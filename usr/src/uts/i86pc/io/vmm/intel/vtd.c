@@ -53,7 +53,7 @@ __FBSDID("$FreeBSD$");
  * Architecture Spec, September 2008.
  */
 
-#define VTD_DRHD_INCLUDE_PCI_ALL(Flags)  (((Flags) >> 0) & 0x1)
+#define	VTD_DRHD_INCLUDE_PCI_ALL(Flags)  (((Flags) >> 0) & 0x1)
 
 /* Section 10.4 "Register Descriptions" */
 struct vtdmap {
@@ -105,14 +105,14 @@ struct vtdmap {
 #define	VTD_PTE_SUPERPAGE	(1UL << 7)
 #define	VTD_PTE_ADDR_M		(0x000FFFFFFFFFF000UL)
 
-#define VTD_RID2IDX(rid)	(((rid) & 0xff) * 2)
+#define	VTD_RID2IDX(rid)	(((rid) & 0xff) * 2)
 
 struct domain {
 	uint64_t	*ptp;		/* first level page table page */
 	int		pt_levels;	/* number of page table levels */
 	int		addrwidth;	/* 'AW' field in context entry */
 	int		spsmask;	/* supported super page sizes */
-	u_int		id;		/* domain id */
+	uint_t		id;		/* domain id */
 	vm_paddr_t	maxaddr;	/* highest address to be mapped */
 	SLIST_ENTRY(domain) next;
 };
@@ -129,8 +129,8 @@ typedef int			(*drhd_ident_func_t)(void);
 static dev_info_t	*vtddips[DRHD_MAX_UNITS];
 #endif
 
-static uint64_t root_table[PAGE_SIZE / sizeof(uint64_t)] __aligned(4096);
-static uint64_t ctx_tables[256][PAGE_SIZE / sizeof(uint64_t)] __aligned(4096);
+static uint64_t root_table[PAGE_SIZE / sizeof (uint64_t)] __aligned(4096);
+static uint64_t ctx_tables[256][PAGE_SIZE / sizeof (uint64_t)] __aligned(4096);
 
 static MALLOC_DEFINE(M_VTD, "vtd", "vtd");
 
@@ -161,10 +161,10 @@ vtd_max_domains(struct vtdmap *vtdmap)
 	}
 }
 
-static u_int
+static uint_t
 domain_id(void)
 {
-	u_int id;
+	uint_t id;
 	struct domain *dom;
 
 	/* Skip domain id 0 - it is reserved when Caching Mode field is set */
@@ -186,7 +186,7 @@ domain_id(void)
 static struct vtdmap *
 vtd_device_scope(uint16_t rid)
 {
-	int i, remaining, pathremaining;
+	int i, remaining, pathrem;
 	char *end, *pathend;
 	struct vtdmap *vtdmap;
 	ACPI_DMAR_HARDWARE_UNIT *drhd;
@@ -199,21 +199,23 @@ vtd_device_scope(uint16_t rid)
 		if (VTD_DRHD_INCLUDE_PCI_ALL(drhd->Flags)) {
 			/*
 			 * From Intel VT-d arch spec, version 3.0:
-			 * If a DRHD structure with INCLUDE_PCI_ALL flag Set is reported
-			 * for a Segment, it must be enumerated by BIOS after all other
-			 * DRHD structures for the same Segment.
+			 * If a DRHD structure with INCLUDE_PCI_ALL flag Set is
+			 * reported for a Segment, it must be enumerated by BIOS
+			 * after all other DRHD structures for the same Segment.
 			 */
 			vtdmap = vtdmaps[i];
-			return(vtdmap);
+			return (vtdmap);
 		}
 
 		end = (char *)drhd + drhd->Header.Length;
-		remaining = drhd->Header.Length - sizeof(ACPI_DMAR_HARDWARE_UNIT);
-		while (remaining > sizeof(ACPI_DMAR_DEVICE_SCOPE)) {
-			device_scope = (ACPI_DMAR_DEVICE_SCOPE *)(end - remaining);
+		remaining = drhd->Header.Length -
+		    sizeof (ACPI_DMAR_HARDWARE_UNIT);
+		while (remaining > sizeof (ACPI_DMAR_DEVICE_SCOPE)) {
+			device_scope =
+			    (ACPI_DMAR_DEVICE_SCOPE *)(end - remaining);
 			remaining -= device_scope->Length;
 
-			switch (device_scope->EntryType){
+			switch (device_scope->EntryType) {
 				/* 0x01 and 0x02 are PCI device entries */
 				case 0x01:
 				case 0x02:
@@ -226,10 +228,12 @@ vtd_device_scope(uint16_t rid)
 				continue;
 
 			pathend = (char *)device_scope + device_scope->Length;
-			pathremaining = device_scope->Length - sizeof(ACPI_DMAR_DEVICE_SCOPE);
-			while (pathremaining >= sizeof(ACPI_DMAR_PCI_PATH)) {
-				path = (ACPI_DMAR_PCI_PATH *)(pathend - pathremaining);
-				pathremaining -= sizeof(ACPI_DMAR_PCI_PATH);
+			pathrem = device_scope->Length -
+			    sizeof (ACPI_DMAR_DEVICE_SCOPE);
+			while (pathrem >= sizeof (ACPI_DMAR_PCI_PATH)) {
+				path = (ACPI_DMAR_PCI_PATH *)
+				    (pathend - pathrem);
+				pathrem -= sizeof (ACPI_DMAR_PCI_PATH);
 
 				if (PCI_RID2SLOT(rid) != path->Device)
 					continue;
@@ -281,7 +285,7 @@ vtd_iotlb_global_invalidate(struct vtdmap *vtdmap)
 	iotlb_reg = (volatile uint64_t *)((caddr_t)vtdmap + offset + 8);
 
 	*iotlb_reg =  VTD_IIR_IVT | VTD_IIR_IIRG_GLOBAL |
-		      VTD_IIR_DRAIN_READS | VTD_IIR_DRAIN_WRITES;
+	    VTD_IIR_DRAIN_READS | VTD_IIR_DRAIN_WRITES;
 
 	while (1) {
 		val = *iotlb_reg;
@@ -375,7 +379,8 @@ vtd_init(void)
 	 * set vtd.regmap.1.addr=0xfeda0000
 	 */
 	for (units = 0; units < DRHD_MAX_UNITS; units++) {
-		snprintf(envname, sizeof(envname), "vtd.regmap.%d.addr", units);
+		snprintf(envname, sizeof (envname), "vtd.regmap.%d.addr",
+		    units);
 		if (getenv_ulong(envname, &mapaddr) == 0)
 			break;
 		vtdmaps[units] = (struct vtdmap *)PHYS_TO_DMAP(mapaddr);
@@ -392,8 +397,8 @@ vtd_init(void)
 		return (ENXIO);
 
 	end = (char *)dmar + dmar->Header.Length;
-	remaining = dmar->Header.Length - sizeof(ACPI_TABLE_DMAR);
-	while (remaining > sizeof(ACPI_DMAR_HEADER)) {
+	remaining = dmar->Header.Length - sizeof (ACPI_TABLE_DMAR);
+	while (remaining > sizeof (ACPI_DMAR_HEADER)) {
 		hdr = (ACPI_DMAR_HEADER *)(end - remaining);
 		if (hdr->Length > remaining)
 			break;
@@ -431,7 +436,7 @@ skip_dmar:
 	drhd_num = units;
 
 	max_domains = 64 * 1024; /* maximum valid value */
-	for (i = 0; i < drhd_num; i++){
+	for (i = 0; i < drhd_num; i++) {
 		vtdmap = vtdmaps[i];
 
 		if (VTD_CAP_CM(vtdmap->cap) != 0)
@@ -538,13 +543,12 @@ vtd_add_device(void *arg, uint16_t rid)
 
 	if (ctxp[idx] & VTD_CTX_PRESENT) {
 		panic("vtd_add_device: device %x is already owned by "
-		      "domain %d", rid,
-		      (uint16_t)(ctxp[idx + 1] >> 8));
+		    "domain %d", rid, (uint16_t)(ctxp[idx + 1] >> 8));
 	}
 
 	if ((vtdmap = vtd_device_scope(rid)) == NULL)
 		panic("vtd_add_device: device %x is not in scope for "
-		      "any DMA remapping unit", rid);
+		    "any DMA remapping unit", rid);
 
 	/*
 	 * Order is important. The 'present' bit is set only after all fields
@@ -601,7 +605,7 @@ vtd_remove_device(void *arg, uint16_t rid)
 
 static uint64_t
 vtd_update_mapping(void *arg, vm_paddr_t gpa, vm_paddr_t hpa, uint64_t len,
-		   int remove)
+    int remove)
 {
 	struct domain *dom;
 	int i, spshift, ptpshift, ptpindex, nlevels;
@@ -773,10 +777,10 @@ vtd_create_domain(vm_paddr_t maxaddr)
 
 	if (i >= 5) {
 		panic("vtd_create_domain: SAGAW 0x%x does not support AGAW %d",
-		      tmp, agaw);
+		    tmp, agaw);
 	}
 
-	dom = malloc(sizeof(struct domain), M_VTD, M_ZERO | M_WAITOK);
+	dom = malloc(sizeof (struct domain), M_VTD, M_ZERO | M_WAITOK);
 	dom->pt_levels = pt_levels;
 	dom->addrwidth = addrwidth;
 	dom->id = domain_id();

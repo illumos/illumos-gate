@@ -119,7 +119,7 @@ struct vcpu {
 #ifndef __FreeBSD__
 	int		lastloccpu;	/* (o) last host cpu localized to */
 #endif
-	u_int		runblock;	/* (i) block vcpu from run state */
+	uint_t		runblock;	/* (i) block vcpu from run state */
 	int		reqidle;	/* (i) request vcpu to idle */
 	struct vlapic	*vlapic;	/* (i) APIC device model */
 	enum x2apic_state x2apic_state;	/* (i) APIC mode */
@@ -184,7 +184,7 @@ struct vm {
 	struct vpmtmr	*vpmtmr;		/* (i) virtual ACPI PM timer */
 	struct vrtc	*vrtc;			/* (o) virtual RTC */
 	volatile cpuset_t active_cpus;		/* (i) active vcpus */
-	volatile cpuset_t debug_cpus;		/* (i) vcpus stopped for debug */
+	volatile cpuset_t debug_cpus;		/* (i) vcpus stopped for dbg */
 	int		suspend;		/* (i) stop VM execution */
 	volatile cpuset_t suspended_cpus;	/* (i) suspended vcpus */
 	volatile cpuset_t halted_cpus;		/* (x) cpus in a hard halt */
@@ -250,8 +250,8 @@ static struct vmm_ops *ops = &vmm_ops_null;
 
 #define	VMINIT(vm, pmap)		((*ops->vminit)(vm, pmap))
 #define	VMRUN(vmi, vcpu, rip, pmap, evinfo) \
-	((*ops->vmrun)(vmi, vcpu, rip, pmap, evinfo) )
-#define	VMCLEANUP(vmi)			((*ops->vmcleanup)(vmi) )
+	((*ops->vmrun)(vmi, vcpu, rip, pmap, evinfo))
+#define	VMCLEANUP(vmi)			((*ops->vmcleanup)(vmi))
 #define	VMSPACE_ALLOC(min, max)		((*ops->vmspace_alloc)(min, max))
 #define	VMSPACE_FREE(vmspace)		((*ops->vmspace_free)(vmspace))
 
@@ -282,18 +282,12 @@ SYSCTL_NODE(_hw, OID_AUTO, vmm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
  * interrupts disabled.
  */
 static int halt_detection_enabled = 1;
-SYSCTL_INT(_hw_vmm, OID_AUTO, halt_detection, CTLFLAG_RDTUN,
-    &halt_detection_enabled, 0,
-    "Halt VM if all vcpus execute HLT with interrupts disabled");
 
+/* IPI vector used for vcpu notifications */
 static int vmm_ipinum;
-SYSCTL_INT(_hw_vmm, OID_AUTO, ipinum, CTLFLAG_RD, &vmm_ipinum, 0,
-    "IPI vector used for vcpu notifications");
 
+/* Trap into hypervisor on all guest exceptions and reflect them back */
 static int trace_guest_exceptions;
-SYSCTL_INT(_hw_vmm, OID_AUTO, trace_guest_exceptions, CTLFLAG_RDTUN,
-    &trace_guest_exceptions, 0,
-    "Trap into hypervisor on all guest exceptions and reflect them back");
 
 static void vm_free_memmap(struct vm *vm, int ident);
 static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
@@ -523,8 +517,8 @@ vm_init(struct vm *vm, bool create)
 /*
  * The default CPU topology is a single thread per package.
  */
-u_int cores_per_package = 1;
-u_int threads_per_core = 1;
+uint_t cores_per_package = 1;
+uint_t threads_per_core = 1;
 
 int
 vm_create(const char *name, struct vm **retvm)
@@ -546,7 +540,7 @@ vm_create(const char *name, struct vm **retvm)
 	if (vmspace == NULL)
 		return (ENOMEM);
 
-	vm = malloc(sizeof(struct vm), M_VM, M_WAITOK | M_ZERO);
+	vm = malloc(sizeof (struct vm), M_VM, M_WAITOK | M_ZERO);
 	strcpy(vm->name, name);
 	vm->vmspace = vmspace;
 
@@ -590,7 +584,7 @@ vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
 	vm->cores = cores;
 	vm->threads = threads;
 	vm->maxcpus = VM_MAXCPU;	/* XXX temp to keep code working */
-	return(0);
+	return (0);
 }
 
 static void
@@ -837,7 +831,7 @@ vm_free_memseg(struct vm *vm, int ident)
 	seg = &vm->mem_segs[ident];
 	if (seg->object != NULL) {
 		vm_object_deallocate(seg->object);
-		bzero(seg, sizeof(struct mem_seg));
+		bzero(seg, sizeof (struct mem_seg));
 	}
 }
 
@@ -954,7 +948,7 @@ vm_free_memmap(struct vm *vm, int ident)
 		    mm->gpa + mm->len);
 		KASSERT(error == KERN_SUCCESS, ("%s: vm_map_remove error %d",
 		    __func__, error));
-		bzero(mm, sizeof(struct mem_map));
+		bzero(mm, sizeof (struct mem_map));
 	}
 }
 
@@ -1025,7 +1019,7 @@ vm_iommu_modify(struct vm *vm, bool map)
 		gpa = mm->gpa;
 		while (gpa < mm->gpa + mm->len) {
 			vp = vm_gpa_hold(vm, -1, gpa, PAGE_SIZE, VM_PROT_WRITE,
-					 &cookie);
+			    &cookie);
 			KASSERT(vp != NULL, ("vm(%s) could not map gpa %lx",
 			    vm_name(vm), gpa));
 
@@ -1065,21 +1059,12 @@ vm_iommu_modify(struct vm *vm, bool map)
 #define	vm_iommu_unmap(vm)	vm_iommu_modify((vm), false)
 #define	vm_iommu_map(vm)	vm_iommu_modify((vm), true)
 
-#ifdef __FreeBSD__
-int
-vm_unassign_pptdev(struct vm *vm, int bus, int slot, int func)
-#else
 int
 vm_unassign_pptdev(struct vm *vm, int pptfd)
-#endif /* __FreeBSD__ */
 {
 	int error;
 
-#ifdef __FreeBSD__
-	error = ppt_unassign_device(vm, bus, slot, func);
-#else
 	error = ppt_unassign_device(vm, pptfd);
-#endif /* __FreeBSD__ */
 	if (error)
 		return (error);
 
@@ -1089,13 +1074,8 @@ vm_unassign_pptdev(struct vm *vm, int pptfd)
 	return (0);
 }
 
-#ifdef __FreeBSD__
-int
-vm_assign_pptdev(struct vm *vm, int bus, int slot, int func)
-#else
 int
 vm_assign_pptdev(struct vm *vm, int pptfd)
-#endif /* __FreeBSD__ */
 {
 	int error;
 	vm_paddr_t maxaddr;
@@ -1111,17 +1091,13 @@ vm_assign_pptdev(struct vm *vm, int pptfd)
 		vm_iommu_map(vm);
 	}
 
-#ifdef __FreeBSD__
-	error = ppt_assign_device(vm, bus, slot, func);
-#else
 	error = ppt_assign_device(vm, pptfd);
-#endif /* __FreeBSD__ */
 	return (error);
 }
 
 void *
 vm_gpa_hold(struct vm *vm, int vcpuid, vm_paddr_t gpa, size_t len, int reqprot,
-	    void **cookie)
+    void **cookie)
 {
 	int i, count, pageoff;
 	struct mem_map *mm;
@@ -1244,8 +1220,7 @@ is_segment_register(int reg)
 }
 
 int
-vm_get_seg_desc(struct vm *vm, int vcpu, int reg,
-		struct seg_desc *desc)
+vm_get_seg_desc(struct vm *vm, int vcpu, int reg, struct seg_desc *desc)
 {
 
 	if (vcpu < 0 || vcpu >= vm->maxcpus)
@@ -1258,8 +1233,7 @@ vm_get_seg_desc(struct vm *vm, int vcpu, int reg,
 }
 
 int
-vm_set_seg_desc(struct vm *vm, int vcpu, int reg,
-		struct seg_desc *desc)
+vm_set_seg_desc(struct vm *vm, int vcpu, int reg, struct seg_desc *desc)
 {
 	if (vcpu < 0 || vcpu >= vm->maxcpus)
 		return (EINVAL);
@@ -3264,7 +3238,7 @@ vm_copy_teardown(struct vm *vm, int vcpuid, struct vm_copyinfo *copyinfo,
 		if (copyinfo[idx].cookie != NULL)
 			vm_gpa_release(copyinfo[idx].cookie);
 	}
-	bzero(copyinfo, num_copyinfo * sizeof(struct vm_copyinfo));
+	bzero(copyinfo, num_copyinfo * sizeof (struct vm_copyinfo));
 }
 
 int
@@ -3277,7 +3251,7 @@ vm_copy_setup(struct vm *vm, int vcpuid, struct vm_guest_paging *paging,
 	void *hva, *cookie;
 	uint64_t gpa;
 
-	bzero(copyinfo, sizeof(struct vm_copyinfo) * num_copyinfo);
+	bzero(copyinfo, sizeof (struct vm_copyinfo) * num_copyinfo);
 
 	nused = 0;
 	remaining = len;

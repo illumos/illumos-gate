@@ -28,8 +28,8 @@
  * $FreeBSD$
  */
 
-#ifndef _SVM_H_
-#define _SVM_H_
+#ifndef	_SVM_H_
+#define	_SVM_H_
 
 /*
  * Guest register state that is saved outside the VMCB.

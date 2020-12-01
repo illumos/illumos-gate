@@ -40,15 +40,9 @@ __FBSDID("$FreeBSD$");
 
 #include "npt.h"
 
-SYSCTL_DECL(_hw_vmm);
-SYSCTL_NODE(_hw_vmm, OID_AUTO, npt, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
-    NULL);
-
 static int npt_flags;
-SYSCTL_INT(_hw_vmm_npt, OID_AUTO, pmap_flags, CTLFLAG_RD,
-	&npt_flags, 0, NULL);
 
-#define NPT_IPIMASK	0xFF
+#define	NPT_IPIMASK	0xFF
 
 /*
  * AMD nested page table init.

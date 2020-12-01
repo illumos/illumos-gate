@@ -53,7 +53,7 @@ static struct vmm_stat_type *vsttab[MAX_VMM_STAT_ELEMS];
 
 static MALLOC_DEFINE(M_VMM_STAT, "vmm stat", "vmm stat");
 
-#define	vst_size	((size_t)vst_num_elems * sizeof(uint64_t))
+#define	vst_size	((size_t)vst_num_elems * sizeof (uint64_t))
 
 void
 vmm_stat_register(void *arg)
@@ -137,7 +137,7 @@ vmm_stat_desc_copy(int index, char *buf, int bufsize)
 		if (index >= vst->index && index < vst->index + vst->nelems) {
 			if (vst->nelems > 1) {
 				snprintf(buf, bufsize, "%s[%d]",
-					 vst->desc, index - vst->index);
+				    vst->desc, index - vst->index);
 			} else {
 				strlcpy(buf, vst->desc, bufsize);
 			}

@@ -46,7 +46,7 @@
 
 struct svm_softc;
 
-#define BIT(n)			(1ULL << n)
+#define	BIT(n)			(1ULL << n)
 
 /*
  * Secure Virtual Machine: AMD64 Programmer's Manual Vol2, Chapter 15
@@ -186,11 +186,11 @@ struct svm_softc;
  * EXITINTINFO, Interrupt exit info for all intrecepts.
  * Section 15.7.2, Intercepts during IDT Interrupt Delivery.
  */
-#define VMCB_EXITINTINFO_VECTOR(x)	((x) & 0xFF)
-#define VMCB_EXITINTINFO_TYPE(x)	((x) & (0x7 << 8))
-#define VMCB_EXITINTINFO_EC_VALID(x)	(((x) & BIT(11)) != 0)
-#define VMCB_EXITINTINFO_VALID(x)	(((x) & BIT(31)) != 0)
-#define VMCB_EXITINTINFO_EC(x)		(((x) >> 32) & 0xFFFFFFFF)
+#define	VMCB_EXITINTINFO_VECTOR(x)	((x) & 0xFF)
+#define	VMCB_EXITINTINFO_TYPE(x)	((x) & (0x7 << 8))
+#define	VMCB_EXITINTINFO_EC_VALID(x)	(((x) & BIT(11)) != 0)
+#define	VMCB_EXITINTINFO_VALID(x)	(((x) & BIT(31)) != 0)
+#define	VMCB_EXITINTINFO_EC(x)		(((x) >> 32) & 0xFFFFFFFF)
 
 /* Offset of various VMCB fields. */
 #define	VMCB_OFF_CTRL(x)		(x)
@@ -229,7 +229,7 @@ struct vmcb_segment {
 	uint32_t	limit;
 	uint64_t	base;
 };
-CTASSERT(sizeof(struct vmcb_segment) == 16);
+CTASSERT(sizeof (struct vmcb_segment) == 16);
 
 /* Convert to/from vmcb segment access to generic (VMX) access */
 #define	VMCB_ATTR2ACCESS(attr)	((((attr) & 0xf00) << 4) | ((attr) & 0xff))
@@ -313,7 +313,7 @@ struct vmcb_ctrl {
 	uint64_t vmsa_pa;	/* 0x108: VMSA pointer */
 	uint64_t _pad8[94];	/* 0x110-0x3FF: Reserved */
 };
-CTASSERT(sizeof(struct vmcb_ctrl) == 1024);
+CTASSERT(sizeof (struct vmcb_ctrl) == 1024);
 CTASSERT(offsetof(struct vmcb_ctrl, vmsa_pa) == 0x108);
 
 struct vmcb_state {
@@ -361,7 +361,7 @@ struct vmcb_state {
 	uint64_t int_to;		/* 0x290 */
 	uint64_t _pad7[301];		/* Reserved up to end of VMCB */
 };
-CTASSERT(sizeof(struct vmcb_state) == 0xC00);
+CTASSERT(sizeof (struct vmcb_state) == 0xC00);
 CTASSERT(offsetof(struct vmcb_state, int_to) == 0x290);
 
 /*
@@ -377,7 +377,7 @@ struct vmcb {
 	struct vmcb_ctrl ctrl;
 	struct vmcb_state state;
 };
-CTASSERT(sizeof(struct vmcb) == PAGE_SIZE);
+CTASSERT(sizeof (struct vmcb) == PAGE_SIZE);
 CTASSERT(offsetof(struct vmcb, state) == 0x400);
 
 struct vmcb_segment *vmcb_segptr(struct vmcb *vmcb, int type);

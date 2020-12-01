@@ -58,6 +58,7 @@
  * We modify %rsp to point to the 'vmxctx' so we can use it to restore
  * host context in case of an error with 'vmlaunch' or 'vmresume'.
  */
+/* BEGIN CSTYLED */
 #define	VMX_GUEST_RESTORE						\
 	movq	VMXCTX_GUEST_CR2(%rdi),%rsi;				\
 	movq	%rsi,%cr2;						\
@@ -99,6 +100,7 @@
 	movq	%rbx, VMXCTX_GUEST_CR2(%rdi);				\
 	movq	VMXSTK_TMPRDI(%rsp), %rdx;				\
 	movq	%rdx, VMXCTX_GUEST_RDI(%rdi);
+/* END CSTYLED */
 
 
 /*

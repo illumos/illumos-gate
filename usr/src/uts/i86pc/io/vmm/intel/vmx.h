@@ -106,7 +106,7 @@ struct vmxstate {
 struct apic_page {
 	uint32_t reg[PAGE_SIZE / 4];
 };
-CTASSERT(sizeof(struct apic_page) == PAGE_SIZE);
+CTASSERT(sizeof (struct apic_page) == PAGE_SIZE);
 
 /* Posted Interrupt Descriptor (described in section 29.6 of the Intel SDM) */
 struct pir_desc {
@@ -114,7 +114,7 @@ struct pir_desc {
 	uint64_t	pending;
 	uint64_t	unused[3];
 } __aligned(64);
-CTASSERT(sizeof(struct pir_desc) == 64);
+CTASSERT(sizeof (struct pir_desc) == 64);
 
 /* Index into the 'guest_msrs[]' array */
 enum {

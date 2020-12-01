@@ -39,33 +39,34 @@
 #endif
 
 #define	VCPU_CTR0(vm, vcpuid, format)					\
-CTR2(KTR_VMM, "vm %s[%d]: " format, vm_name((vm)), (vcpuid))
+	CTR2(KTR_VMM, "vm %s[%d]: " format, vm_name((vm)), (vcpuid))
 
 #define	VCPU_CTR1(vm, vcpuid, format, p1)				\
-CTR3(KTR_VMM, "vm %s[%d]: " format, vm_name((vm)), (vcpuid), (p1))
+	CTR3(KTR_VMM, "vm %s[%d]: " format, vm_name((vm)), (vcpuid), (p1))
 
 #define	VCPU_CTR2(vm, vcpuid, format, p1, p2)				\
-CTR4(KTR_VMM, "vm %s[%d]: " format, vm_name((vm)), (vcpuid), (p1), (p2))
+	CTR4(KTR_VMM, "vm %s[%d]: " format, vm_name((vm)), (vcpuid), (p1), (p2))
 
 #define	VCPU_CTR3(vm, vcpuid, format, p1, p2, p3)			\
-CTR5(KTR_VMM, "vm %s[%d]: " format, vm_name((vm)), (vcpuid), (p1), (p2), (p3))
+	CTR5(KTR_VMM, "vm %s[%d]: " format, vm_name((vm)), (vcpuid),	\
+	(p1), (p2), (p3))
 
 #define	VCPU_CTR4(vm, vcpuid, format, p1, p2, p3, p4)			\
-CTR6(KTR_VMM, "vm %s[%d]: " format, vm_name((vm)), (vcpuid),		\
-    (p1), (p2), (p3), (p4))
+	CTR6(KTR_VMM, "vm %s[%d]: " format, vm_name((vm)), (vcpuid),	\
+	(p1), (p2), (p3), (p4))
 
 #define	VM_CTR0(vm, format)						\
-CTR1(KTR_VMM, "vm %s: " format, vm_name((vm)))
+	CTR1(KTR_VMM, "vm %s: " format, vm_name((vm)))
 
 #define	VM_CTR1(vm, format, p1)						\
-CTR2(KTR_VMM, "vm %s: " format, vm_name((vm)), (p1))
+	CTR2(KTR_VMM, "vm %s: " format, vm_name((vm)), (p1))
 
 #define	VM_CTR2(vm, format, p1, p2)					\
-CTR3(KTR_VMM, "vm %s: " format, vm_name((vm)), (p1), (p2))
+	CTR3(KTR_VMM, "vm %s: " format, vm_name((vm)), (p1), (p2))
 
 #define	VM_CTR3(vm, format, p1, p2, p3)					\
-CTR4(KTR_VMM, "vm %s: " format, vm_name((vm)), (p1), (p2), (p3))
+	CTR4(KTR_VMM, "vm %s: " format, vm_name((vm)), (p1), (p2), (p3))
 
 #define	VM_CTR4(vm, format, p1, p2, p3, p4)				\
-CTR5(KTR_VMM, "vm %s: " format, vm_name((vm)), (p1), (p2), (p3), (p4))
+	CTR5(KTR_VMM, "vm %s: " format, vm_name((vm)), (p1), (p2), (p3), (p4))
 #endif

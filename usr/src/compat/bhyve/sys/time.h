@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2013 Pluribus Networks Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _COMPAT_FREEBSD_SYS_TIME_H_
@@ -49,6 +50,17 @@ binuptime(struct bintime *bt)
 	(((a)->sec == (b)->sec) ?					\
 	    ((a)->frac cmp (b)->frac) :					\
 	    ((a)->sec cmp (b)->sec))
+
+/*
+ * The bintime_cmp() macro is problematic for a couple reasons:
+ * 1. Bearing a lowercase name suggests it is a function rather than a macro.
+ * 2. Placing the comparison operator as the last argument runs afoul of our
+ *    cstyle rules, unlike cases such as VERIFY3*().
+ *
+ * To remedy these issues in illumos bhyve, we provide a slightly modified
+ * version which addresses both problems.
+ */
+#define	BINTIME_CMP(a, cmp, b)	bintime_cmp((a), (b), cmp)
 
 #define SBT_1S  ((sbintime_t)1 << 32)
 #define SBT_1M  (SBT_1S * 60)

@@ -88,8 +88,6 @@ SYSCTL_NODE(_hw_vmm, OID_AUTO, ept, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
 static int ept_enable_ad_bits;
 
 static int ept_pmap_flags;
-SYSCTL_INT(_hw_vmm_ept, OID_AUTO, pmap_flags, CTLFLAG_RD,
-    &ept_pmap_flags, 0, NULL);
 
 int
 ept_init(int ipinum)
@@ -136,43 +134,8 @@ ept_init(int ipinum)
 	return (0);
 }
 
-#if 0
-static void
-ept_dump(uint64_t *ptp, int nlevels)
-{
-	int i, t, tabs;
-	uint64_t *ptpnext, ptpval;
-
-	if (--nlevels < 0)
-		return;
-
-	tabs = 3 - nlevels;
-	for (t = 0; t < tabs; t++)
-		printf("\t");
-	printf("PTP = %p\n", ptp);
-
-	for (i = 0; i < 512; i++) {
-		ptpval = ptp[i];
-
-		if (ptpval == 0)
-			continue;
-
-		for (t = 0; t < tabs; t++)
-			printf("\t");
-		printf("%3d 0x%016lx\n", i, ptpval);
-
-		if (nlevels != 0 && (ptpval & EPT_PG_SUPERPAGE) == 0) {
-			ptpnext = (uint64_t *)
-				  PHYS_TO_DMAP(ptpval & EPT_ADDR_MASK);
-			ept_dump(ptpnext, nlevels);
-		}
-	}
-}
-#endif
-
-
 void
-ept_invalidate_mappings(u_long eptp)
+ept_invalidate_mappings(ulong_t eptp)
 {
 	hma_vmx_invept_allcpus((uintptr_t)eptp);
 }

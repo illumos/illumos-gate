@@ -48,7 +48,7 @@ struct vm_object;
 
 int		vmm_mem_init(void);
 struct vm_object *vmm_mmio_alloc(struct vmspace *, vm_paddr_t gpa, size_t len,
-				 vm_paddr_t hpa);
+    vm_paddr_t hpa);
 void		vmm_mmio_free(struct vmspace *, vm_paddr_t gpa, size_t size);
 vm_paddr_t	vmm_mem_maxaddr(void);
 

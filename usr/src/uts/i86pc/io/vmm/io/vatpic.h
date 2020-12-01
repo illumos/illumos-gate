@@ -49,7 +49,8 @@ int vatpic_elc_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
 int vatpic_assert_irq(struct vm *vm, int irq);
 int vatpic_deassert_irq(struct vm *vm, int irq);
 int vatpic_pulse_irq(struct vm *vm, int irq);
-int vatpic_set_irq_trigger(struct vm *vm, int irq, enum vm_intr_trigger trigger);
+int vatpic_set_irq_trigger(struct vm *vm, int irq,
+    enum vm_intr_trigger trigger);
 
 void vatpic_pending_intr(struct vm *vm, int *vecptr);
 void vatpic_intr_accepted(struct vm *vm, int vector);

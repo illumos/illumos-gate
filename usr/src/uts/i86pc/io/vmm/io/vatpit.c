@@ -174,7 +174,6 @@ vatpit_callout_handler(void *a)
 
 done:
 	VATPIT_UNLOCK(vatpit);
-	return;
 }
 
 static void
@@ -197,7 +196,7 @@ pit_timer_start_cntr0(struct vatpit *vatpit)
 		 * ticks in the past.
 		 */
 		binuptime(&now);
-		if (bintime_cmp(&c->callout_bt, &now, <)) {
+		if (BINTIME_CMP(&c->callout_bt, <, &now)) {
 			c->callout_bt = now;
 			bintime_add(&c->callout_bt, &delta);
 		}
@@ -391,8 +390,9 @@ vatpit_handler(void *arg, bool in, uint16_t port, uint8_t bytes, uint32_t *eax)
 			tmp &= 0xff;
 			*eax = tmp;
 			c->frbyte ^= 1;
-		}  else
+		} else {
 			*eax = c->ol[--c->olbyte];
+		}
 	} else {
 		c->cr[c->crbyte++] = *eax;
 		if (c->crbyte == 2) {
@@ -441,7 +441,7 @@ vatpit_init(struct vm *vm)
 	struct vatpit_callout_arg *arg;
 	int i;
 
-	vatpit = malloc(sizeof(struct vatpit), M_VATPIT, M_WAITOK | M_ZERO);
+	vatpit = malloc(sizeof (struct vatpit), M_VATPIT, M_WAITOK | M_ZERO);
 	vatpit->vm = vm;
 
 	mtx_init(&vatpit->mtx, "vatpit lock", NULL, MTX_SPIN);

@@ -131,8 +131,8 @@ struct vie {
 
 	uint8_t		scale;
 
-	uint8_t		vex_reg:4,		/* vvvv: first source register specifier */
-			vex_pp:2,		/* pp */
+	uint8_t		vex_reg:4,	/* vvvv: first source reg specifier */
+			vex_pp:2,	/* pp */
 			_sparebits:2;
 
 	uint8_t		_sparebytes[2];
@@ -537,23 +537,25 @@ vie_repeat(struct vie *vie)
 /*
  * Return the status flags that would result from doing (x - y).
  */
+/* BEGIN CSTYLED */
 #define	GETCC(sz)							\
-static u_long								\
+static ulong_t								\
 getcc##sz(uint##sz##_t x, uint##sz##_t y)				\
 {									\
-	u_long rflags;							\
+	ulong_t rflags;							\
 									\
 	__asm __volatile("sub %2,%1; pushfq; popq %0" :			\
 	    "=r" (rflags), "+r" (x) : "m" (y));				\
 	return (rflags);						\
 } struct __hack
+/* END CSTYLED */
 
 GETCC(8);
 GETCC(16);
 GETCC(32);
 GETCC(64);
 
-static u_long
+static ulong_t
 getcc(int opsize, uint64_t x, uint64_t y)
 {
 	KASSERT(opsize == 1 || opsize == 2 || opsize == 4 || opsize == 8,
@@ -572,23 +574,25 @@ getcc(int opsize, uint64_t x, uint64_t y)
 /*
  * Macro creation of functions getaddflags{8,16,32,64}
  */
+/* BEGIN CSTYLED */
 #define	GETADDFLAGS(sz)							\
-static u_long								\
+static ulong_t								\
 getaddflags##sz(uint##sz##_t x, uint##sz##_t y)				\
 {									\
-	u_long rflags;							\
+	ulong_t rflags;							\
 									\
 	__asm __volatile("add %2,%1; pushfq; popq %0" :			\
 	    "=r" (rflags), "+r" (x) : "m" (y));				\
 	return (rflags);						\
 } struct __hack
+/* END CSTYLED */
 
 GETADDFLAGS(8);
 GETADDFLAGS(16);
 GETADDFLAGS(32);
 GETADDFLAGS(64);
 
-static u_long
+static ulong_t
 getaddflags(int opsize, uint64_t x, uint64_t y)
 {
 	KASSERT(opsize == 1 || opsize == 2 || opsize == 4 || opsize == 8,
@@ -607,23 +611,25 @@ getaddflags(int opsize, uint64_t x, uint64_t y)
 /*
  * Return the status flags that would result from doing (x & y).
  */
+/* BEGIN CSTYLED */
 #define	GETANDFLAGS(sz)							\
-static u_long								\
+static ulong_t								\
 getandflags##sz(uint##sz##_t x, uint##sz##_t y)				\
 {									\
-	u_long rflags;							\
+	ulong_t rflags;							\
 									\
 	__asm __volatile("and %2,%1; pushfq; popq %0" :			\
 	    "=r" (rflags), "+r" (x) : "m" (y));				\
 	return (rflags);						\
 } struct __hack
+/* END CSTYLED */
 
 GETANDFLAGS(8);
 GETANDFLAGS(16);
 GETANDFLAGS(32);
 GETANDFLAGS(64);
 
-static u_long
+static ulong_t
 getandflags(int opsize, uint64_t x, uint64_t y)
 {
 	KASSERT(opsize == 1 || opsize == 2 || opsize == 4 || opsize == 8,
@@ -659,8 +665,10 @@ vie_emulate_mov(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 		 */
 		size = 1;	/* override for byte operation */
 		error = vie_read_bytereg(vie, vm, vcpuid, &byte);
-		if (error == 0)
-			error = vie_mmio_write(vie, vm, vcpuid, gpa, byte, size);
+		if (error == 0) {
+			error = vie_mmio_write(vie, vm, vcpuid, gpa, byte,
+			    size);
+		}
 		break;
 	case 0x89:
 		/*
@@ -1021,7 +1029,7 @@ vie_emulate_movs(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 				goto done;
 
 			error = vm_gla2gpa(vm, vcpuid, paging, dstaddr,
-			   PROT_WRITE, &dstgpa, &fault);
+			    PROT_WRITE, &dstgpa, &fault);
 			if (error || fault)
 				goto done;
 
@@ -1190,16 +1198,16 @@ vie_emulate_and(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 		 */
 
 		/* get the first operand */
-                error = vie_mmio_read(vie, vm, vcpuid, gpa, &val1, size);
-                if (error)
+		error = vie_mmio_read(vie, vm, vcpuid, gpa, &val1, size);
+		if (error)
 			break;
 
-                /*
+		/*
 		 * perform the operation with the pre-fetched immediate
 		 * operand and write the result
 		 */
-                result = val1 & vie->immediate;
-                error = vie_mmio_write(vie, vm, vcpuid, gpa, result, size);
+		result = val1 & vie->immediate;
+		error = vie_mmio_write(vie, vm, vcpuid, gpa, result, size);
 		break;
 	default:
 		break;
@@ -1241,9 +1249,9 @@ vie_emulate_or(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 		 * OR reg (ModRM:reg) and mem (ModRM:r/m) and store the
 		 * result in reg.
 		 *
-		 * 0b/r         or r16, r/m16
-		 * 0b/r         or r32, r/m32
-		 * REX.W + 0b/r or r64, r/m64
+		 * 0b/r		or r16, r/m16
+		 * 0b/r		or r32, r/m32
+		 * REX.W + 0b/r	or r64, r/m64
 		 */
 
 		/* get the first operand */
@@ -1277,16 +1285,16 @@ vie_emulate_or(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 		 */
 
 		/* get the first operand */
-                error = vie_mmio_read(vie, vm, vcpuid, gpa, &val1, size);
-                if (error)
+		error = vie_mmio_read(vie, vm, vcpuid, gpa, &val1, size);
+		if (error)
 			break;
 
-                /*
+		/*
 		 * perform the operation with the pre-fetched immediate
 		 * operand and write the result
 		 */
-                result = val1 | vie->immediate;
-                error = vie_mmio_write(vie, vm, vcpuid, gpa, result, size);
+		result = val1 | vie->immediate;
+		error = vie_mmio_write(vie, vm, vcpuid, gpa, result, size);
 		break;
 	default:
 		break;
@@ -1384,7 +1392,7 @@ vie_emulate_cmp(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 			size = 1;
 
 		/* get the first operand */
-                error = vie_mmio_read(vie, vm, vcpuid, gpa, &op1, size);
+		error = vie_mmio_read(vie, vm, vcpuid, gpa, &op1, size);
 		if (error)
 			return (error);
 
@@ -1543,9 +1551,9 @@ vie_emulate_add(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 		/*
 		 * ADD r/m to r and store the result in r
 		 *
-		 * 03/r            ADD r16, r/m16
-		 * 03/r            ADD r32, r/m32
-		 * REX.W + 03/r    ADD r64, r/m64
+		 * 03/r			ADD r16, r/m16
+		 * 03/r			ADD r32, r/m32
+		 * REX.W + 03/r		ADD r64, r/m64
 		 */
 
 		/* get the first operand */
@@ -1598,9 +1606,9 @@ vie_emulate_sub(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 		/*
 		 * SUB r/m from r and store the result in r
 		 *
-		 * 2B/r            SUB r16, r/m16
-		 * 2B/r            SUB r32, r/m32
-		 * REX.W + 2B/r    SUB r64, r/m64
+		 * 2B/r		SUB r16, r/m16
+		 * 2B/r		SUB r32, r/m32
+		 * REX.W + 2B/r	SUB r64, r/m64
 		 */
 
 		/* get the first operand */
@@ -2653,9 +2661,6 @@ _vm_gla2gpa(struct vm *vm, int vcpuid, struct vm_guest_paging *paging,
 	int ptpshift = 0, ptpindex = 0;
 	uint64_t ptpphys;
 	uint64_t *ptpbase = NULL, pte = 0, pgsize = 0;
-#ifdef	__FreeBSD__
-	u_int retries;
-#endif
 	uint32_t *ptpbase32, pte32;
 	void *cookie;
 
@@ -2665,16 +2670,9 @@ _vm_gla2gpa(struct vm *vm, int vcpuid, struct vm_guest_paging *paging,
 	writable = prot & VM_PROT_WRITE;
 	cookie = NULL;
 	retval = 0;
-#ifdef	__FreeBSD__
-	retries = 0;
-#endif
 restart:
 	ptpphys = paging->cr3;		/* root of the page tables */
 	ptp_release(&cookie);
-#ifdef	__FreeBSD__
-	if (retries++ > 0)
-		maybe_yield();
-#endif
 
 	if (vie_canonical_check(paging->cpu_mode, gla)) {
 		/*
@@ -2713,8 +2711,8 @@ restart:
 			    (usermode && (pte32 & PG_U) == 0) ||
 			    (writable && (pte32 & PG_RW) == 0)) {
 				if (!check_only) {
-					pfcode = pf_error_code(usermode, prot, 0,
-					    pte32);
+					pfcode = pf_error_code(usermode, prot,
+					    0, pte32);
 					vm_inject_pf(vm, vcpuid, pfcode, gla);
 				}
 				goto fault;
@@ -2759,7 +2757,7 @@ restart:
 		/* Zero out the lower 5 bits and the upper 32 bits */
 		ptpphys &= 0xffffffe0UL;
 
-		ptpbase = ptp_hold(vm, vcpuid, ptpphys, sizeof(*ptpbase) * 4,
+		ptpbase = ptp_hold(vm, vcpuid, ptpphys, sizeof (*ptpbase) * 4,
 		    &cookie);
 		if (ptpbase == NULL)
 			goto error;
@@ -2816,8 +2814,8 @@ restart:
 		if (nlevels > 0 && (pte & PG_PS) != 0) {
 			if (pgsize > 1 * GB) {
 				if (!check_only) {
-					pfcode = pf_error_code(usermode, prot, 1,
-					    pte);
+					pfcode = pf_error_code(usermode, prot,
+					    1, pte);
 					vm_inject_pf(vm, vcpuid, pfcode, gla);
 				}
 				goto fault;
@@ -2984,8 +2982,8 @@ decode_prefixes(struct vie *vie, enum vm_cpu_mode cpu_mode, int cs_d)
 	/*
 	 * § 2.3.5, "The VEX Prefix", SDM Vol 2.
 	 */
-	if ((cpu_mode == CPU_MODE_64BIT || cpu_mode == CPU_MODE_COMPATIBILITY)
-	    && x == 0xC4) {
+	if ((cpu_mode == CPU_MODE_64BIT ||
+	    cpu_mode == CPU_MODE_COMPATIBILITY) && x == 0xC4) {
 		const struct vie_op *optab;
 
 		/* 3-byte VEX prefix. */
@@ -3420,7 +3418,7 @@ vie_verify_gla(struct vie *vie, struct vm *vm, int cpuid, uint64_t gla)
 		error = vm_get_register(vm, cpuid, vie->base_register, &base);
 		if (error) {
 			printf("verify_gla: error %d getting base reg %d\n",
-				error, vie->base_register);
+			    error, vie->base_register);
 			return (-1);
 		}
 
@@ -3437,7 +3435,7 @@ vie_verify_gla(struct vie *vie, struct vm *vm, int cpuid, uint64_t gla)
 		error = vm_get_register(vm, cpuid, vie->index_register, &idx);
 		if (error) {
 			printf("verify_gla: error %d getting index reg %d\n",
-				error, vie->index_register);
+			    error, vie->index_register);
 			return (-1);
 		}
 	}
@@ -3470,8 +3468,7 @@ vie_verify_gla(struct vie *vie, struct vm *vm, int cpuid, uint64_t gla)
 		error = vm_get_seg_desc(vm, cpuid, seg, &desc);
 		if (error) {
 			printf("verify_gla: error %d getting segment"
-			       " descriptor %d", error,
-			       vie->segment_register);
+			    " descriptor %d", error, vie->segment_register);
 			return (-1);
 		}
 		segbase = desc.base;
@@ -3481,10 +3478,10 @@ vie_verify_gla(struct vie *vie, struct vm *vm, int cpuid, uint64_t gla)
 	gla2 &= size2mask[vie->addrsize];
 	if (gla != gla2) {
 		printf("verify_gla mismatch: segbase(0x%0lx)"
-		       "base(0x%0lx), scale(%d), index(0x%0lx), "
-		       "disp(0x%0lx), gla(0x%0lx), gla2(0x%0lx)\n",
-		       segbase, base, vie->scale, idx, vie->displacement,
-		       gla, gla2);
+		    "base(0x%0lx), scale(%d), index(0x%0lx), "
+		    "disp(0x%0lx), gla(0x%0lx), gla2(0x%0lx)\n",
+		    segbase, base, vie->scale, idx, vie->displacement,
+		    gla, gla2);
 		return (-1);
 	}
 

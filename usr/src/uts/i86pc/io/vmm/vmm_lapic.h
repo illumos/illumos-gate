@@ -45,9 +45,9 @@
 
 struct vm;
 
-bool lapic_msr(u_int num);
-int lapic_rdmsr(struct vm *vm, int cpu, u_int msr, uint64_t *rval);
-int lapic_wrmsr(struct vm *vm, int cpu, u_int msr, uint64_t wval);
+bool lapic_msr(uint_t num);
+int lapic_rdmsr(struct vm *vm, int cpu, uint_t msr, uint64_t *rval);
+int lapic_wrmsr(struct vm *vm, int cpu, uint_t msr, uint64_t wval);
 
 int lapic_mmio_read(struct vm *vm, int cpu, uint64_t gpa, uint64_t *rval,
     int size);

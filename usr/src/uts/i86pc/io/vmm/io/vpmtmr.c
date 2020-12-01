@@ -58,7 +58,7 @@ __FBSDID("$FreeBSD$");
  * This implementation will be 32-bits
  */
 
-#define PMTMR_FREQ	3579545  /* 3.579545MHz */
+#define	PMTMR_FREQ	3579545  /* 3.579545MHz */
 
 struct vpmtmr {
 	struct vm	*vm;
@@ -77,7 +77,7 @@ vpmtmr_init(struct vm *vm)
 	struct vpmtmr *vpmtmr;
 	struct bintime bt;
 
-	vpmtmr = malloc(sizeof(struct vpmtmr), M_VPMTMR, M_WAITOK | M_ZERO);
+	vpmtmr = malloc(sizeof (struct vpmtmr), M_VPMTMR, M_WAITOK | M_ZERO);
 	vpmtmr->vm = vm;
 	vpmtmr->baseuptime = sbinuptime();
 	vpmtmr->baseval = 0;
