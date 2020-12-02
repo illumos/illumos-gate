@@ -3340,7 +3340,14 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 
 		if (cmd == DKIOCGMEDIAINFOEXT) {
 			media_info.dki_pbsize = 1U << lsp->ls_pbshift;
-			size = sizeof (struct dk_minfo_ext);
+			switch (ddi_model_convert_from(flag & FMODELS)) {
+			case DDI_MODEL_ILP32:
+				size = sizeof (struct dk_minfo_ext32);
+				break;
+			default:
+				size = sizeof (struct dk_minfo_ext);
+				break;
+			}
 		} else {
 			size = sizeof (struct dk_minfo);
 		}

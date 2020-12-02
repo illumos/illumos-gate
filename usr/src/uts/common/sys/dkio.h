@@ -356,6 +356,23 @@ struct dk_minfo_ext {
 	uint_t		dki_pbsize;	/* Physical blocksize of media */
 };
 
+#ifdef	_KERNEL
+
+/*
+ * The 32-bit version of the media info API did not end up with a consistent
+ * size in an ILP32 and LP64 interface. While the actual offsets of the members
+ * are the same, the resulting structure size is not.
+ */
+#pragma pack(4)
+struct dk_minfo_ext32 {
+	uint_t		dki_media_type;	/* Media type or profile info */
+	uint_t		dki_lbsize;	/* Logical blocksize of media */
+	diskaddr_t	dki_capacity;	/* Capacity as # of dki_lbsize blks */
+	uint_t		dki_pbsize;	/* Physical blocksize of media */
+};
+#pragma pack()
+#endif
+
 /*
  * Media types or profiles known
  */

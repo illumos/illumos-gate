@@ -72,7 +72,8 @@ $(i386_ONLY)file path=boot/forth/shortcuts.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/support.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/version.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/gptzfsboot group=sys mode=0444
-$(i386_ONLY)file path=boot/illumos.png group=sys mode=0444
+$(i386_ONLY)file path=boot/illumos-brand.png group=sys mode=0444
+$(i386_ONLY)file path=boot/illumos-logo.png group=sys mode=0444
 $(i386_ONLY)file path=boot/isoboot group=sys mode=0444
 $(i386_ONLY)file path=boot/loader group=sys mode=0444
 $(i386_ONLY)file path=boot/loader.help group=sys mode=0444

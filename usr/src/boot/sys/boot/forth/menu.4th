@@ -941,7 +941,7 @@ only forth definitions also menu-infrastructure
 	then
 	menuX !
 
-	menu-box
+	['] menu-box console-iterate
 	at-bl
 ;
 

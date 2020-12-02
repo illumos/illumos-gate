@@ -24090,13 +24090,24 @@ sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
 {
 	struct dk_minfo_ext	mie;
 	int			rval = 0;
+	size_t			len;
 
 	rval = sd_get_media_info_com(dev, &mie.dki_media_type,
 	    &mie.dki_lbsize, &mie.dki_capacity, &mie.dki_pbsize);
 
 	if (rval)
 		return (rval);
-	if (ddi_copyout(&mie, arg, sizeof (struct dk_minfo_ext), flag))
+
+	switch (ddi_model_convert_from(flag & FMODELS)) {
+	case DDI_MODEL_ILP32:
+		len = sizeof (struct dk_minfo_ext32);
+		break;
+	default:
+		len = sizeof (struct dk_minfo_ext);
+		break;
+	}
+
+	if (ddi_copyout(&mie, arg, len, flag))
 		rval = EFAULT;
 	return (rval);
 

@@ -2,7 +2,7 @@
 \ Copyright (c) 2003 Aleksander Fafula <alex@fafula.com>
 \ Copyright (c) 2006-2015 Devin Teske <dteske@FreeBSD.org>
 \ All rights reserved.
-\ 
+\
 \ Redistribution and use in source and binary forms, with or without
 \ modification, are permitted provided that the following conditions
 \ are met:
@@ -11,7 +11,7 @@
 \ 2. Redistributions in binary form must reproduce the above copyright
 \    notice, this list of conditions and the following disclaimer in the
 \    documentation and/or other materials provided with the distribution.
-\ 
+\
 \ THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
 \ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 \ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -23,8 +23,6 @@
 \ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 \ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 \ SUCH DAMAGE.
-\ 
-\ $FreeBSD$
 
 marker task-beastie.4th
 
@@ -40,11 +38,11 @@ variable logoY
 \ This function draws any number of beastie logos at (loader_logo_x,
 \ loader_logo_y) if defined, else (46,4) (to the right of the menu). To choose
 \ your beastie, set the variable `loader_logo' to the respective logo name.
-\ 
+\
 \ NOTE: Each is defined as a logo function in /boot/logo-${loader_logo}.4th
 \ NOTE: If `/boot/logo-${loader_logo}.4th' does not exist or does not define
 \       a `logo' function, no beastie is drawn.
-\ 
+\
 : draw-beastie ( -- ) \ at (loader_logo_x,loader_logo_y), else (46,4)
 
 	s" loader_logo_x" getenv dup -1 <> if
@@ -80,6 +78,10 @@ variable logoY
 			logoX @ logoY @ rot execute
 		else drop then
 	then
+;
+
+: draw-beastie
+	['] draw-beastie console-iterate
 ;
 
 also support-functions

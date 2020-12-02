@@ -1,6 +1,6 @@
 \ Copyright (c) 2006-2015 Devin Teske <dteske@FreeBSD.org>
 \ All rights reserved.
-\ 
+\
 \ Redistribution and use in source and binary forms, with or without
 \ modification, are permitted provided that the following conditions
 \ are met:
@@ -9,7 +9,7 @@
 \ 2. Redistributions in binary form must reproduce the above copyright
 \    notice, this list of conditions and the following disclaimer in the
 \    documentation and/or other materials provided with the distribution.
-\ 
+\
 \ THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
 \ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 \ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -21,8 +21,6 @@
 \ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 \ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 \ SUCH DAMAGE.
-\ 
-\ $FreeBSD$
 
 2 brandX ! 1 brandY ! \ Initialize brand placement defaults
 
@@ -33,6 +31,18 @@
 ;
 
 : brand ( x y -- ) \ "illumos" [wide] logo in B/W (5 rows x 39 columns)
+
+	framebuffer? if
+		s" term-putimage" sfind if
+			\ note, we use 0, 0 for image upper left as origin,
+			\ and 0, 7 for lower right to preserve aspect ratio
+			>r 0 0 0 0 7
+			s" /boot/illumos-brand.png"
+			r> execute if 2drop exit then
+		else
+			drop
+		then
+	then
 
 	s"  _  _  _                               " brand+
 	s" (_)| || | _   _  _ __ ___    ___   ___ " brand+
