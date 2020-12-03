@@ -90,6 +90,38 @@ _putuint(struct xdr *xdr, unsigned i)
 	return (sizeof (int));
 }
 
+static int
+_getint_mem(struct xdr *xdr, int *ip)
+{
+	*ip = *(int *)xdr->xdr_idx;
+	return (sizeof (int));
+}
+
+static int
+_putint_mem(struct xdr *xdr, int i)
+{
+	int *ip = (int *)xdr->xdr_idx;
+
+	*ip = i;
+	return (sizeof (int));
+}
+
+static int
+_getuint_mem(struct xdr *xdr, unsigned *ip)
+{
+	*ip = *(unsigned *)xdr->xdr_idx;
+	return (sizeof (unsigned));
+}
+
+static int
+_putuint_mem(struct xdr *xdr, unsigned i)
+{
+	unsigned *up = (unsigned *)xdr->xdr_idx;
+
+	*up = i;
+	return (sizeof (int));
+}
+
 /*
  * XDR data translations.
  */
@@ -182,8 +214,6 @@ xdr_u_int(xdr_t *xdr, unsigned *ip)
 static bool
 xdr_int64(xdr_t *xdr, int64_t *lp)
 {
-	int hi;
-	unsigned lo;
 	bool rv = false;
 
 	if (xdr->xdr_idx + sizeof (int64_t) > xdr->xdr_buf + xdr->xdr_buf_size)
@@ -192,18 +222,21 @@ xdr_int64(xdr_t *xdr, int64_t *lp)
 	switch (xdr->xdr_op) {
 	case XDR_OP_ENCODE:
 		/* Encode value *lp, store to buf */
-		hi = *lp >> 32;
-		lo = *lp & UINT32_MAX;
-		xdr->xdr_idx += xdr->xdr_putint(xdr, hi);
-		xdr->xdr_idx += xdr->xdr_putint(xdr, lo);
+		if (xdr->xdr_putint == _putint)
+			*(int64_t *)xdr->xdr_idx = htobe64(*lp);
+		else
+			*(int64_t *)xdr->xdr_idx = *lp;
+		xdr->xdr_idx += sizeof (int64_t);
 		rv = true;
 		break;
 
 	case XDR_OP_DECODE:
 		/* Decode buf, return value to *ip */
-		xdr->xdr_idx += xdr->xdr_getint(xdr, &hi);
-		xdr->xdr_idx += xdr->xdr_getuint(xdr, &lo);
-		*lp = (((int64_t)hi) << 32) | lo;
+		if (xdr->xdr_getint == _getint)
+			*lp = be64toh(*(int64_t *)xdr->xdr_idx);
+		else
+			*lp = *(int64_t *)xdr->xdr_idx;
+		xdr->xdr_idx += sizeof (int64_t);
 		rv = true;
 	}
 	return (rv);
@@ -212,7 +245,6 @@ xdr_int64(xdr_t *xdr, int64_t *lp)
 static bool
 xdr_uint64(xdr_t *xdr, uint64_t *lp)
 {
-	unsigned hi, lo;
 	bool rv = false;
 
 	if (xdr->xdr_idx + sizeof (uint64_t) > xdr->xdr_buf + xdr->xdr_buf_size)
@@ -221,18 +253,21 @@ xdr_uint64(xdr_t *xdr, uint64_t *lp)
 	switch (xdr->xdr_op) {
 	case XDR_OP_ENCODE:
 		/* Encode value *ip, store to buf */
-		hi = *lp >> 32;
-		lo = *lp & UINT32_MAX;
-		xdr->xdr_idx += xdr->xdr_putint(xdr, hi);
-		xdr->xdr_idx += xdr->xdr_putint(xdr, lo);
+		if (xdr->xdr_putint == _putint)
+			*(uint64_t *)xdr->xdr_idx = htobe64(*lp);
+		else
+			*(uint64_t *)xdr->xdr_idx = *lp;
+		xdr->xdr_idx += sizeof (uint64_t);
 		rv = true;
 		break;
 
 	case XDR_OP_DECODE:
 		/* Decode buf, return value to *ip */
-		xdr->xdr_idx += xdr->xdr_getuint(xdr, &hi);
-		xdr->xdr_idx += xdr->xdr_getuint(xdr, &lo);
-		*lp = (((uint64_t)hi) << 32) | lo;
+		if (xdr->xdr_getuint == _getuint)
+			*lp = be64toh(*(uint64_t *)xdr->xdr_idx);
+		else
+			*lp = *(uint64_t *)xdr->xdr_idx;
+		xdr->xdr_idx += sizeof (uint64_t);
 		rv = true;
 	}
 	return (rv);
@@ -288,6 +323,10 @@ static bool
 xdr_array(xdr_t *xdr, const unsigned nelem, const xdrproc_t elproc)
 {
 	bool rv = true;
+	unsigned c = nelem;
+
+	if (!xdr_u_int(xdr, &c))
+		return (false);
 
 	for (unsigned i = 0; i < nelem; i++) {
 		if (!elproc(xdr, xdr->xdr_idx))
@@ -1119,15 +1158,19 @@ nvlist_add_common(nvlist_t *nvl, const char *name, data_type_t type,
 	uint8_t *ptr;
 	size_t namelen;
 	int decoded_size, encoded_size;
-	xdr_t xdr;
+	xdr_t xdr = {
+		.xdr_op = XDR_OP_ENCODE,
+		.xdr_putint = _putint_mem,
+		.xdr_putuint = _putuint_mem,
+		.xdr_buf = nvl->nv_data,
+		.xdr_idx = nvl->nv_data,
+		.xdr_buf_size = nvl->nv_size
+	};
 
 	nvs = (nvs_data_t *)nvl->nv_data;
 	if (nvs->nvl_nvflag & NV_UNIQUE_NAME)
 		(void) nvlist_remove(nvl, name, type);
 
-	xdr.xdr_buf = nvl->nv_data;
-	xdr.xdr_idx = nvl->nv_data;
-	xdr.xdr_buf_size = nvl->nv_size;
 	if (!nvlist_size_native(&xdr, &nvl->nv_size))
 		return (EINVAL);
 
@@ -1164,63 +1207,109 @@ nvlist_add_common(nvlist_t *nvl, const char *name, data_type_t type,
 	hp = (nvp_header_t *)nvl->nv_idx;
 	*hp = head;
 	nvl->nv_idx += sizeof (*hp);
-	*(unsigned *)nvl->nv_idx = namelen;
-	nvl->nv_idx += sizeof (unsigned);
-	strlcpy((char *)nvl->nv_idx, name, namelen + 1);
-	nvl->nv_idx += NV_ALIGN4(namelen);
-	*(unsigned *)nvl->nv_idx = type;
-	nvl->nv_idx += sizeof (unsigned);
-	*(unsigned *)nvl->nv_idx = nelem;
-	nvl->nv_idx += sizeof (unsigned);
+
+	xdr.xdr_buf = nvl->nv_data;
+	xdr.xdr_idx = nvl->nv_idx;
+
+	xdr.xdr_idx += xdr.xdr_putuint(&xdr, namelen);
+	strlcpy((char *)xdr.xdr_idx, name, namelen + 1);
+	xdr.xdr_idx += NV_ALIGN4(namelen);
+	xdr.xdr_idx += xdr.xdr_putuint(&xdr, type);
+	xdr.xdr_idx += xdr.xdr_putuint(&xdr, nelem);
 
 	switch (type) {
 	case DATA_TYPE_BOOLEAN:
 		break;
+
 	case DATA_TYPE_BYTE_ARRAY:
 		*(unsigned *)nvl->nv_idx = encoded_size;
 		nvl->nv_idx += sizeof (unsigned);
 		bcopy(data, nvl->nv_idx, nelem);
 		nvl->nv_idx += encoded_size;
 		break;
+
 	case DATA_TYPE_STRING:
 		encoded_size = strlen(data);
-		*(unsigned *)nvl->nv_idx = encoded_size;
-		nvl->nv_idx += sizeof (unsigned);
-		strlcpy((char *)nvl->nv_idx, data, encoded_size + 1);
-		nvl->nv_idx += NV_ALIGN4(encoded_size);
+		xdr.xdr_idx += xdr.xdr_putuint(&xdr, encoded_size);
+		strlcpy((char *)xdr.xdr_idx, data, encoded_size + 1);
+		xdr.xdr_idx += NV_ALIGN4(encoded_size);
 		break;
+
 	case DATA_TYPE_STRING_ARRAY:
 		for (uint32_t i = 0; i < nelem; i++) {
 			encoded_size = strlen(((char **)data)[i]);
-			*(unsigned *)nvl->nv_idx = encoded_size;
-			nvl->nv_idx += sizeof (unsigned);
-			strlcpy((char *)nvl->nv_idx, ((char **)data)[i],
+			xdr.xdr_idx += xdr.xdr_putuint(&xdr, encoded_size);
+			strlcpy((char *)xdr.xdr_idx, ((char **)data)[i],
 			    encoded_size + 1);
-			nvl->nv_idx += NV_ALIGN4(encoded_size);
+			xdr.xdr_idx += NV_ALIGN4(encoded_size);
 		}
 		break;
+
 	case DATA_TYPE_BYTE:
 	case DATA_TYPE_INT8:
 	case DATA_TYPE_UINT8:
+		xdr_char(&xdr, (char *)data);
+		break;
+
 	case DATA_TYPE_INT8_ARRAY:
 	case DATA_TYPE_UINT8_ARRAY:
-		for (uint32_t i = 0; i < nelem; i++) {
-			*(unsigned *)nvl->nv_idx = ((uint8_t *)data)[i];
-			nvl->nv_idx += sizeof (unsigned);
-		}
+		xdr_array(&xdr, nelem, (xdrproc_t)xdr_char);
 		break;
+
 	case DATA_TYPE_INT16:
+		xdr_short(&xdr, (short *)data);
+		break;
+
 	case DATA_TYPE_UINT16:
+		xdr_u_short(&xdr, (unsigned short *)data);
+		break;
+
 	case DATA_TYPE_INT16_ARRAY:
+		xdr_array(&xdr, nelem, (xdrproc_t)xdr_short);
+		break;
+
 	case DATA_TYPE_UINT16_ARRAY:
-		for (uint32_t i = 0; i < nelem; i++) {
-			*(unsigned *)nvl->nv_idx = ((uint16_t *)data)[i];
-			nvl->nv_idx += sizeof (unsigned);
-		}
+		xdr_array(&xdr, nelem, (xdrproc_t)xdr_u_short);
 		break;
+
+	case DATA_TYPE_BOOLEAN_VALUE:
+	case DATA_TYPE_INT32:
+		xdr_int(&xdr, (int *)data);
+		break;
+
+	case DATA_TYPE_UINT32:
+		xdr_u_int(&xdr, (unsigned int *)data);
+		break;
+
+	case DATA_TYPE_BOOLEAN_ARRAY:
+	case DATA_TYPE_INT32_ARRAY:
+		xdr_array(&xdr, nelem, (xdrproc_t)xdr_int);
+		break;
+
+	case DATA_TYPE_UINT32_ARRAY:
+		xdr_array(&xdr, nelem, (xdrproc_t)xdr_u_int);
+		break;
+
+	case DATA_TYPE_INT64:
+		xdr_int64(&xdr, (int64_t *)data);
+		break;
+
+	case DATA_TYPE_UINT64:
+		xdr_uint64(&xdr, (uint64_t *)data);
+		break;
+
+	case DATA_TYPE_INT64_ARRAY:
+		xdr_array(&xdr, nelem, (xdrproc_t)xdr_int64);
+		break;
+
+	case DATA_TYPE_UINT64_ARRAY:
+		xdr_array(&xdr, nelem, (xdrproc_t)xdr_uint64);
+		break;
+
 	case DATA_TYPE_NVLIST:
-		bcopy(((nvlist_t *)data)->nv_data, nvl->nv_idx, encoded_size);
+		bcopy(((nvlist_t *)data)->nv_data, xdr.xdr_idx, encoded_size);
 		break;
+
 	case DATA_TYPE_NVLIST_ARRAY: {
 		uint8_t *buf = nvl->nv_idx;
 		size_t size;
@@ -1239,8 +1328,9 @@ nvlist_add_common(nvlist_t *nvl, const char *name, data_type_t type,
 		}
 		break;
 	}
+
 	default:
-		bcopy(data, nvl->nv_idx, encoded_size);
+		bcopy(data, xdr.xdr_idx, encoded_size);
 	}
 
 	nvl->nv_size += head.encoded_size;
@@ -1464,9 +1554,15 @@ nvpair_print(nvp_header_t *nvp, unsigned int indent)
 	nv_string_t *nvp_name;
 	nv_pair_data_t *nvp_data;
 	nvlist_t nvlist;
-	xdr_t xdr;
-	unsigned i, j, u;
-	uint64_t u64;
+	unsigned i, j;
+	xdr_t xdr = {
+		.xdr_op = XDR_OP_DECODE,
+		.xdr_getint = _getint_mem,
+		.xdr_getuint = _getuint_mem,
+		.xdr_buf = (const uint8_t *)nvp,
+		.xdr_idx = NULL,
+		.xdr_buf_size = nvp->encoded_size
+	};
 
 	nvp_name = (nv_string_t *)((uintptr_t)nvp + sizeof (*nvp));
 	nvp_data = (nv_pair_data_t *)
@@ -1478,32 +1574,59 @@ nvpair_print(nvp_header_t *nvp, unsigned int indent)
 	printf("%s [%d] %.*s", typenames[nvp_data->nv_type],
 	    nvp_data->nv_nelem, nvp_name->nv_size, nvp_name->nv_data);
 
+	xdr.xdr_idx = nvp_data->nv_data;
 	switch (nvp_data->nv_type) {
 	case DATA_TYPE_BYTE:
 	case DATA_TYPE_INT8:
-	case DATA_TYPE_UINT8:
-		bcopy(nvp_data->nv_data, &u, sizeof (u));
-		printf(" = 0x%x\n", (unsigned char)u);
+	case DATA_TYPE_UINT8: {
+		char c;
+
+		if (xdr_char(&xdr, &c))
+			printf(" = 0x%x\n", c);
 		break;
+	}
 
 	case DATA_TYPE_INT16:
-	case DATA_TYPE_UINT16:
-		bcopy(nvp_data->nv_data, &u, sizeof (u));
-		printf(" = 0x%hx\n", (unsigned short)u);
+	case DATA_TYPE_UINT16: {
+		unsigned short u;
+
+		if (xdr_u_short(&xdr, &u))
+			printf(" = 0x%hx\n", u);
 		break;
+	}
 
 	case DATA_TYPE_BOOLEAN_VALUE:
 	case DATA_TYPE_INT32:
-	case DATA_TYPE_UINT32:
-		bcopy(nvp_data->nv_data, &u, sizeof (u));
-		printf(" = 0x%x\n", u);
+	case DATA_TYPE_UINT32: {
+		unsigned u;
+
+		if (xdr_u_int(&xdr, &u))
+			printf(" = 0x%x\n", u);
 		break;
+	}
 
 	case DATA_TYPE_INT64:
-	case DATA_TYPE_UINT64:
-		bcopy(nvp_data->nv_data, &u64, sizeof (u64));
-		printf(" = 0x%jx\n", (uintmax_t)u64);
+	case DATA_TYPE_UINT64: {
+		uint64_t u;
+
+		if (xdr_uint64(&xdr, &u))
+			printf(" = 0x%jx\n", (uintmax_t)u);
 		break;
+	}
+
+	case DATA_TYPE_INT64_ARRAY:
+	case DATA_TYPE_UINT64_ARRAY: {
+		uint64_t *u;
+		if (xdr_array(&xdr, nvp_data->nv_nelem,
+		    (xdrproc_t)xdr_uint64)) {
+			u = (uint64_t *)(nvp_data->nv_data + sizeof (unsigned));
+			for (i = 0; i < nvp_data->nv_nelem; i++)
+				printf(" [%u] = 0x%jx", i, (uintmax_t)u[i]);
+			printf("\n");
+		}
+
+		break;
+	}
 
 	case DATA_TYPE_STRING:
 	case DATA_TYPE_STRING_ARRAY:
