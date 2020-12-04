@@ -24,6 +24,7 @@
 #include <libctf_impl.h>
 #include <assert.h>
 #include <gelf.h>
+#include <sys/list.h>
 
 static ctf_convert_f ctf_converters[] = {
 	ctf_dwarf_convert
@@ -209,17 +210,29 @@ ctf_convert_init(int *errp)
 	cch->cch_batchsize = CTF_CONVERT_DEFAULT_BATCHSIZE;
 	cch->cch_warncb = NULL;
 	cch->cch_warncb_arg = NULL;
+	list_create(&cch->cch_nodebug, sizeof (ctf_convert_filelist_t),
+	    offsetof(ctf_convert_filelist_t, ccf_node));
 
 	return (cch);
+}
+
+static void
+ctf_convert_fini_filelist(ctf_convert_filelist_t *ccf)
+{
+	ctf_strfree(ccf->ccf_basename);
+	ctf_free(ccf, sizeof (ctf_convert_filelist_t));
 }
 
 void
 ctf_convert_fini(ctf_convert_t *cch)
 {
-	if (cch->cch_label != NULL) {
-		size_t len = strlen(cch->cch_label) + 1;
-		ctf_free(cch->cch_label, len);
-	}
+	ctf_convert_filelist_t *ccf;
+
+	ctf_strfree(cch->cch_label);
+	while ((ccf = list_remove_head(&cch->cch_nodebug)) != NULL)
+		ctf_convert_fini_filelist(ccf);
+	list_destroy(&cch->cch_nodebug);
+
 	ctf_free(cch, sizeof (struct ctf_convert_handle));
 }
 
@@ -262,11 +275,7 @@ ctf_convert_set_label(ctf_convert_t *cch, const char *label)
 	if (dup == NULL)
 		return (ENOMEM);
 
-	if (cch->cch_label != NULL) {
-		size_t len = strlen(cch->cch_label) + 1;
-		ctf_free(cch->cch_label, len);
-	}
-
+	ctf_strfree(cch->cch_label);
 	cch->cch_label = dup;
 	return (0);
 }
@@ -276,6 +285,28 @@ ctf_convert_set_warncb(ctf_convert_t *cch, ctf_convert_warn_f cb, void *arg)
 {
 	cch->cch_warncb = cb;
 	cch->cch_warncb_arg = arg;
+	return (0);
+}
+
+int
+ctf_convert_add_ignore(ctf_convert_t *cch, const char *basename)
+{
+	ctf_convert_filelist_t *ccf;
+
+	if (strchr(basename, '/') != NULL)
+		return (EINVAL);
+
+	ccf = ctf_alloc(sizeof (ctf_convert_filelist_t));
+	if (ccf == NULL)
+		return (ENOMEM);
+
+	ccf->ccf_basename = ctf_strdup(basename);
+	if (ccf->ccf_basename == NULL) {
+		ctf_free(ccf, sizeof (ctf_convert_filelist_t));
+		return (ENOMEM);
+	}
+	list_insert_tail(&cch->cch_nodebug, ccf);
+
 	return (0);
 }
 

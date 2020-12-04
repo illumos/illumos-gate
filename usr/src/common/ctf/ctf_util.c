@@ -149,6 +149,17 @@ ctf_strdup(const char *s1)
 }
 
 /*
+ * Free a string which was allocated via ctf_alloc()
+ */
+void
+ctf_strfree(char *s)
+{
+	if (s == NULL)
+		return;
+	ctf_free(s, strlen(s) + 1);
+}
+
+/*
  * Store the specified error code into errp if it is non-NULL, and then
  * return NULL for the benefit of the caller.
  */

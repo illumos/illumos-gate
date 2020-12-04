@@ -10,7 +10,7 @@
 .\"
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd December 06, 2020
+.Dd December 07, 2020
 .Dt ctfconvert 1ONBLD
 .Os
 .Sh NAME
@@ -22,6 +22,7 @@
 .Op Fl b Ar batchsize
 .Op Fl j Ar threads
 .Op Fl l Ar label | Fl L Ar labelenv
+.Op Fl M Ar ignorefile
 .Op Fl o Ar outfile
 .Ar ELF_object
 .Sh DESCRIPTION
@@ -89,6 +90,23 @@ Note that if the file contains no debug data in any of the compilation units
 then this flag will cause
 .Nm
 to exit successfully without taking any action, and can mask missing debug data.
+.It Fl M Ar ignorefile
+Allow
+.Ar ELF_object
+to have missing debug data in selected source files.
+The source files to ignore are specified as a list of file basenames (without
+any directory component) in
+.Ar ignorefile .
+Each file should be listed on its own line, separated by a newline.
+It is not possible to encode a file name that contains a newline and any other
+white-space within the line is considered to be part of the file name being
+specified.
+The
+.Sq /
+character may not appear in the file name.
+Empty lines and any line which has a
+.Sq #
+character in the first column are ignored.
 .It Fl b Ar batchsize
 Batch-process this many compilation units from the source file at once (default
 256). This helps to reduce memory usage when processing large objects which

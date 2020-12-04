@@ -25,10 +25,16 @@
 #include <libelf.h>
 #include <libctf.h>
 #include <ctf_impl.h>
+#include <sys/list.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct ctf_convert_filelist {
+	list_node_t ccf_node;
+	char *ccf_basename;
+} ctf_convert_filelist_t;
 
 struct ctf_convert_handle {
 	char *cch_label;
@@ -36,6 +42,7 @@ struct ctf_convert_handle {
 	uint_t cch_nthreads;
 	uint_t cch_batchsize;
 	ctf_convert_warn_f cch_warncb;
+	list_t cch_nodebug;
 	void *cch_warncb_arg;
 };
 

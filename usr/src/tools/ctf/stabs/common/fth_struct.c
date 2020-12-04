@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 /*
  * Used to dump structures and unions in forth mode.
@@ -103,20 +105,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/list.h>
 
 #include "ctf_headers.h"
 #include "forth.h"
-#include "list.h"
 #include "memory.h"
 
 static ctf_id_t	fth_str_curtid;
-static list_t	*fth_str_curmems;
+static list_t	fth_str_curmems;
 
 /*
  * Node type for the member-storage list (fth_str_curmems) built by
  * fth_struct_members()
  */
 typedef struct fth_str_mem {
+	list_node_t	fsm_node;
 	char		*fsm_memname;
 	char		*fsm_format;
 	ctf_id_t	fsm_tid;
@@ -147,6 +150,21 @@ fth_struct_memcmp(void *m1, void *m2)
 }
 
 static void
+fth_slist_add(fth_str_mem_t *mem)
+{
+	fth_str_mem_t *l;
+
+	for (l = list_head(&fth_str_curmems); l != NULL;
+	    l = list_next(&fth_str_curmems, l)) {
+		if (fth_struct_memcmp(l, mem) > 0) {
+			list_insert_before(&fth_str_curmems, l, mem);
+			return;
+		}
+	}
+	list_insert_tail(&fth_str_curmems, mem);
+}
+
+static void
 fth_free_str_mem(fth_str_mem_t *mem)
 {
 	free(mem->fsm_memname);
@@ -161,7 +179,8 @@ fth_struct_header(ctf_id_t tid)
 	ssize_t sz;
 
 	fth_str_curtid = tid;
-	fth_str_curmems = NULL;
+	list_create(&fth_str_curmems, sizeof (fth_str_mem_t),
+	    offsetof(fth_str_mem_t, fsm_node));
 
 	if ((sz = ctf_type_size(ctf, fth_str_curtid)) == CTF_ERR)
 		return (parse_warn("Can't get size for %s", fth_curtype));
@@ -418,7 +437,7 @@ fth_struct_members_cb(const char *memname, ctf_id_t tid, ulong_t off, void *arg)
 	mem->fsm_tid = tid;
 	mem->fsm_off = off;
 
-	slist_add(&fth_str_curmems, mem, fth_struct_memcmp);
+	fth_slist_add(mem);
 
 	return (0);
 }
@@ -453,20 +472,20 @@ fth_struct_members(char *memfilter, char *format)
 static int
 fth_struct_trailer(void)
 {
-	if (list_count(fth_str_curmems) == 0) {
+	fth_str_mem_t *mem;
+
+	if (list_is_empty(&fth_str_curmems)) {
 		if (fth_struct_members(NULL, NULL) < 0)
 			return (-1);
 	}
 
-	while (!list_empty(fth_str_curmems)) {
-		fth_str_mem_t *mem = list_remove(&fth_str_curmems,
-		    list_first(fth_str_curmems), NULL, NULL);
-
+	while ((mem = list_remove_head(&fth_str_curmems)) != NULL) {
 		if (fth_print_member(mem, 0) < 0)
 			return (-1);
 
 		fth_free_str_mem(mem);
 	}
+	list_destroy(&fth_str_curmems);
 
 	(void) fprintf(out, "\n");
 	(void) fprintf(out, "kdbg-words definitions\n");

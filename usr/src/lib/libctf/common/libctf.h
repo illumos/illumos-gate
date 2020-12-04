@@ -118,6 +118,7 @@ extern int ctf_convert_set_batchsize(ctf_convert_t *, uint_t);
 extern int ctf_convert_set_flags(ctf_convert_t *, ctf_convert_flag_t);
 extern int ctf_convert_set_label(ctf_convert_t *, const char *);
 extern int ctf_convert_set_nthreads(ctf_convert_t *, uint_t);
+extern int ctf_convert_add_ignore(ctf_convert_t *, const char *);
 
 extern ctf_file_t *ctf_fdconvert(ctf_convert_t *, int, int *, char *, size_t);
 
