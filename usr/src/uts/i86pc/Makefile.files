@@ -122,6 +122,7 @@ CORE_OBJS +=			\
 	startup.o		\
 	timestamp.o		\
 	todpc_subr.o		\
+	tscc_cpuid.o		\
 	tscc_hpet.o		\
 	tscc_pit.o		\
 	tscc_vmware.o		\
