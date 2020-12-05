@@ -25,7 +25,7 @@
  *
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -49,6 +49,12 @@
 #include <sys/cpu.h>
 #include <sys/sdt.h>
 #include <sys/comm_page.h>
+#include <sys/bootconf.h>
+#include <sys/kobj.h>
+#include <sys/kobj_lex.h>
+#include <sys/tsc.h>
+#include <sys/prom_debug.h>
+#include <util/qsort.h>
 
 /*
  * Using the Pentium's TSC register for gethrtime()
@@ -127,15 +133,15 @@ static volatile int tsc_sync_go;
 #define	TSC_SYNC_DONE		3
 #define	SYNC_ITERATIONS		10
 
-#define	TSC_CONVERT_AND_ADD(tsc, hrt, scale) {	 	\
-	unsigned int *_l = (unsigned int *)&(tsc); 	\
-	(hrt) += mul32(_l[1], scale) << NSEC_SHIFT; 	\
+#define	TSC_CONVERT_AND_ADD(tsc, hrt, scale) {		\
+	unsigned int *_l = (unsigned int *)&(tsc);	\
+	(hrt) += mul32(_l[1], scale) << NSEC_SHIFT;	\
 	(hrt) += mul32(_l[0], scale) >> (32 - NSEC_SHIFT); \
 }
 
-#define	TSC_CONVERT(tsc, hrt, scale) { 			\
-	unsigned int *_l = (unsigned int *)&(tsc); 	\
-	(hrt) = mul32(_l[1], scale) << NSEC_SHIFT; 	\
+#define	TSC_CONVERT(tsc, hrt, scale) {			\
+	unsigned int *_l = (unsigned int *)&(tsc);	\
+	(hrt) = mul32(_l[1], scale) << NSEC_SHIFT;	\
 	(hrt) += mul32(_l[0], scale) >> (32 - NSEC_SHIFT); \
 }
 
@@ -162,8 +168,24 @@ static uint_t	shadow_nsec_scale;
 static uint32_t	shadow_hres_lock;
 int get_tsc_ready();
 
-static inline
-hrtime_t tsc_protect(hrtime_t a) {
+/*
+ * Allow an operator specify an explicit TSC calibration source
+ * via /etc/system e.g. `set tsc_calibration="pit"`
+ */
+char *tsc_calibration;
+
+/*
+ * The source that was used to calibrate the TSC. This is currently just
+ * for diagnostic purposes.
+ */
+static tsc_calibrate_t *tsc_calibration_source;
+
+/* The TSC frequency after calibration */
+static uint64_t tsc_freq;
+
+static inline hrtime_t
+tsc_protect(hrtime_t a)
+{
 	if (a > tsc_resume_cap) {
 		atomic_inc_32(&tsc_wayback);
 		DTRACE_PROBE3(tsc__wayback, htrime_t, a, hrtime_t, tsc_last,
@@ -899,4 +921,220 @@ tsc_resume(void)
 		tsc_needs_resume = 0;
 	}
 
+}
+
+static int
+tsc_calibrate_cmp(const void *a, const void *b)
+{
+	const tsc_calibrate_t * const *a1 = a;
+	const tsc_calibrate_t * const *b1 = b;
+	const tsc_calibrate_t *l = *a1;
+	const tsc_calibrate_t *r = *b1;
+
+	/* Sort from highest preference to lowest preference */
+	if (l->tscc_preference > r->tscc_preference)
+		return (-1);
+	if (l->tscc_preference < r->tscc_preference)
+		return (1);
+
+	/* For equal preference sources, sort alphabetically */
+	int c = strcmp(l->tscc_source, r->tscc_source);
+
+	if (c < 0)
+		return (-1);
+	if (c > 0)
+		return (1);
+	return (0);
+}
+
+SET_DECLARE(tsc_calibration_set, tsc_calibrate_t);
+
+static tsc_calibrate_t *
+tsc_calibrate_get_force(const char *source)
+{
+	tsc_calibrate_t **tsccpp;
+
+	VERIFY3P(source, !=, NULL);
+
+	SET_FOREACH(tsccpp, tsc_calibration_set) {
+		tsc_calibrate_t *tsccp = *tsccpp;
+
+		if (strcasecmp(source, tsccp->tscc_source) == 0)
+			return (tsccp);
+	}
+
+	/*
+	 * If an operator explicitly gave a TSC value and we didn't find it,
+	 * we should let them know.
+	 */
+	cmn_err(CE_NOTE,
+	    "Explicit TSC calibration source '%s' not found; using default",
+	    source);
+
+	return (NULL);
+}
+
+/*
+ * As described in tscc_pit.c, as an intertim measure as we transition to
+ * alternate calibration sources besides the PIT, we still want to gather
+ * what the values would have been had we used the PIT. Therefore, if we're
+ * using a source other than the PIT, we explicitly run the PIT calibration
+ * which will store the TSC frequency as measured by the PIT for the
+ * benefit of the APIC code (as well as any potential diagnostics).
+ */
+static void
+tsc_pit_also(void)
+{
+	tsc_calibrate_t *pit = tsc_calibrate_get_force("PIT");
+	uint64_t dummy;
+
+	/* We should always have the PIT as a possible calibration source */
+	VERIFY3P(pit, !=, NULL);
+
+	/* If we used the PIT to calibrate, we don't need to run again */
+	if (tsc_calibration_source == pit)
+		return;
+
+	/*
+	 * Since we're not using the PIT as the actual TSC calibration source,
+	 * we don't care about the results or saving the result -- tscc_pit.c
+	 * saves the frequency in a global for the benefit of the APIC code.
+	 */
+	(void) pit->tscc_calibrate(&dummy);
+}
+
+uint64_t
+tsc_calibrate(void)
+{
+	tsc_calibrate_t **tsccpp, *force;
+	size_t tsc_set_size;
+	int tsc_name_len;
+
+	/*
+	 * Every x86 system since the Pentium has TSC support. Since we
+	 * only support 64-bit x86 systems, there should always be a TSC
+	 * present, and something's horribly wrong if it's missing.
+	 */
+	if (!is_x86_feature(x86_featureset, X86FSET_TSC))
+		panic("System does not have TSC support");
+
+	/*
+	 * If we already successfully calibrated the TSC, no need to do
+	 * it again.
+	 */
+	if (tsc_freq > 0)
+		return (tsc_freq);
+
+	PRM_POINT("Calibrating the TSC...");
+
+	/*
+	 * Allow an operator to explicitly specify a calibration source via
+	 * `set tsc_calibration=foo` in the bootloader or
+	 * `set tsc_calibration="foo"` in /etc/system (preferring a bootloader
+	 * supplied value over /etc/system).
+	 *
+	 * If no source is given, or the specified source is not found, we
+	 * fallback to trying all of the known sources in order by preference
+	 * (high preference value to low preference value) until one succeeds.
+	 */
+	tsc_name_len = BOP_GETPROPLEN(bootops, "tsc_calibration");
+	if (tsc_name_len > 0) {
+		/* Overwrite any /etc/system supplied value */
+		if (tsc_calibration != NULL) {
+			size_t len = strlen(tsc_calibration) + 1;
+
+			kobj_free_string(tsc_calibration, len);
+		}
+
+		tsc_calibration = kmem_zalloc(tsc_name_len + 1, KM_SLEEP);
+		BOP_GETPROP(bootops, "tsc_calibration", tsc_calibration);
+	}
+
+	if (tsc_calibration != NULL &&
+	    (force = tsc_calibrate_get_force(tsc_calibration)) != NULL) {
+		if (tsc_name_len > 0) {
+			PRM_POINT("Forcing bootloader specified TSC calibration"
+			    " source");
+		} else {
+			PRM_POINT("Forcing /etc/system specified TSC "
+			    "calibration source");
+		}
+		PRM_DEBUGS(force->tscc_source);
+
+		if (!force->tscc_calibrate(&tsc_freq))
+			panic("Failed to calibrate the TSC");
+
+		tsc_calibration_source = force;
+
+		/*
+		 * We've saved the tsc_calibration_t that matched the value
+		 * of tsc_calibration at this point, so we can release the
+		 * memory for the value now.
+		 */
+		if (tsc_name_len > 0) {
+			kmem_free(tsc_calibration, tsc_name_len + 1);
+		} else if (tsc_calibration != NULL) {
+			size_t len = strlen(tsc_calibration) + 1;
+
+			kobj_free_string(tsc_calibration, len);
+		}
+		tsc_calibration = NULL;
+
+		tsc_pit_also();
+		return (tsc_freq);
+	}
+
+	/*
+	 * While we could sort the set contents in place, we'll make a copy
+	 * of the set and avoid modifying the original set.
+	 */
+	tsc_set_size = SET_COUNT(tsc_calibration_set) *
+	    sizeof (tsc_calibrate_t **);
+	tsccpp = kmem_zalloc(tsc_set_size, KM_SLEEP);
+	bcopy(SET_BEGIN(tsc_calibration_set), tsccpp, tsc_set_size);
+
+	/*
+	 * Sort by preference, highest to lowest
+	 */
+	qsort(tsccpp, SET_COUNT(tsc_calibration_set),
+	    sizeof (tsc_calibrate_t **), tsc_calibrate_cmp);
+
+	for (uint_t i = 0; i < SET_COUNT(tsc_calibration_set); i++) {
+		PRM_DEBUGS(tsccpp[i]->tscc_source);
+		if (tsccpp[i]->tscc_calibrate(&tsc_freq)) {
+			VERIFY3U(tsc_freq, >, 0);
+
+			cmn_err(CE_CONT,
+			    "?TSC calibrated using %s; freq is %lu MHz\n",
+			    tsccpp[i]->tscc_source, tsc_freq / 1000000);
+
+			/*
+			 * Note that tsccpp is just a (sorted) array of
+			 * pointers to the tsc_calibration_t's (from the
+			 * linker set). The actual tsc_calibration_t's aren't
+			 * kmem_alloc()ed (being part of the linker set), so
+			 * it's safe to keep a pointer to the one that was
+			 * used for calibration (intended for diagnostic
+			 * purposes).
+			 */
+			tsc_calibration_source = tsccpp[i];
+
+			kmem_free(tsccpp, tsc_set_size);
+			tsc_pit_also();
+			return (tsc_freq);
+		}
+	}
+
+	/*
+	 * In case it's useful, we don't free tsccpp -- we're about to panic
+	 * anyway.
+	 */
+	panic("Failed to calibrate TSC");
+}
+
+uint64_t
+tsc_get_freq(void)
+{
+	VERIFY(tsc_freq > 0);
+	return (tsc_freq);
 }

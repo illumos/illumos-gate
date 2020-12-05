@@ -23,7 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  * Copyright (c) 2016, 2017 by Delphix. All rights reserved.
  * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  */
@@ -76,6 +76,7 @@
 #include <sys/hpet.h>
 #include <sys/apic_common.h>
 #include <sys/apic_timer.h>
+#include <sys/tsc.h>
 
 static void	apic_record_ioapic_rdt(void *intrmap_private,
 		    ioapic_rdt_t *irdt);
@@ -141,6 +142,23 @@ int	apic_panic_on_nmi = 0;
 int	apic_panic_on_apic_error = 0;
 
 int	apic_verbose = 0;	/* 0x1ff */
+
+/* If set, force APIC calibration to use the PIT instead of the TSC */
+int	apic_calibrate_use_pit = 0;
+
+/*
+ * It was found empirically that 5 measurements seem sufficient to give a good
+ * accuracy. Most spurious measurements are higher than the target value thus
+ * we eliminate up to 2/5 spurious measurements.
+ */
+#define	APIC_CALIBRATE_MEASUREMENTS		5
+
+#define	APIC_CALIBRATE_PERCENT_OFF_WARNING	10
+
+extern int pit_is_broken; /* from tscc_pit.c */
+
+uint64_t apic_info_tsc[APIC_CALIBRATE_MEASUREMENTS];
+uint64_t apic_info_pit[APIC_CALIBRATE_MEASUREMENTS];
 
 #ifdef DEBUG
 int	apic_debug = 0;
@@ -1100,13 +1118,16 @@ apic_cpu_remove(psm_cpu_request_t *reqp)
  * The fixed-frequency PIT (aka 8254) is used for the measurement.
  */
 static uint64_t
-apic_calibrate_impl()
+apic_calibrate_pit(void)
 {
 	uint8_t		pit_tick_lo;
 	uint16_t	pit_tick, target_pit_tick, pit_ticks_adj;
 	uint32_t	pit_ticks;
 	uint32_t	start_apic_tick, end_apic_tick, apic_ticks;
 	ulong_t		iflag;
+
+	if (pit_is_broken)
+		return (0);
 
 	apic_reg_ops->apic_write(APIC_DIVIDE_REG, apic_divide_reg_init);
 	apic_reg_ops->apic_write(APIC_INIT_COUNT, APIC_MAXVAL);
@@ -1178,13 +1199,67 @@ apic_calibrate_impl()
 }
 
 /*
- * It was found empirically that 5 measurements seem sufficient to give a good
- * accuracy. Most spurious measurements are higher than the target value thus
- * we eliminate up to 2/5 spurious measurements.
+ * Return the number of ticks the APIC decrements in SF nanoseconds.
+ * The TSC is used for the measurement.
  */
-#define	APIC_CALIBRATE_MEASUREMENTS		5
+static uint64_t
+apic_calibrate_tsc(void)
+{
+	uint64_t	tsc_now, tsc_end, tsc_amt, tsc_hz;
+	uint64_t	apic_ticks;
+	uint32_t	start_apic_tick, end_apic_tick;
+	ulong_t		iflag;
 
-#define	APIC_CALIBRATE_PERCENT_OFF_WARNING	10
+	tsc_hz = tsc_get_freq();
+
+	/*
+	 * APIC_TIME_COUNT is in i8254 PIT ticks, which have a period
+	 * slightly under 1us. We can just treat the value as the number of
+	 * microseconds for our sampling period -- that is we wait
+	 * APIC_TIME_COUNT microseconds (corresponding to 'tsc_amt' of TSC
+	 * ticks).
+	 */
+	tsc_amt = tsc_hz * APIC_TIME_COUNT / MICROSEC;
+
+	apic_reg_ops->apic_write(APIC_DIVIDE_REG, apic_divide_reg_init);
+	apic_reg_ops->apic_write(APIC_INIT_COUNT, APIC_MAXVAL);
+
+	iflag = intr_clear();
+
+	tsc_now = tsc_read();
+	tsc_end = tsc_now + tsc_amt;
+	start_apic_tick = apic_reg_ops->apic_read(APIC_CURR_COUNT);
+
+	while (tsc_now < tsc_end)
+		tsc_now = tsc_read();
+
+	end_apic_tick = apic_reg_ops->apic_read(APIC_CURR_COUNT);
+
+	intr_restore(iflag);
+
+	apic_ticks = start_apic_tick - end_apic_tick;
+
+	/*
+	 * We likely did not wait exactly APIC_TIME_COUNT microseconds, but
+	 * slightly longer. Add the additional amount to tsc_amt.
+	 */
+	tsc_amt += tsc_now - tsc_end;
+
+	/*
+	 * This calculation is analogous to the one used with the PIT.
+	 * However, due to the typically _much_ higher precision of the
+	 * TSC compared to the PIT, we have to be careful we do not overflow.
+	 *
+	 * Since contemporary APIC timers have frequencies on the order of
+	 * tens of MHz (i.e. 66MHz), we calculate that first. Then we
+	 * scale the result by SF (because the caller wants it scaled by
+	 * that amount), then convert the result to scaled (SF) ticks per ns.
+	 *
+	 */
+	uint64_t apic_freq = apic_ticks * tsc_hz / tsc_amt;
+
+	return (apic_freq * SF / NANOSEC);
+}
 
 /*
  * Return the number of ticks the APIC decrements in SF nanoseconds.
@@ -1205,9 +1280,30 @@ apic_calibrate()
 	 * Therefore we take several measurements and then keep the median.
 	 * The median is preferred to the average here as we only want to
 	 * discard outliers.
+	 *
+	 * Traditionally, only the PIT was used to calibrate the APIC as the
+	 * the TSC was not calibrated at this point in the boot process (or
+	 * on even (much, much) older systems, possibly not present). On
+	 * newer systems, the PIT is not always present. We now default to
+	 * using the TSC (since it's now calibrated early enough in the boot
+	 * process to be usable), but for debugging purposes as we transition,
+	 * we still try to use the PIT and record those values. On systems
+	 * without a functioning PIT, the PIT measurements will always be 0.
 	 */
-	for (int i = 0; i < APIC_CALIBRATE_MEASUREMENTS; i++)
-		measurements[i] = apic_calibrate_impl();
+	for (int i = 0; i < APIC_CALIBRATE_MEASUREMENTS; i++) {
+		apic_info_tsc[i] = apic_calibrate_tsc();
+		apic_info_pit[i] = apic_calibrate_pit();
+
+		if (apic_calibrate_use_pit) {
+			if (pit_is_broken) {
+				panic("Failed to calibrate APIC due to broken "
+				    "PIT");
+			}
+			measurements[i] = apic_info_pit[i];
+		} else {
+			measurements[i] = apic_info_tsc[i];
+		}
+	}
 
 	/*
 	 * sort results and retrieve median.

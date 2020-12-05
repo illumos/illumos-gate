@@ -23,7 +23,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -539,7 +539,7 @@ _sys_rtt_end:
 	 * believe the amd64 tsc is more reliable, could this code be
 	 * simpler?
 	 */
-	ENTRY_NP(freq_tsc)
+	ENTRY_NP(freq_tsc_pit)
 	pushq	%rbp
 	movq	%rsp, %rbp
 	movq	%rdi, %r9	/* save pit_counter */
@@ -737,5 +737,5 @@ freq_tsc_end:
 	popq	%rbx
 	leaveq
 	ret
-	SET_SIZE(freq_tsc)
+	SET_SIZE(freq_tsc_pit)
 
