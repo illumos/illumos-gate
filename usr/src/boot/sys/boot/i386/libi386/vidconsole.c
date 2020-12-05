@@ -78,6 +78,9 @@ static vis_modechg_cb_t modechg_cb;
 static struct vis_modechg_arg *modechg_arg;
 static tem_vt_state_t tem;
 
+/* RGB colors for 8-bit depth */
+struct paletteentry pe8[CMAP_SIZE];
+
 #define	KEYBUFSZ	10
 #define	DEFAULT_FGCOLOR	7
 #define	DEFAULT_BGCOLOR	0
@@ -542,7 +545,6 @@ static int
 vidc_vbe_cons_put_cmap(struct vis_cmap *cm)
 {
 	int i, rc;
-	struct paletteentry pe;
 	rgb_t rgb;
 	uint32_t c;
 
@@ -568,8 +570,6 @@ vidc_vbe_cons_put_cmap(struct vis_cmap *cm)
 	rgb.blue.pos = gfx_fb.u.fb2.framebuffer_blue_field_position;
 	rgb.blue.size = gfx_fb.u.fb2.framebuffer_blue_mask_size;
 
-	pe.Alignment = 0;
-
 	/*
 	 * The first 16 colors need to be in VGA color order.
 	 */
@@ -582,10 +582,12 @@ vidc_vbe_cons_put_cmap(struct vis_cmap *cm)
 		} else {
 			c = rgb_color_map(&rgb, i);
 		}
-		pe.Red = (c >> rgb.red.pos) & ((1 << rgb.red.size) - 1);
-		pe.Green = (c >> rgb.green.pos) & ((1 << rgb.green.size) - 1);
-		pe.Blue = (c >> rgb.blue.pos) & ((1 << rgb.blue.size) - 1);
-		rc = vbe_set_palette(&pe, i);
+		pe8[i].Red = (c >> rgb.red.pos) & ((1 << rgb.red.size) - 1);
+		pe8[i].Green =
+		    (c >> rgb.green.pos) & ((1 << rgb.green.size) - 1);
+		pe8[i].Blue = (c >> rgb.blue.pos) & ((1 << rgb.blue.size) - 1);
+		pe8[i].Alignment = 0;
+		rc = vbe_set_palette(&pe8[i], i);
 	}
 	return (rc);
 }
