@@ -62,13 +62,32 @@ const uint8_t solaris_color_to_pc_color[16] = {
 	pc_magenta,		/*  6 - magenta		*/
 	pc_brown,		/*  7 - brown		*/
 	pc_white,		/*  8 - white		*/
-	pc_grey,		/*  9 - gery		*/
+	pc_grey,		/*  9 - grey		*/
 	pc_brt_blue,		/* 10 - brt_blue	*/
 	pc_brt_green,		/* 11 - brt_green	*/
 	pc_brt_cyan,		/* 12 - brt_cyan	*/
 	pc_brt_red,		/* 13 - brt_red		*/
 	pc_brt_magenta,		/* 14 - brt_magenta	*/
 	pc_yellow		/* 15 - yellow		*/
+};
+
+const uint8_t pc_color_to_solaris_color[16] = {
+	sun_black,		/*  0 - black		*/
+	sun_blue,		/*  1 - blue		*/
+	sun_green,		/*  2 - green		*/
+	sun_cyan,		/*  3 - cyan		*/
+	sun_red,		/*  4 - red		*/
+	sun_magenta,		/*  5 - magenta		*/
+	sun_brown,		/*  6 - brown		*/
+	sun_white,		/*  7 - white		*/
+	sun_grey,		/*  8 - grey		*/
+	sun_brt_blue,		/*  9 - brt_blue	*/
+	sun_brt_green,		/* 10 - brt_green	*/
+	sun_brt_cyan,		/* 11 - brt_cyan	*/
+	sun_brt_red,		/* 12 - brt_red		*/
+	sun_brt_magenta,	/* 13 - brt_magenta	*/
+	sun_yellow,		/* 14 - yellow		*/
+	sun_brt_white		/* 15 - brt_white	*/
 };
 
 /* 4-bit to 24-bit color translation. */

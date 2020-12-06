@@ -133,10 +133,24 @@ typedef TAILQ_HEAD(edid_resolution, resolution) edid_res_list_t;
 
 extern multiboot_tag_framebuffer_t gfx_fb;
 
+typedef enum {
+	GfxFbBltVideoFill,
+	GfxFbBltVideoToBltBuffer,
+	GfxFbBltBufferToVideo,
+	GfxFbBltVideoToVideo,
+	GfxFbBltOperationMax,
+} GFXFB_BLT_OPERATION;
+
+int gfxfb_blt(void *, GFXFB_BLT_OPERATION, uint32_t, uint32_t,
+    uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+
 void bios_text_font(bool);
 bool gfx_get_edid_resolution(struct vesa_edid_info *, edid_res_list_t *);
-void gfx_framework_init(struct visual_ops *);
+void gfx_framework_init(void);
 uint32_t gfx_fb_color_map(uint8_t);
+int gfx_fb_cons_clear(struct vis_consclear *);
+void gfx_fb_cons_copy(struct vis_conscopy *);
+void gfx_fb_cons_display(struct vis_consdisplay *);
 void gfx_fb_display_cursor(struct vis_conscursor *);
 void gfx_fb_setpixel(uint32_t, uint32_t);
 void gfx_fb_drawrect(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
