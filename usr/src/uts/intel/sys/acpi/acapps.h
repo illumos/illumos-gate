@@ -189,7 +189,7 @@
     Prefix
 
 #define ACPI_COMMON_BUILD_TIME \
-    "Build date/time: %s %s\n", __DATE__, __TIME__
+    "Build version: %s\n", ACPI_DATE
 
 /* Macros for usage messages */
 

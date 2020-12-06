@@ -30,6 +30,7 @@ CERRWARN += -_gcc=-Wno-unused-function
 SMOFF = all_func_returns
 
 CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi -DACPI_DUMP_APP
+CPPFLAGS += -DACPI_DATE=\"$(VERSION)\"
 
 LDLIBS += -ldevinfo
 
