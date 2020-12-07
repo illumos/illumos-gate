@@ -642,6 +642,7 @@ zfs_probe_partition(void *arg, const char *partname,
 
 	/* filter out partitions *not* used by zfs */
 	switch (part->type) {
+	case PART_EFI:		/* efi system partition */
 	case PART_RESERVED:	/* efi reserverd */
 	case PART_VTOC_BOOT:	/* vtoc boot area */
 	case PART_VTOC_SWAP:

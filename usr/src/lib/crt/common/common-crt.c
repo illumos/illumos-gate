@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016, Richard Lowe.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -35,8 +36,8 @@ extern int main(int argc, char **argv, char **envp);
 extern void _init(void);
 extern void _fini(void);
 
-#pragma weak _start_crt_compiler
-extern void _start_crt_compiler(int argc, char **argv);
+#pragma weak __start_crt_compiler
+extern int __start_crt_compiler(int argc, char **argv);
 
 #if defined(__x86)
 int __longdouble_used = 0;
@@ -80,21 +81,34 @@ _start_crt(int argc, char **argv, void (*exit_handler)(void))
 	_environ = argv + (argc + 1);
 	___Argv = argv;
 
-	if (&_start_crt_compiler != NULL)
-		_start_crt_compiler(argc, argv);
-
-#if defined(__x86)
-	__fpstart();
-#endif
-#if defined(__i386) 		/* Not amd64 */
 	/*
-	 * Note that Studio cc(1) sets the _value of the symbol_, that is, its
-	 * address.  Not the value _at_ that address.
+	 * __start_crt_compiler() provides a hook for compilers to perform
+	 * extra initialisation before main() is called. For example, gcc uses
+	 * this to initialise profiling code for objects built with its -pg
+	 * option by linking in an extra object that provides this function.
+	 *
+	 * This mechanism replaces the earlier separate gcrt1.o.
+	 *
+	 * If __start_crt_compiler() returns a non-zero value, then the
+	 * process will exit with that value, without main() being called.
 	 */
-	__fsr((uintptr_t)&__fsr_init_value);
+	if (&__start_crt_compiler != NULL)
+		ret = __start_crt_compiler(argc, argv);
+
+	if (ret == 0) {
+#if defined(__x86)
+		__fpstart();
 #endif
-	_init();
-	ret = main(argc, argv, _environ);
+#if defined(__i386)		/* Not amd64 */
+		/*
+		 * Note that Studio cc(1) sets the _value of the symbol_, that
+		 * is, its address.  Not the value _at_ that address.
+		 */
+		__fsr((uintptr_t)&__fsr_init_value);
+#endif
+		_init();
+		ret = main(argc, argv, _environ);
+	}
 	exit(ret);
 	_exit(ret);
 }
