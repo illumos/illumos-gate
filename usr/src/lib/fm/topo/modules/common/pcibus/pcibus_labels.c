@@ -222,7 +222,7 @@ pci_slot_label_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp, did_t *pdp)
 {
 	tnode_t *anode, *apnode;
 	did_t *adp, *apdp;
-	char *plat, *pp, *l, *ancestor_l = NULL, *new_l = NULL;
+	char *plat, *pp, *l = NULL, *ancestor_l = NULL, *new_l = NULL;
 	int err, b, d, f, done = 0;
 	size_t len;
 

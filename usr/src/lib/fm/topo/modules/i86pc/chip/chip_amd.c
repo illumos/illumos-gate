@@ -467,10 +467,10 @@ amd_dimm_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
 	nvlist_t *fmri, **dimmarr = NULL;
 	uint64_t num;
 	uint_t ndimm;
-	id_t smbid;
-	const char *serial;
-	const char *part;
-	const char *rev;
+	id_t smbid = -1;
+	const char *serial = NULL;
+	const char *part = NULL;
+	const char *rev = NULL;
 
 	if (nvlist_lookup_nvlist_array(mc, "dimmlist", &dimmarr, &ndimm) != 0) {
 		whinge(mod, NULL, "amd_dimm_create: dimmlist lookup failed\n");
