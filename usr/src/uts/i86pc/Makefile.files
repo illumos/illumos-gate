@@ -71,6 +71,7 @@ CORE_OBJS +=			\
 	hma_fpu.o		\
 	hment.o			\
 	hold_page.o		\
+	hpet_acpi.o		\
 	hrtimers.o		\
 	htable.o		\
 	hypercall.o		\
@@ -121,6 +122,7 @@ CORE_OBJS +=			\
 	startup.o		\
 	timestamp.o		\
 	todpc_subr.o		\
+	tscc_hpet.o		\
 	tscc_pit.o		\
 	trap.o			\
 	turbo.o			\
@@ -198,9 +200,9 @@ PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o
 PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
 PCPLUSMP_OBJS += apic.o apic_regops.o psm_common.o apic_introp.o	\
 			mp_platform_common.o mp_platform_misc.o		\
-			hpet_acpi.o apic_common.o apic_timer.o
+			apic_common.o apic_timer.o
 APIX_OBJS += apix.o apic_regops.o psm_common.o apix_intr.o apix_utils.o \
-		apix_irm.o mp_platform_common.o hpet_acpi.o apic_common.o \
+		apix_irm.o mp_platform_common.o apic_common.o \
 		apic_timer.o apix_regops.o
 
 

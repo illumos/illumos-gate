@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Oxide Computer Company
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/hpet_acpi.h>
@@ -37,6 +38,8 @@
 #include <sys/cpupart.h>
 #include <sys/x86_archext.h>
 #include <sys/prom_debug.h>
+#include <sys/psm.h>
+#include <sys/bootconf.h>
 
 static int hpet_init_proxy(int *hpet_vect, iflag_t *hpet_flags);
 static boolean_t hpet_install_proxy(void);
@@ -100,9 +103,13 @@ static kmutex_t		hpet_proxy_lock;	/* lock for lAPIC proxy data */
  */
 static hpet_proxy_t	*hpet_proxy_users;	/* one per CPU */
 
+static boolean_t	hpet_early_init_failed;
 
 ACPI_TABLE_HPET		*hpet_table;		/* ACPI HPET table */
 hpet_info_t		hpet_info;		/* Human readable Information */
+
+static hrtime_t (*apic_timer_stop_count_fn)(void);
+static void (*apic_timer_restart_fn)(hrtime_t);
 
 /*
  * Provide HPET access from unix.so.
@@ -118,30 +125,43 @@ hpet_establish_hooks(void)
 }
 
 /*
- * Get the ACPI "HPET" table.
- * acpi_probe() calls this function from mp_startup before drivers are loaded.
- * acpi_probe() verified the system is using ACPI before calling this.
+ * Initialize the HPET early in the boot process if it is both present
+ * and needed to calibrate the TSC. This initializes the HPET enough to
+ * allow the main counter to be read for calibration purposes.
  *
- * There may be more than one ACPI HPET table (Itanium only?).
- * Intel's HPET spec defines each timer block to have up to 32 counters and
- * be 1024 bytes long.  There can be more than one timer block of 32 counters.
- * Each timer block would have an additional ACPI HPET table.
- * Typical x86 systems today only have 1 HPET with 3 counters.
- * On x86 we only consume HPET table "1" for now.
+ * If the HPET is not needed early in the boot process, but is needed later
+ * by ACPI, this will be called at that time to start the initialization
+ * process.
  */
 int
-hpet_acpi_init(int *hpet_vect, iflag_t *hpet_flags)
+hpet_early_init(void)
 {
 	extern hrtime_t tsc_read(void);
-	extern int	idle_cpu_no_deep_c;
-	extern int	cpuid_deep_cstates_supported(void);
 	void		*la;
 	uint64_t	ret;
 	uint_t		num_timers;
 	uint_t		ti;
 
+	PRM_POINT("Initializing the HPET...");
+
+	/* If we tried and failed, don't try again. */
+	if (hpet_early_init_failed) {
+		PRM_POINT("Prior HPET initialization failed, aborting...");
+		return (DDI_FAILURE);
+	}
+
+	/* No need to initialize again if we already succeeded */
+	if (hpet.supported >= HPET_TIMER_SUPPORT)
+		return (DDI_SUCCESS);
+
 	(void) memset(&hpet_info, 0, sizeof (hpet_info));
 	hpet.supported = HPET_NO_SUPPORT;
+
+	/*
+	 * Once called, we assume initialization fails unless we complete all
+	 * the early init tasks.
+	 */
+	hpet_early_init_failed = B_TRUE;
 
 	if ((get_hwenv() & HW_XEN_HVM) != 0) {
 		/*
@@ -156,25 +176,20 @@ hpet_acpi_init(int *hpet_vect, iflag_t *hpet_flags)
 		return (DDI_FAILURE);
 	}
 
-	if (idle_cpu_no_deep_c ||
-	    !cpuid_deep_cstates_supported()) {
-		/*
-		 * If Deep C-States are disabled or not supported, then we do
-		 * not need to program the HPET at all as it will not
-		 * subsequently be used.
-		 */
-		PRM_POINT("no need to program the HPET");
-		return (DDI_FAILURE);
-	}
-
-	hpet_establish_hooks();
-
 	/*
-	 * Get HPET ACPI table 1.
+	 * If there are any HPET tables, we should have mapped and stored
+	 * the address of the first table while building up the boot
+	 * properties.
+	 *
+	 * Systems with a large numbers of HPET timer blocks may have
+	 * multiple HPET tables (each HPET table can contain at most 32 timer
+	 * blocks). Most x86 systems have 1 HPET table with 3 counters (it
+	 * appears multiple HPET timers was largely seen on Itanium systems).
+	 * illumos currently only uses the first HPET table, so we do not need
+	 * to be concerned about additional tables.
 	 */
-	PRM_POINT("AcpiGetTable() HPET #1");
-	if (ACPI_FAILURE(AcpiGetTable(ACPI_SIG_HPET, HPET_TABLE_1,
-	    (ACPI_TABLE_HEADER **)&hpet_table))) {
+	if (BOP_GETPROPLEN(bootops, "hpet-table") != 8 ||
+	    BOP_GETPROP(bootops, "hpet-table", (void *)&hpet_table) != 0) {
 		cmn_err(CE_NOTE, "!hpet_acpi: unable to get ACPI HPET table");
 		return (DDI_FAILURE);
 	}
@@ -303,6 +318,49 @@ hpet_acpi_init(int *hpet_vect, iflag_t *hpet_flags)
 	 * HPET main counter reads are supported now.
 	 */
 	hpet.supported = HPET_TIMER_SUPPORT;
+	hpet_early_init_failed = B_FALSE;
+
+	PRM_POINT("HPET main counter configured for reading...");
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Called by acpi_init() to set up HPET interrupts and fully initialize the
+ * HPET.
+ */
+int
+hpet_acpi_init(int *hpet_vect, iflag_t *hpet_flags, hrtime_t (*stop_fn)(void),
+    void (*restart_fn)(hrtime_t))
+{
+	extern int	idle_cpu_no_deep_c;
+	extern int	cpuid_deep_cstates_supported(void);
+
+	PRM_POINT("Completing HPET initialization...");
+
+	if (hpet_early_init() != DDI_SUCCESS) {
+		PRM_POINT("Early HPET initialization failed; aborting...");
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * These functions reside in either pcplusmp or apix, and allow
+	 * the HPET to proxy the LAPIC.
+	 */
+	apic_timer_stop_count_fn = stop_fn;
+	apic_timer_restart_fn = restart_fn;
+
+	hpet_establish_hooks();
+
+	if (idle_cpu_no_deep_c ||
+	    !cpuid_deep_cstates_supported()) {
+		/*
+		 * If Deep C-States are disabled or not supported, then we do
+		 * not need to program the HPET at all as it will not
+		 * subsequently be used.
+		 */
+		PRM_POINT("no need to program the HPET");
+		return (DDI_FAILURE);
+	}
 
 	return (hpet_init_proxy(hpet_vect, hpet_flags));
 }
@@ -449,7 +507,8 @@ hpet_checksum_table(unsigned char *table, unsigned int length)
 static void *
 hpet_memory_map(ACPI_TABLE_HPET *hpet_table)
 {
-	return (AcpiOsMapMemory(hpet_table->Address.Address, HPET_SIZE));
+	return (psm_map_new(hpet_table->Address.Address, (size_t)HPET_SIZE,
+	    PSM_PROT_WRITE | PSM_PROT_READ));
 }
 
 static int
@@ -482,6 +541,18 @@ hpet_stop_main_counter(hpet_info_t *hip)
 	gcr = *gcr_ptr;
 
 	return (gcr & HPET_GCFR_ENABLE_CNF ? ~AE_OK : AE_OK);
+}
+
+boolean_t
+hpet_timer_is_readable(void)
+{
+	return ((hpet.supported >= HPET_TIMER_SUPPORT) ? B_TRUE : B_FALSE);
+}
+
+uint64_t
+hpet_read_timer(void)
+{
+	return (hpet_read_main_counter_value(&hpet_info));
 }
 
 /*
@@ -1274,8 +1345,6 @@ hpet_guaranteed_schedule(hrtime_t required_wakeup_time)
 static boolean_t
 hpet_use_hpet_timer(hrtime_t *lapic_expire)
 {
-	extern hrtime_t	apic_timer_stop_count(void);
-	extern void	apic_timer_restart(hrtime_t);
 	hrtime_t	now, expire, dead;
 	uint64_t	lapic_count, dead_count;
 	cpupart_t	*cpu_part;
@@ -1301,7 +1370,7 @@ hpet_use_hpet_timer(hrtime_t *lapic_expire)
 	 * idle thread acquires the mutex but before it clears interrupts.
 	 */
 	ASSERT(!interrupts_enabled());
-	lapic_count = apic_timer_stop_count();
+	lapic_count = apic_timer_stop_count_fn();
 	now = gethrtime();
 	dead = now + hpet_idle_spin_timeout;
 	*lapic_expire = expire = now + lapic_count;
@@ -1322,7 +1391,7 @@ hpet_use_hpet_timer(hrtime_t *lapic_expire)
 		/*
 		 * spin
 		 */
-		apic_timer_restart(expire);
+		apic_timer_restart_fn(expire);
 		sti();
 		cli();
 
@@ -1337,7 +1406,7 @@ hpet_use_hpet_timer(hrtime_t *lapic_expire)
 			}
 		}
 
-		lapic_count = apic_timer_stop_count();
+		lapic_count = apic_timer_stop_count_fn();
 		now = gethrtime();
 		*lapic_expire = expire = now + lapic_count;
 		if (lapic_count == (hrtime_t)-1) {
@@ -1349,7 +1418,7 @@ hpet_use_hpet_timer(hrtime_t *lapic_expire)
 			return (B_TRUE);
 		}
 		if (now > dead) {
-			apic_timer_restart(expire);
+			apic_timer_restart_fn(expire);
 			*lapic_expire = (hrtime_t)HPET_INFINITY;
 			return (B_FALSE);
 		}
@@ -1360,7 +1429,7 @@ hpet_use_hpet_timer(hrtime_t *lapic_expire)
 	    (hpet_state.proxy_installed == B_FALSE) ||
 	    (hpet_state.uni_cstate == B_TRUE)) {
 		mutex_exit(&hpet_proxy_lock);
-		apic_timer_restart(expire);
+		apic_timer_restart_fn(expire);
 		*lapic_expire = (hrtime_t)HPET_INFINITY;
 		return (B_FALSE);
 	}
@@ -1387,7 +1456,7 @@ hpet_use_hpet_timer(hrtime_t *lapic_expire)
 	mutex_exit(&hpet_proxy_lock);
 
 	if (rslt == B_FALSE) {
-		apic_timer_restart(expire);
+		apic_timer_restart_fn(expire);
 		*lapic_expire = (hrtime_t)HPET_INFINITY;
 	}
 
@@ -1409,7 +1478,6 @@ hpet_use_hpet_timer(hrtime_t *lapic_expire)
 static void
 hpet_use_lapic_timer(hrtime_t expire)
 {
-	extern void	apic_timer_restart(hrtime_t);
 	processorid_t	cpu_id = CPU->cpu_id;
 
 	ASSERT(CPU->cpu_thread == CPU->cpu_idle_thread);
@@ -1421,7 +1489,7 @@ hpet_use_lapic_timer(hrtime_t expire)
 	 * Do not enable a LAPIC Timer that was initially disabled.
 	 */
 	if (expire != HPET_INFINITY)
-		apic_timer_restart(expire);
+		apic_timer_restart_fn(expire);
 }
 
 /*

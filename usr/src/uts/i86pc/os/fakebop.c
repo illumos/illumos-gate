@@ -2935,6 +2935,15 @@ build_firmware_properties(struct xboot_info *xbp)
 #endif /* __xpv */
 	if (tp != NULL)
 		process_mcfg((ACPI_TABLE_MCFG *)tp);
+
+	/*
+	 * Map the first HPET table (if it exists) and save the address.
+	 * If the HPET is required to calibrate the TSC, we require the
+	 * HPET table prior to being able to load modules, so we cannot use
+	 * the acpica module (and thus AcpiGetTable()) to locate it.
+	 */
+	if ((tp = find_fw_table(rsdp, ACPI_SIG_HPET)) != NULL)
+		bsetprop64("hpet-table", (uint64_t)(uintptr_t)tp);
 }
 
 /*

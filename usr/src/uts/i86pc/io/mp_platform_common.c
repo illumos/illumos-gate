@@ -22,7 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2020 RackTop Systems, Inc.
  * Copyright 2020 Oxide Computer Company
  */
@@ -1039,7 +1039,8 @@ acpi_probe(char *modname)
 		 * failure message it will be logged by the routine itself.
 		 */
 		PRM_POINT("hpet_acpi_init()");
-		(void) hpet_acpi_init(&apic_hpet_vect, &apic_hpet_flags);
+		(void) hpet_acpi_init(&apic_hpet_vect, &apic_hpet_flags,
+		    apic_timer_stop_count, apic_timer_restart);
 #endif
 
 		kmem_free(local_ids, NCPU * sizeof (uint32_t));
