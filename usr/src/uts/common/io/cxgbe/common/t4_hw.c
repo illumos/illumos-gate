@@ -9351,6 +9351,7 @@ void t4_handle_get_port_info(struct port_info *pi, const __be64 *rpl)
 	enum fw_port_module_type mod_type;
 	unsigned int speed, fc, fec;
 	fw_port_cap32_t pcaps, acaps, lpacaps, linkattr;
+	boolean_t fec_changed;
 
 	/*
 	 * Extract the various fields from the Port Information message.
@@ -9452,8 +9453,11 @@ void t4_handle_get_port_info(struct port_info *pi, const __be64 *rpl)
 		t4_os_portmod_changed(adapter, pi->port_id);
 	}
 
+	fec_changed = fec != (lc->requested_fec == FEC_AUTO ?
+	    lc->fec : lc->requested_fec);
 	if (link_ok != lc->link_ok || speed != lc->speed ||
-	    fc != lc->fc || fec != lc->fec) {	/* something changed */
+	    fc != lc->fc || fec_changed) {
+		/* something changed */
 		if (!link_ok && lc->link_ok) {
 			lc->link_down_rc = linkdnrc;
 			CH_WARN_RATELIMIT(adapter,
@@ -9464,6 +9468,13 @@ void t4_handle_get_port_info(struct port_info *pi, const __be64 *rpl)
 		lc->speed = speed;
 		lc->fc = fc;
 		lc->fec = fec;
+		if (fec_changed) {
+			/*
+			 * If the fec is not as requested we need
+			 * to save the l1 config.
+			 */
+			lc->redo_l1cfg = B_TRUE;
+		}
 
 		lc->lpacaps = lpacaps;
 		lc->acaps = acaps & ADVERT_MASK;
@@ -9691,10 +9702,12 @@ static void init_link_config(struct link_config *lc, fw_port_cap32_t pcaps,
 
 	if (fec_supported(pcaps)) {
 		/*
-		 * For Forward Error Control, we default to whatever the Firmware
-		 * tells us the Link is currently advertising.
+		 * For Forward Error Control, we default to whatever the
+		 * Firmware tells us the Link is currently advertising.
+		 * We also retain any overrides set.
 		 */
-		lc->requested_fec = FEC_AUTO;
+		if (lc->requested_fec == 0)
+			lc->requested_fec = FEC_AUTO;
 		lc->fec = fwcap_to_cc_fec(lc->def_acaps);
 	} else {
 		lc->requested_fec = FEC_NONE;
