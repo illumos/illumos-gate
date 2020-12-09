@@ -13510,6 +13510,7 @@ s usr/share/man/man3c/getgrgid.3c=getgrnam.3c
 s usr/share/man/man3c/getgrgid_r.3c=getgrnam.3c
 f usr/share/man/man3c/getgrnam.3c 0444 root bin
 s usr/share/man/man3c/getgrnam_r.3c=getgrnam.3c
+f usr/share/man/man3c/getgrouplist.3c 0444 root bin
 s usr/share/man/man3c/gethomelgroup.3c=getcpuid.3c
 f usr/share/man/man3c/gethostid.3c 0444 root bin
 f usr/share/man/man3c/gethostname.3c 0444 root bin

@@ -1374,11 +1374,14 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 {
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
+	aggr_port_t *last_attached = NULL;
 	mac_register_t *mac;
 	boolean_t link_state_changed;
-	mac_perim_handle_t mph;
+	mac_perim_handle_t mph, pmph;
+	datalink_id_t tempid;
+	boolean_t mac_registered = B_FALSE;
 	int err;
-	int i;
+	int i, j;
 	kt_did_t tid = 0;
 
 	/* need at least one port */
@@ -1525,6 +1528,8 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 		goto bail;
 	}
 
+	mac_registered = B_TRUE;
+
 	mac_perim_enter_by_mh(grp->lg_mh, &mph);
 
 	/*
@@ -1554,12 +1559,33 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 		 * underlying port. Note that this is done after the
 		 * aggr registers its MAC.
 		 */
-		VERIFY3S(aggr_add_pseudo_tx_group(port, &grp->lg_tx_group),
-		    ==, 0);
+		err = aggr_add_pseudo_tx_group(port, &grp->lg_tx_group);
+
+		if (err != 0) {
+			mac_perim_exit(mph);
+			goto bail;
+		}
 
 		for (i = 0; i < grp->lg_rx_group_count; i++) {
-			VERIFY3S(aggr_add_pseudo_rx_group(port,
-			    &grp->lg_rx_groups[i]), ==, 0);
+			err = aggr_add_pseudo_rx_group(port,
+			    &grp->lg_rx_groups[i]);
+
+			if (err != 0) {
+				/*
+				 * Undo what we have added for the current
+				 * port.
+				 */
+				aggr_rem_pseudo_tx_group(port,
+				    &grp->lg_tx_group);
+
+				for (j = 0; j < i; j++) {
+					aggr_rem_pseudo_rx_group(port,
+					    &grp->lg_rx_groups[j]);
+				}
+
+				mac_perim_exit(mph);
+				goto bail;
+			}
 		}
 
 		if (aggr_port_notify_link(grp, port))
@@ -1569,6 +1595,8 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 		 * Initialize the callback functions for this port.
 		 */
 		aggr_port_init_callbacks(port);
+
+		last_attached = port;
 	}
 
 	if (link_state_changed)
@@ -1585,17 +1613,7 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	return (0);
 
 bail:
-
 	grp->lg_closing = B_TRUE;
-
-	port = grp->lg_ports;
-	while (port != NULL) {
-		aggr_port_t *cport;
-
-		cport = port->lp_next;
-		aggr_port_delete(port);
-		port = cport;
-	}
 
 	/*
 	 * Inform the lacp_rx thread to exit.
@@ -1618,6 +1636,47 @@ bail:
 	mutex_exit(&grp->lg_tx_flowctl_lock);
 	if (tid != 0)
 		thread_join(tid);
+
+	if (mac_registered) {
+		(void) dls_devnet_destroy(grp->lg_mh, &tempid, B_TRUE);
+		(void) mac_disable(grp->lg_mh);
+
+		if (last_attached != NULL) {
+			/*
+			 * Detach and clean up ports added.
+			 */
+			mac_perim_enter_by_mh(grp->lg_mh, &mph);
+
+			for (port = grp->lg_ports; ; port = port->lp_next) {
+				mac_perim_enter_by_mh(port->lp_mh, &pmph);
+				(void) aggr_grp_detach_port(grp, port);
+				mac_perim_exit(pmph);
+
+				aggr_rem_pseudo_tx_group(port,
+				    &grp->lg_tx_group);
+
+				for (i = 0; i < grp->lg_rx_group_count; i++) {
+					aggr_rem_pseudo_rx_group(port,
+					    &grp->lg_rx_groups[i]);
+				}
+				if (port == last_attached)
+					break;
+			}
+
+			mac_perim_exit(mph);
+		}
+
+		(void) mac_unregister(grp->lg_mh);
+	}
+
+	port = grp->lg_ports;
+	while (port != NULL) {
+		aggr_port_t *cport;
+
+		cport = port->lp_next;
+		aggr_port_delete(port);
+		port = cport;
+	}
 
 	kmem_free(grp->lg_tx_blocked_rings,
 	    (sizeof (mac_ring_handle_t *) * MAX_RINGS_PER_GROUP));
