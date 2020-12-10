@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2020, the University of Queensland
+ * Copyright (c) 2021, the University of Queensland
  * Copyright 2020 RackTop Systems, Inc.
  */
 
@@ -1493,6 +1493,8 @@ mlxcx_register_mac(mlxcx_t *mlxp)
 	VERIFY3U(mlxp->mlx_nports, ==, 1);
 	port = &mlxp->mlx_ports[0];
 
+	mutex_enter(&port->mlp_mtx);
+
 	mac->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
 	mac->m_driver = mlxp;
 	mac->m_dip = mlxp->mlx_dip;
@@ -1509,6 +1511,8 @@ mlxcx_register_mac(mlxcx_t *mlxp)
 		mlxcx_warn(mlxp, "mac_register() returned %d", ret);
 	}
 	mac_free(mac);
+
+	mutex_exit(&port->mlp_mtx);
 
 	mlxcx_update_link_state(mlxp, port);
 

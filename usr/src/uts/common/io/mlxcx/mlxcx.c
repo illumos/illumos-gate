@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020, The University of Queensland
+ * Copyright 2021, The University of Queensland
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2020 RackTop Systems, Inc.
  */
@@ -2365,10 +2365,26 @@ mlxcx_setup_eq(mlxcx_t *mlxp, uint_t vec, uint64_t events)
 		return (B_FALSE);
 	}
 	mleq->mleq_state |= MLXCX_EQ_INTR_ENABLED;
+	mleq->mleq_state |= MLXCX_EQ_ATTACHING;
 	mlxcx_arm_eq(mlxp, mleq);
 	mutex_exit(&mleq->mleq_mtx);
 
 	return (B_TRUE);
+}
+
+static void
+mlxcx_eq_set_attached(mlxcx_t *mlxp)
+{
+	uint_t vec;
+	mlxcx_event_queue_t *mleq;
+
+	for (vec = 0; vec < mlxp->mlx_intr_count; ++vec) {
+		mleq = &mlxp->mlx_eqs[vec];
+
+		mutex_enter(&mleq->mleq_mtx);
+		mleq->mleq_state &= ~MLXCX_EQ_ATTACHING;
+		mutex_exit(&mleq->mleq_mtx);
+	}
 }
 
 static boolean_t
@@ -2764,7 +2780,10 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Set up asynchronous event queue which handles control type events
 	 * like PAGE_REQUEST and CMD completion events.
 	 *
-	 * This will enable and arm the interrupt on EQ 0.
+	 * This will enable and arm the interrupt on EQ 0. Note that only page
+	 * reqs and cmd completions will be handled until we call
+	 * mlxcx_eq_set_attached further down (this way we don't need an extra
+	 * set of locks over the mlxcx_t sub-structs not allocated yet)
 	 */
 	if (!mlxcx_setup_async_eqs(mlxp)) {
 		goto err;
@@ -2890,6 +2909,12 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto err;
 	}
 	mlxp->mlx_attach |= MLXCX_ATTACH_MAC_HDL;
+
+	/*
+	 * This tells the interrupt handlers they can start processing events
+	 * other than cmd completions and page requests.
+	 */
+	mlxcx_eq_set_attached(mlxp);
 
 	return (DDI_SUCCESS);
 
