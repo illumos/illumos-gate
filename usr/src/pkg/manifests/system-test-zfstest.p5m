@@ -2892,6 +2892,7 @@ file path=opt/zfs-tests/tests/functional/removal/removal_with_send_recv \
 file path=opt/zfs-tests/tests/functional/removal/removal_with_snapshot mode=0555
 file path=opt/zfs-tests/tests/functional/removal/removal_with_write mode=0555
 file path=opt/zfs-tests/tests/functional/removal/removal_with_zdb mode=0555
+file path=opt/zfs-tests/tests/functional/removal/remove_attach_mirror mode=0555
 file path=opt/zfs-tests/tests/functional/removal/remove_expanded mode=0555
 file path=opt/zfs-tests/tests/functional/removal/remove_mirror mode=0555
 file path=opt/zfs-tests/tests/functional/removal/remove_mirror_sanity mode=0555

@@ -240,6 +240,7 @@ typedef struct indirect_child {
 	 */
 	struct indirect_child *ic_duplicate;
 	list_node_t ic_node; /* node on is_unique_child */
+	int ic_error; /* set when a child does not contain the data */
 } indirect_child_t;
 
 /*
@@ -1251,15 +1252,14 @@ vdev_indirect_read_all(zio_t *zio)
 				continue;
 
 			/*
-			 * Note, we may read from a child whose DTL
-			 * indicates that the data may not be present here.
-			 * While this might result in a few i/os that will
-			 * likely return incorrect data, it simplifies the
-			 * code since we can treat scrub and resilver
-			 * identically.  (The incorrect data will be
-			 * detected and ignored when we verify the
-			 * checksum.)
+			 * If a child is missing the data, set ic_error. Used
+			 * in vdev_indirect_repair(). We perform the read
+			 * nevertheless which provides the opportunity to
+			 * reconstruct the split block if at all possible.
 			 */
+			if (vdev_dtl_contains(ic->ic_vdev, DTL_MISSING,
+			    zio->io_txg, 1))
+				ic->ic_error = SET_ERROR(ESTALE);
 
 			ic->ic_data = abd_alloc_sametype(zio->io_abd,
 			    is->is_size);
@@ -1389,7 +1389,11 @@ vdev_indirect_checksum_error(zio_t *zio,
  * Issue repair i/os for any incorrect copies.  We do this by comparing
  * each split segment's correct data (is_good_child's ic_data) with each
  * other copy of the data.  If they differ, then we overwrite the bad data
- * with the good copy.  Note that we do this without regard for the DTL's,
+ * with the good copy.  The DTL is checked in vdev_indirect_read_all() and
+ * if a vdev is missing a copy of the data we set ic_error and the read is
+ * performed. This provides the opportunity to reconstruct the split block
+ * if at all possible. ic_error is checked here and if set it suppresses
+ * incrementing the checksum counter. Aside from this DTLs are not checked,
  * which simplifies this code and also issues the optimal number of writes
  * (based on which copies actually read bad data, as opposed to which we
  * think might be wrong).  For the same reason, we always use
@@ -1399,11 +1403,6 @@ static void
 vdev_indirect_repair(zio_t *zio)
 {
 	indirect_vsd_t *iv = zio->io_vsd;
-
-	enum zio_flag flags = ZIO_FLAG_IO_REPAIR;
-
-	if (!(zio->io_flags & (ZIO_FLAG_SCRUB | ZIO_FLAG_RESILVER)))
-		flags |= ZIO_FLAG_SELF_HEAL;
 
 	if (!spa_writeable(zio->io_spa))
 		return;
@@ -1425,6 +1424,14 @@ vdev_indirect_repair(zio_t *zio)
 			    ZIO_TYPE_WRITE, ZIO_PRIORITY_ASYNC_WRITE,
 			    ZIO_FLAG_IO_REPAIR | ZIO_FLAG_SELF_HEAL,
 			    NULL, NULL));
+
+			/*
+			 * If ic_error is set the current child does not have
+			 * a copy of the data, so suppress incrementing the
+			 * checksum counter.
+			 */
+			if (ic->ic_error == ESTALE)
+				continue;
 
 			vdev_indirect_checksum_error(zio, is, ic);
 		}
