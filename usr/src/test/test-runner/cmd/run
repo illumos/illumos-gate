@@ -148,7 +148,7 @@ class Output(object):
         for easy sorting/merging later.
         """
         fd = self.fileno()
-        buf = os.read(fd, 4096).decode('utf-8')
+        buf = os.read(fd, 4096).decode('utf-8', errors='ignore')
         if not buf:
             return None
         if '\n' not in buf:
