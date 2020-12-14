@@ -1222,10 +1222,9 @@ nvlist_add_common(nvlist_t *nvl, const char *name, data_type_t type,
 		break;
 
 	case DATA_TYPE_BYTE_ARRAY:
-		*(unsigned *)nvl->nv_idx = encoded_size;
-		nvl->nv_idx += sizeof (unsigned);
-		bcopy(data, nvl->nv_idx, nelem);
-		nvl->nv_idx += encoded_size;
+		xdr.xdr_idx += xdr.xdr_putuint(&xdr, encoded_size);
+		bcopy(data, xdr.xdr_idx, nelem);
+		xdr.xdr_idx += NV_ALIGN4(encoded_size);
 		break;
 
 	case DATA_TYPE_STRING:
@@ -1311,20 +1310,20 @@ nvlist_add_common(nvlist_t *nvl, const char *name, data_type_t type,
 		break;
 
 	case DATA_TYPE_NVLIST_ARRAY: {
-		uint8_t *buf = nvl->nv_idx;
 		size_t size;
-		xdr_t xdr;
+		xdr_t xdr_nv;
 
 		for (uint32_t i = 0; i < nelem; i++) {
-			xdr.xdr_idx = ((nvlist_t **)data)[i]->nv_data;
-			xdr.xdr_buf = xdr.xdr_idx;
-			xdr.xdr_buf_size = ((nvlist_t **)data)[i]->nv_size;
+			xdr_nv.xdr_idx = ((nvlist_t **)data)[i]->nv_data;
+			xdr_nv.xdr_buf = xdr_nv.xdr_idx;
+			xdr_nv.xdr_buf_size = ((nvlist_t **)data)[i]->nv_size;
 
-			if (!nvlist_size_native(&xdr, &size))
+			if (!nvlist_size_native(&xdr_nv, &size))
 				return (EINVAL);
 
-			bcopy(((nvlist_t **)data)[i]->nv_data, buf, size);
-			buf += size;
+			bcopy(((nvlist_t **)data)[i]->nv_data, xdr.xdr_idx,
+			    size);
+			xdr.xdr_idx += size;
 		}
 		break;
 	}
@@ -1617,6 +1616,7 @@ nvpair_print(nvp_header_t *nvp, unsigned int indent)
 	case DATA_TYPE_INT64_ARRAY:
 	case DATA_TYPE_UINT64_ARRAY: {
 		uint64_t *u;
+
 		if (xdr_array(&xdr, nvp_data->nv_nelem,
 		    (xdrproc_t)xdr_uint64)) {
 			u = (uint64_t *)(nvp_data->nv_data + sizeof (unsigned));

@@ -607,6 +607,8 @@ aggr_grp_add_port(aggr_grp_t *grp, datalink_id_t port_linkid, boolean_t force,
 	port->lp_grp = grp;
 	AGGR_GRP_REFHOLD(grp);
 	grp->lg_nports++;
+	if (grp->lg_nports > grp->lg_nports_high)
+		grp->lg_nports_high = grp->lg_nports;
 
 	aggr_lacp_init_port(port);
 	mac_perim_exit(mph);
@@ -675,7 +677,7 @@ aggr_add_pseudo_rx_ring(aggr_port_t *port,
 	 * No slot for this new RX ring.
 	 */
 	if (j == MAX_RINGS_PER_GROUP)
-		return (EIO);
+		return (ENOSPC);
 
 	ring->arr_flags |= MAC_PSEUDO_RING_INUSE;
 	ring->arr_hw_rh = hw_rh;
@@ -884,7 +886,7 @@ aggr_add_pseudo_tx_ring(aggr_port_t *port,
 	 * No slot for this new TX ring.
 	 */
 	if (i == MAX_RINGS_PER_GROUP)
-		return (EIO);
+		return (ENOSPC);
 	/*
 	 * The following 4 statements needs to be done before
 	 * calling mac_group_add_ring(). Otherwise it will
@@ -948,13 +950,17 @@ aggr_rem_pseudo_tx_ring(aggr_pseudo_tx_group_t *tx_grp,
  * rings of the aggr and the hardware rings of the underlying port.
  */
 static int
-aggr_add_pseudo_tx_group(aggr_port_t *port, aggr_pseudo_tx_group_t *tx_grp)
+aggr_add_pseudo_tx_group(aggr_port_t *port, aggr_pseudo_tx_group_t *tx_grp,
+    uint_t limit)
 {
 	aggr_grp_t		*grp = port->lp_grp;
 	mac_ring_handle_t	hw_rh[MAX_RINGS_PER_GROUP], pseudo_rh;
 	mac_perim_handle_t	pmph;
 	int			hw_rh_cnt, i = 0, j;
 	int			err = 0;
+
+	if (limit == 0)
+		return (ENOSPC);
 
 	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 	mac_perim_enter_by_mh(port->lp_mh, &pmph);
@@ -973,12 +979,13 @@ aggr_add_pseudo_tx_group(aggr_port_t *port, aggr_pseudo_tx_group_t *tx_grp)
 	if (hw_rh_cnt == 0)
 		port->lp_tx_ring_cnt = 1;
 	else
-		port->lp_tx_ring_cnt = hw_rh_cnt;
+		port->lp_tx_ring_cnt = MIN(hw_rh_cnt, limit);
 
+	port->lp_tx_ring_alloc = port->lp_tx_ring_cnt;
 	port->lp_tx_rings = kmem_zalloc((sizeof (mac_ring_handle_t *) *
-	    port->lp_tx_ring_cnt), KM_SLEEP);
+	    port->lp_tx_ring_alloc), KM_SLEEP);
 	port->lp_pseudo_tx_rings = kmem_zalloc((sizeof (mac_ring_handle_t *) *
-	    port->lp_tx_ring_cnt), KM_SLEEP);
+	    port->lp_tx_ring_alloc), KM_SLEEP);
 
 	if (hw_rh_cnt == 0) {
 		if ((err = aggr_add_pseudo_tx_ring(port, tx_grp,
@@ -987,7 +994,7 @@ aggr_add_pseudo_tx_group(aggr_port_t *port, aggr_pseudo_tx_group_t *tx_grp)
 			port->lp_pseudo_tx_rings[0] = pseudo_rh;
 		}
 	} else {
-		for (i = 0; err == 0 && i < hw_rh_cnt; i++) {
+		for (i = 0; err == 0 && i < port->lp_tx_ring_cnt; i++) {
 			err = aggr_add_pseudo_tx_ring(port,
 			    tx_grp, hw_rh[i], &pseudo_rh);
 			if (err != 0)
@@ -1005,10 +1012,11 @@ aggr_add_pseudo_tx_group(aggr_port_t *port, aggr_pseudo_tx_group_t *tx_grp)
 			}
 		}
 		kmem_free(port->lp_tx_rings,
-		    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_cnt));
+		    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_alloc));
 		kmem_free(port->lp_pseudo_tx_rings,
-		    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_cnt));
+		    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_alloc));
 		port->lp_tx_ring_cnt = 0;
+		port->lp_tx_ring_alloc = 0;
 	} else {
 		port->lp_tx_grp_added = B_TRUE;
 		port->lp_tx_notify_mh = mac_client_tx_notify(port->lp_mch,
@@ -1042,9 +1050,9 @@ aggr_rem_pseudo_tx_group(aggr_port_t *port, aggr_pseudo_tx_group_t *tx_grp)
 		aggr_rem_pseudo_tx_ring(tx_grp, port->lp_pseudo_tx_rings[i]);
 
 	kmem_free(port->lp_tx_rings,
-	    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_cnt));
+	    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_alloc));
 	kmem_free(port->lp_pseudo_tx_rings,
-	    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_cnt));
+	    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_alloc));
 
 	port->lp_tx_ring_cnt = 0;
 	(void) mac_client_tx_notify(port->lp_mch, NULL, port->lp_tx_notify_mh);
@@ -1111,6 +1119,48 @@ aggr_pseudo_stop_rx_ring(mac_ring_driver_t arg)
 }
 
 /*
+ * Trim each port in a group to ensure it uses no more than tx_ring_limit
+ * rings.
+ */
+static void
+aggr_grp_balance_tx(aggr_grp_t *grp, uint_t tx_ring_limit)
+{
+	aggr_port_t *port;
+	mac_perim_handle_t mph;
+	uint_t i, tx_ring_cnt;
+
+	ASSERT(tx_ring_limit > 0);
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+
+	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
+		mac_perim_enter_by_mh(port->lp_mh, &mph);
+
+		/*
+		 * Reduce the Tx ring count first to prevent rings being
+		 * used as they are removed.
+		 */
+		rw_enter(&grp->lg_tx_lock, RW_WRITER);
+		if (port->lp_tx_ring_cnt <= tx_ring_limit) {
+			rw_exit(&grp->lg_tx_lock);
+			mac_perim_exit(mph);
+			continue;
+		}
+
+		tx_ring_cnt = port->lp_tx_ring_cnt;
+		port->lp_tx_ring_cnt = tx_ring_limit;
+		rw_exit(&grp->lg_tx_lock);
+
+		for (i = tx_ring_cnt - 1; i >= tx_ring_limit; i--) {
+			aggr_rem_pseudo_tx_ring(&grp->lg_tx_group,
+			    port->lp_pseudo_tx_rings[i]);
+
+		}
+
+		mac_perim_exit(mph);
+	}
+}
+
+/*
  * Add one or more ports to an existing link aggregation group.
  */
 int
@@ -1120,6 +1170,7 @@ aggr_grp_add_ports(datalink_id_t linkid, uint_t nports, boolean_t force,
 	int rc;
 	uint_t port_added = 0;
 	uint_t grp_added;
+	uint_t nports_high, tx_ring_limit;
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
 	boolean_t link_state_changed = B_FALSE;
@@ -1139,6 +1190,24 @@ aggr_grp_add_ports(datalink_id_t linkid, uint_t nports, boolean_t force,
 	 */
 	mac_perim_enter_by_mh(grp->lg_mh, &mph);
 	rw_exit(&aggr_grp_lock);
+
+	/*
+	 * Limit the number of Tx rings per port. When determining the
+	 * number of ports take into consideration the existing high
+	 * value, and what the new high value may be after this request.
+	 */
+	nports_high = MAX(grp->lg_nports_high, grp->lg_nports + nports);
+	tx_ring_limit = MAX_RINGS_PER_GROUP / nports_high;
+
+	if (tx_ring_limit == 0) {
+		rc = ENOSPC;
+		goto bail;
+	}
+
+	/*
+	 * Balance the Tx rings so each port has a fair share of rings.
+	 */
+	aggr_grp_balance_tx(grp, tx_ring_limit);
 
 	/* Add the specified ports to the aggr. */
 	for (uint_t i = 0; i < nports; i++) {
@@ -1164,7 +1233,8 @@ aggr_grp_add_ports(datalink_id_t linkid, uint_t nports, boolean_t force,
 		 * Create the pseudo ring for each HW ring of the underlying
 		 * port.
 		 */
-		rc = aggr_add_pseudo_tx_group(port, &grp->lg_tx_group);
+		rc = aggr_add_pseudo_tx_group(port, &grp->lg_tx_group,
+		    tx_ring_limit);
 		if (rc != 0)
 			goto bail;
 
@@ -1380,6 +1450,7 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	mac_perim_handle_t mph, pmph;
 	datalink_id_t tempid;
 	boolean_t mac_registered = B_FALSE;
+	uint_t tx_ring_limit;
 	int err;
 	int i, j;
 	kt_did_t tid = 0;
@@ -1551,6 +1622,25 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	aggr_lacp_set_mode(grp, lacp_mode, lacp_timer);
 
 	/*
+	 * The pseudo Tx group holds a maximum of MAX_RINGS_PER_GROUP
+	 * rings, when all the Tx rings of all the ports are accumulated
+	 * it is conceivable this limit is exceeded. We try and prevent
+	 * this by limiting the number of rings an individual port will use.
+	 *
+	 * - When an aggr is first created, we will not let an
+	 *   individual port use more than MAX_RINGS_PER_GROUP/nports
+	 *   rings.
+	 * - As ports are added to an existing aggr, each of the
+	 *   ports will not use more than MAX_RINGS_PER_GROUP/nports_high.
+	 *   Where nports_high is the highest number of ports the aggr has
+	 *   held (including any ports being added). This may involve
+	 *   trimming rings from existing ports.
+	 */
+
+	/* Leave room for 4 ports */
+	tx_ring_limit = MAX_RINGS_PER_GROUP / MAX(4, nports);
+
+	/*
 	 * Attach each port if necessary.
 	 */
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
@@ -1559,7 +1649,8 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 		 * underlying port. Note that this is done after the
 		 * aggr registers its MAC.
 		 */
-		err = aggr_add_pseudo_tx_group(port, &grp->lg_tx_group);
+		err = aggr_add_pseudo_tx_group(port, &grp->lg_tx_group,
+		    tx_ring_limit);
 
 		if (err != 0) {
 			mac_perim_exit(mph);

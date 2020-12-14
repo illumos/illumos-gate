@@ -142,6 +142,7 @@ struct flatpanelinfo
 
 #define	CMAP_SIZE		256	/* Number of colors in palette */
 
+extern struct paletteentry pe8[CMAP_SIZE];
 extern int palette_format;
 
 /* high-level VBE helpers, from vbe.c */

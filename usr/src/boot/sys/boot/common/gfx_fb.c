@@ -27,6 +27,7 @@
 #include <efilib.h>
 #else
 #include <btxv86.h>
+#include <vbe.h>
 #endif
 #include <sys/tem_impl.h>
 #include <sys/consplat.h>
@@ -1205,7 +1206,7 @@ gfx_fb_putimage(png_t *png, uint32_t ux1, uint32_t uy1, uint32_t ux2,
 	struct vis_consdisplay da;
 	uint32_t i, j, x, y, fheight, fwidth, color;
 	int fbpp;
-	uint8_t r, g, b, a, *p;
+	uint8_t r, g, b, a;
 	bool scale = false;
 	bool trace = false;
 
@@ -1433,40 +1434,74 @@ gfx_fb_putimage(png_t *png, uint32_t ux1, uint32_t uy1, uint32_t ux2,
 			    << gfx_fb.u.fb2.framebuffer_blue_field_position;
 
 			switch (gfx_fb.framebuffer_common.framebuffer_bpp) {
+#if !defined(EFI)
 			case 8: {
 				uint32_t best, dist, k;
 				int diff;
 
+				/* if alpha is 0, use screen bg color */
+				if (a == 0) {
+					text_color_t fg, bg;
+
+					tem_get_colors(
+					    (tem_vt_state_t)tems.ts_active,
+					    &fg, &bg);
+					da.data[j] = gfx_fb_color_map(bg);
+					break;
+				}
+
 				color = 0;
-				best = 256 * 256 * 256;
-				for (k = 0; k < 16; k++) {
-					diff = r - cmap4_to_24.red[k];
+				best = CMAP_SIZE * CMAP_SIZE * CMAP_SIZE;
+				for (k = 0; k < CMAP_SIZE; k++) {
+					diff = r - pe8[k].Red;
 					dist = diff * diff;
-					diff = g - cmap4_to_24.green[k];
+					diff = g - pe8[k].Green;
 					dist += diff * diff;
-					diff = b - cmap4_to_24.blue[k];
+					diff = b - pe8[k].Blue;
 					dist += diff * diff;
+
+					if (dist == 0)
+						break;
 
 					if (dist < best) {
 						color = k;
 						best = dist;
-						if (dist == 0)
-							break;
 					}
 				}
-				da.data[j] = solaris_color_to_pc_color[color];
+				if (k == CMAP_SIZE)
+					k = color;
+				da.data[j] = (k < 16) ?
+				    solaris_color_to_pc_color[k] : k;
 				break;
 			}
 			case 15:
 			case 16:
+				/* if alpha is 0, use screen bg color */
+				if (a == 0) {
+					text_color_t fg, bg;
+
+					tem_get_colors(
+					    (tem_vt_state_t)tems.ts_active,
+					    &fg, &bg);
+					color = gfx_fb_color_map(bg);
+				}
 				*(uint16_t *)(da.data+j) = color;
 				break;
 			case 24:
-				p = (uint8_t *)&color;
-				da.data[j] = p[0];
-				da.data[j+1] = p[1];
-				da.data[j+2] = p[2];
+				/* if alpha is 0, use screen bg color */
+				if (a == 0) {
+					text_color_t fg, bg;
+
+					tem_get_colors(
+					    (tem_vt_state_t)tems.ts_active,
+					    &fg, &bg);
+					color = gfx_fb_color_map(bg);
+				}
+				da.data[j] = ((uint8_t *)&color)[0];
+				da.data[j + 1] = ((uint8_t *)&color)[1];
+				da.data[j + 2] = ((uint8_t *)&color)[2];
 				break;
+#endif
 			case 32:
 				color |= a << 24;
 				*(uint32_t *)(da.data+j) = color;

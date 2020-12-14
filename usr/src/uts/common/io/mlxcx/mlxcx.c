@@ -2874,10 +2874,14 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	mlxp->mlx_attach |= MLXCX_ATTACH_CHKTIMERS;
 
-	if (!mlxcx_setup_sensors(mlxp)) {
-		goto err;
+	/*
+	 * Some devices may not have a working temperature sensor; however,
+	 * there isn't a great way for us to know. We shouldn't fail attach if
+	 * this doesn't work.
+	 */
+	if (mlxcx_setup_sensors(mlxp)) {
+		mlxp->mlx_attach |= MLXCX_ATTACH_SENSORS;
 	}
-	mlxp->mlx_attach |= MLXCX_ATTACH_SENSORS;
 
 	/*
 	 * Finally, tell MAC that we exist!
