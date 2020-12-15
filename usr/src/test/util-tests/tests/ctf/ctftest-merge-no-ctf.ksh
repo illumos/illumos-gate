@@ -18,6 +18,14 @@ result=0
 
 progname=$(basename $0)
 
+#
+# The assembler and compiler may not end up using the same architecture
+# (e.g. 32-bit or 64-bit) by default. So we force this to always be
+# consistent.
+#
+cflags="-m64"
+asflags="--64"
+
 fail()
 {
 	echo "Failed: $*" 2>&1
@@ -67,7 +75,7 @@ cat <<EOF >file2.c
 #include <stdio.h>
 struct foo { char b; float c; };
 struct foo stuff[90];
-char myfunc(int a) { printf("%d\n", a); }
+char myfunc(int a) { printf("%d\n", a); return ('z'); }
 EOF
 
 cat <<EOF >file3.cc
@@ -85,29 +93,29 @@ EOF
 
 echo "$progname: ctfmerge should fail if one C-source lacks CTF"
 
-$ctf_cc $ctf_debugflags -c -o file1.o file1.c
+$ctf_cc $cflags $ctf_debugflags -c -o file1.o file1.c
 $ctf_convert file1.o
-$ctf_cc -c -o file2.o file2.c
+$ctf_cc $cflags -c -o file2.o file2.c
 ld -r -o files.o file2.o file1.o
 fail_no_ctf $ctf_merge -o files.o file2.o file1.o
 ld -r -o files.o file2.o file1.o
 $ctf_merge -m -o files.o file2.o file1.o
 has_ctf files.o
-$ctf_cc -o mybin file2.o file1.o
+$ctf_cc $cflags -o mybin file2.o file1.o
 fail_no_ctf $ctf_merge -o mybin file2.o file1.o
-$ctf_cc -o mybin file2.o file1.o
+$ctf_cc $cflags -o mybin file2.o file1.o
 $ctf_merge -m -o mybin file2.o file1.o
 
 
 echo "$progname: ctfmerge should allow a .cc file to lack CTF"
-$ctf_cxx -c -o file3.o file3.cc
+$ctf_cxx $cflags -c -o file3.o file3.cc
 ld -r -o files.o file1.o file3.o
 $ctf_merge -o files.o file1.o file3.o
 ld -r -o files.o file1.o file3.o
 $ctf_merge -m -o files.o file1.o file3.o
 
 echo "$progname: ctfmerge should allow an .s file to lack CTF"
-$ctf_as -o file4.o file4.s
+$ctf_as $asflags -o file4.o file4.s
 ld -r -o files.o file4.o file1.o
 $ctf_merge -o files.o file4.o file1.o
 ld -r -o files.o file4.o file1.o

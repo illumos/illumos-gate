@@ -20,45 +20,45 @@
  * Test various function and function pointer cases.
  */
 
-static void
+void
 simple_func(void)
 {
 }
 
-static void
+void
 one(int v)
 {
 }
 
-static void
+void
 two(int v, const char *a)
 {
 }
 
-static void
+void
 three(int v, const char *a, float b)
 {
 }
 
-static const char *
+const char *
 noarg(void)
 {
 	return ("hello, world");
 }
 
-static const char *
+const char *
 argument(uintptr_t base)
 {
 	return ((const char *)(base + 1));
 }
 
-static void
+void
 vararg(const char *foo, ...)
 {
 
 }
 
-static uintptr_t
+uintptr_t
 vararg_ret(const char *foo, ...)
 {
 	return ((uintptr_t)foo);

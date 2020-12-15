@@ -51,7 +51,7 @@ BINS =		$(BUILDDIR)/test-merge-reduction-32c.so.1 \
 
 CFLAGS = -fPIC
 LDFLAGS = -shared -Wl,-Mmapfile-vers -Wl,-ztext -Wl,-zdefs \
-	  -htest-merge-reduction.so.1
+	  -Wl,-htest-merge-reduction.so.1 -lc
 
 build: $(BINS)
 

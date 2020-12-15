@@ -120,9 +120,18 @@ static check_descent_t check_descent_cv_int_array_gcc7[] = {
 	{ NULL }
 };
 
+static check_descent_t check_descent_cv_int_array_clang9[] = {
+	{ "const volatile int [13]", CTF_K_ARRAY, "const volatile int", 13 },
+	{ "const volatile int", CTF_K_CONST },
+	{ "volatile int", CTF_K_VOLATILE },
+	{ "int", CTF_K_INTEGER },
+	{ NULL }
+};
+
 static check_descent_test_t alt_descents_cv_int_array[] = {
 	{ "cv_int_array", check_descent_cv_int_array_gcc4 },
 	{ "cv_int_array", check_descent_cv_int_array_gcc7 },
+	{ "cv_int_array", check_descent_cv_int_array_clang9 },
 	{ NULL }
 };
 
@@ -142,9 +151,18 @@ static check_descent_t check_descent_vc_int_array_gcc7[] = {
 	{ NULL }
 };
 
+static check_descent_t check_descent_vc_int_array_clang9[] = {
+	{ "const volatile int [15]", CTF_K_ARRAY, "const volatile int", 15 },
+	{ "const volatile int", CTF_K_CONST },
+	{ "volatile int", CTF_K_VOLATILE },
+	{ "int", CTF_K_INTEGER },
+	{ NULL }
+};
+
 static check_descent_test_t alt_descents_vc_int_array[] = {
 	{ "vc_int_array", check_descent_vc_int_array_gcc4 },
 	{ "vc_int_array", check_descent_vc_int_array_gcc7 },
+	{ "vc_int_array", check_descent_vc_int_array_clang9 },
 	{ NULL }
 };
 
@@ -164,9 +182,19 @@ static check_descent_t check_descent_vc_int_array2_gcc7[] = {
 	{ NULL }
 };
 
+static check_descent_t check_descent_vc_int_array2_clang9[] = {
+	{ "const volatile int [17]", CTF_K_ARRAY, "const volatile int", 17 },
+	{ "const volatile int", CTF_K_CONST },
+	{ "volatile int", CTF_K_VOLATILE },
+	{ "int", CTF_K_INTEGER },
+	{ NULL }
+};
+
+
 static check_descent_test_t alt_descents_vc_int_array2[] = {
 	{ "vc_int_array2", check_descent_vc_int_array2_gcc4 },
 	{ "vc_int_array2", check_descent_vc_int_array2_gcc7 },
+	{ "vc_int_array2", check_descent_vc_int_array2_clang9 },
 	{ NULL }
 };
 
@@ -214,9 +242,24 @@ static check_descent_t check_descent_cv_3d_array_gcc7[] = {
 	{ NULL }
 };
 
+static check_descent_t check_descent_cv_3d_array_clang9[] = {
+	{ "const volatile int [3][2][1]", CTF_K_ARRAY,
+	    "const volatile int [2][1]", 3 },
+	{ "const volatile int [2][1]", CTF_K_ARRAY,
+	    "const volatile int [1]", 2 },
+	{ "const volatile int [1]", CTF_K_ARRAY,
+	    "const volatile int", 1 },
+	{ "const volatile int", CTF_K_CONST },
+	{ "volatile int", CTF_K_VOLATILE },
+	{ "int", CTF_K_INTEGER },
+	{ NULL }
+};
+
+
 static check_descent_test_t alt_descents_cv_3d_array[] = {
 	{ "cv_3d_array", check_descent_cv_3d_array_gcc4 },
 	{ "cv_3d_array", check_descent_cv_3d_array_gcc7 },
+	{ "cv_3d_array", check_descent_cv_3d_array_clang9 },
 	{ NULL }
 };
 

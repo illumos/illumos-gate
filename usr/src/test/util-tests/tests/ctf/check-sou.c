@@ -41,7 +41,11 @@ static check_number_t check_bitfields[] = {
 #endif
 	{ "unsigned short:1", CTF_K_INTEGER, 0, 0, 1 },
 	{ "unsigned int:7", CTF_K_INTEGER, 0, 0, 7 },
-	{ "unsigned int:32", CTF_K_INTEGER, 0, 0, 32 },
+	/*
+	 * Skipped on clang as it doesn't process csts correctly. See
+	 * check_members_csts.
+	 */
+	{ "unsigned int:32", CTF_K_INTEGER, 0, 0, 32, SKIP_CLANG },
 	{ "int:3", CTF_K_INTEGER, CTF_INT_SIGNED, 0, 3 },
 	{ NULL }
 };
@@ -233,6 +237,10 @@ static check_member_t check_member_rings[] = {
 	{ NULL }
 };
 
+/*
+ * Unfortunately this test case fails with clang in at least versions 8-10. See
+ * https://bugs.llvm.org/show_bug.cgi?id=44601 for more information on the bug.
+ */
 static check_member_t check_member_csts[] = {
 	{ "rdy", "unsigned int:7", 0 },
 	{ "csts", "unsigned int:32", 7 },
@@ -317,7 +325,7 @@ static check_member_test_t members[] = {
 	{ "struct stats", CTF_K_STRUCT, 16, check_member_stats },
 	{ "struct fellowship", CTF_K_STRUCT, 2, check_member_fellowship },
 	{ "struct rings", CTF_K_STRUCT, 8, check_member_rings },
-	{ "struct csts", CTF_K_STRUCT, 5, check_member_csts },
+	{ "struct csts", CTF_K_STRUCT, 5, check_member_csts, SKIP_CLANG },
 	{ "union jrpg", CTF_K_UNION, 32, check_member_jrpg },
 	{ "struct android", CTF_K_STRUCT, 4, check_member_android },
 	{ "union nier", CTF_K_UNION, 4, check_member_nier },
@@ -422,6 +430,13 @@ main(int argc, char *argv[])
 		}
 
 		for (j = 0; members[j].cmt_type != NULL; j++) {
+			if (ctftest_skip(members[j].cmt_skips)) {
+				warnx("skipping members test %s due to "
+				    "known compiler issue",
+				    members[j].cmt_type);
+				continue;
+			}
+
 			if (!ctftest_check_members(members[j].cmt_type, fp,
 			    members[j].cmt_kind, members[j].cmt_size,
 			    members[j].cmt_members)) {

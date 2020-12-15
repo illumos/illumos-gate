@@ -22,3 +22,9 @@ mumble(uint32_t a)
 {
 	return (a);
 }
+
+uint32_t
+c(uint16_t c)
+{
+	return (mumble(c));
+}
