@@ -136,25 +136,6 @@ ADMIN_NIC_TAG=${CONFIG_admin_tag:-"admin"}
 
 nic="${tagv[$ADMIN_NIC_TAG]}"
 
-if [[ -n "${aggr_links[$nic]}" ]]; then
-    mode=${aggr_mode[$nic]:-"off"}
-
-    for l in ${aggr_links[$nic]}; do
-        [[ -n "${mac_to_link[$l]}" ]] || fatal "MAC '$l' not present"
-        links+="${mac_to_link[$l]} "
-    done
-    links="${links% }"
-
-    echo "Creating aggr: $nic (mode=$mode, links=${links})"
-    dladm create-aggr -l ${links// / -l } -L $mode $nic
-elif valid_mac "$nic"; then
-    [[ -n "${mac_to_link[$nic]}" ]] || \
-        fatal "ERROR: admin mac address $nic not found on system"
-    nic=${mac_to_link[$nic]}
-else
-    fatal "ERROR: Invalid value of ${ADMIN_NIC_TAG}_nic ($nic)"
-fi
-
 # If there are other nic tags configured on the same link as
 # the admin tag, find the largest MTU to use to set the
 # datalink MTU
@@ -177,6 +158,31 @@ for tag in ${tags[@]}; do
         dlmtu=${mtu[$tag]}
     fi
 done
+
+
+if [[ -n "${aggr_links[$nic]}" ]]; then
+    mode=${aggr_mode[$nic]:-"off"}
+
+    for l in ${aggr_links[$nic]}; do
+        [[ -n "${mac_to_link[$l]}" ]] || fatal "MAC '$l' not present"
+        link="${mac_to_link[$l]}"
+        if [[ -n "$dlmtu" ]]; then
+            dladm set-linkprop -p mtu=$dlmtu $link || \
+                fatal "ERROR: Failed to set mtu on $link to $dlmtu"
+        fi
+        links+="${link} "
+    done
+    links="${links% }"
+
+    echo "Creating aggr: $nic (mode=$mode, links=${links})"
+    dladm create-aggr -l ${links// / -l } -L $mode $nic
+elif valid_mac "$nic"; then
+    [[ -n "${mac_to_link[$nic]}" ]] || \
+        fatal "ERROR: admin mac address $nic not found on system"
+    nic=${mac_to_link[$nic]}
+else
+    fatal "ERROR: Invalid value of ${ADMIN_NIC_TAG}_nic ($nic)"
+fi
 
 if [[ -n "$dlmtu" ]]; then
     dladm set-linkprop -p mtu=$dlmtu $nic || \
