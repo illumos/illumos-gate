@@ -39,7 +39,6 @@ UTSBASE	= ../..
 #
 MODULE		= idmap
 OBJECTS		= $(IDMAP_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(IDMAP_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
@@ -53,20 +52,17 @@ include $(UTSBASE)/sparc/Makefile.sparc
 LDFLAGS += -dy -N"sys/doorfs" -N"strmod/rpcmod"
 
 #
-# Lint warnings turned off
+# warnings turned off
 #
 # Function variables unused for rpcgen-generated code
 # Constant conditions for do { } while (0) macros
 #
-LINTTAGS += -erroff=E_FUNC_VAR_UNUSED -erroff=E_CONSTANT_CONDITION
-
 CERRWARN	+= -_gcc=-Wno-unused-variable
 
 #
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CLEANFILES	+= $(MODSTUBS_O)
 
@@ -82,12 +78,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

@@ -20,11 +20,10 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/fjlite/Makefile
 # Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This Makefile defines the build rules for the directory
 #	uts/sun4u/fjlite and its children.
@@ -41,14 +40,3 @@
 $(OBJS_DIR)/%.o:	$(UTSBASE)/sun4u/fjlite/os/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-#
-# Lint object build rules
-#
-
-#
-# fjlite specific drivers
-#
-
-$(LINTS_DIR)/%.ln:	$(UTSBASE)/sun4u/fjlite/os/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))

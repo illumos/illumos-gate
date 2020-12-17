@@ -38,7 +38,6 @@ CRYPTODIR = $(COMMONBASE)/crypto
 #
 MODULE		= bignum
 OBJECTS		= $(BIGNUM_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(BIGNUM_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 BIGNUM_PSR_OBJS = bignum_amd64.o bignum_amd64_asm.o
@@ -52,7 +51,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -74,12 +72,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
@@ -107,10 +99,8 @@ include $(UTSBASE)/intel/Makefile.targ
 
 BIGNUM_CFG = -DPSR_MUL
 CFLAGS	+= -xO4 -xcrossfile
-$(OBJS_DIR)/bignumimpl.o $(LINTS_DIR)/bignumimpl.ln := \
-	CPPFLAGS += $(BIGNUM_CFG)
-$(OBJS_DIR)/bignum_amd64.o $(LINTS_DIR)/bignum_amd64.ln := \
-	CPPFLAGS += $(BIGNUM_CFG)
+$(OBJS_DIR)/bignumimpl.o := CPPFLAGS += $(BIGNUM_CFG)
+$(OBJS_DIR)/bignum_amd64.o := CPPFLAGS += $(BIGNUM_CFG)
 
 $(OBJS_DIR)/bignum_amd64.o: $(BIGNUMDIR)/amd64/bignum_amd64.c
 	$(COMPILE.c) -o $@ $(BIGNUM_CFG) $(BIGNUMDIR)/amd64/bignum_amd64.c
@@ -119,9 +109,3 @@ $(OBJS_DIR)/bignum_amd64.o: $(BIGNUMDIR)/amd64/bignum_amd64.c
 $(OBJS_DIR)/bignum_amd64_asm.o: $(BIGNUMDIR)/amd64/bignum_amd64_asm.s
 	$(COMPILE.s) -P -o $@ $(BIGNUM_CFG) \
 		$(BIGNUMDIR)/amd64/bignum_amd64_asm.s
-
-$(LINTS_DIR)/bignum_amd64.ln: $(BIGNUMDIR)/amd64/bignum_amd64.c
-	@($(LHEAD) $(LINT.c) $(BIGNUMDIR)/amd64/bignum_amd64.c $(LTAIL))
-
-$(LINTS_DIR)/bignum_amd64_asm.ln: $(BIGNUMDIR)/amd64/bignum_amd64_asm.s
-	@($(LHEAD) $(LINT.s) $(BIGNUMDIR)/amd64/bignum_amd64_asm.s $(LTAIL))

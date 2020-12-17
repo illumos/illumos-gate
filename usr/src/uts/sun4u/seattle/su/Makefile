@@ -23,9 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# uts/sun4u/seattle/su/Makefile
+
 #
 #	This makefile drives the install of the platform su.conf
 #	driver configuration file in the sun4u Seattle system.
@@ -69,7 +67,7 @@ $(CONF_INSTALL_OBJ):	FRC
 #
 .KEEP_STATE:
 
-def all clean clobber lint modlintlib clean.lint:
+def all clean clobber:
 
 install:	$(INSTALL_TARGET)
 

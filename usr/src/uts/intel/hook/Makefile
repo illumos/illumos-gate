@@ -42,7 +42,6 @@ UTSBASE	= ../..
 #
 MODULE		= hook
 OBJECTS		= $(HOOK_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(HOOK_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 
@@ -60,7 +59,6 @@ $(OBJS_DIR)/hook.o := SMOFF += all_func_returns
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 
@@ -76,12 +74,6 @@ all:		$(ALL_DEPS) $(SISCHECK_DEPS)
 clean:		$(CLEAN_DEPS) $(SISCLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS) $(SISCLEAN_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS) $(SISCHECK_DEPS)
 

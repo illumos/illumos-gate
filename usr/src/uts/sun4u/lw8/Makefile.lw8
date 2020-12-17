@@ -23,7 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 #	Global definitions for sun4u implementation specific modules.
@@ -59,8 +58,6 @@ USR_LW8_ISYS_DIR	= $(USR_LW8_INC_DIR)/sys
 USR_LW8_SBIN_DIR	= $(USR_LW8_DIR)/sbin
 USR_LW8_LIB_DIR		= $(USR_LW8_DIR)/lib
 
-LW8_LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/lw8/lint-libs/$(OBJS_DIR)
-
 #
 #	Define modules.
 #
@@ -94,8 +91,6 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 UNIX_DIR	= $(UTSBASE)/$(PLATFORM)/serengeti/unix
 MODSTUBS_DIR	= $(UNIX_DIR)
 DSF_DIR		= $(UTSBASE)/$(PLATFORM)/serengeti/genassym
-LINTS_DIR	= $(OBJS_DIR)
-LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/lw8/lint-libs/$(OBJS_DIR)
 
 #
 #       Define the actual specific platforms
@@ -121,13 +116,3 @@ CPP_DEFS_32   =
 CPP_DEFS_64   = -D__sparcv9
 CPP_DEFS      = $(CPP_DEFS_$(CLASS))
 
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_STATIC_UNUSED

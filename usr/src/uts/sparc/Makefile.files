@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 #	This Makefile defines all file modules and build rules for the
-# directory uts/sparc and it's children. These are the source files which
+# directory uts/sparc and its children. These are the source files which
 # are specific to the sparc processor.
 #
 
@@ -109,16 +109,12 @@ SDT_OBJS	+= sdt.o
 #
 #	Build up paths and defines.
 #
-LINT_DEFS	+= -Dsparc
 INC_PATH	+= -I$(UTSBASE)/sparc
 INC_PATH	+= -I$(UTSBASE)/sparc/krtld
 
 #
 # Since assym.h is a derived file, the dependency must be explicit for
-# all files including this file. (This is only actually required in the
-# instance when the .nse_depinfo file does not exist.) It may seem that
-# the lint targets should also have a similar dependency, but they don't
-# since only C headers are included when #defined(lint) is true.
+# all files including this file.
 #
 ASSYM_DEPS +=	sparc_ddi.o
 

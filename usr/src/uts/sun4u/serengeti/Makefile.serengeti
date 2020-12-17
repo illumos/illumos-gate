@@ -66,8 +66,6 @@ USR_SERENGETI_ISYS_DIR		= $(USR_SERENGETI_INC_DIR)/sys
 USR_SERENGETI_SBIN_DIR		= $(USR_SERENGETI_DIR)/sbin
 USR_SERENGETI_LIB_DIR		= $(USR_SERENGETI_DIR)/lib
 
-SERENGETI_LINT_LIB_DIR		= $(UTSBASE)/$(PLATFORM)/serengeti/lint-libs/$(OBJS_DIR)
-
 #
 #       Include the makefiles which define build rule templates, the
 #       collection of files per module, and a few specific flags. Note
@@ -95,7 +93,7 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 #
 #	Define modules
 #
-SERENGETI_KMODS	= cheetah cheetahplus  
+SERENGETI_KMODS	= cheetah cheetahplus
 SERENGETI_KMODS	+= platmod sbdp sgcn sghsc sgsbbc ssm
 
 #
@@ -104,12 +102,9 @@ SERENGETI_KMODS	+= platmod sbdp sgcn sghsc sgsbbc ssm
 UNIX_DIR	= $(UTSBASE)/$(PLATFORM)/serengeti/unix
 MODSTUBS_DIR	= $(UNIX_DIR)
 DSF_DIR		= $(UTSBASE)/$(PLATFORM)/serengeti/genassym
-LINTS_DIR	= $(OBJS_DIR)
-LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/serengeti/lint-libs/$(OBJS_DIR)
 
 UNIX_O		= $(UNIX_DIR)/$(OBJS_DIR)/unix.o
 
-LINT_LIB	= $(LINT_LIB_DIR)/llib-lunix.ln
 
 #
 #       Define the actual specific platforms
@@ -135,15 +130,3 @@ MACHINE_DEFS	+= -DC_OBP
 CPP_DEFS_32	= -D__sparc
 CPP_DEFS_64	= -D__sparc -D__sparcv9
 CPP_DEFS	= $(CPP_DEFS_$(CLASS))
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV

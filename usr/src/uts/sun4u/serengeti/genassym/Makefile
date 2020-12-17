@@ -24,8 +24,6 @@
 # Use is subject to license terms.
 #
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #
 #	This makefile drives the production of assym.h through genconst/stabs.
 #
@@ -62,7 +60,6 @@ CLEANFILES	= $(GENCONST) Nothing_to_remove
 CLOBBERFILES	= $(ASSYM_H) $(CLEANFILES) Nothing_to_remove
 ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
-CLEANLINTFILES	+= $(LINT32_FILES)
 
 #
 #	Default build targets.
@@ -76,8 +73,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-clean.lint:
 
 install:	def
 

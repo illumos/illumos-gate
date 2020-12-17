@@ -20,11 +20,10 @@
 # CDDL HEADER END
 #
 #
-# uts/sfmmu/Makefile.rules
 # Copyright (c) 1991-2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This Makefile defines all build rules for the directory uts/sfmmu and
 # its children. These are the source files which are common to all sfmmu
@@ -38,11 +37,3 @@
 #	  Lines whose initial directory components are equal are sorted
 #	  alphabetically by the remaining components.
 
-#
-#	Section 1a: C object build rules
-#
-
-
-#
-#	Section 1b: Lint `object' build rules
-#

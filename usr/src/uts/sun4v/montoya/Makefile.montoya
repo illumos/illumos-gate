@@ -54,8 +54,6 @@ USR_MONTOYA_ISYS_DIR	= $(USR_MONTOYA_INC_DIR)/sys
 
 USR_MONTOYA_SBIN_LINKS	= $(USR_MONTOYA_SBIN_DIR)/prtdiag
 
-MONTOYA_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/montoya/lint-libs/$(OBJS_DIR)
-
 #
 #	Define modules.
 #
@@ -80,8 +78,6 @@ include $(UTSBASE)/sun4v/montoya/Makefile.files
 include $(UTSBASE)/sun4v/Makefile.sun4v
 
 MODSTUBS_DIR  = $(UNIX_DIR)
-LINTS_DIR	= $(OBJS_DIR)
-LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/montoya/lint-libs/$(OBJS_DIR)
 
 
 #

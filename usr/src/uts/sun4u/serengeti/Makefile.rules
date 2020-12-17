@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This Makefile defines the build rules for the directory
 #	uts/sun4u/serengeti.
@@ -61,16 +61,3 @@ CLEANFILES += $(SBDP_IL)
 
 $(SBDP_IL):		$(UTSBASE)/sun4u/serengeti/ml/sbdp.il.cpp
 	$(IL_CPP) $(UTSBASE)/sun4u/serengeti/ml/sbdp.il.cpp >$@
-
-
-#
-#	Section 1b: Lint `object' build rules
-#
-$(LINTS_DIR)/%.ln:              $(UTSBASE)/sun4u/serengeti/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:              $(UTSBASE)/sun4u/serengeti/ml/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/serengeti/os/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))

@@ -32,7 +32,6 @@ UTSBASE = ../..
 MODULE		= mc-amd
 #
 OBJECTS		= $(MCAMD_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(MCAMD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 SRCDIR		= $(UTSBASE)/intel/io/mc-amd
 CONF_SRCDIR	= $(SRCDIR)
@@ -50,7 +49,6 @@ include ../Makefile.intel
 #       Define targets
 #
 ALL_TARGET      = $(BINARY)
-LINT_TARGET     = $(MODULE).lint
 INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
@@ -77,16 +75,9 @@ clean:          $(CLEAN_DEPS)
 
 clobber:        $(CLOBBER_DEPS)
 
-lint:           $(LINT_DEPS)
-
-modlintlib:     $(MODLINTLIB_DEPS)
-
-clean.lint:     $(CLEAN_LINT_DEPS)
-
 install:        $(INSTALL_DEPS)
 
 $(OBJECTS): $(OBJS_DIR) $(MCAMD_OFF_H)
-$(LINTS): $(MCAMD_OFF_H)
 
 #
 # Create mcamd_off.h

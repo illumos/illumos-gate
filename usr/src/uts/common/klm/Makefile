@@ -68,6 +68,4 @@ clean:
 
 clobber:	clean
 
-lint:
-
 .KEEP_STATE:

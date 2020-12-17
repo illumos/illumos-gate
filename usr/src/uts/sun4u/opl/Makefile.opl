@@ -61,7 +61,6 @@ USR_OPL_SBIN_FRUADM	= $(USR_OPL_SBIN_DIR)/fruadm
 USR_OPL_INC_DIR		= $(USR_OPL_DIR)/include
 USR_OPL_ISYS_DIR	= $(USR_OPL_INC_DIR)/sys
 
-OPL_LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/opl/lint-libs/$(OBJS_DIR)
 OPLMSU_OPTION		= options
 
 #
@@ -110,12 +109,9 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 UNIX_DIR	= $(UTSBASE)/$(PLATFORM)/opl/unix
 MODSTUBS_DIR	= $(UNIX_DIR)
 DSF_DIR		= $(UTSBASE)/$(PLATFORM)/opl/genassym
-LINTS_DIR	= $(OBJS_DIR)
-LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/opl/lint-libs/$(OBJS_DIR)
 
 UNIX_O		= $(UNIX_DIR)/$(OBJS_DIR)/unix.o
 
-LINT_LIB	= $(LINT_LIB_DIR)/llib-lunix.ln
 
 #
 #	Define the actual specific platforms
@@ -152,7 +148,7 @@ MACHINE_DEFS += -DOLYMPUS_C_REV_A_ERRATA_XCALL
 MACHINE_DEFS += -DOLYMPUS_C_REV_B_ERRATA_XCALL
 #
 # OLYMPUS C Spurious interrupts
-# - When an UE is detected in a interrupt packet, 
+# - When an UE is detected in a interrupt packet,
 #   Olympus-C takes an interrupt_vector_trap (TT=0x60) while
 #   ASI_INTR_RECIEVE.BUSY is set to zero to indicate the existence
 #   of the error. Software will see this as a spurious interrupt since
@@ -164,17 +160,5 @@ MACHINE_DEFS += -DOLYMPUS_C_REV_B_ERRATA_XCALL
 #   accordingly. For the domain, the system should panic as it is not
 #   recoverable.
 MACHINE_DEFS += -DCLEAR_INTR_BUSYBIT_ON_SPURIOUS
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 .KEEP_STATE:

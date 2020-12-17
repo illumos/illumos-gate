@@ -33,13 +33,6 @@ UTSBASE = ..
 
 include Makefile.sparc
 
-LINT_KMODS_X1	= $(LINT_KMODS:nsmb=)
-LINT_KMODS_X2	= $(LINT_KMODS_X1:smbfs=)
-LINT_KMODLIBS	= $(LINT_KMODS_X2:e1000g=)
-LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
-		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
-		  $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-
 DRV_KMODS	+= dprov
 
 def		:=	TARGET= def
@@ -47,21 +40,16 @@ all		:=	TARGET= all
 install		:=	TARGET= install
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 install_h	:=	TARGET= install_h
 
 .KEEP_STATE:
 
-.PARALLEL:	$(PARALLEL_KMODS) $(XMODS) config $(LINT_DEPS)
+.PARALLEL:	$(PARALLEL_KMODS) $(XMODS) config
 
 def all install clean clobber modlist: $(KMODS) $(XMODS) config
-
-modlintlib clean.lint: $(LINT_KMODS) $(XMODS)
 
 $(KMODS) config:	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
@@ -78,16 +66,5 @@ install_h check:	FRC
 	@cd sys; pwd; $(MAKE) $(TARGET)
 	@cd v7/sys; pwd; $(MAKE) $(TARGET)
 	@cd v9/sys; pwd; $(MAKE) $(TARGET)
-
-#
-#	Full kernel lint target.
-#
-LINT_TARGET	= globallint
-
-globallint:
-	@-$(ECHO) "\nFULL KERNEL: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
-
-lint:	modlintlib .WAIT $(LINT_DEPS)
 
 include ../Makefile.targ

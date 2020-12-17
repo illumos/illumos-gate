@@ -33,12 +33,6 @@
 #
 
 #
-#	Default rule for building the lint library directory:
-#
-$(LINT_LIB_DIR):
-	-@mkdir -p $@ 2> /dev/null
-
-#
 #	All C objects depend on inline files. However, cc(1) doesn't generate
 #	the correct dependency info. Also, these Makefiles don't contain a
 #	separate list of C-derived object files (but it is light weight to
@@ -69,28 +63,9 @@ $(MODULE).check.targ:	$(BINARY) $(OBJECTS) $(EXTRA_CHECK_OBJS) $(UNIX_O) $(MODST
 	$(LD) -o /dev/null $(OBJECTS) $(EXTRA_CHECK_OBJS) $(UNIX_O) $(MODSTUBS_O) $(GENLIB)
 
 #
-#	Module lint library construction targets.
-#
-MOD_LINT_LIB	= $(LINT_LIB_DIR)/llib-l$(LINT_MODULE).ln
-
-$(MOD_LINT_LIB):	$(LINT_LIB_DIR) $(LINTS)
-	@-$(ECHO) "\n$(OBJS_DIR)/$(MODULE): (library construction):"
-	@($(LINT) -o $(LINT_MODULE)-$(OBJS_DIR) \
-		$(LINTFLAGS) $(LINTS) $(LTAIL))
-	@$(MV) llib-l$(LINT_MODULE)-$(OBJS_DIR).ln $@
-
-$(LINT_MODULE).lint:	$(MOD_LINT_LIB) $(LINT_LIB) $(GEN_LINT_LIB)
-	@-$(ECHO) "\n$(OBJS_DIR)/$(LINT_MODULE): global crosschecks:"
-	@($(LINT) $(LINTFLAGS) $(MOD_LINT_LIB) \
-		$(LINT_LIB) $(GEN_LINT_LIB) $(LTAIL))
-
-#
-# Since assym.h is a derived file, the dependency must be explicit for
-# all files including this file. (This is only actually required in the
-# instance when the .nse_depinfo file does not exist.) It may seem that
-# the lint targets should also have a similar dependency, but they don't
-# since only C headers are included when #defined(lint) is true. The
-# actual lists are defined in */Makefile.files.
+# Since assym.h is a derived file, the dependency must be explicit for all
+# files including this file.  The actual lists are defined in
+# */Makefile.files.
 #
 $(ASSYM_DEPS:%=$(OBJS_DIR)/%):	$(DSF_DIR)/$(OBJS_DIR)/assym.h
 
@@ -100,9 +75,6 @@ $(ASSYM_DEPS:%=$(OBJS_DIR)/%):	$(DSF_DIR)/$(OBJS_DIR)/assym.h
 #
 $(MODSTUBS_O):	$(MODSTUBS)
 	$(COMPILE.s) -o $@ $(MODSTUBS)
-
-$(LINTS_DIR)/modstubs.ln:	$(MODSTUBS)
-	@($(LHEAD) $(LINT.s) $(MODSTUBS) $(LTAIL))
 
 #
 # Build the source file which contains the kernel's utsname,
@@ -121,10 +93,6 @@ $(OBJS_DIR)/vers.o: $(OBJECTS)
 	    -DUTS_PLATFORM=\"$(UNAME_M)\" -o $@ $(SRC)/uts/common/os/vers.c
 	$(CTFCONVERT_O)
 	$(POST_PROCESS_O)
-
-$(LINTS_DIR)/vers.ln: $(SRC)/uts/common/os/vers.c
-	@($(LHEAD) $(LINT.c) -DUTS_RELEASE=\"\" -DUTS_VERSION=\"\" \
-	    -DUTS_PLATFORM=\"\" $(SRC)/uts/common/os/vers.c $(LTAIL))
 
 #
 #	Installation targets and rules:
@@ -304,16 +272,12 @@ def $(DEF_DEPS)			:= TARGET = def
 all $(ALL_DEPS)			:= TARGET = all
 clean $(CLEAN_DEPS)		:= TARGET = clean
 clobber $(CLOBBER_DEPS)		:= TARGET = clobber
-lint $(LINT_DEPS)		:= TARGET = lint
-modlintlib $(MODLINTLIB_DEPS)	:= TARGET = modlintlib
 modlist	$(MODLIST_DEPS)		:= TARGET = modlist
 modlist	$(MODLIST_DEPS)		:= NO_STATE= -K $$MODSTATE$$$$
-clean.lint $(CLEAN_LINT_DEPS)	:= TARGET = clean.lint
 install $(INSTALL_DEPS)		:= TARGET = install
 symcheck $(SYM_DEPS)		:= TARGET = symcheck
 
-ALL_TARGS	= def all clean clobber lint modlintlib \
-		  clean.lint lintlib install symcheck
+ALL_TARGS	= def all clean clobber install symcheck
 
 ALL_OBJ32	= $(ALL_TARGS:%=%.obj32)
 
@@ -367,10 +331,6 @@ $(OBJS_DIR):
 def.targ:		$(OBJS_DIR) $(ALL_TARGET)
 
 all.targ:		$(OBJS_DIR) $(ALL_TARGET)
-
-lint.targ:		$(OBJS_DIR) $(LINT_TARGET)
-
-modlintlib.targ:	$(OBJS_DIR) $(MOD_LINT_LIB)
 
 install.targ:		$(OBJS_DIR) $(INSTALL_TARGET)
 
@@ -482,34 +442,5 @@ clean.targ:
 
 clobber.targ:
 	-$(RM) $(CLOBBERFILES) Nothing_to_remove
-
-clean.lint.targ:
-	-$(RM) $(CLEANLINTFILES) Nothing_to_remove
-
-#
-#	Create fake lintlibs in the 64b dirs so
-#	global linting works
-#
-lint64:
-	@$(ECHO) $(MODULE) fake lints
-	@for dir in $(LINT64_DIRS); do \
-		if [ ! -d $$dir ]; then mkdir $$dir; fi \
-	done
-	@for file in $(LINT64_FILES); do \
-		if [ ! -f $$file ]; then touch $$file; fi \
-	done
-
-#
-#	In some places we also need to create fake lintlibs for 32b
-#	dirs so global linting works
-#
-lint32:
-	@$(ECHO) $(MODULE) fake lints
-	@for dir in $(LINT32_DIRS); do \
-		if [ ! -d $$dir ]; then mkdir $$dir; fi \
-	done
-	@for file in $(LINT32_FILES); do \
-		if [ ! -f $$file ]; then touch $$file; fi \
-	done
 
 FRC:

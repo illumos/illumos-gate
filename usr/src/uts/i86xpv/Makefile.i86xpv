@@ -50,9 +50,6 @@ UNIX_DIR	 = $(UTSBASE)/$(PLATFORM)/unix
 GENLIB_DIR	 = $(UTSBASE)/intel/genunix
 MODSTUBS_DIR	 = $(UNIX_DIR)
 DSF_DIR		 = $(UTSBASE)/$(PLATFORM)/genassym
-LINTS_DIR	 = $(OBJS_DIR)
-LINT_LIB_DIR	 = $(UTSBASE)/$(PLATFORM)/lint-libs/$(OBJS_DIR)
-GEN_LINT_LIB_DIR = $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)
 
 DTRACESTUBS_O	 = $(OBJS_DIR)/dtracestubs.o
 DTRACESTUBS	 = $(OBJS_DIR)/libdtracestubs.so
@@ -62,12 +59,6 @@ SYM_MOD		= $(OBJS_DIR)/unix.sym
 UNIX_O		 = $(UNIX_DIR)/$(OBJS_DIR)/unix.o
 MODSTUBS_O	 = $(MODSTUBS_DIR)/$(OBJS_DIR)/modstubs.o
 GENLIB		 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
-LINT_LIB	 = $(LINT_LIB_DIR)/llib-lunix.ln
-DBOOT_LINT_LIB	 = $(LINT_LIB_DIR)/llib-ldboot.ln
-GEN_LINT_LIB	 = $(GEN_LINT_LIB_DIR)/llib-lgenunix.ln
-
-LINT32_DIRS	 = $(LINT32_BUILDS:%=$(UTSBASE)/$(PLATFORM)/lint-libs/%)
-LINT32_FILES	 = $(LINT32_DIRS:%=%/llib-l$(MODULE).ln)
 
 #
 #	Include the makefiles which define build rule templates, the

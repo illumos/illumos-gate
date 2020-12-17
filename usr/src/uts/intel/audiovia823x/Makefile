@@ -38,7 +38,6 @@ UTSBASE = ../..
 #
 MODULE		= audiovia823x
 OBJECTS		= $(AUDIOVIA823X_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(AUDIOVIA823X_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
 #
@@ -55,7 +54,6 @@ LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -70,12 +68,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

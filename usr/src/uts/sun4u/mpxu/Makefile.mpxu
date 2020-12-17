@@ -56,8 +56,6 @@ USR_MPXU_SBIN_PRTDIAG	= $(USR_MPXU_SBIN_DIR)/prtdiag
 USR_MPXU_SBIN_FRUADM	= $(USR_MPXU_SBIN_DIR)/fruadm
 USR_MPXU_LIB_DIR	= $(USR_MPXU_DIR)/lib
 
-MPXU_LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/mpxu/lint-libs/$(OBJS_DIR)
-
 #
 # Links to UltraSparc III crypto modules
 #
@@ -88,8 +86,6 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 MPXU_KMODS	= tsalarm
 
 MODSTUBS_DIR	= $(UNIX_DIR)
-LINTS_DIR	= $(OBJS_DIR)
-LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/mpxu/lint-libs/$(OBJS_DIR)
 
 #
 #       Define the actual specific platforms
@@ -112,14 +108,3 @@ CPP_DEFS_32   =
 CPP_DEFS_64   = -D__sparcv9
 CPP_DEFS      = $(CPP_DEFS_$(CLASS))
 
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV

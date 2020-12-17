@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 #
-#	This makefile drives the production of the mac driver 
+#	This makefile drives the production of the mac driver
 #	kernel module.
 #
 #	sparc architecture dependent
@@ -38,7 +38,6 @@ UTSBASE	= ../..
 #
 MODULE		= mac
 OBJECTS		= $(MAC_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(MAC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
@@ -50,7 +49,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -61,14 +59,12 @@ $(RELEASE_BUILD)CFLAGS		+= -xinline=auto -xcrossfile
 $(RELEASE_BUILD)COPTIMIZE	= -xO5
 LDFLAGS				+= -dy
 
-LINTTAGS			+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS			+= -erroff=E_BAD_PTR_CAST_ALIGN
 
-CERRWARN		 	+= -_gcc=-Wno-unused-label
-CERRWARN		 	+= $(CNOWARN_UNINIT)
-CERRWARN		 	+= -_gcc=-Wno-type-limits
-CERRWARN		 	+= -_gcc=-Wno-switch
-CERRWARN		 	+= -_gcc=-Wno-unused-variable
+CERRWARN			+= -_gcc=-Wno-unused-label
+CERRWARN			+= $(CNOWARN_UNINIT)
+CERRWARN			+= -_gcc=-Wno-type-limits
+CERRWARN			+= -_gcc=-Wno-switch
+CERRWARN			+= -_gcc=-Wno-unused-variable
 
 #
 #	Default build targets.
@@ -82,12 +78,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

@@ -1967,7 +1967,6 @@ NVME_OBJS = nvme.o
 #
 #	Build up defines and paths.
 #
-LINT_DEFS	+= -Dunix
 
 #
 #	This duality can be removed when the native and target compilers

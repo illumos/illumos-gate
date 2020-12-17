@@ -37,7 +37,6 @@ UTSBASE   = ../..
 #
 MODULE		= xge
 OBJECTS		= $(XGE_HAL_OBJS:%=$(OBJS_DIR)/%) $(XGE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(XGE_HAL_OBJS:%.o=$(LINTS_DIR)/%.ln) $(XGE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
 #
@@ -49,7 +48,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -76,7 +74,7 @@ HAL_CFLAGS	 = -DXGE_HAL_USE_MGMT_AUX
 #TRACE_CFLAGS = -DXGE_DEBUG_MODULE_MASK=0xffffffff \
 #		-DXGE_DEBUG_TRACE_MASK=0xffffffff \
 #		-DXGE_DEBUG_ERR_MASK=0xffffffff
-TRACE_CFLAGS 	= -DXGE_DEBUG_MODULE_MASK=0x00003010 \
+TRACE_CFLAGS	= -DXGE_DEBUG_MODULE_MASK=0x00003010 \
 		-DXGE_DEBUG_TRACE_MASK=0x00000000  \
 		-DXGE_DEBUG_ERR_MASK=0x00003010
 
@@ -93,19 +91,11 @@ CFLAGS64	+= $(XGE_CFLAGS) -xO4 -xcrossfile
 #
 LDFLAGS		+=  -dy -N misc/mac -N drv/ip
 
-#	Lint flag
 #
-LINTFLAGS	+= $(XGE_CFLAGS) -Xc99=%all
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-label
@@ -125,12 +115,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

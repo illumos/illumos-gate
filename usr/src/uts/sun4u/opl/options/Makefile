@@ -22,9 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# uts/sun4u/opl/options/Makefile
+
 #
 #	This makefile drives the production of the opl options conf file
 #
@@ -51,7 +49,6 @@ include $(UTSBASE)/sun4u/opl/Makefile.opl
 #	Define targets
 #
 ALL_TARGET	= $(SRC_CONFILE)
-LINT_TARGET	= 
 INSTALL_TARGET	= $(ROOT_OPL_DRV_DIR) $(ROOT_CONFFILE)
 
 #
@@ -71,12 +68,6 @@ def:		$(DEF_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

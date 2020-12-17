@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	This Makefile defines the build rules for the directory
@@ -44,9 +42,3 @@
 $(OBJS_DIR)/lombus.o:		$(UTSBASE)/sun4u/lw2plus/io/lombus.c
 	$(COMPILE.c) -o $@ $(UTSBASE)/sun4u/lw2plus/io/lombus.c
 	$(CTFCONVERT_O)
-
-#
-#	Section 1b: Lint `object' build rules
-#
-$(LINTS_DIR)/lombus.ln:		$(UTSBASE)/sun4u/lw2plus/io/lombus.c
-	@($(LHEAD) $(LINT.c) $(UTSBASE)/sun4u/lw2plus/io/lombus.c $(LTAIL))

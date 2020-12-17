@@ -20,13 +20,12 @@
 # CDDL HEADER END
 #
 #
-# uts/sfmmu/Makefile.files
 # Copyright (c) 1991 by Sun Microsystems, Inc.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This Makefile defines all file modules and build rules for the
-# directory uts/sfmmu and it's children. These are the source files which
+# directory uts/sfmmu and its children. These are the source files which
 # are specific to the sparc9 processor.
 #
 
@@ -41,13 +40,3 @@
 #	Section 3:	misc.
 #
 INC_PATH	+= -I$(UTSBASE)/sfmmu
-
-#
-# Since assym.h is a derived file, the dependency must be explicit for
-# all files including this file. (This is only actually required in the
-# instance when the .nse_depinfo file does not exist.) It may seem that
-# the lint targets should also have a similar dependency, but they don't
-# since only C headers are included when #defined(lint) is true.
-#
-# ASSYM_DEPS	+= overflow.o
-# ASSYM_DEPS	+= underflow.o

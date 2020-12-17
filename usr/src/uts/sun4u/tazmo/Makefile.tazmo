@@ -55,8 +55,6 @@ USR_TAZMO_ISYS_DIR	= $(USR_TAZMO_INC_DIR)/sys
 USR_TAZMO_SBIN_DIR	= $(USR_TAZMO_DIR)/sbin
 USR_TAZMO_LIB_DIR	= $(USR_TAZMO_DIR)/lib
 
-TAZMO_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/tazmo/lint-libs/$(OBJS_DIR)
-
 #
 # Define objects.
 #
@@ -74,14 +72,3 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 #
 TAZMO_KMODS	= platmod
 TAZMO_KMODS	+= envctrl
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-

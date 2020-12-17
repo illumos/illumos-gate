@@ -39,7 +39,6 @@ UTSBASE	= ../..
 #
 MODULE		= niumx
 OBJECTS		= $(NIUMX_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(NIUMX_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 
 #
@@ -51,7 +50,6 @@ include $(UTSBASE)/sun4v/Makefile.sun4v
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -60,7 +58,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 INC_PATH	+= -I$(UTSBASE)/sun4v/io/niumx
 
 #
-# lint pass one enforcement
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
 #
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
@@ -83,12 +83,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

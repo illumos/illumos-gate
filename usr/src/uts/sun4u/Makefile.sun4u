@@ -103,8 +103,6 @@ UNIX_DIR	 = $(UTSBASE)/$(PLATFORM)/unix
 GENLIB_DIR	 = $(UTSBASE)/$(PLATFORM)/genunix
 MODSTUBS_DIR	 = $(UNIX_DIR)
 DSF_DIR		 = $(UTSBASE)/$(PLATFORM)/genassym
-LINTS_DIR	 = $(OBJS_DIR)
-LINT_LIB_DIR	 = $(UTSBASE)/$(PLATFORM)/lint-libs/$(OBJS_DIR)
 
 DTRACESTUBS_O	 = $(OBJS_DIR)/dtracestubs.o
 DTRACESTUBS	 = $(OBJS_DIR)/libdtracestubs.so
@@ -112,12 +110,6 @@ DTRACESTUBS	 = $(OBJS_DIR)/libdtracestubs.so
 UNIX_O		 = $(UNIX_DIR)/$(OBJS_DIR)/unix.o
 MODSTUBS_O	 = $(MODSTUBS_DIR)/$(OBJS_DIR)/modstubs.o
 GENLIB		 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
-
-LINT_LIB	 = $(LINT_LIB_DIR)/llib-lunix.ln
-GEN_LINT_LIB	 = $(LINT_LIB_DIR)/llib-lgenunix.ln
-
-LINT64_DIRS	 = $(LINT64_BUILDS:%=$(UTSBASE)/$(PLATFORM)/lint-libs/%)
-LINT64_FILES	 = $(LINT64_DIRS:%=%/llib-l$(MODULE).ln)
 
 #
 #	cpu and platform modules need to know how to build their own symcheck module
@@ -216,9 +208,7 @@ ASFLAGS		+= $(AS_XARCH)
 
 AS_INC_PATH	+= -I$(DSF_DIR)/$(OBJS_DIR)
 
-LINT_KMODS	+= $(GENUNIX_KMODS)
 
-LINT_DEFS = -m64
 
 #
 #	The following must be defined for all implementations:
@@ -437,9 +427,6 @@ CRYPTO_KMODS	+= des
 #	generic-unix module (/kernel/genunix):
 #
 GENUNIX_KMODS	+= genunix
-
-#	'User' "Modules" excluded from the Full Kernel lint target:
-#
 
 #
 #	Modules eXcluded from the product:

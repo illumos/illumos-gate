@@ -19,11 +19,10 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/cherrystone/Makefile.cherrystone
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile contains the common definitions for the
 #	sun4u Littleneck system dependent modules.
@@ -59,7 +58,6 @@ USR_CHERRYSTONE_SBIN_DIR	= $(USR_CHERRYSTONE_DIR)/sbin
 USR_CHERRYSTONE_LIB_DIR	= $(USR_CHERRYSTONE_DIR)/lib
 USR_CHERRYSTONE_ISYS_DIR	= $(USR_CHERRYSTONE_INC_DIR)/sys
 
-CHERRYSTONE_LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/cherrystone/lint-libs/$(OBJS_DIR)
 #
 # Define objects.
 #
@@ -81,11 +79,3 @@ include $(UTSBASE)/sun4u/cherrystone/Makefile.files
 #	Include common rules.
 #
 include $(UTSBASE)/sun4u/Makefile.sun4u
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-

@@ -38,7 +38,6 @@ UTSBASE	= ../..
 #
 MODULE		= kmech_dummy
 OBJECTS		= $(KGSS_DUMMY_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(KGSS_DUMMY_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_KGSS_DIR)/$(MODULE)
 
 #
@@ -52,13 +51,9 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-#
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
+CFLAGS		+= $(CCVERBOSE)
 
 #
 # Define dependency on kgssapi
@@ -78,11 +73,6 @@ clean:		$(CLEAN_DEPS)
 
 clobber:        $(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 #
 # Do not install the dummy GSS-API mechanism in the proto area

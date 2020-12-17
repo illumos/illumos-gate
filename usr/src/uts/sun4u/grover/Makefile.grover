@@ -50,9 +50,6 @@ USR_GROVER_ISYS_DIR	= $(USR_GROVER_INC_DIR)/sys
 USR_GROVER_SBIN_DIR	= $(USR_GROVER_DIR)/sbin
 USR_GROVER_LIB_DIR	= $(USR_GROVER_DIR)/lib
 
-
-GROVER_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/grover/lint-libs/$(OBJS_DIR)
-
 #
 # Define objects.
 #
@@ -70,15 +67,3 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 #
 GROVER_KMODS	= platmod
 GROVER_KMODS	+= grfans
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV

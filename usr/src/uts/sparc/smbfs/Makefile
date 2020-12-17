@@ -24,7 +24,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the smbfs (Server 
+#	This makefile drives the production of the smbfs (Server
 #	message block file system) kernel module.
 #
 #	sparc architecture dependent
@@ -40,7 +40,6 @@ UTSBASE	= ../..
 #
 MODULE		= smbfs
 OBJECTS		= $(SMBFS_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(SMBFS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_FS_DIR)/$(MODULE)
 
 #
@@ -52,7 +51,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -65,15 +63,13 @@ INC_PATH	+= -I$(UTSBASE)/common/fs/smbclnt
 INC_PATH	+= -I$(COMMONBASE)/smbclnt
 LDFLAGS         += -dy -Ndrv/nsmb
 
-# Until CR 4994570 is fixed...
-LINTTAGS	+= -erroff=E_BAD_FORMAT_ARG_TYPE2
+#
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
+#
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)
-
-# The mb_put/md_get functions are intentionally used with and without
-# return value checks, so filter those out like LGREP.2 does.
-LGREP.nsmb =	egrep -v ' ignored: (mb_init|mb_put|md_get)'
-LTAIL	+=	2>&1 | $(LGREP.2) | $(LGREP.nsmb) || true
 
 #
 #	Default build targets.
@@ -87,12 +83,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

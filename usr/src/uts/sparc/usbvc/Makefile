@@ -43,18 +43,12 @@ UTSBASE	= ../..
 #
 MODULE		= usbvc
 OBJECTS		= $(USBVC_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(USBVC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
 include $(UTSBASE)/sparc/Makefile.sparc
-
-#
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
 
 #
 # depends on misc/usba
@@ -64,16 +58,15 @@ LDFLAGS		+= -dy -Nmisc/usba
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
+#
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
+#
+CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= $(CNOWARN_UNINIT)
-
-#
-# Disable this because it is necessary for this driver
-# and it is surely safe
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 .KEEP_STATE:
 
@@ -84,12 +77,6 @@ def:		$(DEF_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

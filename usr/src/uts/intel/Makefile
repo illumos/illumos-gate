@@ -34,14 +34,6 @@ include Makefile.intel
 # a directory under uts/intel.
 BINARY=
 
-LINT_KMODS_X1	= $(LINT_KMODS:nsmb=)
-LINT_KMODS_X2	= $(LINT_KMODS_X1:smbfs=)
-LINT_KMODS_X3	= $(LINT_KMODS_X2:e1000g=)
-LINT_KMODS_X4	= $(LINT_KMODS_X3:qede=)
-LINT_KMODLIBS	= $(LINT_KMODS_X4:iwn=)
-LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
-		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-
 #
 # dprov is delivered in the SUNWcryptoint package.
 #
@@ -57,19 +49,15 @@ install		:=	TARGET= install
 install.prereq	:=	TARGET= install
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-lint.prereq	:=	TARGET= lint
-modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 install_h	:=	TARGET= install_h
 install_h.prereq	:=	TARGET= install_h
 
 .KEEP_STATE:
 
-.PARALLEL:	$(PARALLEL_KMODS) $(XMODS) config $(LINT_DEPS)
+.PARALLEL:	$(PARALLEL_KMODS) $(XMODS) config
 
 def all install clean clobber modlist: genassym $(KMODS) $(XMODS) config
 
@@ -117,19 +105,11 @@ all.prereq install.prereq def.prereq: genassym genunix FRC
 	@cd ../i86pc/genassym; pwd; $(MAKE) $(@:%.prereq=%)
 
 #
-# i86pc lint libraries should be built first
-#
-lint.prereq: FRC
-	@cd ../i86pc; pwd; $(MAKE) $(NO_STATE) lint
-
-#
 # Nothing to do for any other prerequisite targets.
 #
 %.prereq:
 
 genunix: $(PRIVS_C)
-
-modlintlib clean.lint: $(LINT_KMODS) $(XMODS)
 
 genassym $(KMODS) $(SUBDIRS) config:	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
@@ -146,25 +126,5 @@ install_h check:	FRC
 	@cd asm; pwd; $(MAKE) $(TARGET)
 	@cd ia32/sys; pwd; $(MAKE) $(TARGET)
 	@cd amd64/sys; pwd; $(MAKE) $(TARGET)
-
-#
-# Work-around to disable acpica global crosscheck lint warnings
-#
-LGREP.intel =	grep -v 'intel/io/acpica'
-
-#
-#	Full kernel lint target.
-#
-LINT_TARGET	= globallint
-
-# workaround for multiply defined errors
-globallint := LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
-
-globallint:
-	@pwd
-	@-$(ECHO) "\nFULL KERNEL: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.intel) | $(LGREP.2)
-
-lint:	modlintlib .WAIT $(LINT_DEPS)
 
 include ../Makefile.targ

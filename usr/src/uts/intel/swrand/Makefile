@@ -39,7 +39,6 @@ COM_DIR = $(COMMONBASE)/crypto
 #
 MODULE		= swrand
 OBJECTS		= $(SWRANDPROV_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(SWRANDPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
 INC_PATH	+= -I../../i86pc
 
@@ -52,14 +51,9 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-#
-# lint pass one enforcement
-#
-CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
-LINTFLAGS	+= -I$(COM_DIR)
+CFLAGS		+= -I$(COM_DIR)
 
 #
 # Linkage dependencies
@@ -67,13 +61,11 @@ LINTFLAGS	+= -I$(COM_DIR)
 LDFLAGS += -dy -Nmisc/kcf -Nmisc/sha1
 
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-
+CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
@@ -88,12 +80,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

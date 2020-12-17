@@ -36,7 +36,6 @@ COM_DIR = $(COMMONBASE)/crypto/arcfour
 #	Define the module and object file sets.
 #
 MODULE		= arcfour
-LINTS		= $(ARCFOURPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ARCFOURPROV_OBJS_32 =
 ARCFOURPROV_OBJS_64 = arcfour-x86_64.o
 ARCFOURPROV_OBJS += $(ARCFOURPROV_OBJS_$(CLASS))
@@ -52,7 +51,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -75,12 +73,6 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
 install:	$(INSTALL_DEPS)
 
 #
@@ -90,9 +82,6 @@ include $(UTSBASE)/intel/Makefile.targ
 
 $(OBJS_DIR)/arcfour-x86_64.o: arcfour-x86_64.s
 	$(COMPILE.s) -o $@ ${@F:.o=.s}
-
-$(OBJS_DIR)/arcfour-x86_64.ln: arcfour-x86_64.s
-	@($(LHEAD) $(LINT.s) ${@F:.ln=.s} $(LTAIL))
 
 arcfour-x86_64.s: $(COM_DIR)/amd64/arcfour-x86_64.pl
 	$(PERL) $? $@

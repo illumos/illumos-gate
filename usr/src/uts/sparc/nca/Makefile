@@ -19,14 +19,12 @@
 # CDDL HEADER END
 #
 #
-# uts/sparc/nca/Makefile
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
-#	This makefile drives the production of the nca driver 
+#	This makefile drives the production of the nca driver
 #	kernel module.
 #
 #	sparc architecture dependent
@@ -42,7 +40,6 @@ UTSBASE	= ../..
 #
 MODULE		= nca
 OBJECTS		= $(NCA_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(NCA_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_STRMOD_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/inet/nca
@@ -56,22 +53,11 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
-#
-# lint pass one enforcement and OS version
-#
 CFLAGS += $(CCVERBOSE)
 
 LDFLAGS += -dy -Nfs/sockfs -Ndrv/ip
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 #
 #	Default build targets.
@@ -85,12 +71,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS) lint64
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

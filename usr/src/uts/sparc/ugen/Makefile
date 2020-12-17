@@ -41,7 +41,6 @@ UTSBASE	= ../..
 #
 MODULE		= ugen
 OBJECTS		= $(UGEN_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(UGEN_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
 #
@@ -50,9 +49,11 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 include $(UTSBASE)/sparc/Makefile.sparc
 
 #
-# lint pass one enforcement
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
 #
-CFLAGS += $(CCVERBOSE)
+CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
@@ -64,7 +65,6 @@ LDFLAGS         += -dy -Nmisc/usba
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 .KEEP_STATE:
@@ -76,12 +76,6 @@ def:		$(DEF_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

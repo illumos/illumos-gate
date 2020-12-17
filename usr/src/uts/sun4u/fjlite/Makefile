@@ -20,11 +20,10 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/fjlite/Makefile
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the sun4u fjlite platform
 #	module.
@@ -49,12 +48,8 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-lintlib		:=	TARGET= lintlib
-modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 IMPLEMENTED_PLATFORM	= SUNW,UltraAX-i2
@@ -66,29 +61,15 @@ IMPLEMENTED_PLATFORM	= SUNW,UltraAX-i2
 
 .PARALLEL:	$(FJLITE_KMODS)
 
-def all clean clobber clean.lint modlist:	$(FJLITE_KMODS)
+def all clean clobber modlist:	$(FJLITE_KMODS)
 
 install:	$(ROOT_FJLITE_DIR) $(USR_FJLITE_DIR) \
 		.WAIT $(FJLITE_KMODS)
-
-modlintlib:	$(FJLITE_KMODS)
 
 $(FJLITE_KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 install_h check:
-
-lint:	modlintlib .WAIT $(LINT_DEPS)
-
-LINT_LIBS	= $(LINT_LIB) \
-			-L$(FJLITE_LINT_LIB_DIR) \
-			-L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
-			    $(CLOSED_LINT_KMODS:%=-l%) \
-			-L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
-
-lint.platmod:   modlintlib
-	@-$(ECHO) "\nFJ-lite Platform-dependent module: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 #
 #	Include common targets.

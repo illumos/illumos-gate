@@ -40,7 +40,6 @@ UTSBASE	= ../..
 #
 MODULE		= poll
 OBJECTS		= $(DEVPOLL_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(DEVPOLL_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io
 
@@ -49,23 +48,17 @@ CONF_SRCDIR	= $(UTSBASE)/common/io
 #
 include $(UTSBASE)/intel/Makefile.intel
 
+#
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
+#
 CERRWARN	+= $(CNOWARN_UNINIT)
-
-#
-# It's unfortunate that we have to disable this; however, it's lint's fault. We
-# have a line which only causes a lint warning on a 64-bit build. If we suppress
-# it, then the 32-bit lint build complains about it being unnecessarily
-# suppressed. Therefore, the only thing it seems like we can do is disable the
-# lint warning completely.
-#
-
-LINTTAGS      += -erroff=E_BAD_PTR_CAST_ALIGN
 
 #
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
@@ -80,12 +73,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

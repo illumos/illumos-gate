@@ -43,12 +43,6 @@ UNIX		= unix
 OBJECTS		= $(SPECIAL_OBJS:%=$(OBJS_DIR)/%) \
 		  $(CORE_OBJS:%=$(OBJS_DIR)/%) \
 		  $(MACH_NOT_YET_KMODS:%=$(OBJS_DIR)/%)
-LINTS		= $(SPECIAL_OBJS:%.o=$(LINTS_DIR)/%.ln) \
-		  $(CORE_OBJS:%.o=$(LINTS_DIR)/%.ln) \
-		  $(KRTLD_OBJS:%.o=$(LINTS_DIR)/%.ln) \
-		  $(MACH_NOT_YET_KMODS:%.o=$(LINTS_DIR)/%.ln) \
-		  $(LINTS_DIR)/vers.ln \
-		  $(LINTS_DIR)/modstubs.ln
 
 KRTLD_MAPFILE	= $(UTSBASE)/sparc/krtld/mapfile
 KRTLD_OBJECTS	= $(KRTLD_OBJS:%=$(OBJS_DIR)/%)
@@ -83,7 +77,6 @@ include $(UTSBASE)/sun4v/Makefile.sun4v
 #	Define targets
 #
 ALL_TARGET	= $(UNIX_BIN)
-LINT_TARGET	= $(LINT_LIB)
 INSTALL_TARGET	= $(UNIX_BIN) $(ROOTMODULE) $(UNIX32_LINK)
 
 #
@@ -100,26 +93,16 @@ CLEANFILES	+= $(UNIX_O) $(MODSTUBS_O) $(KRTLD_O) $(KRTLD_OBJECTS) \
 		   $(DTRACESTUBS_O) $(DTRACESTUBS)
 
 CLOBBERFILES	= $(CLEANFILES) $(UNIX_BIN)
-CLEANLINTFILES	+= $(LINT_LIB)
 
-#
-# lint pass one enforcement
 # Turn on doubleword alignment for 64 bit counter timer registers
-#
-CFLAGS += $(CCVERBOSE) -dalign
+CFLAGS += -dalign
 
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-
+CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-char-subscripts
@@ -144,10 +127,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
@@ -193,23 +172,6 @@ $(PLATLIB):
 #
 $(CPULIB):	$(CPU_OBJ)
 	$(BUILD.SO) $(CPU_OBJ)
-
-#
-#	The global lint target builds the kernel lint library (llib-lunix.ln)
-#	which is equivalent to a lint of /unix.o. Then all kernel modules for
-#	this architecture are linted against the kernel lint library.
-#
-#	Note:	lint errors in the kernel lint library will be repeated for
-#		each module. It is important that the kernel lint library
-#		be clean to keep the textual output to a reasonable level.
-#
-
-$(LINT_LIB):	$(LINT_LIB_DIR) $(LINTS)
-	@-$(ECHO) "\n$(UNIX): (library construction):"
-	@$(LINT) -o $(UNIX) $(LINTFLAGS) $(LINTS)
-	@$(MV) $(@F) $@
-
-lintlib:	$(LINT_DEPS)
 
 #
 #	Include common targets.

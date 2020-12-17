@@ -31,7 +31,6 @@ UTSBASE = ../..
 #
 MODULE		= pcbe.SPARC-T3
 OBJECTS		= $(N2_PCBE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(N2_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
 
 #
@@ -43,13 +42,8 @@ include $(UTSBASE)/sun4v/Makefile.sun4v
 #	Define targets.
 #
 ALL_TARGET	= $(BINARY)
-LINT_MODULE	= kt_pcbe
-LINT_TARGET	= $(LINT_MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-#
-# lint pass one enforcement
-#
 CFLAGS += -DKT_IMPL
 
 #
@@ -70,12 +64,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

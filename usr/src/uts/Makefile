@@ -77,15 +77,13 @@ install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
 clobber_h	:=	TARGET= clobber
-lint		:=	TARGET= lint
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 
 .KEEP_STATE:
 
-def all lint: all_h $(PMTMO_FILE) $($(MACH)_ARCHITECTURES)
+def all: all_h $(PMTMO_FILE) $($(MACH)_ARCHITECTURES)
 
 install: all_h install_dirs $(PMTMO_FILE) $($(MACH)_ARCHITECTURES)
 
@@ -202,7 +200,7 @@ clean clobber: $($(MACH)_ARCHITECTURES) $(DYNHDRDIRS)
 # testing convenience
 clobber_h: $(DYNHDRDIRS)
 
-clean.lint modlist: $($(MACH)_ARCHITECTURES)
+modlist: $($(MACH)_ARCHITECTURES)
 
 #
 # Cross-reference customization: build a cross-reference over all of

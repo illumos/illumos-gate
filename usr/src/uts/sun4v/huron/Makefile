@@ -50,12 +50,8 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-lintlib		:=	TARGET= lintlib
-modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 #
@@ -64,8 +60,6 @@ check		:=	TARGET= check
 .KEEP_STATE:
 
 def:
-
-lintlib:      unix
 
 IMPLEMENTED_PLATFORM	= SUNW,SPARC-Enterprise-T5120
 LINKED_PLATFORMS	= SUNW,SPARC-Enterprise-T5220
@@ -80,7 +74,6 @@ install:	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%)
 
 install_h check:
 
-lint:
 
 clean:
 

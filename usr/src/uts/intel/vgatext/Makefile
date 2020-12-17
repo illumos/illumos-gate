@@ -41,7 +41,6 @@ UTSBASE	= ../..
 #
 MODULE		= vgatext
 OBJECTS		= $(VGATEXT_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(VGATEXT_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 GFX_DIR		= $(UTSBASE)/i86pc/io/gfx_private
 INC_PATH	+= -I$(GFX_DIR)
@@ -57,7 +56,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) # $(SRC_CONFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -72,12 +70,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

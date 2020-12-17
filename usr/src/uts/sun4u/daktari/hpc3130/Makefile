@@ -40,7 +40,6 @@ UTSBASE	= ../../..
 #
 MODULE		= hpc3130
 OBJECTS		= $(HPC3130_DAK_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(HPC3130_DAK_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DAKTARI_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun4u/daktari/io
 
@@ -53,7 +52,6 @@ include $(UTSBASE)/sun4u/daktari/Makefile.daktari
 #       Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
@@ -61,10 +59,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
-CLEANLINTFILES	+= $(LINT32_FILES)
 
 #
-# lint pass one enforcement
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
 #
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-char-subscripts
@@ -90,15 +89,8 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
+install:	$(INSTALL_DEPS)
 
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
-install:  	$(INSTALL_DEPS)
-
-LINT_LIB_DIR	= $(DAKTARI_LINT_LIB_DIR)
 
 #
 #	Include common targets.

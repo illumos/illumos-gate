@@ -47,13 +47,11 @@ CONF_SRCDIR	= $(UTSBASE)/intel/io/intel_nb5000
 include ../Makefile.intel
 
 OBJECTS		= $(INTEL_NB5000_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(INTEL_NB5000_OBJS:%.o=$(LINTS_DIR)/%.ln)
 
 #
 #       Define targets
 #
 ALL_TARGET      = $(BINARY)
-LINT_TARGET     = $(LINT_MODULE).lint
 INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
@@ -79,12 +77,6 @@ all:            $(ALL_DEPS)
 clean:          $(CLEAN_DEPS)
 
 clobber:        $(CLOBBER_DEPS)
-
-lint:           $(LINT_DEPS)
-
-modlintlib:     $(MODLINTLIB_DEPS)
-
-clean.lint:     $(CLEAN_LINT_DEPS)
 
 install:        $(INSTALL_DEPS)
 

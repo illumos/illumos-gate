@@ -40,7 +40,6 @@ UTSBASE	= ../../..
 #
 MODULE		= platmod
 OBJECTS		= $(CSTONEPLATMOD_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(CSTONEPLATMOD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_CHERRYSTONE_MISC_DIR)/$(MODULE)
 
 PLAT_DIR	= .
@@ -60,7 +59,6 @@ CLEANFILES	+= $(PLATLIB) $(SYM_MOD)
 #	Define targets
 #
 ALL_TARGET	= $(SYM_MOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 ALL_BUILDS	= debug64 obj64
@@ -68,7 +66,9 @@ DEF_BUILDS	= obj64
 $(NOT_RELEASE_BUILD)DEF_BUILDS = debug64
 
 #
-# lint pass one enforcement
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
 #
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-unused-function
@@ -86,17 +86,10 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
 install:	$(INSTALL_DEPS)
 
 check:
 
-LINT_LIB_DIR	= $(CHERRYSTONE_LINT_LIB_DIR)
 
 $(PLATLIB):	$(OBJECTS)
 	$(BUILD.SO) $(OBJECTS)

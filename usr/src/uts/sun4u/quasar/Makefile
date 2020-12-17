@@ -20,11 +20,10 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/quasar/Makefile
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the sun4u quasar platform
 #	module.
@@ -48,12 +47,8 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-lintlib		:=	TARGET= lintlib
-modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 #
@@ -64,7 +59,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all install_h clean lint lintlib modlintlib clean.lint clobber check:
+def all install_h clean clobber check:
 
 modlist:
 
@@ -72,7 +67,7 @@ install:	install_darwin $(INSTALL_DEPS) $(USR_QUASAR_DIR)
 
 INSTALL_TARGET	=	platmod
 
-platmod: 	$(ROOT_QUASAR_MISC_DIR)
+platmod:	$(ROOT_QUASAR_MISC_DIR)
 	-@$(RM) -r $(OBJS_DIR)
 	-@$(RM) $(ROOT_QUASAR_MISC_DIR)/$@
 	$(SYMLINK) $(ROOT_QUASAR_MISC_LINK)/$@ $(ROOT_QUASAR_MISC_DIR)/$@

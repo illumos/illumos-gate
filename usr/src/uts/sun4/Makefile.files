@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 #	This Makefile defines all file modules for the directory uts/sun4
-#	and it's children. These are the source files which are common 
+#	and its children. These are the source files which are common
 #	between sun4u and sun4r.
 #
 
@@ -95,10 +95,7 @@ INC_PATH	+= -I$(UTSBASE)/sun4
 
 #
 # Since assym.h is a derived file, the dependency must be explicit for
-# all files including this file. (This is only actually required in the
-# instance when the .make.state file does not exist.) It may seem that
-# the lint targets should also have a similar dependency, but they don't
-# since only C headers are included when #defined(lint) is true.
+# all files including this file.
 #
 ASSYM_DEPS	+= genalign.o copy.o ip_ocsum.o
 ASSYM_DEPS	+= common_asm.o

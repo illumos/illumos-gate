@@ -23,7 +23,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This Makefile defines all file modules for the directory uts/sun4v
-#	and it's children. These are the source files which are sun4v
+#	and its children. These are the source files which are sun4v
 #	"implementation architecture" dependent.
 #
 
@@ -115,7 +115,7 @@ SPECIAL_OBJS += intrq.o
 #			driver modules
 #
 ROOTNEX_OBJS	+= mach_rootnex.o
-PX_OBJS		+= px_lib4v.o px_err.o px_tools_4v.o px_hcall.o px_libhv.o 
+PX_OBJS		+= px_lib4v.o px_err.o px_tools_4v.o px_hcall.o px_libhv.o
 FPC_OBJS	+= fpc-impl-4v.o fpc-asm-4v.o
 N2PIUPC_OBJS	+= n2piupc.o n2piupc_tables.o n2piupc_kstats.o \
 			n2piupc_biterr.o n2piupc_asm.o
@@ -127,7 +127,7 @@ N2RNG_OBJS	+= n2rng.o n2rng_debug.o n2rng_hcall.o n2rng_kcf.o \
 		   n2rng_provider.o
 
 #
-# 			CPU/Memory Error Injector (memtest) sun4v driver
+#			CPU/Memory Error Injector (memtest) sun4v driver
 #
 MEMTEST_OBJS	+= memtest.o memtest_asm.o \
 			memtest_v.o memtest_v_asm.o \
@@ -204,12 +204,10 @@ PLATMOD_OBJS	= platmod.o
 #
 ALL_DEFS	+= -Dsun4u -Dsun4v
 INC_PATH	+= -I$(UTSBASE)/sun4v
+
 #
 # Since assym.h is a derived file, the dependency must be explicit for
-# all files including this file. (This is only actually required in the
-# instance when the .make.state file does not exist.) It may seem that
-# the lint targets should also have a similar dependency, but they don't
-# since only C headers are included when #defined(lint) is true.
+# all files including this file.
 #
 ASSYM_DEPS	+= mach_locore.o
 ASSYM_DEPS	+= module_sfmmu_asm.o

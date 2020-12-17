@@ -40,7 +40,6 @@ UTSBASE   = ../..
 #
 MODULE		= chxge
 OBJECTS		= $(CH_OBJS:%=$(OBJS_DIR)/%) $(CH_COM_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(CH_OBJS:%.o=$(LINTS_DIR)/%.ln) $(CH_COM_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
 #
@@ -52,7 +51,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CFLAGS		+= -DC99_NOT_SUPPORTED -DCONFIG_CHELSIO_T1_1G \
@@ -75,32 +73,12 @@ CFLAGS		+= -DSUN_KSTATS -DHOST_PAUSE -DTX_CKSUM_FIX -DTX_THREAD_RECLAIM
 #
 LDFLAGS		+= -dy -N misc/gld -N drv/ip -N misc/mac
 
-#	Lint flag
-#
-LINTFLAGS	+= -DC99_NOT_SUPPORTED -DCONFIG_CHELSIO_T1_1G \
-		-I$(UTSBASE)/common/io/chxge/ \
-		-I$(UTSBASE)/common/io/chxge/com
-
-LINTFLAGS	+= -DCONFIG_SMP
-
-LINTFLAGS	+= -DRX_MAX_COUNT=256
-
-LINTFLAGS	+= -DCONFIG_CHELSIO_T1_OFFLOAD
-
-LINTFLAGS	+= -DSUN_KSTATS -DHOST_PAUSE -DTX_CKSUM_FIX -DTX_THREAD_RECLAIM
-
-LINTFLAGS	+= -Xc99=%all
 
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-unused-variable
@@ -124,12 +102,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

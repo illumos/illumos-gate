@@ -48,10 +48,3 @@ $(NGDR_IO)/dr_err.c:	$(SBDGENERR) $(SBD_IOCTL)
 	$(RM) $@
 	$(SBDGENERRCMD) ESBD < $(SBD_IOCTL) > $(NGDR_IO)/dr_err.c
 
-#
-# Section 1b: Lint object build rules
-#
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/ngdr/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-

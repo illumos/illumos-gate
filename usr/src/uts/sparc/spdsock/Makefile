@@ -59,10 +59,16 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 LDFLAGS += -dy -Ndrv/ip
 
 #
-# lint pass one enforcement
+# Overrides
 #
-CFLAGS += $(CCVERBOSE)
+INC_PATH += -I$(UTSBASE)/common/io/bpf
 
+#
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
+#
+CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 #

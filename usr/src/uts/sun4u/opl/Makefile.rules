@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This Makefile defines the build rules for the directory
 #	uts/sun4u/opl and its children.
@@ -105,34 +105,5 @@ CLEANFILES += $(DRMACH_IL)
 
 $(DRMACH_IL):   $(UTSBASE)/sun4u/opl/ml/drmach.il.cpp
 	$(IL_CPP) $(UTSBASE)/sun4u/opl/ml/drmach.il.cpp > $@
-
-
-#
-#	Section 1b: Lint object build rules
-#
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/ngdr/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/dr_mem.ln:		$(UTSBASE)/sun4u/opl/io/dr_mem.c
-	@($(LHEAD) $(LINT.c) $(UTSBASE)/sun4u/opl/io/dr_mem.c $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/opl/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/opl/io/pcicmu/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/opl/ml/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/opl/os/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/opl/io/oplpanel/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/opl/io/oplmsu/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 .KEEP_STATE:

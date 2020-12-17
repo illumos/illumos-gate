@@ -17,18 +17,15 @@ UTSBASE=	$(SRC)/uts
 
 MODULE=		pvscsi
 OBJECTS=	$(PVSCSI_OBJS:%=$(OBJS_DIR)/%)
-LINTS=		$(PVSCSI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE=	$(ROOT_DRV_DIR)/$(MODULE)
 
 include		$(UTSBASE)/intel/Makefile.intel
 
 ALL_TARGET=	$(BINARY)
-LINT_TARGET=	$(MODULE).lint
 INSTALL_TARGET=	$(BINARY) $(ROOTMODULE)
 
 LDFLAGS	+=	-dy -N misc/scsi
 
-LINTTAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 
 .KEEP_STATE:
 
@@ -36,16 +33,11 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean.lint:	$(CLEAN_LINT_DEPS)
-
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
 
 include		$(UTSBASE)/intel/Makefile.targ

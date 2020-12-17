@@ -56,7 +56,7 @@ COMMONBASE=	$(UTSBASE)/../common
 #
 
 #
-#	DEF_BUILDS is for def, lint, sischeck, and install
+#	DEF_BUILDS is for def, sischeck, and install
 #	ALL_BUILDS is for everything else (all, clean, ...)
 #
 # The NOT_RELEASE_BUILD noise is to maintain compatibility with the
@@ -71,14 +71,6 @@ $(NOT_RELEASE_BUILD)DEF_BUILDSONLY64	= debug64
 ALL_BUILDS32				= obj32 debug32
 ALL_BUILDS64				= obj64 debug64
 ALL_BUILDSONLY64			= obj64 debug64
-
-#
-#	For modules in 64b dirs that aren't built 64b
-#	or modules in 64b dirs that aren't built 32b we
-#	need to create empty modlintlib files so global lint works
-#
-LINT32_BUILDS	= debug32
-LINT64_BUILDS	= debug64
 
 #
 #	Build class (32b or 64b)
@@ -135,51 +127,9 @@ LD_amd64_64	= $(amd64_LD)
 
 LD		= $(LD_$(MACH)_$(CLASS))
 
-LINT_sparc_32	= $(sparc_LINT)
-LINT_sparc_64	= $(sparcv9_LINT)
-
-LINT_i386_32	= $(i386_LINT)
-LINT_i386_64	= $(amd64_LINT)
-LINT_amd64_64	= $(amd64_LINT)
-
-LINT		= $(LINT_$(MACH)_$(CLASS))
-
 MODEL_32	= ilp32
 MODEL_64	= lp64
 MODEL		= $(MODEL_$(CLASS))
-
-#
-#	Build rules for linting the kernel.
-#
-LHEAD =	$(ECHO) "\n$@";
-
-# Note: egrep returns "failure" if there are no matches, which is
-# exactly the opposite of what we need.
-LGREP.2 =	if egrep -v ' (_init|_fini|_info) '; then false; else true; fi
-
-LTAIL =
-
-LINT.c =	$(LINT) -c -dirout=$(LINTS_DIR) $(LINTFLAGS) $(LINT_DEFS) $(CPPFLAGS)
-
-# Please do not add new erroff directives here.  If you need to disable
-# lint warnings in your module for things that cannot be fixed in any
-# reasonable manner, please augment LINTTAGS in your module Makefile
-# instead.
-LINTTAGS	= -erroff=E_INCONS_ARG_DECL2
-LINTTAGS	+= -erroff=E_INCONS_VAL_TYPE_DECL2
-
-LINTFLAGS_sparc_32	= $(LINTCCMODE) -nsxmuF -errtags=yes
-LINTFLAGS_sparc_64	= $(LINTFLAGS_sparc_32) -m64
-LINTFLAGS_i386_32	= $(LINTCCMODE) -nsxmuF -errtags=yes
-LINTFLAGS_i386_64	= $(LINTFLAGS_i386_32) -m64
-
-LINTFLAGS	= $(LINTFLAGS_$(MACH)_$(CLASS)) $(LINTTAGS)
-LINTFLAGS	+= $(C99LMODE)
-
-#
-#	Override this variable to modify the name of the lint target.
-#
-LINT_MODULE=	$(MODULE)
 
 #
 #	Build the compile/assemble lines:
@@ -288,10 +238,10 @@ CFLAGS_uts		+= $(CFLAGS_uts_$(MACH))
 CFLAGS_uts		+= -_gcc=-fno-asynchronous-unwind-tables
 
 #
-#	Declare that $(OBJECTS) and $(LINTS) can be compiled in parallel.
-#	The DUMMY target is for those instances where OBJECTS and LINTS
-#	are empty (to avoid an unconditional .PARALLEL).
-.PARALLEL:	$(OBJECTS) $(LINTS) DUMMY
+#	Declare that $(OBJECTS) can be compiled in parallel.  The DUMMY target
+#	is for those instances where OBJECTS is empty (to avoid an
+#	unconditional .PARALLEL).
+.PARALLEL:	$(OBJECTS) DUMMY
 
 #
 #	Expanded dependencies
@@ -300,10 +250,7 @@ DEF_DEPS	= $(DEF_BUILDS:%=def.%)
 ALL_DEPS	= $(ALL_BUILDS:%=all.%)
 CLEAN_DEPS	= $(ALL_BUILDS:%=clean.%)
 CLOBBER_DEPS	= $(ALL_BUILDS:%=clobber.%)
-LINT_DEPS	= $(DEF_BUILDS:%=lint.%)
-MODLINTLIB_DEPS	= $(DEF_BUILDS:%=modlintlib.%)
 MODLIST_DEPS	= $(DEF_BUILDS:%=modlist.%)
-CLEAN_LINT_DEPS	= $(ALL_BUILDS:%=clean.lint.%)
 INSTALL_DEPS	= $(DEF_BUILDS:%=install.%)
 SYM_DEPS	= $(SYM_BUILDS:%=symcheck.%)
 SISCHECK_DEPS	= $(DEF_BUILDS:%=sischeck.%)
@@ -317,8 +264,7 @@ BINARY		= $(OBJS_DIR)/$(MODULE)
 #
 #	Default cleanup definitions
 #
-CLEANLINTFILES	= $(LINTS) $(MOD_LINT_LIB)
-CLEANFILES	= $(OBJECTS) $(CLEANLINTFILES)
+CLEANFILES	= $(OBJECTS)
 CLOBBERFILES	= $(BINARY) $(CLEANFILES)
 
 #
@@ -650,13 +596,6 @@ KMODS = $(GENUNIX_KMODS) $(PARALLEL_KMODS)
 
 $(PARALLEL_KMODS): $(GENUNIX_KMODS)
 
-LINT_KMODS = $(DRV_KMODS) $(EXEC_KMODS) $(FS_KMODS) $(SCHED_KMODS) \
-	  $(TOD_KMODS) $(STRMOD_KMODS) $(SYS_KMODS) $(MISC_KMODS) \
-	  $(MACH_KMODS) $(GSS_KMODS) $(DACF_KMODS) $(IPP_KMODS) \
-	  $(CRYPTO_KMODS) $(PCBE_KMODS) \
-	  $(DRV_KMODS_$(CLASS)) $(MISC_KMODS_$(CLASS)) $(MAC_KMODS) \
-	  $(BRAND_KMODS) $(KICONV_KMODS) $(CC_KMODS) $(SOCKET_KMODS)
-
 #
 #	Files to be compiled with -xa, to generate basic block execution
 #	count data.
@@ -679,7 +618,6 @@ $(BB_FILES)	:= XAOPT = -xa
 #	$(RELEASE_BUILD) is on for a number of the late beta and fcs builds.
 #
 $(NOT_RELEASE_BUILD)$(OBJS_DIR)/unix_bb.o   := CPPFLAGS     += -DKCOV
-$(NOT_RELEASE_BUILD)$(OBJS_DIR)/unix_bb.ln  := CPPFLAGS     += -DKCOV
 
 #
 #	Do not let unix_bb.o get compiled with -xa!
