@@ -34,7 +34,7 @@ UTSBASE = ../..
 #
 MODULE		= pcbe.GenuineIntel.15
 OBJECTS		= $(P4_PCBE_OBJS:%=$(OBJS_DIR)/%)
-ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
 
 #
 #	Include common rules.

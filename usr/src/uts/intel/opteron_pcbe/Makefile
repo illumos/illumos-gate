@@ -47,7 +47,7 @@ CPCGEN_SRCS	= $(CPCGEN_OBJS:%.o=%.c) opteron_pcbe_cpcgen.h
 MODULE		= pcbe.AuthenticAMD
 OBJECTS		= $(OPTERON_PCBE_OBJS:%=$(OBJS_DIR)/%)
 OBJECTS		+= $(CPCGEN_OBJS:%=$(OBJS_DIR)/%)
-ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
 
 #
 #	Include common rules.

@@ -49,6 +49,9 @@ $(ROOT_PSM_MOD_DIR):		$(ROOT_PSM_DIR)
 $(ROOT_PSM_MOD_DIRS_32):	$(ROOT_PSM_MOD_DIR)
 	-$(INS.dir)
 
+$(ROOT_PSM_PCBE_DIR):		$(ROOT_PSM_MOD_DIR)
+	-$(INS.dir)
+
 $(ROOT_PSM_DIR)/%:		% $(ROOT_PSM_DIR)
 	$(INS.file)
 

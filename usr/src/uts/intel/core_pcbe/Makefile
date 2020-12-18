@@ -66,7 +66,7 @@ CPCGEN_SRCS	= $(CPCGEN_OBJS:%.o=%.c) core_pcbe_cpcgen.h
 MODULE		= pcbe.GenuineIntel.6.15
 OBJECTS		= $(CORE_PCBE_OBJS:%=$(OBJS_DIR)/%)
 OBJECTS		+= $(CPCGEN_OBJS:%=$(OBJS_DIR)/%)
-ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
 
 #
 # This order matches the families declared in uts/intel/sys/x86_archext.h.
