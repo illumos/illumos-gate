@@ -1,0 +1,15 @@
+The bhyve kernel module and its associated userland consumers have been updated
+to the latest upstream FreeBSD sources as documented in
+
+	usr/src/uts/i86pc/io/vmm/README.sync
+
+The userland components in this directory have further been updated with the
+following cherry-picked updates which will need taking into account during the
+next sync.
+
+	commit 44a544d41c504fbe37f836eb503e4ae721daada9
+	Author: grehan <grehan@FreeBSD.org>
+	Date:   Fri Dec 18 00:38:48 2020 +0000
+
+	    Fix issues with various VNC clients.
+
