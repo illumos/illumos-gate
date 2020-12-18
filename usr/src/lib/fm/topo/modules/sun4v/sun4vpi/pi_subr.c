@@ -355,6 +355,7 @@ pi_get_chassisid(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
 	    num_nodes, MD_STR_COMPONENT);
 
 	idx = 0;
+	result = 0;
 	while (id == NULL && idx < num_nodes) {
 		hc_name = pi_get_topo_hc_name(mod, mdp, chassis_nodes[idx]);
 		if (hc_name != NULL && strcmp(hc_name, MD_STR_CHASSIS) == 0) {
@@ -976,7 +977,7 @@ int
 pi_set_auth(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
     tnode_t *t_parent, tnode_t *t_node)
 {
-	int 		result;
+	int		result;
 	int		err;
 	nvlist_t	*auth;
 	char		*val = NULL;

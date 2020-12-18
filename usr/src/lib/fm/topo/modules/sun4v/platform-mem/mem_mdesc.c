@@ -200,13 +200,14 @@ mem_get_dimm_by_sn(char *sn, md_mem_info_t *mem)
 
 mem_grp_t *
 find_grp(mde_cookie_t *listp, size_t n, mde_cookie_t *bclist,
-    mem_bank_map_t **banklist, size_t mem_bank_count, md_mem_info_t *mem) {
-
+    mem_bank_map_t **banklist, size_t mem_bank_count, md_mem_info_t *mem)
+{
 	mem_grp_t *mg;
 	mem_bank_map_t *bp;
 	size_t i, j;
 	int err;
 
+	err = 0;
 	for (mg = mem->mem_group; mg != NULL; mg = mg->mg_next) {
 		if (mg->mg_size == n) {
 			err = 0;
@@ -220,9 +221,9 @@ find_grp(mde_cookie_t *listp, size_t n, mde_cookie_t *bclist,
 				}
 				if (bp == NULL) err++;
 			}
-		}
-		else
+		} else {
 			err++;
+		}
 		if (err == 0)
 			return (mg);
 	}
@@ -231,8 +232,8 @@ find_grp(mde_cookie_t *listp, size_t n, mde_cookie_t *bclist,
 
 mem_grp_t *
 create_grp(topo_mod_t *mod, mde_cookie_t *listp, size_t n, mde_cookie_t *bclist,
-    mem_bank_map_t **banklist, size_t mem_bank_count, md_mem_info_t *mem) {
-
+    mem_bank_map_t **banklist, size_t mem_bank_count, md_mem_info_t *mem)
+{
 	mem_grp_t *mg;
 	size_t i, j;
 
