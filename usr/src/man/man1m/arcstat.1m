@@ -16,14 +16,12 @@
 .SH NAME
 arcstat \- report ZFS ARC and L2ARC statistics
 .SH SYNOPSIS
-.LP
 .nf
-\fBarcstat\fR [\fB-hvxr\fR] [\fB-f field[,field]...\fR] [\fB-o file\fR] [\fB-s string\fR] 
+\fBarcstat\fR [\fB-hvxr\fR] [\fB-f field[,field]...\fR] [\fB-o file\fR] [\fB-s string\fR]
       [\fBinterval\fR [\fBcount\fR]]
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBarcstat\fR utility print various ZFS ARC and L2ARC statistics in
 vmstat-like fashion.
 .sp
@@ -36,7 +34,7 @@ The \fBarcstat\fR command reports the following information:
 
 .\"
 .sp
-.ne 1 
+.ne 1
 .na
 \fBc \fR
 .ad
@@ -326,6 +324,96 @@ Total L2ARC accesses per second
 .sp
 .ne 2
 .na
+\fBl2pref \fR
+.ad
+.RS 14n
+L2ARC prefetch allocated size per second
+.RE
+
+.sp
+.ne 2
+.na
+\fBl2pref% \fR
+.ad
+.RS 14n
+L2ARC prefetch allocated size percentage
+.RE
+
+.sp
+.ne 2
+.na
+\fBl2mfu \fR
+.ad
+.RS 14n
+L2ARC MFU allocated size per second
+.RE
+
+.sp
+.ne 2
+.na
+\fBl2mfu% \fR
+.ad
+.RS 14n
+L2ARC MFU allocated size percentage
+.RE
+
+.sp
+.ne 2
+.na
+\fBl2mru \fR
+.ad
+.RS 14n
+L2ARC MRU allocated size per second
+.RE
+
+.sp
+.ne 2
+.na
+\fBl2mru% \fR
+.ad
+.RS 14n
+L2ARC MRU allocated size percentage
+.RE
+
+.sp
+.ne 2
+.na
+\fBl2data \fR
+.ad
+.RS 14n
+L2ARC data (buf content) allocated size per second
+.RE
+
+.sp
+.ne 2
+.na
+\fBl2data% \fR
+.ad
+.RS 14n
+L2ARC data (buf content) allocated size percentage
+.RE
+
+.sp
+.ne 2
+.na
+\fBl2meta \fR
+.ad
+.RS 14n
+L2ARC metadata (buf content) allocated size per second
+.RE
+
+.sp
+.ne 2
+.na
+\fBl2meta% \fR
+.ad
+.RS 14n
+L2ARC metadata (buf content) allocated size percentage
+.RE
+
+.sp
+.ne 2
+.na
 \fBl2size \fR
 .ad
 .RS 14n
@@ -370,7 +458,6 @@ Actual (compressed) size of the L2ARC
 .\"
 
 .SH OPTIONS
-.LP
 The following options are supported:
 
 .sp
@@ -429,7 +516,6 @@ Show field headers and definitions
 .RE
 
 .SH OPERANDS
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -450,6 +536,5 @@ Specify the sampling interval in seconds.
 .RE
 
 .SH AUTHORS
-.LP
 arcstat was originally written by Neelakanth Nadgir and supported only ZFS ARC statistics.
 Mike Harsch updated it to support L2ARC statistics.

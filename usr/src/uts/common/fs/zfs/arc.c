@@ -26,6 +26,10 @@
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011, 2019, Delphix. All rights reserved.
  * Copyright (c) 2020, George Amanakis. All rights reserved.
+ * Copyright (c) 2020, The FreeBSD Foundation [1]
+ *
+ * [1] Portions of this software were developed by Allan Jude
+ *     under sponsorship from the FreeBSD Foundation.
  */
 
 /*
@@ -440,6 +444,8 @@ arc_stats_t arc_stats = {
 	{ "evict_not_enough",		KSTAT_DATA_UINT64 },
 	{ "evict_l2_cached",		KSTAT_DATA_UINT64 },
 	{ "evict_l2_eligible",		KSTAT_DATA_UINT64 },
+	{ "evict_l2_eligible_mfu",	KSTAT_DATA_UINT64 },
+	{ "evict_l2_eligible_mru",	KSTAT_DATA_UINT64 },
 	{ "evict_l2_ineligible",	KSTAT_DATA_UINT64 },
 	{ "evict_l2_skip",		KSTAT_DATA_UINT64 },
 	{ "hash_elements",		KSTAT_DATA_UINT64 },
@@ -476,6 +482,11 @@ arc_stats_t arc_stats = {
 	{ "mfu_ghost_evictable_metadata", KSTAT_DATA_UINT64 },
 	{ "l2_hits",			KSTAT_DATA_UINT64 },
 	{ "l2_misses",			KSTAT_DATA_UINT64 },
+	{ "l2_prefetch_asize",		KSTAT_DATA_UINT64 },
+	{ "l2_mru_asize",		KSTAT_DATA_UINT64 },
+	{ "l2_mfu_asize",		KSTAT_DATA_UINT64 },
+	{ "l2_bufc_data_asize",		KSTAT_DATA_UINT64 },
+	{ "l2_bufc_metadata_asize",	KSTAT_DATA_UINT64 },
 	{ "l2_feeds",			KSTAT_DATA_UINT64 },
 	{ "l2_rw_clash",		KSTAT_DATA_UINT64 },
 	{ "l2_read_bytes",		KSTAT_DATA_UINT64 },
@@ -701,6 +712,13 @@ uint64_t zfs_crc64_table[256];
 #define	L2ARC_FEED_SECS		1		/* caching interval secs */
 #define	L2ARC_FEED_MIN_MS	200		/* min caching interval ms */
 
+/*
+ * We can feed L2ARC from two states of ARC buffers, mru and mfu,
+ * and each of the state has two types: data and metadata.
+ */
+#define	L2ARC_FEED_TYPES	4
+
+
 #define	l2arc_writes_sent	ARCSTAT(arcstat_l2_writes_sent)
 #define	l2arc_writes_done	ARCSTAT(arcstat_l2_writes_done)
 
@@ -714,6 +732,7 @@ uint64_t l2arc_feed_min_ms = L2ARC_FEED_MIN_MS;	/* min interval milliseconds */
 boolean_t l2arc_noprefetch = B_TRUE;		/* don't cache prefetch bufs */
 boolean_t l2arc_feed_again = B_TRUE;		/* turbo warmup */
 boolean_t l2arc_norw = B_TRUE;			/* no reads during writes */
+int l2arc_meta_percent = 33;			/* limit on headers size */
 
 /*
  * L2ARC Internals
@@ -784,6 +803,18 @@ static inline void arc_hdr_clear_flags(arc_buf_hdr_t *hdr, arc_flags_t flags);
 
 static boolean_t l2arc_write_eligible(uint64_t, arc_buf_hdr_t *);
 static void l2arc_read_done(zio_t *);
+static void l2arc_do_free_on_write(void);
+static void l2arc_hdr_arcstats_update(arc_buf_hdr_t *hdr, boolean_t incr,
+    boolean_t state_only);
+
+#define	l2arc_hdr_arcstats_increment(hdr) \
+	l2arc_hdr_arcstats_update((hdr), B_TRUE, B_FALSE)
+#define	l2arc_hdr_arcstats_decrement(hdr) \
+	l2arc_hdr_arcstats_update((hdr), B_FALSE, B_FALSE)
+#define	l2arc_hdr_arcstats_increment_state(hdr) \
+	l2arc_hdr_arcstats_update((hdr), B_TRUE, B_TRUE)
+#define	l2arc_hdr_arcstats_decrement_state(hdr) \
+	l2arc_hdr_arcstats_update((hdr), B_FALSE, B_TRUE)
 
 /*
  * The arc_all_memory function is a ZoL enhancement that lives in their OSL
@@ -928,6 +959,12 @@ buf_hash_remove(arc_buf_hdr_t *hdr)
 	    buf_hash_table.ht_table[idx]->b_hash_next == NULL)
 		ARCSTAT_BUMPDOWN(arcstat_hash_chains);
 }
+
+/*
+ * l2arc_mfuonly : A ZFS module parameter that controls whether only MFU
+ *		metadata and data are cached from ARC into L2ARC.
+ */
+int l2arc_mfuonly = 0;
 
 /*
  * Global data structures and functions for the buf kmem cache.
@@ -2170,7 +2207,11 @@ add_reference(arc_buf_hdr_t *hdr, void *tag)
 			arc_evictable_space_decrement(hdr, state);
 		}
 		/* remove the prefetch flag if we get a reference */
+		if (HDR_HAS_L2HDR(hdr))
+			l2arc_hdr_arcstats_decrement_state(hdr);
 		arc_hdr_clear_flags(hdr, ARC_FLAG_PREFETCH);
+		if (HDR_HAS_L2HDR(hdr))
+			l2arc_hdr_arcstats_increment_state(hdr);
 	}
 }
 
@@ -2406,8 +2447,15 @@ arc_change_state(arc_state_t *new_state, arc_buf_hdr_t *hdr,
 		}
 	}
 
-	if (HDR_HAS_L1HDR(hdr))
+	if (HDR_HAS_L1HDR(hdr)) {
 		hdr->b_l1hdr.b_state = new_state;
+
+		if (HDR_HAS_L2HDR(hdr) && new_state != arc_l2c_only) {
+			l2arc_hdr_arcstats_decrement_state(hdr);
+			hdr->b_l2hdr.b_arcs_state = new_state->arcs_state;
+			l2arc_hdr_arcstats_increment_state(hdr);
+		}
+	}
 
 	/*
 	 * L2 headers should never be on the L2 state list since they don't
@@ -2711,7 +2759,7 @@ static void l2arc_log_blk_fetch_abort(zio_t *zio);
 
 /* L2ARC persistence block restoration routines. */
 static void l2arc_log_blk_restore(l2arc_dev_t *dev,
-    const l2arc_log_blk_phys_t *lb, uint64_t lb_asize, uint64_t lb_daddr);
+    const l2arc_log_blk_phys_t *lb, uint64_t lb_asize);
 static void l2arc_hdr_restore(const l2arc_log_ent_phys_t *le,
     l2arc_dev_t *dev);
 
@@ -3436,7 +3484,8 @@ arc_alloc_buf(spa_t *spa, void *tag, arc_buf_contents_t type, int32_t size)
 arc_buf_hdr_t *
 arc_buf_alloc_l2only(size_t size, arc_buf_contents_t type, l2arc_dev_t *dev,
     dva_t dva, uint64_t daddr, int32_t psize, uint64_t birth,
-    enum zio_compress compress, boolean_t protected, boolean_t prefetch)
+    enum zio_compress compress, boolean_t protected,
+    boolean_t prefetch, arc_state_type_t arcs_state)
 {
 	arc_buf_hdr_t	*hdr;
 
@@ -3459,6 +3508,7 @@ arc_buf_alloc_l2only(size_t size, arc_buf_contents_t type, l2arc_dev_t *dev,
 
 	hdr->b_l2hdr.b_dev = dev;
 	hdr->b_l2hdr.b_daddr = daddr;
+	hdr->b_l2hdr.b_arcs_state = arcs_state;
 
 	return (hdr);
 }
@@ -3542,6 +3592,76 @@ arc_alloc_raw_buf(spa_t *spa, void *tag, uint64_t dsobj, boolean_t byteorder,
 }
 
 static void
+l2arc_hdr_arcstats_update(arc_buf_hdr_t *hdr, boolean_t incr,
+    boolean_t state_only)
+{
+	l2arc_buf_hdr_t *l2hdr = &hdr->b_l2hdr;
+	l2arc_dev_t *dev = l2hdr->b_dev;
+	uint64_t lsize = HDR_GET_LSIZE(hdr);
+	uint64_t psize = HDR_GET_PSIZE(hdr);
+	uint64_t asize = vdev_psize_to_asize(dev->l2ad_vdev, psize);
+	arc_buf_contents_t type = hdr->b_type;
+	int64_t lsize_s;
+	int64_t psize_s;
+	int64_t asize_s;
+
+	if (incr) {
+		lsize_s = lsize;
+		psize_s = psize;
+		asize_s = asize;
+	} else {
+		lsize_s = -lsize;
+		psize_s = -psize;
+		asize_s = -asize;
+	}
+
+	/* If the buffer is a prefetch, count it as such. */
+	if (HDR_PREFETCH(hdr)) {
+		ARCSTAT_INCR(arcstat_l2_prefetch_asize, asize_s);
+	} else {
+		/*
+		 * We use the value stored in the L2 header upon initial
+		 * caching in L2ARC. This value will be updated in case
+		 * an MRU/MRU_ghost buffer transitions to MFU but the L2ARC
+		 * metadata (log entry) cannot currently be updated. Having
+		 * the ARC state in the L2 header solves the problem of a
+		 * possibly absent L1 header (apparent in buffers restored
+		 * from persistent L2ARC).
+		 */
+		switch (hdr->b_l2hdr.b_arcs_state) {
+			case ARC_STATE_MRU_GHOST:
+			case ARC_STATE_MRU:
+				ARCSTAT_INCR(arcstat_l2_mru_asize, asize_s);
+				break;
+			case ARC_STATE_MFU_GHOST:
+			case ARC_STATE_MFU:
+				ARCSTAT_INCR(arcstat_l2_mfu_asize, asize_s);
+				break;
+			default:
+				break;
+		}
+	}
+
+	if (state_only)
+		return;
+
+	ARCSTAT_INCR(arcstat_l2_psize, psize_s);
+	ARCSTAT_INCR(arcstat_l2_lsize, lsize_s);
+
+	switch (type) {
+		case ARC_BUFC_DATA:
+			ARCSTAT_INCR(arcstat_l2_bufc_data_asize, asize_s);
+			break;
+		case ARC_BUFC_METADATA:
+			ARCSTAT_INCR(arcstat_l2_bufc_metadata_asize, asize_s);
+			break;
+		default:
+			break;
+	}
+}
+
+
+static void
 arc_hdr_l2hdr_destroy(arc_buf_hdr_t *hdr)
 {
 	l2arc_buf_hdr_t *l2hdr = &hdr->b_l2hdr;
@@ -3554,9 +3674,7 @@ arc_hdr_l2hdr_destroy(arc_buf_hdr_t *hdr)
 
 	list_remove(&dev->l2ad_buflist, hdr);
 
-	ARCSTAT_INCR(arcstat_l2_psize, -psize);
-	ARCSTAT_INCR(arcstat_l2_lsize, -HDR_GET_LSIZE(hdr));
-
+	l2arc_hdr_arcstats_decrement(hdr);
 	vdev_space_update(dev->l2ad_vdev, -asize, 0, 0);
 
 	(void) zfs_refcount_remove_many(&dev->l2ad_alloc, arc_hdr_size(hdr),
@@ -3766,6 +3884,21 @@ arc_evict_hdr(arc_buf_hdr_t *hdr, kmutex_t *hash_lock)
 		if (l2arc_write_eligible(hdr->b_spa, hdr)) {
 			ARCSTAT_INCR(arcstat_evict_l2_eligible,
 			    HDR_GET_LSIZE(hdr));
+
+			switch (state->arcs_state) {
+				case ARC_STATE_MRU:
+					ARCSTAT_INCR(
+					    arcstat_evict_l2_eligible_mru,
+					    HDR_GET_LSIZE(hdr));
+					break;
+				case ARC_STATE_MFU:
+					ARCSTAT_INCR(
+					    arcstat_evict_l2_eligible_mfu,
+					    HDR_GET_LSIZE(hdr));
+					break;
+				default:
+					break;
+			}
 		} else {
 			ARCSTAT_INCR(arcstat_evict_l2_ineligible,
 			    HDR_GET_LSIZE(hdr));
@@ -4769,9 +4902,6 @@ arc_adapt(int bytes, arc_state_t *state)
 	int64_t mrug_size = zfs_refcount_count(&arc_mru_ghost->arcs_size);
 	int64_t mfug_size = zfs_refcount_count(&arc_mfu_ghost->arcs_size);
 
-	if (state == arc_l2c_only)
-		return;
-
 	ASSERT(bytes > 0);
 	/*
 	 * Adapt the target size of the MRU list:
@@ -5066,10 +5196,14 @@ arc_access(arc_buf_hdr_t *hdr, kmutex_t *hash_lock)
 				ASSERT(multilist_link_active(
 				    &hdr->b_l1hdr.b_arc_node));
 			} else {
+				if (HDR_HAS_L2HDR(hdr))
+					l2arc_hdr_arcstats_decrement_state(hdr);
 				arc_hdr_clear_flags(hdr,
 				    ARC_FLAG_PREFETCH |
 				    ARC_FLAG_PRESCIENT_PREFETCH);
 				ARCSTAT_BUMP(arcstat_mru_hits);
+				if (HDR_HAS_L2HDR(hdr))
+					l2arc_hdr_arcstats_increment_state(hdr);
 			}
 			hdr->b_l1hdr.b_arc_access = now;
 			return;
@@ -5098,13 +5232,16 @@ arc_access(arc_buf_hdr_t *hdr, kmutex_t *hash_lock)
 		 * was evicted from the cache.  Move it to the
 		 * MFU state.
 		 */
-
 		if (HDR_PREFETCH(hdr) || HDR_PRESCIENT_PREFETCH(hdr)) {
 			new_state = arc_mru;
 			if (zfs_refcount_count(&hdr->b_l1hdr.b_refcnt) > 0) {
+				if (HDR_HAS_L2HDR(hdr))
+					l2arc_hdr_arcstats_decrement_state(hdr);
 				arc_hdr_clear_flags(hdr,
 				    ARC_FLAG_PREFETCH |
 				    ARC_FLAG_PRESCIENT_PREFETCH);
+				if (HDR_HAS_L2HDR(hdr))
+					l2arc_hdr_arcstats_increment_state(hdr);
 			}
 			DTRACE_PROBE1(new_state__mru, arc_buf_hdr_t *, hdr);
 		} else {
@@ -5365,8 +5502,6 @@ arc_read_done(zio_t *zio)
 	}
 
 	arc_hdr_clear_flags(hdr, ARC_FLAG_L2_EVICTED);
-	if (l2arc_noprefetch && HDR_PREFETCH(hdr))
-		arc_hdr_clear_flags(hdr, ARC_FLAG_L2CACHE);
 
 	callback_list = hdr->b_l1hdr.b_acb;
 	ASSERT3P(callback_list, !=, NULL);
@@ -5692,8 +5827,12 @@ top:
 			ASSERT((zio_flags & ZIO_FLAG_SPECULATIVE) ||
 			    rc != EACCES);
 		} else if (*arc_flags & ARC_FLAG_PREFETCH &&
-		    zfs_refcount_count(&hdr->b_l1hdr.b_refcnt) == 0) {
+		    zfs_refcount_is_zero(&hdr->b_l1hdr.b_refcnt)) {
+			if (HDR_HAS_L2HDR(hdr))
+				l2arc_hdr_arcstats_decrement_state(hdr);
 			arc_hdr_set_flags(hdr, ARC_FLAG_PREFETCH);
+			if (HDR_HAS_L2HDR(hdr))
+				l2arc_hdr_arcstats_increment_state(hdr);
 		}
 		DTRACE_PROBE1(arc__hit, arc_buf_hdr_t *, hdr);
 		arc_access(hdr, hash_lock);
@@ -5816,8 +5955,13 @@ top:
 		}
 
 		if (*arc_flags & ARC_FLAG_PREFETCH &&
-		    zfs_refcount_is_zero(&hdr->b_l1hdr.b_refcnt))
+		    zfs_refcount_is_zero(&hdr->b_l1hdr.b_refcnt)) {
+			if (HDR_HAS_L2HDR(hdr))
+				l2arc_hdr_arcstats_decrement_state(hdr);
 			arc_hdr_set_flags(hdr, ARC_FLAG_PREFETCH);
+			if (HDR_HAS_L2HDR(hdr))
+				l2arc_hdr_arcstats_increment_state(hdr);
+		}
 		if (*arc_flags & ARC_FLAG_PRESCIENT_PREFETCH)
 			arc_hdr_set_flags(hdr, ARC_FLAG_PRESCIENT_PREFETCH);
 
@@ -5887,7 +6031,7 @@ top:
 			 * 3. This buffer isn't currently writing to the L2ARC.
 			 * 4. The L2ARC entry wasn't evicted, which may
 			 *    also have invalidated the vdev.
-			 * 5. This isn't prefetch and l2arc_noprefetch is set.
+			 * 5. This isn't prefetch or l2arc_noprefetch is 0.
 			 */
 			if (HDR_HAS_L2HDR(hdr) &&
 			    !HDR_L2_WRITING(hdr) && !HDR_L2_EVICTED(hdr) &&
@@ -5905,6 +6049,17 @@ top:
 				cb->l2rcb_bp = *bp;
 				cb->l2rcb_zb = *zb;
 				cb->l2rcb_flags = zio_flags;
+
+				/*
+				 * When Compressed ARC is disabled, but the
+				 * L2ARC block is compressed, arc_hdr_size()
+				 * will have returned LSIZE rather than PSIZE.
+				 */
+				if (HDR_GET_COMPRESS(hdr) != ZIO_COMPRESS_OFF &&
+				    !HDR_COMPRESSION_ENABLED(hdr) &&
+				    HDR_GET_PSIZE(hdr) != 0) {
+					size = HDR_GET_PSIZE(hdr);
+				}
 
 				asize = vdev_psize_to_asize(vd, size);
 				if (asize != size) {
@@ -6917,6 +7072,13 @@ arc_state_init(void)
 	aggsum_init(&astat_hdr_size, 0);
 	aggsum_init(&astat_other_size, 0);
 	aggsum_init(&astat_l2_hdr_size, 0);
+
+	arc_anon->arcs_state = ARC_STATE_ANON;
+	arc_mru->arcs_state = ARC_STATE_MRU;
+	arc_mru_ghost->arcs_state = ARC_STATE_MRU_GHOST;
+	arc_mfu->arcs_state = ARC_STATE_MFU;
+	arc_mfu_ghost->arcs_state = ARC_STATE_MFU_GHOST;
+	arc_l2c_only->arcs_state = ARC_STATE_L2C_ONLY;
 }
 
 static void
@@ -7389,9 +7551,11 @@ l2arc_write_eligible(uint64_t spa_guid, arc_buf_hdr_t *hdr)
 	 * 2. is already cached on the L2ARC.
 	 * 3. has an I/O in progress (it may be an incomplete read).
 	 * 4. is flagged not eligible (zfs property).
+	 * 5. is a prefetch and l2arc_noprefetch is set.
 	 */
 	if (hdr->b_spa != spa_guid || HDR_HAS_L2HDR(hdr) ||
-	    HDR_IO_IN_PROGRESS(hdr) || !HDR_L2CACHE(hdr))
+	    HDR_IO_IN_PROGRESS(hdr) || !HDR_L2CACHE(hdr) ||
+	    (l2arc_noprefetch && HDR_PREFETCH(hdr)))
 		return (B_FALSE);
 
 	return (B_TRUE);
@@ -7575,9 +7739,6 @@ l2arc_write_done(zio_t *zio)
 	DTRACE_PROBE2(l2arc__iodone, zio_t *, zio,
 	    l2arc_write_callback_t *, cb);
 
-	if (zio->io_error != 0)
-		ARCSTAT_BUMP(arcstat_l2_writes_error);
-
 	/*
 	 * All writes completed, or an error was hit.
 	 */
@@ -7637,8 +7798,7 @@ top:
 			arc_hdr_clear_flags(hdr, ARC_FLAG_HAS_L2HDR);
 
 			uint64_t psize = HDR_GET_PSIZE(hdr);
-			ARCSTAT_INCR(arcstat_l2_psize, -psize);
-			ARCSTAT_INCR(arcstat_l2_lsize, -HDR_GET_LSIZE(hdr));
+			l2arc_hdr_arcstats_decrement(hdr);
 
 			bytes_dropped +=
 			    vdev_psize_to_asize(dev->l2ad_vdev, psize);
@@ -7686,6 +7846,8 @@ top:
 	list_destroy(&cb->l2wcb_abd_list);
 
 	if (zio->io_error != 0) {
+		ARCSTAT_BUMP(arcstat_l2_writes_error);
+
 		/*
 		 * Restore the lbps array in the header to its previous state.
 		 * If the list of log block pointers is empty, zero out the
@@ -7978,7 +8140,7 @@ l2arc_sublist_lock(int list_num)
 	multilist_t *ml = NULL;
 	unsigned int idx;
 
-	ASSERT(list_num >= 0 && list_num <= 3);
+	ASSERT(list_num >= 0 && list_num < L2ARC_FEED_TYPES);
 
 	switch (list_num) {
 	case 0:
@@ -7993,6 +8155,8 @@ l2arc_sublist_lock(int list_num)
 	case 3:
 		ml = arc_mru->arcs_list[ARC_BUFC_DATA];
 		break;
+	default:
+		return (NULL);
 	}
 
 	/*
@@ -8380,7 +8544,16 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz)
 	/*
 	 * Copy buffers for L2ARC writing.
 	 */
-	for (int try = 0; try <= 3; try++) {
+	for (int try = 0; try < L2ARC_FEED_TYPES; try++) {
+		/*
+		 * If try == 1 or 3, we cache MRU metadata and data
+		 * respectively.
+		 */
+		if (l2arc_mfuonly) {
+			if (try == 1 || try == 3)
+				continue;
+		}
+
 		multilist_sublist_t *mls = l2arc_sublist_lock(try);
 		uint64_t passed_sz = 0;
 
@@ -8532,6 +8705,8 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz)
 
 			hdr->b_l2hdr.b_dev = dev;
 			hdr->b_l2hdr.b_daddr = dev->l2ad_hand;
+			hdr->b_l2hdr.b_arcs_state =
+			    hdr->b_l1hdr.b_state->arcs_state;
 			arc_hdr_set_flags(hdr,
 			    ARC_FLAG_L2_WRITING | ARC_FLAG_HAS_L2HDR);
 
@@ -8555,6 +8730,7 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz)
 			write_psize += psize;
 			write_asize += asize;
 			dev->l2ad_hand += asize;
+			l2arc_hdr_arcstats_increment(hdr);
 			vdev_space_update(dev->l2ad_vdev, asize, 0, 0);
 
 			mutex_exit(hash_lock);
@@ -8598,8 +8774,6 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz)
 	ASSERT3U(write_asize, <=, target_sz);
 	ARCSTAT_BUMP(arcstat_l2_writes_sent);
 	ARCSTAT_INCR(arcstat_l2_write_bytes, write_psize);
-	ARCSTAT_INCR(arcstat_l2_lsize, write_lsize);
-	ARCSTAT_INCR(arcstat_l2_psize, write_psize);
 
 	dev->l2ad_writing = B_TRUE;
 	(void) zio_wait(pio);
@@ -8613,6 +8787,15 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz)
 	l2arc_dev_hdr_update(dev);
 
 	return (write_asize);
+}
+
+static boolean_t
+l2arc_hdr_limit_reached(void)
+{
+	int64_t s = aggsum_upper_bound(&astat_l2_hdr_size);
+
+	return (arc_reclaim_needed() || (s > arc_meta_limit * 3 / 4) ||
+	    (s > (arc_warm ? arc_c : arc_c_max) * l2arc_meta_percent / 100));
 }
 
 /*
@@ -8680,7 +8863,7 @@ l2arc_feed_thread(void *unused)
 		/*
 		 * Avoid contributing to memory pressure.
 		 */
-		if (arc_reclaim_needed()) {
+		if (l2arc_hdr_limit_reached()) {
 			ARCSTAT_BUMP(arcstat_l2_abort_lowmem);
 			spa_config_exit(spa, SCL_L2ARC, dev);
 			continue;
@@ -8810,8 +8993,6 @@ l2arc_rebuild_vdev(vdev_t *vd, boolean_t reopen)
 	l2arc_dev_hdr_phys_t	*l2dhdr;
 	uint64_t		l2dhdr_asize;
 	spa_t			*spa;
-	int			err;
-	boolean_t		l2dhdr_valid = B_TRUE;
 
 	dev = l2arc_vdev_get(vd);
 	ASSERT3P(dev, !=, NULL);
@@ -8840,10 +9021,7 @@ l2arc_rebuild_vdev(vdev_t *vd, boolean_t reopen)
 	/*
 	 * Read the device header, if an error is returned do not rebuild L2ARC.
 	 */
-	if ((err = l2arc_dev_hdr_read(dev)) != 0)
-		l2dhdr_valid = B_FALSE;
-
-	if (l2dhdr_valid && dev->l2ad_log_entries > 0) {
+	if (l2arc_dev_hdr_read(dev) == 0 && dev->l2ad_log_entries > 0) {
 		/*
 		 * If we are onlining a cache device (vdev_reopen) that was
 		 * still present (l2arc_vdev_present()) and rebuild is enabled,
@@ -9120,7 +9298,7 @@ l2arc_rebuild(l2arc_dev_t *dev)
 		 * online the L2ARC dev at a later time (or re-import the pool)
 		 * to reconstruct it (when there's less memory pressure).
 		 */
-		if (arc_reclaim_needed()) {
+		if (l2arc_hdr_limit_reached()) {
 			ARCSTAT_BUMP(arcstat_l2_rebuild_abort_lowmem);
 			cmn_err(CE_NOTE, "System running low on memory, "
 			    "aborting L2ARC rebuild.");
@@ -9137,7 +9315,7 @@ l2arc_rebuild(l2arc_dev_t *dev)
 		 * L2BLK_GET_PSIZE returns aligned size for log blocks.
 		 */
 		uint64_t asize = L2BLK_GET_PSIZE((&lbps[0])->lbp_prop);
-		l2arc_log_blk_restore(dev, this_lb, asize, lbps[0].lbp_daddr);
+		l2arc_log_blk_restore(dev, this_lb, asize);
 
 		/*
 		 * log block restored, include its pointer in the list of
@@ -9219,7 +9397,7 @@ l2arc_rebuild(l2arc_dev_t *dev)
 		PTR_SWAP(this_lb, next_lb);
 		this_io = next_io;
 		next_io = NULL;
-		}
+	}
 
 	if (this_io != NULL)
 		l2arc_log_blk_fetch_abort(this_io);
@@ -9247,6 +9425,13 @@ out:
 		    "no valid log blocks");
 		bzero(l2dhdr, dev->l2ad_dev_hdr_asize);
 		l2arc_dev_hdr_update(dev);
+	} else if (err == ECANCELED) {
+		/*
+		 * In case the rebuild was canceled do not log to spa history
+		 * log as the pool may be in the process of being removed.
+		 */
+		zfs_dbgmsg("L2ARC rebuild aborted, restored %llu blocks",
+		    zfs_refcount_count(&dev->l2ad_lb_count));
 	} else if (err != 0) {
 		spa_history_log_internal(spa, "L2ARC rebuild", NULL,
 		    "aborted, restored %llu blocks",
@@ -9279,7 +9464,7 @@ l2arc_dev_hdr_read(l2arc_dev_t *dev)
 
 	err = zio_wait(zio_read_phys(NULL, dev->l2ad_vdev,
 	    VDEV_LABEL_START_SIZE, l2dhdr_asize, abd,
-	    ZIO_CHECKSUM_LABEL, NULL, NULL, ZIO_PRIORITY_ASYNC_READ,
+	    ZIO_CHECKSUM_LABEL, NULL, NULL, ZIO_PRIORITY_SYNC_READ,
 	    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_CANFAIL |
 	    ZIO_FLAG_DONT_PROPAGATE | ZIO_FLAG_DONT_RETRY |
 	    ZIO_FLAG_SPECULATIVE, B_FALSE));
@@ -9448,10 +9633,17 @@ cleanup:
  */
 static void
 l2arc_log_blk_restore(l2arc_dev_t *dev, const l2arc_log_blk_phys_t *lb,
-    uint64_t lb_asize, uint64_t lb_daddr)
+    uint64_t lb_asize)
 {
 	uint64_t	size = 0, asize = 0;
 	uint64_t	log_entries = dev->l2ad_log_entries;
+
+	/*
+	 * Usually arc_adapt() is called only for data, not headers, but
+	 * since we may allocate significant amount of memory here, let ARC
+	 * grow its arc_c.
+	 */
+	arc_adapt(log_entries * HDR_L2ONLY_SIZE, arc_l2c_only);
 
 	for (int i = log_entries - 1; i >= 0; i--) {
 		/*
@@ -9515,18 +9707,17 @@ l2arc_hdr_restore(const l2arc_log_ent_phys_t *le, l2arc_dev_t *dev)
 	    L2BLK_GET_PSIZE((le)->le_prop), le->le_birth,
 	    L2BLK_GET_COMPRESS((le)->le_prop),
 	    L2BLK_GET_PROTECTED((le)->le_prop),
-	    L2BLK_GET_PREFETCH((le)->le_prop));
+	    L2BLK_GET_PREFETCH((le)->le_prop),
+	    L2BLK_GET_STATE((le)->le_prop));
 	asize = vdev_psize_to_asize(dev->l2ad_vdev,
 	    L2BLK_GET_PSIZE((le)->le_prop));
 
 	/*
 	 * vdev_space_update() has to be called before arc_hdr_destroy() to
-	 * avoid underflow since the latter also calls the former.
+	 * avoid underflow since the latter also calls vdev_space_update().
 	 */
+	l2arc_hdr_arcstats_increment(hdr);
 	vdev_space_update(dev->l2ad_vdev, asize, 0, 0);
-
-	ARCSTAT_INCR(arcstat_l2_lsize, HDR_GET_LSIZE(hdr));
-	ARCSTAT_INCR(arcstat_l2_psize, HDR_GET_PSIZE(hdr));
 
 	mutex_enter(&dev->l2ad_mtx);
 	list_insert_tail(&dev->l2ad_buflist, hdr);
@@ -9547,14 +9738,15 @@ l2arc_hdr_restore(const l2arc_log_ent_phys_t *le, l2arc_dev_t *dev)
 			arc_hdr_set_flags(exists, ARC_FLAG_HAS_L2HDR);
 			exists->b_l2hdr.b_dev = dev;
 			exists->b_l2hdr.b_daddr = le->le_daddr;
+			exists->b_l2hdr.b_arcs_state =
+			    L2BLK_GET_STATE((le)->le_prop);
 			mutex_enter(&dev->l2ad_mtx);
 			list_insert_tail(&dev->l2ad_buflist, exists);
 			(void) zfs_refcount_add_many(&dev->l2ad_alloc,
 			    arc_hdr_size(exists), exists);
 			mutex_exit(&dev->l2ad_mtx);
+			l2arc_hdr_arcstats_increment(exists);
 			vdev_space_update(dev->l2ad_vdev, asize, 0, 0);
-			ARCSTAT_INCR(arcstat_l2_lsize, HDR_GET_LSIZE(exists));
-			ARCSTAT_INCR(arcstat_l2_psize, HDR_GET_PSIZE(exists));
 		}
 		ARCSTAT_BUMP(arcstat_l2_rebuild_bufs_precached);
 	}
@@ -9848,6 +10040,7 @@ l2arc_log_blk_insert(l2arc_dev_t *dev, const arc_buf_hdr_t *hdr)
 	L2BLK_SET_TYPE((le)->le_prop, hdr->b_type);
 	L2BLK_SET_PROTECTED((le)->le_prop, !!(HDR_PROTECTED(hdr)));
 	L2BLK_SET_PREFETCH((le)->le_prop, !!(HDR_PREFETCH(hdr)));
+	L2BLK_SET_STATE((le)->le_prop, hdr->b_l1hdr.b_state->arcs_state);
 
 	dev->l2ad_log_blk_payload_asize += vdev_psize_to_asize(dev->l2ad_vdev,
 	    HDR_GET_PSIZE(hdr));
