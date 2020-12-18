@@ -675,6 +675,8 @@ libzfs_handle_t *
 libzfs_init(void)
 {
 	libzfs_handle_t *hdl;
+	int error;
+	char *env;
 
 	if ((hdl = calloc(1, sizeof (libzfs_handle_t))) == NULL) {
 		return (NULL);
@@ -716,6 +718,20 @@ libzfs_init(void)
 
 	if (getenv("ZFS_PROP_DEBUG") != NULL) {
 		hdl->libzfs_prop_debug = B_TRUE;
+	}
+	if ((env = getenv("ZFS_SENDRECV_MAX_NVLIST")) != NULL) {
+		if ((error = zfs_nicestrtonum(hdl, env,
+		    &hdl->libzfs_max_nvlist))) {
+			errno = error;
+			(void) close(hdl->libzfs_fd);
+			(void) fclose(hdl->libzfs_mnttab);
+			(void) fclose(hdl->libzfs_sharetab);
+			regfree(&hdl->libzfs_urire);
+			free(hdl);
+			return (NULL);
+		}
+	} else {
+		hdl->libzfs_max_nvlist = (SPA_MAXBLOCKSIZE * 4);
 	}
 
 	return (hdl);

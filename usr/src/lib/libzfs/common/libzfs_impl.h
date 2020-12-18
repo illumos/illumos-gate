@@ -93,6 +93,7 @@ struct libzfs_handle {
 	boolean_t libzfs_prop_debug;
 	di_devlink_handle_t libzfs_devlink;
 	regex_t libzfs_urire;
+	uint64_t libzfs_max_nvlist;
 };
 
 struct zfs_handle {
