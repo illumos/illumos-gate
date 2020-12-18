@@ -1912,6 +1912,19 @@ svm_dr_leave_guest(struct svm_regctx *gctx)
 	load_dr7(gctx->host_dr7);
 }
 
+static void
+svm_apply_tsc_adjust(struct svm_softc *svm_sc, int vcpuid)
+{
+	const uint64_t offset = vcpu_tsc_offset(svm_sc->vm, vcpuid, true);
+	struct vmcb_ctrl *ctrl = svm_get_vmcb_ctrl(svm_sc, vcpuid);
+
+	if (ctrl->tsc_offset != offset) {
+		ctrl->tsc_offset = offset;
+		svm_set_dirty(svm_sc, vcpuid, VMCB_CACHE_I);
+	}
+}
+
+
 /*
  * Start vcpu with specified RIP.
  */
@@ -1970,6 +1983,8 @@ svm_vmrun(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 		vcpustate->lastcpu = curcpu;
 		vmm_stat_incr(vm, vcpu, VCPU_MIGRATIONS, 1);
 	}
+
+	svm_apply_tsc_adjust(svm_sc, vcpu);
 
 	svm_msr_guest_enter(svm_sc, vcpu);
 

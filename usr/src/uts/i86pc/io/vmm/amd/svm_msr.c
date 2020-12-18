@@ -150,15 +150,6 @@ svm_rdmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t *result)
 	int error = 0;
 
 	switch (num) {
-	case MSR_MCG_CAP:
-	case MSR_MCG_STATUS:
-		*result = 0;
-		break;
-	case MSR_MTRRcap:
-	case MSR_MTRRdefType:
-	case MSR_MTRR4kBase ... MSR_MTRR4kBase + 8:
-	case MSR_MTRR16kBase ... MSR_MTRR16kBase + 1:
-	case MSR_MTRR64kBase:
 	case MSR_SYSCFG:
 	case MSR_AMDK8_IPM:
 	case MSR_EXTFEATURES:
@@ -190,16 +181,6 @@ svm_wrmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t val)
 	int error = 0;
 
 	switch (num) {
-	case MSR_MCG_CAP:
-	case MSR_MCG_STATUS:
-		break;		/* ignore writes */
-	case MSR_MTRRcap:
-		vm_inject_gp(sc->vm, vcpu);
-		break;
-	case MSR_MTRRdefType:
-	case MSR_MTRR4kBase ... MSR_MTRR4kBase + 8:
-	case MSR_MTRR16kBase ... MSR_MTRR16kBase + 1:
-	case MSR_MTRR64kBase:
 	case MSR_SYSCFG:
 		/* Ignore writes */
 		break;

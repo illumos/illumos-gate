@@ -236,9 +236,7 @@ enum vcpu_state vcpu_get_state(struct vm *vm, int vcpu, int *hostcpu);
 void vcpu_block_run(struct vm *, int);
 void vcpu_unblock_run(struct vm *, int);
 
-#ifndef __FreeBSD__
-uint64_t vcpu_tsc_offset(struct vm *vm, int vcpuid);
-#endif
+uint64_t vcpu_tsc_offset(struct vm *vm, int vcpuid, bool phys_adj);
 
 static __inline int
 vcpu_is_running(struct vm *vm, int vcpu, int *hostcpu)

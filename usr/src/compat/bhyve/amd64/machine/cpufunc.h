@@ -112,6 +112,9 @@ read_rflags(void)
 	return (rf);
 }
 
+/* Equivalent to the FreeBSD rdtsc(), but with any necessary per-cpu offset */
+uint64_t rdtsc_offset(void);
+
 static __inline uint64_t
 rdmsr(u_int msr)
 {
@@ -119,15 +122,6 @@ rdmsr(u_int msr)
 
 	__asm __volatile("rdmsr" : "=a" (low), "=d" (high) : "c" (msr));
 	return (low | ((uint64_t)high << 32));
-}
-
-static __inline uint64_t
-rdtsc(void)
-{
-	extern hrtime_t tsc_gethrtimeunscaled_delta(void);
-
-	/* Get the TSC reading with any needed synch offset applied */
-	return ((uint64_t)tsc_gethrtimeunscaled_delta());
 }
 
 static __inline void

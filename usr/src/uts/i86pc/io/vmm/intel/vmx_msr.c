@@ -410,17 +410,6 @@ vmx_rdmsr(struct vmx *vmx, int vcpuid, uint_t num, uint64_t *val)
 	error = 0;
 
 	switch (num) {
-	case MSR_MCG_CAP:
-	case MSR_MCG_STATUS:
-		*val = 0;
-		break;
-	case MSR_MTRRcap:
-	case MSR_MTRRdefType:
-	case MSR_MTRR4kBase ... MSR_MTRR4kBase + 8:
-	case MSR_MTRR16kBase ... MSR_MTRR16kBase + 1:
-	case MSR_MTRR64kBase:
-		*val = 0;
-		break;
 	case MSR_IA32_FEATURE_CONTROL:
 		/*
 		 * We currently don't support SGX support in guests, so
@@ -460,17 +449,6 @@ vmx_wrmsr(struct vmx *vmx, int vcpuid, uint_t num, uint64_t val)
 	error = 0;
 
 	switch (num) {
-	case MSR_MCG_CAP:
-	case MSR_MCG_STATUS:
-		break;		/* ignore writes */
-	case MSR_MTRRcap:
-		vm_inject_gp(vmx->vm, vcpuid);
-		break;
-	case MSR_MTRRdefType:
-	case MSR_MTRR4kBase ... MSR_MTRR4kBase + 8:
-	case MSR_MTRR16kBase ... MSR_MTRR16kBase + 1:
-	case MSR_MTRR64kBase:
-		break;		/* Ignore writes */
 	case MSR_IA32_MISC_ENABLE:
 		changed = val ^ misc_enable;
 		/*
@@ -497,11 +475,6 @@ vmx_wrmsr(struct vmx *vmx, int vcpuid, uint_t num, uint64_t val)
 		else
 			vm_inject_gp(vmx->vm, vcpuid);
 		break;
-#ifdef __FreeBSD__
-	case MSR_TSC:
-		error = vmx_set_tsc_offset(vmx, vcpuid, val - rdtsc());
-		break;
-#endif /* __FreeBSD__ */
 	default:
 		error = EINVAL;
 		break;
