@@ -176,17 +176,17 @@
 #     As compiler drivers may assign -D a different meaning, the
 #     LD_OPTIONS environment variable is often used:
 #        LD_OPTIONS=-Dtoken1,token2 cc -o prog ...
-# 
+#
 #     The position of -D on the link-edit command line is significant.
 #     Diagnostics are enabled when a debug token is first encountered,
 #     and can be switched off by prepending the token with "!".
-# 
+#
 #     Diagnostic output can be directed to a file using the "output"
 #     token, The output file is used as specified, without a process
 #     id suffix.
-# 
+#
 #     All link-editor diagnostics are prepended with the string "debug".
-# 
+#
 
 # TRANSLATION_NOTE - The next series of messages makes the above output in C
 # locale.
@@ -312,8 +312,8 @@
 #                              alt        all alternative link-map lists
 #                              alt[0-9]+  specific alternative link-map list
 #                              base       the base, or main, link-map list
-#                              ldso       the runtime linker link-map list 
-# 
+#                              ldso       the runtime linker link-map list
+#
 
 # TRANSLATION_NOTE - The next series of messages makes the above output in C
 # locale.
@@ -367,7 +367,7 @@
 #         fullname         prepend full output file name to diagnostics
 #         class            prepend output file elfclass (32/64) to
 #                            diagnostics
-# 
+#
 
 # TRANSLATION_NOTE - The next series of messages makes the above output in C
 # locale.
@@ -561,9 +561,6 @@
 @ MSG_ARG_WLDEL		"arg[%d]\toption=-W%s:  translated: prefix -Wl,: \
 			 removed"
 @ MSG_ARG_FILE		"arg[%d]\tfile=%s"
-
-@ MSG_ARG_NG_UNKNOWN	"warning: unrecognized -z guidance item: %s"
-
 
 # Bindings messages
 # NOTE: these are used by appcert(1) and lari(1), use care when changing.
@@ -801,9 +798,9 @@
 @ MSG_MAP_DV		"depend versions directive; line=%llu, object=%s"
 @ MSG_MAP_DV_ENTRY	"%12.12s  %s; line=%llu"
 
-@ MSG_MAP_SORT_TITLE	"mapfile additions: segment sorting required" 
-@ MSG_MAP_SORT_TITLE_O	"before:" 
-@ MSG_MAP_SORT_TITLE_S	"after:" 
+@ MSG_MAP_SORT_TITLE	"mapfile additions: segment sorting required"
+@ MSG_MAP_SORT_TITLE_O	"before:"
+@ MSG_MAP_SORT_TITLE_S	"after:"
 @ MSG_MAP_POST_TITLE	"mapfile post processing"
 @ MSG_MAP_ENT_ORD_TITLE	"set entrance criteria input section sort keys; \
 			 segment=%s"
@@ -845,7 +842,7 @@
 # TRANSLATION_NOTE - The following two items are used following a number in
 # the MSG_SHD_OFFSET_ENT_XX format strings below. For example "1 entry"
 # or "23 entries".
-# 
+#
 @ MSG_SHD_ENTRY_1	"entry"
 @ MSG_SHD_ENTRY_N	"entries"
 
@@ -864,9 +861,9 @@
 			 discarded in favor of section=%s; file=%s"
 
 @ MSG_SEC_GNU_COMDAT_1	"section=%s; identified as COMDAT with \
-			 relaxed relocations enabled" 
+			 relaxed relocations enabled"
 @ MSG_SEC_GNU_COMDAT_2	"section=%s; identified as COMDAT"
-@ MSG_SEC_GNU_COMDAT_3	"section=%s; relaxed relocations enabled" 
+@ MSG_SEC_GNU_COMDAT_3	"section=%s; relaxed relocations enabled"
 
 @ MSG_SEC_GRP_DEFINE	"section=%s; input from file=%s; defines %s\
 			 group: signature symbol: %s"
@@ -896,7 +893,7 @@
 			 unused: does not satisfy any references%s"
 @ MSG_USD_SECDISCARD	"; discarded"
 @ MSG_USD_FILE		"file=%s  unused: does not satisfy any references"
-@ MSG_USD_NEEDSTR	"file=%s  unused: unable to determine use" 
+@ MSG_USD_NEEDSTR	"file=%s  unused: unable to determine use"
 @ MSG_USD_UNREF		"file=%s  unreferenced: unused dependency of %s"
 @ MSG_USD_FILECYCLIC	"file=%s  unused: cyclic group [%d] member: \
 			 unreferenced outside of group"
@@ -1072,7 +1069,7 @@
 @ MSG_AUD_PLTEXIT	"auditor %s: la_pltexit(): %s"
 
 @ MSG_AUD_IGNORE	"file=%s;  global auditing request ignored: object \
-			 did not initiate process" 
+			 did not initiate process"
 @ MSG_AUD_SKIP		"file=%s;  skipped: using auditor from %s"
 @ MSG_AUD_TERM		"file=%s;  auditor has indicated path should be skipped"
 

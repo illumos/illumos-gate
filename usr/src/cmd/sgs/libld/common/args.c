@@ -916,8 +916,8 @@ guidance_parse(Ofl_desc *ofl, char *optarg)
 					if (strcasecmp(name, item->name) == 0)
 						break;
 				if (item->name == NULL) {
-					DBG_CALL(Dbg_args_guidance_unknown(
-					    ofl->ofl_lml, name));
+					ld_eprintf(ofl, ERR_GUIDANCE,
+					    MSG_INTL(MSG_GUIDE_UNKNOWN), name);
 					continue;
 				}
 				ofl_guideflags |= item->flag;
