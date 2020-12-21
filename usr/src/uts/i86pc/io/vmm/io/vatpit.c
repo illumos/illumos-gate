@@ -76,7 +76,6 @@ struct vatpit_callout_arg {
 	int		channel_num;
 };
 
-
 struct channel {
 	int		mode;
 	uint16_t	initial;	/* initial counter value */
@@ -292,7 +291,6 @@ pit_readback(struct vatpit *vatpit, uint8_t cmd)
 
 	return (error);
 }
-
 
 static int
 vatpit_update_mode(struct vatpit *vatpit, uint8_t val)

@@ -179,6 +179,7 @@ struct pci_vtnet_softc {
 	struct nm_desc	*vsc_nmd;
 
 	int		vsc_rx_ready;
+	bool		features_negotiated;	/* protected by rx_mtx */
 	int		resetting;	/* protected by tx_mtx */
 
 	uint64_t	vsc_features;	/* negotiated features */
@@ -227,6 +228,8 @@ pci_vtnet_reset(void *vsc)
 
 	/* Acquire the RX lock to block RX processing. */
 	pthread_mutex_lock(&sc->rx_mtx);
+
+	sc->features_negotiated = false;
 
 	/* Set sc->resetting and give a chance to the TX thread to stop. */
 	pthread_mutex_lock(&sc->tx_mtx);
@@ -347,6 +350,11 @@ pci_vtnet_tap_rx(struct pci_vtnet_softc *sc)
 #else
 	assert(sc->vsc_dlpifd != -1);
 #endif
+
+	/* Features must be negotiated */
+	if (!sc->features_negotiated) {
+		return;
+	}
 
 	/*
 	 * But, will be called when the rx ring hasn't yet
@@ -558,6 +566,11 @@ pci_vtnet_netmap_rx(struct pci_vtnet_softc *sc)
 	 */
 	assert(sc->vsc_nmd != NULL);
 
+	/* Features must be negotiated */
+	if (!sc->features_negotiated) {
+		return;
+	}
+
 	/*
 	 * But, will be called when the rx ring hasn't yet
 	 * been set up.
@@ -678,11 +691,14 @@ pci_vtnet_ping_rxq(void *vsc, struct vqueue_info *vq)
 
 	/*
 	 * A qnotify means that the rx process can now begin.
+	 * Enable RX only if features are negotiated.
 	 */
-	if (sc->vsc_rx_ready == 0) {
+	pthread_mutex_lock(&sc->rx_mtx);
+	if (sc->vsc_rx_ready == 0 && sc->features_negotiated) {
 		sc->vsc_rx_ready = 1;
 		vq_kick_disable(vq);
 	}
+	pthread_mutex_unlock(&sc->rx_mtx);
 }
 
 static void
@@ -1132,6 +1148,10 @@ pci_vtnet_neg_features(void *vsc, uint64_t negotiated_features)
 		/* non-merge rx header is 2 bytes shorter */
 		sc->rx_vhdrlen -= 2;
 	}
+
+	pthread_mutex_lock(&sc->rx_mtx);
+	sc->features_negotiated = true;
+	pthread_mutex_unlock(&sc->rx_mtx);
 }
 
 struct pci_devemu pci_de_vnet = {

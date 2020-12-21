@@ -61,6 +61,7 @@ SRCS =	acpi.c			\
 	pci_virtio_rnd.c	\
 	pci_virtio_viona.c	\
 	pci_xhci.c		\
+	pctestdev.c		\
 	pm.c			\
 	post.c			\
 	ps2kbd.c		\
@@ -97,7 +98,7 @@ SRCS =	acpi.c			\
 	#pci_hda.c		\
 
 # The bhyve generic net-backend stuff has been ignored by us at the moment
-# because SmartOS users prefer to use viona for its superior network perf.
+# because illumos users prefer to use viona for its superior network perf.
 	#net_backends.c		\
 
 

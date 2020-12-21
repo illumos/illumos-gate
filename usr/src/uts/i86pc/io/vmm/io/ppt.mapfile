@@ -41,6 +41,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	ppt_assigned_devices;
 	ppt_is_mmio;
 	ppt_assign_device;
+	ppt_disable_msix;
 	ppt_unassign_device;
 	ppt_unassign_all;
 	ppt_map_mmio;
