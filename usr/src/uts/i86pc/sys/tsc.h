@@ -21,7 +21,7 @@
  */
 #define	TSC_NONE		0x0
 #define	TSC_RDTSC_CPUID		0x1
-#define	TSC_RDTSC_MFENCE	0x2
+/* formerly TSC_RDTSC_MFENCE	0x2 */
 #define	TSC_RDTSC_LFENCE	0x3
 #define	TSC_TSCP		0x4
 

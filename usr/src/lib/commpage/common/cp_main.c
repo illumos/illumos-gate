@@ -25,7 +25,6 @@ __cp_can_gettime(comm_page_t *cp)
 {
 	switch (cp->cp_tsc_type) {
 	case TSC_TSCP:
-	case TSC_RDTSC_MFENCE:
 	case TSC_RDTSC_LFENCE:
 	case TSC_RDTSC_CPUID:
 		return (1);

@@ -44,6 +44,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/systm.h>
+#include <sys/x86_archext.h>
+#include <sys/privregs.h>
 
 #include <machine/cpufunc.h>
 #include <machine/specialreg.h>
@@ -162,13 +164,17 @@ svm_rdmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t *result)
 	case MSR_EXTFEATURES:
 		*result = 0;
 		break;
-	case MSR_DE_CFG:
-		/*
-		 * MSR_DE_CFG is used for a vast array of AMD errata, spanning
-		 * from family 10h to 17h.  In the future, it might make sense
-		 * to more thoroughly emulate its contents.
-		 */
+	case MSR_AMD_DE_CFG:
 		*result = 0;
+		/*
+		 * Bit 1 of DE_CFG is defined by AMD to control whether the
+		 * lfence instruction is serializing.  Practically all CPUs
+		 * supported by bhyve also contain this MSR, making it safe to
+		 * expose unconditionally.
+		 */
+		if (is_x86_feature(x86_featureset, X86FSET_LFENCE_SER)) {
+			*result |= AMD_DE_CFG_LFENCE_DISPATCH;
+		}
 		break;
 	default:
 		error = EINVAL;
@@ -197,8 +203,8 @@ svm_wrmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t val)
 	case MSR_SYSCFG:
 		/* Ignore writes */
 		break;
-	case MSR_DE_CFG:
-		/* Ignore writes for now. (See: svm_rdmsr) */
+	case MSR_AMD_DE_CFG:
+		/* Ignore writes */
 		break;
 	case MSR_AMDK8_IPM:
 		/*
