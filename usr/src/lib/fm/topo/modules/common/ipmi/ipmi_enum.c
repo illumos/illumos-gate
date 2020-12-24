@@ -451,6 +451,12 @@ ipmi_check_entity(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 	case IPMI_ET_FAN:
 		labelname = "FAN";
 		break;
+
+	default:
+		topo_mod_dprintf(mod, "unknown entity type, %u: cannot set "
+		    "label name", edp->ed_entity);
+		nvlist_free(fmri);
+		return (1);
 	}
 
 	len = strlen(label);
