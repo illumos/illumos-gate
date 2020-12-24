@@ -26,7 +26,7 @@
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2021 Joyent, Inc.
 # Copyright 2018 Jason King
 #
 
@@ -61,6 +61,7 @@ SRCS += \
 	mdb_kb_kvm.c \
 	mdb_kproc.c \
 	mdb_kvm.c \
+	mdb_linkerset.c \
 	mdb_logio.c \
 	mdb_list.c \
 	mdb_macalias.c \
@@ -90,6 +91,7 @@ SRCS += \
 	mdb_umem.c \
 	mdb_value.c \
 	mdb_vcb.c \
+	mdb_walkers.c \
 	mdb_wcb.c \
 	mdb_whatis.c
 

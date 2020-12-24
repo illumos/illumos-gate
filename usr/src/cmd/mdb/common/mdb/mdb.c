@@ -24,7 +24,7 @@
  */
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 /*
@@ -83,6 +83,7 @@
 #define	DCMD_ABORTED(x)	((x) == DCMD_USAGE || (x) == DCMD_ABORT)
 
 extern const mdb_dcmd_t mdb_dcmd_builtins[];
+extern const mdb_walker_t mdb_walker_builtins[];
 extern mdb_dis_ctor_f *const mdb_dis_builtins[];
 
 /*
@@ -461,6 +462,7 @@ mdb_create(const char *execname, const char *arg0)
 	static char rootdir[MAXPATHLEN];
 
 	const mdb_dcmd_t *dcp;
+	const mdb_walker_t *wcp;
 	int i;
 
 	bzero(&mdb, sizeof (mdb_t));
@@ -503,7 +505,7 @@ mdb_create(const char *execname, const char *arg0)
 
 	mdb.m_rminfo.mi_dvers = MDB_API_VERSION;
 	mdb.m_rminfo.mi_dcmds = mdb_dcmd_builtins;
-	mdb.m_rminfo.mi_walkers = NULL;
+	mdb.m_rminfo.mi_walkers = mdb_walker_builtins;
 
 	(void) mdb_nv_create(&mdb.m_rmod.mod_walkers, UM_SLEEP);
 	(void) mdb_nv_create(&mdb.m_rmod.mod_dcmds, UM_SLEEP);
@@ -544,6 +546,9 @@ mdb_create(const char *execname, const char *arg0)
 
 	for (dcp = &mdb_dcmd_builtins[0]; dcp->dc_name != NULL; dcp++)
 		(void) mdb_module_add_dcmd(&mdb.m_rmod, dcp, 0);
+
+	for (wcp = &mdb_walker_builtins[0]; wcp->walk_name != NULL; wcp++)
+		(void) mdb_module_add_walker(&mdb.m_rmod, wcp, 0);
 
 	for (i = 0; mdb_dis_builtins[i] != NULL; i++)
 		(void) mdb_dis_create(mdb_dis_builtins[i]);

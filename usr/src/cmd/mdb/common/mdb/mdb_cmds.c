@@ -26,7 +26,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2019 Joyent, Inc. All rights reserved.
+ * Copyright 2021 Joyent, Inc.
  * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright (c) 2015, 2017 by Delphix. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
@@ -71,6 +71,7 @@
 #include <mdb/mdb_macalias.h>
 #include <mdb/mdb_tab.h>
 #include <mdb/mdb_typedef.h>
+#include <mdb/mdb_linkerset.h>
 #ifdef _KMDB
 #include <kmdb/kmdb_kdi.h>
 #endif
@@ -3130,6 +3131,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	    head_help },
 	{ "help", "[cmd]", "list commands/command help", cmd_help, NULL,
 	    cmd_help_tab },
+	{ "linkerset", "[name]", "display linkersets", cmd_linkerset,
+	    linkerset_help, cmd_linkerset_tab },
 	{ "list", "?type member [variable]",
 	    "walk list using member as link pointer", cmd_list, NULL,
 	    mdb_tab_complete_mt },
