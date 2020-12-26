@@ -201,7 +201,7 @@ dmu_recv_begin_check(void *arg, dmu_tx_t *tx)
 	struct drr_begin *drrb = drba->drba_cookie->drc_drrb;
 	uint64_t fromguid = drrb->drr_fromguid;
 	int flags = drrb->drr_flags;
-	ds_hold_flags_t dsflags = 0;
+	ds_hold_flags_t dsflags = DS_HOLD_FLAG_NONE;
 	int error;
 	uint64_t featureflags = DMU_GET_FEATUREFLAGS(drrb->drr_versioninfo);
 	dsl_dataset_t *ds;
@@ -399,7 +399,7 @@ dmu_recv_begin_sync(void *arg, dmu_tx_t *tx)
 	dsl_dataset_t *ds, *newds;
 	objset_t *os;
 	uint64_t dsobj;
-	ds_hold_flags_t dsflags = 0;
+	ds_hold_flags_t dsflags = DS_HOLD_FLAG_NONE;
 	int error;
 	uint64_t crflags = 0;
 	dsl_crypto_params_t dummy_dcp = { 0 };
@@ -541,7 +541,7 @@ dmu_recv_resume_begin_check(void *arg, dmu_tx_t *tx)
 	dsl_pool_t *dp = dmu_tx_pool(tx);
 	struct drr_begin *drrb = drba->drba_cookie->drc_drrb;
 	int error;
-	ds_hold_flags_t dsflags = 0;
+	ds_hold_flags_t dsflags = DS_HOLD_FLAG_NONE;
 	uint64_t featureflags = DMU_GET_FEATUREFLAGS(drrb->drr_versioninfo);
 	dsl_dataset_t *ds;
 	const char *tofs = drba->drba_cookie->drc_tofs;
@@ -670,7 +670,7 @@ dmu_recv_resume_begin_sync(void *arg, dmu_tx_t *tx)
 	uint64_t featureflags = DMU_GET_FEATUREFLAGS(drrb->drr_versioninfo);
 	dsl_dataset_t *ds;
 	objset_t *os;
-	ds_hold_flags_t dsflags = 0;
+	ds_hold_flags_t dsflags = DS_HOLD_FLAG_NONE;
 	uint64_t dsobj;
 	/* 6 extra bytes for /%recv */
 	char recvname[ZFS_MAX_DATASET_NAME_LEN + 6];
@@ -1824,8 +1824,9 @@ static void
 dmu_recv_cleanup_ds(dmu_recv_cookie_t *drc)
 {
 	dsl_dataset_t *ds = drc->drc_ds;
-	ds_hold_flags_t dsflags = (drc->drc_raw) ? 0 : DS_HOLD_FLAG_DECRYPT;
+	ds_hold_flags_t dsflags;
 
+	dsflags = (drc->drc_raw) ? DS_HOLD_FLAG_NONE : DS_HOLD_FLAG_DECRYPT;
 	/*
 	 * Wait for the txg sync before cleaning up the receive. For
 	 * resumable receives, this ensures that our resume state has
@@ -2832,11 +2833,12 @@ add_ds_to_guidmap(const char *name, avl_tree_t *guid_map, uint64_t snapobj,
 	dsl_dataset_t *snapds;
 	guid_map_entry_t *gmep;
 	objset_t *os;
-	ds_hold_flags_t dsflags = (raw) ? 0 : DS_HOLD_FLAG_DECRYPT;
+	ds_hold_flags_t dsflags;
 	int err;
 
 	ASSERT(guid_map != NULL);
 
+	dsflags = (raw) ? DS_HOLD_FLAG_NONE : DS_HOLD_FLAG_DECRYPT;
 	err = dsl_pool_hold(name, FTAG, &dp);
 	if (err != 0)
 		return (err);
