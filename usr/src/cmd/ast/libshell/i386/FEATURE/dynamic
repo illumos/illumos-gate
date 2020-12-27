@@ -1,0 +1,16 @@
+/* : : generated from contrib/ast/src/cmd/ksh93/features/dynamic by iffe version 2012-07-17 : : */
+#ifndef _def_dynamic_ksh93
+#define _def_dynamic_ksh93	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#if SHOPT_DYNAMIC
+#include	<dlldefs.h>
+#endif
+#if !defined(SHOPT_FS_3D) && SHOPT_DYNAMIC
+#   define SHOPT_FS_3D	1
+#endif /* !SHOPT_FS_3D */
+#if SHOPT_FS_3D
+#   undef mount
+#   include	<fs3d.h>
+#endif /* SHOPT_FS_3D */
+
+#endif

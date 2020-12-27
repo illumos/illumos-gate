@@ -1,0 +1,22 @@
+/* : : generated from contrib/ast/src/cmd/ksh93/features/cmds by iffe version 2012-07-17 : : */
+#ifndef _def_cmds_ksh93
+#define _def_cmds_ksh93	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#define _cmd_newgrp	1
+#define _usr_bin_newgrp	1
+#define _cmd_test	1
+#define _usr_bin_test	1
+#define _cmd_id	1
+#define _usr_bin_id	1
+#define _cmd_wc	1
+#define _usr_bin_wc	1
+#define _cmd_cut	1
+#define _usr_bin_cut	1
+#define _cmd_logname	1
+#define _usr_bin_logname	1
+#define _cmd_pfexec	1
+#define _usr_bin_pfexec	1
+#define _cmd_tput	1
+#define _usr_bin_tput	1
+#define _pth_ed	"/usr/bin/ed"
+#endif

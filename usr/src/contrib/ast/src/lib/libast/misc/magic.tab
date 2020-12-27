@@ -1,0 +1,1723 @@
+#
+# @(#)magic (AT&T Research) 2012-05-11
+#
+# magic number database for file(1) and magic(3)
+#
+# the tab separated fields are:
+#
+#	[op]offset	type	[mask]operator	description mime
+#
+#	+		previous fields must match, current optional
+#	&		previous and current fields must match
+#	{		start nesting block
+#	}		end nesting block
+#	s{		function declaration and call
+#	}		function return
+#	s()		function call
+#
+#	offset		byte offset for magic number test or (@offset) expr
+#			or file meta-data from { atime blocks ctime fstype
+#			gid mode mtime name nlink size uid }
+#	type		{ byte short long quad date edit match }
+#	mask		optional &number before operator
+#	operator	comparison operator { < <= > >= != == (default) }
+#	description	file description for magic number match
+#	mime		optional mime type
+#
+# numeric values may be decimal, octal, or hex
+# the description string may have one printf format spec for the
+# matched magic number
+#
+
+0	short		070707		binary cpio archive		application/pax
+0	string		070707		cpio archive			application/pax
++76	edit		%!PAX!C!\([^!]*\).*%\1%	, compressed, version %s
++76	edit		%!PAX!D!\([^!]*\).*%\1%	, delta, version %s
++76	string		DELTA!!!	, delta, version 88
++76	match		!(*!*)		, [ %s ... ]
+0	string		070701		System V asc cpio archive	application/pax
++110	string		*		, [ %s ... ]
+0	string		070702		System V aschk cpio archive	application/pax
++110	string		*		, [ %s ... ]
+0	long		0177555		System III ar archive		application/x-ar
+0	short		0177545		pdp11 ar archive		application/x-ar
+0	long		0x04034b50	zip archive			application/zip
++2	byte		>0		, version %d
+&3	byte		*		.%d
+0	long		0x223e9f78	ms outlook tnef archive		application/pax
+0	string		MSCF		ms cabinet archive		application/pax
+&4	long		0
++25	byte		*		, version %d
++24	byte		*		.%d
+0	string		\x52\x61\x72\x21\x1a\x07	rar archive	application/pax
+0	long		0x0d010b05	make object			application/x-nmake
+o{
++4	byte		<037		(version %ld)
++4	edit		%.*\(..\)/\(..\)/\(..\).*%19\3-\1-\2%	, version %s
++4	edit		%.*\(....-..-..\).*%\1%	, version %s
+}
+0	long		0177535		make object, old magic		application/x-nmake
+o()
+0	long		0x090f0301	jmake project db		application/x-jmake
++4	string		*		, version %s
+0	long		0x0b130800	ksh binary script		application/ksh
++4	byte		*		, version %ld
+0	string		vkda		delta				application/x-vdelta
++4	byte		>0		(version %ld)
+0	long		0x03040200	cql db				application/x-cql
++4	byte		*		, version %d
++5	byte		*		.%d
++6	string		*		, %s
+0	string		!<cdb-
++6	edit		%\([^-]*\)-\([0-9.]*\)>.*%cql db, \1 format, version \2%	%s	application/x-cql
+0	long		0x08091800
++32	string		*		%s				application/x-cql
++0	byte		*		hashed index
++4	long		>0		, %d record%s
++8	long		>0		, %d max
++12	date		>0		, stamp %s
+0	string		\1S\1B\1C\1S	sbcs delta			application/x-sbcs
+0	long		0100554		apl workspace			application/x-apl
+0	short		017037		packed data			application/zip
+0	string		<ar>		System V 1.0 ar archive		application/x-ar
+0	string		!<arch>\n/	ar library			application/x-ar
++68	long		0x020b0619	, hp s800 relocatable
++68	long		0x02100619	, hp pa-risc 1.1 relocatable
++68	long		0x02110619	, hp pa-risc 1.2 relocatable
++68	long		0x02140619	, hp pa-risc 2.0 relocatable
+0	string		!<arch>\n__.SYMDEF	ar library, ranlib	application/x-ar
+0	string		!<arch>\n__________E	ar library, hybrid	application/x-ar
+0	string		!<arch>\n_______[0-9_][0-9_][0-9_]E[BL]E[BL]_	ar library, hybrid	application/x-ar
+o{
++22	byte		'X'		, out of date
++20	byte		'U'		, ucode members
++21	byte		>='A'		, %c-endian members
++19	byte		>='A'		, %c-endian hash
+}
+0	string		!<arch>\n________64E	ar library, 64 bit hybrid	application/x-ar
+o()
+0	string		!<arch>		ar archive			application/x-ar
+0	string		<aiaff>\n	aix ar library			application/x-ar
+0	string		<bigaf>\n	aix ar library, big		application/x-ar
+20	short		0xa7dc		zoo archive			application/x-zoo
+&22	short		0xfdc4
++32	byte		*		, version %ld
++33	byte		*		.%ld
+
+0	string		\326\303\304\330				vcodex data		application/x-vczip
++5	void		vcodex()
+
+0	long		0x080456
+{
+85	byte		<10		sun
++85	byte		<3		m680%d0
++85	byte		3		sparc
++85	byte		>3		*unknown*
+}
++85	byte		*		core dump			x-system/core
++128	string		*		from `%s'
++132	string		*		from `%s'
+0	long		050632		core dump			x-system/core
+0	long		&0xfff00000==0xe8c00000	Alliant core dump
++160	string		*		from `%s'
+
+0	long		0x02100106	hp pa-risc 1.1 object		x-system/obj
+0	long		0x02100107	hp pa-risc 1.1 executable		x-system/exe
+o{
++(@144)	long		0x054ef630	, dynamically linked
++96	long		>0		, not stripped
+}
+0	long		0x02100108	hp pa-risc 1.1 executable, shared	x-system/exe
+o()
+0	long		0x0210010b	hp pa-risc 1.1 executable, demand-load	x-system/exe
+o()
+0	long		0x0210010e	hp pa-risc 1.1 shared library	x-system/dll
+o()
+0	long		0x0210010d	hp pa-risc 1.1 shared library	x-system/dll
+s{
++96	long		>0		, not stripped
+}
+
+0	long		0x02140106	hp pa-risc 2.0 object		x-system/obj
+0	long		0x02140107	hp pa-risc 2.0 executable		x-system/exe
+o()
+0	long		0x02140108	hp pa-risc 2.0 executable, shared	x-system/exe
+o()
+0	long		0x0214010b	hp pa-risc 2.0 executable, demand-load	x-system/exe
+o()
+0	long		0x0214010e	hp pa-risc 2.0 shared library	x-system/dll
+o()
+0	long		0x0214010d	hp pa-risc 2.0 shared library	x-system/dll
+s()
+
+0	long		0x020b0106	hp s800 object			x-system/obj
+0	long		0x020b0107	hp s800 executable		x-system/exe
+o()
+0	long		0x020b0108	hp s800 executable, shared	x-system/exe
+o()
+0	long		0x020b010b	hp s800 executable, demand-load	x-system/exe
+o()
+0	long		0x020b010d	hp s800 shared library		x-system/dll
+s()
+0	long		0x020b010e	hp s800 shared library		x-system/dll
+s()
+
+0	long		0x02080108	hp s500 executable, pure	x-system/exe
+o{
++16	long		>0		, version %ld
+}
+0	long		0x02080107	hp s500 executable		x-system/exe
+o()
+0	long		0x02080106	hp s500 executable, relocatable	x-system/obj
+o()
+0	long		0x020c0108	hp s200 executable, pure	x-system/exe
+o{
++36	long		>0		, not stripped
++4	short		>0		, version %ld
+}
+0	long		0x020c0107	hp s200 executable		x-system/exe
+o()
+0	long		0x020c010b	hp s200 executable, demand-load	x-system/exe
+o()
+0	long		0x020a0108	hp s200 2.x executable, pure	x-system/exe
+o()
+0	long		0x020a0107	hp s200 2.x executable		x-system/exe
+o()
+0	long		0x020c0106	hp s200 executable, relocatable	x-system/exe
++4	short		>0		, version %ld
+0	long		0x0208ff65	hp s500 old archive		application/x-ar
+0	long		0x020cff65	hp s200 old archive		application/x-ar
+0	long		0x020aff65	hp s200 old archive		application/x-ar
+0	short		0x8000		hp lif file
+0	long		0x020c010c	hp compiled Lisp
+0	long		0x4da7eee8	hp windows font
++8	byte		>0		, version %ld
+
+0	string		Joy!peffpwpc	PowerPC executable
+0	short		0x01df		PowerPC object			x-system/obj
+&3	byte		3
+
+0	long		0x50900107	pyramid 90x executable		x-system/exe
+o{
++0	long		&0x7=0x3	, paged
++0	long		&0x8		, pure
++16	long		>0		, not stripped
+}
+0	long		0x50900108	pyramid 90x object		x-system/obj
+0	long		0x5090010b	pyramid 90x executable		x-system/exe
+o()
+
+0	long		0x000001EB	plan9 386 executable		x-system/exe
+0	long		0x00000107	plan9 68020 executable		x-system/exe
+&mode	long		&0111!=0
+0	long		0x00000197	plan9 hobbit executable		x-system/exe
+0	long		0x00000407	plan9 mips executable		x-system/exe
+0	long		0x000002AB	plan9 sparc executable		x-system/exe
+
+0	long		0x7E004501	plan9 386 object		x-system/obj
+0	long		0x4D013201	plan9 68020 object		x-system/obj
+0	long		0x430D013C	plan9 hobbit object		x-system/obj
+0	long		0x3A11013C	plan9 mips object		x-system/obj
+0	long		0x7410013C	plan9 sparc object		x-system/obj
+
+0	long		&0x0030FFFF==0x00000064	linux 386
+&0	long		&0x000F0000>0
++20	long		&0xEFDFFFFF==0	executable			x-system/exe
++20	long		&0xEFDFFFFF!=0	shared library			x-system/dll
++0	long		0x01080064	, pure
++0	long		0x010B0064	, paged
++0	long		0x00CC0064	, paged, no page 0
+{
+20	long		&0xEFDFFFFF==0
+&16	long		>0		, not stripped
+}
+216	long		0421		linux core dump			x-system/core
+
+0	long		0x00cc0064	linux 386 kernel code		x-system/exe
++size	long		<600000		, compressed
+510	short		0xaa55		linux 386 kernel image		x-system/exe
++size	long		<600000		, compressed
+0	long		0x03010410	minix 386 executable		x-system/exe
+0	long		0x000186a3	minix 386 object		x-system/obj
+
+0	long		0314		bsd 386 executable, paged, no page 0	x-system/exe
++16	long		>0		, not stripped
+0	long		0407		bsd 386 executable		x-system/exe
+&mode	long		&0111!=0
++16	long		>0		, not stripped
+0	long		0407		bsd-or-linux 386 object		x-system/obj
+0	long		0410		bsd 386 executable, pure	x-system/exe
++16	long		>0		, not stripped
+0	long		0413		bsd 386 executable, paged	x-system/exe
++16	long		>0		, not stripped
+
+0	belong		0xcafebabe	java object			x-java/obj
+&4	belong		>30
++6	beshort		*		version %d
++6	beshort		*		.%d
+
+a{
++4	long		&0x00ffffff=1	vax
++4	long		&0x00ffffff=2	romp
++4	long		&0x00ffffff=3	architecture=%ld
++4	long		&0x00ffffff=4	ns32032
++4	long		&0x00ffffff=5	ns32332
++4	long		&0x00ffffff=6	m68k
++4	long		&0x00ffffff=7	i386
++4	long		&0x00ffffff=8	mips
++4	long		&0x00ffffff=9	ns32532
++4	long		&0x00ffffff=10	architecture=%ld
++4	long		&0x00ffffff=11	hp pa-risc
++4	long		&0x00ffffff=12	acorn
++4	long		&0x00ffffff=13	m88k
++4	long		&0x00ffffff=14	sparc
++4	long		&0x00ffffff=15	i860-big
++4	long		&0x00ffffff=16	i860
++4	long		&0x00ffffff=17	rs6000
++4	long		&0x00ffffff=18	powerpc
++4	long		&0x00ffffff>=19	architecture=%ld
++4	long		&0x01000000!=0	\b-64
+}
+
+0	belong		0xcafebabe	universal binary [
++4	belong		loop(a,4,20)
++4	belong		*		]
++010000	void		magic()
++0	void		*		...
+
+0	long		&0xfffffffe=0xfeedface	mach-o
++0	long		&0x00000001!=0	64-bit
+a()
++12	long		<=0		filetype=%ld
+{
+12	long		1		relocatable			x-system/obj
+&mode	long		&0111!=0
+}
+{
+12	long		1		object				x-system/obj
+&mode	long		&0111==0
+}
++12	long		2		executable			x-system/exe
++12	long		3		fixed vm shared library		x-system/dll
++12	long		4		core				x-system/core
++12	long		5		preload executable		x-system/exe
++12	long		6		shared library			x-system/dll
++12	long		7		dynamic link editor		x-system/exe
++12	long		8		bundle				x-system/dll
++12	long		>=9		filetype=%ld
+
+2	short		0407
+m{
+1	byte		<10		sun
++1	byte		<3		m680%d0
++1	byte		3		sparc
++1	byte		>3		*unknown*
+}
++0	byte		!=0xffffffff	object				x-system/obj
+2	short		0410
+m()
++0	byte		!=0xffffffff	executable, pure		x-system/exe
+o{
+{
+0	byte		&0200
+&20	long		>=0x2000	, dynamically linked
+}
++16	long		>0		, not stripped
+}
+2	short		0413
+m()
+{
+0	byte		&0200
+&20	long		<0x2000		shared library			x-system/dll
+}
++0	byte		!=0xffffffff	executable, paged		x-system/exe
+o()
+
+0	short		0420		Alliant virtual executable	x-system/exe
++16	long		>0		, not stripped
+o{
++2	short		&0x0001		, 68020 only
++2	short		&0x0002		, vector instructions
++2	short		&0x0008		, IP only
++2	short		&0x0010		, CE only
++2	short		&0x0020		, common library
++2	short		&0x0200		, no complex
+}
+0	short		0421		Alliant object			x-system/obj
++16	long		0		, no symbols
+o()
+
+0	short		0x01df		aix RISC
+{
+18	short		&0x2002==0x0002	executable			x-system/exe
++18	short		&0x1000		, dynamically linked
++12	long		>0		, not stripped
+}
++18	short		&0x2002==0	object				x-system/obj
++18	short		&0x2000		shared library			x-system/dll
+0	short		0x0103		aix RT executable		x-system/exe
++2	byte		0x50		, pure
++28	long		>0		, not stripped
++6	short		>0		, version %ld
+0	short		0x0104		aix shared library		x-system/dll
+0	short		0x0105		aix ctab data
+0	short		0xfe04		aix structured file
+
+0	short		0401		unix-rt ldp
+0	short		0405		old overlay
+0	short		0437		pdp11 kernel overlay
+
+0	short		0407		System III executable		x-system/exe
+o{
++16	long		>0		, not stripped
++2	short		>0		, version %ld
+}
+0	short		0410		System III executable, pure	x-system/exe
+o()
+0	short		0411		System III executable, separate I&D	x-system/exe
+o()
+
+0	long		0407		vax object			x-system/obj
+0	long		0410		vax executable, pure		x-system/exe
+o{
++16	long		>0		, not stripped
+}
+0	long		0413		vax executable, paged		x-system/exe
+o()
+
+0	short		0413		vax executable, pure		x-system/exe
++8	short		>0		, not stripped
++15	byte		>0		, version %ld
+
+0	short		0570		vax
+o{
+{
+16	short		>0		executable			x-system/exe
++12	long		>0		, not stripped
++22	short		>0		, version %ld
+}
++16	short		0		object				x-system/obj
+}
+0	short		0575		vax
+o()
+0	short		0502		basic-16
+o()
+0	short		0503		basic-16 (TV)
+o()
+0	short		0510		x86
+o()
+0	short		0511		x86 (TV)
+o()
+0	short		0550		3b20
+o()
+0	short		0551		3b20d (TV)
+o()
+
+0	long		0x464c457f	elf
+&4	byte		<2
+&5	byte		1
+o{
+{
++18	short		0		machine=UNKNOWN
++18	short		1		3b
++18	short		2		sparc
++18	short		3		i386
++18	short		4		m68k
++18	short		5		m88k
++18	short		6		i486
++18	short		7		i860
+{
+18	short		8
+{
+36	long		&0xf00000f0==0x00000000
++4	byte		1			mips2
++4	byte		2			mips4
+}
++36	long		&0xf0000000==0x10000000	mips2
++36	long		&0xf0000000==0x20000000	mips3
++36	long		&0xf0000000==0x30000000	mips4
++36	long		&0xf00000f0==0x00000040	mips4
++36	long		&0xf0000000==0x40000000	mips5
++36	long		&0xf0000000==0x50000000	mips6
++36	long		&0xf0000000==0x60000000	mips7
++36	long		&0xf0000000==0x70000000	mips8
++36	long		&0xf0000000==0x80000000	mips9
+}
++18	short		9		amdahl
++18	short		10		mips_le
++18	short		11		rs6000
++18	short		15		pa
++18	short		16		n-cube
++18	short		17		fujitsu500
++18	short		18		sparc32+
++18	short		20		powerpc
++18	short		21		powerpc-64
++18	short		22		s390
++18	short		23		cell-BE
++18	short		36		nec-v800
++18	short		37		fujitsu-fr20
++18	short		38		trw-rh32
++18	short		39		fujitsu-mma
++18	short		40		arm
++18	short		41		alpha
++18	short		42		hitachi-sh
++18	short		43		sparc64-v9
++18	short		44		siemens-tricore
++18	short		45		argonaut
++18	short		46		hitachi-h8/300
++18	short		47		hitachi-h8/300h
++18	short		48		hitachi-h8s
++18	short		49		hitachi-h8/500
++18	short		50		itanium
++18	short		51		mips-x
++18	short		52		motorola-coldfire
++18	short		53		motorola-m68hc12
++18	short		54		fujutsu-mma
++18	short		55		siemens-pcp
++18	short		56		sony-ncpu
++18	short		57		denso-ndr1
++18	short		58		motorola-startcore
++18	short		59		toyota-me16
++18	short		60		stm-st100
++18	short		61		alc-tinyj
++18	short		62		x86-64
++18	short		63		sony-dsp
++18	short		66		siemens-fx66
++18	short		67		stm-st9-16
++18	short		68		stm-st7-8
++18	short		69		motorola-mc68hc16
++18	short		70		motorola-mc68hc11
++18	short		71		motorola-mc68hc08
++18	short		72		motorola-mc68hc05
++18	short		73		sgi-svx
++18	short		74		stm-st19-8
++18	short		75		vax
++18	short		76		axis, 32-bit
++18	short		77		infineon-javelin-32
++18	short		78		element-14-firepath-64
++18	short		79		lsi-zsp-16
++18	short		80		knuth-mmix-64
++18	short		81		harvard-huany
++18	short		82		sitera-prism
++18	short		83		amtel-avr-8
++18	short		84		fujitsu-fr30
++18	short		85		mitsubishi-d10v
++18	short		86		mitsubishi-d30v
++18	short		87		nec-v850
++18	short		88		matsushita-m32r
++18	short		89		matsushita-mn10300
++18	short		90		matsushita-mn10200
++18	short		91		picojava
++18	short		92		openrisc-32
++18	short		93		arc-tangent-a5
++18	short		94		tensilica-xtensa
++18	short		0x9026		alpha
++18	short		0xa390		s390
+|18	short		*		machine=0x%04lX
+}
++16	short		0		type=UNKNOWN
++16	short		1		object				x-system/obj
++16	short		2		executable			x-system/exe
++16	short		3		shared library			x-system/dll
+{
+16	short		4		core dump			x-system/core
++(@28+@42H*@44H+104)	string		*		from `%s'
+}
++16	short		>4		type=%d
++4	byte		0		, 16-bit
++4	byte		1		, 32-bit
++5	byte		1		, little-endian
+{
+18	short		==8
+&36	long		&0x000000f0==0x00000000
+&4	byte		1			, old
+}
+{
+18	short		1
++36	long		1		, mau
+}
++20	long		>1		, version %ld
+{
+16	short		2
+&(@28+4*32)	long	2		, dynamically linked
+}
+}
+
+0	long		0x7f454c46	elf
+&4	byte		1
+&5	byte		2
+o()
+
+0	long		0x464c457f	elf
+&4	byte		2
+&5	byte		1
+o{
+{
++18	short		0		machine=UNKNOWN
++18	short		1		3b
++18	short		2		sparc
++18	short		3		i386
++18	short		4		m68k
++18	short		5		m88k
++18	short		6		i486
++18	short		7		i860
+{
+18	short		8
+{
+48	long		&0xf00000f0==0x00000000
++4	byte		1			mips2
++4	byte		2			mips4
+}
++48	long		&0xf0000000==0x10000000	mips2
++48	long		&0xf0000000==0x20000000	mips3
++48	long		&0xf0000000==0x30000000	mips4
++48	long		&0xf00000f0==0x00000040	mips4
++48	long		&0xf0000000==0x40000000	mips5
++48	long		&0xf0000000==0x50000000	mips6
++48	long		&0xf0000000==0x60000000	mips7
++48	long		&0xf0000000==0x70000000	mips8
++48	long		&0xf0000000==0x80000000	mips9
+}
++18	short		9		amdahl
++18	short		10		mips_le
++18	short		11		rs6000
++18	short		15		pa
++18	short		16		n-cube
++18	short		17		fujitsu500
++18	short		18		sparc32+
++18	short		20		powerpc
++18	short		21		powerpc-64
++18	short		22		s390
++18	short		23		cell-BE
++18	short		36		nec-v800
++18	short		37		fujitsu-fr20
++18	short		38		trw-rh32
++18	short		39		fujitsu-mma
++18	short		40		arm
++18	short		41		alpha
++18	short		42		hitachi-sh
++18	short		43		sparc64-v9
++18	short		44		siemens-tricore
++18	short		45		argonaut
++18	short		46		hitachi-h8/300
++18	short		47		hitachi-h8/300h
++18	short		48		hitachi-h8s
++18	short		49		hitachi-h8/500
++18	short		50		itanium
++18	short		51		mips-x
++18	short		52		motorola-coldfire
++18	short		53		motorola-m68hc12
++18	short		54		fujutsu-mma
++18	short		55		siemens-pcp
++18	short		56		sony-ncpu
++18	short		57		denso-ndr1
++18	short		58		motorola-startcore
++18	short		59		toyota-me16
++18	short		60		stm-st100
++18	short		61		alc-tinyj
++18	short		62		x86-64
++18	short		63		sony-dsp
++18	short		66		siemens-fx66
++18	short		67		stm-st9-16
++18	short		68		stm-st7-8
++18	short		69		motorola-mc68hc16
++18	short		70		motorola-mc68hc11
++18	short		71		motorola-mc68hc08
++18	short		72		motorola-mc68hc05
++18	short		73		sgi-svx
++18	short		74		stm-st19-8
++18	short		75		vax
++18	short		76		axis-32
++18	short		77		infineon-javelin-32
++18	short		78		element-14-firepath-64
++18	short		79		lsi-zsp-16
++18	short		80		knuth-mmix-64
++18	short		81		harvard-huany
++18	short		82		sitera-prism
++18	short		83		amtel-avr-8
++18	short		84		fujitsu-fr30
++18	short		85		mitsubishi-d10v
++18	short		86		mitsubishi-d30v
++18	short		87		nec-v850
++18	short		88		matsushita-m32r
++18	short		89		matsushita-mn10300
++18	short		90		matsushita-mn10200
++18	short		91		picojava
++18	short		92		openrisc-32
++18	short		93		arc-tangent-a5
++18	short		94		tensilica-xtensa
++18	short		0x9026		alpha
++18	short		0xa390		s390
+|18	short		*		machine=0x%04lX
+}
++16	short		0		type=UNKNOWN
++16	short		1		object				x-system/obj
++16	short		2		executable			x-system/exe
++16	short		3		shared library			x-system/dll
+{
+16	short		4		core dump			x-system/core
++(@28+@42H*@44H+104)	string		*		from `%s'
+}
++16	short		>4		type=%ld
++4	byte		2		, 64-bit
++5	byte		1		, little-endian
++20	long		>1		, version %ld
+{
+16	short		2
++(@32Q+3*56)	long	2		, dynamically linked
++(@32Q+4*56)	long	2		, dynamically linked
+}
+}
+
+0	long		0x7f454c46	elf
+&4	byte		2
+&5	byte		2
+o()
+
+0	lelong			000000407	netbsd little-endian object	x-system/obj
++16	lelong			0		, stripped
+0	belong			000000407	netbsd big-endian object	x-system/obj
++16	belong			0		, stripped
+
+0	belong&0377777777	041400413	netbsd i386
+d{
+0	byte			&0x80		
++20	lelong			<4096		shared library			x-system/dll
++20	lelong			>=4096		executable, dynamically linked	x-system/exe
+}
++0	byte			^0x80		executable			x-system/exe
++16	lelong			0		, stripped
+0	belong&0377777777	041400410	netbsd i386 pure
+p{
++0	byte			&0x80		executable, dynamically linked	x-system/exe
++0	byte			^0x80		executable			x-system/exe
++16	lelong			0		, stripped
+}
+0	belong&0377777777	041400407	netbsd i386
+n{
++0	byte			&0x80		executable, dynamically linked, impure	x-system/exe
+{
+0	byte			^0x80
++0	byte			&0x40		position independent
++20	lelong			!0		executable			x-system/exe
++20	lelong			=0		object				x-system/obj
+}
++16	lelong			0		, stripped
+}
+0	belong&0377777777	041400507	netbsd i386 core
+c{
++12	string			*		from '%s'			x-system/core
+}
+
+0	belong&0377777777	042000413	netbsd m68k4k
+d()
+0	belong&0377777777	042000410	netbsd m68k4k pure
+p()
+0	belong&0377777777	042000407	netbsd m68k4k
+n()
+0	belong&0377777777	042000507	netbsd m68k4k core
+c()
+
+0	belong&0377777777	042200413	netbsd ns32532
+d()
+0	belong&0377777777	042200410	netbsd ns32532 pure
+p()
+0	belong&0377777777	042200407	netbsd ns32532
+n()
+0	belong&0377777777	042200507	netbsd ns32532 core
+c()
+
+0	belong&0377777777	042600413	netbsd pmax
+d()
+0	belong&0377777777	042600410	netbsd pmax pure
+p()
+0	belong&0377777777	042600407	netbsd pmax
+n()
+0	belong&0377777777	042600507	netbsd pmax core
+c()
+
+0	belong&0377777777	043000413	netbsd vax 1k
+d()
+0	belong&0377777777	043000410	netbsd vax 1k pure
+p()
+0	belong&0377777777	043000407	netbsd vax 1k
+n()
+0	belong&0377777777	043000507	netbsd vax 1k core
+c()
+
+0	belong&0377777777	045400413	netbsd vax 4k
+d()
+0	belong&0377777777	045400410	netbsd vax 4k pure
+p()
+0	belong&0377777777	045400407	netbsd vax 4k
+n()
+0	belong&0377777777	045400507	netbsd vax 4k core
+c()
+
+0	belong&0377777777	041600413	netbsd m68k
+d{
+0	byte			&0x80		
++20	belong			<8192		shared library			x-system/dll
++20	belong			>=8192		executable, dynamically linked	x-system/exe
+}
++0	byte			^0x80		executable			x-system/exe
++16	belong			0		, stripped
+0	belong&0377777777	041600410	netbsd m68k pure
+p()
+0	belong&0377777777	041600407	netbsd m68k
+n()
+0	belong&0377777777	041600507	netbsd m68k core
+c()
+0	belong&0377777777	042400413	netbsd sparc
+d()
+
+0	belong&0377777777	042400410	netbsd sparc pure
+p()
+0	belong&0377777777	042400407	netbsd sparc
+n()
+0	belong&0377777777	042400507	netbsd sparc core
+c()
+
+0	belong&0377777777	043400413	netbsd mips
+d()
+0	belong&0377777777	043400410	netbsd mips pure
+p()
+0	belong&0377777777	043400407	netbsd mips
+n()
+0	belong&0377777777	043400507	netbsd mips core
+c()
+
+0	belong&0377777777	043600413	netbsd arm32
+d()
+0	belong&0377777777	043600410	netbsd arm32 pure
+p()
+0	belong&0377777777	043600407	netbsd arm32
+n()
+0	belong&0377777777	043600507	netbsd arm32 core
+c()
+
+0	lelong			0x00070185	ECOFF netbsd alpha binary
++10	leshort			0x0000		, stripped			x-system/obj
+0	belong&0377777777	043200507	netbsd alpha core
+c()
+
+0	short		0560		3b
+{
+16	short		>0		executable			x-system/exe
++12	long		>0		, not stripped
+}
++16	short		0		object				x-system/obj
++18	short		&010000		, paging 3b2/300
++18	short		&020000		, 32100
++18	short		&040000		, mau
+{
+16	short		>0
++20	short		0443		, shared library		x-system/dll
++20	short		0410		, swapped
++20	short		0413		, paged
++22	short		>0		, version %ld
+}
+0	short		0561		3b (TV)
+{
+16	short		>0		executable			x-system/exe
++12	long		>0		, not stripped
+}
++16	short		0		object				x-system/obj
++18	short		&020000		, 32100 required
++18	short		&040000		, mau hardware required
+
+0	short		0512		pc 286 small model (COFF)
+o{
+{
+16	short		>0		executable			x-system/exe
++12	long		>0		, not stripped
+}
++16	short		0		object				x-system/obj
+{
+16	short		>0
+&22	short		>0		, version %ld
+}
+}
+0	short		0522		pc 286 large model (COFF)
+o()
+
+0	short		0514		pc 386
+o{
+{
+16	short		>0		executable			x-system/exe
++12	long		>0		, not stripped
+}
++16	short		0		object				x-system/obj
+{
+16	short		>0
+&22	short		>0		, version %ld
+}
++0	short		!=0x8664	, 32 bit
++0	short		0x8664		, 64 bit
+}
+0	short		0x8664		pc 386
+o()
+0	short		0524		pc 386
+o()
+0	short		0604		pc alpha
+o()
+
+0	short		0520		m68k
+{
+16	short		>0		executable			x-system/exe
++12	long		>0		, not stripped
+}
++16	short		0		object				x-system/obj
+{
+16	short		>0
++20	short		0410		, pure
++20	short		0413		, paged
++22	short		>0		, version %ld
+}
+
+0	short		0521		m68k executable, shared		x-system/exe
+o{
++12	long		>0		, not stripped
+}
+0	short		0522		m68k executable, shared, paged	x-system/exe
+o()
+
+0	long		0x02c5e2c4	mvs OpenEdition object		x-system/obj
+&4	long		0x40404040
+0	long		0xc9c5e6d7	mvs OpenEdition executable	x-system/exe
+&4	long		0xd3d4c840
+
+0	short		0530		u370 5.2/5.0
+o{
+{
+20	long		!=0440
+&18	short		&01		executable			x-system/exe
++0	short		&01==0		, pure
++12	long		>0		, not stripped
+}
++20	long		0440		shared library			x-system/dll
++18	short		&01==0		object				x-system/obj
++18	byte		&0x40		, BIG
++49	byte		&0xf!=0		, pre-XA
+{
+18	short		&01
++24	long		>0		, version %ld
+}
+}
+0	short		0531		amdahl 5.2
+o()
+0	short		0534		amdahl 5.2
+o()
+0	short		0535		u370 5.2
+o()
+
+0	short		0700		ncr tower32
+o{
++18	short		&0040000	68000
++18	short		&0040000==0	68020
++18	short		&0020000	\b+68881
+{
+18	short		&0000001==0	object				x-system/obj
++22	short		>0		, version %ld
+}
+{
+18	short		&0001		executable			x-system/exe
++20	short		0413		, paged
++20	short		0443		shared library			x-system/dll
++20	short		0410		, pure, swapped
++20	short		0407		, swapped
++12	long		>0		, not stripped
+}
+}
+0	short		0720		ncr towe32r/600
+o()
+0	short		0740		ncr tower32/800
+o()
+0	short		0610		ncr tower/XP rel 2
+o()
+0	short		0615		ncr tower/XP rel 2
+o()
+0	short		0620		ncr tower/XP rel 3
+o()
+0	short		0625		ncr tower/XP rel 3
+o()
+0	short		0630		ncr tower32/600/400
+o()
+0	short		0640		ncr tower32/800
++18	short		&00040000	compatible
+o()
+0	short		0645		ncr tower32/800 68010
+o()
+
+0	short		0457		DG MV pure executable		x-system/exe
++40	long		>0		, not stripped
++2	short		>0		, version %ld
+0	short		0460		DG MV object			x-system/obj
++2	short		>0		, version %ld
+0	short		0541		m88k pure executable		x-system/exe
++12	long		>0		, not stripped
++22	short		>0		, version %ld
+0	short		0555		m88k object			x-system/obj
++22	short		>0		, version %ld
+
+0	short		&0xfffd==0x0160	mips
+{
+18	short		&02		executable			x-system/exe
++20	short		0410		, pure
++20	short		0413		, paged
++20	short		0443		, shared library		x-system/dll
++8	long		!=0		, not stripped
+}
++18	short		&02==0		object				x-system/obj
+o{
++0	short		&0x2		, little-endian
++22	byte		*		, version %ld
++23	byte		*		.%ld
+}
+0	short		&0xfffd==0x180	mips ucode		x-system/obj
+o()
+0	long		0xdeadadb0	mips core dump		x-system/core
+f{
++4	long		1
+&16	string		*		from `%s'
++0	long		&0xff==0xb0	, 32-bit, old
++0	long		&0xff==0xbb	, 32-bit
++0	long		&0xff==0x40	, 64-bit
+}
+0	long		0xbabec0bb	mips core dump		x-system/core
+f()
+0	long		0xdeadad40	mips core dump		x-system/core
+f()
+
+0	short		0603		alpha
+{
+22	short		&02
+&22	short		&030000!=020000	executable			x-system/exe
++24	short		0410		, pure
++24	short		0413		, paged
++22	short		&020000		, dynamically linked
++16	long		!=0		, not stripped
+}
++22	short		&030000==020000	shared library			x-system/dll
+{
+22	short		&030002==0
++24	short		0407		object				x-system/obj
+}
++27	byte		*		, version %ld
++26	byte		*		.%ld
+
+0	short		0432		compiled terminfo entry
+0	short		0433		curses screen image
+0	short		0434		curses screen image
+
+0	long		0x14031008		tcpdump cons headers	application/x-tcpdump
+v{
++4	long		>0			, version %d
+&8	long		*			.%d
+}
+0	long		0x14031004		tcpdump cons data	application/x-tcpdump
+v()
+
+257	string		ustar		pax archive			application/pax
+&156	match		[gx]
+o{
+&99	byte		0
+&100	match		+([ 0-7])?
+}
+
+257	string		ustar\ \ 	gnu tar archive			application/pax
+o{
+&99	byte		0
+&100	match		+([ 0-7])?
++0	match		???*		, [ %s ... ]
+}
+
+257	string		ustar		tar archive			application/pax
+o()
+
+99	byte		0		old tar archive			application/pax
+o()
+
+0	string		\301\304\331\100\323\311\302\331\306	ca librarian archive	application/pax
+
+0	match		<[hH][tT][mM][lL]>	html input		text/html
+0	match		<!?(--)[Dd][Oo][Cc][Tt][Yy][Pp][Ee] [Hh][Tt][Mm][Ll]	html input		text/html
+
+0	long		0x02f78301
++16	string		TeX		TeX dvi output			application/x-dvi
+
+0	byte		0201		shell history			application/sh
+&1	byte		<07		version %d
+
+0	byte		1
+&1	byte		0150
+&2	match		[0-9][0-9][0-9][0-9][0-9]	sccs		application/x-sccs
+
+0		short	0x5a4d
+o{
+&24		short	0x0040
+{
++(@60H)		short	0x454c		os/2 linear
++(@60H)		short	0x454e		os/2
++(@60H)		short	0x4550		win32
++(@60H+4)	short	0x014c		386
++(@60H+4)	short	0x0150		powerpc
++(@60H+4)	short	0x0162		mips
++(@60H+4)	short	0x0166		mips, big endian?
++(@60H+4)	short	0x0184		alpha
++(@60H+4)	short	0x8664		386
+|(@60H+4)	short	*		machine=0x%04lX
+}
++(@60H+22)	short	&0x2002==0x0002	executable			x-system/exe
++(@60H+22)	short	&0x2000		shared library			x-system/dll
++(@60H+22)	short	&0x0120==0	, 16 bit
++(@60H+22)	short	&0x0120==0x0100	, 32 bit
++(@60H+22)	short	&0x0120==0x0020	, 64 bit
++(@60H+92)	short	0		, unknown subsystem
++(@60H+92)	short	1		, native
++(@60H+92)	short	2		, windows gui
++(@60H+92)	short	5		, os2
++(@60H+92)	short	7		, posix
++(@60H+92)	short	>7		, subsystem %d
++50		string	PKWARE		, self extracting zip
++36		string	LHA's		, self extracting lha
++233		string	PKSFX2		, self extracting zip
+}
+
+0		short	0x5a4c
+o()
+
+0	long		0x4c000000
+&4	long		0x01140200	windows shortcut		application/x-windows-lnk
+
+0	string		PMCC		windows GRP			application/dos-grp
+369	string		MICROSOFT	windows PIF			application/dos-pif
+0	long		0xffffffff	dos device driver		application/dos-drv
+&name	match		*.(SYS|sys)
+0	string		LZ		dos builtin
+0	byte		0xe9		dos executable, COM		application/x-dos
+0	byte		0xeb		dos executable, COM		application/x-dos
+0	byte		0xf0		dos library			application/x-ar
+0	byte		0x80		dos object, OMF			application/dos-omf
+
+0	match		x[ ]T[ ]	ditroff				application/x-ditroff
+&4	string		*		for %s
+0	string		%!		postscript input		application/postscript
+{
+2	string		PS-Adobe-	, conforming
++11	match		+([0-9]).+([0-9])	, version %s
+}
+0	string		%PDF		adobe acrobat file		application/x-pdf
++5	match		+([0-9]).+([0-9])	, version %s
+0	string		@document(	imagen input
+
+0	long		0x2e736e64	audio data			audio/basic
+o{
++12	long		1		, 8-bit u-law
++12	long		2		, 8-bit linear pcm
++12	long		3		, 16-bit linear pcm
++12	long		4		, 24-bit linear pcm
++12	long		5		, 32-bit linear pcm
++12	long		6		, 32-bit floating point
++12	long		7		, 64-bit floating point
++12	long		23		, compressed (G.721 ADPCM)
++20	long		=1		, mono
++20	long		=2		, stereo
++20	short		=3		, 3 channels
++20	short		=4		, quad
++20	short		>4		, %d channel%s
++16	long		*		, %d hz
+}
+0	long		0x0064732E	dec audio data			audio/x-dec
+o()
+
+0	string		Creative\ Voice\ File	soundblaster audio data	audio/x-soundblaster
+0	long		0x4e54524b	multitrack audio data file	audio/x-multitrack
++4	long		*		, version %ld
+
+0	string		MThd		standard midi data		audio/midi
++9	byte		>0		, format %d
++11	byte		>1		, %d channel%s
+0	string		CTMF		creative music data
+0	string		SBI		soundblaster instrument data
+0	string		Creative\ Voice\ File	creative labs voice data
+&19	byte		0x1A
++23	byte		>0		, version %d
++22	byte		>0		\b.%d
+
+0	string		RIFF		riff audio data			audio/riff
++8	string		AIFF		aiff format
++8	string		AIFC		aiff-c format
++8	string		WAVE		, wave format
++8	string		8SVX		8svx format
++34	leshort		>0		, %d bit
++22	leshort		=1		, mono
++22	leshort		=2		, stereo
++22	leshort		=3		, 3 channels
++22	leshort		=4		, quad
++22	leshort		>4		, %d channel%s
++24	lelong		>0		, %d hz
+
+8	long		0x41494646	aiff audio data			audio/aiff
+8	long		0x41494643	aiff-C audio data		audio/aiff
+0	long		0x4e54524b	multitrack audio data		audio/multitrack
+
+0	string		;vdb;ciao	ciao virtual database		application/x-ciao
+0	string		;vdb;		vdb archive			application/pax
++5	string		*		, %s
+
+0	string		#pragma pp:checkpoint	preprocessor checkpoint	application/x-libpp
++22	edit		%"\([^"]*\)".*%\1%	, version %s
+
+#
+# pc application files
+#
+
+0	string		HDR*PowerBuilder	power builder library	application/x-powerbuilder
++18	edit		%\([0-9][0-9]\)\([0-9][0-9]\).*%\1.\2%	, version %s
+
+#
+# database files
+#
+
+0	long	0x13579ace	dbm 1.x database	application/x-dbm
+0	string	GDBM		gnu dbm 2.x database	application/x-gdbm
+
+12	long	0x00042253	bsd db queue
++16	long	>0		version %d
++12	belong	0x00042253	, big-endian
++12	lelong	0x00042253	, little-endian
+
+0	long	0x00053162	bsd db btree		application/x-bsd-db
++4	long	>2		1.86
++4	long	<3		1.85
++4	long	>0		, version %d
++0	belong	0x00053162	, big-endian
++0	lelong	0x00053162	, little-endian
++16	long	*		, %d record%s
++20	long	*		, flags 0x%x
+
+12	long	0x00053162	bsd db btree
++16	long	>0		version %d
++12	belong	0x00053162	, big-endian
++12	lelong	0x00053162	, little-endian
+
+0	long	0x00061561	bsd db hash		application/x-bsd-db
++4	long	>2		1.86
++4	long	<3		1.85
++4	long	>0		version %d
++8	long	4321		, big-endian
++8	long	1234		, little-endian
++56	long	*		, %d key%s
+
+12	long	0x00061561	bsd db hash
++16	long	>0		version %d
++12	belong	0x00061561	, big-endian
++12	lelong	0x00061561	, little-endian
+
+0	long	0x950412de	gnu message catalog	application/x-locale
++4	long	*		, revision %d
++8	long	*		, %d message%s
+
+#
+# from the net
+#
+
+1	string		# This is a shell archive.	shar archive	application/x-shar
+81	string		# This is a shell archive.	shar archive	application/x-shar
+
+0	short		0x1f9d		compressed data			application/zip
+{
+2	byte		&0200
+&2	byte		&037>0		, %d bit%s
+}
+0	short		017436		packed data			application/zip
+0	short		0x9d1f		compressed data			application/zip
++2	byte		&0200		, blocked
++2	byte		&037>0		, with %d bit%s
+
+0	short		0x1f10		pzip compressed data		application/pzip
+&2	byte		>0		, version %d
+&3	byte		<10		.%d
+
+0	short		0x1f8b		pzip compressed data		application/pzip
+&10	short		0x9217
+
+0	short		0x1f8b		gzip compressed data		application/gzip
++9	byte		0		, dos
++9	byte		1		, amiga
++9	byte		2		, vms
++9	byte		3		, unix
++9	byte		5		, atari
++9	byte		6		, os/2
++9	byte		7		, mac
++9	byte		10		, tops/20
++9	byte		11		, win/32
++2	byte		<8		, reserved
++2	byte		8		, deflate
++3	byte		&0x1		, ascii
++3	byte		&0x2		, continuation
++3	byte		&0x4		, extra field
++3	byte		&0x8		, original name
++3	byte		&0x10		, comment
++3	byte		&0x20		, encrypted
++8	byte		2		, max compression
++8	byte		4		, max speed
++4	ledate		>0		, %s
+
+0	string		BZh		bzip compressed data		application/zip
++3	byte		>='0'&<='9'	, %c00k blocks
+0	long		0x0000abcd	NOC newbridge raw stats
+v{
++4	short		*		, version %d
++6	short		*		.%d
+}
+0	long		0x0e130414	NOC switch stats
+v()
+0	long		0x0e13130d	NOC switch summary stats
+v()
+
+0	string		\x{FD}7zXZ	xz compressed data		application/xz
+
+0	leshort		0		windows icon resource		application/x-ms-icon
+&2	leshort		1
++4	leshort		x		, %d icon%s
+
+0	string		begin 0		uuencoded data			application/x-uuencode
+0	string		\x89PNG		PNG image data			image/png
+&4	belong		0x0d0a1a0a
++16	belong		x		, %ld x
++20	belong		x		%ld
++24	byte		x		, %d-bit
++25	byte		0		, grayscale
++25	byte		2		, color RGB
++25	byte		3		, colormap
++25	byte		4		, gray+alpha
++25	byte		6		, color RGBA
+#+26	byte		0		, deflate/32K
++28	byte		0		, non-interlaced
++28	byte		1		, interlaced
+0	string		\377\330\377	JPEG image			image/jpeg
+0	string		GIF		GIF image			image/gif
++3	string		*		, version %-.3s
+{
+6	leshort		>0		, %d
+&8	leshort		>0		x %d
+}
++10	byte		&0x40		, interlaced
++10	byte		&0x03==0x00	, 2 colors
++10	byte		&0x03==0x01	, 4 colors
++10	byte		&0x03==0x02	, 8 colors
++10	byte		&0x03==0x03	, 16 colors
++10	byte		&0x03==0x04	, 32 colors
++10	byte		&0x03==0x05	, 64 colors
++10	byte		&0x03==0x06	, 128 colors
++10	byte		&0x03==0x07	, 256 colors
+0	short		0x4d4d		TIFF image, big-endian		image/tiff
++2	short		>0		, version %d
+0	short		0x4949		TIFF image, little-endian	image/tiff
++2	short		>0		, version %d
+0	short		000732		sgi imagelib image		image/x-imagelib
++6	short		*		, %d
++8	short		*		x %d
+
+0	string		gimp xcf	gimp XCF image			image/x-gimp
++9	string		file		, version 0
+{
+9	string		v		, version
+&10	string		*		%s
+}
++14	belong		x		, %lu x
++18	belong		x		%lu
++22     belong          0               , rgb color
++22     belong          1               , greyscale
++22     belong          2               , indexed color
+
+0	string		MOVI		sgi movie			video/x-sgi
+
+0	byte		0
+&4	string		moov		quicktime movie			video/quicktime
+0	byte		0
+&4	string		mdat		quicktime movie			video/quicktime
+8	string		AVI		avi movie			video/avi
+0	long		0x000001BA	mpeg movie			video/mpeg
+0	long		0x000001B3	mpeg movie			video/mpeg
+
+0	string		<MakerFile	frame maker file		application/framemaker
+0	string		{\\rtf		rich text			application/rtf
+
+0	long		0xd0cf11e0	ms powerpoint document	application/x-powerpoint
+
+0	string		ms C/C++ program database	ms program database	application/x-dbx
++33	string		*		, version %s
+
+0	string		\377WPC		corel wordperfect document	application/x-wordperfect
+
+0	beshort		0xedab
+&2	beshort		0xeedb		red hat package manager
++4	byte		*		v%d
++8	beshort		1		i386
++8	beshort		2		alpha
++8	beshort		3		sparc
++8	beshort		4		mips
++8	beshort		5		powerpc
++8	beshort		6		68k
++8	beshort		7		sgi
++8	beshort		>7		unknown
++6	beshort		0		binary
++6	beshort		1		source
++10	string		*		, %s
+
+0	short		0x9900			pgp key public ring	application/pgp
+0	short		0x9501			pgp key security ring	application/pgp
+0	short		0x9500			pgp key security ring	application/pgp
+0	string		-----BEGIN\040PGP	pgp armored data	application/pgp
++15	string		PUBLIC\040KEY\040BLOCK- , public key block
++15	string		MESSAGE-		, message
++15	string		SIGNED\040MESSAGE-	, signed message
++15	string		PGP\040SIGNATURE-	, signature
+
+0	string		Core			osf unknown core dump	x-system/core
+&name	match		core*
++24	string		*			from `%s'
+
+0	match		From[ ]			mail message		message/rfc822
+0	match		(BABYL|From|Received|Return-Path|To)?(:)[ ]	mail message	message/partial
+
+0	string		\001fcp			X11 portable compiled font	x-X11/font
+
+0	string		\357\273\277		utf-8 encoded text	application/x-iconv
+0	string		\376\377		utf-16 encoded text	application/x-iconv
+0	string		\377\376		utf-16 encoded text, little-endian	application/x-iconv
+
+32769	string		CD001	ISO 9660 CD-ROM filesystem image			data/x-filesystem
++32808	string		*	, '%s'
++34816	string		\000CD001\001EL\ TORITO\ SPECIFICATION	, bootable
+37633	string		CD001	ISO 9660 CD-ROM filesystem image, raw 2352 byte sectors	data/x-filesystem
+32776	string		CDROM	High Sierra CD-ROM filesystem image			data/x-filesystem
+
+#
+# front compression data
+#
+
+0	byte		0
+&1	edit		%^\([A-Z_][A-Z_]*\)-\([^0-9]*\)-\([0-9][0-9]\)%\1 data, with \2, version \3%l	%s	application/x-%s
+0	byte		0
+&1	edit		%^\([A-Z_][A-Z_]*\)\([0-9][0-9]\)%\1 data, version \2%l	%s	application/x-%s
+
+#
+# generic binary magic
+#
+
+0	long		0x00010203
+&4	string		*		%s			application/x-%s
+&12	string		*		%s data
+&24	version		*		, version %s
++28	long		>0		, size %u
+{
+&28	long		>=4
+&32	long		>0		, %u
+}
+{
+&28	long		>=8
+&36	long		>0		, %u
+}
+
+#
+# local additions
+#
+
+0	match		info mam		mam program		application/x-mam
+0	edit		%^!<\([^>]*\)>.*%\1%l	%s data			application/x-%s
+0	string		\015\023\007\000	ast message catalog	application/x-locale
++4	string		*			, %s
+
+#
+# last chance
+#
+
+name	match		*.(o|obj)		unknown object		x-system/obj
+name	match		core			unknown core dump	x-system/core
+name	match		core.*			unknown core dump	x-system/core
+
+#
+# we resisted til now
+#
+
+0	void	registry()
+|name	match	*.acp	Office.ActorPreview			application/x-ms-office
+|name	match	*.act	Office.Actor				application/x-ms-office
+|name	match	*.ade	Microsoft Access project extension	application/x-ms
+|name	match	*.adp	Microsoft Access project		application/x-ms
+|name	match	*.aif	AIFF Audio				audio/x-aiff
+|name	match	*.aifc	AIFF Audio				audio/aiff
+|name	match	*.aiff	AIFF Audio				audio/aiff
+|name	match	*.aim	AOL Instant Messenger Launch		application/x-aim
+|name	match	*.ani	Animated Cursor				application/x-ms-anifile
+|name	match	*.app	Application file			application/x-ms
+|name	match	*.arc	WinZip File				application/x-ms-winzip
+|name	match	*.arj	WinZip File				application/x-ms-winzip
+|name	match	*.art	ART Image				image/x-jg
+|name	match	*.asp	Active Server Page			application/x-ms
+|name	match	*.asx	Windows Media Audio / Video		application/x-ms
+|name	match	*.au	Sound Clip				audio/basic
+|name	match	*.avi	Video Clip				video/avi
+|name	match	*.awx	Custom AppWizard			application/x-ms-awxfile
+|name	match	*.b64	WinZip File				application/x-ms-winzip
+|name	match	*.bas	Microsoft Visual Basic class module	application/x-ms
+|name	match	*.bat	MS-DOS Batch File			application/x-ms-batfile
+|name	match	*.bfc	Briefcase				application/x-ms-briefcase
+|name	match	*.bhx	WinZip File				application/x-ms-winzip
+|name	match	*.bmp	Bitmap Image				image/bmp
+|name	match	*.bpg	Borland Project Group			application/x-ms-borlandprojectgroup
+|name	match	*.bpk	C++Builder Package			application/x-ms-bcbpackage
+|name	match	*.bpr	C++Builder Project			application/x-ms-bcbproject
+|name	match	*.bsc	Browser Information			application/x-ms-bscfile
+|name	match	*.cda	CD Audio Track				application/x-ms-cdafile
+|name	match	*.cdf	Channel File				application/x-netcdf
+|name	match	*.cer	Internet Security Certificate		application/x-x509-ca-cert
+|name	match	*.cfg	CFG File				application/x-ms-cfg_auto_file
+|name	match	*.chm	Compiled HTML Help file			application/x-ms-help
+|name	match	*.cil	Clip Gallery Download Package		application/x-ms-clipgallerydownloadpackage
+|name	match	*.class	Java class file				application/x-java
+|name	match	*.clp	Clipboard Clip				application/x-ms-clpfile
+|name	match	*.cmd	Windows Command Script			application/x-ms-cmdfile
+|name	match	*.com	MS-DOS Application			application/x-ms-comfile
+|name	match	*.cpl	Control Panel extension			application/x-ms-cplfile
+|name	match	*.cpp	C++ Source File				application/x-c++
+|name	match	*.crt	Internet Security Certificate		application/x-x509-ca-cert
+|name	match	*.css	HyperText Style Sheet			text/css
+|name	match	*.csv	Microsoft Excel Comma Separated Values File	application/x-ms-excel
+|name	match	*.cur	Cursor					application/x-ms-curfile
+|name	match	*.cxx	C++ Source File				application/x-c++
+|name	match	*.dcx	DCX Image Document			application/x-ms-dcximage
+|name	match	*.der	Internet Security Certificate		application/x-x509-ca-cert
+|name	match	*.dfm	C++Builder Form				application/x-ms-bcbform
+|name	match	*.dic	Text Document				application/x-ms-txtfile
+|name	match	*.dif	DV					video/x-dv
+|name	match	*.dll	Windows dynamic link library		application/x-ms-dll
+|name	match	*.doc	Microsoft Word Document			application/x-ms-word
+|name	match	*.dot	Microsoft Word Template			application/x-ms-word
+|name	match	*.drv	Device driver				application/x-ms-drvfile
+|name	match	*.dsm	Developer Studio Macro File		application/x-ms-dsmfile
+|name	match	*.dsn	Microsoft OLE DB Provider for ODBC Drivers	application/x-ms-msdasql
+|name	match	*.dsp	Project File				application/x-ms-dspfile
+|name	match	*.dsw	Project Workspace			application/x-ms-dswfile
+|name	match	*.dv	DV					video/x-dv
+|name	match	*.ebh	Ebasic Files				application/x-ms-hclebasich
+|name	match	*.ebx	Ebrun Files				application/x-ms-hclebrun
+|name	match	*.exc	Text Document				application/x-ms-txtfile
+|name	match	*.exe	Application				application/x-msdownload
+|name	match	*.fav	Outlook Bar Shortcuts			application/x-ms-outlook
+|name	match	*.fdf	Adobe Acrobat Forms Document		application/x-ms-acroexch
+|name	match	*.fnd	Saved Search				application/x-ms-fndfile
+|name	match	*.fon	Font file				application/x-ms-fonfile
+|name	match	*.fs	Ftp Files				application/x-ms-hclftp
+|name	match	*.fxp	Microsoft Visual FoxPro compiled program	application/x-ms-foxpro
+|name	match	*.gfi	Genigraphics GraphicsLink		application/x-ms-graphicslink
+|name	match	*.gfx	Genigraphics GraphicsLink		application/x-ms-graphicslink
+|name	match	*.gif	GIF Image				image/gif
+|name	match	*.gim	Genigraphics GraphicsLink		application/x-ms-graphicslink
+|name	match	*.gix	Genigraphics GraphicsLink		application/x-ms-graphicslink
+|name	match	*.gna	Genigraphics GraphicsLink		application/x-ms-graphicslink
+|name	match	*.gnx	Genigraphics GraphicsLink		application/x-ms-graphicslink
+|name	match	*.gra	Microsoft Graph 97 Chart		application/x-ms-msgraph
+|name	match	*.grp	Microsoft Program Group			application/x-ms-msprogramgroup
+|name	match	*.gst	MSMap.Datainst.8			application/x-ms-msmap
+|name	match	*.gwx	Genigraphics GraphicsLink		application/x-ms-graphicslink
+|name	match	*.gwz	Genigraphics GraphicsLink		application/x-ms-graphicslink
+|name	match	*.gz	WinZip File				application/gzip
+|name	match	*.hep	HostExplorer Session Profile		application/x-ms-hostexplorer
+|name	match	*.hlp	Help File				application/x-ms-help
+|name	match	*.hpp	C++ Header File				application/x-c++
+|name	match	*.hqx	WinZip File				application/mac-binhex40
+|name	match	*.hs3	HostExplorer Hotspot Definition		application/x-ms-hostexplorer
+|name	match	*.hs5	HostExplorer Hotspot Definition		application/x-ms-hostexplorer
+|name	match	*.hsv	HostExplorer Hotspot Definition		application/x-ms-hostexplorer
+|name	match	*.ht	HyperTerminal File			application/x-ms-htfile
+|name	match	*.hta	HTML program				application/x-ms
+|name	match	*.htm	html source				text/html
+|name	match	*.hts	Hummingbird Telnet Program v6.0.0.0	application/x-ms-hummingbird
+|name	match	*.htt	HyperText Template			text/webviewhtml
+|name	match	*.htw	HTML Document				application/x-ms-htmlfile
+|name	match	*.htx	HTML Document				text/html
+|name	match	*.hxx	C++ Header File				application/x-c++
+|name	match	*.ico	Icon					application/x-ms-icon
+|name	match	*.idb	Intermediate File			application/x-ms-mdpxfile
+|name	match	*.ilk	Intermediate File			application/x-ms-mdpxfile
+|name	match	*.inf	Setup Information			application/x-ms-setup
+|name	match	*.ini	Configuration Settings			application/x-ms-config
+|name	match	*.ins	Internet Communication Settings		application/x-internet-signup
+|name	match	*.iqy	Microsoft Excel Web Query File		application/x-ms-iqyfile
+|name	match	*.isp	Internet Communication Settings		application/x-internet-signup
+|name	match	*.its	Internet Document Set			application/x-ms-its
+|name	match	*.ivt	InfoViewer Title			application/x-ms-ivt
+|name	match	*.jfif	JPEG Image				image/jpeg
+|name	match	*.job	Scheduler Job Object			application/x-ms-jobobject
+|name	match	*.jod	Microsoft.Jet.OLEDB.3.51		application/x-ms-microsoft
+|name	match	*.jpe	JPEG Image				image/jpeg
+|name	match	*.jpeg	JPEG Image				image/jpeg
+|name	match	*.jpg	JPEG Image				image/jpeg
+|name	match	*.js	JavaScript file				application/x-java
+|name	match	*.jse	JavaScript Encoded Script file		application/x-ms
+|name	match	*.jsp	JavaScript Page				application/x-ms
+|name	match	*.km3	HostExplorer KeyMap Definition		application/x-ms-hostexplorer
+|name	match	*.km5	HostExplorer KeyMap Definition		application/x-ms-hostexplorer
+|name	match	*.kmv	HostExplorer KeyMap Definition		application/x-ms-hostexplorer
+|name	match	*.lam	LAMDocument				application/x-ms-lamdocument
+|name	match	*.ldb	Microsoft Access Record-Locking Information	application/x-ms-access
+|name	match	*.lnk	Shortcut				application/x-ms
+|name	match	*.log	Text Document				application/x-text
+|name	match	*.lzh	WinZip File				application/x-ms-winzip
+|name	match	*.m1v	Movie Clip				video/mpeg
+|name	match	*.mac	MacPaint Image				image/x-macpaint
+|name	match	*.mad	Microsoft Access Module Shortcut	application/x-ms-access
+|name	match	*.maf	Microsoft Access Form Shortcut		application/x-ms-access
+|name	match	*.mam	Microsoft Access Macro Shortcut		application/x-ms-access
+|name	match	*.maq	Microsoft Access Query Shortcut		application/x-ms-access
+|name	match	*.mar	Microsoft Access Report Shortcut	application/x-ms-access
+|name	match	*.mat	Microsoft Access Table Shortcut		application/x-ms-access
+|name	match	*.mda	Microsoft Access Add-in			application/x-ms-access
+|name	match	*.mdb	Microsoft Access Database		application/x-ms-access
+|name	match	*.mdb	Microsoft Access program		application/x-ms
+|name	match	*.mde	Microsoft Access MDE Database		application/x-ms-access
+|name	match	*.mdn	Microsoft Access Blank Database Template	application/x-ms-access
+|name	match	*.mdp	Project Workspace			application/x-ms-mdpfile
+|name	match	*.mdt	Microsoft Access Add-in Data		application/x-ms-access
+|name	match	*.mdw	Microsoft Access Workgroup Information	application/x-ms-access
+|name	match	*.mdz	Microsoft Access Database Wizard Template	application/x-ms-access
+|name	match	*.mht	Microsoft MHTML Document 4.0		message/rfc822
+|name	match	*.mhtml	Microsoft MHTML Document 4.0		message/rfc822
+|name	match	*.mid	MIDI Sequence				audio/mid
+|name	match	*.mmm	Media Clip				application/x-ms-mplayer
+|name	match	*.mov	QuickTime Movie				video/quicktime
+|name	match	*.mp2	Movie Clip				video/mpeg
+|name	match	*.mpa	Movie Clip				video/mpeg
+|name	match	*.mpe	Movie Clip				video/mpeg
+|name	match	*.mpeg	Movie Clip				video/mpeg
+|name	match	*.mpg	Movie Clip				video/mpeg
+|name	match	*.msc	Microsoft Common Console Document	application/x-ms-mmc
+|name	match	*.msg	Outlook Item				application/x-ms-msgfile
+|name	match	*.msi	Microsoft Windows Installer package	application/x-ms
+|name	match	*.msp	Windows Installer patch			application/x-ms
+|name	match	*.mst	Visual Test source files		application/x-ms
+|name	match	*.nsc	Netscape Conference Call File		application/x-conference
+|name	match	*.obd	Microsoft Office Binder			application/x-ms-office
+|name	match	*.obt	Microsoft Office Binder Template	application/x-ms-office
+|name	match	*.obz	Microsoft Office Binder Wizard		application/x-ms-office
+|name	match	*.odl	Object Definition Language File		application/x-ms-odlfile
+|name	match	*.ofn	Other Office Documents...		application/x-ms-office
+|name	match	*.oft	Outlook Item Template			application/x-ms-outlook
+|name	match	*.ops	Microsoft Office profile settings file	application/x-ms
+|name	match	*.opx	MS Organization Chart 2.0		application/x-ms-orgpluswopx
+|name	match	*.oss	Office Search				application/x-ms-ossfile
+|name	match	*.pcd	Photo CD Image				application/x-ms-pcdfile
+|name	match	*.pch	Intermediate File			application/x-ms-mdpxfile
+|name	match	*.pct	PICT Image				image/pict
+|name	match	*.pcx	PCX Image				application/x-ms-pcxfile
+|name	match	*.pdb	Intermediate File			application/x-ms-mdpxfile
+|name	match	*.pdf	Adobe Acrobat Document			application/pdf
+|name	match	*.pfm	Type 1 Font file			application/x-ms-pfmfile
+|name	match	*.php	Perl CGI Script File			application/x-perl
+|name	match	*.pic	PICT Image				image/pict
+|name	match	*.pict	PICT Image				image/pict
+|name	match	*.pif	Shortcut to MS-DOS Program		application/x-ms-piffile
+|name	match	*.pif	Shortcut to MS-DOS program		application/x-ms
+|name	match	*.pkg	Microsoft Developer Extension		application/x-ms-pkgfile
+|name	match	*.pma	Performance Monitor File		application/x-ms-perffile
+|name	match	*.pmc	Performance Monitor File		application/x-ms-perffile
+|name	match	*.pml	Performance Monitor File		application/x-ms-perffile
+|name	match	*.pmr	Performance Monitor File		application/x-ms-perffile
+|name	match	*.pmw	Performance Monitor File		application/x-ms-perffile
+|name	match	*.pnf	Precompiled Setup Information		application/x-ms-pnffile
+|name	match	*.png	PNG Image				application/x-ms-pngfile
+|name	match	*.pntg	MacPaint Image				image/x-macpaint
+|name	match	*.pop	HostExplorer Poppad Definition		application/x-ms-hostexplorer
+|name	match	*.pot	Microsoft PowerPoint Template		application/vnd.ms-powerpoint
+|name	match	*.ppa	Microsoft PowerPoint Addin		application/vnd.ms-powerpoint
+|name	match	*.pps	Microsoft PowerPoint SlideShow		application/vnd.ms-powerpoint
+|name	match	*.ppt	Microsoft PowerPoint Presentation	application/vnd.ms-powerpoint
+|name	match	*.prf	System file				application/x-ms
+|name	match	*.prg	Program source file			application/x-ms
+|name	match	*.psd	Photoshop Image				image/x-photoshop
+|name	match	*.pwz	Microsoft PowerPoint Wizard		application/vnd.ms-powerpoint
+|name	match	*.qif	QuickTime Image				image/x-quicktime
+|name	match	*.qk3	HostExplorer QuickKeys			application/x-ms-hostexplorer
+|name	match	*.qk5	HostExplorer QuickKeys			application/x-ms-hostexplorer
+|name	match	*.qkv	HostExplorer QuickKeys			application/x-ms-hostexplorer
+|name	match	*.qt	QuickTime Movie				video/quicktime
+|name	match	*.qti	QuickTime Image				image/x-quicktime
+|name	match	*.qtif	QuickTime Image				image/x-quicktime
+|name	match	*.qtp	QuickTime Preferences			application/x-ms-quicktimepreferences
+|name	match	*.qts	QuickTime				application/x-ms-quicktimesystem
+|name	match	*.qtx	QuickTime Extension			application/x-ms-quicktimeextension
+|name	match	*.que	Scheduler Queue Object			application/x-ms-queueobject
+|name	match	*.rc	Resource Template			application/x-ms-rcfile
+|name	match	*.rct	Resource Template			application/x-ms-rcfile
+|name	match	*.reg	Registration Entries			application/x-ms-regfile
+|name	match	*.res	Intermediate File			application/x-ms-mdpxfile
+|name	match	*.rmi	MIDI Sequence				audio/mid
+|name	match	*.rnk	Dial-Up Shortcut			application/x-ms-rnkfile
+|name	match	*.rtf	Rich Text Format			application/x-ms-word
+|name	match	*.rx	XRX Files				application/x-ms-hclbroadway
+|name	match	*.sbr	Intermediate File			application/x-ms-mdpxfile
+|name	match	*.sc2	Microsoft Schedule+ 7.0 Application	application/x-ms-scheduleplus
+|name	match	*.scd	Microsoft Schedule+ 7.0 Application	application/x-ms-scheduleplus
+|name	match	*.scf	Windows Explorer Command		application/x-ms-explorer
+|name	match	*.sch	Microsoft Schedule+ 7.0 Application	application/x-ms-scheduleplus
+|name	match	*.scp	Text Document				application/x-ms-txtfile
+|name	match	*.scr	Screen Saver				application/x-ms-scrfile
+|name	match	*.sct	Windows Script Component		application/x-ms
+|name	match	*.sd2	Sound Designer 2			audio/x-sd2
+|name	match	*.ses	Xsession Files				application/x-ms-hclxsession
+|name	match	*.shb	Shortcut into a document		application/x-ms-docshortcut
+|name	match	*.shs	Scrap object				application/x-ms-shellscrap
+|name	match	*.shtml	Netscape Hypertext Document		application/x-ms-netscapemarkup
+|name	match	*.slk	Microsoft Excel SLK Data Import Format	application/x-ms-excel
+|name	match	*.snd	Sound Clip				audio/basic
+|name	match	*.stm	HTML Document				text/html
+|name	match	*.sys	System file				application/x-ms-sysfile
+|name	match	*.taz	WinZip File				application/x-ms-winzip
+|name	match	*.tga	TGA Image				application/x-ms-tgafile
+|name	match	*.tif	TIF Image Document			image/tiff
+|name	match	*.tlb	Type Library				application/x-ms-tlbfile
+|name	match	*.ttf	TrueType Font file			application/x-ms-ttffile
+|name	match	*.txt	Text Document				text/plain
+|name	match	*.tz	WinZip File				application/x-ms-winzip
+|name	match	*.udl	Microsoft Data Link			application/x-ms-msdasc
+|name	match	*.url	Internet Shortcut			application/x-ms-internetshortcut
+|name	match	*.uue	WinZip File				application/x-ms-winzip
+|name	match	*.vb	Microsoft Visual Basic Scripting Edition (VBScript) file	application/x-ms
+|name	match	*.vbe	VBScript Encoded Script file		application/x-ms
+|name	match	*.vbs	VBScript file				application/x-ms
+|name	match	*.vir	Virus Infected File			application/x-ms-virus
+|name	match	*.wav	Wave Sound				audio/x-wav
+|name	match	*.wbk	Microsoft Word Backup Document		application/x-ms-word
+|name	match	*.wiz	Microsoft Word Wizard			application/x-ms-word
+|name	match	*.wll	Microsoft Word Addin			application/x-ms-word
+|name	match	*.wpd	corel wordperfect document		application/x-wordperfect
+|name	match	*.wri	Write Document				application/x-ms-wrifile
+|name	match	*.wrl	SGI.CosmoPlayer.1			application/x-ms-sgi
+|name	match	*.wrz	SGI.CosmoPlayer.1			application/x-ms-sgi
+|name	match	*.ws	Wstart Files				application/x-ms-hclwstart
+|name	match	*.wsc	Windows Script Component		application/x-ms
+|name	match	*.wsf	Windows Script file			application/x-ms
+|name	match	*.wsh	Windows Script Host Settings file	application/x-ms
+|name	match	*.wtx	Text Document				application/x-ms-txtfile
+|name	match	*.xbm	Netscape Hypertext Document		image/x-xbitmap
+|name	match	*.xif	XIF Image Document			application/x-ms-xifimage
+|name	match	*.xla	Microsoft Excel Add-In			application/x-ms-excel
+|name	match	*.xlb	Microsoft Excel Worksheet		application/x-ms-excel
+|name	match	*.xlc	Microsoft Excel Chart			application/x-ms-excel
+|name	match	*.xld	Microsoft Excel 5.0 DialogSheet		application/x-ms-excel
+|name	match	*.xlk	Microsoft Excel Backup File		application/x-ms-excel
+|name	match	*.xll	Microsoft Excel XLL Add-In		application/x-ms-excel
+|name	match	*.xlm	Microsoft Excel 4.0 Macro		application/x-ms-excel
+|name	match	*.xls	Microsoft Excel Worksheet		application/vnd.ms-excel
+|name	match	*.xlt	Microsoft Excel Template		application/x-ms-excel
+|name	match	*.xlv	Microsoft Excel VBA Module		application/x-ms-excel
+|name	match	*.xlw	Microsoft Excel Workspace		application/x-ms-excel
+|name	match	*.xnk	Microsoft Exchange Shortcut		application/x-ms-exchange
+|name	match	*.xs	Microsoft Exchange start Files		application/x-ms-exchange
+|name	match	*.xxe	WinZip File				application/x-ms-winzip
+|name	match	*.zip	WinZip File				application/x-zip-compressed

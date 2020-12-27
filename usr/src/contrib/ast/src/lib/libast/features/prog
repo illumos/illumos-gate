@@ -1,0 +1,12 @@
+lib	getexecname,_NSGetExecutablePath
+
+tst	run{
+	for p in /proc/self/exe /proc/self/path/a.out
+	do	if	test -e $p
+		then	echo "#define _PROC_PROG	\"$p\""
+			break
+		fi
+	done
+}end
+
+_hdr_macho_o_dyld = hdr mach-o/dyld

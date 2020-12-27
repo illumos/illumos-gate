@@ -1,0 +1,35 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+#
+
+# These macros should be kept synchronised with those in
+# usr/src/contrib/ast/src/lib/libcmd/Makefile
+
+AST_LICENSE = since=1992,author=gsf+dgk
+ASTLIB= libcmd
+ASTSRC= $(C_AST)/src/lib/$(ASTLIB)
+HDRGUARD= cmd
+
+FEATURES= ids sockets symlink utsname
+HEADERSRC= cmd.h
+HEADERGEN= cmdext.h
+HEADERINSTALL= $(HEADERSRC) $(HEADERGEN)
+LOBJDIRS=
+LIBOBJS= \
+	basename.o cat.o chgrp.o cksum.o chmod.o chown.o cmdinit.o \
+	cmp.o comm.o cp.o cut.o date.o dirname.o expr.o fds.o \
+	fmt.o fold.o fts_fix.o getconf.o head.o id.o join.o lib.o ln.o \
+	logname.o md5sum.o mkdir.o mkfifo.o mktemp.o mv.o paste.o \
+	pathchk.o pids.o rev.o revlib.o rm.o rmdir.o stty.o sum.o \
+	sync.o tail.o tee.o tty.o uname.o uniq.o vmstate.o wc.o wclib.o

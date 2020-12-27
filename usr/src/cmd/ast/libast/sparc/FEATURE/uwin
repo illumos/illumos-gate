@@ -1,0 +1,37 @@
+/* : : generated from contrib/ast/src/lib/libast/features/uwin by iffe version 2012-07-17 : : */
+#ifndef _def_uwin_ast
+#define _def_uwin_ast	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#define _lib_a64l	1	/* a64l() in default lib(s) */
+#define _lib_acosh	1	/* acosh() in default lib(s) */
+#define _lib_asinh	1	/* asinh() in default lib(s) */
+#define _lib_atanh	1	/* atanh() in default lib(s) */
+#define _lib_cbrt	1	/* cbrt() in default lib(s) */
+#define _lib_ceil	1	/* ceil() in default lib(s) */
+#define _lib_crypt	1	/* crypt() in default lib(s) */
+#define _lib_erf	1	/* erf() in default lib(s) */
+#define _lib_exp	1	/* exp() in default lib(s) */
+#define _lib_expm1	1	/* expm1() in default lib(s) */
+#define _lib_floor	1	/* floor() in default lib(s) */
+#define _lib_gamma	1	/* gamma() in default lib(s) */
+#define _lib_getpass	1	/* getpass() in default lib(s) */
+#define _lib_lgamma	1	/* lgamma() in default lib(s) */
+#define _lib_log	1	/* log() in default lib(s) */
+#define _lib_log1p	1	/* log1p() in default lib(s) */
+#define _lib_random	1	/* random() in default lib(s) */
+#define _lib_rcmd	1	/* rcmd() in default lib(s) */
+#define _lib_rint	1	/* rint() in default lib(s) */
+#define _lib_srand48	1	/* srand48() in default lib(s) */
+#define _lib_copysign	1	/* copysign() in default lib(s) */
+#define _lib_logb	1	/* logb() in default lib(s) */
+#define _lib_finite	1	/* finite() in default lib(s) */
+#define _lib_sqrt	1	/* sqrt() in default lib(s) */
+#define _lib_ilogb	1	/* ilogb() in default lib(s) */
+#define _lib_remainder	1	/* remainder() in default lib(s) */
+#define _lib_scalb	1	/* scalb() in default lib(s) */
+#define _lib__finite	1	/* _finite() in default lib(s) */
+#define _lib__scalb	1	/* _scalb() in default lib(s) */
+#define _dat__iob	1	/* _iob in default lib(s) */
+#define stricmp		strcasecmp
+
+#endif

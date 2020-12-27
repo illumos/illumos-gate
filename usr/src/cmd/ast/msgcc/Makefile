@@ -23,30 +23,32 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 
-SHELL=/usr/bin/ksh93
+SHELL= /usr/bin/ksh93
 
 include ../../Makefile.cmd
 
 .KEEP_STATE:
 
 # Set common AST build flags (e.g., needed to support the math stuff).
-include ../../../Makefile.ast
+include ../Makefile.ast
+
+ASTSRC= $(C_AST)/src/cmd/msgcc
 
 # build rules
-CPPFLAGS = \
+CPPFLAGS= \
         $(DTEXTDOM) $(DTS_ERRNO) \
         -I$(ROOT)/usr/include/ast \
 	-I$(ROOT)/usr/include \
 	-D_PACKAGE_ast \
 	'-DUSAGE_LICENSE=\
-		"[-author?Glenn Fowler <gsf@research.att.com>]"\
-		"[-copyright?Copyright (c) 1986-2009 AT&T Intellectual Property]"\
-		"[-license?http://www.opensource.org/licenses/cpl1.0.txt]"\
-		"[--catalog?msgcc]"'
+	    "[-author?Glenn Fowler <gsf@research.att.com>]"\
+	    "[-copyright?Copyright (c) 2000-2012 AT&T Intellectual Property]"\
+	    "[-license?http://www.eclipse.org/org/documents/epl-v10.html]" \
+	    "[--catalog?msgcc]"'
 
-CFLAGS += \
-	$(ASTCFLAGS)
+CFLAGS += $(ASTCFLAGS)
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-empty-body
@@ -58,25 +60,38 @@ SMATCH=off
 LDLIBS += -last
 msgcpp   := LDLIBS += -lpp
 
+CPROG= msgcvt msggen msgget msgcpp
+PROG= msgcc $(CPROG)
+
+all: $(PROG)
+
 # This target should use "shcomp" in the future
-msgcc:	msgcc.sh
+msgcc:	$(ASTSRC)/msgcc.sh
 	rm -f msgcc ; \
 	{ \
 		print "#!/usr/bin/ksh93" ; \
 		print "export PATH=/usr/ast/bin:/usr/xpg6/bin:/usr/xpg4/bin:/usr/bin:\$${PATH}" ; \
 		print "builtin date" ; \
-		cat "msgcc.sh" ; \
+		cat "$(ASTSRC)/msgcc.sh" ; \
 	} >msgcc ; \
 	chmod a+rx msgcc
 
 ROOTCMDDIR=$(ROOT)/usr/ast/bin
 
-PROG= msgcvt msggen msgget msgcpp msgcc
-
-all: $(PROG)
-
 install: all $(ROOTCMD)
-
-clean lint:
+check clean install_h _feature:
 
 include ../../Makefile.targ
+POFILE= msgcpp.po
+
+# Create dummy file since AST/ksh/msgcc doesn't use *.po files
+msgcpp.po:
+	$(RM) $@
+	$(TOUCH) $(@)
+
+$(CPROG):
+	$(LINK.c) -o $@ $(ASTSRC)/$@.c $(LDLIBS)
+	$(POST_PROCESS)
+
+FRC:
+.PARALLEL: $(PROG)

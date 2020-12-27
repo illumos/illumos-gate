@@ -1,0 +1,71 @@
+NOTE regression tests for --regress enabled ksh
+
+UNIT ksh-regress
+
+EXPORT HOME=. ENV=.env.sh LC_ALL=C HISTFILE=
+
+TEST mode suid/sgid combinations
+
+# these tests are the product { all modes combinations } X { tests }
+
+defaults=(
+	"etc=$HOME"
+	"source"
+)
+modes=(
+	interactive
+	login
+	privileged
+	rc
+	restricted
+)
+tests=(
+	""
+	"euid=0"
+	"euid=0 p_suid=0"
+	"euid=0 p_suid=99999"
+	"euid=1"
+	"euid=1 p_suid=0"
+	"euid=1 p_suid=99999"
+	"egid=1"
+	"egid=1 p_suid=0"
+	"egid=1 p_suid=99999"
+)
+
+integer n=1 m=${#modes[@]}
+d=
+for o in ${defaults[@]}
+do	d="$d --regress=$o"
+done
+for ((b=0; b<m; b++))
+do	(( n *= 3 ))
+done
+for (( b=0; b<n; b++ ))
+do	k=
+	z=$(printf "%0$m..3u" $b)
+	for (( i=0; i<m; i++ ))
+	do	case $z in
+		1*)	k="$k --no${modes[i]}" ;;
+		2*)	k="$k --${modes[i]}" ;;
+		esac
+		z=${z#?}
+	done
+	for t in "${tests[@]}"
+	do	o=$d
+		for r in $t
+		do	o="$o --regress=$r"
+		done
+		o="$o $k"
+
+EXEC $o <<!
+set --state
+!
+
+	done
+done
+
+TEST privileged/noprivileged sequence
+
+EXEC --regress=etc=. --regress=euid=1 --privileged <<!
+set --state; set --noprivileged; set --state; set --privileged; set --state; set --noprivileged; set --state
+!

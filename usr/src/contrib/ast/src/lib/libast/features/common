@@ -1,0 +1,624 @@
+iff	AST_COMMON
+hdr	pthread,stdarg,stddef,stdint,inttypes,types,unistd
+sys	types
+typ	long.double,size_t,ssize_t
+typ	__va_list stdio.h
+
+mac	SF_APPEND,SF_CLOSE	sys/stat.h sys/socket.h
+
+dll	import note{ Microsoft import/export nonsense }end execute{
+	__declspec(dllimport) int foo;
+	int main() { return foo == 5 ? 0 : 1; }
+	int	bar = 5;
+	int*	_imp__foo = &bar;
+}end
+
+std	proto note{ standard C prototypes ok }end compile{
+	extern int foo(int, int);
+	bar() { foo(1, 1); }
+}end
+
+tst	ptr_void note{ standard C void* ok }end compile{
+	extern void* foo();
+	void* bar() { return foo(); }
+}end
+
+cat{
+	/* disable non-standard linux/gnu inlines */
+	#ifdef __GNUC__	
+	#	undef	__OPTIMIZE_SIZE__
+	#	define	__OPTIMIZE_SIZE__	1
+	#endif
+
+	/* __STD_C indicates that the language is ANSI-C or C++ */
+	#if !defined(__STD_C) && __STDC__
+	#	define	__STD_C		1
+	#endif
+	#if !defined(__STD_C) && (__cplusplus || c_plusplus)
+	#	define __STD_C		1
+	#endif
+	#if !defined(__STD_C) && _std_proto
+	#	define __STD_C		1
+	#endif
+	#if !defined(__STD_C)
+	#	define __STD_C		0
+	#endif
+
+	/* extern symbols must be protected against C++ name mangling */
+	#ifndef _BEGIN_EXTERNS_
+	#	if __cplusplus || c_plusplus
+	#		define _BEGIN_EXTERNS_	extern "C" {
+	#		define _END_EXTERNS_	}
+	#	else
+	#		define _BEGIN_EXTERNS_
+	#		define _END_EXTERNS_
+	#	endif
+	#endif
+
+	/* _ARG_ simplifies function prototyping among flavors of C */
+	#ifndef _ARG_
+	#	if __STD_C
+	#		define _ARG_(x)	x
+	#	else
+	#		define _ARG_(x)	()
+	#	endif
+	#endif
+
+	/* _NIL_ simplifies defining nil pointers to a given type */
+	#ifndef _NIL_
+	#	define _NIL_(x)	((x)0)
+	#endif
+
+	/* __INLINE__, if defined, is the inline keyword */
+	#if !defined(__INLINE__) && defined(__cplusplus)
+	#	define __INLINE__	inline
+	#endif
+	#if !defined(__INLINE__) && defined(_WIN32) && !defined(__GNUC__)
+	#	define __INLINE__	__inline
+	#endif
+
+	/* Void_t is defined so that Void_t* can address any type */
+	#ifndef Void_t
+	#	if __STD_C
+	#		define Void_t		void
+	#	else
+	#		define Void_t		char
+	#	endif
+	#endif
+
+	/* windows variants and veneers */
+	#if !defined(_WINIX) && (_UWIN || __CYGWIN__ || __EMX__)
+	#	define _WINIX		1
+	#endif
+
+	/* dynamic linked library external scope handling */
+	#ifdef __DYNAMIC__
+	#	undef	__DYNAMIC__
+	#	ifndef _DLL
+	#		define _DLL		1
+	#	endif
+	#endif
+	#if _dll_import
+	#	if _BLD_STATIC && !_BLD_DLL
+	#		undef	_DLL
+	#	else
+	#		if !_UWIN && !defined(_DLL)
+	#			define _DLL		1
+	#		endif
+	#	endif
+	#	if !defined(__EXPORT__) && _BLD_DLL
+	#		define __EXPORT__	__declspec(dllexport)
+	#	endif
+	#	if !defined(__IMPORT__) && ( _BLD_DLL || defined(_DLL) )
+	#		define __IMPORT__	__declspec(dllimport)
+	#	endif
+	#	if _BLD_DLL && _UWIN
+	#	define __DYNAMIC__(v)		(_ast_getdll()->_ast_ ## v)
+	#	endif
+	#endif
+	#if !defined(_astimport)
+	#	if defined(__IMPORT__) && defined(_DLL)
+	#		define _astimport	__IMPORT__
+	#	else
+	#		define _astimport	extern
+	#	endif
+	#endif
+	#if _dll_import && ( !_BLD_DLL || _WINIX && !_UWIN )
+	#	ifdef __STDC__
+	#	define __EXTERN__(T,obj)	extern T obj; T* _imp__ ## obj = &obj
+	#	define __DEFINE__(T,obj,val)	T obj = val; T* _imp__ ## obj = &obj
+	#	else
+	#	define __EXTERN__(T,obj)	extern T obj; T* _imp__/**/obj = &obj
+	#	define __DEFINE__(T,obj,val)	T obj = val; T* _imp__/**/obj = &obj
+	#	endif
+	#else
+	#	define __EXTERN__(T,obj)	extern T obj
+	#	define __DEFINE__(T,obj,val)	T obj = val
+	#endif
+}end
+
+if	tst - note{ <stdarg.h>+<wchar.h> works }end compile{
+		/*<NOSTDIO>*/
+		#include <stdarg.h>
+		#include <wchar.h>
+	}end 
+elif	tst - note{ explicit <sys/va_list.h> before <stdarg.h>+<wchar.h> }end compile{
+		/*<NOSTDIO>*/
+		#include <sys/va_list.h>
+		#include <stdarg.h>
+		#include <wchar.h>
+	}end {
+		#include <sys/va_list.h>
+	}
+endif
+
+tst	ast_LL note{ LL numeric suffix supported }end compile{
+	int i = 1LL;
+	unsigned int u = 1ULL; /* NOTE: some compilers choke on 1LLU */
+}end
+
+tst	- -DN=1 - -DN=2 - -DN=3 - -DN=4 - -DN=5 - -DN=6 - -DN=7 - -DN=8 - -DN=0 output{
+	#define _BYTESEX_H
+
+	#include <string.h>
+	#include <sys/types.h>
+
+	#if _STD_
+	#if N == 1
+	#define _ast_int8_t	long
+	#define _ast_int8_str	"long"
+	#endif
+	#if N == 2
+	#define _ast_int8_t	long long
+	#define _ast_int8_str	"long long"
+	#endif
+	#if N == 3
+	#define _ast_int8_t	__int64
+	#define _ast_int8_str	"__int64"
+	#endif
+	#if N == 4
+	#define _ast_int8_t	__int64_t
+	#define _ast_int8_str	"__int64_t"
+	#endif
+	#if N == 5
+	#define _ast_int8_t	_int64_t
+	#define _ast_int8_str	"_int64_t"
+	#endif
+	#if N == 6
+	#define _ast_int8_t	int64_t
+	#define _ast_int8_str	"int64_t"
+	#endif
+	#if N == 7
+	#define _ast_int8_t	_int64
+	#define _ast_int8_str	"_int64"
+	#endif
+	#if N == 8
+	#define _ast_int8_t	int64
+	#define _ast_int8_str	"int64"
+	#endif
+	#endif
+
+	#define elementsof(x)	(sizeof(x)/sizeof(x[0]))
+	
+	static char			i_char = 1;
+	static short			i_short = 1;
+	static int			i_int = 1;
+	static long			i_long = 1L;
+	#ifdef _ast_int8_t
+	#if _ast_LL
+	static _ast_int8_t		i_long_long = 1LL;
+	static unsigned _ast_int8_t	u_long_long = 18446744073709551615ULL;
+	#else
+	static _ast_int8_t		i_long_long = 1;
+	static unsigned _ast_int8_t	u_long_long = 18446744073709551615;
+	#endif
+	#endif
+	
+	static struct
+	{
+		char*	name;
+		int	size;
+		char*	swap;
+	} int_type[] = 
+	{
+		"char",		sizeof(char),		(char*)&i_char,
+		"short",	sizeof(short),		(char*)&i_short,
+		"int",		sizeof(int),		(char*)&i_int,
+		"long",		sizeof(long),		(char*)&i_long,
+	#ifdef _ast_int8_t
+		_ast_int8_str,	sizeof(_ast_int8_t),	(char*)&i_long_long,
+	#endif
+	};
+	
+	static int	int_size[] = { 1, 2, 4, 8 };
+	
+	int
+	main()
+	{
+		register int	t;
+		register int	s;
+		register int	m = 1;
+		register int	b = 1;
+		register int	w = 0;
+	
+	#ifdef _ast_int8_t
+		unsigned _ast_int8_t	p;
+		char			buf[64];
+
+		if (int_type[elementsof(int_type)-1].size <= 4)
+			return 1;
+		p = 0x12345678;
+		p <<= 32;
+		p |= 0x9abcdef0;
+		sprintf(buf, "0x%016llx", p);
+		if (strcmp(buf, "0x123456789abcdef0"))
+			return 1;
+	#endif
+		for (s = 0; s < elementsof(int_size); s++)
+		{
+			for (t = 0; t < elementsof(int_type) && int_type[t].size < int_size[s]; t++);
+			if (t < elementsof(int_type))
+			{
+				m = int_size[s];
+	#if __INTERIX
+				if (m == 8)
+				{
+					printf("#ifdef _MSC_VER\n");
+					printf("#define _ast_int8_t	__int64\n");
+					printf("#else\n");
+					printf("#define _ast_int8_t	long long\n");
+					printf("#endif\n");
+				}
+				else
+	#endif
+				printf("#define _ast_int%d_t		%s\n", m, int_type[t].name);
+				if (m > 1)
+				{
+					if (*int_type[t].swap)
+						w |= b;
+					b <<= 1;
+				}
+			}
+		}
+		printf("#define _ast_intmax_t		_ast_int%d_t\n", m);
+		if (m == sizeof(long))
+			printf("#define _ast_intmax_long		1\n");
+		printf("#define _ast_intswap		%d\n", w);
+		printf("\n");
+		return 0;
+	}
+}end
+
+tst	- output{
+	#include <string.h>
+	#include <sys/types.h>
+
+	#if _X86_ || _X64_ 
+	#define COND		1
+	#define CONDNAME	"_X64_"
+	#else
+	#define COND		0
+	#endif
+
+	#define elementsof(x)	(sizeof(x)/sizeof(x[0]))
+	
+	static struct
+	{
+		char*	name;
+		int	size;
+		int	cond;
+	} types[] = 
+	{
+		"short",	sizeof(short),		0,
+		"int",		sizeof(int),		0,
+		"long",		sizeof(long),		0,
+		"size_t",	sizeof(size_t),		0,
+		"pointer",	sizeof(void*),		COND * 4,
+		"float",	sizeof(float),		0,
+		"double",	sizeof(double),		0,
+	#ifdef _typ_long_double
+		"long_double",	sizeof(long double),	0,
+	#endif
+	};
+	
+	int
+	main()
+	{
+		register int	t;
+
+		for (t = 0; t < elementsof(types); t++)
+	#if COND
+			if (types[t].cond)
+			{
+				printf("#if %s\n", CONDNAME);
+				printf("#define _ast_sizeof_%s%s	%d	/* sizeof(%s) */\n", types[t].name, strlen(types[t].name) < 4 ? "\t" : "", types[t].cond * 2, types[t].name);
+				printf("#else\n");
+				printf("#define _ast_sizeof_%s%s	%d	/* sizeof(%s) */\n", types[t].name, strlen(types[t].name) < 4 ? "\t" : "", types[t].cond, types[t].name);
+				printf("#endif\n");
+			}
+			else
+	#endif
+				printf("#define _ast_sizeof_%s%s	%d	/* sizeof(%s) */\n", types[t].name, strlen(types[t].name) < 4 ? "\t" : "", types[t].size, types[t].name);
+		printf("\n");
+		return 0;
+	}
+}end
+
+tst	- -DN=1 - -DN=0 output{
+	#define _BYTESEX_H
+
+	#include <string.h>
+	#include <sys/types.h>
+
+	#if !N || !_STD_
+	#undef	_typ_long_double
+	#endif
+
+	#define elementsof(x)	(sizeof(x)/sizeof(x[0]))
+	
+	static struct
+	{
+		char*	name;
+		int	size;
+	} flt_type[] = 
+	{
+		"float",	sizeof(float),
+		"double",	sizeof(double),
+	#ifdef _typ_long_double
+		"long double",	sizeof(long double),
+	#endif
+	};
+	
+	int
+	main()
+	{
+		register int	t;
+		register int	m = 1;
+	
+	#ifdef _typ_long_double
+		long double	p;
+		char		buf[64];
+
+		if (flt_type[elementsof(flt_type)-1].size <= sizeof(double))
+			return 1;
+		p = 1.12345E-55;
+		sprintf(buf, "%1.5LE", p);
+		if (strcmp(buf, "1.12345E-55"))
+			return 1;
+	#endif
+		for (t = 0; t < elementsof(flt_type); t++)
+		{
+			while (t < (elementsof(flt_type) - 1) && flt_type[t].size == flt_type[t + 1].size)
+				t++;
+			m = flt_type[t].size;
+			printf("#define _ast_flt%d_t		%s\n", flt_type[t].size, flt_type[t].name);
+		}
+		printf("#define _ast_fltmax_t		_ast_flt%d_t\n", m);
+		if (m == sizeof(double))
+			printf("#define _ast_fltmax_double		1\n");
+		return 0;
+	}
+}end
+
+typ int8_t stdint.h inttypes.h no{
+	#undef	_typ_int8_t
+	#define	_typ_int8_t	1
+	typedef _ast_int1_t int8_t;
+}end
+typ uint8_t stdint.h inttypes.h no{
+	#undef	_typ_uint8_t
+	#define	_typ_uint8_t	1
+	typedef unsigned _ast_int1_t uint8_t;
+}end
+typ int16_t stdint.h inttypes.h no{
+	#undef	_typ_int16_t
+	#define	_typ_int16_t	1
+	typedef _ast_int2_t int16_t;
+}end
+typ uint16_t stdint.h inttypes.h no{
+	#undef	_typ_uint16_t
+	#define	_typ_uint16_t	1
+	typedef unsigned _ast_int2_t uint16_t;
+}end
+typ int32_t stdint.h inttypes.h no{
+	#undef	_typ_int32_t
+	#define	_typ_int32_t	1
+	typedef _ast_int4_t int32_t;
+}end
+typ uint32_t stdint.h inttypes.h no{
+	#undef	_typ_uint32_t
+	#define	_typ_uint32_t	1
+	typedef unsigned _ast_int4_t uint32_t;
+}end
+typ int64_t stdint.h inttypes.h no{
+	#ifdef _ast_int8_t
+	#undef	_typ_int64_t
+	#define	_typ_int64_t	1
+	typedef _ast_int8_t int64_t;
+	#endif
+}end
+typ uint64_t stdint.h inttypes.h no{
+	#ifdef _ast_int8_t
+	#undef	_typ_uint64_t
+	#define	_typ_uint64_t	1
+	typedef unsigned _ast_int8_t uint64_t;
+	#endif
+}end
+typ intmax_t stdint.h inttypes.h no{
+	#undef	_typ_intmax_t
+	#define	_typ_intmax_t	1
+	typedef _ast_intmax_t intmax_t;
+}end
+typ uintmax_t stdint.h inttypes.h no{
+	#undef	_typ_uintmax_t
+	#define	_typ_uintmax_t	1
+	typedef unsigned _ast_intmax_t uintmax_t;
+}end
+typ uintptr_t stdint.h inttypes.h no{
+	#undef	_typ_uintptr_t
+	#define	_typ_uintptr_t	1
+	#if _ast_sizeof_pointer == 8 && defined(_ast_int8_t)
+	typedef unsigned _ast_int8_t uintptr_t;
+	#else
+	typedef unsigned _ast_int4_t uintptr_t;
+	#endif
+}end
+
+tst	- -DTRY=1 - -DTRY=1 -Dvoid=char - -DTRY=2 - -DTRY=3 - -DTRY=4 output{
+	#if _STD_ && _hdr_stdarg
+	#include <stdarg.h>
+	static void
+	varyfunny(int* p, ...)
+	{
+		va_list	ap;
+		va_start(ap, p);
+	#if TRY == 1
+		*p = *ap++ != 0;
+	#endif /*TRY == 1*/
+	#if TRY == 2
+		*p = *ap != 0;
+	#endif /*TRY == 2*/
+	#if TRY == 3
+		*p = ap++ != 0;
+	#endif /*TRY == 3*/
+		va_end(ap);
+	}
+	#else
+	#include <varargs.h>
+	static void
+	varyfunny(va_alist)
+	va_dcl
+	{
+		va_list	ap;
+		int*	p;
+		va_start(ap);
+		p = va_arg(ap, int*);
+	#if TRY == 1
+		*p = *ap++ != 0;
+	#endif /*TRY == 1*/
+	#if TRY == 2
+		*p = *ap != 0;
+	#endif /*TRY == 2*/
+	#if TRY == 3
+		*p = ap++ != 0;
+	#endif /*TRY == 3*/
+		va_end(ap);
+	}
+	#endif
+	int
+	main()
+	{
+		int	r;
+
+		printf("\n#ifndef va_listref\n");
+		printf("#ifndef	va_start\n");
+		printf("#if __STD_C\n");
+		printf("#include <stdarg.h>\n");
+		printf("#else\n");
+		printf("#include <varargs.h>\n");
+		printf("#endif\n");
+		printf("#endif\n");
+	#if TRY == 4
+		printf("#define va_listref(p) (&(p))\t");
+			printf("/* pass va_list to varargs function */\n");
+		printf("#define va_listval(p) (*(p))\t");
+			printf("/* retrieve va_list from va_arg(ap,va_listarg) */\n");
+		printf("#define va_listarg va_list*\t");
+			printf("/* va_arg() va_list type */\n");
+	#else
+		varyfunny(&r);
+		printf("#define va_listref(p) (p)\t");
+			printf("/* pass va_list to varargs function */\n");
+		if (sizeof(va_list) > sizeof(void*))
+			printf("#define va_listval(p) (*(p))\t");
+		else
+			printf("#define va_listval(p) (p)\t");
+			printf("/* retrieve va_list from va_arg(ap,va_listarg) */\n");
+	#if TRY == 2
+		printf("#define va_listarg va_list*\t");
+	#else
+		printf("#define va_listarg va_list\t");
+	#endif /*TRY == 2*/
+			printf("/* va_arg() va_list type */\n");
+	#endif /*TRY == 4*/
+	
+	#if _UWIN
+		printf("#ifndef va_copy\n");
+		printf("#define va_copy(to,fr) ((to)=(fr))\t");
+			printf("/* copy va_list fr -> to */\n");
+		printf("#endif\n");
+	#else
+	#if !defined(va_copy)
+	#if defined(__va_copy)
+		printf("#ifndef va_copy\n");
+		printf("#define va_copy(to,fr) __va_copy(to,fr)\t");
+			printf("/* copy va_list fr -> to */\n");
+		printf("#endif\n");
+	#else
+	#if TRY == 2
+		printf("#ifndef va_copy\n");
+		printf("#define va_copy(to,fr) memcpy(to,fr,sizeof(va_list))\t");
+			printf("/* copy va_list fr -> to */\n");
+		printf("#endif\n");
+	#else
+		printf("#ifndef va_copy\n");
+		printf("#define va_copy(to,fr) ((to)=(fr))\t");
+			printf("/* copy va_list fr -> to */\n");
+		printf("#endif\n");
+	#endif
+	#endif
+	#endif
+	#endif
+	
+		printf("#endif\n");
+		return 0;
+	}
+}end
+
+cat{
+	#ifndef _AST_STD_H
+	#	if __STD_C && _hdr_stddef
+	#	include	<stddef.h>
+	#	endif
+	#	if _sys_types
+	#	include	<sys/types.h>
+	#	endif
+	#	if _hdr_stdint
+	#	include	<stdint.h>
+	#	else
+	#		if _hdr_inttypes
+	#		include	<inttypes.h>
+	#		endif
+	#	endif
+	#endif
+	#if !_typ_size_t
+	#	define _typ_size_t	1
+		typedef int size_t;
+	#endif
+	#if !_typ_ssize_t
+	#	define _typ_ssize_t	1
+		typedef int ssize_t;
+	#endif
+	#ifndef _AST_STD_H
+	#	define _def_map_ast	1
+	#	if !_def_map_ast
+	#		include <ast_map.h>
+	#	endif
+	#endif
+}end
+
+run{
+	grep __NO_INCLUDE_WARN__ /usr/include/stat.h >/dev/null 2>&1 &&
+	grep '<name.h>' /usr/include/sys/stat.h >/dev/null 2>&1 &&
+	grep __name_h /usr/include/name.h >/dev/null 2>&1 &&
+	cat <<!
+	/* disable ${HOSTTYPE} <sys/foo.h> vs. <foo.h> clash warnings */
+	#ifndef __NO_INCLUDE_WARN__
+	#define __NO_INCLUDE_WARN__	1
+	#endif
+	/* disable ${HOSTTYPE} <sys/stat.h> <name.h> hijack */
+	#ifndef __name_h
+	#define __name_h		1
+	#endif
+	!
+}end

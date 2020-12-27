@@ -1,0 +1,171 @@
+set stdio
+if tst note{ _ALL_SOURCE & _POSIX_SOURCE & _POSIX_C_SOURCE & _XOPEN_SOURCE & __EXTENSIONS__ works }end compile{
+		#define _ALL_SOURCE	1
+		#define _POSIX_SOURCE	1
+		#define _POSIX_C_SOURCE	21000101L
+		#define _XOPEN_SOURCE	9900
+		#define _GNU_SOURCE	1
+		#define __EXTENSIONS__	1
+		#include <sys/types.h>
+		#include <sys/stat.h>
+		#include <stdlib.h>
+		#include <unistd.h>
+	}end {
+		#ifndef _ALL_SOURCE
+		#define _ALL_SOURCE	1
+		#endif
+		#ifndef _POSIX_SOURCE
+		#define _POSIX_SOURCE	1
+		#endif
+		#ifndef _POSIX_C_SOURCE
+		#define _POSIX_C_SOURCE	21000101L
+		#endif
+		#ifndef _XOPEN_SOURCE
+		#define _XOPEN_SOURCE	9900
+		#endif
+		#ifndef _GNU_SOURCE
+		#define _GNU_SOURCE	1
+		#endif
+		#ifndef __EXTENSIONS__
+		#define __EXTENSIONS__	1
+		#endif
+	}
+elif tst note{ _ALL_SOURCE & _POSIX_SOURCE & _XOPEN_SOURCE & __EXTENSIONS__ works }end compile{
+		#define _ALL_SOURCE	1
+		#define _POSIX_SOURCE	1
+		#define _XOPEN_SOURCE	9900
+		#define _GNU_SOURCE	1
+		#define __EXTENSIONS__	1
+		#include <sys/types.h>
+		#include <sys/stat.h>
+		#include <stdlib.h>
+		#include <unistd.h>
+	}end {
+		#ifndef _ALL_SOURCE
+		#define _ALL_SOURCE	1
+		#endif
+		#ifndef _POSIX_SOURCE
+		#define _POSIX_SOURCE	1
+		#endif
+		#ifndef _XOPEN_SOURCE
+		#define _XOPEN_SOURCE	9900
+		#endif
+		#ifndef _GNU_SOURCE
+		#define _GNU_SOURCE	1
+		#endif
+		#ifndef __EXTENSIONS__
+		#define __EXTENSIONS__	1
+		#endif
+	}
+elif tst note{ _POSIX_SOURCE & _POSIX_C_SOURCE & _XOPEN_SOURCE & __EXTENSIONS__ works }end compile{
+		#define _POSIX_SOURCE	1
+		#define _POSIX_C_SOURCE	21000101L
+		#define _XOPEN_SOURCE	9900
+		#define _GNU_SOURCE	1
+		#define __EXTENSIONS__	1
+		#include <sys/types.h>
+		#include <sys/stat.h>
+		#include <stdlib.h>
+		#include <unistd.h>
+	}end {
+		#ifndef _POSIX_SOURCE
+		#define _POSIX_SOURCE	1
+		#endif
+		#ifndef _POSIX_C_SOURCE
+		#define _POSIX_C_SOURCE	21000101L
+		#endif
+		#ifndef _XOPEN_SOURCE
+		#define _XOPEN_SOURCE	9900
+		#endif
+		#ifndef _GNU_SOURCE
+		#define _GNU_SOURCE	1
+		#endif
+		#ifndef __EXTENSIONS__
+		#define __EXTENSIONS__	1
+		#endif
+	}
+elif tst note{ _POSIX_SOURCE & _XOPEN_SOURCE & __EXTENSIONS__ works }end compile{
+		#define _POSIX_SOURCE	1
+		#define _XOPEN_SOURCE	1
+		#define __EXTENSIONS__	1
+		#include <sys/types.h>
+		#include <sys/stat.h>
+		#include <stdlib.h>
+		#include <unistd.h>
+	}end {
+		#ifndef _POSIX_SOURCE
+		#define _POSIX_SOURCE	1
+		#endif
+		#ifndef _XOPEN_SOURCE
+		#define _XOPEN_SOURCE	1
+		#endif
+		#ifndef __EXTENSIONS__
+		#define __EXTENSIONS__	1
+		#endif
+	}
+elif tst note{ _XOPEN_SOURCE & __EXTENSIONS__ works }end compile{
+		#define _XOPEN_SOURCE	1
+		#define __EXTENSIONS__	1
+		#include <sys/types.h>
+		#include <sys/stat.h>
+		#include <stdlib.h>
+		#include <unistd.h>
+	}end {
+		#ifndef _XOPEN_SOURCE
+		#define _XOPEN_SOURCE	1
+		#endif
+		#ifndef __EXTENSIONS__
+		#define __EXTENSIONS__	1
+		#endif
+	}
+elif tst note{ _XOPEN_SOURCE works }end compile{
+		#define _XOPEN_SOURCE	1
+		#include <sys/types.h>
+		#include <sys/stat.h>
+		#include <stdlib.h>
+		#include <unistd.h>
+	}end {
+		#ifndef _XOPEN_SOURCE
+		#define _XOPEN_SOURCE	1
+		#endif
+	}
+else tst note{ __EXTENSIONS__ works }end compile{
+		#define __EXTENSIONS__	1
+		#include <sys/types.h>
+		#include <sys/stat.h>
+	}end {
+		#ifndef __EXTENSIONS__
+		#define __EXTENSIONS__	1
+		#endif
+	}
+endif
+
+if tst -D_ISOC99_SOURCE -lm note{ _ISOC99_SOURCE plays nice }end link{
+		#include <sys/types.h>
+		#include <sys/stat.h>
+		#include <stdlib.h>
+		#include <unistd.h>
+		#include <math.h>
+		int main() { return signbit(-0.0); }
+	}end {
+		#ifndef _ISOC99_SOURCE
+		#define _ISOC99_SOURCE	1
+		#endif
+	}
+endif
+
+cat{
+
+/*
+ * this is a nasty game we all play to honor standards symbol visibility
+ * it would help if all implementations had
+ *	_KITCHEN_SINK_SOURCE
+ * that enabled all symbols from the latest implemented standards
+ * that's probably the most useful but least portable request
+ */
+
+#if __MACH__
+#undef  _POSIX_SOURCE
+#endif
+
+}end

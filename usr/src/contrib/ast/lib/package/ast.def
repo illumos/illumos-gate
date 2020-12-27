@@ -1,0 +1,49 @@
+#
+# ast default license info
+#
+
+message_set=3
+
+contributor+=(
+	[gsf]="Glenn Fowler <gsf@research.att.com>"
+	[dgk]="David Korn <dgk@research.att.com>"
+	[kpv]="Phong Vo <kpv@research.att.com>"
+
+	[aedgar]="Adam Edgar <aedgar@research.att.com>"
+	[alb]="Adam Buchsbaum <alb@adambuchsbaum.com>"
+	[ashaikh]="Aman Shaikh <ashaikh@research.att.com>"
+	[bala]="Bala Krishnamurthy <bala@research.att.com>"
+	[brussell]="Brian Russell <brussell@research.att.com>"
+	[chen]="Robin Chen <chen@research.att.com>"
+	[dfwc]="Don Caldwell <dfwc@research.att.com>"
+	[ek]="Lefty Koutsofios <ek@research.att.com>"
+	[gruber]="Bob Gruber <bob.gruber@gmail.com>"
+	[jiawang]="Jia Wang <jiawang@research.att.com>"
+	[jkf]="Jeff Fellin <jkf@research.att.com>"
+	[jlk]="Jeff Korn <@google.com>"
+	[kfisher]="Kathleen Fisher <kfisher@research.att.com>"
+	[kwc]="Ken Church <@microsoft.com>"
+
+	[bwk]="Brian Kernigham <bwk@research.bell-labs.com>"
+	[dmr]="Dennis Ritchie <dmr@research.bell-labs.com>"
+	[doug]="Doug McIlroy <doug@research.bell-labs.com>"
+	[ekrell]="Eduardo Krell <ekrell@adexus.cl>"
+	[jjs]="John Snyder <jjs@adexus.cl>"
+	[rao]="Herman Rao <rao@fareastone.att.com.tw>"
+
+	[ast-users]="AST users mailgroup <ast-users@research.att.com>"
+	[ast-developers]="AST developers mailgroup <ast-developers@research.att.com>"
+)
+
+license+=(
+	organization="Information and Software Systems Research"
+	domain=research.att.com
+	parent="AT&T"
+	corporation="Intellectual Property"
+	company="Research"
+	location="Florham Park NJ"
+
+	package=ast
+	since=1986
+	author=gsf+dgk+kpv
+)

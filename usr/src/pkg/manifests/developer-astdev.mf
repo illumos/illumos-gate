@@ -52,7 +52,4 @@ file path=usr/share/man/man1/msgget.1
 legacy pkg=SUNWastdev desc="AT&T AST development utilities" \
     name="AT&T AST development utilities"
 license cr_Sun license=cr_Sun
-license usr/src/cmd/ast/THIRDPARTYLICENSE \
-    license=usr/src/cmd/ast/THIRDPARTYLICENSE
-license usr/src/lib/libpp/THIRDPARTYLICENSE \
-    license=usr/src/lib/libpp/THIRDPARTYLICENSE
+license usr/src/contrib/ast/LICENSE license=usr/src/contrib/ast/LICENSE

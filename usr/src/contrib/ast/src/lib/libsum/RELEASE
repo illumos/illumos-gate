@@ -1,0 +1,16 @@
+12-02-29 sum-sha2.c: bitcount[] order reversed to allow a single noalias buffer copy
+09-09-28 sumlib.c: use simple (faster) method name match function
+08-06-05 sum-lmd.c: align context to largest int
+08-05-01 sumlib.c: add some -lmd verification checks
+08-02-11 sum-lmd.c,features/sum: add wrapper for solaris -lmd
+07-10-29 sum.h,sumlib.c: add SUM_LEGACY for legacy output format
+07-09-21 sum-sha1.c: reinstate Steve Reid's public domain implementation
+07-07-26 sumlib.c: drop GPL sum-sha1.c
+05-02-14 sumlib.c: split into sum-*.c
+05-02-14 sum-sha2.c: add SHA { 256 384 512 }
+04-02-29 Makefile: compile with $(CC.PIC) for codexlib/sum $(CC.DLL)
+03-12-16 add { crc prng } generic methods and maps[] to these methods
+03-12-16 sum.h,sumlib.c: add sumdata()
+03-09-29 sumlib.c: fix FNV to use ^ instead of +
+03-04-28 sumlib.c: drop md5 `zeroize' for performance
+	 sumlib.c: add FIPS 180-1 SHA-1

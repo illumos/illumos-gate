@@ -1,0 +1,251 @@
+set	prototyped
+lib	_fxstat,__fxstat,_lxstat,__lxstat,_xmknod,__xmknod,_xstat,__xstat,lstat,mknod,sync sys/types.h sys/stat.h
+lib	_fxstat64,__fxstat64,_lxstat64,__lxstat64,_xstat64,__xstat64 -D_LARGEFILE64_SOURCE sys/types.h sys/stat.h
+mac	fstat,lstat,stat,mknod sys/types.h sys/stat.h
+
+lcl	xstat -D_LARGEFILE64_SOURCE link{
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	struct stat64 { int xxx; }; /* disable if stat64 available */
+	#if _STD_
+	extern int stat(const char* path, struct stat* st)
+	#else
+	int stat(path, st)
+	char*		path;
+	struct stat*	st;
+	#endif
+	{
+	#if _lib___xstat
+		return __xstat(_STAT_VER, path, st);
+	#else
+		return _xstat(_STAT_VER, path, st);
+	#endif
+	}
+	int
+	main()
+	{
+		struct stat	st;
+		return stat(".",&st) < 0;
+	}
+}end
+
+lcl	xstat64 -D_LARGEFILE64_SOURCE link{
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#if _STD_
+	extern int stat64(const char* path, struct stat64* st)
+	#else
+	int stat64(path, st)
+	char*		path;
+	#endif
+	{
+	#if _lib___xstat64
+		return __xstat64(_STAT_VER, path, st);
+	#else
+		return _xstat64(_STAT_VER, path, st);
+	#endif
+	}
+	int
+	main()
+	{
+		struct stat64	st;
+		return stat64(".",&st) < 0;
+	}
+}end
+
+header	sys/stat.h
+header	sys/mkdev.h
+
+extern	chmod		int	(const char*, mode_t)
+extern	fstat		int	(int, struct stat*)
+extern	lstat		int	(const char*, struct stat*)
+extern	mkdir		int	(const char*, mode_t)
+extern	mkfifo		int	(const char*, mode_t)
+extern	mknod		int	(const char*, mode_t, dev_t)
+extern	stat		int	(const char*, struct stat*)
+
+define	FS_default	"ufs"
+
+macro{
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#ifndef major
+	#include <sys/param.h>
+	#ifndef major
+	#include <sys/sysmacros.h>
+	#endif
+	<<"#if defined(__STDPP__directive) && defined(__STDPP__initial)">>
+	<<"__STDPP__directive pragma pp:initial">>
+	<<"#endif">>
+	<<"#ifndef major">>
+	#ifdef major
+	<<"#define major(x)">> major((x))
+	#else
+	#ifndef L_BITSMAJOR
+	#define L_BITSMAJOR 8
+	#endif
+	#ifndef L_BITSMINOR
+	#define L_BITSMINOR 8
+	#endif
+	#ifndef L_MAXMAJ
+	#define L_MAXMAJ ((1<<L_BITSMAJOR)-1)
+	#endif
+	#ifndef L_MAXMIN
+	#define L_MAXMIN ((1<<L_BITSMINOR)-1)
+	#endif
+	<<"#define major(x)">> ((int)(((unsigned)(x)>>L_BITSMINOR)&L_MAXMAJ))
+	#endif
+	<<"#endif">>
+	<<"#ifndef minor">>
+	#ifdef minor
+	<<"#define minor(x)">> minor((x))
+	#else
+	<<"#define minor(x)">> ((int)((x)&L_MAXMIN))
+	#endif
+	<<"#endif">>
+	<<"#ifndef makedev">>
+	#ifdef makedev
+	<<"#define makedev(x,y)">> makedev((x),(y))
+	#else
+	<<"#define makedev(x,y)">> ((dev_t)((((x)&0377)<<8)|((y)&0377)))
+	#endif
+	<<"#endif">>
+	#endif
+	<<"#if defined(__STDPP__directive) && defined(__STDPP__initial)">>
+	<<"__STDPP__directive pragma pp:noinitial">>
+	<<"#endif">>
+}end fail{
+	cat <<!
+	#ifndef major
+	#define major(x)	((int)(((unsigned)(x)>>8)&0377))
+	#endif
+	#ifndef minor
+	#define minor(x)	((int)((x)&0377))
+	#endif
+	#ifndef makedev
+	#define makedev(x,y)	((dev_t)((((x)&0377)<<8)|((y)&0377)))
+	#endif
+	!
+}end
+
+hdr	mntent,mnttab stdio.h
+sys	mntent,mnttab stdio.h
+sys	fs_types,mount,statfs,statvfs,vfs,vmount sys/param.h sys/ucred.h
+
+mem	mnttab.mt_dev,mnttab.mt_filsys,mnttab.mt_fstyp sys/types.h mnttab.h
+mem	mntent.mnt_opts,w_mntent.mnt_opts,mnttab.mnt_opts sys/types.h stdio.h mntent.h sys/mntent.h
+mem	mntent.mnt_opts,mnttab.mnt_opts stdio.h sys/types.h mnttab.h sys/mnttab.h
+mem	stat.st_blocks,stat.st_blksize,stat.st_rdev sys/types.h sys/stat.h
+mem	statfs.f_files,statfs.f_bavail sys/types.h - sys/statfs.h - sys/vfs.h - sys/param.h sys/mount.h
+mem	statvfs.f_basetype,statvfs.f_frsize sys/types.h sys/statvfs.h
+
+ary	f_reserved7 sys/types.h sys/statvfs.h note{ statvfs.f_reserved7 can double for statvfs.f_basetype }end compile{
+	int f(vp)struct statvfs* vp;{return vp->f_reserved7[0] = 1;}
+}end
+
+lib	getfsstat,getmntent,getmntinfo,mntctl,mntopen,mntread,mntclose,setmntent
+lib	w_getmntent
+lib	statfs,statvfs
+
+lib	statfs4 sys/types.h - sys/statfs.h - sys/vfs.h - sys/mount.h compile{
+	int f()
+	{
+		struct statfs fs;
+		return statfs("/",&fs,sizeof(fs),0);
+	}
+}end
+
+lib	getmntinfo_statvfs note{ getmntinfo uses statvfs -- since when? }end compile{
+	#include <sys/types.h>
+	#include <sys/mount.h>
+	int
+	gmi(struct statvfs* fs)
+	{
+		fs->f_flag = 0;
+		return getmntinfo(fs, 0);
+	}
+}end
+
+lib	getfsstat_statvfs note{ getfsstat uses statvfs -- just in case it is confused like getmntinfo }end compile{
+	#include <sys/types.h>
+	#include <sys/mount.h>
+	int
+	gfs(struct statvfs* fs)
+	{
+		fs->f_flag = 0;
+		return getfsstat(fs, sizeof(struct statvfs), MNT_WAIT);
+	}
+}end
+
+cat{
+	#if _sys_statvfs
+	#include <sys/statvfs.h>
+	#if !_mem_statvfs_f_basetype
+	#if _ary_f_reserved7
+	#define f_basetype	f_reserved7
+	#endif
+	#endif
+	#else
+	#define _mem_f_basetype_statvfs	1
+	#define _mem_f_frsize_statvfs	1
+	struct statvfs
+	{
+	unsigned long	f_bsize;	/* fundamental file system block size */
+	unsigned long	f_frsize;	/* fragment size */
+	unsigned long	f_blocks;	/* total # of blocks of f_frsize on fs */
+	unsigned long	f_bfree;	/* total # of free blocks of f_frsize */
+	unsigned long	f_bavail;	/* # of free blocks avail to non-superuser */
+	unsigned long	f_files;	/* total # of file nodes (inodes) */
+	unsigned long	f_ffree;	/* total # of free file nodes */
+	unsigned long	f_favail;	/* # of free nodes avail to non-superuser */
+	unsigned long	f_fsid;		/* file system id (dev for now) */
+	char		f_basetype[16]; /* target fs type name, null-terminated */
+	unsigned long	f_flag;		/* bit-mask of flags */
+	unsigned long	f_namemax;	/* maximum file name length */
+	char		f_fstr[32];	/* filesystem-specific string */
+	unsigned long	f_filler[16];	/* reserved for future expansion */
+	};
+	extern int	fstatvfs(int, struct statvfs*);
+	extern int	statvfs(const char*, struct statvfs*);
+	#endif
+	#if _typ_off64_t
+	#undef	off_t
+	#define off_t	off64_t
+	#endif
+	#if _lib_statvfs64 && !defined(statvfs)
+	#define statvfs		statvfs64
+	#if !defined(__USE_LARGEFILE64)
+	extern int		statvfs64(const char*, struct statvfs64*);
+	#endif
+	#endif
+	#if _lib_fstatvfs64 && !defined(fstatvfs)
+	#define fstatvfs	fstatvfs64
+	#if !defined(__USE_LARGEFILE64)
+	extern int		fstatvfs64(int, struct statvfs64*);
+	#endif
+	#endif
+}end
+
+str	st_fstype sys/types.h sys/stat.h note{ stat.st_fstype is a string }end compile{
+	int f(st)struct stat* st;{return st->st_fstype[0];}
+}end
+
+int	st_fstype sys/types.h sys/stat.h note{ stat.st_fstype is an int }end compile{
+	int f(st)struct stat* st;{return st->st_fstype = 1;}
+}end
+
+int	st_spare1 sys/types.h sys/stat.h note{ stat.st_spare1 is an int }end compile{
+	int f(st)struct stat* st;{return st->st_spare1 = 1;}
+}end
+
+ary	st_spare4 sys/types.h sys/stat.h note{ stat.st_spare4 is an array }end compile{
+	int f(st)struct stat* st;{return st->st_spare4[0] = 1;}
+}end
+
+ary	st_extra sys/types.h sys/stat.h note{ stat.st_extra is an array }end compile{
+	int f(st)struct stat* st;{return st->st_extra[0] = 1;}
+}end
+
+ary	st_pad4 sys/types.h sys/stat.h note{ stat.st_pad4 is an array }end compile{
+	int f(st)struct stat* st;{return st->st_pad4[0] = 1;}
+}end

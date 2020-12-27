@@ -588,16 +588,11 @@ license usr/src/common/mpi/THIRDPARTYLICENSE \
     license=usr/src/common/mpi/THIRDPARTYLICENSE
 license usr/src/common/util/THIRDPARTYLICENSE.multi3 \
     license=usr/src/common/util/THIRDPARTYLICENSE.multi3
-license usr/src/lib/libast/THIRDPARTYLICENSE \
-    license=usr/src/lib/libast/THIRDPARTYLICENSE
+license usr/src/contrib/ast/LICENSE license=usr/src/contrib/ast/LICENSE
 license usr/src/lib/libbsdmalloc/THIRDPARTYLICENSE \
     license=usr/src/lib/libbsdmalloc/THIRDPARTYLICENSE
 license usr/src/lib/libc/THIRDPARTYLICENSE \
     license=usr/src/lib/libc/THIRDPARTYLICENSE
-license usr/src/lib/libcmd/THIRDPARTYLICENSE \
-    license=usr/src/lib/libcmd/THIRDPARTYLICENSE
-license usr/src/lib/libdll/THIRDPARTYLICENSE \
-    license=usr/src/lib/libdll/THIRDPARTYLICENSE
 license usr/src/lib/libdwarf/THIRDPARTYLICENSE \
     license=usr/src/lib/libdwarf/THIRDPARTYLICENSE
 license usr/src/lib/libinetutil/common/THIRDPARTYLICENSE \
@@ -612,10 +607,6 @@ license usr/src/lib/libresolv/THIRDPARTYLICENSE \
     license=usr/src/lib/libresolv/THIRDPARTYLICENSE
 license usr/src/lib/libresolv2/THIRDPARTYLICENSE \
     license=usr/src/lib/libresolv2/THIRDPARTYLICENSE
-license usr/src/lib/libshell/THIRDPARTYLICENSE \
-    license=usr/src/lib/libshell/THIRDPARTYLICENSE
-license usr/src/lib/libsum/THIRDPARTYLICENSE \
-    license=usr/src/lib/libsum/THIRDPARTYLICENSE
 license usr/src/lib/pam_modules/authtok_check/THIRDPARTYLICENSE \
     license=usr/src/lib/pam_modules/authtok_check/THIRDPARTYLICENSE
 license usr/src/lib/passwdutil/THIRDPARTYLICENSE \

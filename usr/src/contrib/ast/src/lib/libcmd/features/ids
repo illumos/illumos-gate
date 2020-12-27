@@ -1,0 +1,9 @@
+lib	endgrent,getgrent,setgrent
+lib	fsid,getfsgid,isfsg sys/types.h sys/fss.h fsg.h -lfsg
+lib	getsid unistd.h
+mac	fsid sys/types.h sys/fss.h fsg.h
+cat{
+	#if !_lib_fsid && _mac_fsid
+	#define _lib_fsid	1
+	#endif
+}end

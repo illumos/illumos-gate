@@ -1,0 +1,18 @@
+This area contains the build configuration for selected AT&T Software Technology
+(AST) libraries and commands. In particular ksh (the illumos /bin/sh), its
+supporting libraries and and a small number of system commands, see
+./ksh/builtins/alias.c
+
+The source for these components is in usr/src/contrib/ast/; see the README
+file there for more information.
+
+The AST library builds use FEATURE files to describe the capabilities of the
+host system and build environment (similar to the output from tools like
+GNU autoconf). In order to support cross compilation and ensure reproducible
+builds, these files are present in this tree under libXXX/<arch>/FEATURE/
+alongside a small number of other generated files.
+
+The FEATURE files can be re-generated based on the current contents of
+proto using 'make _feature' in this directory. This should be done after
+adding new features to the standard libraries that AST can detect and use.
+This needs to be done for all supported architectures.

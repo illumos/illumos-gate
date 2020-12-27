@@ -1,0 +1,14 @@
+10-10-20 msgcc.sh: add raw type (like str) for ksh -D style strings
+10-06-01 sync with ast api 20100601
+06-11-15 msgcc.sh: date -f x => date +x for ast-base portability
+06-10-11 add sfstruse() error checks
+02-03-11 msgcc: fix merge replacement threshhold logic
+	 msggen: convert { \a \b \f \n \r \v } back to C escapes
+	 msgcpp: set pp:modern
+02-02-14 msggen: add -f to list printf format signatures
+01-10-10 msgcc: allow some email forms to pass
+01-06-10 msgcpp: add proper escapes to OMIT pattern
+01-05-29 msgcc: add similar unused message replacement, -M-similar
+01-04-22 msgcc,msggen,msgget: use mcindex()
+01-01-31 ignore ls generation errors
+00-04-20 first release

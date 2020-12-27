@@ -1,0 +1,13 @@
+tst	- note{ sizeof(integral-type) }end output{
+	#include "FEATURE/common"
+	int
+	main()
+	{
+		printf("#define _ast_sizeof_char	%d\n", sizeof(char));
+		printf("#define _ast_sizeof_short	%d\n", sizeof(short));
+		printf("#define _ast_sizeof_int		%d\n", sizeof(int));
+		printf("#define _ast_sizeof_long	%d\n", sizeof(long));
+		printf("#define _ast_sizeof_intmax_t	%d\n", sizeof(_ast_intmax_t));
+		return 0;
+	}
+}end
