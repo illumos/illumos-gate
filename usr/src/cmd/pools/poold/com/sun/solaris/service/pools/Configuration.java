@@ -23,8 +23,6 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- *ident	"%Z%%M%	%I%	%E% SMI"
- *
  */
 
 package com.sun.solaris.service.pools;
@@ -173,7 +171,7 @@ public class Configuration extends Element
 	/**
 	 * Remove the configuration.
 	 *
-	 * @throws PoolsExecption If the removal fails.
+	 * @throws PoolsException If the removal fails.
 	 */
 	public void remove() throws PoolsException
 	{
@@ -187,7 +185,7 @@ public class Configuration extends Element
 	 * made since the last commit or (if there are no commits) since the
 	 * configuration was opened.
 	 *
-	 * @throws PoolsExecption If the rollback fails.
+	 * @throws PoolsException If the rollback fails.
 	 */
 	public void rollback() throws PoolsException
 	{
@@ -201,7 +199,7 @@ public class Configuration extends Element
 	 * was last committed (or opened if there have been no prior commits)
 	 * permanent.
 	 *
-	 * @throws PoolsExecption If the commit fails.
+	 * @throws PoolsException If the commit fails.
 	 */
 	public void commit(int active) throws PoolsException
 	{
@@ -216,7 +214,7 @@ public class Configuration extends Element
 	 *
 	 * @param location The location of the export.
 	 * @param format The format of the export.
-	 * @throws PoolsExecption If the export fails.
+	 * @throws PoolsException If the export fails.
 	 */
 	public void export(String location, int format) throws PoolsException
 	{
@@ -230,7 +228,7 @@ public class Configuration extends Element
 	 * configuration satisfies the supplied validation level.
 	 *
 	 * @param level The desired level of validation.
-	 * @throws PoolsExecption If the validation fails.
+	 * @throws PoolsException If the validation fails.
 	 */
 	public void validate(int level) throws PoolsException
 	{
@@ -243,7 +241,7 @@ public class Configuration extends Element
 	 * Update the configuration, ensuring that the current state of the
 	 * configuration reflects that of the kernel.
 	 *
-	 * @throws PoolsExecption If the update fails.
+	 * @throws PoolsException If the update fails.
 	 * @return a bitmap of the changed types.
 	 */
 	public int update() throws PoolsException
@@ -255,7 +253,7 @@ public class Configuration extends Element
 	 * Create a pool with the supplied name.
 	 *
 	 * @param name The name of the PoolInternal.
-	 * @throws PoolsExecption If the pool creation fails.
+	 * @throws PoolsException If the pool creation fails.
 	 * @return a pool with the supplied name.
 	 */
 	public Pool createPool(String name) throws PoolsException
@@ -286,7 +284,7 @@ public class Configuration extends Element
 	 * Get the pool with the supplied name.
 	 *
 	 * @param name The name of the pool to be found.
-	 * @throws PoolsExecption If the pool cannot be located.
+	 * @throws PoolsException If the pool cannot be located.
 	 * @return a pool with the supplied name.
 	 */
 	public Pool getPool(String name) throws PoolsException
@@ -304,13 +302,13 @@ public class Configuration extends Element
 			elements.put(p.getKey(), p);
 			return (p);
 		}
-	}	
+	}
 
 	/**
 	 * Get the proxy for the pool with the supplied name.
 	 *
 	 * @param name The name of the pool to be found.
-	 * @throws PoolsExecption If the pool cannot be located.
+	 * @throws PoolsException If the pool cannot be located.
 	 * @return the proxy for the pool with the supplied name.
 	 */
 	long checkPool(String name) throws PoolsException
@@ -322,14 +320,14 @@ public class Configuration extends Element
 			throw new PoolsException();
 		}
 		return (aPool);
-	}	
+	}
 
 	/**
 	 * Get a list of pools which match the supplied selection criteria
 	 * in values.
 	 *
 	 * @param values A list of values to be used to qualify the search.
-	 * @throws PoolsExecption If there is an error executing the query.
+	 * @throws PoolsException If there is an error executing the query.
 	 * @return a list of pools which match the supplied criteria
 	 */
 	public List getPools(List values) throws PoolsException
@@ -350,13 +348,13 @@ public class Configuration extends Element
 			    ((Long)pools.get(i)).longValue()));
 		return (aList);
 	}
-	
+
 	/**
 	 * Create a resource with the supplied type and name.
 	 *
 	 * @param type The type of the resource.
 	 * @param name The name of the resource.
-	 * @throws PoolsExecption If the resource creation fails.
+	 * @throws PoolsException If the resource creation fails.
 	 * @return a resource of the supplied type and name.
 	 */
 	public Resource createResource(String type, String name)
@@ -391,7 +389,7 @@ public class Configuration extends Element
 	 *
 	 * @param type The type of the resource to be found.
 	 * @param name The name of the resource to be found.
-	 * @throws PoolsExecption If the resource cannot be located.
+	 * @throws PoolsException If the resource cannot be located.
 	 * @return a resource with the supplied name.
 	 */
 	public Resource getResource(String type, String name)
@@ -410,7 +408,7 @@ public class Configuration extends Element
 			elements.put(r.getKey(), r);
 			return (r);
 		}
-	}	
+	}
 
 	/**
 	 * Get the proxy for the resource with the supplied type and
@@ -418,7 +416,7 @@ public class Configuration extends Element
 	 *
 	 * @param type The type of the resource to be found.
 	 * @param name The name of the resource to be found.
-	 * @throws PoolsExecption If the resource cannot be located.
+	 * @throws PoolsException If the resource cannot be located.
 	 * @return the proxy for the resource with the supplied name.
 	 */
 	long checkResource(String type, String name) throws PoolsException
@@ -430,14 +428,14 @@ public class Configuration extends Element
 			throw new PoolsException();
 		}
 		return (res);
-	}	
+	}
 
 	/**
 	 * Get a list of resources which match the supplied selection criteria
 	 * in values.
 	 *
 	 * @param values A list of values to be used to qualify the search.
-	 * @throws PoolsExecption If there is an error executing the query.
+	 * @throws PoolsException If there is an error executing the query.
 	 * @return a list of resources which match the supplied criteria
 	 */
 	public List getResources(List values) throws PoolsException
@@ -464,7 +462,7 @@ public class Configuration extends Element
 	 *
 	 * @param type The type of the component to be found.
 	 * @param sys_id The sys_id of the component to be found.
-	 * @throws PoolsExecption If the component cannot be located.
+	 * @throws PoolsException If the component cannot be located.
 	 * @return a component with the supplied name.
 	 */
 	public Component getComponent(String type, long sys_id)
@@ -482,14 +480,14 @@ public class Configuration extends Element
 		if (comps.size() != 1)
 			throw new PoolsException();
 		return ((Component) comps.get(0));
-	}	
+	}
 
 	/**
 	 * Get the component proxy with the supplied type and sys_id.
 	 *
 	 * @param type The type of the component to be found.
 	 * @param sys_id The sys_id of the component to be found.
-	 * @throws PoolsExecption If the component cannot be located.
+	 * @throws PoolsException If the component cannot be located.
 	 * @return a component with the supplied name.
 	 */
 	long checkComponent(String type, long sys_id)
@@ -507,20 +505,20 @@ public class Configuration extends Element
 		if (comps.size() != 1)
 			throw new PoolsException();
 		return (((Long)comps.get(0)).longValue());
-	}	
+	}
 
 	/**
 	 * Get a list of components which match the supplied selection criteria
 	 * in values.
 	 *
 	 * @param values A list of values to be used to qualify the search.
-	 * @throws PoolsExecption If there is an error executing the query.
+	 * @throws PoolsException If there is an error executing the query.
 	 * @return a list of components which match the supplied criteria
 	 */
 	public List getComponents(List values) throws PoolsException
 	{
 		List components;
-		
+
 		if ((components = PoolInternal.pool_query_components(getConf(),
 		    values)) == null) {
 			if (PoolInternal.pool_error() ==
@@ -556,7 +554,7 @@ public class Configuration extends Element
 				throw new PoolsException();
 			long sys_id = idValue.getLong();
 			idValue.close();
-				
+
 			if (elements.containsKey(type + "." + sys_id))
 				aList.add((Component)elements.get(type + "." +
 					  sys_id));
@@ -573,7 +571,7 @@ public class Configuration extends Element
 	 * selection criteria in values.
 	 *
 	 * @param values A list of values to be used to qualify the search.
-	 * @throws PoolsExecption If there is an error executing the query.
+	 * @throws PoolsException If there is an error executing the query.
 	 * @return a list of component proxies which match the
 	 * supplied criteria
 	 */
@@ -649,13 +647,13 @@ public class Configuration extends Element
 	{
 		return name.hashCode();
 	}
-	
+
 	/**
 	 * Return the pointer to this configuration as an element.
 	 *
 	 * @return The pointer to the native configuration which this object
 	 * wraps.
-	 * @throws PoolsExecption If there is an error converting the native
+	 * @throws PoolsException If there is an error converting the native
 	 * configuration pointer to a native elem pointer.
 	 */
 	protected long getElem() throws PoolsException
@@ -668,7 +666,7 @@ public class Configuration extends Element
 	}
 
 	/**
-	 * Return the anme of the configuration.
+	 * Return the name of the configuration.
 	 */
 	String getName()
 	{

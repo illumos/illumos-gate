@@ -219,7 +219,7 @@ public class Value {
 	 * Set this value to take the supplied string value.
 	 *
 	 * @param value The value to which this value should be set.
-	 * @throws PoolsExecption If the setting of the value fails.
+	 * @throws PoolsException If the setting of the value fails.
 	 */
 	public void setValue(String value) throws PoolsException
 	{

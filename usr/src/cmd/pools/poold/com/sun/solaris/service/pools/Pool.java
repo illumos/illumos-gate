@@ -23,8 +23,6 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- *ident	"%Z%%M%	%I%	%E% SMI"
- *
  */
 
 package com.sun.solaris.service.pools;
@@ -108,7 +106,7 @@ public class Pool extends Element {
 	 * searched.
 	 *
 	 * @param values A list of values to be used to qualify the search.
-	 * @throws PoolsExecption If there is an error executing the query.
+	 * @throws PoolsException If there is an error executing the query.
 	 * @return a list of resources which match the supplied criteria
 	 */
 	public List getResources(List values) throws PoolsException
@@ -195,7 +193,7 @@ public class Pool extends Element {
 	 * Return the pointer to this pool as an element.
 	 *
 	 * @return The pointer to the native pool which this object wraps.
-	 * @throws PoolsExecption If there is an error converting the native
+	 * @throws PoolsException If there is an error converting the native
 	 * pool pointer to a native elem pointer.
 	 */
 	protected long getElem() throws PoolsException

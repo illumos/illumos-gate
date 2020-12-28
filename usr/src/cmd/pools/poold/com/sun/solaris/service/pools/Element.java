@@ -84,7 +84,7 @@ public abstract class Element implements Property, PropertyWalk
 	 * Get the property with the supplied name.
 	 *
 	 * @param name The name of the property to be retrieved.
-	 * @throws PoolsExecption If there is an error accessing the property.
+	 * @throws PoolsException If there is an error accessing the property.
 	 * @return a value containing the property details.
 	 */
         private Value getProperty(String name) throws PoolsException
@@ -113,7 +113,7 @@ public abstract class Element implements Property, PropertyWalk
 	 *
 	 * @param name The name of the property to be retrieved.
 	 * @param proxy The proxy item used to retrieve the property.
-	 * @throws PoolsExecption If there is an error accessing the property.
+	 * @throws PoolsException If there is an error accessing the property.
 	 * @return a value containing the property details.
 	 */
         protected Value getProperty(String name, long proxy)
@@ -143,7 +143,7 @@ public abstract class Element implements Property, PropertyWalk
 	 *
 	 * @param name The name of the property to be updated.
 	 * @param value The value of the property to be updated.
-	 * @throws PoolsExecption If there is an error accessing the property.
+	 * @throws PoolsException If there is an error accessing the property.
 	 */
         public void putProperty(String name, Value value) throws PoolsException
 	{
@@ -156,7 +156,7 @@ public abstract class Element implements Property, PropertyWalk
 	 * Remove the element property with the supplied name.
 	 *
 	 * @param name The name of the property to be removed.
-	 * @throws PoolsExecption If there is an error removing the property.
+	 * @throws PoolsException If there is an error removing the property.
 	 */
         public void rmProperty(String name) throws PoolsException
 	{
@@ -259,7 +259,7 @@ public abstract class Element implements Property, PropertyWalk
 	 * @param elem The element to whom the property belongs.
 	 * @param val The value representing the current element.
 	 * @param user User supplied data, provided when the walk is invoked.
-	 * @throws PoolsExecption If there is an error walking the property.
+	 * @throws PoolsException If there is an error walking the property.
 	 * @return 0 to continue the walk, anything else to terminate it.
 	 */
 	public int walk(Element elem, Value val, Object user)
@@ -275,7 +275,7 @@ public abstract class Element implements Property, PropertyWalk
 	 * Return the pointer to this subtype as an element.
 	 *
 	 * @return The pointer to the native subtype which this object wraps.
-	 * @throws PoolsExecption If there is an error converting the native
+	 * @throws PoolsException If there is an error converting the native
 	 * subtype pointer to a native elem pointer.
 	 */
 	protected abstract long getElem() throws PoolsException;
@@ -286,7 +286,7 @@ public abstract class Element implements Property, PropertyWalk
 	 * @param handler The object which will receive the callbacks.
 	 * @param user Data supplied by the user for use in the callback.
 	 * @return 0 for a successful walk, else 1.
-	 * @throws PoolsExecption If there is an error during the walk.
+	 * @throws PoolsException If there is an error during the walk.
 	 */
 	public int walkProperties(PropertyWalk handler, Object user)
 	    throws PoolsException

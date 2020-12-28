@@ -23,8 +23,6 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- *ident	"%Z%%M%	%I%	%E% SMI"
- *
  */
 
 package com.sun.solaris.service.pools;
@@ -40,12 +38,12 @@ import java.util.ArrayList;
 
 public interface PropertyWalk {
 	/**
-	 * Walk all properties of the invoking object, calling the 
+	 * Walk all properties of the invoking object, calling the
 	 *
 	 * @param elem The element to whom the property belongs.
 	 * @param val The value representing the current element.
 	 * @param user User supplied data, provided when the walk is invoked.
-	 * @throws PoolsExecption If there is an error walking the property.
+	 * @throws PoolsException If there is an error walking the property.
 	 * @return 0 to continue the walk, anything else to terminate it.
 	 */
 	public int walk(Element elem, Value val, Object user)
