@@ -107,10 +107,10 @@ rxbuf_ctor(void *arg1, void *arg2, int kmflag)
 	int (*callback)(caddr_t);
 	int rc = ENOMEM;
 
-	if (kmflag & KM_SLEEP)
-		callback = DDI_DMA_SLEEP;
-	else
+	if ((kmflag & KM_NOSLEEP) != 0)
 		callback = DDI_DMA_DONTWAIT;
+	else
+		callback = DDI_DMA_SLEEP;
 
 	rc = ddi_dma_alloc_handle(p->dip, &p->dma_attr_rx, callback, 0,
 	    &rxb->dhdl);
