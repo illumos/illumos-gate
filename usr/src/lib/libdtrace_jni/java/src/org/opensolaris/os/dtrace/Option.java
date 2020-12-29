@@ -22,8 +22,6 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 package org.opensolaris.os.dtrace;
 
@@ -44,8 +42,8 @@ import java.beans.*;
  * is running.
  * <p>
  * See the <a
- * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlis?a=view>
- * <b>Options and Tunables</b></a> chapter of the <i>Solaris Dynamic
+ * href=http://dtrace.org/guide/chp-opt.html>
+ * <b>Options and Tunables</b></a> chapter of the <i>Dynamic
  * Tracing Guide</i>.
  * <p>
  * Immutable.  Supports persistence using {@link java.beans.XMLEncoder}.
@@ -304,17 +302,17 @@ public final class Option implements Serializable {
     public static final String VALUE_UNSET = "unset";
 
     /**
-     * {@link #bufpolicy} value: use {@code ring} princical buffer
+     * {@link #bufpolicy} value: use {@code ring} principal buffer
      * policy.
      */
     public static final String VALUE_RING = "ring";
     /**
-     * {@link #bufpolicy} value: use {@code fill} princical buffer
+     * {@link #bufpolicy} value: use {@code fill} principal buffer
      * policy.
      */
     public static final String VALUE_FILL = "fill";
     /**
-     * {@link #bufpolicy} default value: use {@code switch} princical
+     * {@link #bufpolicy} default value: use {@code switch} principal
      * buffer policy.
      */
     public static final String VALUE_SWITCH = "switch";
@@ -369,7 +367,7 @@ public final class Option implements Serializable {
      */
     public static final String defaultargs = "defaultargs";
     /**
-     * Define symbol when invoking preprocssor (compile-time).
+     * Define symbol when invoking preprocessor (compile-time).
      */
     public static final String define = "define";
     /**
@@ -484,9 +482,9 @@ public final class Option implements Serializable {
      * #VALUE_FILL fill}, or {@link #VALUE_RING ring}).  Runtime option.
      * <p>
      * See the <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlhr?a=view>
+     * href=http://dtrace.org/guide/chp-buf.html#chp-buf-2>
      * <b>Principal Buffer Policies</b></a> section of the
-     * <b>Buffers and Buffering</b> chapter of the <i>Solaris Dynamic
+     * <b>Buffers and Buffering</b> chapter of the <i>Dynamic
      * Tracing Guide</i>.
      */
     public static final String bufpolicy = "bufpolicy";
@@ -495,9 +493,9 @@ public final class Option implements Serializable {
      * #VALUE_MANUAL manual}).  Runtime option.
      * <p>
      * See the <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlhu?a=view>
+     * href=http://dtrace.org/guide/chp-buf.html#chp-buf-5>
      * <b>Buffer Resizing Policy</b></a> section of the <b>Buffers
-     * and Buffering</b> chapter of the <i>Solaris Dynamic Tracing
+     * and Buffering</b> chapter of the <i>Dynamic Tracing
      * Guide</i>.
      */
     public static final String bufresize = "bufresize";

@@ -22,8 +22,6 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 package org.opensolaris.os.dtrace;
 
@@ -42,9 +40,9 @@ import java.beans.*;
  *     ...
  * </code></pre>
  * See the <a
- * href="http://docs.sun.com/app/docs/doc/817-6223/6mlkidlk1?a=view">
+ * href="http://dtrace.org/guide/chp-fbt.html#chp-fbt-10">
  * <b>Examples</b></a> section of the <b>{@code fbt}
- * Provider</b> chapter of the <i>Solaris Dynamic Tracing Guide</i>.
+ * Provider</b> chapter of the <i>Dynamic Tracing Guide</i>.
  * <p>
  * Immutable.  Supports persistence using {@link java.beans.XMLEncoder}.
  *

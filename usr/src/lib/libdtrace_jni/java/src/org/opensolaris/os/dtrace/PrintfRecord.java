@@ -22,8 +22,6 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 package org.opensolaris.os.dtrace;
 
@@ -156,7 +154,7 @@ public final class PrintfRecord implements Record, Serializable,
     }
 
     /**
-     * Gets the unfomatted elements passed to the DTrace {@code
+     * Gets the unformatted elements passed to the DTrace {@code
      * printf()} action after the format string.
      *
      * @return non-null, unmodifiable list of unformatted elements
@@ -198,7 +196,7 @@ public final class PrintfRecord implements Record, Serializable,
      * printf()} element at the given index (using the same order that
      * they appear in the {@code printf()} argument list)
      * @throws ArrayIndexOutOfBoundsException if the given index is
-     * out of range (index < 0 || index >= getRecordCount())
+     * out of range (index &lt; 0 || index &gt;= getRecordCount())
      */
     public ValueRecord
     getRecord(int i)

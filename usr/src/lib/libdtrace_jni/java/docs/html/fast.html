@@ -2,8 +2,6 @@
    Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
    Use is subject to license terms.
 
-   ident	"%Z%%M%	%I%	%E% SMI"
-
    CDDL HEADER START
 
    The contents of this file are subject to the terms of the
@@ -60,8 +58,8 @@ line to <tt>/etc/user_attr</tt>:
 <br>
 <br>
 <i>(Substitute your user name.)</i>  See the <a
-href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidln0?a=view>
-<b>Security</b></a> chapter of the <i>Solaris Dynamic Tracing Guide</i>
+href=http://dtrace.org/guide/chp-sec.html>
+<b>Security</b></a> chapter of the <i>Dynamic Tracing Guide</i>
 for more information.
 <br>
 <h4><a name="Writing_a_Simple_Consumer"></a>Writing a Simple Consumer</h4>
@@ -110,7 +108,7 @@ Here is a simple example that runs a given D script:<br>
 	    File file = new File(args[0]);
 	    String[] macroArgs = new String[args.length - 1];
 	    System.arraycopy(args, 1, macroArgs, 0, (args.length - 1));</font>
-	
+
 	    Consumer consumer = new LocalConsumer();
 	    consumer.addConsumerListener(new ConsumerAdapter() {
 		public void dataReceived(DataEvent e) {
@@ -203,9 +201,9 @@ such as an aggregation:<br>
 <br>
 The above script uses the <tt>$$1</tt> macro variable as a placeholder
 for whatever executable you'd like to trace.  See the <a
-href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidliq?a=view><b>
+href=http://dtrace.org/guide/chp-script.html#chp-script-3><b>
 Macro Arguments</b></a> section of the <b>Scripting</b> chapter of the
-<i>Solaris Dynamic Tracing Guide</i>.  Using two dollar signs (<tt>$$1</tt>)
+<i>Dynamic Tracing Guide</i>.  Using two dollar signs (<tt>$$1</tt>)
 instead of one (<tt>$1</tt>) forces expansion of the macro variable to
 type string.<br>
 <br>
@@ -316,10 +314,10 @@ longer available to the <tt>getAggregate()</tt> method.<br>
 <br>
 Be aware that you cannot call <tt>getAggregate()</tt> on an interval
 faster that the <tt>aggrate</tt> setting.  See the <a
-href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlis?a=view>
-<b>Options and Tunables</b></a> chapter of the <i>Solaris Dynamic
+href=http://dtrace.org/guide/chp-opt.html>
+<b>Options and Tunables</b></a> chapter of the <i>Dynamic
 Tracing Guide</i>.  See also the <a
-href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlhf?a=view>
+href=http://dtrace.org/guide/chp-aggs.html#chp-aggs-4>
 <b>Minimizing Drops</b></a> section of the <b>Aggregations</b> chapter
 for specific information about the <tt>aggrate</tt> option.  The default
 <tt>aggrate</tt> is once per second.  Here's an example of how you might
@@ -358,9 +356,9 @@ href="../api/org/opensolaris/os/dtrace/Aggregation.html">
 In addition to supporting macro arguments (see the <tt>syscall.d</tt>
 aggregation example above), the Java DTrace API also supports the
 <tt>$target</tt> macro variable.  (See the <a
-href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlir?a=view>
+href=http://dtrace.org/guide/chp-script.html#chp-script-4>
 <b>Target Process ID</b></a> section of the <b>Scripting</b> chapter of
-the <i>Solaris Dynamic Tracing Guide</i>.)  This allows you to trace a
+the <i>Dynamic Tracing Guide</i>.)  This allows you to trace a
 process from the very beginning of its execution, rather than sometime
 after you manually obtain its process ID.  The API does this by creating
 a process that is initially suspended and allowed to start only after <a
@@ -485,10 +483,10 @@ href=../api/org/opensolaris/os/dtrace/PrintaRecord.html>
 action will not be included in the requested aggregate.
 <h2><a name="Learning_DTrace"></a>Learning More</h2>
 <br>
-The <a href="http://www.opensolaris.org/os/community/dtrace/">
-OpenSolaris DTrace page</a> has links to resources to help you learn
+The <a href="http://dtrace.org/">
+DTrace page</a> has links to resources to help you learn
 DTrace.  In particular, you should read the <a
-href="http://docs.sun.com/app/docs/doc/817-6223"><i>Solaris Dynamic Tracing
+href="http://dtrace.org/guide/"><i>Dynamic Tracing
     Guide</i></a>.<br>
 <br>
 Try the example Java programs on this page with other D scripts.  You
