@@ -25,7 +25,9 @@ TMPDIR=${TMPDIR:-/tmp}
 log_must mkfile $MINVDEVSIZE $TMPDIR/dsk1
 log_must mkfile $MINVDEVSIZE $TMPDIR/dsk2
 log_must mkfile $MINVDEVSIZE $TMPDIR/dsk3
-DISKS="$TMPDIR/dsk1 raidz $TMPDIR/dsk2 $TMPDIR/dsk3"
+DISKS1="$TMPDIR/dsk1"
+DISKS2="$TMPDIR/dsk2 $TMPDIR/dsk3"
+DISKS="$DISKS1 $DISKS2"
 
 function cleanup
 {
@@ -33,7 +35,7 @@ function cleanup
 	log_must rm -f $DISKS
 }
 
-log_must default_setup_noexit "$DISKS"
+log_must default_setup_noexit "$DISKS1 raidz $DISKS2"
 log_onexit cleanup
 
 # Attempt to remove the non raidz disk.
