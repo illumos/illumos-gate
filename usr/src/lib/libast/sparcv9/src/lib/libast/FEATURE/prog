@@ -1,7 +1,0 @@
-/* : : generated from /home/gisburn/ksh93/ast_ksh_20100309/build_sparc_64bit/src/lib/libast/features/prog by iffe version 2009-12-04 : : */
-#ifndef _def_prog_ast
-#define _def_prog_ast	1
-#define _sys_types	1	/* #include <sys/types.h> ok */
-#define _lib_getexecname	1	/* getexecname() in default lib(s) */
-#define _PROC_PROG	"/proc/self/path/a.out"
-#endif
