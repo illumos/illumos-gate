@@ -1,0 +1,151 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH PREROOT 3
+.SH NAME
+preroot \- preroot support
+.SH SYNOPSIS
+.EX
+#include <preroot.h>
+
+char*    getpreroot(char* \fIpath\fP, char* \fIcmd\fP);
+int      ispreroot(char* \fIdir\fP);
+int      realopen(char* \fIpath\fP, int \fImode\fP, int \fIperm\fP);
+void     setpreroot(char** \fIargv\fP, char* \fIdir\fP);
+.EE
+.SH DESCRIPTION
+The
+.I preroot
+routines manipulate the process preroot.
+.I preroot
+is a kernel supported per-process two level viewpath.
+All pathnames rooted at
+.L /
+are first searched for in the process preroot directory
+and then in the system root directory.
+Setting the process preroot is a priveleged operation controlled by the
+.IR /etc/preroot (1)
+command.
+.PP
+.L <preroot.h>
+defines the symbol
+.B FS_PREROOT
+for those systems that support preroot.
+The following routines are valid only when
+.B FS_PREROOT
+is defined:
+.TP
+.L getpreroot
+returns a pointer to the absolute pathname of the preroot directory
+for the executable
+.IR cmd .
+The result is placed in
+.IR path .
+If
+.I path
+is
+.B 0
+then
+.IR malloc (3)
+is used to allocate the pathname space.
+.B 0
+is returned if
+.I cmd
+has no preroot or if an error was encountered.
+In this case
+.I errno
+is set to indicate the error.
+.TP
+.L ispreroot
+Non-zero is returned if 
+.I dir
+is the current process preroot.
+If 
+.I dir
+is
+.B 0
+then non-zero is returned if the current process has a preroot.
+.TP
+.L realopen
+temporarily disables the process preroot and does an
+.IR open (3)
+relative to the system root directory.
+The return value from
+.I open
+is returned.
+If there is no preroot then
+.I realopen
+is equivalent to
+.IR open .
+.TP
+.L setpreroot
+calls
+.IR execvp (3)
+as
+.L "execvp(a\fIrgv\fP[0],\fIargv\fP)"
+with the process preroot set to
+.IR dir .
+.I argv
+must be a
+.BR 0 -terminated
+argument array.
+If 
+.I argv
+is
+.B 0
+then the value of
+.I opt_argv
+from
+.IR optget (3)
+is used.
+.L setpreroot
+returns immediately if
+.I dir
+is already the process preroot.
+.SH "SEE ALSO"
+/etc/preroot(1)
+.SH BUGS
+Preroot semantics should be preserved when reading directories.
+The
+.I ast
+.IR directory (3)
+routines do this.
+.IR 3d (1)
+viewpathing does 
+.I preroot
+the right way.

@@ -1,0 +1,357 @@
+.fp 5 CW
+.TH LIBASO 3
+.SH NAME
+\fBASO\fP \- Atomic Scalar Operations
+.SH SYNOPSIS
+.de Tp
+.fl
+.ne 2
+.TP
+..
+.de Ss
+.fl
+.ne 2
+.SS "\\$1"
+..
+.de Cs
+.nf
+.ft 5
+..
+.de Ce
+.ft 1
+.fi
+..
+.ta 1.0i 2.0i 3.0i 4.0i 5.0i
+.Cs
+#include <aso.h>
+.Ce
+.Ss "TYPES"
+.Cs
+typedef int (*Asoerror_f)(int, const char*);
+typedef void* (*Asoinit_f)(void*, const char*);
+typedef ssize_t (*Asolock_f)(void*, ssize_t, void volatile*);
+
+typedef struct Asodisc_s
+{
+	uint32_t	version;
+	unsigned int	hung;
+	Asoerror_f	errorf;
+} Asodisc_t;
+
+typedef struct Asometh_s
+{
+	const char*	name;
+	int		type;
+	Asoinit_f	initf;
+	Asolock_f	lockf;
+	const char*	details;
+} Asometh_t;
+.Ce
+.Ss "OPERATIONS"
+.Cs
+uint8_t		asocas8(uint8_t volatile*, int, int);
+uint8_t		asoget8(uint8_t volatile*);
+uint8_t		asoinc8(uint8_t volatile*);
+uint8_t		asodec8(uint8_t volatile*);
+
+uint16_t	asocas16(uint16_t volatile*, uint16_t, uint16_t);
+uint16_t	asoget16(uint16_t volatile*);
+uint16_t	asoinc16(uint16_t volatile*);
+uint16_t	asodec16(uint16_t volatile*);
+
+uint32_t	asocas32(uint32_t volatile*, uint32_t, uint32_t);
+uint32_t	asoget32(uint32_t volatile*);
+uint32_t	asoinc32(uint32_t volatile*);
+uint32_t	asodec32(uint32_t volatile*);
+
+uint64_t	asocas64(uint64_t volatile*, uint64_t, uint64_t);
+uint64_t	asoget64(uint64_t volatile*);
+uint64_t	asoinc64(uint64_t volatile*);
+uint64_t	asodec64(uint64_t volatile*);
+
+unsigned char	asocaschar(unsigned char volatile*, int, int);
+unsigned char	asogetchar(unsigned char volatile*);
+unsigned char	asoincchar(unsigned char volatile*);
+unsigned char	asodecchar(unsigned char volatile*);
+
+unsigned short	asocasshort(unsigned short volatile*, unsigned short, unsigned short);
+unsigned short	asogetshort(unsigned short volatile*);
+unsigned short	asoincshort(unsigned short volatile*);
+unsigned short	asodecshort(unsigned short volatile*);
+
+unsigned int	asocasint(unsigned int volatile*, unsigned int, unsigned int);
+unsigned int	asogetint(unsigned int volatile*);
+unsigned int	asoincint(unsigned int volatile*);
+unsigned int	asodecint(unsigned int volatile*);
+
+unsigned long	asocaslong(unsigned long volatile*, unsigned long, unsigned long);
+unsigned long	asogetlong(unsigned long volatile*);
+unsigned long	asoinclong(unsigned long volatile*);
+unsigned long	asodeclong(unsigned long volatile*);
+
+size_t		asocassize(size_t volatile*, size_t, size_t);
+size_t		asogetsize(size_t volatile*);
+size_t		asoincsize(size_t volatile*);
+size_t		asodecsize(size_t volatile*);
+
+void*		asocasptr(void volatile*, void*, void*);
+void*		asogetptr(void volatile*);
+
+void		ASODISC(Asodisc_t*, Asoerror_f);
+Asometh_t*	asometh(int, void*);
+int		asoinit(const char*, Asometh_t*, Asodisc_t*);
+int		asolock(unsigned int volatile*, unsigned int, int);
+int		asoloop(uintmax_t);
+int		asorelax(long);
+.Ce
+.SH DESCRIPTION
+.PP
+\fIASO\fP provides functions to perform atomic scalar operations.
+The functions on the type \f5uint32_t\fP will be fully described below.
+Other functions work similarly on their respective types.
+Some of the functions may be macros that call other functions.
+64 bit operations are provided if the compiler supports 64 bit integers and/or pointers.
+.PP
+.Ss "TYPES"
+.PP
+\f5uint8_t, uint16_t, uint32_t, uint64_t\fP
+
+These are \fIunsigned integer\fP types of different sizes in bits.
+For example, \f5uint32_t\fP represents the type of unsigned integer with 32 bits or 4 bytes.
+.PP
+.Ss "OPERATIONS"
+.PP
+.Ss "  uint32_t asoget32(uint32_t* from);"
+This function returns the value \f5*from\fP.
+.PP
+.Ss "  uint32_t asoinc32(uint32_t* dest);"
+.Ss "  uint32_t asodec32(uint32_t* dest);"
+These functions increment \f5*dest\fP by 1 and decrement \f5*dest\fP by 1 in an atomic step.
+The return value is the old value in \f5*dest\fP.
+
+Consider an example where two concurrent threads/processes call \f5asoinc32()\fP
+on the same \f5dest\fP with values, say \fIv1\fP and \fIv2\fP.
+The eventual value in \f5dest\fP
+will be as if \f5*dest += 2\fP was performed in a single-threaded execution.
+
+That should be constrasted with a situation where, instead of \f5asoinc32()\fP or \f5asodec32()\fP,
+only normal increment (++) or decrement (--) were used.
+Then, the end result could be either \f5*dest += 1\fP or \f5*dest += 2\fP,
+depending on states of the hardware cache and process scheduling.
+.PP
+.Ss "  uint32_t asocas32(uint32_t* dest, uint32_t tstval, uint32_t newval);"
+This function provides the atomic \fIcompare-and-swap\fP operation.
+If the current content of \f5dest\fP is equal to \f5tstval\fP then it will be set to \f5newval\fP.
+If multiple threads/processes are performing the same operations only one will succeed with a
+return value of \f5tstval\fP.
+The return value is the old value in \f5*dest\fP.
+.PP
+.Ss "  void asorelax(long nsec)"
+This function causes the calling process or thread to briefly pause
+for \f5nsec\fP nanoseconds.
+It is useful to implement tight loops that occasionally yield control.
+.PP
+.Ss "  int asolock(unsigned int* lock, unsigned int key, int type)"
+This function uses \f5key\fP, a non-zero unsigned integer, to lock or unlock the \f5lock\fP.
+It returns \f50\fP on success and \f5-1\fP on failure.
+The argument \f5type\fP can take one of the following values:
+.Tp
+\f5ASO_UNLOCK\fP:
+This unlocks the lock if it was locked with \f5key\fP. It is an error to try
+unlocking a lock of a different key.
+.Tp
+\f5ASO_TRYLOCK\fP:
+This makes a single attempt to use the given \f5key\fP to acquire a lock.
+An error will result if the lock is already locked with a different key.
+.Tp
+\f5ASO_LOCK\fP:
+This is a regular locking call. If the lock is locked with a different key,
+this call will wait until the lock is open, then lock it with the given \f5key\fP.
+.Tp
+\f5ASO_SPINLOCK\fP:
+Regardless of what key is currently locking the lock,
+this call will always wait until the lock is open, then lock it with the given \f5key\fP.
+Note that, if the lock is already locked with \f5key\fP, this call can result
+in a deadlock unless that lock can be opened by some other mechanism, e.g.,
+by a different process or thread.
+.PP
+.Ss "  int asoloop(uintmax_t iteration);"
+This function is used to implement spin locks that periodically relinquish the processor:
+.Cs
+uintmax_t iteration;
+iteration = 0;
+for (;;) {
+    /* test resource with an aso*() call */
+    if (asoloop(++iteration))
+        /* an error occurred */;
+}
+.Ce
+The value of \f5iteration\fP should be \f51\fP (\fInot\fP \f50\fP) for the first loop iteration.
+\f50\fP is returned on success, \f5-1\fP on failure.
+If \f5iteration mod 4\fP is \f50\fP then \f5asorelax(1)\fP is called to temporarily relinquish
+the processor.
+If \f5Asodisc_t.hung != 0\fP and \f5Asodisc_t.errorf != 0\fP and
+\f5iteration mod (2**Asodisc_t.hung-1)\fP is \f50\fP,
+then \f5Asodisc_t.errorf\fP is called with type \f5ASO_HUNG\fP
+and \f5-1\fP is returned.
+.PP
+.Ss "DISCIPLINE"
+.PP
+The Asodisc_t discipline structure allows the caller to modify default behavior.
+The \fIASO\fP discipline is global for all threads and forked children of the current process.
+The discipline is set and modified by the \f5asoinit()\fP function, described below.
+The structure members are:
+.Tp
+\f5uint32_t version;\fP
+This must be set to \f5ASO_VERSION\fP by the caller and is used by the implementation to detect
+release differences between the caller and the implementation.
+The version is integer of the form \fIYYYYMMDD\fP where \fIYYYY\fP is the release year, \fIMM\fP
+is the release month, and \fIDD\fP is the release day of month.
+This allows the implementation to be forwards and backwards binary compatible with all releases.
+.Tp
+\f5unsigned int hung;\fP
+An error occurs if \f5asoloop\fP() is called \f52**Asometh_t.hung\fP times without gaining access to the loop resource.
+The default value \f50\fP disables the test.
+.Tp
+\f5Asoerror_f errorf;\fP
+\f5int (*errorf)(int type, const char* mesg);\fP
+If \f5errorf\fP != \f50\fP then it is called for each \fIASO\fP fatal library condition.
+\f5type\fP may be one of: \f5ASO_METHOD\fP - a method error; \f5ASO_HUNG\fP - \f5asoloop\fP() was called
+\f52**Asometh_t.hung\fP times with no access to the loop resource.
+\f5mesg\fP is a 0-terminated messsage description.
+.Ss "  void ASODISC(Asodisc_t* disc, Asoerror_f errorf);"
+.PP
+This function-like-macro initializes \f5disc->version = ASO_VERSION\fP, \f5disc->errorf = errorf\fP,
+and the remaining \f5disc\fP members to \f50\fP.
+.PP
+.Ss "METHODS"
+.PP
+Several atomic locking methods are implemented for atomic operations
+not supported by \fIintrinsic\fP functions or assembly instructions.
+Methods are controlled by the \f5asometh()\fP and \f5asoinit()\fP
+functions, described below.
+The \fIASO\fP method is global for all threads and forked children of the current process.
+A given method may have multiple types.
+The methods types are:
+.Tp
+\f5ASO_INTRINSIC\fP:
+Some hardware platforms provide machine instructions to implement these operations directly.
+In that case, if a local compiler permits, calls to these \fIintrinsic\fP functions
+may be translated directly into their corresponding machine instructions.
+When necessary the implementation can use only the intrinsic \fIcompare-and-swap\fP
+function on the largest integer type to emulate all other \fIASO\fP operations.
+The \f5ASO_INTRINSIC\fP method type is the default when supported by the compiler.
+It may be used for single-process single-thread, multi-thread, and
+multi-process applications.
+When supported by the hardware / compiler, the library provides the "\fBintrinsic\fP" method with type
+\f5ASO_INTRINSIC|ASO_PROCESS|ASO_THREAD|ASO_SIGNAL\fP.
+.Tp
+\f5ASO_SIGNAL\fP:
+This method type is suitable only for single-process single-thread applications.
+It can be used to provide locking between asyncronous \fBsignal\fP(2) handlers
+and the main program.
+The library provides the "\fBsignal\fP" method with type \f5ASO_SIGNAL\fP.
+This is the default method type when \f5ASO_INTRINSIC\fP is not supported.
+.Tp
+\f5ASO_THREAD\fP:
+This method type is suitable for single-process single-thread, and multi-thread applications.
+It typically requires thread library support, and since the default \f5aso\fP library
+is not linked with a thread library, no \f5ASO_THREAD\fP method is provided by default.
+Threaded applications must link with \fB-ltaso\fP (before \fB-laso\fP or \fB-last\fP)
+in order to access \f5ASO_THREAD\fP methods.
+The \fB-ltaso\fP library provides the "\fBspin\fP" (using \fBpthread_spin_lock\fP(3)) and
+"\fBmutex"\fP (using \fBpthread_mutex_lock\fP(3)) methods with type \f5ASO_THREAD|ASO_SIGNAL\fP.
+.Tp
+\f5ASO_PROCESS\fP:
+This method type is suitable for single-process single-thread, and multi-process applications.
+Some \f5ASO_PROCESS\fP methods may also be suitable for multi-thread applications (if they have the \f5ASO_THREAD\fP type.)
+These methods are typically and noticably \fIslow\fP, up to 2 orders of magnitude slower than
+\f5ASO_INTRINSIC\fP for some applications.
+They are provided as a last resort when other methods are not available.
+The library provides the "\fBsemaphore\fP" method with type \f5ASO_PROCESS|ASO_THREAD|ASO_SIGNAL\fP
+and the "\fBfcntl\fP" method with type \f5ASO_PROCESS|ASO_SIGNAL\fP.
+
+.Ss "  Asometh_t* asometh(int type, void* data);"
+This function looks up methods by type or name.
+If type is \f50\fP and \f5data\fP is \f50\fP then the current method is returned; a valid method
+will always be returned for this call.
+If type is \f50\fP then \f5data\fP is treated as a \f50\fP-terminated string method name;
+\f50\fP is returned if no matching method is found.
+The pseudo-type \f5ASO_NEXT\fP generates the list of all methods in successive calls:
+.Cs
+Asometh_t* meth;
+meth = 0;
+while (meth = asometh(ASO_NEXT, meth))
+	/* examine meth->... */
+.Ce
+Otherwise if \f5type\fP is not \f50\fP and not \f5ASO_NEXT\fP it is treated as a combination of the ordered types
+\f5ASO_THREAD\fP, \f5ASO_SIGNAL\fP, \f5ASO_INTRINSIC\fP, \f5ASO_PROCESS\fP:
+the first method with \f5(meth->type & type) != 0\fP is returned;
+\f50\fP is returned if no matching method is found.
+
+Method names are treated as a name, optionally followed by a list of
+\fB,\fP\fIname\fP=\fIvalue\fP details, and optionally ending with \fB,\fP\fIpathname\fP.
+The \fBsemaphore\fP method uses \fBsize\fP=\fInumber\fP to specify
+the number of semaphores and hashes \fIpathname\fP to determine the semaphore IPC key.
+The \fBfcntl\fP method uses \fBsize\fP=\fInumber\fP to specify
+the number of 1 byte file locks and uses \fIpathname\fP as the
+file to lock using \f5fcntl(F_SETLCK[W])\fP.
+
+.Ss "  int asoinit(const char* details, Asometh_t* meth, Asodisc_t* disc);"
+This function sets the global discipline to \f5disc\fP,
+closes the current method (releasing its resources),
+temporarily instantiates the default method
+(either \f5ASO_INTRINSIC\fP if available or \f5AS_SIGNAL\fP otherwise),
+and initializes \f5meth\fP and instantiates it as the new method.
+If \f5disc\fP is \f50\fP the the global discpline is not modified.
+If \f5meth\fP is \f50\fP then \f51\fP is returned if \f5asoinit()\fP has
+already been called to initialize a method, otherwise \f50\fP is returned.
+If \f5meth->lockf\fP is \f50\fP and \f5(meth->type & ASO_INTRINSIC) != 0\fP
+then \f5-1\fP is returned and the current method is not changed.
+If an error occurs instantiating \f5meth\fP then the current method is
+set to the default and \f5-1\fP is returned.
+Otherwise \f50\fP is returned on success.
+
+Method resources are released by the next \f5asometh()\fP call,
+or by an \fIASO\fP cleanup function called via \f5atexit\fP(2).
+System global method resources are released on last use;
+this includes removing semaphore keys or
+physical files that may be used by some methods.
+In some cases \fIASO\fP maintains reference counts within
+the resource to determine last use.
+
+An application requiring a specific method must check the default method before
+using any \fIASO\fP operations. For example, a threaded application would
+do something like this:
+.Cs
+void* data = 0 /* \fIor\fP a method name string with optional details */
+Asometh_t* meth;
+if (data || !(asometh(0, 0)->type & (ASO_INTRINSIC|ASO_THREAD))) {
+    if (!(meth = asometh(ASO_INTRINSIC|ASO_THREAD, data)))
+        /* error -- suitable method not found */;
+    else if (asoinit(meth, 0, 0, ASO_VERSION))
+        /* error -- method initialization error */;
+}
+/* ready for \fIASO\fP operaions */
+.Ce
+A multi-process application would check for \f5(ASO_INTRINSIC|ASO_PROCESS)\fP
+instead of \f5(ASO_INTRINSIC|ASO_THREAD)\fP.
+
+.PP
+.SH IMPLEMENTATION NOTES
+Unlike other \fIAST\fP library discipline/method functions which can instantiate
+multiple discpline/method handles within a single process, the \fIASO\fP
+library allows only one discipline and method to be set at a time, with the additional
+restriction that it may only be set by the main and only thread of the calling process.
+For this reason there is no open/close interface with an instantation handle;
+instead the global discipline/method is simply initialized by \f5asoinit()\fP.
+
+\f5ASO_THREAD\fP and \f5ASO_PROCESS\fP methods rely on the \f5Asometh_t.lockf()\fP
+being sufficiently "heavy" to flush the calling thread/process memory cache
+so the subsequent \fIASO\fP operation operates on the physical memory location
+instead of the cached location. There is currently no other portable mechanism
+that guarantees this other than the \f5ASO_INTRINSIC\fP method.
+
+.PP
+.SH AUTHOR
+Kiem-Phong Vo, Adam Edgar, and Glenn Fowler

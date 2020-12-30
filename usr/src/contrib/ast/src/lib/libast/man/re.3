@@ -1,0 +1,214 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH RE 3
+.SH NAME
+recomp, reexec, ressub, refree, reerror \(mi regular expression library
+.SH SYNOPSIS
+.EX
+#include <re.h>
+
+Re_program_t* recomp(char* \fIpattern\fP, int \fIflags\fP);
+int reexec(Re_program_t* \fIre\fP, char* \fIsource\fP);
+void ressub(Re_program_t* \fIre\fP, Sfio_t* \fIsp\fP, char* \fIold\fP, char* \fInew\fP, int \fIflags\fP);
+void reerror(char* \fImessage\fP);
+void refree(Re_program_t* \fIre\fP);
+.EE
+.SH DESCRIPTION
+.L recomp
+compiles a regular expression in
+.I pattern
+and returns a pointer to the compiled regular expression.
+The space is allocated by
+.IR malloc (3)
+and may be released by
+.LR refree .
+Regular expressions are as in
+.IR egrep (1)
+except that newlines are treated as ordinary
+characters and
+.L $
+matches the end of a null-terminated string.
+.I flags
+may be
+.L RE_EDSTYLE
+which specifies
+.IR ed (1)
+style special characters,
+.LR \e( ,
+.LR \e) ,
+.LR \e? ,
+.L \e+
+and
+.L \e|
+for the
+.IR egrep (1)
+.LR ( ,
+.LR ) ,
+.LR ? ,
+.L +
+and
+.LR | ,
+respectively.
+.PP
+.L reexec
+matches the null-terminated
+.I source
+string against the compiled regular expression
+.I re
+from a previous call to
+.LR recomp .
+If it matches,
+.L reexec
+returns a non-zero value.
+If
+.I flags
+is
+.L RE_MATCH
+then the array
+.I re\->match
+is filled with character pointers to the substrings of
+.I source
+that correspond to the
+parenthesized subexpressions of 
+.IR pattern :
+.I re\->match[i].sp
+points to the beginning and
+.I re\->match[i].ep
+points just beyond
+the end of substring
+.IR i .
+(Subexpression
+.I i
+begins at the
+.IR i th
+matched left parenthesis, counting from 1.)
+Pointers in
+.I re\->match[0]
+pick out the substring that corresponds to
+the entire regular expression.
+Unused elements of
+.I re\->match
+are filled with zeros.
+Matches involving
+.LR * ,
+.LR + ,
+and 
+.L ?
+are extended as far as possible.
+A maximum of 9 subexpressions will be matched.
+The structure of elements of
+.I re\->match 
+is:
+.nf
+.ta 8n
+	typedef struct
+	{
+		char* sp;
+		char* ep;
+	} rematch;
+.fi
+.LP
+.L ressub
+places in the
+.IR sfio (3)
+stream
+.I sp
+a substitution instance of
+.I old
+to
+.I new
+in
+.I source
+in the context of the last
+.L reexec
+performed on
+.IR re\->match .
+Each instance of
+.LI \e n ,
+where
+.I n
+is a digit, is replaced by the
+string delimited by
+.LI re\->match[ n ].sp
+and
+.LI re\->match[ n ].ep .
+Each instance of 
+.L &
+is replaced by the string delimited by
+.I re\->match[0].sp
+and
+.IR re\->match[0].ep .
+If
+.L RE_ALL
+is set in
+.I flags
+then all occurrences of
+.I old
+are replaced by
+.IR new .
+If
+.L RE_LOWER
+.RL [ RE_UPPER ]
+is set in
+.I flags
+then
+.I old
+is converted to lower [upper] case.
+.LP
+.L reerror,
+called whenever an error is detected in
+.L recomp,
+.L reexec,
+or
+.L ressub,
+writes the string
+.I msg
+on the standard error file and exits.
+.L reerror
+may be replaced to perform
+special error processing.
+.SH DIAGNOSTICS
+.L recomp
+returns 0 for an invalid expression or other failure.
+.L reexec
+returns 1 if
+.I source
+is accepted, 0 otherwise.
+.SH "SEE ALSO"
+ed(1), grep(1), expr(1)

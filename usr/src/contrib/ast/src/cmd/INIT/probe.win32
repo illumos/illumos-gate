@@ -1,0 +1,283 @@
+:
+# @(#)probe.win32 (AT&T Research) 2010-01-01
+#
+# win32 specific make C probe initialization
+# wrapped cc's are easy on uwin
+#
+# 2> easy.err to avoid mysterious hang with bcc
+
+# begin preamble shared with the pp probe.ini
+
+IFS=$'\n'
+
+chmod 777 . # cl.exe setuid workaround
+
+typeset -A header version
+
+# we are probing on behalf of libpp and nmake
+# so the native preprocessor must be forced in
+# order to bootstrap libpp and nmake
+
+nativepp=-1
+export nativepp
+
+probe_header="
+stddef.h
+"
+for inc in syslimits.h winerror.h ostream bits/ctype_base.h stream.h
+do	echo 	"#include <$inc>" > easy.c
+	if	$cc -E easy.c > /dev/null 2> easy.err 
+	then	probe_header="$probe_header
+$inc
+"
+	fi
+done
+
+{
+for i in $probe_header
+do	echo "#include <$i>"
+done
+echo '#ifdef __cplusplus'
+echo "int _Pr0b3_cplus=__cplusplus;"
+echo '#endif'
+echo '#ifdef _UWIN'
+echo "int _Pr0b3_uwin=_UWIN;"
+echo '#endif'
+echo '#ifdef __BORLANDC__'
+echo "int _Pr0b3_version_BORLAND=__BORLANDC__;"
+echo '#endif'
+echo '#ifdef __DMC__'
+echo "int _Pr0b3_version_DM=__DMC__;"
+echo '#endif'
+echo '#ifdef _MSC_VER'
+echo "int _Pr0b3_version_MS=_MSC_VER;"
+echo '#endif'
+echo '#ifdef __ICL'
+echo "int _Pr0b3_version_ICL=__ICL;"
+echo '#endif'
+echo '#ifdef __LCC__'
+echo "int _Pr0b3_version_LCC=0+__LCC__;"
+echo '#endif'
+echo '#ifdef __MINGW32__'
+echo "int _Pr0b3_version_MINGW=__MINGW32__;"
+echo '#endif'
+echo '#ifdef __INTERIX'
+echo "int _Pr0b3_version_INTERIX=__INTERIX;"
+echo '#endif'
+echo '#ifdef __WATCOMC__'
+echo "int _Pr0b3_version_WATCOM=__WATCOMC__;"
+echo '#endif'
+} > easy.c
+
+include=
+uwin=
+cplus=
+
+$cc -E easy.c 2>&1 |
+egrep -i '^(#(line)? 1 .*\.[hH]| *int +_Pr0b3_[a-zA-Z_]* *= *[0-9])' |
+sed	-e 's,_Pr0b3_,,' \
+	-e 's/.*"\(.*\)".*/\1/' \
+	-e 's,^  *,,' \
+	-e 's,  *$,,' \
+	-e 's, *= *,=,' \
+	-e 's,^\(.\):[\\/]*,/\1/,' \
+	-e 's,[\\/][\\/]*,/,g' \
+	-e 's,^\(/.*\)/\(.*\)$,header[\2]="\1",' \
+	-e 's, *int *\(.*\);.*,\1,' \
+	-e 's,^version_\(.*\)=,version[\1]=,' \
+	> easy.sh
+. ./easy.sh
+
+include=
+for i in $probe_header
+do	d=${header[$i]}
+	if	[[ $d ]]
+	then	include="$include
+$d"
+	elif	[[ $i == */* ]]
+	then	d=${header[${i##*/}]}
+		if	[[ $d == */${i%/*} ]]
+		then	include="$include
+${d%/${i%/*}}"
+		fi
+	fi
+done
+
+i=$($cc -V 2> easy.err)
+if	test "" != "$i" -a -d "$i/include"
+then	include="$i/include
+$include"
+fi
+
+stdinclude=
+for inc in $include
+do	if	[[ ${inc%/*} -ef /msdev/platformsdk ]]
+	then	inc=/msdev/platformsdk/${inc##*/}
+	elif	[[ ${inc%/*} -ef /platformsdk ]]
+	then	inc=/platformsdk/${inc##*/}
+	fi
+	for dup in $stdinclude
+	do	[[ $inc -ef $dup ]] && continue 2
+	done
+	stdinclude="$stdinclude
+$inc"
+done
+
+# end preamble shared with the pp probe.ini
+
+if	[[ ${version[@]} == [0-9]* && $stdinclude ]]
+then	: the payoff
+	set -- $cc
+	cmd=$1
+	shift
+	set -- $(whence $cmd) "$@"
+	typ=$(package)
+	dialect="ANSI CLOSURE DYNAMIC EXPORT=DLL LIBPP -I-"
+	case ${cc##*/} in
+	*CC*)	dialect="$dialect C++"
+		cplus=1
+		;;
+	esac
+	ld=${cc%cc}ld
+	if	[[ ! -x $ld ]]
+	then	ld=${cc%/*}/ld
+		if	[[ ! -x $ld ]]
+		then	case $cc in
+			*/ncc)	ld=/usr/bin/nld ;;
+			*)	ld=/usr/bin/ld ;;
+			esac
+		fi
+	fi
+	{
+		if	$cc -v >/dev/null 2>&1
+		then	v=$($cc -v 2>/dev/null)
+			if	[[ $v ]]
+			then	print "# ;VERSION;-v;$v;PATH;$cc"
+			fi
+		else	v=
+		fi
+		cat <<!
+CC.CC = $*
+CC.NATIVE = $*
+CC.EXECTYPE = $typ
+CC.HOSTTYPE = $typ
+CC.ALTPP.FLAGS = -Yp,\$(CPP:D)
+CC.ALTPP.ENV =
+CC.AR = ar
+CC.ARFLAGS =
+CC.DEBUG = -g
+CC.DIALECT = $dialect
+CC.DLL = -D_BLD_DLL
+CC.DLLBIG = -D_BLD_DLL
+CC.DLL.DEF = -D_BLD_DLL
+CC.DLL.DIR = \$(BINDIR)
+CC.DLL.LIBRARIES =
+CC.DLL.VARIANTS =
+CC.DYNAMIC =
+CC.EXPORT.DYNAMIC =
+CC.LD = $ld
+CC.LD.DYNAMIC = -Bdynamic
+CC.LD.LAZY =
+CC.LD.NOLAZY =
+CC.LD.ORIGIN =
+CC.LD.RECORD =
+CC.LD.NORECORD =
+CC.LD.RUNPATH =
+CC.LD.STATIC = -Bstatic
+CC.LD.STRIP =
+CC.LIB.DLL = option
+CC.LIB.ALL = -Bwhole-archive
+CC.LIB.UNDEF = -Bno-whole-archive
+CC.MAKE.OPTIONS = nativepp=0
+CC.NM = nm
+CC.NMEDIT =
+CC.NMFLAGS =
+CC.OPTIMIZE = -O
+CC.PIC =
+CC.PICBIG =
+CC.READONLY =
+CC.REPOSITORY =
+CC.SHARED = -G
+CC.SHARED.LD = $ld
+CC.SHARED.REGISTRY =
+CC.SHARED.REGISTRY.PATH =
+CC.SHELLMAGIC =
+CC.SIZE = size
+CC.STATIC = -Bstatic
+!
+		inc=
+		lib=
+		if	[[ ${version[LCC]} ]]
+		then	lib=/lcc
+		fi
+		if	[[ $stdinclude == *' '* ]]
+		then	stdinclude=${stdinclude//' '/''}
+		fi
+		stdinc=
+		stdlib=
+		for inc in $stdinclude
+		do	stdinc="$stdinc $inc"
+			d=${inc%/*}/lib
+			if	[[ -d $d ]]
+			then	stdlib="$stdlib $d"
+			fi
+		done
+		case $uwin in
+		[0-9]*)	cat <<!
+CC.STDINCLUDE = /usr/include $stdinc
+CC.STDLIB = /usr/lib$lib $stdlib
+!
+			;;
+		*)	cat <<!
+CC.STDINCLUDE = $stdinc
+CC.STDLIB = $stdlib
+!
+			;;
+		esac
+		cat <<!
+CC.STRICT =
+CC.STRIP = strip
+CC.STRIP.FLAGS =
+CC.PREFIX.ARCHIVE = lib
+CC.PREFIX.DYNAMIC =
+CC.PREFIX.SHARED =
+CC.PREFIX.SYMBOL = _
+CC.SUFFIX.ARCHIVE = .a
+CC.SUFFIX.COMMAND =
+CC.SUFFIX.DEBUG = .pdb
+CC.SUFFIX.DYNAMIC = .dll
+CC.SUFFIX.LD = .def .exp .ign .res
+CC.SUFFIX.OBJECT = .o
+CC.SUFFIX.SHARED = .lib
+CC.SUFFIX.SOURCE = .c
+CC.SUFFIX.STATIC =
+!
+		if	[[ $v ]]
+		then	case $v in
+			*\"*)	v=$(print -r -- | sed -e 's,",\\",g' -e 's,^ ,,' -e 's,.*,"&",') ;;
+			*\'*)	v=\"$v\" ;;
+			esac
+			cat <<!
+CC.VERSION = -v
+CC.VERSION.STRING = $v
+!
+		else	cat <<!
+CC.VERSION =
+CC.VERSION.STRING =
+!
+		fi
+		if	[[ ${version[MINGW]} || ${version[MS]} ]]
+		then	cat <<!
+CC.WARN = -Wall
+!
+		else	cat <<!
+CC.WARN =
+!
+		fi
+		cat <<!
+CC.PREROOT =
+CC.UNIVERSE = att
+!
+	} >&3
+	exit 0
+fi

@@ -1,0 +1,890 @@
+.fp 5 CW
+.de L		\" literal font
+.ft 5
+.if !\\$1 \&\\$1 \\$2 \\$3 \\$4 \\$5 \\$6 \f1
+..
+.de LR
+.}S 5 1 \& "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.de RL
+.}S 1 5 \& "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH PP 3
+.SH NAME \" @(#)pp.3 (gsf@research.att.com) 04/01/92
+pp \- ANSI C preprocessor library
+.SH SYNOPSIS
+.EX
+:PACKAGE: ast
+#include <pp.h>
+%include "pptokens.yacc
+\-lpp
+.EE
+.SH DESCRIPTION
+The
+.I pp
+library provides a tokenizing implementation of the C language preprocessor
+and supports K&R (Reiser), ANSI and C++ dialects.
+The preprocessor is comprised of 12 public functions,
+a global character class table accessed by macros, and
+a single global struct with 10 public elements.
+.PP
+.I pp
+operates in two modes.
+.I Standalone
+mode is used to implement the traditional standalone C preprocessor.
+.I Tokeinizing
+mode provides a function interface to a stream of preprocessed tokens.
+.I pp
+is by default ANSI; the only default predefined symbols are
+.L __STDC__
+and
+.LR __STDPP__ .
+Dialects (K&R, C++) and local conventions are determined by
+compiler specific
+.IR probe (1)
+information that is included at runtime.
+The
+.I probe
+information can be overridden by providing a file
+.L pp_default.h
+with pragmas and definitions for each compiler implementation.
+This file is usually located in the compiler specific
+default include directory.
+.PP
+Directive, command line argument, option and pragma syntax is described in
+.IR cpp (1).
+.I pp
+specific semantics are described below.
+Most semantic differences with standard or classic implementations are in the
+form of optimizations.
+.PP
+Options and pragmas map to
+.L ppop
+function calls described below.
+For the remaining descriptions,
+``setting \f5ppop(PP_\fP\fIoperation\fP\f5)\fP''
+is a shorthand for calling
+.L ppop
+with the arguments appropriate for
+\f5PP_\fP\fIoperation\fP.
+.PP
+The library interface describes only the public functions and struct elements.
+Static structs and pointers to structs are provided by the library.
+The user should not attempt to allocate structs.
+In particular,
+.L sizeof
+is meaningless for
+.I pp
+supplied structs.
+.PP
+The global struct
+.L pp
+provides readonly information.
+Any changes to
+.L pp
+must be done using the functions described below.
+.L pp
+has the following public elements:
+.TP
+.L "char* version"
+The
+.I pp
+implementaion version string.
+.TP
+.L "char* lineid"
+The current line sync directive name.
+Used for standalone line sync output.
+The default value is the empty string.
+See the
+.L ppline
+function below.
+.TP
+.L "char* outfile"
+The current output file name.
+.TP
+.L "char* pass"
+The pragma pass name for
+.I pp.
+The default value is
+.LR pp .
+.TP
+.L "char* token"
+The string representation for the current input token.
+.TP
+.L "int flags"
+The inclusive or of:
+.RS
+.TP
+.L PP_comment
+Set if 
+.L ppop(PP_COMMENT)
+was set.
+.TP
+.L PP_compatibility
+Set if 
+.L ppop(PP_COMPATIBILITY)
+was set.
+.TP
+.L PP_linefile
+Set if standalone line syncs require a file argument.
+.TP
+.L PP_linetype
+Set if standalone line syncs require a third argument.
+The third argument is
+.L 1
+for include file push,
+.L 2
+for include file pop and null otherwise.
+.TP
+.L PP_strict
+Set if 
+.L ppop(PP_STRICT)
+was set.
+.TP
+.L PP_transition
+Set if 
+.L ppop(PP_TRANSITION)
+was set.
+.RE
+.TP
+.L "struct ppdirs* lcldirs"
+The list of directories to be searched for "..." include files.
+If the first directory name is "" then it is replaced by the
+directory of the including file at include time.
+The public elements of
+.L "struct ppdirs"
+are:
+.RS
+.TP
+.L "char* name"
+The directory pathname.
+.TP
+.L "struct ppdirs* next"
+The next directory,
+.L 0
+if it is the last in the list.
+.RE
+.TP
+.L "struct ppdirs* stddirs"
+.L pp.stddirs\->next
+is the list of directories to be searched for <...> include files.
+This list may be
+.LR 0 .
+.TP
+.L "struct ppsymbol* symbol"
+If
+.L ppop(PP_COMPILE)
+was set then
+.L pp.symbol
+points to the symbol table entry for the current identifier token.
+.L pp.symbol
+is undefined for non-identifier tokens.
+Once defined, an identifier will always have the same
+.L ppsymbol
+pointer.
+If
+.L ppop(PP_NOHASH)
+was also set then
+.L pp.symbol
+is defined for macro and keyword tokens and
+.L 0
+for all other identifiers.
+The elements of
+.L "struct ppsymbol"
+are:
+.RS
+.TP
+.L "char* name"
+The identifier name.
+.TP
+.L "int flags"
+The inclusive or of the following flags:
+.PD 0
+.RS
+.TP
+.L SYM_ACTIVE
+Currently being expanded.
+.TP
+.L SYM_BUILTIN
+Builtin macro.
+.TP
+.L SYM_DISABLED
+Macro expansion currently disabled.
+.TP
+.L SYM_FUNCTION
+Function-like macro.
+.TP
+.L SYM_INIT
+Initialization macro.
+.TP
+.L SYM_KEYWORD
+Keyword identifier.
+.TP
+.L SYM_LOADED
+Loaded checkpoint macro.
+.TP
+.L SYM_MULTILINE
+.L #macdef
+macro.
+.TP
+.L SYM_NOEXPAND
+No identifiers in macro body.
+.TP
+.L SYM_PREDEFINED
+Predefined macro.
+.TP
+.L SYM_PREDICATE
+Also a
+.L #assert
+predicate.
+.TP
+.L SYM_READONLY
+Readonly macro.
+.TP
+.L SYM_REDEFINE
+Ok to redefine.
+.TP
+.L SYM_VARIADIC
+Variadic function-like macro.
+.TP
+.L SYM_UNUSED
+First unused symbol flag bit index.
+The bits from
+.L (1<<SYM_UNUSED)
+on are initially unset and may be set by the user.
+.RE
+.PD
+.TP
+.L "struct ppmacro* macro"
+Non-zero if the identifier is a macro.
+.L "int macro\->arity"
+is the number of formal arguments for function-like macros and
+.L "char* macro\->value"
+is the macro definition value, a
+.L 0
+terminated string that may contain internal mark sequences.
+.TP
+.L "char* value"
+Initially set to
+.L 0
+and never modified by
+.IR pp .
+This field may be set by the user.
+.RE
+.TP
+.L "Hash_table_t* symtab"
+The macro and identifier
+.L "struct ppsymbol"
+hash table.
+The
+.IR hash (3)
+routines may be used to examine the table, with the exception that the
+following macros must be used for individual
+.L pp.symtab
+symbol lookup:
+.RS
+.TP
+.L "struct ppsymbol* ppsymget(Hash_table_t* table, char* name)"
+Return the
+.L ppsymbol
+pointer for
+.LR name ,
+0 if
+.L name
+not defined.
+.TP
+.L "struct ppsymbol* ppsymset(Hash_table_t* table, char* name)"
+Return the
+.L ppsymbol
+pointer for
+.LR name .
+If
+.L name
+is not defined then allocate and return a new
+.L ppsymbol
+for it.
+.RE
+.RE
+.PP
+Error messages are reported using
+.IR error (3)
+and the following globals relate to
+.IR pp :
+.TP
+.L "int error_info.errors"
+The level 2 error count.
+Error levels above 2 cause immediate exit.
+If
+.L error_info.errors
+is non-zero then the user program exit status should also be non-zero.
+.TP
+.L "char* error_info.file"
+The current input file name.
+.TP
+.L "int error_info.line"
+The current input line number.
+.TP
+.L "int error_info.trace"
+The debug trace level,
+.L 0
+by default.
+Larger negative numbers produce more trace information.
+Enabled when the user program is linked with the
+.B \-g
+.IR cc (1)
+option.
+.TP
+.L "int error_info.warnings"
+The level 1 error count.
+Warnings do not affect the exit status.
+.PP
+The functions are:
+.TP
+.L "extern int ppargs(char** argv, int last);"
+Passed to
+.IR optjoin (3)
+to parse
+.IR cpp (1)
+style options and arguments.
+The user may also supply application specific option parsers.
+Also handles non-standard options like the sun
+.L \-undef
+and GNU
+.LR \-trigraphs .
+Hello in there, ever here of
+.IR getopt (3)?
+.TP
+.L "extern void ppcpp(void);"
+This is the standalone
+.IR cpp (1)
+entry point.
+.L ppcpp
+consumes all of the input and writes the preprocessed text to the output.
+A single call to
+.L ppcpp
+is equivalent to, but more efficient than:
+.EX
+    ppop(PP_SPACEOUT, 1);
+    while (pplex())
+	ppprintf(" %s", pp.token);
+.EE
+.TP
+.L "extern int ppcomment(char* head, char* comment, char* tail, int line);"
+The default comment handler that passes comments to the output.
+May be used as an argument to
+.LR ppop(PP_COMMENT) ,
+or the user may supply an application specific handler.
+.L head
+is the comment head text,
+.L "/*"
+for C and
+.L "//"
+for C++,
+.L comment
+is the comment body,
+.L tail
+is the comment tail text,
+.L "*/"
+for C and
+.B newline
+for C++, and
+.L line
+is the comment starting line number.
+.TP
+.L "extern void pperror(int level, char* format, ...);"
+Equivalent to
+.IR error (3).
+All
+.I pp
+error and warning messages pass through
+.LR pperror .
+The user may link with an application specific
+.L pperror
+to override the library default.
+.TP
+.L "extern int ppincref(char* parent, char* file, int line, int push);"
+The default include reference handler that outputs
+.L file
+to the standard error.
+May be used as an argument to the
+.LR ppop(PP_INCREF) ,
+or the user may supply an application specific handler.
+.L parent
+is the including file name,
+.L file
+is the current include file name,
+.L line
+is the current line number in
+.LR file ,
+and 
+.L push
+is non-zero if
+.L file
+is being pushed or
+.L 0
+if file is being popped.
+.TP
+.L "extern void ppinput(char* buffer, char* file, int line);"
+Pushes the
+.L 0
+terminated
+.L buffer
+on the
+.I pp
+input stack.
+.L file
+is the pseudo file name used in line syncs for
+.L buffer
+and
+.L line
+is the starting line number.
+.TP
+.L "int pplex(void)"
+Returns the token type of the next input token.
+.L pp.token
+and where applicable
+.L pp.symbol
+are updated to refer to the new token.
+The token type constants are defined in
+.L pp.h
+for
+.L #include
+and
+.L pp.yacc
+for
+.IR yacc (1)
+.LR %include .
+The token constant names match
+.LR T_[A-Z_]* ;
+some are encoded by oring with
+.L N_[A-Z_]*
+tokens.
+.sp
+The numeric constant tokens and encodings are:
+.EX
+    T_DOUBLE          (N_NUMBER|N_REAL)
+    T_DOUBLE_L        (N_NUMBER|N_REAL|N_LONG)
+    T_FLOAT           (N_NUMBER|N_REAL|N_FLOAT)
+    T_DECIMAL         (N_NUMBER)
+    T_DECIMAL_L       (N_NUMBER|N_LONG)
+    T_DECIMAL_U       (N_NUMBER|N_UNSIGNED)
+    T_DECIMAL_UL      (N_NUMBER|N_UNSIGNED|N_LONG)
+    T_OCTAL           (N_NUMBER|N_OCTAL)
+    T_OCTAL_L         (N_NUMBER|N_OCTAL|N_LONG)
+    T_OCTAL_U         (N_NUMBER|N_OCTAL|N_UNSIGNED)
+    T_OCTAL_UL        (N_NUMBER|N_OCTAL|N_UNSIGNED|N_LONG)
+    T_HEXADECIMAL     (N_NUMBER|N_HEXADECIMAL)
+    T_HEXADECIMAL_L   (N_NUMBER|N_HEXADECIMAL|N_LONG)
+    T_HEXADECIMAL_U   (N_NUMBER|N_HEXADECIMAL|N_UNSIGNED)
+    T_HEXADECIMAL_UL  (N_NUMBER|N_HEXADECIMAL|N_UNSIGNED|N_LONG)
+.EE
+The normal C tokens are:
+.EX
+    T_ID              \fIC identifier\fP
+    T_INVALID         \fIinvalid token\fP
+    T_HEADER          <..>
+    T_CHARCONST       '..'
+    T_WCHARCONST      L'..'
+    T_STRING          ".."
+    T_WSTRING         L".."
+    T_PTRMEM          ->
+    T_ADDADD          ++
+    T_SUBSUB          --
+    T_LSHIFT          <<
+    T_RSHIFT          >>
+    T_LE              <=
+    T_GE              >=
+    T_EQ              ==
+    T_NE              !=
+    T_ANDAND          &&
+    T_OROR            ||
+    T_MPYEQ           *=
+    T_DIVEQ           /=
+    T_MODEQ           %=
+    T_ADDEQ           +=
+    T_SUBEQ           -=
+    T_LSHIFTEQ        <<=
+    T_RSHIFTEQ        >>=
+    T_ANDEQ           &=
+    T_XOREQ           ^=
+    T_OREQ            |=
+    T_TOKCAT          ##
+    T_VARIADIC        ...
+    T_DOTREF          .*    [\fIif\fP PP_PLUSPLUS]
+    T_PTRMEMREF       ->*   [\fIif\fP PP_PLUSPLUS]
+    T_SCOPE           ::    [\fIif\fP PP_PLUSPLUS]
+    T_UMINUS          \fIunary minus\fP
+.EE
+If
+.L ppop(PP_COMPILE)
+was set then the keyword tokens are also defined.
+Compiler differences and dialects are detected by the
+.I pp
+.IR probe (1)
+information, and only the appropriate keywords are enabled.
+The ANSI keyword tokens are:
+.EX
+T_AUTO          T_BREAK          T_CASE           T_CHAR
+T_CONTINUE      T_DEFAULT        T_DO             T_DOUBLE_T
+T_ELSE          T_EXTERN         T_FLOAT_T        T_FOR
+T_GOTO          T_IF             T_INT            T_LONG
+T_REGISTER      T_RETURN         T_SHORT          T_SIZEOF
+T_STATIC        T_STRUCT         T_SWITCH         T_TYPEDEF
+T_UNION         T_UNSIGNED       T_WHILE          T_CONST
+T_ENUM          T_SIGNED         T_VOID           T_VOLATILE
+.EE
+and the C++ keyword tokens are:
+.EX
+T_CATCH         T_CLASS          T_DELETE         T_FRIEND
+T_INLINE        T_NEW            T_OPERATOR       T_OVERLOAD
+T_PRIVATE       T_PROTECTED      T_PUBLIC         T_TEMPLATE
+T_THIS          T_THROW          T_TRY            T_VIRTUAL
+.EE
+In addition,
+.L T_ASM
+is recognized where appropriate.
+Additional keyword tokens
+.L ">= T_KEYWORD"
+may be added using
+.LR ppop(PP_COMPILE) .
+.sp
+Many C implementations show no restraint in adding new keywords; some
+PC compilers have tripled the number of keywords.
+For the most part these new keywords introduce noise constructs that
+can be ignored for standard
+.RI ( reasonable )
+analysis and compilation.
+The noise keywords fall in four syntactic categories that map into the two
+noise keyword tokens
+.L T_NOISE 
+and 
+.LR T_NOISES .
+For
+.L T_NOISES
+.L pp.token
+points to the entire noise construct, including the offending noise keyword.
+The basic noise keyword categories are:
+.RS
+.TP
+.L T_NOISE
+The simplest noise: a single keyword that is noise in any context and maps to
+.LR T_NOISE .
+.TP
+.L T_X_GROUP
+A noise keyword that precedes an optional grouping construct, either
+.L "(..)"
+or
+.L "{..}"
+and maps to
+.LR T_NOISES .
+.TP
+.L T_X_LINE
+A noise keyword that consumes the remaining tokens in the line
+and maps to
+.LR T_NOISES .
+.TP
+.L T_X_STATEMENT
+A noise keyword that consumes the tokens up to the next
+.L ;
+and maps to
+.LR T_NOISES .
+.RE
+.sp
+If
+.L ppop(PP_NOISE)
+is
+.L "> 0"
+then implementation specific noise constructs are mapped to either
+.L T_NOISE
+or
+.L T_NOISES ,
+otherwise if
+.L ppop(PP_NOISE)
+is
+.L "< 0"
+then noise constructs are completely ignored,
+otherwise the unmapped grouping noise tokens
+.L T_X_.*
+are returned.
+.sp
+Token encodings may be tested by the following macros:
+.RS
+.TP
+.L "int isnumber(int token);"
+Non-zero if
+.L token
+is an integral or floating point numeric constant.
+.TP
+.L "int isinteger(int token);"
+Non-zero if
+.L token
+is an integral numeric constant.
+.TP
+.L "int isreal(int token);"
+Non-zero if
+.L token
+is a floating point numeric constant.
+.TP
+.L "int isassignop(int token);"
+Non-zero if
+.L token
+is a C assignment operator.
+.TP
+.L "int isseparate(int token);"
+Non-zero if
+.L token
+must be separated from other tokens by
+.BR space .
+.TP
+.L "int isnoise(int token);"
+Non-zero if
+.L token
+is a noise keyword.
+.RE
+.TP
+.L "extern int ppline(int line, char* file);"
+The default line sync handler that outputs line sync pragmas for the C compiler
+front end.
+May be used as an argument to
+.LR ppop(PP_LINE) ,
+or the user may supply an application specific handler.
+.L line
+is the line number and
+.L file
+is the file name.
+If
+.L ppop(PP_LINEID)
+was set then the directive
+\fB#\fP \fIlineid line \fP"\fIfile\fP" is output.
+.TP
+.L "extern int ppmacref(struct ppsymbol* symbol, char* file, int line, int type);"
+The default macro reference handler that outputs a macro reference pragmas.
+May be used as an argument to
+.LR ppop(PP_MACREF) ,
+or the user may supply an application specific handler.
+.L symbol
+is the macro
+.L ppsymbol
+pointer,
+.L file
+is the reference file,
+.L line
+is the reference line,
+and if
+.L type
+is non-zero a macro value checksum is also output.
+The pragma syntax is
+\fB#pragma pp:macref\fP "\fIsymbol\->name\fP" \fIline checksum\fP.
+.TP
+.L "int ppop(int op, ...)"
+.L ppop
+is the option control interface.
+.L op
+determines the type(s) of the remaining argument(s).
+Options marked by
+.L "/*INIT*/"
+must be done before
+.LR PP_INIT .
+.RS
+.TP
+.L "(PP_ASSERT, char* string) /*INIT*/"
+.L string
+is asserted as if by
+.LR #assert .
+.TP
+.L "(PP_BUILTIN, char*(*fun)(char* buf, char* name, char* args)) /*INIT*/"
+Installs 
+.L fun
+as the unknown builtin macro handler.
+Builtin macros are of the form
+.LR "#(name args)" .
+.L fun 
+is called with
+.L name
+set to the unknown builtin macro name and
+.L args
+set to the arguments.
+.L buf
+is a
+.L MAXTOKEN+1
+buffer that can be used for the
+.L fun
+return value.
+.L 0
+should be returned on error.
+.TP
+.L "(PP_COMMENT,void (*fun)(char*head,char*body,char*tail,int line) /*INIT*/"
+.TP
+.L "(PP_COMPATIBILITY, char* string) /*INIT*/"
+.TP
+.L "(PP_COMPILE, char* string) /*INIT*/"
+.TP
+.L "(PP_DEBUG, char* string) /*INIT*/"
+.TP
+.L "(PP_DEFAULT, char* string) /*INIT*/"
+.TP
+.L "(PP_DEFINE, char* string) /*INIT*/"
+.L string
+is defined as if by
+.LR #define .
+.TP
+.L "(PP_DIRECTIVE, char* string) /*INIT*/"
+The directive
+.BI # string
+is executed.
+.TP
+.L "(PP_DONE, char* string) /*INIT*/"
+.TP
+.L "(PP_DUMP, char* string) /*INIT*/"
+.TP
+.L "(PP_FILEDEPS, char* string) /*INIT*/"
+.TP
+.L "(PP_FILENAME, char* string) /*INIT*/"
+.TP
+.L "(PP_HOSTDIR, char* string) /*INIT*/"
+.TP
+.L "(PP_HOSTED, char* string) /*INIT*/"
+.TP
+.L "(PP_ID, char* string) /*INIT*/"
+.TP
+.L "(PP_IGNORE, char* string) /*INIT*/"
+.TP
+.L "(PP_INCLUDE, char* string) /*INIT*/"
+.TP
+.L "(PP_INCREF, char* string) /*INIT*/"
+.TP
+.L "(PP_INIT, char* string) /*INIT*/"
+.TP
+.L "(PP_INPUT, char* string) /*INIT*/"
+.TP
+.L "(PP_LINE, char* string) /*INIT*/"
+.TP
+.L "(PP_LINEFILE, char* string) /*INIT*/"
+.TP
+.L "(PP_LINEID, char* string) /*INIT*/"
+.TP
+.L "(PP_LINETYPE, char* string) /*INIT*/"
+.TP
+.L "(PP_LOCAL, char* string) /*INIT*/"
+.TP
+.L "(PP_MACREF, char* string) /*INIT*/"
+.TP
+.L "(PP_MULTIPLE, char* string) /*INIT*/"
+.TP
+.L "(PP_NOHASH, char* string) /*INIT*/"
+.TP
+.L "(PP_NOID, char* string) /*INIT*/"
+.TP
+.L "(PP_NOISE, char* string) /*INIT*/"
+.TP
+.L "(PP_OPTION, char* string) /*INIT*/"
+The directive
+\fB#pragma pp:\fP\fIstring\fP
+is executed.
+.TP
+.L "(PP_OPTARG, char* string) /*INIT*/"
+.TP
+.L "(PP_OUTPUT, char* string) /*INIT*/"
+.TP
+.L "(PP_PASSNEWLINE, char* string) /*INIT*/"
+.TP
+.L "(PP_PASSTHROUGH, char* string) /*INIT*/"
+.TP
+.L "(PP_PLUSPLUS, char* string) /*INIT*/"
+.TP
+.L "(PP_PRAGMA, char* string) /*INIT*/"
+.TP
+.L "(PP_PREFIX, char* string) /*INIT*/"
+.TP
+.L "(PP_PROBE, char* string) /*INIT*/"
+.TP
+.L "(PP_READ, char* string) /*INIT*/"
+.TP
+.L "(PP_RESERVED, char* string) /*INIT*/"
+.TP
+.L "(PP_SPACEOUT, char* string) /*INIT*/"
+.TP
+.L "(PP_STANDALONE, char* string) /*INIT*/"
+.TP
+.L "(PP_STANDARD, char* string) /*INIT*/"
+.TP
+.L "(PP_STRICT, char* string) /*INIT*/"
+.TP
+.L "(PP_TEST, char* string) /*INIT*/"
+.TP
+.L "(PP_TRUNCATE, char* string) /*INIT*/"
+.TP
+.L "(PP_UNDEF, char* string) /*INIT*/"
+.TP
+.L "(PP_WARN, char* string) /*INIT*/"
+.RE
+.TP
+.L "int pppragma(char* dir, char* pass, char* name, char* value, int nl);"
+The default handler that
+copies unknown directives and pragmas to the output.
+May be used as an argument to
+.LR ppop(PP_PRAGMA) ,
+or the user may supply an application specific handler.
+This function is most often called after directive and pragma mapping.
+Any of the arguments may be
+.LR 0 .
+.L dir
+is  the directive name,
+.L pass
+is the pragma pass name,
+.L name
+is the pragma option name,
+.L value
+is the pragma option value, and
+.L nl
+is non-zero
+if a trailing newline is required if the pragma is copied to the output.
+.TP
+.L "int ppprintf(char* format, ...);"
+A
+.IR printf (3)
+interface to the standalone
+.I pp
+output buffer.
+Macros provide limited control over output buffering:
+.L "void ppflushout()"
+flushes the output buffer,
+.L "void ppcheckout()"
+flushes the output buffer if over
+.L PPBUFSIZ
+character are buffered,
+.L "int pppendout()"
+returns the number of pending character in the output buffer, and
+.L "void ppputchar(int c)"
+places the character
+.L c
+in the output buffer.
+.SH CAVEATS
+The ANSI mode is intended to be true to the standard.
+The compatibility mode has been proven in practice, but there are
+surely dark corners of some implementations that may have been omitted.
+.SH "SEE ALSO"
+cc(1), cpp(1), nmake(1), probe(1), yacc(1),
+.br
+ast(3), error(3), hash(3), optjoin(3)
+.SH AUTHOR
+Glenn Fowler
+.br
+(Dennis Ritchie provided the original table driven lexer.)
+.br
+AT&T Bell Laboratories

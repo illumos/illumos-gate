@@ -1,0 +1,150 @@
+: generate ast_sa.h
+case $# in
+0)	set cc ;;
+esac
+cat > _ast_.c <<'!'
+	#define _BYTESEX_H
+
+	#include <stdio.h>
+	#include <sys/types.h>
+
+	#if N == 0
+	#define _ast_int8_t	long
+	#define _ast_int8_str	"long"
+	#endif
+	#if N == 1
+	#define _ast_int8_t	long long
+	#define _ast_int8_str	"long long"
+	#endif
+	#if N == 2
+	#define _ast_int8_t	__int64_t
+	#define _ast_int8_str	"__int64_t"
+	#endif
+	#if N == 3
+	#define _ast_int8_t	_int64_t
+	#define _ast_int8_str	"_int64_t"
+	#endif
+	#if N == 4
+	#define _ast_int8_t	int64_t
+	#define _ast_int8_str	"int64_t"
+	#endif
+	#if N == 5
+	#define _ast_int8_t	__int64
+	#define _ast_int8_str	"__int64"
+	#endif
+	#if N == 6
+	#define _ast_int8_t	_int64
+	#define _ast_int8_str	"_int64"
+	#endif
+	#if N == 7
+	#define _ast_int8_t	int64
+	#define _ast_int8_str	"int64"
+	#endif
+
+	#define elementsof(x)	(sizeof(x)/sizeof(x[0]))
+	
+	static char		i_char = 1;
+	static short		i_short = 1;
+	static int		i_int = 1;
+	static long		i_long = 1;
+	#ifdef _ast_int8_t
+	static _ast_int8_t	i_long_long = 1;
+	#endif
+	
+	static struct
+	{
+		char*	name;
+		int	size;
+		char*	swap;
+	} int_type[] =
+	{
+		"char",		sizeof(char),		(char*)&i_char,
+		"short",	sizeof(short),		(char*)&i_short,
+		"int",		sizeof(int),		(char*)&i_int,
+		"long",		sizeof(long),		(char*)&i_long,
+	#ifdef _ast_int8_t
+		_ast_int8_str,	sizeof(_ast_int8_t),	(char*)&i_long_long,
+	#endif
+	};
+	
+	static struct
+	{
+		char*	name;
+		int	size;
+	} flt_type[] =
+	{
+		"float",	sizeof(float),
+		"double",	sizeof(double),
+	#ifdef _typ_long_double
+		"long double",	sizeof(long double),
+	#endif
+	};
+	
+	static int	int_size[] = { 1, 2, 4, 8 };
+	
+	main()
+	{
+		register int	t;
+		register int	s;
+		register int	m = 1;
+		register int	b = 1;
+		register int	w = 0;
+	
+	#ifdef _ast_int8_t
+		if (int_type[elementsof(int_type)-1].size <= 4)
+			return 1;
+	#endif
+		for (s = 0; s < elementsof(int_size); s++)
+		{
+			for (t = 0; t < elementsof(int_type) && int_type[t].size < int_size[s]; t++);
+			if (t < elementsof(int_type))
+			{
+				m = int_size[s];
+				printf("#define _ast_int%d_t		%s\n", m, int_type[t].name);
+				if (m > 1)
+				{
+					if (*int_type[t].swap)
+						w |= b;
+					b <<= 1;
+				}
+			}
+		}
+		printf("#define _ast_intmax_t		_ast_int%d_t\n", m);
+		if (m == sizeof(long))
+			printf("#define _ast_intmax_long		1\n");
+		printf("#define _ast_intswap		%d\n", w);
+		printf("\n");
+		for (t = 0; t < elementsof(flt_type); t++)
+		{
+			while (t < elementsof(flt_type) && flt_type[t].size == flt_type[t + 1].size)
+				t++;
+			m = flt_type[t].size;
+			printf("#define _ast_flt%d_t		%s\n", flt_type[t].size, flt_type[t].name);
+		}
+		printf("#define _ast_fltmax_t		_ast_flt%d_t\n", m);
+		if (m == sizeof(double))
+			printf("#define _ast_fltmax_double		1\n");
+		return 0;
+	}
+!
+echo "#ifndef _AST_SA_H"
+echo "#define _AST_SA_H		1"
+echo
+for i in '' -DN=0 -DN=1 -DN=2 -DN=3 -DN=4 -DN=5 -DN=6 -DN=7 -DN=8
+do	"$@" $i -o _ast_.exe _ast_.c 2> /dev/null &&
+	./_ast_.exe &&
+	break
+done
+echo '#include <stdint.h>' > _ast_.c
+if	"$@" -E _ast_.c > /dev/null 2>&1
+then	echo "#define _hdr_stdint	1"
+fi
+echo '#include <unistd.h>' > _ast_.c
+if	"$@" -E _ast_.c > /dev/null 2>&1
+then	echo "#define _hdr_unistd	1"
+fi
+rm -f _ast_.c _ast_.exe
+echo "#define __DEFINE__(T,obj,val)	T obj = val"
+echo "#define __EXTERN__(T,obj)		extern T obj"
+echo
+echo "#endif"

@@ -1,0 +1,80 @@
+hdr	time
+lib	clock_settime,gettimeofday,settimeofday,stime,utimes
+lib	nanosleep,usleep
+lib	utimensat -D_ATFILE_SOURCE sys/stat.h note{ complete utimensat implementation }end link{
+	#include <fcntl.h>
+	static struct timespec	ts[2];
+	int
+	main()
+	{
+		ts[0].tv_nsec = UTIME_NOW;
+		ts[1].tv_nsec = UTIME_OMIT;
+		return utimensat(AT_FDCWD, ".", ts, AT_SYMLINK_NOFOLLOW) != 0;
+	}
+}end
+
+if ! mem timeval.tv_sec sys/time.h {
+	struct timeval
+	{
+		time_t	tv_sec;
+		time_t	tv_usec;
+	};
+}
+endif
+
+lib	clock_gettime execute{
+	#include <time.h>
+	int
+	main()
+	{
+		struct timespec	tv;
+		return clock_gettime(CLOCK_REALTIME, &tv) != 0;
+	}
+}end
+
+lib	utimets link{
+	#include <time.h>
+	#include <sys/time.h>
+	static struct timespec	tv;
+	int
+	main()
+	{
+		return utimets(".", &tv) != 0;
+	}
+}end
+
+tst	- -DN=1 - -DN=2 - -DN=3 - -DN=4 output{
+	#include <sys/types.h>
+	#include <sys/time.h>
+	int
+	main()
+	{
+		struct timeval	tv;
+#if N == 1
+		struct timezone	tz;
+		if (gettimeofday(&tv, (struct timezone*)0) < 0)
+			return 1;
+		printf("#define tmgettimeofday(p)	gettimeofday(p,(struct timezone*)0)\n");
+#if _lib_settimeofday
+		printf("#define tmsettimeofday(p)	settimeofday(p,(struct timezone*)0)\n");
+#endif
+#endif
+#if N == 2
+		if (gettimeofday(&tv, (void*)0) < 0)
+			return 1;
+		printf("#define tmgettimeofday(p)	gettimeofday(p,(void*)0)\n");
+#if _lib_settimeofday
+		printf("#define tmsettimeofday(p)	gettimeofday(p,(void*)0)\n");
+#endif
+#endif
+#if N == 3
+		if (gettimeofday(&tv) < 0)
+			return 1;
+		printf("#define tmgettimeofday(p)	gettimeofday(p)\n");
+#if _lib_settimeofday
+		printf("#define tmsettimeofday(p)	settimeofday(p)\n");
+#endif
+#endif
+		return 0;
+	}
+}end

@@ -1,0 +1,116 @@
+set	prototyped
+hdr	iconv
+lib	iconv_open,iconv_close,iconv iconv.h -liconv
+nxt	iconv
+
+tst	output{
+	#if !_lib_iconv_open
+	#define _undef_hdr_iconv	1
+	#undef	_hdr_iconv
+	#endif
+	#if !_hdr_iconv
+	#define _undef_lib_iconv_open	1
+	#undef	_lib_iconv_open
+	#endif
+	#if _hdr_iconv
+	#include <sys/types.h>
+	#include <iconv.h>
+	#endif
+
+	int
+	main()
+	{
+		char*	lib;
+
+		printf("#include <ast_common.h>\n");
+		printf("#include <ccode.h>\n");
+	#if _undef_hdr_iconv
+		printf("#undef	_hdr_iconv\n");
+	#endif
+	#if _undef_lib_iconv_open
+		printf("#undef	_lib_iconv_open\n");
+	#endif
+	#if _hdr_iconv && defined(_nxt_iconv_str)
+		printf("#include <%s>	/* the native iconv.h */\n", _nxt_iconv_str);
+	#endif
+		printf("\n");
+		printf("#define ICONV_VERSION		20110111L\n");
+		printf("\n");
+		printf("#define ICONV_FATAL		0x02\n");
+		printf("#define ICONV_OMIT		0x04\n");
+		printf("\n");
+		printf("#define CC_ICONV		(-1)\n");
+		printf("#define CC_UCS			(-2)\n");
+		printf("#define CC_SCU			(-3)\n");
+		printf("#define CC_UTF			(-4)\n");
+		printf("#define CC_UME			(-5)\n");
+		printf("\n");
+	#if _lib_iconv_open
+		lib = "_ast_";
+		printf("#ifndef _ICONV_LIST_PRIVATE_\n");
+		printf("#undef	iconv_t\n");
+		printf("#define	iconv_t		%siconv_t\n", lib);
+		printf("#undef	iconv_f\n");
+		printf("#define	iconv_f		%siconv_f\n", lib);
+		printf("#undef	iconv_list_t\n");
+		printf("#define	iconv_list_t	%siconv_list_t\n", lib);
+		printf("#undef	iconv_open\n");
+		printf("#define iconv_open	%siconv_open\n", lib);
+		printf("#undef	iconv\n");
+		printf("#define	iconv		%siconv\n", lib);
+		printf("#undef	iconv_close\n");
+		printf("#define iconv_close	%siconv_close\n", lib);
+		printf("#undef	iconv_list\n");
+		printf("#define iconv_list	%siconv_list\n", lib);
+		printf("#undef	iconv_move\n");
+		printf("#define iconv_move	%siconv_move\n", lib);
+		printf("#undef	iconv_name\n");
+		printf("#define iconv_name	%siconv_name\n", lib);
+		printf("#undef	iconv_write\n");
+		printf("#define iconv_write	%siconv_write\n", lib);
+		printf("#endif\n");
+	#else
+		lib = "";
+	#endif
+		printf("\n");
+		printf("typedef int (*Iconv_error_f)(void*, void*, int, ...);\n");
+		printf("\n");
+		printf("typedef struct Iconv_disc_s\n");
+		printf("{\n");
+		printf("	uint32_t		version;\n");
+		printf("	Iconv_error_f		errorf;\n");
+		printf("	size_t			errors;\n");
+		printf("	uint32_t		flags;\n");
+		printf("	int			fill;\n");
+		printf("} Iconv_disc_t;\n");
+		printf("\n");
+		printf("typedef Ccmap_t %siconv_list_t;\n", lib);
+		printf("typedef void* %siconv_t;\n", lib);
+		printf("typedef size_t (*%siconv_f)(%siconv_t, char**, size_t*, char**, size_t*);\n", lib, lib);
+		printf("\n");
+		printf("#define iconv_init(d,e)		(memset(d,0,sizeof(*(d))),(d)->version=ICONV_VERSION,(d)->errorf=(Iconv_error_f)(e),(d)->fill=(-1))\n");
+		printf("\n");
+		printf("#if _BLD_ast && defined(__EXPORT__)\n");
+		printf("#define extern		__EXPORT__\n");
+		printf("#endif\n");
+		printf("\n");
+		printf("extern %siconv_t	%siconv_open(const char*, const char*);\n", lib, lib);
+		printf("extern size_t		%siconv(%siconv_t, char**, size_t*, char**, size_t*);\n", lib, lib);
+		printf("extern int		%siconv_close(%siconv_t);\n", lib, lib);
+		printf("extern %siconv_list_t*	%siconv_list(%siconv_list_t*);\n", lib, lib, lib);
+		printf("extern int		%siconv_name(const char*, char*, size_t);\n", lib);
+		printf("#if _SFIO_H\n");
+		printf("extern ssize_t		%siconv_move(%siconv_t, Sfio_t*, Sfio_t*, size_t, Iconv_disc_t*);\n", lib, lib);
+		printf("extern ssize_t		%siconv_write(%siconv_t, Sfio_t*, char**, size_t*, Iconv_disc_t*);\n", lib, lib);
+		printf("#else\n");
+		printf("#if _SFSTDIO_H\n");
+		printf("extern ssize_t		%siconv_move(%siconv_t, FILE*, FILE*, size_t, Iconv_disc_t*);\n", lib, lib);
+		printf("extern ssize_t		%siconv_write(%siconv_t, FILE*, char**, size_t*, Iconv_disc_t*);\n", lib, lib);
+		printf("#endif\n");
+		printf("#endif\n");
+		printf("\n");
+		printf("#undef	extern\n");
+		printf("\n");
+		return 0;
+	}
+}end

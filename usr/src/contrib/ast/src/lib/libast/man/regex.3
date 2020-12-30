@@ -1,0 +1,163 @@
+.fp 5 B
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH REGEX 3
+.SH NAME
+regex \- regular expression interface
+.SH SYNOPSIS
+.EX
+#include <regex.h>
+
+int        regcomp(regex_t* \fIre\fP, const char* \fIregex\fP, int \fIcflags\fP);
+int        regexec(const regex_t* \fIre\fP, const char* \fIstring\fP, size_t \fInmatch\fP, regmatch_t \fIpmatch\fP[], int \fIeflags\fP);
+size_t     regerror(int \fIcode\fP, const regex_t* \fIre\fP, char* \fIerrbuf\fP, size_t \fIerrbuf_size\fP);
+void       regfree(regex_t* \fIre\fP);
+
+regclass_t regclass(const char* \fIstr\fP, char** \fIend\fP);
+int        regaddclass(const char* \fIname\fP, regclass_t \fIclassf\fP);
+int        regcollate(const char* \fIstr\fP, char** \fIend\fP, char* \fIbuf\fP, int \fIsize\fP);
+
+int        regcomb(regex_t* \fIre_1\fP, regex_t* \fIre_2\fP);
+size_t     regdecomp(regex_t* \fIre\fP, regflags_t \fIflags\fP, char* \fIbuf\fP, size_t \fIsize\fP);
+int        regdup(regex_t* \fIre_old\fP, regex_t* \fIre_new\fP);
+regstat_t* regstat(const regex_t* \fIre\fP);
+
+regex_t*   regcache(const char* \fIpattern\fP, regflags_t \fIflags\fP, int* \fIpcode\fP);
+
+int        regncomp(regex_t* \fIre\fP, const char* \fIpattern\fP, size_t \fIsize\fP, regflags_t \fIflags\fP);
+int        regnexec(const regex_t* \fIre\fP, const char* \fIsubject\fP, size_t \fIsize\fP, size_t \fInmatch\fP, regmatch_t* \fImatch\fP, regflags_t \fIflags\fP);
+int        regrecord(const regex_t* \fIre\fP);
+int        regrexec(const regex_t* \fIre\fP, const char* \fIbuf\fP, size_t \fIsize\fP, size_t \fInmatch\fP, regmatch_t* \fImatch\fP, regflags_t \fIflags\fP, int \fIsep\fP, void* \fIhandle\fP, regrecord_t \fIrecordf\fP);
+void       regfatal(regex_t* \fIre\fP, int \fIlevel\fP, int \fIcode\fP);
+void       regfatalpat(regex_t* \fIre\fP, int \fIlevel\fP, int \fIcode\fP, const char* \fIpattern\fP);
+
+int        regsubcomp(regex_t* \fIre\fP, const char* \fIstr\fP, const regflags_t* \fImap\fP, int \fIminmatch\fP, regflags_t \fIflags\fP);
+int        regsubexec(const regex_t* \fIre\fP, const char* \fIsubject\fP, size_t \fInmatch\fP, regmatch_t* match);
+int        regsubflags(regex_t* \fIre\fP, const char* \fIstr\fP, char** \fIend\fP, int \fIdelim\fP, const regflags_t* \fImap\fP, int* \fIpm\fP, regflags_t* \fIpf\fP);
+void       regsubfree(regex_t* \fIre\fP);
+.EE
+
+.SH DESCRIPTION
+.LR regcomp() ,
+.LR regexec() ,
+.LR regerror() ,
+and
+.L regfree()
+are the POSIX regular expression functions.
+The remaining functions are
+.B ast
+extensions.
+.B ast
+also provides
+.I flags
+extensions to the
+.LR regcomp() ,
+.LR regexec()
+functions and
+.I code
+extensions to the
+.L regerror()
+function.
+
+.PP
+.L regcache()
+maintains a cache of compiled regular expressions for patterns of size
+255 bytes or less.
+The initial cache size is 8.
+.L pattern
+and
+.L flags
+are passed to
+.L regcomp()
+with an
+.L re
+pointer maintained by
+.LR regcache() .
+.LR pcode ,
+if not 0, points to the return value of the
+.L regcomp()
+call.
+If the
+.L regcomp()
+call fails,
+.L regcache()
+returns 0 and
+.L pcode
+will point to the non-zero error code.
+Do not call
+.L regfree()
+on the
+.L re
+returned by
+.LR regcache() .
+Both
+.L pattern
+and
+.L flags
+are used to match entries in the cache.
+When the cache is full the least recently used
+.L re
+is freed (via
+.LR regfree() )
+to make space for the new pattern.
+Any
+.L re
+previously returned by
+.L regcache()
+may be freed (invalidated) on the next call to
+.LR regcache() .
+If
+.L pattern
+is longer that 255 bytes then it is still passed on to
+.LR regcomp() ,
+but it will not be cached.
+If
+.L pattern
+is 0 then the cache is flushed.
+In addition, if the integer value of
+.L flags
+is greater than the current cache size, the cache size is increased
+to that integer value.
+0 is always returned when
+.L pattern
+is 0;
+.L pcode
+will point to a non-zero value on error.
+
+.SH "SEE ALSO"
+strmatch(3)

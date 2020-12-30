@@ -1,0 +1,46 @@
+set	prototyped
+lib	nanosleep,usleep,_strftime
+typ	clock_t = uint32_t
+typ	time_t = uint32_t
+
+if sys time {
+	#include <sys/time.h>
+}
+endif
+
+if ! mem tm.tm_sec sys/time.h
+    if hdr time {
+	#include <time.h>
+    }
+    endif
+endif
+
+if sys times {
+	#include <sys/times.h>
+}
+else {
+	struct tms
+	{
+		clock_t	tms_utime;
+		clock_t	tms_stime;
+		clock_t	tms_cutime;
+		clock_t	tms_cstime;
+	};
+	extern clock_t		times(struct tms*);
+}
+endif
+
+if ! mem timeval.tv_sec sys/time.h {
+	struct timeval
+	{
+		time_t	tv_sec;
+		time_t	tv_usec;
+	};
+}
+endif
+
+cat{
+#if !defined(CLOCKS_PER_SEC) && defined(CLK_TCK)
+#define CLOCKS_PER_SEC	CLK_TCK
+#endif
+}end

@@ -1,0 +1,314 @@
+info mam static 00000 1994-07-17 make (AT&T Research) 5.7 2012-06-20
+setv INSTALLROOT ../../..
+setv PACKAGE_ast_INCLUDE ${INSTALLROOT}/include/ast
+setv PACKAGE_ast_LIB ${INSTALLROOT}/lib
+setv PACKAGEROOT ../../../../..
+setv AR ${mam_cc_AR} ${mam_cc_AR_ARFLAGS}
+setv ARFLAGS rc
+setv AS as
+setv ASFLAGS
+setv CC cc
+setv mam_cc_FLAGS
+setv CCFLAGS ${-debug-symbols?1?${mam_cc_DEBUG} -D_BLD_DEBUG?${mam_cc_OPTIMIZE}?}
+setv CCLDFLAGS ${-strip-symbols?1?${mam_cc_LD_STRIP}??}
+setv COTEMP $$
+setv CPIO cpio
+setv CPIOFLAGS
+setv CPP "${CC} -E"
+setv F77 f77
+setv HOSTCC ${CC}
+setv IGNORE
+setv LD ld
+setv LDFLAGS
+setv LEX lex
+setv LEXFLAGS
+setv LPR lpr
+setv LPRFLAGS
+setv M4FLAGS
+setv NMAKE nmake
+setv NMAKEFLAGS
+setv PR pr
+setv PRFLAGS
+setv SHELL /bin/sh
+setv SILENT
+setv TAR tar
+setv YACC yacc
+setv YACCFLAGS -d
+make ${PACKAGEROOT}/lib/package/ast.lic
+done ${PACKAGEROOT}/lib/package/ast.lic
+make install
+make msgadmin
+make msgadmin.sh
+done msgadmin.sh
+meta msgadmin %.sh>% msgadmin.sh msgadmin
+prev msgadmin.sh
+exec - case static,port:$OPTIND:$RANDOM in
+exec - ?*:*:*|*::*|*:*:$RANDOM)
+exec - ;;
+exec - *) if ENV= LC_ALL=C x= $SHELL -nc '[[ a || b ]] && : ${list[level]}  !(pattern)' 2>/dev/null
+exec - then if grep '### .*archaic.* ###' >/dev/null
+exec - then : msgadmin contains archaic constructs :
+exec - else ENV= LC_ALL=C $SHELL -n msgadmin.sh
+exec - fi
+exec - fi
+exec - ;;
+exec - esac
+exec - case '${mam_cc_SHELLMAGIC}' in
+exec - "") case 201 in
+exec - 0) cp msgadmin.sh msgadmin
+exec - ;;
+exec - *) {
+exec - i=`(read x; echo $x) < msgadmin.sh`
+exec - case $i in
+exec - '#!'*|*'||'*|':'*|'":"'*|"':'"*) echo "$i" ;;
+exec - esac
+exec - cat - msgadmin.sh <<'!'
+exec - USAGE_LICENSE="[-author?Glenn Fowler <gsf@research.att.com>][-copyright?Copyright (c) 2000-2012 AT&T Intellectual Property][-license?http://www.eclipse.org/org/documents/epl-v10.html][--catalog?msgcc]"
+exec - !
+exec - } > msgadmin
+exec - ;;
+exec - esac
+exec - ;;
+exec - *) cat - msgadmin.sh > msgadmin <<'!'
+exec - ${mam_cc_SHELLMAGIC}
+exec - USAGE_LICENSE="[-author?Glenn Fowler <gsf@research.att.com>][-copyright?Copyright (c) 2000-2012 AT&T Intellectual Property][-license?http://www.eclipse.org/org/documents/epl-v10.html][--catalog?msgcc]"
+exec - !
+exec - ;;
+exec - esac
+exec - silent test -w msgadmin -a -x msgadmin || chmod u+w,+x msgadmin
+done msgadmin generated
+make msgcpp
+make msgcpp.o
+make msgcpp.c
+make ${PACKAGE_ast_INCLUDE}/ppkey.h implicit
+make ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/prototyped.h dontcare
+done ${PACKAGE_ast_INCLUDE}/ppkey.h
+make ${PACKAGE_ast_INCLUDE}/pp.h implicit
+make ${PACKAGE_ast_INCLUDE}/ccode.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_ccode.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_ccode.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_map.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_map.h dontcare
+make ${PACKAGE_ast_INCLUDE}/endian.h implicit
+make ${PACKAGE_ast_INCLUDE}/bytesex.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+done ${PACKAGE_ast_INCLUDE}/bytesex.h dontcare
+done ${PACKAGE_ast_INCLUDE}/endian.h dontcare
+done ${PACKAGE_ast_INCLUDE}/ast_common.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ccode.h dontcare
+make ${PACKAGE_ast_INCLUDE}/error.h implicit
+make ${PACKAGE_ast_INCLUDE}/option.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_api.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_api.h dontcare
+make ${PACKAGE_ast_INCLUDE}/vmalloc.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+make ${PACKAGE_ast_INCLUDE}/regex.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_api.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_wchar.h implicit
+make ${PACKAGE_ast_INCLUDE}/wctype.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_wctype.h implicit
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+make ${PACKAGE_ast_INCLUDE}/wchar.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_wchar.h implicit
+done ${PACKAGE_ast_INCLUDE}/wchar.h dontcare
+done ${PACKAGE_ast_INCLUDE}/ast_wctype.h dontcare
+done ${PACKAGE_ast_INCLUDE}/wctype.h dontcare
+make ${PACKAGE_ast_INCLUDE}/stdio.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_stdio.h implicit
+make ${PACKAGE_ast_INCLUDE}/sfio_s.h implicit
+done ${PACKAGE_ast_INCLUDE}/sfio_s.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_stdio.h dontcare
+done ${PACKAGE_ast_INCLUDE}/stdio.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/stdio.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_wchar.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/regex.h dontcare
+make ${PACKAGE_ast_INCLUDE}/getopt.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_getopt.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_getopt.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/getopt.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_map.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_botch.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_botch.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ast_limits.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_limits.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ast_fcntl.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_fs.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_fs.h dontcare
+done ${PACKAGE_ast_INCLUDE}/ast_fcntl.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_getopt.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_sys.h implicit
+prev ${PACKAGE_ast_INCLUDE}/getopt.h implicit
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_sys.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ast_lib.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_lib.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_std.h dontcare
+done ${PACKAGE_ast_INCLUDE}/vmalloc.h dontcare
+make ${PACKAGE_ast_INCLUDE}/sfio.h implicit
+prev ${PACKAGE_ast_INCLUDE}/sfio_s.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+done ${PACKAGE_ast_INCLUDE}/sfio.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/option.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/error.h dontcare
+make ${PACKAGE_ast_INCLUDE}/hash.h implicit
+make ${PACKAGE_ast_INCLUDE}/hashpart.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/hashpart.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/hash.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/pp.h
+prev ${PACKAGE_ast_INCLUDE}/error.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+done msgcpp.c
+meta msgcpp.o %.c>%.o msgcpp.c msgcpp
+prev msgcpp.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -DUSAGE_LICENSE=\""[-author?Glenn Fowler <gsf@research.att.com>][-copyright?Copyright (c) 2000-2012 AT&T Intellectual Property][-license?http://www.eclipse.org/org/documents/epl-v10.html][--catalog?msgcc]"\" -c msgcpp.c
+done msgcpp.o generated
+bind -lpp
+bind -last
+exec - ${CC} ${CCLDFLAGS} ${mam_cc_FLAGS} ${CCFLAGS} ${LDFLAGS} ${mam_cc_L+-L${INSTALLROOT}/lib} -o msgcpp msgcpp.o ${mam_libpp} ${mam_libast}
+done msgcpp generated
+make msgcc
+make msgcc.sh
+done msgcc.sh
+meta msgcc %.sh>% msgcc.sh msgcc
+prev msgcc.sh
+exec - case static,port:$OPTIND:$RANDOM in
+exec - ?*:*:*|*::*|*:*:$RANDOM)
+exec - ;;
+exec - *) if ENV= LC_ALL=C x= $SHELL -nc '[[ a || b ]] && : ${list[level]}  !(pattern)' 2>/dev/null
+exec - then if grep '### .*archaic.* ###' >/dev/null
+exec - then : msgcc contains archaic constructs :
+exec - else ENV= LC_ALL=C $SHELL -n msgcc.sh
+exec - fi
+exec - fi
+exec - ;;
+exec - esac
+exec - case '${mam_cc_SHELLMAGIC}' in
+exec - "") case 201 in
+exec - 0) cp msgcc.sh msgcc
+exec - ;;
+exec - *) {
+exec - i=`(read x; echo $x) < msgcc.sh`
+exec - case $i in
+exec - '#!'*|*'||'*|':'*|'":"'*|"':'"*) echo "$i" ;;
+exec - esac
+exec - cat - msgcc.sh <<'!'
+exec - USAGE_LICENSE="[-author?Glenn Fowler <gsf@research.att.com>][-copyright?Copyright (c) 2000-2012 AT&T Intellectual Property][-license?http://www.eclipse.org/org/documents/epl-v10.html][--catalog?msgcc]"
+exec - !
+exec - } > msgcc
+exec - ;;
+exec - esac
+exec - ;;
+exec - *) cat - msgcc.sh > msgcc <<'!'
+exec - ${mam_cc_SHELLMAGIC}
+exec - USAGE_LICENSE="[-author?Glenn Fowler <gsf@research.att.com>][-copyright?Copyright (c) 2000-2012 AT&T Intellectual Property][-license?http://www.eclipse.org/org/documents/epl-v10.html][--catalog?msgcc]"
+exec - !
+exec - ;;
+exec - esac
+exec - silent test -w msgcc -a -x msgcc || chmod u+w,+x msgcc
+done msgcc generated
+make msgcvt
+make msgcvt.o
+make msgcvt.c
+prev ${PACKAGE_ast_INCLUDE}/error.h implicit
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+done msgcvt.c
+meta msgcvt.o %.c>%.o msgcvt.c msgcvt
+prev msgcvt.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -DUSAGE_LICENSE=\""[-author?Glenn Fowler <gsf@research.att.com>][-copyright?Copyright (c) 2000-2012 AT&T Intellectual Property][-license?http://www.eclipse.org/org/documents/epl-v10.html][--catalog?msgcc]"\" -c msgcvt.c
+done msgcvt.o generated
+exec - ${CC} ${CCLDFLAGS} ${mam_cc_FLAGS} ${CCFLAGS} ${LDFLAGS} ${mam_cc_L+-L${INSTALLROOT}/lib} -o msgcvt msgcvt.o ${mam_libast}
+done msgcvt generated
+make msggen
+make msggen.o
+make msggen.c
+make ${PACKAGE_ast_INCLUDE}/mc.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/mc.h
+prev ${PACKAGE_ast_INCLUDE}/error.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ccode.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+done msggen.c
+meta msggen.o %.c>%.o msggen.c msggen
+prev msggen.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -DUSAGE_LICENSE=\""[-author?Glenn Fowler <gsf@research.att.com>][-copyright?Copyright (c) 2000-2012 AT&T Intellectual Property][-license?http://www.eclipse.org/org/documents/epl-v10.html][--catalog?msgcc]"\" -c msggen.c
+done msggen.o generated
+exec - ${CC} ${CCLDFLAGS} ${mam_cc_FLAGS} ${CCFLAGS} ${LDFLAGS} ${mam_cc_L+-L${INSTALLROOT}/lib} -o msggen msggen.o ${mam_libast}
+done msggen generated
+make msgget
+make msgget.o
+make msgget.c
+prev ${PACKAGE_ast_INCLUDE}/mc.h implicit
+prev ${PACKAGE_ast_INCLUDE}/error.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+done msgget.c
+meta msgget.o %.c>%.o msgget.c msgget
+prev msgget.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -DUSAGE_LICENSE=\""[-author?Glenn Fowler <gsf@research.att.com>][-copyright?Copyright (c) 2000-2012 AT&T Intellectual Property][-license?http://www.eclipse.org/org/documents/epl-v10.html][--catalog?msgcc]"\" -c msgget.c
+done msgget.o generated
+exec - ${CC} ${CCLDFLAGS} ${mam_cc_FLAGS} ${CCFLAGS} ${LDFLAGS} ${mam_cc_L+-L${INSTALLROOT}/lib} -o msgget msgget.o ${mam_libast}
+done msgget generated
+make ${INSTALLROOT}/bin
+exec - if silent test ! -d ${INSTALLROOT}/bin
+exec - then mkdir -p ${INSTALLROOT}/bin
+exec - fi
+done ${INSTALLROOT}/bin generated
+make ${INSTALLROOT}/bin/msgadmin
+prev ${INSTALLROOT}/bin
+prev msgadmin
+exec - test '' = 'msgadmin' || ${STDCMP} 2>/dev/null -s msgadmin ${INSTALLROOT}/bin/msgadmin || { ${STDMV} ${INSTALLROOT}/bin/msgadmin ${INSTALLROOT}/bin/msgadmin.old 2>/dev/null || true; ${STDCP} msgadmin ${INSTALLROOT}/bin/msgadmin ;}
+done ${INSTALLROOT}/bin/msgadmin generated
+make ${INSTALLROOT}/bin/msgcpp
+prev msgcpp
+exec - test '' = 'msgcpp' || ${STDCMP} 2>/dev/null -s msgcpp ${INSTALLROOT}/bin/msgcpp || { ${STDMV} ${INSTALLROOT}/bin/msgcpp ${INSTALLROOT}/bin/msgcpp.old 2>/dev/null || true; ${STDCP} msgcpp ${INSTALLROOT}/bin/msgcpp ;}
+done ${INSTALLROOT}/bin/msgcpp generated
+make ${INSTALLROOT}/bin/msgcc
+prev msgcc
+exec - test '' = 'msgcc' || ${STDCMP} 2>/dev/null -s msgcc ${INSTALLROOT}/bin/msgcc || { ${STDMV} ${INSTALLROOT}/bin/msgcc ${INSTALLROOT}/bin/msgcc.old 2>/dev/null || true; ${STDCP} msgcc ${INSTALLROOT}/bin/msgcc ;}
+done ${INSTALLROOT}/bin/msgcc generated
+make ${INSTALLROOT}/bin/msgcvt
+prev msgcvt
+exec - test '' = 'msgcvt' || ${STDCMP} 2>/dev/null -s msgcvt ${INSTALLROOT}/bin/msgcvt || { ${STDMV} ${INSTALLROOT}/bin/msgcvt ${INSTALLROOT}/bin/msgcvt.old 2>/dev/null || true; ${STDCP} msgcvt ${INSTALLROOT}/bin/msgcvt ;}
+done ${INSTALLROOT}/bin/msgcvt generated
+make ${INSTALLROOT}/bin/msggen
+prev msggen
+exec - test '' = 'msggen' || ${STDCMP} 2>/dev/null -s msggen ${INSTALLROOT}/bin/msggen || { ${STDMV} ${INSTALLROOT}/bin/msggen ${INSTALLROOT}/bin/msggen.old 2>/dev/null || true; ${STDCP} msggen ${INSTALLROOT}/bin/msggen ;}
+done ${INSTALLROOT}/bin/msggen generated
+make ${INSTALLROOT}/bin/msgget
+prev msgget
+exec - test '' = 'msgget' || ${STDCMP} 2>/dev/null -s msgget ${INSTALLROOT}/bin/msgget || { ${STDMV} ${INSTALLROOT}/bin/msgget ${INSTALLROOT}/bin/msgget.old 2>/dev/null || true; ${STDCP} msgget ${INSTALLROOT}/bin/msgget ;}
+done ${INSTALLROOT}/bin/msgget generated
+done install virtual
+make test
+make test.msgcc
+prev msgcc
+make msgcc.tst
+done msgcc.tst
+exec - regress msgcc.tst msgcc
+done test.msgcc virtual
+done test dontcare virtual

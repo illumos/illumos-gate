@@ -1,0 +1,6 @@
+
+This area contains selected components of the AT&T Software Technology (AST)
+toolkit from AT&T Research. It is populated from the illumos-specific branch
+at https://github.com/illumos/ast using the 'copy_to_gate.sh' script at the
+top level of that repository.
+

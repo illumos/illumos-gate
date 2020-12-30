@@ -1,0 +1,14 @@
+ksh :PACKAGE:
+
+:LICENSE: *.open
+
+:CATEGORY: shells
+
+:INDEX: standalone AT&T ksh executable
+
+:DESCRIPTION:
+	The AT&T Software Technology ksh package from AT&T Research
+	contains the AT&T ksh executable implemented by David Korn.
+	The download file is a gzipped ksh executable. If you want
+	to build ksh from the source then download one of the ast-ksh,
+	ast-base or ast-open packages.

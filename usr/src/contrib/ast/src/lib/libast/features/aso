@@ -1,0 +1,628 @@
+# ast atomic scalar operations feature tests
+
+if	aso note{ gcc 4.1+ 64 bit memory atomic operations model }end link{
+		#include "FEATURE/common"
+		int main()
+		{
+			uint64_t i = 0;
+			return __sync_fetch_and_add(&i,7);
+		}
+	}end && {
+		#define _aso_cas8(p,o,n)	__sync_val_compare_and_swap(p,o,n)
+		#define _aso_inc8(p)		__sync_fetch_and_add(p,1)
+		#define _aso_dec8(p)		__sync_fetch_and_sub(p,1)
+		#define _aso_cas16(p,o,n)	__sync_val_compare_and_swap(p,o,n)
+		#define _aso_inc16(p)		__sync_fetch_and_add(p,1)
+		#define _aso_dec16(p)		__sync_fetch_and_sub(p,1)
+		#define _aso_cas32(p,o,n)	__sync_val_compare_and_swap(p,o,n)
+		#define _aso_inc32(p)		__sync_fetch_and_add(p,1)
+		#define _aso_dec32(p)		__sync_fetch_and_sub(p,1)
+		#define _aso_cas64(p,o,n)	__sync_val_compare_and_swap(p,o,n)
+		#define _aso_inc64(p)		__sync_fetch_and_add(p,1)
+		#define _aso_dec64(p)		__sync_fetch_and_sub(p,1)
+		#if _ast_sizeof_pointer == 8
+		#define _aso_casptr(p,o,n)	((void*)__sync_val_compare_and_swap(p,(uint64_t)o,(uint64_t)n))
+		#else
+		#define _aso_casptr(p,o,n)	((void*)__sync_val_compare_and_swap(p,(uint32_t)o,(uint32_t)n))
+		#endif
+	}
+elif	aso note{ gcc 4.1+ 32 bit memory atomic operations model }end link{
+		#include "FEATURE/common"
+		int main()
+		{
+			uint32_t i = 0;
+			return __sync_fetch_and_add(&i,7);
+		}
+	}end && {
+		#define _aso_cas8(p,o,n)	__sync_val_compare_and_swap(p,o,n)
+		#define _aso_inc8(p)		__sync_fetch_and_add(p,1)
+		#define _aso_dec8(p)		__sync_fetch_and_sub(p,1)
+		#define _aso_cas16(p,o,n)	__sync_val_compare_and_swap(p,o,n)
+		#define _aso_inc16(p)		__sync_fetch_and_add(p,1)
+		#define _aso_dec16(p)		__sync_fetch_and_sub(p,1)
+		#define _aso_cas32(p,o,n)	__sync_val_compare_and_swap(p,o,n)
+		#define _aso_inc32(p)		__sync_fetch_and_add(p,1)
+		#define _aso_dec32(p)		__sync_fetch_and_sub(p,1)
+		#define _aso_casptr(p,o,n)	((void*)__sync_val_compare_and_swap(p,(uint32_t)o,(uint32_t)n))
+	}
+elif	aso note{ <atomic.h> atomic_cas_64 }end link{
+		#include "FEATURE/common"
+		#include <atomic.h>
+		int main()
+		{
+			uint64_t i = 0;
+			uint32_t j = 1;
+			return atomic_cas_64(&i, 0, 1) != 0 || atomic_add_32_nv(&j, 1) != 1;
+		}
+	}end && {
+		#include <atomic.h>
+		#define _aso_cas8(p,o,n)	atomic_cas_8(p,o,n)
+		#define _aso_inc8(p)		(atomic_add_8_nv(p,1)-1)
+		#define _aso_dec8(p)		(atomic_add_8_nv(p,-1)+1)
+		#define _aso_cas16(p,o,n)	atomic_cas_16(p,o,n)
+		#define _aso_inc16(p)		(atomic_add_16_nv(p,1)-1)
+		#define _aso_dec16(p)		(atomic_add_16_nv(p,-1)+1)
+		#define _aso_cas32(p,o,n)	atomic_cas_32(p,o,n)
+		#define _aso_inc32(p)		(atomic_add_32_nv(p,1)-1)
+		#define _aso_dec32(p)		(atomic_add_32_nv(p,-1)+1)
+		#define _aso_cas64(p,o,n)	atomic_cas_64(p,o,n)
+		#define _aso_inc64(p)		(atomic_add_64_nv(p,1)-1)
+		#define _aso_dec64(p)		(atomic_add_64_nv(p,-1)+1)
+		#if _ast_sizeof_pointer == 8
+		#define _aso_casptr(p,o,n)	((void*)atomic_cas_64((uint64_t*)p,(uint64_t)o,(uint64_t)n))
+		#else
+		#define _aso_casptr(p,o,n)	((void*)atomic_cas_32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
+		#endif
+	}
+elif	aso note{ <atomic.h> atomic_cas_32 }end link{
+		#include "FEATURE/common"
+		#include <atomic.h>
+		int main()
+		{
+			uint32_t i = 0;
+			return atomic_cas_32(&i, 0, 1) != 0 || (atomic_add_32_nv(&i, 1) - 1) != 1;
+		}
+	}end && {
+		#include <atomic.h>
+		#define _aso_cas8(p,o,n)	atomic_cas_8(p,o,n)
+		#define _aso_inc8(p)		(atomic_add_8_nv(p,1)-1)
+		#define _aso_dec8(p)		(atomic_add_8_nv(p,-1)+1)
+		#define _aso_cas16(p,o,n)	atomic_cas_16(p,o,n)
+		#define _aso_inc16(p)		(atomic_add_16_nv(p,1)-1)
+		#define _aso_dec16(p)		(atomic_add_16_nv(p,-1)+1)
+		#define _aso_cas32(p,o,n)	atomic_cas_32(p,o,n)
+		#define _aso_inc32(p)		(atomic_add_32_nv(p,1)-1)
+		#define _aso_dec32(p)		(atomic_add_32_nv(p,-1)+1)
+		#define _aso_casptr(p,o,n)	((void*)atomic_cas_32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
+	}
+elif	aso -latomic note{ <atomic.h> atomic_cas_64 with -latomic }end link{
+		#include "FEATURE/common"
+		#include <atomic.h>
+		int main()
+		{
+			uint64_t i = 0;
+			uint32_t j = 1;
+			return atomic_cas_64(&i, 0, 1) != 0 || (atomic_add_32_nv(&j, 1) - 1) != 1;
+		}
+	}end && {
+		#include <atomic.h>
+		#define _REQ_atomic
+		#define _aso_cas8(p,o,n)	atomic_cas_8(p,o,n)
+		#define _aso_inc8(p)		(atomic_add_8_nv(p,1)-1)
+		#define _aso_dec8(p)		(atomic_add_8_nv(p,-1)+1)
+		#define _aso_cas16(p,o,n)	atomic_cas_16(p,o,n)
+		#define _aso_inc16(p)		(atomic_add_16_nv(p,1)-1)
+		#define _aso_dec16(p)		(atomic_add_16_nv(p,-1)+1)
+		#define _aso_cas32(p,o,n)	atomic_cas_32(p,o,n)
+		#define _aso_inc32(p)		(atomic_add_32_nv(p,1)-1)
+		#define _aso_dec32(p)		(atomic_add_32_nv(p,-1)+1)
+		#define _aso_cas64(p,o,n)	atomic_cas_64(p,o,n)
+		#define _aso_inc64(p)		(atomic_add_64_nv(p,1)-1)
+		#define _aso_dec64(p)		(atomic_add_64_nv(p,-1)+1)
+		#if _ast_sizeof_pointer == 8
+		#define _aso_casptr(p,o,n)	((void*)atomic_cas_64((uint64_t*)p,(uint64_t)o,(uint64_t)n))
+		#else
+		#define _aso_casptr(p,o,n)	((void*)atomic_cas_32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
+		#endif
+	}
+elif	aso note{ <atomic.h> atomic_cas_32 with -latomic }end link{
+		#include "FEATURE/common"
+		#include <atomic.h>
+		int main()
+		{
+			uint32_t i = 0;
+			return atomic_cas_32(&i, 0, 1) != 0 || (atomic_add_32_nv(&i, 1) - 1) != 1;
+		}
+	}end && {
+		#include <atomic.h>
+		#define _REQ_atomic
+		#define _aso_cas8(p,o,n)	atomic_cas_8(p,o,n)
+		#define _aso_inc8(p)		(atomic_add_8_nv(p,1)-1)
+		#define _aso_dec8(p)		(atomic_add_8_nv(p,-1)+1)
+		#define _aso_cas16(p,o,n)	atomic_cas_16(p,o,n)
+		#define _aso_inc16(p)		(atomic_add_16_nv(p,1)-1)
+		#define _aso_dec16(p)		(atomic_add_16_nv(p,-1)+1)
+		#define _aso_cas32(p,o,n)	atomic_cas_32(p,o,n)
+		#define _aso_inc32(p)		(atomic_add_32_nv(p,1)-1)
+		#define _aso_dec32(p)		(atomic_add_32_nv(p,-1)+1)
+		#define _aso_casptr(p,o,n)	((void*)atomic_cas_32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
+	}
+elif	aso note{ <atomic.h> cas64 }end link{
+		#include "FEATURE/common"
+		#include <atomic.h>
+		int main()
+		{
+			uint64_t i = 0;
+			uint32_t j = 1;
+			return cas64(&i, 0, 1) != 0 || (atomic_add_32_nv(&j, 1) - 1) != 1;
+		}
+	}end && {
+		#include <atomic.h>
+		#define _aso_cas8(p,o,n)	cas8(p,o,n)
+		#define _aso_inc8(p)		(atomic_add_8_nv(p,1)-1)
+		#define _aso_dec8(p)		(atomic_add_8_nv(p,-1)+1)
+		#define _aso_cas16(p,o,n)	cas16(p,o,n)
+		#define _aso_inc16(p)		(atomic_add_16_nv(p,1)-1)
+		#define _aso_dec16(p)		(atomic_add_16_nv(p,-1)+1)
+		#define _aso_cas32(p,o,n)	cas32(p,o,n)
+		#define _aso_inc32(p)		(atomic_add_32_nv(p,1)-1)
+		#define _aso_dec32(p)		(atomic_add_32_nv(p,-1)+1)
+		#define _aso_cas64(p,o,n)	cas64(p,o,n)
+		#define _aso_inc64(p)		(atomic_add_64_nv(p,1)-1)
+		#define _aso_dec64(p)		(atomic_add_64_nv(p,-1)+1)
+		#if _ast_sizeof_pointer == 8
+		#define _aso_casptr(p,o,n)	((void*)cas64((uint64_t*)p,(uint64_t)o,(uint64_t)n))
+		#else
+		#define _aso_casptr(p,o,n)	((void*)cas32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
+		#endif
+	}
+elif	aso note{ <atomic.h> just cas64 }end link{
+		#include "FEATURE/common"
+		#include <atomic.h>
+		int main()
+		{
+			uint64_t i = 0;
+			uint32_t j = 1;
+			uint16_t k = 1;
+			uint8_t l = 1;
+			return cas64(&i, 0, 1) != 0 || cas32(&j, 0, 1) != 0 || cas16(&k, 0, 1) != 0 || cas8(&l, 0, 1) != 0;
+		}
+	}end && {
+		#include <atomic.h>
+		#define _aso_cas8(p,o,n)	cas8(p,o,n)
+		#define _aso_cas16(p,o,n)	cas16(p,o,n)
+		#define _aso_cas32(p,o,n)	cas32(p,o,n)
+		#define _aso_cas64(p,o,n)	cas64(p,o,n)
+		#if _ast_sizeof_pointer == 8
+		#define _aso_casptr(p,o,n)	((void*)cas64((uint64_t*)p,(uint64_t)o,(uint64_t)n))
+		#else
+		#define _aso_casptr(p,o,n)	((void*)cas32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
+		#endif
+	}
+elif	aso note{ <atomic.h> cas32 }end link{
+		#include "FEATURE/common"
+		#include <atomic.h>
+		int main()
+		{
+			uint32_t i = 0;
+			return cas32(&i, 0, 1) != 0 || (atomic_add_32_nv(&i, 1) - 1) != 1;
+		}
+	}end && {
+		#include <atomic.h>
+		#define _aso_cas8(p,o,n)	cas8(p,o,n)
+		#define _aso_inc8(p)		(atomic_add_8_nv(p,1)-1)
+		#define _aso_dec8(p)		(atomic_add_8_nv(p,-1)+1)
+		#define _aso_cas16(p,o,n)	cas16(p,o,n)
+		#define _aso_inc16(p)		(atomic_add_16_nv(p,1)-1)
+		#define _aso_dec16(p)		(atomic_add_16_nv(p,-1)+1)
+		#define _aso_cas32(p,o,n)	cas32(p,o,n)
+		#define _aso_inc32(p)		(atomic_add_32_nv(p,1)-1)
+		#define _aso_dec32(p)		(atomic_add_32_nv(p,-1)+1)
+		#define _aso_casptr(p,o,n)	((void*)cas32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
+	}
+elif	aso note{ <atomic.h> just cas32 }end link{
+		#include "FEATURE/common"
+		#include <atomic.h>
+		int main()
+		{
+			uint32_t j = 1;
+			uint16_t k = 1;
+			uint8_t l = 1;
+			return cas32(&j, 0, 1) != 0 || cas16(&k, 0, 1) != 0 || cas8(&l, 0, 1) != 0;
+		}
+	}end && {
+		#include <atomic.h>
+		#define _aso_cas8(p,o,n)	cas8(p,o,n)
+		#define _aso_cas16(p,o,n)	cas16(p,o,n)
+		#define _aso_cas32(p,o,n)	cas32(p,o,n)
+		#define _aso_casptr(p,o,n)	((void*)cas32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
+	}
+elif	aso note{ winix Interlocked }end link{
+		#include <windows.h>
+		int main()
+		{
+			LONG		i = 0;
+			LONGLONG	j = 0;
+			return InterlockedCompareExchange(&i, 1, 0) != 0 ||
+			       InterlockedIncrement(&i) != 1 ||
+			       InterlockedDecrement(&i) != 2;
+		}
+	}end && {
+		#include <ast_windows.h>
+		#define _aso_cas32(p,o,n)	InterlockedCompareExchange((LONG volatile*)p,n,o)
+		#define _aso_inc32(p)		(InterlockedIncrement((LONG volatile*)p)-1)
+		#define _aso_dec32(p)		(InterlockedDecrement((LONG volatile*)p)+1)
+		#if _X64
+		#define _aso_cas64(p,o,n)	InterlockedCompareExchange64((LONGLONG volatile*)p,n,o)
+		#define _aso_inc64(p)		(InterlockedIncrement64((LONGLONG volatile*)p)-1)
+		#define _aso_dec64(p)		(InterlockedDecrement64((LONGLONG volatile*)p)+1)
+		#define _aso_casptr(p,o,n)	((void*)InterlockedCompareExchange64((LONGLONG volatile*)p,(LONGLONG)n,(LONGLONG)o))
+		#else
+		#if _BLD_posix
+		#include "dl.h"
+		typedef struct LL_s
+		{
+			LONG		a;
+			LONG		b;
+		} LL_t;
+		typedef union
+		{
+			LONGLONG	i;
+			LL_t		ll;
+		} LL_u;
+
+		#define _aso_cas64(p,o,n)	_aso_InterlockedCompareExchange64((LONGLONG volatile*)p,n,o)
+		static LONGLONG _aso_InterlockedCompareExchange64_init(LONGLONG volatile*, LONGLONG, LONGLONG);
+		typedef LONGLONG (*_aso_InterlockedCompareExchange64_f)(LONGLONG volatile*, LONGLONG, LONGLONG);
+		static _aso_InterlockedCompareExchange64_f _aso_InterlockedCompareExchange64 = _aso_InterlockedCompareExchange64_init;
+		static LONGLONG _aso_InterlockedCompareExchange64_32(LONGLONG volatile* p, LONGLONG o, LONGLONG n)
+		{
+			LL_t*		lp = (LL_t*)p;
+			LL_t*		op = (LL_t*)&o;
+			LL_t*		np = (LL_t*)&n;
+			LONGLONG	r;
+
+			r = *p;
+			if (_aso_cas32(&lp->a, op->a, np->a) == op->a)
+			{
+				if (_aso_cas32(&lp->b, op->b, np->b) == op->b)
+					return o;
+				_aso_cas32(&lp->a, np->a, op->a);
+			}
+			return r;
+		}
+		static LONGLONG _aso_InterlockedCompareExchange64_init(LONGLONG volatile* p, LONGLONG o, LONGLONG n)
+		{
+			if (!(_aso_InterlockedCompareExchange64 = (_aso_InterlockedCompareExchange64_f)getsymbol(MODULE_kernel, "InterlockedCompareExchange64")))
+				_aso_InterlockedCompareExchange64 = _aso_InterlockedCompareExchange64_32;
+			return _aso_InterlockedCompareExchange64(p, o, n);
+		}
+
+		#define _aso_inc64(p)		(_aso_InterlockedIncrement64((LONGLONG volatile*)p)-1)
+		typedef LONGLONG (*_aso_InterlockedIncrement64_f)(LONGLONG volatile*);
+		static LONGLONG _aso_InterlockedIncrement64_init(LONGLONG volatile*);
+		static _aso_InterlockedIncrement64_f _aso_InterlockedIncrement64 = _aso_InterlockedIncrement64_init;
+		static LONGLONG _aso_InterlockedIncrement64_32(LONGLONG volatile* p)
+		{
+			LONGLONG	o;
+
+			do
+			{
+				o = *p;
+			} while (_aso_InterlockedCompareExchange64_32(p, o, o + 1) != o);
+			return o;
+		}
+		static LONGLONG _aso_InterlockedIncrement64_init(LONGLONG volatile* p)
+		{
+			if (!(_aso_InterlockedIncrement64 = (_aso_InterlockedIncrement64_f)getsymbol(MODULE_kernel, "InterlockedIncrement64")))
+				_aso_InterlockedIncrement64 = _aso_InterlockedIncrement64_32;
+			return _aso_InterlockedIncrement64(p);
+		}
+
+		#define _aso_dec64(p)		(_aso_InterlockedDecrement64((LONGLONG volatile*)p)+1)
+		typedef LONGLONG (*_aso_InterlockedDecrement64_f)(LONGLONG volatile*);
+		static LONGLONG _aso_InterlockedDecrement64_init(LONGLONG volatile*);
+		static _aso_InterlockedDecrement64_f _aso_InterlockedDecrement64 = _aso_InterlockedDecrement64_init;
+		static LONGLONG _aso_InterlockedDecrement64_32(LONGLONG volatile* p)
+		{
+			LONGLONG	o;
+
+			do
+			{
+				o = *p;
+			} while (_aso_InterlockedCompareExchange64_32(p, o, o - 1) != o);
+			return o;
+		}
+		static LONGLONG _aso_InterlockedDecrement64_init(LONGLONG volatile* p)
+		{
+			if (!(_aso_InterlockedDecrement64 = (_aso_InterlockedDecrement64_f)getsymbol(MODULE_kernel, "InterlockedDecrement64")))
+				_aso_InterlockedDecrement64 = _aso_InterlockedDecrement64_32;
+			return _aso_InterlockedDecrement64(p);
+		}
+		#endif
+		#define _aso_casptr(p,o,n)	((void*)InterlockedCompareExchange((LONG volatile*)p,(LONG)n,(LONG)o))
+		#endif
+	}
+elif	aso note{ aix fetch and add }end link{
+		#include <sys/atomic_op.h>
+		int main()
+		{
+			int i = 0;
+			return fetch_and_add((atomic_p)&i,1);
+		}
+	}end && {
+		#include <sys/atomic_op.h>
+		#define _aso_incint(p)		fetch_and_add((atomic_p)p,1)
+		#define _aso_decint(p)		fetch_and_add((atomic_p)p,-1)
+		#define _aso_casint(p,o,n)	(compare_and_swap((atomic_p)p,(int*)&o,(int)n) ? o : *p)
+		#if _ast_sizeof_pointer == 8
+		#define _aso_casptr(p,o,n)	(compare_and_swaplp((atomic_l)p,(long*)&o,(long)n) ? o : *(void**)p)
+		#else
+		#define _aso_casptr(p,o,n)	(compare_and_swap((atomic_p)p,(int*)&o,(int)n) ? o : *(void**)p)
+		#endif
+	}
+elif	aso note{ mips compare and swap }end link{
+		int main()
+		{
+			int i = 1;
+			return __compare_and_swap(&i, 0, 1) != 1;
+		}
+	}end && {
+		#define _aso_cas32(p,o,n)	(__compare_and_swap(p,o,n) ? o : *p)
+		#define _aso_casptr(p,o,n)	(__compare_and_swap((long*)p,(long)o,(long)n) ? o : *(void**)p)
+	}
+elif	aso note{ i386|i386-64 asm compare and swap }end link{
+		#include "FEATURE/common"
+
+		static uint32_t
+		cas32(uint32_t volatile* p, uint32_t o, uint32_t n)
+		{
+			uint32_t	r;
+		
+			__asm__ __volatile__ (
+				"lock ; cmpxchg %3,%4"
+				: "=a"(r), "=m"(*p)
+				: "0"(o), "q"(n), "m"(*p)
+				: "memory", "cc"
+				);
+			return r;
+		}
+
+		#if _ast_sizeof_pointer == 8
+
+		static uint64_t
+		cas64(uint64_t volatile* p, uint64_t o, uint64_t n)
+		{
+			uint64_t	r;
+		
+			__asm__ __volatile__ (
+				"lock ; cmpxchg %3,%4"
+				: "=a"(r), "=m"(*p)
+				: "0"(o), "q"(n), "m"(*p)
+				: "memory", "cc"
+				);
+			return r;
+		}
+
+		#else
+
+		#define cas64(p,o,n)	(*(p))
+
+		#endif
+
+		int main()
+		{
+			uint32_t	i = 0;
+			uint64_t	j = 0;
+			return cas32(&i, 0, 1) || cas64(&j, 0, 1);
+		}
+	}end && {
+		static uint32_t
+		cas32(uint32_t volatile* p, uint32_t o, uint32_t n)
+		{
+			uint32_t	r;
+		
+			__asm__ __volatile__ (
+				"lock ; cmpxchg %3,%4"
+				: "=a"(r), "=m"(*p)
+				: "0"(o), "q"(n), "m"(*p)
+				: "memory", "cc"
+				);
+			return r;
+		}
+
+		#if _ast_sizeof_pointer == 8
+
+		static uint64_t
+		cas64(uint64_t volatile* p, uint64_t o, uint64_t n)
+		{
+			uint64_t	r;
+		
+			__asm__ __volatile__ (
+				"lock ; cmpxchg %3,%4"
+				: "=a"(r), "=m"(*p)
+				: "0"(o), "q"(n), "m"(*p)
+				: "memory", "cc"
+				);
+			return r;
+		}
+		
+		#endif
+
+		#define _aso_cas32(p,o,n)	cas32(p,o,n)
+		#if _ast_sizeof_pointer == 8
+		#define _aso_cas64(p,o,n)	cas64(p,o,n)
+		#define _aso_casptr(p,o,n)	((void*)cas64((uint64_t*)p,(uint64_t)o,(uint64_t)n))
+		#else
+		#define _aso_casptr(p,o,n)	((void*)cas32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
+		#endif
+	}
+elif	aso note{ ia64 asm compare and swap }end link{
+		#include "FEATURE/common"
+
+		static uint32_t
+		cas32(uint32_t volatile* p, uint32_t o, uint32_t n)
+		{
+			uint32_t	r;
+
+			__asm__ __volatile__ (
+				"zxt4 %3=%3 ;; mov ar.ccv=%3 ;; cmpxchg4.acq %0=%1,%2,ar.ccv"
+			        : "=r"(r), "+S"(*p)
+				: "r"(n), "r"(o) : "memory"
+				);
+			return r;
+		}
+
+		static uint64_t
+		cas64(uint64_t volatile* p, uint64_t o, uint64_t n)
+		{
+			uint64_t	r;
+
+			__asm__ __volatile__ (
+				"mov ar.ccv=%3 ;; cmpxchg8.acq %0=%1,%2,ar.ccv"
+			        : "=r"(r), "+S"(*p)
+				: "r"(n), "r"(o) : "memory"
+				);
+			return r;
+		}
+
+		int main()
+		{
+			uint32_t	i = 0;
+			uint64_t	j = 0;
+			return cas32(&i, 0, 1) || cas64(&j, 0, 1);
+		}
+	}end && {
+		static uint32_t
+		cas32(uint32_t volatile* p, uint32_t o, uint32_t n)
+		{
+			uint32_t	r;
+
+			__asm__ __volatile__ (
+				"zxt4 %3=%3 ;; mov ar.ccv=%3 ;; cmpxchg4.acq %0=%1,%2,ar.ccv"
+			        : "=r"(r), "+S"(*p)
+				: "r"(n), "r"(o) : "memory"
+				);
+			return r;
+		}
+
+		static uint64_t
+		cas64(uint64_t volatile* p, uint64_t o, uint64_t n)
+		{
+			uint64_t	r;
+
+			__asm__ __volatile__ (
+				"mov ar.ccv=%3 ;; cmpxchg8.acq %0=%1,%2,ar.ccv"
+			        : "=r"(r), "+S"(*p)
+				: "r"(n), "r"(o) : "memory"
+				);
+			return r;
+		}
+
+		#define _aso_cas32(p,o,n)	cas32(p,o,n)
+		#define _aso_cas64(p,o,n)	cas64(p,o,n)
+		#if _ast_sizeof_pointer == 8
+		#define _aso_casptr(p,o,n)	((void*)cas64((uint64_t*)p,(uint64_t)o,(uint64_t)n))
+		#else
+		#define _aso_casptr(p,o,n)	((void*)cas32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
+		#endif
+	}
+elif	aso note{ ppc asm compare and swap }end link{
+		#include "FEATURE/common"
+
+		static uint32_t
+		cas32(uint32_t volatile* p, uint32_t o, uint32_t n)
+		{
+			int	r;
+		
+			__asm__ __volatile__ (
+				"0:	lwarx %0,0,%1 ;"
+				"	xor. %0,%3,%0;"
+				"	bne 1f;"
+				"	stwcx. %2,0,%1;"
+				"	bne- 0b;"
+				"1:"
+				: "=&r"(r)
+				: "r"(p), "r"(n), "r"(o)
+				: "cr0", "memory"
+				);
+			__asm__ __volatile__ ("isync" : : : "memory");
+			return r ? *p : o;
+		}
+
+		static uint64_t
+		cas64(uint64_t volatile* p, uint64_t o, uint64_t n)
+		{
+			long	r;
+		
+			__asm__ __volatile__ (
+				"0:	ldarx %0,0,%1 ;"
+				"	xor. %0,%3,%0;"
+				"	bne 1f;"
+				"	stdcx. %2,0,%1;"
+				"	bne- 0b;"
+				"1:"
+				: "=&r"(r)
+				: "r"(p), "r"(n), "r"(o)
+				: "cr0", "memory"
+				);
+			__asm__ __volatile__ ("isync" : : : "memory");
+			return r ? *p : o;
+		}
+
+		int main()
+		{
+			uint32_t	i = 0;
+			uint64_t	j = 0;
+			return cas32(&i, 0, 1) || cas64(&j, 0, 1);
+		}
+	}end && {
+		static uint32_t
+		cas32(uint32_t volatile* p, uint32_t o, uint32_t n)
+		{
+			int	r;
+		
+			__asm__ __volatile__ (
+				"0:	lwarx %0,0,%1 ;"
+				"	xor. %0,%3,%0;"
+				"	bne 1f;"
+				"	stwcx. %2,0,%1;"
+				"	bne- 0b;"
+				"1:"
+				: "=&r"(r)
+				: "r"(p), "r"(n), "r"(o)
+				: "cr0", "memory"
+				);
+			__asm__ __volatile__ ("isync" : : : "memory");
+			return r ? *p : o;
+		}
+
+		static uint64_t
+		cas64(uint64_t volatile* p, uint64_t o, uint64_t n)
+		{
+			long	r;
+		
+			__asm__ __volatile__ (
+				"0:	ldarx %0,0,%1 ;"
+				"	xor. %0,%3,%0;"
+				"	bne 1f;"
+				"	stdcx. %2,0,%1;"
+				"	bne- 0b;"
+				"1:"
+				: "=&r"(r)
+				: "r"(p), "r"(n), "r"(o)
+				: "cr0", "memory"
+				);
+			__asm__ __volatile__ ("isync" : : : "memory");
+			return r ? *p : o;
+		}
+
+		#define _aso_cas32(p,o,n)	cas32(p,o,n)
+		#define _aso_cas64(p,o,n)	cas64(p,o,n)
+		#if _ast_sizeof_pointer == 8
+		#define _aso_casptr(p,o,n)	((void*)cas64((uint64_t*)p,(uint64_t)o,(uint64_t)n))
+		#else
+		#define _aso_casptr(p,o,n)	((void*)cas32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
+		#endif
+	}
+endif

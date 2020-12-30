@@ -1,0 +1,67 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH GETCWD 3
+.SH NAME
+getcwd \- return absolute path to current directory
+.SH SYNOPSIS
+.EX
+#include <ast.h>
+
+char* getcwd(char* \fIbuf\fP, size_t \fIlen\fP);
+.EE
+.SH DESCRIPTION
+.L getcwd
+copies the absolute path name of the current directory info into
+.I buf
+of length 
+.IR len .
+The return path may be longer than
+.LR PATH_MAX .
+If
+.I "buff == 0"
+then space is allocated via
+.IR malloc (3)
+and 
+.I len
+extra characters are reserved after the generated path name.
+A pointer to the path name is returned, 
+.L 0
+on error.
+.SH "SEE ALSO"
+pathcd(3)

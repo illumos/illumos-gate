@@ -1,0 +1,9 @@
+lib wait,wait2,wait3,wait4,waitpid
+tst ok_wif sys/types.h sys/wait.h note{ posix wait macros ok }end compile{
+	int	ifexited = WIFEXITED(0);
+	int	exitstatus = WEXITSTATUS(0);
+	int	ifsignaled = WIFSIGNALED(0);
+	int	termsig = WTERMSIG(0);
+	int	ifstopped = WIFSTOPPED(0);
+	int	stopsig = WSTOPSIG(0);
+}end

@@ -1,0 +1,283 @@
+#
+# list of known old cpp predefined symbols
+#
+# @(#)pp.def (gsf@research.att.com) 2007-01-26
+#
+# symbols will be tested for the common `_' permutations
+# qualifiers may be combinations of
+#
+#	architecture	cpu architecture
+#	dialect		C dialect
+#	machine		bundled package name
+#	release		system release name
+#	source		*_SOURCE baggage
+#	system		default is unix
+#	vendor		compiler vendor
+#
+ABI_SOURCE	:source:
+AES_SOURCE	:source:
+AIX		:architecture:
+AIX32		:architecture:
+AIX64		:architecture:
+ALL_SOURCE	:source:
+AM29000		:architecture:
+AM29K		:architecture:
+ANSI_CPP	:dialect:
+AOSVS		:release:
+APPLE		:vendor:
+APPLE_CC	:dialect:
+ATT		:release:
+ATT4		:release:
+BIG_ENDIAN
+BSD		:release:
+BSD_COMPAT	:source:
+BSD_TYPES	:source:
+CDECL
+CI
+CLASSIFY_TYPE
+COMPACT		:architecture:
+COMPILER_VER
+CRAY		:machine:
+CRAY1		:machine:
+CRAY2		:machine:
+DATAGENERAL	:machine:
+DGUX		:release:
+DLL
+DMERT		:release:
+DYNAMIC		:dialect:
+EXTENSIONS	:dialect:
+FreeBSD		:release:
+GNUC		:dialect:vendor:
+GNUC_MINOR
+GNUG		:dialect:vendor:
+HFS		:vendor:
+HIGHC
+HOST_MIPS
+HPUX_SOURCE	:source:
+HUGE		:architecture:
+IBMR2		:architecture:
+ISIS
+LANGUAGE_C	:dialect:
+LANGUAGE_CPLUS	:dialect:
+LANGUAGE_C_PLUS_PLUS	:dialect:
+LARGE		:architecture:
+LARGE_M
+LATTICE		:vendor:
+LONGLONG	:dialect:
+LONG_LONG	:dialect:
+M68010		:machine:
+M68020		:machine:
+MACH		:release:
+MEDIUM		:architecture:
+MIPSEB
+MIPSEL
+MIPS_FPSET
+MIPS_ISA
+MIPS_ISA_MIPS1
+MIPS_ISA_MIPS2
+MIPS_SIM
+MIPS_SIM_ABI16
+MIPS_SIM_ABI32
+MIPS_SZINT
+MIPS_SZLONG
+MIPS_SZPTR
+MODERN_C	:dialect:
+MOXIE		:release:
+MSC_VER		:release:
+MSDOS		:system:
+MSNT		:system:
+MVS		:architecture:
+M_ALPHA		:architecture:
+M_BITFIELDS
+M_I186		:architecture:
+M_I286		:architecture:
+M_I386		:architecture:
+M_I8086		:architecture:
+M_I86		:architecture:
+M_I86LM
+M_I86MM
+M_I86SM
+M_IX86		:architecture:
+M_LDATA
+M_LTEXT
+M_MRX000	:architecture:
+M_PPC		:architecture:
+M_SDATA
+M_STEXT
+M_SYS3
+M_SYS5
+M_SYSIII
+M_SYSV
+M_WDSWAP
+M_XENIX
+NATURAL_ALIGNMENT
+NEXT		:release:
+NeXT		:release:
+ON_SEL
+OSK
+OVERLAY
+PASCAL
+PDP11		:architecture:
+POSIX
+POSIX2_SOURCE	:source:
+POSIX_C_SOURCE	:source:
+POSIX_SOURCE	:source:
+POWER		:architecture:
+PTRDIFF_TYPE
+PWB
+RES
+RT
+SGI_MP_SOURCE	:source:
+SGI_REENTRANT_FUNCTIONS	:dialect:
+SGI_SOURCE	:source:
+SIZE_TYPE
+SMALL		:architecture:
+SMALL_M
+STDC_HOSTED
+STDC_IEC_559
+STDC_IEC_559_COMPLEX
+STDC_ISO_10646
+STDC_VERSION
+STD_INCLUDE_DIR
+SVR3
+SVR4
+SVR4_SOURCE	:source:
+SYSTYPE_BSD
+SYSTYPE_SVR4
+SYSTYPE_SYSV
+TARGET_LIB
+TINY		:architecture:
+TM_DPS6
+TM_L66
+TS
+TS_GCOS
+TS_MOD400
+TURBOC
+UTS		:release:
+UWIN		:release:
+V9		:release:
+VAX		:architecture:
+VAX11C		:vendor:
+VAXC		:vendor:
+VMS		:system:
+WCHAR_T_DEFINED
+WCHAR_TYPE
+WIN32		:release:
+X86		:architecture:
+XOPEN_SOURCE	:source:
+XPG2		:source:
+XPG3		:source:
+XPG4		:source:
+_50SERIES
+alliant		:machine:
+aosvs		:release:
+apollo		:machine:
+c_plusplus	:dialect:
+cpc		:machine:
+cplusplus	:dialect:
+cpm		:system:
+cpm68k		:machine:
+cpm80		:machine:
+cpm86		:machine:
+cray		:machine:
+datageneral	:machine:
+decus
+dgux		:release:
+dmert		:release:
+fpcc
+ftx
+gcos		:release:
+gimpel		:release:
+gnu
+gould		:machine:
+hobbit		:architecture:
+host_mips
+hp9000s200	:architecture:
+hp9000s300	:architecture:
+hp9000s500	:architecture:
+hp9000s700	:architecture:
+hp9000s800	:architecture:
+hppa		:architecture:machine:
+hpux		:release:
+i286		:architecture:
+i386		:architecture:
+i80186		:architecture:
+i80286		:architecture:
+i8080		:architecture:
+i8086		:architecture:
+i860		:architecture:
+iAPX286		:architecture:
+iAPX386		:architecture:
+ibm		:architecture:
+ibm032		:architecture:
+interdata	:architecture:
+kl10
+linux		:release:
+m68000		:architecture:
+m68k		:architecture:
+m88000		:architecture:
+m88k		:architecture:
+mbb
+mc300		:architecture:
+mc500		:architecture:
+mc68000		:architecture:
+mc68008		:architecture:
+mc68010		:architecture:
+mc68020		:architecture:
+mc68k32		:architecture:
+mc700		:architecture:
+mert		:release:
+mips		:architecture:
+mpm
+msdos		:system:
+n16		:architecture:
+n32032		:architecture:
+n32332		:architecture:
+news800
+nomacarg
+nonstopux	:system:
+ns1600		:architecture:
+ns16000		:architecture:
+ns32000		:architecture:
+orion		:release:
+os		:release:
+pcdos		:system:
+pdp11		:architecture:
+ppc		:architecture:
+pyr		:architecture:
+rsx		:release:
+sel		:architecture:
+selport
+sequent		:machine:
+sequoia		:machine:
+sparc		:architecture:
+spectrum	:machine:
+sun		:machine:
+sun2		:machine:
+sun3		:machine:
+svr4		:release:
+tahoe		:architecture:
+topix		:release:
+tops20		:machine:
+tss		:system:
+u370		:architecture:
+u3b		:architecture:
+u3b15		:architecture:
+u3b2		:architecture:
+u3b20		:architecture:
+u3b200		:architecture:
+u3b20d		:architecture:
+u3b4000		:architecture:
+u3b5		:architecture:
+univac		:machine:
+unix		:system:
+unixpc		:machine:
+uts		:release:
+vax		:architecture:
+vax11c		:vendor:
+vaxc		:vendor:
+vms		:system:
+xinu		:release:
+z80		:architecture:
+z800		:architecture:
+z8000		:architecture:

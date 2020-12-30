@@ -1,0 +1,11 @@
+lib	eaccess,euidaccess
+macro{
+	#include <sys/types.h>
+	#include <unistd.h>
+	#ifdef EFF_ONLY_OK
+	<<"#define EFF_ONLY_OK">>	EFF_ONLY_OK
+	#endif
+	#ifdef EX_OK
+	<<"#define EX_OK">>	EX_OK
+	#endif
+}end

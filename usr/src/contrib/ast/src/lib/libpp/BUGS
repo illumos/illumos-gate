@@ -1,0 +1,6 @@
+libpp bug list
+
+01/22/93 gsf	"" join drops trailing newline of last token in last file
+06/11/92 gsf	spurious empty character constant warning for shipproto.c
+02/29/92 gsf	"" join bombs if next line is #ident
+02/01/87 gsf	a/**/b doesn't concatenate outside macro bodies (COMPATIBILITY)

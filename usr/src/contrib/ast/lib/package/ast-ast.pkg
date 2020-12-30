@@ -1,0 +1,11 @@
+ast-ast :PACKAGE: libast
+
+:LICENSE: *.open
+
+:CATEGORY: devel libs
+
+:INDEX: the ast library, period
+
+:DESCRIPTION:
+	The AT&T Software Technology ast-ast package from AT&T Research
+	contains the ast library.

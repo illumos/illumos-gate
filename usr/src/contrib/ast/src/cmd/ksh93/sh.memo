@@ -1,0 +1,3248 @@
+.	 \" use troff -mm
+.nr C 3
+.nr N 2 
+.SA 1  \"  right justified
+.ND "December 21, 1993"
+.TL "311466-6713" "61175"  \" charging case filing case 
+Introduction to \f5ksh-93\fP
+.AU "David G. Korn" DGK MH 11267 7975 3C-526B "(research!dgk)"
+.TM  11267-931221-26  \"  technical memo + TM numbers
+.MT 1  \"  memo type
+.OK Shell "Command interpreter" Language UNIX  \" keyword
+.AS 2   \" abstract start for TM 
+\f5ksh-93\fP is a
+major rewrite of \f5ksh\fP,
+a program that serves as a command language
+(shell) for the UNIX* 
+.FS  *
+UNIX is a registered trademark of Novell.
+.FE
+operating system.
+As with \f5ksh\fP, \f5ksh-93\fP
+is essentially compatible with the System V version of the Bourne shell\*(Rf,
+.RS
+S. R. Bourne,
+.I "An Introduction to the UNIX
+Shell,"
+BSTJ - Vol. 57, No. 6 part 2, pages 1947-1972, 1978.
+.RF
+and compatible with previous versions of \f5ksh\fP.
+\f5ksh-93\fP is intended to comply with the IEEE POSIX 1003.2
+and ISO 9945-2\*(Rf
+.RS
+.I "POSIX \- Part 2: Shell and Utilities,"
+IEEE Std 1003.2-1992, ISO/IEC 9945-2, IEEE, 1993.
+.RF
+shell standard.
+In addition to changes in the language required
+by these standards, the primary focus of \f5ksh-93\fP
+is related to shell programming.
+\f5ksh-93\fP provides the programming power of several
+other interpretive languages such as \f5awk\fP\*(Rf,
+.RS
+Al Aho,
+Brian Kernighan,
+and
+Peter Weinberger,
+.I "The AWK Programming Language,"
+Addison Wesley, 1988.
+.RF
+\f5FIT\fP\*(Rf,
+.RS
+Lloyd H. Nakatani and Laurence W. Ruedisueli,
+.I "The FIT Programming Language Primer",
+TM 1126-920301-03, 1992.
+.RF
+\f5PERL\fP\*(Rf,
+.RS
+Larry Wall and Randal Schwartz,
+.I "Programming perl,"
+O'Reilly & Assoc, 1990.
+.RF
+and
+\f5tcl\fP\*(Rf.
+.RS
+John K. Ousterhout,
+.I "Tcl: An Embeddable Command Language",
+Proceedings of the Washington USENIX meeting, pp. 133-146, 1990.
+.RF
+.P
+This memo
+assumes that the reader is already familiar with the Bourne shell.
+It introduces most of the features of \f5ksh-93\fP
+relative to the Bourne shell; both
+as a command language and as a programming language.
+The Appendix contains
+a sample script written in \f5ksh-93\fP.
+.AE   \" abstract end
+.H 1 "INTRODUCTION"
+.P
+The term "shell" is used to describe a program that provides
+a command language
+interface.
+Because the UNIX*\ 
+.FS *
+UNIX is a registered trademark of USL
+.FE
+system shell is a user level program, and not part of
+the operating system itself,
+anyone can write a new shell or modify an existing one.
+This has caused an evolutionary progress
+in the design and implementation of shells,
+with the better ones surviving.
+The most widely available UNIX system shells are the Bourne shell\*(Rf,
+.RS
+S. R. Bourne,
+.IR "An Introduction to the UNIX Shell" ,
+Bell System Technical Journal,
+Vol. 57, No. 6, Part 2, pp. 1947-1972, July 1978.
+.RF
+written by Steve Bourne
+at AT&T Bell Laboratories,
+the C shell\*(Rf,
+.RS
+W. Joy,
+.IR "An Introduction to the C Shell" ,
+Unix Programmer's Manual, Berkeley Software Distribution,
+University of California, Berkeley, 1980.
+.RF
+written by Bill Joy at the University of California, Berkeley,
+and the KornShell language \*(Rf,
+.RS
+Morris Bolsky and David Korn,
+.IR "The KornShell Command and Programming Language" ,
+Prentice Hall, 1989.
+.RF
+written by David Korn
+at AT&T Bell Laboratories.
+The Bourne shell is available on almost all versions of the UNIX
+system.
+The C Shell is available with all Berkeley Software Distribution (BSD) UNIX systems and on many other systems.
+The KornShell
+is available on System V Release 4 systems. 
+In addition, it is available on many other systems.
+The source for the KornShell language is available from the AT&T Toolchest,
+an electronic software distribution system.
+It runs on all known versions of the UNIX system and
+on many UNIX system look-alikes.
+.P
+There have been several articles comparing the UNIX system shells.
+Jason Levitt\*(Rf 
+.RS
+Jason Levitt,
+.IR "The Korn Shell: An Emerging Standard" ,
+UNIX/World, pp. 74-81, September 1986. 
+.RF
+highlights some of the new features
+introduced by the KornShell language.
+Rich Bilancia\*(Rf 
+.RS
+Rich Bilancia,
+.IR "Proficiency and Power are Yours With the Korn Shell" ,
+UNIX/World, pp. 103-107, September 1987. 
+.RF
+explains some of the advantages of using the KornShell language.
+John Sebes\*(Rf 
+.RS
+John Sebes,
+.I "Comparing UNIX Shells,"
+UNIX Papers,
+Edited by the Waite Group, Howard W. Sams & Co., 1987.
+.RF
+provides a more detailed comparison of the three shells,
+both as a command language and as a programming language.
+.P
+The KornShell language is a superset of the
+Bourne shell. The KornShell language has many of the popular C shell features,
+plus additional features of its own.
+Its initial popularity stems primarily from its improvements as
+a command language.
+The primary interactive benefit of the KornShell command language
+is a visual command line editor that allows you to
+make corrections to your current command line
+or to earlier command lines,
+without having to retype them.
+.P
+However,
+in the long run,
+the power of the KornShell language as a high-level programming language,
+as described by Dolotta and Mashey\*(Rf,
+.RS
+T. A. Dolotta and J. R. Mashey,
+.I "Using the shell as a Primary Programming Tool,"
+Proc. 2nd. Int. Conf. on Software Engineering, 1976,
+pages 169-176.
+.RF
+may prove to be of greater significance.
+\f5ksh-93\fP provides the programming power of several
+other interpretive languages such as \f5awk\fP,
+\f5FIT\fP,
+\f5PERL\fP,
+and
+\f5tcl\fP.
+An application that was originally written in the C programming language
+was rewritten in the KornShell language.
+More than 20,000 lines of C code were replaced with KornShell scripts
+totaling fewer than 700 lines.
+In most instances there was no perceptible difference in performance
+between the two versions of the code.
+.P
+The KornShell language has been embedded into windowing systems
+allowing graphical user interfaces to be developed in shell
+rather than having to build applications that need to be
+compiled.
+The \f5wksh\fP program\*(Rf
+.RS
+J. S. Pendergrast,
+.IR "WKSH - Korn Shell with X-Windows Support",
+USL. 1991.
+.RF
+provides a method of developing OpenLook or Motif
+applications as \f5ksh\fP scripts.
+.P
+This memo is an introduction to \f5ksh-93\fP,
+the program that implements an enhanced version
+of the KornShell language.
+It is referred to as \f5ksh\fP in the rest of this memo.
+The memo describes the KornShell language based on the
+features of the 12/28/93 release of \f5ksh\fP.
+This memo is not a tutorial, only an introduction.
+The second edition of reference [9] gives 
+a more complete treatment of the KornShell language.
+.P
+A concerted effort has been made to achieve both System V Bourne shell
+compatibility and IEEE POSIX compatibility
+so that scripts written for either of these shells
+can run without modification with \f5ksh\fP.
+In addition, \f5ksh-93\fP attempts to
+be compatible with older versions of \f5ksh\fP.
+When there are conflicts between versions of the shell,
+\f5ksh-93\fP selects the behavior dictated by the IEEE POSIX
+standard.
+The description of features in this memo assumes
+that the reader is already familiar with the Bourne shell.
+.H 1 "COMMAND LANGUAGE"
+There is no separate command language.
+All features of the language, except job control,
+can be
+used both within a script and interactively from a terminal.
+However, features that are more likely to be used
+while running commands interactively from a terminal
+are presented here.
+.H 2 "Setting Options"
+By convention, UNIX commands
+consist of a command name followed by options and other arguments.
+Options are either of the form \f5-\fP\fIletter\fP,
+or \f5-\fP\fIletter value\fP.
+In the former case, several options may be grouped after a single \f5-\fP.
+The argument \f5--\fP signifies an end to the option list and is
+only required when the first non-option argument begins with
+a \f5-\fP.
+Most commands print an error message which
+shows which options are permitted
+when given incorrect arguments.
+In addition, the option sequence \f5-?\fP causes most commands
+to print a usage message which lists the valid options. 
+.P
+Ordinarily, \f5ksh\fP executes a command by 
+using the command name to locate a program to run
+and by running the program as a separate process.
+Some commands, referred to as
+.IR built-ins ,
+are carried out by \f5ksh\fP itself,
+without creating a separate process.
+The reasons that some commands are built-in are presented later.
+In nearly all cases the distinction
+between a command that is built-in and one that
+is not is invisible to the user.
+However, nearly
+all commands that are built-in follow command line conventions.
+.P
+\f5ksh\fP has several options that can be set by the user
+as command line arguments at invocation and as option arguments to the
+\f5set\fP command.
+Most other options can be set with a single letter option or as a name
+that follows the \f5-o\fP option. 
+Use
+\f5set\ -o\fP
+to display the current option settings.
+Some of these options, such as
+.B interactive
+and
+.B monitor
+(see
+.I "Job Control"
+below),
+are enabled automatically by \f5ksh\fP
+when the shell is connected to a terminal device.
+Other options, such as
+.B noclobber
+and
+.BR ignoreeof ,
+are normally placed in a startup file.
+The
+.B noclobber
+option causes
+\f5ksh\fP
+to print an error message when you use
+.B >
+to redirect output to a file that already exists.
+If you want to redirect to an existing file, then
+you have to use
+.B >|
+to override
+the
+.B noclobber
+option.
+The
+.B ignoreeof
+option
+is used to prevent the
+.I end-of-file
+character, normally
+.B ^D
+(Control- d),
+from exiting the shell and possibly logging you out.
+You must type \f5exit\fP
+to log out.
+Most of the options are described in this memo as appropriate. 
+.H 2 "Command Aliases"
+.P
+Command aliases provide a mechanism of associating a command name and
+arguments with a shorter name.
+Aliases are defined with the \f5alias\fP
+built-in.
+The form of an \f5alias\fP
+command definition is:
+.ce
+\f5alias\fP \fIname\fP\f5=\fP\fIvalue\fP
+As with most other shell assignments, no space is allowed before or after
+the \f5=\fP.
+The characters of an alias name cannot be characters that are
+special to the shell. 
+The replacement string,
+.I value,
+can contain any valid shell script,
+including meta-characters such as pipe symbols and i/o-redirection
+provided that they are quoted.
+Unlike
+\f5csh\fP,
+aliases in
+\f5ksh\fP
+cannot take arguments.
+The equivalent functionality of aliases with arguments can
+be achieved with shell functions, described later.
+.P
+As a command is being read,
+the command name is checked against a list of
+.I alias
+names.
+If it is found,
+the name is replaced by the alias value associated with the
+.I alias
+and then rescanned.
+When rescanning the value for an alias, alias substitutions
+are performed except for an alias that is currently being processed.
+This prevents infinite loops in alias substitutions.
+For example with the aliases, \f5alias\ l=ls\ 'ls=ls\ -C'\fP,
+the command name \f5l\fP becomes \f5ls\fP, which becomes \f5ls\ -C\fP.
+Ordinarily, only the command name word is processed for alias substitution.
+However, if the value of an alias ends in a space,
+then the word following the alias is also checked for alias substitution.
+This makes it possible
+to define an alias whose first argument is the name of a command
+and have alias substitution performed on this argument,
+for example
+\f5nohup='nohup\ '\fP.
+.P
+Aliases can be used to redefine built-in commands so that
+the alias,
+.ce
+\f5alias test=./test\fP
+can be used to look for \f5test\fP
+in your current working directory rather than
+using the built-in \f5test\fP command.
+Reserved words such as
+\f5for\fP and \f5while\fP
+cannot be changed by aliasing.
+The command \f5alias\fP,
+without arguments, generates
+a list of aliases and corresponding alias values.
+The \f5unalias\fP command removes the name and text of an alias.
+.P
+Aliases are used to save typing and to improve readability of scripts.
+Several aliases are predefined by \f5ksh\fP.
+For example, the predefined alias
+.ce
+\f5alias integer='typeset -i'\fP
+allows the integer variables \f5i\fP and \f5j\fP
+to be declared and initialized with the command
+.ce
+\f5integer i=0 j=1\fP
+.P
+While aliases can be defined in scripts,
+it is not recommended.
+The location of an alias command can be important
+since aliases are only processed when a command is read.
+A \fB\s+2.\s-2\fP
+procedure (the shell equivalent of an include file)
+is read all at once (unlike
+start up files
+which are read a command at
+a time) so that any aliases defined there will not effect any commands
+within this script.
+Predefined aliases do not have this problem.
+.H 2 "Command Re-entry"
+.P
+When run interactively,
+\f5ksh\fP saves the
+commands you type at a terminal in a file.
+If the variable
+\fB\s-1HISTFILE\s+1\fP
+is set to the name of a file to which the user
+has write access,
+then the commands are stored in this
+.I history
+file.
+Otherwise the file
+\fB$\s-1HOME\s+1/.sh_history\fP
+is checked for write access and if this fails
+an unnamed file is used to hold the history lines.
+Commands are always appended to this file.
+Instances of \f5ksh\fP
+that run concurrently and use the same history file
+name, share access to the history file so that a command
+entered in one shell will be available for editing in another
+shell.
+The file may be truncated when \f5ksh\fP
+determines that no other shell is using the history file.
+The number of commands accessible to the user is determined by the value of the
+\fB\s-1HISTSIZE\s+1\fP
+variable at the time the shell is invoked.
+The default value is 256.
+Each command may consist of one or more lines since a compound
+command is considered one command.
+If the character
+.B !
+is placed within the
+.I "primary prompt"
+string,
+\fB\s-1PS1\s+1\fP,
+then it is replaced by the command number each time the prompt is given.
+.P
+A built-in command named \f5hist\fP
+is used to list and/or edit
+any of these saved commands.
+The option
+.B \-l
+is used to specify listing of previous commands.
+The command can always be specified with
+a range of one or more commands.
+The range can be specified by giving the command
+number, relative or absolute, or by giving
+the first character or characters of the command.
+When given without specifying the range,
+the last 16
+commands are listed, each
+preceded by the command number.
+.P
+If the listing option is not selected,
+then the range of commands specified,
+or the last command if no range is given,
+is passed to an editor program before
+being re-executed by \f5ksh\fP.
+The editor to be used may be specified
+with the option
+.B \-e
+and following it with the editor name.
+If this option is not specified, the
+value of the shell variable
+\fB\s-1HISTEDIT\s+1\fP
+is used as the name of the editor,
+providing that this variable has a non-null value.
+If this variable is not set, or is null,
+and the
+.B \-e
+option has not been selected,
+then
+\f5/bin/ed\fP
+is used.
+When editing has been complete,
+the edited text automatically becomes
+the input for \f5ksh\fP.
+As this text is read by \f5ksh\fP, it is echoed onto the terminal.
+.P
+The 
+.B \-s
+option causes the editing to be bypassed
+and just re-executes the command.
+In this case only a single command can be specified as the range
+and an optional argument of the form
+\fIold\fP\fB=\fP\fInew\fP
+may be added which requests a simple string substitution
+prior to evaluation.
+A convenient alias,
+.ce
+\f5alias r='hist -s'\fP
+has been pre-defined so that
+the single key-stroke
+\f5r\fP
+can be used to re-execute the previous command
+and the key-stroke sequence,
+\f5r\ abc=def\ c\fP
+can be used to re-execute the last command that starts with
+the letter \f5c\fP
+with the first occurrence of the string \f5abc\fP
+replaced with the string \f5def\fP.
+Typing
+\f5r\ c\ >\ file\fP
+re-executes the most recent command starting with the letter \f5c\fP,
+with standard output redirected to
+.IR file .
+.H 2 "In-line editing"
+.P
+Lines typed from a terminal frequently need changes made
+before entering them.
+With the Bourne shell the only method to fix up commands
+is by backspacing or killing the whole line.
+\f5ksh\fP offers options that allow the user to edit parts of the
+current command line before submitting the command.
+The in-line edit options make the command line into a single
+line screen edit window.
+When the command is longer than the width of the terminal,
+only a portion of the command is visible.
+Moving within the line automatically makes that portion visible.
+Editing can be performed on this window until the
+.I return
+key is pressed.
+The editing modes have editing directives that access the history file
+in which previous commands are saved.
+A user can copy any of the most recent
+\fB\s-1HISTSIZE\s+1\fP
+commands from this file into the input edit window.
+You can locate commands by searching or by position.
+.P
+The in-line editing options do not use the
+.I termcap
+or
+.I terminfo
+databases.
+They work on most standard terminals.
+They only require that the backspace character moves the cursor left
+and the space character overwrites the current character on the screen
+and moves the cursor to the right.
+Very few terminals or terminal emulators do not have
+this behavior.
+.P
+There is a choice of editor options.
+The
+.BR emacs ,
+.BR gmacs ,
+or
+.B vi
+option is selected by turning on the
+corresponding
+option of the \f5set\fP
+command.
+If the value of the
+\fB\s-1EDITOR\s+1\fP
+or
+\fB\s-1VISUAL\s+1\fP
+variables ends with any of these suffixes
+the corresponding option is turned on.
+A large subset of each of these editors'
+features is available within the shell.  Additional
+functions, such as file name completion, have also been added.
+.P
+In the
+.B emacs
+or
+.B gmacs
+mode the user positions the cursor to the point
+needing correction and inserts, deletes, or replaces
+characters as needed.
+The only difference between these two modes is the
+meaning of the directive
+.BR ^T .
+Control keys and escape sequences are used for cursor
+positioning and control functions.
+The available editing functions are listed in the manual page.
+.P
+The
+.B vi
+editing mode
+starts in insert mode and enters control mode when the
+user types ESC ( 033 ).
+The
+.I return
+key, which submits the current command for processing,
+can be entered from either mode.
+The cursor can be anywhere on the line.
+A subset of commonly used
+.I vi
+editing directives are available.
+The
+.B k
+and
+.B j
+directives that normally move up and down by one
+.IR line ,
+move up and down one
+.I command
+in the history file,
+copying the command into the input edit window.
+For reasons of efficiency,
+the terminal is kept in canonical mode until an
+ESC
+is typed.
+On some terminals,
+and on earlier versions of the UNIX operating system,
+this doesn't work correctly.
+The
+.B viraw
+option,
+which always uses
+.I raw
+or
+.I cbreak
+mode,
+must be used in this case.
+.P
+Most of the code for the editing options does not rely on the
+\f5ksh\fP code and can be used in a stand-alone mode with most any command
+to add in-line edit capability.
+However,
+all versions of the in-line editors have some features that
+use some shell specific code.  For example,
+with all edit modes, the
+ESC-=
+directive applied to command words
+(the first word on the line,
+or the first word after a
+.BR ; ,
+.BR | ,
+.BR ( ,
+or
+.BR & )
+lists all aliases, functions, or commands
+that match the portion of the given current word.
+When applied to other words, this directive
+prints the names of files that match the current
+word.
+The ESC\fB-*\fP directive
+adds the expanded list of matching files to the command line.
+A trailing
+.B *
+is added to the word if it doesn't contain any file pattern matching
+characters before the expansion.
+In
+.B emacs
+and
+.B gmacs
+mode,
+ESC-ESC
+indicates command completion when applied to
+command names, otherwise it indicates pathname completion.
+With command or pathname completion,
+the list generated by the
+ESC-= directive is examined to find
+the longest common prefix.
+With command completion, only the last component of
+the pathname is used to compute the longest command prefix.
+If the longest common prefix is a complete match,
+then the word is replaced by the pathname, and a
+.B /
+is appended if
+pathname is a directory, otherwise a space is added.
+In
+.B vi
+mode,
+.B \e
+from control mode gives the same behavior.
+.H 2 "Key Binding"
+.P
+It is possible to intercept keys as they are entered and
+apply new meanings or bindings.
+A trap named
+\fB\s-1KEYBD\s+1\fP
+is evaluated each time
+\f5ksh\fP processes characters entered
+from the keyboard,  
+other than those typed
+while entering a search string or an argument to an
+edit directive such as
+.B r
+in vi-mode.
+The action associated with this trap can change the value of
+the entered key to cause the key to perform a different
+operation.
+.P
+When the
+\fB\s-1KEYBD\s+1\fP
+trap is entered,
+the \fB.sh.edtext\fP
+variable contains the contents of the current input line
+and the \fB.sh.edcol\fP
+variable gives the current cursor position within this line.
+The \fB.sh.edmode\fP
+variable contains the
+.B ESC
+character when the trap is entered from
+.B vi
+insert mode.
+Otherwise, this value is null.
+The \fB.sh.edchar\fP
+variable contains the character or
+escape sequence that caused the trap.
+A key sequence is either a single character,
+.B ESC
+followed by a single character,
+or
+.B ESC[
+followed by a single character.
+In the \fBvi\fP edit mode,
+the characters after the
+.B ESC
+must be entered within half a second after the
+.BR ESC .
+The value of \fB.sh.edchar\fP
+at the end of the trap will be used as
+the input sequence. 
+.P
+Using the associative array facility of \f5ksh\fP described later,
+and the function facility of \f5ksh\fP, it is easy to write
+a single trap so that keys can be bound dynamically.  For example,
+.sp
+.nf
+.in .5i
+.ta 4i
+\f5typeset -A Keytable
+trap 'eval "${Keytable[${.sh.edchar}]}"' KEYBD
+function keybind # key action
+{ 
+        typeset key=$(print -f "%q" "$2")
+        case $# in
+        2)      Keytable[$1]='.sh.edchar=${.sh.edmode}'"$key"
+                ;;
+        1)      unset Keytable[$1]
+                ;;
+        *)      print -u2 "Usage: $0 key [action]"
+                ;;
+        esac
+}\fP
+.ta
+.in
+.fi
+.sp
+.H 2 "Job Control"
+.P
+The job control mechanism 
+is almost identical to the version introduced in \f5csh\fP
+of the Berkeley UNIX operating system,
+version 4.1 and later.
+The job control feature allows the user to stop and
+restart programs, and to move programs to and from the
+foreground and the background.
+It will only work on systems that provide support for
+these features.
+However,
+even systems without job control have a
+.B monitor
+option which, when enabled, will report the progress
+of background jobs and enable the user to \f5kill\fP
+jobs by job number or job name.
+.P
+An interactive shell associates a
+.I job
+with each pipeline typed in from the terminal
+and assigns it a small integer number
+called the job number.
+If the job is run asynchronously,
+the job number is printed at the terminal.
+At any given time, only one job owns the terminal,
+i.e., keyboard signals are only sent to the processes in one job.
+When \f5ksh\fP creates a foreground job,
+it gives it ownership of the terminal.
+If you are running a job and wish to stop
+it you hit the key
+.B ^Z
+(control-\fBZ\fP)
+which sends a
+\fB\s-1STOP\s+1\fP
+signal to all processes in the current job.
+The shell receives notification that the processes
+have stopped and takes back control of the terminal.
+.P
+There are commands to continue programs in the foreground
+and background.
+There are several ways to refer to jobs.
+The character
+.B %
+introduces a job name.
+You can refer to jobs by name or number as described in the manual page.
+The built-in command \f5bg\fP
+allows you to continue a job in the background,
+while the built-in command \f5fg\fP
+allows you to continue a job in the foreground even
+though you may have started it in the background.
+.P
+A job being run in the background will stop if it tries
+to read from the terminal.
+It is also possible to stop background jobs that try to write on
+the terminal by setting the terminal options
+appropriately.
+.P
+There is a built-in command \f5jobs\fP
+that lists the status of all running and stopped jobs.
+In addition,
+you are informed of the change of state (running or stopped)
+of any background
+jobs just before each prompt.
+If you want to be notified about background job completions
+as soon as they occur without waiting for a prompt, then use the
+.B notify
+option.
+When you try to exit the shell while jobs are stopped or running,
+you will receive a message from \f5ksh\fP.
+If you ignore this message and try to exit again,
+all stopped processes will be terminated.
+In addition, for login shells, the
+\fB\s-1HUP\s+1\fP
+signal will be sent to
+all background jobs
+unless the job has been disowned with the
+.B disown
+command.
+.P
+A built-in version of \f5kill\fP
+makes it possible to use
+.I job
+numbers as targets for signals.
+Signals can be selected by number or name.
+The name of the signal is the name found in the
+.I include
+file
+.B /usr/include/sys/signal.h
+with the prefix
+.B \s-1SIG\s+1
+removed.
+The
+.B \-l
+option of \f5kill\fP 
+provides a means to map individual signal names to and from
+signal number.
+In addition, if no signal name or number is given,
+\f5kill\ -l\fP 
+generates a list of valid signal names.
+.H 2 "Changing Directories"
+By default,
+\f5ksh\fP
+maintains a logical view of the file system hierarchy
+which makes symbolic links transparent.
+For systems that have symbolic links,
+this means that if \f5/bin\fP is a symbolic link to \f5/usr/bin\fP
+and you change directory to \f5/bin\fP, \f5pwd\fP will indicate
+that you are in \f5/bin\fP, not \f5/usr/bin\fP. 
+\f5pwd\ -P\fP
+generates the physical pathname of the present working
+directory by resolving all the symbolic links.
+By default,
+the \f5cd\fP
+command will take you where you expect to go even if you cross
+symbolic links.
+A subsequent \f5cd\ ..\fP in the example above
+will place you in \f5/\fP, not \f5/usr\fP.
+On systems with symbolic links,
+\f5cd\ -P\fP
+causes
+.B ..
+to be treated physically.
+.P
+\f5ksh\fP remembers your last directory
+in the variable
+\fB\s-1OLDPWD\s+1\fP.
+The \f5cd\fP
+built-in can be given with argument
+.B \-
+to return to the previous directory
+and print the name of the directory.
+Note that \f5cd\ -\fP
+done twice returns you to the starting directory,
+not the second previous directory.
+A directory
+.I stack
+manager has been written as shell
+.I functions
+to
+.I push
+and
+.I pop
+directories from the stack.
+.H 2 "Prompts"
+.P
+When \f5ksh\fP
+reads commands from a terminal,
+it issues a prompt whenever it is ready
+to accept more input and then
+waits for the user to respond.
+The
+\fB\s-1TMOUT\s+1\fP
+variable
+can be set to be the number of seconds that the shell will wait for
+input before terminating.
+A 60 second warning message is printed
+before terminating.
+.P
+The shell uses two prompts.
+The primary prompt,
+defined by the value of the
+\fB\s-1PS1\s+1\fP
+variable,
+is issued at the start of each command.
+The secondary prompt,
+defined by the value of the
+\fB\s-1PS2\s+1\fP
+variable,
+is issued when more input is needed to complete a command.
+.P
+\f5ksh\fP allows the user to specify a list of files or directories
+to check before issuing the
+\fB\s-1PS1\s+1\fP
+prompt.
+The variable
+\fB\s-1MAILPATH\s+1\fP
+is a colon (
+.B :
+) separated list of file names to be checked for changes
+periodically. The user is notified
+before the next prompt.
+Each of the names in this list can be followed by a
+.B ?
+and a message to be given when a change has been detected in the file.
+The prompt will be evaluated for parameter expansion, command
+substitution and arithmetic expansion which are described later.
+The parameter
+.B $_
+within a mail message will evaluate to the name of the file that
+has changed.
+The parameter
+\fB\s-1MAILCHECK\s+1\fP
+is used to specify the minimal interval in seconds before
+new mail is checked for.
+.P
+In addition to replacing each
+.B !
+in the prompt with the command number,
+\f5ksh\fP expands
+the value of the
+.B \s-1PS1\s+1
+variable
+for parameter expansions, arithmetic expansions,
+and command substitutions as described below
+to generate the prompt.
+The expansion characters that are to be applied when
+the prompt is issued must be quoted to prevent the
+expansions from occurring when assigning the value to
+.B \s-1PS1\s+1.
+For example,
+\f3\s-1PS1\s+1="$\s-1PWD\s+1"\fP
+causes 
+.B \s-1PS1\s+1
+to be set to the value of
+.B \s-1PWD\s+1
+at the time of the assignment whereas
+.B \s-1PS1\s+1='$\s-1PWD\s+1'
+causes
+.B \s-1PWD\s+1
+to be expanded at the time the prompt is issued.
+.P
+Command substitution may require a separate process
+to execute and cause the prompt display to be somewhat
+slow, especially
+when the return key is pressed several times in a row.
+Therefore, its use
+within
+.B \s-1PS1\s+1
+is discouraged.
+Some variables are maintained by \f5ksh\fP
+so that their values can be used with
+.B \s-1PS1\s+1.
+The
+.B \s-1PWD\s+1
+variable stores the pathname of the current working directory.
+The value of 
+.B \s-1SECONDS\s+1
+variable
+is the value of the most
+recent assignment plus the elapsed time.
+By default, the time is measured in milli-seconds,
+but since
+.B \s-1SECONDS\s+1
+is a floating point variable, the
+number of places after the decimal point in the expanded
+value can be
+specified with
+\f5typeset\ -F\fP\fIplaces\fP\f5\ SECONDS\fP.
+In a roundabout way, this variable
+can be used to generate a time stamp into the
+.B \s-1PS1\s+1
+prompt without creating a process at each prompt.
+The following code explains how you can do this on
+System V.  On BSD, you need a different command to initialize
+the
+.B \s-1SECONDS\s+1
+variable.
+\f5
+.sp
+.nf
+.in .5i
+# . this script and use $TIME as part of your PS1 string to
+# get the time of day in your prompt
+typeset -RZ2  _x1 _x2 _x3
+(( SECONDS=$(date  '+3600*%H+60*%M+%S') ))
+_s='_x1=(SECONDS/3600)%24,_x2=(SECONDS/60)%60,_x3=SECONDS%60,0'
+TIME='"${_d[_s]}$_x1:$_x2:$_x3"'
+# PS1=${TIME}whatever
+.fi
+.ta
+.in
+.sp
+\fP
+.H 2 "Tilde substitution"
+.P
+The character
+.B \(ap
+at the beginning of a word has special meaning to \f5ksh\fP.
+If the characters after the
+.B \(ap
+up to a
+.B /
+match a user login name in the password database, then the
+.B \(ap
+and the name are replaced by
+that user's login directory.
+If no match is found, the original word
+is unchanged.
+A
+.B \(ap
+by itself, or in front of a
+.BR / ,
+is replaced by the value of the
+\fB\s-1HOME\s+1\fP
+parameter.
+A
+.B \(ap
+followed by a
+.B +
+or
+.B \-
+is replaced by the value of
+.B $\s-1PWD\s+1
+or
+.B $\s-1OLDPWD\s+1
+respectively.
+.H 2 "Output formats"
+The output of built-in commands and traces have values quoted so that they
+can be re-input to the shell.
+This makes it easy to cut and paste shell output on systems
+which use a pointing device such as a mouse.
+In addition, output can be saved in a file for reuse.
+.P
+.H 2 "The \fB\s-1ENV\s+1\fP file"
+When an interactive \f5ksh\fP starts, it evaluates the
+.B $\s-1ENV\s+1
+variable to arrive at a file name.
+If this value is not null,
+\f5ksh\fP attempts to read and process
+commands in a file by this name.
+Earlier versions of \f5ksh\fP read the \fB\s-1ENV\s+1\fP file
+for all invocations of the shell primarily to allow
+function definitions to be available for all shell
+invocations.
+The function search path, \fB\s-1FPATH\s+1\fP, described later,
+eliminated the primary need for this capability and it was
+removed because the high performance cost was no longer
+deemed acceptable.
+.H 1 "PROGRAMMING LANGUAGE"
+The KornShell vastly extends the set of applications that
+can be implemented efficiently at the shell level.
+It does this by providing simple yet powerful mechanisms
+to perform arithmetic, pattern matching,
+substring generation,
+and arrays.
+Users can write applications as separate functions that can
+be defined in the same file or in a library of functions
+stored in a directory and loaded on demand.
+.H 2 "String Processing"
+The shell is primarily a string processing language.
+By default, variables hold variable length strings.
+There are no limits to the length of strings.  Storage
+management is handled by the shell automatically.
+Declarations are not required.
+With most programming languages, string constants are designated
+by enclosing characters in single quotes or double quotes.
+Since most of the words in the language are strings, the shell
+requires quotes only when a string contains characters that
+are normally processed specially by the shell, but their
+literal meaning is intended.
+However, since the shell is a string processing language,
+and some characters can occur as literals and as language metacharacters,
+quoting is an important part of the language.
+.P
+There are four quoting mechanisms in \f5ksh\fP.
+The simplest is to enclose a sequence of characters inside single quotes.
+All characters between a pair of single quotes have their literal meaning;
+the single quote itself cannot appear.
+A
+.B $
+immediately preceding
+a single quoted string
+causes all the characters until the matching single quote
+to be interpreted as an ANSI-C language string.
+Thus, \f5'\en'\fP represents characters \f5\e\fP and
+\f5n\fP, whereas, \f5$'\en'\fP 
+represents the new-line character.
+Double quoted strings remove the special meaning of all characters
+except
+.BR $ ,
+.BR \(ga ,
+and
+.BR \e ,
+so that parameter expansion and command substitution (defined below)
+are performed.
+The final mechanism for quoting a character is by preceding it with the
+escape character
+.BR \e\^ .
+This mechanism works outside of quoted strings and for the characters
+.BR $ ,
+.BR \(ga ,
+\fB"\fP,
+and
+.B \e
+in double quoted strings.
+.P
+Variables are designated by
+one or more
+strings of alphanumeric
+characters beginning with an alphabetic character
+separated by a \fB\s+2.\s-2\fP.
+Upper and lower case characters are distinct, so that the variable
+.B A
+and
+.B a
+are names of different variables.
+There is no
+limit to the length of the name of a variable.
+You do not have to declare variables.
+You can assign a value to a variable by writing the name of the
+variable, followed by an equal sign, followed by a character string
+that represents its value.
+To create a variable whose name
+contains a \fB\s+2.\s-2\fP,
+the variable whose name consists of
+the characters before the last \fB\s+2.\s-2\fP
+must already exist.
+You reference a variable by
+putting the name inside curly braces and
+preceding the braces with a dollar sign.
+The braces may be omitted when the name
+is alphanumeric.
+If \f5x\fP and \f5y\fP
+are two shell variables, then
+to define a new variable,
+\f5z\fP,
+whose value is
+the concatenation of the values of
+\f5x\fP and \f5y\fP,
+you just say
+\f5z=$x$y\fP.
+It is that easy.
+.P
+The
+.B $
+can be thought of as meaning
+"value of."
+You can also capture the output of any command with the notation
+.BI $( command ) .
+This is referred to as command substitution.
+For example,
+\f5x=$(date)\fP
+assigns the output from the \f5date\fP
+command to the variable \f5x\fP.
+Command substitution in the
+Bourne shell is denoted by enclosing the command between
+backquotes,
+(\fB\(ga\^\(ga\fP).
+This notation
+suffers from some
+complicated quoting rules.
+Thus, it is hard to write \f5sed\fP
+patterns which contains back slashes within command substitution.
+Putting the pattern in single quotes
+is of little help.
+\f5ksh\fP accepts the Bourne shell command substitution syntax
+for backward compatibility.
+The
+.BI $( command )
+notation allows
+the \fIcommand\fP itself to contain quoted strings even if the substitution
+occurs within double quotes. Nesting is legal.
+.P
+The special command substitution of the form
+\f5$(cat\ file)\fP
+can be replaced by
+\f5$(<\ file)\fP,
+which is faster because
+the \f5cat\fP
+command doesn't have to run.
+.H 2 "Shell Parameters and Variables"
+.P
+There are three types of parameters used by \f5ksh\fP,
+special parameters, positional parameters, and named
+parameters which are called variables.
+\f5ksh\fP defines the same special parameters,
+.BR 0 ,
+.BR * ,
+.BR @ ,
+.BR # ,
+.BR ? ,
+.BR $ ,
+.BR ! ,
+and
+.BR \- ,
+as in the Bourne shell.
+.P
+Positional parameters are set when the shell is invoked,
+as arguments to the \f5set\fP built-in,
+and by calls to functions (see below) and \fB\s+2.\s-2\fP
+procedures.
+They are named by numbers starting at 1.
+.P
+The third type of parameter is a variable.
+As mentioned earlier,
+\f5ksh\fP uses variables whose names
+consist of one or more
+alpha-numeric strings separated by a \fB\s+2.\s-2\fP.
+There is no need to specify the
+.I type
+of a variable in the shell because, by default,
+variables store strings of arbitrary length
+and values will automatically be converted to numbers
+when used in an arithmetic context.
+However, \f5ksh\fP variables
+can have one or more
+.I attributes
+that control the internal representation of the variable,
+the way the variable is printed, and its access or
+scope.
+In addition,
+\f5ksh\fP
+allows variables to represent arrays of values
+and references to other variables.
+The \f5typeset\fP
+built-in command of \f5ksh\fP
+assigns attributes to variables.
+Two of the attributes,
+.I readonly
+and
+.IR export ,
+are available in the Bourne shell.
+Most of the remaining attributes are discussed here.
+The complete list of attributes appears in the manual.
+The \f5unset\fP
+built-in of \f5ksh\fP removes
+values and attributes of variables.
+When a variable is exported, certain of its attributes are also exported.
+.P
+Whenever a value is assigned to a variable,
+the value is transformed according to the attributes of the variable.
+Changing the attribute of a variable can change its value.
+The attributes
+.B \-L
+and
+.B \-R
+are for left and right field justification respectively.
+They are useful for aligning columns in a report.
+For each of these attributes, a width can be defined explicitly or else
+it is defined the first time an assignment is made to the variable.
+Each assignment causes justification of the field, truncating
+if necessary.
+Assignment to fixed sized variables
+provides one way to generate a substring consisting of
+a fixed number of characters from
+the beginning or end of a string.
+Other methods are discussed later.
+.P
+The attributes
+.B \-u
+and
+.B \-l
+are used for upper case and lower case
+formatting, respectively.
+Since it makes no sense to have both attributes on simultaneously,
+turning on either of these attributes turns the other off.
+The following script,
+using \f5read\fP and \f5print\fP which are described later,
+provides an example of the use of shell variables
+with attributes.
+This script reads a file of lines each consisting of five fields separated by
+.B :
+and prints fields 4 and 2 in upper case in columns 1-15, left justified,
+and columns 20-25 right-justified respectively.
+.sp
+.nf
+.in .5i
+.ta 3.4i
+\f5typeset -uL15 f4                # 15 character left justified
+typeset -uR6 f2                 # 6 character right justified
+IFS=:                           # set field separator to :
+while   read -r f1 f2 f3 f4 f5  # read line, split into fields
+do      print -r -- "$f4  $f2"  # print fields 4 and 2
+done\fP
+.fi
+.ta
+.in
+.sp
+.P
+The
+.BR \-i ,
+.BR \-E ,
+and
+.BR \-F ,
+attributes are used to represent numbers.
+Each can be followed by a decimal number.
+The
+.B \-i
+attribute causes the value to be represented as an integer and it
+can be followed by a number representing the numeric base when expanding
+its value.
+Whenever a value is assigned to an integer variable, it is evaluated
+as an arithmetic expression
+and then truncated to an integer.
+.P
+The
+.B \-E
+attribute causes the value to be represented in scientific
+notation whenever its value is expanded.  The number following the 
+.B \-E
+determines the number of significant figures, and defaults to 6.
+The
+.B \-F
+attribute causes the value to be represented with a fixed number
+of places after the decimal point. 
+Assignments to variables with the
+.B \-E
+or
+.B \-F
+attributes cause the evaluation of the right hand side of the assignment.
+.P
+\f5ksh\fP allows one-dimensional
+.I arrays
+in addition to simple variables.
+There are two types of arrays; associative arrays
+and indexed arrays.
+The subscript for an associative array is an arbitrary
+string, whereas the subscript for an indexed array is
+an arithmetic expression that is evaluated to yield an integer
+index.
+Any variable can become an indexed array
+by referring to it with
+an integer
+.IR subscript .
+All elements of an array need not exist.
+Subscripts for arrays
+must evaluate to an
+integer between 0 and some maximum value, otherwise
+an error results.
+The maximum value may vary from one machine to another but
+is at least 4095.
+Evaluation of subscripts is described in
+the next section.
+Attributes apply to the whole array.
+.P
+Assignments to array variables can be made to individual elements
+via parameter
+assignment commands or the
+.B typeset
+built-in.
+Additionally, values can be assigned sequentially with
+compound assignment as described below, or by the
+.B \-A
+.I name
+option of the \f5set\fP command.
+Referencing of subscripted variables requires the character
+.BR $ ,
+but also requires braces around the array element name.
+The braces are needed to avoid conflicts with the
+file name generation mechanism.
+The form of any array element reference is:
+.ce
+.BI ${ name [ subscript ]}
+Subscript values of
+.B *
+and
+.B @
+can be used to generate all elements of an array,
+as they are used for expansion of positional parameters.
+The list of currently defined subscripts for a given
+variable can be generated with 
+.BI ${! name [@]} ,
+or
+.BI ${! name [*]} .
+.P
+The
+.B \-n
+or
+.I nameref
+attribute causes the variable to be treated
+as a reference to the variable defined by its value.
+Once this attribute is set, all references to this variable
+become references to the variable named by the value
+of this variable.
+For example, if \f5foo=bar\fP, then setting the reference
+attribute on \f5foo\fP will cause all subsequent references
+to \f5foo\fP to behave as the variable whose name is \f5$foo\fP
+was referenced, which in this case is the variable \f5bar\fP.
+Unsetting this attribute breaks the association.
+Reference variables are usually used inside functions whose
+arguments are the names of shell variables. 
+The names for reference variables cannot contain a \fB\s+2.\s-2\fP.
+Whenever a shell variable is referenced, the portion of the
+variable up to the first \fB\s+2.\s-2\fP
+is checked to see whether it matches the name of a reference
+variable.
+If it does, then the name of the variable actually used
+consists of the concatenation of the name of the variable
+defined by the reference plus the remaining portion of the
+original variable name.
+For example, using the predefined alias, \f5alias\ nameref='typeset\ -n'\fP,
+.sp
+.nf
+.in .5i
+.ta 3.4i
+\f5\^.bar.home.bam="hello world"
+nameref foo=.bar.home
+print ${foo.bam}
+\fBhello world\fP\fP
+.fi
+.ta
+.in
+.sp
+.H 2 "Compound Assignment"
+Compound assignments are used to assign values to arrays
+and compound data structures.
+The syntax for a compound assignment is
+.IB name =( assignment-list )
+where
+\fIname\fP
+is the name of the variable to which you want to assign values.
+No space is permitted between the variable name and the \fB=\fP
+but can appear between the \fB=\fP and the open parenthesis.
+New-lines can appear between the parentheses.
+.P
+The \fIassignment-list\fP can be in several different forms
+yielding different results.
+If \fIassignment-list\fP is simply a list of words, then
+the words are processed as they are with the \f5for\fP command
+and assigned sequentially as an indexed array.
+For example,
+.ce
+\f5foo=( * )\fP
+creates an indexed array \f5foo\fP and assigns the
+file names in the current directory to each index starting
+at zero.
+.P
+The second form for \fIassignment-list\fP is a list of assignments
+of the special form \fB[\fP\fIword\fP\fB]=\fP\fIword\fP.
+No space is permitted before or after the \fB=\fP.
+In this case, the variable given by \fIname\fP becomes
+an associative array with the given arguments as subscripts.
+For example,
+.ce
+\f5bar=( [color]=red [shape]=box )\fP
+creates an associate array named \f5bar\fP whose
+subscripts are \f5color\fP and \f5shape\fP.
+.P
+The third form for \fIassignment-list\fP is a list of
+normal assignments, including compound assignments.
+These assignments cause sub-variables to be assigned
+corresponding to the given assignments.
+In addition to assignments, the \fIassignment-list\fP
+can contain \f5typeset\fP commands.
+In addition to creating sub-variables,
+the effect of a compound assignment is to make
+the value of the original variable be a parenthesized
+assignment list of its components.
+For example, the assignment
+.sp
+.nf
+.in .5i
+.ta 3.4i
+\f5foo=(
+        left=bar
+        typeset -i count=3
+        point=(
+                x=50
+                y=60
+        )
+        colors=( red green yellow )
+        right=bam
+) \fP
+.ta
+.in
+.fi
+.sp
+is equivalent to the assignments
+.sp
+.nf
+.in .5i
+.ta 3.4i
+\f5foo.left=bar
+foo.count=3
+foo.point.x=50
+foo.point.y=60
+foo.colors=( red green yellow )
+foo.right=bam\fP
+.ta
+.in
+.fi
+.sp
+In addition, the value of \f5"$foo"\fP is
+.sp
+.nf
+.in .5i
+.ta 3.4i
+\f5(
+        colors=( red green yellow )
+        left=bar
+        typeset -i count=3
+        point=(
+                y=60
+                x=50
+        )
+        right=bam
+)\fP
+.ta
+.in
+.fi
+.sp
+.H 2 "Substring Generation"
+The expansion of a variable or parameter can be modified so that
+only a portion of the value results. 
+It is often necessary to extract a portion of a shell variable or
+a portion of an array.
+There are several parameter expansion operators that can do this.
+One method to generate a substring is with an expansion of
+the form \fB${\fP\fIname\fP\fB:\fP\fIoffset\fP\fB:\fP\fIlength\fP\fB}\fP
+where \fIoffset\^\fP is an arithmetic expression that defines the
+offset of the first character starting from 0, and
+\fIlength\^\fP is an arithmetic expression that defines the
+length of the substring.
+If
+.BI : length\^
+is omitted,
+the length of the value of
+.I name\^
+starting at
+.I offset\^
+is used.
+The
+.BI : offset : length
+operators can also be applied to array expansions and to parameters
+.B *
+and
+.B @
+to generate portions of an array.
+For example, the expansion, \fB${\fP\fIname\fP\fB[@]:\fP\fIoffset\fP\fB:\fP\fIlength\fP\fB}\fP, yields up to \fIlength\fP elements of the array \fIname\fP
+starting at the element \fIoffset\fP.
+.P
+The other parameter expansion modifiers use shell patterns
+to describe portions of the string to modify and delete.
+A description of shell patterns is contained below.
+When these
+modifiers are applied to special parameters
+.B @
+and
+.B *
+or to array parameters given as
+\fIname\fP\fB[@]\fP or \fIname\fP\fB[*]\fP,
+the operation is performed on each element.
+There are four parameter expansion modifiers that
+strip off leading and trailing substrings
+during parameter expansion
+by removing the characters matching a given pattern.
+An expansion of
+the form \fB${\fP\fIname\fP\fB#\fP\fIpattern\fP\fB}\fP
+causes the smallest matching prefix of the value of
+.I name\^
+to be removed.
+The largest prefix matching
+.I pattern\^
+is removed by using
+.B ##
+instead of
+.BR # .
+Similarly,
+an expansion of
+the form \fB${\fP\fIname\fP\fB%\fP\fIpattern\fP\fB}\fP
+causes the smallest matching substring at the end of
+.I name\^
+to be removed.
+Again, using
+.B %%
+instead of
+.BR % ,
+causes the largest matching trailing substring to be deleted.
+For example, if the shell variable
+.B file
+has value
+.BR foo.c ,
+then the expression
+.B ${file%.c}.o
+has value
+.BR foo.o .
+.P
+The value of an expansion can be changed by
+specifying a pattern that matches the part that needs to be changed
+after the
+the parameter expansion modifier
+.BR / .
+An expansion of the form
+\fB${\fP\fIname\fP\fB/\fP\fIpattern\fP\fB/\fP\fIstring\fP\fB}\fP
+replaces the first match of \fIpattern\fP with
+the value of variable \fIname\fP to \fIstring\fP.
+The second
+.B /
+is not necessary when \fIstring\fP is null.
+The expansion
+\fB${\fP\fIname\fP\fB//\fP\fIpattern\fP\fB/\fP\fIstring\fP\fB}\fP
+changes all occurrences of the \fIpattern\fP into \fIstring\fP.
+The parameter expansion modifiers
+.B /#
+and
+.B /%
+cause the matching pattern to be anchored to the beginning and
+end respectively.
+.P
+Finally, there are parameter expansion modifiers that yield
+the name of the variable, the string length of the value, or the number
+of elements of an array.
+\fB${!\fP\fIname\fP\fB}\fP
+yields the name of the variable which will be \fIname\fP itself
+except when \fIname\fP is a reference variable.  In this case
+it will yield the name of the variable it refers to.
+When applied to an array variable,
+\fB${!\fP\fIname\fP\fB[@]}\fP and
+\fB${!\fP\fIname\fP\fB[*]}\fP 
+generate the names of all subscripts.
+\fB${#\fP\fIname\fP\fB}\fP
+will be the length in bytes of
+\fB$\fP\fIname\fP.
+For an array variable
+\fB${#\fP\fIname\fP\fB[*]}\fP
+gives the number of elements in the array.
+.H 2 "Arithmetic Evaluation"
+.P
+For the most part, the shell is a string processing
+language.  However, the need for arithmetic has
+long been obvious.
+Many of the characters that are special to the
+Bourne shell are needed as arithmetic operators.
+To make arithmetic easy to use, and to maintain
+compatibility with the Bourne shell, \f5ksh\fP uses matching
+.B ((
+and
+.B ))
+to delineate arithmetic expressions.
+While single parentheses might have been
+more desirable, these already mean
+.I subshell\^
+so that another notation was required.
+The arithmetic expression
+inside the double parentheses
+follows the same syntax, associativity and precedence
+as the ANSI-C\*(Rf
+.RS
+American National Standard for Information Systems \- Programming
+Language \- C, ANSI X3.159-1989.
+.RF
+programming language.
+The characters between the matching double parentheses
+are processed with the same rules used for double
+quotes so that spaces can be used to aid readability
+without additional quoting.
+.P
+All arithmetic evaluations are performed using
+double precision floating point arithmetic.
+Floating point constants follow the same rules as
+the ANSI-C programming language.
+Integer arithmetic constants are written as
+.ce
+.IB base # number,
+where
+.I base\^
+is a decimal integer between
+two and sixty-four and
+.I number\^
+is any non-negative number.
+Base ten is used
+when no base is specified.
+The digits are represented by the characters
+.BR 0-9a-zA-Z_@ .
+For bases less than or equal to 36,
+upper and lower case characters can
+be used interchangeably to represent the digits
+from 10 thru 35.
+.P
+Arithmetic expressions are made from constants,
+variables, and operators.
+Parentheses may be used for grouping.
+The contents inside the double parentheses
+are processed with the same expansions as occurs in a double quoted string,
+so that all
+.B $
+expansions are performed before the expression is evaluated.
+However, there is usually no need to use the
+.B $
+to get the value of a variable
+because the arithmetic evaluator replaces the name of the variable
+by its value within an arithmetic expression.
+The
+.B $
+cannot be used when the variable is the subject of assignment
+or an increment operation.
+As a rule it is better not to use
+.B $
+in front of variables in an arithmetic expression.
+.P
+An arithmetic command of the form
+.B
+(( ... ))
+.R
+is a command that evaluates the enclosed arithmetic expression.
+For example, the command
+.ce
+\f5(( x++ ))\fP
+can be used to
+increment the variable \f5x\fP,
+assuming that \f5x\fP contains some numerical value.
+The arithmetic command is true (return value 0), when the resulting
+expression is non-zero, and false (return value 1) when the
+expression evaluates to zero.
+This makes the command easy to use with the \f5if\fP and \f5while\fP
+compound commands.
+.P
+The \f5for\fP compound command
+has been extended for use in arithmetic contexts. 
+The syntax,
+.ce
+\f5for\fP \fB((\fP \fIexpr1\fP\fB;\fP \fIexpr2\fP \fB;\fP \fIexpr3 \fP\fB))\fP
+can be used as the first line of a \f5for\fP loop with the same semantics
+as the \f5for\fP statement in the ANSI-C programming language.
+.P
+Arithmetic evaluations can also be performed as part of the evaluation
+of a command line.
+The syntax
+.B
+$((\ ...\ ))
+.R
+expands to the value of the enclosed arithmetic expression.
+This expansion can occur wherever parameter expansion is performed.
+For example using the \f5ksh\fP command \f5print\fP (described
+later)
+.ce
+\f5print $((2+2))\fP
+prints the number 4.
+.P
+The following script prints the first
+.I n
+lines of its standard input onto its standard output,
+where
+.I n
+can be supplied as an optional argument whose default value is 20.
+.sp
+.nf
+.in .5i
+.ta 4i
+\f5integer n=${1-20}                       # set n
+while   (( n-- >=0 )) && read -r line   # at most n lines
+do      print -r -- "$line"
+done\fP
+.fi
+.ta
+.in
+.sp
+.H 2 "Shell Expansions"
+.P
+The commands you enter from the terminal or from a script
+are divided into words and each word undergoes several
+expansions to generate the command name and its arguments.
+This is done in two phases.
+The first phase recognizes reserved words, spaces and operators
+to decide where command boundaries lie.
+Alias substitutions take place during this phase.
+The second phase performs expansions in the following order:
+.BL
+.LI
+Tilde substitution,
+parameter expansion,
+arithmetic expansion,
+and command substitution
+are performed from left to right.
+The option
+.B \-u
+or
+.BR nounset ,
+will cause an error to occur when any variable 
+that is not set is expanded. 
+.LI
+The characters that result from parameter expansion and
+command substitution above are checked with the characters
+in the
+\fB\s-1IFS\s+1\fP variable
+for possible
+field splitting.
+(See a description of \f5read\fP below to see how
+\fB\s-1IFS\s+1\fP is used.)
+Setting
+\fB\s-1IFS\s+1\fP to a null
+value causes field splitting to be skipped.
+.LI
+Pathname generation (as described below)
+is performed on each of the fields.
+Any field that doesn't match a pathname is left alone.
+The option,
+.B \-f
+or
+.BR noglob ,
+is used to disable pathname generation.
+.LE
+.H 2 "Pattern Matching"
+The shell is primarily a string processing language and uses
+patterns for matching file names as well as for matching strings.
+The characters
+.BR ? ,
+.BR * ,
+and
+.B [
+are processed specially 
+by the shell when not quoted.
+These characters are used to form patterns that
+match strings.
+Patterns are used by the shell to match pathnames,
+to specify substrings,
+and for
+.B case
+commands.
+The character
+.B ?
+matches any one character.
+The character
+.B *
+matches zero or more characters.
+The character sequence
+.BR [ ... ]
+defines a character class
+that matches any character contained within
+.BR [\^] .
+A range of characters can be specified by putting a
+.B \-
+between the first and last character of the range.
+An exclamation mark,
+.BR ! ,
+immediately after the
+.BR [ ,
+means match all characters except the characters specified.
+For example, the pattern
+\f5a?c*.[!a-z]\fP
+matches any string beginning with an
+.BR a ,
+whose third character is a
+.BR c ,
+and that ends in
+.B .
+(dot) followed by any character except the lower case letters,
+.BR a\-z .
+The sequence \f5[:alpha:]\fP
+inside a character class, matches any set of characters in
+the ANSI-C
+.B alpha
+class.
+Similarly, \f5[:\fP\fIclass\fP\f5:]\fP matches
+each of the characters in the given \fIclass\fP
+for all the ANSI-C character classes.
+For example, \f5[[:alnum:]_]\fP
+matches any alpha-numeric character or the character
+.BR _ .
+.P
+\f5ksh\fP
+treats
+strings of the form
+.BI ( pattern-list
+.BR ) ,
+where
+.I pattern-list
+is a list of one or more patterns separated by a
+.BR \(bv ,
+specially when preceded by
+.BR * ,
+.BR ? ,
+.BR + ,
+.BR @ ,
+or
+.BR ! .
+A
+.B ?
+preceding
+.BI ( pattern-list )
+means that the pattern list enclosed in
+.B (\^)
+is optional.
+An
+.BI @( pattern-list )
+matches any pattern in the list of patterns enclosed in
+.BR () .
+A
+.BI *( pattern-list )
+matches any string that contains zero or more of each of the enclosed
+patterns,
+whereas
+.BI +( pattern-list )
+requires a match of one or more of any of the given patterns.
+For instance, the pattern
+.B +([0\-9])?(.)
+matches one or more digits optionally followed by a
+.BR . (dot).
+A
+.BI !( pattern-list )
+matches anything except any of the given patterns.
+For example,
+\f5print\ !(*.o)\fP
+displays all file names in the current directory that do not end in
+.BR .o .
+.P
+When patterns are used to generate pathnames when expanding
+commands several other rules apply.
+A separate match is made
+for each file name component of the pathname. 
+Read permission is required for
+any portion of the pathname that contains any special
+pattern character. 
+Search permission is required for every component except
+possibly the last.
+.P
+By default,
+file names in each directory that begin with \fB\s+2.\s-2\fP
+are skipped when performing a match.
+If the pattern to be matched starts with a leading \fB\s+2.\s-2\fP,
+then only files beginning with a \fB\s+2.\s-2\fP,
+are examined when reading each directory to find matching files.
+If the
+\fB\s-1FIGNORE\s+1\fP variable
+is set,
+then only files that do not match this pattern
+are considered.
+This overrides the special meaning of \fB\s+2.\s-2\fP
+in a pattern and in a file name.
+.P
+If the
+.B markdirs
+option is set,
+each matching pathname that is the name
+of a directory has a trailing 
+.B /
+appended to the name.
+.P
+.H 2 "Conditional Expressions"
+The Bourne shell uses the \f5test\fP
+command, or the equivalent \f5[\fP
+command, to test files for attributes
+and to compare strings or numbers.
+The problem with \f5test\fP
+is that the shell has expanded the words of the \f5test\fP
+command and
+split them into arguments before \f5test\fP begins execution.
+\f5test\fP
+cannot distinguish between operators and operands.
+In most cases
+\f5test\ "$1"\fP
+will test whether argument 1 is non-null.
+However,
+if argument 1 is
+.BR \-f ,
+then \f5test\fP
+will treat
+.B \-f
+as an operator and
+yield a syntax error.
+One of the most frequent errors with
+\f5test\fP
+occurs when its operands are not within double quotes.
+In this case, the argument may expand to more than a single
+argument or to no argument at all.  In either case this
+will likely cause a syntax error.
+What makes this most insidious is that these errors are frequently
+data dependent.  A script that appears to run correctly may abort
+if given unexpected data.
+.P
+To get around these problems,
+\f5ksh\fP
+has a compound command for conditional expression testing
+as part of the language.
+The reserved words
+.B [[
+and
+.B ]]
+delimit the range of the command. 
+Because they are reserved words, not operator characters,
+they require spaces to separate them
+from arguments.
+The words between
+.B [[
+and
+.B ]]
+are not processed for field splitting or for pathname generation.
+In addition, since \f5ksh\fP
+determines the operators before parameter expansion,
+expansions that yield no argument cause no problem.
+The operators within
+.BR [[ ... ]]
+are almost the same as those for the \f5test\fP
+command.
+All unary operators are of the form
+.BI \- letter
+and are followed by a single operand.
+Instead of
+.B \-a
+and
+.BR \-o ,
+.BR [[ ... ]]
+uses
+.B &&
+and
+.B \(bv\(bv
+to indicate "and" and "or".
+Parentheses are used without quoting for grouping.
+.P
+The right hand side of the string comparison operators
+.B ==
+and
+.B !=
+takes a pattern and tests whether the left hand operand
+matches this pattern.  Quoting the pattern results
+is a string comparison rather than the pattern match. 
+The operators
+.B <
+and
+.B >
+within
+.BR [[ ... ]]
+designate lexicographical comparison.
+.P
+In addition there are several other new comparison primitives.
+The binary operators
+.B \-ot
+and
+.B \-nt
+compare the modification times
+of two files to see which file is
+.I "older than"
+or
+.I "newer than"
+the other.
+The binary operator
+.B \-ef
+tests whether two files
+have the same device and i-node number,
+i.\ e., a link to the same file.
+.P
+The unary operator
+.B \-L
+returns true if its operand is a symbolic link.
+The unary operator
+.B \-O
+(\fB\-G\fP)
+returns true if the owner (or group) of the file operand matches
+that of the caller.
+The unary operator
+.B \-o
+returns true when its operand is the name of an option that is
+currently on.
+.P
+The following script illustrates some of the uses of
+.BR [[ ... ]] . 
+The reference manual contains the complete list of operators.
+.sp
+.nf
+.in .5i
+.ta 4i
+\f5for i
+do      # execute foo for numeric directory
+        if      [[ \-d $i && $i == +([0\-9]) ]]
+        then    foo
+        # otherwise if writable or executable file and not mine
+        elif    [[ (\-w $i\(bv\(bv\-x $i) && ! \-O $i ]]
+        then    bar
+        fi
+done\fP
+.fi
+.ta
+.in
+.sp
+.H 2 "Input and Output"
+\f5ksh\fP has
+extended I/O capabilities to enhance the
+use of the shell as a programming language.
+As with the Bourne shell,
+you use the I/O redirection operator,
+.BR < ,
+to control where input comes from,
+and the I/O redirection operator,
+.BR > ,
+to control where output goes to. 
+Each of these operators can be preceded with a single digit that
+specifies a file unit number to associate with the file stream.
+Ordinarily you specify these I/O redirection operators with a specific
+command to which it applies.
+However, if you specify I/O redirections with the \f5exec\fP
+command,
+and don't specify arguments to \f5exec\fP,
+then the I/O redirection applies to the current program.
+For example, the command
+\f5exec\ <\ foobar\fP
+opens file \f5foobar\fP
+for reading.
+The \f5exec\fP
+command is also used to close files.
+A file descriptor unit can be opened as a copy of an existing
+file descriptor unit by using either of the
+.B <&
+or
+.B >&
+operators and putting the file descriptor unit of the original file
+after the
+.BR & .
+Thus, \f52>&1\fP means open standard error (file descriptor 2)
+as a copy of standard output (file descriptor 1).
+A file descriptor value of
+.B \-
+after the
+.B &
+indicates that the file should be closed.
+To close file unit 5, specify
+\f5exec\ 5<&-\fP.
+There are two additional redirection operators with \f5ksh\fP
+and the POSIX shell that are not part of the Bourne shell.
+The
+.B >|
+operator overrides the effect of the
+.B noclobber
+option described earlier.
+The
+.B <\^>
+operator causes a file to be opened for both reading and writing.
+.P
+\f5ksh\fP recognizes certain pathnames and treats them
+specially.
+Pathnames of the form
+.BI /dev/fd/ n\^
+are treated as equivalent to the file defined by file descriptor
+.IR n .
+These name can be used as the script argument to \f5ksh\fP
+and in conditional testing as described above.
+On underlying systems that support
+.B /dev/fd
+in the file system, these names can be passed to other commands.
+Pathnames of the form
+.BI /dev/tcp/ hostid / port
+and
+.BI /dev/udp/ hostid / port
+can be used to create
+.B tcp
+and
+.B udp
+connections to services given by the
+.I hostid\^
+number and
+.I port\^
+number.
+The
+.I hostid\^
+cannot use symbolic values. In practice these
+numbers are typically generated by command substitution.
+For example,
+\f5exec\ 5>\ /dev/tcp/$(service\ name)\fP
+would open file descriptor 5 for sending messages
+to hostid and port number defined by the output of \f5service\ name\fP.
+.P
+The Bourne shell has a built-in command \f5read\fP
+for reading lines from standard input (file descriptor 0)
+and splitting it into fields based on the value of the
+.B \s-1IFS\s+1
+variable, and a command \f5echo\fP
+to write strings to standard output.
+(On some systems, \f5echo\fP
+is not a built-in command and incurs considerable overhead to use.)
+Unfortunately, neither of these commands
+is able to perform some very basic tasks.
+For example.
+with the Bourne shell,
+the \f5read\fP
+built-in cannot read a single line that ends in
+.BR \e .
+With \f5ksh\fP
+the \f5read\fP
+built-in has a
+.B \-r
+option to remove the special meaning for
+.B \e
+which allows it to be
+treated as a regular
+character rather than the line continuation character.
+With the Bourne shell,
+there is no simple way to have more than one file open
+at any time for reading.
+\f5ksh\fP has options on the \f5read\fP
+command to specify the file
+descriptor for the input.
+The fields that are read from a line can be stored into an indexed
+array with the
+.B \-A
+option to read.
+This allows a line to be split into an arbitrary number of fields.
+.P
+The way the Bourne shell uses the
+\fB\s-1IFS\s+1\fP variable to
+split lines into fields greatly limits its utility.
+Often data files consist of lines that use a character such
+as
+.B :
+to delimit fields with two adjacent delimiters that denote
+a null field.
+The Bourne shell treats adjacent delimiters as a single
+field delimiter.
+With \f5ksh\fP,
+delimiters that are considered white space characters
+have the behavior of the Bourne shell, but other
+adjacent delimiters separate
+null fields.
+.P
+The \f5read\fP command is often used in scripts that interact
+with the user by prompting the user and then requesting some
+input.
+With the Bourne shell two commands are needed; one to
+prompt the user, the other to read the reply.
+\f5ksh\fP allows these two commands to be combined.
+The first argument of the \f5read\fP
+command can be followed by a
+.B ?
+and a prompt string which is used whenever the input
+device is a terminal.
+Because the prompt is associated with the \f5read\fP built-in,
+the built-in command line editors will be able to re-output
+the prompt whenever the line needs to be refreshed when
+reading from a terminal device.
+.P
+With the Bourne shell,
+there is no way to set a time limit for waiting for the user
+response to read.
+The
+.B \-t
+option to \f5read\fP takes a floating
+point argument that gives the time in seconds,
+or fractions of seconds that the shell should wait for a reply.
+.P
+The version of the \f5echo\fP command in System V
+treats certain sequences beginning with
+.B \e
+as control sequences.
+This makes it hard to output strings without interpretation.
+Most BSD derived systems do not interpret
+.B \e
+control sequences.
+Unfortunately, the BSD versions of \f5echo\fP accepts a 
+.B \-n
+option to prevent a trailing new-line, but has no way to
+cause the string
+.B \-n
+to be printed.
+Neither of these versions is adequate. Also, because they
+are incompatible, it is very hard to write portable shell scripts
+using \f5echo\fP.
+The \f5ksh\fP built-in, \f5print\fP,
+outputs characters to the terminal or to a file and
+subsumes the functions of all versions of \f5echo\fP.
+Ordinarily, escape sequences in arguments beginning with
+.B \e
+are processed the same as for the System V \f5echo\fP command.
+However \f5print\fP follows the standard conventions for
+options and has options that make \f5print\fP very versatile.
+The
+.B \-r
+option can be used to output the arguments without any special meaning.
+The
+.B \-n
+option can be used here to suppress the trailing new-line
+that is ordinarily appended.
+As with \f5read\fP, it is possible to specify the file descriptor number
+as an option to the command to avoid having to use
+redirection operators with each occurrence of the command.
+.P
+The IEEE POSIX shell and utilities standard committee was unable
+to reconcile the differences between the System V and BSD
+versions of \f5echo\fP.
+They introduced a new command named \f5printf\fP
+which takes an ANSI-C format string and a list of options
+and outputs the strings using the ANSI-C formatting rules.
+Since \f5ksh\fP is POSIX conforming, it accepts \f5printf\fP.
+However, there is a
+.B \-f
+options to \f5print\fP that can be used to specify
+a format string which processes the arguments the same way that
+\f5printf\fP does.
+.P
+The format processing for \f5print\fP and \f5printf\fP has
+been extended slightly.
+There are three additional formatting directives.
+The
+.B %b
+format causes the
+.B \e
+escape sequences to be expanded as they are with the System V \f5echo\fP
+command.
+The
+.B %q
+format causes quotes to
+be placed on the output as required
+so that it can be used as shell input.
+Special characters in the output of most \f5ksh\fP built-in commands
+and in the output from an execution trace
+are quoted in an equivalent fashion. 
+The
+.B %P
+format causes an extended regular expression string to
+be converted into a shell pattern.
+This is useful for writing shell applications that have
+to accept regular expressions as input.
+Finally, the escape sequence
+.B \e\^E
+which expands to the terminal escape character (octal 033)
+has been added.
+.P
+The shell is frequently used as a programming language for
+interactive dialogues.
+The
+\f5select\fP
+statement has been added to the language
+to make it easier to
+present menu selection alternatives to the
+user and evaluate the reply.
+The list of alternatives is numbered and put in columns.
+A user settable prompt,
+\fB\s-1PS3\s+1\fP,
+is issued and if the answer is
+a number corresponding to one of the alternatives,
+the select loop variable is set to this value.
+In any case, the
+.B \s-1REPLY\s+1
+variable is used to store the user entered reply.
+The shell variables
+.B \s-1LINES\s+1
+and
+.B \s-1COLUMNS\s+1
+are used to control the layout of select lists.
+.H 2 "Option Parsing"
+The \f5getopts\fP built-in command can be used
+to process command arguments in a manner consistent
+with the way \f5ksh\fP does for its own built-in commands.
+.P
+The \f5getopts\fP built-in allows users to specify options
+as separate arguments or to group options that do not
+take arguments together.  Options that require arguments
+do not require space to separate them from the option argument.
+The
+.B \s-1OPTARG\s+1
+variable stores the value of the option argument
+after finding a variable that takes an argument.
+The
+.B \s-1OPTIND\s+1
+variable holds the index of the current options argument.
+After processing options, the arguments should be
+shifted by
+.B \s-1OPTIND\s+1\-1
+to make the
+remaining arguments be \f5"$@"\fP.
+.P
+The \f5getopts\fP argument description allows additional
+information to be specified along with the options
+that is used to generate \fIusage\fP messages for
+incorrect arguments and for the option argument \fB\-?\fP.
+The example in the APPENDIX uses \f5getopts\fP to process
+its arguments.
+.H 2 "Co-process"
+\f5ksh\fP can spawn a
+.I co-process
+by adding a
+.B "|&"
+after a command.
+This process will be run with its standard input and its
+standard output connected to the shell.  The built-in command \f5print\fP
+with the
+.B \-p
+option will write into the standard input of this
+process and
+the built-in command \f5read\fP
+with the
+.B \-p
+option will read from the output of this process.
+.P
+In addition, the I/O redirection operators \fB<&\fP and \fB>&\fP can
+be used to move the input or output pipe of the co-process
+to a numbered file descriptor.
+Use \f5exec\ 3>&\ p\fP to move the input of the co-process
+to file descriptor \fB3\fP.
+After you have connected to file descriptor \fB3\fP, you
+can direct the output of any command to the co-process
+by running \fIcommand\fP\f5\ >&3\fP.
+Also, by moving the input of the co-process to a numbered descriptor,
+it is possible to run a second co-process.
+The output of both co-processes will be the file descriptor
+associated with \f5read\ -p\fP.
+You can use \f5exec\ 4<&\ p\fP to cause the output of these
+co-processes to go to file descriptor \fB4\fP of the shell.
+Once you have moved the pipe to descriptor \fB4\fP, it is possible
+to connect a server to the co-process by running \fIcommand\fP\f5\ 4<&\ p\fP
+or to close the co-process pipe with \f5exec\ 4<&\ -\fP.
+.H 2 "Functions"
+.P
+Function definitions are of the form
+.sp
+.in +.5i
+.nf
+\f5function\fP \fIname\fP
+.br
+.B {
+.br
+        any shell script
+.br
+.B }
+.fi
+.sp
+.in
+A function whose name contains a \fB\s+2.\s-2\fP
+is called a \fIdiscipline\fP function.
+The portion of the name after the last \fB\s+2.\s-2\fP
+is the name of the discipline.
+Discipline functions named \f5get\fP, \f5set\fP, and \f5unset\fP
+can be assigned to any variable to intercept lookups,
+assignments and unsetting of the variable
+defined by the portion of the name before the last \fB\s+2.\s-2\fP.
+Applications can create additional disciplines for variables
+that are created as part of user defined built-ins.
+The portion of the name before the last \fB\s+2.\s-2\fP
+must refer to the name of an existing variable.
+Thus, if \f5p\fP is a reference to \f5PATH\fP, then
+the function name \f5p.get\fP and \f5PATH.get\fP
+refer to the same function.
+.P
+The function is invoked either
+by specifying
+.I name
+as the command name
+and optionally following it with arguments
+or by using it as an option to the \fB\s+2.\s-2\fP
+built-in command.
+Positional parameters are saved before each
+function call and restored when completed.
+The arguments that follow the function name on the calling
+line become positional parameters inside the function.
+The \f5return\fP
+built-in can be used to cause the function to return to
+the statement following
+the point of invocation.
+.P
+Functions can also be defined with the System V notation,
+.sp
+.in +.5i
+.nf
+\fIname\fP \f5()\fP
+.br
+.B {
+.br
+        any shell script
+.br
+.B }
+.fi
+.sp
+.in
+Functions defined with this syntax cannot be used as the first
+argument to a \fB\s+2.\s-2\fP procedure.
+\f5ksh\fP accepts this notation for compatibility only.
+There is no need to use this notation when writing
+\f5ksh\fP scripts.
+.P
+Functions defined with the \f5function\fP\ \fIname\fP syntax
+and invoked by name
+are executed in the current shell environment
+and can share named variables with the calling program.
+Options, other than execution trace
+.BR \-x ,
+set by the calling program are
+passed down to a function.
+The options are
+not shared with
+the function so that any options set within a function are
+restored when the function exits.
+Traps ignored by the caller are ignored within the function
+and cannot be enabled.
+Traps caught by the calling program are reset to their
+default action within the function.
+In most instances, the default action is
+to cause the function to terminate.
+A trap on
+\fB\s-1EXIT\s+1\fP
+defined within a function executes after the function
+completes but
+before the caller resumes.
+Therefore,
+any variable assignments and
+any options set as part of a trap action will be effective
+after the caller resumes.
+.P
+By default, variables are inherited by the function and shared
+by the calling program.
+However,
+for functions defined with the \f5function\fP\ \fIname\fP syntax
+that are invoked by name,
+environment substitutions preceding the function call
+apply only to the scope of the function call.
+Also, variables whose names do not contain a \fB\s+2.\s-2\fP
+that are defined with the \f5typeset\fP
+built-in command are local to the function that they are declared in.
+Thus, for the function defined
+.sp
+.nf
+.in .5i
+\f5function  name
+{
+     typeset -i x=10
+     let z=x+y
+     print $z
+}\fP
+.fi
+.ta
+.in
+.sp
+invoked as
+\f5y=13\ name\fP,
+\f5x\fP and \f5y\fP
+are local variables with respect to the function
+\f5name\fP
+while
+\f5z\fP
+is global.
+.P
+Functions defined with the \fIname\fP\f5()\fP syntax,
+and functions invoked as an argument to the \fB\s+2.\s-2\fP
+command,
+share everything other than positional parameters with the caller.
+Assignments that precede the call remain in effect after the
+function completes.
+.P
+Alias and function names are not passed down to shell scripts
+or carried across separate
+invocations of \f5ksh\fP.
+The
+.B $\s-1FPATH\s+1
+variable gives a colon separated list of directories that
+is searched for function definitions when trying to resolve
+the command name.
+Whenever a file name contained in
+.B $\s-1FPATH\s+1
+is found, the complete file is read and all functions
+contained within become defined.
+.P
+Calls that reference functions can be recursive.
+Except for special built-ins,
+function names take precedence over built-in names and names
+of programs when used as command names.
+To write a replacement function that invokes the command that
+you wish to replace,
+you can use the \f5command\fP built-in command.
+The arguments to \f5command\fP are the name and arguments
+of the program you want to execute.
+For example to write a
+.B cd
+function which changes the directory and prints out the directory name,
+you can write
+.sp
+.nf
+.in .5i
+\f5function  cd
+{
+     if      command cd  "$@"
+     then    print  -r -- $PWD
+     fi
+}\fP
+.fi
+.ta
+.in
+.sp
+.P
+The
+\fB\s-1FPATH\s+1\fP
+variable is a colon separated list that \f5ksh\fP
+uses to search for function definitions.
+When
+\f5ksh\fP
+encounters an autoload function,
+it runs the
+.B .
+command on the script containing the function,
+and then executes the function.
+.P
+For interactive shells,
+function definitions may also be placed in the
+\fB\s-1ENV\s+1\fP
+file.
+However, this
+causes the shell to take longer to begin executing.
+.H 2 "Process Substitution"
+.P
+This feature is only available
+on versions of the UNIX operating system which support the
+.B /dev/fd
+directory for naming open files.
+Each command argument of the form
+\fB<(\fP\fIlist\^\fP\fB)\fP
+or
+\fB>(\fP\fIlist\^\fP\fB)\fP
+will run process
+.I list
+asynchronously connected to some file in the
+.B /dev/fd
+directory.
+The name of this file will become the argument to the command.
+If the form with
+.B >
+is selected then writing on this file will provide input for
+.IR list .
+If
+.B <
+is used,
+then the file passed as an argument will contain the output of the
+.I list
+process.
+For example,
+.sp
+.nf
+.in .5i
+\f5paste  <(cut \-f1 \fP\fIfile1\fP\f5)  <(cut \-f2 \fP\fIfile2\fP\f5) | tee >(\fP\fIprocess1\fP\f5)  >(\fP\fIprocess2\fP\f5)\fP
+.fi
+.ta
+.in
+.sp
+extracts
+fields 1 and 3 from
+the files
+.I file1
+and
+.I file2
+respectively,
+places the
+results side by side, and
+sends it
+to the processes
+.I process1
+and
+.IR process2 ,
+as well as putting it onto the standard output.
+Note that the file which is passed as an argument to the command is
+a UNIX system
+.IR pipe (2)
+so that the programs that expect to
+.IR lseek (2)
+on the file will not work.
+.H 2 "Finding Commands"
+.P
+The addition of aliases, functions,
+and more built-ins
+has made it substantially more difficult to know what
+a given command name really means.
+.P
+Commands that begin with reserved words
+are an integral part of the shell language itself
+and typically define the control flow of the language.
+Some control flow commands are not reserved words in
+the language but are \fIspecial\fP built-ins.
+Special built-ins are built-ins that are considered a
+part of the language rather than user definable commands.
+The best examples of commands that fit this description
+are \f5break\fP and \f5continue\fP.
+Because they are not reserved words, they can be the
+result of shell expansions and are not effected by quoting. 
+These commands have the following special properties:
+.BL
+.LI
+Assignments that precede them apply to the current shell process,
+not just to the given command.
+.LI
+An error in the format of these commands cause a shell script
+or function that contains them to abort.
+.LI
+They cannot be overridden by shell functions.
+.LE
+.P
+Other commands are built-in because they perform side effects
+on the current environment that would be nearly impossible
+to implement otherwise.
+Built-ins such as \f5cd\fP and \f5read\fP
+are examples of such built-ins.
+These built-ins are semantically equivalent to commands that
+are not built-in except that they don't take a path search
+to locate.
+.P
+A third reason to have a command built-in is so that
+it will be unaffected by the setting of the
+.B \s-1PATH\s+1
+variable.
+The \f5print\fP  command fits this category.
+Scripts that use \f5print\fP will be portable
+to all sites that run \f5ksh\fP.
+.P
+The final reason for having a command be a built-in is
+for performance.
+On most systems it is more than an order of magnitude
+faster to initiate a command that is built-in than
+to create a separate process to run the command.
+Examples that fit this category are \f5test\fP
+and \f5pwd\fP.
+.P
+Given a command name \f5ksh\fP decides what it means using
+the following order:
+.BL
+.LI
+Reserved words define commands that form part of the shell
+grammar.
+They cannot be quoted.
+.LI
+Alias substitutions occur first as part of the reading of commands.
+Using quotes in the command name will prevent alias substitutions.
+.LI
+Special built-ins.
+.LI
+Functions.
+.LI
+Commands that are built-in that are not associated with a pathname
+such as \f5cd\fP and \f5print\fP.
+.LI
+If the command name contains a
+.BR / ,
+the program or script corresponding to the given name is executed.
+.LI
+A path search locates the pathname corresponding to the command.
+If the pathname where it is found matches the pathname associated
+with a built-in command, the built-in command is executed.
+If the directory where the command is found is listed in the
+.B \s-1FPATH\s+1
+variable, the file is read into the shell
+like a dot script, and a function by that name is invoked.
+Once a pathname is found, \f5ksh\fP remembers its location
+and only checks relative directories in \fB\s-1PATH\s+1\fP
+the next time the command name is used.
+Assigning a value to \fB\s-1PATH\s+1\fP
+causes \f5ksh\fP to forget the location of all command names.
+.LI
+The
+.B \s-1FPATH\s+1
+variable is searched and files found are treated as described above.
+.LE
+.P
+The first argument of the \f5command\fP built-in, described earlier,
+skips the checks for reserved words and for function definitions.
+In all other ways, \f5command\fP behaves like a built-in
+that is not associated with a pathname.
+As a result, if the first argument of \f5command\fP is
+a special built-in, the special properties of this built-in
+do not apply.  
+For example, whereas, \f5exec\ 3<\ foo\fP will cause a script containing
+it to abort if the open fails, \f5command\ exec\ 3<\ foo\fP
+results in a non-zero exit status but does not abort the script.
+.P
+You can get a complete list of the special built-in commands
+with \f5builtin\ -s\fP. 
+In addition \f5builtin\fP without arguments gives a list of
+the current built-ins and the pathname that they are associated with.
+A built-in can be bound to another pathname by giving
+the pathname for the built-in.  The basename of this path must
+be the name of an existing built-in for this to succeed.
+Specifying the name of the built-in without a pathname causes
+this built-in to be found before a path search.
+A built-in can be deleted  with the \fB\-d\fP option.
+.P
+On systems with run time loading of libraries, built-in commands
+can be added with the \f5builtin\fP command.
+Each command that is to be built-in must be written as a
+C function whose name is of the form \f5b_\fP\fIname\fP, where
+\fIname\fP is the name of the built-in that is to be added.
+The function has the same argument calling convention as
+\f5main\fP.  The lower eight bits of the return value become
+the exit status for this built-in.
+Builtins are added by specifying the pathname of the library
+as an argument to the \fB\-f\fP option of \f5builtin\fP.
+.P
+The built-in command,
+\f5whence\fP,
+when used with the
+.B \-v
+option, tells how a given command is bound.
+A line is printed for each argument to \f5whence\fP
+telling what would happen if this argument were used as a command name.
+It reports on reserved words, aliases, built-ins, and
+functions.
+If the command is none of the above,
+it follows the path search rules and prints the full path-name,
+if any, otherwise it prints an error message.
+.H 2 "Symbolic Names"
+To avoid implementation dependencies, \f5ksh\fP
+accepts and generates symbolic names
+for built-ins that use numerical values in the Bourne shell.
+The
+.B \-S
+option of the
+\f5umask\fP built-in command
+accepts and displays
+default file creation permissions
+symbolically.
+It uses the same symbolic notation as the \f5chmod\fP command.
+.P
+The \f5trap\fP and \f5kill\fP built-in commands
+allows the signal names to be given symbolically.
+The names of signals and traps
+corresponding to signals are the same as the signal name with
+the
+.B \s-1SIG\s+1
+prefix removed.
+The trap
+.B 0
+is named
+\fB\s-1EXIT\s+1\fP.
+.H 2 "Additional Variables"
+In addition to the variables discussed earlier, \f5ksh\fP
+has other variables that it handles specially. 
+The variable \fB\s-1RANDOM\s+1\fP
+produces a random number in the range 0 to 32767 each time it is referenced.
+Assignment to this variable sets the seed for the
+random number generator.
+.P
+The parameter \fB\s-1PPID\s+1\fP
+is used to generate the process id of the process which invoked this shell.
+.H 2 "Added Traps"
+A new trap named
+\fB\s-1ERR\s+1\fP
+has been added.
+This trap is invoked whenever the shell would exit if the
+.B \-e
+option were set.
+This trap is used by
+Fourth Generation Make\*(Rf
+.RS
+G. S. Fowler,
+.I "The Fourth Generation Make,"
+Proceedings of the Portland USENIX meeting, pp. 159-174, 1985.
+.RF
+which runs \f5ksh\fP
+as a co-process.
+.P
+A trap named
+\fB\s-1DEBUG\s+1\fP
+gets executed after each command.
+This trap can be used for debugging and other purposes.
+.P
+The
+\fB\s-1KEYBD\s+1\fP
+trap was described earlier.
+.H 2 Debugging
+The primary method for debugging Bourne shell scripts is to
+use the
+.B \-x
+option to enable the execution trace.
+After all
+the expansions have been performed,
+but before each command is executed,
+the trace writes to standard error the name and arguments
+of each command preceded by a
+.BR + .
+While the trace is very useful, there is no way
+to find out what line of source a given trace line
+corresponds to.
+With
+\f5ksh\fP
+the
+\fB\s-1PS4\s+1\fP
+variable
+is evaluated for parameter expansion and
+is displayed before each command,
+instead of the
+.BR + .
+.P
+The
+\fB\s-1LINENO\s+1\fP
+variable is set to the current line number relative to the
+beginning of the current script or function. 
+It is most useful as part of the
+\fB\s-1PS4\s+1\fP
+prompt.
+.P
+The
+\fB\s-1DEBUG\s+1\fP
+trap can be used to write a break point shell
+debugger in \f5ksh\fP.
+An example of such a debugger is \f5kshdb\fP.\*(Rf
+.RS
+Bill Rosenblatt,
+.IR "Debugging Shell Scripts with \f5kshdb\fP" ,
+Unix World, Volume X, No. 5, 1993.
+.RF
+.H 2 "Timing Commands"
+.P
+Finding the time it takes to execute commands
+has been a serious problem with the Bourne shell.
+Since the \f5time\fP command is not part of the
+language, it is necessary to write a script
+in order to time a \f5for\fP or \f5while\fP loop.
+The extra time in invoking the shell and processing
+the script is accumulated along with the time
+to execute the script.
+.P
+More seriously, the Bourne shell does not give correct
+times for pipelines.
+The reason for this is that the times for some members
+of a pipeline are not counted when computing the time.
+As an extreme example,
+running \f5time\fP on the script
+.ce
+\f5cat < /dev/null | sort -u bigfile | wc\fP
+with the Bourne shell will show very little
+user and system time no matter how
+large \f5bigfile\fP is.
+.P
+To correct these problems,
+a reserved word \f5time\fP
+has been added to replace
+the \f5time\fP
+command.
+Any function, command or pipeline can be preceded by this reserved word
+to obtain information about the elapsed, user, and system times.
+Since I/O redirections bind to the command, not to
+\f5time\fP,
+parentheses should be used to redirect the timing information which
+is normally printed on file descriptor 2.
+.H 1 SECURITY
+There are several documented problems associated with the security of
+shell procedures\*(Rf.
+.RS
+F. T. Grampp and R. H. Morris,
+.I "UNIX Operating System Security,"
+AT&T Bell Labs Tech. Journal, Vol. 63, No. 8, Part 2, pp. 1649-1671, 1984.
+.RF
+These security holes occur primarily because a user can manipulate the
+.I environment
+to subvert the intent of a
+.I setuid
+shell procedure.
+Sometimes, shell procedures are initiated from 
+binary programs, without the author's
+awareness, by library routines which invoke shells to carry out
+their tasks.
+When the binary program is run
+.I setuid
+then the shell procedure runs with the permissions afforded to the
+owner of the binary file.
+.P
+In the Bourne shell,
+the
+.B \s-1IFS\s+1
+parameter is used to split each word into separate command arguments.
+If a user knows that some
+.I setuid
+program will run
+\f5sh\ -c\ /bin/pwd\fP
+(or any other command in
+.BR /bin )
+then the user sets and exports
+.BR \s-1IFS\s+1=\^/ .
+Instead of running
+.B /bin/pwd
+the shell will run
+.B bin
+with
+.B pwd
+as an argument.
+The user puts his or her own \f5bin\fP
+program into the current directory.
+This program can
+create a copy of the shell,
+make this shell
+.IR setuid ,
+and then run the \f5/bin/pwd\fP
+program so that the original program continues to run successfully.
+This kind of penetration is not possible with
+\f5ksh\fP
+since the
+.B \s-1IFS\s+1
+parameter only splits arguments that result from command or parameter
+substitution.
+.P
+Some
+.I setuid
+programs run programs using
+.I system()
+without giving the full pathname.
+If the
+user sets the
+.B \s-1PATH\s+1
+variable so that the desired command will be found
+in his or her local bin, then the same technique described above can
+be employed to compromise the security of the system.
+To close up this and other security holes,
+\f5ksh\fP
+resets the effective user id to the real user id and the effective 
+group id to the real group id unless the
+.I privileged
+option
+.RB ( \-p\^ )
+is specified at invocation.
+In
+this mode, the
+.B privileged
+mode, the
+.B .profile
+and
+.B \s-1ENV\s+1
+files are not processed.
+Instead, the file
+.B /etc/suid_profile
+is read and executed.
+This gives an administrator control over the
+environment to set the
+.B \s-1PATH\s+1
+variable or to log setuid shell invocations.
+Clearly security of the system is compromised if
+.B /etc
+or this file is publicly writable.
+.P
+Some versions of the UNIX operating system look for the characters
+\f5#!\fP
+as the first two characters of an executable file.
+If these characters are found, then the next word on this line is taken
+as the interpreter to
+invoke
+for this command and the interpreter is
+.IR exec ed
+with the name of the script as argument zero and argument one.
+If the
+.I setuid
+or
+.I setgid
+bits are on for this file, then the interpreter
+is run with the effective uid and/or gid set accordingly.
+This scheme has three major drawbacks.
+First of all,
+putting the pathname of the interpreter into the script
+makes the script less portable since the interpreter
+may be installed in a different directory on another system.
+Secondly, using the
+\f5#!\fP
+notation forces an
+.B exec
+of the interpreter even when the call is invoked from the interpreter
+which it must exec.  This is inefficient since
+\f5ksh\fP can handle a failed exec much faster than starting up
+again.
+More importantly,
+.I setuid
+and
+.I setgid
+procedures provide an easy target for intrusion.
+By linking a
+.I setuid
+or
+.I setgid
+procedure to a name beginning with a
+.B \-
+the interpreter is fooled into thinking that it is being invoked with
+a command line option rather than the name of a file.
+When the interpreter is the shell, the user gets a privileged
+interactive shell.
+There is code in
+\f5ksh\fP
+to guard against this simple form of intrusion.
+.P
+A more reliable way to handle
+.I setuid
+and
+.I setgid
+procedures is provided with
+\f5ksh\fP.
+The technique does not require any changes to the operating system
+and provides better security.
+Another advantage to this method is that it also allows scripts which
+have execute permission but no read permission to run.  Taking away read
+permission makes scripts more secure.
+.P
+The method relies on a setuid
+.B root
+program to authenticate the
+request and exec the shell with the correct mode bits to carry out
+the task.  This shell is invoked with the requested file already open
+for reading.  A script which cannot be opened for reading or which
+has its setuid and/or setgid bits turned on causes this setuid
+.B root
+program to get \fBexec\fPed.
+For security reasons, this program is given the full
+pathname
+\f5/etc/suid_exec\fP.
+A description of the implementation of the
+\f5/etc/suid_exec\fP
+program can be found in
+a separate paper\*(Rf.
+.RS
+D. G Korn
+.I "Parlez-vous Kanji?"
+TM-59554-860602-03, 1986.
+.RF
+.H 1 "CODE CHANGES"
+\f5ksh\fP is written in ANSI-C as a reusable library.
+The code can be compiled with C++ and older K&R C as well.
+The code uses the IEEE POSIX 1003.1 and ISO 9945-1 standard\*(Rf
+.RS
+.I "POSIX \- Part 1: System Application Program Interface,"
+IEEE Std 1003.1-1990, ISO/IEC 9945-1:1990.
+.RF
+wherever possible so that \f5ksh\fP should be able to run
+on any POSIX compliant system.  In addition, it is possible
+to compile \f5ksh\fP for older systems.
+.P
+Unlike earlier version of the Bourne shell,
+\f5ksh\fP treats eight bit characters transparently
+without stripping off the
+leading bit.
+There is also a compile time switch to enable handling multi-byte
+and multi-width characters sets.
+.P
+On systems with dynamic libraries, it is possible to add built-in
+commands at run time  with the built-in command \f5builtin\fP 
+described earlier.
+It is also possible to embed \f5ksh\fP in applications in
+a manner analogous to \f5tcl\fP.
+.H 1 "EXAMPLE"
+.P
+An example of a \f5ksh\fP script is included
+in the Appendix.
+This one page program is a variant of the UNIX system
+\f5grep\fP(1) program.
+Pattern matching for this version of \f5grep\fP
+means shell patterns.
+.P
+The first half uses the \f5getopts\fP command to
+find the option flags.
+Nearly all options have been implemented.
+The second half goes through each line of each file
+to look for a pattern match.
+.P
+This program is not intended to serve as a
+replacement for \f5grep\fP
+which has been highly tuned for performance.
+It does
+illustrate the programming power of \f5ksh\fP.
+Note that no auxiliary processes are spawned by this script.
+It was written and debugged in under two hours.
+While performance is acceptable for small files,
+this program runs at only one tenth
+the speed of \f5grep\fP
+for large files.
+.H 1 "PERFORMANCE"
+.P
+\f5ksh\fP executes many scripts faster than the System V Bourne shell;
+in some cases more than 10 times as fast.
+The primary reason for this is that \f5ksh\fP creates fewer
+processes.
+The time to execute a built-in command or a function is one or two
+orders of magnitude faster than performing a \f5fork\fP() and
+\f5exec\fP() to create a separate process.
+Command substitution and commands inside parentheses
+are performed without creating another process, unless necessary
+to preserve correct behavior.
+.P
+Another reason for improved performance is the use of the \fBsfio\fP\*(Rf,
+.RS
+David Korn and Kiem-Phong Vo,
+.IR "SFIO - A Safe/Fast String/File I/O,"
+Proceedings of the Summer Usenix,
+pp. 235-255, 1991.
+.RF
+library for I/O.  The \fBsfio\fP library buffers all I/O
+and buffers are flushed only when required.
+The algorithms used in \fBsfio\fP perform better than
+traditional versions of standard I/O so that programs that
+spend most of their time
+formatting output may actually perform better
+than versions written in C.
+.P
+Several of the internal algorithms have been changed
+so that the number of subroutine calls has been
+substantially reduced.
+\f5ksh\fP uses variable sized hash tables for variables.
+Scripts that rely heavily on referencing variables execute faster.
+More processing is performed while reading the script
+so that execution time is saved while running loops.
+These changes are not noticeable for scripts that \f5fork()\fP
+and run processes,
+but they reduce the time that it takes to interpret commands by
+more than a factor of two.
+.P
+Most importantly, \f5ksh\fP provide mechanisms to write applications
+that do not require as many processes.
+The arithmetic provided by the shell eliminates the need for the
+\f5expr\fP command.
+The pattern matching and substring capabilities eliminate the
+need to use \f5sed\fP or \f5awk\fP to process strings.
+.P
+The architecture of \f5ksh\fP makes it easy to make commands
+built-ins without changing the semantics at all.
+Systems that have run-time binding of libraries allow
+applications to be sped up by supplying the critical
+programs as shell built-in commands.
+Implementations on other systems can add built-in commands
+at compile time.
+The procedure for writing built-in commands that can be loaded
+at run time is in a separate document.\*(Rf,
+.RS
+David Korn,
+.IR "Guidelines for writing \f5ksh-93\fP built-in commands,"
+to be published, 1994.
+.RF
+.H 1  "CONCLUSION"
+.P
+The 1988 version of \f5ksh\fP has tens of thousands of regular users
+and is a suitable replacement for the Bourne shell.
+The 1993 version of \f5ksh\fP is essentially upward compatible with
+both the 1988 version of \f5ksh\fP and with the recent IEEE POSIX
+and ISO shell standard.
+The 1993 version offers many advantages for programming applications,
+and it has been rewritten so that it can be used in embedded applications.
+It also offers improved performance.
+.SG dgk \"  signature typist initials 
+\" .CS 14 24 38 0 0 16  \" cover sheet for TM
+.bp
+.ce
+\fIAPPENDIX\fP
+.nf
+\f5
+.ta .66i 1.33i 2i 2.66i 3.33i 4i 4.66i 5.33i 6i 6.66i 7.33i 8i
+.so grep.mm
+.fi
+\fP
+
+

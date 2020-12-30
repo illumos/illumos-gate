@@ -1,0 +1,19 @@
+ast-make :PACKAGE: \
+		nmake cpp probe 3d ksh93 coshell cs ss pax paxlib tw \
+		libast libardir libcmd libsum libdll libcoshell libpp
+
+:AUXILIARY: bin/proto bin/pax
+
+:LICENSE: *.open
+
+:COVERS: ast-ksh ast-ast
+
+:CATEGORY: devel libs shells
+
+:INDEX: ksh, pax, nmake
+
+:DESCRIPTION:
+	The AT&T Software Technology ast-make package from AT&T Research
+	contains an almost minimal set of commands and libraries required
+	to run ast nmake. ksh, coshell, pax, tw, and the 3d user-level
+	filesystem are also included.

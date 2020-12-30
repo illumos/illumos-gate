@@ -1,0 +1,161 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.PP
+..
+.de Tp
+.fl
+.ne 3
+.TP
+..
+.de Ss
+.fl
+.ne 3
+.SS "\\$1"
+..
+.ta 1.0i 2.0i 3.0i 4.0i 5.0i
+.TH ASTSA 3
+.SH NAME
+astsa \- standalone libast support
+.SH SYNOPSIS
+.EX
+#include <ast.h>
+#include <ccode.h>
+#include <error.h>
+#include <option.h>
+#include <stk.h>
+.EE
+.SH DESCRIPTION
+.B astsa
+is a standalone subset of
+.BR ast (3)
+that requires only
+.BR cdt (3)
+and
+.BR sfio (3).
+.PP
+.B <ast.h>
+includes
+.BR <ast_common.h> ,
+.B <stdarg.h>
+or
+.BR <varargs.h> ,
+.BR <sfio.h> ,
+.BR <limits.h> ,
+and
+.B <limits.h>
+and
+.B <unistd.h>
+if supported by the local system.
+.PP
+The macros and functions provided by
+.B <ast.h>
+are described below.
+The other headers are described in
+.BR ccode (3),
+.BR error (3),
+.BR optget (3),
+and
+.BR stk (3).
+.SH MACROS
+.Ss "size_t elementsof(\fIx\fP)"
+Evaluates to the number of elements in the array variable
+.IR x .
+.Ss "\fItype\fP* newof(void* old, \fItype\fP, size_t \fIelements\fP, size_t \fIextra\fP)"
+Equivalent to (\fItype\fP*)realloc((char*)\fIold\fP,sizeof(\fItype\fP)*\fIelements\fP+\fIextra\fP)
+if \fIold\fP!=0 and
+(\fItype\fP*)calloc(1,sizeof(\fItype\fP)*\fIelements\fP+\fIextra\fP)
+otherwise.
+.Ss "\fItype\fP* oldof(void* old, \fItype\fP, size_t \fIelements\fP, size_t \fIextra\fP)"
+Equivalent to (\fItype\fP*)realloc((char*)\fIold\fP,sizeof(\fItype\fP)*\fIelements\fP+\fIextra\fP)
+if \fIold\fP!=0 and
+(\fItype\fP*)malloc(1,sizeof(\fItype\fP)*\fIelements\fP+\fIextra\fP)
+otherwise.
+.Ss "size_t roundof(\fIx\fP,\fIy\fP)"
+Evaluates to \fIx\fP rounded up to the next power of 2 boundary \fIy\fP.
+.Ss "int ssizeof(\fIx\fP)"
+Equivalent to (int)sizeof(\fIx\fP).
+.Ss "int streq(\fIa\fP,\fIb\fP)"
+Equivalent to (*(\fIa\fP)==*(\fIb\fP)&&strcmp(\fIa\fP,\fIb\fP)==0).
+.Ss "int strneq(\fIa\fP,\fIb\fP,\fIn\fP)"
+Equivalent to (*(\fIa\fP)==*(\fIb\fP)&&strncmp(\fIa\fP,\fIb\fP,\fIn\fP)==0).
+.SH FUNCTIONS
+.Ss "void astwinsize(int \fIfd\fP, int* \fIplines\fP, int* \fIpcolumns\fP)"
+If \fIplines\fP!=0 then *\fIplines\fP is set to the number of lines on the
+tty device corresponding to \fIfd\fP.
+If \fIpcolumns\fP!=0 then *\fIpcolumns\fP is set to the number of columns
+on the tty device corresponding to \fIfd\fP.
+The default if \fIfd\fP is not a terminal device, or if \fIfd\fP queries fail,
+is 24 lines and 80 columns.
+.Ss "char* fmterror(int \fIerrno\fP)"
+Returns the error message text corresponding to the
+.BR errno (3)
+\fIerrno\fP.
+.Ss "char* strerror(int \fIerrno\fP)"
+Equivalent to fmterror(\fIerrno\fP).
+.Ss "int strgrpmatch(const char* \fIstring\fP, const char* \fIpattern\fP, int* \fIsub\fP, int \fInsub\fP, int \fIflags\fP)"
+Matches the null terminated \fIstring\fP against the null terminated
+.BR ksh (1)
+augmented \fIpattern\fP.
+If \fIsub\fP!=0 then \fIsub\fP[2*\fIi\fP] is set to the start offset and \fIsub\fP[2*\fIi\fP+1] is set
+to the end offset of the \fIi\fP-th parenthesized subexpression.
+\fInsub\fP is 1/2 the number of elements in \fIsub\fP.
+\fIflags\fP controls the matching:
+.Tp
+\f5STR_MAXIMAL\fP:
+Maximal match.
+The default is minimal (first) match.
+.Tp
+\f5STR_LEFT\fP:
+Implicit left anchor.
+.Tp
+\f5STR_RIGHT\fP:
+Implicit right anchor.
+.Tp
+\f5STR_ICASE\fP:
+Ignore case.
+.Tp
+\f5STR_GROUP\fP:
+(|&) inside [@|*|+{n,m}](...) only.
+.Ss "int strmatch(const char* \fIstring\fP, const char* \fIpattern\fP, int* \fIsub\fP, int \fInsub\fP, int \fIflags\fP)"
+Equivalent to strgrpmatch(\fIstring\fP,\fIpattern\fP,0,0,STR_MAXIMAL|STR_LEFT|STR_RIGHT).
+.SH "SEE ALSO"
+.BR ast (3),
+.BR ccode (3),
+.BR cdt (3),
+.BR error (3),
+.BR malloc (3),
+.BR option (3),
+.BR sfio (3),
+.BR stk (3)

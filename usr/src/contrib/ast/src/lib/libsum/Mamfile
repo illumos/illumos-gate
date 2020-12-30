@@ -1,0 +1,247 @@
+info mam static 00000 1994-07-17 make (AT&T Research) 5.7 2012-06-20
+setv INSTALLROOT ../../..
+setv PACKAGE_ast_INCLUDE ${INSTALLROOT}/include/ast
+setv PACKAGE_ast_LIB ${INSTALLROOT}/lib
+setv PACKAGEROOT ../../../../..
+setv AR ${mam_cc_AR} ${mam_cc_AR_ARFLAGS}
+setv ARFLAGS rc
+setv AS as
+setv ASFLAGS
+setv CC cc
+setv mam_cc_FLAGS ${mam_cc_PIC}
+setv CCFLAGS ${-debug-symbols?1?${mam_cc_DEBUG} -D_BLD_DEBUG?${mam_cc_OPTIMIZE}?}
+setv CCLDFLAGS ${-strip-symbols?1?${mam_cc_LD_STRIP}??}
+setv COTEMP $$
+setv CPIO cpio
+setv CPIOFLAGS
+setv CPP "${CC} -E"
+setv F77 f77
+setv HOSTCC ${CC}
+setv IGNORE
+setv LD ld
+setv LDFLAGS
+setv LEX lex
+setv LEXFLAGS
+setv LPR lpr
+setv LPRFLAGS
+setv M4FLAGS
+setv NMAKE nmake
+setv NMAKEFLAGS
+setv PR pr
+setv PRFLAGS
+setv SHELL /bin/sh
+setv SILENT
+setv TAR tar
+setv YACC yacc
+setv YACCFLAGS -d
+make ${PACKAGEROOT}/lib/package/ast.lic
+done ${PACKAGEROOT}/lib/package/ast.lic
+make install
+make sum
+make libsum.a archive
+make sum.req
+exec - set -
+exec - echo 'int main(){return 0;}' > 1.${COTEMP}.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -c 1.${COTEMP}.c &&
+exec - x=`${CC} ${mam_cc_FLAGS} ${CCFLAGS} ${LDFLAGS} -o 1.${COTEMP}.x 1.${COTEMP}.o -l'*' 2>&1 | sed -e 's/[][()+@?]/#/g' || :` &&
+exec - {
+exec - case "" in
+exec - *?) echo " " ;;
+exec - esac
+exec - for i in sum md ast
+exec - do case $i in
+exec - "sum"|sum)
+exec - ;;
+exec - *) if test -f ${INSTALLROOT}/lib/lib/$i
+exec - then y=`cat ${INSTALLROOT}/lib/lib/$i`
+exec - case $y in
+exec - *-?*) echo "" $y ;;
+exec - esac
+exec - continue
+exec - elif test ! -f ${INSTALLROOT}/lib/lib$i.a
+exec - then case `{ ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -L${INSTALLROOT}/lib ${LDFLAGS} -o 1.${COTEMP}.x 1.${COTEMP}.o -l$i 2>&1 || echo '' $x ;} | sed -e 's/[][()+@?]/#/g' || :` in
+exec - *$x*) case `{ ${CC} ${mam_cc_FLAGS} ${CCFLAGS} ${LDFLAGS} -o 1.${COTEMP}.x 1.${COTEMP}.o -l$i 2>&1 || echo '' $x ;} | sed -e 's/[][()+@?]/#/g' || :` in
+exec - *$x*) continue ;;
+exec - esac
+exec - ;;
+exec - esac
+exec - fi
+exec - ;;
+exec - esac
+exec - echo " -l$i"
+exec - done
+exec - } > sum.req
+exec - rm -f 1.${COTEMP}.*
+done sum.req generated
+make sumlib.o
+make sumlib.c
+make sum-sha2.c implicit
+make ${PACKAGE_ast_INCLUDE}/endian.h implicit
+make ${PACKAGE_ast_INCLUDE}/bytesex.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_map.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_map.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_common.h dontcare
+done ${PACKAGE_ast_INCLUDE}/bytesex.h dontcare
+done ${PACKAGE_ast_INCLUDE}/endian.h dontcare
+done sum-sha2.c dontcare
+make sum-sha1.c implicit
+done sum-sha1.c dontcare
+make sum-md5.c implicit
+done sum-md5.c dontcare
+make sum-lmd.c implicit
+make sha2.h implicit
+done sha2.h dontcare virtual
+make sha1.h implicit
+done sha1.h dontcare virtual
+make md5.h implicit
+done md5.h dontcare virtual
+make md4.h implicit
+done md4.h dontcare virtual
+done sum-lmd.c dontcare
+make sum-prng.c implicit
+make ${PACKAGE_ast_INCLUDE}/fnv.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+make ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/prototyped.h dontcare
+done ${PACKAGE_ast_INCLUDE}/fnv.h
+done sum-prng.c
+make sum-crc.c implicit
+done sum-crc.c
+make sum-bsd.c implicit
+done sum-bsd.c
+make sum-ast4.c implicit
+done sum-ast4.c
+make sum-att.c implicit
+done sum-att.c
+make FEATURE/sum implicit
+meta FEATURE/sum features/%>FEATURE/% features/sum sum
+make features/sum
+done features/sum
+bind -last
+exec - iffe -v -c '${CC} ${mam_cc_FLAGS} ${CCFLAGS}   ${LDFLAGS} ' ref ${mam_cc_L+-L${INSTALLROOT}/lib} -I${PACKAGE_ast_INCLUDE} -I${INSTALLROOT}/include ${mam_libast} : run features/sum
+done FEATURE/sum generated
+make ${PACKAGE_ast_INCLUDE}/hashpart.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/hashpart.h
+make ${PACKAGE_ast_INCLUDE}/swap.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/swap.h
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+make sum.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_api.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_api.h dontcare
+make ${PACKAGE_ast_INCLUDE}/vmalloc.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+make ${PACKAGE_ast_INCLUDE}/regex.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_api.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_wchar.h implicit
+make ${PACKAGE_ast_INCLUDE}/wctype.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_wctype.h implicit
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+make ${PACKAGE_ast_INCLUDE}/wchar.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_wchar.h implicit
+done ${PACKAGE_ast_INCLUDE}/wchar.h dontcare
+done ${PACKAGE_ast_INCLUDE}/ast_wctype.h dontcare
+done ${PACKAGE_ast_INCLUDE}/wctype.h dontcare
+make ${PACKAGE_ast_INCLUDE}/stdio.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_stdio.h implicit
+make ${PACKAGE_ast_INCLUDE}/sfio_s.h implicit
+done ${PACKAGE_ast_INCLUDE}/sfio_s.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_stdio.h dontcare
+done ${PACKAGE_ast_INCLUDE}/stdio.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/stdio.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_wchar.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/regex.h dontcare
+make ${PACKAGE_ast_INCLUDE}/getopt.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_getopt.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_getopt.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/getopt.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_map.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_botch.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_botch.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ast_limits.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_limits.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ast_fcntl.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_fs.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_fs.h dontcare
+done ${PACKAGE_ast_INCLUDE}/ast_fcntl.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_getopt.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_sys.h implicit
+prev ${PACKAGE_ast_INCLUDE}/getopt.h implicit
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_sys.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ast_lib.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_lib.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_std.h dontcare
+done ${PACKAGE_ast_INCLUDE}/vmalloc.h dontcare
+make ${PACKAGE_ast_INCLUDE}/sfio.h implicit
+prev ${PACKAGE_ast_INCLUDE}/sfio_s.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+done ${PACKAGE_ast_INCLUDE}/sfio.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast.h dontcare
+done sum.h
+done sumlib.c
+meta sumlib.o %.c>%.o sumlib.c sumlib
+prev sumlib.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c sumlib.c
+done sumlib.o generated
+exec - ${AR} rc libsum.a sumlib.o
+exec - (ranlib libsum.a) >/dev/null 2>&1 || true
+done libsum.a generated
+done sum virtual
+prev libsum.a archive
+make ${INSTALLROOT}/lib
+exec - if silent test ! -d ${INSTALLROOT}/lib
+exec - then mkdir -p ${INSTALLROOT}/lib
+exec - fi
+done ${INSTALLROOT}/lib generated
+make ${INSTALLROOT}/lib/libsum.a archive
+prev ${INSTALLROOT}/lib
+prev libsum.a archive
+exec - test '' = 'libsum.a' || ${STDCMP} 2>/dev/null -s libsum.a ${INSTALLROOT}/lib/libsum.a || { ${STDMV} ${INSTALLROOT}/lib/libsum.a ${INSTALLROOT}/lib/libsum.a.old 2>/dev/null || true; ${STDCP} libsum.a ${INSTALLROOT}/lib/libsum.a ;}
+exec - (ranlib ${INSTALLROOT}/lib/libsum.a) >/dev/null 2>&1 || true
+done ${INSTALLROOT}/lib/libsum.a generated
+make ${INSTALLROOT}/lib/lib
+exec - if silent test ! -d ${INSTALLROOT}/lib/lib
+exec - then mkdir -p ${INSTALLROOT}/lib/lib
+exec - fi
+done ${INSTALLROOT}/lib/lib generated
+make ${INSTALLROOT}/lib/lib/sum
+prev ${INSTALLROOT}/lib/lib
+prev sum.req
+exec - test '' = 'sum.req' || ${STDCMP} 2>/dev/null -s sum.req ${INSTALLROOT}/lib/lib/sum || { ${STDMV} ${INSTALLROOT}/lib/lib/sum ${INSTALLROOT}/lib/lib/sum.old 2>/dev/null || true; ${STDCP} sum.req ${INSTALLROOT}/lib/lib/sum ;}
+done ${INSTALLROOT}/lib/lib/sum generated
+make ${PACKAGE_ast_INCLUDE}
+exec - if silent test ! -d ${PACKAGE_ast_INCLUDE}
+exec - then mkdir -p ${PACKAGE_ast_INCLUDE}
+exec - fi
+done ${PACKAGE_ast_INCLUDE} generated
+make ${PACKAGE_ast_INCLUDE}/sum.h
+prev ${PACKAGE_ast_INCLUDE}
+prev sum.h
+exec - proto -p -s -l ${PACKAGEROOT}/lib/package/ast.lic '-o since=1996,author=gsf' sum.h > 1.${COTEMP}.x
+exec - if cmp 2>/dev/null -s ${PACKAGE_ast_INCLUDE}/sum.h 1.${COTEMP}.x
+exec - then rm -f 1.${COTEMP}.x
+exec - else mv 1.${COTEMP}.x ${PACKAGE_ast_INCLUDE}/sum.h
+exec - fi
+done ${PACKAGE_ast_INCLUDE}/sum.h generated
+done install virtual
+make test
+done test dontcare virtual

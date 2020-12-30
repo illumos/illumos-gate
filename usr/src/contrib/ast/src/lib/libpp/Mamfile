@@ -1,0 +1,811 @@
+info mam static 00000 1994-07-17 make (AT&T Research) 5.7 2012-06-20
+setv INSTALLROOT ../../..
+setv PACKAGE_ast_INCLUDE ${INSTALLROOT}/include/ast
+setv PACKAGE_ast_LIB ${INSTALLROOT}/lib
+setv PACKAGEROOT ../../../../..
+setv AR ${mam_cc_AR} ${mam_cc_AR_ARFLAGS}
+setv ARFLAGS rc
+setv AS as
+setv ASFLAGS
+setv CC cc
+setv mam_cc_FLAGS
+setv CCFLAGS ${-debug-symbols?1?${mam_cc_DEBUG} -D_BLD_DEBUG?${mam_cc_OPTIMIZE}?}
+setv CCLDFLAGS ${-strip-symbols?1?${mam_cc_LD_STRIP}??}
+setv COTEMP $$
+setv CPIO cpio
+setv CPIOFLAGS
+setv CPP "${CC} -E"
+setv F77 f77
+setv HOSTCC ${CC}
+setv IGNORE
+setv LD ld
+setv LDFLAGS
+setv LEX lex
+setv LEXFLAGS
+setv LPR lpr
+setv LPRFLAGS
+setv M4FLAGS
+setv NMAKE nmake
+setv NMAKEFLAGS
+setv PR pr
+setv PRFLAGS
+setv SHELL /bin/sh
+setv SILENT
+setv TAR tar
+setv YACC yacc
+setv YACCFLAGS -d
+make ${PACKAGEROOT}/lib/package/ast.lic
+done ${PACKAGEROOT}/lib/package/ast.lic
+make install
+make ppsym
+make ppsym.o
+make ppsym.c
+make ${PACKAGE_ast_INCLUDE}/endian.h implicit
+make ${PACKAGE_ast_INCLUDE}/bytesex.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_map.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_map.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_common.h dontcare
+done ${PACKAGE_ast_INCLUDE}/bytesex.h dontcare
+done ${PACKAGE_ast_INCLUDE}/endian.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ast.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_api.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_api.h dontcare
+make ${PACKAGE_ast_INCLUDE}/vmalloc.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+make ${PACKAGE_ast_INCLUDE}/regex.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_api.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_wchar.h implicit
+make ${PACKAGE_ast_INCLUDE}/wctype.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_wctype.h implicit
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+make ${PACKAGE_ast_INCLUDE}/wchar.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_wchar.h implicit
+done ${PACKAGE_ast_INCLUDE}/wchar.h dontcare
+done ${PACKAGE_ast_INCLUDE}/ast_wctype.h dontcare
+done ${PACKAGE_ast_INCLUDE}/wctype.h dontcare
+make ${PACKAGE_ast_INCLUDE}/stdio.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_stdio.h implicit
+make ${PACKAGE_ast_INCLUDE}/sfio_s.h implicit
+done ${PACKAGE_ast_INCLUDE}/sfio_s.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_stdio.h dontcare
+done ${PACKAGE_ast_INCLUDE}/stdio.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/stdio.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_wchar.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+make ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/prototyped.h dontcare
+done ${PACKAGE_ast_INCLUDE}/regex.h dontcare
+make ${PACKAGE_ast_INCLUDE}/getopt.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_getopt.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_getopt.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/getopt.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_map.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_botch.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_botch.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ast_limits.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_limits.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ast_fcntl.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_fs.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_fs.h dontcare
+done ${PACKAGE_ast_INCLUDE}/ast_fcntl.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_getopt.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_sys.h implicit
+prev ${PACKAGE_ast_INCLUDE}/getopt.h implicit
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+prev ${PACKAGE_ast_INCLUDE}/endian.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_sys.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ast_lib.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_lib.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_std.h dontcare
+done ${PACKAGE_ast_INCLUDE}/vmalloc.h dontcare
+make ${PACKAGE_ast_INCLUDE}/sfio.h implicit
+prev ${PACKAGE_ast_INCLUDE}/sfio_s.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+done ${PACKAGE_ast_INCLUDE}/sfio.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast.h
+done ppsym.c
+meta ppsym.o %.c>%.o ppsym.c ppsym
+prev ppsym.c
+setv _BLD_pp -U_BLD_pp
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppsym.c
+done ppsym.o generated
+bind -last
+exec - ${CC} ${CCLDFLAGS} ${mam_cc_FLAGS} ${CCFLAGS} ${LDFLAGS} ${mam_cc_L+-L${INSTALLROOT}/lib} -o ppsym ppsym.o ${mam_libast} ${mam_libast}
+done ppsym generated
+make pp
+make libpp.a archive
+make pp.req
+exec - set -
+exec - echo 'int main(){return 0;}' > 1.${COTEMP}.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -c 1.${COTEMP}.c &&
+exec - x=`${CC} ${mam_cc_FLAGS} ${CCFLAGS} ${LDFLAGS} -o 1.${COTEMP}.x 1.${COTEMP}.o -l'*' 2>&1 | sed -e 's/[][()+@?]/#/g' || :` &&
+exec - {
+exec - case "" in
+exec - *?) echo " " ;;
+exec - esac
+exec - for i in pp ast
+exec - do case $i in
+exec - "pp"|pp)
+exec - ;;
+exec - *) if test -f ${INSTALLROOT}/lib/lib/$i
+exec - then y=`cat ${INSTALLROOT}/lib/lib/$i`
+exec - case $y in
+exec - *-?*) echo "" $y ;;
+exec - esac
+exec - continue
+exec - elif test ! -f ${INSTALLROOT}/lib/lib$i.a
+exec - then case `{ ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -L../../lib ${LDFLAGS} -o 1.${COTEMP}.x 1.${COTEMP}.o -l$i 2>&1 || echo '' $x ;} | sed -e 's/[][()+@?]/#/g' || :` in
+exec - *$x*) case `{ ${CC} ${mam_cc_FLAGS} ${CCFLAGS} ${LDFLAGS} -o 1.${COTEMP}.x 1.${COTEMP}.o -l$i 2>&1 || echo '' $x ;} | sed -e 's/[][()+@?]/#/g' || :` in
+exec - *$x*) continue ;;
+exec - esac
+exec - ;;
+exec - esac
+exec - fi
+exec - ;;
+exec - esac
+exec - echo " -l$i"
+exec - done
+exec - } > pp.req
+exec - rm -f 1.${COTEMP}.*
+done pp.req generated
+make ppargs.o
+make ppargs.c
+make pplib.h implicit
+prev ${PACKAGE_ast_INCLUDE}/vmalloc.h implicit
+make ppkey.h implicit
+done ppkey.h dontcare
+make ppdef.h implicit
+make gentab
+make gentab.sh
+done gentab.sh
+meta gentab %.sh>% gentab.sh gentab
+prev gentab.sh
+exec - case static,port:$OPTIND:$RANDOM in
+exec - ?*:*:*|*::*|*:*:$RANDOM)
+exec - ;;
+exec - *) if ENV= LC_ALL=C x= $SHELL -nc '[[ a || b ]] && : ${list[level]}  !(pattern)' 2>/dev/null
+exec - then if grep '### .*archaic.* ###' >/dev/null
+exec - then : gentab contains archaic constructs :
+exec - else ENV= LC_ALL=C $SHELL -n gentab.sh
+exec - fi
+exec - fi
+exec - ;;
+exec - esac
+exec - case '${mam_cc_SHELLMAGIC}' in
+exec - "") case 0 in
+exec - 0) cp gentab.sh gentab
+exec - ;;
+exec - *) {
+exec - i=`(read x; echo $x) < gentab.sh`
+exec - case $i in
+exec - '#!'*|*'||'*|':'*|'":"'*|"':'"*) echo "$i" ;;
+exec - esac
+exec - cat - gentab.sh <<'!'
+exec -
+exec - !
+exec - } > gentab
+exec - ;;
+exec - esac
+exec - ;;
+exec - *) cat - gentab.sh > gentab <<'!'
+exec - ${mam_cc_SHELLMAGIC}
+exec -
+exec - !
+exec - ;;
+exec - esac
+exec - silent test -w gentab -a -x gentab || chmod u+w,+x gentab
+done gentab generated
+make pp.tab
+done pp.tab
+exec - ${INSTALLROOT}/src/lib/libpp/gentab -d pp.tab > ppdef.h
+done ppdef.h dontcare generated
+make pp.h implicit
+make ${PACKAGE_ast_INCLUDE}/ccode.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_ccode.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_ccode.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_common.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ccode.h dontcare
+make ${PACKAGE_ast_INCLUDE}/error.h implicit
+make ${PACKAGE_ast_INCLUDE}/option.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/option.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/error.h dontcare
+make ${PACKAGE_ast_INCLUDE}/hash.h implicit
+make ${PACKAGE_ast_INCLUDE}/hashpart.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/hashpart.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/hash.h dontcare
+done pp.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/error.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+done pplib.h
+done ppargs.c
+meta ppargs.o %.c>%.o ppargs.c ppargs
+prev ppargs.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -DUSAGE_LICENSE=\""[-author?Glenn Fowler <gsf@research.att.com>][-copyright?Copyright (c) 1986-2012 AT&T Intellectual Property][-license?http://www.eclipse.org/org/documents/epl-v10.html][--catalog?libpp]"\" -c ppargs.c
+done ppargs.o generated
+make ppbuiltin.o
+make ppbuiltin.c
+make ${PACKAGE_ast_INCLUDE}/times.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_time.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_time.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/times.h
+prev pplib.h implicit
+done ppbuiltin.c
+meta ppbuiltin.o %.c>%.o ppbuiltin.c ppbuiltin
+prev ppbuiltin.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppbuiltin.c
+done ppbuiltin.o generated
+make ppcall.o
+make ppcall.c
+prev pplib.h implicit
+done ppcall.c
+meta ppcall.o %.c>%.o ppcall.c ppcall
+prev ppcall.c
+exec - ${CC} ${mam_cc_FLAGS} ${-debug-symbols?1?${mam_cc_DEBUG} -D_BLD_DEBUG?${CCFLAGS.FORCE}?} ${DEBUG+-DDEBUG=${DEBUG}} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppcall.c
+done ppcall.o generated
+make ppcomment.o
+make ppcomment.c
+prev pplib.h implicit
+done ppcomment.c
+meta ppcomment.o %.c>%.o ppcomment.c ppcomment
+prev ppcomment.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppcomment.c
+done ppcomment.o generated
+make ppcontext.o
+make ppcontext.c
+prev pplib.h implicit
+done ppcontext.c
+meta ppcontext.o %.c>%.o ppcontext.c ppcontext
+prev ppcontext.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppcontext.c
+done ppcontext.o generated
+make ppcontrol.o
+make ppcontrol.c
+prev ${PACKAGE_ast_INCLUDE}/regex.h implicit
+prev pplib.h implicit
+done ppcontrol.c
+meta ppcontrol.o %.c>%.o ppcontrol.c ppcontrol
+prev ppcontrol.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppcontrol.c
+done ppcontrol.o generated
+make ppcpp.o
+make ppcpp.c
+make pplex.c implicit
+make ${PACKAGE_ast_INCLUDE}/wait.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_wait.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_wait.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/wait.h dontcare
+make ${PACKAGE_ast_INCLUDE}/ls.h implicit
+make ${PACKAGE_ast_INCLUDE}/ast_mode.h implicit
+done ${PACKAGE_ast_INCLUDE}/ast_mode.h dontcare
+prev ${PACKAGE_ast_INCLUDE}/ast_fs.h implicit
+prev ${PACKAGE_ast_INCLUDE}/ast_std.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/ls.h dontcare
+make ppfsm.h implicit
+done ppfsm.h
+prev pplib.h implicit
+done pplex.c
+done ppcpp.c
+meta ppcpp.o %.c>%.o ppcpp.c ppcpp
+prev ppcpp.c
+exec - ${CC} ${mam_cc_FLAGS} ${-debug-symbols?1?${mam_cc_DEBUG} -D_BLD_DEBUG?${CCFLAGS.FORCE}?} ${DEBUG+-DDEBUG=${DEBUG}} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppcpp.c
+done ppcpp.o generated
+make ppdata.o
+make ppdata.c
+prev pplib.h implicit
+done ppdata.c
+meta ppdata.o %.c>%.o ppdata.c ppdata
+prev ppdata.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppdata.c
+done ppdata.o generated
+make pperror.o
+make pperror.c
+prev pplib.h implicit
+done pperror.c
+meta pperror.o %.c>%.o pperror.c pperror
+prev pperror.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c pperror.c
+done pperror.o generated
+make ppexpr.o
+make ppexpr.c
+prev ${PACKAGE_ast_INCLUDE}/regex.h implicit
+prev pplib.h implicit
+done ppexpr.c
+meta ppexpr.o %.c>%.o ppexpr.c ppexpr
+prev ppexpr.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppexpr.c
+done ppexpr.o generated
+make ppfsm.o
+make ppfsm.c
+prev ppfsm.h implicit
+prev pplib.h implicit
+done ppfsm.c
+meta ppfsm.o %.c>%.o ppfsm.c ppfsm
+prev ppfsm.c
+exec - ${CC} ${mam_cc_FLAGS} ${-debug-symbols?1?${mam_cc_DEBUG} -D_BLD_DEBUG?${CCFLAGS.FORCE}?} ${DEBUG+-DDEBUG=${DEBUG}} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppfsm.c
+done ppfsm.o generated
+make ppincref.o
+make ppincref.c
+prev pplib.h implicit
+done ppincref.c
+meta ppincref.o %.c>%.o ppincref.c ppincref
+prev ppincref.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppincref.c
+done ppincref.o generated
+make ppinput.o
+make ppinput.c
+make ../../lib/libast/path/pathnative.c implicit
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+done ../../lib/libast/path/pathnative.c
+prev pplib.h implicit
+done ppinput.c
+meta ppinput.o %.c>%.o ppinput.c ppinput
+prev ppinput.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppinput.c
+done ppinput.o generated
+make ppkey.o
+make ppkey.c
+prev ppkey.h implicit
+prev pplib.h implicit
+done ppkey.c
+meta ppkey.o %.c>%.o ppkey.c ppkey
+prev ppkey.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppkey.c
+done ppkey.o generated
+make pplex.o
+prev pplex.c
+meta pplex.o %.c>%.o pplex.c pplex
+prev pplex.c
+exec - ${CC} ${mam_cc_FLAGS} ${-debug-symbols?1?${mam_cc_DEBUG} -D_BLD_DEBUG?${CCFLAGS.FORCE}?} ${DEBUG+-DDEBUG=${DEBUG}} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c pplex.c
+done pplex.o generated
+make ppline.o
+make ppline.c
+prev pplib.h implicit
+done ppline.c
+meta ppline.o %.c>%.o ppline.c ppline
+prev ppline.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppline.c
+done ppline.o generated
+make ppmacref.o
+make ppmacref.c
+prev pplib.h implicit
+done ppmacref.c
+meta ppmacref.o %.c>%.o ppmacref.c ppmacref
+prev ppmacref.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppmacref.c
+done ppmacref.o generated
+make ppmisc.o
+make ppmisc.c
+prev pplib.h implicit
+done ppmisc.c
+meta ppmisc.o %.c>%.o ppmisc.c ppmisc
+prev ppmisc.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppmisc.c
+done ppmisc.o generated
+make ppop.o
+make ppop.c
+make ${PACKAGE_ast_INCLUDE}/preroot.h implicit
+done ${PACKAGE_ast_INCLUDE}/preroot.h
+prev ${PACKAGE_ast_INCLUDE}/ls.h implicit
+make pptab.h implicit
+prev gentab
+prev pp.tab
+exec - ${INSTALLROOT}/src/lib/libpp/gentab -t pp.tab > pptab.h
+done pptab.h generated
+prev pplib.h implicit
+done ppop.c
+meta ppop.o %.c>%.o ppop.c ppop
+prev ppop.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppop.c
+done ppop.o generated
+make pppragma.o
+make pppragma.c
+prev pplib.h implicit
+done pppragma.c
+meta pppragma.o %.c>%.o pppragma.c pppragma
+prev pppragma.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c pppragma.c
+done pppragma.o generated
+make ppprintf.o
+make ppprintf.c
+prev pplib.h implicit
+done ppprintf.c
+meta ppprintf.o %.c>%.o ppprintf.c ppprintf
+prev ppprintf.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppprintf.c
+done ppprintf.o generated
+make ppproto.o
+make ppproto.c
+make ../libast/port/astlicense.c implicit
+prev ${PACKAGE_ast_INCLUDE}/ast.h implicit
+done ../libast/port/astlicense.c dontcare
+prev ppfsm.h implicit
+prev pplib.h implicit
+make ${PACKAGE_ast_INCLUDE}/hashkey.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/hashkey.h dontcare
+prev ppfsm.c implicit
+done ppproto.c
+meta ppproto.o %.c>%.o ppproto.c ppproto
+prev ppproto.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppproto.c
+done ppproto.o generated
+make ppsearch.o
+make ppsearch.c
+prev ${PACKAGE_ast_INCLUDE}/ls.h implicit
+make ${PACKAGE_ast_INCLUDE}/vdb.h implicit
+prev ${PACKAGE_ast_INCLUDE}/prototyped.h implicit
+done ${PACKAGE_ast_INCLUDE}/vdb.h dontcare
+prev pplib.h implicit
+done ppsearch.c
+meta ppsearch.o %.c>%.o ppsearch.c ppsearch
+prev ppsearch.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c ppsearch.c
+done ppsearch.o generated
+make pptrace.o
+make pptrace.c
+make ${PACKAGE_ast_INCLUDE}/sig.h implicit
+done ${PACKAGE_ast_INCLUDE}/sig.h dontcare
+make ppdebug.h implicit
+prev ppfsm.h
+prev ppdef.h
+prev pplib.h
+exec - : > 1.${COTEMP}.c
+exec - ${STDED} ${STDEDFLAGS} 1.${COTEMP}.c <<'!'
+exec - r ppfsm.h
+exec - 1,/^#define PROTO/-d
+exec - /^#define LAST/,$d
+exec - v/^#define/d
+exec - g/PROTOMAIN/d
+exec - 1,$s/^#define //
+exec - 1,$s/[^A-Za-z0-9_].*//
+exec - 1,$s/.*/ "&", &,/
+exec - 1i
+exec - /*
+exec - * preprocessor library debug maps
+exec - */
+exec - struct map
+exec - {
+exec - char* nam;
+exec - long val;
+exec - };
+exec - static struct map pplexmap[] =
+exec - {
+exec - .
+exec - $a
+exec - };
+exec - .
+exec - ka
+exec - r ppdef.h
+exec - 'a+1,/^#define ADD/-d
+exec - /^$/,$d
+exec - 'a+1,$s/^#define //
+exec - 'a+1,$s/[ 	].*//
+exec - 'a+1,$s/.*/	"&", &,/
+exec - 'aa
+exec - static struct map ppstatemap[] =
+exec - {
+exec - .
+exec - $a
+exec - };
+exec - .
+exec - ka
+exec - r ppdef.h
+exec - 'a+1,/^#define ALLMULTIPLE/-d
+exec - /^$/,$d
+exec - 'a+1,$s/^#define //
+exec - 'a+1,$s/[ 	].*//
+exec - 'a+1,$s/.*/	"&", &,/
+exec - 'aa
+exec - static struct map ppmodemap[] =
+exec - {
+exec - .
+exec - $a
+exec - };
+exec - .
+exec - ka
+exec - r ppdef.h
+exec - 'a+1,/^#define ELSEIF/-d
+exec - /^$/,$d
+exec - 'a+1,$s/^#define //
+exec - 'a+1,$s/[ 	].*//
+exec - 'a+1,$s/.*/	"&", &,/
+exec - 'aa
+exec - static struct map ppoptionmap[] =
+exec - {
+exec - .
+exec - $a
+exec - };
+exec - .
+exec - ka
+exec - r pplib.h
+exec - 'a+1,/^#define IN_BUFFER/-d
+exec - /^$/,$d
+exec - 'a+1,$s/^#define IN_//
+exec - 'a+1,$s/[ 	].*//
+exec - 'a+1,$s/.*/	"&", IN_&,/
+exec - 'aa
+exec - static struct map ppinmap[] =
+exec - {
+exec - .
+exec - $a
+exec - };
+exec - .
+exec - w
+exec - q
+exec - !
+exec - if cmp 2>/dev/null -s 1.${COTEMP}.c ppdebug.h
+exec - then rm -f 1.${COTEMP}.c
+exec - else mv 1.${COTEMP}.c ppdebug.h
+exec - fi
+done ppdebug.h dontcare generated
+prev ppfsm.h implicit
+prev pplib.h implicit
+done pptrace.c
+meta pptrace.o %.c>%.o pptrace.c pptrace
+prev pptrace.c
+exec - ${CC} ${mam_cc_FLAGS} ${CCFLAGS} -I. -I${PACKAGE_ast_INCLUDE} -D_PACKAGE_ast -c pptrace.c
+done pptrace.o generated
+exec - ${AR} rc libpp.a ppargs.o ppbuiltin.o ppcall.o ppcomment.o ppcontext.o ppcontrol.o ppcpp.o ppdata.o pperror.o ppexpr.o ppfsm.o ppincref.o ppinput.o ppkey.o pplex.o ppline.o ppmacref.o ppmisc.o ppop.o pppragma.o ppprintf.o ppproto.o ppsearch.o pptrace.o
+exec - (ranlib libpp.a) >/dev/null 2>&1 || true
+done libpp.a generated
+done pp virtual
+prev libpp.a archive
+make ${INSTALLROOT}/lib
+exec - if silent test ! -d ${INSTALLROOT}/lib
+exec - then mkdir -p ${INSTALLROOT}/lib
+exec - fi
+done ${INSTALLROOT}/lib generated
+make ${INSTALLROOT}/lib/libpp.a archive
+prev ${INSTALLROOT}/lib
+prev libpp.a archive
+exec - test '' = 'libpp.a' || ${STDCMP} 2>/dev/null -s libpp.a ${INSTALLROOT}/lib/libpp.a || { ${STDMV} ${INSTALLROOT}/lib/libpp.a ${INSTALLROOT}/lib/libpp.a.old 2>/dev/null || true; ${STDCP} libpp.a ${INSTALLROOT}/lib/libpp.a ;}
+exec - (ranlib ${INSTALLROOT}/lib/libpp.a) >/dev/null 2>&1 || true
+done ${INSTALLROOT}/lib/libpp.a generated
+make ${INSTALLROOT}/man/man3
+exec - if silent test ! -d ${INSTALLROOT}/man/man3
+exec - then mkdir -p ${INSTALLROOT}/man/man3
+exec - fi
+done ${INSTALLROOT}/man/man3 generated
+make ${INSTALLROOT}/man/man3/pp.3
+prev ${INSTALLROOT}/man/man3
+make pp.3
+done pp.3
+exec - test '' = 'pp.3' || ${STDCMP} 2>/dev/null -s pp.3 ${INSTALLROOT}/man/man3/pp.3 || { ${STDMV} ${INSTALLROOT}/man/man3/pp.3 ${INSTALLROOT}/man/man3/pp.3.old 2>/dev/null || true; ${STDCP} pp.3 ${INSTALLROOT}/man/man3/pp.3 ;}
+done ${INSTALLROOT}/man/man3/pp.3 generated
+make ${INSTALLROOT}/lib/lib
+exec - if silent test ! -d ${INSTALLROOT}/lib/lib
+exec - then mkdir -p ${INSTALLROOT}/lib/lib
+exec - fi
+done ${INSTALLROOT}/lib/lib generated
+make ${INSTALLROOT}/lib/lib/pp
+prev ${INSTALLROOT}/lib/lib
+prev pp.req
+exec - test '' = 'pp.req' || ${STDCMP} 2>/dev/null -s pp.req ${INSTALLROOT}/lib/lib/pp || { ${STDMV} ${INSTALLROOT}/lib/lib/pp ${INSTALLROOT}/lib/lib/pp.old 2>/dev/null || true; ${STDCP} pp.req ${INSTALLROOT}/lib/lib/pp ;}
+done ${INSTALLROOT}/lib/lib/pp generated
+make ${PACKAGE_ast_INCLUDE}
+exec - if silent test ! -d ${PACKAGE_ast_INCLUDE}
+exec - then mkdir -p ${PACKAGE_ast_INCLUDE}
+exec - fi
+done ${PACKAGE_ast_INCLUDE} generated
+make ${PACKAGE_ast_INCLUDE}/pp.h
+prev ${PACKAGE_ast_INCLUDE}
+prev pp.h
+exec - proto -p -s -l ${PACKAGEROOT}/lib/package/ast.lic '-o since=1986,author=gsf' pp.h > 1.${COTEMP}.x
+exec - if cmp 2>/dev/null -s ${PACKAGE_ast_INCLUDE}/pp.h 1.${COTEMP}.x
+exec - then rm -f 1.${COTEMP}.x
+exec - else mv 1.${COTEMP}.x ${PACKAGE_ast_INCLUDE}/pp.h
+exec - fi
+done ${PACKAGE_ast_INCLUDE}/pp.h generated
+make ${PACKAGE_ast_INCLUDE}/ppkey.h
+prev ppkey.h
+exec - proto -p -s -l ${PACKAGEROOT}/lib/package/ast.lic '-o since=1986,author=gsf' ppkey.h > 1.${COTEMP}.x
+exec - if cmp 2>/dev/null -s ${PACKAGE_ast_INCLUDE}/ppkey.h 1.${COTEMP}.x
+exec - then rm -f 1.${COTEMP}.x
+exec - else mv 1.${COTEMP}.x ${PACKAGE_ast_INCLUDE}/ppkey.h
+exec - fi
+done ${PACKAGE_ast_INCLUDE}/ppkey.h generated
+make ${PACKAGE_ast_INCLUDE}/pp.yacc
+make pp.yacc
+meta pp.yacc %.h>%.yacc pp.h pp
+prev pp.h
+prev pp.h
+exec - rm -f pp.yacc
+exec - {
+exec - cat pp.h
+exec - } > 1.${COTEMP}.c
+exec - ${STDED} ${STDEDFLAGS} 1.${COTEMP}.c <<'!'
+exec - g/^#define N_/m0
+exec - v/^#define [NT]_/d
+exec - 1,$s/^#define \(T_[A-Z0-9_]*\).*/&\
+exec - printf(" \1 %d", \1);/
+exec - g/^printf.*T_HEADER/d
+exec - g/^printf.*T_KEYWORD/d
+exec - g/^printf.*T_TOKCAT/d
+exec - g/^printf.*T_TOKEN/d
+exec - 0a
+exec - #include <stdio.h>
+exec - int
+exec - main(argc, argv)
+exec - int argc;
+exec - char** argv;
+exec - {
+exec - printf("%%token /*generated from pp.h*/");
+exec - .
+exec - $a
+exec - printf("\n");
+exec - return 0;
+exec - }
+exec - .
+exec - w
+exec - q
+exec - !
+exec - ${CC} -o ${COTEMP}.exe 1.${COTEMP}.c
+exec - ./${COTEMP}.exe > pp.yacc
+exec - rm -f 1.${COTEMP}.c ${COTEMP}.exe
+done pp.yacc generated
+exec - test '' = 'pp.yacc' || ${STDCMP} 2>/dev/null -s pp.yacc ${PACKAGE_ast_INCLUDE}/pp.yacc || { ${STDMV} ${PACKAGE_ast_INCLUDE}/pp.yacc ${PACKAGE_ast_INCLUDE}/pp.yacc.old 2>/dev/null || true; ${STDCP} pp.yacc ${PACKAGE_ast_INCLUDE}/pp.yacc ;}
+done ${PACKAGE_ast_INCLUDE}/pp.yacc generated
+make ${PACKAGE_ast_INCLUDE}/ppkey.yacc
+make ppkey.yacc
+meta ppkey.yacc %.h>%.yacc ppkey.h ppkey
+prev ppkey.h
+prev pp.h
+exec - rm -f ppkey.yacc
+exec - {
+exec - sed -n -e '/^#define T_TOKEN/p' -e '/^#define N_/p' pp.h
+exec - cat ppkey.h
+exec - } > 1.${COTEMP}.c
+exec - ${STDED} ${STDEDFLAGS} 1.${COTEMP}.c <<'!'
+exec - g/^#define N_/m0
+exec - v/^#define [NT]_/d
+exec - 1,$s/^#define \(T_[A-Z0-9_]*\).*/&\
+exec - printf(" \1 %d", \1);/
+exec - g/^printf.*T_HEADER/d
+exec - g/^printf.*T_KEYWORD/d
+exec - g/^printf.*T_TOKCAT/d
+exec - g/^printf.*T_TOKEN/d
+exec - 0a
+exec - #include <stdio.h>
+exec - int
+exec - main(argc, argv)
+exec - int argc;
+exec - char** argv;
+exec - {
+exec - printf("%%token /*generated from ppkey.h*/");
+exec - .
+exec - $a
+exec - printf("\n");
+exec - return 0;
+exec - }
+exec - .
+exec - w
+exec - q
+exec - !
+exec - ${CC} -o ${COTEMP}.exe 1.${COTEMP}.c
+exec - ./${COTEMP}.exe > ppkey.yacc
+exec - rm -f 1.${COTEMP}.c ${COTEMP}.exe
+done ppkey.yacc generated
+exec - test '' = 'ppkey.yacc' || ${STDCMP} 2>/dev/null -s ppkey.yacc ${PACKAGE_ast_INCLUDE}/ppkey.yacc || { ${STDMV} ${PACKAGE_ast_INCLUDE}/ppkey.yacc ${PACKAGE_ast_INCLUDE}/ppkey.yacc.old 2>/dev/null || true; ${STDCP} ppkey.yacc ${PACKAGE_ast_INCLUDE}/ppkey.yacc ;}
+done ${PACKAGE_ast_INCLUDE}/ppkey.yacc generated
+make ${INSTALLROOT}/lib/probe/C/pp
+exec - if silent test ! -d ${INSTALLROOT}/lib/probe/C/pp
+exec - then mkdir -p ${INSTALLROOT}/lib/probe/C/pp
+exec - fi
+done ${INSTALLROOT}/lib/probe/C/pp generated
+make ${INSTALLROOT}/lib/probe/C/pp/probe
+prev ${INSTALLROOT}/lib/probe/C/pp
+make probe
+meta probe %.sh>% probe.sh probe
+make probe.sh
+make ${INSTALLROOT}/lib/probe/C/probe
+done ${INSTALLROOT}/lib/probe/C/probe
+make pp.probe
+done pp.probe
+exec - cat ${INSTALLROOT}/lib/probe/C/probe pp.probe > probe.sh
+done probe.sh generated
+exec - case static,port:$OPTIND:$RANDOM in
+exec - ?*:*:*|*::*|*:*:$RANDOM)
+exec - ;;
+exec - *) if ENV= LC_ALL=C x= $SHELL -nc '[[ a || b ]] && : ${list[level]}  !(pattern)' 2>/dev/null
+exec - then if grep '### .*archaic.* ###' >/dev/null
+exec - then : probe contains archaic constructs :
+exec - else ENV= LC_ALL=C $SHELL -n probe.sh
+exec - fi
+exec - fi
+exec - ;;
+exec - esac
+exec - case '${mam_cc_SHELLMAGIC}' in
+exec - "") case 0 in
+exec - 0) cp probe.sh probe
+exec - ;;
+exec - *) {
+exec - i=`(read x; echo $x) < probe.sh`
+exec - case $i in
+exec - '#!'*|*'||'*|':'*|'":"'*|"':'"*) echo "$i" ;;
+exec - esac
+exec - cat - probe.sh <<'!'
+exec -
+exec - !
+exec - } > probe
+exec - ;;
+exec - esac
+exec - ;;
+exec - *) cat - probe.sh > probe <<'!'
+exec - ${mam_cc_SHELLMAGIC}
+exec -
+exec - !
+exec - ;;
+exec - esac
+exec - silent test -w probe -a -x probe || chmod u+w,+x probe
+done probe generated
+exec - test '' = 'probe' || ${STDCMP} 2>/dev/null -s probe ${INSTALLROOT}/lib/probe/C/pp/probe || { ${STDMV} ${INSTALLROOT}/lib/probe/C/pp/probe ${INSTALLROOT}/lib/probe/C/pp/probe.old 2>/dev/null || true; ${STDCP} probe ${INSTALLROOT}/lib/probe/C/pp/probe ;}
+done ${INSTALLROOT}/lib/probe/C/pp/probe generated
+make ${INSTALLROOT}/lib/probe/C/pp/pp.def
+make pp.def
+done pp.def
+exec - test '' = 'pp.def' || ${STDCMP} 2>/dev/null -s pp.def ${INSTALLROOT}/lib/probe/C/pp/pp.def || { ${STDMV} ${INSTALLROOT}/lib/probe/C/pp/pp.def ${INSTALLROOT}/lib/probe/C/pp/pp.def.old 2>/dev/null || true; ${STDCP} pp.def ${INSTALLROOT}/lib/probe/C/pp/pp.def ;}
+done ${INSTALLROOT}/lib/probe/C/pp/pp.def generated
+make ${INSTALLROOT}/lib/probe/C/pp/pp.key
+make pp.key
+done pp.key
+exec - test '' = 'pp.key' || ${STDCMP} 2>/dev/null -s pp.key ${INSTALLROOT}/lib/probe/C/pp/pp.key || { ${STDMV} ${INSTALLROOT}/lib/probe/C/pp/pp.key ${INSTALLROOT}/lib/probe/C/pp/pp.key.old 2>/dev/null || true; ${STDCP} pp.key ${INSTALLROOT}/lib/probe/C/pp/pp.key ;}
+done ${INSTALLROOT}/lib/probe/C/pp/pp.key generated
+make ${INSTALLROOT}/lib/probe/C/pp/ppsym
+prev ppsym
+exec - test '' = 'ppsym' || ${STDCMP} 2>/dev/null -s ppsym ${INSTALLROOT}/lib/probe/C/pp/ppsym || { ${STDMV} ${INSTALLROOT}/lib/probe/C/pp/ppsym ${INSTALLROOT}/lib/probe/C/pp/ppsym.old 2>/dev/null || true; ${STDCP} ppsym ${INSTALLROOT}/lib/probe/C/pp/ppsym ;}
+done ${INSTALLROOT}/lib/probe/C/pp/ppsym generated
+make ${INSTALLROOT}/lib/probe/C/pp/probe.ini
+make probe.ini
+make probe.win32
+done probe.win32
+exec - t=${mam_cc_HOSTTYPE}
+exec - ifs=$IFS
+exec - IFS=.
+exec - set x $t
+exec - IFS=$ifs
+exec - t=$2
+exec - set x probe.win32
+exec - while :
+exec - do shift
+exec - case $# in
+exec - 0) break ;;
+exec - esac
+exec - case $1 in
+exec - *probe.$t)
+exec - break
+exec - esac
+exec - done
+exec - case $1 in
+exec - ?*) cmp -s $1 probe.ini || cp $1 probe.ini ;;
+exec - *) : > probe.ini
+exec - esac
+done probe.ini generated
+exec - test '' = 'probe.ini' || ${STDCMP} 2>/dev/null -s probe.ini ${INSTALLROOT}/lib/probe/C/pp/probe.ini || { ${STDMV} ${INSTALLROOT}/lib/probe/C/pp/probe.ini ${INSTALLROOT}/lib/probe/C/pp/probe.ini.old 2>/dev/null || true; ${STDCP} probe.ini ${INSTALLROOT}/lib/probe/C/pp/probe.ini ;}
+done ${INSTALLROOT}/lib/probe/C/pp/probe.ini generated
+done install virtual
+make test
+done test dontcare virtual

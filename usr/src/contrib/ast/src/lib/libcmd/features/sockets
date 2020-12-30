@@ -1,0 +1,3 @@
+sys	socket
+hdr	arpa.inet,netinet.in
+lib	getsockname,getsockopt,inet_ntoa

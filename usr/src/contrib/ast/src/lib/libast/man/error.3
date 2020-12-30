@@ -1,0 +1,283 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH ERROR 3
+.SH NAME
+error \- error and debug trace message formatter
+.SH SYNOPSIS
+.EX
+#include <error.h>
+
+Error_info_t error_info;
+
+void         error(int \fIlevel\fP, ...);
+void         errorv(const char* \fIlibrary\fP, int \fIlevel\fP, va_alist \fIargs\fP);
+void         liberror(const char* \fIlibrary\fP, int \fIlevel\fP, ...);
+
+#include <debug.h>
+
+debug(\fIstatement\fP)
+message((int \fIlevel\fP, ...))
+libmessage((const char* \fIlibrary\fI, int \fIlevel\fP, ...))
+.EE
+.SH DESCRIPTION
+.L error
+is the error and debug trace message formatter.
+.I level
+is the severity level.
+Messages with
+.I "level < error_info.trace"
+are suppressed.
+.I error_info.trace
+is initially
+.LR 0 .
+The remaining arguments are passed on to
+.LR printf .
+A
+.I newline
+is appended to the message text, so none should appear in the
+.L printf
+format.
+If 
+.I error_info.id
+is not
+.L 0
+then messages with
+.I "level > 0"
+are prefixed by
+.IR error_info.id: .
+.PP
+Before the message text is output to standard error
+it is passed to the function
+.LR "char* ERROR_translate(const char* \fItext\fP, int \fIflag\fP)" .
+By default
+.L ERROR_translate
+returns the
+.L text
+argument, but on some systems it may do language translation via lookup
+on the original source text.
+.RL ( error
+calls 
+.L ERROR_translate
+with a 0
+.L flag
+argument).
+.PP
+.I level
+may be one of:
+.TP
+.B <0
+Negative values are for debug tracing.
+Debug messages are prefixed with
+.BI debug level.
+If
+.I "errno != error_info.last_errno"
+then 
+.I error_info.last_errno
+is set to
+.I errno
+and the error text for errno is appended to the message.
+.TP
+.B "ERROR_INFO [0]"
+Information only; no prefixes are added to the message.
+.TP
+.B "ERROR_WARNING [1]"
+.L "warning:"
+is added after
+.L error_info.id
+and
+.I error_info.warnings
+is incremented.
+.TP
+.I "ERROR_ERROR [2]"
+(soft error)
+.I error_info.errors
+is incremented.
+.TP
+.B ">= ERROR_FATAL [3]"
+(hard error)
+.I error_info.errors
+is incremented and
+.L exit(\fIlevel\fP\-2)
+is called after the message is emitted.
+.TP
+.B "ERROR_PANIC [77]"
+(unrecoverable internal error)
+.L "panic:"
+is added after
+.IR error_info.id .
+.PP
+The following may be inclusive-or'd into
+.I level
+for alternate behavior:
+.TP
+.L ERROR_SYSTEM
+The error text for
+.I errno
+is appended to the message.
+.TP
+.L ERROR_OUTPUT
+The next argument is the file descriptor where the error message
+should be emitted.
+.TP
+.L ERROR_SOURCE
+Then next two arguments are a file name and line number that are added
+to the message after
+.IR error_info.id .
+.TP
+.L ERROR_USAGE
+A usage message is emitted.
+.TP
+.L ERROR_PROMPT
+The trailing 
+.I newline
+is suppressed.
+.TP
+.L ERROR_NOID
+The
+.I error_info.id
+prefix is suppressed.
+.TP
+.L ERROR_LIBRARY
+The message is from a library routine.
+.SH ENVIRONMENT
+The elements of the global struct
+.I error_info
+control error output and actions.
+Parts of 
+.I error_info
+can be initialized from the
+.L ERROR_OPTIONS
+environment variable.
+.L ERROR_OPTIONS
+contains space separated
+.IR name [ =value ]
+options, described below.
+.TP
+.I "int core"
+If
+.I "error_info.core != 0"
+then 
+.I "level >= error_info.core"
+generates a core dump.
+Initialized by
+.EX
+ERROR_OPTIONS="core=\fIlevel\fP"
+.EE
+where 
+.I level
+can be a number or one of
+.LR error ,
+.LR fatal ,
+or
+.LR panic .
+.I error_info.core
+is a handy way to get a stack trace at the exact point of error.
+.TP
+.I "int error_info.trace"
+If
+.I "error_info.trace != 0"
+and
+.I "level < error_info.trace"
+then the error message text is suppressed.
+.L exit()
+may still be called if appropriate for
+.IR level .
+Initialized by
+.EX
+ERROR_OPTIONS="trace=\fIlevel\fP"
+.EE
+where
+.I error_info.trace
+is set to the negative of
+.IR level .
+.PP
+Library error messages, suppressed by default, are enabled by
+.EX
+ERROR_OPTIONS="library"
+.EE
+The system
+.I errno
+message text can be forced for each message by
+.EX
+ERROR_OPTIONS="system"
+.EE
+.SH "EXTENDED DESCRIPTION"
+.L "<debug.h>"
+provides debugging message macros when
+.L DEBUG
+or
+.L _TRACE_
+are defined
+.RL ( _TRACE_
+is defined by
+.I makerules
+when 
+.L CCFLAGS
+contains
+.LR \-g ).
+All of the macros expand to nothing when both
+.L DEBUG
+and
+.L _TRACE_
+are not defined.
+Otherwise
+.L debug
+expands its arg and
+.L libmessage
+and
+.L message
+call
+.L liberror
+and 
+.L error
+respectively if
+.IR "error_info.trace<0" .
+Notice that
+.L libmessage
+and
+.L message
+are macro hacks that require double parentheses ((...)) around the
+arguments.
+.SH EXAMPLE
+To enable debugging message level -3, library messages, and system
+.I errno
+text for all commands:
+.EX
+export ERROR_OPTIONS="trace=3 library system"
+.EE

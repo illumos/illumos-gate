@@ -1,0 +1,601 @@
+#
+# posix { getconf limits } macro table
+#
+# @(#)conf.tab (AT&T Research) 2010-06-28
+#
+# name standard section call flags [ header ... ] [ value ... ]
+#
+# name:		sans prefix
+# standard:	AST, C, POSIX, SVID, XOPEN, <vendor> { SCO, SGI, SUN, ... }
+# section:	section number in standard
+# call:		CS=confstr PC=pathconf SC=sysconf SI=sysinfo QQ=query XX=none
+# flags:	0	no flags
+#		C	defer call to native getconf(1)
+#		D	defer minmax to native getconf(1)
+#		F	unistd.h feature
+#		L	limits.h constant
+#		M	has _<standard><section>_<name> minmax value
+#		N	_<call>_<name>
+#		O	use original name and definition
+#		R	_<standard>_<call>_<section>_<name>
+#		S	_<call>_<standard><section>_<name>
+#		U	<standard><section>_<name> prefixed by underscore
+#		V	_ prefix not allowed
+#		W	standard required
+#		X	define even if native is dynamic (ast special)
+#
+# default names if <section> <= 1
+#
+#	_<call>_<name>
+#	<standard>_<name>
+#
+# default names if <section> > 1
+#
+#	_<call>_<section>_<name>
+#	<standard><section>_<name>
+#
+# the [NSU] flags modify the default names
+#
+
+ABI_AIO_XFER_MAX		C	QQ 1 L
+ABI_ASYNCHRONOUS_IO		C	QQ 1 L
+ABI_ASYNC_IO			C	QQ 1 L
+ADVISORY_INFO			POSIX	SC 1 FUW
+AIO_LISTIO_MAX			POSIX	SC 1 LMU	2
+AIO_MAX				POSIX	SC 1 LMU	1
+AIO_PRIO_DELTA_MAX		POSIX	SC 1 LMU
+ALLOC_SIZE_MIN			POSIX	PC 1 LUVW
+ARCHITECTURE			SVID	SI 1 O
+ARG_MAX				POSIX	SC 1 CDLMUX	NCARGS 4096
+ASYNCHRONOUS_IO			POSIX	SC 1 CDFUW
+ASYNC_IO			POSIX	PC 1 FUW
+ATEXIT_MAX			XOPEN	SC 1 LMU	32
+AUDIT				C	QQ 1 L
+AVAIL_PROCESSORS		C	QQ 1 L
+AVPHYS_PAGES			SUN	SC 1 0
+BARRIERS			POSIX	SC 1 FUW
+BC_BASE_MAX			POSIX	SC 2 LMN	99
+BC_DIM_MAX			POSIX	SC 2 LMN	2048
+BC_SCALE_MAX			POSIX	SC 2 LMN	99
+BC_STRING_MAX			POSIX	SC 2 LMN	1000
+BUSTYPES			SVID	SI 1 O
+CHARCLASS_NAME_MAX		XOPEN	XX 1 L		14
+CHAR_BIT			C	XX 1 L		8
+CHAR_MAX			C	XX 1 L
+CHAR_MIN			C	XX 1 L
+CHAR_TERM			POSIX	SC 2 FUW
+CHILD_MAX			POSIX	SC 1 CDLMUX	6	cc{
+	#if _lib_fork
+	#define child()		fork()
+	#else
+	#ifdef	_map_spawnve
+	#define spawnve		_map_spawnve
+	#endif
+	extern int		spawnve(const char*, char* const[], char* const[]);
+	static char*		cmd[] = { "/bin/echo", 0 };
+	#define child()		spawnve(cmd[0],cmd,(char**)0)
+	#endif
+	int main()
+	{
+		int	i;
+		int	n;
+		for (i = 3; i < 512 && (n = child()) >= 0; i++)
+			if (!n) _exit(0);
+		while (wait((int*)0) > 0);
+		for (n = 8; n < i; n <<= 1);
+		printf("%d", n);
+		return 0;
+	}
+}
+CHOWN_RESTRICTED		POSIX	PC 1 FUW
+CKPT				POSIX	SC 1 FU
+CLK_TCK				POSIX	SC 1 L		HZ 60
+CLOCKRES_MIN			POSIX	SC 1 MUW	1
+CLOCKS_PER_SEC			C	QQ 1 L
+CLOCK_SELECTION			POSIX	SC 1 FUVW
+COLL_WEIGHTS_MAX		POSIX	SC 2 DLMN	2
+CPUTIME				POSIX	SC 1 FUW
+CPU_KEYBITS1			C	QQ 1 L
+CPU_VERSION			C	QQ 1 L
+CRYPT				XOPEN	SC 1 FSUW
+C_BIND				POSIX	SC 2 CFU
+C_DEV				POSIX	SC 2 CFU
+C_VERSION			POSIX	SC 2 CDFU
+DATAKEYS_MAX			C	QQ 1 0
+DELAYTIMER_MAX			POSIX	SC 1 LMU	32
+ENH_I18N			XOPEN	SC 1 FSUW
+EQUIV_CLASS_MAX			C	QQ 1 L
+EXEC_INTERPRETER_LENGTH		C	QQ 1 L
+EXPR_NEST_MAX			POSIX	SC 2 LMN	32
+FCHR_MAX			SVID	SC 1 LMU	LONG_MAX 2147483647
+FILESIZEBITS			POSIX	PC 1 LMU	(8*sizeof(off_t)) 32
+FILE_LOCKING			POSIX	SC 1 FU
+FORT_DEV			POSIX	SC 2 CFUW
+FORT_RUN			POSIX	SC 2 CFUW
+FSYNC				POSIX	SC 1 CDFUW	_lib_fsync
+GETGR_R_SIZE_MAX		C	QQ 1 L
+GETPW_R_SIZE_MAX		C	QQ 1 L
+HOSTID				C	QQ 1 L
+HOSTNAME			SVID	SI 1 O
+HOST_NAME_MAX			POSIX	SC 1 LMU	255
+HW_PROVIDER			SVID	SI 1 O
+HW_SERIAL			C	QQ 1 L
+ILP32_OFF32			XBS5	SC 1 FU
+ILP32_OFF32_CFLAGS		XBS5	CS 1 FU
+ILP32_OFF32_LDFLAGS		XBS5	CS 1 FU
+ILP32_OFF32_LIBS		XBS5	CS 1 FU
+ILP32_OFF32_LINTFLAGS		XBS5	CS 1 FU
+ILP32_OFFBIG			XBS5	SC 1 FU
+ILP32_OFFBIG_CFLAGS		XBS5	CS 1 FU
+ILP32_OFFBIG_LDFLAGS		XBS5	CS 1 FU
+ILP32_OFFBIG_LIBS		XBS5	CS 1 FU
+ILP32_OFFBIG_LINTFLAGS		XBS5	CS 1 FU
+INITTAB_NAME			SVID	SI 1 O
+INT_MAX				C	XX 1 L		32767
+INT_MIN				C	XX 1 L		-32767
+IOV_MAX				XOPEN	SC 1 LMU	16
+IO_TYPE				C	QQ 1 L
+IPV6				POSIX	SC 1 FUW
+IP_SECOPTS			C	QQ 1 L
+JOB_CONTROL			POSIX	SC 1 FUW	cc{
+	#include "FEATURE/wait"
+	#if _ok_wif
+	int main()
+	{
+		printf("1");
+		return 0;
+	}
+	#endif
+}
+KERNEL_CLIST			SCO	SC 1 0
+KERNEL_CLIST_MAX		SCO	SC 1 0
+KERNEL_DISK			SCO	SC 1 0
+KERNEL_DISK_MAX			SCO	SC 1 0
+KERNEL_DMABUF			SCO	SC 1 0
+KERNEL_DMABUF_MAX		SCO	SC 1 0
+KERNEL_FILE			SCO	SC 1 0
+KERNEL_FILE_MAX			SCO	SC 1 0
+KERNEL_FLCKREC			SCO	SC 1 0
+KERNEL_FLCKREC_MAX		SCO	SC 1 0
+KERNEL_INODE			SCO	SC 1 0
+KERNEL_INODE_MAX		SCO	SC 1 0
+KERNEL_MOUNT			SCO	SC 1 0
+KERNEL_MOUNT_MAX		SCO	SC 1 0
+KERNEL_PINODE			SCO	SC 1 0
+KERNEL_PINODE_MAX		SCO	SC 1 0
+KERNEL_PROC			SCO	SC 1 0
+KERNEL_PROC_MAX			SCO	SC 1 0
+KERNEL_REGION			SCO	SC 1 0
+KERNEL_REGION_MAX		SCO	SC 1 0
+KERNEL_S5INODE			SCO	SC 1 0
+KERNEL_S5INODE_MAX		SCO	SC 1 0
+KERNEL_STAMP			SVID	SI 1 O
+KERN_POINTERS			C	QQ 1 L
+KERN_SIM			C	QQ 1 L
+LEGACY				XOPEN	SC 1 FU
+LFS_CFLAGS			POSIX	CS 1 MU		cc{ -D_LARGEFILE_SOURCE "-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64" -D_LARGEFILE64_SOURCE -64
+	#include <sys/types.h>
+	int
+	main()
+	{
+		if (sizeof(off_t) >= sizeof(off_64_t))
+		{
+			printf("-");
+			return 0;
+		}
+		return 1;
+	}
+}
+LFS64_CFLAGS			POSIX	CS 1 MU		: LFS_CFLAGS
+LFS64_LDFLAGS			POSIX	CS 1 MU		: LFS_CFLAGS
+LFS64_LIBS			POSIX	CS 1 MU
+LFS64_LINTFLAGS			POSIX	CS 1 MU		: LFS_CFLAGS
+LFS_LDFLAGS			POSIX	CS 1 MU		: LFS_CFLAGS
+LFS_LIBS			POSIX	CS 1 MU
+LFS_LINTFLAGS			POSIX	CS 1 MU		: LFS_CFLAGS
+LINE_MAX			POSIX	SC 2 LMN	2048
+LINK_MAX			POSIX	PC 1 LMU	MAXLINK SHRT_MAX 8
+LLONG_MAX			C	XX 1 L
+LLONG_MIN			C	XX 1 L
+LOCALEDEF			POSIX	SC 1 FUW
+LOCALEDEF			POSIX	SC 2 CFUW
+LOGIN_NAME_MAX			POSIX	SC 1 LMU
+LOGNAME_MAX			SVID	SC 1 MU		8
+LONG_BIT			XOPEN	XX 1 L		(8*sizeof(long)) 32
+LONG_MAX			C	XX 1 L		2147483647
+LONG_MIN			C	XX 1 L		-2147483647
+LP64_OFF64			XBS5	SC 1 FU
+LP64_OFF64_CFLAGS		XBS5	CS 1 FU
+LP64_OFF64_LDFLAGS		XBS5	CS 1 FU
+LP64_OFF64_LIBS			XBS5	CS 1 FU
+LP64_OFF64_LINTFLAGS		XBS5	CS 1 FU
+LPBIG_OFFBIG			XBS5	SC 1 FU
+LPBIG_OFFBIG_CFLAGS		XBS5	CS 1 FU
+LPBIG_OFFBIG_LDFLAGS		XBS5	CS 1 FU
+LPBIG_OFFBIG_LIBS		XBS5	CS 1 FU
+LPBIG_OFFBIG_LINTFLAGS		XBS5	CS 1 FU
+MACHINE				SVID	SI 1 O
+MAPPED_FILES			POSIX	SC 1 CDFUW	_lib_mmap
+MAX_CANON			POSIX	PC 1 LMU	CANBSIZ 255
+MAX_INPUT			POSIX	PC 1 LMU	MAX_CANON 255	
+MB_LEN_MAX			C	XX 1 L		1
+MCAS_OFFSET			C	QQ 1 L
+MEMLOCK				POSIX	SC 1 CDFUW
+MEMLOCK_RANGE			POSIX	SC 1 CDFUW
+MEMORY_PROTECTION		POSIX	SC 1 CDFUW
+MESSAGE_PASSING			POSIX	SC 1 CDFUW
+MMAP_FIXED_ALIGNMENT		C	QQ 1 L		_AST_PAGESIZE
+MONOTONIC_CLOCK			POSIX	SC 1 FUW
+MQ_OPEN_MAX			POSIX	SC 1 LMU	8
+MQ_PRIO_MAX			POSIX	SC 1 LMU	32
+MSEM_LOCKID			C	QQ 1 L
+MULTI_PROCESS			POSIX	SC 1 FU
+NACLS_MAX			SVID	SC 1 0
+NAME_MAX			POSIX	PC 1 LMU	14	cc{
+	int main()
+	{
+	#ifdef MAXNAMLEN
+		printf("%d", MAXNAMLEN);
+	#else
+	#if !defined(remove) && (!_lib_remove || _lib_unlink)
+	#define remove		unlink
+	#endif
+		int	i;
+		int	n;
+		int	v;
+		char	name[256];
+		for (i = 0; i < sizeof(name); i++)
+			name[i] = 'F';
+		name[8] = '.';
+		name[sizeof(name) - 1] = 0;
+		if ((n = creat(name, 0666)) >= 0)
+		{
+			close(n);
+			for (v = 12; v < sizeof(name); v++)
+			{
+				name[v] = 0;
+				if (remove(name) >= 0) break;
+				name[v] = 'F';
+			}
+		}
+		else for (v = 12; v < sizeof(name); v++)
+		{
+			name[v] = 0;
+			if ((n = creat(name, 0666)) >= 0)
+			{
+				close(n);
+				remove(name);
+				name[v] = 'F';
+			}
+			else
+			{
+				v--;
+				break;
+			}
+		}
+		printf("%d", v);
+		return 0;
+	}
+	#endif
+}
+NGROUPS_MAX			POSIX	SC 1 CDLMU	8	cc{
+	#if _lib_getgroups
+	int main()
+	{
+		int	n;
+		gid_t	g;
+		if ((n = getgroups(0, &g)) < 0)
+	#if defined(NGROUPS) && (NGROUPS-0) > 0
+			n = NGROUPS;
+	#else
+			return 1;
+	#endif
+		printf("%d", n);
+		return 0;
+	}
+	#endif
+}
+NL_ARGMAX			XOPEN	XX 1 L		9
+NL_LANGMAX			XOPEN	XX 1 L		14
+NL_MAX				C	QQ 1 L
+NL_MSGMAX			XOPEN	XX 1 L		32767
+NL_NMAX				XOPEN	XX 1 L		1
+NL_SETMAX			XOPEN	XX 1 L		255
+NL_SPECMAX			C	QQ 1 L
+NL_TEXTMAX			XOPEN	XX 1 L		LINE_MAX
+NO_TRUNC			POSIX	PC 1 FUW
+NPROCESSORS_CONF		SVID	SC 1 0
+NPROCESSORS_MAX			SVID	SC 1 0
+NPROCESSORS_ONLN		SVID	SC 1 0
+NPROC_CONF			C	QQ 1 L
+NPROC_ONLN			C	QQ 1 L
+NSS_BUFLEN_GROUP		C	QQ 1 L
+NSS_BUFLEN_PASSWD		C	QQ 1 L
+NUM_PROCESSORS			C	QQ 1 L
+NZERO				XOPEN	XX 1 L		20
+OPEN_MAX			POSIX	SC 1 CDLMUX	16	cc{
+	#if _lib_getdtablesize
+	extern int		getdtablesize(void);
+	int main()
+	{
+		printf("%d", getdtablesize());
+		return 0;
+	}
+	#else
+	int main()
+	{
+		int	i;
+		int	n;
+		int	v;
+		n = 0;
+		v = 2;
+		while ((i = dup(0)) >= 0)
+		{
+			if (!n) n = i;
+			if (i > v) v = i;
+		}
+		while (n <= v) close(n++);
+		printf("%d", v);
+		return 0;
+	}
+	#endif
+}
+OPEN_MAX_CEIL			AST	XX 1 L		OPEN_MAX
+OSREL_MAJ			C	QQ 1 L
+OSREL_MIN			C	QQ 1 L
+OSREL_PATCH			C	QQ 1 L
+OS_BASE				SVID	SI 1 O
+OS_PROVIDER			SVID	SI 1 O
+OS_VERSION			AES	SC 1 FSU
+PAGESIZE			POSIX	SC 1 MU		PAGESIZE PAGE_SIZE 4096	cc{
+	int main()
+	{
+	#if _WIN32
+		printf("%ld", 64*1024L);
+		return 0;
+	#else
+	#if _lib_getpagesize
+	#if _npt_getpagesize
+	extern size_t		getpagesize(void);
+	#endif
+		printf("%d", getpagesize());
+		return 0;
+	#endif
+	#else
+		return 1;
+	#endif
+	}
+}
+PAGE_SIZE			POSIX	SC 1 MU		_AST_PAGESIZE
+PASS_MAX			SVID	SC 1 CDLMU	8
+PATH				POSIX	CS 1 CMU	"/bin:/usr/bin"
+PATH_MAX			POSIX	PC 1 CDLMUX	MAXPATHLEN 1024
+PBS				POSIX	SC 2 FUW
+PBS_ACCOUNTING			POSIX	SC 2 FUW
+PBS_CHECKPOINT			POSIX	SC 2 FUW
+PBS_LOCATE			POSIX	SC 2 FUW
+PBS_MESSAGE			POSIX	SC 2 FUW
+PBS_TRACK			POSIX	SC 2 FUW
+PHYS_PAGES			SUN	SC 1 0
+PID_MAX				SVID	SC 1 LMU	30000	cc{
+	int main()
+	{
+		long	v;
+		int	fd;
+		int	n;
+		char	buf[1024];
+#ifdef PID_MAX
+		v = PID_MAX;
+#else
+		v = 99999;
+#endif
+		if ((fd = open("/proc/sys/kernel/pid_max", 0)) >= 0 && (n = read(fd, buf, sizeof(buf)-1)) > 1)
+		{
+			buf[n] = 0;
+			v = strtol(buf, (char**)0, 0);
+		}
+		else
+		{
+#ifdef __sgi
+			v = 0x7fffffff;
+#endif
+		}
+		printf("%ld", v);
+		return 0;
+	}
+}
+PII				POSIX	SC 1 FU
+PII_INTERNET			POSIX	SC 1 FU
+PII_INTERNET_DGRAM		POSIX	SC 1 FU
+PII_INTERNET_STREAM		POSIX	SC 1 FU
+PII_OSI				POSIX	SC 1 FU
+PII_OSI_CLTS			POSIX	SC 1 FU
+PII_OSI_COTS			POSIX	SC 1 FU
+PII_OSI_M			POSIX	SC 1 FU
+PII_SOCKET			POSIX	SC 1 FU
+PII_XTI				POSIX	SC 1 FU
+PIPE_BUF			POSIX	PC 1 LMU	512
+POLL				POSIX	SC 1 FU
+PRIORITIZED_IO			POSIX	SC 1 FUW
+PRIORITY_SCHEDULING		POSIX	SC 1 CDFUW
+PRIO_IO				POSIX	PC 1 FUW
+PROC_RSRC_MGR			C	QQ 1 L
+PTHREAD_DESTRUCTOR_ITERATIONS	C	QQ 1 L
+PTHREAD_KEYS_MAX		C	QQ 1 L
+PTHREAD_STACK_MIN		C	QQ 1 L
+PTHREAD_THREADS_MAX		C	QQ 1 L
+PTRDIFF_MAX			C	XX 1 LMU	stdint.h 65535
+PTRDIFF_MIN			C	XX 1 LMU	stdint.h -65535
+RAW_SOCKETS			POSIX	SC 1 FUW
+READER_WRITER_LOCKS		POSIX	SC 1 FUW
+REALTIME			XOPEN	SC 1 FU
+REALTIME_SIGNALS		POSIX	SC 1 CDFUW
+REALTIME_THREADS		XOPEN	SC 1 FU
+REC_INCR_XFER_SIZE		POSIX	PC 1 LVW
+REC_MAX_XFER_SIZE		POSIX	PC 1 LVW
+REC_MIN_XFER_SIZE		POSIX	PC 1 LVW
+REC_XFER_ALIGN			POSIX	PC 1 LVW
+REENTRANT_FUNCTIONS		POSIX	SC 1 FU
+REGEXP				POSIX	SC 1 FUW
+REGEX_VERSION			POSIX	SC 1 F		20030916
+RELEASE				AST	XX 1 L
+RESOURCE_LIMITS			POSIX	SC 1 FU
+RE_DUP_MAX			POSIX	SC 2 LMN	255
+RTSIG_MAX			POSIX	SC 1 LMU	8
+SAVED_IDS			POSIX	SC 1 FUW	cc{
+	#if _lib_setuid && !_lib_setreuid
+	int main()
+	{
+		printf("1");
+		return 0;
+	}
+	#endif
+}
+SCHAR_MAX			C	XX 1 L		127
+SCHAR_MIN			C	XX 1 L		-127
+SECURITY_CLASS			C	QQ 1 L
+SELECT				POSIX	SC 1 FU
+SEMAPHORES			POSIX	SC 1 CDFUW
+SEM_NSEMS_MAX			POSIX	SC 1 LMU	256
+SEM_VALUE_MAX			POSIX	SC 1 LMU	32767
+SF_BUFSIZE			AST	XX 1 MUX	sh{
+	sed -e '/[ 	]*#[ 	]*define[ 	][ 	]*SF_BUFSIZE[ 	]/!d' -e 's/^[^0-9]*//' -e 's/[^0-9]*$//' $PACKAGEROOT/src/lib/libast/include/sfio.h
+}
+SH				AST	CS 1 MU		sh{
+	ifs=$IFS
+	IFS=:
+	set '' `$CONF_getconf PATH 2>/dev/null` /bin /usr/bin /sbin /usr/sbin
+	shift
+	path=$*
+	IFS=$ifs
+	for s in ksh ksh93 sh
+	do	for d in $path
+		do	if	test -x $d/$s
+			then	case $s in
+				ksh)	case `$d/$s '--?-author' 2>&1` in
+					*'David Korn'*) ;;
+					*)		continue ;;
+					esac
+					;;
+				esac
+				echo '"'$d/$s'"'
+				exit
+			fi
+		done
+	done
+	echo '"/bin/sh"'
+}
+SHARED_MEMORY_OBJECTS		POSIX	SC 1 CDFUW
+SHELL				POSIX	SC 1 FUVW
+SHM				XOPEN	SC 1 FSUW
+SHRT_MAX			C	XX 1 L		32767
+SHRT_MIN			C	XX 1 L		-32767
+SIG_ATOMIC_MAX			C	XX 1 L		signal.h
+SIG_ATOMIC_MIN			C	XX 1 L		signal.h
+SIGQUEUE_MAX			POSIX	SC 1 LMU	32
+SIGQUEUE_MAX			POSIX	SC 1 LMU	32
+SIGRT_MAX			SVID	SC 1 0
+SIGRT_MIN			SVID	SC 1 0
+SIZE_MAX			C	XX 1 LMX	stdint.h UINT_MAX 65535
+SLVM_MAXNODES			C	QQ 1 L
+SOCK_MAXBUF			C	QQ 1 0
+SOFTPOWER			C	QQ 1 L
+SPAWN				POSIX	SC 1 FUW
+SPIN_LOCKS			POSIX	SC 1 FUW
+SPORADIC_SERVER			POSIX	SC 1 FUW
+SRPC_DOMAIN			C	QQ 1 0
+SS_REPL_MAX			POSIX	SC 1 FUW
+SSIZE_MAX			POSIX	XX 1 LMUX	INT_MAX 32767
+STD_BLK				SVID	SC 1 LMU	1024
+STREAM_MAX			POSIX	SC 1 LMU	OPEN_MAX 8
+STREAMS				XOPEN	SC 1 FSUW
+SW_DEV				POSIX	SC 2 CFUW
+SYMLINK_MAX			POSIX	PC 1 LMU	255	cc{
+	int main()
+	{
+		printf("%d", PATH_MAX-1);
+		return 0;
+	}
+}
+SYMLINKS			POSIX	PC 2 FUW
+SYMLOOP_MAX			POSIX	SC 1 LMU	8
+SYNCHRONIZED_IO			POSIX	SC 1 CDFUW
+SYNC_IO				POSIX	PC 1 FUW
+SYSNAME				SVID	SI 1 O
+SYSPID_MAX			SVID	SC 1 LMU	2
+THREADS				POSIX	SC 1 CDFUW
+THREADS_PRIO_CEILING		POSIX	SC 1 FUW
+THREADS_PRIO_INHERIT		POSIX	SC 1 FUW
+THREAD_ATTR_STACKADDR		POSIX	SC 1 CDFUW
+THREAD_ATTR_STACKSIZE		POSIX	SC 1 CDFUW
+THREAD_CPUTIME			POSIX	SC 1 FUW
+THREAD_DESTRUCTOR_ITERATIONS	POSIX	SC 1 LMUW	PTHREAD_DESTRUCTOR_ITERATIONS 4
+THREAD_KEYS_MAX			POSIX	SC 1 LMUW	PTHREAD_KEYS_MAX 128
+THREAD_PRIORITY_SCHEDULING	POSIX	SC 1 CDFUW
+THREAD_PRIO_INHERIT		POSIX	SC 1 CDFUW
+THREAD_PRIO_PROTECT		POSIX	SC 1 CDFUW
+THREAD_PROCESS_SHARED		POSIX	SC 1 CDFUW
+THREAD_SAFE_FUNCTIONS		POSIX	SC 1 CDFUW
+THREAD_SPORADIC_SERVER		POSIX	SC 1 FUW
+THREAD_STACK_MIN		POSIX	SC 1 LUW	PTHREAD_STACK_MIN
+THREAD_THREADS_MAX		POSIX	SC 1 LMUW	PTHREAD_THREADS_MAX 64
+TIMEOUTS			POSIX	SC 1 FUW
+TIMERS				POSIX	SC 1 CDFUW
+TIMER_MAX			POSIX	SC 1 LMU	32
+TMP				AST	CS 1 MU		"/tmp"
+TMP_MAX				C	SC 1 LMU	10000
+TRACE				POSIX	SC 1 FUW
+TRACE_EVENT_FILTER		POSIX	SC 1 FUW
+TRACE_EVENT_NAME_MAX		POSIX	SC 1 FUVW
+TRACE_INHERIT			POSIX	SC 1 FUW
+TRACE_LOG			POSIX	SC 1 FUW
+TRACE_NAME_MAX			POSIX	SC 1 FUVW
+TRACE_SYS_MAX			POSIX	SC 1 FUVW
+TRACE_USER_EVENT_MAX		POSIX	SC 1 FUVW
+TTY_NAME_MAX			POSIX	SC 1 LMU	9
+TYPED_MEMORY_OBJECTS		POSIX	SC 1 FUW
+TZNAME_MAX			POSIX	SC 1 CDLMU	6
+T_IOV_MAX			C	QQ 1 0
+UCHAR_MAX			C	XX 1 L		255
+UCHAR_MIN			C	XX 1 L
+UID_MAX				SVID	SC 1 LMU	60002
+UINT_MAX			C	XX 1 L		65535
+UIO_MAXIOV			C	QQ 1 0
+ULLONG_MAX			C	XX 1 L
+ULONG_MAX			C	XX 1 L		4294967295
+UNIX				XOPEN	SC 1 FSUW
+UPE				POSIX	SC 2 CFUW
+USER_LIMIT			SVID	SI 1 O
+USHRT_MAX			C	XX 1 L		65535
+V6_ILP32_OFF32			POSIX	SC 1 W
+V6_ILP32_OFFBIG			POSIX	SC 1 W
+V6_LP64_OFF64			POSIX	SC 1 W
+V6_LPBIG_OFFBIG			POSIX	SC 1 W
+VDISABLE			POSIX	PC 1 FUW
+VERSION				POSIX	SC 1 CDFSU	200112
+VERSION				POSIX	SC 2 CDFSU	200112
+VERSION				XOPEN	SC 1 CDFSU	600
+VERSION				AST	XX 1 MS		_AST_VERSION
+VERSION				SVID	SI 1 S
+VERSION				XPG	SC 3 DFSU
+VERSION				XPG	SC 4 DFSU
+VERSION_88			C	XX 1 L
+VERSION_88			POSIX	SC 1 FSU
+VERSION_90			C	XX 1 L
+VERSION_90			POSIX	SC 1 FSU
+VERSION_93			C	XX 1 L
+VERSION_93			POSIX	SC 1 FSU
+WCHAR_MAX			C	XX 1 L		stddef.h
+WCHAR_MIN			C	XX 1 L		stddef.h
+WINT_MIN			C	XX 1 L		wchar.h
+WINT_MAX			C	XX 1 L		wchar.h
+WORD_BIT			XOPEN	XX 1 L		(8*sizeof(int))
+XCU_VERSION			XOPEN	SC 1 CDFSU
+XPG2				XOPEN	XX 1 FU
+XPG3				XOPEN	XX 1 FU
+XPG4				XOPEN	XX 1 FU
+
+# vendor prefixes
+
+VERSION				GNU		XX 1 S
+VERSION				TRUSTEDBSD	XX 1 S

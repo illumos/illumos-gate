@@ -1,0 +1,15 @@
+astsa implements a small subset of the ast library for other ast
+standalone commands and libraries using X/Open interfaces. 
+
+To get better performance and functionality, consider using any of
+the full-featured ast-* packages at
+
+	http://www.research.att.com/sw/download/
+
+astsa.omk is an old make makefile that builds the headers and objects
+and defines these variables for use in other makefiles
+
+	ASTSA_OPTIMIZE	``-O'' by default
+
+The astsa files may be combined in a single directory with other ast
+standalone packages.

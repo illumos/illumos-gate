@@ -1,0 +1,414 @@
+.fp 5 CW
+.TH SHELL 3 "28 Feb 2003" AST
+.SH NAME
+\fBshell\fR \- a \f5ksh\fP library interface
+.SH SYNOPSIS
+.ta .8i 1.6i 2.4i 3.2i 4.0i 4.8i 5.6i
+.SS "HEADERS/LIBRARIES"
+.nf
+.ft 5
+#include        <shell.h>
+libshell.a      -lshell
+.ft R
+.fi
+.SS "DATA TYPES"
+.nf
+.ft 5
+Shell_t;
+Shopt_t;
+Shscope_t;
+Shbltin_t;
+Shbltin_f;
+Shinit_f;
+Shwait_f;
+.ft R
+.fi
+.SS "FUNCTIONS"
+.nf
+.ft 5
+int	sh_main(int \fIargc\fP, char *\fIargv\fP[], Sh_init \fIfn\fP);
+Shell_t	*sh_init(int \fIargc\fP, char *\fIargv\fP[]);
+Shell_t	*sh_getinterp(void);
+
+Namval_t	*sh_addbuiltin(const char *\fIname\fP,Sh_bltin_f \fIfn\fP,void *\fIarg\fP);
+
+unsigned int	sh_isoption(int \fIoption\fP);
+unsigned int	sh_onoption(int \fIoption\fP);
+unsigned int	sh_offoption(int \fIoption\fP);
+
+void	*sh_parse(Shell_t *\fIshp\fP, Sfio_t *\fIsp\fP, int \fIflags\fP);
+int 	sh_trap(const char *\fIstring\fP, int \fImode\fP);
+int	sh_run(int \fIargc\fP, char *\fIargv\fP[]);
+int 	sh_eval(Sfio_t *\fIsp\fP,int \fImode\fP);
+int 	sh_fun(Namval_t *\fIfunnode\fP, Namval_t *\fIvarnode\fP, char *\fIargv\fP[]);
+int 	sh_funscope(int \fIargc\fP,char *\fIargv\fP[],int(*\fIfn\fP)(void*),void *\fIarg\fP,int \fIflags\fP);
+Shscope_t	*sh_getscope(int \fIindex\fP,int \fIwhence\fP);
+Shscope_t	*sh_setscope(Shscope_t *\fIscope\fP);
+
+int	(*sh_fdnotify(int(*\fIfn\fP)(int,int)))(int,int);
+char	*sh_fmtq(const char *\fIstring\fP);
+void	*sh_waitnotify(Shwait_f \fIfn\fP);
+void 	sh_delay(double \fIsec\fP);
+Sfio_t 	*sh_iogetiop(int  \fIfd\fP, int \fImode\fP);
+int	sh_sigcheck(void);
+.ft R
+.fi
+.SH DESCRIPTION
+The \fIShell\fP library is a set of functions used for
+writing extensions to \f5ksh\fP or writing commands
+that embed shell command processing.
+The include file \f5<shell.h>\fP contains the type definitions,
+function prototypes and symbolic constants defined by
+this interface.  It also defines replacement definitions for
+the standard library functions
+\f5access()\fP,
+\f5close()\fP,
+\f5dup()\fP,
+\f5exit()\fP,
+\f5fcntl()\fP,
+\f5lseek()\fP,
+\f5open()\fP,
+\f5pipe()\fP,
+\f5read()\fP,
+and
+\f5write()\fP
+that must be used
+with all code
+intended to be compiled as built-in commands.
+.P
+The \f5<shell.h>\fP header includes \f5<ast.h>\fP which
+in turn includes the standard include files, \f5<stddef.h>\fP,
+\f5<stdlib.h>\fP, \f5<stdarg.h>\fP, \f5<limits.h>\fP,
+\f5<stdio.h>\fP, \f5<string.h>\fP, \f5<unistd.h>\fP,
+\f5<sys/types.h>\fP, \f5<fcntl.h>\fP, and \f5<locale.h>\fP.
+The \f5<shell.h>\fP header also includes the headers
+\f5<cdt.h>\fP,
+\f5<cmd.h>\fP,
+\f5<sfio.h>\fP,
+\f5<nval.h>\fP,
+\f5<stk.h>\fP,
+and \f5<error.h>\fP
+so that in most cases, programs only require the single
+header \f5<shell.h>\fP.
+.PP
+Programs can use this library in one of the following ways:
+.PD 0
+.TP
+.B 1
+To write builtin commands and/or other code that will be loaded
+into the shell by loading dynamic libraries
+at run time using the \f5builtin\fP(1) command.
+In this case the shell will look for a function named \f5lib_init\fP
+in your library and, if found, will execute this function with
+two arguments.  The first
+argument will be an \f5int\fP with value \f50\fP when the library is loaded.
+The second argument will contain a pointer to a structure of type
+\f5Shbltin_t\fP.
+In addition, for each argument named on the \f5builtin\fP
+command line, it will look for a function named \f5b_\fP\fIname\fP\f5()\fP
+in your library and will \fIname\fP as a built-in.
+.TP
+.B 2
+To build separate a separate command that uses the shell as a
+library at compile or run time.
+In this case the \f5sh_init()\fP function must be called to
+initialize this library before any other commands in this library
+are invoked.
+The arguments \fIargc\fP and \fIargv\fP are the number
+of arguments and the vector of arguments as supplied by the shell.
+It returns a pointer the \f5Shell_t\fP.
+.TP
+.B 3
+To build a new version of \f5ksh\fP with extended capabilities,
+for example \f5tksh\fP(1).
+In this case, the user writes a \f5main()\fP function that
+calls \f5sh_main()\fP with the \fIargc\fP and \fIargv\fP arguments
+from \f5main\fP and pointer to function, \fIfn\fP as a third
+argument..  The function \fIfn\fP will
+be invoked with argument \f50\fP after \f5ksh\fP has done initialization,
+but before \f5ksh\fP has processed any start up files or executed
+any commands.  The function \fIfn\fP
+will be invoked with an argument of \f51\fP before \f5ksh\fP
+begins to execute a script that has been invoked by name
+since \f5ksh\fP cleans up memory and long jumps back to
+the beginning of the shell in this case.
+The function \fIfn\fP will be called with argument \f5-1\fP before
+the shell exits.
+.PD
+.PP
+The \f5Shell_t\fP structure contains the following fields:
+.nf
+.ft 5
+	Shopt_t	\fIoptions\fP;		\fR/* set -o options */\fP
+	Dt_t	*\fIvar_tree\fP;		\fR/* shell variable dictionary */\fP
+	Dt_t	*\fIfun_tree\fP;		\fR/* shell function dictionary */\fP
+	Dt_t	*\fIalias_tree\fP;		\fR/* shell alias dictionary */\fP
+	Dt_t	*\fIbltin_tree\fP;		\fR/* shell built-in dictionary */\fP
+	Shscope_t	*\fItopscope\fP;		\fR/* pointer to top-level scope */\fP
+	char	*\fIinfile_name\fP;	\fR/* path name of current input file*/\fP
+	int	\fIinlineno\fP;		\fR/* line number of current input file*/\fP
+	int	\fIexitval\fP;		\fR/* most recent exit value*/\fP
+.ft R
+.fi
+This structure is returned by \f5sh_init()\fP but can also be retrieved
+by a call to \f5sh_getinterp()\fP.
+.PP
+All built-in commands to the shell are invoked with
+three arguments.  The first two arguments give the
+number of arguments and the argument list
+and uses the same conventions as the \f5main()\fP function
+of a program.  The third argument is a pointer to a structure
+of type \f5Shbltin_t\fP.  This structure contains \f5shp\fP which is a pointer
+to the shell interpreter, and \f5ptr\fP which is a pointer that
+can be associated with each built-in.
+The \f5sh_addbuiltin()\fP function is used to add, replace or delete
+built-in commands. 
+It takes the name of the built-in, \fIname\fP, a pointer
+to the function that implements the built-in, \fIfn\fP, and
+a pointer that will be passed to the function in the \f5ptr\fP field when
+it is invoked.
+If, \fIfn\fP is non-\f5NULL\fP the built-in command
+is added or replaced.  Otherwise, \f5sh_addbuiltin()\fP will
+return a pointer to the built-in if it exists or \f5NULL\fP otherwise.
+If \fIarg\fP is \f5(void*)1\fP the built-in will be deleted.
+The \fIname\fP argument can be in the format of a pathname.
+It cannot be the name of any of the special built-in commands.
+If \fIname\fP contains a \f5/\fP, the built-in is the basename of
+the pathname and the built-in will only be executed
+if the given pathname is encountered when performing
+a path search.
+When adding or replacing a built-in,
+\f5sh_addbuiltin()\fP function returns a pointer to
+the name-value pair corresponding to the built-in on success and \f5NULL\fP
+if it is unable to add or replace the built-in.
+When deleting a built-in, \f5NULL\fP is returned on success or
+if not found, and the name-value pair pointer is returned if the built-in
+cannot be deleted.
+.PP
+The functions \f5sh_onoption()\fP, \f5sh_offoption()\fP, \f5sh_isoption()\fP
+are used to set, unset, and test for shell options respectively.
+The \fIoption\fP argument can be any one of the following:
+.IP
+\f5SH_ALLEXPORT\fP:
+The \f5NV_EXPORT\fP attribute is given to each variable whose
+name is an identifier when a value is assigned.
+.IP
+\f5SH_BGNICE\fP:
+Each background process is run at a lower priority.
+.IP
+\f5SH_ERREXIT\fP:
+Causes a non-interactive shell to exit when a command,
+other than a conditional command, returns non-zero.
+.IP
+\f5SH_EMACS\fP:
+The emacs editing mode.
+.IP
+\f5SH_GMACS\fP:
+Same as the emacs editing mode except for the behavior of CONTROL-T.
+.IP
+\f5SH_HISTORY\fP:
+Indicates that the history file has been created and that
+commands can be logged.
+.IP
+\f5SH_IGNOREEOF\fP:
+Do not treat end-of-file as exit.
+.IP
+\f5SH_INTERACTIVE\fP:
+.IP
+Set for interactive shells.
+Do not set or unset this option.
+\f5SH_MARKDIRS\fP:
+A \fB/\fP is added to the end of each directory generated by pathname
+expansion.
+.IP
+\f5SH_MONITOR\fP:
+Indicates that the monitor option is enabled for job control.
+.IP
+\f5SH_NOCLOBBER\fP:
+The \fB>\fP redirection will fail if the file exists.  Each file
+created with \fB>\fP will have the \f5O_EXCL\fP bit set as described
+in \f5<fcntl.h>\fP
+.IP
+\f5SH_NOGLOB\fP:
+Do not perform pathname expansion.
+.IP
+\f5SH_NOLOG\fP:
+Do not save function definitions in the history file.
+.IP
+\f5SH_NOTIFY\fP:
+Cause a message to be generated as soon as each background job completes.
+.IP
+\f5SH_NOUNSET\fP:
+Cause the shell to fail with an error of an unset variable is
+referenced.
+.IP
+\f5SH_PRIVILEGED\fP:
+.IP
+\f5SH_VERBOSE\fP:
+Cause each line to be echoed as it is read by the parser.
+.IP
+\f5SH_XTRACE\fP:
+Cause each command to be displayed after all expansions, but
+before execution.
+.IP
+\f5SH_VI\fP:
+The vi edit mode.
+.IP
+\f5SH_VIRAW\fP:
+Read character at a time rather than line at a time when
+in vi edit mode.
+.IP
+.PP
+The \f5sh_trap()\fP function can be used to compile and execute
+a string or file.
+A value of \f50\fP for \fImode\fP indicates that \fIname\fP
+refers to a string.  A value of \f51\fP for \fImode\fP
+indicates that \fIname\fP is an \f5Sfio_t*\fP to an open stream.
+A value of \f52\fP for \fImode\fP indicates that \fIname\fP
+points to a parse tree that has been returned by \f5sh_parse()\fP.
+The complete file associated with the string or file
+is compiled and then executed so that aliases defined
+within the string or file will not take effect until
+the next command is executed.
+.PP
+The \f5sh_run()\fP function will run the command given by
+by the argument list \fIargv\fP containing \fIargc\fP elements. 
+If \fIargv\fP\f5[0]\fP does not contain a \f5/\fP, it will
+be checked to see if it is a built-in or function before
+performing a path search. 
+.PP
+The \f5sh_eval()\fP function executes a string or file
+stream \fIsp\fP.
+If \fImode\fP is non-zero and the history file has
+been created, the stream defined by \fIsp\fP
+will be appended to the history file as a command.
+.PP
+The \f5sh_parse()\fP function takes a pointer to the
+shell interpreter \fIshp\fP, a pointer to a string or file stream
+\fIsp\fP, and compilation flags, and returns a pointer
+to a parse tree of the compiled stream.  This pointer can
+be used in subsequent calls to \f5sh_trap()\fP.
+The compilation flags can be zero or more of the following:
+.IP
+\f5SH_NL\fP:
+Treat new-lines as \fB;\fP.
+.IP
+\f5SH_EOF\fP:
+An end of file causes syntax error.  By default it will
+be treated as a new-line.
+.PP
+\f5ksh\fP executes each function defined with the \f5function\fP
+reserved word in a separate scope.  The \f5Shscope_t\fP type
+provides an interface to some of the information that
+is available on each scope.  The structure contains
+the following public members:
+.nf
+      \f5Sh_scope_t      *par_scope;\fP
+      \f5int             argc;\fP
+      \f5char            **argv;\fP
+      \f5char            *cmdname;\fP
+      \f5Dt_t      	 *var_tree;\fP
+.fi
+The \f5sh_getscope()\fP function can be used to the the
+scope information associated with existing scope.
+Scopes are numbered from \f50\fP for the global scope
+up to the current scope level.  The \fIwhence\fP
+argument uses the symbolic constants associated with \f5lseek()\fP
+to indicate whether the \f5Iscope\fP argument is absolute,
+relative to the current scope, or relative to the topmost scope.
+The\f5sh_setscope()\fP function can be used to make a
+a known scope the current scope.  It returns a pointer to the
+old current scope.
+.PP
+The \f5sh_funscope()\fP function can be used to run a function
+in a new scope.  The arguments \fIargc\fP and \fIargv\fP
+are the number of arguments and the list of arguments
+respectively.  If \fIfn\fP is non-\f5NULL\fP, then
+this function is invoked with \fIargc\fP, \fIargv\fP, and \fIarg\fP
+as arguments.
+.PP
+The \f5sh_fun()\fP function can be called within a
+discipline function or built-in extension to execute a
+discipline function script. 
+The argument \fIfunnode\fP is a pointer to the shell function
+or built-in to execute.
+The argument \fIvarnode\fP is a pointer to the name
+value pair that has defined this discipline.
+The array \fIargv\fP is a \f5NULL\fP terminated list of
+arguments that are passed to the function. 
+.PP
+By default, \f5ksh\fP only records but does not act
+on signals when running a built-in command.
+If a built-in takes a substantial amount of time
+to execute, then it should check for interrupts
+periodically by calling \f5sh_sigcheck()\fP.
+If a signal is pending, \f5sh_sigcheck()\fP will exit
+the function you are calling and return to the point
+where the most recent built-in was invoked, or where
+\f5sh_eval()\fP or \f5sh_trap()\fP was called.
+.PP
+The \f5sh_delay()\fP function is used to cause the
+shell to sleep for a period of time defined by \fIsec\fP.
+.PP
+The \f5sh_fmtq()\fP function can be used to convert a string
+into a string that is quoted so that it can be reinput
+to the shell. The quoted string returned by \f5sh_fmtq\fP
+may be returned on the current stack, so that it
+must be saved or copied.
+.PP
+The \f5sh_fdnotify()\fP function causes the function \fIfn\fP
+to be called whenever the shell duplicates or closes a file.
+It is provided for extensions that need to keep track of
+file descriptors that could be changed by shell commands.
+The function \fIfn\fP is called with two arguments.
+The first argument is the original file descriptor.  The
+second argument is the new file descriptor for duplicating
+files, and \f5SH_FDCLOSE\fP when a file has been closed.
+The previously installed \f5sh_fdnotify()\fP function pointer
+is returned.
+.PP
+The \f5sh_waitnotify()\fP function causes the function \fIfn\fP
+to be called whenever the shell is waiting for input from
+a slow device or waiting for a process to complete.
+This function can process events and run shell commands
+until there is input, the timer is reached or a signal arises.
+It is called with three arguments. The first is the file
+descriptor from which the shell trying to read  or \f5\-1\fP
+if the shell is waiting for a process to complete.
+The second is a timeout in milliseconds.
+A value of \f5\-1\fP for the timeout means that
+no timeout should be set.
+The third argument is 0 for input file descriptors
+and 1 for output file descriptor. 
+The function needs to return a value \f5>0\fP if there
+is input on the file descriptor, and a value \f5<0\fP
+if the timeout is reached or a signal has occurred.
+A value of \f50\fP indicates
+that the function has returned without processing and that the shell
+should wait for input or process completion.
+The previous installed \f5sh_waitnotify()\fP function pointer is returned.
+.PP
+The \f5sh_iogetiop()\fP function returns a pointer to the
+Sfio stream corresponding to file descriptor number \fIfd\fP
+and the given mode \fImode\fP.  The mode can be either
+\f5SF_READ\fP or \f5SF_WRITE\fP.
+The \fIfd\fP argument can the number of an open file descriptor or
+one of the following symbolic constants:
+.IP
+\f5SH_IOCOPROCESS\fP:
+The stream corresponding to the most recent co-process.
+.IP
+\f5SH_IOHISTFILE\fP:
+The stream corresponding to the history file.
+If no stream exists corresponding to \fIfd\fP or the stream
+can not be accessed in the specified mode, \f5NULL\fP is returned.
+.SH SEE ALSO
+builtin(1)
+cdt(3)
+error(3)
+nval(3)
+sfio(3)
+stk(3)
+tksh(1)
+.SH AUTHOR
+David G. Korn (dgk@research.att.com).

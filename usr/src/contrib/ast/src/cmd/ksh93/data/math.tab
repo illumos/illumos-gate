@@ -1,0 +1,75 @@
+# <return type: i:integer f:floating-point> <#floating-point-args> <function-name> [<alias> ...]
+# <function-name>l variants are handled by features/math.sh
+# @(#)math.tab (AT&T Research) 2010-10-26
+f 1 acos
+f 1 acosh
+f 1 asin
+f 1 asinh
+f 1 atan
+f 2 atan2
+f 1 atanh
+f 1 cbrt
+f 1 ceil
+f 2 copysign
+f 1 cos
+f 1 cosh
+f 1 erf
+f 1 erfc
+f 1 exp
+f 1 exp2
+f 1 expm1
+f 1 fabs abs
+f 2 fdim
+f 1 finite
+f 1 floor int
+f 3 fma
+f 2 fmax
+f 2 fmin
+f 2 fmod
+i 1 fpclassify
+i 1 fpclass
+f 2 hypot
+i 1 ilogb
+i 1 isfinite
+i 2 isgreater
+i 2 isgreaterequal
+i 1 isinf
+i 1 isinfinite
+i 2 isless
+i 2 islessequal
+i 2 islessgreater
+i 1 isnan
+i 1 isnormal
+i 1 issubnormal fpclassify=FP_SUBNORMAL
+i 2 isunordered
+i 1 iszero fpclassify=FP_ZERO fpclass=FP_NZERO|FP_PZERO {return a1==0.0||a1==-0.0;}
+f 1 j0
+f 1 j1
+f 2 jn
+x 2 ldexp
+f 1 lgamma
+f 1 log
+f 1 log10
+f 1 log1p
+f 1 log2
+f 1 logb
+f 1 nearbyint
+f 2 nextafter
+f 2 nexttoward
+f 2 pow
+f 2 remainder
+f 1 rint
+f 1 round {Sfdouble_t r;Sflong_t y;y=floor(2*a1);r=rint(a1);if(2*a1==y)r+=(r<a1)-(a1<0);return r;}
+f 2 scalb
+f 2 scalbn
+i 1 signbit
+f 1 sin
+f 1 sinh
+f 1 sqrt
+f 1 tan
+f 1 tanh
+f 1 tgamma {Sfdouble_t r=exp(lgamma(a1));return (signgam<0)?-r:r;}
+f 1 trunc
+f 1 y0
+f 1 y1
+f 2 yn

@@ -1,0 +1,369 @@
+: ksh regression test harness :
+
+USAGE_LICENSE="[-author?David Korn <dgk@research.att.com>][-author?Glenn Fowler <gsf@research.att.com>][-copyright?Copyright (c) 2000-2012 AT&T Intellectual Property][-license?http://www.eclipse.org/org/documents/epl-v10.html]"
+
+command=shtests
+
+setslocale='*@(locale).sh'
+timesensitive='*@(options|sigchld|subshell).sh'
+valgrindflags='--xml=yes --log-file=/dev/null --track-origins=yes --read-var-info=yes'
+
+USAGE=$'
+[-s8?
+@(#)$Id: shtests (AT&T Research) 2012-05-29 $
+]
+'$USAGE_LICENSE$'
+[+NAME?shtests - ksh regression test harness]
+[+DESCRIPTION?\bshtests\b is the \bksh\b(1) regression test harness for
+    \b$SHELL\b or \bksh\b if \bSHELL\b is not defined and exported. If
+    none of the \b--posix --utf8 --compile\b options are specified then
+    all three are enabled.]
+[+INPUT FILES?\bshtests\b regression test files are shell scripts that
+    run in an environment controlled by \bshtests\b. An identification
+    message is printed before and after each test on the standard output.
+    The default environment settings are:]
+    {
+        [+unset LANG]
+        [+unset LC_ALL]
+        [+LC_NUMERIC=C?\b.\b radix point assumed by all test scripts.]
+        [+VMALLOC_OPTIONS=abort?\bvmalloc\b(1) arena checking enabled
+            with \babort(2)\b on error.]
+    }
+[c:compile?Run test scripts using \bshcomp\b(1).]
+[d:debug?Enable \bshtests\b execution trace.]
+[l:locale?Disable \b--utf8\b and run the \b--posix\b and \b--compile\b
+    tests, if enabled, in the locale of the caller. This may cause invalid
+    regressions, especially for locales where \b.\b is not the radix
+    point.]
+[p:posix?Run the test scripts in the posix/C locale.]
+[t!:time?Include the current date/time in the test identification
+    messages.]
+[u:utf8?Run the test scripts in the ast-specific C.UTF-8 locale.]
+[v!:vmalloc_options?Run tests with \bVMALLOC_OPTIONS=abort\b. Test
+    script names matching \b'$timesensitive$'\b are run with
+    \bVMALLOC_OPTIONS\b unset.]
+[V:valgrind?Set \b--novmalloc_options\b and run the test scripts with
+    \bvalgrind\b(1) on \bksh\b. If \b$SHELL-g\b exists and is executable
+    than it is used instead of \b$SHELL\b.]
+[x:trace?Enable script execution trace.]
+
+[ test.sh ... ] [ name=value ... ]
+
+[+SEE ALSO?\bksh\b(1), \bregress\b(1), \brt\b(1)]
+'
+
+function usage
+{
+	OPTIND=0
+	getopts -a $command "$USAGE" OPT '--??long'
+	exit 2
+}
+
+function valxml
+{
+	typeset state=INIT data dir file fn line what
+	integer errors=0
+
+	#print === $1 ===; cat $1; print === ===
+	while	read data
+	do	case $state in
+		INIT)	case $data in
+			'<error>')
+				state=ERROR
+				;;
+			esac
+			;;
+		ERROR)	case $data in
+			'<kind>'Leak*'</kind>')
+				state=SKIP
+				;;
+			'<kind>'*'</kind>')
+				state=KEEP
+				what=UNKNOWN
+				;;
+			esac
+			;;
+		FRAME)	case $data in
+			'<dir>'*'</dir>')
+				dir=${data#'<dir>'}
+				dir=${dir%'</dir>'}
+				;;
+			'<file>'*'</file>')
+				file=${data#'<file>'}
+				file=${file%'</file>'}
+				;;
+			'<fn>'*'</fn>')
+				fn=${data#'<fn>'}
+				fn=${fn%'</fn>'}
+				;;
+			'<line>'*'</line>')
+				line=${data#'<line>'}
+				line=${line%'</line>'}
+				;;
+			'</frame>')
+				[[ $dir ]] && dir+=/
+				dir+=$file
+				[[ $dir ]] && dir+=:
+				[[ $line ]] && dir+=$line:
+				[[ $fn ]] && dir+=$fn
+				[[ $dir ]] && echo $'\t    '$dir
+				state=KEEP
+				;;
+			esac
+			;;
+		KEEP)	case $data in
+			'<auxwhat>'*'</auxwhat>')
+				what=${data#'<auxwhat>'}
+				what=${what%'</auxwhat>'}
+				echo $'\t'"$what"
+				;;
+			'<frame>')
+				state=FRAME
+				dir=
+				file=
+				fn=
+				line=
+				;;
+			'<what>Syscall param mount(type) points to unaddressable byte(s)</what>')
+				state=SKIP
+				;;
+			'<what>'*'</what>')
+				(( errors++ ))
+				what=${data#'<what>'}
+				what=${what%'</what>'}
+				echo $'\n\t'"$what"
+				;;
+			'<xwhat>')
+				state=WHAT
+				;;
+			'</error>')
+				state=INIT
+				;;
+			esac
+			;;
+		SKIP)	case $data in
+			'</error>')
+				state=INIT
+				;;
+			esac
+			;;
+		WHAT)	case $data in
+			'<text>'*'</text>')
+				(( errors++ ))
+				what=${data#'<text>'}
+				what=${what%'</text>'}
+				echo $'\n\t'"$what"
+				;;
+			'</xwhat>')
+				state=KEEP
+				;;
+			esac
+			;;
+		esac
+	done < "$1"
+	(( errors )) && echo
+	return $errors
+}
+
+unset DISPLAY ENV FIGNORE HISTFILE
+trap + PIPE # unadvertized -- set SIGPIPE to SIG_DFL #
+
+integer compile=-1 posix=-1 utf8=-1
+integer debug=0 locale=0 time=1
+typeset vmalloc_options=abort trace= valgrind=
+vmalloc_options= #XXX# until multi-region vmalloc trace fixed #XXX#
+
+while	getopts -a $command "$USAGE" OPT
+do	case $OPT in
+	c)	if	(( $OPTARG ))
+		then	compile=2
+		else	compile=0
+		fi
+		;;
+	d)	debug=$OPTARG
+		;;
+	l)	locale=$OPTARG
+		;;
+	p)	posix=$OPTARG
+		;;
+	t)	time=$OPTARG
+		;;
+	u)	utf8=$OPTARG
+		;;
+	v)	if	(( OPTARG ))
+		then	vmalloc_options=abort
+		else	vmalloc_options=
+		fi
+		;;
+	V)	valgrind="${VALGRIND:-valgrind} ${VALGRINDFLAGS:-$valgrindflags}"
+		vmalloc_options=
+		;;
+	x)	trace=-x
+		;;
+	*)	usage
+		;;
+	esac
+done
+shift $OPTIND-1
+
+if	(( debug )) || [[ $trace ]]
+then	export PS4=':$LINENO: '
+	if	(( debug ))
+	then	set -x
+	fi
+fi
+
+while	[[ $1 == *=* ]]
+do	eval export "$1"
+	shift
+done
+
+if	(( compile <= 0 && posix <= 0 && utf8 <= 0 ))
+then	(( compile )) && compile=1
+	(( posix )) && posix=1
+	(( utf8 )) && utf8=1
+fi
+(( compile < 0 )) && compile=0
+(( posix < 0 )) && posix=0
+(( utf8 < 0 )) && utf8=0
+if	(( locale ))
+then	utf8=0
+	if	[[ $LC_ALL ]]
+	then	export LANG=$LC_ALL
+	fi
+else	unset LANG LC_ALL
+	export LC_NUMERIC=C
+fi
+if	[[ $VMALLOC_OPTIONS ]]
+then	vmalloc_options=$VMALLOC_OPTIONS
+else	VMALLOC_OPTIONS=$vmalloc_options
+fi
+[[ $VMALLOC_OPTIONS ]] || timesensitive=.
+export PATH PWD SHCOMP SHELL VMALLOC_OPTIONS
+PWD=$(pwd)
+SHELL=${SHELL-ksh}
+case $0 in
+/*)	d=$(dirname $0);;
+*/*)	d=$PWD/$(dirname $0);;
+*)	d=$PWD;;
+esac
+case $SHELL in
+/*)	;;
+*/*)	SHELL=$d/$SHELL;;
+*)	SHELL=$(whence $SHELL);;
+esac
+PATH=/bin:/usr/bin
+if	[[ -d /usr/ucb ]]
+then	PATH=$PATH:/usr/ucb
+fi
+PATH=$PATH:$d
+if	[[ $INSTALLROOT && -r $INSTALLROOT/bin/.paths ]]
+then	PATH=$INSTALLROOT/bin:$PATH
+fi
+if	[[ ${SHELL%/*} != $INSTALLROOT/bin ]]
+then	PATH=${SHELL%/*}:$PATH
+fi
+if	[[ ! $SHCOMP ]]
+then	s=${SHELL:##*sh}
+	s=${SHELL:%/*}/shcomp$s
+	if	[[ -x $s ]]
+	then	SHCOMP=$s
+	elif	[[ -x ${s%-g} ]]
+	then	SHCOMP=${s%-g}
+	else	SHCOMP=shcomp
+	fi
+fi
+if	(( compile ))
+then	if	whence $SHCOMP > /dev/null
+	then	tmp=$(mktemp -dt) || { echo mktemp -dt failed >&2; exit 1; }
+		trap "cd /; rm -rf $tmp" EXIT
+	elif	(( compile > 1 ))
+	then	echo $0: --compile: $SHCOMP not found >&2
+		exit 1
+	else	compile=0
+	fi
+fi
+if	[[ $valgrind ]]
+then	if	[[ -x $SHELL-g ]]
+	then	SHELL=$SHELL-g
+	fi
+	if	[[ ! $tmp ]]
+	then	tmp=$(mktemp -dt) || { echo mktemp -dt failed >&2; exit 1; }
+		trap "cd /; rm -rf $tmp" EXIT
+	fi
+	valxml=$tmp/valgrind.xml
+	valgrind+=" --xml-file=$valxml"
+fi
+typeset -A tests
+for i in ${*-*.sh}
+do	if	[[ ! -r $i ]]
+	then	echo $0: $i: not found >&2
+		continue
+	fi
+	t=$(grep -c err_exit $i)
+	if	(( t > 2 ))
+	then	(( t = t - 2 ))
+	fi
+	tests[$i]=$t
+	T=test
+	if	(( t != 1 ))
+	then	T=${T}s
+	fi
+	u=${i##*/}
+	u=${u%.sh}
+	if	[[ $i == $timesensitive ]]
+	then	VMALLOC_OPTIONS=
+	fi
+	if	(( posix || utf8 ))
+	then	locales=
+		(( posix )) && locales+=" ${LANG:-C}"
+		[[ $utf8 == 0 || $i == $setslocale ]] || locales+=" C.UTF-8"
+		for lang in $locales
+		do	o=$u
+			if	[[ $lang == C ]]
+			then	lang=
+			else	o="$o($lang)"
+				lang=LANG=$lang
+			fi
+			echo test $o begins ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"}
+			E=error
+			eval $lang \$valgrind \$SHELL \$trace \$i
+			e=$?
+			if	[[ $valgrind ]]
+			then	valxml $valxml
+				(( e += $? ))
+			fi
+			if	(( e == 0 ))
+			then	echo test $o passed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} "[ $t $T 0 ${E}s ]"
+			else	e=$?
+				if	(( e != 1 ))
+				then	E=${E}s
+				fi
+				echo test $o failed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} with exit code $e "[ $t $T $e $E ]"
+			fi
+		done
+	fi
+	if	(( compile ))
+	then	c=$tmp/shcomp-$u.ksh
+		o="$u(shcomp)"
+		echo test $o begins ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"}
+		E=error
+		if	$SHCOMP $i > $c
+		then	if	$valgrind $SHELL $trace $c
+			then	echo test $o passed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} "[ $t $T 0 ${E}s ]"
+			else	e=$?
+				if	(( e != 1 ))
+				then	E=${E}s
+				fi
+				echo test $o failed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} with exit code $e "[ $t $T $e $E ]"
+			fi
+		else	e=$?
+			t=1
+			T=test
+			echo test $o failed to compile ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} with exit code $e "[ $t $T 1 $E ]"
+		fi
+		if	[[ $i == $timesensitive ]]
+		then	VMALLOC_OPTIONS=$vmalloc_options
+		fi
+	fi
+done

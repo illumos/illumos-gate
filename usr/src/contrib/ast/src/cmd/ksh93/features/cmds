@@ -1,0 +1,27 @@
+#define _pth
+#cmd	newgrp,test,id,wc,cut,logname,universe,pfexec,tput
+#pth	ed fail{
+#	echo '#define _pth_ed	"ed" /* ed not found on standard PATH */'
+#}end
+
+# Statically define the available commands since detecting them inside
+# proto is a circular problem (cut, for example, is provided by ksh93)
+
+define _cmd_newgrp	1
+define _usr_bin_newgrp	1
+define _cmd_test	1
+define _usr_bin_test	1
+define _cmd_id		1
+define _usr_bin_id	1
+define _cmd_wc		1
+define _usr_bin_wc	1
+define _cmd_cut		1
+define _usr_bin_cut	1
+define _cmd_logname	1
+define _usr_bin_logname	1
+define _cmd_pfexec	1
+define _usr_bin_pfexec	1
+define _cmd_tput	1
+define _usr_bin_tput	1
+define _pth_ed "/usr/bin/ed"
+

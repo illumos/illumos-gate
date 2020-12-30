@@ -1,0 +1,143 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH STRLS 3
+.SH NAME
+fmtls \- format file information in buffer
+.SH SYNOPSIS
+.EX
+#include <ls.h>
+
+char*         fmtls(char* \fIbuf\fP, char* \fIname\fP, struct stat* \fIst\fP, char* \fIinfo\fP, char* \fIlink\fP, int \fIflags\fP);
+.EE
+.SH DESCRIPTION
+.L fmtls
+formats
+.IR ls (1)
+style file information into the buffer
+.IR buf .
+A pointer to the trailing 0 in 
+.I buf
+is returned.
+.I name
+is the file name.
+.I st
+is a pointer to the
+.B "struct stat
+status information for
+.I name
+obtained from one of the
+.IR stat (2)
+routines.
+.I info
+is an additional string that will appear before
+.I name
+in
+.I buf
+and
+.I link
+is the name of the related hard or soft link file.
+Both
+.I info
+and
+.I link
+may be 0.
+.I flags
+controls the format style and may be a combination of the following:
+.PP
+.TP
+.B LS_ATIME
+Use
+.I st->st_atime
+rather than
+.I st->st_mtime
+for
+.BR LS_LONG .
+.TP
+.B LS_CTIME
+Use
+.I st->st_mtime
+rather than
+.I st->st_mtime
+for
+.BR LS_LONG .
+.TP
+.B LS_BLOCKS
+List the number of blocks.
+.TP
+.B LS_INUMBER
+List the file serial number (inode number).
+.TP
+.B LS_LONG
+List the file mode, link count, user and group name,
+size or major/minor device number, and date along with the
+file name.
+.TP
+.B LS_MARK
+The file name is appended with
+.L /
+for directories,
+.L @
+for symbolic links,
+and
+.L *
+for executable files.
+.TP
+.B LS_NOGROUP
+Omit the group name from
+.BR LS_LONG .
+.TP
+.B LS_NOUSER
+Omit the user name from
+.BR LS_LONG .
+.PP
+The user and group fields are each
+.B LS_W_NAME
+characters wide,
+the
+.B LS_INUMBER 
+field is
+.B LS_W_INUMBER
+characters wide,
+and the
+.B LS_BLOCKS
+field is
+.B LS_W_BLOCKS
+characters wide.
+.SH "SEE ALSO"
+ls(1), stat(2), strmode(3)

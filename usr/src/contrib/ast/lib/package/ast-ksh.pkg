@@ -1,0 +1,89 @@
+ast-ksh :PACKAGE: ksh93 libast libcmd libcoshell libsum libdll
+
+:COVERS: ksh
+
+:LICENSE: *.open
+
+:CATEGORY: shells
+
+:INDEX: ksh and support libraries
+
+:DESCRIPTION:
+	The AT&T Software Technology ast-ksh package from AT&T Research
+	contains ksh and support libraries. This is the minimal set of
+	components needed to build ksh.
+
+:DETAILS: cyg
+	:README:
+		This package installs a standalone ksh93 executable ksh93.exe
+		and its man page ksh93.1.  If /bin/ksh.exe does not exist then
+		these symlinks
+			/bin/ksh.exe => ksh93.exe
+			/usr/share/man/man1/ksh93.1 => ksh.1
+		are created.  This allows alternative ksh impelementations,
+		e.g., /bin/pdksh.exe, to be selected by changing the ksh.exe
+		and ksh.1 symbolic links.  In addition, ksh and ksh93 paths are
+		added to /etc/shells if not already present.
+		$()
+		Each builtin or special command accepts the --man and --html
+		options to list the man page on the standard error. The --???
+		option describes the self documenting options available to all
+		builtin and special commands.
+		$()
+		The stanadlone ksh is statically linked with the ast libcmd
+		library which provides several builtin versions of /bin
+		commands. "builtin | grep /opt/ast/bin" lists the libcmd
+		builtins on the standard output. /opt/ast/bin/FOO accesses
+		the FOO builtin, whether the /opt/ast/bin directory exists
+		or not. "builtin FOO" allows /opt/ast/bin/FOO to be accessed
+		as FOO, bypassing the $PATH setting. To enable all libcmd
+		builtins do one of the following:
+		  (a) create the directory /opt/ast/bin and the file
+		      /opt/ast/bin/.paths with this line
+		      	BUILTIN_LIB=.
+		      and place /opt/ast/bin before /bin and /usr/bin in $PATH
+		      (this will affect all ksh subshells and scripts)
+		  (b) run "builtin $( builtin | sed -e '/\//!d' -e 's,.*/,,' )"
+		      (this will affect only the current shell)
+		Some scripts may run significantly faster with libcmd builtins
+		enabled.
+		$()
+		The ast library checks the DOSPATHVARS environment variable
+		for variable path values to convert to and from native windows
+		format when cross-executing between cygwin and non-cygwin
+		programs. The value is a space separated list of environment
+		variables to convert. PATH is handled by cygwin so it is not
+		converted by the ast library.
+		$()
+		The astksh cygwin source package provides a bootstrap build
+		environment that is not suited for an edit/build/debug cycle.
+		If you want to explore and modify the source then you should
+		install the (non-cygwinized) ast-base package which includes
+		AT&T nmake. With ast-base you will also be able to regenerate
+		the astksh cygwin source and binary packages.
+		$()
+		For more information on ksh and other AT&T ast tools see
+		   http://www.research.att.com/sw/download/
+	:EXPORT:
+		SHOPT_CMDLIB_DIR=1
+	bin/ksh93.exe :INSTALL: bin/ksh.exe
+	share/man/man1/ksh93.1 :INSTALL: man/man1/sh.1
+	:POSTINSTALL:
+		if	[ ! -e /bin/ksh.exe ]
+		then	ln -fs ksh93.exe /bin/ksh.exe
+			ln -fs ksh93.1 /usr/share/man/man1/ksh.1
+		else	echo "/bin/ksh.exe already exists"
+		fi
+		if [ -f /etc/shells ]
+		then	for i in /bin/ksh93 /bin/ksh /usr/bin/ksh93 /usr/bin/ksh
+			do	if	grep $i /etc/shells >/dev/null 2>&1
+				then	echo "$i already in /etc/shells"
+				else	echo $i >> /etc/shells
+					echo "$i added to /etc/shells"
+				fi
+			done
+		else	echo "no /etc/shells file"
+		fi
+		exit 0
+	:TEST: bin/ksh
+		KSH=$<; cd src/cmd/ksh93/tests; CYGWIN="$$CYGWIN ntsec binmode" SHELL=$$KSH $$KSH shtests

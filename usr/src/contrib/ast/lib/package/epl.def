@@ -1,0 +1,8 @@
+license+=(
+	type=epl
+	id=eclipse
+	name="Eclipse Public License"
+	version=1.0
+	url=http://www.eclipse.org/org/documents/${license.type}-v${license.version//./}.html
+	urlmd5=b35adb5213ca9657e911e9befb180842
+)

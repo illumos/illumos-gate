@@ -1,0 +1,44 @@
+# aso method feature tests
+
+aso fcntl note{ fcntl(F_SETLCK[W]) work }end link{
+		#include <sys/types.h>
+		#include <unistd.h>
+		#include <fcntl.h>
+
+		int main()
+		{
+			struct flock	lock;
+
+			lock.l_type = F_WRLCK;
+			lock.l_whence = SEEK_SET;
+			lock.l_start = 0;
+			lock.l_len = 1;
+			return fcntl(1, F_SETLKW, &lock) < 0;
+		}
+}end
+
+aso semaphore note{ semget semop semctl work }end link{
+		#include <sys/types.h>
+		#include <sys/stat.h>
+		#include <unistd.h>
+		#include <fcntl.h>
+		#include <sys/ipc.h>
+		#include <sys/sem.h>
+
+		int main()
+		{
+			int		id;
+			struct sembuf	sem;
+
+			if ((id = semget(IPC_PRIVATE, 16, IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR)) < 0)
+				return 1;
+			sem.sem_num = 0;
+			sem.sem_op = 1;
+			sem.sem_flg = 0;
+			if (semop(id, &sem, 1) < 0)
+				return 1;
+			if (semctl(id, 0, IPC_RMID) < 0)
+				return 1;
+			return 0;
+		}
+}end

@@ -1,0 +1,13 @@
+ast-dss :PACKAGE: dss libdss libpz dsslib
+
+:REQUIRES: ast-base
+
+:LICENSE: *.(open|proprietary|special)
+
+:CATEGORY: algorithms database utils
+
+:INDEX: data stream scan command and support libraries
+
+:DESCRIPTION:
+	The AT&T Software Technology ast-dss package from AT&T Research
+	contains the dss command, plugins and support libraries.
