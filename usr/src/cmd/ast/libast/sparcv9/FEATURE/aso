@@ -1,0 +1,24 @@
+/* : : generated from contrib/ast/src/lib/libast/features/aso by iffe version 2012-07-17 : : */
+#ifndef _def_aso_ast
+#define _def_aso_ast	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+/* gcc 4.1+ 64 bit memory atomic operations model */
+#define _aso_cas8(p,o,n)	__sync_val_compare_and_swap(p,o,n)
+#define _aso_inc8(p)		__sync_fetch_and_add(p,1)
+#define _aso_dec8(p)		__sync_fetch_and_sub(p,1)
+#define _aso_cas16(p,o,n)	__sync_val_compare_and_swap(p,o,n)
+#define _aso_inc16(p)		__sync_fetch_and_add(p,1)
+#define _aso_dec16(p)		__sync_fetch_and_sub(p,1)
+#define _aso_cas32(p,o,n)	__sync_val_compare_and_swap(p,o,n)
+#define _aso_inc32(p)		__sync_fetch_and_add(p,1)
+#define _aso_dec32(p)		__sync_fetch_and_sub(p,1)
+#define _aso_cas64(p,o,n)	__sync_val_compare_and_swap(p,o,n)
+#define _aso_inc64(p)		__sync_fetch_and_add(p,1)
+#define _aso_dec64(p)		__sync_fetch_and_sub(p,1)
+#if _ast_sizeof_pointer == 8
+#define _aso_casptr(p,o,n)	((void*)__sync_val_compare_and_swap(p,(uint64_t)o,(uint64_t)n))
+#else
+#define _aso_casptr(p,o,n)	((void*)__sync_val_compare_and_swap(p,(uint32_t)o,(uint32_t)n))
+#endif
+
+#endif

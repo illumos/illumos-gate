@@ -1,0 +1,71 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+#
+
+AST_IFFE =	$(AST_TOOLS)/iffe
+
+# The AST sources use a utility called "iffe" (If FEature Exists) to probe the
+# build environment, and to generate the header files needed to build the
+# libraries and commands. In order to support cross-compilation, the
+# generated FEATURE files are bundled with gate, but a TBC target is
+# provided to re-generate them if necessary due to a change elsewhere in gate.
+#
+# NOTES:
+#
+# Only the primary compiler is used with iffe.
+#
+# We use big PIC here since pic is too small on 64-bit sparc and on 32-bit
+# it's close to the barrier.
+#
+# "-D_map_libc=1" is needed to force map.c to add a "_ast_" prefix to all
+# AST symbol names which may otherwise collide with libc.
+#
+# "-D_lib_socket=1 -lsocket -lnsl" was added to make sure ksh93 is compiled
+# with networking support enabled; the current AST build infrastructure has
+# problems with detecting networking support in illumos.
+#
+# "-D_TS_ERRNO -D_REENTRANT" are flags taken from the default OS/Net
+# build system.
+
+IFFECC=		$($(TARGETMACH)_CC)
+IFFECPPFLAGS=	$(ASTPLATFORMCPPFLAGS) \
+		-D_TS_ERRNO -D_REENTRANT \
+		-YI,$(ROOT)/usr/include -D_BLD_DLL -D_BLD_ast \
+		-D_lib_socket=1 -D_map_libc=1 \
+		$(LIBSHELLFEATUREFLAGS) \
+		-I$(ASTSRC)/include -I.
+IFFECFLAGS=	$(CSTD_GNU99) $($(TARGETMACH)_COPTFLAG) \
+		$($(TARGETMACH)_C_BIGPICFLAGS) $($(TARGETMACH)_CFLAGS)
+IFFELDFLAGS= 	$(ZASSERTDEFLIB) $(ZFATALWARNINGS) $(LDLIBS)
+IFFELIBS=	-lsocket -lnsl
+IFFEC=		$(IFFECC) $(IFFECPPFLAGS) $(IFFECFLAGS) \
+		$(IFFELDFLAGS) $(IFFELIBS)
+IFFEFLAGS=	-v -R $(ROOT)
+
+FEATURE/% := SHADOW_CCS=
+
+FEATURE/%: $(ASTSRC)/features/%
+	PATH=$(AST_TOOLS):$$PATH \
+	    $(AST_IFFE) $(IFFEFLAGS) -c '$(IFFEC)' run $< $(IFFE_EXTRA)
+	$(POST_PROCESS_AST) $@
+
+FEATURE/%: $(ASTSRC)/features/%.c
+	PATH=$(AST_TOOLS):$$PATH \
+	    $(AST_IFFE) $(IFFEFLAGS) -c '$(IFFEC)' run $< $(IFFE_EXTRA)
+	$(POST_PROCESS_AST) $@
+
+FEATURE/%: $(ASTSRC)/features/%.sh
+	PATH=$(AST_TOOLS):$$PATH \
+	    $(AST_IFFE) $(IFFEFLAGS) -c '$(IFFEC)' run $< $(IFFE_EXTRA)
+	$(POST_PROCESS_AST) $@

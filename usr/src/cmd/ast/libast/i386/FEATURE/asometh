@@ -1,0 +1,7 @@
+/* : : generated from contrib/ast/src/lib/libast/features/asometh by iffe version 2012-07-17 : : */
+#ifndef _def_asometh_ast
+#define _def_asometh_ast	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#define _aso_fcntl	1	/* fcntl(F_SETLCK[W]) work */
+#define _aso_semaphore	1	/* semget semop semctl work */
+#endif

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/source/demo/system@$(PKGVERS)
@@ -82,7 +83,6 @@ file path=usr/demo/ksh/bin/xmldocumenttree1 mode=0755
 file path=usr/demo/ksh/fun/dirs mode=0755
 file path=usr/demo/ksh/fun/popd mode=0755
 file path=usr/demo/ksh/fun/pushd mode=0755
-file path=usr/demo/ksh/fun/title mode=0755
 file path=usr/demo/ksh/src/cpvprint.sh
 file path=usr/demo/ksh/src/crawlsrccomments.sh
 file path=usr/demo/ksh/src/filemutexdemo1.sh
@@ -119,6 +119,7 @@ file path=usr/demo/ksh/tests/bracket.sh
 file path=usr/demo/ksh/tests/builtins.sh
 file path=usr/demo/ksh/tests/case.sh
 file path=usr/demo/ksh/tests/comvar.sh
+file path=usr/demo/ksh/tests/comvario.sh
 file path=usr/demo/ksh/tests/coprocess.sh
 file path=usr/demo/ksh/tests/cubetype.sh
 file path=usr/demo/ksh/tests/enum.sh
@@ -128,13 +129,20 @@ file path=usr/demo/ksh/tests/functions.sh
 file path=usr/demo/ksh/tests/glob.sh
 file path=usr/demo/ksh/tests/grep.sh
 file path=usr/demo/ksh/tests/heredoc.sh
+file path=usr/demo/ksh/tests/illumos_13434_chunked_heredoc.sh
 file path=usr/demo/ksh/tests/io.sh
+file path=usr/demo/ksh/tests/leaks.sh
+file path=usr/demo/ksh/tests/locale.sh
+file path=usr/demo/ksh/tests/math.sh
 file path=usr/demo/ksh/tests/nameref.sh
+file path=usr/demo/ksh/tests/namespace.sh
 file path=usr/demo/ksh/tests/options.sh
 file path=usr/demo/ksh/tests/path.sh
 file path=usr/demo/ksh/tests/pointtype.sh
+file path=usr/demo/ksh/tests/pty.sh
 file path=usr/demo/ksh/tests/quoting.sh
 file path=usr/demo/ksh/tests/quoting2.sh
+file path=usr/demo/ksh/tests/readcsv.sh
 file path=usr/demo/ksh/tests/recttype.sh
 file path=usr/demo/ksh/tests/restricted.sh
 file path=usr/demo/ksh/tests/return.sh
@@ -285,5 +293,4 @@ legacy pkg=SUNWosdem \
     name="OS demo source"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license usr/src/lib/libshell/THIRDPARTYLICENSE \
-    license=usr/src/lib/libshell/THIRDPARTYLICENSE
+license usr/src/contrib/ast/LICENSE license=usr/src/contrib/ast/LICENSE

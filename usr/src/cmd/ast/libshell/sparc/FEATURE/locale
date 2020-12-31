@@ -1,0 +1,42 @@
+/* : : generated from contrib/ast/src/cmd/ksh93/features/locale by iffe version 2012-07-17 : : */
+#ifndef _def_locale_ksh93
+#define _def_locale_ksh93	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#define _hdr_locale	1	/* #include <locale.h> ok */
+#define _hdr_wchar	1	/* #include <wchar.h> ok */
+#define _hdr_wctype	1	/* #include <wctype.h> ok */
+#define _lib_localeconv	1	/* localeconv() in default lib(s) */
+#define _lib_wctype	1	/* wctype() in default lib(s) */
+#define _lib_iswctype	1	/* iswctype() in default lib(s) */
+#define _lib_iswblank	1	/* iswblank() in default lib(s) */
+#define _lib_wctrans	1	/* wctrans() in default lib(s) */
+#define _lib_towctrans	1	/* towctrans() in default lib(s) */
+#define _hdr_time	1	/* #include <time.h> ok */
+#define _sys_time	1	/* #include <sys/time.h> ok */
+#define _sys_times	1	/* #include <sys/times.h> ok */
+#define _hdr_stddef	1	/* #include <stddef.h> ok */
+#define _hdr_stdlib	1	/* #include <stdlib.h> ok */
+#define _typ_wctrans_t	1	/* wctrans_t is a type */
+#if _PACKAGE_ast
+#   undef  _hdr_locale
+#   define _hdr_locale 1
+#else
+#   ifdef _hdr_locale
+#	include <locale.h>
+#	ifndef LC_MESSAGES
+#	    define LC_MESSAGES  LC_ALL
+#	endif /* LC_MESSAGES */
+#   endif /* _hdr_locale */
+#endif /* _PACKAGE_ast */
+#ifdef _hdr_locale
+#   ifdef _lib_localeconv
+	static struct lconv *lp;
+#	define GETDECIMAL(x)  (((lp=localeconv()) && lp->decimal_point && *lp->decimal_point) ?  *lp->decimal_point : '.' )
+#   else
+#	define GETDECIMAL(x)	('.')
+#   endif /* _lib_localeconv */
+#else
+#   define GETDECIMAL(x)	('.')
+#endif /* _hdr_locale */
+
+#endif

@@ -1,0 +1,5 @@
+/* : : generated from contrib/ast/src/lib/libast/features/omitted by iffe version 2012-07-17 : : */
+#ifndef _def_omitted_ast
+#define _def_omitted_ast	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#endif

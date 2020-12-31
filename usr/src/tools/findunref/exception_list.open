@@ -24,6 +24,7 @@
 # Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2020 Joyent, Inc.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 #
 # open-tree exception list
@@ -47,65 +48,6 @@
 ./usr/src/cmd/tcpd
 ./usr/src/grub
 ./usr/src/uts/intel/sys/acpi
-
-#
-# Ignore ksh93/ast-related files that are only used to resync our build
-# configuration with upstream.
-#
-./usr/src/lib/libast/*/src/lib/libast/FEATURE
-./usr/src/lib/libast/*/src/lib/libast/ast_namval.h
-./usr/src/lib/libast/common/comp/conf.*
-./usr/src/lib/libast/common/features
-./usr/src/lib/libast/common/include/ast_windows.h
-./usr/src/lib/libast/common/port/lc.tab
-./usr/src/lib/libast/common/port/lcgen.c
-./usr/src/lib/libcmd/*/src/lib/libcmd/FEATURE
-./usr/src/lib/libcmd/common/features
-./usr/src/lib/libdll/*/src/lib/libdll/FEATURE
-./usr/src/lib/libdll/common/features
-./usr/src/lib/libpp/*/pp.*
-./usr/src/lib/libpp/common/gentab.sh
-./usr/src/lib/libpp/common/ppsym.c
-./usr/src/lib/libpp/i386/ppdebug.h
-./usr/src/lib/libpp/sparc/ppdebug.h
-./usr/src/lib/libshell/*/src/cmd/ksh93/FEATURE
-./usr/src/lib/libshell/common/data/math.tab
-./usr/src/lib/libshell/common/features
-./usr/src/lib/libshell/misc/buildksh93.sh
-./usr/src/lib/libshell/misc/buildksh93.readme
-
-#
-# Ignore ksh93/ast-related "iffe" (if feature enabled) probe
-#
-./usr/src/lib/libsum/common/features/sum
-
-#
-# Ignore ksh93/ast-related upstream source, currently superseded by
-# a per-platform version of sum.h, since we use libmd.so.1 for some
-# ciphers.
-#
-./usr/src/lib/libsum/common/sum.h
-
-#
-# Ignore ksh93/ast-related test programs.
-#
-./usr/src/cmd/ast/msgcc/msgcc.tst
-./usr/src/lib/libast/common/port/astmath.c
-
-#
-# Ignore ksh93/ast-related source components that are not currently
-# used but may be useful later.
-#
-./usr/src/lib/libcmd/common/cksum.c
-./usr/src/lib/libcmd/common/md5sum.c
-./usr/src/lib/libcmd/common/sum.c
-./usr/src/lib/libshell/common/bltins/mkservice.c
-./usr/src/lib/libshell/common/data/bash_pre_rc.sh
-./usr/src/lib/libshell/common/include/env.h
-./usr/src/lib/libshell/common/sh/bash.c
-./usr/src/lib/libshell/common/sh/env.c
-./usr/src/lib/libshell/common/sh/shcomp.c
-./usr/src/lib/libshell/common/sh/suid_exec.c
 
 #
 # Ignore any files built as part of the nightly program itself.

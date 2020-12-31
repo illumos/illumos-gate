@@ -27,3 +27,4 @@ usr/src/lib/libpool/dtd/rm_pool.dtd.1
 usr/src/lib/libzonecfg/dtd/zonecfg.dtd.1
 usr/src/test/util-tests/tests/grep_xpg4/files/*
 usr/src/tools/smatch/src/*
+usr/src/contrib/ast/*
