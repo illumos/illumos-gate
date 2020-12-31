@@ -10,7 +10,7 @@
 .\"
 .\"
 .\" Copyright 2019 Joyent, Inc.
-.\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2021 Oxide Computer Company
 .\"
 .Dd May 19, 2020
 .Dt DDI_UFM 9E
@@ -42,23 +42,23 @@
 .Fo ddi_ufm_op_fill_image
 .Fa "ddi_ufm_handle_t *uhp"
 .Fa "void *drv_arg"
-.Fa "uint_t imgid"
+.Fa "uint_t imgno"
 .Fa "ddi_ufm_image_t *imgp"
 .Fc
 .Ft int
 .Fo ddi_ufm_op_fill_slot
 .Fa "ddi_ufm_handle_t *uhp"
 .Fa "void *drv_arg"
-.Fa "uint_t imgid"
-.Fa "uint_t slotid"
+.Fa "uint_t imgno"
+.Fa "uint_t slotno"
 .Fa "ddi_ufm_slot_t *slotp"
 .Fc
 .Ft int
 .Fo ddi_ufm_op_readimg
 .Fa "ddi_ufm_handle_t *uhp"
 .Fa "void *drv_arg"
-.Fa "uint_t imgid"
-.Fa "uint_t slotid"
+.Fa "uint_t imgno"
+.Fa "uint_t slotno"
 .Fa "uint64_t len"
 .Fa "uint64_t offset"
 .Fa "void *buf"
@@ -77,13 +77,11 @@ This is a private value that the driver passed in when calling
 .Xr ddi_ufm_init 9F .
 .It Fa nimgp
 A pointer that the driver should set with a number of images.
-.It Fa nslotp
-A pointer that the driver should set with a number of slots.
-.It Fa imgid
+.It Fa imgno
 An integer indicating which image information is being requested for.
 .It Fa imgp
 An opaque pointer that represents a UFM image.
-.It Fa slotid
+.It Fa slotno
 An integer indicating which slot information is being requested for.
 .It Fa slotp
 An opaque pointer that represents a UFM slot.
@@ -92,7 +90,7 @@ Indicates the number of bytes from a firmware payload that are desired.
 .It Fa offset
 Indicates an offset in a firmware payload to start reading from.
 .It Fa buf
-A buffer to place data firmware data read into.
+A buffer to place raw firmware data from the device into.
 .It Fa nreadp
 A pointer whose value should be updated with the number of bytes
 actually read from the image.
@@ -104,35 +102,42 @@ These interfaces aim to provide a simple series of callbacks
 for a device driver to implement such that it is easy to report
 information and in the future, manipulate firmware modules.
 .Ss UFM Background
-UFMs may come in different flavors and styles ranging from a
-firmware blob, to an EEPROM image, to microcode, and more.
+UFMs come in different flavors and styles that vary from device to
+device.
+.Qq Firmware
+generally refers to some form of software that runs on a device and is often
+packaged up as a binary payload.
+However, many things that aren't always called
+.Qq firmware ,
+such as EEPROM images, CPU microcode, flash based configuration, and more, are
+all just as important here.
 Take for example a hard drive.
 While it is a field replaceable unit (FRU), it also contains some amount
 of firmware that manages the drive which can be updated independently of
 replacing the drive.
 .Pp
 The motherboard often has a UFM in the form of the BIOS or UEFI.
-The Lights out management controller on a system has a UFM, which is usually
+The Lights Out Management controller on a system has a UFM, which is usually
 the entire system image.
 CPUs also have a UFM in the form of microcode.
 .Pp
-An important property of a UFM is that it is a property of the device
+An important property of a UFM is that it is a persistent part of the device
 itself.
 For example, many WiFi device drivers are required to send a binary blob of
 firmware to the device after every reset.
-Because these images are not properties of the device and must be upgraded by
-either changing the device driver or related system files, we do not consider
+Because these images are not persistent parts of the device and must be upgraded
+by either changing the device driver or related system files, we do not consider
 these UFMs.
 .Pp
-There are also devices that have firmware which is a property of the
+There are also devices that have firmware which is a part of the
 device, but may not be upgradable from the running OS.
 This may be because the vendor doesn't have tooling to upgrade the image or
 because the firmware image itself cannot be upgraded in the field at all.
 For example, a YubiKey has a firmware image that's burned into it in the
 factory, but there is no way to change the firmware on it short of
 replacing the device in its entirety.
-However, because these images are a permanent part of the device, we also
-consider them a UFM.
+However, because these images are a permanent and persistent part of the device,
+we also consider them a UFM.
 .Ss Images and Slots
 A device that supports UFMs is made up of one or more distinct firmware
 images.
@@ -142,13 +147,14 @@ has independent firmware revisions.
 .Pp
 A given image may have a number of slots.
 A slot represents a particular version of the image.
-Only one slot can be active at a given time.
-Devices support slots such that a firmware image can be downloaded
-to the device without impacting the current device if it fails half-way
-through.
-The slot that's currently in use is referred to as the
+Only one slot is considered the
 .Em active
 slot.
+It represents the currently running version of the image.
+Devices support multiple slots so that an image can be downloaded to an inactive
+slot without risking damage to the active slot.
+This ensures that a power-loss or failure halfway through writing to a slot
+doesn't leave the device with corrupted firmware.
 .Pp
 The various entry points are designed such that all a driver has to do
 is provide information about the image and its slots to the kernel, it
@@ -180,14 +186,14 @@ typedef struct ddi_ufm_ops {
 	int (*ddi_ufm_op_nimages)(ddi_ufm_handle_t *uhp, void *drv_arg,
 	    uint_t *nimgp);
 	int (*ddi_ufm_op_fill_image)(ddi_ufm_handle_t *uhp, void *drv_arg,
-            uint_t imgid, ddi_ufm_image_t *imgp);
+            uint_t imgno, ddi_ufm_image_t *imgp);
 	int (*ddi_ufm_op_fill_slot)(ddi_ufm_handle_t *uhp, void *drv_arg,
-            int imgid, ddi_ufm_image_t *img, uint_t slotid,
+            int imgno, ddi_ufm_image_t *img, uint_t slotno,
 	    ddi_ufm_slot_t *slotp);
 	int (*ddi_ufm_op_getcaps)(ddi_ufm_handle_t *uhp, void *drv_arg,
 	    ddi_ufm_cap_t *caps);
 	int (*ddi_ufm_op_readimg)(ddi_ufm_handle_t *uhp, void *drv_arg,
-	    uint_t imgid, uint_t slotid, uint64_t len, uint64_t offset,
+	    uint_t imgno, uint_t slotno, uint64_t len, uint64_t offset,
 	    void *buf, uint64_t *nreadp);
 } ddi_ufm_ops_t;
 .Ed
@@ -197,23 +203,28 @@ The
 and
 .Fn ddi_ufm_op_readimg
 entry points are optional.
-If a device only has a single image, then there is no reason to implement the
+If a device only has a single image, then there is no requirement to implement
+the
 .Fn ddi_ufm_op_nimages
-entry point.
+entry point and it may be set to
+.Dv NULL .
 The system will assume that there is only a single image.
 .Pp
 Slots and images are numbered starting at zero.
-If a driver indicates support for multiple images or slots then the images
+If a driver indicates support for multiple images, through the
+.Fn ddi_ufm_op_nimages
+entry point, or slots, by using the
+.Xr ddi_ufm_image_set_nslots 9F
+function in the
+.Fn ddi_fum_op_fill_image
+callback then the images
 or slots will be numbered sequentially going from 0 to the number of images or
 slots minus one.
 These values will be passed to the various entry points to indicate which image
 and slot the system is interested in.
 It is up to the driver to maintain a consistent view of the images and slots
 for a given UFM.
-.Pp
-The members of this structure should be filled in the following ways:
-.Bl -tag -width Fn
-.It Fn ddi_ufm_op_nimages
+.Ss Fn ddi_ufm_op_nimages
 The
 .Fn ddi_ufm_op_nimages
 entry point is an optional entry point that answers the question of how
@@ -236,16 +247,16 @@ Common values are:
 An error occurred while communicating with the device to determine the
 number of firmware images.
 .El
-.It Fn ddi_ufm_op_fill_image
+.Ss Fn ddi_ufm_op_fill_image
 The
 .Fn ddi_ufm_op_fill_image
 entry point is used to fill in information about a given image.
 The value in
-.Fa imgid
+.Fa imgno
 is used to indicate which image the system is asking to fill
 information about.
 If the driver does not recognize the image ID in
-.Fa imgid
+.Fa imgno
 then it should return an error.
 .Pp
 The
@@ -257,10 +268,14 @@ To fill in information about the image, the driver should call the functions
 described in
 .Xr ddi_ufm_image 9F .
 .Pp
-The driver should call the
+The driver must call the
 .Xr ddi_ufm_image_set_desc 9F
 function to set a description of the image which indicates its purpose.
 This should be a human-readable string.
+In addition, the driver must call the
+.Xr ddi_ufm_image_set_nslots 9F
+function to indicate the number of slots that the device supports for
+that particular firmware image.
 The driver may also set any ancillary data that it deems may be useful with the
 .Xr ddi_ufm_image_set_misc 9F function.
 This function takes an nvlist, allowing the driver to set arbitrary keys and values.
@@ -275,7 +290,7 @@ Common values are:
 .Bl -tag -width Er -offset width
 .It Er EINVAL
 The image indicated by
-.Fa imgid
+.Fa imgno
 is unknown.
 .It Er EIO
 An error occurred talking to the device while trying to fill out
@@ -284,21 +299,21 @@ firmware image information.
 The driver was unable to allocate memory while filling out image
 information.
 .El
-.It Fn ddi_ufm_op_fill_slot
+.Ss Fn ddi_ufm_op_fill_slot
 The
 .Fn ddi_ufm_op_fill_slot
 function is used to fill in information about a specific slot for a
 specific image.
 The value in
-.Fa imgid
+.Fa imgno
 indicates the image the system wants slot information for and the value
 in
-.Fa slotid
+.Fa slotno
 indicates which slot of that image the system is interested in.
 If the device driver does not recognize the value in either or
-.Fa imgid
+.Fa imgno
 or
-.Fa slotid ,
+.Fa slotno ,
 then it should return an error.
 .Pp
 The
@@ -323,21 +338,29 @@ function should be used to set the attributes of the UFM slot.
 These attributes include the following enumeration values:
 .Bl -tag -width Dv
 .It Dv DDI_UFM_ATTR_READABLE
-This attribute indicates that the firmware image in the specified slot
+The
+.Dv DDI_UFM_ATTR_READABLE
+attribute indicates that the firmware image in the specified slot
 may be read, even if the device driver does not currently support such
 functionality.
 .It Dv DDI_UFM_ATTR_WRITEABLE
-This attributes indicates that the firmware image in the specified slot
+The
+.Dv DDI_UFM_ATTR_WRITEABLE
+attribute indicates that the firmware image in the specified slot
 may be updated, even if the driver does not currently support such
 functionality.
 .It Dv DDI_UFM_ATTR_ACTIVE
-This attributes indicates that the firmware image in the specified slot
+The
+.Dv DDI_UFM_ATTR_ACTIVE
+attribute indicates that the firmware image in the specified slot
 is the active
 .Pq i.e. currently running
 firmware.
 Only one slot should be marked active.
 .It Dv DDI_UFM_ATTR_EMPTY
-This attributes indicates that the specified slot does not currently contain
+The
+.Dv DDI_UFM_ATTR_EMPTY
+attribute indicates that the specified slot does not currently contain
 any firmware image.
 .El
 .Pp
@@ -364,9 +387,9 @@ Common values are:
 .Bl -tag -width Er -offset width
 .It Er EINVAL
 The image or slot indicated by
-.Fa imgid
+.Fa imgno
 and
-.Fa slotid
+.Fa slotno
 is unknown.
 .It Er EIO
 An error occurred talking to the device while trying to fill out
@@ -375,11 +398,14 @@ firmware slot information.
 The driver was unable to allocate memory while filling out slot
 information.
 .El
-.It Fn ddi_ufm_op_getcaps
+.Ss Fn ddi_ufm_op_getcaps
 The
 .Fn ddi_ufm_op_getcaps
 function is used to indicate which DDI UFM capabilities are supported by this
 driver instance.
+Currently, all UFM-capable drivers are required to implement the
+.Dv DDI_UFM_CAP_REPORT
+capability.
 The following capabilities are supported and the drivers should return a
 bitwise-inclusive-OR of the following values:
 .Bl -tag -width Dv -offset width
@@ -387,8 +413,11 @@ bitwise-inclusive-OR of the following values:
 Indicates that the driver is capable of reporting UFM information and
 implements the
 .Fn ddi_ufm_op_fill_slot
-entry point and optionally the
+and
 .Fn ddi_ufm_op_fill_image
+entry points.
+It also indicates, that it optionally implements
+.Fn ddi_ufm_op_nimages
 entry point.
 .It Dv DDI_UFM_CAP_READIMG
 Indicates that the driver is capable of reading a binary firmware
@@ -414,15 +443,15 @@ capabilities.
 .It Er ENOMEM
 The driver was unable to allocate memory.
 .El
-.It Fn ddi_ufm_op_readimg
+.Ss Fn ddi_ufm_op_readimg
 The
 .Fn ddi_ufm_op_readimg
 is an optional entry point that allows the system to read a binary
 firmware payload from the device.
 The driver should read the firmware payload indicated by both
-.Fa imgid
+.Fa imgno
 and
-.Fa slotid .
+.Fa slotno .
 The driver should check to make sure that the region requested, starting
 at
 .Fa offset
@@ -445,9 +474,9 @@ Common values are:
 .Bl -tag -width Er -offset width
 .It Er EINVAL
 The image or slot indicate by
-.Fa imgid
+.Fa imgno
 and
-.Fa slotid
+.Fa slotno
 is unknown.
 The combination of
 .Fa offset
@@ -463,20 +492,24 @@ firmware image.
 The driver does not support reading a firmware payload on this device or
 from a particular image and slot.
 .El
-.El
 .Ss Caching and Updates
 The system will fetch firmware and slot information on an as-needed
 basis.
 Once it obtains some information, it may end up caching this information on
 behalf of the driver.
-Whenever the driver believes that something could have changed -- it need know
-that it has -- then the driver must call
+Whenever the driver believes that something could have changed then the driver
+must call
+.Xr ddi_ufm_update 9F .
+The driver does not need to know for certain that something has changed.
+For example, after a device reset or firmware upgrade, the driver doesn't need
+to check if the firmware revision changed at all, it can simply call
 .Xr ddi_ufm_update 9F .
 .Ss Locking
 All UFM operations on a single UFM handle will always be run serially.
 However, the device driver may still need to apply adequate locking to
-its structure members as other may be accessing the same data structure
-or trying to communicate with the device.
+its structure members as other entry points may be called on the device in
+parallel, which could access the same data structures and try to communicate
+with the device.
 .Ss Unregistering from the UFM subsystem
 When a device driver is detached, it should unregister from the UFM
 subsystem.
