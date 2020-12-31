@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FEX_SET_HANDLING 3M "Jul 12, 2006" "SunOS 5.11" "Mathematical Library Functions"
+.TH FEX_SET_HANDLING 3M "December 28, 2020" "SunOS 5.11" "Mathematical Library Functions"
 .SH NAME
 fex_set_handling, fex_get_handling, fex_getexcepthandler, fex_setexcepthandler
 \- control floating point exception handling modes
 .SH SYNOPSIS
-.LP
 .nf
 c99 [ \fIflag\fR... ] \fIfile\fR... -lm [ \fIlibrary\fR... ]
 #include <fenv.h>
@@ -32,8 +31,6 @@ c99 [ \fIflag\fR... ] \fIfile\fR... -lm [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions provide control of floating point exception handling modes. For
 each function, the \fIex\fR argument specifies one or more exceptions indicated
 by a bitwise-OR of any of the following values defined in <\fBfenv.h\fR>:
@@ -307,7 +304,7 @@ the value contained in \fBinfo->res\fR on exit is substituted for the result of
 the operation, the flags indicated by \fBinfo->flags\fR are set, and execution
 resumes at the point where the exception occurred.  The handler might modify
 \fBinfo->res\fR and \fBinfo->flags\fR to supply any desired result value and
-flags.  Alternatively, if the exception is underflow or overflow, the hander
+flags.  Alternatively, if the exception is underflow or overflow, the handler
 might set
 .sp
 .LP
@@ -348,13 +345,9 @@ structure pointed to by \fIbuf\fR.  This data structure must have been set by a
 previous call to \fBfex_getexcepthandler()\fR. Otherwise the effect on the
 indicated modes is undefined.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBfex_set_handling()\fR function returns a non-zero value if the requested
 exception handling mode is established. Otherwise, it returns 0.
 .SH EXAMPLES
-.sp
-.LP
 The following example demonstrates how to substitute a predetermined value for
 the result of a 0/0 invalid operation.
 .sp
@@ -424,8 +417,6 @@ When \fIx\fR = 0, \fIf(x)\fR is computed as 0/0 and an invalid operation
 exception occurs.  In this example, the value 2.0 is substituted for the
 result.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -442,16 +433,12 @@ MT-Level	MT-Safe (see Notes)
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBsigfpe\fR(3C), \fBfeclearexcept\fR(3M), \fBfegetenv\fR(3M),
 \fBfex_set_log\fR(3M), \fBattributes\fR(5)
 .sp
 .LP
 \fINumerical Computation Guide\fR
 .SH NOTES
-.sp
-.LP
 In a multithreaded application, the preceding functions affect exception
 handling modes only for the calling thread.
 .sp

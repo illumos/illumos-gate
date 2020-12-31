@@ -17,7 +17,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.TH SMB 4 "May 16, 2020"
+.TH SMB 4 "December 28, 2020"
 .SH NAME
 smb \- configuration properties for Solaris CIFS server
 .SH DESCRIPTION
@@ -162,7 +162,7 @@ when encryption is On (see \fBencrypt\fR property) and negotiated SMB dialect is
 .sp
 When the property is set the valid values are aes-128-ccm and aes-128-gcm.
 If aes-128-gcm is selected both CCM and GCM are allowed, but GCM is preferred.
-If aes-128-ccm is seelcted it is the only allowed cipher. If the property is not
+If aes-128-ccm is selected it is the only allowed cipher. If the property is not
 set explicitly the default value is used - aes-128-gcm.
 .sp
 The property can be set to one of these values:

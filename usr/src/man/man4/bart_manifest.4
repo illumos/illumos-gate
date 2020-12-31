@@ -3,12 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BART_MANIFEST 4 "Sep 9, 2003"
+.TH BART_MANIFEST 4 "December 28, 2020"
 .SH NAME
 bart_manifest \- system audit manifest file
 .SH DESCRIPTION
-.sp
-.LP
 The \fBbart\fR(1M) command generates a manifest that describes the contents of
 a managed host. A manifest consists of a header and entries. Each entry
 represents a single file. Entries are sorted in ascending order by file name.
@@ -33,8 +31,6 @@ This comment block lists the attributes reported for each file type.
 .LP
 To see the format of a manifest file, see \fBEXAMPLES\fR.
 .SS "Manifest File Entries"
-.sp
-.LP
 Each manifest file entry is a single line of one of the following forms,
 depending on the file type:
 .sp
@@ -243,14 +239,12 @@ block device files only.
 .RE
 
 .SS "Quoting Syntax"
-.sp
-.LP
 The rules file supports a quoting syntax for representing nonstandard file
 names.
 .sp
 .LP
-When generating a manifest for file names that embeded TAB, SPACE, or NEWLINE
-characters, the special characters are encoded in their octal forms.
+When generating a manifest for file names that contain embedded TAB, SPACE, or
+NEWLINE characters, the special characters are encoded in their octal forms.
 .sp
 
 .sp
@@ -274,7 +268,6 @@ _
 .TE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSample Manifest File
 .sp
 .LP
@@ -310,6 +303,4 @@ the encoded versions of the file names to correctly handle special characters.
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdate\fR(1), \fBbart\fR(1M), \fBbart_rules\fR(4), \fBattributes\fR(5)

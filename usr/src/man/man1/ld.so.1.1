@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LD.SO.1 1 "Oct 5, 2012"
+.TH LD.SO.1 1 "December 28, 2020"
 .SH NAME
 ld.so.1 \- runtime linker for dynamic objects
 .SH SYNOPSIS
-.LP
 .nf
 \fB/lib/ld.so.1\fR
 .fi
@@ -18,8 +17,6 @@ ld.so.1 \- runtime linker for dynamic objects
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 Dynamic applications consist of one or more dynamic objects. A dynamic
 application is typically a dynamic executable and one or more shared object
 dependencies. As part of the initialization and execution of a dynamic
@@ -39,7 +36,7 @@ link-editor is the name of the runtime linker, \fBld.so.1\fR.
 During the process of executing a dynamic executable, the kernel maps the file,
 and locates the required interpreter. See \fBexec\fR(2) and \fBmmapobj\fR(2).
 The kernel maps in, and transfers control to, this interpreter. Sufficient
-information is passed to the interpretor to allow the interpreter to continue
+information is passed to the interpreter to allow the interpreter to continue
 to bind, and then execute the application.
 .sp
 .LP
@@ -142,8 +139,6 @@ runpath is specified when the dynamic object is constructed using the \fB-R\fR
 option to \fBld\fR(1). The environment variable \fBLD_LIBRARY_PATH\fR can be
 used to indicate directories to be searched before the default directories.
 .SS "Command Line Usage"
-.sp
-.LP
 Typically, the runtime linker is invoked indirectly through executing a dynamic
 executable that declares the runtime linker as its interpreter. The runtime
 linker can also be executed directly from the command line. This mechanism is
@@ -167,8 +162,6 @@ VARIABLES.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 Each environment variable can be specified with a \fB_32\fR or \fB_64\fR
 suffix. This makes the environment variable specific, respectively, to 32-bit
 or 64-bit processes. This environment variable overrides any non-suffixed
@@ -579,8 +572,6 @@ Notice that environment variable names beginning with the
 characters '\fBLD_\fR' are reserved for possible future enhancements to \fBld\fR(1) and
 \fBld.so.1\fR.
 .SH SECURITY
-.sp
-.LP
 Secure processes have some restrictions applied to the evaluation of their
 dependencies and runpaths to prevent malicious dependency substitution or
 symbol interposition.
@@ -652,7 +643,6 @@ When creating a secure process, relative path names should \fBnot\fR be used to
 express dependencies, or to construct \fBdlopen\fR(3C) path names. This
 restriction should be applied to the application and to \fBall\fR dependencies.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing LD_FLAGS to group environment variable information
 .sp
 .LP
@@ -683,7 +673,6 @@ example% \fBLD_FLAGS_64=library_path=/lib/one/64,preload=foo.so\fR
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/ld.so.1\fR\fR
@@ -784,8 +773,6 @@ Default configuration file for 64-bit applications.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcrle\fR(1), \fBgprof\fR(1), \fBlari\fR(1), \fBld\fR(1), \fBldd\fR(1),
 \fBexec\fR(2), \fBissetugid\fR(2), \fBmmapobj\fR(2), \fBprofil\fR(2),
 \fBdladdr\fR(3C), \fBdlclose\fR(3C), \fBdldump\fR(3C), \fBdlerror\fR(3C),
@@ -795,8 +782,6 @@ Default configuration file for 64-bit applications.
 .LP
 \fILinker and Libraries Guide\fR
 .SH NOTES
-.sp
-.LP
 Care should be exercised when using \fBLD_PROFILE\fR in combination with other
 process monitoring techniques, such as users of \fBproc\fR(4). Multiple process
 monitoring techniques can result in deadlock conditions that leave the profile

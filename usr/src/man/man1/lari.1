@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LARI 1 "Nov 28, 2007"
+.TH LARI 1 "December 28, 2020"
 .SH NAME
 lari \- link analysis of runtime interfaces
 .SH SYNOPSIS
-.LP
 .nf
 \fBlari\fR [\fB-bCDsVv\fR] [\fB-a\fR | \fB-i\fR | \fB-o\fR] \fIfile\fR | \fIdirectory\fR...
 .fi
@@ -18,8 +17,6 @@ lari \- link analysis of runtime interfaces
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBlari\fR utility analyzes the interface requirements of dynamic \fBELF\fR
 objects. Two basic modes of operation are available. The first mode displays
 runtime interface information. The second mode generates interface definitions.
@@ -99,8 +96,6 @@ associated \fImapfile\fR directives. See the \fILinker and Libraries Guide\fR
 for more details on using \fImapfiles\fR to version objects. An initial version
 of these \fImapfiles\fR can be created by \fBlari\fR.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported.
 .sp
 .ne 2
@@ -295,7 +290,7 @@ This symbol definition has been directly bound to.
 .ad
 .RS 11n
 This symbol definition provides for an interposer.  An object that explicitly
-identifies itself as an interposor defines all global symbols as interposers.
+identifies itself as an interposer defines all global symbols as interposers.
 See the \fB-z\fR \fBinterpose\fR option of \fBld\fR(1), and the
 \fBLD_PRELOAD\fR variable of \fBld.so.1\fR(1). Individual symbols within a
 dynamic executable can be defined as interposers by using the \fBINTERPOSE\fR
@@ -391,8 +386,6 @@ See the \fILinker and Libraries Guide\fR for more details of these symbol
 classifications.
 .SH EXTENDED DESCRIPTION
 .SS "Interesting Information"
-.sp
-.LP
 By default, or specifically using the \fB-i\fR option, \fBlari\fR filters any
 runtime interface information to present interesting events. This filtering is
 carried out mainly to reduce the amount of information that can be generated
@@ -473,8 +466,6 @@ explicitly established, instances can exist that are unexpected and surprising.
 Directly bound symbols, and symbols with protected visibility, are output as
 interesting information.
 .SS "Overhead Information"
-.sp
-.LP
 When using the \fB-o\fR option, \fBlari\fR displays symbol definitions that
 might be considered overhead.
 .sp
@@ -555,7 +546,6 @@ bindings of this type require relocation processing at application start up,
 rather than the deferred relocation processing used when calling functions
 directly. Use of this address also requires an indirection at runtime.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAnalyzing a case of multiple bindings
 .sp
 .LP
@@ -649,7 +639,6 @@ foo.so {
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB$TMPDIR/lari.dbg.\fIfile\fR\fR\fR
@@ -659,8 +648,6 @@ Binding output produced by \fBldd\fR(1).
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -678,8 +665,6 @@ Interface Stability	See below.
 .LP
 The human readable output is Uncommitted. The options are Committed.
 .SH SEE ALSO
-.sp
-.LP
 \fBld\fR(1), \fBldd\fR(1), \fBld.so.1\fR(1), \fBdlopen\fR(3C), \fBdlsym\fR(3C),
 \fBattributes\fR(5)
 .sp
