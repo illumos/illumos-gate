@@ -167,7 +167,7 @@ shbinexec(
 {
 	_NOTE(ARGUNUSED(brand_action))
 	vnode_t *nvp;
-	int error = 0;
+	int error = 0, eba;
 	struct intpdata idata;
 	struct pathname intppn;
 	struct pathname resolvepn;
@@ -246,8 +246,9 @@ shbinexec(
 		args->fname = devfd;
 	}
 
+	eba = EBA_NONE;
 	error = gexec(&nvp, uap, args, &idata, ++level, execsz, exec_file, cred,
-	    EBA_NONE);
+	    &eba);
 
 	if (!error) {
 		/*
