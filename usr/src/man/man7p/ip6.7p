@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IP6 7P "Dec 2, 2008"
+.TH IP6 7P "December 28, 2020"
 .SH NAME
 ip6 \- Internet Protocol Version 6
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -25,8 +24,6 @@ t = t_open ("/dev/rawip6", O_RDWR);
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBIPv6\fR protocol is the next generation of the internetwork datagram
 delivery protocol of the Internet protocol family. Programs may use \fBIPv6\fR
 through higher-level protocols such as the Transmission Control Protocol
@@ -37,8 +34,6 @@ Transport Level Interface (\fBTLI\fR). The protocol options and \fBIPv6\fR
 extension headers defined in the \fBIPv6\fR specification may be set in
 outgoing datagrams.
 .SH APPLICATION PROGRAMMING INTERFACE
-.sp
-.LP
 The \fBSTREAMS\fR driver \fB/dev/rawip6\fR is the \fBTLI\fR transport provider
 that provides raw access to \fBIPv6\fR.
 .sp
@@ -82,7 +77,7 @@ The socket options supported at the \fBIPv6\fR level are:
 .ad
 .RS 24n
 Limit reception and transmission of packets to this interface. Takes an integer
-as an argument; the integer is the selected interace index.
+as an argument; the integer is the selected interface index.
 .RE
 
 .sp
@@ -578,8 +573,6 @@ reconstructed within a short time period.
 Errors in sending discovered at the network interface driver layer are passed
 by IPv6 back up to the user process.
 .SH SEE ALSO
-.sp
-.LP
 \fBsvcs\fR(1), \fBndd\fR(1M), \fBrouteadm\fR(1M), \fBsvcadm\fR(1M),
 \fBread\fR(2), \fBwrite\fR(2), \fBbind\fR(3SOCKET), \fBconnect\fR(3SOCKET),
 \fBgetsockopt\fR(3SOCKET), \fBrecv\fR(3SOCKET), \fBrecvmsg\fR(3SOCKET),
@@ -596,8 +589,6 @@ Specification\fR. The Internet Society. December, 1998.
 Stevens, W., and Thomas, M. \fIRFC 2292, Advanced Sockets API for IPv6\fR.
 Network Working Group. February 1998.
 .SH DIAGNOSTICS
-.sp
-.LP
 A socket operation may fail with one of the following errors returned:
 .sp
 .ne 2
@@ -766,8 +757,6 @@ Invalid socket type for the option.
 .RE
 
 .SH NOTES
-.sp
-.LP
 Applications using the sockets \fBAPI\fR must use the Advanced Sockets
 \fBAPI\fR for \fBIPv6\fR (\fIRFC 2292\fR) to see elements of the inbound
 packet's \fBIPv6\fR header or extension headers.

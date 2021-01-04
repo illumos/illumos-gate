@@ -3212,6 +3212,7 @@ setx86isalist(void)
 	switch (x86_vendor) {
 	case X86_VENDOR_Intel:
 	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
 	case X86_VENDOR_TM:
 		if (is_x86_feature(x86_featureset, X86FSET_CMOV)) {
 			/*

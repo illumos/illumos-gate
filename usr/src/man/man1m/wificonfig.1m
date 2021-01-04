@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WIFICONFIG 1M "Oct 31, 2007"
+.TH WIFICONFIG 1M "December 28, 2020"
 .SH NAME
 wificonfig \- WLAN configuration
 .SH SYNOPSIS
-.LP
 .nf
 \fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] [\fB-i\fR \fIinterface\fR] autoconf
      [\fIwait\fR={\fIn\fR|\fIforever\fR}]
@@ -117,8 +116,6 @@ wificonfig \- WLAN configuration
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBwificonfig\fR defines a set of subcommands and parameters to configure
 \fBWiFi\fR interfaces in the system. A driver may support all parameters or a
 subset of these parameters.
@@ -167,8 +164,6 @@ configure the interface. (See the \fBautoconf\fR subcommand for the
 heuristics). A few subcommands (\fBlistprefer\fR, \fBsetprefer\fR,
 \fBremoveprefer\fR) are defined to manipulate the Preference List.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -191,8 +186,6 @@ Configuration Profiles and \fBWEP\fR keys.
 .RE
 
 .SS "OPERANDS"
-.sp
-.LP
 The following operand is supported:
 .sp
 .ne 2
@@ -207,8 +200,6 @@ profile name.
 .RE
 
 .SS "SUBCOMMANDS"
-.sp
-.LP
 The following subcommands are supported:
 .sp
 .ne 2
@@ -265,7 +256,7 @@ parameter is set as "profile".
 .sp
 If the \fBWLAN\fRs in the Preference list are available, the user can specify
 the number of seconds to wait before \fBconnect\fR returns using the wait
-option. By default (without the wait option), \fBconnect\fR trys for 10
+option. By default (without the wait option), \fBconnect\fR tries for 10
 seconds. If "\fIforever\fR" or -1 follows the wait option, \fBwificonfig\fR
 tries until the \fBNIC\fR is successfully connected to the profile or essid
 that was specified.
@@ -275,7 +266,7 @@ whether or not a Configuration Profile was found for the specified name:
 .sp
 .in +2
 .nf
-Connecting to profile <name>	
+Connecting to profile <name>
 Connecting to essid <name>
 .fi
 .in -2
@@ -781,7 +772,6 @@ subcommand.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRListing the Parameters Supported by a Driver
 .sp
 .LP
@@ -884,10 +874,10 @@ To display the history of the \fBWLAN\fRs:
     WLAN history:
 
   essid	        bssid	            encryption	last seen
-  myXXX           00:0f:24:11:12:14  WEP     	Fri Sep 13 09:15:24 2004
-  my_office_ssid  00:0f:24:11:12:15  WEP     	Fri Sep 13 13:20:04 2004
-  my_neighbor1    00:0f:24:11:12:16  NONE    	Fri Sep 14 08:01:26 2004
-  my_neighbor2    00:0f:24:11:12:17  WEP      Fri Sep 18 21:33:12 2004
+  myXXX           00:0f:24:11:12:14  WEP        Fri Sep 13 09:15:24 2004
+  my_office_ssid  00:0f:24:11:12:15  WEP        Fri Sep 13 13:20:04 2004
+  my_neighbor1    00:0f:24:11:12:16  NONE       Fri Sep 14 08:01:26 2004
+  my_neighbor2    00:0f:24:11:12:17  WEP        Fri Sep 18 21:33:12 2004
 .fi
 .in -2
 .sp
@@ -910,7 +900,7 @@ To configure the interface according to the previously saved Preference List:
 .sp
 .LP
 If the Preference List is empty, or none of the \fBWLAN\fRs listed by the
-Proference List can be found, \fBwificonfig\fR uses the default configuration,
+Preference List can be found, \fBwificonfig\fR uses the default configuration,
 directs the interface to scan and join the \fBWLAN\fR using the built-in
 heuristics specified above.
 
@@ -1011,7 +1001,6 @@ roomlinx        00:40:96:a0:ab:39 access point  none            8
 .sp
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -1049,8 +1038,6 @@ Minor error
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1065,6 +1052,4 @@ Interface Stability	Unstable
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBps\fR(1), \fBifconfig\fR(1M), \fBattributes\fR(5), \fBath\fR(7D)

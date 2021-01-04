@@ -51,6 +51,10 @@ multiboot_color_t *cmap;
 /* The default VGA color palette format is 6 bits per primary color. */
 int palette_format = 6;
 
+#define	VESA_MODE_BASE	0x100
+#define	VESA_MODE_MAX	0x1ff
+#define	VESA_MODE_COUNT	(VESA_MODE_MAX - VESA_MODE_BASE + 1)
+
 /* Actually assuming mode 3. */
 void
 bios_set_text_mode(int mode)
@@ -458,7 +462,7 @@ vbe_find_mode_xydm(int x, int y, int depth, int m)
 	struct modeinfoblock mi;
 	uint32_t farptr;
 	uint16_t mode;
-	int safety = 0, i;
+	int safety, i;
 
 	memset(vbe, 0, sizeof (vbe));
 	memcpy(vbe->VbeSignature, "VBE2", 4);
@@ -466,8 +470,7 @@ vbe_find_mode_xydm(int x, int y, int depth, int m)
 		return (0);
 	if (memcmp(vbe->VbeSignature, "VESA", 4) != 0)
 		return (0);
-	farptr = vbe->VideoModePtr;
-	if (farptr == 0)
+	if (vbe->VideoModePtr == 0)
 		return (0);
 
 	if (m != -1)
@@ -478,10 +481,12 @@ vbe_find_mode_xydm(int x, int y, int depth, int m)
 		i = depth;
 
 	while (i > 0) {
+		farptr = vbe->VideoModePtr;
+		safety = 0;
 		while ((mode = *(uint16_t *)vbe_farptr(farptr)) != 0xffff) {
 			safety++;
 			farptr += 2;
-			if (safety == 100)
+			if (safety == VESA_MODE_COUNT)
 				return (0);
 			if (biosvbe_get_mode_info(mode, &mi) != VBE_SUCCESS) {
 				continue;
@@ -489,7 +494,6 @@ vbe_find_mode_xydm(int x, int y, int depth, int m)
 			/* we only care about linear modes here */
 			if (vbe_mode_is_supported(&mi) == 0)
 				continue;
-			safety = 0;
 
 			if (m != -1) {
 				if (m == mode)
@@ -675,7 +679,7 @@ vbe_modelist(int depth)
 	while ((mode = *(uint16_t *)vbe_farptr(farptr)) != 0xffff) {
 		safety++;
 		farptr += 2;
-		if (safety == 100) {
+		if (safety == VESA_MODE_COUNT) {
 			printf("[?] ");
 			break;
 		}
@@ -921,7 +925,7 @@ command_vesa(int argc, char *argv[])
 		return (CMD_ERROR);
 	}
 
-	if (modenum >= 0x100) {
+	if (modenum >= VESA_MODE_BASE) {
 		if (vbestate.vbe_mode != modenum) {
 			reset_font_flags();
 			bios_text_font(false);

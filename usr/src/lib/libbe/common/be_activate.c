@@ -26,7 +26,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
- * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <assert.h>
@@ -333,36 +333,39 @@ _be_activate(char *be_name, be_nextboot_state_t nextboot)
 		}
 	}
 
-	if ((zhp = zfs_open(g_zfs, root_ds, ZFS_TYPE_FILESYSTEM)) != NULL) {
-		/*
-		 * We don't need to close the zfs handle at this
-		 * point because The callback funtion
-		 * be_promote_ds_callback() will close it for us.
-		 */
-		if (be_promote_ds_callback(zhp, NULL) != 0) {
-			be_print_err(gettext("be_activate: "
-			    "failed to activate the "
-			    "datasets for %s: %s\n"),
-			    root_ds,
+	if (nextboot == BE_NEXTBOOT_IGNORE) {
+		if ((zhp = zfs_open(g_zfs, root_ds, ZFS_TYPE_FILESYSTEM)) !=
+		    NULL) {
+			/*
+			 * We don't need to close the zfs handle at this
+			 * point because The callback funtion
+			 * be_promote_ds_callback() will close it for us.
+			 */
+			if (be_promote_ds_callback(zhp, NULL) != 0) {
+				be_print_err(gettext("be_activate: "
+				    "failed to activate the "
+				    "datasets for %s: %s\n"),
+				    root_ds,
+				    libzfs_error_description(g_zfs));
+				ret = BE_ERR_PROMOTE;
+				goto done;
+			}
+		} else {
+			be_print_err(gettext("be_activate: failed to open "
+			    "dataset (%s): %s\n"), root_ds,
 			    libzfs_error_description(g_zfs));
-			ret = BE_ERR_PROMOTE;
+			ret = zfs_err_to_be_err(g_zfs);
 			goto done;
 		}
-	} else {
-		be_print_err(gettext("be_activate: failed to open "
-		    "dataset (%s): %s\n"), root_ds,
-		    libzfs_error_description(g_zfs));
-		ret = zfs_err_to_be_err(g_zfs);
-		goto done;
-	}
 
-	if (getzoneid() == GLOBAL_ZONEID &&
-	    be_get_uuid(cb.obe_root_ds, &uu) == BE_SUCCESS &&
-	    (ret = be_promote_zone_ds(cb.obe_name, cb.obe_root_ds))
-	    != BE_SUCCESS) {
-		be_print_err(gettext("be_activate: failed to promote "
-		    "the active zonepath datasets for zones in BE %s\n"),
-		    cb.obe_name);
+		if (getzoneid() == GLOBAL_ZONEID &&
+		    be_get_uuid(cb.obe_root_ds, &uu) == BE_SUCCESS &&
+		    (ret = be_promote_zone_ds(cb.obe_name, cb.obe_root_ds))
+		    != BE_SUCCESS) {
+			be_print_err(gettext("be_activate: failed to promote "
+			    "the active zonepath datasets for zones in BE "
+			    "%s\n"), cb.obe_name);
+		}
 	}
 
 	if (getzoneid() != GLOBAL_ZONEID) {

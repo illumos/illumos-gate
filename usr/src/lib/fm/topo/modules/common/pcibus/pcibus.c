@@ -671,7 +671,7 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 	tnode_t *fn;
 	uint_t class, subclass;
 	uint_t vid, did;
-	uint_t pdev_sz;
+	uint_t pdev_sz = 0;
 	did_t *dp = NULL;
 
 	if (*dev == NULL) {

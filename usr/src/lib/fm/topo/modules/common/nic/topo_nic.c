@@ -251,6 +251,8 @@ nic_create_transceiver(topo_mod_t *mod, tnode_t *pnode, dladm_handle_t handle,
 	case NIC_PORT_SFF:
 		ret = port_create_sff(mod, pnode, tranid, &port);
 		break;
+	default:
+		return (-1);
 	}
 
 	if ((ret = nic_port_datalink_props(mod, port, handle, linkid)) != 0)

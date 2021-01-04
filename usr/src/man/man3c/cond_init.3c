@@ -44,7 +44,7 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH COND_INIT 3C "February 15, 2020"
+.TH COND_INIT 3C "December 28, 2020"
 .SH NAME
 cond_init, cond_wait, cond_timedwait, cond_reltimedwait, cond_signal,
 cond_broadcast, cond_destroy \- condition variables
@@ -435,7 +435,7 @@ The \fBcond_timedwait()\fR and \fBcond_reltimedwait()\fR functions are similar
 to \fBcond_wait()\fR, except that the calling thread will not wait for the
 condition to become true past the absolute time specified by \fIabstime\fR or
 the relative time specified by \fIreltime\fR. Note that \fBcond_timedwait()\fR
-or \fBcond_reltimedwait()\fR might continue to block as it trys to reacquire
+or \fBcond_reltimedwait()\fR might continue to block as it tries to reacquire
 the mutex pointed to by \fImp\fR, which may be locked by another thread. If
 either \fBcond_timedwait()\fR or \fBcond_reltimedwait()\fR returns because of a
 timeout, it returns the error value \fBETIME\fR.

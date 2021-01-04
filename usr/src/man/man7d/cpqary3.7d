@@ -11,11 +11,10 @@
 .\"
 .\" Copyright (C) 2013 Hewlett-Packard Development Company, L.P.
 .\"
-.TH CPQARY3 7D Aug 26, 2013"
+.TH CPQARY3 7D "December 28, 2020"
 .SH NAME
 cpqary3 - provides disk and SCSI tape support for HP Smart Array controllers
 .SH DESCRIPTION
-.LP
 The cpqary3 module provides low-level interface routines between the common
 disk I/O subsystem and the HP SMART Array controllers. The cpqary3 driver
 provides disk and SCSI tape support for the HP Smart Array controllers.
@@ -32,7 +31,7 @@ controller can support up to 32 logical volumes. In addition, each controller
 supports up to a maximum of 28 connected SCSI tape drives.
 With 1.90 and later versions of cpqary3 driver, HP Smart Array SAS controllers,
 having Firmware Revision 5.10 or later, will support 64 logical drives. This
-firmware also supports Dual Domian Multipath configurations.
+firmware also supports Dual Domain Multipath configurations.
 .LP
 The driver attempts to initialize itself in accordance with the information
 found in the configuration file, /kernel/drv/cpqary3.conf.
@@ -77,7 +76,6 @@ then target ID entries for tape drives from 65 to 65+N must be added in
 .BR sd (7D),
 .BR st (7D)
 .SH NOTES
-.LP
 The Smart Array controllers supported by the current version of the
 cpqary3 driver do not support 'format unit' SCSI command. Hence, selecting
 \&'format' option under 'format' utility main menu is not supported. In addition,

@@ -200,7 +200,7 @@ mc_add_dimms(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
 	char *rev = NULL;
 	char *label = NULL;
 	char *name;
-	id_t smbid;
+	id_t smbid = -1;
 
 	if (topo_node_range_create(mod, pnode, DIMM, 0,
 	    maxdimms ? maxdimms-1 : ndimms-1) < 0) {

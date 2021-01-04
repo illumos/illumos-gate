@@ -100,17 +100,11 @@ ctf_zopen(int *errp)
 		return (zlib.z_dlp); /* library is already loaded */
 
 	/*
-	 * Get the zone native root.  For the tools build, we don't need
-	 * this (it seems fair to impose that we always build the system in
-	 * a native zone), and we want to allow build machines that are older
-	 * that the notion of the native root, so we only actually make this
-	 * call if we're not the tools build.
+	 * Get the zone native root.  For the tools build, we don't NEED this,
+	 * but since we don't allow build machines that are older that the
+	 * notion of the native root anymore, we do it all the time anyway.
 	 */
-#ifndef	CTF_TOOLS_BUILD
 	zroot = zone_get_nroot();
-#else
-	zroot = NULL;
-#endif
 
 	if (zroot != NULL) {
 		(void) snprintf(buf, MAXPATHLEN, "%s/%s", zroot, _libctf_zlib);

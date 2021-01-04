@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PKTOOL 1 "Mar 23, 2009"
+.TH PKTOOL 1 "December 28, 2020"
 .SH NAME
 pktool \- manage certificates and keys
 .SH SYNOPSIS
-.LP
 .nf
 \fBpktool\fR [\fB-f\fR \fIoption_file\fR] [\fB-i\fR] \fIsubcommand\fR \fIsubcommand_options\fR ...
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpktool\fR command allows users to manage the certificates and keys on
 multiple keystores including PKCS#11 tokens (that is, Cryptographic Framework),
 Netscape Security Services (NSS) tokens, and standard file based keystore for
@@ -26,8 +23,6 @@ Revocation List (CRL). \fBpktool\fR does not provide support for creating CRLs,
 signing CRLs, or exporting CRLs. The CRL support for the PKCS#11 keystore is
 file-based.
 .SH OPTIONS
-.sp
-.LP
 The following command options are supported:
 .sp
 .ne 2
@@ -97,8 +92,6 @@ The resulting \fBsubject-DN\fR is:
 .RE
 
 .SH SUBCOMMANDS
-.sp
-.LP
 The following subcommands are supported:
 .sp
 .ne 2
@@ -719,8 +712,6 @@ synonym for \fB-?\fR.
 .RE
 
 .SH USAGE
-.sp
-.LP
 The \fBpktool\fR subcommands support the following options:
 .sp
 .ne 2
@@ -887,7 +878,7 @@ For the \fBgencert\fR and \fBgencsr\fR subcommands, the valid private key types
 are: \fBrsa\fR, or \fBdsa\fR. The default key type is \fBrsa\fR.
 .sp
 For the \fBgenkey\fR subcommand, the valid symmetric key types are: \fBaes\fR,
-\fBarcfou\fRr, \fBdes\fR, \fB3des\fR, or \fBgeneric\fR. The default key type is
+\fBarcfour\fR, \fBdes\fR, \fB3des\fR, or \fBgeneric\fR. The default key type is
 \fBaes\fR.
 .sp
 .in +2
@@ -1249,7 +1240,6 @@ command line option has a higher priority than the environment variable.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRGenerating a Self-Signed Certificate
 .sp
 .LP
@@ -1301,8 +1291,6 @@ file into the keystore indicated in the command:
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -1323,8 +1311,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1339,8 +1325,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBpkcs11_softtoken\fR(5)
 .sp
 .LP

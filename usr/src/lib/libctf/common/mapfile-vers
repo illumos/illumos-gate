@@ -24,6 +24,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -66,6 +67,14 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_add_typedef;
 	ctf_add_union;
 	ctf_add_volatile;
+	ctf_convert_add_ignore;
+	ctf_convert_fini;
+	ctf_convert_init;
+	ctf_convert_set_batchsize;
+	ctf_convert_set_flags;
+	ctf_convert_set_label;
+	ctf_convert_set_nthreads;
+	ctf_convert_set_warncb;
 	ctf_create;
 	ctf_dataptr;
 	ctf_delete_type;

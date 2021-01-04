@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd October 29, 2017
+.Dd December 28, 2020
 .Dt VT 7I
 .Os
 .Sh NAME
@@ -277,7 +277,7 @@ to
 .Dv KD_TEXT
 or a VT of
 .Dv KD_TEXT
-mode is actived from a previous active VT of
+mode is activated from a previous active VT of
 .Dv KD_GRAPHICS
 mode, the virtual console manager initiates a
 .Dv KDSETMODE

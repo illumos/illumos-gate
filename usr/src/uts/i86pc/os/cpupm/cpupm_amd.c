@@ -37,8 +37,9 @@ cpupm_amd_init(cpu_t *cp)
 	cpupm_mach_state_t *mach_state =
 	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
 
-	/* AMD? */
-	if (x86_vendor != X86_VENDOR_AMD)
+	/* AMD or Hygon? */
+	if (x86_vendor != X86_VENDOR_AMD &&
+	    x86_vendor != X86_VENDOR_HYGON)
 		return (B_FALSE);
 
 	/*

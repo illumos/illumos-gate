@@ -22,8 +22,6 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- *ident	"%Z%%M%	%I%	%E% SMI"
  */
 
 package com.sun.solaris.service.pools;
@@ -69,7 +67,7 @@ public class Resource extends Element
 	}
 
         /**
-         * Returns a pointer to the native resouce represented by this resource
+         * Returns a pointer to the native resource represented by this resource
 	 * object.
          *
 	 * @throws PoolsException If the pool cannot be located.
@@ -96,7 +94,7 @@ public class Resource extends Element
 		    donor.getResource(), getResource(), qty) !=
 		    PoolInternal.PO_SUCCESS)
 			throw new PoolsException();
-	}		
+	}
 
         /**
          * Transfer the specified resource components from the donor to this
@@ -114,7 +112,7 @@ public class Resource extends Element
 		    donor.getResource(), getResource(), components) !=
 		    PoolInternal.PO_SUCCESS)
 			throw new PoolsException();
-	}		
+	}
 
 	/**
 	 * Get a list of components which match the supplied selection
@@ -122,7 +120,7 @@ public class Resource extends Element
 	 * this resource are searched.
 	 *
 	 * @param values A list of values to be used to qualify the search.
-	 * @throws PoolsExecption If there is an error executing the query.
+	 * @throws PoolsException If there is an error executing the query.
 	 * @return a list of components which match the supplied criteria
 	 */
 	public List getComponents(List values) throws PoolsException
@@ -211,7 +209,7 @@ public class Resource extends Element
 	 * Return the pointer to this resource as an element.
 	 *
 	 * @return The pointer to the native resource which this object wraps.
-	 * @throws PoolsExecption If there is an error converting the native
+	 * @throws PoolsException If there is an error converting the native
 	 * resource pointer to a native elem pointer.
 	 */
 	protected long getElem() throws PoolsException

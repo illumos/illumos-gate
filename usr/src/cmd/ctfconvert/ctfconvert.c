@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -37,9 +38,6 @@
 #define	CTFCONVERT_FATAL	1
 #define	CTFCONVERT_USAGE	2
 
-#define	CTFCONVERT_DEFAULT_BATCHSIZE	256
-#define	CTFCONVERT_DEFAULT_NTHREADS	4
-
 static char *ctfconvert_progname;
 
 static void
@@ -55,6 +53,20 @@ ctfconvert_fatal(const char *fmt, ...)
 	exit(CTFCONVERT_FATAL);
 }
 
+static void
+ctfconvert_warning(void *arg, const char *fmt, ...)
+{
+	va_list ap;
+	char *buf;
+
+	va_start(ap, fmt);
+	if (vasprintf(&buf, fmt, ap) != -1) {
+		(void) fprintf(stderr, "%s: WARNING: %s", ctfconvert_progname,
+		    buf);
+		free(buf);
+	}
+	va_end(ap);
+}
 
 static void
 ctfconvert_usage(const char *fmt, ...)
@@ -68,21 +80,24 @@ ctfconvert_usage(const char *fmt, ...)
 		va_end(ap);
 	}
 
-	(void) fprintf(stderr, "Usage: %s [-ikm] [-j nthrs] [-l label | "
+	(void) fprintf(stderr, "Usage: %s [-fikms] [-j nthrs] [-l label | "
 	    "-L labelenv] [-b batchsize]\n"
-	    "                  [-o outfile] input\n"
+	    "                  [-o outfile] [-M ignorefile] input\n"
 	    "\n"
 	    "\t-b  batch process this many dies at a time (default %d)\n"
+	    "\t-f  always attempt to convert files\n"
 	    "\t-i  ignore files not built partially from C sources\n"
 	    "\t-j  use nthrs threads to perform the merge (default %d)\n"
 	    "\t-k  keep around original input file on failure\n"
 	    "\t-l  set output container's label to specified value\n"
 	    "\t-L  set output container's label to value from environment\n"
 	    "\t-m  allow input to have missing debug info\n"
-	    "\t-o  copy input to outfile and add CTF\n",
+	    "\t-M  allow files listed in ignorefile to have missing debug\n"
+	    "\t-o  copy input to outfile and add CTF\n"
+	    "\t-s  allow truncation of data that cannot be fully converted\n",
 	    ctfconvert_progname,
-	    CTFCONVERT_DEFAULT_BATCHSIZE,
-	    CTFCONVERT_DEFAULT_NTHREADS);
+	    CTF_CONVERT_DEFAULT_BATCHSIZE,
+	    CTF_CONVERT_DEFAULT_NTHREADS);
 }
 
 /*
@@ -192,13 +207,13 @@ ctfconvert_fixup_genunix(ctf_file_t *fp)
 		    CTF_K_STRUCT);
 		if (mcpu == CTF_ERR) {
 			ctfconvert_fatal("failed to add 'struct machcpu' "
-			    "forward: %s", ctf_errmsg(ctf_errno(fp)));
+			    "forward: %s\n", ctf_errmsg(ctf_errno(fp)));
 		}
 	} else {
 		int kind;
 		if ((kind = ctf_type_kind(fp, mcpu)) == CTF_ERR) {
 			ctfconvert_fatal("failed to get the type kind for "
-			    "the struct machcpu: %s",
+			    "the struct machcpu: %s\n",
 			    ctf_errmsg(ctf_errno(fp)));
 		}
 
@@ -230,21 +245,23 @@ main(int argc, char *argv[])
 {
 	int c, ifd, err;
 	boolean_t keep = B_FALSE;
-	uint_t flags = 0;
-	uint_t bsize = CTFCONVERT_DEFAULT_BATCHSIZE;
-	uint_t nthreads = CTFCONVERT_DEFAULT_NTHREADS;
+	ctf_convert_flag_t flags = 0;
+	uint_t bsize = CTF_CONVERT_DEFAULT_BATCHSIZE;
+	uint_t nthreads = CTF_CONVERT_DEFAULT_NTHREADS;
 	const char *outfile = NULL;
 	const char *label = NULL;
 	const char *infile = NULL;
+	const char *ignorefile = NULL;
 	char *tmpfile;
 	ctf_file_t *ofp;
-	char buf[4096];
+	char buf[4096] = "";
 	boolean_t optx = B_FALSE;
 	boolean_t ignore_non_c = B_FALSE;
+	ctf_convert_t *cch;
 
 	ctfconvert_progname = basename(argv[0]);
 
-	while ((c = getopt(argc, argv, ":b:ij:kl:L:mo:X")) != -1) {
+	while ((c = getopt(argc, argv, ":b:fij:kl:L:mM:o:sX")) != -1) {
 		switch (c) {
 		case 'b': {
 			long argno;
@@ -258,6 +275,9 @@ main(int argc, char *argv[])
 			bsize = (uint_t)argno;
 			break;
 		}
+		case 'f':
+			flags |= CTF_FORCE_CONVERSION;
+			break;
 		case 'i':
 			ignore_non_c = B_TRUE;
 			break;
@@ -285,8 +305,14 @@ main(int argc, char *argv[])
 		case 'm':
 			flags |= CTF_ALLOW_MISSING_DEBUG;
 			break;
+		case 'M':
+			ignorefile = optarg;
+			break;
 		case 'o':
 			outfile = optarg;
+			break;
+		case 's':
+			flags |= CTF_ALLOW_TRUNCATION;
 			break;
 		case 'X':
 			optx = B_TRUE;
@@ -327,8 +353,66 @@ main(int argc, char *argv[])
 	if (outfile != NULL && strcmp(infile, outfile) != 0)
 		keep = B_TRUE;
 
-	ofp = ctf_fdconvert(ifd, label, bsize, nthreads, flags, &err, buf,
-	    sizeof (buf));
+	cch = ctf_convert_init(&err);
+	if (cch == NULL) {
+		ctfconvert_fatal(
+		    "failed to create libctf conversion handle: %s\n",
+		    strerror(err));
+	}
+	if ((err = ctf_convert_set_nthreads(cch, nthreads)) != 0)
+		ctfconvert_fatal("Could not set number of threads: %s\n",
+		    strerror(err));
+	if ((err = ctf_convert_set_batchsize(cch, bsize)) != 0)
+		ctfconvert_fatal("Could not set batch size: %s\n",
+		    strerror(err));
+	if ((err = ctf_convert_set_flags(cch, flags)) != 0)
+		ctfconvert_fatal("Could not set conversion flags: %s\n",
+		    strerror(err));
+	if (label != NULL && (err = ctf_convert_set_label(cch, label)) != 0)
+		ctfconvert_fatal("Could not set label: %s\n",
+		    strerror(err));
+	if ((err = ctf_convert_set_warncb(cch, ctfconvert_warning, NULL)) != 0)
+		ctfconvert_fatal("Could not set warning callback: %s\n",
+		    strerror(err));
+
+	if (ignorefile != NULL) {
+		char *buf = NULL;
+		ssize_t cnt;
+		size_t len = 0;
+		FILE *fp;
+
+		if ((fp = fopen(ignorefile, "r")) == NULL) {
+			ctfconvert_fatal("Could not open ignorefile '%s': %s\n",
+			    ignorefile, strerror(errno));
+		}
+
+		while ((cnt = getline(&buf, &len, fp)) != -1) {
+			char *p = buf;
+
+			if (cnt == 0 || *p == '#')
+				continue;
+
+			(void) strsep(&p, "\n");
+			if ((err = ctf_convert_add_ignore(cch, buf)) != 0) {
+				ctfconvert_fatal(
+				    "Failed to add '%s' to ignore list: %s\n",
+				    buf, strerror(err));
+			}
+		}
+		free(buf);
+		if (cnt == -1 && ferror(fp) != 0) {
+			ctfconvert_fatal(
+			    "Error reading from ignorefile '%s': %s\n",
+			    ignorefile, strerror(errno));
+		}
+
+		(void) fclose(fp);
+	}
+
+	ofp = ctf_fdconvert(cch, ifd, &err, buf, sizeof (buf));
+
+	ctf_convert_fini(cch);
+
 	if (ofp == NULL) {
 		/*
 		 * Normally, ctfconvert requires that its input file has at
@@ -351,9 +435,19 @@ main(int argc, char *argv[])
 		if (keep == B_FALSE)
 			(void) unlink(infile);
 
-		if (err == ECTF_CONVBKERR || err == ECTF_CONVNODEBUG) {
-			ctfconvert_fatal("%s\n", buf);
-		} else {
+		switch (err) {
+		case ECTF_CONVBKERR:
+			ctfconvert_fatal("CTF conversion failed: %s", buf);
+			break;
+		case ECTF_CONVNODEBUG:
+			ctfconvert_fatal("CTF conversion failed due to "
+			    "missing debug data; use -m to override\n");
+			break;
+		default:
+			if (*buf != '\0') {
+				(void) fprintf(stderr, "%s: %s",
+				    ctfconvert_progname, buf);
+			}
 			ctfconvert_fatal("CTF conversion failed: %s\n",
 			    ctf_errmsg(err));
 		}
@@ -378,7 +472,7 @@ main(int argc, char *argv[])
 		if (keep == B_FALSE)
 			(void) unlink(infile);
 		ctfconvert_fatal("failed to write CTF section to output file: "
-		    "%s", ctf_errmsg(ctf_errno(ofp)));
+		    "%s\n", ctf_errmsg(ctf_errno(ofp)));
 	}
 	ctf_close(ofp);
 

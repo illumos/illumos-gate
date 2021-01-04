@@ -1366,7 +1366,8 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	 */
 	if (!gcpu_suppress_log_on_init &&
 	    ((vendor == X86_VENDOR_Intel && family >= 0xf) ||
-	    vendor == X86_VENDOR_AMD))
+	    vendor == X86_VENDOR_AMD ||
+	    vendor == X86_VENDOR_HYGON))
 		gcpu_mca_logout(hdl, NULL, -1ULL, NULL, B_FALSE,
 		    GCPU_MPT_WHAT_POKE_ERR);
 

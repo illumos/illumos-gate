@@ -547,7 +547,8 @@ opt_pcbe_init(void)
 	 * loads this module based on its name in the module directory, but it
 	 * could have been renamed.
 	 */
-	if (cpuid_getvendor(CPU) != X86_VENDOR_AMD || amd_family < 0xf)
+	if ((cpuid_getvendor(CPU) != X86_VENDOR_AMD || amd_family < 0xf) &&
+	    cpuid_getvendor(CPU) != X86_VENDOR_HYGON)
 		return (-1);
 
 	if (amd_family == 0xf) {
@@ -556,7 +557,9 @@ opt_pcbe_init(void)
 		    "AMD Opteron & Athlon64");
 	} else {
 		(void) snprintf(amd_pcbe_impl_name, sizeof (amd_pcbe_impl_name),
-		    "AMD Family %02xh", amd_family);
+		    "%s Family %02xh",
+		    cpuid_getvendor(CPU) == X86_VENDOR_HYGON ? "Hygon" : "AMD",
+		    amd_family);
 	}
 
 	/*
@@ -598,7 +601,8 @@ opt_pcbe_init(void)
 		amd_pcbe_cpuref = amd_fam_11h_bkdg;
 		amd_events = family_11h_events;
 		amd_generic_events = opt_generic_events;
-	} else if (amd_family == 0x17 && amd_model <= 0x2f) {
+	} else if ((amd_family == 0x17 && amd_model <= 0x2f) ||
+	    amd_family == 0x18) {
 		amd_pcbe_cpuref = amd_fam_17h_zen1_reg;
 		amd_events = opteron_pcbe_f17h_zen1_events;
 		amd_generic_events = family_17h_zen1_papi_events;

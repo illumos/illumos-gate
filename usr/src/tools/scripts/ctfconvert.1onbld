@@ -10,7 +10,7 @@
 .\"
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd October 23, 2020
+.Dd December 07, 2020
 .Dt ctfconvert 1ONBLD
 .Os
 .Sh NAME
@@ -18,10 +18,11 @@
 .Nd Convert ELF object debug data to CTF container
 .Sh SYNOPSIS
 .Nm
-.Op Fl ikm
+.Op Fl fikms
 .Op Fl b Ar batchsize
 .Op Fl j Ar threads
 .Op Fl l Ar label | Fl L Ar labelenv
+.Op Fl M Ar ignorefile
 .Op Fl o Ar outfile
 .Ar ELF_object
 .Sh DESCRIPTION
@@ -45,6 +46,13 @@ option is present, the source file will be removed if an error occurs.
 .Sh OPTIONS
 The following options are supported:
 .Bl -tag -width Ar
+.It Fl f
+Always attempt conversion.
+This option causes
+.Nm
+to attempt conversion even for files where it does not seem appropriate.
+This is occasionally necessary to convert objects which have had some
+local symbols removed from the symbol table.
 .It Fl i
 Ignore files not built partially from C sources.
 .Nm
@@ -53,9 +61,16 @@ will usually check
 to see if at least one of the input files was a
 .Sq .c
 file, and exit with an error if not.
-The
+With the
 .Fl i
-option overrides this check and allows processing to continue.
+option, the check is still done but
+.Nm
+will exit with a success status instead of an error.
+In either case, conversion is not attempted.
+To attempt conversion even when the object does not appear to have been built
+from C sources, use the
+.Fl f
+option.
 .It Fl k
 When processing a file in-place and an error occurs, keep the input file
 rather than deleting it.
@@ -74,7 +89,24 @@ option relaxes this restriction allowing processing of such files.
 Note that if the file contains no debug data in any of the compilation units
 then this flag will cause
 .Nm
-to exit successfully without taking any action, and can mask missing CTF data.
+to exit successfully without taking any action, and can mask missing debug data.
+.It Fl M Ar ignorefile
+Allow
+.Ar ELF_object
+to have missing debug data in selected source files.
+The source files to ignore are specified as a list of file basenames (without
+any directory component) in
+.Ar ignorefile .
+Each file should be listed on its own line, separated by a newline.
+It is not possible to encode a file name that contains a newline and any other
+white-space within the line is considered to be part of the file name being
+specified.
+The
+.Sq /
+character may not appear in the file name.
+Empty lines and any line which has a
+.Sq #
+character in the first column are ignored.
 .It Fl b Ar batchsize
 Batch-process this many compilation units from the source file at once (default
 256). This helps to reduce memory usage when processing large objects which
@@ -89,6 +121,17 @@ variable.
 .It Fl o Ar outfile
 Write the new object with added CTF ta to the specified output file, rather
 than updating the input in-place.
+.It Fl s
+This option allows truncation of data that cannot be converted to CTF format
+because it exceeds the allowed size.
+Without this option being provided, conversion of such data would produce a
+fatal error.
+The current implementation allows truncation of
+.Vt enum
+definitions.
+When this occurs the resulting CTF data does not contain all possible
+.Vt enum
+values and a warning will be produced for each truncation.
 .El
 .Sh OPERANDS
 The following operands are supported:
@@ -110,6 +153,11 @@ The command line interface of
 .Nm
 is
 .Sy Uncommitted .
+The output of
+.Nm
+is
+.Sy Not-An-Interface
+and may change at any time.
 .Sh SEE ALSO
 .Xr ctfdiff 1 ,
 .Xr ctfdump 1 ,

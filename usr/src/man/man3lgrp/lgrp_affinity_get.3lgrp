@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LGRP_AFFINITY_GET 3LGRP "Apr 16, 2003"
+.TH LGRP_AFFINITY_GET 3LGRP "December 28, 2020"
 .SH NAME
-lgrp_affinity_get, lgrp_affinity_set \- get of set lgroup affinity
+lgrp_affinity_get, lgrp_affinity_set \- get or set lgroup affinity
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-llgrp\fR [ \fIlibrary \&.\|.\|.\fR ]
 #include <sys/lgrp_user.h>
@@ -23,7 +22,6 @@ cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-llgrp\fR [ \fIlibrary \&.\|.
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBlgrp_affinity_get()\fR function returns the affinity that the LWP or set
 of LWPs specified by the \fIidtype\fR and \fIid\fR arguments have for the given
 lgroup.
@@ -86,7 +84,7 @@ home lgroup for which it has a strong affinity.
 .LP
 The \fBLGRP_AFF_WEAK\fR affinity is a hint to the operating system that the
 calling thread has a weak affinity for the given lgroup.  If a thread has a
-weak affinity for its home lgroup, the operating system interpets this to mean
+weak affinity for its home lgroup, the operating system interprets this to mean
 that thread does not mind whether it is rehomed, unlike \fBLGRP_AFF_STRONG\fR.
 Load balancing, dynamic reconfiguration, processor binding, or processor set
 binding and manipulation are examples of events that can cause the operating
@@ -98,7 +96,6 @@ remove a thread's affinity for a particular lgroup.  Initially, each thread
 has no affinity to any lgroup.  If a thread has no lgroup affinities set, the
 operating system chooses a home lgroup for the thread with no affinity set.
 .SH RETURN VALUES
-.LP
 Upon successful completion, \fBlgrp_affinity_get()\fR returns the affinity for
 the given lgroup.
 .sp
@@ -109,7 +106,6 @@ Upon successful completion, \fBlgrp_affinity_set()\fR return 0.
 Otherwise, both functions return \(mi1 and set \fBerrno\fR to indicate the
 error.
 .SH ERRORS
-.LP
 The \fBlgrp_affinity_get()\fR and \fBlgrp_affinity_set()\fR functions will fail
 if:
 .sp
@@ -142,7 +138,6 @@ The specified lgroup or LWP(s) was not found.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -159,5 +154,4 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBlgrp_home\fR(3LGRP), \fBliblgrp\fR(3LIB), \fBattributes\fR(5)

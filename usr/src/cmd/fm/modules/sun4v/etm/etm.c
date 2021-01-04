@@ -3183,8 +3183,8 @@ etm_async_event_handler(void *arg)
 						    "error: can't find iosvc "
 						    "for async evnt %d\n",
 						    async_e.event_type);
-					(void) pthread_mutex_unlock(
-					    &iosvc_list_lock);
+						(void) pthread_mutex_unlock(
+						    &iosvc_list_lock);
 						break;
 					}
 
@@ -3197,7 +3197,7 @@ etm_async_event_handler(void *arg)
 					 * the ldom name and the msg Q
 					 * remains in iosvc_list
 					 */
-					if (iosvc->ldom_name != '\0')
+					if (*iosvc->ldom_name != '\0')
 						fmd_hdl_debug(fmd_hdl,
 						    "info: iosvc  w/ ldom_name "
 						    "%s \n", iosvc->ldom_name);

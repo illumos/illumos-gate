@@ -161,9 +161,9 @@ static uint64_t	msiq_config_other_regs[] = {
 #define	MSIQ_MAPPING_SIZE	(MSI_MAPPING_ENTRIES * sizeof (uint64_t))
 
 /* OPL tuning variables for link unstable issue */
-int wait_perst = 5000000; 	/* step 9, default: 5s */
+int wait_perst = 5000000;	/* step 9, default: 5s */
 int wait_enable_port = 30000;	/* step 11, default: 30ms */
-int link_retry_count = 2; 	/* step 11, default: 2 */
+int link_retry_count = 2;	/* step 11, default: 2 */
 int link_status_check = 400000;	/* step 11, default: 400ms */
 
 static uint64_t msiq_suspend(devhandle_t dev_hdl, pxu_t *pxu_p);
@@ -2108,7 +2108,7 @@ uint64_t
 hvio_intr_getstate(devhandle_t dev_hdl, sysino_t sysino,
     intr_state_t *intr_state)
 {
-	intr_state_t state;
+	uint64_t state;
 
 	state = CSRA_FR((caddr_t)dev_hdl, INTERRUPT_CLEAR,
 	    SYSINO_TO_DEVINO(sysino), ENTRIES_INT_STATE);

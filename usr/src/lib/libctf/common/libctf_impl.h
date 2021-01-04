@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _LIBCTF_IMPL_H
@@ -24,15 +25,31 @@
 #include <libelf.h>
 #include <libctf.h>
 #include <ctf_impl.h>
+#include <sys/list.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef int (*ctf_convert_f)(int, Elf *, uint_t, uint_t, uint_t,
-    ctf_file_t **, char *, size_t);
-extern int ctf_dwarf_convert(int, Elf *, uint_t, uint_t, uint_t,
-    ctf_file_t **, char *, size_t);
+typedef struct ctf_convert_filelist {
+	list_node_t ccf_node;
+	char *ccf_basename;
+} ctf_convert_filelist_t;
+
+struct ctf_convert_handle {
+	char *cch_label;
+	uint_t cch_flags;
+	uint_t cch_nthreads;
+	uint_t cch_batchsize;
+	ctf_convert_warn_f cch_warncb;
+	list_t cch_nodebug;
+	void *cch_warncb_arg;
+};
+
+typedef int (*ctf_convert_f)(ctf_convert_t *, int, Elf *, ctf_file_t **,
+    char *, size_t);
+extern int ctf_dwarf_convert(ctf_convert_t *, int, Elf *, ctf_file_t **,
+    char *, size_t);
 
 /*
  * Symbol walking

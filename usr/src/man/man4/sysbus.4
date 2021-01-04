@@ -3,16 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYSBUS 4 "Nov 18, 2004"
+.TH SYSBUS 4 "December 28, 2020"
 .SH NAME
 sysbus, isa \- device tree properties for ISA bus device drivers
 .SH DESCRIPTION
-.sp
-.LP
-Solaris for x86 supports  the \fBISA\fR bus as the system bus. Drivers for
-devices on this buse use the device tree built by the booting system to
+Solaris for x86 supports the \fBISA\fR bus as the system bus. Drivers for
+devices on this bus use the device tree built by the booting system to
 retrieve the necessary system resources used by the driver. These resources
-include device I/O port addresses, any interrupt capabilities  that the device
+include device I/O port addresses, any interrupt capabilities that the device
 can have, any DMA channels it can require, and any memory-mapped addresses it
 can occupy.
 .sp
@@ -42,7 +40,7 @@ file for the driver. Each entry in the array of integers for the
 the \fBinterrupts\fR property to specify the \fBIPL\fR value that is used by
 the system for this interrupt in this driver. This is the priority that this
 device's interrupt handler receives relative to the interrupt handlers of other
-drivers.  The priority is an integer from  \fB1\fR to \fB16\fR. Generally,
+drivers.  The priority is an integer from \fB1\fR to \fB16\fR. Generally,
 disks are assigned a priority of \fB5\fR, while mice and printers are lower,
 and serial communication devices are higher, typically \fB7\fR. \fB10\fR is
 reserved by the system and must not be used.  Priorities \fB11\fR and greater
@@ -69,14 +67,14 @@ associated with the device on the bus.
 The first integer of the tuple specifies the memory type, \fB0\fR specifies a
 memory range and \fB1\fR specifies an I/O range. The second integer specifies
 the base address of the memory range. The third integer of each 3-tuple
-specifies  the size, in bytes, of the mappable region.
+specifies the size, in bytes, of the mappable region.
 .sp
 The driver can refer to the elements of this array by index, and construct
 kernel mappings to these addresses using \fBddi_map_regs\fR(9F). The index into
-the array is passed as the  \fIrnumber\fR argument of \fBddi_map_regs()\fR.
+the array is passed as the \fIrnumber\fR argument of \fBddi_map_regs()\fR.
 .sp
-All  \fBsysbus\fR devices have \fBreg\fR properties.  The first tuple of this
-property  is used to construct the address part of the device name under
+All \fBsysbus\fR devices have \fBreg\fR properties.  The first tuple of this
+property is used to construct the address part of the device name under
 \fB/devices\fR. In the case of \fBPlug and Play ISA\fR devices, the first tuple
 is a special tuple that does not denote a memory range, but is used by the
 system only to create the address part of the device name.  This special tuple
@@ -106,8 +104,6 @@ devices that use DMA channels have a \fBdma-channels\fR property.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -122,8 +118,6 @@ Architecture	x86
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBprtconf\fR(1M), \fBdriver.conf\fR(4), \fBscsi\fR(4), \fBattributes\fR(5),
 \fBddi_add_intr\fR(9F), \fBddi_intr_hilevel\fR(9F), \fBddi_map_regs\fR(9F),
 \fBddi_prop_op\fR(9F)

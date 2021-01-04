@@ -1003,18 +1003,10 @@ ctf_merge_fini_input(ctf_merge_input_t *cmi)
 void
 ctf_merge_fini(ctf_merge_t *cmh)
 {
-	size_t len;
 	ctf_merge_input_t *cmi;
 
-	if (cmh->cmh_label != NULL) {
-		len = strlen(cmh->cmh_label) + 1;
-		ctf_free(cmh->cmh_label, len);
-	}
-
-	if (cmh->cmh_pname != NULL) {
-		len = strlen(cmh->cmh_pname) + 1;
-		ctf_free(cmh->cmh_pname, len);
-	}
+	ctf_strfree(cmh->cmh_label);
+	ctf_strfree(cmh->cmh_pname);
 
 	while ((cmi = list_remove_head(&cmh->cmh_inputs)) != NULL)
 		ctf_merge_fini_input(cmi);
@@ -1074,11 +1066,7 @@ ctf_merge_label(ctf_merge_t *cmh, const char *label)
 	if (dup == NULL)
 		return (EAGAIN);
 
-	if (cmh->cmh_label != NULL) {
-		size_t len = strlen(cmh->cmh_label) + 1;
-		ctf_free(cmh->cmh_label, len);
-	}
-
+	ctf_strfree(cmh->cmh_label);
 	cmh->cmh_label = dup;
 	return (0);
 }
@@ -1272,10 +1260,7 @@ ctf_merge_uniquify(ctf_merge_t *cmh, ctf_file_t *u, const char *pname)
 	dup = ctf_strdup(pname);
 	if (dup == NULL)
 		return (EINVAL);
-	if (cmh->cmh_pname != NULL) {
-		size_t len = strlen(cmh->cmh_pname) + 1;
-		ctf_free(cmh->cmh_pname, len);
-	}
+	ctf_strfree(cmh->cmh_pname);
 	cmh->cmh_pname = dup;
 	cmh->cmh_unique = u;
 	return (0);

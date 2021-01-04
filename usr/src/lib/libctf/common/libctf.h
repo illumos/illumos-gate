@@ -25,6 +25,7 @@
  */
 /*
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -37,7 +38,7 @@
  * In the meantime, be aware that any program linked with libctf in this
  * release of illumos is almost guaranteed to break in the next release.
  *
- * In short, do not user this header file or libctf for any purpose.
+ * In short, do not use this header file or libctf for any purpose.
  */
 
 #ifndef	_LIBCTF_H
@@ -75,16 +76,54 @@ extern int ctf_diff_functions(ctf_diff_t *, ctf_diff_func_f, void *);
 extern int ctf_diff_objects(ctf_diff_t *, ctf_diff_obj_f, void *);
 extern void ctf_diff_fini(ctf_diff_t *);
 
-/*
- * Normally, we return a failure if we find a C-derived compilation unit that
- * lacks DWARF or CTF (as required).  This flag over-rides this check.
- */
-#define	CTF_ALLOW_MISSING_DEBUG	0x01
+#define	CTF_CONVERT_DEFAULT_BATCHSIZE	256
+#define	CTF_CONVERT_DEFAULT_NTHREADS	4
 
-extern ctf_file_t *ctf_elfconvert(int, Elf *, const char *, uint_t, uint_t,
-    uint_t, int *, char *, size_t);
-extern ctf_file_t *ctf_fdconvert(int, const char *, uint_t, uint_t, uint_t,
-    int *, char *, size_t);
+typedef enum ctf_convert_flag {
+	/*
+	 * Normally, we return a failure if we find a C-derived compilation
+	 * unit that lacks DWARF or CTF (as required).  This flag over-rides
+	 * this check.
+	 */
+	CTF_ALLOW_MISSING_DEBUG	 = 0x01,
+	/*
+	 * Normally, we return a failure if we can't fully convert a structure
+	 * to CTF format, such as an enum with too many values. This flag
+	 * allows us to continue and convert what we can.
+	 */
+	CTF_ALLOW_TRUNCATION = 0x02,
+	/*
+	 * Conversion is not usually attempted for objects that don't appear
+	 * to be built from C sources. This flag overrides this and attempts
+	 * conversion anyway.
+	 */
+	CTF_FORCE_CONVERSION = 0x04
+} ctf_convert_flag_t;
+
+#define	CTF_CONVERT_ALL_FLAGS	(CTF_ALLOW_MISSING_DEBUG | \
+				    CTF_ALLOW_TRUNCATION | \
+				    CTF_FORCE_CONVERSION)
+
+/* opaque handle for ctfconvert functions */
+struct ctf_convert_handle;
+typedef struct ctf_convert_handle ctf_convert_t;
+
+extern ctf_convert_t *ctf_convert_init(int *);
+extern void ctf_convert_fini(ctf_convert_t *);
+
+typedef void (*ctf_convert_warn_f)(void *, const char *, ...);
+/* Any warning callback must be MT-Safe if multiple threads are used */
+extern int ctf_convert_set_warncb(ctf_convert_t *, ctf_convert_warn_f, void *);
+extern int ctf_convert_set_batchsize(ctf_convert_t *, uint_t);
+extern int ctf_convert_set_flags(ctf_convert_t *, ctf_convert_flag_t);
+extern int ctf_convert_set_label(ctf_convert_t *, const char *);
+extern int ctf_convert_set_nthreads(ctf_convert_t *, uint_t);
+extern int ctf_convert_add_ignore(ctf_convert_t *, const char *);
+
+extern ctf_file_t *ctf_elfconvert(ctf_convert_t *, int, Elf *, int *, char *,
+    size_t);
+extern ctf_file_t *ctf_fdconvert(ctf_convert_t *, int, int *, char *, size_t);
+
 
 typedef enum ctf_hsc_ret {
 	CHR_ERROR = -1,

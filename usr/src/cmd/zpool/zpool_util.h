@@ -35,44 +35,44 @@ extern "C" {
 /*
  * Basic utility functions
  */
-void *safe_malloc(size_t);
-void zpool_no_memory(void);
-uint_t num_logs(nvlist_t *nv);
-uint64_t array64_max(uint64_t array[], unsigned int len);
-int highbit64(uint64_t i);
-int lowbit64(uint64_t i);
-int isnumber(char *str);
+extern void *safe_malloc(size_t);
+extern void zpool_no_memory(void);
+extern uint_t num_logs(nvlist_t *nv);
+extern uint64_t array64_max(uint64_t array[], unsigned int len);
+extern int highbit64(uint64_t i);
+extern int lowbit64(uint64_t i);
+extern int isnumber(char *str);
 
 /*
  * Virtual device functions
  */
 
-nvlist_t *make_root_vdev(zpool_handle_t *zhp, nvlist_t *props, int force,
+extern nvlist_t *make_root_vdev(zpool_handle_t *zhp, nvlist_t *props, int force,
     int check_rep, boolean_t replacing, boolean_t dryrun,
     zpool_boot_label_t boot_type, uint64_t boot_size, int argc, char **argv);
-nvlist_t *split_mirror_vdev(zpool_handle_t *zhp, char *newname,
+extern nvlist_t *split_mirror_vdev(zpool_handle_t *zhp, char *newname,
     nvlist_t *props, splitflags_t flags, int argc, char **argv);
 
 /*
  * Pool list functions
  */
-int for_each_pool(int, char **, boolean_t unavail, zprop_list_t **,
+extern int for_each_pool(int, char **, boolean_t unavail, zprop_list_t **,
     zpool_iter_f, void *);
 
 /* Vdev list functions */
 typedef int (*pool_vdev_iter_f)(zpool_handle_t *, nvlist_t *, void *);
-int for_each_vdev(zpool_handle_t *zhp, pool_vdev_iter_f func, void *data);
+extern int for_each_vdev(zpool_handle_t *, pool_vdev_iter_f, void *);
 
 typedef struct zpool_list zpool_list_t;
 
-zpool_list_t *pool_list_get(int, char **, zprop_list_t **, int *);
-void pool_list_update(zpool_list_t *);
-int pool_list_iter(zpool_list_t *, int unavail, zpool_iter_f, void *);
-void pool_list_free(zpool_list_t *);
-int pool_list_count(zpool_list_t *);
-void pool_list_remove(zpool_list_t *, zpool_handle_t *);
+extern zpool_list_t *pool_list_get(int, char **, zprop_list_t **, int *);
+extern void pool_list_update(zpool_list_t *);
+extern int pool_list_iter(zpool_list_t *, int unavail, zpool_iter_f, void *);
+extern void pool_list_free(zpool_list_t *);
+extern int pool_list_count(zpool_list_t *);
+extern void pool_list_remove(zpool_list_t *, zpool_handle_t *);
 
-libzfs_handle_t *g_zfs;
+extern libzfs_handle_t *g_zfs;
 
 #ifdef	__cplusplus
 }

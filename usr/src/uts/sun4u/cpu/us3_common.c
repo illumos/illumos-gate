@@ -3331,7 +3331,7 @@ ce_scrub_xdiag_recirc(struct async_flt *aflt, errorq_t *eqp,
 	case CE_ACT_DONE:
 		break;
 
-	case CE_ACT(CE_DISP_BAD):
+	case CE_DISP_BAD:
 	default:
 #ifdef DEBUG
 		cmn_err(CE_PANIC, "ce_scrub_post: Bad action '%d'", action);

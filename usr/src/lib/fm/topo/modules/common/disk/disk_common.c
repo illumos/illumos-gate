@@ -1165,6 +1165,7 @@ disk_status(topo_mod_t *mod, tnode_t *nodep, topo_version_t vers,
 	 */
 	if (nvlist_lookup_string(in_nvl, "path", &fullpath) == 0) {
 		devpath = NULL;
+		pathlen = 0;
 	} else {
 		/*
 		 * Get the /devices path and attempt to open the disk status

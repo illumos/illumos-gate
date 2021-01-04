@@ -5,38 +5,32 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRINT 1 "Mar 27, 2008"
+.TH PRINT 1 "December 28, 2020"
 .SH NAME
 print \- shell built-in function to output characters to the screen or window
 .SH SYNOPSIS
 .SS "ksh"
-.LP
 .nf
 \fBprint\fR [\fB-Rnprsu\fR [\fIn\fR]] [\fIarg\fR]...
 .fi
 
 .SS "ksh93"
-.LP
 .nf
 \fBprint\fR [\fB-Renprs\fR] [\fB-f\fR \fIformat\fR] [\fB-u\fR \fIfd\fR] [\fIstring\fR...]
 .fi
 
 .SH DESCRIPTION
 .SS "ksh"
-.sp
-.LP
 The shell output mechanism. When no options are specified, or when an option
 followed by \fB\&'\fR a \fB\(mi\fR is specified, or when just \fB-\fR is
 specified, the arguments are printed on standard output as described by
 \fBecho\fR(1).
 .SS "ksh93"
-.sp
-.LP
 By default, \fBprint\fR writes each string operand to standard output and
 appends a NEWLINE character.
 .sp
 .LP
-Unless, the \fB-r\fR, \fB-R\fR, or \fB-f\fR option is speciifed, each \fB\e\fR
+Unless, the \fB-r\fR, \fB-R\fR, or \fB-f\fR option is specified, each \fB\e\fR
 character in each string operand is processed specially as follows:
 .sp
 .ne 2
@@ -132,8 +126,6 @@ The 8-bit character whose \fBASCII\fR code is the \fB1\fR-, \fB2\fR-, or
 
 .SH OPTIONS
 .SS "ksh"
-.sp
-.LP
 The following options are supported by \fBksh\fR:
 .sp
 .ne 2
@@ -185,8 +177,6 @@ placed. The default is 1.
 .RE
 
 .SS "ksh93"
-.sp
-.LP
 The following options are supported by \fBksh93\fR:
 .sp
 .ne 2
@@ -271,8 +261,6 @@ default value is \fB1\fR.
 .RE
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -293,7 +281,5 @@ Output file is not open for writing.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBecho\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBprintf\fR(1),
 \fBattributes\fR(5)

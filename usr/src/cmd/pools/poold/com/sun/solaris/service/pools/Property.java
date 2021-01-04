@@ -23,15 +23,13 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- *ident	"%Z%%M%	%I%	%E% SMI"
- *
  */
 
 package com.sun.solaris.service.pools;
 
 /**
  * The <code>Property</code> interface specifies the contract between
- * a pools configuration element and it's properties. This interface
+ * a pools configuration element and its properties. This interface
  * must be implemented by all pools configuration elements to ensure that
  * properties can be manipulated.
  */
@@ -41,7 +39,7 @@ public interface Property {
 	 * Get a property with the supplied name.
 	 *
 	 * @param name The name of the property to be retrieved.
-	 * @throws PoolsExecption If there is an error accessing the property.
+	 * @throws PoolsException If there is an error accessing the property.
 	 */
 	public boolean getBoolProperty(String name) throws PoolsException;
 
@@ -49,7 +47,7 @@ public interface Property {
 	 * Get a property with the supplied name.
 	 *
 	 * @param name The name of the property to be retrieved.
-	 * @throws PoolsExecption If there is an error accessing the property.
+	 * @throws PoolsException If there is an error accessing the property.
 	 */
 	public double getDoubleProperty(String name) throws PoolsException;
 
@@ -57,7 +55,7 @@ public interface Property {
 	 * Get a property with the supplied name.
 	 *
 	 * @param name The name of the property to be retrieved.
-	 * @throws PoolsExecption If there is an error accessing the property.
+	 * @throws PoolsException If there is an error accessing the property.
 	 */
 	public long getLongProperty(String name) throws PoolsException;
 
@@ -65,7 +63,7 @@ public interface Property {
 	 * Get a property with the supplied name.
 	 *
 	 * @param name The name of the property to be retrieved.
-	 * @throws PoolsExecption If there is an error accessing the property.
+	 * @throws PoolsException If there is an error accessing the property.
 	 */
 	public String getStringProperty(String name) throws PoolsException;
 
@@ -74,7 +72,7 @@ public interface Property {
 	 *
 	 * @param name The name of the property to be updated.
 	 * @param value The value of the property to be updated.
-	 * @throws PoolsExecption If there is an error accessing the property.
+	 * @throws PoolsException If there is an error accessing the property.
 	 */
 	public void putProperty(String name, Value value) throws PoolsException;
 
@@ -82,7 +80,7 @@ public interface Property {
 	 * Remove the property with the supplied name.
 	 *
 	 * @param name The name of the property to be removed.
-	 * @throws PoolsExecption If there is an error removing the property.
+	 * @throws PoolsException If there is an error removing the property.
 	 */
 	public void rmProperty(String name) throws PoolsException;
 }

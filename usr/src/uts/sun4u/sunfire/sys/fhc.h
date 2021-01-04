@@ -27,8 +27,6 @@
 #ifndef	_SYS_FHC_H
 #define	_SYS_FHC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -486,6 +484,7 @@ struct ft_link_list {
  * boards. It is used by both the kernel and user programs.
  */
 enum board_type {
+	EMPTY_BOARD = -1,
 	UNINIT_BOARD = 0,		/* Uninitialized board type */
 	UNKNOWN_BOARD,			/* Unknown board type */
 	CPU_BOARD,			/* System board CPU(s) */

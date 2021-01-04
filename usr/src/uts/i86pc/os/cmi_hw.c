@@ -1272,6 +1272,7 @@ cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 	switch (vendor) {
 	case X86_VENDOR_Intel:
 	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
 		if (cmi_ext_topo_check == 0) {
 			cpuid_get_ext_topo((cpu_t *)priv, &cmi_core_nbits,
 			    &cmi_strand_nbits);

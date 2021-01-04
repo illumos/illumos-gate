@@ -55,9 +55,6 @@ arch_ROOTCONF = $(ROOT)/usr/platform/$(ARCH)/lib/fm/topo/plugins/$(CONF)
 plat_ROOTCONF = $(PLATFORMS:%=$(ROOT)/usr/platform/%/lib/fm/topo/plugins/$(CONF))
 ROOTCONF = $($(CLASS)_ROOTCONF)
 
-CERRWARN += $(CNOWARN_UNINIT)
-CERRWARN += -_gcc=-Wno-parentheses
-
 APIMAP = ../../../libtopo/common/topo_mod.map
 MAPFILES =		# use APIMAP instead
 

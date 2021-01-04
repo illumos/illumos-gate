@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -768,7 +766,7 @@ fhc_bdlist_prime(int first, int count, int incr)
 
 			type = jtag_get_board_type(jtm->jtag_cmd, sc);
 			switch (type) {
-			case -1:
+			case EMPTY_BOARD:
 				fhc_bd_sc_evt(sc, SYSC_EVT_BD_EMPTY);
 				continue;
 			case DISK_BOARD:

@@ -23,8 +23,6 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- *ident	"%Z%%M%	%I%	%E% SMI"
- *
  */
 
 package com.sun.solaris.service.pools;
@@ -147,7 +145,7 @@ public class Component extends Element
 	 * Return the pointer to this component as an element.
 	 *
 	 * @return The pointer to the native component which this object wraps.
-	 * @throws PoolsExecption If there is an error converting the native
+	 * @throws PoolsException If there is an error converting the native
 	 * component pointer to a native elem pointer.
 	 */
 	protected long getElem() throws PoolsException

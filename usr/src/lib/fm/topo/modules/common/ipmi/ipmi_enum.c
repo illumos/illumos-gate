@@ -454,6 +454,12 @@ ipmi_check_entity(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 	case IPMI_ET_FAN:
 		labelname = "FAN";
 		break;
+
+	default:
+		topo_mod_dprintf(mod, "unknown entity type, %u: cannot set "
+		    "label name", edp->ed_entity);
+		nvlist_free(fmri);
+		return (1);
 	}
 
 	len = strlen(label);
@@ -631,7 +637,7 @@ ipmi_enum_sp(topo_mod_t *mod, tnode_t *pnode)
 	char ipv4_addr[INET_ADDRSTRLEN], subnet[INET_ADDRSTRLEN];
 	char gateway[INET_ADDRSTRLEN], macaddr[18];
 	char ipv6_addr[INET6_ADDRSTRLEN];
-	char **ipv6_routes;
+	char **ipv6_routes = NULL;
 	const char *sp_rev, *ipv4_cfgtype, *ipv6_cfgtype;
 	nvlist_t *auth, *fmri;
 	tnode_t *sp_node;

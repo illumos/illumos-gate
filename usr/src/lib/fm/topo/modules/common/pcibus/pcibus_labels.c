@@ -127,7 +127,7 @@ pci_label_slotname_lookup(topo_mod_t *mod, char *platform,
 					topo_mod_dprintf(mod,
 					    "%s: calling test function=%p\n",
 					    __func__, rw.srw_test);
-					if (ret = rw.srw_test(mod, dp))
+					if ((ret = rw.srw_test(mod, dp)) != 0)
 						rlabel = rw.srw_new;
 					topo_mod_dprintf(mod,
 					    "%s: test function return=%d\n",
@@ -192,7 +192,7 @@ pci_label_missing_lookup(topo_mod_t *mod, char *platform, did_t *dp)
 					topo_mod_dprintf(mod,
 					    "%s: calling test function=%p\n",
 					    __func__, m.dl_test);
-					if (ret = m.dl_test(mod, dp))
+					if ((ret = m.dl_test(mod, dp)) != 0)
 						rlabel = m.dl_label;
 					topo_mod_dprintf(mod,
 					    "%s: test function return=%d\n",
@@ -222,7 +222,7 @@ pci_slot_label_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp, did_t *pdp)
 {
 	tnode_t *anode, *apnode;
 	did_t *adp, *apdp;
-	char *plat, *pp, *l, *ancestor_l = NULL, *new_l = NULL;
+	char *plat, *pp, *l = NULL, *ancestor_l = NULL, *new_l = NULL;
 	int err, b, d, f, done = 0;
 	size_t len;
 

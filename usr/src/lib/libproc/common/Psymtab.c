@@ -755,6 +755,7 @@ static ctf_file_t *
 Pconvert_file_ctf(file_info_t *fptr)
 {
 	int err;
+	ctf_convert_t *cch;
 	ctf_file_t *fp;
 	char errmsg[1024];
 
@@ -770,20 +771,25 @@ Pconvert_file_ctf(file_info_t *fptr)
 	 */
 	if (fptr->file_cvt == B_TRUE)
 		return (NULL);
+
+	cch = ctf_convert_init(&err);
+	if (cch == NULL)
+		return (NULL);
+
 	fptr->file_cvt = B_TRUE;
 
 	fp = NULL;
 	if (fptr->file_dbgelf != NULL) {
-		fp = ctf_elfconvert(fptr->file_fd, fptr->file_dbgelf, NULL, 1,
-		    1, 0, &err, errmsg, sizeof (errmsg));
+		fp = ctf_elfconvert(cch, fptr->file_fd, fptr->file_dbgelf, &err,
+		    errmsg, sizeof (errmsg));
 		if (fp == NULL) {
 			dprintf("failed to convert %s: %s\n", fptr->file_pname,
 			    err == ECTF_CONVBKERR ? errmsg : ctf_errmsg(err));
 		}
 	}
 	if (fp == NULL) {
-		fp = ctf_elfconvert(fptr->file_fd, fptr->file_elf, NULL, 1, 1,
-		    0, &err, errmsg, sizeof (errmsg));
+		fp = ctf_elfconvert(cch, fptr->file_fd, fptr->file_elf, &err,
+		    errmsg, sizeof (errmsg));
 		if (fp == NULL) {
 			dprintf("failed to convert %s: %s\n", fptr->file_pname,
 			    err == ECTF_CONVBKERR ? errmsg : ctf_errmsg(err));
@@ -793,6 +799,7 @@ Pconvert_file_ctf(file_info_t *fptr)
 		fptr->file_ctfp = fp;
 	}
 
+	ctf_convert_fini(cch);
 	return (NULL);
 }
 

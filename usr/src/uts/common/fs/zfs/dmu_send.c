@@ -1222,9 +1222,10 @@ dmu_send_obj(const char *pool, uint64_t tosnap, uint64_t fromsnap,
 	dsl_pool_t *dp;
 	dsl_dataset_t *ds;
 	dsl_dataset_t *fromds = NULL;
-	ds_hold_flags_t dsflags = (rawok) ? 0 : DS_HOLD_FLAG_DECRYPT;
+	ds_hold_flags_t dsflags;
 	int err;
 
+	dsflags = (rawok) ? DS_HOLD_FLAG_NONE : DS_HOLD_FLAG_DECRYPT;
 	err = dsl_pool_hold(pool, FTAG, &dp);
 	if (err != 0)
 		return (err);
@@ -1287,9 +1288,10 @@ dmu_send(const char *tosnap, const char *fromsnap, boolean_t embedok,
 	dsl_pool_t *dp;
 	dsl_dataset_t *ds;
 	int err;
-	ds_hold_flags_t dsflags = (rawok) ? 0 : DS_HOLD_FLAG_DECRYPT;
+	ds_hold_flags_t dsflags;
 	boolean_t owned = B_FALSE;
 
+	dsflags = (rawok) ? DS_HOLD_FLAG_NONE : DS_HOLD_FLAG_DECRYPT;
 	if (fromsnap != NULL && strpbrk(fromsnap, "@#") == NULL)
 		return (SET_ERROR(EINVAL));
 

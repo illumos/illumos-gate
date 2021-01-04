@@ -748,7 +748,7 @@ add_pair(const char *name, const char *nvlist, const char *key,
 		int32_t lv;
 		int16_t v;
 
-		v = strtol(value, &end, 0);
+		lv = strtol(value, &end, 0);
 		if (errno != 0 || *end != '\0')
 			goto done;
 		if (lv < INT16_MIN || lv > INT16_MAX)

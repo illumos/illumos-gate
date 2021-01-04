@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/ddi.h>
@@ -1165,7 +1163,7 @@ jtag_check_plus_board(
 /*
  * Returns (positive) board type if something detected, including
  * UNKNOWN_BOARD.
- * Returns -1 if nothing there.
+ * Returns EMPTY_BOARD if nothing there.
  */
 enum board_type
 jtag_get_board_type(volatile u_int *jreg, sysc_cfga_stat_t *sc)
@@ -1261,7 +1259,7 @@ jtag_get_board_type(volatile u_int *jreg, sysc_cfga_stat_t *sc)
 		break;
 
 	case RING_BROKEN:
-		result = -1;
+		result = EMPTY_BOARD;
 		break;
 
 	default:
