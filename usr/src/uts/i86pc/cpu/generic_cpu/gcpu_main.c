@@ -150,7 +150,10 @@ gcpu_init_ident_ppin(cmi_hdl_t hdl)
 	 * failure of this part, as we will have gotten everything that we need.
 	 * It is possible that it locked open, for example.
 	 */
-	(void) cmi_hdl_wrmsr(hdl, ppin_ctl_msr, MSR_PPIN_CTL_LOCKED);
+	if (cmi_hdl_wrmsr(hdl, ppin_ctl_msr, MSR_PPIN_CTL_DISABLED) ==
+	    CMI_SUCCESS) {
+		(void) cmi_hdl_wrmsr(hdl, ppin_ctl_msr, MSR_PPIN_CTL_LOCKED);
+	}
 
 	return (kmem_asprintf("iv0-%s-%x-%llx", vendor, cmi_hdl_chipsig(hdl),
 	    value));

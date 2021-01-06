@@ -472,6 +472,7 @@ extern "C" {
  * These values are currently the same between Intel and AMD.
  */
 #define	MSR_PPIN_CTL_MASK	0x03
+#define	MSR_PPIN_CTL_DISABLED	0x00
 #define	MSR_PPIN_CTL_LOCKED	0x01
 #define	MSR_PPIN_CTL_ENABLED	0x02
 
