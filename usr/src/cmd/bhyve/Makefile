@@ -136,6 +136,7 @@ CSTD=		$(CSTD_GNU99)
 C99MODE=	-xc99=%all
 
 $(PROG) := LDLIBS += -lsocket -lnsl -ldlpi -ldladm -lmd -luuid -lvmmapi -lz
+NATIVE_LIBS += libz.so
 $(MEVENT_TEST_PROG) := LDLIBS += -lsocket
 
 .KEEP_STATE:

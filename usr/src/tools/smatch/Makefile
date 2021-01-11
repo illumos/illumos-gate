@@ -45,10 +45,13 @@ CFLAGS += -DSMATCHDATADIR='"$(SMATCHDATADIR)"'
 CFLAGS += -DGCC_BASE='"/no/such/dir"'
 CFLAGS += -DMULTIARCH_TRIPLET=NULL
 
-LDCHECKS = -Wl,$(ZASSERTDEFLIB) -Wl,$(ZGUIDANCE) -Wl,$(ZFATALWARNINGS)
-LDLIBS += -Wl,$(ZLAZYLOAD) -Wl,$(ZDIRECT) -lsqlite3 -lcrypto -lgcc -lm -lc
+LDCHECKS = $(ZASSERTDEFLIB) $(ZGUIDANCE) $(ZFATALWARNINGS)
+LDLIBS += $(ZLAZYLOAD) $(ZDIRECT) -lsqlite3 -lcrypto -lgcc -lm -lc
 LDFLAGS = $(MAPFILE.NES:%=-Wl,-M%)
 LDFLAGS += -L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib
+
+NATIVE_LIBS += libsqlite3.so libcrypto.so libm.so libc.so
+LDFLAGS += $(NATIVE_LIBS:%=$(ZASSERTDEFLIB)=%)
 
 CPPFLAGS += -nostdinc
 CPPFLAGS += -Isrc/
