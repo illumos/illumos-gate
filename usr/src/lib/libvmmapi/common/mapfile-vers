@@ -123,6 +123,8 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_unassign_pptdev;
 		vm_pmtmr_set_location;
 		vm_wrlock_cycle;
+		vm_get_run_state;
+		vm_set_run_state;
 
 	local:
 		*;

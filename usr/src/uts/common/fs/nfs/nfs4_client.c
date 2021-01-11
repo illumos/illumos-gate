@@ -24,7 +24,7 @@
  */
 
 /*
- *  	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
+ *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *	All Rights Reserved
  */
 
@@ -464,33 +464,15 @@ nfs4_attr_cache(vnode_t *vp, nfs4_ga_res_t *garp,
 	rp = VTOR4(vp);
 	mutex_enter(&rp->r_statelock);
 	was_serial = (rp->r_serial == curthread);
-	if (rp->r_serial && !was_serial) {
-		klwp_t *lwp = ttolwp(curthread);
-
+	if (rp->r_serial != NULL && !was_serial) {
 		/*
-		 * If we're the recovery thread, then purge current attrs
-		 * and bail out to avoid potential deadlock between another
-		 * thread caching attrs (r_serial thread), recov thread,
-		 * and an async writer thread.
+		 * Purge current attrs and bail out to avoid potential deadlock
+		 * between another thread caching attrs (r_serial thread), this
+		 * thread, and a thread trying to read or write pages.
 		 */
-		if (recov) {
-			PURGE_ATTRCACHE4_LOCKED(rp);
-			mutex_exit(&rp->r_statelock);
-			return;
-		}
-
-		if (lwp != NULL)
-			lwp->lwp_nostop++;
-		while (rp->r_serial != NULL) {
-			if (!cv_wait_sig(&rp->r_cv, &rp->r_statelock)) {
-				mutex_exit(&rp->r_statelock);
-				if (lwp != NULL)
-					lwp->lwp_nostop--;
-				return;
-			}
-		}
-		if (lwp != NULL)
-			lwp->lwp_nostop--;
+		PURGE_ATTRCACHE4_LOCKED(rp);
+		mutex_exit(&rp->r_statelock);
+		return;
 	}
 
 	/*
@@ -3067,7 +3049,7 @@ nfs_free_mi4(mntinfo4_t *mi)
 	nfs4_oo_hash_bucket_t   *bucketp;
 	nfs4_debug_msg_t	*msgp;
 	int i;
-	servinfo4_t 		*svp;
+	servinfo4_t		*svp;
 
 	/*
 	 * Code introduced here should be carefully evaluated to make

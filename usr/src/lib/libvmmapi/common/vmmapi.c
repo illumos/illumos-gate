@@ -1302,6 +1302,18 @@ vm_set_x2apic_state(struct vmctx *ctx, int vcpu, enum x2apic_state state)
 	return (error);
 }
 
+#ifndef __FreeBSD__
+int
+vcpu_reset(struct vmctx *vmctx, int vcpu)
+{
+	struct vm_vcpu_reset vvr;
+
+	vvr.vcpuid = vcpu;
+	vvr.kind = VRK_RESET;
+
+	return (ioctl(vmctx->fd, VM_RESET_CPU, &vvr));
+}
+#else /* __FreeBSD__ */
 /*
  * From Intel Vol 3a:
  * Table 9-1. IA-32 Processor States Following Power-up, Reset or INIT
@@ -1458,6 +1470,7 @@ vcpu_reset(struct vmctx *vmctx, int vcpu)
 done:
 	return (error);
 }
+#endif /* __FreeBSD__ */
 
 int
 vm_get_gpa_pmap(struct vmctx *ctx, uint64_t gpa, uint64_t *pte, int *num)
@@ -1839,6 +1852,39 @@ vm_wrlock_cycle(struct vmctx *ctx)
 	}
 	return (0);
 }
+
+int
+vm_get_run_state(struct vmctx *ctx, int vcpu, enum vcpu_run_state *state,
+    uint8_t *sipi_vector)
+{
+	struct vm_run_state data;
+
+	data.vcpuid = vcpu;
+	if (ioctl(ctx->fd, VM_GET_RUN_STATE, &data) != 0) {
+		return (errno);
+	}
+
+	*state = data.state;
+	*sipi_vector = data.sipi_vector;
+	return (0);
+}
+
+int
+vm_set_run_state(struct vmctx *ctx, int vcpu, enum vcpu_run_state state,
+    uint8_t sipi_vector)
+{
+	struct vm_run_state data;
+
+	data.vcpuid = vcpu;
+	data.state = state;
+	data.sipi_vector = sipi_vector;
+	if (ioctl(ctx->fd, VM_SET_RUN_STATE, &data) != 0) {
+		return (errno);
+	}
+
+	return (0);
+}
+
 #endif /* __FreeBSD__ */
 
 #ifdef __FreeBSD__

@@ -58,8 +58,7 @@ void fbsdrun_set_capabilities(struct vmctx *ctx, int cpu);
 #ifdef __FreeBSD__
 void fbsdrun_addcpu(struct vmctx *ctx, int fromcpu, int newcpu, uint64_t rip);
 #else
-void fbsdrun_addcpu(struct vmctx *ctx, int fromcpu, int newcpu, uint64_t rip,
-    bool suspend);
+void fbsdrun_addcpu(struct vmctx *ctx, int newcpu, uint64_t rip, bool suspend);
 #endif
 int  fbsdrun_muxed(void);
 int  fbsdrun_vmexit_on_hlt(void);

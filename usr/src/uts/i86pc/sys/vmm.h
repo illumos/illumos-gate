@@ -217,9 +217,9 @@ enum vm_exitcode {
 	VM_EXITCODE_PAUSE,
 	VM_EXITCODE_PAGING,
 	VM_EXITCODE_INST_EMUL,
-	VM_EXITCODE_SPINUP_AP,
+	VM_EXITCODE_RUN_STATE,
 	VM_EXITCODE_MMIO_EMUL,
-	VM_EXITCODE_RUNBLOCK,
+	VM_EXITCODE_DEPRECATED,	/* formerly RUNBLOCK */
 	VM_EXITCODE_IOAPIC_EOI,
 	VM_EXITCODE_SUSPENDED,
 	VM_EXITCODE_MMIO,
@@ -287,6 +287,18 @@ struct vm_task_switch {
 	struct vm_guest_paging paging;
 };
 
+enum vcpu_run_state {
+	VRS_HALT		= 0,
+	VRS_INIT		= (1 << 0),
+	VRS_RUN			= (1 << 1),
+
+	VRS_PEND_INIT		= (1 << 14),
+	VRS_PEND_SIPI		= (1 << 15),
+};
+#define VRS_MASK_VALID(v)	\
+	((v) & (VRS_INIT | VRS_RUN | VRS_PEND_SIPI | VRS_PEND_SIPI))
+#define VRS_IS_VALID(v)		((v) == VRS_MASK_VALID(v))
+
 struct vm_exit {
 	enum vm_exitcode	exitcode;
 	int			inst_length;	/* 0 means unknown */
@@ -348,10 +360,6 @@ struct vm_exit {
 			uint64_t	wval;
 		} msr;
 		struct {
-			int		vcpu;
-			uint64_t	rip;
-		} spinup_ap;
-		struct {
 			uint64_t	rflags;
 		} hlt;
 		struct {
@@ -367,8 +375,8 @@ struct vm_exit {
 enum vm_entry_cmds {
 	VEC_DEFAULT = 0,
 	VEC_DISCARD_INSTR,	/* discard inst emul state */
-	VEC_COMPLETE_MMIO,	/* entry includes result for mmio emul */
-	VEC_COMPLETE_INOUT,	/* entry includes result for inout emul */
+	VEC_FULFILL_MMIO,	/* entry includes result for mmio emul */
+	VEC_FULFILL_INOUT,	/* entry includes result for inout emul */
 };
 
 struct vm_entry {

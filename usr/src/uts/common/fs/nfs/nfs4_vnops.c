@@ -2596,12 +2596,6 @@ nfs4close_otw(rnode4_t *rp, cred_t *cred_otw, nfs4_open_owner_t *oop,
 	osp->os_ref_count--;
 
 	if (ep->error == 0) {
-		/*
-		 * Avoid a deadlock with the r_serial thread waiting for
-		 * os_sync_lock in nfs4_get_otw_cred_by_osp() which might be
-		 * held by us. We will wait in nfs4_attr_cache() for the
-		 * completion of the r_serial thread.
-		 */
 		mutex_exit(&osp->os_sync_lock);
 		*have_sync_lockp = 0;
 

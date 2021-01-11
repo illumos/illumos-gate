@@ -30,6 +30,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _VLAPIC_H_
@@ -37,6 +38,8 @@
 
 struct vm;
 enum x2apic_state;
+
+void vlapic_reset(struct vlapic *vlapic);
 
 int vlapic_write(struct vlapic *vlapic, int mmio_access, uint64_t offset,
     uint64_t data);

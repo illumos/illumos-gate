@@ -992,13 +992,10 @@ int
 vlapic_icrlo_write_handler(struct vlapic *vlapic)
 {
 	int i;
-	bool phys;
 	cpuset_t dmask;
 	uint64_t icrval;
-	uint32_t dest, vec, mode;
-	struct vlapic *vlapic2;
+	uint32_t dest, vec, mode, dsh;
 	struct LAPIC *lapic;
-	uint16_t maxcpus;
 
 	lapic = vlapic->apic_page;
 	lapic->icr_lo &= ~APIC_DELSTAT_PEND;
@@ -1010,93 +1007,79 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic)
 		dest = icrval >> (32 + 24);
 	vec = icrval & APIC_VECTOR_MASK;
 	mode = icrval & APIC_DELMODE_MASK;
+	dsh = icrval & APIC_DEST_MASK;
 
 	if (mode == APIC_DELMODE_FIXED && vec < 16) {
 		vlapic_set_error(vlapic, APIC_ESR_SEND_ILLEGAL_VECTOR, false);
-		VLAPIC_CTR1(vlapic, "Ignoring invalid IPI %d", vec);
 		return (0);
 	}
+	if (mode == APIC_DELMODE_INIT &&
+	    (icrval & APIC_LEVEL_MASK) == APIC_LEVEL_DEASSERT) {
+		/* No work required to deassert INIT */
+		return (0);
+	}
+	if ((mode == APIC_DELMODE_STARTUP || mode == APIC_DELMODE_INIT) &&
+	    !(dsh == APIC_DEST_DESTFLD || dsh == APIC_DEST_ALLESELF)) {
+		/*
+		 * While Intel makes no mention of restrictions for destination
+		 * shorthand when sending INIT or SIPI, AMD requires either a
+		 * specific destination or all-excluding self.  Common use seems
+		 * to be restricted to those two cases.
+		 */
+		return (-1);
+	}
 
-	VLAPIC_CTR2(vlapic, "icrlo 0x%016lx triggered ipi %d", icrval, vec);
+	switch (dsh) {
+	case APIC_DEST_DESTFLD:
+		vlapic_calcdest(vlapic->vm, &dmask, dest,
+		    (icrval & APIC_DESTMODE_LOG) == 0, false, x2apic(vlapic));
+		break;
+	case APIC_DEST_SELF:
+		CPU_SETOF(vlapic->vcpuid, &dmask);
+		break;
+	case APIC_DEST_ALLISELF:
+		dmask = vm_active_cpus(vlapic->vm);
+		break;
+	case APIC_DEST_ALLESELF:
+		dmask = vm_active_cpus(vlapic->vm);
+		CPU_CLR(vlapic->vcpuid, &dmask);
+		break;
+	default:
+		/*
+		 * All possible delivery notations are covered above.
+		 * We should never end up here.
+		 */
+		panic("unknown delivery shorthand: %x", dsh);
+	}
 
-	if (mode == APIC_DELMODE_FIXED || mode == APIC_DELMODE_NMI) {
-		switch (icrval & APIC_DEST_MASK) {
-		case APIC_DEST_DESTFLD:
-			phys = ((icrval & APIC_DESTMODE_LOG) == 0);
-			vlapic_calcdest(vlapic->vm, &dmask, dest, phys, false,
-			    x2apic(vlapic));
+	while ((i = CPU_FFS(&dmask)) != 0) {
+		i--;
+		CPU_CLR(i, &dmask);
+		switch (mode) {
+		case APIC_DELMODE_FIXED:
+			lapic_intr_edge(vlapic->vm, i, vec);
+			vmm_stat_incr(vlapic->vm, vlapic->vcpuid,
+			    VLAPIC_IPI_SEND, 1);
+			vmm_stat_incr(vlapic->vm, i,
+			    VLAPIC_IPI_RECV, 1);
 			break;
-		case APIC_DEST_SELF:
-			CPU_SETOF(vlapic->vcpuid, &dmask);
+		case APIC_DELMODE_NMI:
+			vm_inject_nmi(vlapic->vm, i);
 			break;
-		case APIC_DEST_ALLISELF:
-			dmask = vm_active_cpus(vlapic->vm);
+		case APIC_DELMODE_INIT:
+			(void) vm_inject_init(vlapic->vm, i);
 			break;
-		case APIC_DEST_ALLESELF:
-			dmask = vm_active_cpus(vlapic->vm);
-			CPU_CLR(vlapic->vcpuid, &dmask);
+		case APIC_DELMODE_STARTUP:
+			(void) vm_inject_sipi(vlapic->vm, i, vec);
 			break;
+		case APIC_DELMODE_LOWPRIO:
+		case APIC_DELMODE_SMI:
 		default:
-			CPU_ZERO(&dmask);	/* satisfy gcc */
+			/* Unhandled IPI modes (for now) */
 			break;
 		}
-
-		while ((i = CPU_FFS(&dmask)) != 0) {
-			i--;
-			CPU_CLR(i, &dmask);
-			if (mode == APIC_DELMODE_FIXED) {
-				lapic_intr_edge(vlapic->vm, i, vec);
-				vmm_stat_incr(vlapic->vm, vlapic->vcpuid,
-				    VLAPIC_IPI_SEND, 1);
-				vmm_stat_incr(vlapic->vm, i,
-				    VLAPIC_IPI_RECV, 1);
-				VLAPIC_CTR2(vlapic, "vlapic sending ipi %d "
-				    "to vcpuid %d", vec, i);
-			} else {
-				vm_inject_nmi(vlapic->vm, i);
-				VLAPIC_CTR1(vlapic, "vlapic sending ipi nmi "
-				    "to vcpuid %d", i);
-			}
-		}
-
-		return (0);	/* handled completely in the kernel */
 	}
-
-	maxcpus = vm_get_maxcpus(vlapic->vm);
-	if (mode == APIC_DELMODE_INIT) {
-		if ((icrval & APIC_LEVEL_MASK) == APIC_LEVEL_DEASSERT)
-			return (0);
-
-		if (vlapic->vcpuid == 0 && dest != 0 && dest < maxcpus) {
-			vlapic2 = vm_lapic(vlapic->vm, dest);
-
-			/* move from INIT to waiting-for-SIPI state */
-			if (vlapic2->boot_state == BS_INIT) {
-				vlapic2->boot_state = BS_SIPI;
-			}
-
-			return (0);
-		}
-	}
-
-	if (mode == APIC_DELMODE_STARTUP) {
-		if (vlapic->vcpuid == 0 && dest != 0 && dest < maxcpus) {
-			vlapic2 = vm_lapic(vlapic->vm, dest);
-
-			/*
-			 * Ignore SIPIs in any state other than wait-for-SIPI
-			 */
-			if (vlapic2->boot_state != BS_SIPI)
-				return (0);
-
-			vlapic2->boot_state = BS_RUNNING;
-			vm_req_spinup_ap(vlapic->vm, dest, vec << PAGE_SHIFT);
-			return (0);
-		}
-	}
-
-	/* Return to userland.  */
-	return (-1);
+	return (0);
 }
 
 void
@@ -1450,30 +1433,72 @@ vlapic_write(struct vlapic *vlapic, int mmio_access, uint64_t offset,
 	return (retval);
 }
 
-static void
+void
 vlapic_reset(struct vlapic *vlapic)
 {
-	struct LAPIC *lapic;
+	struct LAPIC *lapic = vlapic->apic_page;
+	uint32_t *isrptr, *tmrptr, *irrptr;
 
-	lapic = vlapic->apic_page;
-	bzero(lapic, sizeof (struct LAPIC));
+	/* Reset any timer-related state first */
+	VLAPIC_TIMER_LOCK(vlapic);
+	callout_stop(&vlapic->callout);
+	lapic->icr_timer = 0;
+	lapic->ccr_timer = 0;
+	VLAPIC_TIMER_UNLOCK(vlapic);
+	lapic->dcr_timer = 0;
+	vlapic_dcr_write_handler(vlapic);
+
+	/*
+	 * Sync any APIC acceleration (APICv/AVIC) state into the APIC page so
+	 * it is not leftover after the reset.  This is performed after the APIC
+	 * timer has been stopped, in case it happened to fire just prior to
+	 * being deactivated.
+	 */
+	if (vlapic->ops.sync_state) {
+		(*vlapic->ops.sync_state)(vlapic);
+	}
 
 	lapic->id = vlapic_get_id(vlapic);
 	lapic->version = VLAPIC_VERSION;
 	lapic->version |= (VLAPIC_MAXLVT_INDEX << MAXLVTSHIFT);
+
+	lapic->tpr = 0;
+	lapic->apr = 0;
+	lapic->ppr = 0;
+
+#ifdef __ISRVEC_DEBUG
+	/* With the PPR cleared, the isrvec tracking should be reset too */
+	vlapic->isrvec_stk_top = 0;
+#endif
+
+	lapic->eoi = 0;
+	lapic->ldr = 0;
 	lapic->dfr = 0xffffffff;
 	lapic->svr = APIC_SVR_VECTOR;
-	vlapic_mask_lvts(vlapic);
-
-	lapic->dcr_timer = 0;
-	vlapic_dcr_write_handler(vlapic);
-
-	if (vlapic->vcpuid == 0)
-		vlapic->boot_state = BS_RUNNING;	/* BSP */
-	else
-		vlapic->boot_state = BS_INIT;		/* AP */
-
 	vlapic->svr_last = lapic->svr;
+
+	isrptr = &lapic->isr0;
+	tmrptr = &lapic->tmr0;
+	irrptr = &lapic->irr0;
+	for (uint_t i = 0; i < 8; i++) {
+		atomic_store_rel_int(&isrptr[i * 4], 0);
+		atomic_store_rel_int(&tmrptr[i * 4], 0);
+		atomic_store_rel_int(&irrptr[i * 4], 0);
+	}
+
+	lapic->esr = 0;
+	vlapic->esr_pending = 0;
+	lapic->icr_lo = 0;
+	lapic->icr_hi = 0;
+
+	lapic->lvt_cmci = 0;
+	lapic->lvt_timer = 0;
+	lapic->lvt_thermal = 0;
+	lapic->lvt_pcint = 0;
+	lapic->lvt_lint0 = 0;
+	lapic->lvt_lint1 = 0;
+	lapic->lvt_error = 0;
+	vlapic_mask_lvts(vlapic);
 }
 
 void

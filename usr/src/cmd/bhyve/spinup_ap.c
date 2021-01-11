@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include "bhyverun.h"
 #include "spinup_ap.h"
 
+#ifdef __FreeBSD__
 static void
 spinup_ap_realmode(struct vmctx *ctx, int newcpu, uint64_t *rip)
 {
@@ -101,7 +102,6 @@ spinup_ap(struct vmctx *ctx, int vcpu, int newcpu, uint64_t rip)
 
 	fbsdrun_set_capabilities(ctx, newcpu);
 
-#ifdef __FreeBSD__
 	/*
 	 * Enable the 'unrestricted guest' mode for 'newcpu'.
 	 *
@@ -110,17 +110,30 @@ spinup_ap(struct vmctx *ctx, int vcpu, int newcpu, uint64_t rip)
 	 */
 	error = vm_set_capability(ctx, newcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
 	assert(error == 0);
-#else
-	/* Unrestricted Guest is always enabled on illumos */
-#endif
 
 	spinup_ap_realmode(ctx, newcpu, &rip);
 
-#ifdef __FreeBSD__
 	fbsdrun_addcpu(ctx, vcpu, newcpu, rip);
-#else
-	fbsdrun_addcpu(ctx, vcpu, newcpu, rip, false);
-#endif
 
 	return (newcpu);
 }
+#else /* __FreeBSD__ */
+void
+spinup_halted_ap(struct vmctx *ctx, int newcpu)
+{
+	int error;
+
+	assert(newcpu != 0);
+	assert(newcpu < guest_ncpus);
+
+	error = vcpu_reset(ctx, newcpu);
+	assert(error == 0);
+
+	fbsdrun_set_capabilities(ctx, newcpu);
+
+	error = vm_set_run_state(ctx, newcpu, VRS_HALT, 0);
+	assert(error == 0);
+
+	fbsdrun_addcpu(ctx, newcpu, 0, false);
+}
+#endif /* __FreeBSD__ */

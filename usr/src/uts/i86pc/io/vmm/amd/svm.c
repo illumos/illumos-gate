@@ -1917,8 +1917,7 @@ svm_dr_leave_guest(struct svm_regctx *gctx)
  * Start vcpu with specified RIP.
  */
 static int
-svm_vmrun(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
-    struct vm_eventinfo *evinfo)
+svm_vmrun(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 {
 	struct svm_regctx *gctx;
 	struct svm_softc *svm_sc;
@@ -2010,34 +2009,18 @@ svm_vmrun(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 		inject_state = svm_inject_vlapic(svm_sc, vcpu, vlapic,
 		    inject_state);
 
-		if (vcpu_suspended(evinfo)) {
+		/*
+		 * Check for vCPU bail-out conditions.  This must be done after
+		 * svm_inject_events() to detect a triple-fault condition.
+		 */
+		if (vcpu_entry_bailout_checks(vm, vcpu, state->rip)) {
 			enable_gintr();
-			vm_exit_suspended(vm, vcpu, state->rip);
 			break;
 		}
 
-		if (vcpu_runblocked(evinfo)) {
+		if (vcpu_run_state_pending(vm, vcpu)) {
 			enable_gintr();
-			vm_exit_runblock(vm, vcpu, state->rip);
-			break;
-		}
-
-		if (vcpu_reqidle(evinfo)) {
-			enable_gintr();
-			vm_exit_reqidle(vm, vcpu, state->rip);
-			break;
-		}
-
-		/* We are asked to give the cpu by scheduler. */
-		if (vcpu_should_yield(vm, vcpu)) {
-			enable_gintr();
-			vm_exit_astpending(vm, vcpu, state->rip);
-			break;
-		}
-
-		if (vcpu_debugged(vm, vcpu)) {
-			enable_gintr();
-			vm_exit_debug(vm, vcpu, state->rip);
+			vm_exit_run_state(vm, vcpu, state->rip);
 			break;
 		}
 
@@ -2303,7 +2286,7 @@ svm_setreg(void *arg, int vcpu, int ident, uint64_t val)
 }
 
 static int
-svm_setdesc(void *arg, int vcpu, int reg, struct seg_desc *desc)
+svm_setdesc(void *arg, int vcpu, int reg, const struct seg_desc *desc)
 {
 	struct vmcb *vmcb;
 	struct svm_softc *sc;

@@ -2738,8 +2738,7 @@ vmx_dr_leave_guest(struct vmxctx *vmxctx)
 }
 
 static int
-vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
-    struct vm_eventinfo *evinfo)
+vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 {
 	int rc, handled, launched;
 	struct vmx *vmx;
@@ -2834,39 +2833,17 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 		}
 
 		/*
-		 * Check for vcpu suspension after injecting events because
-		 * vmx_inject_events() can suspend the vcpu due to a
-		 * triple fault.
+		 * Check for vCPU bail-out conditions.  This must be done after
+		 * vmx_inject_events() to detect a triple-fault condition.
 		 */
-		if (vcpu_suspended(evinfo)) {
+		if (vcpu_entry_bailout_checks(vmx->vm, vcpu, rip)) {
 			enable_intr();
-			vm_exit_suspended(vmx->vm, vcpu, rip);
 			break;
 		}
 
-		if (vcpu_runblocked(evinfo)) {
+		if (vcpu_run_state_pending(vm, vcpu)) {
 			enable_intr();
-			vm_exit_runblock(vmx->vm, vcpu, rip);
-			break;
-		}
-
-		if (vcpu_reqidle(evinfo)) {
-			enable_intr();
-			vm_exit_reqidle(vmx->vm, vcpu, rip);
-			break;
-		}
-
-		if (vcpu_should_yield(vm, vcpu)) {
-			enable_intr();
-			vm_exit_astpending(vmx->vm, vcpu, rip);
-			vmx_astpending_trace(vmx, vcpu, rip);
-			handled = HANDLED;
-			break;
-		}
-
-		if (vcpu_debugged(vm, vcpu)) {
-			enable_intr();
-			vm_exit_debug(vmx->vm, vcpu, rip);
+			vm_exit_run_state(vmx->vm, vcpu, rip);
 			break;
 		}
 
@@ -2985,18 +2962,11 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 		rip = vmexit->rip;
 	} while (handled);
 
-	/*
-	 * If a VM exit has been handled then the exitcode must be BOGUS
-	 * If a VM exit is not handled then the exitcode must not be BOGUS
-	 */
-	if ((handled && vmexit->exitcode != VM_EXITCODE_BOGUS) ||
-	    (!handled && vmexit->exitcode == VM_EXITCODE_BOGUS)) {
-		panic("Mismatch between handled (%d) and exitcode (%d)",
-		    handled, vmexit->exitcode);
+	/* If a VM exit has been handled then the exitcode must be BOGUS */
+	if (handled && vmexit->exitcode != VM_EXITCODE_BOGUS) {
+		panic("Non-BOGUS exitcode (%d) unexpected for handled VM exit",
+		    vmexit->exitcode);
 	}
-
-	if (!handled)
-		vmm_stat_incr(vm, vcpu, VMEXIT_USERSPACE, 1);
 
 	VCPU_CTR1(vm, vcpu, "returning from vmx_run: exitcode %d",
 	    vmexit->exitcode);
@@ -3261,7 +3231,7 @@ vmx_getdesc(void *arg, int vcpu, int seg, struct seg_desc *desc)
 }
 
 static int
-vmx_setdesc(void *arg, int vcpu, int seg, struct seg_desc *desc)
+vmx_setdesc(void *arg, int vcpu, int seg, const struct seg_desc *desc)
 {
 	int hostcpu, running;
 	struct vmx *vmx = arg;
