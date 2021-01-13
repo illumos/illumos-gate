@@ -22,6 +22,7 @@
 
 /*
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/ddi.h>
@@ -867,7 +868,8 @@ t4_mc_getcapab(void *arg, mac_capab_t cap, void *data)
 	case MAC_CAPAB_HCKSUM:
 		if (pi->features & CXGBE_HW_CSUM) {
 			uint32_t *d = data;
-			*d = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
+			*d = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM |
+			    HCKSUM_INET_FULL_V6;
 		} else
 			status = B_FALSE;
 		break;
@@ -878,8 +880,10 @@ t4_mc_getcapab(void *arg, mac_capab_t cap, void *data)
 		    pi->features & CXGBE_HW_CSUM) {
 			mac_capab_lso_t *d = data;
 
-			d->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+			d->lso_flags = LSO_TX_BASIC_TCP_IPV4 |
+			    LSO_TX_BASIC_TCP_IPV6;
 			d->lso_basic_tcp_ipv4.lso_max = 65535;
+			d->lso_basic_tcp_ipv6.lso_max = 65535;
 		} else
 			status = B_FALSE;
 		break;
