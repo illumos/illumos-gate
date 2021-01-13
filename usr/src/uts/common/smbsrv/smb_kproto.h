@@ -742,6 +742,9 @@ cred_t *smb_kcred_create(void);
 void smb_user_setcred(smb_user_t *, cred_t *, uint32_t);
 boolean_t smb_is_same_user(cred_t *, cred_t *);
 boolean_t smb_user_has_security_priv(smb_user_t *, cred_t *);
+void smb_user_inc_trees(smb_user_t *);
+void smb_user_dec_trees(smb_user_t *);
+void smb_user_wait_trees(smb_user_t *);
 
 /*
  * SMB tree functions (file smb_tree.c)

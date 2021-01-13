@@ -1077,6 +1077,8 @@ typedef struct smb_user {
 	uint32_t		u_privileges;
 	uint16_t		u_uid;		/* unique per-session */
 	uint32_t		u_audit_sid;
+	uint32_t		u_owned_tree_cnt;
+	kcondvar_t		u_owned_tree_cv;
 
 	uint32_t		u_sign_flags;
 	struct smb_key		u_sign_key;	/* SMB2 signing */

@@ -662,6 +662,55 @@ smb_user_enum(smb_user_t *user, smb_svcenum_t *svcenum)
 	return (rc);
 }
 
+/*
+ * Count references by trees this user owns,
+ * and allow waiting for them to go away.
+ */
+void
+smb_user_inc_trees(smb_user_t *user)
+{
+	mutex_enter(&user->u_mutex);
+	user->u_owned_tree_cnt++;
+	mutex_exit(&user->u_mutex);
+}
+
+void
+smb_user_dec_trees(smb_user_t *user)
+{
+	mutex_enter(&user->u_mutex);
+	user->u_owned_tree_cnt--;
+	if (user->u_owned_tree_cnt == 0)
+		cv_broadcast(&user->u_owned_tree_cv);
+	mutex_exit(&user->u_mutex);
+}
+
+int smb_user_wait_tree_tmo = 30;
+
+/*
+ * Wait (up to 30 sec.) for trees to go away.
+ * Should happen in less than a second.
+ */
+void
+smb_user_wait_trees(smb_user_t *user)
+{
+	clock_t	time;
+
+	time = SEC_TO_TICK(smb_user_wait_tree_tmo) + ddi_get_lbolt();
+	mutex_enter(&user->u_mutex);
+	while (user->u_owned_tree_cnt != 0) {
+		if (cv_timedwait(&user->u_owned_tree_cv,
+		    &user->u_mutex, time) < 0)
+			break;
+	}
+	mutex_exit(&user->u_mutex);
+#ifdef	DEBUG
+	if (user->u_owned_tree_cnt != 0) {
+		cmn_err(CE_NOTE, "smb_user_wait_trees failed");
+		debug_enter("smb_user_wait_trees debug");
+	}
+#endif
+}
+
 /* *************************** Static Functions ***************************** */
 
 /*

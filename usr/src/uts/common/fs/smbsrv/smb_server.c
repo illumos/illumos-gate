@@ -1998,6 +1998,10 @@ smb_server_fclose(smb_server_t *sv, uint32_t uniqid)
  * so it can force a logoff that we haven't noticed yet.
  * This is not called frequently, so we just walk the list of
  * connections searching for the user.
+ *
+ * Note that this must wait for any durable handles (ofiles)
+ * owned by this user to become "orphaned", so that a reconnect
+ * that may immediately follow can find and use such ofiles.
  */
 void
 smb_server_logoff_ssnid(smb_request_t *sr, uint64_t ssnid)
@@ -2005,6 +2009,9 @@ smb_server_logoff_ssnid(smb_request_t *sr, uint64_t ssnid)
 	smb_server_t	*sv = sr->sr_server;
 	smb_llist_t	*sess_list;
 	smb_session_t	*sess;
+	smb_user_t	*user = NULL;
+
+	SMB_SERVER_VALID(sv);
 
 	if (sv->sv_state != SMB_SERVER_STATE_RUNNING)
 		return;
@@ -2016,38 +2023,77 @@ smb_server_logoff_ssnid(smb_request_t *sr, uint64_t ssnid)
 	    sess != NULL;
 	    sess = smb_llist_next(sess_list, sess)) {
 
-		smb_user_t	*user;
-
 		SMB_SESSION_VALID(sess);
 
 		if (sess->dialect < SMB_VERS_2_BASE)
 			continue;
 
-		if (sess->s_state != SMB_SESSION_STATE_NEGOTIATED)
-			continue;
-
-		user = smb_session_lookup_ssnid(sess, ssnid);
-		if (user == NULL)
-			continue;
-
-		if (!smb_is_same_user(user->u_cred, sr->user_cr)) {
-			smb_user_release(user);
+		switch (sess->s_state) {
+		case SMB_SESSION_STATE_NEGOTIATED:
+		case SMB_SESSION_STATE_TERMINATED:
+		case SMB_SESSION_STATE_DISCONNECTED:
+			break;
+		default:
 			continue;
 		}
 
-		/* Treat this as if we lost the connection */
-		user->preserve_opens = SMB2_DH_PRESERVE_SOME;
-		smb_user_logoff(user);
-		smb_user_release(user);
+		/*
+		 * Normal situation is to find a LOGGED_ON user.
+		 */
+		user = smb_session_lookup_uid_st(sess, ssnid, 0,
+		    SMB_USER_STATE_LOGGED_ON);
+		if (user != NULL) {
+
+			if (smb_is_same_user(user->u_cred, sr->user_cr)) {
+				/* Treat this as if we lost the connection */
+				user->preserve_opens = SMB2_DH_PRESERVE_SOME;
+				smb_user_logoff(user);
+				break;
+			}
+			smb_user_release(user);
+			user = NULL;
+		}
 
 		/*
-		 * The above may have left work on the delete queues
+		 * If we raced with disconnect, may find LOGGING_OFF,
+		 * in which case we want to just wait for it.
 		 */
-		smb_llist_flush(&sess->s_tree_list);
-		smb_llist_flush(&sess->s_user_list);
+		user = smb_session_lookup_uid_st(sess, ssnid, 0,
+		    SMB_USER_STATE_LOGGING_OFF);
+		if (user != NULL) {
+			if (smb_is_same_user(user->u_cred, sr->user_cr))
+				break;
+			smb_user_release(user);
+			user = NULL;
+		}
 	}
 
 	smb_llist_exit(sess_list);
+
+	if (user != NULL) {
+		/*
+		 * Wait for durable handles to be orphaned.
+		 * Note: not holding the sess list rwlock.
+		 */
+		smb_user_wait_trees(user);
+
+		/*
+		 * Could be doing the last release on a user below,
+		 * which can leave work on the delete queues for
+		 * s_user_list or s_tree_list so flush those.
+		 * Must hold the session list after the user release
+		 * so that the session can't go away while we flush.
+		 */
+		smb_llist_enter(sess_list, RW_READER);
+
+		sess = user->u_session;
+		smb_user_release(user);
+
+		smb_llist_flush(&sess->s_tree_list);
+		smb_llist_flush(&sess->s_user_list);
+
+		smb_llist_exit(sess_list);
+	}
 }
 
 /* See also: libsmb smb_kmod_setcfg */

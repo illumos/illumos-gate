@@ -308,6 +308,8 @@ smb2_fsctl_odx_read(smb_request_t *sr, smb_fsctl_t *fsctl)
 	 */
 	data = in_file_off;
 	tok_type = STORAGE_OFFLOAD_TOKEN_TYPE_NATIVE1;
+	if (sr->sr_state != SMB_REQ_STATE_ACTIVE)
+		return (NT_STATUS_SUCCESS);
 	rc = smb_fsop_next_alloc_range(ofile->f_cr, ofile->f_node,
 	    &data, &hole);
 	switch (rc) {
