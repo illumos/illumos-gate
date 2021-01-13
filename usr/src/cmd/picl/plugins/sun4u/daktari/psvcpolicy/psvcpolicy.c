@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Daktari platform platform specific environment monitoring policies
  */
@@ -98,7 +96,7 @@ static int dak_policy_debug = 0;
 #define	GET_SENSOR_FAILED_MSG		\
 	gettext("Failed to get sensor value, id = %s, errno = %d\n")
 #define	ADD_PS_MSG			\
-gettext("WARNING: Only 1 Power Supply in system. ADD a 2nd Power Supply.\n")
+    gettext("WARNING: Only 1 Power Supply in system. ADD a 2nd Power Supply.\n")
 #define	REMOVE_LOAD_MSG			\
 	gettext("WARNING: Power Supply at 95%% current. Remove some load.\n")
 #define	PS_OVER_CURRENT_MSG		\
@@ -201,7 +199,7 @@ static i2c_noise_param_t i2cparams[] = {
 
 static void
 i2cparams_debug(i2c_noise_param_t *pi2cparams, char *platform,
-	int usingDefaults)
+    int usingDefaults)
 {
 	char s[128];
 	i2c_noise_param_t *p;
@@ -1849,7 +1847,7 @@ psvc_check_disk_fault_policy_0(psvc_opaque_t hdlp, char *id)
 {
 	int32_t		status = PSVC_SUCCESS;
 	int32_t		i;
-	char		curr_state[32], prev_state[32], led_state[32];
+	char		prev_state[32], led_state[32];
 	char		disk_fault[32], disk_state[32];
 	static char	*disk_id[DAK_MAX_DISKS] = {NULL};
 	static char	*led_id[DAK_MAX_DISKS] = {NULL};
@@ -1884,7 +1882,6 @@ psvc_check_disk_fault_policy_0(psvc_opaque_t hdlp, char *id)
 	}
 
 	for (i = 0; i < DAK_MAX_DISKS; i++) {
-		curr_state[0] = 0;
 		prev_state[0] = 0;
 
 		status = psvc_get_attr(hdlp, disk_id[i], PSVC_PRESENCE_ATTR,

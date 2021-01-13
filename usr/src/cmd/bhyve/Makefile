@@ -140,6 +140,7 @@ C99MODE=	-xc99=%all
 
 $(PROG) := LDLIBS += -lsocket -lnsl -ldlpi -ldladm -lmd -lsunw_crypto -luuid \
 	-lvmmapi -lz
+NATIVE_LIBS += libz.so
 $(ZHYVE_PROG) := LDLIBS += -lnvpair
 $(MEVENT_TEST_PROG) := LDLIBS += -lsocket
 

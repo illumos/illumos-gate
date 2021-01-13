@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
- * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <Python.h>
@@ -868,6 +868,11 @@ convertBEInfoToDictionary(be_node_list_t *be, PyObject **listDict)
 
 	if (PyDict_SetItemString(*listDict, BE_ATTR_ACTIVE_ON_BOOT,
 	    (be->be_active_on_boot ? Py_True : Py_False)) != 0) {
+		return (B_FALSE);
+	}
+
+	if (PyDict_SetItemString(*listDict, BE_ATTR_ACTIVE_NEXTBOOT,
+	    (be->be_active_next ? Py_True : Py_False)) != 0) {
 		return (B_FALSE);
 	}
 

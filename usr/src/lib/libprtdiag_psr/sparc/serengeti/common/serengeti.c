@@ -959,7 +959,6 @@ cpu_node_configured(char *const node)
 	int nlist = 0;
 	boolean_t rv;
 	char *err_string = NULL;
-	char *const *ap_args = NULL;
 	struct cfga_list_data *statlist = NULL;
 	struct cfga_list_data dat;
 	cfga_flags_t flags = CFGA_FLAG_LIST_ALL;
@@ -967,7 +966,6 @@ cpu_node_configured(char *const node)
 	if (node == NULL)
 		return (FALSE);
 
-	ap_args = &node;
 	ret = config_list_ext(1, &node, &statlist, &nlist,
 	    NULL, NULL, &err_string, flags);
 

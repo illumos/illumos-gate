@@ -58,7 +58,7 @@ sym_hash_compare(Sym_s_list * s1, Sym_s_list * s2)
  * we need to examine the symbols the indices reference. It is safe, because
  * the linker is single threaded.
  */
-Sym *dynsort_compare_syms;
+static Sym *dynsort_compare_syms;
 
 static int
 dynsort_compare(const void *idx1, const void *idx2)

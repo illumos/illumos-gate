@@ -26,6 +26,7 @@ SRCDIR=		$(SRC)/contrib/mDNSResponder
 CFLAGS += $(CSTD_GNU99)
 CPPFLAGS += -I$(SRCDIR)/mDNSShared
 CPPFLAGS += -DmDNSResponderVersion=878.1.1
+CPPFLAGS += -DMDNS_VERSIONSTR_NODTS
 LDLIBS += -lsocket -ldns_sd
 
 # not linted

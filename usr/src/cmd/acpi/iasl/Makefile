@@ -105,6 +105,7 @@ INTERMEDIATES = \
 SMATCH=off
 
 CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi -DACPI_ASL_COMPILER -I.
+CPPFLAGS += -DACPI_DATE=\"$(VERSION)\"
 
 LEX_C_FILES = aslcompilerlex.c dtparserlex.c prparserlex.c
 YACC_C_FILES = aslcompilerparse.c dtparserparse.c prparserparse.c
