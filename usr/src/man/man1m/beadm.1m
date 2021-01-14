@@ -1,12 +1,13 @@
 '\" te
 .\" Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright 2016 Toomas Soome <tsoome@me.com>
-.TH BEADM 1M "May 2, 2020"
+.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+.TH BEADM 1M "Jan 14, 2021"
 .SH NAME
 beadm \- utility for managing zfs boot environments
 .SH SYNOPSIS
 .nf
-\fBbeadm\fR \fBcreate\fR [\fB-a\fR] [\fB-d\fR \fIdescription\fR]
+\fBbeadm\fR \fBcreate\fR [\fB-a\fR | \fB-t\fR] [\fB-d\fR \fIdescription\fR]
      [\fB-e\fR \fInon-activeBeName\fR | \fIbeName@snapshot\fR]
      [\fB-o\fR \fIproperty=value\fR] ... [\fB-p\fR \fIzpool\fR]
      [\fB-v\fR] \fIbeName\fR
@@ -161,7 +162,7 @@ Displays command usage.
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBcreate\fR [\fB-a\fR] [\fB-d\fR \fIdescription\fR]
+\fBbeadm\fR \fBcreate\fR [\fB-a\fR | \fB-t\fR] [\fB-d\fR \fIdescription\fR]
      [\fB-e\fR \fInon-activeBeName\fR | \fIbeName@snapshot\fR]
      [\fB-o\fR \fIproperty=value\fR] ... [\fB-p\fR \fIzpool\fR]
      [\fB-v\fR] \fIbeName\fR
@@ -184,8 +185,8 @@ option is not provided, \fIbeName\fR will be used as the title.
 .ad
 .sp .6
 .RS 4n
-Activate the newly created BE upon creation.  The default is to not activate
-the newly created BE.
+Activate the newly created BE.  The default is to not activate
+the newly created BE.  See also \fB-t\fR.
 .RE
 .sp
 .ne 2
@@ -238,6 +239,17 @@ Create the new BE in the specified zpool.  If this is not provided, the
 default
 behavior is to create the new BE in the same pool as as the origin BE.
 This option is not supported in non-global zone.
+.RE
+.ne 2
+.na
+\fB-t\fR
+.ad
+.sp .6
+.RS 4n
+Temporarily activate the newly created BE. The new BE will be
+used for the next boot only and the temporary activation will be automatically
+removed.  The default is to not activate the newly created BE.  See also
+\fB-a\fR.
 .RE
 .sp
 .ne 2

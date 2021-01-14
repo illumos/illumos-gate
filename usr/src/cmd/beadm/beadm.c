@@ -26,7 +26,7 @@
  * Copyright 2015 Gary Mills
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright 2017 Jason King
- * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * Copyright (c) 2018, Joyent, Inc.
  */
 
@@ -130,14 +130,14 @@ usage(void)
 	    "\tsubcommands:\n"
 	    "\n"
 	    "\tbeadm activate [-v] [-t | -T] beName\n"
-	    "\tbeadm create [-a] [-d BE_desc]\n"
+	    "\tbeadm create [-a | -t] [-d BE_desc]\n"
 	    "\t\t[-o property=value] ... [-p zpool] \n"
 	    "\t\t[-e nonActiveBe | beName@snapshot] [-v] beName\n"
 	    "\tbeadm create [-d BE_desc]\n"
 	    "\t\t[-o property=value] ... [-p zpool] [-v] beName@snapshot\n"
 	    "\tbeadm destroy [-Ffsv] beName \n"
 	    "\tbeadm destroy [-Fv] beName@snapshot \n"
-	    "\tbeadm list [[-a] | [-d] [-s]] [-H]\n"
+	    "\tbeadm list [-a | -ds] [-H]\n"
 	    "\t\t[-k|-K date | name | space] [-v] [beName]\n"
 	    "\tbeadm mount [-s ro|rw] [-v] beName [mountpoint]\n"
 	    "\tbeadm unmount [-fv] beName | mountpoint\n"
@@ -762,6 +762,7 @@ be_do_create(int argc, char **argv)
 	nvlist_t	*be_attrs;
 	nvlist_t	*zfs_props = NULL;
 	boolean_t	activate = B_FALSE;
+	boolean_t	t_activate = B_FALSE;
 	boolean_t	is_snap = B_FALSE;
 	int		c;
 	int		err = 1;
@@ -774,7 +775,7 @@ be_do_create(int argc, char **argv)
 	char		*propval = NULL;
 	char		*strval = NULL;
 
-	while ((c = getopt(argc, argv, "ad:e:io:p:v")) != -1) {
+	while ((c = getopt(argc, argv, "ad:e:io:p:tv")) != -1) {
 		switch (c) {
 		case 'a':
 			activate = B_TRUE;
@@ -812,6 +813,9 @@ be_do_create(int argc, char **argv)
 		case 'p':
 			nbe_zpool = optarg;
 			break;
+		case 't':
+			t_activate = B_TRUE;
+			break;
 		case 'v':
 			libbe_print_errors(B_TRUE);
 			break;
@@ -819,6 +823,13 @@ be_do_create(int argc, char **argv)
 			usage();
 			goto out2;
 		}
+	}
+
+	if (activate && t_activate) {
+		(void) fprintf(stderr,
+		    _("create: -a and -t are mutually exclusive\n"));
+		usage();
+		goto out2;
 	}
 
 	argc -= optind;
@@ -932,6 +943,14 @@ be_do_create(int argc, char **argv)
 			optind = 1;
 
 			err = be_do_activate(2, args);
+			goto out;
+		}
+		if (!is_snap && t_activate) {
+			char *args[] = { "activate", "-t", "", NULL };
+			args[2] = nbe_name;
+			optind = 1;
+
+			err = be_do_activate(3, args);
 			goto out;
 		}
 
