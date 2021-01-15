@@ -52,7 +52,6 @@ SYMBOL_VERSION SUNWprivate_4.83 {
 		};
 
 		Dbg_args_file;
-		Dbg_args_guidance_unknown;
 		Dbg_args_option;
 		Dbg_args_str2chr;
 		Dbg_args_Wldel;

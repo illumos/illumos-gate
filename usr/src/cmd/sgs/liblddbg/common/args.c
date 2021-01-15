@@ -65,16 +65,3 @@ Dbg_args_file(Lm_list *lml, int ndx, char *file)
 
 	dbg_print(lml, MSG_INTL(MSG_ARG_FILE), ndx, file);
 }
-
-
-/*
- * Report unrecognized item provided to '-z guidance' option.
- */
-void
-Dbg_args_guidance_unknown(Lm_list *lml, const char *item)
-{
-	if (DBG_NOTCLASS(DBG_C_ARGS))
-		return;
-
-	dbg_print(lml, MSG_INTL(MSG_ARG_NG_UNKNOWN), item);
-}

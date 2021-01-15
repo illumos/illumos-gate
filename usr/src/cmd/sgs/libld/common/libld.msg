@@ -699,6 +699,7 @@
 @ MSG_REJ_KMOD		"file %s: kernel modules can't be link-edit input"
 
 # Guidance messages
+@ MSG_GUIDE_UNKNOWN	"unrecognized -z guidance item: %s"
 @ MSG_GUIDE_SUMMARY	"see ld(1) -z guidance for more information"
 @ MSG_GUIDE_DEFS	"-z defs option recommended for shared objects"
 @ MSG_GUIDE_DIRECT	"-B direct or -z direct option recommended before \
