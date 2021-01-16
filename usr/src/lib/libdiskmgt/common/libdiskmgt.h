@@ -354,6 +354,7 @@ typedef enum {
 
 #define	DM_CTYPE_ATA		"ata"
 #define	DM_CTYPE_FIBRE		"fibre"
+#define	DM_CTYPE_LOFI		"lofi"
 #define	DM_CTYPE_NVME		"nvme"
 #define	DM_CTYPE_SATA		"sata"
 #define	DM_CTYPE_SCSI		"scsi"
