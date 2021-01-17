@@ -47,13 +47,14 @@ static struct vbeinfoblock *vbe =
 	(struct vbeinfoblock *)&vbestate.vbe_control_info;
 static struct modeinfoblock *vbe_mode =
 	(struct modeinfoblock *)&vbestate.vbe_mode_info;
+static uint16_t *vbe_mode_list;
+static size_t vbe_mode_list_size;
 multiboot_color_t *cmap;
 /* The default VGA color palette format is 6 bits per primary color. */
 int palette_format = 6;
 
-#define	VESA_MODE_BASE	0x100
-#define	VESA_MODE_MAX	0x1ff
-#define	VESA_MODE_COUNT	(VESA_MODE_MAX - VESA_MODE_BASE + 1)
+#define	VESA_MODE_BASE		0x100
+#define	VESA_END_OF_MODE_LIST	0xffff
 
 /* Actually assuming mode 3. */
 void
@@ -278,9 +279,25 @@ vbe_check(void)
 	return (1);
 }
 
+/*
+ * Translate selector:offset style address to linear adress.
+ * selector = farptr >> 16;
+ * offset = farptr & 0xffff;
+ * linear = (selector * 4) + offset.
+ * By using mask 0xffff0000, we wil get the optimised line below.
+ * As a final step, translate physical address to loader virtual address.
+ */
+static void *
+vbe_farptr(uint32_t farptr)
+{
+	return (PTOV((((farptr & 0xffff0000) >> 12) + (farptr & 0xffff))));
+}
+
 void
 vbe_init(void)
 {
+	uint16_t *p, *ml;
+
 	/* First set FB for text mode. */
 	gfx_fb.framebuffer_common.mb_type = MULTIBOOT_TAG_TYPE_FRAMEBUFFER;
 	gfx_fb.framebuffer_common.framebuffer_type =
@@ -301,9 +318,37 @@ vbe_init(void)
 	if (memcmp(vbe->VbeSignature, "VESA", 4) != 0)
 		return;
 
+	/*
+	 * Copy mode list array. We must do this because some systems do
+	 * place this array to scratch memory, which will be reused by
+	 * subsequent VBE calls. (vbox 6.1 is one example).
+	 */
+	p = ml = vbe_farptr(vbe->VideoModePtr);
+	while (*p++ != VESA_END_OF_MODE_LIST)
+		;
+
+	vbe_mode_list_size = (uintptr_t)p - (uintptr_t)ml;
+
+	/*
+	 * Since vbe_init() is used only once at very start of the loader,
+	 * we assume malloc will not fail there. But in case it does,
+	 * we point vbe_mode_list to memory pointed by VideoModePtr.
+	 * If the VideoModePtr memory area is not valid, we will fail to
+	 * pick usable VBE mode and fall back to use text mode.
+	 */
+	vbe_mode_list = malloc(vbe_mode_list_size);
+	if (vbe_mode_list == NULL)
+		vbe_mode_list = ml;
+	else
+		bcopy(ml, vbe_mode_list, vbe_mode_list_size);
+
+	/* reset VideoModePtr, to make sure, we only do use vbe_mode_list. */
+	vbe->VideoModePtr = 0;
+
 	vbestate.mb_type = MULTIBOOT_TAG_TYPE_VBE;
 	vbestate.mb_size = sizeof (vbestate);
 	vbestate.vbe_mode = 0;
+
 	/* vbe_set_mode() will set up the rest. */
 }
 
@@ -446,12 +491,6 @@ vbe_set_mode(int modenum)
 	return (0);
 }
 
-static void *
-vbe_farptr(uint32_t farptr)
-{
-	return (PTOV((((farptr & 0xffff0000) >> 12) + (farptr & 0xffff))));
-}
-
 /*
  * Verify existance of mode number or find mode by
  * dimensions. If depth is not given, walk values 32, 24, 16, 8.
@@ -460,17 +499,15 @@ static int
 vbe_find_mode_xydm(int x, int y, int depth, int m)
 {
 	struct modeinfoblock mi;
-	uint32_t farptr;
 	uint16_t mode;
-	int safety, i;
+	size_t idx, nentries;
+	int i;
 
 	memset(vbe, 0, sizeof (vbe));
 	memcpy(vbe->VbeSignature, "VBE2", 4);
 	if (biosvbe_info(vbe) != VBE_SUCCESS)
 		return (0);
 	if (memcmp(vbe->VbeSignature, "VESA", 4) != 0)
-		return (0);
-	if (vbe->VideoModePtr == 0)
 		return (0);
 
 	if (m != -1)
@@ -480,17 +517,16 @@ vbe_find_mode_xydm(int x, int y, int depth, int m)
 	else
 		i = depth;
 
+	nentries = vbe_mode_list_size / sizeof (*vbe_mode_list);
 	while (i > 0) {
-		farptr = vbe->VideoModePtr;
-		safety = 0;
-		while ((mode = *(uint16_t *)vbe_farptr(farptr)) != 0xffff) {
-			safety++;
-			farptr += 2;
-			if (safety == VESA_MODE_COUNT)
-				return (0);
-			if (biosvbe_get_mode_info(mode, &mi) != VBE_SUCCESS) {
+		for (idx = 0; idx < nentries; idx++) {
+			mode = vbe_mode_list[idx];
+			if (mode == VESA_END_OF_MODE_LIST)
+				break;
+
+			if (biosvbe_get_mode_info(mode, &mi) != VBE_SUCCESS)
 				continue;
-			}
+
 			/* we only care about linear modes here */
 			if (vbe_mode_is_supported(&mi) == 0)
 				continue;
@@ -624,9 +660,8 @@ void
 vbe_modelist(int depth)
 {
 	struct modeinfoblock mi;
-	uint32_t farptr;
 	uint16_t mode;
-	int nmodes = 0, safety = 0;
+	int nmodes, idx, nentries;
 	int ddc_caps;
 	uint_t width, height;
 	bool edid = false;
@@ -662,6 +697,7 @@ vbe_modelist(int depth)
 		if (vbe_get_flatpanel(&width, &height))
 			printf(": Panel %dx%d\n", width, height);
 
+	nmodes = 0;
 	memset(vbe, 0, sizeof (vbe));
 	memcpy(vbe->VbeSignature, "VBE2", 4);
 	if (biosvbe_info(vbe) != VBE_SUCCESS)
@@ -672,25 +708,18 @@ vbe_modelist(int depth)
 	vbe_print_vbe_info(vbe);
 	printf("Modes: ");
 
-	farptr = vbe->VideoModePtr;
-	if (farptr == 0)
-		goto done;
-
-	while ((mode = *(uint16_t *)vbe_farptr(farptr)) != 0xffff) {
-		safety++;
-		farptr += 2;
-		if (safety == VESA_MODE_COUNT) {
-			printf("[?] ");
+	nentries = vbe_mode_list_size / sizeof (*vbe_mode_list);
+	for (idx = 0; idx < nentries; idx++) {
+		mode = vbe_mode_list[idx];
+		if (mode == VESA_END_OF_MODE_LIST)
 			break;
-		}
+
 		if (biosvbe_get_mode_info(mode, &mi) != VBE_SUCCESS)
 			continue;
+
 		/* we only care about linear modes here */
 		if (vbe_mode_is_supported(&mi) == 0)
 			continue;
-
-		/* we found some mode so reset safety counter */
-		safety = 0;
 
 		/* apply requested filter */
 		if (depth != -1 && mi.BitsPerPixel != depth)
