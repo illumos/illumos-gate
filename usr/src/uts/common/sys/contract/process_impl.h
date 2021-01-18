@@ -26,8 +26,6 @@
 #ifndef	_SYS_CONTRACT_PROCESS_IMPL_H
 #define	_SYS_CONTRACT_PROCESS_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/contract.h>
 #include <sys/contract_impl.h>
 #include <sys/contract/process.h>
@@ -72,8 +70,8 @@ struct cont_process {
 /*
  * Kernel APIs
  */
-ctmpl_process_t *sys_process_tmpl;
-ct_type_t *process_type;
+extern ctmpl_process_t *sys_process_tmpl;
+extern ct_type_t *process_type;
 
 struct proc;
 void contract_process_init(void);

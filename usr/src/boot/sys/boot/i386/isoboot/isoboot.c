@@ -331,12 +331,10 @@ main(void)
 
 /* Needed so btxld can link us properly; do not remove. */
 void
-exit(int x __unused)
+exit(int x)
 {
 
-	while (1)
-		;
-	__unreachable();
+	__exit(x);
 }
 
 static void

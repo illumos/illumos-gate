@@ -138,9 +138,17 @@ SMOFF += all_func_returns,leaks,no_if_block
 CSTD=		$(CSTD_GNU99)
 C99MODE=	-xc99=%all
 
-$(PROG) := LDLIBS += -lsocket -lnsl -ldlpi -ldladm -lmd -lsunw_crypto -luuid \
-	-lvmmapi -lz
-NATIVE_LIBS += libz.so
+$(PROG) := LDLIBS += \
+	-lsocket \
+	-lnsl \
+	-ldlpi \
+	-ldladm \
+	-lmd \
+	-lsunw_crypto \
+	-luuid \
+	-lvmmapi \
+	-lz
+NATIVE_LIBS += libz.so libsunw_crypto.so
 $(ZHYVE_PROG) := LDLIBS += -lnvpair
 $(MEVENT_TEST_PROG) := LDLIBS += -lsocket
 

@@ -871,7 +871,8 @@ rfb_handle(struct rfb_softc *rc, int cfd)
 #ifdef __FreeBSD__
 			message = "Auth failed: authentication type mismatch";
 #else
-			message = (unsigned char *)"Auth failed: authentication type mismatch";
+			message = (unsigned char *)
+			    "Auth failed: authentication type mismatch";
 #endif
 			goto report_and_done;
 		}
@@ -896,7 +897,11 @@ rfb_handle(struct rfb_softc *rc, int cfd)
 		 * The client then sends the resulting 16-bytes response.
 		 */
 #ifndef NO_OPENSSL
+#ifdef __FreeBSD__
+		strncpy(keystr, rc->password, PASSWD_LENGTH);
+#else
 		strncpy((char *)keystr, rc->password, PASSWD_LENGTH);
+#endif
 
 		/* VNC clients encrypts the challenge with all the bit fields
 		 * in each byte of the password mirrored.
@@ -931,8 +936,12 @@ rfb_handle(struct rfb_softc *rc, int cfd)
 				&ks, DES_ENCRYPT);
 
 		if (memcmp(crypt_expected, buf, AUTH_LENGTH) != 0) {
+#ifdef __FreeBSD__
+			message = "Auth Failed: Invalid Password.";
+#else
 			message =
 			    (unsigned char *)"Auth Failed: Invalid Password.";
+#endif
 			sres = htonl(1);
 		} else {
 			sres = 0;
