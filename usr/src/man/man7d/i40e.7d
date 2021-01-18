@@ -11,8 +11,9 @@
 .\"
 .\" Copyright (c) 2018 Joyent, Inc.
 .\" Copyright 2020 Ryan Zezeski
+.\" Copyright 2021 Oxide Computer Company
 .\"
-.Dd July 1, 2020
+.Dd January 18, 2021
 .Dt I40E 7D
 .Os
 .Sh NAME
@@ -29,8 +30,8 @@ supports the Data Link Provider Interface,
 The
 .Nm
 driver supports the Intel 710 and 722 Ethernet Controller families of
-networking interface cards which come in 1 GbE, 10 GbE, 25 GbE, and 40
-GbE variants.
+networking interface cards which support speeds of 1 GbE, 2.5 GbE, 5 GbE, 10
+GbE, 25 GbE, and 40 GbE.
 .Pp
 In addition to basic device initialization and the sending and receiving
 of frames, it supports the following features:
