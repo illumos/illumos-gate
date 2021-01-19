@@ -621,6 +621,8 @@ extern "C" {
 #define	PCI_CAP_ID_MSI_X	0x11	/* MSI-X supported */
 #define	PCI_CAP_ID_SATA		0x12	/* SATA Data/Index Config supported */
 #define	PCI_CAP_ID_FLR		0x13	/* Function Level Reset supported */
+#define	PCI_CAP_ID_EA		0x14	/* Enhanced Allocation */
+#define	PCI_CAP_ID_FPB		0x15	/* Flattening Portal Bridge */
 
 /*
  * Capability next entry pointer values
@@ -909,13 +911,16 @@ typedef struct pcix_attr {
 #define	PCI_MSI_CTRL		0x02	/* MSI control register, 2 bytes */
 #define	PCI_MSI_ADDR_OFFSET	0x04	/* MSI 32-bit msg address, 4 bytes */
 #define	PCI_MSI_32BIT_DATA	0x08	/* MSI 32-bit msg data, 2 bytes */
+#define	PCI_MSI_32BIT_EXTDATA	0x0A	/* MSI 32-bit msg ext data, 2 bytes */
 #define	PCI_MSI_32BIT_MASK	0x0C	/* MSI 32-bit mask bits, 4 bytes */
 #define	PCI_MSI_32BIT_PENDING	0x10	/* MSI 32-bit pending bits, 4 bytes */
 
 /*
  * PCI Message Signalled Interrupts (MSI) capability entry offsets for 64-bit
  */
+#define	PCI_MSI_64BIT_ADDR	0x08	/* MSI 64-bit upper address, 4 bytes */
 #define	PCI_MSI_64BIT_DATA	0x0C	/* MSI 64-bit msg data, 2 bytes */
+#define	PCI_MSI_64BIT_EXTDATA	0x0E	/* MSI 64-bit msg ext data, 2 bytes */
 #define	PCI_MSI_64BIT_MASKBITS	0x10	/* MSI 64-bit mask bits, 4 bytes */
 #define	PCI_MSI_64BIT_PENDING	0x14	/* MSI 64-bit pending bits, 4 bytes */
 

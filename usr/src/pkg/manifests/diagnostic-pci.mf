@@ -23,4 +23,5 @@ dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/pci
 file path=usr/lib/pci/pcidb mode=0555
+file path=usr/lib/pci/pcieadm mode=0555
 license lic_CDDL license=lic_CDDL

@@ -536,6 +536,7 @@ extern "C" {
 #define	PCIE_EXT_CAP_NEXT_PTR_MASK	0xFFF
 
 #define	PCIE_EXT_CAP_NEXT_PTR_NULL	0x0
+#define	PCIE_EXT_CAP_MAX_PTR		0x3c0	/* max. number of caps */
 
 /*
  * PCI-Express Enhanced Capability Identifier Values
@@ -559,6 +560,7 @@ extern "C" {
 #define	PCIE_EXT_CAP_ID_SRIOV		0x10	/* Single Root I/O Virt. */
 #define	PCIE_EXT_CAP_ID_MRIOV		0x11	/* Multi Root I/O Virt. */
 #define	PCIE_EXT_CAP_ID_MULTICAST	0x12	/* Multicast Services */
+#define	PCIE_EXT_CAP_ID_PGREQ		0x13	/* Page Request */
 #define	PCIE_EXT_CAP_ID_EA		0x14	/* Enhanced Allocation */
 #define	PCIE_EXT_CAP_ID_RESIZE_BAR	0x15	/* Resizable BAR */
 #define	PCIE_EXT_CAP_ID_DPA		0x16	/* Dynamic Power Allocation */
@@ -573,11 +575,15 @@ extern "C" {
 #define	PCIE_EXT_CAP_ID_FRS		0x21	/* Function Ready Stat. Queue */
 #define	PCIE_EXT_CAP_ID_RTR		0x22	/* Readiness Time Reporting */
 #define	PCIE_EXT_CAP_ID_DVS		0x23	/* Designated Vendor-Specific */
+#define	PCIE_EXT_CAP_ID_VFRBAR		0x24	/* VF Resizable BAR */
 #define	PCIE_EXT_CAP_ID_DLF		0x25	/* Data Link Feature */
-#define	PCIE_EXT_CAP_ID_PL16GTE		0x26	/* Physical Layer 16.0 GT/s */
+#define	PCIE_EXT_CAP_ID_PL16GT		0x26	/* Physical Layer 16.0 GT/s */
 #define	PCIE_EXT_CAP_ID_LANE_MARGIN	0x27	/* Lane Margining */
 #define	PCIE_EXT_CAP_ID_HIEARCHY_ID	0x28	/* Hierarchy ID */
 #define	PCIE_EXT_CAP_ID_NPEM		0x29	/* Native PCIe Enclosure Mgmt */
+#define	PCIE_EXT_CAP_ID_PL32GT		0x2A	/* Physical Layer 32.0 GT/s */
+#define	PCIE_EXT_CAP_ID_AP		0x2B	/* Alternate Protocol */
+#define	PCIE_EXT_CAP_ID_SFI		0x2C	/* Sys. Firmware Intermediary */
 
 /*
  * PCI-Express Advanced Error Reporting Extended Capability Offsets
@@ -596,6 +602,7 @@ extern "C" {
 #define	PCIE_AER_RE_STS			0x30	/* Root Error Status */
 #define	PCIE_AER_CE_SRC_ID		0x34	/* Error Source ID */
 #define	PCIE_AER_ERR_SRC_ID		0x36	/* Error Source ID */
+#define	PCIE_AER_TLP_PRE_LOG		0x38	/* TLP Prefix Log */
 
 /* Bridges Only */
 #define	PCIE_AER_SUCE_STS		0x2c	/* Secondary UCE Status */

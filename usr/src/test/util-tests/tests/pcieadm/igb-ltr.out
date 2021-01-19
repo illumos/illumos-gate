@@ -1,0 +1,11 @@
+Latency Tolerance Reporting Capability (0x18)
+  Capability Header: 0x1d010018
+    |--> Capability ID: 0x18
+    |--> Capability Version: 0x1
+    |--> Next Capability Offset: 0x1d0
+  Max Snoop Latency: 0x0
+    |--> Latency Value: 0x0
+    |--> Latency Scale: 1 ns (0x0)
+  Max No-Snoop Latency: 0x0
+    |--> Latency Value: 0x0
+    |--> Latency Scale: 1 ns (0x0)

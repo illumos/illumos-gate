@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/sysmacros.h>
@@ -1189,11 +1190,18 @@ pcie_capture_speeds(dev_info_t *dip)
 	uint16_t	vers, status;
 	uint32_t	cap, cap2, ctl2;
 	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
+	dev_info_t	*rcdip;
 
 	if (!PCIE_IS_PCIE(bus_p))
 		return;
 
-	vers = PCIE_CAP_GET(16, bus_p, PCIE_PCIECAP);
+	rcdip = pcie_get_rc_dip(dip);
+	if (bus_p->bus_cfg_hdl == NULL) {
+		vers = pci_cfgacc_get16(rcdip, bus_p->bus_bdf,
+		    bus_p->bus_pcie_off + PCIE_PCIECAP);
+	} else {
+		vers = PCIE_CAP_GET(16, bus_p, PCIE_PCIECAP);
+	}
 	if (vers == PCI_EINVAL16)
 		return;
 	vers &= PCIE_PCIECAP_VER_MASK;
@@ -1207,10 +1215,17 @@ pcie_capture_speeds(dev_info_t *dip)
 		ctl2 = 0;
 		break;
 	case PCIE_PCIECAP_VER_2_0:
-		cap2 = PCIE_CAP_GET(32, bus_p, PCIE_LINKCAP2);
+		if (bus_p->bus_cfg_hdl == NULL) {
+			cap2 = pci_cfgacc_get32(rcdip, bus_p->bus_bdf,
+			    bus_p->bus_pcie_off + PCIE_LINKCAP2);
+			ctl2 = pci_cfgacc_get16(rcdip, bus_p->bus_bdf,
+			    bus_p->bus_pcie_off + PCIE_LINKCTL2);
+		} else {
+			cap2 = PCIE_CAP_GET(32, bus_p, PCIE_LINKCAP2);
+			ctl2 = PCIE_CAP_GET(16, bus_p, PCIE_LINKCTL2);
+		}
 		if (cap2 == PCI_EINVAL32)
 			cap2 = 0;
-		ctl2 = PCIE_CAP_GET(16, bus_p, PCIE_LINKCTL2);
 		if (ctl2 == PCI_EINVAL16)
 			ctl2 = 0;
 		break;
@@ -1219,8 +1234,15 @@ pcie_capture_speeds(dev_info_t *dip)
 		return;
 	}
 
-	status = PCIE_CAP_GET(16, bus_p, PCIE_LINKSTS);
-	cap = PCIE_CAP_GET(32, bus_p, PCIE_LINKCAP);
+	if (bus_p->bus_cfg_hdl == NULL) {
+		status = pci_cfgacc_get16(rcdip, bus_p->bus_bdf,
+		    bus_p->bus_pcie_off + PCIE_LINKSTS);
+		cap = pci_cfgacc_get32(rcdip, bus_p->bus_bdf,
+		    bus_p->bus_pcie_off + PCIE_LINKCAP);
+	} else {
+		status = PCIE_CAP_GET(16, bus_p, PCIE_LINKSTS);
+		cap = PCIE_CAP_GET(32, bus_p, PCIE_LINKCAP);
+	}
 	if (status == PCI_EINVAL16 || cap == PCI_EINVAL32)
 		return;
 
@@ -1658,6 +1680,8 @@ initial_done:
 	pcie_init_pfd(dip);
 
 	pcie_init_plat(dip);
+
+	pcie_capture_speeds(dip);
 
 final_done:
 
