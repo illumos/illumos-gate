@@ -1836,7 +1836,7 @@ check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, uint_t thiscpu)
 
 	eptgen = pmap->pm_eptgen;
 	flush = hma_svm_asid_update(&vcpustate->hma_asid, flush_by_asid(),
-	    vcpustate->eptgen == eptgen);
+	    vcpustate->eptgen != eptgen);
 
 	if (flush != VMCB_TLB_FLUSH_NOTHING) {
 		ctrl->asid = vcpustate->hma_asid.hsa_asid;
