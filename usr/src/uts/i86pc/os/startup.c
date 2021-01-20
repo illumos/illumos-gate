@@ -235,8 +235,8 @@ static void layout_kernel_va(void);
 pgcnt_t physmem = PHYSMEM;
 pgcnt_t obp_pages;	/* Memory used by PROM for its text and data */
 
-char *kobj_file_buf;
-int kobj_file_bufsize;	/* set in /etc/system */
+extern char *kobj_file_buf;
+extern int kobj_file_bufsize;	/* set in /etc/system */
 
 /* Global variables for MP support. Used in mp_startup */
 caddr_t	rm_platter_va = 0;
@@ -321,7 +321,7 @@ static struct seg *segmap = &kmapseg;	/* easier to use name for in here */
 
 struct seg *segkp = &kpseg;	/* Pageable kernel virtual memory segment */
 
-struct seg kvseg_core;		/* Segment used for the core heap */
+extern struct seg kvseg_core;		/* Segment used for the core heap */
 struct seg kpmseg;		/* Segment used for physical mapping */
 struct seg *segkpm = &kpmseg;	/* 64bit kernel physical mapping segment */
 

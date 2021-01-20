@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 
-cpupm_state_ops_t cpupm_throttle_ops;
+extern cpupm_state_ops_t cpupm_throttle_ops;
 
 extern void cpupm_throttle_manage_notification(void *);
 

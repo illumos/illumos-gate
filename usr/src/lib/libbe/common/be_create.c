@@ -24,7 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2016 Martin Matuska. All rights reserved.
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -50,6 +50,7 @@
 
 #include <libbe.h>
 #include <libbe_priv.h>
+#include <libzfsbootenv.h>
 
 /* Library wide variables */
 libzfs_handle_t *g_zfs = NULL;
@@ -470,6 +471,28 @@ be_destroy(nvlist_t *be_attrs)
 			    "make the current BE 'active on boot'\n"));
 			return (ret);
 		}
+	}
+
+	/*
+	 * Detect if the BE to destroy is referenced in the pool's nextboot
+	 * field, and unset it if so.
+	 */
+	if (getzoneid() == GLOBAL_ZONEID) {
+		char *nextboot = NULL;
+
+		if (lzbe_get_boot_device(bt.obe_zpool, &nextboot) == 0 &&
+		    nextboot != NULL && strcmp(nextboot, bt.obe_root_ds) == 0) {
+			if (lzbe_set_boot_device(bt.obe_zpool,
+			    lzbe_add, "") != 0) {
+				be_print_err(gettext("be_destroy: failed to "
+				    "remove temporary activation for "
+				    "dataset %s on pool %s\n"),
+				    bt.obe_root_ds, bt.obe_zpool);
+				free(nextboot);
+				return (BE_ERR_UNKNOWN);
+			}
+		}
+		free(nextboot);
 	}
 
 	/* Get handle to BE's root dataset */
