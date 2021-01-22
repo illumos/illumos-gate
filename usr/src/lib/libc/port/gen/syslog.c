@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -86,10 +86,10 @@
 
 #define	PRIMASK(p)	(1 << ((p) & LOG_PRIMASK))
 #define	PRIFAC(p)	(((p) & LOG_FACMASK) >> 3)
-#define	IMPORTANT 	LOG_ERR
+#define	IMPORTANT	LOG_ERR
 
 #ifndef FALSE
-#define	FALSE 	0
+#define	FALSE	0
 #endif
 
 #ifndef TRUE
@@ -190,6 +190,7 @@ vsyslog(int pri, const char *fmt, va_list ap)
 	uint32_t msgid;
 	char *msgid_start, *msgid_end;
 	int nowait;
+	int ret;
 
 /*
  * Maximum tag length is 256 (the pad in outline) minus the size of the
@@ -338,9 +339,10 @@ vsyslog(int pri, const char *fmt, va_list ap)
 	dat.buf = outline;
 
 	/* output the message to the local logger */
-	if ((putmsg(LogFile, &ctl, &dat, 0) >= 0) && syslogd_ok())
-		return;
+	ret = putmsg(LogFile, &ctl, &dat, 0);
 	if (!(LogStat & LOG_CONS))
+		return;
+	if ((ret >= 0) && syslogd_ok())
 		return;
 
 	/*
