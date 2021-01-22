@@ -11,6 +11,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2021 Oxide Computer Company
 #
 
 <include global_zone_only_component>
@@ -37,9 +38,11 @@ driver name=amdnbtemp \
 driver name=coretemp
 driver name=pchtemp \
     alias=pci8086,2f9,p \
+    alias=pci8086,6f9,p \
     alias=pci8086,8c24,p \
     alias=pci8086,8ca4,p \
     alias=pci8086,8d24,p \
+    alias=pci8086,9ca4,p \
     alias=pci8086,9d31,p \
     alias=pci8086,9df9,p \
     alias=pci8086,a131,p \
