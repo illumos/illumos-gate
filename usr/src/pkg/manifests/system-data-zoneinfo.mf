@@ -17,7 +17,7 @@
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2020.1,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2021.1,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -312,7 +312,6 @@ file path=usr/share/lib/zoneinfo/Atlantic/Stanley
 file path=usr/share/lib/zoneinfo/Australia/Adelaide
 file path=usr/share/lib/zoneinfo/Australia/Brisbane
 file path=usr/share/lib/zoneinfo/Australia/Broken_Hill
-file path=usr/share/lib/zoneinfo/Australia/Currie
 file path=usr/share/lib/zoneinfo/Australia/Darwin
 file path=usr/share/lib/zoneinfo/Australia/Eucla
 file path=usr/share/lib/zoneinfo/Australia/Hobart
@@ -589,6 +588,8 @@ hardlink path=usr/share/lib/zoneinfo/Atlantic/St_Helena \
 hardlink path=usr/share/lib/zoneinfo/Australia/ACT target=../Australia/Sydney
 hardlink path=usr/share/lib/zoneinfo/Australia/Canberra \
     target=../Australia/Sydney
+hardlink path=usr/share/lib/zoneinfo/Australia/Currie \
+    target=../Australia/Hobart
 hardlink path=usr/share/lib/zoneinfo/Australia/LHI \
     target=../Australia/Lord_Howe
 hardlink path=usr/share/lib/zoneinfo/Australia/NSW target=../Australia/Sydney
