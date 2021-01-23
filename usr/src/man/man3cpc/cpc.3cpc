@@ -3,7 +3,8 @@
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright (c) 2019, Joyent, Inc.
-.Dd March 27, 2020
+.\" Copyright 2021 Oxide Computer Company
+.Dd January 22, 2021
 .Dt CPC 3CPC
 .Os
 .Sh NAME
@@ -101,6 +102,8 @@ Intel Goldmont Plus SoC events; covers model 7ah.
 Intel Haswell client events; covers models 46h, 45h, and 3ch.
 .It Xr hsx_events 3CPC
 Intel Haswell server events; covers model 3fh.
+.It xr icl_events 3CPC
+Intel Ice Lake client events; covers model 7eh.
 .It Xr ivb_events 3CPC
 Intel Ivy Bridge client events; covers model 3ah.
 .It Xr ivt_events 3CPC
@@ -112,13 +115,17 @@ Intel Nehalem-EP events; covers models, 1ah, 1fh, and 1eh.
 .It Xr nhm_ex_events 3CPC
 Intel Sandy Bridge server events; covers model 23h.
 .It Xr skl_events 3CPC
-Intel Skylake client events; covers model 9eh, 8eh, 5e, and 4eh.
+Intel Skylake client events; covers model a6h, a5h, 9eh, 8eh, 5e, and 4eh.
 .It Xr skx_events 3CPC
 Intel Skylake server events; covers model 55h, steppings 0-4h.
 .It Xr slm_events 3CPC
 Intel Atom Silvermont events; covers models 4ch, 4dh, and 37h.
+.It Xr snr_Events 3CPC
+Intel Atom Snow Ridge events; covers model 86h.
 .It Xr snb_events 3CPC
-Intel Sandy Bridge Client events; covers model 2ah.
+Intel Sandy Bridge client events; covers model 2ah.
+.It Xr tgl_events 3CPC
+Intel Tiger Lake client events; covers models 8ch and 8dh.
 .It Xr wsm_ep_dp_events 3CPC
 Intel Westmere-EP-DP events; covers model 2ch.
 .It Xr wsm_ep_sp_events 3CPC

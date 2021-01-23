@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/diagnostic/cpu-counters@$(PKGVERS)
@@ -97,6 +98,7 @@ $(i386_ONLY)file path=usr/share/man/man3cpc/glm_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/glp_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/hsw_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/hsx_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/icl_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/ivb_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/ivt_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/jkt_events.3cpc
@@ -108,6 +110,8 @@ $(i386_ONLY)file path=usr/share/man/man3cpc/skl_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/skx_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/slm_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/snb_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/snr_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/tgl_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/wsm_ep_dp_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/wsm_ep_sp_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/wsm_ex_events.3cpc
@@ -146,9 +150,21 @@ $(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.47 \
     target=pcbe.GenuineIntel.6.15
 $(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.122 \
     target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.126 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.134 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.140 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.141 \
+    target=pcbe.GenuineIntel.6.15
 $(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.142 \
     target=pcbe.GenuineIntel.6.15
 $(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.158 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.165 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.166 \
     target=pcbe.GenuineIntel.6.15
 $(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.38 \
     target=pcbe.GenuineIntel.6.15

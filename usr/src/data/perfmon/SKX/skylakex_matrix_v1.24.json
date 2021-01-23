@@ -180,5 +180,12 @@
     "MATRIX_VALUE": "0x060400",
     "MATRIX_REGISTER": "0,1",
     "DESCRIPTION": "miss the L3 and the data is returned from local dram."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT.SNOOP_HIT_WITH_FWD",
+    "MATRIX_VALUE": "0x08003c ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "hit in the L3 and the snoop to one of the sibling cores hits the line in E/S/F state and the line is forwarded."
   }
 ]
