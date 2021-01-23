@@ -298,6 +298,7 @@ CTASSERT(offsetof(nvme_identify_ctrl_t, id_vs) == 3072);
 
 CTASSERT(sizeof (nvme_identify_nsid_t) == 0x1000);
 CTASSERT(offsetof(nvme_identify_nsid_t, id_fpi) == 32);
+CTASSERT(offsetof(nvme_identify_nsid_t, id_anagrpid) == 92);
 CTASSERT(offsetof(nvme_identify_nsid_t, id_nguid) == 104);
 CTASSERT(offsetof(nvme_identify_nsid_t, id_lbaf) == 128);
 CTASSERT(offsetof(nvme_identify_nsid_t, id_vs) == 384);
