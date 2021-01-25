@@ -10,8 +10,9 @@
 .\"
 .\"
 .\" Copyright 2019 Joyent, Inc.
+.\" Copyright 2021 Oxide Computer Company
 .\"
-.Dd September 30, 2020
+.Dd January 21, 2021
 .Dt PCHTEMP 7D
 .Os
 .Sh NAME
@@ -32,6 +33,8 @@ Intel 8 Series / C220 Series Chipset Platform Controller Hub
 .It
 Intel 9 Series Chipset Family Platform Controller Hub
 .It
+Intel Mobile 5th Generation Processor Family (Broadwell-U)
+.It
 Intel C610 Series Chipset and X99 Chipset Platform Controller Hub
 .It
 Intel 100 Series Chipset Family Platform Controller Hub
@@ -46,6 +49,8 @@ Intel 300 Series and Intel C240 Series Chipset Family Platform
 Controller Hub
 .It
 Intel 400 Series Chipset Family On-Package Platform Controller Hub
+.It
+Intel 400 Series Chipset Family Platform Controller Hub
 .El
 .Pp
 Temperature information is available to the system via the fault

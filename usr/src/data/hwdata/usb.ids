@@ -9,8 +9,8 @@
 #	The latest version can be obtained from
 #		http://www.linux-usb.org/usb.ids
 #
-# Version: 2020.08.26
-# Date:    2020-08-26 20:34:09
+# Version: 2021.01.22
+# Date:    2021-01-22 20:34:10
 #
 
 # Vendors, devices and interfaces. Please keep sorted.
@@ -22447,6 +22447,9 @@
 32b3  TEXA
 	d1a6  TXT Multihub
 	d1a7  TXT Multihub
+3310  MUDITA Sp. z o.o.
+	0100  Pure
+	0101  Pure tethering
 3333  InLine
 	3333  2 port KVM switch model 60652K
 3334  AEI

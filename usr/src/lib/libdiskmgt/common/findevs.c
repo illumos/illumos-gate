@@ -28,7 +28,7 @@
  * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2017 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <fcntl.h>
@@ -629,6 +629,28 @@ add_disk2controller(disk_t *diskp, struct search_args *args)
 		return (0);
 	}
 
+	/*
+	 * Certain pseudo-device nodes do not all immediately have a valid
+	 * parent-node. In particular, lofi (and zfs) would point to the generic
+	 * /pseudo node. As a result, if we find a lofi disk, redirect it to the
+	 * actual path. If we don't find it in this, then just fall back to the
+	 * traditional path.
+	 */
+	if (libdiskmgt_str_eq(di_node_name(pnode), "pseudo") &&
+	    libdiskmgt_str_eq(di_node_name(node), "lofi")) {
+		di_node_t n;
+
+		n = di_drv_first_node("lofi", pnode);
+		while (n != DI_NODE_NIL) {
+			if (di_instance(n) == 0) {
+				pnode = n;
+				break;
+			}
+
+			n = di_drv_next_node(n);
+		}
+	}
+
 	minor = di_minor_next(pnode, NULL);
 	if (minor == NULL) {
 		return (0);
@@ -1063,6 +1085,10 @@ ctype(di_node_t node, di_minor_t minor)
 	    libdiskmgt_str_eq(name, "xpvd"))
 		return (DM_CTYPE_XEN);
 
+	if (libdiskmgt_str_eq(type, DDI_PSEUDO) &&
+	    libdiskmgt_str_eq(name, "lofi"))
+		return (DM_CTYPE_LOFI);
+
 	if (dm_debug) {
 		(void) fprintf(stderr,
 		    "INFO: unknown controller type=%s name=%s\n", type, name);
@@ -1439,6 +1465,11 @@ is_ctrl(di_node_t node, di_minor_t minor)
 	if (libdiskmgt_str_eq(type, DDI_PSEUDO) &&
 	    (libdiskmgt_str_eq(name, "ide") ||
 	    libdiskmgt_str_eq(name, "xpvd")))
+		return (1);
+
+	if (libdiskmgt_str_eq(type, DDI_PSEUDO) &&
+	    libdiskmgt_str_eq(name, "lofi") &&
+	    libdiskmgt_str_eq(di_minor_name(minor), "ctl"))
 		return (1);
 
 	return (0);

@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -34,7 +34,7 @@
  * generation:
  *
  *  - Intel 8 Series PCH
- *  - Intel 9 Series PCH
+ *  - Intel 9 Series and Broadwell Mobile Low Power PCH
  *  - Intel C610 Series and X99 PCH
  *  - Intel C620 Series PCH
  *  - Intel 100 Series PCH
@@ -42,7 +42,7 @@
  *  - Intel Sunrise Point-LP (Kaby Lake-U) PCH
  *  - Intel Cannon Lake (Whiskey Lake-U) PCH
  *  - Intel 300 Series and C240 Chipset
- *  - Intel 400 Series (On-Package) PCH
+ *  - Intel 400 Series and On-Package PCH
  *
  * The following chipsets use a different format and are not currently
  * supported:
