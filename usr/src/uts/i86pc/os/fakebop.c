@@ -130,8 +130,8 @@ static char *curr_page = NULL;		/* ptr to avail bprop memory */
 static int curr_space = 0;		/* amount of memory at curr_page */
 
 #ifdef __xpv
-start_info_t *xen_info;
-shared_info_t *HYPERVISOR_shared_info;
+extern start_info_t *xen_info;
+extern shared_info_t *HYPERVISOR_shared_info;
 #endif
 
 /*

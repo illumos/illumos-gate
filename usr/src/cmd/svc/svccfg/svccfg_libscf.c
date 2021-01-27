@@ -16470,7 +16470,7 @@ find_add_svc_mfst(const char *svnbuf, const char *mfst)
  * Create the service to manifest avl tree.
  *
  * Walk each of the manifests currently installed in the supported
- * directories, /lib/svc/manifests and /var/svc/manifests.  For
+ * directories, /lib/svc/manifest and /var/svc/manifest.  For
  * each of the manifests, inventory the services and add them to
  * the tree.
  *

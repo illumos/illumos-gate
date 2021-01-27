@@ -71,6 +71,10 @@ rds_transport_ops_t rds_ib_transport_ops = {
 	rds_if_lookup_by_name
 };
 
+/* Global pools of buffers */
+rds_bufpool_t	rds_dpool; /* data pool */
+rds_bufpool_t	rds_cpool; /* ctrl pool */
+
 /* global */
 rds_state_t	*rdsib_statep = NULL;
 krwlock_t	rds_loopback_portmap_lock;

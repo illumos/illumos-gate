@@ -24,6 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Josef "Jeff" Sipek <jeffpc@josefsipek.net>
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1439,7 +1440,8 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"taa_no",
 	"ppin",
 	"vaes",
-	"vpclmulqdq"
+	"vpclmulqdq",
+	"lfence_serializing"
 };
 
 boolean_t
@@ -2732,7 +2734,6 @@ cpuid_enable_enhanced_ibrs(void)
 	wrmsr(MSR_IA32_SPEC_CTRL, val);
 }
 
-#ifndef __xpv
 /*
  * Determine whether or not we can use the AMD optimized retpoline
  * functionality. We use this when we know we're on an AMD system and we can
@@ -2741,46 +2742,12 @@ cpuid_enable_enhanced_ibrs(void)
 static boolean_t
 cpuid_use_amd_retpoline(struct cpuid_info *cpi)
 {
-	uint64_t val;
-	on_trap_data_t otd;
-
 	if (cpi->cpi_vendor != X86_VENDOR_AMD &&
 	    cpi->cpi_vendor != X86_VENDOR_HYGON)
 		return (B_FALSE);
 
-	/*
-	 * We need to determine whether or not lfence is serializing. It always
-	 * is on families 0xf and 0x11. On others, it's controlled by
-	 * MSR_AMD_DE_CFG (MSRC001_1029). If some hypervisor gives us a crazy
-	 * old family, don't try and do anything.
-	 */
-	if (cpi->cpi_family < 0xf)
-		return (B_FALSE);
-	if (cpi->cpi_family == 0xf || cpi->cpi_family == 0x11)
-		return (B_TRUE);
-
-	/*
-	 * While it may be tempting to use get_hwenv(), there are no promises
-	 * that a hypervisor will actually declare themselves to be so in a
-	 * friendly way. As such, try to read and set the MSR. If we can then
-	 * read back the value we set (it wasn't just set to zero), then we go
-	 * for it.
-	 */
-	if (!on_trap(&otd, OT_DATA_ACCESS)) {
-		val = rdmsr(MSR_AMD_DE_CFG);
-		val |= AMD_DE_CFG_LFENCE_DISPATCH;
-		wrmsr(MSR_AMD_DE_CFG, val);
-		val = rdmsr(MSR_AMD_DE_CFG);
-	} else {
-		val = 0;
-	}
-	no_trap();
-
-	if ((val & AMD_DE_CFG_LFENCE_DISPATCH) != 0)
-		return (B_TRUE);
-	return (B_FALSE);
+	return (is_x86_feature(x86_featureset, X86FSET_LFENCE_SER));
 }
-#endif	/* !__xpv */
 
 /*
  * Determine how we should mitigate TAA or if we need to. Regardless of TAA, if
@@ -3019,10 +2986,8 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 	} else if (is_x86_feature(featureset, X86FSET_IBRS_ALL)) {
 		cpuid_enable_enhanced_ibrs();
 		v2mit = X86_SPECTREV2_ENHANCED_IBRS;
-#ifndef __xpv
 	} else if (cpuid_use_amd_retpoline(cpi)) {
 		v2mit = X86_SPECTREV2_RETPOLINE_AMD;
-#endif	/* !__xpv */
 	} else {
 		v2mit = X86_SPECTREV2_RETPOLINE;
 	}
@@ -4184,6 +4149,59 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 			cpi->cpi_fp_amd_save = 1;
 		}
 	}
+
+	/*
+	 * Check (and potentially set) if lfence is serializing.
+	 * This is useful for accurate rdtsc measurements and AMD retpolines.
+	 */
+	if ((cpi->cpi_vendor == X86_VENDOR_AMD ||
+	    cpi->cpi_vendor == X86_VENDOR_HYGON) &&
+	    is_x86_feature(featureset, X86FSET_SSE2)) {
+		/*
+		 * The AMD white paper Software Techniques For Managing
+		 * Speculation on AMD Processors details circumstances for when
+		 * lfence instructions are serializing.
+		 *
+		 * On family 0xf and 0x11, it is inherently so.  On family 0x10
+		 * and later (excluding 0x11), a bit in the DE_CFG MSR
+		 * determines the lfence behavior.  Per that whitepaper, AMD has
+		 * committed to supporting that MSR on all later CPUs.
+		 */
+		if (cpi->cpi_family == 0xf || cpi->cpi_family == 0x11) {
+			add_x86_feature(featureset, X86FSET_LFENCE_SER);
+		} else if (cpi->cpi_family >= 0x10) {
+			uint64_t val = 0;
+
+#if !defined(__xpv)
+			/*
+			 * Be careful when attempting to enable the bit, and
+			 * verify that it was actually set in case we are
+			 * running in a hypervisor which is less than faithful
+			 * about its emulation of this feature.
+			 */
+			on_trap_data_t otd;
+			if (!on_trap(&otd, OT_DATA_ACCESS)) {
+				val = rdmsr(MSR_AMD_DE_CFG);
+				val |= AMD_DE_CFG_LFENCE_DISPATCH;
+				wrmsr(MSR_AMD_DE_CFG, val);
+				val = rdmsr(MSR_AMD_DE_CFG);
+			}
+			no_trap();
+#endif
+
+			if ((val & AMD_DE_CFG_LFENCE_DISPATCH) != 0) {
+				add_x86_feature(featureset, X86FSET_LFENCE_SER);
+			}
+		}
+	} else if (cpi->cpi_vendor == X86_VENDOR_Intel &&
+	    is_x86_feature(featureset, X86FSET_SSE2)) {
+		/*
+		 * Documentation and other OSes indicate that lfence is always
+		 * serializing on Intel CPUs.
+		 */
+		add_x86_feature(featureset, X86FSET_LFENCE_SER);
+	}
+
 
 	/*
 	 * Check the processor leaves that are used for security features.
@@ -7262,11 +7280,6 @@ patch_tsc_read(int flag)
 	case TSC_NONE:
 		cnt = &_no_rdtsc_end - &_no_rdtsc_start;
 		(void) memcpy((void *)tsc_read, (void *)&_no_rdtsc_start, cnt);
-		break;
-	case TSC_RDTSC_MFENCE:
-		cnt = &_tsc_mfence_end - &_tsc_mfence_start;
-		(void) memcpy((void *)tsc_read,
-		    (void *)&_tsc_mfence_start, cnt);
 		break;
 	case TSC_RDTSC_LFENCE:
 		cnt = &_tsc_lfence_end - &_tsc_lfence_start;

@@ -183,7 +183,7 @@ struct tem_vt_state {
 	term_char_t	*tvs_outbuf;	/* place to keep incomplete lines */
 	int		tvs_outindex;	/* index into a_outbuf */
 	void		*tvs_pix_data;	/* pointer to tmp bitmap area */
-	int		tvs_pix_data_size;
+	unsigned	tvs_pix_data_size;
 	text_color_t	tvs_fg_color;
 	text_color_t	tvs_bg_color;
 	int		tvs_first_line;	/* kernel console output begins */
@@ -226,7 +226,7 @@ typedef struct tem_state {
 	struct tem_size ts_p_dimension;	/* screen dimensions in pixels */
 	struct tem_pix_pos ts_p_offset;	/* pix offset to center the display */
 
-	int	ts_pix_data_size;	/* size of bitmap data areas */
+	unsigned ts_pix_data_size;	/* size of bitmap data areas */
 	int	ts_pdepth;		/* pixel depth */
 	struct font	ts_font;	/* font table */
 	bool	update_font;		/* flag the font change */

@@ -108,10 +108,10 @@ struct visual_ops fb_ops = {
 	.ident = &fb_ident,
 	.kdsetmode = NULL,
 	.devinit = vidc_vbe_devinit,
-	.cons_copy = NULL,
-	.cons_display = NULL,
+	.cons_copy = gfx_fb_cons_copy,
+	.cons_display = gfx_fb_cons_display,
 	.cons_cursor = vidc_cons_cursor,
-	.cons_clear = NULL,
+	.cons_clear = gfx_fb_cons_clear,
 	.cons_put_cmap = vidc_vbe_cons_put_cmap
 };
 
@@ -570,24 +570,24 @@ vidc_vbe_cons_put_cmap(struct vis_cmap *cm)
 	rgb.blue.pos = gfx_fb.u.fb2.framebuffer_blue_field_position;
 	rgb.blue.size = gfx_fb.u.fb2.framebuffer_blue_mask_size;
 
-	/*
-	 * The first 16 colors need to be in VGA color order.
-	 */
-	for (i = cm->index; i < 256 && rc == 0; i++) {
-		if (i < 16) {
-			if (i < 15)
-				c = rgb_color_map(&rgb, i + 1);
-			else
-				c = rgb_color_map(&rgb, 0);
-		} else {
-			c = rgb_color_map(&rgb, i);
-		}
+	for (i = cm->index; i < NCMAP && rc == 0; i++) {
+		int idx;
+
+		/* Pick RGB from cmap4_to_24 */
+		c = rgb_color_map(&rgb, i);
+		/* The first 16 colors need to be in VGA color order. */
+		if (i < NCOLORS)
+			idx = solaris_color_to_pc_color[i];
+		else
+			idx = i;
+
 		pe8[i].Red = (c >> rgb.red.pos) & ((1 << rgb.red.size) - 1);
 		pe8[i].Green =
 		    (c >> rgb.green.pos) & ((1 << rgb.green.size) - 1);
-		pe8[i].Blue = (c >> rgb.blue.pos) & ((1 << rgb.blue.size) - 1);
-		pe8[i].Alignment = 0;
-		rc = vbe_set_palette(&pe8[i], i);
+		pe8[i].Blue =
+		    (c >> rgb.blue.pos) & ((1 << rgb.blue.size) - 1);
+		pe8[i].Reserved = 0;
+		rc = vbe_set_palette(&pe8[i], idx);
 	}
 	return (rc);
 }
@@ -869,7 +869,7 @@ vidc_init(struct console *cp, int arg)
 		}
 	}
 
-	gfx_framework_init(&fb_ops);
+	gfx_framework_init();
 	/* set up callback before calling tem_info_init(). */
 	tem_register_modechg_cb(vidc_install_font, (tem_modechg_cb_arg_t)cp);
 	rc = tem_info_init(cp);

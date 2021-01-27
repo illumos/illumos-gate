@@ -738,6 +738,7 @@ extern "C" {
 #define	X86FSET_PPIN		99
 #define	X86FSET_VAES		100
 #define	X86FSET_VPCLMULQDQ	101
+#define	X86FSET_LFENCE_SER	102
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -1138,7 +1139,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	102
+#define	NUM_X86_FEATURES	103
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);

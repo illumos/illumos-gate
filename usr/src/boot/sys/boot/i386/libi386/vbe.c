@@ -333,7 +333,7 @@ vbe_set_palette(const struct paletteentry *entry, size_t slot)
 	pe.Blue = entry->Blue;
 	pe.Green = entry->Green;
 	pe.Red = entry->Red;
-	pe.Alignment = entry->Alignment;
+	pe.Reserved = entry->Reserved;
 
 	if (vbe->Capabilities & VBE_CAP_SNOW)
 		mode = 0x80;

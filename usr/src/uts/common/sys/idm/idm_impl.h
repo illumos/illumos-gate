@@ -472,7 +472,7 @@ typedef struct {
 	kmem_cache_t	*idm_so_128k_buf_cache;
 } idm_global_t;
 
-idm_global_t	idm; /* Global state */
+extern idm_global_t	idm; /* Global state */
 
 int
 idm_idpool_create(idm_idpool_t	*pool);

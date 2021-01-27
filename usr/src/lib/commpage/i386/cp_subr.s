@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/asm_linkage.h>
@@ -88,11 +89,11 @@
 	movl	CP_TSC_TYPE(%edi), %eax
 
 4:
-	cmpl	$TSC_RDTSC_MFENCE, %eax
-	jne	5f
-	mfence
-	rdtsc
-	jmp	8f
+	/*
+	 * TSC_RDTSC_MFENCE was used in the past for AMD chips, but has been
+	 * supplanted by TSC_RDTSC_LFENCE, which works on Intel and AMD (when
+	 * lfence can be confirmed as serializing).
+	 */
 
 5:
 	cmpl	$TSC_RDTSC_LFENCE, %eax

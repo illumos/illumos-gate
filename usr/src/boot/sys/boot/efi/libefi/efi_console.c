@@ -124,10 +124,10 @@ struct visual_ops fb_ops = {
 	.ident = &fb_ident,
 	.kdsetmode = NULL,
 	.devinit = efi_fb_devinit,
-	.cons_copy = NULL,
-	.cons_display = NULL,
+	.cons_copy = gfx_fb_cons_copy,
+	.cons_display = gfx_fb_cons_display,
 	.cons_cursor = efi_cons_cursor,
-	.cons_clear = NULL,
+	.cons_clear = gfx_fb_cons_clear,
 	.cons_put_cmap = NULL
 };
 
@@ -539,7 +539,7 @@ efi_cons_init(struct console *cp, int arg __unused)
 	if (status == EFI_SUCCESS)
 		ecd->ecd_coninex = coninex;
 
-	gfx_framework_init(&fb_ops);
+	gfx_framework_init();
 
 	if (tem_info_init(cp) == 0 && tem == NULL) {
 		tem = tem_init();

@@ -31,6 +31,7 @@ import io
 import os
 import logging
 import platform
+import re
 from logging.handlers import WatchedFileHandler
 from datetime import datetime
 from optparse import OptionParser
@@ -102,8 +103,8 @@ class Result(object):
     def done(self, proc, killed):
         """
         Finalize the results of this Cmd.
-	Report SKIP for return codes 3,4 (NOTINUSE, UNSUPPORTED)
-	as defined in ../stf/include/stf.shlib
+        Report SKIP for return codes 3,4 (NOTINUSE, UNSUPPORTED)
+        as defined in ../stf/include/stf.shlib
         """
         global retcode
 
@@ -468,6 +469,9 @@ class TestGroup(Test):
                (self.pathname, self.outputdir, self.tests, self.timeout,
                 self.pre, pre_user, self.post, post_user, self.user)
 
+    def filter(self, keeplist):
+        self.tests = [ x for x in self.tests if x in keeplist ]
+
     def verify(self, logger):
         """
         Check the pre/post scripts, user and tests in this TestGroup. Omit
@@ -609,6 +613,24 @@ class TestRun(object):
 
             testgroup.verify(self.logger)
 
+    def filter(self, keeplist):
+        for group in list(self.testgroups.keys()):
+            if group not in keeplist:
+                del self.testgroups[group]
+                continue
+
+            g = self.testgroups[group]
+
+            if g.pre and os.path.basename(g.pre) in keeplist[group]:
+                continue
+
+            g.filter(keeplist[group])
+
+        for test in list(self.tests.keys()):
+            directory, base = os.path.split(test)
+            if directory not in keeplist or base not in keeplist[directory]:
+                del self.tests[test]
+
     def read(self, logger, options):
         """
         Read in the specified runfile, and apply the TestRun properties
@@ -620,7 +642,7 @@ class TestRun(object):
         """
         config = configparser.RawConfigParser()
         if not len(config.read(options.runfile)):
-            fail("Coulnd't read config file %s" % options.runfile)
+            fail("Couldn't read config file %s" % options.runfile)
 
         for opt in TestRun.props:
             if config.has_option('DEFAULT', opt):
@@ -686,10 +708,18 @@ class TestRun(object):
 
         for test in sorted(self.tests.keys()):
             config.add_section(test)
+            for prop in Test.props:
+                if prop not in self.props:
+                    config.set(testgroup, prop,
+                        getattr(self.testgroups[testgroup], prop))
 
         for testgroup in sorted(self.testgroups.keys()):
             config.add_section(testgroup)
             config.set(testgroup, 'tests', self.testgroups[testgroup].tests)
+            for prop in TestGroup.props:
+                if prop not in self.props:
+                    config.set(testgroup, prop,
+                        getattr(self.testgroups[testgroup], prop))
 
         try:
             with open(options.template, 'w') as f:
@@ -743,7 +773,7 @@ class TestRun(object):
         testlogger = logging.getLogger(__name__)
         testlogger.setLevel(logging.DEBUG)
 
-        if options.cmd != 'wrconfig':
+        if not options.template:
             try:
                 old = os.umask(0)
                 os.makedirs(self.outputdir, mode=0o777)
@@ -870,29 +900,45 @@ def find_tests(testrun, options):
             testrun.addtest(p, options)
 
 
+def filter_tests(testrun, options):
+    try:
+        fh = open(options.logfile, "r")
+    except Exception as e:
+        fail('%s' % e)
+
+    failed = {}
+    while True:
+            line = fh.readline()
+            if not line:
+                 break
+            m = re.match(r'Test: (.*)/(\S+).*\[FAIL\]', line)
+            if not m:
+                continue
+            group, test = m.group(1, 2)
+            try:
+                failed[group].append(test)
+            except KeyError:
+                failed[group] = [ test ]
+    fh.close()
+
+    testrun.filter(failed)
+
+
 def fail(retstr, ret=1):
     print('%s: %s' % (argv[0], retstr))
     exit(ret)
 
 
 def options_cb(option, opt_str, value, parser):
-    path_options = ['runfile', 'outputdir', 'template']
-
-    if option.dest == 'runfile' and '-w' in parser.rargs or \
-            option.dest == 'template' and '-c' in parser.rargs:
-        fail('-c and -w are mutually exclusive.')
+    path_options = ['runfile', 'outputdir', 'template', 'logfile']
 
     if opt_str in parser.rargs:
         fail('%s may only be specified once.' % opt_str)
 
-    if option.dest == 'runfile':
-        parser.values.cmd = 'rdconfig'
-    if option.dest == 'template':
-        parser.values.cmd = 'wrconfig'
-
-    setattr(parser.values, option.dest, value)
     if option.dest in path_options:
         setattr(parser.values, option.dest, os.path.abspath(value))
+    else:
+        setattr(parser.values, option.dest, value)
 
 
 def parse_args():
@@ -902,6 +948,10 @@ def parse_args():
                       help='Specify tests to run via config file.')
     parser.add_option('-d', action='store_true', default=False, dest='dryrun',
                       help='Dry run. Print tests, but take no other action.')
+    parser.add_option('-l', action='callback', callback=options_cb,
+                      default=None, dest='logfile', metavar='logfile',
+                      type='string',
+                      help='Read logfile and re-run tests which failed.')
     parser.add_option('-g', action='store_true', default=False,
                       dest='do_groups', help='Make directories TestGroups.')
     parser.add_option('-o', action='callback', callback=options_cb,
@@ -932,9 +982,6 @@ def parse_args():
                       help='Specify a user to execute the post script.')
     (options, pathnames) = parser.parse_args()
 
-    if not options.runfile and not options.template:
-        options.cmd = 'runtests'
-
     if options.runfile and len(pathnames):
         fail('Extraneous arguments.')
 
@@ -945,18 +992,20 @@ def parse_args():
 
 def main():
     options = parse_args()
+
     testrun = TestRun(options)
 
-    if options.cmd == 'runtests':
-        find_tests(testrun, options)
-    elif options.cmd == 'rdconfig':
+    if options.runfile:
         testrun.read(testrun.logger, options)
-    elif options.cmd == 'wrconfig':
+    else:
         find_tests(testrun, options)
+
+    if options.logfile:
+        filter_tests(testrun, options)
+
+    if options.template:
         testrun.write(options)
         exit(0)
-    else:
-        fail('Unknown command specified')
 
     testrun.complete_outputdirs()
     testrun.run(options)

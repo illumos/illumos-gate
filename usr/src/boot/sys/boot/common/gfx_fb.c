@@ -16,13 +16,64 @@
  */
 
 /*
- * Common functions to implement graphical framebuffer support for console.
+ * The workhorse here is gfxfb_blt(). It is implemented to mimic UEFI
+ * GOP Blt, and allows us to fill the rectangle on screen, copy
+ * rectangle from video to buffer and buffer to video and video to video.
+ * Such implementation does allow us to have almost identical implementation
+ * for both BIOS VBE and UEFI.
+ *
+ * ALL pixel data is assumed to be 32-bit BGRA (byte order Blue, Green, Red,
+ * Alpha) format, this allows us to only handle RGB data and not to worry
+ * about mixing RGB with indexed colors.
+ * Data exchange between memory buffer and video will translate BGRA
+ * and native format as following:
+ *
+ * 32-bit to/from 32-bit is trivial case.
+ * 32-bit to/from 24-bit is also simple - we just drop the alpha channel.
+ * 32-bit to/from 16-bit is more complicated, because we nee to handle
+ * data loss from 32-bit to 16-bit. While reading/writing from/to video, we
+ * need to apply masks of 16-bit color components. This will preserve
+ * colors for terminal text. For 32-bit truecolor PMG images, we need to
+ * translate 32-bit colors to 15/16 bit colors and this means data loss.
+ * There are different algorithms how to perform such color space reduction,
+ * we are currently using bitwise right shift to reduce color space and so far
+ * this technique seems to be sufficient (see also gfx_fb_putimage(), the
+ * end of for loop).
+ * 32-bit to/from 8-bit is the most troublesome because 8-bit colors are
+ * indexed. From video, we do get color indexes, and we do translate
+ * color index values to RGB. To write to video, we again need to translate
+ * RGB to color index. Additionally, we need to translate between VGA and
+ * Sun colors.
+ *
+ * Our internal color data is represented using BGRA format. But the hardware
+ * used indexed colors for 8-bit colors (0-255) and for this mode we do
+ * need to perform translation to/from BGRA and index values.
+ *
+ *                   - paletteentry RGB <-> index -
+ * BGRA BUFFER <----/                              \ - VIDEO
+ *                  \                              /
+ *                   -  RGB (16/24/32)            -
+ *
+ * To perform index to RGB translation, we use palette table generated
+ * from when we set up 8-bit mode video. We cannot read palette data from
+ * the hardware, because not all hardware supports reading it.
+ *
+ * BGRA to index is implemented in rgb_to_color_index() by searching
+ * palette array for closest match of RBG values.
+ *
+ * Note: In 8-bit mode, We do store first 16 colors to palette registers
+ * in VGA color order, this serves two purposes; firstly,
+ * if palette update is not supported, we still have correct 16 colors.
+ * Secondly, the kernel does get correct 16 colors when some other boot
+ * loader is used. However, the palette map for 8-bit colors is using
+ * Sun color ordering - this does allow us to skip translation
+ * from VGA colors to Sun colors, while we are reading RGB data.
  */
 
 #include <sys/cdefs.h>
 #include <sys/param.h>
 #include <stand.h>
-#if	defined(EFI)
+#if defined(EFI)
 #include <efi.h>
 #include <efilib.h>
 #else
@@ -59,25 +110,16 @@ static int gfx_inverse = 0;
 static int gfx_inverse_screen = 0;
 static uint8_t gfx_fg = DEFAULT_ANSI_FOREGROUND;
 static uint8_t gfx_bg = DEFAULT_ANSI_BACKGROUND;
-#if	defined(EFI)
+#if defined(EFI)
 static EFI_GRAPHICS_OUTPUT_BLT_PIXEL *GlyphBuffer;
+#else
+static struct paletteentry *GlyphBuffer;
+#endif
 static size_t GlyphBufferSize;
-#endif
 
-static int gfx_fb_cons_clear(struct vis_consclear *);
-static void gfx_fb_cons_copy(struct vis_conscopy *);
-static void gfx_fb_cons_display(struct vis_consdisplay *);
-
-#if	defined(EFI)
-static int gfx_gop_cons_clear(uint32_t data, uint32_t width, uint32_t height);
-static void gfx_gop_cons_copy(struct vis_conscopy *);
-static void gfx_gop_cons_display(struct vis_consdisplay *);
-static void gfx_gop_display_cursor(struct vis_conscursor *);
-#endif
-static int gfx_bm_cons_clear(uint32_t data, uint32_t width, uint32_t height);
-static void gfx_bm_cons_copy(struct vis_conscopy *);
-static void gfx_bm_cons_display(struct vis_consdisplay *);
-static void gfx_bm_display_cursor(struct vis_conscursor *);
+int gfx_fb_cons_clear(struct vis_consclear *);
+void gfx_fb_cons_copy(struct vis_conscopy *);
+void gfx_fb_cons_display(struct vis_consdisplay *);
 
 static bool insert_font(char *, FONT_FLAGS);
 
@@ -90,17 +132,6 @@ static bool insert_font(char *, FONT_FLAGS);
  * Task Priority Level (TPL) to TPL_NOTIFY, which is highest priority
  * usable in application.
  */
-struct gfx_fb_ops {
-	int (*gfx_cons_clear)(uint32_t, uint32_t, uint32_t);
-	void (*gfx_cons_copy)(struct vis_conscopy *);
-	void (*gfx_cons_display)(struct vis_consdisplay *);
-	void (*gfx_cons_display_cursor)(struct vis_conscursor *);
-} gfx_fb_ops = {
-	.gfx_cons_clear = gfx_bm_cons_clear,
-	.gfx_cons_copy = gfx_bm_cons_copy,
-	.gfx_cons_display = gfx_bm_cons_display,
-	.gfx_cons_display_cursor = gfx_bm_display_cursor
-};
 
 /*
  * Translate platform specific FB address.
@@ -108,7 +139,7 @@ struct gfx_fb_ops {
 static uint8_t *
 gfx_get_fb_address(void)
 {
-#if	defined(EFI)
+#if defined(EFI)
 	return ((uint8_t *)(uintptr_t)
 	    gfx_fb.framebuffer_common.framebuffer_addr);
 #else
@@ -174,28 +205,35 @@ gfx_parse_mode_str(char *str, int *x, int *y, int *depth)
 
 /*
  * Support for color mapping.
+ * For 8, 24 and 32 bit depth, use mask size 8.
+ * 15/16 bit depth needs to use mask size from mode,
+ * or we will lose color information from 32-bit to 15/16 bit translation.
  */
 uint32_t
 gfx_fb_color_map(uint8_t index)
 {
 	rgb_t rgb;
+	int bpp;
 
-	if (gfx_fb.framebuffer_common.framebuffer_type !=
-	    MULTIBOOT_FRAMEBUFFER_TYPE_RGB) {
-		if (index < nitems(solaris_color_to_pc_color))
-			return (solaris_color_to_pc_color[index]);
-		else
-			return (index);
-	}
+	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
 
-	rgb.red.pos = gfx_fb.u.fb2.framebuffer_red_field_position;
-	rgb.red.size = gfx_fb.u.fb2.framebuffer_red_mask_size;
+	rgb.red.pos = 16;
+	if (bpp == 2)
+		rgb.red.size = gfx_fb.u.fb2.framebuffer_red_mask_size;
+	else
+		rgb.red.size = 8;
 
-	rgb.green.pos = gfx_fb.u.fb2.framebuffer_green_field_position;
-	rgb.green.size = gfx_fb.u.fb2.framebuffer_green_mask_size;
+	rgb.green.pos = 8;
+	if (bpp == 2)
+		rgb.green.size = gfx_fb.u.fb2.framebuffer_green_mask_size;
+	else
+		rgb.green.size = 8;
 
-	rgb.blue.pos = gfx_fb.u.fb2.framebuffer_blue_field_position;
-	rgb.blue.size = gfx_fb.u.fb2.framebuffer_blue_mask_size;
+	rgb.blue.pos = 0;
+	if (bpp == 2)
+		rgb.blue.size = gfx_fb.u.fb2.framebuffer_blue_mask_size;
+	else
+		rgb.blue.size = 8;
 
 	return (rgb_color_map(&rgb, index));
 }
@@ -328,30 +366,15 @@ gfx_set_inverses(struct env_var *ev, int flags, const void *value)
  * Initialize gfx framework.
  */
 void
-gfx_framework_init(struct visual_ops *fb_ops)
+gfx_framework_init(void)
 {
 	int rc, limit;
 	char *env, buf[2];
-#if	defined(EFI)
-	extern EFI_GRAPHICS_OUTPUT *gop;
-
-	if (gop != NULL) {
-		gfx_fb_ops.gfx_cons_clear = gfx_gop_cons_clear;
-		gfx_fb_ops.gfx_cons_copy = gfx_gop_cons_copy;
-		gfx_fb_ops.gfx_cons_display = gfx_gop_cons_display;
-		gfx_fb_ops.gfx_cons_display_cursor = gfx_gop_display_cursor;
-	}
-#endif
 
 	if (gfx_fb.framebuffer_common.framebuffer_bpp < 24)
 		limit = 7;
 	else
 		limit = 255;
-
-	/* Add visual io callbacks */
-	fb_ops->cons_clear = gfx_fb_cons_clear;
-	fb_ops->cons_copy = gfx_fb_cons_copy;
-	fb_ops->cons_display = gfx_fb_cons_display;
 
 	/* set up tem inverse controls */
 	env = getenv("tem.inverse");
@@ -415,84 +438,527 @@ gfx_framework_init(struct visual_ops *fb_ops)
 }
 
 /*
- * visual io callbacks.
+ * Get indexed color from RGB. This function is used to write data to video
+ * memory when the adapter is set to use indexed colors.
+ * Since UEFI does only support 32-bit colors, we do not implement it for
+ * UEFI because there is no need for it and we do not have palette array
+ * for UEFI.
  */
-
-#if	defined(EFI)
-static int
-gfx_gop_cons_clear(uint32_t data, uint32_t width, uint32_t height)
+static uint8_t
+rgb_to_color_index(uint8_t r, uint8_t g, uint8_t b)
 {
-	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *BltBuffer;
-	EFI_STATUS status;
-	extern EFI_GRAPHICS_OUTPUT *gop;
+#if !defined(EFI)
+	uint32_t color, best, dist, k;
+	int diff;
 
-	BltBuffer = (EFI_GRAPHICS_OUTPUT_BLT_PIXEL *)&data;
+	color = 0;
+	best = 255 * 255 * 255;
+	for (k = 0; k < NCMAP; k++) {
+		diff = r - pe8[k].Red;
+		dist = diff * diff;
+		diff = g - pe8[k].Green;
+		dist += diff * diff;
+		diff = b - pe8[k].Blue;
+		dist += diff * diff;
 
-	status = gop->Blt(gop, BltBuffer, EfiBltVideoFill, 0, 0,
-	    0, 0, width, height, 0);
+		/* Exact match, exit the loop */
+		if (dist == 0)
+			break;
 
-	if (EFI_ERROR(status))
-		return (1);
-	else
-		return (0);
-}
+		if (dist < best) {
+			color = k;
+			best = dist;
+		}
+	}
+	if (k == NCMAP)
+		k = color;
+	return (k);
+#else
+	(void) r;
+	(void) g;
+	(void) b;
+	return (0);
 #endif
+}
+
+static void
+gfx_mem_wr1(uint8_t *base, size_t size, uint32_t o, uint8_t v)
+{
+
+	if (o >= size)
+		return;
+	*(uint8_t *)(base + o) = v;
+}
+
+static void
+gfx_mem_wr2(uint8_t *base, size_t size, uint32_t o, uint16_t v)
+{
+
+	if (o >= size)
+		return;
+	*(uint16_t *)(base + o) = v;
+}
+
+static void
+gfx_mem_wr4(uint8_t *base, size_t size, uint32_t o, uint32_t v)
+{
+
+	if (o >= size)
+		return;
+	*(uint32_t *)(base + o) = v;
+}
 
 static int
-gfx_bm_cons_clear(uint32_t data, uint32_t width, uint32_t height)
+gfxfb_blt_fill(void *BltBuffer,
+    uint32_t DestinationX, uint32_t DestinationY,
+    uint32_t Width, uint32_t Height)
 {
-	uint8_t *fb, *fb8;
-	uint32_t *fb32, pitch;
-	uint16_t *fb16;
-	uint32_t i, j;
+#if defined(EFI)
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *p;
+#else
+	struct paletteentry *p;
+#endif
+	uint32_t data, bpp, pitch, y, x;
+	size_t size;
+	off_t off;
+	uint8_t *destination;
 
-	fb = gfx_get_fb_address();
+	if (BltBuffer == NULL)
+		return (EINVAL);
+
+	if (DestinationY + Height >
+	    gfx_fb.framebuffer_common.framebuffer_height)
+		return (EINVAL);
+
+	if (DestinationX + Width > gfx_fb.framebuffer_common.framebuffer_width)
+		return (EINVAL);
+
+	if (Width == 0 || Height == 0)
+		return (EINVAL);
+
+	p = BltBuffer;
+	if (gfx_fb.framebuffer_common.framebuffer_bpp == 8) {
+		data = rgb_to_color_index(p->Red, p->Green, p->Blue);
+	} else {
+		data = (p->Red &
+		    ((1 << gfx_fb.u.fb2.framebuffer_red_mask_size) - 1)) <<
+		    gfx_fb.u.fb2.framebuffer_red_field_position;
+		data |= (p->Green &
+		    ((1 << gfx_fb.u.fb2.framebuffer_green_mask_size) - 1)) <<
+		    gfx_fb.u.fb2.framebuffer_green_field_position;
+		data |= (p->Blue &
+		    ((1 << gfx_fb.u.fb2.framebuffer_blue_mask_size) - 1)) <<
+		    gfx_fb.u.fb2.framebuffer_blue_field_position;
+	}
+
+	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
 	pitch = gfx_fb.framebuffer_common.framebuffer_pitch;
+	destination = gfx_get_fb_address();
+	size = gfx_fb.framebuffer_common.framebuffer_height * pitch;
 
-	switch (gfx_fb.framebuffer_common.framebuffer_bpp) {
-	case 8:		/* 8 bit */
-		for (i = 0; i < height; i++) {
-			(void) memset(fb + i * pitch, data, pitch);
-		}
-		break;
-	case 15:
-	case 16:		/* 16 bit */
-		for (i = 0; i < height; i++) {
-			fb16 = (uint16_t *)(fb + i * pitch);
-			for (j = 0; j < width; j++)
-				fb16[j] = (uint16_t)(data & 0xffff);
-		}
-		break;
-	case 24:		/* 24 bit */
-		for (i = 0; i < height; i++) {
-			fb8 = fb + i * pitch;
-			for (j = 0; j < pitch; j += 3) {
-				fb8[j] = (data >> 16) & 0xff;
-				fb8[j+1] = (data >> 8) & 0xff;
-				fb8[j+2] = data & 0xff;
+	for (y = DestinationY; y < Height + DestinationY; y++) {
+		off = y * pitch + DestinationX * bpp;
+		for (x = 0; x < Width; x++) {
+			switch (bpp) {
+			case 1:
+				gfx_mem_wr1(destination, size, off,
+				    (data < NCOLORS) ?
+				    solaris_color_to_pc_color[data] : data);
+				break;
+			case 2:
+				gfx_mem_wr2(destination, size, off, data);
+				break;
+			case 3:
+				gfx_mem_wr1(destination, size, off,
+				    (data >> 16) & 0xff);
+				gfx_mem_wr1(destination, size, off + 1,
+				    (data >> 8) & 0xff);
+				gfx_mem_wr1(destination, size, off + 2,
+				    data & 0xff);
+				break;
+			case 4:
+				gfx_mem_wr4(destination, size, off, data);
+				break;
+			default:
+				return (EINVAL);
 			}
+			off += bpp;
 		}
-		break;
-	case 32:		/* 32 bit */
-		for (i = 0; i < height; i++) {
-			fb32 = (uint32_t *)(fb + i * pitch);
-			for (j = 0; j < width; j++)
-				fb32[j] = data;
-		}
-		break;
-	default:
-		return (1);
 	}
 
 	return (0);
 }
 
 static int
+gfxfb_blt_video_to_buffer(void *BltBuffer, uint32_t SourceX, uint32_t SourceY,
+    uint32_t DestinationX, uint32_t DestinationY,
+    uint32_t Width, uint32_t Height, uint32_t Delta)
+{
+#if defined(EFI)
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *p;
+#else
+	struct paletteentry *p;
+#endif
+	uint32_t x, sy, dy;
+	uint32_t bpp, pitch, copybytes;
+	off_t off;
+	uint8_t *source, *destination, *sb;
+	uint8_t rm, rp, gm, gp, bm, bp;
+	bool bgra;
+
+	if (BltBuffer == NULL)
+		return (EINVAL);
+
+	if (SourceY + Height >
+	    gfx_fb.framebuffer_common.framebuffer_height)
+		return (EINVAL);
+
+	if (SourceX + Width > gfx_fb.framebuffer_common.framebuffer_width)
+		return (EINVAL);
+
+	if (Width == 0 || Height == 0)
+		return (EINVAL);
+
+	if (Delta == 0)
+		Delta = Width * sizeof (*p);
+
+	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
+	pitch = gfx_fb.framebuffer_common.framebuffer_pitch;
+
+	copybytes = Width * bpp;
+
+	rm = (1 << gfx_fb.u.fb2.framebuffer_red_mask_size) - 1;
+	rp = gfx_fb.u.fb2.framebuffer_red_field_position;
+	gm = (1 << gfx_fb.u.fb2.framebuffer_green_mask_size) - 1;
+	gp = gfx_fb.u.fb2.framebuffer_green_field_position;
+	bm = (1 << gfx_fb.u.fb2.framebuffer_blue_mask_size) - 1;
+	bp = gfx_fb.u.fb2.framebuffer_blue_field_position;
+	/* If FB pixel format is BGRA, we can use direct copy. */
+	bgra = bpp == 4 &&
+	    gfx_fb.u.fb2.framebuffer_red_mask_size == 8 &&
+	    gfx_fb.u.fb2.framebuffer_red_field_position == 16 &&
+	    gfx_fb.u.fb2.framebuffer_green_mask_size == 8 &&
+	    gfx_fb.u.fb2.framebuffer_green_field_position == 8 &&
+	    gfx_fb.u.fb2.framebuffer_blue_mask_size == 8 &&
+	    gfx_fb.u.fb2.framebuffer_blue_field_position == 0;
+
+	for (sy = SourceY, dy = DestinationY; dy < Height + DestinationY;
+	    sy++, dy++) {
+		off = sy * pitch + SourceX * bpp;
+		source = gfx_get_fb_address() + off;
+		destination = (uint8_t *)BltBuffer + dy * Delta +
+		    DestinationX * sizeof (*p);
+
+		if (bgra) {
+			bcopy(source, destination, copybytes);
+		} else {
+			for (x = 0; x < Width; x++) {
+				uint32_t c = 0;
+
+				p = (void *)(destination + x * sizeof (*p));
+				sb = source + x * bpp;
+				switch (bpp) {
+				case 1:
+					c = *sb;
+					break;
+				case 2:
+					c = *(uint16_t *)sb;
+					break;
+				case 3:
+					c = sb[0] << 16 | sb[1] << 8 | sb[2];
+					break;
+				case 4:
+					c = *(uint32_t *)sb;
+					break;
+				default:
+					return (EINVAL);
+				}
+
+				if (bpp == 1) {
+					*(uint32_t *)p = gfx_fb_color_map(
+					    (c < NCOLORS) ?
+					    pc_color_to_solaris_color[c] : c);
+				} else {
+					p->Red = (c >> rp) & rm;
+					p->Green = (c >> gp) & gm;
+					p->Blue = (c >> bp) & bm;
+					p->Reserved = 0;
+				}
+			}
+		}
+	}
+
+	return (0);
+}
+
+static int
+gfxfb_blt_buffer_to_video(void *BltBuffer, uint32_t SourceX, uint32_t SourceY,
+    uint32_t DestinationX, uint32_t DestinationY,
+    uint32_t Width, uint32_t Height, uint32_t Delta)
+{
+#if defined(EFI)
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *p;
+#else
+	struct paletteentry *p;
+#endif
+	uint32_t x, sy, dy;
+	uint32_t bpp, pitch, copybytes;
+	off_t off;
+	uint8_t *source, *destination;
+	uint8_t rm, rp, gm, gp, bm, bp;
+	bool bgra;
+
+	if (BltBuffer == NULL)
+		return (EINVAL);
+
+	if (DestinationY + Height >
+	    gfx_fb.framebuffer_common.framebuffer_height)
+		return (EINVAL);
+
+	if (DestinationX + Width > gfx_fb.framebuffer_common.framebuffer_width)
+		return (EINVAL);
+
+	if (Width == 0 || Height == 0)
+		return (EINVAL);
+
+	if (Delta == 0)
+		Delta = Width * sizeof (*p);
+
+	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
+	pitch = gfx_fb.framebuffer_common.framebuffer_pitch;
+
+	copybytes = Width * bpp;
+
+	rm = (1 << gfx_fb.u.fb2.framebuffer_red_mask_size) - 1;
+	rp = gfx_fb.u.fb2.framebuffer_red_field_position;
+	gm = (1 << gfx_fb.u.fb2.framebuffer_green_mask_size) - 1;
+	gp = gfx_fb.u.fb2.framebuffer_green_field_position;
+	bm = (1 << gfx_fb.u.fb2.framebuffer_blue_mask_size) - 1;
+	bp = gfx_fb.u.fb2.framebuffer_blue_field_position;
+	/* If FB pixel format is BGRA, we can use direct copy. */
+	bgra = bpp == 4 &&
+	    gfx_fb.u.fb2.framebuffer_red_mask_size == 8 &&
+	    gfx_fb.u.fb2.framebuffer_red_field_position == 16 &&
+	    gfx_fb.u.fb2.framebuffer_green_mask_size == 8 &&
+	    gfx_fb.u.fb2.framebuffer_green_field_position == 8 &&
+	    gfx_fb.u.fb2.framebuffer_blue_mask_size == 8 &&
+	    gfx_fb.u.fb2.framebuffer_blue_field_position == 0;
+
+	for (sy = SourceY, dy = DestinationY; sy < Height + SourceY;
+	    sy++, dy++) {
+		off = dy * pitch + DestinationX * bpp;
+		destination = gfx_get_fb_address() + off;
+
+		if (bgra) {
+			source = (uint8_t *)BltBuffer + sy * Delta +
+			    SourceX * sizeof (*p);
+			bcopy(source, destination, copybytes);
+		} else {
+			for (x = 0; x < Width; x++) {
+				uint32_t c;
+
+				p = (void *)((uint8_t *)BltBuffer +
+				    sy * Delta +
+				    (SourceX + x) * sizeof (*p));
+				if (bpp == 1) {
+					c = rgb_to_color_index(p->Red,
+					    p->Green, p->Blue);
+				} else {
+					c = (p->Red & rm) << rp |
+					    (p->Green & gm) << gp |
+					    (p->Blue & bm) << bp;
+				}
+				off = x * bpp;
+				switch (bpp) {
+				case 1:
+					gfx_mem_wr1(destination, copybytes,
+					    off, (c < NCOLORS) ?
+					    solaris_color_to_pc_color[c] : c);
+					break;
+				case 2:
+					gfx_mem_wr2(destination, copybytes,
+					    off, c);
+					break;
+				case 3:
+					gfx_mem_wr1(destination, copybytes,
+					    off, (c >> 16) & 0xff);
+					gfx_mem_wr1(destination, copybytes,
+					    off + 1, (c >> 8) & 0xff);
+					gfx_mem_wr1(destination, copybytes,
+					    off + 2, c & 0xff);
+					break;
+				case 4:
+					gfx_mem_wr4(destination, copybytes,
+					    off, c);
+					break;
+				default:
+					return (EINVAL);
+				}
+			}
+		}
+	}
+
+	return (0);
+}
+
+static int
+gfxfb_blt_video_to_video(uint32_t SourceX, uint32_t SourceY,
+    uint32_t DestinationX, uint32_t DestinationY,
+    uint32_t Width, uint32_t Height)
+{
+	uint32_t bpp, copybytes;
+	int pitch;
+	uint8_t *source, *destination;
+	off_t off;
+
+	if (SourceY + Height >
+	    gfx_fb.framebuffer_common.framebuffer_height)
+		return (EINVAL);
+
+	if (SourceX + Width > gfx_fb.framebuffer_common.framebuffer_width)
+		return (EINVAL);
+
+	if (DestinationY + Height >
+	    gfx_fb.framebuffer_common.framebuffer_height)
+		return (EINVAL);
+
+	if (DestinationX + Width > gfx_fb.framebuffer_common.framebuffer_width)
+		return (EINVAL);
+
+	if (Width == 0 || Height == 0)
+		return (EINVAL);
+
+	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
+	pitch = gfx_fb.framebuffer_common.framebuffer_pitch;
+
+	copybytes = Width * bpp;
+
+	off = SourceY * pitch + SourceX * bpp;
+	source = gfx_get_fb_address() + off;
+	off = DestinationY * pitch + DestinationX * bpp;
+	destination = gfx_get_fb_address() + off;
+
+	/*
+	 * To handle overlapping areas, set up reverse copy here.
+	 */
+	if ((uintptr_t)destination > (uintptr_t)source) {
+		source += Height * pitch;
+		destination += Height * pitch;
+		pitch = -pitch;
+	}
+
+	while (Height-- > 0) {
+		bcopy(source, destination, copybytes);
+		source += pitch;
+		destination += pitch;
+	}
+
+	return (0);
+}
+
+int
+gfxfb_blt(void *BltBuffer, GFXFB_BLT_OPERATION BltOperation,
+    uint32_t SourceX, uint32_t SourceY,
+    uint32_t DestinationX, uint32_t DestinationY,
+    uint32_t Width, uint32_t Height, uint32_t Delta)
+{
+	int rv;
+#if defined(EFI)
+	EFI_STATUS status;
+	extern EFI_GRAPHICS_OUTPUT *gop;
+
+	/*
+	 * We assume Blt() does work, if not, we will need to build
+	 * exception list case by case.
+	 */
+	if (gop != NULL) {
+		switch (BltOperation) {
+		case GfxFbBltVideoFill:
+			status = gop->Blt(gop, BltBuffer, EfiBltVideoFill,
+			    SourceX, SourceY, DestinationX, DestinationY,
+			    Width, Height, Delta);
+			break;
+
+		case GfxFbBltVideoToBltBuffer:
+			status = gop->Blt(gop, BltBuffer,
+			    EfiBltVideoToBltBuffer,
+			    SourceX, SourceY, DestinationX, DestinationY,
+			    Width, Height, Delta);
+			break;
+
+		case GfxFbBltBufferToVideo:
+			status = gop->Blt(gop, BltBuffer, EfiBltBufferToVideo,
+			    SourceX, SourceY, DestinationX, DestinationY,
+			    Width, Height, Delta);
+			break;
+
+		case GfxFbBltVideoToVideo:
+			status = gop->Blt(gop, BltBuffer, EfiBltVideoToVideo,
+			    SourceX, SourceY, DestinationX, DestinationY,
+			    Width, Height, Delta);
+			break;
+
+		default:
+			status = EFI_INVALID_PARAMETER;
+			break;
+		}
+
+		switch (status) {
+		case EFI_SUCCESS:
+			rv = 0;
+			break;
+
+		case EFI_INVALID_PARAMETER:
+			rv = EINVAL;
+			break;
+
+		case EFI_DEVICE_ERROR:
+		default:
+			rv = EIO;
+			break;
+		}
+
+		return (rv);
+	}
+#endif
+
+	switch (BltOperation) {
+	case GfxFbBltVideoFill:
+		rv = gfxfb_blt_fill(BltBuffer, DestinationX, DestinationY,
+		    Width, Height);
+		break;
+
+	case GfxFbBltVideoToBltBuffer:
+		rv = gfxfb_blt_video_to_buffer(BltBuffer, SourceX, SourceY,
+		    DestinationX, DestinationY, Width, Height, Delta);
+		break;
+
+	case GfxFbBltBufferToVideo:
+		rv = gfxfb_blt_buffer_to_video(BltBuffer, SourceX, SourceY,
+		    DestinationX, DestinationY, Width, Height, Delta);
+		break;
+
+	case GfxFbBltVideoToVideo:
+		rv = gfxfb_blt_video_to_video(SourceX, SourceY,
+		    DestinationX, DestinationY, Width, Height);
+		break;
+
+	default:
+		rv = EINVAL;
+		break;
+	}
+	return (rv);
+}
+
+/*
+ * visual io callbacks.
+ */
+int
 gfx_fb_cons_clear(struct vis_consclear *ca)
 {
+	int rv;
 	uint32_t data, width, height;
-	int ret;
-#if	defined(EFI)
+#if defined(EFI)
 	EFI_TPL tpl;
 #endif
 
@@ -500,74 +966,34 @@ gfx_fb_cons_clear(struct vis_consclear *ca)
 	width = gfx_fb.framebuffer_common.framebuffer_width;
 	height = gfx_fb.framebuffer_common.framebuffer_height;
 
-#if	defined(EFI)
+#if defined(EFI)
 	tpl = BS->RaiseTPL(TPL_NOTIFY);
 #endif
-	ret = gfx_fb_ops.gfx_cons_clear(data, width, height);
-#if	defined(EFI)
+	rv = gfxfb_blt(&data, GfxFbBltVideoFill, 0, 0,
+	    0, 0, width, height, 0);
+#if defined(EFI)
 	BS->RestoreTPL(tpl);
 #endif
-	return (ret);
+
+	return (rv);
 }
 
-#if	defined(EFI)
-static void
-gfx_gop_cons_copy(struct vis_conscopy *ma)
-{
-	UINTN width, height;
-	extern EFI_GRAPHICS_OUTPUT *gop;
-
-	width = ma->e_col - ma->s_col + 1;
-	height = ma->e_row - ma->s_row + 1;
-
-	(void) gop->Blt(gop, NULL, EfiBltVideoToVideo, ma->s_col, ma->s_row,
-	    ma->t_col, ma->t_row, width, height, 0);
-}
-#endif
-
-static void
-gfx_bm_cons_copy(struct vis_conscopy *ma)
-{
-	uint32_t soffset, toffset;
-	uint32_t width, height;
-	uint8_t *src, *dst, *fb;
-	uint32_t bpp, pitch;
-
-	fb = gfx_get_fb_address();
-	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
-	pitch = gfx_fb.framebuffer_common.framebuffer_pitch;
-
-	soffset = ma->s_col * bpp + ma->s_row * pitch;
-	toffset = ma->t_col * bpp + ma->t_row * pitch;
-	src = fb + soffset;
-	dst = fb + toffset;
-	width = (ma->e_col - ma->s_col + 1) * bpp;
-	height = ma->e_row - ma->s_row + 1;
-
-	if (toffset <= soffset) {
-		for (uint32_t i = 0; i < height; i++) {
-			uint32_t increment = i * pitch;
-			(void) memmove(dst + increment, src + increment, width);
-		}
-	} else {
-		for (int i = height - 1; i >= 0; i--) {
-			uint32_t increment = i * pitch;
-			(void) memmove(dst + increment, src + increment, width);
-		}
-	}
-}
-
-static void
+void
 gfx_fb_cons_copy(struct vis_conscopy *ma)
 {
-#if	defined(EFI)
+	uint32_t width, height;
+#if defined(EFI)
 	EFI_TPL tpl;
 
 	tpl = BS->RaiseTPL(TPL_NOTIFY);
 #endif
 
-	gfx_fb_ops.gfx_cons_copy(ma);
-#if	defined(EFI)
+	width = ma->e_col - ma->s_col + 1;
+	height = ma->e_row - ma->s_row + 1;
+
+	(void) gfxfb_blt(NULL, GfxFbBltVideoToVideo, ma->s_col, ma->s_row,
+	    ma->t_col, ma->t_row, width, height, 0);
+#if defined(EFI)
 	BS->RestoreTPL(tpl);
 #endif
 }
@@ -600,103 +1026,57 @@ alpha_blend(uint8_t fg, uint8_t bg, uint8_t alpha)
 
 /* Copy memory to framebuffer or to memory. */
 static void
-bitmap_cpy(uint8_t *dst, uint8_t *src, uint32_t len, int bpp)
+bitmap_cpy(void *dst, void *src, size_t size)
 {
+#if defined(EFI)
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *ps, *pd;
+#else
+	struct paletteentry *ps, *pd;
+#endif
 	uint32_t i;
 	uint8_t a;
 
-	switch (bpp) {
-	case 4:
-		/*
-		 * we only implement alpha blending for depth 32,
-		 * use memcpy for other cases.
-		 */
-		for (i = 0; i < len; i += bpp) {
-			a = src[i+3];
-			dst[i] = alpha_blend(src[i], dst[i], a);
-			dst[i+1] = alpha_blend(src[i+1], dst[i+1], a);
-			dst[i+2] = alpha_blend(src[i+2], dst[i+2], a);
-			dst[i+3] = a;
-		}
-		break;
-	default:
-		(void) memcpy(dst, src, len);
-		break;
-	}
-}
-
-#if	defined(EFI)
-static void
-gfx_gop_cons_display(struct vis_consdisplay *da)
-{
-	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *BltBuffer;
-	uint32_t size;
-	int bpp;
-	extern EFI_GRAPHICS_OUTPUT *gop;
-
-	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
-	size = sizeof (*BltBuffer) * da->width * da->height;
+	ps = src;
+	pd = dst;
 
 	/*
-	 * Common data to display is glyph, use preallocated
-	 * glyph buffer.
+	 * we only implement alpha blending for depth 32.
 	 */
-	if (size == GlyphBufferSize) {
-		BltBuffer = GlyphBuffer;
-	} else {
-		BltBuffer = malloc(size);
+	for (i = 0; i < size; i++) {
+		a = ps[i].Reserved;
+		pd[i].Red = alpha_blend(ps[i].Red, pd[i].Red, a);
+		pd[i].Green = alpha_blend(ps[i].Green, pd[i].Green, a);
+		pd[i].Blue = alpha_blend(ps[i].Blue, pd[i].Blue, a);
+		pd[i].Reserved = a;
 	}
-	if (BltBuffer == NULL) {
-		if (gfx_get_fb_address() != NULL) {
-			/* Fall back to bitmap implementation */
-			gfx_bm_cons_display(da);
-		}
-		/*
-		 * We can not use Blt() and we have no address
-		 * to write data to FB.
-		 */
-		return;
-	}
-
-	(void) gop->Blt(gop, BltBuffer, EfiBltVideoToBltBuffer,
-	    da->col, da->row, 0, 0, da->width, da->height, 0);
-	bitmap_cpy((void *)BltBuffer, da->data, size, bpp);
-	(void) gop->Blt(gop, BltBuffer, EfiBltBufferToVideo,
-	    0, 0, da->col, da->row, da->width, da->height, 0);
-
-	if (BltBuffer != GlyphBuffer)
-		free(BltBuffer);
 }
-#endif
 
-static void
-gfx_bm_cons_display(struct vis_consdisplay *da)
+static void *
+allocate_glyphbuffer(uint32_t width, uint32_t height)
 {
-	uint32_t size;		/* write size per scanline */
-	uint8_t *fbp;		/* fb + calculated offset */
-	int i, bpp, pitch;
+	size_t size;
 
-	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
-	pitch = gfx_fb.framebuffer_common.framebuffer_pitch;
-
-	size = da->width * bpp;
-	fbp = gfx_get_fb_address();
-	fbp += da->col * bpp + da->row * pitch;
-
-	/* write all scanlines in rectangle */
-	for (i = 0; i < da->height; i++) {
-		uint8_t *dest = fbp + i * pitch;
-		uint8_t *src = da->data + i * size;
-		bitmap_cpy(dest, src, size, bpp);
+	size = sizeof (*GlyphBuffer) * width * height;
+	if (size != GlyphBufferSize) {
+		free(GlyphBuffer);
+		GlyphBuffer = malloc(size);
+		if (GlyphBuffer == NULL)
+			return (NULL);
+		GlyphBufferSize = size;
 	}
+	return (GlyphBuffer);
 }
 
-static void
+void
 gfx_fb_cons_display(struct vis_consdisplay *da)
 {
-#if	defined(EFI)
+#if defined(EFI)
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *BltBuffer;
 	EFI_TPL tpl;
+#else
+	struct paletteentry *BltBuffer;
 #endif
+	uint32_t size;
 
 	/* make sure we will not write past FB */
 	if ((uint32_t)da->col >= gfx_fb.framebuffer_common.framebuffer_width ||
@@ -707,65 +1087,81 @@ gfx_fb_cons_display(struct vis_consdisplay *da)
 	    gfx_fb.framebuffer_common.framebuffer_height)
 		return;
 
-#if	defined(EFI)
+	size = sizeof (*BltBuffer) * da->width * da->height;
+
+	/*
+	 * Common data to display is glyph, use preallocated
+	 * glyph buffer.
+	 */
+	if (tems.ts_pix_data_size != GlyphBufferSize)
+		(void) allocate_glyphbuffer(da->width, da->height);
+
+	if (size == GlyphBufferSize) {
+		BltBuffer = GlyphBuffer;
+	} else {
+		BltBuffer = malloc(size);
+	}
+	if (BltBuffer == NULL)
+		return;
+
+#if defined(EFI)
 	tpl = BS->RaiseTPL(TPL_NOTIFY);
 #endif
-	gfx_fb_ops.gfx_cons_display(da);
-#if	defined(EFI)
+	if (gfxfb_blt(BltBuffer, GfxFbBltVideoToBltBuffer,
+	    da->col, da->row, 0, 0, da->width, da->height, 0) == 0) {
+		bitmap_cpy(BltBuffer, da->data, da->width * da->height);
+		(void) gfxfb_blt(BltBuffer, GfxFbBltBufferToVideo,
+		    0, 0, da->col, da->row, da->width, da->height, 0);
+	}
+
+#if defined(EFI)
 	BS->RestoreTPL(tpl);
 #endif
+	if (BltBuffer != GlyphBuffer)
+		free(BltBuffer);
+}
+
+static void
+gfx_fb_cursor_impl(uint32_t fg, uint32_t bg, struct vis_conscursor *ca)
+{
+	union pixel {
+#if defined(EFI)
+		EFI_GRAPHICS_OUTPUT_BLT_PIXEL p;
+#else
+		struct paletteentry p;
+#endif
+		uint32_t p32;
+	} *row;
+
+	/*
+	 * Build inverse image of the glyph.
+	 * Since xor has self-inverse property, drawing cursor
+	 * second time on the same spot, will restore the original content.
+	 */
+	for (screen_size_t i = 0; i < ca->height; i++) {
+		row = (union pixel *)(GlyphBuffer + i * ca->width);
+		for (screen_size_t j = 0; j < ca->width; j++) {
+			row[j].p32 = (row[j].p32 ^ fg) ^ bg;
+		}
+	}
 }
 
 void
 gfx_fb_display_cursor(struct vis_conscursor *ca)
 {
-#if	defined(EFI)
+	union pixel {
+#if defined(EFI)
+		EFI_GRAPHICS_OUTPUT_BLT_PIXEL p;
+#else
+		struct paletteentry p;
+#endif
+		uint32_t p32;
+	} fg, bg;
+#if defined(EFI)
 	EFI_TPL tpl;
 
 	tpl = BS->RaiseTPL(TPL_NOTIFY);
 #endif
-	gfx_fb_ops.gfx_cons_display_cursor(ca);
-#if	defined(EFI)
-	BS->RestoreTPL(tpl);
-#endif
-}
-
-#if	defined(EFI)
-static void
-gfx_gop_display_cursor(struct vis_conscursor *ca)
-{
-	union pixel {
-		EFI_GRAPHICS_OUTPUT_BLT_PIXEL p;
-		uint32_t p32;
-	} *row, fg, bg;
-	size_t size;
-	extern EFI_GRAPHICS_OUTPUT *gop;
-
-	size = sizeof (*GlyphBuffer) * ca->width * ca->height;
-	if (size != GlyphBufferSize) {
-		free(GlyphBuffer);
-		GlyphBuffer = malloc(size);
-		if (GlyphBuffer == NULL) {
-			if (gfx_get_fb_address() != NULL) {
-				/* Fall back to bitmap implementation */
-				gfx_bm_display_cursor(ca);
-			}
-			/*
-			 * We can not use Blt() and we have no address
-			 * to write data to FB.
-			 */
-			return;
-		}
-		GlyphBufferSize = size;
-	}
-
-	/*
-	 * Since EfiBltVideoToBltBuffer is valid, Blt() can fail only
-	 * due to device error.
-	 */
-	if (gop->Blt(gop, GlyphBuffer, EfiBltVideoToBltBuffer,
-	    ca->col, ca->row, 0, 0, ca->width, ca->height, 0) != EFI_SUCCESS)
-		return;
 
 	fg.p.Reserved = 0;
 	fg.p.Red = ca->fg_color.twentyfour[0];
@@ -776,102 +1172,18 @@ gfx_gop_display_cursor(struct vis_conscursor *ca)
 	bg.p.Green = ca->bg_color.twentyfour[1];
 	bg.p.Blue = ca->bg_color.twentyfour[2];
 
-	/*
-	 * Build inverse image of the glyph.
-	 * Since xor has self-inverse property, drawing cursor
-	 * second time on the same spot, will restore the original content.
-	 */
-	for (screen_size_t i = 0; i < ca->height; i++) {
-		row = (union pixel *)(GlyphBuffer + i * ca->width);
-		for (screen_size_t j = 0; j < ca->width; j++) {
-			row[j].p32 = (row[j].p32 ^ fg.p32) ^ bg.p32;
-		}
+	if (allocate_glyphbuffer(ca->width, ca->height) != NULL) {
+		if (gfxfb_blt(GlyphBuffer, GfxFbBltVideoToBltBuffer,
+		    ca->col, ca->row, 0, 0, ca->width, ca->height, 0) == 0)
+			gfx_fb_cursor_impl(fg.p32, bg.p32, ca);
+
+		(void) gfxfb_blt(GlyphBuffer, GfxFbBltBufferToVideo, 0, 0,
+		    ca->col, ca->row, ca->width, ca->height, 0);
 	}
 
-	(void) gop->Blt(gop, GlyphBuffer, EfiBltBufferToVideo,
-	    0, 0, ca->col, ca->row, ca->width, ca->height, 0);
-}
+#if defined(EFI)
+	BS->RestoreTPL(tpl);
 #endif
-
-static void
-gfx_bm_display_cursor(struct vis_conscursor *ca)
-{
-	uint32_t fg, bg;
-	uint32_t offset, size, *fb32;
-	uint16_t *fb16;
-	uint8_t *fb8, *fb;
-	uint32_t bpp, pitch;
-
-	fb = gfx_get_fb_address();
-	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
-	pitch = gfx_fb.framebuffer_common.framebuffer_pitch;
-
-	size = ca->width * bpp;
-
-	/*
-	 * Build cursor image. We are building mirror image of data on
-	 * frame buffer by (D xor FG) xor BG.
-	 */
-	offset = ca->col * bpp + ca->row * pitch;
-	switch (gfx_fb.framebuffer_common.framebuffer_bpp) {
-	case 8:		/* 8 bit */
-		fg = ca->fg_color.mono;
-		bg = ca->bg_color.mono;
-		for (int i = 0; i < ca->height; i++) {
-			fb8 = fb + offset + i * pitch;
-			for (uint32_t j = 0; j < size; j += 1) {
-				fb8[j] = (fb8[j] ^ (fg & 0xff)) ^ (bg & 0xff);
-			}
-		}
-		break;
-	case 15:
-	case 16:	/* 16 bit */
-		fg = ca->fg_color.sixteen[0] << 8;
-		fg |= ca->fg_color.sixteen[1];
-		bg = ca->bg_color.sixteen[0] << 8;
-		bg |= ca->bg_color.sixteen[1];
-		for (int i = 0; i < ca->height; i++) {
-			fb16 = (uint16_t *)(fb + offset + i * pitch);
-			for (int j = 0; j < ca->width; j++) {
-				fb16[j] = (fb16[j] ^ (fg & 0xffff)) ^
-				    (bg & 0xffff);
-			}
-		}
-		break;
-	case 24:	/* 24 bit */
-		fg = ca->fg_color.twentyfour[0] << 16;
-		fg |= ca->fg_color.twentyfour[1] << 8;
-		fg |= ca->fg_color.twentyfour[2];
-		bg = ca->bg_color.twentyfour[0] << 16;
-		bg |= ca->bg_color.twentyfour[1] << 8;
-		bg |= ca->bg_color.twentyfour[2];
-
-		for (int i = 0; i < ca->height; i++) {
-			fb8 = fb + offset + i * pitch;
-			for (uint32_t j = 0; j < size; j += 3) {
-				fb8[j] = (fb8[j] ^ ((fg >> 16) & 0xff)) ^
-				    ((bg >> 16) & 0xff);
-				fb8[j+1] = (fb8[j+1] ^ ((fg >> 8) & 0xff)) ^
-				    ((bg >> 8) & 0xff);
-				fb8[j+2] = (fb8[j+2] ^ (fg & 0xff)) ^
-				    (bg & 0xff);
-			}
-		}
-		break;
-	case 32:	/* 32 bit */
-		fg = ca->fg_color.twentyfour[0] << 16;
-		fg |= ca->fg_color.twentyfour[1] << 8;
-		fg |= ca->fg_color.twentyfour[2];
-		bg = ca->bg_color.twentyfour[0] << 16;
-		bg |= ca->bg_color.twentyfour[1] << 8;
-		bg |= ca->bg_color.twentyfour[2];
-		for (int i = 0; i < ca->height; i++) {
-			fb32 = (uint32_t *)(fb + offset + i * pitch);
-			for (int j = 0; j < ca->width; j++)
-				fb32[j] = (fb32[j] ^ fg) ^ bg;
-		}
-		break;
-	}
 }
 
 /*
@@ -903,13 +1215,8 @@ isqrt(int num)
 void
 gfx_fb_setpixel(uint32_t x, uint32_t y)
 {
-	uint32_t c, offset, pitch, bpp;
-	uint8_t *fb;
+	uint32_t c;
 	text_color_t fg, bg;
-#if	defined(EFI)
-	EFI_GRAPHICS_OUTPUT_BLT_PIXEL p;
-	extern EFI_GRAPHICS_OUTPUT *gop;
-#endif
 
 	if (plat_stdout_is_framebuffer() == 0)
 		return;
@@ -921,38 +1228,7 @@ gfx_fb_setpixel(uint32_t x, uint32_t y)
 	    y >= gfx_fb.framebuffer_common.framebuffer_height)
 		return;
 
-	fb = gfx_get_fb_address();
-	pitch = gfx_fb.framebuffer_common.framebuffer_pitch;
-	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
-
-	offset = y * pitch + x * bpp;
-	switch (gfx_fb.framebuffer_common.framebuffer_bpp) {
-	case 8:
-		fb[offset] = c & 0xff;
-		break;
-	case 15:
-	case 16:
-		*(uint16_t *)(fb + offset) = c & 0xffff;
-		break;
-	case 24:
-		fb[offset] = (c >> 16) & 0xff;
-		fb[offset + 1] = (c >> 8) & 0xff;
-		fb[offset + 2] = c & 0xff;
-		break;
-	case 32:
-#if	defined(EFI)
-		if (gop != NULL) {
-			p.Reserved = 0;
-			p.Red = (c >> 16) & 0xff;
-			p.Green = (c >> 8) & 0xff;
-			p.Blue = c & 0xff;
-			gop->Blt(gop, &p, EfiBltBufferToVideo, 0, 0,
-			    x, y, 1, 1, 0);
-		} else
-#endif
-		*(uint32_t *)(fb + offset) = c;
-		break;
-	}
+	gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x, y, 1, 1, 0);
 }
 
 /*
@@ -1203,9 +1479,13 @@ int
 gfx_fb_putimage(png_t *png, uint32_t ux1, uint32_t uy1, uint32_t ux2,
     uint32_t uy2, uint32_t flags)
 {
+#if defined(EFI)
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *p;
+#else
+	struct paletteentry *p;
+#endif
 	struct vis_consdisplay da;
-	uint32_t i, j, x, y, fheight, fwidth, color;
-	int fbpp;
+	uint32_t i, j, x, y, fheight, fwidth;
 	uint8_t r, g, b, a;
 	bool scale = false;
 	bool trace = false;
@@ -1333,9 +1613,8 @@ gfx_fb_putimage(png_t *png, uint32_t ux1, uint32_t uy1, uint32_t ux2,
 	if ((flags & FL_PUTIMAGE_BORDER))
 		gfx_fb_drawrect(ux1, uy1, ux2, uy2, 0);
 
-	fbpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
-
-	da.data = malloc(fwidth * fheight * fbpp);
+	da.data = malloc(fwidth * fheight * sizeof (*p));
+	p = (void *)da.data;
 	if (da.data == NULL) {
 		if (trace)
 			printf("Out of memory.\n");
@@ -1375,7 +1654,7 @@ gfx_fb_putimage(png_t *png, uint32_t ux1, uint32_t uy1, uint32_t ux2,
 			uint32_t offset_x1 = offset_x + 1;
 
 			/* Target pixel index */
-			j = (y * fwidth + x) * fbpp;
+			j = y * fwidth + x;
 
 			if (!scale) {
 				i = GETPIXEL(x, y);
@@ -1425,88 +1704,19 @@ gfx_fb_putimage(png_t *png, uint32_t ux1, uint32_t uy1, uint32_t ux2,
 				a = pixel[3];
 			}
 
-			color =
-			    r >> (8 - gfx_fb.u.fb2.framebuffer_red_mask_size)
-			    << gfx_fb.u.fb2.framebuffer_red_field_position |
-			    g >> (8 - gfx_fb.u.fb2.framebuffer_green_mask_size)
-			    << gfx_fb.u.fb2.framebuffer_green_field_position |
-			    b >> (8 - gfx_fb.u.fb2.framebuffer_blue_mask_size)
-			    << gfx_fb.u.fb2.framebuffer_blue_field_position;
+			if (trace)
+				printf("r/g/b: %x/%x/%x\n", r, g, b);
+			/*
+			 * Rough colorspace reduction for 15/16 bit colors.
+			 */
+			p[j].Red = r >>
+			    (8 - gfx_fb.u.fb2.framebuffer_red_mask_size);
+			p[j].Green = g >>
+			    (8 - gfx_fb.u.fb2.framebuffer_green_mask_size);
+			p[j].Blue = b >>
+			    (8 - gfx_fb.u.fb2.framebuffer_blue_mask_size);
+			p[j].Reserved = a;
 
-			switch (gfx_fb.framebuffer_common.framebuffer_bpp) {
-#if !defined(EFI)
-			case 8: {
-				uint32_t best, dist, k;
-				int diff;
-
-				/* if alpha is 0, use screen bg color */
-				if (a == 0) {
-					text_color_t fg, bg;
-
-					tem_get_colors(
-					    (tem_vt_state_t)tems.ts_active,
-					    &fg, &bg);
-					da.data[j] = gfx_fb_color_map(bg);
-					break;
-				}
-
-				color = 0;
-				best = CMAP_SIZE * CMAP_SIZE * CMAP_SIZE;
-				for (k = 0; k < CMAP_SIZE; k++) {
-					diff = r - pe8[k].Red;
-					dist = diff * diff;
-					diff = g - pe8[k].Green;
-					dist += diff * diff;
-					diff = b - pe8[k].Blue;
-					dist += diff * diff;
-
-					if (dist == 0)
-						break;
-
-					if (dist < best) {
-						color = k;
-						best = dist;
-					}
-				}
-				if (k == CMAP_SIZE)
-					k = color;
-				da.data[j] = (k < 16) ?
-				    solaris_color_to_pc_color[k] : k;
-				break;
-			}
-			case 15:
-			case 16:
-				/* if alpha is 0, use screen bg color */
-				if (a == 0) {
-					text_color_t fg, bg;
-
-					tem_get_colors(
-					    (tem_vt_state_t)tems.ts_active,
-					    &fg, &bg);
-					color = gfx_fb_color_map(bg);
-				}
-				*(uint16_t *)(da.data+j) = color;
-				break;
-			case 24:
-				/* if alpha is 0, use screen bg color */
-				if (a == 0) {
-					text_color_t fg, bg;
-
-					tem_get_colors(
-					    (tem_vt_state_t)tems.ts_active,
-					    &fg, &bg);
-					color = gfx_fb_color_map(bg);
-				}
-				da.data[j] = ((uint8_t *)&color)[0];
-				da.data[j + 1] = ((uint8_t *)&color)[1];
-				da.data[j + 2] = ((uint8_t *)&color)[2];
-				break;
-#endif
-			case 32:
-				color |= a << 24;
-				*(uint32_t *)(da.data+j) = color;
-				break;
-			}
 			wc += wcstep;
 		}
 		hc += hcstep;
