@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -113,8 +113,8 @@ wsdiff_path = [ "/usr/bin",
 wsdiff_exceptions = [
 ]
 
-# Path to genunix, used for CTF diff
-genunix = "/kernel/amd64/genunix"
+# Path to genunix, used for finding the proto root, and for CTF diff
+genunix = "kernel/amd64/genunix"
 
 if PY3:
 	def getoutput(cmd):
@@ -273,12 +273,10 @@ def diffFileData(tmpf1, tmpf2) :
 		if binaries :
 			try:
 				os.unlink(tmp_od1)
-			except OSError as e:
-				error("diffFileData: unlink failed %s" % e)
-			try:
 				os.unlink(tmp_od2)
 			except OSError as e:
-				error("diffFileData: unlink failed %s" % e)
+				error("diffFileData: unlink failed {}"
+				    .format(e))
 	except:
 		error("failed to get output of command: " + dcmd)
 
@@ -303,9 +301,17 @@ def str_prefix_trunc(s, prefix) :
 # e.g. proto.base/root_sparc/usr/src/cmd/prstat => usr/src/cmd/prstat
 #
 def fnFormat(fn) :
-	root_arch_str = "root_" + arch
+	global baseWsRoot, ptchWsRoot
 
-	pos = fn.find(root_arch_str)
+	if len(os.path.commonprefix([fn, baseWsRoot])) == len(baseWsRoot):
+		return fn[len(baseWsRoot) + 1:]
+
+	if len(os.path.commonprefix([fn, ptchWsRoot])) == len(ptchWsRoot):
+		return fn[len(ptchWsRoot) + 1:]
+
+	# Fall back to looking for the expected root_<arch>[-nd] string
+
+	pos = fn.find("root_" + arch)
 	if pos == -1 :
 		return fn
 
@@ -318,11 +324,19 @@ def fnFormat(fn) :
 #
 # Find the path to a proto root given the name of a file or directory under it
 # e.g. proto.base/root_i386-nd/usr/bin => proto.base/root_i386-nd
+#      root/usr/bin => root
 #
 def protoroot(fn):
-	root_arch_str = "root_" + arch
+	root = fn
+	while len(root) > 1:
+		if os.path.isfile(os.path.join(root, genunix)):
+			return root
+		root = os.path.dirname(root)
 
-	pos = fn.find(root_arch_str)
+	# genunix was not found, try and determine the root by checking for
+	# the expected root_<arch>[-nd] string
+
+	pos = fn.find("root_" + arch)
 	if pos == -1:
 		return None
 
@@ -331,7 +345,6 @@ def protoroot(fn):
 		return fn
 
 	return fn[:pos]
-
 
 #####
 # Usage / argument processing
@@ -757,14 +770,13 @@ def diff_ctf(f1, f2):
 	# Find genunix so that it can be used for parent CTF data when
 	# appropriate.
 	if diff_ctf.genunix1 is None:
-		global genunix, baseRoot, ptchRoot
+		global genunix, baseWsRoot, ptchWsRoot
 
-		d1 = protoroot(baseRoot)
-		d2 = protoroot(ptchRoot)
-		if (d1 and d2 and os.path.isfile(d1 + genunix) and
-		    os.path.isfile(d2 + genunix)):
-			diff_ctf.genunix1 = d1 + genunix
-			diff_ctf.genunix2 = d2 + genunix
+		if (baseWsRoot and ptchWsRoot and
+		    os.path.isfile(os.path.join(baseWsRoot, genunix)) and
+		    os.path.isfile(os.path.join(ptchWsRoot, genunix))):
+			diff_ctf.genunix1 = os.path.join(baseWsRoot, genunix)
+			diff_ctf.genunix2 = os.path.join(ptchWsRoot, genunix)
 			debug("CTF: Found {}".format(diff_ctf.genunix1))
 			debug("CTF: Found {}".format(diff_ctf.genunix2))
 		else:
@@ -868,12 +880,9 @@ def diff_elf_section(f1, f2, section, sh_type) :
 	# remove temp files as we no longer need them
 	try:
 		os.unlink(tmpFile1)
-	except OSError as e:
-		error("diff_elf_section: unlink failed %s" % e)
-	try:
 		os.unlink(tmpFile2)
 	except OSError as e:
-		error("diff_elf_section: unlink failed %s" % e)
+		error("diff_elf_section: unlink failed {}".format(e))
 
 	return (data)
 
@@ -1065,13 +1074,9 @@ def compareArchives(base, ptch, fileType) :
 
 	try:
 		os.makedirs(ArchTmpDir1)
-	except OSError as e:
-		error("compareArchives: makedir failed %s" % e)
-		return -1
-	try:
 		os.makedirs(ArchTmpDir2)
 	except OSError as e:
-		error("compareArchives: makedir failed %s" % e)
+		error("compareArchives: makedir failed {}".format(e))
 		return -1
 
 	# copy over the objects to the temp areas, and
@@ -1244,12 +1249,9 @@ def compareByDumping(base, ptch, quiet, fileType) :
 	# Remove the temporary files now.
 	try:
 		os.unlink(tmpFile1)
-	except OSError as e:
-		error("compareByDumping: unlink failed %s" % e)
-	try:
 		os.unlink(tmpFile2)
 	except OSError as e:
-		error("compareByDumping: unlink failed %s" % e)
+		error("compareByDumping: unlink failed {}".format(e))
 
 	return ret
 
@@ -1378,8 +1380,8 @@ def main() :
 
 	# changed files for worker thread processing
 	global changedFiles
-	global baseRoot
-	global ptchRoot
+
+	global baseRoot, ptchRoot, baseWsRoot, ptchWsRoot
 
 	# Sort the list of files from a temporary file
 	global o_sorted
@@ -1410,12 +1412,12 @@ def main() :
 			log = open(results, "w")
 		except:
 			logging = False
-			error("failed to open log file: " + log)
+			error("failed to open log file: {}".format(log))
 			sys.exit(1)
 
-		dateTimeStr= "# %04d-%02d-%02d at %02d:%02d:%02d" % \
-		    time.localtime()[:6]
 		v_info("# This file was produced by wsdiff")
+		dateTimeStr= time.strftime('# %Y-%m-%d at %H:%M:%S',
+		    time.localtime())
 		v_info(dateTimeStr)
 
 	# Changed files (used only for the sorted case)
@@ -1465,26 +1467,32 @@ def main() :
 	#
 	# validate the base and patch paths
 	#
-	if baseRoot[-1] != '/' :
-		baseRoot += '/'
-
-	if ptchRoot[-1] != '/' :
-		ptchRoot += '/'
+	baseRoot = os.path.abspath(baseRoot) + os.sep
+	ptchRoot = os.path.abspath(ptchRoot) + os.sep
 
 	if not os.path.exists(baseRoot) :
-		error("old proto area: " + baseRoot + " does not exist")
+		error("old proto area: {} does not exist".format(baseRoot))
 		sys.exit(1)
 
 	if not os.path.exists(ptchRoot) :
-		error("new proto area: " + ptchRoot + " does not exist")
+		error("new proto area: {} does not exist".format(ptchRoot))
 		sys.exit(1)
+
+	#
+	# attempt to find the workspace root directory for the proto area
+	#
+	baseWsRoot = protoroot(baseRoot)
+	ptchWsRoot = protoroot(ptchRoot)
+	debug("base workspace root: {}".format(baseWsRoot))
+	debug("ptch workspace root: {}".format(ptchWsRoot))
 
 	#
 	# log some information identifying the run
 	#
-	v_info("Old proto area: " + baseRoot)
-	v_info("New proto area: " + ptchRoot)
-	v_info("Results file: " + results + "\n")
+	v_info("Old proto area: {}".format(baseRoot))
+	v_info("New proto area: {}".format(ptchRoot))
+	v_info("Results file: {}".format(results))
+	v_info("")
 
 	#
 	# Set up the temporary directories / files
@@ -1495,12 +1503,9 @@ def main() :
 	tmpDir2 = "/tmp/wsdiff_tmp2_" + str(pid) + "/"
 	try:
 		os.makedirs(tmpDir1)
-	except OSError as e:
-		error("main: makedir failed %s" % e)
-	try:
 		os.makedirs(tmpDir2)
 	except OSError as e:
-		error("main: makedir failed %s" % e)
+		error("main: makedir failed {}".format(e))
 
 	# Derive a catalog of new, deleted, and to-be-compared objects
 	# either from the specified base and patch proto areas, or from
