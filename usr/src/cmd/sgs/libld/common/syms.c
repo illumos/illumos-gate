@@ -33,6 +33,9 @@
 
 #define	ELF_TARGET_AMD64
 
+/* We deliberately choose a locale unaware ctype */
+#include	<sys/ctype.h>
+
 #include	<stdio.h>
 #include	<string.h>
 #include	<debug.h>
@@ -315,6 +318,41 @@ ld_sym_find(const char *name, Word hash, avl_index_t *where, Ofl_desc *ofl)
 	 * Return symbol found.
 	 */
 	return (sav->sav_sdp);
+}
+
+/*
+ * GCC sometimes emits local aliases for otherwise global symbols, such that
+ * it has a guaranteed way to refer to a symbol from the current object
+ * regardless of interposition.
+ *
+ * The only way we can match on these aliases is by them ending either
+ * ".localalias" or ".localalias.N" where N is any integer.
+ */
+static inline Boolean
+is_gcc_localalias(Sym_desc *sdp)
+{
+	char *p;
+
+	if (ELF_ST_BIND(sdp->sd_sym->st_info) != STB_LOCAL)
+		return (FALSE);
+
+	if ((p = strstr(sdp->sd_name, MSG_ORIG(MSG_SYM_LOCALALIAS))) != NULL) {
+		p += MSG_SYM_LOCALALIAS_SIZE;
+		switch (*p++) {
+		case '\0':			/* unnumbered */
+			return (TRUE);
+		case '.':			/* numbered? */
+			if (*p == '\0')		/* no integer */
+				return (FALSE);
+			while (ISDIGIT(*p))	/* skip integer */
+				p++;
+			if (*p != '\0')		/* non-integer chars */
+				return (FALSE);
+			return (TRUE);
+		}
+	}
+
+	return (FALSE);
 }
 
 /*
@@ -2040,7 +2078,6 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	uchar_t		osabi = ifl->ifl_ehdr->e_ident[EI_OSABI];
 	Half		mach = ifl->ifl_ehdr->e_machine;
 	Half		etype = ifl->ifl_ehdr->e_type;
-	int		etype_rel;
 	const char	*symsecname, *strsecname;
 	Word		symsecndx;
 	avl_index_t	where;
@@ -2117,13 +2154,12 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	if ((ifl->ifl_oldndx = libld_malloc((size_t)(total *
 	    sizeof (Sym_desc *)))) == NULL)
 		return (S_ERROR);
-	etype_rel = (etype == ET_REL);
-	if (etype_rel && local) {
+	if ((etype == ET_REL) && (local != 0)) {
 		if ((ifl->ifl_locs =
 		    libld_calloc(sizeof (Sym_desc), local)) == NULL)
 			return (S_ERROR);
 		/* LINTED */
-		ifl->ifl_locscnt = (Word)local;
+		ifl->ifl_locscnt = local;
 	}
 	ifl->ifl_symscnt = total;
 
@@ -2131,7 +2167,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * If there are local symbols to save add them to the symbol table
 	 * index array.
 	 */
-	if (local) {
+	if (local != 0) {
 		int		allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
 		Sym_desc	*last_file_sdp = NULL;
 		int		last_file_ndx = 0;
@@ -2215,8 +2251,9 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 					/* Will not appear in output object */
 					symtab_enter = 0;
 				}
-			} else if (etype == ET_DYN)
+			} else if (etype == ET_DYN) {
 				continue;
+			}
 
 			/*
 			 * Fill in the remaining symbol descriptor information.
@@ -2313,7 +2350,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * to make sure the section boundaries encompass it.
 			 * If they don't, the ELF file is corrupt.
 			 */
-			if (etype_rel) {
+			if (etype == ET_REL) {
 				if (SYM_LOC_BADADDR(sdp, sym, type)) {
 					issue_badaddr_msg(ifl, ofl, sdp,
 					    sym, shndx);
@@ -2349,6 +2386,14 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				}
 			}
 
+			/*
+			 * If this symbol comes from a relocatable object and
+			 * looks like a GCC local function alias, don't
+			 * include it in dynsort sections, since the global
+			 * name will always be preferable.
+			 */
+			if ((etype == ET_REL) && is_gcc_localalias(sdp))
+				sdp->sd_flags |= FLG_SY_NODYNSORT;
 
 			/*
 			 * Sanity check for TLS
@@ -2729,10 +2774,10 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			if ((sdp = ld_sym_enter(name, nsym, hash, ifl, ofl, ndx,
 			    shndx, sdflags, &where)) == (Sym_desc *)S_ERROR)
 				return (S_ERROR);
-
 		} else if (ld_sym_resolve(sdp, nsym, ifl, ofl, ndx, shndx,
-		    sdflags) == S_ERROR)
+		    sdflags) == S_ERROR) {
 			return (S_ERROR);
+		}
 
 		/*
 		 * Now that we have a symbol descriptor, retain the descriptor
@@ -2790,7 +2835,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * case, we don't check it, because it was already checked
 		 * as part of its own file.
 		 */
-		if (etype_rel && (sdp->sd_file == ifl)) {
+		if ((etype == ET_REL) && (sdp->sd_file == ifl)) {
 			Sym *tsym = sdp->sd_sym;
 
 			if (SYM_LOC_BADADDR(sdp, tsym,
