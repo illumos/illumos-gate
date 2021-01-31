@@ -108,11 +108,8 @@ $(XPG4SH:%=$(ROOTXPG4BIN)/%):
 $(ALIASPROG:%=$(ROOTBIN)/%): $(ROOTPROG)
 	$(RM) $@; $(LN) $(ROOTPROG) $@
 
-.KEEP_STATE:
-
 # Set common AST build flags (e.g., needed to support the math stuff).
 include ../../Makefile.ast
-
 
 ASTSRC= $(C_AST)/src/cmd/ksh93
 

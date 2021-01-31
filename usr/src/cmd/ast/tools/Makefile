@@ -13,6 +13,8 @@
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
+SHELL= /usr/bin/ksh93
+
 CTOOLS= mamake ratz release proto lcgen
 SHTOOLS= iffe mamprobe mprobe package gentab
 
@@ -32,7 +34,7 @@ _msg _feature:
 clean clobber:
 	$(RM) $(OBJS) $(TOOLS)
 
-package: FRC
+package:
 	$(RM) $@
 	# The string returned by 'package' must match the value used by
 	# AT&T upstream, which is "i386" or "sun4", regardless of whether
@@ -85,6 +87,5 @@ CERRWARN += -_gcc=-Wno-unused-value
 CERRWARN += $(CNOWARN_UNINIT)
 SMATCH= off
 
+.KEEP_STATE:
 .PARALLEL: $(TOOLS)
-
-FRC:
