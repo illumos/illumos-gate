@@ -22,6 +22,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -77,7 +78,8 @@
 #include <inet/ipclassifier.h>
 #include <sys/squeue_impl.h>
 #include <inet/ipnet.h>
-#include <sys/ethernet.h>
+#include <sys/vxlan.h>
+#include <inet/inet_hash.h>
 
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
@@ -345,6 +347,73 @@ void (*cl_inet_unbind)(netstackid_t stack_id, uint8_t protocol,
     void *args) = NULL;
 
 typedef union T_primitives *t_primp_t;
+
+/*
+ * Various protocols that encapsulate UDP have no real use for the source port.
+ * Instead, they want to vary the source port to provide better equal-cost
+ * multipathing and other systems that use fanout. Consider something like
+ * VXLAN. If you're actually sending multiple different streams to a single
+ * host, if you don't vary the source port, then the tuple of ( SRC IP, DST IP,
+ * SRC Port, DST Port) will always be the same.
+ *
+ * Here, we return a port to hash this to, if we know how to hash it. If for
+ * some reason we can't perform an L4 hash, then we just return the default
+ * value, usually the default port. After we determine the hash we transform it
+ * so that it's in the range of [ min, max ].
+ *
+ * We'd like to avoid a pull up for the sake of performing the hash. If the
+ * first mblk_t doesn't have the full protocol header, then we just send it to
+ * the default. If for some reason we have an encapsulated packet that has its
+ * protocol header in different parts of an mblk_t, then we'll go with the
+ * default port. This means that that if a driver isn't consistent about how it
+ * generates the frames for a given flow, it will not always be consistently
+ * hashed. That should be an uncommon event.
+ */
+uint16_t
+udp_srcport_hash(mblk_t *mp, int type, uint16_t min, uint16_t max,
+    uint16_t def)
+{
+	size_t szused = 0;
+	ip6_t *ip6h;
+	ipha_t *ipha;
+	uint16_t sap;
+	uint64_t hash;
+	uint32_t mod;
+
+	ASSERT(min <= max);
+
+	if (type != UDP_HASH_VXLAN)
+		return (def);
+
+	if (!IS_P2ALIGNED(mp->b_rptr, sizeof (uint16_t)))
+		return (def);
+
+	if (MBLKL(mp) < VXLAN_HDR_LEN) {
+		return (def);
+	} else {
+		szused = VXLAN_HDR_LEN;
+	}
+
+	/* Can we hold a MAC header? */
+	if (MBLKL(mp) + szused < sizeof (struct ether_header))
+		return (def);
+
+	/*
+	 * We need to lie about the starting offset into the message block for
+	 * convenience. Undo it at the end. We know that inet_pkt_hash() won't
+	 * modify the mblk_t.
+	 */
+	mp->b_rptr += szused;
+	hash = inet_pkt_hash(DL_ETHER, mp, INET_PKT_HASH_L2 |
+	    INET_PKT_HASH_L3 | INET_PKT_HASH_L4);
+	mp->b_rptr -= szused;
+
+	if (hash == 0)
+		return (def);
+
+	mod = max - min + 1;
+	return ((hash % mod) + min);
+}
 
 /*
  * Return the next anonymous port in the privileged port range for
@@ -1585,6 +1654,11 @@ udp_opt_get(conn_t *connp, t_scalar_t level, t_scalar_t name,
 			*i1 = udp->udp_rcvhdr ? 1 : 0;
 			mutex_exit(&connp->conn_lock);
 			return (sizeof (int));
+		case UDP_SRCPORT_HASH:
+			mutex_enter(&connp->conn_lock);
+			*i1 = udp->udp_vxlanhash;
+			mutex_exit(&connp->conn_lock);
+			return (sizeof (int));
 		}
 	}
 	mutex_enter(&connp->conn_lock);
@@ -1719,6 +1793,26 @@ udp_do_opt_set(conn_opt_arg_t *coa, int level, int name,
 			mutex_enter(&connp->conn_lock);
 			udp->udp_rcvhdr = onoff;
 			mutex_exit(&connp->conn_lock);
+			return (0);
+		case UDP_SRCPORT_HASH:
+			/*
+			 * This should have already been verified, but double
+			 * check.
+			 */
+			if ((error = secpolicy_ip_config(cr, B_FALSE)) != 0) {
+				return (error);
+			}
+
+			/* First see if the val is something we understand */
+			if (*i1 != UDP_HASH_DISABLE && *i1 != UDP_HASH_VXLAN)
+				return (EINVAL);
+
+			if (!checkonly) {
+				mutex_enter(&connp->conn_lock);
+				udp->udp_vxlanhash = *i1;
+				mutex_exit(&connp->conn_lock);
+			}
+			/* Fully handled this option. */
 			return (0);
 		}
 		break;
@@ -2003,12 +2097,24 @@ udp_prepend_hdr(conn_t *connp, ip_xmit_attr_t *ixa, const ip_pkt_t *ipp,
 	uint32_t	cksum;
 	udp_t		*udp = connp->conn_udp;
 	boolean_t	insert_spi = udp->udp_nat_t_endpoint;
+	boolean_t	hash_srcport = udp->udp_vxlanhash;
 	uint_t		ulp_hdr_len;
+	uint16_t	srcport;
 
 	data_len = msgdsize(data_mp);
 	ulp_hdr_len = UDPH_SIZE;
 	if (insert_spi)
 		ulp_hdr_len += sizeof (uint32_t);
+
+	/*
+	 * If we have source port hashing going on, determine the hash before
+	 * we modify the mblk_t.
+	 */
+	if (hash_srcport == B_TRUE) {
+		srcport = udp_srcport_hash(mp, UDP_HASH_VXLAN,
+		    IPPORT_DYNAMIC_MIN, IPPORT_DYNAMIC_MAX,
+		    ntohs(connp->conn_lport));
+	}
 
 	mp = conn_prepend_hdr(ixa, ipp, v6src, v6dst, IPPROTO_UDP, flowinfo,
 	    ulp_hdr_len, data_mp, data_len, us->us_wroff_extra, &cksum, errorp);
@@ -2021,7 +2127,11 @@ udp_prepend_hdr(conn_t *connp, ip_xmit_attr_t *ixa, const ip_pkt_t *ipp,
 	ixa->ixa_pktlen = data_len + ixa->ixa_ip_hdr_length;
 
 	udpha = (udpha_t *)(mp->b_rptr + ixa->ixa_ip_hdr_length);
-	udpha->uha_src_port = connp->conn_lport;
+	if (hash_srcport == B_TRUE) {
+		udpha->uha_src_port = htons(srcport);
+	} else {
+		udpha->uha_src_port = connp->conn_lport;
+	}
 	udpha->uha_dst_port = dstport;
 	udpha->uha_checksum = 0;
 	udpha->uha_length = htons(data_len);
@@ -3196,6 +3306,7 @@ udp_prepend_header_template(conn_t *connp, ip_xmit_attr_t *ixa, mblk_t *mp,
 	udp_t		*udp = connp->conn_udp;
 	udp_stack_t	*us = udp->udp_us;
 	boolean_t	insert_spi = udp->udp_nat_t_endpoint;
+	boolean_t	hash_srcport = udp->udp_vxlanhash;
 	uint_t		pktlen;
 	uint_t		alloclen;
 	uint_t		copylen;
@@ -3204,8 +3315,19 @@ udp_prepend_header_template(conn_t *connp, ip_xmit_attr_t *ixa, mblk_t *mp,
 	udpha_t		*udpha;
 	uint32_t	cksum;
 	ip_pkt_t	*ipp;
+	uint16_t	srcport;
 
 	ASSERT(MUTEX_HELD(&connp->conn_lock));
+
+	/*
+	 * If we have source port hashing going on, determine the hash before
+	 * we modify the mblk_t.
+	 */
+	if (hash_srcport == B_TRUE) {
+		srcport = udp_srcport_hash(mp, UDP_HASH_VXLAN,
+		    IPPORT_DYNAMIC_MIN, IPPORT_DYNAMIC_MAX,
+		    ntohs(connp->conn_lport));
+	}
 
 	/*
 	 * Copy the header template and leave space for an SPI
@@ -3305,6 +3427,9 @@ udp_prepend_header_template(conn_t *connp, ip_xmit_attr_t *ixa, mblk_t *mp,
 		*((uint32_t *)(udpha + 1)) = 0;
 
 	udpha->uha_dst_port = dstport;
+	if (hash_srcport == B_TRUE)
+		udpha->uha_src_port = htons(srcport);
+
 	return (mp);
 }
 

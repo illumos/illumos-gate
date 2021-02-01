@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef	_UDP_IMPL_H
@@ -179,7 +180,11 @@ typedef	struct udp_s {
 		udp_nat_t_endpoint : 1,	/* UDP_NAT_T_ENDPOINT option */
 		udp_rcvhdr : 1,		/* UDP_RCVHDR option */
 
-		udp_pad_to_bit_31 : 29;
+		udp_vxlanhash: 1,	/* UDP_SRCPORT_HASH option */
+					/* Because there's only VXLAN, cheat */
+					/* and only use a single bit */
+
+		udp_pad_to_bit_31 : 28;
 
 	/* Following 2 fields protected by the uf_lock */
 	struct udp_s	*udp_bind_hash; /* Bind hash chain */
