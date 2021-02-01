@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -2276,9 +2277,9 @@ so_tpi_fallback(struct sonode *so, struct cred *cr)
 	fbfunc = sp->sp_smod_info->smod_proto_fallback_func;
 
 	/*
-	 * Cannot fallback if the socket has active filters
+	 * Cannot fallback if the socket has active filters or a krecv callback.
 	 */
-	if (so->so_filter_active > 0)
+	if (so->so_filter_active > 0 || so->so_krecv_cb != NULL)
 		return (EINVAL);
 
 	switch (so->so_family) {
@@ -2455,4 +2456,54 @@ out:
 		freemsg(arg.soqa_urgmark_mp);
 
 	return (error);
+}
+
+int
+so_krecv_set(sonode_t *so, so_krecv_f cb, void *arg)
+{
+	int ret;
+
+	if (cb == NULL && arg != NULL)
+		return (EINVAL);
+
+	SO_BLOCK_FALLBACK(so, so_krecv_set(so, cb, arg));
+
+	mutex_enter(&so->so_lock);
+	if (so->so_state & SS_FALLBACK_COMP) {
+		mutex_exit(&so->so_lock);
+		SO_UNBLOCK_FALLBACK(so);
+		return (ENOTSUP);
+	}
+
+	ret = so_lock_read(so, 0);
+	VERIFY(ret == 0);
+	/*
+	 * Other consumers may actually care about getting extant data delivered
+	 * to them, when they come along, they should figure out the best API
+	 * for that.
+	 */
+	so_rcv_flush(so);
+
+	so->so_krecv_cb = cb;
+	so->so_krecv_arg = arg;
+
+	so_unlock_read(so);
+	mutex_exit(&so->so_lock);
+	SO_UNBLOCK_FALLBACK(so);
+
+	return (0);
+}
+
+void
+so_krecv_unblock(sonode_t *so)
+{
+	mutex_enter(&so->so_lock);
+	VERIFY(so->so_krecv_cb != NULL);
+
+	so->so_rcv_queued = 0;
+	(void) so_check_flow_control(so);
+	/*
+	 * so_check_flow_control() always drops so->so_lock, so we won't
+	 * need to drop it ourselves.
+	 */
 }

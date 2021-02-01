@@ -22,11 +22,17 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef	_INET_KSOCKET_KSOCKET_IMPL_H
 #define	_INET_KSOCKET_KSOCKET_IMPL_H
 
+/*
+ * Note that if this relationship ever changes, the logic in ksocket_krecv_set
+ * must be updated and we must maintain local state about this on whatever the
+ * new ksocket object is.
+ */
 #define	KSTOSO(ks)	((struct sonode *)(ks))
 #define	SOTOKS(so)	((ksocket_t)(uintptr_t)(so))
 
@@ -45,7 +51,7 @@
 #define	__KSOCKET_EV_cantrecvmore	KSOCKET_EV_CANTRECVMORE
 #define	__KSOCKET_EV_error		KSOCKET_EV_ERROR
 
-#define	KSOCKET_CALLBACK(so, cbfn, arg) 				\
+#define	KSOCKET_CALLBACK(so, cbfn, arg)					\
 	if ((so)->so_ksock_callbacks.ksock_cb_##cbfn != NULL) {		\
 		(*(so)->so_ksock_callbacks.ksock_cb_##cbfn)(SOTOKS(so),	\
 		    __KSOCKET_EV_##cbfn, (so)->so_ksock_cb_arg, (arg));	\

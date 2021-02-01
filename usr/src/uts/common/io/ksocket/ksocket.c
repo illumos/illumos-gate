@@ -22,7 +22,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/file.h>
@@ -931,4 +931,16 @@ ksocket_rele(ksocket_t ks)
 		if (--so->so_count == 1)
 			cv_signal(&so->so_closing_cv);
 	}
+}
+
+int
+ksocket_krecv_set(ksocket_t ks, ksocket_krecv_f cb, void *arg)
+{
+	return (so_krecv_set(KSTOSO(ks), (so_krecv_f)cb, arg));
+}
+
+void
+ksocket_krecv_unblock(ksocket_t ks)
+{
+	return (so_krecv_unblock(KSTOSO(ks)));
 }

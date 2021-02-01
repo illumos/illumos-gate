@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -103,6 +104,7 @@ struct sockaddr_ux {
 
 typedef struct sonodeops sonodeops_t;
 typedef struct sonode sonode_t;
+typedef boolean_t (*so_krecv_f)(sonode_t *, mblk_t *, size_t, int, void *);
 
 struct sodirect_s;
 
@@ -245,6 +247,10 @@ struct sonode {
 	struct sof_instance	*so_filter_top;		/* top of stack */
 	struct sof_instance	*so_filter_bottom;	/* bottom of stack */
 	clock_t			so_filter_defertime;	/* time when deferred */
+
+	/* Kernel direct receive callbacks */
+	so_krecv_f		so_krecv_cb;		/* recv callback */
+	void			*so_krecv_arg;		/* recv cb arg */
 };
 
 #define	SO_HAVE_DATA(so)						\
@@ -948,6 +954,15 @@ extern struct sonode	*socreate(struct sockparams *, int, int, int, int,
 
 extern int	so_copyin(const void *, void *, size_t, int);
 extern int	so_copyout(const void *, void *, size_t, int);
+
+/*
+ * Functions to manipulate the use of direct receive callbacks. This should not
+ * be used outside of sockfs and ksocket. These are generally considered a use
+ * once interface for a socket and will cause all outstanding data on the socket
+ * to be flushed.
+ */
+extern int	so_krecv_set(sonode_t *, so_krecv_f, void *);
+extern void	so_krecv_unblock(sonode_t *);
 
 #endif
 

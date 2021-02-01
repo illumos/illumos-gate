@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  * Copyright 2017 Sebastian Wiedenroth
  */
 
@@ -457,16 +458,16 @@ sonode_constructor(void *buf, void *cdrarg, int kmflags)
 	vp->v_data = so;
 	vn_setops(vp, socket_vnodeops);
 
-	so->so_priv 		= NULL;
+	so->so_priv		= NULL;
 	so->so_oobmsg		= NULL;
 
 	so->so_proto_handle	= NULL;
 
-	so->so_peercred 	= NULL;
+	so->so_peercred		= NULL;
 
 	so->so_rcv_queued	= 0;
-	so->so_rcv_q_head 	= NULL;
-	so->so_rcv_q_last_head 	= NULL;
+	so->so_rcv_q_head	= NULL;
+	so->so_rcv_q_last_head	= NULL;
 	so->so_rcv_head		= NULL;
 	so->so_rcv_last_head	= NULL;
 	so->so_rcv_wanted	= 0;
@@ -503,6 +504,9 @@ sonode_constructor(void *buf, void *cdrarg, int kmflags)
 	cv_init(&so->so_rcv_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&so->so_copy_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&so->so_closing_cv, NULL, CV_DEFAULT, NULL);
+
+	so->so_krecv_cb = NULL;
+	so->so_krecv_arg = NULL;
 
 	return (0);
 }
@@ -656,6 +660,10 @@ sonode_fini(struct sonode *so)
 	/* Detach and destroy filters */
 	if (so->so_filter_top != NULL)
 		sof_sonode_cleanup(so);
+
+	/* Clean up any remnants of krecv callbacks */
+	so->so_krecv_cb = NULL;
+	so->so_krecv_arg = NULL;
 
 	ASSERT(list_is_empty(&so->so_acceptq_list));
 	ASSERT(list_is_empty(&so->so_acceptq_defer));
