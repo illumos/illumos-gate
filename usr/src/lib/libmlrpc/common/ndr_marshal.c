@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -38,17 +38,39 @@ static const int ndr_native_byte_order = NDR_REPLAB_INTG_LITTLE_ENDIAN;
 static int ndr_decode_hdr_common(ndr_stream_t *, ndr_common_header_t *);
 static int ndr_decode_pac_hdr(ndr_stream_t *, ndr_pac_hdr_t *);
 
+/*
+ * This is the layout of an RPC PDU, as shown in
+ * [MS-RPCE] 2.2.2.13 "Verification Trailer".
+ *
+ *	+-------------------------------+
+ *	|       PDU Header              |
+ *	+-------------------------------+ ====
+ *	|       Stub Data               |
+ *	+-------------------------------+ PDU
+ *	|       Stub Padding Octets     |
+ *	+-------------------------------+ Body
+ *	|       Verification Trailer    |
+ *	+-------------------------------+ Here
+ *	|       Authentication Padding  |
+ *	+-------------------------------+ ====
+ *	|       sec_trailer             |
+ *	+-------------------------------+
+ *	|       Authentication Token    |
+ *	+-------------------------------+
+ *
+ * We don't use the "Verification Trailer" for anything yet.
+ * sec_trailer and Authentication Token are for Secure RPC,
+ * and are collectively the 'auth_verifier_co' in DCERPC.
+ *
+ * Each fragment of a multi-fragment response has a unique
+ * header and, if authentication was requested, a unique
+ * sec_trailer.
+ */
+
 static int
-ndr_encode_decode_common(ndr_stream_t *nds, unsigned opnum,
-    ndr_typeinfo_t *ti, void *datum)
+ndr_convert_nds_error(ndr_stream_t *nds)
 {
 	int rc;
-
-	/*
-	 * Perform the (un)marshalling
-	 */
-	if (ndo_operation(nds, ti, opnum, datum))
-		return (NDR_DRC_OK);
 
 	switch (nds->error) {
 	case NDR_ERR_MALLOC_FAILED:
@@ -76,6 +98,31 @@ ndr_encode_decode_common(ndr_stream_t *nds, unsigned opnum,
 	}
 
 	return (rc);
+}
+
+static int
+ndr_encode_decode_common(ndr_stream_t *nds, unsigned opnum,
+    ndr_typeinfo_t *ti, void *datum)
+{
+	/*
+	 * Perform the (un)marshalling
+	 */
+	if (ndo_operation(nds, ti, opnum, datum))
+		return (NDR_DRC_OK);
+
+	return (ndr_convert_nds_error(nds));
+}
+
+static int
+ndr_encode_decode_type(ndr_stream_t *nds, ndr_typeinfo_t *ti, void *datum)
+{
+	/*
+	 * Perform the (un)marshalling
+	 */
+	if (ndo_process(nds, ti, datum))
+		return (NDR_DRC_OK);
+
+	return (ndr_convert_nds_error(nds));
 }
 
 ndr_buf_t *
@@ -115,7 +162,7 @@ ndr_buf_fini(ndr_buf_t *nbuf)
  *
  *	pac_info_t info;
  *
- * 	if ((nbuf = ndr_buf_init(&TYPEINFO(ndr_pac)) != NULL) {
+ *	if ((nbuf = ndr_buf_init(&TYPEINFO(ndr_pac)) != NULL) {
  *		rc = ndr_decode_buf(nbuf, opnum, data, datalen, &info);
  *		...
  *		ndr_buf_fini(nbuf);
@@ -145,6 +192,7 @@ ndr_buf_decode(ndr_buf_t *nbuf, unsigned hdr_type, unsigned opnum,
 		return (rc);
 
 	bcopy(data, nbuf->nb_nds.pdu_base_addr, datalen);
+	nbuf->nb_nds.pdu_size = datalen;
 
 	switch (hdr_type) {
 	case NDR_PTYPE_COMMON:
@@ -252,7 +300,9 @@ ndr_decode_pdu_hdr(ndr_xa_t *mxa)
 	ndr_common_header_t	*hdr = &mxa->recv_hdr.common_hdr;
 	ndr_stream_t		*nds = &mxa->recv_nds;
 	int			rc;
+	ulong_t			saved_offset;
 
+	saved_offset = nds->pdu_scan_offset;
 	rc = ndr_decode_hdr_common(nds, hdr);
 	if (NDR_DRC_IS_FAULT(rc))
 		return (rc);
@@ -264,6 +314,16 @@ ndr_decode_pdu_hdr(ndr_xa_t *mxa)
 		return (NDR_DRC_FAULT_RPCHDR_DECODE_FAILED);
 
 	mxa->ptype = hdr->ptype;
+	/* pdu_scan_offset now points to (this fragment's) stub data */
+	nds->pdu_body_offset = nds->pdu_scan_offset;
+	nds->pdu_hdr_size = nds->pdu_scan_offset - saved_offset;
+	nds->pdu_body_size = hdr->frag_length - hdr->auth_length -
+	    nds->pdu_hdr_size -
+	    ((hdr->auth_length != 0) ? SEC_TRAILER_SIZE : 0);
+
+	if (hdr->auth_length != 0 && hdr->auth_length >
+	    (hdr->frag_length - nds->pdu_hdr_size - SEC_TRAILER_SIZE))
+		return (NDR_DRC_FAULT_RECEIVED_MALFORMED);
 	return (NDR_DRC_OK);
 }
 
@@ -274,6 +334,7 @@ ndr_decode_hdr_common(ndr_stream_t *nds, ndr_common_header_t *hdr)
 	int			rc;
 	int			charset;
 	int			byte_order;
+	ulong_t			saved_offset;
 
 	if (nds->m_op != NDR_M_OP_UNMARSHALL)
 		return (NDR_DRC_FAULT_RPCHDR_MODE_MISMATCH);
@@ -281,8 +342,8 @@ ndr_decode_hdr_common(ndr_stream_t *nds, ndr_common_header_t *hdr)
 	/*
 	 * All PDU headers are at least this big
 	 */
-	rc = NDS_GROW_PDU(nds, sizeof (ndr_common_header_t), 0);
-	if (!rc)
+	saved_offset = nds->pdu_scan_offset;
+	if ((nds->pdu_size - saved_offset) < sizeof (ndr_common_header_t))
 		return (NDR_DRC_FAULT_RPCHDR_RECEIVED_RUNT);
 
 	/*
@@ -315,6 +376,8 @@ ndr_decode_hdr_common(ndr_stream_t *nds, ndr_common_header_t *hdr)
 
 	rc = ndr_encode_decode_common(nds, ptype, &TYPEINFO(ndr_hdr), hdr);
 
+	if (hdr->frag_length > (nds->pdu_size - saved_offset))
+		rc = NDR_DRC_FAULT_RECEIVED_MALFORMED;
 	return (NDR_DRC_PTYPE_RPCHDR(rc));
 }
 
@@ -329,8 +392,7 @@ ndr_decode_pac_hdr(ndr_stream_t *nds, ndr_pac_hdr_t *hdr)
 	/*
 	 * All PDU headers are at least this big
 	 */
-	rc = NDS_GROW_PDU(nds, sizeof (ndr_pac_hdr_t), 0);
-	if (!rc)
+	if ((nds->pdu_size - nds->pdu_scan_offset) < sizeof (ndr_pac_hdr_t))
 		return (NDR_DRC_FAULT_RPCHDR_RECEIVED_RUNT);
 
 	/*
@@ -388,6 +450,13 @@ ndr_decode_frag_hdr(ndr_stream_t *nds, ndr_common_header_t *hdr)
 		    sizeof (WORD));
 		nds_bswap(&tmp->call_id, &hdr->call_id, sizeof (DWORD));
 	}
+
+	/* pdu_scan_offset points to byte 0 of this fragment */
+	nds->pdu_hdr_size = NDR_RSP_HDR_SIZE;
+	nds->pdu_body_offset = nds->pdu_scan_offset + nds->pdu_hdr_size;
+	nds->pdu_body_size = hdr->frag_length - hdr->auth_length -
+	    nds->pdu_hdr_size -
+	    ((hdr->auth_length != 0) ? SEC_TRAILER_SIZE : 0);
 }
 
 /*
@@ -418,7 +487,10 @@ ndr_remove_frag_hdr(ndr_stream_t *nds)
 	data = hdr + NDR_RSP_HDR_SIZE;
 	nbytes = nds->pdu_size - nds->pdu_scan_offset - NDR_RSP_HDR_SIZE;
 
-	bcopy(data, hdr, nbytes);
+	/*
+	 * Move all of the data after the header back to where the header began.
+	 */
+	memmove(hdr, data, nbytes);
 	nds->pdu_size -= NDR_RSP_HDR_SIZE;
 }
 
@@ -442,9 +514,24 @@ ndr_show_hdr(ndr_common_header_t *hdr)
 		fragtype = "intermediate";
 
 	ndo_printf(NULL, NULL,
-	    "ndr hdr: %d.%d ptype=%d, %s frag (flags=0x%08x) len=%d",
+	    "ndr hdr: %d.%d ptype=%d, %s frag (flags=0x%08x) len=%d "
+	    "auth_len=%d",
 	    hdr->rpc_vers, hdr->rpc_vers_minor, hdr->ptype,
-	    fragtype, hdr->pfc_flags, hdr->frag_length);
+	    fragtype, hdr->pfc_flags, hdr->frag_length, hdr->auth_length);
+}
+
+void
+ndr_show_auth(ndr_sec_t *auth)
+{
+	if (auth == NULL) {
+		ndo_printf(NULL, NULL, "ndr auth: <null>");
+		return;
+	}
+
+	ndo_printf(NULL, NULL,
+	    "ndr auth: type=0x%x, level=0x%x, pad_len=%d, ctx_id=%d",
+	    auth->auth_type, auth->auth_level, auth->auth_pad_len,
+	    auth->auth_context_id);
 }
 
 int
@@ -645,4 +732,197 @@ ndr_alter_context_rsp_hdr_size(void)
 	offset += NDR_ALIGN4(offset);
 	offset += sizeof (ndr_p_result_list_t);
 	return (offset);
+}
+
+/*
+ * This is a hand-coded (un)marshalling routine for auth_verifier_co
+ * (aka ndr_sec_t).
+ *
+ * We need to pretend this structure isn't variably sized, until ndrgen
+ * has been modified to support variable-sized arrays.
+ * Here, we only account for the fixed-size members (8 bytes), plus
+ * a pointer for the C structure.
+ *
+ * We then convert between a pointer to the auth token (auth_value,
+ * allocated here during unmarshall) and a flat, 'fixed'-sized array.
+ */
+
+int ndr__auth_verifier_co(ndr_ref_t *encl_ref);
+ndr_typeinfo_t ndt__auth_verifier_co = {
+    1,		/* NDR version */
+    3,		/* alignment */
+    NDR_F_STRUCT,	/* flags */
+    ndr__auth_verifier_co,	/* ndr_func */
+    8,		/* pdu_size_fixed_part */
+    0,		/* pdu_size_variable_part */
+    8 + sizeof (void *),	/* c_size_fixed_part */
+    0,		/* c_size_variable_part */
+};
+
+/*
+ * [_no_reorder]
+ */
+int
+ndr__auth_verifier_co(ndr_ref_t *encl_ref)
+{
+	ndr_stream_t		*nds = encl_ref->stream;
+	ndr_xa_t		*mxa = /*LINTED E_BAD_PTR_CAST_ALIGN*/
+	    (ndr_xa_t *)encl_ref->datum;
+	ndr_common_header_t	*hdr;
+	ndr_ref_t		myref;
+	ndr_sec_t		*val;
+
+	/*
+	 * Assumes scan_offset points to the end of PDU body.
+	 * (That's base + frag_len - auth_len - SEC_TRAILER_SIZE)
+	 *
+	 * At some point, NDRGEN could use struct initializers instead of
+	 * bzero() + initialization.
+	 */
+	bzero(&myref, sizeof (myref));
+	myref.enclosing = encl_ref;
+	myref.stream = encl_ref->stream;
+
+	switch (nds->m_op) {
+	case NDR_M_OP_MARSHALL:
+		val = &mxa->send_auth;
+		hdr = &mxa->send_hdr.common_hdr;
+		break;
+
+	case NDR_M_OP_UNMARSHALL:
+		val = &mxa->recv_auth;
+		hdr = &mxa->recv_hdr.common_hdr;
+		val->auth_value = (uchar_t *)NDS_MALLOC(nds, hdr->auth_length,
+		    encl_ref);
+		break;
+
+	default:
+		NDR_SET_ERROR(encl_ref, NDR_ERR_M_OP_INVALID);
+		return (0);
+	}
+
+	/*
+	 * ndr_topmost() can't account for auth_length (pdu_scan/end_offset).
+	 * This would only matter if any of this struct's members
+	 * are treated as 'outer' constructs, but they aren't.
+	 */
+	encl_ref->pdu_end_offset += hdr->auth_length;
+	nds->pdu_scan_offset += hdr->auth_length;
+
+	NDR_MEMBER(_uchar, auth_type, 0UL);
+	NDR_MEMBER(_uchar, auth_level, 1UL);
+	NDR_MEMBER(_uchar, auth_pad_len, 2UL);
+	NDR_MEMBER(_uchar, auth_rsvd, 3UL);
+	NDR_MEMBER(_ulong, auth_context_id, 4UL);
+
+	NDR_MEMBER_PTR_WITH_DIMENSION(_uchar, auth_value, 8UL,
+	    hdr->auth_length);
+
+	return (1);
+}
+
+int
+ndr_encode_pdu_auth(ndr_xa_t *mxa)
+{
+	ndr_common_header_t	*hdr = &mxa->send_hdr.common_hdr;
+	ndr_stream_t		*nds = &mxa->send_nds;
+	int			rc;
+	ulong_t			want_size;
+
+	if (nds->m_op != NDR_M_OP_MARSHALL)
+		return (NDR_DRC_FAULT_MODE_MISMATCH);
+
+	if (hdr->auth_length == 0)
+		return (NDR_DRC_OK);
+
+	want_size = nds->pdu_scan_offset + hdr->auth_length + SEC_TRAILER_SIZE;
+
+	/*
+	 * Make sure we have space for the sec trailer - the marshaller
+	 * doesn't know how large the auth token is.
+	 * Note: ndr_add_auth_token() has already added padding.
+	 *
+	 * NDS_GROW_PDU will adjust pdu_size for us.
+	 */
+	if (nds->pdu_max_size < want_size) {
+		if (NDS_GROW_PDU(nds, want_size, NULL) == 0)
+			return (NDR_DRC_FAULT_ENCODE_TOO_BIG);
+	} else {
+		nds->pdu_size = want_size;
+	}
+	rc = ndr_encode_decode_type(nds, &TYPEINFO(auth_verifier_co),
+	    mxa);
+
+	return (rc);
+}
+
+int
+ndr_decode_pdu_auth(ndr_xa_t *mxa)
+{
+	ndr_common_header_t	*hdr = &mxa->recv_hdr.common_hdr;
+	ndr_stream_t		*nds = &mxa->recv_nds;
+	ndr_sec_t		*auth = &mxa->recv_auth;
+	int			rc;
+	ulong_t			saved_offset;
+	size_t			auth_size;
+
+	if (nds->m_op != NDR_M_OP_UNMARSHALL)
+		return (NDR_DRC_FAULT_MODE_MISMATCH);
+
+	mxa->recv_auth.auth_pad_len = 0;
+	if (hdr->auth_length == 0)
+		return (NDR_DRC_OK);
+
+	/*
+	 * Save the current offset, and skip to the sec_trailer.
+	 * That's located after the (fragment of) stub data and the auth
+	 * pad bytes (collectively the 'PDU Body').
+	 */
+	saved_offset = nds->pdu_scan_offset;
+	nds->pdu_scan_offset = nds->pdu_body_offset + nds->pdu_body_size;
+
+	/* auth_length is all of the data after the sec_trailer */
+	if (hdr->auth_length >
+	    (nds->pdu_size - nds->pdu_scan_offset - SEC_TRAILER_SIZE)) {
+		nds->pdu_scan_offset = saved_offset;
+		return (NDR_DRC_FAULT_RECEIVED_MALFORMED);
+	}
+
+	rc = ndr_encode_decode_type(nds, &TYPEINFO(auth_verifier_co),
+	    mxa);
+
+	/*
+	 * Reset the scan_offset for call decode processing.
+	 * If we were successful, remove the sec trailer and padding
+	 * from size accounting.
+	 */
+	if (auth->auth_pad_len > nds->pdu_body_size)
+		rc = NDR_DRC_FAULT_RECEIVED_MALFORMED;
+	else if (rc == NDR_DRC_OK) {
+		auth_size = hdr->auth_length + SEC_TRAILER_SIZE +
+		    auth->auth_pad_len;
+
+		/*
+		 * After the authenticator has been decoded,
+		 * pdu_scan_offset points to just after the auth token,
+		 * which is the end of the fragment.
+		 *
+		 * If there's no data after the authenticator, then we
+		 * just remove the authenticator from size accounting.
+		 * Otherwise, need to memmove() all of that data back to after
+		 * the stub data. The data we move starts at the beginning of
+		 * the next fragment.
+		 */
+		if (nds->pdu_size > nds->pdu_scan_offset) {
+			uchar_t *next_frag_ptr = nds->pdu_base_addr +
+			    nds->pdu_scan_offset;
+
+			memmove(next_frag_ptr - auth_size, next_frag_ptr,
+			    nds->pdu_size - nds->pdu_scan_offset);
+		}
+
+		nds->pdu_size -= auth_size;
+	}
+	nds->pdu_scan_offset = saved_offset;
+	return (rc);
 }

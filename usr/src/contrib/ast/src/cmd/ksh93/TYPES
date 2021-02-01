@@ -1,0 +1,182 @@
+
+The ability for users to define types has been added to ksh93t.
+Here is a quick summary of how types are defined and used in ksh93t.
+This is still a work in progress so some changes and additions
+are likely.
+
+A type can be defined either by a shared library or by using the new
+typeset -T option to the shell.  The method for defining types via
+a shared library is not described here.  However, the source file
+bltins/enum.c is an example of a builtin that creates enumeration types.
+
+By convention, typenames begin with a capitol letter and end in _t.
+To define a type, use
+	typeset -T Type_t=(
+		definition
+	)
+where definition contains assignment commands, declaration commands,
+and function definitions.  A declaration command (for example typeset,
+readonly, and export), is a built-in that differs from other builtins in
+that tilde substitution is performed on arguments after an =, assignments
+do not have to precede the command name, and field splitting and pathname
+expansion is not performed on the arguments.
+For example,
+	typeset -T Pt_t=(
+		float -h 'length in inches' x=1
+		float -h 'width in inches' y=0
+		integer -S count=0
+		len()
+		{
+			print -r $((sqrt(_.x*_.x + _.y*_.y)))
+		}
+		set()
+		{
+			(( _.count++))
+		}
+	)
+
+defines a type Pt_t that has three variables x, y, and count defined as well
+as the discipline functions len and set.  The variable x has an initial value
+of 1 and the variable y has an initial value of 0.  The new -h option argument,
+is used for documentations purposes as described later and is ignored outside
+of a type definition.
+
+
+The variable count has the new -S attribute which means that it is shared
+between all instances of the type.  The -S option to typeset is ignored
+outside of a type definition.  Note the variable named _ that is used inside
+the function definition for len and set.  It will be a reference to the
+instance of Pt_t that invoked the function.  The functions len and set
+could also have been defined with function len and function set, but
+since there are no local variables, the len() and set() form are more
+efficient since they don't need to set up a context for local variables
+and for saving and restoring traps.
+
+If the discipline function named create is defined it will be
+invoked when creating each instance for that type. A function named
+create cannot be defined by any instance.
+
+When a type is defined, a declaration built-in command by this name
+is added to ksh.  As with other shell builtins, you can get the man page
+for this newly added command by invoking Pt_t --man.  The information from
+the -h options will be embedded in this man page.  Any functions that
+use getopts to process arguments will be cross referenced on the generated
+man page.
+
+Since Pt_t is now a declaration command it can be used in the definition
+of other types, for example
+	typeset -T Rect_t=( Pt_t ur ll)
+
+Because a type definition is a command, it can be loaded on first reference
+by putting the definition into a file that is found on FPATH.
+Thus, if this definition is in a file named Pt_t on FPATH, then
+a program can create instances of Pt_t without first including
+the definition.
+
+A type definition is readonly and cannot be unset.  Unsetting non-shared
+elements of a type restores them to their default value.  Unsetting a
+shared element has no effect.
+
+The Pt_t command is used to create an instance of Pt_t.
+	Pt_t p1
+creates an instance named p1 with the initial value for p1.x set to 1
+and the initial value of p1.y set to 0.
+	Pt_t p2=(x=3 y=4)
+creates an instance with the specified initial values.  The len function
+gives the distance of the point to the origin.  Thus, p1.len will output
+1 and p2.len will output 5.
+
+ksh93t also introduces a more efficient command substitution mechanism.
+Instead of $(command), the new command substitution ${ command;}
+can be used.  Unlike (and ) which are always special, the { and } are
+reserved words and require the space after { and a newline or ; before }.
+Unlike $(), the ${ ;} command substitution executes the command in
+the current shell context saving the need to save and restore
+changes, therefore also allowing side effects. 
+
+When trying to expand an element of a type, if the element does not exist,
+ksh will look for a discipline function with that name and treat this as if
+it were the ${ ;} command substitution.  Thus, ${p1.len} is equivalent to
+${ p1.len;} and within an arithmetic expression, p1.len will be expanded
+via the new command substitution method.
+
+The type of any variable can be obtained from the new prefix
+operator @.  Thus, ${@p1} will output Pt_t.
+
+By default, each instance inherits all the discipline functions defined
+by the type definition other than create.  However, each instance can define
+a function by the same name that will override this definition.
+However, only discipline functions with the same name as those defined
+by the type or the standard get, set, append, and unset disciplines
+can be defined by each instance.
+
+Each instance of the type Pt_t behaves like a compound variable except
+that only the variables defined by the type can be referenced or set.
+Thus, p2.x=9 is valid, but p2.z=9 is not.  Unless a set discipline function
+does otherwise, the value of $p1 will be expanded to the form of a compound
+variable that can be used for reinput into ksh.
+
+If the variables var1 and var2 are of the same type, then the assignment
+	var2=var1
+will create a copy of the variable var1 into var2.  This is equivalent to
+	eval var2="$var1"
+but is faster since the variable does not need to get expanded or reparsed.
+
+The type Pt_t can be referenced as if it were a variable using the name
+.sh.type.Pt_t.  To change the default point location for subsequent
+instances of Pt_t, you can do
+	.sh.type.Pt_t=(x=5 y=12)
+so that
+	Pt_t p3
+	p3.len
+would be 13.
+
+Types can be defined for simple variables as well as for compound
+objects such as Pt_t.  In this case, the variable named . inside
+the definition refers to the real value for the variable.  For example,
+the type definition
+	typeset -T Time_t=(
+		integer .=0
+		_='%H:%M:%S'
+		get()
+		{
+			.sh.value=$(printf "%(${_._})T" "#$((_))" )
+		}
+		set()
+		{
+			.sh.value=$(printf "%(%#)T" "${.sh.value}")
+
+		}
+	)
+
+The sub-variable name _ is reserved for data used by discipline functions
+and will not be included with data written with the %B option to printf.
+In this case it is used to specify a date format.
+
+In this case
+	Time_t t1 t2=now
+will define t1 as the time at the beginning of the epoch and t2
+as the current time.  Unlike the previous case, $t2 will output
+the current time in the date format specified by the value t2._.
+However, the value of ${t2.} will expand the instance to a form
+that can be used as input to the shell.
+
+Finally, types can be derived from an existing type.  If the first
+element in a type definition is named _, then the new type
+consists of all the elements and discipline functions from the
+type of _ extended by elements and discipline functions defined
+by new type definition.  For example,
+
+	typeset -T Pq_t=(
+		Pt_t _
+		float z=0.
+		len()
+		{
+			print -r $((sqrt(_.x*_.x + _.y*_.y + _.z*_.z)))
+		}
+	)
+
+defines a new type Pq_t which is based on Pq_t and contains an additional
+field z and a different len discipline function.  It is also possible
+to create a new type Pt_t based on the original Pt_t.  In this case
+the original Pt_t is no longer accessible.

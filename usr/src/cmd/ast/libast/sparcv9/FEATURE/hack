@@ -1,0 +1,5 @@
+/* : : generated from contrib/ast/src/lib/libast/features/hack by iffe version 2012-07-17 : : */
+#ifndef _def_hack_ast
+#define _def_hack_ast	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#endif

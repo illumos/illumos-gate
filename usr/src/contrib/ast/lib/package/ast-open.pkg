@@ -1,0 +1,20 @@
+ast-open :PACKAGE: \
+		ksh93 kshlib pax html proto bzip libast libardir libcmd libdll \
+		libexpr libodelta librecsort libsum libuu libvdelta libbz \
+		libz tests 3d coshell cpp cs mam msgcc nmake probe ss \
+		libcoshell libcs libmam libpp libcodex paxlib codexlib \
+		at builtin codex dss dsslib ie mailx mam ncsl pack pzip \
+		re sort sortlib std tksh tw warp libdss libpz \
+		libtksh libtk vczip libvcodex libvgraph libtaso jcl libjcl
+
+:COVERS: ast-base ast-dss
+
+:LICENSE: *.open
+
+:CATEGORY: devel libs mail shells utils
+
+:INDEX: ksh, pax, nmake, sfio, and ast open source commands and libraries
+
+:DESCRIPTION:
+	The AT&T Software Technology ast-open package from AT&T Research
+	contains all of the ast open source commands and libraries.

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -43,6 +43,7 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
+#include <mlsvc.h>
 #include <smbsrv/ndl/netlogon.ndl>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/netrauth.h>
@@ -62,7 +63,78 @@ static int netr_gen_password(BYTE *, BYTE *, BYTE *);
 /*
  * Shared with netr_logon.c
  */
-netr_info_t netr_global_info;
+netr_info_t netr_global_info = {
+	.use_secure_rpc = B_TRUE,
+	.use_logon_ex = B_TRUE
+};
+extern ndr_auth_ctx_t netr_ssp_ctx;
+
+/*
+ * These flags control various parts of NetLogon RPC messages.
+ * The default is 0 - setting a bit disables some feature.
+ * They are set in smbd/netlogon_flags in svc:/network/smb/server.
+ * These are set when smbd starts. Changing them requires
+ * restarting smbd.
+ *
+ * These shouldn't be confused with either SamLogonEx's ExtraFlags,
+ * or NetrServerAuthenticate's negotiate_flags.
+ *
+ * DISABLE_SECURE_RPC causes Netlogon to use unauthenticated RPC.
+ * Note that the underlying transport is still authenticated and signed.
+ *
+ * DISABLE_RESP_VERIF instructs RPC authentication to ignore failures
+ * when verifying responses.
+ *
+ * DISABLE_SAMLOGONEX causes Netlogon to always use SamLogon, which
+ * makes use of Netlogon Authenticators.
+ */
+#define	NETR_CFG_DISABLE_SECURE_RPC	0x00000001
+#define	NETR_CFG_DISABLE_RESP_VERIF	0x00000002
+#define	NETR_CFG_DISABLE_SAMLOGONEX	0x00000004
+
+void
+netlogon_init_global(uint32_t flags)
+{
+	netr_global_info.use_secure_rpc =
+	    ((flags & NETR_CFG_DISABLE_SECURE_RPC) == 0);
+	netr_ssp_ctx.auth_verify_resp =
+	    ((flags & NETR_CFG_DISABLE_RESP_VERIF) == 0);
+	netr_global_info.use_logon_ex =
+	    ((flags & NETR_CFG_DISABLE_SAMLOGONEX) == 0);
+}
+
+/*
+ * AES-CFB8 has the odd property that 1/256 keys will encrypt
+ * a full block of 0s to all 0s. In order to mitigate this, Windows DCs
+ * now reject Challenges and Credentials where "none of the first 5 bytes
+ * are unique" (i.e. [MS-NRPC] 3.1.4.1 "Session-Key Negotiation" Step 7).
+ * This detects that condition so that we can avoid having our connection
+ * rejected unexpectedly.
+ *
+ * I've interpreted this condition as 'amongst the first 5 bytes,
+ * at least one must appear exactly once'.
+ *
+ * NOTE: Win2012r2 seems to only reject challenges whose first 5 bytes are 0.
+ */
+boolean_t
+passes_dc_mitigation(uint8_t *buf)
+{
+	int i, j;
+
+	for (i = 0; i < 5; i++) {
+		for (j = 0; j < 5; j++) {
+			if (i != j && buf[i] == buf[j])
+				break;
+		}
+
+		/* if this byte didn't match any other byte, this passes */
+		if (j == 5)
+			return (B_TRUE);
+	}
+
+	/* None of the bytes were unique - the check fails */
+	return (B_FALSE);
+}
 
 /*
  * netlogon_auth
@@ -79,32 +151,73 @@ netr_info_t netr_global_info;
  *
  */
 DWORD
-netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
+netlogon_auth(char *server, char *domain, DWORD flags)
 {
+	mlsvc_handle_t netr_handle;
 	netr_info_t *netr_info;
 	int rc;
 	DWORD leout_rc[2];
+	boolean_t retry;
+	DWORD status;
+
+	/*
+	 * [MS-NRPC] 3.1.4.1 "Session-Key Negotiation"
+	 * Negotiation happens on an 'unprotected RPC channel'
+	 * (no RPC-level auth).
+	 */
+	status = netr_open(server, domain, &netr_handle);
+
+	if (status != 0) {
+		syslog(LOG_ERR, "netlogon_auth remote open failed (%s)",
+		    xlate_nt_status(status));
+		return (status);
+	}
 
 	netr_info = &netr_global_info;
-	bzero(netr_info, sizeof (netr_info_t));
-
-	netr_info->flags |= flags;
+	bzero(&netr_info->session_key, sizeof (netr_info->session_key));
+	netr_info->flags = flags;
 
 	rc = smb_getnetbiosname(netr_info->hostname, NETBIOS_NAME_SZ);
 	if (rc != 0)
-		return (NT_STATUS_UNSUCCESSFUL);
+		goto errout;
 
 	/* server is our DC.  Note: normally an FQDN. */
 	(void) snprintf(netr_info->server, sizeof (netr_info->server),
 	    "\\\\%s", server);
 
-	LE_OUT32(&leout_rc[0], random());
-	LE_OUT32(&leout_rc[1], random());
-	(void) memcpy(&netr_info->client_challenge, leout_rc,
-	    sizeof (struct netr_credential));
+	/*
+	 * Domain (FQDN and NetBIOS) Name needed for Netlogon SSP-based
+	 * Secure RPC.
+	 */
+	rc = smb_getdomainname(netr_info->nb_domain,
+	    sizeof (netr_info->nb_domain));
+	if (rc != 0)
+		goto errout;
 
-	if ((rc = netr_server_req_challenge(netr_handle, netr_info)) == 0) {
-		rc = netr_server_authenticate2(netr_handle, netr_info);
+	rc = smb_getfqdomainname(netr_info->fqdn_domain,
+	    sizeof (netr_info->fqdn_domain));
+	if (rc != 0)
+		goto errout;
+
+	/*
+	 * [MS-NRPC] 3.1.4.1 "Session-Key Negotiation" Step 7
+	 * Windows DCs will reject negotiate attempts if none of the first
+	 * 5 bytes of the Challenge are unique.
+	 * Keep retrying until we've generated one that satisfies this.
+	 */
+	do {
+		retry = B_FALSE;
+		LE_OUT32(&leout_rc[0], arc4random());
+		LE_OUT32(&leout_rc[1], arc4random());
+		(void) memcpy(&netr_info->client_challenge, leout_rc,
+		    sizeof (struct netr_credential));
+
+		if (!passes_dc_mitigation(netr_info->client_challenge.data))
+			retry = B_TRUE;
+	} while (retry);
+
+	if ((rc = netr_server_req_challenge(&netr_handle, netr_info)) == 0) {
+		rc = netr_server_authenticate2(&netr_handle, netr_info);
 		if (rc == 0) {
 			/*
 			 * TODO: (later)  When joining a domain using a
@@ -117,6 +230,9 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 
 		}
 	}
+
+errout:
+	(void) netr_close(&netr_handle);
 
 	return ((rc) ? NT_STATUS_UNSUCCESSFUL : NT_STATUS_SUCCESS);
 }
@@ -141,6 +257,34 @@ netr_open(char *server, char *domain, mlsvc_handle_t *netr_handle)
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	status = ndr_rpc_bind(netr_handle, server, domain, user, "NETR");
+
+	return (status);
+}
+
+uint32_t auth_context_id = 1;
+
+DWORD
+netr_open_secure(char *server, char *domain, mlsvc_handle_t *netr_handle)
+{
+	char user[SMB_USERNAME_MAXLEN];
+	DWORD status;
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
+
+	/*
+	 * If the server doesn't support SECURE_RPC_FLAG, or we've disabled
+	 * secure rpc (netr_global_info.use_secure_rpc), then SECURE_RPC_FLAG
+	 * won't be in the set of negotiated flags. Don't use SecureRPC if
+	 * that's the case.
+	 */
+	if ((netr_global_info.nego_flags & NETR_NEGO_SECURE_RPC_FLAG) != 0) {
+		netr_ssp_ctx.auth_context_id = auth_context_id++;
+		status = ndr_rpc_bind_secure(netr_handle, server, domain, user,
+		    "NETR", &netr_ssp_ctx);
+	} else {
+		status = ndr_rpc_bind(netr_handle, server, domain, user,
+		    "NETR");
+	}
 
 	return (status);
 }
@@ -192,8 +336,9 @@ netr_server_req_challenge(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 }
 
 uint32_t netr_server_auth2_flags =
-    NETR_NEGOTIATE_BASE_FLAGS |
-    NETR_NEGOTIATE_STRONGKEY_FLAG;
+    NETR_NEGO_BASE_FLAGS |
+    NETR_NEGO_STRONGKEY_FLAG |
+    NETR_NEGO_SECURE_RPC_FLAG;
 
 /*
  * netr_server_authenticate2
@@ -222,7 +367,15 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	arg.hostname = (unsigned char *)netr_info->hostname;
 	arg.negotiate_flags = netr_server_auth2_flags;
 
-	if (arg.negotiate_flags & NETR_NEGOTIATE_STRONGKEY_FLAG) {
+	/*
+	 * If we've disabled SecureRPC, remove it from our negotiate_flags
+	 * so that the returned flags don't include it. We won't later use
+	 * SecureRPC if the returned flags don't include the flag.
+	 */
+	if (!netr_global_info.use_secure_rpc)
+		arg.negotiate_flags &= ~NETR_NEGO_SECURE_RPC_FLAG;
+
+	if (arg.negotiate_flags & NETR_NEGO_STRONGKEY_FLAG) {
 		if (netr_gen_skey128(netr_info) != SMBAUTH_SUCCESS)
 			return (-1);
 	} else {
@@ -230,15 +383,22 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 			return (-1);
 	}
 
+	/*
+	 * We can't 'fiddle' with anything here to prevent getting bitten by
+	 * ClientStoredCredential-based mitigations.
+	 *
+	 * If we're using SamLogonEx, we won't use authenticators unless
+	 * some other NetLogon command is implemented and used.
+	 */
 	if (netr_gen_credentials(netr_info->session_key.key,
 	    &netr_info->client_challenge, 0,
-	    &netr_info->client_credential) != SMBAUTH_SUCCESS) {
+	    &netr_info->client_credential, B_FALSE) != SMBAUTH_SUCCESS) {
 		return (-1);
 	}
 
 	if (netr_gen_credentials(netr_info->session_key.key,
 	    &netr_info->server_challenge, 0,
-	    &netr_info->server_credential) != SMBAUTH_SUCCESS) {
+	    &netr_info->server_credential, B_FALSE) != SMBAUTH_SUCCESS) {
 		return (-1);
 	}
 
@@ -253,6 +413,9 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 		ndr_rpc_release(netr_handle);
 		return (-1);
 	}
+
+	/* The server returns the intersection of our flags and their flags. */
+	netr_info->nego_flags = arg.negotiate_flags;
 
 	rc = memcmp(&netr_info->server_credential, &arg.server_credential,
 	    sizeof (struct netr_credential));
@@ -450,7 +613,7 @@ netr_gen_skey64(netr_info_t *netr_info)
  */
 int
 netr_gen_credentials(BYTE *session_key, netr_cred_t *challenge,
-    DWORD timestamp, netr_cred_t *out_cred)
+    DWORD timestamp, netr_cred_t *out_cred, boolean_t retry)
 {
 	unsigned char buffer[8];
 	DWORD data[2];
@@ -471,6 +634,18 @@ netr_gen_credentials(BYTE *session_key, netr_cred_t *challenge,
 
 	rc = smb_auth_DES(out_cred->data, 8, &session_key[NETR_DESKEY_LEN],
 	    NETR_DESKEY_LEN, buffer, 8);
+
+	/*
+	 * [MS-NRPC] 3.1.4.6 "Calling Methods Requiring Session-Key
+	 * Establishment" Step 6
+	 *
+	 * Windows DCs will reject authenticators if none of the first
+	 * 5 bytes of the ClientStoredCredential are unique.
+	 * Keep retrying until we've generated one that satisfies this,
+	 * but only if the caller can handle retries.
+	 */
+	if (retry && !passes_dc_mitigation(out_cred->data))
+		return (SMBAUTH_RETRY);
 
 	return (rc);
 }

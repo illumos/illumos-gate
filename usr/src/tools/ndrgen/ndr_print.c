@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ */
+
 #include "ndrgen.h"
 #include "y.tab.h"
 
@@ -51,6 +55,7 @@ print_node(ndr_node_t *np)
 
 	switch (np->label) {
 	case ALIGN_KW:		nm = "align";		break;
+	case FAKE_KW:		nm = "fake";		break;
 	case STRUCT_KW:		nm = "struct";		break;
 	case UNION_KW:		nm = "union";		break;
 	case TYPEDEF_KW:	nm = "typedef";		break;
@@ -104,6 +109,7 @@ print_node(ndr_node_t *np)
 	case DEFAULT_KW:
 	case _NO_REORDER_KW:
 	case EXTERN_KW:
+	case FAKE_KW:
 		(void) printf("%s", nm);
 		break;
 
@@ -193,7 +199,7 @@ print_node(ndr_node_t *np)
  * Supports formats such as size_is(x) or size_is(x / 2).  The supported
  * operators are:
  *
- * 	* / % + - & | ^
+ *	* / % + - & | ^
  */
 void
 print_field_attr(ndr_node_t *np)

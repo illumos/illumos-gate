@@ -1,0 +1,412 @@
+:
+# @(#)probe.win32 (AT&T Research) 2009-03-19
+#
+# win32 specific pp C probe initialization
+# wrapped cc's are easy on uwin
+#
+# 2> easy.err to avoid mysterious hang with bcc
+
+# begin preamble shared with the make probe.ini
+
+IFS=$'\n'
+
+chmod 777 .
+
+typeset -A header version
+
+# we are probing on behalf of libpp and nmake
+# so the native preprocessor must be forced in
+# order to bootstrap libpp and nmake
+
+nativepp=-1
+export nativepp
+
+probe_header="
+stddef.h
+"
+for inc in syslimits.h winerror.h ostream bits/ctype_base.h stream.h
+do	echo 	"#include <$inc>" > easy.c
+	if	$cc -E easy.c > /dev/null 2> easy.err 
+	then	probe_header="$probe_header
+$inc
+"
+	fi
+done
+
+{
+for i in $probe_header
+do	echo "#include <$i>"
+done
+echo '#ifdef __cplusplus'
+echo "int _Pr0b3_cplus=__cplusplus;"
+echo '#endif'
+echo '#ifdef _UWIN'
+echo "int _Pr0b3_uwin=_UWIN;"
+echo '#endif'
+echo '#ifdef __BORLANDC__'
+echo "int _Pr0b3_version_BORLAND=__BORLANDC__;"
+echo '#endif'
+echo '#ifdef __DMC__'
+echo "int _Pr0b3_version_DM=__DMC__;"
+echo '#endif'
+echo '#ifdef _MSC_VER'
+echo "int _Pr0b3_version_MS=_MSC_VER;"
+echo '#endif'
+echo '#ifdef __ICL'
+echo "int _Pr0b3_version_ICL=__ICL;"
+echo '#endif'
+echo '#ifdef __LCC__'
+echo "int _Pr0b3_version_LCC=0+__LCC__;"
+echo '#endif'
+echo '#ifdef __MINGW32__'
+echo "int _Pr0b3_version_MINGW=__MINGW32__;"
+echo '#endif'
+echo '#ifdef __INTERIX'
+echo "int _Pr0b3_version_INTERIX=__INTERIX;"
+echo '#endif'
+echo '#ifdef __WATCOMC__'
+echo "int _Pr0b3_version_WATCOM=__WATCOMC__;"
+echo '#endif'
+} > easy.c
+
+include=
+uwin=
+cplus=
+
+$cc -E easy.c 2>&1 |
+egrep -i '^(#(line)? 1 .*\.[hH]| *int +_Pr0b3_[a-zA-Z_]* *= *[0-9])' |
+sed	-e 's,_Pr0b3_,,' \
+	-e 's/.*"\(.*\)".*/\1/' \
+	-e 's,^  *,,' \
+	-e 's,  *$,,' \
+	-e 's, *= *,=,' \
+	-e 's,^\(.\):[\\/]*,/\1/,' \
+	-e 's,[\\/][\\/]*,/,g' \
+	-e 's,^\(/.*\)/\(.*\)$,header[\2]="\1",' \
+	-e 's, *int *\(.*\);.*,\1,' \
+	-e 's,^version_\(.*\)=,version[\1]=,' \
+	> easy.sh
+. ./easy.sh
+
+include=
+for i in $probe_header
+do	d=${header[$i]}
+	if	[[ $d ]]
+	then	include="$include
+$d"
+	elif	[[ $i == */* ]]
+	then	d=${header[${i##*/}]}
+		if	[[ $d == */${i%/*} ]]
+		then	include="$include
+${d%/${i%/*}}"
+		fi
+	fi
+done
+
+i=$($cc -V 2> easy.err)
+if	test "" != "$i" -a -d "$i/include"
+then	include="$i/include
+$include"
+fi
+
+stdinclude=
+for inc in $include
+do	if	[[ ${inc%/*} -ef /msdev/platformsdk ]]
+	then	inc=/msdev/platformsdk/${inc##*/}
+	elif	[[ ${inc%/*} -ef /platformsdk ]]
+	then	inc=/platformsdk/${inc##*/}
+	fi
+	for dup in $stdinclude
+	do	[[ $inc -ef $dup ]] && continue 2
+	done
+	stdinclude="$stdinclude
+$inc"
+done
+
+# end preamble shared with the make probe.ini
+
+pragexpand='#pragma pp:pragmaexpand'
+
+if	[[ ${version[BORLAND]} ]]
+then	version=${version[BORLAND]} VERSION=__BORLANDC__ 
+	reserved="#pragma pp:reserved __asm=GROUP __based=GROUP __cdecl __declspec=GROUP __except __export __far __fastcall __finally __huge __inline __int16 __int32 __int64 __int8 __leave __near __novtordisp __pascal __restrict __stdcall __syscall __try __unaligned __wchar_t
+#pragma pp:reserved _asm=GROUP _based=GROUP _cdecl _declspec=GROUP _except _export _far _fastcall _finally _fortran _huge _int16 _int32 _int64 _int8 _leave _near _pascal _stdcall _syscall _try
+#pragma pp:reserved cdecl const enum far fortran huge near pascal signed void volatile"
+	specific="#define <long long> __int64
+#define <__int64 int> __int64
+#define <__int64 unsigned> unsigned __int64"
+	pragexpand='#pragma pp:nopragmaexpand'
+	pragmas="#pragma pp:nocatliteral
+#pragma pp:stringsplit
+#pragma pp:lineid line"
+elif	[[ ${version[DM]} ]]
+then	version=${version[DM]} VERSION=__DMC__ 
+	reserved="#pragma pp:reserved _Bool _Complex _Imaginary asm=GROUP _asm=GROUP __asm=GROUP const enum _fortran __inline _int64 __int64 __restrict signed void volatile _based=GROUP __based=GROUP cdecl _cdecl __cdecl _declspec=GROUP __declspec=GROUP _except __except _export __export far _far __far _fastcall __fastcall _finally __finally huge _huge __huge _interrupt __interrupt _leave __leave _loadds __loadds near _near __near pascal _pascal __pascal _saveregs __saveregs _segname __segname _stdcall __stdcall _syscall __syscall _try __try _cs __cs _ss __ss _unaligned __unaligned"
+	specific="#define __TIMESTAMP__   __DATE__ \" \" __TIME__"
+	pragmas="#pragma pp:transition
+#pragma pp:elseif
+#pragma pp:lineid line"
+elif	[[ ${version[MS]} ]]
+then	version=${version[MS]} VERSION=_MSC_VER
+	reserved="#pragma pp:reserved __asm=GROUP __based=GROUP __cdecl __declspec=GROUP __except __export __far __fastcall __finally __huge __inline __int16 __int32 __int64 __int8 __leave __near __novtordisp __pascal __restrict __stdcall __syscall __try __unaligned __wchar_t
+#pragma pp:reserved _asm=GROUP _based=GROUP _cdecl _declspec=GROUP _except _export _far _fastcall _finally _fortran _huge _int16 _int32 _int64 _int8 _leave _near _pascal _stdcall _syscall _try
+#pragma pp:reserved cdecl const enum far fortran huge near pascal signed void volatile"
+	specific="#define <long long> __int64
+#define <__int64 int> __int64
+#define <__int64 unsigned> unsigned __int64"
+	pragmas="#pragma pp:lineid line"
+elif	[[ ${version[LCC]} ]]
+then	version=${version[LCC]} VERSION=__LCC__
+	reserved="#pragma pp:reserved _Bool _Complex _asm=GROUP const enum inline __inline __int64 restrict signed void volatile _cdecl __cdecl __declspec=GROUP __except _huge _stdcall __stdcall __try"
+	specific="#pragma pp:map \"/#(pragma )?import>/\" \"/#(pragma )?import(.*)/__STDPP__IMPORT__(\2)/\"
+#macdef __STDPP__IMPORT__(x)
+#pragma pp:noallmultiple
+#include x
+#pragma pp:allmultiple
+#endmac
+"
+	pragmas="#pragma pp:hostedtransition
+#pragma pp:strict
+#pragma pp:spaceout
+#pragma pp:elseif
+"
+elif	[[ ${version[MINGW]} ]]
+then	version=${version[MINGW]} VERSION=__MINGW32__
+	reserved="#pragma pp:reserved __declspec=GROUP __alignof=GROUP __alignof__=GROUP __attribute=GROUP __attribute__=GROUP __extension__=GROUP asm=GROUP __asm=GROUP __asm__=GROUP const __const __const__ enum inline __inline __inline__ __restrict __restrict__ signed __signed __signed__ typeof=GROUP __typeof=GROUP __typeof__=GROUP void volatile __volatile __volatile__ __cdecl _stdcall __stdcall"
+	specific="#define __declspec(x)   __attribute__((x))"
+	pragexpand='#pragma pp:nopragmaexpand'
+	pragmas='#pragma pp:map "/#include_next>/" ",[^\<]*\<,#include <.../,"
+#pragma pp:lineid
+#pragma pp:linetype 2'
+fi
+
+undef_predef=
+echo "char* fun() { return (char*)__FUNCTION__; }
+int main() { return !fun(); }" > easy.c
+rm -f easy.exe
+if	$cc -o easy.exe easy.c && test -x easy.exe
+then	undef_predef="$undef_predef
+#undef	__FUNCTION__"
+fi
+
+dialect=ansi
+if	[[ $cplus ]]
+then	dialect=C++
+fi
+
+if	[[ $version == [0-9]* && $stdinclude ]]
+then	hosttype=$(package)
+	machine=${hosttype#*.}
+	case $uwin in
+	[0-9]*) standard="
+#pragma pp:include \"/usr/include\""
+		assert="
+#define #system(unix)
+#define #release(V)
+#define #release(system5)
+#define #version(${version})"
+		;;
+	*)	predefined=""
+		standard=""
+		assert=""
+		;;
+	esac
+	for inc in $stdinclude
+	do	standard="$standard
+#pragma pp:include \"$inc\""
+	done
+	: the payoff
+	set -- $cc
+	cmd=$1
+	shift
+	set -- $(whence $cmd) "$@"
+	if	"$@" -v >/dev/null 2>&1
+	then	v=$("$@" -v 2>/dev/null)
+		if	[[ $v ]]
+		then	v=";VERSION;-v;$v;PATH;$*"
+		fi
+	else	v=
+	fi
+	if	[[ ! $v ]]
+	then	v="$*"
+	fi
+	cat >&3 <<!
+/* $v
+*/
+
+#pragma pp:predefined
+#define _STD_INCLUDE_DIR ...
+#define _${machine}_ 1
+!
+	{
+	cat <<'!'
+#ifdef unix
+char* str_unix = "#define unix" unix ;
+char* str___unix__ = "#define __unix__" 1 ;
+#else
+#ifdef __unix__
+char* str___unix__ = "#define __unix__" __unix__ ;
+#endif
+#endif
+!
+	premac="
+M_I86
+M_I386
+M_I386CM
+M_I386LM
+M_I386MM
+M_I386SM
+MSDOS
+NO_EXT_KEYS
+_ALPHA_
+_AXP64_
+_CPPUNWIND
+_GENIA64_
+_INTEGRAL_MAX_BITS
+_MSC_EXTENSIONS
+_MSC_VER
+_M_ALPHA
+_M_ALPHA_
+_M_AMD64
+_M_IA64
+_M_IX86
+_M_MRX000
+_M_PPC
+_NTSYSTEM_
+_POSIX_
+_PUSHPOP_SUPPORTED
+_STDCALL_SUPPORTED
+_UWIN
+_WIN32
+_WIN64
+_X64_
+_X86_
+_stdcall
+__BORLANDC__
+__CHAR_SIGNED__
+__CHAR_UNSIGNED__
+__COMPACT__
+__DEFALIGN
+__DMC__
+__DOS__
+__ECL__
+__EDG__
+__FLAT__
+__FPCE__
+__FPI__
+__GNUC__
+__GNUC_MINOR__
+__GNUG__
+__HUGE__
+__I86__
+__ICL
+__INITIAL_POINTER_SIZE
+__INLINE_8087
+__INLINE__FUNCTIONS__
+__INTEL_COMPILER
+__INTERIX
+__INTSIZE
+__LARGE__
+__LCCDEBUGLEVEL
+__LCCOPTIMLEVEL
+__LCC__
+__MEDIUM__
+__MINGW32__
+__MSVCRT__
+__NT__
+__OPENNT
+__OS2__
+__QNX__
+__SC__
+__SMALL__
+__STATIC__
+__STDC__
+__STDC_HOSTED__
+__STDC_IEC_559__
+__STDC_IEC_559_COMPLEX__
+__STDC_ISO_10646__
+__STDC_VERSION__
+__STRLEN
+__TURBOC__
+__WATCOMC__
+__WIN32__
+__WINDOWS__
+__WINDOWS_386__
+__WINVER__
+__ZTC__
+__cdecl
+__cplusplus
+__i386
+__i386__
+__i486
+__i486__
+__i586
+__i586__
+__i686
+__i686__
+__k6
+__k6__
+__pentium
+__pentium__
+__pentiumpro
+__pentiumpro__
+__stdcall
+"
+	echo "#define	s(x)	#x"
+	echo "#define	q(x)	s(x)"
+	for i in $premac
+	do	echo "#ifdef $i"
+		echo "char* str_$i = \"#define $i\" q(:$i:);"
+		echo "#endif"
+	done
+	} > easy.c
+	$cc -E easy.c > easy.out 2>&1
+	sed     -e '/=/!d' -e 's,[^"]*,echo ,' -e 's/":/"/' -e 's/:"/"/' easy.out > easy.sh
+	. ./easy.sh >&3
+	if	[[ $cc == *CC ]]
+	then	src=cpp
+	else	src=c
+	fi
+	print 'typedef char wchar_t;' > easy.$src
+	if	! $cc -c easy.$src >/dev/null 2>&1
+	then	print -u3 '#define _WCHAR_T_DEFINED 1'
+		print -u3 '#define _NATIVE_WCHAR_T_DEFINED 1'
+		if	[[ ! $reserved ]]
+		then	reserved="#pragma pp:reserved"
+		fi
+		reserved="$reserved wchar_t"
+	fi
+	cat >&3 <<!
+#pragma pp:nopredefined
+
+$specific
+
+#define #hosttype(${hosttype})${assert}
+#define #architecture(${machine})
+#define #model()
+#define #machine(${machine})
+#define #addressing()
+#define #preroot()
+#define #universe(att)
+#define #dialect(${dialect})
+$undef_predef
+
+$reserved
+
+$pragmas
+
+#pragma pp:pluscomment
+$pragexpand
+#pragma pp:zeof
+#pragma pp:id "$"${standard}
+#pragma pp:nocatliteral
+#pragma pp:stringsplit
+#pragma pp:headerexpand
+#pragma pp:map "/#(pragma )?ident>/"
+#pragma pp:map "/#pragma lint:/" ",#pragma lint:(.*),##/*\1*/,u"
+#pragma pp:map "/#(pragma )?sccs>/"
+#pragma pp:map "/#pragma once/" ",#pragma once,#pragma pp:nomultiple,"
+#pragma pp:map "/#pragma comment.*linker.*manifest/"
+!
+	exit 0
+fi

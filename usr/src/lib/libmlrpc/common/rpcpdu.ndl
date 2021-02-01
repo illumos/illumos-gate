@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _RPCPDU_NDL_
@@ -132,7 +133,7 @@ typedef struct ndr_representation_label	ndr_replab_t;
  * MS-RPCE 2.2.2.3 PFC_SUPPORT_HEADER_SIGN
  * For PDU types bind, bind_ack, alter_context and alter_context_resp,
  * 0x04 means PFC_SUPPORT_HEADER_SIGN.
- * For other PDU types 0x04 means PFC_PENDING_CANCEL. 
+ * For other PDU types 0x04 means PFC_PENDING_CANCEL.
  */
 #define NDR_PFC_FIRST_FRAG		0x01	/* First fragment */
 #define NDR_PFC_LAST_FRAG		0x02	/* Last framgent */
@@ -202,7 +203,7 @@ EXTERNTYPEINFO(ndr_common_header)
  * One header per serialization stream: the header must be little endian.
  * The filler must be set to 0xcccccccc during marshaling and ignored
  * during unmarshaling.
- */ 
+ */
 _NO_REORDER_
 struct ndr_serialtype1_hdr {
 	BYTE		version;	/* 00:01 1 */
@@ -232,7 +233,7 @@ EXTERNTYPEINFO(ndr_serialtype1_priv_hdr)
  * The header must be little endian.
  * The endianinfo and reserved fields must be set to 0xcccccccc during
  * marshaling and ignored during unmarshaling.
- */ 
+ */
 _NO_REORDER_
 struct ndr_serialtype2_hdr {
 	BYTE		version;	/* 00:01 1 */
@@ -362,7 +363,35 @@ EXTERNTYPEINFO(ndr_port_any)
 #define NDR_USER_DATA_NOT_READABLE				6
 #define NDR_NO_PSAP_AVAILABLE					7
 #define NDR_AUTH_TYPE_NOT_RECOGNIZED				8
-#define NDR_INAVLID_CHECKSUM					9
+#define NDR_INVALID_CHECKSUM					9
+
+/*
+ * NDRGEN can't handle variable-length arrays, so we provide our own
+ * marshal/unmarshal routine, so that we can convert to and from
+ * our pointer and a fixed-size array.
+ *
+ * NOTE: MS-RPCE calls this a sec_trailer_t, so we use ndr_sec_t.
+ * auth_value should also be an ANY_SIZE_ARRAY, but NDRGEN can't handle
+ * variable-sized arrays.
+ */
+IMPORT_EXTERN
+_NO_REORDER_
+struct auth_verifier_co {
+	/* restore 16 byte alignment */
+	/* SIZE_IS(auth_pad_len) */
+	/* BYTE auth_pad[ANY_SIZE_ARRAY] */ /* align(16) */
+	BYTE auth_type; /* 00:01 */
+	BYTE auth_level; /* 01:01 */
+	BYTE auth_pad_len; /* 02:01 */
+	BYTE auth_rsvd; /* 03:01 */
+	DWORD auth_context_id; /* 04:04 */
+	/* SIZE_IS(hdr->auth_length) */
+	BYTE *auth_value; /* 08:* credentials */
+};
+typedef struct auth_verifier_co ndr_sec_t;
+EXTERNTYPEINFO(auth_verifier_co)
+
+#define	SEC_TRAILER_SIZE	8
 
 /*
  * Alter Context PDU (0x0E)
@@ -376,7 +405,7 @@ struct ndr_alter_context_hdr {
 	WORD max_recv_frag;		/* 18:02 ignored */
 	DWORD assoc_group_id;		/* 20:04 ignored */
 
-	/* 
+	/*
 	 * Presentation context list (see bind hdr comments).
 	 */
 	ndr_p_cont_list_t p_context_elem;	/* 24: */
@@ -406,7 +435,7 @@ struct ndr_alter_context_rsp_hdr {
 	DWORD assoc_group_id;		/* 20:04 ignored */
 	ndr_port_any_t sec_addr;	/* 24:20 ignored */
 
-	/* 
+	/*
 	 * Presentation context list (see bind hdr comments).
 	 */
 	ndr_p_result_list_t p_result_list; /* 44:nn */

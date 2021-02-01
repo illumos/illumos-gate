@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef	_LIBMLSVC_H
@@ -155,6 +155,8 @@ typedef struct mlrpc_handle mlsvc_handle_t;
 void ndr_rpc_init(void);
 void ndr_rpc_fini(void);
 uint32_t ndr_rpc_bind(mlsvc_handle_t *, char *, char *, char *, const char *);
+uint32_t ndr_rpc_bind_secure(mlsvc_handle_t *, char *, char *, char *,
+    const char *, ndr_auth_ctx_t *);
 void ndr_rpc_unbind(mlsvc_handle_t *);
 void ndr_rpc_status(mlsvc_handle_t *, int, uint32_t);
 

@@ -1,0 +1,12 @@
+INIT :PACKAGE:
+
+:CATEGORY: admin utils
+
+:INDEX: the package command with support scripts and utilities
+
+:DESCRIPTION:
+	The INIT package is required by all but the standalone
+	and self extracting archive packages. It contains
+	the package command, support scripts, and utilities.
+	The package command installs binary packages, makes
+	source packages, and generates new package tarballs.

@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ */
+
 #include <errno.h>
 #include <stdarg.h>
 #include "ndrgen.h"
@@ -117,6 +121,7 @@ static ndr_keyword_t keywtable[] = {
 
 	{ "transmit_as", TRANSMIT_AS_KW, 0 },
 	{ "arg_is",	ARG_IS_KW,	0 },
+	{ "fake",	FAKE_KW,	0 },
 
 	{ "char",	BASIC_TYPE,	1 },
 	{ "uchar",	BASIC_TYPE,	1 },

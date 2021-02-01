@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _SMBSRV_NETRAUTH_H
@@ -51,8 +51,61 @@ extern "C" {
 /*
  * Negotiation flags for challenge/response authentication.
  */
-#define	NETR_NEGOTIATE_BASE_FLAGS		0x000001FF
-#define	NETR_NEGOTIATE_STRONGKEY_FLAG		0x00004000
+#define	NETR_NEGO_UNUSED_A_FLAG			0x00000001
+#define	NETR_NEGO_BDC_UPDATE_FLAG		0x00000002
+#define	NETR_NEGO_RC4_ENCRYPT_FLAG		0x00000004
+#define	NETR_NEGO_UNUSED_D_FLAG			0x00000008
+
+#define	NETR_NEGO_BDC_CHANGELOG_FLAG		0x00000010
+#define	NETR_NEGO_DC_RESTART_SYNC_FLAG		0x00000020
+#define	NETR_NEGO_VALID2_NOTREQUIRED_FLAG	0x00000040
+#define	NETR_NEGO_OPNUM17_FLAG			0x00000080
+
+#define	NETR_NEGO_PWCHANGE_REFUSE_FLAG		0x00000100
+#define	NETR_NEGO_OPNUM32_FLAG			0x00000200
+#define	NETR_NEGO_GENERIC_PASSTHRU_FLAG		0x00000400
+#define	NETR_NEGO_CONCURRENT_RPC_FLAG		0x00000800
+
+#define	NETR_NEGO_AVOID_USERDB_REPL_FLAG	0x00001000
+#define	NETR_NEGO_AVOID_SECURITYDB_REPL_FLAG	0x00002000
+#define	NETR_NEGO_STRONGKEY_FLAG		0x00004000
+#define	NETR_NEGO_TRANSITIVE_TRUSTFLAG		0x00008000
+
+#define	NETR_NEGO_UNUSED_Q_FLAG			0x00010000
+#define	NETR_NEGO_PASSWORDSET2_FLAG		0x00020000
+#define	NETR_NEGO_GETDOMAININFO_FLAG		0x00040000
+#define	NETR_NEGO_CROSS_FOREST_TRUST_FLAG	0x00080000
+
+#define	NETR_NEGO_IGNORE_NT4EMULATOR_FLAG	0x00100000
+#define	NETR_NEGO_RODC_PASSTHRU_FLAG		0x00200000
+#define	NETR_NEGO_UNDEFINED_9_FLAG		0x00400000
+#define	NETR_NEGO_UNDEFINED_8_FLAG		0x00800000
+
+#define	NETR_NEGO_AES_SHA2_FLAG			0x01000000
+#define	NETR_NEGO_UNDEFINED_6_FLAG		0x02000000
+#define	NETR_NEGO_UNDEFINED_5_FLAG		0x04000000
+#define	NETR_NEGO_UNDEFINED_4_FLAG		0x08000000
+
+#define	NETR_NEGO_UNDEFINED_3_FLAG		0x10000000
+#define	NETR_NEGO_UNUSED_X_FLAG			0x20000000
+#define	NETR_NEGO_SECURE_RPC_FLAG		0x40000000
+#define	NETR_NEGO_UNDEFINED_0_FLAG		0x80000000
+
+/*
+ * TODO: This needs review - some of these are inappropriate.
+ * I.E. BDC_UPDATE, BDC_CHANGELOG, and DC_RESTART_SYNC are
+ * server-to-server only, but we implement a client.
+ */
+#define	NETR_NEGO_BASE_FLAGS	(		\
+	NETR_NEGO_UNUSED_A_FLAG	|		\
+	NETR_NEGO_BDC_UPDATE_FLAG |		\
+	NETR_NEGO_RC4_ENCRYPT_FLAG |		\
+	NETR_NEGO_UNUSED_D_FLAG |		\
+	NETR_NEGO_BDC_CHANGELOG_FLAG |		\
+	NETR_NEGO_DC_RESTART_SYNC_FLAG |	\
+	NETR_NEGO_VALID2_NOTREQUIRED_FLAG |	\
+	NETR_NEGO_OPNUM17_FLAG |		\
+	NETR_NEGO_PWCHANGE_REFUSE_FLAG)		\
 
 #define	NETR_SESSKEY64_SZ			8
 #define	NETR_SESSKEY128_SZ			16
@@ -123,6 +176,8 @@ typedef struct netr_info {
 	DWORD flags;
 	char server[MAXHOSTNAMELEN];		/* Current DC, FQDN */
 	char hostname[NETBIOS_NAME_SZ * 2];	/* local "flat" name */
+	char nb_domain[NETBIOS_NAME_SZ * 2];	/* Current NetBios domain */
+	char fqdn_domain[MAXHOSTNAMELEN];	/* Current Domain */
 	netr_cred_t client_challenge;
 	netr_cred_t server_challenge;
 	netr_cred_t client_credential;
@@ -130,6 +185,10 @@ typedef struct netr_info {
 	netr_session_key_t session_key;
 	BYTE password[NETR_MACHINE_ACCT_PASSWD_MAX];
 	time_t timestamp;
+	uint64_t clh_seqnum; /* Client SequenceNumber for Netlogon SSP */
+	DWORD nego_flags; /* Negotiated flags returned from ServerAuthenciate */
+	boolean_t use_secure_rpc; /* Use "SecureRPC" (RPC-level auth) */
+	boolean_t use_logon_ex; /* Use SamLogonEx (instead of SamLogon) */
 } netr_info_t;
 
 /*
@@ -138,8 +197,10 @@ typedef struct netr_info {
 int netr_gen_skey64(netr_info_t *);
 int netr_gen_skey128(netr_info_t *);
 
-int netr_gen_credentials(BYTE *, netr_cred_t *, DWORD, netr_cred_t *);
+int netr_gen_credentials(BYTE *, netr_cred_t *, DWORD, netr_cred_t *,
+    boolean_t);
 
+void netlogon_init_global(uint32_t);
 
 #define	NETR_A2H(c) (isdigit(c)) ? ((c) - '0') : ((c) - 'A' + 10)
 

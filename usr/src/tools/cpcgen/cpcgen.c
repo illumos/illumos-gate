@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -109,11 +110,16 @@ static cpc_whitelist_t cpcgen_intel_whitelist[] = {
 	{ "SKX", "skx", CPC_FILE_CORE },
 	/* Cascade Lake */
 	{ "CLX", "clx", CPC_FILE_CORE },
+	/* Ice Lake */
+	{ "ICL", "icl", CPC_FILE_CORE },
+	/* Tiger Lake */
+	{ "TGL", "tgl", CPC_FILE_CORE },
 	/* Atom */
 	{ "BNL", "bnl", CPC_FILE_CORE },
 	{ "SLM", "slm", CPC_FILE_CORE },
 	{ "GLM", "glm", CPC_FILE_CORE },
 	{ "GLP", "glp", CPC_FILE_CORE },
+	{ "SNR", "snr", CPC_FILE_CORE },
 	{ NULL }
 };
 
@@ -1068,6 +1074,13 @@ cpcgen_cfile_intel_event(FILE *f, nvlist_t *nvl, const char *path, uint_t ent)
 		cmask = "C0|C1|C2";
 	} else if (strcmp(counter, "0,1,2,3") == 0) {
 		cmask = "C0|C1|C2|C3";
+	} else if (strcmp(counter, "0,1,2,3,4,5,6,7") == 0) {
+		/*
+		 * We don't support the larger number of counters on some
+		 * platforms right now, so just truncate it to the supported
+		 * set.
+		 */
+		cmask = "C0|C1|C2|C3";
 	} else if (strcmp(counter, "0,2,3") == 0) {
 		cmask = "C0|C2|C3";
 	} else if (strcmp(counter, "1,2,3") == 0) {
@@ -1345,7 +1358,8 @@ cpcgen_common_intel_files(int dirfd)
  *   another field.
  * - Offcore is one, indicating that it is off the core and we need to figure
  *   out if we can support this.
- * - If the counter is fixed, don't use it for now.
+ * - If the counter is fixed, don't use it for now. "32"-"35" is another name
+ *    for the fixed counters.
  * - If more than one value is specified in the EventCode or UMask values
  */
 static boolean_t
@@ -1397,6 +1411,9 @@ cpcgen_skip_intel_entry(nvlist_t *nvl, const char *path, uint_t ent)
 
 
 	if (strncasecmp(counter, "fixed", strlen("fixed")) == 0)
+		return (B_TRUE);
+	if (strcmp(counter, "32") == 0 || strcmp(counter, "33") == 0 ||
+	    strcmp(counter, "34") == 0 || strcmp(counter, "35") == 0)
 		return (B_TRUE);
 
 	return (B_FALSE);

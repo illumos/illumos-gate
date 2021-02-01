@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -1474,7 +1474,7 @@ ndr_outer_align(ndr_ref_t *outer_ref)
 		n_pad = NDR_ALIGN4(nds->pdu_scan_offset);
 	}
 
-	if (n_pad == 0)
+	if ((outer_ref->ti->type_flags & NDR_F_FAKE) != 0 || n_pad == 0)
 		return (1);	/* already aligned, often the case */
 
 	if (!ndr_outer_grow(outer_ref, n_pad))
@@ -1544,6 +1544,57 @@ ndr_outer_grow(ndr_ref_t *outer_ref, unsigned n_total)
 }
 
 /*
+ * Some 'outer' constructs incorrectly align the entire construct
+ * on a 4-byte boundary, when each of its members needs to be
+ * aligned separately. This function handles aligning 'inner'
+ * members on their natural alignment boundary.
+ *
+ * NOTE: This assumes it is not being used for headers.
+ * Headers present some unique concerns that this may not
+ * adequately address (e.g. reserved space, pdu_body_offset).
+ */
+int
+ndr_inner_align(ndr_ref_t *arg_ref)
+{
+	ndr_stream_t	*nds = arg_ref->stream;
+	int		rc;
+	unsigned	n_pad;
+
+	n_pad = ((arg_ref->ti->alignment + 1) - arg_ref->pdu_offset) &
+	    arg_ref->ti->alignment;
+
+	if (n_pad == 0)
+		return (1);	/* already aligned, often the case */
+
+	if (!ndr_outer_grow(arg_ref->enclosing, n_pad))
+		return (0);	/* error already set */
+
+	switch (nds->m_op) {
+	case NDR_M_OP_MARSHALL:
+		rc = NDS_PAD_PDU(nds, arg_ref->pdu_offset, n_pad, arg_ref);
+		if (!rc) {
+			NDR_SET_ERROR(arg_ref, NDR_ERR_PAD_FAILED);
+			return (0);
+		}
+		break;
+
+	case NDR_M_OP_UNMARSHALL:
+		break;
+
+	default:
+		NDR_SET_ERROR(arg_ref, NDR_ERR_M_OP_INVALID);
+		return (0);
+	}
+
+	/* All current and future offsets need to advance */
+	arg_ref->enclosing->pdu_offset += n_pad;
+	arg_ref->pdu_offset += n_pad;
+	/* ndr_outer_grow changed pdu_end_offset */
+	nds->pdu_scan_offset += n_pad;
+	return (1);
+}
+
+/*
  * INNER ELEMENTS
  *
  * The local datum (arg_ref->datum) already exists, there is no need to
@@ -1567,6 +1618,22 @@ ndr_inner(ndr_ref_t *arg_ref)
 	int	params;
 
 	params = arg_ref->inner_flags & NDR_F_PARAMS_MASK;
+
+	/*
+	 * Switched unions are meant to be converted to and from encapsulated
+	 * structures on the wire. However, NDRGEN doesn't implement this.
+	 * As a result, our interface definitions use 'fake' structures
+	 * to represent switched unions.
+	 * This causes the structure to be aligned on a struct (4 byte)
+	 * boundary, with none of its members having separate alignment -
+	 * but that's not correct. Each of its members has its own,
+	 * natural alignment, and we need to honor that.
+	 * That happens here.
+	 */
+	if (arg_ref->enclosing != NULL &&
+	    (arg_ref->enclosing->ti->type_flags & NDR_F_FAKE) != 0 &&
+	    !ndr_inner_align(arg_ref))
+		return (0);	/* error already set */
 
 	switch (params) {
 	case NDR_F_NONE:

@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ */
+
 #ifndef _NDRGEN_H
 #define	_NDRGEN_H
 
@@ -97,7 +101,7 @@ typedef struct integer {
 #define	NDLBUFSZ	100
 
 /* This makes certain things much easier */
-#define	N_ADVICE	18
+#define	N_ADVICE	19
 
 typedef struct advice {
 	struct node		*a_nodes[N_ADVICE];
@@ -130,6 +134,7 @@ typedef struct advice {
 #define	a_extern	a_nodes[14]
 #define	a_reference	a_nodes[15]
 #define	a_align		a_nodes[16]
+#define	a_fake		a_nodes[17]
 } ndr_advice_t;
 
 typedef struct typeinfo {

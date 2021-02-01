@@ -1479,6 +1479,7 @@ smb_node_setattr(smb_request_t *sr, smb_node_t *node,
 	int rc;
 	uint_t times_mask;
 	smb_attr_t tmp_attr;
+	smb_node_t *unnamed_node;
 
 	SMB_NODE_VALID(node);
 
@@ -1605,6 +1606,13 @@ smb_node_setattr(smb_request_t *sr, smb_node_t *node,
 	if (node->n_dnode != NULL) {
 		smb_node_notify_change(node->n_dnode,
 		    FILE_ACTION_MODIFIED, node->od_name);
+	}
+
+	if ((unnamed_node = SMB_IS_STREAM(node)) != NULL) {
+		ASSERT(unnamed_node->n_magic == SMB_NODE_MAGIC);
+		ASSERT(unnamed_node->n_state != SMB_NODE_STATE_DESTROYING);
+		smb_node_notify_change(node->n_dnode,
+		    FILE_ACTION_MODIFIED_STREAM, node->od_name);
 	}
 
 	return (0);

@@ -1,0 +1,38 @@
+/* : : generated from contrib/ast/src/cmd/ksh93/features/rlimits by iffe version 2012-07-17 : : */
+#ifndef _def_rlimits_ksh93
+#define _def_rlimits_ksh93	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#define _sys_time	1	/* #include <sys/time.h> ok */
+#define _sys_resource	1	/* #include <sys/resource.h> ok */
+#define _lib_getrlimit	1	/* getrlimit() in default lib(s) */
+#define _lib_getrlimit64	1	/* getrlimit64() in default lib(s) */
+#define _lib_ulimit	1	/* ulimit() in default lib(s) */
+#define _hdr_time	1	/* #include <time.h> ok */
+#define _sys_times	1	/* #include <sys/times.h> ok */
+#define _hdr_stddef	1	/* #include <stddef.h> ok */
+#define _hdr_stdlib	1	/* #include <stdlib.h> ok */
+#define _typ_rlim_t	1	/* rlim_t is a type */
+#define _typ_rlim64_t	1	/* rlim64_t is a type */
+
+#if _sys_resource
+#	include <sys/resource.h>
+#	if _lib_getrlimit64
+#		undef	getrlimit
+#		define	getrlimit	getrlimit64
+#		undef	setrlimit
+#		define	setrlimit	setrlimit64
+#		if _typ_rlim64_t
+#			undef	rlimit
+#			define	rlimit	rlimit64
+#			undef	rlim_t
+#			define	rlim_t	rlim64_t
+#		endif
+#		ifdef RLIM64_INFINITY
+#			undef	RLIM_INFINITY
+#			define	RLIM_INFINITY	RLIM64_INFINITY
+#		endif
+#	endif
+#endif
+
+
+#endif

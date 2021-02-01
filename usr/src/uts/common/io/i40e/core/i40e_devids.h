@@ -1,6 +1,6 @@
 /******************************************************************************
 
-  Copyright (c) 2013-2017, Intel Corporation
+  Copyright (c) 2013-2018, Intel Corporation
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without 
@@ -39,6 +39,8 @@
 #define I40E_INTEL_VENDOR_ID		0x8086
 
 /* Device IDs */
+#define I40E_DEV_ID_X710_N3000		0x0CF8
+#define I40E_DEV_ID_XXV710_N3000	0x0D58
 #define I40E_DEV_ID_SFP_XL710		0x1572
 #define I40E_DEV_ID_QEMU		0x1574
 #define I40E_DEV_ID_KX_B		0x1580
@@ -52,6 +54,15 @@
 #define I40E_DEV_ID_10G_BASE_T4		0x1589
 #define I40E_DEV_ID_25G_B		0x158A
 #define I40E_DEV_ID_25G_SFP28		0x158B
+#define I40E_DEV_ID_10G_BASE_T_BC	0x15FF
+#define I40E_DEV_ID_10G_B		0x104F
+#define I40E_DEV_ID_10G_SFP		0x104E
+#define I40E_DEV_ID_5G_BASE_T_BC	0x101F
+#define I40E_IS_X710TL_DEVICE(d) \
+	(((d) == I40E_DEV_ID_10G_BASE_T_BC) || \
+	((d) == I40E_DEV_ID_5G_BASE_T_BC))
+#define I40E_DEV_ID_VF			0x154C
+#define I40E_DEV_ID_VF_HV		0x1571
 #define I40E_DEV_ID_ADAPTIVE_VF		0x1889
 #define I40E_DEV_ID_KX_X722		0x37CE
 #define I40E_DEV_ID_QSFP_X722		0x37CF
@@ -59,6 +70,7 @@
 #define I40E_DEV_ID_1G_BASE_T_X722	0x37D1
 #define I40E_DEV_ID_10G_BASE_T_X722	0x37D2
 #define I40E_DEV_ID_SFP_I_X722		0x37D3
+#define I40E_DEV_ID_X722_VF		0x37CD
 
 #define i40e_is_40G_device(d)		((d) == I40E_DEV_ID_QSFP_A  || \
 					 (d) == I40E_DEV_ID_QSFP_B  || \

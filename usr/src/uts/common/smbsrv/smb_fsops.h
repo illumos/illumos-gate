@@ -54,6 +54,10 @@ void smb_fsop_oplock_uninstall(smb_node_t *);
 int smb_fsop_create(smb_request_t *, cred_t *, smb_node_t *,
     char *, smb_attr_t *, smb_node_t **);
 
+int
+smb_fsop_create_stream(smb_request_t *, cred_t *, smb_node_t *, smb_node_t *,
+    char *, int, smb_attr_t *, smb_node_t **);
+
 int smb_fsop_mkdir(smb_request_t *, cred_t *, smb_node_t *,
     char *, smb_attr_t *, smb_node_t **);
 
@@ -93,11 +97,17 @@ int smb_fsop_access(smb_request_t *, cred_t *, smb_node_t *, uint32_t);
 
 void smb_fsop_eaccess(smb_request_t *, cred_t *, smb_node_t *, uint32_t *);
 
+int smb_fsop_lookup_file(smb_request_t *, cred_t *, int,
+    smb_node_t *, smb_node_t *, char *, char **, smb_node_t **);
+
 int smb_fsop_lookup_name(smb_request_t *, cred_t *, int,
     smb_node_t *, smb_node_t *, char *, smb_node_t **);
 
 int smb_fsop_lookup(smb_request_t *, cred_t *, int,
     smb_node_t *, smb_node_t *, char *, smb_node_t **);
+
+int smb_fsop_lookup_stream(smb_request_t *, cred_t *, int, smb_node_t *,
+    smb_node_t *, char *, smb_node_t **);
 
 int smb_fsop_commit(smb_request_t *, cred_t *, smb_node_t *);
 

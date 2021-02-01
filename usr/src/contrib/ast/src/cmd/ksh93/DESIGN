@@ -1,0 +1,180 @@
+Here is an overview of the source code organization for ksh93.
+
+Directory layout:
+
+	The directory include contains header files for ksh93.
+	The files nval.h and shell.h are intended to be public
+	headers and can be used to add runtime builtin command.
+	The remainder are private.
+
+	The directory data contains readonly data files for ksh93.
+	The man pages for built-ins are in builtins.c rather
+	than included as statics with the implementations in the
+	bltins directory because some systems don't make static const
+	data readonly and we want these to be shared by all running
+	shells.
+
+	The directory edit contains the code for command line
+	editing and history.
+
+	The fun directory contains some shell function such as
+	pushd, popd, and dirs.
+
+	The directory features contains files that are used to generate
+	header files in the FEATURE directory.  Most of these files
+	are in a format that is processed by iffe.
+
+	The directory bltins contains code for most of the built-in
+	commands.  Additional built-in commands are part of libcmd.
+
+	The directory sh contains most of the code for ksh93.
+
+	The directory tests contains a number of regression tests.
+	In most cases, when a bug gets fixed, a test is added to
+	one of these files.  The regression tests can be run by
+	going to this directory and running
+		SHELL=shell_path shell_path shtests
+	where shell_path is an absolute pathname for the shell to
+	be tested.
+
+	The top level directory contains the nmake Makefile, the
+        RELEASE file, the ksh93 man file (sh.1) and nval.3 and shell.3
+        documentation files. The RELEASE file contains the list of bug
+	fixes and new features since the original ksh93 release.  The file
+	COMPATIBILITY is a list of all known incompatibilities with ksh88.
+
+	The  data/bash_pre_rc.sh is a startup script used when emulating
+	bash if the shell is compiled with SHOPT_BASH and the shell
+	is invoked as bash.  The bash emulation is not complete.
+ 
+Include directory:
+	1.	argnod.h contains the type definitions for command
+		nodes, io nodes, argument nodes, and for positional
+		parameters.a  It defines the prototypes for
+		all the positional parameters functions.
+	2.	builtins.h contains prototypes for builtins as well
+		as symbolic constants that refer to the name-pairs
+		that are associated with some of the built-ins.
+		It also contains prototypes for many of the strings.
+	3.	defs.h is the catch all for all definitions that
+		don't fit elsewhere and it includes several other
+		headers.  It defines a structure that contains ksh
+		global data, sh, and a structure that contains per
+		function data, sh.st. 
+	4.	edit.h contains definitions that are common to both
+		vi and emacs edit modes.
+	5.	env.h contains an alternative interfaces for creating and
+		modifying environment variables. 
+	6.	fault.h contains prototypes for signal related
+		functions and trap and fault handling.
+	7.	fcin.h contains macro and function definitions for
+		reading from a file or string.
+	8.	history.h contains macros and functions definitions
+		related to history file processing.
+	9.	jobs.h contains the definitions relating to job
+		processing and control.
+	10.	lexstates.h contains the states associated with
+		lexical processing.
+	11.	name.h contains the internal definitions related
+		to name-value pair processing.
+	12.	national.h contains a few I18N definitions, mostly
+		obsolete.
+	13.	nval.h is the public interface to the name-value
+		pair library that is documented with nval.3.
+	14.	path.h contains the interface for pathname processing
+		and pathname searching.
+	15.	shell.h is the public interface for shell functions
+		that are documented int shell.3.
+	16.	shlex.h contains the lexical token definitions and
+		interfaces for lexical analysis.
+	17.	shnodes.h contains the definition of the structures
+		for each of the parse nodes and flags for the attributes.
+	18.	shtable.h contains some interfaces and functions for
+		table lookup.
+	19.	streval.h contains the interface to the arithmetic
+		functions.
+	20.	terminal.h is a header file that includes the appropriate
+		terminal include.
+	21.	test.h contains the definitions for the test and [[...]]
+		commands.
+	22.	timeout.h contains the define constant for the maximum
+		shell timeout.
+	23.	ulimit.h includes the appropriate resource header.
+	24.	variables.h contains symbolic constants for the built-in
+		shell variables.
+	25.	version.h contains the version string for this release.
+
+sh directory:
+	1.	args.c contains functions for parsing shell options
+		and for processing positional parameters.
+	2.	arith.c contains callback functions for the streval.c
+		library and the interface to shell arithmetic.
+	3.	array.c contains the code for indexed and associative
+		arrays.
+	4.      bash.c contains code used when compiling with SHOPT_BASH
+		to add bash specific features such as shopt.
+	5.	defs.c contains the data definitions for global symbols.
+	6.	deparse.c contains code to generate shell script from
+		a parse tree.
+	7.	env.c contains code to add and delete environment variables
+		to an environment list.
+	8.	expand.c contains code for file name expansion and
+		file name generation.
+	9.	fault.c contains code for signal processing, trap
+		handling and termination.
+	10.	fcin.c contains code for reading and writing a character
+		at a time from a file or string.
+	11.	init.c contains initialization code and callbacks
+		for get and set functions for built-in variables.	
+	12.	io.o contains code for redirections and managing file
+		descriptors and file streams.
+	13.	jobs.c contains the code for job management.
+	14.	lex.c contains the code for the lexical analyzer.
+	15.	macro.c contains code for the $ macro expansions, including
+		here-documents.
+	16.	main.c contains the calls to initialization, profile
+		processing and the main evaluation loop as well as
+		mail processing.
+	17.	name.c contains the name-value pair routines that are
+		built on the hash library in libast.
+	18.	nvdisc.c contains code related to name-value pair disciplines.
+	19.	nvtree.c contains code for compound variables and for
+		walking the namespace.
+	20.	nvtype.c contains most of the code related to types that
+		are created with typeset -T.
+	21.	parse.c contains the code for the shell parser.
+	22.	path.c contains the code for pathname lookup and
+		some path functions.  It also contains the code
+		that executes commands and scripts.
+	23.	pmain.c is just a calls sh_main() so that all of the
+		rest of the shell can be in a shared library.
+	24.	shcomp.c contains the main program to the shell
+		compiler.  This program parses a script and creates
+		a file that the shell can read containing the parse tree.
+	25.	streval.c is an C arithmetic evaluator.
+	26.	string.c contains some string related functions.
+	27.	subshell.c contains the code to save and restore
+		environments so that subshells can run without creating
+		a new process.
+	28.	suid_exec.c contains the program from running execute
+		only and/or setuid/setgid scripts.
+	29.	tdump.c contains the code to dump a parse tree into
+		a file.
+	30.	timers.c contains code for multiple event timeouts.
+	31.	trestore contains the code for restoring the parse
+		tree from the file created by tdump.
+	32.	userinit.c contains a dummy userinit() function.
+		This is now obsolete with the new version of sh_main().
+	33.	waitevent.c contains the sh_waitnotify function so
+		that builtins can handle processing events when the
+		shell is waiting for input or for process completion.
+	34.	xec.c is the main shell execution loop.
+edit directory:
+	1.      completion.c contains code for command and file generation and
+		completion.
+	2.      edit.c contains common editing and terminal code for vi and
+		emacs.
+	3.      emacs.c contains code for the emacs editor.
+	4.      hexpand.c contains code for C-shell style history expansions.
+	5.      history.c contains code for creating managing the history file.
+	6.      vi.c contains the code for the vi editor.

@@ -205,6 +205,8 @@
 #include <sys/types.h>
 #include <sys/sid.h>
 #include <sys/priv_names.h>
+#include <sys/priv.h>
+#include <sys/policy.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_door.h>
 
@@ -829,6 +831,45 @@ smb_user_setcred(smb_user_t *user, cred_t *cr, uint32_t privileges)
 	user->u_privileges = privileges;
 }
 #endif	/* _KERNEL */
+
+/*
+ * Determines whether a user can be granted ACCESS_SYSTEM_SECURITY
+ */
+boolean_t
+smb_user_has_security_priv(smb_user_t *user, cred_t *cr)
+{
+	/* Need SeSecurityPrivilege to get/set SACL */
+	if ((user->u_privileges & SMB_USER_PRIV_SECURITY) != 0)
+		return (B_TRUE);
+
+#ifdef _KERNEL
+	/*
+	 * ACCESS_SYSTEM_SECURITY is also granted if the file is opened with
+	 * BACKUP/RESTORE intent by a user with BACKUP/RESTORE privilege,
+	 * which means we'll be using u_privcred.
+	 *
+	 * We translate BACKUP as DAC_READ and RESTORE as DAC_WRITE,
+	 * to account for our various SMB_USER_* privileges.
+	 */
+	if (PRIV_POLICY_ONLY(cr,
+	    priv_getbyname(PRIV_FILE_DAC_READ, 0), B_FALSE) ||
+	    PRIV_POLICY_ONLY(cr,
+	    priv_getbyname(PRIV_FILE_DAC_WRITE, 0), B_FALSE))
+		return (B_TRUE);
+#else
+	/*
+	 * No "real" privileges in fksmbsrv, so use the SMB privs instead.
+	 */
+	if ((user->u_privileges &
+	    (SMB_USER_PRIV_BACKUP |
+	    SMB_USER_PRIV_RESTORE |
+	    SMB_USER_PRIV_READ_FILE |
+	    SMB_USER_PRIV_WRITE_FILE)) != 0)
+		return (B_TRUE);
+#endif
+
+	return (B_FALSE);
+}
 
 /*
  * Private function to support smb_user_enum.

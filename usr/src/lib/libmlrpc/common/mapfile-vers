@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2020 Tintri by DDN, Inc. All rights reserved.
 #
 #
 
@@ -45,6 +45,7 @@ SYMBOL_VERSION SUNWprivate {
 	mlrpc_clh_bind;
 	mlrpc_clh_create;
 	mlrpc_clh_free;
+	mlrpc_clh_set_auth;
 	mlrpc_clh_unbind;
 
 	# Allow debug/test programs to provide these.

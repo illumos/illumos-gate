@@ -1,0 +1,6 @@
+/* : : generated from contrib/ast/src/lib/libast/features/locale by iffe version 2012-07-17 : : */
+#ifndef _def_locale_ast
+#define _def_locale_ast	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#define _locale_utf8_str	"UTF-8"
+#endif

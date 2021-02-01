@@ -1,0 +1,23 @@
+lib	lchmod note{ lchmod implemented }end execute{
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#include <errno.h>
+	int
+	main()
+	{
+		lchmod("No-FiLe", 0);
+		return errno != ENOENT;
+	}
+}end
+
+lib	lchown note{ lchown implemented }end execute{
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#include <errno.h>
+	int
+	main()
+	{
+		lchown("No-FiLe", 0, 0);
+		return errno != ENOENT;
+	}
+}end

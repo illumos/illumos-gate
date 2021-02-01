@@ -1,0 +1,14 @@
+set	prototyped
+nxt	wctype
+
+run{
+cat <<!
+	#if _hdr_wctype && defined(_nxt_wctype)
+	#include ${_nxt_wctype-_nxt_wctype}	/* the native wctype.h */
+	#endif
+
+	#undef	iswalpha
+
+	#define iswalpha(w)	(ast.mb_alpha?(*ast.mb_alpha)(w):isalpha(w))
+!
+}end

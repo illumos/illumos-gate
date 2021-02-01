@@ -28,6 +28,7 @@
 # Copyright 2019 Peter Tribble.
 # Copyright 2019 Joyent, Inc.
 # Copyright (c) 2011, 2015 by Delphix. All rights reserved.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 <include SUNWcs.man1.inc>
@@ -1602,6 +1603,7 @@ license usr/src/cmd/which/THIRDPARTYLICENSE \
 license usr/src/cmd/xstr/THIRDPARTYLICENSE \
     license=usr/src/cmd/xstr/THIRDPARTYLICENSE
 license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE
+license usr/src/contrib/ast/LICENSE license=usr/src/contrib/ast/LICENSE
 link path=bin target=./usr/bin
 link path=etc/TIMEZONE target=./default/init
 link path=etc/autopush target=../sbin/autopush

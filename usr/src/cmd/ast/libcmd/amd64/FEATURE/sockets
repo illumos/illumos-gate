@@ -1,0 +1,11 @@
+/* : : generated from contrib/ast/src/lib/libcmd/features/sockets by iffe version 2012-07-17 : : */
+#ifndef _def_sockets_cmd
+#define _def_sockets_cmd	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#define _sys_socket	1	/* #include <sys/socket.h> ok */
+#define _hdr_arpa_inet	1	/* #include <arpa/inet.h> ok */
+#define _hdr_netinet_in	1	/* #include <netinet/in.h> ok */
+#define _lib_getsockname	1	/* getsockname() in default lib(s) */
+#define _lib_getsockopt	1	/* getsockopt() in default lib(s) */
+#define _lib_inet_ntoa	1	/* inet_ntoa() in default lib(s) */
+#endif

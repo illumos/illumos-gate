@@ -1,0 +1,27 @@
+hdr,sys	resource,vlimit sys/time.h
+lib	getrlimit,getrlimit64,ulimit,vlimit
+typ	rlim_t,rlim64_t sys/types.h sys/time.h sys/resource.h
+
+cat{
+
+#if _sys_resource
+#	include <sys/resource.h>
+#	if _lib_getrlimit64
+#		undef	getrlimit
+#		define	getrlimit	getrlimit64
+#		undef	setrlimit
+#		define	setrlimit	setrlimit64
+#		if _typ_rlim64_t
+#			undef	rlimit
+#			define	rlimit	rlimit64
+#			undef	rlim_t
+#			define	rlim_t	rlim64_t
+#		endif
+#		ifdef RLIM64_INFINITY
+#			undef	RLIM_INFINITY
+#			define	RLIM_INFINITY	RLIM64_INFINITY
+#		endif
+#	endif
+#endif
+
+}end

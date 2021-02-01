@@ -28,7 +28,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Tribble.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -215,7 +215,9 @@ file path=usr/include/asm/sunddi.h
 file path=usr/include/asm/thread.h
 file path=usr/include/assert.h
 file path=usr/include/ast/align.h
+file path=usr/include/ast/aso.h
 file path=usr/include/ast/ast.h
+file path=usr/include/ast/ast_api.h
 file path=usr/include/ast/ast_botch.h
 file path=usr/include/ast/ast_ccode.h
 file path=usr/include/ast/ast_common.h
@@ -235,21 +237,24 @@ file path=usr/include/ast/ast_namval.h
 file path=usr/include/ast/ast_ndbm.h
 file path=usr/include/ast/ast_nl_types.h
 file path=usr/include/ast/ast_param.h
+file path=usr/include/ast/ast_sizeof.h
 file path=usr/include/ast/ast_standards.h
 file path=usr/include/ast/ast_std.h
 file path=usr/include/ast/ast_stdio.h
 file path=usr/include/ast/ast_sys.h
 file path=usr/include/ast/ast_time.h
 file path=usr/include/ast/ast_tty.h
-file path=usr/include/ast/ast_version.h
 file path=usr/include/ast/ast_vfork.h
 file path=usr/include/ast/ast_wait.h
 file path=usr/include/ast/ast_wchar.h
+file path=usr/include/ast/ast_wctype.h
 file path=usr/include/ast/ast_windows.h
 file path=usr/include/ast/bytesex.h
 file path=usr/include/ast/ccode.h
 file path=usr/include/ast/cdt.h
+file path=usr/include/ast/cdtlib.h
 file path=usr/include/ast/cmd.h
+file path=usr/include/ast/cmdarg.h
 file path=usr/include/ast/cmdext.h
 file path=usr/include/ast/debug.h
 file path=usr/include/ast/dirent.h
@@ -317,6 +322,7 @@ file path=usr/include/ast/vecargs.h
 file path=usr/include/ast/vmalloc.h
 file path=usr/include/ast/wait.h
 file path=usr/include/ast/wchar.h
+file path=usr/include/ast/wctype.h
 file path=usr/include/ast/wordexp.h
 file path=usr/include/atomic.h
 file path=usr/include/attr.h

@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2020 Tintri by DDN, Inc. All rights reserved.
 #
 
 LIBRARY =	libmlrpc.a
@@ -31,6 +31,7 @@ VERS =		.2
 
 OBJS_COMMON =			\
 	mlrpc_clh.o		\
+	ndr_auth.o		\
 	ndr_client.o		\
 	ndr_heap.o		\
 	ndr_marshal.o		\

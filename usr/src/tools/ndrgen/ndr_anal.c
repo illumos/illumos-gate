@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ */
 
 #include <strings.h>
 #include <string.h>
@@ -1003,6 +1005,7 @@ determine_advice(ndr_advice_t *advice, ndr_node_t *advice_list)
 
 	advice->a_reference = find_advice(advice_list, REFERENCE_KW);
 	advice->a_align = find_advice(advice_list, ALIGN_KW);
+	advice->a_fake = find_advice(advice_list, FAKE_KW);
 }
 
 static ndr_node_t *

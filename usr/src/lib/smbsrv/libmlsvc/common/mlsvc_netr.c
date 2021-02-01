@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -77,7 +78,12 @@ static ndr_service_t netr_service = {
 void
 netr_initialize(void)
 {
+	uint32_t flags;
+
 	(void) ndr_svc_register(&netr_service);
+
+	flags = smb_get_netlogon_flags();
+	netlogon_init_global(flags);
 }
 
 /*
@@ -156,18 +162,16 @@ netr_s_SamLogoff(void *arg, ndr_xa_t *mxa)
 DECL_FIXUP_STRUCT(netr_validation_u);
 DECL_FIXUP_STRUCT(netr_validation_info);
 DECL_FIXUP_STRUCT(netr_SamLogon);
+DECL_FIXUP_STRUCT(netr_SamLogonEx);
 
 /*
- * Patch the netr_SamLogon union.
- * This function is called from mlsvc_netr_ndr.c
+ * Patch the netr_validation_info union.
  */
-void
-fixup_netr_SamLogon(struct netr_SamLogon *arg)
+static unsigned short
+fixup_netr_validation_info(WORD level)
 {
 	unsigned short size1 = 0;
 	unsigned short size2 = 0;
-	unsigned short size3 = 0;
-	WORD level = (WORD)arg->validation_level;
 
 	switch (level) {
 	case 3:
@@ -190,9 +194,43 @@ fixup_netr_SamLogon(struct netr_SamLogon *arg)
 	};
 
 	size2 = size1 + (2 * sizeof (DWORD));
-	size3 = size2 + sizeof (ndr_request_hdr_t) + sizeof (DWORD);
 
 	FIXUP_PDU_SIZE(netr_validation_u, size1);
 	FIXUP_PDU_SIZE(netr_validation_info, size2);
+
+	return (size2);
+}
+
+
+/*
+ * Patch the netr_SamLogon union.
+ * This function is called from mlsvc_netr_ndr.c
+ */
+void
+fixup_netr_SamLogon(struct netr_SamLogon *arg)
+{
+	unsigned short size2 = 0;
+	unsigned short size3 = 0;
+
+	size2 = fixup_netr_validation_info(arg->validation_level);
+	/* netr_valid ENC-UNION + hdr + ret_auth PTR + authoritative + status */
+	size3 = size2 + sizeof (ndr_request_hdr_t) + 3 * sizeof (DWORD);
 	FIXUP_PDU_SIZE(netr_SamLogon, size3);
+}
+
+/*
+ * Patch the netr_SamLogonEx union.
+ * This function is called from mlsvc_netr_ndr.c
+ */
+void
+fixup_netr_SamLogonEx(struct netr_SamLogonEx *arg)
+{
+	unsigned short size2 = 0;
+	unsigned short size3 = 0;
+
+	size2 = fixup_netr_validation_info(arg->validation_level);
+	/* netr_valid ENC-UNION + hdr + authoritative + flags + status */
+	size3 = size2 + sizeof (ndr_request_hdr_t) + 3 * sizeof (DWORD);
+
+	FIXUP_PDU_SIZE(netr_SamLogonEx, size3);
 }

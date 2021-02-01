@@ -23,7 +23,7 @@
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2018 Joyent, Inc.
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2019 Peter Tribble.
 # Copyright 2018 Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
@@ -43,7 +43,6 @@
 #	lib
 #	lib/amd64
 #	lib/sparcv9
-
 
 # Directory hierarchies to skip completely
 SKIP		^usr/lib/libc/			# optimized libc
@@ -107,6 +106,13 @@ UNUSED_DEPS	^usr/lib/picl/plugins/		# require devtree dependencies
 # libnetsnmphelpers.so is empty in some net-snmp versions
 UNUSED_OBJ	unused object=.*/libnetsnmphelpers\.so\..*
 UNREF_OBJ	unreferenced object=.*/libnetsnmphelpers\.so\..*
+
+# ksh93 is just a wrapper into libshell but it is linked with libumem.so
+# so that the underlying libraries use that implementation for memory
+# management. Since ksh itself doesn't perform any memory allocations in
+# the stub, ldd -U determines that libumem is an unreferenced object.
+UNREF_OBJ	/libumem\.so\.1.*/usr/bin/(i86|amd64)/r?ksh(93)?\b
+UNREF_OBJ	/libumem\.so\.1.*/usr/bin/sparcv[79]/r?ksh(93)?\b
 
 # Unused runpaths due to dlopen() use
 UNUSED_RPATH	/usr/lib/fs/autofs.*\ from\ .automountd

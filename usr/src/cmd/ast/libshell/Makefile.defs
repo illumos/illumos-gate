@@ -1,0 +1,96 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+#
+
+# These macros should be kept synchronised with those in
+# usr/src/contrib/ast/src/cmd/ksh93/Makefile
+
+AST_LICENSE = since=1982,author=dgk
+ASTLIB= libshell
+ASTSRC= $(C_AST)/src/cmd/ksh93
+HDRGUARD= ksh93
+
+FEATURES= cmds dynamic externs locale math options poll rlimits setjmp \
+	sigfeatures time ttys \
+	acct execargs pstat
+HEADERSRC= history.h nval.h shell.h
+HEADERGEN=
+HEADERINSTALL= $(HEADERSRC) $(HEADERGEN)
+LOBJDIRS= bltins data edit sh
+LIBOBJS= \
+	bltins/alarm.o \
+	bltins/cd_pwd.o \
+	bltins/cflow.o \
+	bltins/enum.o \
+	bltins/getopts.o \
+	bltins/hist.o \
+	bltins/lib.o \
+	bltins/misc.o \
+	bltins/poll_solaris.o \
+	bltins/print.o \
+	bltins/read.o \
+	bltins/regress.o \
+	bltins/shiocmd_solaris.o \
+	bltins/sleep.o \
+	bltins/test.o \
+	bltins/trap.o \
+	bltins/typeset.o \
+	bltins/ulimit.o \
+	bltins/umask.o \
+	bltins/whence.o \
+	data/aliases.o \
+	data/builtins.o \
+	data/keywords.o \
+	data/lexstates.o \
+	data/limits.o \
+	data/msg.o \
+	data/options.o \
+	data/signals.o \
+	data/strdata.o \
+	data/testops.o \
+	data/variables.o \
+	edit/completion.o \
+	edit/edit.o \
+	edit/emacs.o \
+	edit/hexpand.o \
+	edit/history.o \
+	edit/vi.o \
+	sh/args.o \
+	sh/arith.o \
+	sh/array.o \
+	sh/defs.o \
+	sh/deparse.o \
+	sh/expand.o \
+	sh/fault.o \
+	sh/fcin.o \
+	sh/init.o \
+	sh/io.o \
+	sh/jobs.o \
+	sh/lex.o \
+	sh/macro.o \
+	sh/main.o \
+	sh/name.o \
+	sh/nvdisc.o \
+	sh/nvtree.o \
+	sh/nvtype.o \
+	sh/parse.o \
+	sh/path.o \
+	sh/streval.o \
+	sh/string.o \
+	sh/subshell.o \
+	sh/tdump.o \
+	sh/timers.o \
+	sh/trestore.o \
+	sh/waitevent.o \
+	sh/xec.o

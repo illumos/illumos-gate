@@ -18,6 +18,7 @@ usr/src/cmd/acpi/common/utmath.c
 usr/src/cmd/acpi/common/utnonansi.c
 usr/src/cmd/acpi/common/utprint.c
 usr/src/cmd/acpi/common/utxferror.c
+sr/src/cmd/ast/libshell/common/illumos_cmdlist.h
 usr/src/cmd/cxgbetool/*
 usr/src/cmd/hal/tools/hal_set_property.c
 usr/src/cmd/krb5/kadmin/cli/kadmin_ct.c
@@ -651,7 +652,6 @@ usr/src/lib/krb5/ss/ss_internal.h
 usr/src/lib/krb5/ss/ss.h
 usr/src/lib/krb5/ss/std_rqs.c
 usr/src/lib/krb5/ss/utils.c
-usr/src/lib/libast/common/tm/tvsleep.c
 usr/src/lib/libgss/g_glue.c
 usr/src/lib/libresolv2/common
 usr/src/lib/libresolv2_joy/common
@@ -694,7 +694,6 @@ usr/src/lib/librstp/common/transmit.h
 usr/src/lib/librstp/common/uid_stp.h
 usr/src/lib/librstp/common/vector.c
 usr/src/lib/librstp/common/vector.h
-usr/src/lib/libshell/common/bltins/sleep.c
 usr/src/lib/libsmbfs/smb/derparse.c
 usr/src/lib/libsmbfs/smb/derparse.h
 usr/src/lib/libsmbfs/smb/spnego.c

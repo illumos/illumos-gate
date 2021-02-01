@@ -15,6 +15,7 @@
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
  * Copyright 2020 Ryan Zezeski
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -589,6 +590,12 @@ i40e_link_check(i40e_t *i40e)
 			break;
 		case I40E_LINK_SPEED_1GB:
 			i40e->i40e_link_speed = 1000;
+			break;
+		case I40E_LINK_SPEED_2_5GB:
+			i40e->i40e_link_speed = 2500;
+			break;
+		case I40E_LINK_SPEED_5GB:
+			i40e->i40e_link_speed = 5000;
 			break;
 		case I40E_LINK_SPEED_10GB:
 			i40e->i40e_link_speed = 10000;
@@ -1347,7 +1354,7 @@ i40e_common_code_init(i40e_t *i40e, i40e_hw_t *hw)
 		return (B_FALSE);
 	}
 
-	(void) i40e_aq_stop_lldp(hw, TRUE, NULL);
+	(void) i40e_aq_stop_lldp(hw, TRUE, FALSE, NULL);
 
 	rc = i40e_get_mac_addr(hw, hw->mac.addr);
 	if (rc != I40E_SUCCESS) {
@@ -3178,7 +3185,8 @@ i40e_start(i40e_t *i40e)
 		goto done;
 	}
 
-	err = i40e_aq_set_mac_config(hw, i40e->i40e_frame_max, B_TRUE, 0, NULL);
+	err = i40e_aq_set_mac_config(hw, i40e->i40e_frame_max, B_TRUE, 0,
+	    B_FALSE, NULL);
 	if (err != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to set MAC config: %d", err);
 		rc = B_FALSE;

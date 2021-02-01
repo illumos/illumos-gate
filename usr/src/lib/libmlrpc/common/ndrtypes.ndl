@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _NDRTYPES_NDL_
@@ -42,6 +42,7 @@
 #define IN		[in]
 #define OUT		[out]
 #define INOUT		[in out]
+#define FAKE		[fake]
 
 #define STRING		[string]
 #define SIZE_IS(X)	[size_is(X)]
@@ -85,6 +86,7 @@
 #define IN
 #define OUT
 #define INOUT
+#define FAKE
 
 #define STRING
 #define SIZE_IS(X)

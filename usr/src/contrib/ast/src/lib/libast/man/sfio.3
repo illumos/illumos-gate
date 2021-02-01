@@ -1,0 +1,2373 @@
+.fp 5 CW
+.TH SFIO 3 "01 June 2008"
+.SH NAME
+\fBsfio\fR \- safe/fast string/file input/output
+.SH SYNOPSIS
+.de Tp
+.fl
+.ne 3
+.TP
+..
+.de Ss
+.fl
+.ne 3
+.SS "\\$1"
+..
+.ta 1.0i 2.0i 3.0i 4.0i 5.0i
+.Ss "LIBRARIES"
+.nf
+.ft 5
+#include      <sfio.h>
+
+libsfio.a     -lsfio
+libstdio.a    -lstdio
+libsfio-mt.a  -lsfio-mt
+libstdio-mt.a -lstdio-mt
+.ft 1
+.fi
+.Ss "DATA TYPES"
+.nf
+.ft 5
+Void_t;
+Sfoff_t;
+Sflong_t;
+Sfulong_t;
+Sfdouble_t;
+
+Sfio_t;
+
+Sfdisc_t;
+ssize_t    (*Sfread_f)(Sfio_t*, Void_t*, size_t, Sfdisc_t*);
+ssize_t    (*Sfwrite_f)(Sfio_t*, const Void_t*, size_t, Sfdisc_t*);
+Sfoff_t    (*Sfseek_f)(Sfio_t*, Sfoff_t, int, Sfdisc_t*);
+int        (*Sfexcept_f)(Sfio_t*, int, Void_t*, Sfdisc_t*);
+
+Sffmt_t;
+int        (*Sffmtext_f)(Sfio_t*, Void_t*, Sffmt_t*);
+int        (*Sffmtevent_f)(Sfio_t*, int, Void_t*, Sffmt_t*);
+
+SFIO_VERSION
+.ft 1
+.fi
+.Ss "BIT FLAGS"
+.nf
+.ft 5
+SF_STRING
+SF_READ
+SF_WRITE
+SF_APPENDWR (SF_APPEND)
+SF_LINE
+SF_SHARE
+SF_PUBLIC
+SF_MALLOC
+SF_STATIC
+SF_IOCHECK
+SF_WHOLE
+SF_MTSAFE
+SF_IOINTR
+.ft 1
+.fi
+.Ss "OPENING/CLOSING STREAMS"
+.nf
+.ft 5
+Sfio_t*    sfnew(Sfio_t* f, Void_t* buf, size_t size, int fd, int flags);
+Sfio_t*    sfopen(Sfio_t* f, const char* string, const char* mode);
+Sfio_t*    sfpopen(Sfio_t* f, const char* cmd, const char* mode);
+Sfio_t*    sftmp(size_t size);
+int        sfclose(Sfio_t* f);
+
+
+.ft 1
+.fi
+.Ss "THREAD SAFETY"
+.nf
+.ft 5
+int        sfmutex(Sfio_t* f, int type);
+
+SFMTX_LOCK
+SFMTX_TRYLOCK
+SFMTX_UNLOCK
+SFMTX_CLRLOCK
+.ft 1
+.fi
+.Ss "INPUT/OUTPUT OPERATIONS"
+.nf
+.ft 5
+int        sfgetc(Sfio_t* f);
+int        sfputc(Sfio_t* f, int c);
+int        sfnputc(Sfio_t* f, int c, int n);
+int        sfungetc(Sfio_t* f, int c);
+
+Sfulong_t  sfgetm(Sfio_t* f, Sfulong_t max);
+int        sfputm(Sfio_t* f, Sfulong_t v, Sfulong_t max);
+Sfulong_t  sfgetu(Sfio_t* f);
+int        sfputu(Sfio_t* f, Sfulong_t v);
+Sflong_t   sfgetl(Sfio_t* f);
+int        sfputl(Sfio_t* f, Sflong_t v);
+Sfdouble_t sfgetd(Sfio_t* f);
+int        sfputd(Sfio_t* f, Sfdouble_t v);
+
+char*      sfgetr(Sfio_t* f, int rsc, int type);
+ssize_t    sfputr(Sfio_t* f, const char* s, int rsc);
+Sfoff_t    sfmove(Sfio_t* fr, Sfio_t* fw, Sfoff_t n, int rsc);
+
+ssize_t    sfread(Sfio_t* f, Void_t* buf, size_t n);
+ssize_t    sfwrite(Sfio_t* f, const Void_t* buf, size_t n);
+Sfoff_t    sfseek(Sfio_t* f, Sfoff_t offset, int type);
+Void_t*    sfreserve(Sfio_t* f, ssize_t n, int type);
+.ft 1
+.fi
+.Ss "DATA FORMATTING"
+.nf
+.ft 5
+int        sfscanf(Sfio_t* f, const char* format, ...);
+int        sfsscanf(const char* s, const char* format, ...);
+int        sfvsscanf(const char* s, const char* format, va_list args);
+int        sfvscanf(Sfio_t* f, const char* format, va_list args);
+
+int        sfprintf(Sfio_t* f, const char* format, ...);
+char*      sfprints(const char* format, ...);
+char*      sfvprints(const char* format, va_list args);
+ssize_t    sfaprints(char** sp, const char* format, ...);
+ssize_t    sfvaprints(char** sp, const char* format, va_list args);
+int        sfsprintf(char* s, int n, const char* format, ...);
+int        sfvsprintf(char* s, int n, const char* format, va_list args);
+int        sfvprintf(Sfio_t* f, const char* format, va_list args);
+
+Sffmt_t;
+
+SFFMT_LEFT
+SFFMT_SIGN
+SFFMT_BLANK
+SFFMT_ZERO
+SFFMT_THOUSAND
+SFFMT_LONG
+SFFMT_LLONG
+SFFMT_SHORT
+SFFMT_LDOUBLE
+SFFMT_IFLAG
+SFFMT_JFLAG
+SFFMT_CENTER
+SFFMT_CHOP
+SFFMT_ALTER
+SFFMT_SKIP
+SFFMT_ARGPOS
+SFFMT_VALUE
+
+int        (*Sffmtext_f)(Sfio_t* f, Void_t* v, Sffmt_t* fe);
+int        (*Sffmtevent_f)(Sfio_t* f, int type, Void_t* v, Sffmt_t* fe);
+void       va_copy(va_list to, va_list fr);
+long       sffmtversion(Sffmt_t* fe, type);
+.ft 1
+.fi
+.Ss "BUFFERING, SYNCHRONIZATION"
+.nf
+.ft 5
+Void_t*    sfsetbuf(Sfio_t* f, Void_t* buf, size_t size);
+int        sfsync(Sfio_t* f);
+int        sfpoll(Sfio_t** flist, int n, int timeout); 
+Sfio_t*    sfpool(Sfio_t* f, Sfio_t* poolf, int mode);
+int        sfpurge(Sfio_t* f);
+.ft 1
+.fi
+.Ss "DISCIPLINE, EVENT HANDLING"
+.nf
+.ft 5
+Sfdisc_t*  sfdisc(Sfio_t* f, Sfdisc_t* disc);
+int        sfraise(Sfio_t* f, int type, Void_t* data);
+ssize_t    sfrd(Sfio_t* f, Void_t* buf, size_t n, Sfdisc_t* disc);
+ssize_t    sfwr(Sfio_t* f, const Void_t* buf, size_t n, Sfdisc_t* disc);
+Sfoff_t    sfsk(Sfio_t* f, Sfoff_t offset, int type, Sfdisc_t* disc);
+
+SF_NEW
+SF_READ
+SF_WRITE
+SF_SEEK
+SF_CLOSING (SF_CLOSE)
+SF_DPUSH
+SF_DPOP
+SF_DPOLL
+SF_DBUFFER
+SF_SYNC	
+SF_PURGE
+SF_FINAL
+SF_READY
+SF_LOCKED
+SF_ATEXIT
+SF_EVENT
+.ft 1
+.fi
+.Ss "STREAM CONTROL"
+.nf
+.ft 5
+int        sfresize(Sfio_t* f, Sfoff_t size);
+int        sfset(Sfio_t* f, int flags, int i);
+int        sfsetfd(Sfio_t* f, int fd);
+Sfio_t*    sfstack(Sfio_t* base, Sfio_t* top);
+Sfio_t*    sfswap(Sfio_t* f1, Sfio_t* f2);
+.ft 1
+.fi
+.Ss "STREAM INFORMATION"
+.nf
+.ft 5
+Sfoff_t    sfsize(Sfio_t* f);
+Sfoff_t    sftell(Sfio_t* f);
+ssize_t    sfvalue(Sfio_t* f);
+int        sffileno(Sfio_t* f);
+
+int        sfstacked(Sfio_t* f);
+int        sfeof(Sfio_t* f);
+int        sferror(Sfio_t* f);
+int        sfclrerr(Sfio_t* f);
+int        sfclrlock(Sfio_t* f);
+
+int        sfnotify(void (*notify)(Sfio_t* f, int type, Void_t* data));
+
+int        sfwalk(Sfwalk_f walkf, Void_t* data, int type);
+.ft 1
+.fi
+.Ss "MISCELLANEOUS FUNCTIONS"
+.nf
+.ft 5
+ssize_t    sfmaxr(ssize_t maxr, int s);
+ssize_t    sfslen();
+int        sfulen(Sfulong_t v);
+int        sfllen(Sflong_t v);
+int        sfdlen(Sfdouble_t v);
+ssize_t    sfpkrd(int fd, Void_t* buf, size_t n,
+                  int rsc, long tm, int action);
+.ft 1
+.fi
+.Ss "FULL STRUCTURE SFIO_T"
+.nf
+.ft 5
+#include   <sfio_t.h>
+#define    SFNEW(buf,size,file,flags,disc)
+.ft 1
+.fi
+.Ss "EXAMPLE DISCIPLINES"
+.nf
+.ft 5
+#include   <sfdisc.h>
+
+int        sfdcdio(Sfio_t* f, size_t bufsize);
+int        sfdcdos(Sfio_t* f);
+int        sfdcfilter(Sfio_t* f, const char* cmd);
+int        sfdcseekable(Sfio_t* f);
+int        sfdcslow(Sfio_t* f);
+int        sfdcsubstream(Sfio_t* f, Sfio_t* parent,
+                         Sfoff_t offset, Sfoff_t extent);
+int        sfdctee(Sfio_t* f, Sfio_t* tee);
+int        sfdcunion(Sfio_t* f, Sfio_t** array, int n);
+int        sfdclzw(Sfio_t* f);
+int        sfdcgzip(Sfio_t* f, int flags);
+.ft 1
+.fi
+.Ss "STDIO-COMPATIBILITY"
+.nf
+.ft 5
+#include   <stdio.h>
+cc ... -lstdio -lsfio
+cc ... -lstdio-mt -lsfio-mt
+.ft 1
+.fi
+.SH DESCRIPTION
+.PP
+Sfio provides I/O functions to manage buffered streams.
+Each Sfio stream is a \fIfile stream\fP, representing a file (see \f5open(2)\fP),
+or a \fIstring stream\fP, representing a memory segment.
+Beyond the usual I/O operations on streams,
+Sfio provides I/O disciplines for extended data processing,
+stream stacks for recursive stream processing, and
+stream pools for automatic data synchronization.
+Applications can extend the \f5sfprintf()/sfscanf()\fP functions
+to define their own conversion patterns as well as redefine existing ones.
+.PP
+A discipline defines analogues of 
+the system calls \f5read(2), write(2)\fP and \f5lseek(2)\fP.
+Such system calls or their discipline replacements are used to process stream data.
+Henceforth, ``\fIsystem call\fP'' will refer to either a system call
+or its discipline replacement.
+.PP
+A system call is said to cause an exception if its return value is non-positive.
+Unless overridden by exception handlers (see \f5sfdisc()\fP),
+an interrupted system call (\f5errno == EINTR\fP on UNIX systems)
+will be automatically reinvoked to continue the ongoing operation.
+.PP
+The buffer of a stream is typically a memory segment allocated via \f5malloc(3)\fP
+or supplied by the application.
+File streams may also use memory mapping (\f5mmap(2)\fP) if that is more efficient.
+When memory mapping is used,
+the underlying file should not be truncated while the stream is active.
+Memory mapping can be turned off using \f5sfsetbuf()\fP.
+.PP
+There are three \fIstandard streams\fP:
+\f5sfstdin\fP for input (file descriptor \f50\fP on UNIX systems),
+\f5sfstdout\fP for normal output (file descriptor \f51\fP), and
+\f5sfstderr\fP for error output (file descriptor \f52\fP).
+
+.PP
+.Ss "LIBRARIES"
+.PP
+This version of Sfio can be built and used for both uni-threaded and multi-threaded
+environments. In the former case, streams are not protected from
+simultaneous accesses by different threads. In the latter case, a stream
+is typically locked with a mutex during access so that another thread
+trying to access the same stream will block until the mutex is released.
+
+A program that does not use multiple threads can link with \fBlibsfio.a\fP
+while a program that uses multiple threads should link with \fBlibsfio-mt.a\fP.
+The libraries \fBlibstdio.a\fP and \fBlibstdio-mt.a\fP provide
+corresponding Stdio functions to link with code already compiled using the
+native header \fBstdio.h\fP instead of the one provided by Sfio.
+
+.PP
+.Ss "DATA TYPES"
+.PP
+.Ss "  Void_t*"
+This defines a type suitable to exchange
+data of unknown types between application and Sfio.
+\f5Void_t\fP is a macro defined as \f5void\fP for ANSI-C and C++ and
+\f5char\fP for other compilation environments.
+.PP
+.Ss "  Sfoff_t"
+This defines an integral type suitable to address
+the largest possible file extent.
+.PP
+.Ss "  Sfulong_t, Sflong_t, Sfdouble_t"
+These are respectively the largest
+unsigned integer, signed integer, and floating point value types on the local platform.
+.PP
+.Ss "  Sfio_t"
+This defines the type of a stream handle.
+.PP
+.Ss "  Sfdisc_t"
+.Ss "  ssize_t (*Sfread_f)(Sfio_t*, Void_t*, size_t, Sfdisc_t*)"
+.Ss "  ssize_t (*Sfwrite_f)(Sfio_t*, const Void_t*, size_t, Sfdisc_t*)"
+.Ss "  Sfoff_t (*Sfseek_f)(Sfio_t*, Sfoff_t, int, Sfdisc_t*)"
+.Ss "  int (*Sfexcept_f)(Sfio_t*, int, Void_t*, Sfdisc_t*)"
+\f5Sfdisc_t\fP defines a stream discipline structure.
+\f5Sfread_f\fP, \f5Sfwrite_f\fP and \f5Sfseek_f\fP are the types
+of discipline functions to replace the system calls:
+\f5read(2)\fP, \f5write(2)\fP and \f5lseek(2)\fP.
+\f5Sfexcept_f\fP is the type of an event-handling function.
+See \f5sfdisc()\fP for more details.
+.PP
+.Ss "  Sffmt_t"
+.Ss "  int (*Sffmtext_f)(Sfio_t*, Void_t*, Sffmt_t*)"
+.Ss "  int (*Sffmtevent_f)(Sfio_t*, int, Void_t*, Sffmt_t*)"
+\f5Sffmt_t\fP defines a formatting environment that can be used
+to extend scanning and printing in the \f5sfprint()/sfscanf()\fP
+functions. \f5Sffmtext_f\fP and \f5Sffmtevent_f\fP define the types
+of extension functions definable in \f5Sffmt_t\fP.
+See \f5Sffmt_t\fP below for more details.
+.PP
+.Ss "  SFIO_VERSION"
+This is a macro value of type \f5long int\fP that defines
+the current version number of Sfio. For example, the Sfio2000's
+version number is \f520000515L\fP
+(which also indicates its latest version date: 05/15/2000).
+
+.Ss "BIT FLAGS"
+A number of bit flags control stream operations.
+They are set either at stream initialization or by calling \f5sfset()\fP.
+Following are the flags:
+.Tp
+\f5SF_STRING\fP:
+The stream is memory-based.
+.Tp
+\f5SF_READ\fP, \f5SF_WRITE\fP, \f5SF_APPENDWR\fP (\f5SF_APPEND\fP):
+Flags \f5SF_READ\fP and \f5SF_WRITE\fP indicate readability and writability.
+Flag \f5SF_APPENDWR\fP asserts that the stream is a file opened in append mode
+(see \f5open(2)\fP and \f5fcntl(2)\fP)
+so that data is always output at the end of file.
+On systems without direct support for append mode,
+Sfio uses \f5lseek(2)\fP or its discipline replacement
+to approximate this behavior.
+.Tp
+\f5SF_LINE\fP:
+The stream is line-oriented.
+For a \f5SF_WRITE\fP stream,
+this means that buffered data is flushed
+whenever a new-line character, \f5\en\fP, is output.
+For a \f5SF_READ\fP stream, \f5SF_LINE\fP is only
+significant during calls to functions in the \f5sfscanf()\fP family.
+\f5SF_LINE\fP is set on initialization of
+any stream representing a terminal device.
+.Tp
+\f5SF_SHARE\fP, \f5SF_PUBLIC\fP:
+Flag \f5SF_SHARE\fP means that the underlying file descriptor
+is shared by independent entities (for example, multiple processes).
+
+For a seekable file stream, \f5SF_SHARE\fP means that
+the logical stream and the physical file positions will be made the same
+before a system call to perform physical I/O.
+There are different possibilities.
+If \f5SF_PUBLIC\fP is not set,
+the physical file position is made equal to the logical stream position.
+If \f5SF_PUBLIC\fP is set, there are two cases.
+If the physical file position has changed from its last known position,
+the logical stream position is made equal to the new physical file position.
+Finally, if the physical file location remains the same as its last known position,
+the physical file position is made the same as the logical stream position.
+
+For an unseekable stream (e.g., pipes or terminal devices), if possible,
+\f5SF_SHARE\fP means that
+the block and record I/O operations (\f5sfread()\fP, \f5sfwrite()\fP, \f5sfmove()\fP,
+\f5sfgetr()\fP, \f5sfputr()\fP, \f5sfreserve()\fP, \f5sfscanf()\fP
+and \f5sfvprintf()\fP) will ensure:
+(1) after each writing operation, the stream is synchronized and
+(2) each reading operation only reads the requested amount.
+Note, however, that (2) is not always possible
+without proper OS facilities such as \f5recv(2)\fP or \f5streamio(4)\fP.
+
+A standard stream that is seekable will be initialized with \f5SF_SHARE|SF_PUBLIC\fP.
+.Tp
+\f5SF_MALLOC\fP:
+The stream buffer was obtained via \f5malloc(3)\fP
+and can be reallocated or freed.
+.Tp
+\f5SF_STATIC\fP:
+The stream structure should not be freed when closed (\f5sfclose()\fP).
+This flag is used by an applications that allocate their own
+stream structures. Such applications must use the header file \f5sfio_t.h\fP
+instead of \f5sfio.h\fP.
+.Tp
+\f5SF_IOCHECK\fP:
+If the stream has a discipline exception handler,
+exceptions will be raised in \f5sfsync()\fP, \f5sfpurge()\fP
+or before a system call \f5read(2)\fP or \f5write(2)\fP (see \f5sfdisc()\fP).
+.Tp
+\f5SF_WHOLE\fP:
+This flag guarantees that data written in any single \f5sfwrite()\fP or
+\f5sfputr()\fP call will always be output as a whole to the output device.
+This is useful in certain applications (e.g., networking) where a complex object
+must be output without being split in different system calls.
+Note that the respective stream still buffers data as much as the buffer can accomodate.
+.Tp
+\f5SF_MTSAFE\fP:
+This flag indicates that the respective stream may be accessed by more than one threads.
+A mutex lock will be used to ensure that only one thread at a time can access
+the stream. Note that this flag can only be set at stream opening time
+(see \f5sfopen()\fP, \f5sfpopen()\fP and \f5sfnew()\fP).
+Certain fast macro functions such as \f5sfgetc()\fP and \f5sfputc()\fP will
+no longer behave as macros. Thus, an application that requires such fast macro functions
+should leave \f5SF_MTSAFE\fP off and performs explicit locking with \f5sfmutex()\fP.
+.Tp
+\f5SF_IOINTR\fP:
+This flag indicates that I/O system calls should not be resumed 
+after being interrupted by signals. It is useful for 
+aborting I/O operations on such interruptions. Note, however,
+than certain operating systems (e.g., BSD Unix systems) may automatically
+resume interrupted system calls outside the scope of the library. On such systems,
+\f5SF_IOINTR\fP will be ineffective.
+
+.PP
+.Ss "OPENING/CLOSING STREAMS"
+.PP
+.Ss "  Sfio_t* sfnew(Sfio_t* f, Void_t* buf, size_t size, int fd, int flags)"
+This function creates or renews a stream.
+It returns the new stream on success and \f5NULL\fP on error.
+.Tp
+\f5f\fP:
+If \f5f\fP is \f5NULL\fP, a new stream is created.
+Otherwise, \f5f\fP is reused.
+In this case, if \f5flags\fP does not have \f5SF_EOF\fP,
+\f5f\fP shall be closed via \f5sfclose()\fP before being reused.
+During a stream renewal, buffer, pool and discipline stack are preserved.
+Note that, except for \f5SF_STATIC\fP streams,
+renewing a stream already closed will result in undefined behavior.
+.Tp
+\f5buf\fP, \f5size\fP:
+These determine a buffering scheme.
+See \f5sfsetbuf()\fP for more details.
+.Tp
+\f5fd\fP:
+If \f5SF_STRING\fP is specified in \f5flags\fP, this is ignored.
+Otherwise, \f5fd\fP is a file descriptor (e.g., from \f5open(2)\fP)
+to use for raw data I/O.
+Note that Sfio supports unseekable file descriptors
+opened for both read and write, e.g., sockets.
+.Tp
+\f5flags\fP:
+This is composed from \f5SF_EOF\fP and
+bit values defined in the \fBBIT FLAGS\fP section.
+Note, in particular, that a multi-threaded application should
+set the bit \f5SF_MTSAFE\fP to protect the new stream from
+being simultaneously accessed by multiple threads.
+
+.Ss "  Sfio_t* sfopen(Sfio_t* f, const char* string, const char* mode)"
+
+If \f5string\fP is \f5NULL\fP,
+\f5f\fP is a file stream and
+\f5mode\fP does not imply a string stream,
+\f5sfopen()\fP changes the modes of \f5f\fP according to \f5mode\fP.
+In this case, \f5sfopen()\fP returns \f5f\fP on success and \f5NULL\fP on error.
+This somewhat unusual usage of \f5sfopen()\fP is good for
+resetting certain predefined modes in standard streams including
+\fItext/binary\fP and \fIappend\fP that are inherited from some parent process.
+Note also that \f5SF_READ\fP and \f5SF_WRITE\fP can only be reset if the stream
+is not yet initialized.
+
+\f5sfopen()\fP is normally used to create a new stream or renew a stream.
+In this case, it returns the new stream on success and \f5NULL\fP on error.
+Below are the meanings of the arguments:
+.Tp
+\f5f\fP:
+This is treated as in \f5sfnew()\fP.
+.Tp
+\f5string\fP:
+This is a file name or a string to perform I/O on.
+See above for when this is \f5NULL\fP.
+.Tp
+\f5mode\fP:
+This is composed from the set of letters \f5{s, r, w, +, a, b, t, x, m, u}\fP.
+When conflicting options are present in the same \f5mode\fP string,
+the last one will take effect.
+
+\f5s\fP specifies opening a string stream.
+\f5string\fP can be a null-terminated string or \f5NULL\fP.
+Specifying \f5s\fP alone is equivalent to specifying \f5sr\fP.
+If \f5s\fP is not specified, \f5string\fP defines a file name.
+
+\f5r\fP and \f5w\fP specify read and write modes.
+Write mode creates and/or truncates the given file to make an empty file.
+The \f5+\fP modifier indicates that the stream is opened for both read and write.
+
+\f5a\fP specifies append mode, i.e., data is always output at end of file.
+
+\f5b\fP and \f5t\fP specify binary and text modes.
+
+\f5x\fP specifies exclusive mode, i.e.,
+a file opened for writing should not already exist.
+
+\f5m\fP specifies that the stream needs to be protected from
+simultaneous accesses by multiple threads.
+This turns on the bit flag \f5SF_MTSAFE\fP.
+
+\f5u\fP specifies that the stream is guaranteed to be accessed
+by only one thread at a time. The bit flag \f5SF_MTSAFE\fP is left off.
+The absence of option \f5m\fP is the same as the presence of option \f5u\fP.
+
+.Ss "  Sfio_t* sfpopen(Sfio_t* f, const char* cmd, const char* mode)"
+This function opens a stream that corresponds to the coprocess \f5cmd\fP.
+The argument \f5mode\fP should be composed from \f5r\fP, \f5w\fP, and \f5+\fP.
+The argument \f5f\fP, if not \f5NULL\fP, is a stream to be renewed (see \f5sfnew()\fP).
+\f5sfpopen()\fP returns the new stream or \f5NULL\fP on error.
+
+The standard input/output of \f5cmd\fP
+is connected to the application via a pipe if the stream is opened for writing/reading.
+If the stream is opened for both reading and writing,
+there will be two different associated file descriptors, one for each type of I/O
+(note the effect on \f5sffileno()\fP).
+
+On opening a coprocess for writing (i.e., \f5mode\fP contains \f5w\fP or \f5+\fP),
+the signal handler for \f5SIGPIPE\fP in the parent application
+will be set to \f5SIG_IGN\fP if it is \f5SIG_DFL\fP at that time.
+This protects the parent application from being accidentally killed
+on writing to a coprocess that closes its reading end.
+Applications that need to detect such write errors should use
+disciplines and exception handlers (see \f5sfdisc()\fP).
+
+The command \f5cmd\fP
+is executed by an \fIinterpreter\fP which is either \f5/bin/sh\fP
+or an executable command defined by the environment variable \f5SHELL\fP.
+In either case, the interpreter is invoked with 2 arguments, respectively \f5-c\fP
+and the given command \f5cmd\fP. When the interpreter is \f5/bin/sh\fP or
+\f5/bin/ksh\fP, \f5sfpopen()\fP may execute the command \f5cmd\fP itself
+if there are no shell meta-characters in \f5cmd\fP.
+
+.Ss "  Sfio_t* sftmp(size_t size)"
+This function creates a stream for temporary data.
+It returns the new stream or \f5NULL\fP on error.
+
+A stream created by \f5sftmp()\fP can be completely or partially memory-resident.
+If \f5size\fP is \f5SF_UNBOUND\fP, the stream is a pure string stream.
+If \f5size\fP is zero, the stream is a pure file stream.
+Otherwise, the stream is first created as a string stream but when
+its buffer grows larger than \f5size\fP or on any attempt to change disciplines,
+a temporary file is created.
+Two environment variables, \f5TMPPATH\fP and \f5TMPDIR\fP,
+direct where temporary files are created.
+\f5TMPPATH\fP, if defined,
+specifies a colon-separated set of directories to be
+used in a round-robin fashion to create files.
+If \f5TMPPATH\fP is undefined,
+\f5TMPDIR\fP can be used to specify a single directory to create files.
+If neither of \f5TMPPATH\fP and \f5TMPDIR\fP are defined, \f5/tmp\fP is used.
+
+.Ss "  int sfclose(Sfio_t* f)"
+This function closes the stream \f5f\fP and frees its resources.
+\f5SF_STATIC\fP should be used if the stream space is to be preserved.
+If \f5f\fP is the base of a stream stack (see \f5sfstack()\fP),
+all streams on the stack are closed.
+If \f5f\fP is a \f5sfpopen\fP-stream,
+\f5sfclose()\fP waits until the associated command terminates
+and returns its exit status.
+\f5sfclose()\fP returns \f5-1\fP for failure and \f50\fP for success.
+
+\f5SF_READ|SF_SHARE\fP and \f5SF_WRITE\fP streams
+are synchronized before closing (see \f5sfsync()\fP).
+If \f5f\fP has disciplines,
+their exception handlers will be called twice.
+The first exception handler call has the \f5type\fP argument as one of
+\f5SF_CLOSING\fP or \f5SF_NEW\fP (see \f5sfdisc()\fP.)
+The latter, \f5SF_NEW\fP is used when a stream is being closed via \f5sfnew()\fP
+so that it can be renewed.
+The second call uses \f5type\fP as \f5SF_FINAL\fP
+and is done after all closing operations have succeeded but before
+the stream itself is deallocated.
+In either case, if the exception handler returns a negative value,
+\f5sfclose()\fP will immediately return this value.
+If the exception handler returns a positive value,
+\f5sfclose()\fP will immediately return a zero value.
+
+.PP
+.Ss "THREAD SAFETY"
+.PP
+The libraries \f5libsfio.a\fP and \f5libstdio.a\fP (providing binary
+compatibility to Stdio-based code) only support uni-threaded code.
+Multi-threaded applications should link with
+\f5libsfio-mt.a\fP and \f5libstdio-mt.a\fP.
+When this is done, certain platforms may require additional
+thread libraries for linkage. For example, Linux, Irix and Solaris
+require \f5-lpthread\fP while HPUX requires \f5-lcma\fP.
+Aside from linkage differences, the Sfio API remains identical in all cases.
+
+Note that unlike Stdio streams which are in thread-safe mode by default.
+Sfio streams can be opened in either uni-threaded or multi-threaded mode.
+A uni-threaded stream is more efficient than a multi-threaded one.
+For example, functions such as \f5sfgetc()\fP and \f5sfputc()\fP
+remain as macro or inline functions for a uni-threaded stream while
+they will act as full function calls in a multi-threaded case.
+The three standard streams \f5sfstdin/sfstdout/sfstderr\fP
+are in multi-threaded mode by default
+(however, see \f5sfopen()\fP for how this may be changed).
+Other Sfio streams are normally opened uni-threaded unless
+the flag \f5SF_MTSAFE\fP or the option \f5m\fP were specified.
+Stdio-based code can also make a Stdio stream uni-threaded by
+using the option \f5u\fP when opening a file.
+
+.PP
+.Ss "int sfmutex(Sfio_t* f, int type)"
+This function acquires or releases a mutex
+(mutually exclusive) lock on the stream \f5f\fP.
+It can be used by a thread to serialize a sequence of I/O operations
+executed together in some critical section.
+\f5sfmutex()\fP is implicitly used by
+all Sfio operations on a stream with the flag \f5SF_MTSAFE\fP to
+protect it from concurrent accesses via multiple threads.
+\f5sfmutex()\fP returns \f50\fP on success and some non-zero value on failure.
+
+Each stream has a lock count which starts at \f50\fP.
+When the count is positive, a single thread holds the stream.
+Only this thread can further lock or unlock the stream.
+A different thread attempting to acquire such a locked stream will suspend
+until the lock count returns to \f50\fP.
+Each successful locking operation increases the lock count
+while each successful unlocking operation decreases it,
+thus, allowing nesting of matching lock/unlock operations.
+
+The \f5type\fP argument of \f5sfmutex()\fP takes on the below values:
+.Tp
+\f5SFMTX_LOCK\fP:
+Locking a stream if it is unlocked or increasing the lock count of the stream
+if it is already locked by the same thread. This call will block until it is
+possible to lock the stream.
+.Tp
+\f5SFMTX_TRYLOCK\fP:
+This is the non-blocking version of \f5SFMTX_LOCK\fP.
+If the stream is already locked by a different thread, \f5sfmutex()\fP will
+immediately return with an error status.
+.Tp
+\f5SFMTX_UNLOCK\fP:
+Decreasing the lock count and releasing the stream when the lock count reaches 0.
+An attempt to unlock a stream without a previously successful lock may
+result in undefined behavior in certain implementations.
+The current Sfio implementation returns an error status.
+.Tp
+\f5SFMTX_CLRLOCK\fP:
+Resetting the lock count to \f50\fP and releasing the stream.
+As with \f5SFMTX_LOCK\fP,
+an attempt to clear the lock count without a previously successful lock
+may result in undefined behavior.
+.PP
+.Ss "INPUT/OUPUT OPERATIONS"
+.PP
+.Ss "  int sfgetc(Sfio_t* f)"
+.Ss "  int sfputc(Sfio_t* f, int c)"
+These functions read/write a byte  from/to stream \f5f\fP.
+\f5sfgetc()\fP returns the byte read or \f5-1\fP on error.
+\f5sfputc()\fP returns \f5c\fP on success and \f5-1\fP on error.
+
+.Ss "  ssize_t sfnputc(Sfio_t* f, int c, size_t n)"
+This function attempts to write the byte \f5c\fP to \f5f\fP \f5n\fP times.
+It returns the number of bytes actually written or \f5-1\fP on failure.
+
+.Ss "  int sfungetc(Sfio_t* f, int c)"
+This function pushes the byte \f5c\fP back into \f5f\fP.
+If \f5c\fP matches the byte immediately before the current position in buffered data,
+the current position is simply backed up (note the effect on \f5sftell()\fP and
+\f5sfseek()\fP). There is no theoretical limit on the number of bytes that
+can be pushed back into a stream. Pushed back bytes not part of
+buffered data will be discarded on any operation that implies
+buffer synchronization.
+\f5sfungetc()\fP returns \f5c\fP on success and \f5-1\fP on failure.
+
+.Ss "  Sfulong_t sfgetm(Sfio_t* f, Sfulong_t max)"
+.Ss "  int sfputm(Sfio_t* f, Sfulong_t v, Sfulong_t max)"
+These functions read and write \f5Sfulong_t\fP values
+encoded in a portable format given that the values are at most \f5max\fP.
+Portability across a write architecture and a read architecture
+requires that the bit order in a byte is the same on both architectures and
+the written value is storable in an \f5Sfulong_t\fP on the read architecture.
+\f5sfgetm()\fP returns the value read or \f5-1\fP on error.
+\f5sfputm()\fP returns the number of bytes written or \f5-1\fP on error.
+
+.Ss "  Sfulong_t sfgetu(Sfio_t* f)"
+.Ss "  int sfputu(Sfio_t* f, Sfulong_t v)"
+These functions read and write \f5Sfulong_t\fP values
+in a compact variable-length portable format.
+Portability across a write architecture and a read architecture
+requires that the bit order in a byte is the same on both architectures and
+the written value is storable in an \f5Sfulong_t\fP on the read architecture.
+\f5sfgetu()\fP returns the value read or \f5-1\fP on error.
+\f5sfputu()\fP returns the number of bytes written or \f5-1\fP on error.
+See also \f5sfulen()\fP.
+
+.Ss "  Sflong_t sfgetl(Sfio_t* f)"
+.Ss "  int sfputl(Sfio_t* f, Sflong_t v)"
+These functions are similar to \f5sfgetu()\fP and \f5sfputu()\fP
+but for reading and writing (signed) \f5Sflong_t\fP values.
+See also \f5sfllen()\fP.
+
+.Ss "  Sfdouble_t sfgetd(Sfio_t* f)"
+.Ss "  int sfputd(Sfio_t* f, Sfdouble_t v)"
+These functions read and write \f5Sfdouble_t\fP values.
+In this case, portability depends on the input and output architectures
+having the same floating point value representation.
+Values are coded and decoded using \f5ldexp(3)\fP and \f5frexp(3)\fP
+so they are constrained to the sizes supported by these functions.
+See also \f5sfdlen()\fP.
+
+.Ss "  char* sfgetr(Sfio_t* f, int rsc, int type)"
+This function reads a record of data ending in the record separator \f5rsc\fP.
+After \f5sfgetr()\fP returns, the length of the record even if it is incomplete
+can be retrieved with \f5sfvalue()\fP.
+\f5sfgetr()\fP returns the record on success and \f5NULL\fP on error.
+See also \f5sfmaxr()\fP for limiting the amount of data read to construct a record.
+
+The \f5type\fP argument is composed of some subset of the below bit flags:
+.Tp
+\f5SF_STRING\fP:
+A null byte will replace the record separator to make the record into a C string.
+Otherwise, the record separator is left alone.
+.Tp
+\f5SF_LOCKR\fP:
+Upon successfully obtaining a record \f5r\fP,
+the stream will be locked from further access until it is released with
+a call \f5sfread(f,r,0)\fP.
+.Tp
+\f5SF_LASTR\fP:
+This should be used only after a failed \f5sfgetr()\fP to retrieve
+the last incomplete record. In this case, \f5rsc\fP is ignored.
+
+.Ss "  ssize_t sfputr(Sfio_t* f, const char* s, int rsc)"
+This function writes the null-terminated string \f5s\fP to \f5f\fP.
+If \f5rsc\fP is non-negative, \f5(unsigned char)rsc\fP is output after the string.
+\f5sfputr()\fP returns the number of bytes written or \f5-1\fP on failure.
+
+.Ss "  Sfoff_t sfmove(Sfio_t* fr, Sfio_t* fw, Sfoff_t n, int rsc)"
+This function moves objects
+from input stream \f5fr\fP to output stream \f5fw\fP.
+\f5sfmove()\fP returns the number of objects moved or \f5-1\fP on failure.
+
+An object can be either a byte if the record separator argument
+\f5rsc\fP is negative or a record of \f5rsc\fP is non-negative.
+In the latter case, a record is incomplete if it does not end in \f5rsc\fP. 
+Generally speaking, a stream can have at most one incomplete record.
+If \f5n\fP is negative, all complete objects of \f5fr\fP will be moved.
+Otherwise, \f5n\fP indicates the number of objects to move.
+If either \f5fr\fP or \f5fw\fP is \f5NULL\fP, it acts
+as if it is a stream corresponding to \f5/dev/null\fP,
+the UNIX device that has no read data and throws away any write data.
+For example, the call \f5sfmove(f,(Sfio_t*)0,(Sfoff_t)(-1),'\en')\fP
+counts the number of complete lines in stream \f5f\fP.
+
+.Ss "  ssize_t sfread(Sfio_t* f, Void_t* buf, size_t n)"
+This function reads up to \f5n\fP bytes from \f5f\fP into buffer \f5buf\fP.
+It returns the number of bytes actually read or \f5-1\fP on error.
+
+.Ss "  ssize_t sfwrite(Sfio_t* f, const Void_t* buf, size_t n)"
+This function writes \f5n\fP bytes from \f5buf\fP to \f5f\fP.
+If \f5f\fP is \f5SF_STRING\fP, and the buffer is not large enough,
+an \f5SF_WRITE\fP exception shall be raised.
+\f5sfwrite()\fP returns the number of bytes written or \f5-1\fP on failure.
+
+.Ss "  Sfoff_t sfseek(Sfio_t* f, Sfoff_t offset, int type)"
+This function sets a new I/O position for \f5f\fP.
+It returns the new position or \f5-1\fP on failure.
+
+If the stream is a \f5SF_STRING\fP stream and the new
+address is beyond the current buffer extent,
+an \f5SF_SEEK\fP exception will be raised (see \f5sfdisc()\fP).
+
+The new position is determined based on \f5offset\fP and
+\f5type\fP which is composed from the bit flags:
+.Tp
+\f50\fP or \f5SEEK_SET\fP:
+\f5offset\fP is the desired position.
+.Tp
+\f51\fP or \f5SEEK_CUR\fP:
+\f5offset\fP is relative to the current position (see \f5SF_PUBLIC\fP below).
+.Tp
+\f52\fP or \f5SEEK_END\fP:
+\f5offset\fP is relative to the physical end of file.
+.Tp
+\f5SF_SHARE\fP:
+The stream is treated as if it has the control bit \f5SF_SHARE\fP on.
+This implies that a system call seek will be done to ensure that the
+location seeking to is valid.
+.Tp
+\f5SF_PUBLIC\fP:
+The stream is treated as if it has the control bit \f5SF_PUBLIC\fP on.
+If the physical file position has changed from its last known location,
+the current position is taken as the new physical position.
+Otherwise, the current position is the logical stream position.
+
+.Ss "  Void_t* sfreserve(Sfio_t* f, ssize_t n, int type)"
+This function reserves a data block from the stream \f5f\fP.
+It returns the reserved data block on success and \f5NULL\fP on failure.
+
+If \f5f\fP is a \f5SF_READ\fP stream, the data block is a segment of input data.
+If \f5f\fP is a \f5SF_WRITE\fP stream, the data block is a buffer
+suitable for writing output data.
+For consistency, if \f5f\fP is opened with \f5SF_READ|SF_WRITE\fP,
+it will normally be treated as if it is a \f5SF_READ\fP stream
+(see \f5sfset()\fP for forcing a particular mode) but the returned
+buffer can also be written into (more below).
+However, it is possible to bias to \f5SF_WRITE\fP when the \f5type\fP
+argument is non-negative by adding the \f5SF_WRITE\fP bit \f5type\fP.
+In any case, a reserved data block is guaranteed to be valid only until
+a future access to the stream \f5f\fP.
+
+When \f5f\fP is \f5SF_READ\fP, \f5SF_SHARE\fP and unseekable,
+\f5sfreserve()\fP will attempt to peek at input data without
+consuming it. This enables separate processes to share in reading
+input from unseekable file descriptors (e.g., pipes or devices).
+However, this use of \f5sfreserve()\fP may fail
+on certain platforms that do not properly support
+peeking on unseekable file descriptors.
+
+After a \f5sfreserve()\fP call, whether or not it succeeds,
+\f5sfvalue(f)\fP gives the size of the available data block.
+Any partially reserved data block after a failed \f5sfreserve()\fP
+call can be obtained in another \f5sfreserve()\fP call with the argument
+\f5type\fP being \f5SF_LASTR\fP. The second argument \f5n\fP
+to \f5sfreserve()\fP will be ignored in this case.
+
+A \f5sfreserve()\fP call is successful if it can obtain a data block 
+of size at least the absolute value of \f5n\fP.
+For a \f5SF_READ\fP atream, the argument \f5n\fP is treated as follows:
+.Tp
+\f5n < 0\fP:
+\f5sfreserve()\fP attempts to get \fIat least\fP \f5|n|\fP bytes
+into the buffer.
+.Tp
+\f5n == 0\fP:
+If the argument \f5type\fP is \f50\fP,
+\f5sfreserve()\fP attempts to get \fIat least\fP \f51\fP byte into the buffer
+but does not consume it (as consistent with \f5n == 0\fP).
+If \f5type != 0\fP, no attempt will be made to read data into the buffer.
+For example, the call \f5sfreserve(f, 0, -1)\fP only returns the buffer status,
+i.e., size of existing buffered data and pointer to such data, if any.
+The call \f5sfreserve(f, 0, SF_LOCKR)\fP is similar but also locks the stream.
+.Tp
+\f5n > 0\fP:
+\f5sfreserve()\fP will use attempt to get \fIat most\fP \f5n\fP bytes into
+the buffer. Further, if \f5type == \f5SF_LOCKR\fP (see below), read attempts
+end on a positive amount.
+
+For a successful reservation, the argument \f5type\fP dictates treatment
+as follows:
+.Tp
+\f5type == SF_LASTR\fP:
+After a \f5sfreserve()\fP call with \f5type != SF_LOCKR\fP fails,
+there may be some left over data not accessible via conventional Sfio calls.
+Immediately after such a failed call,
+another call to \f5sfreserve\fP with \f5type == SF_LASTR\fP will return any left over
+data and also advance the stream I/O position by the amount of returned data.
+.Tp
+\f5type < 0\fP:
+If \f5n > 0\fP, the stream I/O position is advanced by \f5n\fP.
+If \f5n < 0\fP, the stream I/O position is advanced by the amount
+of available data.
+For example, a successful \f5sfreserve(f, -1, -1)\fP call will return a
+buffer of data and simultanously advance the stream I/O position by the amount
+indicated by \f5sfvalue(f)\fP.
+.Tp
+\f5type == SF_LOCKR\fP:
+The stream I/O position remains unchanged.
+In addition, \f5f\fP will be locked from further access.
+As appropriate to the stream type (\f5SF_READ\fP, \f5SF_WRITE\fP or both),
+\f5f\fP can be unlocked later
+with one of \f5sfread(f,rsrv,size)\fP or \f5sfwrite(f,rsrv,size)\fP
+where \f5rsrv\fP is the reserved data block and \f5size\fP is the amount of
+data to be consumed. For example, if \f5f\fP is a locked \f5SF_READ\fP stream,
+the call \f5sfread(f,rsrv,1)\fP will reopen the stream and simultaneously
+advance the stream I/O position by \f51\fP.
+Finally, a stream opened for both reading and writing
+can release the lock with either call (with associated operational semantics!)
+For example, the below code reads 10 bytes of data from a stream
+opened with both \f5SF_READ\fP and \f5SF_WRITE\fP, modifies the data in place,
+then rewrites the new data back to the stream:
+
+.nf
+.ft 5
+    rsrv = sfreserve(f, 10, 1);
+    for(i = 0; i < 10; ++i)
+        rsrv[i] = toupper(rsrv[i]);
+    sfwrite(f, rsrv, 10);
+.ft 1
+.fi
+
+.ne 6
+.PP
+.Ss "DATA FORMATTING"
+.PP
+Data printing and scanning are done via the
+\f5sfprintf()\fP and \f5sfscanf()\fP family of functions.
+These functions are similar to their
+ANSI-C \f5fprintf()\fP and \f5fscanf()\fP counterparts.
+However, the Sfio versions have been extended for both portability and generality.
+In particular, a notion of a formatting environment stack is introduced.
+Each formatting element on the stack
+defines a separate \fIformatting pair\fP of a format specification string,
+\f5char* format\fP (the usual second argument in the formatting
+functions), and an argument list, \f5va_list args\fP (the third argument
+in functions \f5sfvprintf()\fP and \f5sfvscanf()\fP).
+A formatting environment element may also specify extension functions
+to obtain or assign arguments and to provide new semantics for pattern processing.
+To simplify the description below, whenever we talk
+about an argument list, unless noted otherwise,
+it is understood that this means either the true
+argument list when there is no extension function or the action to be taken
+by such a function in processing arguments.
+The manipulation of the formatting environment stack is done
+via the pattern \f5!\fP discussed below.
+
+.Ss "%! and Sffmt_t"
+The pattern \f5%!\fP manipulates the formatting environment stack to
+(1) change the top environment to a new environment,
+(2) stack a new environment on top of the current top,
+or (3) pop the top environment.
+The bottom of the environment stack always contains a virtual environment with the
+original formatting pair and without any extension functions.
+
+The top environment of a stack, say \f5fe\fP, is automatically popped whenever
+its format string is completely processed.
+In this case, its event-handling function (if any) is called
+as \f5(*eventf)(f,SF_FINAL,NIL(Void_t*),fe)\fP.
+The top environment
+can also be popped by giving an argument \f5NULL\fP to \f5%!\fP
+or by returning a negative value in an extension function.
+In these cases, the event-handling function is called
+as \f5(*eventf)(f,SF_DPOP,form,fe)\fP where \f5form\fP is the remainder
+of the format string. A negative return value from the event handling function
+will prevent the environment from being popped.
+
+A formatting environment is a structure of type \f5Sffmt_t\fP
+which contains the following elements:
+
+.nf
+.ft 5
+    Sffmtext_f   extf;   /* extension processor        */
+    Sffmtevent_f eventf; /* event handler              */
+
+    char*        form;   /* format string to stack     */
+    va_list      args;   /* corresponding arg list     */
+        
+    int          fmt;    /* pattern being processed    */
+    ssize_t      size;   /* object size                */
+    int          flags;  /* formatting control flags   */
+    int          width;  /* width of field             */
+    int          precis; /* precision required         */
+    int          base;   /* conversion base            */
+
+    char*        t_str;  /* extfdata string            */
+    int          n_str;  /* length of t_str            */
+.ft 1
+.fi
+
+The first four elements of \f5Sffmt_t\fP must be defined by the application
+before the structure is passed to a formatting function.
+The two function fields should not be changed during processing.
+Other elements of \f5Sffmt_t\fP are set by the respective formatting function
+before it calls the extension function \f5Sffmt_t.extf\fP and, subsequently,
+can be modified by this function to redirect formatting or scanning.
+For example, consider a call from a \f5sfprintf()\fP function to process an
+unknown pattern \f5%t\fP (which we may take to mean ``time'') based on a
+formatting environment \f5fe\fP.
+\f5fe->extf\fP may reset \f5fe->fmt\fP to `\f5d\fP' upon returing
+to cause \f5sfprintf()\fP to process the value being formatted as an integer.
+
+Below are the fields of \f5Sffmt_t\fP:
+.Tp
+\f5extf\fP:
+\f5extf\fP is a function to extend scanning and formatting patterns.
+Its usage is discussed below.
+.Tp
+\f5eventf\fP:
+This is a function to process events as discussed earlier.
+.Tp
+\f5form\fP and \f5args\fP:
+This is the formatting pair of a specification string and corresponding argument list.
+When an environment \f5fe\fP is being inserted into the stack,
+if \f5fe->form\fP is \f5NULL\fP, the top environment is changed to \f5fe\fP
+and its associated extension functions
+but processing of the current formatting pair continues.
+On the other hand, if \f5fe->form\fP is not \f5NULL\fP,
+the new environment is pushed onto the stack
+so that pattern processing will start with the new formatting pair as well as
+any associated extension functions.
+During processing, whenever \f5extf\fP is called,
+\f5form\fP and \f5args\fP will be set to the current values of
+the formatting pair in use.
+.Tp
+\f5fmt\fP:
+This is set to the pattern being processed or one of '.', 'I', '('.
+.Tp
+\f5size\fP:
+This is the size of the object being processed.
+.Tp
+\f5flags\fP:
+This is a collection of bits defining the formatting flags specified for the pattern.
+The bits are:
+
+\f5SFFMT_LEFT\fP: Flag \f5-\fP in \f5sfprintf()\fP.
+
+\f5SFFMT_SIGN\fP: Flag \f5+\fP in \f5sfprintf()\fP.
+
+\f5SFFMT_BLANK\fP: Flag \fIspace\fP in \f5sfprintf()\fP.
+
+\f5SFFMT_ZERO\fP: Flag \f50\fP in \f5sfprintf()\fP.
+
+\f5SFFMT_THOUSAND\fP: Flag \f5'\fP in \f5sfprintf()\fP.
+
+\f5SFFMT_LONG\fP: Flag \f5l\fP in \f5sfprintf()\fP and \f5sfscanf()\fP.
+
+\f5SFFMT_LLONG\fP: Flag \f5ll\fP in \f5sfprintf()\fP and \f5sfscanf()\fP.
+
+\f5SFFMT_SHORT\fP: Flag \f5h\fP in \f5sfprintf()\fP and \f5sfscanf()\fP.
+
+\f5SFFMT_LDOUBLE\fP: Flag \f5L\fP in \f5sfprintf()\fP and \f5sfscanf()\fP.
+
+\f5SFFMT_IFLAG\fP: flag \f5I\fP in \f5sfprintf()\fP and \f5sfscanf()\fP.
+
+\f5SFFMT_JFLAG\fP: flag \f5j\fP in \f5sfprintf()\fP and \f5sfscanf()\fP.
+
+\f5SFFMT_CENTER\fP: flag \f5=\fP in \f5sfprintf()\fP and \f5sfscanf()\fP.
+
+\f5SFFMT_CHOP\fP: flag \f5-\fP in \fIprecis\fP in \f5sfprintf()\fP and \f5sfscanf()\fP.
+
+\f5SFFMT_ALTER\fP: Flag \f5#\fP in \f5sfprintf()\fP and \f5sfscanf()\fP.
+
+\f5SFFMT_SKIP\fP: Flag \f5*\fP in \f5sfscanf()\fP.
+
+\f5SFFMT_ARGPOS\fP: This indicates argument processing for \f5pos$\fP.
+
+\f5SFFMT_VALUE\fP: This is set by \f5fe->extf\fP
+to indicate that it is returning a value to be formatted or
+the address of an object to be assigned.
+
+.Tp
+\f5width\fP:
+This is the field width.
+.Tp
+\f5precis\fP:
+This is the precision.
+.Tp
+\f5base\fP:
+This is the conversion base.
+.Tp
+\f5t_str\fP and \f5n_str\fP:
+This is the type string and its size.
+
+.Ss "  int (*Sffmtext_f)(Sfio_t* f, Void_t* v, Sffmt_t* fe)"
+This is the type of the extension function \f5fe->extf\fP to process
+patterns and arguments.
+Arguments are always processed in order and
+\f5fe->extf\fP is called exactly once per argument.
+Note that, when \f5pos$\fP (below) is not used anywhere in a format string,
+each argument is used exactly once per a corresponding pattern.
+In that case, \f5fe->extf\fP is called 
+as soon as the pattern is recognized and before any scanning or formatting.
+On the other hand, when \f5pos$\fP is used in a format string,
+an argument may be used multiple times.
+In this case, all arguments shall be processed in order
+by calling \f5fe->extf\fP exactly once per argument before any pattern processing.
+This case is signified by the flag \f5SFFMT_ARGPOS\fP in \f5fe->flags\fP.
+
+In addition to the predefined formatting patterns and other application-defined
+patterns, \f5fe->extf\fP may be called with \f5fe->fmt\fP being one
+of `\f5(\fP' (left parenthesis), `\f5.\fP' (dot), and `\f5I\fP'.
+
+The left parenthesis requests a string to be used as the \f5extfdata\fP string discussed below.
+In this case, upon returning, \f5fe->extf\fP should set the \f5fe->size\fP field
+to be the length of the string or a negative value to indicate a null-terminated string.
+
+The `\f5I\fP' requests an integer to define the object size.
+
+The dot requests an integer for width, precision, base, or a separator.
+In this case, the \f5fe->size\fP field will indicate how many dots have appeared
+in the pattern specification. Note that, if the actual conversion pattern is 'c' or 's',
+the value \f5*form\fP will be one of these characters.
+.Tp
+\f5f\fP:
+This is the input/output stream in the calling formatting function.
+During a call to \f5fe->extf\fP, the stream shall be unlocked
+so that \f5fe->extf\fP can read from or write to it as appropriate.
+.Tp
+\f5v\fP:
+For both \f5sfscanf()\fP and \f5sfprintf()\fP functions,
+\f5v\fP points to a location suitable for storing any scalars or pointers.
+On return, \f5fe->extf\fP treats \f5v\fP as discussed below.
+.Tp
+\f5fe\fP:
+This is the current formatting environment.
+.PP
+The return value \f5rv\fP of \f5fe->extf\fP directs further processing.
+There are two cases.
+When \f5pos$\fP is present, a negative return value means to ignore \f5fe\fP
+in further argument processing while a non-negative return value is treated
+as the case \f5rv == 0\fP below.
+When \f5pos$\fP is not present, \f5fe->extf\fP is called per argument
+immediately before pattern processing and its return values are treated
+as below:
+.Tp
+\f5rv < 0:\fP
+The environment stack is immediately popped.
+.Tp
+\f5rv == 0:\fP
+The extension function has not consumed (in a scanning case) or
+output (in a printing case) data out of or into the given stream \f5f\fP.
+The fields \f5fmt\fP, \f5flags\fP, \f5size\fP,
+\f5width\fP, \f5precis\fP and \f5base\fP of \f5fe\fP
+shall direct further processing.
+
+For \f5sfprintf()\fP functions, if \f5fe->flags\fP
+has the bit \f5SFFMT_VALUE\fP,
+\f5fe->extf\fP should have set \f5*v\fP to the value to be processed;
+otherwise, a value should be obtained from the argument list.
+Likewise, for \f5sfscanf()\fP functions,
+\f5SFFMT_VALUE\fP means that
+\f5*v\fP should have a suitable address; otherwise,
+an address to assign value should be obtained from the argument list.
+
+When \f5pos$\fP is present,
+if \f5fe->extf\fP changes \f5fe->fmt\fP, this pattern shall be used regardless of
+the pattern defined in the format string. On the other hand, if \f5fe->fmt\fP
+is unchanged by \f5fe->extf\fP, the pattern in the format string is used.
+In any case, the effective pattern should be one of the standardly defined pattern.
+Otherwise, it shall be treated as unmatched.
+.Tp
+\f5rv > 0:\fP
+The extension function has accessed the stream \f5f\fP
+to the extent of \f5rv\fP bytes.
+Processing of the current pattern ceases except that,
+for scanning functions, if \f5fe->flags\fP does not contain
+the bit \f5SFFMT_SKIP\fP, the assignment count shall increase by 1.
+
+.Ss "void va_copy(va_list to, va_list fr)"
+This macro function portably copies the argument list \f5fr\fP to
+the argument list \f5to\fP. It should be used to set the field \f5Sffmt_t.args\fP.
+
+.Ss "long sffmtversion(Sffmt_t* fe, int type)"
+This macro function initializes
+the formatting environment \f5fe\fP with a version number if \f5type\fP is
+non-zero. Otherwise, it returns the current value of the version number of \f5fe\fP.
+This is useful for applications to find out
+when the format of the structure \f5Sffmt_t\fP changes.
+Note that the version number corresponds to the Sfio version number
+which is defined in the macro value \f5SFIO_VERSION\fP.
+
+.Ss "  int sfprintf(Sfio_t* f, const char* format, ...);"
+.Ss "  char* sfprints(const char* format, ...);"
+.Ss "  char* sfvprints(const char* format, va_list args);"
+.Ss "  ssize_t sfaprints(char** sp, const char* format, ...);"
+.Ss "  ssize_t sfvaprints(char** sp, const char* format, va_list args);"
+.Ss "  int sfsprintf(char* s, int n, const char* format, ...)"
+.Ss "  int sfvsprintf(char* s, int n, const char* format, va_list args);"
+.Ss "  int sfvprintf(Sfio_t* f, const char* format, va_list args);"
+These functions format output data.
+\f5sfprintf()\fP and \f5sfvprintf()\fP write to output stream \f5f\fP.
+\f5sfsprintf()\fP and \f5sfvsprintf()\fP write to buffer \f5s\fP
+which is of size \f5n\fP.
+\f5sfprints()\fP and \f5sfvprints()\fP construct data in some Sfio-defined buffer.
+\f5sfaprints()\fP and \f5sfvaprints()\fP are similar to \f5sfprints()\fP
+and \f5sfvprints()\fP
+but they return a string constructed via \f5malloc()\fP in \f5*sp\fP
+and expect this string to be freed by the caller when no longer needed.
+\f5sfvprintf()\fP is the underlying primitive for the other functions.
+Except for \f5sfprints()\fP and \f5sfvprints()\fP
+which return a null-terminated string or \f5NULL\fP,
+other functions return the number of output bytes or \f5-1\fP on failure.
+
+The length of string constructed by \f5sfprints()\fP, \f5sfsprintf()\fP, or
+\f5sfvsprintf()\fP can be retrieved by \f5sfslen()\fP.
+.PP
+The standard patterns are:
+\f5n, s, c, %, h, i, d, p, u, o, x, X, g, G, e, E, f\fP and \f5!\fP.
+Except for \f5!\fP which shall be described below,
+see the ANSI-C specification of \f5fprintf(3)\fP for details on the other patterns.
+Let \f5z\fP be some pattern type. A formatting pattern is defined as below:
+
+.nf
+.ft 5
+    %[pos$][flag][width][.precision[.base]][(extfdata)]z
+.ft 1
+.fi
+
+.Tp
+\f5pos$\fP:
+A pattern can specify which argument in the argument list to use.
+This is done via \f5pos$\fP where \f5pos\fP is the argument position.
+Arguments are numbered so that the first argument after \f5format\fP is at position 1.
+If \f5pos\fP is not specified, the argument following the most recently used one
+will be used.
+The pattern \f5%!\fP (see below) cannot be used subsequent to a usage of \f5pos$\fP.
+Doing so may cause unexpected behaviors.
+.Tp
+\f5flag\fP:
+The flag characters are
+\f5h\fP, \f5hh\fP, \f5l\fP, \f5ll\fP, \f5L\fP, \f5I\fP, \f5j\fP, \f5t\fP, \f5z\fP,
+\f5\-\fP, \f5+\fP, \fIspace\fP, \f50\fP, \f5'\fP, \f5=\fP and \f5#\fP.
+
+Flag \f5I\fP defines the size or type of the object being formatted.
+There are two cases: (1) \f5I\fP by itself and (2) \f5I\fP
+followed by either a decimal number or `*'.
+
+In the first case, for integer and floating point patterns,
+the object type is taken to be the largest appropriate type
+(i.e., one of \f5Sflong_t\fP, \f5Sfulong_t\fP or \f5Sfdouble_t\fP).
+For conversion specifiers \f5s\fP and \f5c\fP, the flag is ignored.
+
+In the second case, a given decimal value would define a size while
+`*' would cause the size to be obtained from the argument list.
+Then, if the conversion specifier is \f5s\fP, this size defines the
+length of the string or strings being formatted (see the discussion of \f5base\fP below).
+For integer and floating point patterns,
+the size is used to select a type from one of the below lists as 
+indicated by the conversion specifier:
+
+.nf
+.ft 5
+    Sflong_t, long, int, short
+    Sfulong_t, unsigned long, unsigned int, unsigned short
+    Sfdouble_t, double, float
+.ft 1
+.fi
+
+The selection algorithm always matches types from left to right in any given list.
+Although selection is generally based on sizes in bytes,
+for compatibility with Microsoft-C, the size 64 
+is matched with an appropriate type with the same number of bits, if any.
+If the given size does not match any of the listed types,
+it shall match one of \f5int\fP, \f5unsigned int\fP, and \f5double\fP
+as defined by the formatting pattern.
+
+Below are a few examples of using the \f5I\fP flag.
+The first example prints an \f5Sflong_t\fP integer.
+This example is actually not portable and
+only works on platforms where \f5sizeof(Sflong_t)\fP is 8.
+The second example shows how to that portably.
+The third example specifies printing a string of length 16.
+This length shall be used regardless of whether or not the given string
+is shorter or longer than 16.
+The last example shows the use of the pattern \f5%n\fP to assign the amount
+of data already output into a \f5short\fP integer \f5n_output\fP.
+
+.nf
+.ft 5
+    sfprintf(sfstdout,"%I8d", Sflong_obj);
+    sfprintf(sfstdout,"%I*d", sizeof(Sflong_obj), Sflong_obj);
+    sfprintf(sfstdout,"%I*s", 16, s);
+    sfprintf(sfstdout,"%d%I*n", 1001, sizeof(short), &n_output);
+.ft 1
+.fi
+
+Flags \f5h\fP, \f5l\fP, \f5j\fP and \f5L\fP are the ANSI-C conventions to
+select the types of input objects.
+For example, \f5%hd\fP indicates a \f5short int\fP,
+while \f5%ld\fP indicates a \f5long int\fP.
+
+Flag \f5hh\fP addresses the byte value types, i.e., \f5char\fP and \f5unsigned char\fP.
+
+Flags \f5z\fP, \f5t\fP and \f5j\fP address respectively
+the types \f5size_t\fP, \f5ptrdiff_t\fP and \f5Sflong_t\fP.
+
+Flags \f5ll\fP and \f5L\fP address respectively
+the largest integer and floating value types, i.e.,
+\f5Sfulong_t\fP, \f5Sflong_t\fP, and \f5Sfdouble_t\fP.
+
+Flag \f5-\fP left-justifies data within the field (otherwise, right-justification).
+
+Flag \f5+\fP means that a signed conversion will always begin with a plus or minus sign.
+
+Flag \fIspace\fP is ignored if \f5+\fP is specified; otherwise,
+it means that if the first character of a signed conversion
+is not a sign or if the result is empty, a space will be prepended.
+
+Flag \f50\fP means padding with zeros on the left.
+
+Flag \f5'\fP outputs thousands-separator used by the current locale.
+\f5setlocale(3)\fP should have been used to set the desired locale.
+
+Flag \f5=\fP centers data within the field.
+
+Flag \f5#\fP indicates an alternative format processing.
+For \f5%o\fP, the first digit is always a zero.
+For \f5%x\fP and \f5%X\fP, a non-zero result will have a prefix
+\f50x\fP or \f50X\fP. For \f5%e\fP, \f5%E\fP, \f5%f\fP, \f5%g\fP, and \f5%G\fP,
+the result always contains a decimal point. For \f5%g\fP and \f5%G\fP,
+trailing zeros will not be removed. For \f5%d\fP, \f5%i\fP and \f5%u\fP,
+the form is \fIbase#number\fP where \fIbase\fP is the conversion base
+and \fInumber\fP is represented by digits for this \fIbase\fP.
+For example, a base \f52\fP conversion with \f5%#..2d\fP for \f510\fP
+is \f52#1010\fP instead of \f51010\fP as printed with \f5%..2d\fP.
+Finally, for \f5%c\fP, bytes will be printed in the C format.
+For example, when the ASCII character set is used,
+the byte value 10 will be printed as \f5\\n\fP while 255 is printed
+as \f5\\377\fP.
+.Tp
+\f5width\fP:
+This defines the width of the printing field. A value to be printed will
+be justified and padded if necessary to fill out the field width.
+.Tp
+\f5precis\fP:
+After a first dot appears, an integral value defines a precision.
+For floating point value patterns, precision is the number of precision digits.
+For \f5%c\fP, precision defines the number of times to repeat the
+character being formatted.
+For \f5%s\fP, precision defines the maximum number of characters to output;
+-\f5precis\fP also defines the maximum number of characters to output, but
+retains the rightmost \f5precis\fP characters.
+.Tp
+\f5base\fP:
+This is defined after exactly two dots have appeared.
+
+For \f5%i\fP, \f5%d\fP, and \f5%u\fP,
+\f5base\fP should be an integer value in the inclusive range \f5[2,64]\fP
+and defines a conversion base.
+If \f5base\fP is not in this range, it is defined to be \f510\fP.
+The digits to represent numbers are:
+
+.nf
+.ft 5
+    01234567890
+    abcdefghijklmnopqrstuvwxyz
+    ABCDEFGHIJKLMNOPQRSTUVWXYZ @_
+.ft 1
+.fi
+
+For \f5%s\fP and \f5%c\fP, \f5base\fP defines a separator.
+Then, for \f5%s\fP, the input argument is taken to be a NULL-terminated array of strings
+while, for \f5%c\fP, this is a null-terminated array of characters.
+The strings or characters will be formatted one of a time based
+on the usual width and precision rules.
+After each formatted string or character, except for the last one,
+the separator \f5base\fP is output if it is a non-zero.
+
+There are further restrictions on the syntax of \f5%s\fP and \f5%c\fP when
+a separator is defined.
+Below are the legitimate sequences for \f5%s\fP and \f5%c\fP after the second dot:
+
+.nf
+\f5    s            c\fP
+\f5    *s           *c\fP
+\f5    \fP\fIz\fP\f5s           \fP\fIz\fP\f5c\fP
+.fi
+
+In the first case, no separator is defined so \f5base\fP is set to zero.
+In the second case, \f5base\fP is obtained from the argument list.
+In the third case, the character \fIz\fP
+must be non-alphanumeric and \f5base\fP will be set to this character.
+
+The below example shows both the call and the result
+of printing a \f5NULL\fP-terminated array
+of three strings \f5apple\fP, \f5orange\fP, and \f5grape\fP:
+
+.nf
+.ft 5
+    sfprintf(sfstdout,"|%8..:s|",list);
+    |   apple:  orange:   grape|
+.ft 1
+.fi
+
+.Tp
+\f5(extfdata)\fP:
+This defines a string \f5extfdata\fP
+to be passed to the extension function \f5Sffmt_t.extf\fP.
+Parentheses shall be balanced.
+If \f5extfdata\fP is \f5*\fP, the string is obtained from the argument list.
+
+.PP
+.Ss "  int sfscanf(Sfio_t* f, const char* format, ...)"
+.Ss "  int sfsscanf(const char* s, const char* format, ...)"
+.Ss "  int sfvsscanf(const char* s, const char* format, va_list args)"
+.Ss "  int sfvscanf(Sfio_t* f, const char* format, va_list args)"
+These functions scan data items.
+\f5sfscanf()\fP scans from the input stream \f5f\fP
+while \f5sfsscanf()\fP and \f5sfvsscanf()\fP
+scan from the null-terminated string \f5s\fP.
+\f5sfvscanf()\fP is the underlying primitive that performs the actual scanning.
+Item types are determined from patterns in string \f5format\fP.
+These functions return
+the number of items successfully scanned or \f5-1\fP on error.
+.PP
+A white space character (blank, tab, or new-line) in \f5format\fP
+normally matches a maximal sequence of input white space characters.
+However, if the input stream is in \f5SF_LINE\fP mode (see \f5sfset()\fP),
+a new-line character only matches white spaces up to an input new-line character.
+This is useful to avoid blocking when scanning typed inputs.
+.PP
+The standard scan patterns are:
+\f5i, d, u, o, x, X, p, n, f, e, E, g, G, c, %, s, []\fP and \f5!\fP.
+Except for \f5!\fP which shall be described below,
+see the ANSI-C specification of \f5fscanf(3)\fP for details on other patterns.
+Let \f5z\fP be some pattern type. A formatting pattern is specified as below:
+
+.nf
+.ft 5
+    %[*][pos$][width][.width.base][(extfdata)][flag]z
+.ft 1
+.fi
+
+.Tp
+\f5pos$\fP:
+A pattern can specify which argument in the argument list to use.
+This is done via \f5pos$\fP where \f5pos\fP is the argument position.
+Arguments are numbered so that the first argument after \f5format\fP is at position 1.
+If \f5pos\fP is not specified, the argument following the most recently used one
+will be used.
+The pattern \f5%!\fP (see below) cannot be used subsequent to a usage of \f5pos$\fP.
+.Tp
+\f5*:\fP
+This discards the corresponding scanned item.
+.Tp
+\f5width\fP and \f5base\fP:
+\f5width\fP defines the maximum number of bytes to scan
+and \f5base\fP defines the base of an integral value being scanned.
+The `.' (dot) notation also allows specifying a `*' (star) to obtain
+the value from the argument list. The below example specifies scanning
+4 bytes to obtain the value of an integer in base 10. At the end of scanning,
+the variable \f5v\fP should have the value \f51234\fP.
+
+.nf
+.ft 5
+    sfsscanf("12345678","%.*.*d", 4, 10, &v);
+.ft 1
+.fi
+
+.Tp
+\f5(extfdata)\fP:
+This defines a string \f5extfdata\fP
+to be passed to the extension function \f5Sffmt_t.extf\fP.
+Parentheses shall be balanced.
+If \f5extfdata\fP is \f5*\fP, the string is obtained from the argument list.
+.Tp
+\f5flag:\fP
+This is \f5#\fP, \f5I\fP, or some sequence of \f5h\fP, \f5l\fP, and \f5L\fP.
+
+Flag \f5#\fP is significant for pattern \f5%i\fP and \f5%[\fP.
+For \f5%i\fP, it means that the \f5#\fP symbol does not have its usual
+meaning in an input sequence \f5base#value\fP.
+For example, the scanning result of \f5%#i\fP on input \f52#1001\fP is \f52\fP
+and the next \f5sfgetc()\fP call will return \f5#\fP.
+For \f5%[\fP, if the next character in the input stream does not match
+the given scan set of characters, \f5#\fP causes a match to a null string
+instead of a failure.
+
+Flag \f5I\fP defines the size or type of the object being formatted.
+There are two cases: (1) \f5I\fP by itself and (2) \f5I\fP
+followed by either a decimal number or `*'.
+
+In the first case, for integer and floating point patterns,
+the object type is taken to be the largest appropriate type
+(i.e., one of \f5Sflong_t\fP, \f5Sfulong_t\fP or \f5Sfdouble_t\fP).
+For string patterns such as \f5%s\fP, the flag is ignored.
+
+In the second case, a given decimal value would define a size while
+`*' would cause the size to be obtained from the argument list.
+For string patterns such as \f5%s\fP or \f5%[\fP, this size defines the
+length of the buffer to store scanned data.
+Specifying a buffer size only limits the amount of data copied into the buffer.
+Scanned data beyond the buffer limit will be discarded.
+For integer and floating point patterns,
+the size is used to select a type from one of the below lists as
+indicated by the conversion specifier:
+
+.nf
+.ft 5
+    Sflong_t, long, int, short
+    Sfulong_t, unsigned long, unsigned int, unsigned short
+    Sfdouble_t, double, float
+.ft 1
+.fi
+
+The selection algorithm always matches types from left to right in any given list.
+Although selection is generally based on sizes in bytes,
+for compatibility with Microsoft-C, the size 64 
+is matched with an appropriate type with the same number of bits, if any.
+If the given size does not match any of the listed types,
+it shall match one of \f5int\fP, \f5unsigned int\fP, and \f5double\fP
+as indicated by the formatting pattern.
+
+Below are examples of using the \f5I\fP flag.
+The first example scans a 64-bit integer.
+The second scans some floating point value
+whose size is explicitly computed and given.
+The last example scans a string into a buffer with the given size 128.
+Note that if the scanned string is longer than 127, only the first 127
+bytes shall be copied into the buffer. The rest of the scanned data
+shall be discarded.
+
+.nf
+.ft 5
+     sfscanf(sfstdin,"%I64d", &int64_obj);
+     sfscanf(sfstdin,"%I*f", sizeof(float_obj), &float_obj);
+     sfscanf(sfstdin,"%I*s", 128, buffer);
+.ft 1
+.fi
+
+Flags \f5h\fP, \f5l\fP, and \f5L\fP are the ANSI-C conventions
+for indicating the type of a scanned element.
+For example, \f5%hd\fP means scanning a \f5short int\fP.
+The flags \f5ll\fP and \f5L\fP mean respectively scanning an
+integer or a floating point value with largest size
+(i.e, \f5Sflong_t\fP or \f5Sfdouble_t\fP).
+.PP
+The \f5%i\fP, \f5%d\fP and \f5%u\fP patterns scan numbers in bases
+from \f52\fP to \f564\fP.
+\f5%i\fP scans integral values in self-describing formats.
+Except for octal, decimal and hexadecimal numbers with the usual formats,
+numbers in general bases are assumed to be of the form: \fIbase#value\fP
+where \fIbase\fP is a number in base 10 and \fIvalue\fP
+is a number in the given base.
+For example, \f52#1001\fP is the binary representation of the decimal value \f59\fP.
+If \fIbase\fP is \f536\fP or less,
+the digits for \fIvalue\fP can be any combination of \f5[0-9], [a-z], [A-Z]\fP
+where upper and lower case digits are not distinguishable.
+If \fIbase\fP is larger than \f536\fP, the set of digits is:
+
+.nf
+.ft 5
+    0123456789
+    abcdefghijklmnopqrstuvwxyz
+    ABCDEFGHIJKLMNOPQRSTUVWXYZ @_
+.ft 1
+.fi
+
+.PP
+.Ss "BUFFERING, SYNCHRONIZATION"
+.PP
+.Ss "  Void_t* sfsetbuf(Sfio_t* f, Void_t* buf, size_t size)"
+This function changes the buffering scheme for the stream \f5f\fP.
+The stream will be synchronized before any buffer modification.
+If a new buffer is successfully set and the old buffer has not been freed,
+\f5sfsetbuf()\fP returns the old buffer. Otherwise, it returns \f5NULL\fP.
+After a \f5sfsetbuf()\fP call,
+\f5sfvalue()\fP returns the size of the returned buffer.
+
+Sfio attempts to read data in blocks likely to be serviced fast by the file system.
+This means block sizes being multiples of a suitable alignment value
+(e.g., 512, 1024 or 8192). By default, the alignment value
+is computed via some internal mechanism depending on the local platform but
+it can also be explicitly set via the call \f5sfsetbuf(f, (Void_t*)f, size)\fP.
+
+In invocations of \f5sfsetbuf()\fP other than the above case,
+the \f5size\fP argument is treated as follows:
+.Tp
+\f5size == SF_UNBOUND\fP:
+Sfio will pick a suitable buffer size.
+If \f5buf\fP is \f5NULL\fP,
+Sfio will also pick a suitable buffering scheme (such as memory mapping.)
+If \f5buf\fP is not \f5NULL\fP, its actual value is ignored
+but the buffer will be allocated via \f5malloc(3)\fP.
+This can be used to avoid memory mapping.
+.Tp
+\f5size > 0\fP:
+This is the suggested size to use for buffering or memory mapping.
+If \f5buf\fP is \f5NULL\fP,
+Sfio will pick a suitable buffering scheme as discussed above.
+If \f5buf\fP is not \f5NULL\fP, then \f5buf\fP and \f5size\fP determine
+a buffer of the given size.
+.Tp
+\f5size == 0\fP:
+If \f5buf\fP is \f5NULL\fP, the stream will be unbuffered.
+If \f5buf\fP is not \f5NULL\fP,
+\f5sfsetbuf()\fP simply returns the stream buffer.
+In this case, no attempt will be made to synchronize the stream.
+
+.Ss "  int sfsync(Sfio_t* f)"
+This function synchronizes the logical and physical views of stream \f5f\fP.
+It returns a negative value for failure and \f50\fP for success.
+
+For a \f5SF_WRITE\fP stream, synchronization means to write out any buffered data.
+For a seekable \f5SF_READ\fP file stream,
+the physical file position is aligned with the logical stream position and,
+if \f5SF_SHARE\fP is on, buffered data is discarded.
+If \f5f\fP is \f5NULL\fP, all streams are synchronized.
+If \f5f\fP is the base of a stream stack (see \f5sfstack()\fP),
+all stacked streams are synchronized.
+Note that a stacked stream can only be synchronized this way.
+If \f5f\fP is in a pool (see \f5sfpool()\fP) but not being the head,
+the pool head is synchronized.
+
+If \f5f\fP has flag \f5SF_IOCHECK\fP, the \f5SF_SYNC\fP event is raised
+before and after synchronization. See \f5sfdisc()\fP for details.
+
+.Ss "  int sfpoll(Sfio_t** flist, int n, int timeout)"
+This function polls a set of streams to see if I/O operations
+can be performed on them without blocking.
+This is useful for multiplexing I/O over a set of streams.
+If a stream has a discipline, the exception function may be called
+before and after the stream is polled (see \f5sfdisc()\fP for details).
+After a successful \f5sfpoll()\fP call,
+for each ready stream \f5f\fP, \f5sfvalue(f)\fP returns
+a bit combination of \f5SF_READ\fP and \f5SF_WRITE\fP to tell which I/O
+mode is available. If \f5SF_READ\fP is available, an attempt to read
+a byte will not block. If \f5SF_WRITE\fP is available,
+an attempt to flush will not block.
+\f5sfpoll()\fP returns the number of ready streams or \f5-1\fP on failure.
+.Tp
+\f5flist\fP and \f5n\fP:
+\f5flist\fP is an array of \f5n\fP streams to be polled.
+Upon return, ready streams are moved to the front
+of \f5flist\fP in the same relative order.
+.Tp
+\f5timeout\fP:
+This defines an elapse time in milliseconds
+to wait to see if any stream is ready for I/O.
+If \f5timeout\fP is negative, \f5sfpoll()\fP will block until some stream become ready.
+Note that \f5SF_STRING\fP and normal file streams never block
+and are always ready for I/O.
+If a stream with discipline is being polled and
+its readiness is as yet undetermined (e.g., empty buffer,)
+the discipline exception function will be called with \f5SF_DPOLL\fP
+before querying the operating system.
+
+.Ss "  Sfio_t* sfpool(Sfio_t* f, Sfio_t* poolf, int mode)"
+This function manipulates pools of streams.
+In a pool, only one stream is at the head and can have buffered data.
+All other streams in the pool will be synchronized.
+A stream becomes head when it is used for some I/O operation.
+\f5sfpool()\fP returns \f5NULL\fP on failure.
+.Tp
+\f5f\fP and \f5poolf\fP:
+If \f5f\fP is \f5NULL\fP,
+\f5sfpool()\fP simply returns the head of the pool containing \f5poolf\fP.
+If \f5f\fP is not \f5NULL\fP and \f5poolf\fP is \f5NULL\fP,
+\f5f\fP is deleted from its pool.
+In this case, if no other stream from the same pool can become head,
+\f5sfpool()\fP will return \f5NULL\fP; otherwise, it returns some stream
+from the remainder of the pool.
+If both \f5f\fP and \f5poolf\fP are not \f5NULL\fP,
+\f5f\fP is moved from its current pool (if any)
+into the same pool with \f5poolf\fP.
+In this case, \f5poolf\fP is returned.
+.Tp
+\f5mode\fP:
+If \f5poolf\fP is already in a pool, \f5mode\fP is ignored.
+Otherwise, \f5mode\fP should be \f50\fP or \f5SF_SHARE\fP.
+A \f5SF_SHARE\fP pool contains streams with \f5SF_WRITE\fP mode.
+In addition, on change to a new head stream,
+buffered write data of the current head
+is transferred to the new head.
+
+.Ss "  int sfpurge(Sfio_t* f)"
+This function discards all buffered data
+unless \f5f\fP is a \f5SF_STRING\fP stream.
+Note that if \f5f\fP is a \f5SF_READ\fP stream based on an unseekable device,
+purged data will not be recoverable.
+If \f5f\fP is a \f5sfpopen\fP-stream opened for both read and write,
+data of both the read and write pipe ends will be purged
+(see \f5sfset()\fP to selectively turn off read or write mode
+if one set of data is to be preserved.)
+After purging, if \f5f\fP has flag \f5SF_IOCHECK\fP,
+the event \f5SF_PURGE\fP is raised.
+\f5sfpurge()\fP returns \f5-1\fP for failure and \f50\fP for success.
+
+.PP
+.Ss "DISCIPLINE, EVENT-HANDLING"
+.PP
+A file stream uses the system calls \f5read(2)\fP, \f5write(2)\fP
+and \f5lseek(2)\fP to read, write and position in the underlying file.
+Disciplines enable application-defined I/O methods including exception handling and
+data pre/post-processing.
+
+.Ss "  Sfdisc_t* sfdisc(Sfio_t* f, Sfdisc_t* disc)"
+Each stream has a discipline stack whose bottom is a virtual discipline
+representing the actual system calls.
+\f5sfdisc()\fP manipulates the discipline stack of stream \f5f\fP.
+\f5f\fP will be synchronized before any discipline stack manipulation.
+After a successful discipline stack manipulation,
+the stream I/O position (see \f5sfseek()\fP and \f5sftell()\fP)
+and extent (see \f5sfsize()\fP) are updated
+to reflect that defined by the top discipline.
+\f5sfdisc()\fP returns \f5NULL\fP on failure.
+
+If the value of \f5disc\fP is identical to the value of \f5f\fP,
+then the top discipline on the discipline
+stack is returned without any further action.
+An application can then use this feature of \f5sfdisc()\fP
+and the field \f5disc\fP (below) of the discipline structure
+to traverse the entire discipline stack of a stream \f5f\fP as follows:
+
+.nf
+.ft 5
+    for(disc = sfdisc(f, (Sfdisc_t*)f); disc; disc = disc->disc)
+.ft 1
+.fi
+
+If \f5disc\fP is \f5SF_POPDISC\fP or \f5(Sfdisc_t*)0\fP,
+the top element of the stack, if any, is popped and its address is returned.
+Otherwise, \f5disc\fP is pushed onto the discipline stack.
+In this case, if successful, \f5sfdisc()\fP returns
+the discipline that was pushed down.
+
+Note that a discipline can be used on only one stream at a time.
+An application should take care to allocate different discipline
+structures for use with different streams. 
+A discipline structure is of the type \f5Sfdisc_t\fP which
+contains the following public fields:
+
+.nf
+.ft 5
+    Sfread_f   readf;
+    Sfwrite_f  writef;
+    Sfseek_f   seekf;
+    Sfexcept_f exceptf;
+    Sfdisc_t*   disc;
+.ft 1
+.fi
+
+.PP
+The first three fields of \f5Sfdisc_t\fP specify alternative I/O functions.
+If any of them is \f5NULL\fP, it is inherited
+from a discipline pushed earlier on the stack.
+Note that a file stream always
+has \f5read(2)\fP, \f5write(2)\fP, \f5lseek(2)\fP and \f5NIL(Sfexcept_f)\fP
+as the \fIlogical bottom discipline\fP.
+Arguments to I/O discipline functions
+have the same meaning as that of the
+functions \f5sfrd()\fP, \f5sfwr()\fP and \f5sfsk()\fP described below.
+.PP
+The exception function, \f5(*exceptf)()\fP announces exceptional events during
+I/O operations.
+It is called as \f5(*exceptf)(Sfio_t* f, int type, Void_t* value, Sfdisc_t* disc)\fP.
+Unless noted otherwise, the return value of \f5(*exceptf)()\fP is used as follows:
+.Tp
+\f5<0\fP:
+The on-going operation shall terminate.
+.Tp
+\f5>0\fP:
+If the event was raised due to an I/O error,
+the error has been repaired and the on-going operation shall continue normally.
+For some events, e.g., \f5SF_DPOLL\fP, the return value may also have
+additional meanings.
+.Tp
+\f5=0\fP:
+The on-going operation performs default actions with respect to the raised event.
+For example, on a reading error or reaching end of file, the top stream of a stack
+will be popped and closed and the on-going operation continue with the new top
+stream.
+.PP
+The argument \f5type\fP of \f5(*exceptf)()\fP
+identifies the particular exceptional event:
+.Tp
+\f5SF_LOCKED\fP:
+The stream cannot be accessed.
+Note that this lock state is not related to the mutex lock
+that protects a stream from multiple accesses by different threads
+(see section THREAD SAFETY). Rather, the stream was frozen by
+certain operations such as \f5sfreserve()\fP or \f5sfstack()\fP.
+Thus, a stream can be in this state even if the application is uni-threaded.
+.Tp
+\f5SF_READ\fP, \f5SF_WRITE\fP:
+These events are raised around reading and writing operations.
+
+If \f5SF_IOCHECK\fP is on, \f5SF_READ\fP and \f5SF_WRITE\fP
+are raised immediately before \f5read(2) and write(2)\fP calls.
+In this case, \f5*((ssize_t*)value)\fP is the amount of data to be processed.
+The return value of \f5(*exceptf)()\fP, if negative,
+indicates that the stream is not ready for I/O
+and the calling operation will abort with failure.
+If it is positive, the stream is ready for I/O
+but the amount should be restricted to the amount specified by this value.
+If the return value is zero, the I/O operation is carried out normally.
+
+\f5SF_READ\fP and \f5SF_WRITE\fP are also raised on operation failures.
+In such a case, \f5*((ssize_t*)value)\fP
+is the return value from the failed operation.
+.Tp
+\f5SF_SEEK\fP:
+This event is raised when a seek operation fails.
+.Tp
+\f5SF_NEW\fP, \f5SF_CLOSING\fP (\f5SF_CLOSE\fP), \f5SF_FINAL\fP:
+These events are raised during a stream closing.
+\f5SF_NEW\fP is raised for a stream about to be closed to be renewed (see \f5sfnew()\fP).
+\f5SF_CLOSING\fP is raised for a stream about to be closed.
+\f5SF_FINAL\fP is raised after a stream has been closed and before
+its space is to be destroyed (see \f5sfclose()\fP).
+For these events, a non-zero return value from \f5(*exceptf)()\fP causes
+\f5sfclose()\fP to return immediately with the same value.
+.Tp
+\f5SF_DPUSH\fP, \f5SF_DPOP\fP, \f5SF_DBUFFER\fP:
+Events \f5SF_DPUSH\fP and \f5SF_DPOP\fP are raised when a
+discipline is about to be pushed or popped.
+\f5(Sfdisc_t*)value\fP is the to-be top discipline, if any.
+
+A stream buffer is always synchronized before pushing or popping a discipline.
+If this synchronization fails, \f5SF_DBUFFER\fP will be raised with
+\f5*((size_t*)value)\fP being the amount of data still in the buffer.
+If the return value of \f5exceptf\fP is non-negative,
+the push or pop operation will continue normally;
+otherwise, \f5sfdisc()\fP returns failure.
+.Tp
+\f5SF_DPOLL\fP:
+This event is raised by
+\f5sfpoll()\fP to see if the stream is ready for I/O.
+\f5*((int*)value)\fP indicates a time-out interval to wait.
+A negative return value from the exception function means blocking.
+A zero return value means that \f5sfpoll()\fP should
+query the underlying file descriptor.
+A positive return value means non-blocking. In addition,
+this value will be a bit combination of \f5SF_READ\fP and \f5SF_WRITE\fP
+to indicate what I/O modes are ready.
+.Tp
+\f5SF_READY\fP:
+This event is raised by \f5sfpoll()\fP for each ready stream.
+The third argument to the event handler is an integer composed with
+the two bits \f5SF_READ\fP and \f5SF_WRITE\fP to indicate which
+I/O modes are ready.
+.Tp
+\f5SF_SYNC\fP, \f5SF_PURGE\fP:
+If \f5SF_IOCHECK\fP is set,
+these events are raised respectively for a \f5sfsync()\fP or \f5sfpurge()\fP call. 
+In each case, the respective event is raised once before the appropriate
+operation (synchronization or purging) with \f5((int)value)\fP being \f51\fP
+and once after with \f5((int)value)\fP being \f50\fP.
+Note that \f5sfsync()\fP is called for each
+\f5SF_WRITE\fP or \f5SF_SHARE|SF_READ\fP stream on closing.
+
+.Tp
+\f5SF_ATEXIT\fP:
+This event is raised for each open stream before the process exits.
+
+.Ss "  int sfraise(Sfio_t* f, int type, Void_t* data)"
+If \f5f\fP is non-\f5NULL\fP, \f5sfraise()\fP calls all exception handlers
+of \f5f\fP with the event \f5type\fP and associated \f5data\fP.
+If an exception handler returns a non-zero value,
+\f5sfraise()\fP immediate returns the same value.
+Application-defined events should start from the value \f5SF_EVENT\fP
+so as to avoid confusion with system-defined events,
+\f5sfraise()\fP returns \f50\fP on success and \f5-1\fP on failure.
+
+If \f5f\fP is \f5NULL\fP, \f5sfraise()\fP iterates over all streams
+and raise events as described above. In this case,
+\f5sfraise()\fP returns \f50\fP on success and a negative value
+on failure. The absolute value of the return value tells how many
+streams failed on raising the given event.
+
+.Ss "  ssize_t sfrd(Sfio_t* f, Void_t* buf, size_t n, Sfdisc_t* disc)"
+.Ss "  ssize_t sfwr(Sfio_t* f, const Void_t* buf, size_t n, Sfdisc_t* disc)"
+.Ss "  Sfoff_t sfsk(Sfio_t* f, Sfoff_t offset, int type, Sfdisc_t* disc)"
+These functions provides safe methods for a discipline I/O function to invoke
+earlier discipline I/O functions and to properly handle exceptions.
+They should not be used in any other context.
+\f5sfrd()\fP and \f5sfwr()\fP return the number of bytes read or written.
+\f5sfsk()\fP returns the new seek position.
+On error, all three functions return a negative value which should be \f5-1\fP
+or the value returned by the exception handler.
+
+.PP
+.Ss "STREAM CONTROL"
+.PP
+.Ss "  int sfresize(Sfio_t* f, Sfoff_t size)"
+This function resizes the stream \f5f\P so that its extent is \f5size\fP.
+If the stream corresponds to a file, the file size is set to \f5size\fP
+via the system call \f5ftruncate()\fP.
+When a stream is made larger, the new data space is filled with zero's.
+\f5sfresize()\fP returns \f50\fP on success and a negative value on failure.
+
+.Ss "  int sfset(Sfio_t* f, int flags, int set)"
+This function sets control flags for the stream \f5f\fP.
+It returns the previous set of flags or \f50\fP on error.
+
+Settable flags are:
+\f5SF_READ\fP, \f5SF_WRITE\fP, \f5SF_IOCHECK\fP,
+\f5SF_LINE\fP, \f5SF_SHARE\fP, \f5SF_PUBLIC\fP, \f5SF_MALLOC\fP and
+\f5SF_STATIC\fP.
+Note that \f5SF_READ\fP and \f5SF_WRITE\fP can be turned on or off only
+if the stream was opened as \f5SF_READ|SF_WRITE\fP.
+Turning off one of them means that the stream is to be treated exclusively
+in the other mode. It is not possible to turn off both.
+If legal, an attempt to turn on either \f5SF_READ\fP or \f5SF_WRITE\fP
+will cause the stream to be in the given I/O mode.
+.Tp
+\f5set == 0:\fP
+If \f5flags\fP is zero, the current set of flags is simply returned.
+Note that when a stream is first opened, not
+all of its flags are initialized yet (more below). If \f5flags\fP is
+non-zero, an attempt is made to turn off the specified flags.
+.Tp
+\f5set != 0:\fP
+If \f5flags\fP is zero, the stream is initialized if not yet done so.
+Then the current set of flags is returned.
+If \f5flags\fP is non-zero, an attempt is made to turn on the
+specified flags.
+
+.Ss "  int sfsetfd(Sfio_t* f, int fd)"
+This function changes the file descriptor of \f5f\fP.
+Before a change is realized,
+\f5(*notify)(f,SF_SETFD,newfd)\fP (see \f5sfnotify()\fP) is called.
+\f5sfsetfd()\fP returns \f5-1\fP on failure and the new file descriptor on success.
+.Tp
+\f5fd >= 0\fP:
+If the current file descriptor is non-negative,
+it will be changed using \f5dup(3)\fP to a value larger or equal to \f5fd\fP.
+Upon a successful change, the previous file descriptor will be closed.
+If the current file descriptor is negative, it will be set to \f5fd\fP and
+the stream will be reinitialized.
+.Tp
+\f5fd < 0\fP:
+The stream is synchronized (see \f5sfsync()\fP) and its
+file descriptor will be set to this value.
+Then, except for \f5sfclose()\fP, the stream will be inaccessible
+until a future \f5sfsetfd()\fP call resets the file descriptor to a non-negative value.
+Thus, \f5sfsetfd(f,-1)\fP can be used to avoid closing the file descriptor
+of \f5f\fP when \f5f\fP is closed.
+
+.Ss "  Sfio_t* sfstack(Sfio_t* base, Sfio_t* top)"
+This function stacks or unstacks stream.
+Every stream stack is identified by a base stream
+via which all I/O operations are performed.
+However, an I/O operation always takes effect on the top stream.
+If the top stream reaches the end of file or
+has an unrecoverable error condition,
+it is automatically popped and closed
+(see also \f5sfdisc()\fP for alternative handling of these conditions).
+.Tp
+\f5base\fP:
+This is the base stream of the stack.
+If it is \f5NULL\fP, \f5sfstack()\fP does nothing and returns \f5top\fP.
+.Tp
+\f5top\fP:
+If this is \f5SF_POPSTACK\fP or \f5(Sfio_t*)0\fP,
+the stack is popped and \f5sfstack()\fP returns the popped stream.
+Otherwise, \f5top\fP is pushed on top of the stack identified by \f5base\fP
+and \f5sfstack()\fP returns the \f5base\fP stream.
+
+.Ss "  Sfio_t* sfswap(Sfio_t* f1, Sfio_t* f2)"
+This function swaps contents of \f5f1\fP and \f5f2\fP.
+This fails if either stream is in a stream stack but not being a base stream.
+If \f5f2\fP is \f5NULL\fP, a new stream is constructed as a duplicate of \f5f1\fP.
+\f5sfswap()\fP returns \f5f2\fP or \f5f1\fP duplicate on success and
+\f5NULL\fP on failure.
+
+.PP
+.Ss "STREAM INFORMATION"
+.PP
+.Ss "  Sfoff_t sfsize(Sfio_t* f)"
+This function returns the size of stream \f5f\fP (see \f5sfnew()\fP).
+If \f5f\fP is not seekable or if its size is not determinable,
+\f5sfsize()\fP returns \f5-1\fP.
+
+.Ss "  Sfoff_t sftell(Sfio_t* f)"
+This function returns the current I/O position in stream \f5f\fP.
+Note that if \f5f\fP is \f5SF_APPEND\fP
+and a writing operation was just performed,
+the current I/O position is at the physical end of file.
+If \f5f\fP is unseekable, \f5sftell\fP returns the number of bytes
+read from or written to \f5f\fP.
+See also \f5sfungetc()\fP.
+
+.Ss "  ssize_t sfvalue(Sfio_t* f)"
+This function returns the string or buffer length
+for \f5sfreserve()\fP, \f5sfsetbuf()\fP, and \f5sfgetr()\fP.
+
+.Ss "  int sffileno(Sfio_t* f)"
+This function returns the file descriptor of stream \f5f\fP.
+
+.Ss "  int sfstacked(Sfio_t* f)"
+This function returns a non-zero value
+if stream \f5f\fP has been stacked.
+
+.Ss "  int sfeof(Sfio_t* f)"
+.Ss "  int sferror(Sfio_t* f)"
+.Ss "  int sfclrerr(Sfio_t* f)"
+\f5sfeof()\fP tells whether or not the stream has an end-of-file condition.
+\f5sferror()\fP tells whether or not the stream has an error condition.
+\f5sfclrerr()\fP clears both end-of-file and error conditions.
+The end-of-file and error conditions are also cleared on an I/O operation.
+
+.Ss "  int sfclrlock(Sfio_t* f)"
+This function restores the stream back to a normal state.
+This means clearing locks and possibly throwing away unprocessed data.
+As such, this operation is unsafe and should be used with care.
+For example, it may be used before a long jump (\f5longjmp(3)\fP)
+out of some discipline I/O function to restore the internal stream states.
+\f5sfclrlock()\fP returns the current set of flags.
+
+.Ss "  int sfnotify((void(*)notify)(Sfio_t*, int, void*) )"
+This sets a function \f5(*notify)()\fP to be called
+as \f5(*notify)(f, type, data)\fP on various stream events.
+Arguments \f5type\fP and \f5data\fP indicate the reason for the call and accompanying data:
+.Tp
+\f5SF_NEW\fP:
+\f5f\fP is being opened and \f5data\fP is the underlying file descriptor.
+.Tp
+\f5SF_CLOSING\fP (\f5SF_CLOSE\fP):
+\f5f\fP is the stream being closed and \f5data\fP is the underlying file descriptor.
+.Tp
+\f5SF_SETFD\fP:
+The file descriptor of \f5f\fP is being changed to the one
+defined by \f5data\fP (see \f5sfsetfd()\fP.)
+.Tp
+\f5SF_READ\fP:
+An attempt to change \f5f\fP to read mode failed.
+\f5data\fP is the file descriptor of the stream.
+.Tp
+\f5SF_WRITE\fP:
+An attempt to change \f5f\fP to write mode failed.
+\f5data\fP is the file descriptor of the stream.
+.Tp
+\f5SF_MTACCESS\fP:
+When a notifying function was registered (see \f5sfnotify()\fP),
+every Sfio call on a stream with flag \f5SF_MTSAFE\fP will
+invoke the notifying function
+once on entry after the stream is locked
+as \f5(*notify)(f, SF_MTACCESS, Sfio_t** fp), and
+once on return before unlocking as
+as \f5(*notify)(f, SF_MTACCESS, (Sfio_t**)0).
+In the call entry case,
+the notification function could use the argument \f5fp\fP
+to set a stream that would be used for performing the actual I/O operation.
+In this way, certain global streams such as the standard streams \f5sfstdin\fP,
+\f5sfstdout\fP and \f5sfstderr\fP could be made to act differently when used
+in different streams.
+
+.Ss "  int sfwalk(Sfwalk_f walkf, Void_t* data, int type)"
+This function invokes \f5(*walkf)(f, data)\fP on every open stream \f5f\fP
+whose flags as defined by \f5sfset()\fP contains all bit flags given in \f5type\fP.
+On such a call, if the return value is negative, \f5sfwalk()\fP will terminate.
+\f5sfwalk()\fP returns 0 if no stream was processed.
+Otherwise, it returns the return value from the last invocation of \f5walkf()\fP.
+
+As an example, the call \f5sfwalk(walkf, data, SF_READ)\fP will iterate over all streams
+opened for reading. Similarly, \f5sfwalk(walkf, data, SF_READ|SF_WRITE)\fP 
+iterates over all streams opened for both reading and writing.
+Lastly, \f5sfwalk(walkf, data, 0)\fP iterates over all streams.
+
+.PP
+.Ss "MISCELLANEOUS FUNCTIONS"
+.PP
+.Ss "  ssize_t sfmaxr(ssize_t maxr, int set)"
+Certain records may require too much memory for storage, thus, causing
+undesirable side effects. Therefore, the library normally bounds the amount
+of memory used by \f5sfgetr()\fP. A different memory bound
+can be set via \f5sfmaxr()\fP. While a positive \f5maxr\fP hints to \f5sfgetr()\fP
+to use only about that much memory to construct a record, a non-positive bound
+allows \f5sfgetr()\fP to use as much memory as necessary.
+\f5sfmaxr()\fP sets the value only if \f5set\fP is non-zero.
+It returns the value before setting or the current value if not setting.
+
+.Ss "  ssize_t sfslen()"
+This function returns the length of a string just constructed
+by \f5sfsprintf()\fP or \f5sfprints()\fP.  See also \f5sfvalue()\fP.
+
+.Ss "  int sfulen(Sfulong_t v)"
+.Ss "  int sfllen(Sflong_t v)"
+.Ss "  int sfdlen(Sfdouble_t v)"
+These functions return respectively the number of bytes required to code the
+\f5Sfulong_t\fP, \f5Sflong_t\fP or \f5Sfdouble_t\fP value \f5v\fP by \f5sfputu()\fP,
+\f5sfputl()\fP or \f5sfputd()\fP.
+
+.Ss "  ssize_t sfpkrd(int fd, char* buf, size_t n, int rsc, long tm, int action)"
+This function acts directly on the file descriptor \f5fd\fP.
+It does a combination of peeking on incoming data and a time-out read.
+Upon success, it returns the number of bytes received.
+A return value of \f50\fP means that the end-of-file condition has been detected.
+A negative value represents an error.
+.Tp
+\f5buf\fP, \f5n\fP:
+These define a buffer and its size to read data into.
+.Tp
+\f5rsc\fP:
+If \f5>=0\fP, this defines a record separator.
+If the last returned byte is not the record separator, then
+the read data did not contain a complete record. Otherwise,
+it contains one or more records.
+See also \f5action\fP below.
+.Tp
+\f5tm\fP:
+If \f5>=0\fP, this defines a time interval in milliseconds to wait for incoming data.
+.Tp
+\f5action\fP:
+If \f5action > 0\fP, \f5sfpkrd()\fP will peek on incoming data but
+will not read past it. Therefore, a future \f5sfpkrd()\fP or \f5read(2)\fP will see
+the same data again.
+If \f5action <= 0\fP, \f5sfpkrd()\fP will not peek and there are two cases.
+If \f5rsc < 0\fP, an attempt is made to read \f5n\fP bytes.
+If \f5rsc >= 0\fP, an attempt is made to read one record.
+
+.PP
+.Ss "FULL STRUCTURE SFIO_T"
+.PP
+.Ss "  #include <sfio_t.h>"
+Most applications based on Sfio only need to include
+the header file \f5sfio.h\fP which defines an abbreviated \f5Sfio_t\fP
+structure without certain fields private to Sfio.
+However, there are times (e.g., debugging)
+when an application may require more details about the full \f5Sfio_t\fP structure.
+In such cases, the header file \f5sfio_t.h\fP can be used in place of \f5sfio.h\fP.
+Note that an application doing this will become sensitive to changes
+in the internal architecture of Sfio.
+
+.Ss "  #define SFNEW(buf,size,file,flags,disc)"
+This macro function is defined in \f5sfio_t.h\fP for
+use in static initialization of an \f5Sfio_t\fP structure.
+It requires five arguments:
+.Tp
+\f5buf, size\fP:
+These define a buffer and its size.
+.Tp
+\f5file\fP:
+This defines the underlying file descriptor if any.
+.Tp
+\f5flags\fP:
+This is composed from bit flags described above.
+.Tp
+\f5disc\fP:
+This defines a discipline if any.
+
+.PP
+.Ss "EXAMPLE DISCIPLINES"
+.PP
+The below functions create disciplines and insert them into
+the given streams \f5f\fP. These functions return \f50\fP
+on success and \f5-1\fP on failure.
+
+.Ss "int sfdcdio(Sfio_t* f, size_t bufsize)"
+This creates a discipline that uses the direct IO feature
+available on file systems such as SGI's XFS to speed up IO.
+The argument \f5bufsize\fP suggests a buffer size to use for data transfer.
+
+.Ss "int sfdcdos(Sfio_t* f)"
+This creates a discipline to read DOS text files.
+It basically transforms pairs of \er\en to \en.
+
+.Ss "int sfdcfilter(Sfio_t* f, const char* cmd)"
+This creates a discipline that sends data from \f5f\fP
+to the given command \f5cmd\fP to process, then reads back the processed data.
+
+.Ss "int sfdcseekable(Sfio_t* f)"
+This creates a discipline that makes an unseekable reading stream seekable.
+
+.Ss "int sfdcslow(Sfio_t* f)"
+This creates a discipline that makes all Sfio operations return immediately
+on interrupts. This is useful for dealing with slow devices.
+
+.Ss "int sfdcsubstream(Sfio_t* f, Sfio_t* parent, Sfoff_t offset, Sfoff_t extent)"
+This creates a discipline that makes \f5f\fP acts as if it
+corresponds exactly to the subsection of \f5parent\fP
+starting at \f5offset\fP with size \f5extent\fP.
+
+.Ss "int sfdctee(Sfio_t* f, Sfio_t* tee)"
+This creates a discipline that copies to the stream \f5tee\fP
+any data written to \f5f\fP.
+
+.Ss "int sfdcunion(Sfio_t* f, Sfio_t** array, int n)"
+This creates a discipline that makes \f5f\fP act as if it is
+the concatenation of the \f5n\fP streams given in \f5array\fP.
+
+.Ss "int sfdclzw(Sfio_t* f)"
+This creates a discipline that would decompress data in \f5f\fP.
+The stream \f5f\fP should have data from a source compressed by
+the Unix \fBcompress\fP program.
+
+.Ss "int sfdcgzip(Sfio_t* f, int opt)"
+This creates a discipline for reading/writing data compressed by zlib.
+The argument \f5opt\fP defines the optimization level.
+
+.PP
+.Ss "STDIO-COMPATIBILITY"
+.PP
+Sfio provides compatibility functions for all various popular
+Stdio implementations at source and binary level.
+The source Stdio-compatibility interface
+provides the header file \f5stdio.h\fP that defines
+a set of macros or inlined functions to map Stdio calls to Sfio ones.
+This mapping may benignly extend or change the meaning of certain
+original Stdio operations. For example, the Sfio's version of
+\f5popen()\fP allows a coprocess to be opened for both reading and writing
+unlike the original call which only allows a coprocess to be opened for a single mode.
+Similarly, the Sfio's \f5fopen()\fP call can be used to create
+string streams in addition to file streams.
+.PP
+The standard streams \f5stdin\fP, \f5stdout\fP and \f5stderr\fP
+are mapped via \f5#define\fP to \f5sfstdin\fP, \f5sfstdout\fP and \f5sfstderr\fP.
+The latter are typically declared of the type \f5Sfio_t*\fP.
+Certain older Stdio applications require these to be declared
+as addresses of structures so that static initializations of
+the sort ``\f5FILE*\ f\ =\ stdin;\fP'' would work.
+Such applications should use the compile time flag \f5SF_FILE_STRUCT\fP
+to achieve the desired effect.
+.PP
+The binary Stdio-compatibility libraries, \f5libstdio.a\fP and \f5libstdio-mt.a\fP,
+provide complete implementations of Stdio functions suitable
+for linking applications already compiled with native header \f5stdio.h\fP.
+These functions are also slightly altered or extended
+as discussed above.
+.PP
+Below are the supported Stdio functions:
+.PP
+.nf
+.ft 5
+FILE*  fopen(const char* file, const char* mode);
+FILE*  freopen(const char* file, const char* mode, FILE* stream);
+FILE*  fdopen(int filedesc, const char* mode);
+FILE*  popen(const char* command, const char* mode);
+FILE*  tmpfile();
+int    fclose(FILE* stream);
+int    pclose(FILE* stream);
+
+void   flockfile(FILE* stream)
+int    ftrylockfile(FILE* stream)
+void   funlockfile(FILE* stream)
+
+void   setbuf(FILE* stream, char* buf);
+int    setvbuf(FILE* stream, char* buf, int mode, size_t size);
+void   setbuffer(FILE* stream, char* buf, size_t size);
+int    setlinebuf(FILE* stream);
+int    fflush(FILE* stream);
+int    fpurge(FILE* stream);
+
+int    fseek(FILE* stream, long offset, int whence);
+void   rewind(FILE* stream);
+int    fgetpos(FILE* stream, fpos_t* pos);
+int    fsetpos(FILE* stream, fpos_t* pos);
+long   ftell(FILE* stream);
+
+int    getc(FILE* stream);
+int    fgetc(FILE* stream);
+int    getchar(void);
+int    ungetc(int c, FILE* stream);
+int    getw(FILE* stream);
+char*  gets(char* s);
+char*  fgets(char* s, int n, FILE* stream);
+size_t fread(Void_t* ptr, size_t size, size_t nelt, FILE* stream);
+
+int    putc(int c, FILE* stream);
+int    fputc(int c, FILE* stream);
+int    putchar(int c);
+int    putw(int w, FILE* stream);
+int    puts(const char* s, FILE* stream);
+int    fputs(const char* s, FILE* stream);
+size_t fwrite(const Void_t* ptr, size_t size, size_t nelt, FILE* stream);
+
+int    fscanf(FILE* stream, const char* format, ...);
+int    vfscanf(FILE* stream, const char* format, va_list args);
+int    _doscan(FILE* stream, const char* format, va_list args);
+int    scanf(const char* format, ...);
+int    vscanf(const char* format, va_list args);
+int    sscanf(const char* s, const char* format, ...);
+int    vsscanf(const char* s, const char* format, va_list args);
+
+int    fprintf(FILE* stream, const char* format, ...);
+int    vfprintf(FILE* stream, const char* format, va_list args);
+int    _doprnt(FILE* stream, const char* format, va_list args);
+int    printf(const char* format, ...);
+int    vprintf(const char* format, va_list args);
+int    sprintf(const char* s, const char* format, ...);
+int    snprintf(const char* s, int n, const char* format, ...);
+int    vsprintf(const char* s, const char* format, va_list args);
+int    vsnprintf(const char* s, int n, const char* format, va_list args);
+
+int    feof(FILE* stream);
+int    ferror(FILE* stream);
+int    clearerr(FILE* stream);
+.ft 1
+.fi
+
+.PP
+.Ss "RECENT CHANGES"
+.PP
+A few exception types have been added. In particular, exception handlers shall
+be raised with \f5SF_LOCKED\fP on accessing a stream frozen either by
+an ongoing operation or a previous operation (e.g., \f5sfgetr()\fP).
+Before a process exits, the event \f5SF_ATEXIT\fP is raised for each open stream.
+.PP
+A number of disciplines were added for various processing functions.
+Of interests are disciplines to use the direct I/O feature on IRIX6.2,
+read DOS text files, and decompress files compressed by Unix \fIcompress\fP.
+.PP
+Various new stream and function flags have been added. For example,
+the third argument of \f5sfgetr()\fP is now a set of bit flags and not
+just a three-value object. However, the old semantics of this argument
+of \f5sfgetr()\fP is still supported.
+.PP
+The \f5sfopen()\fP call has been extended so that sfopen(f,NULL,mode) can be
+used to changed the mode of a file stream before any I/O operations.
+This is most useful for changing the modes of the standard streams.
+.PP
+The buffering strategy has been significantly enhanced for streams
+that perform many seek operations. Also, the handling of stream and
+file positions have been better clarified so that applications that
+share file descriptors across streams and/or processes can be sure that
+the file states will be consistent.
+.PP
+The strategy for mapping between Sfio and Stdio streams in the binary
+compatibility package has been significantly enhanced for efficiency.
+For most platforms, the mapping is now constant time per look-up.
+.PP
+The \f5SF_BUFCONST\fP flag was deleted. This is largely unused anyway.
+.PP
+The library can be built for thread-safety. This is based largely on
+Posix pthread mutexes except for on UWIN where native Windows APIs
+are used.
+.PP
+The functions \f5sfgetm()\fP and \f5sfputm()\fP were added to encode
+unsigned integer values with known ranges.
+.PP
+The flag \f5SF_APPEND\fP is identical to \f5SF_APPENDWR\fP.
+However it conflicts with a different token of the same name
+defined in the system header \f5stat.h\fP of BSDI Unix systems.
+On such systems, we shall not define \f5SF_APPEND\fP and this
+symbol may be removed in a future release.
+.PP
+Similarly, the exception \f5SF_CLOSE\fP is identical to \f5SF_CLOSING\fP.
+However it conflicts with a different token of the same name
+defined in the system header \f5socket.h\fP of AIX Unix systems.
+On such systems, we shall not define \f5SF_CLOSE\fP and this
+symbol may be removed in a future release.
+.PP
+The printing and scanning functions were extended to handle multibyte characters
+and to conform to the C99 standard.
+.PP
+The function \f5sfpoll()\fP was rehauled to make it useful
+for writing servers that must commnunicate with multiple streams
+without blocking.
+.PP
+The formatting pattern \f5%c\fP for \f5sf*printf\fP was extended
+to allow the flag \f5#\fP to print unprintable character values
+using the C convention. For example, \f5%#c\fP prints the octal value 012
+as \f5\\n\fP.
+
+.SH AUTHORS
+Kiem-Phong Vo, kpv@research.att.com,
+.br
+David G. Korn, dgk@research.att.com, and
+.br
+Glenn S. Fowler, gsf@research.att.com.

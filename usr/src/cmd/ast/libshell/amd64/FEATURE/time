@@ -1,0 +1,23 @@
+/* : : generated from contrib/ast/src/cmd/ksh93/features/time by iffe version 2012-07-17 : : */
+#ifndef _def_time_ksh93
+#define _def_time_ksh93	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#define _hdr_utime	1	/* #include <utime.h> ok */
+#define _lib_gettimeofday	1	/* gettimeofday() in default lib(s) */
+#define _lib_setitimer	1	/* setitimer() in default lib(s) */
+#define _sys_time	1	/* #include <sys/time.h> ok */
+#define _mem_tv_usec_timeval	1	/* tv_usec is a member of struct timeval */
+#define _lib_2_timeofday	1	/* 2 arg gettimeofday() */
+#undef _def_time
+#include	<times.h>
+#define _def_time	1
+#undef timeofday
+#if _lib_2_timeofday
+#define timeofday(p)	gettimeofday(p,(struct timezone*)0)
+#else
+#if _lib_1_timeofday
+#define timeofday(p)	gettimeofday(p)
+#endif
+#endif
+
+#endif

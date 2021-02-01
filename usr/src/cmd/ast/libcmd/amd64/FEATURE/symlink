@@ -1,0 +1,6 @@
+/* : : generated from contrib/ast/src/lib/libcmd/features/symlink by iffe version 2012-07-17 : : */
+#ifndef _def_symlink_cmd
+#define _def_symlink_cmd	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#define _lib_lchown	1	/* lchown implemented */
+#endif

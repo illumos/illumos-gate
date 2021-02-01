@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef	_LIBMLRPC_H
@@ -117,6 +117,7 @@ extern "C" {
 /* Fake PTYPE DRC discriminators */
 #define	NDR_DRC_PTYPE_RPCHDR(DRC)		((DRC) | 0x00FF)
 #define	NDR_DRC_PTYPE_API(DRC)			((DRC) | 0x00AA)
+#define	NDR_DRC_PTYPE_SEC(DRC)			((DRC) | 0x00CC)
 
 /* DRC Recognizers */
 #define	NDR_DRC_IS_OK(DRC)	(((DRC) & NDR_DRC_MASK_SPECIFIER) == 0)
@@ -154,6 +155,10 @@ extern "C" {
 #define	NDR_DRC_FAULT_PARAM_2_UNIMPLEMENTED	0xD200
 #define	NDR_DRC_FAULT_PARAM_3_INVALID		0xC300
 #define	NDR_DRC_FAULT_PARAM_3_UNIMPLEMENTED	0xD300
+#define	NDR_DRC_FAULT_PARAM_4_INVALID		0xC400
+#define	NDR_DRC_FAULT_PARAM_4_UNIMPLEMENTED	0xD400
+#define	NDR_DRC_FAULT_PARAM_5_INVALID		0xC500
+#define	NDR_DRC_FAULT_PARAM_5_UNIMPLEMENTED	0xD500
 
 #define	NDR_DRC_FAULT_OUT_OF_MEMORY		0xF000
 
@@ -178,6 +183,32 @@ extern "C" {
 #define	NDR_DRC_FAULT_API_SERVICE_INVALID	0xC0AA	/* PARAM_0_INVALID */
 #define	NDR_DRC_FAULT_API_BIND_NO_SLOTS		0x91AA	/* RESOURCE_1 */
 #define	NDR_DRC_FAULT_API_OPNUM_INVALID		0xC1AA	/* PARAM_1_INVALID */
+
+/* Secure RPC and SSPs */
+#define	NDR_DRC_FAULT_SEC_TYPE_UNIMPLEMENTED	\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_PARAM_0_UNIMPLEMENTED)
+#define	NDR_DRC_FAULT_SEC_LEVEL_UNIMPLEMENTED	\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_PARAM_1_UNIMPLEMENTED)
+#define	NDR_DRC_FAULT_SEC_SSP_FAILED		\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_RESOURCE_1)
+#define	NDR_DRC_FAULT_SEC_ENCODE_TOO_BIG	\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_ENCODE_TOO_BIG)
+#define	NDR_DRC_FAULT_SEC_AUTH_LENGTH_INVALID	\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_PARAM_2_INVALID)
+#define	NDR_DRC_FAULT_SEC_AUTH_TYPE_INVALID	\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_PARAM_0_INVALID)
+#define	NDR_DRC_FAULT_SEC_AUTH_LEVEL_INVALID	\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_PARAM_1_INVALID)
+#define	NDR_DRC_FAULT_SEC_OUT_OF_MEMORY		\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_OUT_OF_MEMORY)
+#define	NDR_DRC_FAULT_SEC_ENCODE_FAILED		\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_ENCODE_FAILED)
+#define	NDR_DRC_FAULT_SEC_META_INVALID		\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_PARAM_3_INVALID)
+#define	NDR_DRC_FAULT_SEC_SEQNUM_INVALID	\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_PARAM_4_INVALID)
+#define	NDR_DRC_FAULT_SEC_SIG_INVALID		\
+    NDR_DRC_PTYPE_SEC(NDR_DRC_FAULT_PARAM_5_INVALID)
 
 struct ndr_xa;
 struct ndr_client;
@@ -224,12 +255,12 @@ typedef struct ndr_service {
  *		    conn->binding_pool, N_BINDING_POOL);
  */
 typedef struct ndr_binding {
-	struct ndr_binding 	*next;
+	struct ndr_binding	*next;
 	ndr_p_context_id_t	p_cont_id;
 	unsigned char		which_side;
 	struct ndr_client	*clnt;
 	ndr_service_t		*service;
-	void 			*instance_specific;
+	void			*instance_specific;
 } ndr_binding_t;
 
 #define	NDR_BIND_SIDE_CLIENT	1
@@ -422,13 +453,38 @@ typedef struct ndr_xa {
 	unsigned short		opnum;
 	ndr_stream_t		recv_nds;
 	ndr_hdr_t		recv_hdr;
+	ndr_sec_t		recv_auth;
 	ndr_stream_t		send_nds;
 	ndr_hdr_t		send_hdr;
+	ndr_sec_t		send_auth;
 	ndr_binding_t		*binding;	/* what we're using */
 	ndr_binding_t		*binding_list;	/* from connection */
 	ndr_heap_t		*heap;
 	ndr_pipe_t		*pipe;
 } ndr_xa_t;
+
+typedef struct ndr_auth_ops {
+	int (*nao_init)(void *, ndr_xa_t *);
+	int (*nao_recv)(void *, ndr_xa_t *);
+	int (*nao_sign)(void *, ndr_xa_t *);
+	int (*nao_verify)(void *, ndr_xa_t *, boolean_t);
+} ndr_auth_ops_t;
+
+/*
+ * A client provides this structure during bind to indicate
+ * that the RPC runtime should use "Secure RPC" (RPC-level auth).
+ *
+ * Currently, only NETLOGON uses this, and only NETLOGON-based
+ * Integrity protection is supported.
+ */
+typedef struct ndr_auth_ctx {
+	ndr_auth_ops_t		auth_ops;
+	void			*auth_ctx; /* SSP-specific context */
+	uint32_t		auth_context_id;
+	uint8_t			auth_type;
+	uint8_t			auth_level;
+	boolean_t		auth_verify_resp;
+} ndr_auth_ctx_t;
 
 /*
  * 20-byte opaque id used by various RPC services.
@@ -459,6 +515,8 @@ typedef struct ndr_client {
 
 	uint32_t		next_call_id;
 	unsigned		next_p_cont_id;
+
+	ndr_auth_ctx_t		auth_ctx;
 } ndr_client_t;
 
 typedef struct ndr_handle {
@@ -507,6 +565,19 @@ void ndr_remove_frag_hdr(ndr_stream_t *);
 void ndr_show_hdr(ndr_common_header_t *);
 unsigned ndr_bind_ack_hdr_size(ndr_xa_t *);
 unsigned ndr_alter_context_rsp_hdr_size(void);
+int ndr_decode_pdu_auth(ndr_xa_t *);
+int ndr_encode_pdu_auth(ndr_xa_t *);
+void ndr_show_auth(ndr_sec_t *);
+
+/*
+ * MS-RPCE "Secure RPC" (RPC-level auth).
+ * These call the functions in ndr_auth_ops_t, which should be
+ * GSSAPI (or equivalent) calls.
+ */
+int ndr_add_sec_context(ndr_auth_ctx_t *, ndr_xa_t *);
+int ndr_recv_sec_context(ndr_auth_ctx_t *, ndr_xa_t *);
+int ndr_add_auth(ndr_auth_ctx_t *, ndr_xa_t *);
+int ndr_check_auth(ndr_auth_ctx_t *, ndr_xa_t *);
 
 /* ndr_server.c */
 void ndr_pipe_worker(ndr_pipe_t *);
@@ -542,7 +613,10 @@ ssize_t ndr_uiomove(caddr_t, size_t, enum uio_rw, struct uio *);
  * level (bind) handle is released, we close the connection.
  *
  * There are some places in libmlsvc where the code assumes that the
- * handle member is first in this struct.  careful
+ * handle member is first in this struct. Careful!
+ *
+ * Note that this entire structure is bzero()'d once the ndr_client_t
+ * has been created.
  */
 typedef struct mlrpc_handle {
 	ndr_hdid_t	handle;		/* keep first */
@@ -550,6 +624,7 @@ typedef struct mlrpc_handle {
 } mlrpc_handle_t;
 
 int mlrpc_clh_create(mlrpc_handle_t *, void *);
+uint32_t mlrpc_clh_set_auth(mlrpc_handle_t *, ndr_auth_ctx_t *);
 uint32_t mlrpc_clh_bind(mlrpc_handle_t *, ndr_service_t *);
 void mlrpc_clh_unbind(mlrpc_handle_t *);
 void *mlrpc_clh_free(mlrpc_handle_t *);

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -46,7 +46,7 @@
 #include <smbsrv/smb_token.h>
 #include <mlsvc.h>
 
-static uint32_t netlogon_logon(smb_logon_t *, smb_token_t *, smb_domainex_t *);
+uint32_t netlogon_logon(smb_logon_t *, smb_token_t *, smb_domainex_t *);
 static uint32_t netr_server_samlogon(mlsvc_handle_t *, netr_info_t *, char *,
     smb_logon_t *, smb_token_t *);
 static void netr_invalidate_chain(void);
@@ -243,6 +243,56 @@ out:
 	user_info->lg_status = status;
 }
 
+static uint32_t
+netr_get_handle(char *server, char *domain, mlsvc_handle_t *netr_handle)
+{
+	uint32_t status;
+	boolean_t did_renego = B_FALSE;
+
+reauth:
+	if ((netr_global_info.flags & NETR_FLG_VALID) == 0 ||
+	    !smb_match_netlogon_seqnum()) {
+		/*
+		 * This does netr_server_req_challenge() and
+		 * netr_server_authenticate2(), updating the
+		 * current netlogon sequence number.
+		 */
+		status = netlogon_auth(server, domain, NETR_FLG_NULL);
+
+		if (status != 0) {
+			syslog(LOG_ERR, "%s: auth failed (%s)",
+			    __func__, xlate_nt_status(status));
+			return (status);
+		}
+
+		netr_global_info.flags |= NETR_FLG_VALID;
+	}
+
+	/*
+	 * This netr_open_secure call does the work to connect to the DC,
+	 * get the IPC share, open the named pipe, RPC bind, etc.
+	 */
+	status = netr_open_secure(server, domain, netr_handle);
+	if (status != 0) {
+		/*
+		 * This may have failed because the DC restarted.
+		 * Re-negotiate once.
+		 */
+		if (!did_renego) {
+			did_renego = B_TRUE;
+			netr_invalidate_chain();
+			syslog(LOG_ERR, "%s: open failed (%s); "
+			    "renegotiating...",
+			    __func__, xlate_nt_status(status));
+			goto reauth;
+		}
+		syslog(LOG_ERR, "%s: open failed (%s)",
+		    __func__, xlate_nt_status(status));
+	}
+
+	return (status);
+}
+
 /*
  * Run a netr_server_samlogon call, dealing with the possible need to
  * re-establish the NetLogon credential chain.  If that fails, return
@@ -251,25 +301,13 @@ out:
  * netr_server_samlogon() call including the many possibilities listed
  * above that function.
  */
-static uint32_t
+uint32_t
 netlogon_logon(smb_logon_t *user_info, smb_token_t *token, smb_domainex_t *di)
 {
 	char server[MAXHOSTNAMELEN];
 	mlsvc_handle_t netr_handle;
 	uint32_t status;
 	boolean_t did_reauth = B_FALSE;
-
-	/*
-	 * This netr_open call does the work to connect to the DC,
-	 * get the IPC share, open the named pipe, RPC bind, etc.
-	 */
-	status = netr_open(di->d_dci.dc_name, di->d_primary.di_nbname,
-	    &netr_handle);
-	if (status != 0) {
-		syslog(LOG_ERR, "netlogon remote open failed (%s)",
-		    xlate_nt_status(status));
-		return (status);
-	}
 
 	if (di->d_dci.dc_name[0] != '\0' &&
 	    (*netr_global_info.server != '\0')) {
@@ -281,24 +319,13 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token, smb_domainex_t *di)
 	}
 
 reauth:
-	if ((netr_global_info.flags & NETR_FLG_VALID) == 0 ||
-	    !smb_match_netlogon_seqnum()) {
-		/*
-		 * This does netr_server_req_challenge() and
-		 * netr_server_authenticate2(), updating the
-		 * current netlogon sequence number.
-		 */
-		status = netlogon_auth(di->d_dci.dc_name, &netr_handle,
-		    NETR_FLG_NULL);
+	status = netr_get_handle(di->d_dci.dc_name,
+	    di->d_primary.di_nbname, &netr_handle);
 
-		if (status != 0) {
-			syslog(LOG_ERR, "netlogon remote auth failed (%s)",
-			    xlate_nt_status(status));
-			(void) netr_close(&netr_handle);
-			return (NT_STATUS_DOMAIN_TRUST_INCONSISTENT);
-		}
-
-		netr_global_info.flags |= NETR_FLG_VALID;
+	if (status != 0) {
+		syslog(LOG_ERR, "%s: failed to get handle (%s)",
+		    __func__, xlate_nt_status(status));
+		return (NT_STATUS_DOMAIN_TRUST_INCONSISTENT);
 	}
 
 	status = netr_server_samlogon(&netr_handle,
@@ -307,6 +334,7 @@ reauth:
 	if (status == NT_STATUS_INSUFFICIENT_LOGON_INFO) {
 		if (!did_reauth) {
 			/* Call netlogon_auth() again, just once. */
+			(void) netr_close(&netr_handle);
 			did_reauth = B_TRUE;
 			goto reauth;
 		}
@@ -339,38 +367,16 @@ smb_netlogon_check(char *server, char *domain)
 	(void) mutex_unlock(&netlogon_mutex);
 
 	/*
-	 * This section like netlogon_logon(), but only does
-	 * one pass and no netr_server_samlogon call.
+	 * Like netlogon_logon(), but no netr_server_samlogon call.
+	 * We're just making sure we can connect to the NETLOGON server.
 	 */
+	status = netr_get_handle(server, domain, &netr_handle);
+	if (status == 0)
+		(void) netr_close(&netr_handle);
+	else
+		syslog(LOG_ERR, "%s: failed to get handle (%s)",
+		    __func__, xlate_nt_status(status));
 
-	status = netr_open(server, domain,
-	    &netr_handle);
-	if (status != 0) {
-		syslog(LOG_ERR, "netlogon remote open failed (%s)",
-		    xlate_nt_status(status));
-		goto unlock_out;
-	}
-
-	if ((netr_global_info.flags & NETR_FLG_VALID) == 0 ||
-	    !smb_match_netlogon_seqnum()) {
-		/*
-		 * This does netr_server_req_challenge() and
-		 * netr_server_authenticate2(), updating the
-		 * current netlogon sequence number.
-		 */
-		status = netlogon_auth(server, &netr_handle,
-		    NETR_FLG_NULL);
-		if (status != 0) {
-			syslog(LOG_ERR, "netlogon remote auth failed (%s)",
-			    xlate_nt_status(status));
-		} else {
-			netr_global_info.flags |= NETR_FLG_VALID;
-		}
-	}
-
-	(void) netr_close(&netr_handle);
-
-unlock_out:
 	(void) mutex_lock(&netlogon_mutex);
 	netlogon_busy = B_FALSE;
 	(void) cond_signal(&netlogon_cv);
@@ -477,34 +483,36 @@ uint32_t
 netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
     char *server, smb_logon_t *user_info, smb_token_t *token)
 {
-	struct netr_SamLogon arg;
+	struct netr_SamLogon logon_op;
+	struct netr_SamLogonEx logon_ex_op;
 	struct netr_authenticator auth;
 	struct netr_authenticator ret_auth;
 	struct netr_logon_info1 info1;
 	struct netr_logon_info2 info2;
 	struct netr_validation_info3 *info3;
+	union netr_validation_u *valid_info;
+	union netr_logon_info_u *logon_info;
+	LPTSTR servername, hostname;
 	ndr_heap_t *heap;
 	int opnum;
 	int rc, len;
-	uint32_t status;
-
-	bzero(&arg, sizeof (struct netr_SamLogon));
-	opnum = NETR_OPNUM_SamLogon;
+	uint32_t status, *rpc_status;
+	void *rpc_arg;
 
 	/*
 	 * Should we get the server and hostname from netr_info?
 	 */
 
 	len = strlen(server) + 4;
-	arg.servername = ndr_rpc_malloc(netr_handle, len);
-	arg.hostname = ndr_rpc_malloc(netr_handle, NETBIOS_NAME_SZ);
-	if (arg.servername == NULL || arg.hostname == NULL) {
+	servername = ndr_rpc_malloc(netr_handle, len);
+	hostname = ndr_rpc_malloc(netr_handle, NETBIOS_NAME_SZ);
+	if (servername == NULL || hostname == NULL) {
 		ndr_rpc_release(netr_handle);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
-	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
-	if (smb_getnetbiosname((char *)arg.hostname, NETBIOS_NAME_SZ) != 0) {
+	(void) snprintf((char *)servername, len, "\\\\%s", server);
+	if (smb_getnetbiosname((char *)hostname, NETBIOS_NAME_SZ) != 0) {
 		ndr_rpc_release(netr_handle);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
@@ -515,19 +523,49 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
-	arg.auth = &auth;
-	arg.ret_auth = &ret_auth;
-	arg.validation_level = NETR_VALIDATION_LEVEL3;
-	arg.logon_info.logon_level = user_info->lg_level;
-	arg.logon_info.switch_value = user_info->lg_level;
-
+	/*
+	 * If we use Secure RPC, we can use SamLogonEx instead of SamLogon.
+	 * SamLogonEx doesn't use NetLogon authenticators, instead relying
+	 * on Secure RPC to provide security.
+	 * This allows us to avoid being bitten by mitigations in
+	 * the authenticator verification logic on DCs.
+	 */
+	if (netr_info->use_logon_ex &&
+	    (netr_info->nego_flags & NETR_NEGO_SECURE_RPC_FLAG) != 0) {
+		bzero(&logon_ex_op, sizeof (struct netr_SamLogonEx));
+		logon_ex_op.servername = servername;
+		logon_ex_op.hostname = hostname;
+		logon_ex_op.logon_info.logon_level = user_info->lg_level;
+		logon_ex_op.logon_info.switch_value = user_info->lg_level;
+		logon_ex_op.validation_level = NETR_VALIDATION_LEVEL3;
+		logon_ex_op.extra_flags = 0;
+		logon_info = &logon_ex_op.logon_info.ru;
+		valid_info = &logon_ex_op.ru;
+		rpc_status = &logon_ex_op.status;
+		rpc_arg = &logon_ex_op;
+		opnum = NETR_OPNUM_SamLogonEx;
+	} else {
+		bzero(&logon_op, sizeof (struct netr_SamLogon));
+		logon_op.servername = servername;
+		logon_op.hostname = hostname;
+		logon_op.auth = &auth;
+		logon_op.ret_auth = &ret_auth;
+		logon_op.logon_info.logon_level = user_info->lg_level;
+		logon_op.logon_info.switch_value = user_info->lg_level;
+		logon_op.validation_level = NETR_VALIDATION_LEVEL3;
+		logon_info = &logon_op.logon_info.ru;
+		valid_info = &logon_op.ru;
+		rpc_status = &logon_op.status;
+		rpc_arg = &logon_op;
+		opnum = NETR_OPNUM_SamLogon;
+	}
 	heap = ndr_rpc_get_heap(netr_handle);
 
 	switch (user_info->lg_level) {
 	case NETR_INTERACTIVE_LOGON:
 		netr_setup_identity(heap, user_info, &info1.identity);
 		netr_interactive_samlogon(netr_info, user_info, &info1);
-		arg.logon_info.ru.info1 = &info1;
+		logon_info->info1 = &info1;
 		break;
 
 	case NETR_NETWORK_LOGON:
@@ -538,7 +576,7 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 		}
 		netr_setup_identity(heap, user_info, &info2.identity);
 		netr_network_samlogon(heap, netr_info, user_info, &info2);
-		arg.logon_info.ru.info2 = &info2;
+		logon_info->info2 = &info2;
 		break;
 
 	default:
@@ -546,12 +584,12 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
-	rc = ndr_rpc_call(netr_handle, opnum, &arg);
+	rc = ndr_rpc_call(netr_handle, opnum, rpc_arg);
 	if (rc != 0) {
 		bzero(netr_info, sizeof (netr_info_t));
 		status = NT_STATUS_INVALID_PARAMETER;
-	} else if (arg.status != 0) {
-		status = NT_SC_VALUE(arg.status);
+	} else if (*rpc_status != 0) {
+		status = NT_SC_VALUE(*rpc_status);
 
 		/*
 		 * We need to validate the chain even though we have
@@ -559,16 +597,23 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 		 * this will trigger a new credential chain. However,
 		 * a valid credential is returned with some status
 		 * codes; for example, WRONG_PASSWORD.
+		 *
+		 * SamLogonEx doesn't use authenticators - nothing to validate.
 		 */
-		(void) netr_validate_chain(netr_info, arg.ret_auth);
+		if (rpc_arg == &logon_op)
+			(void) netr_validate_chain(netr_info,
+			    logon_op.ret_auth);
 	} else {
-		status = netr_validate_chain(netr_info, arg.ret_auth);
-		if (status == NT_STATUS_INSUFFICIENT_LOGON_INFO) {
-			ndr_rpc_release(netr_handle);
-			return (status);
+		if (rpc_arg == &logon_op) {
+			status = netr_validate_chain(netr_info,
+			    logon_op.ret_auth);
+			if (status == NT_STATUS_INSUFFICIENT_LOGON_INFO) {
+				ndr_rpc_release(netr_handle);
+				return (status);
+			}
 		}
 
-		info3 = arg.ru.info3;
+		info3 = valid_info->info3;
 		status = netr_setup_token(info3, user_info, netr_info, token);
 	}
 
@@ -664,16 +709,24 @@ int
 netr_setup_authenticator(netr_info_t *netr_info,
     struct netr_authenticator *auth, struct netr_authenticator *ret_auth)
 {
+	int rc;
 	bzero(auth, sizeof (struct netr_authenticator));
 
-	netr_info->timestamp = time(0);
-	auth->timestamp = netr_info->timestamp;
-
-	if (netr_gen_credentials(netr_info->session_key.key,
-	    &netr_info->client_credential,
-	    netr_info->timestamp,
-	    (netr_cred_t *)&auth->credential) != SMBAUTH_SUCCESS)
-		return (SMBAUTH_FAILURE);
+	/*
+	 * Windows DCs will reject Authenticators if none of the first
+	 * 5 bytes of the ClientStoredCredential are unique.
+	 * Keep retrying until we've generated one that satisfies this.
+	 */
+	netr_info->timestamp = time(0) - 1;
+	do {
+		auth->timestamp = ++netr_info->timestamp;
+		rc = netr_gen_credentials(netr_info->session_key.key,
+		    &netr_info->client_credential,
+		    netr_info->timestamp,
+		    (netr_cred_t *)&auth->credential, B_TRUE);
+		if (rc != SMBAUTH_SUCCESS && rc != SMBAUTH_RETRY)
+			return (SMBAUTH_FAILURE);
+	} while (rc == SMBAUTH_RETRY);
 
 	if (ret_auth) {
 		bzero(ret_auth, sizeof (struct netr_authenticator));
@@ -713,7 +766,7 @@ netr_validate_chain(netr_info_t *netr_info, struct netr_authenticator *auth)
 
 	if (netr_gen_credentials(netr_info->session_key.key,
 	    &netr_info->client_credential,
-	    netr_info->timestamp, &cred) != SMBAUTH_SUCCESS)
+	    netr_info->timestamp, &cred, B_FALSE) != SMBAUTH_SUCCESS)
 		return (NT_STATUS_INTERNAL_ERROR);
 
 	if (&auth->credential == 0) {

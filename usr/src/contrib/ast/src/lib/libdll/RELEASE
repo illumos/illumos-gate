@@ -1,0 +1,53 @@
+12-07-25 add debug diagnostics
+11-10-11 dll_lib.c: add { dllnames() dll_lib() }
+10-10-20 dllscan.c: version arg "-" => 0
+10-10-19 dllplug.c: fix bug that wiped out dlopen() error message
+10-10-19 dllplug.c: un-localize lookup names (happens with cut and paste)
+10-10-19 dllscan.c: still no code for implicit libs missed by dlopen()
+10-08-02 dllplug.c: fix local path dllcheck() call
+10-05-28 dllplug.c: add dllplugin() with dllcheck() version check
+10-05-28 dllcheck.c: add dllcheck() to do plugin_version() checks
+10-05-28 dllerror.c: add dllerror(int retain) for dll*() and dl*() messages
+09-11-17 dllscan.c: handle name[-.]version in dlsopen()
+09-04-15 dllopen.c: add, use dllopen() internally to wrap dlopen()
+08-05-12 dllscan.c: LIBSUFFIX==.dylib => default plugin version match 0.0
+06-10-11 dllscan.c: check sfstruse() return values -- doh
+06-01-25 dllplug.c: add errorf() library message for dlopen() error
+05-02-14 dllscan.c: "" || "-" => NiL
+04-10-01 dllfind.c: drop ksh "builtin" workaround
+	 dllscan.c: directory prefix in name limits search to dir and siblings
+04-07-22 dllscan.c: access() => eaccess()
+04-01-30 dllfind.c: dllplug(error_info.id) then dllplug(0)
+04-01-28 dllscan.c: update for new plugin scheme: lib/foo/bar.xxx
+	 dllplug.c: add dllplug() for plugin dllfind()
+03-03-12 dllfind.c: dlopen() with RTLD_GLOBAL|RTLD_PARENT defaults
+03-02-11 dllscan.c: change LIBPATH to <dir>[:<env>[:<pat>]][,...]
+03-01-08 dllscan.c: hack version logic again -- is consistency rocket science?
+03-01-07 dlfcn.c: fix darwin.ppc dlopen/dlsym/dlclose
+02-11-18 dllfind.c: add path,size args (with backwards compatibility checks)
+02-11-15 dllfind.c: check for ./path if '.' in path but no '/'
+02-08-30 dllfind.c: fix a bug that returned uninitialized value on not found
+02-08-28 dllscan.c: handle and display bin as a sibling dir
+02-07-31 dllscan.c: add dllsopen,dllsread,dllsclose
+	 dllfind.c: use dllsopen,dllsread,dllsclose
+02-07-26 dllfind.c: add dllinfo()
+02-06-27 dllnext.c: define _GNU_SOURCE to enable RTLD_NEXT
+02-03-17 dllfind.c: fix dll prefix search (for cygwin)
+02-01-11 features/dll: include <dlfcn.h> only if _hdr_dlfcn&&_lib_dlopen
+01-10-31 dlfcn.c: change hp.pa dlopen() prototype (<dlfcn.h> but no -ldl!)
+01-09-25 dllfind: add LIBSUFFIX
+01-07-17 dllfind: do at least one dlopen() to prime dlerror()
+01-05-29 dlopen: fix dlopen(0,0) for HP
+01-04-20 dllfind: use getconf HOSTTYPE LIBPATH LIBSUFFIX
+01-02-14 features/dll: fix unbalanced ' quote and ancient hostinfo reference
+00-01-26 dlllook: add -- dlsym() with `_' weak prefix fallback
+99-04-01 features/dll: drop <stdio.h> -- iffe protos printf
+99-03-19 static=1 for all but win32.*
+98-06-01 dllfind: fix version search
+98-03-11 features/dll: probe for _DLL_RLD_SYM
+98-03-01 dllnext: fix to work!
+98-01-23 -ldl test moved to lib0ast
+98-01-11 update for astconf("LIBPATH")
+	 add dllnext(flags) to uncover next layer
+	 dllfind() and dllnext() in separate files (for 3d)
+97-10-11 move from libast so libast can link static

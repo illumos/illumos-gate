@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2020 Tintri by DDN, Inc. All rights reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
 
@@ -45,6 +45,7 @@ OBJS_COMMON =		\
 	netdfs.o	\
 	netr_auth.o	\
 	netr_logon.o	\
+	netr_ssp.o	\
 	samlib.o	\
 	samr_clnt.o	\
 	samr_svc.o	\
@@ -85,8 +86,9 @@ INCS += -I$(SRC)/common/smbsrv
 INCS += -I$(SRC)/uts/common/smbsrv/ndl
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS += -lmlrpc -lsmb -lsmbns -lshare -lsmbfs -lnsl -lpkcs11 \
-	-lscf -lcmdutils -lsec -lavl -lnvpair -luutil -luuid -lgen -lzfs -lc
+LDLIBS += -lmlrpc -lsmb -lsmbns -lshare -lsmbfs -lnsl -lpkcs11 -lmd5	 \
+	-lscf -lcmdutils -lsec -lavl -lnvpair -luutil -luuid -lgen -lzfs \
+	-lresolv -lc
 
 CPPFLAGS += $(INCS) -D_REENTRANT
 CPPFLAGS += -Dsyslog=smb_syslog

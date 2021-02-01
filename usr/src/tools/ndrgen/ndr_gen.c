@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ */
+
 #include <string.h>
 #include "ndrgen.h"
 #include "y.tab.h"
@@ -527,6 +531,9 @@ generate_typeinfo_typeinfo(ndr_typeinfo_t *ti, int is_static, char *fname_type)
 	*flags = 0;
 	if (ti->is_conformant)
 		(void) strlcat(flags, "|NDR_F_CONFORMANT", NDLBUFSZ);
+
+	if (ti->advice.a_fake)
+		(void) strlcat(flags, "|NDR_F_FAKE", NDLBUFSZ);
 
 	if (ti->type_op == STRUCT_KW) {
 		if (ti->advice.a_operation)

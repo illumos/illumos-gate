@@ -15,6 +15,7 @@
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  * Copyright 2020 Ryan Zezeski
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -670,7 +671,7 @@ i40e_transceiver_read(void *arg, uint_t id, uint_t page, void *buf,
 		uint32_t val;
 
 		status = i40e_aq_get_phy_register(hw,
-		    I40E_AQ_PHY_REG_ACCESS_EXTERNAL_MODULE, page, offset,
+		    I40E_AQ_PHY_REG_ACCESS_EXTERNAL_MODULE, page, TRUE, offset,
 		    &val, NULL);
 		if (status != I40E_SUCCESS) {
 			mutex_exit(&i40e->i40e_general_lock);
@@ -1057,6 +1058,8 @@ i40e_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	case MAC_PROP_STATUS:
 	case MAC_PROP_ADV_100FDX_CAP:
 	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_ADV_2500FDX_CAP:
+	case MAC_PROP_ADV_5000FDX_CAP:
 	case MAC_PROP_ADV_10GFDX_CAP:
 	case MAC_PROP_ADV_25GFDX_CAP:
 	case MAC_PROP_ADV_40GFDX_CAP:
@@ -1068,6 +1071,8 @@ i40e_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	 */
 	case MAC_PROP_EN_100FDX_CAP:
 	case MAC_PROP_EN_1000FDX_CAP:
+	case MAC_PROP_EN_2500FDX_CAP:
+	case MAC_PROP_EN_5000FDX_CAP:
 	case MAC_PROP_EN_10GFDX_CAP:
 	case MAC_PROP_EN_25GFDX_CAP:
 	case MAC_PROP_EN_40GFDX_CAP:
@@ -1230,6 +1235,24 @@ i40e_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		}
 		u8 = pr_val;
 		*u8 = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_1GB) != 0;
+		break;
+	case MAC_PROP_ADV_2500FDX_CAP:
+	case MAC_PROP_EN_2500FDX_CAP:
+		if (pr_valsize < sizeof (uint8_t)) {
+			ret = EOVERFLOW;
+			break;
+		}
+		u8 = pr_val;
+		*u8 = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_2_5GB) != 0;
+		break;
+	case MAC_PROP_ADV_5000FDX_CAP:
+	case MAC_PROP_EN_5000FDX_CAP:
+		if (pr_valsize < sizeof (uint8_t)) {
+			ret = EOVERFLOW;
+			break;
+		}
+		u8 = pr_val;
+		*u8 = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_5GB) != 0;
 		break;
 	case MAC_PROP_ADV_10GFDX_CAP:
 	case MAC_PROP_EN_10GFDX_CAP:
