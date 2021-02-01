@@ -397,6 +397,10 @@ usr/lib/libidspace.so
 usr/lib/amd64/libidspace.so		i386
 usr/include/libidspace.h
 #
+# VXLAN
+#
+usr/include/sys/vxlan.h
+#
 # Private interfaces in libsec
 #
 usr/include/aclutils.h

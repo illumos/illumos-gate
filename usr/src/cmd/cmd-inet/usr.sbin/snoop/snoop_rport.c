@@ -21,6 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -76,6 +77,7 @@ static const struct porttable pt_udp[] = {
 	{ 560,			"RMONITOR" },
 	{ 561,			"MONITOR" },
 	{ IPPORT_SOCKS,		"SOCKS" },
+	{ IPPORT_VXLAN,		"VXLAN" },
 	{ 0,			NULL }
 };
 
@@ -424,6 +426,9 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 			else
 				(void) interpret_socks_reply(flags, data,
 				    dlen);
+			return (1);
+		case IPPORT_VXLAN:
+			(void) interpret_vxlan(flags, data, dlen);
 			return (1);
 		}
 	}

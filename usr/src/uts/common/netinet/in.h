@@ -226,6 +226,7 @@ typedef	uint16_t	sa_family_t;
 #define	IPPORT_SLP		427
 #define	IPPORT_MIP		434
 #define	IPPORT_SMB		445		/* a.k.a. microsoft-ds */
+#define	IPPORT_VXLAN		4789
 
 /*
  * Internet Key Exchange (IKE) ports

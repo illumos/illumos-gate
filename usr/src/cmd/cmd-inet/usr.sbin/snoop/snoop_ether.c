@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -54,8 +55,9 @@
 
 static headerlen_fn_t ether_header_len, fddi_header_len, tr_header_len,
     ib_header_len, ipnet_header_len, ipv4_header_len, ipv6_header_len;
-static interpreter_fn_t interpret_ether, interpret_fddi, interpret_tr,
+static interpreter_fn_t interpret_fddi, interpret_tr,
     interpret_ib, interpret_ipnet, interpret_iptun;
+interpreter_fn_t interpret_ether;
 static void addr_copy_swap(struct ether_addr *, struct ether_addr *);
 static int tr_machdr_len(char *, int *, int *);
 
@@ -1129,8 +1131,8 @@ interpret_fddi(int flags, caddr_t e, int elen, int origlen)
 	if (is_snap)
 		ethertype = ntohs(f->type);
 	else {
-		src_name = 	print_etherinfo(&f->shost);
-		dst_name =  print_etherinfo(&f->dhost);
+		src_name = print_etherinfo(&f->shost);
+		dst_name = print_etherinfo(&f->dhost);
 	}
 
 	/*
