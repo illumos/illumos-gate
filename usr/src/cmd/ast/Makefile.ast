@@ -157,7 +157,8 @@ ASTCFLAGS64= $(CCVERBOSE)
 #
 # They have trailing whitespace, which is removed.
 
-POST_PROCESS_AST = $(SED) -i ' \
+# XXX WORKAROUND - add "" to the -i because SmartOS backed out illumos#586
+POST_PROCESS_AST = $(SED) -i "" ' \
 	s^$(SRC)/^^g; \
 	s/  *$$//; \
 	/def.* _def_.*_$(MACH64)/s/$(MACH64)/$(HDRGUARD)/; \

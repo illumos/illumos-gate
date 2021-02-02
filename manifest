@@ -1968,9 +1968,15 @@ d platform/i86pc/kernel/pcbe/amd64 0755 root sys
 f platform/i86pc/kernel/pcbe/amd64/pcbe.AuthenticAMD 0755 root sys
 f platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.15 0755 root sys
 s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.122=pcbe.GenuineIntel.6.15
+s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.126=pcbe.GenuineIntel.6.15
+s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.134=pcbe.GenuineIntel.6.15
+s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.140=pcbe.GenuineIntel.6.15
+s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.141=pcbe.GenuineIntel.6.15
 s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.142=pcbe.GenuineIntel.6.15
 f platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.15 0755 root sys
 s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.158=pcbe.GenuineIntel.6.15
+s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.165=pcbe.GenuineIntel.6.15
+s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.166=pcbe.GenuineIntel.6.15
 s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.23=pcbe.GenuineIntel.6.15
 s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.26=pcbe.GenuineIntel.6.15
 s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.28=pcbe.GenuineIntel.6.15
@@ -3023,7 +3029,9 @@ f usr/include/asm/thread.h 0644 root bin
 f usr/include/assert.h 0644 root bin
 d usr/include/ast 0755 root bin
 f usr/include/ast/align.h 0644 root bin
+f usr/include/ast/aso.h 0644 root bin
 f usr/include/ast/ast.h 0644 root bin
+f usr/include/ast/ast_api.h 0644 root bin
 f usr/include/ast/ast_botch.h 0644 root bin
 f usr/include/ast/ast_ccode.h 0644 root bin
 f usr/include/ast/ast_common.h 0644 root bin
@@ -3043,21 +3051,24 @@ f usr/include/ast/ast_namval.h 0644 root bin
 f usr/include/ast/ast_ndbm.h 0644 root bin
 f usr/include/ast/ast_nl_types.h 0644 root bin
 f usr/include/ast/ast_param.h 0644 root bin
+f usr/include/ast/ast_sizeof.h 0644 root bin
 f usr/include/ast/ast_standards.h 0644 root bin
 f usr/include/ast/ast_std.h 0644 root bin
 f usr/include/ast/ast_stdio.h 0644 root bin
 f usr/include/ast/ast_sys.h 0644 root bin
 f usr/include/ast/ast_time.h 0644 root bin
 f usr/include/ast/ast_tty.h 0644 root bin
-f usr/include/ast/ast_version.h 0644 root bin
 f usr/include/ast/ast_vfork.h 0644 root bin
 f usr/include/ast/ast_wait.h 0644 root bin
 f usr/include/ast/ast_wchar.h 0644 root bin
+f usr/include/ast/ast_wctype.h 0644 root bin
 f usr/include/ast/ast_windows.h 0644 root bin
 f usr/include/ast/bytesex.h 0644 root bin
 f usr/include/ast/ccode.h 0644 root bin
 f usr/include/ast/cdt.h 0644 root bin
+f usr/include/ast/cdtlib.h 0644 root bin
 f usr/include/ast/cmd.h 0644 root bin
+f usr/include/ast/cmdarg.h 0644 root bin
 f usr/include/ast/cmdext.h 0644 root bin
 f usr/include/ast/debug.h 0644 root bin
 f usr/include/ast/dirent.h 0644 root bin
@@ -3127,6 +3138,7 @@ f usr/include/ast/vecargs.h 0644 root bin
 f usr/include/ast/vmalloc.h 0644 root bin
 f usr/include/ast/wait.h 0644 root bin
 f usr/include/ast/wchar.h 0644 root bin
+f usr/include/ast/wctype.h 0644 root bin
 f usr/include/ast/wordexp.h 0644 root bin
 f usr/include/atomic.h 0644 root bin
 f usr/include/attr.h 0644 root bin
@@ -14754,6 +14766,7 @@ f usr/share/man/man3cpc/glm_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/glp_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/hsw_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/hsx_events.3cpc 0444 root bin
+f usr/share/man/man3cpc/icl_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/ivb_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/ivt_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/jkt_events.3cpc 0444 root bin
@@ -14768,6 +14781,8 @@ f usr/share/man/man3cpc/skl_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/skx_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/slm_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/snb_events.3cpc 0444 root bin
+f usr/share/man/man3cpc/snr_events.3cpc 0444 root bin
+f usr/share/man/man3cpc/tgl_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/wsm_ep_dp_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/wsm_ep_sp_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/wsm_ex_events.3cpc 0444 root bin

@@ -49,8 +49,8 @@ MSGLIBNAME= $(ASTLIB)
 ASTMSGCATALOG= $(ROOT)/usr/lib/locale/C/LC_MESSAGES/$(MSGLIBNAME)
 
 $(DO_BUILD_AST_CATALOGS)ASTMSGCC= \
-	PATH="/usr/ast/bin/:/bin:/usr/bin" \
-		/usr/bin/ksh93 /usr/ast/bin/msgcc >>msgcc.out 2>&1
+	PATH="$(ASTBINDIR):/bin:/usr/bin" \
+		/usr/bin/ksh93 $(MSGCC) >>msgcc.out 2>&1
 
 ASTMSGS=  $(LIBOBJS:%.o=msgs/%.mso)
 
