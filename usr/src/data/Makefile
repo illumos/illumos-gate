@@ -32,6 +32,8 @@ clobber :=	TARGET=clobber
 install :=	TARGET=install
 _msg :=		TARGET=_msg
 
+.PARALLEL: $(SUBDIRS)
+
 .KEEP_STATE:
 
 all clean clobber install: $(SUBDIRS)
