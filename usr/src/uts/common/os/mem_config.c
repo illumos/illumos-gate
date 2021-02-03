@@ -508,7 +508,7 @@ mapalloc:
 	 * Recalculate the paging parameters now total_pages has changed.
 	 * This will also cause the clock hands to be reset before next use.
 	 */
-	setupclock(1);
+	setupclock();
 
 	memsegs_unlock(1);
 
@@ -2699,7 +2699,7 @@ kphysm_del_cleanup(struct mem_handle *mhp)
 	 * Recalculate the paging parameters now total_pages has changed.
 	 * This will also cause the clock hands to be reset before next use.
 	 */
-	setupclock(1);
+	setupclock();
 
 	memsegs_unlock(1);
 
