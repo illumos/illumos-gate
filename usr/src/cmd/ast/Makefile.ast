@@ -157,9 +157,19 @@ ASTCFLAGS64= $(CCVERBOSE)
 #
 # They have trailing whitespace, which is removed.
 
-POST_PROCESS_AST = $(SED) -i ' \
+# Unfortunately, due to differences in the "sed" command implemented in
+# various illumos distributions, we can't portably use 'sed -i' here.
+
+SEDPATTERN= \
 	s^$(SRC)/^^g; \
 	s/  *$$//; \
 	/def.* _def_.*_$(MACH64)/s/$(MACH64)/$(HDRGUARD)/; \
-	/def.* _def_.*_$(MACH)/s/$(MACH)/$(HDRGUARD)/; \
-	'
+	/def.* _def_.*_$(MACH)/s/$(MACH)/$(HDRGUARD)/;
+
+POST_PROCESS_AST= \
+	{ \
+		tf=$$(mktemp /tmp/ast.XXXXXXXXXX) && \
+		$(SED) < "$@" > "$$tf" '$(SEDPATTERN)' && \
+		$(CP) -p "$$tf" "$@" && \
+		$(RM) "$$tf"; \
+	}

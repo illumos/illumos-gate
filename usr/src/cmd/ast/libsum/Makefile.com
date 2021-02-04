@@ -96,3 +96,5 @@ _feature: FRC
 	$(MAKE) -f Makefile.iffe generate
 
 include ../../Makefile.astmsg
+
+FRC:
