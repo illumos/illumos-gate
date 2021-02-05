@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -1134,7 +1135,12 @@ loop:
 			pageout_sample_pages += pcount;
 			pageout_sample_etime += sample_end - sample_start;
 			++pageout_sample_cnt;
-		} else {
+		}
+
+		if (pageout_sample_cnt >= pageout_sample_lim) {
+			/*
+			 * We have enough samples, set the spread.
+			 */
 			pageout_rate = (hrrate_t)pageout_sample_pages *
 			    (hrrate_t)(NANOSEC) / pageout_sample_etime;
 			pageout_new_spread = pageout_rate / 10;
