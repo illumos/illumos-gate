@@ -1,17 +1,16 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2017, Joyent, Inc.
+.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RESOURCE_CONTROLS 5 "April 28, 2017"
+.TH RESOURCE_CONTROLS 5 "Jan 23, 2021"
 .SH NAME
 resource_controls \- resource controls available through projects and zones
 .SH DESCRIPTION
-.LP
-For projects the resource controls facility is configured through the project
-database.  See \fBproject\fR(4). For zones, resource controls are configured
-through \fBzonecfg\fR(1M).  You can set and modify resource controls through the
+The resource controls facility is configured through the project database. See
+\fBproject\fR(4). You can set and modify resource controls through the
 following utilities:
 .RS +4
 .TP
@@ -58,7 +57,7 @@ The following are the resource controls are available:
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-address-space\fR\fR
+\fBprocess.max-address-space\fR
 .ad
 .sp .6
 .RS 4n
@@ -69,7 +68,7 @@ available to this process, expressed as a number of bytes.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-core-size\fR\fR
+\fBprocess.max-core-size\fR
 .ad
 .sp .6
 .RS 4n
@@ -80,7 +79,7 @@ bytes.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-cpu-time\fR\fR
+\fBprocess.max-cpu-time\fR
 .ad
 .sp .6
 .RS 4n
@@ -91,7 +90,7 @@ seconds.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-data-size\fR\fR
+\fBprocess.max-data-size\fR
 .ad
 .sp .6
 .RS 4n
@@ -101,7 +100,7 @@ Maximum heap memory available to this process, expressed as a number of bytes.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-file-descriptor\fR\fR
+\fBprocess.max-file-descriptor\fR
 .ad
 .sp .6
 .RS 4n
@@ -112,7 +111,7 @@ integer.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-file-size\fR\fR
+\fBprocess.max-file-size\fR
 .ad
 .sp .6
 .RS 4n
@@ -123,14 +122,14 @@ number of bytes.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-locked-memory\fR\fR
+\fBprocess.max-locked-memory\fR
 .ad
 .sp .6
 .RS 4n
 Total amount of physical memory that can be locked by this process, expressed
 as a number of bytes. This limit is not enforced for a process with the
-\fB\fBPRIV_PROC_LOCK_MEMORY\fR\fR privilege. Because the ability to lock memory
-is controlled by the \fB\fBPRIV_PROC_LOCK_MEMORY\fR\fR privilege within native
+\fBPRIV_PROC_LOCK_MEMORY\fR privilege. Because the ability to lock memory
+is controlled by the \fBPRIV_PROC_LOCK_MEMORY\fR privilege within native
 zones, this resource control is only useful within branded zones which might
 support a different policy for locking memory.
 .RE
@@ -138,7 +137,7 @@ support a different policy for locking memory.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-msg-messages\fR\fR
+\fBprocess.max-msg-messages\fR
 .ad
 .sp .6
 .RS 4n
@@ -149,7 +148,7 @@ control at \fBmsgget()\fR time), expressed as an integer.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-msg-qbytes\fR\fR
+\fBprocess.max-msg-qbytes\fR
 .ad
 .sp .6
 .RS 4n
@@ -160,7 +159,7 @@ resource control at \fBmsgget()\fR time), expressed as a number of bytes.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-port-events\fR\fR
+\fBprocess.max-port-events\fR
 .ad
 .sp .6
 .RS 4n
@@ -170,7 +169,7 @@ Maximum allowable number of events per event port, expressed as an integer.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-sem-nsems\fR\fR
+\fBprocess.max-sem-nsems\fR
 .ad
 .sp .6
 .RS 4n
@@ -181,7 +180,7 @@ integer.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-sem-ops\fR\fR
+\fBprocess.max-sem-ops\fR
 .ad
 .sp .6
 .RS 4n
@@ -193,7 +192,7 @@ integer, specifying the number of operations.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-sigqueue-size\fR\fR
+\fBprocess.max-sigqueue-size\fR
 .ad
 .sp .6
 .RS 4n
@@ -203,7 +202,7 @@ Maximum number of outstanding queued signals.
 .sp
 .ne 2
 .na
-\fB\fBprocess.max-stack-size\fR\fR
+\fBprocess.max-stack-size\fR
 .ad
 .sp .6
 .RS 4n
@@ -214,7 +213,7 @@ of bytes.
 .sp
 .ne 2
 .na
-\fB\fBproject.cpu-cap\fR\fR
+\fBproject.cpu-cap\fR
 .ad
 .sp .6
 .RS 4n
@@ -228,7 +227,7 @@ action.
 .sp
 .ne 2
 .na
-\fB\fBproject.cpu-shares\fR\fR
+\fBproject.cpu-shares\fR
 .ad
 .sp .6
 .RS 4n
@@ -240,7 +239,7 @@ resource control does not support the \fBsyslog\fR action.
 .sp
 .ne 2
 .na
-\fB\fBproject.max-contracts\fR\fR
+\fBproject.max-contracts\fR
 .ad
 .sp .6
 .RS 4n
@@ -250,7 +249,7 @@ Maximum number of contracts allowed in a project, expressed as an integer.
 .sp
 .ne 2
 .na
-\fB\fBproject.max-crypto-memory\fR\fR
+\fBproject.max-crypto-memory\fR
 .ad
 .sp .6
 .RS 4n
@@ -262,7 +261,7 @@ charged against this resource control.
 .sp
 .ne 2
 .na
-\fB\fBproject.max-locked-memory\fR\fR
+\fBproject.max-locked-memory\fR
 .ad
 .sp .6
 .RS 4n
@@ -273,7 +272,7 @@ Total amount of physical memory locked by device drivers and user processes
 .sp
 .ne 2
 .na
-\fB\fBproject.max-lwps\fR\fR
+\fBproject.max-lwps\fR
 .ad
 .sp .6
 .RS 4n
@@ -284,7 +283,7 @@ integer.
 .sp
 .ne 2
 .na
-\fB\fBproject.max-msg-ids\fR\fR
+\fBproject.max-msg-ids\fR
 .ad
 .sp .6
 .RS 4n
@@ -295,7 +294,18 @@ integer.
 .sp
 .ne 2
 .na
-\fB\fBproject.max-port-ids\fR\fR
+\fBproject.max-processes\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of processes simultaneously available to a project, expressed as
+an integer.
+.RE
+
+.sp
+.ne 2
+.na
+\fBproject.max-port-ids\fR
 .ad
 .sp .6
 .RS 4n
@@ -305,20 +315,7 @@ Maximum allowable number of event ports, expressed as an integer.
 .sp
 .ne 2
 .na
-\fB\fBproject.max-processes\fR\fR
-.ad
-.sp .6
-.RS 4n
-Maximum number of processes that can be active in a project. This rctl is
-similar to \fBproject.max-lwps\fR, except that zombie processes are included.
-This rctl prevents process-slot exhaustion which can occur due to an excessive
-number of zombies. Expressed as an integer.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBproject.max-sem-ids\fR\fR
+\fBproject.max-sem-ids\fR
 .ad
 .sp .6
 .RS 4n
@@ -328,7 +325,7 @@ Maximum number of semaphore IDs allowed for a project, expressed as an integer.
 .sp
 .ne 2
 .na
-\fB\fBproject.max-shm-ids\fR\fR
+\fBproject.max-shm-ids\fR
 .ad
 .sp .6
 .RS 4n
@@ -339,7 +336,7 @@ integer.
 .sp
 .ne 2
 .na
-\fB\fBproject.max-shm-memory\fR\fR
+\fBproject.max-shm-memory\fR
 .ad
 .sp .6
 .RS 4n
@@ -350,7 +347,7 @@ bytes.
 .sp
 .ne 2
 .na
-\fB\fBproject.max-tasks\fR\fR
+\fBproject.max-tasks\fR
 .ad
 .sp .6
 .RS 4n
@@ -360,7 +357,7 @@ Maximum number of tasks allowable in a project, expressed as an integer.
 .sp
 .ne 2
 .na
-\fB\fBproject.pool\fR\fR
+\fBproject.pool\fR
 .ad
 .sp .6
 .RS 4n
@@ -370,7 +367,7 @@ Binds a specified resource pool with a project.
 .sp
 .ne 2
 .na
-\fB\fBrcap.max-rss\fR\fR
+\fBrcap.max-rss\fR
 .ad
 .sp .6
 .RS 4n
@@ -381,7 +378,7 @@ in a project.
 .sp
 .ne 2
 .na
-\fB\fBtask.max-cpu-time\fR\fR
+\fBtask.max-cpu-time\fR
 .ad
 .sp .6
 .RS 4n
@@ -392,11 +389,22 @@ number of seconds.
 .sp
 .ne 2
 .na
-\fB\fBtask.max-lwps\fR\fR
+\fBtask.max-lwps\fR
 .ad
 .sp .6
 .RS 4n
 Maximum number of LWPs simultaneously available to this task's processes,
+expressed as an integer.
+.RE
+
+.sp
+.ne 2
+.na
+\fBtask.max-processes\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of processes simultaneously available to this task,
 expressed as an integer.
 .RE
 
@@ -406,7 +414,7 @@ The following zone-wide resource controls are available:
 .sp
 .ne 2
 .na
-\fB\fBzone.cpu-baseline\fR\fR
+\fBzone.cpu-baseline\fR
 .ad
 .sp .6
 .RS 4n
@@ -420,7 +428,7 @@ This resource control does not support the \fBsyslog\fR action.
 .sp
 .ne 2
 .na
-\fB\fBzone.cpu-burst-time\fR\fR
+\fBzone.cpu-burst-time\fR
 .ad
 .sp .6
 .RS 4n
@@ -433,7 +441,7 @@ This resource control does not support the \fBsyslog\fR action.
 .sp
 .ne 2
 .na
-\fB\fBzone.cpu-cap\fR\fR
+\fBzone.cpu-cap\fR
 .ad
 .sp .6
 .RS 4n
@@ -447,7 +455,7 @@ not support the \fBsyslog\fR action.
 .sp
 .ne 2
 .na
-\fB\fBzone.cpu-shares\fR\fR
+\fBzone.cpu-shares\fR
 .ad
 .sp .6
 .RS 4n
@@ -461,7 +469,7 @@ Expressed as an integer. This resource control does not support the
 .sp
 .ne 2
 .na
-\fB\fBzone.max-locked-memory\fR\fR
+\fBzone.max-locked-memory\fR
 .ad
 .sp .6
 .RS 4n
@@ -471,7 +479,7 @@ Total amount of physical locked memory available to a zone.
 .sp
 .ne 2
 .na
-\fB\fBzone.max-lofi\fR\fR
+\fBzone.max-lofi\fR
 .ad
 .sp .6
 .RS 4n
@@ -480,22 +488,20 @@ zone. Expressed as an integer. This resource control does not support the
 \fBsyslog\fR action.
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBzone.max-lwps\fR\fR
+\fBzone.max-lwps\fR
 .ad
 .sp .6
 .RS 4n
-Sets a limit on how many LWPs can be active in a zone. A zone's total LWPs
-can be further subdivided among projects within the zone within the zone by
-using \fBproject.max-lwps\fR entries. Expressed as an integer.
+Enhances resource isolation by preventing too many LWPs in one zone from
+affecting other zones. A zone's total LWPs can be further subdivided among
+projects within the zone by using \fBproject.max-lwps\fR entries. Expressed as
+an integer.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBzone.max-msg-ids\fR\fR
+\fBzone.max-msg-ids\fR
 .ad
 .sp .6
 .RS 4n
@@ -506,7 +512,7 @@ integer.
 .sp
 .ne 2
 .na
-\fB\fBzone.max-physical-memory\fR\fR
+\fBzone.max-physical-memory\fR
 .ad
 .sp .6
 .RS 4n
@@ -514,26 +520,25 @@ Sets a limit on the amount of physical memory (RSS) that can be used by a zone
 before resident pages start being forcibly paged out.  The unit used is bytes.
 Expressed as an integer.  This resource control does not support the
 \fBsyslog\fR action.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBzone.max-processes\fR\fR
+\fBzone.max-processes\fR
 .ad
 .sp .6
 .RS 4n
-Maximum number of processes that can be active in a zone. This rctl is
-similar to \fBzone.max-lwps\fR, except that zombie processes are included.
-This rctl prevents process-slot exhaustion which can occur due to an excessive
-number of zombies. This rctl can be further subdivided among projects within
-the zone using \fBproject.max-processes\fR. Expressed as an integer.
+Enhances resource isolation by preventing too many processes in one zone from
+affecting other zones. A zone's total processes can be further subdivided among
+projects within the zone by using \fBproject.max-processes\fR entries.
+Expressed as an integer.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBzone.max-sem-ids\fR\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBzone.max-sem-ids\fR
 .ad
 .sp .6
 .RS 4n
@@ -543,7 +548,7 @@ Maximum number of semaphore IDs allowed for a zone, expressed as an integer.
 .sp
 .ne 2
 .na
-\fB\fBzone.max-shm-ids\fR\fR
+\fBzone.max-shm-ids\fR
 .ad
 .sp .6
 .RS 4n
@@ -554,7 +559,7 @@ integer.
 .sp
 .ne 2
 .na
-\fB\fBzone.max-shm-memory\fR\fR
+\fBzone.max-shm-memory\fR
 .ad
 .sp .6
 .RS 4n
@@ -565,7 +570,7 @@ bytes.
 .sp
 .ne 2
 .na
-\fB\fBzone.max-swap\fR\fR
+\fBzone.max-swap\fR
 .ad
 .sp .6
 .RS 4n
@@ -589,7 +594,6 @@ as an integer. This resource control does not support the \fBsyslog\fR action.
 .LP
 See \fBzones\fR(5).
 .SS "Units Used in Resource Controls"
-.LP
 Resource controls can be expressed as in units of size (bytes), time (seconds),
 or as a count (integer). These units use the strings specified below.
 .sp
@@ -674,7 +678,6 @@ Note that unit modifiers (for example, \fB5G\fR) are accepted by the
 \fBprctl\fR(1), \fBprojadd\fR(1M), and \fBprojmod\fR(1M) commands. You cannot
 use unit modifiers in the project database itself.
 .SS "Resource Control Values and Privilege Levels"
-.LP
 A threshold value on a resource control constitutes a point at which local
 actions can be triggered or global actions, such as logging, can occur.
 .sp
@@ -684,7 +687,7 @@ level. The privilege level must be one of the following three types:
 .sp
 .ne 2
 .na
-\fB\fBbasic\fR\fR
+\fBbasic\fR
 .ad
 .sp .6
 .RS 4n
@@ -694,7 +697,7 @@ Can be modified by the owner of the calling process.
 .sp
 .ne 2
 .na
-\fB\fBprivileged\fR\fR
+\fBprivileged\fR
 .ad
 .sp .6
 .RS 4n
@@ -705,7 +708,7 @@ or by \fBprctl\fR(1) (requiring \fBproc_owner\fR privilege).
 .sp
 .ne 2
 .na
-\fB\fBsystem\fR\fR
+\fBsystem\fR
 .ad
 .sp .6
 .RS 4n
@@ -742,7 +745,6 @@ task.max-lwps=(priv,1K,deny)
 .in -2
 
 .SS "Global and Local Actions on Resource Control Values"
-.LP
 There are two categories of actions on resource control values: global and
 local.
 .sp
@@ -828,7 +830,7 @@ follows:
 .sp
 .ne 2
 .na
-\fB\fBnone\fR\fR
+\fBnone\fR
 .ad
 .sp .6
 .RS 4n
@@ -842,7 +844,7 @@ the process exceeding the threshold is not affected.
 .sp
 .ne 2
 .na
-\fB\fBdeny\fR\fR
+\fBdeny\fR
 .ad
 .sp .6
 .RS 4n
@@ -855,7 +857,7 @@ control value. See the \fBfork\fR(2).
 .sp
 .ne 2
 .na
-\fB\fBsignal=\fR\fR
+\fBsignal=\fR
 .ad
 .sp .6
 .RS 4n
@@ -884,7 +886,7 @@ The following are the signals available to resource control values:
 .sp
 .ne 2
 .na
-\fB\fBSIGABRT\fR\fR
+\fBSIGABRT\fR
 .ad
 .sp .6
 .RS 4n
@@ -894,7 +896,7 @@ Terminate the process.
 .sp
 .ne 2
 .na
-\fB\fBSIGHUP\fR\fR
+\fBSIGHUP\fR
 .ad
 .sp .6
 .RS 4n
@@ -905,7 +907,7 @@ the process group that controls the terminal.
 .sp
 .ne 2
 .na
-\fB\fBSIGTERM\fR\fR
+\fBSIGTERM\fR
 .ad
 .sp .6
 .RS 4n
@@ -915,7 +917,7 @@ Terminate the process. Termination signal sent by software.
 .sp
 .ne 2
 .na
-\fB\fBSIGKILL\fR\fR
+\fBSIGKILL\fR
 .ad
 .sp .6
 .RS 4n
@@ -925,7 +927,7 @@ Terminate the process and kill the program.
 .sp
 .ne 2
 .na
-\fB\fBSIGSTOP\fR\fR
+\fBSIGSTOP\fR
 .ad
 .sp .6
 .RS 4n
@@ -935,7 +937,7 @@ Stop the process. Job control signal.
 .sp
 .ne 2
 .na
-\fB\fBSIGXRES\fR\fR
+\fBSIGXRES\fR
 .ad
 .sp .6
 .RS 4n
@@ -945,7 +947,7 @@ Resource control limit exceeded. Generated by resource control facility.
 .sp
 .ne 2
 .na
-\fB\fBSIGXFSZ\fR\fR
+\fBSIGXFSZ\fR
 .ad
 .sp .6
 .RS 4n
@@ -957,7 +959,7 @@ controls with the \fBRCTL_GLOBAL_FILE_SIZE\fR property
 .sp
 .ne 2
 .na
-\fB\fBSIGXCPU\fR\fR
+\fBSIGXCPU\fR
 .ad
 .sp .6
 .RS 4n
@@ -967,7 +969,6 @@ controls with the \fBRCTL_GLOBAL_CPUTIME\fR property
 .RE
 
 .SS "Resource Control Flags and Properties"
-.LP
 Each resource control on the system has a certain set of associated properties.
 This set of properties is defined as a set of flags, which are associated with
 all controlled instances of that resource. Global flags cannot be modified, but
@@ -1007,7 +1008,7 @@ The global flags indicate the following:
 .sp
 .ne 2
 .na
-\fB\fBlowerable\fR\fR
+\fBlowerable\fR
 .ad
 .sp .6
 .RS 4n
@@ -1018,7 +1019,7 @@ control.
 .sp
 .ne 2
 .na
-\fB\fBno-deny\fR\fR
+\fBno-deny\fR
 .ad
 .sp .6
 .RS 4n
@@ -1029,7 +1030,7 @@ denied.
 .sp
 .ne 2
 .na
-\fB\fBcpu-time\fR\fR
+\fBcpu-time\fR
 .ad
 .sp .6
 .RS 4n
@@ -1040,7 +1041,7 @@ are reached.
 .sp
 .ne 2
 .na
-\fB\fBseconds\fR\fR
+\fBseconds\fR
 .ad
 .sp .6
 .RS 4n
@@ -1071,7 +1072,6 @@ resource control. An \fBinf\fR value has an infinite quantity. The value is
 never enforced. Hence, as configured, both threshold quantities represent
 infinite values that are never exceeded.
 .SS "Resource Control Enforcement"
-.LP
 More than one resource control can exist on a resource. A resource control can
 exist at each containment level in the process model. If resource controls are
 active on the same resource at different container levels, the smallest
@@ -1079,7 +1079,6 @@ container's control is enforced first. Thus, action is taken on
 \fBprocess.max-cpu-time\fR before \fBtask.max-cpu-time\fR if both controls are
 encountered simultaneously.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -1094,7 +1093,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.LP
 \fBprctl\fR(1), \fBpooladm\fR(1M), \fBpoolcfg\fR(1M), \fBprojadd\fR(1M),
 \fBprojmod\fR(1M), \fBrctladm\fR(1M), \fBsetrctl\fR(2),
 \fBrctlblk_set_value\fR(3C), \fBlibpool\fR(3LIB), \fBproject\fR(4),

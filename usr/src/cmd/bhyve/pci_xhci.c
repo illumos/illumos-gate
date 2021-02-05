@@ -1849,6 +1849,9 @@ retry:
 
 	DPRINTF(("pci_xhci[%d]: xfer->ndata %u", __LINE__, xfer->ndata));
 
+	if (xfer->ndata <= 0)
+		goto errout;
+
 	if (epid == 1) {
 		err = USB_ERR_NOT_STARTED;
 		if (dev->dev_ue->ue_request != NULL)
@@ -1863,6 +1866,7 @@ retry:
 
 	err = USB_TO_XHCI_ERR(err);
 	if ((err == XHCI_TRB_ERROR_SUCCESS) ||
+	    (err == XHCI_TRB_ERROR_STALL) ||
 	    (err == XHCI_TRB_ERROR_SHORT_PKT)) {
 		err = pci_xhci_xfer_complete(sc, xfer, slot, epid, &do_intr);
 		if (err != XHCI_TRB_ERROR_SUCCESS)
@@ -2813,7 +2817,8 @@ pci_xhci_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	sc->hcsparams2 = XHCI_SET_HCSP2_ERSTMAX(XHCI_ERST_MAX) |
 	                 XHCI_SET_HCSP2_IST(0x04);
 	sc->hcsparams3 = 0;				/* no latency */
-	sc->hccparams1 = XHCI_SET_HCCP1_NSS(1) |	/* no 2nd-streams */
+	sc->hccparams1 = XHCI_SET_HCCP1_AC64(1) |	/* 64-bit addrs */
+	                 XHCI_SET_HCCP1_NSS(1) |	/* no 2nd-streams */
 	                 XHCI_SET_HCCP1_SPC(1) |	/* short packet */
 	                 XHCI_SET_HCCP1_MAXPSA(XHCI_STREAMS_MAX);
 	sc->hccparams2 = XHCI_SET_HCCP2_LEC(1) |

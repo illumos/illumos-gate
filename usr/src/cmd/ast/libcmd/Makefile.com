@@ -77,6 +77,8 @@ CERRWARN	+= -_gcc=-Wno-implicit-function-declaration
 # not linted
 SMATCH=off
 
+.KEEP_STATE:
+
 all: install_h .WAIT $(LIBS)
 
 include $(SRC)/lib/Makefile.targ
@@ -88,12 +90,12 @@ pics/%.o: $(ASTSRC)/%.c
 ######################################################################
 # Header file generation
 
-$(HEADERSRC:%=ast/%): FRC
+$(HEADERSRC:%=ast/%): $(HEADERSRC:%=$(ASTSRC)/%)
 	$(MKDIR) -p $(@D)
 	$(CP) $(ASTSRC)/$(@F) $@
 
 # This rule is derived from $(CONTRIB)/ast/src/lib/libcmd/Makefile
-ast/cmdext.h:
+ast/cmdext.h: $(OBJECTS:%.o=$(ASTSRC)/%.c)
 	$(MKDIR) -p $(@D)
 	echo '#include <shcmd.h>' > $@.tmp
 	$(SED) \

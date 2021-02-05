@@ -34,7 +34,6 @@ $mapfile_version 2
 SYMBOL_VERSION ILLUMOSprivate {
 	global:
 		vcpu_reset;
-		vm_active_cpus;
 		vm_activate_cpu;
 		vm_active_cpus;
 		vm_apicid2vcpu;
@@ -46,19 +45,18 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_copy_teardown;
 		vm_copyin;
 		vm_copyout;
-		vm_create_devmem;
 		vm_create;
 		vm_create_devmem;
 		vm_debug_cpus;
 		vm_destroy;
-		vm_destroy;
+		vm_disable_pptdev_msix;
 		vm_get_capability;
 		vm_get_desc;
 		vm_get_device_fd;
 		vm_get_devmem_offset;
 		vm_get_gpa_pmap;
-		vm_get_hpet_capabilities;
 		vm_get_highmem_size;
+		vm_get_hpet_capabilities;
 		vm_get_intinfo;
 		vm_get_lowmem_limit;
 		vm_get_lowmem_size;
@@ -77,10 +75,6 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_inject_exception;
 		vm_inject_fault;
 		vm_inject_nmi;
-		vm_isa_assert_irq;
-		vm_isa_deassert_irq;
-		vm_isa_pulse_irq;
-		vm_isa_set_irq_trigger;
 		vm_ioapic_assert_irq;
 		vm_ioapic_deassert_irq;
 		vm_ioapic_pincount;
@@ -98,8 +92,10 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_mmap_memseg;
 		vm_open;
 		vm_parse_memsize;
+		vm_pmtmr_set_location;
 		vm_reinit;
 		vm_restart_instruction;
+		vm_resume_cpu;
 		vm_rtc_gettime;
 		vm_rtc_read;
 		vm_rtc_settime;
@@ -119,9 +115,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_suspend;
 		vm_suspend_cpu;
 		vm_suspended_cpus;
-		vm_resume_cpu;
 		vm_unassign_pptdev;
-		vm_pmtmr_set_location;
 		vm_wrlock_cycle;
 		vm_get_run_state;
 		vm_set_run_state;

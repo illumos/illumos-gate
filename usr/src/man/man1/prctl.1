@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRCTL 1 "April 9, 2016"
+.TH PRCTL 1 "Jan 23, 2021"
 .SH NAME
 prctl \- get or set the resource controls of running processes, tasks, and
 projects
 .SH SYNOPSIS
-.LP
 .nf
 \fBprctl\fR [\fB-P\fR] [\fB-t\fR [basic | privileged | system]]
      [\fB-n\fR \fIname\fR [\fB-srx\fR] [\fB-v\fR \fIvalue\fR] [\fB-e\fR | \fB-d\fR \fIaction\fR] [\fB-p\fR \fIpid\fR]]
@@ -16,7 +16,6 @@ projects
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBprctl\fR utility allows the examination and modification of the resource
 controls associated with an active process, task, or project on the system. It
 allows access to the  basic and privileged limits and the  current  usage  on
@@ -26,7 +25,6 @@ the     specified entity.
 See \fBresource_controls\fR(5) for a description of the resource controls
 supported in the current release of the Solaris operating system.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -236,7 +234,6 @@ If none of the \fB-s\fR, \fB-r\fR, \fB-x\fR, \fB-v\fR, \fB-d\fR, or \fB-e\fR
 options are specified, the invocation is considered a get operation. Otherwise,
 it is considered a modify operation.
 .SH OPERANDS
-.LP
 The following operand is supported:
 .sp
 .ne 2
@@ -251,7 +248,6 @@ operation fails. If no \fIid\fR is specified, an error message is returned.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDisplaying Current Resource Control Settings
 .sp
 .LP
@@ -270,6 +266,9 @@ NAME    PRIVILEGE       VALUE    FLAG   ACTION             RECIPIENT
 task.max-cpu-time
         usage            8s
         system          18.4Es    inf   none                -
+task.max-processes
+        usage              30
+        system          2.15G     max   deny                -
 task.max-lwps
         usage              39
         system          2.15G     max   deny                -
@@ -294,6 +293,9 @@ privileged       508MB      -   deny                -
 project.max-tasks
         usage               2
         system          2.15G     max   deny                -
+project.max-processes
+         usage             30
+        system          2.15G     max   deny                -
 project.max-lwps
          usage             39
         system          2.15G     max   deny                -
@@ -308,6 +310,8 @@ zone.max-sem-ids
         system          16.8M     max   deny                -
 zone.max-msg-ids
         system          16.8M     max   deny                -
+zone.max-processes
+        system          2.15G     max   deny                -
 zone.max-lwps
         system          2.15G     max   deny                -
 zone.cpu-shares
@@ -382,7 +386,7 @@ Using the target project, identify the resource limit value before the change:
 	project 10: group.staff
 	project.max-locked-memory
             privileged         256MB       -    deny                  -
-      	    system            16.0EB     max    deny                  -
+	    system            16.0EB     max    deny                  -
 
 current limit is 256 Megabytes.
 .fi
@@ -494,7 +498,6 @@ The cap can be lowered to 50% using:
 .sp
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -533,7 +536,6 @@ Process information and control files
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -552,12 +554,10 @@ Interface Stability	See below.
 The command-line syntax is Committed. The human-readable output is Uncommitted.
 The parsable output is Committed.
 .SH SEE ALSO
-.LP
 \fBrctladm\fR(1M), \fBzonecfg\fR(1M), \fBsetrctl\fR(2),
 \fBrctlblk_get_local_action\fR(3C), \fBproject\fR(4), \fBattributes\fR(5),
 \fBresource_controls\fR(5)
 .SH NOTES
-.LP
 The valid signals that can be set on a resource control block allowing local
 actions are \fBSIGABRT\fR, \fBSIGXRES\fR, \fBSIGHUP\fR, \fBSIGSTOP\fR,
 \fBSIGTERM\fR, and \fBSIGKILL\fR. Additionally, CPU time related controls can

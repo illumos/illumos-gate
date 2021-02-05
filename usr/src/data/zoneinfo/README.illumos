@@ -28,7 +28,7 @@ commands assume that you're inside of the directory you extracted the
 time zone files.
 
 $ cp africa antarctica asia australasia backward etcetera europe \
-  northamerica pacificnew southamerica systemv $CODEMGR_WS/usr/src/data/zoneinfo
+  northamerica southamerica $CODEMGR_WS/usr/src/data/zoneinfo
 
 Next you need to copy the country tab and the zone tab files. These have
 different names in our source tree.
@@ -65,12 +65,12 @@ occurred in zone.tab.txt and backward. The contents of backward describe
 hardlinks that need to exist in packaging. Specifically, if you have a line in
 the form of:
 
-LINK	Beleriand	Gondolin
+LINK	Arda/Beleriand	Arda/Gondolin
 
-That instructs that Gondolin should be hardlinked to Beleriand. In ips parlance
+That instructs that Gondolin should be hardlinked to Beleriand. In IPS parlance
 that'd be:
 
-hardlink path=usr/share/lib/zoneinfo/Beleriand target=./Gondolin
+hardlink path=usr/share/lib/zoneinfo/Arda/Gondolin target=../Arda/Beleriand
 
 The differences in zone.tab.txt describe the additions and removals of various
 file entries. If you're not friends with protocmp yet, this should help you out.

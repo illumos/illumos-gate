@@ -368,6 +368,7 @@ struct vm_run_state {
 #define	VM_SUSPEND_CPU			(VMM_IOC_BASE | 0x1d)
 #define	VM_RESUME_CPU			(VMM_IOC_BASE | 0x1e)
 
+#define	VM_PPTDEV_DISABLE_MSIX		(VMM_IOC_BASE | 0x1f)
 
 #define	VM_DEVMEM_GETOFFSET		(VMM_IOC_BASE | 0xff)
 

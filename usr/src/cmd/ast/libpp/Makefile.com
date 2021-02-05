@@ -72,6 +72,8 @@ CERRWARN	+= -_gcc=-Wno-unused-value
 # "pplex() parse error: turning off implications after 60 seconds"
 SMATCH		= off
 
+.KEEP_STATE:
+
 all: $(LIBS)
 
 include $(SRC)/lib/Makefile.targ

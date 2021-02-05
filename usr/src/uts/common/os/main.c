@@ -565,7 +565,7 @@ main(void)
 	/*
 	 * Set the scan rate and other parameters of the paging subsystem.
 	 */
-	setupclock(0);
+	setupclock();
 
 	/*
 	 * Initialize process 0's lwp directory and lwpid hash table.

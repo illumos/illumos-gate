@@ -72,6 +72,8 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 # needs work
 SMOFF += all_func_returns,strcpy_overflow
 
+.KEEP_STATE:
+
 all: install_h .WAIT $(LIBS)
 
 include $(SRC)/lib/Makefile.targ
@@ -83,7 +85,7 @@ pics/%.o: $(ASTSRC)/%.c
 ######################################################################
 # Header file generation
 
-$(HEADERGEN:%=ast/%): FRC
+$(HEADERGEN:%=ast/%): $(FEATURES:%=FEATURE/%)
 	$(MKDIR) -p $(@D)
 	src=`echo $(@F:%.h=%) | sed 's/^ast_//'`; \
 	    [[ $$src = dlldefs ]] && src=dll; \

@@ -1384,8 +1384,7 @@ i_dlpi_strgetmsg(dlpi_impl_t *dip, int msec, dlpi_msg_t *dlreplyp,
 	data.maxlen = (databuf == NULL) ? sizeof (bufd): *datalenp;
 
 	for (;;) {
-		if (!infinite)
-			start = NSEC2MSEC(gethrtime());
+		start = NSEC2MSEC(gethrtime());
 
 		switch (poll(&pfd, 1, msec)) {
 		default:

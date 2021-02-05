@@ -50,7 +50,7 @@ extern "C" {
 #if defined(_KERNEL)
 #include <sys/vnode.h>
 
-void	setupclock(int);
+void	setupclock(void);
 void	pageout(void);
 void	cv_signal_pageout(void);
 int	queue_io_request(struct vnode *, u_offset_t);

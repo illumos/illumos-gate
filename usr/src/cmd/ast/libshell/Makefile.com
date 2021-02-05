@@ -70,10 +70,12 @@ CERRWARN += -_gcc=-Wno-char-subscripts
 # smatch gets out of memory on common/sh/macro.c
 SMATCH= off
 
+.KEEP_STATE:
+
 all: install_h mkpicdirs .WAIT $(LIBS)
 
 mkpicdirs:
-	mkdir -p $(LOBJDIRS:%=pics/%)
+	@mkdir -p $(LOBJDIRS:%=pics/%)
 
 include $(SRC)/lib/Makefile.targ
 
@@ -84,7 +86,7 @@ pics/%.o: $(ASTSRC)/%.c
 ######################################################################
 # Header file generation
 
-$(HEADERSRC:%=ast/%): FRC
+$(HEADERSRC:%=ast/%): $(HEADERSRC:%=$(ASTSRC)/include/%)
 	$(MKDIR) -p $(@D)
 	$(CP) $(ASTSRC)/include/$(@F) $@
 

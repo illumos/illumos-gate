@@ -105,7 +105,6 @@ ivrs_hdr_iterate_tbl(ivhd_iter_t iter, void *arg)
 
 		default:
 			printf("AMD-Vi:Not IVHD/IVMD type(%d)", ivrs_hdr->Type);
-
 		}
 
 		ivrs_hdr = (ACPI_IVRS_HEADER *)((uint8_t *)ivrs_hdr +

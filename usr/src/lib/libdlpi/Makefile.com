@@ -39,7 +39,6 @@ LDLIBS +=	-lc -linetutil -ldladm
 SRCDIR =	../common
 
 CFLAGS +=	$(CCVERBOSE)
-CERRWARN +=	$(CNOWARN_UNINIT)
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
 
 .KEEP_STATE:

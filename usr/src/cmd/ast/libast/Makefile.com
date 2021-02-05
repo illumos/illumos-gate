@@ -96,10 +96,12 @@ CERRWARN += -_gcc=-Wno-address
 
 SMATCH= off
 
+.KEEP_STATE:
+
 all: install_h mkpicdirs .WAIT $(LIBS)
 
 mkpicdirs:
-	mkdir -p $(LOBJDIRS:%=pics/%)
+	@mkdir -p $(LOBJDIRS:%=pics/%)
 
 include $(SRC)/lib/Makefile.targ
 
@@ -110,7 +112,16 @@ pics/%.o: $(ASTSRC)/%.c
 ######################################################################
 # Header file generation
 
-ast/prototyped.h: FRC
+ast/%:= FILEMODE= 0644
+
+# The HEADERGEN headers are generated from the corresponding FEATURE/ file
+# with any ast_ prefix removed.
+$(HEADERGEN:%=ast/%): $(FEATURES:%=FEATURE/%)
+	src=`echo $(@F:%.h=%) | sed 's/^ast_//'`; \
+	    $(AST_PROTO) FEATURE/$$src > $@
+	$(POST_PROCESS_AST) $@
+
+ast/prototyped.h: $(AST_TOOLS)/proto
 	$(MKDIR) -p $(@D)
 	$(AST_TOOLS)/proto -f /dev/null > $@
 
@@ -122,24 +133,25 @@ ast/ast_common.h: ast/prototyped.h
 ast/lc.h: lc.h
 	$(AST_PROTO) lc.h > ast/lc.h
 
-# The HEADERGEN headers are generated from the corresponding FEATURE/ file
-# with any ast_ prefix removed.
-$(HEADERGEN:%=ast/%): FRC
-	src=`echo $(@F:%.h=%) | sed 's/^ast_//'`; \
-	    $(AST_PROTO) FEATURE/$$src > $@
+ast/%.h: $(ASTSRC)/include/%.h
+	$(INS.file)
 	$(POST_PROCESS_AST) $@
 
-$(HEADERSRC:%=ast/%): FRC
-	src=$(@F) ;\
-	[[ $$src = ast_namval.h ]] && src=namval.h ;\
-	for d in include $(LOBJDIRS) std; do \
-		if [[ -f $(ASTSRC)/$$d/$$src ]]; then \
-			echo "$$d/$$src -> $@"; \
-			cp $(ASTSRC)/$$d/$$src $@; \
-			$(POST_PROCESS_AST) $@; \
-			break; \
-		fi; \
-	done
+ast/%.h: $(ASTSRC)/comp/%.h
+	$(INS.file)
+	$(POST_PROCESS_AST) $@
+
+ast/%.h: $(ASTSRC)/cdt/%.h
+	$(INS.file)
+	$(POST_PROCESS_AST) $@
+
+ast/%.h: $(ASTSRC)/std/%.h
+	$(INS.file)
+	$(POST_PROCESS_AST) $@
+
+ast/ast_namval.h: $(ASTSRC)/include/namval.h
+	$(CP) $(ASTSRC)/include/namval.h $@
+	$(POST_PROCESS_AST) $@
 
 CLOBBERFILES += ast_common.h t.c
 CLOBBERFILES += ast/*

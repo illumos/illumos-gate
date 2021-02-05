@@ -37,10 +37,6 @@
 
 /* Porting note: This is named 'svm_support.S' upstream. */
 
-#define	VMLOAD	.byte 0x0f, 0x01, 0xda
-#define	VMRUN	.byte 0x0f, 0x01, 0xd8
-#define	VMSAVE	.byte 0x0f, 0x01, 0xdb
-
 
 /*
  * Flush scratch registers to avoid lingering guest state being used for
@@ -87,7 +83,7 @@ ENTRY_NP(svm_launch)
 	movq	%rsi, SVMSTK_RSI(%rsp)
 	movq	%rdi, SVMSTK_RDI(%rsp)
 
-	/* VMLOAD and VMRUN expect the VMCB physaddr in %rax */
+	/* Save the physical address of the VMCB in %rax */
 	movq	%rdi, %rax
 
 	/* Restore guest state. */
@@ -106,9 +102,9 @@ ENTRY_NP(svm_launch)
 	movq	SCTX_RDI(%rsi), %rdi
 	movq	SCTX_RSI(%rsi), %rsi	/* %rsi must be restored last */
 
-	VMLOAD
-	VMRUN
-	VMSAVE
+	vmload	%rax
+	vmrun	%rax
+	vmsave	%rax
 
 	/* Grab the svm_regctx pointer */
 	movq	SVMSTK_RSI(%rsp), %rax

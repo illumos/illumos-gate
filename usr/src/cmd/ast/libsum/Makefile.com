@@ -65,6 +65,8 @@ CERRWARN += -_gcc=-Wno-parentheses
 
 SMOFF += all_func_returns
 
+.KEEP_STATE:
+
 # This codepath is performance-critical
 sparc_COPTFLAG = -xO5 -_cc=-xprefetch=auto,explicit
 sparcv9_COPTFLAG = $(sparc_COPTFLAG)
@@ -82,7 +84,7 @@ pics/%.o: $(ASTSRC)/%.c
 ######################################################################
 # Header file generation
 
-$(HEADERSRC:%=ast/%): FRC
+$(HEADERSRC:%=ast/%): $(HEADERSRC:%=$(ASTSRC)/%)
 	$(MKDIR) -p $(@D)
 	$(CP) $(ASTSRC)/$(@F) $@
 
@@ -94,5 +96,3 @@ _feature: FRC
 	$(MAKE) -f Makefile.iffe generate
 
 include ../../Makefile.astmsg
-
-FRC:

@@ -76,13 +76,14 @@ extern pgcnt_t	pageout_reserve; /* point at which we deny non-PG_WAIT calls */
 extern pgcnt_t	pages_before_pager; /* XXX */
 
 /*
- * TRUE if the pageout daemon, fsflush daemon or the scheduler.  These
- * processes can't sleep while trying to free up memory since a deadlock
- * will occur if they do sleep.
+ * TRUE if the pageout daemon, fsflush daemon, or the scheduler.  These threads
+ * can't sleep while trying to free up memory since a deadlock will occur if
+ * they do sleep.
  */
 #define	NOMEMWAIT() (ttoproc(curthread) == proc_pageout || \
 			ttoproc(curthread) == proc_fsflush || \
-			ttoproc(curthread) == proc_sched)
+			ttoproc(curthread) == proc_sched || \
+			(curthread->t_flag & T_PUSHPAGE) != 0)
 
 /* insure non-zero */
 #define	nz(x)	((x) != 0 ? (x) : 1)

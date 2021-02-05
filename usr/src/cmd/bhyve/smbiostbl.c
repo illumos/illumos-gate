@@ -52,6 +52,10 @@ __FBSDID("$FreeBSD$");
 
 #define SMBIOS_BASE		0xF1000
 
+#define	FIRMWARE_VERSION	"13.0"
+/* The SMBIOS specification defines the date format to be mm/dd/yyyy */
+#define	FIRMWARE_RELEASE_DATE	"11/10/2020"
+
 /* BHYVE_ACPI_BASE - SMBIOS_BASE) */
 #define	SMBIOS_MAX_LENGTH	(0xF2400 - 0xF1000)
 
@@ -324,9 +328,9 @@ struct smbios_table_type0 smbios_type0_template = {
 };
 
 const char *smbios_type0_strings[] = {
-	"BHYVE",	/* vendor string */
-	"1.00",		/* bios version string */
-	"03/14/2014",	/* bios release date string */
+	"BHYVE",		/* vendor string */
+	FIRMWARE_VERSION,	/* bios version string */
+	FIRMWARE_RELEASE_DATE,	/* bios release date string */
 	NULL
 };
 
@@ -347,12 +351,12 @@ static int smbios_type1_initializer(struct smbios_structure *template_entry,
     uint16_t *n, uint16_t *size);
 
 const char *smbios_type1_strings[] = {
-	" ",		/* manufacturer string */
-	"BHYVE",	/* product name string */
-	"1.0",		/* version string */
-	"None",		/* serial number string */
-	"None",		/* sku string */
-	" ",		/* family name string */
+	"illumos",		/* manufacturer string */
+	"BHYVE",		/* product name string */
+	"1.0",			/* version string */
+	"None",			/* serial number string */
+	"None",			/* sku string */
+	"Virtual Machine",	/* family name string */
 	NULL
 };
 
@@ -375,7 +379,7 @@ struct smbios_table_type3 smbios_type3_template = {
 };
 
 const char *smbios_type3_strings[] = {
-	" ",		/* manufacturer string */
+	"illumos",	/* manufacturer string */
 	"1.0",		/* version string */
 	"None",		/* serial number string */
 	"None",		/* asset tag string */
@@ -755,7 +759,7 @@ smbios_type19_initializer(struct smbios_structure *template_entry,
 		type19 = (struct smbios_table_type19 *)curaddr;
 		type19->arrayhand = type16_handle;
 		type19->xsaddr = 4*GB;
-		type19->xeaddr = guest_himem;
+		type19->xeaddr = type19->xsaddr + guest_himem;
 	}
 
 	return (0);

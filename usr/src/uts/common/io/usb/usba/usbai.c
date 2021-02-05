@@ -78,6 +78,8 @@ static char *usba_debug_buf = NULL;	/* The debug buf */
 static char *usba_buf_sptr, *usba_buf_eptr;
 static hrtime_t usba_last_timestamp;	/* last time stamp in trace */
 
+usb_dev_cap_t usb_cap;
+
 /* USBA framework initializations */
 void
 usba_usbai_initialization()
@@ -690,7 +692,7 @@ static int
 usba_handle_device_remote_wakeup(dev_info_t *dip, int cmd)
 {
 	int		rval;
-	uint8_t 	bmRequest = USB_DEV_REQ_HOST_TO_DEV;
+	uint8_t		bmRequest = USB_DEV_REQ_HOST_TO_DEV;
 	uchar_t		bRequest;
 	uint16_t	wIndex = 0;
 	usb_cr_t	completion_reason = 0;
@@ -752,7 +754,7 @@ int
 usb_handle_remote_wakeup(dev_info_t *dip, int cmd)
 {
 	usb_cfg_descr_t	cfg_descr;
-	uchar_t 	*usb_cfg;	/* buf for config descriptor */
+	uchar_t		*usb_cfg;	/* buf for config descriptor */
 	size_t		cfg_length;
 	int		rval;
 
@@ -789,15 +791,15 @@ usb_handle_remote_wakeup(dev_info_t *dip, int cmd)
 int
 usb_create_pm_components(dev_info_t *dip, uint_t *pwr_states)
 {
-	uchar_t 		*usb_cfg;	/* buf for config descriptor */
+	uchar_t			*usb_cfg;	/* buf for config descriptor */
 	usb_cfg_descr_t		cfg_descr;
 	size_t			cfg_length;
 	usba_cfg_pwr_descr_t	confpwr_descr;
 	usba_if_pwr_descr_t	ifpwr_descr;
-	uint8_t 		cfg_attrib;
+	uint8_t			cfg_attrib;
 	int			i, lvl, rval;
 	int			n_prop = 0;
-	uint8_t 		*ptr;
+	uint8_t			*ptr;
 	char			*drvname;
 	char			str[USBA_POWER_STR_SIZE];
 	char			*pm_comp[USBA_N_PMCOMP];

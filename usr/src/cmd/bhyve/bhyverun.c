@@ -203,6 +203,7 @@ static int gdb_port = 0;
 static int guest_vmexit_on_hlt, guest_vmexit_on_pause;
 static int virtio_msix = 1;
 static int x2apic_mode = 0;	/* default is xAPIC */
+static int destroy_on_poweroff = 0;
 
 static int strictio;
 static int strictmsr = 1;
@@ -248,7 +249,11 @@ usage(int code)
 {
 
         fprintf(stderr,
-		"Usage: %s [-abehuwxACHPSWY]\n"
+#ifdef	__FreeBSD__
+		"Usage: %s [-abehuwxACDHPSWY]\n"
+#else
+		"Usage: %s [-abdehuwxACDHPSWY]\n"
+#endif
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
 		"       %*s [-g <gdb port>] [-l <lpc>]\n"
 #ifdef	__FreeBSD__
@@ -263,6 +268,7 @@ usage(int code)
 #ifndef __FreeBSD__
 	        "       -d: suspend cpu at boot\n"
 #endif
+		"       -D: destroy on power-off\n"
 		"       -e: exit on unhandled I/O access\n"
 		"       -g: gdb port\n"
 		"       -h: help\n"
@@ -984,6 +990,8 @@ vmexit_suspend(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 	case VM_SUSPEND_RESET:
 		exit(0);
 	case VM_SUSPEND_POWEROFF:
+		if (destroy_on_poweroff)
+			vm_destroy(ctx);
 		exit(1);
 	case VM_SUSPEND_HALT:
 		exit(2);
@@ -1294,9 +1302,9 @@ main(int argc, char *argv[])
 	memflags = 0;
 
 #ifdef	__FreeBSD__
-	optstr = "abehuwxACHIPSWYp:g:G:c:s:m:l:B:U:";
+	optstr = "abehuwxACDHIPSWYp:g:G:c:s:m:l:B:U:";
 #else
-	optstr = "abdehuwxACHIPSWYg:G:c:s:m:l:B:U:";
+	optstr = "abdehuwxACDHIPSWYg:G:c:s:m:l:B:U:";
 #endif
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
@@ -1308,6 +1316,9 @@ main(int argc, char *argv[])
 			break;
 		case 'b':
 			bvmcons = 1;
+			break;
+		case 'D':
+			destroy_on_poweroff = 1;
 			break;
 		case 'B':
 			if (smbios_parse(optarg) != 0) {
