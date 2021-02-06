@@ -48,8 +48,7 @@ XPG6EXOBJS= ${EXOBJS_XPG6:%=$(XD6)/%}
 EXRECOVEROBJS=	exrecover.o ex_extern.o
 OBJS= $(EXOBJS) $(XPG4EXOBJS) $(XPG6EXOBJS) expreserve.o exrecover.o
 SRCS= $(EXOBJS:%.o=%.c) expreserve.c exrecover.c
-TXTS = READ_ME makeoptions asfix.c70 ex.news port.mk.370 port.mk.70	\
-	port.mk.c70 port.mk.usg ovdoprnt.s ovprintf.c rofix
+TXTS = READ_ME makeoptions ex.news
 
 include ../../Makefile.cmd
 
