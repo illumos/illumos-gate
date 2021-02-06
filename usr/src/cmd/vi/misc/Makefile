@@ -59,8 +59,10 @@ $(POFILE): $(POFILES)
 	$(RM) $@
 	cat $(POFILES) > $(POFILE)
 
+$(ROOTPROG):
+	$(RM) $@; $(SYMLINK) ../has/bin/ctags $@
 
-install: all $(ROOTPROG) $(ROOTXPG4PROG)
+install: all $(ROOTPROG) $(ROOTHASBINPROG) $(ROOTXPG4PROG)
 
 clean:
 
