@@ -33,7 +33,6 @@ static char *nextarg = NULL;
 
 static int dontexpand;	/* co-routine state set in getnext, used in expandarg */
 
-#ifdef __STDC__
 static void getcmd(char *, char *, size_t, char *, size_t, struct arglist *);
 static void expandarg(char *, struct arglist *);
 static void printlist(char *, ino_t, char *, int);
@@ -43,27 +42,12 @@ static int fcmp(struct afile *, struct afile *);
 static char *fmtentry(struct afile *);
 static void setpagercmd(void);
 static uint_t setpagerargs(char **);
-#else
-static void getcmd();
-static void expandarg();
-static void printlist();
-static void formatf();
-static char *copynext();
-static int fcmp();
-static char *fmtentry();
-static void setpagercmd();
-static uint_t setpagerargs();
-#endif
 
 /*
  * Read and execute commands from the terminal.
  */
 void
-#ifdef __STDC__
 runcmdshell(void)
-#else
-runcmdshell()
-#endif
 {
 	struct entry *np;
 	ino_t ino;
@@ -120,7 +104,7 @@ loop:
 			break;
 		if (inodetype(ino) == LEAF) {
 			(void) fprintf(stderr,
-				gettext("%s: not a directory\n"), name);
+			    gettext("%s: not a directory\n"), name);
 			break;
 		}
 
@@ -139,7 +123,7 @@ loop:
 		np = lookupname(name);
 		if (np == NIL || (np->e_flags & NEW) == 0) {
 			(void) fprintf(stderr,
-				gettext("%s: not on extraction list\n"), name);
+			    gettext("%s: not on extraction list\n"), name);
 			break;
 		}
 		treescan(name, np->e_ino, deletefile);
@@ -168,7 +152,7 @@ loop:
 	case '?':
 		/* ANSI string catenation, to shut cstyle up */
 		(void) fprintf(stderr, "%s",
-			gettext("Available commands are:\n"
+		    gettext("Available commands are:\n"
 "\tls [arg] - list directory\n"
 "\tmarked [arg] - list items marked for extraction from directory\n"
 "\tcd arg - change directory\n"
@@ -235,7 +219,7 @@ loop:
 					    ">>>pager_vector[%d] = `%s'\n",
 					    index,
 					    pager_vector[index] ?
-						pager_vector[index] : "(null)");
+					    pager_vector[index] : "(null)");
 					index += 1;
 				}
 			}
@@ -313,7 +297,7 @@ loop:
 	default:
 	bad:
 		(void) fprintf(stderr,
-			gettext("%s: unknown command; type ? for help\n"), cmd);
+		    gettext("%s: unknown command; type ? for help\n"), cmd);
 		break;
 	ambiguous:
 		(void) fprintf(stderr,
@@ -339,10 +323,8 @@ static char input[MAXCOMPLEXLEN]; /* shared by getcmd() and setpagercmd() */
  */
 /* ARGSUSED */
 static void
-getcmd(curdir, cmd, cmdsiz, name, namesiz, ap)
-	char *curdir, *cmd, *name;
-	size_t cmdsiz, namesiz;
-	struct arglist *ap;
+getcmd(char *curdir, char *cmd, size_t cmdsiz, char *name, size_t namesiz,
+    struct arglist *ap)
 {
 	char *cp;
 	char output[MAXCOMPLEXLEN];
@@ -460,9 +442,7 @@ getnext:
  * Strip off the next token of the input.
  */
 static char *
-copynext(input, output, outsize)
-	char *input, *output;
-	size_t outsize;
+copynext(char *input, char *output, size_t outsize)
 {
 	char *cp, *bp, *limit;
 	char quote;
@@ -528,9 +508,7 @@ copynext(input, output, outsize)
  * The pathname "canonname" is returned double null terminated.
  */
 void
-canon(rawname, canonname, limit)
-	char *rawname, *canonname;
-	size_t limit;
+canon(char *rawname, char *canonname, size_t limit)
 {
 	char *cp, *np, *prefix;
 	uint_t len;
@@ -609,9 +587,7 @@ canon(rawname, canonname, limit)
  * "[...a-z...]" in params matches a through z.
  */
 static void
-expandarg(arg, ap)
-	char *arg;
-	struct arglist *ap;
+expandarg(char *arg, struct arglist *ap)
 {
 	static struct afile single;
 	int size;
@@ -646,11 +622,7 @@ expandarg(arg, ap)
  * Do an "ls" style listing of a directory
  */
 static void
-printlist(name, ino, basename, marked_only)
-	char *name;
-	ino_t ino;
-	char *basename;
-	int marked_only;
+printlist(char *name, ino_t ino, char *basename, int marked_only)
 {
 	struct afile *fp;
 	struct direct *dp;
@@ -731,8 +703,7 @@ printlist(name, ino, basename, marked_only)
  * Print out a pretty listing of a directory
  */
 static void
-formatf(ap)
-	struct arglist *ap;
+formatf(struct arglist *ap)
 {
 	struct afile *fp;
 	struct entry *np;
@@ -829,8 +800,7 @@ formatf(ap)
  * Comparison routine for qsort.
  */
 static int
-fcmp(f1, f2)
-	struct afile *f1, *f2;
+fcmp(struct afile *f1, struct afile *f2)
 {
 
 	return (strcoll(f1->fname, f2->fname));
@@ -840,8 +810,7 @@ fcmp(f1, f2)
  * Format a directory entry.
  */
 static char *
-fmtentry(fp)
-	struct afile *fp;
+fmtentry(struct afile *fp)
 {
 	static char fmtres[MAXCOMPLEXLEN];
 	static int precision = 0;
@@ -890,8 +859,7 @@ fmtentry(fp)
  */
 /* ARGSUSED */
 void
-onintr(sig)
-	int	sig;
+onintr(int sig)
 {
 	char	buf[300];
 
@@ -907,11 +875,7 @@ onintr(sig)
  * Set up pager_catenated and pager_vector.
  */
 void
-#ifdef __STDC__
 initpagercmd(void)
-#else
-initpagercmd()
-#endif
 {
 	char *cp;
 
@@ -944,11 +908,7 @@ initpagercmd()
  * Resets pager_catenated and pager_vector from user input.
  */
 void
-#ifdef __STDC__
 setpagercmd(void)
-#else
-setpagercmd()
-#endif
 {
 	uint_t catenate_length;
 	int index;
@@ -984,7 +944,7 @@ setpagercmd()
 		(void) fprintf(stderr, gettext("got command `%s'\n"), input);
 	catenate_length = setpagerargs(&nextarg) + strlen(pager_vector[0]) + 1;
 	pager_catenated = (char *)malloc(catenate_length *
-		(size_t)sizeof (char));
+	    (size_t)sizeof (char));
 	if (pager_catenated == (char *)NULL) {
 		(void) fprintf(stderr, gettext("out of memory\n"));
 		done(1);
@@ -1001,8 +961,7 @@ setpagercmd()
  * Extract arguments for the pager command from getcmd()'s input buffer.
  */
 static uint_t
-setpagerargs(source)
-	char	**source;
+setpagerargs(char **source)
 {
 	char	word[MAXCOMPLEXLEN];
 	char	*cp = *source;
@@ -1013,7 +972,7 @@ setpagerargs(source)
 		if (dflag)
 			fprintf(stderr, gettext("got word `%s'\n"), word);
 		pager_vector = (char **)realloc(pager_vector,
-			(size_t)sizeof (char *) * (pager_len + 1));
+		    (size_t)sizeof (char *) * (pager_len + 1));
 		if (pager_vector == (char **)NULL) {
 			(void) fprintf(stderr, gettext("out of memory\n"));
 			done(1);

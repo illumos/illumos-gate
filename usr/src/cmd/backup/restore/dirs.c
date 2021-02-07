@@ -76,7 +76,6 @@ struct odirect {
 	char	d_name[ODIRSIZ];
 };
 
-#ifdef __STDC__
 static ino_t search(ino_t, char	*);
 static void putdir(char *, size_t);
 static void putent(struct direct *);
@@ -89,20 +88,6 @@ static void rst_seekdir(RST_DIR *, offset_t, offset_t);
 static struct inotab *allocinotab(ino_t, struct dinode *, off64_t);
 static void nodeflush(void);
 static struct inotab *inotablookup(ino_t);
-#else
-static ino_t search();
-static void putdir();
-static void putent();
-static void skipmetadata();
-static void flushent();
-static void dcvt();
-static RST_DIR *rst_initdirfile();
-static offset_t rst_telldir();
-static void rst_seekdir();
-static struct inotab *allocinotab();
-static void nodeflush();
-static struct inotab *inotablookup();
-#endif
 
 /*
  *	Extract directory contents, building up a directory structure
@@ -126,7 +111,7 @@ extractdirs(int genmode)
 		saverr = errno;
 		(void) fprintf(stderr,
 		    gettext("%s: %s - cannot create directory temporary\n"),
-			progname, dirfile);
+		    progname, dirfile);
 		errno = saverr;
 		perror("fopen");
 		done(1);
@@ -137,7 +122,7 @@ extractdirs(int genmode)
 			saverr = errno;
 			(void) fprintf(stderr,
 			    gettext("%s: %s - cannot create modefile \n"),
-				progname, modefile);
+			    progname, modefile);
 			errno = saverr;
 			perror("fopen");
 			done(1);
@@ -210,8 +195,8 @@ void
 skipdirs()
 {
 	while (curfile.dip != NULL &&
-		((curfile.dip->di_mode & IFMT) == IFDIR ||
-		(curfile.dip->di_mode & IFMT) == IFATTRDIR)) {
+	    ((curfile.dip->di_mode & IFMT) == IFDIR ||
+	    (curfile.dip->di_mode & IFMT) == IFATTRDIR)) {
 		skipfile();
 	}
 }
@@ -256,13 +241,13 @@ treescan(char *pname, ino_t ino, long (*todo)())
 	else
 		(void) fprintf(stderr,
 		    gettext("Warning: `.' missing from directory %s\n"),
-			pname);
+		    pname);
 	if (dp != NULL && strcmp(dp->d_name, "..") == 0)
 		dp = rst_readdir(dirp); /* first real entry */
 	else
 		(void) fprintf(stderr,
 		    gettext("Warning: `..' missing from directory %s\n"),
-			pname);
+		    pname);
 	bpt = rst_telldir(dirp);
 	/*
 	 * a zero inode signals end of directory
@@ -272,7 +257,7 @@ treescan(char *pname, ino_t ino, long (*todo)())
 		if ((loclen + dp->d_namlen) >= (sizeof (locname) - 2)) {
 			(void) fprintf(stderr,
 			    gettext(
-				"%s%s: ignoring name that exceeds %d char\n"),
+			    "%s%s: ignoring name that exceeds %d char\n"),
 			    locname, dp->d_name, MAXCOMPLEXLEN);
 		} else {
 			/* Always fits by if() condition */
@@ -287,7 +272,7 @@ treescan(char *pname, ino_t ino, long (*todo)())
 	}
 	if (dp == NULL)
 		(void) fprintf(stderr,
-			gettext("corrupted directory: %s.\n"), locname);
+		    gettext("corrupted directory: %s.\n"), locname);
 }
 
 /*
@@ -316,25 +301,26 @@ attrscan(int always, long (*todo)())
 				    (parent->e_flags & (NEW|EXTRACT)) == 0)
 					continue;
 				len = complexcpy(name, myname(parent),
-							MAXCOMPLEXLEN - 3);
+				    MAXCOMPLEXLEN - 3);
 				name[len] = '.';
 				name[len+1] = '\0';
 				name[len+2] = '\0';
 				inattrspace = 1;
 				if ((ep = lookupino(itp->t_ino)) == NULL) {
 					ep = addentry(name, itp->t_ino,
-								NODE|ROOT);
+					    NODE|ROOT);
 				}
 				ep->e_flags |= XATTRROOT;
 				treescan(name, itp->t_ino, todo);
 				inattrspace = 0;
 			} else {
 				(void) fprintf(stderr,
-			gettext("Warning: orphaned attribute directory\n"));
+				    gettext("Warning: orphaned attribute "
+				    "directory\n"));
 			}
 		} else {
-			(void) fprintf(stderr,
-	    gettext("Warning: `..' missing from attribute directory\n"));
+			(void) fprintf(stderr, gettext("Warning: `..' missing "
+			    "from attribute directory\n"));
 		}
 	}
 }
@@ -473,11 +459,7 @@ putent(struct direct *dp)
  * flush out a directory that is finished.
  */
 static void
-#ifdef __STDC__
 flushent(void)
-#else
-flushent()
-#endif
 {
 
 	/* LINTED prev += dp->d_reclen, prev % 4 == 0 */
@@ -591,7 +573,7 @@ rst_seekdir(RST_DIR *sdirp, offset_t loc, offset_t base)
 	loc -= base;
 	if (loc < 0)
 		(void) fprintf(stderr,
-			gettext("bad seek pointer to rst_seekdir %d\n"), loc);
+		    gettext("bad seek pointer to rst_seekdir %d\n"), loc);
 	(void) llseek(sdirp->dd_fd, base + (loc & ~(DIRBLKSIZ - 1)), 0);
 	sdirp->dd_loc = loc & (DIRBLKSIZ - 1);
 	if (sdirp->dd_loc != 0)
@@ -612,7 +594,7 @@ rst_readdir(RST_DIR *rdirp)
 			    DIRBLKSIZ);
 			if (rdirp->dd_size <= 0) {
 				dprintf(stderr,
-					gettext("error reading directory\n"));
+				    gettext("error reading directory\n"));
 				return ((struct direct *)0);
 			}
 		}
@@ -626,7 +608,7 @@ rst_readdir(RST_DIR *rdirp)
 		    (long)dp->d_reclen > (DIRBLKSIZ + 1 - rdirp->dd_loc)) {
 			dprintf(stderr,
 			    gettext("corrupted directory: bad reclen %d\n"),
-				dp->d_reclen);
+			    dp->d_reclen);
 			return ((struct direct *)0);
 		}
 		rdirp->dd_loc += dp->d_reclen;
@@ -634,8 +616,8 @@ rst_readdir(RST_DIR *rdirp)
 			continue;
 		if ((ino_t)(dp->d_ino) >= maxino) {
 			dprintf(stderr,
-				gettext("corrupted directory: bad inum %lu\n"),
-				dp->d_ino);
+			    gettext("corrupted directory: bad inum %lu\n"),
+			    dp->d_ino);
 			continue;
 		}
 		return (dp);
@@ -646,11 +628,7 @@ rst_readdir(RST_DIR *rdirp)
  * Set the mode, owner, and times for all new or changed directories
  */
 void
-#ifdef __STDC__
 setdirmodes(void)
-#else
-setdirmodes()
-#endif
 {
 	FILE *smf;
 	struct entry *ep;
@@ -670,9 +648,9 @@ setdirmodes()
 	if (smf == NULL) {
 		perror("fopen");
 		(void) fprintf(stderr,
-			gettext("cannot open mode file %s\n"), modefile);
+		    gettext("cannot open mode file %s\n"), modefile);
 		(void) fprintf(stderr,
-			gettext("directory mode, owner, and times not set\n"));
+		    gettext("directory mode, owner, and times not set\n"));
 		return;
 	}
 	clearerr(smf);
@@ -710,7 +688,7 @@ setdirmodes()
 		}
 		if (ep == NIL) {
 			panic(gettext("cannot find directory inode %d\n"),
-				node.ino);
+			    node.ino);
 			skipmetadata(smf, node.metasize);
 			continue;
 		}
@@ -720,8 +698,8 @@ setdirmodes()
 			if (fchdir(dfd) < 0) {
 				saverr = errno;
 				(void) fprintf(stderr,
-			    gettext("Can not set attribute context: %s\n"),
-					strerror(saverr));
+				gettext("Can not set attribute context: %s\n"),
+				    strerror(saverr));
 				(void) close(dfd);
 				continue;
 			}
@@ -730,7 +708,7 @@ setdirmodes()
 			saverr = errno;
 			(void) fprintf(stderr,
 			gettext("Can not set directory permissions: %s\n"),
-				strerror(saverr));
+			    strerror(saverr));
 			complained_chmod = 1;
 		}
 		if (node.metasize != 0) {
@@ -739,7 +717,7 @@ setdirmodes()
 				    metasize = node.metasize);
 			if (metadata == NULL) {
 				(void) fprintf(stderr,
-					gettext("Cannot malloc metadata\n"));
+				    gettext("Cannot malloc metadata\n"));
 				done(1);
 			}
 			(void) fread(metadata, 1, node.metasize, smf);
@@ -820,15 +798,15 @@ genliteraldir(char *name, ino_t ino)
 		/* XXX instead of done(), clean up and return FAIL? */
 		if (read(dp, buf, size) == -1) {
 			(void) fprintf(stderr, gettext(
-				"read error extracting inode %d, name %s\n"),
-				curfile.ino, curfile.name);
+			    "read error extracting inode %d, name %s\n"),
+			    curfile.ino, curfile.name);
 			perror("read");
 			done(1);
 		}
 		if (write(ofile, buf, size) == -1) {
 			(void) fprintf(stderr, gettext(
-				"write error extracting inode %d, name %s\n"),
-				curfile.ino, curfile.name);
+			    "write error extracting inode %d, name %s\n"),
+			    curfile.ino, curfile.name);
 			perror("write");
 			done(1);
 		}
@@ -882,9 +860,9 @@ allocinotab(ino_t ino, struct dinode *dip, off64_t seekpt)
 	node.timep[1] = dip->di_mtime;
 	node.mode = dip->di_mode;
 	node.uid =
-		dip->di_suid == UID_LONG ? dip->di_uid : (uid_t)dip->di_suid;
+	    dip->di_suid == UID_LONG ? dip->di_uid : (uid_t)dip->di_suid;
 	node.gid =
-		dip->di_sgid == GID_LONG ? dip->di_gid : (gid_t)dip->di_sgid;
+	    dip->di_sgid == GID_LONG ? dip->di_gid : (gid_t)dip->di_sgid;
 	return (itp);
 }
 
