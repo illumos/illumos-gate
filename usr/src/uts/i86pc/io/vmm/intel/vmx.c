@@ -1156,15 +1156,13 @@ vmx_clear_nmi_window_exiting(struct vmx *vmx, int vcpu)
 static void
 vmx_apply_tsc_adjust(struct vmx *vmx, int vcpu)
 {
-	extern hrtime_t tsc_gethrtime_tick_delta(void);
-	const uint64_t target_offset = (vcpu_tsc_offset(vmx->vm, vcpu) +
-	    (uint64_t)tsc_gethrtime_tick_delta());
+	const uint64_t offset = vcpu_tsc_offset(vmx->vm, vcpu, true);
 
 	ASSERT(vmx->cap[vcpu].proc_ctls & PROCBASED_TSC_OFFSET);
 
-	if (vmx->tsc_offset_active[vcpu] != target_offset) {
-		vmcs_write(VMCS_TSC_OFFSET, target_offset);
-		vmx->tsc_offset_active[vcpu] = target_offset;
+	if (vmx->tsc_offset_active[vcpu] != offset) {
+		vmcs_write(VMCS_TSC_OFFSET, offset);
+		vmx->tsc_offset_active[vcpu] = offset;
 	}
 }
 

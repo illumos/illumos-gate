@@ -67,17 +67,17 @@ fi
 #   unless PS1 gets "unset" first.
 # - Make sure to use absolute paths (e.g. /usr/bin/hostname) to make
 #   sure PS1 works in cases where PATH does not contain /usr/bin/
-if [[ "$(set)" != ~(E)PS1= && "${PS1}" == '' ]] ; then
+if [[ "$(set)" != ~(E)PS1= && -z "${PS1-}" ]] ; then
 	PS1='$(set +o xtrace +o errexit
-                printf "%*s\r%s" COLUMNS ""
-                printf "%s@%s:" "${LOGNAME}" "$(/usr/bin/hostname)"
+                [[ -v COLUMNS ]] && printf "%*s\r%s" COLUMNS ""
+                printf "%s@%s:" "${LOGNAME-}" "$(/usr/bin/hostname)"
 		ellip="${
-			[[ "${LC_ALL}/${LANG}" == ~(Elr)(.*UTF-8/.*|/.*UTF-8) ]] &&
+			[[ "${LC_ALL-}/${LANG-}" == ~(Elr)(.*UTF-8/.*|/.*UTF-8) ]] &&
 				printf "\u[2026]\n" || print "..." ; }"
 		p="${PWD/~(El)${HOME}/\~}"
 		(( ${#p} > 30 )) &&
 			print -r -n -- "${ellip}${p:${#p}-30:30}" ||
 			print -r -n -- "${p}"
-		[[ "${LOGNAME}" == "root" ]] && print -n "# " || print -n "\$ "
+		[[ "${LOGNAME-}" == "root" ]] && print -n "# " || print -n "\$ "
 		)'
 fi

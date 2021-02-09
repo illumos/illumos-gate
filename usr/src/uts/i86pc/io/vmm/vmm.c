@@ -135,9 +135,7 @@ struct vcpu {
 	struct vm_exit	exitinfo;	/* (x) exit reason and collateral */
 	uint64_t	nextrip;	/* (x) next instruction to execute */
 	struct vie	*vie_ctx;	/* (x) instruction emulation context */
-#ifndef __FreeBSD__
 	uint64_t	tsc_offset;	/* (x) offset from host TSC */
-#endif
 };
 
 #define	vcpu_lock_initialized(v) mtx_initialized(&((v)->mtx))
@@ -197,6 +195,7 @@ struct vm {
 	uint16_t	cores;			/* (o) num of cores/socket */
 	uint16_t	threads;		/* (o) num of threads/core */
 	uint16_t	maxcpus;		/* (o) max pluggable cpus */
+	uint64_t	boot_tsc_offset;	/* (i) TSC offset at VM boot */
 
 	struct ioport_config ioports;		/* (o) ioport handling */
 };
@@ -373,6 +372,7 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 	vcpu->guest_xcr0 = XFEATURE_ENABLED_X87;
 	fpu_save_area_reset(vcpu->guestfpu);
 	vmm_stat_init(vcpu->stats);
+	vcpu->tsc_offset = 0;
 }
 
 int
@@ -473,9 +473,6 @@ static void
 vm_init(struct vm *vm, bool create)
 {
 	int i;
-#ifndef __FreeBSD__
-	uint64_t tsc_off;
-#endif
 
 	vm->cookie = VMINIT(vm, vmspace_pmap(vm->vmspace));
 	vm->iommu = NULL;
@@ -498,12 +495,16 @@ vm_init(struct vm *vm, bool create)
 	for (i = 0; i < vm->maxcpus; i++)
 		vcpu_init(vm, i, create);
 
-#ifndef __FreeBSD__
-	tsc_off = (uint64_t)(-(int64_t)rdtsc());
-	for (i = 0; i < vm->maxcpus; i++) {
-		vm->vcpu[i].tsc_offset = tsc_off;
-	}
-#endif /* __FreeBSD__ */
+	/*
+	 * Configure the VM-wide TSC offset so that the call to vm_init()
+	 * represents the boot time (when the TSC(s) read 0).  Each vCPU will
+	 * have its own offset from this, which is altered if/when the guest
+	 * writes to MSR_TSC.
+	 *
+	 * The TSC offsetting math is all unsigned, using overflow for negative
+	 * offets.  A reading of the TSC is negated to form the boot offset.
+	 */
+	vm->boot_tsc_offset = (uint64_t)(-(int64_t)rdtsc_offset());
 }
 
 /*
@@ -1890,23 +1891,107 @@ vm_handle_run_state(struct vm *vm, int vcpuid)
 	return (handled ? 0 : -1);
 }
 
-#ifndef __FreeBSD__
+static int
+vm_handle_rdmsr(struct vm *vm, int vcpuid, struct vm_exit *vme)
+{
+	const uint32_t code = vme->u.msr.code;
+	uint64_t val = 0;
+
+	switch (code) {
+	case MSR_MCG_CAP:
+	case MSR_MCG_STATUS:
+		val = 0;
+		break;
+
+	case MSR_MTRRcap:
+	case MSR_MTRRdefType:
+	case MSR_MTRR4kBase ... MSR_MTRR4kBase + 8:
+	case MSR_MTRR16kBase ... MSR_MTRR16kBase + 1:
+	case MSR_MTRR64kBase:
+		val = 0;
+		break;
+
+	case MSR_TSC:
+		/*
+		 * In all likelihood, this should always be handled in guest
+		 * context by VMX/SVM rather than taking an exit.  (Both VMX and
+		 * SVM pass through read-only access to MSR_TSC to the guest.)
+		 *
+		 * No physical offset is requested of vcpu_tsc_offset() since
+		 * rdtsc_offset() takes care of that instead.
+		 */
+		val = vcpu_tsc_offset(vm, vcpuid, false) + rdtsc_offset();
+		break;
+
+	default:
+		/*
+		 * Anything not handled at this point will be kicked out to
+		 * userspace for attempted processing there.
+		 */
+		return (-1);
+	}
+
+	VERIFY0(vm_set_register(vm, vcpuid, VM_REG_GUEST_RAX,
+	    val & 0xffffffff));
+	VERIFY0(vm_set_register(vm, vcpuid, VM_REG_GUEST_RDX,
+	    val >> 32));
+	return (0);
+}
+
 static int
 vm_handle_wrmsr(struct vm *vm, int vcpuid, struct vm_exit *vme)
 {
-	struct vcpu *cpu = &vm->vcpu[vcpuid];
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
 	const uint32_t code = vme->u.msr.code;
 	const uint64_t val = vme->u.msr.wval;
 
 	switch (code) {
+	case MSR_MCG_CAP:
+	case MSR_MCG_STATUS:
+		/* Ignore writes */
+		break;
+
+	case MSR_MTRRcap:
+		vm_inject_gp(vm, vcpuid);
+		break;
+	case MSR_MTRRdefType:
+	case MSR_MTRR4kBase ... MSR_MTRR4kBase + 8:
+	case MSR_MTRR16kBase ... MSR_MTRR16kBase + 1:
+	case MSR_MTRR64kBase:
+		/* Ignore writes */
+		break;
+
 	case MSR_TSC:
-		cpu->tsc_offset = val - rdtsc();
-		return (0);
+		/*
+		 * The effect of writing the TSC MSR is that a subsequent read
+		 * of the TSC would report that value written (plus any time
+		 * elapsed between the write and the read).  The guest TSC value
+		 * is calculated from a global offset for the guest (which
+		 * effectively makes its TSC read 0 at guest boot) and a
+		 * per-vCPU offset to handle these writes to the MSR.
+		 *
+		 * To calculate that per-vCPU offset, we can work backwards from
+		 * the guest value at the time of write:
+		 *
+		 * value = host TSC + VM boot offset + vCPU offset
+		 *
+		 * so therefore:
+		 *
+		 * value - host TSC - VM boot offset = vCPU offset
+		 */
+		vcpu->tsc_offset = val - vm->boot_tsc_offset - rdtsc_offset();
+		break;
+
+	default:
+		/*
+		 * Anything not handled at this point will be kicked out to
+		 * userspace for attempted processing there.
+		 */
+		return (-1);
 	}
 
-	return (-1);
+	return (0);
 }
-#endif /* __FreeBSD__ */
 
 int
 vm_suspend(struct vm *vm, enum vm_suspend_how how)
@@ -2202,7 +2287,7 @@ restart:
 	KASSERT(!CPU_ISSET(curcpu, &pmap->pm_active),
 	    ("vm_run: absurd pm_active"));
 
-	tscval = rdtsc();
+	tscval = rdtsc_offset();
 
 #ifdef	__FreeBSD__
 	pcb = PCPU_GET(curpcb);
@@ -2240,7 +2325,7 @@ restart:
 	thread_affinity_clear(curthread);
 #endif
 
-	vmm_stat_incr(vm, vcpuid, VCPU_TOTAL_RUNTIME, rdtsc() - tscval);
+	vmm_stat_incr(vm, vcpuid, VCPU_TOTAL_RUNTIME, rdtsc_offset() - tscval);
 
 	critical_exit();
 
@@ -2282,18 +2367,17 @@ restart:
 	case VM_EXITCODE_VMINSN:
 		vm_inject_ud(vm, vcpuid);
 		break;
-#ifndef __FreeBSD__
+	case VM_EXITCODE_RDMSR:
+		error = vm_handle_rdmsr(vm, vcpuid, vme);
+		break;
 	case VM_EXITCODE_WRMSR:
-		if (vm_handle_wrmsr(vm, vcpuid, vme) != 0) {
-			error = -1;
-		}
+		error = vm_handle_wrmsr(vm, vcpuid, vme);
 		break;
 
 	case VM_EXITCODE_HT: {
 		affinity_type = CPU_BEST;
 		break;
 	}
-#endif
 
 	case VM_EXITCODE_MTRAP:
 		vm_suspend_cpu(vm, vcpuid);
@@ -3097,13 +3181,21 @@ vcpu_get_state(struct vm *vm, int vcpuid, int *hostcpu)
 	return (state);
 }
 
-#ifndef	__FreeBSD__
 uint64_t
-vcpu_tsc_offset(struct vm *vm, int vcpuid)
+vcpu_tsc_offset(struct vm *vm, int vcpuid, bool phys_adj)
 {
-	return (vm->vcpu[vcpuid].tsc_offset);
+	ASSERT(vcpuid >= 0 && vcpuid < vm->maxcpus);
+
+	uint64_t vcpu_off = vm->boot_tsc_offset + vm->vcpu[vcpuid].tsc_offset;
+
+	if (phys_adj) {
+		/* Include any offset for the current physical CPU too */
+		extern hrtime_t tsc_gethrtime_tick_delta(void);
+		vcpu_off += (uint64_t)tsc_gethrtime_tick_delta();
+	}
+
+	return (vcpu_off);
 }
-#endif /* __FreeBSD__ */
 
 int
 vm_activate_cpu(struct vm *vm, int vcpuid)

@@ -883,6 +883,8 @@
 @ MSG_SYM_L_START	"START_"
 @ MSG_SYM_L_START_U	"_START_"
 
+@ MSG_SYM_LOCALALIAS	".localalias"
+
 @ MSG_SYM_SECBOUND_START "__start_"
 @ MSG_SYM_SECBOUND_STOP "__stop_"
 

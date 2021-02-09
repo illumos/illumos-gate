@@ -80,6 +80,12 @@ static uint64_t bhyve_xcpuids;
 static int cpuid_leaf_b = 1;
 
 /*
+ * Force exposition of the invariant TSC capability, regardless of whether the
+ * host CPU reports having it.
+ */
+static int vmm_force_invariant_tsc = 0;
+
+/*
  * Round up to the next power of two, if necessary, and then take log2.
  * Returns -1 if argument is zero.
  */
@@ -225,6 +231,7 @@ x86_emulate_cpuid(struct vm *vm, int vcpu_id, uint64_t *rax, uint64_t *rbx,
 			break;
 
 		case CPUID_8000_0007:
+			cpuid_count(func, param, regs);
 			/*
 			 * AMD uses this leaf to advertise the processor's
 			 * power monitoring and RAS capabilities. These
@@ -238,24 +245,26 @@ x86_emulate_cpuid(struct vm *vm, int vcpu_id, uint64_t *rax, uint64_t *rbx,
 			regs[0] = 0;
 			regs[1] = 0;
 			regs[2] = 0;
-			regs[3] = 0;
 
 			/*
-			 * "Invariant TSC" can be advertised to the guest if:
-			 * - host TSC frequency is invariant
-			 * - host TSCs are synchronized across physical cpus
+			 * If the host system possesses an invariant TSC, then
+			 * it is safe to expose to the guest.
 			 *
-			 * XXX This still falls short because the vcpu
-			 * can observe the TSC moving backwards as it
-			 * migrates across physical cpus. But at least
-			 * it should discourage the guest from using the
-			 * TSC to keep track of time.
+			 * If there is measured skew between host TSCs, it will
+			 * be properly offset so guests do not observe any
+			 * change between CPU migrations.
 			 */
-#ifdef __FreeBSD__
-			/* XXXJOY: Wire up with our own TSC logic */
-			if (tsc_is_invariant && smp_tsc)
+			regs[3] &= AMDPM_TSC_INVARIANT;
+
+			/*
+			 * Since illumos avoids deep C-states on CPUs which do
+			 * not support an invariant TSC, it may be safe (and
+			 * desired) to unconditionally expose that capability to
+			 * the guest.
+			 */
+			if (vmm_force_invariant_tsc != 0) {
 				regs[3] |= AMDPM_TSC_INVARIANT;
-#endif /* __FreeBSD__ */
+			}
 			break;
 
 		case CPUID_8000_001D:

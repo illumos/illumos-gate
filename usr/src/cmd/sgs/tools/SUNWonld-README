@@ -1669,3 +1669,4 @@ Bugid   Risk Synopsis
 10581	ld(1) should know kernel modules are a thing
 11057	hidden undefined weak symbols should not leave relocations
 11067	debug statistics crash ld(1) when -z allextract
+13481	ld(1) should skip GCC local aliases when building symsort sections

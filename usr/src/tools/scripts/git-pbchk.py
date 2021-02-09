@@ -21,7 +21,7 @@
 # Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright (c) 2019, Joyent, Inc.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 from __future__ import print_function
@@ -57,6 +57,7 @@ sys.path.insert(2, os.path.join(os.path.dirname(__file__), ".."))
 from onbld.Scm import Ignore
 from onbld.Checks import Comments, Copyright, CStyle, HdrChk, WsCheck
 from onbld.Checks import JStyle, Keywords, ManLint, Mapfile, SpellCheck
+from onbld.Checks import ShellLint
 
 class GitError(Exception):
     pass
@@ -294,6 +295,26 @@ def manlint(root, parent, flist, output):
             ret |= SpellCheck.spellcheck(fh, output=output)
     return ret
 
+def shelllint(root, parent, flist, output):
+    ret = 0
+    output.write("Shell lint:\n")
+
+    def isshell(x):
+        (_, ext) = os.path.splitext(x)
+        if ext in ['.sh', '.ksh']:
+            return True
+        if ext == '':
+            with io.open(x, mode='r', errors='ignore') as fh:
+                if re.match(r'^#.*\bk?sh\b', fh.readline()):
+                    return True
+        return False
+
+    for f in flist(isshell):
+        with io.open(f, mode='rb') as fh:
+            ret |= ShellLint.lint(fh, output=output)
+
+    return ret
+
 def keywords(root, parent, flist, output):
     ret = 0
     output.write("SCCS Keywords:\n")
@@ -399,6 +420,7 @@ def nits(root, parent, paths):
             keywords,
             manlint,
             mapfilechk,
+            shelllint,
             winnames,
             wscheck]
     scmds = [symlinks]
@@ -413,6 +435,7 @@ def pbchk(root, parent, paths):
             keywords,
             manlint,
             mapfilechk,
+            shelllint,
             winnames,
             wscheck]
     scmds = [symlinks]

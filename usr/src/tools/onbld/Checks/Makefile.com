@@ -26,7 +26,7 @@
 # Copyright 2010, Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016, Joyent, Inc.
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 
 include $(SRC)/Makefile.master
 include ../../../Makefile.tools
@@ -47,6 +47,7 @@ PYSRCS = \
 	ManLint.py	\
 	Mapfile.py	\
 	ProcessCheck.py	\
+	ShellLint.py	\
 	SpellCheck.py	\
 	WsCheck.py	\
 	__init__.py

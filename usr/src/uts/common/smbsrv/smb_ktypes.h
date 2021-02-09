@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */

@@ -700,3 +700,21 @@ clock_ts_to_ct(struct timespec *ts, struct clocktime *ct)
 	}
 #endif
 }
+
+/* Equivalent to the FreeBSD rdtsc(), but with any necessary per-cpu offset */
+uint64_t
+rdtsc_offset(void)
+{
+	/*
+	 * The timestamp logic will decide if a delta need be applied to the
+	 * unscaled hrtime reading (effectively rdtsc), but we do require it be
+	 * backed by the TSC itself.
+	 */
+	extern hrtime_t (*gethrtimeunscaledf)(void);
+	extern hrtime_t tsc_gethrtimeunscaled(void);
+	extern hrtime_t tsc_gethrtimeunscaled_delta(void);
+
+	ASSERT(*gethrtimeunscaledf == tsc_gethrtimeunscaled ||
+	    *gethrtimeunscaledf == tsc_gethrtimeunscaled_delta);
+	return ((uint64_t)gethrtimeunscaledf());
+}
