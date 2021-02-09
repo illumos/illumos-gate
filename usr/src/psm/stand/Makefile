@@ -22,24 +22,19 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../../Makefile.master
 
-# note: the x86 needs the "bootblks" target for installboot
 SUBDIRS= lib bootblks boot cpr bootlst
 
 all		:=	TARGET= all
 install		:=	TARGET= install
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-clean.lint	:=	TARGET= clean.lint
 
 .KEEP_STATE:
 
-all install clean lint clean.lint clobber: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
@@ -51,6 +46,6 @@ FRC:
 # goo in the cross-reference, except for the crufty "old" directory.
 #
 STANDDIR=	../../stand
-PROMDIRS=	../promif ../../uts/intel/ia32/promif ../../uts/intel/promif
+PROMDIRS=	../promif
 XRDIRS +=	$(STANDDIR)/lib $(STANDDIR)/sys $(PROMDIRS)
 XRPRUNE =	old

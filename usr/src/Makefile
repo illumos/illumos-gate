@@ -39,8 +39,8 @@ include Makefile.master
 # it defines TARGETDIRS and ROOTDIRS.
 include Targetdirs
 
-COMMON_SUBDIRS=	data uts lib cmd ucblib ucbcmd psm man test
-sparc_SUBDIRS= stand
+COMMON_SUBDIRS=	data uts lib cmd ucblib ucbcmd man test
+sparc_SUBDIRS= psm stand
 i386_SUBDIRS= grub boot
 
 #

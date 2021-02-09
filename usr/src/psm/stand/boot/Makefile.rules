@@ -48,14 +48,6 @@
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-%.o: $(PAMD64_DIR)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
-%.o: $(PAMD64_DIR)/%.s
-	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
-
 %.o: $(MACH_DIR)/%.s
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_O)
@@ -73,48 +65,9 @@
 	$(POST_PROCESS_O)
 
 #
-# Pattern matching rules to lint the source in the current directory
-#
-%.ln: $(TOP_CMN_DIR)/util/%.c
-	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
-
-%.ln: $(TOP_CMN_DIR)/fs/%.c
-	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
-
-%.ln: $(PROM_DIR)/%.c
-	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
-
-%.ln: $(CMN_DIR)/%.c
-	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
-
-%.ln: $(PIM_DIR)/%.c
-	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
-
-%.ln: $(PAMD64_DIR)/%.s
-	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
-
-%.ln: $(PAMD64_DIR)/%.c
-	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
-
-%.ln: $(MACH_DIR)/%.s
-	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
-
-%.ln: $(MACH_DIR)/%.c
-	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
-
-%.ln: %.s
-	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
-
-%.ln: $(PLAT_DIR)/%.c
-	@($(LHEAD) $(LINT.c) -c $< $(LTAIL))
-
-#
-# Rules to compile libraries needed to build and lint the boot loaders.
+# Rules to compile libraries needed to build the boot loaders.
 #
 $(LIBPROM_DIR)/libprom.a $(LIBPLAT_DEP) $(LIBNAME_DIR)/libnames.a: FRC
-	@cd $(@D); pwd; $(MAKE) $(@F)
-
-$(LIBPROM_DIR)/llib-lprom.ln $(LIBPLAT_DEP_L) $(LIBNAME_DIR)/llib-lnames.ln: FRC
 	@cd $(@D); pwd; $(MAKE) $(@F)
 
 FRC:
