@@ -108,7 +108,7 @@ ast/cmdext.h: $(OBJECTS:%.o=$(ASTSRC)/%.c)
 	    >> $@.tmp
 	$(AST_PROTO) -f $@.tmp >> $@
 	rm -f $@.tmp
-	$(POST_PROCESS_AST) $@
+	$(POST_PROCESS_AST)
 
 CLOBBERFILES += ast/*
 

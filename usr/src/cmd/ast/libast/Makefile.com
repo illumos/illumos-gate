@@ -119,7 +119,7 @@ ast/%:= FILEMODE= 0644
 $(HEADERGEN:%=ast/%): $(FEATURES:%=FEATURE/%)
 	src=`echo $(@F:%.h=%) | sed 's/^ast_//'`; \
 	    $(AST_PROTO) FEATURE/$$src > $@
-	$(POST_PROCESS_AST) $@
+	$(POST_PROCESS_AST)
 
 ast/prototyped.h: $(AST_TOOLS)/proto
 	$(MKDIR) -p $(@D)
@@ -127,7 +127,7 @@ ast/prototyped.h: $(AST_TOOLS)/proto
 
 ast/ast_common.h: ast/prototyped.h
 	$(AST_PROTO) FEATURE/common | $(GREP) -v 'define _def_map_' > $@
-	$(POST_PROCESS_AST) $@
+	$(POST_PROCESS_AST)
 	$(CP) $@ .
 
 ast/lc.h: lc.h
@@ -135,23 +135,23 @@ ast/lc.h: lc.h
 
 ast/%.h: $(ASTSRC)/include/%.h
 	$(INS.file)
-	$(POST_PROCESS_AST) $@
+	$(POST_PROCESS_AST)
 
 ast/%.h: $(ASTSRC)/comp/%.h
 	$(INS.file)
-	$(POST_PROCESS_AST) $@
+	$(POST_PROCESS_AST)
 
 ast/%.h: $(ASTSRC)/cdt/%.h
 	$(INS.file)
-	$(POST_PROCESS_AST) $@
+	$(POST_PROCESS_AST)
 
 ast/%.h: $(ASTSRC)/std/%.h
 	$(INS.file)
-	$(POST_PROCESS_AST) $@
+	$(POST_PROCESS_AST)
 
 ast/ast_namval.h: $(ASTSRC)/include/namval.h
 	$(CP) $(ASTSRC)/include/namval.h $@
-	$(POST_PROCESS_AST) $@
+	$(POST_PROCESS_AST)
 
 CLOBBERFILES += ast_common.h t.c
 CLOBBERFILES += ast/*

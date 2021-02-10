@@ -90,7 +90,7 @@ $(HEADERGEN:%=ast/%): $(FEATURES:%=FEATURE/%)
 	src=`echo $(@F:%.h=%) | sed 's/^ast_//'`; \
 	    [[ $$src = dlldefs ]] && src=dll; \
 	    $(AST_PROTO) FEATURE/$$src > $@
-	$(POST_PROCESS_AST) $@
+	$(POST_PROCESS_AST)
 
 install_h: $(HEADERGEN:%=ast/%)
 
