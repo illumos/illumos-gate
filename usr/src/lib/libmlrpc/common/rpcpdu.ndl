@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _RPCPDU_NDL_
@@ -557,9 +557,11 @@ struct ndr_request_hdr_with_object {
 
 /*
  * Convenient for response header sizing and multi-fragment responses.
- * We know the header is going to be 24 bytes.
+ * We know the header is going to be 24 bytes, and the 'common' part
+ * is 16 bytes.
  */
-#define NDR_RSP_HDR_SIZE			24
+#define	NDR_CMN_HDR_SIZE			16
+#define	NDR_RSP_HDR_SIZE			24
 
 
 /*
