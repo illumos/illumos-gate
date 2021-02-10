@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 	.file	"door.s"
@@ -110,7 +112,7 @@
 /*
  * int
  * __door_return(
- *	void 			*data_ptr,
+ *	void			*data_ptr,
  *	size_t			data_size,	(in bytes)
  *	door_return_desc_t	*door_ptr,	(holds returned desc info)
  *	caddr_t			stack_base,
@@ -142,6 +144,8 @@ door_restart:
 	 *		data (if any)
 	 *	 sp->	struct door_results
 	 *
+	 * The stack will be aligned to 16 bytes; we must maintain that
+	 * alignment prior to any call instruction.
 	 * struct door_results has the arguments in place for the server proc,
 	 * so we just call it directly.
 	 */
@@ -152,14 +156,16 @@ door_restart:
 	 * this is the last server thread - call creation func for more
 	 */
 	movl	DOOR_INFO_PTR(%esp), %eax
+	subl	$12, %esp
 	pushl	%eax		/* door_info_t * */
 	call	door_depletion_cb@PLT
-	addl	$4, %esp
+	addl	$16, %esp
 1:
 	/* Call the door server function now */
 	movl	DOOR_PC(%esp), %eax
 	call	*%eax
 	/* Exit the thread if we return here */
+	subl	$12, %esp
 	pushl	$0
 	call	_thrp_terminate
 	/* NOTREACHED */

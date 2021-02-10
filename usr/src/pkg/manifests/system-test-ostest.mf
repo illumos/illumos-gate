@@ -14,6 +14,7 @@
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/test/ostest@$(PKGVERS)
@@ -38,6 +39,7 @@ dir path=opt/os-tests/tests/sdevfs
 dir path=opt/os-tests/tests/secflags
 dir path=opt/os-tests/tests/sigqueue
 dir path=opt/os-tests/tests/sockfs
+dir path=opt/os-tests/tests/stackalign
 dir path=opt/os-tests/tests/stress
 dir path=opt/os-tests/tests/syscall
 dir path=opt/os-tests/tests/timer
@@ -110,6 +112,8 @@ file path=opt/os-tests/tests/sockfs/rights.32 mode=0555
 file path=opt/os-tests/tests/sockfs/rights.64 mode=0555
 file path=opt/os-tests/tests/sockfs/sockpair mode=0555
 file path=opt/os-tests/tests/spoof-ras mode=0555
+file path=opt/os-tests/tests/stackalign/stackalign.32 mode=0555
+file path=opt/os-tests/tests/stackalign/stackalign.64 mode=0555
 file path=opt/os-tests/tests/stress/dladm-kstat mode=0555
 file path=opt/os-tests/tests/syscall/open.32 mode=0555
 file path=opt/os-tests/tests/syscall/open.64 mode=0555
