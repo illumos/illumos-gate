@@ -34,14 +34,13 @@ PLUGINS= $(HERMON-MELLANOX_LIB) $(TAVOR-MELLANOX_LIB) $(SD-GENERIC_LIB)
 OBJECTS= $(PLUGINS:%.so=%.o)
 DYNLIB=	$(PLUGINS:%=%)
 POFILES= $(PLUGINS:%.so=%.po)
-LINTFILE= $(PLUGINS:%.so=%.ln)
 
 POFILE=	fwflash_verify_msg.po
 SRCDIR=	../vendor
 
 include $(SRC)/cmd/fwflash/Makefile.com
 
-CLEANFILES= $(PLUGINS) $(POFILE) $(POFILES) $(LINTFILE)
+CLEANFILES= $(PLUGINS) $(POFILE) $(POFILES)
 
 LIBS= $(DYNLIB)
 CFLAGS += $(C_PICFLAGS)
@@ -58,21 +57,18 @@ $(HERMON-MELLANOX_LIB):= SONAME = $(HERMON-MELLANOX_LIB)
 $(TAVOR-MELLANOX_LIB):=	SONAME = $(TAVOR-MELLANOX_LIB)
 $(SD-GENERIC_LIB):= SONAME = $(SD-GENERIC_LIB)
 
-$(HERMON-MELLANOX_LIB):= DYNFLAGS += -R/usr/lib/fwflash/identify 
+$(HERMON-MELLANOX_LIB):= DYNFLAGS += -R/usr/lib/fwflash/identify
 $(HERMON-MELLANOX_LIB):= LDLIBS += -L. $(ROOT)/usr/lib/fwflash/identify/hermon.so
 
 $(SD-GENERIC_LIB):= LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi
 $(SD-GENERIC_LIB):= DYNFLAGS += -R/usr/lib/scsi
 
-
-.KEEP STATE:
+.KEEP_STATE:
 
 all: $(LIBS)
 
 install: all $(ROOTLIBS)
 
-lint: $(LINTFILE) 
-
-_msg msg: $(POFILE)
+_msg: $(POFILE)
 
 include $(SRC)/lib/Makefile.targ

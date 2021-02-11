@@ -83,19 +83,7 @@ $(IMPLEMENTATIONS):	FRC
 	@cd $@; pwd; THISIMPL=$@ $(MAKE) $(NO_STATE) $(TARGET)
 
 $(XMODS):	FRC
-	@if [ -f $@/Makefile  ]; then \
-		cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET); \
-	else \
-		true; \
-	fi
-
-$(CLOSED_XMODS):	FRC
-	@if [ -f $(CLOSED)/uts/sun4v/$@/Makefile  ]; then \
-		cd $(CLOSED)/uts/sun4v/$@; pwd; \
-		    $(MAKE) $(NO_STATE) $(TARGET); \
-	else \
-		true; \
-	fi
+	cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(CLOSED_KMODS):	FRC
 	cd $(CLOSED)/uts/sun4v/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

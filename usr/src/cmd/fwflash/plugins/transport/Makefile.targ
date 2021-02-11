@@ -37,7 +37,6 @@ PLUGINS=	$(SES_LIB) $(TAVOR_LIB) $(HERMON_LIB) $(SD_LIB) $(UFM_LIB)
 OBJECTS= $(PLUGINS:%.so=%.o)
 DYNLIB=	$(PLUGINS:%=%)
 POFILES= $(PLUGINS:%.so=%.po)
-LINTFILE= $(PLUGINS:%.so=%.ln)
 
 SLINKS=		sgen.so
 POFILE=	fwflash_transport_identify_ses.po
@@ -45,7 +44,7 @@ SRCDIR= ../common
 
 include $(SRC)/cmd/fwflash/Makefile.com
 
-CLEANFILES=	$(PLUGINS) $(POFILES) $(POFILE) $(LINTFILE) $(SLINKS)
+CLEANFILES=	$(PLUGINS) $(POFILES) $(POFILE) $(SLINKS)
 
 LIBS= $(DYNLIB)
 CFLAGS += $(C_PICFLAGS)
@@ -79,7 +78,7 @@ $(UFM_LIB):=	LDLIBS += -lpcidb -lnvpair -lc
 $(SES_LIB):=	DYNFLAGS += -R/usr/lib/scsi
 $(SD_LIB):=	DYNFLAGS += -R/usr/lib/scsi
 
-.KEEP STATE:
+.KEEP_STATE:
 
 $(ROOTUSRLIBFWFLASHIDF)/$(SLINKS) : $(ROOTUSRLIBFWFLASHIDF)/$(SES_LIB)
 	@$(RM) $@
@@ -90,8 +89,6 @@ all: $(LIBS)
 install: all  $(ROOTLIBS) \
 	$(ROOTUSRLIBFWFLASHIDF)/$(SLINKS)
 
-lint: $(LINTFILE)
-
-_msg msg: $(POFILE)
+_msg: $(POFILE)
 
 include $(SRC)/lib/Makefile.targ

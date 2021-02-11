@@ -210,17 +210,8 @@ THIRDPARTYLICENSE.arp: arp.c
 
 CLOBBERFILES += THIRDPARTYLICENSE.arp
 
-#
-# The reason this rule checks for the existence of the
-# Makefile is that some of the directories do not exist
-# in our exportable source builds.
-#
 $(SUBDIRS): FRC
-	@if [ -f $@/Makefile  ]; then \
-		cd $@; pwd; $(MAKE) $(TARGET); \
-	else \
-		true; \
-	fi
+	cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 

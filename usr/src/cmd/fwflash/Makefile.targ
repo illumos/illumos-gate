@@ -35,10 +35,9 @@ HDRS=		fwflash.h
 
 PROG=		$(SRCS:%.c=%)
 OBJS=		$(SRCS:%.c=%.o)
-LINTFILE=	$(SRCS:%.c=%.ln)
 POFILES=	$(SRCS:%.c=%.po)
 
-POFILE= 	fwflash_msg.po
+POFILE=		fwflash_msg.po
 
 HDRDIR=../common
 SRCDIR=../common
@@ -73,7 +72,7 @@ $(PROG): install_h $(OBJS)
 all:	$(PROG)
 
 clean:
-	$(RM) $(POFILE) $(POFILES) $(LINTFILE) $(PROG)
+	$(RM) $(POFILE) $(POFILES) $(PROG)
 
 clobber: clean
 	$(RM) $(OBJS)
@@ -84,6 +83,4 @@ install: all $(ROOTUSRSBIN) $(ROOTUSRSBIN)/$(PROG)
 
 install_h:$(ROOTUSRINCLDFWFLASH) $(ROOTHDRS)
 
-lint: $(LINTFILE)	
-
-_msg msg:	$(POFILE)
+_msg:	$(POFILE)

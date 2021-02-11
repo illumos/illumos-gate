@@ -543,8 +543,6 @@ _msg:			$(MSGSUBDIRS:%=%-nodepend) .WAIT _dc
 
 _dc:			$(DCSUBDIRS:%=%-nodepend)
 
-lint:
-
 # Library interdependencies are called out explicitly here.
 ../cmd/sgs/libconv: crt
 ../cmd/sgs/libdl: crt
@@ -722,17 +720,9 @@ udapl:		libdevinfo libdladm
 # OpenSolaris).
 #
 $(SUBDIRS): FRC
-	@if [ -f $@/Makefile  ]; then \
-		cd $@; pwd; $(MAKE) $(TARGET); \
-	else \
-		true; \
-	fi
+	cd $@; pwd; $(MAKE) $(TARGET)
 
 $(SUBDIRS:%=%-nodepend):
-	@if [ -f $(@:%-nodepend=%)/Makefile  ]; then \
-		cd $(@:%-nodepend=%); pwd; $(MAKE) $(TARGET); \
-	else \
-		true; \
-	fi
+	cd $(@:%-nodepend=%); pwd; $(MAKE) $(TARGET)
 
 FRC:

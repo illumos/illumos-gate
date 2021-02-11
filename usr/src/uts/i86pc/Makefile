@@ -79,11 +79,7 @@ $(IMPLEMENTATIONS):     FRC
 	@cd $@; pwd; THISIMPL=$@ $(MAKE) $(NO_STATE) $(TARGET)
 
 $(XMODS):	FRC
-	@if [ -f $@/Makefile  ]; then \
-		cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET); \
-	else \
-		true; \
-	fi
+	cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 install_h check:	$(IMPLEMENTATIONS) FRC
 	@cd sys; pwd; $(MAKE) $(TARGET)
