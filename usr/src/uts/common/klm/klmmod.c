@@ -62,7 +62,6 @@ void (*lm_set_nlm_status)(int nlm_id, flk_nlm_status_t) = NULL;
  */
 void (*lm_remove_file_locks)(int) = NULL;
 
-krwlock_t		lm_lck;
 zone_key_t		nlm_zone_key;
 
 /*

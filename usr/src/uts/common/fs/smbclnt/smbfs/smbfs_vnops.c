@@ -34,7 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -326,6 +326,7 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	/*
 	 * We have a new FID and access rights.
 	 */
+	VERIFY(fid != NULL);
 	oldfid = np->n_fid;
 	np->n_fid = fid;
 	np->n_fidrefs++;
@@ -562,6 +563,10 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
 		return (EIO);
 
+	/* Sanity check: should have a valid open */
+	if (np->n_fid == NULL)
+		return (EIO);
+
 	ASSERT(smbfs_rw_lock_held(&np->r_rwlock, RW_READER));
 
 	if (vp->v_type != VREG)
@@ -721,6 +726,10 @@ smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
+
+	/* Sanity check: should have a valid open */
+	if (np->n_fid == NULL)
 		return (EIO);
 
 	ASSERT(smbfs_rw_lock_held(&np->r_rwlock, RW_WRITER));
@@ -4425,6 +4434,10 @@ smbfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
+
+	/* Sanity check: should have a valid open */
+	if (np->n_fid == NULL)
 		return (EIO);
 
 	if (vp->v_flag & VNOMAP)

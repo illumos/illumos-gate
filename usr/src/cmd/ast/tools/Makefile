@@ -15,8 +15,8 @@
 
 SHELL= /usr/bin/ksh93
 
-CTOOLS= mamake ratz release proto lcgen
-SHTOOLS= iffe mamprobe mprobe package gentab
+CTOOLS= proto lcgen
+SHTOOLS= iffe package gentab
 
 TOOLS= $(CTOOLS) $(SHTOOLS) probe
 OBJS= $(CTOOLS:%=%.o)
@@ -82,7 +82,6 @@ STACKPROTECT= none
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-implicit-fallthrough
-CERRWARN += -_gcc=-Wno-unused-but-set-variable
 CERRWARN += -_gcc=-Wno-unused-value
 CERRWARN += $(CNOWARN_UNINIT)
 SMATCH= off

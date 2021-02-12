@@ -383,11 +383,11 @@ typedef struct rfs4_dss_path {
 } rfs4_dss_path_t;
 
 /* array of paths passed-in from nfsd command-line; stored in nvlist */
-char		**rfs4_dss_newpaths;
-uint_t		rfs4_dss_numnewpaths;
+extern char		**rfs4_dss_newpaths;
+extern uint_t		rfs4_dss_numnewpaths;
 
 /* nvlists of all DSS paths: current, and before last warmstart */
-nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
+extern nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
 
 /*
  * The server maintains a set of state on a per client basis that
@@ -876,7 +876,7 @@ typedef struct rfs4_db_mem_cache {
 
 #define	RFS4_DB_MEM_CACHE_NUM 8
 
-rfs4_db_mem_cache_t rfs4_db_mem_cache_table[RFS4_DB_MEM_CACHE_NUM];
+extern rfs4_db_mem_cache_t rfs4_db_mem_cache_table[RFS4_DB_MEM_CACHE_NUM];
 
 
 extern srv_deleg_policy_t nfs4_get_deleg_policy();

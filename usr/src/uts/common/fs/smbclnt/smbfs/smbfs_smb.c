@@ -34,7 +34,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2019 Nexenta by DDN, Inc.  All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -439,7 +439,7 @@ out:
 	if (fhp != NULL)
 		smb_fh_rele(fhp);
 
-	return (0);
+	return (error);
 }
 
 void

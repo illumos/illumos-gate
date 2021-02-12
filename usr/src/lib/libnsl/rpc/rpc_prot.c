@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This set of routines implements the rpc message definition,
  * its serializer and some common rpc utility routines.
@@ -52,8 +50,6 @@
 
 /* * * * * * * * * * * * * * XDR Authentication * * * * * * * * * * * */
 
-struct opaque_auth _null_auth;
-
 /*
  * XDR an opaque authentication struct
  * (see auth.h)
@@ -63,7 +59,7 @@ xdr_opaque_auth(XDR *xdrs, struct opaque_auth *ap)
 {
 	if (xdr_enum(xdrs, &(ap->oa_flavor)))
 		return (xdr_bytes(xdrs, &ap->oa_base,
-			&ap->oa_length, MAX_AUTH_BYTES));
+		    &ap->oa_length, MAX_AUTH_BYTES));
 	return (FALSE);
 }
 
@@ -137,7 +133,7 @@ xdr_replymsg(XDR *xdrs, struct rpc_msg *rmsg)
 	    rmsg->rm_reply.rp_stat == MSG_ACCEPTED &&
 	    rmsg->rm_direction == REPLY &&
 	    (buf = XDR_INLINE(xdrs, 6 * BYTES_PER_XDR_UNIT + (rndup =
-		RNDUP(rmsg->rm_reply.rp_acpt.ar_verf.oa_length)))) != NULL) {
+	    RNDUP(rmsg->rm_reply.rp_acpt.ar_verf.oa_length)))) != NULL) {
 		IXDR_PUT_INT32(buf, rmsg->rm_xid);
 		IXDR_PUT_ENUM(buf, rmsg->rm_direction);
 		IXDR_PUT_ENUM(buf, rmsg->rm_reply.rp_stat);
@@ -162,7 +158,7 @@ xdr_replymsg(XDR *xdrs, struct rpc_msg *rmsg)
 		switch (ar->ar_stat) {
 		case SUCCESS:
 			return ((*(ar->ar_results.proc))
-				(xdrs, ar->ar_results.where));
+			    (xdrs, ar->ar_results.where));
 		case PROG_MISMATCH:
 			if (!xdr_u_int(xdrs, (uint_t *)&(ar->ar_vers.low)))
 				return (FALSE);
@@ -180,7 +176,7 @@ xdr_replymsg(XDR *xdrs, struct rpc_msg *rmsg)
 		if (rmsg->rm_reply.rp_stat != MSG_ACCEPTED) {
 			if (rmsg->rm_reply.rp_stat == MSG_DENIED)
 				return (xdr_rejected_reply(xdrs,
-					&rmsg->rm_reply.rp_rjct));
+				    &rmsg->rm_reply.rp_rjct));
 			return (FALSE);
 		}
 		ar = &rmsg->rm_reply.rp_acpt;
@@ -201,8 +197,7 @@ xdr_replymsg(XDR *xdrs, struct rpc_msg *rmsg)
 				oa->oa_base = malloc(oa->oa_length);
 				if (oa->oa_base == NULL) {
 					syslog(LOG_ERR,
-						"xdr_replymsg : "
-						"out of memory.");
+					    "xdr_replymsg : out of memory.");
 					rpc_callerr.re_status = RPC_SYSTEMERROR;
 					return (FALSE);
 				}
@@ -225,7 +220,7 @@ xdr_replymsg(XDR *xdrs, struct rpc_msg *rmsg)
 		switch (ar->ar_stat) {
 		case SUCCESS:
 			return ((*(ar->ar_results.proc))
-				(xdrs, ar->ar_results.where));
+			    (xdrs, ar->ar_results.where));
 		case PROG_MISMATCH:
 			if (!xdr_u_int(xdrs, (uint_t *)&(ar->ar_vers.low)))
 				return (FALSE);
@@ -244,8 +239,8 @@ xdr_replymsg(XDR *xdrs, struct rpc_msg *rmsg)
 	    xdr_enum(xdrs, (enum_t *)&(rmsg->rm_direction)) &&
 	    (rmsg->rm_direction == REPLY))
 		return (xdr_union(xdrs, (enum_t *)&(rmsg->rm_reply.rp_stat),
-				(caddr_t)&(rmsg->rm_reply.ru),
-				reply_dscrm, NULL_xdrproc_t));
+		    (caddr_t)&(rmsg->rm_reply.ru),
+		    reply_dscrm, NULL_xdrproc_t));
 	return (FALSE);
 }
 
@@ -264,7 +259,7 @@ xdr_callhdr(XDR *xdrs, struct rpc_msg *cmsg)
 	    xdr_enum(xdrs, (enum_t *)&(cmsg->rm_direction)) &&
 	    xdr_u_int(xdrs, (uint_t *)&(cmsg->rm_call.cb_rpcvers)) &&
 	    xdr_u_int(xdrs, (uint_t *)&(cmsg->rm_call.cb_prog))) {
-	    return (xdr_u_int(xdrs, (uint_t *)&(cmsg->rm_call.cb_vers)));
+		return (xdr_u_int(xdrs, (uint_t *)&(cmsg->rm_call.cb_vers)));
 	}
 	return (FALSE);
 }
