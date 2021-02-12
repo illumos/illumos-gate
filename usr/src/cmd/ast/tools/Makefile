@@ -40,10 +40,9 @@ package:
 	# AT&T upstream, which is "i386" or "sun4", regardless of whether
 	# building 32- or 64-bit objects.
 	{ \
-		print "#!/bin/sh"; \
 		[[ $(MACH) == i386 ]] && arch=i386 || arch=sun4; \
-		print "echo sol11.$$arch"; \
-	} >; $@
+		print -e "#!/bin/sh\n\necho sol11.$$arch" > $@; \
+	}
 	$(CHMOD) +x $@
 
 %.o: $(C_ASTINIT)/%.c
@@ -54,20 +53,22 @@ package:
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
+AST_SH_ASSEMBLE= \
+	{ \
+		tf=$$(mktemp /tmp/ast.XXXXXXXXXX) && \
+		print 'USAGE_LICENSE="[-author?ATT]"' > $$tf && \
+		cat $< >> $$tf && \
+		mv $$tf $@; \
+	}
+
 %: $(C_ASTINIT)/%.sh
 	$(RM) $@
-	{ \
-		echo 'USAGE_LICENSE="[-author?ATT]"'; \
-		cat $<; \
-	} >; $@
+	$(AST_SH_ASSEMBLE)
 	$(CHMOD) +x $@
 
 %: $(C_AST)/src/lib/libpp/%.sh
 	$(RM) $@
-	{ \
-		echo 'USAGE_LICENSE="[-author?ATT]"'; \
-		cat $<; \
-	} >; $@
+	$(AST_SH_ASSEMBLE)
 	$(CHMOD) +x $@
 
 $(CTOOLS): $(OBJS)
