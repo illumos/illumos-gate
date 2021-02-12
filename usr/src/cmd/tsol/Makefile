@@ -66,16 +66,15 @@ all	:=	TARGET = all
 install :=	TARGET = install
 clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
 _msg	:=	TARGET = _msg
 
 .KEEP_STATE:
 
 .PARALLEL:	$(SUBDIRS)
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
-$(POFILE): $(MSGSUBDIRS) $(CLOSED_MSGSUBDIRS)
+$(POFILE): $(MSGSUBDIRS)
 	$(RM) $(POFILE)
 	$(CAT) $(POFILES) > $(POFILE)
 

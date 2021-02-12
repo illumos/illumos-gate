@@ -41,8 +41,8 @@ include	$(SRC)/cmd/picl/plugins/Makefile.com
 CPPFLAGS +=	-D_REENTRANT -I$(SRC)/uts/sun4u/serengeti
 CPPFLAGS +=	-I$(SRC)/uts/sun4u/serengeti
 CPPFLAGS +=	-I$(SRC)/uts/sun4u/lw8
-CPPFLAGS +=	-I$(SRC)/uts/sun4u -I$(CLOSED)/uts/sun4u
-CPPFLAGS +=	-I$(SRC)/uts/common -I$(CLOSED)/uts/common
+CPPFLAGS +=	-I$(SRC)/uts/sun4u
+CPPFLAGS +=	-I$(SRC)/uts/common
 
 SRCS =		$(OBJECTS:%.o=%.c)
 
@@ -89,8 +89,6 @@ $(LIBLINKS):	FRC
 # include library targets
 include $(SRC)/lib/Makefile.targ
 include	$(SRC)/cmd/picl/plugins/Makefile.targ
-
-lint:
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -124,10 +124,6 @@ __GNUC64=		$(__GNUC)
 # uncomment things in the lower Makefiles to enable the feature.
 ENABLE_SMB_PRINTING=	$(POUND_SIGN)
 
-# CLOSED is the root of the tree that contains source which isn't released
-# as open source
-CLOSED=		$(SRC)/../closed
-
 # BUILD_TOOLS is the root of all tools including compilers.
 # ONBLD_TOOLS is the root of all the tools that are part of SUNWonbld.
 

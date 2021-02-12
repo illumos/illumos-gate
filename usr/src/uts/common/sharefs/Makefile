@@ -21,10 +21,8 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# 
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# uts/common/nfs/Makefile
+
 #
 # include global definitions
 #
@@ -38,8 +36,8 @@ ROOTDIRS= $(ROOT)/usr/include/sharefs
 
 ROOTHDRS= $(ALLHDRS:%=$(ROOTDIRS)/%)
 
-CHECKHDRS= $(HDRS:%.h=%.check) \
-	$(CLOSEDHDRS:%.h=$(CLOSED)/uts/common/sharefs/%.check)
+CHECKHDRS= $(HDRS:%.h=%.check)
+
 
 $(ROOTDIRS)/%: %
 	$(INS.file)

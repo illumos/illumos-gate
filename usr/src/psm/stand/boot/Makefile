@@ -34,14 +34,13 @@ all		:=	TARGET= all
 install		:=	TARGET= install
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
 
 .KEEP_STATE:
 
-all install lint clean: $(SUBDIRS)
+all install clean: $(SUBDIRS)
 
 clobber: $(SUBDIRS)
-	$(RM) make.out lint.out
+	$(RM) make.out
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
@@ -50,12 +49,11 @@ $(SUBDIRS): FRC
 # Cross-reference customization: include all boot-related source files.
 #
 UTSDIR =	../../../uts
-UTSCLOSED =	../../../../closed/uts
 STANDLIBDIR =	../../../stand/lib
 STANDSYSDIRS =	../../../stand/sys
 PROMDIRS =	../../promif
 NAMESDIRS =	../lib/names
-XRDIRS += 	$(STANDLIBDIR) $(STANDSYSDIRS) $(PROMDIRS) $(NAMESDIRS)
+XRDIRS +=	$(STANDLIBDIR) $(STANDSYSDIRS) $(PROMDIRS) $(NAMESDIRS)
 
 #
 # Components beginning with B! are in the open and closed trees; those

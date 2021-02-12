@@ -54,22 +54,19 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber modlist: $(JAVELIN_KMODS) \
-		$(CLOSED_JAVELIN_KMODS)
+def all clean clobber modlist: $(JAVELIN_KMODS)
+
 
 install:	$(ROOT_JAVELIN_DIR) $(USR_JAVELIN_DIR) \
 		$(USR_JAVELIN_INC_DIR) \
 		$(USR_JAVELIN_SBIN_DIR) \
 		$(USR_JAVELIN_LIB_DIR) \
-		.WAIT $(JAVELIN_KMODS) $(CLOSED_JAVELIN_KMODS)
+		.WAIT $(JAVELIN_KMODS)
 
 install_h check:
 
 $(JAVELIN_KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-$(CLOSED_JAVELIN_KMODS):	FRC
-	cd $(CLOSED)/uts/sun4u/javelin/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 #
 #	Include common targets.

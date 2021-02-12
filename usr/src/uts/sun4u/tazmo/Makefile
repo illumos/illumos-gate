@@ -55,21 +55,18 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber modlist: $(TAZMO_KMODS) $(CLOSED_TAZMO_KMODS)
+def all clean clobber modlist: $(TAZMO_KMODS)
 
 install:	$(ROOT_TAZMO_DIR) $(USR_TAZMO_DIR) \
 		$(USR_TAZMO_INC_DIR) \
 		$(USR_TAZMO_SBIN_DIR) \
 		$(USR_TAZMO_LIB_DIR) \
-		$(TAZMO_KMODS) $(CLOSED_TAZMO_KMODS)
+		$(TAZMO_KMODS)
 
 check install_h:
 
 $(TAZMO_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-$(CLOSED_TAZMO_KMODS): FRC
-	cd $(CLOSED)/uts/sun4u/tazmo/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 #
 #	Include common targets.

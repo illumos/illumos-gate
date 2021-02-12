@@ -24,7 +24,6 @@
 #
 # lib/libprtdiag_psr/sparc/montoya/Makefile
 
-UTSCLOSED = ../../../../uts
 UTSBASE   = ../../../../../src/uts
 
 PLATFORM_OBJECTS= montoya.o

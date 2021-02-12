@@ -56,24 +56,19 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber modlist: $(GROVER_KMODS) \
-	$(CLOSED_GROVER_KMODS)
+def all clean clobber modlist: $(GROVER_KMODS)
 
 install:	$(ROOT_GROVER_DIR) \
 		$(USR_GROVER_DIR) \
 		$(USR_GROVER_INC_DIR) \
 		$(USR_GROVER_SBIN_DIR) \
 		$(USR_GROVER_LIB_DIR) \
-		$(GROVER_KMODS) \
-		$(CLOSED_GROVER_KMODS)
+		$(GROVER_KMODS)
 
 check install_h:
 
 $(GROVER_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-$(CLOSED_GROVER_KMODS): FRC
-	cd $(CLOSED)/uts/sun4u/grover/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 #
 #	Include common targets.

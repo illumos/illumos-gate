@@ -57,7 +57,6 @@ CERRWARN +=	-_gcc=-Wno-unused-function
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-address
 IFLAGS +=	-I $(UTSBASE)/sun4u
-IFLAGS +=	-I $(UTSCLOSED)/sun4u
 CPPFLAGS =	$(IFLAGS) $(CPPFLAGS.master)
 LDLIBS +=	-L $(ROOT)/usr/platform/$(PSR_MACH)/lib -lprtdiag -lc
 DYNFLAGS +=	-R /usr/platform/$(PSR_MACH)/lib
