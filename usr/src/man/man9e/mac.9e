@@ -11,8 +11,9 @@
 .\"
 .\" Copyright 2019 Joyent, Inc.
 .\" Copyright 2020 RackTop Systems, Inc.
+.\" Copyright 2021 Oxide Computer Company
 .\"
-.Dd May 11, 2020
+.Dd February 13, 2021
 .Dt MAC 9E
 .Os
 .Sh NAME
@@ -650,40 +651,62 @@ The
 capability indicates that the driver supports various forms of large
 send offload (LSO).
 The private data is a pointer to a
-.Sy mac_capab_lso_t
+.Ft mac_capab_lso_t
 structure.
-At the moment, LSO support is limited to TCP inside of IPv4.
+The system currently supports offloading TCP packets over both IPv4 and
+IPv6.
 This structure has the following members which are used to indicate
 various types of LSO support.
 .Bd -literal -offset indent
 t_uscalar_t		lso_flags;
 lso_basic_tcp_ivr4_t	lso_basic_tcp_ipv4;
+lso_basic_tcp_ipv6_t	lso_basic_tcp_ipv6;
 .Ed
 .Pp
 The
-.Sy lso_flags
+.Fa lso_flags
 member is used to indicate which members are valid and should be
 considered.
 Each flag represents a different form of LSO.
 The member should be set to the bitwise inclusive OR of the following values:
 .Bl -tag -width Dv -offset indent
-.It Sy LSO_TX_BASIC_TCP_IPV4
+.It Dv LSO_TX_BASIC_TCP_IPV4
 This indicates hardware support for performing TCP segmentation
 offloading over IPv4.
 When this flag is set, the
-.Sy lso_basic_tcp_ipv4
+.Fa lso_basic_tcp_ipv4
+member must be filled in.
+.It Dv LSO_TX_BASIC_TCP_IPV6
+This indicates hardware support for performing TCP segmentation
+offloading over IPv6.
+The IPv6 packet will have no extension headers present.
+When this flag is set, the
+.Fa lso_basic_tcp_ipv6
 member must be filled in.
 .El
 .Pp
 The
-.Sy lso_basic_tcp_ipv4
+.Fa lso_basic_tcp_ipv4
 member is a structure with the following members:
 .Bd -literal -offset indent
 t_uscalar_t	lso_max
 .Ed
 .Bd -filled -offset indent
 The
-.Sy lso_max
+.Fa lso_max
+member should be set to the maximum size of the TCP data
+payload that can be offloaded to the hardware.
+.Ed
+.Pp
+The
+.Fa lso_basic_tcp_ipv6
+member is a structure with the following members:
+.Bd -literal -offset indent
+t_uscalar_t	lso_max
+.Ed
+.Bd -filled -offset indent
+The
+.Fa lso_max
 member should be set to the maximum size of the TCP data
 payload that can be offloaded to the hardware.
 .Ed
