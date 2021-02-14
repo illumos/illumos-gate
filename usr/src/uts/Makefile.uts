@@ -175,7 +175,9 @@ CERRWARN += -_gcc=-Wno-missing-field-initializers
 # gcc4 lacks -Wno-maybe-uninitialized
 CNOWARN_UNINIT = -_gcc4=-Wno-uninitialized \
     -_gcc7=-Wno-maybe-uninitialized \
-    -_gcc8=-Wno-maybe-uninitialized
+    -_gcc8=-Wno-maybe-uninitialized \
+    -_gcc9=-Wno-maybe-uninitialized \
+    -_gcc10=-Wno-maybe-uninitialized
 
 # DEBUG v. -nd make for frequent unused variables, empty conditions, etc. in
 # -nd builds
@@ -198,6 +200,7 @@ SMOFF += sizeof
 CFLAGS_uts_i386 += -_gcc7=-fno-shrink-wrap
 CFLAGS_uts_i386 += -_gcc8=-fno-shrink-wrap
 CFLAGS_uts_i386 += -_gcc9=-fno-shrink-wrap
+CFLAGS_uts_i386 += -_gcc10=-fno-shrink-wrap
 
 #
 # retpoline support
@@ -208,6 +211,8 @@ CFLAGS_uts_i386 += -_gcc8=-mindirect-branch=thunk-extern
 CFLAGS_uts_i386 += -_gcc8=-mindirect-branch-register
 CFLAGS_uts_i386 += -_gcc9=-mindirect-branch=thunk-extern
 CFLAGS_uts_i386 += -_gcc9=-mindirect-branch-register
+CFLAGS_uts_i386 += -_gcc10=-mindirect-branch=thunk-extern
+CFLAGS_uts_i386 += -_gcc10=-mindirect-branch-register
 
 CSTD = $(CSTD_GNU99)
 

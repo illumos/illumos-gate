@@ -380,9 +380,11 @@ CCNOAUTOINLINE= \
 	-_gcc7=-fno-ipa-icf \
 	-_gcc8=-fno-ipa-icf \
 	-_gcc9=-fno-ipa-icf \
+	-_gcc10=-fno-ipa-icf \
 	-_gcc7=-fno-clone-functions \
 	-_gcc8=-fno-clone-functions \
-	-_gcc9=-fno-clone-functions
+	-_gcc9=-fno-clone-functions \
+	-_gcc10=-fno-clone-functions
 
 # GCC may put functions in different named sub-sections of .text based on
 # their presumed calling frequency.  At least in the kernel, where we actually
@@ -393,7 +395,8 @@ CCNOAUTOINLINE= \
 CCNOREORDER=	\
 	-_gcc7=-fno-reorder-functions \
 	-_gcc8=-fno-reorder-functions \
-	-_gcc9=-fno-reorder-functions
+	-_gcc9=-fno-reorder-functions \
+	-_gcc10=-fno-reorder-functions
 
 #
 # gcc has a rather aggressive optimization on by default that infers loop
@@ -405,7 +408,8 @@ CCNOREORDER=	\
 CCNOAGGRESSIVELOOPS= \
 	-_gcc7=-fno-aggressive-loop-optimizations \
 	-_gcc8=-fno-aggressive-loop-optimizations \
-	-_gcc9=-fno-aggressive-loop-optimizations
+	-_gcc9=-fno-aggressive-loop-optimizations \
+	-_gcc10=-fno-aggressive-loop-optimizations
 
 #
 # Options to control which version of stack-protector we enable. This
@@ -432,6 +436,7 @@ STACKPROTECT_           = -_gcc4=-fstack-protector
 STACKPROTECT_           += -_gcc7=-fstack-protector-strong
 STACKPROTECT_           += -_gcc8=-fstack-protector-strong
 STACKPROTECT_           += -_gcc9=-fstack-protector-strong
+STACKPROTECT_           += -_gcc10=-fstack-protector-strong
 
 STACKPROTECT_strong     = $(STACKPROTECT_)
 STACKPROTECT_none       =
@@ -523,7 +528,8 @@ CERRWARN +=	-_gcc=-Wno-array-bounds
 CNOWARN_UNINIT = -_gcc4=-Wno-uninitialized \
     -_gcc7=-Wno-maybe-uninitialized \
     -_gcc8=-Wno-maybe-uninitialized \
-    -_gcc9=-Wno-maybe-uninitialized
+    -_gcc9=-Wno-maybe-uninitialized \
+    -_gcc10=-Wno-maybe-uninitialized
 
 CERRWARN += -_smatch=-p=illumos_user
 include $(SRC)/Makefile.smatch
@@ -589,7 +595,7 @@ CALLSYMS=	-W0,-xdbggen=no%usedonly
 # by the CTF tools.  With Sun Studio this is stabs due to bugs in the Studio
 # compilers.  With GCC this is DWARF v2.
 #
-DEBUGFORMAT=	-_cc=-xdebugformat=stabs -_gcc=-gdwarf-2
+DEBUGFORMAT=	-_cc=-xdebugformat=stabs -_gcc=-gdwarf-2 -_gcc10=-gstrict-dwarf
 
 #
 # Ask the compiler to include debugging information
