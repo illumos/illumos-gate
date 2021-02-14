@@ -23,7 +23,6 @@ UTSBASE	= ../..
 #
 MODULE		= lx_netlink
 OBJECTS		= $(LX_NETLINK_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(LX_NETLINK_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_SOCK_DIR)/$(MODULE)
 
 #
@@ -31,13 +30,10 @@ ROOTMODULE	= $(ROOT_SOCK_DIR)/$(MODULE)
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-
 #
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CPPFLAGS	+= -I$(UTSBASE)/common/brand/lx
@@ -59,12 +55,6 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
 install:	$(INSTALL_DEPS)
 
 #
@@ -75,6 +65,3 @@ include $(UTSBASE)/intel/Makefile.targ
 $(OBJS_DIR)/%.o:	$(UTSBASE)/common/brand/lx/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-$(LINTS_DIR)/%.ln:	$(UTSBASE)/common/brand/lx/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))

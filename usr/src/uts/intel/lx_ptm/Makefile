@@ -39,7 +39,6 @@ UTSBASE	= ../..
 #
 MODULE		= lx_ptm
 OBJECTS		= $(LX_PTM_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(LX_PTM_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/brand/lx/io
 
@@ -52,7 +51,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 CPPFLAGS	+= -I$(UTSBASE)/common/brand/lx
@@ -70,12 +68,6 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
 install:	$(INSTALL_DEPS)
 
 #
@@ -86,6 +78,3 @@ include $(UTSBASE)/intel/Makefile.targ
 $(OBJS_DIR)/%.o:	$(UTSBASE)/common/brand/lx/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-$(LINTS_DIR)/%.ln:	$(UTSBASE)/common/brand/lx/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))

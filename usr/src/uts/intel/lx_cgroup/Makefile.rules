@@ -16,6 +16,3 @@
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/brand/lx/cgroups/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/brand/lx/cgroups/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))

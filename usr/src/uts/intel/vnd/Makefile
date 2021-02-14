@@ -17,15 +17,11 @@ UTSBASE	= ../..
 
 MODULE		= vnd
 OBJECTS		= $(VND_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(VND_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
 include $(UTSBASE)/intel/Makefile.intel
 
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/vnd
 
@@ -50,12 +46,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

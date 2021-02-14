@@ -17,20 +17,16 @@ UTSBASE = ../..
 
 MODULE          = overlay
 OBJECTS         = $(OVERLAY_OBJS:%=$(OBJS_DIR)/%)
-LINTS           = $(OVERLAY_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE      = $(ROOT_DRV_DIR)/$(MODULE)
 
 include $(UTSBASE)/intel/Makefile.intel
 
 ALL_TARGET      = $(BINARY) $(SRC_CONFFILE)
-LINT_TARGET     = $(MODULE).lint
 INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/overlay
 MAPFILE		= $(UTSBASE)/common/io/overlay/overlay.mapfile
 
 LDFLAGS += -dy -Nmisc/mac -Ndrv/dld -Nmisc/dls -Nmisc/ksocket
-
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 # needs work
 SMATCH=off
@@ -44,12 +40,6 @@ all:            $(ALL_DEPS)
 clean:          $(CLEAN_DEPS)
 
 clobber:        $(CLOBBER_DEPS)
-
-lint:           $(LINT_DEPS)
-
-modlintlib:     $(MODLINTLIB_DEPS)
-
-clean.lint:     $(CLEAN_LINT_DEPS)
 
 install:        $(INSTALL_DEPS)
 

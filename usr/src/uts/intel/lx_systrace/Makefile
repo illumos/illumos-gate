@@ -27,7 +27,6 @@ UTSBASE	= ../..
 
 MODULE		= lx_systrace
 OBJECTS		= $(LX_SYSTRACE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(LX_SYSTRACE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 ROOTLINK	= $(USR_DTRACE_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/brand/lx/dtrace
@@ -35,19 +34,11 @@ CONF_SRCDIR	= $(UTSBASE)/common/brand/lx/dtrace
 include $(UTSBASE)/intel/Makefile.intel
 
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
 CPPFLAGS += -I$(UTSBASE)/common/brand/lx
 
 LDFLAGS         += -dy -Ndrv/dtrace -Nbrand/lx_brand
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
 .KEEP_STATE:
 
@@ -59,12 +50,6 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
 install:	$(INSTALL_DEPS)
 
 $(ROOTLINK):	$(USR_DTRACE_DIR) $(ROOTMODULE)
@@ -75,6 +60,3 @@ include $(UTSBASE)/intel/Makefile.targ
 $(OBJS_DIR)/%.o:	$(UTSBASE)/common/brand/lx/dtrace/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-$(LINTS_DIR)/%.ln:	$(UTSBASE)/common/brand/lx/dtrace/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))

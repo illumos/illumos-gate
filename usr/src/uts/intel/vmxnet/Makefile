@@ -51,13 +51,11 @@ include $(UTSBASE)/intel/Makefile.intel
 VMXNET_OBJS += vmxnet.o
 
 OBJECTS		= $(VMXNET_OBJS:%=$(OBJS_DIR)/%)
-LINTS           = $(VMXNET_OBJS:%.o=$(LINTS_DIR)/%.ln)
 
 #
 #       Define targets
 #
 ALL_TARGET      = $(BINARY) $(SRC_CONFFILE)
-LINT_TARGET     = $(LINT_MODULE).lint
 INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 CPPFLAGS +=  -I$(UTSBASE)/i86pc
@@ -78,14 +76,6 @@ all:            $(ALL_DEPS)
 clean:          $(CLEAN_DEPS)
 
 clobber:        $(CLOBBER_DEPS)
-
-#
-# Intentionally don't build lint libraries to minimize divergence with
-# the upstream source.
-#
-lint:
-modlintlib:
-clean.lint:
 
 install:        $(INSTALL_DEPS)
 

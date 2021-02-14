@@ -30,9 +30,3 @@
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/brand/lx/procfs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-#
-#	Section 1b: Lint `object' build rules.
-#
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/brand/lx/procfs/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))

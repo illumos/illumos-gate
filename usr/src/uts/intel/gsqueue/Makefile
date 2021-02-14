@@ -17,13 +17,11 @@ UTSBASE	= ../..
 
 MODULE		= gsqueue
 OBJECTS		= $(GSQUEUE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(GSQUEUE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 include $(UTSBASE)/intel/Makefile.intel
 
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 LDFLAGS 	+= -dy -Ndrv/ip
@@ -38,12 +36,6 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
-install:	$(INSTALL_DEPS)
+install:       $(INSTALL_DEPS)
 
 include $(UTSBASE)/intel/Makefile.targ

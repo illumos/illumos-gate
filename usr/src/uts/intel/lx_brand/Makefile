@@ -38,7 +38,6 @@ LX_CMN		= $(SRC)/common/brand/lx
 #
 MODULE		= lx_brand
 OBJECTS		= $(LX_BRAND_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(LX_BRAND_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_BRAND_DIR)/$(MODULE)
 
 #
@@ -50,7 +49,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 INC_PATH	+= -I$(UTSBASE)/common/brand/lx -I$(LX_CMN) -I$(SRC)/common
@@ -59,23 +57,10 @@ INC_PATH	+= -I$(UTSBASE)/common/fs/sockfs
 INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 AS_INC_PATH	+= -I$(UTSBASE)/i86pc/genassym/$(OBJS_DIR)
 
-#
-# lint pass one enforcement
-#
 CFLAGS		+= $(CCVERBOSE)
 
 LDFLAGS		+= -dy -Nexec/elfexec -Nfs/fifofs -Nfs/sockfs -Ndrv/ip \
 		    -Nfs/zfs -Nmisc/klmmod -Nsys/sysacct
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-# Due to zfs_ioctl.h inlines.  gcc catches non-inline ones during compilation.
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
 # needs work
 SMATCH=off
@@ -92,12 +77,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

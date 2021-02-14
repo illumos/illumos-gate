@@ -23,7 +23,6 @@ UTSBASE	= ../..
 #
 MODULE		= inotify
 OBJECTS		= $(INOTIFY_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(INOTIFY_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io
 
@@ -32,7 +31,6 @@ CONF_SRCDIR	= $(UTSBASE)/common/io
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
-LINTTAGS	+= -erroff=E_STRUCT_DERIVED_FROM_FLEX_MBR
 CERRWARN	+= -_gcc=-Wno-parentheses
 LDFLAGS		+= -dy -Nfs/specfs
 
@@ -40,7 +38,6 @@ LDFLAGS		+= -dy -Nfs/specfs
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
@@ -55,12 +52,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
