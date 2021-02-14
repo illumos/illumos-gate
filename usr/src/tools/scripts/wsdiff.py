@@ -327,7 +327,7 @@ def fnFormat(fn) :
 #      root/usr/bin => root
 #
 def protoroot(fn):
-	root = fn
+	root = fn.rstrip('/')
 	while len(root) > 1:
 		if os.path.isfile(os.path.join(root, genunix)):
 			return root
