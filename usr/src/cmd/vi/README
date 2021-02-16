@@ -19,16 +19,14 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
+
   This directory and its subdirectories contain the files necessary
-for making ex/vi in the AT&T UNIX environment: 
+for making ex/vi in the AT&T UNIX environment:
 
 	This is a list of all the important directories and what's
 	hidden under each.
 
-	misc - contains files used in the "make" of ex/vi
-	      { mkstr.c, xstr.c ...}
-	
+
 	port - ex/vi source directory.
 
 	local - contains "uparm.h" which must be edited to
@@ -40,14 +38,14 @@ for making ex/vi in the AT&T UNIX environment:
 		#define binpath(file) "/usr/lbin/file"
 		#define usrpath(file) "/usr/file"
 		** libpath is where ex/vi expects the strings file
-		(exstrings...this file is made as the ex/vi source 
+		(exstrings...this file is made as the ex/vi source
 		is compiled), and ex/vi 's recover & preserve commands
 		(exrecover and expreserve).
 		** usrpath is where the preserved files are held after
 		a hangup or fail..."preserve" is tacked onto
 		the end of the usrpath string .
 
-	PATHs to look at (and possibly change) include: 
+	PATHs to look at (and possibly change) include:
 
 	  port/makefile.usg   ---|
 	  preserve and recover commands all are installed in

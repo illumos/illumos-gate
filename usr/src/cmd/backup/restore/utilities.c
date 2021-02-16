@@ -484,7 +484,6 @@ reply(char *question)
 /*
  * Note that a panic w/ EOF on the tty means all panics will return...
  */
-#ifdef __STDC__
 #include <stdarg.h>
 
 /* VARARGS1 */
@@ -502,27 +501,6 @@ panic(const char *msg, ...)
 		done(1);
 	}
 }
-#else
-#include <varargs.h>
-
-/* VARARGS1 */
-void
-panic(va_dcl)
-{
-	va_list	args;
-	char	*msg;
-
-	va_start(args);
-	msg = va_arg(args, char *);
-	(void) vfprintf(stderr, msg, args);
-	va_end(args);
-	if (reply(gettext("abort")) == GOOD) {
-		if (reply(gettext("dump core")) == GOOD)
-			abort();
-		done(1);
-	}
-}
-#endif
 
 /*
  * Locale-specific version of ctime
@@ -823,13 +801,8 @@ mkentry(char *name, ino_t ino, struct arglist *ap)
 	return (GOOD);
 }
 
-#ifdef __STDC__
 static int gmatch(wchar_t *, wchar_t *);
 static int addg(struct direct *, char *, char *, struct arglist *);
-#else
-static int gmatch();
-static int addg();
-#endif
 
 /*
  * XXX  This value is ASCII (but not language) dependent.  In

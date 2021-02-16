@@ -60,7 +60,6 @@ file path=usr/bin/$(ARCH64)/plimit mode=0555
 file path=usr/bin/$(ARCH64)/pvs mode=0555
 file path=usr/bin/$(ARCH64)/strings mode=0555
 file path=usr/bin/$(ARCH64)/truss mode=0555
-file path=usr/bin/ctags mode=0555
 file path=usr/bin/elfsign mode=0555
 file path=usr/bin/elfwrap mode=0555
 file path=usr/bin/exstr mode=0555
@@ -71,6 +70,8 @@ file path=usr/bin/pvs mode=0555
 file path=usr/bin/regcmp mode=0555
 file path=usr/bin/sotruss mode=0755
 file path=usr/bin/whocalls mode=0755
+file path=usr/has/bin/ctags mode=0555
+file path=usr/has/man/man1has/ctags.1has
 file path=usr/lib/$(ARCH64)/lddstub mode=0555
 file path=usr/lib/$(ARCH64)/libldstab.so.1
 file path=usr/lib/abi/spec2map mode=0755
@@ -93,7 +94,6 @@ file path=usr/lib/link_audit/$(ARCH64)/who.so.1
 file path=usr/lib/link_audit/ldprof.so.1
 file path=usr/lib/link_audit/truss.so.1
 file path=usr/lib/link_audit/who.so.1
-file path=usr/share/man/man1/ctags.1
 file path=usr/share/man/man1/elfsign.1
 file path=usr/share/man/man1/elfwrap.1
 file path=usr/share/man/man1/exstr.1
@@ -121,6 +121,8 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble
+link path=usr/bin/ctags mediator=ctags mediator-implementation=illumos \
+    target=../has/bin/ctags
 link path=usr/ccs/bin/$(ARCH64)/ld target=../../../bin/$(ARCH64)/ld
 link path=usr/ccs/bin/ld target=../../bin/ld
 link path=usr/ccs/bin/regcmp target=../../bin/regcmp
@@ -130,3 +132,6 @@ link path=usr/lib/ld/$(ARCH64)/map.below4G target=../map.below4G
 link path=usr/lib/ld/$(ARCH64)/map.default target=../map.default
 link path=usr/lib/link_audit/32 target=.
 link path=usr/lib/link_audit/64 target=$(ARCH64)
+link path=usr/share/man/man1/ctags.1 mediator=ctags \
+    mediator-implementation=illumos \
+    target=../../../has/man/man1has/ctags.1has

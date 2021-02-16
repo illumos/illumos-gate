@@ -1483,12 +1483,12 @@ static int
 free_iq_fl(struct port_info *pi, struct sge_iq *iq, struct sge_fl *fl)
 {
 	int rc;
-	struct adapter *sc = iq->adapter;
-	dev_info_t *dip;
-
-	dip = pi ? pi->dip : sc->dip;
 
 	if (iq != NULL) {
+		struct adapter *sc = iq->adapter;
+		dev_info_t *dip;
+
+		dip = pi ? pi->dip : sc->dip;
 		if (iq->flags & IQ_ALLOCATED) {
 			rc = -t4_iq_free(sc, sc->mbox, sc->pf, 0,
 			    FW_IQ_TYPE_FL_INT_CAP, iq->cntxt_id,

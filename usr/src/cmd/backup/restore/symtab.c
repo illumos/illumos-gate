@@ -35,22 +35,15 @@
 static struct entry **entry;
 static uint_t entrytblsize;
 
-#ifdef __STDC__
 static void addino(ino_t, struct entry *);
 static struct entry *lookupparent(char *);
 static void removeentry(struct entry *);
-#else
-static void addino();
-static struct entry *lookupparent();
-static void removeentry();
-#endif
 
 /*
  * Look up an entry by inode number
  */
 struct entry *
-lookupino(inum)
-	ino_t inum;
+lookupino(ino_t inum)
 {
 	struct entry *ep;
 
@@ -78,9 +71,7 @@ static int complained_about_range = 0;
  * Add an entry into the entry table
  */
 static void
-addino(inum, np)
-	ino_t inum;
-	struct entry *np;
+addino(ino_t inum, struct entry *np)
 {
 	struct entry **epp;
 
@@ -107,8 +98,7 @@ addino(inum, np)
  * arranges for the necessary memory reclamation, if needed.
  */
 void
-deleteino(inum)
-	ino_t inum;
+deleteino(ino_t inum)
 {
 	struct entry *next;
 	struct entry **prev;
@@ -141,8 +131,7 @@ deleteino(inum)
  *	NULL characters.
  */
 struct entry *
-lookupname(name)
-	char *name;
+lookupname(char *name)
 {
 	struct entry *ep;
 	char *np, *cp;
@@ -186,8 +175,7 @@ lookupname(name)
  * names so the provided name argument must terminate with two NULLs.
  */
 static struct entry *
-lookupparent(name)
-	char *name;
+lookupparent(char *name)
 {
 	struct entry *ep;
 	char *tailindex, savechar, *lastpart;
@@ -233,8 +221,7 @@ lookupparent(name)
  * terminated with two NULLs.
  */
 char *
-myname(ep)
-	struct entry *ep;
+myname(struct entry *ep)
 {
 	char *cp;
 	struct entry *root = lookupino(ROOTINO);
@@ -268,10 +255,7 @@ static struct entry *freelist = NIL;
  * add an entry to the symbol table
  */
 struct entry *
-addentry(name, inum, type)
-	char *name;
-	ino_t inum;
-	int type;
+addentry(char *name, ino_t inum, int type)
 {
 	struct entry *np, *ep;
 	char *cp;
@@ -362,8 +346,7 @@ addentry(name, inum, type)
  * delete an entry from the symbol table
  */
 void
-freeentry(ep)
-	struct entry *ep;
+freeentry(struct entry *ep)
 {
 	struct entry *np;
 	ino_t inum;
@@ -406,9 +389,7 @@ freeentry(ep)
  * Relocate an entry in the tree structure
  */
 void
-moveentry(ep, newname)
-	struct entry *ep;
-	char *newname;
+moveentry(struct entry *ep, char *newname)
 {
 	struct entry *np;
 	char *cp;
@@ -444,8 +425,7 @@ moveentry(ep, newname)
  * Remove an entry in the tree structure
  */
 static void
-removeentry(ep)
-	struct entry *ep;
+removeentry(struct entry *ep)
 {
 	struct entry *np;
 
@@ -455,7 +435,7 @@ removeentry(ep)
 			np->e_xattrs = NIL;
 		else
 			badentry(ep, gettext(
-				"parent does not reference this xattr tree"));
+			    "parent does not reference this xattr tree"));
 	} else if (np->e_entries == ep) {
 		np->e_entries = ep->e_sibling;
 	} else {
@@ -467,7 +447,7 @@ removeentry(ep)
 		}
 		if (np == NIL)
 			badentry(ep, gettext(
-				"cannot find entry in parent list"));
+			    "cannot find entry in parent list"));
 	}
 }
 
@@ -499,8 +479,7 @@ static struct strhdr strtblhdr[allocsize(MAXCOMPLEXLEN) / STRTBLINCR];
  * has an appropriate sized entry, and if not allocates a new one.
  */
 char *
-savename(name)
-	char *name;
+savename(char *name)
 {
 	struct strhdr *np;
 	size_t len, as;
@@ -540,8 +519,7 @@ savename(name)
  * appropriate free list.
  */
 void
-freename(name)
-	char *name;
+freename(char *name)
 {
 	struct strhdr *tp, *np;
 
@@ -572,9 +550,7 @@ struct symtableheader {
  * dump a snapshot of the symbol table
  */
 void
-dumpsymtable(filename, checkpt)
-	char *filename;
-	int checkpt;
+dumpsymtable(char *filename, int checkpt)
 {
 	struct entry *ep, *tep;
 	ino_t i;
@@ -621,19 +597,19 @@ dumpsymtable(filename, checkpt)
 			tep->e_parent = (struct entry *)ep->e_parent->e_index;
 			if (ep->e_links != NIL)
 				tep->e_links =
-					(struct entry *)ep->e_links->e_index;
+				    (struct entry *)ep->e_links->e_index;
 			if (ep->e_sibling != NIL)
 				tep->e_sibling =
-					(struct entry *)ep->e_sibling->e_index;
+				    (struct entry *)ep->e_sibling->e_index;
 			if (ep->e_entries != NIL)
 				tep->e_entries =
-					(struct entry *)ep->e_entries->e_index;
+				    (struct entry *)ep->e_entries->e_index;
 			if (ep->e_xattrs != NIL)
 				tep->e_xattrs =
-					(struct entry *)ep->e_xattrs->e_index;
+				    (struct entry *)ep->e_xattrs->e_index;
 			if (ep->e_next != NIL)
 				tep->e_next =
-					(struct entry *)ep->e_next->e_index;
+				    (struct entry *)ep->e_next->e_index;
 			(void) fwrite((char *)tep, sizeof (*tep), 1, fp);
 		}
 	}
@@ -672,8 +648,7 @@ dumpsymtable(filename, checkpt)
  * Initialize a symbol table from a file
  */
 void
-initsymtable(filename)
-	char *filename;
+initsymtable(char *filename)
 {
 	char *base;
 	off64_t tblsize;
@@ -693,15 +668,23 @@ initsymtable(filename)
 		}
 		/* LINTED: result fits in entrytblsize */
 		entrytblsize = maxino / HASHFACTOR;
-		entry = (struct entry **)
-			/* LINTED entrytblsize fits in a size_t */
-			calloc((size_t)entrytblsize, sizeof (*entry));
-		if (entry == (struct entry **)NULL) {
+		entry = calloc((size_t)entrytblsize, sizeof (*entry));
+		if (entry == NULL) {
 			(void) fprintf(stderr,
 			    gettext("no memory for entry table\n"));
 			done(1);
 		}
-		ep = addentry(".", ROOTINO, NODE);
+		ep = calloc(1, sizeof (*ep));
+		if (ep == NULL) {
+			(void) fprintf(stderr,
+			    gettext("no memory for entry\n"));
+			done(1);
+		}
+		ep->e_type = NODE;
+		ep->e_name = savename(".");
+		ep->e_namlen = 1;
+		ep->e_parent = ep;
+		addino(ROOTINO, ep);
 		/* LINTED: result fits in a short */
 		ep->e_flags |= NEW;
 		return;
@@ -763,10 +746,10 @@ initsymtable(filename)
 		if (hdr.dumpdate != dumptime) {
 			if (hdr.dumpdate < dumptime)
 				(void) fprintf(stderr, gettext(
-					"Incremental volume too low\n"));
+				    "Incremental volume too low\n"));
 			else
 				(void) fprintf(stderr, gettext(
-					"Incremental volume too high\n"));
+				    "Incremental volume too high\n"));
 			done(1);
 		}
 		break;

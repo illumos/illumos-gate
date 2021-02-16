@@ -2904,7 +2904,7 @@ check_busy_bit(struct adapter *padap)
 	int retry = 10;
 	int status = 0;
 
-	while (busy & (1 < retry)) {
+	while (busy && (i < retry)) {
 		val = t4_read_reg(padap, A_CIM_HOST_ACC_CTRL);
 		busy = (0 != (val & CUDBG_CIM_BUSY_BIT));
 		i++;

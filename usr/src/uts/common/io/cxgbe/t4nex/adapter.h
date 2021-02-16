@@ -28,6 +28,7 @@
 #include <sys/ethernet.h>
 #include <sys/queue.h>
 #include <sys/containerof.h>
+#include <sys/ddi_ufm.h>
 
 #include "offload.h"
 #include "firmware/t4fw_interface.h"
@@ -563,6 +564,8 @@ struct adapter {
 	/* Sensors */
 	id_t temp_sensor;
 	id_t volt_sensor;
+
+	ddi_ufm_handle_t *ufm_hdl;
 };
 
 enum {

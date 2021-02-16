@@ -48,6 +48,7 @@ char copyright[] = "@(#) Copyright (c) 1980 Regents of the University of "
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -106,9 +107,11 @@ static TYST tydef = none;
 
 static char	searchar = '/';		/* use /.../ searches		*/
 
+#define	LINEBUFSIZ	4*BUFSIZ
+
 static int	lineno;			/* line number of current line */
 static char
-	line[4*BUFSIZ],		/* current input line			*/
+	line[LINEBUFSIZ],	/* current input line			*/
 	*curfile,		/* current input file name		*/
 	*outfile = "tags",	/* output file				*/
 	*white	= " \f\t\n",	/* white chars				*/
@@ -135,7 +138,7 @@ static int	wflag;		/* -w: suppress warnings		*/
 static int	vflag;		/* -v: create vgrind style index output */
 static int	xflag;		/* -x: create cxref style output	*/
 
-static char	lbuf[LINE_MAX];
+static char	lbuf[LINEBUFSIZ];
 
 static FILE
 	*inf,			/* ioptr for current input file		*/
@@ -144,12 +147,6 @@ static FILE
 static long	lineftell;	/* ftell after getc( inf ) == '\n'	*/
 
 static NODE	*head;		/* the head of the sorted binary tree	*/
-
-#ifdef __STDC__
-char	*strrchr(), *strchr();
-#else
-char	*rindex(), *index();
-#endif
 
 static int	infile_fail;	/* Count of bad opens. Fix bug ID #1082298 */
 
@@ -161,29 +158,29 @@ static char	**mav;		/* our modified argv, after parseargs() */
 
 
 /* our local functions:							*/
-static void	init();
-static void	find_entries(char *file);
-static void	pfnote();
-static void	C_entries();
-static int	start_entry(char **lp, char *token, int *f);
-static void	Y_entries();
-static char	*toss_comment(char *start);
-static void	getaline(long int where);
-static void	free_tree(NODE *node);
-static void	add_node(NODE *node, NODE *cur_node);
-static void	put_entries(NODE *node);
-static int	PF_funcs(FILE *fi);
-static int	tail(char *cp);
-static void	takeprec();
-static void	getit();
-static char	*savestr(char *cp);
-static void	L_funcs(FILE *fi);
-static void	L_getit(int special);
-static int	striccmp(char *str, char *pat);
-static int	first_char();
-static void	toss_yysec();
-static void	Usage();
-static void	parseargs(int ac, char **av);
+static void	init(void);
+static void	find_entries(char *);
+static void	pfnote(char *, int, bool);
+static void	C_entries(void);
+static int	start_entry(char **, char *, int *);
+static void	Y_entries(void);
+static char	*toss_comment(char *);
+static void	getaline(long int);
+static void	free_tree(NODE *);
+static void	add_node(NODE *, NODE *);
+static void	put_entries(NODE *);
+static int	PF_funcs(FILE *);
+static int	tail(char *);
+static void	takeprec(void);
+static void	getit(void);
+static char	*savestr(char *);
+static void	L_funcs(FILE *);
+static void	L_getit(int);
+static int	striccmp(char *, char *);
+static int	first_char(void);
+static void	toss_yysec(void);
+static void	Usage(void);
+static void	parseargs(int, char **);
 
 int
 main(int ac, char *av[])
@@ -296,7 +293,7 @@ main(int ac, char *av[])
  * of a char is TRUE if it is the string "white", else FALSE.
  */
 static void
-init()
+init(void)
 {
 	char	*sp;
 	int	i;
@@ -329,8 +326,7 @@ init()
  * which finds the function and type definitions.
  */
 static void
-find_entries(file)
-char	*file;
+find_entries(char *file)
 {
 	char *cp;
 	struct stat st;
@@ -346,18 +342,10 @@ char	*file;
 	}
 	curfile = savestr(file);
 	lineno = 0;
-#ifdef __STDC__
 	cp = strrchr(file, '.');
-#else
-	cp = rindex(file, '.');
-#endif
 	/* .l implies lisp or lex source code */
 	if (cp && cp[1] == 'l' && cp[2] == '\0') {
-#ifdef __STDC__
 		if (strchr(";([", first_char()) != NULL)	/* lisp */
-#else
-		if (index(";([", first_char()) != NULL)		/* lisp */
-#endif
 		{
 			L_funcs(inf);
 			(void) fclose(inf);
@@ -404,10 +392,7 @@ char	*file;
 }
 
 static void
-pfnote(name, ln, f)
-char	*name;
-int	ln;
-bool	f;		/* f == TRUE when function */
+pfnote(char *name, int ln, bool f)
 {
 	char *fp;
 	NODE *np;
@@ -422,21 +407,14 @@ bool	f;		/* f == TRUE when function */
 		head = np = (NODE *) malloc(sizeof (NODE));
 	}
 	if (xflag == 0 && (strcmp(name, "main") == 0)) {
-#ifdef __STDC__
 		fp = strrchr(curfile, '/');
-#else
-		fp = rindex(curfile, '/');
-#endif
+
 		if (fp == 0)
 			fp = curfile;
 		else
 			fp++;
 		(void) sprintf(nbuf, "M%s", fp);
-#ifdef __STDC__
 		fp = strrchr(nbuf, '.');
-#else
-		fp = rindex(nbuf, '.');
-#endif
 		/* Chop off .cc and .cxx as well as .c, .h, etc		*/
 		if (fp && ((fp[2] == 0) || (fp[2] == 'c' && fp[3] == 0) ||
 			    (fp[3] == 'x' && fp[4] == 0)))
@@ -445,14 +423,10 @@ bool	f;		/* f == TRUE when function */
 	}
 
 	/* remove in-between blanks operator function tags */
-#ifdef __STDC__
 	if (strchr(name, ' ') != NULL)
-#else
-	if (index(name, ' ') != NULL)
-#endif
 	{
 		(void) strcpy(name, strtok(name, " "));
-		while (nametk = strtok(0, " "))
+		while ((nametk = strtok(0, " ")) != NULL)
 			(void) strcat(name, nametk);
 	}
 	np->entry = savestr(name);
@@ -477,7 +451,7 @@ bool	f;		/* f == TRUE when function */
  * to the list.
  */
 static void
-C_entries()
+C_entries(void)
 {
 	int c;
 	char *token, *tp;
@@ -717,9 +691,7 @@ dotoken:
  * in it when it returns.
  */
 static int
-start_entry(lp, token, f)
-char	**lp, *token;
-int	*f;
+start_entry(char **lp, char *token, int *f)
 {
 	char	*sp;
 	int	c;
@@ -832,91 +804,102 @@ ret:
  *	Find the yacc tags and put them in.
  */
 static void
-Y_entries()
+Y_entries(void)
 {
 	char	*sp, *orig_sp;
 	int	brace;
-	bool	in_rule, toklen;
-	char		tok[BUFSIZ];
+	bool	in_rule = FALSE;
+	size_t	toklen;
+	char	tok[LINEBUFSIZ];
 
 	brace = 0;
 	getaline(lineftell);
 	pfnote("yyparse", lineno, TRUE);
-	while (fgets(line, sizeof (line), inf) != NULL)
-		for (sp = line; *sp; sp++)
+	while (fgets(line, sizeof (line), inf) != NULL) {
+		for (sp = line; *sp; sp++) {
 			switch (*sp) {
-			    case '\n':
+			case '\n':
 				lineno++;
 				/* FALLTHROUGH */
-			    case ' ':
-			    case '\t':
-			    case '\f':
-			    case '\r':
+			case ' ':
+			case '\t':
+			case '\f':
+			case '\r':
 				break;
-			    case '"':
-				do {
-					while (*++sp != '"')
-						continue;
-				} while (sp[-1] == '\\');
+			case '"':
+			case '\'': {
+				char start = *sp;
+				sp++;
+
+				while ((*sp != '\0') && (*sp != start)) {
+					if (*sp == '\\')
+						sp++; /* Skip escaped thing */
+					sp++;
+				}
+
+				if (*sp == '\0')
+					sp--;
 				break;
-			    case '\'':
-				do {
-					while (*++sp != '\'')
-						continue;
-				} while (sp[-1] == '\\');
-				break;
-			    case '/':
+			}
+			case '/':
 				if (*++sp == '*')
 					sp = toss_comment(sp);
 				else
 					--sp;
 				break;
-			    case '{':
+			case '{':
 				brace++;
 				break;
-			    case '}':
+			case '}':
 				brace--;
 				break;
-			    case '%':
+			case '%':
 				if (sp[1] == '%' && sp == line)
 					return;
 				break;
-			    case '|':
-			    case ';':
+			case '|':
+			case ';':
 				in_rule = FALSE;
 				break;
-			    default:
+			default:
 				if (brace == 0 && !in_rule && (isalpha(*sp) ||
-								*sp == '.' ||
-								*sp == '_')) {
+				    *sp == '.' ||
+				    *sp == '_')) {
 					orig_sp = sp;
 					++sp;
 					while (isalnum(*sp) || *sp == '_' ||
-						*sp == '.')
+					    *sp == '.')
 						sp++;
 					toklen = sp - orig_sp;
 					while (isspace(*sp))
 						sp++;
 					if (*sp == ':' || (*sp == '\0' &&
-						    first_char() == ':')) {
+					    first_char() == ':')) {
 						(void) strncpy(tok,
-							orig_sp, toklen);
+						    orig_sp, toklen);
 						tok[toklen] = '\0';
 						(void) strcpy(lbuf, line);
 						lbuf[strlen(lbuf) - 1] = '\0';
 						pfnote(tok, lineno, TRUE);
 						in_rule = TRUE;
-					}
-					else
+						/*
+						 * if we read NUL, leave it so
+						 * we read the next line
+						 */
+						if (*sp == '\0')
+							sp--;
+					} else {
 						sp--;
+					}
 				}
 				break;
 			}
+		}
+	}
 }
 
 static char *
-toss_comment(start)
-char	*start;
+toss_comment(char *start)
 {
 	char	*sp;
 
@@ -924,11 +907,7 @@ char	*start;
 	 * first, see if the end-of-comment is on the same line
 	 */
 	do {
-#ifdef __STDC__
 		while ((sp = strchr(start, '*')) != NULL)
-#else
-		while ((sp = index(start, '*')) != NULL)
-#endif
 			if (sp[1] == '/')
 				return (++sp);
 			else
@@ -947,38 +926,33 @@ char	*start;
 }
 
 static void
-getaline(where)
-long int where;
+getaline(long int where)
 {
 	long saveftell = ftell(inf);
 	char *cp;
 
 	(void) fseek(inf, where, 0);
 	(void) fgets(lbuf, sizeof (lbuf), inf);
-#ifdef __STDC__
 	cp = strrchr(lbuf, '\n');
-#else
-	cp = rindex(lbuf, '\n');
-#endif
 	if (cp)
 		*cp = 0;
 	(void) fseek(inf, saveftell, 0);
 }
 
 static void
-free_tree(node)
-NODE	*node;
+free_tree(NODE *node)
 {
+	NODE *next;
 	while (node) {
 		free_tree(node->right);
+		next = node->left;
 		free(node);
-		node = node->left;
+		node = next;
 	}
 }
 
 static void
-add_node(node, cur_node)
-NODE *node, *cur_node;
+add_node(NODE *node, NODE *cur_node)
 {
 	int dif;
 
@@ -1020,8 +994,7 @@ NODE *node, *cur_node;
 }
 
 static void
-put_entries(node)
-NODE	*node;
+put_entries(NODE *node)
 {
 	char	*sp;
 
@@ -1087,8 +1060,7 @@ NODE	*node;
 
 
 static int
-PF_funcs(fi)
-FILE *fi;
+PF_funcs(FILE *fi)
 {
 
 	pfcnt = 0;
@@ -1158,8 +1130,7 @@ FILE *fi;
 }
 
 static int
-tail(cp)
-char *cp;
+tail(char *cp)
 {
 	int len = 0;
 
@@ -1173,9 +1144,8 @@ char *cp;
 }
 
 static void
-takeprec()
+takeprec(void)
 {
-
 	while (isspace(*dbp))
 		dbp++;
 	if (*dbp != '*')
@@ -1193,11 +1163,11 @@ takeprec()
 }
 
 static void
-getit()
+getit(void)
 {
 	char *cp;
 	char c;
-	char nambuf[BUFSIZ];
+	char nambuf[LINEBUFSIZ];
 
 	for (cp = lbuf; *cp; cp++)
 		;
@@ -1217,8 +1187,7 @@ getit()
 }
 
 static char *
-savestr(cp)
-char *cp;
+savestr(char *cp)
 {
 	int len;
 	char *dp;
@@ -1230,37 +1199,13 @@ char *cp;
 	return (dp);
 }
 
-#ifndef __STDC__
-/*
- * Return the ptr in sp at which the character c last
- * appears; NULL if not found
- *
- * Identical to v7 rindex, included for portability.
- */
-
-static char *
-rindex(sp, c)
-char *sp, c;
-{
-	char *r;
-
-	r = NULL;
-	do {
-		if (*sp == c)
-			r = sp;
-	} while (*sp++);
-	return (r);
-}
-#endif
-
 /*
  * lisp tag functions
  * just look for (def or (DEF
  */
 
 static void
-L_funcs(fi)
-FILE *fi;
+L_funcs(FILE *fi)
 {
 	int	special;
 
@@ -1289,12 +1234,11 @@ FILE *fi;
 }
 
 static void
-L_getit(special)
-int	special;
+L_getit(int special)
 {
 	char	*cp;
 	char	c;
-	char		nambuf[BUFSIZ];
+	char	nambuf[LINEBUFSIZ];
 
 	for (cp = lbuf; *cp; cp++)
 		continue;
@@ -1302,11 +1246,7 @@ int	special;
 	if (*dbp == 0)
 		return;
 	if (special) {
-#ifdef __STDC__
 		if ((cp = strchr(dbp, ')')) == NULL)
-#else
-		if ((cp = index(dbp, ')')) == NULL)
-#endif
 			return;
 		while (cp >= dbp && *cp != ':')
 			cp--;
@@ -1336,8 +1276,7 @@ int	special;
  *	completely lower case.
  */
 static int
-striccmp(str, pat)
-char	*str, *pat;
+striccmp(char *str, char *pat)
 {
 	int	c1;
 
@@ -1361,7 +1300,7 @@ char	*str, *pat;
  *	again.
  */
 static int
-first_char()
+first_char(void)
 {
 	int	c;
 	long	off;
@@ -1381,7 +1320,7 @@ first_char()
  *	Toss away code until the next "%%" line.
  */
 static void
-toss_yysec()
+toss_yysec(void)
 {
 	char		buf[BUFSIZ];
 
@@ -1396,7 +1335,7 @@ toss_yysec()
 }
 
 static void
-Usage()
+Usage(void)
 {
 #ifdef XPG4
 	(void) fprintf(stderr, gettext("Usage:\tctags [-aBFuvw] "
@@ -1432,9 +1371,7 @@ Usage()
  *	copy that into our modified argument space.
  */
 static void
-parseargs(ac, av)
-int ac;				/* argument count			*/
-char **av;			/* ptr to original argument space	*/
+parseargs(int ac, char **av)
 {
 	int i;			/* current argument			*/
 	int a;			/* used to parse combined arguments	*/

@@ -12,6 +12,7 @@
 /*
  * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2020 Robert Mustacchi
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -58,6 +59,18 @@ typedef struct nic_port_mac {
 	boolean_t npm_valid;
 	topo_mod_t *npm_mod;
 } nic_port_mac_t;
+
+/*
+ * The following drivers have their main function be a nexus driver which
+ * enumerates children itself which are mac providers rather than having the
+ * main PCI functions actually be the device nodes. As such, when we encounter
+ * them, we need to enumerate them in a slightly different way by walking over
+ * each child of the instance.
+ */
+static const char *nic_nexuses[] = {
+	"t4nex",
+	NULL
+};
 
 /*
  * The first MAC address is always the primary MAC address, so we only worry
@@ -233,7 +246,8 @@ nic_port_datalink_props(topo_mod_t *mod, tnode_t *port, dladm_handle_t handle,
  */
 static int
 nic_create_transceiver(topo_mod_t *mod, tnode_t *pnode, dladm_handle_t handle,
-    datalink_id_t linkid, uint_t tranid, nic_port_type_t port_type)
+    datalink_id_t linkid, topo_instance_t inst, uint_t tranid,
+    nic_port_type_t port_type)
 {
 	int ret;
 	tnode_t *port;
@@ -246,10 +260,10 @@ nic_create_transceiver(topo_mod_t *mod, tnode_t *pnode, dladm_handle_t handle,
 
 	switch (port_type) {
 	case NIC_PORT_UNKNOWN:
-		ret = port_create_unknown(mod, pnode, tranid, &port);
+		ret = port_create_unknown(mod, pnode, inst, &port);
 		break;
 	case NIC_PORT_SFF:
-		ret = port_create_sff(mod, pnode, tranid, &port);
+		ret = port_create_sff(mod, pnode, inst, &port);
 		break;
 	default:
 		return (-1);
@@ -331,6 +345,107 @@ nic_create_transceiver(topo_mod_t *mod, tnode_t *pnode, dladm_handle_t handle,
 	return (0);
 }
 
+static boolean_t
+nic_enum_link_ntrans(dladm_handle_t handle, datalink_id_t linkid, uint_t *ntran,
+    nic_port_type_t *pt)
+{
+	dld_ioc_gettran_t dgt;
+
+	memset(&dgt, 0, sizeof (dgt));
+	dgt.dgt_linkid = linkid;
+	dgt.dgt_tran_id = DLDIOC_GETTRAN_GETNTRAN;
+
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_GETTRAN, &dgt) != 0) {
+		if (errno != ENOTSUP) {
+			return (B_FALSE);
+		}
+		*pt = NIC_PORT_UNKNOWN;
+		*ntran = 1;
+	} else {
+		*ntran = dgt.dgt_tran_id;
+		*pt = NIC_PORT_SFF;
+	}
+
+	return (B_TRUE);
+}
+
+static boolean_t
+nic_enum_devinfo_linkid(dladm_handle_t handle, di_node_t din,
+    datalink_id_t *linkidp)
+{
+	char dname[MAXNAMELEN];
+
+	if (snprintf(dname, sizeof (dname), "%s%d", di_driver_name(din),
+	    di_instance(din)) >= sizeof (dname)) {
+		return (B_FALSE);
+	}
+
+	if (dladm_dev2linkid(handle, dname, linkidp) != DLADM_STATUS_OK)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * When we encounter a nexus driver we need to walk each of its children to
+ * actually get at the dladm handles and devices that we can use for this.
+ */
+static int
+nic_enum_nexus(topo_mod_t *mod, tnode_t *pnode, dladm_handle_t handle,
+    di_node_t din)
+{
+	uint_t total_ports = 0;
+	nic_port_type_t pt;
+	di_node_t child;
+
+	/*
+	 * We have to iterate child nodes in two passes. The first pass is used
+	 * to determine the number of children to create. FM requires that we
+	 * create all the children nodes at once currently.
+	 */
+	for (child = di_child_node(din); child != DI_NODE_NIL;
+	    child = di_sibling_node(child)) {
+		datalink_id_t linkid;
+		uint_t ntrans;
+
+		if (!nic_enum_devinfo_linkid(handle, child, &linkid))
+			return (-1);
+		if (!nic_enum_link_ntrans(handle, linkid, &ntrans, &pt))
+			return (-1);
+
+		total_ports += ntrans;
+	}
+
+	if (total_ports == 0)
+		return (0);
+
+	if (port_range_create(mod, pnode, 0, total_ports - 1) != 0)
+		return (-1);
+
+	total_ports = 0;
+	for (child = di_child_node(din); child != DI_NODE_NIL;
+	    child = di_sibling_node(child)) {
+		datalink_id_t linkid;
+		uint_t i, ntrans;
+
+		if (!nic_enum_devinfo_linkid(handle, child, &linkid))
+			return (-1);
+		if (!nic_enum_link_ntrans(handle, linkid, &ntrans, &pt))
+			return (-1);
+
+		for (i = 0; i < ntrans; i++) {
+			if (nic_create_transceiver(mod, pnode, handle, linkid,
+			    total_ports + i, i, pt) != 0) {
+				return (-1);
+			}
+		}
+
+		total_ports += ntrans;
+	}
+
+	return (0);
+}
+
 /* ARGSUSED */
 static int
 nic_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
@@ -339,10 +454,9 @@ nic_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	di_node_t din = data;
 	datalink_id_t linkid;
 	dladm_handle_t handle;
-	dld_ioc_gettran_t dgt;
 	uint_t ntrans, i;
-	char dname[MAXNAMELEN];
 	nic_port_type_t pt;
+	const char *drv;
 
 	if (strcmp(name, NIC) != 0) {
 		topo_mod_dprintf(mod, "nic_enum: asked to enumerate unknown "
@@ -361,31 +475,25 @@ nic_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		return (-1);
 	}
 
-	if (snprintf(dname, sizeof (dname), "%s%d", di_driver_name(din),
-	    di_instance(din)) >= sizeof (dname)) {
-		topo_mod_dprintf(mod, "nic_enum: device name overflowed "
-		    "internal buffer\n");
-		return (-1);
+	/*
+	 * No driver attached, just skip it.
+	 */
+	if ((drv = di_driver_name(din)) == NULL) {
+		return (0);
 	}
 
-	if (dladm_dev2linkid(handle, dname, &linkid) != DLADM_STATUS_OK)
-		return (-1);
-
-	bzero(&dgt, sizeof (dgt));
-	dgt.dgt_linkid = linkid;
-	dgt.dgt_tran_id = DLDIOC_GETTRAN_GETNTRAN;
-
-	if (ioctl(dladm_dld_fd(handle), DLDIOC_GETTRAN, &dgt) != 0) {
-		if (errno != ENOTSUP) {
-			return (-1);
+	for (i = 0; nic_nexuses[i] != NULL; i++) {
+		if (strcmp(drv, nic_nexuses[i]) == 0) {
+			return (nic_enum_nexus(mod, pnode, handle, din));
 		}
-		pt = NIC_PORT_UNKNOWN;
-		dgt.dgt_tran_id = 1;
-	} else {
-		pt = NIC_PORT_SFF;
 	}
 
-	ntrans = dgt.dgt_tran_id;
+	if (!nic_enum_devinfo_linkid(handle, din, &linkid))
+		return (-1);
+
+	if (!nic_enum_link_ntrans(handle, linkid, &ntrans, &pt))
+		return (-1);
+
 	if (ntrans == 0)
 		return (0);
 
@@ -393,7 +501,7 @@ nic_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		return (-1);
 
 	for (i = 0; i < ntrans; i++) {
-		if (nic_create_transceiver(mod, pnode, handle, linkid, i,
+		if (nic_create_transceiver(mod, pnode, handle, linkid, i, i,
 		    pt) != 0) {
 			return (-1);
 		}

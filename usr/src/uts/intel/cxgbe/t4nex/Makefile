@@ -54,7 +54,7 @@ CFLAGS += -I$(UTSBASE)/common/io/cxgbe -I$(UTSBASE)/common/io/cxgbe/common \
 LDFLAGS += -dy -N misc/mac -N drv/ip
 
 # needs work
-SMATCH=off
+SMOFF += all_func_returns,snprintf_overflow
 
 #
 # Default build targets.

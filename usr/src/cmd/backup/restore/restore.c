@@ -17,25 +17,16 @@
 #undef MAXNAMLEN
 #include <dirent.h>
 
-#ifdef __STDC__
 static char *keyval(int);
 static void removexattrs(struct entry *);
 static void movexattrs(char *, char *);
-#else
-static char *keyval();
-static void removexattrs();
-static void movexattrs();
-#endif
 
 /*
  * This implements the 't' option.
  * List entries on the tape.
  */
 long
-listfile(name, ino, type)
-	char *name;
-	ino_t ino;
-	int type;
+listfile(char *name, ino_t ino, int type)
 {
 	long descend = hflag ? GOOD : FAIL;
 
@@ -52,10 +43,7 @@ listfile(name, ino, type)
  * Request that new entries be extracted.
  */
 long
-addfile(name, ino, type)
-	char *name;
-	ino_t ino;
-	int type;
+addfile(char *name, ino_t ino, int type)
 {
 	struct entry *ep;
 	long descend = hflag ? GOOD : FAIL;
@@ -106,10 +94,7 @@ addfile(name, ino, type)
  */
 /* ARGSUSED */
 long
-deletefile(name, ino, type)
-	char *name;
-	ino_t ino;
-	int type;
+deletefile(char *name, ino_t ino, int type)
 {
 	long descend = hflag ? GOOD : FAIL;
 	struct entry *ep;
@@ -145,11 +130,7 @@ static struct entry *removelist;
  *	Remove directories from the lookup chains.
  */
 void
-#ifdef __STDC__
 removeoldleaves(void)
-#else
-removeoldleaves()
-#endif
 {
 	struct entry *ep;
 	ino_t i;
@@ -192,10 +173,7 @@ removeoldleaves()
  *	Renames are done at the same time.
  */
 long
-nodeupdates(name, ino, type)
-	char *name;
-	ino_t ino;
-	int type;
+nodeupdates(char *name, ino_t ino, int type)
 {
 	struct entry *ep, *np, *ip;
 	long descend = GOOD;
@@ -282,7 +260,7 @@ nodeupdates(name, ino, type)
 		} else {
 			dprintf(stdout,
 			    gettext("name/inode conflict, mktempname %s\n"),
-				myname(np));
+			    myname(np));
 			mktempname(np);
 		}
 		np = NIL;
@@ -351,7 +329,7 @@ nodeupdates(name, ino, type)
 		/* LINTED: result fits into a short */
 		ep->e_flags |= NEW|KEEP;
 		dprintf(stdout, "[%s] %s: %s\n", keyval(key), name,
-			flagvalues(ep));
+		    flagvalues(ep));
 		break;
 
 	/*
@@ -409,7 +387,7 @@ nodeupdates(name, ino, type)
 		/* LINTED: result fits into a short */
 		np->e_flags |= KEEP;
 		dprintf(stdout, "[%s] %s: %s\n", keyval(key), name,
-			flagvalues(np));
+		    flagvalues(np));
 		break;
 
 	/*
@@ -448,7 +426,7 @@ nodeupdates(name, ino, type)
 		/* LINTED: result fits into a short */
 		ip->e_flags |= NEW|KEEP;
 		dprintf(stdout, "[%s] %s: %s\n", keyval(key), name,
-			flagvalues(ip));
+		    flagvalues(ip));
 		break;
 
 	/*
@@ -457,8 +435,7 @@ nodeupdates(name, ino, type)
 	 */
 	case NAMEFND:
 		dprintf(stdout, gettext("[%s] %s: Extraneous name\n"),
-			keyval(key),
-			name);
+		    keyval(key), name);
 		descend = FAIL;
 		break;
 
@@ -505,8 +482,7 @@ nodeupdates(name, ino, type)
  * Calculate the active flags in a key.
  */
 static char *
-keyval(key)
-	int key;
+keyval(int key)
 {
 	static char keybuf[32];
 
@@ -529,11 +505,7 @@ keyval(key)
  * Find unreferenced link names.
  */
 void
-#ifdef __STDC__
 findunreflinks(void)
-#else
-findunreflinks()
-#endif
 {
 	struct entry *ep, *np;
 	ino_t i;
@@ -561,7 +533,7 @@ findunreflinks()
 			if (np->e_type == LEAF) {
 				if (np->e_flags != 0)
 					badentry(np, gettext(
-						"unreferenced with flags"));
+					    "unreferenced with flags"));
 				dprintf(stdout, gettext(
 				    "%s: remove unreferenced name\n"),
 				    myname(np));
@@ -582,11 +554,7 @@ findunreflinks()
  * time O(N).
  */
 void
-#ifdef __STDC__
 removeoldnodes(void)
-#else
-removeoldnodes()
-#endif
 {
 	struct entry *ep, **prev;
 	long change;
@@ -615,8 +583,7 @@ removeoldnodes()
  * Extract new leaves.
  */
 void
-createleaves(symtabfile)
-	char *symtabfile;
+createleaves(char *symtabfile)
 {
 	struct entry *ep;
 	char name[MAXCOMPLEXLEN];
@@ -668,7 +635,7 @@ createleaves(symtabfile)
 		if (first != curfile.ino) {
 			(void) fprintf(stderr,
 			    gettext("expected next file %d, got %d\n"),
-				first, curfile.ino);
+			    first, curfile.ino);
 			skipfile();
 			goto next;
 		}
@@ -724,11 +691,7 @@ createleaves(symtabfile)
  * Efficiently extract a subset of the files on a tape.
  */
 void
-#ifdef __STDC__
 createfiles(void)
-#else
-createfiles()
-#endif
 {
 	ino_t first, next, last;
 	struct entry *ep;
@@ -842,11 +805,7 @@ createfiles()
  * Add links.
  */
 void
-#ifdef __STDC__
 createlinks(void)
-#else
-createlinks()
-#endif
 {
 	struct entry *np, *ep;
 	ino_t i;
@@ -868,8 +827,9 @@ createlinks()
 				if (fchdir(dfd) < 0) {
 					saverr = errno;
 					(void) fprintf(stderr,
-					gettext("%s->%s: link failed: %s\n"),
-						from, to, strerror(saverr));
+					    gettext(
+					    "%s->%s: link failed: %s\n"),
+					    from, to, strerror(saverr));
 					(void) close(dfd);
 					continue;
 				}
@@ -896,11 +856,7 @@ createlinks()
  * that no temporary names remain.
  */
 void
-#ifdef __STDC__
 checkrestore(void)
-#else
-checkrestore()
-#endif
 {
 	struct entry *ep;
 	ino_t i;
@@ -925,10 +881,7 @@ checkrestore()
  * A paranoid check that things are as they should be.
  */
 long
-verifyfile(name, ino, type)
-	char *name;
-	ino_t ino;
-	int type;
+verifyfile(char *name, ino_t ino, int type)
 {
 	struct entry *np, *ep;
 	long descend = GOOD;
@@ -961,8 +914,7 @@ verifyfile(name, ino, type)
  * parent file is removed.
  */
 static void
-removexattrs(ep)
-	struct entry *ep;
+removexattrs(struct entry *ep)
 {
 	struct entry *np = ep;
 
@@ -985,9 +937,7 @@ removexattrs(ep)
  * the file named by the second argument (targ).
  */
 static void
-movexattrs(orig, targ)
-	char *orig;
-	char *targ;
+movexattrs(char *orig, char *targ)
 {
 	char *to, *from;
 	int fromfd, fromdir, tofd, todir, tfd;
@@ -1014,11 +964,12 @@ movexattrs(orig, targ)
 		goto out;
 	}
 	if ((fromdir = openat64(fromfd, ".",
-				O_RDONLY|O_NONBLOCK|O_XATTR)) == -1) {
+	    O_RDONLY|O_NONBLOCK|O_XATTR)) == -1) {
 		fprintf(stderr, gettext("%s: cannot access attributes: "),
-			from);
+		    from);
 		perror("");
-		if (tfd != AT_FDCWD) (void) close(tfd);
+		if (tfd != AT_FDCWD)
+			(void) close(tfd);
 		goto out;
 	}
 	if (tfd != AT_FDCWD) (void) close(tfd);
@@ -1036,8 +987,8 @@ movexattrs(orig, targ)
 	if ((tfd = dup(fromdir)) == -1 ||
 	    (dirp = fdopendir(tfd)) == NULL) {
 		fprintf(stderr,
-	gettext("%s: cannot allocate DIR structure to attribute directory: "),
-			from);
+		gettext("%s: cannot allocate DIR structure to attribute "
+		    "directory: "), from);
 		perror("");
 		if (tfd != -1) (void) close(tfd);
 		goto out;
@@ -1045,13 +996,13 @@ movexattrs(orig, targ)
 
 	while ((dp = readdir(dirp)) != NULL) {
 		if ((dp->d_name[0] == '.' && dp->d_name[1] == '\0') ||
-			(dp->d_name[0] == '.' && dp->d_name[1] == '.' &&
-			dp->d_name[2] == '\0'))
+		    (dp->d_name[0] == '.' && dp->d_name[1] == '.' &&
+		    dp->d_name[2] == '\0'))
 			continue;
 		if ((renameat(fromdir, dp->d_name, todir, dp->d_name)) == -1) {
 			fprintf(stderr,
-				gettext("%s: cannot move attribute %s: "),
-				from, dp->d_name);
+			    gettext("%s: cannot move attribute %s: "),
+			    from, dp->d_name);
 			goto out;
 		}
 	}

@@ -41,10 +41,6 @@
 
 #include "util.h"
 
-#ifdef	BOOTAMD64
-#include <amd64/amd64_page.h>
-#endif	/* BOOTAMD64 */
-
 union {
 	struct exec X;
 	Elf32_Ehdr Elfhdr;
@@ -63,10 +59,10 @@ typedef int	(*func_t)();
 
 #define	__BOOT_NAUXV_IMPL	22
 
-int 	use_align = 0;
-int 	npagesize = 0;
-uint_t 	icache_flush = 0;
-char 	*cpulist = NULL;
+int	use_align = 0;
+int	npagesize = 0;
+uint_t	icache_flush = 0;
+char	*cpulist = NULL;
 char	*mmulist = NULL;
 char	*module_path;		/* path for kernel modules */
 
@@ -76,14 +72,10 @@ char	*module_path;		/* path for kernel modules */
  * and during bringup, the LP64 clients may have ELF32 headers.
  */
 #ifdef	_ELF64_SUPPORT
-#ifndef	BOOTAMD64
 /*
- * Bootstrap vector for ELF32 LP64 client - neither supported nor needed for
- * AMD64
+ * Bootstrap vector for ELF32 LP64 client
  */
 Elf32_Boot *elfbootvecELF32_64;
-#endif	/* !BOOTAMD64 */
-
 Elf64_Boot *elfbootvecELF64;	/* ELF bootstrap vector for Elf64 LP64 */
 
 #define	OK		((func_t)0)
@@ -117,15 +109,10 @@ static int debug = 0;
 #ifdef	_ELF64_SUPPORT
 typedef struct {
 	uint_t	a_type;
-#ifdef	BOOTAMD64
-	uint_t	a_pad;	/* needed to 8-byte align uint64_ts below for AMD64 */
-#endif	/* BOOTAMD64 */
 	union {
 		uint64_t a_val;
 		uint64_t a_ptr;
-#ifndef	BOOTAMD64
 		void	(*a_fcn)();	/* XXX - UNUSED? */
-#endif	/* !BOOTAMD64 */
 	} a_un;
 } auxv64_t;
 
@@ -137,11 +124,7 @@ static uint64_t read_elf64(int, int, Elf64_Ehdr *);
 static Elf64_Addr iload64(char *, Elf64_Phdr *, Elf64_Phdr *, auxv64_t **);
 #endif	/* _ELF64_SUPPORT */
 
-#if defined(i386) && !defined(_SYSCALL32)
-typedef auxv_t	auxv32_t;
-#endif
-
-static func_t 	read_elf32(int, int, Elf32_Ehdr *);
+static func_t	read_elf32(int, int, Elf32_Ehdr *);
 static func_t	iload32(char *, Elf32_Phdr *, Elf32_Phdr *, auxv32_t **);
 static caddr_t	segbrk(caddr_t *, size_t, size_t);
 static int	openpath(char *, char *, int);
@@ -152,26 +135,9 @@ extern void	*kmem_alloc(size_t, int);
 extern void	kmem_free(void *, size_t);
 extern int	cons_gets(char *, int);
 
-#ifdef	BOOTAMD64
-extern const char *amd64_getmmulist(void);
-
-extern int amd64_elf64;
-extern int is_amd64;
-#endif	/* BOOTAMD64 */
-
-#ifdef	lint
-/*
- * This function is currently inlined
- */
-/*ARGSUSED*/
-void
-sync_instruction_memory(caddr_t v, size_t len)
-{}
-#else	/* lint */
 extern void sync_instruction_memory(caddr_t v, size_t len);
-#endif	/* lint */
 
-extern int 	verbosemode;
+extern int	verbosemode;
 extern int	boothowto;
 extern int	pagesize;
 extern char	filename[];
@@ -205,13 +171,7 @@ func_t
 readfile(int fd, int print)
 {
 #ifdef	_ELF64_SUPPORT
-#ifdef	BOOTAMD64
-	extern int bsetprop(struct bootops *, char *, void *, int);
-	extern struct bootops *bop;
-	extern uint64_t elf64_go2;
-#else	/* !BOOTAMD64 */
 	uint64_t elf64_go2;
-#endif	/* BOOTAMD64 */
 #endif	/* _ELF64_SUPPORT */
 
 	ssize_t i;
@@ -262,43 +222,11 @@ readfile(int fd, int print)
 			    elfhdr.e_ident[EI_CLASS], ELFCLASS32, ELFCLASS64);
 
 			if (elfhdr.e_ident[EI_CLASS] == ELFCLASS64) {
-#ifdef	BOOTAMD64
-				if (elfhdr.e_machine != EM_AMD64) {
-					printf("FATAL: 64-bit ELF executable "
-					    "not for AMD64\n       (e_machine "
-					    "= %d).\n", elfhdr.e_machine);
-					return (FAIL);
-				}
-
-				/*
-				 * OK, we know the executable is for an AMD64
-				 * CPU.  Make sure we ARE an AMD64 CPU before
-				 * proceeding.
-				 */
-				if (is_amd64 == 0) {
-					printf("FATAL: AMD64 executables not "
-					    " supported on this CPU.\n");
-					return (FAIL);
-				}
-
-				amd64_elf64 = (elfhdr.e_ident[EI_CLASS] ==
-				    ELFCLASS64);
-#endif	/* BOOTAMD64 */
-
 				elf64_go2 = read_elf64(fd, print,
 				    (Elf64_Ehdr *)&elfhdr);
 
-#ifdef	BOOTAMD64
-				if (elf64_go2 != FAIL_READELF64)
-					(void) bsetprop(bop, "mmu-modlist",
-					    "mmu64", 0);
-
-				return ((elf64_go2 == FAIL_READELF64) ? FAIL :
-				    OK);
-#else	/* !BOOTAMD64 */
 				return ((elf64_go2 == FAIL_READELF64) ? FAIL :
 				    (func_t)elf64_go2);
-#endif	/* BOOTAMD64 */
 
 			} else
 #endif	/* _ELF64_SUPPORT */
@@ -517,32 +445,6 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 				 * Now let's allocate some memory.
 				 */
 
-#ifdef	i386
-				/*
-				 * If vaddr == paddr and npagesize is 0, that
-				 * means the executable needs to be identity
-				 * mapped in memory (va == pa, mapped 1:1)
-				 *
-				 * Otherwise load as usual.
-				 */
-				if ((phdr->p_vaddr == phdr->p_paddr) &&
-				    (npagesize == 0)) {
-					extern caddr_t idmap_mem(uint32_t,
-					    size_t, int);
-
-					uint_t n;
-
-					n = (uint_t)base & (pagesize - 1);
-					if (n) {
-						base -= n;
-						size += n;
-					}
-
-					if (!idmap_mem((uint32_t)base,
-					    (size_t)size, pagesize))
-						goto elferror;
-				} else
-#endif	/* i386 */
 				/* use uintptr_t to suppress the gcc warning */
 				if (get_progmemory((caddr_t)(uintptr_t)base,
 				    size, npagesize))
@@ -667,7 +569,7 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 		bcopy(auxv,
 		    (void *)(uintptr_t)(elfbootvec->eb_un.eb_ptr), size);
 
-#if defined(_ELF64_SUPPORT) && !defined(BOOTAMD64)
+#if defined(_ELF64_SUPPORT)
 		/*
 		 * Make an LP64 copy of the vector for use by 64-bit standalones
 		 * even if they have ELF32.
@@ -695,7 +597,7 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 				a64++;
 			}
 		}
-#endif	/* _ELF64_SUPPORT && !BOOTAMD64 */
+#endif	/* _ELF64_SUPPORT */
 	} else {
 		kmem_free(allphdrs, phdrsize);
 	}
@@ -874,14 +776,8 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 				 * it mapped in permanently as part of
 				 * the kernel image.
 				 */
-#ifdef	BOOTAMD64
-				if ((loadaddr = (Elf64_Addr)
-				    (ADDR_XTND(kmem_alloc(phdr->p_memsz, 0))))
-				    == 0)
-#else	/* !BOOTAMD64 */
 				if ((loadaddr = (Elf64_Addr)(uintptr_t)
 				    kmem_alloc(phdr->p_memsz, 0)) == 0)
-#endif	/* BOOTAMD64 */
 					goto elf64error;
 
 				/*
@@ -1029,15 +925,6 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 		if (npagesize)
 			AUX64(av, AT_SUN_LPAGESZ, npagesize);
 
-#ifdef	BOOTAMD64
-		vsize = strlen(amd64_getmmulist()) + 1;
-		if ((mmulist = kmem_alloc(vsize, 0)) == NULL)
-			goto elf64error;
-
-		bcopy(amd64_getmmulist(), mmulist, vsize);
-		AUX64(av, AT_SUN_MMU, (uintptr_t)mmulist);
-#endif	/* BOOTAMD64 */
-
 		AUX64(av, AT_SUN_IFLUSH, icache_flush);
 		if (cpulist != NULL)
 			AUX64(av, AT_SUN_CPU, (uintptr_t)cpulist);
@@ -1058,16 +945,6 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 			goto elf64error;
 		}
 
-#ifdef	BOOTAMD64
-		if ((elfbootvecELF64->eb_un.eb_ptr =
-		    ADDR_XTND(kmem_alloc(size, 0))) == NULL) {
-			kmem_free(elfbootvecELF64, vsize);
-			goto elf64error;
-		}
-
-		bcopy((char *)auxv,
-		    (char *)ADDR_TRUNC((elfbootvecELF64->eb_un.eb_ptr)), size);
-#else	/* !BOOTAMD64 */
 		if ((elfbootvecELF64->eb_un.eb_ptr =
 		    (Elf64_Addr)kmem_alloc(size, 0)) == 0) {
 			kmem_free(elfbootvecELF64, vsize);
@@ -1076,7 +953,6 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 
 		bcopy((char *)auxv, (char *)(elfbootvecELF64->eb_un.eb_ptr),
 		    size);
-#endif	/* BOOTAMD64 */
 	} else {
 		kmem_free(allphdrs, phdrsize);
 	}
@@ -1165,11 +1041,7 @@ iload32(char *rtld, Elf32_Phdr *thdr, Elf32_Phdr *dhdr, auxv32_t **avp)
 		 * to do relocation, skip it.
 		 */
 		if (!(sp->sh_flags & SHF_ALLOC) &&
-#ifdef i386
-		    sp->sh_type != SHT_REL &&
-#else
 		    sp->sh_type != SHT_RELA &&
-#endif
 		    sp->sh_type != SHT_SYMTAB &&
 		    sp->sh_type != SHT_STRTAB)
 			continue;
@@ -1277,12 +1149,7 @@ iload64(char *rtld, Elf64_Phdr *thdr, Elf64_Phdr *dhdr, auxv64_t **avp)
 	/*
 	 * Allocate and read the ELF header.
 	 */
-#ifdef	BOOTAMD64
-	if ((ehdr = (Elf64_Ehdr *)(uintptr_t)kmem_alloc(sizeof (Elf64_Ehdr),
-	    0)) == NULL) {
-#else	/* !BOOTAMD64 */
 	if ((ehdr = (Elf64_Ehdr *)kmem_alloc(sizeof (Elf64_Ehdr), 0)) == NULL) {
-#endif	/* BOOTAMD64 */
 		printf("boot: alloc error reading ELF header (%s).\n", rtld);
 		goto error;
 	}
@@ -1306,13 +1173,8 @@ iload64(char *rtld, Elf64_Phdr *thdr, Elf64_Phdr *dhdr, auxv64_t **avp)
 		goto error;
 	}
 
-#ifdef	BOOTAMD64
-	AUX64(*avp, AT_SUN_LDELF, (uintptr_t)ehdr);
-	AUX64(*avp, AT_SUN_LDSHDR, (uintptr_t)shdrs);
-#else	/* !BOOTAMD64 */
 	AUX64(*avp, AT_SUN_LDELF, ehdr);
 	AUX64(*avp, AT_SUN_LDSHDR, shdrs);
-#endif	/* BOOTAMD64 */
 
 	/*
 	 * Load sections into the appropriate dynamic segment.
@@ -1340,13 +1202,8 @@ iload64(char *rtld, Elf64_Phdr *thdr, Elf64_Phdr *dhdr, auxv64_t **avp)
 		/*
 		 * Make some room for it.
 		 */
-#ifdef	BOOTAMD64
-		load = ADDR_XTND(segbrk((caddr_t *)spp,
-		    sp->sh_size, sp->sh_addralign));
-#else	/* !BOOTAMD64 */
 		load = (Elf64_Addr)segbrk((caddr_t *)spp, sp->sh_size,
 		    sp->sh_addralign);
-#endif	/* BOOTAMD64 */
 
 		if (load == 0) {
 			printf("boot: allocating memory for section %d "
@@ -1460,10 +1317,7 @@ segbrk(caddr_t *spp, size_t bytes, size_t align)
  * return the file descriptor (or -1 on failure).
  */
 static int
-openpath(path, fname, flags)
-char *path;
-char *fname;
-int flags;
+openpath(char *path, char *fname, int flags)
 {
 	register char *p, *q;
 	char buf[MAXPATHLEN];
@@ -1507,22 +1361,16 @@ int flags;
  * Get the module search path.
  */
 static char *
-getmodpath(fname)
-char *fname;
+getmodpath(char *fname)
 {
 	register char *p = strrchr(fname, '/');
 	static char mod_path[MOD_MAXPATH];
 	size_t len;
 	extern char *impl_arch_name;
-#if defined(__sparcv9) || defined(BOOTAMD64)
-#ifdef	__sparcv9
+#if defined(__sparcv9)
 	char    *isastr = "/sparcv9";
-#endif	/* __sparcv9 */
-#ifdef	BOOTAMD64
-	char	*isastr = "/amd64";
-#endif	/* BOOTAMD64 */
 	size_t	isalen = strlen(isastr);
-#endif	/* __sparcv9 || BOOTAMD64 */
+#endif	/* __sparcv9 */
 
 	if (p == NULL) {
 		/* strchr could not find a "/" */
@@ -1538,17 +1386,15 @@ char *fname;
 	(void) strncpy(mod_path, fname, len);
 	mod_path[len] = 0;
 
-#if defined(__sparcv9) || defined(BOOTAMD64)
+#if defined(__sparcv9)
 	len = strlen(mod_path);
 	if ((len > isalen) && (strcmp(&mod_path[len - isalen], isastr) == 0)) {
 		mod_path[len - isalen] = '\0';
-#if defined(__sparcv9)
 		if ((client_isLP64 == 0) && verbosemode)
 			printf("Assuming LP64 %s client.\n", isastr);
 		client_isLP64 = 1;
-#endif	/* __sparcv9 */
 	}
-#endif	/* __sparcv9 || BOOTAMD64 */
+#endif	/* __sparcv9 */
 	mod_path_uname_m(mod_path, impl_arch_name);
 	(void) strcat(mod_path, " ");
 	(void) strcat(mod_path, MOD_DEFPATH);

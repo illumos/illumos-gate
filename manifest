@@ -2561,7 +2561,6 @@ f usr/bin/crontab 4555 root bin
 f usr/bin/crypt 0555 root bin
 f usr/bin/csh 0555 root bin
 f usr/bin/csplit 0555 root bin
-f usr/bin/ctags 0555 root bin
 f usr/bin/ctfdiff 0555 root bin
 f usr/bin/ctfdump 0555 root bin
 f usr/bin/ctrun 0555 root bin
@@ -12005,7 +12004,6 @@ f usr/share/man/man1/crontab.1 0444 root bin
 f usr/share/man/man1/crypt.1 0444 root bin
 f usr/share/man/man1/csh.1 0444 root bin
 f usr/share/man/man1/csplit.1 0444 root bin
-f usr/share/man/man1/ctags.1 0444 root bin
 f usr/share/man/man1/ctfdiff.1 0444 root bin
 f usr/share/man/man1/ctfdump.1 0444 root bin
 f usr/share/man/man1/ctrun.1 0444 root bin

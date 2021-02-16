@@ -1675,6 +1675,7 @@ flash_fw(struct adapter *sc, void *data, int flags)
 		mbox = sc->mbox;
 
 	rc = -t4_fw_upgrade(sc, mbox, ptr, fw.len, true);
+	ddi_ufm_update(sc->ufm_hdl);
 
 	kmem_free(ptr, fw.len);
 

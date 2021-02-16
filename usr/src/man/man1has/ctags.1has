@@ -45,11 +45,10 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH CTAGS 1 "Mar 18, 1997"
+.TH CTAGS 1HAS "Mar 18, 1997"
 .SH NAME
 ctags \- create a tags file for use with ex and vi
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/ctags\fR [\fB-aBFtuvwx\fR] [\fB-f\fR \fItagsfile\fR] \fIfile\fR...
 .fi
@@ -60,8 +59,6 @@ ctags \- create a tags file for use with ex and vi
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBctags\fR utility makes a tags file for \fBex\fR(1) from the specified C,
 C++, Pascal, FORTRAN, \fByacc\fR(1), and  \fBlex\fR(1) sources. A tags file
 gives the locations of specified objects (in this case functions and typedefs)
@@ -71,11 +68,9 @@ definition. Functions are searched with a pattern, typedefs with a line number.
 Specifiers are given in separate fields on the line, separated by SPACE or TAB
 characters. Using the tags file, \fBex\fR can quickly find these objects'
 definitions.
-.sp
 .LP
 Normally,  \fBctags\fR places the tag descriptions in a file called \fBtags\fR;
 this may be overridden with the \fB-f\fR option.
-.sp
 .LP
 Files with names ending in \fB\&.c\fR or \fB\&.h\fR are assumed to be either C
 or C++ source files and are searched for C/C++  routine and macro definitions.
@@ -85,7 +80,6 @@ assumed to be  \fByacc\fR source files. Files with names ending in \fB\&.l\fR
 are assumed to be  \fBlex\fR files.  Others are first examined to see if they
 contain any Pascal or \fBFORTRAN\fR routine definitions; if not, they are
 processed again looking for C  definitions.
-.sp
 .LP
 The tag \fBmain\fR is treated specially in C or C++ programs.  The tag formed
 is created by prepending \fBM\fR to \fIfile\fR, with a trailing \fB\&.c\fR,
@@ -93,8 +87,6 @@ is created by prepending \fBM\fR to \fIfile\fR, with a trailing \fB\&.c\fR,
 name components also removed.  This makes use of \fBctags\fR practical in
 directories with more than one program.
 .SH OPTIONS
-.sp
-.LP
 The precedence of the options that pertain to printing is \fB-x\fR, \fB-v\fR,
 then the remaining options. The following options are supported:
 .sp
@@ -190,8 +182,6 @@ function index.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following \fIfile\fR operands are supported:
 .sp
 .ne 2
@@ -224,14 +214,10 @@ FORTRAN-language source code.
 .RE
 
 .SH USAGE
-.sp
-.LP
 The \fB-v\fR option is mainly used with \fBvgrind\fR which will be part of the
 optional \fBBSD\fR Compatibility Package.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRProducing entries in alphabetical order
-.sp
 .LP
 Using \fBctags\fR with the \fB-v\fR option produces entries in an order which
 may not always be appropriate for \fBvgrind\fR. To produce results in
@@ -244,11 +230,9 @@ example% \fBctags -v filename.c filename.h | sort -f \|>\| index\fR
 example% \fBvgrind -x index\fR
 .fi
 .in -2
-.sp
 
 .LP
 \fBExample 2 \fRBuilding a tags file
-.sp
 .LP
 To build a tags file for C sources in a directory hierarchy rooted at
 \fIsourcedir\fR, first create an empty tags file, and then run  \fBfind\fR(1)
@@ -261,21 +245,15 @@ example% \fBfind . \e( -name SCCS -prune -name \e\e
        '*.c' -o -name '*.h' \e) -exec ctags -u {} \e;\fR
 .fi
 .in -2
-.sp
 
-.sp
 .LP
 Notice that spaces must be entered exactly as shown.
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBctags\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -296,7 +274,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fBtags\fR\fR
@@ -306,11 +283,7 @@ output tags file
 .RE
 
 .SH ATTRIBUTES
-.sp
 .SS "/usr/xpg4/bin/ctags"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -321,25 +294,18 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBex\fR(1), \fBlex\fR(1), \fBvgrind\fR(1), \fBvi\fR(1), \fByacc\fR(1),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
-.LP
 Recognition of \fBfunctions\fR, \fBsubroutines\fR, and \fBprocedures\fR for
 \fBFORTRAN\fR and Pascal is done in a very simpleminded way. No attempt is made
 to deal with block structure; if you have two Pascal procedures in different
 blocks with the same name, you lose.
-.sp
 .LP
 The method of deciding whether to look for C or Pascal and \fBFORTRAN\fR
 functions is a hack.
-.sp
 .LP
 The \fBctags\fR utility does not know about \fB#ifdefs\fR.
-.sp
 .LP
 The \fBctags\fR utility should know about Pascal types. Relies on the input
 being well formed to detect typedefs. Use of \fB-tx\fR shows only the last line
