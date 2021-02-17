@@ -60,16 +60,32 @@ static const char *generic_status_codes[] = {
 	"Command Aborted due to Missing Fused Command",
 	"Invalid Namespace or Format",
 	"Command Sequence Error",
-	/* NVMe 1.1 */
+	/* NVMe 1.1 -- 0xd */
 	"Invalid SGL Segment Descriptor",
 	"Invalid Number of SGL Descriptors",
 	"Data SGL Length Invalid",
 	"Metadata SGL Length Invalid",
 	"SGL Descriptor Type Invalid",
-	/* NVMe 1.2 */
+	/* NVMe 1.2  -- 0x12 */
 	"Invalid Use of Controller Memory Buffer",
 	"PRP Offset Invalid",
-	"Atomic Write Unit Exceeded"
+	"Atomic Write Unit Exceeded",
+	/* NVMe 1.3 -- 0x15 */
+	"Operation Denied",
+	"SGL Offset Invalid",
+	"Reserved",
+	"Host Identifier Inconsistent Format",
+	"Keep Alive Timeout Expired",
+	"Keep Alive Timeout Invalid",
+	"Command Aborted due to Preempt and Abort",
+	"Sanitize Failed",
+	"Sanitize in Progress",
+	"SGL Data Block Granularity Invalid",
+	"Command Not Supported for Queue in CMB",
+	/* NVMe 1.4 -- 0x20 */
+	"Namespace is Write Protected",
+	"Command Interrupted",
+	"Transient Transport Error"
 };
 
 static const char *specific_status_codes[] = {
@@ -86,12 +102,12 @@ static const char *specific_status_codes[] = {
 	"Invalid Format",
 	"Firmware Activation Requires Conventional Reset",
 	"Invalid Queue Deletion",
-	/* NVMe 1.1 */
+	/* NVMe 1.1 -- 0xd */
 	"Feature Identifier Not Saveable",
 	"Feature Not Changeable",
 	"Feature Not Namespace Specific",
 	"Firmware Activation Requires NVM Subsystem Reset",
-	/* NVMe 1.2 */
+	/* NVMe 1.2 -- 0x12 */
 	"Firmware Activation Requires Reset",
 	"Firmware Activation Requires Maximum Time Violation",
 	"Firmware Activation Prohibited",
@@ -103,7 +119,17 @@ static const char *specific_status_codes[] = {
 	"Namespace Is Private",
 	"Namespace Not Attached",
 	"Thin Provisioning Not Supported",
-	"Controller List Invalid"
+	"Controller List Invalid",
+	/* NVMe 1.3 -- 0x1e */
+	"Boot Partition Write Prohibited",
+	"Invalid Controller Identifier",
+	"Invalid Secondary Controller State",
+	"Invalid Number of Controller Resources",
+	"Invalid Resource Identifier",
+	/* NVMe 1.4 -- 0x23 */
+	"Sanitize Prohibited While Persistent Memory Region is Enabled",
+	"ANA Group Identifier Invalid",
+	"ANA Attach Failed"
 };
 
 static const char *generic_nvm_status_codes[] = {
@@ -130,15 +156,34 @@ static const char *media_nvm_status_codes[] = {
 	"End-to-End Reference Tag Check Error",
 	"Compare Failure",
 	"Access Denied",
-	/* NVMe 1.2 */
+	/* NVMe 1.2 -- 0x87 (0x7) */
 	"Deallocated or Unwritten Logical Block"
+};
+
+static const char *path_status_codes[] = {
+	/* NVMe 1.4 -- 0x00 */
+	"Internal Path Error",
+	"Asymmetric Access Persistent Loss",
+	"Asymmetric Access Inaccessible",
+	"Asymmetric Access Transition"
+};
+
+static const char *path_controller_codes[] = {
+	/* NVMe 1.4 -- 0x60 */
+	"Controller Pathing Error"
+};
+
+static const char *path_host_codes[] = {
+	/* NVMe 1.4 -- 0x70 */
+	"Host Pathing Error",
+	"Command Aborted by Host"
 };
 
 static const char *status_code_types[] = {
 	"Generic Command Status",
 	"Command Specific Status",
-	"Media Errors",
-	"Reserved",
+	"Media and Data Integrity Errors",
+	"Path Related Status",
 	"Reserved",
 	"Reserved",
 	"Reserved",
@@ -1637,30 +1682,44 @@ nvme_print_error_log(int nlog, nvme_error_log_entry_t *elog,
 
 	for (i = 0; i != nlog; i++) {
 		int sc = elog[i].el_sf.sf_sc;
-		const char *sc_str = "";
+		const char *sc_str = "Unknown";
 
 		if (elog[i].el_count == 0 && verbose == 0)
 			break;
 
 		switch (elog[i].el_sf.sf_sct) {
 		case 0: /* Generic Command Status */
-			if (sc < ARRAYSIZE(generic_status_codes))
+			if (sc < ARRAYSIZE(generic_status_codes)) {
 				sc_str = generic_status_codes[sc];
-			else if (sc >= 0x80 &&
-			    sc - 0x80 < ARRAYSIZE(generic_nvm_status_codes))
+			} else if (sc >= 0x80 &&
+			    sc - 0x80 < ARRAYSIZE(generic_nvm_status_codes)) {
 				sc_str = generic_nvm_status_codes[sc - 0x80];
+			}
 			break;
 		case 1: /* Specific Command Status */
-			if (sc < ARRAYSIZE(specific_status_codes))
+			if (sc < ARRAYSIZE(specific_status_codes)) {
 				sc_str = specific_status_codes[sc];
-			else if (sc >= 0x80 &&
-			    sc - 0x80 < ARRAYSIZE(specific_nvm_status_codes))
+			} else if (sc >= 0x80 &&
+			    sc - 0x80 < ARRAYSIZE(specific_nvm_status_codes)) {
 				sc_str = specific_nvm_status_codes[sc - 0x80];
+			}
 			break;
 		case 2: /* Media Errors */
 			if (sc >= 0x80 &&
-			    sc - 0x80 < ARRAYSIZE(media_nvm_status_codes))
+			    sc - 0x80 < ARRAYSIZE(media_nvm_status_codes)) {
 				sc_str = media_nvm_status_codes[sc - 0x80];
+			}
+			break;
+		case 3:	/* Path Related Status */
+			if (sc < ARRAYSIZE(path_status_codes)) {
+				sc_str = path_status_codes[sc];
+			} else if (sc >= 0x60 &&
+			    sc - 0x60 < ARRAYSIZE(path_controller_codes)) {
+				sc_str = path_controller_codes[sc - 0x60];
+			} else if (sc >= 0x70 &&
+			    sc - 0x70 < ARRAYSIZE(path_host_codes)) {
+				sc_str = path_host_codes[sc - 0x70];
+			}
 			break;
 		case 7: /* Vendor Specific */
 			sc_str = "Unknown Vendor Specific";
