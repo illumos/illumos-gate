@@ -103,7 +103,7 @@
 
 #define	LINK	1
 
-extern char	dbst; 			/* libinst/pkgdbmerg.c */
+extern char	dbst;			/* libinst/pkgdbmerg.c */
 
 struct cfextra **extlist;
 struct pinfo **eptlist;
@@ -111,11 +111,10 @@ struct pinfo **eptlist;
 char	*classname = NULL;
 char	*pkginst;
 char	*uniTmp;
-char 	*abi_sym_ptr;
-char 	*ulim;
-char 	*script;
+char	*abi_sym_ptr;
+char	*ulim;
+char	*script;
 
-int	eptnum;
 int	nosetuid;
 int	nocnflct;
 int	warnflag = 0;

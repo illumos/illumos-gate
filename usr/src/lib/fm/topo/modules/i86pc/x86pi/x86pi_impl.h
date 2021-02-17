@@ -91,7 +91,7 @@ extern "C" {
 #define	SMB_MAX_ID	0x40
 
 /* indication of successful fac node creation */
-int fac_done;
+extern int fac_done;
 
 /*
  * Count and smbios struct id(s) for each smbios struct type.
@@ -111,7 +111,7 @@ typedef struct smbs_cnt {
 	smbs_con_ids_t ids[SMB_MAX_ID]; /* SMBIOS table entry id(s) */
 } smbs_cnt_t;
 
-smbs_cnt_t stypes[SMB_TYPE_OEM_HI]; /* one for each struct */
+extern smbs_cnt_t stypes[SMB_TYPE_OEM_HI]; /* one for each struct */
 
 /*
  * The enumerator needs to pass some state in to the function that walks
