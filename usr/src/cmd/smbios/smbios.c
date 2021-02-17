@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2017, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -213,6 +213,43 @@ u128_print(FILE *fp, const char *desc, const uint8_t *data)
 	oprintf(fp, "\n");
 }
 
+/*
+ * Print a string that came from an SMBIOS table. We do this character by
+ * character so we can potentially escape strings.
+ */
+static void
+str_print_label(FILE *fp, const char *header, const char *str, boolean_t label)
+{
+	const char *c;
+
+	oprintf(fp, header);
+	if (label) {
+		oprintf(fp, ": ");
+	}
+
+	for (c = str; *c != '\0'; c++) {
+		if (isprint(*c)) {
+			oprintf(fp, "%c", *c);
+		} else {
+			oprintf(fp, "\\x%02x", *c);
+		}
+	}
+
+	oprintf(fp, "\n");
+}
+
+static void
+str_print_nolabel(FILE *fp, const char *ws, const char *str)
+{
+	return (str_print_label(fp, ws, str, B_FALSE));
+}
+
+static void
+str_print(FILE *fp, const char *header, const char *str)
+{
+	return (str_print_label(fp, header, str, B_TRUE));
+}
+
 static int
 check_oem(smbios_hdl_t *shp)
 {
@@ -316,19 +353,19 @@ static void
 print_common(const smbios_info_t *ip, FILE *fp)
 {
 	if (ip->smbi_manufacturer[0] != '\0')
-		oprintf(fp, "  Manufacturer: %s\n", ip->smbi_manufacturer);
+		str_print(fp, "  Manufacturer", ip->smbi_manufacturer);
 	if (ip->smbi_product[0] != '\0')
-		oprintf(fp, "  Product: %s\n", ip->smbi_product);
+		str_print(fp, "  Product", ip->smbi_product);
 	if (ip->smbi_version[0] != '\0')
-		oprintf(fp, "  Version: %s\n", ip->smbi_version);
+		str_print(fp, "  Version", ip->smbi_version);
 	if (ip->smbi_serial[0] != '\0')
-		oprintf(fp, "  Serial Number: %s\n", ip->smbi_serial);
+		str_print(fp, "  Serial Number", ip->smbi_serial);
 	if (ip->smbi_asset[0] != '\0')
-		oprintf(fp, "  Asset Tag: %s\n", ip->smbi_asset);
+		str_print(fp, "  Asset Tag", ip->smbi_asset);
 	if (ip->smbi_location[0] != '\0')
-		oprintf(fp, "  Location Tag: %s\n", ip->smbi_location);
+		str_print(fp, "  Location Tag", ip->smbi_location);
 	if (ip->smbi_part[0] != '\0')
-		oprintf(fp, "  Part Number: %s\n", ip->smbi_part);
+		str_print(fp, "  Part Number", ip->smbi_part);
 }
 
 static void
@@ -338,9 +375,9 @@ print_bios(smbios_hdl_t *shp, FILE *fp)
 
 	(void) smbios_info_bios(shp, &b);
 
-	oprintf(fp, "  Vendor: %s\n", b.smbb_vendor);
-	oprintf(fp, "  Version String: %s\n", b.smbb_version);
-	oprintf(fp, "  Release Date: %s\n", b.smbb_reldate);
+	str_print(fp, "  Vendor", b.smbb_vendor);
+	str_print(fp, "  Version String", b.smbb_version);
+	str_print(fp, "  Release Date", b.smbb_reldate);
 	oprintf(fp, "  Address Segment: 0x%x\n", b.smbb_segment);
 	oprintf(fp, "  ROM Size: %" PRIu64 " bytes\n", b.smbb_extromsize);
 	oprintf(fp, "  Image Size: %u bytes\n", b.smbb_runsize);
@@ -399,8 +436,8 @@ print_system(smbios_hdl_t *shp, FILE *fp)
 	desc_printf(smbios_system_wakeup_desc(s.smbs_wakeup),
 	    fp, "  Wake-Up Event: 0x%x", s.smbs_wakeup);
 
-	oprintf(fp, "  SKU Number: %s\n", s.smbs_sku);
-	oprintf(fp, "  Family: %s\n", s.smbs_family);
+	str_print(fp, "  SKU Number", s.smbs_sku);
+	str_print(fp, "  Family", s.smbs_family);
 }
 
 static void
@@ -448,7 +485,7 @@ print_chassis(smbios_hdl_t *shp, id_t id, FILE *fp)
 	(void) smbios_info_chassis(shp, id, &c);
 
 	oprintf(fp, "  OEM Data: 0x%x\n", c.smbc_oemdata);
-	oprintf(fp, "  SKU number: %s\n",
+	str_print(fp, "  SKU Number",
 	    c.smbc_sku[0] == '\0' ? "<unknown>" : c.smbc_sku);
 	oprintf(fp, "  Lock Present: %s\n", c.smbc_lock ? "Y" : "N");
 
@@ -646,8 +683,8 @@ print_port(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	(void) smbios_info_port(shp, id, &p);
 
-	oprintf(fp, "  Internal Reference Designator: %s\n", p.smbo_iref);
-	oprintf(fp, "  External Reference Designator: %s\n", p.smbo_eref);
+	str_print(fp, "  Internal Reference Designator", p.smbo_iref);
+	str_print(fp, "  External Reference Designator", p.smbo_eref);
 
 	desc_printf(smbios_port_conn_desc(p.smbo_itype),
 	    fp, "  Internal Connector Type: %u", p.smbo_itype);
@@ -668,7 +705,7 @@ print_slot(smbios_hdl_t *shp, id_t id, FILE *fp)
 	(void) smbios_info_slot(shp, id, &s);
 	smbios_info_smbios_version(shp, &v);
 
-	oprintf(fp, "  Reference Designator: %s\n", s.smbl_name);
+	str_print(fp, "  Reference Designator", s.smbl_name);
 	oprintf(fp, "  Slot ID: 0x%x\n", s.smbl_id);
 
 	desc_printf(smbios_slot_type_desc(s.smbl_type),
@@ -763,7 +800,7 @@ print_obdevs_ext(smbios_hdl_t *shp, id_t id, FILE *fp)
 	enabled = oe.smboe_dtype >> 7;
 	type = smbios_onboard_type_desc(oe.smboe_dtype & 0x7f);
 
-	oprintf(fp, "  Reference Designator: %s\n", oe.smboe_name);
+	str_print(fp, "  Reference Designator", oe.smboe_name);
 	oprintf(fp, "  Device Enabled: %s\n", enabled == B_TRUE ? "true" :
 	    "false");
 	oprintf(fp, "  Device Type: %s\n", type);
@@ -783,7 +820,7 @@ print_obdevs(smbios_hdl_t *shp, id_t id, FILE *fp)
 		argv = alloca(sizeof (smbios_obdev_t) * argc);
 		(void) smbios_info_obdevs(shp, id, argc, argv);
 		for (i = 0; i < argc; i++)
-			oprintf(fp, "  %s\n", argv[i].smbd_name);
+			str_print_nolabel(fp, "  ", argv[i].smbd_name);
 	}
 }
 
@@ -797,7 +834,7 @@ print_strtab(smbios_hdl_t *shp, id_t id, FILE *fp)
 		argv = alloca(sizeof (char *) * argc);
 		(void) smbios_info_strtab(shp, id, argc, argv);
 		for (i = 0; i < argc; i++)
-			oprintf(fp, "  %s\n", argv[i]);
+			str_print_nolabel(fp, "  ", argv[i]);
 	}
 }
 
@@ -808,7 +845,7 @@ print_lang(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	(void) smbios_info_lang(shp, &l);
 
-	oprintf(fp, "  Current Language: %s\n", l.smbla_cur);
+	str_print(fp, "  Current Language", l.smbla_cur);
 	oprintf(fp, "  Language String Format: %u\n", l.smbla_fmt);
 	oprintf(fp, "  Number of Installed Languages: %u\n", l.smbla_num);
 	oprintf(fp, "  Installed Languages:\n");
@@ -994,8 +1031,8 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 		oprintf(fp, "  Configured Speed: Unknown\n");
 	}
 
-	oprintf(fp, "  Device Locator: %s\n", md.smbmd_dloc);
-	oprintf(fp, "  Bank Locator: %s\n", md.smbmd_bloc);
+	str_print(fp, "  Device Locator", md.smbmd_dloc);
+	str_print(fp, "  Bank Locator", md.smbmd_bloc);
 
 	if (md.smbmd_minvolt != 0) {
 		oprintf(fp, "  Minimum Voltage: %.2fV\n",
@@ -1031,7 +1068,7 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 	}
 
 	if (md.smbmd_firmware_rev[0] != '\0') {
-		oprintf(fp, "  Firmware Revision: %s\n", md.smbmd_firmware_rev);
+		str_print(fp, "  Firmware Revision", md.smbmd_firmware_rev);
 	}
 
 	if (md.smbmd_modmfg_id != 0) {
@@ -1140,7 +1177,7 @@ print_vprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 		return;
 	}
 
-	oprintf(fp, "  Description: %s\n", vp.smbvp_description != NULL ?
+	str_print(fp, "  Description", vp.smbvp_description != NULL ?
 	    vp.smbvp_description : "unknown");
 	desc_printf(smbios_vprobe_loc_desc(vp.smbvp_location),
 	    fp, "  Location: %u", vp.smbvp_location);
@@ -1218,7 +1255,7 @@ print_cooldev(smbios_hdl_t *shp, id_t id, FILE *fp)
 	}
 
 	if (cd.smbcd_descr != NULL && cd.smbcd_descr[0] != '\0') {
-		oprintf(fp, "  Description: %s\n", cd.smbcd_descr);
+		str_print(fp, "  Description", cd.smbcd_descr);
 	}
 }
 
@@ -1233,7 +1270,7 @@ print_tprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 		return;
 	}
 
-	oprintf(fp, "  Description: %s\n", tp.smbtp_description != NULL ?
+	str_print(fp, "  Description", tp.smbtp_description != NULL ?
 	    tp.smbtp_description : "unknown");
 	desc_printf(smbios_tprobe_loc_desc(tp.smbtp_location),
 	    fp, "  Location: %u", tp.smbtp_location);
@@ -1297,7 +1334,7 @@ print_iprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 		return;
 	}
 
-	oprintf(fp, "  Description: %s\n", ip.smbip_description != NULL ?
+	str_print(fp, "  Description", ip.smbip_description != NULL ?
 	    ip.smbip_description : "unknown");
 	desc_printf(smbios_iprobe_loc_desc(ip.smbip_location),
 	    fp, "  Location: %u", ip.smbip_location);
@@ -1507,11 +1544,11 @@ print_battery(smbios_hdl_t *shp, id_t id, FILE *fp)
 	}
 
 	if (bat.smbb_date != NULL) {
-		oprintf(fp, "  Manufacture Date: %s\n", bat.smbb_date);
+		str_print(fp, "  Manufacture Date", bat.smbb_date);
 	}
 
 	if (bat.smbb_serial != NULL) {
-		oprintf(fp, "  Serial Number: %s\n", bat.smbb_serial);
+		str_print(fp, "  Serial Number", bat.smbb_serial);
 	}
 
 	if (bat.smbb_chem != SMB_BDC_UNKNOWN) {
@@ -1531,7 +1568,7 @@ print_battery(smbios_hdl_t *shp, id_t id, FILE *fp)
 		oprintf(fp, "  Design Voltage: unknown\n");
 	}
 
-	oprintf(fp, "  SBDS Version Number: %s\n", bat.smbb_version);
+	str_print(fp, "  SBDS Version Number", bat.smbb_version);
 	if (bat.smbb_err != UINT8_MAX) {
 		oprintf(fp, "  Maximum Error: %u\n", bat.smbb_err);
 	} else {
@@ -1540,7 +1577,7 @@ print_battery(smbios_hdl_t *shp, id_t id, FILE *fp)
 	oprintf(fp, "  SBDS Serial Number: %04x\n", bat.smbb_ssn);
 	oprintf(fp, "  SBDS Manufacture Date: %u-%02u-%02u\n", bat.smbb_syear,
 	    bat.smbb_smonth, bat.smbb_sday);
-	oprintf(fp, "  SBDS Device Chemistry: %s\n", bat.smbb_schem);
+	str_print(fp, "  SBDS Device Chemistry", bat.smbb_schem);
 	oprintf(fp, "  OEM-specific Information: 0x%08x\n", bat.smbb_oemdata);
 }
 
