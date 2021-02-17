@@ -90,8 +90,11 @@ _breakpoint(void)
 	ret
 	SET_SIZE(_breakpoint)
 #endif
-
-	ENTRY(_malloc)
+	.section ".ptctext", "ax"
+	.globl _malloc
+	.type _malloc, @function
+	.align ASM_ENTRY_ALIGN
+_malloc:
 	jmp umem_malloc;
 	NOP256
 	NOP256
@@ -100,7 +103,11 @@ _breakpoint(void)
 #endif
 	SET_SIZE(_malloc)
 
-	ENTRY(_free)
+	.section ".ptctext","ax"
+	.globl _free
+	.type _free, @function
+	.align ASM_ENTRY_ALIGN
+_free:
 	jmp umem_malloc_free;
 	NOP256
 	NOP256
@@ -111,5 +118,5 @@ _breakpoint(void)
 
 	ANSI_PRAGMA_WEAK2(malloc,_malloc,function)
 	ANSI_PRAGMA_WEAK2(free,_free,function)
-	
+
 #endif	/* lint */
