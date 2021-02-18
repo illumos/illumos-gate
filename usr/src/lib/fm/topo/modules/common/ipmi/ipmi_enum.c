@@ -860,9 +860,13 @@ ipmi_enum_sp(topo_mod_t *mod, tnode_t *pnode)
 	}
 	ret = 0;
 out:
-	if (lancfg.ilc_ipv6_nroutes > 0) {
-		for (i = 0; i < lancfg.ilc_ipv6_nroutes; i++)
-			topo_mod_free(mod, ipv6_routes[i], INET6_ADDRSTRLEN);
+	if (lancfg.ilc_ipv6_nroutes > 0 && ipv6_routes != NULL) {
+		for (i = 0; i < lancfg.ilc_ipv6_nroutes; i++) {
+			if (ipv6_routes[i] != NULL) {
+				topo_mod_free(mod, ipv6_routes[i],
+				    INET6_ADDRSTRLEN);
+			}
+		}
 		topo_mod_free(mod, ipv6_routes,
 		    lancfg.ilc_ipv6_nroutes * sizeof (char *));
 	}
