@@ -27,8 +27,6 @@
 #ifndef	_RMFORMAT_H
 #define	_RMFORMAT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contents the definitions for rmformat utility
  */
@@ -134,7 +132,7 @@ extern "C" {
 #define	INQUIRY_DATA_LENGTH		96
 #define	DVD_CONFIG_SIZE			0x20
 
-int uscsi_error;	/* used for debugging failed uscsi */
+extern int uscsi_error;	/* used for debugging failed uscsi */
 
 /* fdisk related structures */
 
