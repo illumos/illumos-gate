@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/systm.h>
@@ -20,6 +21,8 @@
 #include <sys/cmn_err.h>
 #include <sys/lx_impl.h>
 #include <sys/lx_brand.h>
+#include <sys/sysmacros.h>
+#include <sys/var.h>
 
 #define	LX_RLIMIT_CPU		0
 #define	LX_RLIMIT_FSIZE		1
@@ -166,8 +169,15 @@ lx_getrlimit_common(int lx_resource, uint64_t *rlim_curp, uint64_t *rlim_maxp)
 		break;
 
 	case LX_RLIMIT_NPROC:
-		/*  zone.max-lwps */
-		rlim64.rlim_cur = rlim64.rlim_max = curzone->zone_nlwps_ctl;
+		/*
+		 * This is a limit on the number of processes for a
+		 * real user ID (not enforced for privileged processes).
+		 *
+		 * This is analogous to v.v_maxup but is further capped
+		 * by zone.max-processes
+		 */
+		rlim64.rlim_cur = rlim64.rlim_max =
+		    MIN(v.v_maxup, curzone->zone_nprocs_ctl);
 		break;
 
 	case LX_RLIMIT_MEMLOCK:
@@ -415,7 +425,7 @@ lx_setrlimit_common(int lx_resource, uint64_t rlim_cur, uint64_t rlim_max)
 
 	case LX_RLIMIT_NPROC:
 		/*
-		 * zone.max-lwps
+		 * zone.max-processes
 		 * Since we're emulating the value via a zone rctl, we can't
 		 * set that from within the zone. Lie and say we set the value.
 		 */
