@@ -58,7 +58,7 @@ static EFI_HANDLE gop_handle;
 /* Saved initial GOP mode. */
 static uint32_t default_mode = UINT32_MAX;
 /* Cached EDID. */
-static struct vesa_edid_info *edid_info = NULL;
+struct vesa_edid_info *edid_info = NULL;
 
 static uint32_t gop_default_mode(void);
 static int efifb_set_mode(EFI_GRAPHICS_OUTPUT *, uint_t);

@@ -196,6 +196,12 @@ reset_font_flags(void)
 	}
 }
 
+__weak_symbol bitmap_data_t *
+gfx_get_font(void)
+{
+	return (NULL);
+}
+
 bitmap_data_t *
 set_font(short *rows, short *cols, short h, short w)
 {
@@ -220,6 +226,9 @@ set_font(short *rows, short *cols, short h, short w)
 			break;
 		}
 	}
+
+	if (font == NULL)
+		font = gfx_get_font();
 
 	if (font != NULL) {
 		*rows = (height - BORDER_PIXELS) / font->height;

@@ -1727,6 +1727,113 @@ gfx_fb_putimage(png_t *png, uint32_t ux1, uint32_t uy1, uint32_t ux2,
 	return (0);
 }
 
+/* Return  w^2 + h^2 or 0, if the dimensions are unknown */
+static unsigned
+edid_diagonal_squared(void)
+{
+	unsigned w, h;
+
+	if (edid_info == NULL)
+		return (0);
+
+	w = edid_info->display.max_horizontal_image_size;
+	h = edid_info->display.max_vertical_image_size;
+
+	/* If either one is 0, we have aspect ratio, not size */
+	if (w == 0 || h == 0)
+		return (0);
+
+	/*
+	 * some monitors encode the aspect ratio instead of the physical size.
+	 */
+	if ((w == 16 && h == 9) || (w == 16 && h == 10) ||
+	    (w == 4 && h == 3) || (w == 5 && h == 4))
+		return (0);
+
+	/*
+	 * translate cm to inch, note we scale by 100 here.
+	 */
+	w = w * 100 / 254;
+	h = h * 100 / 254;
+
+	/* Return w^2 + h^2 */
+	return (w * w + h * h);
+}
+
+/*
+ * calculate pixels per inch.
+ */
+static unsigned
+gfx_get_ppi(void)
+{
+	unsigned dp, di;
+
+	di = edid_diagonal_squared();
+	if (di == 0)
+		return (0);
+
+	dp = gfx_fb.framebuffer_common.framebuffer_width *
+	    gfx_fb.framebuffer_common.framebuffer_width +
+	    gfx_fb.framebuffer_common.framebuffer_height *
+	    gfx_fb.framebuffer_common.framebuffer_height;
+
+	return (isqrt(dp / di));
+}
+
+/*
+ * Calculate font size from density independent pixels (dp):
+ * ((16dp * ppi) / 160) * display_factor.
+ * Here we are using fixed constants: 1dp == 160 ppi and
+ * display_factor 2.
+ *
+ * We are rounding font size up and are searching for font which is
+ * not smaller than calculated size value.
+ */
+bitmap_data_t *
+gfx_get_font(void)
+{
+	unsigned ppi, size;
+	bitmap_data_t *font = NULL;
+	struct fontlist *fl, *next;
+
+	/* Text mode is not supported here. */
+	if (gfx_fb.framebuffer_common.framebuffer_type ==
+	    MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT)
+		return (NULL);
+
+	ppi = gfx_get_ppi();
+	if (ppi == 0)
+		return (NULL);
+
+	/*
+	 * We will search for 16dp font.
+	 * We are using scale up by 10 for roundup.
+	 */
+	size = (16 * ppi * 10) / 160;
+	/* Apply display factor 2.  */
+	size = roundup(size * 2, 10) / 10;
+
+	STAILQ_FOREACH(fl, &fonts, font_next) {
+		next = STAILQ_NEXT(fl, font_next);
+		/*
+		 * If this is last font or, if next font is smaller,
+		 * we have our font. Make sure, it actually is loaded.
+		 */
+		if (next == NULL || next->font_data->height < size) {
+			font = fl->font_data;
+			if (font->font == NULL ||
+			    fl->font_flags == FONT_RELOAD) {
+				if (fl->font_load != NULL &&
+				    fl->font_name != NULL)
+					font = fl->font_load(fl->font_name);
+			}
+			break;
+		}
+	}
+
+	return (font);
+}
+
 static int
 load_mapping(int fd, struct font *fp, int n)
 {
