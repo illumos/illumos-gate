@@ -134,3 +134,4 @@ generic.po:
 FRC:
 
 include ../Makefile.targ
+include $(SRC)/Makefile.msg.targ

@@ -21,9 +21,9 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
-# lib/libsmedia/plugins/bd/Makefile
 
 include		../../../Makefile.lib
 include		Makefile.targ
 include		../Makefile.plugin
+
+include $(SRC)/Makefile.msg.targ

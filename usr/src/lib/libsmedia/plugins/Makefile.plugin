@@ -62,3 +62,5 @@ $(POFILE) : $(POFILE_SRCS)
 	$(SED) -e '/^domain/d' messages.po > $@
 	$(RM) messages.po
 
+
+include $(SRC)/Makefile.msg.targ

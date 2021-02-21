@@ -74,16 +74,6 @@ CHKMFSTSUBDIRS=	cmd
 CHKMANSUBDIRS = man
 
 MSGSUBDIRS=	cmd ucbcmd lib data
-DOMAINS= \
-	SUNW_OST_ADMIN \
-	SUNW_OST_NETRPC \
-	SUNW_OST_OSCMD \
-	SUNW_OST_OSLIB \
-	SUNW_OST_UCBCMD \
-	SUNW_OST_ZONEINFO
-
-MSGDDIRS=       $(DOMAINS:%=$(MSGROOT)/%)
-MSGDIRS=        $(MSGROOT) $(MSGDDIRS) $(MSGROOT)/LC_TIME
 
 all :=			TARGET= all
 install :=		TARGET= install
@@ -126,7 +116,7 @@ install1: mapfiles closedbins sgs
 
 install2: install1 .WAIT $(SUBDIRS)
 
-_msg: _msgdirs rootdirs FRC
+_msg: rootdirs FRC
 	@for m in $(MSGSUBDIRS); do \
 		cd $$m; pwd; $(MAKE) _msg; cd ..; \
 	done
@@ -212,9 +202,7 @@ bldtools:
 rootdirs: $(ROOTDIRS)
 	$(INS) -d -m 775 $(ROOT)/var/mail/:saved
 
-_msgdirs:       $(MSGDIRS)
-
-$(ROOTDIRS) $(MSGDIRS):
+$(ROOTDIRS):
 	$(INS.dir)
 
 userheaders: FRC

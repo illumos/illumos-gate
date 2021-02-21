@@ -26,7 +26,7 @@ include $(SRC)/lib/Makefile.lib
 include ../../Makefile.com
 
 POFILE = libmksh.po
-POFILES = $(OBJECTS:%.o=%.po)
+MSGFILES = $(OBJECTS:%.o=%.cc)
 
 LIBS = $(LIBRARY)
 SRCDIR = ../
@@ -42,11 +42,9 @@ all: $(LIBS)
 
 install: all
 
-$(POFILE): $(POFILES)
-	$(CAT) $(POFILES) > $@
+$(POFILE): pofile_MSGFILES
 
-_msg: $(MSGDOMAIN) $(POFILE)
-	$(RM) $(MSGDOMAIN)/$(POFILE)
-	$(CP) $(POFILE) $(MSGDOMAIN)
+_msg: $(MSGDOMAINPOFILE)
 
 include $(SRC)/lib/Makefile.targ
+include $(SRC)/Makefile.msg.targ
