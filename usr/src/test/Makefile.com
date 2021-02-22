@@ -17,23 +17,12 @@ all     :=      TARGET = all
 install :=      TARGET = install
 clean   :=      TARGET = clean
 clobber :=      TARGET = clobber
-lint    :=      TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
-
-lint_PROG:
-	$(LINT.c) $(PROG).c $(LDLIBS)
-
-lint_SRCS:
-	$(LINT.c) $(SRCS) $(LDLIBS)
+all clean clobber install: $(SUBDIRS)
 
 $(SUBDIRS): FRC
-	@if [ -f $@/Makefile  ]; then \
-		cd $@; pwd; $(MAKE) $(TARGET); \
-	else \
-		true; \
-	fi
+	cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

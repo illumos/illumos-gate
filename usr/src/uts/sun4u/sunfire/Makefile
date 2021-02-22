@@ -54,8 +54,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber modlist: \
-	$(SUNFIRE_KMODS) $(CLOSED_SUNFIRE_KMODS)
+def all clean clobber modlist: $(SUNFIRE_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Ultra-Enterprise
 
@@ -63,16 +62,13 @@ install:	$(ROOT_SUNFIRE_DIR) $(USR_SUNFIRE_DIR) \
 		$(USR_SUNFIRE_INC_DIR) \
 		$(USR_SUNFIRE_SBIN_DIR) \
 		$(USR_SUNFIRE_LIB_DIR) \
-		.WAIT $(SUNFIRE_KMODS) $(CLOSED_SUNFIRE_KMODS)
+		.WAIT $(SUNFIRE_KMODS)
 
 install_h check:	FRC
 	@cd sys; pwd; $(MAKE) $(TARGET)
 
 $(SUNFIRE_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-$(CLOSED_SUNFIRE_KMODS): FRC
-	@cd $(CLOSED)/uts/sun4u/sunfire/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 #
 #	Include common targets.

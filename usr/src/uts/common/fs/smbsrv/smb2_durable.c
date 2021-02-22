@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -813,7 +813,7 @@ smb2_dh_read_nvlist(smb_request_t *sr, smb_node_t *node,
 	smb_attr_t	attr;
 	iovec_t		iov;
 	uio_t		uio;
-	smb_kshare_t	*shr = sr->arg.tcon.si;
+	smb_tree_t	*tree = sr->tid_tree;
 	cred_t		*kcr = zone_kcred();
 	size_t		flen;
 	int		rc;
@@ -823,14 +823,14 @@ smb2_dh_read_nvlist(smb_request_t *sr, smb_node_t *node,
 	rc = smb_node_getattr(NULL, node, kcr, NULL, &attr);
 	if (rc != 0) {
 		cmn_err(CE_NOTE, "CA import (%s/%s) getattr rc=%d",
-		    shr->shr_path, node->od_name, rc);
+		    tree->t_resource, node->od_name, rc);
 		return (rc);
 	}
 
 	if (attr.sa_vattr.va_size < 4 ||
 	    attr.sa_vattr.va_size > sr->sr_req_length) {
 		cmn_err(CE_NOTE, "CA import (%s/%s) bad size=%" PRIu64,
-		    shr->shr_path, node->od_name,
+		    tree->t_resource, node->od_name,
 		    (uint64_t)attr.sa_vattr.va_size);
 		return (EINVAL);
 	}
@@ -847,19 +847,19 @@ smb2_dh_read_nvlist(smb_request_t *sr, smb_node_t *node,
 	rc = smb_fsop_read(sr, kcr, node, NULL, &uio, 0);
 	if (rc != 0) {
 		cmn_err(CE_NOTE, "CA import (%s/%s) read, rc=%d",
-		    shr->shr_path, node->od_name, rc);
+		    tree->t_resource, node->od_name, rc);
 		return (rc);
 	}
 	if (uio.uio_resid != 0) {
 		cmn_err(CE_NOTE, "CA import (%s/%s) short read",
-		    shr->shr_path, node->od_name);
+		    tree->t_resource, node->od_name);
 		return (EIO);
 	}
 
 	rc = nvlist_unpack(sr->sr_request_buf, flen, nvlpp, KM_SLEEP);
 	if (rc != 0) {
 		cmn_err(CE_NOTE, "CA import (%s/%s) unpack, rc=%d",
-		    shr->shr_path, node->od_name, rc);
+		    tree->t_resource, node->od_name, rc);
 		return (rc);
 	}
 

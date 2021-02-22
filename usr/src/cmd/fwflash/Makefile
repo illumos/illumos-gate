@@ -28,7 +28,7 @@ include $(SRC)/Makefile.master
 PROG=		fwflash
 COMMON_SUBDIRS=	$(MACH)
 IDF_SUBDIRS=	plugins/transport
-VRF_SUBDIRS=	plugins 
+VRF_SUBDIRS=	plugins
 SUBDIRS=	$(COMMON_SUBDIRS) .WAIT \
 		$(IDF_SUBDIRS) .WAIT \
 		$(VRF_SUBDIRS)
@@ -39,19 +39,12 @@ clobber :=      TARGET= clobber
 check :=	TARGET= check
 install :=      TARGET= install
 install_h :=	TARGET= install_h
-lint :=         TARGET= lint
 _msg :=         TARGET= _msg
-msg :=         	TARGET= msg
 
-
-all clean clobber install lint msg _msg: $(SUBDIRS)
+all clean clobber install _msg: $(SUBDIRS)
 check install_h: $(COMMON_SUBDIRS)
 
 $(SUBDIRS): FRC
-	@if [ -f $@/Makefile ]; then \
-       		cd $@; pwd; $(MAKE) $(TARGET); \
-        else \
-       		true; \
-        fi
+	cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

@@ -20,9 +20,29 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1996 by Sun Microsystems, Inc.
 # All rights reserved.
+#
 
-include		$(SRC)/cmd/sgs/Makefile.sub
+include		../../../Makefile.master
+
+SUBDIRS=	$(MACH)
+
+all :=		TARGET= all
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+delete :=	TARGET= delete
+install :=	TARGET= install
+catalog :=	TARGET= catalog
+package :=	TARGET= package
+chkmsg :=	TARGET= chkmsg
+
+.KEEP_STATE:
+.KEEP_STATE_FILE: .make.state.$(MACH)
+
+all clean clobber delete install catalog package chkmsg:	$(SUBDIRS)
+
+$(SUBDIRS):	FRC
+		@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

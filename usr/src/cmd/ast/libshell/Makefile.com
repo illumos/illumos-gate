@@ -44,7 +44,7 @@ LIBSHELLMACH= $(TARGETMACH)
 LIBSHELLBASE=..
 
 LIBS= $(DYNLIB)
-LDLIBS += -lcmd -ldll -last -lsocket -lsecdb -lm -lc
+LDLIBS += -lcmd -ldll -last -lsocket -lm -lc
 
 # We use "=" here since using $(CPPFLAGS.master) is very tricky in our
 # case - it MUST come as the last element but future changes in -D options

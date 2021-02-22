@@ -106,8 +106,4 @@ COMMON_MODULES_KVM = \
 	xhci \
 	zfs
 
-CLOSED_COMMON_MODULES_KVM = \
-	mpt \
-	nfs
-
 include $(SRC)/Makefile.master

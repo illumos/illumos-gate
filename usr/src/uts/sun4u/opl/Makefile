@@ -54,9 +54,9 @@ check		:=	TARGET= check
 .KEEP_STATE:
 
 def all clean clobber: genassym unix .WAIT \
-		$(OPL_CPU_KMODS) $(OPL_KMODS) $(CLOSED_OPL_KMODS)
+		$(OPL_CPU_KMODS) $(OPL_KMODS)
 
-modlist:	unix $(OPL_CPU_KMODS) $(OPL_KMODS) $(CLOSED_OPL_KMODS)
+modlist:	unix $(OPL_CPU_KMODS) $(OPL_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,SPARC-Enterprise
 
@@ -68,13 +68,10 @@ install: $(ROOT_OPL_DIR) $(USR_OPL_DIR) \
 	$(USR_OPL_LIB_DIR) \
 	$(OPL_CRYPTO_LINKS) \
 	genassym unix .WAIT $(OPL_CPU_KMODS) $(OPL_KMODS) \
-	$(CLOSED_OPL_KMODS) $(OPLMSU_OPTION)
+	$(OPLMSU_OPTION)
 
 genassym unix $(OPL_KMODS) $(OPL_CPU_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
-$(CLOSED_OPL_KMODS): FRC
-	cd $(CLOSED)/uts/sun4u/opl/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(OPL_CRYPTO_LINKS): $(ROOT_OPL_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_OPL_CRYPTO_DIR_64)/$@

@@ -54,7 +54,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber modlist: $(MPXU_KMODS) $(CLOSED_MPXU_KMODS)
+def all clean clobber modlist: $(MPXU_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire-V240
 
@@ -71,14 +71,10 @@ install:	$(ROOT_MPXU_DIR) $(USR_MPXU_DIR) \
 		$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%) \
 		$(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%) \
 		$(MPXU_CRYPTO_LINKS) \
-		$(CLOSED_MPXU_KMODS) \
 		.WAIT $(MPXU_KMODS)
 
 $(MPXU_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-$(CLOSED_MPXU_KMODS): FRC
-	cd $(CLOSED)/uts/sun4u/mpxu/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(MPXU_CRYPTO_LINKS): $(ROOT_MPXU_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_MPXU_CRYPTO_DIR_64)/$@;

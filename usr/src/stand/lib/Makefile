@@ -31,12 +31,6 @@ sparc_SUBDIRS =
 SUBDIRS = fs/hsfs fs/nfs fs/ufs inet sa sock tcpstubs xdr \
 	tcp $($(MACH)_SUBDIRS)
 
-LINTSUBDIRS = $(SUBDIRS)
-
-#
-# We can get away with this since we're only building .a's, and by the
-# time we run lint all of the lint libraries have already been built.
-#
 .PARALLEL: $(SUBDIRS)
 
 .KEEP_STATE:
@@ -45,23 +39,11 @@ all	:=	TARGET = all
 clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
 install	:=	TARGET = install
-lint	:=	TARGET = lint
 
 all clean clobber install: $(SUBDIRS)
 
-lint: $(LINTSUBDIRS)
-
-#
-# The reason this rule checks for the existence of the
-# Makefile is that some of the directories do not exist
-# in our exportable source builds.
-#
 $(SUBDIRS): FRC
-	@if [ -f $@/Makefile  ]; then \
-		cd $@; pwd; $(MAKE) $(TARGET); \
-	else \
-		true; \
-	fi
+	cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 

@@ -58,7 +58,6 @@ CSTD= $(CSTD_GNU99)
 #	SHOPT_MULTIBYTE		multibyte character handling
 #	SHOPT_NAMESPACE		allow namespaces
 #	SHOPT_OPTIMIZE		optimize loop invariants
-#	SHOPT_PFSH		solaris exec_attr(4) profile execution
 #	SHOPT_RAWONLY		make viraw the only vi mode
 #	SHOPT_STATS		add .sh.stats variable
 #	SHOPT_SUID_EXEC		allow (safe) suid/sgid shell scripts
@@ -89,6 +88,7 @@ CSTD= $(CSTD_GNU99)
 #	SHOPT_FS_3D		3d file system
 #	SHOPT_OLDTERMIO		support both TCGETA and TCGETS
 #	SHOPT_P_SUID		real uid's that require -p for set[ug]id
+#	SHOPT_PFSH		solaris exec_attr(4) profile execution
 #	SHOPT_REGRESS		enable __regress__ builtin
 #	SHOPT_REMOTE		enable --rc if running as a remote shell
 #	SHOPT_SEVENBIT		strip the eigth bit from characters
@@ -108,7 +108,7 @@ LIBSHELLFEATUREFLAGS= \
 	-DSHOPT_MULTIBYTE \
 	-DSHOPT_NAMESPACE \
 	-DSHOPT_OPTIMIZE \
-	-DSHOPT_PFSH \
+	-DSHOPT_PFSH=0 \
 	-DSHOPT_RAWONLY \
 	-DSHOPT_STATS \
 	-DSHOPT_SUID_EXEC \

@@ -33,24 +33,13 @@ all :=          TARGET= all
 install :=      TARGET= install
 clean :=        TARGET= clean
 clobber :=      TARGET= clobber
-lint :=         TARGET= lint
 _msg :=         TARGET= _msg
-msg :=		TARGET= msg
-
 
 .KEEP_STATE:
 
-all clean clobber install lint msg _msg:		$(SUBDIRS)
-
-
+all clean clobber install _msg:		$(SUBDIRS)
 
 $(SUBDIRS): FRC
-	@if [ -f $@/Makefile ]; then \
-		cd $@; pwd; $(MAKE) $(TARGET); \
-	else \
-		true; \
-	fi
+	cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-
-

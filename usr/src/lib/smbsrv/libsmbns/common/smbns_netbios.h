@@ -89,7 +89,7 @@ typedef struct {
 	char		*nbs_last_event;
 } netbios_service_t;
 
-char smb_node_type;
+extern char smb_node_type;
 
 #define	SMB_NODETYPE_B	'B'
 #define	SMB_NODETYPE_P	'P'
@@ -103,15 +103,15 @@ char smb_node_type;
 #define	ADDR_FLAG_VALID		0x0001
 
 typedef struct addr_entry {
-	struct addr_entry 	*forw;
-	struct addr_entry 	*back;
+	struct addr_entry	*forw;
+	struct addr_entry	*back;
 	uint32_t		attributes;
 	uint32_t		conflict_timer;
 	uint32_t		refresh_ttl;
 	uint32_t		ttl;
 	struct sockaddr_in	sin;
 	int			sinlen;
-	uint32_t 		flags;
+	uint32_t		flags;
 } addr_entry_t;
 
 /*
@@ -170,8 +170,8 @@ typedef struct addr_entry {
  */
 
 typedef struct name_entry {
-	struct name_entry 	*forw;
-	struct name_entry 	*back;
+	struct name_entry	*forw;
+	struct name_entry	*back;
 	unsigned char		name[NETBIOS_NAME_SZ];
 	unsigned char		scope[NETBIOS_DOMAIN_NAME_MAX];
 	unsigned short		attributes;
@@ -180,7 +180,7 @@ typedef struct name_entry {
 } name_entry_t;
 
 struct name_question {
-	struct name_entry 	*name;
+	struct name_entry	*name;
 	unsigned		question_type;
 	unsigned		question_class;
 };
@@ -209,10 +209,10 @@ struct name_packet {
 	unsigned		nscount;	/* authority recs */
 	unsigned		arcount;	/* additional recs */
 
-	struct name_question 	*question;
-	struct resource_record 	*answer;
-	struct resource_record 	*authority;
-	struct resource_record 	*additional;
+	struct name_question	*question;
+	struct resource_record	*answer;
+	struct resource_record	*authority;
+	struct resource_record	*additional;
 
 	unsigned char			block_data[4];	/* begining of space */
 };
@@ -592,8 +592,8 @@ typedef struct datagram_query_packet {
 
 
 typedef struct datagram {
-	struct datagram 	*forw;
-	struct datagram 	*back;
+	struct datagram		*forw;
+	struct datagram		*back;
 	struct addr_entry	inaddr;
 	int			discard_timer;
 	unsigned char		packet_type;
@@ -603,14 +603,14 @@ typedef struct datagram {
 	struct name_entry	dest;
 	unsigned short		offset;
 	unsigned short		data_length;
-	unsigned char 		*data;
+	unsigned char		*data;
 	unsigned int		rawbytes;
 	unsigned char		rawbuf[MAX_DATAGRAM_LENGTH];
 } datagram;
 
 typedef struct datagram_queue {
-	struct datagram 	*forw;
-	struct datagram 	*back;
+	struct datagram		*forw;
+	struct datagram		*back;
 } datagram_queue;
 
 typedef struct name_queue {

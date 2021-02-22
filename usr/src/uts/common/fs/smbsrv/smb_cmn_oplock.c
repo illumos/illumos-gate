@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Nexenta by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -495,8 +495,19 @@ smb_oplock_request(smb_request_t *sr, smb_ofile_t *ofile, uint32_t *statep)
 	}
 
 	/* Give caller back the "Granular" bit. */
-	if (status == NT_STATUS_SUCCESS)
+	if (status == NT_STATUS_SUCCESS) {
 		*statep |= LEVEL_GRANULAR;
+
+		/*
+		 * The oplock lease may have moved to this ofile. Update.
+		 * Minor violation of layering here (leases vs oplocks)
+		 * but we want this update coverd by the oplock mutex.
+		 */
+#ifndef	TESTJIG
+		if (ofile->f_lease != NULL)
+			ofile->f_lease->ls_oplock_ofile = ofile;
+#endif
+	}
 
 out:
 	mutex_exit(&node->n_oplock.ol_mutex);
@@ -543,6 +554,12 @@ smb_oplock_req_excl(
 
 	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
 	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
+
+	/*
+	 * Don't allow grants on closing ofiles.
+	 */
+	if (ofile->f_oplock.og_closing)
+		return (status);
 
 	/*
 	 * If Open.Stream.Oplock is empty:
@@ -1028,6 +1045,12 @@ smb_oplock_req_shared(
 
 	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
 	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
+
+	/*
+	 * Don't allow grants on closing ofiles.
+	 */
+	if (ofile->f_oplock.og_closing)
+		return (status);
 
 	/*
 	 * If Open.Stream.Oplock is empty:
@@ -2036,6 +2059,20 @@ smb_oplock_ack_break(
 	} /* Switch (oplock.state) */
 
 out:
+	if (status == NT_STATUS_INVALID_OPLOCK_PROTOCOL)
+		*rop = LEVEL_NONE;
+
+	if (status == NT_STATUS_SUCCESS &&
+	    type == LEVEL_GRANULAR &&
+	    *rop != LEVEL_NONE) {
+		*rop |= LEVEL_GRANULAR;
+		/* As above, leased oplock may have moved. */
+#ifndef	TESTJIG
+		if (ofile->f_lease != NULL)
+			ofile->f_lease->ls_oplock_ofile = ofile;
+#endif
+	}
+
 	/*
 	 * The spec. describes waiting for a break here,
 	 * but we let the caller do that (when needed) if
@@ -2043,14 +2080,6 @@ out:
 	 */
 	mutex_exit(&node->n_oplock.ol_mutex);
 	smb_llist_exit(&node->n_ofile_list);
-
-	if (status == NT_STATUS_INVALID_OPLOCK_PROTOCOL)
-		*rop = LEVEL_NONE;
-
-	if (status == NT_STATUS_SUCCESS &&
-	    type == LEVEL_GRANULAR &&
-	    *rop != LEVEL_NONE)
-		*rop |= LEVEL_GRANULAR;
 
 	return (status);
 }
@@ -2257,13 +2286,12 @@ smb_oplock_break_CLOSE(smb_node_t *node, smb_ofile_t *ofile)
 {
 	smb_ofile_t *o;
 
-	if (ofile == NULL) {
-		ASSERT(0);
-		return;
-	}
+	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
+	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
 
-	smb_llist_enter(&node->n_ofile_list, RW_READER);
-	mutex_enter(&node->n_oplock.ol_mutex);
+	if (ofile->f_oplock.og_closing)
+		return;
+	ofile->f_oplock.og_closing = B_TRUE;
 
 	/*
 	 * If Oplock.IIOplocks is not empty:
@@ -2481,8 +2509,6 @@ smb_oplock_break_CLOSE(smb_node_t *node, smb_ofile_t *ofile)
 	if ((node->n_oplock.ol_state & BREAK_ANY) == 0)
 		cv_broadcast(&node->n_oplock.WaitingOpenCV);
 
-	mutex_exit(&node->n_oplock.ol_mutex);
-	smb_llist_exit(&node->n_ofile_list);
 }
 
 /*
@@ -3515,8 +3541,7 @@ smb_oplock_move(smb_node_t *node,
 
 	ASSERT(fr_ofile->f_node == node);
 	ASSERT(to_ofile->f_node == node);
-
-	mutex_enter(&node->n_oplock.ol_mutex);
+	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
 
 	/*
 	 * The ofile to which we're moving the oplock
@@ -3541,5 +3566,4 @@ smb_oplock_move(smb_node_t *node,
 	if (node->n_oplock.excl_open == fr_ofile)
 		node->n_oplock.excl_open = to_ofile;
 
-	mutex_exit(&node->n_oplock.ol_mutex);
 }
