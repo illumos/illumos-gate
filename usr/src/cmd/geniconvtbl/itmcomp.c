@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -163,9 +161,8 @@ itm_compile(char *file)
 	} else {
 		if (0 != access(file, R_OK)) {
 			int	e = errno;
-			itm_error(
-				gettext("%1$s: can not access %2$s: "),
-				cmd_opt.my_name, file);
+			itm_error(gettext("%1$s: can not access %2$s: "),
+			    cmd_opt.my_name, file);
 			errno = e;
 			PERROR(NULL);
 			exit(ITMC_STATUS_CMD2);
@@ -208,9 +205,9 @@ itm_compile(char *file)
 			(void) memcpy(command, cmd_line, length);
 			*(command + length) = '\0';
 			PERROR(command);
-			itm_error(
-				gettext("%1$s: can not start %2$s on %3$s\n"),
-				cmd_opt.my_name, command, itm_input_file);
+			itm_error(gettext("%1$s: can not start "
+			    "%2$s on %3$s\n"), cmd_opt.my_name, command,
+			    itm_input_file);
 			exit(ITMC_STATUS_SYS);
 		} else {
 			yyin = fp;
@@ -226,9 +223,8 @@ itm_compile(char *file)
 		} else {
 			yyin = fopen(file, "r");
 			if (NULL == yyin) {
-				itm_error(
-					gettext("%1$s: can not open %2$s\n"),
-					cmd_opt.my_name, itm_input_file);
+				itm_error(gettext("%1$s: can not open %2$s\n"),
+				    cmd_opt.my_name, itm_input_file);
 				exit(ITMC_STATUS_CMD2);
 			}
 		}
@@ -311,12 +307,12 @@ parse_opts(int argc, char **argv)
 				error_num += 1;
 			}
 			cmd_opt.preprocess_specified =
-				prog_path_expand(optarg);
+			    prog_path_expand(optarg);
 			cmd_opt.preprocess = cmd_opt.preprocess_specified;
 			if (NULL == cmd_opt.preprocess) {
 				(void) fprintf(stderr,
 				gettext("cannot find preprocessor \"%s\"\n"),
-					optarg);
+				    optarg);
 				error_num += 1;
 			}
 			(void) cpp_opt_append(NULL, NULL);
@@ -391,8 +387,7 @@ parse_opts(int argc, char **argv)
 	if (optind < argc) {
 		cmd_opt.input_file_num = (argc - optind);
 		cmd_opt.input_file =
-			malloc_vital((sizeof (char *)) *
-					(argc - optind + 1));
+		    malloc_vital((sizeof (char *)) * (argc - optind + 1));
 		*(cmd_opt.input_file + (argc - optind)) = NULL;
 	}
 
@@ -411,9 +406,8 @@ parse_opts(int argc, char **argv)
 	    (NULL == cmd_opt.output_file) &&
 	    (NULL == cmd_opt.disassemble) &&
 	    (0 == cmd_opt.no_output)) {
-		itm_error(gettext(
-			"output file is unnamed. "
-			"use -o to specify output file\n"));
+		itm_error(gettext("output file is unnamed. "
+		    "use -o to specify output file\n"));
 		error_num++;
 	}
 
@@ -427,8 +421,8 @@ parse_opts(int argc, char **argv)
 	    cmd_opt.map_name_type ||
 	    cmd_opt.large_table ||
 	    cmd_opt.output_file)) {
-		itm_error(
-			gettext("-d may not specified with other options\n"));
+		itm_error(gettext("-d may not be specified with "
+		    "other options\n"));
 		error_num++;
 	}
 
@@ -446,7 +440,7 @@ parse_opts(int argc, char **argv)
 		p = basename(cmd_opt.preprocess_default);
 		if (NULL == p) {
 			*(cmd_opt.cpp_opt + 0) =
-				strdup_vital(cmd_opt.preprocess_default);
+			    strdup_vital(cmd_opt.preprocess_default);
 		} else {
 			*(cmd_opt.cpp_opt + 0) = strdup_vital(p);
 		}
@@ -513,14 +507,14 @@ cpp_opt_append(char	*opt, char	*arg)
 	if (0 == cmd_opt.cpp_opt_reserved) {
 		cmd_opt.cpp_opt_reserved = 32;
 		cmd_opt.cpp_opt = malloc_vital((sizeof (char *)) * 32);
-		*(cmd_opt.cpp_opt + 0) = "cpp";
+		*(cmd_opt.cpp_opt + 0) = strdup_vital("cpp");
 		cmd_opt.cpp_opt_num = 1;
 	} else if ((cmd_opt.cpp_opt_reserved - 2) <= cmd_opt.cpp_opt_num) {
 		cmd_opt.cpp_opt_reserved += 32;
 		new_opt_list = malloc_vital((sizeof (char *)) *
-					    cmd_opt.cpp_opt_reserved);
+		    cmd_opt.cpp_opt_reserved);
 		(void) memcpy(new_opt_list, cmd_opt.cpp_opt,
-			(sizeof (char *)) * cmd_opt.cpp_opt_num);
+		    (sizeof (char *)) * cmd_opt.cpp_opt_num);
 		(void) memset(new_opt_list + cmd_opt.cpp_opt_num, 0, 32);
 		free(cmd_opt.cpp_opt);
 		cmd_opt.cpp_opt = new_opt_list;
@@ -540,7 +534,7 @@ cpp_opt_trunc(int num)
 		num = cmd_opt.cpp_opt_num;
 	}
 	for (; 0 < num; --num) {
-		free(cmd_opt.cpp_opt + cmd_opt.cpp_opt_num);
+		free(*(cmd_opt.cpp_opt + cmd_opt.cpp_opt_num - 1));
 		--(cmd_opt.cpp_opt_num);
 	}
 }
@@ -600,21 +594,20 @@ prog_path_expand(const char *base_name)
 static void
 usage(int status)
 {
-
 	if (ITMC_STATUS_SUCCESS == status) {
 		(void) fprintf(stdout,
 		gettext("Usage: %1$s [-n] [-f] [-q]\n"
-		"	     [-p preprocessor] [-W argument]\n"
-		"	     [-Dname] [-Dname=def] [-Idirectory] [-Uname]\n"
-		"	     [file ...]\n	%2$s -h\n"),
-		cmd_opt.my_name, cmd_opt.my_name);
+		    "	     [-p preprocessor] [-W argument]\n"
+		    "	     [-Dname] [-Dname=def] [-Idirectory] [-Uname]\n"
+		    "	     [file ...]\n	%2$s -h\n"),
+		    cmd_opt.my_name, cmd_opt.my_name);
 	} else {
 		(void) itm_error(
 		gettext("Usage: %1$s [-n] [-f] [-q]\n"
-		"	     [-p preprocessor] [-W argument]\n"
-		"	     [-Dname] [-Dname=def] [-Idirectory] [-Uname]\n"
-		"	     [file ...]\n	%2$s -h\n"),
-		cmd_opt.my_name, cmd_opt.my_name);
+		    "	     [-p preprocessor] [-W argument]\n"
+		    "	     [-Dname] [-Dname=def] [-Idirectory] [-Uname]\n"
+		    "	     [file ...]\n	%2$s -h\n"),
+		    cmd_opt.my_name, cmd_opt.my_name);
 	}
 	exit(status);
 }
@@ -666,17 +659,15 @@ map_name_type_append(char *optarg)
 					*(phf++) = '\0';
 					hash_factor = atoi(phf);
 					if (hash_factor < 0) {
-						itm_error(
-						gettext(
-						"invalid hash factor is "
-						"specified: %s\n"),
-							phf);
+						itm_error(gettext("invalid "
+						    "hash factor is "
+						    "specified: %s\n"), phf);
 						hash_factor = 0;
 						error_deferred += 1;
 					}
 				}
-				for (i = 0;
-				    NULL != map_type_name[i].name; i++) {
+				for (i = 0; NULL != map_type_name[i].name;
+				    i++) {
 					if (0 ==
 					    strcmp(p, map_type_name[i].name)) {
 						type = map_type_name[i].type;
@@ -684,10 +675,8 @@ map_name_type_append(char *optarg)
 					}
 				}
 				if (NULL == map_type_name[i].name) {
-					itm_error(
-					gettext(
-					"unknown map type is specified: %s\n"),
-					p);
+					itm_error(gettext("unknown map type "
+					    "is specified: %s\n"), p);
 					error_deferred += 1;
 					continue;
 				}
@@ -713,19 +702,17 @@ map_name_type_append(char *optarg)
 					break;
 				}
 				if ('\0' == *name) {
-					itm_error(
-					gettext(
-					"multiple default types are specified:"
-					" \"%1$s\" and \"%2$s\"\n"),
-						map_type_name_str(type),
-						map_type_name_str(m->type));
+					itm_error(gettext("multiple default "
+					    "types are specified:"
+					    " \"%1$s\" and \"%2$s\"\n"),
+					    map_type_name_str(type),
+					    map_type_name_str(m->type));
 				} else {
-					itm_error(
-					gettext("map \"%1$s\" is specified as "
-					"two types \"%2$s\" and \"%3$s\"\n"),
-					name,
-					map_type_name_str(type),
-					map_type_name_str(m->type));
+					itm_error(gettext("map \"%1$s\" is "
+					    "specified as two types \"%2$s\" "
+					    "and \"%3$s\"\n"), name,
+					    map_type_name_str(type),
+					    map_type_name_str(m->type));
 				}
 				error_deferred += 1;
 				m = NULL;
@@ -930,9 +917,9 @@ trace_option(void)
 		}
 	}
 	itm_error("output_file  = %s\n",
-		cmd_opt.output_file ? cmd_opt.output_file : "(stdout)");
+	    cmd_opt.output_file ? cmd_opt.output_file : "(stdout)");
 	itm_error("interpreter  = %s\n",
-		cmd_opt.interpreter ? cmd_opt.interpreter : "(default)");
+	    cmd_opt.interpreter ? cmd_opt.interpreter : "(default)");
 	if (cmd_opt.cpp_opt) {
 		itm_error("cpp_opt	   = %s\n", *(cmd_opt.cpp_opt));
 		for (i = 1; i < cmd_opt.cpp_opt_num; i++) {
@@ -942,15 +929,15 @@ trace_option(void)
 		itm_error("cpp_opt	   = %s\n", "(none)");
 	}
 	itm_error("preprocess_default = %s\n",
-		cmd_opt.preprocess_default ? cmd_opt.preprocess_default :
-		"(no)");
+	    cmd_opt.preprocess_default ? cmd_opt.preprocess_default :
+	    "(no)");
 	itm_error("preprocess_specified = %s\n",
-		cmd_opt.preprocess_specified ? cmd_opt.preprocess_specified :
-		"(no)");
+	    cmd_opt.preprocess_specified ? cmd_opt.preprocess_specified :
+	    "(no)");
 	itm_error("preprocess   = %s\n",
-		cmd_opt.preprocess ? cmd_opt.preprocess : "(no)");
+	    cmd_opt.preprocess ? cmd_opt.preprocess : "(no)");
 	itm_error("disassemble  = %s\n",
-		cmd_opt.disassemble ? "yes" : "no");
+	    cmd_opt.disassemble ? "yes" : "no");
 	itm_error("map type	   =");
 	if (NULL == cmd_opt.map_name_type) {
 		itm_error("\n");
@@ -959,9 +946,9 @@ trace_option(void)
 		itm_error(" ");
 		m = cmd_opt.map_name_type;
 		itm_error("%s=%s",
-			(((NULL == m->name) || ('\0' == *(m->name))) ?
-				"default" : m->name),
-			map_type_name_str(m->type));
+		    (((NULL == m->name) || ('\0' == *(m->name))) ?
+		    "default" : m->name),
+		    map_type_name_str(m->type));
 		if (0 != m->hash_factor) {
 			itm_error(":%ld\n", m->hash_factor);
 		} else {
@@ -969,9 +956,9 @@ trace_option(void)
 		}
 		for (m = m->next; NULL != m; m = m->next) {
 			itm_error("		%s=%s",
-				(((NULL == m->name) || ('\0' == *(m->name))) ?
-					"default" : m->name),
-				map_type_name_str(m->type));
+			    (((NULL == m->name) || ('\0' == *(m->name))) ?
+			    "default" : m->name),
+			    map_type_name_str(m->type));
 			if (0 != m->hash_factor) {
 				itm_error(":%ld\n", m->hash_factor);
 			} else {
@@ -980,13 +967,13 @@ trace_option(void)
 		}
 	}
 	itm_error("large table  = %s\n",
-		cmd_opt.large_table ? "true" : "false");
+	    cmd_opt.large_table ? "true" : "false");
 	itm_error("overwrite	   = %s\n",
-		cmd_opt.force_overwrite ? "true" : "false");
+	    cmd_opt.force_overwrite ? "true" : "false");
 	itm_error("strip	      = %s\n",
-		cmd_opt.strip ? "true" : "false");
+	    cmd_opt.strip ? "true" : "false");
 	itm_error("no_output	   = %s\n",
-		cmd_opt.no_output ? "true" : "false");
+	    cmd_opt.no_output ? "true" : "false");
 	itm_error("trace	      = ");
 	if (NULL == cmd_opt.trace) {
 		itm_error("(no)\n");
