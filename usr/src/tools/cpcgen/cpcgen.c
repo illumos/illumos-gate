@@ -1442,7 +1442,7 @@ cpcgen_manual_amd_file_before(FILE *f, cpc_map_t *map)
 		return (B_FALSE);
 	}
 
-	if ((desc = strdup(map->cmap_name)) == NULL) {
+	if ((desc = strdup(map->cmap_name + 1)) == NULL) {
 		warn("failed to duplicate manual name for %s", map->cmap_name);
 		free(upper);
 		return (B_FALSE);
@@ -1452,7 +1452,6 @@ cpcgen_manual_amd_file_before(FILE *f, cpc_map_t *map)
 		upper[i] = toupper(upper[i]);
 	}
 
-	desc++;
 	c = strchr(desc, '_');
 	if (c != NULL) {
 		*c = ' ';
