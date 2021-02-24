@@ -11,8 +11,6 @@
 #ifndef	_TIP_H
 #define	_TIP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * tip - terminal interface program
  */
@@ -49,49 +47,47 @@ typedef	void (*sig_handler_t)(int);	/* works on BSD and SV */
 /*
  * Remote host attributes
  */
-char	*DV;			/* UNIX device(s) to open */
-char	*EL;			/* chars marking an EOL */
-char	*CM;			/* initial connection message */
-char	*IE;			/* EOT to expect on input */
-char	*OE;			/* EOT to send to complete FT */
-char	*CU;			/* call unit if making a phone call */
-char	*AT;			/* acu type */
-char	*PN;			/* phone number(s) */
-char	*DI;			/* disconnect string */
-char	*PA;			/* parity to be generated */
+extern char	*DV;		/* UNIX device(s) to open */
+extern char	*EL;		/* chars marking an EOL */
+extern char	*CM;		/* initial connection message */
+extern char	*IE;		/* EOT to expect on input */
+extern char	*OE;		/* EOT to send to complete FT */
+extern char	*CU;		/* call unit if making a phone call */
+extern char	*AT;		/* acu type */
+extern char	*PN;		/* phone number(s) */
+extern char	*DI;		/* disconnect string */
+extern char	*PA;		/* parity to be generated */
 
-char	*PH;			/* phone number file */
-char	*RM;			/* remote file name */
-char	*HO;			/* host name */
+extern char	*PH;		/* phone number file */
+extern char	*RM;		/* remote file name */
+extern char	*HO;		/* host name */
 
-int	BR;			/* line speed for conversation */
-int	FS;			/* frame size for transfers */
+extern int	BR;		/* line speed for conversation */
+extern int	FS;		/* frame size for transfers */
 
-signed char	DU;		/* this host is dialed up */
-char	HW;			/* this device is hardwired, see hunt.c */
-char	*ES;			/* escape character */
-char	*EX;			/* exceptions */
-char	*FO;			/* force (literal next) char */
-char	*RC;			/* raise character */
-char	*RE;			/* script record file */
-char	*PR;			/* remote prompt */
-int	DL;			/* line delay for file transfers to remote */
-int	CL;			/* char delay for file transfers to remote */
-int	ET;			/* echocheck timeout */
-int	DB;			/* dialback - ignore hangup */
+extern char	DU;		/* this host is dialed up */
+extern char	HW;		/* this device is hardwired, see hunt.c */
+extern char	*ES;		/* escape character */
+extern char	*EX;		/* exceptions */
+extern char	*FO;		/* force (literal next) char */
+extern char	*RC;		/* raise character */
+extern char	*RE;		/* script record file */
+extern char	*PR;		/* remote prompt */
+extern int	DL;		/* line delay for file transfers to remote */
+extern int	CL;		/* char delay for file transfers to remote */
+extern int	ET;		/* echocheck timeout */
+extern int	DB;		/* dialback - ignore hangup */
 
 /*
  * String value table
  */
-typedef
-	struct {
-		char	*v_name;	/* whose name is it */
-		char	v_type;		/* for interpreting set's */
-		char	v_access;	/* protection of touchy ones */
-		char	*v_abrev;	/* possible abreviation */
-		char	*v_value;	/* casted to a union later */
-	}
-	value_t;
+typedef struct {
+	char	*v_name;	/* whose name is it */
+	char	v_type;		/* for interpreting set's */
+	char	v_access;	/* protection of touchy ones */
+	char	*v_abrev;	/* possible abreviation */
+	char	*v_value;	/* casted to a union later */
+} value_t;
 
 #define	STRING	01		/* string valued */
 #define	BOOL	02		/* true-false value */
@@ -117,14 +113,12 @@ typedef
 /*
  * Definition of ACU line description
  */
-typedef
-	struct {
-		char	*acu_name;
-		int	(*acu_dialer)(char *, char *);
-		void	(*acu_disconnect)(void);
-		void	(*acu_abort)(void);
-	}
-	acu_t;
+typedef struct {
+	char	*acu_name;
+	int	(*acu_dialer)(char *, char *);
+	void	(*acu_disconnect)(void);
+	void	(*acu_abort)(void);
+} acu_t;
 
 #define	equal(a, b)	(strcmp(a, b) == 0)	/* A nice function to compare */
 
@@ -134,20 +128,18 @@ typedef
  *   initialize it in vars.c, so we cast it as needed to keep lint
  *   happy.
  */
-typedef
-	union {
-		int	zz_number;
-		int	*zz_address;
+typedef union {
+	int	zz_number;
+	int	*zz_address;
 #if defined(_LITTLE_ENDIAN)
-		short	zz_boolean;
-		char	zz_character;
+	short	zz_boolean;
+	char	zz_character;
 #endif
 #if defined(_BIG_ENDIAN)
-		int	zz_boolean;
-		int	zz_character;
+	int	zz_boolean;
+	int	zz_character;
 #endif
-	}
-	zzhack;
+} zzhack;
 
 #define	value(v)	vtable[v].v_value
 
@@ -162,14 +154,12 @@ typedef
  *   at the begining of a line (as defined by the eolmarks variable).
  */
 
-typedef
-	struct {
-		char	e_char;		/* char to match on */
-		char	e_flags;	/* experimental, priviledged */
-		char	*e_help;	/* help string */
-		void 	(*e_func)(int);	/* command */
-	}
-	esctable_t;
+typedef struct {
+	char	e_char;		/* char to match on */
+	char	e_flags;	/* experimental, priviledged */
+	char	*e_help;	/* help string */
+	void	(*e_func)(int);	/* command */
+} esctable_t;
 
 #define	NORM	00		/* normal protection, execute anyone */
 #define	EXP	01		/* experimental, mark it with a `*' on help */
@@ -234,30 +224,30 @@ extern void	loginit(void);
 #define	NOFILE	((FILE *)NULL)
 #define	NOPWD	((struct passwd *)0)
 
-struct termios	arg;		/* current mode of local terminal */
-struct termios	defarg;		/* initial mode of local terminal */
+extern struct termios	arg;		/* current mode of local terminal */
+extern struct termios	defarg;		/* initial mode of local terminal */
 
-FILE	*fscript;		/* FILE for scripting */
-FILE	*phfd;			/* FILE for PHONES file */
+extern FILE	*fscript;		/* FILE for scripting */
+extern FILE	*phfd;			/* FILE for PHONES file */
 
-int	fildes[2];		/* file transfer synchronization channel */
-int	repdes[2];		/* read process sychronization channel */
-int	FD;			/* open file descriptor to remote host */
-int	AC;			/* open file descriptor to dialer (v831 only) */
-int	vflag;			/* print .tiprc initialization sequence */
-int	sfd;			/* for ~< operation */
-int	pid;			/* pid of tipout */
-int	uid, euid;		/* real and effective user id's */
-int	gid, egid;		/* real and effective group id's */
-int	stoprompt;		/* for interrupting a prompt session */
-int	timedout;		/* ~> transfer timedout */
-int	cumode;			/* simulating the "cu" program */
+extern int	fildes[2];	/* file transfer synchronization channel */
+extern int	repdes[2];	/* read process sychronization channel */
+extern int	FD;		/* open file descriptor to remote host */
+extern int	AC;		/* open file descriptor to dialer (v831 only) */
+extern int	vflag;		/* print .tiprc initialization sequence */
+extern int	sfd;			/* for ~< operation */
+extern int	pid;			/* pid of tipout */
+extern int	uid, euid;		/* real and effective user id's */
+extern int	gid, egid;		/* real and effective group id's */
+extern int	stoprompt;		/* for interrupting a prompt session */
+extern int	timedout;		/* ~> transfer timedout */
+extern int	cumode;			/* simulating the "cu" program */
 
-char	fname[80];		/* file name buffer for ~< */
-char	copyname[80];		/* file name buffer for ~> */
-char	ccc;			/* synchronization character */
-char	ch;			/* for tipout */
-char	*uucplock;		/* name of lock file for uucp's */
+extern char	fname[80];		/* file name buffer for ~< */
+extern char	copyname[80];		/* file name buffer for ~> */
+extern char	ccc;			/* synchronization character */
+extern char	ch;			/* for tipout */
+extern char	*uucplock;		/* name of lock file for uucp's */
 extern int trusted_device;
 
 

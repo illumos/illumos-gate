@@ -38,7 +38,7 @@ extern "C" {
 #include <fm/fmd_api.h>
 #include <fm/libtopo.h>
 
-nvlist_t *Action_nvl;	/* nvl for problem with action=... prop on it */
+extern nvlist_t *Action_nvl;	/* nvl for problem with action=... prop on it */
 
 void platform_init(void);
 void platform_fini(void);

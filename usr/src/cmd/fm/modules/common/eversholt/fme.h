@@ -85,8 +85,8 @@ extern "C" {
 #define	WOBUF_ISTATS	"istats"
 #define	WOBUF_SERDS	"serds"
 
-struct lut *Istats;	/* instanced stats a la "count=" */
-struct lut *SerdEngines;
+extern struct lut *Istats;	/* instanced stats a la "count=" */
+extern struct lut *SerdEngines;
 
 struct fme;
 

@@ -9,10 +9,10 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "tip.h"
 
+int	gid, egid;
+int	uid, euid;
 void	cleanup(void);
 void	timeout(void);
 

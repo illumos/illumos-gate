@@ -32,8 +32,6 @@
 #ifndef	_ESC_COMMON_TREE_H
 #define	_ESC_COMMON_TREE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -316,24 +314,24 @@ void tree_report();
 int tree_namecmp(struct node *np1, struct node *np2);
 int tree_eventcmp(struct node *np1, struct node *np2);
 
-struct lut *Faults;
-struct lut *Upsets;
-struct lut *Defects;
-struct lut *Errors;
-struct lut *Ereports;
-struct lut *Ereportenames;
-struct lut *Ereportenames_discard;
-struct lut *SERDs;
-struct lut *STATs;
-struct lut *ASRUs;
-struct lut *FRUs;
-struct lut *Configs;
-struct node *Props;
-struct node *Lastprops;
-struct node *Masks;
-struct node *Lastmasks;
-struct node *Problems;
-struct node *Lastproblems;
+extern struct lut *Faults;
+extern struct lut *Upsets;
+extern struct lut *Defects;
+extern struct lut *Errors;
+extern struct lut *Ereports;
+extern struct lut *Ereportenames;
+extern struct lut *Ereportenames_discard;
+extern struct lut *SERDs;
+extern struct lut *STATs;
+extern struct lut *ASRUs;
+extern struct lut *FRUs;
+extern struct lut *Configs;
+extern struct node *Props;
+extern struct node *Lastprops;
+extern struct node *Masks;
+extern struct node *Lastmasks;
+extern struct node *Problems;
+extern struct node *Lastproblems;
 
 #ifdef	__cplusplus
 }

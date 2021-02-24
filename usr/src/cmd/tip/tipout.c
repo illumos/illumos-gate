@@ -9,8 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "tip.h"
 #include <limits.h>
 
@@ -21,6 +19,7 @@
  *  reading from the remote host
  */
 
+FILE	*fscript;
 static	sigjmp_buf sigbuf;
 
 /*

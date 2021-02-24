@@ -38,8 +38,6 @@
 #ifndef	_ESC_COMMON_ESCLEX_H
 #define	_ESC_COMMON_ESCLEX_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -58,18 +56,18 @@ const unsigned long long *lex_s2ullp_lut_lookup(struct lut *root,
     const char *s);
 
 /* lut containing "ident" strings */
-struct lut *Ident;
+extern struct lut *Ident;
 
 /* lut containing "dictionary" strings */
-struct lut *Dicts;
+extern struct lut *Dicts;
 
 /* lut containing valid timeval suffixes */
-struct lut *Timesuffixlut;
+extern struct lut *Timesuffixlut;
 
 /* flags set by #pragmas */
-int Pragma_new_errors_only;
-int Pragma_trust_ereports;
-int Pragma_allow_cycles;
+extern int Pragma_new_errors_only;
+extern int Pragma_trust_ereports;
+extern int Pragma_allow_cycles;
 
 /* exported by esclex.c but names are mandated by the way yacc works... */
 int yylex();

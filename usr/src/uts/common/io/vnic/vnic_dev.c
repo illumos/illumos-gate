@@ -837,8 +837,8 @@ vnic_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 		uint32_t *hcksum_txflags = cap_data;
 
 		*hcksum_txflags = vnic->vn_hcksum_txflags &
-		    (HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM |
-		    HCKSUM_INET_PARTIAL);
+		    (HCKSUM_INET_FULL_V4 | HCKSUM_INET_FULL_V6 |
+		    HCKSUM_IPHDRCKSUM | HCKSUM_INET_PARTIAL);
 		break;
 	}
 	case MAC_CAPAB_LSO: {

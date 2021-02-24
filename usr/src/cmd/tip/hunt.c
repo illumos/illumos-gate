@@ -9,10 +9,9 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "tip.h"
 
+char *uucplock;
 static	sigjmp_buf deadline;
 static	int deadfl;
 
