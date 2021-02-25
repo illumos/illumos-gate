@@ -10,12 +10,14 @@
 .\"
 .\"
 .\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2021 Oxide Computer Company
 .\"
-.Dd May 31, 2016
+.Dd February 25, 2021
 .Dt MAC_PROP_INFO 9F
 .Os
 .Sh NAME
 .Nm mac_prop_info ,
+.Nm mac_prop_info_set_default_fec ,
 .Nm mac_prop_info_set_default_link_flowctrl ,
 .Nm mac_prop_info_set_default_str ,
 .Nm mac_prop_info_set_default_uint8 ,
@@ -26,6 +28,11 @@
 .Nd mac property information functions
 .Sh SYNOPSIS
 .In sys/mac_provider.h
+.Ft void
+.Fo mac_prop_info_set_default_fec
+.Fa "mac_prop_info_handle_t hdl"
+.Fa "link_fec_t fec"
+.Fc
 .Ft void
 .Fo mac_prop_info_set_default_link_flowctrl
 .Fa "mac_prop_info_handle_t hdl"
@@ -66,9 +73,9 @@
 illumos DDI specific
 .Sh PARAMETERS
 .Bl -tag -width Ds
-.It Ft hdl
+.It Fa hdl
 A pointer to the MAC property information handle.
-.It Ft fctl
+.It Fa fctl
 A valid link flow control entry.
 Valid values are documented in the
 .Sy MAC_PROP_FLOWCTRL
@@ -76,16 +83,26 @@ property description in the
 .Sx PROPERTIES
 section of
 .Xr mac 9E .
-.It Ft str
+.It Fa fec
+A valid link forward error correction
+.Pq fec
+scheme.
+Valid values are documented in the
+.Sy MAC_PROP_EN_FEC_CAP
+property description in the
+.Sx PROPERTIES
+section of
+.Xr mac 9E .
+.It Fa str
 A null-terminated ASCII character string that describes that contains a
 value of a property.
-.It Ft u8
+.It Fa u8
 An 8-bit unsigned value.
-.It Ft u16
+.It Fa u16
 An 16-bit unsigned value.
-.It Ft u32
+.It Fa u32
 An 32-bit unsigned value.
-.It Ft perm
+.It Fa perm
 An 8-bit unsigned value which is the bitwise inclusive OR of the
 following values:
 .Bl -tag -width Ds
@@ -105,10 +122,10 @@ This is equivalent to specifying both
 and
 .Sy MAC_PROP_PERM_WRITE .
 .El
-.It Ft low
+.It Fa low
 A 32-bit unsigned value that represents the lowest possible value of an
 integer property, generally inclusive.
-.It Ft high
+.It Fa high
 A 32-bit unsigned value that represents the highest possible value an
 integer property, generally inclusive.
 .El
@@ -156,6 +173,7 @@ function is called, a new property range is added, allowing for multiple
 disjoint ranges to be specified for a given property.
 .Pp
 The remaining functions,
+.Fn mac_prop_info_set_default_fec ,
 .Fn mac_prop_info_set_default_link_flowctrl ,
 .Fn mac_prop_info_set_default_str ,
 .Fn mac_prop_info_set_uint8 ,
@@ -193,6 +211,18 @@ and
 .Fn mac_prop_info_set_default_uint32
 functions set the default value for values whose properties are 8-, 16-,
 and 32-bit unsigned values respectively.
+.Pp
+The
+.Fn mac_prop_info_set_default_fec
+function is used for properties that describe link forward error
+correction values such as
+.Dv MAC_PROP_EN_FEC_CAP
+and
+.Dv MAC_PROP_ADV_FEC_CAP .
+The various values of a
+.Ft link_fec_t
+are documented in
+.Xr mac 9E .
 .Sh CONTEXT
 These functions are generally called on a handle passed into the
 .Xr mc_propinfo 9E

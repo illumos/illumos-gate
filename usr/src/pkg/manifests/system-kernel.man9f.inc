@@ -1036,6 +1036,8 @@ link path=usr/share/man/man9f/list_tail.9f target=list_create.9f
 link path=usr/share/man/man9f/mac_fini_ops.9f target=mac_init_ops.9f
 link path=usr/share/man/man9f/mac_free.9f target=mac_alloc.9f
 link path=usr/share/man/man9f/mac_hcksum_set.9f target=mac_hcksum_get.9f
+link path=usr/share/man/man9f/mac_prop_info_set_default_fec.9f \
+    target=mac_prop_info.9f
 link path=usr/share/man/man9f/mac_prop_info_set_default_link_flowctrl.9f \
     target=mac_prop_info.9f
 link path=usr/share/man/man9f/mac_prop_info_set_default_str.9f \
