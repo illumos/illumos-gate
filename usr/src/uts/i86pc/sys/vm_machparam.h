@@ -130,7 +130,7 @@ extern "C" {
  *
  * XXX - The system doesn't account for multiple swap devices.
  */
-#define	DISKRPM		60
+#define	DISKRPM		600
 
 /*
  * The maximum value for handspreadpages which is the the distance
