@@ -26,7 +26,7 @@
 
 include	../Makefile.cmd
 
-SUBDIRS=	native $(MACH)
+SUBDIRS=	$(MACH)
 $(BUILD64)SUBDIRS +=	$(MACH64)
 
 SAMPLES =	 samples
@@ -35,7 +35,7 @@ all	:= TARGET = all
 install	:= TARGET = install
 clean	:= TARGET = clean
 clobber	:= TARGET = clobber
-_msg	:= TARGET = catalog
+_msg	:= TARGET = _msg
 
 .KEEP_STATE:
 
@@ -43,7 +43,7 @@ _msg	:= TARGET = catalog
 
 all clean clobber install:	$(SUBDIRS) .WAIT $(SAMPLES)
 
-_msg:	$(SUBDIRS)
+_msg:	$(MACH)
 
 $(SUBDIRS) $(SAMPLES):	FRC
 		@cd $@; pwd; $(MAKE) $(TARGET)

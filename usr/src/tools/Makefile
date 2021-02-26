@@ -40,97 +40,98 @@ include ../Makefile.master
 # Anything built before 'install.bin' is present must override binary
 # installation rules in their makefiles. This includes the Makefile for
 # 'install.bin' itself.
-BOOT_SUBDIRS= \
-	smatch \
-	.WAIT \
-	cw \
-	.WAIT \
-	install.bin \
-	.WAIT \
+BOOT_SUBDIRS=		\
+	smatch		\
+	.WAIT		\
+	cw		\
+	.WAIT		\
+	install.bin	\
+	.WAIT		\
 	ctf
 
-COMMON_SUBDIRS= \
-	codesign \
-	cscope-fast \
-	env \
-	findunref \
-	lintdump \
-	make \
-	makesoftcore \
-	ndrgen \
-	onbld \
-	protocmp \
-	protolist \
-	scripts \
+COMMON_SUBDIRS=		\
+	codesign	\
+	cscope-fast	\
+	env		\
+	findunref	\
+	lintdump	\
+	make		\
+	makesoftcore	\
+	ndrgen		\
+	onbld		\
+	protocmp	\
+	protolist	\
+	scripts		\
 	sgs
 
 #
 #  special versions of commands for use only in build
 #
-UNSHIPPED_SUBDIRS = \
-	$(SGSMSG) \
-	$(SGSLIBCONV) \
-	$(SGSLIBELF) \
-	$(SGSLIBLDDBG) \
-	$(SGSLIBLD) \
-	$(SGSLD) \
-	localedef \
-	mandoc \
-	rpcgen \
-	tic \
-	vtfontcvt \
+UNSHIPPED_SUBDIRS =		\
+	$(SGSMSG)		\
+	$(SGSLIBCONV)		\
+	$(SGSLIBELF)		\
+	$(SGSLIBLDDBG)		\
+	$(SGSLIBLD)		\
+	$(SGSLD)		\
+	geniconvtbl		\
+	localedef		\
+	mandoc			\
+	rpcgen			\
+	tic			\
+	vtfontcvt		\
 	zic
 
-sparc_SUBDIRS= \
-	chk4ubin \
-	stabs \
+sparc_SUBDIRS=			\
+	chk4ubin		\
+	stabs			\
 	tokenize
 
-i386_SUBDIRS=		\
-	aw		\
-	cpcgen		\
-	elfextract	\
-	mbh_patch	\
+i386_SUBDIRS=			\
+	aw			\
+	cpcgen			\
+	elfextract		\
+	mbh_patch		\
 	btxld
 
 $(INTEL_BLD)sgs: aw
 
-SUBDIRS= \
-	$($(MACH)_SUBDIRS) \
-	$(COMMON_SUBDIRS) \
+SUBDIRS=			\
+	$($(MACH)_SUBDIRS)	\
+	$(COMMON_SUBDIRS)	\
 	$(UNSHIPPED_SUBDIRS)
 
 include Makefile.tools
 
-ROOTDIRS= \
-	$(ROOTOPT) \
-	$(ROOTONBLD) \
-	$(ROOTONBLD)/bin \
-	$(ROOTONBLD)/bin/$(MACH) \
-	$(ROOTONBLD)/lib \
-	$(ROOTONBLD)/lib/$(MACH) \
-	$(ROOTONBLD)/lib/$(MACH)/64 \
-	$(ROOTONBLD)/lib/perl \
-	$(ROOTONBLD)/env \
-	$(ROOTONBLD)/etc \
-	$(ROOTONBLD)/etc/exception_lists \
-	$(ROOTONBLD)/share \
-	$(ROOTONBLD)/man \
+ROOTDIRS=					\
+	$(ROOTOPT)				\
+	$(ROOTONBLD)				\
+	$(ROOTONBLD)/bin			\
+	$(ROOTONBLD)/bin/$(MACH)		\
+	$(ROOTONBLD)/lib			\
+	$(ROOTONBLD)/lib/$(MACH)		\
+	$(ROOTONBLD)/lib/$(MACH)/64		\
+	$(ROOTONBLD)/lib/perl			\
+	$(ROOTONBLD)/env			\
+	$(ROOTONBLD)/etc			\
+	$(ROOTONBLD)/etc/exception_lists	\
+	$(ROOTONBLD)/share			\
+	$(ROOTONBLD)/man			\
 	$(ROOTONBLD)/man/man1onbld
 
 $(BUILDPY2TOOLS)ROOTDIRS += \
-	$(ROOTONBLD)/lib/python$(PYTHON_VERSION) \
-	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld \
-	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld/Checks \
+	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)		\
+	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld		\
+	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld/Checks	\
 	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld/Scm
 
-$(BUILDPY3TOOLS)ROOTDIRS += \
-	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION) \
-	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld \
-	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld/__pycache__ \
-	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld/Checks \
-	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__ \
-	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld/Scm \
+$(BUILDPY3TOOLS)ROOTDIRS +=							\
+	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)				\
+	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld				\
+	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld/__pycache__		\
+	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld/Checks			\
+	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__	\
+	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld/Scm			\
 	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld/Scm/__pycache__
 
 all :=		TARGET= install

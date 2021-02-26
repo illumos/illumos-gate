@@ -24,161 +24,99 @@
 # Copyright (c) 2019, Joyent, Inc.
 #
 
-$(NOT_NATIVE)NATIVE_BUILD = $(POUND_SIGN)
-
-ITM	= geniconvtbl.so
+LIB	= geniconvtbl.so
 PROG	= geniconvtbl
 
-SRCSH1  = iconv_tm.h hash.h
-SRCCH1  = itmcomp.h itm_util.h maptype.h
-SRCSC1  = itmcomp.c assemble.c disassemble.c itm_util.c
-SRCY1   = itm_comp.y
-SRCL1   = itm_comp.l
-SRCI1   = geniconvtbl.c
+SRCDIR  = $(SRC)/cmd/geniconvtbl
 
+MAPFILE	= $(SRCDIR)/mapfile
 
-YTABC   = y.tab.c
-YTABH   = y.tab.h
-LEXYY   = lex.yy.c
-YOUT    = y.output
-MAPFILE	= ../mapfile
+OBJS    = itmcomp.o assemble.o disassemble.o itm_util.o y.tab.o lex.yy.o
+MSGFILES = itmcomp.i assemble.i disassemble.i itm_util.i y.tab.i lex.yy.i geniconvtbl.i
 
+include $(SRC)/cmd/Makefile.cmd
 
-
-SRCSH	= $(SRCSH1:%.h=../%.h)
-SRCCH	= $(SRCCH1:%.h=../%.h)
-SRCSC	= $(SRCSC1:%.c=../%.c)
-SRCI	= $(SRCI1:%.c=../%.c)
-SRCY    = $(SRCY1:%.y=../%.y)
-SRCL    = $(SRCL1:%.l=../%.l)
-
-SRCYC	= $(SRCY:%.y=%.c)
-SRCLC	= $(SRCL:%.l=%.c)
-
-SRCS    = $(SRCSC) $(YTABC) $(LEXYY)
-HDRS	= $(SRCCH1) $(ERNOSTRH)
-
-
-
-SED	= sed
-LEXSED	= ../lex.sed
-YACCSED	= ../yacc.sed
-
-
-
-# include ../../../lib/Makefile.lib
-include ../../Makefile.cmd
-
+POFILE	= geniconvtbl_.po
 
 ROOTDIRS32=	$(ROOTLIB)/iconv
 ROOTDIRS64=	$(ROOTLIB)/iconv/$(MACH64)
-ROOTITM32 =	$(ROOTDIRS32)/$(ITM)
-ROOTITM64 =	$(ROOTDIRS64)/$(ITM)
+ROOTLIB32 =	$(ROOTDIRS32)/$(LIB)
+ROOTLIB64 =	$(ROOTDIRS64)/$(LIB)
 
-# defined for some useful targets like clean,
-OBJS	= $(SRCSC1:%.c=%.o) $(YTABC:.c=.o) $(LEXYY:.c=.o)
+CLOBBERFILES=	$(LIB)
+CLEANFILES =	$(OBJS) y.tab.c y.tab.h lex.yy.c \
+		$(POFILE)
 
-CHECKHDRS = $(HDRS%.h=%.check)
-
-CLOBBERFILES=	$(ITM) $(SRCYC)
-CLEANFILES =	$(OBJS) $(YTABC) $(YTABH) $(LEXYY) $(YOUT) \
-		$(POFILES) $(POFILE)
-
-CPPFLAGS	+= -I. -I..
+CPPFLAGS	+= -I. -I$(SRCDIR)
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-implicit-function-declaration
-YFLAGS		+= -d -v
+YFLAGS		+= -d
 CFLAGS		+= -D_FILE_OFFSET_BITS=64
 
 # dump_expr() is too hairy
 SMATCH=off
 
-$(ITM) :=	CFLAGS += $(GSHARED) $(C_PICFLAGS) $(ZTEXT) -h$@
-$(ITM) :=	CPPFLAGS += -D_REENTRANT
-$(ITM) :=	sparc_CFLAGS += -xregs=no%appl
-$(ITM) :=	sparcv9_CFLAGS += -xregs=no%appl
+$(LIB) :=	LDFLAGS += $(GSHARED) -h$@ $(ZTEXT) $(ZDEFS) $(BDIRECT) \
+		$(C_PICFLAGS) $(MAPFILE:%=-Wl,-M%)			\
+		$(MAPFILE.PGA:%=-Wl,-M%) $(MAPFILE.NED:%=-Wl,-M%)
+$(LIB) :=	CPPFLAGS += -D_REENTRANT
+$(LIB) :=	sparc_CFLAGS += -xregs=no%appl
+$(LIB) :=	sparcv9_CFLAGS += -xregs=no%appl
+$(LIB) :=	LDLIBS += -lc
 
-LDLIBS += -lgen
-
-MY_NATIVE_CPPFLAGS = -D_FILE_OFFSET_BITS=64 -I. -I..
-MY_NATIVE_LDFLAGS = $(MAPFILE.NES:%=-Wl,-M%) $(MAPFILE.PGA:%=-Wl,-M%) $(MAPFILE.NED:%=-Wl,-M%) $(ZDIRECT) $(ZLAZYLOAD)
-MY_NATIVE_LDLIBS = -lgen
-
-#
-# Message catalog
-#
-POFILES= $(SRCSC1:%.c=%.po) $(SRCI1:%.c=%.po) \
-		$(SRCY1:%.y=%.po) $(SRCL1:%.l=%.po)
-
-POFILE= geniconvtbl_.po
-
-
-
-
+$(PROG) :=	LDLIBS += -lgen
 
 .KEEP_STATE:
 
-.PARALLEL: $(ITM) $(OBJS)
+.PARALLEL: $(LIB) $(OBJS)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-$(ITM): $(SRCI)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -Wl,-M$(MAPFILE) -o $@ $(SRCI) $(LDLIBS)
+$(LIB): $(SRCDIR)/geniconvtbl.c
+	$(LINK.c) -o $@ $(SRCDIR)/geniconvtbl.c $(LDLIBS)
 	$(POST_PROCESS_SO)
 
-$(YTABC) $(YTABH): $(SRCY)
-	$(YACC) $(YFLAGS) $(SRCY)
-	@ $(MV) $(YTABC) $(YTABC)~
-	@ $(SED) -f $(YACCSED) $(YTABC)~ > $(YTABC)
-	@ $(RM) $(YTABC)~
+y.tab.c + y.tab.h: $(SRCDIR)/itm_comp.y
+	$(YACC) $(YFLAGS) $(SRCDIR)/itm_comp.y
+	@ $(MV) y.tab.c y.tab.c~
+	@ $(SED) -f  $(SRCDIR)/yacc.sed y.tab.c~ > y.tab.c
+	@ $(RM) y.tab.c~
 
-$(LEXYY): $(SRCL) $(YTABH)
-	$(LEX) -t $(SRCL) | $(SED) -f $(LEXSED) > $(LEXYY)
-
-
-$(POFILE):  .WAIT $(POFILES)
-	$(RM) $@
-	$(CAT) $(POFILES) >$@
-
-$(POFILES): $(SRCSC) $(SRCI) $(SRCY) $(SRCL)
-
-%.po:	../%.c
-	$(COMPILE.cpp) $<  > $<.i
-	$(BUILD.po)
-
-hdrchk: $(HDRCHECKS)
-
-cstyle: $(SRCS)
-	$(DOT_C_CHECK)
+lex.yy.c: $(SRCDIR)/itm_comp.l y.tab.h
+	$(LEX) -t $(SRCDIR)/itm_comp.l | $(SED) -f $(SRCDIR)/lex.sed > $(@)
 
 clean:
 	$(RM) $(CLEANFILES)
 
+$(POFILE): $(MSGFILES)
+	$(BUILDPO.msgfiles)
+
 %.o:	%.c
 	$(COMPILE.c) $<
 
-%.o:	../%.c
+%.o:	$(SRCDIR)/%.c
 	$(COMPILE.c) $<
+
+%.i:	$(SRCDIR)/%.c
+	$(CPPFORPO) $< > $@
 
 # install rule
 $(ROOTDIRS32)/%: $(ROOTDIRS32) %
-	-$(INS.file)
+	$(INS.file)
 
 $(ROOTDIRS64)/%: $(ROOTDIRS64) %
-	-$(INS.file)
+	$(INS.file)
 
 $(ROOTDIRS32): $(ROOTLIB)
-	-$(INS.dir)
+	$(INS.dir)
 
 $(ROOTDIRS64): $(ROOTDIRS32)
-	-$(INS.dir)
+	$(INS.dir)
 
-$(ROOTLIB) $(ROOTBIN):
-	-$(INS.dir)
-
-include ../../Makefile.targ
+include $(SRC)/cmd/Makefile.targ
+include $(SRC)/Makefile.msg.targ

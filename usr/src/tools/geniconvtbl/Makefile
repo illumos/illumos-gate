@@ -26,19 +26,22 @@
 
 .KEEP_STATE:
 
-NOT_NATIVE = $(POUND_SIGN)              # tell Makefile.com we're native
+include	$(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/geniconvtbl/Makefile.com
+include $(SRC)/tools/Makefile.tools
 
-include ../Makefile.com
+CPPFLAGS	= -I. -I$(SRCDIR)
+CERRWARN	+= $(CNOWARN_UNINIT)
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-unused-variable
+CERRWARN	+= -_gcc=-Wno-implicit-function-declaration
+YFLAGS		+= -d
+CFLAGS		+= -D_FILE_OFFSET_BITS=64
 
-CC =		$(NATIVECC)
-LD =		$(NATIVELD)
-CFLAGS =	$(NATIVE_CFLAGS)
-CPPFLAGS =	$(MY_NATIVE_CPPFLAGS)
-LDFLAGS =	$(MY_NATIVE_LDFLAGS)
-LDLIBS =	$(MY_NATIVE_LDLIBS)
-NATIVE_LIBS +=	libgen.so libc.so
-POST_PROCESS =
+LDLIBS		+= -lgen -lc
+NATIVE_LIBS	+= libgen.so libc.so
 
-all install:	$(PROG)
+install: $(ROOTONBLDMACHPROG)
 
-catalog:
+all: $(PROG)
