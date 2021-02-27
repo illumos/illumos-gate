@@ -36,7 +36,7 @@ The current state of the link.
 For valid link states see the discussion of
 .Sy MAC_PROP_STATUS
 in the
-.Sx PROPERTIES
+.Sy PROPERTIES
 section of
 .Xr mac 9E .
 .El
@@ -46,7 +46,7 @@ The
 function is used by device drivers to inform the MAC layer that the
 state of a link has changed.
 As discussed in the
-.Sx Link Updates
+.Sy Link Updates
 section of
 .Xr mac 9E ,
 the driver should call this whenever it detects that the state of the

@@ -68,7 +68,7 @@ When the
 .Fn mc_propinfo
 entry point is called, the driver needs to first identify the property.
 The set of possible properties and their meaning is listed in the
-.Sx PROPERTIES
+.Sy PROPERTIES
 section of
 .Xr mac 9E .
 It should identify the property based on the value of

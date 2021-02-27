@@ -80,7 +80,7 @@ A valid link flow control entry.
 Valid values are documented in the
 .Sy MAC_PROP_FLOWCTRL
 property description in the
-.Sx PROPERTIES
+.Sy PROPERTIES
 section of
 .Xr mac 9E .
 .It Fa fec
@@ -90,7 +90,7 @@ scheme.
 Valid values are documented in the
 .Sy MAC_PROP_EN_FEC_CAP
 property description in the
-.Sx PROPERTIES
+.Sy PROPERTIES
 section of
 .Xr mac 9E .
 .It Fa str
