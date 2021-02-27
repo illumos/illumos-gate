@@ -84,6 +84,11 @@ DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION) -Wl,-e_start
 LDLIBS +=	-lmapmalloc -lc
 
+#
+# Disable stack protection as we're running in an s10 context.
+#
+STACKPROTECT = none
+
 CERRWARN +=	$(CNOWARN_UNINIT)
 
 $(LIBS):= PICS += $(SHAREDOBJS)
