@@ -43,7 +43,7 @@ safe_opt_dir /etc/systemd/system/network-online.target.wants
 safe_dir /etc/YaST2
 safe_opt_dir /etc/selinux
 
-# Populate resolve.conf setup files
+# Populate resolv.conf setup files
 zonecfg -z $ZONENAME info attr name=resolvers | awk '
 BEGIN {
 	print("# AUTOMATIC ZONE CONFIG")

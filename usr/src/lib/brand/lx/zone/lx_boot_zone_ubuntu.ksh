@@ -12,6 +12,7 @@
 
 #
 # Copyright 2016 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -28,30 +29,32 @@ safe_dir /etc/resolvconf/resolv.conf.d
 safe_dir /etc/network
 safe_dir /etc/network/interfaces.d
 safe_dir /etc/network/interfaces.d/smartos
+safe_dir /etc/systemd
 
-# Populate resolve.conf setup files
-zonecfg -z $ZONENAME info attr name=resolvers | awk '
-BEGIN {
-	print("# AUTOMATIC ZONE CONFIG")
-}
-$1 == "value:" {
-	nres = split($2, resolvers, ",");
-	for (i = 1; i <= nres; i++) {
-		print("nameserver", resolvers[i]);
-	}
-}
-' > $tmpfile
-zonecfg -z $ZONENAME info attr name=dns-domain | awk '
-$1 == "value:" {
-	dom = $2
-}
-END {
-	print("search", dom);
-}
-' >> $tmpfile
-fnm=$ZONEROOT/etc/resolvconf/resolv.conf.d/tail
-if [[ -f $fnm || -h $fnm || ! -e $fnm ]]; then
-	mv -f $tmpfile $fnm
+# Populate resolv.conf setup files IFF we have resolvers information.
+resolvers=`zone_attr resolvers`
+if [[ $? == 0 ]]; then
+
+    echo "# AUTOMATIC ZONE CONFIG" > $tmpfile
+    _IFS=$IFS; IFS=,; for r in $resolvers; do
+        echo "nameserver $r"
+    done >> $tmpfile
+    IFS=$_IFS
+    domain=`zone_attr dns-domain`
+    [[ $? == 0 ]] && echo "search $domain" >> $tmpfile
+
+    if [ -f $ZONEROOT/etc/systemd/resolved.conf ]; then
+        cf=$ZONEROOT/etc/systemd/resolved.conf
+	sed -i -E '/^(DNS|Domains) *=/d' $cf
+        echo "DNS=$resolvers" >> $cf
+        [[ -n "$domain" ]] && echo "Domains=$domain" >> $cf
+        mv -f $tmpfile $ZONEROOT/etc/resolv.conf
+    else
+        fnm=$ZONEROOT/etc/resolvconf/resolv.conf.d/tail
+        if [[ -f $fnm || -h $fnm || ! -e $fnm ]]; then
+            mv -f $tmpfile $fnm
+        fi
+    fi
 fi
 
 # Override network configuration
