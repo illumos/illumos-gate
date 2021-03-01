@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Nexenta by DDN, Inc.  All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -706,7 +706,7 @@ smb2_lease_ofile_close(smb_ofile_t *ofile)
 		if (o->f_oplock.og_closing)
 			continue;
 		/* If we can get a hold, use this ofile. */
-		if (smb_ofile_hold_olbrk(o))
+		if (smb_ofile_hold(o))
 			break;
 	}
 	if (o == NULL) {
