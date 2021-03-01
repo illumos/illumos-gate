@@ -63,7 +63,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_Bottom_panel;
 	_free_overlap;
 	_intersect_panel;
-	_lib_version;
 	_Panel_cnt;
 	_remove_overlap;
 	_Top_panel;

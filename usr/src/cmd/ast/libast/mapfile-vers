@@ -353,7 +353,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_hash_info_;
 	_iblocks;
 	_init;
-	_lib_version;
 	_mode_permmap_;
 	_mode_table_;
 	_opt_info_;

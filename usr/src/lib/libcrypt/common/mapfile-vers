@@ -65,7 +65,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	des_setparity;
 	ecb_crypt;
 	_encrypt	{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	_lib_version;
 	makekey;
 	_makekey;
 	run_crypt;

@@ -112,7 +112,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_Default_Menu;
 	_disconnect;
 	_draw;
-	_lib_version;
 	_link_items;
 	_match;
 	_movecurrent;

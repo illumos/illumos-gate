@@ -449,7 +449,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_init_costs;
 	_init_HP_pair;
 	initscr32;
-	_lib_version;
 	LINES;
 	m_addch;
 	m_addstr;
