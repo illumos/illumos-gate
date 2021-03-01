@@ -20,11 +20,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
-#
-# cmd/troff/Makefile
 #
 
 include ../Makefile.cmd
@@ -47,11 +43,11 @@ POFILES= $(SUBDIRS:%=%/%.po)
 POFILE= troff.po
 
 
-.KEEP_STATE :
+.KEEP_STATE:
 
-all :		$(SUBDIRS)
+all:		$(SUBDIRS)
 
-install clean lint strip :	$(SUBDIRS)
+install clean lint strip:	$(SUBDIRS)
 
 clobber: $(SUBDIRS) local_clobber
 
@@ -60,14 +56,16 @@ local_clobber:
 
 $(POFILE):      $(SUBDIRS) $(POFILES2)
 	cat     $(POFILES) $(POFILES2)  >       $@
-	 
-_msg:   $(SUBDIRS)
+
+_msg:   $(MSGDOMAIN) $(SUBDIRS)
 	  $(RM)	$(POFILE)
 	  cat    $(POFILES)      > $(POFILE)
 	  $(RM) $(MSGDOMAIN)/$(POFILE)
 	  cp $(POFILE) $(MSGDOMAIN)
 
-$(SUBDIRS) :	FRC
-		@cd $@; pwd; $(MAKE) $(TARGET)
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+include $(SRC)/Makefile.msg.targ

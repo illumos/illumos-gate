@@ -496,4 +496,18 @@ done	{n}< /dev/null
 n=$( exec {n}< /dev/null; print -r -- $n)
 [[ -r /dev/fd/$n ]] && err_exit "file descriptor n=$n left open after subshell"
 
+# ==========
+# https://github.com/att/ast/issues/9
+tf=`mktemp`
+echo foo bar > $tf
+$SHELL -c 'echo xxx 1<>; '$tf
+actual=$(cat $tf)
+expect="xxx"
+[[ "$actual" = "$expect" ]] || err_exit "<>; does not truncate files - $expect - $actual"
+rm -f $tf
+
+cp /dev/null $tf
+$SHELL -c '{ echo "Foo"; echo "bar"; uname; } >; '$tf
+[[ -s "$tf" ]] || err_exit ">; does not work with -c"
+rm -f $tf
 exit $((Errors<125?Errors:125))

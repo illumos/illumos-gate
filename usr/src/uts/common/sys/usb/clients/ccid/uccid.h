@@ -83,6 +83,7 @@ typedef struct uccid_cmd_txn_end {
  * Protocol definitions. This should match common/ccid/atr.h.
  */
 typedef enum {
+	UCCID_PROT_NONE = 0,
 	UCCID_PROT_T0	= 1 << 0,
 	UCCID_PROT_T1	= 1 << 1
 } uccid_prot_t;

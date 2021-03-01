@@ -20,12 +20,13 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <assert.h>
 #include <strings.h>
 #include <sys/param.h>
+#include <sys/debug.h>
 
 #include <libmlrpc.h>
 
@@ -419,6 +420,8 @@ ndr_decode_pac_hdr(ndr_stream_t *nds, ndr_pac_hdr_t *hdr)
 	return (NDR_DRC_PTYPE_RPCHDR(rc));
 }
 
+CTASSERT(sizeof (ndr_common_header_t) >= NDR_CMN_HDR_SIZE);
+
 /*
  * Decode an RPC fragment header.  Use ndr_decode_pdu_hdr() to process
  * the first fragment header then this function to process additional
@@ -432,7 +435,7 @@ ndr_decode_frag_hdr(ndr_stream_t *nds, ndr_common_header_t *hdr)
 	int byte_order;
 
 	pdu = (uint8_t *)nds->pdu_base_offset + nds->pdu_scan_offset;
-	bcopy(pdu, hdr, NDR_RSP_HDR_SIZE);
+	bcopy(pdu, hdr, NDR_CMN_HDR_SIZE);
 
 	/*
 	 * Swap non-byte fields if the PDU byte-order

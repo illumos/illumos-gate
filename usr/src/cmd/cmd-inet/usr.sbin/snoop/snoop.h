@@ -101,7 +101,7 @@ extern void del_transient(int port);
  * argument is interpreted.
  */
 #define	XID_CACHE_SIZE 256
-struct cache_struct {
+extern struct cache_struct {
 	int xid_num;	/* RPC transaction id */
 	int xid_frame;	/* Packet number */
 	int xid_prog;	/* RPC program number */
@@ -111,6 +111,26 @@ struct cache_struct {
 	int xid_gss_service; /* none, integ, priv */
 } xid_cache[XID_CACHE_SIZE];
 
+extern char *tkp, *sav_tkp;
+extern char *token;
+extern enum tokentype {
+	EOL,
+	ALPHA,
+	NUMBER,
+	FIELD,
+	ADDR_IP,
+	ADDR_ETHER,
+	SPECIAL,
+	ADDR_IP6,
+	ADDR_AT
+} tokentype;
+extern uint_t tokenval;
+
+enum direction { ANY, TO, FROM };
+extern enum direction dir;
+
+extern int eaddr;	/* need ethernet addr */
+extern int opstack;	/* operand stack depth */
 
 /*
  * The following macros advance the pointer passed to them.  They

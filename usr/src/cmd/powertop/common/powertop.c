@@ -72,7 +72,6 @@ state_info_t		g_cstate_info[NSTATES];
 freq_state_info_t	g_pstate_info[NSTATES];
 cpu_power_info_t	*g_cpu_power_states;
 
-boolean_t		g_turbo_supported;
 boolean_t		g_sig_resize;
 
 uint_t			g_argc;

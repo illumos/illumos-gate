@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -733,8 +733,6 @@ msgbuf_put_oem_string(smb_msgbuf_t *mb, char *mbs, int repc)
 		if ((mb->flags & SMB_MSGBUF_NOTERM) == 0)
 			repc += sizeof (char);
 	}
-	if (smb_msgbuf_has_space(mb, repc) == 0)
-		return (SMB_MSGBUF_OVERFLOW);
 
 	/*
 	 * Convert into a temporary buffer
@@ -756,6 +754,8 @@ msgbuf_put_oem_string(smb_msgbuf_t *mb, char *mbs, int repc)
 	 */
 	s = oembuf;
 	while (repc > 0) {
+		if (smb_msgbuf_has_space(mb, 1) == 0)
+			return (SMB_MSGBUF_OVERFLOW);
 		*mb->scan++ = *s;
 		if (*s != '\0')
 			s++;
@@ -777,6 +777,7 @@ msgbuf_put_unicode_string(smb_msgbuf_t *mb, char *mbs, int repc)
 {
 	smb_wchar_t	*wcsbuf = NULL;
 	smb_wchar_t	*wp;
+	smb_wchar_t	wchar;
 	size_t		wcslen, wcsbytes;
 	size_t		rlen;
 
@@ -800,8 +801,6 @@ msgbuf_put_unicode_string(smb_msgbuf_t *mb, char *mbs, int repc)
 		if ((mb->flags & SMB_MSGBUF_NOTERM) == 0)
 			repc += sizeof (smb_wchar_t);
 	}
-	if (smb_msgbuf_has_space(mb, repc) == 0)
-		return (SMB_MSGBUF_OVERFLOW);
 
 	/*
 	 * Convert into a temporary buffer
@@ -824,16 +823,21 @@ msgbuf_put_unicode_string(smb_msgbuf_t *mb, char *mbs, int repc)
 	 * little-endian order while copying.
 	 */
 	wp = wcsbuf;
-	while (repc > 1) {
-		smb_wchar_t wchar = LE_IN16(wp);
+	while (repc >= sizeof (smb_wchar_t)) {
+		if (smb_msgbuf_has_space(mb, sizeof (smb_wchar_t)) == 0)
+			return (SMB_MSGBUF_OVERFLOW);
+		wchar = LE_IN16(wp);
 		LE_OUT16(mb->scan, wchar);
 		mb->scan += 2;
 		if (wchar != 0)
 			wp++;
 		repc -= sizeof (smb_wchar_t);
 	}
-	if (repc > 0)
+	if (repc > 0) {
+		if (smb_msgbuf_has_space(mb, 1) == 0)
+			return (SMB_MSGBUF_OVERFLOW);
 		*mb->scan++ = '\0';
+	}
 
 	return (0);
 }

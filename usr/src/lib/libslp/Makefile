@@ -75,3 +75,5 @@ $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+include $(SRC)/Makefile.msg.targ

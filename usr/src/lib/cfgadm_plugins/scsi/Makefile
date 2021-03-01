@@ -71,3 +71,5 @@ $(POFILES):
 	$(RM) messages.po
 
 FRC:
+
+include $(SRC)/Makefile.msg.targ

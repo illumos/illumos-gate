@@ -187,7 +187,7 @@ static	uchar_t	*apic_oldvec_to_newvec;
 static	uchar_t	*apic_newvec_to_oldvec;
 
 /* ACPI Interrupt Source Override Structure ptr */
-ACPI_MADT_INTERRUPT_OVERRIDE *acpi_isop;
+extern	ACPI_MADT_INTERRUPT_OVERRIDE *acpi_isop;
 extern	int acpi_iso_cnt;
 
 /*

@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -188,6 +188,7 @@ static void smb_tree_dealloc(void *);
 static boolean_t smb_tree_is_connected_locked(smb_tree_t *);
 static char *smb_tree_get_sharename(char *);
 static int smb_tree_getattr(const smb_kshare_t *, smb_node_t *, smb_tree_t *);
+static void smb_tree_get_creation(smb_node_t *, smb_tree_t *);
 static void smb_tree_get_volname(vfs_t *, smb_tree_t *);
 static void smb_tree_get_flags(const smb_kshare_t *, vfs_t *, smb_tree_t *);
 static void smb_tree_log(smb_request_t *, const char *, const char *, ...);
@@ -1106,6 +1107,7 @@ smb_tree_getattr(const smb_kshare_t *si, smb_node_t *node, smb_tree_t *tree)
 	if (getvfs(&vfsp->vfs_fsid) != vfsp)
 		return (ESTALE);
 
+	smb_tree_get_creation(node, tree);
 	smb_tree_get_volname(vfsp, tree);
 	smb_tree_get_flags(si, vfsp, tree);
 
@@ -1124,6 +1126,23 @@ smb_tree_getattr(const smb_kshare_t *si, smb_node_t *node, smb_tree_t *tree)
 
 	VFS_RELE(vfsp);
 	return (0);
+}
+
+/*
+ * File volume creation time
+ */
+static void
+smb_tree_get_creation(smb_node_t *node, smb_tree_t *tree)
+{
+	smb_attr_t	attr;
+	cred_t		*kcr = zone_kcred();
+
+	bzero(&attr, sizeof (attr));
+	attr.sa_mask = SMB_AT_CRTIME;
+	(void) smb_node_getattr(NULL, node, kcr, NULL, &attr);
+	/* On failure we'll have time zero, which is OK */
+
+	tree->t_create_time = attr.sa_crtime;
 }
 
 /*

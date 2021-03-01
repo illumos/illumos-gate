@@ -20759,6 +20759,7 @@ f usr/share/man/man9f/mac_link_update.9f 0444 root bin
 f usr/share/man/man9f/mac_lso_get.9f 0444 root bin
 f usr/share/man/man9f/mac_maxsdu_update.9f 0444 root bin
 f usr/share/man/man9f/mac_prop_info.9f 0444 root bin
+s usr/share/man/man9f/mac_prop_info_set_default_fec.9f=mac_prop_info.9f
 s usr/share/man/man9f/mac_prop_info_set_default_link_flowctrl.9f=mac_prop_info.9f
 s usr/share/man/man9f/mac_prop_info_set_default_str.9f=mac_prop_info.9f
 s usr/share/man/man9f/mac_prop_info_set_default_uint32.9f=mac_prop_info.9f

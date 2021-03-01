@@ -96,10 +96,12 @@ $(LEGACY_SUBDIRS): FRC
 # Combine all messages files into a single file and copy it to
 # MSGDOMAIN directory
 #
-_msg: ${POFILES}
+_msg: $(MSGDOMAIN) $(POFILES)
 	$(RM) $(POFILE)
 	$(CAT) $(POFILES) > $(POFILE)
 	$(RM)  $(MSGDOMAIN)/$(POFILE)
 	$(CP) $(POFILE) $(MSGDOMAIN)
 
 FRC:
+
+include $(SRC)/Makefile.msg.targ

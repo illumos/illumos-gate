@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -240,10 +240,11 @@ static uint32_t
 smb2_qif_basic(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	smb_attr_t *sa = &qi->qi_attr;
+	int rc;
 
 	ASSERT((sa->sa_mask & SMB_AT_BASIC) == SMB_AT_BASIC);
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "TTTTll",
 	    &sa->sa_crtime,		/* T */
 	    &sa->sa_vattr.va_atime,	/* T */
@@ -251,6 +252,8 @@ smb2_qif_basic(smb_request_t *sr, smb_queryinfo_t *qi)
 	    &sa->sa_vattr.va_ctime,	/* T */
 	    sa->sa_dosattr,		/* l */
 	    0); /* reserved */		/* l */
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -265,10 +268,11 @@ static uint32_t
 smb2_qif_standard(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	smb_attr_t *sa = &qi->qi_attr;
+	int rc;
 
 	ASSERT((sa->sa_mask & SMB_AT_STANDARD) == SMB_AT_STANDARD);
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "qqlbbw",
 	    sa->sa_allocsz,		/* q */
 	    sa->sa_vattr.va_size,	/* q */
@@ -276,6 +280,8 @@ smb2_qif_standard(smb_request_t *sr, smb_queryinfo_t *qi)
 	    qi->qi_delete_on_close,	/* b */
 	    qi->qi_isdir,		/* b */
 	    0); /* reserved */		/* w */
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -290,6 +296,7 @@ smb2_qif_internal(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	smb_attr_t *sa = &qi->qi_attr;
 	u_longlong_t nodeid;
+	int rc;
 
 	ASSERT((sa->sa_mask & SMB_AT_NODEID) == SMB_AT_NODEID);
 	nodeid = sa->sa_vattr.va_nodeid;
@@ -298,9 +305,11 @@ smb2_qif_internal(smb_request_t *sr, smb_queryinfo_t *qi)
 	    (sr->session->s_flags & SMB_SSN_AAPL_CCEXT) != 0)
 		nodeid = 0;
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "q",
 	    nodeid);	/* q */
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -315,9 +324,12 @@ static uint32_t
 smb2_qif_ea_size(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	_NOTE(ARGUNUSED(qi))
+	int rc;
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "l", 0);
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -341,10 +353,13 @@ smb2_qif_access(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	_NOTE(ARGUNUSED(qi))
 	smb_ofile_t *of = sr->fid_ofile;
+	int rc;
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "l",
 	    of->f_granted_access);
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -358,14 +373,17 @@ smb2_qif_access(smb_request_t *sr, smb_queryinfo_t *qi)
 static uint32_t
 smb2_qif_name(smb_request_t *sr, smb_queryinfo_t *qi)
 {
+	int rc;
 
 	ASSERT(qi->qi_namelen > 0);
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "llU",
 	    0, /* FileIndex	 (l) */
 	    qi->qi_namelen,	/* l */
 	    qi->qi_name);	/* U */
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -379,13 +397,16 @@ smb2_qif_position(smb_request_t *sr, smb_queryinfo_t *qi)
 	_NOTE(ARGUNUSED(qi))
 	smb_ofile_t *of = sr->fid_ofile;
 	uint64_t pos;
+	int rc;
 
 	mutex_enter(&of->f_mutex);
 	pos = of->f_seek_pos;
 	mutex_exit(&of->f_mutex);
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "q", pos);
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -399,9 +420,12 @@ static uint32_t
 smb2_qif_mode(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	_NOTE(ARGUNUSED(qi))
+	int rc;
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "l", 0);
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -413,9 +437,12 @@ static uint32_t
 smb2_qif_alignment(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	_NOTE(ARGUNUSED(qi))
+	int rc;
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "l", 0);
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -430,6 +457,7 @@ static uint32_t
 smb2_qif_altname(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	smb_ofile_t *of = sr->fid_ofile;
+	int rc;
 
 	ASSERT(qi->qi_namelen > 0);
 	ASSERT(qi->qi_attr.sa_mask & SMB_AT_NODEID);
@@ -442,10 +470,12 @@ smb2_qif_altname(smb_request_t *sr, smb_queryinfo_t *qi)
 	/* fill in qi->qi_shortname */
 	smb_query_shortname(of->f_node, qi);
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "%lU", sr,
 	    smb_wcequiv_strlen(qi->qi_shortname),
 	    qi->qi_shortname);
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -481,6 +511,7 @@ smb2_qif_pipe(smb_request_t *sr, smb_queryinfo_t *qi)
 	smb_ofile_t *of = sr->fid_ofile;
 	uint32_t	pipe_mode;
 	uint32_t	nonblock;
+	int		rc;
 
 	switch (of->f_ftype) {
 	case SMB_FTYPE_BYTE_PIPE:
@@ -496,9 +527,11 @@ smb2_qif_pipe(smb_request_t *sr, smb_queryinfo_t *qi)
 	}
 	nonblock = 0;	/* XXX todo: Get this from the pipe handle. */
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "ll",
 	    pipe_mode, nonblock);
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -532,13 +565,16 @@ smb2_qif_compr(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	smb_attr_t *sa = &qi->qi_attr;
 	uint16_t CompressionFormat = 0;	/* COMPRESSION_FORMAT_NONE */
+	int rc;
 
 	ASSERT(sa->sa_mask & SMB_AT_SIZE);
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "qw6.",
 	    sa->sa_vattr.va_size,	/* q */
 	    CompressionFormat);		/* w */
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -550,8 +586,9 @@ static uint32_t
 smb2_qif_opens(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	smb_attr_t *sa = &qi->qi_attr;
+	int rc;
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "TTTTqqll",
 	    &sa->sa_crtime,		/* T */
 	    &sa->sa_vattr.va_atime,	/* T */
@@ -561,6 +598,8 @@ smb2_qif_opens(smb_request_t *sr, smb_queryinfo_t *qi)
 	    sa->sa_vattr.va_size,	/* q */
 	    sa->sa_dosattr,		/* l */
 	    0); /* reserved */		/* l */
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }
@@ -578,8 +617,12 @@ static uint32_t
 smb2_qif_tags(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	_NOTE(ARGUNUSED(qi))
-	(void) smb_mbc_encodef(
+	int rc;
+
+	rc = smb_mbc_encodef(
 	    &sr->raw_data, "ll", 0, 0);
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (0);
 }

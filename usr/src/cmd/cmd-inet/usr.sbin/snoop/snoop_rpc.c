@@ -61,6 +61,7 @@ static void rpc_detail_reply(int, int, struct cache_struct *, char *, int len);
 static void print_creds(int);
 static void print_verif(int);
 static void stash_xid(ulong_t, int, int, int, int);
+struct cache_struct xid_cache[XID_CACHE_SIZE];
 
 #define	LAST_FRAG ((ulong_t)1 << 31)
 
@@ -257,8 +258,7 @@ rpc_detail_call(int flags, int xid, int rpcvers, int prog, int vers, int proc,
 }
 
 char *
-nameof_flavor(flavor)
-	int flavor;
+nameof_flavor(int flavor)
 {
 	switch (flavor) {
 	case AUTH_NONE : return ("None");
@@ -545,15 +545,13 @@ struct rpcnames {
 };
 
 int
-compare(a, b)
-	register struct rpcnames *a, *b;
+compare(struct rpcnames *a, struct rpcnames *b)
 {
 	return (a->rp_prog - b->rp_prog);
 }
 
 char *
-nameof_prog(prog)
-	int prog;
+nameof_prog(int prog)
 {
 	struct rpcnames *r;
 	struct rpcnames *bsearch();
@@ -570,8 +568,7 @@ nameof_prog(prog)
 }
 
 char *
-nameof_astat(status)
-	int status;
+nameof_astat(int status)
 {
 	switch (status) {
 	case SUCCESS	  : return ("Success");
@@ -585,8 +582,7 @@ nameof_astat(status)
 }
 
 char *
-nameof_why(why)
-	int why;
+nameof_why(int why)
 {
 	switch (why) {
 	case AUTH_BADCRED:	return ("bogus credentials (seal broken)");
@@ -723,8 +719,7 @@ struct cache_struct *xcp	= &xid_cache[0];
 struct cache_struct *xcplast	= &xid_cache[XID_CACHE_SIZE - 1];
 
 struct cache_struct *
-find_xid(xid)
-	ulong_t xid;
+find_xid(ulong_t xid)
 {
 	struct cache_struct *x;
 
@@ -758,9 +753,7 @@ stash_xid(ulong_t xid, int frame, int prog, int vers, int proc)
 }
 
 void
-check_retransmit(line, xid)
-	char *line;
-	ulong_t xid;
+check_retransmit(char *line, ulong_t xid)
 {
 	struct cache_struct *x;
 	extern int pi_frame;

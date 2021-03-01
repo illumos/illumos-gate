@@ -1028,6 +1028,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		mac_fini_ops.9f					\
 		mac_free.9f					\
 		mac_hcksum_set.9f				\
+		mac_prop_info_set_default_fec.9f		\
 		mac_prop_info_set_default_link_flowctrl.9f	\
 		mac_prop_info_set_default_str.9f		\
 		mac_prop_info_set_default_uint32.9f		\
@@ -1912,6 +1913,8 @@ list_tail.9f				:= LINKSRC = list_create.9f
 mac_free.9f				:= LINKSRC = mac_alloc.9f
 mac_hcksum_set.9f			:= LINKSRC = mac_hcksum_get.9f
 mac_fini_ops.9f				:= LINKSRC = mac_init_ops.9f
+
+mac_prop_info_set_default_fec.9f	:= LINKSRC = mac_prop_info.9f
 mac_prop_info_set_default_link_flowctrl.9f	:= LINKSRC = mac_prop_info.9f
 mac_prop_info_set_default_str.9f	:= LINKSRC = mac_prop_info.9f
 mac_prop_info_set_default_uint8.9f	:= LINKSRC = mac_prop_info.9f

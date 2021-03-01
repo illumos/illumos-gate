@@ -580,13 +580,6 @@ static void	exfile(register Shell_t *shp, register Sfio_t *iop,register int fno)
 		if(t)
 		{
 			execflags = sh_state(SH_ERREXIT)|sh_state(SH_INTERACTIVE);
-			/* The last command may not have to fork */
-			if(!sh_isstate(SH_PROFILE) && sh_isoption(SH_CFLAG) &&
-				(fno<0 || !(shp->fdstatus[fno]&(IOTTY|IONOSEEK)))
-				&& !sfreserve(iop,0,0))
-			{
-					execflags |= sh_state(SH_NOFORK);
-			}
 			shp->st.execbrk = 0;
 			sh_exec(t,execflags);
 			if(shp->forked)

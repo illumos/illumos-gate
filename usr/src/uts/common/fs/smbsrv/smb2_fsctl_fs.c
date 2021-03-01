@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -23,7 +23,16 @@
 #include <smbsrv/smb_fsops.h>
 #include <smb/winioctl.h>
 
-/* ARGSUSED */
+/*
+ * XXX: Should use smb2_fsctl_invalid in place of smb2_fsctl_notsup
+ * but that will require some re-testing.
+ */
+static uint32_t
+smb2_fsctl_invalid(smb_request_t *sr, smb_fsctl_t *fsctl)
+{
+	return (NT_STATUS_INVALID_DEVICE_REQUEST);
+}
+
 static uint32_t
 smb2_fsctl_notsup(smb_request_t *sr, smb_fsctl_t *fsctl)
 {
@@ -52,9 +61,12 @@ smb2_fsctl_get_compression(smb_request_t *sr, smb_fsctl_t *fsctl)
 {
 	_NOTE(ARGUNUSED(sr))
 	uint16_t compress_state = 0;
+	int rc;
 
-	(void) smb_mbc_encodef(fsctl->in_mbc, "w",
+	rc = smb_mbc_encodef(fsctl->in_mbc, "w",
 	    compress_state);
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (NT_STATUS_SUCCESS);
 }
@@ -97,6 +109,7 @@ smb2_fsctl_get_resume_key(smb_request_t *sr, smb_fsctl_t *fsctl)
 {
 	smb_ofile_t *of = sr->fid_ofile;
 	smb2fid_t smb2fid;
+	int rc;
 
 	/* Caller makes sure we have of = sr->fid_ofile */
 	/* Don't insist on a plain file (see above). */
@@ -104,10 +117,12 @@ smb2_fsctl_get_resume_key(smb_request_t *sr, smb_fsctl_t *fsctl)
 	smb2fid.persistent = of->f_persistid;
 	smb2fid.temporal = of->f_fid;
 
-	(void) smb_mbc_encodef(
+	rc = smb_mbc_encodef(
 	    fsctl->out_mbc, "qq16.",
 	    smb2fid.persistent,
 	    smb2fid.temporal);
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	return (NT_STATUS_SUCCESS);
 }
@@ -130,8 +145,10 @@ smb2_fsctl_fs(smb_request_t *sr, smb_fsctl_t *fsctl)
 		break;
 	case FSCTL_SET_REPARSE_POINT:		/* 41 */
 	case FSCTL_GET_REPARSE_POINT:		/* 42 */
-	case FSCTL_CREATE_OR_GET_OBJECT_ID:	/* 48 */
 		func = smb2_fsctl_notsup;
+		break;
+	case FSCTL_CREATE_OR_GET_OBJECT_ID:	/* 48 */
+		func = smb2_fsctl_invalid;
 		break;
 	case FSCTL_SET_SPARSE:			/* 49 */
 		func = smb2_fsctl_set_sparse;
