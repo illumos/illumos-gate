@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -51,12 +49,12 @@ all install:	$(SUBDIRS)
 catalog:        $(POFILE)
 
 $(POFILE):      $(SUBDIR2)
-	$(RM) 	$@
+	$(RM)	$@
 	cat     $(POFILES)      > $@
 
 clean clobber lint putback : $(SUBDIRS)
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

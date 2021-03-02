@@ -30,6 +30,6 @@ $(MACH) $(MACH64): softcore
 .PARALLEL:
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

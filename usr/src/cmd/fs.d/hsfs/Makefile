@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 #  /usr/src/cmd/lib/fs/hsfs is the directory of all ufs specific commands
 #  whose executable reside in $(INSDIR1) and $(INSDIR2).
 #
@@ -49,7 +47,7 @@ POFILES= $(SUBDIR2:%=%/%.po)
 
 .PARALLEL:	$(SUBDIRS)
 
-all:	$(SUBDIRS) 
+all:	$(SUBDIRS)
 
 catalog:        $(SUBDIR2)
 	$(RM) $(POFILE)
@@ -58,6 +56,6 @@ catalog:        $(SUBDIR2)
 install clean clobber lint: $(SUBDIRS)
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

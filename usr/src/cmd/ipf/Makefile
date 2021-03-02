@@ -22,10 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-#cmd/ipf/Makefile
-#
 
 SUBDIRS=	etc examples \
 		lib svc .WAIT \
@@ -51,7 +47,7 @@ all lint clean clobber: $(SUBDIRS)
 install: $(SUBDIRS)
 
 $(SUBDIRS): FRC
-	cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 

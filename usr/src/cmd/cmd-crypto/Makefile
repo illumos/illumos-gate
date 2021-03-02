@@ -49,6 +49,6 @@ all clean clobber _msg: $(SUBDIRS1) $($(MACH)_SUBDIRS)
 install: $(SUBDIRS1) $(SUBDIRS2) $($(MACH)_SUBDIRS)
 
 $(SUBDIRS1) $(SUBDIRS2) $($(MACH)_SUBDIRS) : FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

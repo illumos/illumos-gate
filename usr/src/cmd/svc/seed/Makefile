@@ -120,13 +120,13 @@ SVCCFG = ../svccfg/svccfg-native
 all: global.db nonglobal.db miniroot.db
 
 $(CONFIGD): FRC
-	@cd ../configd; pwd; $(MAKE) $(MFLAGS) native
+	@cd ../configd; pwd; $(MAKE) native
 
 $(SVCCFG): FRC
-	@cd ../svccfg; pwd; $(MAKE) $(MFLAGS) native
+	@cd ../svccfg; pwd; $(MAKE) native
 
 ../milestone/console-login.xml:
-	@cd ../milestone; pwd; $(MAKE) $(MFLAGS) console-login.xml
+	@cd ../milestone; pwd; $(MAKE) console-login.xml
 
 common.db: $(COMMON_DESCRIPTIONS) $(CONFIGD) $(SVCCFG)
 	$(RM) -f common.db common.db-journal

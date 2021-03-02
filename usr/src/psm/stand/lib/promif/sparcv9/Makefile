@@ -20,13 +20,8 @@
 # CDDL HEADER END
 #
 #
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-#
-#
 # Copyright (c) 1997, by Sun Microsystems, Inc.
 # All rights reserved.
-#
-# psm/stand/lib/promif/sparcv9/Makefile
 #
 
 include ../../../../../Makefile.master
@@ -42,6 +37,6 @@ lint	:=	TARGET = lint
 all install clean clobber lint: $(SUBDIRS)
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

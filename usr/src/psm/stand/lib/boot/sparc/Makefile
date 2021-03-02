@@ -20,12 +20,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 1997, 2001-2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# psm/stand/lib/boot/sparc/Makefile
 
 include ../../../../../Makefile.master
 
@@ -40,6 +37,6 @@ lint	:=	TARGET = lint
 install	:=	TARGET = install
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

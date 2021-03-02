@@ -127,9 +127,9 @@ svccfg_help.po := XGETFLAGS =	-a
 all debug: $(PROG)
 
 native: FRC
-	@cd $(LIBUUTIL)/native; pwd; $(MAKE) $(MFLAGS) install
-	@cd $(LIBSCF)/native; pwd; $(MAKE) $(MFLAGS) install
-	@NATIVE_BUILD= $(MAKE) $(MFLAGS) all
+	@cd $(LIBUUTIL)/native; pwd; $(MAKE) install
+	@cd $(LIBSCF)/native; pwd; $(MAKE) install
+	@NATIVE_BUILD= $(MAKE) all
 
 $(PROG): $(OBJS) $(MAPFILES)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

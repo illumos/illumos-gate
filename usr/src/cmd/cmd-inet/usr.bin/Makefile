@@ -170,7 +170,7 @@ $(ROOTREMSHSYMLINK):
 	$(RM) $@; $(SYMLINK) rsh $@
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 
