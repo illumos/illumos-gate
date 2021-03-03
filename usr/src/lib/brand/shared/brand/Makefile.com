@@ -55,6 +55,11 @@ CPPFLAGS +=	-D_REENTRANT -U_ASM -I. -I../sys
 CFLAGS +=	$(CCVERBOSE)
 ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM -I. -I../sys
 
+#
+# Disable stack protection as this code might be running in an s10 context.
+#
+STACKPROTECT = none
+
 # intentional code after abort()
 SMOFF += unreachable
 

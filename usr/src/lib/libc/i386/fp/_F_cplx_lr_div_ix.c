@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * _F_cplx_div_ix(b, w) returns (I * b) / w computed by the text-
  * book formula without regard to exceptions or special cases.
@@ -41,7 +39,7 @@
 float _Complex
 _F_cplx_lr_div_ix(float b, float _Complex w)
 {
-	float _Complex	v;
+	float _Complex	v = 0;
 	long double	c, d, r;
 
 	c = ((float *)&w)[0];

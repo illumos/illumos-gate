@@ -34,6 +34,7 @@
 #include <errno.h>
 #include "err.h"
 
+jmp_buf Err_env;
 jmp_buf	*Err_env_ptr;
 static const char *Myname;
 static int Exitcode;

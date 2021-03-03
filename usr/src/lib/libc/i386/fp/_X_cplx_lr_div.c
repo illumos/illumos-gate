@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * _X_cplx_lr_div(z, w) returns z / w computed by the textbook
  * formula without regard to exceptions or special cases.
@@ -41,7 +39,7 @@
 long double _Complex
 _X_cplx_lr_div(long double _Complex z, long double _Complex w)
 {
-	long double _Complex	v;
+	long double _Complex	v = 0;
 	long double		a, b, c, d, r;
 
 	a = ((long double *)&z)[0];

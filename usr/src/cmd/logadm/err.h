@@ -50,7 +50,7 @@ void err_mailto(const char *recipient);
 #define	EF_JMP	0x08	/* longjmp through Error_env after printing error */
 #define	EF_RAW	0x10	/* don't prepend/append anything to message */
 
-jmp_buf Err_env;
+extern jmp_buf Err_env;
 extern jmp_buf *Err_env_ptr;
 
 #define	SETJMP	setjmp(*(Err_env_ptr = &Err_env))
@@ -70,7 +70,7 @@ void err_free(void *ptr, const char *fname, int line);
 #define	STRDUP(ptr) err_strdup(ptr, __FILE__, __LINE__)
 char *err_strdup(const char *ptr, const char *fname, int line);
 
-int Debug;	/* replace with #define to zero to compile out Debug code */
+extern int Debug; /* replace with #define to zero to compile out Debug code */
 
 #ifdef	__cplusplus
 }

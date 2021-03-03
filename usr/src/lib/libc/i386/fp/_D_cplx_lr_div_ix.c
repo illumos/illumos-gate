@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * _D_cplx_div_ix(b, w) returns (I * b) / w computed by the text-
  * book formula without regard to exceptions or special cases.
@@ -41,7 +39,7 @@
 double _Complex
 _D_cplx_lr_div_ix(double b, double _Complex w)
 {
-	double _Complex	v;
+	double _Complex	v = 0;
 	long double	c, d, r;
 
 	/* LINTED alignment */

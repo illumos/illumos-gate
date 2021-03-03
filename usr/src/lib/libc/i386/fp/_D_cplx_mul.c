@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * _D_cplx_mul(z, w) returns z * w with infinities handled according
  * to C99.
@@ -74,13 +72,13 @@ testinf(double x)
 
 	xx.d = x;
 	return (((((xx.i[1] << 1) - 0xffe00000) | xx.i[0]) == 0)?
-		(1 | (xx.i[1] >> 31)) : 0);
+	    (1 | (xx.i[1] >> 31)) : 0);
 }
 
 double _Complex
 _D_cplx_mul(double _Complex z, double _Complex w)
 {
-	double _Complex	v;
+	double _Complex	v = 0;
 	double		a, b, c, d;
 	long double	x, y;
 	int		recalc, i, j;
