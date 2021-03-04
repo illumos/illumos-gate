@@ -22,6 +22,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -2909,7 +2910,7 @@ cpuset_atomic_xdel(cpuset_t *s, const uint_t cpu)
 }
 
 void
-cpuset_or(cpuset_t *dst, cpuset_t *src)
+cpuset_or(cpuset_t *dst, const cpuset_t *src)
 {
 	for (int i = 0; i < CPUSET_WORDS; i++) {
 		dst->cpub[i] |= src->cpub[i];
@@ -2917,7 +2918,7 @@ cpuset_or(cpuset_t *dst, cpuset_t *src)
 }
 
 void
-cpuset_xor(cpuset_t *dst, cpuset_t *src)
+cpuset_xor(cpuset_t *dst, const cpuset_t *src)
 {
 	for (int i = 0; i < CPUSET_WORDS; i++) {
 		dst->cpub[i] ^= src->cpub[i];
@@ -2925,7 +2926,7 @@ cpuset_xor(cpuset_t *dst, cpuset_t *src)
 }
 
 void
-cpuset_and(cpuset_t *dst, cpuset_t *src)
+cpuset_and(cpuset_t *dst, const cpuset_t *src)
 {
 	for (int i = 0; i < CPUSET_WORDS; i++) {
 		dst->cpub[i] &= src->cpub[i];
