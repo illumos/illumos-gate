@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/machsystm.h>
+#include <sys/archsystm.h>
 #include <sys/controlregs.h>
 #include <sys/x86_archext.h>
 #include <sys/id_space.h>
@@ -522,9 +523,9 @@ uint8_t
 hma_svm_asid_update(hma_svm_asid_t *vcp, boolean_t flush_by_asid,
     boolean_t npt_flush)
 {
-	hma_svm_asid_t *hcp = &hma_svm_cpu_asid[CPU->cpu_seqid];
-
-	ASSERT(curthread->t_preempt != 0);
+	hma_svm_asid_t *hcp;
+	ulong_t iflag;
+	uint8_t res = VMCB_FLUSH_NOTHING;
 
 	/*
 	 * If NPT changes dictate a TLB flush and by-ASID flushing is not
@@ -534,6 +535,17 @@ hma_svm_asid_update(hma_svm_asid_t *vcp, boolean_t flush_by_asid,
 		vcp->hsa_gen = 0;
 	}
 
+	/*
+	 * It is expected that ASID resource updates will commonly be done
+	 * inside a VMM critical section where the GIF is already cleared,
+	 * preventing any possibility of interruption.  Since that cannot be
+	 * checked (there is no easy way to read the GIF), %rflags.IF is also
+	 * cleared for edge cases where an ASID update is performed outside of
+	 * such a GIF-safe critical section.
+	 */
+	iflag = intr_clear();
+
+	hcp = &hma_svm_cpu_asid[CPU->cpu_seqid];
 	if (vcp->hsa_gen != hcp->hsa_gen) {
 		hcp->hsa_asid++;
 
@@ -556,14 +568,17 @@ hma_svm_asid_update(hma_svm_asid_t *vcp, boolean_t flush_by_asid,
 		ASSERT3U(vcp->hsa_asid, <, hma_svm_max_asid);
 
 		if (flush_by_asid) {
-			return (VMCB_FLUSH_ASID);
+			res = VMCB_FLUSH_ASID;
+		} else {
+			res = VMCB_FLUSH_ALL;
 		}
-		return (VMCB_FLUSH_ALL);
 	} else if (npt_flush) {
 		ASSERT(flush_by_asid);
-		return (VMCB_FLUSH_ASID);
+		res = VMCB_FLUSH_ASID;
 	}
-	return (VMCB_FLUSH_NOTHING);
+
+	intr_restore(iflag);
+	return (res);
 }
 
 static int

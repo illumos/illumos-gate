@@ -42,175 +42,168 @@
 .\"
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2021 Oxide Computer Company
 .\"
-.TH OPENDIR 3C "Jun 26, 2007"
-.SH NAME
-opendir, fdopendir \- open directory
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/types.h>
-#include <dirent.h>
-
-\fBDIR *\fR\fBopendir\fR(\fBconst char *\fR\fIdirname\fR);
-.fi
-
-.LP
-.nf
-\fBDIR *\fR\fBfdopendir\fR(\fBint\fR \fIfildes\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBopendir()\fR function opens a directory stream corresponding to the
-directory named by the \fIdirname\fR argument.
-.sp
-.LP
-The \fBfdopendir()\fR function opens a directory stream for the directory file
-descriptor \fIfildes\fR. The directory file descriptor should not be used or
-closed following a successful function call, as this might cause undefined
-results from future operations on the directory stream obtained from the call.
-Use \fBclosedir\fR(3C) to close a directory stream.
-.sp
-.LP
-The directory stream is positioned at the first entry. If the type \fBDIR\fR is
-implemented using a file descriptor, applications will only be able to open up
-to a total of {\fBOPEN_MAX\fR} files and directories. A successful call to any
-of the \fBexec\fR functions will close any directory streams that are open in
-the calling process.  See \fBexec\fR(2).
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBopendir()\fR and \fBfdopendir()\fR return a
-pointer to an object of type \fBDIR\fR. Otherwise, a null pointer is returned
-and \fBerrno\fR is set to indicate the error.
-.SH ERRORS
-.sp
-.LP
-The \fBopendir()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEACCES\fR\fR
-.ad
-.RS 16n
-Search permission is denied for the component of the path prefix of
-\fIdirname\fR or read permission is denied for \fIdirname\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBELOOP\fR\fR
-.ad
-.RS 16n
-Too many symbolic links were encountered in resolving \fIpath\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENAMETOOLONG\fR\fR
-.ad
-.RS 16n
-The length of the \fIdirname\fR argument exceeds {\fBPATH_MAX\fR}, or a path
-name component is longer than {\fBNAME_MAX\fR} while {\fB_POSIX_NO_TRUNC\fR} is
-in effect.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOENT\fR\fR
-.ad
-.RS 16n
-A component of \fIdirname\fR does not name an existing directory or
-\fIdirname\fR is an empty string.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOTDIR\fR\fR
-.ad
-.RS 16n
-A component of \fIdirname\fR is not a directory.
-.RE
-
-.sp
-.LP
-The \fBfdopendir()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBENOTDIR\fR\fR
-.ad
-.RS 11n
-The file descriptor \fIfildes\fR does not reference a directory.
-.RE
-
-.sp
-.LP
-The \fBopendir()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEMFILE\fR\fR
-.ad
-.RS 16n
-There are {\fBOPEN_MAX\fR} file descriptors currently open in the calling
-process.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENAMETOOLONG\fR\fR
-.ad
-.RS 16n
+.Dd February 25, 2021
+.Dt OPENDIR 3C
+.Os
+.Sh NAME
+.Nm opendir ,
+.Nm fdopendir
+.Nd open directory stream
+.Sh SYNOPSIS
+.In sys/types.h
+.In dirent.h
+.Ft "DIR *"
+.Fo opendir
+.Fa "dirname"
+.Fc
+.Ft "DIR *"
+.Fo fdopendir
+.Fa "int filedes"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn opendir
+and
+.Fn fdopendir
+functions are used to create seekable directory streams that can be used
+to iterate over the contents of a directory, most commonly with
+.Xr readdir 3C .
+One can traverse and seek the stream with functions such as
+.Xr seekdir 3C ,
+.Xr telldir 3C ,
+and
+.Xr rewinddir 3C .
+.Pp
+The
+.Fn opendir
+function creates a directory stream from the path named by
+.Fa dirname .
+The
+.Fn fdopendir
+function creates a directory stream from an already opened file
+descriptor,
+.Fa filedes ,
+that refers to a directory.
+After successfully calling
+.Fn fdopendir ,
+.Fa filedes
+belongs to the system and the application must not modify or close it in
+any way.
+.Pp
+The new directory stream is positioned at the first entry.
+When finished with the directory stream, the caller is responsible for
+releasing its resources by calling the
+.Xr closedir 3C
+function.
+This will close the directory stream's underlying file descriptor,
+including
+.Fa filedes
+if
+.Fn fdopendir
+was used to create it.
+In addition, memory associated with the directory stream, such as the
+.Ft struct dirent
+returned from
+.Xr readdir 3C
+will be invalid once a call to
+.Xr closedir 3C
+is completed.
+.Pp
+All directory streams are closed upon a successful call to any of the
+.Xr exec 2
+family of functions.
+The underlying file descriptors behave as though the
+.Dv FD_CLOEXEC
+flag was set upon them.
+.Pp
+Directory streams created by the
+.Fn opendir
+function require an underlying file descriptor.
+As a result, applications are only able to open up to a total of
+.Brq Dv OPEN_MAX
+files and directories.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn opendir
+and
+.Fn fdopendir
+functions return a pointer to an object of type
+Ft DIR .
+Otherwise, a null pointer is returned and
+.Va errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn opendir
+function will fail if:
+.Bl -tag -width Er
+.It Er EACCES
+Search permission is denied for any component of the path prefix of
+.Fa dirname
+or read permission is denied for
+.Fa Idirname .
+.It Er ELOOP
+Too many symbolic links were encountered in resolving
+.Fa path .
+.It Er ENAMETOOLONG
+The length of the
+.Fa dirname
+argument exceeds
+.Brq Dv PATH_MAX ,
+or a path name component is longer than
+.Brq Dv NAME_MAX
+while
+.Brq Dv _POSIX_NO_TRUNC
+is in effect.
+.It Er ENOENT
+A component of
+.Fa dirname
+does not name an existing directory or
+.Fa dirname
+is an empty string.
+.It Er ENOTDIR
+A component of
+.Fa dirname
+is not a directory.
+.El
+.Pp
+The
+.Fn fdopendir
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOTDIR
+The file descriptor
+.Fa filedes
+does not reference a directory.
+.El
+.Pp
+The
+.Fn opendir
+function may fail if:
+.Bl -tag -width Er
+.It Er EMFILE
+There are already
+.Brq Dv OPEN_MAX
+file descriptors currently open in the calling process.
+.It Er ENAMETOOLONG
 Pathname resolution of a symbolic link produced an intermediate result whose
-length exceeds \fBPATH_MAX\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENFILE\fR\fR
-.ad
-.RS 16n
+length exceeds
+.Dv PATH_MAX .
+.It Er ENFILE
 Too many files are currently open on the system.
-.RE
-
-.SH USAGE
-.sp
-.LP
-The \fBopendir()\fR and \fBfdopendir()\fR functions should be used in
-conjunction with \fBreaddir\fR(3C), \fBclosedir\fR(3C) and \fBrewinddir\fR(3C)
-to examine the contents of the directory (see the \fBEXAMPLES\fR section in
-\fBreaddir\fR(3C)). This method is recommended for portability.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	T{
-\fBopendir()\fR is Standard; \fBfdopendir()\fR is Evolving
-T}
-_
-MT-Level	Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBlstat\fR(2), \fBsymlink\fR(2), \fBclosedir\fR(3C), \fBreaddir\fR(3C),
-\fBrewinddir\fR(3C), \fBscandir\fR(3C), \fBattributes\fR(5)
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Safe
+.Sh SEE ALSO
+.Xr lstat 2 ,
+.Xr symlink 2 ,
+.Xr closedir 3C ,
+.Xr readdir 3C ,
+.Xr rewinddir 3C ,
+.Xr seekdir 3C ,
+.Xr telldir 3C ,
+.Xr attributes 5

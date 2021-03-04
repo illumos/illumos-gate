@@ -132,17 +132,19 @@ static VMM_STAT_AMD(VCPU_INTINFO_INJECTED, "Events pending at VM entry");
 static VMM_STAT_AMD(VMEXIT_VINTR, "VM exits due to interrupt window");
 
 static int svm_setreg(void *arg, int vcpu, int ident, uint64_t val);
+static int svm_getreg(void *arg, int vcpu, int ident, uint64_t *val);
+static void flush_asid(struct svm_softc *sc, int vcpuid);
 
-static __inline int
+static __inline bool
 flush_by_asid(void)
 {
-	return (svm_feature & AMD_CPUID_SVM_FLUSH_BY_ASID);
+	return ((svm_feature & AMD_CPUID_SVM_FLUSH_BY_ASID) != 0);
 }
 
-static __inline int
+static __inline bool
 decode_assist(void)
 {
-	return (svm_feature & AMD_CPUID_SVM_DECODE_ASSIST);
+	return ((svm_feature & AMD_CPUID_SVM_DECODE_ASSIST) != 0);
 }
 
 #ifdef __FreeBSD__
@@ -474,6 +476,13 @@ vmcb_init(struct svm_softc *sc, int vcpu, uint64_t iopm_base_pa,
 		else
 			svm_enable_intercept(sc, vcpu, VMCB_CR_INTCPT, mask);
 	}
+
+	/*
+	 * Selectively intercept writes to %cr0.  This triggers on operations
+	 * which would change bits other than TS or MP.
+	 */
+	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT,
+	    VMCB_INTCPT_CR0_WRITE);
 
 	/*
 	 * Intercept everything when tracing guest exceptions otherwise
@@ -884,6 +893,166 @@ svm_handle_mmio_emul(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit,
 	vie_init_mmio(vie, inst_bytes, inst_len, &paging, gpa);
 }
 
+/*
+ * Do not allow CD, NW, or invalid high bits to be asserted in the value of cr0
+ * which is live in the guest.  They are visible via the shadow instead.
+ */
+#define	SVM_CR0_MASK	~(CR0_CD | CR0_NW | 0xffffffff00000000)
+
+static void
+svm_set_cr0(struct svm_softc *svm_sc, int vcpu, uint64_t val, bool guest_write)
+{
+	struct vmcb_state *state;
+	struct svm_regctx *regctx;
+	uint64_t masked, old, diff;
+
+	state = svm_get_vmcb_state(svm_sc, vcpu);
+	regctx = svm_get_guest_regctx(svm_sc, vcpu);
+
+	old = state->cr0 | (regctx->sctx_cr0_shadow & ~SVM_CR0_MASK);
+	diff = old ^ val;
+
+	/* No further work needed if register contents remain the same */
+	if (diff == 0) {
+		return;
+	}
+
+	/* Flush the TLB if the paging or write-protect bits are changing */
+	if ((diff & CR0_PG) != 0 || (diff & CR0_WP) != 0) {
+		flush_asid(svm_sc, vcpu);
+	}
+
+	/*
+	 * If the change in %cr0 is due to a guest action (via interception)
+	 * then other CPU state updates may be required.
+	 */
+	if (guest_write) {
+		if ((diff & CR0_PG) != 0) {
+			uint64_t efer = state->efer;
+
+			/* Keep the long-mode state in EFER in sync */
+			if ((val & CR0_PG) != 0 && (efer & EFER_LME) != 0) {
+				state->efer |= EFER_LMA;
+			}
+			if ((val & CR0_PG) == 0 && (efer & EFER_LME) != 0) {
+				state->efer &= ~EFER_LMA;
+			}
+		}
+	}
+
+	masked = val & SVM_CR0_MASK;
+	regctx->sctx_cr0_shadow = val;
+	state->cr0 = masked;
+	svm_set_dirty(svm_sc, vcpu, VMCB_CACHE_CR);
+
+	if ((masked ^ val) != 0) {
+		/*
+		 * The guest has set bits in %cr0 which we are masking out and
+		 * exposing via shadow.
+		 *
+		 * We must intercept %cr0 reads in order to make the shadowed
+		 * view available to the guest.
+		 *
+		 * Writes to %cr0 must also be intercepted (unconditionally,
+		 * unlike the VMCB_INTCPT_CR0_WRITE mechanism) so we can catch
+		 * if/when the guest clears those shadowed bits.
+		 */
+		svm_enable_intercept(svm_sc, vcpu, VMCB_CR_INTCPT,
+		    BIT(0) | BIT(16));
+	} else {
+		/*
+		 * When no bits remain in %cr0 which require shadowing, the
+		 * unconditional intercept of reads/writes to %cr0 can be
+		 * disabled.
+		 *
+		 * The selective write intercept (VMCB_INTCPT_CR0_WRITE) remains
+		 * in place so we can be notified of operations which change
+		 * bits other than TS or MP.
+		 */
+		svm_disable_intercept(svm_sc, vcpu, VMCB_CR_INTCPT,
+		    BIT(0) | BIT(16));
+	}
+	svm_set_dirty(svm_sc, vcpu, VMCB_CACHE_I);
+}
+
+static void
+svm_get_cr0(struct svm_softc *svm_sc, int vcpu, uint64_t *val)
+{
+	struct vmcb *vmcb;
+	struct svm_regctx *regctx;
+
+	vmcb = svm_get_vmcb(svm_sc, vcpu);
+	regctx = svm_get_guest_regctx(svm_sc, vcpu);
+
+	/*
+	 * Include the %cr0 bits which exist only in the shadow along with those
+	 * in the running vCPU state.
+	 */
+	*val = vmcb->state.cr0 | (regctx->sctx_cr0_shadow & ~SVM_CR0_MASK);
+}
+
+static void
+svm_handle_cr0_read(struct svm_softc *svm_sc, int vcpu, enum vm_reg_name reg)
+{
+	uint64_t val;
+	int err;
+
+	svm_get_cr0(svm_sc, vcpu, &val);
+	err = svm_setreg(svm_sc, vcpu, reg, val);
+	ASSERT(err == 0);
+}
+
+static void
+svm_handle_cr0_write(struct svm_softc *svm_sc, int vcpu, enum vm_reg_name reg)
+{
+	struct vmcb_state *state;
+	uint64_t val;
+	int err;
+
+	state = svm_get_vmcb_state(svm_sc, vcpu);
+
+	err = svm_getreg(svm_sc, vcpu, reg, &val);
+	ASSERT(err == 0);
+
+	if ((val & CR0_NW) != 0 && (val & CR0_CD) == 0) {
+		/* NW without CD is nonsensical */
+		vm_inject_gp(svm_sc->vm, vcpu);
+		return;
+	}
+	if ((val & CR0_PG) != 0 && (val & CR0_PE) == 0) {
+		/* PG requires PE */
+		vm_inject_gp(svm_sc->vm, vcpu);
+		return;
+	}
+	if ((state->cr0 & CR0_PG) == 0 && (val & CR0_PG) != 0) {
+		/* When enabling paging, PAE must be enabled if LME is. */
+		if ((state->efer & EFER_LME) != 0 &&
+		    (state->cr4 & CR4_PAE) == 0) {
+			vm_inject_gp(svm_sc->vm, vcpu);
+			return;
+		}
+	}
+
+	svm_set_cr0(svm_sc, vcpu, val, true);
+}
+
+static void
+svm_inst_emul_other(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
+{
+	struct vie *vie;
+	struct vm_guest_paging paging;
+
+	/* Let the instruction emulation (hopefully in-kernel) handle it */
+	vmexit->exitcode = VM_EXITCODE_INST_EMUL;
+	bzero(&vmexit->u.inst_emul, sizeof (vmexit->u.inst_emul));
+	vie = vm_vie_ctx(svm_sc->vm, vcpu);
+	svm_paging_info(svm_get_vmcb(svm_sc, vcpu), &paging);
+	vie_init_other(vie, &paging);
+
+	/* The instruction emulation will handle advancing %rip */
+	vmexit->inst_length = 0;
+}
+
 static void
 svm_update_virqinfo(struct svm_softc *sc, int vcpu)
 {
@@ -1282,6 +1451,41 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 	svm_save_exitintinfo(svm_sc, vcpu);
 
 	switch (code) {
+	case VMCB_EXIT_CR0_READ:
+		if (VMCB_CRx_INFO1_VALID(info1) != 0) {
+			svm_handle_cr0_read(svm_sc, vcpu,
+			    vie_regnum_map(VMCB_CRx_INFO1_GPR(info1)));
+			handled = 1;
+		} else {
+			/*
+			 * If SMSW is used to read the contents of %cr0, then
+			 * the VALID bit will not be set in `info1`, since the
+			 * handling is different from the mov-to-reg case.
+			 *
+			 * Punt to the instruction emulation to handle it.
+			 */
+			svm_inst_emul_other(svm_sc, vcpu, vmexit);
+		}
+		break;
+	case VMCB_EXIT_CR0_WRITE:
+	case VMCB_EXIT_CR0_SEL_WRITE:
+		if (VMCB_CRx_INFO1_VALID(info1) != 0) {
+			svm_handle_cr0_write(svm_sc, vcpu,
+			    vie_regnum_map(VMCB_CRx_INFO1_GPR(info1)));
+			handled = 1;
+		} else {
+			/*
+			 * Writes to %cr0 without VALID being set in `info1` are
+			 * initiated by the LMSW and CLTS instructions.  While
+			 * LMSW (like SMSW) sees little use in modern OSes and
+			 * bootloaders, CLTS is still used for handling FPU
+			 * state transitions.
+			 *
+			 * Punt to the instruction emulation to handle them.
+			 */
+			svm_inst_emul_other(svm_sc, vcpu, vmexit);
+		}
+		break;
 	case VMCB_EXIT_IRET:
 		/*
 		 * Restart execution at "iret" but with the intercept cleared.
@@ -1844,6 +2048,27 @@ check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, uint_t thiscpu)
 	ctrl->tlb_ctrl = flush;
 	vcpustate->eptgen = eptgen;
 }
+
+static void
+flush_asid(struct svm_softc *sc, int vcpuid)
+{
+	struct svm_vcpu *vcpustate = svm_get_vcpu(sc, vcpuid);
+	struct vmcb_ctrl *ctrl = svm_get_vmcb_ctrl(sc, vcpuid);
+	uint8_t flush;
+
+	flush = hma_svm_asid_update(&vcpustate->hma_asid, flush_by_asid(),
+	    true);
+
+	ASSERT(flush != VMCB_TLB_FLUSH_NOTHING);
+	ctrl->asid = vcpustate->hma_asid.hsa_asid;
+	ctrl->tlb_ctrl = flush;
+	svm_set_dirty(sc, vcpuid, VMCB_CACHE_ASID);
+	/*
+	 * A potential future optimization: We could choose to update the eptgen
+	 * associated with the vCPU, since any pending eptgen change requiring a
+	 * flush will be satisfied by the one which has just now been queued.
+	 */
+}
 #endif /* __FreeBSD__ */
 
 static __inline void
@@ -2180,6 +2405,8 @@ svm_getreg(void *arg, int vcpu, int ident, uint64_t *val)
 		break;
 
 	case VM_REG_GUEST_CR0:
+		svm_get_cr0(sc, vcpu, val);
+		break;
 	case VM_REG_GUEST_CR2:
 	case VM_REG_GUEST_CR3:
 	case VM_REG_GUEST_CR4:
@@ -2251,6 +2478,8 @@ svm_setreg(void *arg, int vcpu, int ident, uint64_t val)
 		break;
 
 	case VM_REG_GUEST_CR0:
+		svm_set_cr0(sc, vcpu, val, false);
+		break;
 	case VM_REG_GUEST_CR2:
 	case VM_REG_GUEST_CR3:
 	case VM_REG_GUEST_CR4:

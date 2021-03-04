@@ -24,6 +24,7 @@
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2016 Martin Matuska. All rights reserved.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -88,18 +89,23 @@ match_mountpoint(zfs_handle_t *zhp, void *data)
 		return (0);
 	}
 
-	/* First check if the dataset is mounted. */
+	/*
+	 * First check if the dataset is mounted.
+	 * If not, move on to iterating child datasets which may still be
+	 * mounted.
+	 */
 	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTED, mp, sizeof (mp), NULL, NULL,
 	    0, B_FALSE) != 0 || strcmp(mp, "no") == 0) {
-		zfs_close(zhp);
-		return (0);
+		goto children;
 	}
 
-	/* Now check mount point. */
+	/*
+	 * Now check mount point.
+	 * Move on to children if it cannot be retrieved.
+	 */
 	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mp, sizeof (mp), NULL, NULL,
 	    0, B_FALSE) != 0) {
-		zfs_close(zhp);
-		return (0);
+		goto children;
 	}
 
 	cbp = (zfs_mount_data_t *)data;
@@ -134,6 +140,7 @@ match_mountpoint(zfs_handle_t *zhp, void *data)
 		return (1);
 	}
 
+children:
 	/* Iterate over any nested datasets. */
 	res = zfs_iter_filesystems(zhp, match_mountpoint, data);
 	zfs_close(zhp);

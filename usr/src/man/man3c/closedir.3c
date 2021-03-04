@@ -43,72 +43,79 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2021 Oxide Computer Company
 .\"
-.TH CLOSEDIR 3C "Jul 24, 2002"
-.SH NAME
-closedir \- close a directory stream
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/types.h>
-#include <dirent.h>
-
-\fBint\fR \fBclosedir\fR(\fBDIR *\fR\fIdirp\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBclosedir()\fR function closes the directory stream referred to by the
-argument \fIdirp.\fR Upon return, the value of \fIdirp\fR may no longer point
-to an accessible object of the type \fBDIR\fR. If a file descriptor is used to
-implement type \fBDIR\fR, that file descriptor will be closed.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBclosedir()\fR returns \fB0\fR. Otherwise,
-\fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
-.SH ERRORS
-.sp
-.LP
-The \fBclosedir()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEBADF\fR\fR
-.ad
-.RS 9n
-The \fIdirp\fR argument does not refer to an open directory stream.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINTR\fR\fR
-.ad
-.RS 9n
-The \fBclosedir()\fR function was interrupted by a signal.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBopendir\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.Dd February 25, 2021
+.Dt CLOSEDIR 3C
+.Os
+.Sh NAME
+.Nm closedir
+.Nd close a directory stream
+.Sh SYNOPSIS
+.In sys/types.h
+.In dirent.h
+.Ft int
+.Fo closedir
+.Fa "DIR *dirp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn closedir
+function closes the directory stream referred to by the argument
+.Fa dirp ,
+which generally came from calling
+.Xr opendir 3C
+or
+.Xr fdopendir 3C .
+Upon return, the value of
+.Fa dirp
+will no longer point to an accessible object of the type
+.Ft DIR .
+The underlying file descriptor for the directory stream will be closed.
+This includes a
+.Ft DIR
+created by passing a file descriptor to
+.Xr fdopendir 3C .
+.Pp
+When the directory stream is closed, any memory that is associated with
+the stream will no longer be valid.
+Most notably, the dirent structures returned from
+.Xr readdir 3C
+use memory associated with the corresponding
+.Ft "DIR *"
+argument.
+Each directory stream has its own independent memory.
+Closing one stream does not impact the validity of other streams.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn closedir
+function returns
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned and
+.Va errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn closedir
+function may fail if:
+.Bl -tag -width Er
+.It Er EBADF
+The
+.Fa dirp
+argument does not refer to an open directory stream.
+.It Er EINTR
+The
+.Fn closedir
+function was interrupted by a signal.
+.El
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy Safe
+.Sh SEE ALSO
+.Xr fdopendir 3C ,
+.Xr opendir 3C ,
+.Xr readdir 3C ,
+.Xr attributes 5
