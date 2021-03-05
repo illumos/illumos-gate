@@ -24,7 +24,7 @@
 
 LIBRARY = libpcidb.a
 VERS = .1
-OBJECTS = pcidb.o
+OBJECTS = pcidb.o list.o
 
 include ../../Makefile.lib
 
@@ -33,11 +33,16 @@ LIBS = $(DYNLIB)
 SRCDIR = ../common
 
 LDLIBS += -lc
+CSTD = $(CSTD_GNU99)
 
 
 .KEEP_STATE:
 
 all: $(LIBS)
+
+pics/%.o: $(SRC)/common/list/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 
 include ../../Makefile.targ

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -41,6 +42,9 @@ typedef struct pcidb_hdl pcidb_hdl_t;
 typedef struct pcidb_vendor pcidb_vendor_t;
 typedef struct pcidb_device pcidb_device_t;
 typedef struct pcidb_subvd pcidb_subvd_t;
+typedef struct pcidb_class pcidb_class_t;
+typedef struct pcidb_subclass pcidb_subclass_t;
+typedef struct pcidb_progif pcidb_progif_t;
 
 extern pcidb_hdl_t *pcidb_open(int);
 extern void pcidb_close(pcidb_hdl_t *);
@@ -76,6 +80,32 @@ extern uint16_t pcidb_subvd_svid(pcidb_subvd_t *);
 extern uint16_t pcidb_subvd_sdid(pcidb_subvd_t *);
 extern pcidb_device_t *pcidb_subvd_device(pcidb_subvd_t *);
 extern pcidb_vendor_t *pcidb_subvd_vendor(pcidb_subvd_t *);
+
+extern pcidb_class_t *pcidb_lookup_class(pcidb_hdl_t *, uint8_t);
+extern pcidb_class_t *pcidb_class_iter(pcidb_hdl_t *);
+extern pcidb_class_t *pcidb_class_iter_next(pcidb_class_t *);
+
+extern const char *pcidb_class_name(pcidb_class_t *);
+extern uint8_t pcidb_class_code(pcidb_class_t *);
+
+extern pcidb_subclass_t *pcidb_lookup_subclass(pcidb_hdl_t *, uint8_t, uint8_t);
+extern pcidb_subclass_t *pcidb_lookup_subclass_by_class(pcidb_class_t *,
+    uint8_t);
+extern pcidb_subclass_t *pcidb_subclass_iter(pcidb_class_t *);
+extern pcidb_subclass_t *pcidb_subclass_iter_next(pcidb_subclass_t *);
+
+extern const char *pcidb_subclass_name(pcidb_subclass_t *);
+extern uint8_t pcidb_subclass_code(pcidb_subclass_t *);
+
+extern pcidb_progif_t *pcidb_lookup_progif(pcidb_hdl_t *, uint8_t, uint8_t,
+    uint8_t);
+extern pcidb_progif_t *pcidb_lookup_progif_by_subclass(pcidb_subclass_t *,
+    uint8_t);
+extern pcidb_progif_t *pcidb_progif_iter(pcidb_subclass_t *);
+extern pcidb_progif_t *pcidb_progif_iter_next(pcidb_progif_t *);
+
+extern const char *pcidb_progif_name(pcidb_progif_t *);
+extern uint8_t pcidb_progif_code(pcidb_progif_t *);
 
 #ifdef __cplusplus
 }

@@ -81,3 +81,5 @@ tests = ['custr_remove', 'custr_trunc']
 
 [/opt/util-tests/tests/sed]
 tests = ['sed_addr', 'multi_test']
+
+[/opt/util-tests/tests/pcidbtest]
