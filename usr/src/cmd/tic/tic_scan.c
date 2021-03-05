@@ -90,6 +90,9 @@
 
 #define	iswhite(ch)	(ch == ' ' || ch == '\t')
 
+extern void err_abort(char *, ...);
+extern void syserr_abort(char *, ...);
+extern void warning(char *, ...);
 
 static int	first_column;		/* See 'next_char()' below */
 
@@ -128,7 +131,6 @@ void panic_mode(int);
  *		EOF		The end of the file has been reached.
  *
  */
-
 int
 get_token()
 {
