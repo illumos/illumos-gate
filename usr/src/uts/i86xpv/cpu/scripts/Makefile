@@ -38,7 +38,7 @@ def all install setup: ao_gendisp.pl $(PERLFILES)
 # We are sharing the ao_gendisp source with the i86pc
 AO_GENDISP_PL=../../../i86pc/cpu/scripts/ao_gendisp.pl
 ao_gendisp.pl: $(AO_GENDISP_PL)
-	$(SYMLINK) $(AO_GENDISP_PL) $@
+	$(RM) $@; $(SYMLINK) $(AO_GENDISP_PL) $@
 
 clean clobber:
 	$(RM) ao_gendisp.pl $(PERLFILES)
