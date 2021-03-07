@@ -1961,7 +1961,7 @@ static void
 tem_safe_tab(struct tem_vt_state *tem,
     cred_t *credp, enum called_from called_from)
 {
-	int	i;
+	size_t	i;
 	screen_pos_t	tabstop;
 
 	ASSERT((MUTEX_HELD(&tems.ts_lock) && MUTEX_HELD(&tem->tvs_lock)) ||
@@ -1983,10 +1983,9 @@ tem_safe_tab(struct tem_vt_state *tem,
 static void
 tem_safe_set_tab(struct tem_vt_state *tem)
 {
-	int	i;
-	int	j;
+	size_t	i, j;
 
-	if (tem->tvs_ntabs == TEM_MAXTAB)
+	if (tem->tvs_ntabs == tem->tvs_maxtab)
 		return;
 	if (tem->tvs_ntabs == 0 ||
 	    tem->tvs_tabs[tem->tvs_ntabs] < tem->tvs_c_cursor.col) {
@@ -2009,8 +2008,7 @@ tem_safe_set_tab(struct tem_vt_state *tem)
 static void
 tem_safe_clear_tabs(struct tem_vt_state *tem, int action)
 {
-	int	i;
-	int	j;
+	size_t	i, j;
 
 	switch (action) {
 	case 3: /* clear all tabs */

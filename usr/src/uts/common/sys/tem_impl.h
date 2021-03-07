@@ -77,7 +77,6 @@ extern "C" {
 #define	TEM_ATTR_ISSET(c, a)	((TEM_CHAR_ATTR(c) & (a)) == (a))
 
 #define	TEM_MAXPARAMS	5	/* maximum number of ANSI paramters */
-#define	TEM_MAXTAB	40	/* maximum number of tab stops */
 #define	TEM_MAXFKEY	30	/* max length of function key with <ESC>Q */
 
 #define	TEM_SCROLL_UP		0
@@ -187,8 +186,9 @@ struct tem_vt_state {
 	int	tvs_curparam;	/* current param # of output esc seq */
 	int	tvs_paramval;	/* value of current param */
 	int	tvs_params[TEM_MAXPARAMS];  /* parameters of output esc seq */
-	screen_pos_t	tvs_tabs[TEM_MAXTAB];	/* tab stops */
-	int	tvs_ntabs;		/* number of tabs used */
+	screen_pos_t	*tvs_tabs;	/* tab stops */
+	size_t	tvs_maxtab;		/* maximum number of tab stops */
+	size_t	tvs_ntabs;		/* number of tabs used */
 	int	tvs_nscroll;		/* number of lines to scroll */
 
 	struct tem_char_pos tvs_s_cursor;	/* start cursor position */

@@ -236,6 +236,10 @@ tem_internal_init(struct tem_vt_state *ptem, cred_t *credp,
 	ptem->tvs_screen_rows = kmem_alloc(ptem->tvs_screen_history_size *
 	    sizeof (term_char_t *), KM_SLEEP);
 
+	ptem->tvs_maxtab = width / 8;
+	ptem->tvs_tabs = kmem_alloc(ptem->tvs_maxtab * sizeof (*ptem->tvs_tabs),
+	    KM_SLEEP);
+
 	tem_safe_reset_display(ptem, credp, CALLED_FROM_NORMAL,
 	    clear_screen, init_color);
 
@@ -339,6 +343,10 @@ tem_free_buf(struct tem_vt_state *tem)
 	if (tem->tvs_screen_rows != NULL) {
 		kmem_free(tem->tvs_screen_rows, tem->tvs_screen_history_size *
 		    sizeof (term_char_t *));
+	}
+	if (tem->tvs_tabs != NULL) {
+		kmem_free(tem->tvs_tabs, tem->tvs_maxtab *
+		    sizeof (*tem->tvs_tabs));
 	}
 }
 
