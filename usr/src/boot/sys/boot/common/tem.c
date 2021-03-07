@@ -214,6 +214,11 @@ tem_internal_init(struct tem_vt_state *ptem,
 	if (ptem->tvs_outbuf == NULL)
 		panic("out of memory in tem_internal_init()\n");
 
+	ptem->tvs_maxtab = width / 8;
+	ptem->tvs_tabs = calloc(ptem->tvs_maxtab, sizeof (*ptem->tvs_tabs));
+	if (ptem->tvs_tabs == NULL)
+		panic("out of memory in tem_internal_init()\n");
+
 	tem_reset_display(ptem, clear_screen, init_color);
 
 	ptem->tvs_utf8_left = 0;
@@ -294,6 +299,9 @@ tem_free_buf(struct tem_vt_state *tem)
 
 	free(tem->tvs_screen_buf);
 	tem->tvs_screen_buf = NULL;
+
+	free(tem->tvs_tabs);
+	tem->tvs_tabs = NULL;
 }
 
 static int
@@ -2399,7 +2407,7 @@ tem_back_tab(struct tem_vt_state *tem)
 static void
 tem_tab(struct tem_vt_state *tem)
 {
-	int	i;
+	size_t	i;
 	screen_pos_t	tabstop;
 
 	tabstop = tems.ts_c_dimension.width - 1;
@@ -2417,10 +2425,9 @@ tem_tab(struct tem_vt_state *tem)
 static void
 tem_set_tab(struct tem_vt_state *tem)
 {
-	int	i;
-	int	j;
+	size_t	i, j;
 
-	if (tem->tvs_ntabs == TEM_MAXTAB)
+	if (tem->tvs_ntabs == tem->tvs_maxtab)
 		return;
 	if (tem->tvs_ntabs == 0 ||
 	    tem->tvs_tabs[tem->tvs_ntabs] < tem->tvs_c_cursor.col) {
@@ -2443,8 +2450,7 @@ tem_set_tab(struct tem_vt_state *tem)
 static void
 tem_clear_tabs(struct tem_vt_state *tem, int action)
 {
-	int	i;
-	int	j;
+	size_t	i, j;
 
 	switch (action) {
 	case 3: /* clear all tabs */
