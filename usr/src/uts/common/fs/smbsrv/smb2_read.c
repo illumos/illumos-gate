@@ -23,6 +23,122 @@
 
 extern boolean_t smb_allow_unbuffered;
 
+int smb2_read_zcopy = 1;
+
+/*
+ * Copy Reduction support.
+ * xuio_t wrapper with additional private data.
+ */
+typedef struct smb_xuio {
+	xuio_t su_xuio;		// keep first!
+	smb_node_t *su_node;
+	uint_t su_ref;
+} smb_xuio_t;
+
+/*
+ * Allocate an smb_xuio_t object.  This survives long enough
+ * to keep track of buffers loaned to us from the VFS layer.
+ * We'll construct mbufs with "external" buffers setup to
+ * point to the loaned VFS buffers, incrementing the su_ref
+ * count for each.  Each such message when free'd will call
+ * the smb_xuio_free function below.
+ */
+smb_xuio_t *
+smb_xuio_alloc(smb_node_t *node)
+{
+	smb_xuio_t *su;
+
+	su = kmem_zalloc(sizeof (*su), KM_SLEEP);
+	su->su_node = node;
+	smb_node_ref(node);
+
+	/*
+	 * Initial ref count set to 1, later incremented
+	 * for the mbufs that refer to borrowed buffers
+	 * owned by this xuio.  See smb_xuio_to_mbuf().
+	 */
+	su->su_ref = 1;
+	su->su_xuio.xu_type = UIOTYPE_ZEROCOPY;
+
+	return (su);
+}
+
+/*
+ * Callback function to return the loaned buffers.
+ * Calls VOP_RETZCBUF() only after all messages with
+ * references to this xuio are free'd.
+ */
+void
+smb_xuio_free(void *varg)
+{
+	uint_t ref;
+	smb_xuio_t *su = (smb_xuio_t *)varg;
+	xuio_t *xu = &su->su_xuio;
+
+	ref = atomic_dec_uint_nv(&su->su_ref);
+	if (ref != 0)
+		return;
+
+	/* The XUIO flag is set by VOP_REQZCBUF */
+	if (xu->xu_uio.uio_extflg & UIO_XUIO) {
+		(void) smb_fsop_retzcbuf(su->su_node, xu, CRED());
+	}
+
+	smb_node_release(su->su_node);
+	kmem_free(su, sizeof (*su));
+}
+
+/*
+ * Wrapper for smb_mbuf_alloc_ext free function because the
+ * free function is passed a pointer to the mbuf, not arg1.
+ */
+static void
+smb_xuio_mbuf_free(mbuf_t *m)
+{
+	ASSERT((m->m_flags & M_EXT) != 0);
+	smb_xuio_free(m->m_ext.ext_arg1);
+	/* caller clears m_ext.ext_buf */
+}
+
+/*
+ * Build list of mbufs pointing to the loaned xuio buffers.
+ * Note these are not visible yet to other threads, so
+ * not using atomics to adjust su_ref.
+ */
+static mbuf_t *
+smb_xuio_to_mbuf(smb_xuio_t *su)
+{
+	uio_t *uiop;
+	struct iovec *iovp;
+	mbuf_t *mp, *mp1;
+	int i;
+
+	uiop = &su->su_xuio.xu_uio;
+	if (uiop->uio_iovcnt == 0)
+		return (NULL);
+
+	iovp = uiop->uio_iov;
+
+	mp = smb_mbuf_alloc_ext(iovp->iov_base, iovp->iov_len,
+	    smb_xuio_mbuf_free, su);
+	ASSERT(mp != NULL);
+	su->su_ref++;
+
+	mp1 = mp;
+	for (i = 1; i < uiop->uio_iovcnt; i++) {
+		iovp = (uiop->uio_iov + i);
+
+		mp1->m_next = smb_mbuf_alloc_ext(iovp->iov_base,
+		    iovp->iov_len, smb_xuio_mbuf_free, su);
+
+		mp1 = mp1->m_next;
+		ASSERT(mp1 != NULL);
+		su->su_ref++;
+	}
+
+	return (mp);
+}
+
 smb_sdrc_t
 smb2_read(smb_request_t *sr)
 {
@@ -30,6 +146,8 @@ smb2_read(smb_request_t *sr)
 	smb_ofile_t *of = NULL;
 	smb_vdb_t *vdb = NULL;
 	struct mbuf *m = NULL;
+	smb_xuio_t *su = NULL;
+	uio_t *uio = NULL;
 	uint16_t StructSize;
 	uint8_t Padding;
 	uint8_t Flags;
@@ -45,8 +163,9 @@ smb2_read(smb_request_t *sr)
 	uint32_t XferCount = 0;
 	uint32_t status;
 	int rc = 0;
-	boolean_t unbuffered = B_FALSE;
 	int ioflag = 0;
+	boolean_t unbuffered = B_FALSE;
+	boolean_t zcopy = B_FALSE;
 
 	/*
 	 * SMB2 Read request
@@ -115,9 +234,6 @@ smb2_read(smb_request_t *sr)
 	vdb->vdb_uio.uio_segflg = UIO_SYSSPACE;
 	vdb->vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
 
-	sr->raw_data.max_bytes = Length;
-	m = smb_mbuf_allocate(&vdb->vdb_uio);
-
 	/*
 	 * Unbuffered refers to the MS-FSA Read argument by the same name.
 	 * It indicates that the cache for this range should be flushed to disk,
@@ -135,37 +251,102 @@ smb2_read(smb_request_t *sr)
 
 	switch (of->f_tree->t_res_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
-		if (!smb_node_is_dir(of->f_node)) {
-			/* Check for conflicting locks. */
-			rc = smb_lock_range_access(sr, of->f_node,
-			    Offset, Length, B_FALSE);
-			if (rc) {
-				rc = ERANGE;
-				break;
+		if (smb_node_is_dir(of->f_node)) {
+			rc = EISDIR;
+			break;
+		}
+		/* Check for conflicting locks. */
+		rc = smb_lock_range_access(sr, of->f_node,
+		    Offset, Length, B_FALSE);
+		if (rc) {
+			rc = ERANGE;
+			break;
+		}
+
+		zcopy = (smb2_read_zcopy != 0);
+		if (zcopy) {
+			su = smb_xuio_alloc(of->f_node);
+			uio = &su->su_xuio.xu_uio;
+			uio->uio_segflg = UIO_SYSSPACE;
+			uio->uio_loffset = (offset_t)Offset;
+			uio->uio_resid = Length;
+
+			rc = smb_fsop_reqzcbuf(of->f_node, &su->su_xuio,
+			    UIO_READ, of->f_cr);
+			if (rc == 0) {
+				ASSERT((uio->uio_extflg & UIO_XUIO) != 0);
+			} else {
+				ASSERT((uio->uio_extflg & UIO_XUIO) == 0);
+				smb_xuio_free(su);
+				su = NULL;
+				uio = NULL;
+				zcopy = B_FALSE;
 			}
 		}
-		rc = smb_fsop_read(sr, of->f_cr, of->f_node, of,
-		    &vdb->vdb_uio, ioflag);
+		if (!zcopy) {
+			sr->raw_data.max_bytes = Length;
+			m = smb_mbuf_allocate(&vdb->vdb_uio);
+			uio = &vdb->vdb_uio;
+		}
+
+		rc = smb_fsop_read(sr, of->f_cr, of->f_node, of, uio, ioflag);
+		if (rc != 0) {
+			if (zcopy) {
+				smb_xuio_free(su);
+				su = NULL;
+				uio = NULL;
+			}
+			m_freem(m);
+			m = NULL;
+			break;
+		}
+
+		/* How much data we moved. */
+		XferCount = Length - uio->uio_resid;
+
+		if (zcopy) {
+			/*
+			 * Build mblk chain of messages pointing to
+			 * the loaned buffers in su->su_xuio
+			 * Done with su (and uio) after this.
+			 * NB: uio points into su->su_xuio
+			 */
+			ASSERT(m == NULL);
+			m = smb_xuio_to_mbuf(su);
+			smb_xuio_free(su);
+			su = NULL;
+			uio = NULL;
+		}
+
+		sr->raw_data.max_bytes = XferCount;
+		smb_mbuf_trim(m, XferCount);
+		MBC_ATTACH_MBUF(&sr->raw_data, m);
+
 		break;
+
 	case STYPE_IPC:
-		if (unbuffered)
+		if (unbuffered) {
 			rc = EINVAL;
-		else
-			rc = smb_opipe_read(sr, &vdb->vdb_uio);
+			break;
+		}
+		sr->raw_data.max_bytes = Length;
+		m = smb_mbuf_allocate(&vdb->vdb_uio);
+
+		rc = smb_opipe_read(sr, &vdb->vdb_uio);
+
+		/* How much data we moved. */
+		XferCount = Length - vdb->vdb_uio.uio_resid;
+		sr->raw_data.max_bytes = XferCount;
+		smb_mbuf_trim(m, XferCount);
+		MBC_ATTACH_MBUF(&sr->raw_data, m);
 		break;
+
 	default:
 	case STYPE_PRINTQ:
 		rc = EACCES;
 		break;
 	}
 	status = smb_errno2status(rc);
-
-	/* How much data we moved. */
-	XferCount = Length - vdb->vdb_uio.uio_resid;
-
-	sr->raw_data.max_bytes = XferCount;
-	smb_mbuf_trim(m, XferCount);
-	MBC_ATTACH_MBUF(&sr->raw_data, m);
 
 	/*
 	 * [MS-SMB2] If the read returns fewer bytes than specified by
