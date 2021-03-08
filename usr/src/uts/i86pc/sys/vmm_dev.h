@@ -38,7 +38,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef	_VMM_DEV_H_
@@ -369,6 +369,7 @@ struct vm_run_state {
 #define	VM_RESUME_CPU			(VMM_IOC_BASE | 0x1e)
 
 #define	VM_PPTDEV_DISABLE_MSIX		(VMM_IOC_BASE | 0x1f)
+#define	VM_ARC_RESV			(VMM_IOC_BASE | 0xfe)
 
 #define	VM_DEVMEM_GETOFFSET		(VMM_IOC_BASE | 0xff)
 

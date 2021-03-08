@@ -38,7 +38,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2020 Oxide Computer Company
  */
 
@@ -310,6 +310,7 @@ int vm_get_run_state(struct vmctx *ctx, int vcpu, enum vcpu_run_state *state,
     uint8_t *sipi_vector);
 int vm_set_run_state(struct vmctx *ctx, int vcpu, enum vcpu_run_state state,
     uint8_t sipi_vector);
+int	vm_arc_resv(struct vmctx *ctx, size_t);
 #endif	/* __FreeBSD__ */
 
 #ifdef	__FreeBSD__

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
  * Copyright (c) 2014 by Saso Kiselkov. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
@@ -4399,6 +4399,7 @@ typedef enum free_memory_reason_t {
 	FMR_PAGES_PP_MAXIMUM,
 	FMR_HEAP_ARENA,
 	FMR_ZIO_ARENA,
+	FMR_VIRT_MACHINE,	/* 'VM' seems ambiguous in this context */
 } free_memory_reason_t;
 
 int64_t last_free_memory;
@@ -4413,6 +4414,48 @@ int64_t arc_pages_pp_reserve = 64;
  * Additional reserve of pages for swapfs.
  */
 int64_t arc_swapfs_reserve = 64;
+
+static volatile uint64_t arc_virt_machine_reserved;
+
+/*
+ * XXX: A possible concern is that we allow arc_virt_machine_reserved to
+ * get so large that we cause the arc to perform a lot of additional
+ * work to keep the arc extremely small. We may want to set limits to
+ * the size of arc_virt_machine_reserved and disallow reservations
+ * beyond that limit.
+ */
+int
+arc_virt_machine_reserve(size_t pages)
+{
+	uint64_t newv;
+
+	newv = atomic_add_64_nv(&arc_virt_machine_reserved, pages);
+
+	/*
+	 * Since arc_virt_machine_reserved effectively lowers arc_c_max
+	 * as needed for vmm memory, if this request would put the arc
+	 * under arc_c_min, we reject it.  arc_c_min should be a value that
+	 * ensures reasonable performance for non-VMM stuff, as well as keep
+	 * us from dipping below lotsfree, which could trigger the pager
+	 * (and send the system toa grinding halt while it pages).
+	 *
+	 * XXX: This is a bit hacky and might be better done w/ a mutex
+	 * instead of atomic ops.
+	 */
+	if (newv + arc_c_min > arc_c_max) {
+		atomic_add_64(&arc_virt_machine_reserved, -(int64_t)pages);
+		return (ENOMEM);
+	}
+
+	zthr_wakeup(arc_reap_zthr);
+	return (0);
+}
+
+void
+arc_virt_machine_release(size_t pages)
+{
+	atomic_add_64(&arc_virt_machine_reserved, -(int64_t)pages);
+}
 
 /*
  * Return the amount of memory that can be consumed before reclaim will be
@@ -4475,6 +4518,17 @@ arc_available_memory(void)
 	if (n < lowest) {
 		lowest = n;
 		r = FMR_PAGES_PP_MAXIMUM;
+	}
+
+	/*
+	 * Check that we have enough memory for any virtual machines that
+	 * are running or starting. We add desfree to keep us out of
+	 * particularly dire circumstances.
+	 */
+	n = PAGESIZE * (availrmem - arc_virt_machine_reserved - desfree);
+	if (n < lowest) {
+		lowest = n;
+		r = FMR_VIRT_MACHINE;
 	}
 
 #if defined(__i386)

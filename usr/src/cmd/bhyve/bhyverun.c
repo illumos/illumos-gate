@@ -1446,6 +1446,13 @@ main(int argc, char *argv[])
 #ifdef	__FreeBSD__
 	err = vm_setup_memory(ctx, memsize, VM_MMAP_ALL);
 #else
+	err = vm_arc_resv(ctx, memsize);
+	if (err != 0) {
+		(void) fprintf(stderr, "Could not shrink ARC: %s\n",
+		    strerror(err));
+		exit(4);
+	}
+
 	do {
 		errno = 0;
 		err = vm_setup_memory(ctx, memsize, VM_MMAP_ALL);
