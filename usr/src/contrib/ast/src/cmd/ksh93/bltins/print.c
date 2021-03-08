@@ -198,6 +198,8 @@ int    b_print(int argc, char *argv[], Shbltin_t *context)
 			argv++;
 			goto skip;
 		}
+		argv++;
+		goto printf;
 	}
 	while((n = optget(argv,options))) switch(n)
 	{
@@ -273,6 +275,7 @@ int    b_print(int argc, char *argv[], Shbltin_t *context)
 			break;
 	}
 	argv += opt_info.index;
+printf:
 	if(error_info.errors || (argc<0 && !(format = *argv++)))
 		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage((char*)0));
 	if(vflag && format)
