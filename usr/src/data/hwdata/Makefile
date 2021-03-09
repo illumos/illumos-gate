@@ -59,7 +59,7 @@ clean:
 update:		usb.update pci.update
 
 # URLs for PCI IDs and USB IDs
-PCIURL=		http://pci-ids.ucw.cz/v2.2/pci.ids
+PCIURL=		https://pci-ids.ucw.cz/v2.2/pci.ids
 USBURL=		http://www.linux-usb.org/usb.ids
 
 # These could move into Makefile.master

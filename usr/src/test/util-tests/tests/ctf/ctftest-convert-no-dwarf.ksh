@@ -38,7 +38,7 @@ fail_no_debug()
 	set +e
 	out=$($ctf_convert $cmd 2>&1)
 
-	if [[ $? -eq 0 ]]; then
+	if (( $? == 0 )); then
 		fail "$cmd succeeded but should have failed"
 		set -e
 		return;
@@ -46,11 +46,7 @@ fail_no_debug()
 
 	set -e
 
-	if echo "$out" | grep "is missing debug info" >/dev/null; then
-		return;
-	fi
-
-	if echo "$out" | grep "does not contain DWARF data" >/dev/null; then
+	if echo "$out" | grep "conversion failed due to missing debug data" >/dev/null; then
 		return;
 	fi
 	fail "$cmd: incorrect output $out"
