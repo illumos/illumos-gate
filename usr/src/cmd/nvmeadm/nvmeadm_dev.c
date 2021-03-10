@@ -218,13 +218,14 @@ nvme_open(di_minor_t minor)
 	di_devfs_path_free(devpath);
 
 	fd = open(path, O_RDWR);
-	free(path);
 
 	if (fd < 0) {
 		if (debug)
 			warn("nvme_open(%s)", path);
+		free(path);
 		return (-1);
 	}
+	free(path);
 
 	return (fd);
 }

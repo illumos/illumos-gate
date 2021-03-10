@@ -12,6 +12,7 @@
 #
 # Copyright 2015 Nexenta Systems, Inc.
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2021 Oxide Computer Company
 #
 
 
@@ -25,12 +26,15 @@ include ../Makefile.ctf
 
 .KEEP_STATE:
 
-CFLAGS +=	$(CCVERBOSE)
+CFLAGS +=	$(CCVERBOSE) -I$(SRC)/uts/common/io/nvme
 LDLIBS +=	-ldevinfo
 CSTD=	$(CSTD_GNU99)
 
-# error: cannot size expression
-SMATCH=off
+#
+# nvme_print_uint128() uses VLAs which understandably confuses smatch.
+# It should probably be rewritten so we can smatch the file.
+#
+nvmeadm_print.o := SMATCH=off
 
 all: $(PROG)
 

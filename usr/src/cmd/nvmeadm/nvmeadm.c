@@ -13,7 +13,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2017 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -77,7 +77,8 @@ struct nvme_feature {
 	size_t f_bufsize;
 	uint_t f_getflags;
 	int (*f_get)(int, const nvme_feature_t *, const nvme_process_arg_t *);
-	void (*f_print)(uint64_t, void *, size_t, nvme_identify_ctrl_t *);
+	void (*f_print)(uint64_t, void *, size_t, nvme_identify_ctrl_t *,
+	    nvme_version_t *);
 };
 
 #define	NVMEADM_CTRL	1
@@ -672,7 +673,7 @@ do_get_logpage_error(int fd, const nvme_process_arg_t *npa)
 	nlog = bufsize / sizeof (nvme_error_log_entry_t);
 
 	(void) printf("%s: ", npa->npa_name);
-	nvme_print_error_log(nlog, elog);
+	nvme_print_error_log(nlog, elog, npa->npa_version);
 
 	free(elog);
 
@@ -791,7 +792,7 @@ do_get_feat_common(int fd, const nvme_feature_t *feat,
 		return (EINVAL);
 
 	nvme_print(2, feat->f_name, -1, NULL);
-	feat->f_print(res, buf, bufsize, npa->npa_idctl);
+	feat->f_print(res, buf, bufsize, npa->npa_idctl, npa->npa_version);
 	free(buf);
 
 	return (0);
@@ -816,7 +817,7 @@ do_get_feat_temp_thresh_one(int fd, const nvme_feature_t *feat,
 		return (EINVAL);
 	}
 
-	feat->f_print(res, (void *)label, 0, npa->npa_idctl);
+	feat->f_print(res, (void *)label, 0, npa->npa_idctl, npa->npa_version);
 	free(buf);
 	return (0);
 }
@@ -844,7 +845,7 @@ do_get_feat_temp_thresh(int fd, const nvme_feature_t *feat,
 		return (ret);
 	}
 
-	if (!NVME_VERSION_ATLEAST(npa->npa_version, 1, 2)) {
+	if (!nvme_version_check(npa->npa_version, 1, 2)) {
 		return (0);
 	}
 
@@ -956,7 +957,7 @@ do_get_feat_intr_vect(int fd, const nvme_feature_t *feat,
 		    == B_FALSE)
 			return (EINVAL);
 
-		feat->f_print(res, NULL, 0, npa->npa_idctl);
+		feat->f_print(res, NULL, 0, npa->npa_idctl, npa->npa_version);
 	}
 
 	return (0);
@@ -1282,7 +1283,7 @@ do_firmware_load(int fd, const nvme_process_arg_t *npa)
 		size += len;
 	} while (len == sizeof (buf));
 
-	close(fw_fd);
+	(void) close(fw_fd);
 
 	if (verbose)
 		(void) printf("%zu bytes downloaded.\n", size);
@@ -1374,4 +1375,26 @@ do_firmware_activate(int fd, const nvme_process_arg_t *npa)
 		    nvme_str_error(sct, sc));
 
 	return (0);
+}
+
+/*
+ * While the NVME_VERSION_ATLEAST macro exists, specifying a version of 1.0
+ * causes GCC to helpfully flag the -Wtype-limits warning because a uint_t is
+ * always >= 0. In many cases it's useful to always indicate what version
+ * something was added in to simplify code (e.g. nvmeadm_print_bit) and we'd
+ * rather just say it's version 1.0 rather than making folks realize that a
+ * hardcoded true is equivalent. Therefore we have this function which can't
+ * trigger this warning today (and adds a minor amount of type safety). If GCC
+ * or clang get smart enough to see through this, then we'll have to just
+ * disable the warning for the single minor comparison (and reformat this a bit
+ * to minimize the impact).
+ */
+boolean_t
+nvme_version_check(nvme_version_t *vers, uint_t major, uint_t minor)
+{
+	if (vers->v_major > major) {
+		return (B_TRUE);
+	}
+
+	return (vers->v_major == major && vers->v_minor >= minor);
 }
