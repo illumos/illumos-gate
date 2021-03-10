@@ -104,6 +104,7 @@ time_t timenow;
 int verbose = 0;
 int trace = 0;
 int automountd_nobrowse = 0;
+int did_fork_exec;
 
 int
 main(argc, argv)

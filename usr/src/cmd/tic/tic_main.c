@@ -24,14 +24,14 @@
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
-/* 
+/*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
  * All Rights Reserved
- * 
+ *
  * University Acknowledgment- Portions of this document are derived from
  * software developed by the University of California, Berkeley, and its
  * contributors.
@@ -233,43 +233,3 @@ check_dir(char dirletter)
 	}
 	return;
 }
-
-#include <curses.h>
-#if (defined(SYSV) || defined(USG)) && !defined(SIGPOLL)
-/*
- *	mkdir(dirname, mode)
- *
- *	forks and execs the mkdir program to create the given directory
- *
- */
-
-mkdir(dirname, mode)
-#ifdef __STDC__
-const
-#endif
-char	*dirname;
-int mode;
-{
-    int	fork_rtn;
-    int	status;
-
-    fork_rtn = fork();
-
-    switch (fork_rtn) {
-	case 0:		/* Child */
-		(void) execl("/bin/mkdir", "mkdir", dirname, (char *)0);
-		_exit(1);
-
-	case -1:	/* Error */
-		fprintf(stderr, "%s: SYSTEM ERROR!! Fork failed!!!\n",
-		    progname);
-		exit(1);
-
-	default:
-		(void) wait(&status);
-		if ((status != 0) || (chmod(dirname, mode) == -1))
-			return (-1);
-		return (0);
-	}
-}
-#endif

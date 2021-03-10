@@ -25,7 +25,8 @@
 
 include ../Makefile.cmd
 
-SUBDIR_CMD=	lsvcrun mfstscan servinfo svcadm svccfg svcprop svcs
+SUBDIR_CMD=	lsvcrun mfstscan servinfo svcadm svccfg svcprop svcs \
+		rootisramdisk
 SUBDIR_DAEMON=	configd startd
 SUBDIR_REPO=	milestone profile seed
 SUBDIR_MISC=	shell
@@ -35,7 +36,6 @@ all :=		TARGET = all
 install :=	TARGET = install
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
-lint :=		TARGET = lint
 _msg :=		TARGET = _msg
 
 .KEEP_STATE:
@@ -58,7 +58,7 @@ ROOTCLASSACTIONS = $(CLASSACTIONS:%=$(ROOT)/usr/sadm/install/scripts/%)
 
 install: $(ROOTDTDS) $(ROOTCLASSACTIONS)
 
-all install lint clean clobber: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 _msg: $(SUBDIR_CMD) startd
 

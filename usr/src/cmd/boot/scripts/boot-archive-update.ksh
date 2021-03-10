@@ -23,6 +23,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 Oxide Computer Company
 #
 
 . /lib/svc/share/smf_include.sh
@@ -30,7 +31,14 @@
 
 UPDATEFILE=/etc/svc/volatile/boot_archive_safefile_update
 
-smf_is_globalzone || exit $SMF_EXIT_OK
+if smf_is_nonglobalzone || smf_root_is_ramdisk; then
+	#
+	# Boot archives only exist in the global zone of persistent root
+	# systems, but this is either a non-global zone or a system booted from
+	# a ramdisk image.
+	#
+	exit $SMF_EXIT_OK
+fi
 
 if [ `uname -p` = "i386" ]; then
 	# on x86 get rid of transient reboot entry in the GRUB menu

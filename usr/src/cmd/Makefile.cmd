@@ -162,6 +162,7 @@ ROOTPROG32=	$(PROG:%=$(ROOTBIN32)/%)
 ROOTCMD64=	$(PROG:%=$(ROOTCMDDIR64)/%)
 ROOTUSRSBINPROG32=	$(PROG:%=$(ROOTUSRSBIN32)/%)
 ROOTUSRSBINPROG64=	$(PROG:%=$(ROOTUSRSBIN64)/%)
+ROOTLIBSVCBINPROG=	$(PROG:%=$(ROOTLIBSVCBIN)/%)
 
 # Symlink rules for /usr/ccs/bin commands. Note, those commands under
 # the rule of the linker area, are controlled by a different set of

@@ -25,7 +25,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright (c) 2018 Joyent, Inc. All rights reserved.
+# Copyright 2021 Joyent, Inc.
 #
 
 KMDBSRCS += \
@@ -60,6 +60,7 @@ KMDBSRCS += \
 	kmdb_kdi.c \
 	kmdb_kvm.c \
 	mdb_logio.c \
+	mdb_linkerset.c \
 	mdb_list.c \
 	mdb_macalias.c \
 	kmdb_main.c \
@@ -88,6 +89,7 @@ KMDBSRCS += \
 	kmdb_umemglue.c \
 	mdb_value.c \
 	mdb_vcb.c \
+	mdb_walkers.c \
 	mdb_wcb.c \
 	mdb_whatis.c \
 	kmdb_wr.c
@@ -96,7 +98,7 @@ KMDBML +=
 
 KMDBOBJS = $(KMDBSRCS:%.c=%.o) $(KMDBML:%.s=%.o)
 
-PROMSRCS += 
+PROMSRCS +=
 
 PROMOBJS = $(PROMSRCS:%.c=%.o)
 
@@ -109,7 +111,7 @@ KCTLSRCS += \
 	kctl_string.c \
 	kctl_wr.c
 
-KCTLML += 
+KCTLML +=
 
 KCTLOBJS = $(KCTLSRCS:%.c=%.o) $(KCTLML:%.s=%.o)
 

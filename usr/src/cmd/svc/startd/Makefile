@@ -62,8 +62,6 @@ POFILES = $(OBJS:%.o=%.po) \
 include ../../Makefile.cmd
 include ../../Makefile.ctf
 
-ROOTCMDDIR=	$(ROOT)/lib/svc/bin
-
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I. -I../common
@@ -131,7 +129,7 @@ $(PROG): $(ALLOBJS)
 $(POFILE): $(POFILES)
 	cat $(POFILES) > $(POFILE)
 
-install: all $(ROOTCMD)
+install: all $(ROOTLIBSVCBINPROG)
 
 clean:
 	$(RM) $(ALLOBJS)

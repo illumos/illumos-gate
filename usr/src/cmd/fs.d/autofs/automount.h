@@ -116,7 +116,7 @@ struct mapline {
  */
 struct mapfs {
 	struct mapfs *mfs_next;	/* next in entry */
-	int 	mfs_ignore;	/* ignore this entry */
+	int	mfs_ignore;	/* ignore this entry */
 	char	*mfs_host;	/* host name */
 	char	*mfs_dir;	/* dir to mount */
 	int	mfs_penalty;	/* mount penalty for this host */
@@ -162,8 +162,8 @@ struct autodir {
 	char	*dir_name;		/* mount point */
 	char	*dir_map;		/* name of map for dir */
 	char	*dir_opts;		/* default mount options */
-	int 	dir_direct;		/* direct mountpoint ? */
-	int 	dir_remount;		/* a remount */
+	int	dir_direct;		/* direct mountpoint ? */
+	int	dir_remount;		/* a remount */
 	struct autodir *dir_next;	/* next entry */
 	struct autodir *dir_prev;	/* prev entry */
 };
@@ -244,8 +244,8 @@ typedef struct command {
 /*
  * globally visible door_server file descriptor
  */
-int did_exec_map;
-int did_fork_exec;
+extern int did_exec_map;
+extern int did_fork_exec;
 
 extern time_t timenow;	/* set at start of processing of each RPC call */
 extern char self[];

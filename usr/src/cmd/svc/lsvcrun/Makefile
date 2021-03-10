@@ -27,17 +27,13 @@
 PROG =		lsvcrun
 OBJS =		lsvcrun.o
 SRCS =		$(OBJS:%.o=%.c)
-POFILES = 	$(OBJS:.o=.po)
-
-ROOTLIBSVCBINPROG = $(ROOT)/lib/svc/bin/$(PROG)
+POFILES =	$(OBJS:.o=.po)
 
 include ../../Makefile.cmd
 
 LDLIBS +=	-lcontract -lscf -luutil
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	$(CNOWARN_UNINIT)
-
-lint := LINTFLAGS = -ux
 
 .KEEP_STATE:
 
@@ -49,12 +45,7 @@ $(PROG): $(OBJS)
 
 install: all $(ROOTLIBSVCBINPROG)
 
-$(ROOTLIBSVCBIN)/%: %
-	$(INS.file)
-
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../../Makefile.targ

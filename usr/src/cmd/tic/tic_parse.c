@@ -122,9 +122,25 @@ struct use_header {
 struct use_header	use_list = {NULL, NULL};
 int			use_count = 0;
 
+
+extern int get_token(void);
+extern int must_swap(void);
+extern void check_dir(char);
+extern void err_abort(char *, ...);
+extern void panic_mode(char);
+extern int read_entry(char *, struct _bool_struct *, struct _num_struct *,
+    struct _str_struct *);
+extern void reset_input(void);
+extern void syserr_abort(char *, ...);
+extern void warning(char *, ...);
+
+int do_entry(struct use_item *);
+int handle_use(struct use_item *, long, short *, short *, short *);
+int save_str(char *);
+int write_object(FILE *, short *, short *, short *);
 void dequeue(struct use_item *);
-void init_structure(short Booleans[], short Numbers[], short Strings[]);
-void dump_structure(short Booleans[], short Numbers[], short Strings[]);
+void dump_structure(short *, short *, short *);
+void init_structure(short *, short *, short *);
 
 /*
  *  The use_list is a doubly-linked list with NULLs terminating the lists:
@@ -276,8 +292,7 @@ dump_list(char *str)
  */
 
 int
-do_entry(item_ptr)
-struct use_item	*item_ptr;
+do_entry(struct use_item *item_ptr)
 {
 	long					entry_offset;
 	int					token_type;
@@ -524,14 +539,13 @@ void
 dump_structure(short Booleans[], short Numbers[], short Strings[])
 {
 	struct stat64	statbuf;
-	FILE		*fp;
+	FILE		*fp = NULL;
 	char		name_list[1024];
 	char		*first_name, *other_names, *cur_name;
 	char		filename[128 + 2 + 1];
 	char		linkname[128 + 2 + 1];
 	int		len;
 	int		alphastart = 0;
-	extern char	*strchr(), *strrchr();
 
 	strcpy(name_list, term_names + string_table);
 	DEBUG(7, "Name list = '%s'\n", name_list);
@@ -666,11 +680,7 @@ dump_structure(short Booleans[], short Numbers[], short Strings[])
 
 
 int
-write_object(fp, Booleans, Numbers, Strings)
-FILE	*fp;
-short	Booleans[];
-short	Numbers[];
-short	Strings[];
+write_object(FILE *fp, short Booleans[], short Numbers[], short Strings[])
 {
 	struct header	header;
 	char		*namelist;
@@ -707,9 +717,8 @@ short	Strings[];
 		cBooleans[i] = Booleans[i];
 
 	if (fwrite(&header, sizeof (header), 1, fp) != 1 ||
-		    fwrite(namelist, sizeof (char), namelen, fp) != namelen ||
-		    fwrite(cBooleans, sizeof (char), BoolCount, fp) !=
-								BoolCount)
+	    fwrite(namelist, sizeof (char), namelen, fp) != namelen ||
+	    fwrite(cBooleans, sizeof (char), BoolCount, fp) != BoolCount)
 		return (-1);
 
 	if ((namelen+BoolCount) % 2 != 0 &&
@@ -744,14 +753,13 @@ short	Strings[];
  */
 
 int
-save_str(string)
-char	*string;
+save_str(char *string)
 {
 	int	old_next_free;
 
 	/* Do not let an offset be 255. It reads as -1 in Vr2 binaries. */
 	if (next_free % 256 == 255)
-		next_free++;
+		string_table[next_free++] = '\0';
 
 	old_next_free = next_free;
 
@@ -825,12 +833,8 @@ init_structure(short Booleans[], short Numbers[], short Strings[])
  */
 
 int
-handle_use(item_ptr, entry_offset, Booleans, Numbers, Strings)
-long		entry_offset;
-struct use_item	*item_ptr;
-short		Booleans[];
-short		Numbers[];
-short		Strings[];
+handle_use(struct use_item *item_ptr, long entry_offset,
+    short Booleans[], short Numbers[], short Strings[])
 {
 	struct _bool_struct	use_bools;
 	struct _num_struct	use_nums;
@@ -848,8 +852,8 @@ short		Strings[];
 	sprintf(filename, "%c/%s", curr_token.tk_valstring[0],
 						curr_token.tk_valstring);
 
-	if (stat64(filename, &statbuf) < 0 ||
-				part2 == 0 && statbuf.st_mtime < start_time) {
+	if ((stat64(filename, &statbuf) < 0) ||
+	    (part2 == 0 && statbuf.st_mtime < start_time)) {
 		DEBUG(2, "Forward USE to %s", curr_token.tk_valstring);
 
 		if (item_ptr == NULL) {
@@ -865,11 +869,13 @@ short		Strings[];
 								filename);
 
 		for (i = 0; i < BoolCount; i++) {
-			if (Booleans[i] == FALSE)
-				if (UB[i] == TRUE)		/* now true */
+			if (Booleans[i] == FALSE) {
+				if (UB[i] == TRUE) {		/* now true */
 					Booleans[i] = TRUE;
-				else if (UB[i] > TRUE)	/* cancelled */
+				} else if (UB[i] > TRUE) {	/* cancelled */
 					Booleans[i] = -2;
+				}
+			}
 		}
 
 		for (i = 0; i < NumCount; i++) {
@@ -878,11 +884,13 @@ short		Strings[];
 		}
 
 		for (i = 0; i < StrCount; i++) {
-			if (Strings[i] == -1)
-				if (US[i] == (char *)-1)
+			if (Strings[i] == -1) {
+				if (US[i] == (char *)-1) {
 					Strings[i] = -2;
-				else if (US[i] != (char *)0)
+				} else if (US[i] != (char *)0) {
 					Strings[i] = save_str(US[i]);
+				}
+			}
 		}
 
 	}

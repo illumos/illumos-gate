@@ -4,7 +4,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980, 1986, 1990 The Regents of the University of California.
@@ -24,8 +24,6 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -48,6 +46,27 @@
 #include <sys/fs/udf_volume.h>
 #include "fsck.h"
 #include <locale.h>
+
+int	debug;
+char	nflag;
+char	yflag;
+int	rflag;
+static int	wflag;		/* check only writable filesystems */
+int	fflag;
+static int	sflag;		/* print status flag */
+int	isdirty;
+int	fsmodified;
+int	iscorrupt;
+int	exitstat;
+uint32_t part_len;
+daddr_t	n_blks;
+daddr_t	n_files;
+daddr_t	n_dirs;
+char	preen;
+char	mountpoint[100];
+char	mountedfs;
+char	*devname;
+struct log_vol_int_desc *lvintp;
 
 extern int32_t	writable(char *);
 extern void	pfatal(char *, ...);
@@ -207,7 +226,6 @@ checkfilesys(char *filesys)
 {
 	char *devstr;
 
-	mountfd = -1;
 	mountedfs = 0;
 	iscorrupt = 1;
 

@@ -68,6 +68,7 @@ static int dapli_process_fake_ibds(DAPL_HCA **hca_list, int hca_idx);
 static DAPL_OS_LOCK g_tavor_state_lock;
 static struct dapls_ib_hca_state g_tavor_state[MAX_HCAS];
 DAPL_OS_LOCK g_tavor_uar_lock;
+DAPL_OS_LOCK dapls_ib_dbp_lock;
 
 DAT_RETURN
 dapli_init_hca(
