@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2012 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2013 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -14,8 +14,8 @@
 *                            AT&T Research                             *
 *                           Florham Park NJ                            *
 *                                                                      *
-*                 Glenn Fowler <gsf@research.att.com>                  *
-*                  David Korn <dgk@research.att.com>                   *
+*               Glenn Fowler <glenn.s.fowler@gmail.com>                *
+*                    David Korn <dgkorn@gmail.com>                     *
 *                                                                      *
 ***********************************************************************/
 #pragma prototyped
@@ -28,7 +28,7 @@
  */
 
 static const char usage[] =
-"+[-?\n@(#)$Id: tail (AT&T Research) 2012-06-19 $\n]"
+"+[-?\n@(#)$Id: tail (AT&T Research) 2013-09-19 $\n]"
 USAGE_LICENSE
 "[+NAME?tail - output trailing portion of one or more files ]"
 "[+DESCRIPTION?\btail\b copies one or more input files to standard output "
@@ -159,8 +159,10 @@ tailpos(register Sfio_t* fp, register Sfoff_t number, int delim)
 	register Sfoff_t	last;
 	register char*		s;
 	register char*		t;
+	int			incomplete;
 	struct stat		st;
 
+	error(-1, "AHA#%d tail number=%I*d", __LINE__, sizeof(number), number);
 	last = sfsize(fp);
 	if ((first = sfseek(fp, (Sfoff_t)0, SEEK_CUR)) < 0)
 		return last || fstat(sffileno(fp), &st) || st.st_size || FIFO(st.st_mode) ? -1 : 0;
@@ -170,6 +172,7 @@ tailpos(register Sfio_t* fp, register Sfoff_t number, int delim)
 			return first;
 		return offset;
 	}
+	incomplete = 1;
 	for (;;)
 	{
 		if ((offset = last - SF_BUFSIZE) < first)
@@ -179,6 +182,15 @@ tailpos(register Sfio_t* fp, register Sfoff_t number, int delim)
 		if (!(s = sfreserve(fp, n, SF_LOCKR)))
 			return -1;
 		t = s + n;
+		if (incomplete)
+		{
+			if (t > s && *(t - 1) != delim && number-- <= 0)
+			{
+				sfread(fp, s, 0);
+				return offset + (t - s);
+			}
+			incomplete = 0;
+		}
 		while (t > s)
 			if (*--t == delim && number-- <= 0)
 			{
@@ -280,6 +292,7 @@ init(Tail_t* tp, Sfoff_t number, int delim, int flags, const char** format)
 		return -1;
 	}
 	sfset(tp->sp, SF_SHARE, 0);
+	error(-1, "AHA#%d offset=%I*d number=%I*d", __LINE__, sizeof(offset), offset, sizeof(number), number);
 	if (offset)
 	{
 		if (number < 0 || !number && (flags & POSITIVE))
@@ -410,6 +423,7 @@ b_tail(int argc, char** argv, Shbltin_t* context)
 	char*			t;
 	char*			r;
 	char*			file;
+	Sfoff_t			moved;
 	Sfoff_t			offset;
 	Sfoff_t			number = DEFAULT;
 	unsigned long		timeout = 0;
@@ -424,7 +438,7 @@ b_tail(int argc, char** argv, Shbltin_t* context)
 	Tail_t*			files;
 	Tv_t			tv;
 
-	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
+	cmdinit(argc, argv, context, ERROR_CATALOG, ERROR_NOTIFY);
 	for (;;)
 	{
 		switch (n = optget(argv, usage))
@@ -639,7 +653,7 @@ b_tail(int argc, char** argv, Shbltin_t* context)
 		{
 			if (n)
 				n = 0;
-			else if (sh_checksig(context) || tvsleep(&tv, NiL))
+			else if (sh_checksig(context) || tvsleep(&tv, NiL) && sh_checksig(context))
 			{
 				error_info.errors++;
 				break;
@@ -686,11 +700,13 @@ b_tail(int argc, char** argv, Shbltin_t* context)
 					{
 						i = 3;
 						while (--i && stat(fp->name, &st))
-							if (sh_checksig(context) || tvsleep(&tv, NiL))
+							if (sh_checksig(context))
 							{
 								error_info.errors++;
 								goto done;
 							}
+							else
+								tvsleep(&tv, NiL);
 						if (i && (fp->dev != st.st_dev || fp->ino != st.st_ino) && !init(fp, 0, 0, flags, &format))
 						{
 							if (!(flags & SILENT))
@@ -746,8 +762,8 @@ b_tail(int argc, char** argv, Shbltin_t* context)
 			if (number < 0 || !number && (flags & POSITIVE))
 			{
 				sfset(ip, SF_SHARE, 1);
-				if (number < -1)
-					sfmove(ip, NiL, -number - 1, delim);
+				if (number < -1 && (moved = sfmove(ip, NiL, -(number + 1), delim)) >= 0 && delim >= 0 && moved < -(number + 1))
+					(void)sfgetr(ip, delim, SF_LASTR);
 				if (flags & REVERSE)
 					rev_line(ip, sfstdout, sfseek(ip, (Sfoff_t)0, SEEK_CUR));
 				else

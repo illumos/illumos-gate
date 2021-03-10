@@ -130,6 +130,7 @@ file path=usr/demo/ksh/tests/glob.sh
 file path=usr/demo/ksh/tests/grep.sh
 file path=usr/demo/ksh/tests/heredoc.sh
 file path=usr/demo/ksh/tests/illumos_13434_chunked_heredoc.sh
+file path=usr/demo/ksh/tests/illumos_4149_builtin_head.sh
 file path=usr/demo/ksh/tests/io.sh
 file path=usr/demo/ksh/tests/leaks.sh
 file path=usr/demo/ksh/tests/locale.sh
