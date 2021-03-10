@@ -29,6 +29,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright (c) 2011, 2015 by Delphix. All rights reserved.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 Oxide Computer Company
 #
 
 <include SUNWcs.man1.inc>
@@ -482,6 +483,7 @@ file path=lib/inet/nwamd mode=0555
 file path=lib/svc/bin/lsvcrun group=sys mode=0555
 file path=lib/svc/bin/mfstscan group=sys mode=0555
 file path=lib/svc/bin/restore_repository group=sys mode=0555
+file path=lib/svc/bin/rootisramdisk group=sys mode=0555
 file path=lib/svc/bin/sqlite group=sys mode=0555
 file path=lib/svc/bin/svc.configd group=sys mode=0555
 file path=lib/svc/bin/svc.ipfd group=sys mode=0555
