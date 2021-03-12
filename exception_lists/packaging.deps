@@ -29,6 +29,7 @@ pkg:/runtime/java/openjdk11
 pkg:/runtime/java/openjdk8
 pkg:/runtime/java/runtime64
 pkg:/security/sudo
+pkg:/service/network/samba
 pkg:/shell/bash
 pkg:/shell/expect
 pkg:/system/bhyve/firmware

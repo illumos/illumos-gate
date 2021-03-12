@@ -11,26 +11,26 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2019 Joyent, Inc.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
-# Copyright 2022 Oxide Computer Company
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = \
-	bhyve-tests \
-	crypto-tests \
-	elf-tests \
-	libc-tests \
-	libmlrpc-tests \
-	net-tests \
-	os-tests \
-	smbclient-tests \
-	smbsrv-tests \
-	test-runner \
-	util-tests \
-	zfs-tests
+READMES = README
 
-include Makefile.com
+ROOTOPTPKG = $(ROOT)/opt/smbsrv-tests
+
+FILES = $(READMES:%=$(ROOTOPTPKG)/%)
+$(FILES) := FILEMODE = 0444
+
+all: $(READMES)
+
+install: $(ROOTOPTPKG) $(FILES)
+
+clean clobber:
+
+$(ROOTOPTPKG):
+	$(INS.dir)
+
+$(ROOTOPTPKG)/%: %
+	$(INS.file)

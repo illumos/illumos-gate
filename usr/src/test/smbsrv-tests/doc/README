@@ -1,0 +1,84 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+#
+
+SMB Server Test Suite README
+
+1. Building and installing the SMB Server Test Suite
+2. Running the SMB Server Test Suite
+3. Test Results
+
+--------------------------------------------------------------------------------
+
+1. Building and installing the SMB Server Test Suite
+
+The SMB Server test suite uses external programs including:
+	smbtorture (and more to come)
+which is installed via a package dependency on:
+	service/network/samba
+Those are run by python and ksh wrappers found here.
+
+To build, just do:
+	cd $SRC/test/smbsrv-tests
+	make install
+
+To install the full suite, run:
+	pkg install pkg:/system/test/smbsrvtest
+
+--------------------------------------------------------------------------------
+
+2. Running the SMB Server Test Suite
+
+The default configuration:
+	/opt/smbsrv-tests/include/default.cfg
+runs tests against a server instance on "localhost",
+using a share named "test" and user=test, pw=test
+
+It's common to copy that default.cfg to something new
+and modify the SMBT_... variables to specify different
+host, share, user, etc.
+
+To run all tests using the default configuration run:
+	/opt/smbsrv-tests/bin/smbsrvtests
+
+To run all tests using a different configuration:
+	/opt/smbsrv-tests/bin/smbsrvtests -c config_file
+
+You can also run individual tests found under:
+	/opt/smbsrv-tests/tests/*
+For example:
+	/opt/smbsrv-tests/tests/smbtorture/runst-smb2
+
+These take similar options (eg. -c config_file).
+
+To run only a subset of the tests, you can pass match patterns
+as additional arguments to the individual test, eg
+	/opt/smbsrv-tests/tests/smbtorture/runst-smb2 smb2.lease
+
+--------------------------------------------------------------------------------
+
+3. Test Results
+
+While the SMB Server Test Suite is running, one informational line is
+printed for each test, ending with one of:
+	PASS, FAIL, SKIP, KILLED, UNKNOWN
+
+The test outputs can be found in:
+	/var/tmp/test_results/smbsrv-tests/
+For example:
+	smbtor-smb2-20210317T162827.summary
+	smbtor-smb2-20210317T162827.log
+
+The *.summary file is the same as what's shown while the test runs.
+The *.log file is the detailed output from the test program(s).
