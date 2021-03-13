@@ -50,7 +50,7 @@ driver name=pchtemp \
     alias=pci8086,a231,p \
     alias=pci8086,a2b1,p \
     alias=pci8086,a379,p
-driver name=smntemp alias=smntemp
+driver name=smntemp
 file path=kernel/drv/$(ARCH64)/amdnbtemp group=sys
 file path=kernel/drv/$(ARCH64)/coretemp group=sys
 file path=kernel/drv/$(ARCH64)/pchtemp group=sys
