@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -388,6 +388,9 @@ coretemp_create_sensor(coretemp_t *ct, cmi_hdl_t hdl, uint_t tjmax,
 		dev_err(ct->coretemp_dip, CE_WARN, "failed to create ksensor "
 		    "for %s: %d", sensor->cs_name, err);
 	}
+
+	ASSERT(MUTEX_HELD(&ct->coretemp_mutex));
+	list_insert_tail(&ct->coretemp_sensors, sensor);
 
 	return (B_TRUE);
 err:
