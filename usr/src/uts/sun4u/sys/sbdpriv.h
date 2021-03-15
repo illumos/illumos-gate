@@ -27,8 +27,6 @@
 #ifndef _SYS_SBDPRIV_H
 #define	_SYS_SBDPRIV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -105,7 +103,7 @@ typedef struct {
 				SBDP_IOCTL_FLAG_FORCE : 0)
 
 typedef struct sbd_handle {
-	void 		*h_sbd;
+	void		*h_sbd;
 	sbderror_t	*h_err;
 	dev_t		h_dev;		/* dev_t of opened device */
 	int		h_cmd;		/* ioctl argument */
@@ -141,12 +139,14 @@ typedef struct sbd_handle {
 	((ep)->e_rsc[0] = '\0')
 
 #define	SBD_GET_PERR(spe, ep) \
+{ \
 	(ep)->e_errno = EIO; \
 	(ep)->e_code = (spe)->e_code; \
 	if (*((spe)->e_rsc) != '\0') \
 		bcopy((caddr_t)((spe)->e_rsc), \
 			(caddr_t)((ep))->e_rsc, \
-			sizeof (((ep))->e_rsc));
+			sizeof (((ep))->e_rsc)); \
+}
 
 /*
  * dev_t is shared by PIM and PSM layers.
