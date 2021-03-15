@@ -445,8 +445,8 @@ int zsa_h_log_n[40];
 
 static int zsa_open(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr);
 static int zsa_close(queue_t *q, int flag, cred_t *cr);
-static void zsa_wput(queue_t *q, mblk_t *mp);
-static void zsa_rsrv(queue_t *q);
+static int zsa_wput(queue_t *q, mblk_t *mp);
+static int zsa_rsrv(queue_t *q);
 
 static struct module_info asyncm_info = {
 	0,
@@ -459,7 +459,7 @@ static struct module_info asyncm_info = {
 
 static struct qinit async_rinit = {
 	putq,
-	(int (*)())zsa_rsrv,
+	zsa_rsrv,
 	zsa_open,
 	zsa_close,
 	NULL,
@@ -468,7 +468,7 @@ static struct qinit async_rinit = {
 };
 
 static struct qinit async_winit = {
-	(int (*)())zsa_wput,
+	zsa_wput,
 	NULL,
 	NULL,
 	NULL,
@@ -1201,7 +1201,7 @@ out:
  * It expects that these functions are handled in upper module(s),
  * as we do in ldterm.
  */
-static void
+static int
 zsa_wput(queue_t *q, mblk_t *mp)
 {
 	struct asyncline	*za;
@@ -1609,12 +1609,13 @@ zsa_wput(queue_t *q, mblk_t *mp)
 		freemsg(mp);
 		break;
 	}
+	return (0);
 }
 
 /*
  * zs read service procedure
  */
-static void
+static int
 zsa_rsrv(queue_t *q)
 {
 	struct asyncline	*za;
@@ -1627,6 +1628,7 @@ zsa_rsrv(queue_t *q)
 		ZSSETSOFT(zs);
 		mutex_exit(zs->zs_excl_hi);
 	}
+	return (0);
 }
 
 /*
