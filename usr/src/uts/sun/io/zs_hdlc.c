@@ -160,7 +160,7 @@ static int  zsh_attach(dev_info_t *dev, ddi_attach_cmd_t cmd);
 static int  zsh_detach(dev_info_t *dev, ddi_detach_cmd_t cmd);
 static int  zsh_open(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr);
 static int  zsh_close(queue_t *rq, int flag, cred_t *cr);
-static void zsh_wput(queue_t *wq, mblk_t *mp);
+static int zsh_wput(queue_t *wq, mblk_t *mp);
 static int zsh_start(struct zscom *zs, struct syncline *zss);
 static void zsh_ioctl(queue_t *wq, mblk_t *mp);
 
@@ -184,7 +184,7 @@ static struct qinit hdlc_rinit = {
 };
 
 static struct qinit hdlc_winit = {
-	(int (*)())zsh_wput,	/* output put procedure */
+	zsh_wput,	/* output put procedure */
 	NULL,		/* output service procedure */
 	NULL,		/* open procedure */
 	NULL,		/* close procedure */
@@ -823,7 +823,7 @@ zsh_hdp_ok_or_rts_state(struct zscom *zs, struct syncline *zss)
 /*
  * Put procedure for write queue.
  */
-static void
+static int
 zsh_wput(queue_t *wq, mblk_t *mp)
 {
 	struct ser_str *stp = (struct ser_str *)wq->q_ptr;
@@ -840,7 +840,7 @@ zsh_wput(queue_t *wq, mblk_t *mp)
 	 */
 	if (stp == NULL) {
 		freemsg(mp);
-		return;
+		return (0);
 	}
 	zs = (struct zscom *)stp->str_com;
 
@@ -856,7 +856,7 @@ zsh_wput(queue_t *wq, mblk_t *mp)
 			qreply(wq, mp);  /* let the read queues have at it */
 		else
 			freemsg(mp);
-		return;
+		return (0);
 	}
 
 	if ((zs == NULL) && (mp->b_datap->db_type != M_PROTO)) {
@@ -865,7 +865,7 @@ zsh_wput(queue_t *wq, mblk_t *mp)
 		    "zsh: clone device %d must be attached before use!",
 		    stp->str_inst);
 		(void) putnextctl1(RD(wq), M_ERROR, EPROTO);
-		return;
+		return (0);
 	}
 
 	if (stp->str_state == STR_CLONE) {	/* Clone opened, limited. */
@@ -877,7 +877,7 @@ zsh_wput(queue_t *wq, mblk_t *mp)
 			    "zsh%x: invalid operation for clone dev.\n",
 			    stp->str_inst);
 			(void) putnextctl1(RD(wq), M_ERROR, EPROTO);
-			return;
+			return (0);
 		}
 	} else {
 		zss = (struct syncline *)zs->zs_priv;
@@ -898,7 +898,7 @@ zsh_wput(queue_t *wq, mblk_t *mp)
 			    zs->zs_unit);
 			freemsg(mp);
 			(void) putnextctl1(RD(wq), M_ERROR, ECOMM);
-			return;
+			return (0);
 		}
 		mutex_exit(zs->zs_excl_hi);
 		if (zs->zs_flags & ZS_NEEDSOFT) {
@@ -911,7 +911,7 @@ zsh_wput(queue_t *wq, mblk_t *mp)
 			freemsg(mp);
 			mp = mp1;
 			if (mp == NULL)
-				return;
+				return (0);
 		}
 		mutex_enter(zs->zs_excl);
 		(void) putq(wq, mp);
@@ -924,7 +924,7 @@ zsh_wput(queue_t *wq, mblk_t *mp)
 			TRACE_1(TR_ZSH, TR_ZSH_WPUT_END,
 			    "zsh_wput end: zs = %p", zs);
 
-			return;
+			return (0);
 		}
 		tmp = NULL;
 again:
@@ -951,7 +951,7 @@ again:
 			TRACE_1(TR_ZSH, TR_ZSH_WPUT_END,
 			    "zsh_wput end: zs = %p", zs);
 
-			return;
+			return (0);
 		}
 
 		if (zss->sl_wd_id == NULL) {
@@ -982,7 +982,7 @@ again:
 		 */
 		if (stp->str_state != STR_CLONE) {
 			freemsg(mp);
-			return;
+			return (0);
 		}
 
 		if (MBLKL(mp) < DL_ATTACH_REQ_SIZE) {
@@ -1122,6 +1122,7 @@ end_proto:
 	}
 
 	TRACE_1(TR_ZSH, TR_ZSH_WPUT_END, "zsh_wput end: zs = %p", zs);
+	return (0);
 }
 
 /*
