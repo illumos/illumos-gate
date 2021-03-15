@@ -202,8 +202,8 @@ int baudtable[] = {
 
 static int asyopen(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr);
 static int asyclose(queue_t *q, int flag, cred_t *cr);
-static void asywput(queue_t *q, mblk_t *mp);
-static void asyrsrv(queue_t *q);
+static int asywput(queue_t *q, mblk_t *mp);
+static int asyrsrv(queue_t *q);
 
 struct module_info asy_info = {
 	0,
@@ -216,7 +216,7 @@ struct module_info asy_info = {
 
 static struct qinit asy_rint = {
 	putq,
-	(int (*)())asyrsrv,
+	asyrsrv,
 	asyopen,
 	asyclose,
 	NULL,
@@ -225,7 +225,7 @@ static struct qinit asy_rint = {
 };
 
 static struct qinit asy_wint = {
-	(int (*)())asywput,
+	asywput,
 	NULL,
 	NULL,
 	NULL,
@@ -382,7 +382,7 @@ asyprobe(dev_info_t *devi)
 static int
 asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
-	register int	instance;
+	int	instance;
 	struct asycom	*asy;
 	struct asyncline *async;
 	char		name[16];
@@ -473,7 +473,7 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 static int
 asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
-	register int	instance;
+	int	instance;
 	struct asycom	*asy;
 	struct asyncline *async;
 	char		name[40];
@@ -879,8 +879,8 @@ asyinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
     void **result)
 {
 	_NOTE(ARGUNUSED(dip))
-	register dev_t dev = (dev_t)arg;
-	register int instance, error;
+	dev_t dev = (dev_t)arg;
+	int instance, error;
 	struct asycom *asy;
 
 	if ((instance = UNIT(dev)) > max_asy_instance)
@@ -3257,7 +3257,7 @@ async_ioctl(struct asyncline *async, queue_t *wq, mblk_t *mp, boolean_t iswput)
 	qreply(wq, mp);
 }
 
-static void
+static int
 asyrsrv(queue_t *q)
 {
 	mblk_t *bp;
@@ -3269,6 +3269,7 @@ asyrsrv(queue_t *q)
 		putnext(q, bp);
 	ASYSETSOFT(async->async_common);
 	async->async_polltid = 0;
+	return (0);
 }
 
 /*
@@ -3282,7 +3283,7 @@ asyrsrv(queue_t *q)
  * It expects that these functions are handled in upper module(s),
  * as we do in ldterm.
  */
-static void
+static int
 asywput(queue_t *q, mblk_t *mp)
 {
 	register struct asyncline *async;
@@ -3333,7 +3334,7 @@ asywput(queue_t *q, mblk_t *mp)
 			error = miocpullup(mp, sizeof (int));
 			if (error != 0) {
 				miocnak(q, mp, 0, error);
-				return;
+				return (0);
 			}
 
 			if (*(int *)mp->b_cont->b_rptr != 0) {
@@ -3497,6 +3498,7 @@ asywput(queue_t *q, mblk_t *mp)
 		freemsg(mp);
 		break;
 	}
+	return (0);
 }
 
 /*
