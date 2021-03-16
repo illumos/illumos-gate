@@ -3134,6 +3134,7 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 			return (EIO);
 		}
 
+		/* FALLTHROUGH */
 	default:
 		/* Unknown disk label type */
 		return (ENOTSUP);
