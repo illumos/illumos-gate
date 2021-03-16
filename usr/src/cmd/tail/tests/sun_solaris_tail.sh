@@ -26,7 +26,7 @@
 
 #
 # Additional tests borrowed from ksh93 builtin tail test script
-# (usr/src/lib/libshell/common/tests/sun_solaris_builtin_tail).  Modified
+# (usr/src/cmd/ast/libshell/common/tests/sun_solaris_builtin_tail).  Modified
 # to use /usr/bin/tail rather than the ksh93 builtin.
 #
 TAIL=/usr/bin/tail
@@ -73,12 +73,12 @@ function waitpidtimeout
 	float -r STEP=0.5 # const
 
 	(( timeout=timeout/STEP ))
-	
+
 	for (( i=0 ; i < timeout ; i+=STEP )) ; do
 		isvalidpid ${pid} || break
 		sleep ${STEP}
 	done
-	
+
 	return 0
 }
 
@@ -110,7 +110,7 @@ function myintseq
 			return 1
                         ;;
         esac
-        
+
         return 0
 }
 
@@ -168,7 +168,7 @@ compound -a testcases=(
 		input=$'1\n2\n3\n4'
 		compound -A tail_args=(
 			[legacy]=(   argv=( "-0"	 ) )
-#			[std_like]=( argv=( "-n" "0" ) ) 
+#			[std_like]=( argv=( "-n" "0" ) )
 		)
 		expected_output=$''
 	)
@@ -311,22 +311,22 @@ for testid in "${!testcases[@]}" ; do
 	for argv_variants in "${!tc.tail_args[@]}" ; do
 		nameref argv=tc.tail_args[${argv_variants}].argv
 		output=$(
-				set -o pipefail
-	          		(trap "" PIPE ; print -r -- "${tc.input}") | $TAIL "${argv[@]}"
+			set -o pipefail
+			(trap "" PIPE ; print -r -- "${tc.input}") | $TAIL "${argv[@]}"
 			) || err_exit "test ${tc.name}/${argv_variants}: command failed with exit code $?"
-	
+
 		[[ "${output}" == "${tc.expected_output}" ]] || err_exit "test ${tc.name}/${argv_variants}: Expected $(doublebackslashquote "${tc.expected_output}"), got $(doublebackslashquote "${output}")"
 	done
 done
 
 
 # test2: test "tail -r </etc/profile | rev -l" vs. "cat </etc/profile"
-[[ "$($TAIL -r </etc/profile | rev -l)" == "$( cat /etc/profile )" ]] || err_exit "'tail -r </etc/profile | rev -l' output does not match 'cat /etc/profile'" 
+[[ "$($TAIL -r </etc/profile | rev -l)" == "$( cat /etc/profile )" ]] || err_exit "'tail -r </etc/profile | rev -l' output does not match 'cat /etc/profile'"
 
 # Test case not applicable to FreeBSD 'tail'
 # test 3: ast-ksh.2009-05-05 "tail" builtin may crash if we pass unsupported long options
 #$SHELL -o errexit -c 'builtin tail ; print "hello" | tail --attack_of_chicken_monsters' >/dev/null 2>&1
-#(( $? == 2 )) || err_exit "expected exit code 2 for unsupported long option, got $?" 
+#(( $? == 2 )) || err_exit "expected exit code 2 for unsupported long option, got $?"
 
 
 # test 4: FIFO tests
@@ -338,7 +338,7 @@ function test_tail_fifo_1
 	typeset tail_cmd="$1"
 	integer i
 	integer tail_pid=-1
-	
+
 	# cleanup trap
 	trap "rm -f tailtestfifo tailout" EXIT
 
@@ -358,7 +358,7 @@ function test_tail_fifo_1
 	fi
 
 	wait || err_exit "tail child returned non-zero exit code=$?"
-	
+
 	[[ "$(cat tailout)" == $'11\n12\n13\n14\n15\n16\n17\n18\n19\n20' ]] || err_exit "test_tail_fifo_1: Expected $(doublebackslashquote '11\n12\n13\n14\n15\n16\n17\n18\n19\n20'), got $(doublebackslashquote "$(cat tailout)")"
 
 	return 0
@@ -369,7 +369,7 @@ function test_tail_fifo_2
 	typeset tail_cmd="$1"
 	integer i
 	integer tail_pid=-1
-	
+
 	# cleanup trap
 	trap "rm -f tailtestfifo tailout" EXIT
 
@@ -398,7 +398,7 @@ function test_tail_fifo_2
 	fi
 
 	wait || err_exit "tail child returned non-zero exit code=$?"
-	
+
 	[[ "$(cat tailout)" == $'5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15' ]] || err_exit "test_tail_fifo_2: Expected $(doublebackslashquote $'5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15'), got $(doublebackslashquote "$(cat tailout)")"
 
 	return 0
@@ -426,7 +426,7 @@ function followtest1
 	if ${usenewline} ; then
 		newline=$'\n'
 	fi
-	
+
 	rm -f "${FOLLOWFILE}" "${OUTFILE}"
 	print -n "${newline}" > "${FOLLOWFILE}"
 
@@ -444,14 +444,14 @@ function followtest1
 	kill -KILL ${tailchild} 2>/dev/null
 	#kill -TERM ${tailchild} 2>/dev/null
 	waitpidtimeout ${tailchild} 5
-	
+
 	if isvalidpid ${tailchild} ; then
 		err_exit "${title}: tail pid=${tailchild} hung."
 		kill -KILL ${tailchild} 2>/dev/null
 	fi
-	
+
 	wait ${tailchild} 2>/dev/null
-	
+
 	rm -f "${FOLLOWFILE}" "${OUTFILE}"
 
 	return 0
@@ -482,24 +482,24 @@ function followtest2
 
 	${testcmd} -n 60000 -f "${FOLLOWFILE}" >"${OUTFILE}" &
 	(( tailchild=$! ))
-	
+
 	sleep 10
 
 	kill -KILL ${tailchild} 2>/dev/null
 	#kill -TERM ${tailchild} 2>/dev/null
 	waitpidtimeout ${tailchild} 5
-	
+
 	if isvalidpid ${tailchild} ; then
 		err_exit "${title}: tail pid=${tailchild} hung."
 		kill -KILL ${tailchild} 2>/dev/null
 	fi
-	
+
 	wait ${tailchild} 2>/dev/null
-		
+
 	# this tail should be an external process
 	outstr=$(/usr/bin/tail "${OUTFILE}") || err_exit "tail returned non-zero exit code $?"
-        [[ "${outstr}" == 49991*50000 ]] || err_exit "${title}: Expected match for 49991*50000, got "$(singlebackslashquote "${outstr}")""	
-	
+        [[ "${outstr}" == 49991*50000 ]] || err_exit "${title}: Expected match for 49991*50000, got "$(singlebackslashquote "${outstr}")""
+
 	rm -f "${FOLLOWFILE}" "${OUTFILE}"
 
 	return 0
