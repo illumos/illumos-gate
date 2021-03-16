@@ -123,34 +123,6 @@ Otherwise,
 is returned and
 .Va errno
 is set to indicate the error.
-.Sh ERRORS
-The
-.Fn getcwd
-function will fail if:
-.Bl -tag -width Er
-.It Er EFAULT
-The
-.Fa buf
-argument points to an invalid address.
-.It Er EINVAL
-The
-.Fa buf
-argument is not
-.Dv NULL
-and the
-.Fa size
-argument is 0.
-.It Er ERANGE
-The pathname
-.Pq including its terminating nul character
-is too long to fit into the provided
-.Pq or allocated
-buffer.
-.It Er EACCESS
-A parent directory cannot be read to get its name.
-.It Er ENOMEM
-Insufficient storage space is available.
-.El
 .Sh EXAMPLES
 .Sy Example 1
 Determine the absolute pathname of the current working directory.
@@ -197,6 +169,34 @@ main(void)
 	return(0);
 }
 .Ed
+.Sh ERRORS
+The
+.Fn getcwd
+function will fail if:
+.Bl -tag -width Er
+.It Er EFAULT
+The
+.Fa buf
+argument points to an invalid address.
+.It Er EINVAL
+The
+.Fa buf
+argument is not
+.Dv NULL
+and the
+.Fa size
+argument is 0.
+.It Er ERANGE
+The pathname
+.Pq including its terminating nul character
+is too long to fit into the provided
+.Pq or allocated
+buffer.
+.It Er EACCESS
+A parent directory cannot be read to get its name.
+.It Er ENOMEM
+Insufficient storage space is available.
+.El
 .Sh USAGE
 Applications should exercise care when using
 .Xr chdir 2
