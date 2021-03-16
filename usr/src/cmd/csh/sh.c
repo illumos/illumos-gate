@@ -48,6 +48,8 @@ bool	fast;
 bool	batch;
 bool	prompt = 1;
 bool	enterhist = 0;
+static time_t chktim;
+char	*err_msg;	/* Error message from scanner/parser */
 
 extern	gid_t getegid(), getgid();
 extern	uid_t geteuid(), getuid();
@@ -123,6 +125,7 @@ main(int c, char **av)
 	tchar s_prompt[MAXHOSTNAMELEN+3];
 	char *c_max_var_len;
 	int c_max_var_len_size;
+	bool intact;
 
 	/*
 	 * set up the error exit, if there is an error before
@@ -883,7 +886,6 @@ pintr1(bool wantnl)
 	 */
 	if (gointr) {
 		search(ZGOTO, 0, gointr);
-		timflg = 0;
 		if (v = pargv)
 			pargv = 0, blkfree(v);
 		if (v = gargv)
@@ -974,7 +976,7 @@ process(bool catch)
 			if (fseekp == feobp)
 				printprompt();
 		}
-		err = 0;
+		err_msg = NULL;
 
 		/*
 		 * Echo not only on VERBOSE, but also with history expansion.
@@ -1005,8 +1007,8 @@ process(bool catch)
 		 * Print lexical error messages, except when sourcing
 		 * history lists.
 		 */
-		if (!enterhist && err)
-			error("%s", gettext(err));
+		if (!enterhist && err_msg)
+			error("%s", gettext(err_msg));
 
 		/*
 		 * If had a history command :p modifier then
@@ -1021,8 +1023,8 @@ process(bool catch)
 		 * Parse the words of the input into a parse tree.
 		 */
 		t = syntax(paraml.next, &paraml, 0);
-		if (err)
-			error("%s", gettext(err));
+		if (err_msg)
+			error("%s", gettext(err_msg));
 
 		/*
 		 * Execute the parse tree
@@ -1041,8 +1043,8 @@ process(bool catch)
 			(void) sigsetmask(omask &~ sigmask(SIGCHLD));
 		}
 
-		if (err)
-			error("%s", gettext(err));
+		if (err_msg)
+			error("%s", gettext(err_msg));
 		/*
 		 * Made it!
 		 */

@@ -24,9 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <poll.h>
 #include <sys/time.h>
 #include <stdlib.h>
@@ -81,7 +78,8 @@ __nis_config_t	ldapConfig = {
  *	> 0	Decrement 'attempts', sleep as indicated, return 1
  */
 int
-__nis_retry_sleep(__nisdb_retry_t *retry, int forceSleep) {
+__nis_retry_sleep(__nisdb_retry_t *retry, int forceSleep)
+{
 
 	if (retry == NULL)
 		return (0);
@@ -111,7 +109,8 @@ static int	rootDirTtl = 0;
  * Return 1 if the root dir has expired, 0 otherwise.
  */
 int
-rootDirExpired(void) {
+rootDirExpired(void)
+{
 	struct timeval	now;
 
 	(void) gettimeofday(&now, 0);
@@ -127,7 +126,8 @@ rootDirExpired(void) {
  * Also establishes the TTL if not set.
  */
 int
-touchRootDir(void) {
+touchRootDir(void)
+{
 	struct timeval	now;
 	int		ttl;
 

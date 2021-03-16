@@ -13,6 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
 [DEFAULT]
@@ -138,3 +139,6 @@ pre = ksensor_init
 tests = [ 'ksensor_basic.32','ksensor_basic.64', 'ksensor_err.32',
     'ksensor_err.64' ]
 post = ksensor_fini
+
+[/opt/os-tests/tests/stackalign]
+tests = ['stackalign.32', 'stackalign.64']

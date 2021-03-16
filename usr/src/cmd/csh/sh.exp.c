@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sh.h"
 #include "sh.tconst.h"
 
@@ -37,6 +35,8 @@
 #define	NOTEQ	6
 #define	EQMATCH 7
 #define	NOTEQMATCH 8
+
+int	uid;
 
 int	exp0(tchar ***, bool);
 int	exp1(tchar ***, bool);
@@ -72,7 +72,7 @@ chk_access(tchar *path, mode_t mode)
 	unsigned char name[MAXPATHLEN*MB_LEN_MAX]; /* General use buffer. */
 
 	/* convert tchar * to char * */
-	tstostr(name, path);
+	tstostr((char *)name, path);
 
 	if (flag == 0) {
 		euid = geteuid();
@@ -611,8 +611,8 @@ evalav(tchar **v)
 	hp->prev = wdp;
 	alias(&paraml);
 	t = syntax(paraml.next, &paraml, 0);
-	if (err)
-		error("%s", gettext(err));
+	if (err_msg)
+		error("%s", gettext(err_msg));
 	execute(t, -1);
 	freelex(&paraml), freesyn(t);
 }

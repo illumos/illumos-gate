@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -34,6 +32,8 @@
 #include "mmc.h"
 #include "util.h"
 #include "main.h"
+
+int uscsi_error;
 
 int
 test_unit_ready(int fd)
@@ -278,7 +278,7 @@ get_configuration(int fd, uint16_t feature, int bufsize, uchar_t *buf)
 
 int
 read10(int fd, uint32_t start_blk, uint16_t nblk, uchar_t *buf,
-	uint32_t bufsize)
+    uint32_t bufsize)
 {
 	struct uscsi_cmd *scmd;
 
@@ -299,7 +299,7 @@ read10(int fd, uint32_t start_blk, uint16_t nblk, uchar_t *buf,
 
 int
 write10(int fd, uint32_t start_blk, uint16_t nblk, uchar_t *buf,
-	uint32_t bufsize)
+    uint32_t bufsize)
 {
 	struct uscsi_cmd *scmd;
 
@@ -396,7 +396,7 @@ blank_disc(int fd, int type, int immediate)
 
 int
 read_cd(int fd, uint32_t start_blk, uint16_t nblk, uchar_t sector_type,
-	uchar_t *buf, uint32_t bufsize)
+    uchar_t *buf, uint32_t bufsize)
 {
 	struct uscsi_cmd *scmd;
 
@@ -891,7 +891,7 @@ print_profile_name(uint16_t num, uchar_t current, uchar_t abbr)
  *
  * Description: Print a list of Profiles supported by the Logical Unit.
  *
- * Parameters:	fd 	- file descriptor for device whose list of
+ * Parameters:	fd	- file descriptor for device whose list of
  *			  profiles we wish to print
  */
 void

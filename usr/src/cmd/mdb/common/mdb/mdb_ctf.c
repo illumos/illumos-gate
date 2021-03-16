@@ -240,7 +240,7 @@ name_to_type(mdb_tgt_t *t, const char *cname, ctf_id_t *idp)
 {
 	const char *object = MDB_TGT_OBJ_EXEC;
 	ctf_file_t *fp = NULL;
-	ctf_id_t id;
+	ctf_id_t id = CTF_ERR;
 	tnarg_t arg;
 	char *p, *s;
 	char buf[MDB_SYM_NAMLEN];

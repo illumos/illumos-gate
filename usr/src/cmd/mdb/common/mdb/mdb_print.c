@@ -533,7 +533,7 @@ cmd_enum(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_ctf_id_t idr;
 
 	int i;
-	intmax_t search;
+	intmax_t search = 0;
 	uint_t isp2;
 
 	info.e_flags = (flags & DCMD_PIPE_OUT)? 0 : E_PRETTY;

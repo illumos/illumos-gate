@@ -743,7 +743,7 @@ static Shnode_t *funct(Lex_t *lexp)
 	register Shnode_t *t;
 	register int flag;
 	struct slnod *volatile slp=0;
-	Stak_t *savstak;
+	Stak_t *savstak = NULL;
 	Sfoff_t	first, last;
 	struct functnod *volatile fp;
 	Sfio_t *iop;

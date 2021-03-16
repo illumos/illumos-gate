@@ -93,89 +93,89 @@ extern "C" {
 #define	BIC(i, w)	(MWORD(w, i) &= ~MBIT(i))
 #define	BIT(i, w)	(MWORD(w, i) & MBIT(i))
 
-uint_t	msiz;
-uchar_t	*clrmap;
-uchar_t	*dirmap;
-uchar_t	*filmap;
-uchar_t	*nodmap;
-uchar_t	*shamap;
-uchar_t	*activemap;
+extern uint_t	msiz;
+extern uchar_t	*clrmap;
+extern uchar_t	*dirmap;
+extern uchar_t	*filmap;
+extern uchar_t	*nodmap;
+extern uchar_t	*shamap;
+extern uchar_t	*activemap;
 
 /*
  *	All calculations done in 0.1" units!
  */
 
-char	*disk;		/* name of the disk file */
-char	*dname;		/* name to put in /etc/dumpdates */
-int	disk_dynamic;	/* true if disk refers to dynamic storage */
-char	*tape;		/* name of the tape file */
-char	*host;		/* name of the remote tape host (may be "user@host") */
-char	*dumpdev;	/* hostname:device for current volume */
-char	*sdumpdev;	/* short form of dumpdev (no user name if remote) */
-char	*increm;	/* name of file containing incremental information */
-char	*filesystem;	/* name of the file system */
-char	*myname;	/* argv[0] without leading path components */
-char	lastincno;	/* increment number of previous dump */
-char	incno;		/* increment number */
-char	*tlabel;	/* what goes in tape header c_label field */
-int	uflag;		/* update flag */
-int	fi;		/* disk file descriptor */
-int	to;		/* tape file descriptor */
-int	mapfd;		/* block disk device descriptor for mmap */
-int	pipeout;	/* true => output to standard output */
-int	tapeout;	/* true => output to a tape drive */
-ino_t	ino;		/* current inumber; used globally */
-off_t	pos;		/* starting offset within ino; used globally */
-int	leftover;	/* number of tape recs left over from prev vol */
-int	nsubdir;	/* counts subdirs, for deciding to dump a dir */
-int	newtape;	/* new tape flag */
-int	nadded;		/* number of added sub directories */
-int	dadded;		/* directory added flag */
-int	density;	/* density in 0.1" units */
-ulong_t	tsize;		/* tape size in 0.1" units */
-u_offset_t esize;	/* estimated tape size, blocks */
-u_offset_t o_esize;	/* number of header blocks (overhead) */
-u_offset_t f_esize;	/* number of TP_BSIZE blocks for files/maps */
-uint_t	etapes;		/* estimated number of tapes */
-uint_t	ntrec;		/* 1K records per tape block */
-int	tenthsperirg;	/* 1/10" per tape inter-record gap */
-dev_t 	partial_dev;	/* id of BLOCK device used in partial mode */
-pid_t	dumppid;	/* process-ID of top-level process */
+extern char	*disk;		/* name of the disk file */
+extern char	*dname;		/* name to put in /etc/dumpdates */
+extern int	disk_dynamic;	/* true if disk refers to dynamic storage */
+extern char	*tape;		/* name of the tape file */
+extern char	*host;	/* name of the remote tape host (may be "user@host") */
+extern char	*dumpdev;	/* hostname:device for current volume */
+extern char	*sdumpdev; /* short form of dumpdev (no user name if remote) */
+extern char	*increm; /* name of file containing incremental information */
+extern char	*filesystem;	/* name of the file system */
+extern char	*myname;	/* argv[0] without leading path components */
+extern char	lastincno;	/* increment number of previous dump */
+extern char	incno;		/* increment number */
+extern char	*tlabel;	/* what goes in tape header c_label field */
+extern int	uflag;		/* update flag */
+extern int	fi;		/* disk file descriptor */
+extern int	to;		/* tape file descriptor */
+extern int	mapfd;		/* block disk device descriptor for mmap */
+extern int	pipeout;	/* true => output to standard output */
+extern int	tapeout;	/* true => output to a tape drive */
+extern ino_t	ino;		/* current inumber; used globally */
+extern off_t	pos;		/* starting offset within ino; used globally */
+extern int	leftover; /* number of tape recs left over from prev vol */
+extern int	nsubdir;	/* counts subdirs, for deciding to dump a dir */
+extern int	newtape;	/* new tape flag */
+extern int	nadded;		/* number of added sub directories */
+extern int	dadded;		/* directory added flag */
+extern int	density;	/* density in 0.1" units */
+extern ulong_t	tsize;		/* tape size in 0.1" units */
+extern u_offset_t esize;	/* estimated tape size, blocks */
+extern u_offset_t o_esize;	/* number of header blocks (overhead) */
+extern u_offset_t f_esize;	/* number of TP_BSIZE blocks for files/maps */
+extern uint_t	etapes;		/* estimated number of tapes */
+extern uint_t	ntrec;		/* 1K records per tape block */
+extern int	tenthsperirg;	/* 1/10" per tape inter-record gap */
+extern dev_t	partial_dev;	/* id of BLOCK device used in partial mode */
+extern pid_t	dumppid;	/* process-ID of top-level process */
 
-int	verify;		/* verify each volume */
-int	doingverify;	/* true => doing a verify pass */
-int	active;		/* recopy active files */
-int	doingactive;	/* true => redumping active files */
-int	archive;	/* true => saving a archive in archivefile */
-char	*archivefile;	/* name of archivefile */
-int	archive_opened;	/* have opened/created the archivefile */
-int	notify;		/* notify operator flag */
-int	diskette;	/* true if dumping to a diskette */
-int	cartridge;	/* true if dumping to a cartridge tape */
-uint_t	tracks;		/* number of tracks on a cartridge tape */
-int	printsize;	/* just print estimated size and exit */
-int	offline;	/* take tape offline after rewinding */
-int	autoload;	/* wait for next tape to autoload; implies offline */
-int	autoload_tries;	/* number of times to check on autoload */
-int	autoload_period; /* seconds, tries*period = total wait time */
-int	doposition;	/* move to specified... */
-daddr32_t filenum;	/* position of dump on 1st volume */
-int	dumpstate;	/* dump output state (see below) */
-int	dumptoarchive;	/* mark records to be archived */
+extern int	verify;		/* verify each volume */
+extern int	doingverify;	/* true => doing a verify pass */
+extern int	active;		/* recopy active files */
+extern int	doingactive;	/* true => redumping active files */
+extern int	archive;	/* true => saving a archive in archivefile */
+extern char	*archivefile;	/* name of archivefile */
+extern int	archive_opened;	/* have opened/created the archivefile */
+extern int	notify;		/* notify operator flag */
+extern int	diskette;	/* true if dumping to a diskette */
+extern int	cartridge;	/* true if dumping to a cartridge tape */
+extern uint_t	tracks;		/* number of tracks on a cartridge tape */
+extern int	printsize;	/* just print estimated size and exit */
+extern int	offline;	/* take tape offline after rewinding */
+extern int	autoload; /* wait for next tape to autoload; implies offline */
+extern int	autoload_tries;	/* number of times to check on autoload */
+extern int	autoload_period; /* seconds, tries*period = total wait time */
+extern int	doposition;	/* move to specified... */
+extern daddr32_t filenum;	/* position of dump on 1st volume */
+extern int	dumpstate;	/* dump output state (see below) */
+extern int	dumptoarchive;	/* mark records to be archived */
 
-int	blockswritten;	/* number of blocks written on current tape */
-uint_t	tapeno;		/* current tape number */
+extern int	blockswritten;	/* number of blocks written on current tape */
+extern uint_t	tapeno;		/* current tape number */
 
-struct fs *sblock;	/* the file system super block */
-int	shortmeta;	/* current file has small amount of metadata */
-union u_shadow c_shadow_save[1];
+extern struct fs *sblock;	/* the file system super block */
+extern int	shortmeta;	/* current file has small amount of metadata */
+extern union u_shadow c_shadow_save[1];
 
-time_t	*telapsed;	/* time spent writing previous tapes */
-time_t	*tstart_writing; /* when we started writing the latest tape */
-time_t	*tschedule;	/* when next to give a remaining-time estimate */
+extern time_t	*telapsed;	/* time spent writing previous tapes */
+extern time_t	*tstart_writing; /* when we started writing the latest tape */
+extern time_t	*tschedule; /* when next to give a remaining-time estimate */
 
-char	*debug_chdir;	/* non-NULL means to mkdir this/pid, and chdir there, */
-			/* once for each separate child */
+extern char	*debug_chdir;	/* non-NULL means to mkdir this/pid, */
+			/* and chdir there, once for each separate child */
 
 /*
  * Defines for the msec part of
@@ -232,8 +232,8 @@ struct	idates {
 	time32_t id_ddate;
 };
 
-size_t	nidates;		/* number of records (might be zero) */
-struct	idates	**idatev;	/* the arrayfied version */
+extern size_t	nidates;		/* number of records (might be zero) */
+extern struct	idates	**idatev;	/* the arrayfied version */
 #define	ITITERATE(i, ip)	\
 	for (i = 0; i < nidates && (ip = idatev[i]) != NULL; i++)
 

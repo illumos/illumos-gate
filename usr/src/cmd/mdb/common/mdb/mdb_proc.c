@@ -5305,7 +5305,7 @@ mdb_proc_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 	char execname[MAXPATHLEN];
 	struct stat64 st;
 	int perr;
-	int state;
+	int state = 0;
 	struct rlimit rlim;
 	int i;
 

@@ -164,7 +164,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_last_page;
 	_left_char;
 	_left_field;
-	_lib_version;
 	__lptr_;
 	_makearg;
 	_misc_request;

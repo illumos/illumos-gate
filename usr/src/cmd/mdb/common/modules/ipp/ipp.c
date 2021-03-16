@@ -568,7 +568,7 @@ dump_classes(
 	uint_t		nelt)
 {
 	ipp_class_t	*array;
-	ipp_class_t	*cp;
+	ipp_class_t	*cp = NULL;
 	uint_t		i;
 	boolean_t	first_time = B_TRUE;
 	char		buf[MAXNAMELEN];
@@ -601,7 +601,7 @@ dump_log(
 	uint_t		nelt)
 {
 	ipp_log_t	*array;
-	ipp_log_t	*lp;
+	ipp_log_t	*lp = NULL;
 	uint_t		i;
 	boolean_t	first_time = B_TRUE;
 	char		buf[MAXNAMELEN];

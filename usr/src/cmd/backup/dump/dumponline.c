@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dump.h"
 #include <math.h>
 #include <limits.h>
@@ -40,6 +38,19 @@ struct inodesc {
 	long	id_gen;			/* generation number */
 	struct inodesc *id_next;	/* next on linked list */
 };
+
+char	*archivefile;
+char	*tape;
+
+int	active;
+int	doingactive;
+int	doposition;
+int	pipeout;
+int	tapeout;
+int	to;
+
+struct fs	*sblock;
+union u_spcl	u_spcl;
 
 static struct inodesc	ilist;		/* list of used inodesc structs */
 static struct inodesc	*last;		/* last inodesc init'd or matched */
@@ -56,11 +67,7 @@ static jmp_buf	truncate_buf;
 static void	(*savebus)();
 static int	incopy;
 
-#ifdef __STDC__
 static void onsigbus(int);
-#else
-static void onsigbus();
-#endif
 
 #endif	/* ENABLE_MMAP */
 
@@ -70,8 +77,7 @@ extern int xflag;
 
 #ifdef ENABLE_MMAP /* XXX part of mmap support */
 static void
-onsigbus(sig)
-	int	sig;
+onsigbus(int sig)
 {
 	if (!incopy) {
 		dumpabort();
@@ -84,11 +90,7 @@ onsigbus(sig)
 #endif	/* ENABLE_MMAP */
 
 void
-#ifdef __STDC__
 allocino(void)
-#else
-allocino()
-#endif
 {
 	ino_t maxino;
 	size_t nused;
@@ -116,11 +118,7 @@ allocino()
 }
 
 void
-#ifdef __STDC__
 freeino(void)
-#else
-freeino()
-#endif
 {
 	int i;
 
@@ -134,8 +132,7 @@ freeino()
 }
 
 void
-resetino(ino)
-	ino_t	ino;
+resetino(ino_t ino)
 {
 	last = ilist.id_next;
 	while (last && last->id_inumber < ino)
@@ -143,8 +140,7 @@ resetino(ino)
 }
 
 char *
-unrawname(cp)
-	char *cp;
+unrawname(char *cp)
 {
 	char *dp;
 	extern char *getfullblkname();
@@ -168,9 +164,7 @@ unrawname(cp)
  * 0 if not mounted, -1 on error.
  */
 int
-lf_ismounted(devname, dirname)
-	char	*devname;	/* name of device (raw or block) */
-	char	*dirname;	/* name of f/s mount point */
+lf_ismounted(char *devname, char *dirname)
 {
 	struct stat64 st;
 	char	*blockname;	/* name of block device */
@@ -218,11 +212,7 @@ static size_t	mapsize;	/* amount of mapped data */
  * constraints.
  */
 caddr_t
-mapfile(fd, offset, bytes, fetch)
-	int	fd;
-	off_t	offset;		/* offset within file */
-	off_t	bytes;		/* number of bytes to map */
-	int	fetch;		/* start faulting in pages */
+mapfile(int fd, off_t offset, off_t bytes, int fetch)
 {
 	/*LINTED [c used during pre-fetch faulting]*/
 	volatile char c, *p;
@@ -257,7 +247,7 @@ mapfile(fd, offset, bytes, fetch)
 	if (mapbase == (caddr_t)-1) {
 		saverr = errno;
 		msg(gettext("Cannot map file at inode `%lu' into memory: %s\n"),
-			ino, strerror(saverr));
+		    ino, strerror(saverr));
 		/* XXX why not call dumpailing() here? */
 		if (!query(gettext(
 	    "Do you want to attempt to continue? (\"yes\" or \"no\") "))) {
@@ -293,18 +283,14 @@ mapfile(fd, offset, bytes, fetch)
 	else
 		/* XGETTEXT:  #ifdef DEBUG only */
 		msg(gettext(
-			"FILE TRUNCATED (fault): Interrupting pre-fetch\n"));
+		    "FILE TRUNCATED (fault): Interrupting pre-fetch\n"));
 #endif
 	(void) signal(SIGBUS, savebus);
 	return (mapstart);
 }
 
 void
-#ifdef __STDC__
 unmapfile(void)
-#else
-unmapfile()
-#endif
 {
 	if (mapbase) {
 		/* XXX we're unmapping it, so what does this gain us? */
@@ -316,11 +302,7 @@ unmapfile()
 #endif	/* ENABLE_MMAP */
 
 void
-#ifdef __STDC__
 activepass(void)
-#else
-activepass()
-#endif
 {
 	static int passno = 1;			/* active file pass number */
 	char *ext, *old;
@@ -374,8 +356,8 @@ activepass()
 			 * Be nice and switch volumes.
 			 */
 			(void) snprintf(buf, sizeof (buf), gettext(
-		"Warning - cannot dump active files to rewind device `%s'\n"),
-				tape);
+			    "Warning - cannot dump active files to rewind "
+			    "device `%s'\n"), tape);
 			msg(buf);
 			close_rewind();
 			changevol();

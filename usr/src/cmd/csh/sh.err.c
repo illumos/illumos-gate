@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sh.h"
 #include <locale.h>
 #include <dirent.h>
@@ -27,11 +25,18 @@
  * C Shell
  */
 
-
+bool	child;
+bool	didfds;
+bool	exiterr;
 bool	errspl;			/* Argument to error was spliced by seterr2 */
+bool	haderr;
+jmp_buf	reslab;
 tchar one[2] = { '1', 0 };
 tchar *onev[2] = { one, NOSTR };
-/* 
+short	SHDIAG;
+int	tpgrp;
+
+/*
  *    contains DIR * for last opendir_(), its left open if an error
  *    longjmp (reset) occurs before it gets closed via closedir.
  *    if its not null in the error handler, then closedir it.
@@ -65,7 +70,6 @@ error(s, a1, a2)
 	 */
 	flush();
 	haderr = 1;		/* Now to diagnostic output */
-	timflg = 0;		/* This isn't otherwise reset */
 	if (v = pargv)
 		pargv = 0, blkfree(v);
 	if (v = gargv)
@@ -76,12 +80,12 @@ error(s, a1, a2)
 	 * an error diagnostic here.
 	 */
 	if (s) {
-			printf(s, a1, a2), printf("\n"); 
+			printf(s, a1, a2), printf("\n");
 	}
-			
+
 
 	didfds = 0;		/* Forget about 0,1,2 */
-	if ((ep = err) && errspl) {
+	if ((ep = err_msg) && errspl) {
 		errspl = 0;
 		xfree(ep);
 	}
@@ -155,8 +159,8 @@ void
 seterr(char *s)
 {
 
-	if (err == 0)
-		err = s, errspl = 0;
+	if (err_msg == NULL)
+		err_msg = s, errspl = 0;
 }
 
 /* Set err to a splice of cp and dp, to be freed later in error() */
@@ -166,27 +170,27 @@ seterr2(tchar *cp, char *dp)
 	char	chbuf[BUFSIZ];
 	char	*gdp;
 
-	if (err)
+	if (err_msg)
 		return;
 
 	/* Concatinate cp and dp in the allocated space. */
 	tstostr(chbuf, cp);
 	gdp = gettext(dp);
-	err = (char *)xalloc(strlen(chbuf)+strlen(gdp)+1);
-	strcpy(err, chbuf);
-	strcat(err, gdp);
+	err_msg = (char *)xalloc(strlen(chbuf)+strlen(gdp)+1);
+	strcpy(err_msg, chbuf);
+	strcat(err_msg, gdp);
 
-	errspl++;/* Remember to xfree(err). */
+	errspl++;/* Remember to xfree(err_msg). */
 }
 
 /* Set err to a splice of cp with a string form of character d */
 void
 seterrc(char *cp, tchar d)
 {
-	char	chbuf[MB_LEN_MAX+1]; 
+	char	chbuf[MB_LEN_MAX+1];
 
 	/* don't overwrite an existing error message */
-	if (err)
+	if (err_msg)
 		return;
 
 #ifdef MBCHAR
@@ -203,9 +207,9 @@ seterrc(char *cp, tchar d)
 
 
 	/* Concatinate cp and d in the allocated space. */
-	err = (char *)xalloc(strlen(cp)+strlen(chbuf)+1);
-	strcpy(err, cp);
-	strcat(err, chbuf);
+	err_msg = (char *)xalloc(strlen(cp)+strlen(chbuf)+1);
+	strcpy(err_msg, cp);
+	strcat(err_msg, chbuf);
 
-	errspl++; /* Remember to xfree(err). */
+	errspl++; /* Remember to xfree(err_msg). */
 }

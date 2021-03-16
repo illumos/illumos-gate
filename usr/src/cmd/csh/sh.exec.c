@@ -28,6 +28,21 @@
  * If there is no search path then we execute only full path names.
  */
 
+char		xhash[HSHSIZ / 8];
+tchar		**Vav;
+tchar		*Vdp;
+tchar		*Vsav;
+
+struct varent	aliases;
+bool		havhash;
+static int	hits;
+static int	misses;
+short		SHOUT;
+short		SHIN;
+
+void		(*parintr)();
+void		(*parterm)();
+
 /*
  * As we search for the command we note the first non-trivial error
  * message for presentation to the user.  This allows us often

@@ -235,6 +235,7 @@ TIC=		$(ONBLD_TOOLS)/bin/$(MACH)/tic
 ZIC=		$(ONBLD_TOOLS)/bin/$(MACH)/zic
 OPENSSL=	/usr/bin/openssl
 CPCGEN=		$(ONBLD_TOOLS)/bin/$(MACH)/cpcgen
+GENICONVTBL=	$(ONBLD_TOOLS)/bin/$(MACH)/geniconvtbl
 
 DEFAULT_CONSOLE_COLOR=					\
 	-DDEFAULT_ANSI_FOREGROUND=ANSI_COLOR_WHITE	\

@@ -231,9 +231,9 @@ lgrp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int opt_q = 0; /* display only address. */
 	int i;
 	const char *s_index = NULL, *s_handle = NULL, *s_parent = NULL;
-	uintptr_t index;
-	uintptr_t handle;
-	uintptr_t parent;
+	uintptr_t index = 0;
+	uintptr_t handle = 0;
+	uintptr_t parent = 0;
 	int filters = 0;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
@@ -638,7 +638,7 @@ lgrp_set_walk_init(mdb_walk_state_t *wsp, klgrpset_t set)
 	lwsd->lswd_nlgrps = nlgrps;
 
 	if (mdb_readsym(lwsd->lwsd_lgrp_tbl, nlgrps * sizeof (lgrp_t *),
-		"lgrp_table") == -1) {
+	    "lgrp_table") == -1) {
 		mdb_warn("unable to read lgrp_table");
 		return (WALK_ERR);
 	}

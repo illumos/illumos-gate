@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 /*
  *	University Copyright- Copyright (c) 1982, 1986, 1988
@@ -43,7 +43,7 @@
 
 /*
  * WRITE() returns:
- * 	>0	no error
+ *	>0	no error
  *	-1	error, errorno is set
  *	-2	security error (secure_write() only)
  */
@@ -55,10 +55,9 @@ static struct	sockaddr_in6 data_addr;
 int	data = -1;
 static int	abrtflag = 0;
 static int	ptflag = 0;
-int		connected;
 static jmp_buf	sendabort;
 static jmp_buf	recvabort;
-static jmp_buf 	ptabort;
+static jmp_buf	ptabort;
 static int ptabflg;
 static boolean_t pasv_refused;
 boolean_t	eport_supported = B_TRUE;
@@ -376,7 +375,7 @@ login(char *host)
 		}
 		stop_timer();
 		(void) printf("Name (%s:%s): ", host,
-			(myname == NULL) ? "" : myname);
+		    (myname == NULL) ? "" : myname);
 		*tmp = '\0';
 		if (fgets(tmp, sizeof (tmp) - 1, stdin) != NULL)
 			tmp[strlen(tmp) - 1] = '\0';
@@ -473,7 +472,7 @@ again:	if (secure_command(command_buf) == 0)
 
 	if (r == 533 && clevel == PROT_P) {
 		(void) fprintf(stderr, "ENC command not supported at server; "
-			"retrying under MIC...\n");
+		    "retrying under MIC...\n");
 		clevel = PROT_S;
 		goto again;
 	}
@@ -498,8 +497,8 @@ getreply(int expecteof)
 	 *	5yz: an error occurred, failure
 	 *	6yz: protected reply (is_base64 == TRUE)
 	 *		631 - base 64 encoded safe message
-	 * 		632 - base 64 encoded private message
-	 * 		633 - base 64 encoded confidential message
+	 *		632 - base 64 encoded private message
+	 *		633 - base 64 encoded confidential message
 	 * 'c'	is a wide char type, for international char sets
 	 */
 	wint_t c;
@@ -538,131 +537,137 @@ getreply(int expecteof)
 		while ((c = ibuf[0] ?
 		    (wint_t)ibuf[i++] : fgetwc(ctrl_in)) != '\n') {
 
-		    if (i >= FTPBUFSIZ)
-			break;
-
-		    if (c == IAC) {	/* handle telnet commands */
-			switch (c = fgetwc(ctrl_in)) {
-			    case WILL:
-			    case WONT:
-				c = fgetwc(ctrl_in);
-				(void) fprintf(ctrl_out, "%c%c%wc", IAC,
-				    WONT, c);
-				(void) fflush(ctrl_out);
+			if (i >= FTPBUFSIZ)
 				break;
-			    case DO:
-			    case DONT:
-				c = fgetwc(ctrl_in);
-				(void) fprintf(ctrl_out, "%c%c%wc", IAC,
-				    DONT, c);
-				(void) fflush(ctrl_out);
-				break;
-			    default:
-				break;
-			}
-			continue;
-		    }
-		    dig++;
-		    if (c == EOF) {
-			if (expecteof) {
-				(void) signal(SIGINT, oldintr);
-				code = 221;
-				return (0);
-			}
-			lostpeer(0);
-			if (verbose) {
-				(void) printf(
-				    "421 Service not available, remote"
-				    " server has closed connection\n");
-			} else
-				(void) printf("Lost connection\n");
-			(void) fflush(stdout);
-			code = 421;
-			return (4);
-		    }
-		    if (n == 0)
-			n = c;
 
-		    if (n == '6')
-			is_base64 = 1;
-
-		    if ((auth_type != AUTHTYPE_NONE) && !ibuf[0] &&
-			(is_base64 || continuation))  {
-			/* start storing chars in obuf */
-			if (c != '\r' && dig > 4)
-				obuf[i++] = (char)c;
-		    } else {
-			if ((auth_type != AUTHTYPE_NONE) && !ibuf[0] &&
-			    dig == 1 && verbose)
-			    (void) printf("Unauthenticated reply received "
-				"from server:\n");
-			if (reply_parse)
-				*reply_ptr++ = (char)c;
-			if (c != '\r' && (verbose > 0 ||
-			    (verbose > -1 && n == '5' && dig > 4))) {
-				if (proxflag &&
-				    (dig == 1 || dig == 5 && verbose == 0))
-					(void) printf("%s:", hostname);
-				(void) putwchar(c);
-			}
-		    } /* endif auth_type && !ibuf[0] ... */
-
-		    if ((auth_type != AUTHTYPE_NONE) && !ibuf[0] && !is_base64)
-			continue;
-
-		    /* we are still extracting the 3 digit code */
-		    if (dig < 4 && isascii(c) && isdigit(c))
-			code = code * 10 + (c - '0');
-
-		    /* starting passive mode */
-		    if (!pflag && code == 227)
-			pflag = 1;
-
-		    /* start to store characters, when dig > 4 */
-		    if (dig > 4 && pflag == 1 && isascii(c) && isdigit(c))
-			pflag = 2;
-		    if (pflag == 2) {
-			if (c != '\r' && c != ')') {
-				/* the mb array is to deal with the wchar_t */
-				char mb[MB_LEN_MAX];
-				int avail;
-
-				/*
-				 * space available in pasv[], accounting
-				 * for trailing NULL
-				 */
-				avail = &pasv[sizeof (pasv)] - pt - 1;
-
-				len = wctomb(mb, c);
-				if (len <= 0 && avail > 0) {
-					*pt++ = (unsigned char)c;
-				} else if (len > 0 && avail >= len) {
-					bcopy(mb, pt, (size_t)len);
-					pt += len;
-				} else {
-					/*
-					 * no room in pasv[];
-					 * close connection
-					 */
-					(void) printf("\nReply too long - "
-					    "closing connection\n");
-					lostpeer(0);
-					(void) fflush(stdout);
-					(void) signal(SIGINT, oldintr);
-					return (4);
+			if (c == IAC) {	/* handle telnet commands */
+				switch (c = fgetwc(ctrl_in)) {
+				case WILL:
+				case WONT:
+					c = fgetwc(ctrl_in);
+					(void) fprintf(ctrl_out, "%c%c%wc", IAC,
+					    WONT, c);
+					(void) fflush(ctrl_out);
+					break;
+				case DO:
+				case DONT:
+					c = fgetwc(ctrl_in);
+					(void) fprintf(ctrl_out, "%c%c%wc", IAC,
+					    DONT, c);
+					(void) fflush(ctrl_out);
+					break;
+				default:
+					break;
 				}
-			} else {
-				*pt = '\0';
-				pflag = 3;
+				continue;
 			}
-		    } /* endif pflag == 2 */
-		    if (dig == 4 && c == '-' && !is_base64) {
-			if (continuation)
-				code = 0;
-			continuation++;
-		    }
-		    if (cp < &reply_string[sizeof (reply_string) - 1])
-			*cp++ = c;
+			dig++;
+			if (c == EOF) {
+				if (expecteof) {
+					(void) signal(SIGINT, oldintr);
+					code = 221;
+					return (0);
+				}
+				lostpeer(0);
+				if (verbose) {
+					(void) printf(
+					    "421 Service not available, remote"
+					    " server has closed connection\n");
+				} else {
+					(void) printf("Lost connection\n");
+				}
+				(void) fflush(stdout);
+				code = 421;
+				return (4);
+			}
+			if (n == 0)
+				n = c;
+
+			if (n == '6')
+				is_base64 = 1;
+
+			if ((auth_type != AUTHTYPE_NONE) && !ibuf[0] &&
+			    (is_base64 || continuation))  {
+				/* start storing chars in obuf */
+				if (c != '\r' && dig > 4)
+					obuf[i++] = (char)c;
+			} else {
+				if ((auth_type != AUTHTYPE_NONE) && !ibuf[0] &&
+				    dig == 1 && verbose)
+					(void) printf("Unauthenticated reply "
+					    "received from server:\n");
+				if (reply_parse)
+					*reply_ptr++ = (char)c;
+				if (c != '\r' && (verbose > 0 ||
+				    (verbose > -1 && n == '5' && dig > 4))) {
+					if (proxflag &&
+					    (dig == 1 || dig == 5 &&
+					    verbose == 0))
+						(void) printf("%s:", hostname);
+					(void) putwchar(c);
+				}
+			} /* endif auth_type && !ibuf[0] ... */
+
+			if ((auth_type != AUTHTYPE_NONE) && !ibuf[0] &&
+			    !is_base64)
+				continue;
+
+			/* we are still extracting the 3 digit code */
+			if (dig < 4 && isascii(c) && isdigit(c))
+				code = code * 10 + (c - '0');
+
+			/* starting passive mode */
+			if (!pflag && code == 227)
+				pflag = 1;
+
+			/* start to store characters, when dig > 4 */
+			if (dig > 4 && pflag == 1 && isascii(c) && isdigit(c))
+				pflag = 2;
+			if (pflag == 2) {
+				if (c != '\r' && c != ')') {
+					/*
+					 * the mb array is to deal with
+					 * the wchar_t
+					 */
+					char mb[MB_LEN_MAX];
+					int avail;
+
+					/*
+					 * space available in pasv[], accounting
+					 * for trailing NULL
+					 */
+					avail = &pasv[sizeof (pasv)] - pt - 1;
+
+					len = wctomb(mb, c);
+					if (len <= 0 && avail > 0) {
+						*pt++ = (unsigned char)c;
+					} else if (len > 0 && avail >= len) {
+						bcopy(mb, pt, (size_t)len);
+						pt += len;
+					} else {
+						/*
+						 * no room in pasv[];
+						 * close connection
+						 */
+						(void) printf("\nReply too long"
+						    " - closing connection\n");
+						lostpeer(0);
+						(void) fflush(stdout);
+						(void) signal(SIGINT, oldintr);
+						return (4);
+					}
+				} else {
+					*pt = '\0';
+					pflag = 3;
+				}
+			} /* endif pflag == 2 */
+			if (dig == 4 && c == '-' && !is_base64) {
+				if (continuation)
+					code = 0;
+				continuation++;
+			}
+			if (cp < &reply_string[sizeof (reply_string) - 1])
+				*cp++ = c;
 
 		} /* end while */
 
@@ -672,15 +677,15 @@ getreply(int expecteof)
 		ibuf[0] = obuf[i] = '\0';
 
 		if (code && is_base64) {
-		    boolean_t again = 0;
-		    n = decode_reply(ibuf, sizeof (ibuf), obuf, n, &again);
-		    if (again)
-			continue;
-		} else
-
-		if (verbose > 0 || verbose > -1 && n == '5') {
-			(void) putwchar(c);
-			(void) fflush(stdout);
+			boolean_t again = 0;
+			n = decode_reply(ibuf, sizeof (ibuf), obuf, n, &again);
+			if (again)
+				continue;
+		} else {
+			if (verbose > 0 || verbose > -1 && n == '5') {
+				(void) putwchar(c);
+				(void) fflush(stdout);
+			}
 		}
 
 		if (continuation && code != originalcode) {
@@ -699,13 +704,14 @@ getreply(int expecteof)
 			(*oldintr)();
 
 		if (reply_parse) {
-		    *reply_ptr = '\0';
-		    if (reply_ptr = strstr(reply_buf, reply_parse)) {
-			reply_parse = reply_ptr + strlen(reply_parse);
-			if (reply_ptr = strpbrk(reply_parse, " \r"))
-				*reply_ptr = '\0';
-		    } else
-			reply_parse = reply_ptr;
+			*reply_ptr = '\0';
+			if (reply_ptr = strstr(reply_buf, reply_parse)) {
+				reply_parse = reply_ptr + strlen(reply_parse);
+				if (reply_ptr = strpbrk(reply_parse, " \r"))
+					*reply_ptr = '\0';
+			} else {
+				reply_parse = reply_ptr;
+			}
 		}
 
 		return (n - '0');
@@ -804,7 +810,7 @@ sendrequest(char *cmd, char *local, char *remote, int allowpipe)
 		if (fstat(fileno(fin), &st) < 0 ||
 		    (st.st_mode&S_IFMT) != S_IFREG) {
 			(void) fprintf(stdout,
-				"%s: not a plain file.\n", local);
+			    "%s: not a plain file.\n", local);
 			(void) signal(SIGINT, oldintr);
 			code = -1;
 			(void) fclose(fin);
@@ -834,7 +840,7 @@ sendrequest(char *cmd, char *local, char *remote, int allowpipe)
 			return;
 		}
 		if (command("REST %lld", (longlong_t)restart_point)
-			!= CONTINUE) {
+		    != CONTINUE) {
 			if (closefunc != NULL)
 				(*closefunc)(fin);
 			restart_point = 0;
@@ -1275,8 +1281,8 @@ writeerr:
 						perror(local);
 					else
 						(void) fprintf(stderr,
-						"%s: Unexpected end of file\n",
-							local);
+						    "%s: Unexpected end of "
+						    "file\n", local);
 					goto abort;
 				}
 				if (c == '\n')
@@ -1329,7 +1335,7 @@ endread:
 			perror("netin");
 		}
 		if ((fflush(fout) == EOF) || ferror(fout) ||
-			(fsync(fileno(fout)) == -1)) {
+		    (fsync(fileno(fout)) == -1)) {
 writer_ascii_err:
 			errflg = 1;
 			perror(local);
@@ -1484,7 +1490,7 @@ initconn(void)
 			perror("ftp: setsockopt (TCP_ABORT_THRESHOLD)");
 		if ((options & SO_DEBUG) &&
 		    setsockopt(data, SOL_SOCKET, SO_DEBUG, (char *)&on,
-			    sizeof (on)) < 0)
+		    sizeof (on)) < 0)
 			perror("setsockopt (ignored)");
 		/*
 		 * Use the system wide default send and receive buffer sizes
@@ -1504,7 +1510,7 @@ initconn(void)
 		if (ipv6rem == B_TRUE) {
 			if (command("EPSV") != COMPLETE) {
 				(void) fprintf(stderr,
-					"Passive mode refused. Try EPRT\n");
+				    "Passive mode refused. Try EPRT\n");
 				pasv_refused = B_TRUE;
 				goto noport;
 			}
@@ -1541,7 +1547,7 @@ initconn(void)
 
 			if (command("PASV") != COMPLETE) {
 				(void) fprintf(stderr,
-					"Passive mode refused. Try PORT\n");
+				    "Passive mode refused. Try PORT\n");
 				pasv_refused = B_TRUE;
 				goto noport;
 			}
@@ -1552,9 +1558,9 @@ initconn(void)
 			 * 227 Entering Passive Mode (h1,h2,h3,h4,p1,p2)
 			 */
 			if (sscanf(pasv, "%d,%d,%d,%d,%d,%d",
-					&a1, &a2, &a3, &a4, &p1, &p2) != 6) {
+			    &a1, &a2, &a3, &a4, &p1, &p2) != 6) {
 				(void) fprintf(stderr,
-					"Passive mode parsing failure.\n");
+				    "Passive mode parsing failure.\n");
 				goto bad;
 			}
 			/*
@@ -1562,8 +1568,8 @@ initconn(void)
 			 * IPv4-mapped IPv6 address.
 			 */
 			a = (unsigned char *)&data_addr.sin6_addr +
-				sizeof (struct in6_addr) -
-				sizeof (struct in_addr);
+			    sizeof (struct in6_addr) -
+			    sizeof (struct in_addr);
 #define	UC(b)	((b)&0xff)
 			a[0] = UC(a1);
 			a[1] = UC(a2);
@@ -1661,18 +1667,19 @@ noport:
 					    hname, htons(data_addr.sin6_port));
 					if (result != COMPLETE)
 						eport_supported = B_FALSE;
-				    }
+				}
 			}
 			/* Try LPRT */
 			if (result != COMPLETE) {
 				result = command(
-"LPRT %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
-6, 16,
-UC(a[0]), UC(a[1]), UC(a[2]), UC(a[3]),
-UC(a[4]), UC(a[5]), UC(a[6]), UC(a[7]),
-UC(a[8]), UC(a[9]), UC(a[10]), UC(a[11]),
-UC(a[12]), UC(a[13]), UC(a[14]), UC(a[15]),
-2, UC(p[0]), UC(p[1]));
+				    "LPRT %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,"
+				    "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+				    6, 16,
+				    UC(a[0]), UC(a[1]), UC(a[2]), UC(a[3]),
+				    UC(a[4]), UC(a[5]), UC(a[6]), UC(a[7]),
+				    UC(a[8]), UC(a[9]), UC(a[10]), UC(a[11]),
+				    UC(a[12]), UC(a[13]), UC(a[14]), UC(a[15]),
+				    2, UC(p[0]), UC(p[1]));
 			}
 		}
 
@@ -1730,7 +1737,7 @@ ptransfer(char *direction, off_t bytes, hrtime_t t0,
 	if (remote)
 		(void) printf("remote: %s\n", remote);
 	(void) printf("%lld bytes %s in %.2g seconds (%.2f Kbytes/s)\n",
-		(longlong_t)bytes, direction, s, bs / 1024.0);
+	    (longlong_t)bytes, direction, s, bs / 1024.0);
 }
 
 /*ARGSUSED*/
@@ -2216,8 +2223,8 @@ gunique(char *local)
 	while (!d) {
 		if (++count == 100) {
 			(void) printf(
-				"runique: can't find unique file name.\n");
-			return ((char *)0);
+			    "gunique: can't find unique file name.\n");
+			return (NULL);
 		}
 		*cp++ = ext;
 		*cp = '\0';
@@ -2290,34 +2297,34 @@ secure_command(char *cmd)
 			in_buf.length = strlen(cmd) + 1;
 
 			maj_stat = gss_context_time(&min_stat, gcontext,
-				&expire_time);
+			    &expire_time);
 			if (GSS_ERROR(maj_stat)) {
 				user_gss_error(maj_stat, min_stat,
-					"gss context has expired");
+				    "gss context has expired");
 				fatal("Your gss credentials have expired.  "
-					"Good-bye!");
+				    "Good-bye!");
 			}
 			maj_stat = gss_seal(&min_stat, gcontext,
-					    (clevel == PROT_P), /* private */
-					    GSS_C_QOP_DEFAULT,
-					    &in_buf, &conf_state,
-					    &out_buf);
+			    (clevel == PROT_P), /* private */
+			    GSS_C_QOP_DEFAULT,
+			    &in_buf, &conf_state,
+			    &out_buf);
 			if (maj_stat != GSS_S_COMPLETE) {
 				/* generally need to deal */
 				user_gss_error(maj_stat, min_stat,
-					(clevel == PROT_P) ?
-					"gss_seal ENC didn't complete":
-					"gss_seal MIC didn't complete");
+				    (clevel == PROT_P) ?
+				    "gss_seal ENC didn't complete":
+				    "gss_seal MIC didn't complete");
 			} else if ((clevel == PROT_P) && !conf_state) {
 				(void) fprintf(stderr,
-					"GSSAPI didn't encrypt message");
+				    "GSSAPI didn't encrypt message");
 				out = out_buf.value;
 			} else {
 				if (debug)
-				(void) fprintf(stderr,
-					"sealed (%s) %d bytes\n",
-					clevel == PROT_P ? "ENC" : "MIC",
-					out_buf.length);
+					(void) fprintf(stderr,
+					    "sealed (%s) %d bytes\n",
+					    clevel == PROT_P ? "ENC" : "MIC",
+					    out_buf.length);
 
 				out = out_buf.value;
 			}
@@ -2332,15 +2339,15 @@ secure_command(char *cmd)
 		length = out_buf.length;
 		if (auth_error = radix_encode(out, in, inlen, &length, 0)) {
 			(void) fprintf(stderr,
-				"Couldn't base 64 encode command (%s)\n",
-				radix_error(auth_error));
+			    "Couldn't base 64 encode command (%s)\n",
+			    radix_error(auth_error));
 			free(in);
 			gss_release_buffer(&min_stat, &out_buf);
 			return (0);
 		}
 
 		(void) fprintf(ctrl_out, "%s %s",
-			clevel == PROT_P ? "ENC" : "MIC", in);
+		    clevel == PROT_P ? "ENC" : "MIC", in);
 
 		free(in);
 		gss_release_buffer(&min_stat, &out_buf);
@@ -2407,11 +2414,8 @@ setpbsz(unsigned int size)
  *	5	if an error occurred
  */
 static int
-decode_reply(uchar_t *plain_buf,
-		int ilen,
-		uchar_t *b64_buf,
-		int retval,
-		boolean_t *again)
+decode_reply(uchar_t *plain_buf, int ilen, uchar_t *b64_buf, int retval,
+    boolean_t *again)
 {
 	int len;
 	int safe = 0;
@@ -2419,26 +2423,26 @@ decode_reply(uchar_t *plain_buf,
 	*again = 0;
 
 	if (!b64_buf[0])	/* if there is no string, no problem */
-	    return (retval);
+		return (retval);
 
 	if ((auth_type == AUTHTYPE_NONE)) {
-	    (void) printf("Cannot decode reply:\n%d %s\n", code, b64_buf);
-	    return ('5');
+		(void) printf("Cannot decode reply:\n%d %s\n", code, b64_buf);
+		return ('5');
 	}
 
 	switch (code) {
 
-	    case 631:	/* 'safe' */
+	case 631:	/* 'safe' */
 		safe = 1;
 		break;
 
-	    case 632:	/* 'private' */
+	case 632:	/* 'private' */
 		break;
 
-	    case 633:	/* 'confidential' */
+	case 633:	/* 'confidential' */
 		break;
 
-	    default:
+	default:
 		(void) printf("Unknown reply: %d %s\n", code, b64_buf);
 		return ('5');
 	}
@@ -2448,7 +2452,7 @@ decode_reply(uchar_t *plain_buf,
 
 	if (auth_error) {
 		(void) printf("Can't base 64 decode reply %d (%s)\n\"%s\"\n",
-			code, radix_error(auth_error), b64_buf);
+		    code, radix_error(auth_error), b64_buf);
 		return ('5');
 	}
 
@@ -2461,10 +2465,10 @@ decode_reply(uchar_t *plain_buf,
 
 		/* decrypt/verify the message */
 		maj_stat = gss_unseal(&min_stat, gcontext,
-			&xmit_buf, &msg_buf, &conf_state, NULL);
+		    &xmit_buf, &msg_buf, &conf_state, NULL);
 		if (maj_stat != GSS_S_COMPLETE) {
 			user_gss_error(maj_stat, min_stat,
-				"failed unsealing reply");
+			    "failed unsealing reply");
 			return ('5');
 		}
 		if (msg_buf.length < ilen - 2 - 1) {
@@ -2474,7 +2478,7 @@ decode_reply(uchar_t *plain_buf,
 			*again = 1;
 		} else {
 			user_gss_error(maj_stat, min_stat,
-				"reply was too long");
+			    "reply was too long");
 			return ('5');
 		}
 	} /* end if GSSAPI */

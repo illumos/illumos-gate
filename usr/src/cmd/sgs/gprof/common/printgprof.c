@@ -34,10 +34,10 @@
 #include "conv.h"
 #include "gprof.h"
 
+double	actime;
+
 void print_demangled_name(int, nltype *);
 static void stripped_name(char **, size_t *, nltype **);
-
-extern long hz;
 
 /*
  * Symbols that must never be printed, no matter what.

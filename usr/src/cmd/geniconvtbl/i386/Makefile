@@ -22,19 +22,15 @@
 # Copyright 1999, 2003 Sun Microsystems, Inc.
 # All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/geniconvtbl/i386/Makefile
 
 .KEEP_STATE:
 
 include ../Makefile.com
 
-catalog: $(MSGDOMAIN) $(POFILE)
-	$(RM) $(MSGDOMAIN)/$(POFILE)
-	$(CP) $(POFILE) $(MSGDOMAIN)
+_msg: $(MSGDOMAINPOFILE)
 
-all:	$(PROG) $(ITM) $(NATIVEPROG)
+all:	$(PROG) $(LIB)
 
-install: all $(ROOTBIN) $(ROOTPROG) $(ROOTITM32) $(ROOTLINKS32)
+install: all $(ROOTBIN) $(ROOTPROG) $(ROOTLIB32) $(ROOTLINKS32)
+
+

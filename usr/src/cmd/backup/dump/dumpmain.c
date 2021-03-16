@@ -41,6 +41,45 @@
 #include "roll_log.h"
 #include <unistd.h>
 
+char		*filesystem;
+char		*host;
+char		*debug_chdir;
+char		*dumpdev;
+char		*sdumpdev;
+char		*tlabel;
+time_t		*telapsed;
+time_t		*tstart_writing;
+
+uchar_t		*clrmap;
+uchar_t		*dirmap;
+uchar_t		*filmap;
+uchar_t		*nodmap;
+uchar_t		*shamap;
+uchar_t		*activemap;
+
+int		archive;
+int		autoload;
+int		autoload_period;
+int		autoload_tries;
+int		archive_opened;
+int		doingverify;
+int		disk_dynamic;
+int		dumpstate;
+int		dumptoarchive;
+int		fi;
+int		leftover;
+int		nadded;
+int		offline;
+int		verify;
+
+uint_t		etapes;
+ulong_t		tsize;
+ino_t		ino;
+off_t		pos;
+pid_t		dumppid;
+u_offset_t	esize;
+union u_shadow	c_shadow_save[1];
+
 int	notify = 0;		/* notify operator flag */
 int	blockswritten = 0;	/* number of blocks written on current tape */
 uint_t	tapeno = 0;		/* current tape number */

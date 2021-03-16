@@ -67,6 +67,7 @@
 extern	struct menu_item menu_partition[];
 extern	struct menu_item menu_analyze[];
 extern	struct menu_item menu_defect[];
+int	prot_type;
 
 /*
  * Choices for the p_tag vtoc field

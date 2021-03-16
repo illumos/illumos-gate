@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * cu [-cdevice] [-sspeed] [-lline] [-bbits] [-h] [-t] [-d] [-n]
  *		[-o|-e] [-L] [-C] telno | systemname [local-cmd]

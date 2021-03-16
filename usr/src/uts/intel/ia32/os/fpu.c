@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -583,8 +584,8 @@ const struct fnsave_state x87_initial = {
 };
 
 /*
- * This vector is patched to xsave_ctxt() if we discover we have an
- * XSAVE-capable chip in fpu_probe.
+ * This vector is patched to xsave_ctxt() or xsaveopt_ctxt() if we discover we
+ * have an XSAVE-capable chip in fpu_probe.
  */
 void (*fpsave_ctxt)(void *) = fpxsave_ctxt;
 void (*fprestore_ctxt)(void *) = fpxrestore_ctxt;
@@ -1448,8 +1449,9 @@ kernel_fpu_end(kfpu_state_t *kfpu, uint_t flags)
 	/*
 	 * When we are ending things, we explicitly don't save the current
 	 * state back to the temporary state. The API is not intended to be a
-	 * permanent save location. We always will clear TS and note that the
-	 * user state should be restored as part of it returning to userland.
+	 * permanent save location. If this is a kernel thread we set TS,
+	 * otherwise we restore the user state on the off chance that a
+	 * context switch occurs before returning to user-land.
 	 */
 	if (curthread->t_lwp != NULL &&
 	    (curthread->t_lwp->lwp_pcb.pcb_fpu.fpu_flags & FPU_EN) != 0) {
@@ -1461,7 +1463,41 @@ kernel_fpu_end(kfpu_state_t *kfpu, uint_t flags)
 			f = FPU_KERNEL;
 		}
 		curthread->t_lwp->lwp_pcb.pcb_fpu.fpu_flags &= ~f;
-		PCB_SET_UPDATE_FPU(&curthread->t_lwp->lwp_pcb);
+		/*
+		 * Don't need to set PCB_SET_UPDATE_FPU here since we'll
+		 * restore our fpu state below if we're a user-level thread.
+		 */
 	}
-	fpdisable();
+
+	/*
+	 * If a user-level thread ever uses the fpu while in the kernel, then
+	 * we cannot call fpdisable since that does STTS. That will set the
+	 * ts bit in %cr0 which will cause an exception if anything touches the
+	 * fpu. However, the user-level context switch handler (fpsave_ctxt)
+	 * needs to access the fpu to save the registers into the pcb.
+	 * fpsave_ctxt relies on CLTS having been done to clear the ts bit in
+	 * fprestore_ctxt when the thread context switched onto the CPU.
+	 */
+	if ((curthread->t_procp->p_flag & SSYS) != 0 ||
+	    curthread->t_lwp == NULL ||
+	    (curthread->t_lwp->lwp_pcb.pcb_fpu.fpu_flags & FPU_EN) == 0) {
+		fpdisable();
+	} else {
+		/*
+		 * This is a user-level thread. If we were to context switch
+		 * before returning to user-land, fpsave_ctxt could overwrite
+		 * the valid user-level fpu data we previously saved in the
+		 * pcb (the fp_save in kernel_fpu_begin). To avoid adding
+		 * complexity to the context switch handlers to account for
+		 * this case, we restore the user-level fpu registers here,
+		 * since user-level thread usage of the kernel fpu tends to be
+		 * uncommon. By restoring the fpu registers here, we avoid
+		 * setting PCB_SET_UPDATE_FPU and having to handle this in
+		 * sys_rtt_common.
+		 *
+		 * fprestore_ctxt checks FPU_VALID so we don't do that here.
+		 */
+		pcb_t *pcb = &curthread->t_lwp->lwp_pcb;
+		fprestore_ctxt(&pcb->pcb_fpu);
+	}
 }

@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module provides with system/library function substitutes for tchar
  * datatype. This also includes two conversion functions between tchar and
@@ -51,6 +49,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+bool	cflg;
 
 /*
  * strtots(to, from): convert a char string 'from' into a tchar buffer 'to'.

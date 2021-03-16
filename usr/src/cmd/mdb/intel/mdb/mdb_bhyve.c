@@ -1022,7 +1022,7 @@ bhyve_aread(mdb_tgt_t *tgt, mdb_tgt_as_t as, void *buf, size_t nbytes,
     mdb_tgt_addr_t addr)
 {
 	bhyve_data_t *bd = tgt->t_data;
-	ssize_t cnt;
+	ssize_t cnt = 0;
 
 	switch ((uintptr_t)as) {
 	case (uintptr_t)MDB_TGT_AS_VIRT:
@@ -1061,7 +1061,7 @@ bhyve_awrite(mdb_tgt_t *tgt, mdb_tgt_as_t as, const void *buf, size_t nbytes,
     mdb_tgt_addr_t addr)
 {
 	bhyve_data_t *bd = tgt->t_data;
-	ssize_t cnt;
+	ssize_t cnt = 0;
 
 	switch ((uintptr_t)as) {
 	case (uintptr_t)MDB_TGT_AS_VIRT:
@@ -1408,15 +1408,15 @@ bhyve_putareg(mdb_tgt_t *tgt, mdb_tgt_tid_t tid, const char *rname,
 
 static const mdb_tgt_ops_t bhyve_ops = {
 	.t_setflags =		bhyve_setflags,
-	.t_setcontext =		(int (*)()) mdb_tgt_notsup,
+	.t_setcontext =		(int (*)())(uintptr_t)mdb_tgt_notsup,
 	.t_activate =		bhyve_activate,
 	.t_deactivate =		bhyve_deactivate,
-	.t_periodic =		(void (*)()) mdb_tgt_nop,
+	.t_periodic =		(void (*)())(uintptr_t)mdb_tgt_nop,
 	.t_destroy =		bhyve_destroy,
 	.t_name =		bhyve_name,
 	.t_isa =		bhyve_isa,
-	.t_platform =		(const char *(*)()) mdb_conf_platform,
-	.t_uname =		(int (*)()) mdb_tgt_notsup,
+	.t_platform =		(const char *(*)())mdb_conf_platform,
+	.t_uname =		(int (*)())(uintptr_t)mdb_tgt_notsup,
 	.t_dmodel =		bhyve_dmodel,
 	.t_aread =		bhyve_aread,
 	.t_awrite =		bhyve_awrite,
@@ -1431,33 +1431,33 @@ static const mdb_tgt_ops_t bhyve_ops = {
 	.t_vtop =		bhyve_vtop,
 	.t_lookup_by_name =	bhyve_lookup_by_name,
 	.t_lookup_by_addr =	bhyve_lookup_by_addr,
-	.t_symbol_iter =	(int (*)()) mdb_tgt_notsup,
-	.t_mapping_iter =	(int (*)()) mdb_tgt_notsup,
-	.t_object_iter =	(int (*)()) mdb_tgt_notsup,
-	.t_addr_to_map =	(const mdb_map_t *(*)()) mdb_tgt_null,
-	.t_name_to_map =	(const mdb_map_t *(*)()) mdb_tgt_null,
-	.t_addr_to_ctf =	(struct ctf_file *(*)()) mdb_tgt_null,
-	.t_name_to_ctf =	(struct ctf_file *(*)()) mdb_tgt_null,
+	.t_symbol_iter =	(int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_mapping_iter =	(int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_object_iter =	(int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_addr_to_map =	(const mdb_map_t *(*)())mdb_tgt_null,
+	.t_name_to_map =	(const mdb_map_t *(*)())mdb_tgt_null,
+	.t_addr_to_ctf =	(struct ctf_file *(*)())mdb_tgt_null,
+	.t_name_to_ctf =	(struct ctf_file *(*)())mdb_tgt_null,
 	.t_status =		bhyve_status,
-	.t_run =		(int (*)()) mdb_tgt_notsup,
+	.t_run =		(int (*)())(uintptr_t)mdb_tgt_notsup,
 	.t_step =		bhyve_step,
-	.t_step_out =		(int (*)()) mdb_tgt_notsup,
-	.t_next =		(int (*)()) mdb_tgt_notsup,
+	.t_step_out =		(int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_next =		(int (*)())(uintptr_t)mdb_tgt_notsup,
 	.t_cont =		bhyve_cont,
-	.t_signal =		(int (*)()) mdb_tgt_notsup,
-	.t_add_vbrkpt =		(int (*)()) mdb_tgt_null,
-	.t_add_sbrkpt =		(int (*)()) mdb_tgt_null,
-	.t_add_pwapt =		(int (*)()) mdb_tgt_null,
-	.t_add_vwapt =		(int (*)()) mdb_tgt_null,
-	.t_add_iowapt =		(int (*)()) mdb_tgt_null,
-	.t_add_sysenter =	(int (*)()) mdb_tgt_null,
-	.t_add_sysexit =	(int (*)()) mdb_tgt_null,
-	.t_add_signal =		(int (*)()) mdb_tgt_null,
-	.t_add_fault =		(int (*)()) mdb_tgt_null,
+	.t_signal =		(int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_add_vbrkpt =		(int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_sbrkpt =		(int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_pwapt =		(int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_vwapt =		(int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_iowapt =		(int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_sysenter =	(int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_sysexit =	(int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_signal =		(int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_fault =		(int (*)())(uintptr_t)mdb_tgt_null,
 	.t_getareg =		bhyve_getareg,
 	.t_putareg =		bhyve_putareg,
-	.t_stack_iter =		(int (*)()) mdb_tgt_notsup,
-	.t_auxv =		(int (*)()) mdb_tgt_notsup
+	.t_stack_iter =		(int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_auxv =		(int (*)())(uintptr_t)mdb_tgt_notsup
 };
 
 int

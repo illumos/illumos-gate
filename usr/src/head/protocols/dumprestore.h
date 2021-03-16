@@ -117,7 +117,7 @@ union u_shadow {
 
 /* if you change anything here, be sure to change normspcl in byteorder.c */
 
-union u_spcl {
+extern union u_spcl {
 	char dummy[TP_BUFSIZE];
 	struct	s_spcl {
 		int32_t	c_type;		    /* record type (see below) */

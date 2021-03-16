@@ -27,8 +27,6 @@
 #ifndef	_TRANSPORT_H
 #define	_TRANSPORT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -42,7 +40,7 @@ extern "C" {
 
 #define	RQBUFLEN	32
 extern char rqbuf[RQBUFLEN];
-uchar_t uscsi_status, rqstatus, rqresid;
+extern uchar_t uscsi_status, rqstatus, rqresid;
 
 struct uscsi_cmd *get_uscsi_cmd(void);
 int uscsi(int fd, struct uscsi_cmd *scmd);

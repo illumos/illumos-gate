@@ -60,7 +60,6 @@ SYMBOL_VERSION SUNW_1.1 {
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	_lib_version;
 	xalloc;
 	xfree;
     local:

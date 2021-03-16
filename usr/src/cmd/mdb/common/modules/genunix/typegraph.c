@@ -2765,7 +2765,7 @@ int
 typeconflict_walk_step(mdb_walk_state_t *wsp)
 {
 	size_t ndx;
-	tg_node_t *node;
+	tg_node_t *node = NULL;
 
 	for (ndx = (size_t)wsp->walk_data; ndx < tg_nnodes; ndx++) {
 		node = &tg_node[ndx];
@@ -2793,7 +2793,7 @@ int
 typeunknown_walk_step(mdb_walk_state_t *wsp)
 {
 	size_t ndx;
-	tg_node_t *node;
+	tg_node_t *node = NULL;
 
 	for (ndx = (size_t)wsp->walk_data; ndx < tg_nnodes; ndx++) {
 		node = &tg_node[ndx];

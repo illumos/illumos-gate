@@ -43,7 +43,6 @@ INPUTFILES1	= $(CODESETS:%=%+UTF-8.src)
 INPUTFILES2	= $(CODESETS:%=UTF-8+%.src)
 INPUTFILES	= $(INPUTFILES1) $(INPUTFILES2)
 BINARYTABLES	= $(INPUTFILES:%.src=%.bt)
-GENICONVTBL	= /usr/bin/geniconvtbl
 GENI_SRCS	= common/binarytables/srcs
 ICONV_DIR	= $(ROOT)/usr/lib/iconv
 BTS_DIR		= $(ICONV_DIR)/geniconvtbl/binarytables

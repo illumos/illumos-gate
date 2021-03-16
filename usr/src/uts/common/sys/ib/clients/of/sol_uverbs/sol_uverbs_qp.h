@@ -41,7 +41,7 @@ extern "C" {
  * Definitions
  */
 #define	IBT_TO_OFA_QP_STATE(_state)  ((_state) < IBT_STATE_SQDRAIN ?   \
-						(_state) : IBT_STATE_SQD)
+	(enum ib_qp_state)(_state) : IB_QPS_SQD)
 
 /*
  * Structures

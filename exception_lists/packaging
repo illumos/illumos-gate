@@ -24,13 +24,13 @@
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
-# Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 # Copyright 2017 RackTop Systems.
-# Copyright 2019, Joyent, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2018 Jason King
-# Copyright 2020 Peter Tribble
+# Copyright 2019, Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 Peter Tribble
 #
 
 #
@@ -744,11 +744,13 @@ usr/lib/sparcv9/libvrrpadm.so		sparc
 #
 opt/onbld/bin/i386/mandoc	i386
 opt/onbld/bin/sparc/mandoc	sparc
+opt/onbld/bin/i386/geniconvtbl	i386
+opt/onbld/bin/sparc/geniconvtbl	sparc
 opt/onbld/bin/i386/makesoftcore	i386
-opt/onbld/bin/i386/rpcgen	i386
-opt/onbld/bin/i386/vtfontcvt	i386
 opt/onbld/bin/sparc/makesoftcore	sparc
+opt/onbld/bin/i386/rpcgen	i386
 opt/onbld/bin/sparc/rpcgen	sparc
+opt/onbld/bin/i386/vtfontcvt	i386
 opt/onbld/bin/sparc/vtfontcvt	sparc
 
 #

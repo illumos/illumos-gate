@@ -61,6 +61,8 @@
 #include "auto_sense.h"
 
 extern	struct menu_item menu_fdisk[];
+struct mboot boot_sec;
+uint_t	xstart;
 
 /*
  * Byte swapping macros for accessing struct ipart

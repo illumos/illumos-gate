@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
@@ -46,6 +46,13 @@
 #include "ex_re.h"
 #include "ex_tty.h"
 #include "ex_vis.h"
+
+#ifndef PRESUNEUC
+int (*wdwc)(wchar_t);
+int (*wdbdg)(wchar_t, wchar_t, int);
+wchar_t *(*wddlm)(wchar_t, wchar_t, int);
+wchar_t (*mcfllr)(void);
+#endif /* PRESUNEUC */
 
 /*
  * Random routines, in alphabetical order.
@@ -588,7 +595,7 @@ qcolumn(unsigned char *lim, unsigned char *gp)
 			col = 0;
 		vcntcol = vcntcol - col + 1;
 	}
- 	if (gp)
+	if (gp)
 		while (*gp) {
 			length = mbtowc(&wchar, (char *)gp, MULTI_BYTE_MAX);
 			if(length < 0) {
@@ -628,7 +635,7 @@ nqcolumn(unsigned char *lim, unsigned char *gp)
 	pline(0);
 	if (lim != NULL)
 		lim[length] = x;
- 	if (gp)
+	if (gp)
 		while (*gp) {
 			length = mbtowc(&wchar, (char *)gp, MULTI_BYTE_MAX);
 			if(length < 0) {

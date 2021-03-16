@@ -2995,7 +2995,7 @@ cpu_walk_init(mdb_walk_state_t *wsp)
 	int max_ncpus, i = 0;
 	uintptr_t current, first;
 	cpu_t cpu, panic_cpu;
-	uintptr_t panicstr, addr;
+	uintptr_t panicstr, addr = 0;
 	GElf_Sym sym;
 
 	cw = mdb_zalloc(sizeof (cpu_walk_t), UM_SLEEP | UM_GC);
@@ -3160,7 +3160,7 @@ cpuinfo_walk_cpu(uintptr_t addr, const cpu_t *cpu, cpuinfo_data_t *cid)
 	kthread_t t;
 	disp_t disp;
 	mdb_cpuinfo_proc_t p;
-	uintptr_t pinned;
+	uintptr_t pinned = 0;
 	char **flagbuf;
 	int nflaglines = 0, flagline = 0, bspl, rval = WALK_NEXT;
 

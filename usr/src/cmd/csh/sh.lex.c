@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>	/* for lseek prototype */
 #include "sh.h"
 #include "sh.tconst.h"
@@ -23,6 +21,14 @@
 /*
  * C shell
  */
+
+bool	justpr;
+static int lastev;
+int	onelflg;
+tchar	**alvec;
+struct wordent *alhistp;
+struct wordent *alhistt;
+struct wordent paraml;
 
 /*
  * These lexical routines read input and form lists of words.
@@ -330,7 +336,7 @@ top:
 			 * the input is original, not from a substitution and
 			 * therefore should not be quoted
 			 */
-			if (!err && cmap(c, _META|_Q|_Q1)||isauxsp(c))
+			if (!err_msg && cmap(c, _META|_Q|_Q1)||isauxsp(c))
 				c |= QUOTE;
 			return (c);
 		}
@@ -480,6 +486,7 @@ void
 addla(tchar *cp)
 {
 	tchar *buf;
+	static tchar *labuf = NULL;
 	int len = 0;
 
 #ifdef TRACE

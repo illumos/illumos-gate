@@ -12,21 +12,15 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <errno.h>
 #include "dump.h"
 
+time_t *tschedule;
 static unsigned int timeout;		/* current timeout */
 static char *attnmessage, *saveattn;	/* attention message */
 
-#ifdef __STDC__
 static void alarmcatch();
 static int idatesort(const void *, const void *);
-#else /* !__STDC__ */
-static void alarmcatch();
-static int idatesort();
-#endif
 
 #ifdef DEBUG
 extern int xflag;
@@ -44,8 +38,7 @@ extern int xflag;
  *	that dump needs attention.
  */
 int
-query(question)
-	char	*question;
+query(char *question)
 {
 	int def = -1;
 
@@ -59,8 +52,7 @@ static jmp_buf sjalarmbuf;
 
 /* real simple check-sum */
 static int
-addem(s)
-	char *s;
+addem(char *s)
 {
 	int total = 0;
 
@@ -72,9 +64,7 @@ addem(s)
 }
 
 int
-query_once(question, def)
-	char	*question;
-	int	def;
+query_once(char	*question, int def)
 {
 	static char *lastmsg;
 	static int lastmsgsum;
@@ -187,11 +177,7 @@ done:
  *	longjmp back there and return the default answer.
  */
 static void
-#ifdef __STDC__
 alarmcatch(void)
-#else
-alarmcatch()
-#endif
 {
 	struct sigvec sv;
 
@@ -216,8 +202,7 @@ alarmcatch()
  */
 /*ARGSUSED*/
 void
-interrupt(sig)
-	int	sig;
+interrupt(int sig)
 {
 	if (!saveattn) {
 		saveattn = attnmessage;
@@ -243,8 +228,7 @@ interrupt(sig)
  *	controlling terminals, and the like.
  */
 void
-broadcast(message)
-	char	*message;
+broadcast(char *message)
 {
 	time_t	clock;
 	pid_t	pid;
@@ -308,9 +292,7 @@ broadcast(message)
  */
 #define	EST_SEC	600			/* every 10 minutes */
 void
-timeest(force, blkswritten)
-	int force;
-	int blkswritten;
+timeest(int force, int blkswritten)
 {
 	time_t tnow, deltat;
 	char *msgp;
@@ -325,10 +307,10 @@ timeest(force, blkswritten)
 		if (!force && blkswritten < 50 * ntrec)
 			return;
 		deltat = (*telapsed + (tnow - *tstart_writing))
-				* ((double)esize / blkswritten - 1.0);
+		    * ((double)esize / blkswritten - 1.0);
 		msgp = gettext("%3.2f%% done, finished in %d:%02d\n");
 		msg(msgp, (blkswritten*100.0)/esize,
-			deltat/3600, (deltat%3600)/60);
+		    deltat/3600, (deltat%3600)/60);
 	}
 }
 
@@ -377,8 +359,7 @@ msgtail(const char *fmt, ...)
  *	we don't actually do it
  */
 void
-lastdump(arg)		/* w ==> just what to do; W ==> most recent dumps */
-	int	arg;
+lastdump(int arg)	/* w ==> just what to do; W ==> most recent dumps */
 {
 	char *lastname;
 	char *date;
@@ -445,14 +426,7 @@ lastdump(arg)		/* w ==> just what to do; W ==> most recent dumps */
 }
 
 static int
-idatesort(v1, v2)
-#ifdef __STDC__
-	const void *v1;
-	const void *v2;
-#else
-	void *v1;
-	void *v2;
-#endif
+idatesort(const void *v1, const void *v2)
 {
 	struct idates **p1 = (struct idates **)v1;
 	struct idates **p2 = (struct idates **)v2;

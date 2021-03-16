@@ -23,26 +23,12 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 .KEEP_STATE:
-
-
 
 include ../Makefile.com
 include ../../Makefile.cmd.64
 
-#catalog: $(MSGDOMAIN64) $(POFILE)
-#	$(RM) $(MSGDOMAIN64)/$(POFILE)
-#	$(CP) $(POFILE) $(MSGDOMAIN64)
+all: $(LIB)
 
-lint := SRCS = $(SRCI)
-
-all: $(ITM)
-
-install: all  $(ROOTITM64) $(ROOTLINKS64)
-
-both: $(ITM) $(PROG)
-
-catalog:
+install: all  $(ROOTLIB64) $(ROOTLINKS64)

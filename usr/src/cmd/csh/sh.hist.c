@@ -12,10 +12,11 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sh.h"
 #include "sh.tconst.h"
+
+struct Hist Histlist;
+int	eventno;
 
 struct Hist *enthist(int, struct wordent *, bool);
 void	hfree(struct Hist *);

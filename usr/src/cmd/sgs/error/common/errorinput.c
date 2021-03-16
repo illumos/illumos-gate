@@ -34,9 +34,6 @@
 int	wordc;		/* how long the current error message is */
 char	**wordv;	/* the actual error message */
 
-int	nerrors;
-int	language;
-
 Errorclass	onelong(void);
 Errorclass	cpp(void);
 Errorclass	pccccom(void);	/* Portable C Compiler C Compiler */
