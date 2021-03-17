@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/bootconf.h>
@@ -115,14 +113,18 @@ kctl_ttable_tlb_modify(caddr_t tba, size_t sz, void (*func)(caddr_t, int))
 }
 
 static void
-kctl_ttable_tlb_lock(caddr_t tba, size_t sz)
+kctl_ttable_tlb_lock(uint64_t ptr, uint64_t sz)
 {
+	caddr_t tba = (caddr_t)ptr;
+
 	kctl_ttable_tlb_modify(tba, sz, kdi_tlb_page_lock);
 }
 
 static void
-kctl_ttable_tlb_unlock(caddr_t tba, size_t sz)
+kctl_ttable_tlb_unlock(uint64_t ptr, uint64_t sz)
 {
+	caddr_t tba = (caddr_t)ptr;
+
 	kctl_ttable_tlb_modify(tba, sz, kdi_tlb_page_unlock);
 }
 
@@ -140,14 +142,14 @@ kctl_ttable_tlb_unlock(caddr_t tba, size_t sz)
 static void
 kctl_ttable_init(void)
 {
-	xc_all((xcfunc_t *)kctl_ttable_tlb_lock, (uint64_t)kctl.kctl_tba,
+	xc_all(kctl_ttable_tlb_lock, (uint64_t)kctl.kctl_tba,
 	    KCTL_TTABLE_SIZE);
 }
 
 static void
 kctl_ttable_fini(void)
 {
-	xc_all((xcfunc_t *)kctl_ttable_tlb_unlock, (uint64_t)kctl.kctl_dseg,
+	xc_all(kctl_ttable_tlb_unlock, (uint64_t)kctl.kctl_dseg,
 	    KCTL_TTABLE_SIZE);
 }
 
@@ -169,7 +171,7 @@ kctl_ttable_reserve(kmdb_auxv_t *kav, size_t *szp)
 static void
 kctl_cpu_init(void)
 {
-	kctl_ttable_tlb_lock(kctl.kctl_tba, KCTL_TTABLE_SIZE);
+	kctl_ttable_tlb_lock((uint64_t)kctl.kctl_tba, KCTL_TTABLE_SIZE);
 }
 
 int
