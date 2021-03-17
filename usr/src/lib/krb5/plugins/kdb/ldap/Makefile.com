@@ -66,7 +66,7 @@ CERRWARN +=	-_gcc=-Wno-unused-function
 
 DYNFLAGS +=	$(KERBRUNPATH)
 # setting -L $(ROOT)/usr/lib/gss because libkdb_ldap needs mech_krb5
-LDLIBS +=	-L $(ROOT)/usr/lib/gss -L $(ROOTLIBDIR) -lkdb_ldap
+LDLIBS +=	-L $(ROOT)/usr/lib/gss -L $(ROOTLIBDIR) -lkdb_ldap -lc
 
 .KEEP_STATE:
 
