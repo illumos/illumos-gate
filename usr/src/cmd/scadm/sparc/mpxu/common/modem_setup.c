@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * modem_setup.c: support for the scadm modem_setup option (access to the
  * service processor modem - if present)
@@ -47,7 +45,7 @@
 extern char *ADM_Get_Var(char *Variable);
 
 static void ADM_Send_Char(char  C);
-static void ADM_Modem_Listen();
+static void *ADM_Modem_Listen(void *);
 static void cleanup();
 
 
@@ -59,7 +57,7 @@ static pthread_t modemListen;
 
 
 void
-ADM_Process_modem_setup()
+ADM_Process_modem_setup(void)
 {
 	rscp_msg_t	msg;
 	struct timespec	timeout;
@@ -95,8 +93,7 @@ ADM_Process_modem_setup()
 
 	/* Create Listening Thread */
 	ADM_Continue = 1;
-	if (pthread_create(&modemListen, NULL,
-	    (void * (*)(void *))ADM_Modem_Listen, (void *)NULL) != 0) {
+	if (pthread_create(&modemListen, NULL, ADM_Modem_Listen, NULL) != 0) {
 		(void) fprintf(stderr, "\n%s\n\n",
 		    gettext("scadm: couldn't create thread"));
 		exit(-1);
@@ -120,7 +117,8 @@ ADM_Process_modem_setup()
 	printw("\n%s\n\n", string);
 
 	while (exitLoop) {
-		while ((Input = getch()) == ERR);
+		while ((Input = getch()) == ERR)
+			;
 
 		if (Input == 10) {
 			State = ST_RESET;
@@ -164,7 +162,7 @@ ADM_Process_modem_setup()
 
 	/* Terminate Thread */
 	ADM_Continue = 0;
-	(void) sleep(3); 	/* Make sure thread has time to 'see' */
+	(void) sleep(3);	/* Make sure thread has time to 'see' */
 				/* termination */
 
 	msg.type = DP_MODEM_DISCONNECT;
@@ -212,8 +210,8 @@ ADM_Send_Char(char C)
 }
 
 
-static void
-ADM_Modem_Listen()
+static void *
+ADM_Modem_Listen(void *arg __unused)
 {
 	rscp_msg_t	Message;
 	struct timespec	Timeout;
@@ -237,6 +235,7 @@ ADM_Modem_Listen()
 		(void) fflush(stdout);
 		ADM_Free(&Message);
 	}
+	return (NULL);
 }
 
 
