@@ -4360,10 +4360,11 @@ anynet_ntoa(sap)
 	(void) sm_snprintf(buf, sizeof(buf), "Family %d: ", sap->sa.sa_family);
 	bp = &buf[strlen(buf)];
 	ap = sap->sa.sa_data;
-	for (l = sizeof(sap->sa.sa_data); --l >= 0; )
+	for (l = sizeof(sap->sa.sa_data); --l >= 0 && SPACELEFT(buf, bp) > 3; )
 	{
 		(void) sm_snprintf(bp, SPACELEFT(buf, bp), "%02x:",
 				   *ap++ & 0377);
+
 		bp += 3;
 	}
 	*--bp = '\0';
