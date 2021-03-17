@@ -518,8 +518,10 @@ static void lock_and_run(ETask_t *tp, int32_t obj_num)
 	(void) pthread_mutex_unlock(&env_lock_mutex);
 }
 
-static void run_policies(EInterval_t *ip)
+static void *
+run_policies(void *ptr)
 {
+	EInterval_t *ip = ptr;
 	ETask_t *tp;
 	int32_t i, j;
 
@@ -545,14 +547,15 @@ static void run_policies(EInterval_t *ip)
 				break;
 		}
 	} while (ip->interval);
+
+	return (NULL);
 }
 
 static void thread_setup(EInterval_t *ip)
 {
 	int32_t status;
 
-	status = pthread_create(&ip->thread, NULL, (void *(*)())run_policies,
-	    ip);
+	status = pthread_create(&ip->thread, NULL, run_policies, ip);
 	if (status != 0) {
 		if (debug_flag)
 			syslog(LOG_ERR, "%s", strerror(errno));
