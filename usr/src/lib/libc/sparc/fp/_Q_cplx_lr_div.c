@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * On SPARC V8, _Q_cplx_lr_div(v, z, w) sets *v = *z / *w computed
  * by the textbook formula without regard to exceptions or special
@@ -45,7 +43,7 @@
 long double _Complex
 _Q_cplx_lr_div(const long double _Complex *z, const long double _Complex *w)
 {
-	long double _Complex	v;
+	long double _Complex	v = 0;
 #else
 void
 _Q_cplx_lr_div(long double _Complex *v, const long double _Complex *z,
