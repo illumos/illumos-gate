@@ -27,7 +27,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2020 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 #include "ixgbe_sw.h"
@@ -412,12 +412,6 @@ tx_failure:
 	if (pull_mp) {
 		freemsg(pull_mp);
 	}
-
-	/*
-	 * tcb->mp should not be set until we know we can transmit (see above),
-	 * so it should always be NULL if we get here.
-	 */
-	VERIFY3P(tcb->mp, ==, NULL);
 
 	/*
 	 * Return the tx control blocks in the pending list to the free list.
