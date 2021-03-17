@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/proc.h>
@@ -83,8 +83,14 @@ upanic(void *addr, size_t len)
 	p->p_upanicflag = upflag;
 	mutex_exit(&p->p_lock);
 
-	if (auditing)		/* audit core dump */
+	/*
+	 * If we're auditing we need to finish the system call itself and then
+	 * begin the core dump.
+	 */
+	if (auditing) {
+		audit_finish(0, SYS_upanic, 0, NULL);
 		audit_core_start(SIGABRT);
+	}
 	code = core(SIGABRT, B_FALSE);
 	if (auditing)		/* audit core dump */
 		audit_core_finish(code ? CLD_KILLED : CLD_DUMPED);
