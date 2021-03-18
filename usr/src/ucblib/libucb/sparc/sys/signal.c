@@ -25,16 +25,12 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*LINTLIBRARY*/
 
 /*
  * 4.3BSD signal compatibility functions
@@ -480,12 +476,13 @@ ucbsigvec(int sig, struct sigvec *nvec, struct sigvec *ovec)
 		 * This allows a child of vfork(2) to set signal handlers
 		 * to SIG_IGN or SIG_DFL without affecting the parent.
 		 */
-		if ((void (*)(int))nhandler != SIG_DFL &&
-		    (void (*)(int))nhandler != SIG_IGN) {
+		if ((void (*)(int))(uintptr_t)nhandler != SIG_DFL &&
+		    (void (*)(int))(uintptr_t)nhandler != SIG_IGN) {
 			_siguhandler[sig] = nhandler;
-			nact.sa_handler = (void (*)(int))ucbsigvechandler;
+			nact.sa_handler =
+			    (void (*)(int))(uintptr_t)ucbsigvechandler;
 		} else {
-			nact.sa_handler = (void (*)(int))nhandler;
+			nact.sa_handler = (void (*)(int))(uintptr_t)nhandler;
 		}
 		mask2set(nvec->sv_mask, &nact.sa_mask);
 		if (sig == SIGKILL || sig == SIGSTOP)
@@ -566,7 +563,8 @@ ucbsignal(int s, void (*a)(int)))(int)
 	static int mask[NSIG];
 	static int flags[NSIG];
 
-	nsv.sv_handler = (void (*) (int, int, struct sigcontext *, char *)) a;
+	nsv.sv_handler =
+	    (void (*) (int, int, struct sigcontext *, char *))(uintptr_t)a;
 	nsv.sv_mask = mask[s];
 	nsv.sv_flags = flags[s];
 	if (ucbsigvec(s, &nsv, &osv) < 0)
