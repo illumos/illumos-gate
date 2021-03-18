@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/saio.h>
 #include <sys/sysmacros.h>
@@ -45,7 +43,6 @@ extern	caddr_t		resalloc(enum RESOURCES type,
 extern	void		resfree(enum RESOURCES type,
 				caddr_t virtaddr, size_t bytes);
 
-caddr_t		memlistpage;
 extern int	pagesize;
 
 /*

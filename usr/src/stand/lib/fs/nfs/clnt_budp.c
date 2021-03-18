@@ -66,7 +66,7 @@ extern int errno;
  * If we create another clnt type this should be
  * moved to a common file
  */
-struct rpc_createerr rpc_createerr;
+extern struct rpc_createerr rpc_createerr;
 
 static struct clnt_ops *clntbudp_ops();
 
@@ -106,14 +106,9 @@ struct cu_data {
  * sent and received.
  */
 CLIENT *
-clntbudp_bufcreate(raddr, program, version, wait, sockp, sendsz, recvsz)
-	struct sockaddr_in *raddr;
-	rpcprog_t program;
-	rpcvers_t version;
-	struct timeval wait;
-	int *sockp;
-	uint_t sendsz;
-	uint_t recvsz;
+clntbudp_bufcreate(struct sockaddr_in *raddr, rpcprog_t program,
+    rpcvers_t version, struct timeval wait, int *sockp, uint_t sendsz,
+    uint_t recvsz)
 {
 	CLIENT *cl;
 	struct cu_data *cu;
@@ -140,7 +135,7 @@ clntbudp_bufcreate(raddr, program, version, wait, sockp, sendsz, recvsz)
 	if (raddr->sin_port == 0) {
 		ushort_t port;
 		if ((port = bpmap_getport(program, version,
-				&(rpc_createerr.cf_stat), raddr, NULL)) == 0) {
+		    &(rpc_createerr.cf_stat), raddr, NULL)) == 0) {
 			goto fooy;
 		}
 		raddr->sin_port = htons(port);
@@ -179,7 +174,7 @@ clntbudp_bufcreate(raddr, program, version, wait, sockp, sendsz, recvsz)
 
 		if (dontroute) {
 			(void) setsockopt(*sockp, SOL_SOCKET, SO_DONTROUTE,
-				(const void *)&dontroute, sizeof (dontroute));
+			    (const void *)&dontroute, sizeof (dontroute));
 		}
 
 		/* attempt to bind to priv port */
@@ -209,12 +204,8 @@ fooy:
 }
 
 CLIENT *
-clntbudp_create(raddr, program, version, wait, sockp)
-	struct sockaddr_in *raddr;
-	rpcprog_t program;
-	rpcvers_t version;
-	struct timeval wait;
-	int *sockp;
+clntbudp_create(struct sockaddr_in *raddr, rpcprog_t program,
+    rpcvers_t version, struct timeval wait, int *sockp)
 {
 
 	return (clntbudp_bufcreate(raddr, program, version, wait, sockp,
@@ -222,14 +213,8 @@ clntbudp_create(raddr, program, version, wait, sockp)
 }
 
 static enum clnt_stat
-clntbudp_call(cl, proc, xargs, argsp, xresults, resultsp, utimeout)
-	CLIENT		*cl;		/* client handle */
-	rpcproc_t	proc;		/* procedure number */
-	xdrproc_t	xargs;		/* xdr routine for args */
-	caddr_t		argsp;		/* pointer to args */
-	xdrproc_t	xresults;	/* xdr routine for results */
-	caddr_t		resultsp;	/* pointer to results */
-	struct timeval	utimeout;	/* seconds to wait before giving up */
+clntbudp_call(CLIENT *cl, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp,
+    xdrproc_t  xresults, caddr_t resultsp, struct timeval utimeout)
 {
 	struct cu_data *cu;
 	XDR *xdrs;
@@ -258,7 +243,7 @@ clntbudp_call(cl, proc, xargs, argsp, xresults, resultsp, utimeout)
 	 */
 	xdelay = cu->cu_wait.tv_sec + 1000 + cu->cu_wait.tv_usec / 1000;
 	(void) setsockopt(cu->cu_sock, SOL_SOCKET, SO_RCVTIMEO,
-				(void *)&xdelay, sizeof (xdelay));
+	    (void *)&xdelay, sizeof (xdelay));
 
 	wait_time = (timeout.tv_sec * 1000) + (timeout.tv_usec / 1000);
 	if (wait_time == 0)
@@ -331,8 +316,8 @@ recv_again:
 		fromlen = sizeof (struct sockaddr);
 
 		inlen = recvfrom(cu->cu_sock, cu->cu_inbuf,
-				(int)cu->cu_recvsz, MSG_DONTWAIT,
-				(struct sockaddr *)&from, &fromlen);
+		    (int)cu->cu_recvsz, MSG_DONTWAIT,
+		    (struct sockaddr *)&from, &fromlen);
 
 		if (inlen < 0) {
 			if (errno == EWOULDBLOCK) {
@@ -358,10 +343,10 @@ recv_again:
 
 		/* see if reply transaction id matches sent id */
 		if (*((uint32_t *)(cu->cu_inbuf)) !=
-				*((uint32_t *)(cu->cu_outbuf))) {
+		    *((uint32_t *)(cu->cu_outbuf))) {
 			dprintf("clntbudp_call: xid: 0x%x != 0x%x\n",
-				*(uint32_t *)(cu->cu_inbuf),
-				*(uint32_t *)(cu->cu_outbuf));
+			    *(uint32_t *)(cu->cu_inbuf),
+			    *(uint32_t *)(cu->cu_outbuf));
 			continue;
 		}
 		/* we now assume we have the proper reply */
@@ -382,7 +367,7 @@ recv_again:
 	_seterr_reply(&reply_msg, &(cu->cu_error));
 	if (cu->cu_error.re_status == RPC_SUCCESS) {
 		if (! AUTH_VALIDATE(cl->cl_auth,
-			&reply_msg.acpted_rply.ar_verf)) {
+		    &reply_msg.acpted_rply.ar_verf)) {
 			cu->cu_error.re_status = RPC_AUTHERROR;
 			cu->cu_error.re_why = AUTH_INVALIDRESP;
 			errors++;
@@ -399,7 +384,7 @@ recv_again:
 	if (cu->cu_error.re_status == RPC_AUTHERROR) {
 		/* maybe our credentials need to be refreshed ... */
 		if (nrefreshes > 0 &&
-			AUTH_REFRESH(cl->cl_auth, NULL, NULL)) {
+		    AUTH_REFRESH(cl->cl_auth, NULL, NULL)) {
 			nrefreshes--;
 		}
 		errors++;
@@ -409,15 +394,13 @@ recv_again:
 	/* Just keep trying till there's no data... */
 	errors++;
 	dprintf("clntbudp_call: from: %s, error: ",
-		inet_ntoa(from.sin_addr));
+	    inet_ntoa(from.sin_addr));
 	rpc_disperr(&cu->cu_error);
 	goto recv_again;
 }
 
 static void
-clntbudp_geterr(cl, errp)
-	CLIENT *cl;
-	struct rpc_err *errp;
+clntbudp_geterr(CLIENT *cl, struct rpc_err *errp)
 {
 	struct cu_data *cu = (struct cu_data *)cl->cl_private;
 
@@ -426,10 +409,7 @@ clntbudp_geterr(cl, errp)
 
 
 static bool_t
-clntbudp_freeres(cl, xdr_res, res_ptr)
-	CLIENT *cl;
-	xdrproc_t xdr_res;
-	caddr_t res_ptr;
+clntbudp_freeres(CLIENT *cl, xdrproc_t xdr_res, caddr_t res_ptr)
 {
 	struct cu_data *cu = (struct cu_data *)cl->cl_private;
 	XDR *xdrs = &(cu->cu_outxdrs);
@@ -439,25 +419,20 @@ clntbudp_freeres(cl, xdr_res, res_ptr)
 }
 
 static void
-clntbudp_abort()
-	/* CLIENT *h; */
+clntbudp_abort(void)
 {
 }
 
 /* ARGSUSED */
 static bool_t
-clntbudp_control(cl, request, info)
-	CLIENT *cl;
-	int request;
-	char *info;
+clntbudp_control(CLIENT *cl, int request, char *info)
 {
 	/* CLNT_CONTROL is not used in boot */
 	return (FALSE);
 }
 
 static void
-clntbudp_destroy(cl)
-	CLIENT *cl;
+clntbudp_destroy(CLIENT *cl)
 {
 	struct cu_data *cu = (struct cu_data *)cl->cl_private;
 
@@ -470,7 +445,7 @@ clntbudp_destroy(cl)
 }
 
 static struct clnt_ops *
-clntbudp_ops()
+clntbudp_ops(void)
 {
 	static struct clnt_ops ops;
 

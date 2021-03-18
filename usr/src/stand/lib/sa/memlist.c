@@ -31,7 +31,7 @@
 #include <sys/bootconf.h>
 #include <sys/salib.h>
 
-extern caddr_t memlistpage;
+caddr_t memlistpage;
 
 /* Always pts to the next free link in the headtable */
 /* i.e. it is always memlistpage+tableoffset */
@@ -41,7 +41,7 @@ static int table_freespace;
 /*
  *	Function prototypes
  */
-extern void 		reset_alloc(void);
+extern void reset_alloc(void);
 
 void
 print_memlist(struct memlist *av)
