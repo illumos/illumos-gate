@@ -26,8 +26,7 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 dir path=usr group=sys
 dir path=usr/sbin
-driver name=cxgbe alias=cxgbe clone_perms="cxgbe 0666 root sys" \
-    perms="* 0666 root sys"
+driver name=cxgbe clone_perms="cxgbe 0666 root sys" perms="* 0666 root sys"
 driver name=t4nex clone_perms="t4nex 0666 root sys" \
     devlink=type=ddi_ctl:devctl;minor1=t4nex\tt4nex\M2 \
     perms="* 0666 root sys" \

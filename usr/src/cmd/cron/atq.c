@@ -2,6 +2,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2021 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -372,7 +373,7 @@ printdate(char *filename)
 {
 	time_t	jobdate;
 	struct tm *unpackeddate;
-	char date[18];				/* reformatted execution date */
+	char date[19];				/* reformatted execution date */
 
 	/*
 	 * Convert the file name to a date.
@@ -385,7 +386,8 @@ printdate(char *filename)
 	/*
 	 * Format the execution date of a job.
 	 */
-	sprintf(date, "%3s %2d, %4d %02d:%02d", mthnames[unpackeddate->tm_mon],
+	snprintf(date, sizeof (date), "%3s %2d, %4d %02d:%02d",
+	    mthnames[unpackeddate->tm_mon],
 	    unpackeddate->tm_mday, unpackeddate->tm_year,
 	    unpackeddate->tm_hour, unpackeddate->tm_min);
 
