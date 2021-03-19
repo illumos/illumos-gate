@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2012 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2013 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -14,8 +14,8 @@
 *                            AT&T Research                             *
 *                           Florham Park NJ                            *
 *                                                                      *
-*                 Glenn Fowler <gsf@research.att.com>                  *
-*                  David Korn <dgk@research.att.com>                   *
+*               Glenn Fowler <glenn.s.fowler@gmail.com>                *
+*                    David Korn <dgkorn@gmail.com>                     *
 *                                                                      *
 ***********************************************************************/
 #pragma prototyped
@@ -27,7 +27,7 @@
  */
 
 static const char usage[] =
-"[-n?\n@(#)$Id: head (AT&T Research) 2012-05-31 $\n]"
+"[-n?\n@(#)$Id: head (AT&T Research) 2013-09-19 $\n]"
 USAGE_LICENSE
 "[+NAME?head - output beginning portion of one or more files ]"
 "[+DESCRIPTION?\bhead\b copies one or more input files to standard "
@@ -77,6 +77,7 @@ b_head(int argc, register char** argv, Shbltin_t* context)
 	register off_t		keep = 10;
 	register off_t		skip = 0;
 	register int		delim = '\n';
+	off_t			moved;
 	int			header = 1;
 	char*			format = (char*)header_fmt+1;
 
@@ -138,9 +139,16 @@ b_head(int argc, register char** argv, Shbltin_t* context)
 			sfprintf(sfstdout, format, cp);
 		format = (char*)header_fmt;
 		if (skip > 0)
-			sfmove(fp, NiL, skip, delim);
-		if (sfmove(fp, sfstdout, keep, delim) < 0 && !ERROR_PIPE(errno) && errno != EINTR)
+		{
+			if ((moved = sfmove(fp, NiL, skip, delim)) < 0 && !ERROR_PIPE(errno) && errno != EINTR)
+				error(ERROR_system(0), "%s: skip error", cp);
+			if (delim >= 0 && moved < skip)
+				goto next;
+		}
+		if ((moved = sfmove(fp, sfstdout, keep, delim)) < 0 && !ERROR_PIPE(errno) && errno != EINTR ||
+		    delim >= 0 && moved < keep && sfmove(fp, sfstdout, SF_UNBOUND, -1) < 0 && !ERROR_PIPE(errno) && errno != EINTR)
 			error(ERROR_system(0), "%s: read error", cp);
+	next:
 		if (fp != sfstdin)
 			sfclose(fp);
 	} while (cp = *argv++);

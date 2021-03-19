@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2011 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2013 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                 Eclipse Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -14,9 +14,9 @@
 *                            AT&T Research                             *
 *                           Florham Park NJ                            *
 *                                                                      *
-*                 Glenn Fowler <gsf@research.att.com>                  *
-*                  David Korn <dgk@research.att.com>                   *
-*                   Phong Vo <kpv@research.att.com>                    *
+*               Glenn Fowler <glenn.s.fowler@gmail.com>                *
+*                    David Korn <dgkorn@gmail.com>                     *
+*                     Phong Vo <phongvo@gmail.com>                     *
 *                                                                      *
 ***********************************************************************/
 #include	"sfhdr.h"
@@ -113,7 +113,11 @@ reg int		rc;	/* record separator */
 
 		/* try reading a block of data */
 		direct = 0;
-		if((r = fr->endb - (next = fr->next)) <= 0)
+		if(fr->rsrv && (r = -fr->rsrv->slen) > 0)
+		{	fr->rsrv->slen = 0;
+			next = fr->rsrv->data;
+		}
+		else if((r = fr->endb - (next = fr->next)) <= 0)
 		{	/* amount of data remained to be read */
 			if((w = n > MAX_SSIZE ? MAX_SSIZE : (ssize_t)n) < 0)
 			{	if(fr->extent < 0)

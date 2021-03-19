@@ -43,110 +43,98 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH GETCWD 3C "Oct 18, 2004"
-.SH NAME
-getcwd \- get pathname of current working directory
-.SH SYNOPSIS
-.LP
-.nf
-#include <unistd.h>
-
-\fBchar *\fR\fBgetcwd\fR(\fBchar *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBgetcwd()\fR function places an absolute pathname of the current working
-directory in the array pointed to by \fIbuf\fR, and returns \fIbuf\fR. The
-pathname copied to the array contains no components that are symbolic links.
-The \fIsize\fR argument is the size in bytes of the character array pointed to
-by \fIbuf\fR and must be at least one greater than the length of the pathname
-to be returned.
-.sp
-.LP
-If \fIbuf\fR is not a null pointer, the pathname is stored in the space pointed
-to by \fIbuf\fR.
-.sp
-.LP
-If \fIbuf\fR is a null pointer, \fBgetcwd()\fR obtains \fIsize\fR bytes of
-space using \fBmalloc\fR(3C). The pointer returned by \fBgetcwd()\fR can be
-used as the argument in a subsequent call to \fBfree()\fR.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBgetcwd()\fR returns the \fIbuf\fR argument. If
-\fIbuf\fR is an invalid destination buffer address, \fINULL\fR is returned and
-\fBerrno\fR is set to \fBEFAULT\fR. Otherwise, a null pointer is returned and
-\fBerrno\fR is set to indicate the error.
-.SH ERRORS
-.sp
-.LP
-The \fBgetcwd()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-The \fIbuf\fR argument is an invalid destination buffer address.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The \fIsize\fR argument is equal to 0.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBERANGE\fR\fR
-.ad
-.RS 10n
-The \fIsize\fR argument is greater than 0 and less than the length of the
-pathname plus 1.
-.RE
-
-.sp
-.LP
-The \fBgetcwd()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEACCES\fR\fR
-.ad
-.RS 10n
-A parent directory cannot be read to get its name.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 10n
-Insufficient storage space is available.
-.RE
-
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRDetermine the absolute pathname of the current working
+.Dd February 27, 2021
+.Dt GETCWD 3C
+.Os
+.Sh NAME
+.Nm getcwd
+.Nd get pathname of current working directory
+.Sh SYNOPSIS
+.In unistd.h
+.Ft "char *"
+.Fo getcwd
+.Fa "char *buf"
+.Fa "size_t size"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn getcwd
+function returns a pointer to a buffer containing the absolute pathname of the
+current working directory.
+The returned pathname contains no components that are symbolic links.
+.Pp
+When
+.Fa buf
+is not
+.Dv NULL ,
+the absolute pathname will be written into
+.Fa buf
+and
+.Fa size
+represents the length in bytes of
+.Fa buf .
+If the length of the pathname and nul terminator exceeds
+.Fa size ,
+nothing will be written and
+.Fn getcwd
+will return
+.Dv NULL .
+Otherwise,
+.Fn getcwd
+returns
+.Fa buf .
+.Pp
+When
+.Fa buf
+is
+.Dv NULL
+then
+.Fn getcwd
+will allocate memory in which to store the pathname of the current working
 directory.
-.sp
-.LP
+If
+.Fa size
+is non-zero, then
+.Fa size
+bytes will be allocated.
+If the length of the pathname and nul terminator exceeds
+.Fa size ,
+the memory will be freed and
+.Fn getcwd
+will return
+.Dv NULL .
+If
+.Fa size
+is zero, then
+.Fn getcwd
+will attempt to allocate enough space to hold the pathname.
+In both cases, it is the caller's responsibility to free the returned buffer
+with the
+.Xr free 3C
+function.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn getcwd
+function returns a pointer to a buffer containing the pathname.
+Otherwise,
+.Dv NULL
+is returned and
+.Va errno
+is set to indicate the error.
+.Sh EXAMPLES
+.Sy Example 1
+Determine the absolute pathname of the current working directory.
+.Pp
 The following example returns a pointer to an array that holds the absolute
-pathname of the current working directory. The pointer is returned in the
-\fIptr\fR variable, which points to the \fIbuf\fR array where the pathname is
-stored.
-
-.sp
-.in +2
-.nf
+pathname of the current working directory.
+The pointer is returned in the
+.Va ptr
+variable, which points to the
+.Va buf
+array where the pathname is stored.
+.Bd -literal -offset Ds
 #include <stdlib.h>
 #include <unistd.h>
 \&...
@@ -155,64 +143,75 @@ char *buf;
 char *ptr;
 size = pathconf(".", _PC_PATH_MAX);
 if ((buf = (char *)malloc((size_t)size)) != NULL)
-       ptr = getcwd(buf, (size_t)size);
+	ptr = getcwd(buf, (size_t)size);
 \&...
-.fi
-.in -2
-
-.LP
-\fBExample 2 \fRPrint the current working directory.
-.sp
-.LP
+.Ed
+.Pp
+.Sy Example 2
+Print the current working directory.
+.Pp
 The following example prints the current working directory.
-
-.sp
-.in +2
-.nf
-#include <unistd.h>
+.Bd -literal -offset Ds
 #include <stdio.h>
+#include <unistd.h>
 
-main(\|)
+int
+main(void)
 {
-    char *cwd;
-    if ((cwd = getcwd(NULL, 64)) == NULL) {
-        perror("pwd");
-        exit(2);
-    }
-    (void)printf("%s\en", cwd);
-    free(cwd); /* free memory allocated by getcwd() */
-    return(0);
+	char *cwd;
+
+	if ((cwd = getcwd(NULL, 0)) == NULL) {
+		perror("pwd");
+		exit(2);
+	}
+	(void)printf("%s\en", cwd);
+	free(cwd); /* free memory allocated by getcwd() */
+	return(0);
 }
-.fi
-.in -2
-
-.SH USAGE
-.sp
-.LP
-Applications should exercise care when using \fBchdir\fR(2) in conjunction with
-\fBgetcwd()\fR. The current working directory is global to all threads within a
-process. If more than one thread calls \fBchdir()\fR to change the working
-directory, a subsequent call to \fBgetcwd()\fR could produce unexpected
-results.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBchdir\fR(2), \fBmalloc\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.Ed
+.Sh ERRORS
+The
+.Fn getcwd
+function will fail if:
+.Bl -tag -width Er
+.It Er EFAULT
+The
+.Fa buf
+argument points to an invalid address.
+.It Er EINVAL
+The
+.Fa buf
+argument is not
+.Dv NULL
+and the
+.Fa size
+argument is 0.
+.It Er ERANGE
+The pathname
+.Pq including its terminating nul character
+is too long to fit into the provided
+.Pq or allocated
+buffer.
+.It Er EACCESS
+A parent directory cannot be read to get its name.
+.It Er ENOMEM
+Insufficient storage space is available.
+.El
+.Sh USAGE
+Applications should exercise care when using
+.Xr chdir 2
+in conjunction with
+.Fn getcwd .
+The current working directory is global to all threads within a process.
+If more than one thread calls
+.Xr chdir 2
+to change the working directory, a subsequent call to
+.Fn getcwd
+could produce unexpected results.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr chdir 2 ,
+.Xr free 3C ,
+.Xr attributes 5 ,
+.Xr standards 5

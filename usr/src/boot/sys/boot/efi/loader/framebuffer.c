@@ -31,6 +31,7 @@
 #include <stand.h>
 #include <bootstrap.h>
 #include <sys/endian.h>
+#include <sys/param.h>
 #include <sys/font.h>
 #include <sys/consplat.h>
 #include <sys/limits.h>
@@ -51,11 +52,13 @@ EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 static EFI_GUID pciio_guid = EFI_PCI_IO_PROTOCOL_GUID;
 EFI_GUID uga_guid = EFI_UGA_DRAW_PROTOCOL_GUID;
 static EFI_GUID active_edid_guid = EFI_EDID_ACTIVE_PROTOCOL_GUID;
+static EFI_GUID discovered_edid_guid = EFI_EDID_DISCOVERED_PROTOCOL_GUID;
+static EFI_HANDLE gop_handle;
 
 /* Saved initial GOP mode. */
 static uint32_t default_mode = UINT32_MAX;
 /* Cached EDID. */
-static struct vesa_edid_info *edid_info;
+struct vesa_edid_info *edid_info = NULL;
 
 static uint32_t gop_default_mode(void);
 static int efifb_set_mode(EFI_GRAPHICS_OUTPUT *, uint_t);
@@ -450,7 +453,7 @@ efifb_from_uga(struct efi_fb *efifb, EFI_UGA_DRAW_PROTOCOL *uga)
  * Fetch EDID info. Caller must free the buffer.
  */
 static struct vesa_edid_info *
-efifb_gop_get_edid(EFI_HANDLE gop)
+efifb_gop_get_edid(EFI_HANDLE h)
 {
 	const uint8_t magic[] = EDID_MAGIC;
 	EFI_EDID_ACTIVE_PROTOCOL *edid;
@@ -460,22 +463,25 @@ efifb_gop_get_edid(EFI_HANDLE gop)
 	size_t size;
 
 	guid = &active_edid_guid;
-	status = OpenProtocolByHandle(gop, guid, (void **)&edid);
-	if (status != EFI_SUCCESS)
-		return (NULL);
-
-	size = sizeof (*edid_infop);
-	if (size < edid->SizeOfEdid)
-		size = edid->SizeOfEdid;
-
-	edid_infop = calloc(1, size);
-	if (edid_infop == NULL) {
-		status = BS->CloseProtocol(gop, guid, IH, NULL);
-		return (NULL);
+	status = BS->OpenProtocol(h, guid, (void **)&edid, IH, NULL,
+	    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	if (status != EFI_SUCCESS ||
+	    edid->SizeOfEdid == 0) {
+		guid = &discovered_edid_guid;
+		status = BS->OpenProtocol(h, guid, (void **)&edid, IH, NULL,
+		    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+		if (status != EFI_SUCCESS ||
+		    edid->SizeOfEdid == 0)
+			return (NULL);
 	}
 
+	size = MAX(sizeof (*edid_infop), edid->SizeOfEdid);
+
+	edid_infop = calloc(1, size);
+	if (edid_infop == NULL)
+		return (NULL);
+
 	memcpy(edid_infop, edid->Edid, edid->SizeOfEdid);
-	status = BS->CloseProtocol(gop, guid, IH, NULL);
 
 	/* Validate EDID */
 	if (memcmp(edid_infop, magic, sizeof (magic)) != 0)
@@ -493,11 +499,10 @@ error:
 static bool
 efifb_get_edid(edid_res_list_t *res)
 {
-	extern EFI_GRAPHICS_OUTPUT *gop;
 	bool rv = false;
 
 	if (edid_info == NULL)
-		edid_info = efifb_gop_get_edid(gop);
+		edid_info = efifb_gop_get_edid(gop_handle);
 
 	if (edid_info != NULL)
 		rv = gfx_get_edid_resolution(edid_info, res);
@@ -508,7 +513,7 @@ efifb_get_edid(edid_res_list_t *res)
 int
 efi_find_framebuffer(struct efi_fb *efifb)
 {
-	EFI_HANDLE h, *hlist;
+	EFI_HANDLE *hlist;
 	UINTN nhandles, i, hsize;
 	extern EFI_GRAPHICS_OUTPUT *gop;
 	extern EFI_UGA_DRAW_PROTOCOL *uga;
@@ -538,18 +543,18 @@ efi_find_framebuffer(struct efi_fb *efifb)
 	/*
 	 * Search for ConOut protocol, if not found, use first handle.
 	 */
-	h = *hlist;
+	gop_handle = *hlist;
 	for (i = 0; i < nhandles; i++) {
 		void *dummy = NULL;
 
 		status = OpenProtocolByHandle(hlist[i], &conout_guid, &dummy);
 		if (status == EFI_SUCCESS) {
-			h = hlist[i];
+			gop_handle = hlist[i];
 			break;
 		}
 	}
 
-	status = OpenProtocolByHandle(h, &gop_guid, (void **)&gop);
+	status = OpenProtocolByHandle(gop_handle, &gop_guid, (void **)&gop);
 	free(hlist);
 
 	if (status == EFI_SUCCESS) {

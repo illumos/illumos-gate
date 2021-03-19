@@ -22,9 +22,8 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/copyops.h>
 #include <sys/errno.h>
@@ -44,31 +43,49 @@ getcwd(char *buf, size_t buflen)
 	size_t kbuflen;
 
 	/*
+	 * If the buffer cannot accommodate one character and nul terminator,
+	 * it is too small.
+	 */
+	if (buflen < 2)
+		return (set_errno(ERANGE));
+
+	/*
 	 * The user should be able to specify any size buffer, but we don't want
 	 * to arbitrarily allocate huge kernel buffers just because the user
 	 * requests it.  So we'll start with MAXPATHLEN (which should hold any
-	 * normal path), and only increase it if we fail with ERANGE.
+	 * normal path), and only increase it if we fail with
+	 * ERANGE / ENAMETOOLONG.
+	 *
+	 * To protect against unbounded memory usage, cap to kmem_max_cached.
+	 * This is far bigger than the length of any practical path on the
+	 * system, and avoids allocating memory from the kmem_oversized arena.
 	 */
 	kbuflen = MIN(buflen, MAXPATHLEN);
 
-	for (;;) {
+	while (kbuflen <= kmem_max_cached) {
 		kbuf = kmem_alloc(kbuflen, KM_SLEEP);
 
 		if (((err = dogetcwd(kbuf, kbuflen)) == 0) &&
-		    (copyout(kbuf, buf, strlen(kbuf) + 1) != 0))
+		    (copyout(kbuf, buf, strlen(kbuf) + 1) != 0)) {
 			err = EFAULT;
+		}
 
 		kmem_free(kbuf, kbuflen);
 
-		if (err == ENAMETOOLONG) {
+		/*
+		 * dogetcwd() inconsistently returns ERANGE or ENAMETOOLONG
+		 * depending on whether it calls dirtopath() and then whether
+		 * the subsequent operations run out of space whilst
+		 * evaluating a cached vnode path or otherwise.
+		 */
+		if (err == ENAMETOOLONG || err == ERANGE) {
+			/* For some reason, getcwd() uses ERANGE. */
+			err = ERANGE;
 			/*
 			 * If the user's buffer really was too small, give up.
-			 * For some reason, getcwd() uses ERANGE for this case.
 			 */
-			if (kbuflen == buflen) {
-				err = ERANGE;
+			if (kbuflen == buflen)
 				break;
-			}
 			kbuflen = MIN(kbuflen * 2, buflen);
 		} else {
 			break;

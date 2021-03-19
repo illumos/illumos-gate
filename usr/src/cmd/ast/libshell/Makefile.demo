@@ -116,6 +116,7 @@ DF_TESTS= \
 
 DF_XTESTS= \
 	tests/README.tests \
+	tests/illumos_4149_builtin_head.sh \
 	tests/illumos_13434_chunked_heredoc.sh \
 	tests/sun_solaris_array_default_datatype.sh \
 	tests/sun_solaris_builtin_poll.sh \

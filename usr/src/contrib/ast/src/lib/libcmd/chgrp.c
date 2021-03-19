@@ -134,7 +134,13 @@ typedef struct Map_s			/* uid/gid map			*/
 	Key_t		to;		/* map to these			*/
 } Map_t;
 
+/*
+ * libast's struid() has the peculiar feature that it returns -1 in response
+ * to not finding a UID for a name on the first call, and -2 for subsequent
+ * calls for the same string.
+ */
 #define NOID		(-1)
+#define STILLNOID	(-2)
 
 #define OPT_CHOWN	0x0001		/* chown			*/
 #define OPT_FORCE	0x0002		/* ignore errors		*/
@@ -180,7 +186,7 @@ getids(register char* s, char** e, Key_t* key, int options)
 			n = (int)strtol(s, &z, 0);
 			if (*z || !(options & OPT_NUMERIC))
 			{
-				if ((m = struid(s)) != NOID)
+				if ((m = struid(s)) != NOID && m != STILLNOID)
 					n = m;
 				else if (*z)
 					error(ERROR_exit(1), "%s: unknown user", s);
@@ -200,7 +206,7 @@ getids(register char* s, char** e, Key_t* key, int options)
 		n = (int)strtol(s, &z, 0);
 		if (*z || !(options & OPT_NUMERIC))
 		{
-			if ((m = strgid(s)) != NOID)
+			if ((m = strgid(s)) != NOID && m != STILLNOID)
 				n = m;
 			else if (*z)
 				error(ERROR_exit(1), "%s: unknown group", s);
