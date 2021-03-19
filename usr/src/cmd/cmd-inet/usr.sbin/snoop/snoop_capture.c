@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2021 Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -173,8 +174,8 @@ void
 init_datalink(dlpi_handle_t dh, ulong_t snaplen, ulong_t chunksize,
     struct timeval *timeout, struct Pf_ext_packetfilt *fp)
 {
-	int 	retv;
-	int 	netfd;
+	int	retv;
+	int	netfd;
 
 	retv = dlpi_bind(dh, DLPI_ANY_SAP, NULL);
 	if (retv != DLPI_SUCCESS)
@@ -195,22 +196,43 @@ init_datalink(dlpi_handle_t dh, ulong_t snaplen, ulong_t chunksize,
 		(void) fprintf(stderr, "(promiscuous mode)\n");
 		retv = dlpi_promiscon(dh, DL_PROMISC_PHYS);
 		if (retv != DLPI_SUCCESS) {
-			pr_errdlpi(dh, "promiscuous mode(physical) failed",
-			    retv);
+			if (fflg) {
+				(void) fprintf(stderr, "Note: enabling "
+				    "promiscuous mode (physical) failed; "
+				    "packet capture may not be complete\n");
+			} else {
+				pr_errdlpi(dh,
+				    "promiscuous mode (physical) failed; "
+				    "use -f to ignore", retv);
+			}
 		}
 	} else {
 		(void) fprintf(stderr, "(non promiscuous)\n");
 		retv = dlpi_promiscon(dh, DL_PROMISC_MULTI);
 		if (retv != DLPI_SUCCESS) {
-			pr_errdlpi(dh, "promiscuous mode(multicast) failed",
-			    retv);
+			if (fflg) {
+				(void) fprintf(stderr, "Note: enabling "
+				    "promiscuous mode (multicast) failed; "
+				    "packet capture may not be complete\n");
+			} else {
+				pr_errdlpi(dh,
+				    "promiscuous mode (multicast) failed; "
+				    "use -f to ignore", retv);
+			}
 		}
 	}
 
 	retv = dlpi_promiscon(dh, DL_PROMISC_SAP);
-	if (retv != DLPI_SUCCESS)
-		pr_errdlpi(dh, "promiscuous mode(SAP) failed", retv);
-
+	if (retv != DLPI_SUCCESS) {
+		if (fflg) {
+			(void) fprintf(stderr, "Note: enabling promiscuous "
+			    "mode (SAP) failed; packet capture may not be "
+			    "complete\n");
+		} else {
+			pr_errdlpi(dh, "promiscuous mode (SAP) failed; "
+			    "use -f to ignore", retv);
+		}
+	}
 	netfd = dlpi_fd(dh);
 
 	if (fp) {
@@ -259,7 +281,7 @@ void
 net_read(dlpi_handle_t dh, size_t chunksize, int filter, void (*proc)(),
     int flags)
 {
-	int 	retval;
+	int	retval;
 	extern int count;
 	size_t	msglen;
 
@@ -296,7 +318,7 @@ net_read(dlpi_handle_t dh, size_t chunksize, int filter, void (*proc)(),
  */
 void
 corrupt(volatile char *pktp, volatile char *pstop, char *buf,
-	volatile char *bufstop)
+    volatile char *bufstop)
 {
 	int c;
 	int i;

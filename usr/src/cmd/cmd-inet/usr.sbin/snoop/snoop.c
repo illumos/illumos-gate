@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -79,6 +81,7 @@ int x_length = 0x7fffffff;
 FILE *namefile;
 boolean_t Pflg;
 boolean_t Iflg;
+boolean_t fflg;
 boolean_t qflg;
 boolean_t rflg;
 #ifdef	DEBUG
@@ -227,7 +230,7 @@ main(int argc, char **argv)
 	}
 	(void) setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 
-	while ((c = getopt(argc, argv, "at:CPDSi:o:Nn:s:d:I:vVp:f:c:x:U?rqz"))
+	while ((c = getopt(argc, argv, "at:CPDSi:o:Nn:s:d:I:vVp:fc:x:U?rqz"))
 	    != EOF) {
 		switch (c) {
 		case 'a':
@@ -305,21 +308,7 @@ main(int argc, char **argv)
 			}
 			break;
 		case 'f':
-			(void) gethostname(self, MAXHOSTNAMELEN);
-			p = strchr(optarg, ':');
-			if (p) {
-				*p = '\0';
-				if (strcmp(optarg, self) == 0 ||
-				    strcmp(p+1, self) == 0)
-				(void) fprintf(stderr,
-				"Warning: cannot capture packets from %s\n",
-				    self);
-				*p = ' ';
-			} else if (strcmp(optarg, self) == 0)
-				(void) fprintf(stderr,
-				"Warning: cannot capture packets from %s\n",
-				    self);
-			argstr = optarg;
+			fflg = B_TRUE;
 			break;
 		case 'x':
 			p = optarg;

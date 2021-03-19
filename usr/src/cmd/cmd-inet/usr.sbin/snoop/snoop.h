@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 Joyent, Inc.
  */
 
 #ifndef	_SNOOP_H
@@ -346,7 +347,7 @@ extern char *prot_title;
 extern unsigned int encap_levels, total_encap_levels;
 
 extern int quitting;
-extern boolean_t Iflg, Pflg, rflg;
+extern boolean_t Iflg, Pflg, fflg, rflg;
 
 /*
  * Global error recovery routine: used to reset snoop variables after

@@ -1,22 +1,21 @@
 '\" te
+.\" Copyright 2021 Joyent, Inc.
 .\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SNOOP 1M "Feb 25, 2017"
+.TH SNOOP 1M "Mar 22, 2021"
 .SH NAME
 snoop \- capture and inspect network packets
 .SH SYNOPSIS
-.LP
 .nf
-\fBsnoop\fR  [\fB-aqrCDINPSvV\fR] [\fB-t\fR [r |  a |  d]] [\fB-c\fR \fImaxcount\fR]
+\fBsnoop\fR  [\fB-afqrCDINPSvV\fR] [\fB-t\fR [r |  a |  d]] [\fB-c\fR \fImaxcount\fR]
  [\fB-d\fR \fIdevice\fR] [\fB-i\fR \fIfilename\fR] [\fB-n\fR \fIfilename\fR] [\fB-o\fR \fIfilename\fR]
  [\fB-p\fR \fIfirst\fR [, \fIlast\fR]] [\fB-s\fR \fIsnaplen\fR] [\fB-x\fR \fIoffset\fR [, \fIlength\fR]]
  [\fIexpression\fR]
 .fi
 
 .SH DESCRIPTION
-.LP
 From a datalink or IP interface, \fBsnoop\fR captures packets and displays
 their contents. If the datalink or IP interface is not specified, \fBsnoop\fR
 will pick a datalink to use, giving priority to datalinks that have been
@@ -163,6 +162,18 @@ Capture link-layer packets from the network using the DLPI datalink specified
 by \fIdatalink\fR, for example, \fBbge0\fR or \fBnet0\fR. The \fBdladm\fR(1M)
 \fBshow-link\fR subcommand can be used to list available datalinks. The
 \fB-d\fR and \fB-I\fR options are mutually exclusive.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR\fR
+.ad
+.sp .6
+.RS 4n
+Ignore any errors when enabling promiscuous mode. Normally any error when
+enabling promiscuous mode on a datalink or IP interface is fatal and causes
+\fBsnoop\fR to exit.
 .RE
 
 .sp
@@ -832,7 +843,6 @@ True if the packet is an \fBOSPF\fR packet.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing the \fBsnoop\fR Command
 .sp
 .LP
@@ -1126,7 +1136,6 @@ Internet services and aliases.
 .RE
 
 .SH SEE ALSO
-.LP
 \fBdladm\fR(1M), \fBifconfig\fR(1M), \fBnetstat\fR(1M), \fBhosts\fR(4),
 \fBrpc\fR(4), \fBservices\fR(4), \fBattributes\fR(5), \fBaudio\fR(7I),
 \fBipnet\fR(7D), \fBbufmod\fR(7M), \fBdlpi\fR(7P), \fBpfmod\fR(7M)
@@ -1135,7 +1144,6 @@ Internet services and aliases.
 Callaghan, B. and Gilligan, R. \fIRFC 1761, Snoop Version 2 Packet Capture File
 Format\fR. Network Working Group. February 1995.
 .SH WARNINGS
-.LP
 The processing overhead is much higher for real-time packet interpretation.
 Consequently, the packet drop count may be higher. For more reliable capture,
 output raw packets to a file using the \fB-o\fR option and analyze the packets
