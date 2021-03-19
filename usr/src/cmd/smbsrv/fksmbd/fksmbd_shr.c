@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014-2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -37,6 +37,8 @@
 #include <smbsrv/smb_share.h>
 #include <smbsrv/smb.h>
 
+#define	SMB_SHRF_ENCRYPT	0x8000	// SMB2_SHAREFLAG_ENCRYPT_DATA?
+
 static void
 new_share(char *name, char *path, char *comment, int flags)
 {
@@ -46,7 +48,13 @@ new_share(char *name, char *path, char *comment, int flags)
 	(void) strlcpy(si.shr_name, name, MAXNAMELEN);
 	(void) strlcpy(si.shr_path, path, MAXPATHLEN);
 	(void) strlcpy(si.shr_cmnt, comment, SMB_SHARE_CMNT_MAX);
+	if (flags & SMB_SHRF_ENCRYPT) {
+		flags &= ~SMB_SHRF_ENCRYPT;
+		si.shr_encrypt = SMB_CONFIG_REQUIRED;
+	}
 	si.shr_flags = flags;
+
+
 	if (smb_shr_add(&si) != 0) {
 		syslog(LOG_ERR, "failed to add test share: %s",
 		    si.shr_name);
@@ -117,6 +125,8 @@ smb_shr_load(void *args)
 	    SMB_SHRF_GUEST_OK);
 	new_share("testca", "/var/smb/test", "fksmbd test CA share",
 	    SMB_SHRF_CA);
+	new_share("teste", "/var/smb/test", "fksmbd test encrypted share",
+	    SMB_SHRF_ENCRYPT);
 
 	/* Allow creating lots of shares for testing. */
 	shr_file = getenv("FKSMBD_SHARE_FILE");

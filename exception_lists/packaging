@@ -554,6 +554,8 @@ usr/lib/smbsrv/libsmbns.so
 usr/lib/smbsrv/amd64/libsmbns.so		i386
 usr/lib/smbsrv/amd64/libsmbns.so.1		i386
 usr/lib/smbsrv/nvlprint
+usr/lib/smbsrv/test-decrypt
+usr/lib/smbsrv/test-encrypt
 usr/lib/smbsrv/test-msgbuf
 usr/lib/smbsrv/testoplock
 #

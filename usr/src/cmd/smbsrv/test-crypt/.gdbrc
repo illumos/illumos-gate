@@ -1,0 +1,33 @@
+
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+#
+
+# gdb script (it allows python :)
+
+python
+import os
+gdb.execute('file' + os.environ['ROOT'] + '/usr/lib/smbsrv/test-decrypt')
+gdb.execute('set env ' + 'LD_LIBRARY_PATH ' + \
+	os.environ['ROOT'] + '/lib:' + \
+	os.environ['ROOT'] + '/usr/lib')
+gdb.execute('set env ' + 'PATH_PKCS11_CONF ' + \
+	os.environ['ROOT'] + '/etc/crypto/pkcs11.conf')
+end
+
+# break C_DecryptUpdate
+# break C_DecryptFinal
+# break soft_aes_decrypt_update
+# break aes_decrypt_contiguous_blocks
+# break ccm_mode_decrypt_contiguous_blocks

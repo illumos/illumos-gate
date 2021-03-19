@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2013-2021 Tintri by DDN, Inc. All rights reserved.
 #
 
 # Helper program to run fksmbd (user-space smbd for debugging)
@@ -52,7 +52,9 @@ fi
 export SMBD_DOOR_NAME="/tmp/fksmbd_door"
 export SMB_SHARE_DNAME="/tmp/fksmbshare_door"
 
-LD_LIBRARY_PATH=$ROOT/usr/lib/smbsrv:$ROOT/usr/lib:$ROOT/lib
+export PATH_PKCS11_CONF=$ROOT/etc/crypto/pkcs11.conf
+
+LD_LIBRARY_PATH=$ROOT/usr/lib/smbsrv:$ROOT/usr/lib:$ROOT/usr/lib:$ROOT/lib
 export LD_LIBRARY_PATH
 
 # Enable everything, for debugging

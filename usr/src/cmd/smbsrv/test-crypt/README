@@ -1,0 +1,40 @@
+
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+#
+
+This directory contains a simple test of the encrypt/decrypt interfaces
+described by smbsrv/smb_kcrypt.h
+
+To build the tests:
+	make install
+
+To run the tests: (on the build system)
+	./Run.sh
+
+For debugging, start by uncommenting the dtrace lines in the
+Run.sh script, and/or run with gdb (see .gdbrc)
+
+If you need to debug in the crypto provider libraries (or even just
+look with gdb) it's easiest to run with a customized pkcs11.conf
+See how the Run.sh file sets the environment for that.
+Your custom pkcs11.conf file should look like this:
+(Substitute your own WS root in there.)
+
+# Start SUNWcsr
+metaslot:metaslot_status=enabled;metaslot_auto_key_migrate=enabled;metaslot_token=Sun Software PKCS#11 softtoken;metaslot_slot=Sun Crypto Softtoken
+/tank/ws2/il-fc-smb/proto/root_i386/usr/lib/security/$ISA/pkcs11_kernel.so
+/tank/ws2/il-fc-smb/proto/root_i386/usr/lib/security/$ISA/pkcs11_softtoken.so
+/tank/ws2/il-fc-smb/proto/root_i386/usr/lib/security/$ISA/pkcs11_tpm.so
+# End SUNWcsr

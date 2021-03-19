@@ -243,6 +243,8 @@ FORBIDDEN_DEP usr/lib/MACH(smbfs)/libfknsmb.so.1
 FORBIDDEN_DEP usr/lib/MACH(smbfs)/libfksmbfs.so.1
 FORBIDDEN_DEP usr/lib/MACH(smbsrv)/libfksmbsrv.so.1
 FORBIDDEN_DEP usr/lib/smbsrv/fksmbd
+FORBIDDEN_DEP usr/lib/smbsrv/test-decrypt
+FORBIDDEN_DEP usr/lib/smbsrv/test-encrypt
 FORBIDDEN_DEP usr/lib/smbsrv/test-msgbuf
 FORBIDDEN_DEP usr/lib/smbsrv/testoplock
 FORBIDDEN_DEP usr/sbin/zdb

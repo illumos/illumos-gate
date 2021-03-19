@@ -22,11 +22,11 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2013-2021 Tintri by DDN, Inc. All rights reserved.
 #
 
 SUBDIRS = smbadm smbd smbstat dtrace fksmbd bind-helper \
-	nvlprint testoplock test-msgbuf
+	nvlprint testoplock test-crypt test-msgbuf
 MSGSUBDIRS = smbadm smbstat
 
 include ../Makefile.cmd

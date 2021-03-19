@@ -261,14 +261,18 @@ smb2_tq_work(void *arg)
 }
 
 /*
- * Any non-zero return code and we'll drop the connection.
- * Other than that, return codes are just informative eg.
- * when looking at dtrace logs, which return did we take?
+ * Wrapper to setup a new mchain for the plaintext request that will
+ * replace the encrypted one.  Returns non-zero to drop the connection.
+ * Error return values here are just for visibility in dtrace.
  */
 static int
 smb3_decrypt_msg(smb_request_t *sr)
 {
-	int save_offset;
+	struct mbuf_chain clear_mbc = {0};
+	struct mbuf_chain tmp_mbc;
+	mbuf_t *m;
+	int clearsize;
+	int rc;
 
 	if (sr->session->dialect < SMB_VERS_3_0) {
 		/* Encrypted message in SMB 2.x */
@@ -280,24 +284,27 @@ smb3_decrypt_msg(smb_request_t *sr)
 	}
 
 	sr->encrypted = B_TRUE;
-	save_offset = sr->command.chain_offset;
-	if (smb3_decode_tform_header(sr) != 0) {
-		/* Bad transform header */
+	if (sr->command.max_bytes <
+	    (SMB3_TFORM_HDR_SIZE + SMB2_HDR_SIZE)) {
+		/* Short transform header */
 		return (-3);
 	}
-	sr->command.chain_offset = save_offset;
+	clearsize = sr->command.max_bytes - SMB3_TFORM_HDR_SIZE;
 
-	sr->tform_ssn = smb_session_lookup_ssnid(sr->session,
-	    sr->smb3_tform_ssnid);
-	if (sr->tform_ssn == NULL) {
-		/* Session not found */
-		return (-4);
+	clear_mbc.max_bytes = clearsize;
+	m = smb_mbuf_alloc_chain(clearsize);
+	MBC_ATTACH_MBUF(&clear_mbc, m);
+
+	rc = smb3_decrypt_sr(sr, &sr->command, &clear_mbc);
+	if (rc != 0) {
+		MBC_FLUSH(&clear_mbc);
+		return (rc);
 	}
 
-	if (smb3_decrypt_sr(sr) != 0) {
-		/* Decryption failed */
-		return (-5);
-	}
+	/* Swap clear_mbc in place of command */
+	tmp_mbc = sr->command;
+	sr->command = clear_mbc;
+	MBC_FLUSH(&tmp_mbc);	// free old sr->command
 
 	return (0);
 }
@@ -687,7 +694,7 @@ cmd_start:
 			 */
 
 			if (sr->encrypted &&
-			    sr->smb2_ssnid != sr->smb3_tform_ssnid) {
+			    sr->smb2_ssnid != sr->th_ssnid) {
 				disconnect = B_TRUE;
 				goto cleanup; /* just do this for now */
 			}
@@ -731,10 +738,10 @@ cmd_start:
 		 * Those commands suppress UID, so they can't be the cmd here.
 		 */
 		if (sr->uid_user->u_encrypt != SMB_CONFIG_DISABLED &&
-		    sr->tform_ssn == NULL) {
+		    sr->th_sid_user == NULL) {
 			smb_user_hold_internal(sr->uid_user);
-			sr->tform_ssn = sr->uid_user;
-			sr->smb3_tform_ssnid = sr->smb2_ssnid;
+			sr->th_sid_user = sr->uid_user;
+			sr->th_ssnid = sr->smb2_ssnid;
 		}
 	}
 
@@ -784,10 +791,11 @@ cmd_start:
 			 * max_protocol to at least 3.0. Additionally,
 			 * if the tree requires encryption, we don't care
 			 * what we support, we still enforce encryption.
+			 * Since smb3_decrypt_msg() does check session->srv_cap,
+			 * we only need to check sr->encrypted here.
 			 */
 			if (sr->tid_tree->t_encrypt == SMB_CONFIG_REQUIRED &&
-			    (!sr->encrypted ||
-			    (session->srv_cap & SMB2_CAP_ENCRYPTION) == 0)) {
+			    !sr->encrypted) {
 				smb2sr_put_error(sr,
 				    NT_STATUS_ACCESS_DENIED);
 				goto cmd_done;
@@ -804,10 +812,10 @@ cmd_start:
 		 * NOTE: assumes we can't have a tree without a user
 		 */
 		if (sr->tid_tree->t_encrypt != SMB_CONFIG_DISABLED &&
-		    sr->tform_ssn == NULL) {
+		    sr->th_sid_user == NULL) {
 			smb_user_hold_internal(sr->uid_user);
-			sr->tform_ssn = sr->uid_user;
-			sr->smb3_tform_ssnid = sr->smb2_ssnid;
+			sr->th_sid_user = sr->uid_user;
+			sr->th_ssnid = sr->smb2_ssnid;
 		}
 	}
 
@@ -1000,7 +1008,7 @@ cmd_done:
 	}
 
 	/* Don't sign if we're going to encrypt */
-	if (sr->tform_ssn == NULL &&
+	if (sr->th_sid_user == NULL &&
 	    (sr->smb2_hdr_flags & SMB2_FLAGS_SIGNED) != 0)
 		smb2_sign_reply(sr);
 
@@ -1332,64 +1340,6 @@ cleanup:
 }
 
 int
-smb3_decode_tform_header(smb_request_t *sr)
-{
-	uint16_t flags;
-	int rc;
-	uint32_t protocolid;
-
-	rc = smb_mbc_decodef(
-	    &sr->command, "l16c16cl..wq",
-	    &protocolid,	/*  l  */
-	    sr->smb2_sig,	/* 16c */
-	    sr->nonce,	/* 16c */
-	    &sr->msgsize,	/* l */
-	    /* reserved	  .. */
-	    &flags,		/* w */
-	    &sr->smb3_tform_ssnid); /* q */
-	if (rc)
-		return (rc);
-
-	ASSERT3U(protocolid, ==, SMB3_ENCRYPTED_MAGIC);
-
-	if (flags != 1) {
-#ifdef DEBUG
-		cmn_err(CE_NOTE, "flags field not 1: %x", flags);
-#endif
-		return (-1);
-	}
-
-	/*
-	 * MsgSize is the amount of data the client tell us to decrypt.
-	 * Make sure this value is not too big and not too small.
-	 */
-	if (sr->msgsize < SMB2_HDR_SIZE ||
-	    sr->msgsize > sr->session->cmd_max_bytes ||
-	    sr->msgsize > sr->command.max_bytes - SMB3_TFORM_HDR_SIZE)
-		return (-1);
-
-	return (rc);
-}
-
-int
-smb3_encode_tform_header(smb_request_t *sr, struct mbuf_chain *mbc)
-{
-	int rc;
-
-	/* Signature and Nonce are added in smb3_encrypt_sr */
-	rc = smb_mbc_encodef(
-	    mbc, "l32.lwwq",
-	    SMB3_ENCRYPTED_MAGIC, /* l */
-	    /* signature(16), nonce(16) 32. */
-	    sr->msgsize,	/* l */
-	    0, /* reserved	   w */
-	    1, /* flags		   w */
-	    sr->smb3_tform_ssnid); /* q */
-
-	return (rc);
-}
-
-int
 smb2_decode_header(smb_request_t *sr)
 {
 	uint32_t pid, tid;
@@ -1482,13 +1432,8 @@ void
 smb2_send_reply(smb_request_t *sr)
 {
 	struct mbuf_chain enc_reply;
-	struct mbuf_chain tmp_reply;
 	smb_session_t *session = sr->session;
-	mbuf_t *mbuf;
-	size_t buflen;
-
-	bzero(&enc_reply, sizeof (enc_reply));
-	bzero(&tmp_reply, sizeof (tmp_reply));
+	mbuf_t *m;
 
 	/*
 	 * [MS-SMB2] 3.3.4.1.4 Encrypting the Message
@@ -1501,47 +1446,40 @@ smb2_send_reply(smb_request_t *sr)
 	 * -- The cmd is not TREE_CONNECT AND
 	 * --- Tree.EncryptData is TRUE
 	 *
-	 * This boils down to sr->tform_ssn != NULL, and the rest
-	 * is enforced when tform_ssn is set.
+	 * This boils down to sr->th_sid_user != NULL, and the rest
+	 * is enforced when th_sid_user is set.
 	 */
 
 	if ((session->capabilities & SMB2_CAP_ENCRYPTION) == 0 ||
-	    sr->tform_ssn == NULL) {
+	    sr->th_sid_user == NULL) {
 		(void) smb_session_send(sr->session, 0, &sr->reply);
 		return;
 	}
 
-	sr->msgsize = sr->reply.chain_offset;
-	(void) MBC_SHADOW_CHAIN(&tmp_reply, &sr->reply,
-	    0, sr->msgsize);
-
 	/*
-	 * Setup a contiguous buffer for the encrypted reply,
-	 * including prepend space for the NBT header.
+	 * Encrypted send
+	 *
+	 * Not doing in-place encryption because we may have
+	 * loaned buffers (eg. from ZFS) that are read-only.
+	 *
+	 * Setup the transform header in its own mblk,
+	 * with leading space for the netbios header.
 	 */
-	buflen = SMB3_TFORM_HDR_SIZE + sr->msgsize + NETBIOS_HDR_SZ;
-	mbuf = smb_mbuf_alloc_kmem(buflen);
-	mbuf->m_data += NETBIOS_HDR_SZ;
-	mbuf->m_len  -= NETBIOS_HDR_SZ;
+	MBC_INIT(&enc_reply, SMB3_TFORM_HDR_SIZE);
+	m = enc_reply.chain;
+	m->m_len = SMB3_TFORM_HDR_SIZE;
 
-	MBC_ATTACH_MBUF(&enc_reply, mbuf);
-	enc_reply.max_bytes = mbuf->m_len;
+	sr->th_msglen = sr->reply.chain_offset;
+	m->m_next = smb_mbuf_alloc_chain(sr->th_msglen);
+	enc_reply.max_bytes += sr->th_msglen;
 
-	if (smb3_encode_tform_header(sr, &enc_reply) != 0) {
-		cmn_err(CE_WARN, "couldn't encode transform header");
-		goto errout;
-	}
-	if (smb3_encrypt_sr(sr, &tmp_reply, &enc_reply) != 0) {
+	if (smb3_encrypt_sr(sr, &sr->reply, &enc_reply) != 0) {
 		cmn_err(CE_WARN, "smb3 encryption failed");
-		goto errout;
+		smb_session_disconnect(sr->session);
+	} else {
+		(void) smb_session_send(sr->session, 0, &enc_reply);
 	}
-
-	(void) smb_session_send(sr->session, 0, &enc_reply);
-	return;
-
-errout:
 	MBC_FLUSH(&enc_reply);
-	smb_session_disconnect(sr->session);
 }
 
 /*
