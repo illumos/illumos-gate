@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2002-2018 Apple Inc. All rights reserved.
+ * Copyright (c) 2002-2020 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,15 +44,14 @@ typedef enum
     kDNSFlag0_QR_Query       = 0x00,
     kDNSFlag0_QR_Response    = 0x80,
 
-    kDNSFlag0_OP_Mask        = 0x78,    // Operation type
-    kDNSFlag0_OP_StdQuery    = 0x00,
-    kDNSFlag0_OP_Subscribe   = 0x06,
-    kDNSFlag0_OP_UnSubscribe = 0x07,
-    kDNSFlag0_OP_Iquery      = 0x08,
-    kDNSFlag0_OP_Status      = 0x10,
-    kDNSFlag0_OP_Unused3     = 0x18,
-    kDNSFlag0_OP_Notify      = 0x20,
-    kDNSFlag0_OP_Update      = 0x28,
+    kDNSFlag0_OP_Mask        = 0xF << 3, // Operation type
+    kDNSFlag0_OP_StdQuery    = 0x0 << 3,
+    kDNSFlag0_OP_Iquery      = 0x1 << 3,
+    kDNSFlag0_OP_Status      = 0x2 << 3,
+    kDNSFlag0_OP_Unused3     = 0x3 << 3,
+    kDNSFlag0_OP_Notify      = 0x4 << 3,
+    kDNSFlag0_OP_Update      = 0x5 << 3,
+    kDNSFlag0_OP_DSO         = 0x6 << 3,
 
     kDNSFlag0_QROP_Mask   = kDNSFlag0_QR_Mask | kDNSFlag0_OP_Mask,
 
@@ -76,7 +75,8 @@ typedef enum
     kDNSFlag1_RC_YXRRSet  = 0x07,
     kDNSFlag1_RC_NXRRSet  = 0x08,
     kDNSFlag1_RC_NotAuth  = 0x09,
-    kDNSFlag1_RC_NotZone  = 0x0A
+    kDNSFlag1_RC_NotZone  = 0x0A,
+	kDNSFlag1_RC_DSOTypeNI = 0x0B
 } DNS_Flags;
 
 typedef enum
@@ -98,6 +98,10 @@ extern mDNSInterfaceID GetNextActiveInterfaceID(const NetworkInterfaceInfo *intf
 
 extern mDNSu32 mDNSRandom(mDNSu32 max);     // Returns pseudo-random result from zero to max inclusive
 
+#if !MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
+extern mDNSu32 mDNS_GetNextResolverGroupID(void);
+#endif
+
 // ***************************************************************************
 #if COMPILER_LIKES_PRAGMA_MARK
 #pragma mark -
@@ -116,7 +120,8 @@ extern mDNSu32 mDNSRandom(mDNSu32 max);     // Returns pseudo-random result from
 // We set the maximum allowable TTL to one hour.
 // With the 25% correction factor to avoid the DNS Zeno's paradox bug, that gives us an actual maximum lifetime of 75 minutes.
 
-#define mDNSMaximumTTLSeconds (mDNSu32)3600
+#define mDNSMaximumMulticastTTLSeconds  (mDNSu32)4500
+#define mDNSMaximumUnicastTTLSeconds    (mDNSu32)3600
 
 #define mDNSValidHostChar(X, notfirst, notlast) (mDNSIsLetter(X) || mDNSIsDigit(X) || ((notfirst) && (notlast) && (X) == '-') )
 
@@ -174,9 +179,11 @@ extern void AppendLabelSuffix(domainlabel *const name, mDNSu32 val, const mDNSBo
 
 extern mDNSu32 RDataHashValue(const ResourceRecord *const rr);
 extern mDNSBool SameRDataBody(const ResourceRecord *const r1, const RDataBody *const r2, DomainNameComparisonFn *samename);
-extern mDNSBool SameNameRecordAnswersQuestion(const ResourceRecord *const rr, const DNSQuestion *const q);
+extern mDNSBool SameNameCacheRecordAnswersQuestion(const CacheRecord *const cr, const DNSQuestion *const q);
 extern mDNSBool ResourceRecordAnswersQuestion(const ResourceRecord *const rr, const DNSQuestion *const q);
-extern mDNSBool AnyTypeRecordAnswersQuestion (const ResourceRecord *const rr, const DNSQuestion *const q);
+extern mDNSBool AuthRecordAnswersQuestion(const AuthRecord *const ar, const DNSQuestion *const q);
+extern mDNSBool CacheRecordAnswersQuestion(const CacheRecord *const cr, const DNSQuestion *const q);
+extern mDNSBool AnyTypeRecordAnswersQuestion (const AuthRecord *const ar, const DNSQuestion *const q);
 extern mDNSBool ResourceRecordAnswersUnicastResponse(const ResourceRecord *const rr, const DNSQuestion *const q);
 extern mDNSBool LocalOnlyRecordAnswersQuestion(AuthRecord *const rr, const DNSQuestion *const q);
 extern mDNSu16 GetRDLength(const ResourceRecord *const rr, mDNSBool estimate);
@@ -206,7 +213,8 @@ extern mDNSu8 *putRData(const DNSMessage *const msg, mDNSu8 *ptr, const mDNSu8 *
 
 #define AllowedRRSpace(msg) (((msg)->h.numAnswers || (msg)->h.numAuthorities || (msg)->h.numAdditionals) ? NormalMaxDNSMessageData : AbsoluteMaxDNSMessageData)
 
-extern mDNSu8 *PutResourceRecordTTLWithLimit(DNSMessage *const msg, mDNSu8 *ptr, mDNSu16 *count, ResourceRecord *rr, mDNSu32 ttl, const mDNSu8 *limit);
+extern mDNSu8 *PutResourceRecordTTLWithLimit(DNSMessage *const msg, mDNSu8 *ptr, mDNSu16 *count, const ResourceRecord *rr,
+    mDNSu32 ttl, const mDNSu8 *limit);
 
 #define PutResourceRecordTTL(msg, ptr, count, rr, ttl) \
     PutResourceRecordTTLWithLimit((msg), (ptr), (count), (rr), (ttl), (msg)->data + AllowedRRSpace(msg))
@@ -233,13 +241,8 @@ extern mDNSu8 *putDeleteAllRRSets(DNSMessage *msg, mDNSu8 *ptr, const domainname
 extern mDNSu8 *putUpdateLease(DNSMessage *msg, mDNSu8 *ptr, mDNSu32 lease);
 extern mDNSu8 *putUpdateLeaseWithLimit(DNSMessage *msg, mDNSu8 *ptr, mDNSu32 lease, mDNSu8 *limit);
 
-extern mDNSu8 *putHINFO(const mDNS *const m, DNSMessage *const msg, mDNSu8 *ptr, DomainAuthInfo *authInfo, mDNSu8 *limit);
-extern mDNSu8 *putDNSSECOption(DNSMessage *msg, mDNSu8 *end, mDNSu8 *limit);
 extern int baseEncode(char *buffer, int blen, const mDNSu8 *data, int len, int encAlg);
 extern void NSEC3Parse(const ResourceRecord *const rr, mDNSu8 **salt, int *hashLength, mDNSu8 **nxtName, int *bitmaplen, mDNSu8 **bitmap);
-
-extern const mDNSu8 *NSEC3HashName(const domainname *name, rdataNSEC3 *nsec3, const mDNSu8 *AnonData, int AnonDataLen,
-    const mDNSu8 hash[NSEC3_MAX_HASH_LEN], int *dlen);
 
 // ***************************************************************************
 #if COMPILER_LIKES_PRAGMA_MARK
@@ -256,8 +259,8 @@ extern const mDNSu8 *getDomainName(const DNSMessage *const msg, const mDNSu8 *pt
 extern const mDNSu8 *skipResourceRecord(const DNSMessage *msg, const mDNSu8 *ptr, const mDNSu8 *end);
 extern const mDNSu8 *GetLargeResourceRecord(mDNS *const m, const DNSMessage * const msg, const mDNSu8 *ptr,
                                             const mDNSu8 * end, const mDNSInterfaceID InterfaceID, mDNSu8 RecordType, LargeCacheRecord *const largecr);
-extern mDNSBool SetRData(const DNSMessage *const msg, const mDNSu8 *ptr, const mDNSu8 *end,
-    LargeCacheRecord *const largecr, mDNSu16 rdlength);
+extern mDNSBool SetRData(const DNSMessage *const msg, const mDNSu8 *ptr, const mDNSu8 *end, ResourceRecord *rr,
+    mDNSu16 rdlength);
 extern const mDNSu8 *skipQuestion(const DNSMessage *msg, const mDNSu8 *ptr, const mDNSu8 *end);
 extern const mDNSu8 *getQuestion(const DNSMessage *msg, const mDNSu8 *ptr, const mDNSu8 *end, const mDNSInterfaceID InterfaceID,
                                  DNSQuestion *question);
@@ -267,9 +270,9 @@ extern const mDNSu8 *LocateAdditionals(const DNSMessage *const msg, const mDNSu8
 extern const mDNSu8 *LocateOptRR(const DNSMessage *const msg, const mDNSu8 *const end, int minsize);
 extern const rdataOPT *GetLLQOptData(mDNS *const m, const DNSMessage *const msg, const mDNSu8 *const end);
 extern mDNSBool GetPktLease(mDNS *const m, const DNSMessage *const msg, const mDNSu8 *const end, mDNSu32 *const lease);
-extern void DumpPacket(mStatus status, mDNSBool sent, char *transport,
-                       const mDNSAddr *srcaddr, mDNSIPPort srcport,
-                       const mDNSAddr *dstaddr, mDNSIPPort dstport, const DNSMessage *const msg, const mDNSu8 *const end);
+extern void DumpPacket(mStatus status, mDNSBool sent, const char *transport, const mDNSAddr *srcaddr, mDNSIPPort srcport,
+    const mDNSAddr *dstaddr, mDNSIPPort dstport, const DNSMessage *const msg, const mDNSu8 *const end,
+    mDNSInterfaceID interfaceID);
 extern mDNSBool RRAssertsNonexistence(const ResourceRecord *const rr, mDNSu16 type);
 extern mDNSBool RRAssertsExistence(const ResourceRecord *const rr, mDNSu16 type);
 extern mDNSBool BitmapTypeCheck(mDNSu8 *bmap, int bitmaplen, mDNSu16 type);
@@ -277,16 +280,16 @@ extern mDNSBool BitmapTypeCheck(mDNSu8 *bmap, int bitmaplen, mDNSu16 type);
 extern mDNSu16 swap16(mDNSu16 x);
 extern mDNSu32 swap32(mDNSu32 x);
 
+extern mDNSBool GetReverseIPv6Addr(const domainname *inQName, mDNSu8 outIPv6[16]);
+
 // ***************************************************************************
 #if COMPILER_LIKES_PRAGMA_MARK
 #pragma mark -
 #pragma mark - Packet Sending Functions
 #endif
-
 extern mStatus mDNSSendDNSMessage(mDNS *const m, DNSMessage *const msg, mDNSu8 *end,
-                                  mDNSInterfaceID InterfaceID, UDPSocket *src, const mDNSAddr *dst,
-                                  mDNSIPPort dstport, TCPSocket *sock, DomainAuthInfo *authInfo,
-                                  mDNSBool useBackgroundTrafficClass);
+                                  mDNSInterfaceID InterfaceID, TCPSocket *tcpSrc, UDPSocket *udpSrc, const mDNSAddr *dst,
+                                  mDNSIPPort dstport, DomainAuthInfo *authInfo, mDNSBool useBackgroundTrafficClass);
 
 // ***************************************************************************
 #if COMPILER_LIKES_PRAGMA_MARK
@@ -297,7 +300,7 @@ extern mStatus mDNSSendDNSMessage(mDNS *const m, DNSMessage *const msg, mDNSu8 *
 extern void ShowTaskSchedulingError(mDNS *const m);
 extern void mDNS_Lock_(mDNS *const m, const char * const functionname);
 extern void mDNS_Unlock_(mDNS *const m, const char * const functionname);
-
+    
 #if defined(_WIN32)
  #define __func__ __FUNCTION__
 #endif

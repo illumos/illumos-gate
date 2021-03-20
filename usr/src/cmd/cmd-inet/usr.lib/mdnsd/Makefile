@@ -32,7 +32,8 @@ SRCDIR=		$(SRC)/contrib/mDNSResponder
 OBJS=		DNSCommon.o DNSDigest.o GenLinkedList.o \
 		PlatformCommon.o PosixDaemon.o \
 		mDNS.o mDNSDebug.o mDNSPosix.o mDNSUNP.o \
-		uDNS.o uds_daemon.o CryptoAlg.o anonymous.o dnssd_ipc.o
+		uDNS.o uds_daemon.o dnssd_ipc.o posix_utilities.o \
+		ClientRequests.o
 SRCS=		$(OBJS:%.o=%.c)
 
 MDNSFLAGS=	-DNOT_HAVE_SA_LEN \
@@ -40,12 +41,14 @@ MDNSFLAGS=	-DNOT_HAVE_SA_LEN \
 		-D_XPG4_2 -D__EXTENSIONS__ -DHAVE_BROKEN_RECVIF_NAME \
 		-DHAVE_IPV6=1 -Dasm=__asm -DMDNSD_NOROOT \
 		-DPID_FILE=\"\" -DMDNSD_USER=\"noaccess\" \
-		-DmDNSResponderVersion=878.260.1
+		-DmDNSResponderVersion=1310.80.1
 
 include	../../../Makefile.cmd
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc7=-Wno-expansion-to-defined
+CERRWARN +=	-_gcc10=-Wno-expansion-to-defined
 CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted

@@ -102,7 +102,7 @@ usr/src/common/bzip2/decompress.c
 usr/src/common/bzip2/bzlib_private.h
 usr/src/common/bzip2/huffman.c
 usr/src/common/crypto/chacha/chacha.c
-usr/src/contrib
+usr/src/contrib/
 usr/src/grub/grub-0.97/grub/asmstub.c
 usr/src/grub/grub-0.97/stage2/bios.c
 usr/src/grub/grub-0.97/stage2/builtins.c

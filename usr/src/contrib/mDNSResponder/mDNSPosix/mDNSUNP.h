@@ -44,14 +44,6 @@ extern "C" {
 typedef unsigned int socklen_t;
 #endif
 
-#if !defined(_SS_MAXSIZE)
-#if HAVE_IPV6
-#define sockaddr_storage sockaddr_in6
-#else
-#define sockaddr_storage sockaddr
-#endif // HAVE_IPV6
-#endif // !defined(_SS_MAXSIZE)
-
 #ifndef NOT_HAVE_SA_LEN
 #define GET_SA_LEN(X) (sizeof(struct sockaddr) > ((struct sockaddr*)&(X))->sa_len ? \
                        sizeof(struct sockaddr) : ((struct sockaddr*)&(X))->sa_len   )
@@ -96,17 +88,6 @@ struct ifi_info {
     struct ifi_info  *ifi_next; /* next of these structures */
 };
 
-#if defined(AF_INET6) && HAVE_IPV6 && HAVE_LINUX
-#define PROC_IFINET6_PATH "/proc/net/if_inet6"
-extern struct ifi_info  *get_ifi_info_linuxv6(int doaliases);
-#endif
-
-#if defined(AF_INET6) && HAVE_IPV6
-#define INET6_ADDRSTRLEN 46 /*Maximum length of IPv6 address */
-#endif
-
-
-
 #define IFI_ALIAS   1           /* ifi_addr is an alias */
 
 /* From the text (Stevens, section 16.6): */
@@ -117,7 +98,11 @@ extern struct ifi_info  *get_ifi_info(int family, int doaliases);
 
 /* 'The free_ifi_info function, which takes a pointer that was */
 /* returned by get_ifi_info and frees all the dynamic memory.' */
-extern void             free_ifi_info(struct ifi_info *);
+extern void free_ifi_info(struct ifi_info *);
+
+#if defined(AF_INET6) && HAVE_IPV6
+#define INET6_ADDRSTRLEN 46 /*Maximum length of IPv6 address */
+#endif
 
 #ifdef NOT_HAVE_DAEMON
 extern int daemon(int nochdir, int noclose);

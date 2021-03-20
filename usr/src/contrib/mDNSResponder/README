@@ -24,23 +24,24 @@
 
 The mdns vendor source repository is at https://github.com/illumos/mdns/.
 
+Updated from upstream version mDNSResponder-1310.80.1
 Updated from upstream version mDNSResponder-878.260.1
 Updated from upstream version mDNSResponder-878.1.1
 Updated from upstream version mDNSResponder-625.41.2
 Updated from upstream version mDNSResponder-576.30.4
 
-Multicast DNS and Service Discovery support in Solaris using the
+Multicast DNS and Service Discovery support in illumos using the
 Apple Bonjour source code (v107.6). Apple Bonjour source can be
 downloaded from:
-	http://developer.apple.com/networking/bonjour/download/
+	https://opensource.apple.com/tarballs/mDNSResponder/
 The following components are integrated from the Apple Bonjour
-source in Solaris:
+source in illumos:
   libdns_sd:	usr/src/lib/libdns_sd <dns_sd.h>
   mdnsd:	usr/src/cmd/cmd-inet/usr.lib/mdnsd
   dns-sd:	usr/src/cmd/cmd-inet/usr.bin/dns-sd
 
 Following fixes have been made to the Apple Bonjour source
-integrated in Solaris:
+integrated in illumos:
 * 64-bit support by adding pad bytes in ipc_msg_hdr_struct
 * 64-bit support in libjdns_sd, dnssd.jar (JNISupport.c, DNSSD.java)
 * mdnsd switches to user 'noaccess' and not 'nobody' after init

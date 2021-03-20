@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2003-2015 Apple Inc. All rights reserved.
+ * Copyright (c) 2003-2020 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -100,7 +100,11 @@ extern char *win32_strerror(int inErrorCode);
 
 // IPC data encoding constants and types
 #define VERSION 1
-#define IPC_FLAGS_NOREPLY 1 // set flag if no asynchronous replies are to be sent to client
+#define IPC_FLAGS_NOREPLY       (1U << 0) // Set flag if no asynchronous replies are to be sent to client.
+#define IPC_FLAGS_TRAILING_TLVS (1U << 1) // Set flag if TLVs follow the standard request data.
+
+#define IPC_TLV_TYPE_RESOLVER_CONFIG_PLIST_DATA 1   // An nw_resolver_config as a binary property list.
+#define IPC_TLV_TYPE_REQUIRE_PRIVACY            2   // A uint8. Non-zero means privacy is required, zero means not required.
 
 // Structure packing macro. If we're not using GNUC, it's not fatal. Most compilers naturally pack the on-the-wire
 // structures correctly anyway, so a plain "struct" is usually fine. In the event that structures are not packed
@@ -210,6 +214,11 @@ int get_string(const char **ptr, const char *const end, char *buffer, int buflen
 void put_rdata(const int rdlen, const unsigned char *rdata, char **ptr);
 const char *get_rdata(const char **ptr, const char *end, int rdlen);  // return value is rdata pointed to by *ptr -
 // rdata is not copied from buffer.
+
+#if APPLE_OSX_mDNSResponder
+size_t get_required_tlv16_length(const uint16_t valuelen);
+void put_tlv16(const uint16_t type, const uint16_t length, const uint8_t *value, char **ptr);
+#endif
 
 void ConvertHeaderBytes(ipc_msg_hdr *hdr);
 

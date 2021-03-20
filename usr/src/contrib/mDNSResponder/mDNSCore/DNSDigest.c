@@ -1,6 +1,5 @@
-/* -*- Mode: C; tab-width: 4 -*-
- *
- * Copyright (c) 2002-2011 Apple Inc. All rights reserved.
+/*
+ * Copyright (c) 2002-2019 Apple Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -571,27 +570,34 @@ void md5_block_data_order (MD5_CTX *c, const void *p,int num);
                          l|=(((unsigned long)(*((c)++)))<< 8),      \
                          l|=(((unsigned long)(*((c)++)))    ),      \
                          l)
-#define HOST_p_c2l(c,l,n)   {                   \
-        switch (n) {                    \
+#define HOST_p_c2l(c,l,n)   {                       \
+        switch (n) {                                \
         case 0: l =((unsigned long)(*((c)++)))<<24; \
+            /* FALLTHROUGH */                       \
         case 1: l|=((unsigned long)(*((c)++)))<<16; \
+            /* FALLTHROUGH */                       \
         case 2: l|=((unsigned long)(*((c)++)))<< 8; \
+            /* FALLTHROUGH */                       \
         case 3: l|=((unsigned long)(*((c)++)));     \
         } }
 #define HOST_p_c2l_p(c,l,sc,len) {                  \
-        switch (sc) {                   \
+        switch (sc) {                               \
         case 0: l =((unsigned long)(*((c)++)))<<24; \
-            if (--len == 0) break;                                                 \
+            if (--len == 0) break;                  \
+            /* FALLTHROUGH */                       \
         case 1: l|=((unsigned long)(*((c)++)))<<16; \
-            if (--len == 0) break;                                                 \
+            if (--len == 0) break;                  \
+            /* FALLTHROUGH */                       \
         case 2: l|=((unsigned long)(*((c)++)))<< 8; \
         } }
 /* NOTE the pointer is not incremented at the end of this */
-#define HOST_c2l_p(c,l,n)   {                   \
-        l=0; (c)+=n;                    \
-        switch (n) {                    \
+#define HOST_c2l_p(c,l,n)   {                       \
+        l=0; (c)+=n;                                \
+        switch (n) {                                \
         case 3: l =((unsigned long)(*(--(c))))<< 8; \
+            /* FALLTHROUGH */                       \
         case 2: l|=((unsigned long)(*(--(c))))<<16; \
+            /* FALLTHROUGH */                       \
         case 1: l|=((unsigned long)(*(--(c))))<<24; \
         } }
 #define _HOST_l2c(l,c)  (*((c)++)=(unsigned char)(((l)>>24)&0xff),  \
@@ -607,34 +613,34 @@ void md5_block_data_order (MD5_CTX *c, const void *p,int num);
                          l|=(((unsigned long)(*((c)++)))<<16),      \
                          l|=(((unsigned long)(*((c)++)))<<24),      \
                          l)
-#define HOST_p_c2l(c,l,n)   {                   \
-        switch (n) {                    \
+#define HOST_p_c2l(c,l,n)   {                       \
+        switch (n) {                                \
         case 0: l =((unsigned long)(*((c)++)));     \
-	/* FALLTHROUGH */	\
+            /* FALLTHROUGH */                       \
         case 1: l|=((unsigned long)(*((c)++)))<< 8; \
-	/* FALLTHROUGH */	\
+            /* FALLTHROUGH */                       \
         case 2: l|=((unsigned long)(*((c)++)))<<16; \
-	/* FALLTHROUGH */	\
+            /* FALLTHROUGH */                       \
         case 3: l|=((unsigned long)(*((c)++)))<<24; \
         } }
 #define HOST_p_c2l_p(c,l,sc,len) {                  \
-        switch (sc) {                   \
+        switch (sc) {                               \
         case 0: l =((unsigned long)(*((c)++)));     \
-            if (--len == 0) break;                                                 \
-	/* FALLTHROUGH */	\
+            if (--len == 0) break;                  \
+            /* FALLTHROUGH */                       \
         case 1: l|=((unsigned long)(*((c)++)))<< 8; \
-            if (--len == 0) break;                                                 \
-	/* FALLTHROUGH */	\
+            if (--len == 0) break;                  \
+            /* FALLTHROUGH */                       \
         case 2: l|=((unsigned long)(*((c)++)))<<16; \
         } }
 /* NOTE the pointer is not incremented at the end of this */
-#define HOST_c2l_p(c,l,n)   {                   \
-        l=0; (c)+=n;                    \
-        switch (n) {                    \
+#define HOST_c2l_p(c,l,n)   {                       \
+        l=0; (c)+=n;                                \
+        switch (n) {                                \
         case 3: l =((unsigned long)(*(--(c))))<<16; \
-	/* FALLTHROUGH */	\
+            /* FALLTHROUGH */                       \
         case 2: l|=((unsigned long)(*(--(c))))<< 8; \
-	/* FALLTHROUGH */	\
+            /* FALLTHROUGH */                       \
         case 1: l|=((unsigned long)(*(--(c))));     \
         } }
 #define _HOST_l2c(l,c)  (*((c)++)=(unsigned char)(((l)    )&0xff),  \
@@ -652,6 +658,7 @@ void md5_block_data_order (MD5_CTX *c, const void *p,int num);
 int HASH_UPDATE (HASH_CTX *c, const void *data_, unsigned long len)
 {
     const unsigned char *data=(const unsigned char *)data_;
+    const unsigned char * const data_end=(const unsigned char *)data_;
     register HASH_LONG * p;
     register unsigned long l;
     int sw,sc,ew,ec;
@@ -675,7 +682,7 @@ int HASH_UPDATE (HASH_CTX *c, const void *data_, unsigned long len)
         if ((c->num+len) >= HASH_CBLOCK)
         {
             l=p[sw]; HOST_p_c2l(data,l,sc); p[sw++]=l;
-            for (; sw<HASH_LBLOCK; sw++)
+            for (; (sw < HASH_LBLOCK) && ((data_end - data) >= 4); sw++)
             {
                 HOST_c2l(data,l); p[sw]=l;
             }
@@ -699,7 +706,7 @@ int HASH_UPDATE (HASH_CTX *c, const void *data_, unsigned long len)
                     l=p[sw];
                 HOST_p_c2l(data,l,sc);
                 p[sw++]=l;
-                for (; sw < ew; sw++)
+                for (; (sw < ew) && ((data_end - data) >= 4); sw++)
                 {
                     HOST_c2l(data,l); p[sw]=l;
                 }
@@ -755,7 +762,7 @@ int HASH_UPDATE (HASH_CTX *c, const void *data_, unsigned long len)
         c->num = (int)len;
         ew=(int)(len>>2);   /* words to copy */
         ec=(int)(len&0x03);
-        for (; ew; ew--,p++)
+        for (; ew && ((data_end - data) >= 4); ew--,p++)
         {
             HOST_c2l(data,l); *p=l;
         }
@@ -1048,6 +1055,10 @@ void md5_block_data_order (MD5_CTX *c, const void *data_, int num)
     C=c->C;
     D=c->D;
 
+#if defined(__clang_analyzer__)
+    // Get rid of false positive analyzer warning.
+    for (const unsigned char *_ptr = data; _ptr < &data[num * HASH_CBLOCK]; ++_ptr) {}
+#endif
     for (; num--;)
     {
         HOST_c2l(data,l); X( 0)=l;      HOST_c2l(data,l); X( 1)=l;
@@ -1283,7 +1294,7 @@ mDNSlocal mDNSs32 DNSDigest_Base64ToBin(const char *src, mDNSu8 *target, mDNSu32
 #define HMAC_OPAD   0x5c
 #define MD5_LEN     16
 
-#define HMAC_MD5_AlgName (*(const domainname*) "\010" "hmac-md5" "\007" "sig-alg" "\003" "reg" "\003" "int")
+#define HMAC_MD5_AlgName "\010" "hmac-md5" "\007" "sig-alg" "\003" "reg" "\003" "int"
 
 // Adapted from Appendix, RFC 2104
 mDNSlocal void DNSDigest_ConstructHMACKey(DomainAuthInfo *info, const mDNSu8 *key, mDNSu32 len)
@@ -1361,10 +1372,10 @@ mDNSexport void DNSDigest_SignMessage(DNSMessage *msg, mDNSu8 **end, DomainAuthI
     MD5_Update(&c, (mDNSu8 *)&tsig.resrec.rroriginalttl, sizeof(tsig.resrec.rroriginalttl));
 
     // alg name
-    AssignDomainName(&tsig.resrec.rdata->u.name, &HMAC_MD5_AlgName);
-    len = DomainNameLength(&HMAC_MD5_AlgName);
+    AssignConstStringDomainName(&tsig.resrec.rdata->u.name, HMAC_MD5_AlgName);
+    len = DomainNameLengthLimit((domainname *)HMAC_MD5_AlgName, (mDNSu8 *)HMAC_MD5_AlgName + sizeof HMAC_MD5_AlgName);
     rdata = tsig.resrec.rdata->u.data + len;
-    MD5_Update(&c, HMAC_MD5_AlgName.c, len);
+    MD5_Update(&c, (mDNSu8 *)HMAC_MD5_AlgName, len);
 
     // time
     // get UTC (universal time), convert to 48-bit unsigned in network byte order
@@ -1445,7 +1456,7 @@ mDNSexport mDNSBool DNSDigest_VerifyMessage(DNSMessage *msg, mDNSu8 *end, LargeC
 
     algo = (domainname*) ptr;
 
-    if (!SameDomainName(algo, &HMAC_MD5_AlgName))
+    if (!SameDomainName(algo, (domainname *)HMAC_MD5_AlgName))
     {
         LogMsg("ERROR: DNSDigest_VerifyMessage - TSIG algorithm not supported: %##s", algo->c);
         *rcode = kDNSFlag1_RC_NotAuth;

@@ -1,6 +1,5 @@
-/* -*- Mode: C; tab-width: 4 -*-
- *
- * Copyright (c) 2003-2011 Apple Inc. All rights reserved.
+/*
+ * Copyright (c) 2003-2020 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -27,6 +26,9 @@
  */
 
 #include "dnssd_ipc.h"
+#if APPLE_OSX_mDNSResponder
+#include "mdns_tlv.h"
+#endif
 
 #if defined(_WIN32)
 
@@ -102,9 +104,11 @@ uint16_t get_uint16(const char **ptr, const char *end)
 
 int put_string(const char *str, char **ptr)
 {
+    size_t len;
     if (!str) str = "";
-    strcpy(*ptr, str);
-    *ptr += strlen(str) + 1;
+    len = strlen(str) + 1;
+    memcpy(*ptr, str, len);
+    *ptr += len;
     return 0;
 }
 
@@ -150,6 +154,20 @@ const char *get_rdata(const char **ptr, const char *end, int rdlen)
         return rd;
     }
 }
+
+#if APPLE_OSX_mDNSResponder
+size_t get_required_tlv16_length(const uint16_t valuelen)
+{
+    return mdns_tlv16_get_required_length(valuelen);
+}
+
+void put_tlv16(const uint16_t type, const uint16_t length, const uint8_t *value, char **ptr)
+{
+	uint8_t *dst = (uint8_t *)*ptr;
+	mdns_tlv16_set(dst, NULL, type, length, value, &dst);
+    *ptr = (char *)dst;
+}
+#endif
 
 void ConvertHeaderBytes(ipc_msg_hdr *hdr)
 {

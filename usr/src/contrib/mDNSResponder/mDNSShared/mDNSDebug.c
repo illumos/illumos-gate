@@ -1,6 +1,5 @@
-/* -*- Mode: C; tab-width: 4 -*-
- *
- * Copyright (c) 2003-2018 Apple Inc. All rights reserved.
+/*
+ * Copyright (c) 2003-2019 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#include "mDNSDebug.h"
 
 #include <stdio.h>
 
@@ -47,37 +44,49 @@ mDNSexport int mDNS_DebugMode = mDNSfalse;
 mDNSexport void verbosedebugf_(const char *format, ...)
 {
     char buffer[512];
-    va_list ptr;
-    va_start(ptr,format);
-    buffer[mDNS_vsnprintf(buffer, sizeof(buffer), format, ptr)] = 0;
-    va_end(ptr);
+    va_list args;
+    va_start(args, format);
+    buffer[mDNS_vsnprintf(buffer, sizeof(buffer), format, args)] = 0;
+    va_end(args);
     mDNSPlatformWriteDebugMsg(buffer);
 }
 #endif
 
 // Log message with default "mDNSResponder" ident string at the start
-mDNSlocal void LogMsgWithLevelv(mDNSLogLevel_t logLevel, const char *format, va_list ptr)
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+mDNSlocal void LogMsgWithLevelv(os_log_t category, os_log_type_t level, const char *format, va_list args)
 {
     char buffer[512];
-    buffer[mDNS_vsnprintf((char *)buffer, sizeof(buffer), format, ptr)] = 0;
-    mDNSPlatformWriteLogMsg(ProgramName, buffer, logLevel);
+    mDNS_vsnprintf(buffer, (mDNSu32)sizeof(buffer), format, args);
+    os_log_with_type(category ? category : mDNSLogCategory_Default, level, "%{private}s", buffer);
 }
+#else
+mDNSlocal void LogMsgWithLevelv(const char *category, mDNSLogLevel_t level, const char *format, va_list args)
+{
+    char buffer[512];
+    char *dst = buffer;
+    const char *const lim = &buffer[512];
+    if (category) mDNS_snprintf_add(&dst, lim, "%s: ", category);
+    mDNS_vsnprintf(dst, (mDNSu32)(lim - dst), format, args);
+    mDNSPlatformWriteLogMsg(ProgramName, buffer, level);
+}
+#endif
 
-#define LOG_HELPER_BODY(L) \
+#define LOG_HELPER_BODY(CATEGORY, LEVEL) \
     { \
-        va_list ptr; \
-        va_start(ptr,format); \
-        LogMsgWithLevelv(L, format, ptr); \
-        va_end(ptr); \
+        va_list args; \
+        va_start(args,format); \
+        LogMsgWithLevelv(CATEGORY, LEVEL, format, args); \
+        va_end(args); \
     }
 
 // see mDNSDebug.h
 #if !MDNS_HAS_VA_ARG_MACROS
-void LogMsg_(const char *format, ...)       LOG_HELPER_BODY(MDNS_LOG_MSG)
-void LogOperation_(const char *format, ...) LOG_HELPER_BODY(MDNS_LOG_OPERATION)
-void LogSPS_(const char *format, ...)       LOG_HELPER_BODY(MDNS_LOG_SPS)
-void LogInfo_(const char *format, ...)      LOG_HELPER_BODY(MDNS_LOG_INFO)
-void LogDebug_(const char *format, ...)     LOG_HELPER_BODY(MDNS_LOG_DEBUG)
+void LogMsg_(const char *format, ...)       LOG_HELPER_BODY(NULL, MDNS_LOG_INFO)
+void LogOperation_(const char *format, ...) LOG_HELPER_BODY(NULL, MDNS_LOG_INFO)
+void LogSPS_(const char *format, ...)       LOG_HELPER_BODY(NULL, MDNS_LOG_INFO)
+void LogInfo_(const char *format, ...)      LOG_HELPER_BODY(NULL, MDNS_LOG_INFO)
+void LogDebug_(const char *format, ...)     LOG_HELPER_BODY(NULL, MDNS_LOG_DEBUG)
 #endif
 
 #if MDNS_DEBUGMSGS
@@ -85,5 +94,20 @@ void debugf_(const char *format, ...)       LOG_HELPER_BODY(MDNS_LOG_DEBUG)
 #endif
 
 // Log message with default "mDNSResponder" ident string at the start
-mDNSexport void LogMsgWithLevel(mDNSLogLevel_t logLevel, const char *format, ...)
-LOG_HELPER_BODY(logLevel)
+mDNSexport void LogMsgWithLevel(mDNSLogCategory_t category, mDNSLogLevel_t level, const char *format, ...)
+LOG_HELPER_BODY(category, level)
+
+mDNSexport void LogToFD(int fd, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+#if APPLE_OSX_mDNSResponder
+    char buffer[1024];
+    buffer[mDNS_vsnprintf(buffer, (mDNSu32)sizeof(buffer), format, args)] = '\0';
+    dprintf(fd, "%s\n", buffer);
+#else
+    (void)fd;
+    LogMsgWithLevelv(NULL, MDNS_LOG_INFO, format, args);
+#endif
+    va_end(args);
+}
