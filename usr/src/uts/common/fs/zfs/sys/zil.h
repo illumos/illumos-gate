@@ -408,6 +408,7 @@ typedef struct itx {
 	itx_wr_state_t	itx_wr_state;	/* write state */
 	uint8_t		itx_sync;	/* synchronous transaction */
 	uint64_t	itx_oid;	/* object id */
+	uint64_t	itx_gen;	/* gen number for zfs_get_data */
 	lr_t		itx_lr;		/* common part of log record */
 	/* followed by type-specific part of lr_xx_t and its immediate data */
 } itx_t;
@@ -417,7 +418,7 @@ typedef int zil_parse_blk_func_t(zilog_t *zilog, blkptr_t *bp, void *arg,
 typedef int zil_parse_lr_func_t(zilog_t *zilog, lr_t *lr, void *arg,
     uint64_t txg);
 typedef int zil_replay_func_t(void *arg1, void *arg2, boolean_t byteswap);
-typedef int zil_get_data_t(void *arg, lr_write_t *lr, char *dbuf,
+typedef int zil_get_data_t(void *arg, uint64_t arg2, lr_write_t *lr, char *dbuf,
     struct lwb *lwb, zio_t *zio);
 
 extern int zil_parse(zilog_t *zilog, zil_parse_blk_func_t *parse_blk_func,

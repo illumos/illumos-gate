@@ -486,6 +486,7 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 {
 	uint32_t blocksize = zp->z_blksz;
 	itx_wr_state_t write_state;
+	uint64_t gen = 0;
 
 	if (zil_replaying(zilog, tx) || zp->z_unlinked)
 		return;
@@ -499,6 +500,9 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 		write_state = WR_COPIED;
 	else
 		write_state = WR_NEED_COPY;
+
+	(void) sa_lookup(zp->z_sa_hdl, SA_ZPL_GEN(zp->z_zfsvfs), &gen,
+	    sizeof (gen));
 
 	while (resid) {
 		itx_t *itx;
@@ -530,6 +534,7 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 		BP_ZERO(&lr->lr_blkptr);
 
 		itx->itx_private = zp->z_zfsvfs;
+		itx->itx_gen = gen;
 		itx->itx_sync = (zp->z_sync_cnt != 0);
 
 		zil_itx_assign(zilog, itx, tx);

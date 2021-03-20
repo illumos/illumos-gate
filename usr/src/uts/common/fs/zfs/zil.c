@@ -1730,7 +1730,8 @@ cont:
 			 * completed after "lwb_write_zio" completed.
 			 */
 			error = zilog->zl_get_data(itx->itx_private,
-			    lrwb, dbuf, lwb, lwb->lwb_write_zio);
+			    itx->itx_gen, lrwb, dbuf, lwb,
+			    lwb->lwb_write_zio);
 			if (dbuf != NULL && error == 0 && dnow == dlen)
 				/* Zero any padding bytes in the last block. */
 				bzero((char *)dbuf + lrwb->lr_length, dpad);
