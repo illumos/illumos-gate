@@ -2252,18 +2252,13 @@ metaslab_load_impl(metaslab_t *msp)
 		range_tree_add(msp->ms_allocatable,
 		    msp->ms_start, msp->ms_size);
 
-		if (msp->ms_freed != NULL) {
+		if (msp->ms_new) {
 			/*
 			 * If the ms_sm doesn't exist, this means that this
 			 * metaslab hasn't gone through metaslab_sync() and
 			 * thus has never been dirtied. So we shouldn't
 			 * expect any unflushed allocs or frees from previous
 			 * TXGs.
-			 *
-			 * Note: ms_freed and all the other trees except for
-			 * the ms_allocatable, can be NULL at this point only
-			 * if this is a new metaslab of a vdev that just got
-			 * expanded.
 			 */
 			ASSERT(range_tree_is_empty(msp->ms_unflushed_allocs));
 			ASSERT(range_tree_is_empty(msp->ms_unflushed_frees));
@@ -2300,8 +2295,6 @@ metaslab_load_impl(metaslab_t *msp)
 	    range_tree_remove, msp->ms_allocatable);
 	range_tree_walk(msp->ms_unflushed_frees,
 	    range_tree_add, msp->ms_allocatable);
-
-	msp->ms_loaded = B_TRUE;
 
 	ASSERT3P(msp->ms_group, !=, NULL);
 	spa_t *spa = msp->ms_group->mg_vd->vdev_spa;
@@ -2598,19 +2591,31 @@ metaslab_init(metaslab_group_t *mg, uint64_t id, uint64_t object,
 		ms->ms_allocated_space = space_map_allocated(ms->ms_sm);
 	}
 
-	range_seg_type_t type;
 	uint64_t shift, start;
-	type = metaslab_calculate_range_tree_type(vd, ms, &start, &shift);
+	range_seg_type_t type =
+	    metaslab_calculate_range_tree_type(vd, ms, &start, &shift);
 
-	/*
-	 * We create the ms_allocatable here, but we don't create the
-	 * other range trees until metaslab_sync_done().  This serves
-	 * two purposes: it allows metaslab_sync_done() to detect the
-	 * addition of new space; and for debugging, it ensures that
-	 * we'd data fault on any attempt to use this metaslab before
-	 * it's ready.
-	 */
 	ms->ms_allocatable = range_tree_create(NULL, type, NULL, start, shift);
+	for (int t = 0; t < TXG_SIZE; t++) {
+		ms->ms_allocating[t] = range_tree_create(NULL, type,
+		    NULL, start, shift);
+	}
+	ms->ms_freeing = range_tree_create(NULL, type, NULL, start, shift);
+	ms->ms_freed = range_tree_create(NULL, type, NULL, start, shift);
+	for (int t = 0; t < TXG_DEFER_SIZE; t++) {
+		ms->ms_defer[t] = range_tree_create(NULL, type, NULL,
+		    start, shift);
+	}
+	ms->ms_checkpointing =
+	    range_tree_create(NULL, type, NULL, start, shift);
+	ms->ms_unflushed_allocs =
+	    range_tree_create(NULL, type, NULL, start, shift);
+
+	metaslab_rt_arg_t *mrap = kmem_zalloc(sizeof (*mrap), KM_SLEEP);
+	mrap->mra_bt = &ms->ms_unflushed_frees_by_size;
+	mrap->mra_floor_shift = metaslab_by_size_min_shift;
+	ms->ms_unflushed_frees = range_tree_create(&metaslab_rt_ops,
+	    type, mrap, start, shift);
 
 	ms->ms_trim = range_tree_create(NULL, type, NULL, start, shift);
 
@@ -2683,9 +2688,16 @@ metaslab_fini(metaslab_t *msp)
 
 	mutex_enter(&msp->ms_lock);
 	VERIFY(msp->ms_group == NULL);
-	metaslab_space_update(vd, mg->mg_class,
-	    -metaslab_allocated_space(msp), 0, -msp->ms_size);
 
+	/*
+	 * If this metaslab hasn't been through metaslab_sync_done() yet its
+	 * space hasn't been accounted for in its vdev and doesn't need to be
+	 * subtracted.
+	 */
+	if (!msp->ms_new) {
+		metaslab_space_update(vd, mg->mg_class,
+		    -metaslab_allocated_space(msp), 0, -msp->ms_size);
+	}
 	space_map_close(msp->ms_sm);
 	msp->ms_sm = NULL;
 
@@ -3082,6 +3094,15 @@ metaslab_segment_weight(metaslab_t *msp)
 boolean_t
 metaslab_should_allocate(metaslab_t *msp, uint64_t asize, boolean_t try_hard)
 {
+	/*
+	 * This case will usually but not always get caught by the checks below;
+	 * metaslabs can be loaded by various means, including the trim and
+	 * initialize code. Once that happens, without this check they are
+	 * allocatable even before they finish their first txg sync.
+	 */
+	if (unlikely(msp->ms_new))
+		return (B_FALSE);
+
 	/*
 	 * If the metaslab is loaded, ms_max_size is definitive and we can use
 	 * the fast check. If it's not, the ms_max_size is a lower bound (once
@@ -3828,16 +3849,14 @@ metaslab_sync(metaslab_t *msp, uint64_t txg)
 	/*
 	 * This metaslab has just been added so there's no work to do now.
 	 */
-	if (msp->ms_freeing == NULL) {
-		ASSERT3P(alloctree, ==, NULL);
+	if (msp->ms_new) {
+		ASSERT0(range_tree_space(alloctree));
+		ASSERT0(range_tree_space(msp->ms_freeing));
+		ASSERT0(range_tree_space(msp->ms_freed));
+		ASSERT0(range_tree_space(msp->ms_checkpointing));
+		ASSERT0(range_tree_space(msp->ms_trim));
 		return;
 	}
-
-	ASSERT3P(alloctree, !=, NULL);
-	ASSERT3P(msp->ms_freeing, !=, NULL);
-	ASSERT3P(msp->ms_freed, !=, NULL);
-	ASSERT3P(msp->ms_checkpointing, !=, NULL);
-	ASSERT3P(msp->ms_trim, !=, NULL);
 
 	/*
 	 * Normally, we don't want to process a metaslab if there are no
@@ -4142,54 +4161,15 @@ metaslab_sync_done(metaslab_t *msp, uint64_t txg)
 
 	mutex_enter(&msp->ms_lock);
 
-	/*
-	 * If this metaslab is just becoming available, initialize its
-	 * range trees and add its capacity to the vdev.
-	 */
-	if (msp->ms_freed == NULL) {
-		range_seg_type_t type;
-		uint64_t shift, start;
-		type = metaslab_calculate_range_tree_type(vd, msp, &start,
-		    &shift);
-
-		for (int t = 0; t < TXG_SIZE; t++) {
-			ASSERT(msp->ms_allocating[t] == NULL);
-
-			msp->ms_allocating[t] = range_tree_create(NULL, type,
-			    NULL, start, shift);
-		}
-
-		ASSERT3P(msp->ms_freeing, ==, NULL);
-		msp->ms_freeing = range_tree_create(NULL, type, NULL, start,
-		    shift);
-
-		ASSERT3P(msp->ms_freed, ==, NULL);
-		msp->ms_freed = range_tree_create(NULL, type, NULL, start,
-		    shift);
-
-		for (int t = 0; t < TXG_DEFER_SIZE; t++) {
-			ASSERT3P(msp->ms_defer[t], ==, NULL);
-			msp->ms_defer[t] = range_tree_create(NULL, type, NULL,
-			    start, shift);
-		}
-
-		ASSERT3P(msp->ms_checkpointing, ==, NULL);
-		msp->ms_checkpointing = range_tree_create(NULL, type, NULL,
-		    start, shift);
-
-		ASSERT3P(msp->ms_unflushed_allocs, ==, NULL);
-		msp->ms_unflushed_allocs = range_tree_create(NULL, type, NULL,
-		    start, shift);
-
-		metaslab_rt_arg_t *mrap = kmem_zalloc(sizeof (*mrap), KM_SLEEP);
-		mrap->mra_bt = &msp->ms_unflushed_frees_by_size;
-		mrap->mra_floor_shift = metaslab_by_size_min_shift;
-		ASSERT3P(msp->ms_unflushed_frees, ==, NULL);
-		msp->ms_unflushed_frees = range_tree_create(&metaslab_rt_ops,
-		    type, mrap, start, shift);
-
+	if (msp->ms_new) {
+		/* this is a new metaslab, add its capacity to the vdev */
 		metaslab_space_update(vd, mg->mg_class, 0, 0, msp->ms_size);
+
+		/* there should be no allocations nor frees at this point */
+		VERIFY0(msp->ms_allocated_this_txg);
+		VERIFY0(range_tree_space(msp->ms_freed));
 	}
+
 	ASSERT0(range_tree_space(msp->ms_freeing));
 	ASSERT0(range_tree_space(msp->ms_checkpointing));
 
