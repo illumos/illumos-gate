@@ -1241,7 +1241,9 @@ $(ASSYMDEP_OBJS:%=pics/%): assym.h
 # assym.h build rules
 
 GENASSYM_C = genassym.c
-LDFLAGS.native = $(LDASSERTS) $(ZASSERTDEFLIB)=libc.so $(BDIRECT)
+LDFLAGS.native = $(LDASSERTS) $(BDIRECT)
+
+genassym := NATIVE_LIBS += libc.so
 
 genassym: $(GENASSYM_C)
 	$(NATIVECC) $(NATIVE_CFLAGS) -Iinc -I$(LIBCDIR)/inc $(CPPFLAGS.native) \

@@ -55,8 +55,9 @@ ELFSIGN_O=		$(TRUE)
 LDLIBS=
 LDFLAGS=		$(MAPFILE.NES:%=-Wl,-M%) $(MAPFILE.NED:%=-Wl,-M%) \
 			    $(MAPFILE.PGA:%=-Wl,-M%) \
-			    $(ZASSERTDEFLIB)=libc.so \
 			    $(BDIRECT)
+
+NATIVE_LIBS += libc.so
 
 # To work around a bootstrapping problem, we can't rely on cw(1) knowing how
 # to translate -shared as we may be using an older one to build the current
