@@ -83,13 +83,6 @@ char door_arg[] = "DOOR ARG";
 int
 main(int argc, char *argv[])
 {
-#if defined(__sparc)
-	/*
-	 * This hasn't been implemented for SPARC, so skip.
-	 */
-	fprintf(stderr, "No SPARC implementation of get_stack_at_entry\n");
-	return (3);
-#else
 	door_arg_t da = {
 	    .data_ptr = (void *)door_arg,
 	    .data_size = sizeof (door_arg)
@@ -167,5 +160,4 @@ main(int argc, char *argv[])
 	(void) close(door_fd);
 
 	return (0);
-#endif
 }
