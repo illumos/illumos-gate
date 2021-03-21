@@ -103,7 +103,7 @@ main(int argc, char *argv[])
 	int door_fd, rc;
 
 	if (pthread_create(&tid, NULL,
-	    (void *(*)(void *))get_stack_at_entry, &arg) != 0) {
+	    (void *(*)(void *))(uintptr_t)get_stack_at_entry, &arg) != 0) {
 		perror("pthread_create() failed:");
 		exit(-2);
 	}
@@ -111,7 +111,8 @@ main(int argc, char *argv[])
 
 	arg.text = "thr_create()";
 
-	if (thr_create(NULL, 0, (void *(*)(void *))get_stack_at_entry,
+	if (thr_create(NULL, 0,
+	    (void *(*)(void *))(uintptr_t)get_stack_at_entry,
 	    &arg, 0, &tid) != 0) {
 		perror("thr_create() failed:");
 		exit(-3);
@@ -142,7 +143,7 @@ main(int argc, char *argv[])
 	arg.text = "door_call()";
 
 	if ((door_fd = door_create(
-	    (door_server_procedure_t *)get_stack_at_entry,
+	    (door_server_procedure_t *)(uintptr_t)get_stack_at_entry,
 	    &arg, 0)) < 0) {
 		perror("failed to create door");
 		exit(-7);
