@@ -31,8 +31,6 @@
 
 #include "nvmeadm.h"
 
-static int nvme_strlen(const char *, int);
-
 static void nvme_print_str(int, const char *, int, const char *, int);
 static void nvme_print_double(int, const char *, double, int, const char *);
 static void nvme_print_int64(int, const char *, uint64_t, const char *,
@@ -244,7 +242,7 @@ nvme_print(int indent, const char *name, int index, const char *fmt, ...)
 /*
  * nvme_strlen -- return length of string without trailing whitespace
  */
-static int
+int
 nvme_strlen(const char *str, int len)
 {
 	if (len < 0)
@@ -483,7 +481,7 @@ nvme_print_version(int indent, const char *name, uint32_t value)
 void
 nvme_print_ctrl_summary(nvme_identify_ctrl_t *idctl, nvme_version_t *version)
 {
-	(void) printf("model: %.*s, serial: %.*s, FW rev: %.*s, NVMe v%d.%d\n",
+	(void) printf("model: %.*s, serial: %.*s, FW rev: %.*s, NVMe v%u.%u\n",
 	    nvme_strlen(idctl->id_model, sizeof (idctl->id_model)),
 	    idctl->id_model,
 	    nvme_strlen(idctl->id_serial, sizeof (idctl->id_serial)),

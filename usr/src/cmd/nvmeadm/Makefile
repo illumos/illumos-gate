@@ -18,7 +18,7 @@
 
 PROG= nvmeadm
 
-OBJS= nvmeadm.o nvmeadm_dev.o nvmeadm_print.o
+OBJS= nvmeadm.o nvmeadm_dev.o nvmeadm_ofmt.o nvmeadm_print.o
 SRCS= $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
@@ -27,7 +27,7 @@ include ../Makefile.ctf
 .KEEP_STATE:
 
 CFLAGS +=	$(CCVERBOSE) -I$(SRC)/uts/common/io/nvme
-LDLIBS +=	-ldevinfo
+LDLIBS +=	-ldevinfo -lofmt
 CSTD=	$(CSTD_GNU99)
 
 #

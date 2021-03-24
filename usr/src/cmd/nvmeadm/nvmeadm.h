@@ -22,6 +22,7 @@
 #include <libdevinfo.h>
 #include <sys/nvme.h>
 #include <nvme_reg.h>
+#include <ofmt.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,10 +31,34 @@ extern "C" {
 extern int verbose;
 extern int debug;
 
+/* Common structures */
+typedef struct nvme_process_arg nvme_process_arg_t;
+typedef struct nvme_feature nvme_feature_t;
+typedef struct nvmeadm_cmd nvmeadm_cmd_t;
+
+struct nvme_process_arg {
+	int npa_argc;
+	char **npa_argv;
+	char *npa_name;
+	char *npa_nsid;
+	int npa_found;
+	boolean_t npa_isns;
+	const nvmeadm_cmd_t *npa_cmd;
+	di_node_t npa_node;
+	di_minor_t npa_minor;
+	char *npa_path;
+	char *npa_dsk;
+	nvme_identify_ctrl_t *npa_idctl;
+	nvme_identify_nsid_t *npa_idns;
+	nvme_version_t *npa_version;
+	ofmt_handle_t npa_ofmt;
+};
+
 /* Version checking */
 extern boolean_t nvme_version_check(nvme_version_t *, uint_t, uint_t);
 
 /* printing functions */
+extern int nvme_strlen(const char *, int);
 extern void nvme_print(int, const char *, int, const char *, ...);
 extern void nvme_print_ctrl_summary(nvme_identify_ctrl_t *, nvme_version_t *);
 extern void nvme_print_nsid_summary(nvme_identify_nsid_t *);
@@ -90,6 +115,11 @@ extern boolean_t nvme_detach(int);
 extern boolean_t nvme_attach(int);
 extern boolean_t nvme_firmware_load(int, void *, size_t, offset_t);
 extern boolean_t nvme_firmware_commit(int fd, int, int, uint16_t *, uint16_t *);
+
+/*
+ * ofmt related
+ */
+extern const ofmt_field_t nvme_list_ofmt[];
 
 #ifdef __cplusplus
 }
