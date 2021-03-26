@@ -29,7 +29,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2018 Jason King
 # Copyright 2019, Joyent, Inc.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Peter Tribble
 #
 
@@ -452,6 +452,10 @@ usr/lib/sparcv9/libdll.so		sparc
 # libpp (a helper library needed by AST's msgcc)
 usr/lib/libpp.so
 usr/lib/locale/C/LC_MESSAGES/libpp
+# libcmd
+usr/lib/libcmd.so
+usr/lib/amd64/libcmd.so			i386
+usr/lib/sparcv9/libcmd.so		sparc
 # libshell
 usr/lib/libshell.so
 usr/lib/amd64/libshell.so		i386

@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 file path=usr/share/man/man1/Intro.1
@@ -39,14 +40,10 @@ file path=usr/share/man/man1/ckkeywd.1
 file path=usr/share/man/man1/ckpath.1
 file path=usr/share/man/man1/ckrange.1
 file path=usr/share/man/man1/ckstr.1
-file path=usr/share/man/man1/cksum.1
 file path=usr/share/man/man1/cktime.1
 file path=usr/share/man/man1/ckuid.1
 file path=usr/share/man/man1/ckyorn.1
 file path=usr/share/man/man1/clear.1
-file path=usr/share/man/man1/cmp.1
-file path=usr/share/man/man1/comm.1
-file path=usr/share/man/man1/command.1
 file path=usr/share/man/man1/cp.1
 file path=usr/share/man/man1/cpio.1
 file path=usr/share/man/man1/crle.1
@@ -56,7 +53,6 @@ file path=usr/share/man/man1/csh.1
 file path=usr/share/man/man1/ctrun.1
 file path=usr/share/man/man1/ctstat.1
 file path=usr/share/man/man1/ctwatch.1
-file path=usr/share/man/man1/cut.1
 file path=usr/share/man/man1/date.1
 file path=usr/share/man/man1/deallocate.1
 file path=usr/share/man/man1/dhcpinfo.1
@@ -85,7 +81,6 @@ file path=usr/share/man/man1/getconf.1
 file path=usr/share/man/man1/getfacl.1
 file path=usr/share/man/man1/getopt.1
 file path=usr/share/man/man1/getoptcvt.1
-file path=usr/share/man/man1/getopts.1
 file path=usr/share/man/man1/gettext.1
 file path=usr/share/man/man1/glob.1
 file path=usr/share/man/man1/grep.1
@@ -99,13 +94,10 @@ file path=usr/share/man/man1/iconv.1
 file path=usr/share/man/man1/isainfo.1
 file path=usr/share/man/man1/isalist.1
 file path=usr/share/man/man1/jobs.1
-file path=usr/share/man/man1/join.1
 file path=usr/share/man/man1/kbd.1
 file path=usr/share/man/man1/keylogin.1
 file path=usr/share/man/man1/keylogout.1
-file path=usr/share/man/man1/kill.1
 file path=usr/share/man/man1/kmfcfg.1
-file path=usr/share/man/man1/ksh93.1
 file path=usr/share/man/man1/kvmstat.1
 file path=usr/share/man/man1/ld.so.1.1
 file path=usr/share/man/man1/let.1
@@ -141,7 +133,6 @@ file path=usr/share/man/man1/nohup.1
 file path=usr/share/man/man1/optisa.1
 file path=usr/share/man/man1/pagesize.1
 file path=usr/share/man/man1/passwd.1
-file path=usr/share/man/man1/paste.1
 file path=usr/share/man/man1/pathchk.1
 file path=usr/share/man/man1/pax.1
 file path=usr/share/man/man1/pfexec.1
@@ -150,7 +141,6 @@ file path=usr/share/man/man1/pgrep.1
 file path=usr/share/man/man1/pktool.1
 file path=usr/share/man/man1/pr.1
 file path=usr/share/man/man1/prctl.1
-file path=usr/share/man/man1/print.1
 file path=usr/share/man/man1/priocntl.1
 file path=usr/share/man/man1/proc.1
 file path=usr/share/man/man1/profiles.1
@@ -160,7 +150,6 @@ file path=usr/share/man/man1/pwd.1
 file path=usr/share/man/man1/read.1
 file path=usr/share/man/man1/readonly.1
 file path=usr/share/man/man1/renice.1
-file path=usr/share/man/man1/rev.1
 file path=usr/share/man/man1/rm.1
 file path=usr/share/man/man1/roles.1
 file path=usr/share/man/man1/runat.1
@@ -169,21 +158,17 @@ file path=usr/share/man/man1/sed.1
 file path=usr/share/man/man1/set.1
 file path=usr/share/man/man1/setfacl.1
 file path=usr/share/man/man1/setpgrp.1
-file path=usr/share/man/man1/shcomp.1
 file path=usr/share/man/man1/shell_builtins.1
 file path=usr/share/man/man1/shift.1
 file path=usr/share/man/man1/sleep.1
 file path=usr/share/man/man1/strchg.1
 file path=usr/share/man/man1/stty.1
-file path=usr/share/man/man1/sum.1
 file path=usr/share/man/man1/suspend.1
 file path=usr/share/man/man1/svcprop.1
 file path=usr/share/man/man1/svcs.1
 file path=usr/share/man/man1/tabs.1
 file path=usr/share/man/man1/tail.1
 file path=usr/share/man/man1/tar.1
-file path=usr/share/man/man1/tee.1
-file path=usr/share/man/man1/test.1
 file path=usr/share/man/man1/time.1
 file path=usr/share/man/man1/times.1
 file path=usr/share/man/man1/tip.1
@@ -193,17 +178,12 @@ file path=usr/share/man/man1/tr.1
 file path=usr/share/man/man1/trap.1
 file path=usr/share/man/man1/true.1
 file path=usr/share/man/man1/tty.1
-file path=usr/share/man/man1/type.1
 file path=usr/share/man/man1/typeset.1
-file path=usr/share/man/man1/umask.1
 file path=usr/share/man/man1/uname.1
-file path=usr/share/man/man1/uniq.1
 file path=usr/share/man/man1/uptime.1
 file path=usr/share/man/man1/uuidgen.1
 file path=usr/share/man/man1/vtfontcvt.1
 file path=usr/share/man/man1/w.1
-file path=usr/share/man/man1/wait.1
-file path=usr/share/man/man1/wc.1
 file path=usr/share/man/man1/which.1
 file path=usr/share/man/man1/who.1
 file path=usr/share/man/man1/write.1
@@ -255,8 +235,6 @@ link path=usr/share/man/man1/helpyorn.1 target=ckyorn.1
 link path=usr/share/man/man1/hist.1 target=history.1
 link path=usr/share/man/man1/if.1 target=shell_builtins.1
 link path=usr/share/man/man1/intro.1 target=Intro.1
-link path=usr/share/man/man1/jsh.1 target=ksh93.1
-link path=usr/share/man/man1/ksh.1 target=ksh93.1
 link path=usr/share/man/man1/notify.1 target=jobs.1
 link path=usr/share/man/man1/onintr.1 target=trap.1
 link path=usr/share/man/man1/page.1 target=more.1
@@ -281,14 +259,11 @@ link path=usr/share/man/man1/red.1 target=ed.1
 link path=usr/share/man/man1/rehash.1 target=hash.1
 link path=usr/share/man/man1/repeat.1 target=shell_builtins.1
 link path=usr/share/man/man1/return.1 target=exit.1
-link path=usr/share/man/man1/rksh.1 target=ksh93.1
-link path=usr/share/man/man1/rksh93.1 target=ksh93.1
 link path=usr/share/man/man1/rmail.1 target=mail.1
 link path=usr/share/man/man1/rmdir.1 target=rm.1
 link path=usr/share/man/man1/select.1 target=shell_builtins.1
 link path=usr/share/man/man1/setenv.1 target=set.1
 link path=usr/share/man/man1/settime.1 target=touch.1
-link path=usr/share/man/man1/sh.1 target=ksh93.1
 link path=usr/share/man/man1/source.1 target=exec.1
 link path=usr/share/man/man1/stop.1 target=jobs.1
 link path=usr/share/man/man1/strconf.1 target=strchg.1

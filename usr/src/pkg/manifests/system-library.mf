@@ -26,7 +26,7 @@
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2017 RackTop Systems.
 # Copyright 2018, Joyent, Inc.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 <include system-library.man3.inc>
@@ -344,15 +344,12 @@ file path=usr/lib/$(ARCH64)/0@0.so.1
 file path=usr/lib/$(ARCH64)/getloginx.so.1
 file path=usr/lib/$(ARCH64)/libads.so.1
 file path=usr/lib/$(ARCH64)/libadutils.so.1
-file path=usr/lib/$(ARCH64)/libast.so.1
 file path=usr/lib/$(ARCH64)/libbsdmalloc.so.1
 file path=usr/lib/$(ARCH64)/libcfgadm.so.1
-file path=usr/lib/$(ARCH64)/libcmd.so.1
 file path=usr/lib/$(ARCH64)/libcommputil.so.1
 file path=usr/lib/$(ARCH64)/libcrle.so.1
 file path=usr/lib/$(ARCH64)/libcrypt.so.1
 file path=usr/lib/$(ARCH64)/libdisasm.so.1
-file path=usr/lib/$(ARCH64)/libdll.so.1
 file path=usr/lib/$(ARCH64)/libexacct.so.1
 file path=usr/lib/$(ARCH64)/libform.so.1
 file path=usr/lib/$(ARCH64)/libfstyp.so.1
@@ -384,12 +381,10 @@ $(i386_ONLY)file path=usr/lib/$(ARCH64)/libsaveargs.so.1
 file path=usr/lib/$(ARCH64)/libsched.so.1
 file path=usr/lib/$(ARCH64)/libsctp.so.1
 file path=usr/lib/$(ARCH64)/libsff.so.1
-file path=usr/lib/$(ARCH64)/libshell.so.1
 file path=usr/lib/$(ARCH64)/libsip.so.1
 file path=usr/lib/$(ARCH64)/libsldap.so.1
 file path=usr/lib/$(ARCH64)/libsmbios.so.1
 file path=usr/lib/$(ARCH64)/libsoftcrypto.so.1
-file path=usr/lib/$(ARCH64)/libsum.so.1
 $(sparc_ONLY)file path=usr/lib/$(ARCH64)/libv12n.so.1
 file path=usr/lib/$(ARCH64)/libvolmgt.so.1
 file path=usr/lib/$(ARCH64)/libwrap.so.1.0
@@ -418,18 +413,15 @@ file path=usr/lib/getloginx.so.1
 file path=usr/lib/lib.b mode=0444
 file path=usr/lib/libads.so.1
 file path=usr/lib/libadutils.so.1
-file path=usr/lib/libast.so.1
 file path=usr/lib/libbsdmalloc.so.1
 $(i386_ONLY)file path=usr/lib/libc/libc_hwcap1.so.1 reboot-needed=true
 $(i386_ONLY)file path=usr/lib/libc/libc_hwcap2.so.1 reboot-needed=true
 $(i386_ONLY)file path=usr/lib/libc/libc_hwcap3.so.1 reboot-needed=true
 file path=usr/lib/libcfgadm.so.1
-file path=usr/lib/libcmd.so.1
 file path=usr/lib/libcommputil.so.1
 file path=usr/lib/libcrle.so.1
 file path=usr/lib/libcrypt.so.1
 file path=usr/lib/libdisasm.so.1
-file path=usr/lib/libdll.so.1
 file path=usr/lib/libexacct.so.1
 file path=usr/lib/libform.so.1
 file path=usr/lib/libfstyp.so.1
@@ -461,12 +453,10 @@ file path=usr/lib/libreparse.so.1
 file path=usr/lib/libsched.so.1
 file path=usr/lib/libsctp.so.1
 file path=usr/lib/libsff.so.1
-file path=usr/lib/libshell.so.1
 file path=usr/lib/libsip.so.1
 file path=usr/lib/libsldap.so.1
 file path=usr/lib/libsmbios.so.1
 file path=usr/lib/libsoftcrypto.so.1
-file path=usr/lib/libsum.so.1
 $(sparc_ONLY)file path=usr/lib/libv12n.so.1
 file path=usr/lib/libvolmgt.so.1
 file path=usr/lib/libwrap.so.1.0
@@ -588,7 +578,6 @@ license usr/src/common/mpi/THIRDPARTYLICENSE \
     license=usr/src/common/mpi/THIRDPARTYLICENSE
 license usr/src/common/util/THIRDPARTYLICENSE.multi3 \
     license=usr/src/common/util/THIRDPARTYLICENSE.multi3
-license usr/src/contrib/ast/LICENSE license=usr/src/contrib/ast/LICENSE
 license usr/src/lib/libbsdmalloc/THIRDPARTYLICENSE \
     license=usr/src/lib/libbsdmalloc/THIRDPARTYLICENSE
 license usr/src/lib/libc/THIRDPARTYLICENSE \
@@ -803,7 +792,6 @@ link path=usr/lib/$(ARCH64)/libc_db.so \
 link path=usr/lib/$(ARCH64)/libc_db.so.1 \
     target=../../../lib/$(ARCH64)/libc_db.so.1
 link path=usr/lib/$(ARCH64)/libcfgadm.so target=libcfgadm.so.1
-link path=usr/lib/$(ARCH64)/libcmd.so target=libcmd.so.1
 link path=usr/lib/$(ARCH64)/libcmdutils.so.1 \
     target=../../../lib/$(ARCH64)/libcmdutils.so.1
 link path=usr/lib/$(ARCH64)/libcommputil.so target=libcommputil.so.1
@@ -1084,7 +1072,6 @@ link path=usr/lib/libc.so.1 target=../../lib/libc.so.1
 link path=usr/lib/libc_db.so target=../../lib/libc_db.so.1
 link path=usr/lib/libc_db.so.1 target=../../lib/libc_db.so.1
 link path=usr/lib/libcfgadm.so target=./libcfgadm.so.1
-link path=usr/lib/libcmd.so target=libcmd.so.1
 link path=usr/lib/libcmdutils.so.1 target=../../lib/libcmdutils.so.1
 link path=usr/lib/libcommputil.so target=./libcommputil.so.1
 link path=usr/lib/libcontract.so target=../../lib/libcontract.so.1

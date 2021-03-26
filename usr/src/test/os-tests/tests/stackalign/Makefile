@@ -21,6 +21,7 @@ PROGS64 = $(PROGS:%=%.64)
 
 OBJS = $(PROGS32:%=%.o) $(PROGS64:%=%.o)
 $(INTEL_BLD)OBJS += stack_i386.o stack_amd64.o
+$(SPARC_BLD)OBJS += stack_sparc.o stack_sparcv9.o
 
 ROOTOPTDIR = $(ROOT)/opt/os-tests/tests
 ROOTOPTSTACK = $(ROOTOPTDIR)/stackalign
@@ -31,6 +32,7 @@ include $(SRC)/cmd/Makefile.cmd
 ASFLAGS += -P -D_ASM
 CFLAGS += -D_REENTRANT
 $(INTEL_BLD)LDFLAGS += -Wl,-zinitarray=get_stack_at_init
+$(SPARC_BLD)LDFLAGS += -Wl,-zinitarray=get_stack_at_init
 
 .KEEP_STATE:
 
@@ -64,11 +66,11 @@ stack_$(MACH).o: stack_$(MACH).s
 stack_$(MACH64).o: stack_$(MACH64).s
 	$(COMPILE64.s) $< -o $@
 
-%.64: %.64.o $(INTEL_BLD)stack_$(MACH64).o
+%.64: %.64.o stack_$(MACH64).o
 	$(LINK64.c) -o $@ $^ $(LDLIBS64)
 	$(POST_PROCESS)
 
-%.32: %.32.o $(INTEL_BLD)stack_$(MACH).o
+%.32: %.32.o stack_$(MACH).o
 	$(LINK.c) -o $@ $^ $(LDLIBS)
 	$(POST_PROCESS)
 

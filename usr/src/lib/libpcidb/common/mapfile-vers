@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2012 Joyent, Inc. All rights reserved.
+# Copyright 2021 Oxide Computer Company
 #
 
 #
@@ -40,30 +41,47 @@ $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate {
     global:
-	pcidb_open;
+	pcidb_class_code;
+	pcidb_class_iter_next;
+	pcidb_class_iter;
+	pcidb_class_name;
 	pcidb_close;
-	pcidb_lookup_vendor;
-	pcidb_vendor_iter;
-	pcidb_vendor_iter_next;
-	pcidb_vendor_name;
-	pcidb_vendor_id;
-	pcidb_lookup_device;
-	pcidb_lookup_device_by_vendor;
-	pcidb_device_iter;
-	pcidb_device_iter_next;
-	pcidb_device_name;
 	pcidb_device_id;
+	pcidb_device_iter_next;
+	pcidb_device_iter;
+	pcidb_device_name;
 	pcidb_device_vendor;
+	pcidb_lookup_class;
+	pcidb_lookup_device_by_vendor;
+	pcidb_lookup_device;
+	pcidb_lookup_progif_by_subclass;
+	pcidb_lookup_progif;
+	pcidb_lookup_subclass_by_class;
+	pcidb_lookup_subclass;
+	pcidb_lookup_subvd_by_device;
+	pcidb_lookup_subvd_by_vendor;
 	pcidb_lookup_subvd;
-	pcidb_lookup_subvd_by_vendor;	
-	pcidb_lookup_subvd_by_device;	
-	pcidb_subvd_iter;
-	pcidb_subvd_iter_next;
-	pcidb_subvd_name;
-	pcidb_subvd_svid;
-	pcidb_subvd_sdid;
+	pcidb_lookup_vendor;
+	pcidb_open;
+	pcidb_progif_code;
+	pcidb_progif_iter_next;
+	pcidb_progif_iter;
+	pcidb_progif_name;
+	pcidb_subclass_code;
+	pcidb_subclass_iter_next;
+	pcidb_subclass_iter;
+	pcidb_subclass_name;
 	pcidb_subvd_device;
+	pcidb_subvd_iter_next;
+	pcidb_subvd_iter;
+	pcidb_subvd_name;
+	pcidb_subvd_sdid;
+	pcidb_subvd_svid;
 	pcidb_subvd_vendor;
+	pcidb_vendor_id;
+	pcidb_vendor_iter_next;
+	pcidb_vendor_iter;
+	pcidb_vendor_name;
     local:
 	*;
 };

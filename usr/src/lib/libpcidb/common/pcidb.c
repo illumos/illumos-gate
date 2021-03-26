@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -57,201 +58,232 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
+#include <stddef.h>
+#include <sys/list.h>
 
 #include "pcidb.h"
 
 #define	PCI_NAME_MAX	256
 #define	PCI_READLINE	1024
 
-/* Forward declarations */
-struct pcidb_vendor;
-struct pcidb_device;
-struct pcidb_subvd;
+struct pcidb_progif {
+	char		pp_name[PCI_NAME_MAX];
+	list_node_t	pp_link;
+	pcidb_subclass_t *pp_subclass;
+	uint8_t		pp_code;
+};
+
+struct pcidb_subclass {
+	char		psc_name[PCI_NAME_MAX];
+	list_node_t	psc_link;
+	list_t		psc_progifs;
+	pcidb_class_t	*psc_class;
+	uint8_t		psc_code;
+};
+
+struct pcidb_class {
+	char		pc_name[PCI_NAME_MAX];
+	list_node_t	pc_link;
+	list_t		pc_subclass;
+	pcidb_hdl_t	*pc_hdl;
+	uint8_t		pc_code;
+};
 
 struct pcidb_subvd {
-	uint16_t		ps_vid;
-	uint16_t		ps_did;
-	char			ps_name[PCI_NAME_MAX];
-	struct pcidb_subvd	*ps_prev;
-	struct pcidb_subvd	*ps_next;
-	struct pcidb_device	*ps_dev;
-	struct pcidb_vendor	*ps_vend;
+	uint16_t	ps_vid;
+	uint16_t	ps_did;
+	char		ps_name[PCI_NAME_MAX];
+	list_node_t	ps_link;
+	pcidb_device_t	*ps_dev;
+	pcidb_vendor_t	*ps_vend;
 };
 
 struct pcidb_device {
-	uint16_t		pd_id;
-	char			pd_name[PCI_NAME_MAX];
-	struct pcidb_subvd	*pd_sstart;
-	struct pcidb_subvd	*pd_send;
-	struct pcidb_device	*pd_next;
-	struct pcidb_device	*pd_prev;
-	struct pcidb_vendor	*pd_vend;
+	uint16_t	pd_id;
+	char		pd_name[PCI_NAME_MAX];
+	list_t		pd_subs;
+	list_node_t	pd_link;
+	pcidb_vendor_t	*pd_vend;
 };
 
 struct pcidb_vendor {
-	uint16_t		pv_id;
-	char			pv_name[PCI_NAME_MAX];
-	struct pcidb_device	*pv_dstart;
-	struct pcidb_device	*pv_dend;
-	struct pcidb_vendor	*pv_prev;
-	struct pcidb_vendor	*pv_next;
+	uint16_t	pv_id;
+	char		pv_name[PCI_NAME_MAX];
+	list_t		pv_devs;
+	list_node_t	pv_link;
+	pcidb_hdl_t	*pv_hdl;
 };
 
 struct pcidb_hdl {
-	pcidb_vendor_t	*ph_vstart;
-	pcidb_vendor_t	*ph_vend;
+	list_t ph_vendors;
+	list_t ph_classes;
 };
 
 typedef enum pcidb_parse {
+	PDB_INIT,
 	PDB_VENDOR,
 	PDB_DEVICE,
-	PDB_SUBDEV
+	PDB_SUBDEV,
+	PDB_CLASS,
+	PDB_SUBCLASS,
+	PDB_PROGIF
 } pcidb_parse_t;
 
 static const char *pci_db = "/usr/share/hwdata/pci.ids";
 
-static void
-pcihdl_add_vendor(pcidb_hdl_t *hdl, pcidb_vendor_t *v)
-{
-	if (hdl->ph_vstart == NULL && hdl->ph_vend == NULL) {
-		hdl->ph_vstart = v;
-		hdl->ph_vend = v;
-		v->pv_prev = NULL;
-		v->pv_next = NULL;
-	} else {
-		v->pv_prev = hdl->ph_vend;
-		v->pv_next = NULL;
-		hdl->ph_vend->pv_next = v;
-		hdl->ph_vend = v;
-	}
-}
-
 static pcidb_vendor_t *
 parse_vendor(char *buf, pcidb_hdl_t *hdl)
 {
-	pcidb_vendor_t *v;
-	size_t len;
+	pcidb_vendor_t *vend;
 
-	v = malloc(sizeof (pcidb_vendor_t));
-	if (v == NULL)
+	vend = malloc(sizeof (pcidb_vendor_t));
+	if (vend == NULL)
 		return (NULL);
 
-	pcihdl_add_vendor(hdl, v);
-	v->pv_dstart = NULL;
-	v->pv_dend = NULL;
+	list_create(&vend->pv_devs, sizeof (pcidb_device_t),
+	    offsetof(pcidb_device_t, pd_link));
+	vend->pv_hdl = hdl;
+	list_insert_tail(&hdl->ph_vendors, vend);
 
 	buf[4] = '\0';
-	v->pv_id = strtol(buf, NULL, 16);
+	vend->pv_id = strtol(buf, NULL, 16);
 	buf += 6;
-	len = strlen(buf);
-	if (buf[len-1] == '\n')
-		buf[len-1] = '\0';
 
-	(void) strlcpy(v->pv_name, buf, PCI_NAME_MAX);
+	(void) strlcpy(vend->pv_name, buf, PCI_NAME_MAX);
 
-	return (v);
-}
-
-static void
-insert_device(pcidb_vendor_t *v, pcidb_device_t *d)
-{
-	d->pd_vend = v;
-	if (v->pv_dstart == NULL && v->pv_dend == NULL) {
-		v->pv_dstart = d;
-		v->pv_dend = d;
-		d->pd_next = NULL;
-		d->pd_prev = NULL;
-	} else {
-		d->pd_prev = v->pv_dend;
-		d->pd_next = NULL;
-		v->pv_dend->pd_next = d;
-		v->pv_dend = d;
-	}
+	return (vend);
 }
 
 static pcidb_device_t *
-parse_device(char *buf, pcidb_vendor_t *v)
+parse_device(char *buf, pcidb_vendor_t *vend)
 {
-	pcidb_device_t *d;
-	size_t len;
+	pcidb_device_t *dev;
 
-	d = malloc(sizeof (pcidb_device_t));
-	if (d == NULL)
-		return (d);
+	dev = malloc(sizeof (pcidb_device_t));
+	if (dev == NULL)
+		return (dev);
 
-	d->pd_sstart = NULL;
-	d->pd_send = NULL;
-	insert_device(v, d);
+	list_create(&dev->pd_subs, sizeof (pcidb_subvd_t),
+	    offsetof(pcidb_subvd_t, ps_link));
+	dev->pd_vend = vend;
+	list_insert_tail(&vend->pv_devs, dev);
 
 	buf++;
 	buf[4] = '\0';
-	d->pd_id = strtol(buf, NULL, 16);
+	dev->pd_id = strtol(buf, NULL, 16);
 	buf += 6;
-	len = strlen(buf);
-	if (buf[len-1] == '\n')
-		buf[len-1] = '\0';
 
-	(void) strlcpy(d->pd_name, buf, PCI_NAME_MAX);
-	return (d);
-}
-
-static void
-insert_subdev(pcidb_device_t *d, pcidb_subvd_t *s)
-{
-	s->ps_dev = d;
-	s->ps_vend = d->pd_vend;
-	if (d->pd_sstart == NULL) {
-		d->pd_sstart = s;
-		d->pd_send = s;
-		s->ps_prev = NULL;
-		s->ps_next = NULL;
-	} else {
-		s->ps_prev = d->pd_send;
-		s->ps_next = NULL;
-		d->pd_send->ps_next = s;
-		d->pd_send = s;
-	}
+	(void) strlcpy(dev->pd_name, buf, PCI_NAME_MAX);
+	return (dev);
 }
 
 static pcidb_subvd_t *
-parse_subdev(char *buf, pcidb_device_t *d)
+parse_subdev(char *buf, pcidb_device_t *dev)
 {
-	pcidb_subvd_t *s;
-	size_t len;
+	pcidb_subvd_t *sub;
 
-	s = malloc(sizeof (pcidb_subvd_t));
-	if (s == NULL)
+	sub = malloc(sizeof (pcidb_subvd_t));
+	if (sub == NULL)
 		return (NULL);
-	insert_subdev(d, s);
+
+	sub->ps_dev = dev;
+	sub->ps_vend = dev->pd_vend;
+	list_insert_tail(&dev->pd_subs, sub);
 
 	buf += 2;
 	buf[4] = '\0';
-	s->ps_vid = strtol(buf, NULL, 16);
+	sub->ps_vid = strtol(buf, NULL, 16);
 	buf += 5;
 	buf[4] = '\0';
-	s->ps_did = strtol(buf, NULL, 16);
+	sub->ps_did = strtol(buf, NULL, 16);
 	buf += 6;
 
-	len = strlen(buf);
-	if (buf[len-1] == '\n')
-		buf[len-1] = '\0';
+	(void) strlcpy(sub->ps_name, buf, PCI_NAME_MAX);
 
-	(void) strlcpy(s->ps_name, buf, PCI_NAME_MAX);
+	return (sub);
+}
 
-	return (s);
+static pcidb_class_t *
+pcidb_parse_class(char *buf, pcidb_hdl_t *hdl)
+{
+	pcidb_class_t *class;
+
+	class = malloc(sizeof (pcidb_class_t));
+	if (class == NULL)
+		return (NULL);
+
+	list_create(&class->pc_subclass, sizeof (pcidb_subclass_t),
+	    offsetof(pcidb_subclass_t, psc_link));
+	class->pc_hdl = hdl;
+	list_insert_tail(&hdl->ph_classes, class);
+
+	buf += 2;
+	buf[3] = '\0';
+	class->pc_code = strtol(buf, NULL, 16);
+	buf += 4;
+	(void) strlcpy(class->pc_name, buf, PCI_NAME_MAX);
+
+	return (class);
+}
+
+static pcidb_subclass_t *
+pcidb_parse_subclass(char *buf, pcidb_class_t *class)
+{
+	pcidb_subclass_t *sub;
+
+	sub = malloc(sizeof (pcidb_subclass_t));
+	if (sub == NULL)
+		return (NULL);
+
+	list_create(&sub->psc_progifs, sizeof (pcidb_progif_t),
+	    offsetof(pcidb_progif_t, pp_link));
+	sub->psc_class = class;
+	list_insert_tail(&class->pc_subclass, sub);
+
+	buf++;
+	buf[3] = '\0';
+	sub->psc_code = strtol(buf, NULL, 16);
+	buf += 4;
+	(void) strlcpy(sub->psc_name, buf, PCI_NAME_MAX);
+
+	return (sub);
+}
+
+static pcidb_progif_t *
+pcidb_parse_progif(char *buf, pcidb_subclass_t *sub)
+{
+	pcidb_progif_t *prog;
+
+	prog = malloc(sizeof (pcidb_progif_t));
+	if (prog == NULL) {
+		return (NULL);
+	}
+
+	prog->pp_subclass = sub;
+	list_insert_tail(&sub->psc_progifs, prog);
+
+	buf += 2;
+	buf[3] = '\0';
+	prog->pp_code = strtol(buf, NULL, 16);
+	buf += 4;
+	(void) strlcpy(prog->pp_name, buf, PCI_NAME_MAX);
+
+	return (prog);
 }
 
 static int
 readline(FILE *f, char *buf, size_t len)
 {
 	for (;;) {
+		char *c;
+
 		if (fgets(buf, len, f) == NULL)
 			return (-1);
 
-		if (buf[0] == 'C')
-			return (-1);
+		if ((c = strchr(buf, '\n')) != NULL)
+			*c = '\0';
 
-		if (buf[0] != '#' && buf[0] != '\n')
+		if (buf[0] != '#' && buf[0] != '\0')
 			return (0);
 	}
 }
@@ -259,12 +291,15 @@ readline(FILE *f, char *buf, size_t len)
 static int
 parse_db(FILE *f, pcidb_hdl_t *hdl)
 {
-	char buf[1024];
-	pcidb_vendor_t *v = NULL;
-	pcidb_device_t *d = NULL;
-	pcidb_parse_t state = PDB_VENDOR;
+	pcidb_vendor_t *vend = NULL;
+	pcidb_device_t *dev = NULL;
+	pcidb_class_t *class = NULL;
+	pcidb_subclass_t *sub = NULL;
+	pcidb_parse_t state = PDB_INIT;
 
 	for (;;) {
+		char buf[1024];
+
 		errno = 0;
 		if (readline(f, buf, sizeof (buf)) != 0) {
 			if (errno != 0)
@@ -275,15 +310,26 @@ parse_db(FILE *f, pcidb_hdl_t *hdl)
 
 newstate:
 		switch (state) {
+		case PDB_INIT:
+			vend = NULL;
+			dev = NULL;
+			class = NULL;
+			sub = NULL;
+			if (buf[0] == 'C') {
+				state = PDB_CLASS;
+			} else {
+				state = PDB_VENDOR;
+			}
+			goto newstate;
 		case PDB_VENDOR:
-			v = parse_vendor(buf, hdl);
-			if (v == NULL)
-				return (0);
+			vend = parse_vendor(buf, hdl);
+			if (vend == NULL)
+				return (-1);
 			state = PDB_DEVICE;
-			continue;
+			break;
 		case PDB_DEVICE:
 			if (buf[0] != '\t') {
-				state = PDB_VENDOR;
+				state = PDB_INIT;
 				goto newstate;
 			}
 
@@ -292,14 +338,14 @@ newstate:
 				goto newstate;
 			}
 
-			assert(v != NULL);
-			d = parse_device(buf, v);
-			if (d == NULL)
+			assert(vend != NULL);
+			dev = parse_device(buf, vend);
+			if (dev == NULL)
 				return (0);
-			continue;
+			break;
 		case PDB_SUBDEV:
 			if (buf[0] != '\t') {
-				state = PDB_VENDOR;
+				state = PDB_INIT;
 				goto newstate;
 			}
 
@@ -309,8 +355,48 @@ newstate:
 			}
 
 			assert(buf[0] == '\t' && buf[1] == '\t');
-			assert(d != NULL);
-			(void) parse_subdev(buf, d);
+			assert(dev != NULL);
+			if (parse_subdev(buf, dev) == NULL) {
+				return (-1);
+			}
+			break;
+		case PDB_CLASS:
+			class = pcidb_parse_class(buf, hdl);
+			state = PDB_SUBCLASS;
+			break;
+		case PDB_SUBCLASS:
+			if (buf[0] != '\t') {
+				state = PDB_INIT;
+				goto newstate;
+			}
+
+			if (buf[1] == '\t') {
+				state = PDB_PROGIF;
+				goto newstate;
+			}
+
+			assert(class != NULL);
+			sub = pcidb_parse_subclass(buf, class);
+			if (sub == NULL) {
+				return (-1);
+			}
+			break;
+		case PDB_PROGIF:
+			if (buf[0] != '\t') {
+				state = PDB_INIT;
+				goto newstate;
+			}
+
+			if (buf[0] == '\t' && buf[1] != '\t') {
+				state = PDB_SUBCLASS;
+				goto newstate;
+			}
+
+			assert(sub != NULL);
+			if (pcidb_parse_progif(buf, sub) == NULL) {
+				return (-1);
+			}
+			break;
 		}
 	}
 }
@@ -330,8 +416,10 @@ pcidb_open(int version)
 	if (h == NULL)
 		return (NULL);
 
-	h->ph_vstart = NULL;
-	h->ph_vend = NULL;
+	list_create(&h->ph_vendors, sizeof (pcidb_vendor_t),
+	    offsetof(pcidb_vendor_t, pv_link));
+	list_create(&h->ph_classes, sizeof (pcidb_class_t),
+	    offsetof(pcidb_class_t, pc_link));
 
 	f = fopen(pci_db, "rF");
 	if (f == NULL) {
@@ -342,7 +430,6 @@ pcidb_open(int version)
 	if (parse_db(f, h) < 0) {
 		(void) fclose(f);
 		pcidb_close(h);
-		free(h);
 		return (NULL);
 	}
 
@@ -352,36 +439,51 @@ pcidb_open(int version)
 }
 
 void
-pcidb_close(pcidb_hdl_t *h)
+pcidb_close(pcidb_hdl_t *hdl)
 {
-	pcidb_vendor_t *v, *tv;
+	pcidb_vendor_t *vend;
+	pcidb_class_t *class;
 
-	pcidb_device_t *d, *td;
-	pcidb_subvd_t *s, *ts;
-
-	if (h == NULL)
+	if (hdl == NULL)
 		return;
 
-	v = h->ph_vstart;
-	while (v != NULL) {
-		d = v->pv_dstart;
-		while (d != NULL) {
-			s = d->pd_sstart;
-			while (s != NULL) {
-				ts = s;
-				s = s->ps_next;
-				free(ts);
-			}
-			td = d;
-			d = d->pd_next;
-			free(td);
-		}
-		tv = v;
-		v = v->pv_next;
-		free(tv);
-	}
+	while ((vend = list_remove_head(&hdl->ph_vendors)) != NULL) {
+		pcidb_device_t *dev;
 
-	free(h);
+		while ((dev = list_remove_head(&vend->pv_devs)) != NULL) {
+			pcidb_subvd_t *sub;
+
+			while ((sub = list_remove_head(&dev->pd_subs)) !=
+			    NULL) {
+				free(sub);
+			}
+			list_destroy(&dev->pd_subs);
+			free(dev);
+		}
+		list_destroy(&vend->pv_devs);
+		free(vend);
+	}
+	list_destroy(&hdl->ph_vendors);
+
+	while ((class = list_remove_head(&hdl->ph_classes)) != NULL) {
+		pcidb_subclass_t *sub;
+
+		while ((sub = list_remove_head(&class->pc_subclass)) != NULL) {
+			pcidb_progif_t *prog;
+
+			while ((prog = list_remove_head(&sub->psc_progifs)) !=
+			    NULL) {
+				free(prog);
+			}
+			list_destroy(&sub->psc_progifs);
+			free(sub);
+		}
+		list_destroy(&class->pc_subclass);
+		free(class);
+	}
+	list_destroy(&hdl->ph_classes);
+
+	free(hdl);
 }
 
 pcidb_vendor_t *
@@ -389,7 +491,8 @@ pcidb_lookup_vendor(pcidb_hdl_t *hdl, uint16_t id)
 {
 	pcidb_vendor_t *v;
 
-	for (v = hdl->ph_vstart; v != NULL; v = v->pv_next) {
+	for (v = list_head(&hdl->ph_vendors); v != NULL;
+	    v = list_next(&hdl->ph_vendors, v)) {
 		if (v->pv_id == id)
 			return (v);
 	}
@@ -398,165 +501,307 @@ pcidb_lookup_vendor(pcidb_hdl_t *hdl, uint16_t id)
 }
 
 const char *
-pcidb_vendor_name(pcidb_vendor_t *v)
+pcidb_vendor_name(pcidb_vendor_t *vend)
 {
-	return (v->pv_name);
+	return (vend->pv_name);
 }
 
 uint16_t
-pcidb_vendor_id(pcidb_vendor_t *v)
+pcidb_vendor_id(pcidb_vendor_t *vend)
 {
-	return (v->pv_id);
+	return (vend->pv_id);
 }
 
 pcidb_vendor_t *
-pcidb_vendor_iter(pcidb_hdl_t *h)
+pcidb_vendor_iter(pcidb_hdl_t *hdl)
 {
-	return (h->ph_vstart);
+	return (list_head(&hdl->ph_vendors));
 }
 
 pcidb_vendor_t *
-pcidb_vendor_iter_next(pcidb_vendor_t *v)
+pcidb_vendor_iter_next(pcidb_vendor_t *vend)
 {
-	assert(v != NULL);
-	return (v->pv_next);
+	assert(vend != NULL);
+	return (list_next(&vend->pv_hdl->ph_vendors, vend));
 }
 
 pcidb_device_t *
-pcidb_lookup_device_by_vendor(pcidb_vendor_t *v, uint16_t id)
+pcidb_lookup_device_by_vendor(pcidb_vendor_t *vend, uint16_t id)
 {
-	pcidb_device_t *d;
-	assert(v != NULL);
+	assert(vend != NULL);
 
-	for (d = v->pv_dstart; d != NULL; d = d->pd_next)
-		if (d->pd_id == id)
-			return (d);
+	for (pcidb_device_t *dev = list_head(&vend->pv_devs); dev != NULL;
+	    dev = list_next(&vend->pv_devs, dev)) {
+		if (dev->pd_id == id)
+			return (dev);
+	}
 
 	return (NULL);
 }
 
 pcidb_device_t *
-pcidb_lookup_device(pcidb_hdl_t *h, uint16_t vid, uint16_t did)
+pcidb_lookup_device(pcidb_hdl_t *hdl, uint16_t vid, uint16_t did)
 {
-	pcidb_vendor_t *v;
+	pcidb_vendor_t *vend;
 
-	v = pcidb_lookup_vendor(h, vid);
-	if (v == NULL)
+	vend = pcidb_lookup_vendor(hdl, vid);
+	if (vend == NULL)
 		return (NULL);
 
-	return (pcidb_lookup_device_by_vendor(v, did));
+	return (pcidb_lookup_device_by_vendor(vend, did));
 }
 
 pcidb_device_t *
-pcidb_device_iter(pcidb_vendor_t *v)
+pcidb_device_iter(pcidb_vendor_t *vend)
 {
-	return (v->pv_dstart);
+	return (list_head(&vend->pv_devs));
 }
 
 pcidb_device_t *
-pcidb_device_iter_next(pcidb_device_t *d)
+pcidb_device_iter_next(pcidb_device_t *dev)
 {
-	return (d->pd_next);
+	return (list_next(&dev->pd_vend->pv_devs, dev));
 }
 
 const char *
-pcidb_device_name(pcidb_device_t *d)
+pcidb_device_name(pcidb_device_t *dev)
 {
-	return (d->pd_name);
+	return (dev->pd_name);
 }
 
 uint16_t
-pcidb_device_id(pcidb_device_t *d)
+pcidb_device_id(pcidb_device_t *dev)
 {
-	return (d->pd_id);
+	return (dev->pd_id);
 }
 
 pcidb_vendor_t *
-pcidb_device_vendor(pcidb_device_t *d)
+pcidb_device_vendor(pcidb_device_t *dev)
 {
-	return (d->pd_vend);
+	return (dev->pd_vend);
 }
 
 pcidb_subvd_t *
-pcidb_lookup_subvd_by_device(pcidb_device_t *d, uint16_t svid, uint16_t sdid)
+pcidb_lookup_subvd_by_device(pcidb_device_t *dev, uint16_t svid, uint16_t sdid)
 {
-	pcidb_subvd_t *s;
+	pcidb_subvd_t *sub;
 
-	assert(d != NULL);
+	assert(dev != NULL);
 
-	for (s = d->pd_sstart; s != NULL; s = s->ps_next)
-		if (s->ps_vid == svid && s->ps_did == sdid)
-			return (s);
+	for (sub = list_head(&dev->pd_subs); sub != NULL;
+	    sub = list_next(&dev->pd_subs, sub)) {
+		if (sub->ps_vid == svid && sub->ps_did == sdid)
+			return (sub);
+	}
 
 	return (NULL);
 }
 
 pcidb_subvd_t *
-pcidb_lookup_subvd_by_vendor(pcidb_vendor_t *v, uint16_t devid, uint16_t svid,
-    uint16_t sdid)
+pcidb_lookup_subvd_by_vendor(pcidb_vendor_t *vend, uint16_t devid,
+    uint16_t svid, uint16_t sdid)
 {
-	pcidb_device_t *d;
+	pcidb_device_t *dev;
 
-	assert(v != NULL);
-	d = pcidb_lookup_device_by_vendor(v, devid);
-	if (d == NULL)
+	assert(vend != NULL);
+	dev = pcidb_lookup_device_by_vendor(vend, devid);
+	if (dev == NULL)
 		return (NULL);
 
-	return (pcidb_lookup_subvd_by_device(d, svid, sdid));
+	return (pcidb_lookup_subvd_by_device(dev, svid, sdid));
 }
 
 pcidb_subvd_t *
-pcidb_lookup_subvd(pcidb_hdl_t *h, uint16_t vid, uint16_t did, uint16_t svid,
+pcidb_lookup_subvd(pcidb_hdl_t *hdl, uint16_t vid, uint16_t did, uint16_t svid,
     uint16_t sdid)
 {
-	pcidb_device_t *d;
+	pcidb_device_t *dev;
 
-	assert(h != NULL);
-	d = pcidb_lookup_device(h, vid, did);
-	if (d == NULL)
+	assert(hdl != NULL);
+	dev = pcidb_lookup_device(hdl, vid, did);
+	if (dev == NULL)
 		return (NULL);
 
-	return (pcidb_lookup_subvd_by_device(d, svid, sdid));
+	return (pcidb_lookup_subvd_by_device(dev, svid, sdid));
 }
 
 pcidb_subvd_t *
-pcidb_subvd_iter(pcidb_device_t *d)
+pcidb_subvd_iter(pcidb_device_t *dev)
 {
-	return (d->pd_sstart);
+	return (list_head(&dev->pd_subs));
 }
 
 pcidb_subvd_t *
-pcidb_subvd_iter_next(pcidb_subvd_t *s)
+pcidb_subvd_iter_next(pcidb_subvd_t *sub)
 {
-	return (s->ps_next);
+	return (list_next(&sub->ps_dev->pd_subs, sub));
 }
 
 const char *
-pcidb_subvd_name(pcidb_subvd_t *s)
+pcidb_subvd_name(pcidb_subvd_t *sub)
 {
-	return (s->ps_name);
+	return (sub->ps_name);
 }
 
 uint16_t
-pcidb_subvd_svid(pcidb_subvd_t *s)
+pcidb_subvd_svid(pcidb_subvd_t *sub)
 {
-	return (s->ps_vid);
+	return (sub->ps_vid);
 }
 
 uint16_t
-pcidb_subvd_sdid(pcidb_subvd_t *s)
+pcidb_subvd_sdid(pcidb_subvd_t *sub)
 {
-	return (s->ps_did);
+	return (sub->ps_did);
 }
 
 pcidb_device_t *
-pcidb_subvd_device(pcidb_subvd_t *s)
+pcidb_subvd_device(pcidb_subvd_t *sub)
 {
-	return (s->ps_dev);
+	return (sub->ps_dev);
 }
 
 pcidb_vendor_t *
-pcidb_subvd_vendor(pcidb_subvd_t *s)
+pcidb_subvd_vendor(pcidb_subvd_t *sub)
 {
-	return (s->ps_vend);
+	return (sub->ps_vend);
+}
+
+
+pcidb_class_t *
+pcidb_lookup_class(pcidb_hdl_t *hdl, uint8_t code)
+{
+	for (pcidb_class_t *class = list_head(&hdl->ph_classes); class != NULL;
+	    class = list_next(&hdl->ph_classes, class)) {
+		if (class->pc_code == code) {
+			return (class);
+		}
+	}
+
+	return (NULL);
+}
+
+pcidb_class_t *
+pcidb_class_iter(pcidb_hdl_t *hdl)
+{
+	return (list_head(&hdl->ph_classes));
+}
+
+pcidb_class_t *
+pcidb_class_iter_next(pcidb_class_t *class)
+{
+	return (list_next(&class->pc_hdl->ph_classes, class));
+}
+
+const char *
+pcidb_class_name(pcidb_class_t *class)
+{
+	return (class->pc_name);
+}
+
+uint8_t
+pcidb_class_code(pcidb_class_t *class)
+{
+	return (class->pc_code);
+}
+
+pcidb_subclass_t *
+pcidb_lookup_subclass(pcidb_hdl_t *hdl, uint8_t ccode, uint8_t subcode)
+{
+	pcidb_class_t *class;
+
+	class = pcidb_lookup_class(hdl, ccode);
+	if (class == NULL) {
+		return (NULL);
+	}
+
+	return (pcidb_lookup_subclass_by_class(class, subcode));
+}
+
+pcidb_subclass_t *
+pcidb_lookup_subclass_by_class(pcidb_class_t *class, uint8_t code)
+{
+	for (pcidb_subclass_t *sub = list_head(&class->pc_subclass);
+	    sub != NULL; sub = list_next(&class->pc_subclass, sub)) {
+		if (sub->psc_code == code) {
+			return (sub);
+		}
+	}
+
+	return (NULL);
+}
+
+pcidb_subclass_t *
+pcidb_subclass_iter(pcidb_class_t *class)
+{
+	return (list_head(&class->pc_subclass));
+}
+
+pcidb_subclass_t *
+pcidb_subclass_iter_next(pcidb_subclass_t *sub)
+{
+	return (list_next(&sub->psc_class->pc_subclass, sub));
+}
+
+const char *
+pcidb_subclass_name(pcidb_subclass_t *sub)
+{
+	return (sub->psc_name);
+}
+
+uint8_t
+pcidb_subclass_code(pcidb_subclass_t *sub)
+{
+	return (sub->psc_code);
+}
+
+pcidb_progif_t *
+pcidb_lookup_progif(pcidb_hdl_t *hdl, uint8_t ccode, uint8_t scode,
+    uint8_t pcode)
+{
+	pcidb_subclass_t *sub;
+
+	sub = pcidb_lookup_subclass(hdl, ccode, scode);
+	if (sub == NULL) {
+		return (NULL);
+	}
+
+	return (pcidb_lookup_progif_by_subclass(sub, pcode));
+}
+
+pcidb_progif_t *
+pcidb_lookup_progif_by_subclass(pcidb_subclass_t *sub, uint8_t code)
+{
+	for (pcidb_progif_t *prog = list_head(&sub->psc_progifs); prog != NULL;
+	    prog = list_next(&sub->psc_progifs, prog)) {
+		if (prog->pp_code == code) {
+			return (prog);
+		}
+	}
+
+	return (NULL);
+}
+
+pcidb_progif_t *
+pcidb_progif_iter(pcidb_subclass_t *sub)
+{
+	return (list_head(&sub->psc_progifs));
+}
+
+pcidb_progif_t *
+pcidb_progif_iter_next(pcidb_progif_t *prog)
+{
+	return (list_next(&prog->pp_subclass->psc_progifs, prog));
+}
+
+const char *
+pcidb_progif_name(pcidb_progif_t *prog)
+{
+	return (prog->pp_name);
+}
+
+uint8_t
+pcidb_progif_code(pcidb_progif_t *prog)
+{
+	return (prog->pp_code);
 }

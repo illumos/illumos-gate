@@ -213,6 +213,18 @@ do	if	(( $(( ${base[$i]}$(printf "%$i" $n) )) != n  ))
 	then	err_exit "printf %$i not working"
 	fi
 done
+if	[[ $(printf -eexist) != -eexist ]]
+then	err_exit 'printf -eexist ... not working'
+fi
+if	[[ $(printf -- "%s" foo) != foo ]]
+then	err_exit 'printf -- not working'
+fi
+if	[[ $(printf -- --) != -- ]]
+then	err_exit 'printf -- -- ... not working'
+fi
+if	[[ $(printf -- -eexist) != -eexist ]]
+then	err_exit 'printf -- -eexist. not working'
+fi
 if	[[ $( trap 'print done' EXIT) != done ]]
 then	err_exit 'trap on EXIT not working'
 fi
