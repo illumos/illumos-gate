@@ -89,6 +89,9 @@ smb_sd_len(smb_sd_t *sd, uint32_t secinfo)
  *
  * Return the security information mask for the specified security
  * descriptor.
+ *
+ * Note: This is used for 'create-with-sd'. 'set-security-info' provides the
+ * secinfo as part of the request, but create does not, so we must infer it.
  */
 uint32_t
 smb_sd_get_secinfo(smb_sd_t *sd)
@@ -104,10 +107,10 @@ smb_sd_get_secinfo(smb_sd_t *sd)
 	if (sd->sd_group)
 		sec_info |= SMB_GROUP_SECINFO;
 
-	if (sd->sd_dacl)
+	if ((sd->sd_control & SE_DACL_PRESENT) != 0)
 		sec_info |= SMB_DACL_SECINFO;
 
-	if (sd->sd_sacl)
+	if ((sd->sd_control & SE_SACL_PRESENT) != 0)
 		sec_info |= SMB_SACL_SECINFO;
 
 	return (sec_info);
