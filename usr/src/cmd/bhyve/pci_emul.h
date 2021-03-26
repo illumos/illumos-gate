@@ -37,6 +37,7 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
+#include <sys/nv.h>
 #include <sys/_pthreadtypes.h>
 
 #include <dev/pci/pcireg.h>
@@ -54,7 +55,9 @@ struct pci_devemu {
 
 	/* instance creation */
 	int       (*pe_init)(struct vmctx *, struct pci_devinst *,
-			     char *opts);
+			     nvlist_t *);
+	int	(*pe_legacy_config)(nvlist_t *, const char *);
+	const char *pe_alias;
 
 	/* ACPI DSDT enumeration */
 	void	(*pe_write_dsdt)(struct pci_devinst *);
@@ -75,10 +78,13 @@ struct pci_devemu {
 				struct pci_devinst *pi, int baridx,
 				uint64_t offset, int size);
 
+	void	(*pe_baraddr)(struct vmctx *ctx, struct pci_devinst *pi,
+			      int baridx, int enabled, uint64_t address);
 #ifndef __FreeBSD__
 	void	(*pe_lintrupdate)(struct pci_devinst *pi);
 #endif /* __FreeBSD__ */
 };
+
 #define PCI_EMUL_SET(x)   DATA_SET(pci_devemu_set, x);
 
 enum pcibar_type {
@@ -237,6 +243,7 @@ int	pci_msix_enabled(struct pci_devinst *pi);
 int	pci_msix_table_bar(struct pci_devinst *pi);
 int	pci_msix_pba_bar(struct pci_devinst *pi);
 int	pci_msi_maxmsgnum(struct pci_devinst *pi);
+int	pci_parse_legacy_config(nvlist_t *nvl, const char *opt);
 int	pci_parse_slot(char *opt);
 void    pci_print_supported_devices();
 void	pci_populate_msicap(struct msicap *cap, int msgs, int nextptr);

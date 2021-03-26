@@ -38,68 +38,12 @@
 #endif
 __FBSDID("$FreeBSD$");
 
+#include <stdlib.h>
+
+#include "config.h"
 #include "pci_emul.h"
 
-#ifdef __FreeBSD__
-static int
-pci_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
-{
-
-	/* config space */
-	pci_set_cfgdata16(pi, PCIR_VENDOR, 0x1275);	/* NetApp */
-	pci_set_cfgdata16(pi, PCIR_DEVICE, 0x1275);	/* NetApp */
-	pci_set_cfgdata8(pi, PCIR_HDRTYPE, PCIM_HDRTYPE_NORMAL);
-	pci_set_cfgdata8(pi, PCIR_CLASS, PCIC_BRIDGE);
-	pci_set_cfgdata8(pi, PCIR_SUBCLASS, PCIS_BRIDGE_HOST);
-
-	pci_emul_add_pciecap(pi, PCIEM_TYPE_ROOT_PORT);
-
-	return (0);
-}
-
-static int
-pci_amd_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
-{
-	(void) pci_hostbridge_init(ctx, pi, opts);
-	pci_set_cfgdata16(pi, PCIR_VENDOR, 0x1022);	/* AMD */
-	pci_set_cfgdata16(pi, PCIR_DEVICE, 0x7432);	/* made up */
-
-	return (0);
-}
-#else
-static void
-pci_hostbridge_setup(struct pci_devinst *pi, uint16_t vendor, uint16_t device)
-{
-	/* config space */
-	pci_set_cfgdata16(pi, PCIR_VENDOR, vendor);
-	pci_set_cfgdata16(pi, PCIR_DEVICE, device);
-	pci_set_cfgdata8(pi, PCIR_HDRTYPE, PCIM_HDRTYPE_NORMAL);
-	pci_set_cfgdata8(pi, PCIR_CLASS, PCIC_BRIDGE);
-	pci_set_cfgdata8(pi, PCIR_SUBCLASS, PCIS_BRIDGE_HOST);
-
-	pci_emul_add_pciecap(pi, PCIEM_TYPE_ROOT_PORT);
-}
-
-
-static int
-pci_hostbridge_parse_pci_val(const char *in, uint16_t *val)
-{
-	long num;
-	char *endp = NULL;
-
-	errno = 0;
-	num = strtol(in, &endp, 0);
-	if (errno != 0 || endp == NULL || *endp != '\0') {
-		fprintf(stderr, "pci_hostbridge: invalid num '%s'", in);
-		return (-1);
-	} else if (num < 1 || num > UINT16_MAX) {
-		fprintf(stderr, "pci_hostbridge: 0x%04lx out of range", num);
-		return (-1);
-	}
-	*val = num;
-	return (0);
-}
-
+#ifndef __FreeBSD__
 static struct pci_hostbridge_model {
 	const char	*phm_model;
 	uint16_t	phm_vendor;
@@ -112,58 +56,30 @@ static struct pci_hostbridge_model {
 };
 
 #define	NUM_HB_MODELS	(sizeof (pci_hb_models) / sizeof (pci_hb_models[0]))
+#endif
 
 static int
-pci_hostbridge_parse_args(char *opts, uint16_t *vendorp, uint16_t *devicep)
+pci_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 {
-	const char *model = NULL;
-	char *next;
-	uint16_t vendor = 0, device = 0;
-	int err = 0;
+	const char *value;
+	u_int vendor, device;
 
-	for (; opts != NULL && *opts != '\0'; opts = next) {
-		char *val, *cp;
+#ifdef __FreeBSD__
+	vendor = 0x1275;	/* NetApp */
+	device = 0x1275;	/* NetApp */
+#else
+	vendor = device = 0;
+#endif
 
-		if ((cp = strchr(opts, ',')) != NULL) {
-			*cp = '\0';
-			next = cp + 1;
-		} else {
-			next = NULL;
-		}
+	value = get_config_value_node(nvl, "vendor");
+	if (value != NULL)
+		vendor = strtol(value, NULL, 0);
+	value = get_config_value_node(nvl, "devid");
+	if (value != NULL)
+		device = strtol(value, NULL, 0);
 
-		if ((cp = strchr(opts, '=')) == NULL) {
-			fprintf(stderr,
-			    "pci_hostbridge: expected value for param"
-			    " (%s=VAL)", opts);
-			err = -1;
-			continue;
-		}
-
-		/* <param>=<value> handling */
-		val = cp + 1;
-		*cp = '\0';
-		if (strcmp(opts, "model") == 0) {
-			model = val;
-		} else if (strcmp(opts, "vendor") == 0) {
-			if (pci_hostbridge_parse_pci_val(val, &vendor) != 0) {
-				err = -1;
-				continue;
-			}
-		} else if (strcmp(opts, "device") == 0) {
-			if (pci_hostbridge_parse_pci_val(val, &device) != 0) {
-				err = -1;
-				continue;
-			}
-		} else {
-			fprintf(stderr,
-			    "pci_hostbridge: unrecognized option '%s'", opts);
-			err = -1;
-			continue;
-		}
-	}
-	if (err != 0) {
-		return (err);
-	}
+#ifndef __FreeBSD__
+	const char *model = get_config_value_node(nvl, "model");
 
 	if (model != NULL && (vendor != 0 || device != 0)) {
 		fprintf(stderr, "pci_hostbridge: cannot specify model "
@@ -175,57 +91,53 @@ pci_hostbridge_parse_args(char *opts, uint16_t *vendorp, uint16_t *devicep)
 		    "device for custom hostbridge");
 		return (-1);
 	}
-	if (model != NULL) {
-		uint_t i;
+	if (model == NULL && vendor == 0 && device == 0)
+		model = "netapp";
 
-		for (i = 0; i < NUM_HB_MODELS; i++) {
+	if (model != NULL) {
+		for (uint_t i = 0; i < NUM_HB_MODELS; i++) {
 			if (strcmp(model, pci_hb_models[i].phm_model) != 0)
 				continue;
 
 			/* found a model match */
-			*vendorp = pci_hb_models[i].phm_vendor;
-			*devicep = pci_hb_models[i].phm_device;
-			return (0);
+			vendor = pci_hb_models[i].phm_vendor;
+			device = pci_hb_models[i].phm_device;
+			break;
 		}
-		fprintf(stderr, "pci_hostbridge: invalid model '%s'", model);
-		return (-1);
+		if (vendor == 0) {
+			fprintf(stderr, "pci_hostbridge: invalid model '%s'",
+			    model);
+			return (-1);
+		}
 	}
+#endif /* !__FreeBSD__ */
 
-	/* custom hostbridge ID was specified */
-	*vendorp = vendor;
-	*devicep = device;
+	/* config space */
+	pci_set_cfgdata16(pi, PCIR_VENDOR, vendor);
+	pci_set_cfgdata16(pi, PCIR_DEVICE, device);
+	pci_set_cfgdata8(pi, PCIR_HDRTYPE, PCIM_HDRTYPE_NORMAL);
+	pci_set_cfgdata8(pi, PCIR_CLASS, PCIC_BRIDGE);
+	pci_set_cfgdata8(pi, PCIR_SUBCLASS, PCIS_BRIDGE_HOST);
+
+	pci_emul_add_pciecap(pi, PCIEM_TYPE_ROOT_PORT);
+
 	return (0);
 }
 
 static int
-pci_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
+pci_amd_hostbridge_legacy_config(nvlist_t *nvl, const char *opts)
 {
-	uint16_t vendor, device;
 
-	if (opts == NULL) {
-		/* Fall back to NetApp default if no options are specified */
-		vendor = 0x1275;
-		device = 0x1275;
-	} else if (pci_hostbridge_parse_args(opts, &vendor, &device) != 0) {
-		return (-1);
-	}
+	set_config_value_node(nvl, "vendor", "0x1022");	/* AMD */
+	set_config_value_node(nvl, "devid", "0x7432");	/* made up */
 
-	pci_hostbridge_setup(pi, vendor, device);
 	return (0);
 }
-
-static int
-pci_amd_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
-{
-	pci_hostbridge_setup(pi, 0x1022, 0x7432);
-	return (0);
-}
-
-#endif /* __FreeBSD__ */
 
 struct pci_devemu pci_de_amd_hostbridge = {
 	.pe_emu = "amd_hostbridge",
-	.pe_init = pci_amd_hostbridge_init,
+	.pe_legacy_config = pci_amd_hostbridge_legacy_config,
+	.pe_alias = "hostbridge",
 };
 PCI_EMUL_SET(pci_de_amd_hostbridge);
 

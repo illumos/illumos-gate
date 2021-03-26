@@ -866,7 +866,7 @@ fail:
 }
 
 static void
-ppt_unmap_mmio(struct vm *vm, struct pptdev *ppt)
+ppt_unmap_all_mmio(struct vm *vm, struct pptdev *ppt)
 {
 	int i;
 	struct pptseg *seg;
@@ -1084,7 +1084,7 @@ ppt_do_unassign(struct pptdev *ppt)
 
 	pf_set_passthru(ppt->pptd_dip, B_FALSE);
 
-	ppt_unmap_mmio(vm, ppt);
+	ppt_unmap_all_mmio(vm, ppt);
 	ppt_teardown_msi(ppt);
 	ppt_teardown_msix(ppt);
 	iommu_remove_device(vm_iommu_domain(vm), pci_get_bdf(ppt->pptd_dip));
@@ -1167,6 +1167,39 @@ ppt_map_mmio(struct vm *vm, int pptfd, vm_paddr_t gpa, size_t len,
 	err = ENOSPC;
 
 done:
+	releasef(pptfd);
+	mutex_exit(&pptdev_mtx);
+	return (err);
+}
+
+int
+ppt_unmap_mmio(struct vm *vm, int pptfd, vm_paddr_t gpa, size_t len)
+{
+	struct pptdev *ppt;
+	int err = 0;
+	uint_t i;
+
+	mutex_enter(&pptdev_mtx);
+	err = ppt_findf(vm, pptfd, &ppt);
+	if (err != 0) {
+		mutex_exit(&pptdev_mtx);
+		return (err);
+	}
+
+	for (i = 0; i < MAX_MMIOSEGS; i++) {
+		struct pptseg *seg = &ppt->mmio[i];
+
+		if (seg->gpa == gpa && seg->len == len) {
+			err = vm_unmap_mmio(vm, seg->gpa, seg->len);
+			if (err == 0) {
+				seg->gpa = 0;
+				seg->len = 0;
+			}
+			goto out;
+		}
+	}
+	err = ENOENT;
+out:
 	releasef(pptfd);
 	mutex_exit(&pptdev_mtx);
 	return (err);

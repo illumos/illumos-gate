@@ -82,8 +82,6 @@ __FBSDID("$FreeBSD$");
 #define	EV_DELETE	0x04
 #endif
 
-extern char *vmname;
-
 static pthread_t mevent_tid;
 static int mevent_timid = 43;
 static int mevent_pipefd[2];

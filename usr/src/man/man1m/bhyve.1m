@@ -1,0 +1,673 @@
+.\" Copyright (c) 2013 Peter Grehan
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" Portions Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd March 18, 2021
+.Dt BHYVE 1M
+.Os
+.Sh NAME
+.Nm bhyve
+.Nd "run a guest operating system inside a virtual machine"
+.Sh SYNOPSIS
+.Nm
+.Op Fl aCDdeHhPSuWwxY
+.Oo
+.Sm off
+.Fl c\~
+.Oo
+.Op Cm cpus=
+.Ar numcpus
+.Oc
+.Op Cm ,sockets= Ar n
+.Op Cm ,cores= Ar n
+.Op Cm ,threads= Ar n
+.Oc
+.Sm on
+.Op Fl G Ar port
+.Oo Fl B
+.Sm off
+.Ar type Ns \&,
+.Op Ar key Ns = Ns Ar value
+.Oo \&, Ns Ar key Ns = Ns Ar value Ns Oc \&...
+.Oc
+.Sm on
+.Op Fl k Ar file
+.Oo Fl l
+.Sm off
+.Cm help \&| Ar lpcdev Op Cm \&, Ar conf
+.Sm on
+.Oc
+.Oo Fl m
+.Sm off
+.Ar memsize
+.Oo
+.Cm K No \&| Cm k No \&| Cm M No \&| Cm m No \&| Cm G No \&| Cm g No \&| Cm T No \&| Cm t
+.Oc
+.Sm on
+.Oc
+.Op Fl o Ar var Ns Cm = Ns Ar value
+.Op Fl r Ar file
+.Oo Fl s
+.Sm off
+.Cm help \&| Ar slot Cm \&, Ar emulation Op Cm \&, Ar conf
+.Sm on
+.Oc
+.Op Fl U Ar uuid
+.Ar vmname
+.Sh DESCRIPTION
+.Nm
+is a hypervisor that runs guest operating systems inside a
+virtual machine.
+.Pp
+Parameters such as the number of virtual CPUs, amount of guest memory, and
+I/O connectivity can be specified with command-line parameters.
+.Pp
+.Nm
+runs until the guest operating system reboots or an unhandled hypervisor
+exit is detected.
+.Sh OPTIONS
+.Bl -tag -width 10n
+.It Fl a
+The guest's local APIC is configured in xAPIC mode.
+The xAPIC mode is the default setting so this option is redundant.
+It will be deprecated in a future version.
+.It Xo
+.Fl B
+.Sm off
+.Ar type Ns \&,
+.Op Ar key Ns = Ns Ar value
+.Oo \&, Ns Ar key Ns = Ns Ar value Ns Oc \&...
+.Sm on
+.Xc
+Configure smbios data.
+.Ar type
+must be set to
+.Sy 1 .
+Supported keys are:
+.Sy manufacturer ,
+.Sy product ,
+.Sy version ,
+.Sy serial ,
+.Sy sku ,
+.Sy family
+and
+.Sy uuid .
+.It Xo Fl c
+.Sm off
+.Op Oo Cm cpus= Oc Ar numcpus
+.Op Cm ,sockets= Ar n
+.Op Cm ,cores= Ar n
+.Op Cm ,threads= Ar n
+.Xc
+.Sm on
+Number of guest virtual CPUs
+and/or the CPU topology.
+The default value for each of
+.Ar numcpus ,
+.Ar sockets ,
+.Ar cores ,
+and
+.Ar threads
+is 1.
+The current maximum number of guest virtual CPUs is 32.
+If
+.Ar numcpus
+is not specified then it will be calculated from the other arguments.
+The topology must be consistent in that the
+.Ar numcpus
+must equal the product of
+.Ar sockets ,
+.Ar cores ,
+and
+.Ar threads .
+If a
+.Ar setting
+is specified more than once the last one has precedence.
+.It Fl C
+Include guest memory in core file.
+.It Fl d
+Suspend CPUs at boot.
+.It Fl D
+Destroy the VM on guest initiated power-off.
+.It Fl e
+Force
+.Nm
+to exit when a guest issues an access to an I/O port that is not emulated.
+This is intended for debug purposes.
+.It Fl G Ar port
+Start a debug server that uses the GDB protocol to export guest state to a
+debugger.
+An IPv4 TCP socket will be bound to the supplied
+.Ar port
+to listen for debugger connections.
+Only a single debugger may be attached to the debug server at a time.
+If
+.Ar port
+begins with
+.Sq w ,
+.Nm
+will pause execution at the first instruction waiting for a debugger to attach.
+.It Fl h
+Print help message and exit.
+.It Fl H
+Yield the virtual CPU thread when a HLT instruction is detected.
+If this option is not specified, virtual CPUs will use 100% of a host CPU.
+.It Fl k Ar file
+Set configuration variables from a simple, key-value config file.
+Each line of the config file is expected to consist of a config variable
+name, an equals sign
+.Pq Sq = ,
+and a value.
+No spaces are permitted between the variable name, equals sign, or
+value.
+Blank lines and lines starting with
+.Sq #
+are ignored.
+.It Fl l Cm help Ns \&| Ns Ar lpcdev Ns Op , Ns Ar conf
+Allow devices behind the LPC PCI-ISA bridge to be configured.
+The only supported devices are the TTY-class devices
+.Ar com1
+through
+.Ar com4 ,
+the boot ROM device
+.Ar bootrom ,
+and the debug/test device
+.Ar pc-testdev .
+.Pp
+.Cm help
+print a list of supported LPC devices.
+.It Fl m Ar memsize Ns Op Ar K|k|M|m|G|g|T|t
+Guest physical memory size.
+The size argument may be suffixed with one of K, M, G or T (either upper
+or lower case) to indicate a multiple of kibibytes, mebibytes, gibibytes,
+or tebibytes.
+If no suffix is given, the value is assumed to be in mebibytes.
+.Pp
+.Ar memsize
+defaults to 256MiB.
+.It Fl o Ar var Ns Cm = Ns Ar value
+Set the configuration variable
+.Ar var
+to
+.Ar value .
+.It Fl P
+Force the guest virtual CPU to exit when a PAUSE instruction is detected.
+.It Fl s Cm help Ns \&| Ns Ar slot Ns \&, Ns Ar emulation Ns Op , Ns Ar conf
+Configure a virtual PCI slot and function.
+.Pp
+.Nm
+provides PCI bus emulation and virtual devices that can be attached to
+slots on the bus.
+There are 32 available slots, with the option of providing up to 8 functions
+per slot.
+.Bl -tag -width 10n
+.It Cm help
+print a list of supported PCI devices.
+.It Ar slot
+.Ar pcislot[:function]
+.Ar bus:pcislot:function
+.Pp
+The
+.Ar pcislot
+value is 0 to 31.
+The optional
+.Ar functiwidth on
+value is 0 to 7.
+The optional
+.Ar bus
+value is 0 to 255.
+If not specified, the
+.Ar function
+value defaults to 0.
+If not specified, the
+.Ar bus
+value defaults to 0.
+.It Ar emulation
+.Bl -tag -width 10n
+.It Li hostbridge \&| Li amd_hostbridge
+.Pp
+Provide a simple host bridge.
+This is usually configured at slot 0, and is required by most guest
+operating systems.
+The
+.Li amd_hostbridge
+emulation is identical but uses a PCI vendor ID of
+.Li AMD .
+.It Li passthru
+PCI pass-through device.
+.It Li virtio-net-viona
+Virtio network interface.
+.It Li virtio-blk
+Virtio block storage interface.
+.It Li virtio-rnd
+Virtio random number generator interface.
+.It Li virtio-console
+Virtio console interface, which exposes multiple ports
+to the guest in the form of simple char devices for simple IO
+between the guest and host userspaces.
+.It Li ahci
+AHCI controller attached to arbitrary devices.
+.It Li ahci-cd
+AHCI controller attached to an ATAPI CD/DVD.
+.It Li ahci-hd
+AHCI controller attached to a SATA hard-drive.
+.It Li e1000
+Intel e82545 network interface.
+.It Li uart
+PCI 16550 serial device.
+.It Li lpc
+LPC PCI-ISA bridge with COM1 to COM4 16550 serial ports, a boot ROM, and,
+optionally, the debug/test device.
+The LPC bridge emulation can only be configured on bus 0.
+.It Li fbuf
+Raw framebuffer device attached to VNC server.
+.It Li xhci
+eXtensible Host Controller Interface (xHCI) USB controller.
+.It Li nvme
+NVM Express (NVMe) controller.
+.El
+.It Op Ar conf
+This optional parameter describes the backend for device emulations.
+If
+.Ar conf
+is not specified, the device emulation has no backend and can be
+considered unconnected.
+.Pp
+Host Bridge Devices
+.Bl -tag -width 10n
+.It Cm model Ns = Ns Ar model
+Specify a hostbridge model to emulate.
+Valid model strings, and their associated vendor and device IDs are:
+.Sy amd Pq 0x1022/0x7432 ,
+.Sy netapp Pq 0x1275/0x1275 ,
+.Sy i440fx Pq 0x8086/0x1237
+and
+.Sy q35 Pq 0x8086/0x29b0 .
+The default value of
+.Ar model
+is
+.Cm netapp .
+.It Cm vendor Ns = Ns Ar vendor
+PCI vendor ID.
+.It Cm devid Ns = Ns Ar devid
+PCI device ID.
+.El
+.Pp
+Providing extra configuration parameters for a host bridge is optional, but if
+parameters are provided then either
+.Va model
+by itself, or both of
+.Va vendor
+and
+.Va devid
+must be specified.
+.Pp
+Network backends:
+.Bl -tag -width 10n
+.It Oo Cm vnic Ns = Oc Ns Ar vnic Ns Oo , Ns Cm feature_mask Ns = Ns Ar mask Oc
+.Pp
+.Ar vnic
+is the name of a configured virtual NIC on the system.
+.Ar mask
+is applied to the virtio feature flags which are advertised to the guest.
+Bits set in the
+.Ar mask
+value are removed from the advertised features.
+.El
+.Pp
+Block storage devices:
+.Bl -tag -width 10n
+.It Pa /filename Ns Oo , Ns Ar block-device-options Oc
+.It Pa /dev/xxx Ns Oo , Ns Ar block-device-options Oc
+.El
+.Pp
+The
+.Ar block-device-options
+are:
+.Bl -tag -width 8n
+.It Cm nocache
+Open the file with
+.Dv O_DIRECT .
+.It Cm direct
+Open the file using
+.Dv O_SYNC .
+.It Cm ro
+Force the file to be opened read-only.
+.It Cm sectorsize Ns = Ns Ar logical Ns Oo / Ns Ar physical Oc
+Specify the logical and physical sector sizes of the emulated disk.
+The physical sector size is optional and is equal to the logical sector size
+if not explicitly specified.
+.It Cm nodelete
+Disable emulation of guest trim requests via
+.Dv DIOCGDELETE
+requests.
+.El
+.Pp
+TTY devices:
+.Bl -tag -width 10n
+.It Cm stdio
+Connect the serial port to the standard input and output of
+the
+.Nm
+process.
+.It Pa /dev/xxx
+Use the host TTY device for serial port I/O.
+.El
+.Pp
+Boot ROM device:
+.Bl -tag -width 10n
+.It Pa romfile
+Map
+.Ar romfile
+in the guest address space reserved for boot firmware.
+.El
+.Pp
+Pass-through devices:
+.Bl -tag -width 10n
+.It Pa /dev/ppt Ns Ar N
+Connect to a PCI device on the host identified by the specificed path.
+.El
+.Pp
+Guest memory must be wired using the
+.Fl S
+option when a pass-through device is configured.
+.Pp
+The host device must have been previously attached to the
+.Sy ppt
+driver.
+.Pp
+Virtio console devices:
+.Bl -tag -width 10n
+.It Li port1= Ns Pa /path/to/port1.sock Ns ,anotherport= Ns Pa ...
+A maximum of 16 ports per device can be created.
+Every port is named and corresponds to a UNIX domain socket created by
+.Nm .
+.Nm
+accepts at most one connection per port at a time.
+.Pp
+Limitations:
+.Bl -bullet -offset 2n
+.It
+Due to lack of destructors in
+.Nm ,
+sockets on the filesystem must be cleaned up manually after
+.Nm
+exits.
+.It
+There is no way to use the "console port" feature, nor the console port
+resize at present.
+.It
+Emergency write is advertised, but no-op at present.
+.El
+.El
+.Pp
+Framebuffer devices:
+.Bl -tag -width 10n
+.It Xo
+.Sm off
+.Oo
+.Cm rfb No = Oo Ar IP \&: Oc Ar port
+|
+.Cm unix No = Ar path
+.Oc
+.Op \&, Cm w No = Ar width
+.Op \&, Cm h No = Ar height
+.Op \&, Cm vga No = Ar vgaconf
+.Op \&, Cm wait
+.Op \&, Cm password No = Ar password
+.Sm on
+.Xc
+.Bl -tag -width 8n
+.It Cm unix Ns = Ns Ar path
+The path to a UNIX socket which will be created and where
+.Nm
+will accept VNC connections.
+.It Cm rfb Ns = Ns Ar IPv4:port No or Ar [IPv6%zone]:port
+An
+.Ar IP
+address and a
+.Ar port
+VNC should listen on.
+The default is to listen on localhost IPv4 address and default VNC port 5900.
+An IPv6 address must be enclosed in square brackets and may contain an
+optional zone identifier.
+.It Cm w Ns = Ns Ar width No and Cm h Ns = Ns Ar height
+A display resolution, width and height, respectively.
+If not specified, a default resolution of 1024x768 pixels will be used.
+Minimal supported resolution is 640x480 pixels,
+and maximum is 1920x1200 pixels.
+.It Cm vga Ns = Ns Ar vgaconf
+Possible values for this option are
+.Dq io
+(default),
+.Dq on
+, and
+.Dq off .
+PCI graphics cards have a dual personality in that they are
+standard PCI devices with BAR addressing, but may also
+implicitly decode legacy VGA I/O space
+.Pq Ad 0x3c0-3df
+and memory space
+.Pq 64KB at Ad 0xA0000 .
+The default
+.Dq io
+option should be used for guests that attempt to issue BIOS calls which result
+in I/O port queries, and fail to boot if I/O decode is disabled.
+.Pp
+The
+.Dq on
+option should be used along with the CSM BIOS capability in UEFI
+to boot traditional BIOS guests that require the legacy VGA I/O and
+memory regions to be available.
+.Pp
+The
+.Dq off
+option should be used for the UEFI guests that assume that
+VGA adapter is present if they detect the I/O ports.
+An example of such a guest is
+.Ox
+in UEFI mode.
+.It Cm wait
+Instruct
+.Nm
+to only boot upon the initiation of a VNC connection, simplifying the
+installation of operating systems that require immediate keyboard input.
+This can be removed for post-installation use.
+.It Cm password Ns = Ns Ar password
+This type of authentication is known to be cryptographically weak and is not
+intended for use on untrusted networks.
+Many implementations will want to use stronger security, such as running
+the session over an encrypted channel provided by IPsec or SSH.
+.El
+.El
+.Pp
+xHCI USB devices:
+.Bl -tag -width 10n
+.It Li tablet
+A USB tablet device which provides precise cursor synchronization
+when using VNC.
+.El
+.Pp
+NVMe devices:
+.Bl -tag -width 10n
+.It Li path
+Accepted device paths are:
+.Ar /dev/blockdev
+or
+.Ar /path/to/image
+or
+.Ar ram=size_in_MiB .
+.It Li maxq
+Max number of queues.
+.It Li qsz
+Max elements in each queue.
+.It Li ioslots
+Max number of concurrent I/O requests.
+.It Li sectsz
+Sector size (defaults to blockif sector size).
+.It Li ser
+Serial number with maximum 20 characters.
+.El
+.Pp
+AHCI devices:
+.Bl -tag -width 10n
+.It Li nmrr
+Nominal Media Rotation Rate, known as RPM. value 1 will indicate device as Solid State Disk. default value is 0, not report.
+.It Li ser
+Serial Number with maximum 20 characters.
+.It Li rev
+Revision Number with maximum 8 characters.
+.It Li model
+Model Number with maximum 40 characters.
+.El
+.El
+.It Fl S
+Wire guest memory.
+.It Fl u
+RTC keeps UTC time.
+.It Fl U Ar uuid
+Set the universally unique identifier
+.Pq UUID
+in the guest's System Management BIOS System Information structure.
+By default a UUID is generated from the host's hostname and
+.Ar vmname .
+.It Fl w
+Ignore accesses to unimplemented Model Specific Registers (MSRs).
+This is intended for debug purposes.
+.It Fl W
+Force virtio PCI device emulations to use MSI interrupts instead of MSI-X
+interrupts.
+.It Fl x
+The guest's local APIC is configured in x2APIC mode.
+.It Fl Y
+Disable MPtable generation.
+.It Ar vmname
+Alphanumeric name of the guest.
+.El
+.Sh CONFIGURATION VARIABLES
+.Nm
+uses an internal tree of configuration variables to describe global and
+per-device settings.
+When
+.Nm
+starts,
+it parses command line options (including config files) in the order given
+on the command line.
+Each command line option sets one or more configuration variables.
+For example,
+the
+.Fl s
+option creates a new tree node for a PCI device and sets one or more variables
+under that node including the device model and device model-specific variables.
+Variables may be set multiple times during this parsing stage with the final
+value overriding previous values.
+.Pp
+Once all of the command line options have been processed,
+the configuration values are frozen.
+.Nm
+then uses the value of configuration values to initialize device models
+and global settings.
+.Pp
+More details on configuration variables can be found in
+.Xr bhyve_config 4 .
+.Sh SIGNAL HANDLING
+.Nm
+deals with the following signals:
+.Pp
+.Bl -tag -width indent -compact
+.It SIGTERM
+Trigger ACPI poweroff for a VM
+.El
+.Sh EXIT STATUS
+Exit status indicates how the VM was terminated:
+.Pp
+.Bl -tag -width indent -compact
+.It 0
+rebooted
+.It 1
+powered off
+.It 2
+halted
+.It 3
+triple fault
+.It 4
+exited due to an error
+.El
+.Sh EXAMPLES
+To run a virtual machine with 1GB of memory, two virtual CPUs, a virtio
+block device backed by the
+.Pa /my/image
+filesystem image, and a serial port for the console:
+.Bd -literal -offset indent
+bhyve -c 2 -s 0,hostbridge -s 1,lpc -s 2,virtio-blk,/my/image \e
+  -l com1,stdio -A -H -P -m 1G vm1
+.Ed
+.Pp
+Run a 24GB single-CPU virtual machine with three network ports.
+.Bd -literal -offset indent
+bhyve -s 0,hostbridge -s 1,lpc -s 2:0,virtio-net-viona,vmvnic0 \e
+  -s 2:1,virtio-net-viona,vmvnic1 -s 2:2,virtio-net-viona,vmvnic2 \e
+  -s 3,virtio-blk,/my/image -l com1,stdio \e
+  -A -H -P -m 24G bigvm
+.Ed
+.Pp
+Run an 8GB virtual machine with 2 quad core CPUs, 2 NVMe disks and one other
+disk attached as a Virtio block device, an AHCI ATAPI CD-ROM, a single viona
+network port, an i440fx hostbridge, and the console port connected to a socket.
+.Bd -literal -offset indent
+bhyve -c sockets=2,cores=4,threads=2 \e
+  -s 0,hostbridge,model=i440fx -s 1,lpc \e
+  -s 1:0,nvme,/dev/zvol/rdsk/tank/hdd0 \e
+  -s 1:1,nvme,/dev/zvol/rdsk/tank/hdd1 \e
+  -s 1:2,virtio-blk,/dev/zvol/rdsk/tank/hdd1 \e
+  -s 2:0,ahci,cd:/images/install.iso \e
+  -s 3,virtio-net-viona,vnic=vmvnic0 \e
+  -l com1,socket,/tmp/vm.com1,wait \e
+  -A -H -P -m 8G
+.Ed
+.Pp
+Run a UEFI virtual machine with a display resolution of 800 by 600 pixels
+that can be accessed via VNC at: 0.0.0.0:5900.
+.Bd -literal -offset indent
+bhyve -c 2 -m 4G -w -H \e
+  -s 0,hostbridge \e
+  -s 3,ahci-cd,/path/to/uefi-OS-install.iso \e
+  -s 4,nvme,/dev/zvol/rdsk/tank/hdd0 \e
+  -s 5,virtio-net-viona,vnic=vnmic0 \e
+  -s 29,fbuf,rfb=0.0.0.0:5900,w=800,h=600,wait \e
+  -s 30,xhci,tablet \e
+  -s 31,lpc -l com1,stdio \e
+  -l bootrom,/usr/share/bhyve/firmware/BHYVE_UEFI.fd \e
+   uefivm
+.Ed
+.Sh SEE ALSO
+.Xr bhyvectl 1M ,
+.Xr bhyve_config 4 ,
+.Pp
+.Rs
+.%A Intel
+.%B 64 and IA-32 Architectures Software Developer’s Manual
+.%V Volume 3
+.Re

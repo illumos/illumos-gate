@@ -25,9 +25,9 @@
 #define	uuid_s_invalid_string_uuid	2
 
 static __inline void
-uuid_from_string(char *str, uuid_t *uuidp, uint32_t *status)
+uuid_from_string(const char *str, uuid_t *uuidp, uint32_t *status)
 {
-	if (uuid_parse(str, *uuidp) == 0) {
+	if (uuid_parse((char *)str, *uuidp) == 0) {
 		*status = uuid_s_ok;
 	} else {
 		*status = uuid_s_invalid_string_uuid;

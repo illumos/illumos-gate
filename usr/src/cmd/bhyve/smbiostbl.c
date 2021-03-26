@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <vmmapi.h>
 
 #include "bhyverun.h"
+#include "config.h"
 #include "debug.h"
 #include "smbiostbl.h"
 
@@ -589,11 +590,13 @@ smbios_type1_initializer(struct smbios_structure *template_entry,
     uint16_t *n, uint16_t *size)
 {
 	struct smbios_table_type1 *type1;
+	const char *guest_uuid_str;
 
 	smbios_generic_initializer(template_entry, template_strings,
 	    curaddr, endaddr, n, size);
 	type1 = (struct smbios_table_type1 *)curaddr;
 
+	guest_uuid_str = get_config_value("uuid");
 	if (guest_uuid_str != NULL) {
 		uuid_t		uuid;
 		uint32_t	status;
@@ -607,6 +610,7 @@ smbios_type1_initializer(struct smbios_structure *template_entry,
 		MD5_CTX		mdctx;
 		u_char		digest[16];
 		char		hostname[MAXHOSTNAMELEN];
+		const char	*vmname;
 
 		/*
 		 * Universally unique and yet reproducible are an
@@ -617,6 +621,7 @@ smbios_type1_initializer(struct smbios_structure *template_entry,
 			return (-1);
 
 		MD5Init(&mdctx);
+		vmname = get_config_value("name");
 		MD5Update(&mdctx, vmname, strlen(vmname));
 		MD5Update(&mdctx, hostname, sizeof(hostname));
 		MD5Final(digest, &mdctx);
@@ -863,27 +868,44 @@ smbios_build(struct vmctx *ctx)
 	return (0);
 }
 
+#ifndef __FreeBSD__
+struct {
+	const char *key;
+	const char **targetp;
+} type1_map[] = {
+	{ "manufacturer", &smbios_type1_strings[0] },
+	{ "product", &smbios_type1_strings[1] },
+	{ "version", &smbios_type1_strings[2] },
+	{ "serial", &smbios_type1_strings[3] },
+	{ "sku", &smbios_type1_strings[4] },
+	{ "family", &smbios_type1_strings[5] },
+	{ 0 }
+};
+
+void
+smbios_apply(void)
+{
+	nvlist_t *nvl;
+
+	nvl = find_config_node("smbios");
+	if (nvl == NULL)
+		return;
+
+	for (uint_t i = 0; type1_map[i].key != NULL; i++) {
+		const char *value;
+
+		value = get_config_value_node(nvl, type1_map[i].key);
+		if (value != NULL)
+			*type1_map[i].targetp = value;
+	}
+}
+
 int
 smbios_parse(const char *opts)
 {
-	char *buf;
-	char *lasts;
-	char *token;
-	char *end;
+	char *buf, *lasts, *token, *end;
+	nvlist_t *nvl;
 	long type;
-	struct {
-		const char *key;
-		const char **targetp;
-	} type1_map[] = {
-		{ "manufacturer", &smbios_type1_strings[0] },
-		{ "product", &smbios_type1_strings[1] },
-		{ "version", &smbios_type1_strings[2] },
-		{ "serial", &smbios_type1_strings[3] },
-		{ "sku", &smbios_type1_strings[4] },
-		{ "family", &smbios_type1_strings[5] },
-		{ "uuid", (const char **)&guest_uuid_str },
-		{ 0 }
-	};
 
 	if ((buf = strdup(opts)) == NULL) {
 		(void) fprintf(stderr, "out of memory\n");
@@ -909,9 +931,15 @@ smbios_parse(const char *opts)
 		goto fail;
 	}
 
+	nvl = create_config_node("smbios");
+	if (nvl == NULL) {
+		(void) fprintf(stderr, "out of memory\n");
+		return (-1);
+	}
+
 	while ((token = strtok_r(NULL, ",", &lasts)) != NULL) {
 		char *val;
-		int i;
+		uint_t i;
 
 		if ((val = strchr(token, '=')) == NULL) {
 			(void) fprintf(stderr, "invalid key=value: '%s'\n",
@@ -920,6 +948,11 @@ smbios_parse(const char *opts)
 		}
 		*val = '\0';
 		val++;
+
+		if (strcmp(token, "uuid") == 0) {
+			set_config_value_node(nvl, token, val);
+			continue;
+		}
 
 		for (i = 0; type1_map[i].key != NULL; i++) {
 			if (strcmp(token, type1_map[i].key) == 0) {
@@ -930,7 +963,7 @@ smbios_parse(const char *opts)
 			(void) fprintf(stderr, "invalid key '%s'\n", token);
 			goto fail;
 		}
-		*type1_map[i].targetp = val;
+		set_config_value_node(nvl, token, val);
 	}
 
 	return (0);
@@ -939,3 +972,4 @@ fail:
 	free(buf);
 	return (-1);
 }
+#endif

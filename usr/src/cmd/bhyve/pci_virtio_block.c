@@ -64,6 +64,7 @@ __FBSDID("$FreeBSD$");
 #include <md5.h>
 
 #include "bhyverun.h"
+#include "config.h"
 #include "debug.h"
 #include "pci_emul.h"
 #include "virtio.h"
@@ -416,26 +417,22 @@ pci_vtblk_notify(void *vsc, struct vqueue_info *vq)
 }
 
 static int
-pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
+pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 {
 	char bident[sizeof("XX:X:X")];
 	struct blockif_ctxt *bctxt;
+	const char *path;
 	MD5_CTX mdctx;
 	u_char digest[16];
 	struct pci_vtblk_softc *sc;
 	off_t size;
 	int i, sectsz, sts, sto;
 
-	if (opts == NULL) {
-		WPRINTF(("virtio-block: backing device required"));
-		return (1);
-	}
-
 	/*
 	 * The supplied backing file has to exist
 	 */
 	snprintf(bident, sizeof(bident), "%d:%d", pi->pi_slot, pi->pi_func);
-	bctxt = blockif_open(opts, bident);
+	bctxt = blockif_open(nvl, bident);
 	if (bctxt == NULL) {
 		perror("Could not open backing file");
 		return (1);
@@ -478,8 +475,9 @@ pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	 * Create an identifier for the backing file. Use parts of the
 	 * md5 sum of the filename
 	 */
+	path = get_config_value_node(nvl, "path");
 	MD5Init(&mdctx);
-	MD5Update(&mdctx, opts, strlen(opts));
+	MD5Update(&mdctx, path, strlen(path));
 	MD5Final(digest, &mdctx);
 	snprintf(sc->vbsc_ident, VTBLK_BLK_ID_BYTES,
 	    "BHYVE-%02X%02X-%02X%02X-%02X%02X",
@@ -520,7 +518,7 @@ pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	pci_set_cfgdata16(pi, PCIR_DEVICE, VIRTIO_DEV_BLOCK);
 	pci_set_cfgdata16(pi, PCIR_VENDOR, VIRTIO_VENDOR);
 	pci_set_cfgdata8(pi, PCIR_CLASS, PCIC_STORAGE);
-	pci_set_cfgdata16(pi, PCIR_SUBDEV_0, VIRTIO_TYPE_BLOCK);
+	pci_set_cfgdata16(pi, PCIR_SUBDEV_0, VIRTIO_ID_BLOCK);
 	pci_set_cfgdata16(pi, PCIR_SUBVEND_0, VIRTIO_VENDOR);
 
 	if (vi_intr_init(&sc->vbsc_vs, 1, fbsdrun_virtio_msix())) {
@@ -569,6 +567,7 @@ pci_vtblk_apply_feats(void *vsc, uint64_t caps)
 struct pci_devemu pci_de_vblk = {
 	.pe_emu =	"virtio-blk",
 	.pe_init =	pci_vtblk_init,
+	.pe_legacy_config = blockif_legacy_config,
 	.pe_barwrite =	vi_pci_write,
 	.pe_barread =	vi_pci_read
 };

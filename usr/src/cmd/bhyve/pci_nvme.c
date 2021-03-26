@@ -84,6 +84,7 @@ __FBSDID("$FreeBSD$");
 
 #include "bhyverun.h"
 #include "block_if.h"
+#include "config.h"
 #include "debug.h"
 #include "pci_emul.h"
 
@@ -581,8 +582,9 @@ pci_nvme_init_nsdata(struct pci_nvme_softc *sc,
 		char *data = NULL;
 		uint64_t eui64 = nvstore->eui64;
 
-		asprintf(&data, "%s%u%u%u", vmname, sc->nsc_pi->pi_bus,
-		    sc->nsc_pi->pi_slot, sc->nsc_pi->pi_func);
+		asprintf(&data, "%s%u%u%u", get_config_value("name"),
+		    sc->nsc_pi->pi_bus, sc->nsc_pi->pi_slot,
+		    sc->nsc_pi->pi_func);
 
 		if (data != NULL) {
 			eui64 = OUI_FREEBSD_NVME_LOW | crc16(0, data, strlen(data));
@@ -1080,8 +1082,12 @@ static int
 nvme_opc_get_log_page(struct pci_nvme_softc* sc, struct nvme_command* command,
 	struct nvme_completion* compl)
 {
-	uint32_t logsize = 0;
+	uint32_t logsize;
 	uint8_t logpage = command->cdw10 & 0xFF;
+
+#ifndef __FreeBSD__
+	logsize = 0;
+#endif
 
 	DPRINTF("%s log page %u len %u", __func__, logpage, logsize);
 
@@ -1140,7 +1146,11 @@ nvme_opc_identify(struct pci_nvme_softc* sc, struct nvme_command* command,
 	struct nvme_completion* compl)
 {
 	void *dest;
-	uint16_t status = 0;
+	uint16_t status;
+
+#ifndef __FreeBSD__
+	status = 0;
+#endif
 
 	DPRINTF("%s identify 0x%x nsid 0x%x", __func__,
 	        command->cdw10 & 0xFF, command->nsid);
@@ -1866,7 +1876,11 @@ pci_nvme_io_done(struct blockif_req *br, int err)
 {
 	struct pci_nvme_ioreq *req = br->br_param;
 	struct nvme_submission_queue *sq = req->nvme_sq;
-	uint16_t code, status = 0;
+	uint16_t code, status;
+
+#ifndef __FreeBSD__
+	status = 0;
+#endif
 
 	DPRINTF("%s error %d %s", __func__, err, strerror(err));
 
@@ -1929,7 +1943,11 @@ nvme_write_read_ram(struct pci_nvme_softc *sc,
 {
 	uint8_t *buf = nvstore->ctx;
 	enum nvme_copy_dir dir;
-	uint16_t status = 0;
+	uint16_t status;
+
+#ifndef __FreeBSD__
+	status = 0;
+#endif
 
 	if (is_write)
 		dir = NVME_COPY_TO_PRP;
@@ -2029,10 +2047,14 @@ nvme_opc_write_read(struct pci_nvme_softc *sc,
     struct pci_nvme_ioreq *req,
     uint16_t *status)
 {
-	uint64_t lba, nblocks, bytes = 0;
+	uint64_t lba, nblocks, bytes;
 	size_t offset;
 	bool is_write = cmd->opc == NVME_OPC_WRITE;
 	bool pending = false;
+
+#ifndef __FreeBSD__
+	bytes = 0;
+#endif
 
 	lba = ((uint64_t)cmd->cdw11 << 32) | cmd->cdw10;
 	nblocks = (cmd->cdw12 & 0xFFFF) + 1;
@@ -2081,10 +2103,10 @@ pci_nvme_dealloc_sm(struct blockif_req *br, int err)
 	struct pci_nvme_ioreq *req = br->br_param;
 	struct pci_nvme_softc *sc = req->sc;
 	bool done = true;
-#ifdef __FreeBSD__
 	uint16_t status;
-#else
-	uint16_t status = 0;
+
+#ifndef __FreeBSD__
+	status = 0;
 #endif
 
 	if (err) {
@@ -2121,10 +2143,14 @@ nvme_opc_dataset_mgmt(struct pci_nvme_softc *sc,
     struct pci_nvme_ioreq *req,
     uint16_t *status)
 {
-	struct nvme_dsm_range *range = NULL;
+	struct nvme_dsm_range *range;
 	uint32_t nr, r, non_zero, dr;
 	int err;
 	bool pending = false;
+
+#ifndef __FreeBSD__
+	range = NULL;
+#endif
 
 	if ((sc->ctrldata.oncs & NVME_ONCS_DSM) == 0) {
 		pci_nvme_status_genc(status, NVME_SC_INVALID_OPCODE);
@@ -2237,8 +2263,12 @@ static void
 pci_nvme_handle_io_cmd(struct pci_nvme_softc* sc, uint16_t idx)
 {
 	struct nvme_submission_queue *sq;
-	uint16_t status = 0;
+	uint16_t status;
 	uint16_t sqhead;
+
+#ifndef __FreeBSD__
+	status = 0;
+#endif
 
 	/* handle all submissions up to sq->tail index */
 	sq = &sc->submit_queues[idx];
@@ -2624,14 +2654,12 @@ pci_nvme_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 	return (0);
 }
 
-
 static int
-pci_nvme_parse_opts(struct pci_nvme_softc *sc, char *opts)
+pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
 {
 	char bident[sizeof("XX:X:X")];
-	char	*uopt, *xopts, *config;
+	const char *value;
 	uint32_t sectsz;
-	int optidx;
 
 	sc->max_queues = NVME_QUEUES;
 	sc->max_qentries = NVME_MAX_QENTRIES;
@@ -2640,81 +2668,81 @@ pci_nvme_parse_opts(struct pci_nvme_softc *sc, char *opts)
 	sc->num_cqueues = sc->max_queues;
 	sc->dataset_management = NVME_DATASET_MANAGEMENT_AUTO;
 	sectsz = 0;
-
-	uopt = strdup(opts);
-	optidx = 0;
 	snprintf(sc->ctrldata.sn, sizeof(sc->ctrldata.sn),
 	         "NVME-%d-%d", sc->nsc_pi->pi_slot, sc->nsc_pi->pi_func);
-	for (xopts = strtok(uopt, ",");
-	     xopts != NULL;
-	     xopts = strtok(NULL, ",")) {
 
-		if ((config = strchr(xopts, '=')) != NULL)
-			*config++ = '\0';
-
-		if (!strcmp("maxq", xopts)) {
-			sc->max_queues = atoi(config);
-		} else if (!strcmp("qsz", xopts)) {
-			sc->max_qentries = atoi(config);
-		} else if (!strcmp("ioslots", xopts)) {
-			sc->ioslots = atoi(config);
-		} else if (!strcmp("sectsz", xopts)) {
-			sectsz = atoi(config);
-		} else if (!strcmp("ser", xopts)) {
-			/*
-			 * This field indicates the Product Serial Number in
-			 * 7-bit ASCII, unused bytes should be space characters.
-			 * Ref: NVMe v1.3c.
-			 */
-			cpywithpad((char *)sc->ctrldata.sn,
-			           sizeof(sc->ctrldata.sn), config, ' ');
-		} else if (!strcmp("ram", xopts)) {
-			uint64_t sz = strtoull(&xopts[4], NULL, 10);
-
-			sc->nvstore.type = NVME_STOR_RAM;
-			sc->nvstore.size = sz * 1024 * 1024;
-			sc->nvstore.ctx = calloc(1, sc->nvstore.size);
-			sc->nvstore.sectsz = 4096;
-			sc->nvstore.sectsz_bits = 12;
-			if (sc->nvstore.ctx == NULL) {
-				perror("Unable to allocate RAM");
-				free(uopt);
-				return (-1);
-			}
-		} else if (!strcmp("eui64", xopts)) {
-			sc->nvstore.eui64 = htobe64(strtoull(config, NULL, 0));
-		} else if (!strcmp("dsm", xopts)) {
-			if (!strcmp("auto", config))
-				sc->dataset_management = NVME_DATASET_MANAGEMENT_AUTO;
-			else if (!strcmp("enable", config))
-				sc->dataset_management = NVME_DATASET_MANAGEMENT_ENABLE;
-			else if (!strcmp("disable", config))
-				sc->dataset_management = NVME_DATASET_MANAGEMENT_DISABLE;
-		} else if (optidx == 0) {
-			snprintf(bident, sizeof(bident), "%d:%d",
-			         sc->nsc_pi->pi_slot, sc->nsc_pi->pi_func);
-			sc->nvstore.ctx = blockif_open(xopts, bident);
-			if (sc->nvstore.ctx == NULL) {
-				perror("Could not open backing file");
-				free(uopt);
-				return (-1);
-			}
-			sc->nvstore.type = NVME_STOR_BLOCKIF;
-			sc->nvstore.size = blockif_size(sc->nvstore.ctx);
-		} else {
-			EPRINTLN("Invalid option %s", xopts);
-			free(uopt);
+	value = get_config_value_node(nvl, "maxq");
+	if (value != NULL)
+		sc->max_queues = atoi(value);
+	value = get_config_value_node(nvl, "qsz");
+	if (value != NULL) {
+		sc->max_qentries = atoi(value);
+		if (sc->max_qentries <= 0) {
+			EPRINTLN("nvme: Invalid qsz option %d",
+			    sc->max_qentries);
 			return (-1);
 		}
-
-		optidx++;
 	}
-	free(uopt);
-
-	if (sc->nvstore.ctx == NULL || sc->nvstore.size == 0) {
-		EPRINTLN("backing store not specified");
-		return (-1);
+	value = get_config_value_node(nvl, "ioslots");
+	if (value != NULL) {
+		sc->ioslots = atoi(value);
+		if (sc->ioslots <= 0) {
+			EPRINTLN("Invalid ioslots option %d", sc->ioslots);
+			return (-1);
+		}
 	}
+	value = get_config_value_node(nvl, "sectsz");
+	if (value != NULL)
+		sectsz = atoi(value);
+	value = get_config_value_node(nvl, "ser");
+	if (value != NULL) {
+		/*
+		 * This field indicates the Product Serial Number in
+		 * 7-bit ASCII, unused bytes should be space characters.
+		 * Ref: NVMe v1.3c.
+		 */
+		cpywithpad((char *)sc->ctrldata.sn,
+		    sizeof(sc->ctrldata.sn), value, ' ');
+	}
+	value = get_config_value_node(nvl, "eui64");
+	if (value != NULL)
+		sc->nvstore.eui64 = htobe64(strtoull(value, NULL, 0));
+	value = get_config_value_node(nvl, "dsm");
+	if (value != NULL) {
+		if (strcmp(value, "auto") == 0)
+			sc->dataset_management = NVME_DATASET_MANAGEMENT_AUTO;
+		else if (strcmp(value, "enable") == 0)
+			sc->dataset_management = NVME_DATASET_MANAGEMENT_ENABLE;
+		else if (strcmp(value, "disable") == 0)
+			sc->dataset_management = NVME_DATASET_MANAGEMENT_DISABLE;
+	}
+
+	value = get_config_value_node(nvl, "ram");
+	if (value != NULL) {
+		uint64_t sz = strtoull(value, NULL, 10);
+
+		sc->nvstore.type = NVME_STOR_RAM;
+		sc->nvstore.size = sz * 1024 * 1024;
+		sc->nvstore.ctx = calloc(1, sc->nvstore.size);
+		sc->nvstore.sectsz = 4096;
+		sc->nvstore.sectsz_bits = 12;
+		if (sc->nvstore.ctx == NULL) {
+			EPRINTLN("nvme: Unable to allocate RAM");
+			return (-1);
+		}
+	} else {
+		snprintf(bident, sizeof(bident), "%d:%d",
+		    sc->nsc_pi->pi_slot, sc->nsc_pi->pi_func);
+		sc->nvstore.ctx = blockif_open(nvl, bident);
+		if (sc->nvstore.ctx == NULL) {
+			EPRINTLN("nvme: Could not open backing file: %s",
+			    strerror(errno));
+			return (-1);
+		}
+		sc->nvstore.type = NVME_STOR_BLOCKIF;
+		sc->nvstore.size = blockif_size(sc->nvstore.ctx);
+	}
+
 	if (sectsz == 512 || sectsz == 4096 || sectsz == 8192)
 		sc->nvstore.sectsz = sectsz;
 	else if (sc->nvstore.type != NVME_STOR_RAM)
@@ -2726,20 +2754,11 @@ pci_nvme_parse_opts(struct pci_nvme_softc *sc, char *opts)
 	if (sc->max_queues <= 0 || sc->max_queues > NVME_QUEUES)
 		sc->max_queues = NVME_QUEUES;
 
-	if (sc->max_qentries <= 0) {
-		EPRINTLN("Invalid qsz option");
-		return (-1);
-	}
-	if (sc->ioslots <= 0) {
-		EPRINTLN("Invalid ioslots option");
-		return (-1);
-	}
-
 	return (0);
 }
 
 static int
-pci_nvme_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
+pci_nvme_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 {
 	struct pci_nvme_softc *sc;
 	uint32_t pci_membar_sz;
@@ -2751,7 +2770,7 @@ pci_nvme_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	pi->pi_arg = sc;
 	sc->nsc_pi = pi;
 
-	error = pci_nvme_parse_opts(sc, opts);
+	error = pci_nvme_parse_config(sc, nvl);
 	if (error < 0)
 		goto done;
 	else
@@ -2828,6 +2847,7 @@ done:
 struct pci_devemu pci_de_nvme = {
 	.pe_emu =	"nvme",
 	.pe_init =	pci_nvme_init,
+	.pe_legacy_config = blockif_legacy_config,
 	.pe_barwrite =	pci_nvme_write,
 	.pe_barread =	pci_nvme_read
 };

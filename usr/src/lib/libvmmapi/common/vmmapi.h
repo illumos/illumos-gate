@@ -132,6 +132,8 @@ int	vm_get_devmem_offset(struct vmctx *ctx, int segid, off_t *mapoff);
 int	vm_mmap_memseg(struct vmctx *ctx, vm_paddr_t gpa, int segid,
 	    vm_ooffset_t segoff, size_t len, int prot);
 
+int	vm_munmap_memseg(struct vmctx *ctx, vm_paddr_t gpa, size_t len);
+
 int	vm_create(const char *name);
 int	vm_get_device_fd(struct vmctx *ctx);
 struct vmctx *vm_open(const char *name);
@@ -220,6 +222,8 @@ int	vm_assign_pptdev(struct vmctx *ctx, int bus, int slot, int func);
 int	vm_unassign_pptdev(struct vmctx *ctx, int bus, int slot, int func);
 int	vm_map_pptdev_mmio(struct vmctx *ctx, int bus, int slot, int func,
 			   vm_paddr_t gpa, size_t len, vm_paddr_t hpa);
+int	vm_unmap_pptdev_mmio(struct vmctx *ctx, int bus, int slot, int func,
+			     vm_paddr_t gpa, size_t len);
 int	vm_setup_pptdev_msi(struct vmctx *ctx, int vcpu, int bus, int slot,
 	    int func, uint64_t addr, uint64_t msg, int numvec);
 int	vm_setup_pptdev_msix(struct vmctx *ctx, int vcpu, int bus, int slot,
@@ -233,6 +237,8 @@ int	vm_assign_pptdev(struct vmctx *ctx, int pptfd);
 int	vm_unassign_pptdev(struct vmctx *ctx, int pptfd);
 int	vm_map_pptdev_mmio(struct vmctx *ctx, int pptfd, vm_paddr_t gpa,
     size_t len, vm_paddr_t hpa);
+int	vm_unmap_pptdev_mmio(struct vmctx *ctx, int pptfd, vm_paddr_t gpa,
+    size_t len);
 int	vm_setup_pptdev_msi(struct vmctx *ctx, int vcpu, int pptfd,
     uint64_t addr, uint64_t msg, int numvec);
 int	vm_setup_pptdev_msix(struct vmctx *ctx, int vcpu, int pptfd,

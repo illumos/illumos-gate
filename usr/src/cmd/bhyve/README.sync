@@ -4,18 +4,18 @@ public Git repository at https://git.freebsd.org/src.git
 The bhyve kernel module and its associated userland consumers have been updated
 to the latest upstream FreeBSD sources as of:
 
-commit 2bb4be0f86501ec0565dba3d37ce0f7d7fc9c464
-Author: grehan <grehan@FreeBSD.org>
-Date:   Fri Dec 18 00:38:48 2020 +0000
+commit 9f40a3be3d5dbddf782c3d1eeaadcd022a4dad01
+Author: John Baldwin <jhb@FreeBSD.org>
+Date:   Wed Mar 24 09:29:15 2021 -0700
 
-    Fix issues with various VNC clients.
+    bhyve hostbridge: Rename "device" property to "devid".
 
-    PR: 250795
-    Submitted by:   Marko Kiiskila <marko@apache.org>
-    Reviewed by:    jhb (bhyve)
-    MFC after:      3 weeks
-    Relnotes:       yes
-    Differential Revision:  https://reviews.freebsd.org/D27605
+    "device" is already used as the generic PCI-level name of the device
+    model to use (e.g. "hostbridge").  The result was that parsing
+    "hostbridge" as an integer failed and the host bridge used a device ID
+    of 0.  The EFI ROM asserts that the device ID of the hostbridge is not
+    0, so booting with the current EFI ROM was failing during the ROM
+    boot.
 
 Divergence Notes:
 

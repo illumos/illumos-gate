@@ -12,6 +12,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -45,6 +46,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	ppt_unassign_device;
 	ppt_unassign_all;
 	ppt_map_mmio;
+	ppt_unmap_mmio;
 	ppt_setup_msi;
 	ppt_setup_msix;
 	ppt_get_limits;

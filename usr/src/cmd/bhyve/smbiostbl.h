@@ -38,6 +38,9 @@
 struct vmctx;
 
 int	smbios_build(struct vmctx *ctx);
+#ifndef __FreeBSD__
 int	smbios_parse(const char *opts);
+void	smbios_apply(void);
+#endif
 
 #endif /* _SMBIOSTBL_H_ */

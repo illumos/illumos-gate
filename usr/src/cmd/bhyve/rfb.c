@@ -437,7 +437,7 @@ static int
 rfb_send_all(struct rfb_softc *rc, int cfd, struct bhyvegc_image *gc)
 {
 	struct rfb_srvr_updt_msg supdt_msg;
-	struct rfb_srvr_rect_hdr srect_hdr;
+        struct rfb_srvr_rect_hdr srect_hdr;
 	ssize_t nwrite;
 	unsigned long zlen;
 	int err;
@@ -631,11 +631,11 @@ rfb_send_screen(struct rfb_softc *rc, int cfd)
 		}
 	}
 
-	/*
-	 * We only send the update if there are changes.
-	 * Restore the pending flag since it was unconditionally cleared
-	 * above.
-	 */
+       /*
+	* We only send the update if there are changes.
+	* Restore the pending flag since it was unconditionally cleared
+	* above.
+	*/
 	if (!changes) {
 		rc->pending = true;
 		goto done;
@@ -1005,7 +1005,7 @@ report_and_done:
 	if (perror == 0)
 		pthread_set_name_np(tid, "rfbout");
 
-	/* Now read in client requests. 1st byte identifies type */
+        /* Now read in client requests. 1st byte identifies type */
 	for (;;) {
 		len = read(cfd, buf, 1);
 		if (len <= 0) {
@@ -1198,7 +1198,7 @@ rfb_init(char *hostname, int port, int wait, char *password)
 
 #ifndef __FreeBSD__
 int
-rfb_init_unix(char *path, int wait, char *password)
+rfb_init_unix(const char *path, int wait, char *password)
 {
 	struct rfb_softc *rc;
 	struct sockaddr_un sock;

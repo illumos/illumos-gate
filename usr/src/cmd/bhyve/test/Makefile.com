@@ -21,7 +21,6 @@ include $(SRC)/cmd/Makefile.cmd.64
 # Force c99 for everything
 #
 CSTD=		$(CSTD_GNU99)
-C99MODE=	-xc99=%all
 
 CFLAGS +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration \
 		-_gcc=-Wno-parentheses
