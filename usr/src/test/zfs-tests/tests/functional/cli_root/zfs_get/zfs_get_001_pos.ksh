@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright (c) 2021 Matt Fiddaman
 #
 
 . $STF_SUITE/tests/functional/cli_root/zfs_get/zfs_get_common.kshlib
@@ -61,13 +62,14 @@ typeset zfs_props=("type" used available creation volsize referenced \
     sharenfs checksum compression atime devices exec readonly setuid zoned \
     snapdir aclmode aclinherit canmount primarycache secondarycache \
     usedbychildren usedbydataset usedbyrefreservation usedbysnapshots \
-    version)
+    version clones)
 
 typeset userquota_props=(userquota@root groupquota@root userused@root \
     groupused@root)
 typeset all_props=("${zfs_props[@]}" "${userquota_props[@]}")
 typeset dataset=($TESTPOOL/$TESTCTR $TESTPOOL/$TESTFS $TESTPOOL/$TESTVOL \
-	$TESTPOOL/$TESTFS@$TESTSNAP $TESTPOOL/$TESTVOL@$TESTSNAP)
+	$TESTPOOL/$TESTFS@$TESTSNAP $TESTPOOL/$TESTVOL@$TESTSNAP
+	$TESTPOOL/$TESTFS@$TESTSNAP1 $TESTPOOL/$TESTCLONE)
 
 typeset bookmark_props=(creation)
 typeset bookmark=($TESTPOOL/$TESTFS#$TESTBKMARK $TESTPOOL/$TESTVOL#$TESTBKMARK)
@@ -97,6 +99,7 @@ function check_return_value
 
 			if [[ $item == $p ]]; then
 				((found += 1))
+				cols=$(echo $line | awk '{print NF}')
 				break
 			fi
 		done < $TESTDIR/$TESTFILE0
@@ -104,6 +107,9 @@ function check_return_value
 		if ((found == 0)); then
 			log_fail "'zfs get $opt $props $dst' return " \
 			    "error message.'$p' haven't been found."
+		elif [[ "$opt" == "-p" ]] && ((cols != 4)); then
+			log_fail "'zfs get $opt $props $dst' returned " \
+			    "$cols columns instead of 4."
 		fi
 	done
 
@@ -117,6 +123,10 @@ log_onexit cleanup
 # Create filesystem and volume's snapshot
 create_snapshot $TESTPOOL/$TESTFS $TESTSNAP
 create_snapshot $TESTPOOL/$TESTVOL $TESTSNAP
+
+# Create second snapshot and clone it
+create_snapshot $TESTPOOL/$TESTFS $TESTSNAP1
+create_clone $TESTPOOL/$TESTFS@$TESTSNAP1 $TESTPOOL/$TESTCLONE
 
 # Create filesystem and volume's bookmark
 create_bookmark $TESTPOOL/$TESTFS $TESTSNAP $TESTBKMARK

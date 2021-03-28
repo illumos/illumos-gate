@@ -34,6 +34,7 @@
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
  * Copyright 2017-2018 RackTop Systems.
+ * Copyright (c) 2021 Matt Fiddaman
  */
 
 #include <ctype.h>
@@ -2413,7 +2414,7 @@ get_clones_string(zfs_handle_t *zhp, char *propbuf, size_t proplen)
 	nvpair_t *pair;
 
 	value = zfs_get_clones_nvl(zhp);
-	if (value == NULL)
+	if (value == NULL || nvlist_empty(value))
 		return (-1);
 
 	propbuf[0] = '\0';
