@@ -342,15 +342,23 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf, size_t len,
 		case ZPOOL_PROP_FRAGMENTATION:
 			if (intval == UINT64_MAX) {
 				(void) strlcpy(buf, "-", len);
+			} else if (literal) {
+				(void) snprintf(buf, len, "%llu",
+				    (u_longlong_t)intval);
 			} else {
 				(void) snprintf(buf, len, "%llu%%",
 				    (u_longlong_t)intval);
 			}
 			break;
 		case ZPOOL_PROP_DEDUPRATIO:
-			(void) snprintf(buf, len, "%llu.%02llux",
-			    (u_longlong_t)(intval / 100),
-			    (u_longlong_t)(intval % 100));
+			if (literal)
+				(void) snprintf(buf, len, "%llu.%02llu",
+				    (u_longlong_t)(intval / 100),
+				    (u_longlong_t)(intval % 100));
+			else
+				(void) snprintf(buf, len, "%llu.%02llux",
+				    (u_longlong_t)(intval / 100),
+				    (u_longlong_t)(intval % 100));
 			break;
 		case ZPOOL_PROP_HEALTH:
 			verify(nvlist_lookup_nvlist(zpool_get_config(zhp, NULL),
