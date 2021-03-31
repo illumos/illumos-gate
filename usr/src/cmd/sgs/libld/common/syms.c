@@ -1718,8 +1718,9 @@ ld_sym_validate(Ofl_desc *ofl)
 				    sym->st_name) && (st_insert(ofl->ofl_strtab,
 				    sdp->sd_name) == -1))
 					return (S_ERROR);
-				if (allow_ldynsym && sym->st_name &&
-				    ldynsym_symtype[type]) {
+				if (allow_ldynsym && ldynsym_symtype[type] &&
+				    ((sym->st_name != 0) ||
+				    (type == STT_FILE))) {
 					ofl->ofl_dynscopecnt++;
 					if (st_insert(ofl->ofl_dynstrtab,
 					    sdp->sd_name) == -1)
@@ -2452,8 +2453,14 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				    sdp->sd_name) == -1))
 					return (S_ERROR);
 
-				if (allow_ldynsym && sym->st_name &&
-				    ldynsym_symtype[type]) {
+				/*
+				 * STT_FILE symbols must always remain, to
+				 * maintain the ordering semantics of symbol
+				 * tables.
+				 */
+				if (allow_ldynsym && ldynsym_symtype[type] &&
+				    ((sym->st_name != 0) ||
+				    (type == STT_FILE))) {
 					ofl->ofl_dynlocscnt++;
 					if (st_insert(ofl->ofl_dynstrtab,
 					    sdp->sd_name) == -1)
