@@ -1214,6 +1214,7 @@ extern void qcallbwrapper(void *);
 
 extern mblk_t *esballoc_wait(unsigned char *, size_t, uint_t, frtn_t *);
 extern mblk_t *esballoca(unsigned char *, size_t, uint_t, frtn_t *);
+extern mblk_t *esballoca_wait(unsigned char *, size_t, uint_t, frtn_t *);
 extern mblk_t *desballoca(unsigned char *, size_t, uint_t, frtn_t *);
 extern int do_sendfp(struct stdata *, struct file *, struct cred *);
 extern int frozenstr(queue_t *);

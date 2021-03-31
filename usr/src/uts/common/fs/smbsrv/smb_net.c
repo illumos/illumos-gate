@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2022 RackTop Systems, Inc.
  * Copyright 2011-2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -35,6 +36,8 @@
 #include <sys/vnode.h>
 #include <sys/socket.h>
 #include <sys/ksocket.h>
+#include <sys/stream.h>
+#include <sys/strsubr.h>
 
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb.h>
@@ -201,91 +204,200 @@ smb_net_txl_destructor(smb_txlst_t *txl)
 	mutex_destroy(&txl->tl_mutex);
 }
 
-/*
- * smb_net_send_mbufs
- *
- * This routine sends an mbuf chain.
- */
-int
-smb_net_send_mbufs(smb_session_t *s, mbuf_t *mhead)
+static void
+smb_net_send_free(void *arg)
 {
-	uio_t		uio;
-	iovec_t		local_iov[SMB_LOCAL_IOV_MAX];
-	iovec_t		*alloc_iov = NULL;
-	int		alloc_sz = 0;
-	mbuf_t		*m = NULL;
-	uint32_t	tlen;
-	int		i, nseg;
-	int		rc;
+	mbuf_t *m = arg;
+	(void) m_free(m);
+}
 
-	bzero(&uio, sizeof (uio));
+/*
+ * Create an mblk that wraps the passed mbuf
+ *
+ * Note we need a place to store a frtn_t for each mbuf.
+ * For M_EXT packets (most are) we have lots of unused space
+ * after the headers: M_dat.MH.MH_dat.MH_ext (a.k.a. m_ext)
+ * If not M_EXT but there's enough trailing space, just use
+ * the trailing space, otherwise convert to external type
+ * (which means copying the data, so do only if necessary).
+ *
+ * To simplify the code, the frtn_t is always located at the
+ * end of the mbuf (in space we make sure is unused).
+ */
+static mblk_t *
+smb_net_wrap_mbuf(mbuf_t *mbuf)
+{
+	frtn_t		*frtn;
+	mblk_t		*mblk;
+
+	if ((mbuf->m_flags & M_EXT) == 0 &&
+	    M_TRAILINGSPACE(mbuf) < sizeof (*frtn)) {
+		/*
+		 * Convert to M_EXT type, like MCLGET(),
+		 * but copy before updating mbuf->m_ext,
+		 * which would otherwise overwrite data.
+		 */
+		caddr_t buf = smb_mbufcl_alloc();
+		ASSERT(mbuf->m_len <= MLEN);
+		bcopy(mbuf->m_data, buf, mbuf->m_len);
+		mbuf->m_ext.ext_buf = buf;
+		mbuf->m_data = buf;
+		mbuf->m_flags |= M_EXT;
+		mbuf->m_ext.ext_size = MCLBYTES;
+		mbuf->m_ext.ext_free = smb_mbufcl_free;
+	}
 
 	/*
-	 * Setup the IOV.  First, count the number of IOV segments
-	 * and decide whether we need to allocate an iovec or can
-	 * use the local_iov;  Get the total length too.
+	 * Store frtn_t at the end of the mbuf data area.
+	 * Note: This is the _internal_ data area (unused)
+	 * not the external data pointed to by m_data.
 	 */
-	nseg = 0;
-	tlen = 0;
-	m = mhead;
-	while (m != NULL) {
-		nseg++;
-		tlen += m->m_len;
-		m = m->m_next;
+	frtn = (void *) &mbuf->m_dat[MLEN - sizeof (*frtn)];
+
+	frtn->free_func = smb_net_send_free;
+	frtn->free_arg = (caddr_t)mbuf;
+
+	mblk = esballoca_wait((void *)mbuf->m_data, mbuf->m_len,
+	    BPRI_MED, frtn);
+	if (mblk != NULL) {
+		mblk->b_wptr += mbuf->m_len;
+		mblk->b_datap->db_type = M_DATA;
 	}
-	if (nseg <= SMB_LOCAL_IOV_MAX) {
-		uio.uio_iov = local_iov;
-	} else {
-		alloc_sz = nseg * sizeof (iovec_t);
-		alloc_iov = kmem_alloc(alloc_sz, KM_SLEEP);
-		uio.uio_iov = alloc_iov;
+
+	return (mblk);
+}
+
+/*
+ * This routine sends an mbuf chain by encapsulating each segment
+ * with an mblk_t setup with external storage (zero-copy).
+ *
+ * Note: the mbufs passed in are free'd via smb_net_send_free.
+ */
+static int
+smb_net_send_mblks(smb_session_t *s, mbuf_t *mbuf_head)
+{
+	struct nmsghdr	msg;
+	mblk_t	*mblk_head;
+	mblk_t	*mblk_prev;
+	mblk_t	*mblk;
+	mbuf_t	*mbuf_prev;
+	mbuf_t	*mbuf;
+	smb_txlst_t *txl;
+	int	rc = 0;
+
+	bzero(&msg, sizeof (msg));
+
+	mblk_prev = NULL;
+	mblk_head = NULL;
+	mbuf_prev = NULL;
+	mbuf = mbuf_head;
+	while (mbuf != NULL) {
+		mblk = smb_net_wrap_mbuf(mbuf);
+		if (mblk == NULL) {
+			rc = ENOSR;
+			break;
+		}
+		if (mblk_head == NULL)
+			mblk_head = mblk;
+		if (mblk_prev != NULL)
+			mblk_prev->b_cont = mblk;
+
+		mblk_prev = mblk;
+		mbuf_prev = mbuf;
+		mbuf = mbuf->m_next;
 	}
-	uio.uio_iovcnt = nseg;
-	uio.uio_segflg = UIO_SYSSPACE;
-	uio.uio_extflg = UIO_COPY_DEFAULT;
-	uio.uio_resid = tlen;
+	if (rc != 0) {
+		/* Bailed with ENOSR. Cleanup */
+		if (mbuf != NULL) {
+			if (mbuf_prev != NULL)
+				mbuf_prev->m_next = NULL;
+			m_freem(mbuf);
+		}
+		if (mblk_head != NULL)
+			freemsg(mblk_head);
+		return (rc);
+	}
 
 	/*
-	 * Build the iov list
+	 * Wait for our turn to send.
 	 */
-	i = 0;
-	m = mhead;
-	while (m != NULL) {
-		uio.uio_iov[i].iov_base = m->m_data;
-		uio.uio_iov[i++].iov_len = m->m_len;
-		m = m->m_next;
+	DTRACE_PROBE1(send__wait__start, struct smb_session_t *, s);
+	txl = &s->s_txlst;
+	mutex_enter(&txl->tl_mutex);
+	while (txl->tl_active)
+		cv_wait(&txl->tl_wait_cv, &txl->tl_mutex);
+	txl->tl_active = B_TRUE;
+	mutex_exit(&txl->tl_mutex);
+	DTRACE_PROBE1(send__wait__done, struct smb_session_t *, s);
+
+	/*
+	 * OK, send it.
+	 */
+	rc = ksocket_sendmblk(s->sock, &msg, 0, &mblk_head, CRED());
+	if (rc != 0) {
+		if (mblk_head != NULL) {
+			freemsg(mblk_head);
+			mblk_head = NULL;
+		}
 	}
-	ASSERT3S(i, ==, nseg);
 
-	rc = smb_net_send_uio(s, &uio);
-
-	if (alloc_iov != NULL)
-		kmem_free(alloc_iov, alloc_sz);
-	if (mhead != NULL)
-		m_freem(mhead);
+	mutex_enter(&txl->tl_mutex);
+	txl->tl_active = B_FALSE;
+	cv_signal(&txl->tl_wait_cv);
+	mutex_exit(&txl->tl_mutex);
 
 	return (rc);
 }
 
 /*
- * smb_net_send_uio
+ * This routine sends an mbuf chain by copying its segments
+ * (scatter/gather) via UIO.
  *
- * This routine puts the transmit buffer passed in on the wire.
- * If another thread is already sending, block on the CV.
+ * The mbuf chain is always free'd (error or not)
  */
-int
-smb_net_send_uio(smb_session_t *s, struct uio *uio)
+static int
+smb_net_send_uio(smb_session_t *s, mbuf_t *mbuf_head)
 {
-	struct msghdr msg;
+	struct nmsghdr	msg;
+	uio_t	uio;
+	iovec_t iov_local[SMB_LOCAL_IOV_MAX];
+	mbuf_t	*mbuf;
+	smb_txlst_t *txl;
+	smb_vdb_t *vdb = NULL;
 	size_t sent;
-	smb_txlst_t *txl = &s->s_txlst;
-	int rc = 0;
+	int	len, nseg, rc;
+
+	bzero(&msg, sizeof (msg));
+	bzero(&uio, sizeof (uio));
+
+	len = nseg = 0;
+	for (mbuf = mbuf_head;
+	     mbuf != NULL;
+	     mbuf = mbuf->m_next) {
+		nseg++;
+		len += mbuf->m_len;
+	}
+
+	if (nseg <= SMB_LOCAL_IOV_MAX) {
+		uio.uio_iov = iov_local;
+		uio.uio_iovcnt = SMB_LOCAL_IOV_MAX;
+	} else {
+		vdb = kmem_alloc(sizeof (*vdb), KM_SLEEP);
+		uio.uio_iov = &vdb->vdb_iovec[0];
+		uio.uio_iovcnt = MAX_IOVEC;
+	}
+	uio.uio_resid = len;
+
+	rc = smb_mbuf_mkuio(mbuf_head, &uio);
+	if (rc != 0)
+		goto out;
 
 	DTRACE_PROBE1(send__wait__start, struct smb_session_t *, s);
 
 	/*
 	 * Wait for our turn to send.
 	 */
+	txl = &s->s_txlst;
 	mutex_enter(&txl->tl_mutex);
 	while (txl->tl_active)
 		cv_wait(&txl->tl_wait_cv, &txl->tl_mutex);
@@ -300,14 +412,13 @@ smb_net_send_uio(smb_session_t *s, struct uio *uio)
 	 * This should block until we've sent it all,
 	 * or given up due to errors (socket closed).
 	 */
-	bzero(&msg, sizeof (msg));
-	msg.msg_iov = uio->uio_iov;
-	msg.msg_iovlen = uio->uio_iovcnt;
-	while (uio->uio_resid > 0) {
+	msg.msg_iov = uio.uio_iov;
+	msg.msg_iovlen = uio.uio_iovcnt;
+	while (uio.uio_resid > 0) {
 		rc = ksocket_sendmsg(s->sock, &msg, 0, &sent, CRED());
 		if (rc != 0)
 			break;
-		uio->uio_resid -= sent;
+		uio.uio_resid -= sent;
 	}
 
 	mutex_enter(&txl->tl_mutex);
@@ -315,5 +426,43 @@ smb_net_send_uio(smb_session_t *s, struct uio *uio)
 	cv_signal(&txl->tl_wait_cv);
 	mutex_exit(&txl->tl_mutex);
 
+out:	
+	if (vdb != NULL)
+		kmem_free(vdb, sizeof (*vdb));
+	m_freem(mbuf_head);
+	return (rc);
+}
+
+/*
+ * This has an optional code path calling ksocket_sendmblk,
+ * which is faster than ksocket_sendmsg (UIO copying) in some
+ * configurations, but needs work before it's uniformly faster.
+ * In particular, the ksocket_sendmblk code path probably needs
+ * to do more like socopyinuio etc, checking the send socket
+ * SO_SND_BUFINFO, SO_SND_COPYAVOID, etc. to find out what is
+ * the preferred MSS, header space, copying preference, etc.
+ *
+ * As it is, this works well with some NIC drivers, particularly
+ * with MTU=9000 as is typical in high performance setups, so
+ * this remains available via this tunable for now.
+ */
+int smb_send_mblks = 0;
+
+/*
+ * smb_net_send_mbufs
+ *
+ * Send the buf chain using either mblk encapsulation (zero-copy)
+ * or via scatter/gather UIO vector, based on the setting.
+ */
+int
+smb_net_send_mbufs(smb_session_t *s, mbuf_t *mbuf_head)
+{
+	int rc;
+
+	if (smb_send_mblks != 0) {
+		rc = smb_net_send_mblks(s, mbuf_head);
+	} else {
+		rc = smb_net_send_uio(s, mbuf_head);
+	}
 	return (rc);
 }

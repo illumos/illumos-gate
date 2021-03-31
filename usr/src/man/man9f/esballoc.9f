@@ -14,16 +14,16 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ESBALLOC 9F "Apr 24, 2021"
+.TH ESBALLOC 9F "Aug 17, 2022"
 .SH NAME
 esballoc, desballoc esballoca, desballoca \-
 allocate a message block using a caller-supplied buffer
 .SH SYNOPSIS
 .nf
 #include <sys/stream.h>
-
-
-
+.fi
+.LP
+.nf
 \fBmblk_t *\fR\fBesballoc\fR(\fBuchar_t *\fR\fIbase\fR, \fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR,
      \fBfrtn_t *\fR\fIfr_rtnp\fR);
 .fi
@@ -48,6 +48,17 @@ allocate a message block using a caller-supplied buffer
 \fBmblk_t *\fR\fBdesballoca\fR(\fBuchar_t *\fR\fIbase\fR, \fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR,
      \fBfrtn_t *\fR\fIfr_rtnp\fR);
 .fi
+.LP
+.nf
+\fBmblk_t *\fR\fBesballoc_wait\fR(\fBuchar_t *\fR\fIbase\fR, \fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR,
+     \fBfrtn_t *\fR\fIfr_rtnp\fR);
+.fi
+
+.LP
+.nf
+\fBmblk_t *\fR\fBesballoca_wait\fR(\fBuchar_t *\fR\fIbase\fR, \fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR,
+     \fBfrtn_t *\fR\fIfr_rtnp\fR);
+.fi
 
 .SH INTERFACE LEVEL
 \fBesballoc()\fR: Architecture independent level 1 (DDI/DKI)
@@ -57,6 +68,11 @@ allocate a message block using a caller-supplied buffer
 \fBesballoca()\fR: illumos DDI specific (illumos DDI)
 \fBdesballoc()\fR: illumos DDI specific (illumos DDI)
 \fBdesballoca()\fR: illumos DDI specific (illumos DDI)
+.sp
+.LP
+.nf
+\fBesballoc_wait()\fR: Volatile (private DDI function)
+\fBesballoca_wait()\fR: Volatile (private DDI function)
 .fi
 .SH PARAMETERS
 .ne 2
@@ -147,13 +163,31 @@ synchronization primitives that include an interrupt priority returned from
 \fBddi_intr_get_pri\fR(9F) or \fBddi_intr_get_softint_pri\fR(9F). If any of
 these restrictions are not followed, the possibility of lock recursion or
 deadlock exists.
+.sp
+.LP
+The variants ending with 'a' (\fBesballoca()\fR or \fBdesballoca()\fR
+add an "extra" ref to the dblk returned, also setting an internal flag
+so that \fBfreeb\fR(9F) handles the extra ref.  The point of this
+extra ref is so that any streams code handling this data block knows
+that the data should not be modified without taking a copy.  This is
+used by callers sending external buffers that must not be modified.
+.sp
+.LP
+The variants ending with "_wait" do a sleeping allocation, where
+the ordinary \fBesballoc()\fR functions can return NULL when the
+system is low on free memory.
 .SH RETURN VALUES
-On success, a pointer to the newly allocated message block is returned. On
-failure, \fBNULL\fR is returned.
+On success, a pointer to the newly allocated message block is returned.
+On failure, \fBesballoc()\fR, \fBesballoca()\fR, \fBdesballoc()\fR and
+\fBdesballoca()\fR return \fBNULL\fR.
+The functions \fBesballoc_wait()\fR and \fBesballoca_wait()\fR
+do not return errors, and instead sleep until memory is available.
 .SH CONTEXT
 The \fBesballoc()\fR, \fBesballoca()\fR, \fBdesballoc()\fR and
 \fBdesballoca()\fR functions can be called from user,
 interrupt, or kernel context.
+The functions \fBesballoc_wait()\fR and \fBesballoca_wait()\fR
+can block and should not be called from interrupt context.
 .SH ATTRIBUTES
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
@@ -166,6 +200,8 @@ l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 Interface Stability	Committed
+_
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO

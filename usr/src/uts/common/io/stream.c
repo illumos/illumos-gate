@@ -977,6 +977,31 @@ esballoca(unsigned char *base, size_t size, uint_t pri, frtn_t *frp)
 	    frp, freebs_enqueue, KM_NOSLEEP));
 }
 
+/*
+ * Same as esballoca() but sleeps waiting for memory.
+ */
+mblk_t *
+esballoca_wait(unsigned char *base, size_t size, uint_t pri, frtn_t *frp)
+{
+	mblk_t *mp;
+
+	/*
+	 * Note that this is structured to allow the common case (i.e.
+	 * STREAMS flowtracing disabled) to call gesballoc() with tail
+	 * call optimization.
+	 */
+	if (!str_ftnever) {
+		mp = gesballoc(base, size, DBLK_RTFU(2, M_DATA, 0, 0),
+		    frp, freebs_enqueue, KM_SLEEP);
+
+		STR_FTALLOC(&DB_FTHDR(mp), FTEV_ESBALLOCA, size);
+		return (mp);
+	}
+
+	return (gesballoc(base, size, DBLK_RTFU(2, M_DATA, 0, 0),
+	    frp, freebs_enqueue, KM_SLEEP));
+}
+
 /*ARGSUSED*/
 mblk_t *
 desballoca(unsigned char *base, size_t size, uint_t pri, frtn_t *frp)
