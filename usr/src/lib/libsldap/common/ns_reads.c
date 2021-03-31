@@ -2052,7 +2052,7 @@ multi_result(ns_ldap_cookie_t *cookie)
 			    gettext(ldap_err2string(cookie->err_rc)));
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-			    NS_LDAP_MEMORY);
+			    LDAP_ERROR);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			return (LDAP_ERROR);
@@ -2122,7 +2122,7 @@ multi_result(ns_ldap_cookie_t *cookie)
 			    gettext(ldap_err2string(cookie->err_rc)));
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-			    NS_LDAP_MEMORY);
+			    LDAP_ERROR);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			return (LDAP_ERROR);
@@ -2380,7 +2380,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			    state);
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-			    NS_LDAP_MEMORY);
+			    LDAP_ERROR);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			cookie->new_state = EXIT;
@@ -2922,15 +2922,15 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				if (cookie->err_rc == LDAP_SERVER_DOWN) {
 					MKERROR(LOG_INFO, *errorp,
 					    cookie->err_rc, err,
-					    NS_LDAP_MEMORY);
+					    LDAP_ERROR);
 				} else {
 					MKERROR(LOG_WARNING, *errorp,
 					    cookie->err_rc, err,
-					    NS_LDAP_MEMORY);
+					    LDAP_ERROR);
 				}
 			} else {
 				MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL,
-				    err, NS_LDAP_MEMORY);
+				    err, LDAP_ERROR);
 			}
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
@@ -2954,7 +2954,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			    cookie->state);
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-			    NS_LDAP_MEMORY);
+			    LDAP_ERROR);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			return (ERROR);

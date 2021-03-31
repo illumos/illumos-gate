@@ -1,6 +1,5 @@
-/* -*- Mode: C; tab-width: 4 -*-
- *
- * Copyright (c) 2002-2018 Apple Inc. All rights reserved.
+/*
+ * Copyright (c) 2002-2019 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +16,12 @@
 
 #ifndef __mDNSDebug_h
 #define __mDNSDebug_h
+
+#include "mDNSFeatures.h"
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+#include <os/log.h>
+#endif
 
 // Set MDNS_DEBUGMSGS to 0 to optimize debugf() calls out of the compiled code
 // Set MDNS_DEBUGMSGS to 1 to generate normal debugging messages
@@ -36,21 +41,61 @@
 //    warning: double format, pointer arg (arg 2)       (for %.4a, %.16a, %#a -- IP address formats)
 #define MDNS_CHECK_PRINTF_STYLE_FUNCTIONS 0
 
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+typedef os_log_t mDNSLogCategory_t;
+
+typedef os_log_type_t mDNSLogLevel_t;
+#define MDNS_LOG_FAULT      OS_LOG_TYPE_FAULT
+#define MDNS_LOG_ERROR      OS_LOG_TYPE_ERROR
+#define MDNS_LOG_WARNING    OS_LOG_TYPE_DEFAULT
+#define MDNS_LOG_DEFAULT    OS_LOG_TYPE_DEFAULT
+#define MDNS_LOG_INFO       OS_LOG_TYPE_DEFAULT
+#define MDNS_LOG_DEBUG      OS_LOG_TYPE_DEBUG
+#else
+typedef const char * mDNSLogCategory_t;
 typedef enum
 {
-    MDNS_LOG_MSG,
-    MDNS_LOG_OPERATION,
-    MDNS_LOG_SPS,
-    MDNS_LOG_INFO,
-    MDNS_LOG_DEBUG,
+    MDNS_LOG_FAULT   = 1,
+    MDNS_LOG_ERROR   = 2,
+    MDNS_LOG_WARNING = 3,
+    MDNS_LOG_DEFAULT = 4,
+    MDNS_LOG_INFO    = 5,
+    MDNS_LOG_DEBUG   = 6
 } mDNSLogLevel_t;
+#endif
 
-// Set this symbol to 1 to answer remote queries for our Address, reverse mapping PTR, and HINFO records
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+    extern os_log_t mDNSLogCategory_Default;
+    extern os_log_t mDNSLogCategory_mDNS;
+    extern os_log_t mDNSLogCategory_uDNS;
+    extern os_log_t mDNSLogCategory_SPS;
+    extern os_log_t mDNSLogCategory_XPC;
+    extern os_log_t mDNSLogCategory_Analytics;
+    extern os_log_t mDNSLogCategory_DNSSEC;
+
+    #define MDNS_LOG_CATEGORY_DEFINITION(NAME)  mDNSLogCategory_ ## NAME
+#else
+    #define MDNS_LOG_CATEGORY_DEFINITION(NAME)  # NAME
+#endif
+
+#define MDNS_LOG_CATEGORY_DEFAULT   MDNS_LOG_CATEGORY_DEFINITION(Default)
+#define MDNS_LOG_CATEGORY_MDNS      MDNS_LOG_CATEGORY_DEFINITION(mDNS)
+#define MDNS_LOG_CATEGORY_UDNS      MDNS_LOG_CATEGORY_DEFINITION(uDNS)
+#define MDNS_LOG_CATEGORY_SPS       MDNS_LOG_CATEGORY_DEFINITION(SPS)
+#define MDNS_LOG_CATEGORY_XPC       MDNS_LOG_CATEGORY_DEFINITION(XPC)
+#define MDNS_LOG_CATEGORY_ANALYTICS MDNS_LOG_CATEGORY_DEFINITION(Analytics)
+#define MDNS_LOG_CATEGORY_DNSSEC    MDNS_LOG_CATEGORY_DEFINITION(DNSSEC)
+
+// Set this symbol to 1 to answer remote queries for our Address, and reverse mapping PTR
 #define ANSWER_REMOTE_HOSTNAME_QUERIES 0
 
 // Set this symbol to 1 to do extra debug checks on malloc() and free()
 // Set this symbol to 2 to write a log message for every malloc() and free()
-//#define MACOSX_MDNS_MALLOC_DEBUGGING 1
+// #define MDNS_MALLOC_DEBUGGING 1
+
+#if (MDNS_MALLOC_DEBUGGING > 0) && defined(WIN32)
+#error "Malloc debugging does not yet work on Windows"
+#endif
 
 //#define ForceAlerts 1
 //#define LogTimeStamps 1
@@ -94,21 +139,27 @@ extern "C" {
 
 #if (MDNS_HAS_VA_ARG_MACROS)
     #if (MDNS_C99_VA_ARGS)
-        #define debug_noop(... ) ((void)0)
-        #define LogMsg(... )           LogMsgWithLevel(MDNS_LOG_MSG, __VA_ARGS__)
-        #define LogOperation(... )     do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_OPERATION, __VA_ARGS__);} while (0)
-        #define LogSPS(... )           do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_SPS,       __VA_ARGS__);} while (0)
-        #define LogInfo(... )          do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_INFO,      __VA_ARGS__);} while (0)
-        #define LogDebug(... )         do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_DEBUG,     __VA_ARGS__);} while (0)
+        #define MDNS_LOG_DEFINITION(LEVEL, ...) \
+            do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_CATEGORY_DEFAULT, LEVEL, __VA_ARGS__); } while (0)
+
+        #define debug_noop(...)   do {} while(0)
+        #define LogMsg(...)       LogMsgWithLevel(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_DEFAULT, __VA_ARGS__)
+        #define LogOperation(...) MDNS_LOG_DEFINITION(MDNS_LOG_INFO,  __VA_ARGS__)
+        #define LogSPS(...)       MDNS_LOG_DEFINITION(MDNS_LOG_INFO,  __VA_ARGS__)
+        #define LogInfo(...)      MDNS_LOG_DEFINITION(MDNS_LOG_INFO,  __VA_ARGS__)
+        #define LogDebug(...)     MDNS_LOG_DEFINITION(MDNS_LOG_DEBUG, __VA_ARGS__)
     #elif (MDNS_GNU_VA_ARGS)
-        #define debug_noop( ARGS... ) ((void)0)
-        #define LogMsg( ARGS... )       LogMsgWithLevel(MDNS_LOG_MSG, ARGS)
-        #define LogOperation( ARGS... ) do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_OPERATION, ARGS);} while (0)
-        #define LogSPS( ARGS... )       do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_SPS,       ARGS);} while (0)
-        #define LogInfo( ARGS... )      do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_INFO,      ARGS);} while (0)
-        #define LogDebug( ARGS... )     do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_DEBUG,     ARGS);} while (0)
+        #define MDNS_LOG_DEFINITION(LEVEL, ARGS...) \
+            do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_CATEGORY_DEFAULT, LEVEL, ARGS); } while (0)
+
+        #define debug_noop(ARGS...)   do {} while (0)
+        #define LogMsg(ARGS... )      LogMsgWithLevel(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_DEFAULT, ARGS)
+        #define LogOperation(ARGS...) MDNS_LOG_DEFINITION(MDNS_LOG_INFO,  ARGS)
+        #define LogSPS(ARGS...)       MDNS_LOG_DEFINITION(MDNS_LOG_INFO,  ARGS)
+        #define LogInfo(ARGS...)      MDNS_LOG_DEFINITION(MDNS_LOG_INFO,  ARGS)
+        #define LogDebug(ARGS...)     MDNS_LOG_DEFINITION(MDNS_LOG_DEBUG, ARGS)
     #else
-        #error Unknown variadic macros
+        #error "Unknown variadic macros"
     #endif
 #else
 // If your platform does not support variadic macros, you need to define the following variadic functions.
@@ -125,6 +176,7 @@ extern void LogSPS_(const char *format, ...)       IS_A_PRINTF_STYLE_FUNCTION(1,
 extern void LogInfo_(const char *format, ...)      IS_A_PRINTF_STYLE_FUNCTION(1,2);
 extern void LogDebug_(const char *format, ...)     IS_A_PRINTF_STYLE_FUNCTION(1,2);
 #endif
+
 
 #if MDNS_DEBUGMSGS
 #define debugf debugf_
@@ -147,7 +199,7 @@ extern int mDNS_McastTracingEnabled;
 extern int mDNS_DebugMode;          // If non-zero, LogMsg() writes to stderr instead of syslog
 extern const char ProgramName[];
 
-extern void LogMsgWithLevel(mDNSLogLevel_t logLevel, const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(2,3);
+extern void LogMsgWithLevel(mDNSLogCategory_t category, mDNSLogLevel_t level, const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(3,4);
 // LogMsgNoIdent needs to be fixed so that it logs without the ident prefix like it used to
 // (or completely overhauled to use the new "log to a separate file" facility)
 #define LogMsgNoIdent LogMsg
@@ -158,19 +210,208 @@ extern void LogFatalError(const char *format, ...);
 #define LogFatalError LogMsg
 #endif
 
-#if APPLE_OSX_mDNSResponder && MACOSX_MDNS_MALLOC_DEBUGGING >= 1
-extern void *mallocL(char *msg, unsigned int size);
-extern void freeL(char *msg, void *x);
-extern void uds_validatelists(void);
-extern void udns_validatelists(void *const v);
+#if MDNS_MALLOC_DEBUGGING >= 1
+extern void *mallocL(const char *msg, mDNSu32 size);
+extern void *callocL(const char *msg, mDNSu32 size);
+extern void freeL(const char *msg, void *x);
+#if APPLE_OSX_mDNSResponder
 extern void LogMemCorruption(const char *format, ...);
 #else
-#define mallocL(X,Y) malloc(Y)
-#define freeL(X,Y) free(Y)
+#define LogMemCorruption LogMsg
+#endif
+#else
+#define mallocL(MSG, SIZE) malloc(SIZE)
+#define callocL(MSG, SIZE) calloc(1, SIZE)
+#define freeL(MSG, PTR) free(PTR)
 #endif
 
 #ifdef __cplusplus
 }
 #endif
 
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+/** @brief Write a log message to system's log storage(memory or disk).
+ *
+ *  On Apple platform, os_log() will be called to log a message.
+ *
+ *  @param CATEGORY         A custom log object previously created by the os_log_create function, and such an object is
+ *                          used to specify "subsystem" and "category". For mDNSResponder, the subsystem should always
+ *                          be set to "com.apple.mDNSResponder"; and the category is used for categorization and
+ *                          filtering of related log messages within the subsystem’s settings. We have 4 categories that
+ *                          are pre-defined: MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_CATEGORY_MDNS, MDNS_LOG_CATEGORY_UDNS,
+ *                          MDNS_LOG_CATEGORY_SPS. If these categories are not enough, use os_log_create to create more.
+ *
+ *  @param LEVEL            The log level that determines the importance of the message. The levels are, in order of
+ *                          decreasing importance:
+ *                              MDNS_LOG_FAULT      Fault-level messages are intended for capturing system-level errors
+ *                                                  that are critical to the system. They are always saved in the data store.
+ *                              MDNS_LOG_ERROR      Error-level messages are intended for reporting process-level errors
+ *                                                  that are unexpected and incorrect during the normal operation. They
+ *                                                  are always saved in the data store.
+ *                              MDNS_LOG_WARNING    Warning-level messages are intended for capturing unexpected and
+ *                                                  possible incorrect behavior that might be used later to root cause
+ *                                                  an error or fault. They are are initially stored in memory buffers
+ *                                                  and then moved to a data store.
+ *                              MDNS_LOG_DEFAULT    Default-level messages are intended for reporting things that might
+ *                                                  result a failure. They are are initially stored in memory buffers
+ *                                                  and then moved to a data store.
+ *                              MDNS_LOG_INFO       Info-level messages are intended for capturing information that may
+ *                                                  be helpful, but isn’t essential, for troubleshooting errors. They
+ *                                                  are initially stored in memory buffers, but will only be moved into
+ *                                                  data store when faults and, optionally, errors occur.
+ *                              MDNS_LOG_DEBUG      Debug-level messages are intended for information that may be useful
+ *                                                  during development or while troubleshooting a specific problem, Debug
+ *                                                  logging should not be used in shipping software. They are only
+ *                                                  captured in memory when debug logging is enabled through a
+ *                                                  configuration change.
+ *
+ *  @param FORMAT           A constant string or format string that produces a human-readable log message. The format
+ *                          string follows the IEEE printf specification, besides the following customized format specifiers:
+ *                              %{mdnsresponder:domain_name}.*P     the pointer to a DNS lable sequence
+ *                              %{mdnsresponder:ip_addr}.20P        the pointer to a mDNSAddr variable
+ *                              %{network:in_addr}.4P               the pointer to a mDNSv4Addr variable
+ *                              %{network:in6_addr}.16P             the pointer to a mDNSv6Addr variable
+ *                              %{mdnsresponder:mac_addr}.6P        the pointer to a 6-byte-length MAC address
+ *
+ *  @param ...              The parameter list that will be formated by the format string. Note that if the customized
+ *                          format specifiers are used and the data length is not specified in the format string, the
+ *                          size should be listed before the pointer to the data, for example:
+ *                              "%{mdnsresponder:domain_name}.*P", (name ? (int)DomainNameLength((const domainname *)name) : 0), <the pointer to a DNS label sequence>
+ *
+ */
+    #define LogRedact(CATEGORY, LEVEL, FORMAT, ...) os_log_with_type(CATEGORY, LEVEL, FORMAT, ## __VA_ARGS__)
+#else
+    #if (MDNS_HAS_VA_ARG_MACROS)
+        #if (MDNS_C99_VA_ARGS)
+            #define LogRedact(CATEGORY, LEVEL, ...) \
+                do { if (mDNS_LoggingEnabled) LogMsgWithLevel(CATEGORY, LEVEL, __VA_ARGS__); } while (0)
+        #elif (MDNS_GNU_VA_ARGS)
+            #define LogRedact(CATEGORY, LEVEL, ARGS...) \
+                do { if (mDNS_LoggingEnabled) LogMsgWithLevel(CATEGORY, LEVEL, ARGS); } while (0)
+        #else
+            #error "Unknown variadic macros"
+        #endif
+    #else
+        #define LogRedact      (mDNS_LoggingEnabled == 0) ? ((void)0) : LogRedact_
+        extern void LogRedact_(const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(1,2);
+    #endif
+#endif // MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+
+// The followings are the customized log specifier defined in os_log. For compatibility, we have to define it when it is
+// not on the Apple platform, for example, the Posix platform. The keyword "public" or "private" is used to control whether
+// the content would be redacted when the redaction is turned on: "public" means the content will always be printed;
+// "private" means the content will be printed as <mask.hash: '<The hashed string from binary data>'> if the redaction is turned on,
+// only when the redaction is turned off, the content will be printed as what it should be. Note that the hash performed
+// to the data is a salted hashing transformation, and the salt is generated randomly on a per-process basis, meaning
+// that hashes cannot be correlated across processes or devices.
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+    #define PUB_S "%{public}s"
+    #define PRI_S "%{private, mask.hash}s"
+#else
+    #define PUB_S "%s"
+    #define PRI_S PUB_S
 #endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+    #define PUB_DM_NAME "%{public, mdnsresponder:domain_name}.*P"
+    #define PRI_DM_NAME "%{private, mask.hash, mdnsresponder:domain_name}.*P"
+    // When DM_NAME_PARAM is used, the file where the function is defined must include DNSEmbeddedAPI.h
+    #define DM_NAME_PARAM(name) ((name) ? ((int)DomainNameLength((name))) : 0), (name)
+#else
+    #define PUB_DM_NAME "%##s"
+    #define PRI_DM_NAME PUB_DM_NAME
+    #define DM_NAME_PARAM(name) (name)
+#endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+    #define PUB_IP_ADDR "%{public, mdnsresponder:ip_addr}.20P"
+    #define PRI_IP_ADDR "%{private, mask.hash, mdnsresponder:ip_addr}.20P"
+
+    #define PUB_IPv4_ADDR "%{public, network:in_addr}.4P"
+    #define PRI_IPv4_ADDR "%{private, mask.hash, network:in_addr}.4P"
+
+    #define PUB_IPv6_ADDR "%{public, network:in6_addr}.16P"
+    #define PRI_IPv6_ADDR "%{private, mask.hash, network:in6_addr}.16P"
+#else
+    #define PUB_IP_ADDR "%#a"
+    #define PRI_IP_ADDR PUB_IP_ADDR
+
+    #define PUB_IPv4_ADDR "%.4a"
+    #define PRI_IPv4_ADDR PUB_IPv4_ADDR
+
+    #define PUB_IPv6_ADDR "%.16a"
+    #define PRI_IPv6_ADDR PUB_IPv6_ADDR
+#endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+    #define PUB_MAC_ADDR "%{public, mdnsresponder:mac_addr}.6P"
+    #define PRI_MAC_ADDR "%{private, mask.hash, mdnsresponder:mac_addr}.6P"
+#else
+    #define PUB_MAC_ADDR "%.6a"
+    #define PRI_MAC_ADDR PUB_MAC_ADDR
+#endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+    #define PUB_DNSKEY "%{public, mdns:rd.dnskey}.*P"
+    #define PRI_DNSKEY "%{private, mask.hash, mdns:rd.dnskey}.*P"
+    #define DNSKEY_PARAM(rdata, rdata_length) (rdata_length), (rdata)
+#else
+    #define PUB_DNSKEY "%p"
+    #define PRI_DNSKEY PUB_DNSKEY
+    #define DNSKEY_PARAM(rdata, rdata_length) (rdata)
+#endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+    #define PUB_DS "%{public, mdns:rd.ds}.*P"
+    #define PRI_DS "%{private, mask.hash, mdns:rd.ds}.*P"
+    #define DS_PARAM(rdata, rdata_length) (rdata_length), (rdata)
+#else
+    #define PUB_DS "%p"
+    #define PRI_DS PUB_DS
+    #define DS_PARAM(rdata, rdata_length) (rdata)
+#endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+    #define PUB_NSEC "%{public, mdns:rd.nsec}.*P"
+    #define PRI_NSEC "%{private, mask.hash, mdns:rd.nsec}.*P"
+    #define NSEC_PARAM(rdata, rdata_length) (rdata_length), (rdata)
+#else
+    #define PUB_NSEC "%p"
+    #define PRI_NSEC PUB_NSEC
+    #define NSEC_PARAM(rdata, rdata_length) (rdata)
+#endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+    #define PUB_NSEC3 "%{public, mdns:rd.nsec3}.*P"
+    #define PRI_NSEC3 "%{private, mask.hash, mdns:rd.nsec3}.*P"
+    #define NSEC3_PARAM(rdata, rdata_length) (rdata_length), (rdata)
+#else
+    #define PUB_NSEC3 "%p"
+    #define PRI_NSEC3 PUB_NSEC3
+    #define NSEC3_PARAM(rdata, rdata_length) (rdata)
+#endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+    #define PUB_RRSIG "%{public, mdns:rd.rrsig}.*P"
+    #define PRI_RRSIG "%{private, mask.hash, mdns:rd.rrsig}.*P"
+    #define RRSIG_PARAM(rdata, rdata_length) (rdata_length), (rdata)
+#else
+    #define PUB_RRSIG "%p"
+    #define PRI_RRSIG PUB_RRSIG
+    #define RRSIG_PARAM(rdata, rdata_length) (rdata)
+#endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, OS_LOG)
+    #define PUB_SVCB "%{public, mdns:rd.svcb}.*P"
+    #define PRI_SVCB "%{private, mask.hash, mdns:rd.svcb}.*P"
+    #define SVCB_PARAM(rdata, rdata_length) (rdata_length), (rdata)
+#else
+    #define PUB_SVCB "%p"
+    #define PRI_SVCB PUB_SVCB
+    #define SVCB_PARAM(rdata, rdata_length) (rdata)
+#endif
+
+extern void LogToFD(int fd, const char *format, ...);
+
+#endif // __mDNSDebug_h

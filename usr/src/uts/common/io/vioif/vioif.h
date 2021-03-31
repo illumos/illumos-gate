@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 /*
@@ -167,7 +167,9 @@ extern "C" {
 					VIRTIO_NET_F_HOST_TSO6 |	\
 					VIRTIO_NET_F_HOST_ECN |		\
 					VIRTIO_NET_F_MAC |		\
-					VIRTIO_NET_F_MTU)
+					VIRTIO_NET_F_MTU |		\
+					VIRTIO_NET_F_CTRL_VQ |		\
+					VIRTIO_NET_F_CTRL_RX)
 
 /*
  * VIRTIO NETWORK HEADER
@@ -201,6 +203,37 @@ struct virtio_net_hdr {
 #define	VIRTIO_NET_HDR_GSO_TCPV6	4
 #define	VIRTIO_NET_HDR_GSO_ECN		0x80
 
+/*
+ * VIRTIO CONTROL VIRTQUEUE HEADER
+ *
+ * This structure appears at the start of each control virtqueue request.
+ */
+struct virtio_net_ctrlq_hdr {
+	uint8_t		vnch_class;
+	uint8_t		vnch_command;
+} __packed;
+
+/*
+ * Contol Queue Classes
+ */
+#define	VIRTIO_NET_CTRL_RX		0
+
+/*
+ * CTRL_RX commands
+ */
+#define	VIRTIO_NET_CTRL_RX_PROMISC	0
+#define	VIRTIO_NET_CTRL_RX_ALLMULTI	1
+#define	VIRTIO_NET_CTRL_RX_ALLUNI	2
+#define	VIRTIO_NET_CTRL_RX_NOMULTI	3
+#define	VIRTIO_NET_CTRL_RX_NOUNI	4
+#define	VIRTIO_NET_CTRL_RX_NOBCAST	5
+
+/*
+ * Control queue ack values
+ */
+#define	VIRTIO_NET_CQ_OK		0
+#define	VIRTIO_NET_CQ_ERR		1
+
 
 /*
  * DRIVER PARAMETERS
@@ -214,6 +247,13 @@ struct virtio_net_hdr {
  */
 #define	VIRTIO_NET_TX_BUFS		256
 #define	VIRTIO_NET_RX_BUFS		256
+
+/*
+ * Initially, only use a single buf for control queue requests (when
+ * present). If this becomes a bottleneck, we can simply increase this
+ * value as necessary.
+ */
+#define	VIRTIO_NET_CTRL_BUFS		1
 
 /*
  * The virtio net header and the first buffer segment share the same DMA
@@ -261,6 +301,12 @@ struct virtio_net_hdr {
  */
 #define	VIOIF_TX_INLINE_SIZE		(2 * 1024)
 
+/*
+ * Control queue messages are very small. This is a rather arbitrary small
+ * bufer size that should be sufficiently large for any control queue
+ * messages we will send.
+ */
+#define	VIOIF_CTRL_SIZE			256
 
 /*
  * TYPE DEFINITIONS
@@ -288,6 +334,15 @@ typedef struct vioif_rxbuf {
 
 	list_node_t			rb_link;
 } vioif_rxbuf_t;
+
+typedef struct vioif_ctrlbuf {
+	vioif_t				*cb_vioif;
+
+	virtio_dma_t			*cb_dma;
+	virtio_chain_t			*cb_chain;
+
+	list_node_t			cb_link;
+} vioif_ctrlbuf_t;
 
 /*
  * Transmit buffers are also allocated in advance.  DMA memory is allocated for
@@ -346,6 +401,7 @@ struct vioif {
 
 	virtio_queue_t			*vif_rx_vq;
 	virtio_queue_t			*vif_tx_vq;
+	virtio_queue_t			*vif_ctrl_vq;
 
 	/* TX virtqueue management resources */
 	boolean_t			vif_tx_corked;
@@ -365,6 +421,9 @@ struct vioif {
 	 * was otherwise generated or set from within the guest.
 	 */
 	unsigned int			vif_mac_from_host:1;
+
+	unsigned int			vif_has_ctrlq:1;
+	unsigned int			vif_has_ctrlq_rx:1;
 
 	uint_t				vif_mtu;
 	uint_t				vif_mtu_max;
@@ -395,6 +454,11 @@ struct vioif {
 	uint_t				vif_rxcopy_thresh;
 	uint_t				vif_txcopy_thresh;
 
+	list_t				vif_ctrlbufs;
+	uint_t				vif_nctrlbufs_alloc;
+	uint_t				vif_ctrlbufs_capacity;
+	vioif_ctrlbuf_t			*vif_ctrlbufs_mem;
+
 	/*
 	 * Statistics visible through mac:
 	 */
@@ -424,6 +488,9 @@ struct vioif {
 	uint64_t			vif_txfail_indirect_limit;
 
 	uint64_t			vif_stat_tx_reclaim;
+
+	uint64_t			vif_noctrlbuf;
+	uint64_t			vif_ctrlbuf_toosmall;
 };
 
 #ifdef __cplusplus

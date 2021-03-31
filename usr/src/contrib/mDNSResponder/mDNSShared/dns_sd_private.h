@@ -1,6 +1,17 @@
-/* -*- Mode: C; tab-width: 4 -*-
- * 
- * Copyright (c) 2015-2018 Apple Inc. All rights reserved.
+/*
+ * Copyright (c) 2015-2020 Apple Inc. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #ifndef _DNS_SD_PRIVATE_H
@@ -8,9 +19,23 @@
 
 #include <dns_sd.h>
 
-// Private flags (kDNSServiceFlagsPrivateOne, kDNSServiceFlagsPrivateTwo, kDNSServiceFlagsPrivateThree, kDNSServiceFlagsPrivateFour) from dns_sd.h
+#if !defined(DNS_SD_EXCLUDE_PRIVATE_API)
+    #if defined(__APPLE__)
+        #define DNS_SD_EXCLUDE_PRIVATE_API  0
+    #else
+        #define DNS_SD_EXCLUDE_PRIVATE_API  1
+    #endif
+#endif
+
+// Private flags (kDNSServiceFlagsPrivateOne, kDNSServiceFlagsPrivateTwo, kDNSServiceFlagsPrivateThree, kDNSServiceFlagsPrivateFour, kDNSServiceFlagsPrivateFive) from dns_sd.h
 enum
 {
+    kDNSServiceFlagsDenyConstrained        = 0x2000,
+    /*
+     * This flag is meaningful only for Unicast DNS queries. When set, the daemon will restrict
+     * DNS resolutions on interfaces defined as constrained for that request.
+     */
+
     kDNSServiceFlagsDenyCellular           = 0x8000000,
     /*
      * This flag is meaningful only for Unicast DNS queries. When set, the daemon will restrict
@@ -36,8 +61,7 @@ enum
      */
 };
 
-
-#if !DNSSD_NO_CREATE_DELEGATE_CONNECTION
+#if !DNS_SD_EXCLUDE_PRIVATE_API
 /* DNSServiceCreateDelegateConnection()
  *
  * Parameters:
@@ -61,7 +85,6 @@ enum
  */
 DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceCreateDelegateConnection(DNSServiceRef *sdRef, int32_t pid, uuid_t uuid);
-#endif
 
 // Map the source port of the local UDP socket that was opened for sending the DNS query
 // to the process ID of the application that triggered the DNS resolution.
@@ -89,7 +112,50 @@ DNSServiceErrorType DNSSD_API DNSServiceGetPID
 DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceSetDefaultDomainForUser(DNSServiceFlags flags, const char *domain);
 
+SPI_AVAILABLE(macos(10.15.4), ios(13.2.2), watchos(6.2), tvos(13.2))
+DNSServiceErrorType DNSSD_API DNSServiceSleepKeepalive_sockaddr
+(
+    DNSServiceRef *                 sdRef,
+    DNSServiceFlags                 flags,
+    const struct sockaddr *         localAddr,
+    const struct sockaddr *         remoteAddr,
+    unsigned int                    timeout,
+    DNSServiceSleepKeepaliveReply   callBack,
+    void *                          context
+);
+
+/*!
+ *  @brief
+ *      Sets the default DNS resolver settings for the caller's process.
+ *
+ *  @param plist_data_ptr
+ *      Pointer to an nw_resolver_config's binary property list data.
+ *
+ *  @param plist_data_len
+ *      Byte-length of the binary property list data. Ignored if plist_data_ptr is NULL.
+ *
+ *  @param require_encryption
+ *      Pass true if the process requires that DNS queries use an encrypted DNS service, such as DNS over HTTPS.
+ *
+ *  @result
+ *      This function returns kDNSServiceErr_NoError on success, kDNSServiceErr_Invalid if plist_data_len
+ *      exceeds 32,768, and kDNSServiceErr_NoMemory if it fails to allocate memory.
+ *
+ *  @discussion
+ *      These settings only apply to the calling process's DNSServiceGetAddrInfo and DNSServiceQueryRecord
+ *      requests. This function exists for code that may still use the legacy DNS-SD API for resolving
+ *      hostnames, i.e., it implements the functionality of dnssd_getaddrinfo_set_need_encrypted_query(), but at
+ *      a process-wide level of granularity.
+ *
+ *      Due to underlying IPC limitations, there's currently a 32 KB limit on the size of the binary property
+ *      list data.
+ */
+SPI_AVAILABLE(macos(10.16), ios(14.0), watchos(7.0), tvos(14.0))
+DNSServiceErrorType DNSSD_API DNSServiceSetResolverDefaults(const void *plist_data_ptr, size_t plist_data_len,
+    bool require_encryption);
+#endif  // !DNS_SD_EXCLUDE_PRIVATE_API
+
 #define kDNSServiceCompPrivateDNS   "PrivateDNS"
 #define kDNSServiceCompMulticastDNS "MulticastDNS"
 
-#endif
+#endif  // _DNS_SD_PRIVATE_H

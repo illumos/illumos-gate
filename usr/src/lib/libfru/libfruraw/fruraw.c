@@ -549,10 +549,17 @@ frt_get_segment_name(fru_seghdl_t node, char **name)
 
 		for (each_seg = 0; each_seg < num_segment; each_seg++) {
 			if (segs[each_seg].handle == node) {
-				segs[each_seg].name[FRU_SEGNAMELEN] = '\0';
-				*name = strdup(segs[each_seg].name);
+				*name = malloc(SEG_NAME_LEN + 1);
+				if (*name != NULL) {
+					(void) memcpy(*name,
+					    segs[each_seg].name,
+					    SEG_NAME_LEN);
+					*name[SEG_NAME_LEN] = '\0';
+				}
 				free(sects);
 				free(segs);
+				if (*name == NULL)
+					return (FRU_FAILURE);
 				return (FRU_SUCCESS);
 			}
 		}

@@ -1,6 +1,5 @@
-/* -*- Mode: C; tab-width: 4 -*-
- *
- * Copyright (c) 2002-2013 Apple Computer, Inc. All rights reserved.
+/*
+ * Copyright (c) 2002-2020 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +19,13 @@
 
 #include "mDNSEmbeddedAPI.h"
 #include "DNSCommon.h"
+#include <sys/types.h>
+#include "dns_sd.h"
+
+#if MDNSRESPONDER_SUPPORTS(COMMON, DNS_PUSH)
+#include "dso.h"
+#include "dso-transport.h"
+#endif
 
 #ifdef  __cplusplus
 extern "C" {
@@ -32,7 +38,6 @@ extern "C" {
 //#define MAX_UCAST_POLL_INTERVAL (1 * 60 * mDNSPlatformOneSecond)
 #define LLQ_POLL_INTERVAL       (15 * 60 * mDNSPlatformOneSecond) // Polling interval for zones w/ an advertised LLQ port (ie not static zones) if LLQ fails due to NAT, etc.
 #define RESPONSE_WINDOW (60 * mDNSPlatformOneSecond)         // require server responses within one minute of request
-#define MAX_DNSSEC_UNANSWERED_QUERIES 1                      // number of unanswered queries from any one uDNS server before turning off DNSSEC Validation
 #define MAX_UCAST_UNANSWERED_QUERIES 2                       // number of unanswered queries from any one uDNS server before trying another server
 #define DNSSERVER_PENALTY_TIME (60 * mDNSPlatformOneSecond)  // number of seconds for which new questions don't pick this server
 
@@ -66,14 +71,34 @@ extern "C" {
 // then use the default value of 30 seconds
 #define DEFAULT_UDNS_TIMEOUT    30 // in seconds
 
-// For questions that are validating responses (q->ValidatingResponse == 1), use 10 seconds
-// which accomodates two DNS servers and two queries per DNS server.
-#define DEFAULT_UDNSSEC_TIMEOUT    10 // in seconds
+#if MDNSRESPONDER_SUPPORTS(COMMON, DNS_PUSH)
+// Push notification structures
+struct mDNS_DNSPushNotificationServer
+{
+    dso_connect_state_t       *connectInfo;       // DSO Connection state information
+    dso_state_t               *connection;        // DNS Stateful Operations/TCP Connection pointer, might be null.
+    mDNSu32                    numberOfQuestions; // Number of questions for this server
+    DNSPushServer_ConnectState connectState;      // Current status of connection attempt to this server
+    mDNSs32                    lastDisconnect;    // Last time we got a disconnect, used to avoid constant reconnects
+    domainname                 serverName;        // The hostname returned by the _dns-push-tls._tcp.<zone> SRV lookup
+    mDNSIPPort                 port;              // The port from the SRV lookup
+#if MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
+    mdns_dns_service_t         dnsservice;
+#else
+    DNSServer                 *qDNSServer;        // DNS server stolen from the question that created this server structure.
+#endif
+    mDNS                      *m;
+    DNSPushNotificationServer *next;
+} ;
 
-// If we are sending queries with EDNS0/DO option and we have no indications that the server
-// is DNSSEC aware and we have already reached MAX_DNSSEC_RETRANSMISSIONS, we disable
-// validation (for optional case only) for any questions that uses this server
-#define MAX_DNSSEC_RETRANSMISSIONS 3
+struct mDNS_DNSPushNotificationZone
+{
+    domainname zoneName;
+    DNSPushNotificationServer *server; // DNS Push Notification Servers for this zone
+    mDNSu32 numberOfQuestions;          // Number of questions for this zone
+    DNSPushNotificationZone *next;
+} ;
+#endif
 
 // Entry points into unicast-specific routines
 
@@ -81,10 +106,15 @@ extern void LLQGotZoneData(mDNS *const m, mStatus err, const ZoneData *zoneInfo)
 extern void startLLQHandshake(mDNS *m, DNSQuestion *q);
 extern void sendLLQRefresh(mDNS *m, DNSQuestion *q);
 
+#if MDNSRESPONDER_SUPPORTS(COMMON, DNS_PUSH)
 extern void DNSPushNotificationGotZoneData(mDNS *const m, mStatus err, const ZoneData *zoneInfo);
 extern void DiscoverDNSPushNotificationServer(mDNS *m, DNSQuestion *q);
-extern void SubscribeToDNSPushNotificationServer(mDNS *m, DNSQuestion *q);
+extern DNSPushNotificationServer *GetConnectionToDNSPushNotificationServer(mDNS *m, DNSQuestion *q);
+extern DNSPushNotificationServer *SubscribeToDNSPushNotificationServer(mDNS *m, DNSQuestion *q);
 extern void UnSubscribeToDNSPushNotificationServer(mDNS *m, DNSQuestion *q);
+extern void DNSPushReconcileConnection(mDNS *m, DNSQuestion *q);
+extern void DNSPushServerDrop(DNSPushNotificationServer *server);
+#endif
 
 extern void SleepRecordRegistrations(mDNS *m);
 
@@ -106,7 +136,6 @@ extern mStatus mDNS_StartNATOperation_internal(mDNS *const m, NATTraversalInfo *
 extern void RecordRegistrationGotZoneData(mDNS *const m, mStatus err, const ZoneData *zoneData);
 extern mStatus uDNS_DeregisterRecord(mDNS *const m, AuthRecord *const rr);
 extern const domainname *GetServiceTarget(mDNS *m, AuthRecord *const rr);
-extern void uDNS_CheckCurrentQuestion(mDNS *const m);
 
 // integer fields of msg header must be in HOST byte order before calling this routine
 extern void uDNS_ReceiveMsg(mDNS *const m, DNSMessage *const msg, const mDNSu8 *const end,
@@ -128,7 +157,7 @@ extern mStatus         uDNS_SetupDNSConfig(mDNS *const m);
 extern void uDNS_SetupWABQueries(mDNS *const m);
 extern void uDNS_StartWABQueries(mDNS *const m, int queryType);
 extern void uDNS_StopWABQueries(mDNS *const m, int queryType);
-extern domainname      *uDNS_GetNextSearchDomain(mDNSInterfaceID InterfaceID, mDNSs8 *searchIndex, mDNSBool ignoreDotLocal);
+extern domainname      *uDNS_GetNextSearchDomain(mDNSInterfaceID InterfaceID, int *searchIndex, mDNSBool ignoreDotLocal);
     
 extern void uDNS_RestartQuestionAsTCP(mDNS *m, DNSQuestion *const q, const mDNSAddr *const srcaddr, const mDNSIPPort srcport);
 
@@ -150,10 +179,14 @@ extern void uDNS_ReceiveNATPacket(mDNS *m, const mDNSInterfaceID InterfaceID, mD
 extern void natTraversalHandleAddressReply(mDNS *const m, mDNSu16 err, mDNSv4Addr ExtAddr);
 extern void natTraversalHandlePortMapReply(mDNS *const m, NATTraversalInfo *n, const mDNSInterfaceID InterfaceID, mDNSu16 err, mDNSIPPort extport, mDNSu32 lease, NATTProtocol protocol);
 
+#if MDNSRESPONDER_SUPPORTS(COMMON, DNS_PUSH)
 // DNS Push Notification
 extern void SubscribeToDNSPushNotification(mDNS *m, DNSQuestion *q);
+#endif
 
-
+extern CacheRecord* mDNSCoreReceiveCacheCheck(mDNS *const m, const DNSMessage *const response, uDNS_LLQType LLQType,
+											  const mDNSu32 slot, CacheGroup *cg,
+                                              CacheRecord ***cfp, mDNSInterfaceID InterfaceID);
 #ifdef  __cplusplus
 }
 #endif

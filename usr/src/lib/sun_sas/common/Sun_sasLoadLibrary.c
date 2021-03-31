@@ -27,6 +27,11 @@
 
 #include <sun_sas.h>
 
+mutex_t all_hbas_lock = DEFAULTMUTEX;
+mutex_t open_handles_lock = DEFAULTMUTEX;
+HBA_UINT16 open_handle_index;
+HBA_UINT32 hba_count;
+
 /*
  * Loads the HBA Library.  Must be called before calling any HBA library
  * functions
@@ -53,23 +58,17 @@ HBA_STATUS Sun_sasLoadLibrary() {
 	}
 	hba_count = 0;
 	open_handle_index = 1;
-	/* Initialize the read-write lock */
-	if (mutex_init(&all_hbas_lock, USYNC_THREAD, NULL)) {
-	    log(LOG_DEBUG, ROUTINE,
-		"Unable to initialize lock in LoadLibrary for reason \"%s\"",
-		strerror(errno));
-	    return (HBA_STATUS_ERROR);
-	}
+
 	/* grab write lock */
 	lock(&all_hbas_lock);
 
 	start = gethrtime();
 	if ((root = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
-	    log(LOG_DEBUG, ROUTINE,
-		"Unable to load device tree for reason \"%s\"",
-		strerror(errno));
-	    unlock(&all_hbas_lock);
-	    return (HBA_STATUS_ERROR);
+		log(LOG_DEBUG, ROUTINE,
+		    "Unable to load device tree: \"%s\"",
+		    strerror(errno));
+		unlock(&all_hbas_lock);
+		return (HBA_STATUS_ERROR);
 	}
 	end = gethrtime();
 	duration = end - start;
@@ -79,9 +78,9 @@ HBA_STATUS Sun_sasLoadLibrary() {
 
 	/* At load time, we only gather libdevinfo information */
 	if (devtree_get_all_hbas(root) == HBA_STATUS_OK) {
-	    atLeastOneHBA = B_TRUE;
+		atLeastOneHBA = B_TRUE;
 	} else {
-	    atLeastOneFailure = B_TRUE;
+		atLeastOneFailure = B_TRUE;
 	}
 
 	di_fini(root);
@@ -90,13 +89,14 @@ HBA_STATUS Sun_sasLoadLibrary() {
 
 	/* Now determine what status code to return */
 	if (atLeastOneHBA) {
-	    /* We've got at least one HBA and possibly some failures */
-	    return (HBA_STATUS_OK);
-	} else if (atLeastOneFailure) {
-	    /* We have no HBAs but have failures */
-	    return (HBA_STATUS_ERROR);
-	} else {
-	    /* We have no HBAs and no failures */
-	    return (HBA_STATUS_OK);
+		/* We've got at least one HBA and possibly some failures */
+		return (HBA_STATUS_OK);
 	}
+	if (atLeastOneFailure) {
+		/* We have no HBAs but have failures */
+		return (HBA_STATUS_ERROR);
+	}
+
+	/* We have no HBAs and no failures */
+	return (HBA_STATUS_OK);
 }

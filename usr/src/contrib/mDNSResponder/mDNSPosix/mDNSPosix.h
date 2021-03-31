@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 4 -*-
+/* -*- Mode: C; tab-width: 4; c-file-style: "bsd"; c-basic-offset: 4; fill-column: 108; indent-tabs-mode: nil; -*-
  *
  * Copyright (c) 2002-2004 Apple Computer, Inc. All rights reserved.
  *
@@ -35,7 +35,7 @@ typedef struct PosixNetworkInterface PosixNetworkInterface;
 
 struct PosixNetworkInterface
 {
-    NetworkInterfaceInfo coreIntf;		// MUST be the first element in this structure
+    NetworkInterfaceInfo coreIntf;      // MUST be the first element in this structure
     mDNSs32 LastSeen;
     const char *            intfName;
     PosixNetworkInterface * aliasIntf;
@@ -57,10 +57,64 @@ struct mDNS_PlatformSupport_struct
 #endif
 };
 
+// We keep a list of client-supplied event sources in PosixEventSource records
+// Add a file descriptor to the set that mDNSPosixRunEventLoopOnce() listens to.
+#define PosixEventFlag_OnList   1
+#define PosixEventFlag_Read     2
+#define PosixEventFlag_Write    4
+    
+typedef void (*mDNSPosixEventCallback)(int fd, void *context);
+struct PosixEventSource
+{
+    struct PosixEventSource *next;
+    mDNSPosixEventCallback readCallback;
+    mDNSPosixEventCallback writeCallback;
+    const char *readTaskName;
+    const char *writeTaskName;
+    void *readContext;
+    void *writeContext;
+    int fd;
+    unsigned flags;
+};
+typedef struct PosixEventSource PosixEventSource;
+    
+struct TCPSocket_struct
+{
+    mDNSIPPort port;            // MUST BE FIRST FIELD -- mDNSCore expects every TCPSocket_struct to begin with mDNSIPPort
+    TCPSocketFlags flags;       // MUST BE SECOND FIELD -- mDNSCore expects every TCPSocket_struct have TCPSocketFlags flags after mDNSIPPort
+    TCPConnectionCallback callback;
+    PosixEventSource events;
+    // SSL context goes here.
+    domainname *hostname;
+    mDNSAddr remoteAddress;
+    mDNSIPPort remotePort;
+    void *context;
+    mDNSBool setup;
+    mDNSBool connected;
+    mStatus err;
+};
+
+struct TCPListener_struct
+{
+    TCPAcceptedCallback callback;
+    PosixEventSource events;
+    void *context;
+    mDNSAddr_Type addressType;
+    TCPSocketFlags socketFlags;
+};
+    
 #define uDNS_SERVERS_FILE "/etc/resolv.conf"
 extern int ParseDNSServers(mDNS *m, const char *filePath);
 extern mStatus mDNSPlatformPosixRefreshInterfaceList(mDNS *const m);
 // See comment in implementation.
+
+// Get the next upcoming mDNS (or DNS) event time as a posix timeval that can be passed to select.
+// This will only update timeout if the next mDNS event is sooner than the value that was passed.
+// Therefore, use { FutureTime, 0 } as an initializer if no other timer events are being managed.
+extern void mDNSPosixGetNextDNSEventTime(mDNS *m, struct timeval *timeout);
+
+// Returns all the FDs that the posix I/O event system expects to be passed to select.
+extern void mDNSPosixGetFDSetForSelect(mDNS *m, int *nfds, fd_set *readfds, fd_set *writefds);
 
 // Call mDNSPosixGetFDSet before calling select(), to update the parameters
 // as may be necessary to meet the needs of the mDNSCore code.
@@ -68,13 +122,18 @@ extern mStatus mDNSPlatformPosixRefreshInterfaceList(mDNS *const m);
 // Set timeout->tv_sec to FutureTime if you want to have effectively no timeout
 // After calling mDNSPosixGetFDSet(), call select(nfds, &readfds, NULL, NULL, &timeout); as usual
 // After select() returns, call mDNSPosixProcessFDSet() to let mDNSCore do its work
-extern void mDNSPosixGetFDSet(mDNS *m, int *nfds, fd_set *readfds, struct timeval *timeout);
-extern void mDNSPosixProcessFDSet(mDNS *const m, fd_set *readfds);
+// mDNSPosixGetFDSet simply calls mDNSPosixGetNextDNSEventTime and then mDNSPosixGetFDSetForSelect.
+extern void mDNSPosixGetFDSet(mDNS *m, int *nfds, fd_set *readfds, fd_set *writefds, struct timeval *timeout);
 
-typedef void (*mDNSPosixEventCallback)(int fd, short filter, void *context);
+
+extern void mDNSPosixProcessFDSet(mDNS *const m, fd_set *readfds, fd_set *writefds);
 
 extern mStatus mDNSPosixAddFDToEventLoop( int fd, mDNSPosixEventCallback callback, void *context);
 extern mStatus mDNSPosixRemoveFDFromEventLoop( int fd);
+extern mStatus mDNSPosixListenForSignalInEventLoop( int signum);
+extern mStatus mDNSPosixIgnoreSignalInEventLoop( int signum);
+extern mStatus mDNSPosixRunEventLoopOnce( mDNS *m, const struct timeval *pTimeout, sigset_t *pSignalsReceived, mDNSBool *pDataDispatched);
+
 extern mStatus mDNSPosixListenForSignalInEventLoop( int signum);
 extern mStatus mDNSPosixIgnoreSignalInEventLoop( int signum);
 extern mStatus mDNSPosixRunEventLoopOnce( mDNS *m, const struct timeval *pTimeout, sigset_t *pSignalsReceived, mDNSBool *pDataDispatched);

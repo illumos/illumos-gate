@@ -24,6 +24,7 @@
 #include <limits.h>
 #include <ctype.h>
 #include <krb5defs.h>
+#include <stdarg.h>
 
 /*
  * If we want to write *to* the client rdist program, *from* the server
@@ -33,15 +34,15 @@
  */
 int wrem = 1;
 
-#define	ack() 	(void) write(wrem, "\0\n", 2)
-#define	err() 	(void) write(wrem, "\1\n", 2)
+#define	ack()	(void) write(wrem, "\0\n", 2)
+#define	err()	(void) write(wrem, "\1\n", 2)
 
 /*
  * Set when a desread() is reqd. in response()
  */
 
 struct	linkbuf *ihead;		/* list of files with more than one link */
-char	buf[RDIST_BUFSIZ];	/* general purpose buffer */
+extern char	buf[RDIST_BUFSIZ];	/* general purpose buffer */
 char	source[RDIST_BUFSIZ];	/* base source directory name */
 char	destination[RDIST_BUFSIZ];	/* base destination directory name */
 char	target[RDIST_BUFSIZ];	/* target/source directory name */
@@ -53,15 +54,15 @@ int	oumask;			/* old umask for creating files */
 
 extern	FILE *lfp;		/* log file for mailing changes */
 
-void	cleanup();
-struct	linkbuf *savelink();
-char	*strsub();
+void	cleanup(int);
+struct linkbuf *savelink(struct stat *, int);
+char	*strsub(char *, char *, char *);
 
-static void comment(char *s);
-static void note();
+static void comment(char *);
+static void note(char *, ...);
 static void hardlink(char *cmd);
-void error();
-void log();
+void error(char *, ...);
+void log(FILE *, char *, ...);
 static void recursive_remove(struct stat *stp);
 static void recvf(char *cmd, int type);
 static void query(char *name);
@@ -78,10 +79,10 @@ static void clean(char *cp);
  *	Qname	- Query if file exists. Return mtime & size if it does.
  */
 void
-server()
+server(void)
 {
 	char cmdbuf[RDIST_BUFSIZ];
-	register char *cp;
+	char *cp;
 
 	signal(SIGHUP, cleanup);
 	signal(SIGINT, cleanup);
@@ -105,7 +106,7 @@ server()
 		}
 		do {
 			if (read(rem, cp, 1) != 1)
-				cleanup();
+				cleanup(0);
 		} while (*cp++ != '\n' && cp < &cmdbuf[RDIST_BUFSIZ]);
 		*--cp = '\0';
 		cp = cmdbuf;
@@ -231,9 +232,7 @@ server()
  * (i.e., more than one source is being copied to the same destination).
  */
 void
-install(src, dest, destdir, opts)
-	char *src, *dest;
-	int destdir, opts;
+install(char *src, char *dest, int destdir, int opts)
 {
 	char *rname;
 	char destcopy[RDIST_BUFSIZ];
@@ -245,10 +244,10 @@ install(src, dest, destdir, opts)
 
 	if (nflag || debug) {
 		printf("%s%s%s%s%s %s %s\n", opts & VERIFY ? "verify":"install",
-			opts & WHOLE ? " -w" : "",
-			opts & YOUNGER ? " -y" : "",
-			opts & COMPARE ? " -b" : "",
-			opts & REMOVE ? " -R" : "", src, dest);
+		    opts & WHOLE ? " -w" : "",
+		    opts & YOUNGER ? " -y" : "",
+		    opts & COMPARE ? " -b" : "",
+		    opts & REMOVE ? " -R" : "", src, dest);
 		if (nflag)
 			return;
 	}
@@ -311,11 +310,9 @@ install(src, dest, destdir, opts)
  * rname is the name of the file on the remote host.
  */
 void
-sendf(rname, opts)
-	char *rname;
-	int opts;
+sendf(char *rname, int opts)
 {
-	register struct subcmd *sc;
+	struct subcmd *sc;
 	struct stat stb;
 	int sizerr, f, u, len;
 	off_t i;
@@ -348,14 +345,14 @@ sendf(rname, opts)
 	if (pw == NULL || pw->pw_uid != stb.st_uid)
 		if ((pw = getpwuid(stb.st_uid)) == NULL) {
 			log(lfp, "%s: no password entry for uid %d \n",
-				target, stb.st_uid);
+			    target, stb.st_uid);
 			pw = NULL;
 			sprintf(user, ":%d", stb.st_uid);
 		}
 	if (gr == NULL || gr->gr_gid != stb.st_gid)
 		if ((gr = getgrgid(stb.st_gid)) == NULL) {
 			log(lfp, "%s: no name for group %d\n",
-				target, stb.st_gid);
+			    target, stb.st_gid);
 			gr = NULL;
 			sprintf(group, ":%d", stb.st_gid);
 		}
@@ -401,7 +398,7 @@ sendf(rname, opts)
 			if ((int)(len + 1 + strlen(dp->d_name)) >=
 			    (int)(RDIST_BUFSIZ - 1)) {
 				error("%.*s/%s: Name too long\n", len, target,
-					dp->d_name);
+				    dp->d_name);
 				continue;
 			}
 			tp = otp;
@@ -505,8 +502,8 @@ sendf(rname, opts)
 		return;
 	}
 	(void) snprintf(buf, sizeof (buf), "R%o %o %ld %ld %s %s %s\n", opts,
-		stb.st_mode & 07777, stb.st_size, stb.st_mtime,
-		protoname(), protogroup(), rname);
+	    stb.st_mode & 07777, stb.st_size, stb.st_mtime,
+	    protoname(), protogroup(), rname);
 	if (debug)
 		printf("buf = %s", buf);
 	(void) deswrite(rem, buf, strlen(buf), 0);
@@ -557,9 +554,7 @@ dospecial:
 }
 
 struct linkbuf *
-savelink(stp, opts)
-	struct stat *stp;
-	int opts;
+savelink(struct stat *stp, int opts)
 {
 	struct linkbuf *lp;
 
@@ -600,18 +595,15 @@ savelink(stp, opts)
  * and 3 if comparing binaries to determine if out of date.
  */
 int
-update(rname, opts, stp)
-	char *rname;
-	int opts;
-	struct stat *stp;
+update(char *rname, int opts, struct stat *stp)
 {
-	register char *cp, *s;
-	register off_t size;
-	register time_t mtime;
+	char *cp, *s;
+	off_t size;
+	time_t mtime;
 
 	if (debug)
 		printf("update(%s, %x%s, %x)\n", rname, opts,
-			printb(opts, OBITS), stp);
+		    printb(opts, OBITS), stp);
 
 	/*
 	 * Check to see if the file exists on the remote machine.
@@ -731,8 +723,7 @@ more:
  *	^Aerror message\n
  */
 static void
-query(name)
-	char *name;
+query(char *name)
 {
 	struct stat stb;
 
@@ -774,11 +765,9 @@ query(name)
 }
 
 static void
-recvf(cmd, type)
-	char *cmd;
-	int type;
+recvf(char *cmd, int type)
 {
-	register char *cp;
+	char *cp;
 	int f, mode, opts, wrerr, olderrno;
 	off_t i, size;
 	time_t mtime;
@@ -843,7 +832,7 @@ recvf(cmd, type)
 			isdot = 0;
 		if (catname >= sizeof (stp) / sizeof (stp[0])) {
 			error("%s:%s: too many directory levels\n",
-				host, target);
+			    host, target);
 			return;
 		}
 		stp[catname] = tp;
@@ -915,7 +904,7 @@ recvf(cmd, type)
 		cp = buf;
 		for (i = 0; i < size; i += j) {
 			if ((j = read(rem, cp, size - i)) <= 0)
-				cleanup();
+				cleanup(0);
 			cp += j;
 		}
 		*cp = '\0';
@@ -963,7 +952,7 @@ recvf(cmd, type)
 			if (j <= 0) {
 				(void) close(f);
 				(void) unlink(new);
-				cleanup();
+				cleanup(0);
 			}
 			amt -= j;
 			cp += j;
@@ -1052,10 +1041,9 @@ badt:
  * Creat a hard link to existing file.
  */
 static void
-hardlink(cmd)
-	char *cmd;
+hardlink(char *cmd)
 {
-	register char *cp;
+	char *cp;
 	struct stat stb;
 	char *oldname;
 	int opts, exists = 0;
@@ -1097,7 +1085,7 @@ hardlink(cmd)
 	}
 	if (chkparent(target) < 0) {
 		error("%s:%s: %s (no parent)\n",
-			host, target, strerror(errno));
+		    host, target, strerror(errno));
 		return;
 	}
 	if (opts & VERIFY) {
@@ -1116,14 +1104,14 @@ hardlink(cmd)
 	}
 	if (exists && (unlink(target) < 0)) {
 		error("%s:%s: %s (unlink)\n",
-			host, target, strerror(errno));
+		    host, target, strerror(errno));
 		return;
 	}
 	if (*oldname == '~')
 		oldname = exptilde(oldnamebuf, sizeof (oldnamebuf), oldname);
 	if (link(oldname, target) < 0) {
 		error("%s:can't link %s to %s\n",
-			host, target, oldname);
+		    host, target, oldname);
 		return;
 	}
 	ack();
@@ -1133,10 +1121,9 @@ hardlink(cmd)
  * Check to see if parent directory exists and create one if not.
  */
 int
-chkparent(name)
-	char *name;
+chkparent(char *name)
 {
-	register char *cp;
+	char *cp;
 	struct stat stb;
 
 	cp = rindex(name, '/');
@@ -1161,11 +1148,9 @@ chkparent(name)
  * Change owner, group and mode of file.
  */
 int
-chog(file, owner, group, mode)
-	char *file, *owner, *group;
-	int mode;
+chog(char *file, char *owner, char *group, int mode)
 {
-	register int i;
+	int i;
 	uid_t uid, gid;
 	extern char user[];
 
@@ -1230,10 +1215,9 @@ ok:
  * machine and remove them.
  */
 static void
-rmchk(opts)
-	int opts;
+rmchk(int opts)
 {
-	register char *cp, *s;
+	char *cp, *s;
 	struct stat stb;
 
 	if (debug)
@@ -1312,11 +1296,10 @@ rmchk(opts)
  * for extraneous files and remove them.
  */
 static void
-clean(cp)
-	register char *cp;
+clean(char *cp)
 {
 	DIR *d;
-	register struct dirent *dp;
+	struct dirent *dp;
 	struct stat stb;
 	char *otp;
 	int len, opts;
@@ -1343,7 +1326,7 @@ clean(cp)
 		if ((int)(len + 1 + strlen(dp->d_name)) >=
 		    (int)(RDIST_BUFSIZ - 1)) {
 			error("%s:%s/%s: Name too long\n",
-				host, target, dp->d_name);
+			    host, target, dp->d_name);
 			continue;
 		}
 		tp = otp;
@@ -1361,7 +1344,7 @@ clean(cp)
 		cp = buf;
 		do {
 			if (read(rem, cp, 1) != 1)
-				cleanup();
+				cleanup(0);
 		} while (*cp++ != '\n' && cp < &buf[RDIST_BUFSIZ]);
 		*--cp = '\0';
 		cp = buf;
@@ -1384,12 +1367,11 @@ clean(cp)
  * or an error message.
  */
 static void
-recursive_remove(stp)
-	struct stat *stp;
+recursive_remove(struct stat *stp)
 {
 	DIR *d;
 	struct dirent *dp;
-	register char *cp;
+	char *cp;
 	struct stat stb;
 	char *otp;
 	int len;
@@ -1421,7 +1403,7 @@ recursive_remove(stp)
 		if ((int)(len + 1 + strlen(dp->d_name)) >=
 		    (int)(RDIST_BUFSIZ - 1)) {
 			error("%s:%s/%s: Name too long\n",
-				host, target, dp->d_name);
+			    host, target, dp->d_name);
 			continue;
 		}
 		tp = otp;
@@ -1452,11 +1434,10 @@ removed:
  * Execute a shell command to handle special cases.
  */
 static void
-dospecial(cmd)
-	char *cmd;
+dospecial(char *cmd)
 {
 	int fd[2], status, pid, i;
-	register char *cp, *s;
+	char *cp, *s;
 	char sbuf[RDIST_BUFSIZ];
 
 	if (pipe(fd) < 0) {
@@ -1516,81 +1497,92 @@ dospecial(cmd)
 		ack();
 }
 
-/*VARARGS2*/
 void
-log(fp, fmt, a1, a2, a3)
-	FILE *fp;
-	char *fmt;
-	int a1, a2, a3;
+log(FILE *fp, char *fmt, ...)
 {
+	va_list ap;
+
 	/* Print changes locally if not quiet mode */
-	if (!qflag)
-		printf(fmt, a1, a2, a3);
+	if (!qflag) {
+		va_start(ap, fmt);
+		vprintf(fmt, ap);
+		va_end(ap);
+	}
 
 	/* Save changes (for mailing) if really updating files */
+	va_start(ap, fmt);
 	if (!(options & VERIFY) && fp != NULL)
-		fprintf(fp, fmt, a1, a2, a3);
+		vfprintf(fp, fmt, ap);
+	va_end(ap);
 }
 
-/*VARARGS1*/
 void
-error(fmt, a1, a2, a3)
-	char *fmt;
-	int a1, a2, a3;
+error(char *fmt, ...)
 {
+	va_list ap;
 	static FILE *fp;
 
 	nerrs++;
 	if (!fp && !(fp = fdopen(rem, "w")))
 		return;
 	if (iamremote) {
+		va_start(ap, fmt);
 		(void) fprintf(fp, "%crdist: ", 0x01);
-		(void) fprintf(fp, fmt, a1, a2, a3);
+		(void) vfprintf(fp, fmt, ap);
 		fflush(fp);
+		va_end(ap);
 	} else {
+		va_start(ap, fmt);
 		fflush(stdout);
 		(void) fprintf(stderr, "rdist: ");
-		(void) fprintf(stderr, fmt, a1, a2, a3);
+		(void) vfprintf(stderr, fmt, ap);
 		fflush(stderr);
+		va_end(ap);
 	}
 	if (lfp != NULL) {
+		va_start(ap, fmt);
 		(void) fprintf(lfp, "rdist: ");
-		(void) fprintf(lfp, fmt, a1, a2, a3);
+		(void) vfprintf(lfp, fmt, ap);
 		fflush(lfp);
+		va_end(ap);
 	}
 }
 
-/*VARARGS1*/
 void
-fatal(fmt, a1, a2, a3)
-	char *fmt;
-	int a1, a2, a3;
+fatal(char *fmt, ...)
 {
+	va_list ap;
 	static FILE *fp;
 
 	nerrs++;
 	if (!fp && !(fp = fdopen(rem, "w")))
 		return;
 	if (iamremote) {
+		va_start(ap, fmt);
 		(void) fprintf(fp, "%crdist: ", 0x02);
-		(void) fprintf(fp, fmt, a1, a2, a3);
+		(void) vfprintf(fp, fmt, ap);
 		fflush(fp);
+		va_end(ap);
 	} else {
+		va_start(ap, fmt);
 		fflush(stdout);
 		(void) fprintf(stderr, "rdist: ");
-		(void) fprintf(stderr, fmt, a1, a2, a3);
+		(void) vfprintf(stderr, fmt, ap);
 		fflush(stderr);
+		va_end(ap);
 	}
 	if (lfp != NULL) {
+		va_start(ap, fmt);
 		(void) fprintf(lfp, "rdist: ");
-		(void) fprintf(lfp, fmt, a1, a2, a3);
+		(void) vfprintf(lfp, fmt, ap);
 		fflush(lfp);
+		va_end(ap);
 	}
-	cleanup();
+	cleanup(0);
 }
 
 int
-response()
+response(void)
 {
 	char *cp, *s;
 	char resp[RDIST_BUFSIZ];
@@ -1648,25 +1640,26 @@ more:
  * Remove temporary files and do any cleanup operations before exiting.
  */
 void
-cleanup()
+cleanup(int arg __unused)
 {
 	(void) unlink(Tmpfile);
 	exit(1);
 }
 
 static void
-note(fmt, a1, a2, a3)
-char *fmt;
-int a1, a2, a3;
+note(char *fmt, ...)
 {
+	va_list ap;
 	static char buf[RDIST_BUFSIZ];
-	(void) snprintf(buf, sizeof (buf) - 1, fmt, a1, a2, a3);
+
+	va_start(ap, fmt);
+	(void) vsnprintf(buf, sizeof (buf) - 1, fmt, ap);
 	comment(buf);
+	va_end(ap);
 }
 
 static void
-comment(s)
-char *s;
+comment(char *s)
 {
 	char three = '\3';
 	char nl = '\n';
@@ -1686,11 +1679,9 @@ char *s;
  * N.B.: uses buf[].
  */
 void
-sendrem(fmt, a1, a2, a3)
-char *fmt;
-int a1, a2, a3;
+sendrem(char *fmt, int a1, int a2, int a3)
 {
-	register int len;
+	int len;
 
 	buf[0] = '\0';
 	len = snprintf(buf + 1, sizeof (buf) - 1, fmt, a1, a2, a3) + 2;
@@ -1708,11 +1699,10 @@ int a1, a2, a3;
  * substring old.
  */
 char *
-strsub(old, new, s)
-	char *old, *new, *s;
+strsub(char *old, char *new, char *s)
 {
 	static char pbuf[PATH_MAX];
-	register char *p, *q, *r, *plim;
+	char *p, *q, *r, *plim;
 
 	/* prepend new to pbuf */
 	for (p = pbuf, q = new, plim = pbuf + sizeof (pbuf) - 1;

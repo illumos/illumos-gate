@@ -11,8 +11,9 @@
 .\"
 .\" Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 2019 Western Digital Corporation.
+.\" Copyright 2021 Oxide Computer Company
 .\"
-.Dd June 27, 2019
+.Dd March 24, 2021
 .Dt NVMEADM 1M
 .Os
 .Sh NAME
@@ -25,20 +26,24 @@
 .Nm
 .Op Fl dv
 .Cm list
-.Op Ar ctl[/ns][,...]
+.Oo
+.Fl p
+.Fl o Ar field Ns [,...]
+.Oc
+.Op Ar ctl[/ns] Ns [,...]
 .Nm
 .Op Fl dv
 .Cm identify
-.Ar ctl[/ns][,...]
+.Ar ctl[/ns] Ns [,...]
 .Nm
 .Op Fl dv
 .Cm get-logpage
-.Ar ctl[/ns][,...]
+.Ar ctl[/ns] Ns [,...]
 .Ar logpage
 .Nm
 .Op Fl dv
 .Cm get-features
-.Ar ctl[/ns][,...]
+.Ar ctl[/ns] Ns [,...]
 .Op Ar feature-list
 .Nm
 .Op Fl dv
@@ -180,16 +185,68 @@ logpage.
 .It Xo
 .Nm
 .Cm list
-.Op Ar ctl[/ns][,...]
+.Oo
+.Fl p
+.Fl o Ar field Ns [,...]
+.Oc
+.Op Ar ctl[/ns] Ns [,...]
 .Xc
 Lists the NVMe controllers and their namespaces in the system and
 prints a 1-line summary of their basic properties for each.
 If a list of controllers and/or namespaces is given then the listing
 is limited to those devices.
+By default, output is human-readable; however, a parsable form can
+controlled by using the following options:
+.Bl -tag -width Fl
+.It Fl p
+Rather than printing human-readable output, outputs an entry for each of
+the specified controllers and namespaces.
+If no controllers or namespaces are given as arguments, then the primary
+namespace of each controller is listed and if the
+.Fl v
+option is specified, then all of the namespaces for a controller are
+listed.
+This option requires that output fields be selected with the
+.Fl o
+option.
+.It Fl o Ar field Ns [,...]
+A comma-separated list of one or more output fields to be used.
+Fields are listed below and the name is case insensitive.
+.El
+.Pp
+The following fields can be specified when using the parsable form:
+.Bl -tag -width CAPACITY
+.It Sy MODEL
+The model number of the device, generally containing information about
+both the manufacturer and the product.
+.It Sy SERIAL
+The NVMe controller's serial number.
+.It Sy FWREV
+The controller's firmware revision.
+.It Sy VERSION
+The version of the NVMe specification the controller supports.
+.It Sy SIZE
+The logical size in bytes of the namespace.
+.It Sy CAPACITY
+The amount of logical bytes that the namespace may actually have allocated at
+any time.
+This may be different than size due to the use of thin provisioning or due to
+administrative action.
+.It Sy USED
+The number of bytes used in the namespace.
+.It Sy INSTANCE
+The name of the device node and instance of it.
+.It Sy NAMESPACE
+The numerical value of the namespace which can be used as part of other
+.Nm
+operations.
+.It Sy DISK
+The name of the disk device that corresponds to the namespace, if any.
+.El
 .It Xo
 .Nm
 .Cm identify
-.Ar ctl[/ns][,...]
+.Ar ctl[/ns] Ns [,...]
 .Xc
 Print detailed information about the specified controllers and/or
 namespaces.
@@ -202,7 +259,7 @@ admin command in the NVMe specification.
 .It Xo
 .Nm
 .Cm get-logpage
-.Ar ctl[/ns][,...]
+.Ar ctl[/ns] Ns [,...]
 .Ar logpage
 .Xc
 Print the specified log page of the specified controllers and/or namespaces.
@@ -225,7 +282,7 @@ admin command in the NVMe specification.
 .It Xo
 .Nm
 .Cm get-features
-.Ar ctl[/ns][,...]
+.Ar ctl[/ns] Ns [,...]
 .Op Ar feature-list
 .Xc
 Prints information about the specified features, or all features if

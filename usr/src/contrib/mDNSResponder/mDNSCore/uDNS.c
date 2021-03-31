@@ -1,6 +1,5 @@
-/* -*- Mode: C; tab-width: 4 -*-
- *
- * Copyright (c) 2002-2017 Apple Inc. All rights reserved.
+/*
+ * Copyright (c) 2002-2020 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +19,23 @@
  * Any dynamic run-time requirements should be handled by the platform layer below or client layer above
  */
 
-#if APPLE_OSX_mDNSResponder
-#include <TargetConditionals.h>
-#endif
 #include "uDNS.h"
 
-#if AWD_METRICS
+#if MDNSRESPONDER_SUPPORTS(APPLE, METRICS)
 #include "Metrics.h"
 #endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, SYMPTOMS)
+#include "SymptomReporter.h"
+#endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
+#include "QuerierSupport.h"
+#endif
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, DNSSECv2)
+#include "dnssec_v2.h"
+#endif // MDNSRESPONDER_SUPPORTS(APPLE, DNSSECv2)
 
 #if (defined(_MSC_VER))
 // Disable "assignment within conditional expression".
@@ -48,16 +56,14 @@ mDNSexport SearchListElem *SearchList = mDNSNULL;
 // The value can be set to true by the Platform code e.g., MacOSX uses the plist mechanism
 mDNSBool StrictUnicastOrdering = mDNSfalse;
 
+extern mDNS mDNSStorage;
+
 // We keep track of the number of unicast DNS servers and log a message when we exceed 64.
 // Currently the unicast queries maintain a 128 bit map to track the valid DNS servers for that
 // question. Bit position is the index into the DNS server list. This is done so to try all
 // the servers exactly once before giving up. If we could allocate memory in the core, then
 // arbitrary limitation of 128 DNSServers can be removed.
-mDNSu8 NumUnicastDNSServers = 0;
 #define MAX_UNICAST_DNS_SERVERS 128
-#if APPLE_OSX_mDNSResponder
-mDNSu8 NumUnreachableDNSServers = 0;
-#endif
 
 #define SetNextuDNSEvent(m, rr) { \
         if ((m)->NextuDNSEvent - ((rr)->LastAPTime + (rr)->ThisAPInterval) >= 0)                                                                              \
@@ -115,111 +121,115 @@ mDNSlocal void SetRecordRetry(mDNS *const m, AuthRecord *rr, mDNSu32 random)
 #pragma mark - Name Server List Management
 #endif
 
-#define TrueFalseStr(X) ((X) ? "true" : "false")
-
-mDNSexport DNSServer *mDNS_AddDNSServer(mDNS *const m, const domainname *d, const mDNSInterfaceID interface, const mDNSs32 serviceID, const mDNSAddr *addr,
-                                        const mDNSIPPort port, mDNSu32 scoped, mDNSu32 timeout, mDNSBool cellIntf, mDNSBool isExpensive, mDNSBool isCLAT46,
-                                        mDNSu16 resGroupID, mDNSBool reqA, mDNSBool reqAAAA, mDNSBool reqDO)
+#if !MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
+mDNSexport DNSServer *mDNS_AddDNSServer(mDNS *const m, const domainname *domain, const mDNSInterfaceID interface,
+    const mDNSs32 serviceID, const mDNSAddr *addr, const mDNSIPPort port, ScopeType scopeType, mDNSu32 timeout,
+    mDNSBool isCell, mDNSBool isExpensive, mDNSBool isConstrained, mDNSBool isCLAT46, mDNSu32 resGroupID,
+    mDNSBool usableA, mDNSBool usableAAAA, mDNSBool reqDO)
 {
-    DNSServer **p = &m->DNSServers;
-    DNSServer *tmp = mDNSNULL;
-
-    if ((NumUnicastDNSServers + 1) > MAX_UNICAST_DNS_SERVERS)
+    DNSServer **p;
+    DNSServer *server;
+    int       dnsCount = CountOfUnicastDNSServers(m);
+    if (dnsCount >= MAX_UNICAST_DNS_SERVERS)
     {
-        LogMsg("mDNS_AddDNSServer: DNS server limit of %d reached, not adding this server", MAX_UNICAST_DNS_SERVERS);
+        LogMsg("mDNS_AddDNSServer: DNS server count of %d reached, not adding this server", dnsCount);
         return mDNSNULL;
     }
 
-    if (!d)
-        d = (const domainname *)"";
+    if (!domain) domain = (const domainname *)"";
 
-    LogInfo("mDNS_AddDNSServer(%d): Adding %#a for %##s, InterfaceID %p, serviceID %u, scoped %d, resGroupID %d req_A %s, req_AAAA %s, cell %s, expensive %s, CLAT46 %s, req_DO %s",
-        NumUnicastDNSServers, addr, d->c, interface, serviceID, scoped, resGroupID,
-        TrueFalseStr(reqA), TrueFalseStr(reqAAAA), TrueFalseStr(cellIntf), TrueFalseStr(isExpensive), TrueFalseStr(isCLAT46), TrueFalseStr(reqDO));
+    LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+        "mDNS_AddDNSServer(%d): Adding " PRI_IP_ADDR " for " PRI_DM_NAME " interface " PUB_S " (%p), serviceID %u, "
+        "scopeType %d, resGroupID %u" PUB_S PUB_S PUB_S PUB_S PUB_S PUB_S PUB_S,
+        dnsCount + 1, addr, DM_NAME_PARAM(domain), InterfaceNameForID(&mDNSStorage, interface), interface, serviceID,
+        (int)scopeType, resGroupID,
+        usableA       ? ", usableA"     : "",
+        usableAAAA    ? ", usableAAAA"  : "",
+        isCell        ? ", cell"        : "",
+        isExpensive   ? ", expensive"   : "",
+        isConstrained ? ", constrained" : "",
+        isCLAT46      ? ", CLAT46"      : "",
+        reqDO         ? ", reqDO"       : "");
 
-    while (*p)  // Check if we already have this {interface,address,port,domain} tuple registered + reqA/reqAAAA bits
+    // Scan our existing list to see if we already have a matching record for this DNS resolver
+    for (p = &m->DNSServers; (server = *p) != mDNSNULL; p = &server->next)
     {
-        if ((*p)->scoped == scoped && (*p)->interface == interface && (*p)->serviceID == serviceID &&
-            mDNSSameAddress(&(*p)->addr, addr) && mDNSSameIPPort((*p)->port, port) && SameDomainName(&(*p)->domain, d) &&
-            (*p)->req_A == reqA && (*p)->req_AAAA == reqAAAA)
+        if (server->interface       != interface)       continue;
+        if (server->serviceID       != serviceID)       continue;
+        if (!mDNSSameAddress(&server->addr, addr))      continue;
+        if (!mDNSSameIPPort(server->port, port))        continue;
+        if (!SameDomainName(&server->domain, domain))   continue;
+        if (server->scopeType       != scopeType)       continue;
+        if (server->timeout         != timeout)         continue;
+        if (!server->usableA        != !usableA)        continue;
+        if (!server->usableAAAA     != !usableAAAA)     continue;
+        if (!server->isCell         != !isCell)         continue;
+        if (!(server->flags & DNSServerFlag_Delete))
         {
-            if (!((*p)->flags & DNSServer_FlagDelete))
-                debugf("Note: DNS Server %#a:%d for domain %##s (%p) registered more than once", addr, mDNSVal16(port), d->c, interface);
-            tmp = *p;
-            *p = tmp->next;
-            tmp->next = mDNSNULL;
+            debugf("Note: DNS Server %#a:%d for domain %##s (%p) registered more than once",
+                addr, mDNSVal16(port), domain->c, interface);
         }
-        else
-        {
-            p=&(*p)->next;
-        }
+        // If we found a matching record, cut it from the list
+        // (and if we’re *not* resurrecting a record that was marked for deletion, it’s a duplicate,
+        // and the debugf message signifies that we’re collapsing duplicate entries into one)
+        *p = server->next;
+        server->next = mDNSNULL;
+        break;
     }
 
-    // NumUnicastDNSServers is the count of active DNS servers i.e., ones that are not marked
-    // with DNSServer_FlagDelete. We should increment it:
-    //
-    // 1) When we add a new DNS server
-    // 2) When we resurrect a old DNS server that is marked with DNSServer_FlagDelete
-    //
-    // Don't increment when we resurrect a DNS server that is not marked with DNSServer_FlagDelete.
-    // We have already accounted for it when it was added for the first time. This case happens when
-    // we add DNS servers with the same address multiple times (mis-configuration).
-
-    if (!tmp || (tmp->flags & DNSServer_FlagDelete))
-        NumUnicastDNSServers++;
-
-
-    if (tmp)
+    // If we broke out because we found an existing matching record, advance our pointer to the end of the list
+    while (*p)
     {
-#if APPLE_OSX_mDNSResponder
-        if (tmp->flags & DNSServer_FlagDelete)
+        p = &(*p)->next;
+    }
+
+    if (server)
+    {
+        if (server->flags & DNSServerFlag_Delete)
         {
-            tmp->flags &= ~DNSServer_FlagUnreachable;
-        }
+#if MDNSRESPONDER_SUPPORTS(APPLE, SYMPTOMS)
+            server->flags &= ~DNSServerFlag_Unreachable;
 #endif
-        tmp->flags &= ~DNSServer_FlagDelete;
-        *p = tmp; // move to end of list, to ensure ordering from platform layer
+            server->flags &= ~DNSServerFlag_Delete;
+        }
+        server->isExpensive   = isExpensive;
+        server->isConstrained = isConstrained;
+        server->isCLAT46      = isCLAT46;
+        *p = server;    // Append resurrected record at end of list
     }
     else
     {
-        // allocate, add to list
-        *p = mDNSPlatformMemAllocate(sizeof(**p));
-        if (!*p)
+        server = (DNSServer *) mDNSPlatformMemAllocateClear(sizeof(*server));
+        if (!server)
         {
             LogMsg("Error: mDNS_AddDNSServer - malloc");
         }
         else
         {
-            (*p)->scoped      = scoped;
-            (*p)->interface   = interface;
-            (*p)->serviceID   = serviceID;
-            (*p)->addr        = *addr;
-            (*p)->port        = port;
-            (*p)->flags       = DNSServer_FlagNew;
-            (*p)->timeout     = timeout;
-            (*p)->cellIntf    = cellIntf;
-            (*p)->isExpensive = isExpensive;
-            (*p)->isCLAT46    = isCLAT46;
-            (*p)->req_A       = reqA;
-            (*p)->req_AAAA    = reqAAAA;
-            (*p)->req_DO      = reqDO;
-            // We start off assuming that the DNS server is not DNSSEC aware and
-            // when we receive the first response to a DNSSEC question, we set
-            // it to true.
-            (*p)->DNSSECAware = mDNSfalse;
-            (*p)->retransDO = 0;
-            AssignDomainName(&(*p)->domain, d);
-            (*p)->next = mDNSNULL;
+            server->interface     = interface;
+            server->serviceID     = serviceID;
+            server->addr          = *addr;
+            server->port          = port;
+            server->scopeType     = scopeType;
+            server->timeout       = timeout;
+            server->usableA       = usableA;
+            server->usableAAAA    = usableAAAA;
+            server->isCell        = isCell;
+            server->isExpensive   = isExpensive;
+            server->isConstrained = isConstrained;
+            server->isCLAT46      = isCLAT46;
+            AssignDomainName(&server->domain, domain);
+            *p = server; // Append new record at end of list
         }
     }
-    if (*p) {
-        (*p)->penaltyTime = 0;
-        // We always update the ID (not just when we allocate a new instance) because we could
-        // be adding a new non-scoped resolver with a new ID and we want all the non-scoped
-        // resolvers belong to the same group.
-        (*p)->resGroupID  = resGroupID;
+    if (server)
+    {
+        server->penaltyTime = 0;
+        // We always update the ID (not just when we allocate a new instance) because we want
+        // all the resGroupIDs for a particular domain to match.
+        server->resGroupID  = resGroupID;
     }
-    return(*p);
+    return(server);
 }
 
 // PenalizeDNSServer is called when the number of queries to the unicast
@@ -233,8 +243,9 @@ mDNSexport void PenalizeDNSServer(mDNS *const m, DNSQuestion *q, mDNSOpaque16 re
 
     mDNS_CheckLock(m);
 
-    LogInfo("PenalizeDNSServer: Penalizing DNS server %#a question for question %p %##s (%s) SuppressUnusable %d",
-            (q->qDNSServer ? &q->qDNSServer->addr : mDNSNULL), q, q->qname.c, DNSTypeName(q->qtype), q->SuppressUnusable);
+    LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+              "PenalizeDNSServer: Penalizing DNS server " PRI_IP_ADDR " question for question %p " PRI_DM_NAME " (" PUB_S ") SuppressUnusable %d",
+              (q->qDNSServer ? &q->qDNSServer->addr : mDNSNULL), q, DM_NAME_PARAM(&q->qname), DNSTypeName(q->qtype), q->SuppressUnusable);
 
     // If we get error from any DNS server, remember the error. If all of the servers,
     // return the error, then return the first error.
@@ -257,27 +268,34 @@ mDNSexport void PenalizeDNSServer(mDNS *const m, DNSQuestion *q, mDNSOpaque16 re
 
     if (!StrictUnicastOrdering)
     {
-        LogInfo("PenalizeDNSServer: Strict Unicast Ordering is FALSE");
+        LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO, "PenalizeDNSServer: Strict Unicast Ordering is FALSE");
         // We penalize the server so that new queries don't pick this server for DNSSERVER_PENALTY_TIME
         // XXX Include other logic here to see if this server should really be penalized
         //
         if (q->qtype == kDNSType_PTR)
         {
-            LogInfo("PenalizeDNSServer: Not Penalizing PTR question");
+            LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO, "PenalizeDNSServer: Not Penalizing PTR question");
         }
-        else if ((rcode == kDNSFlag1_RC_FormErr) || (rcode == kDNSFlag1_RC_ServFail) || (rcode == kDNSFlag1_RC_NotImpl) || (rcode == kDNSFlag1_RC_Refused))
+        else if ((rcode == kDNSFlag1_RC_FormErr) || (rcode == kDNSFlag1_RC_ServFail) || (rcode == kDNSFlag1_RC_NotImpl))
         {
-            LogInfo("PenalizeDNSServer: Not Penalizing DNS Server since it at least responded with rcode %d", rcode);
+            LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                      "PenalizeDNSServer: Not Penalizing DNS Server since it at least responded with rcode %d", rcode);
         }
         else
         {
-            LogInfo("PenalizeDNSServer: Penalizing question type %d", q->qtype);
+            const char *reason = "";
+            if (rcode == kDNSFlag1_RC_Refused)
+            {
+                reason = " because server refused to answer";
+            }
+            LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO, "PenalizeDNSServer: Penalizing question type %d" PUB_S,
+                      q->qtype, reason);
             q->qDNSServer->penaltyTime = NonZeroTime(m->timenow + DNSSERVER_PENALTY_TIME);
         }
     }
     else
     {
-        LogInfo("PenalizeDNSServer: Strict Unicast Ordering is TRUE");
+        LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_DEFAULT, "PenalizeDNSServer: Strict Unicast Ordering is TRUE");
     }
 
 end:
@@ -287,8 +305,9 @@ end:
     {
         if (new)
         {
-            LogMsg("PenalizeDNSServer: ERROR!! GetServerForQuestion returned the same server %#a:%d", &new->addr,
-                   mDNSVal16(new->port));
+            LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_DEFAULT,
+                      "PenalizeDNSServer: ERROR!! GetServerForQuestion returned the same server " PRI_IP_ADDR ":%d",
+                      &new->addr, mDNSVal16(new->port));
             q->ThisQInterval = 0;   // Inactivate this question so that we dont bombard the network
         }
         else
@@ -298,7 +317,7 @@ end:
             // is slow in responding and we have sent three queries. When we repeatedly call, it is
             // okay to receive the same NULL DNS server. Next time we try to send the query, we will
             // realize and re-initialize the DNS servers.
-            LogInfo("PenalizeDNSServer: GetServerForQuestion returned the same server NULL");
+            LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO, "PenalizeDNSServer: GetServerForQuestion returned the same server NULL");
         }
     }
     else
@@ -308,8 +327,9 @@ end:
 
         if (new)
         {
-            LogInfo("PenalizeDNSServer: Server for %##s (%s) changed to %#a:%d (%##s)",
-                    q->qname.c, DNSTypeName(q->qtype), &q->qDNSServer->addr, mDNSVal16(q->qDNSServer->port), q->qDNSServer->domain.c);
+            LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                      "PenalizeDNSServer: Server for " PRI_DM_NAME " (" PUB_S ") changed to " PRI_IP_ADDR ":%d (" PRI_DM_NAME ")",
+                      DM_NAME_PARAM(&q->qname), DNSTypeName(q->qtype), &q->qDNSServer->addr, mDNSVal16(q->qDNSServer->port), DM_NAME_PARAM(&q->qDNSServer->domain));
             // We want to try the next server immediately. As the question may already have backed off, reset
             // the interval. We do this only the first time when we try all the DNS servers. Once we reached the end of
             // list and retrying all the servers again e.g., at least one server failed to respond in the previous try, we
@@ -337,12 +357,15 @@ end:
             // the next query will not happen until cache expiry. If it is a long lived question,
             // AnswerCurrentQuestionWithResourceRecord will not set it to MaxQuestionInterval. In that case,
             // we want the normal backoff to work.
-            LogInfo("PenalizeDNSServer: Server for %p, %##s (%s) changed to NULL, Interval %d", q, q->qname.c, DNSTypeName(q->qtype), q->ThisQInterval);
+            LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                      "PenalizeDNSServer: Server for %p, " PRI_DM_NAME " (" PUB_S ") changed to NULL, Interval %d",
+                      q, DM_NAME_PARAM(&q->qname), DNSTypeName(q->qtype), q->ThisQInterval);
         }
         q->unansweredQueries = 0;
 
     }
 }
+#endif // !MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
 
 // ***************************************************************************
 #if COMPILER_LIKES_PRAGMA_MARK
@@ -377,7 +400,7 @@ mDNSexport DomainAuthInfo *GetAuthInfoForName_internal(mDNS *m, const domainname
     // First purge any dead keys from the list
     while (*p)
     {
-        if ((*p)->deltime && m->timenow - (*p)->deltime >= 0 && AutoTunnelUnregistered(*p))
+        if ((*p)->deltime && m->timenow - (*p)->deltime >= 0)
         {
             DNSQuestion *q;
             DomainAuthInfo *info = *p;
@@ -415,15 +438,14 @@ mDNSexport DomainAuthInfo *GetAuthInfoForName(mDNS *m, const domainname *const n
 
 // MUST be called with the lock held
 mDNSexport mStatus mDNS_SetSecretForDomain(mDNS *m, DomainAuthInfo *info,
-                                           const domainname *domain, const domainname *keyname, const char *b64keydata, const domainname *hostname, mDNSIPPort *port, mDNSBool autoTunnel)
+                                           const domainname *domain, const domainname *keyname, const char *b64keydata, const domainname *hostname, mDNSIPPort *port)
 {
     DNSQuestion *q;
     DomainAuthInfo **p = &m->AuthInfoList;
     if (!info || !b64keydata) { LogMsg("mDNS_SetSecretForDomain: ERROR: info %p b64keydata %p", info, b64keydata); return(mStatus_BadParamErr); }
 
-    LogInfo("mDNS_SetSecretForDomain: domain %##s key %##s%s", domain->c, keyname->c, autoTunnel ? " AutoTunnel" : "");
+    LogInfo("mDNS_SetSecretForDomain: domain %##s key %##s", domain->c, keyname->c);
 
-    info->AutoTunnel = autoTunnel;
     AssignDomainName(&info->domain,  domain);
     AssignDomainName(&info->keyname, keyname);
     if (hostname)
@@ -448,16 +470,6 @@ mDNSexport mStatus mDNS_SetSecretForDomain(mDNS *m, DomainAuthInfo *info,
     while (*p && (*p) != info) p=&(*p)->next;
     if (*p) {LogInfo("mDNS_SetSecretForDomain: Domain %##s Already in list", (*p)->domain.c); return(mStatus_AlreadyRegistered);}
 
-    // Caution: Only zero AutoTunnelHostRecord.namestorage AFTER we've determined that this is a NEW DomainAuthInfo
-    // being added to the list. Otherwise we risk smashing our AutoTunnel host records that are already active and in use.
-    info->AutoTunnelHostRecord.resrec.RecordType = kDNSRecordTypeUnregistered;
-    info->AutoTunnelHostRecord.namestorage.c[0] = 0;
-    info->AutoTunnelTarget.resrec.RecordType = kDNSRecordTypeUnregistered;
-    info->AutoTunnelDeviceInfo.resrec.RecordType = kDNSRecordTypeUnregistered;
-    info->AutoTunnelService.resrec.RecordType = kDNSRecordTypeUnregistered;
-    info->AutoTunnel6Record.resrec.RecordType = kDNSRecordTypeUnregistered;
-    info->AutoTunnelServiceStarted = mDNSfalse;
-    info->AutoTunnelInnerAddress = zerov6Addr;
     info->next = mDNSNULL;
     *p = info;
 
@@ -1003,9 +1015,6 @@ mDNSlocal void StartLLQPolling(mDNS *const m, DNSQuestion *q)
     // we risk causing spurious "SendQueries didn't send all its queries" log messages
     q->LastQTime     = m->timenow - q->ThisQInterval + 1;
     SetNextQueryTime(m, q);
-#if APPLE_OSX_mDNSResponder
-    UpdateAutoTunnelDomainStatuses(m);
-#endif
 }
 
 mDNSlocal mDNSu8 *putLLQ(DNSMessage *const msg, mDNSu8 *ptr, const DNSQuestion *const question, const LLQOptData *const data)
@@ -1061,8 +1070,6 @@ mDNSlocal void sendChallengeResponse(mDNS *const m, DNSQuestion *const q, const 
 
     if (q->tcp) { LogMsg("sendChallengeResponse: ERROR!!: question %##s (%s) tcp non-NULL", q->qname.c, DNSTypeName(q->qtype)); return; }
 
-    if (PrivateQuery(q)) { LogMsg("sendChallengeResponse: ERROR!!: Private Query %##s (%s)", q->qname.c, DNSTypeName(q->qtype)); return; }
-
     if (q->ntries++ == kLLQ_MAX_TRIES)
     {
         LogMsg("sendChallengeResponse: %d failed attempts for LLQ %##s", kLLQ_MAX_TRIES, q->qname.c);
@@ -1091,7 +1098,7 @@ mDNSlocal void sendChallengeResponse(mDNS *const m, DNSQuestion *const q, const 
     responsePtr = putLLQ(&m->omsg, responsePtr, q, llq);
     if (responsePtr)
     {
-        mStatus err = mDNSSendDNSMessage(m, &m->omsg, responsePtr, mDNSInterface_Any, q->LocalSocket, &q->servAddr, q->servPort, mDNSNULL, mDNSNULL, mDNSfalse);
+        mStatus err = mDNSSendDNSMessage(m, &m->omsg, responsePtr, mDNSInterface_Any, mDNSNULL, q->LocalSocket, &q->servAddr, q->servPort, mDNSNULL, mDNSfalse);
         if (err) { LogMsg("sendChallengeResponse: mDNSSendDNSMessage%s failed: %d", q->tcp ? " (TCP)" : "", err); }
     }
     else StartLLQPolling(m,q);
@@ -1140,27 +1147,12 @@ mDNSlocal void recvSetupResponse(mDNS *const m, mDNSu8 rcode, DNSQuestion *const
     }
     else if (q->state == LLQ_SecondaryRequest)
     {
-        //LogInfo("Got LLQ_SecondaryRequest");
-
-        // Fix this immediately if not sooner.  Copy the id from the LLQOptData into our DNSQuestion struct.  This is only
-        // an issue for private LLQs, because we skip parts 2 and 3 of the handshake.  This is related to a bigger
-        // problem of the current implementation of TCP LLQ setup: we're not handling state transitions correctly
-        // if the server sends back SERVFULL or STATIC.
-        if (PrivateQuery(q))
-        {
-            LogInfo("Private LLQ_SecondaryRequest; copying id %08X%08X", llq->id.l[0], llq->id.l[1]);
-            q->id = llq->id;
-        }
-
         if (llq->err) { LogMsg("ERROR: recvSetupResponse %##s (%s) code %d from server", q->qname.c, DNSTypeName(q->qtype), llq->err); StartLLQPolling(m,q); return; }
         if (!mDNSSameOpaque64(&q->id, &llq->id))
         { LogMsg("recvSetupResponse - ID changed.  discarding"); return; }     // this can happen rarely (on packet loss + reordering)
         q->state         = LLQ_Established;
         q->ntries        = 0;
         SetLLQTimer(m, q, llq);
-#if APPLE_OSX_mDNSResponder
-        UpdateAutoTunnelDomainStatuses(m);
-#endif
     }
 }
 
@@ -1216,7 +1208,7 @@ mDNSexport uDNS_LLQType uDNS_recvLLQResponse(mDNS *const m, const DNSMessage *co
                     //debugf("Sending LLQ ack for %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
                     InitializeDNSMessage(&m->omsg.h, msg->h.id, ResponseFlags);
                     ackEnd = putLLQ(&m->omsg, m->omsg.data, q, &opt->u.llq);
-                    if (ackEnd) mDNSSendDNSMessage(m, &m->omsg, ackEnd, mDNSInterface_Any, q->LocalSocket, srcaddr, srcport, mDNSNULL, mDNSNULL, mDNSfalse);
+                    if (ackEnd) mDNSSendDNSMessage(m, &m->omsg, ackEnd, mDNSInterface_Any, mDNSNULL, q->LocalSocket, srcaddr, srcport, mDNSNULL, mDNSfalse);
                     m->rec.r.resrec.RecordType = 0;     // Clear RecordType to show we're not still using it
                     debugf("uDNS_LLQ_Events: q->state == LLQ_Established msg->h.id %d q->TargetQID %d", mDNSVal16(msg->h.id), mDNSVal16(q->TargetQID));
                     *matchQuestion = q;
@@ -1266,7 +1258,7 @@ mDNSexport uDNS_LLQType uDNS_recvLLQResponse(mDNS *const m, const DNSMessage *co
 }
 
 // Stub definition of TCPSocket_struct so we can access flags field. (Rest of TCPSocket_struct is platform-dependent.)
-struct TCPSocket_struct { TCPSocketFlags flags; /* ... */ };
+struct TCPSocket_struct { mDNSIPPort port; TCPSocketFlags flags; /* ... */ };
 
 // tcpCallback is called to handle events (e.g. connection opening and data reception) on TCP connections for
 // Private DNS operations -- private queries, private LLQs, private record updates and private service updates
@@ -1326,23 +1318,18 @@ mDNSlocal void tcpCallback(TCPSocket *sock, void *context, mDNSBool ConnectionEs
         }
         else if (q)
         {
+            mDNSOpaque16 HeaderFlags = uQueryFlags;
+
             // LLQ Polling mode or non-LLQ uDNS over TCP
-            InitializeDNSMessage(&tcpInfo->request.h, q->TargetQID, (DNSSECQuestion(q) ? DNSSecQFlags : uQueryFlags));
+            InitializeDNSMessage(&tcpInfo->request.h, q->TargetQID, HeaderFlags);
             end = putQuestion(&tcpInfo->request, tcpInfo->request.data, tcpInfo->request.data + AbsoluteMaxDNSMessageData, &q->qname, q->qtype, q->qclass);
-            if (DNSSECQuestion(q) && q->qDNSServer && !q->qDNSServer->cellIntf)
-            {
-                if (q->ProxyQuestion)
-                    end = DNSProxySetAttributes(q, &tcpInfo->request.h, &tcpInfo->request, end, tcpInfo->request.data + AbsoluteMaxDNSMessageData);
-                else
-                    end = putDNSSECOption(&tcpInfo->request, end, tcpInfo->request.data + AbsoluteMaxDNSMessageData);
-            }
 
             AuthInfo = q->AuthInfo;     // Need to add TSIG to this message
         }
 
-        err = mDNSSendDNSMessage(m, &tcpInfo->request, end, mDNSInterface_Any, mDNSNULL, &tcpInfo->Addr, tcpInfo->Port, sock, AuthInfo, mDNSfalse);
+        err = mDNSSendDNSMessage(m, &tcpInfo->request, end, mDNSInterface_Any, sock, mDNSNULL, &tcpInfo->Addr, tcpInfo->Port, AuthInfo, mDNSfalse);
         if (err) { debugf("ERROR: tcpCallback: mDNSSendDNSMessage - %d", err); err = mStatus_UnknownErr; goto exit; }
-#if AWD_METRICS
+#if MDNSRESPONDER_SUPPORTS(APPLE, METRICS)
         if (mDNSSameIPPort(tcpInfo->Port, UnicastDNSPort))
         {
             MetricsUpdateDNSQuerySize((mDNSu32)(end - (mDNSu8 *)&tcpInfo->request));
@@ -1404,7 +1391,7 @@ mDNSlocal void tcpCallback(TCPSocket *sock, void *context, mDNSBool ConnectionEs
             if (tcpInfo->replylen < sizeof(DNSMessageHeader))
             { LogMsg("ERROR: tcpCallback - length too short (%d bytes)", tcpInfo->replylen); err = mStatus_UnknownErr; goto exit; }
 
-            tcpInfo->reply = mDNSPlatformMemAllocate(tcpInfo->replylen);
+            tcpInfo->reply = (DNSMessage *) mDNSPlatformMemAllocate(tcpInfo->replylen);
             if (!tcpInfo->reply) { LogMsg("ERROR: tcpCallback - malloc failed"); err = mStatus_NoMemoryErr; goto exit; }
         }
 
@@ -1564,18 +1551,30 @@ mDNSlocal tcpInfo_t *MakeTCPConn(mDNS *const m, const DNSMessage *const msg, con
     tcpInfo_t *info;
     mDNSBool useBackgroundTrafficClass;
 
-    useBackgroundTrafficClass = question ? question->UseBackgroundTrafficClass : mDNSfalse;
+    useBackgroundTrafficClass = question ? question->UseBackgroundTraffic : mDNSfalse;
 
     if ((flags & kTCPSocketFlags_UseTLS) && (!hostname || !hostname->c[0]))
     { LogMsg("MakeTCPConn: TLS connection being setup with NULL hostname"); return mDNSNULL; }
 
-    info = (tcpInfo_t *)mDNSPlatformMemAllocate(sizeof(tcpInfo_t));
+    info = (tcpInfo_t *) mDNSPlatformMemAllocateClear(sizeof(*info));
     if (!info) { LogMsg("ERROR: MakeTCP - memallocate failed"); return(mDNSNULL); }
-    mDNSPlatformMemZero(info, sizeof(tcpInfo_t));
+
+    if (msg)
+    {
+        const mDNSu8 *const start = (const mDNSu8 *)msg;
+        if ((end < start) || ((end - start) > (int)sizeof(info->request)))
+        {
+            LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_ERROR,
+                "MakeTCPConn: invalid DNS message pointers -- msg: %p, end: %p", msg, end);
+            mDNSPlatformMemFree(info);
+            return mDNSNULL;
+        }
+        info->requestLen = (int)(end - start);
+        mDNSPlatformMemCopy(&info->request, msg, info->requestLen);
+    }
 
     info->m          = m;
-    info->sock       = mDNSPlatformTCPSocket(flags, &srcport, useBackgroundTrafficClass);
-    info->requestLen = 0;
+    info->sock       = mDNSPlatformTCPSocket(flags, Addr->type, &srcport, hostname, useBackgroundTrafficClass);
     info->question   = question;
     info->rr         = rr;
     info->Addr       = *Addr;
@@ -1586,15 +1585,9 @@ mDNSlocal tcpInfo_t *MakeTCPConn(mDNS *const m, const DNSMessage *const msg, con
     info->numReplies = 0;
     info->SrcPort = srcport;
 
-    if (msg)
-    {
-        info->requestLen = (int) (end - ((mDNSu8*)msg));
-        mDNSPlatformMemCopy(&info->request, msg, info->requestLen);
-    }
-
     if (!info->sock) { LogMsg("MakeTCPConn: unable to create TCP socket"); mDNSPlatformMemFree(info); return(mDNSNULL); }
     mDNSPlatformSetSocktOpt(info->sock, mDNSTransport_TCP, Addr->type, question);
-    err = mDNSPlatformTCPConnect(info->sock, Addr, Port, hostname, (question ? question->InterfaceID : mDNSNULL), tcpCallback, info);
+    err = mDNSPlatformTCPConnect(info->sock, Addr, Port, (question ? question->InterfaceID : mDNSNULL), tcpCallback, info);
 
     // Probably suboptimal here.
     // Instead of returning mDNSNULL here on failure, we should probably invoke the callback with an error code.
@@ -1618,6 +1611,16 @@ mDNSexport void DisposeTCPConn(struct tcpInfo_t *tcp)
 // Lock must be held
 mDNSexport void startLLQHandshake(mDNS *m, DNSQuestion *q)
 {
+    // States prior to LLQ_InitialRequest should not react to NAT Mapping changes.
+    // startLLQHandshake is never called with q->state < LLQ_InitialRequest except
+    // from LLQNATCallback.   When we are actually trying to do LLQ, then q->state will
+    // be equal to or greater than LLQ_InitialRequest when LLQNATCallback calls
+    // startLLQHandshake.
+    if (q->state < LLQ_InitialRequest)
+    {
+        return;
+    }
+
     if (m->LLQNAT.clientContext != mDNSNULL) // LLQNAT just started, give it some time
     {
         LogInfo("startLLQHandshake: waiting for NAT status for %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
@@ -1650,77 +1653,40 @@ mDNSexport void startLLQHandshake(mDNS *m, DNSQuestion *q)
         return;
     }
 
-    if (PrivateQuery(q))
+    debugf("startLLQHandshake: m->AdvertisedV4 %#a%s Server %#a:%d%s %##s (%s)",
+           &m->AdvertisedV4,                     mDNSv4AddrIsRFC1918(&m->AdvertisedV4.ip.v4) ? " (RFC 1918)" : "",
+           &q->servAddr, mDNSVal16(q->servPort), mDNSAddrIsRFC1918(&q->servAddr)             ? " (RFC 1918)" : "",
+           q->qname.c, DNSTypeName(q->qtype));
+
+    if (q->ntries++ >= kLLQ_MAX_TRIES)
     {
-        if (q->tcp) LogInfo("startLLQHandshake: Disposing existing TCP connection for %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
-        if (q->tcp) { DisposeTCPConn(q->tcp); q->tcp = mDNSNULL; }
-        if (!q->nta)
-        {
-            // Normally we lookup the zone data and then call this function. And we never free the zone data
-            // for "PrivateQuery". But sometimes this can happen due to some race conditions. When we
-            // switch networks, we might end up "Polling" the network e.g., we are behind a Double NAT.
-            // When we poll, we free the zone information as we send the query to the server (See
-            // PrivateQueryGotZoneData). The NAT callback (LLQNATCallback) may happen soon after that. If we
-            // are still behind Double NAT, we would have returned early in this function. But we could
-            // have switched to a network with no NATs and we should get the zone data again.
-            LogInfo("startLLQHandshake: nta is NULL for %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
-            q->nta = StartGetZoneData(m, &q->qname, ZoneServiceLLQ, LLQGotZoneData, q);
-            return;
-        }
-        else if (!q->nta->Host.c[0])
-        {
-            // This should not happen. If it happens, we print a log and MakeTCPConn will fail if it can't find a hostname
-            LogMsg("startLLQHandshake: ERROR!!: nta non NULL for %##s (%s) but HostName %d NULL, LongLived %d", q->qname.c, DNSTypeName(q->qtype), q->nta->Host.c[0], q->LongLived);
-        }
-        q->tcp = MakeTCPConn(m, mDNSNULL, mDNSNULL, kTCPSocketFlags_UseTLS, &q->servAddr, q->servPort, &q->nta->Host, q, mDNSNULL);
-        if (!q->tcp)
-            q->ThisQInterval = mDNSPlatformOneSecond * 5;   // If TCP failed (transient networking glitch) try again in five seconds
-        else
-        {
-            q->state         = LLQ_SecondaryRequest;        // Right now, for private DNS, we skip the four-way LLQ handshake
-            q->ReqLease      = kLLQ_DefLease;
-            q->ThisQInterval = 0;
-        }
-        q->LastQTime     = m->timenow;
-        SetNextQueryTime(m, q);
+        LogMsg("startLLQHandshake: %d failed attempts for LLQ %##s Polling.", kLLQ_MAX_TRIES, q->qname.c);
+        StartLLQPolling(m, q);
     }
     else
     {
-        debugf("startLLQHandshake: m->AdvertisedV4 %#a%s Server %#a:%d%s %##s (%s)",
-               &m->AdvertisedV4,                     mDNSv4AddrIsRFC1918(&m->AdvertisedV4.ip.v4) ? " (RFC 1918)" : "",
-               &q->servAddr, mDNSVal16(q->servPort), mDNSAddrIsRFC1918(&q->servAddr)             ? " (RFC 1918)" : "",
-               q->qname.c, DNSTypeName(q->qtype));
+        mDNSu8 *end;
+        LLQOptData llqData;
 
-        if (q->ntries++ >= kLLQ_MAX_TRIES)
-        {
-            LogMsg("startLLQHandshake: %d failed attempts for LLQ %##s Polling.", kLLQ_MAX_TRIES, q->qname.c);
-            StartLLQPolling(m, q);
-        }
-        else
-        {
-            mDNSu8 *end;
-            LLQOptData llqData;
+        // set llq rdata
+        llqData.vers  = kLLQ_Vers;
+        llqData.llqOp = kLLQOp_Setup;
+        llqData.err   = LLQErr_NoError; // Don't need to tell server UDP notification port when sending over UDP
+        llqData.id    = zeroOpaque64;
+        llqData.llqlease = kLLQ_DefLease;
 
-            // set llq rdata
-            llqData.vers  = kLLQ_Vers;
-            llqData.llqOp = kLLQOp_Setup;
-            llqData.err   = LLQErr_NoError; // Don't need to tell server UDP notification port when sending over UDP
-            llqData.id    = zeroOpaque64;
-            llqData.llqlease = kLLQ_DefLease;
+        InitializeDNSMessage(&m->omsg.h, q->TargetQID, uQueryFlags);
+        end = putLLQ(&m->omsg, m->omsg.data, q, &llqData);
+        if (!end) { LogMsg("ERROR: startLLQHandshake - putLLQ"); StartLLQPolling(m,q); return; }
 
-            InitializeDNSMessage(&m->omsg.h, q->TargetQID, uQueryFlags);
-            end = putLLQ(&m->omsg, m->omsg.data, q, &llqData);
-            if (!end) { LogMsg("ERROR: startLLQHandshake - putLLQ"); StartLLQPolling(m,q); return; }
+        mDNSSendDNSMessage(m, &m->omsg, end, mDNSInterface_Any, mDNSNULL, q->LocalSocket, &q->servAddr, q->servPort , mDNSNULL, mDNSfalse);
 
-            mDNSSendDNSMessage(m, &m->omsg, end, mDNSInterface_Any, q->LocalSocket, &q->servAddr, q->servPort, mDNSNULL, mDNSNULL, mDNSfalse);
-
-            // update question state
-            q->state         = LLQ_InitialRequest;
-            q->ReqLease      = kLLQ_DefLease;
-            q->ThisQInterval = (kLLQ_INIT_RESEND * mDNSPlatformOneSecond);
-            q->LastQTime     = m->timenow;
-            SetNextQueryTime(m, q);
-        }
+        // update question state
+        q->state         = LLQ_InitialRequest;
+        q->ReqLease      = kLLQ_DefLease;
+        q->ThisQInterval = (kLLQ_INIT_RESEND * mDNSPlatformOneSecond);
+        q->LastQTime     = m->timenow;
+        SetNextQueryTime(m, q);
     }
 }
 
@@ -1736,17 +1702,6 @@ mDNSexport const domainname *GetServiceTarget(mDNS *m, AuthRecord *const rr)
         return(&rr->resrec.rdata->u.srv.target);
     else
     {
-#if APPLE_OSX_mDNSResponder
-        DomainAuthInfo *AuthInfo = GetAuthInfoForName_internal(m, rr->resrec.name);
-        if (AuthInfo && AuthInfo->AutoTunnel)
-        {
-            StartServerTunnel(AuthInfo);
-            if (AuthInfo->AutoTunnelHostRecord.namestorage.c[0] == 0) return(mDNSNULL);
-            debugf("GetServiceTarget: Returning %##s", AuthInfo->AutoTunnelHostRecord.namestorage.c);
-            return(&AuthInfo->AutoTunnelHostRecord.namestorage);
-        }
-        else
-#endif // APPLE_OSX_mDNSResponder
         {
             const int srvcount = CountLabels(rr->resrec.name);
             HostnameInfo *besthi = mDNSNULL, *hi;
@@ -1770,13 +1725,13 @@ mDNSexport const domainname *GetServiceTarget(mDNS *m, AuthRecord *const rr)
     }
 }
 
-mDNSlocal const domainname *PUBLIC_UPDATE_SERVICE_TYPE  = (const domainname*)"\x0B_dns-update"     "\x04_udp";
-mDNSlocal const domainname *PUBLIC_LLQ_SERVICE_TYPE     = (const domainname*)"\x08_dns-llq"        "\x04_udp";
+mDNSlocal const domainname *PUBLIC_UPDATE_SERVICE_TYPE         = (const domainname*)"\x0B_dns-update"     "\x04_udp";
+mDNSlocal const domainname *PUBLIC_LLQ_SERVICE_TYPE            = (const domainname*)"\x08_dns-llq"        "\x04_udp";
 
-mDNSlocal const domainname *PRIVATE_UPDATE_SERVICE_TYPE = (const domainname*)"\x0F_dns-update-tls" "\x04_tcp";
-mDNSlocal const domainname *PRIVATE_QUERY_SERVICE_TYPE  = (const domainname*)"\x0E_dns-query-tls"  "\x04_tcp";
-mDNSlocal const domainname *PRIVATE_LLQ_SERVICE_TYPE    = (const domainname*)"\x0C_dns-llq-tls"    "\x04_tcp";
-mDNSlocal const domainname *DNS_PUSH_NOTIFICATION_SERVICE_TYPE = (const domainname*)"\x0C_dns-push-tls"    "\x04_tcp";
+mDNSlocal const domainname *PRIVATE_UPDATE_SERVICE_TYPE        = (const domainname*)"\x0F_dns-update-tls" "\x04_tcp";
+mDNSlocal const domainname *PRIVATE_QUERY_SERVICE_TYPE         = (const domainname*)"\x0E_dns-query-tls"  "\x04_tcp";
+mDNSlocal const domainname *PRIVATE_LLQ_SERVICE_TYPE           = (const domainname*)"\x0C_dns-llq-tls"    "\x04_tcp";
+mDNSlocal const domainname *DNS_PUSH_NOTIFICATION_SERVICE_TYPE = (const domainname*)"\x0D_dns-push-tls"   "\x04_tcp";
 
 #define ZoneDataSRV(X) ( \
         (X)->ZoneService == ZoneServiceUpdate  ? ((X)->ZonePrivate ? PRIVATE_UPDATE_SERVICE_TYPE : PUBLIC_UPDATE_SERVICE_TYPE) : \
@@ -1809,25 +1764,13 @@ mDNSlocal void GetZoneData_QuestionCallback(mDNS *const m, DNSQuestion *question
         {
             AssignDomainName(&zd->ZoneName, answer->name);
             zd->ZoneClass = answer->rrclass;
-            AssignDomainName(&zd->question.qname, &zd->ZoneName);
             GetZoneData_StartQuery(m, zd, kDNSType_SRV);
         }
         else if (zd->CurrentSOA->c[0])
         {
-            DomainAuthInfo *AuthInfo = GetAuthInfoForName(m, zd->CurrentSOA);
-            if (AuthInfo && AuthInfo->AutoTunnel)
-            {
-                // To keep the load on the server down, we don't chop down on
-                // SOA lookups for AutoTunnels
-                LogInfo("GetZoneData_QuestionCallback: not chopping labels for %##s", zd->CurrentSOA->c);
-                zd->ZoneDataCallback(m, mStatus_NoSuchNameErr, zd);
-            }
-            else
-            {
-                zd->CurrentSOA = (domainname *)(zd->CurrentSOA->c + zd->CurrentSOA->c[0]+1);
-                AssignDomainName(&zd->question.qname, zd->CurrentSOA);
-                GetZoneData_StartQuery(m, zd, kDNSType_SOA);
-            }
+            zd->CurrentSOA = (domainname *)(zd->CurrentSOA->c + zd->CurrentSOA->c[0]+1);
+            AssignDomainName(&zd->question.qname, zd->CurrentSOA);
+            GetZoneData_StartQuery(m, zd, kDNSType_SOA);
         }
         else
         {
@@ -1857,8 +1800,37 @@ mDNSlocal void GetZoneData_QuestionCallback(mDNS *const m, DNSQuestion *question
             {
                 AssignDomainName(&zd->Host, &answer->rdata->u.srv.target);
                 zd->Port = answer->rdata->u.srv.port;
-                AssignDomainName(&zd->question.qname, &zd->Host);
-                GetZoneData_StartQuery(m, zd, kDNSType_A);
+                // The MakeTCPConn path, which is used by everything but DNS Push, won't work at all for
+                // IPv6.  This should be fixed for all cases we care about, but for now we make an exception
+                // for Push notifications: we do not look up the a record here, but rather rely on the DSO
+                // infrastructure to do a GetAddrInfo call on the name and try each IP address in sequence
+                // until one connects.  We can't do this for the other use cases because this is in the DSO
+                // code, not in MakeTCPConn.  Ultimately the fix for this is to use Network Framework to do
+                // the connection establishment for all of these use cases.
+                //
+                // One implication of this is that if two different zones have DNS push server SRV records
+                // pointing to the same server using a different domain name, we will not see these as being
+                // the same server, and will not share the connection.   This isn't something we can easily
+                // fix, and so the advice if someone runs into this and considers it a problem should be to
+                // use the same name.
+                //
+                // Another issue with this code is that at present, we do not wait for more than one SRV
+                // record--we cancel the query as soon as the first one comes in.   This isn't ideal: it
+                // would be better to wait until we've gotten all our answers and then pick the one with
+                // the highest priority.   Of course, this is unlikely to cause an operational problem in
+                // practice, and as with the previous point, the fix is easy: figure out which server you
+                // want people to use and don't list any other servers.   Fully switching to Network
+                // Framework for this would (I think!) address this problem, or at least make it someone
+                // else's problem.
+                if (zd->ZoneService != ZoneServiceDNSPush)
+                {
+                    AssignDomainName(&zd->question.qname, &zd->Host);
+                    GetZoneData_StartQuery(m, zd, kDNSType_A);
+                }
+                else
+                {
+                    zd->ZoneDataCallback(m, mStatus_NoError, zd);
+                }                    
             }
             else
             {
@@ -1912,7 +1884,6 @@ mDNSlocal mStatus GetZoneData_StartQuery(mDNS *const m, ZoneData *zd, mDNSu16 qt
     zd->question.ThisQInterval       = -1;
     zd->question.InterfaceID         = mDNSInterface_Any;
     zd->question.flags               = 0;
-    zd->question.Target              = zeroAddr;
     //zd->question.qname.c[0]        = 0;           // Already set
     zd->question.qtype               = qtype;
     zd->question.qclass              = kDNSClass_IN;
@@ -1921,17 +1892,11 @@ mDNSlocal mStatus GetZoneData_StartQuery(mDNS *const m, ZoneData *zd, mDNSu16 qt
     zd->question.ForceMCast          = mDNSfalse;
     zd->question.ReturnIntermed      = mDNStrue;
     zd->question.SuppressUnusable    = mDNSfalse;
-    zd->question.SearchListIndex     = 0;
     zd->question.AppendSearchDomains = 0;
-    zd->question.RetryWithSearchDomains = mDNSfalse;
     zd->question.TimeoutQuestion     = 0;
     zd->question.WakeOnResolve       = 0;
-    zd->question.UseBackgroundTrafficClass = mDNSfalse;
-    zd->question.ValidationRequired = 0;
-    zd->question.ValidatingResponse = 0;
+    zd->question.UseBackgroundTraffic = mDNSfalse;
     zd->question.ProxyQuestion      = 0;
-    zd->question.qnameOrig           = mDNSNULL;
-    zd->question.AnonInfo            = mDNSNULL;
     zd->question.pid                 = mDNSPlatformGetPID();
     zd->question.euid                = 0;
     zd->question.QuestionCallback    = GetZoneData_QuestionCallback;
@@ -1944,51 +1909,25 @@ mDNSlocal mStatus GetZoneData_StartQuery(mDNS *const m, ZoneData *zd, mDNSu16 qt
 // StartGetZoneData is an internal routine (i.e. must be called with the lock already held)
 mDNSexport ZoneData *StartGetZoneData(mDNS *const m, const domainname *const name, const ZoneService target, ZoneDataCallback callback, void *ZoneDataContext)
 {
-    DomainAuthInfo *AuthInfo = GetAuthInfoForName_internal(m, name);
-    int initialskip = (AuthInfo && AuthInfo->AutoTunnel) ? DomainNameLength(name) - DomainNameLength(&AuthInfo->domain) : 0;
-    ZoneData *zd = (ZoneData*)mDNSPlatformMemAllocate(sizeof(ZoneData));
-    if (!zd) { LogMsg("ERROR: StartGetZoneData - mDNSPlatformMemAllocate failed"); return mDNSNULL; }
-    mDNSPlatformMemZero(zd, sizeof(ZoneData));
+    ZoneData *zd = (ZoneData*) mDNSPlatformMemAllocateClear(sizeof(*zd));
+    if (!zd) { LogMsg("ERROR: StartGetZoneData - mDNSPlatformMemAllocateClear failed"); return mDNSNULL; }
     AssignDomainName(&zd->ChildName, name);
     zd->ZoneService      = target;
-    zd->CurrentSOA       = (domainname *)(&zd->ChildName.c[initialskip]);
+    zd->CurrentSOA       = &zd->ChildName;
     zd->ZoneName.c[0]    = 0;
     zd->ZoneClass        = 0;
     zd->Host.c[0]        = 0;
     zd->Port             = zeroIPPort;
     zd->Addr             = zeroAddr;
-    zd->ZonePrivate      = AuthInfo && AuthInfo->AutoTunnel ? mDNStrue : mDNSfalse;
+    zd->ZonePrivate      = mDNSfalse;
     zd->ZoneDataCallback = callback;
     zd->ZoneDataContext  = ZoneDataContext;
 
     zd->question.QuestionContext = zd;
 
     mDNS_DropLockBeforeCallback();      // GetZoneData_StartQuery expects to be called from a normal callback, so we emulate that here
-    if (AuthInfo && AuthInfo->AutoTunnel && !mDNSIPPortIsZero(AuthInfo->port))
-    {
-        LogInfo("StartGetZoneData: Bypassing SOA, SRV query for %##s", AuthInfo->domain.c);
-        // We bypass SOA and SRV queries if we know the hostname and port already from the configuration.
-        // Today this is only true for AutoTunnel. As we bypass, we need to infer a few things:
-        //
-        // 1. Zone name is the same as the AuthInfo domain
-        // 2. ZoneClass is kDNSClass_IN which should be a safe assumption
-        //
-        // If we want to make this bypass mechanism work for non-AutoTunnels also, (1) has to hold
-        // good. Otherwise, it has to be configured also.
-
-        AssignDomainName(&zd->ZoneName, &AuthInfo->domain);
-        zd->ZoneClass = kDNSClass_IN;
-        AssignDomainName(&zd->Host, &AuthInfo->hostname);
-        zd->Port = AuthInfo->port;
-        AssignDomainName(&zd->question.qname, &zd->Host);
-        GetZoneData_StartQuery(m, zd, kDNSType_A);
-    }
-    else
-    {
-        if (AuthInfo && AuthInfo->AutoTunnel) LogInfo("StartGetZoneData: Not Bypassing SOA, SRV query for %##s", AuthInfo->domain.c);
-        AssignDomainName(&zd->question.qname, zd->CurrentSOA);
-        GetZoneData_StartQuery(m, zd, kDNSType_SOA);
-    }
+    AssignDomainName(&zd->question.qname, zd->CurrentSOA);
+    GetZoneData_StartQuery(m, zd, kDNSType_SOA);
     mDNS_ReclaimLockAfterCallback();
 
     return zd;
@@ -2331,7 +2270,7 @@ mDNSlocal void UpdateOneSRVRecord(mDNS *m, AuthRecord *rr)
 
     case regState_NATError:
         if (!NATChanged) return;
-	// if nat changed, register if we have a target (below)
+    // if nat changed, register if we have a target (below)
 	/* FALLTHROUGH */
 
     case regState_NoTarget:
@@ -2602,7 +2541,6 @@ mDNSlocal void GetStaticHostname(mDNS *m)
 
     q->InterfaceID      = mDNSInterface_Any;
     q->flags            = 0;
-    q->Target           = zeroAddr;
     q->qtype            = kDNSType_PTR;
     q->qclass           = kDNSClass_IN;
     q->LongLived        = mDNSfalse;
@@ -2610,17 +2548,11 @@ mDNSlocal void GetStaticHostname(mDNS *m)
     q->ForceMCast       = mDNSfalse;
     q->ReturnIntermed   = mDNStrue;
     q->SuppressUnusable = mDNSfalse;
-    q->SearchListIndex  = 0;
     q->AppendSearchDomains = 0;
-    q->RetryWithSearchDomains = mDNSfalse;
     q->TimeoutQuestion  = 0;
     q->WakeOnResolve    = 0;
-    q->UseBackgroundTrafficClass = mDNSfalse;
-    q->ValidationRequired = 0;
-    q->ValidatingResponse = 0;
+    q->UseBackgroundTraffic = mDNSfalse;
     q->ProxyQuestion      = 0;
-    q->qnameOrig        = mDNSNULL;
-    q->AnonInfo         = mDNSNULL;
     q->pid              = mDNSPlatformGetPID();
     q->euid             = 0;
     q->QuestionCallback = FoundStaticHostname;
@@ -2641,10 +2573,9 @@ mDNSexport void mDNS_AddDynDNSHostName(mDNS *m, const domainname *fqdn, mDNSReco
     if (*ptr) { LogMsg("DynDNSHostName %##s already in list", fqdn->c); return; }
 
     // allocate and format new address record
-    *ptr = mDNSPlatformMemAllocate(sizeof(**ptr));
+    *ptr = (HostnameInfo *) mDNSPlatformMemAllocateClear(sizeof(**ptr));
     if (!*ptr) { LogMsg("ERROR: mDNS_AddDynDNSHostName - malloc"); return; }
 
-    mDNSPlatformMemZero(*ptr, sizeof(**ptr));
     AssignDomainName(&(*ptr)->fqdn, fqdn);
     (*ptr)->arv4.state     = regState_Unregistered;
     (*ptr)->arv6.state     = regState_Unregistered;
@@ -2786,10 +2717,6 @@ mDNSexport void mDNS_SetPrimaryInterfaceInfo(mDNS *m, const mDNSAddr *v4addr, co
         m->StaticHostname.c[0] = 0;
 
         m->NextSRVUpdate = NonZeroTime(m->timenow);
-
-#if APPLE_OSX_mDNSResponder
-        UpdateAutoTunnelDomainStatuses(m);
-#endif
     }
 
     mDNS_Unlock(m);
@@ -2896,22 +2823,13 @@ mDNSlocal mStatus checkUpdateResult(mDNS *const m, const domainname *const displ
     }
 }
 
-// We add three Additional Records for unicast resource record registrations
-// which is a function of AuthInfo and AutoTunnel properties
-mDNSlocal mDNSu32 RRAdditionalSize(mDNS *const m, DomainAuthInfo *AuthInfo)
+mDNSlocal mDNSu32 RRAdditionalSize(DomainAuthInfo *AuthInfo)
 {
-    mDNSu32 leaseSize, hinfoSize, tsigSize;
+    mDNSu32 leaseSize, tsigSize;
     mDNSu32 rr_base_size = 10; // type (2) class (2) TTL (4) rdlength (2)
 
     // OPT RR : Emptyname(.) + base size + rdataOPT
     leaseSize = 1 + rr_base_size + sizeof(rdataOPT);
-
-    // HINFO: Resource Record Name + base size + RDATA
-    // HINFO is added only for autotunnels
-    hinfoSize = 0;
-    if (AuthInfo && AuthInfo->AutoTunnel)
-        hinfoSize = (m->hostlabel.c[0] + 1) + DomainNameLength(&AuthInfo->domain) +
-                    rr_base_size + (2 + m->HIHardware.c[0] + m->HISoftware.c[0]);
 
     //TSIG: Resource Record Name + base size + RDATA
     // RDATA:
@@ -2927,7 +2845,7 @@ mDNSlocal mDNSu32 RRAdditionalSize(mDNS *const m, DomainAuthInfo *AuthInfo)
     tsigSize = 0;
     if (AuthInfo) tsigSize = DomainNameLength(&AuthInfo->keyname) + rr_base_size + 58;
 
-    return (leaseSize + hinfoSize + tsigSize);
+    return (leaseSize + tsigSize);
 }
 
 //Note: Make sure that RREstimatedSize is updated accordingly if anything that is done here
@@ -3009,7 +2927,7 @@ mDNSlocal void SendRecordRegistration(mDNS *const m, AuthRecord *rr)
     limit = ptr + AbsoluteMaxDNSMessageData;
 
     AuthInfo = GetAuthInfoForName_internal(m, rr->resrec.name);
-    limit -= RRAdditionalSize(m, AuthInfo);
+    limit -= RRAdditionalSize(AuthInfo);
 
     mDNS_CheckLock(m);
 
@@ -3046,7 +2964,7 @@ mDNSlocal void SendRecordRegistration(mDNS *const m, AuthRecord *rr)
     {
         LogInfo("SendRecordRegistration UDP %s", ARDisplayString(m, rr));
         if (!rr->nta) { LogMsg("SendRecordRegistration:ERROR!! nta is NULL for %s", ARDisplayString(m, rr)); return; }
-        err = mDNSSendDNSMessage(m, &m->omsg, ptr, mDNSInterface_Any, mDNSNULL, &rr->nta->Addr, rr->nta->Port, mDNSNULL, GetAuthInfoForName_internal(m, rr->resrec.name), mDNSfalse);
+        err = mDNSSendDNSMessage(m, &m->omsg, ptr, mDNSInterface_Any, mDNSNULL, mDNSNULL, &rr->nta->Addr, rr->nta->Port, GetAuthInfoForName_internal(m, rr->resrec.name), mDNSfalse);
         if (err) debugf("ERROR: SendRecordRegistration - mDNSSendDNSMessage - %d", err);
     }
 
@@ -3139,8 +3057,7 @@ mDNSlocal void SendGroupRRMessage(mDNS *const m, AuthRecord *anchorRR, mDNSu8 *p
     mDNSu8 *limit;
     if (!anchorRR) {debugf("SendGroupRRMessage: Could not merge records"); return;}
 
-    if (info && info->AutoTunnel) limit = m->omsg.data + AbsoluteMaxDNSMessageData;
-    else limit = m->omsg.data + NormalMaxDNSMessageData;
+    limit = m->omsg.data + NormalMaxDNSMessageData;
 
     // This has to go in the additional section and hence need to be done last
     ptr = putUpdateLeaseWithLimit(&m->omsg, ptr, DEFAULT_UPDATE_LEASE, limit);
@@ -3162,7 +3079,7 @@ mDNSlocal void SendGroupRRMessage(mDNS *const m, AuthRecord *anchorRR, mDNSu8 *p
     }
     else
     {
-        mStatus err = mDNSSendDNSMessage(m, &m->omsg, ptr, mDNSInterface_Any, mDNSNULL, &anchorRR->nta->Addr, anchorRR->nta->Port, mDNSNULL, info, mDNSfalse);
+        mStatus err = mDNSSendDNSMessage(m, &m->omsg, ptr, mDNSInterface_Any, mDNSNULL, mDNSNULL, &anchorRR->nta->Addr, anchorRR->nta->Port, info, mDNSfalse);
         if (err) LogInfo("SendGroupRRMessage: Cannot send UDP message for %s", ARDisplayString(m, anchorRR));
         else LogInfo("SendGroupRRMessage: Sent a group UDP update ID: %d start %p, end %p, limit %p", mDNSVal16(m->omsg.h.id), m->omsg.data, ptr, limit);
     }
@@ -3318,11 +3235,10 @@ mDNSlocal mDNSBool SendGroupUpdates(mDNS *const m)
                 // Though we allow single record registrations for UDP to be AbsoluteMaxDNSMessageData (See
                 // SendRecordRegistration) to handle large TXT records, to avoid fragmentation we limit UDP
                 // message to NormalMaxDNSMessageData
-                if (AuthInfo && AuthInfo->AutoTunnel) spaceleft = AbsoluteMaxDNSMessageData;
-                else spaceleft = NormalMaxDNSMessageData;
+                spaceleft = NormalMaxDNSMessageData;
 
                 next = m->omsg.data;
-                spaceleft -= RRAdditionalSize(m, AuthInfo);
+                spaceleft -= RRAdditionalSize(AuthInfo);
                 if (spaceleft <= 0)
                 {
                     LogMsg("SendGroupUpdates: ERROR!!: spaceleft is zero at the beginning");
@@ -3525,9 +3441,6 @@ mDNSlocal void hndlRecordUpdateReply(mDNS *m, AuthRecord *rr, mStatus err, mDNSu
     LogInfo("hndlRecordUpdateReply: err %d ID %d state %d %s(%p)", err, mDNSVal16(rr->updateid), rr->state, ARDisplayString(m, rr), rr);
 
     rr->updateError = err;
-#if APPLE_OSX_mDNSResponder
-    if (err == mStatus_BadSig || err == mStatus_BadKey || err == mStatus_BadTime) UpdateAutoTunnelDomainStatuses(m);
-#endif
 
     SetRecordRetry(m, rr, random);
 
@@ -3920,7 +3833,7 @@ mDNSexport void uDNS_ReceiveMsg(mDNS *const m, DNSMessage *const msg, const mDNS
            msg->h.numAnswers,     msg->h.numAnswers     == 1 ? ", "   : "s,",
            msg->h.numAuthorities, msg->h.numAuthorities == 1 ? "y,  " : "ies,",
            msg->h.numAdditionals, msg->h.numAdditionals == 1 ? ""     : "s", end - msg->data);
-#if APPLE_OSX_mDNSResponder
+#if MDNSRESPONDER_SUPPORTS(APPLE, SYMPTOMS) && !MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
     if (NumUnreachableDNSServers > 0)
         SymptomReporterDNSServerReachable(m, srcaddr);
 #endif
@@ -3932,7 +3845,13 @@ mDNSexport void uDNS_ReceiveMsg(mDNS *const m, DNSMessage *const msg, const mDNS
             if (msg->h.flags.b[0] & kDNSFlag0_TC && mDNSSameOpaque16(qptr->TargetQID, msg->h.id) && m->timenow - qptr->LastQTime < RESPONSE_WINDOW)
             {
                 if (!srcaddr) LogMsg("uDNS_ReceiveMsg: TCP DNS response had TC bit set: ignoring");
-                else          uDNS_RestartQuestionAsTCP(m, qptr, srcaddr, srcport);
+                else
+                {
+                    uDNS_RestartQuestionAsTCP(m, qptr, srcaddr, srcport);
+#if MDNSRESPONDER_SUPPORTS(APPLE, METRICS)
+                    qptr->metrics.dnsOverTCPState = DNSOverTCP_Truncated;
+#endif
+                }
             }
     }
 
@@ -3982,7 +3901,6 @@ mDNSexport void sendLLQRefresh(mDNS *m, DNSQuestion *q)
 {
     mDNSu8 *end;
     LLQOptData llq;
-    mDNSu8 *limit = m->omsg.data + AbsoluteMaxDNSMessageData;
 
     if (q->ReqLease)
         if ((q->state == LLQ_Established && q->ntries >= kLLQ_MAX_TRIES) || q->expire - m->timenow < 0)
@@ -4002,45 +3920,12 @@ mDNSexport void sendLLQRefresh(mDNS *m, DNSQuestion *q)
     end = putLLQ(&m->omsg, m->omsg.data, q, &llq);
     if (!end) { LogMsg("sendLLQRefresh: putLLQ failed %##s (%s)", q->qname.c, DNSTypeName(q->qtype)); return; }
 
-    // Note that we (conditionally) add HINFO and TSIG here, since the question might be going away,
-    // so we may not be able to reference it (most importantly it's AuthInfo) when we actually send the message
-    end = putHINFO(m, &m->omsg, end, q->AuthInfo, limit);
-    if (!end) { LogMsg("sendLLQRefresh: putHINFO failed %##s (%s)", q->qname.c, DNSTypeName(q->qtype)); return; }
-
-    if (PrivateQuery(q))
-    {
-        DNSDigest_SignMessageHostByteOrder(&m->omsg, &end, q->AuthInfo);
-        if (!end) { LogMsg("sendLLQRefresh: DNSDigest_SignMessage failed %##s (%s)", q->qname.c, DNSTypeName(q->qtype)); return; }
-    }
-
-    if (PrivateQuery(q) && !q->tcp)
-    {
-        LogInfo("sendLLQRefresh setting up new TLS session %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
-        if (!q->nta)
-        {
-            // Note: If a question is in LLQ_Established state, we never free the zone data for the
-            // question (PrivateQuery). If we free, we reset the state to something other than LLQ_Established.
-            // This function is called only if the query is in LLQ_Established state and hence nta should
-            // never be NULL. In spite of that, we have seen q->nta being NULL in the field. Just refetch the
-            // zone data in that case.
-            q->nta = StartGetZoneData(m, &q->qname, ZoneServiceLLQ, LLQGotZoneData, q);
-            return;
-            // ThisQInterval is not adjusted when we return from here which means that we will get called back
-            // again immediately. As q->servAddr and q->servPort are still valid and the nta->Host is initialized
-            // without any additional discovery for PrivateQuery, things work.
-        }
-        q->tcp = MakeTCPConn(m, &m->omsg, end, kTCPSocketFlags_UseTLS, &q->servAddr, q->servPort, &q->nta->Host, q, mDNSNULL);
-    }
-    else
     {
         mStatus err;
 
-        // if AuthInfo and AuthInfo->AutoTunnel is set, we use the TCP socket but don't need to pass the AuthInfo as
-        // we already protected the message above.
-        LogInfo("sendLLQRefresh: using existing %s session %##s (%s)", PrivateQuery(q) ? "TLS" : "UDP",
-                q->qname.c, DNSTypeName(q->qtype));
+        LogInfo("sendLLQRefresh: using existing UDP session %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
 
-        err = mDNSSendDNSMessage(m, &m->omsg, end, mDNSInterface_Any, q->LocalSocket, &q->servAddr, q->servPort, q->tcp ? q->tcp->sock : mDNSNULL, mDNSNULL, mDNSfalse);
+        err = mDNSSendDNSMessage(m, &m->omsg, end, mDNSInterface_Any, q->tcp ? q->tcp->sock : mDNSNULL, q->LocalSocket, &q->servAddr, q->servPort, mDNSNULL, mDNSfalse);
         if (err)
         {
             LogMsg("sendLLQRefresh: mDNSSendDNSMessage%s failed: %d", q->tcp ? " (TCP)" : "", err);
@@ -4072,16 +3957,13 @@ mDNSexport void LLQGotZoneData(mDNS *const m, mStatus err, const ZoneData *zoneI
     {
         q->servAddr = zoneInfo->Addr;
         q->servPort = zoneInfo->Port;
-        if (!PrivateQuery(q))
+        // We don't need the zone data as we use it only for the Host information which we
+        // don't need if we are not going to use TLS connections.
+        if (q->nta)
         {
-            // We don't need the zone data as we use it only for the Host information which we
-            // don't need if we are not going to use TLS connections.
-            if (q->nta)
-            {
-                if (q->nta != zoneInfo) LogMsg("LLQGotZoneData: nta (%p) != zoneInfo (%p)  %##s (%s)", q->nta, zoneInfo, q->qname.c, DNSTypeName(q->qtype));
-                CancelGetZoneData(m, q->nta);
-                q->nta = mDNSNULL;
-            }
+            if (q->nta != zoneInfo) LogMsg("LLQGotZoneData: nta (%p) != zoneInfo (%p)  %##s (%s)", q->nta, zoneInfo, q->qname.c, DNSTypeName(q->qtype));
+            CancelGetZoneData(m, q->nta);
+            q->nta = mDNSNULL;
         }
         q->ntries = 0;
         debugf("LLQGotZoneData %#a:%d", &q->servAddr, mDNSVal16(q->servPort));
@@ -4107,90 +3989,36 @@ mDNSexport void LLQGotZoneData(mDNS *const m, mStatus err, const ZoneData *zoneI
     mDNS_Unlock(m);
 }
 
-#ifdef DNS_PUSH_ENABLED
+#if MDNSRESPONDER_SUPPORTS(COMMON, DNS_PUSH)
 mDNSexport void DNSPushNotificationGotZoneData(mDNS *const m, mStatus err, const ZoneData *zoneInfo)
 {
     DNSQuestion *q = (DNSQuestion *)zoneInfo->ZoneDataContext;
     mDNS_Lock(m);
 
     // If we get here it means that the GetZoneData operation has completed.
-    // We hold on to the zone data if it is AutoTunnel as we use the hostname
-    // in zoneInfo during the TLS connection setup.
     q->servAddr = zeroAddr;
     q->servPort = zeroIPPort;
-    if (!err && zoneInfo && !mDNSIPPortIsZero(zoneInfo->Port) && !mDNSAddressIsZero(&zoneInfo->Addr) && zoneInfo->Host.c[0])
+    if (!err && zoneInfo && !mDNSIPPortIsZero(zoneInfo->Port) && zoneInfo->Host.c[0])
     {
-        q->dnsPushState      = DNSPUSH_SERVERFOUND;
-        q->dnsPushServerAddr = zoneInfo->Addr;
-        q->dnsPushServerPort = zoneInfo->Port;
-        q->ntries            = 0;
-        LogInfo("DNSPushNotificationGotZoneData %#a:%d", &q->dnsPushServerAddr, mDNSVal16(q->dnsPushServerPort));
-        SubscribeToDNSPushNotificationServer(m,q);
+        q->state = LLQ_DNSPush_Connecting;
+        LogInfo("DNSPushNotificationGotZoneData %##s%%%d", &zoneInfo->Host, ntohs(zoneInfo->Port.NotAnInteger));
+        q->dnsPushServer = SubscribeToDNSPushNotificationServer(m, q);
+        if (q->dnsPushServer == mDNSNULL || (q->dnsPushServer->connectState != DNSPushServerConnectionInProgress &&
+                                             q->dnsPushServer->connectState != DNSPushServerConnected &&
+                                             q->dnsPushServer->connectState != DNSPushServerSessionEstablished))
+        {
+            goto noServer;
+        }
     }
     else
     {
-        q->dnsPushState = DNSPUSH_NOSERVER;
-        StartLLQPolling(m,q);
-        if (err == mStatus_NoSuchNameErr)
-        {
-            // this actually failed, so mark it by setting address to all ones
-            q->servAddr.type  = mDNSAddrType_IPv4;
-            q->servAddr.ip.v4 = onesIPv4Addr;
-        }
+    noServer:
+        q->state = LLQ_InitialRequest;
+        startLLQHandshake(m,q);
     }
     mDNS_Unlock(m);
 }
-#endif // DNS_PUSH_ENABLED
-
-// Called in normal callback context (i.e. mDNS_busy and mDNS_reentrancy are both 1)
-mDNSlocal void PrivateQueryGotZoneData(mDNS *const m, mStatus err, const ZoneData *zoneInfo)
-{
-    DNSQuestion *q = (DNSQuestion *) zoneInfo->ZoneDataContext;
-
-    LogInfo("PrivateQueryGotZoneData %##s (%s) err %d Zone %##s Private %d", q->qname.c, DNSTypeName(q->qtype), err, zoneInfo->ZoneName.c, zoneInfo->ZonePrivate);
-
-    if (q->nta != zoneInfo) LogMsg("PrivateQueryGotZoneData:ERROR!!: nta (%p) != zoneInfo (%p)  %##s (%s)", q->nta, zoneInfo, q->qname.c, DNSTypeName(q->qtype));
-
-    if (err || !zoneInfo || mDNSAddressIsZero(&zoneInfo->Addr) || mDNSIPPortIsZero(zoneInfo->Port) || !zoneInfo->Host.c[0])
-    {
-        LogInfo("PrivateQueryGotZoneData: ERROR!! %##s (%s) invoked with error code %d %p %#a:%d",
-                q->qname.c, DNSTypeName(q->qtype), err, zoneInfo,
-                zoneInfo ? &zoneInfo->Addr : mDNSNULL,
-                zoneInfo ? mDNSVal16(zoneInfo->Port) : 0);
-        CancelGetZoneData(m, q->nta);
-        q->nta = mDNSNULL;
-        return;
-    }
-
-    if (!zoneInfo->ZonePrivate)
-    {
-        debugf("Private port lookup failed -- retrying without TLS -- %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
-        q->AuthInfo      = mDNSNULL;        // Clear AuthInfo so we try again non-private
-        q->ThisQInterval = InitialQuestionInterval;
-        q->LastQTime     = m->timenow - q->ThisQInterval;
-        CancelGetZoneData(m, q->nta);
-        q->nta = mDNSNULL;
-        mDNS_Lock(m);
-        SetNextQueryTime(m, q);
-        mDNS_Unlock(m);
-        return;
-        // Next call to uDNS_CheckCurrentQuestion() will do this as a non-private query
-    }
-
-    if (!PrivateQuery(q))
-    {
-        LogMsg("PrivateQueryGotZoneData: ERROR!! Not a private query %##s (%s) AuthInfo %p", q->qname.c, DNSTypeName(q->qtype), q->AuthInfo);
-        CancelGetZoneData(m, q->nta);
-        q->nta = mDNSNULL;
-        return;
-    }
-
-    q->TargetQID = mDNS_NewMessageID(m);
-    if (q->tcp) { DisposeTCPConn(q->tcp); q->tcp = mDNSNULL; }
-    if (!q->nta) { LogMsg("PrivateQueryGotZoneData:ERROR!! nta is NULL for %##s (%s)", q->qname.c, DNSTypeName(q->qtype)); return; }
-    q->tcp = MakeTCPConn(m, mDNSNULL, mDNSNULL, kTCPSocketFlags_UseTLS, &zoneInfo->Addr, zoneInfo->Port, &q->nta->Host, q, mDNSNULL);
-    if (q->nta) { CancelGetZoneData(m, q->nta); q->nta = mDNSNULL; }
-}
+#endif
 
 // ***************************************************************************
 #if COMPILER_LIKES_PRAGMA_MARK
@@ -4320,19 +4148,6 @@ mDNSexport void RecordRegistrationGotZoneData(mDNS *const m, mStatus err, const 
         mDNSv4AddrIsRFC1918(&m->AdvertisedV4.ip.v4) && newRR->nta && !mDNSAddrIsRFC1918(&newRR->nta->Addr) &&
         newRR->AutoTarget == Target_AutoHostAndNATMAP)
     {
-        DomainAuthInfo *AuthInfo;
-        AuthInfo = GetAuthInfoForName(m, newRR->resrec.name);
-        if (AuthInfo && AuthInfo->AutoTunnel)
-        {
-            domainname *t = GetRRDomainNameTarget(&newRR->resrec);
-            LogMsg("RecordRegistrationGotZoneData: ERROR!! AutoTunnel has Target_AutoHostAndNATMAP for %s", ARDisplayString(m, newRR));
-            if (t) t->c[0] = 0;
-            newRR->resrec.rdlength = newRR->resrec.rdestimate = 0;
-            newRR->state = regState_NoTarget;
-            CancelGetZoneData(m, newRR->nta);
-            newRR->nta = mDNSNULL;
-            return;
-        }
         // During network transitions, we are called multiple times in different states. Setup NAT
         // state just once for this record.
         if (!newRR->NATinfo.clientContext)
@@ -4381,7 +4196,7 @@ mDNSlocal void SendRecordDeregistration(mDNS *m, AuthRecord *rr)
 
     limit = ptr + AbsoluteMaxDNSMessageData;
     AuthInfo = GetAuthInfoForName_internal(m, rr->resrec.name);
-    limit -= RRAdditionalSize(m, AuthInfo);
+    limit -= RRAdditionalSize(AuthInfo);
 
     rr->updateid = mDNS_NewMessageID(m);
     InitializeDNSMessage(&m->omsg.h, rr->updateid, UpdateReqFlags);
@@ -4407,7 +4222,7 @@ mDNSlocal void SendRecordDeregistration(mDNS *m, AuthRecord *rr)
         mStatus err;
         LogInfo("SendRecordDeregistration UDP %s", ARDisplayString(m, rr));
         if (!rr->nta) { LogMsg("SendRecordDeregistration:ERROR!! nta is NULL for %s", ARDisplayString(m, rr)); return; }
-        err = mDNSSendDNSMessage(m, &m->omsg, ptr, mDNSInterface_Any, mDNSNULL, &rr->nta->Addr, rr->nta->Port, mDNSNULL, GetAuthInfoForName_internal(m, rr->resrec.name), mDNSfalse);
+        err = mDNSSendDNSMessage(m, &m->omsg, ptr, mDNSInterface_Any, mDNSNULL, mDNSNULL, &rr->nta->Addr, rr->nta->Port, GetAuthInfoForName_internal(m, rr->resrec.name), mDNSfalse);
         if (err) debugf("ERROR: SendRecordDeregistration - mDNSSendDNSMessage - %d", err);
         //if (rr->state == regState_DeregPending) CompleteDeregistration(m, rr);        // Don't touch rr after this
     }
@@ -4602,70 +4417,76 @@ unreg_error:
 #pragma mark - Periodic Execution Routines
 #endif
 
-mDNSlocal void handle_unanswered_query(mDNS *const m)
-{
-    DNSQuestion *q = m->CurrentQuestion;
-
-    if (q->unansweredQueries >= MAX_DNSSEC_UNANSWERED_QUERIES && DNSSECOptionalQuestion(q))
-    {
-        // If we are not receiving any responses for DNSSEC question, it could be due to
-        // a broken middlebox or a DNS server that does not understand the EDNS0/DOK option that
-        // silently drops the packets. Also as per RFC 5625 there are certain buggy DNS Proxies
-        // that are known to drop these pkts. To handle this, we turn off sending the EDNS0/DOK
-        // option if we have not received any responses indicating that the server or
-        // the middlebox is DNSSEC aware. If we receive at least one response to a DNSSEC
-        // question, we don't turn off validation. Also, we wait for MAX_DNSSEC_RETRANSMISSIONS
-        // before turning off validation to accomodate packet loss.
-        //
-        // Note: req_DO affects only DNSSEC_VALIDATION_SECURE_OPTIONAL questions;
-        // DNSSEC_VALIDATION_SECURE questions ignores req_DO.
-
-        if (!q->qDNSServer->DNSSECAware && q->qDNSServer->req_DO)
-        {
-            q->qDNSServer->retransDO++;
-            if (q->qDNSServer->retransDO == MAX_DNSSEC_RETRANSMISSIONS)
-            {
-                LogInfo("handle_unanswered_query: setting req_DO false for %#a", &q->qDNSServer->addr);
-                q->qDNSServer->req_DO = mDNSfalse;
-            }
-        }
-
-        if (!q->qDNSServer->req_DO)
-        {
-            q->ValidationState     = DNSSECValNotRequired;
-            q->ValidationRequired  = DNSSEC_VALIDATION_NONE;
-
-            if (q->ProxyQuestion)
-                q->ProxyDNSSECOK = mDNSfalse;
-            LogInfo("handle_unanswered_query: unanswered query for %##s (%s), so turned off validation for %#a",
-                q->qname.c, DNSTypeName(q->qtype), &q->qDNSServer->addr);
-        }
-    }
-}
-
 mDNSlocal void uDNS_HandleLLQState(mDNS *const m, DNSQuestion *q)
 {
-#ifdef DNS_PUSH_ENABLED
-    // First attempt to use DNS Push Notification.
-    if (q->dnsPushState == DNSPUSH_INIT)
-        DiscoverDNSPushNotificationServer(m, q);
-#endif // DNS_PUSH_ENABLED
-    switch (q->state)
+    LogMsg("->uDNS_HandleLLQState: %##s %d", &q->qname, q->state);
+    switch(q->state)
     {
+    case LLQ_Init:
+        // If DNS Push isn't supported, LLQ_Init falls through to LLQ_InitialRequest.
+#if MDNSRESPONDER_SUPPORTS(COMMON, DNS_PUSH)
+        // First attempt to use DNS Push Notification.
+        DiscoverDNSPushNotificationServer(m, q);
+        break;
+
+    case LLQ_DNSPush_ServerDiscovery:
+    case LLQ_DNSPush_Connecting:
+    case LLQ_DNSPush_Established:
+        // Sanity check the server state to see if it matches.   If we find that we aren't connected, when
+        // we think we should be, change our state.
+        if (q->dnsPushServer == NULL)
+        {
+            q->state = LLQ_Init;
+            q->ThisQInterval = 0;
+            q->LastQTime = m->timenow;
+            SetNextQueryTime(m, q);
+        }
+        else
+        {
+            switch(q->dnsPushServer->connectState)
+            {
+            case DNSPushServerDisconnected:
+            case DNSPushServerConnectFailed:
+            case DNSPushServerNoDNSPush:
+                LogMsg("uDNS_HandleLLQState: %##s, server state %d doesn't match question state %d",
+                       &q->dnsPushServer->serverName, q->state, q->dnsPushServer->connectState);
+                q->state = LLQ_Poll;
+                q->ThisQInterval = (mDNSPlatformOneSecond * 5);
+                q->LastQTime     = m->timenow;
+                SetNextQueryTime(m, q);
+                break;
+            case DNSPushServerSessionEstablished:
+                LogMsg("uDNS_HandleLLQState: %##s, server connection established but question state is %d",
+                       &q->dnsPushServer->serverName, q->state);
+                q->state = LLQ_DNSPush_Established;
+                q->ThisQInterval = 0;
+                q->LastQTime     = m->timenow;
+                SetNextQueryTime(m, q);
+                break;
+                
+            case DNSPushServerConnectionInProgress:
+            case DNSPushServerConnected:
+                break;
+            }
+        }
+        break;
+#else
+            // Silence warnings; these are never reached without DNS Push
+        case LLQ_DNSPush_ServerDiscovery:
+        case LLQ_DNSPush_Connecting:
+        case LLQ_DNSPush_Established:
+#endif // MDNSRESPONDER_SUPPORTS(COMMON, DNS_PUSH)
         case LLQ_InitialRequest:   startLLQHandshake(m, q); break;
-        case LLQ_SecondaryRequest:
-            // For PrivateQueries, we need to start the handshake again as we don't do the Challenge/Response step
-            if (PrivateQuery(q))   startLLQHandshake(m, q);
-            else                   sendChallengeResponse(m, q, mDNSNULL);
-            break;
+        case LLQ_SecondaryRequest: sendChallengeResponse(m, q, mDNSNULL); break;
         case LLQ_Established:      sendLLQRefresh(m, q); break;
         case LLQ_Poll:             break;       // Do nothing (handled below)
     }
+    LogMsg("<-uDNS_HandleLLQState: %##s %d %d", &q->qname, q->state);
 }
 
 // The question to be checked is not passed in as an explicit parameter;
 // instead it is implicit that the question to be checked is m->CurrentQuestion.
-mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
+mDNSlocal void uDNS_CheckCurrentQuestion(mDNS *const m)
 {
     DNSQuestion *q = m->CurrentQuestion;
     if (m->timenow - NextQSendTime(q) < 0) return;
@@ -4675,7 +4496,9 @@ mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
         uDNS_HandleLLQState(m,q);
     }
 
-    handle_unanswered_query(m);
+#if MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
+    Querier_HandleUnicastQuestion(q);
+#else
     // We repeat the check above (rather than just making this the "else" case) because startLLQHandshake can change q->state to LLQ_Poll
     if (!(q->LongLived && q->state != LLQ_Poll))
     {
@@ -4683,10 +4506,13 @@ mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
         {
             DNSServer *orig = q->qDNSServer;
             if (orig)
-                LogInfo("uDNS_CheckCurrentQuestion: Sent %d unanswered queries for %##s (%s) to %#a:%d (%##s)",
-                        q->unansweredQueries, q->qname.c, DNSTypeName(q->qtype), &orig->addr, mDNSVal16(orig->port), orig->domain.c);
+            {
+                LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                          "[R%u->Q%u] uDNS_CheckCurrentQuestion: Sent %d unanswered queries for " PRI_DM_NAME " (" PUB_S ") to " PRI_IP_ADDR ":%d (" PRI_DM_NAME ")",
+                          q->request_id, mDNSVal16(q->TargetQID), q->unansweredQueries, DM_NAME_PARAM(&q->qname), DNSTypeName(q->qtype), &orig->addr, mDNSVal16(orig->port), DM_NAME_PARAM(&orig->domain));
+            }
 
-#if APPLE_OSX_mDNSResponder
+#if MDNSRESPONDER_SUPPORTS(APPLE, SYMPTOMS)
             SymptomReporterDNSServerUnreachable(orig);
 #endif
             PenalizeDNSServer(m, q, zeroID);
@@ -4709,16 +4535,16 @@ mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
         {
             DNSServer *new;
             DNSQuestion *qptr;
-            q->triedAllServersOnce = 1;
+            q->triedAllServersOnce = mDNStrue;
             // Re-initialize all DNS servers for this question. If we have a DNSServer, DNSServerChangeForQuestion will
             // handle all the work including setting the new DNS server.
             SetValidDNSServers(m, q);
             new = GetServerForQuestion(m, q);
             if (new)
             {
-		mDNSIPPort zp = zeroIPPort;
-                LogInfo("uDNS_checkCurrentQuestion: Retrying question %p %##s (%s) DNS Server %#a:%d ThisQInterval %d",
-                        q, q->qname.c, DNSTypeName(q->qtype), new ? &new->addr : mDNSNULL, mDNSVal16(new? new->port : zp), q->ThisQInterval);
+                LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                          "[R%u->Q%u] uDNS_checkCurrentQuestion: Retrying question %p " PRI_DM_NAME " (" PUB_S ") DNS Server " PRI_IP_ADDR ":%d ThisQInterval %d",
+                          q->request_id, mDNSVal16(q->TargetQID), q, DM_NAME_PARAM(&q->qname), DNSTypeName(q->qtype), new ? &new->addr : mDNSNULL, mDNSVal16(new ? new->port : zeroIPPort), q->ThisQInterval);
                 DNSServerChangeForQuestion(m, q, new);
             }
             for (qptr = q->next ; qptr; qptr = qptr->next)
@@ -4728,84 +4554,66 @@ mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
         {
             mDNSu8 *end;
             mStatus err = mStatus_NoError;
-            mDNSBool private = mDNSfalse;
+            mDNSOpaque16 HeaderFlags = uQueryFlags;
 
-            InitializeDNSMessage(&m->omsg.h, q->TargetQID, (DNSSECQuestion(q) ? DNSSecQFlags : uQueryFlags));
-
+            InitializeDNSMessage(&m->omsg.h, q->TargetQID, HeaderFlags);
             end = putQuestion(&m->omsg, m->omsg.data, m->omsg.data + AbsoluteMaxDNSMessageData, &q->qname, q->qtype, q->qclass);
-            if (DNSSECQuestion(q) && !q->qDNSServer->cellIntf)
-            {
-                if (q->ProxyQuestion)
-                    end = DNSProxySetAttributes(q, &m->omsg.h, &m->omsg, end, m->omsg.data + AbsoluteMaxDNSMessageData);
-                else
-                    end = putDNSSECOption(&m->omsg, end, m->omsg.data + AbsoluteMaxDNSMessageData);
-            }
-            private = PrivateQuery(q);
 
             if (end > m->omsg.data)
             {
-                //LogMsg("uDNS_CheckCurrentQuestion %p %d %p %##s (%s)", q, NextQSendTime(q) - m->timenow, private, q->qname.c, DNSTypeName(q->qtype));
-                if (private)
+                debugf("uDNS_CheckCurrentQuestion sending %p %##s (%s) %#a:%d UnansweredQueries %d",
+                       q, q->qname.c, DNSTypeName(q->qtype),
+                       q->qDNSServer ? &q->qDNSServer->addr : mDNSNULL, mDNSVal16(q->qDNSServer ? q->qDNSServer->port : zeroIPPort), q->unansweredQueries);
+#if APPLE_OSX_mDNSResponder
+                // When a DNS proxy network extension initiates the close of a UDP flow (this usually happens when a DNS
+                // proxy gets disabled or crashes), mDNSResponder's corresponding UDP socket will be marked with the
+                // SS_CANTRCVMORE state flag. Reading from such a socket is no longer possible, so close the current
+                // socket pair so that we can create a new pair.
+                if (q->LocalSocket && mDNSPlatformUDPSocketEncounteredEOF(q->LocalSocket))
                 {
-                    if (q->nta) CancelGetZoneData(m, q->nta);
-                    q->nta = StartGetZoneData(m, &q->qname, q->LongLived ? ZoneServiceLLQ : ZoneServiceQuery, PrivateQueryGotZoneData, q);
-                    if (q->state == LLQ_Poll) q->ThisQInterval = (LLQ_POLL_INTERVAL + mDNSRandom(LLQ_POLL_INTERVAL/10)) / QuestionIntervalStep;
+                    mDNSPlatformUDPClose(q->LocalSocket);
+                    q->LocalSocket = mDNSNULL;
                 }
+#endif
+                if (!q->LocalSocket)
+                {
+                    q->LocalSocket = mDNSPlatformUDPSocket(zeroIPPort);
+                    if (q->LocalSocket)
+                    {
+                        mDNSPlatformSetSocktOpt(q->LocalSocket, mDNSTransport_UDP, mDNSAddrType_IPv4, q);
+                        mDNSPlatformSetSocktOpt(q->LocalSocket, mDNSTransport_UDP, mDNSAddrType_IPv6, q);
+                    }
+                }
+                if (!q->LocalSocket) err = mStatus_NoMemoryErr; // If failed to make socket (should be very rare), we'll try again next time
                 else
                 {
-		    mDNSIPPort zp = zeroIPPort;
-                    debugf("uDNS_CheckCurrentQuestion sending %p %##s (%s) %#a:%d UnansweredQueries %d",
-                           q, q->qname.c, DNSTypeName(q->qtype),
-                           q->qDNSServer ? &q->qDNSServer->addr : mDNSNULL, mDNSVal16(q->qDNSServer ? q->qDNSServer->port : zeroIPPort), q->unansweredQueries);
-#if APPLE_OSX_mDNSResponder
-                    // When a DNS proxy network extension initiates the close of a UDP flow (this usually happens when a DNS
-                    // proxy gets disabled or crashes), mDNSResponder's corresponding UDP socket will be marked with the
-                    // SS_CANTRCVMORE state flag. Reading from such a socket is no longer possible, so close the current
-                    // socket pair so that we can create a new pair.
-                    if (q->LocalSocket && mDNSPlatformUDPSocketEncounteredEOF(q->LocalSocket))
+                    err = mDNSSendDNSMessage(m, &m->omsg, end, q->qDNSServer->interface, mDNSNULL, q->LocalSocket, &q->qDNSServer->addr, q->qDNSServer->port, mDNSNULL, q->UseBackgroundTraffic);
+
+#if MDNSRESPONDER_SUPPORTS(APPLE, METRICS)
+                    if (!err)
                     {
-                        mDNSPlatformUDPClose(q->LocalSocket);
-                        q->LocalSocket = mDNSNULL;
-                    }
-#endif
-                    if (!q->LocalSocket)
-                    {
-                        q->LocalSocket = mDNSPlatformUDPSocket(zeroIPPort);
-                        if (q->LocalSocket)
+                        MetricsUpdateDNSQuerySize((mDNSu32)(end - (mDNSu8 *)&m->omsg));
+                        if (q->metrics.answered)
                         {
-                            mDNSPlatformSetSocktOpt(q->LocalSocket, mDNSTransport_UDP, mDNSAddrType_IPv4, q);
-                            mDNSPlatformSetSocktOpt(q->LocalSocket, mDNSTransport_UDP, mDNSAddrType_IPv6, q);
+                            q->metrics.querySendCount = 0;
+                            q->metrics.answered       = mDNSfalse;
+                        }
+                        if (q->metrics.querySendCount++ == 0)
+                        {
+                            q->metrics.firstQueryTime = NonZeroTime(m->timenow);
                         }
                     }
-                    if (!q->LocalSocket) err = mStatus_NoMemoryErr; // If failed to make socket (should be very rare), we'll try again next time
-                    else
-                    {
-                        err = mDNSSendDNSMessage(m, &m->omsg, end, q->qDNSServer->interface, q->LocalSocket, &q->qDNSServer->addr, q->qDNSServer->port, mDNSNULL, mDNSNULL, q->UseBackgroundTrafficClass);
-#if AWD_METRICS
-                        if (!err)
-                        {
-                            MetricsUpdateDNSQuerySize((mDNSu32)(end - (mDNSu8 *)&m->omsg));
-                            if (q->metrics.answered)
-                            {
-                                q->metrics.querySendCount = 0;
-                                q->metrics.answered       = mDNSfalse;
-                            }
-                            if (q->metrics.querySendCount++ == 0)
-                            {
-                                q->metrics.firstQueryTime = m->timenow;
-                            }
-                        }
 #endif
-                    }
-                }
+				}
             }
 
             if (err == mStatus_HostUnreachErr)
             {
                 DNSServer *newServer;
 
-                LogInfo("uDNS_CheckCurrentQuestion: host unreachable error for DNS server %#a for question [%p] %##s (%s)",
-                    &q->qDNSServer->addr, q, q->qname.c, DNSTypeName(q->qtype));
+                LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                          "[R%u->Q%u] uDNS_CheckCurrentQuestion: host unreachable error for DNS server " PRI_IP_ADDR " for question [%p] " PRI_DM_NAME " (" PUB_S ")",
+                          q->request_id, mDNSVal16(q->TargetQID), &q->qDNSServer->addr, q, DM_NAME_PARAM(&q->qname), DNSTypeName(q->qtype));
 
                 if (!StrictUnicastOrdering)
                 {
@@ -4815,14 +4623,16 @@ mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
                 newServer = GetServerForQuestion(m, q);
                 if (!newServer)
                 {
-                    q->triedAllServersOnce = 1;
+                    q->triedAllServersOnce = mDNStrue;
                     SetValidDNSServers(m, q);
                     newServer = GetServerForQuestion(m, q);
                 }
                 if (newServer)
                 {
-                    LogInfo("uDNS_checkCurrentQuestion: Retrying question %p %##s (%s) DNS Server %#a:%u ThisQInterval %d",
-                        q, q->qname.c, DNSTypeName(q->qtype), newServer ? &newServer->addr : mDNSNULL, mDNSVal16(newServer ? newServer->port : zeroIPPort), q->ThisQInterval);
+                    LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                              "[R%u->Q%u] uDNS_checkCurrentQuestion: Retrying question %p " PRI_DM_NAME " (" PUB_S ") DNS Server " PRI_IP_ADDR ":%u ThisQInterval %d",
+                              q->request_id, mDNSVal16(q->TargetQID), q, DM_NAME_PARAM(&q->qname), DNSTypeName(q->qtype),
+                              newServer ? &newServer->addr : mDNSNULL, mDNSVal16(newServer ? newServer->port : zeroIPPort), q->ThisQInterval);
                     DNSServerChangeForQuestion(m, q, newServer);
                 }
                 if (q->triedAllServersOnce)
@@ -4850,24 +4660,14 @@ mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
                     q->unansweredQueries++;
                     if (q->ThisQInterval > MAX_UCAST_POLL_INTERVAL)
                         q->ThisQInterval = MAX_UCAST_POLL_INTERVAL;
-                    if (private && q->state != LLQ_Poll)
-                    {
-                        // We don't want to retransmit too soon. Hence, we always schedule our first
-                        // retransmisson at 3 seconds rather than one second
-                        if (q->ThisQInterval < (3 * mDNSPlatformOneSecond))
-                            q->ThisQInterval = q->ThisQInterval * QuestionIntervalStep;
-                        if (q->ThisQInterval > LLQ_POLL_INTERVAL)
-                            q->ThisQInterval = LLQ_POLL_INTERVAL;
-                        LogInfo("uDNS_CheckCurrentQuestion: private non polling question for %##s (%s) will be retried in %d ms", q->qname.c, DNSTypeName(q->qtype), q->ThisQInterval);
-                    }
-                    if (q->qDNSServer->cellIntf)
+                    if (q->qDNSServer->isCell)
                     {
                         // We don't want to retransmit too soon. Schedule our first retransmisson at
                         // MIN_UCAST_RETRANS_TIMEOUT seconds.
                         if (q->ThisQInterval < MIN_UCAST_RETRANS_TIMEOUT)
                             q->ThisQInterval = MIN_UCAST_RETRANS_TIMEOUT;
                     }
-                    debugf("uDNS_CheckCurrentQuestion: Increased ThisQInterval to %d for %##s (%s), cell %d", q->ThisQInterval, q->qname.c, DNSTypeName(q->qtype), q->qDNSServer->cellIntf);
+                    debugf("uDNS_CheckCurrentQuestion: Increased ThisQInterval to %d for %##s (%s), cell %d", q->ThisQInterval, q->qname.c, DNSTypeName(q->qtype), q->qDNSServer->isCell);
                 }
                 q->LastQTime = m->timenow;
             }
@@ -4883,15 +4683,16 @@ mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
             // (When we have a group of identical questions, only the active representative of the group gets
             // passed to uDNS_CheckCurrentQuestion -- we only want one set of query packets hitting the wire --
             // but we want *all* of the questions to get answer callbacks.)
-            CacheRecord *rr;
+            CacheRecord *cr;
             const mDNSu32 slot = HashSlotFromNameHash(q->qnamehash);
             CacheGroup *const cg = CacheGroupForName(m, q->qnamehash, &q->qname);
 
             if (!q->qDNSServer)
             {
                 if (!mDNSOpaque128IsZero(&q->validDNSServers))
-                    LogMsg("uDNS_CheckCurrentQuestion: ERROR!!: valid DNSServer bits not zero 0x%x, 0x%x 0x%x 0x%x for question %##s (%s)",
-                           q->validDNSServers.l[3], q->validDNSServers.l[2], q->validDNSServers.l[1], q->validDNSServers.l[0], q->qname.c, DNSTypeName(q->qtype));
+                    LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_ERROR,
+                              "[R%u->Q%u] uDNS_CheckCurrentQuestion: ERROR!!: valid DNSServer bits not zero 0x%x, 0x%x 0x%x 0x%x for question " PRI_DM_NAME " (" PUB_S ")",
+                              q->request_id, mDNSVal16(q->TargetQID), q->validDNSServers.l[3], q->validDNSServers.l[2], q->validDNSServers.l[1], q->validDNSServers.l[0], DM_NAME_PARAM(&q->qname), DNSTypeName(q->qtype));
                 // If we reached the end of list while picking DNS servers, then we don't want to deactivate the
                 // question. Try after 60 seconds. We find this by looking for valid DNSServers for this question,
                 // if we find any, then we must have tried them before we came here. This avoids maintaining
@@ -4899,7 +4700,9 @@ mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
                 SetValidDNSServers(m, q);
                 if (mDNSOpaque128IsZero(&q->validDNSServers))
                 {
-                    LogInfo("uDNS_CheckCurrentQuestion: no DNS server for %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
+                    LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                              "[R%u->Q%u] uDNS_CheckCurrentQuestion: no DNS server for " PRI_DM_NAME " (" PUB_S ")",
+                              q->request_id, mDNSVal16(q->TargetQID), DM_NAME_PARAM(&q->qname), DNSTypeName(q->qtype));
                     q->ThisQInterval = 0;
                 }
                 else
@@ -4916,28 +4719,30 @@ mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
                     q->qDNSServer = GetServerForQuestion(m, q);
                     for (qptr = q->next ; qptr; qptr = qptr->next)
                         if (qptr->DuplicateOf == q) { qptr->validDNSServers = q->validDNSServers; qptr->qDNSServer = q->qDNSServer; }
-		    {
-			mDNSIPPort zp = zeroIPPort;
-                        LogInfo("uDNS_checkCurrentQuestion: Tried all DNS servers, retry question %p SuppressUnusable %d %##s (%s) with DNS Server %#a:%d after 60 seconds, ThisQInterval %d",
-                            q, q->SuppressUnusable, q->qname.c, DNSTypeName(q->qtype),
-                            q->qDNSServer ? &q->qDNSServer->addr : mDNSNULL, mDNSVal16(q->qDNSServer ? q->qDNSServer->port : zp), q->ThisQInterval);
-		    }
+                    LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                              "[R%u->Q%u] uDNS_checkCurrentQuestion: Tried all DNS servers, retry question %p SuppressUnusable %d " PRI_DM_NAME " (" PUB_S ") with DNS Server " PRI_IP_ADDR ":%d after 60 seconds, ThisQInterval %d",
+                              q->request_id, mDNSVal16(q->TargetQID), q, q->SuppressUnusable, DM_NAME_PARAM(&q->qname), DNSTypeName(q->qtype),
+                              q->qDNSServer ? &q->qDNSServer->addr : mDNSNULL, mDNSVal16(q->qDNSServer ? q->qDNSServer->port : zeroIPPort), q->ThisQInterval);
                 }
             }
             else
             {
                 q->ThisQInterval = 0;
-                LogMsg("uDNS_CheckCurrentQuestion DNS server %#a:%d for %##s is disabled", &q->qDNSServer->addr, mDNSVal16(q->qDNSServer->port), q->qname.c);
+                LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                          "[R%u->Q%u] uDNS_CheckCurrentQuestion DNS server " PRI_IP_ADDR ":%d for " PRI_DM_NAME " is disabled",
+                          q->request_id, mDNSVal16(q->TargetQID), &q->qDNSServer->addr, mDNSVal16(q->qDNSServer->port), DM_NAME_PARAM(&q->qname));
             }
 
             if (cg)
             {
-                for (rr = cg->members; rr; rr=rr->next)
+                for (cr = cg->members; cr; cr=cr->next)
                 {
-                    if (SameNameRecordAnswersQuestion(&rr->resrec, q))
+                    if (SameNameCacheRecordAnswersQuestion(cr, q))
                     {
-                        LogInfo("uDNS_CheckCurrentQuestion: Purged resourcerecord %s", CRDisplayString(m, rr));
-                        mDNS_PurgeCacheResourceRecord(m, rr);
+                        LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                                  "[R%u->Q%u] uDNS_CheckCurrentQuestion: Purged resourcerecord " PRI_S,
+                                  q->request_id, mDNSVal16(q->TargetQID), CRDisplayString(m, cr));
+                        mDNS_PurgeCacheResourceRecord(m, cr);
                     }
                 }
             }
@@ -4949,7 +4754,7 @@ mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
             if (!mDNSOpaque16IsZero(q->responseFlags))
                 m->rec.r.responseFlags = q->responseFlags;
             // We're already using the m->CurrentQuestion pointer, so CacheRecordAdd can't use it to walk the question list.
-            // To solve this problem we set rr->DelayDelivery to a nonzero value (which happens to be 'now') so that we
+            // To solve this problem we set cr->DelayDelivery to a nonzero value (which happens to be 'now') so that we
             // momentarily defer generating answer callbacks until mDNS_Execute time.
             CreateNewCacheEntry(m, slot, cg, NonZeroTime(m->timenow), mDNStrue, mDNSNULL);
             ScheduleNextCacheCheckTime(m, slot, NonZeroTime(m->timenow));
@@ -4958,6 +4763,7 @@ mDNSexport void uDNS_CheckCurrentQuestion(mDNS *const m)
             // MUST NOT touch m->CurrentQuestion (or q) after this -- client callback could have deleted it
         }
     }
+#endif // MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
 }
 
 mDNSexport void CheckNATMappings(mDNS *m)
@@ -5151,7 +4957,9 @@ mDNSlocal mDNSs32 CheckRecordUpdates(mDNS *m)
 mDNSexport void uDNS_Tasks(mDNS *const m)
 {
     mDNSs32 nexte;
+#if !MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
     DNSServer *d;
+#endif
 
     m->NextuDNSEvent = m->timenow + FutureTime;
 
@@ -5159,21 +4967,28 @@ mDNSexport void uDNS_Tasks(mDNS *const m)
     if (m->NextuDNSEvent - nexte > 0)
         m->NextuDNSEvent = nexte;
 
+#if !MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
     for (d = m->DNSServers; d; d=d->next)
         if (d->penaltyTime)
         {
             if (m->timenow - d->penaltyTime >= 0)
             {
-                LogInfo("DNS server %#a:%d out of penalty box", &d->addr, mDNSVal16(d->port));
+                LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_INFO,
+                          "DNS server " PRI_IP_ADDR ":%d out of penalty box", &d->addr, mDNSVal16(d->port));
                 d->penaltyTime = 0;
             }
             else
             if (m->NextuDNSEvent - d->penaltyTime > 0)
                 m->NextuDNSEvent = d->penaltyTime;
         }
+#endif
 
     if (m->CurrentQuestion)
-        LogMsg("uDNS_Tasks ERROR m->CurrentQuestion already set: %##s (%s)", m->CurrentQuestion->qname.c, DNSTypeName(m->CurrentQuestion->qtype));
+    {
+        LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_DEFAULT,
+                  "uDNS_Tasks ERROR m->CurrentQuestion already set: " PRI_DM_NAME " (" PRI_S ")",
+                  DM_NAME_PARAM(&m->CurrentQuestion->qname), DNSTypeName(m->CurrentQuestion->qtype));
+    }
     m->CurrentQuestion = m->Questions;
     while (m->CurrentQuestion && m->CurrentQuestion != m->NewQuestions)
     {
@@ -5265,9 +5080,8 @@ mDNSexport void mDNS_AddSearchDomain(const domainname *const domain, mDNSInterfa
     else
     {
         // if domain not in list, add to list, mark as add (1)
-        *p = mDNSPlatformMemAllocate(sizeof(SearchListElem));
+        *p = (SearchListElem *) mDNSPlatformMemAllocateClear(sizeof(**p));
         if (!*p) { LogMsg("ERROR: mDNS_AddSearchDomain - malloc"); return; }
-        mDNSPlatformMemZero(*p, sizeof(SearchListElem));
         AssignDomainName(&(*p)->domain, domain);
         (*p)->next = mDNSNULL;
         (*p)->InterfaceID = InterfaceID;
@@ -5302,7 +5116,7 @@ mDNSlocal void FoundDomain(mDNS *const m, DNSQuestion *question, const ResourceR
 
     if (AddRecord)
     {
-        ARListElem *arElem = mDNSPlatformMemAllocate(sizeof(ARListElem));
+        ARListElem *arElem = (ARListElem *) mDNSPlatformMemAllocateClear(sizeof(*arElem));
         if (!arElem) { LogMsg("ERROR: FoundDomain out of memory"); return; }
         mDNS_SetupResourceRecord(&arElem->ar, mDNSNULL, mDNSInterface_LocalOnly, kDNSType_PTR, 7200, kDNSRecordTypeShared, AuthRecordLocalOnly, FreeARElemCallback, arElem);
         MakeDomainNameFromDNSNameString(&arElem->ar.namestorage, name);
@@ -5696,7 +5510,7 @@ mDNSexport void uDNS_StopWABQueries(mDNS *const m, int queryType)
     uDNS_SetupWABQueries(m);
 }
 
-mDNSexport domainname  *uDNS_GetNextSearchDomain(mDNSInterfaceID InterfaceID, mDNSs8 *searchIndex, mDNSBool ignoreDotLocal)
+mDNSexport domainname  *uDNS_GetNextSearchDomain(mDNSInterfaceID InterfaceID, int *searchIndex, mDNSBool ignoreDotLocal)
 {
     SearchListElem *p = SearchList;
     int count = *searchIndex;
@@ -5736,10 +5550,7 @@ mDNSexport domainname  *uDNS_GetNextSearchDomain(mDNSInterfaceID InterfaceID, mD
         }
         // Point to the next one in the list which we will look at next time.
         (*searchIndex)++;
-        // When we are appending search domains in a ActiveDirectory domain, the question's InterfaceID
-        // set to mDNSInterface_Unicast. Match the unscoped entries in that case.
-        if (((InterfaceID == mDNSInterface_Unicast) && (p->InterfaceID == mDNSInterface_Any)) ||
-            p->InterfaceID == InterfaceID)
+        if (p->InterfaceID == InterfaceID)
         {
             LogInfo("uDNS_GetNextSearchDomain returning domain %##s, InterfaceID %p", p->domain.c, p->InterfaceID);
             return &p->domain;
@@ -5824,34 +5635,515 @@ struct CompileTimeAssertionChecks_uDNS
     // other overly-large structures instead of having a pointer to them, can inadvertently
     // cause structure sizes (and therefore memory usage) to balloon unreasonably.
     char sizecheck_tcpInfo_t     [(sizeof(tcpInfo_t)      <=  9056) ? 1 : -1];
-    char sizecheck_SearchListElem[(sizeof(SearchListElem) <=  6136) ? 1 : -1];
+    char sizecheck_SearchListElem[(sizeof(SearchListElem) <=  6381) ? 1 : -1];
 };
 
 #if COMPILER_LIKES_PRAGMA_MARK
 #pragma mark - DNS Push Notification functions
 #endif
 
-#ifdef DNS_PUSH_ENABLED
-mDNSlocal tcpInfo_t * GetTCPConnectionToPushServer(mDNS *m, DNSQuestion *q)
+#if MDNSRESPONDER_SUPPORTS(COMMON, DNS_PUSH)
+mDNSlocal void DNSPushProcessResponse(mDNS *const m, const DNSMessage *const msg,
+                                      DNSPushNotificationServer *server, ResourceRecord *mrr)
+{
+    // "(CacheRecord*)1" is a special (non-zero) end-of-list marker
+    // We use this non-zero marker so that records in our CacheFlushRecords list will always have NextInCFList
+    // set non-zero, and that tells GetCacheEntity() that they're not, at this moment, eligible for recycling.
+    CacheRecord *CacheFlushRecords = (CacheRecord*)1;
+    CacheRecord **cfp = &CacheFlushRecords;
+    enum { removeName, removeClass, removeRRset, removeRR, addRR } action;
+
+    // Ignore records we don't want to cache.
+
+    // Don't want to cache OPT or TSIG pseudo-RRs
+    if (mrr->rrtype == kDNSType_TSIG)
+    {
+        return;
+    }
+    if (mrr->rrtype == kDNSType_OPT)
+    {
+        return;
+    }
+
+    if ((mrr->rrtype == kDNSType_CNAME) && SameDomainName(mrr->name, &mrr->rdata->u.name))
+    {
+        LogInfo("DNSPushProcessResponse: CNAME loop domain name %##s", mrr->name->c);
+        return;
+    }
+
+    // TTL == -1: delete individual record
+    // TTL == -2: wildcard delete
+    //   CLASS != ANY, TYPE != ANY: delete all records of specified type and class
+    //   CLASS != ANY, TYPE == ANY: delete all RRs of specified class
+    //   CLASS == ANY: delete all RRs on the name, regardless of type or class (TYPE is ignored).
+    // If TTL is zero, this is a delete, not an add.
+    if ((mDNSs32)mrr->rroriginalttl == -1)
+    {
+        LogMsg("DNSPushProcessResponse: Got remove on %##s with type %s",
+               mrr->name, DNSTypeName(mrr->rrtype));
+        action = removeRR;
+    }
+    else if ((mDNSs32)mrr->rroriginalttl == -2)
+    {
+        if (mrr->rrclass == kDNSQClass_ANY)
+        {
+            LogMsg("DNSPushProcessResponse: Got Remove Name on %##s", mrr->name);
+            action = removeName;
+        }
+        else if (mrr->rrtype == kDNSQType_ANY)
+        {
+            LogMsg("DNSPushProcessResponse: Got Remove Name on %##s", mrr->name);
+            action = removeClass;
+        }
+        else
+        {
+            LogMsg("DNSPushProcessResponse: Got Remove RRset on %##s, type %s, rdlength %d",
+                   mrr->name, DNSTypeName(mrr->rrtype), mrr->rdlength);
+            action = removeRRset;
+        }
+    }
+    else
+    {
+        action = addRR;
+    }
+
+    if (action != addRR)
+    {
+        if (m->rrcache_size)
+        {
+            CacheRecord *rr;
+            // Remember the unicast question that we found, which we use to make caching
+            // decisions later on in this function
+            CacheGroup *cg = CacheGroupForName(m, mrr->namehash, mrr->name);
+            for (rr = cg ? cg->members : mDNSNULL; rr; rr=rr->next)
+            {
+                if ( action == removeName  ||
+                    (action == removeClass && rr->resrec.rrclass == mrr->rrclass) ||
+                    (rr->resrec.rrclass == mrr->rrclass &&
+                     ((action == removeRRset && rr->resrec.rrtype == mrr->rrtype) ||
+                      (action == removeRR    && rr->resrec.rrtype == mrr->rrtype  &&
+                       SameRDataBody(mrr, &rr->resrec.rdata->u, SameDomainName)))))
+                {
+                    LogInfo("DNSPushProcessResponse purging %##s (%s) %s",
+                            rr->resrec.name, DNSTypeName(mrr->rrtype), CRDisplayString(m, rr));
+                    // We've found a cache entry to delete.   Now what?
+                    mDNS_PurgeCacheResourceRecord(m, rr);
+                }
+            }
+        }
+    }
+    else
+    {
+        // It's an add.
+        LogMsg("DNSPushProcessResponse: Got add RR on %##s, type %s, length %d",
+               mrr->name, DNSTypeName(mrr->rrtype), mrr->rdlength);
+
+        // When we receive DNS Push responses, we assume a long cache lifetime --
+        // This path is only reached for DNS Push responses; as long as the connection to the server is
+        // live, the RR should stay updated.
+        mrr->rroriginalttl = kLLQ_DefLease /* XXX */;
+
+        // Use the DNS Server we remember from the question that created this DNS Push server structure.
+#if MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
+		mdns_replace(&mrr->dnsservice, server->dnsservice);
+#else
+        mrr->rDNSServer = server->qDNSServer;
+#endif
+        
+        // 2. See if we want to add this packet resource record to our cache
+        // We only try to cache answers if we have a cache to put them in
+        if (m->rrcache_size)
+        {
+            const mDNSu32 slot = HashSlotFromNameHash(mrr->namehash);
+            CacheGroup *cg = CacheGroupForName(m, mrr->namehash, mrr->name);
+            CacheRecord *rr = mDNSNULL;
+
+            // 2a. Check if this packet resource record is already in our cache.
+            rr = mDNSCoreReceiveCacheCheck(m, msg, uDNS_LLQ_Events, slot, cg, &cfp, mDNSNULL);
+
+            // If packet resource record not in our cache, add it now
+            // (unless it is just a deletion of a record we never had, in which case we don't care)
+            if (!rr && mrr->rroriginalttl > 0)
+            {
+                rr = CreateNewCacheEntry(m, slot, cg, 0,
+                                         mDNStrue, &server->connection->transport->remote_addr);
+                if (rr)
+                {
+                    // Not clear that this is ever used, but for verisimilitude, set this to look like
+                    // an authoritative response to a regular query.
+                    rr->responseFlags.b[0] = kDNSFlag0_QR_Response | kDNSFlag0_OP_StdQuery | kDNSFlag0_AA;
+                    rr->responseFlags.b[1] = kDNSFlag1_RC_NoErr | kDNSFlag0_AA;
+                }
+            }
+        }
+    }
+}
+
+mDNSlocal void DNSPushProcessResponses(mDNS *const m, const DNSMessage *const msg, const mDNSu8 *firstAnswer,
+                                           const mDNSu8 *const end, DNSPushNotificationServer *server)
+{
+    DNSQuestion *q;
+    const mDNSu8 *ptr = firstAnswer;
+    mDNSIPPort port;
+    port.NotAnInteger = 0;
+    ResourceRecord *mrr = &m->rec.r.resrec;
+
+    // Validate the contents of the message
+    // XXX Right now this code will happily parse all the valid data and then hit invalid data
+    // and give up.  I don't think there's a risk here, but we should discuss it.
+    // XXX what about source validation?   Like, if we have a VPN, are we safe?   I think yes, but let's think about it.
+    while ((ptr = GetLargeResourceRecord(m, msg, ptr, end, mDNSNULL, kDNSRecordTypePacketAns, &m->rec)))
+    {
+        int gotOne = 0;
+        for (q = m->Questions; q; q = q->next)
+        {
+            if (q->LongLived &&
+                (q->qtype == mrr->rrtype || q->qtype == kDNSServiceType_ANY)
+                && q->qnamehash == mrr->namehash && SameDomainName(&q->qname, mrr->name))
+            {
+                LogMsg("DNSPushProcessResponses found %##s (%s) %d %s %s",
+                       q->qname.c, DNSTypeName(q->qtype), q->state,
+                       q->dnsPushServer ? (q->dnsPushServer->connection
+                                           ? q->dnsPushServer->connection->remote_name
+                                           : "<no push server>") : "<no push server>",
+                       server->connection->remote_name);
+                if (q->dnsPushServer == server)
+                {
+                    gotOne++;
+                    DNSPushProcessResponse(m, msg, server, mrr);
+                    break; // question list may have changed
+                }
+            }
+        }
+        if (!gotOne) {
+            LogMsg("DNSPushProcessResponses: no match for %##s %d %d", mrr->name, mrr->rrtype, mrr->rrclass);
+        }
+        mrr->RecordType = 0;     // Clear RecordType to show we're not still using it
+    }
+}
+                                           
+static void
+DNSPushStartConnecting(DNSPushNotificationServer *server)
+{
+    if (dso_connect(server->connectInfo))
+    {
+        server->connectState = DNSPushServerConnectionInProgress;
+    }
+    else
+    {
+        server->connectState = DNSPushServerConnectFailed;
+    }
+}
+
+mDNSexport  void DNSPushReconcileConnection(mDNS *m, DNSQuestion *q)
+{
+    DNSPushNotificationZone   *zone;
+    DNSPushNotificationZone   *nextZone;
+
+    if (q->dnsPushServer == mDNSNULL)
+    {
+        return;
+    }
+    
+    // Update the counts
+    for (zone = m->DNSPushZones; zone != mDNSNULL; zone = zone->next)
+    {
+        if (zone->server == q->dnsPushServer)
+        {
+            zone->numberOfQuestions--;
+        }
+    }
+    q->dnsPushServer->numberOfQuestions--;
+
+    nextZone = mDNSNULL;
+    for (zone = m->DNSPushZones; zone != mDNSNULL; zone = nextZone)
+    {
+        nextZone = zone->next;
+        if (zone->numberOfQuestions == 0)
+        {
+            if (zone == m->DNSPushZones)
+                m->DNSPushZones = nextZone;
+            LogInfo("DNSPushReconcileConnection: zone %##s is being freed", &zone->zoneName);
+            mDNSPlatformMemFree(zone);
+         }
+     }
+
+    q->dnsPushServer = mDNSNULL;
+}
+
+static const char kDNSPushActivity_Subscription[] = "dns-push-subscription";
+
+static void DNSPushSendKeepalive(DNSPushNotificationServer *server, mDNSu32 inactivity_timeout, mDNSu32 keepalive_interval)
+{
+    dso_message_t state;
+    dso_transport_t *transport = server->connection->transport;
+    if (transport == NULL || transport->outbuf == NULL) {
+        // Should be impossible, don't crash.
+        LogInfo("DNSPushNotificationSendSubscribe: no transport!");
+        return;
+    }
+    dso_make_message(&state, transport->outbuf, transport->outbuf_size, server->connection, false, 0);
+    dso_start_tlv(&state, kDSOType_Keepalive);
+    dso_add_tlv_u32(&state, inactivity_timeout);
+    dso_add_tlv_u32(&state, keepalive_interval);
+    dso_finish_tlv(&state);
+    dso_message_write(server->connection, &state, mDNSfalse);
+}
+
+static void DNSPushNotificationSendSubscriptionChange(mDNSBool subscribe, dso_state_t *dso, DNSQuestion *q)
+{
+    dso_message_t state;
+    dso_transport_t *transport = dso->transport;
+    mDNSu16 len;
+    if (transport == NULL || transport->outbuf == NULL) {
+        // Should be impossible, don't crash.
+        LogInfo("DNSPushNotificationSendSubscribe: no transport!");
+        return;
+    }
+    dso_make_message(&state, transport->outbuf, transport->outbuf_size, dso, subscribe ? false : true, q);
+    dso_start_tlv(&state, subscribe ? kDSOType_DNSPushSubscribe : kDSOType_DNSPushUnsubscribe);
+    len = DomainNameLengthLimit(&q->qname, q->qname.c + (sizeof q->qname));
+    dso_add_tlv_bytes(&state, q->qname.c, len);
+    dso_add_tlv_u16(&state, q->qtype);
+    dso_add_tlv_u16(&state, q->qclass);
+    dso_finish_tlv(&state);
+    dso_message_write(dso, &state, mDNSfalse);
+}
+
+static void DNSPushStop(mDNS *m, DNSPushNotificationServer *server)
+{
+    mDNSBool found = mDNStrue;
+    DNSQuestion *q;
+    while (found)
+    {
+        found = mDNSfalse;
+        server->connectState = DNSPushServerNoDNSPush;
+        
+        for (q = m->Questions; q; q = q->next)
+        {
+            if (q->dnsPushServer == server)
+            {
+                DNSPushReconcileConnection(m, q);
+                q->dnsPushServer = NULL;
+                q->state = LLQ_Poll;
+                q->ThisQInterval = 0;
+                q->LastQTime     = m->timenow;
+                SetNextQueryTime(m, q);
+                break;
+            }
+        }
+    }
+}
+
+mDNSexport void DNSPushServerDrop(DNSPushNotificationServer *server)
+{
+    if (server->connection)
+    {
+        dso_drop(server->connection);
+        server->connection = NULL;
+    }
+    if (server->connectInfo)
+    {
+        dso_connect_state_drop(server->connectInfo);
+    }
+}
+
+static void DNSPushServerFree(mDNS *m, DNSPushNotificationServer *server)
+{
+    DNSPushNotificationServer **sp;
+    DNSPushServerDrop(server);
+
+    sp = &m->DNSPushServers;
+    while (*sp)
+    {
+        if (*sp == server)
+        {
+            *sp = server->next;
+            break;
+        }
+        else
+        {
+        	sp = &server->next;
+        }
+    }
+    mDNSPlatformMemFree(server);
+}
+
+static void DNSPushDSOCallback(void *context, const void *event_context,
+                               dso_state_t *dso, dso_event_type_t eventType)
+{
+    const DNSMessage *message;
+    DNSPushNotificationServer *server = context;
+    dso_activity_t *activity;
+    const dso_query_receive_context_t *receive_context;
+    const dso_disconnect_context_t *disconnect_context;
+    const dso_keepalive_context_t *keepalive_context;
+    DNSQuestion *q;
+    uint16_t rcode;
+    mDNSs32 reconnect_when = 0;
+    mDNS *m = server->m;
+
+    mDNS_CheckLock(m);
+    
+	switch(eventType)
+    {
+	case kDSOEventType_DNSMessage:
+        // We shouldn't get here because we won't use this connection for DNS messages.
+        message = event_context;
+        LogMsg("DNSPushDSOCallback: DNS Message (opcode=%d) received from %##s",
+               (message->h.flags.b[0] & kDNSFlag0_OP_Mask) >> 3, &server->serverName);
+		break;
+
+	case kDSOEventType_DNSResponse:
+        // We shouldn't get here because we already handled any DNS messages
+        message = event_context;
+        LogMsg("DNSPushDSOCallback: DNS Response (opcode=%d) received from %##s",
+               (message->h.flags.b[0] & kDNSFlag0_OP_Mask) >> 3, &server->serverName);
+		break;
+
+	case kDSOEventType_DSOMessage:
+        message = event_context;
+        if (dso->primary.opcode == kDSOType_DNSPushUpdate) {
+            DNSPushProcessResponses(server->m, message, dso->primary.payload,
+                                    dso->primary.payload + dso->primary.length, server);
+        } else {
+            dso_send_not_implemented(dso, &message->h);
+            LogMsg("DNSPushDSOCallback: Unknown DSO Message (Primary TLV=%d) received from %##s",
+                   dso->primary.opcode, &server->serverName);
+        }
+		break;
+
+	case kDSOEventType_DSOResponse:
+        receive_context = event_context;
+        q = receive_context->query_context;
+        rcode = receive_context->rcode;
+        if (q) {
+            // If we got an error on a subscribe, we need to evaluate what went wrong
+            if (rcode == kDNSFlag1_RC_NoErr) {
+                LogMsg("DNSPushDSOCallback: Subscription for %##s/%d/%d succeeded.", q->qname.c, q->qtype, q->qclass);
+                q->state = LLQ_DNSPush_Established;
+                server->connectState = DNSPushServerSessionEstablished;
+            } else {
+                // Don't use this server.
+                q->dnsPushServer->connectState = DNSPushServerNoDNSPush;
+                q->state = LLQ_Poll;
+                q->ThisQInterval = 0;
+                q->LastQTime     = m->timenow;
+                SetNextQueryTime(m, q);
+                LogMsg("DNSPushDSOCallback: Subscription for %##s/%d/%d failed.", q->qname.c, q->qtype, q->qclass);
+            }
+        } else {
+            LogMsg("DNSPushDSOCallback: DSO Response (Primary TLV=%d) (RCODE=%d) (no query) received from %##s",
+                   dso->primary.opcode, receive_context->rcode, &server->serverName);
+            server->connectState = DNSPushServerSessionEstablished;
+        }
+		break;
+
+	case kDSOEventType_Finalize:
+		LogMsg("DNSPushDSOCallback: Finalize");
+		break;
+
+	case kDSOEventType_Connected:
+        LogMsg("DNSPushDSOCallback: Connected to %##s", &server->serverName);
+        server->connectState = DNSPushServerConnected;
+        for (activity = dso->activities; activity; activity = activity->next) {
+            DNSPushNotificationSendSubscriptionChange(mDNStrue, dso, activity->context);
+        }
+		break;
+
+	case kDSOEventType_ConnectFailed:
+        DNSPushStop(m, server);
+        LogMsg("DNSPushDSOCallback: Connection to %##s failed", &server->serverName);
+		break;
+
+	case kDSOEventType_Disconnected:
+        disconnect_context = event_context;
+
+        // If a network glitch broke the connection, try to reconnect immediately.  But if this happens
+        // twice, don't just blindly reconnect.
+        if (disconnect_context->reconnect_delay == 0) {
+            if ((server->lastDisconnect + 90 * mDNSPlatformOneSecond) - m->timenow > 0) {
+                reconnect_when = 3600000; // If we get two disconnects in quick succession, wait an hour before trying again.
+            } else {
+                DNSPushStartConnecting(server);
+                LogMsg("DNSPushDSOCallback: Connection to %##s disconnected, trying immediate reconnect",
+                       &server->serverName);
+            }
+        } else {
+            reconnect_when = disconnect_context->reconnect_delay;
+        }
+        if (reconnect_when != 0) {
+            LogMsg("DNSPushDSOCallback: Holding server %##s out as not reconnectable for %lf seconds",
+                   &server->serverName, 1000.0 * (reconnect_when - m->timenow) / (double)mDNSPlatformOneSecond);
+            dso_schedule_reconnect(m, server->connectInfo, reconnect_when);
+        }
+        server->lastDisconnect = m->timenow;
+        server->connection = mDNSNULL;
+		break;
+
+        // We don't reconnect unless there is demand.   The reason we have this event is so that we can
+        // leave the DNSPushNotificationServer data structure around to _prevent_ attempts to reconnect
+        // before the reconnect delay interval has expired.   When we get this call, we just free up the
+        // server.
+    case kDSOEventType_ShouldReconnect:
+        // This should be unnecessary, but it would be bad to accidentally have a question pointing at
+        // a server that had been freed, so make sure we don't.
+        LogMsg("DNSPushDSOCallback: ShouldReconnect timer for %##s fired, disposing of it.", &server->serverName);
+        DNSPushStop(m, server);
+        DNSPushServerFree(m, server);
+        break;
+
+    case kDSOEventType_Keepalive:
+        LogMsg("DNSPushDSOCallback: Keepalive timer for %##s fired.", &server->serverName);
+        keepalive_context = event_context;
+        DNSPushSendKeepalive(server, keepalive_context->inactivity_timeout, keepalive_context->keepalive_interval);
+        break;
+
+    case kDSOEventType_KeepaliveRcvd:
+        LogMsg("DNSPushDSOCallback: Keepalive message received from %##s.", &server->serverName);
+        break;
+        
+    case kDSOEventType_Inactive:
+        // The set of activities went to zero, and we set the idle timeout.   And it expired without any
+        // new activities starting.   So we can disconnect.
+        LogMsg("DNSPushDSOCallback: Inactivity timer for %##s fired, disposing of it.", &server->serverName);
+        DNSPushStop(m, server);
+        DNSPushServerFree(m, server);
+        break;
+
+    case kDSOEventType_RetryDelay:
+        disconnect_context = event_context;
+        DNSPushStop(m, server);
+        dso_schedule_reconnect(m, server->connectInfo, disconnect_context->reconnect_delay);
+        break;
+    }
+}
+
+DNSPushNotificationServer *GetConnectionToDNSPushNotificationServer(mDNS *m, DNSQuestion *q)
 {
     DNSPushNotificationZone   *zone;
     DNSPushNotificationServer *server;
     DNSPushNotificationZone   *newZone;
     DNSPushNotificationServer *newServer;
+    char name[MAX_ESCAPED_DOMAIN_NAME];
 
     // If we already have a question for this zone and if the server is the same, reuse it
     for (zone = m->DNSPushZones; zone != mDNSNULL; zone = zone->next)
     {
+        LogMsg("GetConnectionToDNSPushNotificationServer: zone compare zone %##s question %##s", &zone->zoneName, &q->nta->ChildName);
         if (SameDomainName(&q->nta->ChildName, &zone->zoneName))
         {
             DNSPushNotificationServer *zoneServer = mDNSNULL;
-            for (zoneServer = zone->servers; zoneServer != mDNSNULL; zoneServer = zoneServer->next)
-            {
-                if (mDNSSameAddress(&q->dnsPushServerAddr, &zoneServer->serverAddr))
+            zoneServer = zone->server;
+            if (zoneServer != mDNSNULL) {
+                LogMsg("GetConnectionToDNSPushNotificationServer: server compare server %##s question %##s",
+                       &zoneServer->serverName, &q->nta->Host);
+                if (SameDomainName(&q->nta->Host, &zoneServer->serverName))
                 {
+                    LogMsg("GetConnectionToDNSPushNotificationServer: server and zone already present.");
                     zone->numberOfQuestions++;
                     zoneServer->numberOfQuestions++;
-                    return zoneServer->connection;
+                    return zoneServer;
                 }
             }
         }
@@ -5860,33 +6152,74 @@ mDNSlocal tcpInfo_t * GetTCPConnectionToPushServer(mDNS *m, DNSQuestion *q)
     // If we have a connection to this server but it is for a differnt zone, create a new zone entry and reuse the connection
     for (server = m->DNSPushServers; server != mDNSNULL; server = server->next)
     {
-        if (mDNSSameAddress(&q->dnsPushServerAddr, &server->serverAddr))
+        LogMsg("GetConnectionToDNSPushNotificationServer: server compare server %##s question %##s",
+               &server->serverName, &q->nta->Host);
+        if (SameDomainName(&q->nta->Host, &server->serverName))
         {
-            newZone = mDNSPlatformMemAllocate(sizeof(DNSPushNotificationZone));
+            newZone = (DNSPushNotificationZone *) mDNSPlatformMemAllocateClear(sizeof(*newZone));
+            if (newZone == NULL)
+            {
+                return NULL;
+            }
             newZone->numberOfQuestions = 1;
             newZone->zoneName = q->nta->ChildName;
-            newZone->servers = server;
+            newZone->server = server;
 
             // Add the new zone to the begining of the list
             newZone->next = m->DNSPushZones;
             m->DNSPushZones = newZone;
 
             server->numberOfQuestions++;
-            return server->connection;
+            LogMsg("GetConnectionToDNSPushNotificationServer: server already present.");
+            return server;
         }
     }
 
     // If we do not have any existing connections, create a new connection
-    newServer = mDNSPlatformMemAllocate(sizeof(DNSPushNotificationServer));
-    newZone   = mDNSPlatformMemAllocate(sizeof(DNSPushNotificationZone));
+    newServer = (DNSPushNotificationServer *) mDNSPlatformMemAllocateClear(sizeof(*newServer));
+    if (newServer == NULL)
+    {
+        return NULL;
+    }
+    newZone = (DNSPushNotificationZone *) mDNSPlatformMemAllocateClear(sizeof(*newZone));
+    if (newZone == NULL)
+    {
+        mDNSPlatformMemFree(newServer);
+        return NULL;
+    }
 
+    newServer->m = m;
     newServer->numberOfQuestions = 1;
-    newServer->serverAddr = q->dnsPushServerAddr;
-    newServer->connection = MakeTCPConn(m, mDNSNULL, mDNSNULL, kTCPSocketFlags_UseTLS, &q->dnsPushServerAddr, q->dnsPushServerPort, &q->nta->Host, q, mDNSNULL);
-
+    AssignDomainName(&newServer->serverName, &q->nta->Host);
+    newServer->port = q->nta->Port;
+#if MDNSRESPONDER_SUPPORTS(APPLE, QUERIER)
+    mdns_replace(&newServer->dnsservice, q->dnsservice);
+#else
+    newServer->qDNSServer = q->qDNSServer;
+#endif
+    ConvertDomainNameToCString(&newServer->serverName, name);
+    newServer->connection = dso_create(mDNSfalse, 10, name, DNSPushDSOCallback, newServer, NULL);
+    if (newServer->connection == NULL)
+    {
+        mDNSPlatformMemFree(newServer);
+        mDNSPlatformMemFree(newZone);
+        return NULL;
+    }
+    newServer->connectInfo = dso_connect_state_create(name, mDNSNULL, newServer->port, 10,
+                                                      AbsoluteMaxDNSMessageData, AbsoluteMaxDNSMessageData,
+                                                      DNSPushDSOCallback, newServer->connection, newServer, "GetDSOConnectionToPushServer");
+    if (newServer->connectInfo)
+    {
+        dso_connect_state_use_tls(newServer->connectInfo);
+        DNSPushStartConnecting(newServer);
+    }
+    else
+    {
+        newServer->connectState = DNSPushServerConnectFailed;
+    }    
     newZone->numberOfQuestions = 1;
     newZone->zoneName = q->nta->ChildName;
-    newZone->servers  = newServer;
+    newZone->server = newServer;
 
     // Add the new zone to the begining of the list
     newZone->next   = m->DNSPushZones;
@@ -5894,170 +6227,74 @@ mDNSlocal tcpInfo_t * GetTCPConnectionToPushServer(mDNS *m, DNSQuestion *q)
 
     newServer->next   = m->DNSPushServers;
     m->DNSPushServers = newServer;
-    return newServer->connection;
+    LogMsg("GetConnectionToDNSPushNotificationServer: allocated new server.");
+
+    return newServer;
+}
+
+DNSPushNotificationServer *SubscribeToDNSPushNotificationServer(mDNS *m, DNSQuestion *q)
+{
+    DNSPushNotificationServer *server = GetConnectionToDNSPushNotificationServer(m, q);
+    char name[MAX_ESCAPED_DOMAIN_NAME + 9];  // type(hex)+class(hex)+name
+    dso_activity_t *activity;
+    if (server == mDNSNULL) return server;
+
+    // Now we have a connection to a push notification server.   It may be pending, or it may be active,
+    // but either way we can add a DNS Push subscription to the server object.
+    mDNS_snprintf(name, sizeof name, "%04x%04x", q->qtype, q->qclass);
+    ConvertDomainNameToCString(&q->qname, &name[8]);
+    activity = dso_add_activity(server->connection, name, kDNSPushActivity_Subscription, q, mDNSNULL);
+    if (activity == mDNSNULL)
+    {
+        LogInfo("SubscribeToDNSPushNotificationServer: failed to add question %##s", &q->qname);
+        return mDNSNULL;
+    }
+    // If we're already connected, send the subscribe request immediately.
+    if (server->connectState == DNSPushServerConnected || server->connectState == DNSPushServerSessionEstablished)
+    {
+        DNSPushNotificationSendSubscriptionChange(mDNStrue, server->connection, q);
+    }
+    return server;
 }
 
 mDNSexport void DiscoverDNSPushNotificationServer(mDNS *m, DNSQuestion *q)
 {
-    /* Use the same  NAT setup as in the LLQ case */
-    if (m->LLQNAT.clientContext != mDNSNULL) // LLQNAT just started, give it some time
-    {
-        LogInfo("startLLQHandshake: waiting for NAT status for %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
-        q->ThisQInterval = LLQ_POLL_INTERVAL + mDNSRandom(LLQ_POLL_INTERVAL/10);    // Retry in approx 15 minutes
-        q->LastQTime = m->timenow;
-        SetNextQueryTime(m, q);
-        return;
-    }
-
-    // Either we don't have {PCP, NAT-PMP, UPnP/IGD} support (ExternalPort is zero) or behind a Double NAT that may or
-    // may not have {PCP, NAT-PMP, UPnP/IGD} support (NATResult is non-zero)
-    if (mDNSIPPortIsZero(m->LLQNAT.ExternalPort) || m->LLQNAT.Result)
-    {
-        LogInfo("startLLQHandshake: Cannot receive inbound packets; will poll for %##s (%s) External Port %d, NAT Result %d",
-                q->qname.c, DNSTypeName(q->qtype), mDNSVal16(m->LLQNAT.ExternalPort), m->LLQNAT.Result);
-        StartLLQPolling(m, q); // Actually sets up the NAT Auto Tunnel
-        return;
-    }
-
-    if (mDNSIPPortIsZero(q->dnsPushServerPort) && q->dnsPushState == DNSPUSH_INIT)
-    {
-        LogInfo("SubscribeToDNSPushNotificationServer: StartGetZoneData for %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
-        q->ThisQInterval = LLQ_POLL_INTERVAL + mDNSRandom(LLQ_POLL_INTERVAL/10);    // Retry in approx 15 minutes
-        q->LastQTime     = m->timenow;
-        SetNextQueryTime(m, q);
-        q->dnsPushServerAddr = zeroAddr;
-        // We know q->dnsPushServerPort is zero because of check above
-        if (q->nta) CancelGetZoneData(m, q->nta);
-        q->nta = StartGetZoneData(m, &q->qname, ZoneServiceDNSPush, DNSPushNotificationGotZoneData, q);
-        return;
-    }
-
-    if (q->tcp)
-    {
-        LogInfo("SubscribeToDNSPushNotificationServer: Disposing existing TCP connection for %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
-        DisposeTCPConn(q->tcp);
-        q->tcp = mDNSNULL;
-    }
-
-    if (!q->nta)
-    {
-        // Normally we lookup the zone data and then call this function. And we never free the zone data
-        // for "PrivateQuery". But sometimes this can happen due to some race conditions. When we
-        // switch networks, we might end up "Polling" the network e.g., we are behind a Double NAT.
-        // When we poll, we free the zone information as we send the query to the server (See
-        // PrivateQueryGotZoneData). The NAT callback (LLQNATCallback) may happen soon after that. If we
-        // are still behind Double NAT, we would have returned early in this function. But we could
-        // have switched to a network with no NATs and we should get the zone data again.
-        LogInfo("SubscribeToDNSPushNotificationServer: nta is NULL for %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
-        q->nta = StartGetZoneData(m, &q->qname, ZoneServiceDNSPush, DNSPushNotificationGotZoneData, q);
-        return;
-    }
-    else if (!q->nta->Host.c[0])
-    {
-        // This should not happen. If it happens, we print a log and MakeTCPConn will fail if it can't find a hostname
-        LogMsg("SubscribeToDNSPushNotificationServer: ERROR!!: nta non NULL for %##s (%s) but HostName %d NULL, LongLived %d", q->qname.c, DNSTypeName(q->qtype), q->nta->Host.c[0], q->LongLived);
-    }
-    q->tcp = GetTCPConnectionToPushServer(m,q);
-    // If TCP failed (transient networking glitch) try again in five seconds
-    q->ThisQInterval = (q->tcp != mDNSNULL) ? q->ThisQInterval = 0 : (mDNSPlatformOneSecond * 5);
+    LogInfo("DiscoverDNSPushNotificationServer: StartGetZoneData for %##s (%s)", q->qname.c, DNSTypeName(q->qtype));
+    q->ThisQInterval = LLQ_POLL_INTERVAL + mDNSRandom(LLQ_POLL_INTERVAL/10);    // Retry in approx 15 minutes
     q->LastQTime     = m->timenow;
     SetNextQueryTime(m, q);
-}
-
-
-mDNSexport void SubscribeToDNSPushNotificationServer(mDNS *m, DNSQuestion *q)
-{
-    mDNSu8     *end = mDNSNULL;
-    InitializeDNSMessage(&m->omsg.h, zeroID, SubscribeFlags);
-    end = putQuestion(&m->omsg, end, m->omsg.data + AbsoluteMaxDNSMessageData, &q->qname, q->qtype, q->qclass);
-    if (!end)
-    {
-        LogMsg("ERROR: SubscribeToDNSPushNotificationServer putQuestion failed");
-        return;
-    }
-
-    mDNSSendDNSMessage(m, &m->omsg, end, mDNSInterface_Any, q->LocalSocket, &q->dnsPushServerAddr, q->dnsPushServerPort, q->tcp->sock, mDNSNULL, mDNSfalse);
-
-    // update question state
-    q->dnsPushState  = DNSPUSH_ESTABLISHED;
-    q->ThisQInterval = (kLLQ_INIT_RESEND * mDNSPlatformOneSecond);
-    q->LastQTime     = m->timenow;
-    SetNextQueryTime(m, q);
-
-}
-
-mDNSlocal  void reconcileDNSPushConnection(mDNS *m, DNSQuestion *q)
-{
-    DNSPushNotificationZone   *zone;
-    DNSPushNotificationServer *server;
-    DNSPushNotificationServer *nextServer;
-    DNSPushNotificationZone   *nextZone;
-
-    // Update the counts
-    for (zone = m->DNSPushZones; zone != mDNSNULL; zone = zone->next)
-    {
-        if (SameDomainName(&zone->zoneName, &q->nta->ChildName))
-        {
-            zone->numberOfQuestions--;
-            for (server = zone->servers; server != mDNSNULL; server = server->next)
-            {
-                if (mDNSSameAddress(&server->serverAddr, &q->dnsPushServerAddr))
-                    server->numberOfQuestions--;
-            }
-        }
-    }
-
-    // Now prune the lists
-    server = m->DNSPushServers;
-    nextServer = mDNSNULL;
-    while(server != mDNSNULL)
-    {
-        nextServer = server->next;
-        if (server->numberOfQuestions <= 0)
-        {
-            DisposeTCPConn(server->connection);
-            if (server == m->DNSPushServers)
-                m->DNSPushServers = nextServer;
-            mDNSPlatformMemFree(server);
-            server = nextServer;
-        }
-        else server = server->next;
-    }
-
-    zone = m->DNSPushZones;
-    nextZone = mDNSNULL;
-    while(zone != mDNSNULL)
-    {
-        nextZone = zone->next;
-        if (zone->numberOfQuestions <= 0)
-        {
-            if (zone == m->DNSPushZones)
-                m->DNSPushZones = nextZone;
-            mDNSPlatformMemFree(zone);
-            zone = nextZone;
-        }
-        else zone = zone->next;
-    }
-
+    if (q->nta) CancelGetZoneData(m, q->nta);
+    q->nta = StartGetZoneData(m, &q->qname, ZoneServiceDNSPush, DNSPushNotificationGotZoneData, q);
+    q->state = LLQ_DNSPush_ServerDiscovery;
 }
 
 mDNSexport void UnSubscribeToDNSPushNotificationServer(mDNS *m, DNSQuestion *q)
 {
-    mDNSu8     *end = mDNSNULL;
-    InitializeDNSMessage(&m->omsg.h, q->TargetQID, UnSubscribeFlags);
-    end = putQuestion(&m->omsg, end, m->omsg.data + AbsoluteMaxDNSMessageData, &q->qname, q->qtype, q->qclass);
-    if (!end)
+    dso_activity_t *activity;
+    
+    if (q->dnsPushServer != mDNSNULL)
     {
-        LogMsg("ERROR: UnSubscribeToDNSPushNotificationServer - putQuestion failed");
-        return;
+        if (q->dnsPushServer->connection != mDNSNULL)
+        {
+            if (q->dnsPushServer->connectState == DNSPushServerSessionEstablished ||
+                q->dnsPushServer->connectState == DNSPushServerConnected)
+            {
+                // Ignore any response we get to a pending subscribe.
+                dso_ignore_response(q->dnsPushServer->connection, q);
+                DNSPushNotificationSendSubscriptionChange(mDNSfalse, q->dnsPushServer->connection, q);
+            }
+            // activities linger even if we are not connected.
+            activity = dso_find_activity(q->dnsPushServer->connection, mDNSNULL, kDNSPushActivity_Subscription, q);
+            if (activity != mDNSNULL) {
+                dso_drop_activity(q->dnsPushServer->connection, activity);
+            }
+        }
+        DNSPushReconcileConnection(m, q);
     }
-
-    mDNSSendDNSMessage(m, &m->omsg, end, mDNSInterface_Any, q->LocalSocket, &q->dnsPushServerAddr, q->dnsPushServerPort, q->tcp->sock, mDNSNULL, mDNSfalse);
-
-    reconcileDNSPushConnection(m, q);
+    // We let the DSO Idle mechanism clean up the connection to the server.
 }
+#endif // MDNSRESPONDER_SUPPORTS(COMMON, DNS_PUSH)
 
-#endif // DNS_PUSH_ENABLED
 #if COMPILER_LIKES_PRAGMA_MARK
 #pragma mark -
 #endif
@@ -6169,7 +6406,7 @@ mDNSexport void RetrySearchDomainQuestions(mDNS *const m)
     (void) m;
 }
 
-mDNSexport mStatus mDNS_SetSecretForDomain(mDNS *m, DomainAuthInfo *info, const domainname *domain, const domainname *keyname, const char *b64keydata, const domainname *hostname, mDNSIPPort *port, mDNSBool autoTunnel)
+mDNSexport mStatus mDNS_SetSecretForDomain(mDNS *m, DomainAuthInfo *info, const domainname *domain, const domainname *keyname, const char *b64keydata, const domainname *hostname, mDNSIPPort *port)
 {
     (void) m;
     (void) info;
@@ -6178,7 +6415,6 @@ mDNSexport mStatus mDNS_SetSecretForDomain(mDNS *m, DomainAuthInfo *info, const 
     (void) b64keydata;
     (void) hostname;
     (void) port;
-    (void) autoTunnel;
 
     return mStatus_UnsupportedErr;
 }
@@ -6217,8 +6453,8 @@ mDNSexport mStatus mDNS_StopNATOperation(mDNS *const m, NATTraversalInfo *traver
 }
 
 mDNSexport DNSServer *mDNS_AddDNSServer(mDNS *const m, const domainname *d, const mDNSInterfaceID interface, const mDNSs32 serviceID, const mDNSAddr *addr,
-                                        const mDNSIPPort port, mDNSu32 scoped, mDNSu32 timeout, mDNSBool cellIntf, mDNSBool isExpensive, mDNSu16 resGroupID,
-                                        mDNSBool reqA, mDNSBool reqAAAA, mDNSBool reqDO)
+                                        const mDNSIPPort port, ScopeType scopeType, mDNSu32 timeout, mDNSBool isCell, mDNSBool isExpensive, mDNSBool isConstrained, mDNSBool isCLAT46,
+                                        mDNSu32 resGroupID, mDNSBool reqA, mDNSBool reqAAAA, mDNSBool reqDO)
 {
     (void) m;
     (void) d;
@@ -6226,10 +6462,12 @@ mDNSexport DNSServer *mDNS_AddDNSServer(mDNS *const m, const domainname *d, cons
     (void) serviceID;
     (void) addr;
     (void) port;
-    (void) scoped;
+    (void) scopeType;
     (void) timeout;
-    (void) cellIntf;
+    (void) isCell;
     (void) isExpensive;
+    (void) isCLAT46;
+    (void) isConstrained;
     (void) resGroupID;
     (void) reqA;
     (void) reqAAAA;
@@ -6308,3 +6546,13 @@ mDNSexport void DiscoverDNSPushNotificationServer(mDNS *m, DNSQuestion *q)
 }
 
 #endif // !UNICAST_DISABLED
+
+
+// Local Variables:
+// mode: C
+// tab-width: 4
+// c-file-style: "bsd"
+// c-basic-offset: 4
+// fill-column: 108
+// indent-tabs-mode: nil
+// End:
