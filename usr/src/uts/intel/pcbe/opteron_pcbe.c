@@ -66,6 +66,7 @@
 /*
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -447,9 +448,10 @@ static const amd_generic_event_t family_10h_generic_events[] = {
 };
 
 /*
- * For Family 17h, the cpcgen utility generates all of our events including ones
- * that need specific unit codes, therefore we leave all unit codes out of
- * these. Zen 1 and Zen 2 have different event sets that they support.
+ * For Family 17h and Family 19h, the cpcgen utility generates all of our events
+ * including ones that need specific unit codes, therefore we leave all unit
+ * codes out of these. Zen 1, Zen 2, and Zen 3 have different event sets that
+ * they support.
  */
 static const amd_generic_event_t family_17h_zen1_papi_events[] = {
 	{ "PAPI_br_cn",		"ExRetCond" },
@@ -474,6 +476,18 @@ static const amd_generic_event_t family_17h_zen2_papi_events[] = {
 	GEN_EV_END
 };
 
+static const amd_generic_event_t family_19h_zen3_papi_events[] = {
+	{ "PAPI_br_cn",		"ExRetCond" },
+	{ "PAPI_br_ins",	"ExRetBrn" },
+	{ "PAPI_tot_cyc",	"LsNotHaltedCyc" },
+	{ "PAPI_tot_ins",	"ExRetInstr" },
+	{ "PAPI_tlb_dm",	"LsL1DTlbMiss" },
+	{ "PAPI_tlb_im",	"BpL1TlbMissL2TlbMiss" },
+	{ "PAPI_tot_cyc",	"LsNotHaltedCyc" },
+	GEN_EV_END
+};
+
+
 
 static char	*evlist;
 static size_t	evlist_sz;
@@ -497,6 +511,9 @@ static char amd_fam_17h_zen2_reg[] = "See \"Preliminary Processor Programming "
 "(AMD publication 55803), \"Processor Programming Reference (PPR) for AMD "
 "Family 17h Model 71h, Revision B0 Processors\" (AMD publication 56176), and "
 "amd_f17h_zen2_events(3CPC)";
+static char amd_fam_19h_zen3_reg[] = "See \"Preliminary Processor Programming "
+"Reference (PPR) for AMD Family 19h Model 01h, Revision B1 Processors Volume "
+"1 of 2 (AMD publication 55898) and amd_f17h_zen3_events(3CPC)";
 
 static char amd_pcbe_impl_name[64];
 static char *amd_pcbe_cpuref;
@@ -611,6 +628,10 @@ opt_pcbe_init(void)
 		amd_pcbe_cpuref = amd_fam_17h_zen2_reg;
 		amd_events = opteron_pcbe_f17h_zen2_events;
 		amd_generic_events = family_17h_zen2_papi_events;
+	} else if (amd_family == 0x19 && amd_model <= 0xf) {
+		amd_pcbe_cpuref = amd_fam_19h_zen3_reg;
+		amd_events = opteron_pcbe_f19h_zen3_events;
+		amd_generic_events = family_19h_zen3_papi_events;
 	} else {
 		/*
 		 * Different families have different meanings on events and even

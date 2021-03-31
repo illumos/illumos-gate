@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2021 Oxide Computer Company
 #
 #
 # This Makefile builds the AMD Opteron/Athlon64 Performance Counter BackEnd.
@@ -34,7 +35,8 @@ UTSBASE = ../..
 #
 CPCGEN_OBJS	= \
 	opteron_pcbe_f17h_zen1.o \
-	opteron_pcbe_f17h_zen2.o
+	opteron_pcbe_f17h_zen2.o \
+	opteron_pcbe_f19h_zen3.o
 
 CPCGEN_COMMON	= opteron_pcbe_cpcgen.h
 CPCGEN_CMD	= $(CPCGEN) -d $(SRC)/data/amdpmc -o .

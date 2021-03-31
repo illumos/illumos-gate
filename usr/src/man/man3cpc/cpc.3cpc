@@ -4,7 +4,7 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright (c) 2019, Joyent, Inc.
 .\" Copyright 2021 Oxide Computer Company
-.Dd January 22, 2021
+.Dd March 30, 2021
 .Dt CPC 3CPC
 .Os
 .Sh NAME
@@ -140,10 +140,13 @@ The covered processor families are listed in hexadecimal.
 .Bl -tag -width Xr
 .It Xr amd_f17h_zen1_events 3CPC
 AMD Family 17h Zen 1 processors, including models 00-2fh.
-Include Ryzen, ThreadRipper, and EPYC branded processors.
+Includes Ryzen, ThreadRipper, and EPYC branded processors.
 .It Xr amd_f17h_zen2_events 3CPC
 AMD Family 17h Zen 2 processors, including models 30-7fh.
-Include Ryzen, ThreadRipper, and EPYC branded processors.
+Includes Ryzen, ThreadRipper, and EPYC branded processors.
+.It Xr amd_f17h_zen3_events 3CPC
+AMD Family 19h Zen 3 processors, including models 00-0fh.
+Includes EPYC branded processors.
 .El
 .Ss Using Attributes
 Some processors have advanced performance counter capabilities that are
