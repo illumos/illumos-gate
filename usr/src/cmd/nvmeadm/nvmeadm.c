@@ -245,6 +245,7 @@ main(int argc, char **argv)
 	nvme_process_arg_t npa = { 0 };
 	int help = 0;
 	char *tmp, *lasts = NULL;
+	char *ctrl = NULL;
 
 	while ((c = getopt(argc, argv, "dhv")) != -1) {
 		switch (c) {
@@ -303,7 +304,9 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * All commands but "list" require a ctl/ns argument.
+	 * All commands but "list" require a ctl/ns argument. However, this
+	 * should not be passed through to the command in its subsequent
+	 * arguments.
 	 */
 	if ((npa.npa_argc == 0 || (strncmp(npa.npa_argv[0], "nvme", 4) != 0)) &&
 	    cmd->c_func != do_list) {
@@ -312,11 +315,19 @@ main(int argc, char **argv)
 		exit(-1);
 	}
 
+	if (npa.npa_argc > 0) {
+		ctrl = npa.npa_argv[0];
+		npa.npa_argv++;
+		npa.npa_argc--;
+	} else {
+		ctrl = NULL;
+	}
+
 	/*
 	 * Make sure we're not running commands on multiple controllers that
 	 * aren't allowed to do that.
 	 */
-	if (npa.npa_argv[0] != NULL && strchr(npa.npa_argv[0], ',') != NULL &&
+	if (ctrl != NULL && strchr(ctrl, ',') != NULL &&
 	    cmd->c_multi == B_FALSE) {
 		warnx("%s not allowed on multiple controllers",
 		    cmd->c_name);
@@ -327,7 +338,7 @@ main(int argc, char **argv)
 	/*
 	 * Get controller/namespace arguments and run command.
 	 */
-	npa.npa_name = strtok_r(npa.npa_argv[0], ",", &lasts);
+	npa.npa_name = strtok_r(ctrl, ",", &lasts);
 	do {
 		if (npa.npa_name != NULL) {
 			tmp = strchr(npa.npa_name, '/');
