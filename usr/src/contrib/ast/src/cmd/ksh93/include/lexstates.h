@@ -139,6 +139,7 @@ extern const char e_lexobsolete1[];
 extern const char e_lexobsolete2[];
 extern const char e_lexobsolete3[];
 extern const char e_lexobsolete4[];
+extern const char e_lexobsolete4b[];
 extern const char e_lexobsolete5[];
 extern const char e_lexobsolete6[];
 extern const char e_lexnonstandard[];

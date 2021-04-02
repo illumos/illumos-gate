@@ -1462,8 +1462,36 @@ breakloop:
 		default:
 			if(lp->lex.testop2)
 			{
+#ifdef __ASTUpstream__
 				if(lp->lexd.warn && (c&TEST_ARITH))
 					errormsg(SH_DICT,ERROR_warn(0),e_lexobsolete4,shp->inlineno,state);
+#else
+				if(lp->lexd.warn && (c&TEST_ARITH)) {
+					char *alt = NULL;
+
+					if (strcmp(state, "-eq") == 0)
+						alt = "==";
+					else if (strcmp(state, "-ne") == 0)
+						alt = "!=";
+					else if (strcmp(state, "-lt") == 0)
+						alt = "<";
+					else if (strcmp(state, "-gt") == 0)
+						alt = ">";
+					else if (strcmp(state, "-le") == 0)
+						alt = "<=";
+					else if (strcmp(state, "-ge") == 0)
+						alt = ">=";
+					if (alt != NULL) {
+						errormsg(SH_DICT, ERROR_warn(0),
+						    e_lexobsolete4b,
+						    shp->inlineno, state, alt);
+					} else {
+						errormsg(SH_DICT, ERROR_warn(0),
+						    e_lexobsolete4,
+						    shp->inlineno, state);
+					}
+				}
+#endif
 				if(c&TEST_PATTERN)
 					lp->lex.incase = 1;
 				else if(c==TEST_REP)
