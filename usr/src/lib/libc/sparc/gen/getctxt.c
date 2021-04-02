@@ -25,16 +25,15 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#pragma weak _getcontext = getcontext
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <ucontext.h>
 #include <sys/types.h>
+#include "libc.h"
+
+#pragma weak _getcontext = getcontext
 
 int
 getcontext(ucontext_t *ucp)

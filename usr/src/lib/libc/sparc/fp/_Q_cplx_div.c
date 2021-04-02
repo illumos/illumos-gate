@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * On SPARC V8, _Q_cplx_div(v, z, w) sets *v = *z / *w with infin-
  * ities handling according to C99.
@@ -85,7 +83,7 @@ testinfl(long double x)
 long double _Complex
 _Q_cplx_div(const long double _Complex *z, const long double _Complex *w)
 {
-	long double _Complex	v;
+	long double _Complex	v = 0;
 #else
 void
 _Q_cplx_div(long double _Complex *v, const long double _Complex *z,

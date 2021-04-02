@@ -222,6 +222,11 @@ extern int _so_getsockopt(int, int, int, char *, int *);
 extern int lsign(dl_t);
 
 /*
+ * defined in getctxt.c
+ */
+extern int _getcontext(ucontext_t *) __RETURNS_TWICE;
+
+/*
  * defined in ucontext.s
  */
 extern int __getcontext(ucontext_t *);

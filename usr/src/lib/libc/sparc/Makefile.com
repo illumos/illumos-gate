@@ -1381,7 +1381,9 @@ $(ASSYMDEP_OBJS:%=pics/%): assym.h
 assym.h := CFLAGS += $(CCGDEBUG)
 
 GENASSYM_C = $(LIBCDIR)/$(MACH)/genassym.c
-LDFLAGS.native = $(LDASSERTS) $(ZASSERTDEFLIB)=libc.so $(BDIRECT)
+LDFLAGS.native = $(LDASSERTS) $(BDIRECT)
+
+genassym := NATIVE_LIBS += libc.so
 
 genassym: $(GENASSYM_C)
 	$(NATIVECC) $(NATIVE_CFLAGS) -I$(LIBCBASE)/inc -I$(LIBCDIR)/inc \

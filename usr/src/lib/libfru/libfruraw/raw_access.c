@@ -205,7 +205,7 @@ create_packet_hash_object(void)
 static hash_obj_t *
 get_container_hash_object(int	object_type, handle_t	handle)
 {
-	hash_obj_t	*hash_obj;
+	hash_obj_t	*hash_obj = NULL;
 
 	switch (object_type) {
 	case CONTAINER_TYPE:

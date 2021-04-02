@@ -320,7 +320,7 @@ pics/%.o: $(LIBCBASE)/../port/threads/%.d $(THREADSOBJS:%=pics/%)
 
 # assym rules
 
-LDFLAGS.native = $(LDASSERTS) $(ZASSERTDEFLIB)=libc.so $(BDIRECT)
+LDFLAGS.native = $(LDASSERTS) $(BDIRECT)
 
 #
 # genassym is a funny fish: it's run on the build machine, so should use the
