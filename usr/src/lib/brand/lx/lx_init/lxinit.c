@@ -490,11 +490,34 @@ lxi_iface_ipv6_link_local(const char *iface)
 	return (0);
 }
 
+static int lxi_route_send_msg(struct rt_msghdr *rtm)
+{
+	int sockfd, len;
+
+	if ((sockfd = socket(PF_ROUTE, SOCK_RAW, AF_INET)) < 0) {
+		lxi_warn("socket(PF_ROUTE): %s\n", strerror(errno));
+		return (-1);
+	}
+
+	if ((len = write(sockfd, (const void *)rtm, rtm->rtm_msglen)) < 0) {
+		lxi_warn("could not write rtmsg: %s", strerror(errno));
+		close(sockfd);
+		return (-1);
+	} else if (len < rtm->rtm_msglen) {
+		lxi_warn("write() rtmsg incomplete");
+		close(sockfd);
+		return (-1);
+	}
+
+	close(sockfd);
+	return (0);
+}
+
 static int
 lxi_iface_gateway(const char *iface, const char *dst, int dstpfx,
-    const char *gwaddr)
+    const char *gwaddr, boolean_t llroute)
 {
-	int idx, len, sockfd;
+	int idx;
 	char rtbuf[RTMBUFSZ];
 	struct rt_msghdr *rtm = (struct rt_msghdr *)rtbuf;
 	struct sockaddr_in *dst_sin = (struct sockaddr_in *)
@@ -504,7 +527,10 @@ lxi_iface_gateway(const char *iface, const char *dst, int dstpfx,
 
 	(void) bzero(rtm, RTMBUFSZ);
 	rtm->rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
-	rtm->rtm_flags = RTF_UP | RTF_STATIC | RTF_GATEWAY;
+
+	if (!llroute)
+		rtm->rtm_flags = RTF_UP | RTF_STATIC | RTF_GATEWAY;
+
 	rtm->rtm_msglen = sizeof (rtbuf);
 	rtm->rtm_pid = getpid();
 	rtm->rtm_type = RTM_ADD;
@@ -516,6 +542,15 @@ lxi_iface_gateway(const char *iface, const char *dst, int dstpfx,
 	 * which represents the default gateway.  If we were passed a more
 	 * specific destination network, use that instead.
 	 */
+
+	if (dstpfx == -1) {
+		/*
+		 * no prefix was specified; assume a prefix length of 32,
+		 * which seems in line with the behavior of vmadm.
+		 */
+		dstpfx = 32;
+	}
+
 	dst_sin->sin_family = AF_INET;
 	netmask_sin->sin_family = AF_INET;
 	if (dst != NULL) {
@@ -543,23 +578,7 @@ lxi_iface_gateway(const char *iface, const char *dst, int dstpfx,
 		rtm->rtm_index = idx;
 	}
 
-	if ((sockfd = socket(PF_ROUTE, SOCK_RAW, AF_INET)) < 0) {
-		lxi_warn("socket(PF_ROUTE): %s\n", strerror(errno));
-		return (-1);
-	}
-
-	if ((len = write(sockfd, rtbuf, rtm->rtm_msglen)) < 0) {
-		lxi_warn("could not write rtmsg: %s", strerror(errno));
-		close(sockfd);
-		return (-1);
-	} else if (len < rtm->rtm_msglen) {
-		lxi_warn("write() rtmsg incomplete");
-		close(sockfd);
-		return (-1);
-	}
-
-	close(sockfd);
-	return (0);
+	return (lxi_route_send_msg(rtm));
 }
 
 static void
@@ -634,7 +653,7 @@ lxi_net_setup(zone_dochandle_t handle)
 	while (zonecfg_getnwifent(handle, &lookup) == Z_OK) {
 		const char *iface = lookup.zone_nwif_physical;
 		struct zone_res_attrtab *attrs = lookup.zone_nwif_attrp;
-		const char *ipaddrs, *primary, *gateway;
+		const char *ipaddrs;
 		char ipaddrs_copy[MAXNAMELEN], cidraddr[BUFSIZ],
 		    *ipaddr, *tmp, *lasts;
 		boolean_t first_ipv4_configured = B_FALSE;
@@ -684,12 +703,6 @@ lxi_net_setup(zone_dochandle_t handle)
 				    "to interface %s", ipaddr, iface);
 			}
 		}
-
-		if (zone_find_attr(attrs, "primary", &primary) == 0 &&
-		    strncmp(primary, "true", MAXNAMELEN) == 0 &&
-		    zone_find_attr(attrs, "gateway", &gateway) == 0) {
-			lxi_iface_gateway(iface, NULL, 0, gateway);
-		}
 	}
 
 	if (do_addrconf) {
@@ -700,30 +713,71 @@ lxi_net_setup(zone_dochandle_t handle)
 }
 
 static void
-lxi_net_static_route(const char *line)
+lxi_net_setup_gateways(zone_dochandle_t handle)
 {
-	/*
-	 * Each static route line is a string of the form:
-	 *
-	 *	"10.77.77.2|10.1.1.0/24|false"
-	 *
-	 * i.e. gateway address, destination network, and whether this is
-	 * a "link local" route or a next hop route.
-	 */
-	custr_t *cu = NULL;
-	char *gw = NULL, *dst = NULL;
-	int pfx = -1;
-	int i;
+	struct zone_nwiftab lookup;
 
-	if (custr_alloc(&cu) != 0) {
-		lxi_err("custr_alloc failure");
+	if (zonecfg_setnwifent(handle) != Z_OK)
+		return;
+
+	while (zonecfg_getnwifent(handle, &lookup) == Z_OK) {
+		const char *iface = lookup.zone_nwif_physical;
+		struct zone_res_attrtab *attrs = lookup.zone_nwif_attrp;
+		const char *primary, *gateway;
+
+		if (zone_find_attr(attrs, "primary", &primary) == 0 &&
+		    strcmp(primary, "true") == 0 &&
+		    zone_find_attr(attrs, "gateway", &gateway) == 0) {
+			lxi_iface_gateway(iface, NULL, 0, gateway, B_FALSE);
+		}
 	}
 
+	(void) zonecfg_endnwifent(handle);
+}
+
+/*
+ * Parse a static route line string of the form:
+ *
+ *      "10.77.77.2|10.1.1.0/24|false"
+ *
+ * i.e. gateway address, destination network, and whether this is
+ * a "link local" route or a next hop route.
+ */
+static void
+lxi_parse_route_line(const char *line, custr_t *cu, char *gw, char *dst,
+    int *pfx, size_t gwlen, size_t dstlen)
+{
+	int i;
+	boolean_t havegw = B_FALSE, havedst = B_FALSE, nopfx = B_FALSE;
+
 	for (i = 0; line[i] != '\0'; i++) {
-		if (gw == NULL) {
+		if (!havegw) {
 			if (line[i] == '|') {
-				if ((gw = strdup(custr_cstr(cu))) == NULL) {
-					lxi_err("strdup failure");
+				if (strlcpy(gw, custr_cstr(cu), gwlen)
+				    >= gwlen) {
+					lxi_err("strlcpy failure");
+				} else {
+					havegw = B_TRUE;
+					}
+				custr_reset(cu);
+			} else {
+				if (custr_appendc(cu, line[i]) != 0) {
+					lxi_err("custr_appendc failure");
+				}
+			}
+			continue;
+		}
+
+		if (!havedst) {
+			if (line[i] == '/' || line[i] == '|') {
+				if ((strlcpy(dst, custr_cstr(cu), dstlen))
+				    >= dstlen) {
+					lxi_err("strlcpy failure");
+				} else {
+					havedst = B_TRUE;
+					if (line[i] == '|') {
+						nopfx = B_TRUE;
+					}
 				}
 				custr_reset(cu);
 			} else {
@@ -734,23 +788,9 @@ lxi_net_static_route(const char *line)
 			continue;
 		}
 
-		if (dst == NULL) {
-			if (line[i] == '/') {
-				if ((dst = strdup(custr_cstr(cu))) == NULL) {
-					lxi_err("strdup failure");
-				}
-				custr_reset(cu);
-			} else {
-				if (custr_appendc(cu, line[i]) != 0) {
-					lxi_err("custr_appendc failure");
-				}
-			}
-			continue;
-		}
-
-		if (pfx == -1) {
+		if (*pfx == -1 && !nopfx) {
 			if (line[i] == '|') {
-				pfx = atoi(custr_cstr(cu));
+				*pfx = atoi(custr_cstr(cu));
 				custr_reset(cu);
 			} else {
 				if (custr_appendc(cu, line[i]) != 0) {
@@ -764,26 +804,59 @@ lxi_net_static_route(const char *line)
 			lxi_err("custr_appendc failure");
 		}
 	}
-
-	/*
-	 * We currently only support "next hop" routes, so ensure that
-	 * "linklocal" is false:
-	 */
-	if (strcmp(custr_cstr(cu), "false") != 0) {
-		lxi_warn("invalid static route: %s", line);
-	}
-
-	if (lxi_iface_gateway(NULL, dst, pfx, gw) != 0) {
-		lxi_err("failed to add route: %s/%d -> %s", dst, pfx, gw);
-	}
-
-	custr_free(cu);
-	free(gw);
-	free(dst);
 }
 
 static void
-lxi_net_static_routes(void)
+lxi_net_process_route_line(const char *line, boolean_t llonly)
+{
+	custr_t *cu = NULL;
+	int pfx = -1;
+	char gw[INET6_ADDRSTRLEN];
+	char dst[INET6_ADDRSTRLEN];
+
+	if (custr_alloc(&cu) != 0) {
+		lxi_err("custr_alloc failure");
+	}
+
+	lxi_parse_route_line(line, cu, gw, dst, &pfx, sizeof (gw),
+	    sizeof (dst));
+
+	if (llonly && strcmp(custr_cstr(cu), "true") == 0) {
+		if (lxi_iface_gateway(NULL, dst, pfx, gw, B_TRUE) != 0) {
+			lxi_err("failed to add link-local route: %s/%d -> %s",
+			    dst, pfx, gw);
+		}
+	} else if (!llonly && strcmp(custr_cstr(cu), "false") == 0) {
+		if (lxi_iface_gateway(NULL, dst, pfx, gw, B_FALSE) != 0) {
+			lxi_err("failed to add next-hop route: %s/%d -> %s",
+			    dst, pfx, gw);
+		}
+	} else if (strcmp(custr_cstr(cu), "true") != 0 &&
+	    strcmp(custr_cstr(cu), "false") != 0) {
+		/*
+		 * try to be helpful when we run into something we don't expect.
+		 */
+		lxi_warn("skipping unknown static route defined in line %s, "
+		    " parsed link-local flag=%s",  line, custr_cstr(cu));
+	}
+
+	custr_free(cu);
+}
+
+static void
+lxi_net_static_route(const char *line)
+{
+	lxi_net_process_route_line(line, B_FALSE);
+}
+
+static void
+lxi_net_linklocal_route(const char *line)
+{
+	lxi_net_process_route_line(line, B_TRUE);
+}
+
+static void
+lxi_run_routeinfo(void * callback)
 {
 	const char *cmd = "/native/usr/lib/brand/lx/routeinfo";
 	char *const argv[] = { "routeinfo", NULL };
@@ -796,7 +869,8 @@ lxi_net_static_routes(void)
 		/*
 		 * This binary is (potentially) shipped from another
 		 * consolidation.  If it does not exist, then the platform does
-		 * not currently support static routes for LX-branded zones.
+		 * not currently support link-local or static routes for
+		 * LX-branded zones.
 		 */
 		return;
 	}
@@ -807,9 +881,22 @@ lxi_net_static_routes(void)
 	 * is complete.
 	 */
 	if (run_command(cmd, argv, envp, errbuf, sizeof (errbuf),
-	    lxi_net_static_route, &code) != 0 || code != 0) {
+	    callback, &code) != 0 || code != 0) {
 		lxi_err("failed to run \"%s\": %s", cmd, errbuf);
 	}
+}
+
+static void
+lxi_net_linklocal_routes(void)
+{
+	lxi_run_routeinfo(lxi_net_linklocal_route);
+}
+
+
+static void
+lxi_net_static_routes(void)
+{
+	lxi_run_routeinfo(lxi_net_static_route);
 }
 
 static void
@@ -917,6 +1004,10 @@ main(int argc, char *argv[])
 	handle = lxi_config_open();
 	lxi_net_loopback();
 	lxi_net_setup(handle);
+
+	lxi_net_linklocal_routes();
+	lxi_net_setup_gateways(handle);
+
 	lxi_config_close(handle);
 
 	lxi_net_static_routes();
