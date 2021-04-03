@@ -104,7 +104,8 @@ mdb_ctf_set_int zfs_spa_discard_memory_limit 1000000
 
 nested_wait_discard_finish
 
-log_must zdb $NESTEDPOOL
+log_must zpool export $NESTEDPOOL
+log_must zdb -e -p $FILEDISKDIR $NESTEDPOOL
 
 log_pass "Can export/import but not rewind/checkpoint/discard or " \
     "change pool's config while discarding."
