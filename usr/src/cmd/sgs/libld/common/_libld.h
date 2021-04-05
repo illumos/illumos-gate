@@ -460,6 +460,7 @@ typedef struct {
 #define	AL_CNT_SEGMENTS		20	/* ofl_segs */
 
 #define	AL_CNT_ASSDEFLIB	4	/* ofl_assdeflib exceptions count */
+#define	AL_CNT_MAPASSERT	10	/* mapfile assertions */
 
 /*
  * Return codes for {tls|got}_fixups() routines

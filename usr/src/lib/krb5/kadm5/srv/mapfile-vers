@@ -55,10 +55,30 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	destroy_dict;
 	find_word;
 	handle_chpw;
-	hist_db;
-	hist_key;
-	hist_kvno;
-	hist_princ;
+	hist_db		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 68;
+				};
+			};
+	hist_key	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 28;
+				};
+			};
+	hist_kvno	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 4;
+				};
+			};
+	hist_princ	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 4;
+				};
+			};
 	init_dict;
 	kadm5_check_min_life;
 	kadm5_chpass_principal;
@@ -142,8 +162,18 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_read_realm_params;
 	krb5_string_to_flags;
 	krb5_string_to_keysalts;
-	master_db;
-	master_princ;
+	master_db	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 68;
+				};
+			};
+	master_princ	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 4;
+				};
+			};
 	osa_free_princ_ent;
 	passwd_check;
 	trunc_name;

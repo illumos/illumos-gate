@@ -40,7 +40,7 @@ $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	fork				{ FLAGS = NODIRECT };
+	fork				{ FLAGS = NODIRECT; };
 	fork1;
 	pthread_create;
 	pthread_exit;
@@ -48,59 +48,229 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	thr_create;
 	thr_exit;
 	tnf_allocate;
-	tnf_char_tag_data;
-	tnf_float32_tag_data;
-	tnf_float64_tag_data;
-	tnf_int16_tag_data;
-	tnf_int32_tag_data;
-	tnf_int64_tag_data;
-	tnf_int8_tag_data;
-	tnf_lwpid_tag_data;
-	tnf_name_tag_data;
-	tnf_non_threaded_test_addr;
-	tnf_opaque_tag_data;
-	tnf_pid_tag_data;
+	tnf_char_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_float32_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_float64_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_int16_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_int32_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_int64_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_int8_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_lwpid_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_name_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_non_threaded_test_addr	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_opaque_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_pid_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	__tnf_probe_alloc;
 	tnf_probe_debug;
-	tnf_probe_event_tag_data;
+	tnf_probe_event_tag_data	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	tnf_probe_get_arg_indexed;
 	tnf_probe_get_chars;
 	tnf_probe_get_num_args;
 	tnf_probe_get_type_indexed;
 	tnf_probe_get_value;
-	__tnf_probe_list_head;
-	__tnf_probe_list_valid;
-	__tnf_probe_memseg_p;
+	__tnf_probe_list_head		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	__tnf_probe_list_valid		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
+	__tnf_probe_memseg_p		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	__tnf_probe_notify;
-	__tnf_probe_thr_sync;
-	__tnf_probe_version_1_info;
+	__tnf_probe_thr_sync		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	__tnf_probe_version_1_info	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[2];
+						};
+					};
 	tnf_process_disable;
 	tnf_process_enable;
 	tnf_ref32_1;
-	tnf_size_tag_data;
+	tnf_size_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	tnf_string_1;
-	tnf_string_tag_data;
+	tnf_string_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	tnf_struct_tag_1;
-	tnf_tag_tag_data;
-	__tnf_tag_version_1_info;
+	tnf_tag_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	__tnf_tag_version_1_info	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[2];
+						};
+					};
 	tnf_thread_disable;
-	tnf_threaded_test_addr;
+	tnf_threaded_test_addr		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	tnf_thread_enable;
-	tnf_time_base_tag_data;
-	tnf_time_delta_tag_data;
+	tnf_time_base_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_time_delta_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	tnf_trace_alloc;
 	tnf_trace_commit;
 	tnf_trace_end;
-	tnf_trace_file_min;
-	tnf_trace_file_name;
-	tnf_trace_file_size;
+	tnf_trace_file_min		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
+	tnf_trace_file_name		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 1024;
+						};
+					};
+	tnf_trace_file_size		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
 	tnf_trace_rollback;
-	tnf_uint16_tag_data;
-	tnf_uint32_tag_data;
-	tnf_uint64_tag_data;
-	tnf_uint8_tag_data;
-	tnf_user_struct_properties;
-	_tnfw_b_control;
+	tnf_uint16_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_uint32_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_uint64_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_uint8_tag_data		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	tnf_user_struct_properties	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	_tnfw_b_control			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 
 $if _sparc
 	thr_stksegment;

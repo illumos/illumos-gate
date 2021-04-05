@@ -54,6 +54,6 @@ SYMBOL_VERSION SUNW_1.1 {
 		yyreject_e;
 		yyreject_w;
 		yywrap;
-	local:	
+	local:
 		*;
 };

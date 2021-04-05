@@ -62,7 +62,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ss_quit;
 	ss_self_identify;
 	ss_set_prompt;
-	ss_std_requests;
+	ss_std_requests	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 8;
+				};
+			};
 	ss_subsystem_name;
 	ss_subsystem_version;
 	ss_unimplemented;

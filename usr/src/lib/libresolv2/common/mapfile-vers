@@ -46,7 +46,7 @@ SYMBOL_VERSION SUNW_2.3 {	# SunOS 5.11 (Solaris 11)
 
 SYMBOL_VERSION SUNW_2.2.2 {	# SunOS 5.10 (Solaris 10 Update 5)
     global:
-	inet_aton		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_aton	{ TYPE = FUNCTION; FILTER = libc.so.1; };
 } SUNW_2.2.1;
 
 SYMBOL_VERSION SUNW_2.2.1 {	# SunOS 5.10 (Solaris 10 Update 4)
@@ -77,7 +77,11 @@ SYMBOL_VERSION SUNW_2.1 {	# SunOS 5.6 (Solaris 2.6)
 	__fp_query;
 	_getlong;
 	_getshort;
-	h_errno			{ FLAGS = NODIRECT; FILTER = libnsl.so.1 };
+	h_errno	{
+		  SIZE = 4;
+		  FLAGS = NODIRECT;
+		  FILTER = libnsl.so.1;
+		};
 	__hostalias;
 	hstrerror;
 	__p_cdname;
@@ -86,7 +90,13 @@ SYMBOL_VERSION SUNW_2.1 {	# SunOS 5.6 (Solaris 2.6)
 	__p_time;
 	__p_type;
 	__putlong;
-	_res;
+$if _ELF64
+	_res	{ ASSERT = { TYPE = OBJECT; SIZE = 552; }; };
+$elif _ELF32
+	_res	{ ASSERT = { TYPE = OBJECT; SIZE = 512; }; };
+$else
+$error unknown ELFCLASS
+$endif
 	res_init;
 	res_mkquery;
 	res_query;
@@ -117,7 +127,12 @@ SYMBOL_VERSION SUNWprivate_2.2 {
 
 SYMBOL_VERSION SUNWprivate_2.1 {
     global:
-	__assertion_failed;
+	__assertion_failed	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	assertion_type_to_text;
 	b64_ntop;
 	__b64_ntop;
@@ -132,7 +147,7 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	__ctl_sendhelp;
 	__ctl_server;
 	__ctl_setcsctx;
-	daemon		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	daemon			{ TYPE = FUNCTION; FILTER = libc.so.1; };
 	dn_count_labels;
 	__dn_count_labels;
 	dn_skipname;
@@ -151,7 +166,12 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	__dst_sign_data;
 	__dst_s_put_int16;
 	__dst_s_verify_str;
-	dst_t_func;
+	dst_t_func		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[158];
+					};
+				};
 	__dst_verify_data;
 	__dst_write_key;
 	__evAddTime;
@@ -182,7 +202,12 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	__fp_nquery;
 	fp_query;
 	__fp_resstat;
-	h_errlist;
+	h_errlist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[5];
+					};
+				};
 	__h_errno;
 	__h_errno_set;
 	hostalias;
@@ -200,7 +225,12 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	__ISC_res_nmkupdate;
 	__ISC_res_nupdate;
 	__ISC_res_update;
-	key_file_fmt_str;
+	key_file_fmt_str	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	loc_aton;
 	__loc_aton;
 	loc_ntoa;
@@ -232,7 +262,12 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	__net_data_minimize;
 	__ns_datetosecs;
 	__ns_find_tsig;
-	_ns_flagdata;
+	_ns_flagdata		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 128;
+					};
+				};
 	__ns_format_ttl;
 	__ns_get16;
 	__ns_get32;
@@ -282,11 +317,26 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	__ns_verify_tcp;
 	__ns_verify_tcp_init;
 	p_cdname;
-	__p_cert_syms;
+	__p_cert_syms		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[18];
+					};
+				};
 	p_class;
-	__p_class_syms;
+	__p_class_syms		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[24];
+					};
+				};
 	p_fqnname;
-	__p_key_syms;
+	__p_key_syms		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[18];
+					};
+				};
 	p_option;
 	__p_option;
 	p_query;
@@ -297,7 +347,12 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	__p_section;
 	p_time;
 	p_type;
-	__p_type_syms;
+	__p_type_syms		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[207];
+					};
+				};
 	putlong;
 	putshort;
 	__putshort;
@@ -330,7 +385,12 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	res_nmkupdate;
 	res_nupdate;
 	__res_no_hosts_fallback;
-	_res_opcodes;
+	_res_opcodes		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[16];
+					};
+				};
 	__res_override_retry;
 	res_ownok;
 	__res_ownok;

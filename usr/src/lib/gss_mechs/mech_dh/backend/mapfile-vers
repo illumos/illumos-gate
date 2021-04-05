@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 # Generic interface definition for:
-# 	usr/src/lib/gss_mechs/mech_dh/backend/mech_dh.so.1
+#	usr/src/lib/gss_mechs/mech_dh/backend/mech_dh.so.1
 #
 
 #
@@ -41,10 +41,15 @@
 $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate_1.1 {
-	global:
-		__dh_gss_initialize;
-		__DH_GSS_C_NT_NETNAME;
-		__context_debug_entry;
-	local:
-		*;
+    global:
+	__dh_gss_initialize;
+	__DH_GSS_C_NT_NETNAME	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	__context_debug_entry;
+    local:
+	*;
 };

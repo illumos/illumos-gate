@@ -129,6 +129,12 @@ dynsort_dupwarn(Ofl_desc *ofl, Sym *ldynsym, const char *str,
 	}
 }
 
+static inline Boolean
+ass_enabled(Ass_desc *ma, uint_t ass)
+{
+	return ((ma->ass_enabled & ass) != 0);
+}
+
 /*
  * Build and update any output symbol tables.  Here we work on all the symbol
  * tables at once to reduce the duplication of symbol and string manipulation.
@@ -1122,6 +1128,51 @@ update_osym(Ofl_desc *ofl)
 				bind = STB_WEAK;
 
 			symptr->st_info = ELF_ST_INFO(bind, type);
+		}
+
+#define	IS_DATA_SYMBOL(x)	((ELF_ST_TYPE(x->st_info) == STT_OBJECT) || \
+		    (ELF_ST_TYPE(x->st_info) == STT_COMMON) ||		    \
+		    (ELF_ST_TYPE(x->st_info) == STT_TLS))
+
+/*
+ * Filter symbols, special symbols, and those that will be reduced aren't
+ * worth guidance
+ */
+#define	IS_BORING_SYMBOL(x)	(x->sd_flags & (FLG_SY_REDUCED|FLG_SY_STDFLTR| \
+		    FLG_SY_SPECSEC|FLG_SY_HIDDEN|FLG_SY_ELIM|FLG_SY_IGNORE))
+
+/* Local symbols and unresolved weaks aren't useful to guide on */
+#define	IS_BORING_SCOPE(x)	((ELF_ST_BIND(x->st_info) == STB_LOCAL) || \
+		    ((ELF_ST_BIND(x->st_info) == STB_WEAK) &&		   \
+		    (x->st_shndx == SHN_UNDEF)))
+
+/* Symbol has the assertions recommended for global data */
+#define	HAS_NEEDED_ASSERTS(x)	((x->sd_ass != NULL) &&		\
+		    (ass_enabled(x->sd_ass, SYM_ASSERT_SIZE) ||	\
+		    ass_enabled(x->sd_ass, SYM_ASSERT_ALIAS)))
+
+		/*
+		 * If we're building a shared object and a mapfile is
+		 * specified, issue guidance if any symbol mentioned in the
+		 * mapfile is a global data symbol with no asserted size.
+		 *
+		 * This is somewhat heuristic to maximize the chance of
+		 * -zguidance users seeing our good advice without us being
+		 * annoying (eg. we don't guide when things like
+		 * mapfile.noex* are the only mapfiles)
+		 */
+		if (OFL_GUIDANCE(ofl, FLG_OFG_NO_ASSERTS) &&
+		    (aplist_nitems(ofl->ofl_maps) > 0) && /* mapfile used */
+		    (ofl->ofl_flags & FLG_OF_SHAROBJ) && /* building .so */
+		    (ofl->ofl_flags & FLG_OF_VERDEF) && /* versions/reduce */
+		    (sdp->sd_ref == REF_REL_NEED) && /* symbol in .o */
+		    IS_DATA_SYMBOL(sdp->sd_sym) &&
+		    !IS_BORING_SCOPE(sdp->sd_sym) &&
+		    !IS_BORING_SYMBOL(sdp) &&
+		    !HAS_NEEDED_ASSERTS(sdp)) {
+			ld_eprintf(ofl, ERR_GUIDANCE,
+			    MSG_INTL(MSG_GUIDE_ASSERT_SIZE),
+			    sdp->sd_name, (Lword)sdp->sd_sym->st_size);
 		}
 	}
 
@@ -3608,6 +3659,209 @@ translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
 	return ((Word)elf_ndxscn(osp->os_scn));
 }
 
+typedef struct {
+	avl_node_t	aav_avl;
+	Ass_desc	*aav_ass;
+} Aav_node;
+
+static int
+aav_compare(const void *first, const void *second)
+{
+	Sym *fs = ((Aav_node *)first)->aav_ass->ass_sdp->sd_sym;
+	Sym *ss = ((Aav_node *)second)->aav_ass->ass_sdp->sd_sym;
+
+	if (fs->st_value < ss->st_value)
+		return (-1);
+	if (fs->st_value > ss->st_value)
+		return (1);
+
+	if (fs->st_size < ss->st_size)
+		return (-1);
+	if (fs->st_size > ss->st_size)
+		return (1);
+
+	return (0);
+}
+
+
+/*
+ * Check any assertions from mapfiles, provide guidance if there is global
+ * data in a shared object that does not assert its size.
+ */
+static uintptr_t
+check_mapfile_assertions(Ofl_desc *ofl)
+{
+	Ass_desc	*ma;
+	uintptr_t	ret = 0;
+	Aliste		idx;
+	avl_tree_t	ass_avl;
+
+	avl_create(&ass_avl, &aav_compare, sizeof (Aav_node),
+	    SGSOFFSETOF(Aav_node, aav_avl));
+
+	for (APLIST_TRAVERSE(ofl->ofl_symasserts, idx, ma)) {
+		Sym_desc	*sdp = ma->ass_sdp;
+		Conv_inv_buf_t	inv_buf, inv_buf2;
+
+		/*
+		 * Try to insert the assertion into the tree if it's not an
+		 * alias assertion.  If it's already present, it means we have
+		 * two non-alias assertions and should complain
+		 */
+		if (!ass_enabled(ma, SYM_ASSERT_ALIAS)) {
+			Aav_node *av = libld_calloc(1, sizeof (Aav_node));
+			Aav_node *dup;
+			avl_index_t where;
+
+			if (av == NULL)
+				return (S_ERROR);
+
+			av->aav_ass = ma;
+
+			if ((dup = avl_find(&ass_avl, av, &where)) != NULL) {
+				ld_eprintf(ofl, ERR_FATAL,
+				    MSG_INTL(MSG_ALIAS_NOTALIAS),
+				    ma->ass_file,
+				    ma->ass_lineno,
+				    ma->ass_sdp->sd_name,
+				    dup->aav_ass->ass_sdp->sd_name,
+				    dup->aav_ass->ass_file,
+				    dup->aav_ass->ass_lineno);
+				ret = S_ERROR;
+			} else {
+				avl_insert(&ass_avl, av, where);
+			}
+		}
+
+		/*
+		 * All assertions can assert on binding.  Other
+		 * assertion behaviour differs based on whether we're
+		 * asserting specifics, or asserting an ALIAS.  In the
+		 * latter case, we just compare all the attributes
+		 * against another symbol.
+		 */
+		if (ass_enabled(ma, SYM_ASSERT_BIND) &&
+		    (ma->ass_bind != ELF_ST_BIND(sdp->sd_sym->st_info))) {
+			Sym *sym = sdp->sd_sym;
+
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ASSFAIL_SCOPE),
+			    ma->ass_file, ma->ass_lineno,
+			    demangle(sdp->sd_name),
+			    conv_sym_info_bind(ma->ass_bind, CONV_FMT_ALT_CFNP,
+			    &inv_buf),
+			    conv_sym_info_bind(ELF_ST_BIND(sym->st_info),
+			    CONV_FMT_ALT_CFNP, &inv_buf2));
+			ret = S_ERROR;
+		}
+
+		if (ass_enabled(ma, SYM_ASSERT_ALIAS)) {
+			Sym *rsym, *sym;
+			Sym_desc *asdp;
+
+			if ((asdp = ld_sym_find(ma->ass_alias, SYM_NOHASH,
+			    NULL, ofl)) == NULL) {
+				ld_eprintf(ofl, ERR_FATAL,
+				    MSG_INTL(MSG_ALIAS_BADSYM),
+				    ma->ass_file, ma->ass_lineno,
+				    ma->ass_alias);
+				ret = S_ERROR;
+			} else {
+				/*
+				 * We forbid aliases of aliases, preferring
+				 * they all point to the concrete symbol.
+				 * This is unnecessary, but a strong
+				 * preference for maintainability.
+				 *
+				 * This does prevent circular references
+				 * however, and if this check is removed a
+				 * real check for such would need to be added.
+				 */
+				if (((asdp->sd_flags & FLG_SY_MAPASSRT) != 0) &&
+				    ass_enabled(asdp->sd_ass,
+				    SYM_ASSERT_ALIAS)) {
+					ld_eprintf(ofl, ERR_FATAL,
+					    MSG_INTL(MSG_ALIAS_TOALIAS),
+					    ma->ass_file, ma->ass_lineno,
+					    ma->ass_alias);
+					ret = S_ERROR;
+				}
+
+				rsym = asdp->sd_sym;
+				sym = sdp->sd_sym;
+
+				if ((rsym->st_value != sym->st_value) ||
+				    (rsym->st_size != sym->st_size) ||
+				    (ELF_ST_TYPE(rsym->st_info) !=
+				    ELF_ST_TYPE(sym->st_info))) {
+					ld_eprintf(ofl, ERR_FATAL,
+					    MSG_INTL(MSG_ASSFAIL_ALIAS),
+					    ma->ass_file, ma->ass_lineno,
+					    demangle(sdp->sd_name),
+					    asdp->sd_name);
+					ret = S_ERROR;
+				}
+			}
+
+			/*
+			 * If this is an alias, none of our other checks
+			 * matter.
+			 */
+			continue;
+		}
+
+		/*
+		 * We only want to assert on the size of a _function_ if it's
+		 * explicitly sized, otherwise skip
+		 */
+		if (ass_enabled(ma, SYM_ASSERT_SIZE) &&
+		    (ma->ass_size != sdp->sd_sym->st_size)) {
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ASSFAIL_SIZE),
+			    ma->ass_file, ma->ass_lineno,
+			    demangle(sdp->sd_name),
+			    ma->ass_size, (Lword)sdp->sd_sym->st_size);
+			ret = S_ERROR;
+		}
+
+		if (ass_enabled(ma, SYM_ASSERT_BITS) && (sdp->sd_isc != NULL)) {
+			if ((ma->ass_bits == TRUE) &&
+			    (sdp->sd_isc->is_shdr->sh_type == SHT_NOBITS)) {
+				ld_eprintf(ofl, ERR_FATAL,
+				    MSG_INTL(MSG_ASSFAIL_BITS),
+				    ma->ass_file, ma->ass_lineno,
+				    demangle(sdp->sd_name));
+				ret = S_ERROR;
+			}
+			if ((ma->ass_bits == FALSE) &&
+			    (sdp->sd_isc->is_shdr->sh_type != SHT_NOBITS)) {
+				ld_eprintf(ofl, ERR_FATAL,
+				    MSG_INTL(MSG_ASSFAIL_NOBITS),
+				    ma->ass_file, ma->ass_lineno,
+				    demangle(sdp->sd_name));
+				ret = S_ERROR;
+			}
+		}
+
+		if (ass_enabled(ma, SYM_ASSERT_TYPE) &&
+		    (ma->ass_type != ELF_ST_TYPE(sdp->sd_sym->st_info))) {
+			Ehdr *ehdr = sdp->sd_file->ifl_ehdr;
+
+			ld_eprintf(ofl, ERR_FATAL,
+			    MSG_INTL(MSG_ASSFAIL_TYPE),
+			    ma->ass_file, ma->ass_lineno,
+			    demangle(sdp->sd_name),
+			    conv_sym_info_type(ehdr->e_machine,
+			    ma->ass_type, CONV_FMT_ALT_CFNP, &inv_buf),
+			    conv_sym_info_type(ehdr->e_machine,
+			    ELF_ST_TYPE(sdp->sd_sym->st_info),
+			    CONV_FMT_ALT_CFNP, &inv_buf2));
+			ret = S_ERROR;
+		}
+	}
+
+	return (ret);
+}
+
+
 /*
  * Having created all of the necessary sections, segments, and associated
  * headers, fill in the program headers and update any other data in the
@@ -4166,6 +4420,13 @@ ld_update_outfile(Ofl_desc *ofl)
 	if ((etext = update_osym(ofl)) == (Addr)S_ERROR)
 		return (S_ERROR);
 
+
+	/*
+	 * Now the symbol tables are complete, process any mapfile
+	 * assertions
+	 */
+	if (check_mapfile_assertions(ofl) == S_ERROR)
+		return (S_ERROR);
 	/*
 	 * If we have an PT_INTERP phdr, update it now from the associated
 	 * section information.

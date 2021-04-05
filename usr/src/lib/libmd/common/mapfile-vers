@@ -84,24 +84,24 @@ SYMBOL_VERSION SUNW_1.1 {
 	MD4Init;
 	MD4Update;
 	md5_calc;
-	MD5Final	{ FLAGS = NODIRECT };	# Addr interpose from testsuite
-	MD5Init		{ FLAGS = NODIRECT };	# Addr interpose from testsuite
-	MD5Update	{ FLAGS = NODIRECT };	# Addr interpose from testsuite
+	MD5Final	{ FLAGS = NODIRECT; };	# Addr interpose from testsuite
+	MD5Init	{ FLAGS = NODIRECT; };	# Addr interpose from testsuite
+	MD5Update	{ FLAGS = NODIRECT; };	# Addr interpose from testsuite
 	SHA1Final;
 	SHA1Init;
 	SHA1Update;
-	SHA256Final	{ FLAGS = NODYNSORT };
+	SHA256Final	{ FLAGS = NODYNSORT; };
 	SHA256Init;
-	SHA256Update	{ FLAGS = NODYNSORT };
+	SHA256Update	{ FLAGS = NODYNSORT; };
 	SHA2Final;
 	SHA2Init;
 	SHA2Update;
-	SHA384Final	{ FLAGS = NODYNSORT };
+	SHA384Final	{ FLAGS = NODYNSORT; };
 	SHA384Init;
-	SHA384Update	{ FLAGS = NODYNSORT };
-	SHA512Final	{ FLAGS = NODYNSORT };
+	SHA384Update	{ FLAGS = NODYNSORT; };
+	SHA512Final	{ FLAGS = NODYNSORT; };
 	SHA512Init;
-	SHA512Update	{ FLAGS = NODYNSORT };
+	SHA512Update	{ FLAGS = NODYNSORT; };
 };
 
 SYMBOL_VERSION ILLUMOSprivate {

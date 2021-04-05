@@ -60,12 +60,27 @@ SYMBOL_VERSION SUNW_1.1 {
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	_alloc_overlap;
-	_Bottom_panel;
+	_Bottom_panel	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
 	_free_overlap;
 	_intersect_panel;
-	_Panel_cnt;
+	_Panel_cnt	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 4;
+				};
+			};
 	_remove_overlap;
-	_Top_panel;
+	_Top_panel	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
 	_unlink_obs;
     local:
 	*;

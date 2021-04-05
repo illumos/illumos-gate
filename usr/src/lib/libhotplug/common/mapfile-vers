@@ -58,7 +58,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	hp_pack;
 	hp_unpack;
 	hp_last_change;
-	libhotplug_debug;
+	libhotplug_debug	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
     local:
 	*;
 };

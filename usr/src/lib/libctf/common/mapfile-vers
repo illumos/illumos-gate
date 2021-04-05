@@ -161,7 +161,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ctf_type_size;
 	ctf_type_visit;
 	ctf_version;
-	_libctf_debug;
+	_libctf_debug	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
     local:
 	*;
 };

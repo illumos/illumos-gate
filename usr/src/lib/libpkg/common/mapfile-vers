@@ -99,7 +99,7 @@ SYMBOL_VERSION SUNWprivate {
 	gpkglist;
 	gpkgmap;
 	gpkgmapvfp;
-	holdcinfo;
+	holdcinfo	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	init_cache;
 	isFdRemote;
 	isFstypeRemote;

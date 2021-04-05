@@ -45,8 +45,18 @@ $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	preauthentication_client_1;
-	preauthentication_server_1;
+	preauthentication_client_1	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[11];
+						};
+					};
+	preauthentication_server_1	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[9];
+						};
+					};
     local:
-        *;
+	*;
 };

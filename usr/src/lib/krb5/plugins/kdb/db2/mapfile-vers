@@ -36,15 +36,16 @@
 # MAPFILE HEADER END
 #
 
-# Due to mistakes made early in the history of this library, there are
-# no SUNW_1.1 symbols, but the version is now kept as a placeholder.
-# Don't add any symbols to this version.
-
 $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-        kdb_function_table;
+	kdb_function_table	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[39];
+					};
+				};
     local:
 	*;
 };

@@ -288,7 +288,7 @@ SYMBOL_VERSION SUNW_1.1 {
 		TYPE = FUNCTION;
 		FILTER = pkcs11_softtoken.so.1;
 	};
-    	C_VerifyRecover {
+	C_VerifyRecover {
 		TYPE = FUNCTION;
 		FILTER = pkcs11_softtoken.so.1;
 	};
@@ -312,4 +312,3 @@ SYMBOL_VERSION SUNW_1.1 {
     local:
 	*;
 };
-

@@ -98,6 +98,9 @@ SMOFF += all_func_returns,deref_check,signed
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS +=	-lfakekernel -lpkcs11 -lnsl -lc
 
+# libfknsmb isn't delivered, and is a special case, disable global data complaints
+ZGUIDANCE= -Wl,-zguidance=noasserts
+
 NSMB_DIR=$(SRC)/uts/common/fs/smbclnt/netsmb
 SRCS=   $(OBJS_LOCAL:%.o=$(SRCDIR)/%.c) \
 	$(OBJS_NSMB:%.o=$(NSMB_DIR)/%.c)

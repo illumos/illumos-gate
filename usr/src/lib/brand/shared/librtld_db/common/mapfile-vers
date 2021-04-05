@@ -39,26 +39,35 @@
 $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate_1.1 {
-	global:
-		rtld_db_brand_ops32;
+    global:
+	rtld_db_brand_ops32	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[5];
+					};
+				};
 
 $if _ELF64
-		rtld_db_brand_ops64;
+	rtld_db_brand_ops64	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[5];
+					};
+				};
 $endif
 
-	local:
-		*;
+    local:
+	*;
 };
 
 #Externally defined symbols
 SYMBOL_SCOPE {
     global:
-	ps_pauxv		{ FLAGS = NODIRECT PARENT };
-	ps_pdmodel		{ FLAGS = NODIRECT PARENT };
-	ps_pglobal_lookup	{ FLAGS = NODIRECT PARENT };
-	ps_pglobal_sym		{ FLAGS = NODIRECT PARENT };
-	ps_plog			{ FLAGS = NODIRECT PARENT };
-	ps_pread		{ FLAGS = NODIRECT PARENT };
-	ps_pwrite		{ FLAGS = NODIRECT PARENT };
+	ps_pauxv		{ FLAGS = NODIRECT PARENT; };
+	ps_pdmodel		{ FLAGS = NODIRECT PARENT; };
+	ps_pglobal_lookup	{ FLAGS = NODIRECT PARENT; };
+	ps_pglobal_sym		{ FLAGS = NODIRECT PARENT; };
+	ps_plog			{ FLAGS = NODIRECT PARENT; };
+	ps_pread		{ FLAGS = NODIRECT PARENT; };
+	ps_pwrite		{ FLAGS = NODIRECT PARENT; };
 };
-

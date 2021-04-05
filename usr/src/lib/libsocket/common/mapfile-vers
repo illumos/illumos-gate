@@ -47,7 +47,7 @@ SYMBOL_VERSION ILLUMOS_0.2 {	# reentrant ethers(3SOCKET)
 	ether_ntoa_r;
 } ILLUMOS_0.1;
 
-SYMBOL_VERSION ILLUMOS_0.1 {    # illumos additions
+SYMBOL_VERSION ILLUMOS_0.1 {	# illumos additions
     global:
 	accept4;
 } SUNW_1.7;
@@ -95,8 +95,18 @@ SYMBOL_VERSION SUNW_1.4 {
 	if_indextoname;
 	if_nameindex;
 	if_nametoindex;
-	in6addr_any;
-	in6addr_loopback;
+	in6addr_any		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 16;
+					};
+				};
+	in6addr_loopback	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 16;
+					};
+				};
 	rcmd_af;
 	rexec_af;
 	rresvport_af;
@@ -152,10 +162,10 @@ SYMBOL_VERSION SUNW_0.7 {
 	getservbyport_r;
 	getservent;
 	getservent_r;
-	htonl			{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	htons			{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	ntohl			{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	ntohs			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	htonl	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	htons	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	ntohl	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	ntohs	{ TYPE = FUNCTION; FILTER = libc.so.1; };
 	rcmd;
 	rexec;
 	rresvport;
@@ -185,9 +195,9 @@ $endif
 	getservbyport;
 	getsockname;
 	getsockopt;
-	inet_lnaof		{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	inet_makeaddr		{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	inet_network		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_lnaof	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	inet_makeaddr	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	inet_network	{ TYPE = FUNCTION; FILTER = libc.so.1; };
 	listen;
 	recv;
 	recvfrom;

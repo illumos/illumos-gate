@@ -51,7 +51,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	fletcher_4_incremental_native;
 	fletcher_4_incremental_byteswap;
 	libzfs_add_handle;
-	libzfs_config_ops;
+	libzfs_config_ops		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[2];
+						};
+					};
 	libzfs_errno;
 	libzfs_error_action;
 	libzfs_error_description;
@@ -64,7 +69,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	libzfs_init;
 	libzfs_mnttab_cache;
 	libzfs_print_on_error;
-	spa_feature_table;
+	spa_feature_table		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[162];
+						};
+					};
 	zfs_allocatable_devs;
 	zfs_asprintf;
 	zfs_bookmark_exists;
@@ -93,7 +103,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_get_user_props;
 	zfs_get_type;
 	zfs_handle_dup;
-	zfs_history_event_names;
+	zfs_history_event_names		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[41];
+						};
+					};
 	zfs_hold;
 	zfs_init_libshare_arg;
 	zfs_is_mounted;
@@ -183,7 +198,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_valid_proplist;
 	zfs_get_fsacl;
 	zfs_set_fsacl;
-	zfs_userquota_prop_prefixes;
+	zfs_userquota_prop_prefixes	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[12];
+						};
+					};
 	zfs_zpl_version_map;
 	zpool_add;
 	zpool_checkpoint;

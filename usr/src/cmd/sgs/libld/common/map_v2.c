@@ -126,6 +126,7 @@ typedef struct {
 typedef struct {
 	ld_map_ver_t	ss_mv;
 	ld_map_sym_t	ss_ms;
+	Ass_desc	ss_ma;
 } symbol_state_t;
 
 /*
@@ -564,17 +565,79 @@ gettoken_leftbkt(Mapfile *mf, const char *lhs)
  *	Updates *tkv and returns TK_INT for success, TK_ERROR otherwise.
  */
 static Token
-gettoken_int(Mapfile *mf, const char *lhs, ld_map_tkval_t *tkv)
+gettoken_int(Mapfile *mf, const char *lhs, ld_map_tkval_t *tkv, int flags)
 {
 	Token		tok;
 	Conv_inv_buf_t	inv_buf;
+	char		*start = mf->mf_next;
 
-	switch (tok = ld_map_gettoken(mf, 0, tkv)) {
+	switch (tok = ld_map_gettoken(mf, flags, tkv)) {
 	case TK_ERROR:
+		return (tok);
+	case TK_STRING:
+		if (strcmp(MSG_ORIG(MSG_MAP_ADDRSIZE), tkv->tkv_str) == 0) {
+			tkv->tkv_int.tkvi_str = tkv->tkv_str;
+			switch (ld_targ.t_m.m_class) {
+			case ELFCLASS32:
+				tkv->tkv_int.tkvi_value = sizeof (Elf32_Addr);
+				break;
+			case ELFCLASS64:
+				tkv->tkv_int.tkvi_value = sizeof (Elf64_Addr);
+				break;
+			case ELFCLASSNONE:
+				tkv->tkv_int.tkvi_value = 0;
+				break;
+			default:
+				assert(0);
+			}
+			tkv->tkv_int.tkvi_cnt = MSG_MAP_ADDRSIZE_SIZE;
+			tok = TK_INT;
+		} else {
+			break;
+		}
+		/* FALLTHROUGH */
 	case TK_INT:
+		if ((flags & TK_F_MULOK) &&
+		    (ld_map_peektoken(mf) == TK_LEFTSQR)) {
+			ld_map_tkval_t mltplr;
+			Xword oldval;
+
+			/* read the [, which we know must be there */
+			(void) ld_map_gettoken(mf, flags, &mltplr);
+
+			if (ld_map_gettoken(mf, flags & ~TK_F_MULOK,
+			    &mltplr) != TK_INT) {
+				tkv->tkv_int.tkvi_cnt = mf->mf_next - start;
+				mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_INT),
+				    MSG_ORIG(MSG_QSTR_LEFTSQR),
+				    ld_map_tokenstr(TK_INT, tkv, &inv_buf));
+				return (TK_ERROR);
+			}
+
+			if (ld_map_peektoken(mf) != TK_RIGHTSQR) {
+				tkv->tkv_int.tkvi_cnt = mf->mf_next - start;
+				mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_RIGHTSQ),
+				    ld_map_tokenstr(TK_INT, tkv, &inv_buf));
+				return (TK_ERROR);
+			}
+
+			/* Read the right ] */
+			(void) ld_map_gettoken(mf, flags, NULL);
+			tkv->tkv_int.tkvi_cnt = mf->mf_next - start;
+			oldval = tkv->tkv_int.tkvi_value;
+			tkv->tkv_int.tkvi_value *= mltplr.tkv_int.tkvi_value;
+
+			if ((tkv->tkv_int.tkvi_value /
+			    mltplr.tkv_int.tkvi_value) != oldval) {
+				mf_fatal(mf, MSG_INTL(MSG_MAP_MULOVERFLOW),
+				    tkv->tkv_int.tkvi_value,
+				    mltplr.tkv_int.tkvi_value);
+				return (TK_ERROR);
+			}
+		}
+
 		return (tok);
 	}
-
 	mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_INT), lhs,
 	    ld_map_tokenstr(tok, tkv, &inv_buf));
 	return (TK_ERROR);
@@ -993,7 +1056,6 @@ parse_cap_list(Mapfile *mf, Token eq_tok, Caplist *caplist,
  * CAPABILITY [capid] { HW = hwcap_flags...
  * -------------------------^
  */
-/* ARGSUSED 2 */
 static Token
 at_cap_hw(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1048,7 +1110,6 @@ at_cap_hw(Mapfile *mf, Token eq_tok, void *uvalue)
  * CAPABILITY [capid] { HW_1 = value ;
  * ---------------------------^
  */
-/* ARGSUSED 2 */
 static Token
 at_cap_hw_1(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1060,7 +1121,6 @@ at_cap_hw_1(Mapfile *mf, Token eq_tok, void *uvalue)
  * CAPABILITY [capid] { HW_2 = value ;
  * ---------------------------^
  */
-/* ARGSUSED 2 */
 static Token
 at_cap_hw_2(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1072,7 +1132,6 @@ at_cap_hw_2(Mapfile *mf, Token eq_tok, void *uvalue)
  * CAPABILITY [capid] { SF = sfcap_flags...
  * -------------------------^
  */
-/* ARGSUSED 2 */
 static Token
 at_cap_sf(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1120,7 +1179,6 @@ at_cap_sf(Mapfile *mf, Token eq_tok, void *uvalue)
  * CAPABILITY [capid] { SF_1 = value ;
  * ---------------------------^
  */
-/* ARGSUSED 2 */
 static Token
 at_cap_sf_1(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1132,7 +1190,6 @@ at_cap_sf_1(Mapfile *mf, Token eq_tok, void *uvalue)
  * CAPABILITY [capid] { MACHINE = value ;
  * ------------------------------^
  */
-/* ARGSUSED 2 */
 static Token
 at_cap_mach(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1144,7 +1201,6 @@ at_cap_mach(Mapfile *mf, Token eq_tok, void *uvalue)
  * CAPABILITY [capid] { PLATFORM = value ;
  * -------------------------------^
  */
-/* ARGSUSED 2 */
 static Token
 at_cap_plat(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1270,7 +1326,6 @@ gts_efunc_at_dv_allow(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
  * DEPEND_VERSIONS object_name { ALLOW = version
  * -------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_dv_allow(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1303,7 +1358,6 @@ gts_efunc_at_dv_require(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
  * DEPEND_VERSIONS object_name { REQURE = version
  * --------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_dv_require(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1419,7 +1473,7 @@ dir_phdr_add_null(Mapfile *mf)
 		return (TK_ERROR);
 
 	/* integer token */
-	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_PHDR_ADD_NULL), &tkv) ==
+	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_PHDR_ADD_NULL), &tkv, 0) ==
 	    TK_ERROR)
 		return (TK_ERROR);
 
@@ -1440,7 +1494,6 @@ dir_phdr_add_null(Mapfile *mf)
  * segment_directive segment_name { ALIGN = value
  * ----------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_align(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1448,7 +1501,7 @@ at_seg_align(Mapfile *mf, Token eq_tok, void *uvalue)
 	ld_map_tkval_t	tkv;
 
 	/* value */
-	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_ALIGN), &tkv) == TK_ERROR)
+	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_ALIGN), &tkv, 0) == TK_ERROR)
 		return (TK_ERROR);
 
 	sgp->sg_phdr.p_align = tkv.tkv_int.tkvi_value;
@@ -1476,7 +1529,6 @@ gts_efunc_at_seg_assign_file_basename(Mapfile *mf, Token tok,
  * segment_directive segment_name { ASSIGN { FILE_BASENAME = file_name
  * ---------------------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_assign_file_basename(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1513,7 +1565,6 @@ gts_efunc_at_seg_assign_file_objname(Mapfile *mf, Token tok,
  * segment_directive segment_name { ASSIGN { FILE_OBJNAME = name
  * --------------------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_assign_file_objname(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1549,7 +1600,6 @@ gts_efunc_at_seg_assign_file_path(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
  * segment_directive segment_name { ASSIGN { FILE_PATH = file_path
  * -----------------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_assign_file_path(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1572,7 +1622,6 @@ at_seg_assign_file_path(Mapfile *mf, Token eq_tok, void *uvalue)
  * segment_directive segment_name { ASSIGN { FLAGS = ... ;
  * -------------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_assign_flags(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1690,7 +1739,6 @@ gts_efunc_at_seg_assign_is_name(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
  * segment_directive segment_name { ASSIGN { IS_NAME = section_name ;
  * ---------------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_assign_is_name(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1723,7 +1771,6 @@ gts_efunc_at_seg_assign_type(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
  * segment_directive segment_name { ASSIGN { TYPE = section_type ;
  * ------------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_assign_type(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1771,7 +1818,6 @@ at_seg_assign_type(Mapfile *mf, Token eq_tok, void *uvalue)
  * segment_directive segment_name { ASSIGN { ...
  * -----------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_assign(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1868,7 +1914,6 @@ at_seg_assign(Mapfile *mf, Token eq_tok, void *uvalue)
  * segment_directive segment_name { DISABLE ;
  * ----------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_disable(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1897,7 +1942,6 @@ at_seg_disable(Mapfile *mf, Token eq_tok, void *uvalue)
  * STACK { FLAGS eq-op ... ;
  * -------------------^
  */
-/* ARGSUSED 2 */
 static Token
 at_seg_flags(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1919,7 +1963,6 @@ at_seg_flags(Mapfile *mf, Token eq_tok, void *uvalue)
  * segment_directive segment_name { IS_ORDER eq_op value
  * -----------------------------------------------^
  */
-/* ARGSUSED 2 */
 static Token
 at_seg_is_order(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -1994,7 +2037,6 @@ at_seg_is_order(Mapfile *mf, Token eq_tok, void *uvalue)
  * segment_directive segment_name { MAX_SIZE = value
  * -------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_max_size(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2002,7 +2044,7 @@ at_seg_max_size(Mapfile *mf, Token eq_tok, void *uvalue)
 	ld_map_tkval_t	tkv;
 
 	/* value */
-	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_MAX_SIZE), &tkv) == TK_ERROR)
+	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_MAX_SIZE), &tkv, 0) == TK_ERROR)
 		return (TK_ERROR);
 
 	sgp->sg_length = tkv.tkv_int.tkvi_value;
@@ -2016,7 +2058,6 @@ at_seg_max_size(Mapfile *mf, Token eq_tok, void *uvalue)
  * segment_directive segment_name { NOHDR ;
  * --------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_nohdr(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2042,7 +2083,6 @@ at_seg_nohdr(Mapfile *mf, Token eq_tok, void *uvalue)
  * segment_directive segment_name { OS_ORDER eq_op assign_name...
  * -----------------------------------------------^
  */
-/* ARGSUSED 2 */
 static Token
 at_seg_os_order(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2091,7 +2131,6 @@ at_seg_os_order(Mapfile *mf, Token eq_tok, void *uvalue)
  * segment_directive segment_name { PADDR = paddr
  * ----------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_paddr(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2110,7 +2149,7 @@ at_seg_paddr(Mapfile *mf, Token eq_tok, void *uvalue)
 		}
 
 	/* value */
-	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_PADDR), &tkv) == TK_ERROR)
+	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_PADDR), &tkv, 0) == TK_ERROR)
 		return (TK_ERROR);
 
 	sgp->sg_phdr.p_paddr = tkv.tkv_int.tkvi_value;
@@ -2124,7 +2163,6 @@ at_seg_paddr(Mapfile *mf, Token eq_tok, void *uvalue)
  * segment_directive segment_name { ROUND = value
  * ----------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_round(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2132,7 +2170,7 @@ at_seg_round(Mapfile *mf, Token eq_tok, void *uvalue)
 	ld_map_tkval_t	tkv;
 
 	/* value */
-	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_ROUND), &tkv) == TK_ERROR)
+	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_ROUND), &tkv, 0) == TK_ERROR)
 		return (TK_ERROR);
 
 	sgp->sg_round = tkv.tkv_int.tkvi_value;
@@ -2146,7 +2184,6 @@ at_seg_round(Mapfile *mf, Token eq_tok, void *uvalue)
  * segment_directive segment_name { SIZE_SYMBOL = symbol_name
  * ----------------------------------------------^
  */
-/* ARGSUSED 2 */
 static Token
 at_seg_size_symbol(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2206,7 +2243,6 @@ at_seg_size_symbol(Mapfile *mf, Token eq_tok, void *uvalue)
  * segment_directive segment_name { VADDR = vaddr
  * ----------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_seg_vaddr(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2225,7 +2261,7 @@ at_seg_vaddr(Mapfile *mf, Token eq_tok, void *uvalue)
 		}
 
 	/* value */
-	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_VADDR), &tkv) == TK_ERROR)
+	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_VADDR), &tkv, 0) == TK_ERROR)
 		return (TK_ERROR);
 
 	sgp->sg_phdr.p_vaddr = tkv.tkv_int.tkvi_value;
@@ -2657,7 +2693,6 @@ gts_efunc_at_sym_aux(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
  * SYMBOL [version_name] { symbol_name { AUXILIARY = soname
  * -------------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_sym_aux(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2691,7 +2726,6 @@ gts_efunc_at_sym_filter(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
  * SYMBOL [version_name] { symbol_name { FILTER = soname
  * ----------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_sym_filter(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2713,7 +2747,6 @@ at_sym_filter(Mapfile *mf, Token eq_tok, void *uvalue)
  * SYMBOL [version_name] { symbol_name { FLAGS = ...
  * ---------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_sym_flags(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2860,7 +2893,6 @@ at_sym_flags(Mapfile *mf, Token eq_tok, void *uvalue)
  * SYMBOL [version_name] { symbol_name { SIZE = value
  * --------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_sym_size(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2868,10 +2900,12 @@ at_sym_size(Mapfile *mf, Token eq_tok, void *uvalue)
 	ld_map_tkval_t	tkv;
 
 	/* value */
-	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_SIZE), &tkv) == TK_ERROR)
+	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_SIZE), &tkv,
+	    TK_F_MULOK) == TK_ERROR)
 		return (TK_ERROR);
 
 	ss->ss_ms.ms_size = tkv.tkv_int.tkvi_value;
+	ss->ss_ms.ms_size_set = TRUE;
 
 	/* terminator */
 	return (gettoken_term(mf, MSG_ORIG(MSG_MAPKW_SIZE)));
@@ -2920,7 +2954,6 @@ gts_efunc_at_sym_type(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
  * SYMBOL [version_name] { symbol_name { TYPE = symbol_type
  * --------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_sym_type(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2952,7 +2985,6 @@ at_sym_type(Mapfile *mf, Token eq_tok, void *uvalue)
  * SYMBOL [version_name] { symbol_name { VALUE = value
  * ---------------------------------------------^
  */
-/* ARGSUSED 1 */
 static Token
 at_sym_value(Mapfile *mf, Token eq_tok, void *uvalue)
 {
@@ -2960,15 +2992,290 @@ at_sym_value(Mapfile *mf, Token eq_tok, void *uvalue)
 	ld_map_tkval_t	tkv;
 
 	/* value */
-	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_VALUE), &tkv) == TK_ERROR)
+	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_VALUE), &tkv, 0) == TK_ERROR)
 		return (TK_ERROR);
 
 	ss->ss_ms.ms_value = tkv.tkv_int.tkvi_value;
 	ss->ss_ms.ms_value_set = TRUE;
 
-
 	/* terminator */
 	return (gettoken_term(mf, MSG_ORIG(MSG_MAPKW_VALUE)));
+}
+
+typedef struct {
+	const char	*name;
+	uchar_t		ms_type;
+} at_ass_type_t;
+
+static at_ass_type_t	at_ass_type_list[] = {
+	/* Accept DATA as well to match sym attrs */
+	{ MSG_ORIG(MSG_MAPKW_DATA),	STT_OBJECT },
+	{ MSG_ORIG(MSG_MAPKW_OBJECT),	STT_OBJECT },
+	{ MSG_ORIG(MSG_MAPKW_FUNC),	STT_FUNC },
+	/* Accept FUNCTION as well to match sym attrs */
+	{ MSG_ORIG(MSG_MAPKW_FUNCTION),	STT_FUNC },
+	{ MSG_ORIG(MSG_MAPKW_SECTION),	STT_SECTION },
+	{ MSG_ORIG(MSG_MAPKW_FILE),	STT_FILE },
+	{ MSG_ORIG(MSG_MAPKW_COMMON),	STT_COMMON },
+	{ MSG_ORIG(MSG_MAPKW_TLS),	STT_TLS },
+	{ 0 }
+};
+
+static size_t	at_ass_type_list_bufsize =
+    KW_NAME_SIZE(MSG_MAPKW_OBJECT) +
+    KW_NAME_SIZE(MSG_MAPKW_FUNC) +
+    KW_NAME_SIZE(MSG_MAPKW_FUNCTION) +
+    KW_NAME_SIZE(MSG_MAPKW_SECTION) +
+    KW_NAME_SIZE(MSG_MAPKW_FILE) +
+    KW_NAME_SIZE(MSG_MAPKW_COMMON) +
+    KW_NAME_SIZE(MSG_MAPKW_TLS);
+
+static void
+gts_efunc_at_ass_type(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
+{
+	Conv_inv_buf_t	inv_buf;
+	char		buf[VLA_SIZE(at_ass_type_list_bufsize)];
+
+	mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_SYMTYPE),
+	    ld_map_kwnames(at_ass_type_list, SGSOFFSETOF(at_ass_type_t, name),
+	    sizeof (at_ass_type_list[0]), buf, at_ass_type_list_bufsize),
+	    ld_map_tokenstr(tok, tkv, &inv_buf));
+}
+
+typedef struct {
+	const char	*name;		/* attribute name */
+	Boolean		ms_bits;	/* bits? */
+} at_ass_shattr_t;
+
+static at_ass_shattr_t	at_ass_shattr_list[] = {
+	{ MSG_ORIG(MSG_MAPKW_BITS),	TRUE },
+	{ MSG_ORIG(MSG_MAPKW_NOBITS),	FALSE },
+	{ 0 }
+};
+
+static size_t	at_ass_shattr_list_bufsize =
+    KW_NAME_SIZE(MSG_MAPKW_BITS) +
+    KW_NAME_SIZE(MSG_MAPKW_NOBITS);
+
+static void
+gts_efunc_at_ass_shattr(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
+{
+	Conv_inv_buf_t	inv_buf;
+	char		buf[VLA_SIZE(at_ass_shattr_list_bufsize)];
+
+	mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_SHATTRTYPE),
+	    ld_map_kwnames(at_ass_shattr_list,
+	    SGSOFFSETOF(at_ass_shattr_t, name), sizeof (at_ass_shattr_list[0]),
+	    buf, at_ass_shattr_list_bufsize),
+	    ld_map_tokenstr(tok, tkv, &inv_buf));
+}
+
+static Token
+at_ass_shattr(Mapfile *mf, Token eq_tok, void *uvalue)
+{
+	symbol_state_t	*ss = uvalue;
+	at_ass_shattr_t	*shattr;
+	ld_map_tkval_t	tkv;
+
+	if (gettoken_str(mf, TK_F_KEYWORD, &tkv,
+	    gts_efunc_at_ass_shattr) == TK_ERROR)
+		return (TK_ERROR);
+
+	shattr = ld_map_kwfind(tkv.tkv_str, at_ass_shattr_list,
+	    SGSOFFSETOF(at_ass_shattr_t, name), sizeof (shattr[0]));
+
+	if (shattr == NULL) {
+		gts_efunc_at_ass_shattr(mf, TK_STRING, &tkv);
+		return (TK_ERROR);
+	}
+
+	ss->ss_ma.ass_bits = shattr->ms_bits;
+	ss->ss_ma.ass_enabled |= SYM_ASSERT_BITS;
+
+	return (gettoken_term(mf, MSG_ORIG(MSG_MAPKW_SHATTR)));
+}
+
+typedef struct {
+	const char	*name;		/* binding name */
+	uchar_t		ms_bind;	/* STB_ value */
+} at_ass_bind_t;
+
+static at_ass_bind_t	at_ass_bind_list[] = {
+	{ MSG_ORIG(MSG_MAPKW_GLOBAL),	STB_GLOBAL },
+	{ MSG_ORIG(MSG_MAPKW_LOCAL),	STB_LOCAL },
+	{ MSG_ORIG(MSG_MAPKW_WEAK),	STB_WEAK },
+	{ 0 }
+};
+
+static size_t	at_ass_bind_list_bufsize =
+    KW_NAME_SIZE(MSG_MAPKW_GLOBAL) +
+    KW_NAME_SIZE(MSG_MAPKW_LOCAL) +
+    KW_NAME_SIZE(MSG_MAPKW_WEAK);
+
+static void
+gts_efunc_at_ass_bind(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
+{
+	Conv_inv_buf_t	inv_buf;
+	char		buf[VLA_SIZE(at_ass_bind_list_bufsize)];
+
+	mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_BINDTYPE),
+	    ld_map_kwnames(at_ass_bind_list, SGSOFFSETOF(at_ass_bind_t, name),
+	    sizeof (at_ass_bind_list[0]), buf, at_ass_bind_list_bufsize),
+	    ld_map_tokenstr(tok, tkv, &inv_buf));
+}
+
+static Token
+at_ass_bind(Mapfile *mf, Token eq_tok, void *uvalue)
+{
+	symbol_state_t	*ss = uvalue;
+	at_ass_bind_t	*bind;
+	ld_map_tkval_t	tkv;
+
+	if (gettoken_str(mf, TK_F_KEYWORD, &tkv,
+	    gts_efunc_at_ass_bind) == TK_ERROR)
+		return (TK_ERROR);
+
+	bind = ld_map_kwfind(tkv.tkv_str, at_ass_bind_list,
+	    SGSOFFSETOF(at_ass_bind_t, name), sizeof (bind[0]));
+
+	if (bind == NULL) {
+		gts_efunc_at_ass_bind(mf, TK_STRING, &tkv);
+		return (TK_ERROR);
+	}
+
+	ss->ss_ma.ass_bind = bind->ms_bind;
+	ss->ss_ma.ass_enabled |= SYM_ASSERT_BIND;
+
+	return (gettoken_term(mf, MSG_ORIG(MSG_MAPKW_BIND)));
+}
+
+static Token
+at_ass_size(Mapfile *mf, Token eq_tok, void *uvalue)
+{
+	symbol_state_t	*ss = uvalue;
+	ld_map_tkval_t	tkv;
+
+	if (gettoken_int(mf, MSG_ORIG(MSG_MAPKW_SIZE), &tkv,
+	    TK_F_MULOK) == TK_ERROR)
+		return (TK_ERROR);
+
+	ss->ss_ma.ass_size = tkv.tkv_int.tkvi_value;
+	ss->ss_ma.ass_enabled |= SYM_ASSERT_SIZE;
+
+	return (gettoken_term(mf, MSG_ORIG(MSG_MAPKW_SIZE)));
+}
+
+static Token
+at_ass_alias(Mapfile *mf, Token eq_tok, void *uvalue)
+{
+	symbol_state_t	*ss = uvalue;
+	ld_map_tkval_t	tkv;
+
+	if (ld_map_gettoken(mf, 0, &tkv) != TK_STRING) {
+		mf_fatal0(mf, MSG_INTL(MSG_MAP_BADALIAS));
+		return (TK_ERROR);
+	}
+
+	ss->ss_ma.ass_alias = tkv.tkv_str;
+	ss->ss_ma.ass_enabled |= SYM_ASSERT_ALIAS;
+
+	return (gettoken_term(mf, MSG_ORIG(MSG_MAPKW_ALIAS)));
+}
+
+static Token
+at_ass_type(Mapfile *mf, Token eq_tok, void *uvalue)
+{
+	ld_map_tkval_t	 tkv;
+	at_ass_type_t	*type;
+	symbol_state_t	*ss = uvalue;
+
+	if (gettoken_str(mf, TK_F_KEYWORD, &tkv,
+	    gts_efunc_at_ass_type) == TK_ERROR)
+		return (TK_ERROR);
+
+	type = ld_map_kwfind(tkv.tkv_str, at_ass_type_list,
+	    SGSOFFSETOF(at_sym_type_t, name), sizeof (type[0]));
+
+	if (type == NULL) {
+		gts_efunc_at_ass_type(mf, TK_STRING, &tkv);
+		return (TK_ERROR);
+	}
+
+	ss->ss_ma.ass_type = type->ms_type;
+	ss->ss_ma.ass_enabled |= SYM_ASSERT_TYPE;
+
+	return (gettoken_term(mf, MSG_ORIG(MSG_MAPKW_ASSERT)));
+}
+
+static Token
+at_sym_assert(Mapfile *mf, Token eq_tok, void *uvalue)
+{
+	static attr_t	attr_list[] = {
+		{ MSG_ORIG(MSG_MAPKW_ALIAS),	at_ass_alias,	ATTR_FMT_EQ },
+		/*
+		 * The Solaris manuals describe both BIND and BINDING, take both
+		 * but prefer BINDING
+		 */
+		{ MSG_ORIG(MSG_MAPKW_BIND),	at_ass_bind,	ATTR_FMT_EQ },
+		{ MSG_ORIG(MSG_MAPKW_BINDING),	at_ass_bind,	ATTR_FMT_EQ },
+		{ MSG_ORIG(MSG_MAPKW_SHATTR),	at_ass_shattr,	ATTR_FMT_EQ },
+		{ MSG_ORIG(MSG_MAPKW_SIZE),	at_ass_size,	ATTR_FMT_EQ },
+		{ MSG_ORIG(MSG_MAPKW_TYPE),	at_ass_type,	ATTR_FMT_EQ },
+		{ 0 }
+	};
+
+	static size_t	attr_list_bufsize =
+	    KW_NAME_SIZE(MSG_MAPKW_ALIAS) +
+	    KW_NAME_SIZE(MSG_MAPKW_BIND) +
+	    KW_NAME_SIZE(MSG_MAPKW_BINDING) +
+	    KW_NAME_SIZE(MSG_MAPKW_SHATTR) +
+	    KW_NAME_SIZE(MSG_MAPKW_SIZE) +
+	    KW_NAME_SIZE(MSG_MAPKW_TYPE);
+
+	symbol_state_t *ss = uvalue;
+	int done = 0;
+	Token tok;
+	ld_map_tkval_t tkv;
+	Conv_inv_buf_t	inv_buf;
+
+	/* Read assertions until the closing } */
+	for (done = 0; done == 0; ) {
+		switch (tok = ld_map_gettoken(mf, 0, &tkv)) {
+		case TK_ERROR:
+			return (TK_ERROR);
+		case TK_LEFTBKT:
+			if (parse_attributes(mf, ss->ss_ms.ms_name,
+			    attr_list, attr_list_bufsize, ss) == TK_ERROR)
+				return (TK_ERROR);
+
+			/*
+			 * If we're stating we're an alias for another symbol,
+			 * the only other thing that maybe specified for
+			 * _this_ symbol is its binding.
+			 */
+			if ((ss->ss_ma.ass_enabled & SYM_ASSERT_ALIAS) &&
+			    (ss->ss_ma.ass_enabled &
+			    ~(SYM_ASSERT_ALIAS|SYM_ASSERT_BIND))) {
+				mf_fatal(mf, MSG_INTL(MSG_MAP_ALIAS_COMBO),
+				    ss->ss_ms.ms_name);
+				return (TK_ERROR);
+			}
+
+			tok = gettoken_term(mf, MSG_INTL(MSG_MAP_SYMATTR));
+			if (tok == TK_ERROR)
+				return (TK_ERROR);
+			if (tok == TK_SEMICOLON)
+				return (tok);
+			break;
+		default:
+			mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_SYMDELIM),
+			    ld_map_tokenstr(tok, &tkv, &inv_buf));
+			return (TK_ERROR);
+		}
+	}
+
+	/* If we drop through here, something is wrong */
+	return (TK_ERROR);
 }
 
 /*
@@ -2977,7 +3284,7 @@ at_sym_value(Mapfile *mf, Token eq_tok, void *uvalue)
  * entry:
  *	mf - Mapfile descriptor
  *	dir_name - Name of directive.
- *	ss - Pointer to symbol state block that has had its ss_nv
+ *	ss - Pointer to symbol state block that has had its ss_mv
  *		member initialzed via a call to ld_map_sym_ver_init().
  *
  * exit:
@@ -2995,6 +3302,7 @@ parse_symbol_attributes(Mapfile *mf, const char *dir_name, symbol_state_t *ss)
 		{ MSG_ORIG(MSG_MAPKW_SIZE),	at_sym_size,	ATTR_FMT_EQ },
 		{ MSG_ORIG(MSG_MAPKW_TYPE),	at_sym_type,	ATTR_FMT_EQ },
 		{ MSG_ORIG(MSG_MAPKW_VALUE),	at_sym_value,	ATTR_FMT_EQ },
+		{ MSG_ORIG(MSG_MAPKW_ASSERT),	at_sym_assert,	ATTR_FMT_EQ },
 
 		/* List must be null terminated */
 		{ 0 }
@@ -3010,7 +3318,8 @@ parse_symbol_attributes(Mapfile *mf, const char *dir_name, symbol_state_t *ss)
 	    KW_NAME_SIZE(MSG_MAPKW_FLAGS) +
 	    KW_NAME_SIZE(MSG_MAPKW_SIZE) +
 	    KW_NAME_SIZE(MSG_MAPKW_TYPE) +
-	    KW_NAME_SIZE(MSG_MAPKW_VALUE);
+	    KW_NAME_SIZE(MSG_MAPKW_VALUE) +
+	    KW_NAME_SIZE(MSG_MAPKW_ASSERT);
 
 	Token		tok;
 	ld_map_tkval_t	tkv, tkv_sym;
@@ -3034,7 +3343,10 @@ parse_symbol_attributes(Mapfile *mf, const char *dir_name, symbol_state_t *ss)
 		case TK_STRING:
 			/* Default value for all symbol attributes is 0 */
 			(void) memset(&ss->ss_ms, 0, sizeof (ss->ss_ms));
+			(void) memset(&ss->ss_ma, 0, sizeof (ss->ss_ma));
 			ss->ss_ms.ms_name = tkv_sym.tkv_str;
+			ss->ss_ma.ass_file = mf->mf_name;
+			ss->ss_ma.ass_lineno = mf->mf_lineno;
 
 			/*
 			 * Turn off the WEAK flag to indicate that definitions
@@ -3080,7 +3392,22 @@ parse_symbol_attributes(Mapfile *mf, const char *dir_name, symbol_state_t *ss)
 					done = 1;
 
 				/* FALLTHROUGH */
-			case TK_SEMICOLON:
+			case TK_SEMICOLON: {
+				ld_map_sym_t *ms = &ss->ss_ms;
+				/*
+				 * If an EXTERN or PARENT symbol has
+				 * assertions issue an error, since we can't
+				 * check them.
+				 */
+				if ((ss->ss_ma.ass_enabled != 0) &&
+				    (((ms->ms_sdflags & FLG_SY_PARENT) != 0) ||
+				    ((ms->ms_sdflags & FLG_SY_EXTERN) != 0))) {
+					mf_fatal(mf,
+					    MSG_INTL(MSG_MAP_EXTPAR_ASSERT),
+					    ms->ms_name);
+					return (TK_ERROR);
+				}
+
 				/*
 				 * Add the new symbol. It should be noted that
 				 * all symbols added by the mapfile start out
@@ -3091,9 +3418,10 @@ parse_symbol_attributes(Mapfile *mf, const char *dir_name, symbol_state_t *ss)
 				 * processing.
 				 */
 				if (!ld_map_sym_enter(mf, &ss->ss_mv,
-				    &ss->ss_ms))
+				    &ss->ss_ms, &ss->ss_ma))
 					return (TK_ERROR);
 				break;
+			}
 			default:
 				mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_SYMDELIM),
 				    ld_map_tokenstr(tok, &tkv, &inv_buf));

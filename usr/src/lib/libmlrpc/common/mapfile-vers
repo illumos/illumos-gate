@@ -49,8 +49,8 @@ SYMBOL_VERSION SUNWprivate {
 	mlrpc_clh_unbind;
 
 	# Allow debug/test programs to provide these.
-	ndo_printf		{ FLAGS = NODIRECT };
-	ndo_trace		{ FLAGS = NODIRECT };
+	ndo_printf	{ FLAGS = NODIRECT; };
+	ndo_trace	{ FLAGS = NODIRECT; };
 
 	ndr_buf_decode;
 	ndr_buf_fini;
@@ -96,20 +96,39 @@ SYMBOL_VERSION SUNWprivate {
 	nds_destruct;
 	nds_initialize;
 
-	ndt__char;
-	ndt_s_char;
-	ndt__uchar;
-	ndt_s_uchar;
-	ndt__wchar;
-	ndt_s_wchar;
-	ndt__short;
-	ndt_s_short;
-	ndt__ushort;
-	ndt_s_ushort;
-	ndt__long;
-	ndt_s_long;
-	ndt__ulong;
-	ndt_s_ulong;
+$if _ELF32
+	ndt__char	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt_s_char	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt__uchar	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt_s_uchar	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt__wchar	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt_s_wchar	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt__short	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt_s_short	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt__ushort	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt_s_ushort	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt__long	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt_s_long	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt__ulong	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+	ndt_s_ulong	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
+$elif _ELF64
+	ndt__char	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt_s_char	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt__uchar	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt_s_uchar	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt__wchar	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt_s_wchar	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt__short	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt_s_short	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt__ushort	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt_s_ushort	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt__long	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt_s_long	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt__ulong	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+	ndt_s_ulong	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
+$else
+$error unknown ELFCLASS
+$endif
 
     local:
 	*;

@@ -41,15 +41,15 @@ $mapfile_version 2
 SYMBOL_VERSION SUNW_1.2 {
     global:
 	add_wchstr;
-	COLOR_PAIRS;
-	COLORS;
-	COLS;
-	curscr;
-	cur_term;
-	LINES;
+	COLOR_PAIRS	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	COLORS		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	COLS		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	curscr		{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
+	cur_term	{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
+	LINES		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	mvget_wstr;
 	putp;
-	stdscr;
+	stdscr		{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
 	tparm;
 	tputs;
 } SUNW_1.1;
@@ -429,45 +429,100 @@ SYMBOL_VERSION SUNW_1.1 {
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	boolcodes;
-	boolfnames;
-	boolnames;
-	__cht1;
-	__cht2;
-	numcodes;
-	numfnames;
-	numnames;
-	__pcht1;
-	__pcht2;
-	strcodes;
-	strfnames;
-	strnames;
-	__w1;
-	__WACS_BLOCK;
-	__WACS_BOARD;
-	__WACS_BTEE;
-	__WACS_BULLET;
-	__WACS_CKBOARD;
-	__WACS_DARROW;
-	__WACS_DEGREE;
-	__WACS_DIAMOND;
-	__WACS_HLINE;
-	__WACS_LANTERN;
-	__WACS_LARROW;
-	__WACS_LLCORNER;
-	__WACS_LRCORNER;
-	__WACS_LTEE;
-	__WACS_PLMINUS;
-	__WACS_PLUS;
-	__WACS_RARROW;
-	__WACS_RTEE;
-	__WACS_S1;
-	__WACS_S9;
-	__WACS_TTEE;
-	__WACS_UARROW;
-	__WACS_ULCORNER;
-	__WACS_URCORNER;
-	__WACS_VLINE;
+	boolcodes	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[38];
+				};
+			};
+	boolfnames	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[38];
+				};
+			};
+	boolnames	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[38];
+				};
+			};
+	__cht1		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	__cht2		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	numcodes	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[34];
+				};
+			};
+	numfnames	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[34];
+				};
+			};
+	numnames	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[34];
+				};
+			};
+	__pcht1		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
+	__pcht2		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
+	strcodes	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[395];
+				};
+			};
+	strfnames	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[395];
+				};
+			};
+	strnames	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[395];
+				};
+			};
+	__w1		{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
+	__WACS_BLOCK	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_BOARD	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_BTEE	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_BULLET	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_CKBOARD	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_DARROW	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_DEGREE	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_DIAMOND	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_HLINE	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_LANTERN	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_LARROW	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_LLCORNER	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_LRCORNER	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_LTEE	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_PLMINUS	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_PLUS	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_RARROW	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_RTEE	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_S1	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_S9	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_TTEE	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_UARROW	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_ULCORNER	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_URCORNER	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	__WACS_VLINE	{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
     local:
 	*;
 };

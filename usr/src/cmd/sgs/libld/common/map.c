@@ -55,7 +55,7 @@
  * Tokens are representations of the sys/auxv_$MACH.h capabilities, for example:
  *
  *	#define AV_386_FPU 0x0001	is represented as	FPU
- *	#define AV_386_TSC 0x0002	 "    "    "   " 	TSC
+ *	#define AV_386_TSC 0x0002	"    "	  "     "	TSC
  *
  * Or, the above two capabilities could be represented as V0x3.  Note, the
  * OVERRIDE flag is used to ensure that only those values provided via this
@@ -286,7 +286,7 @@ valuetoxword(Mapfile *mf, ld_map_tkval_t *tkv, Xword *value)
 /*
  * Process a mapfile segment declaration definition.
  *	segment_name	= segment_attribute;
- * 	segment_attribute : segment_type  segment_flags  virtual_addr
+ *	segment_attribute : segment_type  segment_flags	 virtual_addr
  *			    physical_addr  length alignment
  */
 static Boolean
@@ -589,7 +589,7 @@ map_equal(Mapfile *mf, Sg_desc *sgp)
 /*
  * Process a mapfile mapping directives definition.
  *
- * 	segment_name : section_attribute [ : file_name ]
+ *	segment_name : section_attribute [ : file_name ]
  *
  * Where segment_attribute is one of: section_name section_type section_flags;
  */
@@ -795,7 +795,7 @@ map_colon(Mapfile *mf, Ent_desc *enp)
 
 /*
  * Process a mapfile size symbol definition.
- * 	segment_name @ symbol_name;
+ *	segment_name @ symbol_name;
  */
 static Boolean
 map_atsign(Mapfile *mf, Sg_desc *sgp)
@@ -850,7 +850,7 @@ map_pipe(Mapfile *mf, Sg_desc *sgp)
 
 /*
  * Process a mapfile library specification definition.
- * 	shared_object_name - shared object definition
+ *	shared_object_name - shared object definition
  *	shared object definition : [ shared object type [ = SONAME ]]
  *					[ versions ];
  */
@@ -1074,6 +1074,7 @@ map_version(Mapfile *mf, char *name)
 					    }
 					    /* LINTED */
 					    ms.ms_size = (Addr)number;
+					    ms.ms_size_set = TRUE;
 					    break;
 					    /* END CSTYLED */
 					}
@@ -1180,7 +1181,7 @@ map_version(Mapfile *mf, char *name)
 			 * resolution process.  Symbols defined as locals will
 			 * be reduced in scope after all input file processing.
 			 */
-			if (!ld_map_sym_enter(mf, &mv, &ms))
+			if (!ld_map_sym_enter(mf, &mv, &ms, NULL))
 				return (FALSE);
 			break;
 
@@ -1217,7 +1218,7 @@ ld_map_parse_v1(Mapfile *mf)
 	char		*name;
 	Ofl_desc	*ofl = mf->mf_ofl;
 	ld_map_tkval_t	tkv;		/* Value of token */
-	avl_index_t 	where;
+	avl_index_t	where;
 
 	/*
 	 * We now parse the mapfile until the gettoken routine returns EOF.

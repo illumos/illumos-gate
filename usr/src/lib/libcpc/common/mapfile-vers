@@ -119,7 +119,6 @@ $endif
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	SUNWprivate_1.1;
 	cpc_terminate;
     local:
 	*;

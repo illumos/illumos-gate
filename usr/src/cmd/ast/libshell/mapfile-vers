@@ -122,8 +122,14 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	nv_unset;
 
 	# semi-private, needed for shcomp
-	sh;
-	e_dict;
+$if _ELF64
+	sh	{ ASSERT = { TYPE = OBJECT; SIZE = 1888; }; };
+$elif _ELF32
+	sh	{ ASSERT = { TYPE = OBJECT; SIZE = 1216; }; };
+$else
+$error unknown ELFCLASS
+$endif
+	e_dict	{ ASSERT = { TYPE = OBJECT; SIZE = 9; }; };
 
     local:
 	*;

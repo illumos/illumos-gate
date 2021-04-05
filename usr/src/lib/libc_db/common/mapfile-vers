@@ -120,7 +120,7 @@ SYMBOL_SCOPE {
 	ps_lgetfpregs		{ FLAGS = EXTERN };
 	ps_lgetregs		{ FLAGS = EXTERN };
 	ps_lgetxregs		{ FLAGS = EXTERN };
-	ps_lgetxregsize		{ FLAGS = EXTERN };
+	ps_lgetxregsize	{ FLAGS = EXTERN };
 	ps_lsetfpregs		{ FLAGS = EXTERN };
 	ps_lsetregs		{ FLAGS = EXTERN };
 	ps_lsetxregs		{ FLAGS = EXTERN };

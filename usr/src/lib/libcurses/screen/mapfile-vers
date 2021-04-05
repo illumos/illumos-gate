@@ -370,62 +370,238 @@ SYMBOL_VERSION SUNW_1.1 {
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	acs32map;
-	acs_map;
-	BC;
-	bit_attributes;
+	acs32map		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	acs_map			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	BC			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	bit_attributes		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 36;
+					};
+				};
 	_blast_keys;
-	boolcodes;
-	boolfnames;
-	boolnames;
+	boolcodes		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[38];
+					};
+				};
+	boolfnames		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[38];
+					};
+				};
+	boolnames		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[38];
+					};
+				};
 	box32;
 	_branchto;
-	_called_before;
+	_called_before		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 1;
+					};
+				};
 	_ccleanup;
 	cconvert;
 	cexpand;
 	_change_color;
 	_change_video;
 	_chkinput;
-	COLOR_PAIRS;
-	COLORS;
-	COLS;
+	COLOR_PAIRS		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	COLORS			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	COLS			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 	_countchar;
 	cpr;
-	_csmax;
-	cswidth;
-	cur_bools;
-	cur_nums;
-	curscr;
+	_csmax			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 2;
+					};
+				};
+	cswidth			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 8;
+					};
+				};
+	cur_bools		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	cur_nums		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	curscr			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	curserr;
-	curs_errno;
-	curs_err_strings;
-	curses_version;
+	curs_errno		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 2;
+					};
+				};
+	curs_err_strings	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[4];
+					};
+				};
+	curses_version		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_curs_mbstowcs;
 	_curs_mbtowc;
-	curs_parm_err;
-	_curs_scrwidth;
-	cur_strs;
+	curs_parm_err		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 32;
+					};
+				};
+	_curs_scrwidth		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 8;
+					};
+				};
+	cur_strs		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_curs_wcstombs;
 	_curs_wctomb;
-	cur_term;
-	Def_term;
+	cur_term		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	Def_term		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_delay;
 	delkey;
 	delkeymap;
 	delterm;
-	_do_slk_noref;
-	_do_slk_ref;
-	_do_slk_tch;
+	_do_slk_noref		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	_do_slk_ref		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	_do_slk_tch		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	draino;
-	_endwin;
-	_first_term;
+	_endwin			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 1;
+					};
+				};
+$if _ELF64
+	_first_term		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 2032;
+					};
+				};
+$elif _ELF32
+	_first_term		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 1340;
+					};
+				};
+$else
+$error unknown ELFCLASS
+$endif
 	fixterm;
 	force_doupdate;
-	_frst_bools;
-	_frst_nums;
-	_frst_strs;
-	_frst_tblstr;
+	_frst_bools		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 38;
+					};
+				};
+	_frst_nums		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 68;
+					};
+				};
+	_frst_strs		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[395];
+					};
+				};
+	_frst_tblstr		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 1400;
+					};
+				};
 	garbagedlines;
 	garbagedwin;
 	getattrs;
@@ -449,7 +625,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_init_costs;
 	_init_HP_pair;
 	initscr32;
-	LINES;
+	LINES			{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	m_addch;
 	m_addstr;
 	makenew;
@@ -463,7 +639,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	mbgetwidth;
 	_mbinsshift;
 	mbscrw;
-	_mbtrue;
+	_mbtrue			{ ASSERT = { TYPE = OBJECT; SIZE = 1; }; };
 	_mbvalid;
 	m_clear;
 	memSset;
@@ -474,7 +650,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	mouse_off;
 	mouse_on;
 	mouse_set;
-	Mouse_status;
+	Mouse_status		{ ASSERT = { TYPE = OBJECT; SIZE = 20; }; };
 	m_refresh;
 	mvhline;
 	mvvline;
@@ -483,19 +659,34 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	newkey;
 	newscreen;
 	newterm32;
-	numcodes;
-	numfnames;
-	numnames;
-	Oldcolors;
-	ospeed;
+	numcodes		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[34];
+					};
+				};
+	numfnames		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[34];
+					};
+				};
+	numnames		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[34];
+					};
+				};
+	Oldcolors		{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
+	ospeed			{ ASSERT = { TYPE = OBJECT; SIZE = 2; }; };
 	_outch;
 	_outchar;
-	outchcount;
+	outchcount		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	_outwch;
 	_overlap;
 	p32echochar;
 	_padjust;
-	PC;
+	PC			{ ASSERT = { TYPE = OBJECT; SIZE = 1; }; };
 	pr_bfooting;
 	pr_bheading;
 	pr_boolean;
@@ -506,48 +697,104 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	pr_nfooting;
 	pr_nheading;
 	pr_number;
-	prog_istermios;
-	progname		{ FLAGS = NODIRECT };
+	prog_istermios		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	progname		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				  FLAGS = NODIRECT;
+				};
 	pr_onecolumn;
 	pr_sfooting;
 	pr_sheading;
 	pr_string;
 	pr_width;
 	_quick_echo;
-	_quick_ptr;
+	_quick_ptr		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	request_mouse_pos;
 	resetterm;
-	_rip_init;
+	_rip_init		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	rmpadding;
 	saveterm;
 	_scr_all;
 	scr_ll_dump;
-	_scrmax;
+	_scrmax			{ ASSERT = { TYPE = OBJECT; SIZE = 2; }; };
 	scr_reset;
 	setcurscreen;
 	set_curterm;
 	setcurterm;
-	_setidln;
+	_setidln		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	setkeymap;
-	shell_istermios;
-	_slk_init;
+	shell_istermios		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	_slk_init		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	slk_start;
 	_slk_update;
-	SP;
+	SP			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_sprintw;
 	__sscans;
-	stdscr;
+	stdscr			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_strbyte2code;
 	_strcode2byte;
-	strcodes;
-	strfnames;
-	strnames;
-	TABSIZE;
+	strcodes		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[395];
+					};
+				};
+	strfnames		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[395];
+					};
+				};
+	strnames		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[395];
+					};
+				};
+	TABSIZE			{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	_tcsearch;
 	termerr;
-	term_errno;
-	term_err_strings;
-	term_parm_err;
+	term_errno		{ ASSERT = { TYPE = OBJECT; SIZE = 2; }; };
+	term_err_strings	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[8];
+					};
+				};
+	term_parm_err		{ ASSERT = { TYPE = OBJECT; SIZE = 32; }; };
 	tgetch;
 	tgetwch;
 	tifgetflag;
@@ -565,17 +812,37 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	traceon;
 	_tstp;
 	ttimeout;
-	ttytype;
-	_unctrl;
-	UP;
+	ttytype			{ ASSERT = { TYPE = OBJECT; SIZE = 1024; }; };
+	_unctrl			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[128];
+					};
+				};
+	UP			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_update_old_y_area;
 	use_env;
-	_use_env;
-	_useidln;
+	_use_env		{ ASSERT = { TYPE = OBJECT; SIZE = 1; }; };
+	_useidln		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	vid32attr;
 	vid32puts;
 	vidupdate;
-	_virtscr;
+	_virtscr		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	vline;
 	w32addch;
 	w32attroff;
@@ -587,7 +854,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	wmbinch;
 	wmbmove;
 	wmouse_position;
-	_y16update;
+	_y16update		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
     local:
 	*;
 };

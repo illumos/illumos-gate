@@ -40,14 +40,14 @@ $mapfile_version 2
 
 SYMBOL_VERSION SUNW_1.2 {
     global:
-	COLOR_PAIRS;
-	COLORS;
-	COLS;
-	curscr;
-	cur_term;
-	LINES;
+	COLOR_PAIRS	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	COLORS		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	COLS		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	curscr		{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
+	cur_term	{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
+	LINES		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	putp;
-	stdscr;
+	stdscr		{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
 	tparm;
 	tputs;
 } SUNW_1.1;

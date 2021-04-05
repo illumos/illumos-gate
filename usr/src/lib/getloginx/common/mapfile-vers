@@ -44,4 +44,3 @@ SYMBOL_VERSION ILLUMOS_0.1 {	# first release of getloginx.so.1
     local:
 	*;
 };
-

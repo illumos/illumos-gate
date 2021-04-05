@@ -274,4 +274,3 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_thr_self				{ TYPE = FUNCTION };
 	_thr_setspecific			{ TYPE = FUNCTION };
 };
-

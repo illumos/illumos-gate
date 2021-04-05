@@ -195,7 +195,7 @@ typedef STACK(void) generic_stack_t;
 #define	CEXP_OP_STACK_INIT	1
 #define	CEXP_VAL_STACK_INIT	1
 #else
-#define	CDIR_STACK_INIT 	16
+#define	CDIR_STACK_INIT		16
 #define	CEXP_OP_STACK_INIT	8
 #define	CEXP_VAL_STACK_INIT	(CEXP_OP_STACK_INIT * 2) /* 2 vals per binop */
 #endif
@@ -478,9 +478,9 @@ static const mf_tokdisp_t gettok_dispatch_v2 = {
 	TK_OP_ID,			/* 88 - X */
 	TK_OP_ID,			/* 89 - Y */
 	TK_OP_ID,			/* 90 - Z */
-	TK_OP_BADCHR,			/* 91 - [ */
+	TK_LEFTSQR,			/* 91 - [ */
 	TK_OP_BADCHR,			/* 92 - \ */
-	TK_OP_BADCHR,			/* 93 - ] */
+	TK_RIGHTSQR,			/* 93 - ] */
 	TK_OP_BADCHR,			/* 94 - ^ */
 	TK_OP_ID,			/* 95 - _ */
 	TK_OP_BADCHR,			/* 96 - ` */
@@ -1711,6 +1711,7 @@ ld_map_getint(Mapfile *mf, ld_map_tkval_t *value, Boolean notail)
 	ld_map_strtoxword_t	s2xw_ret;
 	ld_map_npatch_t	np;
 	char		*endptr;
+	char		*startptr = mf->mf_next;
 	char		*errstr = mf->mf_next;
 
 	value->tkv_int.tkvi_str = mf->mf_next;
@@ -1727,8 +1728,9 @@ ld_map_getint(Mapfile *mf, ld_map_tkval_t *value, Boolean notail)
 	}
 
 	/* Advance position to item following value, skipping whitespace */
-	value->tkv_int.tkvi_cnt = endptr - mf->mf_next;
+	value->tkv_int.tkvi_cnt = endptr - startptr;
 	mf->mf_next = endptr;
+
 	while (isspace_nonl(*mf->mf_next))
 		mf->mf_next++;
 
@@ -1927,6 +1929,29 @@ gettoken_cquote_str(Mapfile *mf, int flags, ld_map_tkval_t *tkv)
 }
 
 /*
+ * Peek ahead at the text token.
+ *
+ * entry:
+ *   mf - Mapfile descriptor
+ *
+ * exit:
+ *   Returns one of the TK_* values, including the TK_OP values (that is,
+ *   tokens are not processed into their necessarily final form).
+ */
+Token
+ld_map_peektoken(Mapfile *mf)
+{
+	int ch;
+
+	if (mf->mf_next_ch == 0)
+		ch = *mf->mf_next;
+	else
+		ch = mf->mf_next_ch;
+
+	return ((ch & 0x80) ? TK_OP_ILLCHR : mf->mf_tokdisp[ch]);
+}
+
+/*
  * Get a token from the mapfile.
  *
  * entry:
@@ -2115,6 +2140,10 @@ ld_map_tokenstr(Token tok, ld_map_tkval_t *tkv, Conv_inv_buf_t *inv_buf)
 		return (MSG_ORIG(MSG_QSTR_LEFTBKT));
 	case TK_RIGHTBKT:
 		return (MSG_ORIG(MSG_QSTR_RIGHTBKT));
+	case TK_LEFTSQR:
+		return (MSG_ORIG(MSG_QSTR_LEFTSQR));
+	case TK_RIGHTSQR:
+		return (MSG_ORIG(MSG_QSTR_RIGHTSQR));
 	case TK_PIPE:
 		return (MSG_ORIG(MSG_QSTR_PIPE));
 	case TK_INT:
@@ -2661,10 +2690,10 @@ ld_map_post_process(Ofl_desc *ofl)
 		 *	as the sort key.
 		 *
 		 * v2)	The version 2 syntax has the user specify a name for
-		 * 	the entry criteria, and then provide a list of entry
-		 * 	criteria names via the IS_ORDER segment attribute.
-		 * 	Sections placed via the criteria listed in IS_ORDER
-		 * 	are sorted, and the others are not.
+		 *	the entry criteria, and then provide a list of entry
+		 *	criteria names via the IS_ORDER segment attribute.
+		 *	Sections placed via the criteria listed in IS_ORDER
+		 *	are sorted, and the others are not.
 		 *
 		 * Regardless of the syntax version used, the section sorting
 		 * code expects the following:

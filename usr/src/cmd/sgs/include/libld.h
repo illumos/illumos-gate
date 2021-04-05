@@ -407,6 +407,8 @@ struct ofl_desc {
 	ofl_guideflag_t	ofl_guideflags;	/* -z guide flags */
 	APlist		*ofl_assdeflib;	/* -z assert-deflib exceptions */
 	int		ofl_aslr;	/* -z aslr, -1 disable, 1 enable */
+	APlist		*ofl_symasserts; /* assertions about symbols */
+					/* from mapfiles */
 };
 
 #define	FLG_OF_DYNAMIC	0x00000001	/* generate dynamic output module */
@@ -538,6 +540,7 @@ struct ofl_desc {
 #define	FLG_OFG_NO_MF		0x00000008	/* use v2 mapfile syntax */
 #define	FLG_OFG_NO_TEXT		0x00000010	/* verify pure text segment */
 #define	FLG_OFG_NO_UNUSED	0x00000020	/* remove unused dependency */
+#define	FLG_OFG_NO_ASSERTS	0x00000040	/* suggest mapfile assertions */
 
 /*
  * Test to see if a guidance should be given for a given category
@@ -1146,6 +1149,25 @@ typedef struct {
 	Word		md_oidx;	/* output Move entry index */
 } Mv_desc;
 
+#define	SYM_ASSERT_SIZE		0x01
+#define	SYM_ASSERT_BIND		0x02
+#define	SYM_ASSERT_TYPE		0x04
+#define	SYM_ASSERT_BITS		0x08
+#define	SYM_ASSERT_ALIAS	0x10
+
+typedef struct {
+	Sym_desc	*ass_sdp;
+	char		*ass_file;
+	Lineno		ass_lineno;
+	uchar_t		ass_type;
+	uchar_t		ass_bind;
+	Lword		ass_size;
+	Boolean		ass_bits;
+	const char	*ass_alias;
+	/* Assertions explicitly enabled by user */
+	uint_t		ass_enabled;
+} Ass_desc;
+
 /*
  * Symbol descriptor.
  */
@@ -1165,6 +1187,7 @@ struct sym_desc {
 	Word		sd_shndx;	/* sect. index sym is associated w/ */
 	sd_flag_t	sd_flags;	/* state flags */
 	Half		sd_ref;		/* reference definition of symbol */
+	Ass_desc	*sd_ass;	/* pointer back to symbol assertions */
 };
 
 /*
@@ -1316,6 +1339,8 @@ struct sym_avlnode {
 					/*    capabilities */
 #define	FLG_SY_DEFERRED	0x0200000000000	/* symbol should not be bound to */
 					/*	during BIND_NOW relocations */
+
+#define	FLG_SY_MAPASSRT	0x0400000000000 /* Symbol has attribute assertions */
 
 /*
  * A symbol can only be truly hidden if it is not a capabilities symbol.

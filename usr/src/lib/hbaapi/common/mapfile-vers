@@ -119,4 +119,3 @@ SYMBOL_VERSION SUNW_2.0 {
     local:
 	*;
 };
-

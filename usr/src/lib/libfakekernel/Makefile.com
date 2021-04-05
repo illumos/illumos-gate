@@ -70,6 +70,10 @@ CPPFLAGS += -D_FILE_OFFSET_BITS=64
 # this library is for debugging, let's always define DEBUG here.
 CPPFLAGS += -DDEBUG
 
+# libfakekernel isn't delivered, and is a special case, disable global data
+# complaints
+ZGUIDANCE= -Wl,-zguidance=noasserts
+
 LDLIBS += -lumem -lcryptoutil -lsocket -lc
 
 .KEEP_STATE:

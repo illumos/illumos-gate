@@ -103,8 +103,8 @@ $if _sparc && _ELF32
 SYMBOL_VERSION SISCD_2.3 {
 	global:
 $endif
-		dlclose			{ TYPE = FUNCTION };
-		dlerror			{ TYPE = FUNCTION };
+		dlclose		{ TYPE = FUNCTION };
+		dlerror		{ TYPE = FUNCTION };
 		dlopen			{ TYPE = FUNCTION };
 		dlsym			{ TYPE = FUNCTION };
 };
@@ -113,14 +113,14 @@ $endif
 SYMBOL_VERSION SUNWprivate_1.1 {
 	global:
 		_ld_libc		{ TYPE = FUNCTION };
-		_dlinfo			{ TYPE = FUNCTION };
-		_dldump			{ TYPE = FUNCTION };
+		_dlinfo		{ TYPE = FUNCTION };
+		_dldump		{ TYPE = FUNCTION };
 		_dlmopen		{ TYPE = FUNCTION };
-		_dlopen			{ TYPE = FUNCTION };
+		_dlopen		{ TYPE = FUNCTION };
 		_dlerror		{ TYPE = FUNCTION };
 		_dlsym			{ TYPE = FUNCTION };
 		_dlclose		{ TYPE = FUNCTION };
-		_dladdr			{ TYPE = FUNCTION };
+		_dladdr		{ TYPE = FUNCTION };
 		_dladdr1		{ TYPE = FUNCTION };
 
 $if amd64

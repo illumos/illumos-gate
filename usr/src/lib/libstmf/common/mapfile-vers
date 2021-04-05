@@ -94,7 +94,7 @@ SYMBOL_VERSION SUNW_1.1 {
 	    stmfSetLuProp;
 	    stmfSetStmfProp;
 	    stmfGetStmfProp;
-            stmfValidateView;
+	    stmfValidateView;
 	local:
 		*;
 };
@@ -108,4 +108,3 @@ SYMBOL_VERSION SUNWprivate {
 	local:
 	    *;
 };
-

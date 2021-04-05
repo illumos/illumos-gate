@@ -54,7 +54,13 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	assertExclusive;
 	beginTransaction;
 	bp2buf;
-	cons;
+	cons			{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 	createQuery;
 	db_abort_merge_dict;
 	db_add_entry;
@@ -110,10 +116,31 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	init_yptol_flag;
 	internalTableName;
 	internal_table_name;
-	justTesting;
-	ldapConfig;
-	ldapDBTableMapping;
-	ldapMappingList;
+	justTesting		{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	ldapConfig		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 60;
+					};
+				};
+	ldapDBTableMapping	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 140;
+					};
+				};
+	ldapMappingList		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 340;
+					};
+				};
 	loadAllLDAP;
 	lock_core;
 	lock_map;
@@ -122,7 +149,13 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	__make_legal;
 	mapFromLDAP;
 	mapToLDAP;
-	mflag;
+	mflag			{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 	__nisdb_get_tsd;
 	__nisdb_lock_report;
 	__nisdb_rlock;
@@ -144,10 +177,28 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	__nis_scan_table_mt;
 	__nis_ulock_db_table;
 	__nis_ulock_hash_table;
-	nogecos;
-	nopw;
-	noshell;
-	numMisaligned;
+	nogecos			{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	nopw			{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	noshell			{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	numMisaligned		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	objFromLDAP;
 	objToLDAP;
 	p2buf;
@@ -160,7 +211,13 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	remove_root_object;
 	rename_map;
 	sc2buf;
-	setColumnsDuringConfig;
+	setColumnsDuringConfig	{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 	sfree;
 	shim_changepasswd;
 	shim_dbm_close;
@@ -173,23 +230,40 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	shim_dbm_open;
 	shim_dbm_store;
 	shim_exit;
-	single;
+	single			{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 	socket;
-	tbl_prototype;
+	tbl_prototype		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 24;
+					};
+				};
 	unlock_core;
 	unlock_map;
 	unlockTransLog;
 	update_root_object;
 	validloginshell;
 	validstr;
-	verbose;
+	verbose			{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 	xdr_nis_fetus_object;
 	xdr_nis_name_abbrev;
 	ypcheck_domain_yptol;
 	ypcheck_map_existence_yptol;
 	ypmkfilename;
-	yptol_mode;
-	yptol_newlock;
+	yptol_mode		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	yptol_newlock		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
     local:
 	*;
 };

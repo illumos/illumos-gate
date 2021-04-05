@@ -25,6 +25,9 @@ dir path=opt/elf-tests/runfiles
 dir path=opt/elf-tests/tests
 dir path=opt/elf-tests/tests/assert-deflib
 dir path=opt/elf-tests/tests/linker-sets
+dir path=opt/elf-tests/tests/mapfiles
+dir path=opt/elf-tests/tests/mapfiles/assert
+dir path=opt/elf-tests/tests/mapfiles/parser
 dir path=opt/elf-tests/tests/tls
 dir path=opt/elf-tests/tests/tls/amd64
 dir path=opt/elf-tests/tests/tls/amd64/ie
@@ -40,6 +43,47 @@ file path=opt/elf-tests/tests/linker-sets/in-use-check mode=0555
 file path=opt/elf-tests/tests/linker-sets/simple mode=0555
 file path=opt/elf-tests/tests/linker-sets/simple-src.c mode=0444
 file path=opt/elf-tests/tests/linker-sets/simple.out mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.alias-with-others \
+    mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.circalias mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.guidance mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.no-extern mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.no-parent mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.not-alias mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.true mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.unknown-alias mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.unknown-assert mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.unknown-bind mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.unknown-shattr mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.unknown-type mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongalias mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongbits mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongbits2 mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongscope mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongsize mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongtype mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongtype-alias \
+    mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongtype2 mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/object.c mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/test-assert mode=0555
+file path=opt/elf-tests/tests/mapfiles/parser/mapfile.addrsize.good mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/mapfile.addrsize.mult mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/mapfile.addrsize.substring \
+    mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/mapfile.addrsize.superstring \
+    mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/mapfile.addrsize.wrong mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.good mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.noterm \
+    mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.overflow \
+    mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.twobegin \
+    mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.wrong mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/object.c mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/test-parser mode=0555
 file path=opt/elf-tests/tests/tls/amd64/ie/Makefile.test mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/amd64-ie-test mode=0555
 file path=opt/elf-tests/tests/tls/amd64/ie/style1-func-with-r12.s mode=0444

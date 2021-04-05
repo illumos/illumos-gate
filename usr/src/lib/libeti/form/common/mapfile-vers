@@ -119,12 +119,32 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__advance;
 	_beg_field;
 	_beg_line;
-	__braelist;
-	__braslist;
-	__bravar;
+	__braelist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[10];
+					};
+				};
+	__braslist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[10];
+					};
+				};
+	__bravar		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[10];
+					};
+				};
 	_buf_to_win;
 	__cclass;
-	__cflg;
+	__cflg			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_checkchar;
 	_checkfield;
 	_clr_eof;
@@ -136,9 +156,24 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_data_entry;
 	_data_manipulation;
 	_data_navigation;
-	_DEFAULT_FIELD;
-	_DEFAULT_FIELDTYPE;
-	_DEFAULT_FORM;
+	_DEFAULT_FIELD		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	_DEFAULT_FIELDTYPE	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	_DEFAULT_FORM		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_del_char;
 	_del_line;
 	_del_prev;
@@ -147,7 +182,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_down_field;
 	_end_field;
 	_end_line;
-	__eptr_;
+	__eptr_			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	__execute;
 	_field_navigation;
 	_first_active;
@@ -159,12 +199,21 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_ins_char;
 	_ins_line;
 	_ins_mode;
-	__i_size	{ TYPE = DATA; FILTER = libc.so.1; SIZE = 0x4 };
+	__i_size		{
+				  TYPE = DATA;
+				  FILTER = libc.so.1;
+				  SIZE = 0x4;
+				};
 	_last_field;
 	_last_page;
 	_left_char;
 	_left_field;
-	__lptr_;
+	__lptr_			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_makearg;
 	_misc_request;
 	_new_line;
@@ -207,21 +256,66 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__size;
 	_slast_field;
 	_snext_field;
-	__sp_;
+	__sp_			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_sprev_field;
-	__st;
-	__stmax;
+	__st			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[51];
+					};
+				};
+	__stmax			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_sync_attrs;
 	_sync_buffer;
 	_sync_field;
 	_sync_linked;
 	_sync_opts;
-	TYPE_ALNUM;
-	TYPE_ALPHA;
-	TYPE_ENUM;
-	TYPE_INTEGER;
-	TYPE_NUMERIC;
-	TYPE_REGEXP;
+	TYPE_ALNUM		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	TYPE_ALPHA		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	TYPE_ENUM		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	TYPE_INTEGER		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	TYPE_NUMERIC		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	TYPE_REGEXP		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	_up_char;
 	_update_current;
 	_up_field;
@@ -233,17 +327,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__xpop;
 	__xpush;
 
-	__loc1	{
-		TYPE = DATA;
-		FILTER = libc.so.1;
-$if _ELF32
-		SIZE = 0x4;
-$elif _ELF64
-		SIZE = 0x8;
-$else
-$error unknown ELFCLASS
-$endif
-	};
+	__loc1			{
+				  TYPE = DATA;
+				  FILTER = libc.so.1;
+				  SIZE = addrsize;
+				};
 
     local:
 	*;

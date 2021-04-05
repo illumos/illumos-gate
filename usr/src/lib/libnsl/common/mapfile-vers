@@ -40,7 +40,7 @@
 
 $mapfile_version 2
 
-SYMBOL_VERSION ILLUMOS_0.1 {    # illumos additions
+SYMBOL_VERSION ILLUMOS_0.1 {	# illumos additions
     global:
 	svc_tp_create_addr;
 } SUNW_1.10;
@@ -52,7 +52,7 @@ SYMBOL_VERSION SUNW_1.10 {	# SunOS 5.11 (Solaris 11)
 
 SYMBOL_VERSION SUNW_1.9.1 {	# SunOS 5.10 (Solaris 10 update 5)
     global:
-	inet_aton		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_aton	{ TYPE = FUNCTION; FILTER = libc.so.1; };
 } SUNW_1.9;
 
 SYMBOL_VERSION SUNW_1.9 {	# SunOS 5.10 (Solaris 10)
@@ -78,8 +78,8 @@ SYMBOL_VERSION SUNW_1.7 {	# SunOS 5.8 (Solaris 8)
 	freehostent;
 	getipnodebyaddr;
 	getipnodebyname;
-	inet_ntop		{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	inet_pton		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_ntop	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	inet_pton	{ TYPE = FUNCTION; FILTER = libc.so.1; };
 } SUNW_1.6;
 
 SYMBOL_VERSION SUNW_1.6 {	# SunOS 5.7 (Solaris 7)
@@ -119,12 +119,17 @@ SYMBOL_VERSION SUNW_1.2 {
 	SUNW_1.2;
 } SUNW_1.1;
 
-SYMBOL_VERSION SUNW_1.1 {		# SunOS 5.6 (Solaris 2.6)
+SYMBOL_VERSION SUNW_1.1 {	# SunOS 5.6 (Solaris 2.6)
     global:
 	clnt_create_vers_timed;
 	clnt_door_create;
 $if _ELF32
-	_new_svc_fdset;
+	_new_svc_fdset	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 8192;
+				};
+			};
 $endif
 	rpc_gss_getcred;
 	rpc_gss_get_error;
@@ -142,8 +147,13 @@ $endif
 	rpc_gss_set_svc_name;
 	rpc_gss_svc_max_data_length;
 	svc_door_create;
-	svc_max_pollfd;
-	svc_pollfd;
+	svc_max_pollfd	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	svc_pollfd	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
 	_xti_accept;
 	_xti_alloc;
 	_xti_bind;
@@ -199,7 +209,7 @@ SYMBOL_VERSION SUNW_0.8 {	# SunOS 5.4 (Solaris 2.4)
 SYMBOL_VERSION SUNW_0.7 {	# SunOS 5.3 (Solaris 2.3)
     global:
 	authdes_create;
-	authdes_lock;
+	authdes_lock	{ ASSERT = { TYPE = OBJECT; SIZE = 24; }; };
 	auth_destroy;
 	callrpc;
 	clnt_broadcast;
@@ -234,10 +244,21 @@ SYMBOL_VERSION SUNW_0.7 {	# SunOS 5.3 (Solaris 2.3)
 	getrpcbynumber_r;
 	getrpcent;
 	getrpcent_r;
-	h_errno			{ FLAGS = NODIRECT };
-	inet_ntoa_r		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	h_errno		{
+			  FLAGS = NODIRECT;
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 4;
+				};
+			};
+	inet_ntoa_r	{ TYPE = FUNCTION; FILTER = libc.so.1; };
 	key_secretkey_is_set;
-	maxbno;
+	maxbno		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
 	nc_sperror;
 	netdir_perror;
 	netdir_sperror;
@@ -282,7 +303,7 @@ SYMBOL_VERSION SUNW_0.7 {	# SunOS 5.3 (Solaris 2.3)
 	svc_unregister;
 	__t_errno;
 	t_getname;
-	t_nerr;
+	t_nerr		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	t_strerror;
 	undial;
 	xdr_destroy;
@@ -318,12 +339,12 @@ SYMBOL_VERSION SISCD_2.3 {
 $endif
 	gethostbyaddr;
 	gethostbyname;
-	inet_addr		{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	inet_netof		{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	inet_ntoa		{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	_null_auth;
+	inet_addr	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	inet_netof	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	inet_ntoa	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	_null_auth	{ ASSERT = { TYPE = OBJECT; SIZE = addrsize[3]; }; };
 	rpc_broadcast_exp;
-	svc_fdset;
+	svc_fdset	{ ASSERT = { TYPE = OBJECT; SIZE = 8192; }; };
 $if _ELF32
 } SYSVABI_1.3;
 
@@ -362,7 +383,7 @@ $endif
 	key_gendes;
 	key_setsecret;
 	nc_perror;
-	_nderror;
+	_nderror	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	netdir_free;
 	netdir_getbyaddr;
 	netdir_getbyname;
@@ -377,7 +398,7 @@ $endif
 	rpcb_set;
 	rpcb_unset;
 	rpc_call;
-	rpc_createerr;
+	rpc_createerr	{ ASSERT = { TYPE = OBJECT; SIZE = 16; }; };
 	rpc_reg;
 	setnetconfig;
 	setnetpath;
@@ -406,7 +427,7 @@ $endif
 	t_bind;
 	t_close;
 	t_connect;
-	t_errno;
+	t_errno		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	t_error;
 	t_free;
 	t_getinfo;
@@ -554,18 +575,43 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	__authenticate;
-	bitno;
-	blkno;
+	bitno				{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	blkno				{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	calchash;
 	cbc_crypt;
 	__cbc_triple_crypt;
 	check_version;
 	__clnt_create_loopback;
-	dbrdonly;
+	dbrdonly			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
 	__des_crypt;
 	des_setparity_g;
-	dirbuf;
-	dirf;
+	dirbuf				{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4096;
+						};
+					};
+	dirf				{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
 	ecb_crypt;
 	__empty_yp_cache;
 	firsthash;
@@ -573,7 +619,10 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__gen_dhkeys;
 	__gen_dhkeys_g;
 	getdomainname;
-	gethostname		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	gethostname			{
+					  TYPE = FUNCTION;
+					  FILTER = libc.so.1;
+					};
 	_get_hostserv_inetnetdir_byaddr;
 	_get_hostserv_inetnetdir_byname;
 	__getnetnamebyuid;
@@ -585,7 +634,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	getsecretkey_g;
 	hashinc;
 	_herrno2nss;
-	hmask;
+	hmask				{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	__inet_address_count;
 	__inet_free_local_interfaces;
 	__inet_get_addr;
@@ -597,13 +651,28 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	key_decryptsession_g;
 	key_decryptsession_pk;
 	key_decryptsession_pk_g;
-	__key_decryptsession_pk_LOCAL;
+	__key_decryptsession_pk_LOCAL	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	key_encryptsession_g;
 	key_encryptsession_pk;
 	key_encryptsession_pk_g;
-	__key_encryptsession_pk_LOCAL;
+	__key_encryptsession_pk_LOCAL	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	key_gendes_g;
-	__key_gendes_LOCAL;
+	__key_gendes_LOCAL		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	key_get_conv;
 	key_get_conv_g;
 	key_removesecret_g;
@@ -631,12 +700,27 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__nis_rpc_domain;
 	__nis_translate_mechanism;
 	nis_write_obj;
-	__nsl_dom;
+	__nsl_dom			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 16;
+						};
+					};
 	__nss2herrno;
 	nss_ioctl;
 	order_haddrlist_af;
-	pagbuf;
-	pagf;
+	pagbuf				{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 1024;
+						};
+					};
+	pagf				{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
 	passwd2des;
 	passwd2des_g;
 	__rpcbind_is_up;
@@ -666,7 +750,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	str2servent;
 	__svcauth_des;
 	svc_get_local_cred;
-	_svc_getreqset_proc;
+	_svc_getreqset_proc		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	__svc_get_svcauth;
 	__svc_set_proc_cleanup_cb;
 	__svc_vc_dup;
@@ -676,8 +765,18 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	svc_xprt_free;
 	_switch_gethostbyaddr_r;
 	_switch_gethostbyname_r;
-	t_errlist;
-	tiusr_statetbl;
+	t_errlist			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[58];
+						};
+					};
+	tiusr_statetbl			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 225;
+						};
+					};
 	_uncached_gethostbyaddr_r;
 	_uncached_gethostbyname_r;
 	usingypmap;

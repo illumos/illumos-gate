@@ -21,9 +21,6 @@
 
 #
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
-#
-
-#
 # Copyright (c) 2012, Joyent, Inc.  All rights reserved.
 # Copyright 2017 RackTop Systems.
 #
@@ -176,7 +173,7 @@
 			 \t\t\ton dynamic dependencies\n"
 @ MSG_ARG_DETAIL_ZGUIDE	"\t[-z guidance | -z guidance=item1,item2,...]\n\
 			 \t\t\tenable guidance warnings. items: \
-			 noall, nodefs,\n\
+			 noall, noasserts, nodefs,\n\
 			 \t\t\tnodirect, nolazyload, nomapfile, notext, \
 			 nounused\n"
 @ MSG_ARG_DETAIL_ZH	"\t[-z help], [--help]\n\
@@ -473,8 +470,8 @@
 @ MSG_SCN_NONALLOC	"%s: non-allocatable section '%s' directed to a \
 			 loadable segment: %s"
 
-@ MSG_SCN_MULTICOMDAT	"file %s: section [%u]%s: cannot be susceptible to multiple \
-			 COMDAT mechanisms: %s"
+@ MSG_SCN_MULTICOMDAT	"file %s: section [%u]%s: cannot be susceptible \
+			 to multiple COMDAT mechanisms: %s"
 
 @ MSG_SCN_DWFOVRFLW	"%s: section %s: encoded DWARF data exceeds \
 			 section size"
@@ -521,10 +518,10 @@
 			 0x%llx for symbol index"
 @ MSG_PSYM_INVMINFO2	"file %s: section [%u]%s: entry[%d] has invalid m_info: \
 			 0x%llx for size"
-@ MSG_PSYM_INVMREPEAT	"file %s: section [%u]%s: entry[%d] has invalid m_repeat: \
-			 0x%llx"
-@ MSG_PSYM_CANNOTEXPND	"file %s: section [%u]%s: entry[%d] can not be expanded: \
-			 associated symbol size is unknown %s"
+@ MSG_PSYM_INVMREPEAT	"file %s: section [%u]%s: entry[%d] has \
+			 invalid m_repeat: 0x%llx"
+@ MSG_PSYM_CANNOTEXPND	"file %s: section [%u]%s: entry[%d] can not be \
+			 expanded: associated symbol size is unknown %s"
 @ MSG_PSYM_NOSTATIC	"and partial initialization cannot be deferred to \
 			 a static object"
 @ MSG_MOVE_OVERLAP	"file %s: section [%u]%s: symbol '%s' overlapping move \
@@ -710,6 +707,8 @@
 @ MSG_GUIDE_TEXT	"position independent (PIC) code recommended for \
 			 shared objects"
 @ MSG_GUIDE_UNUSED	"removal of unused dependency recommended: %s"
+@ MSG_GUIDE_ASSERT_SIZE "size assertion recommended for non-local data: %s \
+			 size: %llu"
 
 @ _END_
 
@@ -731,6 +730,8 @@
 @ MSG_QSTR_DASH		"'-'"
 @ MSG_QSTR_LEFTBKT	"'{'"
 @ MSG_QSTR_RIGHTBKT	"'}'"
+@ MSG_QSTR_LEFTSQR	"'['"
+@ MSG_QSTR_RIGHTSQR	"']'"
 @ MSG_QSTR_PIPE		"'|'"
 @ MSG_QSTR_STAR		"'*'"
 @ MSG_STR_DOT		"."
@@ -1190,6 +1191,7 @@
 
 @ MSG_MAP_EXP_ATTR	"%s: %llu: expected attribute name (%s), or \
 			 terminator (';', '}'): %s"
+@ MSG_MAP_EXP_BINDTYPE	"%s: %llu: expected binding type (%s): %s"
 @ MSG_MAP_EXP_CAPMASK	"%s: %llu: expected capability name, integer value, or \
 			 terminator (';', '}'): %s"
 @ MSG_MAP_EXP_CAPNAME	"%s: %llu: expected name, or terminator (';', '}'): %s"
@@ -1206,6 +1208,7 @@
 @ MSG_MAP_EXP_FILNAM	"%s: %llu: expected file name following %s: %s"
 @ MSG_MAP_EXP_FILPATH	"%s: %llu: expected file path following %s: %s"
 @ MSG_MAP_EXP_INT	"%s: %llu: expected integer value following %s: %s"
+@ MSG_MAP_EXP_RIGHTSQ	"%s: %llu: expected ']' to terminate multiplier of: %s"
 @ MSG_MAP_EXP_LBKT	"%s: %llu: expected '{' following %s: %s"
 @ MSG_MAP_EXP_OBJNAM	"%s: %llu: expected object name following %s: %s"
 @ MSG_MAP_SFLG_ONEBANG	"%s: %llu: '!' can only be specified once per flag"
@@ -1220,6 +1223,7 @@
 @ MSG_MAP_EXP_SEM	"%s: %llu: expected ';' to terminate %s: %s"
 @ MSG_MAP_EXP_SEMLBKT	"%s: %llu: expected ';' or '{' following %s: %s"
 @ MSG_MAP_EXP_SEMRBKT	"%s: %llu: expected ';' or '}' to terminate %s: %s"
+@ MSG_MAP_EXP_SHATTRTYPE "%s: %llu: expected section attribute (%s): %s"
 @ MSG_MAP_EXP_SHTYPE	"%s: %llu: expected section type: %s"
 @ MSG_MAP_EXP_SYM	"%s: %llu: expected symbol name, symbol scope, \
 			 or '*': %s"
@@ -1234,12 +1238,18 @@
 @ MSG_MAP_EXP_VERSION	"%s: %llu: expected version name following %s: %s"
 @ MSG_MAP_BADEXTRA	"%s: %llu: unexpected text found following %s directive"
 @ MSG_MAP_VALUELIMIT	"%s: %llu: numeric value exceeds word size: %s"
+@ MSG_MAP_MULOVERFLOW	"%s: %llu: multiplication overflow (%llu * %llu)"
 @ MSG_MAP_MALVALUE	"%s: %llu: malformed numeric value: %s"
 @ MSG_MAP_BADVALUETAIL	"%s: %llu: unexpected characters following numeric \
 			 constant: %s"
 @ MSG_MAP_WSNEEDED	"%s: %llu: whitespace needed before token: %s"
 @ MSG_MAP_BADCHAR	"%s: %llu: unexpected text: %s"
 @ MSG_MAP_BADKWQUOTE	"%s: %llu: mapfile keywords should not be quoted: %s"
+@ MSG_MAP_BADALIAS	"%s: %llu: expected string valued ALIAS"
+@ MSG_MAP_ALIAS_COMBO   "%s: %llu: %s: ALIAS assertions may only be \
+			 used with BINDING"
+@ MSG_MAP_EXTPAR_ASSERT "%s: %llu: can't assert attributes of \
+			 extern/parent symbol: %s"
 @ MSG_MAP_CDIR_NOTBOL	"%s: %llu: mapfile control directive not at start of \
 			 line: %s"
 @ MSG_MAP_NOATTR	"%s: %llu: %s specified no attributes (empty {})"
@@ -1290,6 +1300,23 @@
 @ MSG_ARG_ASSDEFLIB_MALFORMED	"library name malformed: %s"
 @ MSG_ARG_ASSDEFLIB_FOUND	"dynamic library found on default search path \
 				(%s): lib%s.so"
+# Assertion failures
+@ MSG_ASSFAIL_ALIAS	"%s: %llu: assertion failed: symbol %s is \
+			 not an alias of %s"
+@ MSG_ASSFAIL_SCOPE	"%s: %llu: assertion failed: scope of symbol %s \
+			 should be: %s is: %s"
+@ MSG_ASSFAIL_SIZE	"%s: %llu: assertion failed: size of symbol %s \
+			 should be: %llu is: %llu"
+@ MSG_ASSFAIL_TYPE	"%s: %llu: assertion failed: type of symbol %s \
+			 should be: %s is: %s",
+@ MSG_ASSFAIL_BITS	"%s: %llu: assertion failed: symbol %s is in an \
+			 SHT_NOBITS section"
+@ MSG_ASSFAIL_NOBITS	"%s: %llu: assertion failed: symbol %s is not in an \
+			 SHT_NOBITS section"
+@ MSG_ALIAS_BADSYM	"%s: %llu: assertion failed: unknown symbol in ALIAS: %s"
+@ MSG_ALIAS_NOTALIAS	"%s: %llu: %s and %s (%s: %llu) should be asserted \
+			 as aliases"
+@ MSG_ALIAS_TOALIAS     "%s: %llu: %s should not be aliased to an alias"
 
 @ _END_
 
@@ -1503,6 +1530,7 @@
 @ MSG_ARG_GUIDE_NO_MAPFILE	"nomapfile"
 @ MSG_ARG_GUIDE_NO_TEXT		"notext"
 @ MSG_ARG_GUIDE_NO_UNUSED	"nounused"
+@ MSG_ARG_GUIDE_NO_ASSERTS	"noasserts"
 
 # -z type= strings
 @ MSG_ARG_TYPE_RELOC	"reloc"
@@ -1537,6 +1565,7 @@
 @ MSG_MAP_NOTE		"note"
 @ MSG_MAP_NULL		"null"
 @ MSG_MAP_STACK		"stack"
+@ MSG_MAP_ADDRSIZE	"addrsize"
 @ MSG_MAP_ADDVERS	"addvers"
 @ MSG_MAP_FUNCTION	"function"
 @ MSG_MAP_DATA		"data"
@@ -1552,12 +1581,17 @@
 @ MSG_MAP_DYNSORT	"dynsort"
 @ MSG_MAP_NODYNSORT	"nodynsort"
 
+@ MSG_MAPKW_ALIAS		"ALIAS"
 @ MSG_MAPKW_ALIGN		"ALIGN"
 @ MSG_MAPKW_ALLOC		"ALLOC"
 @ MSG_MAPKW_ALLOW		"ALLOW"
 @ MSG_MAPKW_AMD64_LARGE		"AMD64_LARGE"
+@ MSG_MAPKW_ASSERT		"ASSERT"
 @ MSG_MAPKW_ASSIGN_SECTION	"ASSIGN_SECTION"
 @ MSG_MAPKW_AUX			"AUXILIARY"
+@ MSG_MAPKW_BIND		"BIND"
+@ MSG_MAPKW_BINDING		"BINDING"
+@ MSG_MAPKW_BITS		"BITS"
 @ MSG_MAPKW_CAPABILITY		"CAPABILITY"
 @ MSG_MAPKW_COMMON		"COMMON"
 @ MSG_MAPKW_DATA		"DATA"
@@ -1570,30 +1604,34 @@
 @ MSG_MAPKW_EXECUTE		"EXECUTE"
 @ MSG_MAPKW_EXPORTED		"EXPORTED"
 @ MSG_MAPKW_EXTERN		"EXTERN"
-@ MSG_MAPKW_FILTER		"FILTER"
+@ MSG_MAPKW_FILE		"FILE"
 @ MSG_MAPKW_FILE_BASENAME	"FILE_BASENAME"
-@ MSG_MAPKW_FILE_PATH		"FILE_PATH"
 @ MSG_MAPKW_FILE_OBJNAME	"FILE_OBJNAME"
-@ MSG_MAPKW_FUNCTION		"FUNCTION"
+@ MSG_MAPKW_FILE_PATH		"FILE_PATH"
+@ MSG_MAPKW_FILTER		"FILTER"
 @ MSG_MAPKW_FLAGS		"FLAGS"
+@ MSG_MAPKW_FUNC		"FUNC"
+@ MSG_MAPKW_FUNCTION		"FUNCTION"
 @ MSG_MAPKW_GLOBAL		"GLOBAL"
-@ MSG_MAPKW_INTERPOSE		"INTERPOSE"
-@ MSG_MAPKW_HIDDEN		"HIDDEN"
 @ MSG_MAPKW_HDR_NOALLOC		"HDR_NOALLOC"
+@ MSG_MAPKW_HIDDEN		"HIDDEN"
 @ MSG_MAPKW_HW			"HW"
 @ MSG_MAPKW_HW_1		"HW_1"
 @ MSG_MAPKW_HW_2		"HW_2"
+@ MSG_MAPKW_INTERPOSE		"INTERPOSE"
 @ MSG_MAPKW_IS_NAME		"IS_NAME"
 @ MSG_MAPKW_IS_ORDER		"IS_ORDER"
 @ MSG_MAPKW_LOAD_SEGMENT	"LOAD_SEGMENT"
 @ MSG_MAPKW_LOCAL		"LOCAL"
 @ MSG_MAPKW_MACHINE		"MACHINE"
 @ MSG_MAPKW_MAX_SIZE		"MAX_SIZE"
-@ MSG_MAPKW_NOHDR		"NOHDR"
+@ MSG_MAPKW_NOBITS		"NOBITS"
 @ MSG_MAPKW_NODIRECT		"NODIRECT"
 @ MSG_MAPKW_NODYNSORT		"NODYNSORT"
+@ MSG_MAPKW_NOHDR		"NOHDR"
 @ MSG_MAPKW_NOTE_SEGMENT	"NOTE_SEGMENT"
 @ MSG_MAPKW_NULL_SEGMENT	"NULL_SEGMENT"
+@ MSG_MAPKW_OBJECT		"OBJECT"
 @ MSG_MAPKW_OS_ORDER		"OS_ORDER"
 @ MSG_MAPKW_PADDR		"PADDR"
 @ MSG_MAPKW_PARENT		"PARENT"
@@ -1601,21 +1639,25 @@
 @ MSG_MAPKW_PLATFORM		"PLATFORM"
 @ MSG_MAPKW_PROTECTED		"PROTECTED"
 @ MSG_MAPKW_READ		"READ"
-@ MSG_MAPKW_ROUND		"ROUND"
 @ MSG_MAPKW_REQUIRE		"REQUIRE"
+@ MSG_MAPKW_ROUND		"ROUND"
+@ MSG_MAPKW_SECTION		"SECTION"
 @ MSG_MAPKW_SEGMENT_ORDER	"SEGMENT_ORDER"
 @ MSG_MAPKW_SF			"SF"
 @ MSG_MAPKW_SF_1		"SF_1"
+@ MSG_MAPKW_SHATTR		"SH_ATTR"
 @ MSG_MAPKW_SINGLETON		"SINGLETON"
 @ MSG_MAPKW_SIZE		"SIZE"
 @ MSG_MAPKW_SIZE_SYMBOL		"SIZE_SYMBOL"
 @ MSG_MAPKW_STACK		"STACK"
+@ MSG_MAPKW_SYMBOLIC		"SYMBOLIC"
 @ MSG_MAPKW_SYMBOL_SCOPE	"SYMBOL_SCOPE"
 @ MSG_MAPKW_SYMBOL_VERSION	"SYMBOL_VERSION"
-@ MSG_MAPKW_SYMBOLIC		"SYMBOLIC"
+@ MSG_MAPKW_TLS			"TLS"
 @ MSG_MAPKW_TYPE		"TYPE"
 @ MSG_MAPKW_VADDR		"VADDR"
 @ MSG_MAPKW_VALUE		"VALUE"
+@ MSG_MAPKW_WEAK		"WEAK"
 @ MSG_MAPKW_WRITE		"WRITE"
 
 

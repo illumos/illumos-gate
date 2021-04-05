@@ -1,0 +1,75 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2012, Richard Lowe.
+#
+
+
+$mapfile_version 2
+
+
+SYMBOL_VERSION foo {
+    global:
+	common		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 4;
+				  SH_ATTR = NOBITS;
+				  BINDING = GLOBAL;
+				};
+			};
+	data		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 5;
+				  SH_ATTR = BITS;
+				  BINDING = GLOBAL;
+				};
+			};
+	function	{
+			  ASSERT = {
+				  TYPE = FUNCTION;
+				  SH_ATTR = BITS;
+				  BINDING = GLOBAL;
+				};
+			};
+	weak_function	{
+			  ASSERT = {
+				  BINDING = WEAK;
+				  ALIAS = function;
+				};
+			};
+	weak_data	{ ASSERT = { BINDING = WEAK; ALIAS = data; }; };
+	tbs		{
+			  ASSERT = {
+				  TYPE = TLS;
+				  SH_ATTR = NOBITS;
+				  SIZE = 4;
+				};
+			};
+	tdata		{
+			  ASSERT = {
+				  TYPE = TLS;
+				  SH_ATTR = BITS;
+				  SIZE = 4;
+				};
+			};
+	extern		{
+			  FLAGS = EXTERN;
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 4;
+				};
+			};
+    local:
+	*;
+};

@@ -38,13 +38,13 @@
 $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate_1.1 {
-	global:
-		cfga_version;
-		cfga_change_state;
-		cfga_private_func;
-		cfga_test;
-		cfga_list_ext;
-		cfga_help;
-	local:
-		*;
+    global:
+	cfga_version	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	cfga_change_state;
+	cfga_private_func;
+	cfga_test;
+	cfga_list_ext;
+	cfga_help;
+    local:
+	*;
 };

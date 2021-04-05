@@ -222,14 +222,54 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	gss_krb5_ccache_name;
 	gss_krb5_copy_ccache;
 	gss_mech_initialize;
-	gss_mech_krb5;
-	gss_mech_krb5_old;
-	gss_mech_krb5_wrong;
-	gss_mech_set_krb5;
-	gss_mech_set_krb5_both;
-	gss_mech_set_krb5_old;
-	gss_nt_krb5_name;
-	gss_nt_krb5_principal;
+	gss_mech_krb5			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	gss_mech_krb5_old		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	gss_mech_krb5_wrong		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	gss_mech_set_krb5		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	gss_mech_set_krb5_both		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	gss_mech_set_krb5_old		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	gss_nt_krb5_name		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	gss_nt_krb5_principal		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	gssspi_acquire_cred_with_password;
 	imp_error_table;
 	k5_ef_hash;
@@ -252,7 +292,13 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	kg_make_seq_num;
 	kg_seal;
 	kg_unseal;
-	kg_vdb;
+$if _ELF64
+	kg_vdb	{ ASSERT = { TYPE = OBJECT; SIZE = 48; }; };
+$elif _ELF32
+	kg_vdb	{ ASSERT = { TYPE = OBJECT; SIZE = 36; }; };
+$else
+$error unknown ELFCLASS
+$endif
 	kpws_error_table;
 	krb5_425_conv_principal;
 	krb5_524_conv_principal;
@@ -323,9 +369,19 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_cc_default;
 	krb5_cc_default_name;
 	krb5_cc_destroy;
-	krb5_cc_dfl_ops;
+	krb5_cc_dfl_ops			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	krb5_cc_end_seq_get;
-	krb5_cc_file_ops;
+	krb5_cc_file_ops		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[23];
+						};
+					};
 	krb5_cc_gen_new;
 	krb5_cc_get_name;
 	krb5_cc_get_principal;
@@ -345,8 +401,29 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_check_transited_list;
 	krb5_checksum_size;
 	krb5_cksumtype_to_string;
-	krb5_cksumtypes_length;
-	krb5_cksumtypes_list;
+	krb5_cksumtypes_length		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
+$if _ELF64
+	krb5_cksumtypes_list		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 672;
+						};
+					};
+$elif _ELF32
+	krb5_cksumtypes_list		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 384;
+						};
+					};
+$else
+$error unknown ELFCLASS
+$endif
 	krb5_clear_error_message;
 	krb5_copy_addr;
 	krb5_copy_addresses;
@@ -366,9 +443,24 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_decode_kdc_rep;
 	krb5_decode_ticket;
 	krb5_decrypt_tkt_part;
-	krb5_default_pwd_prompt1;
-	krb5_default_pwd_prompt2;
-	krb5_defkeyname;
+	krb5_default_pwd_prompt1	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	krb5_default_pwd_prompt2	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	krb5_defkeyname			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	krb5_do_preauth;
 	krb5_encode_authdata_container;
 	krb5_encode_kdc_rep;
@@ -376,12 +468,27 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_encrypt_tkt_part;
 	krb5_enctype_to_string;
 	krb5_enctype_to_istring;
-	krb5_enctypes_length;
-	krb5_enctypes_list;
+	krb5_enctypes_length		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
+	krb5_enctypes_list		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[200];
+						};
+					};
 	krb5_error_table;
 	krb5_externalize_data;
 	krb5_externalize_opaque;
-	krb5_fcc_ops;
+	krb5_fcc_ops			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[23];
+						};
+					};
 	krb5_find_serializer;
 	krb5_free_address;
 	krb5_free_addresses;
@@ -493,7 +600,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_getenv;
 	krb5_gss_display_status2;
 	krb5_gss_import_name;
-	krb5_gss_oid_array;
+	krb5_gss_oid_array		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[14];
+						};
+					};
 	krb5_gss_userok;
 	krb5_gss_register_acceptor_identity;
 	krb5_hmac;
@@ -512,7 +624,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_kt_close;
 	krb5_kt_default;
 	krb5_kt_default_name;
-	krb5_kt_dfl_ops;
+	krb5_kt_dfl_ops			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[12];
+						};
+					};
 	krb5_kt_end_seq_get;
 	krb5_kt_find_realm;
 	krb5_kt_free_entry;
@@ -528,8 +645,18 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_kt_resolve;
 	krb5_kt_start_seq_get;
 	krb5_kt_ad_validate;
-	krb5_ktf_ops;
-	krb5_ktf_writable_ops;
+	krb5_ktf_ops			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[12];
+						};
+					};
+	krb5_ktf_writable_ops		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[12];
+						};
+					};
 	krb5_ktfile_add;
 	krb5_ktfile_close;
 	krb5_ktfile_end_get;
@@ -538,7 +665,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_ktfile_get_next;
 	krb5_ktfile_remove;
 	krb5_ktfile_resolve;
-	krb5_ktfile_ser_entry;
+	krb5_ktfile_ser_entry		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[4];
+						};
+					};
 	krb5_ktfile_start_seq_get;
 	krb5_ktfile_wresolve;
 	krb5_ktfileint_close;
@@ -556,8 +688,18 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_lock_file;
 	krb5_make_full_ipaddr;
 	krb5_make_fulladdr;
-	krb5_max_dgram_size;
-	krb5_max_skdc_timeout;
+	krb5_max_dgram_size		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
+	krb5_max_skdc_timeout		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
 	krb5_mk_1cred;
 	krb5_mk_error;
 	krb5_mk_ncred;
@@ -577,7 +719,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_os_hostaddr;
 	krb5_os_init_context;
 	krb5_os_localaddr;
-	krb5_overridekeyname;
+	krb5_overridekeyname		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	krb5_pac_add_buffer;
 	krb5_pac_free;
 	krb5_pac_get_buffer;
@@ -606,7 +753,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_rc_file_get_name;
 	krb5_rc_file_get_span;
 	krb5_rc_file_init;
-	krb5_rc_file_ops;
+	krb5_rc_file_ops		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[12];
+						};
+					};
 	krb5_rc_file_recover;
 	krb5_rc_file_resolve;
 	krb5_rc_file_store;
@@ -628,7 +780,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_rc_mem_get_name;
 	krb5_rc_mem_get_span;
 	krb5_rc_mem_init;
-	krb5_rc_mem_ops;
+	krb5_rc_mem_ops			{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[12];
+						};
+					};
 	krb5_rc_mem_recover;
 	krb5_rc_mem_resolve;
 	krb5_rc_mem_store;
@@ -690,8 +847,18 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_set_time_offsets;
 	krb5_setenv;
 	krb5_size_opaque;
-	krb5_skdc_timeout_1;
-	krb5_skdc_timeout_shift;
+	krb5_skdc_timeout_1		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
+	krb5_skdc_timeout_shift		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
 	krb5_sname_to_principal;
 	krb5_string_to_cksumtype;
 	krb5_string_to_deltat;
@@ -733,7 +900,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5int_get_plugin_dir_data;
 	krb5int_getspecific;
 	krb5int_gmt_mktime;
-	krb5int_hash_sha1;
+	krb5int_hash_sha1		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize[3];
+						};
+					};
 	krb5int_init_context_kdc;
 	krb5int_init_fac;
 	krb5int_mutex_alloc;
@@ -742,7 +914,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5int_pbkdf2_hmac_sha1;
 	krb5int_pthread_loaded;
 	krb5int_key_register;
-	krb5int_sendtokdc_debug_handler;
+	krb5int_sendtokdc_debug_handler	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	krb5int_setspecific;
 	krb5int_vset_error;
 	kwarn_add_warning;
