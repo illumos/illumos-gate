@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2021 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -2933,7 +2933,15 @@ vm_inject_init(struct vm *vm, int vcpuid)
 	vcpu = &vm->vcpu[vcpuid];
 	vcpu_lock(vcpu);
 	vcpu->run_state |= VRS_PEND_INIT;
+	/*
+	 * As part of queuing the INIT request, clear any pending SIPI.  It
+	 * would not otherwise survive across the reset of the vCPU when it
+	 * undergoes the requested INIT.  We would not want it to linger when it
+	 * could be mistaken as a subsequent (after the INIT) SIPI request.
+	 */
+	vcpu->run_state &= ~VRS_PEND_SIPI;
 	vcpu_notify_event_locked(vcpu, VCPU_NOTIFY_EXIT);
+
 	vcpu_unlock(vcpu);
 	return (0);
 }
