@@ -1103,6 +1103,22 @@ nvme_submit_cmd_common(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 	cmd->nc_completed = B_FALSE;
 
 	/*
+	 * Now that we hold the queue pair lock, we must check whether or not
+	 * the controller has been listed as dead (e.g. was removed due to
+	 * hotplug). This is necessary as otherwise we could race with
+	 * nvme_remove_callback(). Because this has not been enqueued, we don't
+	 * call nvme_unqueue_cmd(), which is why we must manually decrement the
+	 * semaphore.
+	 */
+	if (cmd->nc_nvme->n_dead) {
+		taskq_dispatch_ent(qp->nq_cq->ncq_cmd_taskq, cmd->nc_callback,
+		    cmd, TQ_NOSLEEP, &cmd->nc_tqent);
+		sema_v(&qp->nq_sema);
+		mutex_exit(&qp->nq_mutex);
+		return;
+	}
+
+	/*
 	 * Try to insert the cmd into the active cmd array at the nq_next_cmd
 	 * slot. If the slot is already occupied advance to the next slot and
 	 * try again. This can happen for long running commands like async event

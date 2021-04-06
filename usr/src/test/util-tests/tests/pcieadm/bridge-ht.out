@@ -1,0 +1,4 @@
+HyperTransport Capability - MSI Mapping (0x8)
+  Command: 0xa803
+    |--> Enable: enabled (0x1)
+    |--> Fixed: enabled (0x2)

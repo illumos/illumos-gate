@@ -1873,12 +1873,12 @@ vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd,
 
 	*hma_release = B_FALSE;
 
-	if (clean_zsd) {
-		vmm_zsd_rem_vm(sc);
-	}
-
 	if (vmm_drv_purge(sc) != 0) {
 		return (EINTR);
+	}
+
+	if (clean_zsd) {
+		vmm_zsd_rem_vm(sc);
 	}
 
 	/* Clean up devmem entries */

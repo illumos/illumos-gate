@@ -1,0 +1,3 @@
+Device /dev/stdin -- Type 0 Header
+  Vendor ID: 0x8086 -- Intel Corporation
+  Device ID: 0x1521 -- I350 Gigabit Network Connection

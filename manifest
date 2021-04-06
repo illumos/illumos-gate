@@ -10229,8 +10229,10 @@ s usr/lib/nss_user.so.1=../../lib/nss_user.so.1
 f usr/lib/passmgmt 0555 root sys
 f usr/lib/passwdutil.so.1 0755 root bin
 d usr/lib/pci 0755 root bin
+f usr/lib/pci/pcidb 0555 root bin
 f usr/lib/pci/pcidr 0555 root bin
 f usr/lib/pci/pcidr_plugin.so 0755 root bin
+f usr/lib/pci/pcieadm 0555 root bin
 f usr/lib/pci/pcieb 0555 root bin
 f usr/lib/pfexecd 0555 root bin
 d usr/lib/picl 0755 root sys

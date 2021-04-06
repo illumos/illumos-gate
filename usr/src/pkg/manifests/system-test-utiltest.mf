@@ -77,6 +77,7 @@ dir path=opt/util-tests/tests/mdb/format
 dir path=opt/util-tests/tests/mdb/options
 dir path=opt/util-tests/tests/mdb/typedef
 dir path=opt/util-tests/tests/mergeq
+dir path=opt/util-tests/tests/pci
 dir path=opt/util-tests/tests/sed
 dir path=opt/util-tests/tests/sed/regress.multitest.out
 dir path=opt/util-tests/tests/sleep
@@ -1686,7 +1687,23 @@ file path=opt/util-tests/tests/mdb/typedef/tst.union.mdb mode=0444
 file path=opt/util-tests/tests/mdb/typedef/tst.union.mdb.out mode=0444
 file path=opt/util-tests/tests/mergeq/mqt mode=0555
 file path=opt/util-tests/tests/mergeq/wqt mode=0555
+file path=opt/util-tests/tests/pci/bridge-efilt-p.out mode=0444
+file path=opt/util-tests/tests/pci/bridge-efilt.out mode=0444
+file path=opt/util-tests/tests/pci/bridge-ht-p.out mode=0444
+file path=opt/util-tests/tests/pci/bridge-ht.msi-p.out mode=0444
+file path=opt/util-tests/tests/pci/bridge-ht.msi.command-p.out mode=0444
+file path=opt/util-tests/tests/pci/bridge-ht.out mode=0444
+file path=opt/util-tests/tests/pci/bridge.pci mode=0444
+file path=opt/util-tests/tests/pci/header0-basic-L.out mode=0444
+file path=opt/util-tests/tests/pci/header0-basic-LH.out mode=0444
+file path=opt/util-tests/tests/pci/header0-basic-n.out mode=0444
+file path=opt/util-tests/tests/pci/header0-basic.out mode=0444
+file path=opt/util-tests/tests/pci/header0-parse.out mode=0444
+file path=opt/util-tests/tests/pci/igb-ltr-p.out mode=0444
+file path=opt/util-tests/tests/pci/igb-ltr.out mode=0444
+file path=opt/util-tests/tests/pci/igb.pci mode=0444
 file path=opt/util-tests/tests/pcidbtest mode=0555
+file path=opt/util-tests/tests/pcieadmtest mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555
 file path=opt/util-tests/tests/sed/multi_test mode=0555
 file path=opt/util-tests/tests/sed/regress.multitest.out/1.1 mode=0444

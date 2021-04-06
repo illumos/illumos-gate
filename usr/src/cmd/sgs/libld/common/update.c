@@ -702,9 +702,11 @@ update_osym(Ofl_desc *ofl)
 			enter_in_symtab = symtab &&
 			    (!(ofl->ofl_flags & FLG_OF_REDLSYM) ||
 			    sdp->sd_move);
-			enter_in_ldynsym = ldynsym && sdp->sd_name &&
+			enter_in_ldynsym = ldynsym &&
+			    ((sym->st_name != 0) || (type == STT_FILE)) &&
 			    ldynsym_symtype[type] &&
 			    !(ofl->ofl_flags & FLG_OF_REDLSYM);
+
 			_symshndx = NULL;
 
 			if (enter_in_symtab) {

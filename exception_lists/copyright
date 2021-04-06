@@ -419,6 +419,8 @@ usr/src/test/util-tests/tests/grep_xpg4/files/test*
 usr/src/test/util-tests/tests/head/*.in
 usr/src/test/util-tests/tests/head/*.out
 usr/src/test/util-tests/tests/libsff/*.out
+usr/src/test/util-tests/tests/pcieadm/*.out
+usr/src/test/util-tests/tests/pcieadm/*.pci
 usr/src/test/zfs-tests/tests/functional/history/*Z
 usr/src/test/zfs-tests/tests/functional/history/*txt
 usr/src/tools/btxld/btx.h

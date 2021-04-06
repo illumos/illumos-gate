@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2020, the University of Queensland
+ * Copyright (c) 2021, the University of Queensland
  * Copyright 2020 RackTop Systems, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
@@ -422,7 +422,9 @@ mlxcx_update_link_state(mlxcx_t *mlxp, mlxcx_port_t *port)
 	default:
 		ls = LINK_STATE_UNKNOWN;
 	}
-	mac_link_update(mlxp->mlx_mac_hdl, ls);
+
+	if (mlxp->mlx_mac_hdl != NULL)
+		mac_link_update(mlxp->mlx_mac_hdl, ls);
 
 	mutex_exit(&port->mlp_mtx);
 }
@@ -762,10 +764,16 @@ mlxcx_intr_async(caddr_t arg, caddr_t arg2)
 		DTRACE_PROBE2(event, mlxcx_t *, mlxp, mlxcx_eventq_ent_t *,
 		    ent);
 
+		/*
+		 * Handle events which can be processed while we're still in
+		 * mlxcx_attach(). Everything on the mlxcx_t which these events
+		 * use must be allocated and set up prior to the call to
+		 * mlxcx_setup_async_eqs().
+		 */
 		switch (ent->mleqe_event_type) {
 		case MLXCX_EVENT_CMD_COMPLETION:
 			mlxcx_cmd_completion(mlxp, ent);
-			break;
+			continue;
 		case MLXCX_EVENT_PAGE_REQUEST:
 			func = from_be16(ent->mleqe_page_request.
 			    mled_page_request_function_id);
@@ -783,7 +791,7 @@ mlxcx_intr_async(caddr_t arg, caddr_t arg2)
 				mutex_exit(&param->mla_mtx);
 				mlxcx_warn(mlxp, "Unexpected page request "
 				    "whilst another is pending");
-				break;
+				continue;
 			}
 			param->mla_pages.mlp_npages =
 			    (int32_t)from_be32(ent->mleqe_page_request.
@@ -795,7 +803,20 @@ mlxcx_intr_async(caddr_t arg, caddr_t arg2)
 
 			taskq_dispatch_ent(mlxp->mlx_async_tq, mlxcx_pages_task,
 			    param, 0, &param->mla_tqe);
-			break;
+			continue;
+		}
+
+		/*
+		 * All other events should be ignored while in attach.
+		 */
+		mutex_enter(&mleq->mleq_mtx);
+		if (mleq->mleq_state & MLXCX_EQ_ATTACHING) {
+			mutex_exit(&mleq->mleq_mtx);
+			continue;
+		}
+		mutex_exit(&mleq->mleq_mtx);
+
+		switch (ent->mleqe_event_type) {
 		case MLXCX_EVENT_PORT_STATE:
 			portn = get_bits8(
 			    ent->mleqe_port_state.mled_port_state_port_num,
@@ -1055,17 +1076,30 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 	}
 	mleq->mleq_badintrs = 0;
 
+	mutex_enter(&mleq->mleq_mtx);
 	ASSERT(mleq->mleq_state & MLXCX_EQ_ARMED);
 	mleq->mleq_state &= ~MLXCX_EQ_ARMED;
+#if defined(DEBUG)
+	/*
+	 * If we're still in mlxcx_attach and an intr_n fired, something really
+	 * weird is going on. This shouldn't happen in the absence of a driver
+	 * or firmware bug, so in the interests of minimizing branches in this
+	 * function this check is under DEBUG.
+	 */
+	if (mleq->mleq_state & MLXCX_EQ_ATTACHING) {
+		mutex_exit(&mleq->mleq_mtx);
+		mlxcx_warn(mlxp, "intr_n (%u) fired during attach, disabling "
+		    "vector", mleq->mleq_intr_index);
+		mlxcx_fm_ereport(mlxp, DDI_FM_DEVICE_INVAL_STATE);
+		ddi_fm_service_impact(mlxp->mlx_dip, DDI_SERVICE_LOST);
+		(void) ddi_intr_disable(mlxp->mlx_intr_handles[
+		    mleq->mleq_intr_index]);
+		goto done;
+	}
+#endif
+	mutex_exit(&mleq->mleq_mtx);
 
 	for (; ent != NULL; ent = mlxcx_eq_next(mleq)) {
-		if (ent->mleqe_event_type != MLXCX_EVENT_COMPLETION) {
-			mlxcx_fm_ereport(mlxp, DDI_FM_DEVICE_INVAL_STATE);
-			ddi_fm_service_impact(mlxp->mlx_dip, DDI_SERVICE_LOST);
-			(void) ddi_intr_disable(mlxp->mlx_intr_handles[
-			    mleq->mleq_intr_index]);
-			goto done;
-		}
 		ASSERT3U(ent->mleqe_event_type, ==, MLXCX_EVENT_COMPLETION);
 
 		probe.mlcq_num =
@@ -1075,7 +1109,7 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 		mutex_exit(&mleq->mleq_mtx);
 
 		if (mlcq == NULL)
-			continue;
+			goto update_eq;
 
 		mlwq = mlcq->mlcq_wq;
 

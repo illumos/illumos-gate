@@ -1,0 +1,10 @@
+pcieadm: filter 'atelier' did not match any fields
+PCI Express Capability (0x10)
+  Link Status: 0x7043
+    |--> Link Speed: 8.0 GT/s (0x3)
+    |--> Link Width: 0x4
+    |--> Link Training: no (0x0)
+    |--> Slot Clock Configuration: common (0x1000)
+    |--> Data Link Layer Link Active: yes (0x2000)
+    |--> Link Bandwidth Management Status: change occurred (0x4000)
+    |--> Link Autonomous Bandwidth Status: no change (0x0)
