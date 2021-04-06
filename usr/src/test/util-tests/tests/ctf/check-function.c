@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -24,6 +25,13 @@ static const char *two_args[] = { "int", "const char *" };
 static const char *three_args[] = { "int", "const char *", "float" };
 static const char *argument_args[] = { "uintptr_t" };
 static const char *vararg_args[] = { "const char *" };
+static const char *vla1_args[] = { "int", "int *" };
+static const char *vla2_args[] = { "int", "int (*)[0]" };
+static const char *vla3_args[] = { "int", "int (*)[7]" };
+static const char *vla4_args[] = { "int", "int (*)[0]" };
+static const char *vla5_args[] = { "int", "int", "int (*)[3][0]" };
+static const char *vla6_args[] = { "int", "int", "int (*)[0][4]" };
+
 
 static check_function_test_t functions[] = {
 	{ "simple_func", "void", 0, 0, NULL },
@@ -34,6 +42,12 @@ static check_function_test_t functions[] = {
 	{ "argument", "const char *", 1, 0, argument_args },
 	{ "vararg", "void", 1, CTF_FUNC_VARARG, vararg_args },
 	{ "vararg_ret", "uintptr_t", 1, CTF_FUNC_VARARG, vararg_args },
+	{ "vla1", "int", 2, 0, vla1_args },
+	{ "vla2", "int", 2, 0, vla2_args },
+	{ "vla3", "int", 2, 0, vla3_args },
+	{ "vla4", "int", 2, 0, vla4_args },
+	{ "vla5", "int", 3, 0, vla5_args },
+	{ "vla6", "int", 3, 0, vla6_args },
 	{ NULL }
 };
 
