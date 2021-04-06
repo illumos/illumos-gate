@@ -248,6 +248,7 @@ static void lxpr_read_sys_kernel_osrel(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_pid_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_rand_entavl(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_rand_uuid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_sem(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmall(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -590,6 +591,7 @@ static lxpr_dirent_t sys_kerneldir[] = {
 static lxpr_dirent_t sys_randdir[] = {
 	{ LXPR_SYS_KERNEL_RAND_BOOTID,	"boot_id" },
 	{ LXPR_SYS_KERNEL_RAND_ENTAVL,	"entropy_avail" },
+	{ LXPR_SYS_KERNEL_RAND_UUID,	"uuid" },
 };
 
 #define	SYS_RANDDIRFILES (sizeof (sys_randdir) / sizeof (sys_randdir[0]))
@@ -932,6 +934,7 @@ static void (*lxpr_read_function[])() = {
 	lxpr_read_invalid,		/* /proc/sys/kernel/random */
 	lxpr_read_sys_kernel_rand_bootid, /* /proc/sys/kernel/random/boot_id */
 	lxpr_read_sys_kernel_rand_entavl, /* .../kernel/random/entropy_avail */
+	lxpr_read_sys_kernel_rand_uuid, /* .../kernel/random/uuid */
 	lxpr_read_sys_kernel_sem,	/* /proc/sys/kernel/sem */
 	lxpr_read_sys_kernel_shmall,	/* /proc/sys/kernel/shmall */
 	lxpr_read_sys_kernel_shmmax,	/* /proc/sys/kernel/shmmax */
@@ -1101,6 +1104,7 @@ static vnode_t *(*lxpr_lookup_function[])() = {
 	lxpr_lookup_sys_kdir_randdir,	/* /proc/sys/kernel/random */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/random/boot_id */
 	lxpr_lookup_not_a_dir,		/* .../kernel/random/entropy_avail */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/random/uuid */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/sem */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmall */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmmax */
@@ -1270,6 +1274,7 @@ static int (*lxpr_readdir_function[])() = {
 	lxpr_readdir_sys_kdir_randdir,	/* /proc/sys/kernel/random */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/random/boot_id */
 	lxpr_readdir_not_a_dir,		/* .../kernel/random/entropy_avail */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/random/uuid */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/sem */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmall */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmmax */
@@ -4923,7 +4928,25 @@ lxpr_read_sys_kernel_pid_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", maxpid);
 }
 
-/* ARGSUSED */
+static void
+lxpr_gen_uuid(char *uuid, size_t size)
+{
+	uint8_t r[16];
+	if (random_get_bytes(r, sizeof (r)) != 0) {
+		(void) random_get_pseudo_bytes(r, sizeof (r));
+	}
+	/* Set UUID version to 4 (random) */
+	r[6] = 0x40 | (r[6] & 0x0f);
+	/* Set UUID variant to 1 */
+	r[8] = 0x80 | (r[8] & 0x3f);
+
+	(void) snprintf(uuid, size,
+	    "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x"
+	    "-%02x%02x%02x%02x%02x%02x",
+	    r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8],
+	    r[9], r[10], r[11], r[12], r[13], r[14], r[15]);
+}
+
 static void
 lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4937,13 +4960,11 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 *    safe choice if you need to identify a specific boot on a specific
 	 *    booted kernel.
 	 *
-	 * We'll just generate a random ID if necessary. On Linux the format
-	 * appears to resemble a uuid but since it is not documented to be a
-	 * uuid, we don't worry about that.
+	 * On Linux the format appears to resemble a uuid so stick with that.
 	 */
 	zone_t *zone = LXPTOZ(lxpnp);
 	lx_zone_data_t *lxzd = ztolxzd(zone);
-	char bootid[LX_BOOTID_LEN];
+	char bootid[UUID_PRINTABLE_STRING_LENGTH];
 
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_RAND_BOOTID);
 	ASSERT(zone->zone_brand == &lx_brand);
@@ -4951,30 +4972,7 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	mutex_enter(&lxzd->lxzd_lock);
 	if (lxzd->lxzd_bootid[0] == '\0') {
-		int i;
-
-		for (i = 0; i < 5; i++) {
-			u_longlong_t n;
-			char s[32];
-
-			(void) random_get_bytes((uint8_t *)&n, sizeof (n));
-			switch (i) {
-			case 0:	(void) snprintf(s, sizeof (s), "%08llx", n);
-				s[8] = '\0';
-				break;
-			case 4:	(void) snprintf(s, sizeof (s), "%012llx", n);
-				s[12] = '\0';
-				break;
-			default: (void) snprintf(s, sizeof (s), "%04llx", n);
-				s[4] = '\0';
-				break;
-			}
-			if (i > 0)
-				(void) strlcat(lxzd->lxzd_bootid, "-",
-				    sizeof (lxzd->lxzd_bootid));
-			(void) strlcat(lxzd->lxzd_bootid, s,
-			    sizeof (lxzd->lxzd_bootid));
-		}
+		lxpr_gen_uuid(lxzd->lxzd_bootid, sizeof (lxzd->lxzd_bootid));
 	}
 	(void) strlcpy(bootid, lxzd->lxzd_bootid, sizeof (bootid));
 	mutex_exit(&lxzd->lxzd_lock);
@@ -4993,6 +4991,24 @@ lxpr_read_sys_kernel_rand_entavl(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(LXPTOZ(lxpnp)->zone_brand == &lx_brand);
 
 	lxpr_uiobuf_printf(uiobuf, "%d\n", swrand_stats.ss_entEst);
+}
+
+static void
+lxpr_read_sys_kernel_rand_uuid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	/*
+	 * Each read from this read-only file should return a new
+	 * random 128-bit UUID string in the standard UUID format.
+	 */
+	zone_t *zone = LXPTOZ(lxpnp);
+	char uuid[UUID_PRINTABLE_STRING_LENGTH];
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_RAND_UUID);
+	ASSERT(zone->zone_brand == &lx_brand);
+
+	lxpr_gen_uuid(uuid, sizeof (uuid));
+
+	lxpr_uiobuf_printf(uiobuf, "%s\n", uuid);
 }
 
 /* ARGSUSED */

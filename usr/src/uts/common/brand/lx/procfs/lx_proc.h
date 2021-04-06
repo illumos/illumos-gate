@@ -225,6 +225,7 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_KERNEL_RANDDIR,	/* /proc/sys/kernel/random */
 	LXPR_SYS_KERNEL_RAND_BOOTID, /* /proc/sys/kernel/random/boot_id */
 	LXPR_SYS_KERNEL_RAND_ENTAVL, /* /proc/sys/kernel/random/entropy_avail */
+	LXPR_SYS_KERNEL_RAND_UUID, /* /proc/sys/kernel/random/uuid */
 	LXPR_SYS_KERNEL_SEM,		/* /proc/sys/kernel/sem		*/
 	LXPR_SYS_KERNEL_SHMALL,		/* /proc/sys/kernel/shmall	*/
 	LXPR_SYS_KERNEL_SHMMAX,		/* /proc/sys/kernel/shmmax	*/
