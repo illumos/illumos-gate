@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017, Joyent Inc.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -958,7 +959,22 @@ closef(file_t *fp)
 
 	vp = fp->f_vnode;
 
-	error = VOP_CLOSE(vp, flag, count, offset, fp->f_cred, NULL);
+	/*
+	 * The __FLXPATH flag is a private interface for use by the lx
+	 * brand in order to emulate open(O_NOFOLLOW|O_PATH) which,
+	 * when a symbolic link is encountered, returns a file
+	 * descriptor which references it.
+	 * See uts/common/brand/lx/syscall/lx_open.c
+	 *
+	 * When this flag is set, VOP_OPEN() will not have been called when
+	 * this file descriptor was opened, and VOP_CLOSE() should not be
+	 * called here (for a symlink, most filesystems would return ENOSYS
+	 * anyway)
+	 */
+	if (fp->f_flag2 & (__FLXPATH >> 16))
+		error = 0;
+	else
+		error = VOP_CLOSE(vp, flag, count, offset, fp->f_cred, NULL);
 
 	if (count > 1) {
 		mutex_exit(&fp->f_tlock);
@@ -1118,7 +1134,7 @@ falloc(vnode_t *vp, int flag, file_t **fpp, int *fdp)
 	mutex_enter(&fp->f_tlock);
 	fp->f_count = 1;
 	fp->f_flag = (ushort_t)flag;
-	fp->f_flag2 = (flag & (FSEARCH|FEXEC)) >> 16;
+	fp->f_flag2 = (flag & (FSEARCH|FEXEC|__FLXPATH)) >> 16;
 	fp->f_vnode = vp;
 	fp->f_offset = 0;
 	fp->f_audit_data = 0;

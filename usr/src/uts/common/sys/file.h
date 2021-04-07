@@ -28,6 +28,7 @@
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
 /* Copyright 2020 Joyent, Inc. */
+/* Copyright 2021 OmniOS Community Edition (OmniOSce) Association. */
 
 #ifndef _SYS_FILE_H
 #define	_SYS_FILE_H
@@ -120,6 +121,10 @@ typedef struct fpollinfo {
 #define	FCLOEXEC	0x800000	/* O_CLOEXEC = 0x800000 */
 #define	FDIRECTORY	0x1000000	/* O_DIRECTORY = 0x1000000 */
 #define	FDIRECT		0x2000000	/* O_DIRECT = 0x2000000 */
+/*
+ * Private interface for lx O_PATH|O_NOFOLLOW emulation for symlinks.
+ */
+#define	__FLXPATH	0x80000000
 
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 

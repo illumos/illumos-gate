@@ -25,7 +25,7 @@
  */
 /*
  * Copyright (c) 2017 Joyent, Inc.  All Rights reserved.
- * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <stdio.h>
@@ -44,6 +44,7 @@
 #include <sys/mkdev.h>
 #include <sys/stropts.h>
 #include <sys/timod.h>
+#include <sys/file.h>
 #include <sys/un.h>
 #include <libproc.h>
 #include <netinet/in.h>
@@ -364,12 +365,13 @@ dofcntl(struct ps_prochandle *Pr, const prfdinfo_t *info, int mandatory,
 
 #define	ALL_O_FLAGS	O_ACCMODE | O_NDELAY | O_NONBLOCK | O_APPEND | \
 			O_SYNC | O_DSYNC | O_RSYNC | O_XATTR | \
-			O_CREAT | O_TRUNC | O_EXCL | O_NOCTTY | O_LARGEFILE
+			O_CREAT | O_TRUNC | O_EXCL | O_NOCTTY | O_LARGEFILE | \
+			__FLXPATH
 
 static void
 show_fileflags(int flags)
 {
-	char buffer[136];
+	char buffer[147];
 	char *str = buffer;
 
 	switch (flags & O_ACCMODE) {
@@ -417,6 +419,8 @@ show_fileflags(int flags)
 		(void) strcat(str, "|O_LARGEFILE");
 	if (flags & O_XATTR)
 		(void) strcat(str, "|O_XATTR");
+	if (flags & __FLXPATH)
+		(void) strcat(str, "|__FLXPATH");
 	if (flags & ~(ALL_O_FLAGS))
 		(void) sprintf(str + strlen(str), "|0x%x",
 		    flags & ~(ALL_O_FLAGS));

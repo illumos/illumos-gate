@@ -27,6 +27,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2018 Joyent, Inc.
  * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -2480,6 +2481,7 @@ conv_cnote_fileflags(uint32_t fileflags, Conv_fmt_flags_t fmt_flags,
 		{ 0x2000,	MSG_PR_O_LARGEFILE },
 		{ 0x20000,	MSG_PR_O_NOFOLLOW },
 		{ 0x40000,	MSG_PR_O_NOLINKS },
+		{ 0x80000000,	MSG_PR___FLXPATH },
 		{ 0, 0 },
 	};
 

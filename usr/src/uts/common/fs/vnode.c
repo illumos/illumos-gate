@@ -24,6 +24,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1165,7 +1166,20 @@ top:
 	 * Do remaining checks for FNOFOLLOW and FNOLINKS.
 	 */
 	if ((filemode & FNOFOLLOW) && vp->v_type == VLNK) {
-		error = ELOOP;
+		/*
+		 * The __FLXPATH flag is a private interface for use by the lx
+		 * brand in order to emulate open(O_NOFOLLOW|O_PATH) which,
+		 * when a symbolic link is encountered, returns a file
+		 * descriptor which references it.
+		 * See uts/common/brand/lx/syscall/lx_open.c
+		 *
+		 * When this flag is set, VOP_OPEN() is not called (for a
+		 * symlink, most filesystems will return ENOSYS anyway)
+		 * and the link's vnode is returned to be linked to the
+		 * file descriptor.
+		 */
+		if ((filemode & __FLXPATH) == 0)
+			error = ELOOP;
 		goto out;
 	}
 	if (filemode & FNOLINKS) {

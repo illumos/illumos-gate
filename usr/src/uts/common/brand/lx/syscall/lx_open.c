@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/systm.h>
@@ -171,13 +171,19 @@ lx_openat(int atfd, char *path, int fmode, int cmode)
 
 	flags = ltos_open_flags(fmode);
 
+	if ((fmode & (LX_O_NOFOLLOW|LX_O_PATH|__FLXPATH)) ==
+	    (LX_O_NOFOLLOW|LX_O_PATH|__FLXPATH)) {
+		flags |= __FLXPATH;
+	}
+
 	if (flags & O_CREAT)
 		mode = (mode_t)cmode;
 
 	ttolwp(curthread)->lwp_errno = 0;
 	fd = openat(atfd, path, flags, mode);
 	if (ttolwp(curthread)->lwp_errno != 0) {
-		if ((fmode & LX_O_NOFOLLOW) && (fmode & LX_O_PATH) &&
+		if ((fmode & (LX_O_NOFOLLOW|LX_O_PATH|__FLXPATH)) ==
+		    (LX_O_NOFOLLOW|LX_O_PATH) &&
 		    ttolwp(curthread)->lwp_errno == ELOOP) {
 			/*
 			 * On Linux, if O_NOFOLLOW and O_PATH are set together
@@ -189,17 +195,14 @@ lx_openat(int atfd, char *path, int fmode, int cmode)
 			 * fstatat(2), linkat(2), and readlinkat(2) alongside
 			 * an empty pathname.
 			 *
-			 * We do not have a way to return such a file
-			 * descriptor in illumos so open it without NO_FOLLOW
-			 * and allow the postprocess to emulate O_PATH by
-			 * removing the read and write flags.
-			 * This is enough to keep recent systemd happy
-			 * although any attempt to use the fd for the above
-			 * listed calls without a pathname will fail or modify
-			 * the symlink target.
+			 * illumos has a private interface flag that causes
+			 * openat() to return a file descriptor attached to
+			 * the symlink's vnode. This, in conjunction with the
+			 * other adjustments made in lx_open_postprocess()
+			 * for O_PATH, is enough to satisfy systemd and
+			 * other parts of Linux.
 			 */
-			return (lx_openat(atfd, path, fmode & ~LX_O_NOFOLLOW,
-			    cmode));
+			return (lx_openat(atfd, path, fmode|__FLXPATH, cmode));
 		}
 
 		if (ttolwp(curthread)->lwp_errno == EINTR)
