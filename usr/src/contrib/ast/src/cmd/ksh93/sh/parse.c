@@ -290,7 +290,7 @@ static Shnode_t *getanode(Lex_t *lp, struct argnod *ap)
 	else
 	{
 		if(sh_isoption(SH_NOEXEC) && (ap->argflag&ARG_MAC) && paramsub(ap->argval))
-			errormsg(SH_DICT,ERROR_warn(0),e_lexwarnvar,lp->sh->inlineno);
+			errormsg(SH_DICT,ERROR_warn(0),e_lexwarnvar,lp->sh->inlineno, ap->argval);
 		t->ar.arcomp = 0;
 	}
 	return(t);

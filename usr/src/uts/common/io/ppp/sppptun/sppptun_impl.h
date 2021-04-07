@@ -150,7 +150,7 @@ struct tuncl_s {
 };
 
 #define	TO_TLL(p) \
-	((tunll_t *)((caddr_t)(p) - offsetof(tunll_t, tll_next)))
+	((tunll_t *)((uintptr_t)(p) - offsetof(tunll_t, tll_next)))
 
 #define	TLLF_NOTLOWER		0x00000001	/* never set */
 #define	TLLF_CLOSING		0x00000002	/* driver detach initiated */

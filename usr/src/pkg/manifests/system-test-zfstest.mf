@@ -739,6 +739,9 @@ file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_change-key/zfs_change-key_child \
     mode=0555
 file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_change-key/zfs_change-key_clones \
+    mode=0555
+file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_change-key/zfs_change-key_format \
     mode=0555
 file \
