@@ -16,7 +16,6 @@ SRCS = ctfdump.c
 include ../../Makefile.ctf
 
 CSTD = $(CSTD_GNU99)
-C99LMODE = -Xc99=%all
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lctf
 NATIVE_LIBS += libctf.so libc.so
@@ -44,6 +43,6 @@ $(ROOTONBLDMACHPROG): $(PROG)
 install: $(ROOTONBLDMACHPROG)
 
 clean:
-	$(RM) $(OBJS) $(LINTFILES)
+	$(RM) $(OBJS)
 
 include $(SRC)/tools/Makefile.targ

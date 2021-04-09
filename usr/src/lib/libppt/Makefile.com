@@ -26,7 +26,6 @@ LIBS = $(DYNLIB)
 SRCS =	$(SRCDIR)/libppt.c
 
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
 
 LDLIBS += -lpcidb -ldevinfo -lcmdutils -lnvpair -lc
 

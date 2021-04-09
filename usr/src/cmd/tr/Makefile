@@ -27,9 +27,7 @@ CLOBBERFILES=	$(PROG)
 
 
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
 CPPFLAGS +=	-D_ILLUMOS_PRIVATE -I.
-LINTFLAGS +=	-D_ILLUMOS_PRIVATE -I.
 
 # install rules
 $(ROOTINC)/% : %
@@ -50,8 +48,6 @@ install: all .WAIT $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTXPG6PROG)
 $(ROOTXPG4PROG) $(ROOTXPG6PROG):
 	-$(RM) $@
 	-$(LN) -s ../../bin/$(PROG) $@
-
-lint: 	lint_SRCS
 
 clean:
 	$(RM) $(OBJS)

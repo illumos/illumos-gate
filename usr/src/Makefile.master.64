@@ -38,7 +38,6 @@ COMPILE.d=	$(COMPILE64.d)
 COMPILE.b=	$(COMPILE64.b)
 LINK.c=		$(LINK64.c)
 LINK.cc=	$(LINK64.cc)
-LINT.c=		$(LINT64.c)
 NATIVE_CFLAGS=	$(NATIVE_CFLAGS64)
 NATIVE_CCFLAGS=	$(NATIVE_CCFLAGS64)
 
@@ -58,14 +57,13 @@ LDLIBS.lib =	$(LDLIBS64)
 GCCLIBDIR=	$(GCCLIBDIR64)
 
 #
-# Override Makefile.master's settings of CC, CCC, AS and LINT
+# Override Makefile.master's settings
 #
 CC=		$(CC64)
 CCC=		$(CCC64)
 CPP=		$(CPP64)
 AS=		$(AS64)
 LD=		$(LD64)
-LINT=		$(LINT64)
 NATIVECC=	$(NATIVECC64)
 NATIVECCC=	$(NATIVECCC64)
 NATIVECPP=	$(NATIVECPP64)

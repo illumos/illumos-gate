@@ -59,9 +59,6 @@ $(ROOTMANIFEST):= FILEMODE = 0444
 $(ROOTSVCMETHOD):= FILEMODE = 0555
 $(ROOTVARSMBDLL):= FILEMODE = 0755
 
-LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
-LINTFLAGS += -xerroff=E_NAME_USED_NOT_DEF2
-
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -D_IPP_PRIVATE_STRUCTURES
 CPPFLAGS += -D_REENTRANT
@@ -75,7 +72,6 @@ CPPFLAGS += -I $(ROOT)/usr/include/kerberosv5
 SMOFF += all_func_returns,deref_check
 
 CSTD =       $(CSTD_GNU99)
-C99LMODE =      -Xc99=%all
 
 LDFLAGS += -R/usr/lib/smbsrv
 LDLIBS += -L$(ROOT)/usr/lib/smbsrv
@@ -102,8 +98,6 @@ all:		$(PROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:		lint_SRCS
 
 $(PROG):	$(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

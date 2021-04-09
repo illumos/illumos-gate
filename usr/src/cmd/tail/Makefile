@@ -27,8 +27,6 @@ CLOBBERFILES=	$(PROG)
 CPPFLAGS +=        -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
-LINTFLAGS +=	-I. -erroff=E_CONSTANT_CONDITION
 
 SMOFF += leaks
 
@@ -51,8 +49,6 @@ install: all .WAIT $(ROOTPROG) $(ROOTXPG4PROG)
 $(ROOTXPG4PROG):
 	-$(RM) $@
 	-$(LN) -s ../../bin/$(PROG) $@
-
-lint: 	lint_SRCS
 
 clean:
 	$(RM) $(OBJS)

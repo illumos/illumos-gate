@@ -41,5 +41,3 @@ MODSRCS_DIR = ../../../common/modules/libmlsvc
 CPPFLAGS += -I$(SRC)/uts/common
 
 CSTD=	$(CSTD_GNU99)
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all

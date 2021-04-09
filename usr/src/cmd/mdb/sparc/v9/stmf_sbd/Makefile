@@ -39,4 +39,3 @@ include ../../../Makefile.module
 CPPFLAGS += -I$(UTSBASE)/common -I$(UTSBASE)/common/sys -I$(STMFSBDBASE)
 
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all

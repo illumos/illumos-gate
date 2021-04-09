@@ -12,6 +12,7 @@
 #
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
 #
+
 PROG=		od
 XPG4PROG=	$(PROG)
 
@@ -22,11 +23,9 @@ include ../Makefile.cmd
 
 CLOBBERFILES=	$(PROG)
 
-
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
+
 CPPFLAGS +=	-D__EXTENSIONS__ -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
-LINTFLAGS +=	-D__EXTENSIONS__
 
 # install rules
 $(ROOTINC)/% : %
@@ -36,7 +35,7 @@ $(ROOTINC)/% : %
 
 .PARALLEL: $(OBJS)
 
-all:		$(PROG) 
+all:		$(PROG)
 
 $(PROG):	$(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -47,8 +46,6 @@ install: all .WAIT $(ROOTPROG) $(ROOTXPG4PROG)
 $(ROOTXPG4PROG):
 	-$(RM) $@
 	-$(LN) -s ../../bin/$(PROG) $@
-
-lint: 	lint_SRCS
 
 clean:
 	$(RM) $(OBJS)

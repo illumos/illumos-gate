@@ -50,9 +50,7 @@ CERRWARN += -_gcc=-Wno-switch
 # not linted
 SMATCH=off
 
-LINTFLAGS += -mu
 CSTD =       $(CSTD_GNU99)
-C99LMODE =      -Xc99=%all
 
 MANIFEST = vscan.xml
 ROOTMANIFESTDIR= $(ROOTSVCSYSTEM)/filesystem
@@ -75,8 +73,6 @@ all: $(PROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

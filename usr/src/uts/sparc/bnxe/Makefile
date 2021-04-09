@@ -47,8 +47,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 ALL_TARGET	= $(BINARY) $(CONFMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-C99LMODE=       -Xc99=%all
-
 #
 #	Driver-specific flags
 #	XXX inline bits were originally set to inline

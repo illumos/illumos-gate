@@ -523,11 +523,10 @@ CCERRWARN += -_gcc=-Wno-unknown-pragmas
 CCERRWARN += -_gcc=-Wno-unused-parameter
 CCERRWARN += -_gcc=-Wno-missing-field-initializers
 
-# C standard.  Keep Studio flags until we get rid of lint.
+# C standard
 CSTD_GNU89=	-xc99=%none
 CSTD_GNU99=	-xc99=%all
 CSTD=		$(CSTD_GNU89)
-C99LMODE=	$(CSTD:-xc99%=-Xc99%)
 
 # In most places, assignments to these macros should be appended with +=
 # (CPPFLAGS.first allows values to be prepended to CPPFLAGS).
@@ -872,41 +871,6 @@ LINK.cc=		$(CCC) $(CCFLAGS) $(CPPFLAGS) $(NORUNPATH) \
 LINK64.cc=		$(CCC) $(CCFLAGS64) $(CPPFLAGS) $(NORUNPATH) \
 			$(LDFLAGS) $(CCNEEDED64) $(LDCHECKS)
 
-#
-# lint macros
-#
-# Note that the undefine of __PRAGMA_REDEFINE_EXTNAME can be removed once
-# ON is built with a version of lint that has the fix for 4484186.
-#
-ALWAYS_LINT_DEFS =	-errtags=yes -s
-ALWAYS_LINT_DEFS +=	-erroff=E_PTRDIFF_OVERFLOW
-ALWAYS_LINT_DEFS +=	-erroff=E_ASSIGN_NARROW_CONV
-ALWAYS_LINT_DEFS +=	-U__PRAGMA_REDEFINE_EXTNAME
-ALWAYS_LINT_DEFS +=	$(C99LMODE)
-ALWAYS_LINT_DEFS +=	-errsecurity=$(SECLEVEL)
-ALWAYS_LINT_DEFS +=	-erroff=E_SEC_CREAT_WITHOUT_EXCL
-ALWAYS_LINT_DEFS +=	-erroff=E_SEC_FORBIDDEN_WARN_CREAT
-# XX64 -- really only needed for amd64 lint
-ALWAYS_LINT_DEFS +=	-erroff=E_ASSIGN_INT_TO_SMALL_INT
-ALWAYS_LINT_DEFS +=	-erroff=E_CAST_INT_CONST_TO_SMALL_INT
-ALWAYS_LINT_DEFS +=	-erroff=E_CAST_INT_TO_SMALL_INT
-ALWAYS_LINT_DEFS +=	-erroff=E_CAST_TO_PTR_FROM_INT
-ALWAYS_LINT_DEFS +=	-erroff=E_COMP_INT_WITH_LARGE_INT
-ALWAYS_LINT_DEFS +=	-erroff=E_INTEGRAL_CONST_EXP_EXPECTED
-ALWAYS_LINT_DEFS +=	-erroff=E_PASS_INT_TO_SMALL_INT
-ALWAYS_LINT_DEFS +=	-erroff=E_PTR_CONV_LOSES_BITS
-
-# This forces lint to pick up note.h and sys/note.h from Devpro rather than
-# from the proto area.  The note.h that ON delivers would disable NOTE().
-ONLY_LINT_DEFS =	-I$(SPRO_VROOT)/prod/include/lint
-
-SECLEVEL=	core
-LINT.c=		$(LINT) $(ONLY_LINT_DEFS) $(LINTFLAGS) $(CPPFLAGS) \
-		$(ALWAYS_LINT_DEFS)
-LINT64.c=	$(LINT) $(ONLY_LINT_DEFS) $(LINTFLAGS64) $(CPPFLAGS) \
-		$(ALWAYS_LINT_DEFS)
-LINT.s=		$(LINT.c)
-
 # For some future builds, NATIVE_MACH and MACH might be different.
 # Therefore, NATIVE_MACH needs to be redefined in the
 # environment as `uname -p` to override this macro.
@@ -935,13 +899,6 @@ CW_CCC_COMPILERS=	$(PRIMARY_CCC:%=--primary %) $(SHADOW_CCCS:%=--shadow %)
 
 CW_LINKER=		--linker $(LD)
 
-# Till SS12u1 formally becomes the NV CBE, LINT is hard
-# coded to be picked up from the $SPRO_ROOT/sunstudio12.1/
-# location. Impacted variables are sparc_LINT, sparcv9_LINT,
-# i386_LINT, amd64_LINT.
-# Reset them when SS12u1 is rolled out.
-#
-
 # Specify platform compiler versions for languages
 # that we use (currently only c and c++).
 #
@@ -951,18 +908,15 @@ BUILD_CC=		$(CW) $(CW_LINKER) $(CW_CC_COMPILERS) --
 BUILD_CCC=		$(CW) -C $(CW_LINKER) $(CW_CCC_COMPILERS) --
 BUILD_CPP=		/usr/ccs/lib/cpp
 BUILD_LD=		$(ONBLD_TOOLS)/bin/$(MACH)/ld
-BUILD_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
 $(MACH)_CC=		$(BUILD_CC)
 $(MACH)_CCC=		$(BUILD_CCC)
 $(MACH)_CPP=		$(BUILD_CPP)
 $(MACH)_LD=		$(BUILD_LD)
-$(MACH)_LINT=		$(BUILD_LINT)
 $(MACH64)_CC=		$(BUILD_CC)
 $(MACH64)_CCC=		$(BUILD_CCC)
 $(MACH64)_CPP=		$(BUILD_CPP)
 $(MACH64)_LD=		$(BUILD_LD)
-$(MACH64)_LINT=		$(BUILD_LINT)
 
 sparc_AS=		/usr/ccs/bin/as -xregsym=no
 sparcv9_AS=		$($(MACH)_AS)
@@ -976,14 +930,12 @@ NATIVECCC=		$($(NATIVE_MACH)_CCC)
 NATIVECPP=		$($(NATIVE_MACH)_CPP)
 NATIVEAS=		$($(NATIVE_MACH)_AS)
 NATIVELD=		$($(NATIVE_MACH)_LD)
-NATIVELINT=		$($(NATIVE_MACH)_LINT)
 
 NATIVECC64=		$($(NATIVE_MACH64)_CC)
 NATIVECCC64=		$($(NATIVE_MACH64)_CCC)
 NATIVECPP64=		$($(NATIVE_MACH64)_CPP)
 NATIVEAS64=		$($(NATIVE_MACH64)_AS)
 NATIVELD64=		$($(NATIVE_MACH64)_LD)
-NATIVELINT64=		$($(NATIVE_MACH64)_LINT)
 
 #
 # Makefile.master.64 overrides these settings
@@ -993,14 +945,12 @@ CCC=			$(NATIVECCC)
 CPP=			$(NATIVECPP)
 AS=			$(NATIVEAS)
 LD=			$(NATIVELD)
-LINT=			$(NATIVELINT)
 
 CC64=			$(NATIVECC64)
 CCC64=			$(NATIVECCC64)
 CPP64=			$(NATIVECPP64)
 AS64=			$(NATIVEAS64)
 LD64=			$(NATIVELD64)
-LINT64=			$(NATIVELINT64)
 
 # Pass -Y flag to cpp (method of which is release-dependent)
 CCYFLAG=		-Y I,
