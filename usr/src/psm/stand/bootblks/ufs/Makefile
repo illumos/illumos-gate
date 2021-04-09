@@ -32,22 +32,12 @@ all	:=	TARGET= all
 install	:=	TARGET= install
 clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
-lint	:=	TARGET= lint
 
 .KEEP_STATE:
 
-all install clean clobber lint : $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-
-#
-# install targets
-#
-$(USR_SBIN): $(USR)
-	-$(INS.dir)
-
-$(USR_SBIN)/%:	% $(USR_SBIN)
-	$(INS.file)

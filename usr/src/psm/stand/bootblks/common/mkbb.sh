@@ -46,13 +46,13 @@ shift $(($OPTIND - 1))
 #
 rdoff=$(($bblen - $rdlen))
 
-bbsize=$(ls -l $1 | awk -e '{ print $5 }')
+bbsize=$(ls -l $1 | awk '{ print $5 }')
 if [ $bbsize -gt $rdoff ]; then
     printf "$1 must be smaller than $rdoff\n"
     exit -1
 fi
 
-rdsize=$(ls -l $2 | awk -e '{ print $5 }')
+rdsize=$(ls -l $2 | awk '{ print $5 }')
 if [ $rdsize -gt $rdlen ]; then
     printf "$1 must be smaller than $rdlen\n"
     exit -1
@@ -70,7 +70,7 @@ dd if=$2 of=$3 conv=notrunc bs=1 oseek=$rdoff
 # extended bootblk for zfs debug
 #
 if [ $totlen -gt $bblen ]; then
-    extsize=$(ls -l $extra | awk -e '{ print $5 }')
+    extsize=$(ls -l $extra | awk '{ print $5 }')
     if [ $extsize -gt 16384 ]; then
 	printf "$1 must be smaller than 16k\n"
 	exit -1

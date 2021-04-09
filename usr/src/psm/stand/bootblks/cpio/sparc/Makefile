@@ -18,21 +18,23 @@
 #
 # CDDL HEADER END
 #
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# psm/stand/bootblks/cpio/sparc/Makefile
 #
 
-include ../../../Makefile.master
+BASEDIR = ../..
 
-SUBDIRS = cpio ufs hsfs zfs
+SUBDIRS	= sun4u sun4v
 
-all install clean clobber : $(SUBDIRS)
+all	:=	TARGET= all
+install	:=	TARGET= install
+clean	:=	TARGET= clean
+clobber	:=	TARGET= clobber
 
-all	:=	TARGET = all
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-install	:=	TARGET = install
+.KEEP_STATE:
+
+all install clean clobber: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

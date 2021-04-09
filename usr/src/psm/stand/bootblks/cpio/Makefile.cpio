@@ -18,23 +18,38 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2021 Toomas Soome <tsoome@me.com>
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# psm/stand/bootblks/cpio/Makefile.cpio
+#
 
-include ../../../Makefile.master
+include $(BASEDIR)/Makefile.com
 
-SUBDIRS = cpio ufs hsfs zfs
+#
+# Define FS dependent targets
+#
 
-all install clean clobber : $(SUBDIRS)
+CPIO_DIR		= $(BASEDIR)/cpio/common
 
-all	:=	TARGET = all
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-install	:=	TARGET = install
+FS_FCODE		= boot-cpio.fcode
+FS_BB			= cpio.bb
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+CPIOBOOT_FTH		= $(CPIO_DIR)/boot-cpio.fth
+CPIO_FTH			= $(CPIO_DIR)/cpio.fth
 
-FRC:
+#
+# Where and how stuff gets installed
+#
+ROOT_PSM_BOOTBLOCK	= $(ROOT_PSM_LIB_CPIO_DIR)/$(PROG)
+USR_PSM_BOOTBLOCK	= $(USR_PSM_LIB_CPIO_DIR)/$(PROG)
+BOOTBLK_LINK		= $(BOOTBLK_LINK_PREFIX)/cpio/$(PROG)
+
+USR			= $(ROOT)/usr
+
+%.fcode:	$(CPIO_DIR)/%.fth
+	$(TOKENIZE) $<
+
+$(FS_FCODE):	$(UTIL_FTH) $(CPIO_FTH) $(BOOT_FTH)
+	$(TOKENIZE) $(CPIOBOOT_FTH)
