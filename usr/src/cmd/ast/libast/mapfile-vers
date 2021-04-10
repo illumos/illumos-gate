@@ -90,7 +90,13 @@ $elif _ELF32
 	_Sftable		{
 				  ASSERT = {
 					  TYPE = OBJECT;
+					$if _x86
 					  SIZE = 1192;
+					$elif _sparc
+					  SIZE = 1248;
+					$else
+					$error Unknown architecture
+					$endif
 					};
 				};
 	_Vmextern		{
@@ -1083,31 +1089,61 @@ $elif _ELF32
 	_Sfstderr		{
 				  ASSERT = {
 					  TYPE = OBJECT;
+					$if _x86
 					  SIZE = 104;
+					$elif _sparc
+					  SIZE = 112;
+					$else
+					$error Unknown architecture
+					$endif
 					};
 				};
 	_Sfstdin		{
 				  ASSERT = {
 					  TYPE = OBJECT;
+					$if _x86
 					  SIZE = 104;
+					$elif _sparc
+					  SIZE = 112;
+					$else
+					$error Unknown architecture
+					$endif
 					};
 				};
 	_Sfstdout		{
 				  ASSERT = {
 					  TYPE = OBJECT;
+					$if _x86
 					  SIZE = 104;
+					$elif _sparc
+					  SIZE = 112;
+					$else
+					$error Unknown architecture
+					$endif
 					};
 				};
 	_Stak_data		{
 				  ASSERT = {
 					  TYPE = OBJECT;
+					$if _x86
 					  SIZE = 104;
+					$elif _sparc
+					  SIZE = 112;
+					$else
+					$error Unknown architecture
+					$endif
 					};
 				};
 	_ast_conf_data		{
 				  ASSERT = {
 					  TYPE = OBJECT;
+					$if _x86
 					  SIZE = 23324;
+					$elif _sparc
+					  SIZE = 27440;
+					$else
+					$error Unknown architecture
+					$endif
 					};
 				};
 $else

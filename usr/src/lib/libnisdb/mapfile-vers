@@ -129,6 +129,7 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 					  SIZE = 60;
 					};
 				};
+$if _x86
 	ldapDBTableMapping	{
 				  ASSERT = {
 					  TYPE = OBJECT;
@@ -141,6 +142,22 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 					  SIZE = 340;
 					};
 				};
+$elif _sparc
+	ldapDBTableMapping	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 144;
+					};
+				};
+	ldapMappingList		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 344;
+					};
+				};
+$else
+$error Unknown architecture
+$endif
 	loadAllLDAP;
 	lock_core;
 	lock_map;

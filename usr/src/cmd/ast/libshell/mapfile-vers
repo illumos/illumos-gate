@@ -123,9 +123,21 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 
 	# semi-private, needed for shcomp
 $if _ELF64
+	$if _x86
 	sh	{ ASSERT = { TYPE = OBJECT; SIZE = 1888; }; };
+	$elif _sparc
+	sh	{ ASSERT = { TYPE = OBJECT; SIZE = 1920; }; };
+	$else
+	$error Unknown architecture
+	$endif
 $elif _ELF32
+	$if _x86
 	sh	{ ASSERT = { TYPE = OBJECT; SIZE = 1216; }; };
+	$elif _sparc
+	sh	{ ASSERT = { TYPE = OBJECT; SIZE = 1224; }; };
+	$else
+	$error Unknown architecture
+	$endif
 $else
 $error unknown ELFCLASS
 $endif

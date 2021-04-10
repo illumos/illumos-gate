@@ -81,8 +81,18 @@ SYMBOL_VERSION SUNW_2.0 {
 		g_scsi_send_diag_cmd;
 		g_scsi_tur;
 		g_scsi_writebuffer_cmd;
-		g_switch_to_alpa;
-		g_sf_alpa_to_switch;
+		g_switch_to_alpa {
+		    ASSERT = {
+			TYPE = OBJECT;
+			SIZE = 126;
+		    };
+		};
+		g_sf_alpa_to_switch {
+		    ASSERT = {
+			TYPE = OBJECT;
+			SIZE = 240;
+		    };
+		};
 		g_i18n_catopen;
 		g_port_offline;
 		g_port_online;
@@ -113,7 +123,23 @@ SYMBOL_VERSION SUNW_2.0 {
 		g_scsi_inquiry_cmd;
 		g_scsi_persistent_reserve_in_cmd;
 		g_get_path_type;
-		l_catd;
+$if _ELF32
+		l_catd {
+		    ASSERT = {
+			TYPE = OBJECT;
+			SIZE = 4;
+		    };
+		};
+$elif _ELF64
+		l_catd {
+		    ASSERT = {
+			TYPE = OBJECT;
+			SIZE = 8;
+		    };
+		};
+$else
+$error Unknown ELFCLASS
+$endif
 		g_get_lun_str;
 		g_get_lun_number;
 		g_get_pathlist;

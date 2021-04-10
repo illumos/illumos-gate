@@ -1672,3 +1672,4 @@ Bugid   Risk Synopsis
 13481	ld(1) should skip GCC local aliases when building symsort sections
 13684	ld aborts when input object has no file name
 13487	want mapfile-based assertions about symbol properties
+13487	want mapfile-based assertions about symbol properties (fix SPARC)
