@@ -13,6 +13,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/param.h>
@@ -624,17 +625,21 @@ vm_mapping_gap(struct vmspace *vms, uintptr_t addr, size_t size)
 {
 	vmspace_mapping_t *vmsm;
 	list_t *ml = &vms->vms_maplist;
-	const uintptr_t range_end = addr + size;
+	const uintptr_t range_end = addr + size - 1;
 
 	ASSERT(MUTEX_HELD(&vms->vms_lock));
+	ASSERT(size > 0);
 
 	for (vmsm = list_head(ml); vmsm != NULL; vmsm = list_next(ml, vmsm)) {
-		const uintptr_t seg_end = vmsm->vmsm_addr + vmsm->vmsm_len;
+		const uintptr_t seg_end = vmsm->vmsm_addr + vmsm->vmsm_len - 1;
 
-		if ((vmsm->vmsm_addr >= addr && vmsm->vmsm_addr < range_end) ||
-		    (seg_end > addr && seg_end < range_end)) {
-			return (B_FALSE);
-		}
+		/*
+		 * The two ranges do not overlap if the start of either of
+		 * them is after the end of the other.
+		 */
+		if (vmsm->vmsm_addr > range_end || addr > seg_end)
+			continue;
+		return (B_FALSE);
 	}
 	return (B_TRUE);
 }
