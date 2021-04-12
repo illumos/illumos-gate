@@ -26,13 +26,13 @@ default_setup_noexit "$DISKS"
 
 function cleanup
 {
-	log_must set_min_bytes 131072
+	log_must set_tunable64 zfs_condense_min_mapping_bytes 131072
 	default_cleanup_noexit
 }
 
 log_onexit cleanup
 
-log_must set_min_bytes 1
+log_must set_tunable64 zfs_condense_min_mapping_bytes 1
 
 log_must zfs set recordsize=512 $TESTPOOL/$TESTFS
 

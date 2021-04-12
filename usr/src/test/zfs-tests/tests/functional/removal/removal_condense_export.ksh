@@ -21,24 +21,19 @@
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/removal/removal.kshlib
 
-function set_condense_delay # ticks
-{
-	typeset ticks=$1
-	echo "zfs_condense_indirect_commit_entry_delay_ticks/W 0t$ticks" | \
-	    mdb -kw
-}
-
 function reset
 {
-	log_must set_condense_delay 0
-	log_must set_min_bytes 131072
+	log_must set_tunable32 zfs_condense_indirect_commit_entry_delay_ticks 0
+	log_must set_tunable32 zfs_condense_indirect_obsolete_pct 25
+	log_must set_tunable64 zfs_condense_min_mapping_bytes 131072
 	default_cleanup_noexit
 }
 
 default_setup_noexit "$DISKS" "true"
 log_onexit reset
-log_must set_condense_delay 500
-log_must set_min_bytes 1
+log_must set_tunable32 zfs_condense_indirect_commit_entry_delay_ticks 500
+log_must set_tunable32 zfs_condense_indirect_obsolete_pct 5
+log_must set_tunable64 zfs_condense_min_mapping_bytes 1
 
 log_must zfs set recordsize=512 $TESTPOOL/$TESTFS
 
