@@ -129,13 +129,49 @@ pcieadm_ofmt_errx(const char *fmt, ...)
 	verrx(EXIT_FAILURE, fmt, ap);
 }
 
-boolean_t
+/*
+ * We determine if a node is PCI in a two step process. The first is to see if
+ * the node's name starts with pci, and has an additional character that
+ * indicates it's not the synthetic root of the tree. However, the node name
+ * changes for some classes of devices such as GPUs. As such, for those we try
+ * to look at the compatible property and see if we have a pciexclass or
+ * pciclass entry. We look specifically for the class to make sure that we don't
+ * fall for the synthetic nodes that have a compatible property of
+ * 'pciex_root_complex'.
+ *
+ * The compatible property is a single string that is actually a compressed
+ * string. That is, there are multiple strings concatenated together in a single
+ * pointer.
+ */
+static boolean_t
 pcieadm_di_node_is_pci(di_node_t node)
 {
 	const char *name;
+	char *compat;
+	int nents;
 
 	name = di_node_name(node);
-	return (strncmp("pci", name, 3) == 0);
+	if (strncmp("pci", name, 3) == 0) {
+		return (name[3] != '\0');
+	}
+
+	nents = di_prop_lookup_strings(DDI_DEV_T_ANY, node, "compatible",
+	    &compat);
+	if (nents <= 0) {
+		return (B_FALSE);
+	}
+
+	for (int i = 0; i < nents; i++) {
+		if (strncmp("pciclass,", compat, strlen("pciclass,")) == 0 ||
+		    strncmp("pciexclass,", compat, strlen("pciexclass,")) ==
+		    0) {
+			return (B_TRUE);
+		}
+
+		compat += strlen(compat) + 1;
+	}
+
+	return (B_FALSE);
 }
 
 static int
@@ -144,15 +180,6 @@ pcieadm_di_walk_cb(di_node_t node, void *arg)
 	pcieadm_di_walk_t *walk = arg;
 
 	if (!pcieadm_di_node_is_pci(node)) {
-		return (DI_WALK_CONTINUE);
-	}
-
-	/*
-	 * We create synthetic nodes for the root of PCIe tree basically
-	 * functions as all the resources available for one or more bridges.
-	 * When we encounter that top-level node skip it.
-	 */
-	if (strcmp("pci", di_node_name(node)) == 0) {
 		return (DI_WALK_CONTINUE);
 	}
 
@@ -216,7 +243,7 @@ pcieadm_find_dip_cb(di_node_t node, void *arg)
 	}
 	(void) snprintf(bdf, sizeof (bdf), "%x/%x/%x", PCI_REG_BUS_G(regs[0]),
 	    PCI_REG_DEV_G(regs[0]), PCI_REG_FUNC_G(regs[0]));
-	(void) snprintf(bdf, sizeof (bdf), "%02x/%02x/%02x",
+	(void) snprintf(altbdf, sizeof (altbdf), "%02x/%02x/%02x",
 	    PCI_REG_BUS_G(regs[0]), PCI_REG_DEV_G(regs[0]),
 	    PCI_REG_FUNC_G(regs[0]));
 
