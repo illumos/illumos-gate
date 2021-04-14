@@ -674,4 +674,109 @@ level=$($SHELL -c $'$SHELL -c \'print -r "$SHLVL"\'')
 $SHELL -c 'unset .sh' 2> /dev/null
 [[ $? == 1 ]] || err_exit 'unset .sh should return 1'
 
+# Keep the list in sync (minus ".sh") with shtab_variables[] in
+# src/cmd/ksh93/data/variables.c Note: as long as changing $PATH forks a
+# virtual subshell, "PATH" should also be excluded below.
+set -- \
+	"PS1" \
+	"PS2" \
+	"IFS" \
+	"PWD" \
+	"HOME" \
+	"MAIL" \
+	"REPLY" \
+	"SHELL" \
+	"EDITOR" \
+	"MAILCHECK" \
+	"RANDOM" \
+	"ENV" \
+	"HISTFILE" \
+	"HISTSIZE" \
+	"HISTEDIT" \
+	"HISTCMD" \
+	"FCEDIT" \
+	"CDPATH" \
+	"MAILPATH" \
+	"PS3" \
+	"OLDPWD" \
+	"VISUAL" \
+	"COLUMNS" \
+	"LINES" \
+	"PPID" \
+	"_" \
+	"TMOUT" \
+	"SECONDS" \
+	"LINENO" \
+	"OPTARG" \
+	"OPTIND" \
+	"PS4" \
+	"FPATH" \
+	"LANG" \
+	"LC_ALL" \
+	"LC_COLLATE" \
+	"LC_CTYPE" \
+	"LC_MESSAGES" \
+	"LC_NUMERIC" \
+	"FIGNORE" \
+	"KSH_VERSION" \
+	"JOBMAX" \
+	".sh.edchar" \
+	".sh.edcol" \
+	".sh.edtext" \
+	".sh.edmode" \
+	".sh.name" \
+	".sh.subscript" \
+	".sh.value" \
+	".sh.version" \
+	".sh.dollar" \
+	".sh.match" \
+	".sh.command" \
+	".sh.file" \
+	".sh.fun" \
+	".sh.lineno" \
+	".sh.subshell" \
+	".sh.level" \
+	".sh.stats" \
+	".sh.math" \
+	".sh.pool" \
+	".sh.pid" \
+	"SHLVL" \
+	"CSWIDTH"
+
+# ... upper/lowercase test
+$SHELL -c '
+       typeset -u upper
+       typeset -l lower
+       errors=0
+       PS1=/dev/null/test_my_case_too
+       PS2=$PS1 PS3=$PS1 PS4=$PS1 OPTARG=$PS1 IFS=$PS1 FPATH=$PS1 FIGNORE=$PS1 CSWIDTH=$PS1
+       for var
+       do      case $var in
+               RANDOM | HISTCMD | _ | SECONDS | LINENO | JOBMAX | .sh.stats)
+                       # these are expected to fail below as their values change; just test against crashing
+                       typeset -u "$var"
+                       typeset -l "$var"
+                       continue ;;
+               esac
+               nameref val=$var
+               upper=$val
+               lower=$val
+               typeset -u "$var"
+               if      [[ $val != "$upper" ]]
+               then    echo "  $0: typeset -u does not work on special variable $var" \
+                               "(expected $(printf %q "$upper"), got $(printf %q "$val"))" >&2
+                       let errors++
+               fi
+               typeset -l "$var"
+               if      [[ $val != "$lower" ]]
+               then    echo "  $0: typeset -l does not work on special variable $var" \
+                               "(expected $(printf %q "$lower"), got $(printf %q "$val"))" >&2
+                       let errors++
+               fi
+       done
+       exit $((errors + 1))
+' changecase_test "$@" PATH    # do include PATH here as well
+(((e = $?) == 1)) || err_exit "typeset -l/-u doesn't work on special variables" \
+       "(exit status $e$( ((e>128)) && print -n / && kill -l "$e"))"
+
 exit $((Errors<125?Errors:125))
