@@ -78,7 +78,10 @@ $(UFM_LIB):=	LDLIBS += -lpcidb -lnvpair -lc
 $(SES_LIB):=	DYNFLAGS += -R/usr/lib/scsi
 $(SD_LIB):=	DYNFLAGS += -R/usr/lib/scsi
 
-.KEEP_STATE:
+# Size assertions are non-constant and not useful here
+ZGUIDANCE=-Wl,-zguidance=noasserts
+
+.KEEP STATE:
 
 $(ROOTUSRLIBFWFLASHIDF)/$(SLINKS) : $(ROOTUSRLIBFWFLASHIDF)/$(SES_LIB)
 	@$(RM) $@

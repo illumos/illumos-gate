@@ -19,7 +19,7 @@
 #
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.	All rights reserved.
 #
 
 #
@@ -65,8 +65,8 @@ SYMBOL_VERSION SUNWprivate {
 	nls_str_toloc;
 	nls_str_upper;
 
-	nsmb_close		{ FLAGS = NODIRECT };
-	nsmb_ioctl		{ FLAGS = NODIRECT };
+	nsmb_close		{ FLAGS = NODIRECT; };
+	nsmb_ioctl		{ FLAGS = NODIRECT; };
 
 	smb_cf_minauth_from_str;
 	smb_cf_version_from_str;
@@ -83,7 +83,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_ctx_gethandle;
 	smb_ctx_init;
 	smb_ctx_kill;
-	smb_ctx_newvc		{ FLAGS = NODIRECT };
+	smb_ctx_newvc		{ FLAGS = NODIRECT; };
 	smb_ctx_opt;
 	smb_ctx_parseunc;
 	smb_ctx_readrc;
@@ -107,34 +107,46 @@ SYMBOL_VERSION SUNWprivate {
 	smb_ctx_setuser;
 	smb_ctx_setwins;
 
-	smb_debug		{ FLAGS = NODIRECT };	# data
+	smb_debug		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				  FLAGS = NODIRECT;
+				};
 	smb_error;
-#
-# Functions to support named pipes
+	#
+	# Functions to support named pipes
 	smb_fh_close;
 	smb_fh_getssnkey;
 	smb_fh_open;
 	smb_fh_read;
 	smb_fh_write;
 	smb_fh_xactnp;
-#
+	#
 	smb_get_authentication;
 	smb_getprogname;
 	smb_iod_connect;
 	smb_iod_door_path;
-	smb_iod_open_door	{ FLAGS = NODIRECT };
-	smb_iod_start		{ FLAGS = NODIRECT };
+	smb_iod_open_door	{ FLAGS = NODIRECT; };
+	smb_iod_start		{ FLAGS = NODIRECT; };
 	smb_iod_work;
 	smb_lib_init;
-	smb_open_driver		{ FLAGS = NODIRECT };
+	smb_open_driver		{ FLAGS = NODIRECT; };
 	smb_open_printer;
 	smb_open_rcfile;
 	smb_simplecrypt;
 	smb_simpledecrypt;
 	smb_strerror;
-	smb_verbose		{ FLAGS = NODIRECT };	# data
-#
-# Functions to support Access Control Lists (ACLs)
+	smb_verbose		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				  FLAGS = NODIRECT;
+				};
+	#
+	# Functions to support Access Control Lists (ACLs)
 	smbfs_acl_free_sd;
 	smbfs_acl_get;
 	smbfs_acl_getsd;
@@ -143,7 +155,7 @@ SYMBOL_VERSION SUNWprivate {
 	smbfs_acl_set;
 	smbfs_acl_setsd;
 	smbfs_acl_zfs2sd;
-#
+	#
 	smbfs_default_dom_usr;
 	smbfs_keychain_add;
 	smbfs_keychain_addhash;
@@ -155,7 +167,12 @@ SYMBOL_VERSION SUNWprivate {
 	smbfs_set_default_domain;
 	smbfs_set_default_user;
 
-	smbutil_std_opts;
+	smbutil_std_opts	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 29;
+					};
+				};
 
 	spnegoCreateNegTokenHint;
 	spnegoCreateNegTokenInit;

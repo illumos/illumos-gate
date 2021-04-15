@@ -49,4 +49,3 @@ SYMBOL_VERSION SUNWprivate {
 	local:
 	    *;
 };
-

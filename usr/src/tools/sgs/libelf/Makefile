@@ -34,6 +34,10 @@ SGSMSGTARG +=	$(SGSMSG32)
 NATIVE_LIBS +=	libc.so
 CW_LINKER =
 
+# As a bootstrapping issue, we can't use the real mapfile because we build
+# early in tools and thus don't have support for assertions.
+MAPFILES=
+
 .KEEP_STATE:
 
 install:	all $(ROOTONBLDLIBMACH)/$(DYNLIB) $(ROOTONBLDLIBMACH)/$(LIBLINKS)

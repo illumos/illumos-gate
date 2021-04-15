@@ -107,7 +107,7 @@ SYMBOL_VERSION ILLUMOS_0.2 {	# Second interface change in illumos
 SYMBOL_VERSION ILLUMOS_0.1 {	# First interface change in illumos
     global:
 	wb_poll;
-} SUNW_1.2;    
+} SUNW_1.2;
 
 SYMBOL_VERSION SUNW_1.2 {	# update to libwombat, Solaris 10
     global:
@@ -252,6 +252,10 @@ The minor revision number is incremented whenever one or more new interfaces
 is added to a library.  Once a version comes to exist in illumos, it is from
 that point onward considered to be immutable.
 
+While strongly discouraged, if it is necessary to add global data symbols to a
+library (which become part of the ABI), an assertion that specifies the size
+of the object must be added.
+
 4.2 Adding a Private interface
 
 Private interfaces are the non-ABI interfaces of the library.  Unlike
@@ -280,6 +284,9 @@ link-editor, the public interface to which is provided by the ld
 command. When making a modification to the interface of such a library, you
 should follow the convention already in place.
 
+As with public interfaces, the size of global objects must be asserted in
+private versions (though it will be less problematic to change them later).
+
 4.3 Historical handling of Solaris update releases.
 
 To aid the understanding of our existing mapfiles, it is useful to note how
@@ -295,15 +302,15 @@ though not all, new interfaces were included in the intervening update
 releases between full releases.
 
 Consequently, the new version number for an update cannot be a minor
-increment, but must be a micro increment to ensure that was a distinct
-version between the two releases.  For example, if Release N had version
-number SUNW_1.3 and Release N+1 had SUNW_1.4, then interfaces added to
-an update of Release N must have micro numbers such as SUNW_1.3.1,
-SUNW_1.3.2, etc.  (note that the micro number is not directly tied to the
-update number: SUNW_1.3.1 may have appeared in Update 2).  The micro versions form
-an inheritance chain that is inserted between two successive minor versions.
-For example, the mapfile-vers file for minor release "N+1" to reflect its
-inclusion of micro releases will look like the following:
+increment, but must be a micro increment to ensure that was a distinct version
+between the two releases.  For example, if Release N had version number
+SUNW_1.3 and Release N+1 had SUNW_1.4, then interfaces added to an update of
+Release N must have micro numbers such as SUNW_1.3.1, SUNW_1.3.2, etc.  (note
+that the micro number is not directly tied to the update number: SUNW_1.3.1
+may have appeared in Update 2).  The micro versions form an inheritance chain
+that is inserted between two successive minor versions.  For example, the
+mapfile-vers file for minor release "N+1" to reflect its inclusion of micro
+releases will look like the following:
 
 $mapfile_version 2
 
@@ -441,12 +448,12 @@ that uses the interface.  For example:
     library
 
 SYSVABI and SISCD are reserved version names for interfaces listed in the
-System V Interface Definition and the Sparc Compliance Definition.  Avoid using
-these version names when copying the implementation of standard interfaces to
-another library.  Instead, use ILLUMOS_0.1 for a new library, and ILLUMOS_m.n for
-an existing library (where m.n is the next version; i.e., if the
-last version was ILLUMOS_0.8, then you should version the interfaces with
-ILLUMOS_0.9).
+System V Interface Definition and the Sparc Compliance Definition.  Avoid
+using these version names when copying the implementation of standard
+interfaces to another library.  Instead, use ILLUMOS_0.1 for a new library,
+and ILLUMOS_m.n for an existing library (where m.n is the next version; i.e.,
+if the last version was ILLUMOS_0.8, then you should version the interfaces
+with ILLUMOS_0.9).
 
 -------------------------------------------------------------------------------
 

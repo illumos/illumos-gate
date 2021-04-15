@@ -71,9 +71,19 @@ SYMBOL_VERSION SUNW_1.1 {
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	_tnfctl_externally_traced_pid;
-	_tnfctl_internal_tracing_flag;
+	_tnfctl_externally_traced_pid	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
+	_tnfctl_internal_tracing_flag	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
     local:
-	# Redunce all remaining globals to local scope
+	# Reduce all remaining globals to local scope
 	*;
 };

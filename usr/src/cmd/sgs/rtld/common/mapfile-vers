@@ -45,91 +45,140 @@ $mapfile_version 2
 # All symbols in ld.so.1 are private as no-one should bind to these directly.
 #
 SYMBOL_VERSION SUNWprivate_1.3 {
-	protected:
-		 dladdr;		# Standard dlopen(3x) family
-		 dladdr1;
-		 dldump;
-		 dlclose;
-		 dlerror;
-		 dlinfo;
-		 dlopen;
-		 dlmopen;
-		 dlsym;
+    protected:
+	dladdr;	# Standard dlopen(3x) family
+	dladdr1;
+	dldump;
+	dlclose;
+	dlerror;
+	dlinfo;
+	dlopen;
+	dlmopen;
+	dlsym;
 
-		_dladdr;		# these should not exist
-		_dladdr1;
-		_dldump;
-		_dlclose;
-		_dlerror;
-		_dlinfo;
-		_dlopen;
-		_dlmopen;
-		_dlsym;
+	_dladdr;	# these should not exist
+	_dladdr1;
+	_dldump;
+	_dlclose;
+	_dlerror;
+	_dlinfo;
+	_dlopen;
+	_dlmopen;
+	_dlsym;
 
-		_ld_libc;		# provides libc initialization
+	_ld_libc;	# provides libc initialization
 
-		_elf_rtbndr;		# dbx expects to find these
-		 elf_rtbndr;
-		_rt_boot;		# Provides basic adb symbol offsets
+	_elf_rtbndr;	# dbx expects to find these
+	elf_rtbndr;
+	_rt_boot;	# Provides basic adb symbol offsets
 
-		 rtld_db_dlactivity;	# Required to support librtld_db
-		 rtld_db_preinit;
-		 rtld_db_postinit;
-		 r_debug;
+	rtld_db_dlactivity;	# Required to support librtld_db
+	rtld_db_preinit;
+	rtld_db_postinit;
+	r_debug		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  $if _x86 && _ELF32
 
-		 elf_plt_write;
-		 is_so_loaded;
-		 lml_main;
-		 lookup_sym;
+				  SIZE = 44;
+				  $elif _x86 && _ELF64
 
-		 alist_append;		# librtld support
-		 ld_entry_cnt;
-		 dbg_desc;		# Diagnostic support
-		 dbg_print;
-		 eprintf;		# Error message printing
-		 veprintf;
+				  SIZE = 80;
+				  $else
 
-		 dgettext;		# Messaging support
-		 strerror;
+				  $error Unknown platform
 
-		 calloc;		# Memory management (mapmalloc).
-		 free;
-		 malloc;
-		 realloc;
+				  $endif
 
-		_environ;		# PLT tracing getenv() support.
-		 environ;
+				};
+			};
 
-		 memcpy;		# Some routines are useful for support
-		 snprintf;		# libraries such as liblddbg.
-		 sprintf;		# Note that some of these functions
-		 strcat;		# (like sprintf) may have reduced
-		 strcmp;		# functionality over libc, as a simpler
-		 strcpy;		# implementation is provided in ld.so.1.
-		 strlen;
-		 strrchr;
-		 strtok_r;
-	      ___errno;
-		 qsort;
-		dl_iterate_phdr;
+	elf_plt_write;
+	is_so_loaded;
+	lml_main	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  $if _x86 && _ELF32
+
+				  SIZE = addrsize[41];
+				  $elif _x86 && _ELF64
+
+				  SIZE = addrsize[38];
+				  $else
+
+				  $error Unknown platform
+
+				  $endif
+
+				};
+			};
+	lookup_sym;
+
+	alist_append;	# librtld support
+	ld_entry_cnt	{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
+	# Diagnostic support
+	dbg_desc	{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
+	dbg_print;
+	eprintf;	# Error message printing
+	veprintf;
+
+	dgettext;	# Messaging support
+	strerror;
+
+	calloc;	# Memory management (mapmalloc).
+	free;
+	malloc;
+	realloc;
+
+	# PLT tracing getenv() support.
+	_environ	{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
+	environ		{
+			  ASSERT = {
+				  BINDING = WEAK;
+				  ALIAS = _environ;
+				};
+			};
+
+	memcpy;	# Some routines are useful for support
+	snprintf;	# libraries such as liblddbg.
+	sprintf;	# Note that some of these functions
+	strcat;	# (like sprintf) may have reduced
+	strcmp;	# functionality over libc, as a simpler
+	strcpy;	# implementation is provided in ld.so.1.
+	strlen;
+	strrchr;
+	strtok_r;
+	___errno;
+	qsort;
+	dl_iterate_phdr;
 
 $if _x86 && _ELF64
-		# amd64 ABI exception unwinding
-		_dlamd64getunwind;
-		dlamd64getunwind;
+	# amd64 ABI exception unwinding
+	_dlamd64getunwind;
+	dlamd64getunwind;
 $endif
 
-		# doXX_reloc_rtld and relocXX_table are required to
-		# support librtld.so.
+	# doXX_reloc_rtld and relocXX_table are required to
+	# support librtld.so.
 $if _ELF32
-		do32_reloc_rtld;
-		reloc32_table;
+	do32_reloc_rtld;
+	reloc32_table	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[117];
+				};
+			};
 $elif _ELF64
-		do64_reloc_rtld;
-		reloc64_table;
+	do64_reloc_rtld;
+	reloc64_table	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[68];
+				};
+			};
 $else
 $error unknown ELFCLASS
 $endif
-	local:
-		*;
+    local:
+	*;
 };

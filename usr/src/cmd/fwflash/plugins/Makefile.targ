@@ -63,7 +63,10 @@ $(HERMON-MELLANOX_LIB):= LDLIBS += -L. $(ROOT)/usr/lib/fwflash/identify/hermon.s
 $(SD-GENERIC_LIB):= LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi
 $(SD-GENERIC_LIB):= DYNFLAGS += -R/usr/lib/scsi
 
-.KEEP_STATE:
+# Size assertions are non-constant and not useful here
+ZGUIDANCE=-Wl,-zguidance=noasserts
+
+.KEEP STATE:
 
 all: $(LIBS)
 

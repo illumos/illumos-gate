@@ -43,6 +43,7 @@ SYMBOL_VERSION SUNW_1.1 {
 	global:
 		main;
 		yyerror;
-	local:	
+	local:
 		*;
 };
+

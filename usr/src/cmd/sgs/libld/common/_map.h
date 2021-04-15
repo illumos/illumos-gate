@@ -156,6 +156,8 @@ typedef enum {
 	TK_INT =	12,	/* Integer value: Unsigned machine word */
 	TK_STAR =	13,	/* * */
 	TK_BANG =	14,	/* ! */
+	TK_LEFTSQR =	15,	/* [ */
+	TK_RIGHTSQR =	16,	/* ] */
 
 	/*
 	 * Items below this point are for the use of ld_map_gettoken().
@@ -197,11 +199,13 @@ typedef union {
  * Values for gettoken() flags argument. These flags are used to
  * alter gettoken() default behavior under certain conditions.
  */
-#define	TK_F_EOFOK	1	/* Quietly return TK_EOF instead of normal */
-				/* 	TK_ERROR "premature EOF" error */
-#define	TK_F_STRLC	2	/* TK_STRING: Convert string to lowercase */
-#define	TK_F_KEYWORD	4	/* For directives and attributes: Disallow */
+#define	TK_F_EOFOK	0x1	/* Quietly return TK_EOF instead of normal */
+				/*	TK_ERROR "premature EOF" error */
+#define	TK_F_STRLC	0x2	/* TK_STRING: Convert string to lowercase */
+#define	TK_F_KEYWORD	0x4	/* For directives and attributes: Disallow */
 				/*	quoted TK_STRING tokens */
+#define	TK_F_MULOK	0x8	/* TK_INT: Allow multiplicand[multiplier] */
+				/*	syntax */
 
 /*
  * Possible return values from ld_map_strtoxword()
@@ -246,9 +250,10 @@ typedef struct {
 	const char	*ms_name;	/* symbol name */
 	sd_flag_t	ms_sdflags;	/* 0 / mapfile set flags */
 	Word		ms_shndx;	/* SHN_UNDEF / mapfile set sec index */
-	uchar_t 	ms_type;	/* STT_NOTYPE / mapfile set type */
+	uchar_t		ms_type;	/* STT_NOTYPE / mapfile set type */
 	Addr		ms_value;	/* user set value, if ms_value_set */
 	Addr		ms_size;	/* 0 / mapfile set size */
+	Boolean		ms_size_set;	/* True if ms_size set, even if to 0 */
 	const char	*ms_filtee;	/* NULL or filtee name */
 	Boolean		ms_value_set;	/* TRUE if ms_value set, even if to 0 */
 	Word		ms_dft_flag;	/* 0, or type of filter in ms_filtee */
@@ -264,6 +269,7 @@ typedef struct {
 #define	ld_map_ifl		ld64_map_ifl
 #define	ld_map_parse_v1		ld64_map_parse_v1
 #define	ld_map_parse_v2		ld64_map_parse_v2
+#define	ld_map_peektoken	ld64_map_peektoken
 #define	ld_map_seg_alloc	ld64_map_seg_alloc
 #define	ld_map_seg_ent_add	ld64_map_seg_ent_add
 #define	ld_map_seg_ent_files	ld64_map_seg_ent_files
@@ -292,6 +298,7 @@ typedef struct {
 #define	ld_map_ifl		ld32_map_ifl
 #define	ld_map_parse_v1		ld32_map_parse_v1
 #define	ld_map_parse_v2		ld32_map_parse_v2
+#define	ld_map_peektoken	ld32_map_peektoken
 #define	ld_map_seg_alloc	ld32_map_seg_alloc
 #define	ld_map_seg_ent_add	ld32_map_seg_ent_add
 #define	ld_map_seg_ent_files	ld32_map_seg_ent_files
@@ -317,6 +324,7 @@ typedef struct {
  */
 extern void		ld_map_lowercase(char *);
 extern Token		ld_map_gettoken(Mapfile *, int, ld_map_tkval_t *);
+extern Token		ld_map_peektoken(Mapfile *);
 extern Boolean		ld_map_parse_v1(Mapfile *);
 extern Boolean		ld_map_parse_v2(Mapfile *);
 extern ld_map_strtoxword_t ld_map_strtoxword(const char *restrict,
@@ -349,7 +357,7 @@ extern Boolean		ld_map_seg_size_symbol(Mapfile *, Sg_desc *, Token,
 			    const char *symname);
 extern Sg_desc		*ld_map_seg_stack(Mapfile *);
 extern Boolean		ld_map_sym_enter(Mapfile *, ld_map_ver_t *,
-			    ld_map_sym_t *);
+			    ld_map_sym_t *, Ass_desc *);
 extern void		ld_map_sym_filtee(Mapfile *, ld_map_ver_t *,
 			    ld_map_sym_t *, Word, const char *);
 extern void		ld_map_sym_scope(Mapfile *, const char *,

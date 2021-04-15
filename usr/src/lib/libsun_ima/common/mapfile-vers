@@ -140,4 +140,3 @@ SYMBOL_VERSION SUNWprivate_1.0 {
     local:
 	*;
 };
-

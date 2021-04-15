@@ -47,7 +47,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	cfga_list_ext;
 	cfga_private_func;
 	cfga_test;
-	cfga_version;
+	cfga_version	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 
     local:
 	*;

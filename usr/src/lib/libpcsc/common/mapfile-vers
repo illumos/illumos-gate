@@ -31,9 +31,24 @@ $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate {
     global:
-	g_rgSCardRawPci;
-	g_rgSCardT0Pci;
-	g_rgSCardT1Pci;
+	g_rgSCardRawPci	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[2];
+				};
+			};
+	g_rgSCardT0Pci	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[2];
+				};
+			};
+	g_rgSCardT1Pci	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[2];
+				};
+			};
 	SCardEstablishContext;
 	SCardReleaseContext;
 	SCardFreeMemory;

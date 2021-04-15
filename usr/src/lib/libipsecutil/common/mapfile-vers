@@ -56,13 +56,19 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	dump_key;
 	dump_sadb_idtype;
 	dump_sockaddr;
-	env;
-	_errfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	_errxfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+$if _ELF64
+	env		{ ASSERT = { TYPE = OBJECT; SIZE = 64; }; };
+$elif _ELF32
+	env		{ ASSERT = { TYPE = OBJECT; SIZE = 40; }; };
+$else
+$error unknown ELFCLASS
+$endif
+	_errfp		{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	_errxfp		{ TYPE = FUNCTION; FILTER = libc.so.1; };
 	getipsecalgs;
 	getipsecprotos;
 	in_masktoprefix;
-	interactive;
+	interactive	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	ipsecalgs_diag;
 	ipsecproto_get_exec_mode;
 	ipsecproto_set_exec_mode;
@@ -74,18 +80,28 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	keysock_diag;
 	kmc_insert_mapping;
 	kmc_lookup_by_cookie;
-	lineno;
-	lines_added;
-	lines_parsed;
+	lineno		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	lines_added	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	lines_parsed	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	list_ints;
-	nflag;
+	nflag		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	bytecnt2out;
 	bytecnt2str;
-	debugfile;
-	my_fmri;
+	debugfile	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
+	my_fmri		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
 	opensavefile;
 	parsedbgopts;
-	pflag;
+	pflag		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	print_address;
 	print_asn1_name;
 	print_diagnostic;
@@ -103,7 +119,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	print_supp;
 	printsatime;
 	privstr2num;
-	readfile;
+	readfile	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	rparsealg;
 	rparseidtype;
 	rparsesatype;
@@ -116,12 +132,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	secs2str;
 	spdsock_diag;
 	spdsock_get_ext;
-	_verrfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	_verrxfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	_vwarnfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	_vwarnxfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	_warnfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	_warnxfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_verrfp		{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	_verrxfp	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	_vwarnfp	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	_vwarnxfp	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	_warnfp		{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	_warnxfp	{ TYPE = FUNCTION; FILTER = libc.so.1; };
     local:
 	*;
 };

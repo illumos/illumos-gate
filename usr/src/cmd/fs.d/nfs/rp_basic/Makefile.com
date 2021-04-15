@@ -48,13 +48,15 @@ CPPFLAGS +=	-D_REENTRANT -I$(SRC)/cmd/fs.d/nfs/lib
 # not linted
 SMATCH=off
 
+ZGUIDANCE=	-Wl,-zguidance=noasserts
+
 .KEEP_STATE:
 
 all: $(LIBS)
 
 install: $(ROOTLIBDIR) $(ROOTLIBDIR64) all
 
-lint: lintcheck
+
 
 pics/ref_subr.o:     ../../lib/ref_subr.c
 	$(COMPILE.c) -o pics/ref_subr.o ../../lib/ref_subr.c

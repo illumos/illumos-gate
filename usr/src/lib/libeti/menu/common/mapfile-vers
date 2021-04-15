@@ -108,8 +108,35 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_chk_current;
 	_chk_top;
 	_connect;
-	_Default_Item;
-	_Default_Menu;
+$if _ELF64
+	_Default_Item	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 112;
+				};
+			};
+	_Default_Menu	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 192;
+				};
+			};
+$elif _ELF32
+	_Default_Item	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 60;
+				};
+			};
+	_Default_Menu	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 128;
+				};
+			 };
+$else
+$error unknown ELFCLASS
+$endif
 	_disconnect;
 	_draw;
 	_link_items;

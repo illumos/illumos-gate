@@ -40,7 +40,12 @@ $mapfile_version 2
 
 SYMBOL_VERSION SUNW_1.3 {
     global:
-	_siguhandler;
+	_siguhandler	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[34];
+				};
+			};
 } SUNW_1.2;
 
 # Due to mistakes made early in the history of this library, there are
@@ -57,7 +62,7 @@ SYMBOL_VERSION SUNW_1.2 {
 # between platforms:
 #    amd64:  SUNW_1.1 is empty, and SUNW_0.7 contains everything.
 #    i386, sparc: SUNW_1.1 contains 5 largefile API routines, and everything
-#        else in in SUNW_0.7.
+#	 else in in SUNW_0.7.
 #    sparcv9: Everything is in SUNW_1.1, and SUNW_0.7 is empty
 
 SYMBOL_VERSION SUNW_1.1 {
@@ -92,7 +97,7 @@ $endif
 	gethostid;
 	gethostname;
 	getpagesize;
-	getrusage		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	getrusage	{ TYPE = FUNCTION; FILTER = libc.so.1; };
 	gettimeofday;
 	getwd;
 	index;
@@ -122,16 +127,21 @@ $endif
 	sigstack;
 	sigvec;
 	sigvechandler;
-	sleep			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	sleep		{ TYPE = FUNCTION; FILTER = libc.so.1; };
 	sprintf;
 	srand;
 	statfs;
-	sys_siglist;
+	sys_siglist	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[34];
+				};
+			};
 	times;
-	ualarm			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	ualarm		{ TYPE = FUNCTION; FILTER = libc.so.1; };
 	usignal;
 	usigpause;
-	usleep			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	usleep		{ TYPE = FUNCTION; FILTER = libc.so.1; };
 	vfprintf;
 	vprintf;
 	vsprintf;
@@ -146,8 +156,8 @@ $if _sparc
 	longjmp;
 	setjmp;
 $elif _x86 && _ELF32
-	longjmp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	setjmp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	longjmp		{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	setjmp		{ TYPE = FUNCTION; FILTER = libc.so.1; };
 $endif
 
 $if _sparc && _ELF64
@@ -183,20 +193,17 @@ $if _sparc
 	_setjmp;
 	__sigcleanup;
 $if _ELF32
-	syscall			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	syscall		{ TYPE = FUNCTION; FILTER = libc.so.1; };
 $endif
 $endif
 
 $if _x86 && _ELF32
-	_longjmp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	_setjmp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	_syscall		{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	_times			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_longjmp	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	_setjmp		{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	_syscall	{ TYPE = FUNCTION; FILTER = libc.so.1; };
+	_times		{ TYPE = FUNCTION; FILTER = libc.so.1; };
 $endif
-
 
     local:
 	*;
 };
-
-

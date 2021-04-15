@@ -32,6 +32,7 @@
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright 2018 Nexenta Systems, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef _SYS_X86_ARCHEXT_H
@@ -1082,11 +1083,26 @@ extern "C" {
 #define	INTC_MODEL_BROADWELL_XEON_D	0x56
 
 #define	INTC_MODEL_SKYLAKE_MOBILE	0x4e
+/*
+ * Note, this model is shared with Cascade Lake and Cooper Lake.
+ */
 #define	INTC_MODEL_SKYLAKE_XEON		0x55
 #define	INTC_MODEL_SKYLAKE_DESKTOP	0x5e
 
+/*
+ * Note, both Kaby Lake models are shared with Coffee Lake, Whiskey Lake, Amber
+ * Lake, and some Comet Lake parts.
+ */
 #define	INTC_MODEL_KABYLAKE_MOBILE	0x8e
 #define	INTC_MODEL_KABYLAKE_DESKTOP	0x9e
+
+#define	INTC_MODEL_ICELAKE_XEON		0x6a
+#define	INTC_MODEL_ICELAKE_MOBILE	0x7e
+#define	INTC_MODEL_TIGERLAKE_MOBILE	0x8c
+
+#define	INTC_MODEL_COMETLAKE		0xa5
+#define	INTC_MODEL_COMETLAKE_MOBILE	0xa6
+#define	INTC_MODEL_ROCKETLAKE		0xa7
 
 /*
  * Atom Processors

@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.	All rights reserved.
 #
 
 #
@@ -43,7 +43,12 @@ SYMBOL_VERSION SUNW_1.3 {
     global:
 	gss_add_buffer_set_member;
 	gss_create_empty_buffer_set;
-	GSS_C_INQ_SSPI_SESSION_KEY;
+	GSS_C_INQ_SSPI_SESSION_KEY	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	gss_inquire_sec_context_by_oid;
 	gss_release_buffer_set;
 } SUNW_1.2;
@@ -57,12 +62,42 @@ SYMBOL_VERSION SUNW_1.2 {
 	gss_add_cred_with_password;
 	gss_add_oid_set_member;
 	gss_canonicalize_name;
-	GSS_C_NT_ANONYMOUS;
-	GSS_C_NT_EXPORT_NAME;
-	GSS_C_NT_HOSTBASED_SERVICE;
-	GSS_C_NT_MACHINE_UID_NAME;
-	GSS_C_NT_STRING_UID_NAME;
-	GSS_C_NT_USER_NAME;
+	GSS_C_NT_ANONYMOUS		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	GSS_C_NT_EXPORT_NAME		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	GSS_C_NT_HOSTBASED_SERVICE	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	GSS_C_NT_MACHINE_UID_NAME	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	GSS_C_NT_STRING_UID_NAME	{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
+	GSS_C_NT_USER_NAME		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = addrsize;
+						};
+					};
 	gss_compare_name;
 	gss_context_time;
 	gss_create_empty_oid_set;
@@ -130,10 +165,30 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__gss_get_modOptions;
 	__gss_mech_qops;
 	__gss_mech_to_oid;
-	gss_mech_krb5;
-	gss_nt_exported_name;
-	gss_nt_service_name;
-	gss_nt_service_name_v2;
+	gss_mech_krb5		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	gss_nt_exported_name	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	gss_nt_service_name	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	gss_nt_service_name_v2	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
 	__gss_num_to_qop;
 	__gss_oid_to_mech;
 	gss_oid_to_str;

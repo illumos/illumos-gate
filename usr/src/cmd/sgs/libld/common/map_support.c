@@ -1057,7 +1057,7 @@ ld_map_sym_filtee(Mapfile *mf, ld_map_ver_t *mv, ld_map_sym_t *ms,
  *	problems, increments mv->mv_errcnt, and returns TRUE.
  */
 Boolean
-ld_map_sym_enter(Mapfile *mf, ld_map_ver_t *mv, ld_map_sym_t *ms)
+ld_map_sym_enter(Mapfile *mf, ld_map_ver_t *mv, ld_map_sym_t *ms, Ass_desc *ma)
 {
 	Ofl_desc	*ofl = mf->mf_ofl;
 	Word		hash;
@@ -1125,6 +1125,26 @@ ld_map_sym_enter(Mapfile *mf, ld_map_ver_t *mv, ld_map_sym_t *ms)
 		if (sym->st_shndx == SHN_UNDEF)
 			sdp->sd_flags |= (FLG_SY_MAPREF | FLG_SY_GLOBREF);
 
+		if (ma != NULL && ma->ass_enabled != 0) {
+			Ass_desc *m;
+
+			/*
+			 * Mark the symbol so we can issue guidance more
+			 * easily
+			 */
+			sdp->sd_flags |= FLG_SY_MAPASSRT;
+
+			if ((m = libld_calloc(1, sizeof (Ass_desc))) == NULL)
+				return (FALSE);
+			memcpy(m, ma, sizeof (Ass_desc));
+			m->ass_sdp = sdp;
+			sdp->sd_ass = m;
+
+			if (aplist_append(&ofl->ofl_symasserts, m,
+			    AL_CNT_MAPASSERT) == NULL) {
+				return (FALSE);
+			}
+		}
 	} else {
 		conflict = NULL;
 		sym = sdp->sd_sym;
@@ -1143,7 +1163,7 @@ ld_map_sym_enter(Mapfile *mf, ld_map_ver_t *mv, ld_map_sym_t *ms)
 			sym->st_value = ms->ms_value;
 		}
 		if (sym->st_size) {
-			if (ms->ms_size && (sym->st_size != ms->ms_size))
+			if (ms->ms_size_set && (sym->st_size != ms->ms_size))
 				conflict = MSG_INTL(MSG_MAP_DIFF_SYMSZ);
 		} else {
 			sym->st_size = ms->ms_size;
@@ -1195,7 +1215,7 @@ ld_map_sym_enter(Mapfile *mf, ld_map_ver_t *mv, ld_map_sym_t *ms)
 	 * copy-relocations to be established to filter OBJT
 	 * definitions.
 	 */
-	if ((ms->ms_shndx == SHN_ABS) && ms->ms_size && !ms->ms_value_set) {
+	if ((ms->ms_shndx == SHN_ABS) && ms->ms_size_set && !ms->ms_value_set) {
 		/* Create backing section if not there */
 		if (sdp->sd_isc == NULL) {
 			Is_desc	*isp;

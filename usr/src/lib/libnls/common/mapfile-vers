@@ -48,10 +48,10 @@ SYMBOL_VERSION SUNW_1.1 {
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	nlsc2addr;
-	_nlscall;
+	_nlscall	{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
 	nlsenv;
-	_nlslog;
-	_nlsrmsg;
+	_nlslog		{ ASSERT = { TYPE = OBJECT; SIZE = 4;  };  };
+	_nlsrmsg	{ ASSERT = { TYPE = OBJECT; SIZE = addrsize; }; };
     local:
 	*;
 };

@@ -133,4 +133,3 @@ SYMBOL_VERSION SUNW_1.1 {
    local:
 	*;
 };
-

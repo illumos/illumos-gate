@@ -144,6 +144,12 @@ conv_sym_info_type_strings(Half mach, Conv_fmt_flags_t fmt_flags)
 		MSG_STT_FILE_CF,	MSG_STT_COMMON_CF,
 		MSG_STT_TLS_CF,		MSG_STT_IFUNC_CF
 	};
+	static const Msg	types_cfnp[] = {
+		MSG_STT_NOTYPE_CFNP,	MSG_STT_OBJECT_CFNP,
+		MSG_STT_FUNC_CFNP,	MSG_STT_SECTION_CFNP,
+		MSG_STT_FILE_CFNP,	MSG_STT_COMMON_CFNP,
+		MSG_STT_TLS_CFNP,		MSG_STT_IFUNC_CFNP
+	};
 	static const Msg	types_nf[] = {
 		MSG_STT_NOTYPE_NF,	MSG_STT_OBJECT_NF,
 		MSG_STT_FUNC_NF,	MSG_STT_SECTION_NF,
@@ -154,17 +160,22 @@ conv_sym_info_type_strings(Half mach, Conv_fmt_flags_t fmt_flags)
 	    CONV_DS_MSG_INIT(STT_NOTYPE, types_def) };
 	static const conv_ds_msg_t ds_types_cf = {
 	    CONV_DS_MSG_INIT(STT_NOTYPE, types_cf) };
+	static const conv_ds_msg_t ds_types_cfnp = {
+	    CONV_DS_MSG_INIT(STT_NOTYPE, types_cfnp) };
 	static const conv_ds_msg_t ds_types_nf = {
 	    CONV_DS_MSG_INIT(STT_NOTYPE, types_nf) };
 
 
 	static const Msg	sparc_def[] = { MSG_STT_SPARC_REGISTER_DEF };
 	static const Msg	sparc_cf[] = { MSG_STT_SPARC_REGISTER_CF };
+	static const Msg	sparc_cfnp[] = { MSG_STT_SPARC_REGISTER_CFNP };
 	static const Msg	sparc_nf[] = { MSG_STT_SPARC_REGISTER_NF };
 	static const conv_ds_msg_t ds_sparc_def = {
 	    CONV_DS_MSG_INIT(STT_SPARC_REGISTER, sparc_def) };
 	static const conv_ds_msg_t ds_sparc_cf = {
 	    CONV_DS_MSG_INIT(STT_SPARC_REGISTER, sparc_cf) };
+	static const conv_ds_msg_t ds_sparc_cfnp = {
+	    CONV_DS_MSG_INIT(STT_SPARC_REGISTER, sparc_cfnp) };
 	static const conv_ds_msg_t ds_sparc_nf = {
 	    CONV_DS_MSG_INIT(STT_SPARC_REGISTER, sparc_nf) };
 
@@ -182,6 +193,11 @@ conv_sym_info_type_strings(Half mach, Conv_fmt_flags_t fmt_flags)
 		retarr[retndx++] = CONV_DS_ADDR(ds_types_cf);
 		if (is_sparc)
 			retarr[retndx++] = CONV_DS_ADDR(ds_sparc_cf);
+		break;
+	case CONV_FMT_ALT_CFNP:
+		retarr[retndx++] = CONV_DS_ADDR(ds_types_cfnp);
+		if (is_sparc)
+			retarr[retndx++] = CONV_DS_ADDR(ds_sparc_cfnp);
 		break;
 	case CONV_FMT_ALT_NF:
 		retarr[retndx++] = CONV_DS_ADDR(ds_types_nf);
@@ -227,6 +243,10 @@ conv_sym_info_bind_strings(Conv_fmt_flags_t fmt_flags)
 		MSG_STB_LOCAL_CF,	MSG_STB_GLOBAL_CF,
 		MSG_STB_WEAK_CF
 	};
+	static const Msg	binds_cfnp[] = {
+		MSG_STB_LOCAL_CFNP,	MSG_STB_GLOBAL_CFNP,
+		MSG_STB_WEAK_CFNP
+	};
 	static const Msg	binds_nf[] = {
 		MSG_STB_LOCAL_NF,	MSG_STB_GLOBAL_NF,
 		MSG_STB_WEAK_NF
@@ -235,6 +255,8 @@ conv_sym_info_bind_strings(Conv_fmt_flags_t fmt_flags)
 	    CONV_DS_MSG_INIT(STB_LOCAL, binds_def) };
 	static const conv_ds_msg_t ds_binds_cf = {
 	    CONV_DS_MSG_INIT(STB_LOCAL, binds_cf) };
+	static const conv_ds_msg_t ds_binds_cfnp = {
+	    CONV_DS_MSG_INIT(STB_LOCAL, binds_cfnp) };
 	static const conv_ds_msg_t ds_binds_nf = {
 	    CONV_DS_MSG_INIT(STB_LOCAL, binds_nf) };
 
@@ -244,6 +266,8 @@ conv_sym_info_bind_strings(Conv_fmt_flags_t fmt_flags)
 		CONV_DS_ADDR(ds_binds_def), NULL };
 	static const conv_ds_t	*ds_cf[] = {
 		CONV_DS_ADDR(ds_binds_cf), NULL };
+	static const conv_ds_t	*ds_cfnp[] = {
+		CONV_DS_ADDR(ds_binds_cfnp), NULL };
 	static const conv_ds_t	*ds_nf[] = {
 		CONV_DS_ADDR(ds_binds_nf), NULL };
 
@@ -252,6 +276,8 @@ conv_sym_info_bind_strings(Conv_fmt_flags_t fmt_flags)
 	switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
 	case CONV_FMT_ALT_CF:
 		return (ds_cf);
+	case CONV_FMT_ALT_CFNP:
+		return (ds_cfnp);
 	case CONV_FMT_ALT_NF:
 		return (ds_nf);
 	}

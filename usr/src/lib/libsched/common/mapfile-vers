@@ -45,4 +45,3 @@ SYMBOL_VERSION SUNWprivate_1.1 {
     local:
 	*;
 };
-

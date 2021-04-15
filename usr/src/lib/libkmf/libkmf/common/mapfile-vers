@@ -39,202 +39,1182 @@ $mapfile_version 2
 
 SYMBOL_VERSION SUNW_1.1 {
     global:
-	KMFOID_AliasedEntryName;
-	KMFOID_AuthorityInfoAccess;
-	KMFOID_AuthorityKeyID;
-	KMFOID_AuthorityKeyIdentifier;
-	KMFOID_AuthorityRevocationList;
-	KMFOID_BasicConstraints;
-	KMFOID_BusinessCategory;
-	KMFOID_CACertificate;
-	KMFOID_CertificatePolicies;
-	KMFOID_CertificateRevocationList;
-	KMFOID_ChallengePassword;
-	KMFOID_CollectiveFacsimileTelephoneNumber;
-	KMFOID_CollectiveInternationalISDNNumber;
-	KMFOID_CollectiveOrganizationName;
-	KMFOID_CollectiveOrganizationalUnitName;
-	KMFOID_CollectivePhysicalDeliveryOfficeName;
-	KMFOID_CollectivePostOfficeBox;
-	KMFOID_CollectivePostalAddress;
-	KMFOID_CollectivePostalCode;
-	KMFOID_CollectiveStateProvinceName;
-	KMFOID_CollectiveStreetAddress;
-	KMFOID_CollectiveTelephoneNumber;
-	KMFOID_CollectiveTelexNumber;
-	KMFOID_CollectiveTelexTerminalIdentifier;
-	KMFOID_CommonName;
-	KMFOID_ContentType;
-	KMFOID_CounterSignature;
-	KMFOID_CountryName;
-	KMFOID_CrlDistributionPoints;
-	KMFOID_CrlNumber;
-	KMFOID_CrlReason;
-	KMFOID_CrossCertificatePair;
-	KMFOID_DNQualifier;
-	KMFOID_DSA;
-	KMFOID_DeltaCrlIndicator;
-	KMFOID_Description;
-	KMFOID_DestinationIndicator;
-	KMFOID_DistinguishedName;
-	KMFOID_EC_PUBLIC_KEY;
-	KMFOID_ECC_c2pnb163v1;
-	KMFOID_ECC_c2pnb163v2;
-	KMFOID_ECC_c2pnb163v3;
-	KMFOID_ECC_c2pnb176v1;
-	KMFOID_ECC_c2pnb208w1;
-	KMFOID_ECC_c2pnb272w1;
-	KMFOID_ECC_c2pnb304w1;
-	KMFOID_ECC_c2pnb368w1;
-	KMFOID_ECC_c2tnb191v1;
-	KMFOID_ECC_c2tnb191v2;
-	KMFOID_ECC_c2tnb191v3;
-	KMFOID_ECC_c2tnb239v1;
-	KMFOID_ECC_c2tnb239v2;
-	KMFOID_ECC_c2tnb239v3;
-	KMFOID_ECC_c2tnb359v1;
-	KMFOID_ECC_c2tnb431r1;
-	KMFOID_ECC_prime192v2;
-	KMFOID_ECC_prime192v3;
-	KMFOID_ECC_secp112r1;
-	KMFOID_ECC_secp112r2;
-	KMFOID_ECC_secp128r1;
-	KMFOID_ECC_secp128r2;
-	KMFOID_ECC_secp160k1;
-	KMFOID_ECC_secp160r1;
-	KMFOID_ECC_secp160r2;
-	KMFOID_ECC_secp192k1;
-	KMFOID_ECC_secp224k1;
-	KMFOID_ECC_secp224r1;
-	KMFOID_ECC_secp256k1;
-	KMFOID_ECC_secp384r1;
-	KMFOID_ECC_secp521r1;
-	KMFOID_ECC_sect113r1;
-	KMFOID_ECC_sect113r2;
-	KMFOID_ECC_sect131r1;
-	KMFOID_ECC_sect131r2;
-	KMFOID_ECC_sect163k1;
-	KMFOID_ECC_sect163r1;
-	KMFOID_ECC_sect163r2;
-	KMFOID_ECC_sect193r1;
-	KMFOID_ECC_sect193r2;
-	KMFOID_ECC_sect233k1;
-	KMFOID_ECC_sect233r1;
-	KMFOID_ECC_sect239k1;
-	KMFOID_ECC_sect283k1;
-	KMFOID_ECC_sect283r1;
-	KMFOID_ECC_sect409k1;
-	KMFOID_ECC_sect409r1;
-	KMFOID_ECC_sect571k1;
-	KMFOID_ECC_sect571r1;
-	KMFOID_ECC_secp192r1;
-	KMFOID_ECC_secp256r1;
-	KMFOID_EmailAddress;
-	KMFOID_EnhancedSearchGuide;
-	KMFOID_ExtendedCertificateAttributes;
-	KMFOID_ExtendedKeyUsage;
-	KMFOID_ExtensionRequest;
-	KMFOID_FacsimileTelephoneNumber;
-	KMFOID_GenerationQualifier;
-	KMFOID_GivenName;
-	KMFOID_HoldInstructionCode;
-	KMFOID_HouseIdentifier;
-	KMFOID_Initials;
-	KMFOID_InternationalISDNNumber;
-	KMFOID_InvalidityDate;
-	KMFOID_IssuerAltName;
-	KMFOID_IssuingDistributionPoints;
-	KMFOID_KeyUsage;
-	KMFOID_KeyUsageRestriction;
-	KMFOID_KnowledgeInformation;
-	KMFOID_LocalityName;
-	KMFOID_MD2WithRSA;
-	KMFOID_MD5;
-	KMFOID_MD5WithRSA;
-	KMFOID_Member;
-	KMFOID_MessageDigest;
-	KMFOID_MS_KP_SCLogon;
-	KMFOID_MS_KP_SCLogon_UPN;
-	KMFOID_Name;
-	KMFOID_NameConstraints;
-	KMFOID_ObjectClass;
-	KMFOID_OrganizationName;
-	KMFOID_OrganizationalUnitName;
-	KMFOID_Owner;
-	KMFOID_PKINIT_ClientAuth;
-	KMFOID_PKINIT_Kdc;
-	KMFOID_PKINIT_san;
-	KMFOID_PKIX_KP_ClientAuth;
-	KMFOID_PKIX_KP_CodeSigning;
-	KMFOID_PKIX_KP_EmailProtection;
-	KMFOID_PKIX_KP_IPSecEndSystem;
-	KMFOID_PKIX_KP_IPSecTunnel;
-	KMFOID_PKIX_KP_IPSecUser;
-	KMFOID_PKIX_KP_OCSPSigning;
-	KMFOID_PKIX_KP_ServerAuth;
-	KMFOID_PKIX_KP_TimeStamping;
-	KMFOID_PKIX_PQ_CPSuri;
-	KMFOID_PKIX_PQ_Unotice;
-	KMFOID_PhysicalDeliveryOfficeName;
-	KMFOID_PkixAdCaIssuers;
-	KMFOID_PkixAdOcsp;
-	KMFOID_PolicyConstraints;
-	KMFOID_PolicyMappings;
-	KMFOID_PostOfficeBox;
-	KMFOID_PostalAddress;
-	KMFOID_PostalCode;
-	KMFOID_PreferredDeliveryMethod;
-	KMFOID_PresentationAddress;
-	KMFOID_PrivateKeyUsagePeriod;
-	KMFOID_ProtocolInformation;
-	KMFOID_RFC822mailbox;
-	KMFOID_RSA;
-	KMFOID_RegisteredAddress;
-	KMFOID_RoleOccupant;
-	KMFOID_SHA1;
-	KMFOID_SHA1WithDSA;
-	KMFOID_SHA1WithECDSA;
-	KMFOID_SHA1WithRSA;
-	KMFOID_SHA224;
-	KMFOID_SHA256;
-	KMFOID_SHA384;
-	KMFOID_SHA512;
-	KMFOID_SHA224WithDSA;
-	KMFOID_SHA256WithDSA;
-	KMFOID_SHA224WithECDSA;
-	KMFOID_SHA256WithECDSA;
-	KMFOID_SHA256WithRSA;
-	KMFOID_SHA384WithECDSA;
-	KMFOID_SHA384WithRSA;
-	KMFOID_SHA512WithECDSA;
-	KMFOID_SHA512WithRSA;
-	KMFOID_SearchGuide;
-	KMFOID_SeeAlso;
-	KMFOID_SerialNumber;
-	KMFOID_SigningTime;
-	KMFOID_StateProvinceName;
-	KMFOID_StreetAddress;
-	KMFOID_SubjectAltName;
-	KMFOID_SubjectDirectoryAttributes;
-	KMFOID_SubjectKeyIdentifier;
-	KMFOID_SupportedApplicationContext;
-	KMFOID_Surname;
-	KMFOID_TelephoneNumber;
-	KMFOID_TelexNumber;
-	KMFOID_TelexTerminalIdentifier;
-	KMFOID_Title;
-	KMFOID_UniqueIdentifier;
-	KMFOID_UniqueMember;
-	KMFOID_UnstructuredAddress;
-	KMFOID_UnstructuredName;
-	KMFOID_UserCertificate;
-	KMFOID_UserPassword;
-	KMFOID_VerisignCertificatePolicy;
-	KMFOID_X9CM_DSA;
-	KMFOID_X9CM_DSAWithSHA1;
-	KMFOID_X_121Address;
-	KMFOID_domainComponent;
-	KMFOID_userid;
+	KMFOID_AliasedEntryName			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_AuthorityInfoAccess		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_AuthorityKeyID			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_AuthorityKeyIdentifier		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_AuthorityRevocationList		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_BasicConstraints			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_BusinessCategory			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CACertificate			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CertificatePolicies		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CertificateRevocationList	{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ChallengePassword		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CollectiveFacsimileTelephoneNumber	{
+							  ASSERT = {
+								  TYPE = OBJECT;
+								  SIZE = addrsize[2];
+								};
+							};
+	KMFOID_CollectiveInternationalISDNNumber	{
+							  ASSERT = {
+								  TYPE = OBJECT;
+								  SIZE = addrsize[2];
+								};
+							};
+	KMFOID_CollectiveOrganizationName		{
+							  ASSERT = {
+								  TYPE = OBJECT;
+								  SIZE = addrsize[2];
+								};
+							};
+	KMFOID_CollectiveOrganizationalUnitName		{
+							  ASSERT = {
+								  TYPE = OBJECT;
+								  SIZE = addrsize[2];
+								};
+							};
+	KMFOID_CollectivePhysicalDeliveryOfficeName	{
+							  ASSERT = {
+								  TYPE = OBJECT;
+								  SIZE = addrsize[2];
+								};
+							};
+	KMFOID_CollectivePostOfficeBox		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CollectivePostalAddress		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CollectivePostalCode		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CollectiveStateProvinceName		{
+							  ASSERT = {
+								  TYPE = OBJECT;
+								  SIZE = addrsize[2];
+								};
+							};
+	KMFOID_CollectiveStreetAddress		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CollectiveTelephoneNumber	{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CollectiveTelexNumber		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CollectiveTelexTerminalIdentifier	{
+							  ASSERT = {
+								  TYPE = OBJECT;
+								  SIZE = addrsize[2];
+								};
+							};
+	KMFOID_CommonName			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ContentType			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CounterSignature			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CountryName			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CrlDistributionPoints		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CrlNumber			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CrlReason			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_CrossCertificatePair		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_DNQualifier			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_DSA				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_DeltaCrlIndicator		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_Description			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_DestinationIndicator		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_DistinguishedName		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2pnb163v1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2pnb163v2			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2pnb163v3			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2pnb176v1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2pnb208w1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2pnb272w1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2pnb304w1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2pnb368w1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2tnb191v1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2tnb191v2			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2tnb191v3			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2tnb239v1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2tnb239v2			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2tnb239v3			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2tnb359v1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_c2tnb431r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_prime192v2			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_prime192v3			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp112r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp112r2			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp128r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp128r2			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp160k1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp160r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp160r2			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp192k1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp192r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp224k1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp224r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp256k1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp256r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp384r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_secp521r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect113r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect113r2			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect131r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect131r2			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect163k1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect163r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect163r2			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect193r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect193r2			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect233k1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect233r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect239k1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect283k1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect283r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect409k1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect409r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect571k1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ECC_sect571r1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_EC_PUBLIC_KEY			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_EmailAddress			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_EnhancedSearchGuide		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ExtendedCertificateAttributes		{
+							  ASSERT = {
+								  TYPE = OBJECT;
+								  SIZE = addrsize[2];
+								};
+							};
+	KMFOID_ExtendedKeyUsage			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ExtensionRequest			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_FacsimileTelephoneNumber		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_GenerationQualifier		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_GivenName			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_HoldInstructionCode		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_HouseIdentifier			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_Initials				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_InternationalISDNNumber		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_InvalidityDate			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_IssuerAltName			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_IssuingDistributionPoints	{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_KeyUsage				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_KeyUsageRestriction		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_KnowledgeInformation		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_LocalityName			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_MD2WithRSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_MD5				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_MD5WithRSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_MS_KP_SCLogon			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_MS_KP_SCLogon_UPN		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_Member				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_MessageDigest			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_Name				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_NameConstraints			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ObjectClass			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_OrganizationName			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_OrganizationalUnitName		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_Owner				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKINIT_ClientAuth		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKINIT_Kdc			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKINIT_san			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKIX_KP_ClientAuth		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKIX_KP_CodeSigning		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKIX_KP_EmailProtection		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKIX_KP_IPSecEndSystem		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKIX_KP_IPSecTunnel		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKIX_KP_IPSecUser		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKIX_KP_OCSPSigning		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKIX_KP_ServerAuth		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKIX_KP_TimeStamping		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKIX_PQ_CPSuri			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PKIX_PQ_Unotice			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PhysicalDeliveryOfficeName		{
+							  ASSERT = {
+								  TYPE = OBJECT;
+								  SIZE = addrsize[2];
+								};
+							};
+	KMFOID_PkixAdCaIssuers			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PkixAdOcsp			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PolicyConstraints		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PolicyMappings			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PostOfficeBox			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PostalAddress			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PostalCode			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PreferredDeliveryMethod		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PresentationAddress		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_PrivateKeyUsagePeriod		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_ProtocolInformation		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_RFC822mailbox			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_RSA				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_RegisteredAddress		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_RoleOccupant			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA1				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA1WithDSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA1WithECDSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA1WithRSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA224				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA224WithDSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA224WithECDSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA256				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA256WithDSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA256WithECDSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA256WithRSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA384				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA384WithECDSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA384WithRSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA512				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA512WithECDSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SHA512WithRSA			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SearchGuide			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SeeAlso				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SerialNumber			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SigningTime			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_StateProvinceName		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_StreetAddress			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SubjectAltName			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SubjectDirectoryAttributes		{
+							  ASSERT = {
+								  TYPE = OBJECT;
+								  SIZE = addrsize[2];
+								};
+							};
+	KMFOID_SubjectKeyIdentifier			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_SupportedApplicationContext		{
+							  ASSERT = {
+								  TYPE = OBJECT;
+								  SIZE = addrsize[2];
+								};
+							};
+	KMFOID_Surname				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_TelephoneNumber			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_TelexNumber			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_TelexTerminalIdentifier		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_Title				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_UniqueIdentifier			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_UniqueMember			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_UnstructuredAddress		{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_UnstructuredName			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_UserCertificate			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_UserPassword			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_VerisignCertificatePolicy	{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_X9CM_DSA				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_X9CM_DSAWithSHA1			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_X_121Address			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_domainComponent			{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
+	KMFOID_userid				{
+						  ASSERT = {
+							  TYPE = OBJECT;
+							  SIZE = addrsize[2];
+							};
+						};
 	kmf_add_cert_eku;
 	kmf_add_csr_eku;
 	kmf_add_policy_to_db;

@@ -18,9 +18,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.	All rights reserved.
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.	 All rights reserved.
 # Use is subject to license terms.
 #
 # Interface definition for libm.so.1
@@ -71,169 +71,174 @@ $add amd64
 $endif
 
 SYMBOL_VERSION SUNW_1.1.1 {
-	global:
-		__acosf;
-		__acosl;
-		__asinf;
-		__asinl;
-		__atan2f;
-		__atan2l;
-		__atanf;
-		__atanl;
-		__ceilf;
-		__ceill;
-		__cosf;
-		__coshf;
-		__coshl;
-		__cosl;
-		__expf;
-		__expl;
-		__fabsf;
-		__fabsl;
-		__floorf;
-		__floorl;
-		__fmodf;
-		__fmodl;
-		__frexpf;
-		__frexpl;
-		__ldexpf;
-		__ldexpl;
-		__log10f;
-		__log10l;
-		__logf;
-		__logl;
-		__modff;
-		__modfl;
-		__powf;
-		__powl;
-		__sinf;
-		__sinhf;
-		__sinhl;
-		__sinl;
-		__sqrtf;
-		__sqrtl;
-		__tanf;
-		__tanhf;
-		__tanhl;
-		__tanl;
+    global:
+	__acosf;
+	__acosl;
+	__asinf;
+	__asinl;
+	__atan2f;
+	__atan2l;
+	__atanf;
+	__atanl;
+	__ceilf;
+	__ceill;
+	__cosf;
+	__coshf;
+	__coshl;
+	__cosl;
+	__expf;
+	__expl;
+	__fabsf;
+	__fabsl;
+	__floorf;
+	__floorl;
+	__fmodf;
+	__fmodl;
+	__frexpf;
+	__frexpl;
+	__ldexpf;
+	__ldexpl;
+	__log10f;
+	__log10l;
+	__logf;
+	__logl;
+	__modff;
+	__modfl;
+	__powf;
+	__powl;
+	__sinf;
+	__sinhf;
+	__sinhl;
+	__sinl;
+	__sqrtf;
+	__sqrtl;
+	__tanf;
+	__tanhf;
+	__tanhl;
+	__tanl;
 } SUNW_1.1;
 
 SYMBOL_VERSION SUNW_1.1 {
-	global:
-		__acos;
-		__acosh;
-		__asin;
-		__asinh;
-		__atan;
-		__atan2;
-		__atanh;
-		__cbrt;
-		__ceil;
-		__copysign;
-		__cos;
-		__cosh;
-		__erf;
-		__erfc;
-		__exp;
-		__expm1;
-		__fabs;
-		__floor;
-		__fmod;
-		__gamma;
-		__gamma_r;
-		__hypot;
-		__ilogb;
-		__isnan;
-		__j0;
-		__j1;
-		__jn;
-		__lgamma;
-		__lgamma_r;
-		__log;
-		__log10;
-		__log1p;
-		__logb;
-		__nextafter;
-		__pow;
-		__remainder;
-		__rint;
-		__scalb;
-		__scalbn;
-		__signgam;
-		__significand;
-		__sin;
-		__sinh;
-		__sqrt;
-		__tan;
-		__tanh;
-		__y0;
-		__y1;
-		__yn;
-		acos;
-		acosh;
-		asin;
-		asinh;
-		atan;
-		atan2;
-		atanh;
-		cbrt;
-		ceil;
-		copysign;
-		cos;
-		cosh;
-		erf;
-		erfc;
-		exp;
-		expm1;
-		fabs;
-		floor;
-		fmod;
-		gamma;
-		gamma_r;
-		hypot;
-		ilogb;
-		isnan;
-		j0;
-		j1;
-		jn;
-		lgamma;
-		lgamma_r;
-		log;
-		log10;
-		log1p;
-		logb;
-		matherr;
-		nextafter;
-		pow;
-		remainder;
-		rint;
-		scalb;
-		scalbn;
-		signgam;
-		significand;
-		sin;
-		sinh;
-		sqrt;
-		tan;
-		tanh;
-		y0;
-		y1;
-		yn;
+    global:
+	__acos;
+	__acosh;
+	__asin;
+	__asinh;
+	__atan;
+	__atan2;
+	__atanh;
+	__cbrt;
+	__ceil;
+	__copysign;
+	__cos;
+	__cosh;
+	__erf;
+	__erfc;
+	__exp;
+	__expm1;
+	__fabs;
+	__floor;
+	__fmod;
+	__gamma;
+	__gamma_r;
+	__hypot;
+	__ilogb;
+	__isnan;
+	__j0;
+	__j1;
+	__jn;
+	__lgamma;
+	__lgamma_r;
+	__log;
+	__log10;
+	__log1p;
+	__logb;
+	__nextafter;
+	__pow;
+	__remainder;
+	__rint;
+	__scalb;
+	__scalbn;
+	__signgam	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	__significand;
+	__sin;
+	__sinh;
+	__sqrt;
+	__tan;
+	__tanh;
+	__y0;
+	__y1;
+	__yn;
+	acos;
+	acosh;
+	asin;
+	asinh;
+	atan;
+	atan2;
+	atanh;
+	cbrt;
+	ceil;
+	copysign;
+	cos;
+	cosh;
+	erf;
+	erfc;
+	exp;
+	expm1;
+	fabs;
+	floor;
+	fmod;
+	gamma;
+	gamma_r;
+	hypot;
+	ilogb;
+	isnan;
+	j0;
+	j1;
+	jn;
+	lgamma;
+	lgamma_r;
+	log;
+	log10;
+	log1p;
+	logb;
+	matherr;
+	nextafter;
+	pow;
+	remainder;
+	rint;
+	scalb;
+	scalbn;
+	signgam		{
+			  ASSERT = {
+				  BINDING = WEAK;
+				  ALIAS = __signgam;
+				};
+			};
+	significand;
+	sin;
+	sinh;
+	sqrt;
+	tan;
+	tanh;
+	y0;
+	y1;
+	yn;
 };
 
 $if i386
 SYMBOL_VERSION SUNWprivate_1.2 {
-	global:
-		__libm_errno;	# SC3.0.1 -lmopt
+    global:
+	__libm_errno;	# SC3.0.1 -lmopt
 } SUNWprivate_1.1;
 $endif
 
 SYMBOL_VERSION SUNWprivate_1.1 {
-	global:
-		_lib_version;
-		__libm__rem_pio2;
-		__libm__rem_pio2m;
+    global:
+	_lib_version	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	__libm__rem_pio2;
+	__libm__rem_pio2m;
 	# anything else is local
-	local:
-		*;	# symbols not mentioned in this file are scoped out
+    local:
+	*;	# symbols not mentioned in this file are scoped out
 };

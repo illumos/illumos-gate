@@ -35,19 +35,19 @@
 # that match this pattern that should be skipped.
 #
 
-syntax: glob
 exception_lists/mapfilechk
-usr/src/boot/*
-usr/src/cmd/lp/filter/postscript/font/devpost/charlib/*
+usr/src/boot/
+usr/src/cmd/lp/filter/postscript/font/devpost/charlib/
 usr/src/cmd/mdb/common/kmdb/mapfile_skel
+usr/src/cmd/mklocale/
+usr/src/cmd/perl/
 usr/src/cmd/sgs/libconv/common/map.msg
-usr/src/cmd/troff/troff.d/tmac.d/*
+usr/src/cmd/troff/troff.d/tmac.d/
 usr/src/data/perfmon/mapfile.csv
 usr/src/lib/README.mapfiles
 usr/src/lib/fm/topo/maps/Makefile.map
-usr/src/cmd/perl/*
-usr/src/cmd/mklocale/*
-usr/src/tools/onbld/Checks/Mapfile*
-usr/src/tools/scripts/*
-usr/src/uts/common/mapfiles/dtrace.mapfile.awk
+usr/src/test/elf-tests/
+usr/src/tools/onbld/Checks/Mapfile
+usr/src/tools/scripts/
 usr/src/uts/Makefile.mapfile
+usr/src/uts/common/mapfiles/dtrace.mapfile.awk

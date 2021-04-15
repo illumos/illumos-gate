@@ -84,9 +84,14 @@ SYMBOL_VERSION ILLUMOS_0.38 {
 } ILLUMOS_0.37;
 
 SYMBOL_VERSION ILLUMOS_0.37 {
-   global:
-	__stack_chk_guard;
-   protected:
+    global:
+	__stack_chk_guard	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+    protected:
 	__stack_chk_fail;
 } ILLUMOS_0.36;
 
@@ -437,43 +442,62 @@ SYMBOL_VERSION ILLUMOS_0.5 {	# common C++ ABI exit handlers
 
 SYMBOL_VERSION ILLUMOS_0.4 {	# Illumos additions
     protected:
-        pipe2;
-        dup3;
-        mkostemp;
-        mkostemps;
+	pipe2;
+	dup3;
+	mkostemp;
+	mkostemps;
 
 $if lf64
-        mkostemp64;
-        mkostemps64;
+	mkostemp64;
+	mkostemps64;
 $endif
 } ILLUMOS_0.3;
 
 SYMBOL_VERSION ILLUMOS_0.3 {	# Illumos additions
     protected:
-        assfail3;
+	assfail3;
 } ILLUMOS_0.2;
 
 SYMBOL_VERSION ILLUMOS_0.2 {	# Illumos additions
     protected:
-        posix_spawn_pipe_np;
+	posix_spawn_pipe_np;
 } ILLUMOS_0.1;
 
 SYMBOL_VERSION ILLUMOS_0.1 {	# Illumos additions
     protected:
-        timegm;
+	timegm;
 } SUNW_1.23;
 
 SYMBOL_VERSION SUNW_1.23 {	# SunOS 5.11 (Solaris 11)
     global:
-	_nl_domain_bindings;
-	_nl_msg_cat_cntr;
+	_nl_domain_bindings	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	_nl_msg_cat_cntr	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 
 $if _ELF32
-	dl_iterate_phdr	{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
+	dl_iterate_phdr		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/ld.so.1;
+				};
 $elif sparcv9
-	dl_iterate_phdr	{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
+	dl_iterate_phdr		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/sparcv9/ld.so.1;
+				};
 $elif amd64
-	dl_iterate_phdr	{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
+	dl_iterate_phdr	{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
 $else
 $error unknown platform
 $endif
@@ -670,7 +694,7 @@ $if lf64
 $endif
 } SUNW_1.22.7;
 
-SYMBOL_VERSION SUNW_1.22.7 {   # s10u10 - SunOS 5.10 (Solaris 10) patch additions
+SYMBOL_VERSION SUNW_1.22.7 {	# s10u10 - SunOS 5.10 (Solaris 10) patch additions
     protected:
 	SUNW_1.22.7;
 } SUNW_1.22.6;
@@ -710,14 +734,14 @@ SYMBOL_VERSION SUNW_1.22.1 {	# SunOS 5.10 (Solaris 10) patch additions
     protected:
 	atomic_add_8;
 	atomic_add_8_nv;
-	atomic_add_char		{ FLAGS = NODYNSORT };
-	atomic_add_char_nv	{ FLAGS = NODYNSORT };
-	atomic_add_int		{ FLAGS = NODYNSORT };
-	atomic_add_int_nv	{ FLAGS = NODYNSORT };
-	atomic_add_ptr		{ FLAGS = NODYNSORT };
-	atomic_add_ptr_nv	{ FLAGS = NODYNSORT };
-	atomic_add_short	{ FLAGS = NODYNSORT };
-	atomic_add_short_nv	{ FLAGS = NODYNSORT };
+	atomic_add_char		{ FLAGS = NODYNSORT; };
+	atomic_add_char_nv	{ FLAGS = NODYNSORT; };
+	atomic_add_int		{ FLAGS = NODYNSORT; };
+	atomic_add_int_nv	{ FLAGS = NODYNSORT; };
+	atomic_add_ptr		{ FLAGS = NODYNSORT; };
+	atomic_add_ptr_nv	{ FLAGS = NODYNSORT; };
+	atomic_add_short	{ FLAGS = NODYNSORT; };
+	atomic_add_short_nv	{ FLAGS = NODYNSORT; };
 	atomic_and_16;
 	atomic_and_16_nv;
 	atomic_and_32_nv;
@@ -725,23 +749,23 @@ SYMBOL_VERSION SUNW_1.22.1 {	# SunOS 5.10 (Solaris 10) patch additions
 	atomic_and_64_nv;
 	atomic_and_8;
 	atomic_and_8_nv;
-	atomic_and_uchar	{ FLAGS = NODYNSORT };
-	atomic_and_uchar_nv	{ FLAGS = NODYNSORT };
-	atomic_and_uint_nv	{ FLAGS = NODYNSORT };
-	atomic_and_ulong	{ FLAGS = NODYNSORT };
-	atomic_and_ulong_nv	{ FLAGS = NODYNSORT };
-	atomic_and_ushort	{ FLAGS = NODYNSORT };
-	atomic_and_ushort_nv	{ FLAGS = NODYNSORT };
+	atomic_and_uchar	{ FLAGS = NODYNSORT; };
+	atomic_and_uchar_nv	{ FLAGS = NODYNSORT; };
+	atomic_and_uint_nv	{ FLAGS = NODYNSORT; };
+	atomic_and_ulong	{ FLAGS = NODYNSORT; };
+	atomic_and_ulong_nv	{ FLAGS = NODYNSORT; };
+	atomic_and_ushort	{ FLAGS = NODYNSORT; };
+	atomic_and_ushort_nv	{ FLAGS = NODYNSORT; };
 	atomic_cas_16;
 	atomic_cas_32;
 	atomic_cas_64;
 	atomic_cas_8;
-	atomic_cas_ptr		{ FLAGS = NODYNSORT };
-	atomic_cas_uchar	{ FLAGS = NODYNSORT };
-	atomic_cas_uint		{ FLAGS = NODYNSORT };
-	atomic_cas_ulong	{ FLAGS = NODYNSORT };
-	atomic_cas_ushort	{ FLAGS = NODYNSORT };
-	atomic_clear_long_excl	{ FLAGS = NODYNSORT };
+	atomic_cas_ptr		{ FLAGS = NODYNSORT; };
+	atomic_cas_uchar	{ FLAGS = NODYNSORT; };
+	atomic_cas_uint		{ FLAGS = NODYNSORT; };
+	atomic_cas_ulong	{ FLAGS = NODYNSORT; };
+	atomic_cas_ushort	{ FLAGS = NODYNSORT; };
+	atomic_clear_long_excl	{ FLAGS = NODYNSORT; };
 	atomic_dec_16;
 	atomic_dec_16_nv;
 	atomic_dec_32;
@@ -750,14 +774,14 @@ SYMBOL_VERSION SUNW_1.22.1 {	# SunOS 5.10 (Solaris 10) patch additions
 	atomic_dec_64_nv;
 	atomic_dec_8;
 	atomic_dec_8_nv;
-	atomic_dec_uchar	{ FLAGS = NODYNSORT };
-	atomic_dec_uchar_nv	{ FLAGS = NODYNSORT };
-	atomic_dec_uint		{ FLAGS = NODYNSORT };
-	atomic_dec_uint_nv	{ FLAGS = NODYNSORT };
-	atomic_dec_ulong	{ FLAGS = NODYNSORT };
-	atomic_dec_ulong_nv	{ FLAGS = NODYNSORT };
-	atomic_dec_ushort	{ FLAGS = NODYNSORT };
-	atomic_dec_ushort_nv	{ FLAGS = NODYNSORT };
+	atomic_dec_uchar	{ FLAGS = NODYNSORT; };
+	atomic_dec_uchar_nv	{ FLAGS = NODYNSORT; };
+	atomic_dec_uint		{ FLAGS = NODYNSORT; };
+	atomic_dec_uint_nv	{ FLAGS = NODYNSORT; };
+	atomic_dec_ulong	{ FLAGS = NODYNSORT; };
+	atomic_dec_ulong_nv	{ FLAGS = NODYNSORT; };
+	atomic_dec_ushort	{ FLAGS = NODYNSORT; };
+	atomic_dec_ushort_nv	{ FLAGS = NODYNSORT; };
 	atomic_inc_16;
 	atomic_inc_16_nv;
 	atomic_inc_32;
@@ -766,14 +790,14 @@ SYMBOL_VERSION SUNW_1.22.1 {	# SunOS 5.10 (Solaris 10) patch additions
 	atomic_inc_64_nv;
 	atomic_inc_8;
 	atomic_inc_8_nv;
-	atomic_inc_uchar	{ FLAGS = NODYNSORT };
-	atomic_inc_uchar_nv	{ FLAGS = NODYNSORT };
-	atomic_inc_uint		{ FLAGS = NODYNSORT };
-	atomic_inc_uint_nv	{ FLAGS = NODYNSORT };
-	atomic_inc_ulong	{ FLAGS = NODYNSORT };
-	atomic_inc_ulong_nv	{ FLAGS = NODYNSORT };
-	atomic_inc_ushort	{ FLAGS = NODYNSORT };
-	atomic_inc_ushort_nv	{ FLAGS = NODYNSORT };
+	atomic_inc_uchar	{ FLAGS = NODYNSORT; };
+	atomic_inc_uchar_nv	{ FLAGS = NODYNSORT; };
+	atomic_inc_uint		{ FLAGS = NODYNSORT; };
+	atomic_inc_uint_nv	{ FLAGS = NODYNSORT; };
+	atomic_inc_ulong	{ FLAGS = NODYNSORT; };
+	atomic_inc_ulong_nv	{ FLAGS = NODYNSORT; };
+	atomic_inc_ushort	{ FLAGS = NODYNSORT; };
+	atomic_inc_ushort_nv	{ FLAGS = NODYNSORT; };
 	atomic_or_16;
 	atomic_or_16_nv;
 	atomic_or_32_nv;
@@ -781,23 +805,23 @@ SYMBOL_VERSION SUNW_1.22.1 {	# SunOS 5.10 (Solaris 10) patch additions
 	atomic_or_64_nv;
 	atomic_or_8;
 	atomic_or_8_nv;
-	atomic_or_uchar		{ FLAGS = NODYNSORT };
-	atomic_or_uchar_nv	{ FLAGS = NODYNSORT };
-	atomic_or_uint_nv	{ FLAGS = NODYNSORT };
-	atomic_or_ulong		{ FLAGS = NODYNSORT };
-	atomic_or_ulong_nv	{ FLAGS = NODYNSORT };
-	atomic_or_ushort	{ FLAGS = NODYNSORT };
-	atomic_or_ushort_nv	{ FLAGS = NODYNSORT };
-	atomic_set_long_excl	{ FLAGS = NODYNSORT };
+	atomic_or_uchar		{ FLAGS = NODYNSORT; };
+	atomic_or_uchar_nv	{ FLAGS = NODYNSORT; };
+	atomic_or_uint_nv	{ FLAGS = NODYNSORT; };
+	atomic_or_ulong		{ FLAGS = NODYNSORT; };
+	atomic_or_ulong_nv	{ FLAGS = NODYNSORT; };
+	atomic_or_ushort	{ FLAGS = NODYNSORT; };
+	atomic_or_ushort_nv	{ FLAGS = NODYNSORT; };
+	atomic_set_long_excl	{ FLAGS = NODYNSORT; };
 	atomic_swap_16;
 	atomic_swap_32;
 	atomic_swap_64;
 	atomic_swap_8;
-	atomic_swap_ptr		{ FLAGS = NODYNSORT };
-	atomic_swap_uchar	{ FLAGS = NODYNSORT };
-	atomic_swap_uint	{ FLAGS = NODYNSORT };
-	atomic_swap_ulong	{ FLAGS = NODYNSORT };
-	atomic_swap_ushort	{ FLAGS = NODYNSORT };
+	atomic_swap_ptr		{ FLAGS = NODYNSORT; };
+	atomic_swap_uchar	{ FLAGS = NODYNSORT; };
+	atomic_swap_uint	{ FLAGS = NODYNSORT; };
+	atomic_swap_ulong	{ FLAGS = NODYNSORT; };
+	atomic_swap_ushort	{ FLAGS = NODYNSORT; };
 	membar_consumer;
 	membar_enter;
 	membar_exit;
@@ -812,69 +836,72 @@ $if i386
 	# we add the NODYNSORT attribute to them. On this platform, they are
 	# aliases for the non-_nv versions. If that is changed, these lines
 	# should be removed.
-	atomic_and_64_nv	{ FLAGS = NODYNSORT };
-	atomic_dec_64_nv	{ FLAGS = NODYNSORT };
-	atomic_inc_64_nv	{ FLAGS = NODYNSORT };
-	atomic_or_64_nv		{ FLAGS = NODYNSORT };
+	atomic_and_64_nv	{ FLAGS = NODYNSORT; };
+	atomic_dec_64_nv	{ FLAGS = NODYNSORT; };
+	atomic_inc_64_nv	{ FLAGS = NODYNSORT; };
+	atomic_or_64_nv		{ FLAGS = NODYNSORT; };
 $endif
 $if _sparc
 	# Note: atomic_OP_WIDTH_nv symbols are also defined above. Here,
 	# we add the NODYNSORT attribute to them. On this platform, they are
 	# aliases for the non-_nv versions. If that is changed, these lines
 	# should be removed.
-	atomic_add_8_nv		{ FLAGS = NODYNSORT };
-	atomic_and_8_nv		{ FLAGS = NODYNSORT };
-	atomic_and_16_nv	{ FLAGS = NODYNSORT };
-	atomic_and_32_nv	{ FLAGS = NODYNSORT };
-	atomic_and_64_nv	{ FLAGS = NODYNSORT };
-	atomic_dec_8_nv		{ FLAGS = NODYNSORT };
-	atomic_dec_16_nv	{ FLAGS = NODYNSORT };
-	atomic_dec_32_nv	{ FLAGS = NODYNSORT };
-	atomic_dec_64_nv	{ FLAGS = NODYNSORT };
-	atomic_inc_8_nv		{ FLAGS = NODYNSORT };
-	atomic_inc_16_nv	{ FLAGS = NODYNSORT };
-	atomic_inc_32_nv	{ FLAGS = NODYNSORT };
-	atomic_inc_64_nv	{ FLAGS = NODYNSORT };
-	atomic_or_8_nv		{ FLAGS = NODYNSORT };
-	atomic_or_16_nv		{ FLAGS = NODYNSORT };
-	atomic_or_32_nv		{ FLAGS = NODYNSORT };
-	atomic_or_64_nv		{ FLAGS = NODYNSORT };
+	atomic_add_8_nv		{ FLAGS = NODYNSORT; };
+	atomic_and_8_nv		{ FLAGS = NODYNSORT; };
+	atomic_and_16_nv	{ FLAGS = NODYNSORT; };
+	atomic_and_32_nv	{ FLAGS = NODYNSORT; };
+	atomic_and_64_nv	{ FLAGS = NODYNSORT; };
+	atomic_dec_8_nv		{ FLAGS = NODYNSORT; };
+	atomic_dec_16_nv	{ FLAGS = NODYNSORT; };
+	atomic_dec_32_nv	{ FLAGS = NODYNSORT; };
+	atomic_dec_64_nv	{ FLAGS = NODYNSORT; };
+	atomic_inc_8_nv		{ FLAGS = NODYNSORT; };
+	atomic_inc_16_nv	{ FLAGS = NODYNSORT; };
+	atomic_inc_32_nv	{ FLAGS = NODYNSORT; };
+	atomic_inc_64_nv	{ FLAGS = NODYNSORT; };
+	atomic_or_8_nv		{ FLAGS = NODYNSORT; };
+	atomic_or_16_nv		{ FLAGS = NODYNSORT; };
+	atomic_or_32_nv		{ FLAGS = NODYNSORT; };
+	atomic_or_64_nv		{ FLAGS = NODYNSORT; };
 $endif
 } SUNW_1.22;
 
 SYMBOL_VERSION SUNW_1.22 {	# SunOS 5.10 (Solaris 10)
     global:
 $if _ELF32
-	dladdr		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	dladdr1		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	dlclose		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	dldump		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	dlerror		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	dlinfo		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	dlmopen		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	dlopen		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	dlsym		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
+	dladdr		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1; };
+	dladdr1		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1; };
+	dlclose		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1; };
+	dldump		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1; };
+	dlerror		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1; };
+	dlinfo		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1; };
+	dlmopen		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1; };
+	dlopen		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1; };
+	dlsym		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1; };
 $elif sparcv9
-	dladdr		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	dladdr1		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	dlclose		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	dldump		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	dlerror		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	dlinfo		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	dlmopen		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	dlopen		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	dlsym		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
+	dladdr		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1; };
+	dladdr1		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1; };
+	dlclose		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1; };
+	dldump		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1; };
+	dlerror		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1; };
+	dlinfo		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1; };
+	dlmopen		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1; };
+	dlopen		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1; };
+	dlsym		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1; };
 $elif amd64
-	dladdr		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	dladdr1		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	dlamd64getunwind { TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	dlclose		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	dldump		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	dlerror		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	dlinfo		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	dlmopen		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	dlopen		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	dlsym		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
+	dladdr		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1; };
+	dladdr1		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1; };
+	dlamd64getunwind	{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
+	dlclose		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1; };
+	dldump		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1; };
+	dlerror		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1; };
+	dlinfo		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1; };
+	dlmopen		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1; };
+	dlopen		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1; };
+	dlsym		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1; };
 $else
 $error unknown platform
 $endif
@@ -888,12 +915,12 @@ $endif
 	atomic_add_32_nv;
 	atomic_add_64;
 	atomic_add_64_nv;
-	atomic_add_long		{ FLAGS = NODYNSORT };
-	atomic_add_long_nv	{ FLAGS = NODYNSORT };
+	atomic_add_long			{ FLAGS = NODYNSORT; };
+	atomic_add_long_nv		{ FLAGS = NODYNSORT; };
 	atomic_and_32;
-	atomic_and_uint		{ FLAGS = NODYNSORT };
+	atomic_and_uint			{ FLAGS = NODYNSORT; };
 	atomic_or_32;
-	atomic_or_uint		{ FLAGS = NODYNSORT };
+	atomic_or_uint			{ FLAGS = NODYNSORT; };
 	_Exit;
 	getisax;
 	_getisax;
@@ -1016,9 +1043,9 @@ $endif
 	pthread_barrier_wait;
 	pthread_condattr_getclock;
 	pthread_condattr_setclock;
-	pthread_mutexattr_getrobust_np	{ FLAGS = NODYNSORT };
-	pthread_mutexattr_setrobust_np	{ FLAGS = NODYNSORT };
-	pthread_mutex_consistent_np	{ FLAGS = NODYNSORT };
+	pthread_mutexattr_getrobust_np	{ FLAGS = NODYNSORT; };
+	pthread_mutexattr_setrobust_np	{ FLAGS = NODYNSORT; };
+	pthread_mutex_consistent_np	{ FLAGS = NODYNSORT; };
 	pthread_mutex_reltimedlock_np;
 	pthread_mutex_timedlock;
 	pthread_rwlock_reltimedrdlock_np;
@@ -1104,16 +1131,16 @@ $if _sparc
 	# the NODYNSORT attribute to them. On this platform, they are aliases
 	# for the non-_nv versions. If that is changed, these lines should be
 	# removed.
-	atomic_add_16_nv	{ FLAGS = NODYNSORT };
-	atomic_add_32_nv	{ FLAGS = NODYNSORT };
-	atomic_add_64_nv	{ FLAGS = NODYNSORT };
+	atomic_add_16_nv		{ FLAGS = NODYNSORT; };
+	atomic_add_32_nv		{ FLAGS = NODYNSORT; };
+	atomic_add_64_nv		{ FLAGS = NODYNSORT; };
 $endif
 
 $if i386
 	# Note: atomic_add_64_nv is also defined above. Here, we add the
 	# NODYNSORT attribute to it. On this platform, it is an aliases for
 	# atomic_add_64. If that is changed, this line should be removed.
-	atomic_add_64_nv	{ FLAGS = NODYNSORT };
+	atomic_add_64_nv		{ FLAGS = NODYNSORT; };
 $endif
 
 $if amd64
@@ -1129,10 +1156,30 @@ $if amd64
 	_SUNW_Unwind_Resume;
 	_SUNW_Unwind_SetGR;
 	_SUNW_Unwind_SetIP;
-	_UA_CLEANUP_PHASE;
-	_UA_FORCE_UNWIND;
-	_UA_HANDLER_FRAME;
-	_UA_SEARCH_PHASE;
+	_UA_CLEANUP_PHASE		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
+	_UA_FORCE_UNWIND		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
+	_UA_HANDLER_FRAME		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
+	_UA_SEARCH_PHASE		{
+					  ASSERT = {
+						  TYPE = OBJECT;
+						  SIZE = 4;
+						};
+					};
 	_Unwind_DeleteException;
 	_Unwind_ForcedUnwind;
 	_Unwind_GetCFA;
@@ -1202,7 +1249,7 @@ SYMBOL_VERSION SUNW_1.21 {	# SunOS 5.9 (Solaris 9)
 	getcpuid;
 	_getcpuid;
 	gethomelgroup;
-	_gethomelgroup		{ FLAGS = NODYNSORT };
+	_gethomelgroup	{ FLAGS = NODYNSORT; };
 	getpagesizes;
 	getrctl;
 	_getrctl;
@@ -1463,7 +1510,12 @@ SYMBOL_VERSION SUNW_1.2 {
 
 SYMBOL_VERSION SUNW_1.1 {	# SunOS 5.6 (Solaris 2.6)
     global:
-	__loc1;
+	__loc1		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
     protected:
 	basename;
 	bindtextdomain;
@@ -1576,8 +1628,8 @@ SYMBOL_VERSION SUNW_1.1 {	# SunOS 5.6 (Solaris 2.6)
 	regex;
 	resolvepath;
 	_resolvepath;
-	rwlock_destroy		{ FLAGS = NODYNSORT };
-	_rwlock_destroy		{ FLAGS = NODYNSORT };
+	rwlock_destroy		{ FLAGS = NODYNSORT; };
+	_rwlock_destroy		{ FLAGS = NODYNSORT; };
 	sema_destroy;
 	_sema_destroy;
 	_setjmp;
@@ -1694,7 +1746,7 @@ $if lf64
 	setrlimit64;
 	_setrlimit64;
 	s_fcntl;
-	_s_fcntl		{ FLAGS = NODYNSORT };
+	_s_fcntl	{ FLAGS = NODYNSORT; };
 	s_ioctl;
 	stat64;
 	_stat64;
@@ -1780,13 +1832,19 @@ SYMBOL_VERSION SUNW_0.9 {	# SunOS 5.5 (Solaris 2.5)
 
 SYMBOL_VERSION SUNW_0.8 {	# SunOS 5.4 (Solaris 2.4)
     global:
-	__xpg4			{ FLAGS = NODIRECT };
+	__xpg4		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 4;
+				};
+			  FLAGS = NODIRECT;
+			};
     protected:
 	addsev;
-	cond_broadcast		{ FLAGS = NODYNSORT };
-	cond_destroy		{ FLAGS = NODYNSORT };
+	cond_broadcast	{ FLAGS = NODYNSORT; };
+	cond_destroy	{ FLAGS = NODYNSORT; };
 	cond_init;
-	cond_signal		{ FLAGS = NODYNSORT };
+	cond_signal	{ FLAGS = NODYNSORT; };
 	cond_timedwait;
 	cond_wait;
 	confstr;
@@ -1798,24 +1856,24 @@ SYMBOL_VERSION SUNW_0.8 {	# SunOS 5.4 (Solaris 2.4)
 	iconv_close;
 	iconv_open;
 	lfmt;
-	mutex_destroy		{ FLAGS = NODYNSORT };
+	mutex_destroy	{ FLAGS = NODYNSORT; };
 	mutex_init;
-	mutex_lock		{ FLAGS = NODYNSORT };
-	mutex_trylock		{ FLAGS = NODYNSORT };
-	mutex_unlock		{ FLAGS = NODYNSORT };
+	mutex_lock	{ FLAGS = NODYNSORT; };
+	mutex_trylock	{ FLAGS = NODYNSORT; };
+	mutex_unlock	{ FLAGS = NODYNSORT; };
 	pfmt;
 	regcomp;
 	regerror;
 	regexec;
 	regfree;
 	rwlock_init;
-	rw_rdlock		{ FLAGS = NODYNSORT };
+	rw_rdlock	{ FLAGS = NODYNSORT; };
 	rw_read_held;
-	rw_tryrdlock		{ FLAGS = NODYNSORT };
-	rw_trywrlock		{ FLAGS = NODYNSORT };
-	rw_unlock		{ FLAGS = NODYNSORT };
+	rw_tryrdlock	{ FLAGS = NODYNSORT; };
+	rw_trywrlock	{ FLAGS = NODYNSORT; };
+	rw_unlock	{ FLAGS = NODYNSORT; };
 	rw_write_held;
-	rw_wrlock		{ FLAGS = NODYNSORT };
+	rw_wrlock	{ FLAGS = NODYNSORT; };
 	sema_held;
 	sema_init;
 	sema_post;
@@ -1834,7 +1892,7 @@ SYMBOL_VERSION SUNW_0.8 {	# SunOS 5.4 (Solaris 2.4)
 	thr_join;
 	thr_keycreate;
 	thr_kill;
-	thr_self		{ FLAGS = NODYNSORT };
+	thr_self	{ FLAGS = NODYNSORT; };
 	thr_setconcurrency;
 	thr_setprio;
 	thr_setspecific;
@@ -1849,35 +1907,135 @@ SYMBOL_VERSION SUNW_0.8 {	# SunOS 5.4 (Solaris 2.4)
 
 SYMBOL_VERSION SUNW_0.7 {	# SunOS 5.3 (Solaris 2.3)
     global:
-	altzone;
-	_ctype;
-	isnanf			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	lone;
-	lten;
-	lzero;
-	memalign		{ FLAGS = NODIRECT };
-	modff			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	nss_default_finders;
-	_sibuf;
-	_sobuf;
-	_sys_buslist;
-	_sys_cldlist;
-	_sys_fpelist;
-	_sys_illlist;
-	_sys_segvlist;
-	_sys_siginfolistp;
-	_sys_siglist;
-	_sys_siglistn;
-	_sys_siglistp;
-	_sys_traplist;
-	valloc			{ FLAGS = NODIRECT };
+	altzone			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	_ctype			{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  ALIAS = __ctype;
+					};
+				};
+	isnanf			{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	lone			{ ASSERT = { TYPE = OBJECT; SIZE = 8; }; };
+	lten			{ ASSERT = { TYPE = OBJECT; SIZE = 8; }; };
+	lzero			{ ASSERT = { TYPE = OBJECT; SIZE = 8; }; };
+	memalign		{ FLAGS = NODIRECT; };
+	modff			{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	nss_default_finders	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	_sibuf			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 1032;
+					};
+				};
+	_sobuf			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 1032;
+					};
+				};
+	_sys_buslist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[3];
+					};
+				};
+	_sys_cldlist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[6];
+					};
+				};
+	_sys_fpelist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[9];
+					};
+				};
+	_sys_illlist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[8];
+					};
+				};
+	_sys_segvlist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[2];
+					};
+				};
+	_sys_siginfolistp	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	_sys_siglist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[34];
+					};
+				};
+	_sys_siglistn		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	_sys_siglistp		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	_sys_traplist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[6];
+					};
+				};
+	valloc			{ FLAGS = NODIRECT; };
 
 $if _ELF32
-	_bufendtab;
-	_lastbuf;
-	sys_errlist;
-	sys_nerr;
-	_sys_nsig;
+	_bufendtab		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 244;
+					};
+				};
+	_lastbuf		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	sys_errlist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 608;
+					};
+				};
+	sys_nerr		{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  ALIAS = _sys_num_err;
+					};
+				};
+	_sys_nsig		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 $endif
 
     protected:
@@ -1927,7 +2085,7 @@ $endif
 	file_to_decimal;
 	finite;
 	_flsbuf;
-	fork1			{ FLAGS = NODYNSORT };
+	fork1			{ FLAGS = NODYNSORT; };
 	fpclass;
 	fpgetmask;
 	fpgetsticky;
@@ -2010,8 +2168,8 @@ $endif
 	mlockall;
 	mrand48;
 	munlockall;
-	_mutex_held		{ FLAGS = NODYNSORT };
-	_mutex_lock		{ FLAGS = NODYNSORT };
+	_mutex_held		{ FLAGS = NODYNSORT; };
+	_mutex_lock		{ FLAGS = NODYNSORT; };
 	nrand48;
 	_nss_netdb_aliases;
 	_nss_XbyY_buf_alloc;
@@ -2095,16 +2253,15 @@ $endif
 	vhangup;
 	vsyslog;
 	yield;
-
 $if i386
-	# Note: _syscall is also defined above. Here, we add the NODYNSORT
-	# attribute to it. On this platform, it is an alias to syscall.
+	# Note: _syscall is also defined above.	 Here, we add the NODYNSORT
+	# attribute to it.  On this platform, _syscall is an alias to syscall
 	# If that is changed, this lines should be removed.
-	_syscall		{ FLAGS = NODYNSORT };
+	_syscall	{ FLAGS = NODYNSORT; };
 $endif
 
-# The 32-bit sparc ABI requires SISCD_2.3. On other platforms, those symbols
-# go directly into SUNW_0.7.
+	# The 32-bit sparc ABI requires SISCD_2.3. On other platforms, those symbols
+	# go directly into SUNW_0.7.
 $if sparc32
 } SISCD_2.3;
 
@@ -2112,8 +2269,21 @@ SYMBOL_VERSION SISCD_2.3 {
 $endif
 
     global:
-	errno			{ FLAGS = NODIRECT };
-	_iob;
+	errno		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 4;
+				};
+			  FLAGS = NODIRECT;
+			};
+
+$if _ELF64
+	_iob		{ ASSERT = { TYPE = OBJECT; SIZE = 2560; }; };
+$elif _ELF32
+	_iob		{ ASSERT = { TYPE = OBJECT; SIZE = 960; }; };
+$else
+$error unknown ELFCLASS
+$endif
 
     protected:
 	addseverity;
@@ -2184,12 +2354,13 @@ $if sparc32
 	_Q_ulltoq;
 	sbrk;
 	_sbrk;
-	__umul64		{ FLAGS = NODYNSORT };	# Same address as __mul64
+	__umul64	{ FLAGS = NODYNSORT; };	# Same address as __mul64
 $endif
 
-# On 32-bit platforms, the following symbols go into SYSVABI_1.3, but on
-# other platforms they go directly into the current version (which will be
-# either SUNW_0.7, or SISCD_2.3, depending on the similar issue described above.
+	# On 32-bit platforms, the following symbols go into SYSVABI_1.3, but
+	# on other platforms they go directly into the current version (which
+	# will be either SUNW_0.7, or SISCD_2.3, depending on the similar
+	# issue described above.
 $if _ELF32
 } SYSVABI_1.3;
 
@@ -2197,49 +2368,91 @@ SYMBOL_VERSION SYSVABI_1.3 {
 $endif
 
     global:
-	_altzone;
-	calloc			{ FLAGS = NODIRECT };
-	__ctype;
-	daylight;
-	_daylight;
-	environ			{ FLAGS = NODIRECT };
-	_environ		{ FLAGS = NODIRECT };
-	free			{ FLAGS = NODIRECT };
-	frexp			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	getdate_err;
-	_getdate_err;
+	_altzone	{ ASSERT = { BINDING = WEAK; ALIAS = altzone; }; };
+	calloc		{ FLAGS = NODIRECT; };
+	__ctype		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 521;
+				};
+			};
+	daylight	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	_daylight	{ ASSERT = { BINDING = WEAK; ALIAS = daylight; }; };
+	environ		{
+			  ASSERT = {
+				  BINDING = WEAK;
+				  ALIAS = _environ;
+				};
+			  FLAGS = NODIRECT;
+			};
+	_environ	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			  FLAGS = NODIRECT;
+			};
+	free		{ FLAGS = NODIRECT; };
+	frexp		{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	getdate_err	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	_getdate_err	{
+			  ASSERT = {
+				  BINDING = WEAK;
+				  ALIAS = getdate_err;
+				};
+			};
 	getenv;
-	__huge_val;
-	__iob;
-	isnan			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	_isnan			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	isnand			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	_isnand			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	ldexp			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	logb			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	malloc			{ FLAGS = NODIRECT };
+	__huge_val	{ ASSERT = { TYPE = OBJECT; SIZE = 8; }; };
+	__iob		{ ASSERT = { BINDING = WEAK; ALIAS = _iob; }; };
+	isnan		{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	_isnan		{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	isnand		{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	_isnand		{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	ldexp		{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	logb		{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	malloc		{ FLAGS = NODIRECT; };
 	memcmp;
 	memcpy;
 	memmove;
 	memset;
-	modf			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	_modf			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	nextafter		{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	_nextafter		{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	_numeric;
-	optarg;
-	opterr;
-	optind;
-	optopt;
-	realloc			{ FLAGS = NODIRECT };
-	scalb			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	_scalb			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	timezone;
-	_timezone;
-	tzname;
-	_tzname;
+	modf		{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	_modf		{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	nextafter	{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	_nextafter	{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	_numeric	{ ASSERT = { TYPE = OBJECT; SIZE = 2; }; };
+	optarg		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
+	opterr		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	optind		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	optopt		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	realloc		{ FLAGS = NODIRECT; };
+	scalb		{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	_scalb		{ TYPE = FUNCTION; FILTER = libm.so.2; };
+	timezone	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
+	_timezone	{ ASSERT = { BINDING = WEAK; ALIAS = timezone; }; };
+	tzname		{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize[2];
+				};
+			};
+	_tzname		{
+			  ASSERT = {
+				  BINDING = WEAK;
+				  ALIAS = tzname;
+				};
+			};
 $if i386
-	_fp_hw;
+	_fp_hw		{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 $endif
 
     protected:
@@ -2283,8 +2496,8 @@ $endif
 	_cleanup;
 	clearerr;
 	clock;
-	_close;
 	close;
+	_close;
 	closedir;
 	_closedir;
 	creat;
@@ -2576,7 +2789,7 @@ $endif
 	_semop;
 	setbuf;
 	setcontext;
-	_setcontext		{ FLAGS = NODYNSORT };
+	_setcontext	{ FLAGS = NODYNSORT; };
 	setgid;
 	_setgid;
 	setgroups;
@@ -2604,7 +2817,7 @@ $endif
 	shmget;
 	_shmget;
 	sigaction;
-	_sigaction		{ FLAGS = NODYNSORT };
+	_sigaction	{ FLAGS = NODYNSORT; };
 	sigaddset;
 	_sigaddset;
 	sigaltstack;
@@ -2639,7 +2852,7 @@ $endif
 	sigset;
 	_sigset;
 	sigsetjmp;
-	_sigsetjmp		{ FLAGS = NODYNSORT };
+	_sigsetjmp	{ FLAGS = NODYNSORT; };
 	sigsuspend;
 	_sigsuspend;
 	sleep;
@@ -2797,7 +3010,7 @@ $if sparc32
 	.stret2;
 	.stret4;
 	# .stret4 and .stret8 are the same thing
-	.stret8			{ FLAGS = NODYNSORT };
+	.stret8		{ FLAGS = NODYNSORT; };
 	.udiv;
 	.umul;
 	.urem;
@@ -2828,12 +3041,12 @@ $endif
 $if sparcv9
 	# __align_cpy_1 is an alias for memcpy. Filter it out of
 	# the .SUNW_dynsymsort section
-	__align_cpy_1		{ FLAGS = NODYNSORT };
+	__align_cpy_1	{ FLAGS = NODYNSORT; };
 	__align_cpy_16;
 	__align_cpy_2;
 	__align_cpy_4;
 	# __align_cpy_8 is same as __align_cpy_16
-	__align_cpy_8		{ FLAGS = NODYNSORT };
+	__align_cpy_8	{ FLAGS = NODYNSORT; };
 	__dtoul;
 	__ftoul;
 	_Qp_add;
@@ -2865,8 +3078,8 @@ $if sparcv9
 	__sparc_utrap_install;
 $endif
 
-# On amd64, we also have SYSVABI_1.3, but it contains a small subset of
-# the symbols put in that version on other platforms.
+	# On amd64, we also have SYSVABI_1.3, but it contains a small subset of
+	# the symbols put in that version on other platforms.
 $if amd64
 } SYSVABI_1.3;
 
@@ -2874,7 +3087,7 @@ SYMBOL_VERSION SYSVABI_1.3 {
 $endif
     global:
 $if !_sparc
-	__flt_rounds;
+	__flt_rounds	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 $endif
 
     protected:
@@ -2903,91 +3116,416 @@ $endif
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	___Argv			{ FLAGS = NODIRECT };
-	cfree			{ FLAGS = NODIRECT };
-	_cswidth;
-	__ctype_mask;
-	__environ_lock		{ FLAGS = NODIRECT };
-	__inf_read;
-	__inf_written;
-	__i_size;
-	_isnanf			{ TYPE = FUNCTION; FILTER = libm.so.2 };
+	___Argv			{
+				  FLAGS = NODIRECT;
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	cfree			{ FLAGS = NODIRECT; };
+	_cswidth		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 16;
+					};
+				};
+	__ctype_mask		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	__environ_lock		{
+				  FLAGS = NODIRECT;
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 24;
+					};
+				};
+	__inf_read		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	__inf_written		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	__i_size		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	_isnanf			{
+				  TYPE = FUNCTION;
+				  FILTER = libm.so.2;
+				};
 	__iswrune;
-	__libc_threaded;
-	_lib_version		{ FLAGS = NODIRECT };
-	_logb			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	_lone			{ FLAGS = NODYNSORT };
-	_lten			{ FLAGS = NODYNSORT };
-	_lzero			{ FLAGS = NODYNSORT };
-	__malloc_lock;
+	__libc_threaded		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	_lib_version		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				  FLAGS = NODIRECT;
+				};
+	_logb			{
+				  TYPE = FUNCTION;
+				  FILTER = libm.so.2;
+				};
+	_lone			{
+				  FLAGS = NODYNSORT;
+				  ASSERT = {
+					  BINDING = WEAK;
+					  ALIAS = lone;
+					};
+				};
+	_lten			{
+				  FLAGS = NODYNSORT;
+				  ASSERT = {
+					  BINDING = WEAK;
+					  ALIAS = lten;
+					};
+				};
+	_lzero			{
+				  FLAGS = NODYNSORT;
+				  ASSERT = {
+					  BINDING = WEAK;
+					  ALIAS = lzero;
+					};
+				};
+	__malloc_lock		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 24;
+					};
+				};
 	_memcmp;
-	_memcpy			{ FLAGS = NODYNSORT };
+	_memcpy			{ FLAGS = NODYNSORT; };
 	_memmove;
 	_memset;
-	_modff			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	__nan_read;
-	__nan_written;
+	_modff			{
+				  TYPE = FUNCTION;
+				  FILTER = libm.so.2;
+				};
+	__nan_read		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	__nan_written		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 	__nextwctype;
-	__nis_debug_bind;
-	__nis_debug_calls;
-	__nis_debug_file;
-	__nis_debug_rpc;
-	__nis_prefsrv;
-	__nis_preftype;
-	__nis_server;
-	_nss_default_finders;
-	__progname		{ FLAGS = NODIRECT };
-	_smbuf;
-	_sp;
-	__strdupa_str		{ FLAGS = NODIRECT };
-	__strdupa_len		{ FLAGS = NODIRECT };
-	_tdb_bootstrap;
-	__threaded;
-	thr_probe_getfunc_addr;
-	__trans_lower;
-	__trans_upper;
-	_uberdata;
-	__xpg6			{ FLAGS = NODIRECT };
+	__nis_debug_bind	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	__nis_debug_calls	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	__nis_debug_file	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	__nis_debug_rpc		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	__nis_prefsrv		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	__nis_preftype		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	__nis_server		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	_nss_default_finders	{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  ALIAS = nss_default_finders;
+					};
+				};
+	__progname		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				  FLAGS = NODIRECT;
+				};
+
+$if _ELF64
+	_smbuf			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 168;
+					};
+				};
+$elif _ELF32
+	_smbuf			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 488;
+					};
+				};
+$else
+$error unknown ELFCLASS
+$endif
+	_sp			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	__strdupa_str		{
+				  ASSERT = {
+					  TYPE = TLS;
+					  SIZE = addrsize;
+					};
+				  FLAGS = NODIRECT;
+				};
+	__strdupa_len		{
+				  ASSERT = {
+					  TYPE = TLS;
+					  SIZE = addrsize;
+					};
+				  FLAGS = NODIRECT;
+				};
+	_tdb_bootstrap		{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  ALIAS = __tdb_bootstrap;
+					};
+				};
+	__threaded		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	thr_probe_getfunc_addr	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	__trans_lower		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	__trans_upper		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	_uberdata		{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  ALIAS = __uberdata;
+					};
+				};
+	__xpg6			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				  FLAGS = NODIRECT;
+				};
 
 $if _ELF32
-	_dladdr			{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	_dladdr1		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	_dlclose		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	_dldump			{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	_dlerror		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	_dlinfo			{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	_dlmopen		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	_dlopen			{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	_dlsym			{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	_ld_libc		{ TYPE = FUNCTION; FILTER = /usr/lib/ld.so.1 };
-	_sys_errlist;
-	_sys_errs;
-	_sys_index;
-	_sys_nerr		{ FLAGS = NODYNSORT };
-	_sys_num_err;
+	_dladdr			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/ld.so.1;
+				};
+	_dladdr1		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/ld.so.1;
+				};
+	_dlclose		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/ld.so.1;
+				};
+	_dldump			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/ld.so.1;
+				};
+	_dlerror		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/ld.so.1;
+				};
+	_dlinfo			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/ld.so.1;
+				};
+	_dlmopen		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/ld.so.1;
+				};
+	_dlopen			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/ld.so.1;
+				};
+	_dlsym			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/ld.so.1;
+				};
+	_ld_libc		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/ld.so.1;
+				};
+	_sys_errlist		{
+				  ASSERT = {
+					  BINDING = WEAK;
+					  ALIAS = sys_errlist;
+					};
+				};
+	_sys_errs		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 3216;
+					};
+				};
+	_sys_index		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 608;
+					};
+				};
+	_sys_nerr		{
+				  FLAGS = NODYNSORT;
+				  ASSERT = {
+					  BINDING = WEAK;
+					  ALIAS = _sys_num_err;
+					};
+				};
+	_sys_num_err		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 $elif sparcv9
-	_dladdr		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	_dladdr1	{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	_dlclose	{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	_dldump		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	_dlerror	{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	_dlinfo		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	_dlmopen	{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	_dlopen		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	_dlsym		{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
-	_ld_libc	{ TYPE = FUNCTION; FILTER = /usr/lib/sparcv9/ld.so.1 };
+	_dladdr			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/sparcv9/ld.so.1;
+				};
+	_dladdr1		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/sparcv9/ld.so.1;
+				};
+	_dlclose		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/sparcv9/ld.so.1;
+				};
+	_dldump			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/sparcv9/ld.so.1;
+				};
+	_dlerror		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/sparcv9/ld.so.1;
+				};
+	_dlinfo			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/sparcv9/ld.so.1;
+				};
+	_dlmopen		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/sparcv9/ld.so.1;
+				};
+	_dlopen			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/sparcv9/ld.so.1;
+				};
+	_dlsym			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/sparcv9/ld.so.1;
+				};
+	_ld_libc		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/sparcv9/ld.so.1;
+				};
 $elif amd64
-	_dladdr		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	_dladdr1	{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	_dlamd64getunwind { TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	_dlclose	{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	_dldump		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	_dlerror	{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	_dlinfo		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	_dlmopen	{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	_dlopen		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	_dlsym		{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
-	_ld_libc	{ TYPE = FUNCTION; FILTER = /usr/lib/amd64/ld.so.1 };
+	_dladdr			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
+	_dladdr1		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
+	_dlamd64getunwind	{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
+	_dlclose		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
+	_dldump			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
+	_dlerror		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
+	_dlinfo			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
+	_dlmopen		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
+	_dlopen			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
+	_dlsym			{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
+	_ld_libc		{
+				  TYPE = FUNCTION;
+				  FILTER = /usr/lib/amd64/ld.so.1;
+				};
 $else
 $error unknown platform
 $endif
@@ -2998,7 +3536,12 @@ $if _sparc
 	__yday_to_month;
 $endif
 $if i386
-	_sse_hw;
+	_sse_hw			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 $endif
 
     protected:
@@ -3061,8 +3604,8 @@ $endif
 	_findiop;
 	__fini_daemon_priv;
 	_finite;
-	_fork1			{ FLAGS = NODYNSORT };
-	_forkall		{ FLAGS = NODYNSORT };
+	_fork1			{ FLAGS = NODYNSORT; };
+	_forkall		{ FLAGS = NODYNSORT; };
 	_fpclass;
 	_fpgetmask;
 	_fpgetround;
@@ -3108,7 +3651,7 @@ $endif
 	klpd_register_id;
 	klpd_unregister;
 	klpd_unregister_id;
-	_lgrp_home_fast		{ FLAGS = NODYNSORT };
+	_lgrp_home_fast		{ FLAGS = NODYNSORT; };
 	_lgrpsys;
 	_lltostr;
 	_lock_clear;
@@ -3124,12 +3667,12 @@ $endif
 	modutx;
 	msgctl64;
 	__multi_innetgr;
-	_mutex_destroy		{ FLAGS = NODYNSORT };
+	_mutex_destroy		{ FLAGS = NODYNSORT; };
 	mutex_enter;
 	mutex_exit;
 	mutex_held;
-	_mutex_init		{ FLAGS = NODYNSORT };
-	_mutex_unlock		{ FLAGS = NODYNSORT };
+	_mutex_init		{ FLAGS = NODYNSORT; };
+	_mutex_unlock		{ FLAGS = NODYNSORT; };
 	name_to_attr;
 	nfs_getfh;
 	nfssvc;
@@ -3429,96 +3972,96 @@ $if i386
 	__udivrem64;
 $endif
 
-# The following functions should not be exported from libc,
-# but /lib/libm.so.2, some older versions of the Studio
-# compiler/debugger components, and some ancient programs
-# found in /usr/dist reference them.  When we no longer
-# care about these old and broken binary objects, these
-# symbols should be deleted.
-	_brk					{ FLAGS = NODYNSORT };
-	_cond_broadcast				{ FLAGS = NODYNSORT };
-	_cond_init				{ FLAGS = NODYNSORT };
-	_cond_signal				{ FLAGS = NODYNSORT };
-	_cond_wait				{ FLAGS = NODYNSORT };
-	_ecvt					{ FLAGS = NODYNSORT };
-	_fcvt					{ FLAGS = NODYNSORT };
-	_getc_unlocked				{ FLAGS = NODYNSORT };
-	_llseek					{ FLAGS = NODYNSORT };
-	_pthread_attr_getdetachstate		{ FLAGS = NODYNSORT };
-	_pthread_attr_getinheritsched		{ FLAGS = NODYNSORT };
-	_pthread_attr_getschedparam		{ FLAGS = NODYNSORT };
-	_pthread_attr_getschedpolicy		{ FLAGS = NODYNSORT };
-	_pthread_attr_getscope			{ FLAGS = NODYNSORT };
-	_pthread_attr_getstackaddr		{ FLAGS = NODYNSORT };
-	_pthread_attr_getstacksize		{ FLAGS = NODYNSORT };
-	_pthread_attr_init			{ FLAGS = NODYNSORT };
-	_pthread_condattr_getpshared		{ FLAGS = NODYNSORT };
-	_pthread_condattr_init			{ FLAGS = NODYNSORT };
-	_pthread_cond_init			{ FLAGS = NODYNSORT };
-	_pthread_create				{ FLAGS = NODYNSORT };
-	_pthread_getschedparam			{ FLAGS = NODYNSORT };
-	_pthread_join				{ FLAGS = NODYNSORT };
-	_pthread_key_create			{ FLAGS = NODYNSORT };
-	_pthread_mutexattr_getprioceiling	{ FLAGS = NODYNSORT };
-	_pthread_mutexattr_getprotocol		{ FLAGS = NODYNSORT };
-	_pthread_mutexattr_getpshared		{ FLAGS = NODYNSORT };
-	_pthread_mutexattr_init			{ FLAGS = NODYNSORT };
-	_pthread_mutex_getprioceiling		{ FLAGS = NODYNSORT };
-	_pthread_mutex_init			{ FLAGS = NODYNSORT };
-	_pthread_sigmask			{ FLAGS = NODYNSORT };
-	_rwlock_init				{ FLAGS = NODYNSORT };
-	_rw_rdlock				{ FLAGS = NODYNSORT };
-	_rw_unlock				{ FLAGS = NODYNSORT };
-	_rw_wrlock				{ FLAGS = NODYNSORT };
-	_sbrk_unlocked				{ FLAGS = NODYNSORT };
-	_select					{ FLAGS = NODYNSORT };
-	_sema_init				{ FLAGS = NODYNSORT };
-	_sema_post				{ FLAGS = NODYNSORT };
-	_sema_trywait				{ FLAGS = NODYNSORT };
-	_sema_wait				{ FLAGS = NODYNSORT };
-	_sysfs					{ FLAGS = NODYNSORT };
-	_thr_create				{ FLAGS = NODYNSORT };
-	_thr_exit				{ FLAGS = NODYNSORT };
-	_thr_getprio				{ FLAGS = NODYNSORT };
-	_thr_getspecific			{ FLAGS = NODYNSORT };
-	_thr_join				{ FLAGS = NODYNSORT };
-	_thr_keycreate				{ FLAGS = NODYNSORT };
-	_thr_kill				{ FLAGS = NODYNSORT };
-	_thr_main				{ FLAGS = NODYNSORT };
-	_thr_self				{ FLAGS = NODYNSORT };
-	_thr_setspecific			{ FLAGS = NODYNSORT };
-	_thr_sigsetmask				{ FLAGS = NODYNSORT };
-	_thr_stksegment				{ FLAGS = NODYNSORT };
-	_ungetc_unlocked			{ FLAGS = NODYNSORT };
+	# The following functions should not be exported from libc,
+	# but /lib/libm.so.2, some older versions of the Studio
+	# compiler/debugger components, and some ancient programs
+	# found in /usr/dist reference them.  When we no longer
+	# care about these old and broken binary objects, these
+	# symbols should be deleted.
+	_brk					{ FLAGS = NODYNSORT; };
+	_cond_broadcast				{ FLAGS = NODYNSORT; };
+	_cond_init				{ FLAGS = NODYNSORT; };
+	_cond_signal				{ FLAGS = NODYNSORT; };
+	_cond_wait				{ FLAGS = NODYNSORT; };
+	_ecvt					{ FLAGS = NODYNSORT; };
+	_fcvt					{ FLAGS = NODYNSORT; };
+	_getc_unlocked				{ FLAGS = NODYNSORT; };
+	_llseek					{ FLAGS = NODYNSORT; };
+	_pthread_attr_getdetachstate		{ FLAGS = NODYNSORT; };
+	_pthread_attr_getinheritsched		{ FLAGS = NODYNSORT; };
+	_pthread_attr_getschedparam		{ FLAGS = NODYNSORT; };
+	_pthread_attr_getschedpolicy		{ FLAGS = NODYNSORT; };
+	_pthread_attr_getscope			{ FLAGS = NODYNSORT; };
+	_pthread_attr_getstackaddr		{ FLAGS = NODYNSORT; };
+	_pthread_attr_getstacksize		{ FLAGS = NODYNSORT; };
+	_pthread_attr_init			{ FLAGS = NODYNSORT; };
+	_pthread_condattr_getpshared		{ FLAGS = NODYNSORT; };
+	_pthread_condattr_init			{ FLAGS = NODYNSORT; };
+	_pthread_cond_init			{ FLAGS = NODYNSORT; };
+	_pthread_create				{ FLAGS = NODYNSORT; };
+	_pthread_getschedparam			{ FLAGS = NODYNSORT; };
+	_pthread_join				{ FLAGS = NODYNSORT; };
+	_pthread_key_create			{ FLAGS = NODYNSORT; };
+	_pthread_mutexattr_getprioceiling	{ FLAGS = NODYNSORT; };
+	_pthread_mutexattr_getprotocol		{ FLAGS = NODYNSORT; };
+	_pthread_mutexattr_getpshared		{ FLAGS = NODYNSORT; };
+	_pthread_mutexattr_init			{ FLAGS = NODYNSORT; };
+	_pthread_mutex_getprioceiling		{ FLAGS = NODYNSORT; };
+	_pthread_mutex_init			{ FLAGS = NODYNSORT; };
+	_pthread_sigmask			{ FLAGS = NODYNSORT; };
+	_rwlock_init				{ FLAGS = NODYNSORT; };
+	_rw_rdlock				{ FLAGS = NODYNSORT; };
+	_rw_unlock				{ FLAGS = NODYNSORT; };
+	_rw_wrlock				{ FLAGS = NODYNSORT; };
+	_sbrk_unlocked				{ FLAGS = NODYNSORT; };
+	_select					{ FLAGS = NODYNSORT; };
+	_sema_init				{ FLAGS = NODYNSORT; };
+	_sema_post				{ FLAGS = NODYNSORT; };
+	_sema_trywait				{ FLAGS = NODYNSORT; };
+	_sema_wait				{ FLAGS = NODYNSORT; };
+	_sysfs					{ FLAGS = NODYNSORT; };
+	_thr_create				{ FLAGS = NODYNSORT; };
+	_thr_exit				{ FLAGS = NODYNSORT; };
+	_thr_getprio				{ FLAGS = NODYNSORT; };
+	_thr_getspecific			{ FLAGS = NODYNSORT; };
+	_thr_join				{ FLAGS = NODYNSORT; };
+	_thr_keycreate				{ FLAGS = NODYNSORT; };
+	_thr_kill				{ FLAGS = NODYNSORT; };
+	_thr_main				{ FLAGS = NODYNSORT; };
+	_thr_self				{ FLAGS = NODYNSORT; };
+	_thr_setspecific			{ FLAGS = NODYNSORT; };
+	_thr_sigsetmask				{ FLAGS = NODYNSORT; };
+	_thr_stksegment				{ FLAGS = NODYNSORT; };
+	_ungetc_unlocked			{ FLAGS = NODYNSORT; };
 
     local:
-	__imax_lldiv				{ FLAGS = NODYNSORT };
-	_ti_thr_self				{ FLAGS = NODYNSORT };
-	*;
+	_ti_thr_self				{ FLAGS = NODYNSORT; };
+	__imax_lldiv				{ FLAGS = NODYNSORT; };
 
+	*;
 $if lf64
-	_seekdir64		{ FLAGS = NODYNSORT };
-	_telldir64		{ FLAGS = NODYNSORT };
+	_seekdir64		{ FLAGS = NODYNSORT; };
+	_telldir64		{ FLAGS = NODYNSORT; };
 $endif
 
 $if _sparc
-	__cerror		{ FLAGS = NODYNSORT };
+	__cerror		{ FLAGS = NODYNSORT; };
 $endif
 
 $if sparc32
-	__cerror64		{ FLAGS = NODYNSORT };
+	__cerror64		{ FLAGS = NODYNSORT; };
 $endif
 
 $if sparcv9
-	__cleanup		{ FLAGS = NODYNSORT };
+	__cleanup		{ FLAGS = NODYNSORT; };
 $endif
 
 $if i386
-	_syscall6		{ FLAGS = NODYNSORT };
-	__systemcall6		{ FLAGS = NODYNSORT };
+	_syscall6		{ FLAGS = NODYNSORT; };
+	__systemcall6		{ FLAGS = NODYNSORT; };
 $endif
 
 $if amd64
-	___tls_get_addr		{ FLAGS = NODYNSORT };
+	___tls_get_addr		{ FLAGS = NODYNSORT; };
 $endif
 };

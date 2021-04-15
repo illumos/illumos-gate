@@ -37,6 +37,9 @@ SGSMSGTARG +=	$(SGSMSG32)
 NATIVE_LIBS +=	libc.so
 CW_LINKER =
 
+# A bootstrapping problem means we can't use the regular mapfile just yet
+MAPFILES =
+
 all:		$(DYNLIB) $(LIBLINKS)
 
 install:	all $(ROOTONBLDLIBMACH)/$(DYNLIB) $(ROOTONBLDLIBMACH)/$(LIBLINKS)

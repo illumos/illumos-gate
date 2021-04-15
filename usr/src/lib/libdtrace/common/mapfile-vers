@@ -59,7 +59,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	dtrace_close;
 	dtrace_consume;
 	dtrace_ctlfd;
-	_dtrace_debug;
+	_dtrace_debug	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 4;
+				};
+			};
 	dtrace_desc2str;
 	dtrace_dof_create;
 	dtrace_dof_destroy;
@@ -118,7 +123,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	dtrace_type_strcompile;
 	dtrace_uaddr2str;
 	dtrace_update;
-	_dtrace_version;
+	_dtrace_version	{
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = addrsize;
+				};
+			};
 	dtrace_vopen;
 	dtrace_work;
 	dtrace_xstr2desc;

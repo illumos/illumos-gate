@@ -42,7 +42,7 @@ $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	pp;
+	pp	{ ASSERT = { TYPE = OBJECT; SIZE = 716; }; };
 	ppop;
 	pplex;
 	ppinput;

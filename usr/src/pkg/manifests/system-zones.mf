@@ -61,7 +61,14 @@ dir path=usr/share/man/man5
 dir path=usr/share/man/man7d
 driver name=zcons
 file path=etc/zones/SUNWblank.xml mode=0444 variant.opensolaris.zone=global
-file path=etc/zones/SUNWdefault.xml mode=0444 variant.opensolaris.zone=global
+#
+# The SUNWdefault.xml file is marked as non-dehydratable so that is not removed
+# from an IPS image when `pkg dehydrate` is run on it.
+# This file must be retained so that `zoneadm` can determine the default brand
+# for the IPS image during subsequent rehydration.
+#
+file path=etc/zones/SUNWdefault.xml dehydrate=false mode=0444 \
+    variant.opensolaris.zone=global
 file path=etc/zones/index group=sys original_name=SUNWzone:etc/zones/index \
     preserve=true variant.opensolaris.zone=global
 file path=lib/svc/manifest/system/resource-mgmt.xml group=sys mode=0444 \

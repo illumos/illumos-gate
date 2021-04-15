@@ -25,53 +25,117 @@
 $mapfile_version 2
 
 SYMBOL_VERSION ILLUMOS_0.2 {
-	global:
-		resident		{ FLAGS = NODIRECT; };
+    global:
+	resident	{
+			  FLAGS = NODIRECT;
+			  ASSERT = {
+				  TYPE = OBJECT;
+				  SIZE = 4;
+				};
+			};
 } ILLUMOS_0.1;
 
 SYMBOL_VERSION ILLUMOS_0.1 {
-	global:
-		allow_severity		{ FLAGS = NODIRECT; };
-		clean_exit;
-		deny_severity		{ FLAGS = NODIRECT; };
-		dot_quad_addr;
-		dry_run;
-		eval_client;
-		eval_hostaddr;
-		eval_hostinfo;
-		eval_hostname;
-		eval_server;
-		eval_user;
-		fromhost;
-		hosts_access;
-		hosts_access_verbose;
-		hosts_allow_table;
-		hosts_ctl;
-		hosts_deny_table;
-		numeric_addr;
-		paranoid;
-		percent_m;
-		percent_x;
-		process_options;
-		refuse;
-		request_init;
-		request_set;
-		rfc931;
-		rfc931_timeout;
-		shell_cmd;
-		skip_ipv6_addrs;
-		sock_host;
-		sock_hostaddr;
-		sock_hostname;
-		sockgen_simplify;
-		split_at;
-		tcpd_buf;
-		tcpd_context;
-		tcpd_gethostbyname;
-		tcpd_warn;
-		tli_host;
-		unknown;
-		xgets;
-	local:
-		*;
+    global:
+	allow_severity		{
+				  FLAGS = NODIRECT;
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	clean_exit;
+	deny_severity		{
+				  FLAGS = NODIRECT;
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	dot_quad_addr;
+	dry_run			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	eval_client;
+	eval_hostaddr;
+	eval_hostinfo;
+	eval_hostname;
+	eval_server;
+	eval_user;
+	fromhost;
+	hosts_access;
+	hosts_access_verbose	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	hosts_allow_table	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	hosts_ctl;
+	hosts_deny_table	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize;
+					};
+				};
+	numeric_addr;
+	paranoid		{ ASSERT = { TYPE = OBJECT; SIZE = 9; }; };
+	percent_m;
+	percent_x;
+	process_options;
+	refuse;
+	request_init;
+	request_set;
+	rfc931;
+	rfc931_timeout		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
+	shell_cmd;
+	skip_ipv6_addrs;
+	sock_host;
+	sock_hostaddr;
+	sock_hostname;
+	sockgen_simplify;
+	split_at;
+	tcpd_buf		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  $if _x86 && _ELF64
+
+					  SIZE = addrsize[8];
+					  $elif _x86 && _ELF32
+
+					  SIZE = addrsize[10];
+					  $else
+
+					  $error Unknown architecture
+
+					  $endif
+
+					};
+				};
+	tcpd_context		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[2];
+					};
+				};
+	tcpd_gethostbyname;
+	tcpd_warn;
+	tli_host;
+	unknown			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 8;
+					};
+				};
+	xgets;
+    local:
+	*;
 };

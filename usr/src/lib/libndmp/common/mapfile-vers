@@ -10,10 +10,10 @@
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
-# 	- Redistributions of source code must retain the above copyright
+#	- Redistributions of source code must retain the above copyright
 #	  notice, this list of conditions and the following disclaimer.
 #
-# 	- Redistributions in binary form must reproduce the above copyright
+#	- Redistributions in binary form must reproduce the above copyright
 #	  notice, this list of conditions and the following disclaimer in
 #	  the documentation and/or other materials provided with the
 #	  distribution.
@@ -61,13 +61,13 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ndmp_get_session_info_free;
 	ndmp_get_stats;
 	ndmp_get_prop;
-	ndmp_set_prop;	
+	ndmp_set_prop;
 	ndmp_service_refresh;
 	ndmp_door_status;
 	ndmp_base64_encode;
 	ndmp_base64_decode;
 	ndmp_strerror;
-	ndmp_errno;
+	ndmp_errno	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	ndmp_door_decode_start;
 	ndmp_door_decode_finish;
 	ndmp_door_encode_start;

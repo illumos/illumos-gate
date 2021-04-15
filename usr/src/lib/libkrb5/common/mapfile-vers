@@ -50,296 +50,296 @@ SYMBOL_SCOPE {
     global:
 
 # com_err.h
-        com_err			{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        com_err_va		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        error_message		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	com_err			{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	com_err_va		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	error_message		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
 
 # krb5.h (non-private and non-deprecated)
-        krb5_c_encrypt		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_decrypt		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_encrypt_length	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_block_size	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_init_state	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_free_state	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_make_random_key	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_random_make_octets { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_string_to_key	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_string_to_key_with_params {
+	krb5_c_encrypt		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_decrypt		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_encrypt_length	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_block_size	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_init_state	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_free_state	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_make_random_key	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_random_make_octets { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_string_to_key	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_string_to_key_with_params {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_c_enctype_compare	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_make_checksum	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_verify_checksum	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_checksum_length	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_keyed_checksum_types { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_valid_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_valid_cksumtype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_is_coll_proof_cksum { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_c_is_keyed_cksum	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_gen_new		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_initialize	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_destroy		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_close		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_store_cred	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_retrieve_cred	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_get_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_get_principal	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_start_seq_get	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_next_cred	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_end_seq_get	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_remove_cred	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_set_flags	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_get_type	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_get_type	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_get_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_close		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_get_entry	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_start_seq_get	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_next_entry	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_end_seq_get	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_init_context	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_init_secure_context { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_enctype_compare	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_make_checksum	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_verify_checksum	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_checksum_length	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_keyed_checksum_types { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_valid_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_valid_cksumtype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_is_coll_proof_cksum { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_c_is_keyed_cksum	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_gen_new		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_initialize	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_destroy		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_close		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_store_cred	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_retrieve_cred	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_get_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_get_principal	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_start_seq_get	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_next_cred	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_end_seq_get	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_remove_cred	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_set_flags	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_get_type	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_get_type	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_get_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_close		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_get_entry	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_start_seq_get	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_next_entry	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_end_seq_get	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_init_context	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_init_secure_context { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
 	krb5_free_context	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_set_default_tgs_enctypes {
+	krb5_set_default_tgs_enctypes {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_permitted_enctypes { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_is_thread_safe	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_tgt_creds	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_get_credentials	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_get_credentials_validate {
+	krb5_get_permitted_enctypes { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_is_thread_safe	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_tgt_creds	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_credentials	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_credentials_validate {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_credentials_renew { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_mk_req		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_mk_req_extended	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_mk_rep		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_rd_rep		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_mk_error		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_rd_error		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_rd_safe		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_rd_priv		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_parse_name		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_unparse_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_unparse_name_ext	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_set_principal_realm { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_address_search	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_address_compare	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_address_order	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_realm_compare	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_principal_compare	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_init_keyblock	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_copy_keyblock	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_copy_keyblock_contents { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_copy_creds		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_copy_data		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_copy_principal	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_copy_addresses	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_copy_ticket	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_copy_authdata	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_copy_authenticator	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_copy_checksum	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_get_server_rcache	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_build_principal_ext { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_build_principal	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_resolve		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_default_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_default		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_keytab_entry_contents	{
+	krb5_get_credentials_renew { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_mk_req		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_mk_req_extended	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_mk_rep		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_rd_rep		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_mk_error		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_rd_error		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_rd_safe		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_rd_priv		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_parse_name		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_unparse_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_unparse_name_ext	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_set_principal_realm { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_address_search	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_address_compare	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_address_order	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_realm_compare	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_principal_compare	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_init_keyblock	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_copy_keyblock	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_copy_keyblock_contents { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_copy_creds		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_copy_data		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_copy_principal	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_copy_addresses	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_copy_ticket	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_copy_authdata	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_copy_authenticator	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_copy_checksum	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_server_rcache	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_build_principal_ext { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_build_principal	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_resolve		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_default_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_default		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_keytab_entry_contents	{
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_kt_remove_entry	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_add_entry	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_principal2salt	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_resolve		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_default_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_set_default_name { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_default		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cc_copy_creds	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_principal	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_authenticator	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_addresses	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_authdata	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_ticket	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_error		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_creds		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_cred_contents	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_checksum	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_checksum_contents { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_keyblock	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_keyblock_contents { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_ap_rep_enc_part { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_data		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_data_contents	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_unparsed_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_cksumtypes	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_us_timeofday	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_timeofday		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_os_localaddr	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_get_default_realm	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_set_default_realm	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_default_realm	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_sname_to_principal	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_change_password	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_set_password	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_set_password_using_ccache {
+	krb5_kt_remove_entry	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_add_entry	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_principal2salt	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_resolve		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_default_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_set_default_name { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_default		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cc_copy_creds	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_principal	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_authenticator	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_addresses	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_authdata	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_ticket	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_error		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_creds		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_cred_contents	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_checksum	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_checksum_contents { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_keyblock	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_keyblock_contents { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_ap_rep_enc_part { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_data		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_data_contents	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_unparsed_name	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_cksumtypes	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_us_timeofday	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_timeofday		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_os_localaddr	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_default_realm	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_set_default_realm	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_default_realm	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_sname_to_principal	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_change_password	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_set_password	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_set_password_using_ccache {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_profile	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_rd_req		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kt_read_service_key { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_mk_safe		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_mk_priv		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_sendauth		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_recvauth		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_recvauth_version	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_mk_ncred		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_mk_1cred		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_rd_cred		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_fwd_tgt_creds	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_init	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_free	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_setflags	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_getflags	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_set_checksum_func	{
+	krb5_get_profile	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_rd_req		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_read_service_key { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_mk_safe		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_mk_priv		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_sendauth		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_recvauth		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_recvauth_version	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_mk_ncred		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_mk_1cred		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_rd_cred		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_fwd_tgt_creds	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_init	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_free	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_setflags	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_getflags	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_set_checksum_func	{
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_auth_con_get_checksum_func	{
+	krb5_auth_con_get_checksum_func	{
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	 };
-        krb5_auth_con_setaddrs	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_getaddrs	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_setports	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_setuseruserkey {
+	krb5_auth_con_setaddrs	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_getaddrs	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_setports	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_setuseruserkey {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_auth_con_getkey	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_getsendsubkey { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_getrecvsubkey { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_setsendsubkey { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_setrecvsubkey { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_getlocalseqnumber	{
+	krb5_auth_con_getkey	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_getsendsubkey { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_getrecvsubkey { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_setsendsubkey { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_setrecvsubkey { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_getlocalseqnumber	{
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_auth_con_getremoteseqnumber {
+	krb5_auth_con_getremoteseqnumber {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_auth_con_setrcache	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_getrcache	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_getauthenticator {
+	krb5_auth_con_setrcache	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_getrcache	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_getauthenticator {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_read_password	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_aname_to_localname	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_get_host_realm	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_host_realm	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_kuserok		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_auth_con_genaddrs	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_set_real_time	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_string_to_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_string_to_salttype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_string_to_cksumtype { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_string_to_timestamp { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_string_to_deltat	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_enctype_to_string	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_salttype_to_string	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_cksumtype_to_string { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_timestamp_to_string { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_timestamp_to_sfstring { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_deltat_to_string	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_xfree_wrap		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_xfree		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_prompter_posix	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_get_init_creds_opt_init {
+	krb5_read_password	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_aname_to_localname	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_host_realm	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_host_realm	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kuserok		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_auth_con_genaddrs	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_set_real_time	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_string_to_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_string_to_salttype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_string_to_cksumtype { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_string_to_timestamp { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_string_to_deltat	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_enctype_to_string	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_salttype_to_string	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_cksumtype_to_string { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_timestamp_to_string { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_timestamp_to_sfstring { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_deltat_to_string	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_xfree_wrap		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_xfree		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_prompter_posix	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_init_creds_opt_init {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_init_creds_opt_set_tkt_life {
+	krb5_get_init_creds_opt_set_tkt_life {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_init_creds_opt_set_renew_life {
+	krb5_get_init_creds_opt_set_renew_life {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_init_creds_opt_set_forwardable {
+	krb5_get_init_creds_opt_set_forwardable {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_init_creds_opt_set_proxiable {
+	krb5_get_init_creds_opt_set_proxiable {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_init_creds_opt_set_etype_list {
+	krb5_get_init_creds_opt_set_etype_list {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_init_creds_opt_set_address_list { 
+	krb5_get_init_creds_opt_set_address_list {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1
 	};
-        krb5_get_init_creds_opt_set_preauth_list {
-		TYPE = FUNCTION; 
+	krb5_get_init_creds_opt_set_preauth_list {
+		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_init_creds_opt_set_salt {
+	krb5_get_init_creds_opt_set_salt {
 		TYPE = FUNCTION;
 		 FILTER = mech_krb5.so.1;
 	};
-        krb5_get_init_creds_password { 
+	krb5_get_init_creds_password {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_init_creds_keytab { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_verify_init_creds_opt_init	{
+	krb5_get_init_creds_keytab { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_verify_init_creds_opt_init	{
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_verify_init_creds_opt_set_ap_req_nofail {
+	krb5_verify_init_creds_opt_set_ap_req_nofail {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_verify_init_creds	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_get_validated_creds { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_get_renewed_creds	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_decode_ticket	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_appdefault_string	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_appdefault_boolean	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_realm_iterator_create { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_realm_iterator	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_realm_iterator_free { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_free_realm_string	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_get_prompt_types	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_string_to_key	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_use_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_init_allocated_keyblock {
+	krb5_verify_init_creds	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_validated_creds { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_renewed_creds	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_decode_ticket	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_appdefault_string	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_appdefault_boolean	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_realm_iterator_create { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_realm_iterator	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_realm_iterator_free { TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_free_realm_string	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_prompt_types	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_string_to_key	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_use_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_init_allocated_keyblock {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-        krb5_get_key_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_get_key_length	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_get_key_data	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_set_key_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_set_key_data	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_set_key_length	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_pac_add_buffer	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_pac_free		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_pac_get_buffer	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_pac_get_types	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_pac_init		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_pac_parse		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_pac_verify		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_key_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_key_length	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_get_key_data	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_set_key_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_set_key_data	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_set_key_length	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_pac_add_buffer	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_pac_free		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_pac_get_buffer	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_pac_get_types	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_pac_init		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_pac_parse		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_pac_verify		{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
 	krb5_decode_authdata_container {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
@@ -350,15 +350,15 @@ SYMBOL_SCOPE {
 	};
 
 # krb5.h - priv/deprecated
-        krb5_string_to_key	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-        krb5_use_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_string_to_key	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_use_enctype	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
 	krb5_checksum_size	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
-	krb5_kt_free_entry 	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
+	krb5_kt_free_entry	{ TYPE = FUNCTION; FILTER = mech_krb5.so.1 };
 	krb5_auth_con_getlocalsubkey {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};
-	krb5_auth_con_getremotesubkey { 
+	krb5_auth_con_getremotesubkey {
 		TYPE = FUNCTION;
 		FILTER = mech_krb5.so.1;
 	};

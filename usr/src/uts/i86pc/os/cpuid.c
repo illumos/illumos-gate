@@ -24,7 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Josef "Jeff" Sipek <jeffpc@josefsipek.net>
  * Copyright 2020 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -3237,6 +3237,7 @@ cpuid_pass1_ppin(cpu_t *cpu, uchar_t *featureset)
 		case INTC_MODEL_BROADWELL_XEON:
 		case INTC_MODEL_BROADWELL_XEON_D:
 		case INTC_MODEL_SKYLAKE_XEON:
+		case INTC_MODEL_ICELAKE_XEON:
 			if (!on_trap(&otd, OT_DATA_ACCESS)) {
 				uint64_t value;
 

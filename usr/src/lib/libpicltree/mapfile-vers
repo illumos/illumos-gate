@@ -89,7 +89,7 @@ SYMBOL_VERSION SUNWprivate_1.2 {
     global:
 	dbg_exec;
 	dbg_print;
-	verbose_level;
+	verbose_level	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 } SUNWprivate_1.1;
 
 SYMBOL_VERSION SUNWprivate_1.1 {
