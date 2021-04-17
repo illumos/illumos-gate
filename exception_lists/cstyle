@@ -1357,6 +1357,7 @@ usr/src/cmd/bhyve/pci_lpc.[ch]
 usr/src/cmd/bhyve/pci_nvme.c
 usr/src/cmd/bhyve/pci_passthru.c
 usr/src/cmd/bhyve/pci_uart.c
+usr/src/cmd/bhyve/pci_virtio_9p.c
 usr/src/cmd/bhyve/pci_virtio_block.c
 usr/src/cmd/bhyve/pci_virtio_console.c
 usr/src/cmd/bhyve/pci_virtio_net.c
@@ -1390,3 +1391,4 @@ usr/src/uts/i86pc/io/vmm/amd/amdvi_*.[ch]
 usr/src/uts/i86pc/io/vmm/amd/ivrs_*.c
 usr/src/uts/i86pc/sys/vmm.h
 usr/src/uts/i86pc/sys/vmm_dev.h
+usr/src/lib/lib9p/common/*

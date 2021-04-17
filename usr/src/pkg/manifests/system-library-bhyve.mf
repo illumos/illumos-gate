@@ -14,7 +14,7 @@
 #
 
 #
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/library/bhyve@$(PKGVERS)
@@ -30,8 +30,10 @@ dir path=usr/lib group=bin
 dir path=usr/lib/$(ARCH64) group=bin
 file path=lib/$(ARCH64)/libvmm.so.1
 file path=lib/$(ARCH64)/libvmmapi.so.1
+file path=usr/lib/$(ARCH64)/lib9p.so.1
 file path=usr/lib/$(ARCH64)/libppt.so.1
 file path=usr/lib/libppt.so.1
 license lic_CDDL license=lic_CDDL
+license usr/src/lib/lib9p/COPYRIGHT license=usr/src/lib/lib9p/COPYRIGHT
 license usr/src/lib/libvmmapi/THIRDPARTYLICENSE \
     license=usr/src/lib/libvmmapi/THIRDPARTYLICENSE

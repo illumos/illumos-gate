@@ -69,6 +69,7 @@ usr/src/cmd/bhyve/pci_lpc.[ch]
 usr/src/cmd/bhyve/pci_nvme.c
 usr/src/cmd/bhyve/pci_passthru.c
 usr/src/cmd/bhyve/pci_uart.c
+usr/src/cmd/bhyve/pci_virtio_9p.c
 usr/src/cmd/bhyve/pci_virtio_block.c
 usr/src/cmd/bhyve/pci_virtio_console.c
 usr/src/cmd/bhyve/pci_virtio_net.c
@@ -95,3 +96,4 @@ usr/src/cmd/bhyve/xmsr.[ch]
 usr/src/cmd/bhyvectl/bhyvectl.c
 usr/src/contrib/bhyve/*
 usr/src/lib/libvmmapi/common/vmmapi.[ch]
+usr/src/lib/lib9p/common/*

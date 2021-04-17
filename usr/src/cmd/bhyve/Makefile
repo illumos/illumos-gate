@@ -56,6 +56,7 @@ SRCS =	acpi.c			\
 	pci_nvme.c		\
 	pci_passthru.c		\
 	pci_uart.c		\
+	pci_virtio_9p.c		\
 	pci_virtio_block.c	\
 	pci_virtio_console.c	\
 	pci_virtio_net.c	\
@@ -115,6 +116,7 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
 		-I$(CONTRIB)/bhyve/dev/usb/controller \
 		-I$(CONTRIB)/bhyve/dev/mii \
+		-I$(SRC)/lib/lib9p/common \
 		-I$(SRC)/uts/common/io/e1000api \
 		$(CPPFLAGS.master) \
 		-I$(SRC)/uts/i86pc/io/vmm \
@@ -128,6 +130,8 @@ pci_nvme.o := SMOFF += kmalloc_wrong_size
 
 pci_passthru.o := CERRWARN += -_gcc10=-Wno-address-of-packed-member
 
+pci_virtio_9p.o := SMOFF += kmalloc_wrong_size
+
 pci_xhci.o := CERRWARN += -_gcc10=-Wno-address-of-packed-member
 
 SMOFF += all_func_returns,leaks,no_if_block
@@ -136,6 +140,7 @@ SMOFF += all_func_returns,leaks,no_if_block
 CSTD=		$(CSTD_GNU99)
 
 $(PROG) := LDLIBS += \
+	-l9p \
 	-lsocket \
 	-lnsl \
 	-ldlpi \

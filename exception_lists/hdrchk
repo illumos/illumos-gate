@@ -433,3 +433,4 @@ usr/src/uts/i86pc/io/vmm/vmm_util.h
 usr/src/uts/i86pc/io/vmm/x86.h
 usr/src/uts/i86pc/sys/vmm.h
 usr/src/uts/i86pc/sys/vmm_dev.h
+usr/src/lib/lib9p/common/*

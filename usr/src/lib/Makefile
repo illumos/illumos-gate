@@ -274,6 +274,7 @@ SUBDIRS +=				\
 	$($(MACH)_SUBDIRS)
 
 i386_SUBDIRS=		\
+	lib9p		\
 	libfdisk	\
 	libppt		\
 	libsaveargs	\
@@ -489,6 +490,7 @@ HDRSUBDIRS=				\
 	$($(MACH)_HDRSUBDIRS)
 
 i386_HDRSUBDIRS=	\
+	lib9p		\
 	libfdisk	\
 	libppt		\
 	libsaveargs	\
@@ -581,6 +583,7 @@ gss_mechs/mech_krb5: libgss libresolv2 pkcs11 libkstat
 gss_mechs/mech_spnego: gss_mechs/mech_krb5
 hal:		dbusdeps
 krb5:		gss_mechs/mech_krb5 libtecla libldap5
+lib9p:		libsec libcustr
 libads:		libnsl
 libadt_jni:	libbsm
 libadutils:	libldap5 libresolv2

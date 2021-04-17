@@ -862,6 +862,12 @@ usr/lib/sparcv9/libdwarf.so		sparc
 usr/lib/libdwarf.so
 
 #
+# lib9p is private
+#
+usr/include/lib9p.h
+usr/lib/amd64/lib9p.so			i386
+
+#
 # We're not quite ready to ship ctfconvert and ctfmerge
 #
 usr/bin/ctfconvert
