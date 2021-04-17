@@ -27,6 +27,7 @@
  */
 /*
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2021 Jason King
  */
 
 /*
@@ -84,25 +85,25 @@ GROUP(demangle_osx,
     "<core::option::Option<T>>::unwrap::_MSG_FILE_LINE_COL::haf7cb8d5824ee659"),
     T("__ZN4core5slice89_$LT$impl$u20$core..iter..traits..IntoIterator$u20$for$u20$$RF$$u27$a$u20$$u5b$T$u5d$$GT$9into_iter17h450e234d27262170E",
     "core::slice::<impl core::iter::traits::IntoIterator for &'a [T]>::into_iter::h450e234d27262170"));
-/* END CSTYLED */
 
 GROUP(demangle_elements_beginning_with_underscore,
     T("_ZN13_$LT$test$GT$E", "<test>"),
     T("_ZN28_$u7b$$u7b$closure$u7d$$u7d$E", "{{closure}}"),
     T("_ZN15__STATIC_FMTSTRE", "__STATIC_FMTSTR"));
 
-/* BEGIN CSTYLED */
 GROUP(demangle_trait_impls,
     T("_ZN71_$LT$Test$u20$$u2b$$u20$$u27$static$u20$as$u20$foo..Bar$LT$Test$GT$$GT$3barE",
     "<Test + 'static as foo::Bar<Test>>::bar"));
-/* END CSTYLED */
 
 GROUP(invalid_no_chop, T_ERR("_ZNfooE"));
 
-/* BEGIN CSTYLED */
 GROUP(handle_assoc_types,
     T("_ZN151_$LT$alloc..boxed..Box$LT$alloc..boxed..FnBox$LT$A$C$$u20$Output$u3d$R$GT$$u20$$u2b$$u20$$u27$a$GT$$u20$as$u20$core..ops..function..FnOnce$LT$A$GT$$GT$9call_once17h69e8f44b3723e1caE",
     "<alloc::boxed::Box<alloc::boxed::FnBox<A, Output=R> + 'a> as core::ops::function::FnOnce<A>>::call_once::h69e8f44b3723e1ca"));
+
+/* C++ mangled names that aren't valid rust names */
+GROUP(cplusplus_as_rust, T_ERR("_ZN7mozilla3dom13BrowserParent22RecvUpdateContentCacheERKNS_12ContentCacheE"));
+
 /* END CSTYLED */
 
 static rust_test_grp_t *rust_tests[] = {
@@ -113,7 +114,8 @@ static rust_test_grp_t *rust_tests[] = {
 	&demangle_elements_beginning_with_underscore,
 	&demangle_trait_impls,
 	&invalid_no_chop,
-	&handle_assoc_types
+	&handle_assoc_types,
+	&cplusplus_as_rust,
 };
 
 static const size_t n_rust_tests = ARRAY_SIZE(rust_tests);

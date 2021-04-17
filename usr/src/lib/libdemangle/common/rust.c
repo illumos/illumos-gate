@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2021 Jason King
  */
 
 #include <errno.h>
@@ -32,12 +33,12 @@
  *     https://docs.rs/rustc-demangle/0.1.13/rustc_demangle/
  *
  * A mangled rust name is:
- *     <prefix> <name> <hash> E
+ *     <prefix> <name>
  *
  * <prefix>	::=	_Z
  *			__Z
  *
- * <name>	::= <name-segment>+
+ * <name>	::= N <name-segment>+ [<hash>] E
  *
  * <name-segment> ::= <len> <name-chars>{len}
  *
@@ -166,15 +167,18 @@ rust_demangle(const char *s, size_t slen, sysdem_ops_t *ops)
 	if ((ret = custr_xalloc(&st.rds_demangled, &custr_alloc)) != 0)
 		return (NULL);
 
-	while (sv_remaining(&sv) > 1) {
-		if (rustdem_parse_name(&st, &sv))
-			continue;
-		if (st.rds_error != 0)
-			goto fail;
+	if (!rustdem_parse_name(&st, &sv)) {
+		if (st.rds_error == 0)
+			st.rds_error = EINVAL;
+		goto fail;
 	}
 
-	if (st.rds_error != 0 || !sv_consume_if_c(&sv, 'E'))
+	if (sv_remaining(&sv) > 0) {
+		DEMDEBUG("ERROR: unexpected trailing characters after "
+		    "terminating 'E': '%.*s'", SV_PRINT(&sv));
+		st.rds_error = EINVAL;
 		goto fail;
+	}
 
 	char *res = xstrdup(ops, custr_cstr(st.rds_demangled));
 	if (res == NULL) {
@@ -199,7 +203,7 @@ rustdem_parse_prefix(rustdem_state_t *st, strview_t *svp)
 
 	sv_init_sv(&pfx, svp);
 
-	DEMDEBUG("checking for '_ZN' or '__ZN' in '%.*s'", SV_PRINT(&pfx));
+	DEMDEBUG("checking for '_Z' or '__Z' in '%.*s'", SV_PRINT(&pfx));
 
 	if (st->rds_error != 0)
 		return (B_FALSE);
@@ -209,7 +213,7 @@ rustdem_parse_prefix(rustdem_state_t *st, strview_t *svp)
 
 	(void) sv_consume_if_c(&pfx, '_');
 
-	if (!sv_consume_if_c(&pfx, 'Z') || !sv_consume_if_c(&pfx, 'N'))
+	if (!sv_consume_if_c(&pfx, 'Z'))
 		return (B_FALSE);
 
 	/* Update svp with new position */
@@ -260,12 +264,21 @@ rustdem_parse_name_segment(rustdem_state_t *st, strview_t *svp, boolean_t first)
 
 	/*
 	 * A rust hash starts with 'h', and is the last component of a name
-	 * before the terminating 'E'
+	 * before the terminating 'E'. It is however not always present
+	 * in every mangled symbol, and a last segment that starts with 'h'
+	 * could be confused for it, so failing to parse it just means
+	 * we don't have a trailing hash.
 	 */
 	if (sv_peek(&name, 0) == 'h' && last) {
-		if (!rustdem_parse_hash(st, &name))
-			return (B_FALSE);
-		goto done;
+		if (rustdem_parse_hash(st, &name))
+			goto done;
+
+		/*
+		 * However any error other than 'not a hash' (e.g. ENOMEM)
+		 * means we should fail.
+		 */
+		if (st->rds_error != 0)
+			goto done;
 	}
 
 	while (sv_remaining(&name) > 0) {
@@ -306,12 +319,17 @@ rustdem_parse_name_segment(rustdem_state_t *st, strview_t *svp, boolean_t first)
 	}
 
 done:
-	DEMDEBUG("%s: consumed '%.*s'", __func__, (int)len, svp->sv_first);
 	sv_consume_n(&sv, len);
+	VERIFY3P(svp->sv_first, <=, sv.sv_first);
+	DEMDEBUG("%s: consumed '%.*s'", __func__,
+	    (int)(sv.sv_first - svp->sv_first), svp->sv_first);
 	sv_init_sv(svp, &sv);
 	return (B_TRUE);
 }
 
+/*
+ * Parse N (<num><name>{num})+[<num>h<hex digits>]E
+ */
 static boolean_t
 rustdem_parse_name(rustdem_state_t *st, strview_t *svp)
 {
@@ -323,14 +341,28 @@ rustdem_parse_name(rustdem_state_t *st, strview_t *svp)
 
 	sv_init_sv(&name, svp);
 
-	if (sv_remaining(&name) == 0)
+	DEMDEBUG("%s: name = '%.*s'", __func__, SV_PRINT(&name));
+
+	if (sv_remaining(&name) == 0) {
+		DEMDEBUG("%s: empty name", __func__);
 		return (B_FALSE);
+	}
+
+	if (!sv_consume_if_c(&name, 'N')) {
+		DEMDEBUG("%s: does not start with 'N'", __func__);
+		return (B_FALSE);
+	}
 
 	while (sv_remaining(&name) > 0 && sv_peek(&name, 0) != 'E') {
 		if (!rustdem_parse_name_segment(st, &name, first))
 			return (B_FALSE);
 		first = B_FALSE;
 	}
+	VERIFY(sv_consume_if_c(&name, 'E'));
+
+	VERIFY3P(svp->sv_first, <=, name.sv_first);
+	DEMDEBUG("%s: consumed '%.*s'", __func__,
+	    (int)(name.sv_first - svp->sv_first), svp->sv_first);
 
 	sv_init_sv(svp, &name);
 	return (B_TRUE);
