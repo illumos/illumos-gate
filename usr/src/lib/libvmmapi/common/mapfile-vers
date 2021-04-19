@@ -13,6 +13,7 @@
 # Copyright 2013 Pluribus Networks Inc.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -66,6 +67,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_get_pptdev_limits;
 		vm_get_register;
 		vm_get_register_set;
+		vm_get_run_state;
 		vm_get_seg_desc;
 		vm_get_stat_desc;
 		vm_get_stats;
@@ -91,6 +93,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_map_pptdev_mmio;
 		vm_mmap_getnext;
 		vm_mmap_memseg;
+		vm_munmap_memseg;
 		vm_open;
 		vm_parse_memsize;
 		vm_pmtmr_set_location;
@@ -108,6 +111,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_set_memflags;
 		vm_set_register;
 		vm_set_register_set;
+		vm_set_run_state;
 		vm_set_topology;
 		vm_set_x2apic_state;
 		vm_setup_memory;
@@ -117,9 +121,8 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_suspend_cpu;
 		vm_suspended_cpus;
 		vm_unassign_pptdev;
+		vm_unmap_pptdev_mmio;
 		vm_wrlock_cycle;
-		vm_get_run_state;
-		vm_set_run_state;
 
 	local:
 		*;

@@ -94,8 +94,8 @@ __FBSDID("$FreeBSD$");
 #include "atkbdc.h"
 #include "console.h"
 #include "bootrom.h"
+#include "config.h"
 #include "inout.h"
-#include "dbgport.h"
 #include "debug.h"
 #include "fwctl.h"
 #include "gdb.h"
@@ -190,25 +190,10 @@ static const char * const vmx_exit_reason_desc[] = {
 typedef int (*vmexit_handler_t)(struct vmctx *, struct vm_exit *, int *vcpu);
 extern int vmexit_task_switch(struct vmctx *, struct vm_exit *, int *vcpu);
 
-char *vmname;
-
 int guest_ncpus;
 uint16_t cores, maxcpus, sockets, threads;
 
-char *guest_uuid_str;
-
 int raw_stdio = 0;
-
-static int gdb_port = 0;
-static int guest_vmexit_on_hlt, guest_vmexit_on_pause;
-static int virtio_msix = 1;
-static int x2apic_mode = 0;	/* default is xAPIC */
-static int destroy_on_poweroff = 0;
-
-static int strictio;
-static int strictmsr = 1;
-
-static int acpi;
 
 static char *progname;
 static const int BSP = 0;
@@ -250,16 +235,16 @@ usage(int code)
 
         fprintf(stderr,
 #ifdef	__FreeBSD__
-		"Usage: %s [-abehuwxACDHPSWY]\n"
+		"Usage: %s [-aehuwxACDHPSWY]\n"
 #else
-		"Usage: %s [-abdehuwxACDHPSWY]\n"
+		"Usage: %s [-adehuwxACDHPSWY]\n"
 #endif
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
-		"       %*s [-g <gdb port>] [-l <lpc>]\n"
+		"       %*s [-k <file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
 #ifdef	__FreeBSD__
-		"       %*s [-m mem] [-p vcpu:hostcpu] [-s <pci>] [-U uuid] <vm>\n"
+		"       %*s [-p vcpu:hostcpu] [-s <pci>] [-U uuid] [<vm>]\n"
 #else
-		"       %*s [-m mem] [-s <pci>] [-U uuid] <vm>\n"
+		"       %*s [-s <pci>] [-U uuid] [<vm>]\n"
 #endif
 		"       -a: local apic is in xAPIC mode (deprecated)\n"
 		"       -A: create ACPI tables\n"
@@ -270,11 +255,12 @@ usage(int code)
 #endif
 		"       -D: destroy on power-off\n"
 		"       -e: exit on unhandled I/O access\n"
-		"       -g: gdb port\n"
 		"       -h: help\n"
 		"       -H: vmexit from the guest on hlt\n"
+		"       -k: key=value flat config file\n"
 		"       -l: LPC device configuration\n"
 		"       -m: memory size\n"
+		"       -o: set config 'var' to 'value'\n"
 #ifdef	__FreeBSD__
 		"       -p: pin 'vcpu' to 'hostcpu'\n"
 #endif
@@ -295,11 +281,8 @@ usage(int code)
 
 /*
  * XXX This parser is known to have the following issues:
- * 1.  It accepts null key=value tokens ",,".
- * 2.  It accepts whitespace after = and before value.
- * 3.  Values out of range of INT are silently wrapped.
- * 4.  It doesn't check non-final values.
- * 5.  The apparently bogus limits of UINT16_MAX are for future expansion.
+ * 1.  It accepts null key=value tokens ",," as setting "cpus" to an
+ *     empty string.
  *
  * The acceptance of a null specification ('-c ""') is by design to match the
  * manual page syntax specification, this results in a topology of 1 vCPU.
@@ -307,78 +290,114 @@ usage(int code)
 static int
 topology_parse(const char *opt)
 {
-	uint64_t ncpus;
-	int c, chk, n, s, t, tmp;
 	char *cp, *str;
-	bool ns, scts;
 
-	c = 1, n = 1, s = 1, t = 1;
-	ns = false, scts = false;
+	if (*opt == '\0') {
+		set_config_value("sockets", "1");
+		set_config_value("cores", "1");
+		set_config_value("threads", "1");
+		set_config_value("cpus", "1");
+		return (0);
+	}
+
 	str = strdup(opt);
 	if (str == NULL)
-		goto out;
+		errx(4, "Failed to allocate memory");
 
 	while ((cp = strsep(&str, ",")) != NULL) {
-		if (sscanf(cp, "%i%n", &tmp, &chk) == 1) {
-			n = tmp;
-			ns = true;
-		} else if (sscanf(cp, "cpus=%i%n", &tmp, &chk) == 1) {
-			n = tmp;
-			ns = true;
-		} else if (sscanf(cp, "sockets=%i%n", &tmp, &chk) == 1) {
-			s = tmp;
-			scts = true;
-		} else if (sscanf(cp, "cores=%i%n", &tmp, &chk) == 1) {
-			c = tmp;
-			scts = true;
-		} else if (sscanf(cp, "threads=%i%n", &tmp, &chk) == 1) {
-			t = tmp;
-			scts = true;
+		if (strncmp(cp, "cpus=", strlen("cpus=")) == 0)
+			set_config_value("cpus", cp + strlen("cpus="));
+		else if (strncmp(cp, "sockets=", strlen("sockets=")) == 0)
+			set_config_value("sockets", cp + strlen("sockets="));
+		else if (strncmp(cp, "cores=", strlen("cores=")) == 0)
+			set_config_value("cores", cp + strlen("cores="));
+		else if (strncmp(cp, "threads=", strlen("threads=")) == 0)
+			set_config_value("threads", cp + strlen("threads="));
 #ifdef notyet  /* Do not expose this until vmm.ko implements it */
-		} else if (sscanf(cp, "maxcpus=%i%n", &tmp, &chk) == 1) {
-			m = tmp;
+		else if (strncmp(cp, "maxcpus=", strlen("maxcpus=")) == 0)
+			set_config_value("maxcpus", cp + strlen("maxcpus="));
 #endif
-		/* Skip the empty argument case from -c "" */
-		} else if (cp[0] == '\0')
-			continue;
+		else if (strchr(cp, '=') != NULL)
+			goto out;
 		else
-			goto out;
-		/* Any trailing garbage causes an error */
-		if (cp[chk] != '\0')
-			goto out;
+			set_config_value("cpus", cp);
 	}
 	free(str);
-	str = NULL;
-
-	/*
-	 * Range check 1 <= n <= UINT16_MAX all values
-	 */
-	if (n < 1 || s < 1 || c < 1 || t < 1 ||
-	    n > UINT16_MAX || s > UINT16_MAX || c > UINT16_MAX  ||
-	    t > UINT16_MAX)
-		return (-1);
-
-	/* If only the cpus was specified, use that as sockets */
-	if (!scts)
-		s = n;
-	/*
-	 * Compute sockets * cores * threads avoiding overflow
-	 * The range check above insures these are 16 bit values
-	 * If n was specified check it against computed ncpus
-	 */
-	ncpus = (uint64_t)s * c * t;
-	if (ncpus > UINT16_MAX || (ns && n != ncpus))
-		return (-1);
-
-	guest_ncpus = ncpus;
-	sockets = s;
-	cores = c;
-	threads = t;
-	return(0);
+	return (0);
 
 out:
 	free(str);
 	return (-1);
+}
+
+static int
+parse_int_value(const char *key, const char *value, int minval, int maxval)
+{
+	char *cp;
+	long lval;
+
+	errno = 0;
+	lval = strtol(value, &cp, 0);
+	if (errno != 0 || *cp != '\0' || cp == value || lval < minval ||
+	    lval > maxval)
+		errx(4, "Invalid value for %s: '%s'", key, value);
+	return (lval);
+}
+
+/*
+ * Set the sockets, cores, threads, and guest_cpus variables based on
+ * the configured topology.
+ *
+ * The limits of UINT16_MAX are due to the types passed to
+ * vm_set_topology().  vmm.ko may enforce tighter limits.
+ */
+static void
+calc_topolopgy(void)
+{
+	const char *value;
+	bool explicit_cpus;
+	uint64_t ncpus;
+
+	value = get_config_value("cpus");
+	if (value != NULL) {
+		guest_ncpus = parse_int_value("cpus", value, 1, UINT16_MAX);
+		explicit_cpus = true;
+	} else {
+		guest_ncpus = 1;
+		explicit_cpus = false;
+	}
+	value = get_config_value("cores");
+	if (value != NULL)
+		cores = parse_int_value("cores", value, 1, UINT16_MAX);
+	else
+		cores = 1;
+	value = get_config_value("threads");
+	if (value != NULL)
+		threads = parse_int_value("threads", value, 1, UINT16_MAX);
+	else
+		threads = 1;
+	value = get_config_value("sockets");
+	if (value != NULL)
+		sockets = parse_int_value("sockets", value, 1, UINT16_MAX);
+	else
+		sockets = guest_ncpus;
+
+	/*
+	 * Compute sockets * cores * threads avoiding overflow.  The
+	 * range check above insures these are 16 bit values.
+	 */
+	ncpus = (uint64_t)sockets * cores * threads;
+	if (ncpus > UINT16_MAX)
+		errx(4, "Computed number of vCPUs too high: %ju",
+		    (uintmax_t)ncpus);
+
+	if (explicit_cpus) {
+		if (guest_ncpus != ncpus)
+			errx(4, "Topology (%d sockets, %d cores, %d threads) "
+			    "does not match %d vCPUs", sockets, cores, threads,
+			    guest_ncpus);
+	} else
+		guest_ncpus = ncpus;
 }
 
 #ifndef WITHOUT_CAPSICUM
@@ -441,15 +460,83 @@ pincpu_parse(const char *opt)
 		return (-1);
 	}
 
-	if (vcpumap[vcpu] == NULL) {
-		if ((vcpumap[vcpu] = malloc(sizeof(cpuset_t))) == NULL) {
-			perror("malloc");
-			return (-1);
-		}
-		CPU_ZERO(vcpumap[vcpu]);
+	snprintf(key, sizeof(key), "vcpu.%d.cpuset", vcpu);
+	value = get_config_value(key);
+
+	if (asprintf(&newval, "%s%s%d", value != NULL ? value : "",
+	    value != NULL ? "," : "", pcpu) == -1) {
+		perror("failed to build new cpuset string");
+		return (-1);
 	}
-	CPU_SET(pcpu, vcpumap[vcpu]);
+
+	set_config_value(key, newval);
+	free(newval);
 	return (0);
+}
+
+static void
+parse_cpuset(int vcpu, const char *list, cpuset_t *set)
+{
+	char *cp, *token;
+	int pcpu, start;
+
+	CPU_ZERO(set);
+	start = -1;
+	token = __DECONST(char *, list);
+	for (;;) {
+		pcpu = strtoul(token, &cp, 0);
+		if (cp == token)
+			errx(4, "invalid cpuset for vcpu %d: '%s'", vcpu, list);
+		if (pcpu < 0 || pcpu >= CPU_SETSIZE)
+			errx(4, "hostcpu '%d' outside valid range from 0 to %d",
+			    pcpu, CPU_SETSIZE - 1);
+		switch (*cp) {
+		case ',':
+		case '\0':
+			if (start >= 0) {
+				if (start > pcpu)
+					errx(4, "Invalid hostcpu range %d-%d",
+					    start, pcpu);
+				while (start < pcpu) {
+					CPU_SET(start, vcpumap[vcpu]);
+					start++;
+				}
+				start = -1;
+			}
+			CPU_SET(pcpu, vcpumap[vcpu]);
+			break;
+		case '-':
+			if (start >= 0)
+				errx(4, "invalid cpuset for vcpu %d: '%s'",
+				    vcpu, list);
+			start = pcpu;
+			break;
+		default:
+			errx(4, "invalid cpuset for vcpu %d: '%s'", vcpu, list);
+		}
+		if (*cp == '\0')
+			break;
+		token = cp + 1;
+	}
+}
+
+static void
+build_vcpumaps(void)
+{
+	char key[16];
+	const char *value;
+	int vcpu;
+
+	for (vcpu = 0; vcpu < guest_ncpus; vcpu++) {
+		snprintf(key, sizeof(key), "vcpu.%d.cpuset", vcpu);
+		value = get_config_value(key);
+		if (value == NULL)
+			continue;
+		vcpumap[vcpu] = malloc(sizeof(cpuset_t));
+		if (vcpumap[vcpu] == NULL)
+			err(4, "Failed to allocate cpuset for vcpu %d", vcpu);
+		parse_cpuset(vcpu, value, vcpumap[vcpu]);
+	}
 }
 
 void
@@ -476,24 +563,10 @@ paddr_guest2host(struct vmctx *ctx, uintptr_t gaddr, size_t len)
 }
 
 int
-fbsdrun_vmexit_on_pause(void)
-{
-
-	return (guest_vmexit_on_pause);
-}
-
-int
-fbsdrun_vmexit_on_hlt(void)
-{
-
-	return (guest_vmexit_on_hlt);
-}
-
-int
 fbsdrun_virtio_msix(void)
 {
 
-	return (virtio_msix);
+	return (get_config_bool_default("virtio_msix", true));
 }
 
 static void *
@@ -509,8 +582,7 @@ fbsdrun_start_thread(void *param)
 	snprintf(tname, sizeof(tname), "vcpu %d", vcpu);
 	pthread_set_name_np(mtp->mt_thr, tname);
 
-	if (gdb_port != 0)
-		gdb_cpu_add(vcpu);
+	gdb_cpu_add(vcpu);
 
 	vm_loop(mtp->mt_ctx, vcpu, mtp->mt_startrip);
 
@@ -671,7 +743,7 @@ vmexit_inout(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 		return (error);
 	}
 
-	error = emulate_inout(ctx, vcpu, &inout, strictio != 0);
+	error = emulate_inout(ctx, vcpu, &inout);
 	if (error) {
 		fprintf(stderr, "Unhandled %s%c 0x%04x at 0x%lx\n",
 		    in ? "in" : "out",
@@ -704,7 +776,7 @@ vmexit_rdmsr(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 	if (error != 0) {
 		fprintf(stderr, "rdmsr to register %#x on vcpu %d\n",
 		    vme->u.msr.code, *pvcpu);
-		if (strictmsr) {
+		if (get_config_bool("x86.strictmsr")) {
 			vm_inject_gp(ctx, *pvcpu);
 			return (VMEXIT_CONTINUE);
 		}
@@ -730,7 +802,7 @@ vmexit_wrmsr(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 	if (error != 0) {
 		fprintf(stderr, "wrmsr to register %#x(%#lx) on vcpu %d\n",
 		    vme->u.msr.code, vme->u.msr.wval, *pvcpu);
-		if (strictmsr) {
+		if (get_config_bool("x86.strictmsr")) {
 			vm_inject_gp(ctx, *pvcpu);
 			return (VMEXIT_CONTINUE);
 		}
@@ -884,11 +956,8 @@ vmexit_mtrap(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 
 	stats.vmexit_mtrap++;
 
-	if (gdb_port == 0) {
-		fprintf(stderr, "vm_loop: unexpected VMEXIT_MTRAP\n");
-		exit(4);
-	}
 	gdb_cpu_mtrap(*pvcpu);
+
 	return (VMEXIT_CONTINUE);
 }
 
@@ -990,7 +1059,7 @@ vmexit_suspend(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 	case VM_SUSPEND_RESET:
 		exit(0);
 	case VM_SUSPEND_POWEROFF:
-		if (destroy_on_poweroff)
+		if (get_config_bool_default("destroy_on_poweroff", false))
 			vm_destroy(ctx);
 		exit(1);
 	case VM_SUSPEND_HALT:
@@ -1008,10 +1077,6 @@ static int
 vmexit_debug(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 {
 
-	if (gdb_port == 0) {
-		fprintf(stderr, "vm_loop: unexpected VMEXIT_DEBUG\n");
-		exit(4);
-	}
 	gdb_cpu_suspend(*pvcpu);
 	return (VMEXIT_CONTINUE);
 }
@@ -1020,10 +1085,6 @@ static int
 vmexit_breakpoint(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 {
 
-	if (gdb_port == 0) {
-		fprintf(stderr, "vm_loop: unexpected VMEXIT_DEBUG\n");
-		exit(4);
-	}
 	gdb_cpu_breakpoint(*pvcpu, vmexit);
 	return (VMEXIT_CONTINUE);
 }
@@ -1136,7 +1197,7 @@ fbsdrun_set_capabilities(struct vmctx *ctx, int cpu)
 {
 	int err, tmp;
 
-	if (fbsdrun_vmexit_on_hlt()) {
+	if (get_config_bool_default("x86.vmexit_on_hlt", false)) {
 		err = vm_get_capability(ctx, cpu, VM_CAP_HALT_EXIT, &tmp);
 		if (err < 0) {
 			fprintf(stderr, "VM exit on HLT not supported\n");
@@ -1147,7 +1208,7 @@ fbsdrun_set_capabilities(struct vmctx *ctx, int cpu)
 			handler[VM_EXITCODE_HLT] = vmexit_hlt;
 	}
 
-        if (fbsdrun_vmexit_on_pause()) {
+	if (get_config_bool_default("x86.vmexit_on_pause", false)) {
 		/*
 		 * pause exit support required for this mode
 		 */
@@ -1162,7 +1223,7 @@ fbsdrun_set_capabilities(struct vmctx *ctx, int cpu)
 			handler[VM_EXITCODE_PAUSE] = vmexit_pause;
         }
 
-	if (x2apic_mode)
+	if (get_config_bool_default("x86.x2apic", false))
 		err = vm_set_x2apic_state(ctx, cpu, X2APIC_ENABLED);
 	else
 		err = vm_set_x2apic_state(ctx, cpu, X2APIC_DISABLED);
@@ -1274,63 +1335,103 @@ mark_provisioned(void)
 
 #endif
 
+static bool
+parse_config_option(const char *option)
+{
+	const char *value;
+	char *path;
+
+	value = strchr(option, '=');
+	if (value == NULL || value[1] == '\0')
+		return (false);
+	path = strndup(option, value - option);
+	if (path == NULL)
+		err(4, "Failed to allocate memory");
+	set_config_value(path, value + 1);
+	return (true);
+}
+
+static void
+parse_simple_config_file(const char *path)
+{
+	FILE *fp;
+	char *line, *cp;
+	size_t linecap;
+	unsigned int lineno;
+
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		err(4, "Failed to open configuration file %s", path);
+	line = NULL;
+	linecap = 0;
+	lineno = 1;
+	for (lineno = 1; getline(&line, &linecap, fp) > 0; lineno++) {
+		if (*line == '#' || *line == '\n')
+			continue;
+		cp = strchr(line, '\n');
+		if (cp != NULL)
+			*cp = '\0';
+		if (!parse_config_option(line))
+			errx(4, "%s line %u: invalid config option '%s'", path,
+			    lineno, line);
+	}
+	free(line);
+	fclose(fp);
+}
+
+static void
+set_defaults(void)
+{
+
+	set_config_bool("acpi_tables", false);
+	set_config_value("memory.size", "256M");
+	set_config_bool("x86.strictmsr", true);
+}
+
 int
 main(int argc, char *argv[])
 {
-	int c, error, dbg_port, err, bvmcons;
-	int max_vcpus, mptgen, memflags;
-	int rtc_localtime;
-	bool gdb_stop;
-#ifndef __FreeBSD__
-	bool suspend = false;
-#endif
+	int c, error, err;
+	int max_vcpus, memflags;
 	struct vmctx *ctx;
 	uint64_t rip;
 	size_t memsize;
+	const char *value, *vmname;
 	char *optstr;
 
-	bvmcons = 0;
+	init_config();
+	set_defaults();
 	progname = basename(argv[0]);
-	dbg_port = 0;
-	gdb_stop = false;
-	guest_ncpus = 1;
-	sockets = cores = threads = 1;
-	maxcpus = 0;
-	memsize = 256 * MB;
-	mptgen = 1;
-	rtc_localtime = 1;
-	memflags = 0;
 
 #ifdef	__FreeBSD__
-	optstr = "abehuwxACDHIPSWYp:g:G:c:s:m:l:B:U:";
+	optstr = "aehuwxACDHIPSWYk:o:p:G:c:s:m:l:U:";
 #else
-	optstr = "abdehuwxACDHIPSWYg:G:c:s:m:l:B:U:";
+	/* +d, +B, -p */
+	optstr = "adehuwxACDHIPSWYk:o:G:c:s:m:l:B:U:";
 #endif
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
 		case 'a':
-			x2apic_mode = 0;
+			set_config_bool("x86.x2apic", false);
 			break;
 		case 'A':
-			acpi = 1;
-			break;
-		case 'b':
-			bvmcons = 1;
+			set_config_bool("acpi_tables", true);
 			break;
 		case 'D':
-			destroy_on_poweroff = 1;
+			set_config_bool("destroy_on_poweroff", true);
 			break;
+#ifndef	__FreeBSD__
 		case 'B':
 			if (smbios_parse(optarg) != 0) {
 				errx(EX_USAGE, "invalid SMBIOS "
 				    "configuration '%s'", optarg);
 			}
 			break;
-#ifndef	__FreeBSD__
 		case 'd':
-			suspend = true;
+			set_config_bool("suspend_at_boot", true);
 			break;
-#else
+#endif
+#ifdef	__FreeBSD__
 		case 'p':
 			if (pincpu_parse(optarg) != 0) {
 				errx(EX_USAGE, "invalid vcpu pinning "
@@ -1345,17 +1446,17 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 'C':
-			memflags |= VM_MEM_F_INCORE;
-			break;
-		case 'g':
-			dbg_port = atoi(optarg);
+			set_config_bool("memory.guest_in_core", true);
 			break;
 		case 'G':
 			if (optarg[0] == 'w') {
-				gdb_stop = true;
+				set_config_bool("gdb.wait", true);
 				optarg++;
 			}
-			gdb_port = atoi(optarg);
+			set_config_value("gdb.port", optarg);
+			break;
+		case 'k':
+			parse_simple_config_file(optarg);
 			break;
 		case 'l':
 			if (strncmp(optarg, "help", strlen(optarg)) == 0) {
@@ -1375,15 +1476,17 @@ main(int argc, char *argv[])
 			else
 				break;
 		case 'S':
-			memflags |= VM_MEM_F_WIRED;
+			set_config_bool("memory.wired", true);
 			break;
                 case 'm':
-			error = vm_parse_memsize(optarg, &memsize);
-			if (error)
-				errx(EX_USAGE, "invalid memsize '%s'", optarg);
+			set_config_value("memory.size", optarg);
+			break;
+		case 'o':
+			if (!parse_config_option(optarg))
+				errx(EX_USAGE, "invalid configuration option '%s'", optarg);
 			break;
 		case 'H':
-			guest_vmexit_on_hlt = 1;
+			set_config_bool("x86.vmexit_on_hlt", true);
 			break;
 		case 'I':
 			/*
@@ -1395,28 +1498,28 @@ main(int argc, char *argv[])
 			 */
 			break;
 		case 'P':
-			guest_vmexit_on_pause = 1;
+			set_config_bool("x86.vmexit_on_pause", true);
 			break;
 		case 'e':
-			strictio = 1;
+			set_config_bool("x86.strictio", true);
 			break;
 		case 'u':
-			rtc_localtime = 0;
+			set_config_bool("rtc.use_localtime", false);
 			break;
 		case 'U':
-			guest_uuid_str = optarg;
+			set_config_value("uuid", optarg);
 			break;
 		case 'w':
-			strictmsr = 0;
+			set_config_bool("x86.strictmsr", false);
 			break;
 		case 'W':
-			virtio_msix = 0;
+			set_config_bool("virtio_msix", false);
 			break;
 		case 'x':
-			x2apic_mode = 1;
+			set_config_bool("x86.x2apic", true);
 			break;
 		case 'Y':
-			mptgen = 0;
+			set_config_bool("x86.mptable", false);
 			break;
 		case 'h':
 			usage(0);			
@@ -1427,14 +1530,35 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1)
+	if (argc > 1)
 		usage(1);
 
-	vmname = argv[0];
+	if (argc == 1)
+		set_config_value("name", argv[0]);
+
+	vmname = get_config_value("name");
+	if (vmname == NULL)
+		usage(1);
+
+	if (get_config_bool_default("config.dump", false)) {
+		dump_config();
+		exit(1);
+	}
+
+	calc_topolopgy();
+#ifdef __FreeBSD__
+	build_vcpumaps();
+#endif
+
+	value = get_config_value("memory.size");
+	error = vm_parse_memsize(value, &memsize);
+	if (error)
+		errx(EX_USAGE, "invalid memsize '%s'", value);
+
 	ctx = do_open(vmname);
 
-	max_vcpus = num_vcpus_allowed(ctx);
-	if (guest_ncpus > max_vcpus) {
+        max_vcpus = num_vcpus_allowed(ctx);
+        if (guest_ncpus > max_vcpus) {
 		fprintf(stderr, "%d vCPUs requested but only %d available\n",
 			guest_ncpus, max_vcpus);
 		exit(4);
@@ -1442,6 +1566,11 @@ main(int argc, char *argv[])
 
 	fbsdrun_set_capabilities(ctx, BSP);
 
+	memflags = 0;
+	if (get_config_bool_default("memory.wired", false))
+		memflags |= VM_MEM_F_WIRED;
+	if (get_config_bool_default("memory.guest_in_core", false))
+		memflags |= VM_MEM_F_INCORE;
 	vm_set_memflags(ctx, memflags);
 #ifdef	__FreeBSD__
 	err = vm_setup_memory(ctx, memsize, VM_MMAP_ALL);
@@ -1465,7 +1594,7 @@ main(int argc, char *argv[])
 	} while (error == ENOMEM);
 #endif
 	if (err) {
-		fprintf(stderr, "Unable to setup memory (%d)\n", errno);
+		fprintf(stderr, "Unable to set up memory (%d)\n", errno);
 		exit(4);
 	}
 
@@ -1485,7 +1614,7 @@ main(int argc, char *argv[])
 	pci_irq_init(ctx);
 	ioapic_init(ctx);
 
-	rtc_init(ctx, rtc_localtime);
+	rtc_init(ctx);
 	sci_init(ctx);
 #ifndef	__FreeBSD__
 	pmtmr_init(ctx);
@@ -1503,29 +1632,27 @@ main(int argc, char *argv[])
 	 * Initialize after PCI, to allow a bootrom file to reserve the high
 	 * region.
 	 */
-	if (acpi)
+	if (get_config_bool("acpi_tables"))
 		vmgenc_init(ctx);
 
-	if (dbg_port != 0)
-		init_dbgport(dbg_port);
-
+	value = get_config_value("gdb.port");
 #ifdef __FreeBSD__
-	if (gdb_port != 0)
-		init_gdb(ctx, gdb_port, gdb_stop);
+	if (value != NULL)
+		init_gdb(ctx, atoi(value), get_config_bool_default("gdb.wait",
+		    false));
 #else
-	if (gdb_port < 0) {
-		/*
-		 * Set up the internal gdb state needed for basic debugging, but
-		 * skip the step of listening on a port for the GDB server.
-		 */
-		init_mdb(ctx, gdb_stop);
-	} else if (gdb_port != 0) {
-		init_gdb(ctx, gdb_port, gdb_stop);
+	if (value != NULL) {
+		int port = atoi(value);
+
+		if (port < 0) {
+			init_mdb(ctx,
+			    get_config_bool_default("gdb.wait", false));
+		} else {
+			init_gdb(ctx, port,
+			    get_config_bool_default("gdb.wait", false));
+		}
 	}
 #endif
-
-	if (bvmcons)
-		init_bvmcons();
 
 	vga_init(1);
 
@@ -1549,7 +1676,7 @@ main(int argc, char *argv[])
 	/*
  	 * build the guest tables, MP etc.
 	 */
-	if (mptgen) {
+	if (get_config_bool_default("x86.mptable", true)) {
 		error = mptable_build(ctx, guest_ncpus);
 		if (error) {
 			perror("error to build the guest tables");
@@ -1557,10 +1684,13 @@ main(int argc, char *argv[])
 		}
 	}
 
+#ifndef __FreeBSD__
+	smbios_apply();
+#endif
 	error = smbios_build(ctx);
 	assert(error == 0);
 
-	if (acpi) {
+	if (get_config_bool("acpi_tables")) {
 		error = acpi_build(ctx, guest_ncpus);
 		assert(error == 0);
 	}
@@ -1592,7 +1722,8 @@ main(int argc, char *argv[])
 	/* Set BSP to run (unlike the APs which wait for INIT) */
 	error = vm_set_run_state(ctx, BSP, VRS_RUN, 0);
 	assert(error == 0);
-	fbsdrun_addcpu(ctx, BSP, rip, suspend);
+	fbsdrun_addcpu(ctx, BSP, rip,
+	    get_config_bool_default("suspend_at_boot", false));
 
 	/* Add subsequent CPUs, which will wait until INIT/SIPI-ed */
 	for (uint_t i = 1; i < guest_ncpus; i++) {

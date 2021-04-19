@@ -1358,6 +1358,7 @@ usr/src/cmd/bhyve/bhyvegc.[ch]
 usr/src/cmd/bhyve/bhyverun.[ch]
 usr/src/cmd/bhyve/block_if.[ch]
 usr/src/cmd/bhyve/bootrom.[ch]
+usr/src/cmd/bhyve/config.[ch]
 usr/src/cmd/bhyve/console.[ch]
 usr/src/cmd/bhyve/consport.c
 usr/src/cmd/bhyve/dbgport.[ch]
@@ -1394,6 +1395,7 @@ usr/src/cmd/bhyve/pci_virtio_net.c
 usr/src/cmd/bhyve/pci_virtio_rnd.c
 usr/src/cmd/bhyve/pci_virtio_scsi.c
 usr/src/cmd/bhyve/pci_xhci.[ch]
+usr/src/cmd/bhyve/pctestdev.c
 usr/src/cmd/bhyve/pm.c
 usr/src/cmd/bhyve/post.c
 usr/src/cmd/bhyve/ps2kbd.[ch]

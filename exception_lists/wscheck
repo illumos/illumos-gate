@@ -10,6 +10,7 @@
 #
 # Copyright 2019 Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 syntax: glob
 
@@ -127,6 +128,7 @@ usr/src/cmd/bhyve/bhyvegc.[ch]
 usr/src/cmd/bhyve/bhyverun.[ch]
 usr/src/cmd/bhyve/block_if.[ch]
 usr/src/cmd/bhyve/bootrom.[ch]
+usr/src/cmd/bhyve/config.[ch]
 usr/src/cmd/bhyve/console.[ch]
 usr/src/cmd/bhyve/consport.c
 usr/src/cmd/bhyve/dbgport.[ch]

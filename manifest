@@ -12394,6 +12394,8 @@ f usr/share/man/man1m/automount.1m 0444 root bin
 f usr/share/man/man1m/automountd.1m 0444 root bin
 f usr/share/man/man1m/autopush.1m 0444 root bin
 f usr/share/man/man1m/bart.1m 0444 root bin
+f usr/share/man/man1m/bhyve.1m 0444 root bin
+f usr/share/man/man1m/bhyvectl.1m 0444 root bin
 f usr/share/man/man1m/bootadm.1m 0444 root bin
 f usr/share/man/man1m/busstat.1m 0444 root bin
 f usr/share/man/man1m/captoinfo.1m 0444 root bin
@@ -19232,6 +19234,7 @@ f usr/share/man/man4/auth_attr.4 0444 root bin
 f usr/share/man/man4/autofs.4 0444 root bin
 f usr/share/man/man4/bart_manifest.4 0444 root bin
 f usr/share/man/man4/bart_rules.4 0444 root bin
+f usr/share/man/man4/bhyve_config.4 0444 root bin
 f usr/share/man/man4/bootparams.4 0444 root bin
 f usr/share/man/man4/cardbus.4 0444 root bin
 f usr/share/man/man4/compver.4 0444 root bin

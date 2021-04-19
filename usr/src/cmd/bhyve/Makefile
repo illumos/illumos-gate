@@ -13,6 +13,7 @@
 # Copyright 2014 Pluribus Networks Inc.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG =		bhyve
@@ -35,8 +36,7 @@ SRCS =	acpi.c			\
 	block_if.c		\
 	bootrom.c		\
 	console.c		\
-	consport.c		\
-	dbgport.c		\
+	config.c		\
 	fwctl.c			\
 	gdb.c			\
 	inout.c			\
@@ -131,13 +131,17 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-DWITHOUT_CAPSICUM
 
 pci_nvme.o := CERRWARN += -_gcc=-Wno-pointer-sign
+pci_nvme.o := CERRWARN += -_gcc10=-Wno-address-of-packed-member
 pci_nvme.o := SMOFF += kmalloc_wrong_size
+
+pci_passthru.o := CERRWARN += -_gcc10=-Wno-address-of-packed-member
+
+pci_xhci.o := CERRWARN += -_gcc10=-Wno-address-of-packed-member
 
 SMOFF += all_func_returns,leaks,no_if_block
 
 # Force c99 for everything
 CSTD=		$(CSTD_GNU99)
-C99MODE=	-xc99=%all
 
 $(PROG) := LDLIBS += \
 	-lsocket \
@@ -145,6 +149,7 @@ $(PROG) := LDLIBS += \
 	-ldlpi \
 	-ldladm \
 	-lmd \
+	-lnvpair \
 	-lsunw_crypto \
 	-luuid \
 	-lvmmapi \

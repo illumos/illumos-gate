@@ -36,7 +36,7 @@
 
 int	rfb_init(char *hostname, int port, int wait, char *password);
 #ifndef __FreeBSD__
-int	rfb_init_unix(char *path, int wait, char *password);
+int	rfb_init_unix(const char *path, int wait, char *password);
 #endif
 
 #endif /* _RFB_H_ */

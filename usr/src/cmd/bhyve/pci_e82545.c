@@ -66,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include "mii.h"
 
 #include "bhyverun.h"
+#include "config.h"
 #include "debug.h"
 #include "pci_emul.h"
 #include "mevent.h"
@@ -360,7 +361,7 @@ static void e82545_reset(struct e82545_softc *sc, int dev);
 static void e82545_rx_enable(struct e82545_softc *sc);
 static void e82545_rx_disable(struct e82545_softc *sc);
 #ifdef	__FreeBSD__
-static void e82545_tap_callback(int fd, enum ev_type type, void *param);
+static void e82545_rx_callback(int fd, enum ev_type type, void *param);
 #endif
 static void e82545_tx_start(struct e82545_softc *sc);
 static void e82545_tx_enable(struct e82545_softc *sc);
@@ -841,7 +842,7 @@ static uint8_t dummybuf[2048];
 
 /* XXX one packet at a time until this is debugged */
 static void
-e82545_tap_callback(int fd, enum ev_type type, void *param)
+e82545_rx_callback(int fd, enum ev_type type, void *param)
 {
 	struct e82545_softc *sc = param;
 	struct e1000_rx_desc *rxd;
@@ -2236,24 +2237,24 @@ e82545_reset(struct e82545_softc *sc, int drvr)
 }
 
 static void
-e82545_open_tap(struct e82545_softc *sc, char *opts)
+e82545_open_tap(struct e82545_softc *sc, const char *path)
 {
 	char tbuf[80];
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_t rights;
 #endif
 	
-	if (opts == NULL) {
+	if (path == NULL) {
 		sc->esc_tapfd = -1;
 		return;
 	}
 
 	strcpy(tbuf, "/dev/");
-	strlcat(tbuf, opts, sizeof(tbuf));
+	strlcat(tbuf, path, sizeof(tbuf));
 
 	sc->esc_tapfd = open(tbuf, O_RDWR);
 	if (sc->esc_tapfd == -1) {
-		DPRINTF("unable to open tap device %s\n", opts);
+		DPRINTF("unable to open tap device %s\n", path);
 		exit(4);
 	}
 
@@ -2277,7 +2278,7 @@ e82545_open_tap(struct e82545_softc *sc, char *opts)
 #ifdef	__FreeBSD__
 	sc->esc_mevp = mevent_add(sc->esc_tapfd,
 				  EVF_READ,
-				  e82545_tap_callback,
+				  e82545_rx_callback,
 				  sc);
 	if (sc->esc_mevp == NULL) {
 		DPRINTF("Could not register mevent %d\n", EVF_READ);
@@ -2288,15 +2289,12 @@ e82545_open_tap(struct e82545_softc *sc, char *opts)
 }
 
 static int
-e82545_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
+e82545_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 {
 	char nstr[80];
 	struct e82545_softc *sc;
-	char *optscopy;
-	char *vtopts;
-	int mac_provided;
-
-	DPRINTF("Loading with options: %s", opts);
+	const char *mac;
+	int err;
 
 	/* Setup our softc */
 	sc = calloc(1, sizeof(*sc));
@@ -2334,50 +2332,20 @@ e82545_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	pci_emul_alloc_bar(pi, E82545_BAR_IO, PCIBAR_IO,
 		E82545_BAR_IO_LEN);
 
-	/*
-	 * Attempt to open the tap device and read the MAC address
-	 * if specified.  Copied from virtio-net, slightly modified.
-	 */
-	mac_provided = 0;
-	sc->esc_tapfd = -1;
-	if (opts != NULL) {
-		int err = 0;
-
-		optscopy = vtopts = strdup(opts);
-		(void) strsep(&vtopts, ",");
-
-		/*
-		 * Parse the list of options in the form
-		 *     key1=value1,...,keyN=valueN.
-		 */
-		while (vtopts != NULL) {
-			char *value = vtopts;
-			char *key;
-
-			key = strsep(&value, "=");
-			if (value == NULL)
-				break;
-			vtopts = value;
-			(void) strsep(&vtopts, ",");
-
-			if (strcmp(key, "mac") == 0) {
-				err = net_parsemac(value, sc->esc_mac.octet);
-				if (err)
-					break;
-				mac_provided = 1;
-			}
+	mac = get_config_value_node(nvl, "mac");
+	if (mac != NULL) {
+		err = net_parsemac(mac, sc->esc_mac.octet);
+		if (err) {
+			free(sc);
+			return (err);
 		}
-
-		if (strncmp(optscopy, "tap", 3) == 0 ||
-		    strncmp(optscopy, "vmnet", 5) == 0)
-			e82545_open_tap(sc, optscopy);
-
-		free(optscopy);
-	}
-
-	if (!mac_provided) {
+	} else
 		net_genmac(pi, sc->esc_mac.octet);
-	}
+
+	const char *tap = get_config_value_node(nvl, "tap");
+	if (tap != NULL && (strncmp(tap, "tap", 3) == 0 ||
+	    strncmp(tap, "vmnet", 5) == 0))
+		e82545_open_tap(sc, tap);
 
 	/* H/w initiated reset */
 	e82545_reset(sc, 0);
@@ -2385,9 +2353,38 @@ e82545_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	return (0);
 }
 
+#ifndef __FreeBSD__
+static int
+e82545_legacy_config(nvlist_t *nvl, const char *opt)
+{
+	char *config, *name, *tofree, *value;
+
+	if (opt == NULL)
+		return (0);
+
+	config = tofree = strdup(opt);
+	while ((name = strsep(&config, ",")) != NULL) {
+		value = strchr(name, '=');
+		if (value != NULL) {
+			*value++ = '\0';
+			set_config_value_node(nvl, name, value);
+		} else {
+			set_config_value_node(nvl, "tap", name);
+		}
+	}
+	free(tofree);
+	return (0);
+}
+#endif
+
 struct pci_devemu pci_de_e82545 = {
 	.pe_emu = 	"e1000",
 	.pe_init =	e82545_init,
+#ifdef __FreeBSD__
+	.pe_legacy_config = netbe_legacy_config,
+#else
+	.pe_legacy_config = e82545_legacy_config,
+#endif
 	.pe_barwrite =	e82545_write,
 	.pe_barread =	e82545_read
 };

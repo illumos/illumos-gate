@@ -47,7 +47,9 @@
 
 struct vmctx;
 struct vm_exit;
+#ifndef __FreeBSD__
 struct vm_inout;
+#endif
 
 /*
  * inout emulation handlers return 0 on success and -1 on failure.
@@ -85,10 +87,12 @@ struct inout_port {
 	DATA_SET(inout_port_set, __CONCAT(__inout_port, __LINE__))
 
 void	init_inout(void);
-int	emulate_inout(struct vmctx *, int vcpu, struct vm_inout *inout,
-    bool strict);
+#ifdef __FreeBSD__
+int	emulate_inout(struct vmctx *, int vcpu, struct vm_exit *vmexit);
+#else
+int	emulate_inout(struct vmctx *, int vcpu, struct vm_inout *inout);
+#endif
 int	register_inout(struct inout_port *iop);
 int	unregister_inout(struct inout_port *iop);
-void	init_bvmcons(void);
 
 #endif	/* _INOUT_H_ */

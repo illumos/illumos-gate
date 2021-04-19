@@ -416,6 +416,7 @@ usr/src/cmd/bhyve/pci_emul.h
 usr/src/cmd/bhyve/pci_hda.h
 usr/src/cmd/bhyve/pci_irq.h
 usr/src/cmd/bhyve/pci_lpc.h
+usr/src/cmd/bhyve/pctestdev.h
 usr/src/cmd/bhyve/ps2kbd.h
 usr/src/cmd/bhyve/ps2mouse.h
 usr/src/cmd/bhyve/rfb.h
