@@ -216,7 +216,7 @@ log_init(void)
 	log_intrq = log_makeq(0, LOG_HIWAT, (void *)ipltospl(SPL8));
 
 	/*
-	 * Create a queue to hold the most recent 8K of console messages.
+	 * Create a queue to hold the most recent 64K of console messages.
 	 * Useful for debugging.  Required by the "$<msgbuf" adb macro.
 	 */
 	log_recentq = log_makeq(0, LOG_RECENTSIZE, NULL);
