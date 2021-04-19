@@ -292,12 +292,16 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	kg_make_seq_num;
 	kg_seal;
 	kg_unseal;
+$if _x86
 $if _ELF64
 	kg_vdb	{ ASSERT = { TYPE = OBJECT; SIZE = 48; }; };
 $elif _ELF32
 	kg_vdb	{ ASSERT = { TYPE = OBJECT; SIZE = 36; }; };
+$endif
+$elif _sparc
+	kg_vdb	{ ASSERT = { TYPE = OBJECT; SIZE = 48; }; };
 $else
-$error unknown ELFCLASS
+$error Unknown architecture
 $endif
 	kpws_error_table;
 	krb5_425_conv_principal;

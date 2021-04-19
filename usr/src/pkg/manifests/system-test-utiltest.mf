@@ -1703,6 +1703,7 @@ file path=opt/util-tests/tests/pci/igb-ltr-p.out mode=0444
 file path=opt/util-tests/tests/pci/igb-ltr.out mode=0444
 file path=opt/util-tests/tests/pci/igb.pci mode=0444
 file path=opt/util-tests/tests/pcidbtest mode=0555
+file path=opt/util-tests/tests/pcieadm-priv mode=0555
 file path=opt/util-tests/tests/pcieadmtest mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555
 file path=opt/util-tests/tests/sed/multi_test mode=0555

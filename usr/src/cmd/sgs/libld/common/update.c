@@ -3722,11 +3722,11 @@ check_mapfile_assertions(Ofl_desc *ofl)
 				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ALIAS_NOTALIAS),
 				    ma->ass_file,
-				    ma->ass_lineno,
+				    EC_LINENO(ma->ass_lineno),
 				    ma->ass_sdp->sd_name,
 				    dup->aav_ass->ass_sdp->sd_name,
 				    dup->aav_ass->ass_file,
-				    dup->aav_ass->ass_lineno);
+				    EC_LINENO(dup->aav_ass->ass_lineno));
 				ret = S_ERROR;
 			} else {
 				avl_insert(&ass_avl, av, where);
@@ -3745,7 +3745,7 @@ check_mapfile_assertions(Ofl_desc *ofl)
 			Sym *sym = sdp->sd_sym;
 
 			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ASSFAIL_SCOPE),
-			    ma->ass_file, ma->ass_lineno,
+			    ma->ass_file, EC_LINENO(ma->ass_lineno),
 			    demangle(sdp->sd_name),
 			    conv_sym_info_bind(ma->ass_bind, CONV_FMT_ALT_CFNP,
 			    &inv_buf),
@@ -3762,7 +3762,7 @@ check_mapfile_assertions(Ofl_desc *ofl)
 			    NULL, ofl)) == NULL) {
 				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ALIAS_BADSYM),
-				    ma->ass_file, ma->ass_lineno,
+				    ma->ass_file, EC_LINENO(ma->ass_lineno),
 				    ma->ass_alias);
 				ret = S_ERROR;
 			} else {
@@ -3781,7 +3781,8 @@ check_mapfile_assertions(Ofl_desc *ofl)
 				    SYM_ASSERT_ALIAS)) {
 					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_ALIAS_TOALIAS),
-					    ma->ass_file, ma->ass_lineno,
+					    ma->ass_file,
+					    EC_LINENO(ma->ass_lineno),
 					    ma->ass_alias);
 					ret = S_ERROR;
 				}
@@ -3795,7 +3796,8 @@ check_mapfile_assertions(Ofl_desc *ofl)
 				    ELF_ST_TYPE(sym->st_info))) {
 					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_ASSFAIL_ALIAS),
-					    ma->ass_file, ma->ass_lineno,
+					    ma->ass_file,
+					    EC_LINENO(ma->ass_lineno),
 					    demangle(sdp->sd_name),
 					    asdp->sd_name);
 					ret = S_ERROR;
@@ -3816,7 +3818,7 @@ check_mapfile_assertions(Ofl_desc *ofl)
 		if (ass_enabled(ma, SYM_ASSERT_SIZE) &&
 		    (ma->ass_size != sdp->sd_sym->st_size)) {
 			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ASSFAIL_SIZE),
-			    ma->ass_file, ma->ass_lineno,
+			    ma->ass_file, EC_LINENO(ma->ass_lineno),
 			    demangle(sdp->sd_name),
 			    ma->ass_size, (Lword)sdp->sd_sym->st_size);
 			ret = S_ERROR;
@@ -3827,7 +3829,7 @@ check_mapfile_assertions(Ofl_desc *ofl)
 			    (sdp->sd_isc->is_shdr->sh_type == SHT_NOBITS)) {
 				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ASSFAIL_BITS),
-				    ma->ass_file, ma->ass_lineno,
+				    ma->ass_file, EC_LINENO(ma->ass_lineno),
 				    demangle(sdp->sd_name));
 				ret = S_ERROR;
 			}
@@ -3835,7 +3837,7 @@ check_mapfile_assertions(Ofl_desc *ofl)
 			    (sdp->sd_isc->is_shdr->sh_type != SHT_NOBITS)) {
 				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ASSFAIL_NOBITS),
-				    ma->ass_file, ma->ass_lineno,
+				    ma->ass_file, EC_LINENO(ma->ass_lineno),
 				    demangle(sdp->sd_name));
 				ret = S_ERROR;
 			}
@@ -3847,7 +3849,7 @@ check_mapfile_assertions(Ofl_desc *ofl)
 
 			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_ASSFAIL_TYPE),
-			    ma->ass_file, ma->ass_lineno,
+			    ma->ass_file, EC_LINENO(ma->ass_lineno),
 			    demangle(sdp->sd_name),
 			    conv_sym_info_type(ehdr->e_machine,
 			    ma->ass_type, CONV_FMT_ALT_CFNP, &inv_buf),

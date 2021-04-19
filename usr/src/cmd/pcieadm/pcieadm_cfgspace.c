@@ -4869,8 +4869,17 @@ pcieadm_save_cfgspace_cb(di_node_t devi, void *arg)
 	    PCI_REG_BUS_G(regs[0]), PCI_REG_DEV_G(regs[0]),
 	    PCI_REG_FUNC_G(regs[0]));
 
-	if ((fd = openat(psc->psc_dirfd, fname, O_WRONLY | O_TRUNC | O_CREAT,
-	    0666)) < 0) {
+	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, psc->psc_pci->pia_priv_eff) !=
+	    0) {
+		err(EXIT_FAILURE, "failed to raise privileges");
+	}
+	fd = openat(psc->psc_dirfd, fname, O_WRONLY | O_TRUNC | O_CREAT, 0666);
+	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, psc->psc_pci->pia_priv_min) !=
+	    0) {
+		err(EXIT_FAILURE, "failed to reduce privileges");
+	}
+
+	if (fd < 0) {
 		warn("failed to create output file %s", fname);
 		psc->psc_ret = EXIT_FAILURE;
 		return (DI_WALK_CONTINUE);

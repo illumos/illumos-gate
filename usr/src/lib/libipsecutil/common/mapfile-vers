@@ -56,12 +56,16 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	dump_key;
 	dump_sadb_idtype;
 	dump_sockaddr;
-$if _ELF64
+$if _x86 && _ELF64
 	env		{ ASSERT = { TYPE = OBJECT; SIZE = 64; }; };
-$elif _ELF32
+$elif _x86 && _ELF32
 	env		{ ASSERT = { TYPE = OBJECT; SIZE = 40; }; };
+$elif _sparc && _ELF64
+	env		{ ASSERT = { TYPE = OBJECT; SIZE = 96; }; };
+$elif _sparc && _ELF32
+	env		{ ASSERT = { TYPE = OBJECT; SIZE = 48; }; };
 $else
-$error unknown ELFCLASS
+$error Unknown architecture
 $endif
 	_errfp		{ TYPE = FUNCTION; FILTER = libc.so.1; };
 	_errxfp		{ TYPE = FUNCTION; FILTER = libc.so.1; };

@@ -112,6 +112,9 @@ SYMBOL_VERSION ILLUMOS_0.1 {
 					  $elif _x86 && _ELF32
 
 					  SIZE = addrsize[10];
+					  $elif _sparc
+
+					  SIZE = addrsize[12];
 					  $else
 
 					  $error Unknown architecture

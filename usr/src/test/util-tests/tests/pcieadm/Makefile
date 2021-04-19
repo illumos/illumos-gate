@@ -18,7 +18,7 @@ include $(SRC)/test/Makefile.com
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests/tests
 ROOTOPTPCI = $(ROOT)/opt/util-tests/tests/pci
-PROG = pcieadmtest
+PROG = pcieadmtest pcieadm-priv
 DATAFILES = bridge.pci igb.pci \
 	header0-basic.out \
 	header0-basic-L.out \

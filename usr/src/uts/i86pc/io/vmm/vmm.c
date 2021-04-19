@@ -40,6 +40,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2021 Joyent, Inc.
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/cdefs.h>
@@ -714,9 +715,7 @@ vm_map_mmio(struct vm *vm, vm_paddr_t gpa, size_t len, vm_paddr_t hpa)
 int
 vm_unmap_mmio(struct vm *vm, vm_paddr_t gpa, size_t len)
 {
-
-	vmm_mmio_free(vm->vmspace, gpa, len);
-	return (0);
+	return (vm_map_remove(&vm->vmspace->vm_map, gpa, gpa + len));
 }
 
 /*

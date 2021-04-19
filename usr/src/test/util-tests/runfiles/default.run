@@ -89,3 +89,5 @@ tests = ['sed_addr', 'multi_test']
 
 [/opt/util-tests/tests/pcidbtest]
 [/opt/util-tests/tests/pcieadmtest]
+[/opt/util-tests/tests/pcieadm-priv]
+user = root

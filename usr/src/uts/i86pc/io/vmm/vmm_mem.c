@@ -109,13 +109,6 @@ vmm_mmio_alloc(struct vmspace *vmspace, vm_paddr_t gpa, size_t len,
 	return (obj);
 }
 
-void
-vmm_mmio_free(struct vmspace *vmspace, vm_paddr_t gpa, size_t len)
-{
-
-	vm_map_remove(&vmspace->vm_map, gpa, gpa + len);
-}
-
 vm_paddr_t
 vmm_mem_maxaddr(void)
 {

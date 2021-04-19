@@ -1955,12 +1955,21 @@ SYMBOL_VERSION SUNW_0.7 {	# SunOS 5.3 (Solaris 2.3)
 					  SIZE = addrsize[6];
 					};
 				};
+$if _x86
 	_sys_fpelist		{
 				  ASSERT = {
 					  TYPE = OBJECT;
 					  SIZE = addrsize[9];
 					};
 				};
+$else
+	_sys_fpelist		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = addrsize[8];
+					};
+				};
+$endif
 	_sys_illlist		{
 				  ASSERT = {
 					  TYPE = OBJECT;
@@ -2006,12 +2015,21 @@ SYMBOL_VERSION SUNW_0.7 {	# SunOS 5.3 (Solaris 2.3)
 	valloc			{ FLAGS = NODIRECT; };
 
 $if _ELF32
+$if _x86
 	_bufendtab		{
 				  ASSERT = {
 					  TYPE = OBJECT;
 					  SIZE = 244;
 					};
 				};
+$else
+	_bufendtab		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 84;
+					};
+				};
+$endif
 	_lastbuf		{
 				  ASSERT = {
 					  TYPE = OBJECT;
@@ -2280,7 +2298,11 @@ $endif
 $if _ELF64
 	_iob		{ ASSERT = { TYPE = OBJECT; SIZE = 2560; }; };
 $elif _ELF32
+$if _x86
 	_iob		{ ASSERT = { TYPE = OBJECT; SIZE = 960; }; };
+$else
+	_iob		{ ASSERT = { TYPE = OBJECT; SIZE = 320; }; };
+$endif
 $else
 $error unknown ELFCLASS
 $endif
@@ -3295,12 +3317,21 @@ $if _ELF64
 					};
 				};
 $elif _ELF32
+$if _x86
 	_smbuf			{
 				  ASSERT = {
 					  TYPE = OBJECT;
 					  SIZE = 488;
 					};
 				};
+$else
+	_smbuf			{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 168;
+					};
+				};
+$endif
 $else
 $error unknown ELFCLASS
 $endif
@@ -3531,9 +3562,24 @@ $error unknown platform
 $endif
 
 $if _sparc
-	__lyday_to_month;
-	__mon_lengths;
-	__yday_to_month;
+	__lyday_to_month	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 48;
+					};
+				};
+	__mon_lengths		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 96;
+					};
+				};
+	__yday_to_month		{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 48;
+					};
+				};
 $endif
 $if i386
 	_sse_hw			{

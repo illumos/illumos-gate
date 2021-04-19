@@ -71,7 +71,6 @@ extern void pcieadm_init_cfgspace_file(pcieadm_t *, const char *,
 extern void pcieadm_fini_cfgspace_file(void *);
 extern void pcieadm_find_nexus(pcieadm_t *);
 extern void pcieadm_find_dip(pcieadm_t *, const char *);
-extern boolean_t pcieadm_di_node_is_pci(di_node_t);
 
 /*
  * Output related
