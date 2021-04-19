@@ -483,6 +483,16 @@ pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	    "BHYVE-%02X%02X-%02X%02X-%02X%02X",
 	    digest[0], digest[1], digest[2], digest[3], digest[4], digest[5]);
 
+#ifndef __FreeBSD__
+	const char *serial;
+
+	if ((serial = get_config_value_node(nvl, "serial")) != NULL ||
+	    (serial = get_config_value_node(nvl, "ser")) != NULL) {
+		bzero(sc->vbsc_ident, VTBLK_BLK_ID_BYTES);
+		strlcpy(sc->vbsc_ident, serial, VTBLK_BLK_ID_BYTES);
+	}
+#endif
+
 	/* setup virtio block config space */
 	sc->vbsc_cfg.vbc_capacity = size / VTBLK_BSIZE; /* 512-byte units */
 	sc->vbsc_cfg.vbc_size_max = 0;	/* not negotiated */
