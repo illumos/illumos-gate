@@ -222,7 +222,9 @@ VirtIO block storage interface.
 .It Li virtio-console
 VirtIO console interface.
 .It Li virtio-net-viona
-VirtIO network interface.
+Accelerated VirtIO network interface.
+.It Li net-viona
+Legacy VirtIO network interface.
 .It Li virtio-rnd
 VirtIO random number generator interface.
 .It Li xhci
@@ -272,7 +274,7 @@ Specify the logical and physical sector size of the emulated disk.
 If the physical size is not specified, it is set to be equal to the logical
 size.
 .El
-.Ss virtio-net-viona Settings
+.Ss virtio-net-viona Network Backend Settings
 Viona network devices use the following settings to configure their backend.
 .Bl -column "feature_flags" "string" "Default"
 .It Sy Name Ta Sy Format Ta Sy Default Ta Sy Description
@@ -280,6 +282,21 @@ Viona network devices use the following settings to configure their backend.
 The VNIC to use for the network connection.
 .It feature_mask Ta integer Ta 0 Ta
 Specify a mask to apply to the virtio features advertised to the guest.
+.El
+.Ss Other Network Backend Settings
+Other network devices use the following settings to configure their backend.
+.Bl -column "feature_flags" "string" "Default"
+.It Sy Name Ta Sy Format Ta Sy Default Ta Sy Description
+.It vnic Ta string Ta Ta
+The VNIC to use for the network connection.
+.It promiscphys Ta bool Ta false Ta
+Enable promiscuous mode at the physical level.
+.It promiscsap Ta bool Ta true Ta
+Enable promiscuous mode at the SAP level.
+.It promiscmulti Ta bool Ta true Ta
+Enable promiscuous mode for all multicast addresses.
+.It promiscrxonly Ta bool Ta true Ta
+The selected promiscuous modes are only enabled for received traffic.
 .El
 .Ss UART Device Settings
 .Bl -column "Name" "Format" "Default"

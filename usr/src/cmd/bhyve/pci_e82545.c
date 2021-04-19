@@ -42,13 +42,11 @@ __FBSDID("$FreeBSD$");
 #include <net/ethernet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#ifndef	__FreeBSD__
-#include <sys/filio.h>
-#endif
 
 #ifndef WITHOUT_CAPSICUM
 #include <capsicum_helpers.h>
 #endif
+
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -71,6 +69,7 @@ __FBSDID("$FreeBSD$");
 #include "pci_emul.h"
 #include "mevent.h"
 #include "net_utils.h"
+#include "net_backends.h"
 
 /* Hardware/register definitions XXX: move some to common code. */
 #define E82545_VENDOR_ID_INTEL			0x8086
@@ -250,11 +249,10 @@ struct  eth_uni {
 struct e82545_softc {
 	struct pci_devinst *esc_pi;
 	struct vmctx	*esc_ctx;
-	struct mevent   *esc_mevp;
 	struct mevent   *esc_mevpitr;
 	pthread_mutex_t	esc_mtx;
 	struct ether_addr esc_mac;
-	int		esc_tapfd;
+	net_backend_t	*esc_be;
 
 	/* General */
 	uint32_t	esc_CTRL;	/* x0000 device ctl */
@@ -360,9 +358,7 @@ struct e82545_softc {
 static void e82545_reset(struct e82545_softc *sc, int dev);
 static void e82545_rx_enable(struct e82545_softc *sc);
 static void e82545_rx_disable(struct e82545_softc *sc);
-#ifdef	__FreeBSD__
 static void e82545_rx_callback(int fd, enum ev_type type, void *param);
-#endif
 static void e82545_tx_start(struct e82545_softc *sc);
 static void e82545_tx_enable(struct e82545_softc *sc);
 static void e82545_tx_disable(struct e82545_softc *sc);
@@ -556,7 +552,6 @@ e82545_eecd_strobe(struct e82545_softc *sc)
 	}
 }
 
-#ifdef	__FreeBSD__
 static void
 e82545_itr_callback(int fd, enum ev_type type, void *param)
 {
@@ -575,7 +570,6 @@ e82545_itr_callback(int fd, enum ev_type type, void *param)
 	}
 	pthread_mutex_unlock(&sc->esc_mtx);
 }
-#endif
 
 static void
 e82545_icr_assert(struct e82545_softc *sc, uint32_t bits)
@@ -601,11 +595,9 @@ e82545_icr_assert(struct e82545_softc *sc, uint32_t bits)
 		sc->esc_irq_asserted = 1;
 		pci_lintr_assert(sc->esc_pi);
 		if (sc->esc_ITR != 0) {
-#ifdef	__FreeBSD__
 			sc->esc_mevpitr = mevent_add(
 			    (sc->esc_ITR + 3905) / 3906,  /* 256ns -> 1ms */
 			    EVF_TIMER, e82545_itr_callback, sc);
-#endif
 		}
 	}
 }
@@ -631,11 +623,9 @@ e82545_ims_change(struct e82545_softc *sc, uint32_t bits)
 		sc->esc_irq_asserted = 1;
 		pci_lintr_assert(sc->esc_pi);
 		if (sc->esc_ITR != 0) {
-#ifdef	__FreeBSD__
 			sc->esc_mevpitr = mevent_add(
 			    (sc->esc_ITR + 3905) / 3906,  /* 256ns -> 1ms */
 			    EVF_TIMER, e82545_itr_callback, sc);
-#endif
 		}
 	}
 }
@@ -837,9 +827,6 @@ e82545_bufsz(uint32_t rctl)
 	return (256);	/* Forbidden value. */
 }
 
-#ifdef	__FreeBSD__
-static uint8_t dummybuf[2048];
-
 /* XXX one packet at a time until this is debugged */
 static void
 e82545_rx_callback(int fd, enum ev_type type, void *param)
@@ -857,7 +844,7 @@ e82545_rx_callback(int fd, enum ev_type type, void *param)
 	if (!sc->esc_rx_enabled || sc->esc_rx_loopback) {
 		DPRINTF("rx disabled (!%d || %d) -- packet(s) dropped",
 		    sc->esc_rx_enabled, sc->esc_rx_loopback);
-		while (read(sc->esc_tapfd, dummybuf, sizeof(dummybuf)) > 0) {
+		while (netbe_rx_discard(sc->esc_be) > 0) {
 		}
 		goto done1;
 	}
@@ -870,7 +857,7 @@ e82545_rx_callback(int fd, enum ev_type type, void *param)
 	if (left < maxpktdesc) {
 		DPRINTF("rx overflow (%d < %d) -- packet(s) dropped",
 		    left, maxpktdesc);
-		while (read(sc->esc_tapfd, dummybuf, sizeof(dummybuf)) > 0) {
+		while (netbe_rx_discard(sc->esc_be) > 0) {
 		}
 		goto done1;
 	}
@@ -887,9 +874,9 @@ e82545_rx_callback(int fd, enum ev_type type, void *param)
 			    rxd->buffer_addr, bufsz);
 			vec[i].iov_len = bufsz;
 		}
-		len = readv(sc->esc_tapfd, vec, maxpktdesc);
+		len = netbe_recv(sc->esc_be, vec, maxpktdesc);
 		if (len <= 0) {
-			DPRINTF("tap: readv() returned %d\n", len);
+			DPRINTF("netbe_recv() returned %d", len);
 			goto done;
 		}
 
@@ -970,7 +957,6 @@ done1:
 	DPRINTF("rx_run done: head %x, tail %x", sc->esc_RDH, sc->esc_RDT);
 	pthread_mutex_unlock(&sc->esc_mtx);
 }
-#endif
 
 static uint16_t
 e82545_carry(uint32_t sum)
@@ -983,11 +969,7 @@ e82545_carry(uint32_t sum)
 }
 
 static uint16_t
-#ifdef __FreeBSD__
 e82545_buf_checksum(uint8_t *buf, int len)
-#else
-e82545_buf_checksum(caddr_t buf, int len)
-#endif
 {
 	int i;
 	uint32_t sum = 0;
@@ -1024,7 +1006,11 @@ e82545_iov_checksum(struct iovec *iov, int iovcnt, int off, int len)
 	odd = 0;
 	while (len > 0 && iovcnt > 0) {
 		now = MIN(len, iov->iov_len - off);
+#ifdef __FreeBSD__
 		s = e82545_buf_checksum(iov->iov_base + off, now);
+#else
+		s = e82545_buf_checksum((uint8_t *)iov->iov_base + off, now);
+#endif
 		sum += odd ? (s << 8) : s;
 		odd ^= (now & 1);
 		len -= now;
@@ -1069,10 +1055,10 @@ static void
 e82545_transmit_backend(struct e82545_softc *sc, struct iovec *iov, int iovcnt)
 {
 
-	if (sc->esc_tapfd == -1)
+	if (sc->esc_be == NULL)
 		return;
 
-	(void) writev(sc->esc_tapfd, iov, iovcnt);
+	(void) netbe_send(sc->esc_be, iov, iovcnt);
 }
 
 static void
@@ -1094,19 +1080,16 @@ static int
 e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
     uint16_t dsize, uint16_t *rhead, int *tdwb)
 {
-#ifdef	__FreeBSD__
 	uint8_t *hdr, *hdrp;
-#else
-	caddr_t hdr, hdrp;
-#endif
 	struct iovec iovb[I82545_MAX_TXSEGS + 2];
 	struct iovec tiov[I82545_MAX_TXSEGS + 2];
 	struct e1000_context_desc *cd;
 	struct ck_info ckinfo[2];
 	struct iovec *iov;
 	union  e1000_tx_udesc *dsc;
-	int desc, dtype, len, ntype, iovcnt, tlen, hdrlen, vlen, tcp, tso;
+	int desc, dtype, len, ntype, iovcnt, tlen, tcp, tso;
 	int mss, paylen, seg, tiovcnt, left, now, nleft, nnow, pv, pvoff;
+	unsigned hdrlen, vlen;
 	uint32_t tcpsum, tcpseq;
 	uint16_t ipcs, tcpcs, ipid, ohead;
 
@@ -1116,7 +1099,6 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 	ntype = 0;
 	tso = 0;
 	ohead = head;
-	hdr = NULL;
 
 	/* iovb[0/1] may be used for writable copy of headers. */
 	iov = &iovb[2];
@@ -1251,6 +1233,68 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 	} else {
 		/* In case of TSO header length provided by software. */
 		hdrlen = sc->esc_txctx.tcp_seg_setup.fields.hdr_len;
+
+		/*
+		 * Cap the header length at 240 based on 7.2.4.5 of
+		 * the Intel 82576EB (Rev 2.63) datasheet.
+		 */
+		if (hdrlen > 240) {
+			WPRINTF("TSO hdrlen too large: %d", hdrlen);
+			goto done;
+		}
+
+		/*
+		 * If VLAN insertion is requested, ensure the header
+		 * at least holds the amount of data copied during
+		 * VLAN insertion below.
+		 *
+		 * XXX: Realistic packets will include a full Ethernet
+		 * header before the IP header at ckinfo[0].ck_start,
+		 * but this check is sufficient to prevent
+		 * out-of-bounds access below.
+		 */
+		if (vlen != 0 && hdrlen < ETHER_ADDR_LEN*2) {
+			WPRINTF("TSO hdrlen too small for vlan insertion "
+			    "(%d vs %d) -- dropped", hdrlen,
+			    ETHER_ADDR_LEN*2);
+			goto done;
+		}
+
+		/*
+		 * Ensure that the header length covers the used fields
+		 * in the IP and TCP headers as well as the IP and TCP
+		 * checksums.  The following fields are accessed below:
+		 *
+		 * Header | Field | Offset | Length
+		 * -------+-------+--------+-------
+		 * IPv4   | len   | 2      | 2
+		 * IPv4   | ID    | 4      | 2
+		 * IPv6   | len   | 4      | 2
+		 * TCP    | seq # | 4      | 4
+		 * TCP    | flags | 13     | 1
+		 * UDP    | len   | 4      | 4
+		 */
+		if (hdrlen < ckinfo[0].ck_start + 6 ||
+		    hdrlen < ckinfo[0].ck_off + 2) {
+			WPRINTF("TSO hdrlen too small for IP fields (%d) "
+			    "-- dropped", hdrlen);
+			goto done;
+		}
+		if (sc->esc_txctx.cmd_and_length & E1000_TXD_CMD_TCP) {
+			if (hdrlen < ckinfo[1].ck_start + 14 ||
+			    (ckinfo[1].ck_valid &&
+			    hdrlen < ckinfo[1].ck_off + 2)) {
+				WPRINTF("TSO hdrlen too small for TCP fields "
+				    "(%d) -- dropped", hdrlen);
+				goto done;
+			}
+		} else {
+			if (hdrlen < ckinfo[1].ck_start + 8) {
+				WPRINTF("TSO hdrlen too small for UDP fields "
+				    "(%d) -- dropped", hdrlen);
+				goto done;
+			}
+		}
 	}
 
 	/* Allocate, fill and prepend writable header vector. */
@@ -1270,9 +1314,14 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 		}
 		iov--;
 		iovcnt++;
+#ifdef __FreeBSD__
 		iov->iov_base = hdr;
+#else
+		iov->iov_base = (caddr_t)hdr;
+#endif
 		iov->iov_len = hdrlen;
-	}
+	} else
+		hdr = NULL;
 
 	/* Insert VLAN tag. */
 	if (vlen != 0) {
@@ -1283,7 +1332,11 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 		hdr[ETHER_ADDR_LEN*2 + 1] = sc->esc_VET & 0xff;
 		hdr[ETHER_ADDR_LEN*2 + 2] = dsc->td.upper.fields.special >> 8;
 		hdr[ETHER_ADDR_LEN*2 + 3] = dsc->td.upper.fields.special & 0xff;
+#ifdef __FreeBSD__
 		iov->iov_base = hdr;
+#else
+		iov->iov_base = (caddr_t)hdr;
+#endif
 		iov->iov_len += ETHER_VLAN_ENCAP_LEN;
 		/* Correct checksum offsets after VLAN tag insertion. */
 		ckinfo[0].ck_start += ETHER_VLAN_ENCAP_LEN;
@@ -1311,10 +1364,12 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 	tcp = (sc->esc_txctx.cmd_and_length & E1000_TXD_CMD_TCP) != 0;
 	mss = sc->esc_txctx.tcp_seg_setup.fields.mss;
 	paylen = (sc->esc_txctx.cmd_and_length & 0x000fffff);
-	DPRINTF("tx %s segmentation offload %d+%d/%d bytes %d iovs\r\n",
+	DPRINTF("tx %s segmentation offload %d+%d/%d bytes %d iovs",
 	    tcp ? "TCP" : "UDP", hdrlen, paylen, mss, iovcnt);
 	ipid = ntohs(*(uint16_t *)&hdr[ckinfo[0].ck_start + 4]);
-	tcpseq = ntohl(*(uint32_t *)&hdr[ckinfo[1].ck_start + 4]);
+	tcpseq = 0;
+	if (tcp)
+		tcpseq = ntohl(*(uint32_t *)&hdr[ckinfo[1].ck_start + 4]);
 	ipcs = *(uint16_t *)&hdr[ckinfo[0].ck_off];
 	tcpcs = 0;
 	if (ckinfo[1].ck_valid)	/* Save partial pseudo-header checksum. */
@@ -1326,7 +1381,11 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 
 		/* Construct IOVs for the segment. */
 		/* Include whole original header. */
+#ifdef __FreeBSD__
 		tiov[0].iov_base = hdr;
+#else
+		tiov[0].iov_base = (caddr_t)hdr;
+#endif
 		tiov[0].iov_len = hdrlen;
 		tiovcnt = 1;
 		/* Include respective part of payload IOV. */
@@ -1340,7 +1399,7 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 			} else
 				pvoff += nnow;
 		}
-		DPRINTF("tx segment %d %d+%d bytes %d iovs\r\n",
+		DPRINTF("tx segment %d %d+%d bytes %d iovs",
 		    seg, hdrlen, now, tiovcnt);
 
 		/* Update IP header. */
@@ -1435,7 +1494,7 @@ e82545_tx_run(struct e82545_softc *sc)
 	    sc->esc_TDH, sc->esc_TDHr, sc->esc_TDT);
 }
 
-static void *
+static _Noreturn void *
 e82545_tx_thread(void *param)
 {
 	struct e82545_softc *sc = param;
@@ -1455,9 +1514,6 @@ e82545_tx_thread(void *param)
 		/* Process some tx descriptors.  Lock dropped inside. */
 		e82545_tx_run(sc);
 	}
-#ifndef	__FreeBSD__
-	return (NULL);
-#endif
 }
 
 static void
@@ -2236,58 +2292,6 @@ e82545_reset(struct e82545_softc *sc, int drvr)
 	sc->esc_TXDCTL = 0;
 }
 
-static void
-e82545_open_tap(struct e82545_softc *sc, const char *path)
-{
-	char tbuf[80];
-#ifndef WITHOUT_CAPSICUM
-	cap_rights_t rights;
-#endif
-	
-	if (path == NULL) {
-		sc->esc_tapfd = -1;
-		return;
-	}
-
-	strcpy(tbuf, "/dev/");
-	strlcat(tbuf, path, sizeof(tbuf));
-
-	sc->esc_tapfd = open(tbuf, O_RDWR);
-	if (sc->esc_tapfd == -1) {
-		DPRINTF("unable to open tap device %s\n", path);
-		exit(4);
-	}
-
-	/*
-	 * Set non-blocking and register for read
-	 * notifications with the event loop
-	 */
-	int opt = 1;
-	if (ioctl(sc->esc_tapfd, FIONBIO, &opt) < 0) {
-		WPRINTF("tap device O_NONBLOCK failed: %d\n", errno);
-		close(sc->esc_tapfd);
-		sc->esc_tapfd = -1;
-	}
-
-#ifndef WITHOUT_CAPSICUM
-	cap_rights_init(&rights, CAP_EVENT, CAP_READ, CAP_WRITE);
-	if (caph_rights_limit(sc->esc_tapfd, &rights) == -1)
-		errx(EX_OSERR, "Unable to apply rights for sandbox");
-#endif
-	
-#ifdef	__FreeBSD__
-	sc->esc_mevp = mevent_add(sc->esc_tapfd,
-				  EVF_READ,
-				  e82545_rx_callback,
-				  sc);
-	if (sc->esc_mevp == NULL) {
-		DPRINTF("Could not register mevent %d\n", EVF_READ);
-		close(sc->esc_tapfd);
-		sc->esc_tapfd = -1;
-	}
-#endif
-}
-
 static int
 e82545_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 {
@@ -2342,10 +2346,23 @@ e82545_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	} else
 		net_genmac(pi, sc->esc_mac.octet);
 
-	const char *tap = get_config_value_node(nvl, "tap");
-	if (tap != NULL && (strncmp(tap, "tap", 3) == 0 ||
-	    strncmp(tap, "vmnet", 5) == 0))
-		e82545_open_tap(sc, tap);
+	err = netbe_init(&sc->esc_be, nvl, e82545_rx_callback, sc);
+	if (err) {
+		free(sc);
+		return (err);
+	}
+
+#ifndef __FreeBSD__
+	size_t buflen = sizeof (sc->esc_mac.octet);
+
+	err = netbe_get_mac(sc->esc_be, sc->esc_mac.octet, &buflen);
+	if (err != 0) {
+		free(sc);
+		return (err);
+	}
+#endif
+
+	netbe_rx_enable(sc->esc_be);
 
 	/* H/w initiated reset */
 	e82545_reset(sc, 0);
@@ -2353,40 +2370,12 @@ e82545_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	return (0);
 }
 
-#ifndef __FreeBSD__
-static int
-e82545_legacy_config(nvlist_t *nvl, const char *opt)
-{
-	char *config, *name, *tofree, *value;
-
-	if (opt == NULL)
-		return (0);
-
-	config = tofree = strdup(opt);
-	while ((name = strsep(&config, ",")) != NULL) {
-		value = strchr(name, '=');
-		if (value != NULL) {
-			*value++ = '\0';
-			set_config_value_node(nvl, name, value);
-		} else {
-			set_config_value_node(nvl, "tap", name);
-		}
-	}
-	free(tofree);
-	return (0);
-}
-#endif
-
 struct pci_devemu pci_de_e82545 = {
 	.pe_emu = 	"e1000",
 	.pe_init =	e82545_init,
-#ifdef __FreeBSD__
 	.pe_legacy_config = netbe_legacy_config,
-#else
-	.pe_legacy_config = e82545_legacy_config,
-#endif
 	.pe_barwrite =	e82545_write,
-	.pe_barread =	e82545_read
+	.pe_barread =	e82545_read,
 };
 PCI_EMUL_SET(pci_de_e82545);
 

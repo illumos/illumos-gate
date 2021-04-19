@@ -44,6 +44,7 @@ SRCS =	acpi.c			\
 	mem.c			\
 	mevent.c		\
 	mptbl.c			\
+	net_backends.c		\
 	net_utils.c		\
 	pci_ahci.c		\
 	pci_e82545.c		\
@@ -98,11 +99,6 @@ SRCS =	acpi.c			\
 	#hda_codec.c		\
 	#pci_hda.c		\
 
-# The bhyve generic net-backend stuff has been ignored by us at the moment
-# because illumos users prefer to use viona for its superior network perf.
-	#net_backends.c		\
-
-
 OBJS = $(SRCS:.c=.o)
 
 CLOBBERFILES =	$(ROOTUSRSBINPROG)
@@ -113,7 +109,8 @@ MEVENT_TEST_OBJS = $(MEVENT_TEST_SRCS:.c=.o)
 
 CLEANFILES =	$(PROG) $(MEVENT_TEST_PROG) $(MEVENT_TEST_OBJS)
 
-CFLAGS +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration -_gcc=-Wno-parentheses
+CFLAGS +=	$(CCVERBOSE)
+CFLAGS +=	-_gcc=-Wimplicit-function-declaration -_gcc=-Wno-parentheses
 CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
 		-I$(CONTRIB)/bhyve/dev/usb/controller \
