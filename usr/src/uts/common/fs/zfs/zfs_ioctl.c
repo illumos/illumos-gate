@@ -37,6 +37,7 @@
  * Copyright (c) 2017, loli10K <ezomori.nozomu@gmail.com>. All rights reserved.
  * Copyright 2017 RackTop Systems.
  * Copyright (c) 2017, Datto, Inc. All rights reserved.
+ * Copyright 2021 The University of Queensland
  */
 
 /*
@@ -3875,6 +3876,7 @@ zfs_ioc_destroy_bookmarks(const char *poolname, nvlist_t *innvl,
 static const zfs_ioc_key_t zfs_keys_channel_program[] = {
 	{"program",	DATA_TYPE_STRING,		0},
 	{"arg",		DATA_TYPE_ANY,			0},
+	{"hidden_args",	DATA_TYPE_ANY,      		ZK_OPTIONAL},
 	{"sync",	DATA_TYPE_BOOLEAN_VALUE,	ZK_OPTIONAL},
 	{"instrlimit",	DATA_TYPE_UINT64,		ZK_OPTIONAL},
 	{"memlimit",	DATA_TYPE_UINT64,		ZK_OPTIONAL},
