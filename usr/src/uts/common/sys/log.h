@@ -30,8 +30,6 @@
 #ifndef _SYS_LOG_H
 #define	_SYS_LOG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/strlog.h>
 #include <sys/stream.h>
@@ -55,7 +53,7 @@ extern "C" {
 #define	LOG_HIWAT	1048576		/* threshold for tossing messages */
 
 #define	LOG_MAGIC	0xf00d4109U	/* "food for log" - unsent msg magic */
-#define	LOG_RECENTSIZE	8192		/* queue of most recent messages */
+#define	LOG_RECENTSIZE	65536		/* queue of most recent messages */
 #define	LOG_MINFREE	4096		/* message cache low water mark */
 #define	LOG_MAXFREE	8192		/* message cache high water mark */
 
