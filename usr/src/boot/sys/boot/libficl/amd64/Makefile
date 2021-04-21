@@ -17,13 +17,14 @@
 include $(SRC)/Makefile.master
 
 MACHINE=	$(MACH64)
+DYNLIB=		libficl_pics.a
 
-all install: lib
+all install: $(DYNLIB)
 
 include ../Makefile.com
 
 CFLAGS += -m64 $(CFLAGS64)
 
-$(OBJECTS): machine x86
+include $(SRC)/boot/sys/boot/Makefile.lib
 
 FRC:

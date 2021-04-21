@@ -13,7 +13,6 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
-include $(SRC)/Makefile.master
 include $(SRC)/boot/Makefile.version
 include $(SRC)/boot/sys/boot/Makefile.inc
 
@@ -89,18 +88,46 @@ smbios.o := CPPFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
 # Use network-endian UUID format for backward compatibility.
 #CPPFLAGS += -DSMBIOS_NETWORK_ENDIAN_UUID
 
-DPLIBSTAND=	../../../libstand/$(MACHINE)/libstand.a
-LIBSTAND=	-L../../../libstand/$(MACHINE) -lstand
+DPLIBSTAND=	../../../libstand/$(MACHINE)/libstand_pics.a
+LIBSTAND=	-L../../../libstand/$(MACHINE) -lstand_pics
 
 BOOT_FORTH=	yes
 CPPFLAGS +=	-DBOOT_FORTH
 CPPFLAGS +=	-I$(SRC)/common/ficl
 CPPFLAGS +=	-I../../../libficl
-DPLIBFICL=	../../../libficl/$(MACHINE)/libficl.a
-LIBFICL=	-L../../../libficl/$(MACHINE) -lficl
+DPLIBFICL=	../../../libficl/$(MACHINE)/libficl_pics.a
+LIBFICL=	-L../../../libficl/$(MACHINE) -lficl_pics
 
 # Always add MI sources
-include	../Makefile.common
+#
+SRCS +=	boot.c commands.c console.c devopen.c interp.c
+SRCS +=	interp_backslash.c interp_parse.c ls.c misc.c
+SRCS +=	module.c linenoise.c zfs_cmd.c
+
+OBJS += boot.o commands.o console.o devopen.o interp.o \
+	interp_backslash.o interp_parse.o ls.o misc.o \
+	module.o linenoise.o zfs_cmd.o
+
+SRCS +=	load_elf32.c load_elf32_obj.c reloc_elf32.c
+SRCS +=	load_elf64.c load_elf64_obj.c reloc_elf64.c
+
+OBJS += load_elf32.o load_elf32_obj.o reloc_elf32.o \
+	load_elf64.o load_elf64_obj.o reloc_elf64.o
+
+SRCS +=	disk.c part.c dev_net.c vdisk.c
+OBJS += disk.o part.o dev_net.o vdisk.o
+CPPFLAGS += -DLOADER_DISK_SUPPORT
+CPPFLAGS += -DLOADER_GPT_SUPPORT
+CPPFLAGS += -DLOADER_MBR_SUPPORT
+
+part.o := CPPFLAGS += -I$(ZLIB)
+
+SRCS +=  bcache.c
+OBJS +=  bcache.o
+
+# Forth interpreter
+SRCS +=	interp_forth.c
+OBJS +=	interp_forth.o
 CPPFLAGS +=	-I../../../common
 
 # For multiboot2.h, must be last, to avoid conflicts
@@ -116,7 +143,7 @@ LDFLAGS =	-nostdlib --eh-frame-hdr
 LDFLAGS +=	-shared --hash-style=both --enable-new-dtags
 LDFLAGS +=	-T$(LDSCRIPT) -Bsymbolic
 
-CLEANFILES=	loader.sym loader.bin
+CLEANFILES=	$(EFIPROG) loader.sym loader.bin
 CLEANFILES +=	$(FONT).c vers.c
 
 NEWVERSWHAT=	"EFI loader" $(MACHINE)
@@ -158,7 +185,7 @@ x86:
 	$(SYMLINK) ../../../../x86/include x86
 
 clean clobber:
-	$(RM) $(CLEANFILES) $(OBJS)
+	$(RM) $(CLEANFILES) $(OBJS) machine x86
 
 %.o:	../%.c
 	$(COMPILE.c) $<

@@ -13,23 +13,25 @@
 # Copyright 2021 Toomas Soome <tsoome@me.com>
 #
 
-SRCS +=		$(ZFSSRC)/zfs.c
-SRCS +=		$(ZFSSRC)/gzip.c
-SRCS +=		$(SRC)/common/list/list.c
-OBJS +=		zfs.o
-OBJS +=		gzip.o
-OBJS +=		nvlist.o
-OBJS +=		list.o
+SRCS +=	$(ZFSSRC)/zfs.c
+SRCS +=	$(ZFSSRC)/gzip.c
+SRCS +=	$(SRC)/common/list/list.c
+OBJECTS +=	zfs.o
+OBJECTS +=	gzip.o
+OBJECTS +=	nvlist.o
+OBJECTS +=	list.o
 
-zfs.o := CPPFLAGS +=	-I../../common
-zfs.o := CPPFLAGS +=	-I../../../cddl/boot/zfs -I$(LZ4)
-zfs.o := CPPFLAGS +=	-I$(SRC)/uts/common/fs/zfs
-nvlist.o := CPPFLAGS +=	-I../../common -I../../../cddl/boot/zfs
+objs/zfs.o pics/zfs.o := CPPFLAGS +=	-I../../common
+objs/zfs.o pics/zfs.o := CPPFLAGS +=	-I../../../cddl/boot/zfs -I$(LZ4)
+objs/zfs.o pics/zfs.o := CPPFLAGS +=	-I$(SRC)/uts/common/fs/zfs
+objs/zfs.o pics/zfs.o := CPPFLAGS +=	-I$(CRYPTOSRC)
+objs/nvlist.o pics/nvlist.o := CPPFLAGS +=	-I../../common
+objs/nvlist.o pics/nvlist.o := CPPFLAGS +=	-I../../../cddl/boot/zfs
 
-%.o:	$(ZFSSRC)/%.c
+pics/%.o objs/%.o:	$(ZFSSRC)/%.c
 	$(COMPILE.c) -o $@ $<
 
-%.o:	$(SRC)/common/list/%.c
-	$(COMPILE.c) -DNDEBUG $<
+pics/%.o objs/%.o:	$(SRC)/common/list/%.c
+	$(COMPILE.c) -DNDEBUG -o $@ $<
 
 zfs.o: $(ZFSSRC)/zfsimpl.c

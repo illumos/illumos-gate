@@ -14,37 +14,23 @@
 # Copyright 2019 Joyent, Inc.
 #
 
-include $(SRC)/Makefile.master
 include $(SRC)/boot/sys/boot/Makefile.inc
 
 CPPFLAGS +=	-I../../../../include -I$(SASRC)
-CPPFLAGS +=	-I../../.. -I. -I$(SRC)/common/bzip2
-
-$(LIBRARY): $(SRCS) $(OBJS)
-	$(AR) $(ARFLAGS) $@ $(OBJS)
+CPPFLAGS +=	-I../../.. -I.
 
 include $(SASRC)/Makefile.inc
 include $(CRYPTOSRC)/Makefile.inc
 include $(ZFSSRC)/Makefile.inc
 
-LIBCSRC=	$(SRC)/lib/libc
-OBJS +=		explicit_bzero.o
-OBJS +=		memmem.o
-
 CPPFLAGS +=	-I$(SRC)/uts/common
-
-# needs work
-printf.o := SMOFF += 64bit_shift
-
-# too hairy
-_inflate.o := SMATCH=off
 
 # 64-bit smatch false positive :/
 SMOFF += uninitialized
 
-clean: clobber
-clobber:
-	$(RM) $(CLEANFILES) $(OBJS) machine $(LIBRARY)
+# needs work
+objs/printf.o := SMOFF += 64bit_shift
+pics/printf.o := SMOFF += 64bit_shift
 
 machine:
 	$(RM) machine
@@ -54,23 +40,30 @@ x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
 
-%.o:	$(SASRC)/%.c
-	$(COMPILE.c) $<
+pics/%.o objs/%.o:	%.c
+	$(COMPILE.c) -o $@ $<
 
-%.o:	$(LIBSRC)/libc/net/%.c
-	$(COMPILE.c) $<
+pics/%.o objs/%.o:	$(SASRC)/%.c
+	$(COMPILE.c) -o $@ $<
 
-%.o:	$(LIBSRC)/libc/string/%.c
-	$(COMPILE.c) $<
+pics/%.o objs/%.o:	$(LIBSRC)/libc/net/%.c
+	$(COMPILE.c) -o $@ $<
 
-%.o:	$(LIBSRC)/libc/uuid/%.c
-	$(COMPILE.c) $<
+pics/%.o objs/%.o:	$(LIBSRC)/libc/string/%.c
+	$(COMPILE.c) -o $@ $<
 
-%.o:	$(ZLIB)/%.c
-	$(COMPILE.c) $<
+pics/%.o objs/%.o:	$(LIBSRC)/libc/uuid/%.c
+	$(COMPILE.c) -o $@ $<
 
-%.o:	$(LZ4)/%.c
-	$(COMPILE.c) $<
+pics/%.o objs/%.o:	$(ZLIB)/%.c
+	$(COMPILE.c) -o $@ $<
 
-%.o:	$(SRC)/common/util/%.c
-	$(COMPILE.c) $<
+pics/%.o objs/%.o:	$(LZ4)/%.c
+	$(COMPILE.c) -o $@ $<
+
+pics/%.o objs/%.o:	$(SRC)/common/util/%.c
+	$(COMPILE.c) -o $@ $<
+
+clean: clobber
+clobber:
+	$(RM) $(CLEANFILES) machine x86
