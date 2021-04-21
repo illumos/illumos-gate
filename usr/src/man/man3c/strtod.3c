@@ -44,7 +44,7 @@
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH STRTOD 3C "Aug 25, 2019"
+.TH STRTOD 3C "Apr 21, 2021"
 .SH NAME
 strtod, strtof, strtold, atof \- convert string to floating-point number
 .SH SYNOPSIS
@@ -206,7 +206,8 @@ conversion could be performed, \fB0\fR is returned.
 If the correct value is outside the range of representable values,
 \fB\(+-HUGE_VAL\fR, \fB\(+-HUGE_VALF\fR, or \fB\(+-HUGE_VALL\fR is returned
 (according to the sign of the value), a floating point overflow exception is
-raised, and \fBerrno\fR is set to \fBERANGE\fR.
+raised, and \fBerrno\fR is set to \fBERANGE\fR. \fBHUGE_VAL\fR,
+\fBHUGE_VALF\fR, and \fBHUGE_VALL\fR are described in \fBmath.h\fR(3HEAD).
 .sp
 .LP
 If the correct value would cause an underflow, the correctly rounded result
@@ -326,8 +327,8 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-\fBisspace\fR(3C), \fBlocaleconv\fR(3C), \fBscanf\fR(3C), \fBsetlocale\fR(3C),
-\fBstrtol\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBisspace\fR(3C), \fBlocaleconv\fR(3C), \fBmath.h\fR(3HEAD), \fBscanf\fR(3C),
+\fBsetlocale\fR(3C), \fBstrtol\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
 The \fBstrtod()\fR and \fBatof()\fR functions can be used safely in
 multithreaded applications, as long as \fBsetlocale\fR(3C) is not called to
