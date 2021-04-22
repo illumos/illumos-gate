@@ -37,7 +37,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2018 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -2296,10 +2296,12 @@ svm_vmrun(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 		VCPU_CTR1(vm, vcpu, "vmcb clean %x", ctrl->vmcb_clean);
 
 		/* Launch Virtual Machine. */
+		vcpu_ustate_change(vm, vcpu, VU_RUN);
 		VCPU_CTR1(vm, vcpu, "Resume execution at %lx", state->rip);
 		svm_dr_enter_guest(gctx);
 		svm_launch(vmcb_pa, gctx, get_pcpu());
 		svm_dr_leave_guest(gctx);
+		vcpu_ustate_change(vm, vcpu, VU_EMU_KERN);
 
 		CPU_CLR_ATOMIC(curcpu, &pmap->pm_active);
 

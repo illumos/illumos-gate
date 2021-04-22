@@ -40,7 +40,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -2918,9 +2918,11 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 		}
 
 		vmx_run_trace(vmx, vcpu);
+		vcpu_ustate_change(vm, vcpu, VU_RUN);
 		vmx_dr_enter_guest(vmxctx);
 		rc = vmx_enter_guest(vmxctx, vmx, launched);
 		vmx_dr_leave_guest(vmxctx);
+		vcpu_ustate_change(vm, vcpu, VU_EMU_KERN);
 
 #ifndef	__FreeBSD__
 		vmx->vmcs_state[vcpu] |= VS_LAUNCHED;
