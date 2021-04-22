@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2021 H. William Welliver
 
 # This script configures IP routing.
 
@@ -28,8 +29,8 @@
 
 #
 # In a shared-IP zone we need this service to be up, but all of the work
-# it tries to do is irrelevant (and will actually lead to the service 
-# failing if we try to do it), so just bail out. 
+# it tries to do is irrelevant (and will actually lead to the service
+# failing if we try to do it), so just bail out.
 # In the global zone and exclusive-IP zones we proceed.
 #
 smf_configure_ip || exit $SMF_EXIT_OK
@@ -79,6 +80,34 @@ fi
 # administration.
 #
 smf_netstrategy
+
+#
+# See if static routes were created by install. If so, they were created
+# under /etc/svc/volatile. Copy them into their proper place.
+#
+if [ -f /etc/svc/volatile/etc/inet/static_routes ]; then
+	echo "Installing persistent routes"
+	if [ -f /etc/inet/static_routes ]; then
+		cat /etc/svc/volatile/etc/inet/static_routes | grep -v '^#' \
+		    >> /etc/inet/static_routes
+	else
+		cp /etc/svc/volatile/etc/inet/static_routes \
+		    /etc/inet/static_routes
+	fi
+	/usr/bin/rm /etc/svc/volatile/etc/inet/static_routes
+
+fi
+
+#
+# Read /etc/inet/static_routes and add each link-local route.
+#
+if [ -f /etc/inet/static_routes ]; then
+	echo "Adding persistent link-local routes:"
+	/usr/bin/egrep -v "^(#|$)" /etc/inet/static_routes \
+	    | /usr/bin/grep -E -- "-interface |-iface " | while read line; do
+		/usr/sbin/route add $line
+	done
+fi
 
 if [ "$_INIT_NET_STRATEGY" = "dhcp" ] && \
     [ -n "`/sbin/dhcpinfo Router`" ]; then
@@ -184,28 +213,12 @@ else
 fi
 
 #
-# See if static routes were created by install. If so, they were created
-# under /etc/svc/volatile. Copy them into their proper place.
-#
-if [ -f /etc/svc/volatile/etc/inet/static_routes ]; then
-	echo "Installing persistent routes"
-	if [ -f /etc/inet/static_routes ]; then
-		cat /etc/svc/volatile/etc/inet/static_routes | grep -v '^#' \
-		    >> /etc/inet/static_routes
-	else
-		cp /etc/svc/volatile/etc/inet/static_routes \
-		    /etc/inet/static_routes
-	fi
-	/usr/bin/rm /etc/svc/volatile/etc/inet/static_routes
-	
-fi
-
-#
-# Read /etc/inet/static_routes and add each route.
+# Read /etc/inet/static_routes and add each non-link-local route.
 #
 if [ -f /etc/inet/static_routes ]; then
 	echo "Adding persistent routes:"
-	/usr/bin/egrep -v "^(#|$)" /etc/inet/static_routes | while read line; do
+	/usr/bin/egrep -v "^(#|$)" /etc/inet/static_routes \
+	    | /usr/bin/grep -v -E -- "-interface |-iface " | while read line; do
 		/usr/sbin/route add $line
 	done
 fi
