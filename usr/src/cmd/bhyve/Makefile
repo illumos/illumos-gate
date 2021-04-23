@@ -64,6 +64,7 @@ SRCS =	acpi.c			\
 	pctestdev.c		\
 	pm.c			\
 	post.c			\
+	privileges.c		\
 	ps2kbd.c		\
 	ps2mouse.c		\
 	rfb.c			\
