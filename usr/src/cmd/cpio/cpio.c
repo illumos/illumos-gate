@@ -909,7 +909,7 @@ add_lnk(struct Lnk **sublist_return)
 static int
 bfill(void)
 {
-	int i = 0, rv;
+	int i = 0, rv = 0;
 	static int eof = 0;
 
 	if (!Dflag) {
@@ -2053,7 +2053,7 @@ static int
 creat_tmp(char *nam_p)
 {
 	char *t_p;
-	int	cwd;
+	int	cwd = -1;
 
 	if ((Args & OCp) && G_p->g_ino == DesSt.st_ino &&
 	    G_p->g_dev == DesSt.st_dev) {
@@ -4464,7 +4464,7 @@ gethdr(void)
 {
 	ushort_t ftype;
 	int hit = NONE, cnt = 0;
-	int goodhdr, hsize, offset;
+	int goodhdr, hsize = 0, offset;
 	int bswap = 0;
 	char *preptr;
 	int k = 0;
@@ -4880,7 +4880,7 @@ gethdr(void)
 		int	pad;
 		int	cnt;
 		char	*tp;
-		int	attrsize;
+		int	attrsize = 0;
 
 		if (Pflag) {
 			bytes = Gen.g_filesz;
@@ -5820,7 +5820,7 @@ read_hdr(int hdr)
 	int rv = NONE;
 	major_t maj, rmaj;
 	minor_t min, rmin;
-	char tmpnull;
+	char tmpnull = '\0';
 	static int bar_read_cnt = 0;
 
 	if (hdr != BAR) {
@@ -6282,7 +6282,7 @@ rstfiles(int over, int dirfd)
 
 		/* Acl was not set, so we must chmod */
 		if (!acl_is_set) {
-			mode_t orig_mask, new_mask;
+			mode_t orig_mask = 0, new_mask;
 
 			/*
 			 * use fchmod for attributes, since
@@ -7127,8 +7127,8 @@ verbose(char *nam_p)
 static void
 write_hdr(int arcflag, off_t len)
 {
-	int cnt, pad;
-	mode_t mode;
+	int cnt = 0, pad;
+	mode_t mode = 0;
 	uid_t uid;
 	gid_t gid;
 	const char warnfmt[] = "%s%s%s : %s";
@@ -8560,7 +8560,7 @@ prepare_xattr_hdr(
 						 * length of filename + attr
 						 * in link section
 						 */
-	int			linkstringlen;
+	int			linkstringlen = 0;
 	int			complen;	/* length of pathing section */
 	int			linklen;	/* length of link section */
 	int			attrnames_index; /* attrnames starting index */
@@ -9072,7 +9072,7 @@ sl_info_t *
 sl_insert(dev_t device, ino_t inode, int ftype)
 {
 	sl_info_t *p;		/* moves down the tree */
-	sl_info_t *q;		/* scratch */
+	sl_info_t *q = NULL;	/* scratch */
 	sl_info_t *r;		/* scratch */
 	sl_info_t *s;		/* pt where rebalancing may be needed */
 	sl_info_t *t;		/* father of s */
