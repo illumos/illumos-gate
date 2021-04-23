@@ -1316,9 +1316,9 @@ static void
 add_oversize(oversize_t *lp)
 {
 	int merge_flags = INSERT_ONLY;
-	oversize_t *nx;  	/* ptr to item right of insertion point */
-	oversize_t *pv;  	/* ptr to item left of insertion point */
-	uint_t size_lp, size_pv, size_nx;
+	oversize_t *nx;		/* ptr to item right of insertion point */
+	oversize_t *pv;		/* ptr to item left of insertion point */
+	uint_t size_lp, size_pv, size_nx = 0;
 	uintptr_t endp_lp, endp_pv, endp_nx;
 
 	/*
