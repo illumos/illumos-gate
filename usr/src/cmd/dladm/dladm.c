@@ -2816,6 +2816,10 @@ print_link(show_state_t *state, datalink_id_t linkid, link_fields_buf_t *lbuf)
 		goto done;
 	}
 
+	(void) snprintf(lbuf->link_name, sizeof (lbuf->link_name),
+	    "%s", link);
+	(void) dladm_class2str(class, lbuf->link_class);
+
 	if (state->ls_flags == DLADM_OPT_ACTIVE) {
 		dladm_attr_t	dlattr;
 
@@ -2857,12 +2861,7 @@ link_mtu:
 				goto done;
 			mtu = dlattr.da_max_sdu;
 		}
-	}
 
-	(void) snprintf(lbuf->link_name, sizeof (lbuf->link_name),
-	    "%s", link);
-	(void) dladm_class2str(class, lbuf->link_class);
-	if (state->ls_flags == DLADM_OPT_ACTIVE) {
 		(void) snprintf(lbuf->link_mtu, sizeof (lbuf->link_mtu),
 		    "%u", mtu);
 		(void) get_linkstate(link, B_TRUE, lbuf->link_state);
@@ -3013,7 +3012,7 @@ print_xaggr_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	boolean_t		is_port = (l->laggr_lport >= 0);
 	char			tmpbuf[DLADM_STRSIZE];
 	const char		*objname;
-	dladm_aggr_port_attr_t	*portp;
+	dladm_aggr_port_attr_t	*portp = NULL;
 	dladm_phys_attr_t	dpa;
 
 	if (is_port) {
@@ -3199,7 +3198,7 @@ print_aggr_stats_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	boolean_t		is_port = (l->laggr_lport >= 0);
 	dladm_aggr_port_attr_t	*portp;
 	dladm_status_t		*stat, status;
-	pktsum_t		*diff_stats;
+	pktsum_t		*diff_stats = NULL;
 
 	stat = l->laggr_status;
 	*stat = DLADM_STATUS_OK;
@@ -3214,6 +3213,10 @@ print_aggr_stats_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 			goto err;
 		}
 		diff_stats = l->laggr_diffstats;
+		if (diff_stats == NULL) {
+			status = DLADM_STATUS_BADVAL;
+			goto err;
+		}
 	}
 
 	switch (ofarg->ofmt_id) {
@@ -7158,7 +7161,7 @@ get_secobj_val(char *obj_name, uint8_t *obj_val, uint_t *obj_lenp,
     dladm_secobj_class_t class, FILE *filep)
 {
 	int		rval;
-	uint_t		len, len2;
+	uint_t		len = 0, len2;
 	char		buf[DLADM_SECOBJ_VAL_MAX], buf2[DLADM_SECOBJ_VAL_MAX];
 
 	if (filep == NULL) {
@@ -8607,8 +8610,8 @@ do_show_bridge(int argc, char **argv, const char *use)
 	/* -t: TRILL nickname table related data */
 	char		*default_trill_fields = "nick,flags,link,nexthop";
 	char		*default_str;
-	char		*all_str;
-	ofmt_field_t	*field_arr;
+	char		*all_str = NULL;
+	ofmt_field_t	*field_arr = NULL;
 	ofmt_handle_t	ofmt;
 	ofmt_status_t	oferr;
 	uint_t		ofmtflags = 0;
@@ -8731,6 +8734,9 @@ do_show_bridge(int argc, char **argv, const char *use)
 		default_str = all_str = default_trill_fields;
 		field_arr = bridge_trill_fields;
 		break;
+
+	default:
+		die("unknown operations mode: %d", op_mode);
 	}
 
 	if (fields_str == NULL)
