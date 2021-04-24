@@ -110,7 +110,7 @@ changepasswd(SVCXPRT *transp)
 	 * The adj_crypt_* pointers are used to point into adjbuf
 	 * NOT adj_encrypt
 	 */
-	char *adj_crypt_begin, *adj_crypt_end;
+	char *adj_crypt_begin, *adj_crypt_end = NULL;
 	char name[UTUSERLEN + sizeof (":")];
 	char *p;
 

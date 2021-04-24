@@ -92,9 +92,7 @@ static void loadtable(FILE *nf);
 static void dumptable(void);
 
 int
-main(argc, argv)
-    int argc;
-    char *argv[];
+main(int argc, char *argv[])
 {
 	char *group;
 	struct grouplist *glist;
@@ -102,12 +100,12 @@ main(argc, argv)
 
 	loadtable(stdin);
 	if (argc == 2 && argv[1][0] == '-' &&
-			(argv[1][1] == 'u' || argv[1][1] == 'h')) {
+	    (argv[1][1] == 'u' || argv[1][1] == 'h')) {
 		byuser = (argv[1][1] == 'u');
 	} else {
 		(void) fprintf(stderr,
-				"usage: %s -h (by host), %s -u (by user)\n",
-				argv[0], argv[0]);
+		    "usage: %s -h (by host), %s -u (by user)\n",
+		    argv[0], argv[0]);
 		exit(1);
 	}
 
@@ -159,7 +157,7 @@ dumptable(void)
 				fputs(entry->name, stdout);
 				putc('\t', stdout);
 				for (groups = entry->groups; groups;
-						groups = groups->next) {
+				    groups = groups->next) {
 					fputs(groups->str, stdout);
 					if (groups->next) {
 						putc(',', stdout);
@@ -189,15 +187,15 @@ storegroup(char *group, struct grouplist *glist, int byuser)
 	for (; glist; glist = glist->gl_nxt) {
 		name = byuser ? glist->gl_name : glist->gl_machine;
 		if (!name) {
-		    name = universal;
+			name = universal;
 		} else if (!isalnum(*name) && *name != '_') {
-		    continue;
+			continue;
 		}
 		domain = glist->gl_domain;
 		if (!domain) {
-		    domain = universal;
+			domain = universal;
 		}
-		key = malloc((unsigned) (strlen(name)+strlen(domain)+2));
+		key = malloc((strlen(name) + strlen(domain) + 2));
 		(void) sprintf(key, "%s.%s", name, domain);
 		enter(key, group);
 	}
@@ -227,11 +225,17 @@ appendgroup(groupentrylist grlist, char *group)
 {
 	stringlist cur, prev;
 
+	prev = NULL;
 	for (cur = grlist->groups; cur; prev = cur, cur = cur->next) {
 		if (strcmp(group, cur->str) == 0) {
-		    return;
+			return;
 		}
 	}
+
+	/* prev is NULL only when grlist->groups is NULL.  */
+	if (prev == NULL)
+		return;
+
 	prev->next = MALLOC(stringnode);
 	cur = prev->next;
 	cur->str = group;
@@ -243,7 +247,7 @@ enter(char *name, char *group)
 {
 	int key;
 	groupentrylist gel;
-	groupentrylist gelprev;
+	groupentrylist gelprev = NULL;
 
 	key = tablekey(name);
 	if (grouptable[key] == NULL) {
@@ -251,13 +255,13 @@ enter(char *name, char *group)
 	} else {
 		gel = grouptable[key];
 		while (gel && strcmp(gel->name, name)) {
-		    gelprev = gel;
-		    gel = gel->next;
+			gelprev = gel;
+			gel = gel->next;
 		}
 		if (gel) {
-		    appendgroup(gel, group);
+			appendgroup(gel, group);
 		} else {
-		    gelprev->next = newentry(name, group);
+			gelprev->next = newentry(name, group);
 		}
 	}
 }
@@ -274,8 +278,9 @@ loadtable(FILE *nf)
 	char *line;
 
 	while (getaline(buf, MAXGROUPLEN, nf)) {
+		/* skip leading blanks */
 		for (p = buf; *p && isspace((int)*p); p++)
-			;	/* skip leading blanks */
+			;
 		for (; *p && *p != '#' && *p != ' ' && *p != '\t'; p++)
 			;
 		if (*p == EOS || *p == '#')
