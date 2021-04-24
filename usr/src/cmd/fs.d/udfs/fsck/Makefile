@@ -38,7 +38,6 @@ UDFSDIR=	../mkfs
 UDFSOBJS=	udfslib.o
 #UDFSSRCS=	$(UDFSOBJS:%.o=%.c)
 
-CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 
 # not linted
@@ -72,21 +71,5 @@ $(POFILE):      $(SRCS)
 	sed "/^domain/d" messages.po >  $@
 	$(RM) $(POFILE).i messages.po
 
-lint:
-	$(LINT.c) -mu $(SRCS)
-
-clean:     
+clean:
 	$(RM) $(FSCKOBJS) $(UDFSOBJS)
-
-putback:
-	-cstyle -p inode.c
-	-cstyle -p main.c
-	-cstyle -p pass1.c
-	-cstyle -p setup.c
-	-cstyle -p utilities.c
-	-keywords inode.c
-	-keywords main.c
-	-keywords pass1.c
-	-keywords setup.c
-	-keywords utilities.c
-	-keywords Makefile

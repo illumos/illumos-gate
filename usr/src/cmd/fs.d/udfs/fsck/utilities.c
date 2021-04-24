@@ -147,6 +147,7 @@ printfree()
 	int i, startfree, endfree;
 
 	startfree = -1;
+	endfree = -1;
 	for (i = 0; i < part_len; i++) {
 		if (!testbusy(i)) {
 			if (startfree <= 0)

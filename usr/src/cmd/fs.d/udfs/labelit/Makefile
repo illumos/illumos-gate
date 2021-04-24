@@ -34,22 +34,18 @@ include		../../Makefile.fstype
 
 LDLIBS += -ladm
 CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
-CPPFLAGS += -I../fstyp
-
-LINTFLAGS += -xerroff=E_STATIC_UNUSED
-LINTFLAGS64 += -xerroff=E_STATIC_UNUSED
+CPPFLAGS += -I../common
 
 CERRWARN += -_gcc=-Wno-unused-function
-CERRWARN += $(CNOWARN_UNINIT)
 
 labelit : labelit.o  ud_lib.o
 	$(LINK.c) -o $@ labelit.o ud_lib.o $(LDLIBS)
 	$(POST_PROCESS)
 
-labelit.o : labelit.c ../fstyp/ud_lib.h
+labelit.o : labelit.c ../common/ud_lib.h
 
-ud_lib.o : ../fstyp/ud_lib.c ../fstyp/ud_lib.h
-	$(COMPILE.c) -o $@ ../fstyp/ud_lib.c
+ud_lib.o : ../common/ud_lib.c ../common/ud_lib.h
+	$(COMPILE.c) -o $@ ../common/ud_lib.c
 	$(POST_PROCESS_O)
 
 # for messaging catalog
@@ -60,7 +56,7 @@ POFILE= labelit.po
 #
 catalog:	$(POFILE)
 
-$(POFILE):	$(SRCS) ../fstyp/ud_lib.h
+$(POFILE):	$(SRCS) ../common/ud_lib.h
 	$(RM) $@
 	$(COMPILE.cpp) $(SRCS) > $(POFILE).i
 	$(XGETTEXT) $(XGETFLAGS) $(POFILE).i
@@ -69,11 +65,3 @@ $(POFILE):	$(SRCS) ../fstyp/ud_lib.h
 
 clean :
 	rm -f labelit.o ud_lib.o
-
-lint:
-	$(LINT.c) -mu $(SRCS)
-
-putback:
-	-cstyle -p labelit.c
-	-keywords labelit.c
-	-keywords Makefile

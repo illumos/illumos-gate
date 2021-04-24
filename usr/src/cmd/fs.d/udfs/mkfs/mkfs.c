@@ -602,7 +602,7 @@ wtvolseq(tag_t *tp, daddr_t blk1, daddr_t blk2)
 }
 
 static void
-volseqinit()
+volseqinit(void)
 {
 	struct tag *tp;
 	struct nsr_desc *nsp;
@@ -1181,7 +1181,7 @@ wtfs(daddr_t bno, int size, char *bf)
 }
 
 static void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr,
 		gettext("udfs usage: mkfs [-F FSType] [-V]"
@@ -1331,7 +1331,7 @@ true:
 }
 
 static uint32_t
-get_bsize()
+get_bsize(void)
 {
 	struct dk_cinfo info;
 	struct fd_char fd_char;
@@ -1382,14 +1382,14 @@ get_bsize()
  * Read in the volume sequences descriptors.
  */
 static int
-readvolseq()
+readvolseq(void)
 {
 	struct tag *tp;
 	uint8_t *cp, *end;
 	int err;
 	struct pri_vol_desc *pvolp;
-	struct part_desc *partp;
-	struct log_vol_desc *logvp;
+	struct part_desc *partp = NULL;
+	struct log_vol_desc *logvp = NULL;
 	struct anch_vol_desc_ptr *avp;
 	char *main_vdbuf;
 	uint32_t nextblock;
@@ -1461,7 +1461,7 @@ done:
 }
 
 uint32_t
-get_last_block()
+get_last_block(void)
 {
 	struct vtoc vtoc;
 	struct dk_cinfo dki_info;

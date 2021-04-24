@@ -25,7 +25,7 @@
 
 FSTYP_VERS=1
 FSTYPE=		udfs
-LIBPROG=	fstyp.so.${FSTYP_VERS} 
+LIBPROG=	fstyp.so.${FSTYP_VERS}
 
 include ../../../../lib/Makefile.lib
 include ../../Makefile.fstype
@@ -37,12 +37,8 @@ CFLAGS +=	$(C_PICFLAGS)
 DYNLIB=		$(LIBPROG)
 
 CERRWARN +=	-_gcc=-Wno-unused-function
-CERRWARN +=	$(CNOWARN_UNINIT)
 
 LDLIBS += -lnvpair -ladm -lc
-
-LINTFLAGS += -erroff=E_STATIC_UNUSED -erroff=E_NAME_DEF_NOT_USED2
-LINTFLAGS64 += -erroff=E_STATIC_UNUSED -erroff=E_NAME_DEF_NOT_USED2
 
 #
 # Override PMAP dependency
@@ -56,7 +52,9 @@ OBJS= fstyp.o ud_lib.o
 
 SRCS= $(OBJS:%.o=%.c)
 
-CPPFLAGS += 	-DFSTYP_VERS=${FSTYP_VERS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+CPPFLAGS +=	-I../common
+CPPFLAGS +=	-DFSTYP_VERS=${FSTYP_VERS}
+CPPFLAGS +=	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 $(LIBPROG): $(OBJS)
 	$(LINK.c) $(CPPFLAGS) $(CFLAGS) $(DYNFLAGS) $(GSHARED) -o $@ $(OBJS) \
@@ -64,6 +62,10 @@ $(LIBPROG): $(OBJS)
 	$(POST_PROCESS_SO)
 
 %.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: ../common/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
@@ -75,10 +77,5 @@ install: all
 	$(RM) $(ROOTLIBFSTYPE)/fstyp
 	$(LN) $(ROOTUSRSBIN)/fstyp $(ROOTLIBFSTYPE)/fstyp
 
-lint: lint_SRCS
-
-cstyle:
-	$(CSTYLE) $(SRCS)
-
-clean:     
+clean:
 	$(RM) $(OBJS)
