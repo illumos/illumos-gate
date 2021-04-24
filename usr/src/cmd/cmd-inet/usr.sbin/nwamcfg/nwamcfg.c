@@ -212,22 +212,22 @@ typedef struct prop_table_entry {
 
 /* NCU properties table */
 static prop_table_entry_t ncu_prop_table[] = {
-	{ PT_TYPE, 			NWAM_NCU_PROP_TYPE },
-	{ PT_CLASS, 			NWAM_NCU_PROP_CLASS },
-	{ PT_PARENT, 			NWAM_NCU_PROP_PARENT_NCP },
+	{ PT_TYPE,			NWAM_NCU_PROP_TYPE },
+	{ PT_CLASS,			NWAM_NCU_PROP_CLASS },
+	{ PT_PARENT,			NWAM_NCU_PROP_PARENT_NCP },
 	{ PT_ACTIVATION_MODE,		NWAM_NCU_PROP_ACTIVATION_MODE },
-	{ PT_ENABLED, 			NWAM_NCU_PROP_ENABLED },
-	{ PT_PRIORITY_GROUP, 		NWAM_NCU_PROP_PRIORITY_GROUP },
+	{ PT_ENABLED,			NWAM_NCU_PROP_ENABLED },
+	{ PT_PRIORITY_GROUP,		NWAM_NCU_PROP_PRIORITY_GROUP },
 	{ PT_PRIORITY_MODE,		NWAM_NCU_PROP_PRIORITY_MODE },
-	{ PT_LINK_MACADDR, 		NWAM_NCU_PROP_LINK_MAC_ADDR },
-	{ PT_LINK_AUTOPUSH, 		NWAM_NCU_PROP_LINK_AUTOPUSH },
-	{ PT_LINK_MTU, 			NWAM_NCU_PROP_LINK_MTU },
-	{ PT_IP_VERSION, 		NWAM_NCU_PROP_IP_VERSION },
-	{ PT_IPV4_ADDRSRC, 		NWAM_NCU_PROP_IPV4_ADDRSRC },
-	{ PT_IPV4_ADDR, 		NWAM_NCU_PROP_IPV4_ADDR },
+	{ PT_LINK_MACADDR,		NWAM_NCU_PROP_LINK_MAC_ADDR },
+	{ PT_LINK_AUTOPUSH,		NWAM_NCU_PROP_LINK_AUTOPUSH },
+	{ PT_LINK_MTU,			NWAM_NCU_PROP_LINK_MTU },
+	{ PT_IP_VERSION,		NWAM_NCU_PROP_IP_VERSION },
+	{ PT_IPV4_ADDRSRC,		NWAM_NCU_PROP_IPV4_ADDRSRC },
+	{ PT_IPV4_ADDR,			NWAM_NCU_PROP_IPV4_ADDR },
 	{ PT_IPV4_DEFAULT_ROUTE,	NWAM_NCU_PROP_IPV4_DEFAULT_ROUTE },
-	{ PT_IPV6_ADDRSRC, 		NWAM_NCU_PROP_IPV6_ADDRSRC },
-	{ PT_IPV6_ADDR, 		NWAM_NCU_PROP_IPV6_ADDR },
+	{ PT_IPV6_ADDRSRC,		NWAM_NCU_PROP_IPV6_ADDRSRC },
+	{ PT_IPV6_ADDR,			NWAM_NCU_PROP_IPV6_ADDR },
 	{ PT_IPV6_DEFAULT_ROUTE,	NWAM_NCU_PROP_IPV6_DEFAULT_ROUTE },
 	{ PT_IP_PRIMARY,		NWAM_NCU_PROP_IP_PRIMARY },
 	{ PT_IP_REQHOST,		NWAM_NCU_PROP_IP_REQHOST },
@@ -236,47 +236,47 @@ static prop_table_entry_t ncu_prop_table[] = {
 
 /* ENM properties table */
 static prop_table_entry_t enm_prop_table[] = {
-	{ PT_ENM_FMRI, 		NWAM_ENM_PROP_FMRI },
-	{ PT_ENM_START, 	NWAM_ENM_PROP_START },
-	{ PT_ENM_STOP, 		NWAM_ENM_PROP_STOP },
-	{ PT_ACTIVATION_MODE, 	NWAM_ENM_PROP_ACTIVATION_MODE },
-	{ PT_CONDITIONS, 	NWAM_ENM_PROP_CONDITIONS },
-	{ PT_ENABLED, 		NWAM_ENM_PROP_ENABLED },
+	{ PT_ENM_FMRI,		NWAM_ENM_PROP_FMRI },
+	{ PT_ENM_START,		NWAM_ENM_PROP_START },
+	{ PT_ENM_STOP,		NWAM_ENM_PROP_STOP },
+	{ PT_ACTIVATION_MODE,	NWAM_ENM_PROP_ACTIVATION_MODE },
+	{ PT_CONDITIONS,	NWAM_ENM_PROP_CONDITIONS },
+	{ PT_ENABLED,		NWAM_ENM_PROP_ENABLED },
 	{ 0, NULL }
 };
 
 /* LOCation properties table */
 static prop_table_entry_t loc_prop_table[] = {
-	{ PT_ACTIVATION_MODE, 	NWAM_LOC_PROP_ACTIVATION_MODE },
-	{ PT_CONDITIONS, 	NWAM_LOC_PROP_CONDITIONS },
-	{ PT_ENABLED, 		NWAM_LOC_PROP_ENABLED },
-	{ PT_LOC_NAMESERVICES, 	NWAM_LOC_PROP_NAMESERVICES },
+	{ PT_ACTIVATION_MODE,	NWAM_LOC_PROP_ACTIVATION_MODE },
+	{ PT_CONDITIONS,	NWAM_LOC_PROP_CONDITIONS },
+	{ PT_ENABLED,		NWAM_LOC_PROP_ENABLED },
+	{ PT_LOC_NAMESERVICES,	NWAM_LOC_PROP_NAMESERVICES },
 	{ PT_LOC_NAMESERVICES_CONFIG, NWAM_LOC_PROP_NAMESERVICES_CONFIG_FILE },
 	{ PT_LOC_DNS_CONFIGSRC, NWAM_LOC_PROP_DNS_NAMESERVICE_CONFIGSRC },
-	{ PT_LOC_DNS_DOMAIN, 	NWAM_LOC_PROP_DNS_NAMESERVICE_DOMAIN },
-	{ PT_LOC_DNS_SERVERS, 	NWAM_LOC_PROP_DNS_NAMESERVICE_SERVERS },
-	{ PT_LOC_DNS_SEARCH, 	NWAM_LOC_PROP_DNS_NAMESERVICE_SEARCH },
+	{ PT_LOC_DNS_DOMAIN,	NWAM_LOC_PROP_DNS_NAMESERVICE_DOMAIN },
+	{ PT_LOC_DNS_SERVERS,	NWAM_LOC_PROP_DNS_NAMESERVICE_SERVERS },
+	{ PT_LOC_DNS_SEARCH,	NWAM_LOC_PROP_DNS_NAMESERVICE_SEARCH },
 	{ PT_LOC_NIS_CONFIGSRC, NWAM_LOC_PROP_NIS_NAMESERVICE_CONFIGSRC },
-	{ PT_LOC_NIS_SERVERS, 	NWAM_LOC_PROP_NIS_NAMESERVICE_SERVERS },
+	{ PT_LOC_NIS_SERVERS,	NWAM_LOC_PROP_NIS_NAMESERVICE_SERVERS },
 	{ PT_LOC_LDAP_CONFIGSRC, NWAM_LOC_PROP_LDAP_NAMESERVICE_CONFIGSRC },
 	{ PT_LOC_LDAP_SERVERS,	NWAM_LOC_PROP_LDAP_NAMESERVICE_SERVERS },
 	{ PT_LOC_DEFAULT_DOMAIN, NWAM_LOC_PROP_DEFAULT_DOMAIN },
-	{ PT_LOC_NFSV4_DOMAIN, 	NWAM_LOC_PROP_NFSV4_DOMAIN },
-	{ PT_LOC_IPF_CONFIG, 	NWAM_LOC_PROP_IPFILTER_CONFIG_FILE },
+	{ PT_LOC_NFSV4_DOMAIN,	NWAM_LOC_PROP_NFSV4_DOMAIN },
+	{ PT_LOC_IPF_CONFIG,	NWAM_LOC_PROP_IPFILTER_CONFIG_FILE },
 	{ PT_LOC_IPF_V6_CONFIG, NWAM_LOC_PROP_IPFILTER_V6_CONFIG_FILE },
-	{ PT_LOC_IPNAT_CONFIG, 	NWAM_LOC_PROP_IPNAT_CONFIG_FILE },
-	{ PT_LOC_IPPOOL_CONFIG, NWAM_LOC_PROP_IPPOOL_CONFIG_FILE },
-	{ PT_LOC_IKE_CONFIG, 	NWAM_LOC_PROP_IKE_CONFIG_FILE },
+	{ PT_LOC_IPNAT_CONFIG,	NWAM_LOC_PROP_IPNAT_CONFIG_FILE },
+	{ PT_LOC_IPPOOL_CONFIG,	NWAM_LOC_PROP_IPPOOL_CONFIG_FILE },
+	{ PT_LOC_IKE_CONFIG,	NWAM_LOC_PROP_IKE_CONFIG_FILE },
 	{ PT_LOC_IPSECPOL_CONFIG, NWAM_LOC_PROP_IPSECPOLICY_CONFIG_FILE },
 	{ 0, NULL }
 };
 
 /* Known WLAN properties table */
 static prop_table_entry_t wlan_prop_table[] = {
-	{ PT_WLAN_BSSIDS, 	NWAM_KNOWN_WLAN_PROP_BSSIDS },
-	{ PT_WLAN_PRIORITY, 	NWAM_KNOWN_WLAN_PROP_PRIORITY },
-	{ PT_WLAN_KEYNAME, 	NWAM_KNOWN_WLAN_PROP_KEYNAME },
-	{ PT_WLAN_KEYSLOT, 	NWAM_KNOWN_WLAN_PROP_KEYSLOT },
+	{ PT_WLAN_BSSIDS,	NWAM_KNOWN_WLAN_PROP_BSSIDS },
+	{ PT_WLAN_PRIORITY,	NWAM_KNOWN_WLAN_PROP_PRIORITY },
+	{ PT_WLAN_KEYNAME,	NWAM_KNOWN_WLAN_PROP_KEYNAME },
+	{ PT_WLAN_KEYSLOT,	NWAM_KNOWN_WLAN_PROP_KEYSLOT },
 	{ PT_WLAN_SECURITY_MODE, NWAM_KNOWN_WLAN_PROP_SECURITY_MODE },
 	{ 0, NULL }
 };
@@ -1122,7 +1122,7 @@ check_scope(int cmd)
 
 /* Returns the active object type depending on which handle is not NULL */
 static nwam_object_type_t
-active_object_type()
+active_object_type(void)
 {
 	/* Check ncu_h before ncp_h, ncp_h must be loaded before ncu_h */
 	if (ncu_h != NULL)
@@ -1204,6 +1204,10 @@ do_commit()
 		case NWAM_OBJECT_TYPE_KNOWN_WLAN:
 			verr = nwam_known_wlan_validate(wlan_h, &errprop);
 			break;
+		default:
+			verr = NWAM_INVALID_HANDLE;
+			nwamerr(ret, "Unknown object type");
+			return;
 		}
 
 		if (verr != NWAM_SUCCESS)
@@ -1677,6 +1681,7 @@ destroy_func(cmd_t *cmd)
 		ncp_h = NULL;
 	} else {
 		nerr("Destroy error: unknown object-type");
+		ret = NWAM_INVALID_HANDLE;
 	}
 
 done:
@@ -1819,6 +1824,9 @@ revert_func(cmd_t *cmd)
 		nwam_known_wlan_free(wlan_h);
 		wlan_h = NULL;
 		ret = nwam_known_wlan_read(name, 0, &wlan_h);
+		break;
+	default:
+		ret = NWAM_INVALID_HANDLE;
 		break;
 	}
 
@@ -1988,6 +1996,9 @@ prop_value_type(nwam_object_type_t object_type, const char *prop)
 	case NWAM_OBJECT_TYPE_KNOWN_WLAN:
 		ret = nwam_known_wlan_get_prop_type(prop, &value_type);
 		break;
+	default:
+		ret = NWAM_INVALID_HANDLE;
+		break;
 	}
 
 	if (ret != NWAM_SUCCESS)
@@ -2010,9 +2021,9 @@ str_to_nwam_value(nwam_object_type_t object_type, char *input_str, int pt_type,
 	int		max_str_num;
 
 	nwam_value_type_t	value_type;
-	int64_t			*int_vals;
-	uint64_t		*uint_vals;
-	boolean_t		*boolean_vals;
+	int64_t			*int_vals = NULL;
+	uint64_t		*uint_vals = NULL;
+	boolean_t		*boolean_vals = NULL;
 
 	/*
 	 * Worst case is that each char separated by DELIMITER, so the
@@ -2130,6 +2141,8 @@ str_to_nwam_value(nwam_object_type_t object_type, char *input_str, int pt_type,
 	} else if (value_type == NWAM_VALUE_TYPE_BOOLEAN) {
 		ret = nwam_value_create_boolean_array(boolean_vals, n, &data);
 		free(boolean_vals);
+	} else {
+		ret = NWAM_INVALID_HANDLE;
 	}
 	array_free((void **)val, max_str_num);
 
@@ -2346,6 +2359,9 @@ show_prop_test(nwam_object_type_t object_type, const char *prop,
 			break;
 		case NWAM_OBJECT_TYPE_KNOWN_WLAN:
 			return (B_TRUE);
+		default:
+			ret = NWAM_INVALID_HANDLE;
+			break;
 		}
 		if (ret != NWAM_SUCCESS)
 			continue;
@@ -2481,6 +2497,9 @@ is_prop_multivalued(nwam_object_type_t object_type, const char *prop)
 		break;
 	case NWAM_OBJECT_TYPE_KNOWN_WLAN:
 		ret = nwam_known_wlan_prop_multivalued(prop, &multi);
+		break;
+	default:
+		ret = NWAM_INVALID_HANDLE;
 		break;
 	}
 
@@ -2771,11 +2790,14 @@ output_prop_val(const char *prop_name, nwam_value_t value, FILE *wf,
 			return;
 		}
 		tostr = bool2str;
+	} else {
+		nerr("Unknown value type");
+		return;
 	}
 
 	/* now, loop and print each value */
 	for (i = 0; i < num; i++) {
-		void *val;
+		void *val = NULL;
 
 		/* get the pointer to the ith value to pass to func() */
 		if (value_type == NWAM_VALUE_TYPE_STRING)
@@ -3858,6 +3880,9 @@ clear_func(cmd_t *cmd)
 	case NWAM_OBJECT_TYPE_KNOWN_WLAN:
 		ret = nwam_known_wlan_delete_prop(wlan_h, prop);
 		break;
+	default:
+		ret = NWAM_INVALID_HANDLE;
+		break;
 	}
 
 	if (ret != NWAM_SUCCESS) {
@@ -4156,6 +4181,10 @@ verify_func(cmd_t *cmd)
 	case NWAM_OBJECT_TYPE_KNOWN_WLAN:
 		ret = nwam_known_wlan_validate(wlan_h, &errprop);
 		break;
+	default:
+		ret = NWAM_INVALID_HANDLE;
+		nwamerr(ret, "Unknown object type");
+		return;
 	}
 	if (ret != NWAM_SUCCESS)
 		nwamerr(ret, "Verify error on property '%s'", errprop);
@@ -4224,7 +4253,7 @@ one_command_at_a_time(int argc, char *argv[])
 static int
 cmd_file(char *file)
 {
-	FILE *infile;
+	FILE *infile = NULL;
 	int err;
 	struct stat statbuf;
 	boolean_t using_real_file = (strcmp(file, "-") != 0);

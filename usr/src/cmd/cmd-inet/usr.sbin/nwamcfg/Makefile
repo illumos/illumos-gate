@@ -39,7 +39,6 @@ CLEANFILES +=	nwamcfg_lex.c nwamcfg_grammar.tab.c nwamcfg_grammar.tab.h
 CLEANFILES +=	$(PROG).ln
 
 CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
@@ -70,11 +69,5 @@ check:  $(PROG).c $(PROG).h
 
 clean:
 	$(RM) $(OBJS) $(CLEANFILES)
-
-#
-# We don't do lint of lex- and yacc- generated source files
-#
-lint:
-	$(LINT.c) -c $(PROG).c $(LDLIBS)
 
 include ../../../Makefile.targ
