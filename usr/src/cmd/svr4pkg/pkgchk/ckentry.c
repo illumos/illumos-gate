@@ -62,8 +62,7 @@ int
 ckentry(int envflag, int maptyp, struct cfent *ept, VFP_T *vfp,
     PKGserver server)
 {
-	int	a_err, c_err,
-		errflg;
+	int	a_err, c_err, errflg;
 	char	*path;
 	char	*ir = get_inst_root();
 
@@ -138,7 +137,7 @@ ckentry(int envflag, int maptyp, struct cfent *ept, VFP_T *vfp,
 		}
 		/* Report invalid modtimes by passing cverify a -1 */
 		c_err = cverify((!fflag ? (-1) : fflag),  &ept->ftype, path,
-			&ept->cinfo, 1);
+		    &ept->cinfo, 1);
 		if (c_err) {
 			logerr(gettext("ERROR: %s"), path);
 			logerr(getErrbufAddr());
@@ -169,7 +168,7 @@ ckentry(int envflag, int maptyp, struct cfent *ept, VFP_T *vfp,
 			/* validate contents */
 			/* Report invalid modtimes by passing cverify a -1 */
 			if (c_err = cverify((!fflag ? (-1) : fflag),
-				&ept->ftype, ept->path, &ept->cinfo, 1)) {
+			    &ept->ftype, ept->path, &ept->cinfo, 1)) {
 				errflg++;
 				if (!qflag || (c_err != VE_EXIST)) {
 					if (!a_err)
@@ -210,7 +209,7 @@ xdir(int maptyp, VFP_T *vfp, PKGserver server, char *dirname)
 	struct cfent	mine;
 	struct dirent	*drp;
 	struct pinfo	*pinfo;
-	void		*pos;
+	void		*pos = NULL;
 
 	if (!maptyp)
 		pos = vfpGetCurrCharPtr(vfp); /* get current position in file */
@@ -301,7 +300,7 @@ findspool(struct cfent *ept)
 	}
 
 	(void) snprintf(path, sizeof (path), "%s/%s", host,
-		ept->path + (ept->path[0] == '/'));
+	    ept->path + (ept->path[0] == '/'));
 
 	if (access(path, 0) == 0) {
 		return (path);
@@ -309,8 +308,8 @@ findspool(struct cfent *ept)
 
 	if ((ept->ftype != 'i') && (ept->volno > 0)) {
 		(void) snprintf(path, sizeof (path),
-				"%s.%d/%s", host, ept->volno,
-			ept->path + (ept->path[0] == '/'));
+		    "%s.%d/%s", host, ept->volno,
+		    ept->path + (ept->path[0] == '/'));
 		if (access(path, 0) == 0) {
 			return (path);
 		}

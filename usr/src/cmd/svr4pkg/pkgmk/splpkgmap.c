@@ -73,16 +73,16 @@ struct class_type {
 };
 
 static fsblkcnt_t	btotal;	/* blocks stored on current part */
-static fsblkcnt_t	bmax; 	/* maximum number of blocks on any part */
+static fsblkcnt_t	bmax;	/* maximum number of blocks on any part */
 
 static fsfilcnt_t	ftotal;	/* files stored on current part */
 static fsfilcnt_t	fmax;	/* maximum number of files on any part */
-static fsblkcnt_t	bpkginfo; 	/* blocks used by pkginfo file */
+static fsblkcnt_t	bpkginfo;	/* blocks used by pkginfo file */
 static char	**dirlist;
-static short	volno; 		/* current part */
-static int	nparts = -1; 	/* total number of parts */
+static short	volno;		/* current part */
+static int	nparts = -1;	/* total number of parts */
 static int	nclass;
-static fsblkcnt_t 	DIRSIZE;
+static fsblkcnt_t	DIRSIZE;
 static struct	class_type *cl;
 
 static int	nodecount(char *path);
@@ -165,7 +165,7 @@ splpkgmap(struct cfent **eptlist, unsigned int eptnum, char *order[],
 				    nblk(eptlist[i]->cinfo.size, bsize, frsize);
 				if (total > *plimit) {
 					progerr(gettext(ERR_FREE),
-						pkgdev.dirname);
+					    pkgdev.dirname);
 					quit(1);
 				}
 				allocnode(eptlist[i]->path);
@@ -317,7 +317,7 @@ splpkgmap(struct cfent **eptlist, unsigned int eptnum, char *order[],
 		/*
 		 * packaging overhead.
 		 */
-		btemp += (bpkginfo + 2L); 	/* from newvolume() */
+		btemp += (bpkginfo + 2L);	/* from newvolume() */
 		if ((f[j].blks + btemp) > *plimit) {
 			errflg++;
 			progerr(gettext(ERR_TOOBIG), f[j].ept->path, f[j].blks);
@@ -407,6 +407,7 @@ store(struct data **sf, unsigned int eptnum, char *aclass, fsblkcnt_t limit,
 	long	ftemp;
 	fsblkcnt_t	btemp;
 
+	svnodes = 0;
 	select = 0;
 	choice = (-1);
 	for (i = 0; i < eptnum; ++i) {
@@ -485,7 +486,7 @@ allocnode(char *path)
 			dirlist[i] = qstrdup(path);
 			if ((++i % MALSIZ) == 0) {
 				dirlist = (char **)realloc(dirlist,
-					(i+MALSIZ) * sizeof (char *));
+				    (i+MALSIZ) * sizeof (char *));
 				if (dirlist == NULL) {
 					progerr(gettext(ERR_MEMORY), errno);
 					quit(99);
@@ -570,7 +571,7 @@ newvolume(struct data **sf, unsigned int eptnum, fsblkcnt_t limit,
 			btotal += sf[i]->blks + (newnodes * DIRSIZE);
 			if (btotal > limit) {
 				progerr(gettext(ERR_VOLBLKS), volno, btotal,
-					limit);
+				    limit);
 				quit(1);
 			} else if ((ilimit == 0) && (ftotal+1 > ilimit)) {
 				progerr(gettext(ERR_VOLFILES), volno, ftotal+1,
@@ -602,7 +603,7 @@ addclass(char *aclass, int vol)
 	cl[nclass].last = vol;
 	if ((++nclass % MALSIZ) == 0) {
 		cl = (struct class_type *)realloc((char *)cl,
-			sizeof (struct class_type) * (nclass+MALSIZ));
+		    sizeof (struct class_type) * (nclass+MALSIZ));
 		if (!cl) {
 			progerr(gettext(ERR_MEMORY), errno);
 			quit(99);

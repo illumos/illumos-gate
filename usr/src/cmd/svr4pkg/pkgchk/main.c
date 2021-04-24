@@ -115,7 +115,7 @@ int	xflag = 0;
 int	qflag = 0;
 int	Rflag = 0;
 int	dflag = 0;
-char 	*device;
+char	*device;
 
 char	*uniTmp;
 
@@ -151,9 +151,7 @@ main(int argc, char *argv[])
 	char *catg_arg = NULL;
 	int	c;
 	int	n = 0;
-	char	*prog,
-	    *Rvalue,
-	    *dvalue;
+	char	*prog, *Rvalue = NULL, *dvalue = NULL;
 	int pathtype;
 
 	/* initialize locale mechanism */

@@ -93,10 +93,10 @@ typedef unsigned int		WAITER_T;
  * It does not survive a reboot
  * It consists of fixed length records
  * Each record has the following information:
- * 	record number - record position within the lock file
- * 	lock count - number of lock holders maintaining this lock
- * 	lock object - object being locked
- * 	lock key - key needed to manipulate existing lock
+ *	record number - record position within the lock file
+ *	lock count - number of lock holders maintaining this lock
+ *	lock object - object being locked
+ *	lock key - key needed to manipulate existing lock
  *	lock exclusive - is the lock exclusive (single locker only)
  */
 
@@ -410,7 +410,7 @@ admin_lock(int argc, char **argv)
 	/* if -t option is specified, override all other options */
 
 	if (tFlag) {
-		int	rs;
+		int	rs = 0;
 		int	rx;
 		int	a;
 
@@ -1271,7 +1271,7 @@ _openLockFile(char *a_root)
  *	a_s1Lock - first lock object to compare against the second
  *	a_s2Lock - second lock object to compare against the first
  * Returns:
- * 	== 0 - the locks match at some level
+ *	== 0 - the locks match at some level
  *	!= 0 - the locks do not match at any level
  */
 
@@ -1288,7 +1288,7 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 	char		s2Prefix[MAXPATHLEN] = {'\0'};
 	int		result = 0;
 	int		s1Cnt;
-	int		s2Cnt;
+	int		s2Cnt = 0;
 
 	/* entry assertions */
 
@@ -2041,7 +2041,7 @@ _decrementLockCount(int a_fd, LOCK_T *a_theLock)
  * Returns:	char *
  *			== NULL - error, no key generated
  *			!= NULL - generated key
- * NOTE:    	Any results returned is placed in new storage for the
+ * NOTE:	Any results returned is placed in new storage for the
  *		calling method. The caller must use 'lu_memFree' to dispose
  *		of the storage once the results are no longer needed.
  */
@@ -2059,7 +2059,7 @@ _getUniqueId(void)
 	 * same length as unique uid but contains different information that
 	 * is as unique as can be made - include current hires time (nanosecond
 	 * real timer). Such a unique i.d. will look like:
-	 * 	0203104092-1145345-0004e94d6af481a0
+	 *	0203104092-1145345-0004e94d6af481a0
 	 */
 
 	hretime = gethrtime();

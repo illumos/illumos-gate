@@ -374,7 +374,7 @@ ocfile(PKGserver *server, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
 int
 socfile(PKGserver *server, boolean_t quiet)
 {
-	boolean_t 	readonly = B_FALSE;
+	boolean_t	readonly = B_FALSE;
 	PKGserver	newserver;
 
 	if (pkgadm_dir == NULL) {
@@ -585,21 +585,19 @@ pkgWlock(int verbose)
 	(void) signal(SIGALRM, do_alarm);
 	(void) alarm(LOCKWAIT);
 
+	retval = 0;
 	do {
 		if (lockf(lock_fd, F_LOCK, 0)) {
 			if (errno == EAGAIN || errno == EINTR)
 				logerr(gettext(MSG_XWTING));
 			else if (errno == ECOMM) {
 				logerr(gettext(ERR_LCKREM));
-				retval = 0;
 				break;
 			} else if (errno == EBADF) {
 				logerr(gettext(ERR_BADLCK));
-				retval = 0;
 				break;
 			} else if (errno == EDEADLK) {
 				logerr(gettext(ERR_DEADLCK));
-				retval = 0;
 				break;
 			}
 		} else {

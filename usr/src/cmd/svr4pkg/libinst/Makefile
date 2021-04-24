@@ -46,7 +46,7 @@ include	$(SRC)/cmd/Makefile.cmd
 #
 # For messaging catalog
 POFILE = libinst.po
-MSGFILES=$(OBJS:%.o=%.i) 
+MSGFILES=$(OBJS:%.o=%.i)
 
 CPPFLAGS +=	-I$(SRC)/cmd/svr4pkg/hdrs \
 		-I$(SRC)/lib/libpkg/common \
@@ -59,13 +59,8 @@ CPPFLAGS +=	-I$(SRC)/cmd/svr4pkg/hdrs \
 # For stop-in-your-tracks debugging
 #CPPFLAGS +=	-DBUG_DEBUG
 
-# Lint flags 
-#
-LINTFLAGS += -un
-
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
-CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-clobbered
 CERRWARN += -_gcc=-Wno-unused-variable
 

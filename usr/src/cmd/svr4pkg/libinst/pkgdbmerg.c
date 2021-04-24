@@ -134,7 +134,7 @@ pkgdbmerg(PKGserver server, VFP_T *tmpvfp, struct cfextra **extlist)
 		 */
 		/* Metafiles don't get merged. */
 		if ((el_ent->cf_ent.ftype == 'i') ||
-			(el_ent->cf_ent.ftype == 'n')) {
+		    (el_ent->cf_ent.ftype == 'n')) {
 			continue;
 		}
 
@@ -289,7 +289,7 @@ pkgdbmerg(PKGserver server, VFP_T *tmpvfp, struct cfextra **extlist)
 static int
 do_like_ent(VFP_T *vfpo, struct cfextra *el_ent, struct cfent *cf_ent, int ctrl)
 {
-	int	stflag, ignore, changed, mrg_result;
+	int	stflag, ignore, changed, mrg_result = -1;
 
 	ignore = changed = 0;
 
@@ -400,14 +400,14 @@ do_like_ent(VFP_T *vfpo, struct cfextra *el_ent, struct cfent *cf_ent, int ctrl)
 		mrg_result = merg(el_ent, cf_ent);
 
 		switch (mrg_result) {
-		    case MRG_SAME:
+		case MRG_SAME:
 			break;
 
-		    case MRG_DIFFERENT:
+		case MRG_DIFFERENT:
 			changed++;
 			break;
 
-		    case MRG_REPLACE:
+		case MRG_REPLACE:
 			/*
 			 * We'll pick one or the other later. For now, cf_ent
 			 * will have the fault value and el_ent will retain
@@ -419,7 +419,7 @@ do_like_ent(VFP_T *vfpo, struct cfextra *el_ent, struct cfent *cf_ent, int ctrl)
 			ignore++;
 			break;
 
-		    default:
+		default:
 			break;
 		}
 	}
@@ -569,11 +569,9 @@ do_new_ent(VFP_T *vfpo, struct cfextra *el_ent, int ctrl)
 	}
 
 	if (strcmp(el_ent->cf_ent.ainfo.owner, DB_UNDEFINED_ENTRY) == 0)
-		(void) strcpy(el_ent->cf_ent.ainfo.owner,
-				DEFAULT_OWNER);
+		(void) strcpy(el_ent->cf_ent.ainfo.owner, DEFAULT_OWNER);
 	if (strcmp(el_ent->cf_ent.ainfo.group, DB_UNDEFINED_ENTRY) == 0)
-		(void) strcpy(el_ent->cf_ent.ainfo.group,
-				DEFAULT_GROUP);
+		(void) strcpy(el_ent->cf_ent.ainfo.group, DEFAULT_GROUP);
 
 	/*
 	 * Do not allow installation if nocnflct is set and this pathname is
@@ -643,11 +641,11 @@ static void
 set_change(struct cfextra *el_ent)
 {
 	int	n;
-	char 	*tp;
+	char	*tp;
 
 	tp = el_ent->server_path;
 	if ((el_ent->cf_ent.ftype == 'f') || (el_ent->cf_ent.ftype == 'e') ||
-		(el_ent->cf_ent.ftype == 'v')) {
+	    (el_ent->cf_ent.ftype == 'v')) {
 		if (cverify(0, &(el_ent->cf_ent.ftype), tp,
 		    &(el_ent->cf_ent.cinfo), 1)) {
 			el_ent->mstat.contchg = 1;
@@ -657,11 +655,11 @@ set_change(struct cfextra *el_ent)
 				el_ent->mstat.attrchg = 1;
 		}
 	} else if (!el_ent->mstat.attrchg &&
-		((el_ent->cf_ent.ftype == 'd') ||
-		(el_ent->cf_ent.ftype == 'x') ||
-		(el_ent->cf_ent.ftype == 'c') ||
-		(el_ent->cf_ent.ftype == 'b') ||
-		(el_ent->cf_ent.ftype == 'p'))) {
+	    ((el_ent->cf_ent.ftype == 'd') ||
+	    (el_ent->cf_ent.ftype == 'x') ||
+	    (el_ent->cf_ent.ftype == 'c') ||
+	    (el_ent->cf_ent.ftype == 'b') ||
+	    (el_ent->cf_ent.ftype == 'p'))) {
 		n = averify(0, &(el_ent->cf_ent.ftype), tp,
 		    &(el_ent->cf_ent.ainfo));
 		if (n == VE_ATTR)
@@ -670,8 +668,8 @@ set_change(struct cfextra *el_ent)
 			el_ent->mstat.contchg = 1;
 		}
 	} else if (!el_ent->mstat.attrchg &&
-		((el_ent->cf_ent.ftype == 's') ||
-		(el_ent->cf_ent.ftype == 'l'))) {
+	    ((el_ent->cf_ent.ftype == 's') ||
+	    (el_ent->cf_ent.ftype == 'l'))) {
 		n = averify(0, &(el_ent->cf_ent.ftype), tp,
 		    &(el_ent->cf_ent.ainfo));
 		if (n == VE_ATTR)
@@ -686,30 +684,30 @@ static int
 is_setuid(struct cfent *ent)
 {
 	return (((ent->ftype == 'f') || (ent->ftype == 'v') ||
-		(ent->ftype == 'e')) &&
-		(ent->ainfo.mode != BADMODE) &&
-		(ent->ainfo.mode != WILDCARD) &&
-		(ent->ainfo.mode & S_ISUID));
+	    (ent->ftype == 'e')) &&
+	    (ent->ainfo.mode != BADMODE) &&
+	    (ent->ainfo.mode != WILDCARD) &&
+	    (ent->ainfo.mode & S_ISUID));
 }
 
 static int
 is_setgid(struct cfent *ent)
 {
 	return (((ent->ftype == 'f') || (ent->ftype == 'v') ||
-		(ent->ftype == 'e')) && (ent->ainfo.mode != BADMODE) &&
-		(ent->ainfo.mode != WILDCARD) &&
-		(ent->ainfo.mode & S_ISGID) &&
-		(ent->ainfo.mode & (S_IEXEC|S_IXUSR|S_IXOTH)));
+	    (ent->ftype == 'e')) && (ent->ainfo.mode != BADMODE) &&
+	    (ent->ainfo.mode != WILDCARD) &&
+	    (ent->ainfo.mode & S_ISGID) &&
+	    (ent->ainfo.mode & (S_IEXEC|S_IXUSR|S_IXOTH)));
 }
 
 char *types[] = {
 	"fev",	/* type 1, regular files */
-	"s", 	/* type 2, symbolic links */
-	"l", 	/* type 3, linked files */
-	"dx", 	/* type 4, directories */
-	"c", 	/* type 5, character special devices */
-	"b", 	/* type 6, block special devices */
-	"p", 	/* type 7, named pipes */
+	"s",	/* type 2, symbolic links */
+	"l",	/* type 3, linked files */
+	"dx",	/* type 4, directories */
+	"c",	/* type 5, character special devices */
+	"b",	/* type 6, block special devices */
+	"p",	/* type 7, named pipes */
 	NULL
 };
 
@@ -791,35 +789,35 @@ typechg(struct cfent *el_ent, struct cfent *cf_ent, struct mergstat *mstat)
 
 	/* allow change, but warn user of possible problems */
 	switch (itype) {
-	    case 1:
+	case 1:
 		logerr(gettext(WRN_NOTFILE), el_ent->path);
 		break;
 
-	    case 2:
+	case 2:
 		logerr(gettext(WRN_NOTSYMLN), el_ent->path);
 		break;
 
-	    case 3:
+	case 3:
 		logerr(gettext(WRN_NOTLINK), el_ent->path);
 		break;
 
-	    case 4:
+	case 4:
 		logerr(gettext(WRN_NOTDIR), el_ent->path);
 		break;
 
-	    case 5:
+	case 5:
 		logerr(gettext(WRN_NOTCHAR), el_ent->path);
 		break;
 
-	    case 6:
+	case 6:
 		logerr(gettext(WRN_NOTBLOCK), el_ent->path);
 		break;
 
-	    case 7:
+	case 7:
 		logerr(gettext(WRN_NOTPIPE), el_ent->path);
 		break;
 
-	    default:
+	default:
 		break;
 	}
 	return (retcode);
@@ -869,32 +867,32 @@ merg(struct cfextra *el_ent, struct cfent *cf_ent)
 		n = typechg(&(el_ent->cf_ent), cf_ent, &(el_ent->mstat));
 
 		switch (n) {
-		    case TYPE_OK:
+		case TYPE_OK:
 			break;
 
 		    /* This is an allowable change. */
-		    case TYPE_WARNING:
+		case TYPE_WARNING:
 			el_ent->mstat.contchg = 1;
 			break;
 
 		    /* Not allowed, but leaving it as is is OK. */
-		    case TYPE_IGNORED:
+		case TYPE_IGNORED:
 			logerr(gettext(MSG_TYPIGN));
 			if (cp_cfent(cf_ent, el_ent) == 0)
 				quit(99);
 			return (MRG_SAME);
 
 		    /* Future analysis will reveal if this is OK. */
-		    case TYPE_REPLACE:
+		case TYPE_REPLACE:
 			el_ent->mstat.replace = 1;
 			return (MRG_REPLACE);
 
 		    /* Kill it before it does any damage. */
-		    case TYPE_FATAL:
+		case TYPE_FATAL:
 			logerr(gettext(MSG_TYPE_ERR));
 			quit(99);
 
-		    default:
+		default:
 			break;
 		}
 
@@ -941,9 +939,9 @@ merg(struct cfextra *el_ent, struct cfent *cf_ent)
 				if (strcmp(el_ent->cf_ent.ainfo.local,
 				    "?") == 0) {
 					(void) strlcpy(
-						el_ent->cf_ent.ainfo.local,
-						cf_ent->ainfo.local,
-						PATH_MAX);
+					    el_ent->cf_ent.ainfo.local,
+					    cf_ent->ainfo.local,
+					    PATH_MAX);
 				} else {
 					el_ent->mstat.contchg = 1;
 				}
@@ -961,7 +959,7 @@ merg(struct cfextra *el_ent, struct cfent *cf_ent)
 		el_ent->mstat.contchg = 1;
 		changed++;
 	} else if (((el_ent->cf_ent.ftype == 'f') ||
-					(el_ent->cf_ent.ftype == 'v'))) {
+	    (el_ent->cf_ent.ftype == 'v'))) {
 		/*
 		 * For regular files, Look at content information; a BADCONT
 		 * in any el_ent field indicates the contents are unknown --
@@ -983,7 +981,7 @@ merg(struct cfextra *el_ent, struct cfent *cf_ent)
 			el_ent->mstat.contchg = 1;
 		}
 	} else if (((el_ent->cf_ent.ftype == 'c') ||
-					(el_ent->cf_ent.ftype == 'b'))) {
+	    (el_ent->cf_ent.ftype == 'b'))) {
 		/*
 		 * For devices, if major or minor numbers are identical the
 		 * merge is trivial. If the el_ent value is ambiguous (BAD),

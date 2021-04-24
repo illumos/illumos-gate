@@ -315,9 +315,9 @@ already_mounted(struct vfstab *vfs, int is_local_host, char *client_path,
  * OK and "0" for failure.
  */
 int
-unmount_client()
+unmount_client(void)
 {
-	int	errcode;
+	int	errcode = 0;
 	int	exit_no;
 	int	n;
 	int	retcode = 1;
@@ -435,9 +435,9 @@ unmount_client()
  * everything OK and "0" for failure.
  */
 int
-mount_client()
+mount_client(void)
 {
-	int	errcode;
+	int	errcode = 0;
 	int	exit_no;
 	int	n;
 	int	retcode = 1;
@@ -851,12 +851,12 @@ construct_vfs(struct vfstab *vfsent, char *client_path, char *link_name,
 int
 get_mntinfo(int map_client, char *vfstab_file)
 {
-	static 	char 	*rn = "/";
+	static	char	*rn = "/";
 	FILE		*pp;
 	struct	mnttab	mtbuf;
 	struct	mnttab	*mt = &mtbuf;
 	char		*install_root;
-	int 		is_remote;
+	int		is_remote;
 
 	/*
 	 * Open the mount table for the current host and establish a global
@@ -1401,12 +1401,12 @@ get_remote_path(uint32_t n)
 	char	*p;
 
 	if (!is_remote_fs_n(n))
-		return (NULL); 	/* local */
+		return (NULL);	/* local */
 	p = strchr(fs_tab[n]->remote_name, ':');
 	if (!p)
-		p = fs_tab[n]->remote_name; 	/* Loopback */
+		p = fs_tab[n]->remote_name;	/* Loopback */
 	else
-		p++; 	/* remote */
+		p++;	/* remote */
 	return (p);
 }
 
@@ -1419,7 +1419,7 @@ char *
 get_mount_point(uint32_t n)
 {
 	if (!is_remote_fs_n(n))
-		return (NULL); 	/* local */
+		return (NULL);	/* local */
 	return (fs_tab[n]->name);
 }
 
