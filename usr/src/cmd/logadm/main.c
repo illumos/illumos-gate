@@ -162,7 +162,7 @@ static struct lut *Gzipnames = NULL;
 int
 main(int argc, char *argv[])
 {
-	struct opts *clopts;		/* from parsing command line */
+	struct opts *clopts = NULL;	/* from parsing command line */
 	const char *conffile;		/* our configuration file */
 	const char *timestamps;		/* our timestamps file */
 	struct fn_list *lognames;	/* list of lognames we're processing */
@@ -1135,7 +1135,7 @@ docopytruncate(struct opts *opts, const char *file, const char *file_copy)
 	struct stat s;
 	struct utimbuf times;
 	off_t written = 0, rem, last = 0, thresh = 1024 * 1024;
-	ssize_t len;
+	ssize_t len = 0;
 
 	/* print info if necessary */
 	if (opts_count(opts, "vn") != 0) {

@@ -35,7 +35,6 @@ include ../Makefile.cmd
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-clobbered
-CERRWARN += $(CNOWARN_UNINIT)
 XGETFLAGS += -a -x logadm.xcl
 
 $(ROOTETC)/$(CONFIGFILE):= FILEMODE= 644
@@ -89,8 +88,6 @@ $(POFILE): $(POFILES)
 
 clean:
 	$(RM) $(OBJS) $(TESTOBJS)
-
-lint: lint_SRCS
 
 include ../Makefile.targ
 
