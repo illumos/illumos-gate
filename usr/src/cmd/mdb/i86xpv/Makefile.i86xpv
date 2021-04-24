@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 ROOTMOD = $(ROOT)/usr/platform/i86xpv/lib/mdb/$(MDBTGT)$(MACHMODDIR)
 ROOTKMOD = $(ROOT)/platform/i86xpv/kernel/kmdb$(MACHMODDIR)

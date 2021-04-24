@@ -74,6 +74,3 @@ MAPFILE_SOURCES = \
 %.o: ../../../../../uts/intel/promif/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
-
-%.ln: ../../../../../uts/intel/promif/%.c
-	$(LINT.c) -c $<

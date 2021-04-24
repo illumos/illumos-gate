@@ -39,4 +39,3 @@ CPPFLAGS += -I$(SRC)/uts/common
 
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-char-subscripts
-CERRWARN += $(CNOWARN_UNINIT)

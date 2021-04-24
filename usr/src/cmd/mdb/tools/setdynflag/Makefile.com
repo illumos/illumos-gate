@@ -46,7 +46,6 @@ include $(SRC)/Makefile.native
 CPPFLAGS = -I../../common
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
-CERRWARN += $(CNOWARN_UNINIT)
 LDFLAGS += $(ZLAZYLOAD) $(BDIRECT)
 LDLIBS = -lelf
 NATIVE_LIBS += libelf.so libc.so

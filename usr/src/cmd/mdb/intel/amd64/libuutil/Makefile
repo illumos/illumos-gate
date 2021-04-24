@@ -23,7 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = libuutil.so
 MDBTGT = proc
@@ -40,6 +39,3 @@ include ../../../Makefile.module
 %.o: $(MODSRCS_DIR)/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
-
-%.ln: $(MODSRCS_DIR)/%.c
-	$(LINT.c) -c $<

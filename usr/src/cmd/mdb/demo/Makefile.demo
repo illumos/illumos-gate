@@ -28,9 +28,7 @@
 
 all := TARGET = all
 clean := TARGET = clean
-clean.lint := TARGET = clean.lint
 clobber := TARGET = clobber
-lint := TARGET = lint
 
 MACH :sh= uname -p
 SUBDIRS_i386 = i386 amd64
@@ -38,7 +36,7 @@ SUBDIRS = $(SUBDIRS_$(MACH))
 
 TARGET =
 
-all clean clean.lint clobber lint: $(SUBDIRS)
+all clean clobber: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) -f ../Makefile.$@ $(TARGET)

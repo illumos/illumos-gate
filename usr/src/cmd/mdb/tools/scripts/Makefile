@@ -21,7 +21,6 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
 .SUFFIXES: .pl
@@ -36,7 +35,7 @@ ROOTPKGSCRIPTS = $(PKGSCRIPTS:%=$(ROOTOPTPKGBIN)/%)
 
 all install: $(BLDSCRIPTS) $(PKGSCRIPTS)
 
-clean.lint dmods install_h lint:
+dmods install_h:
 
 clobber: clean
 

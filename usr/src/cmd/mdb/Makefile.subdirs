@@ -23,20 +23,17 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
 
 all := TARGET = all
-clean.lint := TARGET = clean.lint
 clean := TARGET = clean
 clobber := TARGET = clobber
 dmods := TARGET = dmods
 install := TARGET = install
 install_h := TARGET = install_h
-lint := TARGET = lint
 
-all clean.lint clean clobber dmods install lint: $(SUBDIRS)
+all clean clobber dmods install: $(SUBDIRS)
 
 #
 # VERSION is to keep ctfconvert/ctfmerge from complaining

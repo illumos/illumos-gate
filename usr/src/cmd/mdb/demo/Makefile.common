@@ -31,14 +31,13 @@ CPPFLAGS += -D_KERNEL
 LDFLAGS += $(ZTEXT)
 
 OBJECTS = $(MODULES:%.so=%.o)
-LINTFILES = $(MODULES:%.so=%.ln)
 
 all: $(MODULES)
 
 .KEEP_STATE:
 
 .NO_PARALLEL:
-.PARALLEL: $(OBJECTS) $(LINTFILES)
+.PARALLEL: $(OBJECTS)
 
 %.so: %.o
 	$(CC) $(CFLAGS) -G -o $@ $< $(LDFLAGS) $(LIBS)
@@ -52,16 +51,5 @@ all: $(MODULES)
 clean:
 	rm -f $(OBJECTS)
 
-clean.lint:
-	rm -f $(LINTFILES)
-
-clobber: clean clean.lint
+clobber: clean
 	rm -f $(MODULES)
-
-%.ln: %.c
-	$(LINT) $(LINTFLAGS) $(CPPFLAGS) -c $<
-
-%.ln: ../common/%.c
-	$(LINT) $(LINTFLAGS) $(CPPFLAGS) -c $<
-
-lint: $(LINTFILES)

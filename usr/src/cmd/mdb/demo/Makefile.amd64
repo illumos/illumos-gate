@@ -24,13 +24,10 @@
 #
 
 CC = cc
-LINT = lint
 
 CFLAGS = -m64
 CPPFLAGS =
 LDFLAGS =
 LIBS =
-
-LINTFLAGS = -m64
 
 include ../Makefile.common

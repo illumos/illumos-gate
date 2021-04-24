@@ -35,13 +35,7 @@ include ../../Makefile.ia32
 include ../../../Makefile.module
 
 CFLAGS += -I../../../../../lib/libproc/common
-LINTFLAGS += -I../../../../../lib/libproc/common
-
-CERRWARN += $(CNOWARN_UNINIT)
 
 %.o: $(MODSRCS_DIR)/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
-
-%.ln: $(MODSRCS_DIR)/%.c
-	$(LINT.c) -c $<

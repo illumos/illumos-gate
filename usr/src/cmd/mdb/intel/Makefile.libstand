@@ -29,6 +29,3 @@ SRCS += stat.c
 %.o: ../../libstand/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
-
-%.ln: ../../libstand/%.c
-	$(LINT.c) -c $<

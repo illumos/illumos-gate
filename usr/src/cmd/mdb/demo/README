@@ -46,9 +46,8 @@ the CC macro definitions in Makefile.i386 and Makefile.amd64 to point to the
 appropriate pathnames.
 
 The Makefiles contained in this directory are set up to use the C compiler (cc)
-and lint utility found in your $PATH.  These four Makefiles can also be used
-to define base compiler settings for the corresponding instruction set
-architecture (ISA):
+found in your $PATH.  These four Makefiles can also be used to define base
+compiler settings for the corresponding instruction set architecture (ISA):
 
 	Makefile.i386		- rules for building 32-bit x86 objects
 	Makefile.amd64		- rules for building 64-bit x86 objects
@@ -74,9 +73,7 @@ The Makefile in this directory supports the following targets:
 
 	make all (default)	- build all modules for the current machine
 	make clean		- remove object files from build directories
-	make clean.lint		- remove lint files from build directories
-	make clobber		- remove objects, modules, and lint files
-	make lint		- run lint against each example module
+	make clobber		- remove objects, and modules
 
 To build the example modules, execute "make" in this directory.  This will
 execute the default "make all" target.

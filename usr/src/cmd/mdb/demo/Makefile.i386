@@ -23,16 +23,12 @@
 # Copyright (c) 1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 CC = cc
-LINT = lint
 
 CFLAGS =
 CPPFLAGS =
 LDFLAGS =
 LIBS =
-
-LINTFLAGS =
 
 include ../Makefile.common

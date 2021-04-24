@@ -39,7 +39,7 @@ include ../../../Makefile.kmdb.files
 OBJS += mdb_lex.o mdb_grammar.o
 
 .NO_PARALLEL:
-.PARALLEL: kmdb_modlinktest.o kmdb_terminfo.c $(ALLOBJS) $(ALLOBJS:%.o=%.ln)
+.PARALLEL: kmdb_modlinktest.o kmdb_terminfo.c $(ALLOBJS)
 
 SRCINCDIRS	+= . .. ../.. ../../../common ../../../common/libstand
 OSINCDIRS	+= $(SRC)/uts/$(MMU) $(SRC)/uts/$(ISADIR)
@@ -88,7 +88,6 @@ SUPPORTED_TERMS	= \
 	xterm \
 	xterms
 
-CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-char-subscripts
 CERRWARN += -_gcc=-Wno-clobbered
 CERRWARN += -_gcc=-Wno-unused-variable
@@ -114,9 +113,9 @@ mdb_lex.o mdb_grammar.o := CERRWARN += -_gcc=-Wno-unused-label
 
 kmdb_ctf_open.o := CPPFLAGS += -I$(SRC)/common/ctf
 
-PROMTGTS	= $(PROMOBJS) $(PROMOBJS:%.o=%.ln)
-VERSTGTS	= $(VERSOBJS) $(VERSOBJS:%.o=%.ln)
-KCTLTGTS	= $(KCTLOBJS) $(KCTLOBJS:%.o=%.ln)
+PROMTGTS	= $(PROMOBJS)
+VERSTGTS	= $(VERSOBJS)
+KCTLTGTS	= $(KCTLOBJS)
 
 $(PROMTGTS) := CPPFLAGS += -D_BOOT -D_KERNEL -D_MACHDEP $(PROMINCDIRS:%=-I%) \
 	-Dassfail=kmdb_prom_assfail
@@ -126,7 +125,7 @@ $(VERSTGTS) := CPPFLAGS += -DKMDB_VERSION='$(KMDB_VERSION)'
 $(KCTLTGTS) := CPPFLAGS += -D_KERNEL
 $(KCTLTGTS) := ASFLAGS += -D_KERNEL
 
-ffs.o ffs.ln := CPPFLAGS += -Dffs=mdb_ffs
+ffs.o := CPPFLAGS += -Dffs=mdb_ffs
 
 $(ROOTMISC) $(ROOTMISC64) := FILEMODE = 0755
 

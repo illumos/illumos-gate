@@ -48,7 +48,7 @@ ROOTDEMODIR = $(ROOT)/usr/demo/mdb
 ROOTDEMOFILES = $(DEMOFILES:%=$(ROOTDEMODIR)/%)
 ROOTDEMOSUBDIRS = $(DEMOSUBDIRS:%=$(ROOTDEMODIR)/%)
 
-all clean.lint clean clobber dmods install_h lint:
+all clean clobber dmods install_h:
 
 install: $(ROOTDEMOFILES)
 

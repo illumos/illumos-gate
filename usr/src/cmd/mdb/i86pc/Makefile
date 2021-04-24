@@ -23,7 +23,6 @@
 # Copyright (c) 1997-1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 SUBDIRS = modules
 include ../Makefile.subdirs

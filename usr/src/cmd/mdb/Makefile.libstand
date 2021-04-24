@@ -76,9 +76,6 @@ CFLAGS64 += $(STAND_FLAGS_64)
 ASFLAGS += -D_ASM
 ASFLAGS64 += -D_ASM
 
-LINTFLAGS += -n -errtags=yes
-CLINTFILES = $(SRCS:%.c=%.ln)
-
 CERRWARN += -_gcc=-Wno-parentheses
 
 LIB = libstand.a
@@ -86,7 +83,7 @@ COBJS = $(SRCS:%.c=%.o)
 OBJS = $(COBJS:%.S=%.o)
 
 .NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
+.PARALLEL: $(OBJS)
 
 install all: $(LIB)
 
@@ -94,10 +91,7 @@ $(LIB): $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
 
 clobber clean:
-	$(RM) $(LIB) $(OBJS) $(LINTFILES)
-
-lint: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES)
+	$(RM) $(LIB) $(OBJS)
 
 #
 # Dynamic rules for object construction

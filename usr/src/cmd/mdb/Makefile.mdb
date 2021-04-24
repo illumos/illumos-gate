@@ -105,7 +105,6 @@ CSTD=	$(CSTD_GNU99)
 LDLIBS += -lcurses -lkvm -lproc -lrtld_db -lctf -lumem -ldisasm -lscf
 LDLIBS += -ldemangle-sys
 
-CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-char-subscripts
 CERRWARN += -_gcc=-Wno-clobbered
 CERRWARN += -_gcc=-Wno-parentheses

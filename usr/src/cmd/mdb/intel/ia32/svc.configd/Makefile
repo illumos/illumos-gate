@@ -23,7 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = svc.configd.so
 MDBTGT = proc
@@ -41,6 +40,3 @@ CPPFLAGS += -I$(SRC)/cmd/svc/configd -I$(SRC)/cmd/svc/common -I$(SRC)/common/svc
 %.o: $(MODSRCS_DIR)/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
-
-%.ln: $(MODSRCS_DIR)/%.c
-	$(LINT.c) -c $<
