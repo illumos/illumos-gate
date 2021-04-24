@@ -696,7 +696,7 @@ boolean_t
 nwamd_check_conditions(nwam_activation_mode_t activation_mode,
     char **condition_strings, uint_t num_conditions)
 {
-	boolean_t ret;
+	boolean_t ret = B_FALSE;
 	nwam_condition_t condition;
 	nwam_condition_object_type_t object_type;
 	char *object_name;
