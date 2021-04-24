@@ -23,12 +23,6 @@
  * Use is subject to license terms.
  */
 
-
-
-
-/*LINTLIBRARY*/
-
-
 /*
  * Administration program for SENA
  * subsystems and individual FC_AL devices.
@@ -441,7 +435,7 @@ getaction(char *cmd, struct keyword *matches, int  *retval)
 int
 main(int argc, char **argv)
 {
-register int 	c;
+register int	c;
 /* getopt varbs */
 extern char *optarg;
 char		*optstring = NULL;
@@ -450,7 +444,7 @@ int		cmd = 0;		/* Cmd verb from cmd line */
 int		exit_code = 0;		/* exit code for program */
 int		temp_fd;		/* For -f option */
 char		*file_name = NULL;
-int		option_t_input;
+int		option_t_input = 0;
 char		*path_phys = NULL;
 int		USE_FCHBA = 0;
 

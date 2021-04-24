@@ -889,7 +889,7 @@ fchba_dump_map(char **argv)
 	HBA_FCPTARGETMAPPINGV2    *map;
 	HBA_STATUS status;
 	int count, adapterIndex, portIndex, mapIndex, discIndex;
-	char name[256], *physical, *comp_phys;
+	char name[256], *physical = NULL, *comp_phys = NULL;
 	L_inquiry	inq;
 	struct scsi_extended_sense sense;
 	HBA_UINT8	scsiStatus;
@@ -1099,7 +1099,7 @@ fchba_display_link_status(char **argv)
 	HBA_FCPTARGETMAPPINGV2    *map;
 	HBA_STATUS status;
 	int count, adapterIndex, portIndex, discIndex;
-	char name[256], *physical, *comp_phys;
+	char name[256], *physical = NULL, *comp_phys = NULL;
 	int		matched;
 	struct fc_rls_acc_params	rls;
 	uint32_t	rls_size = sizeof (rls);
@@ -2073,6 +2073,8 @@ devctl_hdl_t	dcp;
 	case DEV_OFFLINE:
 		exit_code = devctl_device_offline(dcp);
 		break;
+	default:
+		exit_code = 0;
 	}
 
 	if (exit_code != 0) {
