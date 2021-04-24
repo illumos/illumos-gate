@@ -60,6 +60,8 @@ main(int argc, char **argv)
 	int rr_type = T_A;
 	HEADER *h;
 
+	type = T_A;
+
 	if (argc > 3)
 		exit(1);
 

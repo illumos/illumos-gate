@@ -41,7 +41,7 @@ CPPFLAGS += -I. -I$(SRC)/uts/common/gssapi/mechs/krb5/include \
 		-I$(KRB5IPROPDIR) \
 		-I$(SRC)/uts/common/gssapi/include/ $(DEFS)
 
-COPTFLAG += $(XESS) #-I$(KINCDIR) 
+COPTFLAG += $(XESS) #-I$(KINCDIR)
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-unused-variable
@@ -83,8 +83,6 @@ check:	$(CHKMANIFEST)
 
 clean:
 	$(RM) $(OBJS) $(DERIVED_OBJS) $(ISRC)
-
-lint: lint_SRCS
 
 include ../../../Makefile.targ
 

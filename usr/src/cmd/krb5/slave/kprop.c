@@ -12,7 +12,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -26,7 +26,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  */
 
@@ -72,23 +72,23 @@ void	PRS
 	(int, char **);
 void	get_tickets
 	(krb5_context);
-static void usage 
+static void usage
 	(void);
-krb5_error_code open_connection 
+krb5_error_code open_connection
 	(char *, int *, char *, unsigned int);
-void	kerberos_authenticate 
-	(krb5_context, krb5_auth_context *, 
+void	kerberos_authenticate
+	(krb5_context, krb5_auth_context *,
 		   int, krb5_principal, krb5_creds **);
-int	open_database 
+int	open_database
 	(krb5_context, char *, int *);
-void	close_database 
+void	close_database
 	(krb5_context, int);
-void	xmit_database 
-	(krb5_context, krb5_auth_context, krb5_creds *, 
+void	xmit_database
+	(krb5_context, krb5_auth_context, krb5_creds *,
 		   int, int, int);
-void	send_error 
+void	send_error
 	(krb5_context, krb5_creds *, int, char *, krb5_error_code);
-void	update_last_prop_file 
+void	update_last_prop_file
 	(char *, char *);
 
 static void usage()
@@ -112,7 +112,7 @@ main(argc, argv)
 	krb5_auth_context auth_context;
 #define	ERRMSGSIZ	256
 	char	Errmsg[ERRMSGSIZ];
-	
+
 	(void) setlocale(LC_ALL, "");
 
 #if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
@@ -137,14 +137,14 @@ main(argc, argv)
 		exit(1);
 	}
 	if (fd < 0) {
-		fprintf(stderr, 
+		fprintf(stderr,
 			gettext("%s: %s while opening connection to %s\n"),
 			progname, Errmsg, slave_host);
 		exit(1);
 	}
-	kerberos_authenticate(context, &auth_context, fd, my_principal, 
+	kerberos_authenticate(context, &auth_context, fd, my_principal,
 			      &my_creds);
-	xmit_database(context, auth_context, my_creds, fd, database_fd, 
+	xmit_database(context, auth_context, my_creds, fd, database_fd,
 		      database_size);
 	update_last_prop_file(slave_host, file);
 	printf(gettext("Database propagation to %s: SUCCEEDED\n"), slave_host);
@@ -157,11 +157,11 @@ void PRS(argc, argv)
 	int	argc;
 	char	**argv;
 {
-	int c;	
+	int c;
 	register char	*word, ch;
-	extern int optind; 
+	extern int optind;
 	extern char *optarg;
-	
+
 	progname = argv[0];
 	while ((c= getopt(argc, argv, "r:f:dP:s:h:")) != EOF) {
 		switch (c) {
@@ -213,8 +213,8 @@ void get_tickets(context)
 	char *svcname = NULL;
 	char *def_realm = NULL;
 	char *master_host = NULL;
-	
-	
+
+
 	/*
 	 * Figure out what tickets we'll be using to send stuff
 	 */
@@ -238,8 +238,8 @@ void get_tickets(context)
 	 * Always pick up the master hostname from krb5.conf, as
 	 * opposed to picking up the localhost, so we do not get bit
 	 * if the master KDC is HA and hence points to a logicalhost.
-	 */ 
-	retval = kadm5_get_master(context, def_realm, &master_host); 
+	 */
+	retval = kadm5_get_master(context, def_realm, &master_host);
 	if (retval) {
 	    free(def_realm);
 	    com_err(progname, retval,
@@ -350,7 +350,7 @@ void get_tickets(context)
 
 	if (keytab)
 	    (void) krb5_kt_close(context, keytab);
-	
+
 	/*
 	 * Now destroy the cache right away --- the credentials we
 	 * need will be in my_creds.
@@ -375,23 +375,23 @@ open_connection(host, fd, Errmsg, ErrmsgSz)
 	unsigned int	 ErrmsgSz;
 {
 	int	s;
-	krb5_error_code	retval;
-	
+	krb5_error_code	retval = 0;
+
 	int	socket_length;
 	struct addrinfo hints, *ai, *aitop;
 	struct sockaddr_storage	  ss;
 	char serv_or_port[NI_MAXSERV];
 	enum err_types {SOCKET, CONNECT};
-	int which_err;
-	
+	int which_err = -1;
+
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;    /* go for either IPv4 or v6 */
 	hints.ai_socktype = SOCK_STREAM;
 
 	if (port != 0)
-		(void) snprintf(serv_or_port, sizeof(serv_or_port), ("%hu"), 
+		(void) snprintf(serv_or_port, sizeof(serv_or_port), ("%hu"),
 				port);
-	else 
+	else
 		strncpy(serv_or_port, KPROP_SERVICE, sizeof(serv_or_port));
 
 	if (getaddrinfo(host, serv_or_port, &hints, &aitop) != 0) {
@@ -425,17 +425,17 @@ open_connection(host, fd, Errmsg, ErrmsgSz)
 
 	if (ai == NULL) {
 		switch (which_err) {
-			case SOCKET: 
-				(void) snprintf(Errmsg, ERRMSGSIZ, 
+			case SOCKET:
+				(void) snprintf(Errmsg, ERRMSGSIZ,
 						gettext("in call to socket"));
 				break;
-			case CONNECT: 
-				(void) snprintf(Errmsg, ERRMSGSIZ, 
+			case CONNECT:
+				(void) snprintf(Errmsg, ERRMSGSIZ,
 						gettext("in call to connect"));
 				break;
 			default :
 				retval = -1; /* generic error */
-				(void) snprintf(Errmsg, ERRMSGSIZ, 
+				(void) snprintf(Errmsg, ERRMSGSIZ,
 					gettext("could not setup network"));
 				break;
 		}
@@ -464,7 +464,7 @@ open_connection(host, fd, Errmsg, ErrmsgSz)
 	if (getsockname(s, (struct sockaddr *)&ss, &socket_length) < 0) {
 		retval = errno;
 		close(s);
-		(void) snprintf(Errmsg, ERRMSGSIZ, 
+		(void) snprintf(Errmsg, ERRMSGSIZ,
 				gettext("in call to getsockname"));
 		return(retval);
 	}
@@ -492,10 +492,10 @@ void kerberos_authenticate(context, auth_context, fd, me, new_creds)
 	krb5_ap_rep_enc_part	*rep_result;
 
     retval = krb5_auth_con_init(context, auth_context);
-    if (retval) 
+    if (retval)
 	exit(1);
 
-    krb5_auth_con_setflags(context, *auth_context, 
+    krb5_auth_con_setflags(context, *auth_context,
 			   KRB5_AUTH_CONTEXT_DO_SEQUENCE);
 
     retval = krb5_auth_con_setaddrs(context, *auth_context, &sender_addr,
@@ -505,7 +505,7 @@ void kerberos_authenticate(context, auth_context, fd, me, new_creds)
 	exit(1);
     }
 
-    retval = krb5_sendauth(context, auth_context, (void *)&fd, 
+    retval = krb5_sendauth(context, auth_context, (void *)&fd,
 			   kprop_version, me, creds.server,
 			   AP_OPTS_MUTUAL_REQUIRED, NULL, &creds, NULL,
 			   &error, &rep_result, new_creds);
@@ -550,16 +550,16 @@ open_database(context, data_fn, size)
 {
 	int		fd;
 	int		err;
-	struct stat 	stbuf, stbuf_ok;
+	struct stat	stbuf, stbuf_ok;
 	char		*data_ok_fn;
 	static char ok[] = ".dump_ok";
 
 	dbpathname = strdup(data_fn);
 	if (!dbpathname) {
- 	    com_err(progname, ENOMEM, gettext("allocating database file name '%s'"),
- 		    data_fn);
- 	    exit(1);
- 	}
+		com_err(progname, ENOMEM,
+		    gettext("allocating database file name '%s'"), data_fn);
+		exit(1);
+	}
 	if ((fd = open(dbpathname, O_RDONLY)) < 0) {
 		com_err(progname, errno, gettext("while trying to open %s"),
 			dbpathname);
@@ -574,7 +574,7 @@ open_database(context, data_fn, size)
 	} else if (err) {
 	    com_err(progname, err, gettext("while trying to lock '%s'"), dbpathname);
 	    exit(1);
-	}	    
+	}
 	if (fstat(fd, &stbuf)) {
 		com_err(progname, errno, gettext("while trying to stat %s"),
 			data_fn);
@@ -616,18 +616,18 @@ close_database(context, fd)
     (void)close(fd);
     return;
 }
-  
+
 /*
  * Now we send over the database.  We use the following protocol:
  * Send over a KRB_SAFE message with the size.  Then we send over the
  * database in blocks of KPROP_BLKSIZE, encrypted using KRB_PRIV.
  * Then we expect to see a KRB_SAFE message with the size sent back.
- * 
+ *
  * At any point in the protocol, we may send a KRB_ERROR message; this
  * will abort the entire operation.
  */
 void
-xmit_database(context, auth_context, my_creds, fd, database_fd, 
+xmit_database(context, auth_context, my_creds, fd, database_fd,
 	      in_database_size)
     krb5_context context;
     krb5_auth_context auth_context;
@@ -642,7 +642,7 @@ xmit_database(context, auth_context, my_creds, fd, database_fd,
 	krb5_error_code	retval;
 	krb5_error	*error;
 	/* These must be 4 bytes */
-	krb5_ui_4	database_size = in_database_size; 
+	krb5_ui_4	database_size = in_database_size;
 	krb5_ui_4	send_size;
 
 	/*
@@ -652,7 +652,7 @@ xmit_database(context, auth_context, my_creds, fd, database_fd,
 	inbuf.data = (char *) &send_size;
 	inbuf.length = sizeof(send_size); /* must be 4, really */
 	/* KPROP_CKSUMTYPE */
-	retval = krb5_mk_safe(context, auth_context, &inbuf, 
+	retval = krb5_mk_safe(context, auth_context, &inbuf,
 			      &outbuf, NULL);
 	if (retval) {
 		com_err(progname, retval, gettext("while encoding database size"));
@@ -672,12 +672,12 @@ xmit_database(context, auth_context, my_creds, fd, database_fd,
 	 */
 	retval = krb5_auth_con_initivector(context, auth_context);
 	if (retval) {
-	    send_error(context, my_creds, fd, 
+	    send_error(context, my_creds, fd,
 		   gettext("failed while initializing i_vector"), retval);
 	    com_err(progname, retval, gettext("while allocating i_vector"));
 	    exit(1);
 	}
- 
+
 	/*
 	 * Send over the file, block by block....
 	 */
@@ -731,7 +731,7 @@ xmit_database(context, auth_context, my_creds, fd, database_fd,
 	 * the error message
 	 */
 	if (krb5_is_krb_error(&inbuf)) {
- 	        retval = krb5_rd_error(context, &inbuf, &error);
+		retval = krb5_rd_error(context, &inbuf, &error);
 		if (retval) {
 			com_err(progname, retval,
 				gettext("while decoding error response from server"));
@@ -743,8 +743,8 @@ xmit_database(context, auth_context, my_creds, fd, database_fd,
 				gettext("Generic remote error: %s\n"),
 					error->text.data);
 		} else if (error->error) {
-			com_err(progname, 
-				(krb5_error_code) error->error + 
+			com_err(progname,
+				(krb5_error_code) error->error +
 				  ERROR_TABLE_BASE_krb5,
 				gettext("signalled from server"));
 			if (error->text.data)

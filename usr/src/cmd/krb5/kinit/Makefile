@@ -9,7 +9,7 @@ PROG= kinit
 OBJS	= kinit.o
 SRCS	= kinit.c
 
-DEFS =  -DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 -DHAVE_PWD_H=1 -DHAVE_COMPILE=1 -DHAVE_STEP=1 
+DEFS =  -DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 -DHAVE_PWD_H=1 -DHAVE_COMPILE=1 -DHAVE_STEP=1
 
 include ../../Makefile.cmd
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
@@ -39,7 +39,7 @@ LDLIBS += $(KMECHLIB)
 
 all: $(PROG)
 
-$(PROG):       $(OBJS)  
+$(PROG):       $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -48,13 +48,11 @@ install: $(KRB5PROG)
 clean:
 	$(RM) $(OBJS)
 
-lint: lint_SRCS
-
 include ../../Makefile.targ
 
-$(POFILE): $(DERIVED_FILES) .WAIT $(POFILES) 
-	$(RM) $@ 
-	$(CAT) $(POFILES) > $@ 
+$(POFILE): $(DERIVED_FILES) .WAIT $(POFILES)
+	$(RM) $@
+	$(CAT) $(POFILES) > $@
 
 generic.po:
 	$(RM) messages.po

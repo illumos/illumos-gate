@@ -36,7 +36,6 @@ include ../../../Makefile.cmd
 POFILE=		$(SSRCS:%.sh=%.po)
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off
@@ -56,9 +55,6 @@ install: $(PROG) $(KRB5SBINPROG) $(KRB5LIBKLPROG)
 $(KLPROG):	$(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
-
-lint:
-	$(LINT.c) $(CSRCS) $(LDLIBS)
 
 clean:
 	$(RM) $(OBJS)

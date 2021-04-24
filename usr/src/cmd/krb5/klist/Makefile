@@ -6,9 +6,9 @@
 
 PROG= klist
 
-OUTPUT_OPTION = -I. 
+OUTPUT_OPTION = -I.
 
-OBJS	= klist.o                       
+OBJS	= klist.o
 SRCS	= $(OBJS:.o=.c)
 
 include ../../Makefile.cmd
@@ -31,13 +31,13 @@ CERRWARN += -_gcc=-Wno-unused-function
 # not linted
 SMATCH=off
 
-$(GPROGS) := CPPFLAGS += -DSYSV -DSunOS=50 
+$(GPROGS) := CPPFLAGS += -DSYSV -DSunOS=50
 
 .KEEP_STATE:
 
 all: $(PROG)
 
-$(PROG):       $(OBJS)  
+$(PROG):       $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -48,13 +48,11 @@ install_h:
 clean:
 	$(RM) $(OBJS)
 
-lint: lint_SRCS
-
 include ../../Makefile.targ
 
-$(POFILE): $(DERIVED_FILES) .WAIT $(POFILES) 
-	$(RM) $@ 
-	$(CAT) $(POFILES) > $@ 
+$(POFILE): $(DERIVED_FILES) .WAIT $(POFILES)
+	$(RM) $@
+	$(CAT) $(POFILES) > $@
 
 generic.po:
 	$(RM) messages.po

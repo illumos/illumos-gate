@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 PROG= krb5-config
 SHFILES= krb5-config
 CLOBBERFILES = $(SHFILES)
@@ -33,7 +31,7 @@ include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 
 .KEEP_STATE:
 
-all: $(SHFILES) 
+all: $(SHFILES)
 
 install: all $(KRB5PROG)
 

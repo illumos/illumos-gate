@@ -50,7 +50,7 @@ main(int argc, char **argv)
 {
 	krb5_context ctx = NULL;
 	krb5_error_code code = 0;
-	krb5_enctype *enctypes;
+	krb5_enctype *enctypes = NULL;
 	int enctype_count = 0;
 	krb5_ccache cc = NULL;
 	krb5_keytab kt = NULL;
@@ -327,8 +327,8 @@ kt_remove_entries(krb5_context ctx, krb5_keytab kt, const krb5_principal princ)
 static
 void
 kt_add_entry(krb5_context ctx, krb5_keytab kt, const krb5_principal princ,
-	const krb5_principal sprinc, krb5_enctype enctype, krb5_kvno kvno,
-	const char *pw)
+    const krb5_principal sprinc, krb5_enctype enctype, krb5_kvno kvno,
+    const char *pw)
 {
 	krb5_keytab_entry *entry;
 	krb5_data password, salt;
