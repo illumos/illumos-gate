@@ -12,7 +12,7 @@
 #
 # Copyright 2017, Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2020 Nexenta by DDN, Inc. All rights reserved.
+# Copyright 2020-2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2019 Joyent, Inc.
 #
@@ -939,6 +939,7 @@ link path=usr/share/man/man9f/ddi_umem_free.9f target=ddi_umem_alloc.9f
 link path=usr/share/man/man9f/ddi_umem_unlock.9f target=ddi_umem_lock.9f
 link path=usr/share/man/man9f/ddi_unmap_regs.9f target=ddi_map_regs.9f
 link path=usr/share/man/man9f/desballoc.9f target=esballoc.9f
+link path=usr/share/man/man9f/desballoca.9f target=esballoc.9f
 link path=usr/share/man/man9f/dev_err.9f target=cmn_err.9f
 link path=usr/share/man/man9f/devmap_load.9f target=devmap_unload.9f
 link path=usr/share/man/man9f/devmap_umem_setup.9f \
@@ -947,6 +948,7 @@ link path=usr/share/man/man9f/dlerrorack.9f target=dlbindack.9f
 link path=usr/share/man/man9f/dlokack.9f target=dlbindack.9f
 link path=usr/share/man/man9f/dlphysaddrack.9f target=dlbindack.9f
 link path=usr/share/man/man9f/dluderrorind.9f target=dlbindack.9f
+link path=usr/share/man/man9f/esballoca.9f target=esballoc.9f
 link path=usr/share/man/man9f/firmware_close.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_free.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_get_size.9f target=firmload.9f

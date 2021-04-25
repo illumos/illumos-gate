@@ -1,14 +1,24 @@
 '\" te
-.\"  Copyright 1989 AT&T
+.\" Copyright 1989 AT&T
 .\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ESBALLOC 9F "Jan 16, 2006"
+.\" Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ESBALLOC 9F "Apr 24, 2021"
 .SH NAME
-esballoc, desballoc \- allocate a message block using a caller-supplied buffer
+esballoc, desballoc esballoca, desballoca \-
+allocate a message block using a caller-supplied buffer
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 
@@ -23,16 +33,32 @@ esballoc, desballoc \- allocate a message block using a caller-supplied buffer
 \fBmblk_t *\fR\fBdesballoc\fR(\fBuchar_t *\fR\fIbase\fR, \fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR,
      \fBfrtn_t *\fR\fIfr_rtnp\fR);
 .fi
+.LP
+.nf
+#include <sys/strsubr.h>
+.fi
+.LP
+.nf
+\fBmblk_t *\fR\fBesballoca\fR(\fBuchar_t *\fR\fIbase\fR, \fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR,
+     \fBfrtn_t *\fR\fIfr_rtnp\fR);
+.fi
+
+.LP
+.nf
+\fBmblk_t *\fR\fBdesballoca\fR(\fBuchar_t *\fR\fIbase\fR, \fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR,
+     \fBfrtn_t *\fR\fIfr_rtnp\fR);
+.fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 \fBesballoc()\fR: Architecture independent level 1 (DDI/DKI)
 .sp
 .LP
+.nf
+\fBesballoca()\fR: Solaris DDI specific (Solaris DDI)
 \fBdesballoc()\fR: Solaris DDI specific (Solaris DDI)
+\fBdesballoca()\fR: Solaris DDI specific (Solaris DDI)
+.fi
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIbase\fR\fR
@@ -69,11 +95,10 @@ Free routine data structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
-The \fBesballoc()\fR and \fBdesballoc()\fR functions operate identically to
-\fBallocb\fR(9F), except that the data buffer to associate with the message is
-specified by the caller. The allocated message will have both the \fBb_wptr\fR
+The \fBesballoc()\fR, \fBesballoca()\fR, \fBdesballoc()\fR and
+\fBdesballoca()\fR functions operate identically to \fBallocb\fR(9F),
+except that the data buffer to associate with the message is specified
+by the caller. The allocated message will have both the \fBb_wptr\fR
 and \fBb_rptr\fR set to the supplied data buffer starting at \fIbase\fR. Only
 the buffer itself can be specified by the caller. The message block and data
 block header are allocated as if by \fBallocb\fR(9F).
@@ -97,40 +122,39 @@ caddr_t free_arg;        /* argument to free_func() */
 .LP
 Instead of requiring a specific number of arguments, the \fBfree_arg\fR field
 is defined of type \fBcaddr_t\fR. This way, the driver can pass a pointer to a
-structure if more than one argument is needed.
+structure if more than one argument is needed.  Note that the address of the
+\fBfree_rtn\fR(9S) structure passed to \fBesballoc()\fR is used when the
+returned mblk/dblk pair is freed, and must remain valid until then.
 .sp
 .LP
-If \fBesballoc()\fR was used, then \fBfree_func\fR will be called
-asynchronously at some point after the message is no longer referenced. If
-\fBdesballoc()\fR was used, then \fBfree_func\fR will be called synchronously
-by the thread releasing the final reference. See \fBfreeb\fR(9F).
+If \fBesballoc()\fR or \fBesballoca()\fR was used, then \fBfree_func\fR will
+be called asynchronously at some point after the message is no longer
+referenced. If \fBdesballoc()\fR or \fBdesballoca()\fR was used, then
+\fBfree_func\fR will be called synchronously by the thread releasing
+the final reference. See \fBfreeb\fR(9F).
 .sp
 .LP
 The \fBfree_func\fR routine must not sleep, and must not access any dynamically
 allocated data structures that could be freed before or during its execution.
-In addition, because messages allocated with \fBdesballoc()\fR are freed in the
-context of the caller, \fBfree_func\fR must not call another module's \fBput\fR
-procedure, or attempt to acquire a private module lock which might be held by
-another thread across a call to a STREAMS utility routine that could free a
-message block. Finally, \fBfree_func\fR routines specified using
-\fBdesballoc\fR may run in interrupt context and thus must only use
+In addition, because messages allocated with \fBdesballoc()\fR or
+\fBdesballoca()\fR are freed in the context of the caller, \fBfree_func\fR
+must not call another module's \fBput\fR procedure, or attempt to acquire a
+private module lock which might be held by another thread across a call to a
+STREAMS utility routine that could free a message block. Finally,
+\fBfree_func\fR routines specified using \fBdesballoc()\fR or
+\fBdesballoca()\fR may run in interrupt context and thus  must only use
 synchronization primitives that include an interrupt priority returned from
 \fBddi_intr_get_pri\fR(9F) or \fBddi_intr_get_softint_pri\fR(9F). If any of
 these restrictions are not followed, the possibility of lock recursion or
 deadlock exists.
 .SH RETURN VALUES
-.sp
-.LP
 On success, a pointer to the newly allocated message block is returned. On
 failure, \fBNULL\fR is returned.
 .SH CONTEXT
-.sp
-.LP
-The \fBesballoc()\fR and \fBdesballoc()\fR functions can be called from user,
+The \fBesballoc()\fR, \fBesballoca()\fR, \fBdesballoc()\fR and
+\fBdesballoca()\fR functions can be called from user,
 interrupt, or kernel context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -145,8 +169,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBallocb\fR(9F), \fBddi_intr_get_pri\fR(9F),
 \fBddi_intr_get_softint_pri\fR(9F), \fBfreeb\fR(9F), \fBdatab\fR(9S),
 \fBfree_rtn\fR(9S)
