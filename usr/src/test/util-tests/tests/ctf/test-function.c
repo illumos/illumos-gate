@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -62,6 +63,42 @@ uintptr_t
 vararg_ret(const char *foo, ...)
 {
 	return ((uintptr_t)foo);
+}
+
+int
+vla1(int n, int arr[n])
+{
+	return (arr[1]);
+}
+
+int
+vla2(int n, int arr[n][n])
+{
+	return (arr[1][2]);
+}
+
+int
+vla3(int n, int arr[n][7])
+{
+	return (arr[1][2]);
+}
+
+int
+vla4(int n, int arr[23][n])
+{
+	return (arr[1][2]);
+}
+
+int
+vla5(int a, int b, int arr[a][3][b])
+{
+	return (arr[1][2][3]);
+}
+
+int
+vla6(int a, int b, int arr[a][b][4])
+{
+	return (arr[1][2][3]);
 }
 
 typedef int (*strfunc_t)(const char *, const char *);

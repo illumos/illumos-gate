@@ -30,7 +30,7 @@
 /*
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 Robert Mustacchi
- * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -1589,8 +1589,9 @@ ctf_dwarf_array_upper_bound(ctf_cu_t *cup, Dwarf_Die range, ctf_arinfo_t *ar)
 	Dwarf_Attribute attr;
 	Dwarf_Unsigned uval;
 	Dwarf_Signed sval;
-	Dwarf_Half form;
+	Dwarf_Half attrnum, form;
 	Dwarf_Error derr;
+	enum Dwarf_Form_Class class;
 	const char *formstr = NULL;
 	uint_t adj = 0;
 	int ret = 0;
@@ -1611,10 +1612,12 @@ ctf_dwarf_array_upper_bound(ctf_cu_t *cup, Dwarf_Die range, ctf_arinfo_t *ar)
 	 * find neither, then we treat the lack of this as a zero element array.
 	 * Our value is initialized assuming we find a DW_AT_count value.
 	 */
+	attrnum = DW_AT_count;
 	ret = ctf_dwarf_attribute(cup, range, DW_AT_count, &attr);
 	if (ret != 0 && ret != ENOENT) {
 		return (ret);
 	} else if (ret == ENOENT) {
+		attrnum = DW_AT_upper_bound;
 		ret = ctf_dwarf_attribute(cup, range, DW_AT_upper_bound, &attr);
 		if (ret != 0 && ret != ENOENT) {
 			return (ret);
@@ -1678,6 +1681,18 @@ ctf_dwarf_array_upper_bound(ctf_cu_t *cup, Dwarf_Die range, ctf_arinfo_t *ar)
 		}
 		break;
 	}
+
+	/*
+	 * The value of attr is not always a constant value. For things
+	 * such as C99 variable length arrays, it can be a reference to another
+	 * entity or a DWARF expression. In either of these cases, we treat
+	 * this as a zero length array.
+	 */
+	class = dwarf_get_form_class(cup->cu_vers, attrnum, cup->cu_addrsz,
+	    form);
+
+	if (class == DW_FORM_CLASS_REFERENCE || class == DW_FORM_CLASS_BLOCK)
+		goto done;
 
 	if (dwarf_get_FORM_name(form, &formstr) != DW_DLV_OK)
 		formstr = "unknown DWARF form";
