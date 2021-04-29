@@ -27,7 +27,8 @@ NEWVERSWHAT=	"ZFS enabled bootstrap loader" x86
 # Set by loader Makefile
 CPPFLAGS +=	-I$(ZFSSRC)
 CPPFLAGS +=	-I../libi386
-LIBI386=        ../libi386/libi386.a
+DPLIBI386=	../libi386/libi386.a
+LIBI386=	-L../libi386 -li386
 
 ROOT_BOOT=	$(ROOT)/boot
 ROOT_BOOT_DEFAULTS=	$(ROOT)/boot/defaults
@@ -51,7 +52,8 @@ CPPFLAGS +=	-DLOADER_GZIP_SUPPORT
 
 # Enable BootForth
 CPPFLAGS +=	-DBOOT_FORTH -I$(SRC)/common/ficl -I../../libficl
-LIBFICL=	../../libficl/$(MACH)/libficl.a
+DPLIBFICL=	../../libficl/$(MACH)/libficl.a
+LIBFICL=	-L../../libficl/$(MACH) -lficl
 
 # Always add MI sources
 SRCS +=	boot.c commands.c console.c devopen.c interp.c
@@ -60,7 +62,7 @@ SRCS +=	module.c linenoise.c multiboot2.c nvstore.c
 SRCS +=	zfs_cmd.c
 SRCS +=	font.c $(FONT).c tem.c
 
-module.o := CPPFLAGS += -I$(BOOTSRC)/libcrypto
+module.o := CPPFLAGS += -I$(CRYPTOSRC)
 tem.o := CPPFLAGS += $(DEFAULT_CONSOLE_COLOR)
 
 SRCS +=	load_elf32.c load_elf32_obj.c reloc_elf32.c
@@ -92,8 +94,8 @@ LDFLAGS=	-static -T $(LDSCRIPT) -N --gc-sections
 
 # i386 standalone support library
 CPPFLAGS +=	-I.. -I../../../../lib/libstand
-LIBSTAND=	../../libstand/$(MACH)/libstand.a
-LIBCRYPTO=	../../libcrypto/$(MACH)/libcrypto.a
+DPLIBSTAND=	../../libstand/$(MACH)/libstand.a
+LIBSTAND=	-L../../libstand/$(MACH) -lstand
 
 # BTX components
 CPPFLAGS +=	-I../btx/lib
@@ -136,8 +138,8 @@ FORTH +=	menu.rc
 
 # XXX crt0.o needs to be first for pxeboot(8) to work
 
-DPADD=	$(LIBFICL) $(LIBI386) $(LIBCRYPTO) $(LIBSTAND)
-LDADD=	$(LIBFICL) $(LIBI386) $(LIBCRYPTO) $(LIBSTAND)
+DPADD=	$(DPLIBFICL) $(DPLIBI386) $(DPLIBSTAND)
+LDADD=	$(LIBFICL) $(LIBI386) $(LIBSTAND)
 
 CLEANFILES +=	machine x86
 
@@ -153,7 +155,7 @@ OBJS=		$(SRCS:%.c=%.o)
 
 $(OBJS): machine x86
 
-$(PROG): $(OBJS) $(LDADD)
+$(PROG): $(OBJS) $(DPADD)
 	$(LD) $(LDFLAGS) -o $@ $(BTXCRT) $(OBJS) $(LDADD)
 
 clean: clobber

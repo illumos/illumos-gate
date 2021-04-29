@@ -24,6 +24,7 @@ $(LIBRARY): $(SRCS) $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)
 
 include $(SASRC)/Makefile.inc
+include $(CRYPTOSRC)/Makefile.inc
 include $(ZFSSRC)/Makefile.inc
 
 LIBCSRC=	$(SRC)/lib/libc

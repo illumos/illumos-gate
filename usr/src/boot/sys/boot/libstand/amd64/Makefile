@@ -21,14 +21,17 @@ all install:    $(LIBRARY)
 
 include ../Makefile.com
 
+ASFLAGS =	$(amd64_AS_XARCH) -I$(SRC)/uts/common -D_ASM
 CFLAGS +=	-m64 $(CFLAGS64)
 CCASFLAGS +=	-m64
 
-CLEANFILES += x86
+CLEANFILES += x86 sha1-x86_64.s
 
 # _setjmp/_longjmp
 SRCS += $(SASRC)/amd64/_setjmp.S
 OBJS += _setjmp.o
+SRCS += sha1-x86_64.s
+OBJS += sha1-x86_64.o
 
 $(LIBRARY): $(SRCS) $(OBJS)
 
