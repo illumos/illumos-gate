@@ -77,12 +77,13 @@ typedef struct smb_cups_ops {
 	void		(*cupsFreeDests)(int, cups_dest_t *);
 	ipp_t		*(*cupsDoFileRequest)(http_t *, ipp_t *,
 	    const char *, const char *);
-	ipp_t		*(*ippNew)();
+	ipp_t		*(*ippNewRequest)();
 	void		(*ippDelete)();
 	char		*(*ippErrorString)();
 	ipp_attribute_t	*(*ippAddString)();
 	void		(*httpClose)(http_t *);
 	http_t		*(*httpConnect)(const char *, int);
+	ipp_status_t	(*ippGetStatusCode)(ipp_t *);
 } smb_cups_ops_t;
 
 static uint32_t smbd_cups_jobnum = 1;
@@ -198,7 +199,6 @@ smbd_spool_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
 	http_t		*http = NULL;		/* HTTP connection to server */
 	ipp_t		*request = NULL;	/* IPP Request */
 	ipp_t		*response = NULL;	/* IPP Response */
-	cups_lang_t	*language = NULL;	/* Default language */
 	char		uri[HTTP_MAX_URI];	/* printer-uri attribute */
 	char		new_jobname[SMBD_PJOBLEN];
 	smbd_printjob_t	pjob;
@@ -233,21 +233,11 @@ smbd_spool_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
 		return;
 	}
 
-	if ((request = cups->ippNew()) == NULL) {
+	if ((request = cups->ippNewRequest(IPP_PRINT_JOB)) == NULL) {
 		syslog(LOG_INFO,
 		    "smbd_spool_copyfile: ipp not running");
 		return;
 	}
-
-	request->request.op.operation_id = IPP_PRINT_JOB;
-	request->request.op.request_id = 1;
-	language = cups->cupsLangDefault();
-
-	cups->ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_CHARSET,
-	    "attributes-charset", NULL, cups->cupsLangEncoding(language));
-
-	cups->ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_LANGUAGE,
-	    "attributes-natural-language", NULL, language->language);
 
 	(void) snprintf(uri, sizeof (uri), "ipp://localhost/printers/%s",
 	    SMBD_PRINTER);
@@ -291,7 +281,7 @@ smbd_spool_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
 	response = cups->cupsDoFileRequest(http, request, uri,
 	    pjob.pj_filename);
 	if (response != NULL) {
-		if (response->request.status.status_code >= IPP_OK_CONFLICT) {
+		if (cups->ippGetStatusCode(response) >= IPP_OK_CONFLICT) {
 			syslog(LOG_ERR,
 			    "smbd_spool_copyfile: printer %s: %s",
 			    SMBD_PRINTER,
@@ -312,9 +302,6 @@ smbd_spool_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
 out:
 	if (response)
 		cups->ippDelete(response);
-
-	if (language)
-		cups->cupsLangFree(language);
 
 	if (http)
 		cups->httpClose(http);
@@ -358,12 +345,15 @@ smbd_cups_init(void)
 	smb_cups.httpConnect = (http_t *(*)(const char *, int))
 	    dlsym(smb_cups.cups_hdl, "httpConnect");
 
-	smb_cups.ippNew = (ipp_t *(*)())dlsym(smb_cups.cups_hdl, "ippNew");
+	smb_cups.ippNewRequest = (ipp_t *(*)())
+	    dlsym(smb_cups.cups_hdl, "ippNewRequest");
 	smb_cups.ippDelete = (void (*)())dlsym(smb_cups.cups_hdl, "ippDelete");
 	smb_cups.ippErrorString = (char *(*)())
 	    dlsym(smb_cups.cups_hdl, "ippErrorString");
 	smb_cups.ippAddString = (ipp_attribute_t *(*)())
 	    dlsym(smb_cups.cups_hdl, "ippAddString");
+	smb_cups.ippGetStatusCode = (ipp_status_t (*)(ipp_t *))
+	    dlsym(smb_cups.cups_hdl, "ippGetStatusCode");
 
 	if (smb_cups.cupsLangDefault == NULL ||
 	    smb_cups.cupsLangEncoding == NULL ||
@@ -372,12 +362,13 @@ smbd_cups_init(void)
 	    smb_cups.cupsLangFree == NULL ||
 	    smb_cups.cupsGetDests == NULL ||
 	    smb_cups.cupsFreeDests == NULL ||
-	    smb_cups.ippNew == NULL ||
+	    smb_cups.ippNewRequest == NULL ||
 	    smb_cups.httpClose == NULL ||
 	    smb_cups.httpConnect == NULL ||
 	    smb_cups.ippDelete == NULL ||
 	    smb_cups.ippErrorString == NULL ||
-	    smb_cups.ippAddString == NULL) {
+	    smb_cups.ippAddString == NULL ||
+	    smb_cups.ippGetStatusCode == NULL) {
 		(void) dlclose(smb_cups.cups_hdl);
 		smb_cups.cups_hdl = NULL;
 		(void) mutex_unlock(&smbd_cups_mutex);
