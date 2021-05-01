@@ -392,10 +392,12 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	dladm_status_t		status;
 	dladm_vnic_attr_t	attr;
 	char			errmsg[DLADM_STRSIZE];
+	char			tname[MAXCOMLEN + 1];
 	int error, i;
 	struct pci_viona_softc *sc;
 	uint64_t ioport;
 	const char *vnic;
+	pthread_t tid;
 
 	vnic = get_config_value_node(nvl, "vnic");
 	if (vnic == NULL) {
@@ -450,8 +452,10 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 		return (1);
 	}
 
-	error = pthread_create(NULL, NULL, pci_viona_poll_thread, sc);
+	error = pthread_create(&tid, NULL, pci_viona_poll_thread, sc);
 	assert(error == 0);
+	snprintf(tname, sizeof (tname), "vionapoll:%s", vnic);
+	pthread_set_name_np(tid, tname);
 
 	/* initialize config space */
 	pci_set_cfgdata16(pi, PCIR_DEVICE, VIRTIO_DEV_NET);
