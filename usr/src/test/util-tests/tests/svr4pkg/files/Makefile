@@ -10,16 +10,30 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2017 Jason King
-# Copyright 2020 Joyent, Inc.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 Peter Tribble.
+# Copyright 2020 Oxide Computer Company
 #
 
-SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
-SUBDIRS += demangle mergeq workq chown ctf smbios libjedec awk make sleep
-SUBDIRS += libcustr find mdb sed head pcidb pcieadm svr4pkg
+include $(SRC)/cmd/Makefile.cmd
+
+ROOTOPTPKG = $(ROOT)/opt/util-tests
+TESTDIR = $(ROOTOPTPKG)/tests/files/svr4pkg
+
+DIRS = data
+IDIRS = $(DIRS:%=$(TESTDIR)/%)
+
+all clean clobber:
+
+install: $(IDIRS)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %
+	$(INS.dir)
+
+SUBDIRS = data
 
 include $(SRC)/test/Makefile.com
