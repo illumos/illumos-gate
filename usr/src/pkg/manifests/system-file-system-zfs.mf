@@ -100,8 +100,7 @@ file path=usr/lib/sysevent/modules/zfs_mod.so group=sys
 file path=usr/lib/zfs/availdevs mode=0555
 file path=usr/lib/zfs/pyzfs.py mode=0555
 file path=usr/lib/zfs/pyzfs.pyc mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/zdb mode=0555
-file path=usr/sbin/$(ARCH64)/zdb mode=0555
+file path=usr/sbin/zdb mode=0555
 file path=usr/sbin/zstreamdump mode=0555
 file path=usr/share/man/man1m/zdb.1m
 file path=usr/share/man/man1m/zfs-program.1m
@@ -112,7 +111,6 @@ file path=usr/share/man/man1m/ztest.1m
 file path=usr/share/man/man5/zpool-features.5
 hardlink path=kernel/fs/$(ARCH64)/zfs target=../../../kernel/drv/$(ARCH64)/zfs
 hardlink path=usr/lib/fs/zfs/fstyp target=../../../sbin/fstyp
-hardlink path=usr/sbin/zdb target=../../usr/lib/isaexec
 legacy pkg=SUNWzfskr desc="ZFS kernel root components" \
     name="ZFS Kernel (Root)"
 legacy pkg=SUNWzfsr desc="ZFS root components" name="ZFS (Root)"

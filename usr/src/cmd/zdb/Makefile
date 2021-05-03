@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,37 +18,53 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2020 Joyent, Inc.
+# Copyright 2017 RackTop Systems.
 #
 
-PROG:sh=	basename `pwd`
+PROG=	zdb
+OBJS=	zdb.o zdb_il.o
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
+include ../Makefile.ctf
 
-$(INTEL_BLD)SUBDIRS	= $(MACH)
-$(BUILD64)SUBDIRS	+= $(MACH64)
+INCS += -I../../lib/libzpool/common
+INCS +=	-I../../uts/common/fs/zfs
+INCS +=	-I../../common/zfs
+INCS += -I../../lib/libzutil/common
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+LDLIBS += -lzpool -lumem -lnvpair -lzutil -lavl -lfakekernel
+
+CSTD=	$(CSTD_GNU99)
+
+CPPFLAGS.first = -I$(SRC)/lib/libfakekernel/common -D_FAKE_KERNEL
+CPPFLAGS += $(INCS)
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+
+# re-enable warnings that we can tolerate, which are disabled by default
+# in Makefile.master
+CERRWARN += -_gcc=-Wmissing-braces
+CERRWARN += -_gcc=-Wsign-compare
+
+SMOFF += 64bit_shift,all_func_returns
 
 .KEEP_STATE:
 
-all clean clobber lint:	$(SUBDIRS)
+all: $(PROG)
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTUSRSBINPROG)
-	-$(LN) $(ISAEXEC) $(ROOTUSRSBINPROG)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+install: all $(ROOTUSRSBINPROG)
 
-FRC:
+clean:
+	$(RM) $(OBJS)
 
 include ../Makefile.targ

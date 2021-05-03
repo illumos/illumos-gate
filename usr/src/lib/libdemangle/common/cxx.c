@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Jason King.
+ * Copyright 2021 Jason King.
  */
 #include <ctype.h>
 #include <errno.h>
@@ -4087,13 +4087,15 @@ print_sp(const str_pair_t *sp, FILE *out)
 static void
 print_name(const name_t *n, FILE *out)
 {
-	const str_pair_t *sp = name_top((name_t *)n);
+	const str_pair_t *sp;
 	size_t i;
 
 	(void) fprintf(out, "Name:\n");
 
 	if (name_len(n) == 0)
 		return;
+
+	sp = name_top((name_t *)n);
 
 	for (i = 0; i < n->nm_len; i++, sp--) {
 		(void) fprintf(out, "  [%02zu] ", i);

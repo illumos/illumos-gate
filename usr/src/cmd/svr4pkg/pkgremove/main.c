@@ -94,17 +94,17 @@ extern int delmap(int flag, char *pkginst, PKGserver *server, VFP_T **tfp);
 #define	PARENTZONETYPE	"parent-zone-type="
 #define	PARENTZONETYPE_LEN	((sizeof (PARENTZONETYPE))-1)
 
-struct	admin adm; 	/* holds info about installation admin */
-int	dreboot; 	/* non-zero if reboot required after installation */
+struct	admin adm;	/* holds info about installation admin */
+int	dreboot;	/* non-zero if reboot required after installation */
 int	ireboot;	/* non-zero if immediate reboot required */
 int	failflag;	/* non-zero if fatal error has occurred */
 int	warnflag;	/* non-zero if non-fatal error has occurred */
 int	pkgverbose;	/* non-zero if verbose mode is selected */
 int	started;
-int	nocnflct = 0; 	/* pkgdbmerg needs this defined */
-int	nosetuid = 0; 	/* pkgdbmerg needs this defined */
+int	nocnflct = 0;	/* pkgdbmerg needs this defined */
+int	nosetuid = 0;	/* pkgdbmerg needs this defined */
 
-char	*pkginst; 	/* current package (source) instance to process */
+char	*pkginst;	/* current package (source) instance to process */
 
 int	dbchg;
 char	*msgtext;
@@ -117,13 +117,13 @@ char	pkgloc[PATH_MAX];
  * packages, the '-o' command line switch changes this to /dev/tty
  * to allow user interaction during these scripts. -- JST
  */
-static char 	*script_in = PROC_STDIN;	/* assume ABI compliance */
+static char	*script_in = PROC_STDIN;	/* assume ABI compliance */
 
-static char	*client_mntdir; 	/* mount point for client's basedir */
+static char	*client_mntdir;		/* mount point for client's basedir */
 static char	pkgbin[PATH_MAX],
 		rlockfile[PATH_MAX],
-		*admnfile, 		/* file to use for installation admin */
-		*tmpdir; 		/* location to place temporary files */
+		*admnfile,		/* file to use for installation admin */
+		*tmpdir;		/* location to place temporary files */
 
 static void		ckreturn(int retcode, char *msg);
 static void		rmclass(char *aclass, int rm_remote, char *a_zoneName);
@@ -173,7 +173,7 @@ main(int argc, char *argv[])
 	int		i;
 	int		map_client = 1;
 	int		n;
-	int		nodelete = 0; 	/* do not delete file or run scripts */
+	int		nodelete = 0;	/* do not delete file or run scripts */
 	int		pkgrmremote = 0;	/* dont remove remote objects */
 	struct sigaction	nact;
 	struct sigaction	oact;
@@ -1115,7 +1115,7 @@ static void
 rmclass(char *aclass, int rm_remote, char *a_zoneName)
 {
 	struct cfent	*ept;
-	FILE	*fp;
+	FILE	*fp = NULL;
 	char	tmpfile[PATH_MAX];
 	char	script[PATH_MAX];
 	int	i;

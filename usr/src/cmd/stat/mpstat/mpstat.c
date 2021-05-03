@@ -78,7 +78,7 @@ main(int argc, char **argv)
 	struct snapshot *new = NULL;
 	enum snapshot_types types = SNAP_CPUS;
 	hrtime_t start_n;
-	hrtime_t period_n;
+	hrtime_t period_n = 0;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */

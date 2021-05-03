@@ -36,7 +36,6 @@ include ../Makefile.cmd
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-clobbered
-CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-label
 XGETFLAGS += -a -x logadm.xcl
 
@@ -91,8 +90,6 @@ $(POFILE): $(POFILES)
 
 clean:
 	$(RM) $(OBJS) $(TESTOBJS)
-
-lint: lint_SRCS
 
 include ../Makefile.targ
 

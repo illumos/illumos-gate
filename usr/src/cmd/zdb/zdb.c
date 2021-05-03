@@ -4240,7 +4240,9 @@ zdb_leak_init_prepare_indirect_vdevs(spa_t *spa, zdb_cb_t *zcb)
 		 */
 		VERIFY0(vdev_metaslab_init(vd, 0));
 
+#if defined(DEBUG)
 		vdev_indirect_mapping_t *vim = vd->vdev_indirect_mapping;
+#endif
 		uint64_t vim_idx = 0;
 		for (uint64_t m = 0; m < vd->vdev_ms_count; m++) {
 
@@ -5214,7 +5216,7 @@ verify_checkpoint_vdev_spacemaps(spa_t *checkpoint, spa_t *current)
 		for (uint64_t c = ckpoint_rvd->vdev_children;
 		    c < current_rvd->vdev_children; c++) {
 			vdev_t *current_vd = current_rvd->vdev_child[c];
-			ASSERT3P(current_vd->vdev_checkpoint_sm, ==, NULL);
+			VERIFY3P(current_vd->vdev_checkpoint_sm, ==, NULL);
 		}
 	}
 
