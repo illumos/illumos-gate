@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -171,7 +171,7 @@
  * the viona_desb_t entries is done during the VRS_INIT stage of the ring
  * worker thread.  The ring size informs that allocation as the number of
  * concurrent transmissions is limited by the number of descriptors in the
- * ring.  This minimizes allocation in the transmit hot-path by aqcuiring those
+ * ring.  This minimizes allocation in the transmit hot-path by acquiring those
  * fixed-size resources during initialization.
  *
  * This optimization depends on the underlying NIC driver freeing the mblks in
