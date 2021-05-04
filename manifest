@@ -11073,7 +11073,7 @@ f usr/sbin/ypalias 0555 root bin
 f usr/sbin/ypinit 0555 root bin
 f usr/sbin/yppoll 0555 root bin
 f usr/sbin/ypset 0555 root bin
-h usr/sbin/zdb 0555 root bin
+f usr/sbin/zdb 0555 root bin
 f usr/sbin/zdump 0555 root bin
 s usr/sbin/zfs=../../sbin/zfs
 f usr/sbin/zic 0555 root bin
