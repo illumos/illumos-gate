@@ -40,6 +40,6 @@ install: all .WAIT $(INSTDIRS)
 .PARALLEL: libstand libficl libcrypto
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

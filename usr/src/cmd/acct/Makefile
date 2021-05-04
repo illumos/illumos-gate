@@ -146,7 +146,7 @@ $(ETCINITD)/% : %
 	$(INS.file)
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 

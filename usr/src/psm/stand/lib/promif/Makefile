@@ -23,10 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# psm/stand/lib/promif/Makefile
-#
 
 include ../../../../Makefile.master
 
@@ -43,6 +39,6 @@ lint	:=	TARGET = lint
 all install clean clobber lint: $(SUBDIRS)
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

@@ -19,12 +19,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# psm/stand/bootlst/Makefile
 #
 include $(SRC)/Makefile.master
 
@@ -44,6 +40,6 @@ all install clean clobber lint clean.lint: $(SUBDIRS)
 
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

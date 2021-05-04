@@ -14,7 +14,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -31,6 +31,7 @@
 #include <sys/id_space.h>
 #include <sys/fs/sdev_plugin.h>
 #include <sys/smt.h>
+#include <sys/kstat.h>
 
 #include <sys/kernel.h>
 #include <sys/hma.h>
@@ -108,6 +109,9 @@ struct vmm_lease {
 
 static int vmm_drv_block_hook(vmm_softc_t *, boolean_t);
 static void vmm_lease_break_locked(vmm_softc_t *, vmm_lease_t *);
+static int vmm_kstat_alloc(vmm_softc_t *, minor_t, const cred_t *);
+static void vmm_kstat_init(vmm_softc_t *);
+static void vmm_kstat_fini(vmm_softc_t *);
 
 static int
 vmmdev_get_memseg(vmm_softc_t *sc, struct vm_memseg *mseg)
@@ -1563,6 +1567,10 @@ vmmdev_do_vm_create(char *name, cred_t *cr)
 		goto fail;
 	}
 
+	if (vmm_kstat_alloc(sc, minor, cr) != 0) {
+		goto fail;
+	}
+
 	error = vm_create(name, &sc->vmm_vm);
 	if (error == 0) {
 		/* Complete VM intialization and report success. */
@@ -1584,12 +1592,14 @@ vmmdev_do_vm_create(char *name, cred_t *cr)
 		sc->vmm_zone = crgetzone(cr);
 		zone_hold(sc->vmm_zone);
 		vmm_zsd_add_vm(sc);
+		vmm_kstat_init(sc);
 
 		list_insert_tail(&vmm_list, sc);
 		mutex_exit(&vmm_mtx);
 		return (0);
 	}
 
+	vmm_kstat_fini(sc);
 	ddi_remove_minor_node(vmmdev_dip, name);
 fail:
 	id_free(vmm_minors, minor);
@@ -1916,6 +1926,7 @@ vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd,
 		sc->vmm_flags |= VMM_DESTROY;
 	} else {
 		vm_destroy(sc->vmm_vm);
+		vmm_kstat_fini(sc);
 		ddi_soft_state_free(vmm_statep, minor);
 		id_free(vmm_minors, minor);
 		*hma_release = B_TRUE;
@@ -1974,6 +1985,130 @@ vmmdev_do_vm_destroy(const char *name, cred_t *cr)
 		vmm_hma_release();
 
 	return (err);
+}
+
+#define	VCPU_NAME_BUFLEN	32
+
+static int
+vmm_kstat_alloc(vmm_softc_t *sc, minor_t minor, const cred_t *cr)
+{
+	zoneid_t zid = crgetzoneid(cr);
+	int instance = minor;
+	kstat_t *ksp;
+
+	ASSERT3P(sc->vmm_kstat_vm, ==, NULL);
+
+	ksp = kstat_create_zone(VMM_MODULE_NAME, instance, "vm",
+	    VMM_KSTAT_CLASS, KSTAT_TYPE_NAMED,
+	    sizeof (vmm_kstats_t) / sizeof (kstat_named_t), 0, zid);
+
+	if (ksp == NULL) {
+		return (-1);
+	}
+	sc->vmm_kstat_vm = ksp;
+
+	for (uint_t i = 0; i < VM_MAXCPU; i++) {
+		char namebuf[VCPU_NAME_BUFLEN];
+
+		ASSERT3P(sc->vmm_kstat_vcpu[i], ==, NULL);
+
+		(void) snprintf(namebuf, VCPU_NAME_BUFLEN, "vcpu%u", i);
+		ksp = kstat_create_zone(VMM_MODULE_NAME, instance, namebuf,
+		    VMM_KSTAT_CLASS, KSTAT_TYPE_NAMED,
+		    sizeof (vmm_vcpu_kstats_t) / sizeof (kstat_named_t),
+		    0, zid);
+		if (ksp == NULL) {
+			goto fail;
+		}
+
+		sc->vmm_kstat_vcpu[i] = ksp;
+	}
+
+	/*
+	 * If this instance is associated with a non-global zone, make its
+	 * kstats visible from the GZ.
+	 */
+	if (zid != GLOBAL_ZONEID) {
+		kstat_zone_add(sc->vmm_kstat_vm, GLOBAL_ZONEID);
+		for (uint_t i = 0; i < VM_MAXCPU; i++) {
+			kstat_zone_add(sc->vmm_kstat_vcpu[i], GLOBAL_ZONEID);
+		}
+	}
+
+	return (0);
+
+fail:
+	for (uint_t i = 0; i < VM_MAXCPU; i++) {
+		if (sc->vmm_kstat_vcpu[i] != NULL) {
+			kstat_delete(sc->vmm_kstat_vcpu[i]);
+			sc->vmm_kstat_vcpu[i] = NULL;
+		} else {
+			break;
+		}
+	}
+	kstat_delete(sc->vmm_kstat_vm);
+	sc->vmm_kstat_vm = NULL;
+	return (-1);
+}
+
+static void
+vmm_kstat_init(vmm_softc_t *sc)
+{
+	kstat_t *ksp;
+
+	ASSERT3P(sc->vmm_vm, !=, NULL);
+	ASSERT3P(sc->vmm_kstat_vm, !=, NULL);
+
+	ksp = sc->vmm_kstat_vm;
+	vmm_kstats_t *vk = ksp->ks_data;
+	ksp->ks_private = sc->vmm_vm;
+	kstat_named_init(&vk->vk_name, "vm_name", KSTAT_DATA_STRING);
+	kstat_named_setstr(&vk->vk_name, sc->vmm_name);
+
+	for (uint_t i = 0; i < VM_MAXCPU; i++) {
+		ASSERT3P(sc->vmm_kstat_vcpu[i], !=, NULL);
+
+		ksp = sc->vmm_kstat_vcpu[i];
+		vmm_vcpu_kstats_t *vvk = ksp->ks_data;
+
+		kstat_named_init(&vvk->vvk_vcpu, "vcpu", KSTAT_DATA_UINT32);
+		vvk->vvk_vcpu.value.ui32 = i;
+		kstat_named_init(&vvk->vvk_time_init, "time_init",
+		    KSTAT_DATA_UINT64);
+		kstat_named_init(&vvk->vvk_time_run, "time_run",
+		    KSTAT_DATA_UINT64);
+		kstat_named_init(&vvk->vvk_time_idle, "time_idle",
+		    KSTAT_DATA_UINT64);
+		kstat_named_init(&vvk->vvk_time_emu_kern, "time_emu_kern",
+		    KSTAT_DATA_UINT64);
+		kstat_named_init(&vvk->vvk_time_emu_user, "time_emu_user",
+		    KSTAT_DATA_UINT64);
+		kstat_named_init(&vvk->vvk_time_sched, "time_sched",
+		    KSTAT_DATA_UINT64);
+		ksp->ks_private = sc->vmm_vm;
+		ksp->ks_update = vmm_kstat_update_vcpu;
+	}
+
+	kstat_install(sc->vmm_kstat_vm);
+	for (uint_t i = 0; i < VM_MAXCPU; i++) {
+		kstat_install(sc->vmm_kstat_vcpu[i]);
+	}
+}
+
+static void
+vmm_kstat_fini(vmm_softc_t *sc)
+{
+	ASSERT(sc->vmm_kstat_vm != NULL);
+
+	kstat_delete(sc->vmm_kstat_vm);
+	sc->vmm_kstat_vm = NULL;
+
+	for (uint_t i = 0; i < VM_MAXCPU; i++) {
+		ASSERT3P(sc->vmm_kstat_vcpu[i], !=, NULL);
+
+		kstat_delete(sc->vmm_kstat_vcpu[i]);
+		sc->vmm_kstat_vcpu[i] = NULL;
+	}
 }
 
 static int
@@ -2324,8 +2459,8 @@ vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	if ((sph = sdev_plugin_register("vmm", &vmm_sdev_ops, NULL)) ==
-	    (sdev_plugin_hdl_t)NULL) {
+	sph = sdev_plugin_register(VMM_MODULE_NAME, &vmm_sdev_ops, NULL);
+	if (sph == (sdev_plugin_hdl_t)NULL) {
 		ddi_remove_minor_node(dip, NULL);
 		goto fail;
 	}

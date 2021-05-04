@@ -22,8 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# psm/stand/cpr/common/Makefile.com
-#
+
 GREP	=	egrep
 WC	=	wc
 TOPDIR	=	../../../../..
@@ -97,7 +96,7 @@ cprboot: $(CPRBOOT_MAPFILE) $(CPRBOOTOBJ) $(SALIBS)
 	$(CHK4UBINARY)
 
 $(SALIBS): FRC
-	@cd $(@D); $(MAKE) $(MFLAGS)
+	@cd $(@D); $(MAKE)
 
 $(ROOTDIR):
 	$(INS.dir)

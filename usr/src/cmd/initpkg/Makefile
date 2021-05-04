@@ -82,10 +82,10 @@ $(ROOTSBINL):	$(ROOTSBIN)/rc0
 	$(RM) $@; $(LN) $(ROOTSBIN)/rc0 $@
 
 all_init.d: FRC
-	@cd init.d; pwd; $(MAKE) $(MFLAGS) all
+	@cd init.d; pwd; $(MAKE) all
 
 ins_init.d: FRC
-	@cd init.d; pwd; $(MAKE) $(MFLAGS) install
+	@cd init.d; pwd; $(MAKE) install
 
 $(SHFILES):
 	sh $@.sh $(ROOT)

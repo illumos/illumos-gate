@@ -60,7 +60,7 @@ $(CRONTABD)/root :=	FILEMODE =	0600
 all: $(CRON_ENT) $(CRON_LIB) $(ETC_SCRIPT) $(SUBDIRS)
 
 install: all $(DIRS) $(CRONTABS) $(CRONLIBS) $(ETCSCRIPTS) $(ETCZONESD) \
-	$(SUBDIRS) 
+	$(SUBDIRS)
 
 $(CRONTABD)/% : %
 	$(INS.file)
@@ -73,7 +73,7 @@ $(ETCZONESD): $(ZI_SPECIAL)
 	$(CHMOD) $(FILEMODE) $(ZISPECIALS)
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 $(DIRS):
 	$(INS.dir)

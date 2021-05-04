@@ -29,9 +29,6 @@ SRCS= $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
 
-CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += $(CNOWARN_UNINIT)
-
 .KEEP_STATE:
 
 all: $(PROG)
@@ -44,7 +41,5 @@ install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../Makefile.targ

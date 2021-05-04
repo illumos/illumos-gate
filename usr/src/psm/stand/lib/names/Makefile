@@ -23,9 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# psm/stand/lib/names/Makefile
 
 include ../../../../Makefile.master
 
@@ -43,6 +40,6 @@ lint	:=	TARGET = lint
 install	:=	TARGET = install
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

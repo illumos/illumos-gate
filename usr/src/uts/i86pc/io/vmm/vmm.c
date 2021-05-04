@@ -137,6 +137,10 @@ struct vcpu {
 	uint64_t	nextrip;	/* (x) next instruction to execute */
 	struct vie	*vie_ctx;	/* (x) instruction emulation context */
 	uint64_t	tsc_offset;	/* (x) offset from host TSC */
+
+	enum vcpu_ustate ustate;	/* (i) microstate for the vcpu */
+	hrtime_t	ustate_when;	/* (i) time of last ustate change */
+	uint64_t ustate_total[VU_MAX];	/* (o) total time spent in ustates */
 };
 
 #define	vcpu_lock_initialized(v) mtx_initialized(&((v)->mtx))
@@ -262,9 +266,6 @@ SDT_PROVIDER_DEFINE(vmm);
 
 static MALLOC_DEFINE(M_VM, "vm", "vm");
 
-/* statistics */
-static VMM_STAT(VCPU_TOTAL_RUNTIME, "vcpu total runtime");
-
 SYSCTL_NODE(_hw, OID_AUTO, vmm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
     NULL);
 
@@ -300,6 +301,7 @@ typedef struct vm_thread_ctx {
 	struct vm	*vtc_vm;
 	int		vtc_vcpuid;
 	uint_t		vtc_status;
+	enum vcpu_ustate vtc_ustate;
 } vm_thread_ctx_t;
 
 #endif /* __FreeBSD__ */
@@ -362,9 +364,15 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 		vcpu->guestfpu = fpu_save_area_alloc();
 		vcpu->stats = vmm_stat_alloc();
 		vcpu->vie_ctx = vie_alloc();
+
+		vcpu->ustate = VU_INIT;
+		vcpu->ustate_when = gethrtime();
 	} else {
 		vie_reset(vcpu->vie_ctx);
 		bzero(&vcpu->exitinfo, sizeof (vcpu->exitinfo));
+		if (vcpu->ustate != VU_INIT) {
+			vcpu_ustate_change(vm, vcpu_id, VU_INIT);
+		}
 	}
 
 	vcpu->run_state = VRS_HALT;
@@ -1356,8 +1364,6 @@ save_guest_fpustate(struct vcpu *vcpu)
 #endif
 }
 
-static VMM_STAT(VCPU_IDLE_TICKS, "number of ticks vcpu was idle");
-
 static int
 vcpu_set_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate,
     bool from_idle)
@@ -1466,7 +1472,7 @@ static int
 vm_handle_hlt(struct vm *vm, int vcpuid, bool intr_disabled)
 {
 	struct vcpu *vcpu;
-	int t, vcpu_halted, vm_halted;
+	int vcpu_halted, vm_halted;
 	bool userspace_exit = false;
 
 	KASSERT(!CPU_ISSET(vcpuid, &vm->halted_cpus), ("vcpu already halted"));
@@ -1519,11 +1525,11 @@ vm_handle_hlt(struct vm *vm, int vcpuid, bool intr_disabled)
 			}
 		}
 
-		t = ticks;
+		vcpu_ustate_change(vm, vcpuid, VU_IDLE);
 		vcpu_require_state_locked(vm, vcpuid, VCPU_SLEEPING);
 		(void) cv_wait_sig(&vcpu->vcpu_cv, &vcpu->mtx.m);
 		vcpu_require_state_locked(vm, vcpuid, VCPU_FROZEN);
-		vmm_stat_incr(vm, vcpuid, VCPU_IDLE_TICKS, ticks - t);
+		vcpu_ustate_change(vm, vcpuid, VU_EMU_KERN);
 	}
 
 	if (vcpu_halted)
@@ -1857,6 +1863,7 @@ vm_handle_suspend(struct vm *vm, int vcpuid)
 	vcpu_unlock(vcpu);
 #else
 	vcpu_lock(vcpu);
+	vcpu_ustate_change(vm, vcpuid, VU_INIT);
 	while (1) {
 		int rc;
 
@@ -1961,9 +1968,11 @@ vm_handle_run_state(struct vm *vm, int vcpuid)
 			break;
 		}
 
+		vcpu_ustate_change(vm, vcpuid, VU_IDLE);
 		vcpu_require_state_locked(vm, vcpuid, VCPU_SLEEPING);
 		(void) cv_wait_sig(&vcpu->vcpu_cv, &vcpu->mtx.m);
 		vcpu_require_state_locked(vm, vcpuid, VCPU_FROZEN);
+		vcpu_ustate_change(vm, vcpuid, VU_EMU_KERN);
 	}
 	vcpu_unlock(vcpu);
 
@@ -2162,6 +2171,15 @@ vmm_savectx(void *arg)
 	}
 
 	/*
+	 * Account for going off-cpu, unless the vCPU is idled, where being
+	 * off-cpu is the explicit point.
+	 */
+	if (vm->vcpu[vcpuid].ustate != VU_IDLE) {
+		vtc->vtc_ustate = vm->vcpu[vcpuid].ustate;
+		vcpu_ustate_change(vm, vcpuid, VU_SCHED);
+	}
+
+	/*
 	 * If the CPU holds the restored guest FPU state, save it and restore
 	 * the host FPU state before this thread goes off-cpu.
 	 */
@@ -2179,6 +2197,11 @@ vmm_restorectx(void *arg)
 	vm_thread_ctx_t *vtc = arg;
 	struct vm *vm = vtc->vtc_vm;
 	const int vcpuid = vtc->vtc_vcpuid;
+
+	/* Complete microstate accounting for vCPU being off-cpu */
+	if (vm->vcpu[vcpuid].ustate != VU_IDLE) {
+		vcpu_ustate_change(vm, vcpuid, vtc->vtc_ustate);
+	}
 
 	/*
 	 * When coming back on-cpu, only restore the guest FPU status if the
@@ -2304,7 +2327,6 @@ vm_run(struct vm *vm, int vcpuid, const struct vm_entry *entry)
 #ifdef	__FreeBSD__
 	struct pcb *pcb;
 #endif
-	uint64_t tscval;
 	struct vm_exit *vme;
 	bool intr_disabled;
 	pmap_t pmap;
@@ -2325,6 +2347,8 @@ vm_run(struct vm *vm, int vcpuid, const struct vm_entry *entry)
 	pmap = vmspace_pmap(vm->vmspace);
 	vcpu = &vm->vcpu[vcpuid];
 	vme = &vcpu->exitinfo;
+
+	vcpu_ustate_change(vm, vcpuid, VU_EMU_KERN);
 
 #ifndef	__FreeBSD__
 	vtc.vtc_vm = vm;
@@ -2366,8 +2390,6 @@ restart:
 	KASSERT(!CPU_ISSET(curcpu, &pmap->pm_active),
 	    ("vm_run: absurd pm_active"));
 
-	tscval = rdtsc_offset();
-
 #ifdef	__FreeBSD__
 	pcb = PCPU_GET(curpcb);
 	set_pcb_flags(pcb, PCB_FULL_IRET);
@@ -2403,8 +2425,6 @@ restart:
 	 */
 	thread_affinity_clear(curthread);
 #endif
-
-	vmm_stat_incr(vm, vcpuid, VCPU_TOTAL_RUNTIME, rdtsc_offset() - tscval);
 
 	critical_exit();
 
@@ -2484,6 +2504,7 @@ exit:
 
 	VCPU_CTR2(vm, vcpuid, "retu %d/%d", error, vme->exitcode);
 
+	vcpu_ustate_change(vm, vcpuid, VU_EMU_USER);
 	return (error);
 }
 
@@ -3557,6 +3578,25 @@ vcpu_notify_event_type(struct vm *vm, int vcpuid, vcpu_notify_t ntype)
 	vcpu_unlock(vcpu);
 }
 
+void
+vcpu_ustate_change(struct vm *vm, int vcpuid, enum vcpu_ustate ustate)
+{
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
+	hrtime_t now = gethrtime();
+
+	ASSERT3U(ustate, !=, vcpu->ustate);
+	ASSERT3S(ustate, <, VU_MAX);
+	ASSERT3S(ustate, >=, VU_INIT);
+
+	hrtime_t delta = now - vcpu->ustate_when;
+	vcpu->ustate_total[vcpu->ustate] += delta;
+
+	membar_producer();
+
+	vcpu->ustate_when = now;
+	vcpu->ustate = ustate;
+}
+
 struct vmspace *
 vm_get_vmspace(struct vm *vm)
 {
@@ -3810,6 +3850,26 @@ vm_ioport_unhook(struct vm *vm, void **cookie)
 	VERIFY(IOP_GEN_COOKIE(old_func, old_arg, port) == (uintptr_t)*cookie);
 
 	*cookie = NULL;
+}
+
+int
+vmm_kstat_update_vcpu(struct kstat *ksp, int rw)
+{
+	struct vm *vm = ksp->ks_private;
+	vmm_vcpu_kstats_t *vvk = ksp->ks_data;
+	const int vcpuid = vvk->vvk_vcpu.value.ui32;
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
+
+	ASSERT3U(vcpuid, <, VM_MAXCPU);
+
+	vvk->vvk_time_init.value.ui64 = vcpu->ustate_total[VU_INIT];
+	vvk->vvk_time_run.value.ui64 = vcpu->ustate_total[VU_RUN];
+	vvk->vvk_time_idle.value.ui64 = vcpu->ustate_total[VU_IDLE];
+	vvk->vvk_time_emu_kern.value.ui64 = vcpu->ustate_total[VU_EMU_KERN];
+	vvk->vvk_time_emu_user.value.ui64 = vcpu->ustate_total[VU_EMU_USER];
+	vvk->vvk_time_sched.value.ui64 = vcpu->ustate_total[VU_SCHED];
+
+	return (0);
 }
 
 #ifndef __FreeBSD__

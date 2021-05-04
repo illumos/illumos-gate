@@ -34,7 +34,7 @@ $(64ONLY)SUBDIRS= $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 USRLIBIPF=		$(ROOTLIB)/ipf
-USRLIBIPFLICENCE=	$(LICENCE:%=$(USRLIBIPF)/%) 
+USRLIBIPFLICENCE=	$(LICENCE:%=$(USRLIBIPF)/%)
 
 FILEMODE= 0755
 
@@ -61,6 +61,6 @@ install: all $(SUBDIRS) install_local
 install_local: $(USRLIBIPF) $(USRLIBIPFLICENCE)
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

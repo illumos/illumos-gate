@@ -380,6 +380,7 @@ typeset -u got
 exp=100
 ((got=$exp))
 [[ $got == $exp ]] || err_exit "typeset -l fails on numeric value -- expected '$exp', got '$got'"
+unset got
 
 unset s
 typeset -a -u s=( hello world chicken )

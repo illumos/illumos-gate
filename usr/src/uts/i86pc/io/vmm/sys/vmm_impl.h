@@ -13,6 +13,7 @@
 /*
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef _VMM_IMPL_H_
@@ -22,6 +23,8 @@
 #include <sys/queue.h>
 #include <sys/varargs.h>
 #include <sys/zone.h>
+#include <sys/kstat.h>
+#include <sys/vmm.h>
 
 #ifdef	_KERNEL
 
@@ -76,6 +79,9 @@ struct vmm_softc {
 	list_node_t	vmm_zsd_linkage;
 	zone_t		*vmm_zone;
 	vmm_zsd_t	*vmm_zsd;
+
+	kstat_t		*vmm_kstat_vm;
+	kstat_t		*vmm_kstat_vcpu[VM_MAXCPU];
 };
 typedef struct vmm_softc vmm_softc_t;
 
@@ -84,6 +90,8 @@ void vmm_zsd_fini(void);
 int vmm_zsd_add_vm(vmm_softc_t *sc);
 void vmm_zsd_rem_vm(vmm_softc_t *sc);
 int vmm_do_vm_destroy(vmm_softc_t *, boolean_t);
+
+#define	VMM_MODULE_NAME	"vmm"
 
 #endif /* _KERNEL */
 

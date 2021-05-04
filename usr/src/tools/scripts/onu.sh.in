@@ -23,6 +23,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010, Richard Lowe
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PATH=/usr/bin:/usr/sbin
@@ -86,39 +87,57 @@ configure_publishers()
 	typeset on_publisher=$(pkg -R $root list -Hv \
 	    "${consolidation}-incorporation" | cut -d/ -f3)
 
-        if [[ "$on_publisher" != "$redistpub" ]]; then
-	        do_cmd pkg -R $root set-publisher --no-refresh \
-                    --non-sticky $on_publisher
-        fi
-	do_cmd pkg -R $root set-publisher -e --no-refresh -P -O $uri $redistpub
+	if [[ "$on_publisher" != "$redistpub" ]]; then
+		do_cmd pkg -R $root set-publisher -r --no-refresh \
+		    --set-property signature-policy=verify \
+		    --non-sticky $on_publisher
+	fi
+
+	do_cmd pkg -R $root set-publisher -r -e --no-refresh -P \
+	    --set-property signature-policy=verify -O $uri $redistpub
+
 	do_cmd pkg -R $root refresh --full
+}
+
+prepare_image()
+{
+	print "**\n** Preparing for ONU from $distribution\n**"
+
+	case $distribution in
+	    omnios)
+		# This removes files from the image that cause conflicts with
+		# stock illumos-gate, and removes omnios-only kernel drivers
+		# etc.
+		do_cmd pkg -R $root change-facet -r onu.ooceonly=false
+		;;
+	esac
 }
 
 update()
 {
 	root=$1
 
-	pkg -R $root list entire > /dev/null 2>&1
-	[ $? -eq 0 ] && do_cmd pkg -R $root uninstall entire
+	pkg -R $root list -q entire && do_cmd pkg -R $root uninstall entire
 
 	configure_publishers $root
+
+	prepare_image
 
 	do_cmd pkg -R $root image-update
 }
 
 update_zone()
 {
-	zone=$1
+	OIFS="$IFS"
+	IFS=":"
+	set -- $1
+	zone=$2; state=$3; path=$4; brand=$6
+	IFS="$OIFS"
 
-	name=`echo $zone | cut -d: -f 2`
-	if [ $name = "global" ]; then
-		return
-	fi
-
-	brand=`echo $zone | cut -d: -f 6`
-	if [ $brand != "ipkg" ]; then
-		return
-	fi
+	[[ "$zone" == "global" ]] && return
+	[[ "$state" == "incomplete" ]] && return
+	[[ "$state" == "configured" ]] && return
+	[[ "$brand" == "$nlbrand" ]] || return
 
 	if [ "$zone_warned" = 0 ]; then
 		echo "WARNING: Use of onu(1) will prevent use of zone attach in the new BE" >&2
@@ -126,19 +145,30 @@ update_zone()
 		zone_warned=1
 	fi
 
-	state=`echo $zone | cut -d: -f 3`
-
-	case "$state" in
-	configured|incomplete)
-		return
-		;;
-	esac
-
-	zoneroot=`echo $zone | cut -d: -f 4`
-
-	echo "Updating zone $name"
-	update $zoneroot/root
+	print "**\n** Updating zone $zone (brand $brand)\n**"
+	update "$path/root"
 }
+
+typeset -l distribution
+if [[ -r /etc/os-release ]]; then
+	distribution=$(awk -F= '$1 == "ID" { print $2 }' /etc/os-release)
+elif [[ -r /etc/release ]]; then
+	distribution=$(awk 'NR == 1 { print $1 }' /etc/release)
+else
+	distribution=unknown
+fi
+
+case $distribution in
+    openindiana)
+	nlbrand=nlipkg
+	;;
+    omnios)
+	nlbrand=ipkg
+	;;
+    *)
+	nlbrand=unknown
+	;;
+esac
 
 sourcebe=""
 targetbe=""
@@ -209,11 +239,15 @@ if [ -n "$repodir" ]; then
 	# need an absolute path
 	[[ $redistdir == /* ]] || redistdir=$PWD/$redistdir
 	redistpub=$(python@PYTHON_VERSION@ <<# EOF
-		import ConfigParser
-		p = ConfigParser.SafeConfigParser()
+		try:	# python3
+			import configparser
+			p = configparser.ConfigParser()
+		except:	# python2
+			import ConfigParser
+			p = ConfigParser.SafeConfigParser()
 		p.read("$cfgfile")
 		pp = p.get("publisher", "prefix")
-		print "%s" % pp
+		print("{}".format(pp))
 		EOF) || exit_error "Cannot determine publisher prefix"
 	[[ -n "$redistpub" ]] || exit_error "Repository has no publisher prefix"
 	uri="file://$redistdir"

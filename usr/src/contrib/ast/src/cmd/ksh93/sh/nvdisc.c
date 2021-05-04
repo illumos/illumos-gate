@@ -742,7 +742,7 @@ Namfun_t *nv_disc(register Namval_t *np, register Namfun_t* fp, int mode)
 			if(lp && !lp->disc)
 				fp->next = lp;
 			else
-				fp->next = 0;
+				fp->next = *lpp;
 		}
 		else
 		{

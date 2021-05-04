@@ -189,17 +189,11 @@ static int	MS_BUF_BYTES = 4096;
 
 static int	MS_DEBUG;
 
-
-/*
- * Most of these should be "void", but the people who defined the "streams"
- * data structures for S5 didn't understand data types.
- */
-static int msopen(queue_t *q, dev_t *devp, int oflag, int sflag,
-				cred_t *credp);
+static int msopen(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *credp);
 static int msclose(queue_t *q, int flag, cred_t *credp);
-static void mswput(queue_t *q, mblk_t *mp);
-static void msrput(queue_t *q, mblk_t *mp);
-static void msrserv(queue_t *q);
+static int mswput(queue_t *q, mblk_t *mp);
+static int msrput(queue_t *q, mblk_t *mp);
+static int msrserv(queue_t *q);
 
 static struct module_info msmiinfo = {
 	0,
@@ -211,11 +205,11 @@ static struct module_info msmiinfo = {
 };
 
 static struct qinit msrinit = {
-	(int (*)())msrput,
-	(int (*)())msrserv,
+	msrput,
+	msrserv,
 	msopen,
 	msclose,
-	(int (*)())NULL,
+	NULL,
 	&msmiinfo
 };
 
@@ -229,11 +223,11 @@ static struct module_info msmoinfo = {
 };
 
 static struct qinit mswinit = {
-	(int (*)())mswput,
-	(int (*)())NULL,
+	mswput,
+	NULL,
 	msopen,
 	msclose,
-	(int (*)())NULL,
+	NULL,
 	&msmoinfo
 };
 
@@ -247,10 +241,10 @@ static struct streamtab ms_info = {
 static void	msresched(void *);
 static void	msreioctl(void *);
 static void	msioctl(queue_t *q, mblk_t *mp);
-static int	ms_getparms(register Ms_parms *data);
-static int	ms_setparms(register Ms_parms *data);
+static int	ms_getparms(Ms_parms *data);
+static int	ms_setparms(Ms_parms *data);
 static void	msflush(struct msdata *msd);
-static void	msinput(/* struct msdata *msd, char c */); /* XXX */
+static void	msinput(struct msdata *msd, char c);
 static void	msincr(void *);
 
 /*
@@ -265,26 +259,23 @@ static void	msincr(void *);
 /* ARGSUSED */
 static void
 dummy_callback(void *arg)
-{}
+{
+}
 
 /*
  * Open a mouse.
  */
 /*ARGSUSED*/
 static int
-msopen(q, devp, oflag, sflag, credp)
-	queue_t	*q;
-	dev_t	*devp;
-	int	oflag, sflag;
-	cred_t	*credp;
+msopen(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *credp)
 {
-	register struct mousebuf *b;
-	register struct ms_softc *ms;
-	register struct msdata *msd;
+	struct mousebuf *b;
+	struct ms_softc *ms;
+	struct msdata *msd;
 	mblk_t	 *mp;
 	mblk_t	 *datap;
-	register struct iocblk *iocb;
-	register struct termios *cb;
+	struct iocblk *iocb;
+	struct termios *cb;
 	int error = 0;
 
 	if (q->q_ptr != NULL)
@@ -386,7 +377,7 @@ msopen(q, devp, oflag, sflag, credp)
 		ms->ms_bufbytes = MS_BUF_BYTES;
 		b = kmem_zalloc((uint_t)ms->ms_bufbytes, KM_SLEEP);
 		b->mb_size = 1 + (ms->ms_bufbytes - sizeof (struct mousebuf))
-			/ sizeof (struct mouseinfo);
+		    / sizeof (struct mouseinfo);
 		ms->ms_buf = b;
 		ms->ms_vuidaddr = VKEY_FIRST;
 		msjittertimeout = JITTER_TIMEOUT;
@@ -414,13 +405,10 @@ error:
  */
 /* ARGSUSED1 */
 static int
-msclose(q, flag, credp)
-	queue_t		*q;
-	int		flag;
-	cred_t		*credp;
+msclose(queue_t *q, int flag, cred_t *credp)
 {
-	register struct msdata *msd = (struct msdata *)q->q_ptr;
-	register struct ms_softc *ms;
+	struct msdata *msd = (struct msdata *)q->q_ptr;
+	struct ms_softc *ms;
 
 	/*
 	 * Tell the module below us that it need not return input immediately.
@@ -470,16 +458,15 @@ msclose(q, flag, credp)
  * Read queue service routine.
  * Turn buffered mouse events into stream messages.
  */
-static void
-msrserv(q)
-	register queue_t *q;
+static int
+msrserv(queue_t *q)
 {
 	struct msdata *msd = (struct msdata *)q->q_ptr;
-	register struct ms_softc *ms;
-	register struct mousebuf *b;
-	register struct mouseinfo *mi;
-	register int    button_number;
-	register int    hwbit;
+	struct ms_softc *ms;
+	struct mousebuf *b;
+	struct mouseinfo *mi;
+	int    button_number;
+	int    hwbit;
 	mblk_t	 *bp;
 
 	/*
@@ -487,7 +474,7 @@ msrserv(q)
 	 * initialization is complete.
 	 */
 	if (!(msd->msd_flags & MS_OPEN)) {
-		return;
+		return (1);
 	}
 
 	ms = &msd->msd_softc;
@@ -498,7 +485,7 @@ msrserv(q)
 		no_pkt = no_pkt > 0 ? no_pkt : (b->mb_size - no_pkt);
 		if (no_pkt < msd->msd_hold_baud_stup) {
 			msd->msd_qenable_more = 1;
-			return;
+			return (0);
 		} else {
 			/*
 			 * throw away packets in beginning (mostly garbage)
@@ -519,7 +506,7 @@ msrserv(q)
 		switch (ms->ms_readformat) {
 
 		case MS_3BYTE_FORMAT: {
-			register char *cp;
+			char *cp;
 
 			if ((bp = allocb(3, BPRI_HI)) != NULL) {
 				cp = (char *)bp->b_wptr;
@@ -539,7 +526,7 @@ msrserv(q)
 				msd->msd_resched_id = qbufcall(q, 3, BPRI_HI,
 				    msresched, msd);
 				if (msd->msd_resched_id == 0)
-					return;	/* try again later */
+					return (0);	/* try again later */
 				/* bufcall failed; just pitch this event */
 				/* or maybe flush queue? */
 			}
@@ -552,7 +539,7 @@ msrserv(q)
 		}
 
 		case MS_VUID_FORMAT: {
-			register Firm_event *fep;
+			Firm_event *fep;
 
 			bp = NULL;
 			switch (ms->ms_eventstate) {
@@ -589,7 +576,7 @@ msrserv(q)
 					sizeof (Firm_event),
 					BPRI_HI, msresched, msd);
 				    if (msd->msd_resched_id == 0)
-					return;	/* try again later */
+					return (0);	/* try again later */
 				    /* bufcall failed; just pitch this event */
 				    /* or maybe flush queue? */
 				    ms->ms_eventstate = EVENT_X;
@@ -617,7 +604,7 @@ msrserv(q)
 					sizeof (Firm_event),
 					BPRI_HI, msresched, msd);
 				    if (msd->msd_resched_id == 0)
-					return;	/* try again later */
+					return (0);	/* try again later */
 				    /* bufcall failed; just pitch this event */
 				    /* or maybe flush queue? */
 				    ms->ms_eventstate = EVENT_X;
@@ -644,7 +631,7 @@ msrserv(q)
 					sizeof (Firm_event),
 					BPRI_HI, msresched, msd);
 				    if (msd->msd_resched_id == 0)
-					return;	/* try again later */
+					return (0);	/* try again later */
 				    /* bufcall failed; just pitch this event */
 				    /* or maybe flush queue? */
 				    ms->ms_eventstate = EVENT_X;
@@ -670,6 +657,7 @@ msrserv(q)
 		}
 		}
 	}
+	return (0);
 }
 
 static void
@@ -687,10 +675,8 @@ msresched(void *msdptr)
  * Line discipline output queue put procedure: handles M_IOCTL
  * messages.
  */
-static void
-mswput(q, mp)
-	register queue_t *q;
-	register mblk_t *mp;
+static int
+mswput(queue_t *q, mblk_t *mp)
 {
 
 	/*
@@ -713,6 +699,7 @@ mswput(q, mp)
 		msioctl(q, mp);
 		break;
 	}
+	return (0);
 }
 
 static void
@@ -731,13 +718,11 @@ msreioctl(void *msdptr)
 }
 
 static void
-msioctl(q, mp)
-	register queue_t *q;
-	register mblk_t *mp;
+msioctl(queue_t *q, mblk_t *mp)
 {
 	struct msdata		*msd;
-	register struct ms_softc *ms;
-	register struct iocblk	*iocp;
+	struct ms_softc *ms;
+	struct iocblk	*iocp;
 	Vuid_addr_probe		*addr_probe;
 	uint_t			ioctlrespsize;
 	int			err = 0;
@@ -859,8 +844,7 @@ allocfailure:
 }
 
 static int
-ms_getparms(data)
-	register Ms_parms	*data;
+ms_getparms(Ms_parms *data)
 {
 	data->jitter_thresh = ms_jitter_thresh;
 	data->speed_law = ms_speedlaw;
@@ -869,8 +853,7 @@ ms_getparms(data)
 }
 
 static int
-ms_setparms(data)
-	register Ms_parms	*data;
+ms_setparms(Ms_parms *data)
 {
 	ms_jitter_thresh = data->jitter_thresh;
 	ms_speedlaw = data->speed_law;
@@ -879,11 +862,10 @@ ms_setparms(data)
 }
 
 static void
-msflush(msd)
-	register struct msdata *msd;
+msflush(struct msdata *msd)
 {
-	register struct ms_softc *ms = &msd->msd_softc;
-	register queue_t *q;
+	struct ms_softc *ms = &msd->msd_softc;
+	queue_t *q;
 
 	ms->ms_oldoff = 0;
 	ms->ms_eventstate = EVENT_BUT3;
@@ -898,22 +880,20 @@ msflush(msd)
 /*
  * Mouse read queue put procedure.
  */
-static void
-msrput(q, mp)
-	register queue_t *q;
-	register mblk_t *mp;
+static int
+msrput(queue_t *q, mblk_t *mp)
 {
-	register struct msdata *msd = (struct msdata *)q->q_ptr;
-	register mblk_t *bp;
-	register char *readp;
-	register mblk_t *imp;
-	register mblk_t *datap;
-	register struct iocblk *iocb;
-	register struct termios *cb;
+	struct msdata *msd = (struct msdata *)q->q_ptr;
+	mblk_t *bp;
+	char *readp;
+	mblk_t *imp;
+	mblk_t *datap;
+	struct iocblk *iocb;
+	struct termios *cb;
 	struct iocblk *iocp;
 
 	if (msd == 0)
-		return;
+		return (0);
 
 	switch (mp->b_datap->db_type) {
 
@@ -925,17 +905,17 @@ msrput(q, mp)
 		/* FALLTHROUGH */
 	default:
 		putnext(q, mp);
-		return;
+		return (0);
 
 	case M_BREAK:
 		if (msd->msd_flags & MS_IOCTOSS) {
 			freemsg(mp);
-			return;
+			return (0);
 		}
 
 		if (msd->msd_rcnt_baud_chng && msd->msd_data_pkt_cnt == 0) {
 			freemsg(mp);
-			return;
+			return (0);
 		}
 
 		/*
@@ -979,12 +959,12 @@ msrput(q, mp)
 		 * Change baud rate.
 		 */
 		if ((imp = mkiocb(TCSETSF)) == NULL) {
-			return;
+			return (0);
 		}
 		if ((datap = allocb(sizeof (struct termios),
 		    BPRI_HI)) == NULL) {
 			freemsg(imp);
-			return;
+			return (0);
 		}
 
 		iocb = (struct iocblk *)imp->b_rptr;
@@ -1011,7 +991,7 @@ msrput(q, mp)
 		msd->msd_data_pkt_cnt = 0;
 		if (MS_DEBUG)
 			printf("baud %x\n", msd->msd_baud_rate);
-		return;
+		return (0);
 
 	case M_IOCACK:
 	case M_IOCNAK:
@@ -1042,13 +1022,13 @@ msrput(q, mp)
 			}
 			freemsg(mp);
 		}
-		return;
+		return (0);
 
 	case M_DATA:
 		if ((msd->msd_flags & MS_IOCTOSS) ||
 		    !(msd->msd_flags & MS_OPEN)) {
 			freemsg(mp);
-			return;
+			return (0);
 		}
 		break;
 	}
@@ -1070,6 +1050,7 @@ msrput(q, mp)
 	} while ((bp = bp->b_cont) != NULL);	/* next block, if any */
 
 	freemsg(mp);
+	return (0);
 }
 
 /*
@@ -1093,15 +1074,13 @@ msrput(q, mp)
  */
 
 static void
-msinput(msd, c)
-	register struct msdata *msd;
-	char c;
+msinput(struct msdata *msd, char c)
 {
-	register struct ms_softc *ms;
-	register struct mousebuf *b;
-	register struct mouseinfo *mi;
-	register int    jitter_radius;
-	register int    temp;
+	struct ms_softc *ms;
+	struct mousebuf *b;
+	struct mouseinfo *mi;
+	int    jitter_radius;
+	int    temp;
 
 	ms = &msd->msd_softc;
 	b = ms->ms_buf;
@@ -1226,14 +1205,14 @@ static void
 msincr(void *arg)
 {
 	struct msdata  *msd = arg;
-	register struct ms_softc *ms = &msd->msd_softc;
-	register struct mousebuf *b;
-	register struct mouseinfo *mi;
+	struct ms_softc *ms = &msd->msd_softc;
+	struct mousebuf *b;
+	struct mouseinfo *mi;
 	char			oldbutt;
-	register short		xc, yc;
-	register int		wake;
-	register int		speedlimit = ms_speedlimit;
-	register int		xabs, yabs;
+	short		xc, yc;
+	int		wake;
+	int		speedlimit = ms_speedlimit;
+	int		xabs, yabs;
 
 	/*
 	 * No longer waiting for jitter timeout

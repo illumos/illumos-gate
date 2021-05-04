@@ -26,9 +26,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  * users.c
@@ -186,7 +184,7 @@ initmsg(char *p)	/* Ptr to command name */
  *  void wrtmsg(severity, action, tag, text[, txtarg1[, txtarg2[, ...]]])
  *
  *	This function writes a message using the standard message
- * 	generation facility.
+ *	generation facility.
  *
  *  Arguments:
  *	severity	The severity-component of the message
@@ -653,13 +651,13 @@ main(int argc, char **argv)
 	struct group	*grent;		/* Ptr to an /etc/group entry */
 	char	*token;		/* Ptr to a token extracted by strtok() */
 	char	**pp;		/* Ptr to a member of a group */
-	char	*g_arg;		/* Ptr to the -g option's argument */
-	char	*l_arg;		/* Ptr to the -l option's argument */
+	char	*g_arg = NULL;	/* Ptr to the -g option's argument */
+	char	*l_arg = NULL;	/* Ptr to the -l option's argument */
 	int	g_seen;		/* FLAG, true if -g on cmd */
 	int	l_seen;		/* FLAG, TRUE if -l is on the command line */
 	int	errflg;	/* FLAG, TRUE if there is a command-line problem */
 	int	done;		/* FLAG, TRUE if the process (?) is complete */
-	int	groupcount;	/* Number of groups specified by the user */
+	int	groupcount = 0;	/* Number of groups specified by the user */
 	int	rc;		/* Return code from strcmp() */
 	int	c;		/* Character returned from getopt() */
 
@@ -711,11 +709,11 @@ main(int argc, char **argv)
 	 *  If the -g groups option was on the command line, build a
 	 *  list containing groups we're to list logins for.
 	 */
+	reqgrphead = NULL;
 	if (g_seen) {
 
 		/* Begin with an empty list */
 		groupcount = 0;
-		reqgrphead = NULL;
 
 		/* Extract the first token putting an element on the list */
 		if ((token = strtok(g_arg, ",")) != NULL) {
@@ -732,10 +730,11 @@ main(int argc, char **argv)
 			 * Extract subsequent tokens (group names), avoiding
 			 * duplicate names (note, list is NOT empty)
 			 */
-			while (token = strtok(NULL, ",")) {
+			while ((token = strtok(NULL, ",")) != NULL) {
 
 				/* Check for duplication */
 				rgrp = reqgrphead;
+				rc = 0;
 				while (rgrp &&
 				    (rc = strcmp(token, rgrp->groupname)))
 					rgrp = rgrp->next;
@@ -756,16 +755,14 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 *  If -l logins is on the command line, build a list of logins
-	 *  we're to generate reports for.
+	 * If -l logins is on the command line, build a list of logins
+	 * we're to generate reports for.
+	 * Begin with a null list.
 	 */
+	reqloginhead = NULL;
 	if (l_seen) {
-
-		/* Begin with a null list */
-		reqloginhead = NULL;
-
 		/* Extract the first token from the argument to the -l option */
-		if (token = strtok(l_arg, ",")) {
+		if ((token = strtok(l_arg, ",")) != NULL) {
 
 			/* Put the first element in the list */
 			plogin = (struct reqlogin *)
@@ -781,10 +778,11 @@ main(int argc, char **argv)
 			 * comma list ...
 			 */
 
-			while (token = strtok(NULL, ",")) {
+			while ((token = strtok(NULL, ",")) != NULL) {
 
 				/* Check for duplication (list is not empty) */
 				rlogin = reqloginhead;
+				rc = 0;
 				while (rlogin &&
 				    (rc = strcmp(token, rlogin->loginname)))
 					rlogin = rlogin->next;
@@ -819,7 +817,7 @@ main(int argc, char **argv)
 	if (g_seen) {
 
 		/* For each group in the /etc/group file ... */
-		while (grent = getgrent()) {
+		while ((grent = getgrent()) != NULL) {
 
 			/* For each group mentioned with the -g option ... */
 			for (pgrp = reqgrphead; (groupcount > 0) && pgrp;
@@ -885,7 +883,7 @@ main(int argc, char **argv)
 	 *  Loop through the /etc/passwd file squirelling away the
 	 *  information we need for the display.
 	 */
-	while (pwent = getpwent()) {
+	while ((pwent = getpwent()) != NULL) {
 
 		/*
 		 * The login from /etc/passwd hasn't been included in

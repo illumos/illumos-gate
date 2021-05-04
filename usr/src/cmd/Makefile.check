@@ -155,7 +155,7 @@ check: svccfg_check $(MANIFEST_TOPDIRS) $(MANIFEST_SUBDIRS) $(MISC_SUBDIRS)
 
 svccfg_check:
 	@$(ECHO) "building requirements for svccfg check ..."; \
-	(cd $(SRC)/cmd/svc/seed && pwd && $(MAKE) $(MFLAGS) global.db)
+	(cd $(SRC)/cmd/svc/seed && pwd && $(MAKE) global.db)
 
 $(MANIFEST_TOPDIRS) $(MANIFEST_SUBDIRS) $(MISC_SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) check
