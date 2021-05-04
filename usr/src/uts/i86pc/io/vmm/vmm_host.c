@@ -143,60 +143,34 @@ vmm_get_host_xcr0(void)
 uint64_t
 vmm_get_host_datasel(void)
 {
-
-#ifdef	__FreeBSD__
-	return (GSEL(GDATA_SEL, SEL_KPL));
-#else
 	return (SEL_GDT(GDT_KDATA, SEL_KPL));
-#endif
-
 }
 
 uint64_t
 vmm_get_host_codesel(void)
 {
-
-#ifdef	__FreeBSD__
-	return (GSEL(GCODE_SEL, SEL_KPL));
-#else
 	return (SEL_GDT(GDT_KCODE, SEL_KPL));
-#endif
 }
 
 uint64_t
 vmm_get_host_tsssel(void)
 {
-
-#ifdef	__FreeBSD__
-	return (GSEL(GPROC0_SEL, SEL_KPL));
-#else
 	return (SEL_GDT(GDT_KTSS, SEL_KPL));
-#endif
 }
 
 uint64_t
 vmm_get_host_fsbase(void)
 {
-
-#ifdef	__FreeBSD__
-	return (0);
-#else
 	return (rdmsr(MSR_FSBASE));
-#endif
 }
 
 uint64_t
 vmm_get_host_idtrbase(void)
 {
-
-#ifdef	__FreeBSD__
-	return (r_idt.rd_base);
-#else
 	desctbr_t idtr;
 
 	rd_idtr(&idtr);
 	return (idtr.dtr_base);
-#endif
 }
 
 const struct xsave_limits *

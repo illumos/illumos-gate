@@ -86,10 +86,8 @@ typedef struct vmspace *(*vmi_vmspace_alloc)(vm_offset_t min, vm_offset_t max);
 typedef void	(*vmi_vmspace_free)(struct vmspace *vmspace);
 typedef struct vlapic *(*vmi_vlapic_init)(void *vmi, int vcpu);
 typedef void	(*vmi_vlapic_cleanup)(void *vmi, struct vlapic *vlapic);
-#ifndef __FreeBSD__
 typedef void	(*vmi_savectx)(void *vmi, int vcpu);
 typedef void	(*vmi_restorectx)(void *vmi, int vcpu);
-#endif
 
 struct vmm_ops {
 	vmm_init_func_t		init;		/* module wide initialization */
@@ -110,10 +108,8 @@ struct vmm_ops {
 	vmi_vlapic_init		vlapic_init;
 	vmi_vlapic_cleanup	vlapic_cleanup;
 
-#ifndef __FreeBSD__
 	vmi_savectx		vmsavectx;
 	vmi_restorectx		vmrestorectx;
-#endif
 };
 
 extern struct vmm_ops vmm_ops_intel;
@@ -139,13 +135,8 @@ int vm_alloc_memseg(struct vm *vm, int ident, size_t len, bool sysmem);
 void vm_free_memseg(struct vm *vm, int ident);
 int vm_map_mmio(struct vm *vm, vm_paddr_t gpa, size_t len, vm_paddr_t hpa);
 int vm_unmap_mmio(struct vm *vm, vm_paddr_t gpa, size_t len);
-#ifdef __FreeBSD__
-int vm_assign_pptdev(struct vm *vm, int bus, int slot, int func);
-int vm_unassign_pptdev(struct vm *vm, int bus, int slot, int func);
-#else
 int vm_assign_pptdev(struct vm *vm, int pptfd);
 int vm_unassign_pptdev(struct vm *vm, int pptfd);
-#endif /* __FreeBSD__ */
 
 /*
  * APIs that inspect the guest memory map require only a *single* vcpu to
@@ -380,8 +371,6 @@ enum event_inject_state {
 	EIS_REQ_EXIT	= (1 << 15),
 };
 
-#ifndef	__FreeBSD__
-
 void vmm_sol_glue_init(void);
 void vmm_sol_glue_cleanup(void);
 
@@ -436,7 +425,5 @@ typedef struct vmm_vcpu_kstats {
 #define	VMM_KSTAT_CLASS	"misc"
 
 int vmm_kstat_update_vcpu(struct kstat *, int);
-
-#endif /* __FreeBSD */
 
 #endif /* _VMM_KERNEL_H_ */

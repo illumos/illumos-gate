@@ -64,12 +64,7 @@ struct svm_regctx {
 	uint64_t	host_debugctl;
 };
 
-#ifdef __FreeBSD__
-struct pcpu;
-void svm_launch(uint64_t pa, struct svm_regctx *gctx, struct pcpu *pcpu);
-#else
 struct cpu;
 void svm_launch(uint64_t pa, struct svm_regctx *gctx, struct cpu *pcpu);
-#endif
 
 #endif /* _SVM_H_ */

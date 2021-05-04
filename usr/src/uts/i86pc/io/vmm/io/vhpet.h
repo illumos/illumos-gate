@@ -47,8 +47,6 @@ int vhpet_mmio_read(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t *val,
     int size);
 int vhpet_getcap(struct vm_hpet_cap *cap);
 
-#ifndef __FreeBSD__
 void vhpet_localize_resources(struct vhpet *vhpet);
-#endif
 
 #endif	/* _VHPET_H_ */

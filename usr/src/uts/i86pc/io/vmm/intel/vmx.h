@@ -127,13 +127,11 @@ enum {
 	GUEST_MSR_NUM		/* must be the last enumeration */
 };
 
-#ifndef	__FreeBSD__
 typedef enum {
 	VS_NONE		= 0x0,
 	VS_LAUNCHED	= 0x1,
 	VS_LOADED	= 0x2
 } vmcs_state_t;
-#endif /* __FreeBSD__ */
 
 /* virtual machine softc */
 struct vmx {
@@ -142,12 +140,10 @@ struct vmx {
 	char		msr_bitmap[PAGE_SIZE];
 	struct pir_desc	pir_desc[VM_MAXCPU];
 	uint64_t	guest_msrs[VM_MAXCPU][GUEST_MSR_NUM];
-#ifndef	__FreeBSD__
 	uint64_t	host_msrs[VM_MAXCPU][GUEST_MSR_NUM];
 	uint64_t	tsc_offset_active[VM_MAXCPU];
 	vmcs_state_t	vmcs_state[VM_MAXCPU];
 	uintptr_t	vmcs_pa[VM_MAXCPU];
-#endif
 	struct vmxctx	ctx[VM_MAXCPU];
 	struct vmxcap	cap[VM_MAXCPU];
 	struct vmxstate	state[VM_MAXCPU];
