@@ -10798,7 +10798,6 @@ f usr/sbin/amd64/ipnat 0555 root bin
 f usr/sbin/amd64/ippool 0555 root bin
 f usr/sbin/amd64/lockstat 0555 root bin
 f usr/sbin/amd64/plockstat 0555 root bin
-f usr/sbin/amd64/zdb 0555 root bin
 f usr/sbin/amd64/zinject 0555 root bin
 f usr/sbin/arp 0555 root bin
 f usr/sbin/audit 0555 root bin
@@ -11074,7 +11073,7 @@ f usr/sbin/ypalias 0555 root bin
 f usr/sbin/ypinit 0555 root bin
 f usr/sbin/yppoll 0555 root bin
 f usr/sbin/ypset 0555 root bin
-h usr/sbin/zdb=usr/lib/isaexec
+h usr/sbin/zdb 0555 root bin
 f usr/sbin/zdump 0555 root bin
 s usr/sbin/zfs=../../sbin/zfs
 f usr/sbin/zic 0555 root bin
