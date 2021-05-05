@@ -81,7 +81,7 @@ $(SD_LIB):=	DYNFLAGS += -R/usr/lib/scsi
 # Size assertions are non-constant and not useful here
 ZGUIDANCE=-Wl,-zguidance=noasserts
 
-.KEEP STATE:
+.KEEP_STATE:
 
 $(ROOTUSRLIBFWFLASHIDF)/$(SLINKS) : $(ROOTUSRLIBFWFLASHIDF)/$(SES_LIB)
 	@$(RM) $@
