@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2024 H. William Welliver <william@welliver.org>
  */
 
 #ifndef _LIBDLSIM_H
@@ -43,7 +45,7 @@ typedef struct dladm_simnet_attr {
 } dladm_simnet_attr_t;
 
 dladm_status_t dladm_simnet_create(dladm_handle_t, const char *,
-    uint_t, uint32_t);
+    uint_t, const char *, uint32_t);
 dladm_status_t dladm_simnet_delete(dladm_handle_t, datalink_id_t, uint32_t);
 dladm_status_t dladm_simnet_modify(dladm_handle_t, datalink_id_t,
     datalink_id_t, uint32_t);

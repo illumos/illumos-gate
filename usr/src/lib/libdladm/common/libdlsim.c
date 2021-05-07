@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2024 H. William Welliver <william@welliver.org>
  */
 
 #include <sys/types.h>
@@ -178,14 +180,39 @@ done:
 
 dladm_status_t
 dladm_simnet_create(dladm_handle_t handle, const char *simnetname,
-    uint_t media, uint32_t flags)
+    uint_t media, const char *maddr, uint32_t flags)
 {
 	datalink_id_t simnet_id;
 	dladm_status_t status;
 	dladm_simnet_attr_t attr;
+	uchar_t *mac_addr;
+	uint_t maclen;
 
 	if (!(flags & DLADM_OPT_ACTIVE))
 		return (DLADM_STATUS_NOTSUP);
+
+	bzero(&attr, sizeof (attr));
+
+	if (maddr != NULL) {
+		mac_addr = _link_aton(maddr, (int *)&maclen);
+		if (mac_addr == NULL) {
+			if (maclen == (uint_t)-1)
+				return (DLADM_STATUS_INVALIDMACADDR);
+			else
+				return (DLADM_STATUS_NOMEM);
+		} else if (maclen != ETHERADDRL) {
+			free(mac_addr);
+			return (DLADM_STATUS_INVALIDMACADDRLEN);
+		} else if ((mac_addr[0] & 1) || !(mac_addr[0] & 2)) {
+			/* mac address must be unicast and local */
+			free(mac_addr);
+			return (DLADM_STATUS_INVALIDMACADDR);
+		}
+
+		attr.sna_mac_len = maclen;
+		bcopy(mac_addr, attr.sna_mac_addr, maclen);
+		free(mac_addr);
+	}
 
 	flags &= (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
 	if ((status = dladm_create_datalink_id(handle, simnetname,
@@ -193,7 +220,6 @@ dladm_simnet_create(dladm_handle_t handle, const char *simnetname,
 	    &simnet_id)) != DLADM_STATUS_OK)
 		return (status);
 
-	bzero(&attr, sizeof (attr));
 	attr.sna_link_id = simnet_id;
 	attr.sna_type = media;
 	status = i_dladm_create_simnet(handle, &attr);
