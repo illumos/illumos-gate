@@ -195,7 +195,7 @@ conf_scan(const char *fname, char *buf, int buflen, int timescan)
 	for (line = buf; line < ebuf; line = eline) {
 		char *ap;
 		struct opts *opts = NULL;
-		struct confinfo *cp = NULL;
+		struct confinfo *cp;
 
 		lineno++;
 		err_fileline(fname, lineno);
