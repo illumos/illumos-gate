@@ -528,7 +528,7 @@ static struct optinfo Testopttable[] = {
 int
 main(int argc, char *argv[])
 {
-	struct opts *opts;
+	struct opts *opts = NULL;
 
 	err_init(argv[0]);
 	setbuf(stdout, NULL);
