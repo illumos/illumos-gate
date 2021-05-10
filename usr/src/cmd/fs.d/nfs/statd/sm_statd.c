@@ -545,8 +545,6 @@ statd_call_statd(char *name)
 	stat_chge ntf;
 	int i;
 	int rc;
-	int dummy1, dummy2, dummy3, dummy4;
-	char ascii_addr[MAXNAMELEN];
 	size_t unq_len;
 
 	ntf.mon_name = hostname;
@@ -944,7 +942,7 @@ move_file(char *fromdir, char *file, char *todir)
 int
 create_symlink(char *todir, char *rname, char *lname)
 {
-	int error;
+	int error = 0;
 	char lpath[MAXPATHLEN];
 
 	/*
@@ -1296,8 +1294,8 @@ record_addr(char *name, sa_family_t family, struct netobj *ah)
 	int i;
 	int path_len;
 	char *famstr;
-	struct in_addr addr;
-	char *addr6;
+	struct in_addr addr = { 0 };
+	char *addr6 = NULL;
 	char ascii_addr[MAXNAMELEN];
 	char path[MAXPATHLEN];
 

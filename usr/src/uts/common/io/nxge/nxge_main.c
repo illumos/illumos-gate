@@ -6056,7 +6056,7 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 	dev_info_t		*dip = nxgep->dip;
 	p_nxge_ldg_t		ldgp;
 	p_nxge_intr_t		intrp;
-	uint_t			*inthandler;
+	ddi_intr_handler_t	*inthandler;
 	void			*arg1, *arg2;
 	int			behavior;
 	int			nintrs, navail, nrequest;
@@ -6179,7 +6179,7 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 		arg1 = ldgp->ldvp;
 		arg2 = nxgep;
 		if (ldgp->nldvs == 1) {
-			inthandler = (uint_t *)ldgp->ldvp->ldv_intr_handler;
+			inthandler = ldgp->ldvp->ldv_intr_handler;
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
 			    "nxge_add_intrs_adv_type: "
 			    "arg1 0x%x arg2 0x%x: "
@@ -6187,7 +6187,7 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 			    arg1, arg2,
 			    x, ldgp->intdata));
 		} else if (ldgp->nldvs > 1) {
-			inthandler = (uint_t *)ldgp->sys_intr_handler;
+			inthandler = ldgp->sys_intr_handler;
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
 			    "nxge_add_intrs_adv_type: "
 			    "arg1 0x%x arg2 0x%x: "
@@ -6195,6 +6195,8 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 			    "(entry %d intdata 0x%x)\n",
 			    arg1, arg2,
 			    ldgp->nldvs, x, ldgp->intdata));
+		} else {
+			inthandler = NULL;
 		}
 
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
@@ -6202,8 +6204,7 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 		    "htable 0x%llx", x, intrp->htable[x]));
 
 		if ((ddi_status = ddi_intr_add_handler(intrp->htable[x],
-		    (ddi_intr_handler_t *)inthandler, arg1, arg2))
-		    != DDI_SUCCESS) {
+		    inthandler, arg1, arg2)) != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "==> nxge_add_intrs_adv_type: failed #%d "
 			    "status 0x%x", x, ddi_status));
@@ -6250,7 +6251,7 @@ nxge_add_intrs_adv_type_fix(p_nxge_t nxgep, uint32_t int_type)
 	dev_info_t		*dip = nxgep->dip;
 	p_nxge_ldg_t		ldgp;
 	p_nxge_intr_t		intrp;
-	uint_t			*inthandler;
+	ddi_intr_handler_t	*inthandler;
 	void			*arg1, *arg2;
 	int			behavior;
 	int			nintrs, navail;
@@ -6346,7 +6347,7 @@ nxge_add_intrs_adv_type_fix(p_nxge_t nxgep, uint32_t int_type)
 		arg1 = ldgp->ldvp;
 		arg2 = nxgep;
 		if (ldgp->nldvs == 1) {
-			inthandler = (uint_t *)ldgp->ldvp->ldv_intr_handler;
+			inthandler = ldgp->ldvp->ldv_intr_handler;
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
 			    "nxge_add_intrs_adv_type_fix: "
 			    "1-1 int handler(%d) ldg %d ldv %d "
@@ -6354,18 +6355,19 @@ nxge_add_intrs_adv_type_fix(p_nxge_t nxgep, uint32_t int_type)
 			    x, ldgp->ldg, ldgp->ldvp->ldv,
 			    arg1, arg2));
 		} else if (ldgp->nldvs > 1) {
-			inthandler = (uint_t *)ldgp->sys_intr_handler;
+			inthandler = ldgp->sys_intr_handler;
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
 			    "nxge_add_intrs_adv_type_fix: "
 			    "shared ldv %d int handler(%d) ldv %d ldg %d"
 			    "arg1 0x%016llx arg2 0x%016llx\n",
 			    x, ldgp->nldvs, ldgp->ldg, ldgp->ldvp->ldv,
 			    arg1, arg2));
+		} else {
+			inthandler = NULL;
 		}
 
 		if ((ddi_status = ddi_intr_add_handler(intrp->htable[x],
-		    (ddi_intr_handler_t *)inthandler, arg1, arg2))
-		    != DDI_SUCCESS) {
+		    inthandler, arg1, arg2)) != DDI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "==> nxge_add_intrs_adv_type_fix: failed #%d "
 			    "status 0x%x", x, ddi_status));

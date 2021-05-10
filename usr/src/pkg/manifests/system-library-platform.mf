@@ -122,6 +122,7 @@ $(sparc_ONLY)dir path=usr/platform/sun4u/lib
 $(sparc_ONLY)dir path=usr/platform/sun4u/lib/cfgadm
 $(sparc_ONLY)dir path=usr/platform/sun4u/lib/cfgadm/$(ARCH64)
 $(sparc_ONLY)dir path=usr/platform/sun4u/lib/fs
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/fs/cpio
 $(sparc_ONLY)dir path=usr/platform/sun4u/lib/fs/hsfs
 $(sparc_ONLY)dir path=usr/platform/sun4u/lib/fs/nfs
 $(sparc_ONLY)dir path=usr/platform/sun4u/lib/fs/ufs
@@ -131,6 +132,7 @@ $(sparc_ONLY)dir path=usr/platform/sun4v group=sys
 $(sparc_ONLY)dir path=usr/platform/sun4v/include
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fs
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/fs/cpio
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fs/hsfs
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fs/nfs
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fs/ufs
@@ -483,6 +485,8 @@ $(sparc_ONLY)link path=usr/platform/sun4u/lib/cfgadm/ac.so target=./ac.so.1
 $(sparc_ONLY)link path=usr/platform/sun4u/lib/cfgadm/sbd.so target=./sbd.so.1
 $(sparc_ONLY)link path=usr/platform/sun4u/lib/cfgadm/sysctrl.so \
     target=./sysctrl.so.1
+$(sparc_ONLY)link path=usr/platform/sun4u/lib/fs/cpio/bootblk \
+    target=../../../../../../platform/sun4u/lib/fs/cpio/bootblk
 $(sparc_ONLY)link path=usr/platform/sun4u/lib/fs/hsfs/bootblk \
     target=../../../../../../platform/sun4u/lib/fs/hsfs/bootblk
 $(sparc_ONLY)link path=usr/platform/sun4u/lib/fs/ufs/bootblk \
@@ -493,6 +497,8 @@ $(sparc_ONLY)link path=usr/platform/sun4u/lib/libprtdiag.so \
     target=./libprtdiag.so.1
 $(sparc_ONLY)link path=usr/platform/sun4u/lib/libprtdiag_psr.so.1 \
     target=../../SUNW,Ultra-2/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)link path=usr/platform/sun4v/lib/fs/cpio/bootblk \
+    target=../../../../../../platform/sun4v/lib/fs/cpio/bootblk
 $(sparc_ONLY)link path=usr/platform/sun4v/lib/fs/hsfs/bootblk \
     target=../../../../../../platform/sun4v/lib/fs/hsfs/bootblk
 $(sparc_ONLY)link path=usr/platform/sun4v/lib/fs/ufs/bootblk \

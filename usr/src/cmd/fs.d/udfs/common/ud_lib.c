@@ -88,21 +88,12 @@ ud_open_dev(ud_handle_t h, char *special, uint32_t flags)
 	(void) bzero(&i_stat, sizeof (struct stat));
 	(void) bzero(&r_stat, sizeof (struct stat));
 
+	temp = special;
 	/*
 	 * Get the stat structure
 	 */
-	if (stat(special, &i_stat) < 0) {
-		temp = special;
-	} else {
-
-		if ((i_stat.st_mode & S_IFMT) == S_IFCHR) {
-
-			/*
-			 * If Raw deivce is given use it as it is
-			 */
-
-			temp = special;
-		} else if ((i_stat.st_mode & S_IFMT) == S_IFBLK) {
+	if (stat(special, &i_stat) == 0) {
+		if ((i_stat.st_mode & S_IFMT) == S_IFBLK) {
 
 			/*
 			 * Block device try to convert to raw device

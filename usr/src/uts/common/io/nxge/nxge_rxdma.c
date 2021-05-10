@@ -1233,6 +1233,7 @@ nxge_rxdma_hw_mode(p_nxge_t nxgep, boolean_t enable)
 		return (0);
 	}
 
+	rs = 0;
 	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
 		if ((1 << rdc) & set->owned.map) {
 			rx_rbr_ring_t *ring =
@@ -1755,7 +1756,7 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 }
 
 uint_t
-nxge_rx_intr(void *arg1, void *arg2)
+nxge_rx_intr(char *arg1, char *arg2)
 {
 	p_nxge_ldv_t		ldvp = (p_nxge_ldv_t)arg1;
 	p_nxge_t		nxgep = (p_nxge_t)arg2;
@@ -4156,6 +4157,8 @@ nxge_rxdma_hw_start(p_nxge_t nxgep, int channel)
 	rx_mbox_areas_p = nxgep->rx_mbox_areas_p;
 	if (rx_mbox_areas_p) {
 		rx_mbox_p = rx_mbox_areas_p->rxmbox_areas;
+	} else {
+		rx_mbox_p = NULL;
 	}
 
 	i = channel;

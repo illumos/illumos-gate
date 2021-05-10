@@ -1804,6 +1804,7 @@ nxge_param_set_ip_usr(p_nxge_t nxgep, queue_t *q,
 	}
 
 	/* do the actual hw setup with cfg_value. */
+	status = 0;
 	if (cfg_it == B_TRUE) {
 		class = mi_strtol(pa->name, &end, 10);
 		status = nxge_fflp_ip_usr_class_config(nxgep, class, pa->value);
@@ -1813,7 +1814,6 @@ nxge_param_set_ip_usr(p_nxge_t nxgep, queue_t *q,
 	return (status);
 }
 
-/* ARGSUSED */
 static int
 nxge_class_name_2value(p_nxge_t nxgep, char *name)
 {
@@ -1830,10 +1830,9 @@ nxge_class_name_2value(p_nxge_t nxgep, char *name)
 	return (-1);
 }
 
-/* ARGSUSED */
 int
-nxge_param_set_ip_opt(p_nxge_t nxgep, queue_t *q,
-    mblk_t *mp, char *value, caddr_t cp)
+nxge_param_set_ip_opt(p_nxge_t nxgep, queue_t *q __unused,
+    mblk_t *mp __unused, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	status, cfg_value;

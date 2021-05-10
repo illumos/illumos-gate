@@ -147,7 +147,6 @@ NIS2LDAPINC =		-I$(SRC)/lib/libnisdb/yptol
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-extra
 CERRWARN +=	-_gcc=-Wno-unused-label
@@ -180,7 +179,6 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-cstyle :=	TARGET= cstyle
 
 all: $(SHAREDOBJ) $(SUBDIRS) $(PROG) $(TXTS)
 
@@ -276,9 +274,6 @@ $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 check: $(CHKMANIFEST)
-
-cstyle:	$(SUBDIRS)
-	${CSTYLE} `echo $(SRCS) | sed 's/ypinit.c//'`
 
 clean:	$(SUBDIRS)
 	$(RM) $(OBJS) $(CLEANFILES)

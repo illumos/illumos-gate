@@ -59,6 +59,7 @@ $(sparc_ONLY)dir path=platform/sun4u group=sys
 $(sparc_ONLY)dir path=platform/sun4u/lib
 $(sparc_ONLY)dir path=platform/sun4u/lib/$(ARCH64)
 $(sparc_ONLY)dir path=platform/sun4u/lib/fs
+$(sparc_ONLY)dir path=platform/sun4u/lib/fs/cpio
 $(sparc_ONLY)dir path=platform/sun4u/lib/fs/hsfs
 $(sparc_ONLY)dir path=platform/sun4u/lib/fs/ufs
 $(sparc_ONLY)dir path=platform/sun4u/lib/fs/zfs
@@ -66,6 +67,7 @@ $(sparc_ONLY)dir path=platform/sun4v group=sys
 $(sparc_ONLY)dir path=platform/sun4v/lib
 $(sparc_ONLY)dir path=platform/sun4v/lib/$(ARCH64)
 $(sparc_ONLY)dir path=platform/sun4v/lib/fs
+$(sparc_ONLY)dir path=platform/sun4v/lib/fs/cpio
 $(sparc_ONLY)dir path=platform/sun4v/lib/fs/hsfs
 $(sparc_ONLY)dir path=platform/sun4v/lib/fs/ufs
 $(sparc_ONLY)dir path=platform/sun4v/lib/fs/zfs
@@ -80,6 +82,8 @@ $(sparc_ONLY)file \
 # We force bootblks into a new BE because we want to make sure
 # the user can recover from a pre-existing copy of the bootblk
 # in the event that something goes horribly wrong.
+$(sparc_ONLY)file path=platform/sun4u/lib/fs/cpio/bootblk group=sys mode=0444 \
+    reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u/lib/fs/hsfs/bootblk group=sys mode=0444 \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u/lib/fs/ufs/bootblk group=sys mode=0444 \
@@ -89,6 +93,8 @@ $(sparc_ONLY)file path=platform/sun4u/lib/fs/zfs/bootblk group=sys mode=0444 \
 # We force bootblks into a new BE because we want to make sure
 # the user can recover from a pre-existing copy of the bootblk
 # in the event that something goes horribly wrong.
+$(sparc_ONLY)file path=platform/sun4v/lib/fs/cpio/bootblk group=sys mode=0444 \
+    reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/lib/fs/hsfs/bootblk group=sys mode=0444 \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/lib/fs/ufs/bootblk group=sys mode=0444 \

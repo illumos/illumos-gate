@@ -204,10 +204,7 @@ nxge_hio_uninit(nxge_t *nxge)
  *	Any domain
  */
 int
-nxge_dci_map(
-	nxge_t *nxge,
-	vpc_type_t type,
-	int index)
+nxge_dci_map(nxge_t *nxge, vpc_type_t type, int index)
 {
 	nxge_grp_set_t *set;
 	int dc;
@@ -219,6 +216,8 @@ nxge_dci_map(
 	case VP_BOUND_RX:
 		set = &nxge->rx_set;
 		break;
+	default:
+		return (-1);
 	}
 
 	for (dc = 0; dc < NXGE_MAX_TDCS; dc++) {
@@ -427,7 +426,7 @@ nxge_grp_dc_add(
 {
 	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
 	nxge_hio_dc_t *dc;
-	nxge_grp_set_t *set;
+	nxge_grp_set_t *set = NULL;
 	nxge_status_t status = NXGE_OK;
 	int error = 0;
 
@@ -541,10 +540,7 @@ nxge_grp_dc_add(
 }
 
 void
-nxge_grp_dc_remove(
-	nxge_t *nxge,
-	vpc_type_t type,
-	int channel)
+nxge_grp_dc_remove(nxge_t *nxge, vpc_type_t type, int channel)
 {
 	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
 	nxge_hio_dc_t *dc;

@@ -1123,7 +1123,7 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
  *	Any domain
  */
 uint_t
-nxge_tx_intr(void *arg1, void *arg2)
+nxge_tx_intr(char *arg1, char *arg2)
 {
 	p_nxge_ldv_t		ldvp = (p_nxge_ldv_t)arg1;
 	p_nxge_t		nxgep = (p_nxge_t)arg2;
@@ -1334,6 +1334,7 @@ nxge_txdma_hw_mode(p_nxge_t nxgep, boolean_t enable)
 	}
 
 	/* Enable or disable all of the TDCs owned by us. */
+	rs = 0;
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
 		if ((1 << tdc) & set->owned.map) {
@@ -2533,11 +2534,11 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	p_nxge_dma_common_t 	dmap;
 	nxge_os_dma_handle_t	tx_buf_dma_handle;
 	p_tx_ring_t 		tx_ring_p;
-	p_tx_msg_t 		tx_msg_ring;
+	p_tx_msg_t 		tx_msg_ring = NULL;
 	nxge_status_t		status = NXGE_OK;
 	int			ddi_status = DDI_SUCCESS;
-	int			i, j, index;
-	uint32_t		size, bsize;
+	int			i, j, index = 0;
+	uint32_t		size = 0, bsize;
 	uint32_t 		nblocks, nmsgs;
 	char			qname[TASKQ_NAMELEN];
 
@@ -3337,6 +3338,7 @@ nxge_txdma_fatal_err_recover(
 
 	/* Restart TXDMA channel */
 
+	tx_mbox_p = NULL;
 	if (!isLDOMguest(nxgep)) {
 		tx_mbox_p = nxge_txdma_get_mbox(nxgep, channel);
 
@@ -3424,7 +3426,7 @@ nxge_tx_port_fatal_err_recover(p_nxge_t nxgep)
 	tx_mbox_t	*mailbox;
 
 	npi_handle_t	handle;
-	nxge_status_t	status;
+	nxge_status_t	status = NXGE_OK;
 	npi_status_t	rs;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_tx_port_fatal_err_recover"));

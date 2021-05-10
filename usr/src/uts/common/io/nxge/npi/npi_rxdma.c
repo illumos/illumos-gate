@@ -260,6 +260,9 @@ npi_rxdma_cfg_logical_page(npi_handle_t handle, uint8_t rdc,
 	uint64_t value_offset, reloc_offset, mask_offset;
 	uint64_t valid_offset;
 
+	value_offset = 0;
+	reloc_offset = 0;
+	mask_offset = 0;
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,

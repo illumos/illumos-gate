@@ -37,7 +37,7 @@ MAPFILES +=	$(MAPFILE.INT) $(MAPFILE.LEX) $(MAPFILE.NGB)
 MAPOPTS =	$(MAPFILES:%=-Wl,-M%)
 
 CPPFLAGS +=	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
-CPPFLAGS +=	-I../fstyp
+CPPFLAGS +=	-I../common
 LDLIBS +=	-lmalloc -ll -ladm
 LDFLAGS +=	$(MAPOPTS)
 YFLAGS =	"-d"
@@ -45,7 +45,6 @@ YFLAGS =	"-d"
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-value
 CERRWARN +=	-_gcc=-Wno-unused-function
 
@@ -53,7 +52,7 @@ CERRWARN +=	-_gcc=-Wno-unused-function
 # not linted
 SMATCH=off
 
-SRCS=	fsdb.c ../fstyp/ud_lib.c
+SRCS=	fsdb.c ../common/ud_lib.c
 
 fsdb : fsdb_yacc.o fsdb_lex.o ud_lib.o fsdb.o $(MAPFILES)
 	$(LINK.c) -o $@ fsdb.o fsdb_yacc.o fsdb_lex.o \
@@ -64,8 +63,8 @@ fsdb.o : fsdb.c
 	$(COMPILE.c) -o $@ fsdb.c
 	$(POST_PROCESS_O)
 
-ud_lib.o : ../fstyp/ud_lib.c ../fstyp/ud_lib.h
-	$(COMPILE.c) -o $@ ../fstyp/ud_lib.c
+ud_lib.o : ../common/ud_lib.c ../common/ud_lib.h
+	$(COMPILE.c) -o $@ ../common/ud_lib.c
 	$(POST_PROCESS_O)
 
 y.tab.c : fsdb_yacc.y
@@ -96,7 +95,7 @@ catalog:        $(POFILE)
 
 CATSRCS=	$(SRCS) lex.yy.c y.tab.c
 
-$(POFILE):      $(CATSRCS) ../fstyp/ud_lib.h
+$(POFILE):      $(CATSRCS) ../common/ud_lib.h
 	$(RM) $@
 	$(COMPILE.cpp) $(CATSRCS)   > $(POFILE).i
 	$(XGETTEXT) $(XGETFLAGS)        $(POFILE).i

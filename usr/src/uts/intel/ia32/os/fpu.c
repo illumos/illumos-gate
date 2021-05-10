@@ -725,7 +725,8 @@ fp_save(struct fpu_ctx *fp)
 	ASSERT(fp_kind != FP_NO);
 
 	kpreempt_disable();
-	if (!fp || fp->fpu_flags & FPU_VALID) {
+	if (!fp || fp->fpu_flags & FPU_VALID ||
+	    (fp->fpu_flags & FPU_EN) == 0) {
 		kpreempt_enable();
 		return;
 	}
@@ -1336,8 +1337,11 @@ kernel_fpu_begin(kfpu_state_t *kfpu, uint_t flags)
 		ASSERT(curthread->t_preempt > 0);
 		ASSERT(kfpu == NULL);
 
-		if (pl != NULL &&
-		    (pl->lwp_pcb.pcb_fpu.fpu_flags & FPU_EN) != 0) {
+		if (pl != NULL) {
+			/*
+			 * We might have already saved once so FPU_VALID could
+			 * be set. This is handled in fp_save.
+			 */
 			fp_save(&pl->lwp_pcb.pcb_fpu);
 			pl->lwp_pcb.pcb_fpu.fpu_flags |= FPU_KERNEL;
 		}
@@ -1366,14 +1370,22 @@ kernel_fpu_begin(kfpu_state_t *kfpu, uint_t flags)
 	}
 
 	/*
-	 * Not all kernel threads may have an active LWP. If they do, then we
-	 * should go ahead and save the state. We must also note that this state
-	 * is now being used by the kernel and therefore we do not need to save
-	 * or restore the user state.
+	 * Not all threads may have an active LWP. If they do and we're not
+	 * going to re-use the LWP, then we should go ahead and save the state.
+	 * We must also note that the fpu is now being used by the kernel and
+	 * therefore we do not want to manage the fpu state via the user-level
+	 * thread's context handlers.
+	 *
+	 * We might have already saved once (due to a prior use of the kernel
+	 * FPU or another code path) so FPU_VALID could be set. This is handled
+	 * by fp_save, as is the FPU_EN check.
 	 */
-	if (pl != NULL && (pl->lwp_pcb.pcb_fpu.fpu_flags & FPU_EN) != 0) {
-		fp_save(&pl->lwp_pcb.pcb_fpu);
+	if (pl != NULL) {
+		kpreempt_disable();
+		if ((flags & KFPU_USE_LWP) == 0)
+			fp_save(&pl->lwp_pcb.pcb_fpu);
 		pl->lwp_pcb.pcb_fpu.fpu_flags |= FPU_KERNEL;
+		kpreempt_enable();
 	}
 
 	/*
@@ -1405,6 +1417,7 @@ kernel_fpu_begin(kfpu_state_t *kfpu, uint_t flags)
 		fpinit();
 		pf->fpu_flags = FPU_EN | FPU_KERNEL;
 	} else {
+		/* initialize the kfpu state */
 		kernel_fpu_ctx_restore(kfpu);
 	}
 }
@@ -1419,18 +1432,66 @@ kernel_fpu_end(kfpu_state_t *kfpu, uint_t flags)
 		    "without using it");
 	}
 
+	/*
+	 * General comments on why the rest of this function is structured the
+	 * way it is. Be aware that there is a lot of subtlety here.
+	 *
+	 * If a user-level thread ever uses the fpu while in the kernel, then
+	 * we cannot call fpdisable since that does STTS. That will set the
+	 * ts bit in %cr0 which will cause an exception if anything touches the
+	 * fpu. However, the user-level context switch handler (fpsave_ctxt)
+	 * needs to access the fpu to save the registers into the pcb.
+	 * fpsave_ctxt relies on CLTS having been done to clear the ts bit in
+	 * fprestore_ctxt when the thread context switched onto the CPU.
+	 *
+	 * Calling fpdisable only effects the current CPU's %cr0 register.
+	 *
+	 * During removectx and kpreempt_enable, we can voluntarily context
+	 * switch, so the CPU we were on when we entered this function might
+	 * not be the same one we're on when we return from removectx or end
+	 * the function. Note there can be user-level context switch handlers
+	 * still installed if this is a user-level thread.
+	 *
+	 * We also must be careful in the unlikely chance we're running in an
+	 * interrupt thread, since we can't leave the CPU's %cr0 TS state set
+	 * incorrectly for the "real" thread to resume on this CPU.
+	 */
+
 	if ((flags & KFPU_NO_STATE) == 0) {
-		/*
-		 * Disable preemption so that we don't swtch in the middle of
-		 * removing the context handlers. We turn off T_KFPU first,
-		 * since it is possible to voluntarily swtch during kmem_free
-		 * while removing the context handlers.
-		 */
 		kpreempt_disable();
-		curthread->t_flag &= ~T_KFPU;
+	} else {
+		ASSERT(curthread->t_preempt > 0);
+	}
+
+	curthread->t_flag &= ~T_KFPU;
+
+	/*
+	 * When we are ending things, we explicitly don't save the current
+	 * kernel FPU state back to the temporary state. The kfpu API is not
+	 * intended to be a permanent save location.
+	 *
+	 * If this is a user-level thread and we were to context switch
+	 * before returning to user-land, fpsave_ctxt will be a no-op since we
+	 * already saved the user-level FPU state the first time we run
+	 * kernel_fpu_begin (i.e. we won't save the bad kernel fpu state over
+	 * the user-level fpu state). The fpsave_ctxt functions only save if
+	 * FPU_VALID is not already set. fp_save also set PCB_SET_UPDATE_FPU so
+	 * fprestore_ctxt will be done in sys_rtt_common when the thread
+	 * finally returns to user-land.
+	 */
+
+	if ((curthread->t_procp->p_flag & SSYS) != 0 &&
+	    curthread->t_intr == NULL) {
+		/*
+		 * A kernel thread which is not an interrupt thread, so we
+		 * STTS now.
+		 */
+		fpdisable();
+	}
+
+	if ((flags & KFPU_NO_STATE) == 0) {
 		removectx(curthread, kfpu, kernel_fpu_ctx_save,
 		    kernel_fpu_ctx_restore, NULL, NULL, NULL, NULL);
-		kpreempt_enable();
 
 		if (kfpu != NULL) {
 			if (kfpu->kfpu_curthread != curthread) {
@@ -1441,20 +1502,11 @@ kernel_fpu_end(kfpu_state_t *kfpu, uint_t flags)
 				kfpu->kfpu_curthread = NULL;
 			}
 		}
-	} else {
-		ASSERT(curthread->t_preempt > 0);
-		curthread->t_flag &= ~T_KFPU;
+
+		kpreempt_enable();
 	}
 
-	/*
-	 * When we are ending things, we explicitly don't save the current
-	 * state back to the temporary state. The API is not intended to be a
-	 * permanent save location. If this is a kernel thread we set TS,
-	 * otherwise we restore the user state on the off chance that a
-	 * context switch occurs before returning to user-land.
-	 */
-	if (curthread->t_lwp != NULL &&
-	    (curthread->t_lwp->lwp_pcb.pcb_fpu.fpu_flags & FPU_EN) != 0) {
+	if (curthread->t_lwp != NULL) {
 		uint_t f;
 
 		if (flags & KFPU_USE_LWP) {
@@ -1463,41 +1515,5 @@ kernel_fpu_end(kfpu_state_t *kfpu, uint_t flags)
 			f = FPU_KERNEL;
 		}
 		curthread->t_lwp->lwp_pcb.pcb_fpu.fpu_flags &= ~f;
-		/*
-		 * Don't need to set PCB_SET_UPDATE_FPU here since we'll
-		 * restore our fpu state below if we're a user-level thread.
-		 */
-	}
-
-	/*
-	 * If a user-level thread ever uses the fpu while in the kernel, then
-	 * we cannot call fpdisable since that does STTS. That will set the
-	 * ts bit in %cr0 which will cause an exception if anything touches the
-	 * fpu. However, the user-level context switch handler (fpsave_ctxt)
-	 * needs to access the fpu to save the registers into the pcb.
-	 * fpsave_ctxt relies on CLTS having been done to clear the ts bit in
-	 * fprestore_ctxt when the thread context switched onto the CPU.
-	 */
-	if ((curthread->t_procp->p_flag & SSYS) != 0 ||
-	    curthread->t_lwp == NULL ||
-	    (curthread->t_lwp->lwp_pcb.pcb_fpu.fpu_flags & FPU_EN) == 0) {
-		fpdisable();
-	} else {
-		/*
-		 * This is a user-level thread. If we were to context switch
-		 * before returning to user-land, fpsave_ctxt could overwrite
-		 * the valid user-level fpu data we previously saved in the
-		 * pcb (the fp_save in kernel_fpu_begin). To avoid adding
-		 * complexity to the context switch handlers to account for
-		 * this case, we restore the user-level fpu registers here,
-		 * since user-level thread usage of the kernel fpu tends to be
-		 * uncommon. By restoring the fpu registers here, we avoid
-		 * setting PCB_SET_UPDATE_FPU and having to handle this in
-		 * sys_rtt_common.
-		 *
-		 * fprestore_ctxt checks FPU_VALID so we don't do that here.
-		 */
-		pcb_t *pcb = &curthread->t_lwp->lwp_pcb;
-		fprestore_ctxt(&pcb->pcb_fpu);
 	}
 }

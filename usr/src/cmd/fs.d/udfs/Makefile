@@ -31,8 +31,6 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-putback:=	TARGET= putback
 catalog:=       TARGET= catalog
 
 # for messaging catalog
@@ -44,15 +42,13 @@ POFILES= $(SUBDIR2:%=%/%.po)
 
 .PARALLEL:	$(SUBDIRS)
 
-all install:	$(SUBDIRS)
+all install clean clobber:	$(SUBDIRS)
 
 catalog:        $(POFILE)
 
 $(POFILE):      $(SUBDIR2)
 	$(RM)	$@
 	cat     $(POFILES)      > $@
-
-clean clobber lint putback : $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

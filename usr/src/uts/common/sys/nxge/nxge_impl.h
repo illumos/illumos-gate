@@ -619,8 +619,8 @@ struct _nxge_dma_pool_t {
  */
 typedef struct	_nxge_ldg_t nxge_ldg_t, *p_nxge_ldg_t;
 typedef struct	_nxge_ldv_t nxge_ldv_t, *p_nxge_ldv_t;
-typedef uint_t	(*nxge_sys_intr_t)(void *arg1, void *arg2);
-typedef uint_t	(*nxge_ldv_intr_t)(void *arg1, void *arg2);
+typedef uint_t	(*nxge_sys_intr_t)(char *arg1, char *arg2);
+typedef uint_t	(*nxge_ldv_intr_t)(char *arg1, char *arg2);
 
 /*
  * Each logical device Group (64) needs to have the following
@@ -894,7 +894,7 @@ void
 nxge_hw_ioctl(p_nxge_t, queue_t *, mblk_t *, struct iocblk *);
 void nxge_loopback_ioctl(p_nxge_t, queue_t *, mblk_t *, struct iocblk *);
 nxge_status_t nxge_global_reset(p_nxge_t);
-uint_t nxge_intr(void *, void *);
+uint_t nxge_intr(char *, char *);
 void nxge_intr_enable(p_nxge_t);
 void nxge_intr_disable(p_nxge_t);
 void nxge_hw_blank(void *arg, time_t, uint_t);

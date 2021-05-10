@@ -141,10 +141,10 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	nxge_os_dma_handle_t 	tx_desc_dma_handle;
 	p_tx_desc_t 		tx_desc_p;
 	p_tx_msg_t 		tx_msg_ring;
-	p_tx_msg_t 		tx_msg_p;
+	p_tx_msg_t 		tx_msg_p = NULL;
 	tx_desc_t		tx_desc, *tmp_desc_p;
 	tx_desc_t		sop_tx_desc, *sop_tx_desc_p;
-	p_tx_pkt_header_t	hdrp;
+	p_tx_pkt_header_t	hdrp = NULL;
 	tx_pkt_hdr_all_t	tmp_hdrp;
 	p_tx_pkt_hdr_all_t	pkthdrp;
 	uint8_t			npads = 0;
@@ -196,7 +196,7 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	boolean_t		is_lso = B_FALSE;
 	boolean_t		lso_again;
 	int			cur_index_lso;
-	p_mblk_t 		nmp_lso_save;
+	p_mblk_t 		nmp_lso_save = NULL;
 	uint32_t		lso_ngathers;
 	boolean_t		lso_tail_wrap = B_FALSE;
 

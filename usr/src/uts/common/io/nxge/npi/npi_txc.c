@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <npi_txc.h>
 
 /*
@@ -941,12 +939,9 @@ npi_txc_ro_ecc_state_clr(npi_handle_t handle, uint8_t port)
  *	NPI_FAILURE	-
  *	NPI_TXC_PORT_INVALID
  */
-#ifdef lint
-/*ARGSUSED*/
-#endif
 npi_status_t
 npi_txc_sf_states_get(npi_handle_t handle, uint8_t port,
-				txc_sf_states_t *states)
+    txc_sf_states_t *states)
 {
 	txc_sfecc_st_t	ecc;
 	txc_sf_data0_t	d0;
@@ -954,6 +949,12 @@ npi_txc_sf_states_get(npi_handle_t handle, uint8_t port,
 	txc_sf_data2_t	d2;
 	txc_sf_data3_t	d3;
 	txc_sf_data4_t	d4;
+
+	d0.value = 0;
+	d1.value = 0;
+	d2.value = 0;
+	d3.value = 0;
+	d4.value = 0;
 
 	ASSERT(IS_PORT_NUM_VALID(port));
 

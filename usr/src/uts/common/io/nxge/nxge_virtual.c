@@ -62,11 +62,11 @@ uint32_t nxge_groups_per_port = 2;
 extern uint32_t nxge_use_partition;
 extern uint32_t nxge_dma_obp_props_only;
 
-extern uint_t nxge_rx_intr(void *, void *);
-extern uint_t nxge_tx_intr(void *, void *);
-extern uint_t nxge_mif_intr(void *, void *);
-extern uint_t nxge_mac_intr(void *, void *);
-extern uint_t nxge_syserr_intr(void *, void *);
+extern uint_t nxge_rx_intr(char *, char *);
+extern uint_t nxge_tx_intr(char *, char *);
+extern uint_t nxge_mif_intr(char *, char *);
+extern uint_t nxge_mac_intr(char *, char *);
+extern uint_t nxge_syserr_intr(char *, char *);
 extern void *nxge_list;
 
 #define	NXGE_SHARED_REG_SW_SIM
@@ -1043,6 +1043,7 @@ nxge_cfg_verify_set_classify_prop(p_nxge_t nxgep, char *prop,
 	uint_t prop_len;
 	uint_t known_cfg_value;
 
+	new_value = 0;
 	known_cfg_value = (uint_t)known_cfg;
 
 	if (override == B_TRUE) {
@@ -4026,6 +4027,7 @@ nxge_init_mmac(p_nxge_t nxgep, boolean_t compute_addrs)
 	nxge_mmac_t *mmac_info;
 	npi_mac_addr_t mac_addr;
 
+	alt_mac_ls4b = 0;
 	func_num = nxgep->function_num;
 	base_mmac_addr = (uint16_t *)&nxgep->factaddr;
 	mmac_info = (nxge_mmac_t *)&nxgep->nxge_mmac_info;

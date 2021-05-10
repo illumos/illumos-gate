@@ -1014,6 +1014,7 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				min_fsize = (val & XMAC_MIN_TX_FRM_SZ_MASK)
 				    >> XMAC_MIN_TX_FRM_SZ_SHIFT;
 				XMAC_REG_RD(handle, portn, XMAC_MAX_REG, &val);
+				max_fsize = val & XMAC_MAX_FRM_SZ_MASK;
 				attrp->odata[0] = min_fsize;
 				attrp->odata[1] = max_fsize;
 			}

@@ -47,7 +47,6 @@ UDFSDIR=	../../../../uts/common/fs/ufs
 UDFSOBJS=
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off
@@ -62,15 +61,5 @@ $(LIBPROG):	$(OBJS)
 %.o:	$(UDFSDIR)/%.c
 	$(COMPILE.c) $<
 
-lint:
-	$(LINT.c) -mu $(SRCS)
-
-clean:     
+clean:
 	$(RM) $(OBJS)
-
-putback:
-	-cstyle -p mkfs.c
-	-cstyle -p udfslib.c
-	-keywords mkfs.c
-	-keywords udfslib.c
-	-keywords Makefile

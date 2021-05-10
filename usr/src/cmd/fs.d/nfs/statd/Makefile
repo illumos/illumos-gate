@@ -39,10 +39,8 @@ ATTMK=		$(TYPEPROG)
 include		../../Makefile.fstype
 CPPFLAGS +=     -D_REENTRANT -DSUN_THREADS
 
-CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off
