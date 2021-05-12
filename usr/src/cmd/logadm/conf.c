@@ -300,7 +300,7 @@ conf_scan(const char *fname, char *buf, int buflen, int timescan)
 				 * the log file name.
 				 */
 				flags = 0;
-				if (cp == NULL)
+				if (timescan && cp == NULL)
 					flags = CONFF_TSONLY;
 				fillconflist(lineno, entry, opts, comment,
 				    flags);
