@@ -160,13 +160,8 @@ vhpet_counter(struct vhpet *vhpet, sbintime_t *nowptr)
 	if (vhpet_counter_enabled(vhpet)) {
 		now = sbinuptime();
 		delta = now - vhpet->countbase_sbt;
-#ifdef	__FreeBSD__
-		KASSERT(delta >= 0, ("vhpet_counter: uptime went backwards: "
-		    "%#lx to %#lx", vhpet->countbase_sbt, now));
-#else
 		KASSERT(delta >= 0, ("vhpet_counter: uptime went backwards: "
 		    "%lx to %lx", vhpet->countbase_sbt, now));
-#endif
 		val += delta / vhpet->freq_sbt;
 		if (nowptr != NULL)
 			*nowptr = now;
@@ -769,7 +764,6 @@ vhpet_getcap(struct vm_hpet_cap *cap)
 	cap->capabilities = vhpet_capabilities();
 	return (0);
 }
-#ifndef __FreeBSD__
 void
 vhpet_localize_resources(struct vhpet *vhpet)
 {
@@ -777,4 +771,3 @@ vhpet_localize_resources(struct vhpet *vhpet)
 		vmm_glue_callout_localize(&vhpet->timer[i].callout);
 	}
 }
-#endif /* __FreeBSD */

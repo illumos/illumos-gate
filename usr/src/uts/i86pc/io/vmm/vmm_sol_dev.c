@@ -498,9 +498,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_RTC_SETTIME:
 	case VM_RTC_GETTIME:
 	case VM_PPTDEV_DISABLE_MSIX:
-#ifndef __FreeBSD__
 	case VM_DEVMEM_GETOFFSET:
-#endif
 		vmm_read_lock(sc);
 		lock_type = LOCK_READ_HOLD;
 		break;
@@ -1391,7 +1389,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		break;
 	}
 
-#ifndef __FreeBSD__
 	case VM_DEVMEM_GETOFFSET: {
 		struct vm_devmem_offset vdo;
 		list_t *dl = &sc->vmm_devmem_list;
@@ -1427,7 +1424,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_ARC_RESV:
 		error = vm_arc_resv(sc->vmm_vm, (uint64_t)arg);
 		break;
-#endif
 	default:
 		error = ENOTTY;
 		break;

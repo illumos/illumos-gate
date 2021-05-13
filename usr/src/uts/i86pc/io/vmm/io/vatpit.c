@@ -467,7 +467,6 @@ vatpit_cleanup(struct vatpit *vatpit)
 	free(vatpit, M_VATPIT);
 }
 
-#ifndef __FreeBSD__
 void
 vatpit_localize_resources(struct vatpit *vatpit)
 {
@@ -478,4 +477,3 @@ vatpit_localize_resources(struct vatpit *vatpit)
 		}
 	}
 }
-#endif /* __FreeBSD */

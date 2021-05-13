@@ -65,10 +65,6 @@ __FBSDID("$FreeBSD$");
 #include "x86.h"
 
 SYSCTL_DECL(_hw_vmm);
-#ifdef __FreeBSD__
-static SYSCTL_NODE(_hw_vmm, OID_AUTO, topology, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
-    NULL);
-#endif
 
 #define	CPUID_VM_HIGH		0x40000000
 

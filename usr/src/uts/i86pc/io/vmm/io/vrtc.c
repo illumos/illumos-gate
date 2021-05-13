@@ -1005,10 +1005,8 @@ vrtc_cleanup(struct vrtc *vrtc)
 	free(vrtc, M_VRTC);
 }
 
-#ifndef __FreeBSD__
 void
 vrtc_localize_resources(struct vrtc *vrtc)
 {
 	vmm_glue_callout_localize(&vrtc->callout);
 }
-#endif /* __FreeBSD */

@@ -175,9 +175,6 @@ msr_bitmap_change_access(char *bitmap, uint_t msr, int access)
 static uint64_t misc_enable;
 static uint64_t platform_info;
 static uint64_t turbo_ratio_limit;
-#ifdef __FreeBSD__
-static uint64_t host_msrs[GUEST_MSR_NUM];
-#endif /* __FreeBSD__ */
 
 static bool
 nehalem_cpu(void)
@@ -251,18 +248,6 @@ vmx_msr_init(void)
 {
 	uint64_t bus_freq, ratio;
 	int i;
-
-#ifdef __FreeBSD__
-	/* XXXJOY: Do we want to do this caching? */
-	/*
-	 * It is safe to cache the values of the following MSRs because
-	 * they don't change based on curcpu, curproc or curthread.
-	 */
-	host_msrs[IDX_MSR_LSTAR] = rdmsr(MSR_LSTAR);
-	host_msrs[IDX_MSR_CSTAR] = rdmsr(MSR_CSTAR);
-	host_msrs[IDX_MSR_STAR] = rdmsr(MSR_STAR);
-	host_msrs[IDX_MSR_SF_MASK] = rdmsr(MSR_SF_MASK);
-#endif /* __FreeBSD__ */
 
 	/*
 	 * Initialize emulated MSRs
@@ -354,8 +339,6 @@ void
 vmx_msr_guest_enter(struct vmx *vmx, int vcpuid)
 {
 	uint64_t *guest_msrs = vmx->guest_msrs[vcpuid];
-
-#ifndef __FreeBSD__
 	uint64_t *host_msrs = vmx->host_msrs[vcpuid];
 
 	/* Save host MSRs */
@@ -363,12 +346,8 @@ vmx_msr_guest_enter(struct vmx *vmx, int vcpuid)
 	host_msrs[IDX_MSR_CSTAR] = rdmsr(MSR_CSTAR);
 	host_msrs[IDX_MSR_STAR] = rdmsr(MSR_STAR);
 	host_msrs[IDX_MSR_SF_MASK] = rdmsr(MSR_SF_MASK);
-#endif /* __FreeBSD__ */
 
 	/* Save host MSRs (in particular, KGSBASE) and restore guest MSRs */
-#ifdef __FreeBSD__
-	update_pcb_bases(curpcb);
-#endif
 	wrmsr(MSR_LSTAR, guest_msrs[IDX_MSR_LSTAR]);
 	wrmsr(MSR_CSTAR, guest_msrs[IDX_MSR_CSTAR]);
 	wrmsr(MSR_STAR, guest_msrs[IDX_MSR_STAR]);
@@ -380,9 +359,7 @@ void
 vmx_msr_guest_exit(struct vmx *vmx, int vcpuid)
 {
 	uint64_t *guest_msrs = vmx->guest_msrs[vcpuid];
-#ifndef __FreeBSD__
 	uint64_t *host_msrs = vmx->host_msrs[vcpuid];
-#endif
 
 	/* Save guest MSRs */
 	guest_msrs[IDX_MSR_LSTAR] = rdmsr(MSR_LSTAR);

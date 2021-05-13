@@ -144,15 +144,6 @@ vlapic_dfr_write_handler(struct vlapic *vlapic)
 
 	lapic->dfr &= APIC_DFR_MODEL_MASK;
 	lapic->dfr |= APIC_DFR_RESERVED;
-
-#ifdef __FreeBSD__
-	if ((lapic->dfr & APIC_DFR_MODEL_MASK) == APIC_DFR_MODEL_FLAT)
-		VLAPIC_CTR0(vlapic, "vlapic DFR in Flat Model");
-	else if ((lapic->dfr & APIC_DFR_MODEL_MASK) == APIC_DFR_MODEL_CLUSTER)
-		VLAPIC_CTR0(vlapic, "vlapic DFR in Cluster Model");
-	else
-		VLAPIC_CTR1(vlapic, "DFR in Unknown Model %#x", lapic->dfr);
-#endif
 }
 
 void
@@ -245,13 +236,8 @@ vlapic_get_ccr(struct vlapic *vlapic)
 			ccr += bt_rem.frac / vlapic->timer_freq_bt.frac;
 		}
 	}
-#ifdef	__FreeBSD__
-	KASSERT(ccr <= lapic->icr_timer, ("vlapic_get_ccr: invalid ccr %#x, "
-	    "icr_timer is %#x", ccr, lapic->icr_timer));
-#else
 	KASSERT(ccr <= lapic->icr_timer, ("vlapic_get_ccr: invalid ccr %x, "
 	    "icr_timer is %x", ccr, lapic->icr_timer));
-#endif
 	VLAPIC_CTR2(vlapic, "vlapic ccr_timer = %#x, icr_timer = %#x",
 	    ccr, lapic->icr_timer);
 	VLAPIC_TIMER_UNLOCK(vlapic);
@@ -398,13 +384,8 @@ lvt_off_to_idx(uint32_t offset)
 		index = -1;
 		break;
 	}
-#ifdef	__FreeBSD__
-	KASSERT(index >= 0 && index <= VLAPIC_MAXLVT_INDEX, ("lvt_off_to_idx: "
-	    "invalid lvt index %d for offset %#x", index, offset));
-#else
 	KASSERT(index >= 0 && index <= VLAPIC_MAXLVT_INDEX, ("lvt_off_to_idx: "
 	    "invalid lvt index %d for offset %x", index, offset));
-#endif
 
 	return (index);
 }
@@ -1329,13 +1310,8 @@ vlapic_write(struct vlapic *vlapic, int mmio_access, uint64_t offset,
 	uint32_t	*regptr;
 	int		retval;
 
-#ifdef	__FreeBSD__
-	KASSERT((offset & 0xf) == 0 && offset < PAGE_SIZE,
-	    ("vlapic_write: invalid offset %#lx", offset));
-#else
 	KASSERT((offset & 0xf) == 0 && offset < PAGE_SIZE,
 	    ("vlapic_write: invalid offset %lx", offset));
-#endif
 
 	VLAPIC_CTR2(vlapic, "vlapic write offset %#lx, data %#lx",
 	    offset, data);
@@ -1655,13 +1631,11 @@ vlapic_enabled(struct vlapic *vlapic)
 		return (false);
 }
 
-#ifndef __FreeBSD__
 void
 vlapic_localize_resources(struct vlapic *vlapic)
 {
 	vmm_glue_callout_localize(&vlapic->callout);
 }
-#endif /* __FreeBSD */
 
 #ifdef __ISRVEC_DEBUG
 static void

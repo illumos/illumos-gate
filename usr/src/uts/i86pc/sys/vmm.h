@@ -231,9 +231,7 @@ enum vm_exitcode {
 	VM_EXITCODE_DEBUG,
 	VM_EXITCODE_VMINSN,
 	VM_EXITCODE_BPT,
-#ifndef	__FreeBSD__
 	VM_EXITCODE_HT,
-#endif
 	VM_EXITCODE_MAX
 };
 

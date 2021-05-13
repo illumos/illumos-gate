@@ -55,13 +55,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/sysctl.h>
 
-#ifndef __FreeBSD__
 #include <sys/x86_archext.h>
 #include <sys/smp_impldefs.h>
 #include <sys/smt.h>
 #include <sys/hma.h>
 #include <sys/trap.h>
-#endif
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -104,17 +102,6 @@ __FBSDID("$FreeBSD$");
 	(PROCBASED_INT_WINDOW_EXITING	|				\
 	PROCBASED_NMI_WINDOW_EXITING)
 
-#ifdef __FreeBSD__
-#define	PROCBASED_CTLS_ONE_SETTING					\
-	(PROCBASED_SECONDARY_CONTROLS	|				\
-	PROCBASED_MWAIT_EXITING		|				\
-	PROCBASED_MONITOR_EXITING	|				\
-	PROCBASED_IO_EXITING		|				\
-	PROCBASED_MSR_BITMAPS		|				\
-	PROCBASED_CTLS_WINDOW_SETTING	|				\
-	PROCBASED_CR8_LOAD_EXITING	|				\
-	PROCBASED_CR8_STORE_EXITING)
-#else
 /* We consider TSC offset a necessity for unsynched TSC handling */
 #define	PROCBASED_CTLS_ONE_SETTING					\
 	(PROCBASED_SECONDARY_CONTROLS	|				\
@@ -126,7 +113,6 @@ __FBSDID("$FreeBSD$");
 	PROCBASED_CTLS_WINDOW_SETTING	|				\
 	PROCBASED_CR8_LOAD_EXITING	|				\
 	PROCBASED_CR8_STORE_EXITING)
-#endif /* __FreeBSD__ */
 
 #define	PROCBASED_CTLS_ZERO_SETTING	\
 	(PROCBASED_CR3_LOAD_EXITING |	\
@@ -186,12 +172,6 @@ static int no_flush_rsb;
 /*
  * Optional capabilities
  */
-#ifdef __FreeBSD__
-SYSCTL_DECL(_hw_vmm_vmx);
-static SYSCTL_NODE(_hw_vmm_vmx, OID_AUTO, cap,
-    CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
-    NULL);
-#endif
 
 /* HLT triggers a VM-exit */
 static int cap_halt_exit;
@@ -211,9 +191,6 @@ static enum vmx_caps vmx_capabilities;
 /* APICv posted interrupt vector */
 static int pirvec = -1;
 
-#ifdef __FreeBSD__
-static struct unrhdr *vpid_unr;
-#endif /* __FreeBSD__ */
 static uint_t vpid_alloc_failed;
 
 int guest_l1d_flush;
@@ -395,11 +372,7 @@ vpid_free(int vpid)
 	 */
 
 	if (vpid > VM_MAXCPU)
-#ifdef __FreeBSD__
-		free_unr(vpid_unr, vpid);
-#else
 		hma_vmx_vpid_free((uint16_t)vpid);
-#endif
 }
 
 static void
@@ -424,14 +397,11 @@ vpid_alloc(uint16_t *vpid, int num)
 	 * Allocate a unique VPID for each vcpu from the unit number allocator.
 	 */
 	for (i = 0; i < num; i++) {
-#ifdef __FreeBSD__
-		x = alloc_unr(vpid_unr);
-#else
 		uint16_t tmp;
 
 		tmp = hma_vmx_vpid_alloc();
 		x = (tmp == 0) ? -1 : tmp;
-#endif
+
 		if (x == -1)
 			break;
 		else
@@ -686,31 +656,8 @@ vmx_init(int ipinum)
 static void
 vmx_trigger_hostintr(int vector)
 {
-#ifdef __FreeBSD__
-	uintptr_t func;
-	struct gate_descriptor *gd;
-
-	gd = &idt[vector];
-
-	KASSERT(vector >= 32 && vector <= 255, ("vmx_trigger_hostintr: "
-	    "invalid vector %d", vector));
-	KASSERT(gd->gd_p == 1, ("gate descriptor for vector %d not present",
-	    vector));
-	KASSERT(gd->gd_type == SDT_SYSIGT, ("gate descriptor for vector %d "
-	    "has invalid type %d", vector, gd->gd_type));
-	KASSERT(gd->gd_dpl == SEL_KPL, ("gate descriptor for vector %d "
-	    "has invalid dpl %d", vector, gd->gd_dpl));
-	KASSERT(gd->gd_selector == GSEL(GCODE_SEL, SEL_KPL), ("gate descriptor "
-	    "for vector %d has invalid selector %d", vector, gd->gd_selector));
-	KASSERT(gd->gd_ist == 0, ("gate descriptor for vector %d has invalid "
-	    "IST %d", vector, gd->gd_ist));
-
-	func = ((long)gd->gd_hioffset << 16 | gd->gd_looffset);
-	vmx_call_isr(func);
-#else
 	VERIFY(vector >= 32 && vector <= 255);
 	vmx_call_isr(vector - 32);
-#endif /* __FreeBSD__ */
 }
 
 static void *
@@ -939,13 +886,7 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 static int
 vmx_handle_cpuid(struct vm *vm, int vcpu, struct vmxctx *vmxctx)
 {
-#ifdef __FreeBSD__
-	int handled, func;
-
-	func = vmxctx->guest_rax;
-#else
 	int handled;
-#endif
 
 	handled = x86_emulate_cpuid(vm, vcpu, (uint64_t *)&vmxctx->guest_rax,
 	    (uint64_t *)&vmxctx->guest_rbx, (uint64_t *)&vmxctx->guest_rcx,
@@ -1022,11 +963,6 @@ vmx_invvpid(struct vmx *vmx, int vcpu, pmap_t pmap, int running)
 		vmxstate->lastcpu = NOCPU;
 		return;
 	}
-
-#ifdef __FreeBSD__
-	KASSERT(curthread->td_critnest > 0, ("%s: vcpu %d running outside "
-	    "critical section", __func__, vcpu));
-#endif
 
 	/*
 	 * Invalidate all mappings tagged with 'vpid'
@@ -2122,10 +2058,6 @@ emulate_rdmsr(struct vmx *vmx, int vcpuid, uint_t num)
 	return (error);
 }
 
-#ifndef __FreeBSD__
-#define	__predict_false(x)	(x)
-#endif
-
 static int
 vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 {
@@ -2157,13 +2089,9 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	 * These VM-exits are uncommon but must be handled specially
 	 * as most VM-exit fields are not populated as usual.
 	 */
-	if (__predict_false(reason == EXIT_REASON_MCE_DURING_ENTRY)) {
+	if (reason == EXIT_REASON_MCE_DURING_ENTRY) {
 		VCPU_CTR0(vmx->vm, vcpu, "Handling MCE during VM-entry");
-#ifdef __FreeBSD__
-		__asm __volatile("int $18");
-#else
 		vmm_call_trap(T_MCE);
-#endif
 		return (1);
 	}
 
@@ -2424,11 +2352,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		 */
 		if (intr_vec == IDT_MC) {
 			VCPU_CTR0(vmx->vm, vcpu, "Vectoring to MCE handler");
-#ifdef __FreeBSD__
-			__asm __volatile("int $18");
-#else
 			vmm_call_trap(T_MCE);
-#endif
 			return (1);
 		}
 
@@ -2624,9 +2548,7 @@ vmx_exit_inst_error(struct vmxctx *vmxctx, int rc, struct vm_exit *vmexit)
 	case VMX_VMRESUME_ERROR:
 	case VMX_VMLAUNCH_ERROR:
 	case VMX_INVEPT_ERROR:
-#ifndef __FreeBSD__
 	case VMX_VMWRITE_ERROR:
-#endif
 		vmexit->u.vmx.inst_type = rc;
 		break;
 	default:
@@ -2660,11 +2582,7 @@ vmx_exit_handle_nmi(struct vmx *vmx, int vcpuid, struct vm_exit *vmexit)
 		KASSERT((intr_info & 0xff) == IDT_NMI, ("VM exit due "
 		    "to NMI has invalid vector: %x", intr_info));
 		VCPU_CTR0(vmx->vm, vcpuid, "Vectoring to NMI handler");
-#ifdef __FreeBSD__
-		__asm __volatile("int $2");
-#else
 		vmm_call_trap(T_NMIFLT);
-#endif
 	}
 }
 
@@ -2746,10 +2664,6 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 	struct vm_exit *vmexit;
 	struct vlapic *vlapic;
 	uint32_t exit_reason;
-#ifdef __FreeBSD__
-	struct region_descriptor gdtr, idtr;
-	uint16_t ldt_sel;
-#endif
 	bool tpr_shadow_active;
 
 	vmx = arg;
@@ -2770,10 +2684,8 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 
 	vmcs_load(vmcs_pa);
 
-#ifndef __FreeBSD__
 	VERIFY(vmx->vmcs_state[vcpu] == VS_NONE && curthread->t_preempt != 0);
 	vmx->vmcs_state[vcpu] = VS_LOADED;
-#endif
 
 	/*
 	 * XXX
@@ -2855,7 +2767,6 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 			continue;
 		}
 
-#ifndef __FreeBSD__
 		if ((rc = smt_acquire()) != 1) {
 			enable_intr();
 			vmexit->rip = rip;
@@ -2895,23 +2806,6 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 			handled = UNHANDLED;
 			break;
 		}
-#else
-		/*
-		 * VM exits restore the base address but not the
-		 * limits of GDTR and IDTR.  The VMCS only stores the
-		 * base address, so VM exits set the limits to 0xffff.
-		 * Save and restore the full GDTR and IDTR to restore
-		 * the limits.
-		 *
-		 * The VMCS does not save the LDTR at all, and VM
-		 * exits clear LDTR as if a NULL selector were loaded.
-		 * The userspace hypervisor probably doesn't use a
-		 * LDT, but save and restore it to be safe.
-		 */
-		sgdt(&gdtr);
-		sidt(&idtr);
-		ldt_sel = sldt();
-#endif
 
 		if (tpr_shadow_active) {
 			vmx_tpr_shadow_enter(vlapic);
@@ -2924,14 +2818,8 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 		vmx_dr_leave_guest(vmxctx);
 		vcpu_ustate_change(vm, vcpu, VU_EMU_KERN);
 
-#ifndef	__FreeBSD__
 		vmx->vmcs_state[vcpu] |= VS_LAUNCHED;
 		smt_release();
-#else
-		bare_lgdt(&gdtr);
-		lidt(&idtr);
-		lldt(ldt_sel);
-#endif
 
 		if (tpr_shadow_active) {
 			vmx_tpr_shadow_exit(vlapic);
@@ -2954,9 +2842,6 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 			enable_intr();
 			vmx_exit_inst_error(vmxctx, rc, vmexit);
 		}
-#ifdef	__FreeBSD__
-		launched = 1;
-#endif
 		DTRACE_PROBE3(vmm__vexit, int, vcpu, uint64_t, rip,
 		    uint32_t, exit_reason);
 		rip = vmexit->rip;
@@ -2974,10 +2859,8 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap)
 	vmcs_clear(vmcs_pa);
 	vmx_msr_guest_exit(vmx, vcpu);
 
-#ifndef __FreeBSD__
 	VERIFY(vmx->vmcs_state != VS_NONE && curthread->t_preempt != 0);
 	vmx->vmcs_state[vcpu] = VS_NONE;
-#endif
 
 	return (0);
 }
@@ -3733,7 +3616,6 @@ vmx_vlapic_cleanup(void *arg, struct vlapic *vlapic)
 	free(vlapic, M_VLAPIC);
 }
 
-#ifndef __FreeBSD__
 static void
 vmx_savectx(void *arg, int vcpu)
 {
@@ -3764,7 +3646,6 @@ vmx_restorectx(void *arg, int vcpu)
 		vmcs_load(vmx->vmcs_pa[vcpu]);
 	}
 }
-#endif /* __FreeBSD__ */
 
 struct vmm_ops vmm_ops_intel = {
 	.init		= vmx_init,
@@ -3784,13 +3665,10 @@ struct vmm_ops vmm_ops_intel = {
 	.vlapic_init	= vmx_vlapic_init,
 	.vlapic_cleanup	= vmx_vlapic_cleanup,
 
-#ifndef __FreeBSD__
 	.vmsavectx	= vmx_savectx,
 	.vmrestorectx	= vmx_restorectx,
-#endif
 };
 
-#ifndef __FreeBSD__
 /* Side-effect free HW validation derived from checks in vmx_init. */
 int
 vmx_x86_supported(const char **msg)
@@ -3856,4 +3734,3 @@ vmx_x86_supported(const char **msg)
 
 	return (0);
 }
-#endif

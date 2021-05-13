@@ -26,6 +26,7 @@
  * Copyright (c) 2018 Joyent, Inc.
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright 2020 Oxide Computer Company
+ * Copyright (c) 2020 Carlos Neira <cneirabustos@gmail.com>
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -327,7 +328,7 @@ struct seg *segkpm = &kpmseg;	/* 64bit kernel physical mapping segment */
 
 caddr_t segkp_base;		/* Base address of segkp */
 caddr_t segzio_base;		/* Base address of segzio */
-pgcnt_t segkpsize = btop(SEGKPDEFSIZE);	/* size of segkp segment in pages */
+pgcnt_t segkpsize;		/* size of segkp segment in pages */
 caddr_t segkvmm_base;
 pgcnt_t segkvmmsize;
 pgcnt_t segziosize;
@@ -1895,9 +1896,9 @@ layout_kernel_va(void)
 	segkp_base = (caddr_t)valloc_base + valloc_sz;
 	if (!segkp_fromheap) {
 		size = mmu_ptob(segkpsize);
-
 		/*
-		 * determine size of segkp
+		 * Determine size of segkp
+		 * Users can change segkpsize through eeprom.
 		 */
 		if (size < SEGKPMINSIZE || size > SEGKPMAXSIZE) {
 			size = SEGKPDEFSIZE;
@@ -1906,7 +1907,6 @@ layout_kernel_va(void)
 			    mmu_btop(size));
 		}
 		size = MIN(size, MAX(SEGKPMINSIZE, physmem_size));
-
 		segkpsize = mmu_btop(ROUND_UP_LPAGE(size));
 	}
 	PRM_DEBUG(segkp_base);
@@ -3099,6 +3099,13 @@ get_system_configuration(void)
 		segmapfreelists = 0;	/* use segmap driver default */
 	else
 		segmapfreelists = (int)lvalue;
+
+	if (BOP_GETPROPLEN(bootops, "segkpsize") > sizeof (prop) ||
+	    BOP_GETPROP(bootops, "segkpsize", prop) < 0 ||
+	    kobj_getvalue(prop, &lvalue) == -1)
+		segkpsize = mmu_btop(SEGKPDEFSIZE);
+	else
+		segkpsize = mmu_btop((size_t)lvalue);
 
 	/* physmem used to be here, but moved much earlier to fakebop.c */
 }

@@ -53,8 +53,6 @@ int vrtc_addr_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
 int vrtc_data_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
     uint32_t *val);
 
-#ifndef __FreeBSD__
 void vrtc_localize_resources(struct vrtc *);
-#endif
 
 #endif

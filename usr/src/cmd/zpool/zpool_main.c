@@ -5152,7 +5152,7 @@ print_pool(zpool_handle_t *zhp, list_cbdata_t *cb)
 
 static void
 print_one_column(zpool_prop_t prop, uint64_t value, boolean_t scripted,
-    boolean_t valid)
+    boolean_t valid, enum zfs_nicenum_format format)
 {
 	char propval[64];
 	boolean_t fixed;
@@ -5164,23 +5164,32 @@ print_one_column(zpool_prop_t prop, uint64_t value, boolean_t scripted,
 		if (value == 0)
 			(void) strlcpy(propval, "-", sizeof (propval));
 		else
-			zfs_nicenum(value, propval, sizeof (propval));
+			zfs_nicenum_format(value, propval, sizeof (propval),
+			    format);
 		break;
 	case ZPOOL_PROP_FRAGMENTATION:
 		if (value == ZFS_FRAG_INVALID) {
 			(void) strlcpy(propval, "-", sizeof (propval));
+		} else if (format == ZFS_NICENUM_RAW) {
+			(void) snprintf(propval, sizeof (propval), "%llu",
+			    (unsigned long long)value);
 		} else {
 			(void) snprintf(propval, sizeof (propval), "%llu%%",
-			    value);
+			    (unsigned long long)value);
 		}
 		break;
 	case ZPOOL_PROP_CAPACITY:
-		(void) snprintf(propval, sizeof (propval),
-		    value < 1000 ? "%1.2f%%" : value < 10000 ?
-		    "%2.1f%%" : "%3.0f%%", value / 100.0);
+		if (format == ZFS_NICENUM_RAW)
+			(void) snprintf(propval, sizeof (propval), "%llu",
+			    (unsigned long long)value / 100);
+
+		else
+			(void) snprintf(propval, sizeof (propval),
+			    value < 1000 ? "%1.2f%%" : value < 10000 ?
+			    "%2.1f%%" : "%3.0f%%", value / 100.0);
 		break;
 	default:
-		zfs_nicenum(value, propval, sizeof (propval));
+		zfs_nicenum_format(value, propval, sizeof (propval), format);
 	}
 
 	if (!valid)
@@ -5213,6 +5222,12 @@ print_list_stats(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	if (name != NULL) {
 		boolean_t toplevel = (vs->vs_space != 0);
 		uint64_t cap;
+		enum zfs_nicenum_format format;
+
+		if (cb->cb_literal)
+			format = ZFS_NICENUM_RAW;
+		else
+			format = ZFS_NICENUM_1024;
 
 		if (strcmp(name, VDEV_TYPE_INDIRECT) == 0)
 			return;
@@ -5232,21 +5247,23 @@ print_list_stats(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 		 * to indicate that the value is valid.
 		 */
 		print_one_column(ZPOOL_PROP_SIZE, vs->vs_space, scripted,
-		    toplevel);
+		    toplevel, format);
 		print_one_column(ZPOOL_PROP_ALLOCATED, vs->vs_alloc, scripted,
-		    toplevel);
+		    toplevel, format);
 		print_one_column(ZPOOL_PROP_FREE, vs->vs_space - vs->vs_alloc,
-		    scripted, toplevel);
+		    scripted, toplevel, format);
 		print_one_column(ZPOOL_PROP_CHECKPOINT,
-		    vs->vs_checkpoint_space, scripted, toplevel);
+		    vs->vs_checkpoint_space, scripted, toplevel, format);
 		print_one_column(ZPOOL_PROP_EXPANDSZ, vs->vs_esize, scripted,
-		    B_TRUE);
+		    B_TRUE, format);
 		print_one_column(ZPOOL_PROP_FRAGMENTATION,
 		    vs->vs_fragmentation, scripted,
-		    (vs->vs_fragmentation != ZFS_FRAG_INVALID && toplevel));
+		    (vs->vs_fragmentation != ZFS_FRAG_INVALID && toplevel),
+		    format);
 		cap = (vs->vs_space == 0) ? 0 :
 		    (vs->vs_alloc * 10000 / vs->vs_space);
-		print_one_column(ZPOOL_PROP_CAPACITY, cap, scripted, toplevel);
+		print_one_column(ZPOOL_PROP_CAPACITY, cap, scripted, toplevel,
+		    format);
 		(void) printf("\n");
 	}
 
