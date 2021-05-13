@@ -196,9 +196,7 @@ int vm_service_mmio_read(struct vm *vm, int cpuid, uint64_t gpa, uint64_t *rval,
 int vm_service_mmio_write(struct vm *vm, int cpuid, uint64_t gpa, uint64_t wval,
     int wsize);
 
-#ifndef __FreeBSD__
 int vm_arc_resv(struct vm *vm, size_t);
-#endif
 
 #ifdef _SYS__CPUSET_H_
 cpuset_t vm_active_cpus(struct vm *vm);

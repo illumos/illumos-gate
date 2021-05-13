@@ -3692,7 +3692,6 @@ vmm_kstat_update_vcpu(struct kstat *ksp, int rw)
 	return (0);
 }
 
-#ifndef __FreeBSD__
 int
 vm_arc_resv(struct vm *vm, uint64_t len)
 {
@@ -3707,4 +3706,3 @@ vm_arc_resv(struct vm *vm, uint64_t len)
 	vm->arc_resv += pages;
 	return (0);
 }
-#endif /* __FreeBSD__ */
