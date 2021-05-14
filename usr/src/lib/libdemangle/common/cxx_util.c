@@ -13,8 +13,6 @@
  * Copyright 2017 Jason King
  */
 
-#include <sys/debug.h>
-#include <sys/sysmacros.h>
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>

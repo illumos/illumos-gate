@@ -12,23 +12,15 @@
 /*
  * Copyright 2021 Jason King.
  */
-#include <ctype.h>
 #include <errno.h>
-#include <locale.h>
 #include <note.h>
 #include <string.h>
 #include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/isa_defs.h>
-#include <sys/debug.h>
 #include "demangle-sys.h"
 #include "demangle_int.h"
 #include "cxx.h"
-
-#ifndef	ARRAY_SIZE
-#define	ARRAY_SIZE(x) (sizeof (x) / sizeof (x[0]))
-#endif
 
 #define	CPP_QUAL_CONST		(1U)
 #define	CPP_QUAL_VOLATILE	(2U)
@@ -47,7 +39,6 @@ typedef struct cpp_db_s {
 	boolean_t	cpp_tag_templates;
 	boolean_t	cpp_fix_forward_references;
 	boolean_t	cpp_try_to_parse_template_args;
-	locale_t	cpp_loc;
 } cpp_db_t;
 
 #define	CK(x)						\
@@ -81,7 +72,7 @@ static void tpush(cpp_db_t *);
 static void tpop(cpp_db_t *);
 static void tsave(cpp_db_t *, size_t);
 
-static boolean_t db_init(cpp_db_t *, sysdem_ops_t *);
+static void db_init(cpp_db_t *, sysdem_ops_t *);
 static void db_fini(cpp_db_t *);
 static void dump(cpp_db_t *, FILE *);
 
@@ -96,8 +87,8 @@ static const char *parse_block_invoke(const char *, const char *, cpp_db_t *);
 static const char *parse_special_name(const char *, const char *, cpp_db_t *);
 static const char *parse_name(const char *, const char *, boolean_t *,
     cpp_db_t *);
-static const char *parse_call_offset(const char *, const char *, locale_t);
-static const char *parse_number(const char *, const char *, locale_t);
+static const char *parse_call_offset(const char *, const char *);
+static const char *parse_number(const char *, const char *);
 static const char *parse_nested_name(const char *, const char *, boolean_t *,
     cpp_db_t *);
 static const char *parse_local_name(const char *, const char *, boolean_t *,
@@ -105,7 +96,7 @@ static const char *parse_local_name(const char *, const char *, boolean_t *,
 static const char *parse_unscoped_name(const char *, const char *, cpp_db_t *);
 static const char *parse_template_args(const char *, const char *, cpp_db_t *);
 static const char *parse_substitution(const char *, const char *, cpp_db_t *);
-static const char *parse_discriminator(const char *, const char *, locale_t);
+static const char *parse_discriminator(const char *, const char *);
 static const char *parse_cv_qualifiers(const char *, const char *, unsigned *);
 static const char *parse_template_param(const char *, const char *, cpp_db_t *);
 static const char *parse_decltype(const char *, const char *, cpp_db_t *);
@@ -170,8 +161,8 @@ cpp_demangle(const char *src, size_t srclen, sysdem_ops_t *ops)
 	char *volatile result = NULL;
 	cpp_db_t db;
 
-	if (!db_init(&db, ops))
-		goto done;
+	db_init(&db, ops);
+
 	if (setjmp(db.cpp_jmp) != 0)
 		goto done;
 
@@ -315,12 +306,12 @@ parse_block_invoke(const char *first, const char *last, cpp_db_t *db)
 
 	if (t[0] == '_') {
 		/* need at least one digit */
-		if (t + 1 == last || !isdigit_l(t[1], db->cpp_loc))
+		if (t + 1 == last || ISDIGIT(t[1]))
 			return (first);
 		t += 2;
 	}
 
-	while (t < last && isdigit_l(t[0], db->cpp_loc))
+	while (t < last && ISDIGIT(t[0]))
 		t++;
 
 done:
@@ -498,10 +489,10 @@ parse_special_name(const char *first, const char *last, cpp_db_t *db)
 			break;
 		case 'c':
 			nadd_l(db, "covariant return thunk to", 0);
-			t1 = parse_call_offset(first + 2, last, db->cpp_loc);
+			t1 = parse_call_offset(first + 2, last);
 			if (t1 == t)
 				return (first);
-			t = parse_call_offset(t1, last, db->cpp_loc);
+			t = parse_call_offset(t1, last);
 			if (t == t1)
 				return (first);
 			t1 = parse_encoding(t, last, db);
@@ -512,7 +503,7 @@ parse_special_name(const char *first, const char *last, cpp_db_t *db)
 			t = parse_type(first + 2, last, db);
 			if (t == first + 2)
 				return (first);
-			t1 = parse_number(t, last, db->cpp_loc);
+			t1 = parse_number(t, last);
 			if (*t1 != '_')
 				return (first);
 			t = parse_type(t1 + 1, last, db);
@@ -536,7 +527,7 @@ parse_special_name(const char *first, const char *last, cpp_db_t *db)
 				nadd_l(db, "non-virtual thunk to", 0);
 			}
 
-			t = parse_call_offset(first + 1, last, db->cpp_loc);
+			t = parse_call_offset(first + 1, last);
 			if (t == first + 1)
 				return (first);
 			t1 = parse_encoding(t, last, db);
@@ -583,7 +574,7 @@ parse_special_name(const char *first, const char *last, cpp_db_t *db)
  *               # virtual base override, with vcall offset
  */
 static const char *
-parse_call_offset(const char *first, const char *last, locale_t loc)
+parse_call_offset(const char *first, const char *last)
 {
 	VERIFY3P(first, <=, last);
 
@@ -596,7 +587,7 @@ parse_call_offset(const char *first, const char *last, locale_t loc)
 	if (first[0] != 'h' && first[0] != 'v')
 		return (first);
 
-	t = parse_number(first + 1, last, loc);
+	t = parse_number(first + 1, last);
 	if (t == first + 1 || t == last || t[0] != '_')
 		return (first);
 
@@ -606,7 +597,7 @@ parse_call_offset(const char *first, const char *last, locale_t loc)
 	if (first[0] == 'h')
 		return (t);
 
-	t1 = parse_number(t, last, loc);
+	t1 = parse_number(t, last);
 	if (t == t1 || t1 == last || t1[0] != '_')
 		return (first);
 
@@ -712,11 +703,11 @@ parse_local_name(const char *first, const char *last,
 
 	if (t[0] == 's') {
 		nfmt(db, "{0:L}::string literal", "{0:R}");
-		return (parse_discriminator(t, last, db->cpp_loc));
+		return (parse_discriminator(t, last));
 	}
 
 	if (t[0] == 'd') {
-		t1 = parse_number(t + 1, last, db->cpp_loc);
+		t1 = parse_number(t + 1, last);
 		if (t1[0] != '_')
 			return (first);
 		t1++;
@@ -732,7 +723,7 @@ parse_local_name(const char *first, const char *last,
 
 	/* parsed, but ignored */
 	if (t[0] != 'd')
-		t2 = parse_discriminator(t2, last, db->cpp_loc);
+		t2 = parse_discriminator(t2, last);
 
 	return (t2);
 }
@@ -1992,7 +1983,7 @@ parse_function_param(const char *first, const char *last, cpp_db_t *db)
 	unsigned cv = 0;
 
 	if (first[1] == 'L') {
-		t2 = parse_number(t1, last, db->cpp_loc);
+		t2 = parse_number(t1, last);
 		if (t2 == last || t2[0] != 'p')
 			return (first);
 		t1 = t2;
@@ -2002,7 +1993,7 @@ parse_function_param(const char *first, const char *last, cpp_db_t *db)
 		return (first);
 
 	t1 = parse_cv_qualifiers(t1, last, &cv);
-	t2 = parse_number(t1, last, db->cpp_loc);
+	t2 = parse_number(t1, last);
 	if (t2 == last || t2[0] != '_')
 		return (first);
 
@@ -2439,8 +2430,7 @@ parse_unnamed_type_name(const char *first, const char *last, cpp_db_t *db)
 	const char *t2 = NULL;
 
 	if (first[1] == 't') {
-		while (t1 != last && t1[0] != '_' &&
-		    isdigit_l(t1[0], db->cpp_loc))
+		while (t1 != last && t1[0] != '_' && ISDIGIT(t1[0]))
 			t1++;
 
 		if (t1[0] != '_')
@@ -2483,7 +2473,8 @@ parse_unnamed_type_name(const char *first, const char *last, cpp_db_t *db)
 
 	t2 = t1;
 	while (t2 != last && t2[0] != '_') {
-		if (!isdigit_l(*t2++, db->cpp_loc))
+		char c = *t2++;
+		if (!ISDIGIT(c))
 			return (first);
 	}
 
@@ -2653,7 +2644,7 @@ parse_integer_literal(const char *first, const char *last, const char *fmt,
 {
 	VERIFY3P(first, <=, last);
 
-	const char *t = parse_number(first, last, db->cpp_loc);
+	const char *t = parse_number(first, last);
 	const char *start = first;
 
 	if (t == first || t == last || t[0] != 'E')
@@ -2736,11 +2727,9 @@ parse_floating_literal(const char *first, const char *last, cpp_db_t *db)
 		if (!is_xdigit(t[0]))
 			return (first);
 
-		unsigned d1 = isdigit_l(t[0], db->cpp_loc) ?
-		    t[0] - '0' : t[0] - 'a' + 10;
+		unsigned d1 = ISDIGIT(t[0]) ?  t[0] - '0' : t[0] - 'a' + 10;
 		t++;
-		unsigned d0 = isdigit_l(t[0], db->cpp_loc) ?
-		    t[0] - '0' : t[0] - 'a' + 10;
+		unsigned d0 = ISDIGIT(t[0]) ?  t[0] - '0' : t[0] - 'a' + 10;
 
 		*e = (d1 << 4) + d0;
 	}
@@ -2749,11 +2738,9 @@ parse_floating_literal(const char *first, const char *last, cpp_db_t *db)
 		if (!is_xdigit(t[0]))
 			return (first);
 
-		unsigned d0 = isdigit_l(t[0], db->cpp_loc) ?
-		    t[0] - '0' : t[0] - 'a' + 10;
+		unsigned d0 = ISDIGIT(t[0]) ?  t[0] - '0' : t[0] - 'a' + 10;
 		t--;
-		unsigned d1 = isdigit_l(t[0], db->cpp_loc) ?
-		    t[0] - '0' : t[0] - 'a' + 10;
+		unsigned d1 = ISDIGIT(t[0]) ?  t[0] - '0' : t[0] - 'a' + 10;
 
 		*e = (d1 << 4) + d0;
 	}
@@ -2898,7 +2885,7 @@ parse_expr_primary(const char *first, const char *last, cpp_db_t *db)
 			return (t + 1);
 
 		const char *n;
-		for (n = t; n != last && isdigit_l(n[0], db->cpp_loc); n++)
+		for (n = t; n != last && ISDIGIT(n[0]); n++)
 			;
 		if (n == last || nempty(db) || n[0] != 'E')
 			return (first);
@@ -3046,7 +3033,7 @@ parse_operator_name(const char *first, const char *last, cpp_db_t *db)
 	}
 
 	if (first[0] == 'v') {
-		if (!isdigit_l(first[1], db->cpp_loc))
+		if (!ISDIGIT(first[1]))
 			return (first);
 
 		t = parse_source_name(first + 2, last, db);
@@ -3155,19 +3142,19 @@ parse_builtin_type(const char *first, const char *last, cpp_db_t *db)
 }
 
 static const char *
-parse_base36(const char *first, const char *last, size_t *val, locale_t loc)
+parse_base36(const char *first, const char *last, size_t *val)
 {
 	VERIFY3P(first, <=, last);
 
 	const char *t;
 
 	for (t = first, *val = 0; t != last; t++) {
-		if (!isdigit_l(t[0], loc) && !isupper_l(t[0], loc))
+		if (!ISDIGIT(t[0]) && !ISUPPER(t[0]))
 			return (t);
 
 		*val *= 36;
 
-		if (isdigit_l(t[0], loc))
+		if (ISDIGIT(t[0]))
 			*val += t[0] - '0';
 		else
 			*val += t[0] - 'A' + 10;
@@ -3206,7 +3193,7 @@ parse_substitution(const char *first, const char *last, cpp_db_t *db)
 	size_t n = 0;
 
 	if (t[0] != '_') {
-		t = parse_base36(first + 1, last, &n, db->cpp_loc);
+		t = parse_base36(first + 1, last, &n);
 		if (t == first + 1 || t[0] != '_')
 			return (first);
 
@@ -3240,7 +3227,7 @@ parse_source_name(const char *first, const char *last, cpp_db_t *db)
 	const char *t = NULL;
 	size_t n = 0;
 
-	for (t = first; t != last && isdigit_l(t[0], db->cpp_loc); t++) {
+	for (t = first; t != last && ISDIGIT(t[0]); t++) {
 		/* make sure we don't overflow */
 		size_t nn = n * 10;
 		if (nn < n)
@@ -3287,8 +3274,8 @@ parse_vector_type(const char *first, const char *last, cpp_db_t *db)
 	const char *t = first + 2;
 	const char *t1 = NULL;
 
-	if (isdigit_l(first[2], db->cpp_loc) && first[2] != '0') {
-		t1 = parse_number(t, last, db->cpp_loc);
+	if (ISDIGIT(first[2]) && first[2] != '0') {
+		t1 = parse_number(t, last);
 		if (t1 == last || t1 + 1 == last || t1[0] != '_')
 			return (first);
 
@@ -3376,8 +3363,8 @@ parse_array_type(const char *first, const char *last, cpp_db_t *db)
 	size_t n = nlen(db);
 
 	if (t[0] != '_') {
-		if (isdigit_l(t[0], db->cpp_loc) && t[0] != '0') {
-			t1 = parse_number(t, last, db->cpp_loc);
+		if (ISDIGIT(t[0]) && t[0] != '0') {
+			t1 = parse_number(t, last);
 			if (t1 == last)
 				return (first);
 
@@ -3765,7 +3752,7 @@ parse_template_param(const char *first, const char *last, cpp_db_t *db)
 	size_t idx = 0;
 
 	while (t != last && t[0] != '_') {
-		if (!isdigit_l(t[0], db->cpp_loc))
+		if (!ISDIGIT(t[0]))
 			return (first);
 
 		idx *= 10;
@@ -3870,7 +3857,7 @@ parse_template_args(const char *first, const char *last, cpp_db_t *db)
  *  extension      := decimal-digit+               # at the end of string
  */
 static const char *
-parse_discriminator(const char *first, const char *last, locale_t loc)
+parse_discriminator(const char *first, const char *last)
 {
 	VERIFY3P(first, <=, last);
 
@@ -3879,8 +3866,8 @@ parse_discriminator(const char *first, const char *last, locale_t loc)
 	if (first == last)
 		return (first);
 
-	if (isdigit_l(first[0], loc)) {
-		for (t = first; t != last && isdigit_l(t[0], loc); t++)
+	if (ISDIGIT(first[0])) {
+		for (t = first; t != last && ISDIGIT(t[0]); t++)
 			;
 
 		/* not at the end of the string */
@@ -3893,13 +3880,13 @@ parse_discriminator(const char *first, const char *last, locale_t loc)
 	}
 
 	t = first + 1;
-	if (isdigit_l(t[0], loc))
+	if (ISDIGIT(t[0]))
 		return (t + 1);
 
 	if (t[0] != '_' || t + 1 == last)
 		return (first);
 
-	for (t++; t != last && isdigit_l(t[0], loc); t++)
+	for (t++; t != last && ISDIGIT(t[0]); t++)
 		;
 	if (t == last || t[0] != '_')
 		return (first);
@@ -3937,13 +3924,13 @@ parse_cv_qualifiers(const char *first, const char *last, unsigned *cv)
  * <number> ::= [n] <non-negative decimal integer>
  */
 static const char *
-parse_number(const char *first, const char *last, locale_t loc)
+parse_number(const char *first, const char *last)
 {
 	VERIFY3P(first, <=, last);
 
 	const char *t = first;
 
-	if (first == last || (first[0] != 'n' && !isdigit_l(first[0], loc)))
+	if (first == last || (first[0] != 'n' && !ISDIGIT(first[0])))
 		return (first);
 
 	if (t[0] == 'n')
@@ -3952,7 +3939,7 @@ parse_number(const char *first, const char *last, locale_t loc)
 	if (t[0] == '0')
 		return (t + 1);
 
-	while (isdigit_l(t[0], loc))
+	while (ISDIGIT(t[0]))
 		t++;
 
 	return (t);
@@ -4051,7 +4038,7 @@ tsave(cpp_db_t *db, size_t amt)
 	CK(templ_save(&db->cpp_name, amt, &db->cpp_templ));
 }
 
-static boolean_t
+static void
 db_init(cpp_db_t *db, sysdem_ops_t *ops)
 {
 	(void) memset(db, 0, sizeof (*db));
@@ -4062,8 +4049,6 @@ db_init(cpp_db_t *db, sysdem_ops_t *ops)
 	db->cpp_tag_templates = B_TRUE;
 	db->cpp_try_to_parse_template_args = B_TRUE;
 	tpush(db);
-	db->cpp_loc = newlocale(LC_CTYPE_MASK, "C", 0);
-	return ((db->cpp_loc != NULL) ? B_TRUE : B_FALSE);
 }
 
 static void
@@ -4072,7 +4057,6 @@ db_fini(cpp_db_t *db)
 	name_fini(&db->cpp_name);
 	sub_fini(&db->cpp_subs);
 	templ_fini(&db->cpp_templ);
-	freelocale(db->cpp_loc);
 	(void) memset(db, 0, sizeof (*db));
 }
 

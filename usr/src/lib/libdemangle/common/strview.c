@@ -10,10 +10,11 @@
  */
 
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <string.h>
+#include <sys/types.h>
 #include <sys/debug.h>
 #include "strview.h"
 
