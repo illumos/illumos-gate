@@ -785,6 +785,9 @@ do
 	esac
 done
 
+# Skip pkglint if packages aren't being built
+[ $p_FLAG = n ] && L_FLAG=y
+
 if [ $ISUSER -ne 0 ]; then
 	# Set default value for STAFFER, if needed.
 	if [ -z "$STAFFER" -o "$STAFFER" = "nobody" ]; then
