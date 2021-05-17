@@ -62,7 +62,7 @@ OBJS=	\
 	tem.o \
 	vers.o
 
-module.o := CPPFLAGS += -I$(BOOTSRC)/libcrypto
+module.o := CPPFLAGS += -I$(CRYPTOSRC)
 tem.o := CPPFLAGS += $(DEFAULT_CONSOLE_COLOR)
 main.o := CPPFLAGS += -I$(SRC)/uts/common/fs/zfs
 
@@ -98,13 +98,15 @@ smbios.o := CPPFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
 # Use network-endian UUID format for backward compatibility.
 #CPPFLAGS += -DSMBIOS_NETWORK_ENDIAN_UUID
 
-LIBSTAND=	../../../libstand/$(MACHINE)/libstand.a
+DPLIBSTAND=	../../../libstand/$(MACHINE)/libstand.a
+LIBSTAND=	-L../../../libstand/$(MACHINE) -lstand
 
 BOOT_FORTH=	yes
 CPPFLAGS +=	-DBOOT_FORTH
 CPPFLAGS +=	-I$(SRC)/common/ficl
 CPPFLAGS +=	-I../../../libficl
-LIBFICL=	../../../libficl/$(MACHINE)/libficl.a
+DPLIBFICL=	../../../libficl/$(MACHINE)/libficl.a
+LIBFICL=	-L../../../libficl/$(MACHINE) -lficl
 
 # Always add MI sources
 include	../Makefile.common
@@ -147,11 +149,11 @@ loader.bin: loader.sym
 		-j set_Xficl_compile_set \
 		--output-target=$(EFI_TARGET) --subsystem efi-app loader.sym $@
 
-LIBEFI=		../../libefi/$(MACHINE)/libefi.a
-LIBCRYPTO=	../../../libcrypto/$(MACHINE)/libcrypto.a
+DPLIBEFI=	../../libefi/$(MACHINE)/libefi.a
+LIBEFI=		-L../../libefi/$(MACHINE) -lefi
 
-DPADD=		$(LIBFICL) $(LIBEFI) $(LIBCRYPTO) $(LIBSTAND) $(LDSCRIPT)
-LDADD=		$(LIBFICL) $(LIBEFI) $(LIBCRYPTO) $(LIBSTAND)
+DPADD=		$(DPLIBFICL) $(DPLIBEFI) $(DPLIBSTAND) $(LDSCRIPT)
+LDADD=		$(LIBFICL) $(LIBEFI) $(LIBSTAND)
 
 loader.sym:	$(OBJS) $(DPADD)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS) $(LDADD)

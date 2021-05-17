@@ -10,23 +10,15 @@
 #
 
 #
-# Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2021 Toomas Soome <tsoome@me.com>
 #
 
 SRCS +=		$(ZFSSRC)/zfs.c
 SRCS +=		$(ZFSSRC)/gzip.c
-SRCS +=		$(SRC)/common/crypto/edonr/edonr.c
-SRCS +=		$(SRC)/common/crypto/skein/skein.c
-SRCS +=		$(SRC)/common/crypto/skein/skein_iv.c
-SRCS +=		$(SRC)/common/crypto/skein/skein_block.c
 SRCS +=		$(SRC)/common/list/list.c
 OBJS +=		zfs.o
 OBJS +=		gzip.o
-OBJS +=		edonr.o
 OBJS +=		nvlist.o
-OBJS +=		skein.o
-OBJS +=		skein_iv.o
-OBJS +=		skein_block.o
 OBJS +=		list.o
 
 zfs.o := CPPFLAGS +=	-I../../common
@@ -34,16 +26,7 @@ zfs.o := CPPFLAGS +=	-I../../../cddl/boot/zfs -I$(LZ4)
 zfs.o := CPPFLAGS +=	-I$(SRC)/uts/common/fs/zfs
 nvlist.o := CPPFLAGS +=	-I../../common -I../../../cddl/boot/zfs
 
-# Do not unroll skein loops, reduce code size
-skein_block.o := CPPFLAGS +=	-DSKEIN_LOOP=111
-
 %.o:	$(ZFSSRC)/%.c
-	$(COMPILE.c) -o $@ $<
-
-%.o:	$(SRC)/common/crypto/edonr/%.c
-	$(COMPILE.c) -o $@ $<
-
-%.o:	$(SRC)/common/crypto/skein/%.c
 	$(COMPILE.c) -o $@ $<
 
 %.o:	$(SRC)/common/list/%.c

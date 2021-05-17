@@ -39,6 +39,7 @@ PNGLITE=	$(SRC)/common/pnglite
 BOOTSRC=	$(SRC)/boot/sys/boot
 LIBSRC=		$(SRC)/boot/lib
 SASRC=		$(LIBSRC)/libstand
+CRYPTOSRC=	$(SASRC)/crypto
 ZFSSRC=		$(SASRC)/zfs
 ZLIB=		$(SRC)/contrib/zlib
 LZ4=		$(SRC)/common/lz4
