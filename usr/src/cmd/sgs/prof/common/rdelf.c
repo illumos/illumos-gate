@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ELF support routines for processing versioned mon.out files.
  */
@@ -213,8 +211,8 @@ fetch_symtab(Elf *elf, char *filename, mod_info_t *module)
 	Elf_Scn		*scn = NULL, *sym_pri = NULL, *sym_aux = NULL;
 	GElf_Word	strndx = 0;
 	size_t		i, nsyms, nfuncs;
-	GElf_Xword	nsyms_pri, nsyms_aux = 0;
-	Elf_Data	*symdata_pri, *symdata_aux;
+	GElf_Xword	nsyms_pri = 0, nsyms_aux = 0;
+	Elf_Data	*symdata_pri, *symdata_aux = NULL;
 	nltype		*nl, *npe;
 	int		symtab_found = 0;
 

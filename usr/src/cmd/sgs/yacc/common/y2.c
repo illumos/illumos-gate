@@ -898,7 +898,7 @@ defin(int t, wchar_t *s)
 {
 	/* define s to be a terminal if t=0 or a nonterminal if t=1 */
 
-	int val;
+	int val = 0;
 
 	if (t) {
 		if (++nnonter >= nnontersz)

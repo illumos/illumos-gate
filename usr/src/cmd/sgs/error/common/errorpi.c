@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -194,7 +192,7 @@ extern	char	**wordv;
 Errorclass
 pi(void)
 {
-	char	**nwordv;
+	char	**nwordv = NULL;
 
 	if (wordc < 2)
 		return (C_UNKNOWN);

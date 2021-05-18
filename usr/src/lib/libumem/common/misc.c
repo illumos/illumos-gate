@@ -59,7 +59,7 @@ uint_t umem_error_end = 0;
 }
 
 static void
-umem_log_enter(const char *error_str)
+log_enter(const char *error_str)
 {
 	int looped;
 	char c;
@@ -97,7 +97,7 @@ umem_error_enter(const char *error_str)
 		(void) write(UMEM_ERRFD, error_str, strlen(error_str));
 #endif
 
-	umem_log_enter(error_str);
+	log_enter(error_str);
 }
 
 int
@@ -183,7 +183,7 @@ log_message(const char *format, ...)
 		(void) write(UMEM_ERRFD, buf, strlen(buf));
 #endif
 
-	umem_log_enter(buf);
+	log_enter(buf);
 }
 
 #ifndef UMEM_STANDALONE

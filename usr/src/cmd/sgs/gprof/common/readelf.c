@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	"gprof.h"
 #include	<stdlib.h>
 #include	<sys/file.h>
@@ -457,8 +455,8 @@ get_symtab(Elf *elf, mod_info_t *module)
 	GElf_Word	strndx = 0;
 	sztype		nsyms, i;
 	Elf_Data	*symdata_pri;
-	Elf_Data	*symdata_aux;
-	GElf_Xword	nsyms_pri, nsyms_aux = 0;
+	Elf_Data	*symdata_aux = NULL;
+	GElf_Xword	nsyms_pri = 0, nsyms_aux = 0;
 	nltype		*etext = NULL;
 	nltype		*l_nl, *l_npe;
 	sztype		l_nname;
