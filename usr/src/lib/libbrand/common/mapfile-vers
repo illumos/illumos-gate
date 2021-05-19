@@ -67,6 +67,7 @@ SYMBOL_VERSION SUNWprivate {
 	brand_get_prestatechange;
 	brand_get_preuninstall;
 	brand_get_query;
+	brand_get_secflags;
 	brand_get_sysboot;
 	brand_get_shutdown;
 	brand_get_uninstall;

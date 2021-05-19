@@ -76,6 +76,7 @@
 #define	DTD_ELEM_PREUNINSTALL	((const xmlChar *) "preuninstall")
 #define	DTD_ELEM_PRIVILEGE	((const xmlChar *) "privilege")
 #define	DTD_ELEM_QUERY		((const xmlChar *) "query")
+#define	DTD_ELEM_SECFLAGS	((const xmlChar *) "security-flags")
 #define	DTD_ELEM_SHUTDOWN	((const xmlChar *) "shutdown")
 #define	DTD_ELEM_SYMLINK	((const xmlChar *) "symlink")
 #define	DTD_ELEM_SYSBOOT	((const xmlChar *) "sysboot")
@@ -701,6 +702,14 @@ brand_get_query(brand_handle_t bh, const char *zonename,
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
 	    buf, len, DTD_ELEM_QUERY, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_secflags(brand_handle_t bh, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, NULL, NULL, NULL, NULL,
+	    buf, len, DTD_ELEM_SECFLAGS, B_FALSE, B_TRUE));
 }
 
 int

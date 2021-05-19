@@ -622,6 +622,14 @@
 <!ATTLIST query>
 
 <!--
+  security-flags
+    Specifies the default security flags applied to zones of this brand. This
+    set can be overridden via security-flags in zonecfg(1m).
+-->
+<!ELEMENT security-flags	(#PCDATA) >
+<!ATTLIST security-flags>
+
+<!--
   privilege
 
     Add a privilege to the default, prohibited, or required set for all
@@ -671,6 +679,6 @@
 			presnap?, postsnap?, validatesnap?,
 			preuninstall?, uninstall?,
 			prestatechange?, poststatechange?, query?,
-			privilege+)>
+			security-flags?, privilege+)>
 
 <!ATTLIST brand		name		CDATA #REQUIRED>
