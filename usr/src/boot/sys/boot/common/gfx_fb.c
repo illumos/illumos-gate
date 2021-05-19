@@ -1233,25 +1233,28 @@ gfx_fb_setpixel(uint32_t x, uint32_t y)
 
 /*
  * draw rectangle in framebuffer using gfx coordinates.
- * The function is borrowed from fbsd vt_fb.c
  */
 void
 gfx_fb_drawrect(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2,
     uint32_t fill)
 {
-	uint32_t x, y;
+	uint32_t c;
+	text_color_t fg, bg;
 
 	if (plat_stdout_is_framebuffer() == 0)
 		return;
 
-	for (y = y1; y <= y2; y++) {
-		if (fill || (y == y1) || (y == y2)) {
-			for (x = x1; x <= x2; x++)
-				gfx_fb_setpixel(x, y);
-		} else {
-			gfx_fb_setpixel(x1, y);
-			gfx_fb_setpixel(x2, y);
-		}
+	tem_get_colors((tem_vt_state_t)tems.ts_active, &fg, &bg);
+	c = gfx_fb_color_map(fg);
+
+	if (fill != 0) {
+		gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x1, y1, x2 - x1,
+		    y2 - y1, 0);
+	} else {
+		gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x1, y1, x2 - x1, 1, 0);
+		gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x1, y2, x2 - x1, 1, 0);
+		gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x1, y1, 1, y2 - y1, 0);
+		gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x2, y1, 1, y2 - y1, 0);
 	}
 }
 
