@@ -44,8 +44,8 @@
 #include <sys/vmm_dev.h>
 #include <sys/vmm_impl.h>
 #include <sys/vmm_drv.h>
+#include <sys/vmm_vm.h>
 
-#include <vm/vm.h>
 #include <vm/seg_dev.h>
 
 #include "io/ppt.h"
@@ -57,7 +57,6 @@
 #include "vmm_lapic.h"
 #include "vmm_stat.h"
 #include "vmm_util.h"
-#include "vm/vm_glue.h"
 
 /*
  * Locking details:
@@ -1184,10 +1183,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_GLA2GPA: {
 		struct vm_gla2gpa gg;
 
-		CTASSERT(PROT_READ == VM_PROT_READ);
-		CTASSERT(PROT_WRITE == VM_PROT_WRITE);
-		CTASSERT(PROT_EXEC == VM_PROT_EXECUTE);
-
 		if (ddi_copyin(datap, &gg, sizeof (gg), md)) {
 			error = EFAULT;
 			break;
@@ -1203,10 +1198,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	}
 	case VM_GLA2GPA_NOFAULT: {
 		struct vm_gla2gpa gg;
-
-		CTASSERT(PROT_READ == VM_PROT_READ);
-		CTASSERT(PROT_WRITE == VM_PROT_WRITE);
-		CTASSERT(PROT_EXEC == VM_PROT_EXECUTE);
 
 		if (ddi_copyin(datap, &gg, sizeof (gg), md)) {
 			error = EFAULT;

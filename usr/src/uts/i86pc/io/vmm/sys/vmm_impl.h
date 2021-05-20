@@ -35,7 +35,6 @@
  * available by mmap(2)ing the vmm handle at a specific offset.  These offsets
  * begin just above the maximum allow guest physical address.
  */
-#include <vm/vm_param.h>
 #define	VM_DEVMEM_START	(VM_MAXUSER_ADDRESS + 1)
 
 struct vmm_devmem_entry {

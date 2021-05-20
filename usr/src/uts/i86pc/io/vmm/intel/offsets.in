@@ -21,9 +21,9 @@
 
 #include <machine/pmap.h>
 #include <machine/vmm.h>
+#include <sys/vmm_vm.h>
 
 #include "intel/vmx.h"
-#include "vm/vm_glue.h"
 
 vmxctx
 	guest_rdi		VMXCTX_GUEST_RDI

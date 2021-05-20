@@ -61,23 +61,18 @@ __FBSDID("$FreeBSD$");
 #include <sys/smp.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
-#include <vm/vm_object.h>
-#include <vm/vm_map.h>
-#include <vm/vm_page.h>
-#include <vm/pmap.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_param.h>
-
 #include <machine/pcb.h>
 #include <machine/smp.h>
 #include <machine/md_var.h>
 #include <x86/psl.h>
 #include <x86/apicreg.h>
 
+#include <machine/specialreg.h>
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
+#include <machine/vmparam.h>
 #include <sys/vmm_instruction_emul.h>
+#include <sys/vmm_vm.h>
 
 #include "vmm_ioport.h"
 #include "vmm_ktr.h"
@@ -811,7 +806,7 @@ vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
 	vm_ooffset_t last;
 	int i, error;
 
-	if (prot == 0 || (prot & ~(VM_PROT_ALL)) != 0)
+	if (prot == 0 || (prot & ~(PROT_ALL)) != 0)
 		return (EINVAL);
 
 	if (flags & ~VM_MEMMAP_F_WIRED)
@@ -845,7 +840,7 @@ vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
 
 	error = vm_map_find(&vm->vmspace->vm_map, seg->object, first, &gpa,
 	    len, 0, VMFS_NO_SPACE, prot, prot, 0);
-	if (error != KERN_SUCCESS)
+	if (error != 0)
 		return (EFAULT);
 
 	vm_object_reference(seg->object);
@@ -853,10 +848,9 @@ vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
 	if ((flags & VM_MEMMAP_F_WIRED) != 0) {
 		error = vm_map_wire(&vm->vmspace->vm_map, gpa, gpa + len,
 		    VM_MAP_WIRE_USER | VM_MAP_WIRE_NOHOLES);
-		if (error != KERN_SUCCESS) {
+		if (error != 0) {
 			vm_map_remove(&vm->vmspace->vm_map, gpa, gpa + len);
-			return (error == KERN_RESOURCE_SHORTAGE ? ENOMEM :
-			    EFAULT);
+			return (EFAULT);
 		}
 	}
 
@@ -931,7 +925,7 @@ vm_free_memmap(struct vm *vm, int ident)
 	if (mm->len) {
 		error = vm_map_remove(&vm->vmspace->vm_map, mm->gpa,
 		    mm->gpa + mm->len);
-		KASSERT(error == KERN_SUCCESS, ("%s: vm_map_remove error %d",
+		KASSERT(error == 0, ("%s: vm_map_remove error %d",
 		    __func__, error));
 		bzero(mm, sizeof (struct mem_map));
 	}
@@ -1003,7 +997,7 @@ vm_iommu_modify(struct vm *vm, bool map)
 
 		gpa = mm->gpa;
 		while (gpa < mm->gpa + mm->len) {
-			vp = vm_gpa_hold(vm, -1, gpa, PAGE_SIZE, VM_PROT_WRITE,
+			vp = vm_gpa_hold(vm, -1, gpa, PAGE_SIZE, PROT_WRITE,
 			    &cookie);
 			KASSERT(vp != NULL, ("vm(%s) could not map gpa %lx",
 			    vm_name(vm), gpa));
@@ -1502,16 +1496,16 @@ vm_handle_paging(struct vm *vm, int vcpuid)
 	    __func__, vme->inst_length));
 
 	ftype = vme->u.paging.fault_type;
-	KASSERT(ftype == VM_PROT_READ ||
-	    ftype == VM_PROT_WRITE || ftype == VM_PROT_EXECUTE,
+	KASSERT(ftype == PROT_READ ||
+	    ftype == PROT_WRITE || ftype == PROT_EXEC,
 	    ("vm_handle_paging: invalid fault_type %d", ftype));
 
-	if (ftype == VM_PROT_READ || ftype == VM_PROT_WRITE) {
+	if (ftype == PROT_READ || ftype == PROT_WRITE) {
 		rv = pmap_emulate_accessed_dirty(vmspace_pmap(vm->vmspace),
 		    vme->u.paging.gpa, ftype);
 		if (rv == 0) {
 			VCPU_CTR2(vm, vcpuid, "%s bit emulation for gpa %lx",
-			    ftype == VM_PROT_READ ? "accessed" : "dirty",
+			    ftype == PROT_READ ? "accessed" : "dirty",
 			    vme->u.paging.gpa);
 			goto done;
 		}
@@ -1523,7 +1517,7 @@ vm_handle_paging(struct vm *vm, int vcpuid)
 	VCPU_CTR3(vm, vcpuid, "vm_handle_paging rv = %d, gpa = %lx, "
 	    "ftype = %d", rv, vme->u.paging.gpa, ftype);
 
-	if (rv != KERN_SUCCESS)
+	if (rv != 0)
 		return (EFAULT);
 done:
 	return (0);

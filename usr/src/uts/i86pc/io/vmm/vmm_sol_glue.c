@@ -63,6 +63,7 @@
 #include <machine/pmap.h>
 #include <machine/specialreg.h>
 #include <machine/vmm.h>
+#include <machine/vmparam.h>
 #include <sys/vmm_impl.h>
 #include <sys/kernel.h>
 

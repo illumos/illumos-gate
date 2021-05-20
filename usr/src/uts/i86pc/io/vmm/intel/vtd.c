@@ -36,12 +36,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/malloc.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
-
 #include <dev/pci/pcireg.h>
 
 #include <machine/vmparam.h>
+#include <sys/vmm_vm.h>
+
 #include <contrib/dev/acpica/include/acpi.h>
 
 #include <sys/sunndi.h>

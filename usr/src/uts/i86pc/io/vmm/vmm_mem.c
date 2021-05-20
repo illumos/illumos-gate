@@ -34,19 +34,14 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
+#include <sys/mman.h>
 #include <sys/sglist.h>
 #include <sys/lock.h>
 #include <sys/rwlock.h>
 
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/pmap.h>
-#include <vm/vm_map.h>
-#include <vm/vm_object.h>
-#include <vm/vm_page.h>
-#include <vm/vm_pager.h>
-
 #include <machine/md_var.h>
+#include <machine/vm.h>
+#include <sys/vmm_vm.h>
 
 #include "vmm_mem.h"
 
@@ -69,7 +64,8 @@ vmm_mmio_alloc(struct vmspace *vmspace, vm_paddr_t gpa, size_t len,
 	error = sglist_append_phys(sg, hpa, len);
 	KASSERT(error == 0, ("error %d appending physaddr to sglist", error));
 
-	obj = vm_pager_allocate(OBJT_SG, sg, len, VM_PROT_RW, 0, NULL);
+	const int prot = PROT_READ | PROT_WRITE;
+	obj = vm_pager_allocate(OBJT_SG, sg, len, prot, 0, NULL);
 	if (obj != NULL) {
 		/*
 		 * VT-x ignores the MTRR settings when figuring out the
@@ -81,13 +77,13 @@ vmm_mmio_alloc(struct vmspace *vmspace, vm_paddr_t gpa, size_t len,
 		VM_OBJECT_WLOCK(obj);
 		error = vm_object_set_memattr(obj, VM_MEMATTR_UNCACHEABLE);
 		VM_OBJECT_WUNLOCK(obj);
-		if (error != KERN_SUCCESS) {
+		if (error != 0) {
 			panic("vmm_mmio_alloc: vm_object_set_memattr error %d",
 			    error);
 		}
 		error = vm_map_find(&vmspace->vm_map, obj, 0, &gpa, len, 0,
-		    VMFS_NO_SPACE, VM_PROT_RW, VM_PROT_RW, 0);
-		if (error != KERN_SUCCESS) {
+		    VMFS_NO_SPACE, prot, prot, 0);
+		if (error != 0) {
 			vm_object_deallocate(obj);
 			obj = NULL;
 		}

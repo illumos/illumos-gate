@@ -48,8 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
-
+#include <machine/specialreg.h>
 #include <machine/vmm.h>
 #include "vmx.h"
 

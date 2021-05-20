@@ -12,17 +12,19 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/kmem.h>
 #include <sys/machsystm.h>
+#include <sys/mach_mmu.h>
+#include <sys/mman.h>
 #include <sys/x86_archext.h>
 
 #include <sys/gipt.h>
-#include <vm/vm_glue.h>
-
+#include <sys/vmm_vm.h>
 
 struct rvi_map {
 	gipt_map_t	rm_gipt;
