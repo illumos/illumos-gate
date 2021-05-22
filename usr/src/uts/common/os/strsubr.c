@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -3006,7 +3006,7 @@ strwaitbuf(size_t size, int pri)
  *	GETWAIT		Check for read side errors, no M_READ
  *	WRITEWAIT	Check for write side errors.
  *	NOINTR		Do not return error if nonblocking or timeout.
- * 	STR_NOERROR	Ignore all errors except STPLEX.
+ *	STR_NOERROR	Ignore all errors except STPLEX.
  *	STR_NOSIG	Ignore/hold signals during the duration of the call.
  *	STR_PEEK	Pass through the strgeterr().
  */
@@ -6630,9 +6630,9 @@ drain_syncq(syncq_t *sq)
  *
  * qdrain_syncq can be called (currently) from only one of two places:
  *	drain_syncq
- * 	putnext  (or some variation of it).
+ *	putnext  (or some variation of it).
  * and eventually
- * 	qwait(_sig)
+ *	qwait(_sig)
  *
  * If called from drain_syncq, we found it in the list of queues needing
  * service, so there is work to be done (or it wouldn't be in the list).
@@ -6652,8 +6652,8 @@ drain_syncq(syncq_t *sq)
  *
  * ASSUMES:
  *	One claim
- * 	QLOCK held
- * 	SQLOCK not held
+ *	QLOCK held
+ *	SQLOCK not held
  *	Will release QLOCK before returning
  */
 void
@@ -7107,11 +7107,11 @@ static int
 propagate_syncq(queue_t *qp)
 {
 	mblk_t		*bp, *head, *tail, *prev, *next;
-	syncq_t 	*sq;
+	syncq_t		*sq;
 	queue_t		*nqp;
 	syncq_t		*nsq;
 	boolean_t	isdriver;
-	int 		moved = 0;
+	int		moved = 0;
 	uint16_t	flags;
 	pri_t		priority = curthread->t_pri;
 #ifdef DEBUG
@@ -7144,7 +7144,7 @@ propagate_syncq(queue_t *qp)
 			/* debug macro */
 			SQ_PUTLOCKS_HELD(nsq);
 #ifdef DEBUG
-			func = (void (*)())nqp->q_qinfo->qi_putp;
+			func = (void (*)())(uintptr_t)nqp->q_qinfo->qi_putp;
 #endif
 		}
 
