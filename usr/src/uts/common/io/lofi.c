@@ -23,9 +23,9 @@
  *
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2016 Andrey Sokolov
- * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright 2019 Joyent, Inc.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 Toomas Soome <tsoome@me.com>
  */
 
 /*
@@ -524,6 +524,23 @@ lofi_tg_getinfo(dev_info_t *dip, int cmd, void *arg, void *tg_cookie)
 }
 
 static void
+lofi_teardown_task(void *arg)
+{
+	struct lofi_state *lsp = arg;
+	int id = LOFI_MINOR2ID(getminor(lsp->ls_dev));
+
+	mutex_enter(&lofi_lock);
+	while (ndi_devi_offline(lsp->ls_dip, NDI_DEVI_REMOVE) != NDI_SUCCESS) {
+		mutex_exit(&lofi_lock);
+		/* do a sleeping wait for one second */;
+		delay(drv_usectohz(MICROSEC));
+		mutex_enter(&lofi_lock);
+	}
+	id_free(lofi_id, id);
+	mutex_exit(&lofi_lock);
+}
+
+static void
 lofi_destroy(struct lofi_state *lsp, cred_t *credp)
 {
 	int id = LOFI_MINOR2ID(getminor(lsp->ls_dev));
@@ -595,8 +612,23 @@ lofi_destroy(struct lofi_state *lsp, cred_t *credp)
 	lsp->ls_vp_closereq = B_FALSE;
 
 	ASSERT(ddi_get_soft_state(lofi_statep, id) == lsp);
-	(void) ndi_devi_offline(lsp->ls_dip, NDI_DEVI_REMOVE);
-	id_free(lofi_id, id);
+	/*
+	 * Instance state is allocated in lofi_attach() and freed in
+	 * lofi_detach(). New instance is created when we create new mapping.
+	 * Instance removal is performed by unmap ioctl on lofi control
+	 * instance (0).
+	 *
+	 * If the unmap is performed with instance which is still in use,
+	 * we either cancel unmap with error or we can perform delayed unmap
+	 * by blocking all IO, waiting the consumers to close access to this
+	 * instance and once there are no more consumers, complete the unmap.
+	 *
+	 * Delayed unmap will trigger instance removal on last lofi_close(),
+	 * but we can not remove device instance while the instance is still
+	 * in use due to lofi_close() is running.
+	 * Spawn task to complete device instance offlining in separate thread.
+	 */
+	(void) taskq_dispatch(system_taskq, lofi_teardown_task, lsp, KM_SLEEP);
 }
 
 static void
