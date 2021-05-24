@@ -3116,7 +3116,8 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 		 * This may fail if, for example, we're trying to look
 		 * up a zoned NFS path from the global zone.
 		 */
-		if (vnodetopath(NULL, lsp->ls_stacked_vp, klip->li_filename,
+		if (lsp->ls_stacked_vp == NULL ||
+		    vnodetopath(NULL, lsp->ls_stacked_vp, klip->li_filename,
 		    sizeof (klip->li_filename), CRED()) != 0) {
 			(void) strlcpy(klip->li_filename, "?",
 			    sizeof (klip->li_filename));

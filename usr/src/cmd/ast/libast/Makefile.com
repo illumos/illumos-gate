@@ -94,6 +94,13 @@ CERRWARN += -_gcc=-Wno-empty-body
 CERRWARN += -_gcc=-Wno-type-limits
 CERRWARN += -_gcc=-Wno-address
 
+# It seems, we get false positives with following three files.
+# Since this is third party source, silencing this warning seems to be
+# reasonable path to take.
+pics/path/pathpath.o := CERRWARN += -_gcc10=-Wno-return-local-addr
+pics/path/pathkey.o := CERRWARN += -_gcc10=-Wno-return-local-addr
+pics/path/pathprobe.o := CERRWARN += -_gcc10=-Wno-return-local-addr
+
 SMATCH= off
 
 .KEEP_STATE:
