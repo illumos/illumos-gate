@@ -19,13 +19,12 @@
 # CDDL HEADER END
 #
 
-# Copyright 2014 Gary Mills
 #
 # Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2020 Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
-#
 #
 # open-tree exception list
 #
@@ -177,6 +176,29 @@
 # This covers header files that are not delivered.
 #
 ./usr/src/uts/common/xen/public/COPYING
+
+#
+# These are in the source tree for reference, but another identical copy is
+# used by packaging.
+#
+./usr/src/cmd/bhyve/THIRDPARTYLICENSE
+./usr/src/cmd/bhyve/THIRDPARTYLICENSE.descrip
+./usr/src/cmd/bhyvectl/THIRDPARTYLICENSE
+./usr/src/cmd/bhyvectl/THIRDPARTYLICENSE.descrip
+./usr/src/contrib/bhyve/THIRDPARTYLICENSE
+./usr/src/contrib/bhyve/THIRDPARTYLICENSE.descrip
+./usr/src/uts/common/fs/smbclnt/netsmb/THIRDPARTYLICENSE.apple
+./usr/src/uts/common/fs/smbclnt/netsmb/THIRDPARTYLICENSE.apple.descrip
+./usr/src/uts/common/fs/smbclnt/netsmb/THIRDPARTYLICENSE.boris_popov
+./usr/src/uts/common/fs/smbclnt/netsmb/THIRDPARTYLICENSE.boris_popov.descrip
+./usr/src/uts/common/io/e1000api/THIRDPARTYLICENSE
+./usr/src/uts/common/io/e1000api/THIRDPARTYLICENSE.descrip
+./usr/src/uts/i86pc/io/viona/THIRDPARTYLICENSE
+./usr/src/uts/i86pc/io/viona/THIRDPARTYLICENSE.descrip
+
+# This is covered by license_in_headers in nfs4_prot.x
+./usr/src/head/rpcsvc/THIRDPARTYLICENSE.nfs4_prot
+./usr/src/head/rpcsvc/THIRDPARTYLICENSE.nfs4_prot.descrip
 
 #
 # ld tests which are not currently delivered

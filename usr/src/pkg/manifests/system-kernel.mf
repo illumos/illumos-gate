@@ -679,8 +679,12 @@ license usr/src/common/crypto/ecc/THIRDPARTYLICENSE \
     license=usr/src/common/crypto/ecc/THIRDPARTYLICENSE
 $(i386_ONLY)license usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE \
     license=usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE
+license usr/src/common/crypto/skein/THIRDPARTYLICENSE \
+    license=usr/src/common/crypto/skein/THIRDPARTYLICENSE
 license usr/src/common/mpi/THIRDPARTYLICENSE \
     license=usr/src/common/mpi/THIRDPARTYLICENSE
+license usr/src/uts/common/inet/cc/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/inet/cc/THIRDPARTYLICENSE
 license usr/src/uts/common/inet/ip/THIRDPARTYLICENSE.rts \
     license=usr/src/uts/common/inet/ip/THIRDPARTYLICENSE.rts
 license usr/src/uts/common/inet/tcp/THIRDPARTYLICENSE \
