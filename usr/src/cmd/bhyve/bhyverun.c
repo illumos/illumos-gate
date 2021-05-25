@@ -1720,9 +1720,7 @@ main(int argc, char *argv[])
 		errx(EX_OSERR, "cap_enter() failed");
 #endif
 
-#ifndef __FreeBSD__
-	illumos_priv_lock();
-#endif
+/* XXX SmartOS:  Upstream drops privs here, but we can't yet.  See below... */
 
 #ifdef __FreeBSD__
 	/*
@@ -1741,6 +1739,14 @@ main(int argc, char *argv[])
 		spinup_halted_ap(ctx, i);
 	}
 	mark_provisioned();
+	/*
+	 * XXX SmartOS:  The mark_provisioned() call above required file-access
+	 * privileges that are dropped by the generic call.  We must widen the
+	 * full-privilege window a bit.  A better solution might be to have
+	 * a way to keep file-access a bit longer, and only have THAT privilege
+	 * to drop here.
+	 */
+	illumos_priv_lock();
 #endif
 
 	/*
