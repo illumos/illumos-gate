@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -49,7 +49,7 @@
 uint32_t netlogon_logon(smb_logon_t *, smb_token_t *, smb_domainex_t *);
 static uint32_t netr_server_samlogon(mlsvc_handle_t *, netr_info_t *, char *,
     smb_logon_t *, smb_token_t *);
-static void netr_invalidate_chain(void);
+static void netr_invalidate_chain(netr_info_t *);
 static void netr_interactive_samlogon(netr_info_t *, smb_logon_t *,
     struct netr_logon_info1 *);
 static void netr_network_samlogon(ndr_heap_t *, netr_info_t *,
@@ -280,7 +280,7 @@ reauth:
 		 */
 		if (!did_renego) {
 			did_renego = B_TRUE;
-			netr_invalidate_chain();
+			netr_invalidate_chain(&netr_global_info);
 			syslog(LOG_ERR, "%s: open failed (%s); "
 			    "renegotiating...",
 			    __func__, xlate_nt_status(status));
@@ -315,7 +315,7 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token, smb_domainex_t *di)
 		    "\\\\%s", di->d_dci.dc_name);
 		if (strncasecmp(netr_global_info.server,
 		    server, strlen(server)) != 0)
-			netr_invalidate_chain();
+			netr_invalidate_chain(&netr_global_info);
 	}
 
 reauth:
@@ -586,7 +586,7 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 
 	rc = ndr_rpc_call(netr_handle, opnum, rpc_arg);
 	if (rc != 0) {
-		bzero(netr_info, sizeof (netr_info_t));
+		netr_invalidate_chain(netr_info);
 		status = NT_STATUS_INVALID_PARAMETER;
 	} else if (*rpc_status != 0) {
 		status = NT_SC_VALUE(*rpc_status);
@@ -774,7 +774,7 @@ netr_validate_chain(netr_info_t *netr_info, struct netr_authenticator *auth)
 		 * If the validation fails, destroy the credential chain.
 		 * This should trigger a new authentication chain.
 		 */
-		bzero(netr_info, sizeof (netr_info_t));
+		netr_invalidate_chain(netr_info);
 		return (NT_STATUS_INSUFFICIENT_LOGON_INFO);
 	}
 
@@ -784,7 +784,7 @@ netr_validate_chain(netr_info_t *netr_info, struct netr_authenticator *auth)
 		 * If the validation fails, destroy the credential chain.
 		 * This should trigger a new authentication chain.
 		 */
-		bzero(netr_info, sizeof (netr_info_t));
+		netr_invalidate_chain(netr_info);
 		result = NT_STATUS_UNSUCCESSFUL;
 	} else {
 		/*
@@ -807,9 +807,18 @@ netr_validate_chain(netr_info_t *netr_info, struct netr_authenticator *auth)
  * on the next attempt.
  */
 static void
-netr_invalidate_chain(void)
+netr_invalidate_chain(netr_info_t *netr_info)
 {
-	netr_global_info.flags &= ~NETR_FLG_VALID;
+	if ((netr_info->flags & NETR_FLG_VALID) == 0)
+		return;
+
+	netr_info->flags &= ~NETR_FLG_VALID;
+	explicit_bzero(&netr_info->session_key,
+	    sizeof (netr_info->session_key));
+	explicit_bzero(&netr_info->client_credential,
+	    sizeof (netr_info->client_credential));
+	explicit_bzero(&netr_info->server_credential,
+	    sizeof (netr_info->server_credential));
 }
 
 /*
