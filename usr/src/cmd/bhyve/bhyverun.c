@@ -114,6 +114,9 @@ __FBSDID("$FreeBSD$");
 #include "rtc.h"
 #include "vga.h"
 #include "vmgenc.h"
+#ifndef __FreeBSD__
+#include "privileges.h"
+#endif
 
 #define GUEST_NIO_PORT		0x488	/* guest upcalls via i/o port */
 
@@ -1545,6 +1548,10 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
+#ifndef __FreeBSD__
+	illumos_priv_init();
+#endif
+
 	calc_topolopgy();
 #ifdef __FreeBSD__
 	build_vcpumaps();
@@ -1711,6 +1718,10 @@ main(int argc, char *argv[])
 
 	if (caph_enter() == -1)
 		errx(EX_OSERR, "cap_enter() failed");
+#endif
+
+#ifndef __FreeBSD__
+	illumos_priv_lock();
 #endif
 
 #ifdef __FreeBSD__

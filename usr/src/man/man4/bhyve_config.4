@@ -25,7 +25,7 @@
 .\"
 .\" Portions Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd March 24, 2021
+.Dd May 6, 2021
 .Dt BHYVE_CONFIG 4
 .Os
 .Sh NAME
@@ -147,8 +147,13 @@ If set to false, MSI interrupts are used instead.
 .It Va config.dump Ta bool Ta false Ta
 If this value is set to true, then
 .Xr bhyve 1M
-will write all of its configuration variables to stdout and exit
-after it has finished parsing command line options.
+will write all of its configuration variables to
+.Dv stdout
+and exit after it has finished parsing command line options.
+.It Va privileges.debug Ta bool Ta false Ta
+Enable debug messages relating to privilege management.
+These messages are sent to
+.Dv stdout .
 .El
 .Ss x86-Specific Settings
 .Bl -column "x86.vmexit_on_pause" "integer" "Default"
@@ -357,7 +362,7 @@ TCP address to listen on for remote connections.
 The IP address must be given as a numeric address.
 IPv6 addresses must be enclosed in square brackets and
 support scoped identifiers as described in
-.Xr getaddrinfo 3socket .
+.Xr getaddrinfo 3SOCKET .
 A bare port number may be given in which case the IPv4
 localhost address is used.
 .It Va unix Ta string Ta Ta
@@ -470,5 +475,5 @@ The path of a UNIX domain socket providing the host connection for the port.
 .El
 .Sh SEE ALSO
 .Xr bhyve 1M ,
-.Xr strtoul 3c ,
-.Xr getaddrinfo 3socket
+.Xr strtoul 3C ,
+.Xr getaddrinfo 3SOCKET

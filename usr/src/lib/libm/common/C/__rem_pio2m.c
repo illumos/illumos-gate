@@ -44,7 +44,7 @@
  * Here PI could as well be a machine value pi.
  *
  * Input parameters:
- * 	x[]	The input value (must be positive) is broken into nx
+ *	x[]	The input value (must be positive) is broken into nx
  *		pieces of 24-bit integers in double precision format.
  *		x[i] will be the i-th 24 bit of x. The scaled exponent
  *		of x[0] is given in input parameter e0 (i.e., x[0]*2^e0
@@ -77,7 +77,7 @@
  *
  *	nx	dimension of x[]
  *
- *  	prec	an interger indicating the precision:
+ *	prec	an interger indicating the precision:
  *			0	24  bits (single)
  *			1	53  bits (double)
  *			2	64  bits (extended)
@@ -96,11 +96,11 @@
  *
  * Here is the description of some local variables:
  *
- * 	jk	jk+1 is the initial number of terms of ipio2[] needed
+ *	jk	jk+1 is the initial number of terms of ipio2[] needed
  *		in the computation. The recommended value is 3,4,4,
  *		6 for single, double, extended,and quad.
  *
- * 	jz	local integer variable indicating the number of
+ *	jz	local integer variable indicating the number of
  *		terms of ipio2[] used.
  *
  *	jx	nx - 1
@@ -114,7 +114,7 @@
  *
  *	jp	jp+1 is the number of terms in pio2[] needed, jp = jk.
  *
- * 	q[]	double array with integral value, representing the
+ *	q[]	double array with integral value, representing the
  *		24-bits chunk of the product of x and 2/pi.
  *
  *	q0	the corresponding exponent of q[0]. Note that the
@@ -134,6 +134,7 @@
  *
  */
 
+#include <assert.h>
 #include "libm.h"
 
 #if defined(__i386) && !defined(__amd64)
@@ -174,6 +175,7 @@ __rem_pio2m(double *x, double *y, int e0, int nx, int prec, const int *ipio2)
 	rp = __swapRP(fp_extended);
 #endif
 
+	fq[0] = NAN;	/* Make gcc happy */
 	/* initialize jk */
 	jp = jk = init_jk[prec];
 
@@ -326,6 +328,8 @@ recompute:
 		for (i = jz; i >= 0; i--)
 			fw += fq[i];
 		y[0] = (ih == 0)? fw : -fw;
+
+		assert(!isnan(fq[0]));
 		fw = fq[0] - fw;
 		for (i = 1; i <= jz; i++)
 			fw += fq[i];
