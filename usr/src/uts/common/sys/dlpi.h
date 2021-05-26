@@ -62,7 +62,7 @@ typedef struct dl_ipnetinfo {
 	uint32_t	dli_pktlen;	/* length of dl_ipnetinfo_t */
 	uint32_t	dli_ifindex;
 	uint32_t	dli_grifindex;
-	uint32_t	dli_zsrc; 	/* packet source zone ID (if any) */
+	uint32_t	dli_zsrc;	/* packet source zone ID (if any) */
 	uint32_t	dli_zdst;	/* packet dest zone ID (if any) */
 } dl_ipnetinfo_t;
 

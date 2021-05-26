@@ -1,133 +1,111 @@
 '\" te
-.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DLPI_PROMISCON 3DLPI "Aug 22, 2007"
-.SH NAME
-dlpi_promiscon, dlpi_promiscoff \- enable or disable DLPI promiscuous mode
-.SH SYNOPSIS
-.LP
-.nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-ldlpi\fR [ \fIlibrary\fR... ]
-#include <libdlpi.h>
-
-\fBint\fR \fBdlpi_promiscon\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBuint_t\fR \fIlevel\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBdlpi_promiscoff\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBuint_t\fR \fIlevel\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBdlpi_promiscon()\fR function enables promiscuous mode on a \fBDLPI\fR
-link instance associated with \fBDLPI\fR handle \fIdh\fR, at the specified
-\fIlevel\fR. After enabling promiscuous mode, the caller will be able to
-receive all messages destined for the \fBDLPI\fR link instance at the specified
-\fIlevel\fR. This operation can be performed in any \fBDLPI\fR state of a
-handle.
-.sp
-.LP
-The \fBdlpi_promiscoff()\fR function disables promiscuous mode on a \fBDLPI\fR
-link instance associated with \fBDLPI\fR handle \fIdh\fR, at the specified
-level. This operation can be performed in any \fBDLPI\fR state of a handle in
-which promiscuous mode is enabled at the specified \fIlevel\fR.
-.sp
-.LP
-The \fIlevel\fR modes are:
-.sp
-.ne 2
-.na
-\fB\fBDL_PROMISC_PHYS\fR\fR
-.ad
-.RS 20n
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use this
+.\" file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the specific
+.\" language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and
+.\" include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add
+.\" the following below this CDDL HEADER, with the fields enclosed by brackets
+.\" "[]" replaced with your own identifying information: Portions Copyright
+.\" [yyyy] [name of copyright owner]
+.\"
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd April 29, 2021
+.Dt DLPI_PROMISCON 3DLPI
+.Os
+.Sh NAME
+.Nm dlpi_promiscon ,
+.Nm dlpi_promiscoff
+.Nd enable or disable DLPI promiscuous mode
+.Sh LIBRARY
+.Lb libdlpi
+.Sh SYNOPSIS
+.In libdlpi.h
+.Ft int
+.Fo dlpi_promiscon
+.Fa dlpi_handle_t dh
+.Fa uint_t level
+.Fc
+.Ft int
+.Fo dlpi_promiscoff
+.Fa dlpi_handle_t dh
+.Fa uint_t level
+.Fc
+.Sh DESCRIPTION
+.Fn dlpi_promiscon
+enables promiscuous mode on a
+.Xr dlpi 7P
+link instance associated with a DLPI handle
+.Fa dh ,
+at the specified
+.Fa level .
+Multiple levels can be combined; the new level is enabled in addition to any
+previously enabled levels.
+After enabling promiscuous mode, the caller will be able to receive all
+messages destined for the DLPI link instance at the specified
+.Fa level .
+This operation can be performed in any DLPI state of a handle.
+.Pp
+.Fn dlpi_promiscoff
+disables promiscuous mode on a
+.Xr dlpi 7P
+link instance associated with DLPI handle
+.Fa dh ,
+at the specified level.
+This operation can be performed in any DLPI state of a handle in
+which promiscuous mode is enabled at the specified
+.Fa level .
+.Pp
+The
+.Fa level
+modes are:
+.Bl -tag -width Ds
+.It Dv DL_PROMISC_PHYS
 Promiscuous mode at the physical level
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDL_PROMISC_SAP\fR\fR
-.ad
-.RS 20n
-Promiscuous mode at the \fBSAP\fR level
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDL_PROMISC_MULTI\fR\fR
-.ad
-.RS 20n
+.It Dv DL_PROMISC_SAP
+Promiscuous mode at the SAP level
+.It Dv DL_PROMISC_MULTI
 Promiscuous mode for all multicast addresses
-.RE
-
-.SH RETURN VALUES
-.sp
-.LP
-Upon success, \fBDLPI_SUCCESS\fR is  returned. If \fBDL_SYSERR\fR is returned,
-\fBerrno\fR contains the specific UNIX system error value. Otherwise, a
-\fBDLPI\fR error value defined in \fB<sys/dlpi.h>\fR or an error value listed
-in the following section is returned.
-.SH ERRORS
-.sp
-.ne 2
-.na
-\fB\fBDLPI_EBADMSG\fR\fR
-.ad
-.RS 18n
+.It Dv DL_PROMISC_RX_ONLY
+When one or more of the above promiscuous modes is also enabled, this option
+modifies it so that only inbound traffic is received.
+When using this level, it is recommended to set it before the others.
+.El
+.Sh RETURN VALUES
+On successful completion,
+.Fn dlpi_promiscon
+and
+.Fn dlpi_promiscoff
+return
+.Dv DLPI_SUCCESS .
+If
+.Dv DL_SYSERR
+is returned,
+.Va errno
+contains the specific UNIX system error value.
+Otherwise, a DLPI error value defined in
+.In sys/dlpi.h ,
+or an error value listed in the following section is returned.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er DLPI_EBADMSG
 Bad DLPI message
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDLPI_EINHANDLE\fR\fR
-.ad
-.RS 18n
-Invalid \fBDLPI\fR handle
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDLPI_EINVAL\fR\fR
-.ad
-.RS 18n
+.It Er DLPI_EINHANDLE
+Invalid DLPI handle
+.It Er DLPI_EINVAL
 Invalid argument
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDLPI_ETIMEDOUT\fR\fR
-.ad
-.RS 18n
-\fBDLPI\fR operation timed out
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-_
-MT-Level	Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBlibdlpi\fR(3LIB), \fBattributes\fR(5)
+.It Er DLPI_ETIMEDOUT
+Operation timed out
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Safe
+.Sh SEE ALSO
+.Xr libdlpi 3LIB ,
+.Xr attributes 5 ,
+.Xr dlpi 7P
