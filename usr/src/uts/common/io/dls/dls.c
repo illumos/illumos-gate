@@ -255,25 +255,10 @@ dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 	uint32_t new_type = new_flags & ~option_flags;
 	mac_client_promisc_type_t mptype = MAC_CLIENT_PROMISC_ALL;
 	uint16_t mac_flags = 0;
-	boolean_t doremove = B_FALSE;
 
 	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
 	ASSERT(!(new_flags & ~(DLS_PROMISC_SAP | DLS_PROMISC_MULTI |
 	    DLS_PROMISC_PHYS | option_flags)));
-
-	/*
-	 * If we only have the non-data receive flags set or are only changing
-	 * them, then there's nothing to do other than update the flags here.
-	 * Basically when we only have something in the set of
-	 * DLS_PROMISC_RX_ONLY and DLS_PROMISC_FIXUPS around, then there's
-	 * nothing else for us to do other than toggle it, as there's no need to
-	 * talk to MAC and we don't have to do anything else.
-	 */
-	if ((old_flags & ~option_flags) == 0 &&
-	    (new_flags & ~option_flags) == 0) {
-		dsp->ds_promisc = new_flags;
-		return (0);
-	}
 
 	/*
 	 * If the user has only requested DLS_PROMISC_MULTI then we need to make
@@ -293,18 +278,6 @@ dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 		mac_flags |= MAC_PROMISC_FLAGS_DO_FIXUPS;
 	if (new_type == DLS_PROMISC_SAP)
 		mac_flags |= MAC_PROMISC_FLAGS_NO_PHYS;
-
-	/*
-	 * If we're coming in and we're being asked to transition to a state
-	 * where the only DLS flags would be enabled are flags that change what
-	 * we do with promiscuous packets (DLS_PROMISC_RX_ONLY and
-	 * DLS_PROMISC_FIXUPS) and not which packets we should receive, then we
-	 * need to remove the MAC layer promiscuous handler.
-	 */
-	if ((new_flags & ~option_flags) == 0 &&
-	    (old_flags & ~option_flags) != 0 && new_flags != 0) {
-		doremove = B_TRUE;
-	}
 
 	/*
 	 * There are three cases we care about here with respect to MAC. Going
@@ -333,7 +306,7 @@ dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 			mac_promisc_remove(dsp->ds_vlan_mph);
 			dsp->ds_vlan_mph = NULL;
 		}
-	} else if (old_type != 0 && (new_type == 0 || doremove == B_TRUE)) {
+	} else if (old_type != 0 && new_type == 0) {
 		ASSERT(dsp->ds_mph != NULL);
 
 		mac_promisc_remove(dsp->ds_mph);
