@@ -19,11 +19,13 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -836,6 +838,20 @@ frnop_func(void *arg)
 
 /*
  * Generic esballoc used to implement the four flavors: [d]esballoc[a].
+ *
+ * The variants with a 'd' prefix (desballoc, desballoca)
+ *	directly free the mblk when it loses its last ref,
+ *	where the other variants free asynchronously.
+ * The variants with an 'a' suffix (esballoca, desballoca)
+ *	add an extra ref, effectively letting the streams subsystem
+ *	know that the message data should not be modified.
+ *	(eg. see db_ref checks in reallocb and elsewhere)
+ *
+ * The method used by the 'a' suffix functions to keep the dblk
+ * db_ref > 1 is non-obvious.  The macro DBLK_RTFU(2,...) passed to
+ * gesballoc sets the initial db_ref = 2 and sets the DBLK_REFMIN
+ * bit in db_flags.  In dblk_decref() that flag essentially means
+ * the dblk has one extra ref, so the "last ref" is one, not zero.
  */
 static mblk_t *
 gesballoc(unsigned char *base, size_t size, uint32_t db_rtfu, frtn_t *frp,
@@ -1889,7 +1905,7 @@ getq(queue_t *q)
  * multidata messages into account.
  */
 
-#define	ADD_MBLK_SIZE(mp, size) 					\
+#define	ADD_MBLK_SIZE(mp, size)						\
 	if (DB_TYPE(mp) != M_MULTIDATA) {				\
 		(size) += MBLKL(mp);					\
 	} else {							\
@@ -3443,9 +3459,9 @@ done:
 int
 strqget(queue_t *q, qfields_t what, unsigned char pri, void *valp)
 {
-	qband_t 	*qbp = NULL;
-	int 		error = 0;
-	kthread_id_t 	freezer;
+	qband_t		*qbp = NULL;
+	int		error = 0;
+	kthread_id_t	freezer;
 
 	freezer = STREAM(q)->sd_freezer;
 	if (freezer == curthread) {
@@ -3566,8 +3582,8 @@ done:
 void
 strwakeq(queue_t *q, int flag)
 {
-	stdata_t 	*stp = STREAM(q);
-	pollhead_t 	*pl;
+	stdata_t	*stp = STREAM(q);
+	pollhead_t	*pl;
 
 	mutex_enter(&stp->sd_lock);
 	pl = &stp->sd_pollist;
@@ -3912,7 +3928,7 @@ out:
 	 * I would like to make the following assertion:
 	 *
 	 * ASSERT((flags & (SQ_EXCL|SQ_CIPUT)) != (SQ_EXCL|SQ_CIPUT) ||
-	 * 	sq->sq_count == 0);
+	 *	sq->sq_count == 0);
 	 *
 	 * which indicates that if we are both putshared and exclusive,
 	 * we became exclusive while executing the putproc, and the only
@@ -3951,7 +3967,7 @@ infonext(queue_t *qp, infod_t *idp)
 	queue_t		*nqp;
 	syncq_t		*sq;
 	uint16_t	count;
-	uint16_t 	flags;
+	uint16_t	flags;
 	struct qinit	*qi;
 	int		(*proc)();
 	struct stdata	*stp;

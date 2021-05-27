@@ -13,7 +13,7 @@
 # Copyright 2017, Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore>
 # Copyright 2019 Joyent, Inc.
-# Copyright 2020 Nexenta by DDN, Inc. All rights reserved.
+# Copyright 2020-2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
@@ -942,6 +942,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		ddi_umem_unlock.9f				\
 		ddi_unmap_regs.9f				\
 		desballoc.9f					\
+		desballoca.9f					\
 		dev_err.9f					\
 		devmap_load.9f					\
 		devmap_umem_setup.9f				\
@@ -949,6 +950,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		dlokack.9f					\
 		dlphysaddrack.9f				\
 		dluderrorind.9f					\
+		esballoca.9f					\
 		firmware_close.9f				\
 		firmware_free.9f				\
 		firmware_get_size.9f				\
@@ -1811,6 +1813,8 @@ dlphysaddrack.9f			:= LINKSRC = dlbindack.9f
 dluderrorind.9f				:= LINKSRC = dlbindack.9f
 
 desballoc.9f				:= LINKSRC = esballoc.9f
+desballoca.9f				:= LINKSRC = esballoc.9f
+esballoca.9f				:= LINKSRC = esballoc.9f
 
 unfreezestr.9f				:= LINKSRC = freezestr.9f
 
