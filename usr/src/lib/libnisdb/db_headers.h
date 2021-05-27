@@ -142,9 +142,7 @@ extern jmp_buf dbenv;
 		int	lockcode1, lockcode2; \
 		WRITELOCKNR(this, lockcode2, msg); \
 		if (lockcode2 != 0) { \
-			if (that != 0) { \
-				WRITEUNLOCKNR(that, lockcode1, msg); \
-			} \
+			WRITEUNLOCKNR(that, lockcode1, msg); \
 			return (retval); \
 		} \
 	}
@@ -152,12 +150,8 @@ extern jmp_buf dbenv;
 #define	WRITEUNLOCK2(this, that, retval1, retval2, msg1, msg2) \
 	{ \
 		int	lockcode1 = 0, lockcode2 = 0; \
-		if (this != 0) { \
-			WRITEUNLOCKNR(this, lockcode1, msg1); \
-		} \
-		if (that != 0) { \
-			WRITEUNLOCKNR(that, lockcode2, msg2); \
-		} \
+		WRITEUNLOCKNR(this, lockcode1, msg1); \
+		WRITEUNLOCKNR(that, lockcode2, msg2); \
 		if (lockcode2 != 0) { \
 			return (retval2); \
 		} else if (lockcode1 != 0) { \
@@ -171,9 +165,7 @@ extern jmp_buf dbenv;
 		int	lockcode1, lockcode2; \
 		READLOCKNR(this, lockcode2, msg); \
 		if (lockcode2 != 0) { \
-			if (that != 0) { \
-				READUNLOCKNR(that, lockcode1, msg); \
-			} \
+			READUNLOCKNR(that, lockcode1, msg); \
 			return (retval); \
 		} \
 	}
@@ -181,12 +173,8 @@ extern jmp_buf dbenv;
 #define	READUNLOCK2(this, that, retval1, retval2, msg1, msg2) \
 	{ \
 		int	lockcode1 = 0, lockcode2 = 0; \
-		if (this != 0) { \
-			READUNLOCKNR(this, lockcode1, msg1); \
-		} \
-		if (that != 0) { \
-			READUNLOCKNR(that, lockcode2, msg2); \
-		} \
+		READUNLOCKNR(this, lockcode1, msg1); \
+		READUNLOCKNR(that, lockcode2, msg2); \
 		if (lockcode2 != 0) { \
 			return (retval2); \
 		} else if (lockcode1 != 0) { \
