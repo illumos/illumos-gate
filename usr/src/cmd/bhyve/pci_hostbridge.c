@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2011 NetApp, Inc.
  * Copyright (c) 2018 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,6 +43,9 @@ __FBSDID("$FreeBSD$");
 
 #include "config.h"
 #include "pci_emul.h"
+#ifndef __FreeBSD__
+#include "bhyverun.h"
+#endif
 
 #ifndef __FreeBSD__
 static struct pci_hostbridge_model {
@@ -109,6 +113,24 @@ pci_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 			    model);
 			return (-1);
 		}
+	}
+
+	/* Both i440fx and Q35 chipsets feature the concept of Programmable
+	 * Address Memory (PAM), where certain physical address ranges can be
+	 * configured to direct reads/writes to either DRAM, or to the PCI MMIO
+	 * space instead.  At boot, they default to bypassing DRAM, so in order
+	 * to cheaply paper over our lack of emulation, the memory in PAM0
+	 * (0xf0000-0xfffff, the System BIOS segment) should be zeroed.
+	 *
+	 * If this emulation is expanded in the future to truly support PAM
+	 * behavior, this hack can be removed.
+	 */
+	if (vendor == 0x8086 && (device == 0x1237 || device == 0x29b0)) {
+		const uintptr_t start = 0xf0000;
+		const size_t len = 0x10000;
+		void *system_bios_region = paddr_guest2host(ctx, start, len);
+		assert(system_bios_region != NULL);
+		bzero(system_bios_region, len);
 	}
 #endif /* !__FreeBSD__ */
 

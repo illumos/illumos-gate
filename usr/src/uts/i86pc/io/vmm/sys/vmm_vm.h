@@ -190,7 +190,6 @@ struct vm_object *vm_object_allocate(objtype_t, vm_pindex_t);
 void vm_object_deallocate(vm_object_t);
 void vm_object_reference(vm_object_t);
 int vm_object_set_memattr(vm_object_t, vm_memattr_t);
-void vm_object_clear(vm_object_t);
 
 #define	VM_OBJECT_WLOCK(vmo)	mutex_enter(&(vmo)->vmo_lock)
 #define	VM_OBJECT_WUNLOCK(vmo)	mutex_exit(&(vmo)->vmo_lock)
