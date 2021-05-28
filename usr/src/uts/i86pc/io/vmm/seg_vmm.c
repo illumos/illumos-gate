@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -40,7 +41,16 @@
 #include <vm/as.h>
 #include <vm/seg.h>
 #include <vm/seg_kmem.h>
-#include <vm/seg_vmm.h>
+
+#include <sys/seg_vmm.h>
+
+typedef struct segvmm_data {
+	krwlock_t	svmd_lock;
+	vm_object_t	svmd_obj;
+	uintptr_t	svmd_obj_off;
+	uchar_t		svmd_prot;
+	size_t		svmd_softlockcnt;
+} segvmm_data_t;
 
 
 static int segvmm_dup(struct seg *, struct seg *);
@@ -105,31 +115,14 @@ segvmm_create(struct seg **segpp, void *argsp)
 	segvmm_crargs_t *cra = argsp;
 	segvmm_data_t *data;
 
-	/*
-	 * Check several aspects of the mapping request to ensure validity:
-	 * - kernel pages must reside entirely in kernel space
-	 * - target protection must be user-accessible
-	 * - kernel address must be page-aligned
-	 */
-	if ((uintptr_t)cra->kaddr <= _userlimit ||
-	    ((uintptr_t)cra->kaddr + seg->s_size) < (uintptr_t)cra->kaddr ||
-	    (cra->prot & PROT_USER) == 0 ||
-	    ((uintptr_t)cra->kaddr & PAGEOFFSET) != 0) {
-		return (EINVAL);
-	}
-
 	data = kmem_zalloc(sizeof (*data), KM_SLEEP);
 	rw_init(&data->svmd_lock, NULL, RW_DEFAULT, NULL);
-	data->svmd_kaddr = (uintptr_t)cra->kaddr;
+	data->svmd_obj = cra->obj;
+	data->svmd_obj_off = cra->offset;
 	data->svmd_prot = cra->prot;
-	data->svmd_cookie = cra->cookie;
-	data->svmd_hold = cra->hold;
-	data->svmd_rele = cra->rele;
 
-	/* Since initial checks have passed, grab a reference on the cookie */
-	if (data->svmd_hold != NULL) {
-		data->svmd_hold(data->svmd_cookie);
-	}
+	/* Grab a hold on the VM object for the duration of this seg mapping */
+	vm_object_reference(data->svmd_obj);
 
 	seg->s_ops = &segvmm_ops;
 	seg->s_data = data;
@@ -146,16 +139,12 @@ segvmm_dup(struct seg *seg, struct seg *newseg)
 
 	newsvmd = kmem_zalloc(sizeof (segvmm_data_t), KM_SLEEP);
 	rw_init(&newsvmd->svmd_lock, NULL, RW_DEFAULT, NULL);
-	newsvmd->svmd_kaddr = svmd->svmd_kaddr;
+	newsvmd->svmd_obj = svmd->svmd_obj;
+	newsvmd->svmd_obj_off = svmd->svmd_obj_off;
 	newsvmd->svmd_prot = svmd->svmd_prot;
-	newsvmd->svmd_cookie = svmd->svmd_cookie;
-	newsvmd->svmd_hold = svmd->svmd_hold;
-	newsvmd->svmd_rele = svmd->svmd_rele;
 
 	/* Grab another hold for the duplicate segment */
-	if (svmd->svmd_hold != NULL) {
-		newsvmd->svmd_hold(newsvmd->svmd_cookie);
-	}
+	vm_object_reference(svmd->svmd_obj);
 
 	newseg->s_ops = seg->s_ops;
 	newseg->s_data = newsvmd;
@@ -180,10 +169,8 @@ segvmm_unmap(struct seg *seg, caddr_t addr, size_t len)
 	/* Unconditionally unload the entire segment range.  */
 	hat_unload(seg->s_as->a_hat, addr, len, HAT_UNLOAD_UNMAP);
 
-	/* Release the hold this segment possessed */
-	if (svmd->svmd_rele != NULL) {
-		svmd->svmd_rele(svmd->svmd_cookie);
-	}
+	/* Release the VM object hold this segment possessed */
+	vm_object_deallocate(svmd->svmd_obj);
 
 	seg_free(seg);
 	return (0);
@@ -206,41 +193,23 @@ static int
 segvmm_fault_in(struct hat *hat, struct seg *seg, uintptr_t va, size_t len)
 {
 	segvmm_data_t *svmd = seg->s_data;
-	const uintptr_t koff = svmd->svmd_kaddr - (uintptr_t)seg->s_base;
 	const uintptr_t end = va + len;
 	const uintptr_t prot = svmd->svmd_prot;
 
-	/* Stick to the simple non-large-page case for now */
 	va &= PAGEMASK;
-
+	uintptr_t off = va - (uintptr_t)seg->s_base;
 	do {
-		htable_t *ht;
-		uint_t entry, lvl;
-		size_t psz;
 		pfn_t pfn;
-		const uintptr_t kaddr = va + koff;
 
-		ASSERT(kaddr >= (uintptr_t)svmd->svmd_kaddr);
-		ASSERT(kaddr < ((uintptr_t)svmd->svmd_kaddr + seg->s_size));
-
-		ht = htable_getpage(kas.a_hat, kaddr, &entry);
-		if (ht == NULL) {
-			return (-1);
-		}
-		lvl = ht->ht_level;
-		pfn = PTE2PFN(x86pte_get(ht, entry), lvl);
-		htable_release(ht);
+		pfn = vm_object_pfn(svmd->svmd_obj, off);
 		if (pfn == PFN_INVALID) {
 			return (-1);
 		}
 
-		/* For the time being, handling for large pages is absent. */
-		psz = PAGESIZE;
-		pfn += mmu_btop(kaddr & LEVEL_OFFSET(lvl));
-
-		hat_devload(hat, (caddr_t)va, psz, pfn, prot, HAT_LOAD);
-
-		va = va + psz;
+		/* Ignore any large-page possibilities for now */
+		hat_devload(hat, (caddr_t)va, PAGESIZE, pfn, prot, HAT_LOAD);
+		va += PAGESIZE;
+		off += PAGESIZE;
 	} while (va < end);
 
 	return (0);
@@ -399,8 +368,8 @@ static int
 segvmm_gettype(struct seg *seg, caddr_t addr)
 {
 	/*
-	 * Since already-existing kernel pages are being mapped into userspace,
-	 * always report the segment type as shared.
+	 * Since already-existing vmm reservoir pages are being mapped into
+	 * userspace, always report the segment type as shared.
 	 */
 	return (MAP_SHARED);
 }
@@ -457,8 +426,8 @@ segvmm_getmemid(struct seg *seg, caddr_t addr, memid_t *memidp)
 {
 	segvmm_data_t *svmd = seg->s_data;
 
-	memidp->val[0] = (uintptr_t)svmd->svmd_kaddr;
-	memidp->val[1] = (uintptr_t)(addr - seg->s_base);
+	memidp->val[0] = (uintptr_t)svmd->svmd_obj;
+	memidp->val[1] = (uintptr_t)(addr - seg->s_base) + svmd->svmd_obj_off;
 	return (0);
 }
 

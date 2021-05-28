@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/systm.h>
+#include <sys/sunddi.h>
 
 #include <machine/pcb.h>
 #include <machine/smp.h>
@@ -191,6 +192,8 @@ struct vm {
 	uint64_t	boot_tsc_offset;	/* (i) TSC offset at VM boot */
 
 	struct ioport_config ioports;		/* (o) ioport handling */
+
+	bool		mem_transient;		/* (o) alloc transient memory */
 };
 
 static int vmm_initialized;
@@ -490,7 +493,7 @@ uint_t cores_per_package = 1;
 uint_t threads_per_core = 1;
 
 int
-vm_create(const char *name, struct vm **retvm)
+vm_create(const char *name, uint64_t flags, struct vm **retvm)
 {
 	struct vm *vm;
 	struct vmspace *vmspace;
@@ -502,8 +505,8 @@ vm_create(const char *name, struct vm **retvm)
 	if (!vmm_initialized)
 		return (ENXIO);
 
-	if (name == NULL || strlen(name) >= VM_MAX_NAMELEN)
-		return (EINVAL);
+	/* Name validation has already occurred */
+	VERIFY3U(strnlen(name, VM_MAX_NAMELEN), <, VM_MAX_NAMELEN);
 
 	vmspace = VMSPACE_ALLOC(0, VM_MAXUSER_ADDRESS);
 	if (vmspace == NULL)
@@ -512,6 +515,7 @@ vm_create(const char *name, struct vm **retvm)
 	vm = malloc(sizeof (struct vm), M_VM, M_WAITOK | M_ZERO);
 	strcpy(vm->name, name);
 	vm->vmspace = vmspace;
+	vm->mem_transient = (flags & VCF_RESERVOIR_MEM) == 0;
 
 	vm->sockets = 1;
 	vm->cores = cores_per_package;	/* XXX backwards compatibility */
@@ -708,20 +712,11 @@ vm_alloc_memseg(struct vm *vm, int ident, size_t len, bool sysmem)
 	struct mem_seg *seg;
 	vm_object_t obj;
 
-#ifndef __FreeBSD__
-	extern pgcnt_t get_max_page_get(void);
-#endif
-
 	if (ident < 0 || ident >= VM_MAX_MEMSEGS)
 		return (EINVAL);
 
 	if (len == 0 || (len & PAGE_MASK))
 		return (EINVAL);
-
-#ifndef __FreeBSD__
-	if (len > ptob(get_max_page_get()))
-		return (EINVAL);
-#endif
 
 	seg = &vm->mem_segs[ident];
 	if (seg->object != NULL) {
@@ -731,7 +726,8 @@ vm_alloc_memseg(struct vm *vm, int ident, size_t len, bool sysmem)
 			return (EINVAL);
 	}
 
-	obj = vm_object_allocate(OBJT_DEFAULT, len >> PAGE_SHIFT);
+	obj = vm_object_allocate(OBJT_DEFAULT, len >> PAGE_SHIFT,
+	    vm->mem_transient);
 	if (obj == NULL)
 		return (ENOMEM);
 

@@ -39,12 +39,26 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef	_VMM_DEV_H_
 #define	_VMM_DEV_H_
 
 #include <machine/vmm.h>
+
+#include <sys/param.h>
+#include <sys/cpuset.h>
+
+struct vm_create_req {
+	char		name[VM_MAX_NAMELEN];
+	uint64_t	flags;
+};
+
+
+struct vm_destroy_req {
+	char		name[VM_MAX_NAMELEN];
+};
 
 struct vm_memmap {
 	vm_paddr_t	gpa;
@@ -66,7 +80,7 @@ struct vm_munmap {
 struct vm_memseg {
 	int		segid;
 	size_t		len;
-	char		name[SPECNAMELEN + 1];
+	char		name[VM_MAX_SEG_NAMELEN];
 };
 
 struct vm_register {
@@ -282,6 +296,13 @@ struct vm_run_state {
 	uint8_t		_pad[3];
 };
 
+struct vmm_resv_query {
+	size_t	vrq_free_sz;
+	size_t	vrq_alloc_sz;
+	size_t	vrq_alloc_transient_sz;
+	size_t	vrq_limit;
+};
+
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
 #define	VMM_IOC_BASE		(('v' << 16) | ('m' << 8))
 #define	VMM_LOCK_IOC_BASE	(('v' << 16) | ('l' << 8))
@@ -291,6 +312,10 @@ struct vm_run_state {
 #define	VMM_CREATE_VM		(VMMCTL_IOC_BASE | 0x01)
 #define	VMM_DESTROY_VM		(VMMCTL_IOC_BASE | 0x02)
 #define	VMM_VM_SUPPORTED	(VMMCTL_IOC_BASE | 0x03)
+
+#define	VMM_RESV_QUERY		(VMMCTL_IOC_BASE | 0x10)
+#define	VMM_RESV_ADD		(VMMCTL_IOC_BASE | 0x11)
+#define	VMM_RESV_REMOVE		(VMMCTL_IOC_BASE | 0x12)
 
 /* Operations performed in the context of a given vCPU */
 #define	VM_RUN				(VMM_CPU_IOC_BASE | 0x01)

@@ -32,11 +32,12 @@
 #include <vm/hat_i86.h>
 #include <vm/seg_vn.h>
 #include <vm/seg_kmem.h>
-#include <vm/seg_vmm.h>
 
 #include <machine/vm.h>
 #include <sys/vmm_gpt.h>
 #include <sys/vmm_vm.h>
+#include <sys/seg_vmm.h>
+#include <sys/vmm_reservoir.h>
 
 #define	PMAP_TO_VMMAP(pm)	((vm_map_t)		\
 	((caddr_t)(pm) - offsetof(struct vmspace, vms_pmap)))
@@ -64,38 +65,6 @@ static void pmap_free(pmap_t);
 static vmspace_mapping_t *vm_mapping_find(struct vmspace *, uintptr_t, size_t,
     boolean_t);
 static void vm_mapping_remove(struct vmspace *, vmspace_mapping_t *);
-
-static vmem_t *vmm_alloc_arena = NULL;
-
-static void *
-vmm_arena_alloc(vmem_t *vmp, size_t size, int vmflag)
-{
-	return (segkmem_xalloc(vmp, NULL, size, vmflag, 0,
-	    segkmem_page_create, &kvps[KV_VVP]));
-}
-
-static void
-vmm_arena_free(vmem_t *vmp, void *inaddr, size_t size)
-{
-	segkmem_xfree(vmp, inaddr, size, &kvps[KV_VVP], NULL);
-}
-
-void
-vmm_arena_init(void)
-{
-	vmm_alloc_arena = vmem_create("vmm_alloc_arena", NULL, 0, 1024 * 1024,
-	    vmm_arena_alloc, vmm_arena_free, kvmm_arena, 0, VM_SLEEP);
-
-	ASSERT(vmm_alloc_arena != NULL);
-}
-
-void
-vmm_arena_fini(void)
-{
-	VERIFY(vmem_size(vmm_alloc_arena, VMEM_ALLOC) == 0);
-	vmem_destroy(vmm_alloc_arena);
-	vmm_alloc_arena = NULL;
-}
 
 struct vmspace *
 vmspace_alloc(vm_offset_t start, vm_offset_t end, pmap_pinit_t pinit)
@@ -164,8 +133,9 @@ vmspace_find_kva(struct vmspace *vms, uintptr_t addr, size_t size)
 
 		switch (vmo->vmo_type) {
 		case OBJT_DEFAULT:
-			result = (void *)((uintptr_t)vmo->vmo_data +
-			    VMSM_OFFSET(vmsm, addr));
+			result = vmmr_region_mem_at(
+			    (vmmr_region_t *)vmo->vmo_data,
+			    VMSM_OFFSET(vmsm, addr) & PAGEMASK);
 			break;
 		default:
 			break;
@@ -344,39 +314,23 @@ vm_object_pager_none(vm_object_t vmo, uintptr_t off, pfn_t *lpfn, uint_t *lvl)
 }
 
 static pfn_t
-vm_object_pager_heap(vm_object_t vmo, uintptr_t off, pfn_t *lpfn, uint_t *lvl)
+vm_object_pager_reservoir(vm_object_t vmo, uintptr_t off, pfn_t *lpfn,
+    uint_t *lvl)
 {
-	const uintptr_t kaddr = ALIGN2PAGE((uintptr_t)vmo->vmo_data + off);
-	uint_t idx, level;
-	htable_t *ht;
-	x86pte_t pte;
-	pfn_t top_pfn, pfn;
+	vmmr_region_t *region;
+	pfn_t pfn;
 
 	ASSERT(vmo->vmo_type == OBJT_DEFAULT);
-	ASSERT(off < vmo->vmo_size);
 
-	ht = htable_getpage(kas.a_hat, kaddr, &idx);
-	if (ht == NULL) {
-		return (PFN_INVALID);
-	}
-	pte = x86pte_get(ht, idx);
-	if (!PTE_ISPAGE(pte, ht->ht_level)) {
-		htable_release(ht);
-		return (PFN_INVALID);
-	}
+	region = vmo->vmo_data;
+	pfn = vmmr_region_pfn_at(region, off & PAGEMASK);
 
-	pfn = top_pfn = PTE2PFN(pte, ht->ht_level);
-	level = ht->ht_level;
-	if (ht->ht_level > 0) {
-		pfn += mmu_btop(kaddr & LEVEL_OFFSET((uint_t)ht->ht_level));
-	}
-	htable_release(ht);
-
+	/* TODO: handle large pages */
 	if (lpfn != NULL) {
-		*lpfn = top_pfn;
+		*lpfn = pfn;
 	}
 	if (lvl != NULL) {
-		*lvl = level;
+		*lvl = 0;
 	}
 	return (pfn);
 }
@@ -419,41 +373,8 @@ vm_object_pager_sg(vm_object_t vmo, uintptr_t off, pfn_t *lpfn, uint_t *lvl)
 	return (pfn);
 }
 
-static void
-vm_reserve_pages(size_t npages)
-{
-	uint_t retries = 60;
-	int rc;
-
-	mutex_enter(&freemem_lock);
-	if (availrmem < npages) {
-		mutex_exit(&freemem_lock);
-
-		/*
-		 * Set needfree and wait for the ZFS ARC reap thread to free up
-		 * some memory.
-		 */
-		page_needfree(npages);
-
-		mutex_enter(&freemem_lock);
-		while ((availrmem < npages) && retries-- > 0) {
-			mutex_exit(&freemem_lock);
-			rc = delay_sig(drv_usectohz(1 * MICROSEC));
-			mutex_enter(&freemem_lock);
-
-			if (rc == EINTR)
-				break;
-		}
-		mutex_exit(&freemem_lock);
-
-		page_needfree(-npages);
-	} else {
-		mutex_exit(&freemem_lock);
-	}
-}
-
 vm_object_t
-vm_object_allocate(objtype_t type, vm_pindex_t psize)
+vm_object_allocate(objtype_t type, vm_pindex_t psize, bool transient)
 {
 	vm_object_t vmo;
 	const size_t size = ptob((size_t)psize);
@@ -468,17 +389,19 @@ vm_object_allocate(objtype_t type, vm_pindex_t psize)
 
 	switch (type) {
 	case OBJT_DEFAULT: {
-		vm_reserve_pages(psize);
 
-		/* XXXJOY: opt-in to larger pages? */
-		vmo->vmo_data = vmem_alloc(vmm_alloc_arena, size, KM_NOSLEEP);
-		if (vmo->vmo_data == NULL) {
+		/* TODO: opt-in to larger pages? */
+		int err;
+		vmmr_region_t *region = NULL;
+
+		err = vmmr_alloc(size, transient, &region);
+		if (err != 0) {
 			mutex_destroy(&vmo->vmo_lock);
 			kmem_free(vmo, sizeof (*vmo));
 			return (NULL);
 		}
-		bzero(vmo->vmo_data, size);
-		vmo->vmo_pager = vm_object_pager_heap;
+		vmo->vmo_data = region;
+		vmo->vmo_pager = vm_object_pager_reservoir;
 	}
 		break;
 	case OBJT_SG:
@@ -505,7 +428,7 @@ vm_pager_allocate(objtype_t type, void *handle, vm_ooffset_t size,
 	VERIFY(type == OBJT_SG);
 	VERIFY(off == 0);
 
-	vmo = vm_object_allocate(type, size);
+	vmo = vm_object_allocate(type, size, false);
 	vmo->vmo_data = sg;
 
 	mutex_enter(&sg->sg_lock);
@@ -529,7 +452,7 @@ vm_object_deallocate(vm_object_t vmo)
 
 	switch (vmo->vmo_type) {
 	case OBJT_DEFAULT:
-		vmem_free(vmm_alloc_arena, vmo->vmo_data, vmo->vmo_size);
+		vmmr_free((vmmr_region_t *)vmo->vmo_data);
 		break;
 	case OBJT_SG:
 		sglist_free((struct sglist *)vmo->vmo_data);
@@ -572,6 +495,17 @@ vm_object_reference(vm_object_t vmo)
 	uint_t ref = atomic_inc_uint_nv(&vmo->vmo_refcnt);
 	/* overflow would be a deadly serious mistake */
 	VERIFY3U(ref, !=, 0);
+}
+
+pfn_t
+vm_object_pfn(vm_object_t vmo, uintptr_t off)
+{
+	/* This is expected to be used only on reservoir-backed memory */
+	if (vmo->vmo_type != OBJT_DEFAULT) {
+		return (PFN_INVALID);
+	}
+
+	return (vmo->vmo_pager(vmo, off, NULL, NULL));
 }
 
 static vmspace_mapping_t *
@@ -912,11 +846,9 @@ vm_segmap_obj(vm_object_t vmo, off_t map_off, size_t size, struct as *as,
 	if (err == 0) {
 		segvmm_crargs_t svma;
 
-		svma.kaddr = (caddr_t)vmo->vmo_data + map_off;
+		svma.obj = vmo;
+		svma.offset = map_off;
 		svma.prot = prot;
-		svma.cookie = vmo;
-		svma.hold = (segvmm_holdfn_t)vm_object_reference;
-		svma.rele = (segvmm_relefn_t)vm_object_deallocate;
 
 		err = as_map(as, *addrp, size, segvmm_create, &svma);
 	}
@@ -969,11 +901,9 @@ vm_segmap_space(struct vmspace *vms, off_t off, struct as *as, caddr_t *addrp,
 		VERIFY(mapoff < vmo->vmo_size);
 		VERIFY((mapoff + size) <= vmo->vmo_size);
 
-		svma.kaddr = (void *)((uintptr_t)vmo->vmo_data + mapoff);
+		svma.obj = vmo;
+		svma.offset = mapoff;
 		svma.prot = prot;
-		svma.cookie = vmo;
-		svma.hold = (segvmm_holdfn_t)vm_object_reference;
-		svma.rele = (segvmm_relefn_t)vm_object_deallocate;
 
 		err = as_map(as, *addrp, len, segvmm_create, &svma);
 	}

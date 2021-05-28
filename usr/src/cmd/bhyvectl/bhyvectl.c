@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -1953,8 +1953,13 @@ main(int argc, char *argv[])
 
 	error = 0;
 
+#ifndef __FreeBSD__
+	if (!error && create)
+		error = vm_create(vmname, 0);
+# else
 	if (!error && create)
 		error = vm_create(vmname);
+#endif /* __FreeBSD__ */
 
 	if (!error) {
 		ctx = vm_open(vmname);

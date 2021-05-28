@@ -45,6 +45,7 @@
 #include <sys/vmm_impl.h>
 #include <sys/vmm_drv.h>
 #include <sys/vmm_vm.h>
+#include <sys/vmm_reservoir.h>
 
 #include <vm/seg_dev.h>
 
@@ -1506,13 +1507,22 @@ vmm_hma_release(void)
 }
 
 static int
-vmmdev_do_vm_create(char *name, cred_t *cr)
+vmmdev_do_vm_create(const struct vm_create_req *req, cred_t *cr)
 {
 	vmm_softc_t	*sc = NULL;
 	minor_t		minor;
 	int		error = ENOMEM;
+	size_t		len;
+	const char	*name = req->name;
 
-	if (strnlen(name, VM_MAX_NAMELEN) >= VM_MAX_NAMELEN) {
+	len = strnlen(name, VM_MAX_NAMELEN);
+	if (len == 0) {
+		return (EINVAL);
+	}
+	if (len >= VM_MAX_NAMELEN) {
+		return (ENAMETOOLONG);
+	}
+	if (strchr(name, '/') != NULL) {
 		return (EINVAL);
 	}
 
@@ -1555,7 +1565,7 @@ vmmdev_do_vm_create(char *name, cred_t *cr)
 		goto fail;
 	}
 
-	error = vm_create(name, &sc->vmm_vm);
+	error = vm_create(req->name, req->flags, &sc->vmm_vm);
 	if (error == 0) {
 		/* Complete VM intialization and report success. */
 		(void) strlcpy(sc->vmm_name, name, sizeof (sc->vmm_name));
@@ -1938,7 +1948,7 @@ vmm_do_vm_destroy(vmm_softc_t *sc, boolean_t clean_zsd)
 
 /* ARGSUSED */
 static int
-vmmdev_do_vm_destroy(const char *name, cred_t *cr)
+vmmdev_do_vm_destroy(const struct vm_destroy_req *req, cred_t *cr)
 {
 	boolean_t	hma_release = B_FALSE;
 	vmm_softc_t	*sc;
@@ -1949,7 +1959,7 @@ vmmdev_do_vm_destroy(const char *name, cred_t *cr)
 
 	mutex_enter(&vmm_mtx);
 
-	if ((sc = vmm_lookup(name)) == NULL) {
+	if ((sc = vmm_lookup(req->name)) == NULL) {
 		mutex_exit(&vmm_mtx);
 		return (ENOENT);
 	}
@@ -2193,6 +2203,47 @@ vmm_is_supported(intptr_t arg)
 }
 
 static int
+vmm_ctl_ioctl(int cmd, intptr_t arg, int md, cred_t *cr, int *rvalp)
+{
+	void *argp = (void *)arg;
+
+	switch (cmd) {
+	case VMM_CREATE_VM: {
+		struct vm_create_req req;
+
+		if ((md & FWRITE) == 0) {
+			return (EPERM);
+		}
+		if (ddi_copyin(argp, &req, sizeof (req), md) != 0) {
+			return (EFAULT);
+		}
+		return (vmmdev_do_vm_create(&req, cr));
+	}
+	case VMM_DESTROY_VM: {
+		struct vm_destroy_req req;
+
+		if ((md & FWRITE) == 0) {
+			return (EPERM);
+		}
+		if (ddi_copyin(argp, &req, sizeof (req), md) != 0) {
+			return (EFAULT);
+		}
+		return (vmmdev_do_vm_destroy(&req, cr));
+	}
+	case VMM_VM_SUPPORTED:
+		return (vmm_is_supported(arg));
+	case VMM_RESV_QUERY:
+	case VMM_RESV_ADD:
+	case VMM_RESV_REMOVE:
+		return (vmmr_ioctl(cmd, arg, md, cr, rvalp));
+	default:
+		break;
+	}
+	/* No other actions are legal on ctl device */
+	return (ENOTTY);
+}
+
+static int
 vmm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
     int *rvalp)
 {
@@ -2207,36 +2258,7 @@ vmm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	minor = getminor(dev);
 
 	if (minor == VMM_CTL_MINOR) {
-		void *argp = (void *)arg;
-		char name[VM_MAX_NAMELEN] = { 0 };
-		size_t len = 0;
-
-		if ((mode & FKIOCTL) != 0) {
-			len = strlcpy(name, argp, sizeof (name));
-		} else {
-			if (copyinstr(argp, name, sizeof (name), &len) != 0) {
-				return (EFAULT);
-			}
-		}
-		if (len >= VM_MAX_NAMELEN) {
-			return (ENAMETOOLONG);
-		}
-
-		switch (cmd) {
-		case VMM_CREATE_VM:
-			if ((mode & FWRITE) == 0)
-				return (EPERM);
-			return (vmmdev_do_vm_create(name, credp));
-		case VMM_DESTROY_VM:
-			if ((mode & FWRITE) == 0)
-				return (EPERM);
-			return (vmmdev_do_vm_destroy(name, credp));
-		case VMM_VM_SUPPORTED:
-			return (vmm_is_supported(arg));
-		default:
-			/* No other actions are legal on ctl device */
-			return (ENOTTY);
-		}
+		return (vmm_ctl_ioctl(cmd, arg, mode, credp, rvalp));
 	}
 
 	sc = ddi_get_soft_state(vmm_statep, minor);
@@ -2422,7 +2444,6 @@ vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	vmm_sol_glue_init();
-	vmm_arena_init();
 
 	/*
 	 * Perform temporary HMA registration to determine if the system
@@ -2462,7 +2483,6 @@ fail:
 	if (reg != NULL) {
 		hma_unregister(reg);
 	}
-	vmm_arena_fini();
 	vmm_sol_glue_cleanup();
 	mutex_exit(&vmmdev_mtx);
 	return (DDI_FAILURE);
@@ -2494,6 +2514,11 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 	mutex_exit(&vmm_mtx);
 
+	if (!vmmr_is_empty()) {
+		mutex_exit(&vmmdev_mtx);
+		return (DDI_FAILURE);
+	}
+
 	VERIFY(vmmdev_sdev_hdl != (sdev_plugin_hdl_t)NULL);
 	if (sdev_plugin_unregister(vmmdev_sdev_hdl) != 0) {
 		mutex_exit(&vmmdev_mtx);
@@ -2507,7 +2532,6 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	VERIFY0(vmm_mod_unload());
 	VERIFY3U(vmmdev_hma_reg, ==, NULL);
-	vmm_arena_fini();
 	vmm_sol_glue_cleanup();
 
 	mutex_exit(&vmmdev_mtx);
@@ -2579,11 +2603,13 @@ _init(void)
 	}
 
 	vmm_zsd_init();
+	vmmr_init();
 
 	error = mod_install(&modlinkage);
 	if (error) {
 		ddi_soft_state_fini(&vmm_statep);
 		vmm_zsd_fini();
+		vmmr_fini();
 	}
 
 	return (error);
@@ -2600,6 +2626,7 @@ _fini(void)
 	}
 
 	vmm_zsd_fini();
+	vmmr_fini();
 
 	ddi_soft_state_fini(&vmm_statep);
 
