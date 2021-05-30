@@ -910,9 +910,6 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 	ASSERT(taddrmask != NULL);
 	addrmask(&addr, taddrmask);
 
-	ac.auth_flavor = flavor;
-	ac.auth_clnt_cred = crdup(cr);
-
 	acc.authc_addr = addr;
 
 	tree = exi->exi_cache[hash(&addr)];
@@ -964,6 +961,10 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 	ASSERT(c != NULL);
 
 	rw_enter(&c->authc_lock, RW_READER);
+
+	ac.auth_flavor = flavor;
+	ac.auth_clnt_cred = cr;
+
 	p = (struct auth_cache *)avl_find(&c->authc_tree, &ac, NULL);
 
 	if (p == NULL) {
@@ -983,7 +984,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 		 */
 		np->auth_clnt = c;
 		np->auth_flavor = flavor;
-		np->auth_clnt_cred = ac.auth_clnt_cred;
+		np->auth_clnt_cred = crdup(cr);
 		np->auth_srv_ngids = 0;
 		np->auth_srv_gids = NULL;
 		np->auth_time = np->auth_freshness = gethrestime_sec();
@@ -1004,12 +1005,11 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 
 			cv_destroy(&np->auth_cv);
 			mutex_destroy(&np->auth_lock);
-			crfree(ac.auth_clnt_cred);
+			crfree(np->auth_clnt_cred);
 			kmem_cache_free(exi_cache_handle, np);
 		}
 	} else {
 		rw_exit(&exi->exi_cache_lock);
-		crfree(ac.auth_clnt_cred);
 	}
 
 	mutex_enter(&p->auth_lock);
@@ -1212,7 +1212,6 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 	return (access);
 
 retrieve:
-	crfree(ac.auth_clnt_cred);
 
 	/*
 	 * Retrieve the required data without caching.
