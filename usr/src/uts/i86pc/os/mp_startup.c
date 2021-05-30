@@ -267,13 +267,8 @@ static void
 init_cpu_id_gdt(struct cpu *cp)
 {
 	/* Write cpu_id into limit field of GDT for usermode retrieval */
-#if defined(__amd64)
 	set_usegd(&cp->cpu_gdt[GDT_CPUID], SDP_SHORT, NULL, cp->cpu_id,
 	    SDT_MEMRODA, SEL_UPL, SDP_BYTES, SDP_OP32);
-#elif defined(__i386)
-	set_usegd(&cp->cpu_gdt[GDT_CPUID], NULL, cp->cpu_id, SDT_MEMRODA,
-	    SEL_UPL, SDP_BYTES, SDP_OP32);
-#endif
 }
 #endif /* !defined(__xpv) */
 
@@ -352,9 +347,7 @@ mp_cpu_configure_common(int cpun, boolean_t boot)
 	 */
 	sp = tp->t_stk;
 	tp->t_sp = (uintptr_t)(sp - MINFRAME);
-#if defined(__amd64)
 	tp->t_sp -= STACK_ENTRY_ALIGN;		/* fake a call */
-#endif
 	/*
 	 * Setup thread start entry point for boot or hotplug.
 	 */
@@ -421,13 +414,6 @@ mp_cpu_configure_common(int cpun, boolean_t boot)
 	cp->cpu_gdt = kmem_zalloc(PAGESIZE, KM_SLEEP);
 	bcopy(CPU->cpu_gdt, cp->cpu_gdt, (sizeof (*cp->cpu_gdt) * NGDT));
 
-#if defined(__i386)
-	/*
-	 * setup kernel %gs.
-	 */
-	set_usegd(&cp->cpu_gdt[GDT_GS], cp, sizeof (struct cpu) -1, SDT_MEMRWA,
-	    SEL_KPL, 0, 1);
-#endif
 
 	/*
 	 * Allocate pages for the CPU LDT.

@@ -71,8 +71,6 @@ extern int	apic_oneshot_enable;
 /* Now the ones for Dynamic Interrupt distribution */
 extern int	apic_enable_dynamic_migration;
 
-extern int apic_have_32bit_cr8;
-
 extern struct psm_ops *psmops;
 
 /*

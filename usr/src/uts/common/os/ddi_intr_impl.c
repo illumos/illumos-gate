@@ -35,7 +35,7 @@
 #include <sys/sunndi.h>
 #include <sys/ndi_impldefs.h>	/* include prototypes */
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 /*
  * MSI-X allocation limit.
  */
@@ -294,7 +294,7 @@ i_ddi_intr_get_limit(dev_info_t *dip, int type, ddi_irm_pool_t *pool_p)
 	limit = MIN(limit, nintrs);
 
 	/* Impose a global MSI-X limit on x86 */
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	if (type == DDI_INTR_TYPE_MSIX)
 		limit = MIN(limit, ddi_msix_alloc_limit);
 #endif
@@ -539,7 +539,7 @@ set_intr_affinity(ddi_intr_handle_t h, processorid_t tgt)
 	return (ret);
 }
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 ddi_acc_handle_t
 i_ddi_get_pci_config_handle(dev_info_t *dip)
 {

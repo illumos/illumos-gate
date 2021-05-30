@@ -878,7 +878,7 @@ load_bootpath_drivers(char *bootpath)
 #endif
 	dip = path_to_devinfo(pathcopy);
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	/*
 	 * i386 does not provide stub nodes for all boot devices,
 	 * but we should be able to find the node for the parent,

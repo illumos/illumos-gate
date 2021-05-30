@@ -251,7 +251,7 @@ aes_ccm_encrypt(CK_AES_CCM_PARAMS *cmparam, const uint8_t *key, int keylen,
 	mech.cm_param	  = (caddr_t)cmparam;
 	mech.cm_param_len = sizeof (CK_AES_CCM_PARAMS);
 
-#if defined(__amd64) || defined(__sparc)
+#if defined(_LP64)
 	ieee80211_dbg(IEEE80211_MSG_CRYPTO, "cm_type=%lx", mech.cm_type);
 #else
 	ieee80211_dbg(IEEE80211_MSG_CRYPTO, "cm_type=%llx", mech.cm_type);
@@ -304,7 +304,7 @@ aes_ccm_decrypt(CK_AES_CCM_PARAMS *cmparam, const uint8_t *key, int keylen,
 	mech.cm_param	  = (caddr_t)cmparam;
 	mech.cm_param_len = sizeof (CK_AES_CCM_PARAMS);
 
-#if defined(__amd64) || defined(__sparc)
+#if defined(_LP64)
 	ieee80211_dbg(IEEE80211_MSG_CRYPTO, "cm_type=%lx", mech.cm_type);
 #else
 	ieee80211_dbg(IEEE80211_MSG_CRYPTO, "cm_type=%llx", mech.cm_type);

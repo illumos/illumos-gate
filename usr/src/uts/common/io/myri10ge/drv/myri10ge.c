@@ -3687,26 +3687,9 @@ myri10ge_send_wrapper(void *arg, mblk_t *mp)
 	struct myri10ge_slice_state *ss = arg;
 	int err = 0;
 	mcp_kreq_ether_send_t *req_list;
-#if defined(__i386)
-	/*
-	 * We need about 2.5KB of scratch space to handle transmits.
-	 * i86pc has only 8KB of kernel stack space, so we malloc the
-	 * scratch space there rather than keeping it on the stack.
-	 */
-	size_t req_size, tx_info_size;
-	struct myri10ge_tx_buffer_state *tx_info;
-	caddr_t req_bytes;
-
-	req_size = sizeof (*req_list) * (MYRI10GE_MAX_SEND_DESC_TSO + 4)
-	    + 8;
-	req_bytes = kmem_alloc(req_size, KM_SLEEP);
-	tx_info_size = sizeof (*tx_info) * (MYRI10GE_MAX_SEND_DESC_TSO + 1);
-	tx_info = kmem_alloc(tx_info_size, KM_SLEEP);
-#else
 	char req_bytes[sizeof (*req_list) * (MYRI10GE_MAX_SEND_DESC_TSO + 4)
 	    + 8];
 	struct myri10ge_tx_buffer_state tx_info[MYRI10GE_MAX_SEND_DESC_TSO + 1];
-#endif
 
 	/* ensure req_list entries are aligned to 8 bytes */
 	req_list = (struct mcp_kreq_ether_send *)
@@ -3714,10 +3697,6 @@ myri10ge_send_wrapper(void *arg, mblk_t *mp)
 
 	err = myri10ge_send(ss, mp, req_list, tx_info);
 
-#if defined(__i386)
-	kmem_free(tx_info, tx_info_size);
-	kmem_free(req_bytes, req_size);
-#endif
 	if (err)
 		return (mp);
 	else

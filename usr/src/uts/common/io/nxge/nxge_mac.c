@@ -4830,21 +4830,13 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	bmcr.value = 0;
 	bmcr.bits.reset = 1;
 	if ((status = nxge_mii_write(nxgep, xcvr_portn,
-#if defined(__i386)
-	    (uint8_t)(uint32_t)&mii_regs->bmcr,
-#else
 	    (uint8_t)(uint64_t)&mii_regs->bmcr,
-#endif
 	    bmcr.value)) != NXGE_OK)
 		goto fail;
 	do {
 		drv_usecwait(500);
 		if ((status = nxge_mii_read(nxgep, xcvr_portn,
-#if defined(__i386)
-		    (uint8_t)(uint32_t)&mii_regs->bmcr,
-#else
 		    (uint8_t)(uint64_t)&mii_regs->bmcr,
-#endif
 		    &bmcr.value)) != NXGE_OK)
 			goto fail;
 		delay++;
@@ -4855,11 +4847,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	}
 
 	if ((status = nxge_mii_read(nxgep, xcvr_portn,
-#if defined(__i386)
-	    (uint8_t)(uint32_t)(&mii_regs->bmsr),
-#else
 	    (uint8_t)(uint64_t)(&mii_regs->bmsr),
-#endif
 	    &bmsr.value)) != NXGE_OK)
 		goto fail;
 
@@ -4904,11 +4892,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	 */
 	if (bmsr.bits.extend_status) {
 		if ((status = nxge_mii_read(nxgep, xcvr_portn,
-#if defined(__i386)
-		    (uint8_t)(uint32_t)(&mii_regs->esr),
-#else
 		    (uint8_t)(uint64_t)(&mii_regs->esr),
-#endif
 		    &esr.value)) != NXGE_OK)
 			goto fail;
 		param_arr[param_anar_1000fdx].value &= esr.bits.link_1000fdx;
@@ -4943,11 +4927,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	 */
 	bmcr.value = 0;
 	if ((status = nxge_mii_write(nxgep, xcvr_portn,
-#if defined(__i386)
-	    (uint8_t)(uint32_t)(&mii_regs->bmcr),
-#else
 	    (uint8_t)(uint64_t)(&mii_regs->bmcr),
-#endif
 	    bmcr.value)) != NXGE_OK)
 		goto fail;
 
@@ -5000,11 +4980,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 
 		/* Write to the auto-negotiation advertisement register */
 		if ((status = nxge_mii_write(nxgep, xcvr_portn,
-#if defined(__i386)
-		    (uint8_t)(uint32_t)(&mii_regs->anar),
-#else
 		    (uint8_t)(uint64_t)(&mii_regs->anar),
-#endif
 		    anar.value)) != NXGE_OK)
 			goto fail;
 		if (bmsr.bits.extend_status) {
@@ -5018,11 +4994,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 			gcr.bits.link_1000hdx =
 			    param_arr[param_anar_1000hdx].value;
 			if ((status = nxge_mii_write(nxgep, xcvr_portn,
-#if defined(__i386)
-			    (uint8_t)(uint32_t)(&mii_regs->gcr),
-#else
 			    (uint8_t)(uint64_t)(&mii_regs->gcr),
-#endif
 			    gcr.value)) != NXGE_OK)
 				goto fail;
 		}
@@ -5048,11 +5020,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 			gcr.bits.master =
 			    param_arr[param_master_cfg_value].value;
 			if ((status = nxge_mii_write(nxgep, xcvr_portn,
-#if defined(__i386)
-			    (uint8_t)(uint32_t)(&mii_regs->gcr),
-#else
 			    (uint8_t)(uint64_t)(&mii_regs->gcr),
-#endif
 			    gcr.value)) != NXGE_OK)
 				goto fail;
 			if (param_arr[param_anar_1000fdx].value) {
@@ -5095,11 +5063,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 				gcr.bits.ms_mode_en = 1;
 				gcr.bits.master = 1;
 				if ((status = nxge_mii_write(nxgep, xcvr_portn,
-#if defined(__i386)
-				    (uint8_t)(uint32_t)(&mii_regs->gcr),
-#else
 				    (uint8_t)(uint64_t)(&mii_regs->gcr),
-#endif
 				    gcr.value)) != NXGE_OK)
 					goto fail;
 				bmcr.value = 0;
@@ -5123,20 +5087,12 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	}
 
 	if ((status = nxge_mii_write(nxgep, xcvr_portn,
-#if defined(__i386)
-	    (uint8_t)(uint32_t)(&mii_regs->bmcr),
-#else
 	    (uint8_t)(uint64_t)(&mii_regs->bmcr),
-#endif
 	    bmcr.value)) != NXGE_OK)
 		goto fail;
 
 	if ((status = nxge_mii_read(nxgep, xcvr_portn,
-#if defined(__i386)
-	    (uint8_t)(uint32_t)(&mii_regs->bmcr),
-#else
 	    (uint8_t)(uint64_t)(&mii_regs->bmcr),
-#endif
 	    &bmcr.value)) != NXGE_OK)
 		goto fail;
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "bmcr = 0x%04X", bmcr.value));
@@ -5147,11 +5103,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	nxgep->soft_bmsr.value = 0;
 
 	if ((status = nxge_mii_read(nxgep, xcvr_portn,
-#if defined(__i386)
-	    (uint8_t)(uint32_t)(&mii_regs->bmsr),
-#else
 	    (uint8_t)(uint64_t)(&mii_regs->bmsr),
-#endif
 	    &nxgep->bmsr.value)) != NXGE_OK)
 		goto fail;
 
@@ -5199,29 +5151,15 @@ nxge_mii_xcvr_fiber_init(p_nxge_t nxgep)
 	bmcr.value = 0;
 	bmcr.bits.reset = 1;
 
-#if defined(__i386)
-
-	if ((status = nxge_mii_write(nxgep, xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->bmcr), bmcr.value)) != NXGE_OK)
-		goto fail;
-#else
 	if ((status = nxge_mii_write(nxgep, xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->bmcr), bmcr.value)) != NXGE_OK)
 		goto fail;
-#endif
 	do {
 		drv_usecwait(500);
-#if defined(__i386)
-		if ((status = nxge_mii_read(nxgep, xcvr_portn,
-		    (uint8_t)(uint32_t)(&mii_regs->bmcr), &bmcr.value))
-		    != NXGE_OK)
-			goto fail;
-#else
 		if ((status = nxge_mii_read(nxgep, xcvr_portn,
 		    (uint8_t)(uint64_t)(&mii_regs->bmcr), &bmcr.value))
 		    != NXGE_OK)
 			goto fail;
-#endif
 		delay++;
 	} while ((bmcr.bits.reset) && (delay < 1000));
 	if (delay == 1000) {
@@ -5229,15 +5167,9 @@ nxge_mii_xcvr_fiber_init(p_nxge_t nxgep)
 		goto fail;
 	}
 
-#if defined(__i386)
-	if ((status = nxge_mii_read(nxgep, xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->bmsr), &bmsr.value)) != NXGE_OK)
-		goto fail;
-#else
 	if ((status = nxge_mii_read(nxgep, xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->bmsr), &bmsr.value)) != NXGE_OK)
 		goto fail;
-#endif
 
 	param_arr[param_autoneg].value &= bmsr.bits.auto_neg_able;
 	param_arr[param_anar_100T4].value = 0;
@@ -5278,17 +5210,10 @@ nxge_mii_xcvr_fiber_init(p_nxge_t nxgep)
 	 * running a Gigibit phy.
 	 */
 	if (bmsr.bits.extend_status) {
-#if defined(__i386)
-		if ((status = nxge_mii_read(nxgep, xcvr_portn,
-		    (uint8_t)(uint32_t)(&mii_regs->esr), &esr.value)) !=
-		    NXGE_OK)
-			goto fail;
-#else
 		if ((status = nxge_mii_read(nxgep, xcvr_portn,
 		    (uint8_t)(uint64_t)(&mii_regs->esr), &esr.value)) !=
 		    NXGE_OK)
 			goto fail;
-#endif
 		param_arr[param_anar_1000fdx].value &=
 		    esr.bits.link_1000fdx;
 		param_arr[param_anar_1000hdx].value = 0;
@@ -5321,15 +5246,9 @@ nxge_mii_xcvr_fiber_init(p_nxge_t nxgep)
 	 * Switch off Auto-negotiation, 100M and full duplex.
 	 */
 	bmcr.value = 0;
-#if defined(__i386)
-	if ((status = nxge_mii_write(nxgep, xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->bmcr), bmcr.value)) != NXGE_OK)
-		goto fail;
-#else
 	if ((status = nxge_mii_write(nxgep, xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->bmcr), bmcr.value)) != NXGE_OK)
 		goto fail;
-#endif
 
 	if ((statsp->port_stats.lb_mode == nxge_lb_phy) ||
 	    (statsp->port_stats.lb_mode == nxge_lb_phy1000)) {
@@ -5365,47 +5284,27 @@ nxge_mii_xcvr_fiber_init(p_nxge_t nxgep)
 		gcr.value = 0;
 		gcr.bits.ms_mode_en = 1;
 		gcr.bits.master = 1;
-#if defined(__i386)
-		if ((status = nxge_mii_write(nxgep, xcvr_portn,
-		    (uint8_t)(uint32_t)(&mii_regs->gcr),
-		    gcr.value)) != NXGE_OK)
-			goto fail;
-#else
 		if ((status = nxge_mii_write(nxgep, xcvr_portn,
 		    (uint8_t)(uint64_t)(&mii_regs->gcr),
 		    gcr.value)) != NXGE_OK)
 			goto fail;
-#endif
 		bmcr.value = 0;
 		bmcr.bits.speed_1000_sel = 1;
 		statsp->mac_stats.link_speed = 1000;
 	}
 
-#if defined(__i386)
-	if ((status = nxge_mii_write(nxgep, xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->bmcr),
-	    bmcr.value)) != NXGE_OK)
-		goto fail;
-#else
 	if ((status = nxge_mii_write(nxgep, xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->bmcr),
 	    bmcr.value)) != NXGE_OK)
 		goto fail;
-#endif
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "nxge_mii_xcvr_fiber_init: value wrote bmcr = 0x%x",
 	    bmcr.value));
 
-#if defined(__i386)
-	if ((status = nxge_mii_read(nxgep, xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->bmcr), &bmcr.value)) != NXGE_OK)
-		goto fail;
-#else
 	if ((status = nxge_mii_read(nxgep, xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->bmcr), &bmcr.value)) != NXGE_OK)
 		goto fail;
-#endif
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "nxge_mii_xcvr_fiber_init: read bmcr = 0x%04X", bmcr.value));
@@ -5414,17 +5313,10 @@ nxge_mii_xcvr_fiber_init(p_nxge_t nxgep)
 	 * Initialize the xcvr status kept in the context structure.
 	 */
 	nxgep->soft_bmsr.value = 0;
-#if defined(__i386)
-	if ((status = nxge_mii_read(nxgep, xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->bmsr),
-	    &nxgep->bmsr.value)) != NXGE_OK)
-		goto fail;
-#else
 	if ((status = nxge_mii_read(nxgep, xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->bmsr),
 	    &nxgep->bmsr.value)) != NXGE_OK)
 		goto fail;
-#endif
 
 	statsp->mac_stats.xcvr_inits++;
 	nxgep->bmsr.value = 0;
@@ -5695,29 +5587,17 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
 		    param_arr[param_autoneg].value) {
 			if ((status = nxge_mii_read(nxgep,
 			    statsp->mac_stats.xcvr_portn,
-#if defined(__i386)
-			    (uint8_t)(uint32_t)(&mii_regs->anar),
-#else
 			    (uint8_t)(uint64_t)(&mii_regs->anar),
-#endif
 			    &anar.value)) != NXGE_OK)
 				goto fail;
 			if ((status = nxge_mii_read(nxgep,
 			    statsp->mac_stats.xcvr_portn,
-#if defined(__i386)
-			    (uint8_t)(uint32_t)(&mii_regs->anlpar),
-#else
 			    (uint8_t)(uint64_t)(&mii_regs->anlpar),
-#endif
 			    &anlpar.value)) != NXGE_OK)
 				goto fail;
 			if ((status = nxge_mii_read(nxgep,
 			    statsp->mac_stats.xcvr_portn,
-#if defined(__i386)
-			    (uint8_t)(uint32_t)(&mii_regs->aner),
-#else
 			    (uint8_t)(uint64_t)(&mii_regs->aner),
-#endif
 			    &aner.value)) != NXGE_OK)
 				goto fail;
 			statsp->mac_stats.lp_cap_autoneg = aner.bits.lp_an_able;
@@ -5736,11 +5616,7 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
 			    param_arr[param_anar_1000hdx].value) {
 				if ((status = nxge_mii_read(nxgep,
 				    statsp->mac_stats.xcvr_portn,
-#if defined(__i386)
-				    (uint8_t)(uint32_t)(&mii_regs->gsr),
-#else
 				    (uint8_t)(uint64_t)(&mii_regs->gsr),
-#endif
 				    &gsr.value)) != NXGE_OK)
 					goto fail;
 				statsp->mac_stats.lp_cap_1000fdx =
@@ -6069,11 +5945,7 @@ nxge_check_mii_link(p_nxge_t nxgep)
 		bmsr_data.value = 0;
 		if ((status = nxge_mii_read(nxgep,
 		    nxgep->statsp->mac_stats.xcvr_portn,
-#if defined(__i386)
-		    (uint8_t)(uint32_t)(&mii_regs->bmsr),
-#else
 		    (uint8_t)(uint64_t)(&mii_regs->bmsr),
-#endif
 		    &bmsr_data.value)) != NXGE_OK) {
 			goto fail;
 		}
@@ -6086,20 +5958,12 @@ nxge_check_mii_link(p_nxge_t nxgep)
 		if (nxgep->param_arr[param_autoneg].value) {
 			if ((status = nxge_mii_read(nxgep,
 			    nxgep->statsp->mac_stats.xcvr_portn,
-#if defined(__i386)
-			    (uint8_t)(uint32_t)(&mii_regs->gsr),
-#else
 			    (uint8_t)(uint64_t)(&mii_regs->gsr),
-#endif
 			    &gsr.value)) != NXGE_OK)
 				goto fail;
 			if ((status = nxge_mii_read(nxgep,
 			    nxgep->statsp->mac_stats.xcvr_portn,
-#if defined(__i386)
-			    (uint8_t)(uint32_t)(&mii_regs->anlpar),
-#else
 			    (uint8_t)(uint64_t)(&mii_regs->anlpar),
-#endif
 			    &anlpar.value)) != NXGE_OK)
 				goto fail;
 			if (nxgep->mac.portmode != PORT_1G_RGMII_FIBER) {
@@ -8544,31 +8408,16 @@ nxge_mii_get_link_mode(p_nxge_t nxgep)
 	mii_regs = NULL;
 	mode.value = 0;
 	mode.bits.shadow = NXGE_MII_MODE_CONTROL_REG;
-#if defined(__i386)
-	if ((status = nxge_mii_write(nxgep, xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->shadow),
-	    mode.value)) != NXGE_OK) {
-		goto fail;
-#else
 	if ((status = nxge_mii_write(nxgep, xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->shadow),
 	    mode.value)) != NXGE_OK) {
 		goto fail;
-#endif
 	}
-#if defined(__i386)
-	if ((status = nxge_mii_read(nxgep, xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->shadow),
-	    &mode.value)) != NXGE_OK) {
-		goto fail;
-	}
-#else
 	if ((status = nxge_mii_read(nxgep, xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->shadow),
 	    &mode.value)) != NXGE_OK) {
 		goto fail;
 	}
-#endif
 
 	if (mode.bits.mode == NXGE_MODE_SELECT_FIBER) {
 		nxgep->mac.portmode = PORT_1G_RGMII_FIBER;
@@ -8804,50 +8653,27 @@ nxge_mii_dump(p_nxge_t nxgep)
 
 	mii_regs = NULL;
 
-#if defined(__i386)
-	(void) nxge_mii_read(nxgep, nxgep->statsp->mac_stats.xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->bmcr), &bmcr.value);
-#else
 	(void) nxge_mii_read(nxgep, nxgep->statsp->mac_stats.xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->bmcr), &bmcr.value);
-#endif
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 	    "nxge_mii_dump: bmcr (0) xcvr 0x%x value 0x%x",
 	    xcvr_portn, bmcr.value));
 
-#if defined(__i386)
-	(void) nxge_mii_read(nxgep,
-	    nxgep->statsp->mac_stats.xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->bmsr), &bmsr.value);
-#else
 	(void) nxge_mii_read(nxgep,
 	    nxgep->statsp->mac_stats.xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->bmsr), &bmsr.value);
-#endif
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 	    "nxge_mii_dump: bmsr (1) xcvr 0x%x value 0x%x",
 	    xcvr_portn, bmsr.value));
 
-#if defined(__i386)
-	(void) nxge_mii_read(nxgep,
-	    nxgep->statsp->mac_stats.xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->idr1), &idr1.value);
-#else
 	(void) nxge_mii_read(nxgep,
 	    nxgep->statsp->mac_stats.xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->idr1), &idr1.value);
-#endif
 
 
-#if defined(__i386)
-	(void) nxge_mii_read(nxgep,
-	    nxgep->statsp->mac_stats.xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->idr2), &idr2.value);
-#else
 	(void) nxge_mii_read(nxgep,
 	    nxgep->statsp->mac_stats.xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->idr2), &idr2.value);
-#endif
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 	    "nxge_mii_dump: idr1 (2) xcvr 0x%x value 0x%x",
@@ -8860,19 +8686,11 @@ nxge_mii_dump(p_nxge_t nxgep)
 	mode.value = 0;
 	mode.bits.shadow = NXGE_MII_MODE_CONTROL_REG;
 
-#if defined(__i386)
-	(void) nxge_mii_write(nxgep, xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->shadow), mode.value);
-
-	(void) nxge_mii_read(nxgep, xcvr_portn,
-	    (uint8_t)(uint32_t)(&mii_regs->shadow), &mode.value);
-#else
 	(void) nxge_mii_write(nxgep, xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->shadow), mode.value);
 
 	(void) nxge_mii_read(nxgep, xcvr_portn,
 	    (uint8_t)(uint64_t)(&mii_regs->shadow), &mode.value);
-#endif
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 	    "nxge_mii_dump: mode control xcvr 0x%x value 0x%x",

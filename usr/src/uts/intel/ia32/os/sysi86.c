@@ -268,11 +268,7 @@ usd_to_ssd(user_desc_t *usd, struct ssd *ssd, selector_t sel)
 	 */
 	ssd->acc2 = usd->usd_avl;
 
-#if defined(__amd64)
 	ssd->acc2 |= usd->usd_long << 1;
-#else
-	ssd->acc2 |= usd->usd_reserved << 1;
-#endif
 
 	ssd->acc2 |= usd->usd_def32 << (1 + 1);
 	ssd->acc2 |= usd->usd_gran << (1 + 1 + 1);
@@ -304,11 +300,7 @@ ssd_to_usd(struct ssd *ssd, user_desc_t *usd)
 	 * 64-bit code selectors are never allowed in the LDT.
 	 * Reserved bit is always 0 on 32-bit systems.
 	 */
-#if defined(__amd64)
 	usd->usd_long = 0;
-#else
-	usd->usd_reserved = 0;
-#endif
 
 	/*
 	 * set avl, DB and granularity bits.
@@ -319,31 +311,6 @@ ssd_to_usd(struct ssd *ssd, user_desc_t *usd)
 }
 
 
-#if defined(__i386)
-
-static void
-ssd_to_sgd(struct ssd *ssd, gate_desc_t *sgd)
-{
-
-	ASSERT(bcmp(sgd, &null_sdesc, sizeof (*sgd)) == 0);
-
-	sgd->sgd_looffset = ssd->bo;
-	sgd->sgd_hioffset = ssd->bo >> 16;
-
-	sgd->sgd_selector = ssd->ls;
-
-	/*
-	 * set type, dpl and present bits.
-	 */
-	sgd->sgd_type = ssd->acc1;
-	sgd->sgd_dpl = ssd->acc1 >> 5;
-	sgd->sgd_p = ssd->acc1 >> 7;
-	ASSERT(sgd->sgd_type == SDT_SYSCGT);
-	ASSERT(sgd->sgd_dpl == SEL_UPL);
-	sgd->sgd_stkcpy = 0;
-}
-
-#endif	/* __i386 */
 
 /*
  * Load LDT register with the current process's LDT.
@@ -396,7 +363,6 @@ ldt_savectx(proc_t *p)
 	ASSERT(p->p_ldt != NULL);
 	ASSERT(p == curproc);
 
-#if defined(__amd64)
 	/*
 	 * The 64-bit kernel must be sure to clear any stale ldt
 	 * selectors when context switching away from a process that
@@ -415,7 +381,6 @@ ldt_savectx(proc_t *p)
 	 *	ldtr register pointing to the private ldt.
 	 */
 	reset_sregs();
-#endif
 
 	ldt_unload();
 	cpu_fast_syscall_enable();
@@ -618,16 +583,13 @@ setdscr(struct ssd *ssd)
 		do {
 			klwp_t *lwp = ttolwp(t);
 			struct regs *rp = lwp->lwp_regs;
-#if defined(__amd64)
 			pcb_t *pcb = &lwp->lwp_pcb;
-#endif
 
 			if (ssd->sel == rp->r_cs || ssd->sel == rp->r_ss) {
 				bad = 1;
 				break;
 			}
 
-#if defined(__amd64)
 			if (PCB_NEED_UPDATE_SEGS(pcb)) {
 				if (ssd->sel == pcb->pcb_ds ||
 				    ssd->sel == pcb->pcb_es ||
@@ -636,9 +598,7 @@ setdscr(struct ssd *ssd)
 					bad = 1;
 					break;
 				}
-			} else
-#endif
-			{
+			} else {
 				if (ssd->sel == rp->r_ds ||
 				    ssd->sel == rp->r_es ||
 				    ssd->sel == rp->r_fs ||

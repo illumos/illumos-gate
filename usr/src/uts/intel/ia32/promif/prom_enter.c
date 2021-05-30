@@ -39,10 +39,6 @@
 void
 prom_enter_mon(void)
 {
-#if defined(I386BOOT)
-	return;
-#endif
-
 #if defined(_KMDB)
 	prom_exit_to_mon();
 #endif

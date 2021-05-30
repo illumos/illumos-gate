@@ -24,10 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rge.h"
-
 
 /*
  * Global variable for default debug flags
@@ -197,7 +194,7 @@ minidump(rge_t *rgep, const char *caption, void *dp, uint_t len)
 		bzero(buf, sizeof (buf));
 		bcopy(dp, buf, nbytes);
 		rge_log(rgep, "%08x %08x %08x %08x",
-			buf[0], buf[1], buf[2], buf[3]);
+		    buf[0], buf[1], buf[2], buf[3]);
 		dp = (caddr_t)dp + nbytes;
 	}
 }
@@ -210,21 +207,21 @@ rge_pkt_dump(rge_t *rgep, rge_bd_t *hrbdp, sw_rbd_t *srbdp, const char *msg)
 	minidump(rgep, "hardware descriptor", hrbdp, sizeof (*hrbdp));
 
 	rge_log(rgep, "PCI address %lx flags_len 0x%x"
-			"vlan_tag 0x%x",
-			hrbdp->host_buf_addr,
-			hrbdp->flags_len,
-			hrbdp->vlan_tag);
+	    "vlan_tag 0x%x",
+	    hrbdp->host_buf_addr,
+	    hrbdp->flags_len,
+	    hrbdp->vlan_tag);
 
 	if (srbdp != NULL) {
 		minidump(rgep, "software descriptor", srbdp, sizeof (*srbdp));
 
 		rge_log(rgep, "PCI address %llx buffer len 0x%x token 0x%x",
-			srbdp->rx_buf->pbuf.cookie.dmac_laddress,
-			srbdp->rx_buf->pbuf.alength,
-			srbdp->rx_buf->pbuf.token);
+		    srbdp->rx_buf->pbuf.cookie.dmac_laddress,
+		    srbdp->rx_buf->pbuf.alength,
+		    srbdp->rx_buf->pbuf.token);
 
 		minidump(rgep, "packet data", srbdp->rx_buf->pbuf.mem_va,
-			hrbdp->flags_len & RBD_LEN_MASK);
+		    hrbdp->flags_len & RBD_LEN_MASK);
 	}
 }
 

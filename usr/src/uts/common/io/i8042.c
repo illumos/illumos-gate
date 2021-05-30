@@ -86,7 +86,7 @@
 #if defined(__sparc)
 #define	I8042_CMD_DISABLE_ALL	0x34
 #define	I8042_CMD_ENABLE_ALL	0x07
-#elif defined(__i386) || defined(__amd64)
+#elif defined(__x86)
 #define	I8042_CMD_DISABLE_ALL	0x74
 #define	I8042_CMD_ENABLE_ALL	0x47
 #endif
@@ -346,7 +346,7 @@ static struct dev_ops i8042_ops = {
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
-	&mod_driverops, 	/* Type of module.  This one is a driver */
+	&mod_driverops,		/* Type of module.  This one is a driver */
 	"i8042 nexus driver",	/* Name of module. */
 	&i8042_ops,		/* driver ops */
 };
@@ -1456,7 +1456,7 @@ i8042_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 static int
 i8042_ctlops(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t op, void *arg, void *result)
+    ddi_ctl_enum_t op, void *arg, void *result)
 {
 	int	*iprop;
 	unsigned int	iprop_len;
@@ -1507,7 +1507,7 @@ i8042_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	/* NOTREACHED */
 }
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 static dev_info_t *
 i8042_devi_findchild_by_node_name(dev_info_t *pdip, char *nodename)
 {
@@ -1587,7 +1587,7 @@ static int
 i8042_bus_config(dev_info_t *parent, uint_t flags,
     ddi_bus_config_op_t op, void *arg, dev_info_t **childp)
 {
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	int nodes_needed = 0;
 	int circ;
 

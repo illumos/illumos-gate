@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
@@ -53,7 +51,7 @@ static uchar_t hkscs_special_sequence[][4] = {
 	{ 0xc3, 0x8a, 0xcc, 0x84 },	/* 0x8862 */
 	{ 0xc3, 0x8a, 0xcc, 0x8c },	/* 0x8864 */
 	{ 0xc3, 0xaa, 0xcc, 0x84 },	/* 0x88a3 */
-	{ 0xc3, 0xaa, 0xcc, 0x8c } 	/* 0x88a5 */
+	{ 0xc3, 0xaa, 0xcc, 0x8c }	/* 0x88a5 */
 };
 
 /* 4 Unicode code point pair map to 1 HKSCS-2004 code point. */
@@ -132,8 +130,8 @@ close_fr_tc(void *s)
  */
 static size_t
 kiconv_fr_big5_common(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno,
-	kiconv_big5toutf8_t ptr_big5touf8)
+    char **outbuf, size_t *outbytesleft, int *errno,
+    kiconv_big5toutf8_t ptr_big5touf8)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -298,7 +296,7 @@ REPLACE_INVALID:
  */
 static size_t
 kiconv_fr_big5(void *kcd, char **inbuf, size_t *inbytesleft, char **outbuf,
-	size_t *outbytesleft, int *errno)
+    size_t *outbytesleft, int *errno)
 {
 	return (kiconv_fr_big5_common(kcd, inbuf, inbytesleft, outbuf,
 	    outbytesleft, errno, big5_to_utf8));
@@ -332,7 +330,7 @@ kiconv_fr_big5hkscs(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 static size_t
 kiconvstr_fr_big5hkscs(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	return kiconvstr_fr_big5_common((uchar_t *)inarray, inlen,
 	    (uchar_t *)outarray, outlen, flag, errno, big5hkscs_to_utf8);
@@ -354,7 +352,7 @@ kiconv_fr_cp950hkscs(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 static size_t
 kiconvstr_fr_cp950hkscs(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	return kiconvstr_fr_big5_common((uchar_t *)inarray, inlen,
 	    (uchar_t *)outarray, outlen, flag, errno, cp950hkscs_to_utf8);
@@ -365,7 +363,7 @@ kiconvstr_fr_cp950hkscs(char *inarray, size_t *inlen, char *outarray,
  */
 static size_t
 kiconv_fr_euctw(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -464,7 +462,7 @@ kiconv_fr_euctw(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 static size_t
 kiconvstr_fr_euctw(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -560,7 +558,7 @@ REPLACE_INVALID:
  */
 static size_t
 kiconv_to_big5(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	return kiconv_utf8_to_cck(kcd, inbuf, inbytesleft, outbuf,
 	    outbytesleft, errno, utf8_to_big5);
@@ -571,7 +569,7 @@ kiconv_to_big5(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 static size_t
 kiconvstr_to_big5(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	return kiconvstr_utf8_to_cck((uchar_t *)inarray, inlen,
 	    (uchar_t *)outarray, outlen, flag, errno, utf8_to_big5);
@@ -582,7 +580,7 @@ kiconvstr_to_big5(char *inarray, size_t *inlen, char *outarray,
  */
 static size_t
 kiconv_to_euctw(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	return kiconv_utf8_to_cck(kcd, inbuf, inbytesleft, outbuf,
 	    outbytesleft, errno, utf8_to_euctw);
@@ -593,7 +591,7 @@ kiconv_to_euctw(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 static size_t
 kiconvstr_to_euctw(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	return kiconvstr_utf8_to_cck((uchar_t *)inarray, inlen,
 	    (uchar_t *)outarray, outlen, flag, errno, utf8_to_euctw);
@@ -604,7 +602,7 @@ kiconvstr_to_euctw(char *inarray, size_t *inlen, char *outarray,
  */
 static size_t
 kiconv_to_cp950hkscs(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	return kiconv_utf8_to_cck(kcd, inbuf, inbytesleft, outbuf,
 	    outbytesleft, errno, utf8_to_cp950hkscs);
@@ -615,7 +613,7 @@ kiconv_to_cp950hkscs(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 static size_t
 kiconvstr_to_cp950hkscs(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	return kiconvstr_utf8_to_cck((uchar_t *)inarray, inlen,
 	    (uchar_t *)outarray, outlen, flag, errno, utf8_to_cp950hkscs);
@@ -626,7 +624,7 @@ kiconvstr_to_cp950hkscs(char *inarray, size_t *inlen, char *outarray,
  */
 static size_t
 kiconv_to_big5hkscs(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	return kiconv_utf8_to_cck(kcd, inbuf, inbytesleft, outbuf,
 	    outbytesleft, errno, utf8_to_big5hkscs);
@@ -650,7 +648,7 @@ kiconvstr_to_big5hkscs(char *inarray, size_t *inlen, char *outarray,
  */
 static int8_t
 big5_to_utf8_common(uint32_t big5_val, uchar_t *ob, uchar_t *obtail,
-	size_t *ret_val, kiconv_table_array_t *table, size_t nitems)
+    size_t *ret_val, kiconv_table_array_t *table, size_t nitems)
 {
 	size_t	index;
 	int8_t	sz;
@@ -689,7 +687,7 @@ big5_to_utf8(uint32_t big5_val, uchar_t *ob, uchar_t *obtail, size_t *ret_val)
  */
 static int8_t
 cp950hkscs_to_utf8(uint32_t hkscs_val, uchar_t *ob, uchar_t *obtail,
-	size_t *ret_val)
+    size_t *ret_val)
 {
 	return (big5_to_utf8_common(hkscs_val, ob, obtail, ret_val,
 	    kiconv_cp950hkscs_utf8, KICONV_CP950HKSCS_UTF8_MAX));
@@ -720,7 +718,7 @@ get_unicode_from_UDA(size_t plane_no, uchar_t b1, uchar_t b2)
  */
 static int8_t
 euctw_to_utf8(size_t plane_no, uint32_t euctw_val, uchar_t *ob,
-	uchar_t *obtail, size_t *ret_val)
+    uchar_t *obtail, size_t *ret_val)
 {
 	uint32_t u32;
 	size_t	index;
@@ -813,7 +811,7 @@ euctw_to_utf8(size_t plane_no, uint32_t euctw_val, uchar_t *ob,
  */
 static int8_t
 big5hkscs_to_utf8(uint32_t hkscs_val, uchar_t *ob, uchar_t *obtail,
-	size_t *ret_val)
+    size_t *ret_val)
 {
 	size_t	index;
 	int8_t	sz;
@@ -856,7 +854,7 @@ big5hkscs_to_utf8(uint32_t hkscs_val, uchar_t *ob, uchar_t *obtail,
 /* ARGSUSED */
 static int8_t
 utf8_to_euctw(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
-	uchar_t *ob, uchar_t *obtail, size_t *ret_val)
+    uchar_t *ob, uchar_t *obtail, size_t *ret_val)
 {
 	size_t		index;
 	size_t		plane_no;
@@ -981,7 +979,7 @@ utf8_to_big5hkscs(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
  */
 static int8_t
 utf8_to_big5_common(uint32_t utf8, uchar_t *ob, uchar_t *obtail,
-	size_t *ret_val, kiconv_table_t *table, size_t nitems)
+    size_t *ret_val, kiconv_table_t *table, size_t nitems)
 {
 	size_t		index;
 	int8_t		big5len;
@@ -1012,7 +1010,7 @@ utf8_to_big5_common(uint32_t utf8, uchar_t *ob, uchar_t *obtail,
 /* ARGSUSED */
 static int8_t
 utf8_to_big5(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
-	uchar_t *ob, uchar_t *obtail, size_t *ret_val)
+    uchar_t *ob, uchar_t *obtail, size_t *ret_val)
 {
 	return (utf8_to_big5_common(utf8, ob, obtail, ret_val,
 	    kiconv_utf8_big5, KICONV_UTF8_BIG5_MAX));
@@ -1024,7 +1022,7 @@ utf8_to_big5(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
 /* ARGSUSED */
 static int8_t
 utf8_to_cp950hkscs(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
-	uchar_t *ob, uchar_t *obtail, size_t *ret_val)
+    uchar_t *ob, uchar_t *obtail, size_t *ret_val)
 {
 	return (utf8_to_big5_common(utf8, ob, obtail, ret_val,
 	    kiconv_utf8_cp950hkscs, KICONV_UTF8_CP950HKSCS));

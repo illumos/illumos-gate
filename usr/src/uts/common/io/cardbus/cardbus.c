@@ -58,7 +58,7 @@
 
 #ifdef sparc
 #include <sys/ddi_subrdefs.h>
-#elif defined(__x86) || defined(__amd64)
+#elif defined(__x86)
 #include <sys/pci_intr_lib.h>
 #include <sys/mach_intr.h>
 #endif
@@ -1092,7 +1092,7 @@ cardbus_init_child_regs(dev_info_t *child)
 {
 	ddi_acc_handle_t config_handle;
 	uint16_t command_preserve, command;
-#if !defined(__i386) && !defined(__amd64)
+#if !defined(__x86)
 	uint8_t bcr;
 #endif
 	uint8_t header_type;
@@ -1139,7 +1139,7 @@ cardbus_init_child_regs(dev_info_t *child)
 	pci_config_put16(config_handle, PCI_CONF_COMM, command);
 	command = pci_config_get16(config_handle, PCI_CONF_COMM);
 
-#if !defined(__i386) && !defined(__amd64)
+#if !defined(__x86)
 	/*
 	 * If the device has a bus control register then program it
 	 * based on the settings in the command register.
@@ -1265,7 +1265,7 @@ cardbus_initchild(dev_info_t *rdip, dev_info_t *dip, dev_info_t *child,
 		    kmem_zalloc(sizeof (struct cardbus_parent_private_data),
 		    KM_SLEEP);
 
-#elif defined(__x86) || defined(__amd64)
+#elif defined(__x86)
 		ppd = (struct cardbus_parent_private_data *)
 		    kmem_zalloc(sizeof (struct cardbus_parent_private_data)
 		    + sizeof (struct intrspec), KM_SLEEP);
@@ -1369,7 +1369,7 @@ cardbus_removechild(dev_info_t *dip)
 			    ppd->ppd.par_nreg * sizeof (struct regspec));
 #ifdef sparc
 		kmem_free(ppd, sizeof (struct cardbus_parent_private_data));
-#elif defined(__x86) || defined(__amd64)
+#elif defined(__x86)
 		kmem_free(ppd, sizeof (struct cardbus_parent_private_data) +
 		    sizeof (struct intrspec));
 #endif

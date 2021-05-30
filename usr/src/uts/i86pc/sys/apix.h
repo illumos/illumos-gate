@@ -76,11 +76,11 @@ enum {
 
 /*
  * Number of interrupt vectors reserved by software on each LOCAL APIC:
- * 	1. Dtrace
+ *	1. Dtrace
  *	2. int80
  *	3. system-call
  *	4. fast-trap
- * 	5. apix-reserved
+ *	5. apix-reserved
  */
 #define	APIX_SW_RESERVED_VECTORS	5
 
@@ -244,11 +244,6 @@ extern int apic_acpi_translate_pci_irq(dev_info_t *dip, int busid, int devid,
 extern int apic_handle_pci_pci_bridge(dev_info_t *idip, int child_devno,
     int child_ipin, struct apic_io_intr **intrp);
 extern void apic_record_rdt_entry(apic_irq_t *irqptr, int irq);
-
-/*
- * From apic_regops.c
- */
-extern int apic_have_32bit_cr8;
 
 /*
  * apix_intr.c

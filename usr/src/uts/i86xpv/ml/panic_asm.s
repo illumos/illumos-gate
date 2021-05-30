@@ -37,7 +37,6 @@
 
 #include "assym.h"
 
-#if defined(__amd64)
 	ENTRY_NP(xpv_panic_getcr3)
 	movq	%cr3, %rax
 	ret
@@ -143,106 +142,6 @@
 	iretq
 	SET_SIZE(xpv_timer_trap)
 
-#elif defined(__i386)
-
-	ENTRY_NP(xpv_panic_setcr3)
-	movl	4(%esp), %eax
-	movl	%eax, %cr3
-	ret
-	SET_SIZE(xpv_panic_setcr3)
-
-	ENTRY(xpv_panic_reload_cr3)
-	movl    %cr3, %eax
-	movl    %eax, %cr3
-	ret
-	SET_SIZE(xpv_panic_reload_cr3)
-
-	/*
-	 * Stack on entry:
-	 *  +------------+
-	 *  |   EFLAGS  |
-	 *  |   CS      |
-	 *  |   EIP     |
-	 *  |   Error   |
-	 *  |   Trap    |   <---- %esp
-	 *  +------------+
-	 */
-	ENTRY_NP(xpv_panic_prep)
-	pushl   %ebp
-	movl	%esp, %ebp
-
-	subl	$REGSIZE, %esp
-	movl	%eax, REGOFF_EAX(%esp)
-	movl	%ebx, REGOFF_EBX(%esp)
-	movl	%esp, %eax
-	addl	$REGSIZE, %eax
-	movl	(%eax), %ebx
-	movl	%ebx, REGOFF_EBP(%esp)
-	movl	4(%eax), %ebx
-	movl	%ebx, REGOFF_TRAPNO(%esp)
-	movl	8(%eax), %ebx
-	movl	%ebx, REGOFF_ERR(%esp)
-	movl	12(%eax), %ebx
-	movl	%ebx, REGOFF_EIP(%esp)
-	movl	16(%eax), %ebx
-	movl	%ebx, REGOFF_CS(%esp)
-	movl	20(%eax), %ebx
-	movl	%ebx, REGOFF_EFL(%esp)
-	addl	$28, %eax
-	movl	%eax, REGOFF_ESP(%esp)
-	xorl	%eax, %eax
-	movw	%gs, %ax
-	mov	%eax, REGOFF_GS(%esp)
-	movw	%fs, %ax
-	mov	%eax, REGOFF_FS(%esp)
-	movw	%es, %ax
-	mov	%eax, REGOFF_ES(%esp)
-	movw	%ds, %ax
-	mov	%eax, REGOFF_DS(%esp)
-	movw	%ss, %ax
-	mov	%eax, REGOFF_SS(%esp)
-	movl	%ecx, REGOFF_ECX(%esp)
-	movl	%edx, REGOFF_EDX(%esp)
-	movl	%edi, REGOFF_EDI(%esp)
-	movl	%esi, REGOFF_ESI(%esp)
-	pushl  	%esp
-	call	xpv_die
-	SET_SIZE(xpv_panic_prep)
-
-	/*
-	 * Switch to the Solaris panic stack and jump into the Xen panic
-	 * handling code.
-	 */
-	ENTRY_NP(xpv_panic_hdlr)
-	movl	4(%esp), %eax
-	lea	panic_stack, %esp
-	add	$PANICSTKSIZE, %esp
-	pushl	%eax
-	call	xpv_do_panic
-	SET_SIZE(xpv_panic_hdlr)
-
-	ENTRY_NP(xpv_surprise_intr)
-	push	%ebp
-	movl	%esp, %ebp
-	pusha
-	call	xpv_interrupt
-	popa
-	pop	%ebp
-	iret
-	SET_SIZE(xpv_surprise_intr)
-
-	ENTRY_NP(xpv_timer_trap)
-	push	%ebp
-	movl	%esp, %ebp
-	pusha
-	call	xpv_timer_tick
-	popa
-	pop	%ebp
-	iret
-	SET_SIZE(xpv_timer_trap)
-
-#endif	/* __i386 */
-
 	ENTRY_NP(xpv_panic_sti)
 	sti
 	ret
@@ -264,7 +163,7 @@
 	push	$0xbad0
 	push	$0x0bad
 	jmp	xpv_panic_prep
-	SET_SIZE(xpv_invaltrap) 
+	SET_SIZE(xpv_invaltrap)
 
 	ENTRY_NP(xpv_div0trap)
 	push	$0
@@ -366,4 +265,3 @@
 	push	$T_SIMDFPE
 	jmp	xpv_panic_prep
 	SET_SIZE(xpv_xmtrap)
-

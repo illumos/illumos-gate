@@ -107,7 +107,6 @@ dtrace_getipl(void)
 void
 dtrace_toxic_ranges(void (*func)(uintptr_t base, uintptr_t limit))
 {
-#ifdef __amd64
 	extern uintptr_t toxic_addr;
 	extern size_t toxic_size;
 
@@ -116,20 +115,6 @@ dtrace_toxic_ranges(void (*func)(uintptr_t base, uintptr_t limit))
 	if (hole_end > hole_start)
 		(*func)(hole_start, hole_end);
 	(*func)(toxic_addr, toxic_addr + toxic_size);
-#else
-	extern void *device_arena_contains(void *, size_t, size_t *);
-	caddr_t	vaddr;
-	size_t	len;
-
-	for (vaddr = (caddr_t)kernelbase; vaddr < (caddr_t)KERNEL_TEXT;
-	    vaddr += len) {
-		len = (caddr_t)KERNEL_TEXT - vaddr;
-		vaddr = device_arena_contains(vaddr, len, &len);
-		if (vaddr == NULL)
-			break;
-		(*func)((uintptr_t)vaddr, (uintptr_t)vaddr + len);
-	}
-#endif
 	(*func)(0, _userlimit);
 }
 
@@ -346,7 +331,6 @@ dtrace_safe_defer_signal(void)
 	 */
 	if (rp->r_pc >= t->t_dtrace_scrpc + isz &&
 	    rp->r_pc < t->t_dtrace_astpc) {
-#ifdef __amd64
 		/*
 		 * If there is a scratch register and we're on the
 		 * instruction immediately after the modified instruction,
@@ -369,7 +353,6 @@ dtrace_safe_defer_signal(void)
 				break;
 			}
 		}
-#endif
 		rp->r_pc = t->t_dtrace_npc;
 		t->t_dtrace_ft = 0;
 		return (0);

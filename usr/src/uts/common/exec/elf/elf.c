@@ -375,7 +375,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	} else {
 		args->to_model = DATAMODEL_LP64;
 		args->stk_prot &= ~PROT_EXEC;
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 		args->dat_prot &= ~PROT_EXEC;
 #endif
 		*execsz = btopr(SINCR) + btopr(SSIZE) + btopr(NCARGS64-1);
@@ -1998,7 +1998,7 @@ top:
 #if defined(__sparc)
 	ehdr->e_ident[EI_DATA] = ELFDATA2MSB;
 	ehdr->e_machine = EM_SPARC;
-#elif defined(__i386) || defined(__i386_COMPAT)
+#elif defined(__i386_COMPAT)
 	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
 	ehdr->e_machine = EM_386;
 #else

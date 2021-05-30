@@ -104,30 +104,20 @@ desctbr_t	gdt0_default_r;
 #endif
 
 gate_desc_t	*idt0;		/* interrupt descriptor table */
-#if defined(__i386)
-desctbr_t	idt0_default_r;		/* describes idt0 in IDTR format */
-#endif
 
 tss_t		*ktss0;			/* kernel task state structure */
 
-#if defined(__i386)
-tss_t		*dftss0;		/* #DF double-fault exception */
-#endif	/* __i386 */
 
 user_desc_t	zero_udesc;		/* base zero user desc native procs */
 user_desc_t	null_udesc;		/* null user descriptor */
 system_desc_t	null_sdesc;		/* null system descriptor */
 
-#if defined(__amd64)
 user_desc_t	zero_u32desc;		/* 32-bit compatibility procs */
-#endif	/* __amd64 */
 
-#if defined(__amd64)
 user_desc_t	ucs_on;
 user_desc_t	ucs_off;
 user_desc_t	ucs32_on;
 user_desc_t	ucs32_off;
-#endif	/* __amd64 */
 
 /*
  * If the size of this is changed, you must update hat_pcp_setup() and the
@@ -438,9 +428,7 @@ xen_idt_to_trap_info(uint_t vec, gate_desc_t *sgd, void *ti_arg)
 		TI_SET_IF(ti, 1);
 	}
 	ti->cs = sgd->sgd_selector;
-#if defined(__amd64)
 	ti->cs |= SEL_KPL;	/* force into ring 3. see KCS_SEL  */
-#endif
 	ti->address = GATESEG_GETOFFSET(sgd);
 	return (1);
 }
@@ -462,7 +450,6 @@ xen_idt_write(gate_desc_t *sgd, uint_t vec)
 
 #endif	/* __xpv */
 
-#if defined(__amd64)
 
 /*
  * Build kernel GDT.
@@ -708,194 +695,6 @@ init_gdt(void)
 
 #endif	/* __xpv */
 
-#elif defined(__i386)
-
-static void
-init_gdt_common(user_desc_t *gdt)
-{
-	int i;
-
-	/*
-	 * Text and data for both kernel and user span entire 32 bit
-	 * address space.
-	 */
-
-	/*
-	 * kernel code segment.
-	 */
-	set_usegd(&gdt[GDT_KCODE], NULL, -1, SDT_MEMERA, SEL_KPL, SDP_PAGES,
-	    SDP_OP32);
-
-	/*
-	 * kernel data segment.
-	 */
-	set_usegd(&gdt[GDT_KDATA], NULL, -1, SDT_MEMRWA, SEL_KPL, SDP_PAGES,
-	    SDP_OP32);
-
-	/*
-	 * user code segment.
-	 */
-	set_usegd(&gdt[GDT_UCODE], NULL, -1, SDT_MEMERA, SEL_UPL, SDP_PAGES,
-	    SDP_OP32);
-
-	/*
-	 * user data segment.
-	 */
-	set_usegd(&gdt[GDT_UDATA], NULL, -1, SDT_MEMRWA, SEL_UPL, SDP_PAGES,
-	    SDP_OP32);
-
-#if !defined(__xpv)
-
-	/*
-	 * TSS for T_DBLFLT (double fault) handler
-	 */
-	set_syssegd((system_desc_t *)&gdt[GDT_DBFLT], dftss0,
-	    sizeof (*dftss0) - 1, SDT_SYSTSS, SEL_KPL);
-
-	/*
-	 * TSS for kernel
-	 */
-	set_syssegd((system_desc_t *)&gdt[GDT_KTSS], ktss0,
-	    sizeof (*ktss0) - 1, SDT_SYSTSS, SEL_KPL);
-
-#endif	/* !__xpv */
-
-	/*
-	 * %gs selector for kernel
-	 */
-	set_usegd(&gdt[GDT_GS], &cpus[0], sizeof (struct cpu) -1, SDT_MEMRWA,
-	    SEL_KPL, SDP_BYTES, SDP_OP32);
-
-	/*
-	 * Initialize lwp private descriptors.
-	 * Only attributes and limits are initialized, the effective
-	 * base address is programmed via fsbase/gsbase.
-	 */
-	set_usegd(&gdt[GDT_LWPFS], NULL, (size_t)-1, SDT_MEMRWA, SEL_UPL,
-	    SDP_PAGES, SDP_OP32);
-	set_usegd(&gdt[GDT_LWPGS], NULL, (size_t)-1, SDT_MEMRWA, SEL_UPL,
-	    SDP_PAGES, SDP_OP32);
-
-	/*
-	 * Initialize the descriptors set aside for brand usage.
-	 * Only attributes and limits are initialized.
-	 */
-	for (i = GDT_BRANDMIN; i <= GDT_BRANDMAX; i++)
-		set_usegd(&gdt0[i], NULL, (size_t)-1, SDT_MEMRWA, SEL_UPL,
-		    SDP_PAGES, SDP_OP32);
-	/*
-	 * Initialize convenient zero base user descriptor for clearing
-	 * lwp  private %fs and %gs descriptors in GDT. See setregs() for
-	 * an example.
-	 */
-	set_usegd(&zero_udesc, NULL, -1, SDT_MEMRWA, SEL_UPL,
-	    SDP_BYTES, SDP_OP32);
-}
-
-#if defined(__xpv)
-
-static user_desc_t *
-init_gdt(void)
-{
-	uint64_t gdtpa;
-	ulong_t ma[1];		/* XXPV should be a memory_t */
-
-#if !defined(__lint)
-	/*
-	 * Our gdt is never larger than a single page.
-	 */
-	ASSERT((sizeof (*gdt0) * NGDT) <= PAGESIZE);
-#endif
-	gdt0 = (user_desc_t *)BOP_ALLOC(bootops, (caddr_t)GDT_VA,
-	    PAGESIZE, PAGESIZE);
-	bzero(gdt0, PAGESIZE);
-
-	init_gdt_common(gdt0);
-	gdtpa = pfn_to_pa(va_to_pfn(gdt0));
-
-	/*
-	 * XXX Since we never invoke kmdb until after the kernel takes
-	 * over the descriptor tables why not have it use the kernel's
-	 * selectors?
-	 */
-	if (boothowto & RB_DEBUG) {
-		set_usegd(&gdt0[GDT_B32DATA], NULL, -1, SDT_MEMRWA, SEL_KPL,
-		    SDP_PAGES, SDP_OP32);
-		set_usegd(&gdt0[GDT_B32CODE], NULL, -1, SDT_MEMERA, SEL_KPL,
-		    SDP_PAGES, SDP_OP32);
-	}
-
-	/*
-	 * Clear write permission for page containing the gdt and install it.
-	 */
-	ma[0] = (ulong_t)(pa_to_ma(gdtpa) >> PAGESHIFT);
-	kbm_read_only((uintptr_t)gdt0, gdtpa);
-	xen_set_gdt(ma, NGDT);
-
-	/*
-	 * Reload the segment registers to use the new GDT
-	 */
-	load_segment_registers(
-	    KCS_SEL, KDS_SEL, KDS_SEL, KFS_SEL, KGS_SEL, KDS_SEL);
-
-	return (gdt0);
-}
-
-#else	/* __xpv */
-
-static user_desc_t *
-init_gdt(void)
-{
-	desctbr_t	r_bgdt, r_gdt;
-	user_desc_t	*bgdt;
-
-#if !defined(__lint)
-	/*
-	 * Our gdt is never larger than a single page.
-	 */
-	ASSERT((sizeof (*gdt0) * NGDT) <= PAGESIZE);
-#endif
-	/*
-	 * XXX this allocation belongs in our caller, not here.
-	 */
-	gdt0 = (user_desc_t *)BOP_ALLOC(bootops, (caddr_t)GDT_VA,
-	    PAGESIZE, PAGESIZE);
-	bzero(gdt0, PAGESIZE);
-
-	init_gdt_common(gdt0);
-
-	/*
-	 * Copy in from boot's gdt to our gdt entries.
-	 * Entry 0 is null descriptor by definition.
-	 */
-	rd_gdtr(&r_bgdt);
-	bgdt = (user_desc_t *)r_bgdt.dtr_base;
-	if (bgdt == NULL)
-		panic("null boot gdt");
-
-	gdt0[GDT_B32DATA] = bgdt[GDT_B32DATA];
-	gdt0[GDT_B32CODE] = bgdt[GDT_B32CODE];
-	gdt0[GDT_B16CODE] = bgdt[GDT_B16CODE];
-	gdt0[GDT_B16DATA] = bgdt[GDT_B16DATA];
-
-	/*
-	 * Install our new GDT
-	 */
-	r_gdt.dtr_limit = (sizeof (*gdt0) * NGDT) - 1;
-	r_gdt.dtr_base = (uintptr_t)gdt0;
-	wr_gdtr(&r_gdt);
-
-	/*
-	 * Reload the segment registers to use the new GDT
-	 */
-	load_segment_registers(
-	    KCS_SEL, KDS_SEL, KDS_SEL, KFS_SEL, KGS_SEL, KDS_SEL);
-
-	return (gdt0);
-}
-
-#endif	/* __xpv */
-#endif	/* __i386 */
 
 /*
  * Build kernel IDT.
@@ -1238,14 +1037,6 @@ init_desctbls(void)
 	    PAGESIZE, PAGESIZE);
 	bzero(ktss0, PAGESIZE);
 
-#if defined(__i386)
-#if !defined(__lint)
-	ASSERT(sizeof (*dftss0) <= PAGESIZE);
-#endif
-	dftss0 = (tss_t *)BOP_ALLOC(bootops, (caddr_t)DFTSS_VA,
-	    PAGESIZE, PAGESIZE);
-	bzero(dftss0, PAGESIZE);
-#endif
 
 	/*
 	 * Setup and install our GDT.
@@ -1272,13 +1063,6 @@ init_desctbls(void)
 	wr_idtr(&idtr);
 	CPU->cpu_idt = idt0;
 
-#if defined(__i386)
-	/*
-	 * We maintain a description of idt0 in convenient IDTR format
-	 * for #pf's on some older pentium processors. See pentium_pftrap().
-	 */
-	idt0_default_r = idtr;
-#endif	/* __i386 */
 
 	init_tss();
 	CPU->cpu_tss = ktss0;
@@ -1320,17 +1104,10 @@ reset_gdtr_limit(void)
 void
 init_boot_gdt(user_desc_t *bgdt)
 {
-#if defined(__amd64)
 	set_usegd(&bgdt[GDT_B32DATA], SDP_LONG, NULL, -1, SDT_MEMRWA, SEL_KPL,
 	    SDP_PAGES, SDP_OP32);
 	set_usegd(&bgdt[GDT_B64CODE], SDP_LONG, NULL, -1, SDT_MEMERA, SEL_KPL,
 	    SDP_PAGES, SDP_OP32);
-#elif defined(__i386)
-	set_usegd(&bgdt[GDT_B32DATA], NULL, -1, SDT_MEMRWA, SEL_KPL,
-	    SDP_PAGES, SDP_OP32);
-	set_usegd(&bgdt[GDT_B32CODE], NULL, -1, SDT_MEMERA, SEL_KPL,
-	    SDP_PAGES, SDP_OP32);
-#endif	/* __i386 */
 }
 
 /*
@@ -1354,7 +1131,6 @@ brand_interpositioning_enable(void)
 #endif
 	}
 
-#if defined(__amd64)
 #if defined(__xpv)
 
 	/*
@@ -1378,7 +1154,6 @@ brand_interpositioning_enable(void)
 	}
 
 #endif
-#endif	/* __amd64 */
 
 	if (is_x86_feature(x86_featureset, X86FSET_SEP)) {
 		if (kpti_enable == 1) {
@@ -1411,7 +1186,6 @@ brand_interpositioning_disable(void)
 #endif
 	}
 
-#if defined(__amd64)
 #if defined(__xpv)
 
 	/*
@@ -1433,7 +1207,6 @@ brand_interpositioning_disable(void)
 	}
 
 #endif
-#endif	/* __amd64 */
 
 	if (is_x86_feature(x86_featureset, X86FSET_SEP)) {
 		if (kpti_enable == 1) {

@@ -165,7 +165,7 @@ pciehpc_init(dev_info_t *dip, caddr_t arg)
 	ctrl_p->hc_ops.enable_hpc_intr = pciehpc_enable_intr;
 	ctrl_p->hc_ops.disable_hpc_intr = pciehpc_disable_intr;
 
-#if	defined(__i386) || defined(__amd64)
+#if	defined(__x86)
 	pciehpc_update_ops(ctrl_p);
 #endif
 

@@ -213,8 +213,6 @@ struct mobj_stats {
 #define	OVERLAPS_STACK(addr, p)						\
 	((p->p_model == DATAMODEL_LP64) &&				\
 	(addr >= (p->p_usrstack - ((p->p_stk_ctl + PAGEOFFSET) & PAGEMASK))))
-#elif defined(__i386)
-#define	OVERLAPS_STACK(addr, p)	0
 #endif
 
 /* lv_flags values - bitmap */

@@ -123,7 +123,7 @@ _init(void)
 {
 	int error = ENOTSUP;
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 
 	if (get_hwenv() != HW_NATIVE)
 		return (ENOTSUP);

@@ -48,7 +48,6 @@ lwp_setprivate(klwp_t *lwp, int which, uintptr_t base)
 	if (thisthread)
 		kpreempt_disable();
 
-#if defined(__amd64)
 
 	/*
 	 * 32-bit compatibility processes point to the per-cpu GDT segment
@@ -117,37 +116,6 @@ lwp_setprivate(klwp_t *lwp, int which, uintptr_t base)
 		break;
 	}
 
-#elif defined(__i386)
-
-	/*
-	 * 32-bit processes point to the per-cpu GDT segment
-	 * descriptors that are virtualized to the lwp.
-	 */
-
-	switch	(which) {
-	case _LWP_FSBASE:
-		set_usegd(&pcb->pcb_fsdesc, (void *)base, -1,
-		    SDT_MEMRWA, SEL_UPL, SDP_PAGES, SDP_OP32);
-		if (thisthread)
-			gdt_update_usegd(GDT_LWPFS, &pcb->pcb_fsdesc);
-
-		rval = rp->r_fs = LWPFS_SEL;
-		break;
-	case _LWP_GSBASE:
-		set_usegd(&pcb->pcb_gsdesc, (void *)base, -1,
-		    SDT_MEMRWA, SEL_UPL, SDP_PAGES, SDP_OP32);
-		if (thisthread)
-			gdt_update_usegd(GDT_LWPGS, &pcb->pcb_gsdesc);
-
-		rval = rp->r_gs = LWPGS_SEL;
-		break;
-	default:
-		rval = -1;
-		break;
-	}
-
-#endif	/* __i386 */
-
 	if (thisthread)
 		kpreempt_enable();
 	return (rval);
@@ -165,8 +133,6 @@ lwp_getprivate(klwp_t *lwp, int which, uintptr_t base)
 
 	kpreempt_disable();
 	switch (which) {
-#if defined(__amd64)
-
 	case _LWP_FSBASE:
 		if ((sbase = pcb->pcb_fsbase) != 0) {
 			if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE) {
@@ -212,24 +178,6 @@ lwp_getprivate(klwp_t *lwp, int which, uintptr_t base)
 		error = EINVAL;
 		break;
 
-#elif defined(__i386)
-
-	case _LWP_FSBASE:
-		if (rp->r_fs == LWPFS_SEL) {
-			sbase = USEGD_GETBASE(&pcb->pcb_fsdesc);
-			break;
-		}
-		error = EINVAL;
-		break;
-	case _LWP_GSBASE:
-		if (rp->r_gs == LWPGS_SEL) {
-			sbase = USEGD_GETBASE(&pcb->pcb_gsdesc);
-			break;
-		}
-		error = EINVAL;
-		break;
-
-#endif	/* __i386 */
 
 	default:
 		error = ENOTSUP;

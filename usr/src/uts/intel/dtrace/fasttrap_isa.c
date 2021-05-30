@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/fasttrap_isa.h>
 #include <sys/fasttrap_impl.h>
 #include <sys/dtrace.h>
@@ -177,16 +175,10 @@
  * Map between instruction register encodings and the kernel constants which
  * correspond to indicies into struct regs.
  */
-#ifdef __amd64
 static const uint8_t regmap[16] = {
 	REG_RAX, REG_RCX, REG_RDX, REG_RBX, REG_RSP, REG_RBP, REG_RSI, REG_RDI,
 	REG_R8, REG_R9, REG_R10, REG_R11, REG_R12, REG_R13, REG_R14, REG_R15,
 };
-#else
-static const uint8_t regmap[8] = {
-	EAX, ECX, EDX, EBX, UESP, EBP, ESI, EDI
-};
-#endif
 
 static ulong_t fasttrap_getreg(struct regs *, uint_t);
 
@@ -196,7 +188,6 @@ fasttrap_anarg(struct regs *rp, int function_entry, int argno)
 	uint64_t value;
 	int shift = function_entry ? 1 : 0;
 
-#ifdef __amd64
 	if (curproc->p_model == DATAMODEL_LP64) {
 		uintptr_t *stack;
 
@@ -212,14 +203,11 @@ fasttrap_anarg(struct regs *rp, int function_entry, int argno)
 		value = dtrace_fulword(&stack[argno - 6 + shift]);
 		DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT | CPU_DTRACE_BADADDR);
 	} else {
-#endif
 		uint32_t *stack = (uint32_t *)rp->r_sp;
 		DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 		value = dtrace_fuword32(&stack[argno + shift]);
 		DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT | CPU_DTRACE_BADADDR);
-#ifdef __amd64
 	}
-#endif
 
 	return (value);
 }
@@ -322,13 +310,11 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 		break;
 	}
 
-#ifdef __amd64
 	/*
 	 * Identify the REX prefix on 64-bit processes.
 	 */
 	if (p->p_model == DATAMODEL_LP64 && (instr[start] & 0xf0) == 0x40)
 		rex = instr[start++];
-#endif
 
 	/*
 	 * Now that we're pretty sure that the instruction is okay, copy the
@@ -411,11 +397,9 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 				 * modes, there is a 32-bit operand.
 				 */
 				if (mod == 0 && rm == 5) {
-#ifdef __amd64
 					if (p->p_model == DATAMODEL_LP64)
 						tp->ftt_base = REG_RIP;
 					else
-#endif
 						tp->ftt_base = FASTTRAP_NOREG;
 					sz = 4;
 				} else  {
@@ -513,7 +497,6 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 			break;
 
 		case FASTTRAP_NOP:
-#ifdef __amd64
 			ASSERT(p->p_model == DATAMODEL_LP64 || rex == 0);
 
 			/*
@@ -523,7 +506,6 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 			 * (e.g. xchgl %r8d, %eax or xcghq %r8, %rax).
 			 */
 			if (FASTTRAP_REX_B(rex) == 0)
-#endif
 				tp->ftt_type = FASTTRAP_T_NOP;
 			break;
 
@@ -550,7 +532,6 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 		}
 	}
 
-#ifdef __amd64
 	if (p->p_model == DATAMODEL_LP64 && tp->ftt_type == FASTTRAP_T_COMMON) {
 		/*
 		 * If the process is 64-bit and the instruction type is still
@@ -596,7 +577,6 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 			}
 		}
 	}
-#endif
 
 	return (0);
 }
@@ -631,7 +611,6 @@ fasttrap_tracepoint_remove(proc_t *p, fasttrap_tracepoint_t *tp)
 	return (0);
 }
 
-#ifdef __amd64
 static uintptr_t
 fasttrap_fulword_noerr(const void *uaddr)
 {
@@ -642,7 +621,6 @@ fasttrap_fulword_noerr(const void *uaddr)
 
 	return (0);
 }
-#endif
 
 static uint32_t
 fasttrap_fuword32_noerr(const void *uaddr)
@@ -721,7 +699,6 @@ fasttrap_sigsegv(proc_t *p, kthread_t *t, uintptr_t addr)
 		aston(t);
 }
 
-#ifdef __amd64
 static void
 fasttrap_usdt_args64(fasttrap_probe_t *probe, struct regs *rp, int argc,
     uintptr_t *argv)
@@ -742,7 +719,6 @@ fasttrap_usdt_args64(fasttrap_probe_t *probe, struct regs *rp, int argc,
 		argv[i] = 0;
 	}
 }
-#endif
 
 static void
 fasttrap_usdt_args32(fasttrap_probe_t *probe, struct regs *rp, int argc,
@@ -907,9 +883,7 @@ fasttrap_pid_probe(struct regs *rp)
 	curthread->t_dtrace_npc = 0;
 	curthread->t_dtrace_scrpc = 0;
 	curthread->t_dtrace_astpc = 0;
-#ifdef __amd64
 	curthread->t_dtrace_regv = 0;
-#endif
 
 	/*
 	 * Treat a child created by a call to vfork(2) as if it were its
@@ -953,7 +927,6 @@ fasttrap_pid_probe(struct regs *rp)
 	if (tp->ftt_ids != NULL) {
 		fasttrap_id_t *id;
 
-#ifdef __amd64
 		if (p->p_model == DATAMODEL_LP64) {
 			for (id = tp->ftt_ids; id != NULL; id = id->fti_next) {
 				fasttrap_probe_t *probe = id->fti_probe;
@@ -995,7 +968,6 @@ fasttrap_pid_probe(struct regs *rp)
 				}
 			}
 		} else {
-#endif
 			uintptr_t s0, s1, s2, s3, s4, s5;
 			uint32_t *stack = (uint32_t *)rp->r_sp;
 
@@ -1050,9 +1022,7 @@ fasttrap_pid_probe(struct regs *rp)
 					    t[2], t[3], t[4]);
 				}
 			}
-#ifdef __amd64
 		}
-#endif
 	}
 
 	/*
@@ -1107,19 +1077,15 @@ fasttrap_pid_probe(struct regs *rp)
 		 * instruction including what happens if the load from %esp
 		 * fails; in that case, we send a SIGSEGV.
 		 */
-#ifdef __amd64
 		if (p->p_model == DATAMODEL_NATIVE) {
-#endif
 			ret = fasttrap_fulword((void *)rp->r_sp, &dst);
 			addr = rp->r_sp + sizeof (uintptr_t);
-#ifdef __amd64
 		} else {
 			uint32_t dst32;
 			ret = fasttrap_fuword32((void *)rp->r_sp, &dst32);
 			dst = dst32;
 			addr = rp->r_sp + sizeof (uint32_t);
 		}
-#endif
 
 		if (ret == -1) {
 			fasttrap_sigsegv(p, curthread, rp->r_sp);
@@ -1209,11 +1175,7 @@ fasttrap_pid_probe(struct regs *rp)
 	case FASTTRAP_T_LOOP:
 	{
 		uint_t taken;
-#ifdef __amd64
 		greg_t cx = rp->r_rcx--;
-#else
-		greg_t cx = rp->r_ecx--;
-#endif
 
 		switch (tp->ftt_code) {
 		case FASTTRAP_LOOPNZ:
@@ -1238,11 +1200,7 @@ fasttrap_pid_probe(struct regs *rp)
 
 	case FASTTRAP_T_JCXZ:
 	{
-#ifdef __amd64
 		greg_t cx = rp->r_rcx;
-#else
-		greg_t cx = rp->r_ecx;
-#endif
 
 		if (cx == 0)
 			new_pc = tp->ftt_dest;
@@ -1255,18 +1213,14 @@ fasttrap_pid_probe(struct regs *rp)
 	{
 		int ret;
 		uintptr_t addr;
-#ifdef __amd64
 		if (p->p_model == DATAMODEL_NATIVE) {
-#endif
 			addr = rp->r_sp - sizeof (uintptr_t);
 			ret = fasttrap_sulword((void *)addr, rp->r_fp);
-#ifdef __amd64
 		} else {
 			addr = rp->r_sp - sizeof (uint32_t);
 			ret = fasttrap_suword32((void *)addr,
 			    (uint32_t)rp->r_fp);
 		}
-#endif
 
 		if (ret == -1) {
 			fasttrap_sigsegv(p, curthread, addr);
@@ -1310,9 +1264,7 @@ fasttrap_pid_probe(struct regs *rp)
 					break;
 				}
 
-#ifdef __amd64
 				if (p->p_model == DATAMODEL_NATIVE) {
-#endif
 					if (fasttrap_fulword((void *)addr,
 					    &value) == -1) {
 						fasttrap_sigsegv(p, curthread,
@@ -1321,7 +1273,6 @@ fasttrap_pid_probe(struct regs *rp)
 						break;
 					}
 					new_pc = value;
-#ifdef __amd64
 				} else {
 					uint32_t value32;
 					addr = (uintptr_t)(uint32_t)addr;
@@ -1334,7 +1285,6 @@ fasttrap_pid_probe(struct regs *rp)
 					}
 					new_pc = value32;
 				}
-#endif
 			} else {
 				new_pc = addr;
 			}
@@ -1349,19 +1299,15 @@ fasttrap_pid_probe(struct regs *rp)
 		if (tp->ftt_type == FASTTRAP_T_CALL) {
 			int ret;
 			uintptr_t addr;
-#ifdef __amd64
 			if (p->p_model == DATAMODEL_NATIVE) {
 				addr = rp->r_sp - sizeof (uintptr_t);
 				ret = fasttrap_sulword((void *)addr,
 				    pc + tp->ftt_size);
 			} else {
-#endif
 				addr = rp->r_sp - sizeof (uint32_t);
 				ret = fasttrap_suword32((void *)addr,
 				    (uint32_t)(pc + tp->ftt_size));
-#ifdef __amd64
 			}
-#endif
 
 			if (ret == -1) {
 				fasttrap_sigsegv(p, curthread, addr);
@@ -1377,11 +1323,7 @@ fasttrap_pid_probe(struct regs *rp)
 	case FASTTRAP_T_COMMON:
 	{
 		uintptr_t addr;
-#if defined(__amd64)
 		uint8_t scratch[2 * FASTTRAP_MAX_INSTR_SIZE + 22];
-#else
-		uint8_t scratch[2 * FASTTRAP_MAX_INSTR_SIZE + 7];
-#endif
 		uint_t i = 0;
 		klwp_t *lwp = ttolwp(curthread);
 
@@ -1391,7 +1333,6 @@ fasttrap_pid_probe(struct regs *rp)
 		 * thread pointer is very different on 32- and 64-bit
 		 * kernels.
 		 */
-#if defined(__amd64)
 		if (p->p_model == DATAMODEL_LP64) {
 			addr = lwp->lwp_pcb.pcb_fsbase;
 			addr += sizeof (void *);
@@ -1399,10 +1340,6 @@ fasttrap_pid_probe(struct regs *rp)
 			addr = lwp->lwp_pcb.pcb_gsbase;
 			addr += sizeof (caddr32_t);
 		}
-#else
-		addr = USEGD_GETBASE(&lwp->lwp_pcb.pcb_gsdesc);
-		addr += sizeof (void *);
-#endif
 
 		/*
 		 * Generic Instruction Tracing
@@ -1426,9 +1363,9 @@ fasttrap_pid_probe(struct regs *rp)
 		 *	jmp	0(%rip)			    6
 		 *	<pc + tp->ftt_size>		    8
 		 * b:	<original instruction>		<= 15
-		 * 	int	T_DTRACE_RET		    2
-		 * 					-----
-		 * 					<= 46
+		 *	int	T_DTRACE_RET		    2
+		 *					-----
+		 *					<= 46
 		 *
 		 * The %pc is set to a, and curthread->t_dtrace_astpc is set
 		 * to b. If we encounter a signal on the way out of the
@@ -1478,9 +1415,9 @@ fasttrap_pid_probe(struct regs *rp)
 		 *	movq	$<value>, %<scratch>	    6
 		 *	jmp	0(%rip)			    6
 		 *	<pc + tp->ftt_size>		    8
-		 * b:	<modified instruction>  	<= 15
-		 * 	int	T_DTRACE_RET		    2
-		 * 					-----
+		 * b:	<modified instruction>		<= 15
+		 *	int	T_DTRACE_RET		    2
+		 *					-----
 		 *					   52
 		 *
 		 * We set curthread->t_dtrace_regv so that upon receiving
@@ -1493,7 +1430,6 @@ fasttrap_pid_probe(struct regs *rp)
 		bcopy(tp->ftt_instr, &scratch[i], tp->ftt_size);
 		i += tp->ftt_size;
 
-#ifdef __amd64
 		if (tp->ftt_ripmode != 0) {
 			greg_t *reg;
 
@@ -1545,7 +1481,6 @@ fasttrap_pid_probe(struct regs *rp)
 			*reg = pc + tp->ftt_size;
 			i += sizeof (uint64_t);
 		}
-#endif
 
 		/*
 		 * Generate the branch instruction to what would have
@@ -1554,7 +1489,6 @@ fasttrap_pid_probe(struct regs *rp)
 		 * %rip-relative branch that loads the 64-bit pc value
 		 * immediately after the jmp instruction.
 		 */
-#ifdef __amd64
 		if (p->p_model == DATAMODEL_LP64) {
 			scratch[i++] = FASTTRAP_GROUP5_OP;
 			scratch[i++] = FASTTRAP_MODRM(0, 4, 5);
@@ -1565,7 +1499,6 @@ fasttrap_pid_probe(struct regs *rp)
 			*(uint64_t *)&scratch[i] = pc + tp->ftt_size;
 			i += sizeof (uint64_t);
 		} else {
-#endif
 			/*
 			 * Set up the jmp to the next instruction; note that
 			 * the size of the traced instruction cancels out.
@@ -1574,9 +1507,7 @@ fasttrap_pid_probe(struct regs *rp)
 			/* LINTED - alignment */
 			*(uint32_t *)&scratch[i] = pc - addr - 5;
 			i += sizeof (uint32_t);
-#ifdef __amd64
 		}
-#endif
 
 		curthread->t_dtrace_astpc = addr + i;
 		bcopy(tp->ftt_instr, &scratch[i], tp->ftt_size);
@@ -1702,7 +1633,6 @@ fasttrap_usdt_getarg(void *arg, dtrace_id_t id, void *parg, int argno,
 static ulong_t
 fasttrap_getreg(struct regs *rp, uint_t reg)
 {
-#ifdef __amd64
 	switch (reg) {
 	case REG_R15:		return (rp->r_r15);
 	case REG_R14:		return (rp->r_r14);
@@ -1736,10 +1666,4 @@ fasttrap_getreg(struct regs *rp, uint_t reg)
 
 	panic("dtrace: illegal register constant");
 	/*NOTREACHED*/
-#else
-	if (reg >= _NGREG)
-		panic("dtrace: illegal register constant");
-
-	return (((greg_t *)&rp->r_gs)[reg]);
-#endif
 }

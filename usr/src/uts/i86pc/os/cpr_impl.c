@@ -73,9 +73,7 @@
 extern int	flushes_require_xcalls;
 extern cpuset_t	cpu_ready_set;
 
-#if defined(__amd64)
 extern void	*wc_long_mode_64(void);
-#endif	/* __amd64 */
 extern int	tsc_gethrtime_enable;
 extern	void	i_cpr_start_cpu(void);
 
@@ -356,12 +354,8 @@ i_cpr_pre_resume_cpus()
 		gdt.base = cpup->wc_gdt_base;
 		gdt.limit = cpup->wc_gdt_limit;
 
-#if defined(__amd64)
 		code_length = (uint32_t)((uintptr_t)wc_long_mode_64 -
 		    (uintptr_t)wc_rm_start);
-#else
-		code_length = 0;
-#endif
 
 		init_real_mode_platter(who, code_length, cpup->wc_cr4, gdt);
 
@@ -523,10 +517,8 @@ i_cpr_power_down(int sleeptype)
 	int		ret = 0;
 	power_req_t	power_req;
 	char *str =	"i_cpr_power_down";
-#if defined(__amd64)
 	/*LINTED*/
 	rm_platter_t *real_mode_platter = (rm_platter_t *)rm_platter_va;
-#endif
 	extern int	cpr_suspend_succeeded;
 	extern void	kernel_wc_code();
 
@@ -567,7 +559,6 @@ i_cpr_power_down(int sleeptype)
 
 	prt_other_cpus();
 
-#if defined(__amd64)
 
 	PMD(PMD_SX, ("real_mode_platter->rm_cr4=%lx, getcr4()=%lx\n",
 	    (ulong_t)real_mode_platter->rm_cr4, (ulong_t)getcr4()))
@@ -595,7 +586,6 @@ i_cpr_power_down(int sleeptype)
 	PMD(PMD_SX, ("real_mode_platter->rm_longmode64_addr=%lx\n",
 	    (ulong_t)real_mode_platter->rm_longmode64_addr))
 
-#endif
 
 	PT(PT_SC);
 	if (wc_save_context(cpup)) {
@@ -633,16 +623,11 @@ i_cpr_power_down(int sleeptype)
 		gdt.base = cpup->wc_gdt_base;
 		gdt.limit = cpup->wc_gdt_limit;
 
-#if defined(__amd64)
 		code_length = (uint32_t)((uintptr_t)wc_long_mode_64 -
 		    (uintptr_t)wc_rm_start);
-#else
-		code_length = 0;
-#endif
 
 		init_real_mode_platter(0, code_length, cpup->wc_cr4, gdt);
 
-#if defined(__amd64)
 		PMD(PMD_SX, ("real_mode_platter->rm_cr4=%lx, getcr4()=%lx\n",
 		    (ulong_t)wcpp->rm_cr4, getcr4()))
 
@@ -655,7 +640,6 @@ i_cpr_power_down(int sleeptype)
 		PMD(PMD_SX,
 		    ("real_mode_platter->rm_temp_gdt[TEMPGDT_KCODE64]=%lx\n",
 		    (ulong_t)wcpp->rm_temp_gdt[TEMPGDT_KCODE64]))
-#endif
 
 		PMD(PMD_SX, ("gdt=%p:%x, idt=%p:%x, ldt=%lx, tr=%lx, "
 		    "kgsbase=%lx\n", (void *)wcpp->rm_gdt_base,
@@ -853,11 +837,6 @@ i_cpr_restore_apic(psm_state_request_t *req)
 	return ((*psm_state)(req));
 }
 
-
-/* stop lint complaining about offset not being used in 32bit mode */
-#if !defined(__amd64)
-/*ARGSUSED*/
-#endif
 static void
 init_real_mode_platter(int cpun, uint32_t offset, uint_t cr4, wc_desctbr_t gdt)
 {
@@ -878,7 +857,6 @@ init_real_mode_platter(int cpun, uint32_t offset, uint_t cr4, wc_desctbr_t gdt)
 	real_mode_platter->rm_gdt_base = gdt.base;
 	real_mode_platter->rm_gdt_lim = gdt.limit;
 
-#if defined(__amd64)
 	if (getcr3() > 0xffffffffUL)
 		panic("Cannot initialize CPUs; kernel's 64-bit page tables\n"
 		    "located above 4G in physical memory (@ 0x%llx).",
@@ -912,7 +890,6 @@ init_real_mode_platter(int cpun, uint32_t offset, uint_t cr4, wc_desctbr_t gdt)
 	 * mapped address, we need to calculate it here.
 	 */
 	real_mode_platter->rm_longmode64_addr = rm_platter_pa + offset;
-#endif	/* __amd64 */
 
 	/* return; */
 }

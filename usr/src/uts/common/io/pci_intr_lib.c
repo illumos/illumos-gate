@@ -61,7 +61,7 @@ pci_class_val_t pci_default_pil [] = {
  * XXX - This is a temporary workaround and it will be removed
  *       after x86 interrupt scalability support.
  */
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	{0x0c0400, 0xffff00, 0x5},	/* Serial Bus, Fibre Channel */
 #else
 	{0x0c0400, 0xffff00, 0x6},	/* Serial Bus, Fibre Channel */

@@ -110,7 +110,7 @@ static int hxge_param_dump_ptrs(p_hxge_t hxgep, queue_t *q,
  */
 
 static hxge_param_t hxge_param_arr[] = {
-	/* min	max	value	old	hw-name 	conf-name	*/
+	/* min	max	value	old	hw-name		conf-name	*/
 	{hxge_param_get_generic, NULL, HXGE_PARAM_READ,
 		0, 999, 1000, 0, "instance", "instance"},
 
@@ -257,12 +257,7 @@ hxge_get_param_soft_properties(p_hxge_t hxgep)
 
 				if (prop_len > HXGE_PARAM_ARRAY_INIT_SIZE)
 					prop_len = HXGE_PARAM_ARRAY_INIT_SIZE;
-#if defined(__i386)
-				cfg_value =
-				    (uint64_t *)(int32_t)param_arr[i].value;
-#else
 				cfg_value = (uint64_t *)param_arr[i].value;
-#endif
 				for (j = 0; j < prop_len; j++) {
 					cfg_value[j] = int_prop_val[j];
 				}
@@ -410,19 +405,10 @@ hxge_init_param(p_hxge_t hxgep)
 		    (param_arr[i].type & HXGE_PARAM_PROP_ARR64)) {
 			alloc_count = HXGE_PARAM_ARRAY_INIT_SIZE;
 			alloc_size = alloc_count * sizeof (uint64_t);
-#if defined(__i386)
-			param_arr[i].value =
-			    (uint64_t)(uint32_t)KMEM_ZALLOC(alloc_size,
-			    KM_SLEEP);
-			param_arr[i].old_value =
-			    (uint64_t)(uint32_t)KMEM_ZALLOC(alloc_size,
-			    KM_SLEEP);
-#else
 			param_arr[i].value =
 			    (uint64_t)KMEM_ZALLOC(alloc_size, KM_SLEEP);
 			param_arr[i].old_value =
 			    (uint64_t)KMEM_ZALLOC(alloc_size, KM_SLEEP);
-#endif
 			param_arr[i].type |=
 			    (alloc_count << HXGE_PARAM_ARRAY_ALLOC_SHIFT);
 		}
@@ -465,17 +451,10 @@ hxge_destroy_param(p_hxge_t hxgep)
 			    HXGE_PARAM_ARRAY_ALLOC_SHIFT);
 			free_count = HXGE_PARAM_ARRAY_INIT_SIZE;
 			free_size = sizeof (uint64_t) * free_count;
-#if defined(__i386)
-			KMEM_FREE((void *)(uint32_t)
-			    hxgep->param_arr[i].value, free_size);
-			KMEM_FREE((void *)(uint32_t)
-			    hxgep->param_arr[i].old_value, free_size);
-#else
 			KMEM_FREE((void *) hxgep->param_arr[i].value,
 			    free_size);
 			KMEM_FREE((void *) hxgep->param_arr[i].old_value,
 			    free_size);
-#endif
 		}
 	}
 
@@ -602,7 +581,7 @@ hxge_mk_mblk_tail_space(p_mblk_t mp, p_mblk_t *nmp, size_t size)
 /* ARGSUSED */
 int
 hxge_param_set_generic(p_hxge_t hxgep, queue_t *q, mblk_t *mp,
-	char *value, caddr_t cp)
+    char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	new_value;
@@ -622,7 +601,7 @@ hxge_param_set_generic(p_hxge_t hxgep, queue_t *q, mblk_t *mp,
 /* ARGSUSED */
 int
 hxge_param_set_mac(p_hxge_t hxgep, queue_t *q, mblk_t *mp,
-	char *value, caddr_t cp)
+    char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	new_value;
@@ -661,7 +640,7 @@ hxge_param_set_mac(p_hxge_t hxgep, queue_t *q, mblk_t *mp,
 /* ARGSUSED */
 int
 hxge_param_rx_intr_pkts(p_hxge_t hxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	cfg_value;
@@ -692,7 +671,7 @@ hxge_param_rx_intr_pkts(p_hxge_t hxgep, queue_t *q,
 /* ARGSUSED */
 int
 hxge_param_rx_intr_time(p_hxge_t hxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	cfg_value;
@@ -731,7 +710,7 @@ hxge_param_set_vlan_ids(p_hxge_t hxgep, queue_t *q, mblk_t *mp, char *value,
 	uint32_t		cfg_it = B_FALSE;
 	uint32_t		*val_ptr, *old_val_ptr;
 	hxge_param_map_t	*vmap, *old_map;
-	p_hxge_class_pt_cfg_t 	p_class_cfgp;
+	p_hxge_class_pt_cfg_t	p_class_cfgp;
 	uint64_t		cfgd_vlans;
 	int			i, inc = 0, cfg_position;
 	hxge_mv_cfg_t		*vlan_tbl;
@@ -768,13 +747,8 @@ hxge_param_set_vlan_ids(p_hxge_t hxgep, queue_t *q, mblk_t *mp, char *value,
 
 	HXGE_DEBUG_MSG((hxgep, NDD_CTL, " hxge_param_set_vlan_ids id %d",
 	    vmap->param_id));
-#if defined(__i386)
-	val_ptr = (uint32_t *)(uint32_t)pa->value;
-	old_val_ptr = (uint32_t *)(uint32_t)pa->old_value;
-#else
 	val_ptr = (uint32_t *)pa->value;
 	old_val_ptr = (uint32_t *)pa->old_value;
-#endif
 
 	/* Search to see if this vlan id is already configured */
 	for (i = 0; i < cfgd_vlans; i++) {
@@ -841,7 +815,7 @@ hxge_param_get_vlan_ids(p_hxge_t hxgep, queue_t *q, mblk_t *mp, caddr_t cp)
 	uint32_t		*val_ptr;
 	hxge_param_map_t	*vmap;
 	p_hxge_param_t		pa = (p_hxge_param_t)cp;
-	p_hxge_class_pt_cfg_t 	p_class_cfgp;
+	p_hxge_class_pt_cfg_t	p_class_cfgp;
 	uint64_t		cfgd_vlans = 0;
 	int buff_alloc_size = HXGE_NDD_INFODUMP_BUFF_SIZE * 32;
 
@@ -865,11 +839,7 @@ hxge_param_get_vlan_ids(p_hxge_t hxgep, queue_t *q, mblk_t *mp, caddr_t cp)
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
 
-#if defined(__i386)
-	val_ptr = (uint32_t *)(uint32_t)pa->value;
-#else
 	val_ptr = (uint32_t *)pa->value;
-#endif
 
 	for (i = 0; i < cfgd_vlans; i++) {
 		vmap = (hxge_param_map_t *)&val_ptr[i];
@@ -889,7 +859,7 @@ hxge_param_get_vlan_ids(p_hxge_t hxgep, queue_t *q, mblk_t *mp, caddr_t cp)
 /* ARGSUSED */
 static int
 hxge_param_tcam_enable(p_hxge_t hxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	uint32_t	status = 0, cfg_value;
 	p_hxge_param_t	pa = (p_hxge_param_t)cp;
@@ -919,7 +889,7 @@ hxge_param_tcam_enable(p_hxge_t hxgep, queue_t *q,
 /* ARGSUSED */
 static int
 hxge_param_set_ether_usr(p_hxge_t hxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	status = 0, cfg_value;
@@ -962,7 +932,7 @@ hxge_class_name_2value(p_hxge_t hxgep, char *name)
 /* ARGSUSED */
 int
 hxge_param_set_ip_opt(p_hxge_t hxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	status, cfg_value;
@@ -1030,7 +1000,7 @@ hxge_param_get_ip_opt(p_hxge_t hxgep, queue_t *q, mblk_t *mp, caddr_t cp)
 /* ARGSUSED */
 static int
 hxge_param_pfc_hash_init(p_hxge_t hxgep, queue_t *q, mblk_t *mp,
-	char *value, caddr_t cp)
+    char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	status, cfg_value;
@@ -1067,7 +1037,7 @@ hxge_param_pfc_hash_init(p_hxge_t hxgep, queue_t *q, mblk_t *mp,
 /* ARGSUSED */
 static int
 hxge_param_set_hxge_debug_flag(p_hxge_t hxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	status = 0;
@@ -1123,7 +1093,7 @@ hxge_param_get_debug_flag(p_hxge_t hxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 /* ARGSUSED */
 static int
 hxge_param_set_hpi_debug_flag(p_hxge_t hxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	status = 0;
@@ -1225,11 +1195,7 @@ hxge_param_dump_ptrs(p_hxge_t hxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 
 	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 	block = 0;
-#if defined(__i386)
-	base = (uint64_t)(uint32_t)hxgep->dev_regs->hxge_regp;
-#else
 	base = (uint64_t)hxgep->dev_regs->hxge_regp;
-#endif
 	while (reg_block[block].offset != ALL_FF_32) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 		    "%9s\t 0x%llx\n", reg_block[block].name,
@@ -1277,7 +1243,7 @@ hxge_param_dump_ptrs(p_hxge_t hxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
  */
 boolean_t
 hxge_nd_load(caddr_t *pparam, char *name,
-	pfi_t get_pfi, pfi_t set_pfi, caddr_t data)
+    pfi_t get_pfi, pfi_t set_pfi, caddr_t data)
 {
 	ND	*nd;
 	NDE	*nde;
@@ -1518,7 +1484,7 @@ hxge_get_default(p_hxge_t hxgep, queue_t *q, p_mblk_t mp, caddr_t data)
 /* ARGSUSED */
 int
 hxge_set_default(p_hxge_t hxgep, queue_t *q, p_mblk_t mp, char *value,
-	caddr_t data)
+    caddr_t data)
 {
 	return (EACCES);
 }

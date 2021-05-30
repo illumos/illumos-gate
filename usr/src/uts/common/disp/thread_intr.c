@@ -24,18 +24,6 @@
  * Use is subject to license terms.
  */
 
-/*
- * FILE NOTICE BEGIN
- *
- * This file should not be modified.  If you wish to modify it or have it
- * modified, please contact Sun Microsystems at <LFI149367@-sun-.-com->
- * (without anti-spam dashes)
- *
- * FILE NOTICE END
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/cpuvar.h>
 #include <sys/stack.h>
 #include <vm/seg_kp.h>
@@ -84,7 +72,7 @@ thread_create_intr(cpu_t *cp)
 	tp->t_bind_cpu = PBIND_NONE;	/* no USER-requested binding */
 	tp->t_bind_pset = PS_NONE;
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	tp->t_stk -= STACK_ALIGN;
 	*(tp->t_stk) = 0;		/* terminate intr thread stack */
 #endif
@@ -110,6 +98,6 @@ cpu_intr_alloc(cpu_t *cp, int n)
 		thread_create_intr(cp);
 
 	cp->cpu_intr_stack = (caddr_t)segkp_get(segkp, INTR_STACK_SIZE,
-		KPD_HASREDZONE | KPD_NO_ANON | KPD_LOCKED) +
-		INTR_STACK_SIZE - SA(MINFRAME);
+	    KPD_HASREDZONE | KPD_NO_ANON | KPD_LOCKED) +
+	    INTR_STACK_SIZE - SA(MINFRAME);
 }

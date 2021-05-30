@@ -45,9 +45,9 @@ static void nxge_hcksum_retrieve(mblk_t *,
 static uint32_t nxge_csgen(uint16_t *, int);
 
 extern uint32_t		nxge_reclaim_pending;
-extern uint32_t 	nxge_bcopy_thresh;
-extern uint32_t 	nxge_dvma_thresh;
-extern uint32_t 	nxge_dma_stream_thresh;
+extern uint32_t		nxge_bcopy_thresh;
+extern uint32_t		nxge_dvma_thresh;
+extern uint32_t		nxge_dma_stream_thresh;
 extern uint32_t		nxge_tx_minfree;
 extern uint32_t		nxge_tx_intr_thres;
 extern uint32_t		nxge_tx_max_gathers;
@@ -135,56 +135,56 @@ nxge_tx_ring_send(void *arg, mblk_t *mp)
 int
 nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 {
-	int 			dma_status, status = 0;
-	p_tx_desc_t 		tx_desc_ring_vp;
+	int			dma_status, status = 0;
+	p_tx_desc_t		tx_desc_ring_vp;
 	npi_handle_t		npi_desc_handle;
-	nxge_os_dma_handle_t 	tx_desc_dma_handle;
-	p_tx_desc_t 		tx_desc_p;
-	p_tx_msg_t 		tx_msg_ring;
-	p_tx_msg_t 		tx_msg_p = NULL;
+	nxge_os_dma_handle_t	tx_desc_dma_handle;
+	p_tx_desc_t		tx_desc_p;
+	p_tx_msg_t		tx_msg_ring;
+	p_tx_msg_t		tx_msg_p = NULL;
 	tx_desc_t		tx_desc, *tmp_desc_p;
 	tx_desc_t		sop_tx_desc, *sop_tx_desc_p;
 	p_tx_pkt_header_t	hdrp = NULL;
 	tx_pkt_hdr_all_t	tmp_hdrp;
 	p_tx_pkt_hdr_all_t	pkthdrp;
 	uint8_t			npads = 0;
-	uint64_t 		dma_ioaddr;
+	uint64_t		dma_ioaddr;
 	uint32_t		dma_flags;
 	int			last_bidx;
-	uint8_t 		*b_rptr;
-	caddr_t 		kaddr;
+	uint8_t			*b_rptr;
+	caddr_t			kaddr;
 	uint32_t		nmblks;
 	uint32_t		ngathers;
 	uint32_t		clen;
-	int 			len;
+	int			len;
 	uint32_t		pkt_len, pack_len, min_len;
 	uint32_t		bcopy_thresh;
-	int 			i, cur_index, sop_index;
+	int			i, cur_index, sop_index;
 	uint16_t		tail_index;
 	boolean_t		tail_wrap = B_FALSE;
 	nxge_dma_common_t	desc_area;
-	nxge_os_dma_handle_t 	dma_handle;
-	ddi_dma_cookie_t 	dma_cookie;
+	nxge_os_dma_handle_t	dma_handle;
+	ddi_dma_cookie_t	dma_cookie;
 	npi_handle_t		npi_handle;
-	p_mblk_t 		nmp;
+	p_mblk_t		nmp;
 	p_mblk_t		t_mp;
-	uint32_t 		ncookies;
-	boolean_t 		good_packet;
-	boolean_t 		mark_mode = B_FALSE;
-	p_nxge_stats_t 		statsp;
+	uint32_t		ncookies;
+	boolean_t		good_packet;
+	boolean_t		mark_mode = B_FALSE;
+	p_nxge_stats_t		statsp;
 	p_nxge_tx_ring_stats_t tdc_stats;
-	t_uscalar_t 		start_offset = 0;
-	t_uscalar_t 		stuff_offset = 0;
-	t_uscalar_t 		end_offset = 0;
-	t_uscalar_t 		value = 0;
-	t_uscalar_t 		cksum_flags = 0;
+	t_uscalar_t		start_offset = 0;
+	t_uscalar_t		stuff_offset = 0;
+	t_uscalar_t		end_offset = 0;
+	t_uscalar_t		value = 0;
+	t_uscalar_t		cksum_flags = 0;
 	boolean_t		cksum_on = B_FALSE;
 	uint32_t		boff = 0;
 	uint64_t		tot_xfer_len = 0;
 	boolean_t		header_set = B_FALSE;
 #ifdef NXGE_DEBUG
-	p_tx_desc_t 		tx_desc_ring_pp;
-	p_tx_desc_t 		tx_desc_pp;
+	p_tx_desc_t		tx_desc_ring_pp;
+	p_tx_desc_t		tx_desc_pp;
 	tx_desc_t		*save_desc_p;
 	int			dump_len;
 	int			sad_len;
@@ -192,11 +192,11 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	int			xfer_len;
 	uint32_t		msgsize;
 #endif
-	p_mblk_t 		mp_chain = NULL;
+	p_mblk_t		mp_chain = NULL;
 	boolean_t		is_lso = B_FALSE;
 	boolean_t		lso_again;
 	int			cur_index_lso;
-	p_mblk_t 		nmp_lso_save = NULL;
+	p_mblk_t		nmp_lso_save = NULL;
 	uint32_t		lso_ngathers;
 	boolean_t		lso_tail_wrap = B_FALSE;
 
@@ -483,11 +483,7 @@ start_again:
 		tx_desc_pp = &tx_desc_ring_pp[i];
 #endif
 		tx_msg_p = &tx_msg_ring[i];
-#if defined(__i386)
-		npi_desc_handle.regp = (uint32_t)tx_desc_p;
-#else
 		npi_desc_handle.regp = (uint64_t)tx_desc_p;
-#endif
 		if (!header_set &&
 		    ((!nxge_tx_use_bcopy && (len > TX_BCOPY_SIZE)) ||
 		    (len >= bcopy_thresh))) {
@@ -654,11 +650,7 @@ start_again:
 				    "ngathers %d",
 				    len, clen,
 				    ngathers));
-#if defined(__i386)
-				npi_desc_handle.regp = (uint32_t)tx_desc_p;
-#else
 				npi_desc_handle.regp = (uint64_t)tx_desc_p;
-#endif
 				while (ncookies > 1) {
 					ngathers++;
 					/*
@@ -705,13 +697,8 @@ start_again:
 					    tx_ring_p->tx_wrap_mask);
 					tx_desc_p = &tx_desc_ring_vp[i];
 
-#if defined(__i386)
-					npi_desc_handle.regp =
-					    (uint32_t)tx_desc_p;
-#else
 					npi_desc_handle.regp =
 					    (uint64_t)tx_desc_p;
-#endif
 					tx_msg_p = &tx_msg_ring[i];
 					tx_msg_p->flags.dma_type = USE_NONE;
 					tx_desc.value = 0;
@@ -745,11 +732,7 @@ start_again:
 		}
 		nmp = nmp->b_cont;
 nxge_start_control_header_only:
-#if defined(__i386)
-		npi_desc_handle.regp = (uint32_t)tx_desc_p;
-#else
 		npi_desc_handle.regp = (uint64_t)tx_desc_p;
-#endif
 		ngathers++;
 
 		if (ngathers == 1) {
@@ -834,11 +817,7 @@ nxge_start_control_header_only:
 
 	tx_msg_p->tx_message = mp;
 	tx_desc_p = &tx_desc_ring_vp[sop_index];
-#if defined(__i386)
-	npi_desc_handle.regp = (uint32_t)tx_desc_p;
-#else
 	npi_desc_handle.regp = (uint64_t)tx_desc_p;
-#endif
 
 	pkthdrp = (p_tx_pkt_hdr_all_t)hdrp;
 	pkthdrp->reserved = 0;
@@ -1132,11 +1111,7 @@ nxge_start_fail2:
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: clean up"));
 		for (i = 0; i < ngathers; i++) {
 			tx_desc_p = &tx_desc_ring_vp[cur_index];
-#if defined(__i386)
-			npi_handle.regp = (uint32_t)tx_desc_p;
-#else
 			npi_handle.regp = (uint64_t)tx_desc_p;
-#endif
 			tx_msg_p = &tx_msg_ring[cur_index];
 			(void) npi_txdma_desc_set_zero(npi_handle, 1);
 			if (tx_msg_p->flags.dma_type == USE_DVMA) {

@@ -353,7 +353,7 @@ mmpagelock(struct as *as, caddr_t va)
 
 #define	NEED_LOCK_KVADDR(kva)	mmpagelock(&kas, kva)
 
-#else	/* __i386, __amd64 */
+#else
 
 #define	NEED_LOCK_KVADDR(va)	0
 

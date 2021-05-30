@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <npi_ipp.h>
 
 uint64_t ipp_fzc_offset[] = {
@@ -111,7 +109,7 @@ npi_status_t
 npi_ipp_dump_regs(npi_handle_t handle, uint8_t port)
 {
 	uint64_t		value, offset;
-	int 			num_regs, i;
+	int			num_regs, i;
 
 	ASSERT(IS_PORT_NUM_VALID(port));
 
@@ -121,11 +119,7 @@ npi_ipp_dump_regs(npi_handle_t handle, uint8_t port)
 	num_regs = sizeof (ipp_fzc_offset) / sizeof (uint64_t);
 	for (i = 0; i < num_regs; i++) {
 		offset = IPP_REG_ADDR(port, ipp_fzc_offset[i]);
-#if defined(__i386)
-		NXGE_REG_RD64(handle, (uint32_t)offset, &value);
-#else
 		NXGE_REG_RD64(handle, offset, &value);
-#endif
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
 		    "%s\t 0x%08llx \n",
 		    offset, ipp_fzc_name[i], value));
@@ -141,7 +135,7 @@ void
 npi_ipp_read_regs(npi_handle_t handle, uint8_t port)
 {
 	uint64_t		value, offset;
-	int 			num_regs, i;
+	int			num_regs, i;
 
 	ASSERT(IS_PORT_NUM_VALID(port));
 
@@ -151,11 +145,7 @@ npi_ipp_read_regs(npi_handle_t handle, uint8_t port)
 	num_regs = sizeof (ipp_fzc_offset) / sizeof (uint64_t);
 	for (i = 0; i < num_regs; i++) {
 		offset = IPP_REG_ADDR(port, ipp_fzc_offset[i]);
-#if defined(__i386)
-		NXGE_REG_RD64(handle, (uint32_t)offset, &value);
-#else
 		NXGE_REG_RD64(handle, offset, &value);
-#endif
 	}
 
 }
@@ -197,7 +187,7 @@ npi_ipp_reset(npi_handle_t handle, uint8_t portn)
  */
 npi_status_t
 npi_ipp_config(npi_handle_t handle, config_op_t op, uint8_t portn,
-		ipp_config_t config)
+    ipp_config_t config)
 {
 	uint64_t val = 0;
 
@@ -278,7 +268,7 @@ npi_ipp_set_max_pktsize(npi_handle_t handle, uint8_t portn, uint32_t bytes)
  */
 npi_status_t
 npi_ipp_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
-		ipp_iconfig_t iconfig)
+    ipp_iconfig_t iconfig)
 {
 	uint64_t val = 0;
 
@@ -392,7 +382,7 @@ npi_ipp_get_dfifo_wr_ptr(npi_handle_t handle, uint8_t portn, uint16_t *wr_ptr)
 
 npi_status_t
 npi_ipp_write_pfifo(npi_handle_t handle, uint8_t portn, uint8_t addr,
-		uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t d4)
+    uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t d4)
 {
 	uint64_t val;
 
@@ -424,8 +414,8 @@ npi_ipp_write_pfifo(npi_handle_t handle, uint8_t portn, uint8_t addr,
 
 npi_status_t
 npi_ipp_read_pfifo(npi_handle_t handle, uint8_t portn, uint8_t addr,
-		uint32_t *d0, uint32_t *d1, uint32_t *d2, uint32_t *d3,
-		uint32_t *d4)
+    uint32_t *d0, uint32_t *d1, uint32_t *d2, uint32_t *d3,
+    uint32_t *d4)
 {
 	ASSERT(IS_PORT_NUM_VALID(portn));
 
@@ -448,7 +438,7 @@ npi_ipp_read_pfifo(npi_handle_t handle, uint8_t portn, uint8_t addr,
 
 npi_status_t
 npi_ipp_write_dfifo(npi_handle_t handle, uint8_t portn, uint16_t addr,
-		uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t d4)
+    uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t d4)
 {
 	uint64_t val;
 
@@ -480,8 +470,8 @@ npi_ipp_write_dfifo(npi_handle_t handle, uint8_t portn, uint16_t addr,
 
 npi_status_t
 npi_ipp_read_dfifo(npi_handle_t handle, uint8_t portn, uint16_t addr,
-		uint32_t *d0, uint32_t *d1, uint32_t *d2, uint32_t *d3,
-		uint32_t *d4)
+    uint32_t *d0, uint32_t *d1, uint32_t *d2, uint32_t *d3,
+    uint32_t *d4)
 {
 	ASSERT(IS_PORT_NUM_VALID(portn));
 
@@ -517,7 +507,7 @@ npi_ipp_get_ecc_syndrome(npi_handle_t handle, uint8_t portn, uint16_t *syndrome)
 
 npi_status_t
 npi_ipp_get_dfifo_eopm_rdptr(npi_handle_t handle, uint8_t portn,
-							uint16_t *rdptr)
+    uint16_t *rdptr)
 {
 	uint64_t val;
 

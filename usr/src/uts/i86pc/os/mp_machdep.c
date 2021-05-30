@@ -104,9 +104,6 @@ static int mach_cpu_create_devinfo(cpu_t *cp, dev_info_t **dipp);
  *	External reference functions
  */
 extern void return_instr();
-#if defined(__i386)
-extern uint64_t freq_notsc(uint32_t *);
-#endif
 extern void pc_gethrestime(timestruc_t *);
 extern int cpuid_get_coreid(cpu_t *);
 extern int cpuid_get_chipid(cpu_t *);

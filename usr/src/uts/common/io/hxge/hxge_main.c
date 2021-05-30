@@ -2341,12 +2341,7 @@ hxge_dma_mem_alloc(p_hxge_t hxgep, dma_method_t method,
 	}
 
 	dma_p->kaddrp = kaddrp;
-#if defined(__i386)
-	dma_p->ioaddr_pp =
-	    (unsigned char *)(uint32_t)dma_p->dma_cookie.dmac_laddress;
-#else
 	dma_p->ioaddr_pp = (unsigned char *) dma_p->dma_cookie.dmac_laddress;
-#endif
 
 	HPI_DMA_ACC_HANDLE_SET(dma_p, dma_p->acc_handle);
 

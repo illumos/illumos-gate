@@ -72,7 +72,7 @@
 #ifdef sparc
 #include <sys/ddi_subrdefs.h>
 
-#elif defined(__x86) || defined(__amd64)
+#elif defined(__x86)
 #include <sys/mach_intr.h>
 #endif
 
@@ -5028,7 +5028,7 @@ pcmcia_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	return (ret);
 }
 
-#elif defined(__x86) || defined(__amd64)
+#elif defined(__x86)
 
 static struct intrspec	*pcmcia_intr_get_ispec(dev_info_t *, int,
 			    pcmcia_logical_socket_t **);

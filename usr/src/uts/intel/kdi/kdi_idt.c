@@ -98,13 +98,6 @@ static kdi_main_t kdi_kmdb_main;
 
 kdi_drreg_t kdi_drreg;
 
-#ifndef __amd64
-/* Used to track the current set of valid kernel selectors. */
-uint32_t	kdi_cs;
-uint32_t	kdi_ds;
-uint32_t	kdi_fs;
-uint32_t	kdi_gs;
-#endif
 
 uintptr_t	kdi_kernel_handler;
 
@@ -330,12 +323,6 @@ kdi_activate(kdi_main_t main, kdi_cpusave_t *cpusave, uint_t ncpusave)
 		kdi_idt_init(KMDBCODE_SEL);
 	else
 		kdi_idt_init(KCS_SEL);
-
-	/* The initial selector set.  Updated by the debugger-entry code */
-#ifndef __amd64
-	kdi_cs = B32CODE_SEL;
-	kdi_ds = kdi_fs = kdi_gs = B32DATA_SEL;
-#endif
 
 	kdi_memranges[0].mr_base = kdi_segdebugbase;
 	kdi_memranges[0].mr_lim = kdi_segdebugbase + kdi_segdebugsize - 1;

@@ -884,14 +884,10 @@ lwp_stk_init(klwp_t *lwp, caddr_t stk)
 	 * have a well-defined initial state (present, ring 3
 	 * and of type data).
 	 */
-#if defined(__amd64)
 	if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE)
 		pcb->pcb_fsdesc = pcb->pcb_gsdesc = zero_udesc;
 	else
 		pcb->pcb_fsdesc = pcb->pcb_gsdesc = zero_u32desc;
-#elif defined(__i386)
-	pcb->pcb_fsdesc = pcb->pcb_gsdesc = zero_udesc;
-#endif	/* __i386 */
 	lwp_installctx(lwp);
 	return (stk);
 }

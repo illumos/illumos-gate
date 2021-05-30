@@ -1857,7 +1857,7 @@ page_create_get_something(vnode_t *vp, u_offset_t off, struct seg *seg,
 
 	flags &= ~PG_MATCH_COLOR;
 	locked = 0;
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	flags = page_create_update_flags_x86(flags);
 #endif
 
@@ -2035,7 +2035,7 @@ page_alloc_pages(struct vnode *vp, struct seg *seg, caddr_t addr,
 	ASSERT(basepp != NULL || ppa != NULL);
 	ASSERT(basepp == NULL || ppa == NULL);
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	while (page_chk_freelist(szc) == 0) {
 		VM_STAT_ADD(alloc_pages[8]);
 		if (anypgsz == 0 || --szc == 0)

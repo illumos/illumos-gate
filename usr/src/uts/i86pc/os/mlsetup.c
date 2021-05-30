@@ -279,19 +279,10 @@ mlsetup(struct regs *rp)
 
 #endif	/* !__xpv */
 
-#if defined(__i386) && !defined(__xpv)
-	/*
-	 * Some i386 processors do not implement the rdtsc instruction,
-	 * or at least they do not implement it correctly. Patch them to
-	 * return 0.
-	 */
-	if (!is_x86_feature(x86_featureset, X86FSET_TSC))
-		patch_tsc_read(TSC_NONE);
-#endif	/* __i386 && !__xpv */
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	patch_memops(cpuid_getvendor(CPU));
-#endif	/* __amd64 && !__xpv */
+#endif	/* !__xpv */
 
 #if !defined(__xpv)
 	/* XXPV	what, if anything, should be dorked with here under xen? */
@@ -436,11 +427,6 @@ mlsetup(struct regs *rp)
 #else	/* __xpv */
 	/* Flag PLAT_DR_FEATURE_ENABLED should only be set by DR driver. */
 	plat_dr_options &= ~PLAT_DR_FEATURE_ENABLED;
-#ifndef	__amd64
-	/* Only enable CPU/memory DR on 64 bits kernel. */
-	plat_dr_options &= ~PLAT_DR_FEATURE_MEMORY;
-	plat_dr_options &= ~PLAT_DR_FEATURE_CPU;
-#endif	/* __amd64 */
 #endif	/* __xpv */
 
 	/*

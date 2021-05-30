@@ -5792,7 +5792,7 @@ ip_net_mask(ipaddr_t addr)
 	ipaddr_t mask = 0;
 	uchar_t	*maskp = (uchar_t *)&mask;
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 #define	TOTALLY_BRAIN_DAMAGED_C_COMPILER
 #endif
 #ifdef  TOTALLY_BRAIN_DAMAGED_C_COMPILER

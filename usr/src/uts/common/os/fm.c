@@ -375,9 +375,9 @@ fm_panic(const char *format, ...)
 	va_list ap;
 
 	(void) atomic_cas_ptr((void *)&fm_panicstr, NULL, (void *)format);
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	fastreboot_disable_highpil();
-#endif /* __i386 || __amd64 */
+#endif /* __x86 */
 	va_start(ap, format);
 	vpanic(format, ap);
 	va_end(ap);

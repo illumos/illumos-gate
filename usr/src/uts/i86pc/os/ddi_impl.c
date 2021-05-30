@@ -106,7 +106,7 @@ static int peek_mem(peekpoke_ctlops_t *in_args);
 
 static int kmem_override_cache_attrs(caddr_t, size_t, uint_t);
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 extern void immu_init(void);
 #endif
 
@@ -178,9 +178,6 @@ configure(void)
 {
 	extern void i_ddi_init_root();
 
-#if defined(__i386)
-	extern int fpu_pentium_fdivbug;
-#endif	/* __i386 */
 	extern int fpu_ignored;
 
 	/*
@@ -189,12 +186,6 @@ configure(void)
 
 	fpu_probe();
 
-#if defined(__i386)
-	if (fpu_pentium_fdivbug) {
-		printf("\
-FP hardware exhibits Pentium floating point divide problem\n");
-	}
-#endif	/* __i386 */
 
 	if (fpu_ignored) {
 		printf("FP hardware will not be used\n");
@@ -217,7 +208,7 @@ FP hardware exhibits Pentium floating point divide problem\n");
 	/* reprogram devices not set up by firmware (BIOS) */
 	impl_bus_reprobe();
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	/*
 	 * Setup but don't startup the IOMMU
 	 * Startup happens later via a direct call

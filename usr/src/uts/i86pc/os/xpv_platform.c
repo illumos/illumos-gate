@@ -194,9 +194,7 @@ xen_hvm_init(void)
 
 	if (xen_bits < 0)
 		return;
-#ifdef __amd64
 	ASSERT(xen_bits == 64);
-#endif
 
 	/*
 	 * Allocate space for the shared_info page and tell Xen where it

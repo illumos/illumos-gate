@@ -112,10 +112,10 @@ pcie_power(dev_info_t *dip, int component, int level)
 	int pmcaps = pwr_p->pwr_pmcaps;
 	int ret = DDI_FAILURE;
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	if (dip)
 		return (DDI_SUCCESS);
-#endif /* defined(__i386) || defined(__amd64) */
+#endif /* defined(__x86) */
 
 	ASSERT(level != PM_LEVEL_UNKNOWN);
 	/* PM should not asking for a level, which is unsupported */
@@ -277,10 +277,10 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 	int rv = DDI_SUCCESS;
 	int level_allowed, comp;
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	if (dip)
 		return (DDI_SUCCESS);
-#endif /* defined(__i386) || defined(__amd64) */
+#endif /* defined(__x86) */
 
 	switch (op) {
 	case BUS_POWER_PRE_NOTIFICATION:
@@ -853,10 +853,10 @@ pcie_pwr_resume(dev_info_t *dip)
 	dev_info_t *cdip;
 	pcie_pwr_t *pwr_p = NULL;
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	if (dip)
 		return (DDI_SUCCESS);
-#endif /* defined(__i386) || defined(__amd64) */
+#endif /* defined(__x86) */
 
 	if (PCIE_PMINFO(dip))
 		pwr_p = PCIE_NEXUS_PMINFO(dip);
@@ -940,10 +940,10 @@ pcie_pwr_suspend(dev_info_t *dip)
 	int *child_counters = NULL; /* per child dip counters */
 	pcie_pwr_t *pwr_p = NULL;
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	if (dip)
 		return (DDI_SUCCESS);
-#endif /* defined(__i386) || defined(__amd64) */
+#endif /* defined(__x86) */
 
 	if (PCIE_PMINFO(dip))
 		pwr_p = PCIE_NEXUS_PMINFO(dip);

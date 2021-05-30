@@ -1022,7 +1022,7 @@ port_state_done:
 		ret = DDI_ENOTSUP;
 	}
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	/*
 	 * like in attach, since hotplugging can change error registers,
 	 * we need to ensure that the proper bits are set on this port

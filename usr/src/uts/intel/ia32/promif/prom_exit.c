@@ -48,18 +48,13 @@ prom_exit_to_mon(void)
 #if !defined(_KMDB)
 	prom_poll_enter();
 #endif
-#ifdef I386BOOT
-	prom_printf("[spinning forever]\n");
-	for (;;)
-		continue;
-#else
+
 #if !defined(_KMDB)
 	if (boothowto & RB_DEBUG)
 		kmdb_enter();
 #endif	/* !_KMDB */
 	prom_reboot_prompt();
 	prom_reboot(NULL);
-#endif	/* !I386BOOT */
 }
 
 #if !defined(_KMDB)

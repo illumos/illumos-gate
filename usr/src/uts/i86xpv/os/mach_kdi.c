@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Kernel/Debugger Interface (KDI) routines.  Called during debugger under
  * various system states (boot, while running, while the debugger has control).
@@ -160,7 +158,6 @@ kdi_slave_wait(void)
  * Note that kmdb entry relies on the fake cpu_t having zero cpu_idt/cpu_id.
  */
 
-#if defined(__amd64)
 
 void *
 boot_kdi_tmpinit(void)
@@ -207,56 +204,3 @@ boot_kdi_tmpfini(void *old)
 	load_segment_registers(B64CODE_SEL, 0, KMDBGS_SEL, B32DATA_SEL);
 #endif
 }
-
-#elif defined(__i386)
-
-/*
- * Sigh.  We're called before we've initialized the kernels GDT, living
- * off the hypervisor's default GDT.  For kmdb's sake, we switch now to
- * a GDT that looks like dboot's GDT; very shortly we'll initialize and
- * switch to the kernel's GDT.
- */
-
-void *
-boot_kdi_tmpinit(void)
-{
-	cpu_t *cpu = kobj_zalloc(sizeof (*cpu), KM_TMP);
-	user_desc_t *bgdt;
-	uint64_t gdtpa;
-	ulong_t ma[1];
-
-	cpu->cpu_self = cpu;
-
-	/*
-	 * (Note that we had better switch to a -new- GDT before
-	 * we discard the KM_TMP mappings, or disaster will ensue.)
-	 */
-	bgdt = kobj_zalloc(PAGESIZE, KM_TMP);
-
-	ASSERT(((uintptr_t)bgdt & PAGEOFFSET) == 0);
-	gdtpa = pfn_to_pa(va_to_pfn(bgdt));
-
-	init_boot_gdt(bgdt);
-
-	set_usegd(&bgdt[GDT_BGSTMP],
-	    cpu, sizeof (*cpu), SDT_MEMRWA, SEL_KPL, SDP_BYTES, SDP_OP32);
-
-	ma[0] = (ulong_t)(pa_to_ma(gdtpa) >> PAGESHIFT);
-	kbm_read_only((uintptr_t)bgdt, gdtpa);
-	if (HYPERVISOR_set_gdt(ma, PAGESIZE / sizeof (user_desc_t)))
-		panic("boot_kdi_tmpinit:HYPERVISOR_set_gdt() failed");
-
-	load_segment_registers(B32CODE_SEL, B32DATA_SEL, B32DATA_SEL, 0,
-	    KMDBGS_SEL, B32DATA_SEL);
-	return (0);
-}
-
-/*ARGSUSED*/
-void
-boot_kdi_tmpfini(void *old)
-{
-	load_segment_registers(B32CODE_SEL, B32DATA_SEL, B32DATA_SEL, 0,
-	    0, B32DATA_SEL);
-}
-
-#endif	/* __i386 */

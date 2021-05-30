@@ -44,11 +44,7 @@
 #define	FBT_RET_IMM16		0xc2
 #define	FBT_LEAVE		0xc9
 
-#ifdef __amd64
 #define	FBT_PATCHVAL		0xcc
-#else
-#define	FBT_PATCHVAL		0xf0
-#endif
 
 #define	FBT_ENTRY	"entry"
 #define	FBT_RETURN	"return"
@@ -97,7 +93,6 @@ fbt_invop(uintptr_t addr, uintptr_t *stack, uintptr_t rval)
 				 */
 				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 				CPU->cpu_dtrace_caller = stack[i++];
-#ifdef __amd64
 				/*
 				 * On amd64, stack[0] contains the dereferenced
 				 * stack pointer, stack[1] contains savfp,
@@ -105,7 +100,6 @@ fbt_invop(uintptr_t addr, uintptr_t *stack, uintptr_t rval)
 				 * over these entries.
 				 */
 				i += 2;
-#endif
 				stack0 = stack[i++];
 				stack1 = stack[i++];
 				stack2 = stack[i++];
@@ -119,7 +113,6 @@ fbt_invop(uintptr_t addr, uintptr_t *stack, uintptr_t rval)
 
 				CPU->cpu_dtrace_caller = 0;
 			} else {
-#ifdef __amd64
 				/*
 				 * On amd64, we instrument the ret, not the
 				 * leave.  We therefore need to set the caller
@@ -130,7 +123,6 @@ fbt_invop(uintptr_t addr, uintptr_t *stack, uintptr_t rval)
 				CPU->cpu_dtrace_caller = stack[0];
 				DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT |
 				    CPU_DTRACE_BADADDR);
-#endif
 
 				dtrace_probe(fbt->fbtp_id, fbt->fbtp_roffset,
 				    rval, 0, 0, 0);
@@ -284,7 +276,6 @@ fbt_provide_module(void *arg, struct modctl *ctl)
 		instr = (uint8_t *)sym->st_value;
 		limit = (uint8_t *)(sym->st_value + sym->st_size);
 
-#ifdef __amd64
 		while (instr < limit) {
 			if (*instr == FBT_PUSHL_EBP)
 				break;
@@ -303,16 +294,6 @@ fbt_provide_module(void *arg, struct modctl *ctl)
 			 */
 			continue;
 		}
-#else
-		if (instr[0] != FBT_PUSHL_EBP)
-			continue;
-
-		if (!(instr[1] == FBT_MOVL_ESP_EBP0_V0 &&
-		    instr[2] == FBT_MOVL_ESP_EBP1_V0) &&
-		    !(instr[1] == FBT_MOVL_ESP_EBP0_V1 &&
-		    instr[2] == FBT_MOVL_ESP_EBP1_V1))
-			continue;
-#endif
 
 		fbt = kmem_zalloc(sizeof (fbt_probe_t), KM_SLEEP);
 		fbt->fbtp_name = name;
@@ -344,7 +325,6 @@ again:
 		if ((size = dtrace_instr_size(instr)) <= 0)
 			continue;
 
-#ifdef __amd64
 		/*
 		 * We only instrument "ret" on amd64 -- we don't yet instrument
 		 * ret imm16, largely because the compiler doesn't seem to
@@ -354,15 +334,6 @@ again:
 			instr += size;
 			goto again;
 		}
-#else
-		if (!(size == 1 &&
-		    (*instr == FBT_POPL_EBP || *instr == FBT_LEAVE) &&
-		    (*(instr + 1) == FBT_RET ||
-		    *(instr + 1) == FBT_RET_IMM16))) {
-			instr += size;
-			goto again;
-		}
-#endif
 
 		/*
 		 * We (desperately) want to avoid erroneously instrumenting a
@@ -412,22 +383,10 @@ again:
 		fbt->fbtp_ctl = ctl;
 		fbt->fbtp_loadcnt = ctl->mod_loadcnt;
 
-#ifndef __amd64
-		if (*instr == FBT_POPL_EBP) {
-			fbt->fbtp_rval = DTRACE_INVOP_POPL_EBP;
-		} else {
-			ASSERT(*instr == FBT_LEAVE);
-			fbt->fbtp_rval = DTRACE_INVOP_LEAVE;
-		}
-		fbt->fbtp_roffset =
-		    (uintptr_t)(instr - (uint8_t *)sym->st_value) + 1;
-
-#else
 		ASSERT(*instr == FBT_RET);
 		fbt->fbtp_rval = DTRACE_INVOP_RET;
 		fbt->fbtp_roffset =
 		    (uintptr_t)(instr - (uint8_t *)sym->st_value);
-#endif
 
 		fbt->fbtp_savedval = *instr;
 		fbt->fbtp_patchval = FBT_PATCHVAL;

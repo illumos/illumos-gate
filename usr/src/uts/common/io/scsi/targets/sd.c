@@ -395,7 +395,7 @@ static int sd_pl2pc[] = {
  * Vendor specific data name property declarations
  */
 
-#if defined(__fibre) || defined(__i386) ||defined(__amd64)
+#if defined(__fibre) || defined(__x86)
 
 static sd_tunables seagate_properties = {
 	SEAGATE_THROTTLE_VALUE,
@@ -473,7 +473,7 @@ static sd_tunables pirus_properties = {
 #endif
 
 #if (defined(__sparc) && !defined(__fibre)) || \
-	(defined(__i386) || defined(__amd64))
+	(defined(__x86))
 
 
 static sd_tunables elite_properties = {
@@ -606,7 +606,7 @@ static sd_tunables tst_properties = {
  *	 made with an FC connection. The entries here are a legacy.
  */
 static sd_disk_config_t sd_disk_table[] = {
-#if defined(__fibre) || defined(__i386) || defined(__amd64)
+#if defined(__fibre) || defined(__x86)
 	{ "SEAGATE ST34371FC", SD_CONF_BSET_THROTTLE, &seagate_properties },
 	{ "SEAGATE ST19171FC", SD_CONF_BSET_THROTTLE, &seagate_properties },
 	{ "SEAGATE ST39102FC", SD_CONF_BSET_THROTTLE, &seagate_properties },
@@ -729,7 +729,7 @@ static sd_disk_config_t sd_disk_table[] = {
 	{ "SYMBIOS", SD_CONF_BSET_NRR_COUNT, &symbios_properties },
 #endif /* fibre or NON-sparc platforms */
 #if ((defined(__sparc) && !defined(__fibre)) ||\
-	(defined(__i386) || defined(__amd64)))
+	(defined(__x86)))
 	{ "SEAGATE ST42400N", SD_CONF_BSET_THROTTLE, &elite_properties },
 	{ "SEAGATE ST31200N", SD_CONF_BSET_THROTTLE, &st31200n_properties },
 	{ "SEAGATE ST41600N", SD_CONF_BSET_TUR_CHECK, NULL },
@@ -746,7 +746,7 @@ static sd_disk_config_t sd_disk_table[] = {
 	    &symbios_properties },
 	{ "LSI", SD_CONF_BSET_THROTTLE | SD_CONF_BSET_NRR_COUNT,
 	    &lsi_properties_scsi },
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	{ " NEC CD-ROM DRIVE:260 ", (SD_CONF_BSET_PLAYMSF_BCD
 				    | SD_CONF_BSET_READSUB_BCD
 				    | SD_CONF_BSET_READ_TOC_ADDR_BCD
@@ -758,7 +758,7 @@ static sd_disk_config_t sd_disk_table[] = {
 				    | SD_CONF_BSET_READ_TOC_ADDR_BCD
 				    | SD_CONF_BSET_NO_READ_HEADER
 				    | SD_CONF_BSET_READ_CD_XD4), NULL },
-#endif /* __i386 || __amd64 */
+#endif /* __x86 */
 #endif /* sparc NON-fibre or NON-sparc platforms */
 
 #if (defined(SD_PROP_TST))
@@ -7550,7 +7550,7 @@ sd_unit_attach(dev_info_t *devi)
 	 * The value used is base on interconnect type.
 	 * fibre = 3, parallel = 5
 	 */
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	un->un_retry_count = un->un_f_is_fibre ? 3 : 5;
 #else
 	un->un_retry_count = SD_RETRY_COUNT;
@@ -7597,7 +7597,7 @@ sd_unit_attach(dev_info_t *devi)
 	 * get updated later in the attach, when setting up default wide
 	 * operations for disks.
 	 */
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	un->un_max_xfer_size = (uint_t)SD_DEFAULT_MAX_XFER_SIZE;
 	un->un_partial_dma_supported = 1;
 #else
@@ -8105,7 +8105,7 @@ sd_unit_attach(dev_info_t *devi)
 					    "is too large for a 32-bit "
 					    "kernel", capacity);
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 					/*
 					 * 1TB disk was treated as (1T - 512)B
 					 * in the past, so that it might have
@@ -8307,7 +8307,7 @@ sd_unit_attach(dev_info_t *devi)
 
 	cmlb_alloc_handle(&un->un_cmlbhandle);
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	/*
 	 * On x86, compensate for off-by-1 legacy error
 	 */
@@ -10375,7 +10375,7 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 			    "device not ready or invalid disk block value\n");
 			goto open_fail;
 		}
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	} else {
 		uchar_t *cp;
 		/*
@@ -10591,7 +10591,7 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 			 * only issues a Sync Cache to DVD-RAM, a newly
 			 * supported device.
 			 */
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 			if ((un->un_f_sync_cache_supported &&
 			    un->un_f_sync_cache_required) ||
 			    un->un_f_dvdram_writable_device == TRUE) {
@@ -12990,7 +12990,7 @@ sd_mapblocksize_iostart(int index, struct sd_lun *un, struct buf *bp)
 		goto done;
 	}
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	/* We do not support non-block-aligned transfers for ROD devices */
 	ASSERT(!ISROD(un));
 #endif
@@ -13787,7 +13787,7 @@ sd_initpkt_for_buf(struct buf *bp, struct scsi_pkt **pktpp)
 
 	mutex_exit(SD_MUTEX(un));
 
-#if defined(__i386) || defined(__amd64)	/* DMAFREE for x86 only */
+#if defined(__x86)	/* DMAFREE for x86 only */
 	if (xp->xb_pkt_flags & SD_XB_DMA_FREED) {
 		/*
 		 * Already have a scsi_pkt -- just need DMA resources.
@@ -13803,7 +13803,7 @@ sd_initpkt_for_buf(struct buf *bp, struct scsi_pkt **pktpp)
 	} else {
 		pktp = NULL;
 	}
-#endif /* __i386 || __amd64 */
+#endif /* __x86 */
 
 	startblock = xp->xb_blkno;	/* Absolute block num. */
 	blockcount = SD_BYTES2TGTBLOCKS(un, bp->b_bcount);
@@ -13851,7 +13851,7 @@ sd_initpkt_for_buf(struct buf *bp, struct scsi_pkt **pktpp)
 		SD_TRACE(SD_LOG_IO_CORE, un,
 		    "sd_initpkt_for_buf: exit: buf:0x%p\n", bp);
 
-#if defined(__i386) || defined(__amd64)	/* DMAFREE for x86 only */
+#if defined(__x86)	/* DMAFREE for x86 only */
 		xp->xb_pkt_flags &= ~SD_XB_DMA_FREED;
 #endif
 
@@ -14523,7 +14523,7 @@ sd_shadow_buf_alloc(struct buf *bp, size_t datalen, uint_t bflags,
 	}
 
 	bflags &= (B_READ | B_WRITE);
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	new_bp = getrbuf(KM_SLEEP);
 	new_bp->b_un.b_addr = kmem_zalloc(datalen, KM_SLEEP);
 	new_bp->b_bcount = datalen;
@@ -14637,7 +14637,7 @@ sd_shadow_buf_free(struct buf *bp)
 	 */
 	bp->b_iodone = NULL;
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	kmem_free(bp->b_un.b_addr, bp->b_bcount);
 	freerbuf(bp);
 #else
@@ -14868,7 +14868,7 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 	struct	sd_xbuf	*xp;
 	struct	buf	*bp;
 	void	(*statp)(kstat_io_t *);
-#if defined(__i386) || defined(__amd64)	/* DMAFREE for x86 only */
+#if defined(__x86)	/* DMAFREE for x86 only */
 	void	(*saved_statp)(kstat_io_t *);
 #endif
 	int	rval;
@@ -14882,7 +14882,7 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 	SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un, "sd_start_cmds: entry\n");
 
 	do {
-#if defined(__i386) || defined(__amd64)	/* DMAFREE for x86 only */
+#if defined(__x86)	/* DMAFREE for x86 only */
 		saved_statp = NULL;
 #endif
 
@@ -14941,7 +14941,7 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 				    kstat_runq_back_to_waitq)) {
 					statp = kstat_waitq_to_runq;
 				}
-#if defined(__i386) || defined(__amd64)	/* DMAFREE for x86 only */
+#if defined(__x86)	/* DMAFREE for x86 only */
 				saved_statp = un->un_retry_statp;
 #endif
 				un->un_retry_statp = NULL;
@@ -15029,7 +15029,7 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 		xp = SD_GET_XBUF(bp);
 		ASSERT(xp != NULL);
 
-#if defined(__i386) || defined(__amd64)	/* DMAFREE for x86 only */
+#if defined(__x86)	/* DMAFREE for x86 only */
 		/*
 		 * Allocate the scsi_pkt if we need one, or attach DMA
 		 * resources if we have a scsi_pkt that needs them. The
@@ -15108,7 +15108,7 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 				SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
 				    "sd_start_cmds: SD_PKT_ALLOC_FAILURE\n");
 
-#if defined(__i386) || defined(__amd64)	/* DMAFREE for x86 only */
+#if defined(__x86)	/* DMAFREE for x86 only */
 
 				if (bp == immed_bp) {
 					/*
@@ -15303,7 +15303,7 @@ got_pkt:
 				goto exit;
 			}
 
-#if defined(__i386) || defined(__amd64)	/* DMAFREE for x86 only */
+#if defined(__x86)	/* DMAFREE for x86 only */
 			/*
 			 * Free the DMA resources for the  scsi_pkt. This will
 			 * allow mpxio to select another path the next time
@@ -16597,7 +16597,7 @@ sd_alloc_rqs(struct scsi_device *devp, struct sd_lun *un)
 	if (un->un_f_is_fibre == TRUE) {
 		un->un_f_arq_enabled = TRUE;
 	} else {
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 		/*
 		 * Circumvent the Adaptec bug, remove this code when
 		 * the bug is fixed
@@ -17051,7 +17051,7 @@ sdintr(struct scsi_pkt *pktp)
 			goto exit;
 		}
 
-#if (defined(__i386) || defined(__amd64))	/* DMAFREE for x86 only */
+#if (defined(__x86))	/* DMAFREE for x86 only */
 		/*
 		 * We want to either retry or fail this command, so free
 		 * the DMA resources here.  If we retry the command then
@@ -17144,7 +17144,7 @@ sdintr(struct scsi_pkt *pktp)
 
 not_successful:
 
-#if (defined(__i386) || defined(__amd64))	/* DMAFREE for x86 only */
+#if (defined(__x86))	/* DMAFREE for x86 only */
 	/*
 	 * The following is based upon knowledge of the underlying transport
 	 * and its use of DMA resources.  This code should be removed when
@@ -17834,7 +17834,7 @@ sense_failed:
 	 * If the request sense failed (for whatever reason), attempt
 	 * to retry the original command.
 	 */
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	/*
 	 * SD_RETRY_DELAY is conditionally compile (#if fibre) in
 	 * sddef.h for Sparc platform, and x86 uses 1 binary
@@ -19384,7 +19384,7 @@ sd_pkt_status_check_condition(struct sd_lun *un, struct buf *bp,
 	} else {
 		SD_INFO(SD_LOG_IO_CORE, un, "sd_pkt_status_check_condition: "
 		    "ARQ,retrying request sense command\n");
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 		/*
 		 * The SD_RETRY_DELAY value need to be adjusted here
 		 * when SD_RETRY_DELAY change in sddef.h
@@ -22571,7 +22571,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		case DKIOCSMBOOT:
 		case DKIOCG_PHYGEOM:
 		case DKIOCG_VIRTGEOM:
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 		case DKIOCSETEXTPART:
 #endif
 			/* let cmlb handle it */
@@ -22726,7 +22726,7 @@ skip_ready_valid:
 	case DKIOCSMBOOT:
 	case DKIOCG_PHYGEOM:
 	case DKIOCG_VIRTGEOM:
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	case DKIOCSETEXTPART:
 #endif
 		SD_TRACE(SD_LOG_IOCTL, un, "DKIOC %d\n", cmd);
@@ -23126,7 +23126,7 @@ skip_ready_valid:
 
 	case CDROMPLAYTRKIND:
 		SD_TRACE(SD_LOG_IOCTL, un, "CDROMPLAYTRKIND\n");
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 		/*
 		 * not supported on ATAPI CD drives, use CDROMPLAYMSF instead
 		 */

@@ -66,7 +66,7 @@
 #include <sys/machelf.h>
 #include <sys/sunddi.h>
 #include "elf_impl.h"
-#if defined(__i386) || defined(__i386_COMPAT)
+#if defined(__i386_COMPAT)
 #include <sys/sysi86.h>
 #endif
 
@@ -129,13 +129,13 @@ setup_note_header(Phdr *v, proc_t *p)
 	kmem_free(pcrp, size);
 
 
-#if defined(__i386) || defined(__i386_COMPAT)
+#if defined(__i386_COMPAT)
 	mutex_enter(&p->p_ldtlock);
 	size = prnldt(p) * sizeof (struct ssd);
 	mutex_exit(&p->p_ldtlock);
 	if (size != 0)
 		v[0].p_filesz += sizeof (Note) + roundup(size, sizeof (Word));
-#endif	/* __i386 || __i386_COMPAT */
+#endif	/* __i386_COMPAT */
 
 	if ((size = prhasx(p)? prgetprxregsize(p) : 0) != 0)
 		v[0].p_filesz += nlwp * sizeof (Note)
@@ -218,10 +218,10 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 	int fd;
 	vnode_t *vroot;
 
-#if defined(__i386) || defined(__i386_COMPAT)
+#if defined(__i386_COMPAT)
 	struct ssd *ssd;
 	size_t ssdsize;
-#endif	/* __i386 || __i386_COMPAT */
+#endif	/* __i386_COMPAT */
 
 	bigsize = MAX(bigsize, priv_get_implinfo_size());
 
@@ -447,7 +447,7 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 
 	VN_RELE(vroot);
 
-#if defined(__i386) || defined(__i386_COMPAT)
+#if defined(__i386_COMPAT)
 	mutex_enter(&p->p_ldtlock);
 	ssdsize = prnldt(p) * sizeof (struct ssd);
 	if (ssdsize != 0) {
@@ -460,7 +460,7 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 	mutex_exit(&p->p_ldtlock);
 	if (error)
 		goto done;
-#endif	/* __i386 || defined(__i386_COMPAT) */
+#endif	/* defined(__i386_COMPAT) */
 
 	nlwp = p->p_lwpcnt;
 	nzomb = p->p_zombcnt;

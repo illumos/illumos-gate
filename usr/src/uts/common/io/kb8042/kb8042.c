@@ -1516,7 +1516,7 @@ kb8042_get_initial_leds(
     int *initial_leds,
     int *initial_led_mask)
 {
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	extern caddr_t	p0_va;
 	uint8_t		bios_kb_flag;
 

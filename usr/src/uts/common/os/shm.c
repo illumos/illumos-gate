@@ -346,7 +346,7 @@ shmat(int shmid, caddr_t uaddr, int uflags, uintptr_t *rvp)
 		size = P2ROUNDUP(size, share_size);
 
 		align_hint = share_size;
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 		/*
 		 * For x86, we want to share as much of the page table tree
 		 * as possible. We use a large align_hint at first, but
@@ -364,7 +364,7 @@ shmat(int shmid, caddr_t uaddr, int uflags, uintptr_t *rvp)
 			while (size >= ptes_per_table * (uint64_t)align_hint)
 				align_hint *= ptes_per_table;
 		}
-#endif /* __i386 || __amd64 */
+#endif /* __x86 */
 
 #if defined(__sparcv9)
 		if (addr == 0 &&

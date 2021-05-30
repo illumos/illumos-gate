@@ -775,7 +775,6 @@ map_addr_proc(
 	ASSERT32(userlimit == as->a_userlimit);
 
 	base = p->p_brkbase;
-#if defined(__amd64)
 	if (p->p_model == DATAMODEL_NATIVE) {
 		if (userlimit < as->a_userlimit) {
 			/*
@@ -811,9 +810,9 @@ map_addr_proc(
 			slen = p->p_usrstack - base -
 			    ((p->p_stk_ctl + PAGEOFFSET) & PAGEMASK);
 		}
-	} else
-#endif /* defined(__amd64) */
+	} else {
 		slen = userlimit - base;
+	}
 
 	/* Make len be a multiple of PAGESIZE */
 	len = (len + PAGEOFFSET) & PAGEMASK;
@@ -943,7 +942,6 @@ valid_va_range_aligned(caddr_t *basep, size_t *lenp, size_t minlen, int dir,
 		return (0);
 	}
 
-#if defined(__amd64)
 	/*
 	 * Deal with a possible hole in the address range between
 	 * hole_start and hole_end that should never be mapped.
@@ -984,7 +982,6 @@ valid_va_range_aligned(caddr_t *basep, size_t *lenp, size_t minlen, int dir,
 		if (lo < hole_end)
 			lo = hole_end;
 	}
-#endif
 
 	if (hi - lo < tot_len)
 		return (0);
@@ -1043,13 +1040,11 @@ valid_usr_range(caddr_t addr, size_t len, uint_t prot, struct as *as,
 	    secflag_enabled(as->a_proc, PROC_SEC_FORBIDNULLMAP))
 		return (RANGE_BADADDR);
 
-#if defined(__amd64)
 	/*
 	 * Check for the VA hole
 	 */
 	if (eaddr > (caddr_t)hole_start && addr < (caddr_t)hole_end)
 		return (RANGE_BADADDR);
-#endif
 
 	return (RANGE_OKAY);
 }
@@ -1577,31 +1572,6 @@ mtype_init(vnode_t *vp, caddr_t vaddr, uint_t *flags, size_t pgsz)
 	int mtype = mtypetop;
 
 #if !defined(__xpv)
-#if defined(__i386)
-	/*
-	 * set the mtype range
-	 * - kmem requests need to be below 4g if restricted_kmemalloc is set.
-	 * - for non kmem requests, set range to above 4g if memory below 4g
-	 * runs low.
-	 */
-	if (restricted_kmemalloc && VN_ISKAS(vp) &&
-	    (caddr_t)(vaddr) >= kernelheap &&
-	    (caddr_t)(vaddr) < ekernelheap) {
-		ASSERT(physmax4g);
-		mtype = mtype4g;
-		if (RESTRICT16M_ALLOC(freemem4g - btop(pgsz),
-		    btop(pgsz), *flags)) {
-			*flags |= PGI_MT_RANGE16M;
-		} else {
-			VM_STAT_ADD(vmm_vmstats.unrestrict16mcnt);
-			VM_STAT_COND_ADD((*flags & PG_PANIC),
-			    vmm_vmstats.pgpanicalloc);
-			*flags |= PGI_MT_RANGE0;
-		}
-		return (mtype);
-	}
-#endif	/* __i386 */
-
 	if (RESTRICT4G_ALLOC) {
 		VM_STAT_ADD(vmm_vmstats.restrict4gcnt);
 		/* here only for > 4g systems */
@@ -1826,10 +1796,6 @@ page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 		i = memrange_num(plat_dr_physmax);
 	else
 		i = memrange_num(physmax);
-#if defined(__i386)
-	if (i > MRI_4G)
-		restricted_kmemalloc = 0;
-#endif
 	/* physmax greater than 4g */
 	if (i == MRI_4G)
 		physmax4g = 1;
@@ -4082,11 +4048,7 @@ page_get_physical(uintptr_t seed)
 	if (offset > kernelbase)
 		offset -= kernelbase;
 	offset <<= MMU_PAGESHIFT;
-#if defined(__amd64)
 	offset += mmu.hole_start;	/* something in VA hole */
-#else
-	offset += 1ULL << 40;	/* something > 4 Gig */
-#endif
 
 	if (page_resv(1, KM_NOSLEEP) == 0)
 		return (NULL);

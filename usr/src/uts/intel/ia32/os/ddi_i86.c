@@ -74,7 +74,7 @@ ddi_dmae_1stparty(dev_info_t *dip, int chnl)
 
 int
 ddi_dmae_prog(dev_info_t *dip, struct ddi_dmae_req *dmaereqp,
-	ddi_dma_cookie_t *cookiep, int chnl)
+    ddi_dma_cookie_t *cookiep, int chnl)
 {
 	return (ddi_dma_mctl(dip, dip, 0, DDI_DMA_E_PROG, (off_t *)dmaereqp,
 	    (size_t *)cookiep, (caddr_t *)(uintptr_t)chnl, 0));
@@ -82,7 +82,7 @@ ddi_dmae_prog(dev_info_t *dip, struct ddi_dmae_req *dmaereqp,
 
 int
 ddi_dmae_swsetup(dev_info_t *dip, struct ddi_dmae_req *dmaereqp,
-	ddi_dma_cookie_t *cookiep, int chnl)
+    ddi_dma_cookie_t *cookiep, int chnl)
 {
 	return (ddi_dma_mctl(dip, dip, 0, DDI_DMA_E_SWSETUP, (off_t *)dmaereqp,
 	    (size_t *)cookiep, (caddr_t *)(uintptr_t)chnl, 0));
@@ -567,7 +567,7 @@ i_ddi_vaddr_swap_put64(ddi_acc_impl_t *hdlp, uint64_t *addr, uint64_t value)
 /*ARGSUSED*/
 void
 i_ddi_vaddr_rep_get8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
-	uint8_t *dev_addr, size_t repcount, uint_t flags)
+    uint8_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint8_t	*h, *d;
 
@@ -585,7 +585,7 @@ i_ddi_vaddr_rep_get8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h, *d;
 
@@ -603,7 +603,7 @@ i_ddi_vaddr_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_swap_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h, *d;
 
@@ -621,7 +621,7 @@ i_ddi_vaddr_swap_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_io_swap_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h;
 	uintptr_t port;
@@ -640,7 +640,7 @@ i_ddi_io_swap_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h, *d;
 
@@ -658,7 +658,7 @@ i_ddi_vaddr_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_swap_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h, *d;
 
@@ -676,7 +676,7 @@ i_ddi_vaddr_swap_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_io_swap_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h;
 	uintptr_t port;
@@ -695,7 +695,7 @@ i_ddi_io_swap_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint64_t *h, *d;
 
@@ -713,7 +713,7 @@ i_ddi_vaddr_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_swap_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint64_t *h, *d;
 
@@ -731,7 +731,7 @@ i_ddi_vaddr_swap_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_rep_put8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
-	uint8_t *dev_addr, size_t repcount, uint_t flags)
+    uint8_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint8_t	*h, *d;
 
@@ -749,7 +749,7 @@ i_ddi_vaddr_rep_put8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h, *d;
 
@@ -767,7 +767,7 @@ i_ddi_vaddr_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_swap_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h, *d;
 
@@ -785,7 +785,7 @@ i_ddi_vaddr_swap_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_io_swap_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h;
 	uintptr_t port;
@@ -804,7 +804,7 @@ i_ddi_io_swap_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h, *d;
 
@@ -822,7 +822,7 @@ i_ddi_vaddr_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_swap_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h, *d;
 
@@ -840,7 +840,7 @@ i_ddi_vaddr_swap_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_io_swap_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h;
 	uintptr_t port;
@@ -859,7 +859,7 @@ i_ddi_io_swap_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_rep_put64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint64_t *h, *d;
 
@@ -877,7 +877,7 @@ i_ddi_vaddr_rep_put64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_vaddr_swap_rep_put64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint64_t *h, *d;
 
@@ -1226,7 +1226,7 @@ i_ddi_prot_vaddr_swap_put64(ddi_acc_impl_t *hdlp, uint64_t *addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_io_rep_get8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
-	uint8_t *dev_addr, size_t repcount, uint_t flags)
+    uint8_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint8_t	*h;
@@ -1253,7 +1253,7 @@ i_ddi_prot_io_rep_get8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_io_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint16_t *h;
@@ -1280,7 +1280,7 @@ i_ddi_prot_io_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_io_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint32_t *h;
@@ -1307,7 +1307,7 @@ i_ddi_prot_io_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_rep_get8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
-	uint8_t *dev_addr, size_t repcount, uint_t flags)
+    uint8_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint8_t	*h, *d;
@@ -1333,7 +1333,7 @@ i_ddi_prot_vaddr_rep_get8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint16_t *h, *d;
@@ -1359,7 +1359,7 @@ i_ddi_prot_vaddr_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_swap_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint16_t *h, *d;
@@ -1385,7 +1385,7 @@ i_ddi_prot_vaddr_swap_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_io_swap_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint16_t *h;
@@ -1412,7 +1412,7 @@ i_ddi_prot_io_swap_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint32_t *h, *d;
@@ -1438,7 +1438,7 @@ i_ddi_prot_vaddr_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_swap_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint32_t *h, *d;
@@ -1464,7 +1464,7 @@ i_ddi_prot_vaddr_swap_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_io_swap_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint32_t *h;
@@ -1491,7 +1491,7 @@ i_ddi_prot_io_swap_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint64_t *h, *d;
@@ -1517,7 +1517,7 @@ i_ddi_prot_vaddr_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_swap_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	int fail = 0;
 	uint64_t *h, *d;
@@ -1543,7 +1543,7 @@ i_ddi_prot_vaddr_swap_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_rep_put8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
-	uint8_t *dev_addr, size_t repcount, uint_t flags)
+    uint8_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint8_t	*h, *d;
 
@@ -1563,7 +1563,7 @@ i_ddi_prot_vaddr_rep_put8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_io_rep_put8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
-	uint8_t *dev_addr, size_t repcount, uint_t flags)
+    uint8_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint8_t	*h;
 	uintptr_t port;
@@ -1584,7 +1584,7 @@ i_ddi_prot_io_rep_put8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h, *d;
 
@@ -1604,7 +1604,7 @@ i_ddi_prot_vaddr_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_io_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h;
 	uintptr_t port;
@@ -1625,7 +1625,7 @@ i_ddi_prot_io_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_swap_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h, *d;
 
@@ -1645,7 +1645,7 @@ i_ddi_prot_vaddr_swap_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_io_swap_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h;
 	uintptr_t port;
@@ -1666,7 +1666,7 @@ i_ddi_prot_io_swap_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h, *d;
 
@@ -1686,7 +1686,7 @@ i_ddi_prot_vaddr_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_io_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h;
 	uintptr_t port;
@@ -1707,7 +1707,7 @@ i_ddi_prot_io_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_swap_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h, *d;
 
@@ -1727,7 +1727,7 @@ i_ddi_prot_vaddr_swap_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_io_swap_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h;
 	uintptr_t port;
@@ -1748,7 +1748,7 @@ i_ddi_prot_io_swap_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_rep_put64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint64_t *h, *d;
 
@@ -1768,7 +1768,7 @@ i_ddi_prot_vaddr_rep_put64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
 /*ARGSUSED*/
 void
 i_ddi_prot_vaddr_swap_rep_put64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint64_t *h, *d;
 
@@ -1787,7 +1787,7 @@ i_ddi_prot_vaddr_swap_rep_put64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
 
 void
 ddi_io_rep_get8(ddi_acc_handle_t handle,
-	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
+    uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_get8)
 	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
@@ -1796,7 +1796,7 @@ ddi_io_rep_get8(ddi_acc_handle_t handle,
 
 void
 ddi_io_rep_get16(ddi_acc_handle_t handle,
-	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
+    uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_get16)
 	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
@@ -1805,7 +1805,7 @@ ddi_io_rep_get16(ddi_acc_handle_t handle,
 
 void
 ddi_io_rep_get32(ddi_acc_handle_t handle,
-	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
+    uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_get32)
 	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
@@ -1815,14 +1815,14 @@ ddi_io_rep_get32(ddi_acc_handle_t handle,
 /*ARGSUSED*/
 void
 i_ddi_io_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	cmn_err(CE_PANIC, "ddi_rep_get64 from i/o space");
 }
 
 void
 ddi_io_rep_put8(ddi_acc_handle_t handle,
-	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
+    uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_put8)
 	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
@@ -1831,7 +1831,7 @@ ddi_io_rep_put8(ddi_acc_handle_t handle,
 
 void
 ddi_io_rep_put16(ddi_acc_handle_t handle,
-	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
+    uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_put16)
 	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
@@ -1840,7 +1840,7 @@ ddi_io_rep_put16(ddi_acc_handle_t handle,
 
 void
 ddi_io_rep_put32(ddi_acc_handle_t handle,
-	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
+    uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_put32)
 	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
@@ -1850,74 +1850,10 @@ ddi_io_rep_put32(ddi_acc_handle_t handle,
 /*ARGSUSED*/
 void
 i_ddi_io_rep_put64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	cmn_err(CE_PANIC, "ddi_rep_put64 to i/o space");
 }
-
-/*
- * We need to separate the old interfaces from the new ones and leave them
- * in here for a while. Previous versions of the OS defined the new interfaces
- * to the old interfaces. This way we can fix things up so that we can
- * eventually remove these interfaces.
- * e.g. A 3rd party module/driver using ddi_io_rep_get8 and built against S10
- * or earlier will actually have a reference to ddi_io_rep_getb in the binary.
- */
-#ifdef _ILP32
-void
-ddi_io_rep_getb(ddi_acc_handle_t handle,
-	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_rep_get8)
-	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
-	    repcount, DDI_DEV_NO_AUTOINCR);
-}
-
-void
-ddi_io_rep_getw(ddi_acc_handle_t handle,
-	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_rep_get16)
-	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
-	    repcount, DDI_DEV_NO_AUTOINCR);
-}
-
-void
-ddi_io_rep_getl(ddi_acc_handle_t handle,
-	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_rep_get32)
-	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
-	    repcount, DDI_DEV_NO_AUTOINCR);
-}
-
-void
-ddi_io_rep_putb(ddi_acc_handle_t handle,
-	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_rep_put8)
-	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
-	    repcount, DDI_DEV_NO_AUTOINCR);
-}
-
-void
-ddi_io_rep_putw(ddi_acc_handle_t handle,
-	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_rep_put16)
-	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
-	    repcount, DDI_DEV_NO_AUTOINCR);
-}
-
-void
-ddi_io_rep_putl(ddi_acc_handle_t handle,
-	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_rep_put32)
-	    ((ddi_acc_impl_t *)handle, host_addr, dev_addr,
-	    repcount, DDI_DEV_NO_AUTOINCR);
-}
-#endif /* _ILP32 */
 
 /*
  * These next two functions could be translated into assembler someday

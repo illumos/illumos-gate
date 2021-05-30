@@ -4621,25 +4621,6 @@ arc_available_memory(void)
 		r = FMR_PAGES_PP_MAXIMUM;
 	}
 
-#if defined(__i386)
-	/*
-	 * If we're on an i386 platform, it's possible that we'll exhaust the
-	 * kernel heap space before we ever run out of available physical
-	 * memory.  Most checks of the size of the heap_area compare against
-	 * tune.t_minarmem, which is the minimum available real memory that we
-	 * can have in the system.  However, this is generally fixed at 25 pages
-	 * which is so low that it's useless.  In this comparison, we seek to
-	 * calculate the total heap-size, and reclaim if more than 3/4ths of the
-	 * heap is allocated.  (Or, in the calculation, if less than 1/4th is
-	 * free)
-	 */
-	n = (int64_t)vmem_size(heap_arena, VMEM_FREE) -
-	    (vmem_size(heap_arena, VMEM_FREE | VMEM_ALLOC) >> 2);
-	if (n < lowest) {
-		lowest = n;
-		r = FMR_HEAP_ARENA;
-	}
-#endif
 
 	/*
 	 * If zio data pages are being allocated out of a separate heap segment,
@@ -4702,12 +4683,6 @@ arc_kmem_reap_soon(void)
 		 */
 		dnlc_reduce_cache((void *)(uintptr_t)arc_reduce_dnlc_percent);
 	}
-#if defined(__i386)
-	/*
-	 * Reclaim unused memory from all kmem caches.
-	 */
-	kmem_reap();
-#endif
 #endif
 
 	for (i = 0; i < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT; i++) {
@@ -6796,10 +6771,6 @@ arc_memory_throttle(spa_t *spa, uint64_t reserve, uint64_t txg)
 #ifdef _KERNEL
 	uint64_t available_memory = ptob(freemem);
 
-#if defined(__i386)
-	available_memory =
-	    MIN(available_memory, vmem_size(heap_arena, VMEM_FREE));
-#endif
 
 	if (freemem > physmem * arc_lotsfree_percent / 100)
 		return (0);

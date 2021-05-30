@@ -89,9 +89,9 @@ int	getloadavg(int *, int);
 int	rusagesys(int, void *, void *, void *, void *);
 int	getpagesizes(int, size_t *, int);
 int	gtty(int, intptr_t);
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 int	hrtsys(struct hrtsysa *, rval_t *);
-#endif /* __i386 || __amd64 */
+#endif /* __x86 */
 int	ioctl(int, int, intptr_t);
 int	kill();
 int	labelsys(int, void *, void *, void *, void *, void *);
@@ -185,7 +185,7 @@ int	statvfs(char *, struct statvfs *);
 int	fstatvfs(int, struct statvfs *);
 offset_t llseek32(int32_t, uint32_t, uint32_t, int);
 
-#if (defined(__i386) && !defined(__amd64)) || defined(__i386_COMPAT)
+#if defined(__i386_COMPAT)
 int	sysi86(short, uintptr_t, uintptr_t, uintptr_t);
 #endif
 
@@ -392,19 +392,15 @@ typedef int64_t	(*llfcn_t)();	/* for casting one-word returns */
 #define	IF_sparc(true, false)	false
 #endif
 
-#if defined(__i386) && !defined(__amd64)
-#define	IF_i386(true, false)	true
-#else
 #define	IF_i386(true, false)	false
-#endif
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 #define	IF_x86(true, false)	true
 #else
 #define	IF_x86(true, false)	false
 #endif
 
-#if (defined(__i386) && !defined(__amd64)) || defined(__i386_COMPAT)
+#if defined(__i386_COMPAT)
 #define	IF_386_ABI(true, false)	true
 #else
 #define	IF_386_ABI(true, false)	false

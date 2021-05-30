@@ -418,29 +418,16 @@ dtrace_getarg(int arg, int aframes)
 	struct frame *fp = (struct frame *)dtrace_getfp();
 	uintptr_t *stack;
 	int i;
-#if defined(__amd64)
 	/*
 	 * A total of 6 arguments are passed via registers; any argument with
 	 * index of 5 or lower is therefore in a register.
 	 */
 	int inreg = 5;
-#endif
 
 	for (i = 1; i <= aframes; i++) {
 		fp = (struct frame *)(fp->fr_savfp);
 
 		if (fp->fr_savpc == (pc_t)dtrace_invop_callsite) {
-#if !defined(__amd64)
-			/*
-			 * If we pass through the invalid op handler, we will
-			 * use the pointer that it passed to the stack as the
-			 * second argument to dtrace_invop() as the pointer to
-			 * the stack.  When using this stack, we must step
-			 * beyond the EIP that was pushed when the trap was
-			 * taken -- hence the "+ 1" below.
-			 */
-			stack = ((uintptr_t **)&fp[1])[1] + 1;
-#else
 			/*
 			 * In the case of amd64, we will use the pointer to the
 			 * regs structure that was pushed when we took the
@@ -463,7 +450,6 @@ dtrace_getarg(int arg, int aframes)
 				stack = (uintptr_t *)(rp->r_rsp);
 				arg -= inreg;
 			}
-#endif
 			goto load;
 		}
 
@@ -479,7 +465,6 @@ dtrace_getarg(int arg, int aframes)
 	 */
 	arg++;
 
-#if defined(__amd64)
 	if (arg <= inreg) {
 		/*
 		 * This shouldn't happen.  If the argument is passed in a
@@ -491,7 +476,6 @@ dtrace_getarg(int arg, int aframes)
 	}
 
 	arg -= (inreg + 1);
-#endif
 	stack = (uintptr_t *)&fp[1];
 
 load:
@@ -547,7 +531,6 @@ dtrace_getstackdepth(int aframes)
 	return (depth - aframes);
 }
 
-#if defined(__amd64)
 static const int dtrace_regmap[] = {
 	REG_GS,		/* GS */
 	REG_FS,		/* FS */
@@ -569,13 +552,11 @@ static const int dtrace_regmap[] = {
 	REG_RSP,	/* UESP */
 	REG_SS		/* SS */
 };
-#endif
 
 
 ulong_t
 dtrace_getreg(struct regs *rp, uint_t reg)
 {
-#if defined(__amd64)
 	if (reg <= SS) {
 		if (reg >= sizeof (dtrace_regmap) / sizeof (int)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
@@ -645,20 +626,11 @@ dtrace_getreg(struct regs *rp, uint_t reg)
 		return (0);
 	}
 
-#else
-	if (reg > SS) {
-		DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
-		return (0);
-	}
-
-	return ((&rp->r_gs)[reg]);
-#endif
 }
 
 void
 dtrace_setreg(struct regs *rp, uint_t reg, ulong_t val)
 {
-#if defined(__amd64)
 	if (reg <= SS) {
 		ASSERT(reg < (sizeof (dtrace_regmap) / sizeof (int)));
 
@@ -721,37 +693,6 @@ dtrace_setreg(struct regs *rp, uint_t reg, ulong_t val)
 		return;
 	}
 
-#else /* defined(__amd64) */
-	switch (reg) {
-	case EAX:
-		rp->r_eax = val;
-		break;
-	case ECX:
-		rp->r_ecx = val;
-		break;
-	case EDX:
-		rp->r_edx = val;
-		break;
-	case EBX:
-		rp->r_ebx = val;
-		break;
-	case ESP:
-		rp->r_esp = val;
-		break;
-	case EBP:
-		rp->r_ebp = val;
-		break;
-	case ESI:
-		rp->r_esi = val;
-		break;
-	case EDI:
-		rp->r_edi = val;
-		break;
-	default:
-		DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
-		return;
-	}
-#endif /* defined(__amd64) */
 }
 
 static int

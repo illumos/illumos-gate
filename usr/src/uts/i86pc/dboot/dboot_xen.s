@@ -29,7 +29,6 @@
 #include "dboot_xboot.h"
 
 #if defined(__amd64)
-
 	ENTRY_NP(_start)
 	/*
 	 * At entry we are passed a (start_info_t *) in %rsi.
@@ -76,7 +75,6 @@
 	SET_SIZE(_start)
 
 #elif defined(__i386)
-
 	ENTRY_NP(_start)
 	/*
 	 * At entry we are passed a (start_info_t *) in %esi.
@@ -116,6 +114,4 @@
 	pushl	%eax
 	call	*%esi
 	SET_SIZE(_start)
-
 #endif	/* __i386 */
-

@@ -291,11 +291,7 @@ privcmd_HYPERVISOR_domctl(xen_domctl_t *opp)
 	}
 
 	case XEN_DOMCTL_gethvmcontext: {
-#if !defined(__GNUC__) && defined(__i386__)
-		if (op.u.hvmcontext.buffer.u.p != NULL)
-#else
 		if (op.u.hvmcontext.buffer.p != NULL)
-#endif
 			error = import_handle(&sub_ie, &op.u.hvmcontext.buffer,
 			    op.u.hvmcontext.size, IE_EXPORT);
 		break;

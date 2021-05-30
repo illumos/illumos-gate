@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/kmem.h>
@@ -53,9 +51,7 @@ struct hment {
 	pfn_t		hm_pfn;		/* mapping page frame number */
 	uint16_t	hm_entry;	/* index of pte in htable */
 	uint16_t	hm_pad;		/* explicitly expose compiler padding */
-#ifdef __amd64
 	uint32_t	hm_pad2;	/* explicitly expose compiler padding */
-#endif
 };
 
 /*
@@ -92,7 +88,7 @@ static avl_tree_t *hment_table;
  * adding the pfn of the page table into both the high bits.
  * The shift by 9 corresponds to the range of values for entry (0..511).
  */
-#define	HMENT_HASH(pfn, entry) (uint32_t) 	\
+#define	HMENT_HASH(pfn, entry) (uint32_t)	\
 	((((pfn) << 9) + entry + pfn) & (hment_hash_entries - 1))
 
 /*

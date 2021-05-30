@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <npi_txdma.h>
 #include <npi_tx_rd64.h>
 #include <npi_tx_wr64.h>
@@ -130,7 +128,7 @@ npi_txdma_dump_tdc_regs(npi_handle_t handle, uint8_t tdc)
 {
 
 	uint64_t		value, offset;
-	int 			num_regs, i;
+	int			num_regs, i;
 
 	ASSERT(TXDMA_CHANNEL_VALID(tdc));
 	if (!TXDMA_CHANNEL_VALID(tdc)) {
@@ -188,11 +186,7 @@ npi_txdma_dump_fzc_regs(npi_handle_t handle)
 
 	num_regs = NUM_TX_FZC_REGS;
 	for (i = 0; i < num_regs; i++) {
-#if defined(__i386)
-		NXGE_REG_RD64(handle, (uint32_t)tx_fzc_offset[i], &value);
-#else
 		NXGE_REG_RD64(handle, tx_fzc_offset[i], &value);
-#endif
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
 		    "%s\t 0x%08llx \n",
 		    tx_fzc_offset[i],
@@ -208,7 +202,7 @@ npi_status_t
 npi_txdma_tdc_regs_zero(npi_handle_t handle, uint8_t tdc)
 {
 	uint64_t		value;
-	int 			num_regs, i;
+	int			num_regs, i;
 
 	ASSERT(TXDMA_CHANNEL_VALID(tdc));
 	if (!TXDMA_CHANNEL_VALID(tdc)) {
@@ -279,7 +273,7 @@ npi_txdma_mode32_set(npi_handle_t handle, boolean_t mode_enable)
  *	handle		- NPI handle
  *	cfgp		- pointer to NPI defined data structure:
  *				- page valid
- * 				- mask
+ *				- mask
  *				- value
  *				- relocation
  *	channel		- hardware TXDMA channel from 0 to 23.
@@ -295,7 +289,7 @@ npi_txdma_mode32_set(npi_handle_t handle, boolean_t mode_enable)
  */
 npi_status_t
 npi_txdma_log_page_set(npi_handle_t handle, uint8_t channel,
-		p_dma_log_page_t cfgp)
+    p_dma_log_page_t cfgp)
 {
 	log_page_vld_t		vld;
 	int			status;
@@ -372,7 +366,7 @@ npi_txdma_log_page_set(npi_handle_t handle, uint8_t channel,
  *	handle		- NPI handle
  *	cfgp		- Get the following values (NPI defined structure):
  *				- page valid
- * 				- mask
+ *				- mask
  *				- value
  *				- relocation
  *	channel		- hardware TXDMA channel from 0 to 23.
@@ -388,7 +382,7 @@ npi_txdma_log_page_set(npi_handle_t handle, uint8_t channel,
  */
 npi_status_t
 npi_txdma_log_page_get(npi_handle_t handle, uint8_t channel,
-		p_dma_log_page_t cfgp)
+    p_dma_log_page_t cfgp)
 {
 	log_page_vld_t		vld;
 	int			status;
@@ -458,7 +452,7 @@ npi_txdma_log_page_get(npi_handle_t handle, uint8_t channel,
  */
 npi_status_t
 npi_txdma_log_page_handle_set(npi_handle_t handle, uint8_t channel,
-		p_log_page_hdl_t hdl_p)
+    p_log_page_hdl_t hdl_p)
 {
 	int			status = NPI_SUCCESS;
 
@@ -506,8 +500,8 @@ npi_txdma_log_page_handle_set(npi_handle_t handle, uint8_t channel,
  */
 npi_status_t
 npi_txdma_log_page_config(npi_handle_t handle, io_op_t op_mode,
-		txdma_log_cfg_t type, uint8_t channel,
-		p_dma_log_page_t cfgp)
+    txdma_log_cfg_t type, uint8_t channel,
+    p_dma_log_page_t cfgp)
 {
 	int			status = NPI_SUCCESS;
 	uint64_t		val;
@@ -666,7 +660,7 @@ npi_txdma_log_page_config(npi_handle_t handle, io_op_t op_mode,
  */
 npi_status_t
 npi_txdma_log_page_vld_config(npi_handle_t handle, io_op_t op_mode,
-		uint8_t channel, p_log_page_vld_t vld_p)
+    uint8_t channel, p_log_page_vld_t vld_p)
 {
 	int			status = NPI_SUCCESS;
 	log_page_vld_t		vld;
@@ -896,7 +890,7 @@ npi_txdma_channel_mbox_enable(npi_handle_t handle, uint8_t channel)
  *	handle		- NPI handle (virtualization flag must be defined).
  *	control		- NPI defined control type supported
  *				- TXDMA_INIT_RESET
- * 				- TXDMA_INIT_START
+ *				- TXDMA_INIT_START
  *				- TXDMA_RESET
  *				- TXDMA_START
  *				- TXDMA_STOP
@@ -917,7 +911,7 @@ npi_txdma_channel_mbox_enable(npi_handle_t handle, uint8_t channel)
  */
 npi_status_t
 npi_txdma_channel_control(npi_handle_t handle, txdma_cs_cntl_t control,
-		uint8_t channel)
+    uint8_t channel)
 {
 	int		status = NPI_SUCCESS;
 	tx_cs_t		cs;
@@ -1034,7 +1028,7 @@ npi_txdma_channel_control(npi_handle_t handle, txdma_cs_cntl_t control,
  */
 npi_status_t
 npi_txdma_control_status(npi_handle_t handle, io_op_t op_mode,
-		uint8_t channel, p_tx_cs_t cs_p)
+    uint8_t channel, p_tx_cs_t cs_p)
 {
 	int		status = NPI_SUCCESS;
 	tx_cs_t		txcs;
@@ -1099,7 +1093,7 @@ npi_txdma_control_status(npi_handle_t handle, io_op_t op_mode,
  */
 npi_status_t
 npi_txdma_event_mask(npi_handle_t handle, io_op_t op_mode,
-		uint8_t channel, p_tx_dma_ent_msk_t mask_p)
+    uint8_t channel, p_tx_dma_ent_msk_t mask_p)
 {
 	int			status = NPI_SUCCESS;
 	tx_dma_ent_msk_t	mask;
@@ -1165,7 +1159,7 @@ npi_txdma_event_mask(npi_handle_t handle, io_op_t op_mode,
  */
 npi_status_t
 npi_txdma_event_mask_config(npi_handle_t handle, io_op_t op_mode,
-		uint8_t channel, txdma_ent_msk_cfg_t *mask_cfgp)
+    uint8_t channel, txdma_ent_msk_cfg_t *mask_cfgp)
 {
 	int		status = NPI_SUCCESS;
 	uint64_t	configuration = *mask_cfgp;
@@ -1312,7 +1306,7 @@ npi_txdma_event_mask_mk_in(npi_handle_t handle, uint8_t channel)
  */
 npi_status_t
 npi_txdma_ring_addr_set(npi_handle_t handle, uint8_t channel,
-		uint64_t start_addr, uint32_t len)
+    uint64_t start_addr, uint32_t len)
 {
 	int		status = NPI_SUCCESS;
 	tx_rng_cfig_t	cfg;
@@ -1358,7 +1352,7 @@ npi_txdma_ring_addr_set(npi_handle_t handle, uint8_t channel,
  */
 npi_status_t
 npi_txdma_ring_config(npi_handle_t handle, io_op_t op_mode,
-		uint8_t channel, uint64_t *reg_data)
+    uint8_t channel, uint64_t *reg_data)
 {
 	int		status = NPI_SUCCESS;
 
@@ -1416,7 +1410,7 @@ npi_txdma_ring_config(npi_handle_t handle, io_op_t op_mode,
  */
 npi_status_t
 npi_txdma_mbox_config(npi_handle_t handle, io_op_t op_mode,
-		uint8_t channel, uint64_t *mbox_addr)
+    uint8_t channel, uint64_t *mbox_addr)
 {
 	int		status = NPI_SUCCESS;
 	txdma_mbh_t	mh;
@@ -1489,9 +1483,9 @@ npi_txdma_mbox_config(npi_handle_t handle, io_op_t op_mode,
  */
 npi_status_t
 npi_txdma_desc_gather_set(npi_handle_t handle,
-		p_tx_desc_t desc_p, uint8_t gather_index,
-		boolean_t mark, uint8_t ngathers,
-		uint64_t dma_ioaddr, uint32_t transfer_len)
+    p_tx_desc_t desc_p, uint8_t gather_index,
+    boolean_t mark, uint8_t ngathers,
+    uint64_t dma_ioaddr, uint32_t transfer_len)
 {
 	int		status;
 
@@ -1551,9 +1545,9 @@ npi_txdma_desc_gather_set(npi_handle_t handle,
  */
 npi_status_t
 npi_txdma_desc_gather_sop_set(npi_handle_t handle,
-		p_tx_desc_t desc_p,
-		boolean_t mark_mode,
-		uint8_t ngathers)
+    p_tx_desc_t desc_p,
+    boolean_t mark_mode,
+    uint8_t ngathers)
 {
 	int		status = NPI_SUCCESS;
 
@@ -1567,10 +1561,10 @@ npi_txdma_desc_gather_sop_set(npi_handle_t handle,
 }
 npi_status_t
 npi_txdma_desc_gather_sop_set_1(npi_handle_t handle,
-		p_tx_desc_t desc_p,
-		boolean_t mark_mode,
-		uint8_t ngathers,
-		uint32_t extra)
+    p_tx_desc_t desc_p,
+    boolean_t mark_mode,
+    uint8_t ngathers,
+    uint32_t extra)
 {
 	int		status = NPI_SUCCESS;
 
@@ -1586,8 +1580,8 @@ npi_txdma_desc_gather_sop_set_1(npi_handle_t handle,
 
 npi_status_t
 npi_txdma_desc_set_xfer_len(npi_handle_t handle,
-		p_tx_desc_t desc_p,
-		uint32_t transfer_len)
+    p_tx_desc_t desc_p,
+    uint32_t transfer_len)
 {
 	int		status = NPI_SUCCESS;
 
@@ -1622,7 +1616,7 @@ npi_txdma_desc_set_zero(npi_handle_t handle, uint16_t entries)
 
 npi_status_t
 npi_txdma_desc_mem_get(npi_handle_t handle, uint16_t index,
-		p_tx_desc_t desc_p)
+    p_tx_desc_t desc_p)
 {
 	int		status = NPI_SUCCESS;
 
@@ -1655,7 +1649,7 @@ npi_txdma_desc_mem_get(npi_handle_t handle, uint16_t index,
  */
 npi_status_t
 npi_txdma_desc_kick_reg_set(npi_handle_t handle, uint8_t channel,
-		uint16_t tail_index, boolean_t wrap)
+    uint16_t tail_index, boolean_t wrap)
 {
 	int			status = NPI_SUCCESS;
 	tx_ring_kick_t		kick;
@@ -1708,7 +1702,7 @@ npi_txdma_desc_kick_reg_set(npi_handle_t handle, uint8_t channel,
  */
 npi_status_t
 npi_txdma_desc_kick_reg_get(npi_handle_t handle, uint8_t channel,
-		p_tx_ring_kick_t kick_p)
+    p_tx_ring_kick_t kick_p)
 {
 	int		status = NPI_SUCCESS;
 
@@ -1748,7 +1742,7 @@ npi_txdma_desc_kick_reg_get(npi_handle_t handle, uint8_t channel,
  */
 npi_status_t
 npi_txdma_ring_head_get(npi_handle_t handle, uint8_t channel,
-		p_tx_ring_hdl_t hdl_p)
+    p_tx_ring_hdl_t hdl_p)
 {
 	int		status = NPI_SUCCESS;
 
@@ -1769,7 +1763,7 @@ npi_txdma_ring_head_get(npi_handle_t handle, uint8_t channel,
 /*ARGSUSED*/
 npi_status_t
 npi_txdma_channel_mbox_get(npi_handle_t handle, uint8_t channel,
-		p_txdma_mailbox_t mbox_p)
+    p_txdma_mailbox_t mbox_p)
 {
 	int		status = NPI_SUCCESS;
 
@@ -1779,7 +1773,7 @@ npi_txdma_channel_mbox_get(npi_handle_t handle, uint8_t channel,
 
 npi_status_t
 npi_txdma_channel_pre_state_get(npi_handle_t handle, uint8_t channel,
-		p_tx_dma_pre_st_t prep)
+    p_tx_dma_pre_st_t prep)
 {
 	int		status = NPI_SUCCESS;
 
@@ -1799,7 +1793,7 @@ npi_txdma_channel_pre_state_get(npi_handle_t handle, uint8_t channel,
 
 npi_status_t
 npi_txdma_ring_error_get(npi_handle_t handle, uint8_t channel,
-		p_txdma_ring_errlog_t ring_errlog_p)
+    p_txdma_ring_errlog_t ring_errlog_p)
 {
 	tx_rng_err_logh_t	logh;
 	tx_rng_err_logl_t	logl;
@@ -1915,7 +1909,7 @@ void
 npi_txdma_dump_desc_one(npi_handle_t handle, p_tx_desc_t desc_p, int desc_index)
 {
 
-	tx_desc_t 		desc, *desp;
+	tx_desc_t		desc, *desp;
 #ifdef NXGE_DEBUG
 	uint64_t		sad;
 	int			xfer_len;
@@ -1977,7 +1971,7 @@ npi_txdma_dump_hdr(npi_handle_t handle, p_tx_pkt_header_t hdrp)
 
 npi_status_t
 npi_txdma_inj_int_error_set(npi_handle_t handle, uint8_t channel,
-	p_tdmc_intr_dbg_t erp)
+    p_tdmc_intr_dbg_t erp)
 {
 	int		status = NPI_SUCCESS;
 

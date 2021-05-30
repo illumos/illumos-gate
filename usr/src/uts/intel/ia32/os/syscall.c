@@ -1100,14 +1100,12 @@ syscall_ap(void)
 
 	callp = LWP_GETSYSENT(lwp) + t->t_sysnum;
 
-#if defined(__amd64)
 	/*
 	 * If the arguments don't fit in registers %rdi-%r9, make sure they
 	 * have been copied to the lwp_arg array.
 	 */
 	if (callp->sy_narg > 6 && save_syscall_args())
 		return ((int64_t)set_errno(EFAULT));
-#endif
 
 	rval.r_val1 = 0;
 	rval.r_val2 = rp->r_r1;

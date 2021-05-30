@@ -101,11 +101,7 @@ kbm_init(struct xboot_info *bi)
 		ptes_per_table = 512;
 		pte_size = 8;
 		lpagesize = TWO_MEG;
-#ifdef __amd64
 		top_level = 3;
-#else
-		top_level = 2;
-#endif
 	} else {
 		shift_amt = shift_amt_nopae;
 		ptes_per_table = 1024;
@@ -268,7 +264,7 @@ restart_new_va:
 			probe_va = mmu.hole_end;
 
 		if (IN_HYPERVISOR_VA(probe_va))
-#if defined(__amd64) && defined(__xpv)
+#if defined(__xpv)
 			probe_va = HYPERVISOR_VIRT_END;
 #else
 			return (0);

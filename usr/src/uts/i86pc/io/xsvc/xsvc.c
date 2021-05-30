@@ -836,12 +836,10 @@ xsvc_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 	 * smmap32 will sign extend the offset. We need to undo that since
 	 * we are passed a physical address in off, not a offset.
 	 */
-#if defined(__amd64)
 	if (((model & DDI_MODEL_MASK) == DDI_MODEL_ILP32) &&
 	    ((off & ~0xFFFFFFFFll) == ~0xFFFFFFFFll)) {
 		off = off & 0xFFFFFFFF;
 	}
-#endif
 
 #ifdef __xpv
 	/*
