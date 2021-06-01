@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2015 Nahanni Systems, Inc.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -465,13 +466,19 @@ pci_fbuf_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 #ifdef __FreeBSD__
 	error = rfb_init(sc->rfb_host, sc->rfb_port, sc->rfb_wait, sc->rfb_password);
 #else
+	char *name;
+
+	(void) asprintf(&name, "%s (bhyve)", get_config_value("name"));
+
 	if (sc->rfb_unix != NULL) {
 		error = rfb_init_unix(sc->rfb_unix, sc->rfb_wait,
-		    sc->rfb_password);
+		    sc->rfb_password, name != NULL ? name : "bhyve");
 	} else {
 		error = rfb_init(sc->rfb_host, sc->rfb_port, sc->rfb_wait,
-		    sc->rfb_password);
+		    sc->rfb_password, name != NULL ? name : "bhyve");
 	}
+	if (error != 0)
+		free(name);
 #endif
 done:
 	if (error)

@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2015 Tycho Nightingale <tycho.nightingale@pluribusnetworks.com>
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,9 +35,13 @@
 
 #define	RFB_PORT	5900
 
-int	rfb_init(char *hostname, int port, int wait, char *password);
 #ifndef __FreeBSD__
-int	rfb_init_unix(const char *path, int wait, char *password);
+int	rfb_init(char *hostname, int port, int wait, char *password,
+    const char *name);
+int	rfb_init_unix(const char *path, int wait, char *password,
+    const char *name);
+#else
+int	rfb_init(char *hostname, int port, int wait, char *password);
 #endif
 
 #endif /* _RFB_H_ */
