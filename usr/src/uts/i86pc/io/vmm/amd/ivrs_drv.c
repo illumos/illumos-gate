@@ -39,9 +39,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/vmparam.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
-
 #include <contrib/dev/acpica/include/acpi.h>
 #include <contrib/dev/acpica/include/accommon.h>
 #include <dev/acpica/acpivar.h>

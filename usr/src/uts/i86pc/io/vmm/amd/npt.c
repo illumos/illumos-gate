@@ -34,9 +34,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/sysctl.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
-#include <vm/vm_extern.h>
+#include <sys/vmm_vm.h>
 
 #include "npt.h"
 

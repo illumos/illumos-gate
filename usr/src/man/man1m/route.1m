@@ -1,5 +1,6 @@
 '\" te
-.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (C) 2021 H. William Welliver
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -7,7 +8,6 @@
 .SH NAME
 route \- manually manipulate the routing tables
 .SH SYNOPSIS
-.LP
 .nf
 \fBroute\fR [\fB-fnvq\fR] [\fB-z\fR \fIzone\fR] \fIsub-command\fR [ [\fImodifiers\fR] \fIargs\fR]
 .fi
@@ -40,7 +40,6 @@ route \- manually manipulate the routing tables
 .fi
 
 .SH DESCRIPTION
-.LP
 \fBroute\fR manually manipulates the network routing tables. These tables are
 normally maintained by the system routing daemon, such as \fBin.routed\fR(1M)
 and \fBin.ripngd\fR(1M).
@@ -88,10 +87,12 @@ Make changes to the network route tables persistent across system restarts. The
 operation is applied to the network routing tables first and, if successful, is
 then applied to the list of saved routes used at system startup. In determining
 whether an operation was successful, a failure to add a route that already
-exists or to delete a route that is not in the routing table is ignored.
-Particular care should be taken when using host or network names in persistent
-routes, as network-based name resolution services are not available at the time
-routes are added at startup.
+exists or to delete a route that is not in the routing table is ignored. At
+startup, any directly reachable routes (those specified with the
+\fB-interface\fR or \fB-iface\fR options) will be created first, followed by
+any remaining routes. Particular care should be taken when using host or network
+names in persistent routes, as network-based name resolution services are not
+available at the time routes are added at startup.
 .RE
 
 .sp
@@ -137,7 +138,6 @@ be a shared-\fBIP\fR zone.
 .RE
 
 .SS "Subcommands"
-.LP
 The following subcommands are supported:
 .sp
 .ne 2
@@ -250,11 +250,9 @@ route monitor [ -inet | -inet6 ]
 .sp
 
 .SH OPERANDS
-.LP
 \fBroute\fR executes its subcommands on routes to destinations by way of
 gateways.
 .SS "Destinations and Gateways"
-.LP
 By default, destination and gateway addresses are interpreted as IPv4
 addresses. All symbolic names are tried first as a host name, using
 \fBgetipnodebyname\fR(3SOCKET). If this lookup fails in the AF_INET case,
@@ -451,7 +449,6 @@ multipathing) group, then requests to add a route will automatically be
 translated to the corresponding IPMP IP interface, and requests to delete or
 change a route on an underlying interface will fail.
 .SS "Routing Flags"
-.LP
 Routes have associated flags that influence operation of the protocols when
 sending to destinations matched by the routes. These flags can be set (and in
 some cases cleared, indicated by \fB~\fR) by including the following modifiers
@@ -605,7 +602,6 @@ sensitivity label.
 .RE
 
 .SS "Compatibility"
-.LP
 The modifiers \fBhost\fR and \fBnet\fR are taken to be equivalent to
 \fB-\fR\fBhost\fR and \fB-net\fR\fB\fR. To specify a symbolic address that
 matches one of these names, use the \fBdst\fR or \fBgateway\fR keyword to
@@ -658,7 +654,6 @@ List of network names and addresses
 .RE
 
 .SH SEE ALSO
-.LP
 \fBuname\fR(1), \fBin.ripngd\fR(1M), \fBin.routed\fR(1M), \fBnetstat\fR(1M),
 \fBrouted\fR(1M), \fBioctl\fR(2), \fBgetipnodebyname\fR(3SOCKET),
 \fBgetnetbyname\fR(3SOCKET), \fBinet_addr\fR(3C), \fBdefaultrouter\fR(4),
@@ -761,7 +756,6 @@ process does not have appropriate privileges.
 .RE
 
 .SH NOTES
-.LP
 Specifying that destinations are local (with the \fB-interface\fR modifier)
 assumes that the routers implement \fBproxy ARP\fR, meaning that they respond
 to ARP queries for all reachable destinations. Normally, using either router

@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -29,13 +29,13 @@
 #include <sys/malloc.h>
 #include <sys/x86_archext.h>
 #include <vm/as.h>
+#include <vm/hat_i86.h>
 #include <vm/seg_vn.h>
 #include <vm/seg_kmem.h>
 #include <vm/seg_vmm.h>
 
-#include <vm/vm_extern.h>
-#include <vm/vm_map.h>
-#include "vm/vm_glue.h"
+#include <machine/vm.h>
+#include <sys/vmm_vm.h>
 
 #define	PMAP_TO_VMMAP(pm)	((vm_map_t)		\
 	((caddr_t)(pm) - offsetof(struct vmspace, vms_pmap)))

@@ -22,8 +22,6 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 package org.opensolaris.os.dtrace;
 
@@ -76,7 +74,7 @@ public interface Consumer {
      * @throws NullPointerException if any of the given open flags is
      * {@code null}
      * @throws IllegalArgumentException if any of the given flags are
-     * mutually exlusive
+     * mutually exclusive
      * @throws IllegalStateException if this consumer is closed or has
      * already been opened
      * @throws DTraceException if an exception occurs in the native
@@ -100,9 +98,9 @@ public interface Consumer {
      * occurrences of {@code $2}, and so on.  {@code $0} is
      * automatically replaced by the executable name and should not be
      * included in the {@code macroArgs} parameter.  See the <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidliq?a=view>
+     * href=http://dtrace.org/guide/chp-script.html#chp-script-3>
      * <b>Macro Arguments</b></a> section of the <b>Scripting</b>
-     * chapter of the <i>Solaris Dynamic Tracing Guide</i>.
+     * chapter of the <i>Dynamic Tracing Guide</i>.
      * @return a non-null {@code Program} identifier that may be passed
      * to {@link #enable(Program program) enable()}
      * @throws NullPointerException if the given program string or any
@@ -129,9 +127,9 @@ public interface Consumer {
      * occurrences of {@code $2}, and so on.  {@code $0} is
      * automatically set to the name of the given file and should not be
      * included in the {@code macroArgs} parameter.  See the <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidliq?a=view>
+     * href=http://dtrace.org/guide/chp-script.html#chp-script-3>
      * <b>Macro Arguments</b></a> section of the <b>Scripting</b>
-     * chapter of the <i>Solaris Dynamic Tracing Guide</i>.
+     * chapter of the <i>Dynamic Tracing Guide</i>.
      * @return a non-null {@code Program} identifier that may be passed
      * to {@link #enable(Program program) enable()}
      * @throws NullPointerException if the given program file or any of
@@ -259,8 +257,8 @@ public interface Consumer {
      * Option#switchrate switchrate} and {@link Option#aggrate aggrate}
      * are settable while a consumer is running; others must be set
      * before calling {@link #go()}.  See the <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlis?a=view>
-     * <b>Options and Tunables</b></a> chapter of the <i>Solaris Dynamic
+     * href=http://dtrace.org/guide/chp-opt.html#chp-opt>
+     * <b>Options and Tunables</b></a> chapter of the <i>Dynamic Tracing
      * Guide</i> for information about specific options.
      *
      * @throws NullPointerException if the given option or value is
@@ -392,9 +390,9 @@ public interface Consumer {
      * <p>
      * A consumer may stop on its own in response to the {@code exit()}
      * action (see <b>{@code exit()}</b> in the <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlhm?a=view>
+     * href=http://dtrace.org/guide/chp-actsub.html#chp-actsub-5>
      * <b>Special Actions</b></a> section of the <b>Actions and
-     * Subroutines</b> chapter of the <i>Solaris Dynamic Tracing
+     * Subroutines</b> chapter of the <i>Dynamic Tracing
      * Guide</i>).  Similarly, a consumer stops automatically if it has
      * at least one target process and all its target processes have
      * completed (see {@link #createProcess(String command)
@@ -491,9 +489,9 @@ public interface Consumer {
      * <p>
      * Provides a programmatic alternative to the {@code printa(})
      * action (see <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlhv?a=view>
+     * href=http://dtrace.org/guide/chp-fmt.html#chp-fmt-printa>
      * <b>{@code printa()}</b></a> in the <b>Output Formatting</b>
-     * chapter of the <i>Solaris Dynamic Tracing Guide</i>).
+     * chapter of the <i>Dynamic Tracing Guide</i>).
      *
      * @throws IllegalStateException if called before {@link #go()} or
      * after {@link #close()}
@@ -511,9 +509,9 @@ public interface Consumer {
      * <p>
      * Provides a programmatic alternative to the {@code printa(})
      * action (see <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlhv?a=view>
+     * href=http://dtrace.org/guide/chp-fmt.html#chp-fmt-printa>
      * <b>{@code printa()}</b></a> in the <b>Output Formatting</b>
-     * chapter of the <i>Solaris Dynamic Tracing Guide</i>).
+     * chapter of the <i>Dynamic Tracing Guide</i>).
      *
      * @param includedAggregationNames  if {@code null}, all available
      * aggregations are included; if non-null, only those aggregations
@@ -542,9 +540,9 @@ public interface Consumer {
      * <p>
      * Provides a programmatic alternative to the {@code printa(}) (see
      * <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlhv?a=view>
+     * href=http://dtrace.org/guide/chp-fmt.html#chp-fmt-printa>
      * <b>{@code printa()}</b></a> in the <b>Output Formatting</b>
-     * chapter of the <i>Solaris Dynamic Tracing Guide</i>) and {@code
+     * chapter of the <i>Dynamic Tracing Guide</i>) and {@code
      * clear()} actions.
      *
      * @param includedAggregationNames  if {@code null}, all available
@@ -574,15 +572,15 @@ public interface Consumer {
      * processStateChanged()} method.
      * <p>
      * See the <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlir?a=view>
+     * href=http://dtrace.org/guide/chp-script.html#chp-script-4>
      * <b>Target Process ID</b></a> section of the <b>Scripting</b>
-     * chapter of the <i>Solaris Dynamic Tracing Guide</i>.
+     * chapter of the <i>Dynamic Tracing Guide</i>.
      *
      * @param command  a string whose first token is assumed to be the
      * name of the command and whose subsequent tokens are the arguments
      * to that command.
      * @return ID of the created process (pid)
-     * @throws NullPointerException if the given command is {@code nul}l
+     * @throws NullPointerException if the given command is {@code null}
      * @throws IllegalArgumentException if the given command is empty or
      * contains only whitespace
      * @throws IllegalStateException if called before {@link
@@ -602,9 +600,9 @@ public interface Consumer {
      * processStateChanged()} method.
      * <p>
      * See the <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlir?a=view>
+     * href=http://dtrace.org/guide/chp-script.html#chp-script-4>
      * <b>Target Process ID</b></a> section of the <b>Scripting</b>
-     * chapter of the <i>Solaris Dynamic Tracing Guide</i>.
+     * chapter of the <i>Dynamic Tracing Guide</i>.
      *
      * @param pid  process ID of the process to be grabbed
      * @throws IllegalStateException if called before {@link

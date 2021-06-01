@@ -265,7 +265,7 @@ count_widths(enum be_fmt be_fmt, struct hdr_info *hdr, be_node_list_t *be_nodes)
 		len[i] = hdr->cols[i].width;
 
 	for (cur_be = be_nodes; cur_be != NULL; cur_be = cur_be->be_next_node) {
-		char name[ZFS_MAX_DATASET_NAME_LEN + 1];
+		char name[ZFS_MAX_DATASET_NAME_LEN];
 		const char *be_name = cur_be->be_node_name;
 		const char *root_ds = cur_be->be_root_ds;
 		char *pos;
@@ -413,7 +413,7 @@ print_be_snapshots(be_node_list_t *be, struct hdr_info *hdr, boolean_t parsable)
 
 	for (snap = be->be_node_snapshots; snap != NULL;
 	    snap = snap->be_next_snapshot) {
-		char name[ZFS_MAX_DATASET_NAME_LEN + 1];
+		char name[ZFS_MAX_DATASET_NAME_LEN];
 		const char *datetime_fmt = "%F %R";
 		const char *be_name = be->be_node_name;
 		const char *root_ds = be->be_root_ds;

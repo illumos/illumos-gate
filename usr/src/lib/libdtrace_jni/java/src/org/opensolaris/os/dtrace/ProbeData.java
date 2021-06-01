@@ -22,8 +22,6 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 package org.opensolaris.os.dtrace;
 
@@ -61,9 +59,9 @@ import java.beans.*;
  * Currently the {@code ProbeData} instance does not record a timestamp.
  * If you need a timestamp, trace the built-in {@code timestamp}
  * variable in your D program.  (See the
- * <a href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlfv?a=view>
+ * <a href=http://dtrace.org/guide/chp-variables.html#chp-variables-5>
  * <b>Built-in Variables</b></a> section of the <b>Variables</b> chapter of
- * the <i>Solaris Dynamic Tracing Guide</i>).
+ * the <i>Dynamic Tracing Guide</i>).
  * <p>
  * Immutable.  Supports persistence using {@link java.beans.XMLEncoder}.
  *

@@ -55,9 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/x86_archext.h>
 #include <sys/trap.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
-
 #include <machine/cpufunc.h>
 #include <machine/psl.h>
 #include <machine/md_var.h>
@@ -67,6 +64,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
 #include <sys/vmm_instruction_emul.h>
+#include <sys/vmm_vm.h>
 
 #include "vmm_lapic.h"
 #include "vmm_stat.h"
@@ -667,11 +665,11 @@ npf_fault_type(uint64_t exitinfo1)
 {
 
 	if (exitinfo1 & VMCB_NPF_INFO1_W)
-		return (VM_PROT_WRITE);
+		return (PROT_WRITE);
 	else if (exitinfo1 & VMCB_NPF_INFO1_ID)
-		return (VM_PROT_EXECUTE);
+		return (PROT_EXEC);
 	else
-		return (VM_PROT_READ);
+		return (PROT_READ);
 }
 
 static bool

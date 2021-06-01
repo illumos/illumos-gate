@@ -61,9 +61,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/hma.h>
 #include <sys/trap.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
-
 #include <machine/psl.h>
 #include <machine/cpufunc.h>
 #include <machine/md_var.h>
@@ -72,6 +69,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/smp.h>
 #include <machine/specialreg.h>
 #include <machine/vmparam.h>
+#include <sys/vmm_vm.h>
 
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
@@ -1806,11 +1804,11 @@ ept_fault_type(uint64_t ept_qual)
 	int fault_type;
 
 	if (ept_qual & EPT_VIOLATION_DATA_WRITE)
-		fault_type = VM_PROT_WRITE;
+		fault_type = PROT_WRITE;
 	else if (ept_qual & EPT_VIOLATION_INST_FETCH)
-		fault_type = VM_PROT_EXECUTE;
+		fault_type = PROT_EXEC;
 	else
-		fault_type = VM_PROT_READ;
+		fault_type = PROT_READ;
 
 	return (fault_type);
 }

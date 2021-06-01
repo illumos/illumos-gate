@@ -680,7 +680,7 @@ public class LocalConsumer implements Consumer {
      *	}
      * </code></pre>
      * Or if you need to create your own thread:
-     * <pre></code>
+     * <pre><code>
      *	protected Thread
      *	createThread()
      *	{
@@ -711,7 +711,7 @@ public class LocalConsumer implements Consumer {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      * @throws IllegalThreadStateException if a subclass calls {@link
      * Thread#start()} on the value of {@link #createThread()}
      * @see #createThread()
@@ -723,7 +723,7 @@ public class LocalConsumer implements Consumer {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      * @throws IllegalThreadStateException if a subclass calls {@link
      * Thread#start()} on the value of {@link #createThread()}
      * @see #createThread()
@@ -765,7 +765,7 @@ public class LocalConsumer implements Consumer {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      *
      * @throws IllegalThreadStateException if attempting to {@code
      * stop()} a running consumer while holding the lock on that
@@ -876,7 +876,7 @@ public class LocalConsumer implements Consumer {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      *
      * @throws IllegalThreadStateException if attempting to {@code
      * close()} a running consumer while holding the lock on that

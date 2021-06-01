@@ -156,6 +156,7 @@ closedbins: bldtools $(ROOTDIRS) FRC
 	(cd $$CLOSED_ROOT; \
 	    $(TAR) cfX - $(CODEMGR_WS)/exception_lists/closed-bins .) | \
 	    (cd $(ROOT); $(TAR) xBpf -); \
+	$(CHMOD) 0400 $(ROOT)/etc/security/tsol/label_encodings; \
 	$(ECHO) "Stripping CTF from closed-bins in $$ROOT"; \
 	( cd $(ROOT); $(CTFSTRIP) $$(cd $$CLOSED_ROOT; $(FIND) \
 	    ./kernel ./usr/kernel ./platform/*/kernel -type f -a -perm -u+x | \

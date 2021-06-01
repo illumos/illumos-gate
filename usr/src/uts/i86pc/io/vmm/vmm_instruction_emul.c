@@ -51,12 +51,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/proc.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
-
 #include <machine/vmparam.h>
 #include <machine/vmm.h>
 #include <sys/vmm_kernel.h>
+#include <sys/vmm_vm.h>
 
 #include <sys/vmm_instruction_emul.h>
 #include <x86/psl.h>
@@ -2724,13 +2722,13 @@ pf_error_code(int usermode, int prot, int rsvd, uint64_t pte)
 
 	if (pte & PG_V)
 		error_code |= PGEX_P;
-	if (prot & VM_PROT_WRITE)
+	if (prot & PROT_WRITE)
 		error_code |= PGEX_W;
 	if (usermode)
 		error_code |= PGEX_U;
 	if (rsvd)
 		error_code |= PGEX_RSV;
-	if (prot & VM_PROT_EXECUTE)
+	if (prot & PROT_EXEC)
 		error_code |= PGEX_I;
 
 	return (error_code);
@@ -2751,7 +2749,9 @@ ptp_hold(struct vm *vm, int vcpu, vm_paddr_t ptpphys, size_t len, void **cookie)
 	void *ptr;
 
 	ptp_release(cookie);
-	ptr = vm_gpa_hold(vm, vcpu, ptpphys, len, VM_PROT_RW, cookie);
+	ptr = vm_gpa_hold(vm, vcpu, ptpphys, len,  PROT_READ | PROT_WRITE,
+	    cookie);
+
 	return (ptr);
 }
 
@@ -2769,7 +2769,7 @@ _vm_gla2gpa(struct vm *vm, int vcpuid, struct vm_guest_paging *paging,
 	*guest_fault = 0;
 
 	usermode = (paging->cpl == 3 ? 1 : 0);
-	writable = prot & VM_PROT_WRITE;
+	writable = prot & PROT_WRITE;
 	cookie = NULL;
 	retval = 0;
 restart:

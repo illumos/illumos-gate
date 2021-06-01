@@ -22,8 +22,6 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 package org.opensolaris.os.dtrace;
 
@@ -195,7 +193,7 @@ public final class Aggregate implements Serializable
 	// team that calling getAggregation() with underbar should
 	// return the unnamed aggregation (same as calling with empty
 	// string).  Underbar is used to identify the unnamed
-	// aggregation in libdtrace; in the jave API it is identifed by
+	// aggregation in libdtrace; in the java API it is identified by
 	// the empty string.  The API never presents underbar but
 	// accepts it as input (just converts underbar to empty string
 	// everywhere it sees it).
@@ -230,11 +228,11 @@ public final class Aggregate implements Serializable
      * can easily be sorted by any arbitrary criteria, for example by
      * key ascending:
      * <pre><code>
-     * List <AggregationRecord> records = aggregate.getRecords();
+     * List &lt;AggregationRecord&gt; records = aggregate.getRecords();
      * Collections.sort(records, new Comparator &lt;AggregationRecord&gt; () {
-     * 	public int compare(AggregationRecord r1, AggregationRecord r2) {
-     * 		return r1.getTuple().compareTo(r2.getTuple());
-     * 	}
+     *  public int compare(AggregationRecord r1, AggregationRecord r2) {
+     *   return r1.getTuple().compareTo(r2.getTuple());
+     *  }
      * });
      * </code></pre>
      * Use {@code getOrderedRecords()} instead of {@code getRecords()}

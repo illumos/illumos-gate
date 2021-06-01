@@ -22,8 +22,6 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 package org.opensolaris.os.dtrace;
 
@@ -56,10 +54,10 @@ import java.io.*;
  * keyed to the empty tuple ({@link Tuple#EMPTY}).
  * <p>
  * For more information, see the <a
- * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlh7?a=view>
- * <b>Aggregations</b></a> chapter of the <i>Solaris Dynamic Tracing
+ * href=http://dtrace.org/guide/chp-aggs.html>
+ * <b>Aggregations</b></a> chapter of the <i>Dynamic Tracing
  * Guide</i>.  Also, the <a
- * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlfv?a=view>
+ * href=http://dtrace.org/guide/chp-variables.html#chp-variables-5>
  * <b>Built-in Variables</b></a> section of the <b>Variables</b> chapter
  * describes variables like {@code execname}, {@code probefunc}, and
  * {@code cpu} useful for aggregating.
@@ -282,7 +280,7 @@ public final class Aggregation implements Serializable {
      * @param key  The record key, or an empty tuple (see {@link
      * Tuple#EMPTY}) to obtain the value from a <i>singleton</i> (a
      * non-keyed instance with only a single value) generated from a
-     * DTrace aggregation declarated without square brackets, for
+     * DTrace aggregation declared without square brackets, for
      * example:
      * <pre>		{@code @a = count();}</pre>
      * @return the record associated with the given key, or {@code null}

@@ -22,8 +22,6 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 package org.opensolaris.os.dtrace;
 
@@ -94,9 +92,9 @@ public interface ConsumerListener extends EventListener {
      * request (by calling {@link Consumer#stop()} or {@link
      * Consumer#abort()}), terminated normally as a result of the DTrace
      * {@code exit()} action (see <a
-     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlhm?a=view>
-     * <tt>exit()</tt></a> in the <b>Special Actions</b> section of the
-     * <b>Actions and Subroutines</b> chapter of the <i>Solaris Dynamic
+     * href=http://dtrace.org/guide/chp-actsub.html#chp-actsub-5>
+     * <b>{@code exit()}</b></a> in the <b>Special Actions</b> section of the
+     * <b>Actions and Subroutines</b> chapter of the <i>Dynamic
      * Tracing Guide</i>) or after the completion of all target
      * processes, or terminated abnormally because of an exception.  It
      * is necessary to call {@link Consumer#close()} to release any

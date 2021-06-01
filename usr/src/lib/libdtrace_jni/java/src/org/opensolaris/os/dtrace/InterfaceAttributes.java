@@ -22,8 +22,6 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 package org.opensolaris.os.dtrace;
 
@@ -38,8 +36,8 @@ import java.beans.*;
  * of future releases.  The D compiler includes features to dynamically
  * compute the stability levels of D programs you create.  For more
  * information, refer to the <a
- * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlnp?a=view>
- * <b>Stability</b></a> chapter of the <i>Solaris Dynamic Tracing
+ * href=http://dtrace.org/guide/chp-stab.html>
+ * <b>Stability</b></a> chapter of the <i>Dynamic Tracing
  * Guide</i>.
  * <p>
  * Immutable.  Supports persistence using {@link java.beans.XMLEncoder}.
@@ -149,7 +147,7 @@ public final class InterfaceAttributes implements Serializable {
 	/**
 	 * The interface might eventually become Standard or Stable but
 	 * is still in transition.  Sun will make reasonable efforts to
-	 * ensure compatibility with previous releases as it eveolves.
+	 * ensure compatibility with previous releases as it evolves.
 	 * When non-upward compatible changes become necessary, they
 	 * will occur in minor and major releases.  These changes will
 	 * be avoided in micro releases whenever possible.  If such a
@@ -209,7 +207,7 @@ public final class InterfaceAttributes implements Serializable {
 
     /**
      * Architectural dependency class.  Tells whether an interface is
-     * common to all Solaris platforms and processors, or whether the
+     * common to all platforms and processors, or whether the
      * interface is associated with a particular architecture such as
      * SPARC processors only.
      */
@@ -271,17 +269,17 @@ public final class InterfaceAttributes implements Serializable {
 	 * instruction sets supported by the system using the {@code
 	 * isainfo(1)} utility.  The interface might not be supported on
 	 * systems that do not export any of of the same instruction
-	 * sets.  For example, an ISA-dependent interface on a Solaris
-	 * SPARC system might not be supported on a Solaris x86 system.
+	 * sets.  For example, an ISA-dependent interface on a
+	 * SPARC system might not be supported on an x86 system.
 	 */
 	ISA("ISA"),
 	/**
-	 * The interface is common to all Solaris systems regardless of the
+	 * The interface is common to all systems regardless of the
 	 * underlying hardware.  DTrace programs and layered applications that
 	 * depend only on Common interfaces can be executed and deployed on
-	 * other Solaris systems with the same Solaris and DTrace revisions.
+	 * other systems with the same illumos and DTrace revisions.
 	 * The majority of DTrace interfaces are Common, so you can use them
-	 * wherever you use Solaris.
+	 * wherever you use illumos.
 	 */
 	COMMON("Common");
 
@@ -379,7 +377,7 @@ public final class InterfaceAttributes implements Serializable {
     }
 
     /**
-     * Gets the stabiltiy level of an interface associated with its name
+     * Gets the stability level of an interface associated with its name
      * as it appears in a D program.  For example, the {@code execname}
      * D variable is a {@link Stability#STABLE STABLE} name: Sun
      * guarantees this identifier will continue to be supported in D
@@ -407,7 +405,7 @@ public final class InterfaceAttributes implements Serializable {
      * Gets the stability level of the data format used by an interface
      * and any associated data semantics.  For example, the {@code pid}
      * D variable is a {@link Stability#STABLE STABLE} interface:
-     * process IDs are a stable concept in Solaris, and Sun guarantees
+     * process IDs are a stable concept in illumos, and it is guaranteed
      * that the {@code pid} variable will be of type {@code pid_t} with
      * the semantic that it is set to the process ID corresponding to
      * the thread that fired a given probe in accordance with the rules
@@ -510,9 +508,9 @@ public final class InterfaceAttributes implements Serializable {
     /**
      * Gets the string representation of this triplet of interface
      * attributes.  The format follows the convention described in the
-     * <a href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlnt?a=view>
+     * <a href=http://dtrace.org/guide/chp-stab.html#chp-stab-3>
      * <b>Interface Attributes</b></a> section of the <b>Stability</b>
-     * chapter of the <i>Solaris Dynamic Tracing Guide</i>.  The
+     * chapter of the <i>Dynamic Tracing Guide</i>.  The
      * attributes appear in the following order, separated by slashes:
      * <pre><code>
      * <i>name-stability / data-stability / dependency-class</i>
