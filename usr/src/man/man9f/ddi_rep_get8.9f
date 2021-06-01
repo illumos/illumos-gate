@@ -5,8 +5,8 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH DDI_REP_GET8 9F "Nov 1, 2005"
 .SH NAME
-ddi_rep_get8, ddi_rep_get16, ddi_rep_get32, ddi_rep_get64, ddi_rep_getw,
-ddi_rep_getl, ddi_rep_getll, ddi_rep_getb \- read data from the mapped memory
+ddi_rep_get8, ddi_rep_get16, ddi_rep_get32, ddi_rep_get64,
+\- read data from the mapped memory
 address, device register or allocated DMA memory address
 .SH SYNOPSIS
 .nf
@@ -147,9 +147,7 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	T{
-\fBddi_rep_getb()\fR, \fBddi_rep_getl()\fR, \fBddi_rep_getll()\fR, and \fBddi_rep_getw()\fR are Obsolete \fBddi_rep_get8()\fR, \fBddi_rep_get16()\fR, \fBddi_rep_get32()\fR, \fBddi_rep_get64()\fR are Committed
-T}
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

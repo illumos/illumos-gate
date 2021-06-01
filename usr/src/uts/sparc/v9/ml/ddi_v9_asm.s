@@ -33,7 +33,7 @@
 #include "assym.h"
 
 /*
- * This file implements the following ddi common access 
+ * This file implements the following ddi common access
  * functions:
  *
  *	ddi_get{8,16,32,64}
@@ -53,14 +53,14 @@
  * the respective indirect function defined in the access handle.  Use of
  * the access handle functions provides compatibility across platforms for
  * drivers.
- * 
+ *
  * By default, the indirect access handle functions are initialized to the
  * i_ddi_get/put routines to perform memory mapped IO.  If memory mapped IO
  * is not possible or desired, the access handle must be intialized to another
  * valid routine to perform the sepcified IO operation.
  *
  * The alignment and placement of the following functions have been optimized
- * such that the implementation specific versions, i_ddi*, fall within the 
+ * such that the implementation specific versions, i_ddi*, fall within the
  * same cache-line of the generic versions, ddi_*.  This insures that an
  * I-cache hit will occur thus minimizing the performance impact of using the
  * access handle.
@@ -68,20 +68,14 @@
 
 	.align 32
 	ENTRY(ddi_get8)
-	ALTENTRY(ddi_getb)
 	ALTENTRY(ddi_io_get8)
-	ALTENTRY(ddi_io_getb)
 	ALTENTRY(ddi_mem_get8)
-	ALTENTRY(ddi_mem_getb)
 	ldn      [%o0 + AHI_GET8], %g1   /* hdl->ahi_get8 access hndl */
 	jmpl    %g1, %g0                 /* jump to access handle routine */
 	nop
 	SET_SIZE(ddi_get8)
-	SET_SIZE(ddi_getb)
 	SET_SIZE(ddi_io_get8)
-	SET_SIZE(ddi_io_getb)
 	SET_SIZE(ddi_mem_get8)
-	SET_SIZE(ddi_mem_getb)
 
 	.align 16
 	ENTRY(i_ddi_get8)
@@ -91,20 +85,14 @@
 
 	.align 32
 	ENTRY(ddi_get16)
-	ALTENTRY(ddi_getw)
 	ALTENTRY(ddi_io_get16)
-	ALTENTRY(ddi_io_getw)
 	ALTENTRY(ddi_mem_get16)
-	ALTENTRY(ddi_mem_getw)
 	ldn      [%o0 + AHI_GET16], %g1   /* hdl->ahi_get16 access hndl */
 	jmpl    %g1, %g0                  /* jump to access handle routine */
 	nop
 	SET_SIZE(ddi_get16)
-	SET_SIZE(ddi_getw)
 	SET_SIZE(ddi_io_get16)
-	SET_SIZE(ddi_io_getw)
 	SET_SIZE(ddi_mem_get16)
-	SET_SIZE(ddi_mem_getw)
 
 	.align 16
 	ENTRY(i_ddi_get16)
@@ -116,20 +104,14 @@
 
 	.align 32
 	ENTRY(ddi_get32)
-	ALTENTRY(ddi_getl)
 	ALTENTRY(ddi_io_get32)
-	ALTENTRY(ddi_io_getl)
 	ALTENTRY(ddi_mem_get32)
-	ALTENTRY(ddi_mem_getl)
 	ldn      [%o0 + AHI_GET32], %g1   /* hdl->ahi_get32 access handle */
 	jmpl    %g1, %g0		  /* jump to access handle routine */
 	nop
 	SET_SIZE(ddi_get32)
-	SET_SIZE(ddi_getl)
 	SET_SIZE(ddi_io_get32)
-	SET_SIZE(ddi_io_getl)
 	SET_SIZE(ddi_mem_get32)
-	SET_SIZE(ddi_mem_getl)
 
 	.align 16
 	ENTRY(i_ddi_get32)
@@ -141,20 +123,14 @@
 
 	.align 32
 	ENTRY(ddi_get64)
-	ALTENTRY(ddi_getll)
 	ALTENTRY(ddi_io_get64)
-	ALTENTRY(ddi_io_getll)
 	ALTENTRY(ddi_mem_get64)
-	ALTENTRY(ddi_mem_getll)
 	ldn      [%o0 + AHI_GET64], %g1   /* hdl->ahi_get64 access handle */
 	jmpl    %g1, %g0                  /* jump to access handle routine */
 	nop
 	SET_SIZE(ddi_get64)
-	SET_SIZE(ddi_getll)
 	SET_SIZE(ddi_io_get64)
-	SET_SIZE(ddi_io_getll)
 	SET_SIZE(ddi_mem_get64)
-	SET_SIZE(ddi_mem_getll)
 
 	.align 16
 	ENTRY(i_ddi_get64)
@@ -166,20 +142,14 @@
 
 	.align 32
 	ENTRY(ddi_put8)
-	ALTENTRY(ddi_putb)
 	ALTENTRY(ddi_io_put8)
-	ALTENTRY(ddi_io_putb)
 	ALTENTRY(ddi_mem_put8)
-	ALTENTRY(ddi_mem_putb)
 	ldn      [%o0 + AHI_PUT8], %g1   /* hdl->ahi_put8 access handle */
 	jmpl    %g1, %g0                 /* jump to access handle routine */
 	nop
 	SET_SIZE(ddi_put8)
-	SET_SIZE(ddi_putb)
 	SET_SIZE(ddi_io_put8)
-	SET_SIZE(ddi_io_putb)
 	SET_SIZE(ddi_mem_put8)
-	SET_SIZE(ddi_mem_putb)
 
 	.align 16
 	ENTRY(i_ddi_put8)
@@ -189,20 +159,14 @@
 
 	.align 32
 	ENTRY(ddi_put16)
-	ALTENTRY(ddi_putw)
 	ALTENTRY(ddi_io_put16)
-	ALTENTRY(ddi_io_putw)
 	ALTENTRY(ddi_mem_put16)
-	ALTENTRY(ddi_mem_putw)
 	ldn      [%o0 + AHI_PUT16], %g1   /* hdl->ahi_put16 access handle */
 	jmpl    %g1, %g0                  /* jump to access handle routine */
 	nop
 	SET_SIZE(ddi_put16)
-	SET_SIZE(ddi_putw)
 	SET_SIZE(ddi_io_put16)
-	SET_SIZE(ddi_io_putw)
 	SET_SIZE(ddi_mem_put16)
-	SET_SIZE(ddi_mem_putw)
 
 	.align 16
 	ENTRY(i_ddi_put16)
@@ -214,20 +178,14 @@
 
 	.align 32
 	ENTRY(ddi_put32)
-	ALTENTRY(ddi_putl)
 	ALTENTRY(ddi_io_put32)
-	ALTENTRY(ddi_io_putl)
 	ALTENTRY(ddi_mem_put32)
-	ALTENTRY(ddi_mem_putl)
 	ldn      [%o0 + AHI_PUT32], %g1   /* hdl->ahi_put16 access handle */
 	jmpl    %g1, %g0                  /* jump to access handle routine */
 	nop
 	SET_SIZE(ddi_put32)
-	SET_SIZE(ddi_putl)
 	SET_SIZE(ddi_io_put32)
-	SET_SIZE(ddi_io_putl)
 	SET_SIZE(ddi_mem_put32)
-	SET_SIZE(ddi_mem_putl)
 
 	.align 16
 	ENTRY(i_ddi_put32)
@@ -239,20 +197,14 @@
 
 	.align 32
 	ENTRY(ddi_put64)
-	ALTENTRY(ddi_putll)
 	ALTENTRY(ddi_io_put64)
-	ALTENTRY(ddi_io_putll)
 	ALTENTRY(ddi_mem_put64)
-	ALTENTRY(ddi_mem_putll)
 	ldn      [%o0 + AHI_PUT64], %g1   /* hdl->ahi_put64 access handle */
-	jmpl    %g1, %g0                  /* jump to access handle routine */ 
+	jmpl    %g1, %g0                  /* jump to access handle routine */
 	nop
 	SET_SIZE(ddi_put64)
-	SET_SIZE(ddi_putll)
 	SET_SIZE(ddi_io_put64)
-	SET_SIZE(ddi_io_putll)
 	SET_SIZE(ddi_mem_put64)
-	SET_SIZE(ddi_mem_putll)
 
 	.align 16
 	ENTRY(i_ddi_put64)
@@ -264,16 +216,16 @@
 
 /*
  * The ddi_io_rep_get/put routines don't take a flag argument like the "plain"
- * and mem versions do.  This flag is used to determine whether or not the 
+ * and mem versions do.  This flag is used to determine whether or not the
  * device address or port should be automatically incremented.  For IO space,
  * the device port is never incremented and as such, the flag is always set
  * to DDI_DEV_NO_AUTOINCR.
  *
- * This define processes the repetitive get functionality.  Automatic 
- * incrementing of the device address is determined by the flag field 
- * %o4.  If this is set for AUTOINCR, %o4 is updated with 1 for the 
+ * This define processes the repetitive get functionality.  Automatic
+ * incrementing of the device address is determined by the flag field
+ * %o4.  If this is set for AUTOINCR, %o4 is updated with 1 for the
  * subsequent increment in 2:.
- * 
+ *
  * If this flag is not set for AUTOINCR, %o4 is update with a value of 0 thus
  * making the increment operation a non-operation.
  */
@@ -294,16 +246,12 @@
 
 	.align 32
 	ENTRY(ddi_rep_get8)
-	ALTENTRY(ddi_rep_getb)
 	ALTENTRY(ddi_mem_rep_get8)
-	ALTENTRY(ddi_mem_rep_getb)
 	ldn      [%o0 + AHI_REP_GET8], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_rep_get8)
-	SET_SIZE(ddi_rep_getb)
 	SET_SIZE(ddi_mem_rep_get8)
-	SET_SIZE(ddi_mem_rep_getb)
 
 	.align 16
 	ENTRY(i_ddi_rep_get8)
@@ -311,19 +259,15 @@
 	retl
 	nop
 	SET_SIZE(i_ddi_rep_get8)
-	
+
 	.align 32
 	ENTRY(ddi_rep_get16)
-	ALTENTRY(ddi_rep_getw)
 	ALTENTRY(ddi_mem_rep_get16)
-	ALTENTRY(ddi_mem_rep_getw)
 	ldn	[%o0 + AHI_REP_GET16], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_rep_get16)
-	SET_SIZE(ddi_rep_getw)
 	SET_SIZE(ddi_mem_rep_get16)
-	SET_SIZE(ddi_mem_rep_getw)
 
 	.align 16
 	ENTRY(i_ddi_rep_get16)
@@ -336,16 +280,12 @@
 
 	.align 32
 	ENTRY(ddi_rep_get32)
-	ALTENTRY(ddi_rep_getl)
 	ALTENTRY(ddi_mem_rep_get32)
-	ALTENTRY(ddi_mem_rep_getl)
 	ldn      [%o0 + AHI_REP_GET32], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_rep_get32)
-	SET_SIZE(ddi_rep_getl)
 	SET_SIZE(ddi_mem_rep_get32)
-	SET_SIZE(ddi_mem_rep_getl)
 
 	.align 16
 	ENTRY(i_ddi_rep_get32)
@@ -358,16 +298,12 @@
 
 	.align 32
 	ENTRY(ddi_rep_get64)
-	ALTENTRY(ddi_rep_getll)
 	ALTENTRY(ddi_mem_rep_get64)
-	ALTENTRY(ddi_mem_rep_getll)
 	ldn      [%o0 + AHI_REP_GET64], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_rep_get64)
-	SET_SIZE(ddi_rep_getll)
 	SET_SIZE(ddi_mem_rep_get64)
-	SET_SIZE(ddi_mem_rep_getll)
 
 	.align 16
 	ENTRY(i_ddi_rep_get64)
@@ -378,12 +314,12 @@
 	SET_SIZE(i_ddi_rep_get64)
 	SET_SIZE(i_ddi_swap_rep_get64)
 
-/* 
- * This define processes the repetitive put functionality.  Automatic 
- * incrementing of the device address is determined by the flag field 
- * %o4.  If this is set for AUTOINCR, %o4 is updated with 1 for the 
+/*
+ * This define processes the repetitive put functionality.  Automatic
+ * incrementing of the device address is determined by the flag field
+ * %o4.  If this is set for AUTOINCR, %o4 is updated with 1 for the
  * subsequent increment in 2:.
- * 
+ *
  * If this flag is not set for AUTOINCR, %o4 is update with a value of 0 thus
  * making the increment operation a non-operation.
  */
@@ -403,16 +339,12 @@
 
 	.align 32
 	ENTRY(ddi_rep_put8)
-	ALTENTRY(ddi_rep_putb)
 	ALTENTRY(ddi_mem_rep_put8)
-	ALTENTRY(ddi_mem_rep_putb)
 	ldn      [%o0 + AHI_REP_PUT8], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_rep_put8)
-	SET_SIZE(ddi_rep_putb)
 	SET_SIZE(ddi_mem_rep_put8)
-	SET_SIZE(ddi_mem_rep_putb)
 
 	.align 16
 	ENTRY(i_ddi_rep_put8)
@@ -423,16 +355,12 @@
 
 	.align 32
 	ENTRY(ddi_rep_put16)
-	ALTENTRY(ddi_rep_putw)
 	ALTENTRY(ddi_mem_rep_put16)
-	ALTENTRY(ddi_mem_rep_putw)
 	ldn      [%o0 + AHI_REP_PUT16], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_rep_put16)
-	SET_SIZE(ddi_rep_putw)
 	SET_SIZE(ddi_mem_rep_put16)
-	SET_SIZE(ddi_mem_rep_putw)
 
 	.align 16
 	ENTRY(i_ddi_rep_put16)
@@ -445,16 +373,12 @@
 
 	.align 32
 	ENTRY(ddi_rep_put32)
-	ALTENTRY(ddi_rep_putl)
 	ALTENTRY(ddi_mem_rep_put32)
-	ALTENTRY(ddi_mem_rep_putl)
 	ldn      [%o0 + AHI_REP_PUT32], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_rep_put32)
-	SET_SIZE(ddi_rep_putl)
 	SET_SIZE(ddi_mem_rep_put32)
-	SET_SIZE(ddi_mem_rep_putl)
 
 	.align 16
 	ENTRY(i_ddi_rep_put32)
@@ -467,16 +391,12 @@
 
 	.align 32
 	ENTRY(ddi_rep_put64)
-	ALTENTRY(ddi_rep_putll)
 	ALTENTRY(ddi_mem_rep_put64)
-	ALTENTRY(ddi_mem_rep_putll)
 	ldn      [%o0 + AHI_REP_PUT64], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_rep_put64)
-	SET_SIZE(ddi_rep_putll)
 	SET_SIZE(ddi_mem_rep_put64)
-	SET_SIZE(ddi_mem_rep_putll)
 
 	.align 16
 	ENTRY(i_ddi_rep_put64)
@@ -489,43 +409,35 @@
 
 	.align 16
 	ENTRY(ddi_io_rep_get8)
-	ALTENTRY(ddi_io_rep_getb)
 	set	DDI_DEV_NO_AUTOINCR, %o4 /* Set flag to DDI_DEV_NO_AUTOINCR */
 	ldn	[%o0 + AHI_REP_GET8], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_io_rep_get8)
-	SET_SIZE(ddi_io_rep_getb)
 
 	.align 16
 	ENTRY(ddi_io_rep_get16)
-	ALTENTRY(ddi_io_rep_getw)
 	set	DDI_DEV_NO_AUTOINCR, %o4 /* Set flag to DDI_DEV_NO_AUTOINCR */
 	ldn	[%o0 + AHI_REP_GET16], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_io_rep_get16)
-	SET_SIZE(ddi_io_rep_getw)
 
 	.align 16
 	ENTRY(ddi_io_rep_get32)
-	ALTENTRY(ddi_io_rep_getl)
 	set	DDI_DEV_NO_AUTOINCR, %o4 /* Set flag to DDI_DEV_NO_AUTOINCR */
 	ldn	[%o0 + AHI_REP_GET32], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_io_rep_get32)
-	SET_SIZE(ddi_io_rep_getl)
 
 	.align 16
 	ENTRY(ddi_io_rep_get64)
-	ALTENTRY(ddi_io_rep_getll)
 	set	DDI_DEV_NO_AUTOINCR, %o4 /* Set flag to DDI_DEV_NO_AUTOINCR */
 	ldn	[%o0 + AHI_REP_GET64], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_io_rep_get64)
-	SET_SIZE(ddi_io_rep_getll)
 
         .align 64
 	ENTRY(ddi_check_acc_handle)
@@ -534,7 +446,7 @@
 	jmpl	%g1, %o7
 	mov	%i0, %o0
 	brnz,a,pn %o0, 0f			! if (return_value != 0)
-	mov	-1, %o0				! 	return (DDI_FAILURE)
+	mov	-1, %o0				!	return (DDI_FAILURE)
 0:						! else	return (DDI_SUCCESS)
 	sra	%o0, 0, %i0
 	ret
@@ -549,43 +461,35 @@
 
 	.align 16
 	ENTRY(ddi_io_rep_put8)
-	ALTENTRY(ddi_io_rep_putb)
 	set	DDI_DEV_NO_AUTOINCR, %o4 /* Set flag to DDI_DEV_NO_AUTOINCR */
 	ldn	[%o0 + AHI_REP_PUT8], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_io_rep_put8)
-	SET_SIZE(ddi_io_rep_putb)
 
 	.align 16
 	ENTRY(ddi_io_rep_put16)
-	ALTENTRY(ddi_io_rep_putw)
 	set	DDI_DEV_NO_AUTOINCR, %o4 /* Set flag to DDI_DEV_NO_AUTOINCR */
 	ldn	[%o0 + AHI_REP_PUT16], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_io_rep_put16)
-	SET_SIZE(ddi_io_rep_putw)
 
 	.align 16
 	ENTRY(ddi_io_rep_put32)
-	ALTENTRY(ddi_io_rep_putl)
 	set	DDI_DEV_NO_AUTOINCR, %o4 /* Set flag to DDI_DEV_NO_AUTOINCR */
 	ldn	[%o0 + AHI_REP_PUT32], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_io_rep_put32)
-	SET_SIZE(ddi_io_rep_putl)
 
 	.align 16
 	ENTRY(ddi_io_rep_put64)
-	ALTENTRY(ddi_io_rep_putll)
 	set	DDI_DEV_NO_AUTOINCR, %o4 /* Set flag to DDI_DEV_NO_AUTOINCR */
 	ldn	[%o0 + AHI_REP_PUT64], %g1
 	jmpl    %g1, %g0
 	nop
 	SET_SIZE(ddi_io_rep_put64)
-	SET_SIZE(ddi_io_rep_putll)
 
 	ENTRY(do_peek)
 	rdpr	%pstate, %o3	! check ints
@@ -620,7 +524,7 @@
 	bnz	1f
 	nop
 	wrpr	%o3, PSTATE_IE, %pstate
-1:	
+1:
 	mov	%g0, %o0
 done:
 	retl
@@ -683,7 +587,7 @@ done:
 	bnz	1f
 	nop
 	wrpr	%o3, PSTATE_IE, %pstate
-1:	
+1:
 	retl
 	sub	%g0, 1, %o0			! return (DDI_FAILURE);
 .peekfail:
@@ -743,7 +647,7 @@ done:
  *			To prevent an access from causing a system panic,
  *			we use on_trap semantics to catch the error and
  *			set error status.
- * 
+ *
  *	If a read access error is detected and DDI_CAUTIOUS_ACC or
  *	DDI_FLAGERR_ACC	protection was requested, we will trampoline to the
  *	error handler, i_ddi_trampoline.  i_ddi_trampoline will:
@@ -756,8 +660,8 @@ done:
  *	generated and claimed by a bus nexus responsible for the write
  *	transaction.  The nexus error handler is expected to set the
  *	error status and the IO initiating driver is expected to check
- *	for a failed transaction via ddi_fm_acc_err_get(). 
- * 
+ *	for a failed transaction via ddi_fm_acc_err_get().
+ *
  */
 
 	.seg	".data"
@@ -783,7 +687,7 @@ done:
 	stx	%g0, [%o4 + ERR_ENA]		! ahi_err->err_ena = 0
 	mov	-2, %o0
 	st	%o0, [%o4 + ERR_STATUS]		! ahi_err->err_status = NONFATAL
-	b	longjmp                		! longjmp back 
+	b	longjmp				! longjmp back
 	add	%o5, OT_JMPBUF, %o0		! %o0 = &ot_jmpbuf
 .cautaccfail:
 	set	.acc_panic, %o0			! Load panic message
@@ -844,7 +748,7 @@ done:
 	ldn	[%o5 + OT_PREV], %o0		! restore ontrap
 	membar	#Sync				! force error barrier
 	stn	%o0, [THREAD_REG + T_ONTRAP];
-	b	longjmp                		! longjmp back 
+	b	longjmp				! longjmp back
 	add	%o5, OT_JMPBUF, %o0		! %o0 = &ot_jmpbuf
 .protaccfail:
 	set	.acc_panic, %o0			! Load panic message
@@ -1057,4 +961,3 @@ cautdone:
 	retl
 	nop
 	SET_SIZE(i_ddi_caut_get)
-

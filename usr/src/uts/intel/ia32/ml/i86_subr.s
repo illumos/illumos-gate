@@ -690,75 +690,6 @@ str_valid:
 	ret
 	SET_SIZE(inb)
 
-
-	ENTRY(repoutsw)
-	movl	%edx, %ecx
-	movw	%di, %dx
-	rep
-	  D16 outsl
-	ret
-	SET_SIZE(repoutsw)
-
-
-	ENTRY(repinsw)
-	movl	%edx, %ecx
-	movw	%di, %dx
-	rep
-	  D16 insl
-	ret
-	SET_SIZE(repinsw)
-
-
-	ENTRY(repinsb)
-	movl	%edx, %ecx
-	movw	%di, %dx
-	movq	%rsi, %rdi
-	rep
-	  insb
-	ret
-	SET_SIZE(repinsb)
-
-
-/*
- * Input a stream of 32-bit words.
- * NOTE: count is a DWORD count.
- */
-
-	ENTRY(repinsd)
-	movl	%edx, %ecx
-	movw	%di, %dx
-	movq	%rsi, %rdi
-	rep
-	  insl
-	ret
-	SET_SIZE(repinsd)
-
-/*
- * Output a stream of bytes
- * NOTE: count is a byte count
- */
-
-	ENTRY(repoutsb)
-	movl	%edx, %ecx
-	movw	%di, %dx
-	rep
-	  outsb
-	ret
-	SET_SIZE(repoutsb)
-
-/*
- * Output a stream of 32-bit words
- * NOTE: count is a DWORD count
- */
-
-	ENTRY(repoutsd)
-	movl	%edx, %ecx
-	movw	%di, %dx
-	rep
-	  outsl
-	ret
-	SET_SIZE(repoutsd)
-
 /*
  * void int3(void)
  * void int18(void)
@@ -1696,4 +1627,3 @@ vpanic_common:
 	popq	%rbx
 	ret
 	SET_SIZE(vmware_port)
-

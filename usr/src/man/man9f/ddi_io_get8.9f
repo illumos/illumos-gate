@@ -5,7 +5,7 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH DDI_IO_GET8 9F "Nov 1, 2005"
 .SH NAME
-ddi_io_get8, ddi_io_get16, ddi_io_get32, ddi_io_getb, ddi_io_getl, ddi_io_getw
+ddi_io_get8, ddi_io_get16, ddi_io_get32
 \- read data from the mapped device register in I/O space
 .SH SYNOPSIS
 .nf
@@ -33,10 +33,8 @@ illumos DDI specific (illumos DDI). The \fBddi_io_get8()\fR,
 \fBddi_io_getl()\fR, and \fBddi_io_getw()\fR functions are obsolete. The
 \fBddi_get8\fR(9F) function replaces \fBddi_io_get8()\fR. The
 \fBddi_get16\fR(9F) function replaces \fBddi_io_get16()\fR. The
-\fBddi_get32\fR(9F) function replaces \fBddi_io_get32()\fR. The
-\fBddi_get8\fR(9F) function replaces \fBddi_io_getb()\fR. The
-\fBddi_get32\fR(9F) function replaces \fBddi_io_getl()\fR. The
-\fBddi_get16\fR(9F) function replaces \fBddi_io_getw()\fR.
+\fBddi_get32\fR(9F) function replaces \fBddi_io_get32()\fR.
+
 .SH PARAMETERS
 .ne 2
 .na

@@ -8,7 +8,6 @@
 .SH NAME
 Intro, intro \- introduction to DDI/DKI functions
 .SH DESCRIPTION
-.LP
 Section 9F describes the kernel functions available for use by device drivers.
 See \fBIntro\fR(9E) for an overview of device driver interfaces.
 .sp
@@ -123,7 +122,6 @@ which can be referred to for further information.
 Every driver MUST include <\fBsys/ddi.h\fR> and <\fBsys/sunddi.h\fR>, in that
 order, and as the last files the driver includes.
 .SH STREAMS KERNEL FUNCTION SUMMARY
-.LP
 The following table summarizes the STREAMS functions described in this section.
 .sp
 
@@ -410,14 +408,10 @@ _
 \fBddi_get_pid\fR	illumos DDI
 \fBddi_get_soft_iblock_cookie\fR	illumos DDI
 \fBddi_get_soft_state\fR	illumos DDI
-\fBddi_getb\fR	illumos DDI
-\fBddi_getl\fR	illumos DDI
-\fBddi_getll\fR	illumos DDI
 \fBddi_getlongprop\fR	illumos DDI
 \fBddi_getlongprop_buf\fR	illumos DDI
 \fBddi_getprop\fR	illumos DDI
 \fBddi_getproplen\fR	illumos DDI
-\fBddi_getw\fR	illumos DDI
 \fBddi_intr_add_handler\fR	illumos DDI
 \fBddi_intr_add_softint\fR	illumos DDI
 \fBddi_intr_alloc\fR	illumos DDI
@@ -446,27 +440,15 @@ _
 \fBddi_io_get16\fR	illumos DDI
 \fBddi_io_get32\fR	illumos DDI
 \fBddi_io_get8\fR	illumos DDI
-\fBddi_io_getb\fR	illumos DDI
-\fBddi_io_getl\fR	illumos DDI
-\fBddi_io_getw\fR	illumos DDI
 \fBddi_io_put16\fR	illumos DDI
 \fBddi_io_put32\fR	illumos DDI
 \fBddi_io_put8\fR	illumos DDI
-\fBddi_io_putb\fR	illumos DDI
-\fBddi_io_putl\fR	illumos DDI
-\fBddi_io_putw\fR	illumos DDI
 \fBddi_io_rep_get16\fR	illumos DDI
 \fBddi_io_rep_get32\fR	illumos DDI
 \fBddi_io_rep_get8\fR	illumos DDI
-\fBddi_io_rep_getb\fR	illumos DDI
-\fBddi_io_rep_getl\fR	illumos DDI
-\fBddi_io_rep_getw\fR	illumos DDI
 \fBddi_io_rep_put16\fR	illumos DDI
 \fBddi_io_rep_put32\fR	illumos DDI
 \fBddi_io_rep_put8\fR	illumos DDI
-\fBddi_io_rep_putb\fR	illumos DDI
-\fBddi_io_rep_putl\fR	illumos DDI
-\fBddi_io_rep_putw\fR	illumos DDI
 \fBddi_iomin\fR	illumos DDI
 \fBddi_log_sysevent\fR	illumos DDI
 \fBddi_map_regs\fR	illumos DDI
@@ -478,34 +460,18 @@ _
 \fBddi_mem_get32\fR	illumos DDI
 \fBddi_mem_get64\fR	illumos DDI
 \fBddi_mem_get8\fR	illumos DDI
-\fBddi_mem_getb\fR	illumos DDI
-\fBddi_mem_getl\fR	illumos DDI
-\fBddi_mem_getll\fR	illumos DDI
-\fBddi_mem_getw\fR	illumos DDI
 \fBddi_mem_put16\fR	illumos DDI
 \fBddi_mem_put32\fR	illumos DDI
 \fBddi_mem_put64\fR	illumos DDI
 \fBddi_mem_put8\fR	illumos DDI
-\fBddi_mem_putb\fR	illumos DDI
-\fBddi_mem_putl\fR	illumos DDI
-\fBddi_mem_putll\fR	illumos DDI
-\fBddi_mem_putw\fR	illumos DDI
 \fBddi_mem_rep_get16\fR	illumos DDI
 \fBddi_mem_rep_get32\fR	illumos DDI
 \fBddi_mem_rep_get64\fR	illumos DDI
 \fBddi_mem_rep_get8\fR	illumos DDI
-\fBddi_mem_rep_getb\fR	illumos DDI
-\fBddi_mem_rep_getl\fR	illumos DDI
-\fBddi_mem_rep_getll\fR	illumos DDI
-\fBddi_mem_rep_getw\fR	illumos DDI
 \fBddi_mem_rep_put16\fR	illumos DDI
 \fBddi_mem_rep_put32\fR	illumos DDI
 \fBddi_mem_rep_put64\fR	illumos DDI
 \fBddi_mem_rep_put8\fR	illumos DDI
-\fBddi_mem_rep_putb\fR	illumos DDI
-\fBddi_mem_rep_putl\fR	illumos DDI
-\fBddi_mem_rep_putll\fR	illumos DDI
-\fBddi_mem_rep_putw\fR	illumos DDI
 \fBddi_mmap_get_model\fR	illumos DDI
 \fBddi_model_convert_from\fR	illumos DDI
 \fBddi_modopen\fR	illumos DDI
@@ -515,20 +481,12 @@ _
 \fBddi_peek32\fR	illumos DDI
 \fBddi_peek64\fR	illumos DDI
 \fBddi_peek8\fR	illumos DDI
-\fBddi_peekc\fR	illumos DDI
-\fBddi_peekd\fR	illumos DDI
-\fBddi_peekl\fR	illumos DDI
-\fBddi_peeks\fR	illumos DDI
 \fBddi_periodic_add\fR	illumos DDI
 \fBddi_periodic_delete\fR	illumos DDI
 \fBddi_poke16\fR	illumos DDI
 \fBddi_poke32\fR	illumos DDI
 \fBddi_poke64\fR	illumos DDI
 \fBddi_poke8\fR	illumos DDI
-\fBddi_pokec\fR	illumos DDI
-\fBddi_poked\fR	illumos DDI
-\fBddi_pokel\fR	illumos DDI
-\fBddi_pokes\fR	illumos DDI
 \fBddi_prop_create\fR	illumos DDI
 \fBddi_prop_exists\fR	illumos DDI
 \fBddi_prop_free\fR	illumos DDI
@@ -554,10 +512,6 @@ _
 \fBddi_put32\fR	illumos DDI
 \fBddi_put64\fR	illumos DDI
 \fBddi_put8\fR	illumos DDI
-\fBddi_putb\fR	illumos DDI
-\fBddi_putl\fR	illumos DDI
-\fBddi_putll\fR	illumos DDI
-\fBddi_putw\fR	illumos DDI
 \fBddi_regs_map_free\fR	illumos DDI
 \fBddi_regs_map_setup\fR	illumos DDI
 \fBddi_remove_event_handler\fR	illumos DDI
@@ -569,18 +523,10 @@ _
 \fBddi_rep_get32\fR	illumos DDI
 \fBddi_rep_get64\fR	illumos DDI
 \fBddi_rep_get8\fR	illumos DDI
-\fBddi_rep_getb\fR	illumos DDI
-\fBddi_rep_getl\fR	illumos DDI
-\fBddi_rep_getll\fR	illumos DDI
-\fBddi_rep_getw\fR	illumos DDI
 \fBddi_rep_put16\fR	illumos DDI
 \fBddi_rep_put32\fR	illumos DDI
 \fBddi_rep_put64\fR	illumos DDI
 \fBddi_rep_put8\fR	illumos DDI
-\fBddi_rep_putb\fR	illumos DDI
-\fBddi_rep_putl\fR	illumos DDI
-\fBddi_rep_putll\fR	illumos DDI
-\fBddi_rep_putw\fR	illumos DDI
 \fBddi_report_dev\fR	illumos DDI
 \fBddi_root_node\fR	illumos DDI
 \fBddi_segmap\fR	illumos DDI
@@ -710,16 +656,10 @@ _
 \fBpci_config_get32\fR	illumos DDI
 \fBpci_config_get64\fR	illumos DDI
 \fBpci_config_get8\fR	illumos DDI
-\fBpci_config_getb\fR	illumos DDI
-\fBpci_config_getl\fR	illumos DDI
-\fBpci_config_getw\fR	illumos DDI
 \fBpci_config_put16\fR	illumos DDI
 \fBpci_config_put32\fR	illumos DDI
 \fBpci_config_put64\fR	illumos DDI
 \fBpci_config_put8\fR	illumos DDI
-\fBpci_config_putb\fR	illumos DDI
-\fBpci_config_putl\fR	illumos DDI
-\fBpci_config_putw\fR	illumos DDI
 \fBpci_config_setup\fR	illumos DDI
 \fBpci_config_teardown\fR	illumos DDI
 \fBpci_ereport_setup\fR	illumos DDI
@@ -738,12 +678,6 @@ _
 \fBproc_signal\fR	illumos DDI
 \fBproc_unref\fR	illumos DDI
 \fBptob\fR	DDI/DKI
-\fBrepinsb\fR	illumos x86 DDI
-\fBrepinsd\fR	illumos x86 DDI
-\fBrepinsw\fR	illumos x86 DDI
-\fBrepoutsb\fR	illumos x86 DDI
-\fBrepoutsd\fR	illumos x86 DDI
-\fBrepoutsw\fR	illumos x86 DDI
 \fBrmalloc\fR	DDI/DKI
 \fBrmalloc_wait\fR	DDI/DKI
 \fBrmallocmap\fR	DDI/DKI
@@ -867,5 +801,4 @@ _
 .TE
 
 .SH SEE ALSO
-.LP
 \fBIntro\fR(9E), \fBmutex\fR(9F)

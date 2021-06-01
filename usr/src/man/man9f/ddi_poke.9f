@@ -5,8 +5,8 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH DDI_POKE 9F "Jan 16, 2006"
 .SH NAME
-ddi_poke, ddi_poke8, ddi_poke16, ddi_poke32, ddi_poke64, ddi_pokec, ddi_pokes,
-ddi_pokel, ddi_poked \- write a value to a location
+ddi_poke, ddi_poke8, ddi_poke16, ddi_poke32, ddi_poke64
+\- write a value to a location
 .SH SYNOPSIS
 .nf
 #include <sys/ddi.h>
@@ -106,22 +106,3 @@ These functions can be called from user, interrupt, or kernel context.
 .sp
 .LP
 \fIWriting Device Drivers\fR
-.SH NOTES
-The functions described in this manual page previously used symbolic names
-which specified their data access size; the function names have been changed so
-they now specify a fixed-width data size. See the following table for the new
-name equivalents:
-.sp
-
-.sp
-.TS
-box;
-l l
-l l .
-\fBPrevious Name\fR	\fBNew Name\fR
-\fBddi_pokec\fR	\fBddi_poke8\fR
-\fBddi_pokes\fR	\fBddi_poke16\fR
-\fBddi_pokel\fR	\fBddi_poke32\fR
-\fBddi_poked\fR	\fBddi_poke64\fR
-.TE
-

@@ -33,10 +33,7 @@
 #include "assym.h"
 
 	ENTRY(ddi_get8)
-	ALTENTRY(ddi_getb)
-	ALTENTRY(ddi_mem_getb)
 	ALTENTRY(ddi_mem_get8)
-	ALTENTRY(ddi_io_getb)
 	ALTENTRY(ddi_io_get8)
 	movl	ACC_ATTR(%rdi), %edx
 	cmpl	$_CONST(DDI_ACCATTR_IO_SPACE|DDI_ACCATTR_DIRECT), %edx
@@ -54,18 +51,12 @@
 	movq	ACC_GETB(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_get8)
-	SET_SIZE(ddi_getb)
-	SET_SIZE(ddi_mem_getb)
 	SET_SIZE(ddi_mem_get8)
-	SET_SIZE(ddi_io_getb)
 	SET_SIZE(ddi_io_get8)
 
 
 	ENTRY(ddi_get16)
-	ALTENTRY(ddi_getw)
-	ALTENTRY(ddi_mem_getw)
 	ALTENTRY(ddi_mem_get16)
-	ALTENTRY(ddi_io_getw)
 	ALTENTRY(ddi_io_get16)
 	movl	ACC_ATTR(%rdi), %edx
 	cmpl	$_CONST(DDI_ACCATTR_IO_SPACE|DDI_ACCATTR_DIRECT), %edx
@@ -83,18 +74,12 @@
 	movq	ACC_GETW(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_get16)
-	SET_SIZE(ddi_getw)
-	SET_SIZE(ddi_mem_getw)
 	SET_SIZE(ddi_mem_get16)
-	SET_SIZE(ddi_io_getw)
 	SET_SIZE(ddi_io_get16)
 
 
 	ENTRY(ddi_get32)
-	ALTENTRY(ddi_getl)
-	ALTENTRY(ddi_mem_getl)
 	ALTENTRY(ddi_mem_get32)
-	ALTENTRY(ddi_io_getl)
 	ALTENTRY(ddi_io_get32)
 	movl	ACC_ATTR(%rdi), %edx
 	cmpl	$_CONST(DDI_ACCATTR_IO_SPACE|DDI_ACCATTR_DIRECT), %edx
@@ -111,30 +96,20 @@
 	movq	ACC_GETL(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_get32)
-	SET_SIZE(ddi_getl)
-	SET_SIZE(ddi_mem_getl)
 	SET_SIZE(ddi_mem_get32)
-	SET_SIZE(ddi_io_getl)
 	SET_SIZE(ddi_io_get32)
 
 
 	ENTRY(ddi_get64)
-	ALTENTRY(ddi_getll)
-	ALTENTRY(ddi_mem_getll)
 	ALTENTRY(ddi_mem_get64)
 	movq	ACC_GETLL(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_get64)
-	SET_SIZE(ddi_getll)
-	SET_SIZE(ddi_mem_getll)
 	SET_SIZE(ddi_mem_get64)
 
 
 	ENTRY(ddi_put8)
-	ALTENTRY(ddi_putb)
-	ALTENTRY(ddi_mem_putb)
 	ALTENTRY(ddi_mem_put8)
-	ALTENTRY(ddi_io_putb)
 	ALTENTRY(ddi_io_put8)
 	movl	ACC_ATTR(%rdi), %ecx
 	cmpl	$_CONST(DDI_ACCATTR_IO_SPACE|DDI_ACCATTR_DIRECT), %ecx
@@ -152,18 +127,12 @@
 	movq	ACC_PUTB(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_put8)
-	SET_SIZE(ddi_putb)
-	SET_SIZE(ddi_mem_putb)
 	SET_SIZE(ddi_mem_put8)
-	SET_SIZE(ddi_io_putb)
 	SET_SIZE(ddi_io_put8)
 
 
 	ENTRY(ddi_put16)
-	ALTENTRY(ddi_putw)
-	ALTENTRY(ddi_mem_putw)
 	ALTENTRY(ddi_mem_put16)
-	ALTENTRY(ddi_io_putw)
 	ALTENTRY(ddi_io_put16)
 	movl	ACC_ATTR(%rdi), %ecx
 	cmpl	$_CONST(DDI_ACCATTR_IO_SPACE|DDI_ACCATTR_DIRECT), %ecx
@@ -181,18 +150,12 @@
 	movq	ACC_PUTW(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_put16)
-	SET_SIZE(ddi_putw)
-	SET_SIZE(ddi_mem_putw)
 	SET_SIZE(ddi_mem_put16)
-	SET_SIZE(ddi_io_putw)
 	SET_SIZE(ddi_io_put16)
 
 
 	ENTRY(ddi_put32)
-	ALTENTRY(ddi_putl)
-	ALTENTRY(ddi_mem_putl)
 	ALTENTRY(ddi_mem_put32)
-	ALTENTRY(ddi_io_putl)
 	ALTENTRY(ddi_io_put32)
 	movl	ACC_ATTR(%rdi), %ecx
 	cmpl	$_CONST(DDI_ACCATTR_IO_SPACE|DDI_ACCATTR_DIRECT), %ecx
@@ -210,118 +173,79 @@
 	movq	ACC_PUTL(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_put32)
-	SET_SIZE(ddi_putl)
-	SET_SIZE(ddi_mem_putl)
 	SET_SIZE(ddi_mem_put32)
-	SET_SIZE(ddi_io_putl)
 	SET_SIZE(ddi_io_put32)
 
 
 	ENTRY(ddi_put64)
-	ALTENTRY(ddi_putll)
-	ALTENTRY(ddi_mem_putll)
 	ALTENTRY(ddi_mem_put64)
 	movq	ACC_PUTLL(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_put64)
-	SET_SIZE(ddi_putll)
-	SET_SIZE(ddi_mem_putll)
 	SET_SIZE(ddi_mem_put64)
 
 
 	ENTRY(ddi_rep_get8)
-	ALTENTRY(ddi_rep_getb)
-	ALTENTRY(ddi_mem_rep_getb)
 	ALTENTRY(ddi_mem_rep_get8)
 	movq	ACC_REP_GETB(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_get8)
-	SET_SIZE(ddi_rep_getb)
-	SET_SIZE(ddi_mem_rep_getb)
 	SET_SIZE(ddi_mem_rep_get8)
 
 
 	ENTRY(ddi_rep_get16)
-	ALTENTRY(ddi_rep_getw)
-	ALTENTRY(ddi_mem_rep_getw)
 	ALTENTRY(ddi_mem_rep_get16)
 	movq	ACC_REP_GETW(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_get16)
-	SET_SIZE(ddi_rep_getw)
-	SET_SIZE(ddi_mem_rep_getw)
 	SET_SIZE(ddi_mem_rep_get16)
 
 
 	ENTRY(ddi_rep_get32)
-	ALTENTRY(ddi_rep_getl)
-	ALTENTRY(ddi_mem_rep_getl)
 	ALTENTRY(ddi_mem_rep_get32)
 	movq	ACC_REP_GETL(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_get32)
-	SET_SIZE(ddi_rep_getl)
-	SET_SIZE(ddi_mem_rep_getl)
 	SET_SIZE(ddi_mem_rep_get32)
 
 
 	ENTRY(ddi_rep_get64)
-	ALTENTRY(ddi_rep_getll)
-	ALTENTRY(ddi_mem_rep_getll)
 	ALTENTRY(ddi_mem_rep_get64)
 	movq	ACC_REP_GETLL(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_get64)
-	SET_SIZE(ddi_rep_getll)
-	SET_SIZE(ddi_mem_rep_getll)
 	SET_SIZE(ddi_mem_rep_get64)
 
 
 	ENTRY(ddi_rep_put8)
-	ALTENTRY(ddi_rep_putb)
-	ALTENTRY(ddi_mem_rep_putb)
 	ALTENTRY(ddi_mem_rep_put8)
 	movq	ACC_REP_PUTB(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_put8)
-	SET_SIZE(ddi_rep_putb)
-	SET_SIZE(ddi_mem_rep_putb)
 	SET_SIZE(ddi_mem_rep_put8)
 
 
 	ENTRY(ddi_rep_put16)
-	ALTENTRY(ddi_rep_putw)
-	ALTENTRY(ddi_mem_rep_putw)
 	ALTENTRY(ddi_mem_rep_put16)
 	movq	ACC_REP_PUTW(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_put16)
-	SET_SIZE(ddi_rep_putw)
-	SET_SIZE(ddi_mem_rep_putw)
 	SET_SIZE(ddi_mem_rep_put16)
 
 
 	ENTRY(ddi_rep_put32)
-	ALTENTRY(ddi_rep_putl)
-	ALTENTRY(ddi_mem_rep_putl)
 	ALTENTRY(ddi_mem_rep_put32)
 	movq	ACC_REP_PUTL(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_put32)
-	SET_SIZE(ddi_rep_putl)
-	SET_SIZE(ddi_mem_rep_putl)
 	SET_SIZE(ddi_mem_rep_put32)
 
 
 	ENTRY(ddi_rep_put64)
-	ALTENTRY(ddi_rep_putll)
-	ALTENTRY(ddi_mem_rep_putll)
 	ALTENTRY(ddi_mem_rep_put64)
 	movq	ACC_REP_PUTLL(%rdi), %rax
 	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_put64)
-	SET_SIZE(ddi_rep_putll)
-	SET_SIZE(ddi_mem_rep_putll)
 	SET_SIZE(ddi_mem_rep_put64)
 
 	ENTRY(i_ddi_vaddr_get8)
@@ -596,4 +520,3 @@ pl_ioadv_done:
 	rep;	ret	/* use 2 byte return instruction when branch target */
 			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(i_ddi_io_rep_put32)
-

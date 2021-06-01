@@ -5,9 +5,8 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH DDI_MEM_GET8 9F "Nov 1, 2005"
 .SH NAME
-ddi_mem_get8, ddi_mem_get16, ddi_mem_get32, ddi_mem_get64, ddi_mem_getb,
-ddi_mem_getl, ddi_mem_getll, ddi_mem_getw \- read data from mapped device in
-the memory space or allocated DMA memory
+ddi_mem_get8, ddi_mem_get16, ddi_mem_get32, ddi_mem_get64
+\- read data from mapped device in the memory space or allocated DMA memory
 .SH SYNOPSIS
 .nf
 #include <sys/ddi.h>
@@ -41,11 +40,7 @@ illumos DDI specific (illumos DDI). The \fBddi_mem_get8()\fR,
 replaces \fBddi_mem_get8()\fR. The \fBddi_get16\fR(9F) function replaces
 \fBddi_mem_get16()\fR. The \fBddi_get32\fR(9F) function replaces
 \fBddi_mem_get32()\fR. The \fBddi_get64\fR(9F) function replaces
-\fBddi_mem_get64()\fR. The \fBddi_get8\fR(9F) function replaces
-\fBddi_mem_getb()\fR. The \fBddi_get32\fR(9F) function replaces
-\fBddi_mem_getl()\fR. The \fBddi_get64\fR(9F) function replaces
-\fBddi_mem_getll()\fR. The \fBddi_get16\fR(9F) function replaces
-\fBddi_mem_getw()\fR.
+\fBddi_mem_get64()\fR.
 .SH PARAMETERS
 .ne 2
 .na
