@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+# Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 #
 
 #
@@ -56,6 +56,7 @@ class TestResult(Enum):
     UNKNOWN = 2
     SKIP = 3
     KILLED = 4
+    TEST_ERR = 5
 
     def __str__(self):
         return self.name
@@ -68,12 +69,12 @@ class TestCase:
 
     __slots__ = 'name', 'result'
 
-    def __init__(self, name, skip=False):
+    def __init__(self, name):
         self.name = name
-        self.result = TestResult.SKIP if skip else TestResult.UNKNOWN
+        self.result = TestResult.UNKNOWN
 
     def __str__(self):
-        return '{0.name} | {0.result}'.format(self)
+        return f'{self.name} | {self.result}'
 
     def run(self, rfd, wfd, timeout, cmd):
         """Run cmd, setting the last element to the test name, and setting result
@@ -81,11 +82,11 @@ class TestCase:
 
         def finish(self, start, wfd):
             timediff = datetime.now() - start
-            wfd.write('END   | {} | {}\n'.format(self, timediff))
+            wfd.write(f'END   | {self} | {timediff}\n')
             return self.result
 
         starttime = datetime.now()
-        wfd.write('START | {} | {}\n'.format(self.name, starttime.time()))
+        wfd.write(f'START | {self.name} | {starttime.time()}\n')
         if self.result == TestResult.SKIP:
             return finish(self, starttime, wfd)
 
@@ -102,6 +103,8 @@ class TestCase:
                     self.result = TestResult.PASS
                 elif line.startswith('skip:'):
                     self.result = TestResult.SKIP
+                elif line.startswith('INTERNAL ERROR:'):
+                    self.result = TestResult.TEST_ERR
         except subprocess.TimeoutExpired:
             self.result = TestResult.KILLED
             wfd.write('\nKilled due to timeout\n')
@@ -109,30 +112,75 @@ class TestCase:
 
         return finish(self, starttime, wfd)
 
-def should_skip(test, pattern, verbose):
-    """Returns whether test matches pattern, indicating it should be skipped."""
+class TestSet:
+    """Class to track state associated with the entire test set"""
 
-    if not pattern or not pattern.match(test):
-        return False
+    __slots__ = 'excluded', 'tests'
 
-    if verbose:
-        print('{} matches exception pattern; marking as skipped'.format(test))
-    return True
+    def __init__(self, tests, skip_pat, verbose):
+        self.excluded = 0
+
+        def should_skip(self, test, pattern, verbose):
+            """Returns whether test matches pattern, indicating it should be
+            skipped."""
+
+            if not pattern or not pattern.match(test):
+                return False
+
+            if verbose:
+                print(f'{test} matches exception pattern; marking as skipped')
+
+            self.excluded += 1
+            return True
+
+        self.tests = [TestCase(line) for line in tests
+            if not should_skip(self, line, skip_pat, verbose)]
+
+
+    def __iter__(self):
+        return iter(self.tests)
+
+    def __len__(self):
+        return len(self.tests)
 
 def fnm2regex(fnm_pat):
     """Maps an fnmatch(7) pattern to a regex pattern that will match against
     any suite that encapsulates the test name"""
 
     rpat = fnmatch.translate(fnm_pat)
-    return r'{}|{}'.format(rpat, rpat.replace(r'\Z', r'\.'))
+
+    #
+    # If the pattern doesn't end with '*', we also need it to match against
+    # any sub-module; '*test' needs to also match 'smb2.test.first', but
+    # not 'smb2.test-other.second'.
+    #
+    if not fnm_pat.endswith('*'):
+        rpat += '|' + fnmatch.translate(fnm_pat + '.*')
+    return rpat
+
+def verbose_fnm2regex(fnm_pat):
+    """fnm2regex(), but prints the input and output patterns"""
+    ret_pat = fnm2regex(fnm_pat)
+    print(f'fnmatch: {fnm_pat} regex: {ret_pat}')
+    return ret_pat
 
 def combine_patterns(iterable, verbose):
     """Combines patterns in an iterable into a single REGEX"""
 
-    pat = re.compile('|'.join(map(fnm2regex, iterable)),
-        flags=re.DEBUG if verbose > 1 else 0)
     if verbose > 1:
-        print('final pattern: {}'.format(pat.pattern))
+        func = verbose_fnm2regex
+    else:
+        func = fnm2regex
+
+    fnmatch_pat = '|'.join(map(func, iterable))
+
+    if not fnmatch_pat:
+        pat = None;
+    else:
+        pat = re.compile(fnmatch_pat, flags=re.DEBUG if verbose > 2 else 0)
+
+    if verbose > 1:
+        print(f'final pattern: {pat.pattern if pat else "<None>"}')
     return pat
 
 class ArgumentFile(argparse.FileType):
@@ -153,13 +201,13 @@ def main():
 
     parser.add_argument('--except', '-e',
         type=ArgumentFile('r'), metavar='EXCEPTIONS_FILE', dest='skip_list',
-        help='A file containing fnmatch(5) patterns of tests to skip')
+        help='A file containing fnmatch(7) patterns of tests to skip')
     parser.add_argument('--list', '-l',
         type=ArgumentFile('r'), metavar='LIST_FILE',
         help='A file containing the list of tests to run')
     parser.add_argument('--match', '-m',
         action='append', metavar='FNMATCH',
-        help='An fnmatch(5) pattern to select tests from smbtorture --list')
+        help='An fnmatch(7) pattern to select tests from smbtorture --list')
     parser.add_argument('--output', '-o',
         default='/tmp/lastrun.log', metavar='LOG_FILE',
         help='Location to store full smbtorture output')
@@ -197,26 +245,24 @@ def main():
     if args.skip_list != None:
         skip_pat = combine_patterns(parse_tests(args.skip_list), args.verbose)
         if args.verbose > 1:
-            print('Exceptions pattern (in REGEX): {}'.format(skip_pat.pattern))
+            exc_pat = skip_pat.pattern if skip_pat else '<NONE>'
+            print(f'Exceptions pattern (in REGEX): {exc_pat}')
     else:
         skip_pat = None
 
-    tests = [TestCase(line, should_skip(line, skip_pat, args.verbose))
-        for line in parse_tests(testgen)]
+    tests = TestSet(parse_tests(testgen), skip_pat, args.verbose)
 
     if args.verbose:
         print('Tests to run:')
         for test in tests:
-            if test.result != TestResult.SKIP:
-                print(test.name)
+            print(test.name)
 
     outw = open(fout, 'w', buffering=1)
     outr = open(fout, 'r')
 
-    cmd = 'smbtorture //{srv}/{shr} -U{usr}%{pswd}'.format(
-        srv=server, shr=share, usr=user, pswd=pswd).split()
+    cmd = f'smbtorture //{server}/{share} -U{user}%{pswd}'.split()
     if args.seed != None:
-        cmd.append('--seed={}'.format(args.seed))
+        cmd.append(f'--seed={args.seed}')
     cmd.append('TEST_HERE')
 
     if args.verbose:
@@ -233,9 +279,10 @@ def main():
     print('\n\nRESULTS:')
     print('=' * 22)
     for res in TestResult:
-        print('{}: {:>{}}'.format(res, results[res], 20 - len(res)))
+        print(f'{res}: {results[res]:>{20 - len(res)}}')
     print('=' * 22)
-    print('Total: {:>15}'.format(len(tests)))
+    print(f'Total: {len(tests):>15}')
+    print(f'Excluded: {tests.excluded:>12}')
 
 if __name__ == '__main__':
     try:
