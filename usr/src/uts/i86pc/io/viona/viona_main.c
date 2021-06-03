@@ -163,7 +163,7 @@
  * this limitation and can avoid extra copying before the buffers are accessed
  * directly by the NIC.  When a guest designates buffers to be transmitted,
  * viona translates the guest-physical addresses contained in the ring
- * descriptors to host-virtual addresses via vmm_dr_gpa2kva().  That pointer is
+ * descriptors to host-virtual addresses via viona_hold_page().  That pointer is
  * wrapped in an mblk_t using a preallocated viona_desb_t for the desballoc().
  * Doing so increments vr_xfer_outstanding, preventing the ring from being
  * reset (allowing the link to drop its vmm handle to the guest) until all

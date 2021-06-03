@@ -35,6 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 
@@ -42,19 +43,55 @@
 
 #include "viona_impl.h"
 
-#define	VRING_ALIGN		4096
 #define	VRING_MAX_LEN		32768
+
+/* Layout and sizing as defined in the spec for a legacy-style virtqueue */
+
+#define	LEGACY_VQ_ALIGN		PAGESIZE
+
+#define	LEGACY_DESC_SZ(qsz)	((qsz) * sizeof (struct virtio_desc))
+/*
+ * Available ring consists of avail_idx (uint16_t), flags (uint16_t), qsz avail
+ * descriptors (uint16_t each), and (optional) used_event (uint16_t).
+ */
+#define	LEGACY_AVAIL_SZ(qsz)	(((qsz) + 3) * sizeof (uint16_t))
+/*
+ * Used ring consists of used_idx (uint16_t), flags (uint16_t), qsz used
+ * descriptors (two uint32_t each), and (optional) avail_event (uint16_t).
+ */
+#define	LEGACY_USED_SZ(qsz)	\
+	((qsz) * sizeof (struct virtio_used) + 3 * sizeof (uint16_t))
+
+#define	LEGACY_AVAIL_FLAGS_OFF(qsz)	LEGACY_DESC_SZ(qsz)
+#define	LEGACY_AVAIL_IDX_OFF(qsz)	\
+	(LEGACY_DESC_SZ(qsz) + sizeof (uint16_t))
+#define	LEGACY_AVAIL_ENT_OFF(qsz, idx)	\
+	(LEGACY_DESC_SZ(qsz) + (2 + (idx)) * sizeof (uint16_t))
+
+#define	LEGACY_USED_FLAGS_OFF(qsz)	\
+	P2ROUNDUP(LEGACY_DESC_SZ(qsz) + LEGACY_AVAIL_SZ(qsz), LEGACY_VQ_ALIGN)
+#define	LEGACY_USED_IDX_OFF(qsz)	\
+	(LEGACY_USED_FLAGS_OFF(qsz) + sizeof (uint16_t))
+#define	LEGACY_USED_ENT_OFF(qsz, idx)	\
+	(LEGACY_USED_FLAGS_OFF(qsz) + 2 * sizeof (uint16_t) + \
+	(idx) * sizeof (struct virtio_used))
+
+#define	LEGACY_VQ_SIZE(qsz)	\
+	(LEGACY_USED_FLAGS_OFF(qsz) + \
+	P2ROUNDUP(LEGACY_USED_SZ(qsz), LEGACY_VQ_ALIGN))
+#define	LEGACY_VQ_PAGES(qsz)	(LEGACY_VQ_SIZE(qsz) / PAGESIZE)
 
 static boolean_t viona_ring_map(viona_vring_t *);
 static void viona_ring_unmap(viona_vring_t *);
 static kthread_t *viona_create_worker(viona_vring_t *);
 
 static void *
-viona_gpa2kva(viona_vring_t *ring, uint64_t gpa, size_t len)
+viona_hold_page(viona_vring_t *ring, uint64_t gpa)
 {
 	ASSERT3P(ring->vr_lease, !=, NULL);
+	ASSERT3U(gpa & PAGEOFFSET, ==, 0);
 
-	return (vmm_drv_gpa2kva(ring->vr_lease, gpa, len));
+	return (vmm_drv_gpa2kva(ring->vr_lease, gpa, PAGESIZE));
 }
 
 static boolean_t
@@ -162,6 +199,9 @@ viona_ring_init(viona_link_t *link, uint16_t idx, uint16_t qsz, uint64_t pa)
 	if (qsz == 0 || qsz > VRING_MAX_LEN || (1 << (ffs(qsz) - 1)) != qsz) {
 		return (EINVAL);
 	}
+	if ((pa & (LEGACY_VQ_ALIGN - 1)) != 0) {
+		return (EINVAL);
+	}
 
 	ring = &link->l_vrings[idx];
 	mutex_enter(&ring->vr_lock);
@@ -187,6 +227,7 @@ viona_ring_init(viona_link_t *link, uint16_t idx, uint16_t qsz, uint64_t pa)
 
 	/* Initialize queue indexes */
 	ring->vr_cur_aidx = 0;
+	ring->vr_cur_uidx = 0;
 
 	if (idx == VIONA_VQ_TX) {
 		viona_tx_ring_alloc(ring, qsz);
@@ -215,6 +256,7 @@ fail:
 	viona_ring_misc_free(ring);
 	ring->vr_size = 0;
 	ring->vr_mask = 0;
+	ring->vr_pa = 0;
 	mutex_exit(&ring->vr_lock);
 	return (err);
 }
@@ -245,7 +287,6 @@ viona_ring_reset(viona_vring_t *ring, boolean_t heed_signals)
 			}
 		}
 	}
-	viona_ring_lease_drop(ring);
 	mutex_exit(&ring->vr_lock);
 	return (0);
 }
@@ -253,46 +294,31 @@ viona_ring_reset(viona_vring_t *ring, boolean_t heed_signals)
 static boolean_t
 viona_ring_map(viona_vring_t *ring)
 {
-	uint64_t pos = ring->vr_pa;
 	const uint16_t qsz = ring->vr_size;
+	uintptr_t pa = ring->vr_pa;
 
 	ASSERT3U(qsz, !=, 0);
-	ASSERT3U(pos, !=, 0);
+	ASSERT3U(qsz, <=, VRING_MAX_LEN);
+	ASSERT3U(pa, !=, 0);
+	ASSERT3U(pa & (LEGACY_VQ_ALIGN - 1), ==, 0);
+	ASSERT3U(LEGACY_VQ_ALIGN, ==, PAGESIZE);
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
+	ASSERT3P(ring->vr_map_pages, ==, NULL);
 
-	const size_t desc_sz = qsz * sizeof (struct virtio_desc);
-	ring->vr_descr = viona_gpa2kva(ring, pos, desc_sz);
-	if (ring->vr_descr == NULL) {
-		goto fail;
-	}
-	pos += desc_sz;
+	const uint_t npages = LEGACY_VQ_PAGES(qsz);
+	ring->vr_map_pages = kmem_zalloc(npages * sizeof (void *), KM_SLEEP);
 
-	const size_t avail_sz = (qsz + 3) * sizeof (uint16_t);
-	ring->vr_avail_flags = viona_gpa2kva(ring, pos, avail_sz);
-	if (ring->vr_avail_flags == NULL) {
-		goto fail;
-	}
-	ring->vr_avail_idx = ring->vr_avail_flags + 1;
-	ring->vr_avail_ring = ring->vr_avail_flags + 2;
-	ring->vr_avail_used_event = ring->vr_avail_ring + qsz;
-	pos += avail_sz;
+	for (uint_t i = 0; i < npages; i++, pa += PAGESIZE) {
+		void *page = viona_hold_page(ring, pa);
 
-	const size_t used_sz = (qsz * sizeof (struct virtio_used)) +
-	    (sizeof (uint16_t) * 3);
-	pos = P2ROUNDUP(pos, VRING_ALIGN);
-	ring->vr_used_flags = viona_gpa2kva(ring, pos, used_sz);
-	if (ring->vr_used_flags == NULL) {
-		goto fail;
+		if (page == NULL) {
+			viona_ring_unmap(ring);
+			return (B_FALSE);
+		}
+		ring->vr_map_pages[i] = page;
 	}
-	ring->vr_used_idx = ring->vr_used_flags + 1;
-	ring->vr_used_ring = (struct virtio_used *)(ring->vr_used_flags + 2);
-	ring->vr_used_avail_event = (uint16_t *)(ring->vr_used_ring + qsz);
 
 	return (B_TRUE);
-
-fail:
-	viona_ring_unmap(ring);
-	return (B_FALSE);
 }
 
 static void
@@ -300,35 +326,57 @@ viona_ring_unmap(viona_vring_t *ring)
 {
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 
-	ring->vr_descr = NULL;
-	ring->vr_avail_flags = NULL;
-	ring->vr_avail_idx = NULL;
-	ring->vr_avail_ring = NULL;
-	ring->vr_avail_used_event = NULL;
-	ring->vr_used_flags = NULL;
-	ring->vr_used_idx = NULL;
-	ring->vr_used_ring = NULL;
-	ring->vr_used_avail_event = NULL;
+	void **map = ring->vr_map_pages;
+	if (map != NULL) {
+		/*
+		 * The bhyve page-hold mechanism does not currently require a
+		 * corresponding page-release action, given the simplicity of
+		 * the underlying virtual memory constructs.
+		 *
+		 * If/when those systems become more sophisticated, more than a
+		 * simple free of the page pointers will be required here.
+		 */
+		const uint_t npages = LEGACY_VQ_PAGES(ring->vr_size);
+		kmem_free(map, npages * sizeof (void *));
+		ring->vr_map_pages = NULL;
+	}
+}
+
+static inline void *
+viona_ring_addr(viona_vring_t *ring, uint_t off)
+{
+	ASSERT3P(ring->vr_map_pages, !=, NULL);
+	ASSERT3U(LEGACY_VQ_SIZE(ring->vr_size), >, off);
+
+	const uint_t page_num = off / PAGESIZE;
+	const uint_t page_off = off % PAGESIZE;
+	return ((caddr_t)ring->vr_map_pages[page_num] + page_off);
 }
 
 void
-viona_intr_ring(viona_vring_t *ring)
+viona_intr_ring(viona_vring_t *ring, boolean_t skip_flags_check)
 {
-	uint64_t addr;
+	if (!skip_flags_check) {
+		volatile uint16_t *avail_flags = viona_ring_addr(ring,
+		    LEGACY_AVAIL_FLAGS_OFF(ring->vr_size));
+
+		if ((*avail_flags & VRING_AVAIL_F_NO_INTERRUPT) != 0) {
+			return;
+		}
+	}
 
 	mutex_enter(&ring->vr_lock);
-	/* Deliver the interrupt directly, if so configured. */
-	if ((addr = ring->vr_msi_addr) != 0) {
-		uint64_t msg = ring->vr_msi_msg;
-
-		mutex_exit(&ring->vr_lock);
-		(void) vmm_drv_msi(ring->vr_lease, addr, msg);
-		return;
-	}
+	uint64_t addr = ring->vr_msi_addr;
+	uint64_t msg = ring->vr_msi_msg;
 	mutex_exit(&ring->vr_lock);
-
-	if (atomic_cas_uint(&ring->vr_intr_enabled, 0, 1) == 0) {
-		pollwakeup(&ring->vr_link->l_pollhead, POLLRDBAND);
+	if (addr != 0) {
+		/* Deliver the interrupt directly, if so configured... */
+		(void) vmm_drv_msi(ring->vr_lease, addr, msg);
+	} else {
+		/* ... otherwise, leave it to userspace */
+		if (atomic_cas_uint(&ring->vr_intr_enabled, 0, 1) == 0) {
+			pollwakeup(&ring->vr_link->l_pollhead, POLLRDBAND);
+		}
 	}
 }
 
@@ -403,6 +451,9 @@ cleanup:
 
 	viona_ring_lease_drop(ring);
 	ring->vr_cur_aidx = 0;
+	ring->vr_size = 0;
+	ring->vr_mask = 0;
+	ring->vr_pa = 0;
 	ring->vr_state = VRS_RESET;
 	ring->vr_state_flags = 0;
 	ring->vr_worker_thread = NULL;
@@ -440,20 +491,203 @@ viona_create_worker(viona_vring_t *ring)
 	return (t);
 }
 
+void
+vq_read_desc(viona_vring_t *ring, uint16_t idx, struct virtio_desc *descp)
+{
+	const uint_t entry_off = idx * sizeof (struct virtio_desc);
+
+	ASSERT3U(idx, <, ring->vr_size);
+
+	bcopy(viona_ring_addr(ring, entry_off), descp, sizeof (*descp));
+}
+
+static uint16_t
+vq_read_avail(viona_vring_t *ring, uint16_t idx)
+{
+	ASSERT3U(idx, <, ring->vr_size);
+
+	volatile uint16_t *avail_ent =
+	    viona_ring_addr(ring, LEGACY_AVAIL_ENT_OFF(ring->vr_size, idx));
+	return (*avail_ent);
+}
+
+/*
+ * Given a buffer descriptor `desc`, attempt to map the pages backing that
+ * region of guest physical memory, taking into account that there are no
+ * guarantees about guest-contiguous pages being host-contiguous.
+ */
+static int
+vq_map_desc_bufs(viona_vring_t *ring, const struct virtio_desc *desc,
+    struct iovec *iov, uint_t niov, uint16_t *idxp)
+{
+	uint64_t gpa = desc->vd_addr;
+	uint32_t len = desc->vd_len;
+	uint16_t lidx = *idxp;
+	caddr_t buf;
+
+	ASSERT3U(lidx, <, niov);
+
+	if (desc->vd_len == 0) {
+		VIONA_PROBE2(desc_bad_len, viona_vring_t *, ring,
+		    uint32_t, desc->vd_len);
+		VIONA_RING_STAT_INCR(ring, desc_bad_len);
+		return (EINVAL);
+	}
+
+	const uint32_t front_offset = desc->vd_addr & PAGEOFFSET;
+	const uint32_t front_len = MIN(len, PAGESIZE - front_offset);
+	uint_t pages = 1;
+	if (front_len < len) {
+		pages += P2ROUNDUP((uint64_t)(len - front_len),
+		    PAGESIZE) / PAGESIZE;
+	}
+
+	if (pages > (niov - lidx)) {
+		VIONA_PROBE1(too_many_desc, viona_vring_t *, ring);
+		VIONA_RING_STAT_INCR(ring, too_many_desc);
+		return (E2BIG);
+	}
+
+	buf = viona_hold_page(ring, gpa & PAGEMASK);
+	if (buf == NULL) {
+		VIONA_PROBE_BAD_RING_ADDR(ring, desc->vd_addr);
+		VIONA_RING_STAT_INCR(ring, bad_ring_addr);
+		return (EFAULT);
+	}
+	iov[lidx].iov_base = buf + front_offset;
+	iov[lidx].iov_len = front_len;
+	gpa += front_len;
+	len -= front_len;
+	lidx++;
+
+	for (uint_t i = 1; i < pages; i++) {
+		ASSERT3U(gpa & PAGEOFFSET, ==, 0);
+
+		buf = viona_hold_page(ring, gpa);
+		if (buf == NULL) {
+			VIONA_PROBE_BAD_RING_ADDR(ring, desc->vd_addr);
+			VIONA_RING_STAT_INCR(ring, bad_ring_addr);
+			return (EFAULT);
+		}
+
+		const uint32_t region_len = MIN(len, PAGESIZE);
+		iov[lidx].iov_base = buf;
+		iov[lidx].iov_len = region_len;
+		gpa += region_len;
+		len -= region_len;
+		lidx++;
+	}
+
+	ASSERT3U(len, ==, 0);
+	ASSERT3U(gpa, ==, desc->vd_addr + desc->vd_len);
+
+	*idxp = lidx;
+	return (0);
+}
+
+/*
+ * Walk an indirect buffer descriptor `desc`, attempting to map the pages
+ * backing the regions of guest memory covered by its contituent descriptors.
+ */
+static int
+vq_map_indir_desc_bufs(viona_vring_t *ring, const struct virtio_desc *desc,
+    struct iovec *iov, uint_t niov, uint16_t *idxp)
+{
+	const uint16_t indir_count = desc->vd_len / sizeof (struct virtio_desc);
+
+	if ((desc->vd_len & 0xf) != 0 || indir_count == 0 ||
+	    indir_count > ring->vr_size ||
+	    desc->vd_addr > (desc->vd_addr + desc->vd_len)) {
+		VIONA_PROBE2(indir_bad_len, viona_vring_t *, ring,
+		    uint32_t, desc->vd_len);
+		VIONA_RING_STAT_INCR(ring, indir_bad_len);
+		return (EINVAL);
+	}
+
+	uint16_t indir_next = 0;
+	caddr_t buf = NULL;
+	uint64_t buf_gpa = UINT64_MAX;
+
+	for (;;) {
+		uint64_t indir_gpa =
+		    desc->vd_addr + (indir_next * sizeof (struct virtio_desc));
+		uint64_t indir_page = indir_gpa & PAGEMASK;
+		struct virtio_desc vp;
+
+		/*
+		 * Get a mapping for the page that the next indirect descriptor
+		 * resides in, if has not already been done.
+		 */
+		if (indir_page != buf_gpa) {
+			buf = viona_hold_page(ring, indir_page);
+			if (buf == NULL) {
+				VIONA_PROBE_BAD_RING_ADDR(ring, desc->vd_addr);
+				VIONA_RING_STAT_INCR(ring, bad_ring_addr);
+				return (EFAULT);
+			}
+			buf_gpa = indir_page;
+		}
+
+		/*
+		 * A copy of the indirect descriptor is made here, rather than
+		 * simply using a reference pointer.  This prevents malicious or
+		 * erroneous guest writes to the descriptor from fooling the
+		 * flags/bounds verification through a race.
+		 */
+		bcopy(buf + (indir_gpa - indir_page), &vp, sizeof (vp));
+
+		if (vp.vd_flags & VRING_DESC_F_INDIRECT) {
+			VIONA_PROBE1(indir_bad_nest, viona_vring_t *, ring);
+			VIONA_RING_STAT_INCR(ring, indir_bad_nest);
+			return (EINVAL);
+		} else if (vp.vd_len == 0) {
+			VIONA_PROBE2(desc_bad_len, viona_vring_t *, ring,
+			    uint32_t, vp.vd_len);
+			VIONA_RING_STAT_INCR(ring, desc_bad_len);
+			return (EINVAL);
+		}
+
+		int err = vq_map_desc_bufs(ring, &vp, iov, niov, idxp);
+		if (err != 0) {
+			return (err);
+		}
+
+		/* Successfully reach the end of the indir chain */
+		if ((vp.vd_flags & VRING_DESC_F_NEXT) == 0) {
+			return (0);
+		}
+		if (*idxp >= niov) {
+			VIONA_PROBE1(too_many_desc, viona_vring_t *, ring);
+			VIONA_RING_STAT_INCR(ring, too_many_desc);
+			return (E2BIG);
+		}
+
+		indir_next = vp.vd_next;
+		if (indir_next >= indir_count) {
+			VIONA_PROBE3(indir_bad_next, viona_vring_t *, ring,
+			    uint16_t, indir_next, uint16_t, indir_count);
+			VIONA_RING_STAT_INCR(ring, indir_bad_next);
+			return (EINVAL);
+		}
+	}
+
+	/* NOTREACHED */
+	return (-1);
+}
+
 int
 vq_popchain(viona_vring_t *ring, struct iovec *iov, uint_t niov,
     uint16_t *cookie)
 {
-	uint_t i, ndesc, idx, head, next;
+	uint16_t i, ndesc, idx, head, next;
 	struct virtio_desc vdir;
-	void *buf;
 
 	ASSERT(iov != NULL);
 	ASSERT(niov > 0 && niov < INT_MAX);
 
 	mutex_enter(&ring->vr_a_mutex);
 	idx = ring->vr_cur_aidx;
-	ndesc = (uint16_t)((unsigned)*ring->vr_avail_idx - (unsigned)idx);
+	ndesc = viona_ring_num_avail(ring);
 
 	if (ndesc == 0) {
 		mutex_exit(&ring->vr_a_mutex);
@@ -472,7 +706,7 @@ vq_popchain(viona_vring_t *ring, struct iovec *iov, uint_t niov,
 		VIONA_RING_STAT_INCR(ring, ndesc_too_high);
 	}
 
-	head = ring->vr_avail_ring[idx & ring->vr_mask];
+	head = vq_read_avail(ring, idx & ring->vr_mask);
 	next = head;
 
 	for (i = 0; i < niov; next = vdir.vd_next) {
@@ -480,102 +714,34 @@ vq_popchain(viona_vring_t *ring, struct iovec *iov, uint_t niov,
 			VIONA_PROBE2(bad_idx, viona_vring_t *, ring,
 			    uint16_t, next);
 			VIONA_RING_STAT_INCR(ring, bad_idx);
-			goto bail;
+			break;
 		}
 
-		vdir = ring->vr_descr[next];
+		vq_read_desc(ring, next, &vdir);
 		if ((vdir.vd_flags & VRING_DESC_F_INDIRECT) == 0) {
-			if (vdir.vd_len == 0) {
-				VIONA_PROBE2(desc_bad_len,
-				    viona_vring_t *, ring,
-				    uint32_t, vdir.vd_len);
-				VIONA_RING_STAT_INCR(ring, desc_bad_len);
-				goto bail;
+			if (vq_map_desc_bufs(ring, &vdir, iov, niov, &i) != 0) {
+				break;
 			}
-			buf = viona_gpa2kva(ring, vdir.vd_addr, vdir.vd_len);
-			if (buf == NULL) {
-				VIONA_PROBE_BAD_RING_ADDR(ring, vdir.vd_addr);
-				VIONA_RING_STAT_INCR(ring, bad_ring_addr);
-				goto bail;
-			}
-			iov[i].iov_base = buf;
-			iov[i].iov_len = vdir.vd_len;
-			i++;
 		} else {
-			const uint_t nindir = vdir.vd_len / 16;
-			volatile struct virtio_desc *vindir;
-
-			if ((vdir.vd_len & 0xf) || nindir == 0) {
-				VIONA_PROBE2(indir_bad_len,
+			/*
+			 * Per the specification (Virtio 1.1 S2.6.5.3.1):
+			 *   A driver MUST NOT set both VIRTQ_DESC_F_INDIRECT
+			 *   and VIRTQ_DESC_F_NEXT in `flags`.
+			 */
+			if ((vdir.vd_flags & VRING_DESC_F_NEXT) != 0) {
+				VIONA_PROBE3(indir_bad_next,
 				    viona_vring_t *, ring,
-				    uint32_t, vdir.vd_len);
-				VIONA_RING_STAT_INCR(ring, indir_bad_len);
-				goto bail;
+				    uint16_t, next, uint16_t, 0);
+				VIONA_RING_STAT_INCR(ring, indir_bad_next);
+				break;
 			}
-			vindir = viona_gpa2kva(ring, vdir.vd_addr, vdir.vd_len);
-			if (vindir == NULL) {
-				VIONA_PROBE_BAD_RING_ADDR(ring, vdir.vd_addr);
-				VIONA_RING_STAT_INCR(ring, bad_ring_addr);
-				goto bail;
-			}
-			next = 0;
-			for (;;) {
-				struct virtio_desc vp;
 
-				/*
-				 * A copy of the indirect descriptor is made
-				 * here, rather than simply using a reference
-				 * pointer.  This prevents malicious or
-				 * erroneous guest writes to the descriptor
-				 * from fooling the flags/bounds verification
-				 * through a race.
-				 */
-				vp = vindir[next];
-				if (vp.vd_flags & VRING_DESC_F_INDIRECT) {
-					VIONA_PROBE1(indir_bad_nest,
-					    viona_vring_t *, ring);
-					VIONA_RING_STAT_INCR(ring,
-					    indir_bad_nest);
-					goto bail;
-				} else if (vp.vd_len == 0) {
-					VIONA_PROBE2(desc_bad_len,
-					    viona_vring_t *, ring,
-					    uint32_t, vp.vd_len);
-					VIONA_RING_STAT_INCR(ring,
-					    desc_bad_len);
-					goto bail;
-				}
-				buf = viona_gpa2kva(ring, vp.vd_addr,
-				    vp.vd_len);
-				if (buf == NULL) {
-					VIONA_PROBE_BAD_RING_ADDR(ring,
-					    vp.vd_addr);
-					VIONA_RING_STAT_INCR(ring,
-					    bad_ring_addr);
-					goto bail;
-				}
-				iov[i].iov_base = buf;
-				iov[i].iov_len = vp.vd_len;
-				i++;
-
-				if ((vp.vd_flags & VRING_DESC_F_NEXT) == 0)
-					break;
-				if (i >= niov) {
-					goto loopy;
-				}
-
-				next = vp.vd_next;
-				if (next >= nindir) {
-					VIONA_PROBE3(indir_bad_next,
-					    viona_vring_t *, ring,
-					    uint16_t, next,
-					    uint_t, nindir);
-					VIONA_RING_STAT_INCR(ring,
-					    indir_bad_next);
-					goto bail;
-				}
+			if (vq_map_indir_desc_bufs(ring, &vdir, iov, niov, &i)
+			    != 0) {
+				break;
 			}
 		}
+
 		if ((vdir.vd_flags & VRING_DESC_F_NEXT) == 0) {
 			*cookie = head;
 			ring->vr_cur_aidx++;
@@ -584,28 +750,56 @@ vq_popchain(viona_vring_t *ring, struct iovec *iov, uint_t niov,
 		}
 	}
 
-loopy:
-	VIONA_PROBE1(too_many_desc, viona_vring_t *, ring);
-	VIONA_RING_STAT_INCR(ring, too_many_desc);
-bail:
 	mutex_exit(&ring->vr_a_mutex);
 	return (-1);
+}
+
+
+static void
+vq_write_used_ent(viona_vring_t *ring, uint16_t idx, uint16_t cookie,
+    uint32_t len)
+{
+	/*
+	 * In a larger ring, entry could be split across pages, so be sure to
+	 * account for that when configuring the transfer by looking up the ID
+	 * and length addresses separately, rather than an address for a
+	 * combined `struct virtio_used`.
+	 */
+	const uint_t used_id_off = LEGACY_USED_ENT_OFF(ring->vr_size, idx);
+	const uint_t used_len_off = used_id_off + sizeof (uint32_t);
+	volatile uint32_t *idp = viona_ring_addr(ring, used_id_off);
+	volatile uint32_t *lenp = viona_ring_addr(ring, used_len_off);
+
+	ASSERT(MUTEX_HELD(&ring->vr_u_mutex));
+
+	*idp = cookie;
+	*lenp = len;
+}
+
+static void
+vq_write_used_idx(viona_vring_t *ring, uint16_t idx)
+{
+	ASSERT(MUTEX_HELD(&ring->vr_u_mutex));
+
+	volatile uint16_t *used_idx =
+	    viona_ring_addr(ring, LEGACY_USED_IDX_OFF(ring->vr_size));
+	*used_idx = idx;
 }
 
 void
 vq_pushchain(viona_vring_t *ring, uint32_t len, uint16_t cookie)
 {
-	volatile struct virtio_used *vu;
-	uint_t uidx;
+	uint16_t uidx;
 
 	mutex_enter(&ring->vr_u_mutex);
 
-	uidx = *ring->vr_used_idx;
-	vu = &ring->vr_used_ring[uidx++ & ring->vr_mask];
-	vu->vu_idx = cookie;
-	vu->vu_tlen = len;
+	uidx = ring->vr_cur_uidx;
+	vq_write_used_ent(ring, uidx & ring->vr_mask, cookie, len);
+	uidx++;
 	membar_producer();
-	*ring->vr_used_idx = uidx;
+
+	vq_write_used_idx(ring, uidx);
+	ring->vr_cur_uidx = uidx;
 
 	mutex_exit(&ring->vr_u_mutex);
 }
@@ -613,26 +807,62 @@ vq_pushchain(viona_vring_t *ring, uint32_t len, uint16_t cookie)
 void
 vq_pushchain_many(viona_vring_t *ring, uint_t num_bufs, used_elem_t *elem)
 {
-	volatile struct virtio_used *vu;
-	uint_t uidx, i;
+	uint16_t uidx;
 
 	mutex_enter(&ring->vr_u_mutex);
 
-	uidx = *ring->vr_used_idx;
-	if (num_bufs == 1) {
-		vu = &ring->vr_used_ring[uidx++ & ring->vr_mask];
-		vu->vu_idx = elem[0].id;
-		vu->vu_tlen = elem[0].len;
-	} else {
-		for (i = 0; i < num_bufs; i++) {
-			vu = &ring->vr_used_ring[(uidx + i) & ring->vr_mask];
-			vu->vu_idx = elem[i].id;
-			vu->vu_tlen = elem[i].len;
-		}
-		uidx = uidx + num_bufs;
+	uidx = ring->vr_cur_uidx;
+
+	for (uint_t i = 0; i < num_bufs; i++) {
+		vq_write_used_ent(ring, uidx & ring->vr_mask, elem[i].id,
+		    elem[i].len);
 	}
+	uidx += num_bufs;
+
 	membar_producer();
-	*ring->vr_used_idx = uidx;
+	vq_write_used_idx(ring, uidx);
+	ring->vr_cur_uidx = uidx;
 
 	mutex_exit(&ring->vr_u_mutex);
+}
+
+/*
+ * Set USED_NO_NOTIFY on VQ so guest elides doorbell calls for new entries.
+ */
+void
+viona_ring_disable_notify(viona_vring_t *ring)
+{
+	volatile uint16_t *used_flags =
+	    viona_ring_addr(ring, LEGACY_USED_FLAGS_OFF(ring->vr_size));
+
+	*used_flags |= VRING_USED_F_NO_NOTIFY;
+}
+
+/*
+ * Clear USED_NO_NOTIFY on VQ so guest resumes doorbell calls for new entries.
+ */
+void
+viona_ring_enable_notify(viona_vring_t *ring)
+{
+	volatile uint16_t *used_flags =
+	    viona_ring_addr(ring, LEGACY_USED_FLAGS_OFF(ring->vr_size));
+
+	*used_flags &= ~VRING_USED_F_NO_NOTIFY;
+}
+
+/*
+ * Return the number of available descriptors in the vring taking care of the
+ * 16-bit index wraparound.
+ *
+ * Note: If the number of apparently available descriptors is larger than the
+ * ring size (due to guest misbehavior), this check will still report the
+ * positive count of descriptors.
+ */
+uint16_t
+viona_ring_num_avail(viona_vring_t *ring)
+{
+	volatile uint16_t *avail_idx =
+	    viona_ring_addr(ring, LEGACY_AVAIL_IDX_OFF(ring->vr_size));
+
+	return (*avail_idx - ring->vr_cur_aidx);
 }

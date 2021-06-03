@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef	_VIONA_IMPL_H
@@ -105,19 +105,10 @@ typedef struct viona_vring {
 	uint16_t	vr_size;
 	uint16_t	vr_mask;	/* cached from vr_size */
 	uint16_t	vr_cur_aidx;	/* trails behind 'avail_idx' */
+	uint16_t	vr_cur_uidx;	/* drives 'used_idx' */
 
-	/* Host-context pointers to the queue */
-	volatile struct virtio_desc	*vr_descr;
-
-	volatile uint16_t		*vr_avail_flags;
-	volatile uint16_t		*vr_avail_idx;
-	volatile uint16_t		*vr_avail_ring;
-	volatile uint16_t		*vr_avail_used_event;
-
-	volatile uint16_t		*vr_used_flags;
-	volatile uint16_t		*vr_used_idx;
-	volatile struct virtio_used	*vr_used_ring;
-	volatile uint16_t		*vr_used_avail_event;
+	/* Reference to guest pages holding virtqueue */
+	void		**vr_map_pages;
 
 	/* Per-ring error condition statistics */
 	struct viona_ring_stats {
@@ -305,7 +296,11 @@ boolean_t viona_ring_lease_renew(viona_vring_t *);
 int vq_popchain(viona_vring_t *, struct iovec *, uint_t, uint16_t *);
 void vq_pushchain(viona_vring_t *, uint32_t, uint16_t);
 void vq_pushchain_many(viona_vring_t *, uint_t, used_elem_t *);
-void viona_intr_ring(viona_vring_t *ring);
+void viona_intr_ring(viona_vring_t *ring, boolean_t);
+void viona_ring_set_no_notify(viona_vring_t *, boolean_t);
+void viona_ring_disable_notify(viona_vring_t *);
+void viona_ring_enable_notify(viona_vring_t *);
+uint16_t viona_ring_num_avail(viona_vring_t *);
 
 void viona_rx_init(void);
 void viona_rx_fini(void);

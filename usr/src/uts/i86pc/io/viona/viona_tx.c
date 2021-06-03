@@ -35,6 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 
@@ -74,30 +75,6 @@ struct viona_desb {
 static void viona_tx(viona_link_t *, viona_vring_t *);
 static void viona_desb_release(viona_desb_t *);
 
-/*
- * Return the number of available descriptors in the vring taking care of the
- * 16-bit index wraparound.
- *
- * Note: If the number of apparently available descriptors is larger than the
- * ring size (due to guest misbehavior), this check will still report the
- * positive count of descriptors.
- */
-static inline uint_t
-viona_vr_num_avail(viona_vring_t *ring)
-{
-	uint16_t ndesc;
-
-	/*
-	 * We're just computing (a-b) in GF(216).
-	 *
-	 * The only glitch here is that in standard C, uint16_t promotes to
-	 * (signed) int when int has more than 16 bits (almost always now).
-	 * A cast back to unsigned is necessary for proper operation.
-	 */
-	ndesc = (unsigned)*ring->vr_avail_idx - (unsigned)ring->vr_cur_aidx;
-
-	return (ndesc);
-}
 
 static void
 viona_tx_wait_outstanding(viona_vring_t *ring)
@@ -198,9 +175,7 @@ viona_tx_done(viona_vring_t *ring, uint32_t len, uint16_t cookie)
 	vq_pushchain(ring, len, cookie);
 
 	membar_enter();
-	if ((*ring->vr_avail_flags & VRING_AVAIL_F_NO_INTERRUPT) == 0) {
-		viona_intr_ring(ring);
-	}
+	viona_intr_ring(ring, B_FALSE);
 }
 
 void
@@ -220,8 +195,8 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 		boolean_t renew = B_FALSE;
 		uint_t ntx = 0;
 
-		*ring->vr_used_flags |= VRING_USED_F_NO_NOTIFY;
-		while (viona_vr_num_avail(ring)) {
+		viona_ring_disable_notify(ring);
+		while (viona_ring_num_avail(ring)) {
 			viona_tx(link, ring);
 
 			/*
@@ -232,7 +207,7 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 			if (ntx++ >= ring->vr_size)
 				break;
 		}
-		*ring->vr_used_flags &= ~VRING_USED_F_NO_NOTIFY;
+		viona_ring_enable_notify(ring);
 
 		VIONA_PROBE2(tx, viona_link_t *, link, uint_t, ntx);
 
@@ -240,23 +215,27 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 		 * Check for available descriptors on the ring once more in
 		 * case a late addition raced with the NO_NOTIFY flag toggle.
 		 *
-		 * The barrier ensures that visibility of the vr_used_flags
-		 * store does not cross the viona_vr_num_avail() check below.
+		 * The barrier ensures that visibility of the no-notify
+		 * store does not cross the viona_ring_num_avail() check below.
 		 */
 		membar_enter();
 		bail = VRING_NEED_BAIL(ring, p);
 		renew = vmm_drv_lease_expired(ring->vr_lease);
-		if (!bail && !renew && viona_vr_num_avail(ring)) {
+		if (!bail && !renew && viona_ring_num_avail(ring)) {
 			continue;
 		}
 
 		if ((link->l_features & VIRTIO_F_RING_NOTIFY_ON_EMPTY) != 0) {
-			viona_intr_ring(ring);
+			/*
+			 * The NOTIFY_ON_EMPTY interrupt should not pay heed to
+			 * the presence of AVAIL_NO_INTERRUPT.
+			 */
+			viona_intr_ring(ring, B_TRUE);
 		}
 
 		mutex_enter(&ring->vr_lock);
 
-		while (!bail && !renew && !viona_vr_num_avail(ring)) {
+		while (!bail && !renew && !viona_ring_num_avail(ring)) {
 			(void) cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
 			bail = VRING_NEED_BAIL(ring, p);
 			renew = vmm_drv_lease_expired(ring->vr_lease);
