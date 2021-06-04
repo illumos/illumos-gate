@@ -392,17 +392,9 @@ file path=usr/include/gssapi/gssapi.h
 file path=usr/include/gssapi/gssapi_ext.h
 file path=usr/include/hal/libhal-storage.h
 file path=usr/include/hal/libhal.h
-$(i386_ONLY)file path=usr/include/ia32/sys/asm_linkage.h
 $(i386_ONLY)file path=usr/include/ia32/sys/kdi_regs.h
-$(i386_ONLY)file path=usr/include/ia32/sys/machtypes.h
 $(i386_ONLY)file path=usr/include/ia32/sys/privmregs.h
 $(i386_ONLY)file path=usr/include/ia32/sys/privregs.h
-$(i386_ONLY)file path=usr/include/ia32/sys/psw.h
-$(i386_ONLY)file path=usr/include/ia32/sys/pte.h
-$(i386_ONLY)file path=usr/include/ia32/sys/reg.h
-$(i386_ONLY)file path=usr/include/ia32/sys/stack.h
-$(i386_ONLY)file path=usr/include/ia32/sys/trap.h
-$(i386_ONLY)file path=usr/include/ia32/sys/traptrace.h
 file path=usr/include/iconv.h
 file path=usr/include/idmap.h
 file path=usr/include/ieeefp.h
@@ -1970,6 +1962,17 @@ license usr/src/lib/pkcs11/include/THIRDPARTYLICENSE \
     license=usr/src/lib/pkcs11/include/THIRDPARTYLICENSE
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload
+$(i386_ONLY)link path=usr/include/ia32/sys/asm_linkage.h \
+    target=../../sys/asm_linkage.h
+$(i386_ONLY)link path=usr/include/ia32/sys/machtypes.h \
+    target=../../sys/machtypes.h
+$(i386_ONLY)link path=usr/include/ia32/sys/psw.h target=../../sys/psw.h
+$(i386_ONLY)link path=usr/include/ia32/sys/pte.h target=../../sys/pte.h
+$(i386_ONLY)link path=usr/include/ia32/sys/reg.h target=../../sys/reg.h
+$(i386_ONLY)link path=usr/include/ia32/sys/stack.h target=../../sys/stack.h
+$(i386_ONLY)link path=usr/include/ia32/sys/trap.h target=../../sys/trap.h
+$(i386_ONLY)link path=usr/include/ia32/sys/traptrace.h \
+    target=../../sys/traptrace.h
 link path=usr/include/iso/assert_iso.h target=../assert.h
 link path=usr/include/iso/errno_iso.h target=../errno.h
 link path=usr/include/iso/float_iso.h target=../float.h

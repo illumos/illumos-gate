@@ -71,18 +71,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/fs/proc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/ia32/ml/%.s
-	$(COMPILE.s) -o $@ $<
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/ia32/os/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/ia32/promif/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/ia32/syscall/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/os/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -95,6 +84,9 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/ml/%.s
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(SRC)/common/acpica/events/%.c
@@ -297,7 +289,7 @@ $(OBJS_DIR)/%.o:	$(UTSBASE)/intel/$(SUBARCH_DIR)/krtld/%.c
 #
 $(OBJS_DIR)/kobj.o		:= CPPFLAGS += -D_DBOOT
 
-$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/intel/ia32/ml/%.s
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/intel/ml/%.s
 	$(DBOOT_AS) -P -D_ASM $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
 
 

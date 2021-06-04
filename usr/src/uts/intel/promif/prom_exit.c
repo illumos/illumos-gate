@@ -23,47 +23,47 @@
  * Use is subject to license terms.
  */
 
-#ifndef _IA32_SYS_MACHTYPES_H
-#define	_IA32_SYS_MACHTYPES_H
-
-#ifdef	__cplusplus
-extern "C" {
-#endif
+#include <sys/promif.h>
+#include <sys/consdev.h>
+#include <sys/promimpl.h>
+#include <sys/archsystm.h>
+#include <sys/reboot.h>
+#include <sys/kdi.h>
 
 /*
- * Machine dependent types:
- *
- *	intel ia32 Version
+ * The Intel cpu does not have an underlying monitor.
+ * So, we do the best we can.....
  */
 
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-	defined(__EXTENSIONS__)
+extern void prom_poll_enter(void);
 
-#define	REG_LABEL_PC	0
-#define	REG_LABEL_SP	1
-#define	REG_LABEL_BP	2
-#if defined(__amd64)
-#define	REG_LABEL_RBX	3
-#define	REG_LABEL_R12	4
-#define	REG_LABEL_R13	5
-#define	REG_LABEL_R14	6
-#define	REG_LABEL_R15	7
-#define	REG_LABEL_MAX	8
-#else /* __amd64 */
-#define	REG_LABEL_EBX	3
-#define	REG_LABEL_ESI	4
-#define	REG_LABEL_EDI	5
-#define	REG_LABEL_MAX	6
-#endif /* __amd64 */
+extern cons_polledio_t *cons_polledio;
 
-typedef	struct _label_t { long val[REG_LABEL_MAX]; } label_t;
+void
+prom_exit_to_mon(void)
+{
 
-#endif /* !defined(_POSIX_C_SOURCE)... */
-
-typedef	unsigned char	lock_t;		/* lock work for busy wait */
-
-#ifdef	__cplusplus
-}
+#if !defined(_KMDB)
+	prom_poll_enter();
 #endif
 
-#endif	/* _IA32_SYS_MACHTYPES_H */
+#if !defined(_KMDB)
+	if (boothowto & RB_DEBUG)
+		kmdb_enter();
+#endif	/* !_KMDB */
+	prom_reboot_prompt();
+	prom_reboot(NULL);
+}
+
+#if !defined(_KMDB)
+void
+prom_poll_enter(void)
+{
+	if (cons_polledio != NULL) {
+		if (cons_polledio->cons_polledio_enter != NULL) {
+			cons_polledio->cons_polledio_enter(
+			    cons_polledio->cons_polledio_argument);
+		}
+	}
+}
+#endif

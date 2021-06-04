@@ -96,7 +96,7 @@ include $(UTSBASE)/Makefile.uts
 #
 #	The following must be defined for all implementations:
 #
-MODSTUBS		= $(UTSBASE)/intel/ia32/ml/modstubs.s
+MODSTUBS		= $(UTSBASE)/intel/ml/modstubs.s
 
 #
 #	Define supported builds

@@ -124,7 +124,7 @@ AS_INC_PATH		+= -I$(DSF_DIR)/$(OBJS_DIR)
 #	GENASSYM_SRC:	genassym.c
 
 UNIX_MAPFILE	= $(UTSBASE)/$(PLATFORM)/conf/Mapfile
-MODSTUBS	= $(UTSBASE)/intel/ia32/ml/modstubs.s
+MODSTUBS	= $(UTSBASE)/intel/ml/modstubs.s
 GENASSYM_SRC	= $(UTSBASE)/i86pc/ml/genassym.c
 OFFSETS_SRC	= $(UTSBASE)/i86pc/ml/offsets.in
 

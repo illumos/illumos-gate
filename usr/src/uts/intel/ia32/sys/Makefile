@@ -19,22 +19,22 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/intel/ia32/sys/Makefile
-#
+
 # include global definitions
 include ../../../../Makefile.master
 
-HDRS=  \
-	asm_linkage.h	\
+HDRS=			\
 	kdi_regs.h	\
-	machtypes.h	\
 	privmregs.h	\
-	privregs.h	\
+	privregs.h
+
+LINKS=			\
+	asm_linkage.h	\
+	machtypes.h	\
 	psw.h		\
 	pte.h		\
 	reg.h		\
@@ -47,8 +47,18 @@ ROOTDIR= $(ROOTINCISA)/sys
 ROOTDIRS= $(ROOTDIR)
 
 ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%)
+ROOTLINKS= $(LINKS:%=$(ROOTDIR)/%)
 
 CHECKHDRS= $(HDRS:%.h=%.check)
+
+$(ROOTDIR)/asm_linkage.h	:= LINK_TARGET = ../../sys/asm_linkage.h
+$(ROOTDIR)/machtypes.h		:= LINK_TARGET = ../../sys/machtypes.h
+$(ROOTDIR)/psw.h		:= LINK_TARGET = ../../sys/psw.h
+$(ROOTDIR)/pte.h		:= LINK_TARGET = ../../sys/pte.h
+$(ROOTDIR)/reg.h		:= LINK_TARGET = ../../sys/reg.h
+$(ROOTDIR)/stack.h		:= LINK_TARGET = ../../sys/stack.h
+$(ROOTDIR)/trap.h		:= LINK_TARGET = ../../sys/trap.h
+$(ROOTDIR)/traptrace.h		:= LINK_TARGET = ../../sys/traptrace.h
 
 # install rules
 $(ROOTDIR)/%: %
@@ -56,14 +66,17 @@ $(ROOTDIR)/%: %
 
 .KEEP_STATE:
 
-.PARALLEL: $(CHECKHDRS) $(ROOTHDRS)
+.PARALLEL: $(CHECKHDRS) $(ROOTHDRS) $(ROOTLINKS)
 
-install_h: $(ROOTINCISA) .WAIT $(ROOTDIRS) .WAIT $(ROOTHDRS)
+install_h: $(ROOTINCISA) .WAIT $(ROOTDIRS) .WAIT $(ROOTHDRS) $(ROOTLINKS)
 
 $(ROOTINCISA):
 	$(INS.dir)
 
 $(ROOTDIRS):	$(ROOTINCISA)
 	$(INS.dir)
+
+$(ROOTLINKS):
+	$(RM) $@; $(SYMLINK) $(LINK_TARGET) $@
 
 check:	$(CHECKHDRS)

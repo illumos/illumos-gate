@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,19 +19,51 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MACHTYPES_H
 #define	_SYS_MACHTYPES_H
 
-#include <sys/feature_tests.h>
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
-#if defined(__i386) || defined(__amd64)
+/*
+ * Machine dependent types:
+ *
+ *	intel ia32 Version
+ */
 
-#include <ia32/sys/machtypes.h>		/* XX64 x86/sys/machtypes.h */
+#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
+	defined(__EXTENSIONS__)
 
+#define	REG_LABEL_PC	0
+#define	REG_LABEL_SP	1
+#define	REG_LABEL_BP	2
+#if defined(__amd64)
+#define	REG_LABEL_RBX	3
+#define	REG_LABEL_R12	4
+#define	REG_LABEL_R13	5
+#define	REG_LABEL_R14	6
+#define	REG_LABEL_R15	7
+#define	REG_LABEL_MAX	8
+#else /* __amd64 */
+#define	REG_LABEL_EBX	3
+#define	REG_LABEL_ESI	4
+#define	REG_LABEL_EDI	5
+#define	REG_LABEL_MAX	6
+#endif /* __amd64 */
+
+typedef	struct _label_t { long val[REG_LABEL_MAX]; } label_t;
+
+#endif /* !defined(_POSIX_C_SOURCE)... */
+
+typedef	unsigned char	lock_t;		/* lock work for busy wait */
+
+#ifdef	__cplusplus
+}
 #endif
 
 #endif	/* _SYS_MACHTYPES_H */

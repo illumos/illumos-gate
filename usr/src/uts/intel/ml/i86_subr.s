@@ -67,7 +67,7 @@
  * if code following causes uncorrectable fault. Turned off
  * by calling no_fault(). Note that while under on_fault(),
  * SMAP is disabled. For more information see
- * uts/intel/ia32/ml/copy.s.
+ * uts/intel/ml/copy.s.
  */
 
 	ENTRY(on_fault)

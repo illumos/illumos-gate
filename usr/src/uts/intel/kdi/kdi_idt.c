@@ -77,7 +77,7 @@
 #include <sys/archsystm.h>
 #include <sys/kdi_impl.h>
 #include <sys/x_call.h>
-#include <ia32/sys/psw.h>
+#include <sys/psw.h>
 #include <vm/hat_i86.h>
 
 #define	KDI_GATE_NVECS	3

@@ -161,7 +161,7 @@
 	 * protect the system.
 	 *
 	 * Later, when the thread finishes resuming, we potentially disable smap
-	 * if PS_ACHK was present in rflags. See uts/intel/ia32/ml/copy.s for
+	 * if PS_ACHK was present in rflags. See uts/intel/ml/copy.s for
 	 * more information on rflags and SMAP.
 	 */
 	pushfq
@@ -173,7 +173,7 @@
 	/*
 	 * Take a moment to potentially clear the RSB buffer. This is done to
 	 * prevent various Spectre variant 2 and SpectreRSB attacks. This may
-	 * not be sufficient. Please see uts/intel/ia32/ml/retpoline.s for more
+	 * not be sufficient. Please see uts/intel/ml/retpoline.s for more
 	 * information about this.
 	 */
 	call	x86_rsb_stuff

@@ -646,7 +646,7 @@ perform_allocations(void)
  * VM has been set up so we can use hot_patch_kernel_text().
  *
  * We can only patch 1, 2, or 4 bytes, but not three bytes. So instead, we
- * replace the four byte word at the patch point. See uts/intel/ia32/ml/copy.s
+ * replace the four byte word at the patch point. See uts/intel/ml/copy.s
  * for more information on what's going on here.
  */
 static void
