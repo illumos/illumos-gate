@@ -4,6 +4,7 @@
  * Copyright (c) 2015 Tycho Nightingale <tycho.nightingale@pluribusnetworks.com>
  * Copyright (c) 2015 Leon Dang
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -143,6 +144,9 @@ struct rfb_softc {
 	uint32_t	*crc;		/* WxH crc cells */
 	uint32_t	*crc_tmp;	/* buffer to store single crc row */
 	int		crc_width, crc_height;
+#ifndef __FreeBSD__
+	const char	*name;
+#endif
 };
 
 struct rfb_pixfmt {
@@ -233,7 +237,11 @@ struct rfb_cuttext_msg {
 };
 
 static void
+#ifndef __FreeBSD__
+rfb_send_server_init_msg(int cfd, struct rfb_softc *rc)
+#else
 rfb_send_server_init_msg(int cfd)
+#endif
 {
 	struct bhyvegc_image *gc_image;
 	struct rfb_srvr_info sinfo;
@@ -255,9 +263,18 @@ rfb_send_server_init_msg(int cfd)
 	sinfo.pixfmt.pad[0] = 0;
 	sinfo.pixfmt.pad[1] = 0;
 	sinfo.pixfmt.pad[2] = 0;
+
+#ifndef __FreeBSD__
+	const char *name = rc->name != NULL ? rc->name : "bhyve";
+
+	sinfo.namelen = htonl(strlen(name));
+	(void)stream_write(cfd, &sinfo, sizeof(sinfo));
+	(void)stream_write(cfd, name, strlen(name));
+#else
 	sinfo.namelen = htonl(strlen("bhyve"));
 	(void)stream_write(cfd, &sinfo, sizeof(sinfo));
 	(void)stream_write(cfd, "bhyve", strlen("bhyve"));
+#endif
 }
 
 static void
@@ -994,7 +1011,11 @@ report_and_done:
 	len = stream_read(cfd, buf, 1);
 
 	/* 4a. Write server-init info */
+#ifndef __FreeBSD__
+	rfb_send_server_init_msg(cfd, rc);
+#else
 	rfb_send_server_init_msg(cfd);
+#endif
 
 	if (!rc->zbuf) {
 		rc->zbuf = malloc(RFB_ZLIB_BUFSZ + 16);
@@ -1095,7 +1116,11 @@ sse42_supported(void)
 }
 
 int
+#ifndef __FreeBSD__
+rfb_init(char *hostname, int port, int wait, char *password, const char *name)
+#else
 rfb_init(char *hostname, int port, int wait, char *password)
+#endif
 {
 	int e;
 	char servname[6];
@@ -1119,6 +1144,10 @@ rfb_init(char *hostname, int port, int wait, char *password)
 	rc->sfd = -1;
 
 	rc->password = password;
+
+#ifndef __FreeBSD__
+	rc->name = name;
+#endif
 
 	snprintf(servname, sizeof(servname), "%d", port ? port : 5900);
 
@@ -1198,7 +1227,7 @@ rfb_init(char *hostname, int port, int wait, char *password)
 
 #ifndef __FreeBSD__
 int
-rfb_init_unix(const char *path, int wait, char *password)
+rfb_init_unix(const char *path, int wait, char *password, const char *name)
 {
 	struct rfb_softc *rc;
 	struct sockaddr_un sock;
@@ -1223,6 +1252,7 @@ rfb_init_unix(const char *path, int wait, char *password)
 	rc->crc_height = RFB_MAX_HEIGHT;
 
 	rc->password = password;
+	rc->name = name;
 
 	rc->sfd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (rc->sfd < 0) {
