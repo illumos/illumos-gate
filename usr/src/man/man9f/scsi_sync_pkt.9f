@@ -7,7 +7,6 @@
 .SH NAME
 scsi_sync_pkt \- synchronize CPU and I/O views of memory
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -17,11 +16,8 @@ scsi_sync_pkt \- synchronize CPU and I/O views of memory
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIpktp\fR\fR
@@ -31,8 +27,6 @@ Pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_sync_pkt()\fR function is used to selectively synchronize a
 \fBCPU\fR's or device's view of the data associated with the \fBSCSI\fR packet
 that has been mapped for \fBI/O\fR. This may involve operations such as flushes
@@ -54,13 +48,9 @@ then \fBscsi_sync_pkt()\fR must be called before calling
 a device to memory \fBscsi_sync_pkt()\fR must be called after the completion of
 the packet but before accessing the data in memory.
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_sync_pkt()\fR function may be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBtran_sync_pkt\fR(9E), \fBddi_dma_sync\fR(9F), \fBscsi_destroy_pkt\fR(9F),
 \fBscsi_init_pkt\fR(9F), \fBscsi_transport\fR(9F), \fBscsi_pkt\fR(9S)
 .sp

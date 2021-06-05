@@ -7,7 +7,6 @@
 .SH NAME
 tran_quiesce, tran_unquiesce \- quiesce and unquiesce a SCSI bus
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -20,11 +19,8 @@ tran_quiesce, tran_unquiesce \- quiesce and unquiesce a SCSI bus
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI
+illumos DDI
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhba_dip\fR\fR
@@ -34,8 +30,6 @@ The \fBdev_info_t\fR pointer associated with the SCSI HBA.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The  \fBtran_quiesce()\fR and  \fBtran_unquiesce()\fR vectors in the
 \fBscsi_hba_tran\fR(9S) structure should be initialized during the HBA driver's
 \fBattach\fR(9E). They are HBA entry points to be called when a user initiates
@@ -49,8 +43,6 @@ I/O activities to resume on the SCSI bus.
 .LP
 Implementation is hardware specific.
 .SH RETURN VALUES
-.sp
-.LP
 \fBtran_quiesce()\fR and \fBtran_unquiesce()\fR should return:
 .sp
 .ne 2
@@ -71,8 +63,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -87,6 +77,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBtran_bus_reset\fR(9E), \fBscsi_hba_tran\fR(9S)

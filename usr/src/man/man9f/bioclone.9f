@@ -7,7 +7,6 @@
 .SH NAME
 bioclone \- clone another buffer
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,11 +17,8 @@ bioclone \- clone another buffer
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIbp\fR\fR
@@ -99,8 +95,6 @@ to return \fINULL\fR immediately if memory is not available.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBbioclone()\fR function returns an initialized buffer to perform
 \fBI/O\fR to a portion of another buffer. The new buffer will be set up to
 perform \fBI/O\fR to the range within the original \fBI/O\fR request specified
@@ -135,18 +129,13 @@ clone buffers is still performing \fBI/O\fR. The \fBbiodone()\fR function has
 to be called on all clone buffers \fBbefore\fR it is called on the original
 buffer.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBbioclone()\fR function returns a pointer to the initialized buffer
 header, or \fBNULL\fR if no space is available.
 .SH CONTEXT
-.sp
-.LP
 The \fBbioclone()\fR function can be called from user, interrup, or interrupt
 context. Drivers must not allow \fBbioclone()\fR to sleep if called from an
 interrupt routine.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBbioclone()\fR for Disk Striping
 .sp
 .LP
@@ -202,8 +191,6 @@ stripe_done(struct buf *bp)
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBbiodone\fR(9F), \fBbp_mapin\fR(9F), \fBfreerbuf\fR(9F), \fBgetrbuf\fR(9F),
 \fBbuf\fR(9S)
 .sp

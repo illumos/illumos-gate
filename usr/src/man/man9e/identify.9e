@@ -7,17 +7,11 @@
 .SH NAME
 identify \- determine if a driver is associated with a device
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI). This entry point is no longer supported.
+illumos DDI specific (illumos DDI). This entry point is no longer supported.
 \fBnulldev\fR(9F) must be specified in the  \fBdev_ops\fR(9S) structure.
 .SH SEE ALSO
-.sp
-.LP
 \fBnulldev\fR(9F), \fBdev_ops\fR(9S)
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -32,8 +26,6 @@ Stability Level	Obsolete
 .TE
 
 .SH WARNING
-.sp
-.LP
-For Solaris 10 and later versions, drivers must remove the \fBidentify(9e)\fR
-implementation to recompile. Otherwise, the compiler generates errors about
-DDI_IDENTIFIED and DDI_NOT_IDENTIFIED.
+Drivers must remove the \fBidentify(9e)\fR implementation to
+recompile. Otherwise, the compiler generates errors about DDI_IDENTIFIED and
+DDI_NOT_IDENTIFIED.

@@ -19,7 +19,7 @@ ddi_create_minor_node \- Create a minor node for this device
 .fi
 
 .SH INTERFACE LEVEL
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -275,4 +275,4 @@ the results of a \fBmodunload\fR(1M) of the driver or a \fBcfgadm\fR(1M) remove
 of hardware controlled by the driver are undefined.
 .SH WARNING
 Drivers must remove references to GLOBAL_DEV, NODEBOUND_DEV, NODESPECIFIC_DEV,
-and ENUMERATED_DEV to compile under Solaris 10 and later versions.
+and ENUMERATED_DEV to compile.

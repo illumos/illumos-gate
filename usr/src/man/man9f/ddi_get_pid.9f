@@ -8,7 +8,6 @@
 .SH NAME
 ddi_get_pid \- returns the process \fBID\fR
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -20,27 +19,17 @@ ddi_get_pid \- returns the process \fBID\fR
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_get_pid()\fR obtains the process \fBID\fR of the current process. This
 value can be used to allow only a select process to perform a certain
 operation. It can also be used to determine whether a device context belongs to
 the current process.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_get_pid()\fR returns the process \fBID\fR.
 .SH CONTEXT
-.sp
-.LP
  This routine can be called from user context only.
 .SH SEE ALSO
-.sp
-.LP
 \fBdrv_getparm\fR(9F)
 .sp
 .LP

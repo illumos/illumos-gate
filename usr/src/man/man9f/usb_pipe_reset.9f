@@ -18,7 +18,7 @@ usb_pipe_reset \- Abort queued requests from a USB pipe and reset the pipe
 .fi
 
 .SH INTERFACE LEVEL
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
 .ne 2
 .na

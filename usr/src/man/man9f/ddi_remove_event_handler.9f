@@ -7,7 +7,6 @@
 .SH NAME
 ddi_remove_event_handler \- remove an NDI event service callback handler
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/dditypes.h>
 #include <sys/sunddi.h>
@@ -16,11 +15,8 @@ ddi_remove_event_handler \- remove an NDI event service callback handler
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fBddi_registration_id_t \fR\fIid\fR\fR
@@ -31,14 +27,11 @@ upon successful registration.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_remove_event_handler()\fR function removes the callback handler
 specified by the registration \fIid\fR (\fBddi_registration_id_t\fR). Upon
 successful removal, the callback handler is removed from the system and will
 not be invoked in the face of the event.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR\fR
@@ -57,13 +50,9 @@ Failed to remove callback handler.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_remove_event_handler()\fR function can be called from user and
 kernel contexts only.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -78,15 +67,11 @@ Stability Level	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBddi_add_event_handler\fR(9F),
 \fBddi_get_eventcookie\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 Device drivers must remove all registered callback handlers before
 \fBdetach\fR(9E) processing for that device instance is complete.

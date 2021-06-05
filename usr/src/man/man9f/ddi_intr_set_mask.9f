@@ -7,7 +7,6 @@
 .SH NAME
 ddi_intr_set_mask, ddi_intr_clr_mask \- set or clear mask for a given interrupt
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -23,11 +22,8 @@ ddi_intr_set_mask, ddi_intr_clr_mask \- set or clear mask for a given interrupt
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIh\fR\fR
@@ -37,8 +33,6 @@ DDI interrupt handle
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_intr_set_mask()\fR function masks the given interrupt pointed to by
 the device's interrupt handle \fIh\fR if the device or host bridge supports the
 masking operation. The \fBddi_intr_get_cap()\fR function returns the \fBRO\fR
@@ -62,8 +56,6 @@ temporarily masked the interrupt. A call to \fBddi_intr_clr_mask()\fR must be
 preceded by a call to \fBddi_intr_set_mask()\fR. It is not necessary to call
 \fBddi_intr_clr_mask()\fR when adding and enabling the interrupt.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_intr_set_mask()\fR and \fBddi_intr_clr_mask()\fR functions return:
 .sp
 .ne 2
@@ -102,13 +94,9 @@ On device not supporting operation.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_intr_set_mask()\fR and \fBddi_intr_clr_mask()\fR functions can be
 called from any context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -123,8 +111,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBddi_intr_block_disable\fR(9F),
 \fBddi_intr_block_enable\fR(9F), \fBddi_intr_disable\fR(9F),
 \fBddi_intr_enable\fR(9F), \fBddi_intr_get_pending\fR(9F)
@@ -132,8 +118,6 @@ Interface Stability	Committed
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 Consumers of these interfaces should verify that the return value is not equal
 to \fBDDI_SUCCESS\fR. Incomplete checking for failure codes could result in
 inconsistent behavior among platforms.

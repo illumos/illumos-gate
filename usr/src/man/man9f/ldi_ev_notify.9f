@@ -7,7 +7,6 @@
 .SH NAME
 ldi_ev_notify \- propagate notification of a state change event
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunldi.h>
 
@@ -16,11 +15,8 @@ ldi_ev_notify \- propagate notification of a state change event
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdev_info_t *dip\fR\fR
@@ -72,8 +68,6 @@ Event specific data.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBldi_ev_notify()\fR function propagates an event up the software stack.
 It may result in two actions:
 .RS +4
@@ -152,8 +146,6 @@ static int
 .in -2
 
 .SH RETURN VALUES
-.sp
-.LP
 The return values for this function are:
 .sp
 .ne 2
@@ -176,11 +168,7 @@ Consumers are blocking the state change.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user and kernel context only.
 .SH SEE ALSO
-.sp
-.LP
 \fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F),
 \fBldi_ev_remove_callbacks\fR(9F)

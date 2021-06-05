@@ -8,7 +8,6 @@
 net_kstat_delete \- remove a kstat for a specific instance of IP from the
 system
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -18,11 +17,8 @@ system
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInetid\fR\fR
@@ -41,24 +37,16 @@ Pointer to a currently installed \fBkstat\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnet_kstat_delete()\fR function removes \fIksp\fR from the \fBkstat\fR
 chain and frees all associated system resources. See \fBkstat_delete\fR(9F) for
 a complete discussion of this function.
 .SH RETURN VALUES
-.sp
-.LP
 If successful, \fBnet_kstat_delete()\fR returns a pointer to the allocated
 \fBkstat\fR. \fINULL\fR is returned upon failure.
 .SH CONTEXT
-.sp
-.LP
 The \fBnet_kstat_delete()\fR function may be called from user,  kernel, or
 interrupt context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -73,7 +61,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBkstat_create\fR(9F), \fBkstat_delete\fR(9F), \fBnet_kstat_create\fR(9F),
 \fBhook_t\fR(9S), \fBkstat_named\fR(9S)

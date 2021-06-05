@@ -8,7 +8,6 @@
 pci_ereport_setup, pci_ereport_teardown, pci_ereport_post \- post error reports
 for the generic PCI errors logged in the PCI Configuration Status register.
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunddi.h>
 
@@ -27,8 +26,7 @@ for the generic PCI errors logged in the PCI Configuration Status register.
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
 .ne 2
 .na
@@ -57,7 +55,6 @@ Pointer to status bit storage location
 .RE
 
 .SH DESCRIPTION
-.LP
 The \fBpci_ereport_setup()\fR function initializes support for error report
 generation and sets up the resources for subsequent access to \fBPCI\fR,
 \fBPCI/X\fR or \fBPCI Express Configuration\fR space. The caller must have
@@ -163,7 +160,7 @@ Error report events are generated automatically if \fBfme_flag\fR is set to
 \fBDDI_FM_ERR_UNEXPECTED\fR and the corresponding error bits are set in the
 various \fBPCI\fR, \fBPCI/X\fR or \fBPCI Express Bus\fR error registers of the
 device associated with \fIdip\fR. The generated error report events are posted
-to the Solaris Fault Manager, \fBfmd\fR(1M), for diagnosis.
+to the illumos Fault Manager, \fBfmd\fR(1M), for diagnosis.
 .sp
 .LP
 If the status argument is non-null, \fBpci_ereport_post()\fR saves the contents
@@ -219,7 +216,6 @@ error on the operational state of the system. This is treated the same way as
 .RE
 
 .SH CONTEXT
-.LP
 The \fBpci_ereport_setup()\fR and \fBpci_ereport_teardown()\fR functions must
 be called from user or kernel context.
 .sp
@@ -260,7 +256,6 @@ xxx_detach(dev_info_t *dip, ddi_attach_cmd_t cmd) {
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -275,7 +270,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBfmd\fR(1M), \fBattributes\fR(5), \fBddi_fm_handler_register\fR(9F),
 \fBddi_fm_init\fR(9F), \fBddi_peek\fR(9F), \fBddi_poke\fR(9F),
 \fBddi_fm_error\fR(9S)

@@ -8,7 +8,6 @@
 .SH NAME
 physio, minphys \- perform physical I/O
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -26,12 +25,9 @@ physio, minphys \- perform physical I/O
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .SS "\fBphysio()\fR"
-.sp
 .ne 2
 .na
 \fB\fIstrat\fR \fR
@@ -89,7 +85,6 @@ Pointer to the \fBuio\fR structure which describes the user \fBI/O\fR request.
 .RE
 
 .SS "\fBminphys()\fR"
-.sp
 .ne 2
 .na
 \fB\fIbp\fR \fR
@@ -99,8 +94,6 @@ Pointer to a \fBbuf\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBphysio()\fR performs unbuffered \fBI/O\fR operations between the device
 \fIdev\fR and the address space described in the \fBuio\fR structure.
 .sp
@@ -127,8 +120,6 @@ default for the capabilities of the system. Drivers that provide their own
 \fBmincnt()\fR routine should also call \fBminphys()\fR to make sure they do
 not exceed the system limit.
 .SH RETURN VALUES
-.sp
-.LP
 \fBphysio()\fR returns:
 .sp
 .ne 2
@@ -149,20 +140,14 @@ Upon failure.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBphysio()\fR can be called from user context only.
 .SH SEE ALSO
-.sp
-.LP
 \fBstrategy\fR(9E), \fBbiodone\fR(9F), \fBbiowait\fR(9F), \fBbuf\fR(9S),
 \fBuio\fR(9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
-.LP
 Since \fBphysio()\fR calls \fBbiowait()\fR to block until each buf transfer is
 complete, it is the drivers responsibility to call \fBbiodone\fR(9F) when the
 transfer is complete, or \fBphysio()\fR will block forever.

@@ -7,7 +7,6 @@
 .SH NAME
 scsi_destroy_pkt \- free an allocated SCSI packet and its DMA resource
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -17,11 +16,8 @@ scsi_destroy_pkt \- free an allocated SCSI packet and its DMA resource
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIpktp\fR\fR
@@ -31,18 +27,13 @@ Pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_destroy_pkt()\fR function releases all necessary resources,
 typically at the end of an I/O transfer. The data is synchronized to memory,
 then the \fBDMA\fR resources are deallocated and \fIpktp\fR is freed.
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_destroy_pkt()\fR function may be called from user, interrupt, or
 kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRReleasing resources
 .sp
 .in +2
@@ -52,8 +43,6 @@ scsi_destroy_pkt(un->un_rqs);
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBtran_destroy_pkt\fR(9E), \fBscsi_init_pkt\fR(9F), \fBscsi_pkt\fR(9S)
 .sp
 .LP

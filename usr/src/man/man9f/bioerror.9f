@@ -7,7 +7,6 @@
 .SH NAME
 bioerror \- indicate error in buffer header
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -19,8 +18,7 @@ bioerror \- indicate error in buffer header
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
 .ne 2
 .na
@@ -40,7 +38,6 @@ Error number to be set, or zero to clear an error indication.
 .RE
 
 .SH DESCRIPTION
-.LP
 If \fIerror\fR is non-zero, \fBbioerror()\fR indicates an error has occurred in
 the \fBbuf\fR(9S) structure. A subsequent call to \fBgeterror\fR(9F) will
 return \fIerror\fR.
@@ -49,8 +46,6 @@ return \fIerror\fR.
 If \fIerror\fR is  \fB0\fR, the error indication is cleared and a subsequent
 call to \fBgeterror\fR(9F) will return  \fB0\fR.
 .SH CONTEXT
-.LP
 \fBbioerror()\fR can be called from any context.
 .SH SEE ALSO
-.LP
 \fBstrategy\fR(9E), \fBgeterror\fR(9F), \fBgetrbuf\fR(9F), \fBbuf\fR(9S)

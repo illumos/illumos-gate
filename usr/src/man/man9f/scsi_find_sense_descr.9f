@@ -7,7 +7,6 @@
 .SH NAME
 scsi_find_sense_descr \- find descriptor in SCSI sense data
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -18,11 +17,8 @@ scsi_find_sense_descr \- find descriptor in SCSI sense data
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIsense_buffer\fR\fR
@@ -52,8 +48,6 @@ descriptor.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_find_sense_descr()\fR function is used to obtain a pointer to a
 specific descriptor type, specified by \fIreq_descr_type\fR, within a
 descriptor sense buffer. Before returning the pointer,
@@ -83,19 +77,13 @@ types are already defined:
 Drivers should use \fBscsi_validate_sense\fR(9F) to ensure that the sense
 buffer contains valid descriptor sense data.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_find_sense_descr()\fR function returns a pointer to a sense
 descriptor of the requested type if a descriptor of that type exists. If no
 such descriptor exists, \fBscsi_find_sense_descr()\fR returns \fINULL\fR.
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_find_sense_descr()\fR function can be called from user or interrupt
 context.
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_ext_sense_fields\fR(9F), \fBscsi_sense_asc\fR(9F),
 \fBscsi_sense_ascq\fR(9F), \fBscsi_sense_cmdspecific_uint64\fR(9F),
 \fBscsi_sense_info_uint64\fR(9F), \fBscsi_sense_key\fR(9F),

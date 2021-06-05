@@ -7,7 +7,6 @@
 .SH NAME
 ddi_intr_hilevel \- indicate interrupt handler type
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,13 +17,10 @@ ddi_intr_hilevel \- indicate interrupt handler type
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI). This interface is obsolete. Use the new
+illumos DDI specific (illumos DDI). This interface is obsolete. Use the new
 interrupt interfaces referenced in \fBIntro\fR(9F). Refer to \fIWriting Device
 Drivers\fR for more information.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -43,8 +39,6 @@ Interrupt number.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_intr_hilevel()\fR function returns non-zero if the specified
 interrupt is a "high level" interrupt.
 .sp
@@ -72,7 +66,6 @@ example those using SBus or VME bus level 6 or 7 interrupts must use this test
 because on some machines those interrupts are high level (above the scheduler
 level) and on other machines they are not.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fBnon-zero\fR
@@ -82,12 +75,8 @@ indicates a high-level interrupt.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from useruser, interrupt, or kernel context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -102,8 +91,6 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_add_intr\fR(9F), \fBIntro\fR(9F), \fBmutex\fR(9F)
 .sp
 .LP

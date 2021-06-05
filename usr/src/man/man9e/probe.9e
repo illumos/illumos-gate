@@ -19,7 +19,7 @@ probe \- determine if a non-self-identifying device is present
 .fi
 
 .SH INTERFACE LEVEL
-Solaris DDI specific (Solaris DDI). This entry point is required for
+illumos DDI specific (illumos DDI). This entry point is required for
 non-self-identifying devices.  You must write it for such devices. For
 self-identifying devices, \fBnulldev\fR(9F) should be specified in the
 \fBdev_ops\fR(9S) structure if a probe routine is not necessary.

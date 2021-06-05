@@ -8,19 +8,14 @@
 .SH NAME
 fmodsw \- STREAMS module declaration structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/conf.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 The \fBfmodsw\fR structure contains information for STREAMS modules. All
 STREAMS modules must define a \fBfmodsw\fR structure.
 .sp
@@ -34,7 +29,6 @@ All modules must set the \fBf_flag\fR to \fBD_MP\fR to indicate that they
 safely allow multiple threads of execution. See \fBmt-streams\fR(9F) for
 additional flags.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 char              f_name[FMNAMESZ + 1];   /* module name */
@@ -44,14 +38,10 @@ int               f_flag;                 /* flags */
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBmt-streams\fR(9F), \fBmodlstrmod\fR(9S), \fBmodule_info\fR(9S)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR
 .SH WARNINGS
-.sp
-.LP
 If \fBf_name\fR does not match the module binary name, unexpected failures can
 occur.

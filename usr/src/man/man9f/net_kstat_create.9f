@@ -8,7 +8,6 @@
 net_kstat_create \- create and initialize a new kstat for a specific instance
 of IP
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -20,11 +19,8 @@ of IP
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInetid\fR\fR
@@ -172,24 +168,16 @@ goes away.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnet_kstat_create()\fR function allocates and initializes a
 \fBkstat\fR(9S) structure. See \fBkstat_create\fR(9F) for a complete discussion
 of this function.
 .SH RETURN VALUES
-.sp
-.LP
 If successful, \fBnet_kstat_create()\fR returns a pointer to the allocated
 \fBkstat\fR. \fINULL\fR is returned upon failure.
 .SH CONTEXT
-.sp
-.LP
 The \fBnet_kstat_create()\fR function may be called from user or kernel
 context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -204,7 +192,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_get_instance\fR(9F), \fBkstat_create\fR(9F), \fBkstat_delete\fR(9F),
 \fBnet_kstat_delete\fR(9F), \fBhook_t\fR(9S), \fBkstat_named\fR(9S)

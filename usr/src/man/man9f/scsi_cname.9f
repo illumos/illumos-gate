@@ -8,7 +8,6 @@
 scsi_cname, scsi_dname, scsi_mname, scsi_rname, scsi_sname \- decode a SCSI
 name
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -38,11 +37,8 @@ name
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIcmd\fR\fR
@@ -97,8 +93,6 @@ A \fBSCSI\fR sense key value.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_cname()\fR function decodes \fBSCSI\fR commands. \fIcmdvec\fR is a
 pointer to an array of strings. The first byte of the string is the command
 value, and the remainder is the name of the command.
@@ -116,16 +110,11 @@ The \fBscsi_rname()\fR function decodes packet completion reasons.
 .LP
 The \fBscsi_sname()\fR function decodes \fBSCSI\fR sense keys.
 .SH RETURN VALUES
-.sp
-.LP
 These functions return a pointer to a string. If an argument is invalid, they
 return a string to that effect.
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user, interrupt, or kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDecoding SCSI tape commands.
 .sp
 .LP
@@ -136,7 +125,7 @@ The \fBscsi_cname()\fR function decodes \fBSCSI \fRtape commands as follows:
 .nf
 static char *st_cmds[] = {
             "\e000test unit ready",
-            "\e001rewind",	
+            "\e001rewind",
             "\e003request sense",
             "\e010read",
             "\e012write",
@@ -155,6 +144,4 @@ static char *st_cmds[] = {
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR

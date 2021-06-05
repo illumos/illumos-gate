@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dma_mem_free \- free previously allocated memory
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,7 +17,6 @@ ddi_dma_mem_free \- free previously allocated memory
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandlep\fR \fR
@@ -29,22 +27,14 @@ Pointer to the data access handle previously allocated by a call to
 .RE
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_dma_mem_free()\fR deallocates the memory acquired by
 \fBddi_dma_mem_alloc\fR(9F). In addition, it destroys the data access handle
 \fIhandlep\fR associated with the memory.
 .SH CONTEXT
-.sp
-.LP
 \fBddi_dma_mem_free()\fR can be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_dma_mem_alloc\fR(9F)
 .sp
 .LP

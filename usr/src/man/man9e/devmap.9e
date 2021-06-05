@@ -8,7 +8,6 @@
 .SH NAME
 devmap \- validate and translate virtual mapping for memory mapped device
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -20,11 +19,8 @@ devmap \- validate and translate virtual mapping for memory mapped device
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR \fR
@@ -80,8 +76,6 @@ The data model type of the current thread.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBdevmap()\fR is a required entry point for character drivers supporting
 memory-mapped devices if the drivers use the devmap framework to set up the
 mapping. A memory mapped device has memory  that can be mapped into a process's
@@ -174,7 +168,6 @@ within the register address space to  \fBdevmap_devmem_setup\fR(9F).
 For kernel memory mapping, the system selects a user virtual address that is
 aligned with the kernel address being mapped for cache coherence.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB0\fR \fR
@@ -193,7 +186,6 @@ An error occurred.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRImplementing the \fBdevmap()\fR Entry Point
 .sp
 .LP
@@ -294,8 +286,6 @@ xxdevmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBmmap\fR(2), \fBattach\fR(9E), \fBdetach\fR(9E), \fBmmap\fR(9E),
 \fBsegmap\fR(9E), \fBddi_devmap_segmap\fR(9F),
 \fBddi_model_convert_from\fR(9F), \fBddi_soft_state\fR(9F),

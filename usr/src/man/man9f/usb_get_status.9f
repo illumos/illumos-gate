@@ -7,7 +7,6 @@
 .SH NAME
 usb_get_status \- Get status of a USB device/endpoint/interface
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/usb/usba.h>
 
@@ -19,11 +18,8 @@ usb_get_status \- Get status of a USB device/endpoint/interface
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -85,8 +81,6 @@ None are recognized.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBusb_get_status()\fR function returns the status of a device, interface
 or endpoint.  All status requests use the default control pipe. Length of data
 returned is USB_GET_STATUS_LEN bytes.  Always block and wait for resources if
@@ -107,7 +101,6 @@ halted). A set bit indicates the corresponding status.
 When the \fIrequest_type\fR is USB_DEV_REQ_RCPT_IF, interface status is
 requested and USB_IF_STATUS (zero) is returned.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fBUSB_SUCCESS\fR
@@ -144,11 +137,8 @@ Status not returned successfully.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 May be called from user or kernel context.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
   uint16_t status;
@@ -166,8 +156,6 @@ May be called from user or kernel context.
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -184,7 +172,5 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBusb_clr_feature\fR(9F), \fBusb_get_alt_if\fR(9F),
 \fBusb_pipe_get_state\fR(9F), \fBusb_get_cfg\fR(9F),

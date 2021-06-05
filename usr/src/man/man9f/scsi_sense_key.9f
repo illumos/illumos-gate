@@ -8,7 +8,6 @@
 scsi_sense_key, scsi_sense_asc, scsi_sense_ascq \- retrieve fields from SCSI
 sense data
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -28,8 +27,7 @@ sense data
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -42,7 +40,6 @@ fixed or descriptor format.
 .RE
 
 .SH DESCRIPTION
-.LP
 The \fBscsi_sense_key()\fR function returns the sense key value from the sense
 data contained in the sense_buffer.
 .sp
@@ -63,17 +60,14 @@ whether the sense data is in fixed format or descriptor format.
 Drivers should use \fBscsi_validate_sense\fR(9F) to ensure that valid sense
 key, \fBasc\fR, and \fBascq\fR values are present in the sense data.
 .SH RETURN VALUES
-.LP
 The \fBscsi_sense_key()\fR function returns the sense key value from the sense
 buffer. The \fBscsi_sense_asc()\fR function returns the additional sense code
 (\fBASC\fR) from the sense buffer and the \fBscsi_sense_ascq()\fR function
 returns the additional sense code qualifier (\fBASCQ\fR) from the sense buffer.
 .SH CONTEXT
-.LP
 The \fBscsi_sense_key()\fR, \fBscsi_sense_asc()\fR, and \fBscsi_sense_ascq()\fR
 functions can be called from user or interrupt context.
 .SH SEE ALSO
-.LP
 \fBscsi_ext_sense_fields\fR(9F), \fBscsi_find_sense_descr\fR(9F),
 \fBscsi_sense_cmdspecific_uint64\fR(9F), \fBscsi_sense_info_uint64\fR(9F),
 \fBscsi_validate_sense\fR(9F)

@@ -8,7 +8,6 @@
 .SH NAME
 ddi_mmap_get_model \- return data model type of current thread
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,12 +18,8 @@ ddi_mmap_get_model \- return data model type of current thread
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_mmap_get_model()\fR returns the \fIC\fR Language Type Model which the
 current thread expects. \fBddi_mmap_get_model()\fR is used in combination with
 \fBddi_model_convert_from\fR(9F) in the \fBmmap\fR(9E) driver entry point to
@@ -33,7 +28,6 @@ the device driver. The device driver might have to adjust the shape of data
 structures before exporting them to a user thread which supports a different
 data model.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_MODEL_ILP32\fR \fR
@@ -62,12 +56,9 @@ entry point.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_mmap_get_model()\fR function can only be called from the
 \fBmmap\fR(9E) driver entry point.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR: Using \fBddi_mmap_get_model()\fR
 .sp
 .LP
@@ -111,8 +102,6 @@ xxmmap(dev_t dev, off_t off, int prot) {
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBmmap\fR(9E), \fBddi_model_convert_from\fR(9F)
 .sp
 .LP

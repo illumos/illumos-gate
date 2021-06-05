@@ -7,7 +7,6 @@
 .SH NAME
 ldi_ev_finalize \- propagate disposition of a state change event
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunldi.h>
 
@@ -16,11 +15,8 @@ ldi_ev_finalize \- propagate disposition of a state change event
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdev_info_t *dip\fR\fR
@@ -82,8 +78,6 @@ Event specific data.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBldi_ev_finalize()\fR function propagates the final disposition of an
 event up the software stack. It may result in two actions:
 .RS +4
@@ -112,15 +106,10 @@ cookie currently possessed by the layered driver. If that is the case, the
 layered driver must generate another event cookie via a new
 \fBldi_ev_get_cookie\fR(9F) call.
 .SH RETURN VALUES
-.sp
-.LP
 None.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user and kernel contexts only.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRInvoking ldi_ev_finalize(9F) from widget's finalize callback
 .sp
 .LP
@@ -158,7 +147,5 @@ widget_finalize(ldi_handle_t lh, ldi_ev_cookie_t foo_cookie,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F),
 \fBldi_ev_remove_callbacks\fR(9F)

@@ -7,7 +7,6 @@
 .SH NAME
 csx_Put8, csx_Put16, csx_Put32, csx_Put64 \- write to device register
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -32,11 +31,8 @@ csx_Put8, csx_Put16, csx_Put32, csx_Put64 \- write to device register
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI\fR)
+illumos \fBDDI \fRSpecific (illumos \fBDDI\fR)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -65,8 +61,6 @@ The data to be written to the device.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions generate a write of various sizes to the mapped memory or
 device register.
 .sp
@@ -82,12 +76,8 @@ maintain a consistent view between the host and the device based on the encoded
 information in the data access handle. The translation may involve byte
 swapping if the host and the device have incompatible endian characteristics.
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_DupHandle\fR(9F), \fBcsx_Get8\fR(9F), \fBcsx_GetMappedAddr\fR(9F),
 \fBcsx_RepGet8\fR(9F), \fBcsx_RepPut8\fR(9F), \fBcsx_RequestIO\fR(9F),
 \fBcsx_RequestWindow\fR(9F)

@@ -7,7 +7,6 @@
 .SH NAME
 scsi_transport \- request by a SCSI target driver to start a command
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -17,11 +16,8 @@ scsi_transport \- request by a SCSI target driver to start a command
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIpkt\fR\fR
@@ -31,8 +27,6 @@ Pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 Target drivers use \fBscsi_transport()\fR to request the host adapter driver to
 transport a command to the \fBSCSI \fRtarget device specified by \fIpkt\fR. The
 target driver must obtain resources for the packet using
@@ -44,8 +38,6 @@ completion of the \fBSCSI\fR command the host adapter calls the completion
 routine provided by the target driver in the \fBpkt_comp\fR member of the
 \fBscsi_pkt\fR pointed to by \fIpkt\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_transport()\fR function returns:
 .sp
 .ne 2
@@ -87,12 +79,9 @@ A fatal error has occurred in the transport layer.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_transport()\fR function can be called from user, interrupt, or
 kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBscsi_transport()\fR
 .sp
 .in +2
@@ -105,8 +94,6 @@ if ((status = scsi_transport(rqpkt)) != TRAN_ACCEPT) {
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBtran_start\fR(9E), \fBmakecom\fR(9F), \fBscsi_init_pkt\fR(9F),
 \fBscsi_pktalloc\fR(9F), \fBscsi_poll\fR(9F), \fBscsi_pkt\fR(9S)
 .sp

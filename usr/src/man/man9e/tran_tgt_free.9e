@@ -7,7 +7,6 @@
 .SH NAME
 tran_tgt_free \- request to free HBA resources allocated on behalf of a target
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -18,11 +17,8 @@ tran_tgt_free \- request to free HBA resources allocated on behalf of a target
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhba_dip\fR \fR
@@ -62,8 +58,6 @@ Pointer to a  \fBscsi_device\fR(9S) structure, describing the target.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBtran_tgt_free()\fR vector in the \fBscsi_hba_tran\fR(9S) structure may
 be initialized during the \fBHBA\fR driver's \fBattach\fR(9E) to point to an
 \fBHBA\fR driver function to be called by the system when an instance of a
@@ -75,8 +69,6 @@ should release any resources allocated during its \fBtran_tgt_init()\fR or
 \fBtran_tgt_probe()\fR initialization performed for this target device
 instance.
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBdetach\fR(9E), \fBtran_tgt_init\fR(9E),
 \fBtran_tgt_probe\fR(9E), \fBscsi_device\fR(9S), \fBscsi_hba_tran\fR(9S)
 .sp

@@ -7,7 +7,6 @@
 .SH NAME
 kstat_intr \- structure for interrupt kstats
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -16,12 +15,8 @@ kstat_intr \- structure for interrupt kstats
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 Interrupt statistics are kept in the \fBkstat_intr\fR structure. When
 \fBkstat_create\fR(9F) creates an interrupt \fBkstat\fR, the \fBks_data\fR
 field is a pointer to one of these structures. The macro \fBKSTAT_INTR_PTR()\fR
@@ -52,7 +47,6 @@ in a particular system configuration.
 Devices that have more than one interrupt of the same type should use multiple
 structures.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 ulong_t    intrs[KSTAT_NUM_INTRS];    /* interrupt counters */
@@ -113,8 +107,6 @@ Multiple service interrupt
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBkstat\fR(9S)
 .sp
 .LP

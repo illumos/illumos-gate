@@ -199,7 +199,7 @@ The return address of a minor name. Free string with
 .RE
 
 .SH INTERFACE LEVEL
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
 The following routines are used to provide unique identifiers, device
 \fBID\fRs, for devices. Specifically, kernel modules use these interfaces to

@@ -7,18 +7,14 @@
 .SH NAME
 scsi_setup_cdb \- setup SCSI command descriptor block (CDB)
 .SH SYNOPSIS
-.LP
 .nf
 \fBint\fR \fBscsi_setup_cdb\fR(\fBunion scsi_cdb\fR \fI*cdbp\fR, \fBuchar_t\fR \fIcmd\fR, \fBuint_t\fR \fIaddr\fR,
      \fBuint_t\fR \fIcnt\fR, \fBuint_t\fR \fIothr_cdb_data\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIcdbp\fR\fR
@@ -66,8 +62,6 @@ Additional \fBCDB\fR data.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_setup_cdb()\fR function initializes a group 0, 1, 2, 4, or 5 type
 of command descriptor block pointed to by  \fIcdbp\fR using \fIcmd\fR,
 \fIaddr\fR, \fIcnt\fR, \fIothr_cdb_data\fR.
@@ -83,8 +77,6 @@ The \fBscsi_setup_cdb()\fR function does not set the \fBLUN\fR bits in
 \fBCDB\fR[1] as the  \fBmakecom\fR(9F) functions do.  Also, the fixed bit for
 sequential access device commands is not set.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_setup_cdb()\fR function returns:
 .sp
 .ne 2
@@ -105,12 +97,8 @@ Upon failure.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from a user, interrupt, or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBmakecom\fR(9F), \fBscsi_pkt\fR(9S)
 .sp
 .LP

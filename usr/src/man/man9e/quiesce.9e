@@ -7,7 +7,6 @@
 .SH NAME
 quiesce \- quiesce a device
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -21,11 +20,8 @@ quiesce \- quiesce a device
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -35,8 +31,6 @@ A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBquiesce()\fR function quiesces a device so that the device no longer
 generates interrupts, modifies or accesses memory. The driver should reset the
 device to a hardware state from which the device can be correctly configured by
@@ -79,8 +73,6 @@ its functionality must be merged into \fBquiesce()\fR. The driver's
 set its \fBdevo_quiesce\fR device function to \fBddi_quiesce_not_needed()\fR to
 indicate that the device it manages does not need to be quiesced.
 .SH RETURN VALUES
-.sp
-.LP
 \fBquiesce()\fR returns the following:
 .sp
 .ne 2
@@ -101,18 +93,12 @@ The operation failed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function is called from kernel context only.
 .SH SEE ALSO
-.sp
-.LP
 \fBreboot\fR(1M), \fBuadmin\fR(1M), \fBuadmin\fR(2), \fBattach\fR(9E),
 \fBdetach\fR(9E), \fBddi_add_intr\fR(9F), \fBddi_map_regs\fR(9F),
 \fBpci_config_setup\fR(9F), \fBtimeout\fR(9F), \fBdev_ops\fR(9S)
 .SH NOTES
-.sp
-.LP
 When \fBquiesce()\fR is called, the system is single-threaded, therefore the
 driver's \fBquiesce()\fR implementation must not be blocked. For example, the
 implementation must not create or tear down mappings, call \fBFMA\fR functions,

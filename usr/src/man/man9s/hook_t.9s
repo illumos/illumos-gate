@@ -8,23 +8,17 @@
 .SH NAME
 hook_t \- callback structure for subscribing to netinfo events
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/hook.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The \fBhook_t\fR data structure defines a callback that is to be inserted into
 a networking event. This data structure must be allocated with a call to
 \fBhook_alloc()\fR and released with a call to \fBhook_free()\fR.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 hook_func_t  h_func;      /* callback function to invoke */
@@ -40,8 +34,6 @@ typedef int (*hook_func_t)(net_event_t token, hook_data_t info,
 .in -2
 
 .SS "CALLBACK RETURN VALUES"
-.sp
-.LP
 The value returned by the \fBhook_func_t\fR function indicates whether or not
 the packet should still be considered valid. If the callback function has
 modified the packet in such a way that it should no longer be processed or
@@ -50,8 +42,6 @@ considered valid, e.g. called \fBfreemsg\fR(9F), then the callback should return
 .sp
 
 .SS "HINT TYPES"
-.sp
-.LP
 Hook hints are hints that are used at the time of insertion and are not rules
 that enforce where a hook lives for its entire lifetime on an event. The valid
 values for the \fBh_hint\fR field are:
@@ -103,8 +93,6 @@ Place the hook after another hook on the list of hooks. The value in
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -119,6 +107,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBnetinfo\fR(9F)

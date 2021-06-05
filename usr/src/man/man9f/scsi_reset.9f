@@ -7,7 +7,6 @@
 .SH NAME
 scsi_reset \- reset a SCSI bus or target
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -17,11 +16,8 @@ scsi_reset \- reset a SCSI bus or target
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIap\fR\fR
@@ -40,8 +36,6 @@ The level of reset required.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_reset()\fR function asks the host adapter driver to reset the
 \fBSCSI \fRbus or a \fBSCSI \fRtarget as specified by \fIlevel\fR. If
 \fIlevel\fR equals \fBRESET_ALL\fR, the \fBSCSI\fR bus is reset. If it equals
@@ -78,8 +72,6 @@ have already called \fBscsi_transport()\fR, but not yet queued or transported
 its command. In this case the HBA will not yet have received the second
 thread's packet and this packet will not be aborted.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_reset()\fR function returns:
 .sp
 .ne 2
@@ -100,13 +92,9 @@ Upon failure.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_reset()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-.sp
-.LP
 \fBtran_reset\fR(9E), \fBtran_reset_notify\fR(9E), \fBscsi_abort\fR(9F)
 .sp
 .LP

@@ -7,7 +7,6 @@
 .SH NAME
 kstat_named_init, kstat_named_setstr \- initialize a named kstat
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -24,8 +23,7 @@ kstat_named_init, kstat_named_setstr \- initialize a named kstat
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
 .ne 2
 .na
@@ -118,7 +116,6 @@ Pointer to a \fBNULL\fR-terminated string.
 .RE
 
 .SH DESCRIPTION
-.LP
 \fBkstat_named_init()\fR associates a name and a type with a
 \fBkstat_named\fR(9S) structure.
 .sp
@@ -131,14 +128,11 @@ persistent kstat the string argument must remain valid even after the module
 that created the kstat is unloaded. This is the only supported method of changing
 the value of long strings.
 .SH RETURN VALUES
-.LP
 None.
 .SH CONTEXT
-.LP
 \fBkstat_named_init()\fR and \fBkstat_named_setstr()\fR can be called from user
 or kernel context.
 .SH SEE ALSO
-.LP
 \fBkstat_create\fR(9F), \fBkstat_install\fR(9F), \fBkstat\fR(9S),
 \fBkstat_named\fR(9S)
 .sp

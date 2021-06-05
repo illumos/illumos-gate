@@ -7,7 +7,6 @@
 .SH NAME
 csx_ConvertSize \- convert device sizes
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,11 +16,8 @@ csx_ConvertSize \- convert device sizes
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIcs\fR \fR
@@ -31,14 +27,10 @@ Pointer to a \fBconvert_size_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
-\fBcsx_ConvertSize()\fR is a Solaris-specific extension that provides a method
+\fBcsx_ConvertSize()\fR is an illumos-specific extension that provides a method
 for clients to convert from one type of device size representation to another,
 that is, from \fIdevsize\fR format to \fIbytes\fR and vice versa.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBconvert_size_t\fR are:
 .sp
 .in +2
@@ -101,7 +93,6 @@ is converted to a \fIbytes\fR value and returned in the \fBbytes\fR field.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -129,12 +120,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_ModifyWindow\fR(9F), \fBcsx_RequestWindow\fR(9F)
 .sp
 .LP

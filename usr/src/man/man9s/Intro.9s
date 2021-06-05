@@ -69,12 +69,12 @@ and
 in that order, and as final entries.
 .Pp
 The following table summarizes the STREAMS structures described in Section 9S.
-.Bl -column "module_info" "Solaris DDI" -offset indent
+.Bl -column "module_info" "illumos DDI" -offset indent
 .It Structure Ta Type
 .It Vt copyreq Ta DDI/DKI
 .It Vt copyresp Ta DDI/DKI
 .It Vt datab Ta DDI/DKI
-.It Vt fmodsw Ta Solaris DDI
+.It Vt fmodsw Ta illumos DDI
 .It Vt free_rtn Ta DDI/DKI
 .It Vt iocblk Ta DDI/DKI
 .It Vt linkblk Ta DDI/DKI
@@ -82,43 +82,43 @@ The following table summarizes the STREAMS structures described in Section 9S.
 .It Vt msgb Ta DDI/DKI
 .It Vt qband Ta DDI/DKI
 .It Vt qinit Ta DDI/DKI
-.It Vt queclass Ta Solaris DDI
+.It Vt queclass Ta illumos DDI
 .It Vt queue Ta DDI/DKI
 .It Vt streamtab Ta DDI/DKI
 .It Vt stroptions Ta DDI/DKI
 .El
 .Pp
 The following table summarizes structures that are not specific to STREAMS I/O.
-.Bl -column "ddi_device_acc_attr" "Solaris x86 DDI" -offset indent
+.Bl -column "ddi_device_acc_attr" "illumos x86 DDI" -offset indent
 .It Structure	Type
-.It Vt aio_req Ta Solaris DDI
+.It Vt aio_req Ta illumos DDI
 .It Vt buf Ta DDI/DKI
-.It Vt cb_ops Ta Solaris DDI
-.It Vt ddi_device_acc_attr Ta Solaris DDI
-.It Vt ddi_dma_attr Ta Solaris DDI
-.It Vt ddi_dma_cookie Ta Solaris DDI
-.It Vt ddi_dmae_req Ta Solaris x86 DDI
-.It Vt ddi_idevice_cookie Ta Solaris DDI
-.It Vt ddi_mapdev_ctl Ta Solaris DDI
-.It Vt devmap_callback_ctl Ta Solaris DDI
-.It Vt dev_ops Ta Solaris DDI
+.It Vt cb_ops Ta illumos DDI
+.It Vt ddi_device_acc_attr Ta illumos DDI
+.It Vt ddi_dma_attr Ta illumos DDI
+.It Vt ddi_dma_cookie Ta illumos DDI
+.It Vt ddi_dmae_req Ta illumos x86 DDI
+.It Vt ddi_idevice_cookie Ta illumos DDI
+.It Vt ddi_mapdev_ctl Ta illumos DDI
+.It Vt devmap_callback_ctl Ta illumos DDI
+.It Vt dev_ops Ta illumos DDI
 .It Vt iovec Ta DDI/DKI
-.It Vt kstat Ta Solaris DDI
-.It Vt kstat_intr Ta Solaris DDI
-.It Vt kstat_io Ta Solaris DDI
-.It Vt kstat_named Ta Solaris DDI
+.It Vt kstat Ta illumos DDI
+.It Vt kstat_intr Ta illumos DDI
+.It Vt kstat_io Ta illumos DDI
+.It Vt kstat_named Ta illumos DDI
 .It Vt map Ta DDI/DKI
-.It Vt modldrv Ta Solaris DDI
-.It Vt modlinkage Ta Solaris DDI
-.It Vt modlstrmod Ta Solaris DDI
-.It Vt scsi_address Ta Solaris DDI
-.It Vt scsi_arq_status Ta Solaris DDI
-.It Vt scsi_device Ta Solaris DDI
-.It Vt scsi_extended_sense Ta Solaris DDI
-.It Vt scsi_hba_tran Ta Solaris DDI
-.It Vt scsi_inquiry Ta Solaris DDI
-.It Vt scsi_pkt Ta Solaris DDI
-.It Vt scsi_status Ta Solaris DDI
+.It Vt modldrv Ta illumos DDI
+.It Vt modlinkage Ta illumos DDI
+.It Vt modlstrmod Ta illumos DDI
+.It Vt scsi_address Ta illumos DDI
+.It Vt scsi_arq_status Ta illumos DDI
+.It Vt scsi_device Ta illumos DDI
+.It Vt scsi_extended_sense Ta illumos DDI
+.It Vt scsi_hba_tran Ta illumos DDI
+.It Vt scsi_inquiry Ta illumos DDI
+.It Vt scsi_pkt Ta illumos DDI
+.It Vt scsi_status Ta illumos DDI
 .It Vt uio Ta DDI/DKI
 .El
 .Sh SEE ALSO

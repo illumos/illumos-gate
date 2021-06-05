@@ -7,7 +7,6 @@
 .SH NAME
 tran_bus_reset \- reset a SCSI bus
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h> int \fIprefix\fR
 
@@ -15,11 +14,8 @@ tran_bus_reset \- reset a SCSI bus
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI
+illumos DDI
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhba_dip\fR\fR
@@ -38,8 +34,6 @@ The level of reset required.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The  \fBtran_bus_reset()\fR vector in the \fBscsi_hba_tran\fR(9S) structure
 should be initialized during the HBA driver's \fBattach\fR(9E). It is an HBA
 entry point to be called when a user initiates a bus reset through device
@@ -65,8 +59,6 @@ Implementation is hardware specific. If it is not possible to reset the SCSI
 bus without changing the state and operating mode of the targets, the HBA
 driver should not initialize this vector or return failure.
 .SH RETURN VALUES
-.sp
-.LP
 \fBtran_bus_reset()\fR should return:
 .sp
 .ne 2
@@ -87,8 +79,6 @@ on failure.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -103,6 +93,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBtran_quiesce\fR(9E), \fBscsi_hba_tran\fR(9S)

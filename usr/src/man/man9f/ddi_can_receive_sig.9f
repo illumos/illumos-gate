@@ -7,7 +7,6 @@
 .SH NAME
 ddi_can_receive_sig \- Test for ability to receive signals
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,16 +17,10 @@ ddi_can_receive_sig \- Test for ability to receive signals
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
-.LP
 None.
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_can_receive_sig()\fR function returns a boolean value
 indicating whether the current thread can receive signals sent by
 \fBkill\fR(2). If the return value is  \fBB_FALSE\fR, then the calling  thread
@@ -38,7 +31,6 @@ Drivers that can block indefinitely awaiting an event should use this function
 to determine if additional means (such as \fBtimeout\fR(9F)) may be necessary
 to avoid creating unkillable threads.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBB_FALSE\fR \fR
@@ -61,11 +53,7 @@ are blocked (see \fBsigprocmask\fR(2)).
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_can_receive_sig()\fR function  may be called from user, kernel, or
 interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBclose\fR(9E), \fBcv_wait\fR(9F), \fBqwait\fR(9F)

@@ -7,7 +7,6 @@
 .SH NAME
 u8_strcmp \- UTF-8 string comparison function
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunddi.h>
 
@@ -16,11 +15,8 @@ u8_strcmp \- UTF-8 string comparison function
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIs1\fR, \fIs2\fR\fR
@@ -215,8 +211,6 @@ The specified Unicode version value is not supported.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 After proper pre-processing, the \fBu8_strcmp()\fR function compares two UTF-8
 strings byte-by-byte, according to the machine ordering defined by the
 corresponding version of the Unicode Standard.
@@ -225,8 +219,6 @@ corresponding version of the Unicode Standard.
 When multiple comparison options are specified, Unicode Normalization is
 performed after case-sensitive or case-insensitive processing is performed.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBu8_strcmp()\fR function returns an integer greater than, equal to, or
 less than 0 if the string pointed to by \fIs1\fR is greater than, equal to, or
 less than the string pointed to by \fIs2\fR, respectively.
@@ -237,11 +229,8 @@ character causes the function to set \fIerrno\fR to indicate the error.
 Afterward, the comparison is still performed on the resultant strings and a
 value based on byte-by-byte comparison is always returned.
 .SH CONTEXT
-.sp
-.LP
 The \fBu8_strcmp()\fR function can be called from user or interrupt context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRPerform simple default string comparison.
 .sp
 .in +2
@@ -329,8 +318,6 @@ docmp_nfd_caseinsensitive_u320(const char *u1, const char *u2) {
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -345,8 +332,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBu8_validate\fR(3C), \fBu8_textprep_str\fR(3C), \fBu8_validate\fR(3C),
 \fBattributes\fR(5), \fBu8_textprep_str\fR(9F), \fBu8_validate\fR(9F),
 \fBuconv_u16tou32\fR(9F)

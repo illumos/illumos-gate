@@ -8,7 +8,6 @@
 scsi_get_device_type_string \- look up per-device-type, returning matching
 information string
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -19,11 +18,8 @@ information string
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIprop_name\fR\fR
@@ -52,8 +48,6 @@ Pointer to a \fBscsi_device\fR(9S) structure of the target.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_get_device_type_string()\fR function looks up the \fIprop_name\fR
 property, which can be specified in the HBA's \fBdriver.conf\fR(4)file. This
 property allows specification of per-device-type information. The syntax for
@@ -95,7 +89,7 @@ For example:
 .nf
 scsi_vhci_failover_override =
 	    "STK     FLEXLINE 400",	"f_asym_lsi",
- 	    "SUN     T4",		"f_tpgs";;
+	    "SUN     T4",		"f_tpgs";;
 .fi
 .in -2
 .sp
@@ -108,8 +102,6 @@ for a matching INQUIRY string. If a match is found,
 string. The meaning of the returned <\fIinformation\fR> string is determined by
 the caller.
 .SH RETURN VALUES
-.sp
-.LP
 \fBscsi_get_device_type_string()\fR returns a copy of the matching
 <\fIinformation\fR> string, or if no match is found, \fBNULL\fR is returned.
 When a non-NULL value is returned, the caller is responsible for freeing the
@@ -122,12 +114,8 @@ kmem_free(info, strlen(info) + 1);
 .in -2
 
 .SH CONTEXT
-.sp
-.LP
 This function can be called from kernel or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBdriver.conf\fR(4)
 .sp
 .LP

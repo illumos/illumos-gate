@@ -7,18 +7,13 @@
 .SH NAME
 gld_mac_info \- Generic LAN Driver MAC info data structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/gld.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The Generic LAN Driver (GLD) Media Access Control (MAC) information
 (\fBgld_mac_info\fR) structure is the main data interface between the
 device-specific driver and GLD. It contains data required by GLD and a pointer
@@ -28,11 +23,10 @@ to an optional additional driver-specific information structure.
 The \fBgld_mac_info\fR structure should be allocated using
 \fBgld_mac_alloc()\fR and deallocated using \fBgld_mac_free()\fR. Drivers can
 make no assumptions about the length of this structure, which might be
-different in different releases of Solaris and/or GLD. Structure members
+different in different releases of illumos and/or GLD. Structure members
 private to GLD, not documented here, should not be set or read by the
 device-specific driver.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 caddr_t         gldm_private;              /* Driver private data */
@@ -210,7 +204,7 @@ Interface). This structure member must be correctly set for GLD to function
 properly.
 .sp
 Support for the DL_TPR and DL_FDDI media types is obsolete and may be removed
-in a future release of Solaris.
+in a future release of illumos.
 .RE
 
 .sp
@@ -340,8 +334,6 @@ link state, the GLD_CAP_LINKSTATE bit should be set.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBgld\fR(7D), \fBdlpi\fR(7P), \fBattach\fR(9E), \fBgld\fR(9E),
 \fBddi_add_intr\fR(9F), \fBgld\fR(9F), \fBgld_stats\fR(9S)
 .sp

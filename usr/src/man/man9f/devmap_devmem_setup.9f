@@ -7,7 +7,6 @@
 .SH NAME
 devmap_devmem_setup, devmap_umem_setup \- set driver memory mapping parameters
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -29,12 +28,8 @@ devmap_devmem_setup, devmap_umem_setup \- set driver memory mapping parameters
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
-.LP
 \fBdevmap_devmem_setup()\fR parameters:
 .sp
 .ne 2
@@ -343,8 +338,6 @@ release. Reserved for future use.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdevmap_devmem_setup()\fR and \fBdevmap_umem_setup()\fR functions are
 used in the \fBdevmap\fR(9E) entry point to pass mapping parameters from the
 driver to the system.
@@ -438,7 +431,6 @@ Drivers use \fBdevmap_umem_setup()\fR to export the kernel memory allocated by
 address that is aligned with the kernel virtual address being mapped to avoid
 cache incoherence if the mapping is not \fBMAP_FIXED.\fR
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -457,13 +449,9 @@ An error occurred.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBdevmap_devmem_setup()\fR and \fBdevmap_umem_setup()\fR can be called from
 user, kernel, and interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBexit\fR(2), \fBfork\fR(2), \fBmmap\fR(2), \fBmunmap\fR(2), \fBdevmap\fR(9E),
 \fBddi_umem_alloc\fR(9F), \fBddi_device_acc_attr\fR(9S),
 \fBdevmap_callback_ctl\fR(9S)

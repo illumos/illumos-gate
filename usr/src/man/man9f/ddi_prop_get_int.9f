@@ -7,7 +7,6 @@
 .SH NAME
 ddi_prop_get_int, ddi_prop_get_int64 \- lookup integer property
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -25,7 +24,6 @@ ddi_prop_get_int, ddi_prop_get_int64 \- lookup integer property
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImatch_dev\fR\fR
@@ -91,12 +89,8 @@ An integer value that is returned if the property cannot be found.
 .RE
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_prop_get_int()\fR and \fBddi_prop_get_int64()\fR functions search
 for an integer property and, if found, returns the value of the property.
 .sp
@@ -160,19 +154,14 @@ property.
 .LP
 \fBddi_prop_get_int64()\fR will not search the PROM for 64-bit property values.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_prop_get_int()\fR and \fBddi_prop_get_int64()\fR return the value of the
 property. If the property is not found, the argument \fBdefvalue\fR is
 returned. If the property is found, but cannot be decoded into an \fBint\fR or
 an \fBint64\fR, then \fBDDI_PROP_NOT_FOUND\fR is returned.
 .SH CONTEXT
-.sp
-.LP
 \fBddi_prop_get_int()\fR and \fBddi_prop_get_int64()\fR can be called from user
 or kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBddi_prop_get_int()\fR
 .sp
 .LP
@@ -181,7 +170,7 @@ The following example demonstrates the use of \fBddi_prop_get_int()\fR.
 .sp
 .in +2
 .nf
-\fB	
+\fB
 /*
 	* Get the value of the integer "width" property, using
 	* our own default if no such property exists
@@ -192,8 +181,6 @@ The following example demonstrates the use of \fBddi_prop_get_int()\fR.
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_prop_exists\fR(9F), \fBddi_prop_lookup\fR(9F),
 \fBddi_prop_remove\fR(9F), \fBddi_prop_update\fR(9F)
 .sp

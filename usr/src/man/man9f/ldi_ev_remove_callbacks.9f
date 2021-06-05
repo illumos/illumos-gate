@@ -7,7 +7,6 @@
 .SH NAME
 ldi_ev_remove_callbacks \- remove all callbacks for a given callback ID
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunldi.h>
 
@@ -15,11 +14,8 @@ ldi_ev_remove_callbacks \- remove all callbacks for a given callback ID
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIldi_callback_id_t id\fR\fR
@@ -31,8 +27,6 @@ An opaque data structure returned on successful calls to
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBldi_ev_remove_callback()\fR function unregisters any callbacks that were
 registered via \fBldi_ev_register_callbacks\fR(9F). Once this function returns,
 the callback \fBID\fR is no longer valid.
@@ -46,14 +40,8 @@ system if the entity registering the callback (a \fBdev_t\fR, \fBdip\fR or
 \fBmodule\fR) no longer exists on the system and the callbacks have not been
 unregistered.
 .SH RETURN VALUES
-.sp
-.LP
 None.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user and kernel contexts only.
 .SH SEE ALSO
-.sp
-.LP
 \fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F)

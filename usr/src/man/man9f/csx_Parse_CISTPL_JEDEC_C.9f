@@ -8,7 +8,6 @@
 csx_Parse_CISTPL_JEDEC_C, csx_Parse_CISTPL_JEDEC_A \- parse JEDEC Identifier
 tuples
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -25,11 +24,8 @@ tuples
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
+illumos \fBDDI\fR Specific (illumos \fBDDI\fR)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR\fR
@@ -60,8 +56,6 @@ these functions, respectively.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBcsx_Parse_CISTPL_JEDEC_C()\fR and \fBcsx_Parse_CISTPL_JEDEC_A()\fR parse the
 \fBJEDEC\fR Identifier tuples, \fBCISTPL_JEDEC_C\fR and \fBCISTPL_JEDEC_A,\fR
 respectively, into a form usable by \fBPC\fR Card drivers.
@@ -71,8 +65,6 @@ The \fBCISTPL_JEDEC_C\fR and \fBCISTPL_JEDEC_A\fR tuples are optional tuples
 provided for cards containing programmable devices. They describe information
 for Common Memory or Attribute Memory space, respectively.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcistpl_jedec_t\fR are:
 .sp
 .in +2
@@ -94,7 +86,6 @@ The structure members of \fBjedec_ident_t\fR are:
 .in -2
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -149,12 +140,8 @@ No \fBPCMCIA\fR hardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_Parse_CISTPL_DEVICE\fR(9F), \fBcsx_RegisterClient\fR(9F),
 \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)

@@ -8,7 +8,6 @@
 pci_config_setup, pci_config_teardown \- setup or tear down the resources for
 enabling accesses to the PCI Local Bus Configuration space
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -24,8 +23,7 @@ enabling accesses to the PCI Local Bus Configuration space
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -45,13 +43,11 @@ Pointer to a data access handle.
 .RE
 
 .SH DESCRIPTION
-.LP
 \fBpci_config_setup()\fR sets up the necessary resources for enabling
 subsequent data accesses to the  \fBPCI \fRLocal Bus Configuration space.
 \fBpci_config_teardown()\fR reclaims and removes those resources  represented
 by the data access handle returned from  \fBpci_config_setup()\fR.
 .SH RETURN VALUES
-.LP
 \fBpci_config_setup()\fR returns:
 .sp
 .ne 2
@@ -72,16 +68,13 @@ Unable to allocate resources for setup.
 .RE
 
 .SH CONTEXT
-.LP
 \fBpci_config_setup()\fR must be called from user or kernel context.
 \fBpci_config_teardown()\fR can be called from any context.
 .SH NOTES
-.LP
 These functions are specific to \fBPCI \fRbus device drivers. For drivers using
 these functions,  a single source to support devices with multiple bus versions
 may not be easy to maintain.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -96,7 +89,6 @@ Architecture	PCI Local Bus
 .TE
 
 .SH SEE ALSO
-.LP
 \fBattributes\fR(5)
 .sp
 .LP

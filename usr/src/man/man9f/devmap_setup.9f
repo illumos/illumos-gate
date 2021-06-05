@@ -8,7 +8,6 @@
 devmap_setup, ddi_devmap_segmap \- set up a user mapping to device memory using
 the devmap framework
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -28,11 +27,8 @@ the devmap framework
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR \fR
@@ -192,8 +188,6 @@ Pointer to the user credential structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBdevmap_setup()\fR and \fBddi_devmap_segmap()\fR allow device drivers to use
 the devmap framework to set up user mappings to device memory.  The devmap
 framework provides several advantages over the default device mapping framework
@@ -259,7 +253,6 @@ offset within the device address space. If the driver does not provide its own
 \fBdevmap\fR(9E) entry point, \fBEINVAL\fR will be returned to the
 \fBmmap\fR(2) system call.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB0\fR \fR
@@ -280,13 +273,9 @@ entry point.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBdevmap_setup()\fR and \fBddi_devmap_segmap()\fR can be called from user or
 kernel context only.
 .SH SEE ALSO
-.sp
-.LP
 \fBmmap\fR(2), \fBdevmap\fR(9E), \fBsegmap\fR(9E), \fBddi_segmap\fR(9F),
 \fBddi_segmap_setup\fR(9F), \fBcb_ops\fR(9S)
 .sp

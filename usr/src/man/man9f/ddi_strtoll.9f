@@ -47,7 +47,6 @@
 .SH NAME
 ddi_strtoll, ddi_strtoull \- string conversion functions
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -63,7 +62,6 @@ ddi_strtoll, ddi_strtoull \- string conversion functions
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIstr\fR\fR
@@ -100,12 +98,8 @@ pointer to variable which contains the converted value
 .RE
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_strtoll()\fR function converts the initial portion of the string
 pointed to by \fIstr\fR to a type \fBlonglong_t\fR representation and stores
 the converted value in \fIresult\fR.
@@ -184,19 +178,13 @@ If the subject sequence is empty or does not have the expected form, no
 conversion is performed and the value of \fIstr\fR is stored in the object
 pointed to by \fIendptr\fR, provided that \fIendptr\fR is not a null pointer.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, these functions return 0 and store the converted
 value in \fIresult\fR. If no conversion is performed due to an invalid base,
 these functions return \fBEINVAL\fR and the variable pointed by \fIresult\fR is
 not changed.
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user, kernel or interrupt context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -211,6 +199,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR

@@ -7,7 +7,6 @@
 .SH NAME
 attach \- Attach a device to the system, or resume it
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,11 +17,8 @@ attach \- Attach a device to the system, or resume it
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -43,13 +39,9 @@ values are passed to it.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBattach\fR(9E) function is the device-specific initialization entry
 point. This entry point is \fBrequired\fR and must be written.
 .SS "DDI_ATTACH"
-.sp
-.LP
 The \fBDDI_ATTACH\fR command must be provided in the \fBattach\fR(9E) entry
 point. \fBDDI_ATTACH\fR is used to initialize a given device instance. When
 \fBattach\fR(9E) is called with \fIcmd\fR set to \fBDDI_ATTACH\fR, all normal
@@ -72,8 +64,6 @@ function can be used to set the power level of a component. This function must
 not be called before data structures referenced in \fBpower\fR(9E) have been
 initialized.
 .SS "DDI_RESUME"
-.sp
-.LP
 The \fBattach()\fR function may be called with \fIcmd\fR set to
 \fBDDI_RESUME\fR after \fBdetach\fR(9E) has been successfully called with
 \fIcmd\fR set to \fBDDI_SUSPEND\fR.
@@ -121,8 +111,6 @@ an operation on the device as part of its \fBDDI_RESUME\fR processing (such as
 loading firmware so that it can detect hot-plug events).
 .RE
 .SH RETURN VALUES
-.sp
-.LP
 The \fBattach()\fR function returns:
 .sp
 .ne 2
@@ -143,8 +131,6 @@ Operation failed
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -159,8 +145,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcpr\fR(7), \fBpm\fR(7D), \fBpm\fR(9P), \fBpm-components\fR(9P),
 \fBdetach\fR(9E), \fBgetinfo\fR(9E), \fBidentify\fR(9E), \fBopen\fR(9E),
 \fBpower\fR(9E), \fBprobe\fR(9E), \fBddi_add_intr\fR(9F),

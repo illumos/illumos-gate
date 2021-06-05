@@ -54,9 +54,9 @@ allocate a message block using a caller-supplied buffer
 .sp
 .LP
 .nf
-\fBesballoca()\fR: Solaris DDI specific (Solaris DDI)
-\fBdesballoc()\fR: Solaris DDI specific (Solaris DDI)
-\fBdesballoca()\fR: Solaris DDI specific (Solaris DDI)
+\fBesballoca()\fR: illumos DDI specific (illumos DDI)
+\fBdesballoc()\fR: illumos DDI specific (illumos DDI)
+\fBdesballoca()\fR: illumos DDI specific (illumos DDI)
 .fi
 .SH PARAMETERS
 .ne 2

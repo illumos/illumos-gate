@@ -7,7 +7,6 @@
 .SH NAME
 mkiocb \- allocates a STREAMS ioctl block for M_IOCTL messages in the kernel.
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 
@@ -17,11 +16,8 @@ mkiocb \- allocates a STREAMS ioctl block for M_IOCTL messages in the kernel.
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIcommand\fR\fR
@@ -31,8 +27,6 @@ ioctl command for the \fBioc_cmd\fR field.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 STREAMS modules or drivers might need to issue an ioctl to a lower module or
 driver. The \fBmkiocb()\fR function tries to allocate (using \fBallocb\fR(9F))
 a STREAMS \fBM_IOCTL\fR message block (\fBiocblk\fR(9S)). Buffer allocation
@@ -139,20 +133,15 @@ Set to \fBIOC_NATIVE\fR to reflect that this is native to the running kernel.
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 Upon success, the \fBmkiocb()\fR function returns a pointer to the allocated
 \fBmblk_t\fR of type \fBM_IOCTL\fR.
 .sp
 .LP
 On failure, it returns a null pointer.
 .SH CONTEXT
-.sp
-.LP
 The \fBmkiocb()\fR function can be called from user, interrupt, or kernel
 context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR\fBM_IOCTL\fR Allocation
 .sp
 .LP
@@ -244,8 +233,6 @@ is available.
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBallocb\fR(9F), \fBputnext\fR(9F), \fBqbufcall\fR(9F), \fBqwait_sig\fR(9F),
 \fBcopyreq\fR(9S), \fBcopyresp\fR(9S), \fBiocblk\fR(9S)
 .sp
@@ -255,8 +242,6 @@ is available.
 .LP
 \fISTREAMS Programming Guide\fR
 .SH WARNINGS
-.sp
-.LP
 It is the module's responsibility to remember the \fBID\fR value of the
 \fBM_IOCTL\fR that was allocated. This will ensure proper cleanup and \fBID\fR
 matching when the \fBM_IOCACK\fR or \fBM_IOCNAK\fR is received.

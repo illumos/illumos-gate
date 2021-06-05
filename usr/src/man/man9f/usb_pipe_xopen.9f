@@ -29,7 +29,7 @@
 .Fa "usb_pipe_handle_t *pipe_handle"
 .Fc
 .Sh INTERFACE LEVEL
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa dip

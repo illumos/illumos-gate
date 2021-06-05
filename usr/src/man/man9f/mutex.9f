@@ -8,7 +8,6 @@
 mutex, mutex_enter, mutex_exit, mutex_init, mutex_destroy, mutex_owned,
 mutex_tryenter \- mutual exclusion lock routines
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ksynch.h>
 
@@ -42,11 +41,8 @@ mutex_tryenter \- mutual exclusion lock routines
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImp\fR\fR
@@ -84,8 +80,6 @@ Type-specific argument for initialization routine.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 A mutex enforces a policy of mutual exclusion. Only one thread at a time may
 hold a particular mutex. Threads trying to lock a held mutex will block until
 the mutex is unlocked.
@@ -135,8 +129,6 @@ memory containing the mutex, and should be called with the mutex unheld (not
 owned by any thread). The caller must be sure that no other thread attempts to
 use the mutex.
 .SH RETURN VALUES
-.sp
-.LP
 \fBmutex_tryenter()\fR returns a non-zero value on success and zero on failure.
 .sp
 .LP
@@ -144,13 +136,10 @@ use the mutex.
 holds the mutex pointed to by \fImp\fR, or when that cannot be determined, if
 any thread holds the mutex. Otherwise \fBmutex_owned()\fR returns zero.
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user, kernel, or high-level interrupt
 context, except for \fBmutex_init()\fR and \fBmutex_destroy()\fR, which can be
 called from user or kernel context only.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRInitializing a Mutex
 .sp
 .LP
@@ -184,8 +173,6 @@ xxstart(struct xxunit *un)
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlockstat\fR(1M), \fBIntro\fR(9F), \fBcondvar\fR(9F),
 \fBddi_intr_alloc\fR(9F), \fBddi_intr_add_handler\fR(9F),
 \fBddi_intr_get_pri\fR(9F), \fBddi_intr_get_softint_pri\fR(9F),
@@ -194,8 +181,6 @@ xxstart(struct xxunit *un)
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 Compiling with \fB_LOCKTEST\fR or \fB_MPSTATS\fR defined has no effect. To
 gather lock statistics, see \fBlockstat\fR(1M).
 .sp

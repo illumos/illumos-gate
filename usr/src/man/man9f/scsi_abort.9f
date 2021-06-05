@@ -7,7 +7,6 @@
 .SH NAME
 scsi_abort \- abort a SCSI command
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -17,11 +16,8 @@ scsi_abort \- abort a SCSI command
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIap\fR\fR
@@ -40,16 +36,12 @@ Pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_abort()\fR function terminates a command that has been transported
 to the host adapter driver. A \fINULL\fR \fIpkt\fR causes all outstanding
 packets to be aborted. On a successful abort, the \fBpkt_reason\fR is set to
 \fBCMD_ABORTED\fR and \fBpkt_statistics\fR is \fBOR\fR'ed with
 \fBSTAT_ABORTED\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_abort()\fR function returns:
 .sp
 .ne 2
@@ -70,12 +62,9 @@ on failure.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_abort()\fR function can be called from user, interrupt, or kernel
 context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRTerminating a command.
 .sp
 .in +2
@@ -87,8 +76,6 @@ context.
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBtran_abort\fR(9E), \fBscsi_reset\fR(9F), \fBscsi_pkt\fR(9S)
 .sp
 .LP

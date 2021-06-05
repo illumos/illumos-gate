@@ -7,18 +7,13 @@
 .SH NAME
 mt-streams \- STREAMS multithreading
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 STREAMS drivers configure the degree of concurrency using the \fBcb_flag\fR
 field in the \fBcb_ops\fR structure (see \fBcb_ops\fR(9S)). The corresponding
 field for \fBSTREAMS \fRmodules is the \fBf_flag\fR in the \fBfmodsw\fR
@@ -50,8 +45,6 @@ different entry points.
 .LP
 All MT safe modules/drivers specify the \fBD_MP\fR flag.
 .SS "Inner Perimeter Flags"
-.sp
-.LP
 The inner perimeter presence and scope are controlled by the mutually exclusive
 flags:
 .sp
@@ -92,8 +85,6 @@ The module/driver has no inner perimeter.
 .RE
 
 .SS "Outer Perimeter Flags"
-.sp
-.LP
 The outer perimeter presence is configured using:
 .sp
 .ne 2
@@ -158,8 +149,6 @@ or outer perimeter from shared to exclusive.
 The use and semantics of \fBqprocson()\fR and \fBqprocsoff\fR(9F) is
 independent of the inner and outer perimeters.
 .SH SEE ALSO
-.sp
-.LP
 \fBclose\fR(9E), \fBopen\fR(9E), \fBput\fR(9E), \fBsrv\fR(9E),
 \fBqprocsoff\fR(9F), \fBqprocson\fR(9F), \fBqwait\fR(9F), \fBqwriter\fR(9F),
 \fBcb_ops\fR(9S)

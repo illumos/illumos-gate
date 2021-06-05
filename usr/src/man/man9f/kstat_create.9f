@@ -7,7 +7,6 @@
 .SH NAME
 kstat_create \- create and initialize a new kstat
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -20,8 +19,7 @@ kstat_create \- create and initialize a new kstat
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
 .ne 2
 .na
@@ -173,7 +171,6 @@ goes away.
 .RE
 
 .SH DESCRIPTION
-.LP
 \fBkstat_create()\fR is used in conjunction with \fBkstat_install\fR(9F) to
 allocate and initialize a \fBkstat\fR(9S) structure. The method is generally as
 follows:
@@ -198,14 +195,11 @@ have the \fBks_data\fR field set at this time. The provider may also set the
 Once the \fBkstat\fR is completely initialized, \fBkstat_install\fR(9F) is used
 to make the \fBkstat\fR accessible to the outside world.
 .SH RETURN VALUES
-.LP
 If successful, \fBkstat_create()\fR returns a pointer to the allocated
 \fBkstat\fR. \fINULL\fR is returned upon failure.
 .SH CONTEXT
-.LP
 \fBkstat_create()\fR can be called from user or kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAllocating and Initializing a \fBkstat\fR Structure
 .sp
 .in +2
@@ -220,7 +214,6 @@ pkstat_t   *ksp;
 .in -2
 
 .SH SEE ALSO
-.LP
 \fBkstat\fR(3KSTAT), \fBddi_get_instance\fR(9F), \fBkstat_delete\fR(9F),
 \fBkstat_install\fR(9F), \fBkstat_named_init\fR(9F), \fBkstat\fR(9S),
 \fBkstat_named\fR(9S)

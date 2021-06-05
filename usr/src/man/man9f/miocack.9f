@@ -7,7 +7,6 @@
 .SH NAME
 miocack \- Positively acknowledge an M_IOCTL message
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -18,11 +17,8 @@ miocack \- Positively acknowledge an M_IOCTL message
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIwq\fR\fR
@@ -59,8 +55,6 @@ Value to set the ioc_rval of the \fBiocblk\fR(9S) to.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmiocack()\fR function converts an M_IOCTL message into a M_IOCACK
 message and sends the resulting message upstream.
 .sp
@@ -77,21 +71,13 @@ Callers that only need to perform the message conversion, or need to perform
 additional steps between the conversion and the      sending of the M_IOCACK
 should use \fBmioc2ack\fR(9F).
 .SH RETURN VALUES
-.sp
-.LP
 None.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, kernel or interrupt context.
 .SH NOTES
-.sp
-.LP
 Callers must not hold any locks across a \fBmiocack()\fR that can be acquired
 as part of \fBput\fR(9E) processing.
 .SH SEE ALSO
-.sp
-.LP
 \fBmioc2ack\fR(9F), \fBput\fR(9E), \fBiocblk\fR(9S)
 .sp
 .LP

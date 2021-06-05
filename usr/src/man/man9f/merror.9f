@@ -7,7 +7,6 @@
 .SH NAME
 merror \- Send an M_ERROR message upstream
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -18,11 +17,8 @@ merror \- Send an M_ERROR message upstream
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIwq\fR\fR
@@ -50,8 +46,6 @@ Error code to include in the M_ERROR message.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmerror()\fR function constructs an M_ERROR message, and sends the
 resulting message upstream.
 .sp
@@ -67,21 +61,13 @@ If the allocation or conversion fails, \fBmerror()\fR silently fails.
 Otherwise, the resulting one-byte data block is assigned the specified error
 code and sent upstream.
 .SH RETURN VALUES
-.sp
-.LP
 None.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, kernel or interrupt context.
 .SH NOTES
-.sp
-.LP
 Callers must not hold any locks across an \fBmerror()\fR that can be acquired
 as part of \fBput\fR(9E) processing.
 .SH SEE ALSO
-.sp
-.LP
 \fBput\fR(9E), \fBdupmsg\fR(9F)
 .sp
 .LP

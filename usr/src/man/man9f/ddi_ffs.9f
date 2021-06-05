@@ -23,7 +23,7 @@ ddi_ffs, ddi_fls \- find first (last) bit set in a long integer
 .fi
 
 .SH INTERFACE LEVEL
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na

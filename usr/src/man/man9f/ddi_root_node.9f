@@ -7,7 +7,6 @@
 .SH NAME
 ddi_root_node \- get the root of the dev_info tree
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -19,25 +18,15 @@ ddi_root_node \- get the root of the dev_info tree
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_root_node()\fR function returns a pointer to the root node of the
 device information tree.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_root_node()\fR function returns a pointer to a device information
 structure.
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_root_node()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR

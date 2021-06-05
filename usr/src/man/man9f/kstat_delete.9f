@@ -7,7 +7,6 @@
 .SH NAME
 kstat_delete \- remove a kstat from the system
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -18,11 +17,8 @@ kstat_delete \- remove a kstat from the system
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIksp\fR \fR
@@ -32,29 +28,19 @@ Pointer to a currently installed \fBkstat\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBkstat_delete()\fR removes \fIksp\fR from the \fBkstat\fR chain and frees all
 associated system resources.
 .SH RETURN VALUES
-.sp
-.LP
 None.
 .SH CONTEXT
-.sp
-.LP
 \fBkstat_delete()\fR can be called from any context.
 .SH SEE ALSO
-.sp
-.LP
 \fBkstat_create\fR(9F), \fBkstat_install\fR(9F), \fBkstat_named_init\fR(9F),
 \fBkstat\fR(9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 When calling \fBkstat_delete()\fR, the driver must not be holding that
 \fBkstat\fR's \fBks_lock\fR. Otherwise, it may deadlock with a \fBkstat\fR
 reader.

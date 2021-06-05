@@ -7,7 +7,6 @@
 .SH NAME
 dump \- dump memory to device during system failure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -19,12 +18,9 @@ dump \- dump memory to device during system failure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris specific (Solaris DDI). This entry point is \fBrequired\fR. For drivers
+illumos specific (illumos DDI). This entry point is \fBrequired\fR. For drivers
 that do not implement \fBdump()\fR routines, \fBnodev\fR(9F) should be used.
 .SH ARGUMENTS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR \fR
@@ -61,8 +57,6 @@ Number of blocks to dump.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBdump()\fR is used to dump a portion of virtual address space directly to a
 device in the case of system failure. It can also be used for checking the
 state of the kernel during a checkpoint operation. The memory area to be dumped
@@ -79,12 +73,8 @@ can delay(9F) be relied upon, since it is implemented via \fBtimeout()\fR. See
 .LP
 \fBdump()\fR is called at interrupt priority.
 .SH RETURN VALUES
-.sp
-.LP
 \fBdump()\fR returns \fB0\fR on success, or the appropriate error number.
 .SH SEE ALSO
-.sp
-.LP
 \fBcpr\fR(7), \fBnodev\fR(9F)
 .sp
 .LP

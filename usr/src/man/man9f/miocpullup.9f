@@ -7,7 +7,6 @@
 .SH NAME
 miocpullup \- Prepare the payload of an M_IOCTL message for access
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -18,11 +17,8 @@ miocpullup \- Prepare the payload of an M_IOCTL message for access
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImp\fR\fR
@@ -41,8 +37,6 @@ Number of bytes to prepare.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmiocpullup()\fR function prepares the payload of the specified M_IOCTL
 message for access by ensuring that it consists of at least \fIsize\fR bytes of
 data.
@@ -54,15 +48,9 @@ as necessary to provide contiguous access to at least \fIsize\fR bytes of data.
 As a special case, if \fIsize\fR is zero, \fBmiocpullup()\fR returns
 successfully, even if no payload exists.
 .SH RETURN VALUES
-.sp
-.LP
 Zero is returned on success. Otherwise an errno value is returned indicating
 the problem.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, kernel or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fISTREAMS Programming Guide\fR

@@ -7,7 +7,6 @@
 .SH NAME
 ddi_device_zero \- zero fill the device
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,11 +18,8 @@ ddi_device_zero \- zero fill the device
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -106,8 +102,6 @@ The size of each data word. Possible values are defined as:
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_device_zero()\fR function fills the given, \fIbytecount\fR, number of
 byte of zeroes to the device register or memory.
 .sp
@@ -122,8 +116,6 @@ units.
 .LP
 The \fIdev_datasz\fR argument determines the size of data word on each access.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_device_zero()\fR returns:
 .sp
 .ne 2
@@ -144,12 +136,8 @@ The byte count is not a multiple of  \fIdev_datasz\fR.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBddi_device_zero()\fR can be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_regs_map_free\fR(9F), \fBddi_regs_map_setup\fR(9F)
 .sp
 .LP

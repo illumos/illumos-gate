@@ -7,18 +7,13 @@
 .SH NAME
 usb_completion_reason \- USB completion reason definitions
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/usb/usba.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 If an error occurs during execution of a USB request, the USBA framework calls
 a client driver's exception callback handler to relay what happened. The host
 controller reports transport errors to the exception callback handler through
@@ -235,8 +230,6 @@ hardware error.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See attributes(5) for descriptions of the following attributes:
 .sp
 
@@ -253,8 +246,6 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBusb_alloc_request\fR(9F), \fBusb_pipe_bulk_xfer\fR(9F),
 \fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_pipe_intr_xfer\fR(9F),
 \fBusb_pipe_isoc_xfer\fR(9F), \fBusb_bulk_request\fR(9S),

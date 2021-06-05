@@ -8,7 +8,6 @@
 ddi_get_driver_private, ddi_set_driver_private \- get or set the address of the
 device's private data area
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -25,12 +24,8 @@ device's private data area
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
-.LP
 \fBddi_get_driver_private()\fR
 .sp
 .ne 2
@@ -63,8 +58,6 @@ Data area address to set.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_get_driver_private()\fR function returns the address of the device's
 private data area from the device information structure pointed to by
 \fIdip\fR.
@@ -74,16 +67,10 @@ The \fBddi_set_driver_private()\fR function sets the address of the device's
 private data area in the device information structure pointed to by \fIdip\fR
 with the value of \fIdata\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_get_driver_private()\fR function returns the contents of
 \fBdevi_driver_data\fR. If \fBddi_set_driver_private()\fR has not been
 previously called with \fIdip\fR, an unpredictable value is returned.
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user , interrupt, or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR

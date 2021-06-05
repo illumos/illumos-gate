@@ -7,7 +7,6 @@
 .SH NAME
 gld \- Generic \fBLAN\fR Driver
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include\fR \fB<sys/stropts.h>\fR
 .fi
@@ -28,15 +27,11 @@ gld \- Generic \fBLAN\fR Driver
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 GLD is a multi-threaded, clonable, loadable kernel module providing support for
-Solaris local area network  (\fBLAN\fR) device drivers. \fBLAN\fR drivers in
-Solaris are \fBSTREAMS\fR-based drivers that use the Data Link Provider
+illumos local area network  (\fBLAN\fR) device drivers. \fBLAN\fR drivers in
+illumos are \fBSTREAMS\fR-based drivers that use the Data Link Provider
 Interface (\fBDLPI\fR) to communicate with network protocol stacks. These
 protocol stacks use the network drivers to send and receive packets on a local
 area network. A network device driver must implement and adhere to the
@@ -44,11 +39,11 @@ requirements imposed by the DDI/DKI specification, \fBSTREAMS\fR specification,
 DLPI specification, and programmatic interface of the device itself.
 .sp
 .LP
-GLD implements most \fBSTREAMS\fR and DLPI functionality required of a Solaris
-LAN driver. Several Solaris network drivers are implemented using GLD.
+GLD implements most \fBSTREAMS\fR and DLPI functionality required of an illumos
+LAN driver. Several illumos network drivers are implemented using GLD.
 .sp
 .LP
-A Solaris network driver implemented using GLD comprises two distinct parts: a
+An illumos network driver implemented using GLD comprises two distinct parts: a
 generic component that deals with \fBSTREAMS\fR and DLPI interfaces, and a
 device-specific component that deals with the particular hardware device. The
 device-specific module indicates its dependency on the GLD module and registers
@@ -71,7 +66,7 @@ Note -
 .sp
 .RS 2
 Support for the DL_TPR and DL_FDDI media types in GLD is obsolete and may be
-removed in a future release of Solaris.
+removed in a future release of illumos.
 .RE
 .sp
 .LP
@@ -80,13 +75,9 @@ DLPI-compliant driver without using the GLD facility. This is true for devices
 that are not IEEE 802-style LAN devices, or where a device type or DLPI service
 not supported by GLD is required.
 .SS "Device Naming Constraints"
-.sp
-.LP
 The name of the device-specific driver module must adhere to the naming
 constraints outlined in the NOTES section of \fBdlpi\fR(7P).
 .SS "Type DL_ETHER: Ethernet V2 and ISO 8802-3 (IEEE 802.3)"
-.sp
-.LP
 For devices designated type \fBDL_ETHER\fR, GLD provides support for both
 Ethernet V2 and ISO 8802-3 (IEEE 802.3) packet processing. Ethernet V2 enables
 a data link service user to access and use any of a variety of conforming data
@@ -114,12 +105,11 @@ whose Ethernet MAC header type value exactly matches the value of the SAP to
 which the stream is bound. SAP values in the range [1-1535] are undefined and
 should not be used.
 .SS "Types DL_TPR and DL_FDDI: SNAP Processing"
-.LP
 Note -
 .sp
 .RS 2
 Support for the DL_TPR and DL_FDDI media types in GLD is obsolete and may be
-removed in a future release of Solaris.
+removed in a future release of illumos.
 .RE
 .sp
 .LP
@@ -153,12 +143,11 @@ specified above. Packets that do will be passed to streams bound to the
 packet's 16-bit SNAP type, as well as being passed to any stream in LLC mode
 (those bound to a SAP value of 0).
 .SS "Type DL_TPR: Source Routing"
-.LP
 Note -
 .sp
 .RS 2
 Support for the DL_TPR media type in GLD is obsolete and may be removed in a
-future release of Solaris.
+future release of illumos.
 .RE
 .sp
 .LP
@@ -180,8 +169,6 @@ Entity\fR \fB(RDE)\fR specified in \fIISO 8802-2 (IEEE 802.2)\fR Section 9.
 However, it is designed to interoperate with any such implementations that may
 exist in the same (or a bridged) network.
 .SS "Style 1 and 2 Providers"
-.sp
-.LP
 GLD implements both Style 1 and Style 2 providers. A physical point of
 attachment (\fBPPA\fR) is the point at which a system attaches itself to a
 physical communication medium. All communication on that physical medium
@@ -195,8 +182,6 @@ of zero. If a device node whose minor number is not zero is opened, Style 1 is
 indicated and the associated \fBPPA\fR is the minor number minus 1. In both
 Style 1 and Style 2 opens, the device is cloned.
 .SS "Implemented DLPI Primitives"
-.sp
-.LP
 GLD implements the following DLPI primitives:
 .sp
 .LP
@@ -301,14 +286,10 @@ primitive will be successful.
 GLD supports the DL_NOTE_LINK_UP, DL_NOTE_LINK_DOWN and DL_NOTE_SPEED
 notifications using the DL_NOTIFY_IND primitive. See \fBdlpi\fR(7P).
 .SS "Implemented ioctl Functions"
-.sp
-.LP
 GLD implements the \fBDLIOCRAW\fR ioctl described in \fBdlpi\fR(7P).  For any
 other ioctl command, GLD passes it to the device-specific driver's
 \fBgldm_ioctl()\fR function as described in \fBgld\fR(9E).
 .SS "Requirements on GLD Drivers"
-.sp
-.LP
 GLD-based drivers must include the header file \fB<sys/gld.h>\fR\&.
 .sp
 .LP
@@ -462,9 +443,7 @@ routine, using \fBgld_mac_free()\fR to deallocate the macinfo structure, and
 return \fBDDI_SUCCESS\fR. It is important to remove the interrupt \fIbefore\fR
 calling \fBgld_mac_free()\fR.
 .SS "Network Statistics"
-.sp
-.LP
-Solaris network drivers must implement statistics variables. GLD itself tallies
+illumos network drivers must implement statistics variables. GLD itself tallies
 some network statistics, but other statistics must be counted by each GLD-based
 driver. GLD provides support for GLD-based drivers to report a standard set of
 network driver statistics. Statistics are reported by GLD using the
@@ -1016,7 +995,6 @@ Number of times the ring has entered the ``Ring_Operational'' state from the
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/misc/gld\fR \fR
@@ -1026,8 +1004,6 @@ loadable kernel module
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBld\fR(1), \fBkstat\fR(7D), \fBdlpi\fR(7P), \fBattach\fR(9E), \fBgld\fR(9E),
 \fBopen\fR(9E), \fBgld\fR(9F), \fBgld_mac_info\fR(9S), \fBgld_stats\fR(9S),
 \fBkstat\fR(9S)
@@ -1035,8 +1011,6 @@ loadable kernel module
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
-.LP
 Contrary to the DLPI specification, GLD returns the device's correct address
 length and broadcast address in \fBDL_INFO_ACK\fR even before the stream has
 been attached to a \fBPPA\fR.

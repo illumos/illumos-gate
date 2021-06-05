@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dma_addr_bind_handle \- binds an address to a DMA handle
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -20,8 +19,7 @@ ddi_dma_addr_bind_handle \- binds an address to a DMA handle
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -193,7 +191,6 @@ by calling \fBddi_dma_ncookies\fR(9F).
 .RE
 
 .SH DESCRIPTION
-.LP
 \fBddi_dma_addr_bind_handle()\fR allocates \fBDMA\fR resources for a memory
 object  such that a device can perform \fBDMA\fR to or from the object.
 \fBDMA\fR resources are allocated considering the device's \fBDMA\fR attributes
@@ -310,7 +307,6 @@ functions accessible from interrupt context are be available. The callback
 function must take whatever steps are necessary to protect its critical
 resources, data structures, queues, and so on.
 .SH RETURN VALUES
-.LP
 \fBddi_dma_addr_bind_handle()\fR returns:
 .sp
 .ne 2
@@ -371,12 +367,10 @@ configuration.
 .RE
 
 .SH CONTEXT
-.LP
 \fBddi_dma_addr_bind_handle()\fR can be called from user, kernel, or interrupt
 context, except when \fIcallback\fR is set to  \fBDDI_DMA_SLEEP\fR, in which
 case it can only be called from user or kernel context.
 .SH SEE ALSO
-.LP
 \fBddi_dma_alloc_handle\fR(9F), \fBddi_dma_cookie_get\fR(9F),
 \fBddi_dma_cookie_iter\fR(9F), \fBddi_dma_free_handle\fR(9F),
 \fBddi_dma_getwin\fR(9F), \fBddi_dma_mem_alloc\fR(9F),
@@ -387,7 +381,6 @@ case it can only be called from user or kernel context.
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.LP
 If the driver permits partial mapping with the  \fBDDI_DMA_PARTIAL\fR flag, the
 number of cookies in each window may exceed the size of the device's
 scatter/gather list as specified in the  \fBdma_attr_sgllen\fR field in the

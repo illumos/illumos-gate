@@ -7,7 +7,6 @@
 .SH NAME
 pci_report_pmcap \- Report Power Management capability of a PCI device
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,11 +17,8 @@ pci_report_pmcap \- Report Power Management capability of a PCI device
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -50,8 +46,6 @@ Argument for the capability
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 Some PCI devices provide power management capabilities in addition to those
 provided by the PCI Power Management Specification. The
 \fBpci_report_pmcap()\fR function reports those Power Management capabilities
@@ -92,8 +86,6 @@ If the driver doesn't make this call, \fBPCI_PM_IDLESPEED_NONE\fR is assumed.
 In this case, one offending device can keep the entire bus from being power
 managed.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBpci_report_pmcap()\fR function returns:
 .sp
 .ne 2
@@ -114,13 +106,9 @@ Failure to report capability because of invalid argument(s)
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBpci_report_pmcap()\fR function can be called from user, kernel and
 interrupt context.
 .SH EXAMPLES
-.sp
-.LP
 1. A device driver knows that the device it controls works with any clock
 between DC and 33 MHz as specified in \fISection 4.2.3.1: Clock Specification
 \fR of the \fIPCI Bus Specification Revision 2.1\fR. The device driver makes
@@ -152,8 +140,6 @@ if (pci_report_pmcap(dip,  PCI_PM_IDLESPEED, (void *)4000) !=
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -168,8 +154,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR
 .sp
 .LP

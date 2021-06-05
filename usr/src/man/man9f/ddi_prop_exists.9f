@@ -7,7 +7,6 @@
 .SH NAME
 ddi_prop_exists \- check for the existence of a property
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,11 +18,8 @@ ddi_prop_exists \- check for the existence of a property
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImatch_dev\fR \fR
@@ -81,8 +77,6 @@ String containing the name of the property.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_prop_exists()\fR checks for the existence of a property regardless  of
 the property value data type.
 .sp
@@ -137,16 +131,11 @@ the only way to look up this property is with a  \fImatch_dev\fR set to
 .LP
 \fIname\fR must always be set to the name of the property being looked up.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_prop_exists()\fR returns  \fB1\fR if the property exists and  \fB0\fR
 otherwise.
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user or kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR: Using \fBddi_prop_exists()\fR
 .sp
 .LP
@@ -168,8 +157,6 @@ The following example demonstrates the use of  \fBddi_prop_exists()\fR.
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_prop_get_int\fR(9F), \fBddi_prop_lookup\fR(9F),
 \fBddi_prop_remove\fR(9F), \fBddi_prop_update\fR(9F)
 .sp

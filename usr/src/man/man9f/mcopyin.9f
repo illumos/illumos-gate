@@ -7,7 +7,6 @@
 .SH NAME
 mcopyin \- Convert an M_IOCTL or M_IOCDATA message to an M_COPYIN
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -19,11 +18,8 @@ mcopyin \- Convert an M_IOCTL or M_IOCDATA message to an M_COPYIN
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImp\fR\fR
@@ -61,8 +57,6 @@ set.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmcopyin()\fR function converts an M_IOCTL or M_IOCDATA message into an
 M_COPYIN message using the supplied arguments.
 .sp
@@ -78,16 +72,10 @@ assigned the pointer-sized quantity found at \fBmp->b_cont->b_rptr\fR.
 .LP
 Any trailing message blocks associated with \fImp\fR are freed.
 .SH RETURN VALUES
-.sp
-.LP
 None.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, kernel or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBmcopyout\fR(9F), \fBcopyreq\fR(9S)
 .sp
 .LP

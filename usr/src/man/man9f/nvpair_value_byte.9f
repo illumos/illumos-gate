@@ -15,7 +15,6 @@ nvpair_value_uint16_array, nvpair_value_uint32_array,
 nvpair_value_uint64_array, nvpair_value_string_array \- retrieve value from a
 name-value pair
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/nvpair.h>
 
@@ -150,11 +149,8 @@ name-value pair
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInvpair\fR\fR
@@ -182,8 +178,6 @@ Address to store the value or starting address of array value.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions retrieve the value of \fInvpair\fR. The data type of
 \fInvpair\fR must match the function name for the call to be successful.
 .sp
@@ -203,7 +197,6 @@ removed from or replaced in an nvlist. Replacement can happen during pair
 addition on nvlists created with NV_UNIQUE_NAME_TYPE and NV_UNIQUE_NAME. See
 \fBnvlist_alloc(9F)\fR for more details.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -223,6 +216,4 @@ match the interface name.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user, interrupt, or kernel context.

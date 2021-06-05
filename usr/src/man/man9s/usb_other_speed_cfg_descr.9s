@@ -7,18 +7,13 @@
 .SH NAME
 usb_other_speed_cfg_descr \- USB other speed configuration descriptor
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/usb/usba.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 The \fBusb_other_speed_cfg_descr_t\fR configuration descriptor defines how
 fields of a high speed device's configuration descriptor change if that device
 is run at its other speed. Fields of this descriptor reflect configuration
@@ -64,8 +59,6 @@ uint8_t     bMaxPower              Maximum power consumption
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -82,8 +75,6 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBusb_get_alt_if\fR(9F), \fBusb_get_cfg\fR(9F),
 \fBusb_get_dev_data\fR(9F), \fBusb_get_string_descr\fR(9F),
 \fBusb_parse_data\fR(9F), \fBusb_cfg_descr\fR(9S), \fBusb_ctrl_request\fR(9S),

@@ -8,7 +8,6 @@
 scsi_hba_tran_alloc, scsi_hba_tran_free \- allocate and free transport
 structures
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -23,11 +22,8 @@ structures
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -56,8 +52,6 @@ Pointer to a \fBscsi_hba_tran\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 For \fBscsi_hba_tran_alloc()\fR:
 .sp
 .LP
@@ -78,13 +72,9 @@ For \fBscsi_hba_tran_free()\fR:
 The \fBscsi_hba_tran_free()\fR function is used to free the
 \fBscsi_hba_tran\fR(9S) structure allocated by \fBscsi_hba_tran_alloc()\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_hba_tran_alloc()\fR function returns a pointer to the allocated
 transport structure, or \fBNULL\fR if no space is available.
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_hba_tran_alloc()\fR function can be called from user, interrupt, or
 kernel context. Drivers must not allow \fBscsi_hba_tran_alloc()\fR to sleep if
 called from an interrupt routine.
@@ -93,8 +83,6 @@ called from an interrupt routine.
 The \fBscsi_hba_tran_free()\fR function can be called from user, interrupt, or
 kernel context context.
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_hba_attach_setup\fR(9F), \fBscsi_hba_tran\fR(9S)
 .sp
 .LP

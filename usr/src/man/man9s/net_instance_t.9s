@@ -8,18 +8,13 @@
 .SH NAME
 net_instance_t \- packet event structure passed through to hooks
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/neti.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnet_instance_t\fR data structure defines a collection of instances to be
 called when relevant events happen within \fBIP\fR. The value returned by the
 \fBnin_create()\fR function is stored internally and passed back to both the
@@ -27,7 +22,6 @@ called when relevant events happen within \fBIP\fR. The value returned by the
 The \fBnetid_t\fR passed through to each function can be used to uniquely
 identify each instance of \fBIP\fR.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
     char    *nin_name;
@@ -76,8 +70,6 @@ Function to be called when an instance of \fBIP\fR is being shutdown.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -92,6 +84,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBnetinfo\fR(9F), \fBattributes\fR(5)

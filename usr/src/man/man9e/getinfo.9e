@@ -7,7 +7,6 @@
 .SH NAME
 getinfo \- get device driver information
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,12 +18,9 @@ getinfo \- get device driver information
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI). This entry point is \fBrequired\fR for
+illumos DDI specific (illumos DDI). This entry point is \fBrequired\fR for
 drivers which export \fBcb_ops\fR(9S) entry points.
 .SH ARGUMENTS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -62,8 +58,6 @@ Pointer to where the requested information is stored.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 When \fIcmd\fR is set to \fBDDI_INFO_DEVT2DEVINFO\fR, \fBgetinfo()\fR should
 return the \fBdev_info_t\fR pointer associated with the \fBdev_t\fR \fIarg\fR.
 The \fBdev_info_t\fR pointer should be returned in the field pointed to by
@@ -81,8 +75,6 @@ provide a \fBgetinfo()\fR entry point, and may use \fBnodev\fR(9F) in the
 \fRdriver is an example of a driver which is not required to provide
 \fBcb_ops\fR(9S) entry points.
 .SH RETURN VALUES
-.sp
-.LP
 \fBgetinfo()\fR should return:
 .sp
 .ne 2
@@ -103,36 +95,37 @@ on failure.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR\fBgetinfo()\fR implementation
 .sp
 .in +2
 .nf
 /*ARGSUSED*/
 static int
-rd_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, \e
-void **resultp)
+rd_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
+    void **resultp)
 {
-       /* Note that in this simple example
-        * the minor number is the instance
-        * number. 	 */
+     /*
+      * Note that in this simple example
+      * the minor number is the instance
+      * number.
+      */
 
      devstate_t *sp;
      int error = DDI_FAILURE;
      switch (infocmd) {
      case DDI_INFO_DEVT2DEVINFO:
-          if ((sp = ddi_get_soft_state(statep,
-              getminor((dev_t) arg))) != NULL) {
-                 *resultp = sp->devi;
-                 error = DDI_SUCCESS;
-          } else
-                 *result = NULL;
-          break;
+	  if ((sp = ddi_get_soft_state(statep,
+	      getminor((dev_t) arg))) != NULL) {
+		 *resultp = sp->devi;
+		 error = DDI_SUCCESS;
+	  } else
+		 *result = NULL;
+	  break;
 
      case DDI_INFO_DEVT2INSTANCE:
-          *resultp = (void *) (uintptr_t) getminor((dev_t) arg);
-          error = DDI_SUCCESS;
-          break;
+	  *resultp = (void *) (uintptr_t) getminor((dev_t) arg);
+	  error = DDI_SUCCESS;
+	  break;
      }
 
      return (error);
@@ -141,15 +134,11 @@ void **resultp)
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_no_info\fR(9F), \fBnodev\fR(9F), \fBcb_ops\fR(9S), \fBdev_ops\fR(9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 Non-\fBgld\fR(7D)-based DLPI network streams drivers are encouraged to switch
 to \fBgld\fR(7D). Failing this, a driver that creates DLPI style-2   minor
 nodes must specify CLONE_DEV for its style-2 \fBddi_create_minor_node\fR(9F)

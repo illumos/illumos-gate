@@ -7,7 +7,6 @@
 .SH NAME
 scsi_hba_lookup_capstr \- return index matching capability string
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -17,11 +16,8 @@ scsi_hba_lookup_capstr \- return index matching capability string
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIcapstr\fR\fR
@@ -31,8 +27,6 @@ Pointer to a string
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_hba_lookup_capstr()\fR function attempts to match \fIcapstr\fR
 against a known set of capability strings. If found, the defined index for the
 matched capability is returned.
@@ -230,19 +224,13 @@ The following indices are defined for the capability strings listed below.
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_hba_lookup_capstr()\fR function returns a non-negative index value
 that corresponds to the capability string. If the string does not match a known
 capability, \fB-1\fR is returned.
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_hba_lookup_capstr()\fR function can be called from user, interrupt,
 or kernel context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -257,8 +245,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBtran_getcap\fR(9E), \fBtran_setcap\fR(9E), \fBscsi_ifgetcap\fR(9F),
 \fBscsi_ifsetcap\fR(9F), \fBscsi_reset_notify\fR(9F)
 .sp

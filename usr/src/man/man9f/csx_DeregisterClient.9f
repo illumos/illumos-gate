@@ -7,7 +7,6 @@
 .SH NAME
 csx_DeregisterClient \- remove client from Card Services list
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,11 +16,8 @@ csx_DeregisterClient \- remove client from Card Services list
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR \fR
@@ -31,8 +27,6 @@ Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function removes a client from the list of registered clients maintained
 by Card Services. The Client Handle returned by \fBcsx_RegisterClient\fR(9F) is
 passed in the \fBclient_handle_t\fR argument.
@@ -41,7 +35,6 @@ passed in the \fBclient_handle_t\fR argument.
 The client must have returned all requested resources before this function is
 called. If any resources have not been released, \fBCS_IN_USE\fR is returned.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -78,18 +71,12 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_RegisterClient\fR(9F)
 .sp
 .LP
 \fIPC Card 95 Standard, PCMCIA/JEIDA\fR
 .SH WARNINGS
-.sp
-.LP
 Clients should be prepared to receive callbacks until Card Services returns
 from this request successfully.

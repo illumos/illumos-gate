@@ -7,7 +7,6 @@
 .SH NAME
 ddi_intr_get_pending \- get pending bit for a given interrupt
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -18,11 +17,8 @@ ddi_intr_get_pending \- get pending bit for a given interrupt
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIh\fR\fR
@@ -41,8 +37,6 @@ Pointer to the pending capability returned for this handle
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_intr_get_pending()\fR function returns non-zero as the integer
 pointed to by the \fIpendingp\fR argument if a corresponding interrupt is
 pending. The corresponding interrupt handle \fIh\fR must already be allocated.
@@ -56,8 +50,6 @@ If the \fBDDI_INTR_FLAG_PENDING\fR capability is not supported,
 \fBddi_intr_get_pending()\fR returns \fBDDI_ENOTSUP\fR and zero in
 \fIpendingp\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_intr_get_pending()\fR function returns:
 .sp
 .ne 2
@@ -96,13 +88,9 @@ On device not supporting operation.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_intr_get_pending()\fR function can be called from either user or
 kernel non-interrupt context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -117,8 +105,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBddi_intr_block_enable\fR(9F),
 \fBddi_intr_block_disable\fR(9F), \fBddi_intr_clr_mask\fR(9F),
 \fBddi_intr_disable\fR(9F), \fBddi_intr_enable\fR(9F),
@@ -127,8 +113,6 @@ Interface Stability	Evolving
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 Any consumer of this interface should verify that the return value is not equal
 to \fBDDI_SUCCESS\fR. Incomplete checking for failure codes could result in
 inconsistent behavior among platforms.

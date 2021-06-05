@@ -8,7 +8,6 @@
 .SH NAME
 ddi_node_name \- return the devinfo node name
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,11 +18,8 @@ ddi_node_name \- return the devinfo node name
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -33,23 +29,15 @@ A pointer the device's \fBdev_info\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_node_name()\fR function returns the device node name contained in
 the \fBdev_info\fR node pointed to by \fIdip\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_node_name()\fR function returns the device node name contained in
 the \fBdev_info\fR structure.
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_node_name()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_binding_name\fR(9F)
 .sp
 .LP

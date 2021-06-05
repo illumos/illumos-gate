@@ -7,7 +7,6 @@
 .SH NAME
 pm_trans_check \- Device power cycle advisory check
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunddi.h>
 
@@ -15,11 +14,8 @@ pm_trans_check \- Device power cycle advisory check
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdatap\fR\fR
@@ -38,8 +34,6 @@ Pointer to time difference when next power cycle will be advised
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpm_trans_check()\fR function checks if a power-cycle is currently
 advised based on data in the \fBpm_trans_data\fR  structure. This function is
 provided to prevent damage to devices from excess power cycles; drivers for
@@ -96,7 +90,6 @@ struct pm_trans_data {
 .in -2
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB1\fR\fR
@@ -124,8 +117,6 @@ Error due to invalid argument.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -140,8 +131,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBpower.conf\fR(4), \fBattributes\fR(5), \fBpower\fR(9E)
 .sp
 .LP

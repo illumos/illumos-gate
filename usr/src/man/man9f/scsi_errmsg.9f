@@ -7,7 +7,6 @@
 .SH NAME
 scsi_errmsg \- display a SCSI request sense message
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -19,11 +18,8 @@ scsi_errmsg \- display a SCSI request sense message
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdevp\fR\fR
@@ -96,8 +92,6 @@ A pointer to a \fBscsi_extended_sense\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_errmsg()\fR function interprets the request sense information in
 the \fIsensep\fR pointer and generates a standard message that is displayed
 using \fBscsi_log\fR(9F). The first line of the message is always a
@@ -121,13 +115,13 @@ following table:
 .TS
 c c c
 l l l .
-\fBSeverity Value:\fR	\fBString:\fR	
-\fBSCSI_ERR_ALL\fR	\fBAll\fR	
-\fBSCSI_ERR_UNKNOWN\fR	\fBUnknown\fR	
-\fBSCSI_ERR_INFO\fR	\fBInformational\fR	
-\fBSCSI_ERR_RECOVERE\fR	\fBRecovered\fR	
-\fBSCSI_ERR_RETRYABL\fR	\fBRetryable\fR	
-\fBSCSI_ERR_FATAL\fR	\fBFatal\fR	
+\fBSeverity Value:\fR	\fBString:\fR
+\fBSCSI_ERR_ALL\fR	\fBAll\fR
+\fBSCSI_ERR_UNKNOWN\fR	\fBUnknown\fR
+\fBSCSI_ERR_INFO\fR	\fBInformational\fR
+\fBSCSI_ERR_RECOVERE\fR	\fBRecovered\fR
+\fBSCSI_ERR_RETRYABL\fR	\fBRetryable\fR
+\fBSCSI_ERR_FATAL\fR	\fBFatal\fR
 .TE
 
 .sp
@@ -183,12 +177,9 @@ static struct scsi_key_strings scsi_cmds[] = {
 .in -2
 
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_errmsg()\fR function may be called from user, interrupt, or kernel
 context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRGenerating error information.
 .sp
 .LP
@@ -219,8 +210,6 @@ ASC: 0x29 (reset), ASCQ: 0x0, FRU: 0x0\fR
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcmn_err\fR(9F), \fBscsi_log\fR(9F), \fBscsi_device\fR(9S),
 \fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
 .sp

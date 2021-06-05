@@ -7,7 +7,6 @@
 .SH NAME
 csx_ParseTuple \- generic tuple parser
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -18,11 +17,8 @@ csx_ParseTuple \- generic tuple parser
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
+illumos \fBDDI\fR Specific (illumos \fBDDI\fR)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR \fR
@@ -61,12 +57,8 @@ Extended tuple data for some tuples.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function is the generic tuple parser entry point.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcisparse_t\fR are:
 .sp
 .in +2
@@ -101,7 +93,6 @@ The structure members of \fBcisparse_t\fR are:
 .in -2
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -165,12 +156,8 @@ No \fBPCMCIA\fR hardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_Parse_CISTPL_BATTERY\fR(9F), \fBcsx_Parse_CISTPL_BYTEORDER\fR(9F),
 \fBcsx_Parse_CISTPL_CFTABLE_ENTRY\fR(9F), \fBcsx_Parse_CISTPL_CONFIG\fR(9F),

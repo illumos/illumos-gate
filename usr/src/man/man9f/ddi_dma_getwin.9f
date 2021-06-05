@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dma_getwin \- activate a new DMA window
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -20,8 +19,7 @@ ddi_dma_getwin \- activate a new DMA window
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -84,7 +82,6 @@ by calling \fBddi_dma_ncookies\fR(9F).
 .RE
 
 .SH DESCRIPTION
-.LP
 \fBddi_dma_getwin()\fR activates a new  \fBDMA\fR window. If a  \fBDMA\fR
 resource allocation request returns \fBDDI_DMA_PARTIAL_MAP\fR indicating that
 resources for less than the entire object were allocated, the current
@@ -122,7 +119,6 @@ the interrupt routine returns without invoking another  \fBDMA\fR transfer.
 Otherwise, it calls  \fBddi_dma_getwin()\fR to shift the current window and
 start another \fBDMA\fR transfer.
 .SH RETURN VALUES
-.LP
 \fBddi_dma_getwin()\fR returns:
 .sp
 .ne 2
@@ -143,10 +139,8 @@ Resources for the specified \fBDMA\fR window are allocated.
 .RE
 
 .SH CONTEXT
-.LP
 \fBddi_dma_getwin()\fR can be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-.LP
 \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
 \fBddi_dma_buf_bind_handle\fR(9F),  \fBddi_dma_cookie_get\fR(9F),
 \fBddi_dma_cookie_iter\fR(9F), \fBddi_dma_ncookies\fR(9F),

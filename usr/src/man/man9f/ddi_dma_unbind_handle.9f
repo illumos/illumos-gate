@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dma_unbind_handle \- unbinds the address in a DMA handle
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,7 +17,6 @@ ddi_dma_unbind_handle \- unbinds the address in a DMA handle
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -29,12 +27,8 @@ The  \fBDMA\fR handle previously allocated by a call to
 .RE
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_dma_unbind_handle()\fR frees all  \fBDMA\fR resources associated with an
 existing  \fBDMA\fR handle.  When a  \fBDMA\fR transfer completes, the driver
 should call \fBddi_dma_unbind_handle()\fR to free system  \fBDMA\fR resources
@@ -43,7 +37,6 @@ established by a call to \fBddi_dma_buf_bind_handle\fR(9F) or
 implicit \fBddi_dma_sync\fR(9F) making further synchronization steps
 unnecessary.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR \fR
@@ -62,13 +55,9 @@ on failure
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBddi_dma_unbind_handle()\fR can be called from user, kernel, or interrupt
 context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
 \fBddi_dma_buf_bind_handle\fR(9F), \fBddi_dma_free_handle\fR(9F),
 \fBddi_dma_sync\fR(9F)

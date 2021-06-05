@@ -9,7 +9,6 @@ nvlist_alloc, nvlist_free, nvlist_size, nvlist_pack, nvlist_unpack, nvlist_dup,
 nv_alloc_init, nv_alloc_fini, nvlist_xalloc, nvlist_xpack, nvlist_xunpack,
 nvlist_xdup, nvlist_merge \- Manage a name-value pair list
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/nvpair.h>
 
@@ -104,8 +103,7 @@ Pluggable Allocation Initialization with Fixed Allocator:
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
 .ne 2
 .na
@@ -234,7 +232,6 @@ Points to a nv_alloc_t structure to be used for the specified \fBnvlist_t\fR.
 .RE
 
 .SH DESCRIPTION
-.LP
 List Manipulation:
 .sp
 .LP
@@ -336,7 +333,6 @@ has the type \fBNV_UNIQUE_NAME_TYPE\fR).
 The \fBnvlist_lookup_nv_alloc()\fR function retrieves the pointer to the
 allocator used when manipulating a name-value pair list.
 .SS "PLUGGABLE ALLOCATORS"
-.LP
 Using Pluggable Allocators:
 .sp
 .LP
@@ -419,7 +415,6 @@ When invoked on a fixed-buffer, the \fBnv_alloc_reset()\fR function resets the
 fixed buffer and prepares it for re-use. The framework consumer is responsible
 for freeing the buffer passed to \fBnv_alloc_init()\fR.
 .SS "CREATING PLUGGABLE ALLOCATORS"
-.LP
 Any producer of name-value pairs may possibily specify his own allocator
 routines. You must provide the following pluggable allocator operations in the
 allocator implementation.
@@ -468,7 +463,6 @@ must exactly match the original allocation.
 The disposition of the allocated objects and the memory used to store them is
 left to the allocator implementation.
 .SH RETURN VALUES
-.LP
 For \fBnvlist_alloc()\fR, \fBnvlist_dup()\fR, \fBnvlist_xalloc()\fR, and
 \fBnvlist_xdup()\fR:
 .sp
@@ -575,7 +569,6 @@ For \fBnvlist_lookup_nv_alloc()\fR:
 .LP
 pointer to the allocator
 .SH USAGE
-.LP
 The fixed-buffer allocator is very simple allocator. It uses a pre-allocated
 buffer for memory allocations and it can be used in interrupt context. You are
 responsible for allocation and de-allocation for the pre-allocated buffer.
@@ -627,7 +620,6 @@ responsible for allocation and de-allocation for the pre-allocated buffer.
 .in -2
 
 .SH CONTEXT
-.LP
 The \fBnvlist_alloc()\fR, \fBnvlist_pack()\fR, \fBnvlist_unpack()\fR, and
 \fBnvlist_dup()\fR functions can be called from interrupt context only if the
 \fBKM_NOSLEEP\fR flag is set. They can be called from user context with any

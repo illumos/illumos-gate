@@ -8,7 +8,6 @@
 usb_pipe_isoc_xfer, usb_pipe_stop_isoc_polling \- USB isochronous transfer and
 polling functions
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/usb/usba.h>
 
@@ -26,10 +25,8 @@ polling functions
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.LP
 For \fBusb_pipe_isoc_xfer()\fR:
 .sp
 .ne 2
@@ -81,7 +78,6 @@ USB_FLAGS_SLEEP is the only flag recognized. Wait for polling to stop.
 .RE
 
 .SH DESCRIPTION
-.LP
 The \fBusb_pipe_isoc_xfer()\fR function requests the USBA framework to perform
 a transfer     through a USB isochronous pipe. The request is passed to the
 host controller driver (HCD), which performs the necessary transactions to
@@ -112,7 +108,6 @@ exception callbacks. Such errors will instead be logged in the packet
 descriptor's isoc_pkt_status field. These errors can be examined when the
 completed request is returned through a normal callback.
 .SS "Isochronous-OUT TRANSFERS"
-.LP
 Allocate room for data when allocating isochronous-OUT requests via
 usb_alloc_isoc_req(9F), by passing a positive value for     the \fIlen\fR
 argument. The data will be divided among the request transactions, each
@@ -127,7 +122,6 @@ new request has its USB_ATTRS_ISOC_XFER_ASAP attribute set, the host controller
 driver will queue the request to start on a frame which immediately follows the
 last frame of the last queued request.
 .SS "Isochronous-IN TRANSFERS"
-.LP
 All isochronous-IN transfers start background polling, and require only a
 single (original) request.  The USBA framework will allocate a new request each
 time polling has new data to return. Specify a zero length when calling
@@ -140,7 +134,6 @@ The original request passed to \fBusb_pipe_isoc_xfer()\fR will be used to
 return status when polling termination is requested, or for error condition
 notification. There can be only one isochronous-IN request submitted at a time.
 .SS "CALLBACKS"
-.LP
 Isochronous transfer normal-completion callbacks cannot block for any reason
 since they are called from interrupt context.  They will have
 USB_CB_INTR_CONTEXT set in their callback flags to note this.
@@ -220,7 +213,6 @@ exception callback with a completion reason of
 USB_CR_STOPPED_POLLING.
 .RE
 .SH RETURN VALUES
-.LP
 For \fBusb_pipe_isoc_xfer()\fR:
 .sp
 .ne 2
@@ -367,7 +359,6 @@ context; the pipe handle is invalid, NULL or pertains to a closing or closed
 pipe; or the pipe is in an error state. Messages regarding these errors will be
 logged to the console logfile.
 .SH CONTEXT
-.LP
 Both of these functions may be called from kernel or user context without
 regard to arguments. May be called from interrupt context only when the
 USB_FLAGS_SLEEP flag is clear.
@@ -421,7 +412,6 @@ USB_FLAGS_SLEEP flag is clear.
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -438,7 +428,6 @@ Interface stability	Evolving
 .TE
 
 .SH SEE ALSO
-.LP
 \fBattributes\fR(5), \fBusb_alloc_request\fR(9F),
 \fBusb_get_current_frame_number\fR(9F), \fBusb_get_cfg\fR(9F),
 \fBusb_get_max_pkts_per_isoc_request\fR(9F), \fBusb_get_status\fR(9F),

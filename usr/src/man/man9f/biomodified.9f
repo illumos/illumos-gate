@@ -7,7 +7,6 @@
 .SH NAME
 biomodified \- check if a buffer is modified
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -16,11 +15,8 @@ biomodified \- check if a buffer is modified
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIbp\fR\fR
@@ -30,8 +26,6 @@ Pointer to the buffer header structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBbiomodified()\fR function returns status to indicate if the buffer is
 modified. The  \fBbiomodified()\fR function is only supported for paged- \fBI/O
 \fRrequest, that is the \fBB_PAGEIO\fRflag must be set in the \fIb_flags\fR
@@ -52,8 +46,6 @@ copies on all submirrors are identical. The \fBbiomodified()\fR function can be
 used in the device driver to detect any modifications to  the buffer by the
 user program during the time the buffer is written to multiple submirrors.
 .SH RETURN VALUES
-.sp
-.LP
 The  \fBbiomodified()\fR function returns the following values:
 .sp
 .ne 2
@@ -83,12 +75,8 @@ Buffer is not used for paged \fBI/O\fR request.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBbiomodified()\fR can be called from any context.
 .SH SEE ALSO
-.sp
-.LP
 \fBbp_mapin\fR(9F), \fBbuf\fR(9S)
 .sp
 .LP

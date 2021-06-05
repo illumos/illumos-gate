@@ -7,22 +7,16 @@
 .SH NAME
 modlmisc \- linkage structure for loadable miscellaneous modules
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/modctl.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmodlmisc\fR structure is used by miscellaneous modules to export module
 specific information to the kernel.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 struct mod_ops      *misc_modops;
@@ -52,6 +46,4 @@ also contain other information (such as a version number).
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBmodload\fR(1M), \fBmodlinkage\fR(9S)

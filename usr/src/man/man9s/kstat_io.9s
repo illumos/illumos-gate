@@ -7,7 +7,6 @@
 .SH NAME
 kstat_io \- structure for I/O kstats
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -16,12 +15,8 @@ kstat_io \- structure for I/O kstats
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 I/O kstat statistics are kept in a \fBkstat_io\fR structure. When
 \fBkstat_create\fR(9F) creates an \fBI/O\fR \fBkstat\fR, the \fBks_data\fR
 field is a pointer to one of these structures. The macro \fBKSTAT_IO_PTR()\fR
@@ -34,7 +29,6 @@ is provided to retrieve this field. It looks like this:
 .in -2
 
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 u_longlong_t      nread;      /* number of bytes read */
@@ -65,8 +59,6 @@ write operation.
 Other \fBI/O\fR statistics are updated through the use of the
 \fBkstat_queue\fR(9F) functions.
 .SH SEE ALSO
-.sp
-.LP
 \fBkstat_create\fR(9F), \fBkstat_named_init\fR(9F), \fBkstat_queue\fR(9F),
 \fBkstat_runq_back_to_waitq\fR(9F), \fBkstat_runq_enter\fR(9F),
 \fBkstat_runq_exit\fR(9F), \fBkstat_waitq_enter\fR(9F),

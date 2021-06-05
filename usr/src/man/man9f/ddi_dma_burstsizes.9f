@@ -8,7 +8,6 @@
 .SH NAME
 ddi_dma_burstsizes \- find out the allowed burst sizes for a DMA mapping
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -20,11 +19,8 @@ ddi_dma_burstsizes \- find out the allowed burst sizes for a DMA mapping
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -34,26 +30,18 @@ A \fBDMA\fR handle.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_dma_burstsizes()\fR returns the allowed burst sizes for a \fBDMA\fR
 mapping. This value is derived from the \fBdma_attr_burstsizes\fR member of the
 \fBddi_dma_attr\fR(9S) structure, but it shows the allowable burstsizes
 \fBafter\fR imposing on it the limitations of other device layers in addition
 to device's own limitations.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_dma_burstsizes()\fR returns a binary encoded value of the allowable
 \fBDMA\fR burst sizes. See \fBddi_dma_attr\fR(9S) for a discussion of
 \fBDMA\fR burst sizes.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_dma_alloc_handle\fR(9F), \fBddi_dma_attr\fR(9S)
 .sp
 .LP

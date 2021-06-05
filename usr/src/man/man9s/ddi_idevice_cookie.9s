@@ -7,27 +7,21 @@
 .SH NAME
 ddi_idevice_cookie \- device interrupt cookie
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI). This interface is obsolete. Use the new
+illumos DDI specific (illumos DDI). This interface is obsolete. Use the new
 interrupt interfaces referenced in \fBIntro\fR(9F). Refer to \fIWriting Device
 Drivers\fR for more information.
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_idevice_cookie_t\fR structure contains interrupt priority and
 interrupt vector information for a device. This structure is useful for devices
 having programmable bus-interrupt levels. \fBddi_add_intr\fR(9F) assigns values
 to the \fBddi_idevice_cookie_t\fR structure members.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 u_short	idev_vector;      /* interrupt vector */
@@ -41,8 +35,6 @@ The \fBidev_vector\fR field contains the interrupt vector number for vectored
 bus architectures such as VMEbus. The \fBidev_priority\fR field contains the
 bus interrupt priority level.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -57,8 +49,6 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_add_intr\fR(9F), \fBIntro\fR(9F)
 .sp
 .LP

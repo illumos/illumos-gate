@@ -8,18 +8,13 @@
 .SH NAME
 tuple \- card information structure (CIS) access structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI Specific (Solaris DDI)
+illumos DDI Specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 The \fBtuple_t\fR structure is the basic data structure provided by card
 services to manage \fBPC\fR card information. A \fBPC\fR card provides
 identification and configuration information through its card information
@@ -62,14 +57,12 @@ of the number of tuple-parsing utility functions; for custom tuples, the driver
 may get access to the raw tuple data by calling \fBcsx_GetTupleData\fR(9F).
 .sp
 .LP
-Solaris \fBPC\fR card drivers do not need to be concerned with which \fBCIS
+illumos \fBPC\fR card drivers do not need to be concerned with which \fBCIS
 \fRchain a tuple appears in. On a multi-function \fBPC\fR card, the client will
 get the tuples from the global \fBCIS \fRfollowed by the tuples in the
 function-specific \fBCIS\fR. The caller will not get any tuples from a
 function-specific \fBCIS \fRthat does not belong to the caller's function.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBtuple_t\fR are:
 .sp
 .in +2
@@ -96,7 +89,7 @@ The fields are defined as follows:
 \fB\fBSocket\fR \fR
 .ad
 .RS 17n
-Not used in Solaris, but for portability with other card services
+Not used in illumos, but for portability with other card services
 implementations, it should be set to the logical socket number.
 .RE
 
@@ -220,8 +213,6 @@ the \fBDesiredTuple\fR field is returned.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_ParseTuple\fR(9F), \fBcsx_Parse_CISTPL_BATTERY\fR(9F),
 \fBcsx_Parse_CISTPL_BYTEORDER\fR(9F), \fBcsx_Parse_CISTPL_CFTABLE_ENTRY\fR(9F),

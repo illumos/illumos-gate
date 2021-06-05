@@ -7,7 +7,6 @@
 .SH NAME
 devmap_access \- device mapping access entry point
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,11 +18,8 @@ devmap_access \- device mapping access entry point
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH ARGUMENTS
-.sp
 .ne 2
 .na
 \fB\fIdhp\fR \fR
@@ -132,8 +128,6 @@ Execution access attempted.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdevmap_access()\fR entry point is an optional routine.  It notifies
 drivers whenever an access is made to a mapping described by  \fIdhp\fR that
 has not been validated or does  not have sufficient protection for the access.
@@ -167,8 +161,6 @@ drivers should perform on the memory object.  If \fBtype\fR is either
 A non-zero return value from  \fBdevmap_access()\fR may result in a
 \fBSIGSEGV\fR or \fBSIGBUS\fR signal being delivered to the process.
 .SH RETURN VALUES
-.sp
-.LP
 \fBdevmap_access()\fR returns the following values:
 .sp
 .ne 2
@@ -190,7 +182,6 @@ An error occurred.  The return value from  \fBdevmap_do_ctxmgt\fR(9F) or
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR\fBdevmap_access()\fR entry point
 .sp
 .LP
@@ -263,8 +254,6 @@ xxdevmap_access(devmap_cookie_t dhp, void *pvtp, offset_t off,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdevmap_map\fR(9E), \fBdevmap_default_access\fR(9F),
 \fBdevmap_do_ctxmgt\fR(9F), \fBdevmap_callback_ctl\fR(9S)
 .sp

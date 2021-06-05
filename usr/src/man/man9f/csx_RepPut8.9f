@@ -8,7 +8,6 @@
 csx_RepPut8, csx_RepPut16, csx_RepPut32, csx_RepPut64 \- write repetitively to
 the device register
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -37,11 +36,8 @@ the device register
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
+illumos \fBDDI\fR Specific (illumos \fBDDI\fR)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -88,8 +84,6 @@ Device address flags.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions generate multiple writes of various sizes to the mapped memory
 or device register.
 .sp
@@ -114,12 +108,8 @@ However, when the \fIflags\fR argument is set to \fBCS_DEV_NO_AUTOINCR\fR, the
 same device offset will be used for every datum access. For example, this flag
 may be useful when writing to a data register.
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_DupHandle\fR(9F), \fBcsx_Get8\fR(9F), \fBcsx_GetMappedAddr\fR(9F),
 \fBcsx_Put8\fR(9F), \fBcsx_RepGet8\fR(9F), \fBcsx_RequestIO\fR(9F),
 \fBcsx_RequestWindow\fR(9F)

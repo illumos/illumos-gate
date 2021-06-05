@@ -8,7 +8,6 @@
 pm_power_has_changed \- Notify Power Management framework of autonomous power
 level change
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -17,11 +16,8 @@ level change
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -49,8 +45,6 @@ Power level to which the indicated component has changed
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpm_power_has_changed\fR(9F) function notifies the Power Management
 framework that the power level of component of \fIdip \fR has changed to
 \fIlevel\fR.
@@ -84,8 +78,6 @@ function must be called from the same thread which entered \fBattach\fR(9E),
 \fBdetach\fR(9E) or \fBpower\fR(9E).
 .RE
 .SH RETURN VALUES
-.sp
-.LP
 The \fBpm_power_has_changed()\fR function returns:
 .sp
 .ne 2
@@ -106,14 +98,10 @@ Invalid component \fIcomponent\fR or power level \fIlevel\fR.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user or kernel context. This function can also
 be called from interrupt context, providing that it is not the first Power
 Management function called by the driver.
 .SH EXAMPLES
-.sp
-.LP
 A hypothetical driver might include this code to handle
 \fBpm_power_has_changed\fR(9F):
 .sp
@@ -164,8 +152,6 @@ xxdisk_power(dev_info *dip, int comp, int level)
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -180,8 +166,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBpower.conf\fR(4), \fBpm\fR(7D), \fBattach\fR(9E), \fBdetach\fR(9E),
 \fBpower\fR(9E), \fBpm_busy_component\fR(9F), \fBpm_idle_component\fR(9F),
 \fBpm_raise_power\fR(9F), \fBpm_lower_power\fR(9F), \fBpm\fR(9P),

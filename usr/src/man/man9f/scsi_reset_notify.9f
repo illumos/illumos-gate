@@ -8,7 +8,6 @@
 .SH NAME
 scsi_reset_notify \- notify target driver of bus resets
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -19,11 +18,8 @@ scsi_reset_notify \- notify target driver of bus resets
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIap\fR\fR
@@ -60,8 +56,6 @@ The callback function argument.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_reset_notify()\fR function is used by a target driver when it needs
 to be notified of a bus reset. The bus reset could be issued by the transport
 layer (e.g. the host bus adapter (\fBHBA)\fR driver or controller) or by
@@ -95,8 +89,6 @@ Target drivers can find out whether the \fBHBA\fR driver and controller support
 reset notification by checking the  \fBreset-notification\fR capability using
 the \fBscsi_ifgetcap\fR(9F) function.
 .SH RETURN VALUES
-.sp
-.LP
 If \fIflag\fR is \fBSCSI_RESET_NOTIFY\fR, \fBscsi_reset_notify()\fR returns:
 .sp
 .ne 2
@@ -139,13 +131,9 @@ No notification request was registered.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_reset_notify()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_address\fR(9S), \fBscsi_ifgetcap\fR(9F)
 .sp
 .LP

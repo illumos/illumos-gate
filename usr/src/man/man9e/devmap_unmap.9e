@@ -7,7 +7,6 @@
 .SH NAME
 devmap_unmap \- device mapping unmap entry point
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -20,11 +19,8 @@ devmap_unmap \- device mapping unmap entry point
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH ARGUMENTS
-.sp
 .ne 2
 .na
 \fB\fIdhp\fR \fR
@@ -103,8 +99,6 @@ for the new region that begins at (\fIoff\fR + \fIlen\fR);  ignored if
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBdevmap_unmap()\fR is called when the system removes the mapping in the range
 [ \fIoff\fR, \fIoff\fR + \fIlen\fR ], such as in the  \fBmunmap\fR(2) or
 \fBexit\fR(2) system calls. Device drivers use \fBdevmap_unmap()\fR to free up
@@ -146,7 +140,6 @@ example, stored in \fIpvtp\fR) and to set \fI*new_pvtp1\fR to point to it.
 The drivers should free up the driver private data, \fIpvtp\fR, previously
 allocated in \fBdevmap_map\fR(9E) before returning to the system.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR\fBdevmap_unmap()\fR implementation
 .sp
 .in +2
@@ -193,8 +186,6 @@ xxdevmap_unmap(devmap_cookie_t dhp, void *pvtp, offset_t off,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBexit\fR(2), \fBmunmap\fR(2), \fBdevmap_map\fR(9E),
 \fBdevmap_callback_ctl\fR(9S)
 .sp

@@ -21,7 +21,7 @@ usb_pipe_close \- Close and cleanup a USB device pipe
 .fi
 
 .SH INTERFACE LEVEL
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
 .ne 2
 .na

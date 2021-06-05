@@ -7,7 +7,6 @@
 .SH NAME
 csx_FreeHandle \- free access handle
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,11 +16,8 @@ csx_FreeHandle \- free access handle
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -32,15 +28,12 @@ The access handle returned from \fBcsx_RequestIO\fR(9F),
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function frees the handle, \fIhandle\fR. If the handle was created by the
 \fBcsx_DupHandle\fR(9F) function, this function will free the storage
 associated with this handle, but will not modify any resources that the
 original handle refers to. If the handle was created by a common access setup
 function, this function will release the resources associated with this handle.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -59,12 +52,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_DupHandle\fR(9F), \fBcsx_RequestIO\fR(9F), \fBcsx_RequestWindow\fR(9F)
 .sp
 .LP

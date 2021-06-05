@@ -7,7 +7,6 @@
 .SH NAME
 qunbufcall \- cancel a pending qbufcall request
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
  #include <sys/ddi.h>
@@ -17,11 +16,8 @@ qunbufcall \- cancel a pending qbufcall request
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIq\fR\fR
@@ -40,8 +36,6 @@ Identifier returned from \fBqbufcall\fR(9F).
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBqunbufcall()\fR function cancels a pending \fBqbufcall()\fR request. The
 argument \fIid\fR is a non-zero identifier of the request to be cancelled.
 \fIid\fR is returned from the \fBqbufcall()\fR function used to issue the
@@ -56,13 +50,9 @@ is blocked at the perimeters associated with the queue. All outstanding
 timeouts and bufcalls must be cancelled before a driver close routine can block
 and before the close  routine calls \fBqprocsoff\fR(9F).
 .SH CONTEXT
-.sp
-.LP
 The \fBqunbufcall()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-.sp
-.LP
 \fBmt-streams\fR(9F), \fBqbufcall\fR(9F), \fBqtimeout\fR(9F),
 \fBquntimeout\fR(9F)
 .sp

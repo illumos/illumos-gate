@@ -8,7 +8,6 @@
 csx_Parse_CISTPL_LONGLINK_A, csx_Parse_CISTPL_LONGLINK_C \- parse the Long Link
 A and C tuples
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -25,11 +24,8 @@ A and C tuples
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR \fR
@@ -60,8 +56,6 @@ return from this function.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function parses the Long Link A and C tuples, \fBCISTPL_LONGLINK_A\fR and
 \fBCISTPL_LONGLINK_A,\fR into a form usable by \fBPC \fRCard drivers.
 .sp
@@ -69,8 +63,6 @@ This function parses the Long Link A and C tuples, \fBCISTPL_LONGLINK_A\fR and
 The \fBCISTPL_LONGLINK_A\fR and \fBCISTPL_LONGLINK_C\fR tuples provide links to
 Attribute and Common Memory.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcistpl_longlink_ac_t\fR are:
 .sp
 .in +2
@@ -121,7 +113,6 @@ space.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -176,12 +167,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_RegisterClient\fR(9F), \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)
 .sp

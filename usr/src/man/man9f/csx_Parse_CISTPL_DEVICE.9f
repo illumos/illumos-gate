@@ -8,7 +8,6 @@
 csx_Parse_CISTPL_DEVICE, csx_Parse_CISTPL_DEVICE_A, csx_Parse_CISTPL_DEVICE_OC,
 csx_Parse_CISTPL_DEVICE_OA \- parse Device Information tuples
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -37,11 +36,8 @@ csx_Parse_CISTPL_DEVICE_OA \- parse Device Information tuples
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR\fR
@@ -73,8 +69,6 @@ respectively.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBcsx_Parse_CISTPL_DEVICE()\fR and \fBcsx_Parse_CISTPL_DEVICE_A()\fR parse the
 5 volt Device Information tuples, \fBCISTPL_DEVICE\fR and
 \fBCISTPL_DEVICE_A,\fR respectively, into a form usable by \fBPC \fRCard
@@ -97,8 +91,6 @@ The \fBCISTPL_DEVICE_OC\fR and \fBCISTPL_DEVICE_OA\fR tuples are used to
 describe the information about the card's device under a set of operating
 conditions for Common Memory or Attribute Memory space, respectively.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcistpl_device_t\fR are:
 .sp
 .in +2
@@ -352,7 +344,6 @@ Extended type follows
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -407,12 +398,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_Parse_CISTPL_JEDEC_C\fR(9F), \fBcsx_RegisterClient\fR(9F),
 \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)

@@ -8,7 +8,6 @@
 ddi_intr_get_nintrs, ddi_intr_get_navail \- return number of interrupts
 supported or available for a given interrupt type
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -24,12 +23,8 @@ supported or available for a given interrupt type
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
-.LP
 \fBddi_intr_get_nintrs()\fR
 .sp
 .ne 2
@@ -91,8 +86,6 @@ from the system
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_intr_get_nintrs()\fR function returns the number of interrupts of
 the given \fItype\fR supported by a particular hardware device. On a successful
 return, the number of supported interrupts is returned as an integer pointed to
@@ -121,8 +114,6 @@ The \fBddi_intr_get_supported_types\fR(9F) function returns a list of valid
 supported types for the given hardware device. It must be called prior to
 calling either the \fBddi_intr_get_nintrs()\fR or \fBddi_intr_get_navail()\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_intr_get_nintrs()\fR and \fBddi_intr_get_navail()\fR functions
 return:
 .sp
@@ -162,13 +153,9 @@ On any implementation specific failure.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_intr_get_nintrs()\fR and \fBddi_intr_get_navail()\fR functions can
 be called from either user or kernel non-interrupt context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -183,16 +170,12 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBddi_intr_alloc\fR(9F), \fBddi_intr_enable\fR(9F),
 \fBddi_intr_get_supported_types\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 The \fBddi_intr_get_nintrs()\fR and \fBddi_intr_get_navail()\fR functions can
 be called at any time, even if the driver has added an interrupt handler for a
 given interrupt specification.

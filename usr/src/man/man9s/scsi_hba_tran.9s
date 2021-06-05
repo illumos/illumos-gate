@@ -7,23 +7,17 @@
 .SH NAME
 scsi_hba_tran \- SCSI Host Bus Adapter (HBA) driver transport vector structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 A \fBscsi_hba_tran_t\fR structure defines vectors that an \fBHBA\fR driver
 exports to \fBSCSA\fR interfaces so that \fBHBA\fR specific functions can be
 executed.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 dev_info_t          *tran_hba_dip;          /* HBAs dev_info
@@ -324,8 +318,6 @@ the \fBservices.h\fR header file.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBtran_abort\fR(9E), \fBtran_bus_reset\fR(9E), \fBtran_destroy_pkt\fR(9E),
 \fBtran_dmafree\fR(9E), \fBtran_getcap\fR(9E), \fBtran_init_pkt\fR(9E),
 \fBtran_quiesce\fR(9E), \fBtran_reset\fR(9E), \fBtran_reset_notify\fR(9E),

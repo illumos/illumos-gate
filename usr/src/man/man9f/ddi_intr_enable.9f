@@ -9,7 +9,6 @@ ddi_intr_enable, ddi_intr_block_enable, ddi_intr_disable,
 ddi_intr_block_disable \- enable or disable a given interrupt or range of
 interrupts
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -37,12 +36,8 @@ interrupts
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
-.LP
 \fBddi_intr_enable()\fR
 .sp
 .ne 2
@@ -108,8 +103,6 @@ Number of interrupts
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_intr_enable()\fR function enables the interrupt given by the
 interrupt handle \fIh\fR.
 .sp
@@ -166,8 +159,6 @@ interrupt with \fBddi_intr_remove_handler()\fR and \fBddi_intr_free()\fR,
 respectively. The \fBddi_intr_block_disable()\fR function should be called if
 the \fBddi_intr_block_enable()\fR function was used to enable the interrupts.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_intr_enable()\fR, \fBddi_intr_block_enable()\fR,
 \fBddi_intr_disable()\fR, and \fBddi_intr_block_disable()\fR functions return:
 .sp
@@ -198,14 +189,10 @@ On any implementation specific failure.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_intr_enable()\fR, \fBddi_intr_block_enable()\fR,
 \fBddi_intr_disable()\fR, and \fBddi_intr_block_disable()\fR functions can be
 called from kernel non-interrupt context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -220,8 +207,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBddi_intr_add_handler\fR(9F), \fBddi_intr_alloc\fR(9F),
 \fBddi_intr_dup_handler\fR(9F), \fBddi_intr_free\fR(9F),
 \fBddi_intr_get_cap\fR(9F), \fBddi_intr_remove_handler\fR(9F), \fBmutex\fR(9F),
@@ -230,8 +215,6 @@ Interface Stability	Committed
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 Consumers of these interfaces should verify that the return value is not equal
 to \fBDDI_SUCCESS\fR. Incomplete checking for failure codes could result in
 inconsistent behavior among platforms.

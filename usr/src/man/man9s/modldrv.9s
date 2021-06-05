@@ -7,22 +7,16 @@
 .SH NAME
 modldrv \- linkage structure for loadable drivers
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/modctl.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmodldrv\fR structure is used by device drivers to export driver specific
 information to the kernel.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 struct mod_ops    *drv_modops;
@@ -63,8 +57,6 @@ Pointer to the driver's \fBdev_ops\fR(9S) structure.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBadd_drv\fR(1M), \fBdev_ops\fR(9S), \fBmodlinkage\fR(9S)
 .sp
 .LP

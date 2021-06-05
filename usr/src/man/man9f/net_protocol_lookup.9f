@@ -8,7 +8,6 @@
 .SH NAME
 net_protocol_lookup \- locate an implementation of a network layer protocol
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/neti.h>
 
@@ -16,11 +15,8 @@ net_protocol_lookup \- locate an implementation of a network layer protocol
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIid\fR\fR
@@ -39,8 +35,6 @@ name of the network protocol to find.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnet_protocol_lookup()\fR function attempts to locate a data structure
 that defines what capabilities it is exporting through this interface. The
 value returned by this call is guaranteed to be valid until it is passed into a
@@ -53,19 +47,13 @@ registered. The symbols \fBNHF_INET\fR and \fBNHF_INET6\fR should be passed to
 \fBnet_protocol_lookup()\fR as the protocol name to gain access to either
 \fBIPv4\fR or \fBIPv6\fR respectively.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBnet_protocol_lookup()\fR function returns \fBNULL\fR if it does not find
 any knowledge about the network protocol referenced. Otherwise, it returns a
 value that can be used with other calls in this framework.
 .SH CONTEXT
-.sp
-.LP
 The \fBnet_protocol_lookup()\fR function may be called from user,  kernel, or
 interrupt context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -80,6 +68,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBnet_protocol_release\fR(9F), \fBattributes\fR(5)

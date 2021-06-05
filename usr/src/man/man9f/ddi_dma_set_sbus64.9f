@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dma_set_sbus64 \- allow 64-bit transfers on SBus
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,11 +17,8 @@ ddi_dma_set_sbus64 \- allow 64-bit transfers on SBus
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -42,8 +38,6 @@ mode.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_dma_set_sbus64()\fR informs the system that the device wishes to perform
 64-bit data transfers on the SBus. The driver must first allocate a  \fBDMA\fR
 handle using  \fBddi_dma_alloc_handle\fR(9F) with a \fBddi_dma_attr\fR(9S)
@@ -64,8 +58,6 @@ driver should retrieve the available burst sizes by calling
 64-bit mode if the system was able to  activate 64-bit transfers.  Otherwise
 burst sizes will be  returned in 32-bit mode.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_dma_set_sbus64()\fR returns:
 .sp
 .ne 2
@@ -86,13 +78,9 @@ Successfully set the SBus to 64-bit mode.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBddi_dma_set_sbus64()\fR can be called from user, kernel, or interrupt
 context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -107,14 +95,10 @@ Architecture	SBus
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBddi_dma_addr_bind_handle\fR(9F),
 \fBddi_dma_alloc_handle\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F),
 \fBddi_dma_burstsizes\fR(9F), \fBddi_dma_attr\fR(9S)
 .SH NOTES
-.sp
-.LP
 64-bit SBus mode is activated on a per SBus slot basis. If there are multiple
 SBus cards in one slot, they all must operate in 64-bit mode or they all must
 operate in 32-bit mode.

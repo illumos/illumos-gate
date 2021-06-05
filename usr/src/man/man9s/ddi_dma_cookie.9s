@@ -7,25 +7,19 @@
 .SH NAME
 ddi_dma_cookie \- DMA address cookie
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunddi.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_dma_cookie_t\fR structure contains \fBDMA\fR address information
 required to program a \fBDMA\fR engine. The structure is filled in by a call to
 \fBddi_dma_getwin\fR(9F), \fBddi_dma_addr_bind_handle\fR(9F), or
 \fBddi_dma_buf_bind_handle\fR(9F), to get device-specific \fBDMA\fR transfer
 information for a \fBDMA\fR request or a \fBDMA\fR window.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 typedef struct {
@@ -75,8 +69,6 @@ to be specified in a \fBddi_dma_attr\fR(9S) structure.
 \fBdmac_type\fR contains bus-specific type bits, if appropriate. For example, a
 device on a \fBPCI\fR bus has \fBPCI\fR address modifier bits placed here.
 .SH SEE ALSO
-.sp
-.LP
 \fBpci\fR(4), \fBsbus\fR(4), \fBsysbus\fR(4),
 \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F),
 \fBddi_dma_getwin\fR(9F), \fBddi_dma_nextcookie\fR(9F), \fBddi_dma_attr\fR(9S)

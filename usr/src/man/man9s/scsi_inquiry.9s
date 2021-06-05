@@ -7,25 +7,19 @@
 .SH NAME
 scsi_inquiry \- SCSI inquiry structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_inquiry\fR structure contains 36 required bytes, followed by a
 variable number of vendor-specific parameters. Bytes 59 through 95, if
 returned, are reserved for future standardization. This structure is part of
 \fBscsi_device\fR(9S) structure and typically filled in by
 \fBscsi_probe\fR(9F).
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 Lines that start with an 'X' will be deleted before submission;
@@ -431,8 +425,6 @@ selection.
 .LP
 \fBinq_ius\fR the \fBSPI3\fR target device supports information unit transfers.
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_probe\fR(9F), \fBscsi_device\fR(9S)
 .sp
 .LP

@@ -7,7 +7,6 @@
 .SH NAME
 ddi_copyout \- copy data from a driver
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -19,11 +18,8 @@ ddi_copyout \- copy data from a driver
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdriverbuf\fR\fR
@@ -60,8 +56,6 @@ Set of flag bits that provide address space information about \fIbuf\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This routine is designed for use in driver \fBioctl\fR(9E) routines for drivers
 that support layered ioctls. \fBddi_copyout()\fR copies data from a driver
 buffer to a destination address, \fIbuf\fR.
@@ -79,8 +73,6 @@ driver developer is not obliged to ensure alignment.  This function
 automatically finds the most efficient move algorithm according to address
 alignment.
 .SH RETURN VALUES
-.sp
-.LP
 Under normal conditions, \fB0\fR is returned to indicate a successful copy.
 Otherwise, \(mi\fB1\fR is returned if one of the following occurs:
 .RS +4
@@ -115,11 +107,8 @@ For example, an uncorrectable parity or \fBECC\fR error occurred.
 If \(mi\fB1\fR is returned to the caller, driver entry point routines should
 return \fBEFAULT\fR.
 .SH CONTEXT
-.sp
-.LP
 \fBddi_copyout()\fR can be called from user or kernel context only.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR\fBddi_copyout()\fR example
 .sp
 .LP
@@ -182,16 +171,12 @@ specified argument contains an invalid address, an error code is returned.
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBioctl\fR(9E), \fBbcopy\fR(9F), \fBcopyin\fR(9F), \fBcopyout\fR(9F),
 \fBddi_copyin\fR(9F), \fBuiomove\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 The value of the \fIflags\fR argument to \fBddi_copyout()\fR should be passed
 through directly from the \fImode\fR argument of \fBioctl()\fR untranslated.
 .sp

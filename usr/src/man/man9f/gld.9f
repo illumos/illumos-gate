@@ -51,7 +51,7 @@ gld_sched, gld_intr \- Generic LAN Driver service routines
 .fi
 
 .SH INTERFACE LEVEL
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na

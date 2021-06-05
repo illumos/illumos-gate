@@ -7,7 +7,6 @@
 .SH NAME
 csx_GetFirstClient, csx_GetNextClient \- return first or next client
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -22,11 +21,8 @@ csx_GetFirstClient, csx_GetNextClient \- return first or next client
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIfnc\fR \fR
@@ -36,14 +32,10 @@ Pointer to a \fBget_firstnext_client_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The functions \fBcsx_GetFirstClient()\fR and \fBcsx_GetNextClient()\fR return
 information about the first or subsequent \fBPC \fRcards, respectively, that
 are installed in the system.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBget_firstnext_client_t\fR are:
 .sp
 .in +2
@@ -117,7 +109,6 @@ The number of clients is returned in this field.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -172,12 +163,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_event_handler\fR(9E)
 .sp
 .LP

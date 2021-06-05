@@ -9,7 +9,6 @@
 queclass \- a STREAMS macro that returns the queue message class definitions
 for a given message block
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 
@@ -17,12 +16,8 @@ for a given message block
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 \fBqueclass\fR returns the queue message class definition for a given data
 block pointed to by the message block \fIbp\fR passed in.
 .sp
@@ -30,6 +25,4 @@ block pointed to by the message block \fIbp\fR passed in.
 The message can be either \fBQNORM\fR, a normal priority message, or
 \fBQPCTL\fR, a high priority message.
 .SH SEE ALSO
-.sp
-.LP
 \fISTREAMS Programming Guide\fR

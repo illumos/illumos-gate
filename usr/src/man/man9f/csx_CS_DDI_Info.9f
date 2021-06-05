@@ -7,7 +7,6 @@
 .SH NAME
 csx_CS_DDI_Info \- obtain DDI information
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,11 +16,8 @@ csx_CS_DDI_Info \- obtain DDI information
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIcdi\fR \fR
@@ -31,15 +27,11 @@ Pointer to a \fBcs_ddi_info_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
-This function is a Solaris-specific extension that is used by clients that need
+This function is an illumos-specific extension that is used by clients that need
 to provide the \fIxx_getinfo\fR driver entry point (see \fBgetinfo\fR(9E)). It
 provides a method for clients to obtain \fBDDI \fRinformation based on their
 socket number and client driver name.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcs_ddi_info_t\fR are:
 .sp
 .in +2
@@ -86,7 +78,6 @@ If the \fBdriver_name\fR is found on the \fBSocket\fR, the
 \fBcsx_CS_DDI_Info()\fR function returns both the \fBdev_info\fR pointer and
 the \fBinstance\fR fields for the requested driver instance.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -114,11 +105,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR: Using csx_CS_DDI_Info
 .sp
 .LP
@@ -172,8 +160,6 @@ pcepp_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBgetinfo\fR(9E), \fBcsx_RegisterClient\fR(9F), \fBddi_get_instance\fR(9F)
 .sp
 .LP

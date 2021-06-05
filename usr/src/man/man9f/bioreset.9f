@@ -7,7 +7,6 @@
 .SH NAME
 bioreset \- reuse a private buffer header after I/O is complete
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/buf.h>
 #include <sys/ddi.h>
@@ -18,11 +17,8 @@ bioreset \- reuse a private buffer header after I/O is complete
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIbp\fR \fR
@@ -32,23 +28,15 @@ Pointer to the \fBbuf\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBbioreset()\fR is used by drivers that allocate private buffers with
 \fBgetrbuf\fR(9F) or \fBkmem_alloc\fR(9F) and want to reuse them in multiple
 transfers before freeing them with \fBfreerbuf\fR(9F) or \fBkmem_free\fR(9F).
 \fBbioreset()\fR resets the buffer header to the state it had when initially
 allocated by \fBgetrbuf()\fR or initialized by \fBbioinit\fR(9F).
 .SH CONTEXT
-.sp
-.LP
 \fBbioreset()\fR can be called from any context.
 .SH SEE ALSO
-.sp
-.LP
 \fBstrategy\fR(9E), \fBbioinit\fR(9F), \fBbiofini\fR(9F), \fBfreerbuf\fR(9F),
 \fBgetrbuf\fR(9F), \fBkmem_alloc\fR(9F), \fBkmem_free\fR(9F), \fBbuf\fR(9S)
 .SH NOTES
-.sp
-.LP
 \fIbp\fR must not describe a transfer in progress.

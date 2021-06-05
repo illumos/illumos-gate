@@ -7,7 +7,6 @@
 .SH NAME
 biofini \- uninitialize a buffer structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -16,11 +15,8 @@ biofini \- uninitialize a buffer structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIbp\fR\fR
@@ -30,8 +26,6 @@ Pointer to the buffer header structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBbiofini()\fR function uninitializes a \fBbuf\fR(9S) structure. If a
 buffer structure has been allocated and initialized using \fBkmem_alloc\fR(9F)
 and \fBbioinit\fR(9F) it needs to be uninitialized using \fBbiofini()\fR before
@@ -39,26 +33,21 @@ calling \fBkmem_free\fR(9F). It is not necessary to call \fBbiofini()\fR before
 freeing a buffer structure using \fBfreerbuf\fR(9F) because \fBfreerbuf()\fR
 will call \fBbiofini()\fR directly.
 .SH CONTEXT
-.sp
-.LP
 The \fBbiofini()\fR function can be called from any context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBbiofini()\fR
 .sp
 .in +2
 .nf
-struct buf *bp = kmem_alloc(biosize(), KM_SLEEP); 	
-bioinit(bp); 	
-/* use buffer */ 	
-biofini(bp); 	
+struct buf *bp = kmem_alloc(biosize(), KM_SLEEP);
+bioinit(bp);
+/* use buffer */
+biofini(bp);
 kmem_free(bp, biosize());
 .fi
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBbioinit\fR(9F), \fBbioreset\fR(9F), \fBbiosize\fR(9F), \fBfreerbuf\fR(9F),
 \fBkmem_alloc\fR(9F), \fBkmem_free\fR(9F), \fBbuf\fR(9S)
 .sp

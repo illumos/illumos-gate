@@ -7,7 +7,6 @@
 .SH NAME
 mioc2ack \- Convert an M_IOCTL message to an M_IOCACK message
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -18,11 +17,8 @@ mioc2ack \- Convert an M_IOCTL message to an M_IOCACK message
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImp\fR\fR
@@ -59,8 +55,6 @@ Value to set the ioc_rval of the  \fBiocblk\fR(9S) to.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmioc2ack()\fR function converts an M_IOCTL message into an M_IOCACK
 message using the supplied arguments.
 .sp
@@ -73,16 +67,10 @@ associated with \fImp\fR to the passed-in values, and clears the
 is not NULL, \fBmioc2ack()\fR resets \fBdp->b_wptr\fR to be \fBdp->b_rptr +
 count\fR (that is, it sets \fIdp\fR to be exactly \fIcount\fR bytes in length).
 .SH RETURN VALUES
-.sp
-.LP
 None.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, kernel or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBmiocack\fR(9F), \fBmiocnak\fR(9F), \fBiocblk\fR(9S)
 .sp
 .LP

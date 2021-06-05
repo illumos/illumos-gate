@@ -7,7 +7,6 @@
 .SH NAME
 csx_RequestWindow, csx_ReleaseWindow \- request or release window resources
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -23,11 +22,8 @@ csx_RequestWindow, csx_ReleaseWindow \- request or release window resources
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR\fR
@@ -55,8 +51,6 @@ Pointer to a \fBwin_req_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The function \fBcsx_RequestWindow()\fR requests a block of system address space
 be assigned to a \fBPC \fRCard in a socket.
 .sp
@@ -75,8 +69,6 @@ window.
 The \fBPC\fR Card Attribute or Common Memory offset for this window is set by
 \fBcsx_MapMemPage\fR(9F).
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBwin_req_t\fR are:
 .sp
 .in +2
@@ -104,7 +96,7 @@ The fields are defined as follows:
 \fB\fBSocket\fR\fR
 .ad
 .RS 26n
-Not used in Solaris, but for portability with other Card Services
+Not used in illumos, but for portability with other Card Services
 implementations, it should be set to the logical socket number.
 .RE
 
@@ -368,12 +360,11 @@ specified socket. Access to the \fBI/O \fRwindow is not enabled until
 \fB\fBReqOffset\fR\fR
 .ad
 .RS 26n
-This field is a Solaris-specific extension that can be used by clients to
+This field is an illumos-specific extension that can be used by clients to
 generate optimum window offsets passed to \fBcsx_MapMemPage\fR(9F).
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -446,12 +437,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_ConvertSpeed\fR(9F), \fBcsx_MapMemPage\fR(9F),
 \fBcsx_ModifyWindow\fR(9F), \fBcsx_RegisterClient\fR(9F),
 \fBcsx_RequestConfiguration\fR(9F)

@@ -7,7 +7,6 @@
 .SH NAME
 ddi_get_devstate \- Check device state
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -16,11 +15,8 @@ ddi_get_devstate \- Check device state
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR \fR
@@ -30,14 +26,11 @@ Pointer to the device's \fBdev_info\fR structure
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_get_devstate()\fR function returns a value indicating the state of
 the device specified by \fB dip\fR, as derived from the configuration
 operations that have been performed on it (or on the bus on which it resides)
 and any fault reports relating to it.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_DEVSTATE_OFFLINE\fR\fR
@@ -88,13 +81,9 @@ due to a fault.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_get_devstate()\fR function may be called from user, kernel, or
 interrupt context.
 .SH NOTES
-.sp
-.LP
 A device driver should call this function to check its own state at each major
 entry point, and before committing resources to a requested operation.  If a
 driver discovers that its device is already down, it should perform required
@@ -113,7 +102,5 @@ to enqueue the operation and service it once the bus has been unquiesced.  Note
 that not all busses support the quiesce/unquiesce operations, so this value may
 never be seen by some drivers.
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E),  \fBioctl\fR(9E), \fBopen\fR(9E), \fBread\fR(9E),
 \fBstrategy\fR(9E), \fBwrite\fR(9E), \fBddi_dev_report_fault\fR(9F)

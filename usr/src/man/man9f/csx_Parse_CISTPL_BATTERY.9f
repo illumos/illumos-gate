@@ -7,7 +7,6 @@
 .SH NAME
 csx_Parse_CISTPL_BATTERY \- parse the Battery Replacement Date tuple
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -18,11 +17,8 @@ csx_Parse_CISTPL_BATTERY \- parse the Battery Replacement Date tuple
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR\fR
@@ -52,8 +48,6 @@ Pointer to a \fBcistpl_battery_t\fR structure which contains the parsed
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function parses the Battery Replacement Date tuple, \fBCISTPL_BATTERY,\fR
 into a form usable by \fBPC \fRCard drivers.
 .sp
@@ -63,8 +57,6 @@ in \fBPC \fRCards with battery-backed storage. It indicates the date on which
 the battery was replaced, and the date on which the battery is expected to need
 replacement. Only one \fBCISTPL_BATTERY\fR tuple is allowed per \fBPC \fRCard.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcistpl_battery_t\fR are:
 .sp
 .in +2
@@ -96,7 +88,6 @@ This field indicates the date on which the battery should be replaced.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -151,12 +142,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_RegisterClient\fR(9F), \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)
 .sp

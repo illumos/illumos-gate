@@ -7,7 +7,6 @@
 .SH NAME
 csx_Get8, csx_Get16, csx_Get32, csx_Get64 \- read data from device address
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -32,11 +31,8 @@ csx_Get8, csx_Get16, csx_Get32, csx_Get64 \- read data from device address
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -56,8 +52,6 @@ The offset in bytes from the base of the mapped resource.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions generate a read of various sizes from the mapped memory or
 device register.
 .sp
@@ -73,16 +67,10 @@ maintain a consistent view between the host and the device based on the encoded
 information in the data access handle. The translation may involve byte
 swapping if the host and the device have incompatible endian characteristics.
 .SH RETURN VALUES
-.sp
-.LP
 These functions return the value read from the mapped address.
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_DupHandle\fR(9F), \fBcsx_GetMappedAddr\fR(9F), \fBcsx_Put8\fR(9F),
 \fBcsx_RepGet8\fR(9F), \fBcsx_RepPut8\fR(9F), \fBcsx_RequestIO\fR(9F),
 \fBcsx_RequestWindow\fR(9F)

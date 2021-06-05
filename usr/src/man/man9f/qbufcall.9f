@@ -7,7 +7,6 @@
 .SH NAME
 qbufcall \- call a function when a buffer becomes available
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/ddi.h>
@@ -19,11 +18,8 @@ qbufcall \- call a function when a buffer becomes available
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIq\fR\fR
@@ -69,8 +65,6 @@ Argument to the function to be called when a buffer becomes available.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBqbufcall()\fR function serves as a \fBqtimeout\fR(9F) call of
 indeterminate length. When a buffer allocation request fails, \fBqbufcall()\fR
 can be used to schedule the routine \fIfunc\fR to be called with the argument
@@ -91,20 +85,14 @@ close  routine calls \fBqprocsoff\fR(9F).
 \fBqprocson\fR(9F) must be called before calling either \fBqbufcall()\fR or
 \fBqtimeout\fR(9F).
 .SH RETURN VALUES
-.sp
-.LP
 If successful, the \fBqbufcall()\fR function returns a \fBqbufcall\fR \fBID\fR
 that can be used in a call to \fBqunbufcall\fR(9F) to cancel the request. If
 the \fBqbufcall()\fR scheduling fails, \fIfunc\fR is never called and \fB0\fR
 is returned.
 .SH CONTEXT
-.sp
-.LP
 The \fBqbufcall()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-.sp
-.LP
 \fBallocb\fR(9F), \fBmt-streams\fR(9F), \fBqprocson\fR(9F), \fBqtimeout\fR(9F),
 \fBqunbufcall\fR(9F), \fBquntimeout\fR(9F)
 .sp
@@ -114,8 +102,6 @@ context.
 .LP
 \fISTREAMS Programming Guide\fR
 .SH WARNINGS
-.sp
-.LP
 Even when \fIfunc\fR is called by \fBqbufcall()\fR, \fBallocb\fR(9F) can fail
 if another module or driver had allocated the memory before \fIfunc\fR was able
 to call \fBallocb\fR(9F).

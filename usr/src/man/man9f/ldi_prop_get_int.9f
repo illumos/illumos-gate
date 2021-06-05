@@ -7,7 +7,6 @@
 .SH NAME
 ldi_prop_get_int, ldi_prop_get_int64 \- Lookup integer property
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunldi.h>
 
@@ -22,7 +21,6 @@ ldi_prop_get_int, ldi_prop_get_int64 \- Lookup integer property
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIlh\fR \fR
@@ -90,12 +88,8 @@ Integer value that is returned if the property is not found.
 .RE
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 The \fBldi_prop_get_int()\fR and \fBldi_prop_get_int64()\fR functions search
 for an integer property associated with a device represented by the layered
 driver handle. If the integer property is found, the functions return the
@@ -163,20 +157,14 @@ not found, the argument defvalue is returned as the property value.
 .LP
 \fBldi_prop_get_int64()\fR does not search the PROM for 64-bit property values.
 .SH RETURN VALUES
-.sp
-.LP
 \fBldi_prop_get_int()\fR and \fBldi_prop_get_int64()\fR return the property
 value. If the property is not found, the argument \fBdefvalue\fR is returned.
 If the property is found, but cannot be decoded into an int or an int64_t,
 DDI_PROP_NOT_FOUND is returned.
 .SH CONTEXT
-.sp
-.LP
 \fBldi_prop_get_int()\fR and \fBldi_prop_get_int64()\fR can be called from user
 or kernel context.
 .SH EXAMPLES
-.sp
-.LP
 Using\fB ldi_prop_get_int64()\fR.
 .sp
 .in +2
@@ -196,8 +184,6 @@ The following example demonstrates the use of ldi_prop_get_int64().
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_prop_get_int\fR(9F), \fBddi_prop_get_int64\fR(9F),
 \fBldi_prop_exists\fR(9F)
 .sp

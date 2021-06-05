@@ -8,7 +8,6 @@
 ddi_fm_init, ddi_fm_fini, ddi_fm_capable \- initialize and get the FM
 capabilities for a device instance
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddifm.h>
 
@@ -27,12 +26,8 @@ capabilities for a device instance
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
-.LP
 \fBddi_fm_init()\fR
 .sp
 .ne 2
@@ -62,8 +57,6 @@ Pointer to where the interrupt block cookie should be returned.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 A device driver can declare its fault management capabilities to the \fBI/O\fR
 Fault Management framework by calling \fBddi_fm_init()\fR. The
 \fBddi_fm_init()\fR function allocates and initializes resources according to
@@ -155,13 +148,9 @@ structure.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from kernel context in a driver \fBattach\fR(9E)
 or \fBdetach\fR(9E) operation.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -176,8 +165,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBprtconf\fR(1M), \fBdriver.conf\fR(4), \fBattributes\fR(5), \fBattach\fR(9E),
 \fBdetach\fR(9E)
 .sp

@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dev_nintrs \- return the number of interrupt specifications a device has
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -19,19 +18,13 @@ ddi_dev_nintrs \- return the number of interrupt specifications a device has
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI). This interface is obsolete. Use the new
+illumos DDI specific (illumos DDI). This interface is obsolete. Use the new
 interrupt interfaces referenced in \fBIntro\fR(9F). Refer to \fIWriting Device
 Drivers\fR for more information.
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_dev_nintrs()\fR function returns the number of interrupt
 specifications a device has in \fB*\fR\fIresultp\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_dev_nintrs()\fR function returns:
 .sp
 .ne 2
@@ -53,13 +46,9 @@ The device has no interrupt specifications.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_dev_nintrs()\fR function can be called from user, interrupt, or
 kernel context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -74,8 +63,6 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBisa\fR(4), \fBsbus\fR(4), \fBddi_add_intr\fR(9F), \fBddi_dev_nregs\fR(9F),
 \fBddi_dev_regsize\fR(9F), \fBIntro\fR(9F)
 .sp

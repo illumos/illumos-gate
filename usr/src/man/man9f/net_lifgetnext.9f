@@ -7,7 +7,6 @@
 .SH NAME
 net_lifgetnext \- search through a list of logical network interfaces
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/neti.h>
 
@@ -16,11 +15,8 @@ net_lifgetnext \- search through a list of logical network interfaces
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInet\fR\fR
@@ -49,8 +45,6 @@ value returned from a successful call to this function.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnet_lifgetnext()\fR function is used to search through all of the
 logical interfaces that are associated with a physical network interface. To
 start searching through this list, a value of 0 should be passed through as the
@@ -63,7 +57,6 @@ that exists, at the time of the call, within the scope of the network interface
 and its assigned network protocol. This value is only guaranteed to be unique
 for a name within the scope of the network interface and its assigned protocol.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
    net_data_t net;
@@ -91,20 +84,14 @@ for a name within the scope of the network interface and its assigned protocol.
 .sp
 
 .SH RETURN VALUES
-.sp
-.LP
 The \fBnet_lifgetnext()\fR function returns a value of -1 if it is not
 supported by the network protocol and a value of 0 if an attempt to go beyond
 the last network interface is made. Otherwise, it returns a value representing
 a network interface.
 .SH CONTEXT
-.sp
-.LP
 The \fBnet_lifgetnext()\fR function may be called from user,  kernel, or
 interrupt context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -119,6 +106,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBnet_phygetnext\fR(9F), \fBnet_phylookup\fR(9F)

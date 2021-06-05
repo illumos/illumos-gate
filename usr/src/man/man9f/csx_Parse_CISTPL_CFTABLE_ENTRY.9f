@@ -8,7 +8,6 @@
 csx_Parse_CISTPL_CFTABLE_ENTRY \- parse 16-bit Card Configuration Table Entry
 tuple
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -19,11 +18,8 @@ tuple
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR\fR
@@ -53,8 +49,6 @@ Pointer to a \fBcistpl_cftable_entry_t\fR structure which contains the parsed
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function parses the 16 bit Card Configuration Table Entry tuple,
 \fBCISTPL_CFTABLE_ENTRY,\fR into a form usable by \fBPC \fRCard drivers.
 .sp
@@ -64,8 +58,6 @@ configuration of a \fBPC \fRCard and to distinguish among the permitted
 configurations. The \fBCISTPL_CONFIG\fR tuple must precede all
 \fBCISTPL_CFTABLE_ENTRY\fR tuples.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcistpl_cftable_entry_t\fR are:
 .sp
 .in +2
@@ -805,7 +797,6 @@ DMA width 16 bits
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -860,12 +851,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_Parse_CISTPL_CONFIG\fR(9F), \fBcsx_RegisterClient\fR(9F),
 \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)

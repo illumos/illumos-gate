@@ -7,7 +7,6 @@
 .SH NAME
 scsi_alloc_consistent_buf \- allocate an I/O buffer for SCSI DMA
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -19,11 +18,8 @@ scsi_alloc_consistent_buf \- allocate an I/O buffer for SCSI DMA
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIap\fR\fR
@@ -79,8 +75,6 @@ The callback function argument.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_alloc_consistent_buf()\fR function returns allocates a buffer
 header and the associated data buffer for direct memory access (DMA) transfer.
 This buffer is allocated from the \fBiobp\fR space, which is considered
@@ -135,20 +129,15 @@ invoked.
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_alloc_consistent_buf()\fR function returns a pointer to a
 \fBbuf\fR(9S) structure on success. It returns \fBNULL\fR if resources are not
 available even if \fIwaitfunc\fR was not \fBSLEEP_FUNC\fR.
 .SH CONTEXT
-.sp
-.LP
 If \fIcallback\fR is \fBSLEEP_FUNC\fR, then this routine may be called only
 from user-level code. Otherwise, it may be called fromuser, interrupt, or
 kernel context. The \fIcallback\fR function may not block or call routines that
 block.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAllocate a request sense packet with consistent DMA resources
 attached.
 .sp
@@ -169,18 +158,16 @@ attached.
 .in +2
 .nf
     bp = scsi_alloc_consistent_buf(&devp->sd_address, NULL,
-         SUN_INQSIZE, B_READ, canwait, NULL);
+	 SUN_INQSIZE, B_READ, canwait, NULL);
     if (bp) {
-    	pkt = scsi_init_pkt(&devp->sd_address, NULL, bp,
-        	CDB_GROUP0, 1, PP_LEN, PKT_CONSISTENT,
+	pkt = scsi_init_pkt(&devp->sd_address, NULL, bp,
+		CDB_GROUP0, 1, PP_LEN, PKT_CONSISTENT,
 		canwait, NULL);
     }
 .fi
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_dma_mem_alloc\fR(9F), \fBddi_dma_sync\fR(9F), \fBgetrbuf\fR(9F),
 \fBscsi_destroy_pkt\fR(9F), \fBscsi_init_pkt\fR(9F),
 \fBscsi_free_consistent_buf\fR(9F), \fBbuf\fR(9S), \fBscsi_address\fR(9S)

@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dma_alloc_handle \- allocate DMA handle
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,11 +18,8 @@ ddi_dma_alloc_handle \- allocate DMA handle
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -89,8 +85,6 @@ Pointer to the  \fBDMA\fR handle to be initialized.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_dma_alloc_handle()\fR allocates a new  \fBDMA\fR handle. A  \fBDMA\fR
 handle is an opaque object used as a reference to subsequently allocated
 \fBDMA\fR resources.   \fBddi_dma_alloc_handle()\fR accepts as parameters the
@@ -127,8 +121,6 @@ resources, data structures, queues, and so forth.
 When a  \fBDMA\fR handle is no longer needed, \fBddi_dma_free_handle\fR(9F)
 must be called to free the handle.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_dma_alloc_handle()\fR returns:
 .sp
 .ne 2
@@ -159,14 +151,10 @@ No resources are available.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBddi_dma_alloc_handle()\fR can be called from user, kernel, or interrupt
 context, except when \fIcallback\fR is set to  \fBDDI_DMA_SLEEP\fR, in which
 case it can be called from user or kernel context only.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F),
 \fBddi_dma_burstsizes\fR(9F), \fBddi_dma_free_handle\fR(9F),
 \fBddi_dma_unbind_handle\fR(9F), \fBddi_dma_attr\fR(9S)

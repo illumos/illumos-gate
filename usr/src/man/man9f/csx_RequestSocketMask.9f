@@ -8,7 +8,6 @@
 csx_RequestSocketMask, csx_ReleaseSocketMask \- set or clear the client's
 client event mask
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -25,11 +24,8 @@ client event mask
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
+illumos \fBDDI\fR Specific (illumos \fBDDI\fR)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR\fR
@@ -57,8 +53,6 @@ Pointer to a \fBrelease_socket_mask_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The function \fBcsx_RequestSocketMask()\fR sets the client's client event mask
 and enables the client to start receiving events at its event callback handler.
 Once this function returns successfully, the client can start receiving events
@@ -76,8 +70,6 @@ mask for this socket.
 The function \fBcsx_ReleaseSocketMask()\fR clears the client's client event
 mask.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBrequest_socket_mask_t\fR are:
 .sp
 .in +2
@@ -106,7 +98,7 @@ The fields are defined as follows:
 \fB\fBSocket\fR\fR
 .ad
 .RS 13n
-Not used in Solaris, but for portability with other Card Services
+Not used in illumos, but for portability with other Card Services
 implementations, it should be set to the logical socket number.
 .RE
 
@@ -122,7 +114,6 @@ additional information about handling events.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -168,12 +159,8 @@ No \fBPCMCIA\fR hardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_event_handler\fR(9E), \fBcsx_GetEventMask\fR(9F),
 \fBcsx_RegisterClient\fR(9F), \fBcsx_SetEventMask\fR(9F)
 .sp

@@ -7,7 +7,6 @@
 .SH NAME
 csx_MapMemPage \- map the memory area on a PC Card
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,11 +16,8 @@ csx_MapMemPage \- map the memory area on a PC Card
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIwh\fR \fR
@@ -40,13 +36,9 @@ Pointer to a \fBmap_mem_page_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function maps the memory area on a \fBPC \fRCard into a page of a window
 allocated with the \fBcsx_RequestWindow\fR(9F) function.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBmap_mem_page_t\fR are:
 .sp
 .in +2
@@ -80,7 +72,6 @@ calling this function.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -135,12 +126,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_ModifyWindow\fR(9F), \fBcsx_ReleaseWindow\fR(9F),
 \fBcsx_RequestWindow\fR(9F)
 .sp

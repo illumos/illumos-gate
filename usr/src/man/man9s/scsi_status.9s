@@ -8,23 +8,17 @@
 .SH NAME
 scsi_status \- SCSI status structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 The \fBSCSI-2\fRstandard defines a status byte that is normally sent by the
 target to the initiator during the status phase at the completion of each
 command.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 uchar  sts_scsi2    :1;       /* SCSI-2 modifier bit */
@@ -171,8 +165,6 @@ it is returned when the command queue in the target is full.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_ifgetcap\fR(9F), \fBscsi_init_pkt\fR(9F),
 \fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
 .sp

@@ -7,7 +7,6 @@
 .SH NAME
 scsi_unprobe, scsi_unslave \- free resources allocated during initial probing
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -22,12 +21,9 @@ scsi_unprobe, scsi_unslave \- free resources allocated during initial probing
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI). The \fBscsi_unslave()\fR interface is
+illumos DDI specific (illumos DDI). The \fBscsi_unslave()\fR interface is
 obsolete. Use \fBscsi_unprobe()\fR instead.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdevp\fR \fR
@@ -37,25 +33,17 @@ Pointer to a \fBscsi_device\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBscsi_unprobe()\fR and \fBscsi_unslave()\fR are used to free any resources
 that were allocated on the driver's behalf during \fBscsi_slave\fR(9F) and
 \fBscsi_probe\fR(9F) activity.
 .SH CONTEXT
-.sp
-.LP
 \fBscsi_unprobe()\fR and \fBscsi_unslave()\fR must not be called from an
 interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_probe\fR(9F), \fBscsi_slave\fR(9F), \fBscsi_device\fR(9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 The \fBscsi_unslave()\fR function is obsolete and will be discontinued in a
 future release. This function has been replaced by \fBscsi_unprobe()\fR.

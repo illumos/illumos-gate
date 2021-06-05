@@ -8,7 +8,6 @@
 .SH NAME
 ddi_in_panic \- determine if system is in panic state
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,12 +18,8 @@ ddi_in_panic \- determine if system is in panic state
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 Drivers controlling devices on which the system may write a kernel crash dump
 in the event of a panic can call \fBddi_in_panic()\fR to determine if the
 system is panicking.
@@ -39,17 +34,11 @@ can  \fBdelay\fR(9F) be relied upon, since it is implemented via
 Drivers that need to enforce a time delay such as  \fBSCSI \fRbus reset delay
 time must busy-wait when the system is panicking.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_in_panic()\fR returns  \fB1\fR if the system is in panic,  or   \fB0\fR
 otherwise.
 .SH CONTEXT
-.sp
-.LP
 \fBddi_in_panic()\fR may be called from any context.
 .SH SEE ALSO
-.sp
-.LP
 \fBdump\fR(9E), \fBdelay\fR(9F), \fBddi_trigger_softintr\fR(9F),
 \fBtimeout\fR(9F)
 .sp

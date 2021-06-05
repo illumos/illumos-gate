@@ -7,7 +7,6 @@
 .SH NAME
 csx_ReleaseConfiguration \- release PC Card and socket configuration
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,11 +16,8 @@ csx_ReleaseConfiguration \- release PC Card and socket configuration
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
+illumos \fBDDI\fR Specific (illumos \fBDDI\fR)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR \fR
@@ -40,8 +36,6 @@ Pointer to a \fBrelease_config_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function returns a \fBPC\fR Card and socket to a simple memory only
 interface and sets the card to configuration zero by writing a \fB0\fR to the
 \fBPC\fR card's \fBCOR\fR (Configuration Option Register).
@@ -65,8 +59,6 @@ Card Services via the corresponding \fBcsx_ReleaseIO\fR(9F),
 socket configuration before releasing any resources requested by the driver via
 the request functions named above.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBrelease_config_t\fR are:
 .sp
 .in +2
@@ -77,10 +69,9 @@ uint32_t     Socket;     /* socket number */
 
 .sp
 .LP
-The \fBSocket\fR field is not used in Solaris, but for portability with other
+The \fBSocket\fR field is not used in illumos, but for portability with other
 Card Services implementations, it should be set to the logical socket number.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -126,12 +117,8 @@ No \fBPCMCIA\fR hardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_RegisterClient\fR(9F), \fBcsx_RequestConfiguration\fR(9F),
 \fBcsx_RequestIO\fR(9F), \fBcsx_RequestIRQ\fR(9F), \fBcsx_RequestWindow\fR(9F)
 .sp
