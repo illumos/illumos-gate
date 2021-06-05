@@ -29,13 +29,13 @@ with supported DMA engine options are described here.
 .sp
 .in +2
 .nf
-uchar_tder_command;          /* Read / Write *
-/uchar_tder_bufprocess;      /* Standard / Chain */
-uchar_tder_path;             /* 8 / 16 / 32 */
-uchar_tder_cycles;           /* Compat / Type A / Type B / Burst */
-uchar_tder_trans;            /* Single / Demand / Block */
-ddi_dma_cookie_t*(*proc)();  /* address of nextcookie routine */
-void*procparms;              /* parameter for nextcookie call */
+uchar_t			der_command;	/* Read / Write * /
+uchar_t			der_bufprocess; /* Standard / Chain */
+uchar_t			der_path;	/* 8 / 16 / 32 */
+uchar_t			der_cycles;	/* Compat / Type A / Type B / Burst */
+uchar_t			der_trans;	/* Single / Demand / Block */
+ddi_dma_cookie_t	*(*proc)();	/* address of nextcookie routine */
+void			*procparms;	/* parameter for nextcookie call */
 .fi
 .in -2
 
