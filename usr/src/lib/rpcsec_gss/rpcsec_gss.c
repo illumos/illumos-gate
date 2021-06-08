@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -43,8 +45,8 @@
 #include <rpc/rpc.h>
 #include <rpc/rpcsec_defs.h>
 
-static void 	rpc_gss_nextverf();
-static bool_t 	rpc_gss_marshall();
+static void	rpc_gss_nextverf();
+static bool_t	rpc_gss_marshall();
 static bool_t	rpc_gss_validate();
 static bool_t	rpc_gss_refresh();
 static void	rpc_gss_destroy();
@@ -117,6 +119,11 @@ __rpc_gss_seccreate(clnt, server_name, mech, service, qop, options_req,
 	rpc_gss_data		*ap = NULL;
 	OM_uint32		qop_num;
 
+	if (options_ret != NULL) {
+		options_ret->major_status = 0;
+		options_ret->minor_status = 0;
+	}
+
 	/*
 	 * convert ascii strings to GSS values
 	 */
@@ -139,6 +146,10 @@ __rpc_gss_seccreate(clnt, server_name, mech, service, qop, options_req,
 	if (gssstat != GSS_S_COMPLETE) {
 		rpc_gss_err.rpc_gss_error = RPC_GSS_ER_SYSTEMERROR;
 		rpc_gss_err.system_error = ENOMEM;
+		if (options_ret != NULL) {
+			options_ret->major_status = gssstat;
+			options_ret->minor_status = minor_stat;
+		}
 		return (NULL);
 	}
 
@@ -183,6 +194,10 @@ __rpc_gss_seccreate(clnt, server_name, mech, service, qop, options_req,
 	 */
 	if (!rpc_gss_seccreate_pvt(&gssstat, &minor_stat, auth, ap,
 				&mech_type, &ret_flags, &time_rec)) {
+		if (options_ret != NULL) {
+			options_ret->major_status = gssstat;
+			options_ret->minor_status = minor_stat;
+		}
 		if (ap->target_name)
 			(void) gss_release_name(&minor_stat, &ap->target_name);
 		free((char *)ap);
