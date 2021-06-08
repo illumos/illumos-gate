@@ -478,6 +478,18 @@ smb_node_release(smb_node_t *node)
 
 		case SMB_NODE_STATE_AVAILABLE:
 			node->n_state = SMB_NODE_STATE_DESTROYING;
+
+			/*
+			 * While we still hold n_mutex,
+			 * make sure FEM hooks are gone.
+			 */
+			if (node->n_fcn_count > 0) {
+				DTRACE_PROBE1(fem__fcn__dangles,
+				    smb_node_t *, node);
+				node->n_fcn_count = 0;
+				(void) smb_fem_fcn_uninstall(node);
+			}
+
 			mutex_exit(&node->n_mutex);
 
 			smb_llist_enter(node->n_hash_bucket, RW_WRITER);
@@ -883,8 +895,9 @@ smb_node_fcn_unsubscribe(smb_node_t *node)
 
 	mutex_enter(&node->n_mutex);
 	node->n_fcn_count--;
-	if (node->n_fcn_count == 0)
-		smb_fem_fcn_uninstall(node);
+	if (node->n_fcn_count == 0) {
+		VERIFY0(smb_fem_fcn_uninstall(node));
+	}
 	mutex_exit(&node->n_mutex);
 }
 

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -173,7 +173,8 @@ smb_oplock_ind_break_in_ack(smb_request_t *ack_sr, smb_ofile_t *ofile,
 	 * We're going to schedule a request that will have a
 	 * reference to this ofile. Get the hold first.
 	 */
-	if (!smb_ofile_hold_olbrk(ofile)) {
+	if (ofile->f_oplock.og_closing ||
+	    !smb_ofile_hold_olbrk(ofile)) {
 		/* It's closing (or whatever).  Nothing to do. */
 		return;
 	}
@@ -264,7 +265,8 @@ smb_oplock_ind_break(smb_ofile_t *ofile, uint32_t NewLevel,
 	 * We're going to schedule a request that will have a
 	 * reference to this ofile. Get the hold first.
 	 */
-	if (!smb_ofile_hold_olbrk(ofile)) {
+	if (ofile->f_oplock.og_closing ||
+	    !smb_ofile_hold_olbrk(ofile)) {
 		/* It's closing (or whatever).  Nothing to do. */
 		return;
 	}

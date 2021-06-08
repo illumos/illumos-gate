@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  * Copyright 2015 Joyent, Inc.
  */
 
@@ -170,12 +170,15 @@ smb_fem_fcn_install(smb_node_t *node)
 	return (rc);
 }
 
-void
+int
 smb_fem_fcn_uninstall(smb_node_t *node)
 {
+	int rc;
+
 	if (smb_fcn_ops == NULL)
-		return;
-	VERIFY0(fem_uninstall(node->vp, smb_fcn_ops, (void *)node));
+		return (ENOSYS);
+	rc = fem_uninstall(node->vp, smb_fcn_ops, (void *)node);
+	return (rc);
 }
 
 int

@@ -30,6 +30,7 @@ PROG=	smbadm
 SRCS=	smbadm.c
 
 include ../../Makefile.cmd
+include ../../Makefile.ctf
 include ../Makefile.smbsrv.defs
 
 LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lsmb -lsmbns -lsecdb -lumem

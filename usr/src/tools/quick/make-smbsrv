@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
 #
 
 # Use normal make (not dmake) by default.
@@ -90,11 +90,12 @@ then
   test -f $ROOT/usr/include/rpcsvc/daemon_utils.h ||
     (cd $SRC/head && $make $targ)
 
-  # always update the smbsrv headers to be safe
+  # always update the sys,smbsrv headers to be safe
   (cd $SRC/uts/common/gssapi && $make -k $targ)
   (cd $SRC/uts/common/sys && $make -k $targ)
   (cd $SRC/uts/common/smb && $make -k $targ)
   (cd $SRC/uts/common/smbsrv && $make -k $targ)
+  (cd $SRC/uts/common/c2 && $make -k $targ)
 fi
 
 if [ "$targ" = lint ]
@@ -106,17 +107,27 @@ fi
 
 # Need some library headers too...
 for lib in \
+  libc \
+  libnsl \
+  libnvpair \
+  libsocket \
+  \
   libads \
+  libbrand \
   libbsm \
   libcmdutils \
   libcryptoutil \
   libdevid \
+  libdisasm \
   libfakekernel	\
   libgss \
   libidmap \
+  libinetutil \
+  libipsecutil \
   libkrb5 \
   libmlrpc \
   libpam \
+  libsaveargs \
   libsec \
   libscf \
   libshare \
@@ -141,35 +152,67 @@ do_kern() {
   *) targ=$1 ;;
   esac
   ( unset SOURCEDEBUG ;
-  (cd $SRC/uts/$x/nsmb && $make $targ) ;
-  (cd $SRC/uts/$x/smbfs && $make $targ) ;
   (cd $SRC/uts/$x/smbsrv && $make $targ) )
 }
 
 ################################################################
+#
+# Build all libraries used by the other targets in here.
+#
+# Run this once (at least) in each new workspace where you
+# will run "make-smbsrv install", if you want to avoid linking
+# against the libraries from your build host.
+#
+do_deplibs() {
 
-# Note lib1 builds prerequisite libraries not delivered by the
-# tar file we create below.  To accelerate clean/install, we
-# skip these on clean (but still nuke them for clobber)
-
-do_lib1() {
+(cd $SRC/lib/ssp_ns && $make $1)
+(cd $SRC/lib/libc && $make $1)
 
 for lib in \
+  libm \
+  libmd \
+  libnsl \
+  libnvpair \
+  libsocket \
   libavl \
   libgss \
+  libgen \
   libkrb5 \
+  libkstat \
   libcmdutils \
+  libresolv2 \
+  libldap5 \
+  libsldap \
+  libreparse \
+  libpam \
+  libuutil \
+  libidmap \
+  libinetutil \
+  libdlpi \
+  libbsm \
+  libsec \
+  libsecdb \
   libsqlite \
-  libuutil
+  libumem \
+  libuuid \
+  libsaveargs \
+  libproc \
+  libscf \
+  libcryptoutil \
+  libmd5 \
+  libzfs_core \
+  libzfs \
+  pkcs11/libpkcs11
 do
-  (cd $SRC/lib/$lib && $make $1)
+  # So we don't have to build EVERYTHING, set LDCHECKS=
+  # when building the dependent libraries.
+  (cd $SRC/lib/$lib && LDCHECKS='' $make $1)
 done
 }
 
-# lib2 builds stuff we include in the tar file,
-# or that we don't mind rebuilding after clean.
+################################################################
 
-do_lib2() {
+do_libs() {
 
 for lib in \
   libfakekernel \
@@ -227,7 +270,6 @@ do
 done
 }
 
-
 ################################################################
 # This builds $SRC/TAGS (and cscope.files) in a helpful order.
 
@@ -283,7 +325,6 @@ usr/lib/smbsrv/smbd
 usr/sbin/smbadm
 usr/sbin/smbstat
 "
-
 	(cd $ROOT && tar cfj ../../smbsrv-${git_rev}.tar.bz2 $files)
 }
 
@@ -303,30 +344,34 @@ do
     set -e
     do_hdrs $arg
     do_kern $arg
-    do_lib1 $arg
-    do_lib2 $arg
+    do_libs $arg
     do_cmds $arg
     ;;
   lint)
     do_hdrs $arg
     do_kern $arg
-    do_lib1 $arg
-    do_lib2 $arg
+    do_libs $arg
     do_cmds $arg
     ;;
   clean)
     # intentionally skip: lib1, hdrs, tools
     do_cmds $arg
-    do_lib2 $arg
+    do_libs $arg
     do_kern $arg
     ;;
   clobber)
     do_cmds $arg
-    do_lib2 $arg
-    do_lib1 $arg
+    do_libs $arg
     do_kern $arg
     do_hdrs $arg
+    do_deplibs $arg
     clobber_tools
+    ;;
+  deplibs)
+    build_tools
+    set -e
+    do_hdrs install
+    do_deplibs install
     ;;
   tags)
     do_tags
@@ -335,7 +380,7 @@ do
     do_tar
     ;;
   *)
-    echo "Usage: $0 {install|lint|clean|clobber|tags|tar}";
+    echo "Usage: $0 {install|lint|clean|clobber|deplibs|tags|tar}";
     exit 1;
     ;;
   esac

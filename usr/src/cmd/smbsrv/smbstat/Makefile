@@ -26,6 +26,7 @@ PROG=	smbstat
 SRCS=	smbstat.c
 
 include ../../Makefile.cmd
+include ../../Makefile.ctf
 
 OBJS=	$(SRCS:%.c=%.o)
 
