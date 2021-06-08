@@ -22,16 +22,32 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2021 Tintri by DDN, Inc.  All rights reserved.
+#
 
 include $(SRC)/lib/Makefile.lib
 
 HDRS =		ipmp.h ipmp_admin.h ipmp_mpathd.h ipmp_query.h ipmp_query_impl.h
 HDRDIR =	common
 SUBDIRS	=	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 POFILE =	libipmp.po
 MSGFILES =	common/ipmp.c
 XGETFLAGS =	-a
+
+TYPECHECK_LIB =	libipmp.so.1
+TYPELIST = \
+	ipmp_addrinfo_t \
+	ipmp_addrlist_t \
+	ipmp_groupinfo_xfer_t \
+	ipmp_grouplist_t \
+	ipmp_ifinfo_xfer_t \
+	ipmp_iflist_t \
+	ipmp_infotype_t \
+	ipmp_targinfo_xfer_t \
+	mi_query_t \
+	mi_result_t
 
 all :=		TARGET = all
 clean :=	TARGET = clean
@@ -44,7 +60,7 @@ all clean clobber install: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 
-check:		$(CHECKHDRS)
+check:		$(CHECKHDRS) $(TYPECHECK)
 
 $(POFILE):	$(MSGFILES)
 		$(BUILDPO.msgfiles)
