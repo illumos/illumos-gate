@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ISASTREAM 3C "Jul 24, 2002"
+.TH ISASTREAM 3C "May 23, 2021"
 .SH NAME
 isastream \- test a file descriptor
 .SH SYNOPSIS
-.LP
 .nf
 #include <stropts.h>
 
@@ -15,19 +14,13 @@ isastream \- test a file descriptor
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-The  \fBisastream()\fR function determines if a file descriptor represents a
+The \fBisastream()\fR function determines if a file descriptor represents a
 STREAMS file. The \fIfildes\fR argument refers to an open file descriptor.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBisastream()\fR returns \fB1\fR if \fIfildes\fR
 represents a STREAMS file, and \fB0\fR if it does not.  Otherwise, \fB\(mi1\fR
 is return and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBisastream()\fR function will fail if:
 .sp
 .ne 2
@@ -39,8 +32,6 @@ The \fIfildes\fR argument is not a valid file descriptor.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -57,9 +48,7 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBattributes\fR(5), , \fBstandards\fR(5), \fBstreamio\fR(7I)
+\fBattributes\fR(5), \fBstandards\fR(5), \fBstreamio\fR(7I)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

@@ -12,7 +12,7 @@
 .\" Copyright 2019 Joyent, Inc.
 .\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd June 9, 2020
+.Dd May 23, 2021
 .Dt UFM 7D
 .Os
 .Sh NAME
@@ -307,6 +307,6 @@ does not exist or the device does not support the UFM interfaces.
 .Sy Evolving
 .Sh SEE ALSO
 .Xr ddi_ufm 9E ,
-.Xr ddi_ufm_image 9E ,
-.Xr ddi_ufm_slot 9E ,
-.Xr ddi_ufm 9F
+.Xr ddi_ufm 9F ,
+.Xr ddi_ufm_image 9F ,
+.Xr ddi_ufm_slot 9F

@@ -3,12 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AD 5 "Oct 22, 2008"
+.TH AD 5 "May 23, 2021"
 .SH NAME
 ad \- Active Directory as a naming repository
 .SH DESCRIPTION
-.sp
-.LP
 Solaris clients can obtain naming information from Active Directory (AD)
 servers.
 .sp
@@ -41,7 +39,6 @@ The client uses the SASL/GSSAPI/KRB5 security model. The \fBkclient\fR utility
 is used to join the client to AD. During the join operation, \fBkclient\fR
 configures Kerberos v5 on the client. See \fBkclient\fR(1M).
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
@@ -70,8 +67,6 @@ Name service switch module for AD.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBpasswd\fR(1), \fBsvcs\fR(1), \fBidmap\fR(1M), \fBidmapd\fR(1M),
-\fBkclient\fR(1M), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M), \fBsvccfg\fR(1M),
+\fBkclient\fR(1M), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
 \fBnsswitch.conf\fR(4), \fBuser_attr\fR(4), \fBsmf\fR(5)

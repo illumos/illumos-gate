@@ -3,12 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BRANDS 5 "Jul 29, 2009"
+.TH BRANDS 5 "May 23, 2021"
 .SH NAME
 brands \- alternate operating environments for non-global zones
 .SH DESCRIPTION
-.sp
-.LP
 The branded zone (BrandZ) framework extends the Solaris Zones infrastructure
 described in \fBzones\fR(5) to include the creation of brands, which provide
 non-global zones that contain non-native operating environments.
@@ -52,8 +50,6 @@ The zoneadm tool (see \fBzoneadm\fR(1M)) is used to report a zone's brand type
 and administer the zone.
 .RE
 .SS "Device Support"
-.sp
-.LP
 The devices supported by each zone are documented in the man pages and other
 documentation for that brand. The zones infrastructure detects any attempt to
 add an unsupported device and issues a warning to the administrator. If the
@@ -61,8 +57,6 @@ administrator chooses to add an unsupported device despite that warning, that
 device might or might not work as expected. The configuration will be untested
 and unsupported.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -77,11 +71,4 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBmdb\fR(1), \fBzlogin\fR(1), \fBzonename\fR(1), \fBdtrace\fR(1M),
-\fBin.rlogind\fR(1M), \fBsshd\fR(1M), \fBzoneadm\fR(1M), \fBzonecfg\fR(1M),
-\fBkill\fR(2), \fBpriocntl\fR(2), \fBgetzoneid\fR(3C), \fBucred_get\fR(3C),
-\fBgetzoneid\fR(3C), \fBproc\fR(4), \fBattributes\fR(5), \fBlx\fR(5),
-\fBnative\fR(5), \fBprivileges\fR(5), \fBzones\fR(5), \fBlx_systrace\fR(7D),
-\fBcrgetzoneid\fR(9F)
+\fBzoneadm\fR(1M), \fBzonecfg\fR(1M), \fBattributes\fR(5), \fBzones\fR(5)

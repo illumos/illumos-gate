@@ -3,14 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DEVID_COMPARE 9F "May 21, 2009"
+.TH DDI_DEVID_COMPARE 9F "May 23, 2021"
 .SH NAME
 ddi_devid_compare, ddi_devid_free, ddi_devid_init, ddi_devid_register,
 ddi_devid_sizeof, ddi_devid_str_decode, ddi_devid_str_encode,
 ddi_devid_str_free, ddi_devid_get, ddi_devid_unregister, ddi_devid_valid \-
 kernel interfaces for device ids
 .SH SYNOPSIS
-.LP
 .nf
 \fBint\fR \fBddi_devid_compare\fR(\fBddi_devid_t\fR \fIdevid1\fR, \fBddi_devid_t\fR \fIdevid2\fR);
 .fi
@@ -68,7 +67,6 @@ kernel interfaces for device ids
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdevid\fR\fR
@@ -201,12 +199,8 @@ The return address of a minor name. Free string with
 .RE
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Solaris DDI specific (Solaris DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The following routines are used to provide unique identifiers, device
 \fBID\fRs, for devices. Specifically, kernel modules use these interfaces to
 identify and locate devices, independent of the device's physical connection or
@@ -301,8 +295,6 @@ The \fBddi_devid_str_free()\fR function is used to free all strings returned by
 the \fBddi_devid\fR functions (the \fBddi_devid_str_encode()\fR function return
 value and the returned \fIretminor_name\fR argument).
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_devid_init()\fR returns the following values:
 .sp
 .ne 2
@@ -526,13 +518,9 @@ Failure; the \fIdevidstr\fR string was not valid.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from a user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
-\fBdevid_get\fR(3DEVID), , \fBlibdevid\fR(3LIB), \fBattributes\fR(5),
+\fBdevid_get\fR(3DEVID), \fBlibdevid\fR(3LIB), \fBattributes\fR(5),
 \fBattach\fR(9E), \fBdetach\fR(9E), \fBkmem_free\fR(9F)
 .sp
 .LP

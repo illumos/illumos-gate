@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POOL_ERROR 3POOL "Sep 23, 2003"
+.TH POOL_ERROR 3POOL "May 23, 2021"
 .SH NAME
 pool_error, pool_strerror \- error interface to resource pools library
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <pool.h>
@@ -21,8 +20,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpool_error()\fR function returns the error value of the last failure
 recorded by the invocation of one of the functions of the resource pool
 configuration library, \fBlibpool\fR.
@@ -34,8 +31,6 @@ for each of the valid pool error codes.
 .LP
 The following error codes can be returned by \fBpool_error()\fR:
 .SH RETURN VALUES
-.sp
-.LP
 The \fBpool_error()\fR function returns the current pool error value for the
 calling thread from among the following:
 .sp
@@ -138,8 +133,6 @@ corresponding to the requested error value. If the error value has no
 corresponding string, \(mi1 is returned and \fBerrno\fR is set to indicate the
 error.
 .SH ERRORS
-.sp
-.LP
 The \fBpool_strerror()\fR function will fail if:
 .sp
 .ne 2
@@ -151,8 +144,6 @@ The specified error value is not defined by the pools error facility.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -171,6 +162,4 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBerrno\fR(3C), \fBlibpool\fR(3LIB), pool_error(3POOL), \fBattributes\fR(5)
+\fBerrno\fR(3C), \fBlibpool\fR(3LIB), \fBattributes\fR(5)
