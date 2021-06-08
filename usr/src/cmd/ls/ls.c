@@ -23,6 +23,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2015 Gary Mills
+ * Copyright 2020 Peter Tribble
  */
 
 /*
@@ -316,7 +317,7 @@ static uint64_t		block_size = 1;
 static char		*dotp = ".";
 
 static u_longlong_t	tblocks; /* number of blocks of files in a directory */
-static time_t		year, now;
+static time_t		year, now, starttime;
 
 static int		num_cols = 80;
 static int		colwidth;
@@ -418,7 +419,7 @@ main(int argc, char *argv[])
 		argc = getargv("ls", &argv, 0);
 #endif
 
-	lb.lmtime.tv_sec = time(NULL);
+	lb.lmtime.tv_sec = starttime = time(NULL);
 	lb.lmtime.tv_nsec = 0;
 	year = lb.lmtime.tv_sec - 6L*30L*24L*60L*60L; /* 6 months ago */
 	now = lb.lmtime.tv_sec + 60;
@@ -1686,7 +1687,7 @@ record_ancestry(char *file, struct stat *pstatb, struct lbuf *rep,
  * algorithm is used for the group mode calculation only.
  * What is modified here from the algorithm is that only the
  * entries with flags ACE_GROUP are considered. For each entry
- * with ACE_GROUP flag, the first occurance of a specific access
+ * with ACE_GROUP flag, the first occurrence of a specific access
  * is checked if it is allowed.
  * We are not interested in perms for user and other, as they
  * were taken from st_mode value.
@@ -1818,10 +1819,7 @@ gstat(char *file, int argfl, struct ditem *myparent)
 		return (rep);
 
 	/* Initialize non-zero members */
-
-	rep->lat.tv_sec = time(NULL);
-	rep->lct.tv_sec = time(NULL);
-	rep->lmt.tv_sec = time(NULL);
+	rep->lat.tv_sec = rep->lct.tv_sec = rep->lmt.tv_sec = starttime;
 
 	if (argfl || statreq) {
 		int doacl;
@@ -2113,7 +2111,7 @@ gstat(char *file, int argfl, struct ditem *myparent)
 			/*
 			 * Allocate 'sacnt' size array to hold extended
 			 * system attribute name (verbose) or respective
-			 * symbol represenation (compact).
+			 * symbol representation (compact).
 			 */
 			rep->exttr = xmalloc(sacnt * sizeof (struct attrb),
 			    rep);
