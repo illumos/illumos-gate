@@ -114,6 +114,8 @@ usr/include/ipadm_ipmgmt.h
 usr/include/ipadm_ndpd.h
 usr/include/libipadm.h
 lib/libipadm.so
+lib/amd64/libipadm.so		i386
+lib/sparcv9/libipadm.so		sparc
 #
 # Private libsocket header file
 #
