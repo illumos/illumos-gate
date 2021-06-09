@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
+ * Copyright 2021, Tintri by DDN. All rights reserved.
  */
 
 #ifndef _IPADM_IPMGMT_H
@@ -255,7 +256,7 @@ typedef struct ipmgmt_retval_s {
 /* IPMGMT_CMD_GETADDR door_return value */
 typedef struct ipmgmt_get_rval_s {
 	int32_t		ir_err;
-	size_t		ir_nvlsize;
+	uint32_t	ir_nvlsize;
 	/* packed nvl follows */
 } ipmgmt_get_rval_t;
 

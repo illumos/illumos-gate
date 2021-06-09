@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
+ * Copyright 2021, Tintri by DDN. All rights reserved.
  */
 
 /*
@@ -680,6 +681,10 @@ ipmgmt_getaddr_handler(void *argp)
 	    NV_ENCODE_NATIVE)) != 0) {
 		goto fail;
 	}
+
+	if (onvlsize > (UINT32_MAX - sizeof (ipmgmt_get_rval_t)))
+		goto fail;
+
 	buflen = onvlsize + sizeof (ipmgmt_get_rval_t);
 	/*
 	 * We cannot use malloc() here because door_return never returns, and
@@ -823,6 +828,10 @@ ipmgmt_initif_handler(void *argp)
 
 	if ((err = nvlist_size(cbarg.cb_onvl, &nvlsize, NV_ENCODE_NATIVE)) != 0)
 		goto fail;
+
+	if (nvlsize > (UINT32_MAX - sizeof (ipmgmt_get_rval_t)))
+		goto fail;
+
 	buflen = nvlsize + sizeof (ipmgmt_get_rval_t);
 	/*
 	 * We cannot use malloc() here because door_return never returns, and
