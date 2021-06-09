@@ -26,7 +26,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 # Copyright 2017 RackTop Systems.
-# Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2018 Jason King
 # Copyright 2019, Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
@@ -456,6 +456,7 @@ usr/lib/fs/autofs/libshare_autofs.so
 usr/lib/fs/autofs/amd64/libshare_autofs.so		i386
 usr/lib/fs/nfs/libshare_nfs.so
 usr/lib/fs/nfs/amd64/libshare_nfs.so		i386
+usr/lib/fs/nfs/rpcsec_gss_conn
 usr/lib/fs/nfs/test_svc_tp_create
 usr/lib/fs/smb/libshare_smb.so
 usr/lib/fs/smb/amd64/libshare_smb.so		i386

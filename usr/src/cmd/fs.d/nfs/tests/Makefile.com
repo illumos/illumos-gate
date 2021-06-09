@@ -2,8 +2,9 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License (the "License").
-# You may not use this file except in compliance with the License.
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,34 +20,27 @@
 # CDDL HEADER END
 #
 #
-#
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 # Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 #
 
-include $(SRC)/Makefile.master
+FSTYPE=		nfs
 
-SUBDIRS = rpcsec_gss_conn test_svc_tp_create
+include		$(SRC)/cmd/fs.d/Makefile.fstype
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-catalog:=       TARGET= catalog
+CFLAGS += $(CCVERBOSE)
 
-.KEEP_STATE:
+SRCS=		$(LIBPROG:%=%.c)
 
-.PARALLEL:	$(SUBDIRS)
+# message catalog
+catalog:
 
-all install clean clobber: $(SUBDIRS)
+$(LIBPROG):	$(OBJS)
+		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+		$(POST_PROCESS)
 
-catalog: $(SUBDIRS)
-	$(RM) $(POFILE)
-	cat $(POFILES) > $(POFILE)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+clean:
+	$(RM) $(OBJS)

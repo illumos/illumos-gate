@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2012 Marcel Telka <marcel@telka.sk>
@@ -49,6 +49,7 @@
 #include <rpc/rpcsec_defs.h>
 #include <sys/sunddi.h>
 #include <sys/atomic.h>
+#include <sys/disp.h>
 
 extern bool_t __rpc_gss_make_principal(rpc_gss_principal_t *, gss_buffer_t);
 
@@ -238,7 +239,6 @@ typedef struct svcrpcsec_gss_taskq_arg {
 
 /* gssd is single threaded, so 1 thread for the taskq is probably good/ok */
 int rpcsec_gss_init_taskq_nthreads = 1;
-static ddi_taskq_t *svcrpcsec_gss_init_taskq = NULL;
 
 extern struct rpc_msg *rpc_msg_dup(struct rpc_msg *);
 extern void rpc_msg_free(struct rpc_msg **, int);
@@ -252,6 +252,110 @@ struct udp_data {
 	mblk_t	*ud_resp;			/* buffer for response */
 	mblk_t	*ud_inmp;			/* mblk chain of request */
 };
+
+static zone_key_t svc_gss_zone_key;
+static uint_t svc_gss_tsd_key;
+
+typedef struct svc_gss_zsd {
+	zoneid_t sgz_zoneid;
+	kmutex_t sgz_lock;
+	taskq_t *sgz_init_taskq;
+} svc_gss_zsd_t;
+
+static taskq_t *
+svc_gss_create_taskq(zone_t *zone)
+{
+	taskq_t *tq;
+
+	if (zone == NULL) {
+		cmn_err(CE_NOTE, "%s: couldn't find zone", __func__);
+		return (NULL);
+	}
+
+	/* Like ddi_taskq_create(), but for zones, just for now */
+	tq = taskq_create_proc("rpcsec_gss_init_taskq",
+	    rpcsec_gss_init_taskq_nthreads, minclsyspri,
+	    rpcsec_gss_init_taskq_nthreads, INT_MAX, zone->zone_zsched,
+	    TASKQ_PREPOPULATE);
+
+	if (tq == NULL)
+		cmn_err(CE_NOTE, "%s: taskq_create_proc failed", __func__);
+
+	return (tq);
+}
+
+static void *
+svc_gss_zone_init(zoneid_t zoneid)
+{
+	svc_gss_zsd_t *zsd;
+	zone_t *zone = curzone;
+
+	zsd = kmem_alloc(sizeof (*zsd), KM_SLEEP);
+	mutex_init(&zsd->sgz_lock, NULL, MUTEX_DEFAULT, NULL);
+	zsd->sgz_zoneid = zoneid;
+
+	if (zone->zone_id != zoneid)
+		zone = zone_find_by_id_nolock(zoneid);
+
+	zsd->sgz_init_taskq = svc_gss_create_taskq(zone);
+	return (zsd);
+}
+
+/*
+ * taskq_destroy() wakes all taskq threads and tells them to exit.
+ * It then cv_wait()'s for all of them to finish exiting.
+ * cv_wait() calls resume(), which accesses the target's process.
+ * That may be one of our taskq threads, which are attached to zone_zsched.
+ *
+ * If we do taskq_destroy() in the zsd_destroy callback, then zone_zsched
+ * will have exited and been destroyed before it runs, and we can panic
+ * in resume(). Our taskq threads are not accounted for in either
+ * zone_ntasks or zone_kthreads, which means zsched does not wait for
+ * taskq threads attached to it to complete before exiting.
+ *
+ * We therefore need to do this at shutdown time. At the point where
+ * the zsd_shutdown callback is invoked, all other zone tasks (processes)
+ * have exited, but zone_kthreads and other taskqs hanging off zsched have not.
+ *
+ * We need to be careful not to allow RPC services to be ran from
+ * zsched-attached taskqs or zone_kthreads.
+ */
+static void
+svc_gss_zone_shutdown(zoneid_t zoneid, void *arg)
+{
+	svc_gss_zsd_t *zsd = arg;
+
+	/* All non-zsched-hung threads should be finished. */
+	mutex_enter(&zsd->sgz_lock);
+	if (zsd->sgz_init_taskq != NULL) {
+		taskq_destroy(zsd->sgz_init_taskq);
+		zsd->sgz_init_taskq = NULL;
+	}
+	mutex_exit(&zsd->sgz_lock);
+}
+
+static void
+svc_gss_zone_fini(zoneid_t zoneid, void *arg)
+{
+	svc_gss_zsd_t *zsd = arg;
+
+	mutex_destroy(&zsd->sgz_lock);
+	kmem_free(zsd, sizeof (*zsd));
+}
+
+static svc_gss_zsd_t *
+svc_gss_get_zsd(void)
+{
+	svc_gss_zsd_t *zsd;
+
+	zsd = tsd_get(svc_gss_tsd_key);
+	if (zsd == NULL) {
+		zsd = zone_getspecific(svc_gss_zone_key, curzone);
+		(void) tsd_set(svc_gss_tsd_key, zsd);
+	}
+
+	return (zsd);
+}
 
 /*ARGSUSED*/
 static int
@@ -305,14 +409,9 @@ svc_gss_init()
 	    svc_gss_data_reclaim,
 	    NULL, NULL, 0);
 
-	if (svcrpcsec_gss_init_taskq == NULL) {
-		svcrpcsec_gss_init_taskq = ddi_taskq_create(NULL,
-		    "rpcsec_gss_init_taskq", rpcsec_gss_init_taskq_nthreads,
-		    TASKQ_DEFAULTPRI, 0);
-		if (svcrpcsec_gss_init_taskq == NULL)
-			cmn_err(CE_NOTE,
-			    "svc_gss_init: ddi_taskq_create failed");
-	}
+	tsd_create(&svc_gss_tsd_key, NULL);
+	zone_key_create(&svc_gss_zone_key, svc_gss_zone_init,
+	    svc_gss_zone_shutdown, svc_gss_zone_fini);
 }
 
 /*
@@ -322,6 +421,9 @@ svc_gss_init()
 void
 svc_gss_fini()
 {
+	if (zone_key_delete(svc_gss_zone_key) != 0)
+		cmn_err(CE_WARN, "%s: failed to delete zone key", __func__);
+	tsd_destroy(&svc_gss_tsd_key);
 	mutex_destroy(&cb_mutex);
 	mutex_destroy(&ctx_mutex);
 	rw_destroy(&cred_lock);
@@ -926,6 +1028,20 @@ rpcsec_gss_init(
 	svc_rpc_gss_data	*client_data;
 	int ret;
 	svcrpcsec_gss_taskq_arg_t *arg;
+	svc_gss_zsd_t *zsd = svc_gss_get_zsd();
+	taskq_t *tq = zsd->sgz_init_taskq;
+
+	if (tq == NULL) {
+		mutex_enter(&zsd->sgz_lock);
+		if (zsd->sgz_init_taskq == NULL)
+			zsd->sgz_init_taskq = svc_gss_create_taskq(curzone);
+		tq = zsd->sgz_init_taskq;
+		mutex_exit(&zsd->sgz_lock);
+		if (tq == NULL) {
+			cmn_err(CE_NOTE, "%s: no taskq available", __func__);
+			return (RPCSEC_GSS_FAILED);
+		}
+	}
 
 	if (creds.ctx_handle.length != 0) {
 		RPCGSS_LOG0(1, "_svcrpcsec_gss: ctx_handle not null\n");
@@ -990,10 +1106,9 @@ rpcsec_gss_init(
 	arg->cr_service = creds.service;
 
 	/* should be ok to hold clm lock as taskq will have new thread(s) */
-	ret = ddi_taskq_dispatch(svcrpcsec_gss_init_taskq,
-	    svcrpcsec_gss_taskq_func, arg, DDI_SLEEP);
-	if (ret == DDI_FAILURE) {
-		cmn_err(CE_NOTE, "rpcsec_gss_init: taskq dispatch fail");
+	if (taskq_dispatch(tq, svcrpcsec_gss_taskq_func, arg, TQ_SLEEP)
+	    == DDI_FAILURE) {
+		cmn_err(CE_NOTE, "%s: taskq dispatch fail", __func__);
 		ret = RPCSEC_GSS_FAILED;
 		rpc_msg_free(&arg->msg, MAX_AUTH_BYTES);
 		SVC_RELE(arg->rq_xprt, NULL, FALSE);
