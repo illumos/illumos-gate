@@ -330,7 +330,7 @@ ipmgmt_setaddr_handler(void *argp)
 	int			err = 0;
 
 	nvlbuf = (char *)argp + sizeof (ipmgmt_setaddr_arg_t);
-	if ((err = nvlist_unpack(nvlbuf, nvlsize, &nvl, NV_ENCODE_NATIVE)) != 0)
+	if ((err = nvlist_unpack(nvlbuf, nvlsize, &nvl, 0)) != 0)
 		goto ret;
 	if (flags & (IPMGMT_ACTIVE|IPMGMT_INIT)) {
 		if ((err = i_ipmgmt_nvl2aobjnode(nvl, &node)) != 0)
@@ -657,7 +657,7 @@ ipmgmt_getaddr_handler(void *argp)
 	char			*buf, *onvlbuf;
 	ipmgmt_getaddr_arg_t	*gargp = argp;
 	ipmgmt_getaddr_cbarg_t	cbarg;
-	ipmgmt_get_rval_t 	rval, *rvalp = &rval;
+	ipmgmt_get_rval_t	rval, *rvalp = &rval;
 	int			err = 0;
 
 	cbarg.cb_ifname = gargp->ia_ifname;
@@ -802,7 +802,7 @@ ipmgmt_initif_handler(void *argp)
 	bzero(&cbarg, sizeof (cbarg));
 	invlbuf = (char *)argp + sizeof (ipmgmt_initif_arg_t);
 	nvlsize = initif->ia_nvlsize;
-	err = nvlist_unpack(invlbuf, nvlsize, &cbarg.cb_invl, NV_ENCODE_NATIVE);
+	err = nvlist_unpack(invlbuf, nvlsize, &cbarg.cb_invl, 0);
 	if (err != 0)
 		goto fail;
 

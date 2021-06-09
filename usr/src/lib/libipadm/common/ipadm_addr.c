@@ -1672,7 +1672,7 @@ ipadm_set_addrprop(ipadm_handle_t iph, const char *pname,
 	ipadm_prop_desc_t	*pdp = NULL;
 	char			defbuf[MAXPROPVALLEN];
 	uint_t			defbufsize = MAXPROPVALLEN;
-	boolean_t 		reset = (pflags & IPADM_OPT_DEFAULT);
+	boolean_t		reset = (pflags & IPADM_OPT_DEFAULT);
 	ipadm_status_t		status = IPADM_SUCCESS;
 
 	/* Check for solaris.network.interface.config authorization */
@@ -2391,7 +2391,7 @@ ipadm_create_addrobj(ipadm_addr_type_t type, const char *aobjname,
 	ipadm_status_t	status;
 	char		*aname, *cp;
 	char		ifname[IPADM_AOBJSIZ];
-	ifspec_t 	ifsp;
+	ifspec_t	ifsp;
 
 	if (ipaddr == NULL)
 		return (IPADM_INVALID_ARG);
@@ -2615,7 +2615,7 @@ i_ipadm_get_db_addr(ipadm_handle_t iph, const char *ifname,
 	if (err == 0) {
 		nvlsize = rvalp->ir_nvlsize;
 		nvlbuf = (char *)rvalp + sizeof (ipmgmt_get_rval_t);
-		err = nvlist_unpack(nvlbuf, nvlsize, onvl, NV_ENCODE_NATIVE);
+		err = nvlist_unpack(nvlbuf, nvlsize, onvl, 0);
 	}
 	free(rvalp);
 	return (ipadm_errno2status(err));

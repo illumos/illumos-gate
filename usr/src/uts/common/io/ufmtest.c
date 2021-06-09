@@ -266,7 +266,7 @@ ufmtest_do_setfw(intptr_t data, int mode)
 	}
 
 	ret = nvlist_unpack(nvlbuf, setfw.utsw_bufsz, &ufmt.ufmt_nvl,
-	    NV_ENCODE_NATIVE);
+	    KM_NOSLEEP);
 	kmem_free(nvlbuf, setfw.utsw_bufsz);
 
 	if (ret != 0)
