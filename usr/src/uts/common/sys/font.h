@@ -128,9 +128,9 @@ extern bitmap_data_t font_data_8x16;
 void reset_font_flags(void);
 bitmap_data_t *set_font(short *, short *, short, short);
 const uint8_t *font_lookup(const struct font *, uint32_t);
-void font_bit_to_pix4(struct font *, uint8_t *, uint32_t, uint8_t, uint8_t);
-void font_bit_to_pix8(struct font *, uint8_t *, uint32_t, uint8_t, uint8_t);
-void font_bit_to_pix16(struct font *, uint16_t *, uint32_t, uint16_t, uint16_t);
+void font_bit_to_pix4(struct font *, uint8_t *, uint32_t, uint32_t, uint32_t);
+void font_bit_to_pix8(struct font *, uint8_t *, uint32_t, uint32_t, uint32_t);
+void font_bit_to_pix16(struct font *, uint16_t *, uint32_t, uint32_t, uint32_t);
 void font_bit_to_pix24(struct font *, uint8_t *, uint32_t, uint32_t, uint32_t);
 void font_bit_to_pix32(struct font *, uint32_t *, uint32_t, uint32_t, uint32_t);
 

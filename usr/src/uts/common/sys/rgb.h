@@ -43,6 +43,8 @@ typedef struct rgb {
 	rgb_color_t blue;
 } rgb_t;
 
+extern rgb_t rgb_info;
+
 typedef struct {
 	uint8_t red[NCOLORS];
 	uint8_t green[NCOLORS];
@@ -99,7 +101,9 @@ extern const uint8_t brt_xlate[XLATE_NCOLORS];
 extern const uint8_t solaris_color_to_pc_color[NCOLORS];
 extern const uint8_t pc_color_to_solaris_color[NCOLORS];
 
-extern uint32_t rgb_color_map(const rgb_t *, uint8_t);
+extern uint32_t rgb_to_color(const rgb_t *, uint32_t, uint32_t, uint32_t,
+    uint32_t);
+extern uint32_t rgb_color_map(const rgb_t *, uint8_t, uint8_t);
 
 #ifdef __cplusplus
 }

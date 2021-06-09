@@ -167,6 +167,7 @@ typedef union {
 	unsigned char eight;		/* eight bit */
 	unsigned char sixteen[2];	/* 16 bit */
 	unsigned char twentyfour[3];	/* 24 bit */
+	unsigned char thirtytwo[4];	/* 32 bit */
 } color_t;
 
 /*
@@ -178,7 +179,7 @@ typedef union {
  * ioctl(fd, VIS_DEVINIT, struct vis_devinit *)
  */
 #define	VIS_DEVINIT	(VIOC|1)
-#define	VIS_CONS_REV		4 /* Console IO interface version */
+#define	VIS_CONS_REV		5 /* Console IO interface version */
 /* Modes */
 #define	VIS_TEXT		0 /* Use text mode when displaying data */
 #define	VIS_PIXEL		1 /* Use pixel mode when displaying data */
@@ -237,7 +238,7 @@ typedef union {
 #define	VIS_CONSCLEAR		(VIOC|8)
 
 struct vis_consclear {
-	unsigned char	bg_color; /* Background color */
+	color_t	bg_color; /* Background color */
 };
 
 struct vis_consdisplay {
@@ -246,8 +247,8 @@ struct vis_consdisplay {
 	screen_size_t	width; /* Width of data */
 	screen_size_t	height; /* Height of data */
 	unsigned char	*data; /* Data to display */
-	unsigned char	fg_color; /* Foreground color */
-	unsigned char	bg_color; /* Background color */
+	color_t		fg_color; /* Foreground color */
+	color_t		bg_color; /* Background color */
 };
 
 struct vis_conscopy {

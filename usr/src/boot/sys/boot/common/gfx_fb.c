@@ -203,39 +203,10 @@ gfx_parse_mode_str(char *str, int *x, int *y, int *depth)
 	return (true);
 }
 
-/*
- * Support for color mapping.
- * For 8, 24 and 32 bit depth, use mask size 8.
- * 15/16 bit depth needs to use mask size from mode,
- * or we will lose color information from 32-bit to 15/16 bit translation.
- */
 uint32_t
 gfx_fb_color_map(uint8_t index)
 {
-	rgb_t rgb;
-	int bpp;
-
-	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
-
-	rgb.red.pos = 16;
-	if (bpp == 2)
-		rgb.red.size = gfx_fb.u.fb2.framebuffer_red_mask_size;
-	else
-		rgb.red.size = 8;
-
-	rgb.green.pos = 8;
-	if (bpp == 2)
-		rgb.green.size = gfx_fb.u.fb2.framebuffer_green_mask_size;
-	else
-		rgb.green.size = 8;
-
-	rgb.blue.pos = 0;
-	if (bpp == 2)
-		rgb.blue.size = gfx_fb.u.fb2.framebuffer_blue_mask_size;
-	else
-		rgb.blue.size = 8;
-
-	return (rgb_color_map(&rgb, index));
+	return (rgb_color_map(&rgb_info, index, 0xff));
 }
 
 static bool
@@ -957,19 +928,18 @@ int
 gfx_fb_cons_clear(struct vis_consclear *ca)
 {
 	int rv;
-	uint32_t data, width, height;
+	uint32_t width, height;
 #if defined(EFI)
 	EFI_TPL tpl;
 #endif
 
-	data = gfx_fb_color_map(ca->bg_color);
 	width = gfx_fb.framebuffer_common.framebuffer_width;
 	height = gfx_fb.framebuffer_common.framebuffer_height;
 
 #if defined(EFI)
 	tpl = BS->RaiseTPL(TPL_NOTIFY);
 #endif
-	rv = gfxfb_blt(&data, GfxFbBltVideoFill, 0, 0,
+	rv = gfxfb_blt(&ca->bg_color, GfxFbBltVideoFill, 0, 0,
 	    0, 0, width, height, 0);
 #if defined(EFI)
 	BS->RestoreTPL(tpl);
@@ -1009,17 +979,22 @@ static uint8_t
 alpha_blend(uint8_t fg, uint8_t bg, uint8_t alpha)
 {
 	uint16_t blend, h, l;
+	uint8_t max_alpha;
+
+	/* 15/16 bit depths have alpha channel size less than 8 */
+	max_alpha = (1 << (rgb_info.red.size + rgb_info.green.size +
+	    rgb_info.blue.size) / 3) - 1;
 
 	/* trivial corner cases */
 	if (alpha == 0)
 		return (bg);
-	if (alpha == 0xFF)
+	if (alpha >= max_alpha)
 		return (fg);
-	blend = (alpha * fg + (0xFF - alpha) * bg);
-	/* Division by 0xFF */
+	blend = (alpha * fg + (max_alpha - alpha) * bg);
+	/* Division by max_alpha */
 	h = blend >> 8;
-	l = blend & 0xFF;
-	if (h + l >= 0xFF)
+	l = blend & max_alpha;
+	if (h + l >= max_alpha)
 		h++;
 	return (h);
 }
@@ -1039,9 +1014,6 @@ bitmap_cpy(void *dst, void *src, size_t size)
 	ps = src;
 	pd = dst;
 
-	/*
-	 * we only implement alpha blending for depth 32.
-	 */
 	for (i = 0; i < size; i++) {
 		a = ps[i].Reserved;
 		pd[i].Red = alpha_blend(ps[i].Red, pd[i].Red, a);
@@ -1163,14 +1135,8 @@ gfx_fb_display_cursor(struct vis_conscursor *ca)
 	tpl = BS->RaiseTPL(TPL_NOTIFY);
 #endif
 
-	fg.p.Reserved = 0;
-	fg.p.Red = ca->fg_color.twentyfour[0];
-	fg.p.Green = ca->fg_color.twentyfour[1];
-	fg.p.Blue = ca->fg_color.twentyfour[2];
-	bg.p.Reserved = 0;
-	bg.p.Red = ca->bg_color.twentyfour[0];
-	bg.p.Green = ca->bg_color.twentyfour[1];
-	bg.p.Blue = ca->bg_color.twentyfour[2];
+	bcopy(&ca->fg_color, &fg.p32, sizeof (fg.p32));
+	bcopy(&ca->bg_color, &bg.p32, sizeof (bg.p32));
 
 	if (allocate_glyphbuffer(ca->width, ca->height) != NULL) {
 		if (gfxfb_blt(GlyphBuffer, GfxFbBltVideoToBltBuffer,
@@ -1215,20 +1181,18 @@ isqrt(int num)
 void
 gfx_fb_setpixel(uint32_t x, uint32_t y)
 {
-	uint32_t c;
 	text_color_t fg, bg;
 
 	if (plat_stdout_is_framebuffer() == 0)
 		return;
 
 	tem_get_colors((tem_vt_state_t)tems.ts_active, &fg, &bg);
-	c = gfx_fb_color_map(fg);
 
 	if (x >= gfx_fb.framebuffer_common.framebuffer_width ||
 	    y >= gfx_fb.framebuffer_common.framebuffer_height)
 		return;
 
-	gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x, y, 1, 1, 0);
+	gfxfb_blt(&fg.n, GfxFbBltVideoFill, 0, 0, x, y, 1, 1, 0);
 }
 
 /*
@@ -1238,23 +1202,25 @@ void
 gfx_fb_drawrect(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2,
     uint32_t fill)
 {
-	uint32_t c;
 	text_color_t fg, bg;
 
 	if (plat_stdout_is_framebuffer() == 0)
 		return;
 
 	tem_get_colors((tem_vt_state_t)tems.ts_active, &fg, &bg);
-	c = gfx_fb_color_map(fg);
 
 	if (fill != 0) {
-		gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x1, y1, x2 - x1,
-		    y2 - y1, 0);
+		gfxfb_blt(&fg.n, GfxFbBltVideoFill,
+		    0, 0, x1, y1, x2 - x1, y2 - y1, 0);
 	} else {
-		gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x1, y1, x2 - x1, 1, 0);
-		gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x1, y2, x2 - x1, 1, 0);
-		gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x1, y1, 1, y2 - y1, 0);
-		gfxfb_blt(&c, GfxFbBltVideoFill, 0, 0, x2, y1, 1, y2 - y1, 0);
+		gfxfb_blt(&fg.n, GfxFbBltVideoFill,
+		    0, 0, x1, y1, x2 - x1, 1, 0);
+		gfxfb_blt(&fg.n, GfxFbBltVideoFill,
+		    0, 0, x1, y2, x2 - x1, 1, 0);
+		gfxfb_blt(&fg.n, GfxFbBltVideoFill,
+		    0, 0, x1, y1, 1, y2 - y1, 0);
+		gfxfb_blt(&fg.n, GfxFbBltVideoFill,
+		    0, 0, x2, y1, 1, y2 - y1, 0);
 	}
 }
 

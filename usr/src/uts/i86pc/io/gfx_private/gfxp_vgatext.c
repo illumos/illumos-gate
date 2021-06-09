@@ -616,8 +616,8 @@ vgatext_cons_display(struct gfxp_fb_softc *softc, struct vis_consdisplay *da)
 	 * should support these ioctls from userland to enable simple
 	 * system startup graphics.
 	 */
-	attr = (solaris_color_to_pc_color[da->bg_color & 0xf] << 4)
-	    | solaris_color_to_pc_color[da->fg_color & 0xf];
+	attr = (solaris_color_to_pc_color[da->bg_color.four & 0xf] << 4)
+	    | solaris_color_to_pc_color[da->fg_color.four & 0xf];
 	string = (uint32_t *)da->data;
 	addr = (struct cgatext *)softc->console->vga.current_base
 	    +  (da->row * VGA_TEXT_COLS + da->col);
@@ -725,12 +725,12 @@ vgatext_cons_clear(struct gfxp_fb_softc *softc, struct vis_consclear *ca)
 	uint16_t val, fg, *base;
 	int i;
 
-	if (ca->bg_color == 0)		/* bright white */
+	if (ca->bg_color.four == 0)	/* bright white */
 		fg = 1;			/* black */
 	else
 		fg = 8;
 
-	val = (solaris_color_to_pc_color[ca->bg_color & 0xf] << 4) |
+	val = (solaris_color_to_pc_color[ca->bg_color.four & 0xf] << 4) |
 	    solaris_color_to_pc_color[fg];
 	val = (val << 8) | ' ';
 

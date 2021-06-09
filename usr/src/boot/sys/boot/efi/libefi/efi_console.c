@@ -297,7 +297,7 @@ efi_text_cons_clear(struct vis_consclear *ca)
 	UINTN attr = conout->Mode->Attribute & 0x0F;
 	uint8_t bg;
 
-	bg = solaris_color_to_efi_color[ca->bg_color & 0xF] & 0x7;
+	bg = solaris_color_to_efi_color[ca->bg_color.four & 0xF] & 0x7;
 
 	attr = EFI_TEXT_ATTR(attr, bg);
 	st = conout->SetAttribute(conout, attr);
@@ -338,8 +338,8 @@ efi_text_cons_display(struct vis_consdisplay *da)
 		da->width--;
 
 	data = (tem_char_t *)da->data;
-	fg = solaris_color_to_efi_color[da->fg_color & 0xf];
-	bg = solaris_color_to_efi_color[da->bg_color & 0xf] & 0x7;
+	fg = solaris_color_to_efi_color[da->fg_color.four & 0xf];
+	bg = solaris_color_to_efi_color[da->bg_color.four & 0xf] & 0x7;
 	attr = EFI_TEXT_ATTR(fg, bg);
 
 	st = conout->SetAttribute(conout, attr);
