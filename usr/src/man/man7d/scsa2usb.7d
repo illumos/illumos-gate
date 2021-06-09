@@ -3,17 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCSA2USB 7D "May 13, 2017"
+.TH SCSA2USB 7D "May 23, 2021"
 .SH NAME
 scsa2usb \- SCSI to USB bridge driver
 .SH SYNOPSIS
-.LP
 .nf
 \fBstorage@unit-address\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBscsa2usb\fR driver is a \fBUSBA\fR (Solaris USB architecture) compliant
 nexus driver that supports the \fIUSB Mass Storage Bulk Only Transport
 Specification 1.0\fR and \fIUSB Control/Bulk/Interrupt (CBI) Transport
@@ -103,7 +101,6 @@ exclude: scsa2usb
 Alternatively, you can disable automatic handling of a device as described in
 the following subsection.
 .SS "Using Volume Management"
-.LP
 Disk storage devices are managed by Volume Manager. Software that manages
 removable media creates a device nickname that can be listed with
 \fBeject\fR(1) or \fBrmmount\fR(1). A device that is not mounted automatically
@@ -130,7 +127,6 @@ You can disable the automatic mounting and unmounting of removable devices by
 inserting a entry for a removable device in \fB/etc/vfstab\fR. In this entry,
 you must set the \fBmount at boot\fR field to \fBno\fR. See \fBvfstab\fR(4).
 .SS "Using \fBmount\fR and \fBumount\fR"
-.LP
 Use \fBmount\fR(1M) to explicitly mount the device and \fBumount\fR(1M) to
 unmount the device. Use \fBeject\fR(1) to eject the media. After you have
 explicitly mounted a removable device, you cannot use a nickname as an argument
@@ -142,20 +138,16 @@ console warning. To hot remove the disk device from the system, unmount the
 file system, then kill all applications accessing the device. Next, hot remove
 the device. A storage device can be hot inserted at any time.
 .SH DEVICE SPECIAL FILES
-.LP
 Disk block special file names are located in \fB/dev/dsk\fR, while raw file
 names are located in \fB/dev/rdsk\fR. Tape raw file names are located in
 \fB/dev/rmt\fR. Input/output requests to the devices must follow the same
 restrictions as those for SCSI disks or tapes. Refer to \fBsd\fR(7D) or
 \fBst\fR(7D).
 .SH IOCTLS
-.LP
 Refer to \fBdkio\fR(7I) and \fBcdio\fR(7I).
 .SH ERRORS
-.LP
 Refer to \fBsd\fR(7D) for disks or \fBst\fR(7D) for tapes.
 .SH FILES
-.LP
 The device special files for the USB mass storage device are created like those
 for a \fBSCSI\fR disk or SCSI tape. Refer to \fBsd\fR(7D) or \fBst\fR(7D).
 .sp
@@ -191,7 +183,7 @@ ugen(7D) nodes
 .sp
 .ne 2
 .na
-\fB\fB/dev/rmt/[0- 127][l,m,h,u,c][b][n]\fR\fR
+\fB\fB/dev/rmt/[0-127][l,m,h,u,c][b][n]\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -232,16 +224,6 @@ is a generic removable media device.
 .sp
 .ne 2
 .na
-\fB\fB/kernel/drv/scsa2usb\fR\fR
-.ad
-.sp .6
-.RS 4n
-32-bit x86 ELF kernel module
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/kernel/drv/amd64/scsa2usb\fR\fR
 .ad
 .sp .6
@@ -270,7 +252,6 @@ Can be used to override specific characteristics.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -285,7 +266,6 @@ Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
-.LP
 \fBcdrw\fR(1), \fBeject\fR(1), \fBrmformat\fR(1), \fBrmmount\fR(1),
 \fBcfgadm_scsi\fR(1M), \fBcfgadm_usb\fR(1M), \fBfdisk\fR(1M), \fBmount\fR(1M),
 \fBumount\fR(1M),
@@ -320,12 +300,11 @@ Transport Specification 1.0\fR
 SCSI Specification \fIT10/995D Revision 11a\fR \(em March 1997
 .sp
 .LP
-SCSI Specification\fIT10/1236-D Revision 20\fR \(em July 2001
+SCSI Specification \fIT10/1236-D Revision 20\fR \(em July 2001
 .sp
 .LP
-SCSI Specification\fIT10/1416-D Revision 23\fR \(em May 2005
+SCSI Specification \fIT10/1416-D Revision 23\fR \(em May 2005
 .SH DIAGNOSTICS
-.LP
 Refer to \fBsd\fR(7D) and \fBst\fR(7D).
 .sp
 .LP
@@ -451,7 +430,6 @@ USB mass storage devices.
 .RE
 
 .SH NOTES
-.LP
 The Zip 100 drive does not comply with \fIUniversal Serial Bus Specification
 1.0\fR and cannot be power managed. Power Management support for Zip 100 has
 been disabled.

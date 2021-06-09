@@ -5,7 +5,7 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
 .\" Copyright 2020 Joyent, Inc.
-.TH ZONES 5 "Jan 29, 2009"
+.TH ZONES 5 "May 23, 2021"
 .SH NAME
 zones \- Solaris application containers
 .SH DESCRIPTION
@@ -26,7 +26,7 @@ You can configure and administer zones with the \fBzoneadm\fR(1M) and
 install file system contents including software packages into the zone, and
 manage the runtime state of the zone. You can use the \fBzlogin\fR(1) to run
 commands within an active zone. You can do this without logging in through a
-network-based login server such as \fBin.rlogind\fR(1M) or \fBsshd\fR(1M).
+network-based login server such as \fBsshd\fR(1M).
 .sp
 .LP
 The autobooting of zones is enabled and disabled by the zones service,
@@ -234,7 +234,7 @@ zone emulates a host identifier, then commands such as \fBhostid\fR(1) and
 display or return the zone's emulated host identifier rather than the host
 machine's identifier.
 .SH SEE ALSO
-\fBhostid\fR(1), \fBzlogin\fR(1), \fBzonename\fR(1), \fBin.rlogind\fR(1M),
+\fBhostid\fR(1), \fBzlogin\fR(1), \fBzonename\fR(1),
 \fBsshd\fR(1M), \fBsysdef\fR(1M), \fBzoneadm\fR(1M), \fBzonecfg\fR(1M),
 \fBkill\fR(2), \fBpriocntl\fR(2), \fBsysinfo\fR(2), \fBgethostid\fR(3C),
 \fBgetzoneid\fR(3C), \fBucred_get\fR(3C), \fBnfs\fR(4), \fBproc\fR(4),

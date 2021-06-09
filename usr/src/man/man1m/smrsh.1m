@@ -23,18 +23,15 @@
 .\" BE LIABLE FOR ANY DIRECT, INDIRECT,    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT    NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF    USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON    ANY THEORY OF LIABILITY, WHETHER
 .\" IN CONTRACT, STRICT LIABILITY, OR TORT    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF    THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
-.TH SMRSH 1M "Nov 6, 1998"
+.TH SMRSH 1M "May 23, 2021"
 .SH NAME
 smrsh \- restricted shell for sendmail
 .SH SYNOPSIS
-.LP
 .nf
 \fBsmrsh\fR \fB-c\fR \fIcommand\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsmrsh\fR program is intended as a replacement for the \fBsh\fR command
 in the \fBprog\fR mailer in \fBsendmail\fR(1M) configuration files. The
 \fBsmrsh\fR program sharply limits commands that can be run using the
@@ -65,8 +62,6 @@ restrict the use of \fBshell\fR or \fBperl\fR scrips in the \fBsm.bin\fR
 directory (using the \fB#!\fR syntax); it simply disallows the execution of
 arbitrary programs.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -78,7 +73,6 @@ Where \fIcommand\fR is a valid command, executes \fIcommand\fR.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/adm/sm.bin\fR\fR
@@ -88,6 +82,4 @@ directory for restricted programs
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBsendmail\fR(1M), , \fBattributes\fR(5)
+\fBsendmail\fR(1M), \fBattributes\fR(5)
