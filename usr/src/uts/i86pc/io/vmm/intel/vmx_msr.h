@@ -27,6 +27,9 @@
  *
  * $FreeBSD$
  */
+/*
+ * Copyright 2021 Oxide Computer Company
+ */
 
 #ifndef _VMX_MSR_H_
 #define	_VMX_MSR_H_
@@ -58,13 +61,14 @@ int vmx_set_ctlreg(int ctl_reg, int true_ctl_reg, uint32_t ones_mask,
 #define	MSR_BITMAP_ACCESS_READ	0x1
 #define	MSR_BITMAP_ACCESS_WRITE	0x2
 #define	MSR_BITMAP_ACCESS_RW	(MSR_BITMAP_ACCESS_READ|MSR_BITMAP_ACCESS_WRITE)
-void	msr_bitmap_initialize(char *bitmap);
-int	msr_bitmap_change_access(char *bitmap, uint_t msr, int access);
+void vmx_msr_bitmap_initialize(struct vmx *);
+void vmx_msr_bitmap_destroy(struct vmx *);
+void vmx_msr_bitmap_change_access(struct vmx *, int, uint_t, int);
 
-#define	guest_msr_rw(vmx, msr) \
-    msr_bitmap_change_access((vmx)->msr_bitmap, (msr), MSR_BITMAP_ACCESS_RW)
+#define	guest_msr_rw(vmx, vcpuid, msr) \
+    vmx_msr_bitmap_change_access((vmx), (vcpuid), (msr), MSR_BITMAP_ACCESS_RW)
 
-#define	guest_msr_ro(vmx, msr) \
-    msr_bitmap_change_access((vmx)->msr_bitmap, (msr), MSR_BITMAP_ACCESS_READ)
+#define	guest_msr_ro(vmx, vcpuid, msr) \
+    vmx_msr_bitmap_change_access((vmx), (vcpuid), (msr), MSR_BITMAP_ACCESS_READ)
 
 #endif
