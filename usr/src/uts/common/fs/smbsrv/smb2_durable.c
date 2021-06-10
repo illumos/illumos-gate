@@ -179,6 +179,8 @@ preserve_some:
 	/* preserve_opens == SMB2_DH_PRESERVE_SOME */
 
 	switch (of->dh_vers) {
+		uint32_t ol_state;
+
 	case SMB2_RESILIENT:
 		return (B_TRUE);
 
@@ -188,7 +190,11 @@ preserve_some:
 		/* FALLTHROUGH */
 	case SMB2_DURABLE_V1:
 		/* IS durable (v1 or v2) */
-		if ((of->f_oplock.og_state & (OPLOCK_LEVEL_BATCH |
+		if (of->f_lease != NULL)
+			ol_state = of->f_lease->ls_state;
+		else
+			ol_state = of->f_oplock.og_state;
+		if ((ol_state & (OPLOCK_LEVEL_BATCH |
 		    OPLOCK_LEVEL_CACHE_HANDLE)) != 0)
 			return (B_TRUE);
 		/* FALLTHROUGH */
