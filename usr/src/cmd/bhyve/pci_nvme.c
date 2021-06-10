@@ -2843,11 +2843,35 @@ done:
 	return (error);
 }
 
+#ifndef __FreeBSD__
+static int
+nvme_legacy_config(nvlist_t *nvl, const char *opts)
+{
+	const char *path;
+	int ret;
+
+	ret = blockif_legacy_config(nvl, opts);
+
+	if (ret != 0)
+		return (ret);
+
+	path = get_config_value_node(nvl, "path");
+
+	if (path != NULL && strncmp(path, "ram=", 4) == 0)
+		set_config_value_node(nvl, "ram", path + 4);
+
+	return (ret);
+}
+#endif
 
 struct pci_devemu pci_de_nvme = {
 	.pe_emu =	"nvme",
 	.pe_init =	pci_nvme_init,
+#ifndef __FreeBSD__
+	.pe_legacy_config = nvme_legacy_config,
+#else
 	.pe_legacy_config = blockif_legacy_config,
+#endif
 	.pe_barwrite =	pci_nvme_write,
 	.pe_barread =	pci_nvme_read
 };
