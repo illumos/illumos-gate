@@ -17,284 +17,237 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/atomic.h>
 #include <sys/kmem.h>
 #include <sys/machsystm.h>
 #include <sys/mach_mmu.h>
 #include <sys/mman.h>
 #include <sys/x86_archext.h>
+#include <vm/hat_pte.h>
 
-#include <sys/gipt.h>
+#include <sys/vmm_gpt.h>
 #include <sys/vmm_vm.h>
 
-struct rvi_map {
-	gipt_map_t	rm_gipt;
-	uint64_t	rm_wired_page_count;
-};
 typedef struct rvi_map rvi_map_t;
+struct rvi_map {
+	vmm_gpt_t	*rm_gpt;
+	kmutex_t	rm_lock;
+};
 
-#define	RVI_LOCK(m)	(&(m)->rm_gipt.giptm_lock)
+static inline uint64_t
+rvi_prot(uint_t prot)
+{
+	uint64_t bits;
 
-#define	RVI_MAX_LEVELS	4
+	bits = 0;
+	if ((prot & PROT_WRITE) != 0)
+		bits |= PT_WRITABLE;
+	if ((prot & PROT_EXEC) == 0)
+		bits |= PT_NX;
 
-CTASSERT(RVI_MAX_LEVELS <= GIPT_MAX_LEVELS);
+	return (bits);
+}
 
-#define	RVI_PRESENT	PT_VALID
-#define	RVI_WRITABLE	PT_WRITABLE
-#define	RVI_ACCESSED	PT_REF
-#define	RVI_DIRTY	PT_MOD
-#define	RVI_LGPG	PT_PAGESIZE
-#define	RVI_NX		PT_NX
-#define	RVI_USER	PT_USER
-#define	RVI_PWT		PT_WRITETHRU
-#define	RVI_PCD		PT_NOCACHE
+static uint_t
+rvi_pte_prot(uint64_t pte)
+{
+	uint_t prot;
 
-#define	RVI_PA_MASK	PT_PADDR
+	if ((pte & PT_VALID) == 0)
+		return (0);
 
-#define	RVI_PAT(attr)	rvi_attr_to_pat(attr)
-#define	RVI_PADDR(addr)	((addr) & RVI_PA_MASK)
-#define	RVI_PROT(prot)	\
-	((((prot) & PROT_WRITE) != 0 ? RVI_WRITABLE : 0) | \
-	(((prot) & PROT_EXEC) == 0 ? RVI_NX : 0))
+	prot = PROT_READ;
+	if ((pte & PT_NX) == 0)
+		prot |= PROT_EXEC;
+	if ((pte & PT_WRITABLE) != 0)
+		prot |= PROT_WRITE;
 
-#define	RVI_IS_ABSENT(pte)	(((pte) & RVI_PRESENT) == 0)
-#define	RVI_PTE_PFN(pte)	mmu_btop(RVI_PADDR(pte))
-#define	RVI_MAPS_PAGE(pte, lvl)	\
-	(!RVI_IS_ABSENT(pte) && (((pte) & RVI_LGPG) != 0 || (lvl) == 0))
-#define	RVI_PTE_PROT(pte)	\
-	(RVI_IS_ABSENT(pte) ? 0 : (			\
-	PROT_READ |					\
-	(((pte) & RVI_NX) == 0 ? PROT_EXEC : 0) |	\
-	(((pte) & RVI_WRITABLE) != 0 ? PROT_WRITE : 0)))
-
-#define	RVI_PTE_ASSIGN_PAGE(lvl, pfn, prot, attr)	\
-	(RVI_PADDR(pfn_to_pa(pfn)) |			\
-	(((lvl) != 0) ? RVI_LGPG : 0) |			\
-	RVI_USER | RVI_ACCESSED | RVI_PRESENT |		\
-	RVI_PAT(attr) |					\
-	RVI_PROT(prot))
-
-#define	RVI_PTE_ASSIGN_TABLE(pfn)	\
-	(RVI_PADDR(pfn_to_pa(pfn)) |			\
-	RVI_USER | RVI_ACCESSED | RVI_PRESENT |		\
-	RVI_PAT(MTRR_TYPE_WB) |				\
-	RVI_PROT(PROT_READ | PROT_WRITE | PROT_EXEC))
-
+	return (prot);
+}
 
 /* Make sure that PAT indexes line up as expected */
 CTASSERT((PAT_DEFAULT_ATTRIBUTE & 0xf) == MTRR_TYPE_WB);
 CTASSERT(((PAT_DEFAULT_ATTRIBUTE >> 24) & 0xf) == MTRR_TYPE_UC);
 
 static inline uint64_t
-rvi_attr_to_pat(const uint8_t attr)
+rvi_attr_to_pat(uint8_t attr)
 {
-	if (attr == MTRR_TYPE_UC) {
-		/* !PAT + PCD + PWT -> PAT3 -> MTRR_TYPE_UC */
-		return (RVI_PCD|RVI_PWT);
-	} else if (attr == MTRR_TYPE_WB) {
-		/* !PAT + !PCD + !PWT -> PAT0 -> MTRR_TYPE_WB */
+
+	if (attr == MTRR_TYPE_UC)
+		return (PT_NOCACHE | PT_WRITETHRU);
+	if (attr == MTRR_TYPE_WB)
 		return (0);
-	}
 
 	panic("unexpected memattr %x", attr);
-	return (0);
-}
-
-static gipt_pte_type_t
-rvi_pte_type(uint64_t pte, uint_t level)
-{
-	if (RVI_IS_ABSENT(pte)) {
-		return (PTET_EMPTY);
-	} else if (RVI_MAPS_PAGE(pte, level)) {
-		return (PTET_PAGE);
-	} else {
-		return (PTET_LINK);
-	}
 }
 
 static uint64_t
-rvi_pte_map(uint64_t pfn)
+rvi_map_table(uint64_t pfn)
 {
-	return (RVI_PTE_ASSIGN_TABLE(pfn));
+	const uint64_t paddr = pfn_to_pa(pfn);
+	const uint64_t flags = PT_USER | PT_REF | PT_VALID;
+	const uint64_t pat = rvi_attr_to_pat(MTRR_TYPE_WB);
+	const uint64_t rprot = PT_WRITABLE;
+	return (paddr | flags | pat | rprot);
+}
+
+static uint64_t
+rvi_map_page(uint64_t pfn, uint_t prot, uint8_t attr)
+{
+	const uint64_t paddr = pfn_to_pa(pfn);
+	const uint64_t flags = PT_USER | PT_REF | PT_VALID;
+	const uint64_t pat = rvi_attr_to_pat(attr);
+	const uint64_t rprot = rvi_prot(prot);
+	return (paddr | flags | pat | rprot);
+}
+
+static pfn_t
+rvi_pte_pfn(uint64_t pte)
+{
+	return (mmu_btop(pte & PT_PADDR));
+}
+
+static bool
+rvi_pte_is_present(uint64_t pte)
+{
+	return ((pte & PT_VALID) == PT_VALID);
+}
+
+static uint_t
+rvi_reset_bits(volatile uint64_t *entry, uint64_t mask, uint64_t bits)
+{
+	uint64_t pte, newpte, oldpte = 0;
+
+	/*
+	 * We use volatile and atomic ops here because we may be
+	 * racing against hardware modifying these bits.
+	 */
+	VERIFY3P(entry, !=, NULL);
+	oldpte = *entry;
+	do {
+		pte = oldpte;
+		newpte = (pte & ~mask) | bits;
+		oldpte = atomic_cas_64(entry, pte, newpte);
+	} while (oldpte != pte);
+
+	return (oldpte & mask);
+}
+
+static uint_t
+rvi_reset_dirty(uint64_t *entry, bool on)
+{
+	return (rvi_reset_bits(entry, PT_MOD, on ? (PT_MOD | PT_REF) : 0));
+}
+
+static uint_t
+rvi_reset_accessed(uint64_t *entry, bool on)
+{
+	return (rvi_reset_bits(entry, (PT_MOD | PT_REF), on ? PT_REF : 0));
+}
+
+static vmm_pte_ops_t rvi_pte_ops = {
+	.vpeo_map_table		= rvi_map_table,
+	.vpeo_map_page		= rvi_map_page,
+	.vpeo_pte_pfn		= rvi_pte_pfn,
+	.vpeo_pte_is_present	= rvi_pte_is_present,
+	.vpeo_pte_prot		= rvi_pte_prot,
+	.vpeo_reset_dirty	= rvi_reset_dirty,
+	.vpeo_reset_accessed	= rvi_reset_accessed,
+};
+
+vmm_gpt_t *
+rvi_create(void)
+{
+	return (vmm_gpt_alloc(&rvi_pte_ops));
 }
 
 static void *
-rvi_create(uintptr_t *pml4_kaddr)
+rvi_ops_create(uintptr_t *root_kaddr)
 {
-	rvi_map_t *rmap;
-	gipt_map_t *map;
-	gipt_t *root;
-	struct gipt_cbs cbs = {
-		.giptc_pte_type = rvi_pte_type,
-		.giptc_pte_map = rvi_pte_map,
-	};
+	rvi_map_t *map;
 
-	rmap = kmem_zalloc(sizeof (*rmap), KM_SLEEP);
-	map = &rmap->rm_gipt;
-	root = gipt_alloc();
-	root->gipt_level = RVI_MAX_LEVELS - 1;
-	gipt_map_init(map, RVI_MAX_LEVELS, GIPT_HASH_SIZE_DEFAULT, &cbs, root);
+	map = kmem_zalloc(sizeof (*map), KM_SLEEP);
+	mutex_init(&map->rm_lock, NULL, MUTEX_DEFAULT, NULL);
+	map->rm_gpt = rvi_create();
+	*root_kaddr = (uintptr_t)vmm_gpt_root_kaddr(map->rm_gpt);
 
-	*pml4_kaddr = (uintptr_t)root->gipt_kva;
-	return (rmap);
+	return (map);
 }
 
 static void
-rvi_destroy(void *arg)
+rvi_ops_destroy(void *arg)
 {
-	rvi_map_t *rmap = arg;
+	rvi_map_t *map = arg;
 
-	if (rmap != NULL) {
-		gipt_map_t *map = &rmap->rm_gipt;
-
-		gipt_map_fini(map);
-		kmem_free(rmap, sizeof (*rmap));
+	if (map != NULL) {
+		vmm_gpt_free(map->rm_gpt);
+		mutex_destroy(&map->rm_lock);
+		kmem_free(map, sizeof (*map));
 	}
 }
 
 static uint64_t
-rvi_wired_count(void *arg)
+rvi_ops_wired_count(void *arg)
 {
-	rvi_map_t *rmap = arg;
+	rvi_map_t *map = arg;
 	uint64_t res;
 
-	mutex_enter(RVI_LOCK(rmap));
-	res = rmap->rm_wired_page_count;
-	mutex_exit(RVI_LOCK(rmap));
+	mutex_enter(&map->rm_lock);
+	res = vmm_gpt_mapped_count(map->rm_gpt);
+	mutex_exit(&map->rm_lock);
 
 	return (res);
 }
 
 static int
-rvi_is_wired(void *arg, uint64_t va, uint_t *protp)
+rvi_ops_is_wired(void *arg, uint64_t gpa, uint_t *protp)
 {
-	rvi_map_t *rmap = arg;
-	gipt_t *pt;
-	int rv = -1;
+	rvi_map_t *map = arg;
+	bool mapped;
 
-	mutex_enter(RVI_LOCK(rmap));
-	pt = gipt_map_lookup_deepest(&rmap->rm_gipt, va);
-	if (pt != NULL) {
-		const uint64_t pte = GIPT_VA2PTE(pt, va);
+	mutex_enter(&map->rm_lock);
+	mapped = vmm_gpt_is_mapped(map->rm_gpt, gpa, protp);
+	mutex_exit(&map->rm_lock);
 
-		if (RVI_MAPS_PAGE(pte, pt->gipt_level)) {
-			*protp = RVI_PTE_PROT(pte);
-			rv = 0;
-		}
-	}
-	mutex_exit(RVI_LOCK(rmap));
-
-	return (rv);
+	return (mapped ? 0 : -1);
 }
 
 static int
-rvi_map(void *arg, uint64_t va, pfn_t pfn, uint_t lvl, uint_t prot,
+rvi_ops_map(void *arg, uint64_t gpa, pfn_t pfn, uint_t _lvl, uint_t prot,
     uint8_t attr)
 {
-	rvi_map_t *rmap = arg;
-	gipt_map_t *map = &rmap->rm_gipt;
-	gipt_t *pt;
-	uint64_t *ptep, pte;
+	rvi_map_t *map = arg;
 
 	ASSERT((prot & PROT_READ) != 0);
 	ASSERT3U((prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)), ==, 0);
-	ASSERT3U(lvl, <, RVI_MAX_LEVELS);
 
-	mutex_enter(RVI_LOCK(rmap));
-	pt = gipt_map_lookup(map, va, lvl);
-	if (pt == NULL) {
-		/*
-		 * A table at the appropriate VA/level that would house this
-		 * mapping does not currently exist.  Try to walk down to that
-		 * point, creating any necessary parent(s).
-		 */
-		pt = gipt_map_create_parents(map, va, lvl);
+	mutex_enter(&map->rm_lock);
+	vmm_gpt_populate_entry(map->rm_gpt, gpa);
+	(void) vmm_gpt_map(map->rm_gpt, gpa, pfn, prot, attr);
+	mutex_exit(&map->rm_lock);
 
-		/*
-		 * There was a large page mapping in the way of creating the
-		 * necessary parent table(s).
-		 */
-		if (pt == NULL) {
-			panic("unexpected large page @ %08lx", va);
-		}
-	}
-	ptep = GIPT_VA2PTEP(pt, va);
-
-	pte = *ptep;
-	if (!RVI_IS_ABSENT(pte)) {
-		if (!RVI_MAPS_PAGE(pte, lvl)) {
-			panic("unexpected PT link @ %08lx in %p", va, pt);
-		} else {
-			panic("unexpected page mapped @ %08lx in %p", va, pt);
-		}
-	}
-
-	pte = RVI_PTE_ASSIGN_PAGE(lvl, pfn, prot, attr);
-	*ptep = pte;
-	pt->gipt_valid_cnt++;
-	rmap->rm_wired_page_count += gipt_level_count[lvl];
-
-	mutex_exit(RVI_LOCK(rmap));
 	return (0);
 }
 
 static uint64_t
-rvi_unmap(void *arg, uint64_t va, uint64_t end_va)
+rvi_ops_unmap(void *arg, uint64_t start, uint64_t end)
 {
-	rvi_map_t *rmap = arg;
-	gipt_map_t *map = &rmap->rm_gipt;
-	gipt_t *pt;
-	uint64_t cur_va = va;
-	uint64_t unmapped = 0;
+	rvi_map_t *map = arg;
+	size_t unmapped = 0;
 
-	mutex_enter(RVI_LOCK(rmap));
+	mutex_enter(&map->rm_lock);
+	unmapped = vmm_gpt_unmap_region(map->rm_gpt, start, end);
+	vmm_gpt_vacate_region(map->rm_gpt, start, end);
+	mutex_exit(&map->rm_lock);
 
-	pt = gipt_map_lookup_deepest(map, cur_va);
-	if (pt == NULL) {
-		mutex_exit(RVI_LOCK(rmap));
-		return (0);
-	}
-	if (!RVI_MAPS_PAGE(GIPT_VA2PTE(pt, cur_va), pt->gipt_level)) {
-		cur_va = gipt_map_next_page(map, cur_va, end_va, &pt);
-		if (cur_va == 0) {
-			mutex_exit(RVI_LOCK(rmap));
-			return (0);
-		}
-	}
-
-	while (cur_va < end_va) {
-		uint64_t *ptep = GIPT_VA2PTEP(pt, cur_va);
-		const uint_t lvl = pt->gipt_level;
-
-		ASSERT(RVI_MAPS_PAGE(*ptep, lvl));
-		*ptep = 0;
-		pt->gipt_valid_cnt--;
-		unmapped += gipt_level_count[pt->gipt_level];
-
-		gipt_t *next_pt = pt;
-		uint64_t next_va;
-		next_va = gipt_map_next_page(map, cur_va, end_va, &next_pt);
-
-		if (pt->gipt_valid_cnt == 0) {
-			gipt_map_clean_parents(map, pt);
-		}
-		if (next_va == 0) {
-			break;
-		}
-		pt = next_pt;
-		cur_va = next_va;
-	}
-	rmap->rm_wired_page_count -= unmapped;
-
-	mutex_exit(RVI_LOCK(rmap));
-
-	return (unmapped);
+	return ((uint64_t)unmapped);
 }
 
 struct vmm_pt_ops rvi_ops = {
-	.vpo_init	= rvi_create,
-	.vpo_free	= rvi_destroy,
-	.vpo_wired_cnt	= rvi_wired_count,
-	.vpo_is_wired	= rvi_is_wired,
-	.vpo_map	= rvi_map,
-	.vpo_unmap	= rvi_unmap,
+	.vpo_init		= rvi_ops_create,
+	.vpo_free		= rvi_ops_destroy,
+	.vpo_wired_cnt		= rvi_ops_wired_count,
+	.vpo_is_wired		= rvi_ops_is_wired,
+	.vpo_map		= rvi_ops_map,
+	.vpo_unmap		= rvi_ops_unmap,
 };

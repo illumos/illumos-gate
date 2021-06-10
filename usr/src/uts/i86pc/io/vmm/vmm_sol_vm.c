@@ -35,6 +35,7 @@
 #include <vm/seg_vmm.h>
 
 #include <machine/vm.h>
+#include <sys/vmm_gpt.h>
 #include <sys/vmm_vm.h>
 
 #define	PMAP_TO_VMMAP(pm)	((vm_map_t)		\
