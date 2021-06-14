@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MP_GETMPLUOIDLISTFROMTPG 3MPAPI "Feb 15, 2006"
+.TH MP_GETMPLUOIDLISTFROMTPG 3MPAPI "June 13, 2021"
 .SH NAME
 MP_GetMPLuOidListFromTPG \- return a list of object IDs
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <mpapi.h>
@@ -18,7 +17,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIoid\fR\fR
@@ -40,8 +38,6 @@ that has type \fBMP_OID_LIST\fR that contains the object IDs of all the
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBMP_GetMPLuOidListFromTPG()\fR function returns the list of object IDs
 for the multipath logical units associated with the specific target port group.
 .sp
@@ -49,7 +45,6 @@ for the multipath logical units associated with the specific target port group.
 When the caller is finished using the list, it must free the memory used by the
 list by calling \fBMP_FreeOidList\fR.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBMP_STATUS_INVALID_OBJECT_TYPE\fR\fR
@@ -67,7 +62,7 @@ happen if an uninitialized object ID is passed to the API.
 .ad
 .sp .6
 .RS 4n
-The \fIpplist\fR is null or specifies a memory area to which data cannot be
+The \fIppList\fR is null or specifies a memory area to which data cannot be
 written, or when the \fIoid\fR has a type subfield other than
 \fBMP_OBJECT_TYPE_TARGET_PORT\fR.
 .RE
@@ -114,8 +109,6 @@ A memory allocation failure occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -134,8 +127,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibMPAPI\fR(3LIB), \fBMP_GetMPLogicalUnitProperties\fR(3MPAPI),
 \fBattributes\fR(5)
 .sp

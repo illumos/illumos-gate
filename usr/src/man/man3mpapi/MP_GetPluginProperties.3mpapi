@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MP_GETPLUGINPROPERTIES 3MPAPI "Feb 15, 2006"
+.TH MP_GETPLUGINPROPERTIES 3MPAPI "June 13, 2021"
 .SH NAME
 MP_GetPluginProperties \- get specified plugin properties
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <mpapi.h>
@@ -18,7 +17,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIoid\fR\fR
@@ -33,18 +31,15 @@ The object ID of the plugin.
 \fB\fIpProps\fR\fR
 .ad
 .RS 10n
-A pointer to an object ID that has type \fBMP_PLUGIN_PR OPERTIES\fR structure
+A pointer to an object ID that has type \fBMP_PLUGIN_PROPERTIES\fR structure
 allocated by the caller. With a successful return, this structure contains the
 properties of the plugin specified by \fIoid\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBMP_GetPluginProperties()\fR function gets the properties of the
 specified plugin.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBMP_STATUS_INVALID_PARAMETER\fR\fR
@@ -88,8 +83,6 @@ The operation is successful.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -108,8 +101,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibMPAPI\fR(3LIB), \fBMP_GetProprietaryLoadBalanceProperties\fR(3MPAPI),
 \fBMP_GetPluginOidList\fR(3MPAPI), \fBattributes\fR(5)
 .sp

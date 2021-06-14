@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MP_GETASSOCIATEDPATHOIDLIST 3MPAPI "Feb 15, 2006"
+.TH MP_GETASSOCIATEDPATHOIDLIST 3MPAPI "June 13, 2021"
 .SH NAME
 MP_GetAssociatedPathOidList \- get a list of object IDs
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <mpapi.h>
@@ -18,7 +17,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIoid\fR\fR
@@ -33,29 +31,26 @@ The object ID of the multipath logical unit, initiator port, or target port.
 \fB\fIppList\fR\fR
 .ad
 .RS 10n
-A pointer to a pointer to an object ID that has type  \fBMP_OID_LIST\fR
+A pointer to a pointer to an object ID that has type \fBMP_OID_LIST\fR
 structure. With a successful return, this will contain a pointer to an object
 ID that has type \fBMP_OID_LIST\fR that contains the object IDs of all the
 paths associated with the specified (multipath) logical unit, initiator port,
-or  target port \fIoid\fR.
+or target port \fIoid\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBMP_GetAssociatedPathOidList()\fR function gets a list of oid object IDs
-for all the path logica l units associated with the specified multipath logical
-unit , initiator port, or target port.
+for all the path logical units associated with the specified multipath logical
+unit, initiator port, or target port.
 .sp
 .LP
-Returns a list of  object IDs for all the path logical units associated with
-the specified mult ipath logical unit, initiator port, or target port.
+Returns a list of object IDs for all the path logical units associated with
+the specified multipath logical unit, initiator port, or target port.
 .sp
 .LP
 When the caller is finished using the list it must free the memory used by the
 list by calling \fBMP_FreeOidList\fR.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBMP_STATUS_INVALID_PARAMETER\fR\fR
@@ -100,8 +95,6 @@ The operation is successful.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -120,8 +113,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibMPAPI\fR(3LIB), \fBMP_GetPathLogicalUnitProperties\fR(3MPAPI),
 \fBattributes\fR(5)
 .sp
