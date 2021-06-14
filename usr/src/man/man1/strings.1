@@ -44,19 +44,16 @@
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
 .\"
-.TH STRINGS 1 "Apr 13, 2007"
+.TH STRINGS 1 "June 13, 2021"
 .SH NAME
 strings \- find printable strings in an object or binary file
 .SH SYNOPSIS
-.LP
 .nf
 \fBstrings\fR [\fB-a\fR | \fB-\fR]
      [\fB-t\fR \fIformat\fR | \fB-o\fR] [\fB-n\fR \fInumber\fR | \fB-number\fR]  [\fB-N\fR \fIname\fR]  [\fIfile\fR]...
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBstrings\fR utility looks for \fBASCII\fR strings in a binary file. A
 string is any sequence of 4 or more printing characters ending with a NEWLINE
 or a \fBNULL\fR character.
@@ -76,8 +73,6 @@ for a file.
 All sections can be inspected with the \fB-a\fR option. Individual sections can
 be inspected with the \fB-N\fR option.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -107,7 +102,7 @@ is \fB4\fR.
 Look only in ELF section name. See \fBelfdump\fR(1). Multiple \fB-N\fR options
 can be specified to inspect multiple sections.
 .sp
-If the \fB-a\fR or \fB-\fRoption is specified, all \fB-N\fR options are
+If the \fB-a\fR or \fB-\fR option is specified, all \fB-N\fR options are
 ignored .
 .RE
 
@@ -159,8 +154,6 @@ The offset is written in hexadecimal.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operand is supported:
 .sp
 .ne 2
@@ -173,14 +166,10 @@ specified, the \fBstrings\fR utility reads from the standard input.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBstrings\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -201,8 +190,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -224,13 +211,9 @@ The \fBstrings\fR utility, including all options except \fB-N\fR, are specified
 by standards. See \fBstandards\fR(5). The \fB-N\fR option is not currently
 specified by any standard.
 .SH SEE ALSO
-.sp
-.LP
 \fBelfdump\fR(1), \fBod\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
-.sp
-.LP
 The algorithm for identifying strings is extremely primitive.
 .sp
 .LP

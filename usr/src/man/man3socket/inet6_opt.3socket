@@ -4,13 +4,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INET6_OPT 3SOCKET "Feb 15, 2007"
+.TH INET6_OPT 3SOCKET "June 13, 2021"
 .SH NAME
 inet6_opt, inet6_opt_init, inet6_opt_append, inet6_opt_finish,
 inet6_opt_set_val, inet6_opt_next, inet6_opt_find, inet6_opt_get_val \- Option
 manipulation mechanism
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsocket\fR [\fIlibrary...\fR]
 #include <netinet/in.h>
@@ -52,13 +51,11 @@ manipulation mechanism
 
 .LP
 .nf
-\fBint\fR\fBinet6_opt_get_val\fR(\fBvoid *\fR\fIdatabuf\fR, \fBint\fR \fIoffset\fR,
+\fBint\fR \fBinet6_opt_get_val\fR(\fBvoid *\fR\fIdatabuf\fR, \fBint\fR \fIoffset\fR,
      \fBvoid *\fR\fIval\fR, \fBsocklen_t *\fR\fIvallen\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBinet6_opt\fR functions enable users to manipulate options without having
 to know the structure of the option header.
 .sp
@@ -128,8 +125,6 @@ in the option's data portion the value should be extracted. The first byte
 following the option type and length is accessed by specifying an \fIoffset\fR
 of zero.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBinet6_opt_init()\fR function returns the number of bytes needed for the
 empty extension header. If the \fIextlen\fR value is not a positive non-zero
 multiple of 8, the function fails and returns \fB-1\fR\&.
@@ -161,8 +156,6 @@ The \fBinet6_opt_get_val()\fR function returns the \fIoffset\fR for the next
 field (that is, \fIoffset\fR + \fIvallen\fR) which can be used when extracting
 option content with multiple fields.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -179,7 +172,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 RFC 3542 - \fIAdvanced Sockets Application Programming Interface (API) for
 IPv6\fR, The Internet Society. May 2003

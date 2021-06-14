@@ -43,7 +43,7 @@
 .\" Copyright (c) 1992, X/Open Company Limited All.  Rights Reserved.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\"
-.TH PAX 1 "September 22, 2020"
+.TH PAX 1 "June 13, 2021"
 .SH NAME
 pax \- portable archive interchange
 .SH SYNOPSIS
@@ -540,7 +540,7 @@ variable. If \fBTMPDIR\fR is not set, \fBpax\fR uses \fB/tmp\fR.
 This keyword is applicable only to the \fB-x\fR \fBpax\fR format. This keyword
 allows user control over the action \fBpax\fR takes upon encountering values in
 an extended header record that, in \fBread\fR or \fBcopy\fR mode, are invalid
-in the destination hierarchy or, in \fBlist\fR mode , cannot be written in the
+in the destination hierarchy or, in \fBlist\fR mode, cannot be written in the
 codeset and current locale of the implementation. The following are invalid
 values that are recognized by \fBpax\fR:
 .RS +4
@@ -1309,7 +1309,7 @@ where <\fIls\fR \fB-l\fR \fIlisting\fR> is the format specified by the \fBls\fR
 command with the \fB-l\fR option. When writing path names in this format, it is
 unspecified what is written for fields for which the underlying archive format
 does not have the correct information, although the correct number of
-blank-character-separated fields is written.
+blank-character-separated fields are written.
 .RE
 .sp
 .LP
@@ -1361,7 +1361,7 @@ When \fBpax\fR is in \fBread\fR mode or \fBlist\fR mode, using the \fB-x\fR
 field in an extended header record cannot be translated from the \fBpax\fR
 UTF-8 codeset format to the codeset and current locale of the implementation,
 \fBpax\fR writes a diagnostic message to standard error, processes the file as
-described for the \fB-o\fR \fBinvalid=\fRoption, and then processes the next
+described for the \fB-o\fR \fBinvalid=\fR option, and then processes the next
 file in the archive.
 .SS "Output Files"
 In \fBread\fR mode, the extracted output files are of the archived file type.
@@ -1449,7 +1449,7 @@ extended header record when the file is archived. If this extended header
 record is associated with a file in the archive, those holes are recreated
 whenever that file is extracted from the archive. See the \fBSEEK_DATA\fR and
 \fBSEEK_HOLE\fR whence values in \fBlseek\fR(2). In all other cases, any
-\fBNUL\fR (\fB\e0\fR) characters found in the archive is written to the file
+\fBNUL\fR (\fB\e0\fR) characters found in the archive are written to the file
 when it is extracted.
 .sp
 .LP
@@ -2407,7 +2407,7 @@ A Solaris extension to \fBpax\fR extended header keywords. Specifies the data
 and hole pairs for a sparse file.
 .sp
 In write or copy modes and when the \fBxustar\fR or \fBpax\fR format (see \fB-x
-format\fR) is specified, \fBpax\fR includes a \fBSUN.holesdate\fR extended
+format\fR) is specified, \fBpax\fR includes a \fBSUN.holesdata\fR extended
 header record if the underlying file system supports the detection of files
 with holes (see \fBfpathconf\fR(2)) and reports that there is at least one hole
 in the file being archived. \fIvalue\fR consists of two or more consecutive
@@ -2702,7 +2702,7 @@ character set as octets with the most significant bit zero. If an
 implementation supports the use of characters outside the portable filename
 character set in names for files, users, and groups, one or more
 implementation-defined encodings of these characters are provided for
-interchange purposes.\fBpax\fR does not create filenames on the local system
+interchange purposes. \fBpax\fR does not create filenames on the local system
 that cannot be accessed by way of the procedures described in volume \fIIEEE
 Std 1003.1-200x\fR. If a filename is found on the medium that would create an
 invalid filename, it is implementation-defined whether the data from the file
