@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KMFCFG 1 "Feb 3, 2009"
+.TH KMFCFG 1 "June 13, 2021"
 .SH NAME
 kmfcfg \- Key Management Policy and Plugin Configuration Utility
 .SH SYNOPSIS
-.LP
 .nf
 \fBkmfcfg\fR \fIsubcommand\fR [\fIoption\fR ...]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBkmfcfg\fR command allows users to configure Key Management Framework
 (KMF) policy databases. The KMF policy database (DB) restricts the use of keys
 and certificates that are managed through the KMF framework.
@@ -28,8 +25,6 @@ export policy definitions either in the system default database file
 For plugin configuration, \fBkmfcfg\fR allows users to display plugin
 information, install or uninstall a KMF plugin, and modify the plugin option.
 .SH SUBCOMMANDS
-.sp
-.LP
 The following subcommands are supported:
 .sp
 .ne 2
@@ -400,7 +395,7 @@ The \fBdelete\fR subcommand supports the following options:
 .ad
 .RS 21n
 Read policy definitions from the indicated file. If \fIdbfile\fR is not
-specified, , the default is the system KMF policy database file:
+specified, the default is the system KMF policy database file:
 \fB/etc/security/kmfpolicy.xml\fR.
 .RE
 
@@ -699,7 +694,6 @@ The \fBdefault\fR policy in the system KMF policy database cannot be modified.
 .RE
 
 .SS "Plugin Subcommands"
-.sp
 .ne 2
 .na
 \fB\fBinstall keystore=\fR\fIkeystore_name\fR \fBmodulepath=\fR\fIpathname\fR\e
@@ -724,7 +718,7 @@ the calling program's instruction set architecture.
 .RS 4n
 Display KMF plugin information.
 .sp
-Without the \fBplugin\fRkeyword, \fBkmfcfg list\fR shows the policy information
+Without the \fBplugin\fR keyword, \fBkmfcfg list\fR shows the policy information
 as described in the \fBSUBCOMMANDS\fR section.
 .RE
 
@@ -755,7 +749,6 @@ Uninstall the plugin with the \fIkeystore_name\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCreating a New Policy
 .sp
 .LP
@@ -774,8 +767,6 @@ ekuname=ipsecTunnel,ipsecUser
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -796,7 +787,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/kmfpolicy.xml\fR\fR
@@ -807,8 +797,6 @@ Default system policy database
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -823,6 +811,4 @@ Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5)

@@ -3,21 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SUN_MP_SENDSCSICMD 3MPAPI "Dec 12, 2006"
+.TH SUN_MP_SENDSCSICMD 3MPAPI "June 13, 2021"
 .SH NAME
 Sun_MP_SendScsiCmd \- send a SCSI command to a logical unit
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <mpapi.h>
-#include <mpapi_sun.h>
+#include <mpapi-sun.h>
 
 \fBMP_STATUS\fR \fBMP_SendScsiCmd\fR(\fBMP_OID\fR \fIoid\fR, \fBstruct uscsi_cmd *\fR\fIcmd\fR);
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIoid\fR\fR
@@ -36,8 +34,6 @@ A \fBuscsi_cmd\fR structure. See \fBuscsi\fR(7I).
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBSun_MP_SendScsiCmd()\fR function sends a SCSI command on a specific path
 to a logical unit. This function is applicable only to an OID whose
 \fBMP_PLUGIN_PROPERTIES\fR \fIdriverVendor\fR, as defined by the Multipath
@@ -45,14 +41,13 @@ Management API, is equal to "Sun Microsystems". See
 \fBMP_GetPluginProperties\fR(3MPAPI) and \fIMultipath Management API Version
 1.0\fR.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBMP_STATUS_INVALID_PARAMETER\fR\fR
 .ad
 .sp .6
 .RS 4n
-The \fIpProps\fR is null or specifies a memory area  to  which data  cannot  be
+The \fIpProps\fR is null or specifies a memory area to which data cannot be
 written, or the \fIoid\fR has a type subfield other than
 \fBMP_OBJECT_TYPE_PLUGIN.\fR
 .RE
@@ -64,7 +59,7 @@ written, or the \fIoid\fR has a type subfield other than
 .ad
 .sp .6
 .RS 4n
-The \fIoid\fR does not specify any valid object type. This  is most  likely  to
+The \fIoid\fR does not specify any valid object type. This is most likely to
 happen if an uninitialized object ID is passed to the API.
 .RE
 
@@ -89,13 +84,9 @@ The operation is successful.
 .RE
 
 .SH WARNINGS
-.sp
-.LP
 The \fBuscsi\fR command is very powerful but somewhat dangerous. See the
-WARNINGS section on \fBattributes\fR(5) before using this interface.
+WARNINGS section of \fBuscsi\fR(7I) before using this interface.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -112,8 +103,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibMPAPI\fR(3LIB), \fBMP_GetPluginProperties\fR(3MPAPI),
 \fBattributes\fR(5), \fBuscsi\fR(7I)
 .sp

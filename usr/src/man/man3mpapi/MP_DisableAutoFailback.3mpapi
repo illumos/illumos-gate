@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MP_DISABLEAUTOFAILBACK 3MPAPI "Feb 15, 2006"
+.TH MP_DISABLEAUTOFAILBACK 3MPAPI "June 13, 2021"
 .SH NAME
 MP_DisableAutoFailback \- disable auto-failback
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <mpapi.h>
@@ -17,7 +16,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIoid\fR\fR
@@ -27,12 +25,9 @@ The object ID of the plugin or the multipath logical unit.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBMP_DisableAutoFailback()\fR function disables auto-failback for the
 specified plugin or multipath logical unit.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBMP_STATUS_INVALID_OBJECT_TYPE\fR\fR
@@ -50,7 +45,7 @@ happen if an uninitialized object ID is passed to the AP I.
 .ad
 .sp .6
 .RS 4n
-The \fIoid\fR has a type subfield other than \fBMP_OBJE CT_TYPE_PLUGIN\fR or
+The \fIoid\fR has a type subfield other than \fBMP_OBJECT_TYPE_PLUGIN\fR or
 \fBMP_OBJECT_TYPE_MULTIPATH_LU\fR.
 .RE
 
@@ -85,8 +80,6 @@ The API is not supported.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -105,8 +98,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibMPAPI\fR(3LIB), \fBMP_EnableAutoFailback\fR(3MPAPI), \fBattributes\fR(5)
 .sp
 .LP

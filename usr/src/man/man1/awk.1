@@ -45,7 +45,7 @@
 .\" Portions Copyright (c) 2005, 2006 Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2020 Joyent, Inc.
 .\"
-.TH AWK 1 "Apr 20, 2020"
+.TH AWK 1 "June 13, 2021"
 .SH NAME
 awk \- pattern scanning and processing language
 .SH SYNOPSIS
@@ -192,10 +192,10 @@ the \fB=\fR represent the name of a \fBawk\fR variable. If that name is a
 \fBawk\fR reserved word, the behavior is undefined. The characters following
 the equal sign is interpreted as if they appeared in the \fBawk\fR program
 preceded and followed by a double-quote (\fB"\fR) character, as a \fBSTRING\fR
-token , except that if the last character is an unescaped backslash, it is
+token, except that if the last character is an unescaped backslash, it is
 interpreted as a literal backslash rather than as the first character of the
 sequence \fB\e\fR\&.. The variable is assigned the value of that \fBSTRING\fR
-token. If the value is considered a \fInumeric\fRstring\fI,\fR the variable is
+token. If the value is considered a \fInumeric\fR string, the variable is
 assigned its numeric value. Each such variable assignment is performed just
 before the processing of the following \fIfile\fR, if any. Thus, an assignment
 before the first \fBfile\fR argument is executed after the \fBBEGIN\fR actions

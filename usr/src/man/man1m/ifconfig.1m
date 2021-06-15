@@ -1,13 +1,12 @@
 '\" te
-.\" Copyright (C) 2012, Darren Reed. All rights reserved 
+.\" Copyright (C) 2012, Darren Reed. All rights reserved
 .\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH IFCONFIG 1M "July 23, 2012"
+.TH IFCONFIG 1M "June 13, 2021"
 .SH NAME
 ifconfig \- configure network interface parameters
 .SH SYNOPSIS
-.LP
 .nf
 \fBifconfig\fR \fIinterface\fR [\fIaddress_family\fR] [\fIaddress\fR [\fI/prefix_length\fR]
  [\fIdest_address\fR]] [\fBaddif\fR \fIaddress\fR [\fI/prefix_length\fR]]
@@ -37,8 +36,6 @@ ifconfig \- configure network interface parameters
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The command \fBifconfig\fR is used to assign an address to a network interface
 and to configure network interface parameters. The \fBifconfig\fR command must
 be used at boot time to define the network address of each interface present on
@@ -50,8 +47,6 @@ specific to that address family. Only privileged users may modify the
 configuration of a network interface. Options appearing within braces
 (\fB{\|}\fR) indicate that one of the options must be specified.
 .SS Network Interface Observability
-.sp
-.LP
 Network interface observability with \fBifconfig\fR is limited to those
 network interfaces that have been prepared for use with the IP
 protocol suite. The preferred method for configuring a network
@@ -60,8 +55,6 @@ with the use of the \fBplumb\fR option as documented below. Network
 interfaces that have not been configured for use with the IP
 protocol suite can only be observed by using the \fBdladm\fR command.
 .SS DHCP Configuration
-.sp
-.LP
 The forms of \fBifconfig\fR that use the \fBauto-dhcp\fR or \fBdhcp\fR
 arguments are used to control the Dynamic Host Configuration Protocol
 ("\fBDHCP\fR") configuration of the interface. In this mode, \fBifconfig\fR is
@@ -72,8 +65,6 @@ address or characteristics of the interface. If the address of an interface
 under \fBDHCP\fR is changed, \fBdhcpagent\fR will remove the interface from its
 control.
 .SH OPTIONS
-.sp
-.LP
 When the \fBifconfig\fR command is executed without any options
 its behavior is the same as when the \fB\-a\fR option is supplied
 with no other options or arguments.
@@ -1136,7 +1127,7 @@ receive packets.
 .RS 4n
 Place the logical interface in zone \fIzonename\fR. The named zone must be
 active in the kernel in the ready or running state. The interface is unplumbed
-when the zone is halted or rebooted. The zone must be configure to be an
+when the zone is halted or rebooted. The zone must be configured to be an
 shared-IP zone. \fBzonecfg\fR(1M) is used to assign network interface names to
 exclusive-IP zones.
 .RE
@@ -1152,8 +1143,6 @@ Place IP interface in the global zone. This is the default.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The \fIinterface\fR operand, as well as address parameters that affect it, are
 described below.
 .sp
@@ -1353,8 +1342,6 @@ configured "up" with \fBifconfig\fR.
 .RE
 
 .SH INTERFACE FLAGS
-.sp
-.LP
 The \fBifconfig\fR command supports the following interface flags. The term
 "address" in this context refers to a logical interface, for example,
 \fBeri0:0\fR, while "interface" refers to the physical interface, for example,
@@ -1574,7 +1561,7 @@ interface.
 .ad
 .sp .6
 .RS 4n
-The interface has no address , just an on-link subnet.
+The interface has no address, just an on-link subnet.
 .RE
 
 .sp
@@ -1768,8 +1755,6 @@ Indicates that the interface uses an IPv6 external resolver.
 .RE
 
 .SH LOGICAL INTERFACES
-.sp
-.LP
 Solaris \fBTCP/IP\fR allows multiple logical interfaces to be associated with a
 physical network interface. This allows a single machine to be assigned
 multiple \fBIP\fR addresses, even though it may have only one network
@@ -1817,8 +1802,8 @@ allocates the next available logical unit number on the \fBeri0\fR physical
 interface and assigns an \fIaddress\fR and \fIprefix_length\fR.
 .sp
 .LP
-A logical interface can be configured with parameters (
-\fIaddress\fR,\fIprefix_length\fR, and so on) different from the physical
+A logical interface can be configured with parameters (\fIaddress\fR,
+\fIprefix_length\fR, and so on) different from the physical
 interface with which it is associated. Logical interfaces that are associated
 with the same physical interface can be given different parameters as well.
 Each logical interface must be associated with an existing and "up" physical
@@ -1840,8 +1825,6 @@ example% \fBifconfig eri0:1 down unplumb\fR
 .LP
 will delete the logical interface \fBeri0:1\fR.
 .SH IP MULTIPATHING GROUPS
-.sp
-.LP
 Physical interfaces that share the same link-layer broadcast domain \fBmust\fR
 be collected into a single IP Multipathing (IPMP) group using the \fBgroup\fR
 subcommand. Each IPMP group has an associated IPMP IP interface, which can
@@ -1919,8 +1902,6 @@ For more background on IPMP, please see the IPMP-related chapters of the
 \fISystem Administration Guide: Network Interfaces and Network
 Virtualization\fR.
 .SH CONFIGURING IPV6 INTERFACES
-.sp
-.LP
 When an IPv6 physical interface is plumbed and configured "up" with
 \fBifconfig\fR, it is automatically assigned an IPv6 link-local address for
 which the last 64 bits are calculated from the \fBMAC\fR address of the
@@ -1993,8 +1974,6 @@ addif 2001:0db8:3c4d:55:a00:20ff:fe8e:f3ad/64 up
 .in -2
 
 .SS "Configuring IP-over-IP Tunnel Interfaces"
-.sp
-.LP
 An IP tunnel is conceptually comprised of two parts: a virtual link between two
 or more IP nodes, and an IP interface above this link which allows the system
 to transmit and receive IP packets encapsulated by the underlying link.
@@ -2078,8 +2057,6 @@ The \fBtsrc\fR, \fBtdst\fR, \fBencaplim\fR, and \fBhoplimit\fR options to
 \fBifconfig\fR are obsolete and maintained only for backward compatibility.
 They are equivalent to their \fBdladm\fR(1M) counterparts.
 .SS "Display of Tunnel Security Settings"
-.sp
-.LP
 The \fBifconfig\fR output for IP tunnel interfaces indicates whether IPsec
 policy is configured for the underlying IP tunnel link. For example, a line of
 the following form will be displayed if IPsec policy is present:
@@ -2096,7 +2073,6 @@ tunnel security settings  -->  use 'ipsecconf -ln -i ip.tun1'
 If you do net set security policy, using either \fBifconfig\fR or
 \fBipsecconf\fR(1M), there is no tunnel security setting displayed.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing the \fBifconfig\fR Command
 .sp
 .LP
@@ -2475,7 +2451,6 @@ example% \fBifconfig hme0 dhcp release\fR
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/netmasks\fR\fR
@@ -2496,8 +2471,6 @@ Default Internet protocol type.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -2516,8 +2489,6 @@ Interface Stability for command output	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdhcpinfo\fR(1), \fBcfgadm\fR(1M), \fBdhcpagent\fR(1M), \fBdladm\fR(1M),
 \fBif_mpadm\fR(1M), \fBin.mpathd\fR(1M), \fBin.ndpd\fR(1M),
 \fBin.routed\fR(1M), \fBipmpstat\fR(1M), \fBipsecconf\fR(1M), \fBndd\fR(1M),
@@ -2530,8 +2501,6 @@ Interface Stability for command output	Uncommitted
 .LP
 \fISystem Administration Guide: IP Services\fR
 .SH DIAGNOSTICS
-.sp
-.LP
 \fBifconfig\fR sends messages that indicate if:
 .RS +4
 .TP
@@ -2552,8 +2521,6 @@ the requested address is unknown
 the user is not privileged and tried to alter an interface's configuration
 .RE
 .SH NOTES
-.sp
-.LP
 Do not select the names \fBbroadcast\fR, \fBdown\fR, \fBprivate\fR,
 \fBtrailers\fR, \fBup\fR or other possible option names when you choose host
 names. If you choose any one of these names as host names, it can cause unusual
