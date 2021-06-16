@@ -278,6 +278,16 @@ lx_prctl(int opt, uintptr_t data)
 		return (0);
 	}
 
+	case LX_PR_SET_NO_NEW_PRIVS: {
+		/*
+		 * On recent versions of Linux more services are starting to set
+		 * NoNewPrivs=yes in their systemd unit file. Since we currently
+		 * just return success for LX_PR_CAPBSET_DROP there is currently
+		 * no need to map this to the illumos privileges.
+		 */
+		return (0);
+	}
+
 	default:
 		break;
 	}
