@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2021, Tintri by DDN. All rights reserved.
  */
 
 /*
@@ -2373,7 +2374,7 @@ if_configure_ipadm(datalink_id_t linkid)
 {
 	char ifinst[MAXLINKNAMELEN];
 	boolean_t found;
-	ipadm_if_info_t *ifinfo, *ptr;
+	ipadm_if_info_list_t *ifinfo, *ptr;
 	ipadm_status_t status;
 
 	assert(linkid != DATALINK_INVALID_LINKID);
@@ -2398,14 +2399,14 @@ if_configure_ipadm(datalink_id_t linkid)
 	}
 	if (ifinfo != NULL) {
 		found = B_FALSE;
-		for (ptr = ifinfo; ptr; ptr = ptr->ifi_next) {
-			if (strncmp(ptr->ifi_name, ifinst,
+		for (ptr = ifinfo; ptr != NULL; ptr = ptr->ifil_next) {
+			if (strncmp(ptr->ifil_ifi.ifi_name, ifinst,
 			    sizeof (ifinst)) == 0) {
 				found = B_TRUE;
 				break;
 			}
 		}
-		free(ifinfo);
+		ipadm_free_if_info(ifinfo);
 		if (!found) {
 			return (0);
 		}

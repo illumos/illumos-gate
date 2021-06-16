@@ -24,6 +24,7 @@
  * Copyright 2018 Joyent, Inc.
  * Copyright 2016 Argo Technologie SA.
  * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
+ * Copyright 2021, Tintri by DDN. All rights reserved.
  */
 
 /*
@@ -566,7 +567,8 @@ ipmgmt_db_getif(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 	ipmgmt_getif_cbarg_t	*cbarg = arg;
 	char			*ifname = cbarg->cb_ifname;
 	char			*intf = NULL;
-	ipadm_if_info_t		*ifp = NULL;
+	ipadm_if_info_list_t	*ifl = NULL;
+	ipadm_if_info_t		*ifp;
 	sa_family_t		af;
 	char			*afstr;
 
@@ -577,20 +579,21 @@ ipmgmt_db_getif(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 		return (B_TRUE);
 	}
 	af = atoi(afstr);
-	for (ifp = cbarg->cb_ifinfo; ifp != NULL; ifp = ifp->ifi_next) {
+	for (ifl = cbarg->cb_ifinfo; ifl != NULL; ifl = ifl->ifil_next) {
+		ifp = &ifl->ifil_ifi;
 		if (strcmp(ifp->ifi_name, intf) == 0)
 			break;
 	}
-	if (ifp == NULL) {
-		ipadm_if_info_t *new;
+	if (ifl == NULL) {
+		ipadm_if_info_list_t *new;
 
 		if ((new = calloc(1, sizeof (*new))) == NULL) {
 			*errp = ENOMEM;
 			return (B_FALSE); /* don't continue the walk */
 		}
-		new->ifi_next = cbarg->cb_ifinfo;
+		new->ifil_next = cbarg->cb_ifinfo;
 		cbarg->cb_ifinfo = new;
-		ifp = new;
+		ifp = &new->ifil_ifi;
 		(void) strlcpy(ifp->ifi_name, intf, sizeof (ifp->ifi_name));
 	}
 

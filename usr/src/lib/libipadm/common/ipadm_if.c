@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2021, Tintry by DDN. All rights reserved.
  */
 
 #include <errno.h>
@@ -82,12 +83,12 @@ i_ipadm_is_if_down(char *ifname, struct ifaddrs *ifa)
  */
 static ipadm_status_t
 i_ipadm_active_if_info(ipadm_handle_t iph, const char *ifname,
-    ipadm_if_info_t **if_info, int64_t lifc_flags)
+    ipadm_if_info_list_t **if_info, int64_t lifc_flags)
 {
 	struct lifreq	*buf;
 	struct lifreq	*lifrp;
 	struct lifreq	lifrl;
-	ipadm_if_info_t	*last = NULL;
+	ipadm_if_info_list_t *ifl, *last = NULL;
 	ipadm_if_info_t	*ifp;
 	int		s;
 	int		n;
@@ -117,24 +118,26 @@ i_ipadm_active_if_info(ipadm_handle_t iph, const char *ifname,
 		 * Check if the interface already exists in our list.
 		 * If it already exists, we need to update its flags.
 		 */
-		for (ifp = *if_info; ifp != NULL; ifp = ifp->ifi_next) {
+		for (ifl = *if_info; ifl != NULL; ifl = ifl->ifil_next) {
+			ifp = &ifl->ifil_ifi;
 			if (strcmp(lifrp->lifr_name, ifp->ifi_name) == 0)
 				break;
 		}
-		if (ifp == NULL) {
-			ifp = calloc(1, sizeof (ipadm_if_info_t));
-			if (ifp == NULL) {
+		if (ifl == NULL) {
+			ifl = calloc(1, sizeof (ipadm_if_info_list_t));
+			if (ifl == NULL) {
 				status = ipadm_errno2status(errno);
 				goto fail;
 			}
+			ifp = &ifl->ifil_ifi;
 			(void) strlcpy(ifp->ifi_name, lifrp->lifr_name,
 			    sizeof (ifp->ifi_name));
-			/* Update the `ifi_next' pointer for this new node */
+			/* Update the `ifil_next' pointer for this new node */
 			if (*if_info == NULL)
-				*if_info = ifp;
+				*if_info = ifl;
 			else
-				last->ifi_next = ifp;
-			last = ifp;
+				last->ifil_next = ifl;
+			last = ifl;
 		}
 
 		/*
@@ -188,12 +191,13 @@ fail:
  */
 static ipadm_status_t
 i_ipadm_persist_if_info(ipadm_handle_t iph, const char *ifname,
-    ipadm_if_info_t **if_info)
+    ipadm_if_info_list_t **if_info)
 {
 	ipadm_status_t		status = IPADM_SUCCESS;
 	ipmgmt_getif_arg_t	getif;
 	ipmgmt_getif_rval_t	*rvalp;
-	ipadm_if_info_t		*ifp, *curr, *prev = NULL;
+	ipadm_if_info_t		*ifp;
+	ipadm_if_info_list_t	*curr, *prev = NULL;
 	int			i = 0, err = 0;
 
 	bzero(&getif, sizeof (getif));
@@ -225,8 +229,8 @@ i_ipadm_persist_if_info(ipadm_handle_t iph, const char *ifname,
 			ipadm_free_if_info(prev);
 			break;
 		}
-		(void) bcopy(ifp, curr, sizeof (*curr));
-		curr->ifi_next = prev;
+		(void) bcopy(ifp, &curr->ifil_ifi, sizeof (*ifp));
+		curr->ifil_next = prev;
 		prev = curr;
 	}
 	*if_info = curr;
@@ -242,14 +246,16 @@ i_ipadm_persist_if_info(ipadm_handle_t iph, const char *ifname,
  */
 ipadm_status_t
 i_ipadm_get_all_if_info(ipadm_handle_t iph, const char *ifname,
-    ipadm_if_info_t **if_info, int64_t lifc_flags)
+    ipadm_if_info_list_t **if_info, int64_t lifc_flags)
 {
 	ipadm_status_t	status;
-	ipadm_if_info_t	*aifinfo = NULL;
-	ipadm_if_info_t	*pifinfo = NULL;
+	ipadm_if_info_list_t *aifinfo = NULL;
+	ipadm_if_info_list_t *pifinfo = NULL;
+	ipadm_if_info_list_t *last = NULL;
+	ipadm_if_info_list_t *aifl;
+	ipadm_if_info_list_t *pifl;
 	ipadm_if_info_t	*aifp;
 	ipadm_if_info_t	*pifp;
-	ipadm_if_info_t	*last = NULL;
 	struct ifaddrs	*ifa;
 	struct ifaddrs	*ifap;
 
@@ -269,7 +275,9 @@ retry:
 			status = ipadm_errno2status(errno);
 			goto fail;
 		}
-		for (aifp = aifinfo; aifp != NULL; aifp = aifp->ifi_next) {
+		for (aifl = aifinfo; aifl != NULL; aifl = aifl->ifil_next) {
+			aifp = &aifl->ifil_ifi;
+
 			/*
 			 * Find the `ifaddrs' structure from `ifa'
 			 * for this interface. We need the IFF_* flags
@@ -299,8 +307,8 @@ retry:
 				aifp->ifi_state = IFIS_DOWN;
 			else
 				aifp->ifi_state = IFIS_OK;
-			if (aifp->ifi_next == NULL)
-				last = aifp;
+			if (aifl->ifil_next == NULL)
+				last = aifl;
 		}
 		freeifaddrs(ifa);
 	}
@@ -321,27 +329,29 @@ retry:
 	 * `aifinfo', it means that this interface was disabled. We should
 	 * add this interface to `aifinfo' and set it state to IFIF_DISABLED.
 	 */
-	for (pifp = pifinfo; pifp != NULL; pifp = pifp->ifi_next) {
-		for (aifp = aifinfo; aifp != NULL; aifp = aifp->ifi_next) {
+	for (pifl = pifinfo; pifl != NULL; pifl = pifl->ifil_next) {
+		pifp = &pifl->ifil_ifi;
+		for (aifl = aifinfo; aifl != NULL; aifl = aifl->ifil_next) {
+			aifp = &aifl->ifil_ifi;
 			if (strcmp(aifp->ifi_name, pifp->ifi_name) == 0) {
 				aifp->ifi_pflags = pifp->ifi_pflags;
 				break;
 			}
 		}
-		if (aifp == NULL) {
-			aifp = malloc(sizeof (ipadm_if_info_t));
-			if (aifp == NULL) {
+		if (aifl == NULL) {
+			aifl = malloc(sizeof (ipadm_if_info_list_t));
+			if (aifl == NULL) {
 				status = ipadm_errno2status(errno);
 				goto fail;
 			}
-			*aifp = *pifp;
-			aifp->ifi_next = NULL;
-			aifp->ifi_state = IFIS_DISABLED;
+			*aifl = *pifl;
+			aifl->ifil_next = NULL;
+			aifl->ifil_ifi.ifi_state = IFIS_DISABLED;
 			if (last != NULL)
-				last->ifi_next = aifp;
+				last->ifil_next = aifl;
 			else
-				aifinfo = aifp;
-			last = aifp;
+				aifinfo = aifl;
+			last = aifl;
 		}
 	}
 	*if_info = aifinfo;
@@ -375,7 +385,7 @@ ipadm_status_t
 i_ipadm_if_pexists(ipadm_handle_t iph, const char *ifname, sa_family_t af,
     boolean_t *exists)
 {
-	ipadm_if_info_t	*ifinfo;
+	ipadm_if_info_list_t	*ifinfo;
 	ipadm_status_t	status;
 
 	/*
@@ -390,9 +400,9 @@ i_ipadm_if_pexists(ipadm_handle_t iph, const char *ifname, sa_family_t af,
 	status = i_ipadm_persist_if_info(iph, ifname, &ifinfo);
 	if (status == IPADM_SUCCESS) {
 		*exists = ((af == AF_INET &&
-		    (ifinfo->ifi_pflags & IFIF_IPV4)) ||
+		    (ifinfo->ifil_ifi.ifi_pflags & IFIF_IPV4)) ||
 		    (af == AF_INET6 &&
-		    (ifinfo->ifi_pflags & IFIF_IPV6)));
+		    (ifinfo->ifil_ifi.ifi_pflags & IFIF_IPV6)));
 		free(ifinfo);
 	} else if (status == IPADM_NOTFOUND) {
 		status = IPADM_SUCCESS;
@@ -495,7 +505,7 @@ i_ipadm_create_ipmp_peer(ipadm_handle_t iph, char *ifname, sa_family_t af)
 	lifgroupinfo_t	lifgr;
 	ipadm_status_t	status = IPADM_SUCCESS;
 	struct lifreq	lifr;
-	int 		other_af_sock;
+	int		other_af_sock;
 
 	assert(af == AF_INET || af == AF_INET6);
 
@@ -1387,7 +1397,7 @@ ipadm_delete_if(ipadm_handle_t iph, const char *ifname, sa_family_t af,
 	 * If af is AF_UNSPEC, then we return the following:
 	 * status1,		if status1 == status2
 	 * IPADM_SUCCESS,	if either of status1 or status2 is SUCCESS
-	 * 			and the other status is ENXIO
+	 *			and the other status is ENXIO
 	 * IPADM_ENXIO,		if both status1 and status2 are ENXIO
 	 * IPADM_FAILURE	otherwise.
 	 */
@@ -1411,12 +1421,12 @@ ipadm_delete_if(ipadm_handle_t iph, const char *ifname, sa_family_t af,
  * identified by `ifname'.
  *
  * Return values:
- * 	On success: IPADM_SUCCESS.
- * 	On error  : IPADM_INVALID_ARG, IPADM_ENXIO or IPADM_FAILURE.
+ *	On success: IPADM_SUCCESS.
+ *	On error  : IPADM_INVALID_ARG, IPADM_ENXIO or IPADM_FAILURE.
  */
 ipadm_status_t
 ipadm_if_info(ipadm_handle_t iph, const char *ifname,
-    ipadm_if_info_t **if_info, uint32_t flags, int64_t lifc_flags)
+    ipadm_if_info_list_t **if_info, uint32_t flags, int64_t lifc_flags)
 {
 	ipadm_status_t	status;
 	ifspec_t	ifsp;
@@ -1442,12 +1452,12 @@ ipadm_if_info(ipadm_handle_t iph, const char *ifname,
  * Frees the linked list allocated by ipadm_if_info().
  */
 void
-ipadm_free_if_info(ipadm_if_info_t *ifinfo)
+ipadm_free_if_info(ipadm_if_info_list_t *ifinfo)
 {
-	ipadm_if_info_t	*ifinfo_next;
+	ipadm_if_info_list_t	*ifinfo_next;
 
 	for (; ifinfo != NULL; ifinfo = ifinfo_next) {
-		ifinfo_next = ifinfo->ifi_next;
+		ifinfo_next = ifinfo->ifil_next;
 		free(ifinfo);
 	}
 }

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
+ * Copyright 2021, Tintri by DDN. All rights reserved.
  */
 
 #ifndef	_IPMGMT_IMPL_H
@@ -62,8 +63,8 @@ extern db_wfunc_t	ipmgmt_db_getprop, ipmgmt_db_resetprop;
 extern db_wfunc_t	ipmgmt_db_add, ipmgmt_db_update;
 
 typedef struct {
-	char		*cb_ifname;
-	ipadm_if_info_t	*cb_ifinfo;
+	char			*cb_ifname;
+	ipadm_if_info_list_t	*cb_ifinfo;
 } ipmgmt_getif_cbarg_t;
 extern db_wfunc_t	ipmgmt_db_getif;
 
@@ -98,7 +99,7 @@ extern db_wfunc_t	ipmgmt_db_initif;
  * A linked list of address object nodes. Each node in the list tracks
  * following information for the address object identified by `am_aobjname'.
  *	- interface on which the address is created
- * 	- logical interface number on which the address is created
+ *	- logical interface number on which the address is created
  *	- address family
  *	- `am_nextnum' identifies the next number to use to generate user part
  *	  of `aobjname'.
@@ -185,7 +186,7 @@ extern int		ipmgmt_db_walk(db_wfunc_t *, void *, ipadm_db_op_t);
 extern int		ipmgmt_aobjmap_op(ipmgmt_aobjmap_t *, uint32_t);
 extern boolean_t	ipmgmt_aobjmap_init(void *, nvlist_t *, char *,
 			    size_t, int *);
-extern int 		ipmgmt_persist_aobjmap(ipmgmt_aobjmap_t *,
+extern int		ipmgmt_persist_aobjmap(ipmgmt_aobjmap_t *,
 			    ipadm_db_op_t);
 extern boolean_t	ipmgmt_ngz_firstboot_postinstall();
 extern int		ipmgmt_persist_if(ipmgmt_if_arg_t *);

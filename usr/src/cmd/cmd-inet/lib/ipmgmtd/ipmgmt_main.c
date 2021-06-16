@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2021, Tintri by DDN. All rights reserved.
  */
 
 /*
@@ -534,13 +535,14 @@ ipmgmt_persist_if_exists(char *ifname, sa_family_t af)
 	bzero(&cbarg, sizeof (cbarg));
 	cbarg.cb_ifname = ifname;
 	(void) ipmgmt_db_walk(ipmgmt_db_getif, &cbarg, IPADM_DB_READ);
-	if ((ifp = cbarg.cb_ifinfo) != NULL) {
+	if (cbarg.cb_ifinfo != NULL) {
+		ifp = &cbarg.cb_ifinfo->ifil_ifi;
 		if ((af == AF_INET && (ifp->ifi_pflags & IFIF_IPV4)) ||
 		    (af == AF_INET6 && (ifp->ifi_pflags & IFIF_IPV6))) {
 			exists = B_TRUE;
 		}
 	}
-	free(ifp);
+	free(cbarg.cb_ifinfo);
 	return (exists);
 }
 
