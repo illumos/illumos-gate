@@ -7,16 +7,13 @@
 .SH NAME
 usb_client_dev_data \- Device configuration information
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/usb/usba.h>
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.LP
 The usb_client_dev_data_t structure carries all device configuration
 information. It is provided to a USB client driver through a call to
 \fBusb_get_dev_data\fR(9F). Most USBA functions require information which comes
@@ -159,7 +156,6 @@ USB_PARSE_LVL_NONE is returned when no tree is returned. Note that the value of
 this field can differ from the parse_level requested as an argument to
 \fBusb_get_dev_data()\fR.
 .SS "TREE STRUCTURE"
-.LP
 The root of the tree is dev_cfg, an array of usb_cfg_data_t configuration
 nodes, each representing one device configuration. The array index does
 not correspond to a configuration's value; use the bConfigurationValue field of
@@ -224,7 +220,6 @@ Configuration and interface alternate nodes return string descriptions. Note
 that all string descriptions returned have a maximum length of USB_MAXSTRINGLEN
 bytes and are in English ASCII.
 .SH EXAMPLES
-.LP
 In the following example, a device's configuration data, including the
 following descriptor tree, is retrieved by \fBusb_get_dev_data\fR(9F) into
 usb_client_dev_data_t *reg_data:
@@ -274,7 +269,6 @@ usb_client_dev_data_t *reg_data:
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -291,7 +285,6 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBusb_get_alt_if\fR(9F), \fBusb_get_cfg\fR(9F), \fBusb_get_dev_data\fR(9F),
 \fBusb_get_string_descr\fR(9F), \fBusb_lookup_ep_data\fR(9F),
 \fBusb_parse_data\fR(9F), \fBusb_pipe_open\fR(9F), \fBusb_cfg_descr\fR(9S),

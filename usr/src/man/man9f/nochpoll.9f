@@ -7,7 +7,6 @@
 .SH NAME
 nochpoll \- error return function for non-pollable devices
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,11 +18,8 @@ nochpoll \- error return function for non-pollable devices
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR\fR
@@ -69,23 +65,15 @@ Poll head pointer.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnochpoll()\fR function is a routine that simply returns the value
 \fBENXIO\fR. It is intended to be used in the \fBcb_ops\fR(9S) structure of a
 device driver for devices that do not support the \fBpoll\fR(2) system call.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBnochpoll()\fR function returns \fBENXIO\fR.
 .SH CONTEXT
-.sp
-.LP
 The \fBnochpoll()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-.sp
-.LP
 \fBpoll\fR(2), \fBchpoll\fR(9E), \fBcb_ops\fR(9S)
 .sp
 .LP

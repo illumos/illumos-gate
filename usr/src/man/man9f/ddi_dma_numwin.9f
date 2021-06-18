@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dma_numwin \- retrieve number of DMA windows
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,7 +17,6 @@ ddi_dma_numwin \- retrieve number of DMA windows
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -39,17 +37,11 @@ windows for this object.
 .RE
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_dma_numwin()\fR returns the number of  \fBDMA\fR windows for a
 \fBDMA\fR object if partial resource allocation was permitted.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_dma_numwin()\fR returns:
 .sp
 .ne 2
@@ -70,12 +62,8 @@ Successfully filled in the number of  \fBDMA\fR windows.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBddi_dma_numwin()\fR can be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
 \fBddi_dma_buf_bind_handle\fR(9F), \fBddi_dma_unbind_handle\fR(9F)
 .sp

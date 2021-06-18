@@ -7,7 +7,6 @@
 .SH NAME
 ddi_get_parent \- find the parent of a device information structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,11 +17,8 @@ ddi_get_parent \- find the parent of a device information structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -32,21 +28,13 @@ Pointer to a device information structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_get_parent()\fR function returns a pointer to the device information
 structure which is the parent of the one pointed to by \fIdip\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_get_parent()\fR function returns a pointer to a device information
 structure.
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_get_parent()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR

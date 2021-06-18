@@ -7,7 +7,6 @@
 .SH NAME
 scsi_probe \- utility for probing a scsi device
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -17,11 +16,8 @@ scsi_probe \- utility for probing a scsi device
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdevp\fR \fR
@@ -40,8 +36,6 @@ Pointer to a \fBscsi_device\fR(9S) structure
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBscsi_probe()\fR determines whether a \fBtarget/lun\fR is present and sets up
 the \fBscsi_device\fR structure with inquiry data.
 .sp
@@ -84,8 +78,6 @@ Wait indefinitely for resources.
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 \fBscsi_probe()\fR returns:
 .sp
 .ne 2
@@ -151,14 +143,11 @@ Device does not respond to an INQUIRY.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBscsi_probe()\fR is normally called from the target driver's \fBprobe\fR(9E)
 or \fBattach\fR(9E) routine. In any case, this routine should not be called
 from interrupt context, because it can sleep waiting for memory to be
 allocated.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR Using \fBscsi_probe()\fR
 .sp
 .in +2
@@ -189,8 +178,6 @@ allocated.
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBprobe\fR(9E), \fBscsi_slave\fR(9F),
 \fBscsi_unprobe\fR(9F), \fBscsi_unslave\fR(9F), \fBscsi_device\fR(9S),
 \fBscsi_inquiry\fR(9S)
@@ -201,7 +188,5 @@ allocated.
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 A \fIwaitfunc\fR function other than \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR is not
 supported and may have unexpected results.

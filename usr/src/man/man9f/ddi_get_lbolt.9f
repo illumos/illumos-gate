@@ -8,7 +8,6 @@
 .SH NAME
 ddi_get_lbolt \- returns the value of lbolt
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -20,28 +19,18 @@ ddi_get_lbolt \- returns the value of lbolt
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_get_lbolt()\fR returns the value of \fBlbolt\fR where \fBlbolt\fR is an
 integer that represents the number of clock ticks since the last system reboot.
 This value is used as a counter or timer inside the system kernel. The tick
 frequency can be determined by using \fBdrv_usectohz\fR(9F) which converts
 microseconds into clock ticks.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_get_lbolt()\fR returns the value of \fBlbolt\fR.
 .SH CONTEXT
-.sp
-.LP
  This routine can be called from any context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_get_time\fR(9F), \fBdrv_getparm\fR(9F), \fBdrv_usectohz\fR(9F)
 .sp
 .LP

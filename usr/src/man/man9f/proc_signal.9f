@@ -8,7 +8,6 @@
 .SH NAME
 proc_signal, proc_ref, proc_unref \- send a signal to a process
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -30,11 +29,8 @@ proc_signal, proc_ref, proc_unref \- send a signal to a process
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIpref\fR\fR
@@ -53,8 +49,6 @@ Signal number to be sent to the process.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This set of routines allows a driver to send a signal to a process. The routine
 \fBproc_ref()\fR is used to retrieve an unambiguous reference to the process
 for signalling purposes. The return value can be used as a unique handle on the
@@ -139,8 +133,6 @@ calling \fBproc_unref()\fR.
 The driver writer must ensure that for each call made to \fBproc_ref()\fR,
 there is exactly one corresponding call to \fBproc_unref()\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBproc_ref()\fR returns the following:
 .sp
 .ne 2
@@ -173,14 +165,10 @@ The process no longer exists; no signal was sent.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBproc_unref()\fR and \fBproc_signal()\fR functions can be called from
 user, interrupt, or kernel context. The \fBproc_ref()\fR function should be
 called only from user context.
 .SH SEE ALSO
-.sp
-.LP
 \fBsignal.h\fR(3HEAD), \fBputnextctl1\fR(9F)
 .sp
 .LP

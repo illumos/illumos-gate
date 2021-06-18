@@ -7,7 +7,6 @@
 .SH NAME
 scsi_log \- display a SCSI-device-related message
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
  #include <sys/cmn_err.h>
@@ -19,11 +18,8 @@ scsi_log \- display a SCSI-device-related message
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -60,8 +56,6 @@ Display format.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_log()\fR function is a utility function that displays a message via
 the \fBcmn_err\fR(9F) routine. The error levels that can be passed in to this
 function are \fBCE_PANIC\fR, \fBCE_WARN\fR, \fBCE_NOTE\fR, \fBCE_CONT\fR, and
@@ -99,13 +93,9 @@ condition is met, the \fB?\fR character has no effect and is simply ignored.
 All formatting conversions in use by \fBcmn_err()\fR also work with
 \fBscsi_log()\fR.
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_log()\fR function may be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-.sp
-.LP
 \fBkernel\fR(1M), \fBsd\fR(7D), \fBcmn_err\fR(9F), \fBscsi_errmsg\fR(9F)
 .sp
 .LP

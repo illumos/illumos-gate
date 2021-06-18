@@ -7,7 +7,6 @@
 .SH NAME
 net_inject_alloc \- allocate a net_inject_t structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/neti.h>
 
@@ -15,11 +14,8 @@ net_inject_alloc \- allocate a net_inject_t structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIversion\fR\fR
@@ -29,24 +25,16 @@ must always be the symbol \fBNETI_VERSION\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnet_inject_alloc()\fR function allocates a \fBnet_inject_t\fR structure,
 returning a pointer for the caller to use.
 .SH RETURN VALUES
-.sp
-.LP
 Upon success, \fBnet_inject_alloc()\fR returns a pointer to the allocated
 \fInet_inject_t\fR structure. On failure, \fBhook_alloc()\fR returns a
 \fINULL\fR pointer.
 .SH CONTEXT
-.sp
-.LP
 The \fBnet_inject_alloc()\fR function may be called from user,  kernel, or
 interrupt context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -61,6 +49,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBnet_inject_free\fR(9F), \fBnet_inject_t\fR(9S)

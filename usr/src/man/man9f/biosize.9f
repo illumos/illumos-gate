@@ -7,7 +7,6 @@
 .SH NAME
 biosize \- returns size of a buffer structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -16,23 +15,15 @@ biosize \- returns size of a buffer structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The  \fBbiosize()\fR function returns the size in bytes of the \fBbuf\fR(9S)
 structure. The  \fBbiosize()\fR function is used by drivers in combination with
 \fBkmem_alloc\fR(9F) and \fBbioinit\fR(9F) to allocate buffer structures
 embedded in other data structures.
 .SH CONTEXT
-.sp
-.LP
 The \fBbiosize()\fR function can be called from any context.
 .SH SEE ALSO
-.sp
-.LP
 \fBbiofini\fR(9F), \fBbioinit\fR(9F), \fBgetrbuf\fR(9F), \fBkmem_alloc\fR(9F),
 \fBbuf\fR(9S)
 .sp

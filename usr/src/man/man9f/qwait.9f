@@ -7,7 +7,6 @@
 .SH NAME
 qwait, qwait_sig \- STREAMS wait routines
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/ddi.h>
@@ -23,11 +22,8 @@ qwait, qwait_sig \- STREAMS wait routines
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIqp\fR\fR
@@ -37,8 +33,6 @@ Pointer to the queue that is being opened or closed.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBqwait()\fR and \fBqwait_sig()\fR are used to wait for a message to arrive to
 the \fBput\fR(9E) or \fBsrv\fR(9E) procedures. \fBqwait()\fR and
 \fBqwait_sig()\fR can also be used to wait for \fBqbufcall\fR(9F) or
@@ -81,7 +75,6 @@ returns zero when the waiting was interrupted by a signal.
 perimeters and the signalling is implicit when a thread leaves the inner
 perimeter. See \fBcondvar\fR(9F).
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -92,12 +85,9 @@ signaled, and the function returned because a signal was pending.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can only be called from an \fBopen\fR(9E) or \fBclose\fR(9E)
 routine.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBqwait()\fR
 .sp
 .LP
@@ -144,8 +134,6 @@ xxrput(qp, mp)
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBclose\fR(9E), \fBopen\fR(9E), \fBput\fR(9E), \fBsrv\fR(9E),
 \fBcondvar\fR(9F), \fBddi_can_receive_sig\fR(9F), \fBmt-streams\fR(9F),
 \fBqbufcall\fR(9F), \fBqprocson\fR(9F), \fBqtimeout\fR(9F)

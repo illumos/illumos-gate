@@ -10,7 +10,6 @@ ddi_prop_update_string_array, ddi_prop_update_int64,
 ddi_prop_update_int64_array, ddi_prop_update_string, ddi_prop_update_byte_array
 \- update properties
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -58,7 +57,6 @@ ddi_prop_update_int64_array, ddi_prop_update_string, ddi_prop_update_byte_array
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR \fR
@@ -182,12 +180,8 @@ A pointer to a byte array with which to update the property.
 .RE
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The property update routines search for and, if found, modify the value of a
 given property. Properties are searched for based on the \fIdip\fR, \fIname\fR,
 \fIdev\fR, and the type of the data (integer, string, or byte). The driver
@@ -297,8 +291,6 @@ pointer to a byte array with which to update the property.
 The property update routines may block to allocate memory needed to hold the
 value of the property.
 .SH RETURN VALUES
-.sp
-.LP
 All of the property update routines return:
 .sp
 .ne 2
@@ -329,11 +321,8 @@ If the bytes of the property cannot be encoded.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can only be called from user or kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUpdating Properties
 .sp
 .LP
@@ -359,8 +348,6 @@ int	options[4];
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBexecve\fR(2), \fBattach\fR(9E), \fBddi_prop_lookup\fR(9F),
 \fBddi_prop_remove\fR(9F), \fBmakedevice\fR(9F)
 .sp

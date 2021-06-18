@@ -7,7 +7,6 @@
 .SH NAME
 ddi_model_convert_from \- determine data model type mismatch
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -16,11 +15,8 @@ ddi_model_convert_from \- determine data model type mismatch
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImodel\fR \fR
@@ -30,11 +26,9 @@ The data model type of the current thread.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_model_convert_from()\fR is used to determine if the current thread uses
 a different \fBC\fR Language Type Model than the device driver. The 64-bit
-version of Solaris will require a 64-bit kernel to support both 64-bit and
+version of illumos will require a 64-bit kernel to support both 64-bit and
 32-bit user mode programs. The difference between a 32-bit program and a 64-bit
 program is in its \fBC\fR Language Type Model: a 32-bit program is \fBILP32\fR
 (integer, longs, and pointers are 32-bit) and a 64-bit program is \fBLP64\fR
@@ -48,7 +42,6 @@ the format of the data before sending it to a 32-bit application.
 between the device driver and the application requires reformatting to any
 non-native data model.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_MODEL_ILP32\fR \fR
@@ -67,11 +60,8 @@ No conversion is necessary. Current thread and driver use the same data model.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBddi_model_convert_from()\fR can be called from any context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR: Using \fBddi_model_convert_from()\fR in the \fBioctl()\fR
 entry point to support both 32-bit and 64-bit applications.
 .sp
@@ -117,8 +107,6 @@ xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBioctl\fR(9E), \fBmmap\fR(9E), \fBddi_mmap_get_model\fR(9F)
 .sp
 .LP

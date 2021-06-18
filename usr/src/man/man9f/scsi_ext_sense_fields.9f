@@ -8,7 +8,6 @@
 scsi_ext_sense_fields, scsi_sense_info_uint64, scsi_sense_cmdspecific_uint64 \-
 retrieve fields from SCSI sense data
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -32,11 +31,8 @@ retrieve fields from SCSI sense data
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIsense_buffer\fR\fR
@@ -112,8 +108,6 @@ parameter.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_ext_sense_fields()\fR function can be used to retrieve any of the
 extended sense data fields from a sense data buffer, regardless of whether the
 sense data is in fixed format or in descriptor format.
@@ -153,8 +147,6 @@ information field as a 64 bit integer.
 Drivers should use \fBscsi_validate_sense\fR(9F) to ensure that the sense
 buffer contains valid sense data.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_sense_info_uint64()\fR function returns \fBTRUE\fR if the
 information field is present and valid. Otherwise it returns \fBFALSE\fR.
 .sp
@@ -163,14 +155,10 @@ The \fBscsi_sense_cmdspecific_uint64()\fR function returns \fBTRUE\fR if the
 command specific information field is present and valid. Otherwise it returns
 \fBFALSE\fR.
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_ext_sense_fields()\fR, \fBscsi_sense_info_uint64()\fR and
 \fBscsi_sense_cmdspecific_uint64()()\fR functions can be called from user or
 interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_find_sense_descr\fR(9F), \fBscsi_sense_asc\fR(9F),
 \fBscsi_sense_ascq\fR(9F), \fBscsi_sense_key\fR(9F),
 \fBscsi_validate_sense\fR(9F)

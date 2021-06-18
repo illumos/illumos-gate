@@ -7,7 +7,6 @@
 .SH NAME
 scsi_poll \- run a polled SCSI command on behalf of a target driver
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -17,11 +16,8 @@ scsi_poll \- run a polled SCSI command on behalf of a target driver
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIpkt\fR\fR
@@ -31,8 +27,6 @@ Pointer to the \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_poll()\fR function requests the host adapter driver to run a polled
 command. Unlike \fBscsi_transport\fR(9F) which runs commands asynchronously,
 \fBscsi_poll()\fR runs commands to completion before returning. If the
@@ -40,8 +34,6 @@ command. Unlike \fBscsi_transport\fR(9F) which runs commands asynchronously,
 defaulted to \fBSCSI_POLL_TIMEOUT\fR to prevent an indefinite hang of the
 system.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_poll()\fR function returns:
 .sp
 .ne 2
@@ -62,21 +54,15 @@ command failed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_poll()\fR function can be called from user, interrupt, or kernel
 context. This function should not be called when the caller is executing
 \fBtimeout\fR(9F) in the context of a thread.
 .SH SEE ALSO
-.sp
-.LP
 \fBmakecom\fR(9F), \fBscsi_transport\fR(9F), \fBscsi_pkt\fR(9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
-.LP
 Since \fBscsi_poll()\fR runs commands to completion before returning, it may
 require more time than is desirable when called from interrupt context.
 Therefore, calling \fBscsi_poll\fR from interrupt context is not recommended.

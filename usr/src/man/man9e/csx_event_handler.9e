@@ -7,7 +7,6 @@
 .SH NAME
 csx_event_handler \- PC Card driver event handler
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -18,11 +17,8 @@ csx_event_handler \- PC Card driver event handler
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris \fBDDI) \fR
+illumos architecture specific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIevent\fR\fR
@@ -50,8 +46,6 @@ A pointer to the \fBevent_callback_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 Each instance of a \fBPC \fRCard driver must register an event handler to
 manage events associated with its \fBPC \fRCard. The driver event handler is
 registered using the \fBevent_handler\fR field of the \fBclient_req_t\fR
@@ -81,8 +75,6 @@ events begin to be delivered to the driver until after a successful call to
 In all cases, Card Services delivers an event to each driver instance
 associated with a function on a multiple function \fBPC \fRCard.
 .SS "Event Indications"
-.sp
-.LP
 The events and their indications are listed below; they are always delivered as
 low priority unless otherwise noted:
 .sp
@@ -413,8 +405,6 @@ Card is write protected.
 .RE
 
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBevent_callback_args_t\fR are:
 .sp
 .in +2
@@ -445,7 +435,6 @@ char               DriverName[MODMAXNAMELEN];
 .in -2
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -473,12 +462,9 @@ Error occurred while handling this event.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function is called from high-level interrupt context in the case of high
 priority events, and from kernel context in the case of low priority events.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
 static int
@@ -566,8 +552,6 @@ xx_event(event_t event, int priority, event_callback_args_t *args)
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_Event2Text\fR(9F), \fBcsx_RegisterClient\fR(9F),
 \fBcsx_RequestSocketMask\fR(9F)
 .sp

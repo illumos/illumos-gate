@@ -7,7 +7,6 @@
 .SH NAME
 miocnak \- Negatively acknowledge an M_IOCTL message
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -18,11 +17,8 @@ miocnak \- Negatively acknowledge an M_IOCTL message
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIwq\fR\fR
@@ -59,8 +55,6 @@ Value to set the ioc_error of the \fBiocblk\fR(9S) to.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmiocnak()\fR function converts an M_IOCTL message into an M_IOCNAK
 message and sends the resulting message upstream.
 .sp
@@ -72,21 +66,13 @@ field.  Since payloads cannot currently be associated with M_IOCNAK messages,
 \fIcount\fR must always be zero. If \fIerror\fR is passed as zero, \fBEINVAL\fR
 is assumed.
 .SH RETURN VALUES
-.sp
-.LP
 None.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, kernel or interrupt context.
 .SH NOTES
-.sp
-.LP
 Callers must not hold any locks across a \fBmiocnak()\fR that can be acquired
 as part of \fBput\fR(9E) processing.
 .SH SEE ALSO
-.sp
-.LP
 \fBmioc2ack\fR(9F), \fBmiocack\fR(9F), \fBput\fR(9E), \fBiocblk\fR(9S)
 .sp
 .LP

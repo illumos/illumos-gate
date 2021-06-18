@@ -8,7 +8,6 @@
 ddi_prop_op, ddi_getprop, ddi_getlongprop, ddi_getlongprop_buf, ddi_getproplen
 \- get property information for leaf device drivers
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -45,16 +44,13 @@ ddi_prop_op, ddi_getprop, ddi_getlongprop, ddi_getlongprop_buf, ddi_getproplen
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI). The \fBddi_getlongprop()\fR,
+illumos DDI specific (illumos DDI). The \fBddi_getlongprop()\fR,
 \fBddi_getlongprop_buf()\fR, \fBddi_getprop()\fR, and \fBddi_getproplen()\fR
 functions are obsolete. Use \fBddi_prop_lookup\fR(9F) instead of
 \fBddi_getlongprop()\fR, \fBddi_getlongprop_buf()\fR, and
 \fBddi_getproplen()\fR. Use \fBddi_prop_get_int\fR(9F) instead of
 \fBddi_getprop()\fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR\fR
@@ -161,8 +157,6 @@ The value that \fBddi_getprop()\fR returns if the property is not found.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_prop_op()\fR function gets arbitrary-size properties for leaf
 devices. The routine searches the device's property list. If it does not find
 the property at the device level, it examines the \fIflags\fR argument, and if
@@ -242,8 +236,6 @@ The \fBddi_getproplen()\fR function returns the length of a given property. It
 is a convenience wrapper for \fBddi_prop_op()\fR with \fIprop_op\fR set to
 \fBPROP_LEN\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_prop_op()\fR, \fBddi_getlongprop()\fR, \fBddi_getlongprop_buf()\fR,
 and \fBddi_getproplen()\fR functions return:
 .sp
@@ -302,14 +294,10 @@ The value of the property or the value passed into the routine as
 \fIdefvalue\fR if the property is not found. By convention, the value of zero
 length properties (boolean properties) are returned as the integer value 1.
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user, interrupt, or kernel context, provided
 \fBDDI_PROP_CANSLEEP\fR is not set; if it is set, they cannot be called from
 interrupt context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -326,8 +314,6 @@ T}
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBddi_prop_create\fR(9F), \fBddi_prop_get_int\fR(9F),
 \fBddi_prop_lookup\fR(9F), \fBkmem_alloc\fR(9F), \fBkmem_free\fR(9F)
 .sp

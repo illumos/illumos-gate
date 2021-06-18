@@ -9,20 +9,14 @@
 Intro, intro \- overview of device driver interfaces and introduction to driver
 entry points
 .SH DESCRIPTION
-.sp
-.LP
 This page provides an overview of device driver interfaces and all of the
 Section 9 man pages (9E, 9F, 9P, and 9S). This overview is followed by an
 introduction to Section 9E, the driver entry-point routines.
 .SS "Overview of Device Driver Interfaces"
-.sp
-.LP
 Section 9 provides reference information needed to write device drivers for the
-Solaris operating environment. It describes the interfaces provided by the
+illumos operating system. It describes the interfaces provided by the
 Device Driver Interface and the Driver-Kernel Interface (DDI/DKI).
 .SS "Porting"
-.sp
-.LP
 Software is usually considered portable if it can be adapted to run in a
 different environment more cheaply than it can be rewritten. The new
 environment may include a different processor, operating system, and even the
@@ -75,8 +69,6 @@ computers of the same family. Although they may run the same operating system
 as those being replaced, architecture-specific code may prevent the software
 from porting.
 .SS "Scope of Interfaces"
-.sp
-.LP
 Although application programs have all of the porting problems mentioned,
 developers attempting to port device drivers have special challenges. Before
 describing the DDI/DKI, it is necessary to understand the position of device
@@ -115,8 +107,6 @@ Driver-Boot/Configuration Software. The interaction between the driver and the
 boot and configuration software is the third interface affecting drivers.
 .RE
 .SS "Scope of the DDI/DKI"
-.sp
-.LP
 The primary goal of the DDI/DKI is to facilitate both source and binary
 portability across successive releases of the operating systems on a particular
 machine. In addition, it promotes source portability across implementations of
@@ -141,21 +131,21 @@ class, \fBsegmap\fR(9E) and \fBhat_getkpfnum\fR(9F)
 .TP
 .ie t \(bu
 .el o
-Solaris DDI - These interfaces specific to Solaris.
+illumos DDI - These interfaces specific to illumos.
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-Solaris SPARC specific DDI - These interfaces are specific to the SPARC
-processor, and may not be available on other processors supported by Solaris.
+illumos SPARC specific DDI - These interfaces are specific to the SPARC
+processor, and may not be available on other processors supported by illumos.
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-Solaris x86 specific DDI - These interfaces are specific to the x86 processor,
-and may not be available on other processors supported by Solaris.
+illumos x86 specific DDI - These interfaces are specific to the x86 processor,
+and may not be available on other processors supported by illumos.
 .RE
 .sp
 .LP
@@ -185,23 +175,17 @@ The headers \fB<sys/ddi.h>\fR and \fB<sys/sunddi.h>\fR must be the last header
 files included by the driver.
 .RE
 .SS "Audience"
-.sp
-.LP
 Section 9 is for software engineers responsible for creating, modifying, or
 maintaining drivers that run on this operating system and beyond. It assumes
 that the reader is familiar with system internals and the C programming
 language.
 .SS "PCMCIA Standard"
-.sp
-.LP
 The \fIPC\fR \fICard\fR \fI95\fR \fIStandard\fR is listed under the \fBSEE\fR
 \fBALSO\fR heading in some Section 9 reference pages. This refers to
 documentation published by the Personal Computer Memory Card International
 Association (PCMCIA) and the Japan Electronic Industry Development Association
 (JEIDA).
 .SS "How to Use Section 9"
-.sp
-.LP
 Section 9 is divided into the following subsections:
 .sp
 .ne 2
@@ -241,8 +225,6 @@ Data Structures - contains reference pages for driver-related structures.
 .RE
 
 .SS "Compatibility Note"
-.sp
-.LP
 Sun Microsystem's implementation of the DDI/DKI was designed to provide binary
 compatibility for third-party device drivers across currently supported
 hardware platforms across minor releases of the operating system. However,
@@ -251,8 +233,6 @@ DDI/DKI. We cannot therefore promise or in any way assure that
 DDI/DKI-compliant device drivers will continue to operate correctly on future
 releases.
 .SS "Introduction to Section 9E"
-.sp
-.LP
 Section 9E describes the entry-point routines a developer can include in a
 device driver. These are called entry-point because they provide the calling
 and return syntax from the kernel into the driver. Entry-points are called, for
@@ -309,8 +289,6 @@ discouraged.
 \fBSEE ALSO\fR gives sources for further information.
 .RE
 .SS "Overview of Driver Entry-Point Routines and Naming Conventions"
-.sp
-.LP
 By convention, a prefix string is added to the driver routine names. For a
 driver with the prefix \fIprefix\fR, the driver code may contain routines named
 \fIprefix\fRopen, \fIprefix\fRclose, \fIprefix\fRread, \fIprefix\fRwrite, and
@@ -351,51 +329,51 @@ c c
 l l .
 \fBRoutine\fR	\fBType \fR
 _
-\fB_fini\fR	Solaris DDI
-\fB_info\fR	Solaris DDI
-\fB_init\fR	Solaris DDI
-\fBaread\fR	Solaris DDI
-\fBattach\fR	Solaris DDI
-\fBawrite\fR	Solaris DDI
+\fB_fini\fR	illumos DDI
+\fB_info\fR	illumos DDI
+\fB_init\fR	illumos DDI
+\fBaread\fR	illumos DDI
+\fBattach\fR	illumos DDI
+\fBawrite\fR	illumos DDI
 \fBchpoll\fR	DDI/DKI
 \fBclose\fR	DDI/DKI
-\fBdetach\fR	Solaris DDI
-\fBdevmap\fR	Solaris DDI
-\fBdevmap_access\fR	Solaris DDI
-\fBdevmap_contextmgt\fR	Solaris DDI
-\fBdevmap_dup\fR	Solaris DDI
-\fBdevmap_map\fR	Solaris DDI
-\fBdevmap_unmap\fR	Solaris DDI
-\fBdump\fR	Solaris DDI
-\fBgetinfo\fR	Solaris DDI
-\fBidentify\fR	Solaris DDI
+\fBdetach\fR	illumos DDI
+\fBdevmap\fR	illumos DDI
+\fBdevmap_access\fR	illumos DDI
+\fBdevmap_contextmgt\fR	illumos DDI
+\fBdevmap_dup\fR	illumos DDI
+\fBdevmap_map\fR	illumos DDI
+\fBdevmap_unmap\fR	illumos DDI
+\fBdump\fR	illumos DDI
+\fBgetinfo\fR	illumos DDI
+\fBidentify\fR	illumos DDI
 \fBioctl\fR	DDI/DKI
-\fBks_update\fR	Solaris DDI
-\fBmapdev_access\fR	Solaris DDI
-\fBmapdev_dup\fR	Solaris DDI
-\fBmapdev_free\fR	Solaris DDI
+\fBks_update\fR	illumos DDI
+\fBmapdev_access\fR	illumos DDI
+\fBmapdev_dup\fR	illumos DDI
+\fBmapdev_free\fR	illumos DDI
 \fBmmap\fR	DKI only
 \fBopen\fR	DDI/DKI
-\fBpower\fR	Solaris DDI
+\fBpower\fR	illumos DDI
 \fBprint\fR	DDI/DKI
-\fBprobe\fR	Solaris DDI
-\fBprop_op\fR	Solaris DDI
+\fBprobe\fR	illumos DDI
+\fBprop_op\fR	illumos DDI
 \fBread\fR	DDI/DKI
 \fBsegmap\fR	DKI only
 \fBstrategy\fR	DDI/DKI
-\fBtran_abort\fR	Solaris DDI
-\fBtran_destroy_pkt\fR	Solaris DDI
-\fBtran_dmafree\fR	Solaris DDI
-\fBtran_getcap\fR	Solaris DDI
-\fBtran_init_pkt\fR	Solaris DDI
-\fBtran_reset\fR	Solaris DDI
-\fBtran_reset_notify\fR	Solaris DDI
-\fBtran_setcap\fR	Solaris DDI
-\fBtran_start\fR	Solaris DDI
-\fBtran_sync_pkt\fR	Solaris DDI
-\fBtran_tgt_free\fR	Solaris DDI
-\fBtran_tgt_init\fR	Solaris DDI
-\fBtran_tgt_probe\fR	Solaris DDI
+\fBtran_abort\fR	illumos DDI
+\fBtran_destroy_pkt\fR	illumos DDI
+\fBtran_dmafree\fR	illumos DDI
+\fBtran_getcap\fR	illumos DDI
+\fBtran_init_pkt\fR	illumos DDI
+\fBtran_reset\fR	illumos DDI
+\fBtran_reset_notify\fR	illumos DDI
+\fBtran_setcap\fR	illumos DDI
+\fBtran_start\fR	illumos DDI
+\fBtran_sync_pkt\fR	illumos DDI
+\fBtran_tgt_free\fR	illumos DDI
+\fBtran_tgt_init\fR	illumos DDI
+\fBtran_tgt_probe\fR	illumos DDI
 \fBwrite\fR	DDI/DKI
 .TE
 
@@ -474,11 +452,9 @@ EINTR	EIO	EINTR	EINTR
 EINVAL	ENXIO	EINVAL	EINVAL
 EIO		EIO	EIO
 ENXIO		ENXIO	ENXIO
-EPERM		EPERM	
-EROFS			
+EPERM		EPERM
+EROFS
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBIntro\fR(9F), \fBIntro\fR(9S)

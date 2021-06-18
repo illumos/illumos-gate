@@ -7,7 +7,6 @@
 .SH NAME
 ddi_get_instance \- get device instance number
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,11 +17,8 @@ ddi_get_instance \- get device instance number
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -32,8 +28,6 @@ Pointer to \fBdev_info\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_get_instance()\fR function returns the instance number of the device
 corresponding to \fIdip\fR.
 .sp
@@ -53,18 +47,12 @@ driver may not appear to be in consecutive order. For example, if device
 removed, \fBfoo1\fR will continue to be associated with instance number \fB1\fR
 (even though \fBfoo1\fR is now the only device of its type on the system).
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_get_instance()\fR function returns the instance number of the device
 corresponding to \fIdip\fR.
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_get_instance()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBpath_to_inst\fR(4)
 .sp
 .LP

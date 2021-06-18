@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dma_free_handle \- free DMA handle
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,7 +17,6 @@ ddi_dma_free_handle \- free DMA handle
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -29,25 +27,17 @@ A pointer to the  \fBDMA\fR handle previously allocated by a call to
 .RE
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_dma_free_handle()\fR destroys the  \fBDMA \fRhandle pointed to by
 \fIhandle\fR. Any further references to the  \fBDMA\fR handle will have
 undefined results. Note that  \fBddi_dma_unbind_handle\fR(9F) must be called
 prior to \fBddi_dma_free_handle()\fR to free any resources the system may be
 caching  on the handle.
 .SH CONTEXT
-.sp
-.LP
 \fBddi_dma_free_handle()\fR can be called from user, kernel, or interrupt
 context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_dma_alloc_handle\fR(9F), \fBddi_dma_unbind_handle\fR(9F)
 .sp
 .LP

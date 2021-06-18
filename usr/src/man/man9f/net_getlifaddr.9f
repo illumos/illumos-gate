@@ -7,7 +7,6 @@
 .SH NAME
 net_getlifaddr \- determine a network address for a given interface
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/neti.h>
 
@@ -17,11 +16,8 @@ net_getlifaddr \- determine a network address for a given interface
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInet\fR\fR
@@ -70,8 +66,6 @@ pointer to an area of memory to store the address data.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnet_getlifaddr()\fR function retrieves the address information for each
 logical interface. Each call to \fBnet_getlifaddr()\fR requires that the caller
 pass a pointer to an array of address information types to retrieve, and an
@@ -123,8 +117,6 @@ network interfaces that support broadcast packets.
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 The \fBnet_getlifaddr()\fR function returns:
 .sp
 .ne 2
@@ -154,13 +146,9 @@ Unsuccessful.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBnet_getifaddr()\fR function may be called from user, kernel, or
 interrupt context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -175,7 +163,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBnet_lifgetnext\fR(9F), \fBnet_phylookup\fR(9F),
 \fBnet_phygetnext\fR(9F), \fBnet_protocol_lookup\fR(9F)

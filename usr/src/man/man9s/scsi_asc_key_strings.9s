@@ -7,22 +7,16 @@
 .SH NAME
 scsi_asc_key_strings \- SCSI ASC ASCQ to message structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
- Solaris DDI specific (Solaris DDI).
+ illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_asc_key_strings\fR structure stores the ASC and ASCQ codes and a
 pointer to the related ASCII string.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 ushort_t asc;           /* ASC code */
@@ -39,8 +33,6 @@ message           Points to the NULL terminated ASCII string
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_vu_errmsg\fR(9F)
 .sp
 .LP

@@ -7,7 +7,6 @@
 .SH NAME
 ddi_get_cred \- returns a pointer to the credential structure of the caller
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -19,23 +18,13 @@ ddi_get_cred \- returns a pointer to the credential structure of the caller
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_get_cred()\fR returns a pointer to the user credential structure of the
 caller.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_get_cred()\fR returns a pointer to the caller's credential structure.
 .SH CONTEXT
-.sp
-.LP
 \fBddi_get_cred()\fR can be called from user context only.
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR

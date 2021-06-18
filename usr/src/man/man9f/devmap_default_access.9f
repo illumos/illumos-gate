@@ -7,7 +7,6 @@
 .SH NAME
 devmap_default_access \- default driver memory access function
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -18,11 +17,8 @@ devmap_default_access \- default driver memory access function
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdhp\fR \fR
@@ -77,8 +73,6 @@ Type of access.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBdevmap_default_access()\fR is a function providing the semantics of
 \fBdevmap_access\fR(9E). The drivers call \fBdevmap_default_access()\fR to
 handle the mappings that do not support context switching. The drivers should
@@ -91,7 +85,6 @@ or be used as the \fBdevmap_access\fR(9E) entry point. The arguments \fIdhp\fR,
 \fIpvtp\fR,  \fIoff\fR,  \fIlen\fR, \fItype\fR,  and \fIrw\fR are provided by
 the \fBdevmap_access\fR(9E) entry point and must not be modified.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB0\fR \fR
@@ -110,12 +103,9 @@ An error occurred.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBdevmap_default_access()\fR must be called from the driver's
 \fBdevmap_access\fR(9E) entry point.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing devmap_default_access in devmap_access.
 .sp
 .LP
@@ -186,8 +176,6 @@ xxdevmap_access(devmap_cookie_t dhp, void *pvtp, offset_t off,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdevmap_access\fR(9E), \fBdevmap_do_ctxmgt\fR(9F),
 \fBdevmap_callback_ctl\fR(9S)
 .sp

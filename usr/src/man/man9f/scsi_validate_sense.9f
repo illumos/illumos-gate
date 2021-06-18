@@ -7,7 +7,6 @@
 .SH NAME
 scsi_validate_sense \- find descriptor in SCSI sense data
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -18,8 +17,7 @@ scsi_validate_sense \- find descriptor in SCSI sense data
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -49,7 +47,6 @@ Returns additional properties of the sense data.
 .RE
 
 .SH DESCRIPTION
-.LP
 The \fBscsi_validate_sense()\fR function returns the format of the sense data
 contained in the provided sense buffer. If the response code field in the sense
 data is not recognized or if there is not enough sense data to include sense
@@ -110,11 +107,9 @@ The sense data in the buffer is in "descriptor format".
 .RE
 
 .SH CONTEXT
-.LP
 The \fBscsi_validate_sense()\fR function can be called from user or interrupt
 context.
 .SH SEE ALSO
-.LP
 \fBscsi_ext_sense_fields\fR(9F), \fBscsi_find_sense_descr\fR(9F),
 \fBscsi_sense_asc\fR(9F), \fBscsi_sense_ascq\fR(9F),
 \fBscsi_sense_cmdspecific_uint64\fR(9F), \fBscsi_sense_info_uint64\fR(9F),

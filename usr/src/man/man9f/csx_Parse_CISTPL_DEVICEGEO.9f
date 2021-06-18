@@ -7,7 +7,6 @@
 .SH NAME
 csx_Parse_CISTPL_DEVICEGEO \- parse the Device Geo tuple
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -18,11 +17,8 @@ csx_Parse_CISTPL_DEVICEGEO \- parse the Device Geo tuple
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR \fR
@@ -52,8 +48,6 @@ Device Geo tuple information upon return from this function.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function parses the Device Geo tuple, \fBCISTPL_DEVICEGEO,\fR into a form
 usable by \fBPC \fRCard drivers.
 .sp
@@ -61,8 +55,6 @@ usable by \fBPC \fRCard drivers.
 The \fBCISTPL_DEVICEGEO\fR tuple describes the device geometry of common memory
 partitions.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcistpl_devicegeo_t\fR are:
 .sp
 .in +2
@@ -141,7 +133,6 @@ This field indicates the hardware interleave
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -196,12 +187,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetNextTuple\fR(9F),
 \fBcsx_GetTupleData\fR(9F), \fBcsx_Parse_CISTPL_DEVICEGEO_A\fR(9F),
 \fBcsx_RegisterClient\fR(9F), \fBtuple\fR(9S)

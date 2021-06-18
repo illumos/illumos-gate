@@ -7,7 +7,6 @@
 .SH NAME
 ddi_log_sysevent \- log system event for drivers
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -20,11 +19,8 @@ ddi_log_sysevent \- log system event for drivers
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -99,8 +95,6 @@ available.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_log_sysevent()\fR function causes a system event, of the specified
 class and subclass, to be generated on behalf of the driver and queued for
 delivery to \fBsyseventd\fR, the user-land \fBsysevent\fR daemon.
@@ -121,8 +115,6 @@ driver name, with the format:
 The two fields of \fBeidp\fR, \fBeid_seq\fR and \fBeid_ts\fR, are sufficient to
 uniquely identify an event.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBsysevent_id_t\fR are:
 .sp
 .in +2
@@ -133,8 +125,6 @@ The structure members of \fBsysevent_id_t\fR are:
 .in -2
 
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_log_sysevent()\fR function returns:
 .sp
 .ne 2
@@ -249,13 +239,10 @@ DATA_TYPE_INT64_ARRAY
 DATA_TYPE_UINT64_ARRAY
 .in -2
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_log_sysevent()\fR function can be called from user, interrupt, or
 kernel context, except when \fIsleep_flag\fR is \fBDDI_SLEEP\fR, in which case
 it cannot be called from interrupt context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRLogging System Event with No Attributes
 .sp
 .in +2
@@ -339,8 +326,6 @@ static int
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBsyseventd\fR(1M), \fBattributes\fR(5), \fBnvlist_add_boolean\fR(9F),
 \fBnvlist_alloc\fR(9F)
 .sp

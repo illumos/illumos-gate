@@ -8,7 +8,6 @@
 nvlist_next_nvpair, nvpair_name, nvpair_type \- return data regarding
 name-value pairs
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/nvpair.h>
 
@@ -26,11 +25,8 @@ name-value pairs
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInvl\fR\fR
@@ -49,8 +45,6 @@ Handle to a name-value pair.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnvlist_next_nvpair()\fR function returns a handle to the next name-value
 pair (\fBnvpair\fR) in the list following \fInvpair\fR. If \fInvpair\fR is
 NULL, the first pair is returned. If \fInvpair\fR is the last pair in the
@@ -65,8 +59,6 @@ The \fBnvpair_type()\fR function retrieves the value of the \fInvpair\fR in the
 form of enumerated type \fBdata_type_t\fR. This is used to determine the
 appropriate \fBnvpair_*()\fR function to call for retrieving the value.
 .SH RETURN VALUES
-.sp
-.LP
 For \fBnvpair_name()\fR: a string containing the name.
 .sp
 .LP
@@ -112,6 +104,4 @@ manipulated. This includes \fBnvlist_next_nvpair()\fR, \fBnvpair_name()\fR and
 created with NV_UNIQUE_NAME_TYPE and NV_UNIQUE_NAME. See \fBnvlist_alloc\fR(9F)
 for more details.
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user, interrupt, or kernel context.

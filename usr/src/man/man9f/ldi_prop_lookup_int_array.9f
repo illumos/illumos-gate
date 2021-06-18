@@ -9,7 +9,6 @@ ldi_prop_lookup_int_array, ldi_prop_lookup_int64_array,
 ldi_prop_lookup_string_array, ldi_prop_lookup_string,
 ldi_prop_lookup_byte_array \- Lookup property information
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunldi.h>
 
@@ -42,7 +41,6 @@ ldi_prop_lookup_byte_array \- Lookup property information
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIlh\fR\fR
@@ -173,12 +171,8 @@ memory containing the property byte array value.
 .RE
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The property look up functions search for and, if found, return the value of a
 given property. Properties are searched for based on the dip and dev_t values
 associated with the layered handle, the property name, and type of the data
@@ -344,8 +338,6 @@ Frees the resources associated with a property previously      allocated using
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 The functions \fBldi_prop_lookup_int_array()\fR,
 \fBldi_prop_lookup_int64_array()\fR, \fBldi_prop_lookup_string_array()\fR,
 \fBldi_prop_lookup_string()\fR, and \fBldi_prop_lookup_byte_array()\fR return
@@ -397,11 +389,8 @@ Property value cannot be decoded.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user or kernel context.
 .SH EXAMPLE
-.sp
 .in +2
 .nf
 Using ldi_prop_lookup_int64_array().
@@ -436,8 +425,6 @@ Using ldi_prop_lookup_int64_array().
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBexecve\fR(2), \fBddi_prop_free\fR(9F), \fBddi_prop_lookup\fR(9F),
 \fBldi_prop_exists\fR(9F) .
 .sp

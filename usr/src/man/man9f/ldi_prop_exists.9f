@@ -7,7 +7,6 @@
 .SH NAME
 ldi_prop_exists \- Check for the existence of a property
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunldi.h>
 
@@ -15,11 +14,8 @@ ldi_prop_exists \- Check for the existence of a property
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIlh\fR\fR
@@ -79,8 +75,6 @@ String containing the name of the property.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBldi_prop_exists()\fR checks for the existence of a property associated with
 a device represented by the layered driver handle, regardless of the property
 value data type.
@@ -143,16 +137,11 @@ DDI_DEV_T_NONE.
 .LP
 name must always be set to the name of the property being looked up.
 .SH RETURN VALUES
-.sp
-.LP
 \fBldi_prop_exists()\fR returns \fB1\fR if the property exists and \fB0\fR
 otherwise.
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH EXAMPLE
-.sp
 .in +2
 .nf
 The following example demonstrates the use of ldi_prop_exists().
@@ -163,8 +152,6 @@ The following example demonstrates the use of ldi_prop_exists().
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_prop_exists(9F)\fR
 .sp
 .LP

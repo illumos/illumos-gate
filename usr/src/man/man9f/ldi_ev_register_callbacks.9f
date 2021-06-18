@@ -7,7 +7,6 @@
 .SH NAME
 ldi_ev_register_callbacks \- add a notify and/or finalize callback
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunldi.h>
 
@@ -17,11 +16,8 @@ ldi_ev_register_callbacks \- add a notify and/or finalize callback
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIldi_handle_t lh\fR\fR
@@ -126,8 +122,6 @@ upon successful registration.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBldi_ev_register_callbacks()\fR interface allows layered drivers to
 register notify and finalize callbacks for certain events. These events are
 listed in the \fBldi_ev_get_cookie\fR(9F) man page. The notify callback is
@@ -326,8 +320,6 @@ Once the registration of the callback(s) is successful, an opaque
 \fIldi_callback_id_t\fR structure is returned which may be used to
 unregister the callback(s) later.
 .SH RETURN VALUES
-.sp
-.LP
 The return values for this function are:
 .sp
 .ne 2
@@ -350,11 +342,8 @@ Failed to add callback(s).
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user and kernel contexts only.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRRegistration and Callbacks for the OFFLINE Event
 .sp
 .LP
@@ -522,7 +511,5 @@ dgrd_finalize(ldi_handle_t lh, ldi_ev_cookie_t off_cookie,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBldi_ev_finalize\fR(9F), \fBldi_ev_get_cookie\fR(9F),
 \fBldi_ev_notify\fR(9F), \fBldi_ev_remove_callbacks\fR(9F)

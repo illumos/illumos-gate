@@ -8,7 +8,6 @@
 mod_install, mod_remove, mod_info, mod_modname \- add, remove or query a
 loadable module
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/modctl.h>
 
@@ -34,8 +33,7 @@ loadable module
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -56,7 +54,6 @@ Pointer to the \fBmodinfo\fR structure passed to \fB_info\fR(9E).
 .RE
 
 .SH DESCRIPTION
-.LP
 \fBmod_install()\fR must be called from a module's \fB_init\fR(9E) routine.
 .sp
 .LP
@@ -89,7 +86,6 @@ driver, the module name is the same as the driver name. This function can be
 used to avoid compiled-in knowledge of the module name, and is of particular
 use when \fB_init\fR(9E) needs to call a function like \fBkstat_create\fR(9F).
 .SH RETURN VALUES
-.LP
 \fBmod_install()\fR and \fBmod_remove()\fR return \fB0\fR upon success and
 non-zero on failure.
 .sp
@@ -100,10 +96,8 @@ non-zero on failure.
 \fBmod_modname()\fR returns the name of the module. The returned name remains
 valid as long as the module remains loaded.
 .SH EXAMPLES
-.LP
 See \fB_init\fR(9E) for an example that uses these functions.
 .SH SEE ALSO
-.LP
 \fB_fini\fR(9E), \fB_info\fR(9E), \fB_init\fR(9E), \fBkstat_create\fR(9F),
 \fBmodldrv\fR(9S), \fBmodlinkage\fR(9S), \fBmodlstrmod\fR(9S)
 .sp

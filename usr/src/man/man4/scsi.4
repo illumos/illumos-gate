@@ -7,9 +7,7 @@
 .SH NAME
 scsi \- configuration files for SCSI target drivers
 .SH DESCRIPTION
-.sp
-.LP
-The architecture of the Solaris \fBSCSI\fR subsystem distinguishes two types of
+The architecture of the illumos \fBSCSI\fR subsystem distinguishes two types of
 device drivers: \fBSCSI\fR target drivers, and \fBSCSI\fR host adapter drivers.
 Target drivers like \fBsd\fR(7D) and \fBst\fR(7D) manage the device on the
 other end of the \fBSCSI\fR bus. Host adapter drivers manage the \fBSCSI\fR bus
@@ -18,7 +16,7 @@ on behalf of all the devices that share it.
 .LP
 Drivers for host adapters provide a common set of interfaces for target
 drivers. These interfaces comprise the Sun Common \fBSCSI\fR Architecture (
-\fBSCSA)\fR which are documented as part of the Solaris DDI/DKI. See
+\fBSCSA)\fR which are documented as part of the illumos DDI/DKI. See
 \fBscsi_ifgetcap\fR(9F), \fBscsi_init_pkt\fR(9F), and \fBscsi_transport\fR(9F)
 for further details of these, and associated routines.
 .sp
@@ -33,8 +31,6 @@ the Fibre Channel interconnects, \fBfcp\fR(7D), \fBifp\fR(7D),
 interconnects target devices by using the target driver \fBdriver.conf\fR(4)
 configuration files.
 .SS "Self-Identifying"
-.sp
-.LP
 Host adapter drivers of class scsi-self-identifying that dynamically create
 self-identifying target device children establish a \fBcompatible\fR property
 on each child. The compatible property is an ordered array of strings, each
@@ -203,12 +199,10 @@ characters.
 
 .sp
 .LP
-Solaris might create additional \fBcompatible\fR forms not described. These
-forms are for Solaris internal use only. Any additional use of these forms is
-discouraged. Future releases of Solaris might not produce these forms.
+illumos might create additional \fBcompatible\fR forms not described. These
+forms are for illumos internal use only. Any additional use of these forms is
+discouraged. Future releases of illumos might not produce these forms.
 .SS "driver.conf"
-.sp
-.LP
 Configuration files for \fBSCSI\fR target drivers should identify the host
 adapter driver implicitly using the \fIclass\fR keyword to remove any
 dependency on the particular host adapter involved.
@@ -247,12 +241,11 @@ target driver configuration file stub device definitions must be defined by
 property class or parent.
 .sp
 .LP
-The \fBSCSI\fR target driver configuration files shipped with Solaris have
+The \fBSCSI\fR target driver configuration files shipped with illumos have
 entries for \fBLUN\fR \fB0\fR only. For devices that support other \fBLUNs,\fR
 such as some \fBCD\fR changers, the system administrator can edit the driver
 configuration file to add entries for other \fBLUNs.\fR
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAn Example Configuration File for a SCSI Target Driver
 .sp
 .LP
@@ -291,7 +284,7 @@ name="sd" class="scsi" target=3 lun=5;
 .sp
 .LP
 It is not necessary to add the line for \fBLUN\fR \fB0\fR, as it already exists
-in the file shipped with Solaris.
+in the file shipped with illumos.
 
 .LP
 \fBExample 2 \fRA Stub Device Definition of \fBsd.conf\fR
@@ -310,8 +303,6 @@ name="sd" class="scsi-self-identifying";
 .sp
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -326,8 +317,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBadd_drv\fR(1M), \fBrem_drv\fR(1M), \fBupdate_drv\fR(1M),
 \fBdriver.conf\fR(4), \fBattributes\fR(5), \fBfcp\fR(7D), \fBifp\fR(7D),
 \fBsata\fR(7D), \fBscsi_vhci\fR(7D), \fBsd\fR(7D), \fBsf\fR(7D), \fBst\fR(7D),
@@ -348,8 +337,6 @@ Interface Stability	Committed
 .LP
 \fIIEEE 1275 SCSI Target Device Binding\fR
 .SH NOTES
-.sp
-.LP
 With \fBdriver.conf\fR(4) configuration, you need to ensure that the
 \fBtarget\fR and \fBlun\fR values claimed by your target driver do not conflict
 with existing target drivers on the system. For example, if the target is a

@@ -173,7 +173,7 @@ indicated by the interface name and retrieve data value
 .fi
 
 .SH INTERFACE LEVEL
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
 .ne 2
 .na

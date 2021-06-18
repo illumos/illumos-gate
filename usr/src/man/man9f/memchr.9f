@@ -7,7 +7,6 @@
 .SH NAME
 memchr, memcmp, memcpy, memmove, memset \- Memory operations
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunddi.h>
 
@@ -37,11 +36,8 @@ memchr, memcmp, memcpy, memmove, memset \- Memory operations
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdst\fR\fR
@@ -69,8 +65,6 @@ Pointers to character strings.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions operate as efficiently as possible on memory areas (arrays of
 bytes bounded by a count, not terminated by a null character). They do not
 check for the overflow of any receiving memory area.
@@ -103,17 +97,11 @@ The \fBmemset()\fR function sets the first \fIn\fR bytes in memory area \fIs\fR
 to the value of \fIc\fR (converted to an \fBunsigned char\fR). It returns
 \fIs\fR.
 .SH USAGE
-.sp
-.LP
 Using \fBmemcpy()\fR might be faster than using \fBmemmove()\fR if the
 application knows that the objects being copied do not overlap.
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user, interrupt, or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBbcopy\fR(9F), \fBddi_copyin\fR(9F), \fBstrcpy\fR(9F)
 .sp
 .LP

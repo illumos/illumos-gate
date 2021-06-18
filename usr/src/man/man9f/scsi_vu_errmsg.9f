@@ -7,7 +7,6 @@
 .SH NAME
 scsi_vu_errmsg \- display a SCSI request sense message
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -21,10 +20,8 @@ scsi_vu_errmsg \- display a SCSI request sense message
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.LP
 The following parameters are supported:
 .sp
 .ne 2
@@ -124,7 +121,6 @@ possible and \fINULL\fR if no decoding is possible.
 .RE
 
 .SH DESCRIPTION
-.LP
 This function is very similar to \fBscsi_errmsg\fR(9F) but allows decoding of
 vendor-unique ASC/ASCQ and FRU information.
 .sp
@@ -214,11 +210,9 @@ For a basic SCSI disk, the following list is appropriate:
 .in -2
 
 .SH CONTEXT
-.LP
 The \fBscsi_vu_errmsg()\fR function may be called from user, interrupt, or
 kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBscsi_vu_errmsg()\fR
 .sp
 .in +2
@@ -254,7 +248,6 @@ WARNING: /sbus@1,f8000000/esp@0,800000/sd@1,0 (sd1):
 .in -2
 
 .SH SEE ALSO
-.LP
 \fBcmn_err\fR(9F), \fBscsi_errmsg\fR(9F), \fBscsi_log\fR(9F),
 \fBscsi_errmsg\fR(9F), \fBscsi_asc_key_strings\fR(9S), \fBscsi_device\fR(9S),
 \fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)

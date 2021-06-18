@@ -8,21 +8,17 @@
 .SH NAME
 queue \- STREAMS queue structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 .fi
 
 .SH INTERFACE LEVEL
-.LP
 Architecture independent level 1 (DDI/DKI)
 .SH DESCRIPTION
-.LP
 A \fBSTREAMS\fR driver or module consists of two \fBqueue\fR structures:
 \fIread\fR for upstream processing and \fIwrite\fR for downstream processing.
 The queue structure is the major building block of a stream.
 .SS "\fBqueue\fR Structure Members"
-.LP
 The \fBqueue\fR structure is defined as type \fBqueue_t\fR. The structure can
 be accessed at any time from inside a \fBSTREAMS\fR entry point associated with
 that queue.
@@ -48,7 +44,6 @@ size_t             q_lowat;     /* queue low water mark */
 Contstraints and restrictions on the use of \fBq_flag\fR and \fBqueue_t\fR
 fields and the \fBq_next\fR values are detailed in the following sections.
 .SS "\fBq_flag\fR Field"
-.LP
 The \fBq_flag\fR field must be used only to check the following flag values.
 .sp
 .ne 2
@@ -114,7 +109,6 @@ Downstream processing element wants to write to queue.
 .RE
 
 .SS "\fBqueue_t\fR Fields"
-.LP
 Aside from \fBq_ptr\fR and \fBq_qinfo\fR, a module or driver must never assume
 that a \fBqueue_t\fR field value will remain unchanged across calls to
 \fBSTREAMS\fR entry points. In addition, many fields can change values inside a
@@ -171,12 +165,11 @@ visible fields, \fBq_qinfo\fR, \fBq_first\fR, \fBq_last\fR, \fBq_next\fR,
 \fBq_count\fR, and \fBq_flag\fR, must never be modified by a module or driver.
 .sp
 .LP
-The Solaris DDI requires that \fBSTREAMS\fR modules and drivers obey the rules
+The illumos DDI requires that \fBSTREAMS\fR modules and drivers obey the rules
 described on this page. Those that do not follow the rules can cause data
 corruption or system instability, and might change in behavior across updates
 or upgrades.
 .SS "\fBq_next\fR Restrictions"
-.LP
 There are additional restrictions associated with the use of the \fBq_next\fR
 value. In particular, a \fBSTREAMS\fR module or driver:
 .RS +4
@@ -210,7 +203,6 @@ However, checking \fBq_next\fR for NULL can be used to distinguish a module
 from a driver in code shared by both.
 .RE
 .SH SEE ALSO
-.LP
 \fBclose\fR(9E), \fBopen\fR(9E), \fBbcanput\fR(9F), \fBcanput\fR(9F),
 \fBgetq\fR(9F), \fBinsq\fR(9F), \fBmod_install\fR(9F), \fBput\fR(9F),
 \fBputbq\fR(9F), \fBputctl\fR(9F), \fBputctl1\fR(9F), \fBputnext\fR(9F),

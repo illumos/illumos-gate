@@ -8,7 +8,6 @@
 net_protocol_notify_register, net_instance_protocol_unregister \- add/delete a
 function to be called for changes to a protocol
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/hook.h>
 #include <sys/neti.h>
@@ -25,11 +24,8 @@ function to be called for changes to a protocol
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIfamily\fR\fR
@@ -57,8 +53,6 @@ pointer to pass into the \fBcallback()\fR function when a change occurs.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnet_protocol_notify_register()\fR function registers a function
 represented by the pointer \fIcallback\fR to be called when there is a change
 to the protocol represented by \fIfamily\fR. The types of changes for which
@@ -110,8 +104,6 @@ is the name of the protocol being added/removed
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 If these functions succeed, 0 is returned. Otherwise, the following error is
 returned:
 .sp
@@ -124,12 +116,8 @@ the given callback function is already registered.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user or kernel context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -144,6 +132,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBnet_protocol_lookup\fR(9F)

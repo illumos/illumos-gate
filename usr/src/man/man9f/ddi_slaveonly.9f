@@ -7,7 +7,6 @@
 .SH NAME
 ddi_slaveonly \- tell if a device is installed in a slave access only location
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -19,11 +18,8 @@ ddi_slaveonly \- tell if a device is installed in a slave access only location
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -33,14 +29,11 @@ A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_slaveonly()\fR function tells the caller if the bus, or part of the
 bus that the device is installed on, does not permit the device to become a DMA
 master, that is, whether the device has been installed in a slave access only
 slot.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR\fR
@@ -59,11 +52,7 @@ The device has not been installed in a slave access only location.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_slaveonly()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR

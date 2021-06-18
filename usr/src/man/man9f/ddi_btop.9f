@@ -7,7 +7,6 @@
 .SH NAME
 ddi_btop, ddi_btopr, ddi_ptob \- page size conversions
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -28,12 +27,8 @@ ddi_btop, ddi_btopr, ddi_ptob \- page size conversions
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 This set of routines use the parent nexus driver to perform conversions in page
 size units.
 .sp
@@ -57,17 +52,12 @@ facilities, these routines should be used in preference to the corresponding
 DDI/DKI routines \fBbtop\fR(9F), \fBbtopr\fR(9F), and \fBptob\fR(9F), which
 only deal in terms of the pagesize of the main system MMU.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_btop()\fR and \fBddi_btopr()\fR functions return the number of
 corresponding pages. \fBddi_ptob()\fR returns the corresponding number of
 bytes. There are no error return values.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, interrupt, or kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRFind the size (in bytes) of one page
 .sp
 .in +2
@@ -77,8 +67,6 @@ pagesize = ddi_ptob(dip, 1L);
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBbtop\fR(9F), \fBbtopr\fR(9F), \fBptob\fR(9F)
 .sp
 .LP

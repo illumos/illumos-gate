@@ -7,25 +7,19 @@
 .SH NAME
 scsi_extended_sense \- SCSI extended sense structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_extended_sense\fR structure for error codes \fB0x70\fR (current
 errors) and \fB0x71\fR (deferred errors) is returned on a successful \fBREQUEST
 SENSE\fR command. \fBSCSI-2 \fRcompliant targets are required to return at
 least the first 18 bytes of this structure. This structure is part of
 \fBscsi_device\fR(9S) structure.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 uchar_t  es_valid   :1;     /* Sense data is valid */
@@ -279,8 +273,6 @@ that has failed.
 valid bit (bit 7) is \fB1\fR. This field is reserved for sense keys not defined
 above.
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_device\fR(9S)
 .sp
 .LP

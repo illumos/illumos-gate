@@ -7,7 +7,6 @@
 .SH NAME
 mcopymsg \- Copy message contents into a buffer and free message
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -18,11 +17,8 @@ mcopymsg \- Copy message contents into a buffer and free message
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImp\fR\fR
@@ -41,8 +37,6 @@ Buffer in which to copy.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmcopymsg()\fR function copies the contents of the specified message into
 the specified buffer. If the message consists of more than a single message
 block, the contents of each message block are placed consecutively into the
@@ -54,16 +48,10 @@ The provided buffer must be large enough to accommodate the message. If the
 buffer is not large enough, the results are unspecified. The \fBmsgsize\fR(9F)
 function can be used to calculate the total size of the message beforehand.
 .SH RETURN VALUES
-.sp
-.LP
 None.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, kernel or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBfreemsg\fR(9F), \fBmsgsize\fR(9F)
 .sp
 .LP

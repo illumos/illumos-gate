@@ -7,7 +7,6 @@
 .SH NAME
 msgsize \- Return the total number of bytes in a message
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -18,11 +17,8 @@ msgsize \- Return the total number of bytes in a message
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImp\fR\fR
@@ -32,21 +28,13 @@ Message to be evaluated.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmsgsize()\fR function counts the number of bytes in a message,
 regardless of the data type of the underlying data blocks.
 .SH RETURN VALUES
-.sp
-.LP
 Number of bytes in the message.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, kernel or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBmsgdsize\fR(9F)
 .sp
 .LP

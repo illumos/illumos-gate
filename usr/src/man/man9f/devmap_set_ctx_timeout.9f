@@ -8,7 +8,6 @@
 devmap_set_ctx_timeout \- set the timeout value for the context management
 callback
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,11 +18,8 @@ callback
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdhp\fR\fR
@@ -43,8 +39,6 @@ management callback function.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdevmap_set_ctx_timeout()\fR function specifies the time interval for the
 system to wait between successive calls to the driver's context management
 callback function, \fBdevmap_contextmgt\fR(9E).
@@ -56,11 +50,7 @@ Device drivers typically call \fBdevmap_set_ctx_timeout()\fR in the
 value of \fB0\fR will result in no delay between successive calls to the
 driver's \fBdevmap_contextmgt\fR(9E) callback function.
 .SH CONTEXT
-.sp
-.LP
 The \fBdevmap_set_ctx_timeout()\fR function can be called from user, interrupt,
 or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBdevmap_contextmgt\fR(9E), \fBdevmap_map\fR(9E), \fBtimeout\fR(9F)

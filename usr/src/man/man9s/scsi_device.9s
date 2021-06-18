@@ -7,18 +7,13 @@
 .SH NAME
 scsi_device \- SCSI device structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_device\fR structure stores common information about each SCSI
 logical unit, including pointers to areas that contain both generic and device
 specific information. There is one \fBscsi_device\fR structure for each logical
@@ -26,7 +21,6 @@ unit attached to the system. The host adapter driver initializes part of this
 structure prior to \fBprobe\fR(9E) and destroys this structure after a probe
 failure or successful \fBdetach\fR(9E).
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 struct scsi_address        sd_address; /* Routing info. */
@@ -74,8 +68,6 @@ buffer.
 \fBsd_private\fR is reserved for the use of target drivers and should generally
 be used to point to target specific data structures.
 .SH SEE ALSO
-.sp
-.LP
 \fBdetach\fR(9E), \fBprobe\fR(9E), \fBmakecom\fR(9F), \fBmutex\fR(9F),
 \fBscsi_probe\fR(9F), \fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
 .sp

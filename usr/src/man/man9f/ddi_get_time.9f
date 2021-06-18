@@ -9,7 +9,6 @@
 .SH NAME
 ddi_get_time \- returns the current time in seconds
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -21,28 +20,18 @@ ddi_get_time \- returns the current time in seconds
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_get_time()\fR returns the current time in seconds since 00:00:00 UTC,
 January 1, 1970. Changes in time of day clock may result in this value
 changing. In other words, the value is not monotonically increasing and
 therefore it must not be used to set wait or expiration intervals. For that,
 instead use \fBddi_get_lbolt\fR(9F) or \fBgethrtime\fR(9F).
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_get_time()\fR returns the time in seconds.
 .SH CONTEXT
-.sp
-.LP
  This routine can be called from any context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_get_lbolt\fR(9F), \fBdrv_getparm\fR(9F), \fBdrv_usectohz\fR(9F),
 \fBgethrtime\fR(9F)
 .sp

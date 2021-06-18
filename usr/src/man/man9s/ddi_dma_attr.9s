@@ -12,7 +12,7 @@ ddi_dma_attr \- DMA attributes structure
 .fi
 
 .SH INTERFACE LEVEL
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
 A \fBddi_dma_attr_t\fR structure describes device- and \fBDMA\fR
 engine-specific attributes necessary to allocate \fBDMA\fR resources for a

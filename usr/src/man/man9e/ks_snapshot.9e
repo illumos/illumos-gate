@@ -7,7 +7,6 @@
 .SH NAME
 ks_snapshot \- take a snapshot of kstat data
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -20,8 +19,7 @@ ks_snapshot \- take a snapshot of kstat data
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -68,7 +66,6 @@ Copy statistics from the buffer to the driver.
 .RE
 
 .SH DESCRIPTION
-.LP
 The \fBkstat\fR mechanism allows for an optional \fBks_snapshot()\fR function
 to copy \fBkstat\fR data. This is the routine that is called to marshall the
 \fBkstat\fR data to be copied to user-land. A driver can opt to use a custom
@@ -147,10 +144,8 @@ For any other error
 .RE
 
 .SH CONTEXT
-.LP
 This function is called from user context only.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRNamed \fBkstat\fRs with Long Strings (\fBKSTAT_DATA_STRING\fR)
 .sp
 .in +2
@@ -187,7 +182,6 @@ xxx_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 .sp
 
 .SH SEE ALSO
-.LP
 \fBks_update\fR(9E), \fBkstat_create\fR(9F), \fBkstat_install\fR(9F),
 \fBkstat\fR(9S)
 .sp

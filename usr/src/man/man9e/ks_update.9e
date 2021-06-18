@@ -7,7 +7,6 @@
 .SH NAME
 ks_update \- dynamically update kstats
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -20,11 +19,8 @@ ks_update \- dynamically update kstats
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIksp\fR \fR
@@ -61,8 +57,6 @@ Update driver statistics from the kstat structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The kstat mechanism allows for an optional \fBks_update()\fR function to update
 kstat data.  This is useful for drivers where the underlying device keeps cheap
 hardware statistics, but extraction is expensive.  Instead of constantly
@@ -102,8 +96,6 @@ No \fBkstat\fR locking should be done inside the \fBks_update()\fR routine.
 The caller will already be holding the \fBkstat's\fR  \fBks_lock\fR (to ensure
 consistent data) and will prevent the \fBkstat\fR from being removed.
 .SH RETURN VALUES
-.sp
-.LP
 \fBks_update()\fR should return
 .sp
 .ne 2
@@ -133,8 +125,6 @@ For any other error.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBkstat_create\fR(9F), \fBkstat_install\fR(9F), \fBkstat\fR(9S)
 .sp
 .LP

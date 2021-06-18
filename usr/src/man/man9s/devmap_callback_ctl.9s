@@ -7,18 +7,13 @@
 .SH NAME
 devmap_callback_ctl \- device mapping-control structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddidevmap.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 A \fBdevmap_callback_ctl\fR structure describes a set of callback routines that
 are called by  the system to notify a device driver to manage events on  the
 device mappings created by \fBdevmap_setup\fR(9F) or
@@ -95,7 +90,6 @@ system calls.
 .RE
 
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 int	devmap_rev;
@@ -112,8 +106,6 @@ void	(*devmap_unmap)(devmap_cookie_t dhp, void *pvtp,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBexit\fR(2), \fBfork\fR(2), \fBmmap\fR(2), \fBmunmap\fR(2), \fBdevmap\fR(9E),
 \fBdevmap_access\fR(9E), \fBdevmap_dup\fR(9E), \fBdevmap_map\fR(9E),
 \fBdevmap_unmap\fR(9E), \fBddi_devmap_segmap\fR(9F),

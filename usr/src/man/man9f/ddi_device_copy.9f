@@ -8,7 +8,6 @@
 ddi_device_copy \- copy data from one device register to another device
 register
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -22,11 +21,8 @@ register
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIsrc_handle\fR \fR
@@ -135,8 +131,6 @@ The size of each data word. Possible values are defined as:
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_device_copy()\fR copies  \fIbytecount\fR bytes from the source  address,
 \fIsrc_addr\fR, to the destination address,  \fIdest_addr\fR. The attributes
 encoded in the access handles, \fIsrc_handle\fR and \fIdest_handle\fR, govern
@@ -161,8 +155,6 @@ negative value decrements the device address.
 The \fIdev_datasz\fR argument determines the size of the data word on each
 access. The data size must be the same between the source and destination.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_device_copy()\fR returns:
 .sp
 .ne 2
@@ -183,12 +175,8 @@ The byte count is not a multiple \fIdev_datasz\fR.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBddi_device_copy()\fR can be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_regs_map_free\fR(9F), \fBddi_regs_map_setup\fR(9F)
 .sp
 .LP

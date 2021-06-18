@@ -8,7 +8,6 @@
 tran_tgt_init \- request to initialize HBA resources on behalf of a particular
 target
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -19,8 +18,7 @@ target
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -61,7 +59,6 @@ Pointer to a  \fBscsi_device\fR(9S) structure, describing the target.
 .RE
 
 .SH DESCRIPTION
-.LP
 The \fBtran_tgt_init()\fR vector in the \fBscsi_hba_tran\fR(9S) structure may
 be initialized during the \fBHBA\fR driver's \fBattach\fR(9E) to point to an
 \fBHBA\fR driver function to be called by the system when an instance of a
@@ -81,7 +78,6 @@ initialize the \fItran_tgt_private\fR field in the structure pointed to by
 \fIhba_tran\fR, to point to the data specific to the particular target device
 instance.
 .SH RETURN VALUES
-.LP
 \fBtran_tgt_init()\fR must return:
 .sp
 .ne 2
@@ -106,7 +102,6 @@ instance of the target device will not be continued, the target driver's
 .RE
 
 .SH SEE ALSO
-.LP
 \fBattach\fR(9E), \fBprobe\fR(9E), \fBtran_tgt_free\fR(9E),
 \fBtran_tgt_probe\fR(9E), \fBscsi_hba_attach_setup\fR(9F),
 \fBscsi_device\fR(9S), \fBscsi_hba_tran\fR(9S)

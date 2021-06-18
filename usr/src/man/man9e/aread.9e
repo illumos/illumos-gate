@@ -8,7 +8,6 @@
 .SH NAME
 aread \- asynchronous read from a device
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/uio.h>
 #include <sys/aio_req.h>
@@ -21,13 +20,10 @@ int\fIprefix\fR
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRspecific (Solaris DDI). This entry point is \fIoptional\fR.
+illumos \fBDDI \fRspecific (illumos DDI). This entry point is \fIoptional\fR.
 Drivers that do not support an \fBaread()\fR entry point should use
 \fBnodev\fR(9F)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR \fR
@@ -56,8 +52,6 @@ Pointer to the credential structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The driver's \fBaread()\fR routine is called to perform an asynchronous read.
 \fBgetminor\fR(9F) can be used to access the minor number component of the
 \fIdev\fR argument. \fBaread()\fR may use the credential structure pointed to
@@ -72,16 +66,11 @@ No fields of the \fBuio\fR(9S) structure pointed to by \fBaio_req\fR, other
 than \fBuio_offset\fR or \fBuio_loffset\fR, may be modified for non-seekable
 devices.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBaread()\fR routine should return \fB0\fR for success, or the appropriate
 error number.
 .SH CONTEXT
-.sp
-.LP
 This function is called from user context only.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRThe following is an example of an \fBaread()\fR routine:
 .sp
 .in +2
@@ -97,14 +86,12 @@ xxaread(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 	if (xsp == NULL)
 		return (ENXIO);
 	return (aphysio(xxstrategy, anocancel,
-					dev, B_READ, xxminphys, aio));		
+					dev, B_READ, xxminphys, aio));
 }
 .fi
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBread\fR(2), \fBaioread\fR(3C), \fBawrite\fR(9E), \fBread\fR(9E),
 \fBstrategy\fR(9E), \fBwrite\fR(9E), \fBanocancel\fR(9F), \fBaphysio\fR(9F),
 \fBddi_get_soft_state\fR(9F), \fBdrv_priv\fR(9F), \fBgetminor\fR(9F),
@@ -114,7 +101,5 @@ xxaread(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 .LP
 \fIWriting Device Drivers\fR
 .SH BUGS
-.sp
-.LP
 There is no way other than calling \fBaphysio\fR(9F) to accomplish an
 asynchronous read.

@@ -7,7 +7,6 @@
 .SH NAME
 priv_getbyname \- map a privilege name to a number
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/cred.h>
 
@@ -17,11 +16,8 @@ priv_getbyname \- map a privilege name to a number
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIpriv\fR\fR
@@ -40,8 +36,6 @@ flags, must be zero or \fBPRIV_ALLOC\fR
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpriv_getbyname()\fR function maps a privilege name to a privilege number
 for use with the \fBpriv_*()\fR kernel interfaces.
 .sp
@@ -61,12 +55,9 @@ Privilege names are case insensitive but allocated privileges preserve case.
 Allocated privileges can be at most \fB{PRIVNAME_MAX}\fR characters long and
 can contain only alphanumeric characters and the underscore character.
 .SH RETURN VALUES
-.sp
-.LP
 This function returns the privilege number, which is greater than or equal to
 0, if it succeeds. It returns a negative error number if an error occurs.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEINVAL\fR\fR
@@ -113,12 +104,8 @@ An attempt was made to allocate a privilege that was longer than
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This functions can be called from user and kernel contexts.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -135,8 +122,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBprivileges\fR(5)
 .sp
 .LP

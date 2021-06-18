@@ -7,7 +7,6 @@
 .SH NAME
 devmap_contextmgt \- driver callback function for context management
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,11 +18,8 @@ devmap_contextmgt \- driver callback function for context management
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH ARGUMENTS
-.sp
 .ne 2
 .na
 \fB\fIdhp\fR \fR
@@ -123,8 +119,6 @@ Write access attempted.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBdevmap_contextmgt()\fR is a driver-supplied function that performs device
 context switching on a  mapping.  Device drivers pass \fBdevmap_contextmgt()\fR
 as an argument to \fBdevmap_do_ctxmgt\fR(9F) in the  \fBdevmap_access\fR(9E)
@@ -163,7 +157,6 @@ A non-zero return value from  \fBdevmap_contextmgt()\fR will be returned to
 failure may result in a \fBSIGSEGV\fR or \fBSIGBUS\fR signal being delivered to
 the process.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB0\fR \fR
@@ -182,7 +175,6 @@ An error occurred.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRmanaging a device context
 .sp
 .LP
@@ -232,8 +224,6 @@ xxdevmap_contextmgt(devmap_cookie_t dhp, void *pvtp, offset_t off,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdevmap_access\fR(9E), \fBdevmap_do_ctxmgt\fR(9F) \fBdevmap_load\fR(9F),
 \fBdevmap_unload\fR(9F)
 .sp

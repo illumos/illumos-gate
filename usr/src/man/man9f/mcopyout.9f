@@ -7,7 +7,6 @@
 .SH NAME
 mcopyout \- Convert an M_IOCTL or M_IOCDATA message to an M_COPYOUT
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -19,11 +18,8 @@ mcopyout \- Convert an M_IOCTL or M_IOCDATA message to an M_COPYOUT
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImp\fR\fR
@@ -69,8 +65,6 @@ Optionally, the payload to copy out.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmcopyout()\fR function converts an M_IOCTL or M_IOCDATA message into an
 M_COPYOUT message using the supplied arguments.
 .sp
@@ -88,16 +82,10 @@ If \fIdp\fR is not NULL, any trailing message blocks associated with \fImp\fR
 are freed, \fBmp->b_cont\fR is reset to \fIdp\fR and \fBdp->b_wptr\fR is set to
 \fBdp->b_rptr + size\fR. Otherwise, any trailing message blocks are unaffected.
 .SH RETURN VALUES
-.sp
-.LP
 None.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, kernel or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBmcopyin\fR(9F), \fBcopyreq\fR(9S), \fBiocblk\fR(9S)
 .sp
 .LP

@@ -7,18 +7,13 @@
 .SH NAME
 scsi_pkt \- SCSI packet structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 A \fBscsi_pkt\fR structure defines the packet that is allocated by
 \fBscsi_init_pkt\fR(9F). The target driver fills in some information and passes
 it to \fBscsi_transport\fR(9F) for execution on the target. The host bus
@@ -28,7 +23,6 @@ specified in the packet is called with a pointer to the packet as its argument.
 From fields within the packet, the target driver can determine the success or
 failure of the command.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 opaque_t             pkt_ha_private;           /* private data for
@@ -251,8 +245,6 @@ DMA flags used, such as \fBDDI_DMA_READ\fR and \fBDDI_DMA_WRITE\fR. See
 The host adapter driver will update the \fBpkt_resid\fR, \fBpkt_reason\fR,
 \fBpkt_state\fR, and \fBpkt_statistics\fR fields.
 .SS "\fBpkt_flags\fR Definitions"
-.sp
-.LP
 The appropriate definitions for the structure member \fBpkt_flags\fR are:
 .sp
 .ne 2
@@ -344,8 +336,6 @@ performance.
 .RE
 
 .SS "\fBpkt_reason\fR Definitions"
-.sp
-.LP
 The appropriate definitions for the structure member \fBpkt_reason\fR are:
 .sp
 .ne 2
@@ -555,8 +545,6 @@ The device has been removed.
 .RE
 
 .SS "pkt_state Definitions"
-.sp
-.LP
 The appropriate definitions for the structure member \fBpkt_state\fR are:
 .sp
 .ne 2
@@ -628,8 +616,6 @@ data residual based on the \fIstatuslen\fR parameter of the
 .RE
 
 .SS "pkt_statistics Definitions"
-.sp
-.LP
 The definitions that are appropriate for the structure member
 \fBpkt_statistics\fR are:
 .sp
@@ -696,8 +682,6 @@ Command timed out.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBtran_init_pkt\fR(9E), \fBtran_setup_pkt\fR(9E), \fBscsi_arq_status\fR(9S),
 \fBscsi_init_pkt\fR(9F), \fBscsi_transport\fR(9F), \fBscsi_status\fR(9S),
 \fBscsi_hba_pkt_comp\fR(9F)
@@ -705,8 +689,6 @@ Command timed out.
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 HBA drivers should signal \fBscsi_pkt\fR completion by calling
 \fBscsi_hba_pkt_comp\fR(9F). This is mandatory for HBA drivers that implement
 \fBtran_setup_pkt\fR(9E). Failure to comply results in undefined behavior.

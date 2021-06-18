@@ -7,7 +7,6 @@
 .SH NAME
 tran_sync_pkt \- SCSI HBA memory synchronization entry point
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -18,11 +17,8 @@ tran_sync_pkt \- SCSI HBA memory synchronization entry point
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIap\fR \fR
@@ -41,8 +37,6 @@ A pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBtran_sync_pkt()\fR vector in the \fBscsi_hba_tran\fR(9S) structure must
 be initialized during the \fBHBA\fR driver's \fBattach\fR(9E) to point to an
 \fBHBA\fR driver entry point to be called when a target driver calls
@@ -55,8 +49,6 @@ data associated with the \fIpkt\fR, typically by calling
 hardware-specific details, such as  flushing \fBI/O\fR caches, or stalling
 until hardware buffers have been drained.
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBtran_init_pkt\fR(9E), \fBddi_dma_sync\fR(9F),
 \fBscsi_hba_attach\fR(9F), \fBscsi_init_pkt\fR(9F), \fBscsi_sync_pkt\fR(9F),
 \fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S), \fBscsi_pkt\fR(9S)
@@ -64,7 +56,5 @@ until hardware buffers have been drained.
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 A target driver may call \fBtran_sync_pkt()\fR on packets for which no
 \fBDMA\fR resources were allocated.

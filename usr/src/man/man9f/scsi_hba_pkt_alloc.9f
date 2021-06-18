@@ -7,7 +7,6 @@
 .SH NAME
 scsi_hba_pkt_alloc, scsi_hba_pkt_free \- allocate and free a scsi_pkt structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -25,11 +24,8 @@ scsi_hba_pkt_alloc, scsi_hba_pkt_free \- allocate and free a scsi_pkt structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -135,8 +131,6 @@ A pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 For \fBscsi_hba_pkt_alloc()\fR:
 .sp
 .LP
@@ -202,13 +196,9 @@ For \fBscsi_hba_pkt_free()\fR:
 The \fBscsi_hba_pkt_free()\fR function frees the space allocated for the
 \fBscsi_pkt\fR(9S) structure.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_hba_pkt_alloc()\fR function returns a pointer to the \fBscsi_pkt\fR
 structure, or \fINULL\fR if no space is available.
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_hba_pkt_alloc()\fR function can be called from user, interrupt, or
 kernel context. Drivers must not allow \fBscsi_hba_pkt_alloc()\fR to sleep if
 called from an interrupt routine.
@@ -217,8 +207,6 @@ called from an interrupt routine.
 The \fBscsi_hba_pkt_free()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBtran_init_pkt\fR(9E), \fBscsi_address\fR(9S), \fBscsi_pkt\fR(9S)
 .sp
 .LP

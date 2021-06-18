@@ -7,7 +7,6 @@
 .SH NAME
 di_walk_minor \- traverse libdevinfo minor nodes
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-ldevinfo\fR [ \fIlibrary\fR... ]
 #include <libdevinfo.h>
@@ -18,7 +17,6 @@ di_walk_minor \- traverse libdevinfo minor nodes
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIarg\fR\fR
@@ -52,7 +50,7 @@ The minor node visited.
 .ad
 .RS 18n
 A character string specifying the minor data type, which may be one of the
-types defined by the Solaris DDI framework, for example, \fBDDI_NT_BLOCK\fR.
+types defined by the illumos DDI framework, for example, \fBDDI_NT_BLOCK\fR.
 \fBNULL\fR matches all \fIminor_node\fR  types. See
 \fBddi_create_minor_node\fR(9F).
 .RE
@@ -76,16 +74,12 @@ Root of subtree to visit.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdi_walk_minor()\fR function visits all minor nodes attached to device
 nodes in a subtree rooted at \fIroot\fR. For each  minor node that matches
 \fIminor_nodetype\fR, the caller-supplied function \fIminor_callback\fR() is
 invoked. The walk terminates immediately when \fIminor_callback\fR() returns
 \fBDI_WALK_TERMINATE\fR.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBdi_walk_minor()\fR returns 0. Otherwise, -1 is
 returned and errno is set to indicate the error.
 .sp
@@ -110,8 +104,6 @@ Terminate the walk immediately.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 The \fBdi_walk_minor()\fR function will fail if:
 .sp
 .ne 2
@@ -123,8 +115,6 @@ Invalid argument.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -141,8 +131,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdladm\fR(1M), \fBdi_minor_nodetype\fR(3DEVINFO), dlpi_walk(3DLPI),
 \fBlibdevinfo\fR(3LIB), \fBattributes\fR(5), \fBfilesystem\fR(5),
 \fBddi_create_minor_node\fR(9F)
@@ -150,14 +138,12 @@ MT-Level	Safe
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 The \fBdi_walk_minor()\fR function is no longer an accurate method for walking
 network datalink interfaces on the system. Applications should use
 \fBdlpi_walk\fR(3DLPI) instead. It has been common for applications to use
 \fBdi_walk_minor()\fR to walk networking devices by passing in a
 \fBminor_nodetype\fR of \fBDDI_NT_NET\fR, in most cases to discover the set of
-DLPI devices on the system. Solaris now makes a layering distinction between
+DLPI devices on the system. illumos now makes a layering distinction between
 networking devices (the objects displayed in the \fBDEVICE\fR field by
 \fBdladm\fR \fBshow-phys\fR) and network datalink interfaces (the objects
 displayed by \fBdladm\fR \fBshow-link\fR). Datalink interfaces are represented

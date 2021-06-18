@@ -8,7 +8,6 @@
 ddi_peek, ddi_peek8, ddi_peek16, ddi_peek32, ddi_peek64, ddi_peekc, ddi_peeks,
 ddi_peekl, ddi_peekd \- read a value from a location
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -34,14 +33,11 @@ ddi_peekl, ddi_peekd \- read a value from a location
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI). The \fBddi_peekc()\fR, \fBddi_peeks()\fR,
+illumos DDI specific (illumos DDI). The \fBddi_peekc()\fR, \fBddi_peeks()\fR,
 \fBddi_peekl()\fR, and \fBddi_peekd()\fR functions are obsolete. Use,
 respectively, \fBddi_peek8()\fR, \fBddi_peek16()\fR, \fBddi_peek32()\fR, and
 \fBddi_peek64()\fR, instead.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -70,8 +66,6 @@ the value read from the location will simply be discarded.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These routines cautiously attempt to read a value from a specified virtual
 address, and return the value to the caller, using the parent nexus driver to
 assist in the process where necessary.
@@ -85,7 +79,6 @@ The routines are most useful when first trying to establish the presence of a
 device on the system in a driver's \fBprobe\fR(9E) or \fBattach\fR(9E)
 routines.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR\fR
@@ -106,11 +99,8 @@ unchanged.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user, interrupt, or kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRChecking to see that the status register of a device is mapped
 into the kernel address space:
 .sp
@@ -157,15 +147,11 @@ failure:
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBprobe\fR(9E), \fBddi_poke\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 The functions described in this manual page previously used symbolic names
 which specified their data access size; the function names have been changed so
 they now specify a fixed-width data size. See the following table for the new

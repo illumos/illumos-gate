@@ -7,7 +7,6 @@
 .SH NAME
 nvlist_remove, nvlist_remove_all \- remove name-value pairs
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/nvpair.h>
 
@@ -20,11 +19,8 @@ nvlist_remove, nvlist_remove_all \- remove name-value pairs
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInvl\fR\fR
@@ -52,8 +48,6 @@ Data type of the \fBnvpair\fR to be removed.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnvlist_remove()\fR function removes the first occurrence of \fInvpair\fR
 that matches the name and the type.
 .sp
@@ -66,16 +60,11 @@ Multiple threads can simultaneously read the same \fBnvlist_t\fR but only one
 thread may actively change a given \fBnvlist_t\fR at a time. The caller is
 responsible for the synchronization.
 .SH RETURN VALUES
-.sp
-.LP
 These functions return \fB0\fR on success and an error value on failure.
 .SH CONTEXT
-.sp
-.LP
 The \fBnvlist_remove()\fR and \fBnvlist_remove_all()\fR functions can be called
 from user, interrupt, or kernel context.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fBEINVAL\fR

@@ -7,7 +7,6 @@
 .SH NAME
 tran_start \- request to transport a SCSI command
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -18,8 +17,7 @@ tran_start \- request to transport a SCSI command
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -39,7 +37,6 @@ Pointer to a \fBscsi_address\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.LP
 The  \fBtran_start()\fR vector in the  \fBscsi_hba_tran\fR(9S) structure must
 be initialized during the \fBHBA \fRdriver's \fBattach\fR(9E) to point to an
 \fBHBA \fRentry point to be called when a target driver calls
@@ -185,7 +182,6 @@ by the transport layer.
 .RE
 
 .SH RETURN VALUES
-.LP
 \fBtran_start()\fR must return:
 .sp
 .ne 2
@@ -227,11 +223,9 @@ A fatal error has occurred in the \fBHBA. \fR
 .RE
 
 .SH CONTEXT
-.LP
 The \fBtran_start()\fR function can be called from user or interrupt context.
 This requirement comes from \fBscsi_transport()\fR.
 .SH SEE ALSO
-.LP
 \fBattach\fR(9E), \fBtran_init_pkt\fR(9E), \fBscsi_hba_attach\fR(9F),
 \fBscsi_transport\fR(9F), \fBscsi_address\fR(9S), \fBscsi_arq_status\fR(9S),
 \fBscsi_hba_tran\fR(9S), \fBscsi_pkt\fR(9S)

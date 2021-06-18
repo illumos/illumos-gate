@@ -8,7 +8,6 @@
 scsi_get_device_type_scsi_options \- look up per-device-type scsi-options
 property
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -19,11 +18,8 @@ property
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -51,8 +47,6 @@ Value returned if no match is found.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_get_device_type_scsi_options()\fR function looks up the property
 \fBdevice-type-scsi-options-list\fR, which can be specified in the HBA's
 \fBdriver.conf\fR(4) file. This property allows specification of
@@ -121,15 +115,9 @@ The \fBscsi_get_device_type_scsi_options()\fR function searches the list of
 duplets for a matching \fBINQUIRY\fR string. If a match is found,
 \fBscsi_get_device_type_scsi_options()\fR returns the corresponding value.
 .SH RETURN VALUES
-.sp
-.LP
 \fBscsi_get_device_type_scsi_options()\fR returns the \fBscsi-options\fR value
 found, or if no match is found the \fBdefault_scsi_options\fR value passed in.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from kernel or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR

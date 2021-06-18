@@ -15,7 +15,6 @@ nvlist_add_int32_array, nvlist_add_uint32_array, nvlist_add_int64_array,
 nvlist_add_uint64_array, nvlist_add_string_array, nvlist_t \- value pair
 functions
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/nvpair.h>
 
@@ -161,11 +160,8 @@ functions
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInvl\fR\fR
@@ -211,8 +207,6 @@ Value or starting address of the array value.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions add a new name-value pair to an \fBnvlist_t\fR. The memory
 allocation policy follows that specified in \fBnvlist_alloc()\fR,
 \fBnvlist_unpack()\fR, or \fBnvlist_dup()\fR. See \fBnvlist_alloc\fR(9F). The
@@ -242,7 +236,6 @@ the synchronization.
 The \fBnvlist_add_boolean()\fR function is deprecated and the
 \fBnvlist_add_boolean_value()\fR function is used instead.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -270,8 +263,6 @@ insufficient memory
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from interrupt context only if (1) the default
 allocator is used and the \fBKM_NOSLEEP\fR flag is set, or (2) the specified
 allocator did not sleep for free memory (for example, if it uses a

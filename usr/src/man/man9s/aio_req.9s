@@ -27,7 +27,7 @@
 .In sys/ddi.h
 .In sys/sunddi.h
 .Sh INTERFACE LEVEL
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .Sh DESCRIPTION
 An
 .Vt aio_req

@@ -8,7 +8,6 @@
 .SH NAME
 csx_ModifyWindow \- modify window attributes
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -18,11 +17,8 @@ csx_ModifyWindow \- modify window attributes
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIwh\fR \fR
@@ -41,8 +37,6 @@ Pointer to a \fBmodify_win_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function modifies the attributes of a window allocated by the
 \fBcsx_RequestWindow\fR(9F) function.
 .sp
@@ -53,8 +47,6 @@ offset into \fBPC \fRCard memory to be mapped into system memory for paged
 windows. The \fBcsx_RequestWindow\fR(9F) and \fBcsx_ReleaseWindow\fR(9F)
 functions must be used to change the window base or size.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBmodify_win_t\fR are:
 .sp
 .in +2
@@ -186,7 +178,6 @@ perturbing the \fBAccessSpeed\fR field.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -250,12 +241,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_ConvertSpeed\fR(9F), \fBcsx_MapMemPage\fR(9F),
 \fBcsx_ReleaseWindow\fR(9F), \fBcsx_RequestWindow\fR(9F)
 .sp

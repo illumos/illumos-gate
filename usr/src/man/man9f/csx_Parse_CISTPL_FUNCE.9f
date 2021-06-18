@@ -7,7 +7,6 @@
 .SH NAME
 csx_Parse_CISTPL_FUNCE \- parse Function Extension tuple
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -19,11 +18,8 @@ csx_Parse_CISTPL_FUNCE \- parse Function Extension tuple
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR\fR
@@ -63,8 +59,6 @@ The function \fBID \fRcode to which this \fBCISTPL_FUNCE\fR tuple refers. See
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function parses the Function Extension tuple, \fBCISTPL_FUNCE,\fR into a
 form usable by \fBPC \fRCard drivers.
 .sp
@@ -74,8 +68,6 @@ The \fBCISTPL_FUNCE\fR tuple is used to describe information about a specific
 Identification tuple, \fBCISTPL_FUNCID,\fR that is being extended. Each
 function has a defined set of extension tuples.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcistpl_funce_t\fR are:
 .sp
 .in +2
@@ -1090,7 +1082,6 @@ Point to point infra red
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -1145,12 +1136,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_Parse_CISTPL_FUNCID\fR(9F), \fBcsx_RegisterClient\fR(9F),
 \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)

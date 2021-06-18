@@ -7,7 +7,6 @@
 .SH NAME
 csx_Error2Text \- convert error return codes to text strings
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,11 +16,8 @@ csx_Error2Text \- convert error return codes to text strings
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIer\fR \fR
@@ -31,13 +27,9 @@ Pointer to an \fBerror2text_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
-This function is a Solaris-specific extension that provides a method for
+This function is an illumos-specific extension that provides a method for
 clients to convert Card Services error return codes to text strings.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBerror2text_t\fR are:
 .sp
 .in +2
@@ -58,7 +50,6 @@ Card Services error return code specified in the item field is not found, the
 .LP
 "{\fIunknown Card Services return code\fR}"
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -77,11 +68,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR: Using the csxError2Text function
 .sp
 .in +2
@@ -99,8 +87,6 @@ if ((ret = csx_RegisterClient(&client_handle, &
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_Event2Text\fR(9F)
 .sp
 .LP

@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dev_nregs \- return the number of register sets a device has
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -19,11 +18,8 @@ ddi_dev_nregs \- return the number of register sets a device has
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -42,13 +38,9 @@ Pointer to an integer that holds the number of register sets on return.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_dev_nregs()\fR function returns the number of sets of registers the
 device has.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_dev_nregs()\fR function returns:
 .sp
 .ne 2
@@ -69,13 +61,9 @@ The device has no registers.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_dev_nregs()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_dev_nintrs\fR(9F), \fBddi_dev_regsize\fR(9F)
 .sp
 .LP

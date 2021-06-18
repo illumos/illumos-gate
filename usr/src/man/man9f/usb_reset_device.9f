@@ -7,7 +7,6 @@
 .SH NAME
 usb_reset_device \- reset a USB device according to the reset_level.
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/usb/usba.h
 
@@ -18,8 +17,7 @@ usb_reset_device \- reset a USB device according to the reset_level.
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
 .ne 2
 .na
@@ -42,7 +40,6 @@ The level to which the device is reset. See below for a list of valid
 .RE
 
 .SH DESCRIPTION
-.LP
 The \fBusb_reset_device()\fR function provides a client driver to request a
 hardware reset for a \fBUSB\fR device, which may be required in some situations
 such as:
@@ -101,7 +98,6 @@ depending on where the failure occurred.
 .RE
 
 .SH RETURN VALUES
-.LP
 The return values for the \fBusb_reset_device()\fR function are:
 .sp
 .ne 2
@@ -164,7 +160,6 @@ If \fBUSB_RESET_LVL_DEFAULT\fR is specified, called from interrupt context
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRResetting a Device
 .sp
 .LP
@@ -233,11 +228,9 @@ static int xxx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 .in -2
 
 .SH CONTEXT
-.LP
 The \fBusb_reset_device()\fR function may be called from user or kernel
 context.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -254,11 +247,9 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBattributes\fR(5), \fBusb_clr_feature\fR(9F), \fBusb_get_cfg\fR(9F),
 \fBusb_pipe_close\fR(9F), \fBusb_pipe_xopen\fR(9F), \fBusb_pipe_reset\fR(9F),
 .SH DIAGNOSTICS
-.LP
 The messages described below may appear on the system console as well as being
 logged. All messages are formatted in the following manner:
 .sp
@@ -310,5 +301,4 @@ function.
 .RE
 
 .SH NOTES
-.LP
 Always close all applications before resetting a device.

@@ -7,7 +7,6 @@
 .SH NAME
 devmap_unload, devmap_load \- control validation of memory address translations
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -24,11 +23,8 @@ devmap_unload, devmap_load \- control validation of memory address translations
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdhp\fR \fR
@@ -57,7 +53,6 @@ Length (in bytes) of the range being affected.
 .RE
 
 .SS "devmap_load() only"
-.sp
 .ne 2
 .na
 \fB\fItype\fR \fR
@@ -76,8 +71,6 @@ Direction of access.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBdevmap_unload()\fR and \fBdevmap_load()\fR are used to control the
 validation of the memory mapping described by \fIdhp\fR in the specified range.
 \fBdevmap_unload()\fR invalidates the mapping translations and will generate
@@ -116,7 +109,6 @@ A non-zero return value from either \fBdevmap_unload()\fR or
 may result in a \fBSIGSEGV\fR or \fBSIGBUS\fR signal being delivered to the
 process.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB0\fR \fR
@@ -135,11 +127,8 @@ An error occurred.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These routines can be called from user or kernel context only.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRManaging a One-Page Device Context
 .sp
 .LP
@@ -183,8 +172,6 @@ xxdevmap_contextmgt(devmap_cookie_t dhp, void *pvtp, offset_t off,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdevmap_access\fR(9E), \fBdevmap_contextmgt\fR(9E)
 .sp
 .LP

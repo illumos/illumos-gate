@@ -7,7 +7,6 @@
 .SH NAME
 tran_tgt_probe \- request to probe SCSI bus for a particular target
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -18,11 +17,8 @@ tran_tgt_probe \- request to probe SCSI bus for a particular target
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIsd\fR \fR
@@ -41,8 +37,6 @@ Pointer to either  \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBtran_tgt_probe()\fR vector in the \fBscsi_hba_tran\fR(9S) structure may
 be initialized during the \fBHBA \fRdriver's \fBattach\fR(9E) to point to a
 function to be called by \fBscsi_probe\fR(9F) when called by a target driver
@@ -93,8 +87,6 @@ Wait indefinitely for resources.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBprobe\fR(9E), \fBtran_tgt_free\fR(9E),
 \fBtran_tgt_init\fR(9E), \fBscsi_hba_probe\fR(9F), \fBscsi_probe\fR(9F),
 \fBscsi_device\fR(9S), \fBscsi_hba_tran\fR(9S)

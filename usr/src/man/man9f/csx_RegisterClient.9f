@@ -7,7 +7,6 @@
 .SH NAME
 csx_RegisterClient \- register a client
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,8 +16,7 @@ csx_RegisterClient \- register a client
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
+illumos \fBDDI\fR Specific (illumos \fBDDI\fR)
 .SH PARAMETERS
 .ne 2
 .na
@@ -38,12 +36,10 @@ Pointer to a \fBclient_reg_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.LP
 This function registers a client with Card Services and returns a unique client
 handle for the client. The client handle must be passed to
 \fBcsx_DeregisterClient\fR(9F) when the client terminates.
 .SH STRUCTURE MEMBERS
-.LP
 The structure members of \fBclient_reg_t\fR are:
 .sp
 .in +2
@@ -305,10 +301,8 @@ No \fBPCMCIA\fR hardware installed.
 .RE
 
 .SH CONTEXT
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.LP
 \fBcsx_DeregisterClient\fR(9F), \fBcsx_RequestSocketMask\fR(9F)
 .sp
 .LP

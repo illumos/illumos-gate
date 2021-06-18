@@ -7,7 +7,6 @@
 .SH NAME
 csx_GetMappedAddr \- return mapped virtual address
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,11 +16,8 @@ csx_GetMappedAddr \- return mapped virtual address
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -41,12 +37,9 @@ The virtual or \fBI/O \fRport number represented by the handle.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function returns the mapped virtual address or the mapped \fBI/O \fRport
 number represented by the handle, \fIhandle\fR.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -77,12 +70,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_DupHandle\fR(9F), \fBcsx_Get8\fR(9F), \fBcsx_Put8\fR(9F),
 \fBcsx_RepGet8\fR(9F), \fBcsx_RepPut8\fR(9F), \fBcsx_RequestIO\fR(9F),
 \fBcsx_RequestWindow\fR(9F)

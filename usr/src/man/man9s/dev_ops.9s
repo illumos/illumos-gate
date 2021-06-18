@@ -7,19 +7,14 @@
 .SH NAME
 dev_ops \- device operations structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/devops.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 \fBdev_ops\fR contains driver common fields and pointers to the \fBbus_ops\fR
 and \fBcb_ops\fR(9S).
 .sp
@@ -138,7 +133,6 @@ does not need to implement quiesce.
 .RE
 
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 int             devo_rev;
@@ -160,8 +154,6 @@ int             (*devo_quiesce)(dev_info_t *dip);
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBdetach\fR(9E), \fBgetinfo\fR(9E), \fBprobe\fR(9E),
 \fBpower\fR(9E), \fBquiesce\fR(9E), \fBnodev\fR(9F)
 .sp

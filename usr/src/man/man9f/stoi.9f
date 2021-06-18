@@ -7,7 +7,6 @@
 .SH NAME
 stoi, numtos \- convert between an integer and a decimal string
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 
@@ -20,11 +19,8 @@ stoi, numtos \- convert between an integer and a decimal string
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIstr\fR\fR
@@ -53,32 +49,20 @@ Character buffer to hold converted decimal number.
 
 .SH DESCRIPTION
 .SS "\fBstoi()\fR"
-.sp
-.LP
 The \fBstoi()\fR function returns the integer value of a string of decimal
 numeric characters beginning at \fI**str\fR. No overflow checking is done.
 \fI*str\fR is updated to point at the last character examined.
 .SS "\fBnumtos()\fR"
-.sp
-.LP
 The \fBnumtos()\fR function converts a \fBlong\fR into a null-terminated
 character string. No bounds checking is done. The caller must ensure there is
 enough space to hold the result.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBstoi()\fR function returns the integer value of the string \fIstr\fR.
 .SH CONTEXT
-.sp
-.LP
 The \fBstoi()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 The \fBstoi()\fR function handles only positive integers; it does not handle
 leading minus signs.

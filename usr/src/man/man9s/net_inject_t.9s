@@ -7,23 +7,17 @@
 .SH NAME
 net_inject_t \- structure for describing how to transmit a packet
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/neti.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnet_inject_t\fR data structure passes information in to \fBnet_inject\fR
 about how to transmit a packet. Transmit includes sending the packet up into
 the system as well as out of it.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
  mblk_t                  *ni_packet;   /* start of the packet */
@@ -64,8 +58,6 @@ The physical interface where the packet will be injected.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -80,6 +72,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBnet_inject\fR(9F), \fBnetinfo\fR(9F), \fBattributes\fR(5)

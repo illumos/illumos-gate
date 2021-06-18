@@ -8,7 +8,6 @@
 .SH NAME
 scsi_free_consistent_buf \- free a previously allocated SCSI DMA I/O buffer
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -18,11 +17,8 @@ scsi_free_consistent_buf \- free a previously allocated SCSI DMA I/O buffer
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIbp\fR\fR
@@ -32,26 +28,18 @@ Pointer to the \fBbuf\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscsi_free_consistent_buf()\fR function frees a buffer header and
 consistent data buffer that was previously allocated using
 \fBscsi_alloc_consistent_buf\fR(9F).
 .SH CONTEXT
-.sp
-.LP
 The \fBscsi_free_consistent_buf()\fR function can be called from user,
 interrupt, or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBfreerbuf\fR(9F), \fBscsi_alloc_consistent_buf\fR(9F), \fBbuf\fR(9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNING
-.sp
-.LP
 The \fBscsi_free_consistent_buf()\fR function will call \fBfreerbuf\fR(9F) to
 free the \fBbuf\fR(9S) that was allocated before or during the call to
 \fBscsi_alloc_consistent_buf\fR(9F).

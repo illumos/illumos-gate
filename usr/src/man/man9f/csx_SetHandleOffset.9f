@@ -7,7 +7,6 @@
 .SH NAME
 csx_SetHandleOffset \- set current access handle offset
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,11 +16,8 @@ csx_SetHandleOffset \- set current access handle offset
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
+illumos \fBDDI\fR Specific (illumos \fBDDI\fR)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -40,12 +36,9 @@ New access handle offset.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function sets the current offset for the access handle, \fIhandle\fR, to
 \fIoffset\fR.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -55,12 +48,8 @@ Successful operation.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetHandleOffset\fR(9F), \fBcsx_RequestIO\fR(9F),
 \fBcsx_RequestIRQ\fR(9F)
 .sp

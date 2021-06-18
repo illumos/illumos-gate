@@ -7,7 +7,6 @@
 .SH NAME
 ddi_driver_major \- return driver's major device number
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -16,17 +15,12 @@ ddi_driver_major \- return driver's major device number
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_driver_major()\fR returns the major device number for the driver
 associated with the supplied \fBdev_info node\fR. This value can then be used
 as an argument to \fBmakedevice\fR(9F) to construct a complete \fBdev_t\fR.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -36,17 +30,11 @@ A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_driver_major()\fR returns the major number of the driver bound to a
 device, if any, or \fBDDI_MAJOR_T_NONE\fR otherwise.
 .SH CONTEXT
-.sp
-.LP
 \fBddi_driver_major()\fR can be called from kernel or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_driver_name\fR(9F)
 .sp
 .LP

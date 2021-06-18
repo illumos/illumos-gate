@@ -7,7 +7,6 @@
 .SH NAME
 mexchange \- Exchange one message for another
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -19,11 +18,8 @@ mexchange \- Exchange one message for another
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIwq\fR\fR
@@ -70,8 +66,6 @@ Optionally, a 4 byte value to store at the beginning of the returned message.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmexchange()\fR function exchanges the passed in message for another
 message of the specified \fIsize\fR and \fItype\fR.
 .sp
@@ -88,17 +82,11 @@ first 4 bytes are assigned to be \fIprimtype\fR. This is chiefly useful for
 STREAMS-based protocols such as \fBDLPI\fR and \fBTPI\fR which store the
 protocol message type in the first 4 bytes of each message.
 .SH RETURN VALUES
-.sp
-.LP
 A pointer to the requested message is returned on success. NULL is returned on
 failure.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, kernel or interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBdupmsg\fR(9F), \fBmerror\fR(9F)
 .sp
 .LP

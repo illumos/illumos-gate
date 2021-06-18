@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dev_regsize \- return the size of a device's register
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -19,11 +18,8 @@ ddi_dev_regsize \- return the size of a device's register
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -55,15 +51,11 @@ Pointer to an integer that holds the size, in bytes, of the described register
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_dev_regsize()\fR function returns the size, in bytes, of the device
 register specified by \fIdip\fR and \fIrnumber\fR. This is useful when, for
 example, one of the registers is a frame buffer with a varying size known only
 to its proms.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_dev_regsize()\fR function returns:
 .sp
 .ne 2
@@ -85,13 +77,9 @@ An invalid (nonexistent) register number was specified.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_dev_regsize()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_dev_nintrs\fR(9F), \fBddi_dev_nregs\fR(9F)
 .sp
 .LP

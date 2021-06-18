@@ -7,7 +7,6 @@
 .SH NAME
 kiconv \- buffer-based code conversion function
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -20,12 +19,8 @@ kiconv \- buffer-based code conversion function
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
-.LP
 The parameters for the \fBkiconv\fR function are as follows:
 .sp
 .ne 2
@@ -130,8 +125,6 @@ The \fIcd\fR input parameter is not a valid open code conversion descriptor.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBkiconv()\fR function converts the sequence of characters from one
 \fBcodeset\fR, in the array specified by \fIinbuf\fR, into a sequence of
 corresponding characters in another \fBcodeset\fR, in the array specified by
@@ -180,8 +173,6 @@ for which an identical character does not exist in the target \fBcodeset\fR,
 \fBkiconv()\fR performs an implementation-defined conversion (that is, a
 non-identical conversion) on this character.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBkiconv()\fR function updates the variables pointed to by the parameters
 to reflect the extent of the conversion and returns the number of non-identical
 conversions performed. If the entire string in the input buffer is converted,
@@ -191,11 +182,8 @@ stopped due to any conditions mentioned above, the value pointed to by
 If such and other error occurs, \fBkiconv()\fR returns (\fBsize_t\fR)-1 and
 sets \fIerrno\fR to indicate the error.
 .SH CONTEXT
-.sp
-.LP
 \fBkiconv()\fR can be called from user or interrupt context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRPerforming a Simple Conversion
 .sp
 .LP
@@ -265,8 +253,6 @@ doconv_error_return:
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -281,8 +267,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBiconv\fR(3C), \fBiconv_close\fR(3C), \fBiconv_open\fR(3C),
 \fBu8_strcmp\fR(3C), \fBu8_textprep_str\fR(3C), \fBu8_validate\fR(3C),
 \fBuconv_u16tou32\fR(3C), \fBuconv_u16tou8\fR(3C), \fBuconv_u32tou16\fR(3C),
@@ -299,7 +283,5 @@ The Unicode Standard:
 .LP
 http://www.unicode.org/standard/standard.html
 .SH NOTES
-.sp
-.LP
 The \fBiconv\fR(3C) man page also has a good example code that can be
 referenced.

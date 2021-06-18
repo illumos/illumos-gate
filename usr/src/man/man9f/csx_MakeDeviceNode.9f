@@ -8,7 +8,6 @@
 csx_MakeDeviceNode, csx_RemoveDeviceNode \- create and remove minor nodes on
 behalf of the client
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -23,11 +22,8 @@ behalf of the client
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR \fR
@@ -46,14 +42,10 @@ Pointer to a \fBmake_device_node_t\fR or \fBremove_device_node_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBcsx_MakeDeviceNode()\fR and \fBcsx_RemoveDeviceNode()\fR are
-Solaris-specific extensions to allow the client to request that device nodes in
+illumos-specific extensions to allow the client to request that device nodes in
 the filesystem are created or removed, respectively, on its behalf.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBmake_device_node_t\fR are:
 .sp
 .in +2
@@ -174,7 +166,6 @@ will be removed from the filesystem.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -229,12 +220,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_RegisterClient\fR(9F), \fBddi_create_minor_node\fR(9F),
 \fBddi_remove_minor_node\fR(9F)
 .sp

@@ -7,7 +7,6 @@
 .SH NAME
 u8_validate \- validate UTF-8 characters and calculate the byte length
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -18,11 +17,8 @@ u8_validate \- validate UTF-8 characters and calculate the byte length
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIu8str\fR\fR
@@ -156,20 +152,15 @@ range of the Unicode coding space.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBu8_validate()\fR function validates \fIu8str\fR in UTF-8 and determines
 the number of bytes constituting the character(s) pointed to by \fIu8str\fR.
 .SH RETURN VALUES
-.sp
-.LP
 If \fIu8str\fR is a null pointer, \fBu8_validate()\fR returns 0. Otherwise,
 \fBu8_validate()\fR returns either the number of bytes that constitute the
 characters if the next \fIn\fR or fewer bytes form valid characters, or -1 if
 there is an validation failure, in which case it may set \fIerrno\fR to
 indicate the error.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDetermine the length of the first UTF-8 character.
 .sp
 .in +2
@@ -272,8 +263,6 @@ if (len == -1) {
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -288,8 +277,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBu8_strcmp\fR(3C), \fBu8_textprep_str\fR(3C), \fBu8_validate\fR(3C),
 \fBattributes\fR(5), \fBu8_strcmp\fR(9F), \fBu8_textprep_str\fR(9F),
 \fBuconv_u16tou32\fR(9F)

@@ -8,7 +8,6 @@
 scsi_hba_init, scsi_hba_fini \- SCSI Host Bus Adapter system initialization and
 completion routines
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -23,11 +22,8 @@ completion routines
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImodlp\fR \fR
@@ -38,8 +34,6 @@ Pointer to the Host Bus Adapters module linkage structure.
 
 .SH DESCRIPTION
 .SS "\fBscsi_hba_init()\fR"
-.sp
-.LP
 \fBscsi_hba_init()\fR is the system-provided initialization routine for
 \fBSCSI\fR \fBHBA\fR drivers.  The \fBscsi_hba_init()\fR function registers the
 \fBHBA\fR in the system and allows the driver to accept configuration requests
@@ -49,35 +43,25 @@ be called in the \fBHBA\fR's \fB_init\fR(9E) routine before
 \fBHBA\fR's \fB_init\fR(9E) should call \fBscsi_hba_fini()\fR before returning
 failure.
 .SS "\fBscsi_hba_fini()\fR"
-.sp
-.LP
 \fBscsi_hba_fini()\fR is the system provided completion routine for \fBSCSI\fR
 \fBHBA\fR drivers. \fBscsi_hba_fini()\fR removes all of the system references
 for the \fBHBA\fR that were created in \fBscsi_hba_init()\fR. The
 \fBscsi_hba_fini()\fR routine should be called in the \fBHBA\fR's
 \fB_fini\fR(9E) routine if \fBmod_remove\fR(9F) is successful.
 .SH RETURN VALUES
-.sp
-.LP
 \fBscsi_hba_init()\fR returns \fB0\fR if successful, and a non-zero value
 otherwise. If \fBscsi_hba_init()\fR fails, the HBA's \fB_init()\fR entry point
 should return the value returned by \fBscsi_hba_init()\fR.
 .SH CONTEXT
-.sp
-.LP
 \fBscsi_hba_init()\fR and \fBscsi_hba_fini()\fR should be called from
 \fB_init\fR(9E) or \fB_fini\fR(9E), respectively.
 .SH SEE ALSO
-.sp
-.LP
 \fB_fini\fR(9E), \fB_init\fR(9E), \fBmod_install\fR(9F), \fBmod_remove\fR(9F),
 \fBscsi_pktalloc\fR(9F), \fBscsi_pktfree\fR(9F), \fBscsi_hba_tran\fR(9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 The \fBHBA\fR is responsible for ensuring that no \fBDDI\fR request routines
 are called on behalf of its \fBSCSI\fR target drivers once
 \fBscsi_hba_fini()\fR is called.

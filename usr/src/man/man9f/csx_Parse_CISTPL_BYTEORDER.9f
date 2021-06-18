@@ -8,7 +8,6 @@
 .SH NAME
 csx_Parse_CISTPL_BYTEORDER \- parse the Byte Order tuple
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -19,11 +18,8 @@ csx_Parse_CISTPL_BYTEORDER \- parse the Byte Order tuple
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR \fR
@@ -53,8 +49,6 @@ Pointer to a \fBcistpl_byteorder_t\fR structure which contains the parsed
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function parses the Byte Order tuple, \fBCISTPL_BYTEORDER\fR, into a form
 usable by \fBPC \fRCard drivers.
 .sp
@@ -63,8 +57,6 @@ The \fBCISTPL_BYTEORDER\fR tuple shall only appear in a partition tuple set for
 a memory-like partition. It specifies two parameters: the order for multi-byte
 data, and the order in which bytes map into words for 16-bit cards.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcistpl_byteorder_t\fR are:
 .sp
 .in +2
@@ -141,7 +133,6 @@ Vendor specific mapping
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -196,12 +187,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_RegisterClient\fR(9F), \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)
 .sp

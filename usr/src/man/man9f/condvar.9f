@@ -9,7 +9,6 @@
 condvar, cv_init, cv_destroy, cv_wait, cv_signal, cv_broadcast, cv_wait_sig,
 cv_timedwait, cv_timedwait_sig \- condition variable routines
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ksynch.h>
 
@@ -66,8 +65,7 @@ cv_timedwait, cv_timedwait_sig \- condition variable routines
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -186,7 +184,6 @@ and
 .RE
 
 .SH DESCRIPTION
-.LP
 Condition variables are a standard form of thread synchronization. They are
 designed to be used with mutual exclusion locks (mutexes). The associated mutex
 is used to ensure that a condition can be checked atomically and that the
@@ -290,7 +287,6 @@ or \fBcv_broadcast()\fR, or due to a premature wakeup (see NOTES).
 .RE
 
 .SH CONTEXT
-.LP
 These functions can be called from user, kernel or interrupt context. In most
 cases, however, \fBcv_wait()\fR, \fBcv_timedwait()\fR, \fBcv_wait_sig()\fR,
 \fBcv_timedwait_sig()\fR, \fBcv_reltimedwait()\fR, and
@@ -313,7 +309,6 @@ serviced. In general, situations like this are hard to predict, so it is
 advisable to avoid waiting on condition variables or semaphores in an interrupt
 context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRWaiting for a Flag Value in a Driver's Unit
 .sp
 .LP
@@ -342,7 +337,7 @@ unblock any threads blocked by the above code.
 .sp
 .in +2
 .nf
-	
+
 mutex_enter(&un->un_lock);
 un->un_flag &= ~UNIT_BUSY;
 cv_broadcast(&un->un_cv);
@@ -351,7 +346,6 @@ mutex_exit(&un->un_lock);
 .in -2
 
 .SH NOTES
-.LP
 It is possible for \fBcv_wait()\fR, \fBcv_wait_sig()\fR, \fBcv_timedwait()\fR,
 \fBcv_timedwait_sig()\fR, \fBcv_reltimedwait()\fR, and
 \fBcv_reltimedwait_sig()\fR to return prematurely, that is, not due to a call to
@@ -378,7 +372,6 @@ processes, users of these functions may need to protect against waiting
 indefinitely for events that might not occur. The \fBddi_can_receive_sig\fR(9F)
 function is provided to detect when signal reception is possible.
 .SH SEE ALSO
-.LP
 \fBkill\fR(2), \fBddi_can_receive_sig\fR(9F), \fBddi_get_lbolt\fR(9F),
 \fBdrv_usectohz\fR(9F) \fBmutex\fR(9F), \fBmutex_init\fR(9F),
 .sp

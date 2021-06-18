@@ -9,7 +9,6 @@
 kmem_cache_create, kmem_cache_alloc, kmem_cache_free, kmem_cache_destroy,
 kmem_cache_set_move \- kernel memory cache allocator operations
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -63,10 +62,8 @@ kmem_cache_set_move \- kernel memory cache allocator operations
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.LP
 The parameters for the \fBkmem_cache_*\fR functions are as follows:
 .sp
 .ne 2
@@ -299,7 +296,6 @@ typically a pointer to the \fBsoft-state\fR structure.
 .RE
 
 .SH DESCRIPTION
-.LP
 In many cases, the cost of initializing and destroying an object exceeds the
 cost of allocating and freeing memory for it. The functions described here
 address this condition.
@@ -562,7 +558,6 @@ it.
 .RE
 
 .SH CONTEXT
-.LP
 Constructors can be invoked during any call to \fBkmem_cache_alloc()\fR, and
 will run in that context. Similarly, destructors can be invoked during any call
 to \fBkmem_cache_free()\fR, and can also be invoked during
@@ -596,7 +591,6 @@ many clients register a \fBmove()\fR function, the allocator never tries to
 move more than one object at a time. Neither the allocator nor the client can
 be assumed to know the object's whereabouts at the time of the callback.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRObject Caching
 .sp
 .LP
@@ -715,7 +709,6 @@ kmem_cache_set_move(object_cache, object_move);
 .in -2
 
 .SH RETURN VALUES
-.LP
 If successful, the constructor function must return \fB0\fR. If KM_NOSLEEP is
 set and memory cannot be allocated without sleeping, the constructor must
 return -\fB1\fR.
@@ -728,7 +721,6 @@ If successful, \fBkmem_cache_alloc()\fR returns a pointer to the allocated
 object. If \fBKM_NOSLEEP\fR is set and memory cannot be allocated without
 sleeping, \fBkmem_cache_alloc()\fR returns \fBNULL\fR.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -743,7 +735,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBcondvar\fR(9F), \fBkmem_alloc\fR(9F), \fBmutex\fR(9F), \fBkstat\fR(9S)
 .sp
 .LP
@@ -758,7 +749,6 @@ J.; USENIX Summer 1994 Technical Conference (1994).
 Resources\fR, Bonwick, J. and Adams, J.; USENIX 2001 Technical Conference
 (2001).
 .SH NOTES
-.LP
 The constructor must be immediately reversible by the destructor, since the
 allocator may call the constructor and destructor on objects still under its
 control at any time without client involvement.

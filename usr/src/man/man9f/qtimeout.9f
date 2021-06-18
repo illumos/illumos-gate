@@ -8,7 +8,6 @@
 .SH NAME
 qtimeout \- execute a function after a specified length of time
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/ddi.h>
@@ -19,11 +18,8 @@ qtimeout \- execute a function after a specified length of time
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIq\fR\fR
@@ -61,8 +57,6 @@ Number of clock ticks to wait before the function is called. Use
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBqtimeout()\fR function schedules the specified function \fIfunc\fR to be
 called after a specified time interval. \fIfunc\fR is called with \fIarg\fR as
 a parameter. Control is immediately returned to the caller. This is useful when
@@ -84,19 +78,13 @@ close  routine calls \fBqprocsoff\fR(9F).
 .LP
 The \fBqprocson\fR(9F) function must be called before calling \fBqtimeout()\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBqtimeout()\fR function returns an opaque non-zero \fBtimeout\fR
 identifier that can be passed to \fBquntimeout\fR(9F) to cancel the request.
 Note: No value is returned from the called function.
 .SH CONTEXT
-.sp
-.LP
 The \fBqtimeout()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-.sp
-.LP
 \fBdrv_usectohz\fR(9F), \fBmt-streams\fR(9F), \fBqbufcall\fR(9F),
 \fBqprocson\fR(9F), \fBqunbufcall\fR(9F), \fBquntimeout\fR(9F)
 .sp

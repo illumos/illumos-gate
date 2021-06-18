@@ -7,7 +7,6 @@
 .SH NAME
 usb_create_pm_components \- Create power management components for USB devices
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/usb/usba.h>
 
@@ -17,11 +16,8 @@ usb_create_pm_components \- Create power management components for USB devices
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -77,8 +73,6 @@ Corresponds to USB_DEV_OS_PWR_0 or no power.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBusb_create_pm_components()\fR function creates pm component properties
 that assume the standard USB D0-D3 powerlevels (USB_DEV_PWR_D0 -
 USB_DEV_PWR_D3). See the device's relevant USB descriptor to determine the
@@ -91,7 +85,6 @@ Note that these USB power levels are inverse of OS power levels. For example,
 USB_DEV_OS_PWR_0 and USB_DEV_PWR_D3 are equivalent levels corresponding to
 powered-down.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fBUSB_SUCCESS\fR
@@ -110,11 +103,8 @@ An error occurred.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 May be called from user or kernel context.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
    uint_t *pwrstates;
@@ -128,8 +118,6 @@ May be called from user or kernel context.
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -146,8 +134,6 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBusb_clr_feature\fR(9F),
 \fBusb_register_hotplug_cbs\fR(9F), \fBusb_get_cfg\fR(9F),
 \fBusb_get_dev_data\fR(9F), \fBusb_handle_remote_wakeup\fR(9F),

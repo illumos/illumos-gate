@@ -7,23 +7,17 @@
 .SH NAME
 modlinkage \- module linkage structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/modctl.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmodlinkage\fR structure is provided by the module writer to the routines
 that install, remove, and retrieve information from a module. See
 \fB_init\fR(9E), \fB_fini\fR(9E), and \fB_info\fR(9E).
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 int    ml_rev
@@ -52,8 +46,6 @@ have only one linkage structure.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBadd_drv\fR(1M), \fB_fini\fR(9E), \fB_info\fR(9E), \fB_init\fR(9E),
 \fBmodldrv\fR(9S), \fBmodlstrmod\fR(9S)
 .sp

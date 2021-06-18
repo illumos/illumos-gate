@@ -8,7 +8,6 @@
 .SH NAME
 scsi_init_pkt \- prepare a complete SCSI packet
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -20,11 +19,8 @@ scsi_init_pkt \- prepare a complete SCSI packet
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIap\fR\fR
@@ -154,8 +150,6 @@ The \fIcallback\fR function argument.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 Target drivers use \fBscsi_init_pkt()\fR to request the transport layer to
 allocate and initialize a packet for a \fBSCSI\fR command which possibly
 includes a data transfer. If \fIpktp\fR is \fINULL,\fR a new \fBscsi_pkt\fR(9S)
@@ -275,21 +269,16 @@ When allocating \fBDMA\fR resources, \fBscsi_init_pkt()\fR returns the
 the system was unable to allocate \fBDMA\fR resources.  A \fBpkt_resid\fR of
 \fB0\fR means that all necessary \fBDMA\fR resources were allocated.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBscsi_init_pkt()\fR function returns \fINULL\fR if the packet or
 \fBDMA\fR resources could not be allocated. Otherwise, it returns a pointer to
 an initialized \fBscsi_pkt\fR(9S). If \fIpktp\fR was not \fINULL\fR the return
 value will be \fIpktp\fR on successful initialization of the packet.
 .SH CONTEXT
-.sp
-.LP
 If \fIcallback\fR is \fBSLEEP_FUNC\fR, then this routine can be called only
 from user-level code. Otherwise, it can be called from user, interrupt, or
 kernel context. The \fIcallback\fR function may not block or call routines that
 block.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAllocating a Packet Without \fBDMA\fR Resources Attached
 .sp
 .LP
@@ -368,8 +357,6 @@ my_pkt = scsi_init_pkt(&devp->sd_address, NULL, bp, CDB_GROUP0,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_alloc_consistent_buf\fR(9F), \fBscsi_destroy_pkt\fR(9F),
 \fBscsi_dmaget\fR(9F), \fBscsi_pktalloc\fR(9F), \fBbuf\fR(9S),
 \fBscsi_address\fR(9S), \fBscsi_pkt\fR(9S)
@@ -377,8 +364,6 @@ my_pkt = scsi_init_pkt(&devp->sd_address, NULL, bp, CDB_GROUP0,
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 If a \fBDMA\fR allocation request fails with \fBDDI_DMA_NOMAPPING\fR, the
 \fBB_ERROR\fR flag will be set in \fIbp\fR, and the \fBb_error\fR field will be
 set to \fBEFAULT\fR.

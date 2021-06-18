@@ -9,7 +9,6 @@ ddi_cred, crgetuid, crgetruid, crgetsuid, crgetgid, crgetrgid, crgetsgid,
 crgetzoneid, crgetgroups, crgetngroups \- access and change parts of the cred_t
 structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/cred.h>
 
@@ -79,11 +78,8 @@ structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIcr\fR\fR
@@ -129,8 +125,6 @@ pointer to array of new groups
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The user credential is a shared, read-only, ref-counted data structure. Its
 actual size and layout are subject to change. The functions described in this
 page allow the programmer to retrieve fields from the structure and to
@@ -180,8 +174,6 @@ to \fIgid\fR.
 It is an error to call this any of the \fBcrset*()\fR functions on a user
 credential structure that was newly allocated.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBcrget*()\fR functions return the requested information.
 .sp
 .LP
@@ -189,12 +181,8 @@ The \fBcrset*id()\fR functions return 0 on success and -1 if any of the
 specified ids are invalid. The functions might cause a system panic if called
 on a user credential structure that is referenced by other parts of the system.
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user and kernel contexts.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -211,8 +199,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBprivileges\fR(5), \fBdrv_priv\fR(9F)
 .sp
 .LP

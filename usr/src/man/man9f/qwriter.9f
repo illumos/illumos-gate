@@ -7,7 +7,6 @@
 .SH NAME
 qwriter \- asynchronous STREAMS perimeter upgrade
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/ddi.h>
@@ -18,11 +17,8 @@ qwriter \- asynchronous STREAMS perimeter upgrade
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIqp\fR \fR
@@ -60,8 +56,6 @@ Either \fBPERIM_INNER\fR or \fBPERIM_OUTER\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBqwriter()\fR is used to upgrade the access at either the inner or the outer
 perimeter from shared to exclusive and call the specified callback function
 when the upgrade has succeeded. See \fBmt-streams\fR(9F). The callback function
@@ -90,14 +84,10 @@ framework will prevent other messages from entering the inner perimeter
 associated with the queue until the upgrade has completed and the callback
 function has finished executing.
 .SH CONTEXT
-.sp
-.LP
 \fBqwriter()\fR can only be called from an \fBput\fR(9E) or \fBsrv\fR(9E)
 routine, or from a \fBqwriter()\fR, \fBqtimeout\fR(9F), or \fBqbufcall\fR(9F)
 callback function.
 .SH SEE ALSO
-.sp
-.LP
 \fBput\fR(9E), \fBsrv\fR(9E), \fBmt-streams\fR(9F), \fBqbufcall\fR(9F),
 \fBqtimeout\fR(9F)
 .sp

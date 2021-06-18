@@ -12,7 +12,7 @@ ddi_remove_minor_node \- remove a minor node for this dev_info
 .fi
 
 .SH INTERFACE LEVEL
-Solaris \fBDDI\fR specific (Solaris \fBDDI\fR).
+illumos \fBDDI\fR specific (illumos \fBDDI\fR).
 .SH PARAMETERS
 .ne 2
 .na

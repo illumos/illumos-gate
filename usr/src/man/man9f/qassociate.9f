@@ -7,7 +7,6 @@
 .SH NAME
 qassociate \- associate STREAMS queue with driver instance
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -19,11 +18,8 @@ qassociate \- associate STREAMS queue with driver instance
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fBqueue_t *\fIq\fR\fR
@@ -43,8 +39,6 @@ Driver instance number or -1.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBqassociate()\fR function must be used by \fBDLPI\fR style 2 device
 drivers to manage the association between STREAMS queues and device instances.
 The \fBgld\fR(7D) does this automatically on behalf of drivers based on it. It
@@ -75,12 +69,9 @@ specified instance. Any prior association is left untouched.
 The interface typically fails because of failure to locate and attach the
 device instance. The interface never fails if the specified instance is -1.
 .SH CONTEXT
-.sp
-.LP
 The \fBqassociate()\fR function can be called from the stream's \fBput\fR(9E)
 entry point.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -99,8 +90,6 @@ Failure.
 .RE
 
 .SH EXAMPLES
-.sp
-.LP
 DLPI style 2 network driver \fBDL_ATTACH_REQ\fR code specifies:
 .sp
 .in +2
@@ -142,7 +131,5 @@ qassociate(q, -1);
 This informs the framework that this driver has been modified to be
 DDI-compliant.
 .SH SEE ALSO
-.sp
-.LP
 \fBdlpi\fR(7P), \fBgld\fR(7D), \fBopen\fR(9E), \fBput\fR(9E),
 \fBddi_no_info\fR(9F), \fBqueue\fR(9S)

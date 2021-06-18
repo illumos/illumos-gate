@@ -7,7 +7,6 @@
 .SH NAME
 kstat \- kernel statistics structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -16,12 +15,8 @@ kstat \- kernel statistics structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 Each kernel statistic (\fBkstat\fR) exported by device drivers consists of a
 header section and a data section. The \fBkstat\fR structure is the header
 portion of the statistic.
@@ -35,7 +30,6 @@ structure in any other manner.
 After allocation, the driver should perform any further initialization needed
 before calling \fBkstat_install\fR(9F) to actually export the \fBkstat\fR.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 void      *ks_data;             /* kstat type-specif. data */
@@ -129,8 +123,6 @@ data structures.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBkstat_create\fR(9F)
 .sp
 .LP

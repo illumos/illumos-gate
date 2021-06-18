@@ -7,7 +7,6 @@
 .SH NAME
 ddi_report_dev \- announce a device
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -19,11 +18,8 @@ ddi_report_dev \- announce a device
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR \fR
@@ -33,19 +29,13 @@ a pointer the device's \fBdev_info\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_report_dev()\fR prints a banner at boot time,  announcing the device
 pointed to by \fIdip\fR. The banner is always placed in the system logfile
 (displayed by \fBdmesg\fR(1M)), but is only displayed on the console if the
 system was booted with the verbose (\fB-v\fR) argument.
 .SH CONTEXT
-.sp
-.LP
 \fBddi_report_dev()\fR can be called from user context.
 .SH SEE ALSO
-.sp
-.LP
 \fBdmesg\fR(1M), \fBkernel\fR(1M)
 .sp
 .LP

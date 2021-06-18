@@ -8,7 +8,6 @@
 ddi_modopen, ddi_modsym, ddi_modclose \- dynamically-loaded kernel module
 functions
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/modctl.h>
 
@@ -28,11 +27,8 @@ functions
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImodname\fR\fR
@@ -94,8 +90,6 @@ Symbol's name as a character string.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The function prototypes for \fBddi_modopen()\fR, \fBddi_modsym()\fR, and
 \fBddi_modclose()\fR are modeled after the userland \fBlibdl\fR(3LIB),
 \fBdlopen\fR(3C), \fBdlsym\fR(3C), and \fBdlclose\fR(3C) interfaces, however
@@ -163,8 +157,6 @@ panic). When the last \fBddi_modclose()\fR of a module occurs, and there are no
 further references to the module, the module \fB_fini\fR(9E)entry point may be
 called. If \fB_fini\fR returns success then the module may be unloaded.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_modopen()\fR function returns a handle to the dynamically-loaded
 kernel module. The \fBddi_modopen()\fR function returns \fBNULL\fR if the
 module cannot be found, the object cannot be relocated, or an error occurs
@@ -183,11 +175,8 @@ When either \fBddi_modopen()\fR or \fBddi_modsym()\fR return \fBNULL\fR,
 additional \fIerrno\fR information related to the failure is returned in
 \fI*errnop\fR if it is not \fBNULL\fR.
 .SH CONTEXT
-.sp
-.LP
 \fBddi_modopen()\fR can be called from user context only.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCoding a Dynamically Loaded Kernel Module
 .sp
 .LP
@@ -299,8 +288,6 @@ rv = ddi_modclose(modp);
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdlclose\fR(3C), \fBdlopen\fR(3C), \fBdlsym\fR(3C), \fBlibdl\fR(3LIB),
 \fBboot\fR(1M), \fBelfwrap\fR(1), \fBmodload\fR(1M), \fBsystem\fR(4),
 \fB_fini\fR(9E), \fB_info\fR(9E), \fB_init\fR(9E)
@@ -308,8 +295,6 @@ rv = ddi_modclose(modp);
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
-.LP
 A \fBsystem\fR(4)forceload must be established for modules targeted by
 \fBddi_modopen()\fR by code involved in the mount of root on "bootdev" during
 machine \fBboot\fR(1M).

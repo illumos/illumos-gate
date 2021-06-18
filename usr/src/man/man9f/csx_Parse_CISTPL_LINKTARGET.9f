@@ -7,7 +7,6 @@
 .SH NAME
 csx_Parse_CISTPL_LINKTARGET \- parse the Link Target tuple
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,11 +16,8 @@ csx_Parse_CISTPL_LINKTARGET \- parse the Link Target tuple
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR \fR
@@ -51,8 +47,6 @@ Pointer to a \fBcistpl_linktarget_t\fR structure which contains the parsed
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function parses the Link Target tuple, \fBCISTPL_LINKTARGET,\fR into a
 form usable by \fBPC\fRCard drivers.
 .sp
@@ -61,8 +55,6 @@ The \fBCISTPL_LINKTARGET\fR tuple is used to verify that tuple chains other
 than the primary chain are valid. All secondary tuple chains are required to
 contain this tuple as the first tuple of the chain.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcistpl_linktarget_t\fR are:
 .sp
 .in +2
@@ -94,7 +86,6 @@ This field provides the Link Target tuple information.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR \fR
@@ -149,12 +140,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_RegisterClient\fR(9F), \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)
 .sp

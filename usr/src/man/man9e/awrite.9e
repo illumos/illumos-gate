@@ -20,7 +20,7 @@ awrite \- asynchronous write to a device
 .fi
 
 .SH INTERFACE LEVEL
-Solaris \fBDDI \fRspecific (Solaris DDI). This entry point is optional. Drivers
+illumos \fBDDI \fRspecific (illumos DDI). This entry point is optional. Drivers
 that do not support an \fBawrite()\fR entry point should use \fBnodev\fR(9F)
 .SH PARAMETERS
 .ne 2

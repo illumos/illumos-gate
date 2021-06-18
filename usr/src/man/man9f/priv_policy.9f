@@ -8,7 +8,6 @@
 priv_policy, priv_policy_only, priv_policy_choice \- check, report, and audit
 privileges
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/policy.h>
 
@@ -29,11 +28,8 @@ privileges
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIcr\fR\fR
@@ -83,8 +79,6 @@ included in the output, NULL is usually the best value to pass as a parameter.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions aid in privilege checking and privilege debugging.
 .sp
 .LP
@@ -106,8 +100,6 @@ and has no side effects.
 The \fBpriv_policy_choice()\fR function behaves like \fBpriv_policy_only()\fR
 but records the successfully used non-basic privileges in the audit trail.
 .SH RETURN VALUES
-.sp
-.LP
 On success, \fBpriv_policy()\fR return 0. On failure it returns its parameter
 \fIerr\fR.
 .sp
@@ -115,7 +107,6 @@ On success, \fBpriv_policy()\fR return 0. On failure it returns its parameter
 On success, \fBpriv_policy_choice()\fR and \fBpriv_policy_only()\fR return 1,
 on failure both return 0.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEINVAL\fR\fR
@@ -162,12 +153,8 @@ An attempt was made to allocate a privilege that was longer than
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This functions can be called from user, interrupt, or kernel context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -182,8 +169,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBacct\fR(3HEAD), \fBattributes\fR(5), \fBprivileges\fR(5)
 .sp
 .LP

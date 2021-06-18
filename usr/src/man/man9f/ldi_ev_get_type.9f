@@ -7,7 +7,6 @@
 .SH NAME
 ldi_ev_get_type \- get event name string from event cookie
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunldi.h>
 
@@ -15,11 +14,8 @@ ldi_ev_get_type \- get event name string from event cookie
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIldi_ev_cookie_t cookie\fR\fR
@@ -31,21 +27,13 @@ An opaque event cookie for the event type returned by a previous call to
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBldi_ev_get_type()\fR function returns the event string represented by
 the \fBLDI\fR event cookie "\fBcookie\fR".
 .SH RETURN VALUES
-.sp
-.LP
 On success, this function returns the event string represented by
 "\fBcookie\fR". On failure, this function returns \fBNULL\fR.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user and kernel contexts only.
 .SH SEE ALSO
-.sp
-.LP
 \fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F),
 \fBldi_ev_remove_callbacks\fR(9F)

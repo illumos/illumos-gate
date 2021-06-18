@@ -10,7 +10,6 @@ ddi_soft_state, ddi_get_soft_state, ddi_soft_state_fini, ddi_soft_state_free,
 ddi_soft_state_init, ddi_soft_state_zalloc \- driver soft state utility
 routines
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -41,11 +40,8 @@ routines
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIstate_p\fR\fR
@@ -95,8 +91,6 @@ associated devinfo node.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 Most device drivers maintain state information with each instance of the device
 they control; for example, a soft copy of a device control register, a mutex
 that must be held while accessing a piece of hardware, a partition table, or a
@@ -151,8 +145,6 @@ The \fBddi_soft_state_zalloc()\fR, \fBddi_soft_state_free()\fR and
 \fBddi_get_soft_state()\fR routines coordinate access to the underlying data
 structures in an MT-safe fashion, thus no additional locks should be necessary.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_get_soft_state()\fR
 .sp
 .ne 2
@@ -218,8 +210,6 @@ allocate an item number that was already allocated.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_soft_state_init()\fR and \fBddi_soft_state_alloc()\fR functions can
 be called from user or kernel context only, since they may internally call
 \fBkmem_zalloc\fR(9F) with the \fBKM_SLEEP\fR flag.
@@ -228,7 +218,6 @@ be called from user or kernel context only, since they may internally call
 The \fBddi_soft_state_fini()\fR, \fBddi_soft_state_free()\fR and
 \fBddi_get_soft_state()\fR routines can be called from any driver context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCreating and Removing Data Structures
 .sp
 .LP
@@ -284,7 +273,7 @@ xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
       if (ddi_soft_state_zalloc(statep, instance) != DDI_SUCCESS)
 	         return (DDI_FAILURE);
 	      softc = ddi_get_soft_state(statep, instance);
-	      softc->dip = dip;	
+	      softc->dip = dip;
 	      ...
 	      return (DDI_SUCCESS);
    default:
@@ -328,28 +317,20 @@ xxopen(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fB_fini\fR(9E), \fB_init\fR(9E), \fBattach\fR(9E), \fBdetach\fR(9E),
 \fBddi_get_instance\fR(9F), \fBgetminor\fR(9F), \fBkmem_zalloc\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
-.LP
 There is no attempt to validate the \fBitem\fR parameter given to
 \fBddi_soft_state_zalloc()\fR other than it must be a positive signed integer.
 Therefore very large item numbers may cause the driver to hang forever waiting
 for virtual memory resources that can never be satisfied.
 .SH NOTES
-.sp
-.LP
 If necessary, a hierarchy of state structures can be constructed by embedding
 state pointers in higher order state structures.
 .SH DIAGNOSTICS
-.sp
-.LP
 All of the messages described below usually indicate bugs in the driver and
 should not appear in normal operation of the system.
 .sp

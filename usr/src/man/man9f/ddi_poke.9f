@@ -8,7 +8,6 @@
 ddi_poke, ddi_poke8, ddi_poke16, ddi_poke32, ddi_poke64, ddi_pokec, ddi_pokes,
 ddi_pokel, ddi_poked \- write a value to a location
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -34,14 +33,11 @@ ddi_pokel, ddi_poked \- write a value to a location
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI). The \fBddi_pokec()\fR, \fBddi_pokes()\fR,
+illumos DDI specific (illumos DDI). The \fBddi_pokec()\fR, \fBddi_pokes()\fR,
 \fBddi_pokel()\fR, and \fBddi_poked()\fR functions are obsolete. Use,
 respectively, \fBddi_poke8()\fR, \fBddi_poke16()\fR, \fBddi_poke32()\fR, and
 \fBddi_poke64()\fR, instead.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -69,8 +65,6 @@ Value to be written to the location.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These routines cautiously attempt to write a value to a specified virtual
 address, using the parent nexus driver to assist in the process where
 necessary.
@@ -88,7 +82,6 @@ routines.
 On multiprocessing machines these routines can be extremely heavy-weight, so
 use the \fBddi_peek\fR(9F) routines instead if possible.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR\fR
@@ -107,19 +100,13 @@ An error occurred while trying to write to the location.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user, interrupt, or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBprobe\fR(9E), \fBddi_peek\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 The functions described in this manual page previously used symbolic names
 which specified their data access size; the function names have been changed so
 they now specify a fixed-width data size. See the following table for the new

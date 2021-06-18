@@ -7,7 +7,6 @@
 .SH NAME
 ddi_strtol \- String conversion routines
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -17,11 +16,8 @@ ddi_strtol \- String conversion routines
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIstr\fR \fR
@@ -58,8 +54,6 @@ Pointer to variable which contains the converted value.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_strtol()\fR function converts the initial portion of the string
 pointed to by \fIstr\fR to a type \fBlong\fR int representation and stores the
 converted value in result.
@@ -132,8 +126,6 @@ If the subject sequence is empty or does not have the expected form, no
 conversion is performed and the value of \fIstr\fR is stored in the object
 pointed to by \fIendptr\fR, provided  that \fIendptr\fR is not a null pointer.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBddi_strtol()\fR returns \fB0\fR and stores the
 converted value in \fIresult\fR. If no conversion is performed due to invalid
 \fIbase\fR, \fBddi_strtol()\fR returns \fBEINVAL\fR and the variable pointed by
@@ -144,11 +136,7 @@ If the correct value is outside the range  of representable values,
 \fBddi_strtol()\fR returns \fBERANGE\fR and the value pointed to by
 \fIresult\fR is not changed.
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_strtol()\fR function may be called from user, kernel or interrupt
 context.
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR

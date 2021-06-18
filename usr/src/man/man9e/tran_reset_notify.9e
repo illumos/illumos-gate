@@ -7,7 +7,6 @@
 .SH NAME
 tran_reset_notify \- request to notify SCSI target of bus reset
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -18,11 +17,8 @@ tran_reset_notify \- request to notify SCSI target of bus reset
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIap\fR \fR
@@ -59,8 +55,6 @@ The callback function argument.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBtran_reset_notify()\fR entry point is called when a target driver
 requests notification of a bus reset.
 .sp
@@ -98,8 +92,6 @@ registered by the target drivers.   When a bus reset occurs, the  \fBHBA
 \fRdriver notifies registered target drivers by calling the callback routine,
 \fIcallback\fR, with the argument, \fIarg\fR, for each registered target.
 .SH RETURN VALUES
-.sp
-.LP
 For \fBSCSI_RESET_NOTIFY\fR requests,  \fBtran_reset_notify()\fR must return
 \fBDDI_SUCCESS\fR if the notification request has been accepted, and
 \fBDDI_FAILURE\fR otherwise.
@@ -109,8 +101,6 @@ For \fBSCSI_RESET_CANCEL\fR requests,  \fBtran_reset_notify()\fR must return
 \fBDDI_SUCCESS\fR if the notification request has been canceled, and
 \fBDDI_FAILURE\fR otherwise.
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBscsi_ifgetcap\fR(9F), \fBscsi_reset_notify\fR(9F),
 \fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S)
 .sp

@@ -7,7 +7,6 @@
 .SH NAME
 csx_Parse_CISTPL_CONFIG \- parse Configuration tuple
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -18,11 +17,8 @@ csx_Parse_CISTPL_CONFIG \- parse Configuration tuple
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR\fR
@@ -52,8 +48,6 @@ Pointer to a \fBcistpl_config_t\fR structure which contains the parsed
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function parses the Configuration tuple, \fBCISTPL_CONFIG,\fR into a form
 usable by \fBPC \fRCard drivers. The \fBCISTPL_CONFIG\fR tuple is used to
 describe the general characteristics of 16-bit \fBPC \fRCards containing \fBI/O
@@ -61,8 +55,6 @@ describe the general characteristics of 16-bit \fBPC \fRCards containing \fBI/O
 including Memory Only cards, which exceed nominal power supply specifications,
 or which need descriptions of their power requirements or other information.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcistpl_config_t\fR are:
 .sp
 .in +2
@@ -232,7 +224,6 @@ This field contains the value of the last valid configuration index for this
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -287,12 +278,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_Parse_CISTPL_CFTABLE_ENTRY\fR(9F), \fBcsx_RegisterClient\fR(9F),
 \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)
@@ -300,7 +287,5 @@ This function may be called from user or kernel context.
 .LP
 \fIPC Card 95 Standard, PCMCIA/JEIDA\fR
 .SH NOTES
-.sp
-.LP
 \fBPC \fRCard drivers should not attempt to use configurations beyond the
 "last" member in the \fBcistpl_config_t\fR structure.

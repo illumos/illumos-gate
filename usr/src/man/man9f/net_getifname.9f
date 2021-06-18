@@ -7,7 +7,6 @@
 .SH NAME
 net_getifname \- determine the name given to a network interface
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/neti.h>
 
@@ -16,11 +15,8 @@ net_getifname \- determine the name given to a network interface
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInet\fR\fR
@@ -58,16 +54,12 @@ size of the buffer in which to store the interface name.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnet_getifname()\fR function copies the name of the network interface
 into the buffer provided. The name will always be null-terminated. If the
 buffer is too small to fit both the interface name and the null-terminated
 name, the name in the buffer is truncated to fit. See \fBnet_phygetnext\fR(9F)
 for an example on how to use this function.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBnet_getifname()\fR function returns:
 .sp
 .ne 2
@@ -97,13 +89,9 @@ Unsuccessful.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBnet_getifname()\fR function may be called from user,  kernel, or
 interrupt context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -118,7 +106,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBnet_phygetnext\fR(9F), \fBnet_phylookup\fR(9F),
 \fBnet_protocol_lookup\fR(9F)

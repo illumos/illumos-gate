@@ -7,7 +7,6 @@
 .SH NAME
 kstat_named \- structure for named kstats
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -16,19 +15,14 @@ kstat_named \- structure for named kstats
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 Named \fBkstats\fR are an array of name-value pairs. These pairs are kept in
 the \fBkstat_named\fR structure. When a \fBkstat\fR is created by
 \fBkstat_create\fR(9F), the driver specifies how many of these structures will
 be allocated. The structures are returned as an array pointed to by the
 \fBks_data\fR field.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 union {
@@ -47,8 +41,6 @@ The only member exposed to drivers is the \fBvalue\fR member. This field is a
 union of several data types. The driver must specify which type it will use in
 the call to \fBkstat_named_init()\fR.
 .SH SEE ALSO
-.sp
-.LP
 \fBkstat_create\fR(9F), \fBkstat_named_init\fR(9F)
 .sp
 .LP

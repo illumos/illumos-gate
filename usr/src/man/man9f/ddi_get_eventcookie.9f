@@ -7,7 +7,6 @@
 .SH NAME
 ddi_get_eventcookie \- retrieve a NDI event service cookie handle
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/dditypes.h>
 #include <sys/sunddi.h>
@@ -17,11 +16,8 @@ ddi_get_eventcookie \- retrieve a NDI event service cookie handle
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fBdev_info_t *\fR\fIdip\fR\fR
@@ -52,8 +48,6 @@ Pointer to cookie where event cookie will be returned.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_get_eventcookie()\fR function queries the device tree for a cookie
 matching the given event name and returns a reference to that cookie. The
 search is performed by a calling up the device tree hierarchy until the request
@@ -64,7 +58,6 @@ reached.
 The cookie returned by this function can be used to register a callback
 handler, unregister a callback handler, or post an event.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR\fR
@@ -84,13 +77,9 @@ device tree hierarchy.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_get_eventcookie()\fR function can be called from user and kernel
 contexts only.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -105,8 +94,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBddi_add_event_handler\fR(9F),
 \fBddi_remove_event_handler\fR(9F)
 .sp

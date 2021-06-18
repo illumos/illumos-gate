@@ -8,7 +8,6 @@
 ddi_enter_critical, ddi_exit_critical \- enter and exit a critical region of
 control
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -25,11 +24,8 @@ control
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIddic\fR\fR
@@ -40,8 +36,6 @@ to \fBddi_exit_critical()\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 Nearly all driver operations can be done without any special synchronization
 and protection mechanisms beyond those provided by, for example, mutexes (see
 \fBmutex\fR(9F)). However, for certain devices there can exist a very short
@@ -57,17 +51,11 @@ The driver may not call any functions external to itself in between the time it
 calls \fBddi_enter_critical()\fR and the time it calls
 \fBddi_exit_critical()\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_enter_critical()\fR function returns an opaque unsigned integer
 which must be used in the subsequent call to \fBddi_exit_critical()\fR.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, interrupt, or kernel context.
 .SH WARNINGS
-.sp
-.LP
 Driver writers should note that in a multiple processor system  this function
 does not temporarily suspend other processors from executing. This function
 also cannot guarantee to actually block the hardware from doing such things as
@@ -79,8 +67,6 @@ Do not write code  bracketed by \fBddi_enter_critical()\fR and
 \fBddi_exit_critical()\fR that can get caught in an infinite loop, as the
 machine may crash if you do.
 .SH SEE ALSO
-.sp
-.LP
 \fBmutex\fR(9F)
 .sp
 .LP

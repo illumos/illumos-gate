@@ -7,7 +7,6 @@
 .SH NAME
 id32_alloc, id32_free, id32_lookup \- 32-bit driver ID management routines
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/id32.h>
@@ -28,11 +27,8 @@ id32_alloc, id32_free, id32_lookup \- 32-bit driver ID management routines
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIptr\fR\fR
@@ -52,8 +48,6 @@ description)
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These routines were originally developed so that device drivers could manage
 64-bit pointers on devices that save space only for 32-bit pointers.
 .sp
@@ -65,7 +59,7 @@ initiated, the driver passes this token to the hardware. When the I/O completes
 the hardware passes back this 32-bit token.
 .sp
 .LP
-Before Solaris supported 64-bit pointers, device drivers just passed a raw
+Before illumos supported 64-bit pointers, device drivers just passed a raw
 32-bit pointer to the hardware. When pointers grew to be 64 bits this was no
 longer possible. The \fBid32_*()\fR routines were created to help drivers
 translate between 64-bit pointers and a 32-bit token.
@@ -87,15 +81,11 @@ valid. When \fBid32_lookup()\fR detects an invalid token it returns NULL.
 Calling routines should check for this return value so that they do not try to
 dereference a NULL pointer.
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user or interrupt context. The routine
 \fBid32_alloc()\fR should not be called from interrupt context when the
 \fBKM_SLEEP\fR flag is passed in. All other routines can be called from
 interrupt or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBkmem_alloc\fR(9F)
 .sp
 .LP

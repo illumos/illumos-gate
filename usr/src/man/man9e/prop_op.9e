@@ -7,7 +7,6 @@
 .SH NAME
 prop_op \- report driver property information
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -21,12 +20,9 @@ prop_op \- report driver property information
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI). This entry point is required, but it can be
+illumos DDI specific (illumos DDI). This entry point is required, but it can be
 \fBddi_prop_op\fR(9F).
 .SH ARGUMENTS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR\fR
@@ -131,8 +127,6 @@ contains the length of caller's buffer,  before calling \fBprop_op()\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBprop_op()\fR is an entry point which reports the values of certain
 properties of the driver or device to the system. Each driver must have a
 \fIprefix\fR \fBprop_op\fR entry point, but most drivers that do not need to
@@ -140,8 +134,6 @@ create or manage their own properties can use \fBddi_prop_op()\fR for this
 entry point.  Then the driver can use \fBddi_prop_update\fR(9F) to create
 properties for its device.
 .SH RETURN VALUES
-.sp
-.LP
 \fBprop_op()\fR should return:
 .sp
 .ne 2
@@ -191,7 +183,6 @@ correct property length.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBprop_op()\fR to Report Property Information
 .sp
 .LP
@@ -237,8 +228,6 @@ xxprop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBIntro\fR(9E), \fBddi_prop_op\fR(9F), \fBddi_prop_update\fR(9F)
 .sp
 .LP

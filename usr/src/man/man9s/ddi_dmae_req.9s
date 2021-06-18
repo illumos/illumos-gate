@@ -8,18 +8,13 @@
 .SH NAME
 ddi_dmae_req \- DMA engine request structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/dma_engine.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris x86 DDI specific (Solaris x86 DDI).
+illumos x86 DDI specific (illumos x86 DDI).
 .SH DESCRIPTION
-.sp
-.LP
 A device driver uses the \fBddi_dmae_req\fR structure to describe the
 parameters for a \fBDMA\fR channel. This structure contains all the information
 necessary to set up the channel, except for the \fBDMA\fR memory address and
@@ -28,21 +23,19 @@ devices. Other modes might be desirable for some devices, or to increase
 performance. The \fBDMA\fR engine request structure is passed to
 \fBddi_dmae_prog\fR(9F).
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The \fBddi_dmae_req\fR structure contains several members, each of which
 controls some aspect of DMA engine operation. The structure members associated
 with supported DMA engine options are described here.
 .sp
 .in +2
 .nf
-uchar_tder_command;          /* Read / Write *
-/uchar_tder_bufprocess;      /* Standard / Chain */
-uchar_tder_path;             /* 8 / 16 / 32 */
-uchar_tder_cycles;           /* Compat / Type A / Type B / Burst */
-uchar_tder_trans;            /* Single / Demand / Block */
-ddi_dma_cookie_t*(*proc)();  /* address of nextcookie routine */
-void*procparms;              /* parameter for nextcookie call */
+uchar_t			der_command;	/* Read / Write * /
+uchar_t			der_bufprocess; /* Standard / Chain */
+uchar_t			der_path;	/* 8 / 16 / 32 */
+uchar_t			der_cycles;	/* Compat / Type A / Type B / Burst */
+uchar_t			der_trans;	/* Single / Demand / Block */
+ddi_dma_cookie_t	*(*proc)();	/* address of nextcookie routine */
+void			*procparms;	/* parameter for nextcookie call */
 .fi
 .in -2
 
@@ -205,8 +198,6 @@ default, in the \fBder_cycles\fR structure member) should use the
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -221,7 +212,5 @@ Architecture	x86
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBisa\fR(4), \fBattributes\fR(5),
 \fBddi_dmae\fR(9F), \fBddi_dma_attr\fR(9S)

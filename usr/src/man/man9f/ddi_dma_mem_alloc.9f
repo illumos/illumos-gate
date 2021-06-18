@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dma_mem_alloc \- allocate memory for DMA transfer
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -21,11 +20,8 @@ ddi_dma_mem_alloc \- allocate memory for DMA transfer
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR\fR
@@ -192,8 +188,6 @@ Pointer to a data access handle.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_dma_mem_alloc()\fR function allocates memory for \fBDMA\fR transfers
 to or from a device. The allocation will obey the alignment, padding
 constraints and device granularity as specified by the \fBDMA\fR attributes
@@ -238,8 +232,6 @@ ensure the consistency of a memory object shared between the \fBCPU\fR and the
 device after a \fBDMA\fR transfer, explicit synchronization steps using
 \fBddi_dma_sync\fR(9F) or \fBddi_dma_unbind_handle\fR(9F) are required.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_dma_mem_alloc()\fR function returns:
 .sp
 .ne 2
@@ -260,14 +252,10 @@ Memory allocation failed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_dma_mem_alloc()\fR function can be called from user, interrupt, or
 kernel context except when \fIwaitfp\fR is set to \fBDDI_DMA_SLEEP\fR, in which
 case it cannot be called from interrupt context.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
 \fBddi_dma_mem_free\fR(9F), \fBddi_dma_sync\fR(9F),
 \fBddi_dma_unbind_handle\fR(9F), \fBddi_get8\fR(9F), \fBddi_put8\fR(9F),
@@ -276,8 +264,6 @@ case it cannot be called from interrupt context.
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
-.LP
 If \fBDDI_NEVERSWAP_ACC\fR is specified, memory can be used for any purpose;
 but if either endian mode is specified, you must use \fBddi_get/put*\fR and
 never anything else.

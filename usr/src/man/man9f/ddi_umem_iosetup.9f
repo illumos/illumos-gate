@@ -7,24 +7,20 @@
 .SH NAME
 ddi_umem_iosetup \- Setup I/O requests to application memory
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
 
-\fBstruct buf *\fR\fBddi_umem_iosetup\fR(\fBddi_umem_cookie_t\fR \fIcookie,\fRoff_t off,	
-     size_t \fIlen\fR, int \fIdirection\fR, dev_t \fIdev\fR, daddr_t \fIblkno\fR,	
+\fBstruct buf *\fR\fBddi_umem_iosetup\fR(\fBddi_umem_cookie_t\fR \fIcookie,\fRoff_t off,
+     size_t \fIlen\fR, int \fIdirection\fR, dev_t \fIdev\fR, daddr_t \fIblkno\fR,
      int (*iodone) (struct buf *), int \fIsleepflag\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIcookie\fR \fR
@@ -101,8 +97,6 @@ available.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_umem_iosetup\fR(9F) function is used by drivers to setup I/O
 requests to application memory which has been locked down using
 \fBddi_umem_lock\fR(9F).
@@ -143,18 +137,12 @@ The \fIsleepflag \fR parameter determines if the caller can sleep for memory.
 After the I/O has completed and the buffer structure is no longer needed, the
 driver calls \fBfreerbuf\fR(9F) to free the buffer structure.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_umem_iosetup\fR(9F) function returns a pointer to the initialized
 buffer header, or \fBNULL\fR if no space is available.
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_umem_iosetup\fR(9F) function can be called from any context only if
 flag is set to \fBDDI_UMEM_NOSLEEP\fR. If \fBDDI_UMEM_SLEEP\fR is set,
 \fBddi_umem_iosetup\fR(9F) can be called from user and kernel context only.
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_umem_lock\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F), \fBfreerbuf\fR(9F),
 \fBphysio\fR(9F), \fBbuf\fR(9S)

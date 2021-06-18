@@ -7,7 +7,6 @@
 .SH NAME
 devmap_do_ctxmgt \- perform device context switching on a mapping
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -21,11 +20,8 @@ devmap_do_ctxmgt \- perform device context switching on a mapping
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdhp\fR \fR
@@ -92,8 +88,6 @@ modified.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 Device drivers call \fBdevmap_do_ctxmgt()\fR in the \fBdevmap_access\fR(9E)
 entry point to perform device context switching on a mapping.
 \fBdevmap_do_ctxmgt()\fR passes a pointer to a driver supplied callback
@@ -117,7 +111,6 @@ actual device context switching.  The return value from
 \fBdevmap_contextmgt\fR(9E) will be returned directly to
 \fBdevmap_do_ctxmgt()\fR.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fB0\fR \fR
@@ -136,12 +129,9 @@ An error occurred.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBdevmap_do_ctxmgt()\fR must be called from the driver's
 \fBdevmap_access\fR(9E) entry point.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing devmap_do_ctxmgt in the devmap_access entry point.
 .sp
 .LP
@@ -212,8 +202,6 @@ xxdevmap_access(devmap_cookie_t dhp, void *pvtp, offset_t off,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdevmap_access\fR(9E), \fBdevmap_contextmgt\fR(9E),
 \fBdevmap_default_access\fR(9F)
 .sp

@@ -7,7 +7,6 @@
 .SH NAME
 devmap_map \- device mapping create entry point
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -19,11 +18,8 @@ devmap_map \- device mapping create entry point
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH ARGUMENTS
-.sp
 .ne 2
 .na
 \fB\fIdhp\fR \fR
@@ -98,8 +94,6 @@ data.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdevmap_map()\fR entry point is an optional routine that allows drivers
 to perform additional processing or to allocate private resources during the
 mapping setup time.  For example, in order for device drivers to support
@@ -134,8 +128,6 @@ not the driver should allocate a private context  for the mapping.  For
 example, a driver may allocate a memory region to store the device context if
 \fIflags\fR is set to  \fBMAP_PRIVATE\fR.
 .SH RETURN VALUES
-.sp
-.LP
 \fBdevmap_map()\fR returns the following values:
 .sp
 .ne 2
@@ -156,7 +148,6 @@ An error occurred.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR \fBdevmap_map()\fRimplementation
 .sp
 .LP
@@ -189,8 +180,6 @@ xxdevmap_map(devmap_cookie_t dhp, dev_t dev, uint_t flags, \e
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdevmap_unmap\fR(9E), \fBdevmap_unload\fR(9F), \fBdevmap_callback_ctl\fR(9S)
 .sp
 .LP

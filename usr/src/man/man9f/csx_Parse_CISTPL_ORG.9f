@@ -7,7 +7,6 @@
 .SH NAME
 csx_Parse_CISTPL_ORG \- parse the Data Organization tuple
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -18,11 +17,8 @@ csx_Parse_CISTPL_ORG \- parse the Data Organization tuple
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIch\fR\fR
@@ -52,16 +48,12 @@ Pointer to a \fBcistpl_org_t\fR structure which contains the parsed
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 This function parses the Data Organization tuple, \fBCISTPL_ORG,\fR into a form
 usable by \fBPC \fRCard drivers.
 .sp
 .LP
 The \fBCISTPL_ORG\fR tuple provides a text description of the organization.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBcistpl_org_t\fR are:
 .sp
 .in +2
@@ -95,7 +87,6 @@ This field provides the text description of this organization.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -150,12 +141,8 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
 \fBcsx_RegisterClient\fR(9F), \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)
 .sp

@@ -8,7 +8,6 @@
 .SH NAME
 ddi_umem_alloc, ddi_umem_free \- allocate and free page-aligned kernel memory
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/sunddi.h>
@@ -23,12 +22,9 @@ ddi_umem_alloc, ddi_umem_free \- allocate and free page-aligned kernel memory
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .SS "ddi_umem_alloc()"
-.sp
 .ne 2
 .na
 \fB\fIsize\fR\fR
@@ -63,7 +59,6 @@ Pointer to a kernel memory cookie.
 .RE
 
 .SS "ddi_umem_free()"
-.sp
 .ne 2
 .na
 \fB\fIcookie\fR\fR
@@ -73,8 +68,6 @@ A kernel memory cookie allocated in \fBddi_umem_alloc()\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_umem_alloc()\fR allocates page-aligned kernel memory and returns a
 pointer to the allocated memory. The number of bytes allocated is a multiple of
 the system page size (roundup of \fIsize\fR). The allocated memory can be used
@@ -101,7 +94,6 @@ To free the allocated memory, a driver calls \fBddi_umem_free()\fR with the
 cookie obtained from \fBddi_umem_alloc()\fR. \fBddi_umem_free()\fR releases the
 entire buffer.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBNon-null\fR\fR
@@ -122,23 +114,17 @@ Memory cannot be allocated by \fBddi_umem_alloc()\fR because
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBddi_umem_alloc()\fR can be called from any context if \fIflag\fR is set to
 \fBDDI_UMEM_NOSLEEP.\fR If \fBDDI_UMEM_SLEEP\fR is set, \fBddi_umem_alloc()\fR
 can be called from user and kernel context only. \fBddi_umem_free()\fR can be
 called from any context.
 .SH SEE ALSO
-.sp
-.LP
 \fBdevmap\fR(9E), \fBcondvar\fR(9F), \fBdevmap_umem_setup\fR(9F),
 \fBkmem_alloc\fR(9F), \fBmutex\fR(9F), \fBrwlock\fR(9F), \fBsemaphore\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
-.LP
 Setting the \fBDDI_UMEM_PAGEABLE\fR flag in \fBddi_umem_alloc()\fR will result
 in an allocation of pageable memory. Because these pages can be swapped out to
 secondary memory devices, drivers should use this flag with care. This memory
@@ -178,7 +164,5 @@ Do not call \fBddi_umem_alloc()\fR within \fBDDI_SUSPEND\fR and
 \fBDDI_RESUME\fR operations. Memory acquired at these times is not reliable. In
 some cases, such a call can cause a system to hang.
 .SH NOTES
-.sp
-.LP
 \fBddi_umem_alloc(0,\fR \fIflag\fR, \fIcookiep\fR\fB)\fR always returns
 \fBNULL.\fR \fBddi_umem_free(NULL)\fR has no effects on system.

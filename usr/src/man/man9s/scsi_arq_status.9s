@@ -7,18 +7,13 @@
 .SH NAME
 scsi_arq_status \- SCSI auto request sense structure
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 When auto request sense has been enabled using  \fBscsi_ifsetcap\fR(9F) and the
 "auto-rqsense" capability, the target driver must allocate a status area in the
 \fBSCSI\fR packet structure for the auto request sense structure (see
@@ -29,7 +24,6 @@ sense structure supplies the \fBSCSI\fR status of the original command, the
 transport information pertaining to the request sense command, and the request
 sense data.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 struct scsi_status       sts_status;          /* SCSI status */
@@ -72,8 +66,6 @@ request sense command.
 \fBsts_sensedata\fR contains the actual sense data if the request sense command
 completed normally.
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_ifgetcap\fR(9F), \fBscsi_init_pkt\fR(9F),
 \fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
 .sp

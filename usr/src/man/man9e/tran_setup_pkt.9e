@@ -8,7 +8,6 @@
 tran_setup_pkt, tran_teardown_pkt, tran_pkt_constructor, tran_pkt_destructor \-
 SCSI HBA packet allocation and deallocation
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -34,8 +33,7 @@ SCSI HBA packet allocation and deallocation
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -82,14 +80,12 @@ Either \fBKM_SLEEP\fR or \fBKM_NOSLEEP\fR.
 .RE
 
 .SH DESCRIPTION
-.LP
 The \fBtran_setup_pkt()\fR and \fBtran_destroy_pkt()\fR vectors in the
 \fBscsi_hba_tran\fR(9S) structure are alternatives to the \fBtran_init_pkt()\fR
 and \fBtran_destroy_pkt()\fR entry points. They are initialized during the
 \fBHBA\fR driver's \fBattach\fR(9E) and they are used when a target driver
 calls \fBscsi_init_pkt\fR(9F) and \fBscsi_destroy_pkt\fR(9F).
 .SS "tran_setup_pkt(\|)"
-.LP
 The \fBtran_setup_pkt()\fR vector is the entry point into the \fBHBA\fR which
 is used to initialize \fBHBA\fR specific information in a \fBscsi_pkt\fR
 structure on behalf of a SCSI target driver. All fields documented in
@@ -147,12 +143,10 @@ Wait indefinitely for resources.
 .RE
 
 .SS "tran_teardown_pkt(\|)"
-.LP
 The \fBtran_teardown_pkt()\fR is the entry point into the \fBHBA\fR that must
 free all of the resources that were allocated to the \fBscsi_pkt\fR(9S)
 structure during \fBtran_setup_pkt()\fR.
 .SS "tran_pkt_constructor(\|) tran_pkt_destructor(\|)"
-.LP
 When using \fBtran_pkt_setup()\fR and \fBtran_pkt_teardown()\fR,
 \fBtran_pkt_constructor()\fR and \fBtran_pkt_destructor()\fR are additional
 optional entry points that perform the actions of a constructor and destructor.
@@ -219,10 +213,8 @@ HBA drivers that implement \fBtran_setup_pkt()\fR must signal
 use of  the \fBscsi_pkt\fR \fIpkt_comp\fR field is not permitted and results in
 undefined behavior.
 .SH RETURN VALUES
-.LP
 \fBtran_setup_pkt()\fR must return zero on success, and \fB-1\fR on failure.
 .SH SEE ALSO
-.LP
 \fBattach\fR(9E), \fBtran_sync_pkt\fR(9E), \fBbioerror\fR(9F),
 \fBddi_dma_buf_bind_handle\fR(9F), \fBkmem_cache_create\fR(9F),
 \fBscsi_alloc_consistent_buf\fR(9F), \fBscsi_destroy_pkt\fR(9F),

@@ -7,7 +7,6 @@
 .SH NAME
 ddi_get_kt_did \- get identifier of current thread
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -19,31 +18,19 @@ ddi_get_kt_did \- get identifier of current thread
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_get_kt_did()\fR function returns a unique 64-bit identifier for the
 currently running thread.
 .SH CONTEXT
-.sp
-.LP
 This routine can be called from user, kernel, or interrupt context. This
 routine cannot be called from a high-level interrupt context.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_get_kt_did()\fR always returns the identifier for the current thread.
 There are no error conditions.
 .SH SEE ALSO
-.sp
-.LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 The value returned by this function can also be seen in \fBadb\fR or \fBmdb\fR
 as the \fBdid\fR field displayed when using the \fBthread\fR macro.
 .sp

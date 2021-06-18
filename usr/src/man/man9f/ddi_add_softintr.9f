@@ -8,7 +8,6 @@
 ddi_add_softintr, ddi_get_soft_iblock_cookie, ddi_remove_softintr,
 ddi_trigger_softintr \- software interrupt handling routines
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -41,14 +40,10 @@ ddi_trigger_softintr \- software interrupt handling routines
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI). These interfaces are obsolete. Use the new
+illumos DDI specific (illumos DDI). These interfaces are obsolete. Use the new
 interrupt interfaces referenced in \fBIntro\fR(9F). Refer to \fIWriting Device
 Drivers\fR for more information.
 .SH PARAMETERS
-.sp
-.LP
 \fBddi_get_soft_iblock_cookie()\fR
 .sp
 .ne 2
@@ -172,8 +167,6 @@ interrupt handler will be called.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 For \fBddi_get_soft_iblock_cookie()\fR:
 .sp
 .LP
@@ -294,8 +287,6 @@ identifier \fIid\fR is used to determine which soft interrupt to trigger. This
 function is used by device drivers when they wish to trigger a soft interrupt
 which has been set up using \fBddi_add_softintr()\fR.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_add_softintr()\fR and \fBddi_get_soft_iblock_cookie()\fR return:
 .sp
 .ne 2
@@ -316,13 +307,10 @@ on failure
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user or kernel context.
 \fBddi_trigger_softintr()\fR may be called from high-level interrupt context as
 well.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRdevice using high-level interrupts
 .sp
 .LP
@@ -508,8 +496,6 @@ xxsoftintr(caddr_t arg)
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -524,16 +510,12 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBddi_add_intr\fR(9F), \fBddi_in_panic\fR(9F), \fBddi_intr_hilevel\fR(9F),
 \fBddi_remove_intr\fR(9F), \fBIntro\fR(9F), \fBmutex_init\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 \fBddi_add_softintr()\fR may not be used to add the same software interrupt
 handler more than once. This is true even if a different value is used for
 \fIint_handler_arg\fR in each of the calls to \fBddi_add_softintr()\fR.

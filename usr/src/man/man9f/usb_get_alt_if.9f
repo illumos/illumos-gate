@@ -8,7 +8,6 @@
 usb_get_alt_if, usb_set_alt_if, usb_get_if_number, usb_owns_device \- Get and
 set alternate interface values
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/usb/usba.h>
 
@@ -42,12 +41,8 @@ set alternate interface values
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
-.LP
 For \fBusb_get_alt_if()\fR:
 .sp
 .ne 2
@@ -168,8 +163,6 @@ Pointer to device's \fBdev_info\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 USB devices can have multiple configurations, each with many interfaces. Within
 interfaces are alternate settings, and within alternate settings are endpoints.
 .sp
@@ -264,8 +257,6 @@ The \fBusb_owns_device()\fR function returns \fBB_TRUE\fR if the driver of the
 dip  argument owns the entire device, or \fBB_FALSE\fR if it owns just a
 particular interface.
 .SH RETURN VALUES
-.sp
-.LP
 For \fBusb_get_alt_if()\fR:
 .sp
 .ne 2
@@ -403,8 +394,6 @@ Driver of the dip argument owns only the current interface.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBusb_get_if_number()\fR and \fBusb_owns_device()\fR functions may be
 called from user or kernel context.
 .sp
@@ -419,7 +408,6 @@ executing in kernel context. Otherwise the callback cannot block. See
 .LP
 The \fBusb_get_alt_if()\fR function may be called from user or kernel context.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
 /* Change alternate setting of interface 0.  Wait for completion. */
@@ -435,8 +423,6 @@ if (usb_set_alt_if(
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -453,7 +439,5 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_get_dev_data\fR(9F),
 \fBusb_get_string_descr\fR(9F), \fBusb_get_cfg\fR(9F)

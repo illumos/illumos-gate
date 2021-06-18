@@ -8,7 +8,6 @@
 .SH NAME
 scsi_ifgetcap, scsi_ifsetcap \- get/set SCSI transport capability
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -24,8 +23,7 @@ scsi_ifgetcap, scsi_ifsetcap \- get/set SCSI transport capability
 .fi
 
 .SH INTERFACE LEVEL
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
 .ne 2
 .na
@@ -63,7 +61,6 @@ Determines if all targets or only the specified target is affected.
 .RE
 
 .SH DESCRIPTION
-.LP
 The \fBscsi_ifsetcap()\fR function is used by target drivers to set the
 capabilities of the host adapter driver. The \fIcap\fR pointer is a name-value
 pair identified by a null-terminated character string and the integer value of
@@ -331,7 +328,6 @@ the default value of the target driver is used for the \fBCDB\fR determination.
 .RE
 
 .SH RETURN VALUES
-.LP
 The \fBscsi_ifsetcap()\fR function returns:
 .sp
 .ne 2
@@ -375,7 +371,6 @@ If the capability was not defined.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBscsi_ifgetcap()\fR
 .sp
 .in +2
@@ -402,10 +397,8 @@ if (scsi_ifsetcap(&devp->sd_address, "tagged-qing", 1, 1) == 1) {
 .in -2
 
 .SH CONTEXT
-.LP
 These functions can be called from user, interrupt, or kernel context.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -420,7 +413,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBtran_reset\fR(9E), \fBscsi_hba_lookup_capstr\fR(9F), \fBscsi_reset\fR(9F),
 \fBscsi_reset_notify\fR(9F), \fBddi_dma_attr\fR(9S),
 \fBscsi_address\fR(9S), \fBscsi_arq_status\fR(9S)

@@ -7,7 +7,6 @@
 .SH NAME
 kiconv_close \- code conversion descriptor deallocation function
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/errno.h>
 #include <sys/sunddi.h>
@@ -18,11 +17,8 @@ kiconv_close \- code conversion descriptor deallocation function
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIcd\fR\fR
@@ -32,14 +28,10 @@ Code conversion descriptor to be deallocated.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBkiconv_close()\fR function deallocates the conversion descriptor
 \fIcd\fR and all other associated resources allocated by the
 \fBkiconv_open()\fR function.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBkiconv_close()\fR returns 0; otherwise, it
 returns the following \fIerrno\fR value to indicate the error:
 .sp
@@ -52,11 +44,8 @@ The code conversion descriptor is invalid.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBkiconv_close()\fR can be called from user or interrupt context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRClosing the Code Conversion
 .sp
 .LP
@@ -86,8 +75,6 @@ error checking:
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -102,8 +89,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBiconv\fR(3C), \fBiconv_close\fR(3C), \fBiconv_open\fR(3C),
 \fBu8_strcmp\fR(3C), \fBu8_textprep_str\fR(3C), \fBu8_validate\fR(3C),
 \fBuconv_u16tou32\fR(3C), \fBuconv_u16tou8\fR(3C), \fBuconv_u32tou16\fR(3C),

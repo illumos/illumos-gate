@@ -7,7 +7,6 @@
 .SH NAME
 csx_Event2Text \- convert events to text strings
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/pccard.h>
 
@@ -17,11 +16,8 @@ csx_Event2Text \- convert events to text strings
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+illumos \fBDDI \fRSpecific (illumos \fBDDI) \fR
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIev\fR\fR
@@ -31,13 +27,9 @@ Pointer to an \fBevent2text_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
-This function is a Solaris-specific extension that provides a method for
+This function is an illumos-specific extension that provides a method for
 clients to convert Card Services events to text strings.
 .SH STRUCTURE MEMBERS
-.sp
-.LP
 The structure members of \fBevent2text_t\fR are:
 .sp
 .in +2
@@ -71,7 +63,6 @@ The text string describing the name of the event.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBCS_SUCCESS\fR\fR
@@ -90,18 +81,15 @@ No \fBPCMCIA \fRhardware installed.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 This function may be called from user or kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR: Using \fBcsx_Event2Text()\fR
 .sp
 .in +2
 .nf
 xx_event(event_t event, int priority, event_callback_args_t *eca)
-{ 	
-	  event2text_t    event2text; 	
+{
+	  event2text_t    event2text;
 
 	  event2text.event = event;
 	  csx_Event2Text(&event2text);
@@ -111,8 +99,6 @@ xx_event(event_t event, int priority, event_callback_args_t *eca)
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcsx_event_handler\fR(9E), \fBcsx_Error2Text\fR(9F)
 .sp
 .LP

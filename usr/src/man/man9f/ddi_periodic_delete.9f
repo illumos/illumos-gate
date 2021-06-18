@@ -9,7 +9,6 @@
 .SH NAME
 ddi_periodic_delete \- cancel periodic function invocation requests
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/dditypes.h>
 #include <sys/sunddi.h>
@@ -18,11 +17,8 @@ ddi_periodic_delete \- cancel periodic function invocation requests
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
+illumos DDI specific (illumos DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIrequest\fR\fR
@@ -32,8 +28,6 @@ Solaris DDI specific (Solaris DDI)
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_periodic_delete()\fR function cancels a periodic invocation request
 previously established with \fBddi_periodic_add\fR(9F).
 .sp
@@ -54,12 +48,9 @@ acquired by the callback function must not be held across the call to
 The callback will not be invoked again after the call to
 \fBddi_periodic_delete()\fR returns.
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_periodic_delete()\fR function may be called from user or kernel
 context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCancelling a periodic invocation request
 .sp
 .LP
@@ -113,13 +104,9 @@ my_periodic_func(void *arg)
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcv_timedwait\fR(9F), \fBddi_intr_get_pri\fR(9F), \fBddi_periodic_add\fR(9F),
 \fBqtimeout\fR(9F), \fBquntimeout\fR(9F), \fBtimeout\fR(9F), \fBuntimeout\fR(9F)
 .SH NOTES
-.sp
-.LP
 Historically this interface was advertised as safe for use from within the
 periodic callback function.  In order to ensure the correct operation of the
 system, and as reflected in the documentation above, this unlikely (and

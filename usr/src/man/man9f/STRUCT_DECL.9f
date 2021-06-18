@@ -9,7 +9,6 @@ STRUCT_DECL, SIZEOF_PTR, SIZEOF_STRUCT, STRUCT_BUF, STRUCT_FADDR, STRUCT_FGET,
 STRUCT_FGETP, STRUCT_FSET, STRUCT_FSETP, STRUCT_HANDLE, STRUCT_INIT,
 STRUCT_SIZE, STRUCT_SET_HANDLE \- 32-bit application data access macros
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -80,12 +79,8 @@ STRUCT_SIZE, STRUCT_SET_HANDLE \- 32-bit application data access macros
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
-.LP
 The macros take the following parameters:
 .sp
 .ne 2
@@ -133,8 +128,6 @@ whatever complex expression would naturally follow the first . or ->.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The above macros allow a device driver to access data consumed from a 32-bit
 application regardless whether the driver was compiled to the ILP32 or LP64
 data model. These macros effectively hide the difference between the data model
@@ -144,8 +137,6 @@ of the user application and the driver.
 The macros can be broken up into two main categories described in the following
 sections.
 .SS "Declaration and Initialization Macros"
-.sp
-.LP
 The macros \fBSTRUCT_DECL()\fR and \fBSTRUCT_HANDLE()\fR declare structure
 handles on the stack, whereas the macros \fBSTRUCT_INIT()\fR and
 \fBSTRUCT_SET_HANDLE()\fR initialize the structure handles to point to an
@@ -222,7 +213,6 @@ When used in an \fBioctl\fR(9E), \fIumodel\fR is the flag parameter. In a
 .RE
 
 .SS "Operation Macros"
-.sp
 .ne 2
 .na
 \fBsize_t STRUCT_SIZE(handle)\fR
@@ -296,7 +286,6 @@ Returns a pointer to the native mode instance of the structure described by
 .RE
 
 .SS "Macros Not Using Handles"
-.sp
 .ne 2
 .na
 \fBsize_t SIZEOF_STRUCT(structname, umodel)\fR
@@ -317,7 +306,6 @@ Returns the size of a pointer based on \fIumodel\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCopying a Structure
 .sp
 .LP
@@ -445,8 +433,6 @@ wput_iocdata(queue_t *q, mblk_t *msgp)
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -461,8 +447,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdevmap\fR(9E), \fBioctl\fR(9E), \fBmmap\fR(9E), \fBddi_mmap_get_model\fR(9F)
 .sp
 .LP

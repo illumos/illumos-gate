@@ -7,7 +7,6 @@
 .SH NAME
 tran_dmafree \- SCSI HBA DMA deallocation entry point
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -17,11 +16,8 @@ tran_dmafree \- SCSI HBA DMA deallocation entry point
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH ARGUMENTS
-.sp
 .ne 2
 .na
 \fB\fIap\fR\fR
@@ -40,8 +36,6 @@ A pointer to a \fIscsi_pkt\fR  structure. See \fBscsi_pkt\fR(9S).
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBtran_dmafree()\fR vector in the \fIscsi_hba_tran\fR structure must be
 initialized during the \fBHBA \fRdriver's \fBattach()\fR to point to an \fBHBA
 \fRentry point to be called when a target driver calls \fBscsi_dmafree\fR(9F).
@@ -55,8 +49,6 @@ itself. Since  \fBtran_destroy_pkt\fR(9E) must also free \fBDMA \fRresources,
 it is important that the \fBHBA \fRdriver keeps accurate note of whether
 \fBscsi_pkt\fR(9S) structures have \fBDMA \fRresources allocated.
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBtran_destroy_pkt\fR(9E), \fBtran_init_pkt\fR(9E),
 \fBscsi_dmafree\fR(9F), \fBscsi_dmaget\fR(9F), \fBscsi_hba_attach\fR(9F),
 \fBscsi_init_pkt\fR(9F), \fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S),
@@ -65,7 +57,5 @@ it is important that the \fBHBA \fRdriver keeps accurate note of whether
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 A target driver may call \fBtran_dmafree()\fR on packets for which no \fBDMA
 \fRresources were allocated.

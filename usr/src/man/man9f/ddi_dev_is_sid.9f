@@ -7,7 +7,6 @@
 .SH NAME
 ddi_dev_is_sid \- tell whether a device is self-identifying
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -19,11 +18,8 @@ ddi_dev_is_sid \- tell whether a device is self-identifying
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -33,15 +29,12 @@ A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_dev_is_sid()\fR function tells the caller whether the device
 described by \fIdip\fR is self-identifying, that is, a device that can
 unequivocally tell the system that it exists. This is useful for drivers that
 support both a self-identifying as well as a non-self-identifying variants of a
 device (and therefore must be probed).
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR\fR
@@ -60,37 +53,32 @@ Device is not self-identifying.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBddi_dev_is_sid()\fR function can be called from user, interrupt, or
 kernel context.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
 1   ...
 2   int
 3   bz_probe(dev_info_t *dip)
 4   {
-5   	...
-6   	if (ddi_dev_is_sid(dip) == DDI_SUCCESS) {
-7   		/*
-8   		 * This is the self-identifying version (OpenBoot).
-9   		 * No need to probe for it because we know it is there.
-10  		 * The existence of dip && ddi_dev_is_sid() proves this.
-11  		 */
-12  			return (DDI_PROBE_DONTCARE);
-13  	}
-14  	/*
-15  	 * Not a self-identifying variant of the device. Now we have to
-16  	 * do some work to see whether it is really attached to the
-17  	 * system.
-18  	 */
+5	...
+6	if (ddi_dev_is_sid(dip) == DDI_SUCCESS) {
+7		/*
+8		 * This is the self-identifying version (OpenBoot).
+9		 * No need to probe for it because we know it is there.
+10		 * The existence of dip && ddi_dev_is_sid() proves this.
+11		 */
+12			return (DDI_PROBE_DONTCARE);
+13	}
+14	/*
+15	 * Not a self-identifying variant of the device. Now we have to
+16	 * do some work to see whether it is really attached to the
+17	 * system.
+18	 */
 19  ...
 .fi
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBprobe\fR(9E) \fIWriting Device Drivers\fR

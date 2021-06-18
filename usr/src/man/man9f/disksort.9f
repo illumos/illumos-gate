@@ -7,7 +7,6 @@
 .SH NAME
 disksort \- single direction elevator seek sort for buffers
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -18,11 +17,8 @@ void
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdp\fR\fR
@@ -48,8 +44,6 @@ meaningful sort key value prior to calling \fBdisksort()\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The function \fBdisksort()\fR sorts a pointer to a buffer into a single forward
 linked list headed by the \fBav_forw\fR element of the argument \fI*dp\fR.
 .sp
@@ -73,18 +67,12 @@ of the \fBav_back\fR structure element of the argument \fI*dp\fR. The
 maintain the forward linkage. The value at the head of the list presumably
 indicates the currently active disk area.
 .SH CONTEXT
-.sp
-.LP
 This function can be called from user, interrupt, or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBstrategy\fR(9E), \fBbuf\fR(9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
-.LP
 The \fBdisksort()\fR function does no locking. Therefore, any locking is
 completely the responsibility of the caller.

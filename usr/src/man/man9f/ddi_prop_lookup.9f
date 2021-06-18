@@ -9,7 +9,6 @@ ddi_prop_lookup, ddi_prop_lookup_int_array, ddi_prop_lookup_int64_array,
 ddi_prop_lookup_string_array, ddi_prop_lookup_string,
 ddi_prop_lookup_byte_array, ddi_prop_free \- look up property information
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -50,7 +49,6 @@ ddi_prop_lookup_byte_array, ddi_prop_free \- look up property information
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImatch_dev\fR\fR
@@ -185,12 +183,8 @@ point to memory containing the byte array value of the property.
 .RE
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI).
+illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
-.sp
-.LP
 The property look up routines search for and, if found, return the value of a
 given property. Properties are searched for based on the \fIdip\fR, \fIname\fR,
 \fImatch_dev\fR, and the type of the data (integer, string, or byte). The
@@ -349,8 +343,6 @@ Frees the resources associated with a property previously allocated using
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 The functions \fBddi_prop_lookup_int_array()\fR,
 \fBddi_prop_lookup_int64_array()\fR, \fBddi_prop_lookup_string_array()\fR,
 \fBddi_prop_lookup_string()\fR, and \fBddi_prop_lookup_byte_array()\fR return
@@ -403,11 +395,8 @@ The value of the property cannot be decoded.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user or kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBddi_prop_lookup_int_array()\fR
 .sp
 .LP
@@ -417,7 +406,7 @@ The following example demonstrates the use of
 .sp
 .in +2
 .nf
-	
+
 int	*options;
 int	noptions;
 
@@ -441,8 +430,6 @@ int	noptions;
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBexecve\fR(2), \fBddi_prop_exists\fR(9F), \fBddi_prop_get_int\fR(9F),
 \fBddi_prop_remove\fR(9F), \fBddi_prop_undefine\fR(9F),
 \fBddi_prop_update\fR(9F)

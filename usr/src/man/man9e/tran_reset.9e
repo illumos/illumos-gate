@@ -7,7 +7,6 @@
 .SH NAME
 tran_reset \- reset a SCSI bus or target
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/scsi/scsi.h>
 
@@ -17,11 +16,8 @@ tran_reset \- reset a SCSI bus or target
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI).
+illumos architecture specific (illumos DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIap\fR \fR
@@ -40,8 +36,6 @@ The level of reset required.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBtran_reset()\fR vector in the \fBscsi_hba_tran\fR(9S) structure must be
 initialized during the \fBHBA\fR driver's \fBattach\fR(9E) to point to an
 \fBHBA\fR entry point to be called when a target driver calls
@@ -107,8 +101,6 @@ provide the means to return the current value of the \fBlun-reset\fR capability
 in its \fBtran_getcap\fR(9E) routine, as well as the means to change the value
 of the \fBlun_reset\fR capability in its \fBtran_getcap\fR(9E) routine.
 .SH RETURN VALUES
-.sp
-.LP
 \fBtran_reset()\fR should return:
 .sp
 .ne 2
@@ -129,21 +121,15 @@ on failure.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBtran_reset()\fR function can be called from user or interrupt context.
 This requirement comes from \fBscsi_reset()\fR.
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBddi_dma_buf_setup\fR(9F), \fBscsi_hba_attach\fR(9F),
 \fBscsi_reset\fR(9F), \fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
-.LP
 If \fBpkt_reason\fR already indicates that an earlier error had occurred for a
 particular \fIpkt\fR, \fBtran_reset()\fR should not overwrite \fBpkt_reason\fR
 with \fBCMD_RESET\fR.
