@@ -16,8 +16,8 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2023 Peter Tribble
-# Copyright 2022 RackTop Systems, Inc.
 # Copyright 2022 Oxide Computer Company
+# Copyright 2023 RackTop Systems, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -84,6 +84,7 @@ _MANFILES=	aac.4d		\
 		ksensor.4d	\
 		ksyms.4d	\
 		llc1.4d		\
+		lmrc.4d		\
 		lockstat.4d	\
 		lofi.4d		\
 		log.4d		\

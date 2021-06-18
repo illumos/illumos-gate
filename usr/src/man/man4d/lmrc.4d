@@ -1,0 +1,83 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 RackTop Systems, Inc.
+.\"
+.Dd May 29, 2023
+.Dt LMRC 4D
+.Os
+.Sh NAME
+.Nm lmrc
+.Nd LSI MegaRAID SAS 3.0 Controller HBA driver
+.Sh DESCRIPTION
+The
+.Nm
+driver works with Broadcom MegaRAID SAS controllers of the Aero and Ventura
+generation, based on the following chipsets:
+.Bl -dash
+.It
+MegaRAID Tri-Mode SAS35xx
+.It
+MegaRAID Tri-Mode SAS34xx
+.It
+MegaRAID 12G SAS/PCIe SAS38xx
+.It
+MegaRAID 12G SAS/PCIe SAS39xx
+.El
+.Pp
+These controllers support SAS, SATA, and NVMe interfaces and expose connected
+devices either as RAID volumes or as JBOD, depending on the particular chipset
+and firmware configuration.
+.sp
+The driver supports the following capabilities:
+.Bl -dash
+.It
+Dynamic hot-plug
+.It
+Honors packet timeouts specified in
+.Xr scsi_pkt 9S
+.It
+Reset of target or logical unit via
+.Xr scsi_reset 9F
+.It
+Abort for individual commands via
+.Xr scsi_abort 9F
+.It
+Command queueing
+.Pq both tagged and untagged
+.El
+.Pp
+The
+.Nm
+driver is based on
+.Xr iport 9 ,
+and uses one iport for physical
+.Pq JBOD
+devices, and another iport for logical
+.Pq RAID
+devices.
+Depending on the controller and firmware, even physical
+.Pq JBOD
+devices may appear as
+logical
+.Pq RAID
+devices to the driver.
+.Sh SEE ALSO
+.Xr sd 4D ,
+.Xr st 4D ,
+.Xr scsi 5 ,
+.Xr iport 9 ,
+.Xr scsi_abort 9F ,
+.Xr scsi_reset 9F ,
+.Xr scsi_pkt 9S
+.Sh BUGS
+The driver has not been tested with SATA or NVMe devices, and as such it is not
+known whether it will work properly when SATA or NVMe drives are connected.
