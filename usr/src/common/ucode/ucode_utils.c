@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -117,7 +119,6 @@ ucode_checksum_intel(uint32_t sum, uint32_t size, uint8_t *code)
 ucode_errno_t
 ucode_validate_amd(uint8_t *ucodep, int size)
 {
-	/* LINTED: pointer alignment */
 	uint32_t *ptr = (uint32_t *)ucodep;
 	uint32_t count;
 
@@ -138,7 +139,6 @@ ucode_validate_amd(uint8_t *ucodep, int size)
 	if (((count = *ptr++) > size) || (count % 16))
 		return (EM_FILEFORMAT);
 
-	/* LINTED: pointer alignment */
 	ptr = (uint32_t *)(((uint8_t *)ptr) + count);
 	size -= count;
 
@@ -152,7 +152,6 @@ ucode_validate_amd(uint8_t *ucodep, int size)
 		if (((count = *ptr++) > size))
 			return (EM_FILEFORMAT);
 
-		/* LINTED: pointer alignment */
 		ptr = (uint32_t *)(((uint8_t *)ptr) + count);
 		size -= count;
 	}
