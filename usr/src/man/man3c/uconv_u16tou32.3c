@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UCONV_U16TOU32 3C "Sep 18, 2007"
+.TH UCONV_U16TOU32 3C "June 19, 2021"
 .SH NAME
 uconv_u16tou32, uconv_u16tou8, uconv_u32tou16, uconv_u32tou8, uconv_u8tou16,
 uconv_u8tou32 \- Unicode encoding conversion functions
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -49,7 +48,6 @@ uconv_u8tou32 \- Unicode encoding conversion functions
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIutf16str\fR\fR
@@ -220,8 +218,6 @@ character to indicate the byte ordering if the output parameter is in
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBuconv_u16tou32()\fR function reads the given \fIutf16str\fR in
 \fBUTF-16\fR until \fBU+0000\fR (zero) in \fIutf16str\fR is encountered as a
 character or until the number of 16-bit unsigned integers specified in
@@ -301,8 +297,6 @@ the specified number of input parameter elements at \fIutf16len\fR,
 As output parameters, \fIutf16len\fR, \fIutf32len\fR, and \fIutf8len\fR are not
 changed if conversion fails for any reason.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful conversion, the functions return \fB0\fR. Upon failure, the
 functions return one of the following \fBerrno\fR values:
 .sp
@@ -345,7 +339,6 @@ Conflicting byte-ordering option \fIflag\fR values are detected.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRConvert a \fBUTF-16\fR string in little-endian byte ordering
 into \fBUTF-8\fR string.
 .sp
@@ -435,7 +428,7 @@ parameter.
 .nf
 #include <sys/types.h>
 #include <sys/errno.h>
-#include <sys/u8_textprep>
+#include <sys/u8_textprep.h>
 \&.
 \&.
 \&.
@@ -460,8 +453,6 @@ if (ret != 0) {
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -478,15 +469,11 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBuconv_u16tou32\fR(9F)
 .sp
 .LP
 The Unicode Standard (http://www.unicode.org)
 .SH NOTES
-.sp
-.LP
 Each \fBUTF-16\fR or \fBUTF-32\fR character maps to an \fBUTF-8\fR character
 that might need one to maximum of four bytes.
 .sp
