@@ -38,6 +38,7 @@ OBJECTS= \
 	dogethost.o	\
 	dogetipnodes.o	\
 	dogetnet.o	\
+	dogetnetgr.o	\
 	dogetnetmask.o	\
 	dogetprofattr.o	\
 	dogetproject.o	\

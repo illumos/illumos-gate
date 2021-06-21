@@ -36,7 +36,6 @@
 passwd:     files ldap
 group:      files ldap
 
-# consult /etc "files" only if ldap is down. 
 hosts:      files ldap
 
 # Note that IPv4 addresses are searched for in all of the ipnodes databases
@@ -51,7 +50,7 @@ netmasks:   files ldap
 bootparams: files ldap
 publickey:  files ldap
 
-netgroup:   ldap
+netgroup:   files ldap
 
 automount:  files ldap
 aliases:    files ldap

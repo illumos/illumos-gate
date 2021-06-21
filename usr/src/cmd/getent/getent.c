@@ -56,6 +56,7 @@ static struct table t[] = {
 	{ "exec_attr",	dogetexecattr },
 	{ "prof_attr",	dogetprofattr },
 	{ "user_attr",	dogetuserattr },
+	{ "netgroup",	dogetnetgr },
 	{ NULL,		NULL }
 };
 
@@ -88,6 +89,10 @@ main(int argc, const char **argv)
 			case EXC_SYNTAX:
 				(void) fprintf(stderr,
 				    gettext("Syntax error\n"));
+				break;
+			case EXC_ERROR:
+				(void) fprintf(stderr,
+				    gettext("Internal error\n"));
 				break;
 			case EXC_ENUM_NOT_SUPPORTED:
 				(void) fprintf(stderr,

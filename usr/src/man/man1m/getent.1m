@@ -19,7 +19,7 @@
 .\" Copyright (c) 2014 Gary Mills
 .\" Copyright (c) 2018 Peter Tribble
 .\"
-.Dd August 13, 2018
+.Dd June 17, 2021
 .Dt GETENT 1M
 .Os
 .Sh NAME
@@ -56,14 +56,16 @@ This can be
 .Cm auth_attr ,
 .Cm exec_attr ,
 .Cm prof_attr ,
+.Cm user_attr ,
 or
-.Cm user_attr .
+.Cm netgroup .
 For each of these databases,
 .Nm
 uses the appropriate library routines described in
 .Xr getpwnam 3C ,
 .Xr getspnam 3C ,
 .Xr getgrnam 3C ,
+.Xr getnetgrent 3C ,
 .Xr gethostbyaddr 3NSL ,
 .Xr gethostbyname 3NSL ,
 .Xr getipnodebyaddr 3SOCKET ,
@@ -101,6 +103,7 @@ line, in the format of the matching administrative file:
 .Xr services 4 ,
 .Xr protocols 4 ,
 .Xr ethers 4 ,
+.Xr netgroup 4 ,
 .Xr networks 4 ,
 .Xr netmasks 4 ,
 .Xr auth_attr 4 ,
@@ -117,9 +120,10 @@ are printed.
 Enumeration is not supported on
 .Cm ipnodes ,
 .Cm ethers ,
+.Cm netgroup ,
 or
 .Cm netmasks .
-.Ss Key Interpretation for passwd, group, and user_attr Databases
+.Ss Key Interpretation for passwd, group, netgroup, and user_attr Databases
 When
 .Nm
 is invoked with
@@ -173,6 +177,46 @@ When
 is invoked with
 .Ar database
 set to
+.Cm netgroup ,
+only a single lookup key is supported, which must be in the following format:
+.Bd -ragged -offset Ds
+.Ar netgroup Oo Ar host Ar user Ar domain Oc
+.Ed
+.Pp
+Specifying only the
+.Ar netgroup
+name will result in entries from the selected netgroup being displayed as
+string triples
+.Pq hostname, username, domain ,
+in a format compatible with
+.Xr netgroup 4 .
+.Pp
+Specifying the
+.Ar netgroup
+along with
+.Ar host ,
+.Ar user
+and
+.Ar domain
+will filter the netgroup display based on these entries.
+An asterisk
+.Pq \&*
+can be used as a wildcard for the
+.Ar host ,
+.Ar user
+or
+.Ar domain
+fields.
+.Pp
+Since the
+.Cm netgroup
+database does not support enumeration, a lookup key must always be specified.
+.Pp
+When
+.Nm
+is invoked with
+.Ar database
+set to
 .Cm user_attr ,
 each key value is processed as follows:
 .Bl -bullet
@@ -216,6 +260,8 @@ Ethernet address to hostname database or domain
 network name database
 .It Pa /etc/netmasks
 network mask database
+.It Pa /etc/netgroup
+network group database
 .It Pa /etc/user_attr
 extended user attributes database
 .It Pa /etc/security/auth_attr
@@ -241,6 +287,7 @@ There is no support for enumeration on this database.
 .El
 .Sh SEE ALSO
 .Xr getgrnam 3C ,
+.Xr getnetgrent 3C ,
 .Xr getpwnam 3C ,
 .Xr getspnam 3C ,
 .Xr gethostbyaddr 3NSL ,

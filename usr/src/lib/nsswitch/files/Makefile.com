@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved
 
 LIBRARY =	libnss_files.a
 VERS =		.1
@@ -33,6 +34,7 @@ OBJECTS =	bootparams_getbyname.o	\
 		gethostent.o		\
 		gethostent6.o		\
 		getnetent.o		\
+		getnetgrent.o		\
 		getprojent.o		\
 		getprotoent.o		\
 		getpwnam.o		\
@@ -75,3 +77,5 @@ $(ROOT)/etc/lib/$(DYNLIB1) := COMPATLINKTARGET= ../../lib/$(DYNLIB1)
 
 all: $(DYNLIB1)
 
+pics/getnetgrent.o := CERRWARN=
+pics/getnetgrent.o := SMATCH=

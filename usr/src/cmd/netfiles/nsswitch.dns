@@ -21,7 +21,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # /etc/nsswitch.dns:
@@ -39,7 +38,7 @@ passwd:     files
 group:      files
 
 # You must also set up the /etc/resolv.conf file for DNS name
-# server lookup.  See resolv.conf(4). For lookup via mdns  
+# server lookup.  See resolv.conf(4). For lookup via mdns
 # svc:/network/dns/multicast:default must also be enabled. See mdnsd(1M)
 hosts:      files dns mdns
 
@@ -54,8 +53,6 @@ ethers:     files
 netmasks:   files
 bootparams: files
 publickey:  files
-# At present there isn't a 'files' backend for netgroup;  the system will 
-#   figure it out pretty quickly, and won't use netgroups at all.
 netgroup:   files
 automount:  files
 aliases:    files
