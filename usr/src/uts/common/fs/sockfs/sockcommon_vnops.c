@@ -25,6 +25,7 @@
  */
 /*
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2021 Racktop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -68,19 +69,19 @@ static int	socket_vop_ioctl(struct vnode *, int, intptr_t, int,
 		    struct cred *, int32_t *, caller_context_t *);
 static int	socket_vop_setfl(struct vnode *, int, int, cred_t *,
 		    caller_context_t *);
-static int 	socket_vop_getattr(struct vnode *, struct vattr *, int,
+static int	socket_vop_getattr(struct vnode *, struct vattr *, int,
 		    struct cred *, caller_context_t *);
-static int 	socket_vop_setattr(struct vnode *, struct vattr *, int,
+static int	socket_vop_setattr(struct vnode *, struct vattr *, int,
 		    struct cred *, caller_context_t *);
-static int 	socket_vop_access(struct vnode *, int, int, struct cred *,
+static int	socket_vop_access(struct vnode *, int, int, struct cred *,
 		    caller_context_t *);
-static int 	socket_vop_fsync(struct vnode *, int, struct cred *,
+static int	socket_vop_fsync(struct vnode *, int, struct cred *,
 		    caller_context_t *);
 static void	socket_vop_inactive(struct vnode *, struct cred *,
 		    caller_context_t *);
-static int 	socket_vop_fid(struct vnode *, struct fid *,
+static int	socket_vop_fid(struct vnode *, struct fid *,
 		    caller_context_t *);
-static int 	socket_vop_seek(struct vnode *, offset_t, offset_t *,
+static int	socket_vop_seek(struct vnode *, offset_t, offset_t *,
 		    caller_context_t *);
 static int	socket_vop_poll(struct vnode *, short, int, short *,
 		    struct pollhead **, caller_context_t *);
@@ -282,16 +283,23 @@ socket_vop_getattr(struct vnode *vp, struct vattr *vap, int flags,
     struct cred *cr, caller_context_t *ct)
 {
 	dev_t		fsid;
-	struct sonode 	*so;
+	struct sonode	*so;
 	static int	sonode_shift = 0;
 
 	/*
 	 * Calculate the amount of bitshift to a sonode pointer which will
-	 * still keep it unique.  See below.
+	 * still keep it unique.  See below. Note that highbit() uses
+	 * 1-based indexing for the highest bit set (and 0 for 'no bits set').
+	 * To use the result of highbit() as a shift value, we must subtract 1
+	 * from the result.
 	 */
-	if (sonode_shift == 0)
-		sonode_shift = highbit(sizeof (struct sonode));
-	ASSERT(sonode_shift > 0);
+	if (sonode_shift == 0) {
+		int bit = highbit(sizeof (struct sonode));
+
+		/* Sanity check */
+		VERIFY3S(bit, >, 0);
+		sonode_shift = bit - 1;
+	}
 
 	so = VTOSO(vp);
 	fsid = sockdev;
@@ -311,11 +319,17 @@ socket_vop_getattr(struct vnode *vp, struct vattr *vap, int flags,
 	vap->va_uid = vap->va_gid = 0;
 	vap->va_fsid = fsid;
 	/*
-	 * If the va_nodeid is > MAX_USHORT, then i386 stats might fail.
-	 * So we shift down the sonode pointer to try and get the most
-	 * uniqueness into 16-bits.
+	 * If the va_nodeid is > UINT32_MAX, then stat(2) might fail in
+	 * unexpected ways inside non-largefile aware 32-bit processes --
+	 * historically, socket inode values (va_nodeid values) were capped at
+	 * UINT16_MAX (for even more ancient reasons long since unnecessary).
+	 * To avoid the potential of surprise failures, we shift down
+	 * the sonode pointer address to try and get the most
+	 * uniqueness into 32-bits. In practice, this represents the unique
+	 * portion of the kernel address space, so the chance of duplicate
+	 * socket inode values is minimized.
 	 */
-	vap->va_nodeid = ((ino_t)so >> sonode_shift) & 0xFFFF;
+	vap->va_nodeid = ((ino_t)so >> sonode_shift) & 0xFFFFFFFF;
 	vap->va_nlink = 0;
 	vap->va_size = 0;
 
