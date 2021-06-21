@@ -59,7 +59,7 @@ DEVTREE_SRC_DIR = $(SRC)/cmd/picl/plugins/common/devtree
 LDLIBS +=       -L$(DEVTREE_SRC_DIR)
 LDLIBS +=       -L$(ROOT)/usr/lib/picl/plugins
 LDLIBS +=	-L$(SRC)/lib/libptree/$(MACH)
-LDLIBS +=       -lc -lpicltree -lpicldevtree
+LDLIBS +=       -lc -lpicltree
 DYNFLAGS +=	-R/usr/platform/\$$PLATFORM/lib/picl/plugins:/usr/platform/sun4u/lib/picl/plugins:/usr/lib/picl/plugins
 
 .KEEP_STATE:

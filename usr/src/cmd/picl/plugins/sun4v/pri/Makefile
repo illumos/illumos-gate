@@ -69,12 +69,7 @@ LDLIBS +=	-L$(ROOT)/usr/lib/picl/plugins -L$(ROOT)/usr/lib/sparcv9
 LDLIBS +=	-L$(ROOT)/usr/lib/libpri
 LDLIBS +=	-L$(ROOT_PLATFORM)/lib -L$(ROOT_PLATFORM)/lib/picl/plugins
 
-LDLIBS +=	-lc -lpicl -lpicltree -lpicldevtree -lpri
-
-# No interfaces from libsnmpplugin.so directly used here, but we need the
-# snmp plugin to load and init before libpriplugin.so.
-#
-LDLIBS +=	-lsnmpplugin
+LDLIBS +=	-lc -lpicl -lpicltree -lpri
 
 #DYNFLAGS +=	-R$(DYNFLAGS_COM)
 $(SPARC_BLD)LDLIBS +=	-R$(DYNFLAGS_PLAT) \

@@ -89,8 +89,7 @@ LDLIBS +=	-L$(SRC)/cmd/picl/plugins/sun4u/envmon
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/frutree
 LDLIBS +=	-L$(ROOT)/usr/lib/picl/plugins
 LDLIBS +=	-lc -ldevinfo -ldevice
-LDLIBS +=	-lpicltree -lpicld_pluginutil -lnvpair -lkstat
-LDLIBS +=	-lpiclevent -lpiclenvmon -lpiclfrutree
+LDLIBS +=	-lpicltree -lpicld_pluginutil -lnvpair
 
 .KEEP_STATE:
 

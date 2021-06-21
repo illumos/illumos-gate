@@ -62,7 +62,7 @@ LDLIBS +=       -L$(DEVTREE_SRC_DIR)
 LDLIBS +=	-L$(SRC)/lib/libptree/$(MACH)
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/devtree
 LDLIBS +=	-L$(ROOT)/usr/lib/picl/plugins
-LDLIBS +=	-lc -lpicldevtree -lpicltree -lnvpair
+LDLIBS +=	-lc -lpicltree -lnvpair
 
 .KEEP_STATE:
 

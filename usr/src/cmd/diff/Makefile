@@ -31,7 +31,6 @@ LIBDIFFH= diffh
 include ../Makefile.cmd
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-address
 
 #
@@ -46,7 +45,7 @@ ROOTLIBDIFFH = $(LIBDIFFH:%=$(ROOTLIB)/%)
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 #
 # Use private rule
@@ -68,9 +67,5 @@ $(DCFILE):
 install: all $(ROOTBINDIFF) $(ROOTLIBDIFFH)
 
 clean:
-
-lint:
-	$(LINT.c) diff.c $(LDLIBS)
-	$(LINT.c) diffh.c $(LDLIBS)
 
 include ../Makefile.targ

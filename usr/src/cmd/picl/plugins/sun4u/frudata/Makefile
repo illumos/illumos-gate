@@ -57,7 +57,7 @@ LDLIBS +=	-L$(SRC)/lib/libfruutils/$(MACH)
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/frutree
 LDLIBS +=	-L$(ROOT)/usr/lib/picl/plugins
 LDLIBS +=	-lc -lnvpair -lfruutils
-LDLIBS +=	-lpicltree -lpiclfrutree -lfruaccess -lpicld_pluginutil
+LDLIBS +=	-lpicltree -lfruaccess -lpicld_pluginutil
 LDLIBS +=	-R/usr/platform/\$$PLATFORM/lib/picl/plugins:/usr/platform/\$$PLATFORM/lib:/usr/platform/sun4u/lib/picl/plugins:/usr/lib/picl/plugins:/usr/platform/sun4u/lib
 .KEEP_STATE:
 

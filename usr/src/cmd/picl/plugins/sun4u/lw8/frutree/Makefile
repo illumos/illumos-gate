@@ -57,8 +57,7 @@ LDLIBS +=	-L$(DEVTREE_SRC_DIR)
 LDLIBS +=	-L$(SRC)/lib/libpicltree/$(MACH)
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/devtree
 LDLIBS +=	-L$(ROOT)/usr/lib/picl/plugins
-LDLIBS +=	-lc -lpicldevtree -lpiclmemcfg
-LDLIBS +=	-lpicltree -lnvpair -lkstat -ldevice
+LDLIBS +=	-lpicltree -lnvpair -lkstat -ldevice -lc
 
 .KEEP_STATE:
 

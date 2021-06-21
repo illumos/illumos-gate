@@ -54,8 +54,7 @@ LDLIBS +=	-L$(SRC)/lib/libpicltree/$(MACH)
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/piclevent
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/memcfg
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/devtree
-LDLIBS +=	-lnvpair -ldevinfo -lc
-LDLIBS +=	-lpicltree -lpicld_pluginutil -lpiclevent -lpicldevtree
+LDLIBS +=	-lnvpair -lc -lpicltree -lpicld_pluginutil
 
 .KEEP_STATE:
 
