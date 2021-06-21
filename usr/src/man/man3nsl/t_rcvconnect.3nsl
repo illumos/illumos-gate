@@ -44,11 +44,10 @@
 .\" Copyright 1994, The X/Open Company Ltd.  All Rights Reserved.
 .\" Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH T_RCVCONNECT 3NSL "May 7, 1998"
+.TH T_RCVCONNECT 3NSL "June 18, 2021"
 .SH NAME
 t_rcvconnect \- receive the confirmation from a connection request
 .SH SYNOPSIS
-.LP
 .nf
 #include <xti.h>
 
@@ -58,13 +57,11 @@ t_rcvconnect \- receive the confirmation from a connection request
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 This routine is part of the \fBXTI\fR interfaces which evolved from the
 \fBTLI\fR interfaces. \fBXTI\fR represents the future evolution of these
 interfaces. However, \fBTLI\fR interfaces are supported for compatibility. When
 using a \fBTLI\fR routine that has the same name as an \fBXTI\fR routine, the
-\fBtiuser.h\fR header file must be used.  Refer to the  \fBTLI\fR
+\fBtiuser.h\fR header file must be used.  Refer to the \fBTLI\fR
 \fBCOMPATIBILITY\fR section for a description of differences between the two
 interfaces.
 .sp
@@ -72,7 +69,7 @@ interfaces.
 This function enables a calling transport user to determine the status of a
 previously sent connection request and is used in conjunction with
 \fBt_connect\fR(3NSL) to establish a connection in asynchronous mode, and to
-complete a synchronous  \fBt_connect\fR(3NSL) call that was interrupted by a
+complete a synchronous \fBt_connect\fR(3NSL) call that was interrupted by a
 signal. The connection will be established on successful completion of this
 function.
 .sp
@@ -103,14 +100,14 @@ by the destination transport user during connection establishment, and
 The \fImaxlen\fR field of each argument must be set before issuing this
 function to indicate the maximum size of the buffer for each. However,
 \fImaxlen\fR can be set to zero, in which case no information to this specific
-argument is given to the user on the return from  \fBt_rcvconnect()\fR. If
-\fIcall\fR is set to  \fINULL,\fR no information at all is returned. By
+argument is given to the user on the return from \fBt_rcvconnect()\fR. If
+\fIcall\fR is set to \fINULL,\fR no information at all is returned. By
 default, \fBt_rcvconnect()\fR executes in synchronous mode and waits for the
 connection to be established before returning. On return, the \fIaddr\fR,
 \fIopt\fR and \fIudata\fR fields reflect values associated with the connection.
 .sp
 .LP
-If  \fBO_NONBLOCK\fR is set by means of \fBt_open\fR(3NSL) or \fBfcntl\fR(2),
+If \fBO_NONBLOCK\fR is set by means of \fBt_open\fR(3NSL) or \fBfcntl\fR(2),
 \fBt_rcvconnect()\fR executes in asynchronous mode, and reduces to a poll for
 existing connection confirmations. If none are available, \fBt_rcvconnect()\fR
 fails and returns immediately without waiting for the connection to be
@@ -118,17 +115,11 @@ established. See \fBTNODATA\fR below. In this case, \fBt_rcvconnect()\fR must
 be called again to complete the connection establishment phase and retrieve the
 information returned in \fIcall\fR.
 .SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, a value of  \fB0\fR is returned.  Otherwise, a
-value of  -1 is returned and \fBt_errno\fR is set to indicate an error.
+Upon successful completion, a value of \fB0\fR is returned.  Otherwise, a
+value of -1 is returned and \fBt_errno\fR is set to indicate an error.
 .SH VALID STATES
-.sp
-.LP
 \fBT_OUTCON\fR.
 .SH ERRORS
-.sp
-.LP
 On failure, \fBt_errno\fR is set to one of the following:
 .sp
 .ne 2
@@ -146,7 +137,7 @@ The specified file descriptor does not refer to a transport endpoint.
 .ad
 .RS 15n
 The number of bytes allocated for an incoming argument \fI(maxlen)\fR is
-greater than  \fB0\fR but not sufficient to store the value of that argument,
+greater than \fB0\fR but not sufficient to store the value of that argument,
 and the connection information to be returned in \fIcall\fR will be discarded.
 The provider's state, as seen by the user, will be changed to
 \fBT_DATAXFER.\fR
@@ -186,7 +177,7 @@ This function is not supported by the underlying transport provider.
 \fB\fBTOUTSTATE\fR\fR
 .ad
 .RS 15n
-The communications endpoint referenced by  \fIfd\fR is not in one of the states
+The communications endpoint referenced by \fIfd\fR is not in one of the states
 in which a call to this function is valid.
 .RE
 
@@ -211,23 +202,17 @@ A system error has occurred during execution of this function.
 .RE
 
 .SH TLI COMPATIBILITY
-.sp
-.LP
 The \fBXTI\fR and \fBTLI\fR interface definitions have common names but use
 different header files. This, and other semantic differences between the two
 interfaces are described in the subsections below.
 .SS "Interface Header"
-.sp
-.LP
 The \fBXTI\fR interfaces use the header file, \fBxti.h\fR. \fBTLI\fR interfaces
 should \fInot\fR use this header.  They should use the header:
 .br
 .in +2
-#include<tiuser.h>
+#include <tiuser.h>
 .in -2
 .SS "Error Description Values"
-.sp
-.LP
 The \fBt_errno\fR value \fBTPROTO\fR can be set by the \fBXTI\fR interface but
 not by the \fBTLI\fR interface.
 .sp
@@ -237,9 +222,7 @@ circumstances than its \fBXTI\fR counterpart is \fBTBUFOVFLW\fR. It can be
 returned even when the \fBmaxlen\fR field of the corresponding buffer has been
 set to zero.
 .SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -253,8 +236,6 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBfcntl\fR(2), \fBt_accept\fR(3NSL), \fBt_alloc\fR(3NSL), \fBt_bind\fR(3NSL),
 \fBt_connect\fR(3NSL), \fBt_listen\fR(3NSL), \fBt_open\fR(3NSL),
 \fBt_optmgmt\fR(3NSL), \fBattributes\fR(5)

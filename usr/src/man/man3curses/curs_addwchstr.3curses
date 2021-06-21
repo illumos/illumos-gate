@@ -4,20 +4,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CURS_ADDWCHSTR 3CURSES "Dec 31, 1996"
+.TH CURS_ADDWCHSTR 3CURSES "June 18, 2021"
 .SH NAME
 curs_addwchstr, addwchstr, addwchnstr, waddwchstr, waddwchnstr, mvaddwchstr,
 mvaddwchnstr, mvwaddwchstr, mvwaddwchnstr \- add string of wchar_t characters
 (and attributes) to a curses window
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR  [\fIflag\fR]... \fIfile\fR... \fB-lcurses\fR [\fIlibrary\fR]...
 .fi
 
 .LP
 .nf
-#include<curses.h>
+#include <curses.h>
 
 \fBint\fR \fBaddwchstr\fR(\fBchtype *\fR\fIwchstr\fR);
 .fi
@@ -58,31 +57,25 @@ mvaddwchnstr, mvwaddwchstr, mvwaddwchnstr \- add string of wchar_t characters
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 All of these routines copy \fIwchstr\fR, which points to a string of
 \fBwchar_t\fR characters, directly into the window image structure starting at
-the current cursor position. The four routines with  \fIn\fR as the last
+the current cursor position. The four routines with \fIn\fR as the last
 argument copy at most \fIn\fR elements, but no more than will fit on the line.
 If \fIn\fR=\fB\(mi1\fR then the whole string is copied, to the maximum number
 that fit on the line.
 .sp
 .LP
 The position of the window cursor is not advanced. These routines work faster
-than  \fBwaddnwstr\fR(3CURSES) because they merely copy \fIwchstr\fR into the
+than \fBwaddnwstr\fR(3CURSES) because they merely copy \fIwchstr\fR into the
 window image structure. On the other hand, care must be taken when using these
 functions because they don't perform any kind of checking (such as for the
 newline character), they do not advance the current cursor position, and they
 truncate the string, rather than wrapping it around to the new line.
 .SH RETURN VALUE
-.sp
-.LP
 All routines return the integer \fBERR\fR upon failure and an integer value
 other than \fBERR\fR upon successful completion, unless otherwise noted in the
 preceding routine descriptions.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -97,17 +90,13 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcurses\fR(3CURSES), \fBwaddnwstr\fR(3CURSES), \fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
 The header file <\fBcurses.h\fR> automatically includes the header files
 <\fBstdio.h\fR>, <\fBunctrl.h\fR> and <\fBwidec.h\fR>.
 .sp
 .LP
-Note that all routines except  \fBwaddwchnstr()\fR may be macros.
+Note that all routines except \fBwaddwchnstr()\fR may be macros.
 .sp
 .LP
 None of these routines can use the color attribute in \fBchtype\fR.

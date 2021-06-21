@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DEVMAP_DUP 9E "Jan 21, 1997"
+.TH DEVMAP_DUP 9E "June 18, 2021"
 .SH NAME
 devmap_dup \- device mapping duplication entry point
 .SH SYNOPSIS
 .nf
 #include <sys/ddi.h>
-#include <sys/sunddi.h
+#include <sys/sunddi.h>
 
 
 
@@ -66,7 +66,7 @@ to set \fInew_pvtp\fR to point to it. \fInew_dhp\fR is the handle of the new
 mapped object.
 .sp
 .LP
-A non-zero return value from  \fBdevmap_dup()\fR will cause a corresponding
+A non-zero return value from \fBdevmap_dup()\fR will cause a corresponding
 operation such as \fBfork()\fR to fail.
 .SH RETURN VALUES
 \fBdevmap_dup()\fR returns the following values:

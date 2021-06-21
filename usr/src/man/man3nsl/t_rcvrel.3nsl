@@ -44,11 +44,10 @@
 .\" Copyright 1994, The X/Open Company Ltd.  All Rights Reserved.
 .\" Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH T_RCVREL 3NSL "May 7, 1998"
+.TH T_RCVREL 3NSL "June 18, 2021"
 .SH NAME
 t_rcvrel \- acknowledge receipt of an orderly release indication
 .SH SYNOPSIS
-.LP
 .nf
 #include <xti.h>
 
@@ -58,13 +57,11 @@ t_rcvrel \- acknowledge receipt of an orderly release indication
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 This routine is part of the \fBXTI\fR interfaces which evolved from the
 \fBTLI\fR interfaces. \fBXTI\fR represents the future evolution of these
 interfaces. However, \fBTLI\fR interfaces are supported for compatibility. When
 using a \fBTLI\fR routine that has the same name as an \fBXTI\fR routine, the
-\fBtiuser.h\fR header file must be used.  Refer to the  \fBTLI\fR
+\fBtiuser.h\fR header file must be used.  Refer to the \fBTLI\fR
 \fBCOMPATIBILITY\fR section for a description of differences between the two
 interfaces.
 .sp
@@ -73,7 +70,7 @@ This function is used to receive an orderly release indication for the incoming
 direction of data transfer. The argument \fIfd\fR identifies the local
 transport endpoint where the connection exists. After receipt of this
 indication, the user may not attempt to receive more data by means of
-\fBt_rcv\fR(3NSL) or  \fBt_rcvv()\fR. Such an attempt will fail with
+\fBt_rcv\fR(3NSL) or \fBt_rcvv()\fR. Such an attempt will fail with
 \fIt_error\fR set to \fBTOUTSTATE\fR. However, the user may continue to send
 data over the connection if \fBt_sndrel\fR(3NSL) has not been called by the
 user. This function is an optional service of the transport provider, and is
@@ -82,17 +79,11 @@ on \fBt_open\fR(3NSL) or \fBt_getinfo\fR(3NSL). Any user data that may be
 associated with the orderly release indication is discarded when
 \fBt_rcvrel()\fR is called.
 .SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, a value of  \fB0\fR is returned.  Otherwise, a
-value of  -1 is returned and \fBt_errno\fR is set to indicate an error.
+Upon successful completion, a value of \fB0\fR is returned.  Otherwise, a
+value of -1 is returned and \fBt_errno\fR is set to indicate an error.
 .SH VALID STATES
-.sp
-.LP
 \fBT_DATAXFER\fR, \fBT_OUTREL\fR.
 .SH ERRORS
-.sp
-.LP
 On failure, \fBt_errno\fR is set to one of the following:
 .sp
 .ne 2
@@ -138,7 +129,7 @@ This function is not supported by the underlying transport provider.
 \fB\fBTOUTSTATE\fR\fR
 .ad
 .RS 15n
-The communications endpoint referenced by  \fIfd\fR is not in one of the states
+The communications endpoint referenced by \fIfd\fR is not in one of the states
 in which a call to this function is valid.
 .RE
 
@@ -163,23 +154,17 @@ A system error has occurred during execution of this function.
 .RE
 
 .SH TLI COMPATIBILITY
-.sp
-.LP
 The \fBXTI\fR and \fBTLI\fR interface definitions have common names but use
 different header files. This, and other semantic differences between the two
 interfaces are described in the subsections below.
 .SS "Interface Header"
-.sp
-.LP
 The \fBXTI\fR interfaces use the header file, \fBxti.h\fR. \fBTLI\fR interfaces
 should \fInot\fR use this header.  They should use the header:
 .br
 .in +2
-#include<tiuser.h>
+#include <tiuser.h>
 .in -2
 .SS "Error Description Values"
-.sp
-.LP
 The \fBt_errno\fR values that can be set by the \fBXTI\fR interface and cannot
 be set by the \fBTLI\fR interface are:
 .br
@@ -191,9 +176,7 @@ be set by the \fBTLI\fR interface are:
 \fBTOUTSTATE\fR
 .in -2
 .SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -207,7 +190,5 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBt_getinfo\fR(3NSL), \fBt_open\fR(3NSL), \fBt_sndrel\fR(3NSL),
 \fBattributes\fR(5)

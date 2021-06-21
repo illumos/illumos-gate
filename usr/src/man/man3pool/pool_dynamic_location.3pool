@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POOL_DYNAMIC_LOCATION 3POOL "Sep 23, 2003"
+.TH POOL_DYNAMIC_LOCATION 3POOL "June 18, 2021"
 .SH NAME
 pool_dynamic_location, pool_static_location, pool_version, pool_get_status,
 pool_set_status, pool_resource_type_list \- resource pool framework functions
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <pool.h>
@@ -43,8 +42,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpool_dynamic_location()\fR function returns the location used by the
 pools framework to store the dynamic configuration.
 .sp
@@ -81,8 +78,6 @@ maximum number of resource types the buffer can hold. On successful completion,
 the list of resource types up to the maximum buffer size is stored in the
 buffer pointed to by \fIreslist\fR.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBpool_dynamic_location()\fR function returns the location used by the
 pools framework to store the dynamic configuration.
 .sp
@@ -100,8 +95,6 @@ Upon successful completion, \fBpool_get_status()\fR, \fBpool_set_status()\fR,
 and \fBpool_resource_type_list()\fR all return 0. Otherwise, \(mi1 is returned
 and \fBpool_error\fR(3POOL) returns the pool specific error.
 .SH ERRORS
-.sp
-.LP
 No errors are defined for \fBpool_dynamic_location()\fR,
 \fBpool_static_location()\fR, and \fBpool_version()\fR.
 .sp
@@ -141,12 +134,11 @@ The \fInumres\fR parameter was \fINULL\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRGet the static location used by the pools framework.
 .sp
 .in +2
 .nf
-#include sys/types.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <pool.h>
 
@@ -181,8 +173,6 @@ const char *location = pool_dynamic_location();
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -201,6 +191,4 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)

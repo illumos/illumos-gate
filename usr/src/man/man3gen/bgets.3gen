@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BGETS 3GEN "May 9, 2001"
+.TH BGETS 3GEN "June 18, 2021"
 .SH NAME
 bgets \- read stream up to next delimiter
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lgen\fR [ \fIlibrary\fR ... ]
 #include <libgen.h>
@@ -17,14 +16,12 @@ cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lgen\fR [ \fIlibrary\fR ... ]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBbgets()\fR function reads characters from \fIstream\fR into \fIbuffer\fR
 until either \fIcount\fR is exhausted or one of the characters in
 \fIbreakstring\fR is encountered in the stream. The read data is terminated
 with a null byte ('\fB\e0\fR\&') and a pointer to the trailing null is
 returned. If a \fIbreakstring\fR character is encountered, the last non-null is
-the delimiter character that  terminated the scan.
+the delimiter character that terminated the scan.
 .sp
 .LP
 Note that, except for the fact that the returned value points to the \fBend\fR
@@ -56,12 +53,9 @@ If \fIbreakstring\fR is a null pointer, the value of \fIbreakstring\fR from the
 previous call is used. If \fIbreakstring\fR is null at the first call, no
 characters will be used to delimit the string.
 .SH RETURN VALUES
-.sp
-.LP
 \fINULL\fR is returned on error or end-of-file.  Reporting the condition is
-delayed to the next  call if any characters were read but not yet returned.
+delayed to the next call if any characters were read but not yet returned.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRExample of the \fBbgets()\fR function.
 .sp
 .LP
@@ -72,7 +66,7 @@ The following example prints the name of the first user encountered in
 .in +2
 .nf
 #include <stdio.h>
-#include<libgen.h>
+#include <libgen.h>
 
 int main()
 {
@@ -94,8 +88,6 @@ int main()
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -110,12 +102,8 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBgets\fR(3C), \fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
 When compiling multithread applications, the \fB_REENTRANT\fR flag must be
 defined on the compile line.  This flag should only be used in multithreaded
 applications.

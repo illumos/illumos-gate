@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CSET 3C "Nov 16, 2003"
+.TH CSET 3C "June 18, 2021"
 .SH NAME
 cset, csetlen, csetcol, csetno, wcsetno \- get information on EUC codesets
 .SH SYNOPSIS
-.LP
 .nf
 #include <euc.h>
 
@@ -32,9 +31,7 @@ cset, csetlen, csetcol, csetno, wcsetno \- get information on EUC codesets
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-Both \fBcsetlen()\fR and \fBcsetcol()\fR take a code set number  \fIcodeset\fR,
+Both \fBcsetlen()\fR and \fBcsetcol()\fR take a code set number \fIcodeset\fR,
 which must be 0, 1, 2, or 3. The \fBcsetlen()\fR function returns the number of
 bytes needed to represent a character of the given Extended Unix Code (EUC)
 code set, excluding the single-shift characters SS2 and SS3 for codesets 2 and
@@ -48,7 +45,7 @@ For example,
 .sp
 .in +2
 .nf
-#include<euc.h>
+#include <euc.h>
 \|.\|.\|.
 x+=csetcol(csetno(c));
 .fi
@@ -66,8 +63,8 @@ example,
 .sp
 .in +2
 .nf
-#include<euc.h>
-#include<widec.h>
+#include <euc.h>
+#include <widec.h>
 \|.\|.\|.
 x+=csetcol(wcsetno(pc));
 .fi
@@ -78,8 +75,6 @@ x+=csetcol(wcsetno(pc));
 increments a counter "x" (such as the cursor position) by the width of the
 Process Code character \fIpc\fR.
 .SH USAGE
-.sp
-.LP
 These functions work only for the EUC locales.
 .sp
 .LP
@@ -87,8 +82,6 @@ The \fBcset()\fR, \fBcsetlen()\fR, \fBcsetcol()\fR, \fBcsetno()\fR, and
 \fBwcsetno()\fR functions can be used safely in multithreaded applications, as
 long as \fBsetlocale\fR(3C) is not being called to change the locale.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -103,6 +96,4 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBsetlocale\fR(3C) \fBeuclen\fR(3C), \fBattributes\fR(5)
+\fBsetlocale\fR(3C), \fBeuclen\fR(3C), \fBattributes\fR(5)
