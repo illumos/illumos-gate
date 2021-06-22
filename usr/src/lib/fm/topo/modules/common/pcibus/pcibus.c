@@ -255,8 +255,7 @@ pciexfn_add_ufm(topo_mod_t *mod, tnode_t *parent, tnode_t *node)
 	}
 	(void) close(fd);
 
-	if (nvlist_unpack(ufmr.ufmr_buf, ufmr.ufmr_bufsz, &ufminfo,
-	    NV_ENCODE_NATIVE) != 0) {
+	if (nvlist_unpack(ufmr.ufmr_buf, ufmr.ufmr_bufsz, &ufminfo, 0) != 0) {
 		topo_mod_dprintf(mod, "failed to unpack nvlist\n");
 		topo_mod_free(mod, ufmr.ufmr_buf, ufmr.ufmr_bufsz);
 		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));

@@ -40,8 +40,6 @@ CFLAGS		+= $(CCVERBOSE) $(C_PICFLAGS)
 CPPFLAGS	+= -I../common -I../../common/inc -D_REENTRANT
 DYNFLAGS	+= $(ZINTERPOSE)
 
-CERRWARN	+= $(CNOWARN_UNINIT)
-
 .KEEP_STATE:
 
 all: $(LIBS)

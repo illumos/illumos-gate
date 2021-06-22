@@ -25,6 +25,7 @@
  * MROUTING Revision 3.5
  * Copyright 2018, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 Racktop Systems, Inc.
  */
 
 /*
@@ -6025,6 +6026,7 @@ udp_report_item_v4(const mib2_udpEntry_t *ude, boolean_t first,
 {
 	char	*leadin;
 	char	lname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
+	char	fname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
 			/* hostname + portname */
 	proc_fdinfo_t	*ph;
 
@@ -6052,7 +6054,7 @@ udp_report_item_v4(const mib2_udpEntry_t *ude, boolean_t first,
 	    lname, sizeof (lname)),
 	    ude->udpEntryInfo.ue_state == MIB2_UDP_connected ?
 	    pr_ap(ude->udpEntryInfo.ue_RemoteAddress,
-	    ude->udpEntryInfo.ue_RemotePort, "udp", lname, sizeof (lname)) :
+	    ude->udpEntryInfo.ue_RemotePort, "udp", fname, sizeof (fname)) :
 	    "") == -1) {
 		fatal(1, "Out of memory");
 	}
@@ -6094,6 +6096,7 @@ udp_report_item_v6(const mib2_udp6Entry_t *ude6, boolean_t first,
 {
 	char		*leadin;
 	char		lname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
+	char		fname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
 			/* hostname + portname */
 	char		ifname[LIFNAMSIZ + 1];
 	const char	*ifnamep;
@@ -6126,7 +6129,7 @@ udp_report_item_v6(const mib2_udp6Entry_t *ude6, boolean_t first,
 	    ude6->udp6LocalPort, "udp", lname, sizeof (lname)),
 	    ude6->udp6EntryInfo.ue_state == MIB2_UDP_connected ?
 	    pr_ap6(&ude6->udp6EntryInfo.ue_RemoteAddress,
-	    ude6->udp6EntryInfo.ue_RemotePort, "udp", lname, sizeof (lname)) :
+	    ude6->udp6EntryInfo.ue_RemotePort, "udp", fname, sizeof (fname)) :
 	    "") == -1) {
 		fatal(1, "Out of memory");
 	}

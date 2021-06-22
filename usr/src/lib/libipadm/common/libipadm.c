@@ -826,7 +826,7 @@ i_ipadm_init_ifs(ipadm_handle_t iph, const char *ifs, nvlist_t **allifs)
 	 * configuration information for the given interface(s).
 	 */
 	err = nvlist_unpack((char *)rvalp + sizeof (ipmgmt_get_rval_t),
-	    rvalp->ir_nvlsize, allifs, NV_ENCODE_NATIVE);
+	    rvalp->ir_nvlsize, allifs, 0);
 	if (err != 0)
 		status = ipadm_errno2status(err);
 done:

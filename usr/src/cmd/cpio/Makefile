@@ -31,7 +31,6 @@ SRCS= $(OBJS:%.o=%.c)
 include ../Makefile.cmd
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -DSOLARIS_PRIVS
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off
@@ -51,7 +50,5 @@ install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../Makefile.targ
