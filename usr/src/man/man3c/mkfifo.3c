@@ -45,11 +45,10 @@
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2014, Joyent, Inc.
 .\"
-.TH MKFIFO 3C "Apr 24, 2002"
+.TH MKFIFO 3C "June 18, 2021"
 .SH NAME
 mkfifo, mkfifoat \- make a FIFO special file
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -62,7 +61,6 @@ mkfifo, mkfifoat \- make a FIFO special file
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBmkfifo()\fR and \fBmkfifoat()\fR functions create a new FIFO special file
 named by the pathname pointed to by \fIpath\fR.  The file permission bits of the
 new FIFO are initialized from \fImode\fR.  The file permission bits of the
@@ -96,11 +94,9 @@ the \fBst_atime\fR, \fBst_ctime\fR, and \fBst_mtime\fR fields of the file. Also,
 the \fBst_ctime\fR and \fBst_mtime\fR fields of the directory that contains the
 new entry are marked for update.
 .SH RETURN VALUES
-.LP
 Upon successful completion, \fB0\fR is returned.  Otherwise, \fB\(mi1\fR is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.LP
 The \fBmkfifo()\fR and \fBmkfifoat()\fR functions will fail if:
 .sp
 .ne 2
@@ -217,7 +213,6 @@ component is longer than {\fBNAME_MAX\fR}.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCreate a FIFO File
 .sp
 .LP
@@ -228,8 +223,8 @@ permissions for the group and others.
 .sp
 .in +2
 .nf
-#include sys/types.h>
-#include sys/stat.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 int status;
 \&...
 status = mkfifo("/home/cnd/mod_done", S_IWUSR | S_IRUSR |
@@ -238,7 +233,6 @@ status = mkfifo("/home/cnd/mod_done", S_IWUSR | S_IRUSR |
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -255,6 +249,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBmkdir\fR(1), \fBchmod\fR(2), \fBexec\fR(2), \fBmknod\fR(2), \fBumask\fR(2),
 \fBstat.h\fR(3HEAD), \fBufs\fR(7FS), \fBattributes\fR(5), \fBstandards\fR(5)

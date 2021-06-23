@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NOTE 3EXT "Dec 31, 1996"
+.TH NOTE 3EXT "June 18, 2021"
 .SH NAME
 NOTE, _NOTE \- annotate source code with info for tools
 .SH SYNOPSIS
-.LP
 .nf
 #include <note.h>
 
@@ -19,7 +18,7 @@ NOTE, _NOTE \- annotate source code with info for tools
 .LP
 .nf
 or
-#include<sys/note.h>
+#include <sys/note.h>
 
 
 
@@ -27,8 +26,6 @@ or
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 These macros are used to embed information for tools in program source. A use
 of one of these macros is called an "annotation". A tool may define a set of
 such annotations which can then be used to provide the tool with information
@@ -101,8 +98,6 @@ particular type of annotation may only be allowed in a subset of those places.
 For example, a particular annotation may not be allowed inside a \fBstruct\fR
 or \fBunion\fR definition.
 .SS "NOTE vs _NOTE"
-.sp
-.LP
 Ordinarily, \fBNOTE\fR should be used rather than \fB_NOTE\fR, since use of
 \fB_NOTE\fR technically makes a program non-portable. However, it may be
 inconvenient to use \fBNOTE\fR for this purpose in existing code if \fBNOTE\fR
@@ -127,8 +122,6 @@ Public header files which span projects should use \fB_NOTE\fR rather than
 \fBNOTE\fR, since \fBNOTE\fR may already be used by a program which needs to
 include such a header file.
 .SS "\fINoteInfo\fR\fB Argument\fR"
-.sp
-.LP
 The actual \fINoteInfo\fR used in an annotation should be specified by a tool
 that deals with program source (see the documentation for the tool to determine
 which annotations, if any, it understands).
@@ -152,8 +145,6 @@ be compatible with an ANSI C tokenizer and that unquoted parentheses be
 balanced (so that the end of the annotation can be determined without intimate
 knowledge of any particular annotation).
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -168,6 +159,4 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBnote\fR(4), \fBattributes\fR(5)

@@ -3,20 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SETLABEL 3C "Dec 29, 1996"
+.TH SETLABEL 3C "June 19, 2021"
 .SH NAME
 setlabel \- define the label for \fBpfmt()\fR and \fBlfmt()\fR
 .SH SYNOPSIS
-.LP
 .nf
-#include <pfmt..h>
+#include <pfmt.h>
 
 \fBint\fR \fBsetlabel\fR(\fBconst char *\fR\fIlabel\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsetlabel()\fR function defines the label for messages produced in
 standard format by subsequent calls to \fBlfmt\fR(3C) and \fBpfmt\fR(3C).
 .sp
@@ -27,15 +24,11 @@ length.
 .LP
 No label is defined before \fBsetlabel()\fR is called. The label should be set
 once at the beginning of a utility and remain constant. A null pointer or an
-empty string passed as argument will reset the  definition of the label.
+empty string passed as argument will reset the definition of the label.
 .SH RETURN VALUE
-.sp
-.LP
 Upon successful completion, \fBsetlabel()\fR returns \fB0\fR; otherwise, it
 returns a non-zero value.
 .SH EXAMPLES
-.sp
-.LP
 The following code (without previous call to \fBsetlabel()\fR):
 .sp
 .in +2
@@ -58,8 +51,6 @@ UX:test: ERROR: Cannot open file
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -74,6 +65,4 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBgetopt\fR(3C), \fBlfmt\fR(3C), \fBpfmt\fR(3C), \fBattributes\fR(5)

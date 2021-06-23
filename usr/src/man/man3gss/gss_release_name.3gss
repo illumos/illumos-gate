@@ -3,27 +3,22 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GSS_RELEASE_NAME 3GSS "Jan 15, 2003"
+.TH GSS_RELEASE_NAME 3GSS "June 18, 2021"
 .SH NAME
 gss_release_name \- discard an internal-form name
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [\fIflag \&.\|.\|.\fR] \fIfile\fR\&.\|.\|. \fB-lgss\fR [\fIlibrary \&.\|.\|.\fR]
-#include <gssapi/gssapi.h
+#include <gssapi/gssapi.h>
 
 \fBOM_uint32\fR \fBgss_release_name\fR(\fBOM_uint32 *\fR\fIminor_status\fR, \fBgss_name_t *\fR\fIname\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBgss_release_name()\fR function frees \fBGSS-API\fR-allocated storage
 associated with an internal-form name.  The \fIname\fR is set to
 \fBGSS_C_NO_NAME\fR on successful completion of this call.
 .SH PARAMETERS
-.sp
-.LP
 The parameter descriptions for \fBgss_release_name()\fR follow:
 .sp
 .ne 2
@@ -44,8 +39,6 @@ The name to be deleted.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 The \fBgss_release_name()\fR function may return the following status codes:
 .sp
 .ne 2
@@ -77,8 +70,6 @@ of the \fIminor_status\fR parameter details the error condition.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -93,8 +84,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5)
 .sp
 .LP

@@ -3,25 +3,22 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ISENCRYPT 3GEN "Dec 29, 1996"
+.TH ISENCRYPT 3GEN "June 18, 2021"
 .SH NAME
 isencrypt \- determine whether a buffer of characters is encrypted
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR  [\fIflag\fR]... [\fIfile\fR]... \fB-lgen\fR [\fIlibrary\fR]...
 .fi
 
 .LP
 .nf
-#include<libgen.h>
+#include <libgen.h>
 
 \fBint\fR \fBisencrypt\fR(\fBconst char *\fR\fIfbuf\fR, \fBsize_t\fR \fIninbuf\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBisencrypt()\fR uses heuristics to determine whether a buffer of characters
 is encrypted. It requires two arguments: a pointer to an array of characters
 and the number of characters in the buffer.
@@ -40,15 +37,11 @@ determine if the buffer is encrypted. If \fIninbuf\fR has at least 64
 characters, a chi-square test is used to determine if the bytes in the buffer
 have a uniform distribution; if it does, then \fBisencrypt()\fR assumes the
 buffer is encrypted.  If the buffer has less than 64 characters, a check is
-made for null characters and a terminating  new-line to determine whether the
+made for null characters and a terminating new-line to determine whether the
 buffer is encrypted.
 .SH RETURN VALUES
-.sp
-.LP
-If the buffer is encrypted,  \fB1\fR is returned; otherwise, zero is returned.
+If the buffer is encrypted, \fB1\fR is returned; otherwise, zero is returned.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -63,12 +56,8 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBsetlocale\fR(3C), \fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
 When compiling multithreaded applications, the \fB_REENTRANT\fR flag must be
 defined on the compile line.  This flag should only be used in multithreaded
 applications.

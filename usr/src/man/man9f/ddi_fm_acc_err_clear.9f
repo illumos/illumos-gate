@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_FM_ACC_ERR_CLEAR 9F "May 10, 2007"
+.TH DDI_FM_ACC_ERR_CLEAR 9F "June 19, 2021"
 .SH NAME
 ddi_fm_acc_err_clear, ddi_fm_dma_err_clear \- clear the error status for an
 access or DMA handle
 .SH SYNOPSIS
 .nf
-#include <sys/ndifma.h>
+#include <sys/ddifm.h>
 
 \fBvoid\fR \fBddi_fm_acc_err_clear\fR(\fBddi_acc_handle_t\fR \fIacc_handle\fR,
      \fBint\fR \fIversion\fR);

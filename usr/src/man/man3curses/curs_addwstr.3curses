@@ -4,20 +4,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CURS_ADDWSTR 3CURSES "Dec 31, 1996"
+.TH CURS_ADDWSTR 3CURSES "June 18, 2021"
 .SH NAME
 curs_addwstr, addwstr, addnwstr, waddwstr, waddnwstr, mvaddwstr, mvaddnwstr,
 mvwaddwstr, mvwaddnwstr \- add a string of wchar_t characters to a curses
 window and advance cursor
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR  [\fIflag\fR]... \fIfile\fR... \fB-lcurses\fR [\fIlibrary\fR]...
 .fi
 
 .LP
 .nf
-#include<curses.h>
+#include <curses.h>
 
 \fBint\fR \fBaddwstr\fR(\fBwchar_t *\fR\fIwstr\fR);
 .fi
@@ -58,22 +57,16 @@ window and advance cursor
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 All of these routines write all the characters of the null-terminated
-\fBwchar_t\fR character string  \fBwstr\fR on the given window. The effect is
-similar to calling \fBwaddwch\fR(3CURSES) once for each  \fBwchar_t\fR
+\fBwchar_t\fR character string \fBwstr\fR on the given window. The effect is
+similar to calling \fBwaddwch\fR(3CURSES) once for each \fBwchar_t\fR
 character in the string. The four routines with \fIn\fR as the last argument
 write at most \fIn\fR \fBwchar_t\fR characters. If \fIn\fR is negative, then
 the entire string will be added.
 .SH RETURN VALUE
-.sp
-.LP
 All routines return the integer \fBERR\fR upon failure and an integer value
 other than \fBERR\fR upon successful completion.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -88,15 +81,11 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcurses\fR(3CURSES), \fBwaddwch\fR(3CURSES), \fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
-The header file  <\fBcurses.h\fR> automatically includes the header files
+The header file <\fBcurses.h\fR> automatically includes the header files
 <\fBstdio.h\fR>, <\fBnctrl.h\fR> and <\fBwidec.h\fR>.
 .sp
 .LP
-Note that all of these routines except  \fBwaddwstr()\fR and  \fBwaddnwstr()\fR
+Note that all of these routines except \fBwaddwstr()\fR and \fBwaddnwstr()\fR
 may be macros.

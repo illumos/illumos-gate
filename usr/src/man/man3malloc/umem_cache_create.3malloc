@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UMEM_CACHE_CREATE 3MALLOC "Mar 24, 2008"
+.TH UMEM_CACHE_CREATE 3MALLOC "June 18, 2021"
 .SH NAME
 umem_cache_create, umem_cache_destroy, umem_cache_alloc, umem_cache_free \-
 allocation cache manipulation
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lumem\fR [ \fIlibrary \&.\|.\|.\fR ]
 #include <umem.h>
@@ -35,9 +34,7 @@ cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lumem\fR [ \fIlibrary \&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-These functions create, destroy, and use an "object cache"  An object cache is
+These functions create, destroy, and use an "object cache".  An object cache is
 a collection of buffers of a single size, with optional content caching enabled
 by the use of callbacks (see \fBCache Callbacks\fR).  Object caches are
 MT-Safe. Multiple allocations and freeing of memory from different threads can
@@ -53,8 +50,6 @@ been created, objects can be requested from and returned to the cache using
 \fBumem_cache_alloc()\fR and \fBumem_cache_free()\fR, respectively. A cache
 with no outstanding buffers can be destroyed with \fBumem_cache_destroy()\fR.
 .SS "Creating and Destroying Caches"
-.sp
-.LP
 The \fBumem_cache_create()\fR function creates a cache of objects and takes as
 arguments the following:
 .sp
@@ -185,8 +180,6 @@ support.
 The \fBumem_cache_destroy()\fR function destroys an object cache. If the cache
 has any outstanding allocations, the behavior is undefined.
 .SS "Allocating Objects"
-.sp
-.LP
 The \fBumem_cache_alloc()\fR function takes as arguments:
 .sp
 .ne 2
@@ -262,8 +255,6 @@ information.
 
 .RE
 .SS "Freeing Objects"
-.sp
-.LP
 The \fBumem_cache_free()\fR function takes as arguments:
 .sp
 .ne 2
@@ -294,20 +285,14 @@ Undefined behavior results if an object is freed multiple times, if an object
 is modified after it is freed, or if an object is freed to a cache other than
 the one from which it was allocated.
 .SS "Caches with Constructors"
-.sp
-.LP
 When a constructor callback is in use, there is essentially a contract between
 the cache and its clients.  The cache guarantees that all objects returned from
 \fBumem_cache_alloc()\fR will be in the constructed state, and the client
 guarantees that it will return the object to the constructed state before
 handing it to \fBumem_cache_free()\fR.
 .SH RETURN VALUES
-.sp
-.LP
 Upon failure, the \fBumem_cache_create()\fR function returns a null pointer.
 .SH ERRORS
-.sp
-.LP
 The \fBumem_cache_create()\fR function will fail if:
 .sp
 .ne 2
@@ -340,7 +325,6 @@ argument is too large and its use would cause integer overflow to occur.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUse a fixed-size structure with no constructor callback.
 .sp
 .in +2
@@ -489,8 +473,8 @@ umem_cache_free(my_obj_cache, cur);
 .sp
 .in +2
 .nf
-#include assert.h>
-#include umem.h>
+#include <assert.h>
+#include <umem.h>
 
 typedef struct my_obj {
           char *my_buffer;
@@ -558,8 +542,6 @@ umem_cache_free(my_obj_8k_cache, my_obj_8k);
 See the \fBEXAMPLES\fR section of \fBumem_alloc\fR(3MALLOC) for examples
 involving the \fBUMEM_NOFAIL\fR flag.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -576,8 +558,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBsetcontext\fR(2), \fBatexit\fR(3C), \fBlibumem\fR(3LIB), \fBlongjmp\fR(3C),
 \fBswapcontext\fR(3C), \fBthr_exit\fR(3C), \fBumem_alloc\fR(3MALLOC),
 \fBumem_debug\fR(3MALLOC), \fBattributes\fR(5)
@@ -591,8 +571,6 @@ Bonwick, Jeff and Jonathan Adams, "Magazines and vmem: Extending the Slab
 Allocator to Many CPUs and Arbitrary Resources", Proceedings of the Summer 2001
 Usenix Conference.
 .SH WARNINGS
-.sp
-.LP
 Any of the following can cause undefined results:
 .RS +4
 .TP
@@ -651,8 +629,6 @@ Any allocations made with a different flags argument results in undefined
 behavior.  The constructor must correctly handle the failure of any allocations
 it makes.
 .SH NOTES
-.sp
-.LP
 Object caches make the following guarantees about objects:
 .RS +4
 .TP
