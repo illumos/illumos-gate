@@ -19,6 +19,7 @@ usr/src/cmd/smbsrv/testoplock/case*.ref
 usr/src/data/hwdata/pci.ids
 usr/src/data/hwdata/usb.ids
 usr/src/data/perfmon/readme.txt
+usr/src/data/ucode/intel/*
 usr/src/test/crypto-tests/tests/digest/data/*.rsp
 usr/src/test/util-tests/tests/dis/i386/*.out
 usr/src/test/libc-tests/tests/qsort/*.c

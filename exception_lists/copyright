@@ -23,9 +23,9 @@
 # Copyright 2020 Tintri by DDN, Inc. All rights reserved.
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011 by Delphix. All rights reserved.
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 syntax: glob
@@ -105,6 +105,8 @@ usr/src/data/hwdata/THIRDPARTYLICENSE.efifixes.tmpl
 usr/src/data/hwdata/pci.ids
 usr/src/data/hwdata/usb.ids
 usr/src/data/perfmon/*
+usr/src/data/ucode/Makefile.links
+usr/src/data/ucode/intel/*
 usr/src/grub/grub-0.97/stage2/Makefile.am
 usr/src/grub/grub-0.97/stage2/builtins.c
 usr/src/grub/grub-0.97/stage2/disk_io.c
