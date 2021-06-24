@@ -106,15 +106,41 @@ const text_cmap_t cmap4_to_24 = {
 };
 /* END CSTYLED */
 
-static uint32_t
-rgb_to_color(const rgb_t *rgb, uint32_t r, uint32_t g, uint32_t b)
+/* RGB configuration from boot loader */
+rgb_t rgb_info = {
+	.red = { .size = 8, .pos = 16 },
+	.green = { .size = 8, .pos = 8 },
+	.blue = { .size = 8, .pos = 0 }
+};
+
+/*
+ * Map r, g, b to RGB value.
+ */
+uint32_t
+rgb_to_color(const rgb_t *rgb, uint32_t a, uint32_t r, uint32_t g, uint32_t b)
 {
 	uint32_t color;
 	int pos, size;
 
+	color = 0;
+	if (a != 0) {
+		if (rgb->red.pos != 0 &&
+		    rgb->green.pos != 0 &&
+		    rgb->blue.pos != 0) {
+			pos = 0;
+			size = MIN(rgb->red.pos,
+			    MIN(rgb->green.pos, rgb->blue.pos));
+		} else {
+			pos = 24;
+			size = (rgb->red.size + rgb->green.size +
+			    rgb->blue.size) / 3;
+		}
+		color = ((a * ((1 << size) - 1)) / 0xff) << pos;
+	}
+
 	pos = rgb->red.pos;
 	size = rgb->red.size;
-	color = ((r * ((1 << size) - 1)) / 0xff) << pos;
+	color |= ((r * ((1 << size) - 1)) / 0xff) << pos;
 
 	pos = rgb->green.pos;
 	size = rgb->green.size;
@@ -128,12 +154,12 @@ rgb_to_color(const rgb_t *rgb, uint32_t r, uint32_t g, uint32_t b)
 }
 
 uint32_t
-rgb_color_map(const rgb_t *rgb, uint8_t index)
+rgb_color_map(const rgb_t *rgb, uint8_t index, uint8_t alpha)
 {
 	uint32_t color, code, gray, level;
 
 	if (index < 16) {
-		color = rgb_to_color(rgb, cmap4_to_24.red[index],
+		color = rgb_to_color(rgb, alpha, cmap4_to_24.red[index],
 		    cmap4_to_24.green[index], cmap4_to_24.blue[index]);
 		return (color);
 	}
@@ -152,8 +178,8 @@ rgb_color_map(const rgb_t *rgb, uint8_t index)
 					red = red ? (red * 40 + 55) : 0;
 					green = green ? (green * 40 + 55) : 0;
 					blue = blue ? (blue * 40 + 55) : 0;
-					color = rgb_to_color(rgb, red, green,
-					    blue);
+					color = rgb_to_color(rgb, alpha,
+					    red, green, blue);
 					return (color);
 				}
 			}
@@ -167,7 +193,7 @@ rgb_color_map(const rgb_t *rgb, uint8_t index)
 		if (code == index)
 			break;
 	}
-	return (rgb_to_color(rgb, level, level, level));
+	return (rgb_to_color(rgb, alpha, level, level, level));
 }
 /*
  * Fonts are statically linked with this module. At some point an
@@ -365,8 +391,8 @@ font_bit_to_pix4(
     struct font *f,
     uint8_t *dest,
     uint32_t c,
-    uint8_t fg_color,
-    uint8_t bg_color)
+    uint32_t fg_color,
+    uint32_t bg_color)
 {
 	uint32_t row;
 	int	byte;
@@ -426,8 +452,8 @@ font_bit_to_pix8(
     struct font *f,
     uint8_t *dest,
     uint32_t c,
-    uint8_t fg_color,
-    uint8_t bg_color)
+    uint32_t fg_color,
+    uint32_t bg_color)
 {
 	uint32_t row;
 	int	byte;
@@ -489,8 +515,8 @@ font_bit_to_pix16(
     struct font *f,
     uint16_t *dest,
     uint32_t c,
-    uint16_t fg_color16,
-    uint16_t bg_color16)
+    uint32_t fg_color16,
+    uint32_t bg_color16)
 {
 	uint32_t row;
 	int	byte;

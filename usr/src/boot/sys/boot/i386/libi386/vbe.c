@@ -39,6 +39,7 @@
 #include "gfx_fb.h"	/* for EDID */
 #include "vbe.h"
 #include <sys/font.h>
+#include <sys/rgb.h>
 #include <sys/vgareg.h>
 #include <sys/vgasubr.h>
 
@@ -488,6 +489,25 @@ vbe_set_mode(int modenum)
 		    mi.BlueFieldPosition;
 		gfx_fb.u.fb2.framebuffer_blue_mask_size = mi.BlueMaskSize;
 	}
+
+	/*
+	 * Support for color mapping.
+	 * For 8, 24 and 32 bit depth, use mask size 8.
+	 * 15/16 bit depth needs to use mask size from mode, or we will
+	 * lose color information from 32-bit to 15/16 bit translation.
+	 */
+	if (mi.BitsPerPixel == 15 || mi.BitsPerPixel == 16) {
+		rgb_info.red.size = gfx_fb.u.fb2.framebuffer_red_mask_size;
+		rgb_info.green.size = gfx_fb.u.fb2.framebuffer_green_mask_size;
+		rgb_info.blue.size = gfx_fb.u.fb2.framebuffer_blue_mask_size;
+	} else {
+		rgb_info.red.size = 8;
+		rgb_info.green.size = 8;
+		rgb_info.blue.size = 8;
+	}
+	rgb_info.red.pos = 16;
+	rgb_info.green.pos = 8;
+	rgb_info.blue.pos = 0;
 
 	return (0);
 }

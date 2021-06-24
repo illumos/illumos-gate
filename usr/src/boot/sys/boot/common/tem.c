@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2021 Toomas Soome <tsoome@me.com>
  */
 
 /*
@@ -55,8 +56,21 @@
  * on the physical screen.  We only store the character and color data in
  * tem_vt_state since the bit2pix conversion only happens when actually
  * rendering to the physical framebuffer.
+ *
+ * Color support:
+ * Text mode can only support standard system colors, 4-bit [0-15] indexed.
+ * On framebuffer devices, we can aditionally use [16-255] or truecolor.
+ * Additional colors can be used via CSI 38 and CSI 48 sequences.
+ * CSI 38/48;5 is using indexed colors [0-255], CSI 38/48;2 does
+ * specify color by RGB triple.
+ *
+ * While sending glyphs to display, we need to process glyph attributes:
+ * TEM_ATTR_BOLD will cause BOLD font to be used (or BRIGHT color if we
+ * we use indexed color [0-7]).
+ * We ignore TEM_ATTR_BRIGHT_FG/TEM_ATTR_BRIGHT_BG with RGB colors.
+ * TEM_ATTR_REVERSE and TEM_ATTR_SCREEN_REVERSE will cause fg and bg to be
+ * swapped.
  */
-
 
 #include <stand.h>
 #include <sys/ascii.h>
@@ -130,14 +144,16 @@ static void	tem_pix_copy(struct tem_vt_state *,
 static void	tem_pix_cursor(struct tem_vt_state *, short);
 static void	tem_get_attr(struct tem_vt_state *, text_color_t *,
 		    text_color_t *, text_attr_t *, uint8_t);
-static void	tem_get_color(text_color_t *, text_color_t *, term_char_t);
+static void	tem_get_color(struct tem_vt_state *,
+		    text_color_t *, text_color_t *, term_char_t *);
+static void	tem_set_color(text_color_t *, color_t *);
 static void	tem_pix_align(struct tem_vt_state *);
 static void	tem_text_display(struct tem_vt_state *, term_char_t *, int,
 		    screen_pos_t, screen_pos_t);
 static void	tem_text_copy(struct tem_vt_state *,
 		    screen_pos_t, screen_pos_t, screen_pos_t, screen_pos_t,
 		    screen_pos_t, screen_pos_t);
-static void	tem_pix_bit2pix(struct tem_vt_state *, term_char_t);
+static void	tem_pix_bit2pix(struct tem_vt_state *, term_char_t *);
 static void	tem_pix_cls_range(struct tem_vt_state *, screen_pos_t, int,
 		    int, screen_pos_t, int, int, boolean_t);
 static void	tem_pix_cls(struct tem_vt_state *, int,
@@ -867,10 +883,13 @@ tems_get_initial_color(tem_color_t *pcolor)
 {
 	boolean_t inverse, inverse_screen;
 	unsigned short  flags = 0;
+	uint8_t fg, bg;
 
-	pcolor->fg_color = DEFAULT_ANSI_FOREGROUND;
-	pcolor->bg_color = DEFAULT_ANSI_BACKGROUND;
-	plat_tem_get_colors(&pcolor->fg_color, &pcolor->bg_color);
+	fg = DEFAULT_ANSI_FOREGROUND;
+	bg = DEFAULT_ANSI_BACKGROUND;
+	plat_tem_get_colors(&fg, &bg);
+	pcolor->fg_color.n = fg;
+	pcolor->bg_color.n = bg;
 
 	tems_get_inverses(&inverse, &inverse_screen);
 	if (inverse)
@@ -883,20 +902,20 @@ tems_get_initial_color(tem_color_t *pcolor)
 		 * The reverse attribute is set.
 		 * In case of black on white we want bright white for BG.
 		 */
-		if (pcolor->fg_color == ANSI_COLOR_WHITE)
+		if (pcolor->fg_color.n == ANSI_COLOR_WHITE)
 			flags |= TEM_ATTR_BRIGHT_BG;
 
 		/*
 		 * For white on black, unset the bright attribute we
 		 * had set to have bright white background.
 		 */
-		if (pcolor->fg_color == ANSI_COLOR_BLACK)
+		if (pcolor->fg_color.n == ANSI_COLOR_BLACK)
 			flags &= ~TEM_ATTR_BRIGHT_BG;
 	} else {
 		/*
 		 * In case of black on white we want bright white for BG.
 		 */
-		if (pcolor->bg_color == ANSI_COLOR_WHITE)
+		if (pcolor->bg_color.n == ANSI_COLOR_WHITE)
 			flags |= TEM_ATTR_BRIGHT_BG;
 	}
 
@@ -1165,12 +1184,23 @@ tem_setparam(struct tem_vt_state *tem, int count, int newparam)
  * Colors 16-255 are used without translation.
  */
 static void
-tem_select_color(struct tem_vt_state *tem, text_color_t color, bool fg)
+tem_select_color(struct tem_vt_state *tem, int color, bool fg)
 {
-	if (fg == true)
-		tem->tvs_fg_color = color;
-	else
-		tem->tvs_bg_color = color;
+	if (color < 0 || color > 255)
+		return;
+
+	/* VGA text mode only does support 16 colors. */
+	if (tems.ts_display_mode == VIS_TEXT && color > 15)
+		return;
+
+	/* Switch to use indexed colors. */
+	if (fg == true) {
+		tem->tvs_flags &= ~TEM_ATTR_RGB_FG;
+		tem->tvs_fg_color.n = color;
+	} else {
+		tem->tvs_flags &= ~TEM_ATTR_RGB_BG;
+		tem->tvs_bg_color.n = color;
+	}
 
 	/*
 	 * For colors 0-7, make sure the BRIGHT attribute is not set.
@@ -1188,10 +1218,10 @@ tem_select_color(struct tem_vt_state *tem, text_color_t color, bool fg)
 	 */
 	if (color < 16) {
 		if (fg == true) {
-			tem->tvs_fg_color -= 8;
+			tem->tvs_fg_color.n -= 8;
 			tem->tvs_flags |= TEM_ATTR_BRIGHT_FG;
 		} else {
-			tem->tvs_bg_color -= 8;
+			tem->tvs_bg_color.n -= 8;
 			tem->tvs_flags |= TEM_ATTR_BRIGHT_BG;
 		}
 	}
@@ -1206,6 +1236,7 @@ tem_selgraph(struct tem_vt_state *tem)
 	int curparam;
 	int count = 0;
 	int param;
+	int r, g, b;
 
 	tem->tvs_state = A_STATE_START;
 
@@ -1274,23 +1305,53 @@ tem_selgraph(struct tem_vt_state *tem)
 		case 35: /* magenta	(light magenta)	foreground */
 		case 36: /* cyan	(light cyan)	foreground */
 		case 37: /* white	(bright white)	foreground */
-			tem->tvs_fg_color = param - 30;
+			tem->tvs_fg_color.n = param - 30;
 			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
+			tem->tvs_flags &= ~TEM_ATTR_RGB_FG;
 			break;
 
 		case 38:
-			/* We should have at least 3 parameters */
-			if (curparam < 3)
+			/*
+			 * We should have 3 parameters for 256 colors and
+			 * 5 parameters for 24-bit colors.
+			 */
+			if (curparam < 3) {
+				curparam = 0;
 				break;
+			}
 
 			/*
-			 * 256 and truecolor needs depth at least 24, but
+			 * 256 and truecolor needs depth > 8, but
 			 * we still need to process the sequence.
 			 */
 			count++;
 			curparam--;
 			param = tem->tvs_params[count];
 			switch (param) {
+			case 2:	/* RGB colors */
+				if (curparam < 4) {
+					curparam = 0;
+					break;
+				}
+				r = tem->tvs_params[++count];
+				g = tem->tvs_params[++count];
+				b = tem->tvs_params[++count];
+				curparam -= 3;
+				if (r < 0 || r > 255 || g < 0 || g > 255 ||
+				    b < 0 || b > 255)
+					break;
+
+				if (tems.ts_display_mode == VIS_PIXEL &&
+				    tems.ts_pdepth > 8) {
+					tem->tvs_flags |= TEM_ATTR_RGB_FG;
+					tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
+					tem->tvs_fg_color.rgb.a =
+					    tem->tvs_alpha;
+					tem->tvs_fg_color.rgb.r = r;
+					tem->tvs_fg_color.rgb.g = g;
+					tem->tvs_fg_color.rgb.b = b;
+				}
+				break;
 			case 5:	/* 256 colors */
 				count++;
 				curparam--;
@@ -1298,6 +1359,7 @@ tem_selgraph(struct tem_vt_state *tem)
 				    true);
 				break;
 			default:
+				curparam = 0;
 				break;
 			}
 			break;
@@ -1307,6 +1369,7 @@ tem_selgraph(struct tem_vt_state *tem)
 			 * Reset the foreground colour and brightness.
 			 */
 			tem->tvs_fg_color = tems.ts_init_color.fg_color;
+			tem->tvs_flags &= ~TEM_ATTR_RGB_FG;
 			if (tems.ts_init_color.a_flags & TEM_ATTR_BRIGHT_FG)
 				tem->tvs_flags |= TEM_ATTR_BRIGHT_FG;
 			else
@@ -1321,23 +1384,54 @@ tem_selgraph(struct tem_vt_state *tem)
 		case 45: /* magenta	(light magenta)	background */
 		case 46: /* cyan	(light cyan)	background */
 		case 47: /* white	(bright white)	background */
-			tem->tvs_bg_color = param - 40;
+			tem->tvs_bg_color.n = param - 40;
+			tem->tvs_flags &= ~TEM_ATTR_RGB_BG;
 			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_BG;
 			break;
 
 		case 48:
+			/*
+			 * We should have 3 parameters for 256 colors and
+			 * 5 parameters for 24-bit colors.
+			 */
 			/* We should have at least 3 parameters */
-			if (curparam < 3)
+			if (curparam < 3) {
+				curparam = 0;
 				break;
+			}
 
 			/*
-			 * 256 and truecolor needs depth at least 24, but
+			 * 256 and truecolor needs depth > 8, but
 			 * we still need to process the sequence.
 			 */
 			count++;
 			curparam--;
 			param = tem->tvs_params[count];
 			switch (param) {
+			case 2:	/* RGB colors */
+				if (curparam < 4) {
+					curparam = 0;
+					break;
+				}
+				r = tem->tvs_params[++count];
+				g = tem->tvs_params[++count];
+				b = tem->tvs_params[++count];
+				curparam -= 3;
+				if (r < 0 || r > 255 || g < 0 || g > 255 ||
+				    b < 0 || b > 255)
+					break;
+
+				if (tems.ts_display_mode == VIS_PIXEL &&
+				    tems.ts_pdepth > 8) {
+					tem->tvs_flags |= TEM_ATTR_RGB_BG;
+					tem->tvs_flags &= ~TEM_ATTR_BRIGHT_BG;
+					tem->tvs_bg_color.rgb.a =
+					    tem->tvs_alpha;
+					tem->tvs_bg_color.rgb.r = r;
+					tem->tvs_bg_color.rgb.g = g;
+					tem->tvs_bg_color.rgb.b = b;
+				}
+				break;
 			case 5:	/* 256 colors */
 				count++;
 				curparam--;
@@ -1345,6 +1439,7 @@ tem_selgraph(struct tem_vt_state *tem)
 				    false);
 				break;
 			default:
+				curparam = 0;
 				break;
 			}
 			break;
@@ -1354,6 +1449,7 @@ tem_selgraph(struct tem_vt_state *tem)
 			 * Reset the background colour and brightness.
 			 */
 			tem->tvs_bg_color = tems.ts_init_color.bg_color;
+			tem->tvs_flags &= ~TEM_ATTR_RGB_BG;
 			if (tems.ts_init_color.a_flags & TEM_ATTR_BRIGHT_BG)
 				tem->tvs_flags |= TEM_ATTR_BRIGHT_BG;
 			else
@@ -1368,8 +1464,9 @@ tem_selgraph(struct tem_vt_state *tem)
 		case 95: /* magenta	(light magenta)	foreground */
 		case 96: /* cyan	(light cyan)	foreground */
 		case 97: /* white	(bright white)	foreground */
-			tem->tvs_fg_color = param - 90;
+			tem->tvs_fg_color.n = param - 90;
 			tem->tvs_flags |= TEM_ATTR_BRIGHT_FG;
+			tem->tvs_flags &= ~TEM_ATTR_RGB_FG;
 			break;
 
 		case 100: /* black	(grey)		background */
@@ -1380,8 +1477,9 @@ tem_selgraph(struct tem_vt_state *tem)
 		case 105: /* magenta	(light magenta)	background */
 		case 106: /* cyan	(light cyan)	background */
 		case 107: /* white	(bright white)	background */
-			tem->tvs_bg_color = param - 100;
+			tem->tvs_bg_color.n = param - 100;
 			tem->tvs_flags |= TEM_ATTR_BRIGHT_BG;
+			tem->tvs_flags &= ~TEM_ATTR_RGB_BG;
 			break;
 
 		default:
@@ -2008,8 +2106,8 @@ tem_copy_width(term_char_t *src, term_char_t *dst, int cols)
 		 * and colors.
 		 */
 		if (src[width].tc_char != dst[width].tc_char ||
-		    src[width].tc_fg_color != dst[width].tc_fg_color ||
-		    src[width].tc_bg_color != dst[width].tc_bg_color) {
+		    src[width].tc_fg_color.n != dst[width].tc_fg_color.n ||
+		    src[width].tc_bg_color.n != dst[width].tc_bg_color.n) {
 			break;
 		}
 		width--;
@@ -2130,6 +2228,7 @@ tem_text_display(struct tem_vt_state *tem __unused, term_char_t *string,
 	struct vis_consdisplay da;
 	int i;
 	tem_char_t c;
+	text_color_t bg, fg;
 
 	if (count == 0)
 		return;
@@ -2140,7 +2239,9 @@ tem_text_display(struct tem_vt_state *tem __unused, term_char_t *string,
 	da.col = col;
 
 	for (i = 0; i < count; i++) {
-		tem_get_color(&da.fg_color, &da.bg_color, string[i]);
+		tem_get_color(tem, &fg, &bg, &string[i]);
+		tem_set_color(&fg, &da.fg_color);
+		tem_set_color(&bg, &da.bg_color);
 		c = TEM_CHAR(string[i].tc_char);
 		tems_display(&da);
 		da.col++;
@@ -2221,7 +2322,7 @@ tem_pix_display(struct tem_vt_state *tem,
 	da.col = (col * da.width) + tems.ts_p_offset.x;
 
 	for (i = 0; i < count; i++) {
-		tem_callback_bit2pix(tem, string[i]);
+		tem_callback_bit2pix(tem, &string[i]);
 		tems_display(&da);
 		da.col += da.width;
 	}
@@ -2288,15 +2389,12 @@ tem_pix_copy(struct tem_vt_state *tem,
 }
 
 static void
-tem_pix_bit2pix(struct tem_vt_state *tem, term_char_t c)
+tem_pix_bit2pix(struct tem_vt_state *tem, term_char_t *c)
 {
 	text_color_t fg, bg;
 
-	fg = DEFAULT_ANSI_FOREGROUND;
-	bg = DEFAULT_ANSI_BACKGROUND;
-
-	tem_get_color(&fg, &bg, c);
-	bit_to_pix32(tem, c.tc_char, fg, bg);
+	tem_get_color(tem, &fg, &bg, c);
+	bit_to_pix32(tem, c->tc_char, fg, bg);
 }
 
 
@@ -2375,10 +2473,8 @@ tem_cls(struct tem_vt_state *tem)
 	    TEM_ATTR_SCREEN_REVERSE);
 	c.tc_char = TEM_ATTR(attr);
 
-	fg_color = DEFAULT_ANSI_FOREGROUND;
-	bg_color = DEFAULT_ANSI_BACKGROUND;
-	tem_get_color(&fg_color, &bg_color, c);
-	cl.bg_color = bg_color;
+	tem_get_color(tem, &fg_color, &bg_color, &c);
+	tem_set_color(&bg_color, &cl.bg_color);
 	(void) tems_cls(&cl);
 
 	tem->tvs_c_cursor.row = 0;
@@ -2514,6 +2610,7 @@ tem_reset_emulator(struct tem_vt_state *tem, boolean_t init_color)
 
 	if (init_color) {
 		/* use initial settings */
+		tem->tvs_alpha = 0xff;
 		tem->tvs_fg_color = tems.ts_init_color.fg_color;
 		tem->tvs_bg_color = tems.ts_init_color.bg_color;
 		tem->tvs_flags = tems.ts_init_color.a_flags;
@@ -2612,7 +2709,6 @@ static void
 tem_pix_cursor(struct tem_vt_state *tem, short action)
 {
 	struct vis_conscursor	ca;
-	uint32_t color;
 	text_color_t fg, bg;
 	term_char_t c;
 	text_attr_t attr;
@@ -2628,18 +2724,9 @@ tem_pix_cursor(struct tem_vt_state *tem, short action)
 	    TEM_ATTR_REVERSE);
 	c.tc_char = TEM_ATTR(attr);
 
-	fg = DEFAULT_ANSI_FOREGROUND;
-	bg = DEFAULT_ANSI_BACKGROUND;
-	tem_get_color(&fg, &bg, c);
-
-	color = tems.ts_color_map(fg);
-	ca.fg_color.twentyfour[0] = (color >> 16) & 0xFF;
-	ca.fg_color.twentyfour[1] = (color >> 8) & 0xFF;
-	ca.fg_color.twentyfour[2] = color & 0xFF;
-	color = tems.ts_color_map(bg);
-	ca.bg_color.twentyfour[0] = (color >> 16) & 0xFF;
-	ca.bg_color.twentyfour[1] = (color >> 8) & 0xFF;
-	ca.bg_color.twentyfour[2] = color & 0xFF;
+	tem_get_color(tem, &fg, &bg, &c);
+	tem_set_color(&fg, &ca.fg_color);
+	tem_set_color(&bg, &ca.bg_color);
 
 	ca.action = action;
 
@@ -2662,17 +2749,12 @@ tem_pix_cursor(struct tem_vt_state *tem, short action)
 
 static void
 bit_to_pix32(struct tem_vt_state *tem,
-    tem_char_t c,
-    text_color_t fg_color4,
-    text_color_t bg_color4)
+    tem_char_t c, text_color_t fg, text_color_t bg)
 {
-	uint32_t fg_color32, bg_color32, *dest;
-
-	fg_color32 = (0xFF << 24) | tems.ts_color_map(fg_color4);
-	bg_color32 = (0xFF << 24) | tems.ts_color_map(bg_color4);
+	uint32_t *dest;
 
 	dest = (uint32_t *)tem->tvs_pix_data;
-	font_bit_to_pix32(&tems.ts_font, dest, c, fg_color32, bg_color32);
+	font_bit_to_pix32(&tems.ts_font, dest, c, fg.n, bg.n);
 }
 
 /*
@@ -2690,19 +2772,18 @@ tem_get_attr(struct tem_vt_state *tem, text_color_t *fg,
 		*bg = tem->tvs_bg_color;
 	}
 
-	if (attr == NULL)
-		return;
-
-	*attr = tem->tvs_flags;
+	if (attr != NULL)
+		*attr = tem->tvs_flags;
 }
 
 static void
-tem_get_color(text_color_t *fg, text_color_t *bg, term_char_t c)
+tem_get_color(struct tem_vt_state *tem, text_color_t *fg, text_color_t *bg,
+    term_char_t *c)
 {
 	bool bold_font;
 
-	*fg = c.tc_fg_color;
-	*bg = c.tc_bg_color;
+	*fg = c->tc_fg_color;
+	*bg = c->tc_bg_color;
 
 	bold_font = tems.ts_font.vf_map_count[VFNT_MAP_BOLD] != 0;
 
@@ -2712,19 +2793,55 @@ tem_get_color(text_color_t *fg, text_color_t *bg, term_char_t c)
 	 * The bright color is traditionally used with TEM_ATTR_BOLD,
 	 * in case there is no bold font.
 	 */
-	if (c.tc_fg_color < XLATE_NCOLORS) {
-		if (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BRIGHT_FG) ||
-		    (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BOLD) && !bold_font))
-			*fg = brt_xlate[c.tc_fg_color];
+	if (!TEM_ATTR_ISSET(c->tc_char, TEM_ATTR_RGB_FG) &&
+	    c->tc_fg_color.n < XLATE_NCOLORS) {
+		if (TEM_ATTR_ISSET(c->tc_char, TEM_ATTR_BRIGHT_FG) ||
+		    (TEM_ATTR_ISSET(c->tc_char, TEM_ATTR_BOLD) && !bold_font))
+			fg->n = brt_xlate[c->tc_fg_color.n];
 		else
-			*fg = dim_xlate[c.tc_fg_color];
+			fg->n = dim_xlate[c->tc_fg_color.n];
 	}
 
-	if (c.tc_bg_color < XLATE_NCOLORS) {
-		if (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BRIGHT_BG))
-			*bg = brt_xlate[c.tc_bg_color];
+	if (!TEM_ATTR_ISSET(c->tc_char, TEM_ATTR_RGB_BG) &&
+	    c->tc_bg_color.n < XLATE_NCOLORS) {
+		if (TEM_ATTR_ISSET(c->tc_char, TEM_ATTR_BRIGHT_BG))
+			bg->n = brt_xlate[c->tc_bg_color.n];
 		else
-			*bg = dim_xlate[c.tc_bg_color];
+			bg->n = dim_xlate[c->tc_bg_color.n];
+	}
+
+	if (tems.ts_display_mode == VIS_TEXT)
+		return;
+
+	/*
+	 * Translate fg and bg to RGB colors.
+	 */
+	if (TEM_ATTR_ISSET(c->tc_char, TEM_ATTR_RGB_FG)) {
+		fg->n = rgb_to_color(&rgb_info,
+		    fg->rgb.a, fg->rgb.r, fg->rgb.g, fg->rgb.b);
+	} else {
+		fg->n = rgb_color_map(&rgb_info, fg->n, tem->tvs_alpha);
+	}
+
+	if (TEM_ATTR_ISSET(c->tc_char, TEM_ATTR_RGB_BG)) {
+		bg->n = rgb_to_color(&rgb_info,
+		    bg->rgb.a, bg->rgb.r, bg->rgb.g, bg->rgb.b);
+	} else {
+		bg->n = rgb_color_map(&rgb_info, bg->n, tem->tvs_alpha);
+	}
+}
+
+static void
+tem_set_color(text_color_t *t, color_t *c)
+{
+	switch (tems.ts_pdepth) {
+	case 4:
+		c->four = t->n & 0xFF;
+		break;
+	default:
+		/* gfx module is expecting all pixel data in 32-bit colors */
+		*(uint32_t *)c = t->n;
+		break;
 	}
 }
 
@@ -2738,7 +2855,7 @@ tem_get_colors(tem_vt_state_t tem_arg, text_color_t *fg, text_color_t *bg)
 	tem_get_attr(tem, &c.tc_fg_color, &c.tc_bg_color, &attr,
 	    TEM_ATTR_REVERSE);
 	c.tc_char = TEM_ATTR(attr);
-	tem_get_color(fg, bg, c);
+	tem_get_color(tem, fg, bg, &c);
 }
 
 /*
@@ -2777,7 +2894,7 @@ tem_pix_cls_range(struct tem_vt_state *tem,
 	/* Make sure we will not draw underlines */
 	c.tc_char = TEM_ATTR(attr & ~TEM_ATTR_UNDERLINE) | ' ';
 
-	tem_callback_bit2pix(tem, c);
+	tem_callback_bit2pix(tem, &c);
 	da.data = (uint8_t *)tem->tvs_pix_data;
 
 	for (i = 0; i < nrows; i++, row++) {
@@ -2820,9 +2937,12 @@ tem_virtual_cls(struct tem_vt_state *tem, size_t count,
     screen_pos_t row, screen_pos_t col)
 {
 	term_char_t c;
+	text_attr_t attr;
 
-	c.tc_char = ' ';
-	tem_get_colors((tem_vt_state_t)tem, &c.tc_fg_color, &c.tc_bg_color);
+	tem_get_attr(tem, &c.tc_fg_color, &c.tc_bg_color, &attr,
+	    TEM_ATTR_SCREEN_REVERSE);
+	/* Make sure we will not draw underlines */
+	c.tc_char = TEM_ATTR(attr & ~TEM_ATTR_UNDERLINE) | ' ';
 
 	while (count > 0) {
 		tem_virtual_display(tem, &c, 1, row, col);

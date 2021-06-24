@@ -95,6 +95,8 @@ extern "C" {
 #define	TEM_ATTR_BRIGHT_BG	0x0040
 #define	TEM_ATTR_TRANSPARENT	0x0080
 #define	TEM_ATTR_IMAGE		0x0100
+#define	TEM_ATTR_RGB_FG		0x0200
+#define	TEM_ATTR_RGB_BG		0x0400
 
 #define	ANSI_COLOR_BLACK	0
 #define	ANSI_COLOR_RED		1
@@ -139,7 +141,15 @@ extern "C" {
 #define	DEFAULT_ANSI_BACKGROUND	ANSI_COLOR_WHITE
 
 typedef uint32_t tem_char_t;	/* 32bit char to support UTF-8 */
-typedef uint8_t text_color_t;
+typedef union {
+	uint32_t n;
+	struct bgra {
+		uint8_t b;
+		uint8_t g;
+		uint8_t r;
+		uint8_t a;
+	} rgb;
+} text_color_t;
 typedef uint16_t text_attr_t;
 
 #if !defined(_BOOT)
@@ -179,6 +189,7 @@ typedef struct term_char {
 struct tem_vt_state {
 	kmutex_t	tvs_lock;
 	uchar_t		tvs_fbmode;	/* framebuffer mode */
+	uchar_t		tvs_alpha;	/* rgb alpha channel */
 	text_attr_t	tvs_flags;	/* flags for this x3.64 terminal */
 	int		tvs_state;	/* state in output esc seq processing */
 	boolean_t	tvs_gotparam;	/* does output esc seq have a param */
@@ -200,8 +211,10 @@ struct tem_vt_state {
 	size_t		tvs_outindex;	/* index into a_outbuf */
 	void		*tvs_pix_data;	/* pointer to tmp bitmap area */
 	size_t		tvs_pix_data_size;
-	text_color_t	tvs_fg_color;
-	text_color_t	tvs_bg_color;
+
+	text_color_t	tvs_fg_color;	/* console foreground */
+	text_color_t	tvs_bg_color;	/* console background */
+
 	int		tvs_first_line;	/* kernel console output begins */
 
 	term_char_t	*tvs_screen_buf;	/* whole screen buffer */
@@ -227,7 +240,7 @@ typedef struct tem_safe_callbacks {
 	    screen_pos_t, screen_pos_t, cred_t *, enum called_from);
 	void (*tsc_cursor)(struct tem_vt_state *, short, cred_t *,
 	    enum called_from);
-	void (*tsc_bit2pix)(struct tem_vt_state *, term_char_t);
+	void (*tsc_bit2pix)(struct tem_vt_state *, term_char_t *);
 	void (*tsc_cls)(struct tem_vt_state *, int,
 	    screen_pos_t, screen_pos_t, cred_t *, enum called_from);
 } tem_safe_callbacks_t;
@@ -311,7 +324,7 @@ void	tem_safe_pix_copy(struct tem_vt_state *,
 	    cred_t *, enum called_from);
 void	tem_safe_pix_cursor(struct tem_vt_state *, short, cred_t *,
 	    enum called_from);
-void	tem_safe_pix_bit2pix(struct tem_vt_state *, term_char_t);
+void	tem_safe_pix_bit2pix(struct tem_vt_state *, term_char_t *);
 void	tem_safe_pix_cls(struct tem_vt_state *, int, screen_pos_t, screen_pos_t,
 	    cred_t *, enum called_from);
 void	tem_safe_pix_cls_range(struct tem_vt_state *,

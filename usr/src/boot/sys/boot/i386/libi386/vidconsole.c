@@ -253,7 +253,7 @@ vidc_text_cons_clear(struct vis_consclear *ca)
 	uint16_t val;
 	int i;
 
-	val = (solaris_color_to_pc_color[ca->bg_color & 0xf] << 4) |
+	val = (solaris_color_to_pc_color[ca->bg_color.four & 0xf] << 4) |
 	    DEFAULT_FGCOLOR;
 	val = (val << 8) | ' ';
 
@@ -470,8 +470,8 @@ vidc_text_cons_display(struct vis_consdisplay *da)
 	} *addr;
 
 	data = (tem_char_t *)da->data;
-	attr = (solaris_color_to_pc_color[da->bg_color & 0xf] << 4) |
-	    solaris_color_to_pc_color[da->fg_color & 0xf];
+	attr = (solaris_color_to_pc_color[da->bg_color.four & 0xf] << 4) |
+	    solaris_color_to_pc_color[da->fg_color.four & 0xf];
 	addr = (struct cgatext *)vgatext + (da->row * TEXT_COLS + da->col);
 
 	for (i = 0; i < da->width; i++) {
@@ -574,7 +574,7 @@ vidc_vbe_cons_put_cmap(struct vis_cmap *cm)
 		int idx;
 
 		/* Pick RGB from cmap4_to_24 */
-		c = rgb_color_map(&rgb, i);
+		c = rgb_color_map(&rgb, i, 0);
 		/* The first 16 colors need to be in VGA color order. */
 		if (i < NCOLORS)
 			idx = solaris_color_to_pc_color[i];

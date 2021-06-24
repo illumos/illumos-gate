@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -239,7 +240,6 @@ ucode_should_update_intel(char *filename, uint32_t new_rev)
 static ucode_errno_t
 ucode_gen_files_amd(uint8_t *buf, int size, char *path)
 {
-	/* LINTED: pointer alignment */
 	uint32_t *ptr = (uint32_t *)buf;
 	char common_path[PATH_MAX];
 	int fd, count, counter;

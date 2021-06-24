@@ -444,9 +444,10 @@ bitmap_cons_clear(struct gfxp_fb_softc *softc, struct vis_consclear *ca)
 
 	console = softc->console;
 	pitch = console->fb.pitch;
-	data = boot_color_map(ca->bg_color);
+
 	switch (console->fb.depth) {
 	case 8:
+		data = ca->bg_color.eight;
 		for (i = 0; i < console->fb.screen.y; i++) {
 			if (softc->mode == KD_TEXT) {
 				fb = console->fb.fb + i * pitch;
@@ -458,6 +459,8 @@ bitmap_cons_clear(struct gfxp_fb_softc *softc, struct vis_consclear *ca)
 		break;
 	case 15:
 	case 16:
+		data = (ca->bg_color.sixteen[0] << 8) |
+		    ca->bg_color.sixteen[1];
 		for (i = 0; i < console->fb.screen.y; i++) {
 			fb16 = (uint16_t *)(console->fb.fb + i * pitch);
 			sfb16 = (uint16_t *)(console->fb.shadow_fb + i * pitch);
@@ -469,6 +472,9 @@ bitmap_cons_clear(struct gfxp_fb_softc *softc, struct vis_consclear *ca)
 		}
 		break;
 	case 24:
+		data = ca->bg_color.twentyfour[0] << 16;
+		data |= ca->bg_color.twentyfour[1] << 8;
+		data |= ca->bg_color.twentyfour[2];
 		for (i = 0; i < console->fb.screen.y; i++) {
 			fb = console->fb.fb + i * pitch;
 			sfb = console->fb.shadow_fb + i * pitch;
@@ -486,6 +492,7 @@ bitmap_cons_clear(struct gfxp_fb_softc *softc, struct vis_consclear *ca)
 		}
 		break;
 	case 32:
+		data = *(uint32_t *)&ca->bg_color;
 		for (i = 0; i < console->fb.screen.y; i++) {
 			fb32 = (uint32_t *)(console->fb.fb + i * pitch);
 			sfb32 = (uint32_t *)(console->fb.shadow_fb + i * pitch);
@@ -523,8 +530,8 @@ bitmap_display_cursor(struct gfxp_fb_softc *softc, struct vis_conscursor *ca)
 	offset = ca->col * bpp + ca->row * pitch;
 	switch (console->fb.depth) {
 	case 8:
-		fg = ca->fg_color.mono;
-		bg = ca->bg_color.mono;
+		fg = ca->fg_color.eight;
+		bg = ca->bg_color.eight;
 		for (i = 0; i < ca->height; i++) {
 			fb8 = console->fb.fb + offset + i * pitch;
 			sfb8 = console->fb.shadow_fb + offset + i * pitch;
@@ -559,12 +566,12 @@ bitmap_display_cursor(struct gfxp_fb_softc *softc, struct vis_conscursor *ca)
 		}
 		break;
 	case 24:
-		fg = ca->fg_color.twentyfour[0] << console->fb.rgb.red.pos;
-		fg |= ca->fg_color.twentyfour[1] << console->fb.rgb.green.pos;
-		fg |= ca->fg_color.twentyfour[2] << console->fb.rgb.blue.pos;
-		bg = ca->bg_color.twentyfour[0] << console->fb.rgb.red.pos;
-		bg |= ca->bg_color.twentyfour[1] << console->fb.rgb.green.pos;
-		bg |= ca->bg_color.twentyfour[2] << console->fb.rgb.blue.pos;
+		fg = ca->fg_color.twentyfour[0] << 16;
+		fg |= ca->fg_color.twentyfour[1] << 8;
+		fg |= ca->fg_color.twentyfour[2];
+		bg = ca->bg_color.twentyfour[0] << 16;
+		bg |= ca->bg_color.twentyfour[1] << 8;
+		bg |= ca->bg_color.twentyfour[2];
 		for (i = 0; i < ca->height; i++) {
 			fb8 = console->fb.fb + offset + i * pitch;
 			sfb8 = console->fb.shadow_fb + offset + i * pitch;
@@ -589,12 +596,8 @@ bitmap_display_cursor(struct gfxp_fb_softc *softc, struct vis_conscursor *ca)
 		}
 		break;
 	case 32:
-		fg = ca->fg_color.twentyfour[0] << console->fb.rgb.red.pos;
-		fg |= ca->fg_color.twentyfour[1] << console->fb.rgb.green.pos;
-		fg |= ca->fg_color.twentyfour[2] << console->fb.rgb.blue.pos;
-		bg = ca->bg_color.twentyfour[0] << console->fb.rgb.red.pos;
-		bg |= ca->bg_color.twentyfour[1] << console->fb.rgb.green.pos;
-		bg |= ca->bg_color.twentyfour[2] << console->fb.rgb.blue.pos;
+		fg = *(uint32_t *)&ca->fg_color;
+		bg = *(uint32_t *)&ca->bg_color;
 		for (i = 0; i < ca->height; i++) {
 			fb32 = (uint32_t *)
 			    (console->fb.fb + offset + i * pitch);

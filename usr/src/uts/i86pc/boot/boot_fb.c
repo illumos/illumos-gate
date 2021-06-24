@@ -206,6 +206,7 @@ xbi_fb_init(struct xboot_info *xbi, bcons_dev_t *bcons_dev)
 	fb_info.rgb.green.pos = tag->u.fb2.framebuffer_green_field_position;
 	fb_info.rgb.blue.size = tag->u.fb2.framebuffer_blue_mask_size;
 	fb_info.rgb.blue.pos = tag->u.fb2.framebuffer_blue_field_position;
+	rgb_info = fb_info.rgb;
 
 	return (B_TRUE);
 }
@@ -408,7 +409,7 @@ boot_color_map(uint8_t index)
 			return (index);
 	}
 
-	return (rgb_color_map(&fb_info.rgb, index));
+	return (rgb_color_map(&fb_info.rgb, index, 0));
 }
 
 /* set up out simple console. */
