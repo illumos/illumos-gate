@@ -1000,7 +1000,7 @@ tems_get_initial_color(tem_color_t *pcolor)
 		 * uses the bright white background colour so we
 		 * match it here.
 		 */
-		if (pcolor->bg_color == ANSI_COLOR_WHITE)
+		if (pcolor->bg_color.n == ANSI_COLOR_WHITE)
 			flags |= TEM_ATTR_BRIGHT_BG;
 	}
 #else
