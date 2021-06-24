@@ -25,6 +25,7 @@
  *
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/asm_linkage.h>
@@ -609,18 +610,18 @@ ucode_locate_intel(cpu_t *cp, cpu_ucode_info_t *uinfop, ucode_file_t *ufp)
 			rc = EM_FILESIZE;
 		} else if (ucode_checksum_intel(0, ext_size,
 		    (uint8_t *)(ucodefp->uf_ext_table))) {
-			rc = EM_CHECKSUM;
+			rc = EM_EXTCHECKSUM;
 		} else {
 			int i;
 
-			ext_size -= UCODE_EXT_TABLE_SIZE_INTEL;
-			for (i = 0; i < ucodefp->uf_ext_table->uet_count;
-			    i++) {
-				if (ucode_checksum_intel(0,
-				    UCODE_EXT_SIG_SIZE_INTEL,
-				    (uint8_t *)(&(ucodefp->uf_ext_table->
-				    uet_ext_sig[i])))) {
-					rc = EM_CHECKSUM;
+			for (i = 0; i < ucodefp->uf_ext_table->uet_count; i++) {
+				ucode_ext_sig_intel_t *sig;
+
+				sig = &ucodefp->uf_ext_table->uet_ext_sig[i];
+
+				if (ucode_checksum_intel_extsig(uhp,
+				    sig) != 0) {
+					rc = EM_SIGCHECKSUM;
 					break;
 				}
 			}

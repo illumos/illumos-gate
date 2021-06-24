@@ -37,7 +37,7 @@
 /*
  * Refer to
  *	Intel 64 and IA-32 Architectures Software Developers's Manual
- *		Chapter 9.11 Microcode Update Facilities
+ *		Chapter 9.11 Microcode Update Facilities	[1]
  * for details.
  */
 
@@ -116,6 +116,31 @@ ucode_checksum_intel(uint32_t sum, uint32_t size, uint8_t *code)
 	return (sum);
 }
 
+uint32_t
+ucode_checksum_intel_extsig(ucode_header_intel_t *uhp,
+    ucode_ext_sig_intel_t *uesp)
+{
+	/*
+	 * From [1], table 9-7, the checksum field contained in the extended
+	 * patch signature is the checksum across the entire update which would
+	 * result if the primary processor signature and processor flags were
+	 * replaced with the values from this entry.
+	 *
+	 * We can therefore just calculate the difference in the checksum
+	 * between the old and new values and return that to the caller. If the
+	 * difference is zero then the checksum for the patch is valid.
+	 */
+	uint32_t diff;
+
+	diff = uesp->ues_signature +
+	    uesp->ues_proc_flags + uesp->ues_checksum;
+	diff -= uhp->uh_signature + uhp->uh_proc_flags +
+	    uhp->uh_checksum;
+
+	return (diff);
+}
+
+
 ucode_errno_t
 ucode_validate_amd(uint8_t *ucodep, int size)
 {
@@ -177,37 +202,35 @@ ucode_validate_intel(uint8_t *ucodep, int size)
 		uint8_t *curbuf = &ucodep[size - remaining];
 		ucode_errno_t rc;
 
-		uhp = (ucode_header_intel_t *)(intptr_t)curbuf;
+		uhp = (ucode_header_intel_t *)curbuf;
 
 		if ((rc = ucode_header_validate_intel(uhp)) != EM_OK)
 			return (rc);
 
 		total_size = UCODE_TOTAL_SIZE_INTEL(uhp->uh_total_size);
 
-		if (ucode_checksum_intel(0, total_size, curbuf))
+		if (ucode_checksum_intel(0, total_size, curbuf) != 0)
 			return (EM_CHECKSUM);
 
 		body_size = UCODE_BODY_SIZE_INTEL(uhp->uh_body_size);
 		ext_size = total_size - (header_size + body_size);
 
 		if (ext_size > 0) {
+			ucode_ext_table_intel_t *ext;
 			uint32_t i;
 
-			if (ucode_checksum_intel(0, ext_size,
-			    &curbuf[header_size + body_size])) {
-				return (EM_CHECKSUM);
-			}
+			ext = (ucode_ext_table_intel_t *)
+			    &curbuf[header_size + body_size];
 
-			ext_size -= UCODE_EXT_TABLE_SIZE_INTEL;
-			for (i = 0; i < ext_size / UCODE_EXT_SIG_SIZE_INTEL;
-			    i++) {
-				if (ucode_checksum_intel(0,
-				    UCODE_EXT_SIG_SIZE_INTEL,
-				    &curbuf[total_size - ext_size +
-				    i * UCODE_EXT_SIG_SIZE_INTEL])) {
+			if (ucode_checksum_intel(0, ext_size, (uint8_t *)ext))
+				return (EM_EXTCHECKSUM);
 
-					return (EM_CHECKSUM);
-				}
+			for (i = 0; i < ext->uet_count; i++) {
+				ucode_ext_sig_intel_t *sig =
+				    &ext->uet_ext_sig[i];
+
+				if (ucode_checksum_intel_extsig(uhp, sig) != 0)
+					return (EM_SIGCHECKSUM);
 			}
 		}
 
