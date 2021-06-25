@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2012-2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <sys/sid.h>
@@ -1237,9 +1237,11 @@ smb_fsop_rename(
 			return (EACCES);
 		}
 
-		if (smb_tree_has_feature(sr->tid_tree,
-		    SMB_TREE_ACEMASKONACCESS))
-			flags = ATTR_NOACLCHECK;
+		/*
+		 * TODO: avoid ACL check for source file.
+		 * smb_vop_rename() passes its own flags to VOP_RENAME,
+		 * and ZFS doesn't pass it on to zfs_zaccess_rename().
+		 */
 	}
 
 	rc = smb_vop_rename(from_dnode->vp, from_name, to_dnode->vp,
