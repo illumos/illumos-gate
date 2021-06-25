@@ -109,6 +109,7 @@ typedef struct viona_vring {
 
 	/* Reference to guest pages holding virtqueue */
 	void		**vr_map_pages;
+	vmm_page_t	*vr_map_hold;
 
 	/* Per-ring error condition statistics */
 	struct viona_ring_stats {
@@ -293,14 +294,18 @@ void viona_ring_free(viona_vring_t *);
 int viona_ring_reset(viona_vring_t *, boolean_t);
 int viona_ring_init(viona_link_t *, uint16_t, uint16_t, uint64_t);
 boolean_t viona_ring_lease_renew(viona_vring_t *);
-int vq_popchain(viona_vring_t *, struct iovec *, uint_t, uint16_t *);
+
+int vq_popchain(viona_vring_t *, struct iovec *, uint_t, uint16_t *,
+    vmm_page_t **);
 void vq_pushchain(viona_vring_t *, uint32_t, uint16_t);
 void vq_pushchain_many(viona_vring_t *, uint_t, used_elem_t *);
+
 void viona_intr_ring(viona_vring_t *ring, boolean_t);
 void viona_ring_set_no_notify(viona_vring_t *, boolean_t);
 void viona_ring_disable_notify(viona_vring_t *);
 void viona_ring_enable_notify(viona_vring_t *);
 uint16_t viona_ring_num_avail(viona_vring_t *);
+
 
 void viona_rx_init(void);
 void viona_rx_fini(void);

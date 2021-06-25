@@ -208,10 +208,11 @@ viona_recv_plain(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 	caddr_t buf = NULL;
 	boolean_t end = B_FALSE;
 	const uint32_t features = ring->vr_link->l_features;
+	vmm_page_t *pages = NULL;
 
 	ASSERT(msz >= MIN_BUF_SIZE);
 
-	n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie);
+	n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie, &pages);
 	if (n <= 0) {
 		/* Without available buffers, the frame must be dropped. */
 		return (ENOSPC);
@@ -279,6 +280,7 @@ viona_recv_plain(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 	}
 
 	/* Release this chain */
+	vmm_drv_page_release_chain(pages);
 	vq_pushchain(ring, copied, cookie);
 	return (0);
 
@@ -287,6 +289,7 @@ bad_frame:
 	    mblk_t *, mp);
 	VIONA_RING_STAT_INCR(ring, bad_rx_frame);
 
+	vmm_drv_page_release_chain(pages);
 	vq_pushchain(ring, MAX(copied, MIN_BUF_SIZE + hdr_sz), cookie);
 	return (EINVAL);
 }
@@ -296,6 +299,7 @@ viona_recv_merged(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 {
 	struct iovec iov[VTNET_MAXSEGS];
 	used_elem_t uelem[VTNET_MAXSEGS];
+	vmm_page_t *pages = NULL, *hdr_pages = NULL;
 	int n, i = 0, buf_idx = 0, err = 0;
 	uint16_t cookie;
 	caddr_t buf;
@@ -307,7 +311,7 @@ viona_recv_merged(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 
 	ASSERT(msz >= MIN_BUF_SIZE);
 
-	n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie);
+	n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie, &hdr_pages);
 	if (n <= 0) {
 		/* Without available buffers, the frame must be dropped. */
 		VIONA_PROBE2(no_space, viona_vring_t *, ring, mblk_t *, mp);
@@ -376,7 +380,12 @@ viona_recv_merged(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 				err = EOVERFLOW;
 				break;
 			}
-			n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie);
+			if (pages != NULL) {
+				vmm_drv_page_release_chain(pages);
+				pages = NULL;
+			}
+			n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie,
+			    &pages);
 			if (n <= 0) {
 				/*
 				 * Without more immediate space to perform the
@@ -452,6 +461,13 @@ done:
 		VIONA_PROBE3(bad_rx_frame, viona_vring_t *, ring,
 		    uint16_t, cookie, mblk_t *, mp);
 		VIONA_RING_STAT_INCR(ring, bad_rx_frame);
+	}
+
+	if (hdr_pages != NULL) {
+		vmm_drv_page_release_chain(hdr_pages);
+	}
+	if (pages != NULL) {
+		vmm_drv_page_release_chain(pages);
 	}
 	vq_pushchain_many(ring, buf_idx + 1, uelem);
 	return (err);

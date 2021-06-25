@@ -1969,33 +1969,49 @@ vmm_drv_lease_expired(vmm_lease_t *lease)
 	return (lease->vml_expired);
 }
 
-void *
-vmm_drv_gpa2kva(vmm_lease_t *lease, uintptr_t gpa, size_t sz)
+vmm_page_t *
+vmm_drv_page_hold(vmm_lease_t *lease, uintptr_t gpa, int prot)
 {
-	vm_page_t *vmp;
-	void *res = NULL;
-
 	ASSERT(lease != NULL);
-	ASSERT3U(sz, ==, PAGESIZE);
 	ASSERT0(gpa & PAGEOFFSET);
 
-	vmp = vmc_hold(lease->vml_vmclient, gpa, PROT_READ | PROT_WRITE);
-	/*
-	 * Break the rules for now and just extract the pointer.  This is
-	 * nominally safe, since holding a driver lease on the VM read-locks it.
-	 *
-	 * A pointer which would otherwise be at risk of being a use-after-free
-	 * vector is made safe since actions such as vmspace_unmap() require
-	 * acquisition of the VM write-lock, (causing all driver leases to be
-	 * broken) allowing the consumers to cease their access prior to
-	 * modification of the vmspace.
-	 */
-	if (vmp != NULL) {
-		res = vmp_get_writable(vmp);
-		vmp_release(vmp);
-	}
+	return ((vmm_page_t *)vmc_hold(lease->vml_vmclient, gpa, prot));
+}
 
-	return (res);
+void
+vmm_drv_page_release(vmm_page_t *vmmp)
+{
+	vmp_release((vm_page_t *)vmmp);
+}
+
+void
+vmm_drv_page_release_chain(vmm_page_t *vmmp)
+{
+	vmp_release_chain((vm_page_t *)vmmp);
+}
+
+const void *
+vmm_drv_page_readable(const vmm_page_t *vmmp)
+{
+	return (vmp_get_readable((const vm_page_t *)vmmp));
+}
+
+void *
+vmm_drv_page_writable(const vmm_page_t *vmmp)
+{
+	return (vmp_get_writable((const vm_page_t *)vmmp));
+}
+
+void
+vmm_drv_page_chain(vmm_page_t *vmmp, vmm_page_t *to_chain)
+{
+	vmp_chain((vm_page_t *)vmmp, (vm_page_t *)to_chain);
+}
+
+vmm_page_t *
+vmm_drv_page_next(const vmm_page_t *vmmp)
+{
+	return ((vmm_page_t *)vmp_next((vm_page_t *)vmmp));
 }
 
 int
