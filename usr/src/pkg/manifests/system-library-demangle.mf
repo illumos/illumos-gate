@@ -30,8 +30,10 @@ set name=pkg.summary value="Symbol demangling support"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
+dir path=usr/include
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
+file path=usr/include/demangle-sys.h
 file path=usr/lib/$(ARCH64)/libdemangle-sys.so.1
 file path=usr/lib/libdemangle-sys.so.1
 license lic_CDDL license=lic_CDDL
