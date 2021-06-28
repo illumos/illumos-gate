@@ -18,8 +18,6 @@
 
 #if defined(__amd64__) || defined(__i386__)
 
-
-#define	kfpu_allowed()		1
 #define	kfpu_initialize(tsk)	do {} while (0)
 #define	kfpu_init()		(0)
 #define	kfpu_fini()		do {} while (0)
@@ -31,6 +29,14 @@
 #include <sys/proc.h>
 #include <sys/disp.h>
 #include <sys/cpuvar.h>
+
+static inline int
+kfpu_allowed(void)
+{
+	extern int zfs_fpu_enabled;
+
+	return (zfs_fpu_enabled != 0 ? 1 : 0);
+}
 
 static inline void
 kfpu_begin(void)
@@ -99,6 +105,7 @@ zfs_avx2_available(void)
 #include <sys/auxv.h>
 #include <sys/auxv_386.h>
 
+#define	kfpu_allowed()		1
 #define	kfpu_begin()		do {} while (0)
 #define	kfpu_end()		do {} while (0)
 

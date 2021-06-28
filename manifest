@@ -3177,6 +3177,7 @@ f usr/include/dat/udat_config.h 0644 root bin
 f usr/include/dat/udat_redirection.h 0644 root bin
 f usr/include/dat/udat_vendor_specific.h 0644 root bin
 f usr/include/deflt.h 0644 root bin
+f usr/include/demangle-sys.h 0644 root bin
 d usr/include/des 0755 root bin
 f usr/include/des/des.h 0644 root bin
 f usr/include/des/desdata.h 0644 root bin
