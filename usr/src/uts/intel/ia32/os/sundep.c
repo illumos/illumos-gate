@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -763,7 +763,7 @@ lwp_attach_brand_hdlrs(klwp_t *lwp)
 	    brand_interpositioning_disable, NULL) == 0);
 	installctx(t, NULL, brand_interpositioning_disable,
 	    brand_interpositioning_enable, NULL, NULL,
-	    brand_interpositioning_disable, NULL);
+	    brand_interpositioning_disable, NULL, NULL);
 
 	if (t == curthread) {
 		kpreempt_disable();
@@ -829,6 +829,7 @@ lwp_installctx(klwp_t *lwp)
 #else
 	void (*restop)(klwp_t *) = lwp_segregs_restore;
 #endif
+	struct ctxop *ctx;
 
 	/*
 	 * Install the basic lwp context handlers on each lwp.
@@ -844,10 +845,14 @@ lwp_installctx(klwp_t *lwp)
 	 */
 	ASSERT(removectx(t, lwp, lwp_segregs_save, restop,
 	    NULL, NULL, NULL, NULL) == 0);
-	if (thisthread)
+	if (thisthread) {
+		ctx = installctx_preallocate();
 		kpreempt_disable();
+	} else {
+		ctx = NULL;
+	}
 	installctx(t, lwp, lwp_segregs_save, restop,
-	    NULL, NULL, NULL, NULL);
+	    NULL, NULL, NULL, NULL, ctx);
 	if (thisthread) {
 		/*
 		 * Since we're the right thread, set the values in the GDT
@@ -874,10 +879,14 @@ lwp_installctx(klwp_t *lwp)
 		ASSERT(removectx(t, kstktop,
 		    sep_save, sep_restore, NULL, NULL, NULL, NULL) == 0);
 
-		if (thisthread)
+		if (thisthread) {
+			ctx = installctx_preallocate();
 			kpreempt_disable();
+		} else {
+			ctx = NULL;
+		}
 		installctx(t, kstktop,
-		    sep_save, sep_restore, NULL, NULL, NULL, NULL);
+		    sep_save, sep_restore, NULL, NULL, NULL, NULL, ctx);
 		if (thisthread) {
 			/*
 			 * We're the right thread, so set the stack pointer

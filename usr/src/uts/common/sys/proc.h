@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  * Copyright 2020 Oxide Computer Company
  */
 
@@ -718,8 +718,9 @@ extern	void	thread_free(kthread_t *);
 extern	void	thread_rele(kthread_t *);
 extern	void	thread_join(kt_did_t);
 extern	int	reaper(void);
+extern	struct ctxop *installctx_preallocate(void);
 extern	void	installctx(kthread_t *, void *, void (*)(), void (*)(),
-    void (*)(), void (*)(), void (*)(), void (*)());
+    void (*)(), void (*)(), void (*)(), void (*)(), struct ctxop *);
 extern	int	removectx(kthread_t *, void *, void (*)(), void (*)(),
     void (*)(), void (*)(), void (*)(), void (*)());
 extern	void	savectx(kthread_t *);

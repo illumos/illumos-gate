@@ -319,10 +319,11 @@ int zfs_deadman_enabled = -1;
 #if defined(__amd64__) || defined(__i386__)
 /*
  * Should we allow the use of mechanisms that depend on saving and restoring
- * the FPU state?  This is currently off by default due to stability issues in
- * the kernel FPU routines; e.g., see bug 13717.
+ * the FPU state?  This was disabled initially due to stability issues in
+ * the kernel FPU routines; see bug 13717. As of the fixes for 13902 and
+ * 13915, it has once again been enabled.
  */
-int zfs_fpu_enabled = 0;
+int zfs_fpu_enabled = 1;
 #endif
 
 /*

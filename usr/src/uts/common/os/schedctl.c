@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -113,7 +113,7 @@ schedctl(void)
 		bzero(ssp, sizeof (*ssp));
 
 		installctx(t, ssp, schedctl_save, schedctl_restore,
-		    schedctl_fork, NULL, NULL, NULL);
+		    schedctl_fork, NULL, NULL, NULL, NULL);
 
 		thread_lock(t);	/* protect against ts_tick and ts_update */
 		t->t_schedctl = ssp;

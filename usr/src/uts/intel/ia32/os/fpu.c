@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  * Copyright 2021 RackTop Systems, Inc.
  */
 
@@ -670,7 +670,7 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 	 */
 
 	installctx(ct, cfp, fpsave_ctxt, fprestore_ctxt, fp_new_lwp,
-	    fp_new_lwp, NULL, fp_free);
+	    fp_new_lwp, NULL, fp_free, NULL);
 }
 
 /*
@@ -796,6 +796,7 @@ void
 fp_exec(void)
 {
 	struct fpu_ctx *fp = &ttolwp(curthread)->lwp_pcb.pcb_fpu;
+	struct ctxop *ctx = installctx_preallocate();
 
 	if (fp_save_mech == FP_XSAVE) {
 		fp->fpu_xsave_mask = XFEATURE_FP_ALL;
@@ -807,7 +808,7 @@ fp_exec(void)
 	 */
 	kpreempt_disable();
 	installctx(curthread, fp, fpsave_ctxt, fprestore_ctxt, fp_new_lwp,
-	    fp_new_lwp, NULL, fp_free);
+	    fp_new_lwp, NULL, fp_free, ctx);
 	fpinit();
 	fp->fpu_flags = FPU_EN;
 	kpreempt_enable();
@@ -836,7 +837,7 @@ fp_seed(void)
 	}
 
 	installctx(curthread, fp, fpsave_ctxt, fprestore_ctxt, fp_new_lwp,
-	    fp_new_lwp, NULL, fp_free);
+	    fp_new_lwp, NULL, fp_free, NULL);
 	fpinit();
 
 	/*
@@ -1318,6 +1319,7 @@ void
 kernel_fpu_begin(kfpu_state_t *kfpu, uint_t flags)
 {
 	klwp_t *pl = curthread->t_lwp;
+	struct ctxop *ctx;
 
 	if ((curthread->t_flag & T_KFPU) != 0) {
 		panic("curthread attempting to nest kernel FPU states");
@@ -1380,23 +1382,25 @@ kernel_fpu_begin(kfpu_state_t *kfpu, uint_t flags)
 	 * FPU or another code path) so FPU_VALID could be set. This is handled
 	 * by fp_save, as is the FPU_EN check.
 	 */
+	ctx = installctx_preallocate();
+	kpreempt_disable();
 	if (pl != NULL) {
-		kpreempt_disable();
 		if ((flags & KFPU_USE_LWP) == 0)
 			fp_save(&pl->lwp_pcb.pcb_fpu);
 		pl->lwp_pcb.pcb_fpu.fpu_flags |= FPU_KERNEL;
-		kpreempt_enable();
 	}
 
 	/*
-	 * Set the context operations for kernel FPU usage. Note that this
-	 * cannot be done with pre-emption and interrupts disabled, since
-	 * installctx does a sleeping allocation. We haven't finished
-	 * initializing our kernel FPU state yet, but in the rare case that we
-	 * happen to save/restore before that, no harm is done.
+	 * Set the context operations for kernel FPU usage. Note that this is
+	 * done with a preallocated buffer and under kpreempt_disable because
+	 * without a preallocated buffer, installctx does a sleeping
+	 * allocation. We haven't finished initializing our kernel FPU state
+	 * yet, and in the rare case that we happen to save/restore just as
+	 * installctx() exits its own kpreempt_enable() internal call, we
+	 * guard against restoring an uninitialized buffer (0xbaddcafe).
 	 */
 	installctx(curthread, kfpu, kernel_fpu_ctx_save, kernel_fpu_ctx_restore,
-	    NULL, NULL, NULL, NULL);
+	    NULL, NULL, NULL, NULL, ctx);
 
 	curthread->t_flag |= T_KFPU;
 
@@ -1420,6 +1424,7 @@ kernel_fpu_begin(kfpu_state_t *kfpu, uint_t flags)
 		/* initialize the kfpu state */
 		kernel_fpu_ctx_restore(kfpu);
 	}
+	kpreempt_enable();
 }
 
 void

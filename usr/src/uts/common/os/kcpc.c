@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2021 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -318,7 +319,7 @@ kcpc_bind_thread(kcpc_set_t *set, kthread_t *t, int *subcode)
 	 * Add a device context to the subject thread.
 	 */
 	installctx(t, ctx, kcpc_save, kcpc_restore, NULL,
-	    kcpc_lwp_create, NULL, kcpc_free);
+	    kcpc_lwp_create, NULL, kcpc_free, NULL);
 
 	/*
 	 * Ask the backend to program the hardware.
@@ -1424,7 +1425,7 @@ kcpc_lwp_create(kthread_t *t, kthread_t *ct)
 	}
 
 	installctx(ct, cctx, kcpc_save, kcpc_restore,
-	    NULL, kcpc_lwp_create, NULL, kcpc_free);
+	    NULL, kcpc_lwp_create, NULL, kcpc_free, NULL);
 }
 
 /*
