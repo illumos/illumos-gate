@@ -38,13 +38,13 @@ ROOTMANIFESTDIR = $(ROOTSVCNETWORK)
 $(ROOTMANIFEST):= FILEMODE = 0444
 
 CPPFLAGS +=	-DSYSV -DSTRNET -DBSD_COMP -I$(CMDINETCOMMONDIR)
-CERRWARN +=	-_gcc=-Wno-clobbered
-CERRWARN +=	-_gcc=-Wno-parentheses
-LDLIBS +=	-lsocket -lnsl
+LDLIBS +=	-ltecla -lsocket -lnsl
+
+CSTD=		$(CSTD_GNU99)
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -54,8 +54,6 @@ install: all $(ROOTPROG) $(ROOTMANIFEST)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 check:		$(CHKMANIFEST)
 
