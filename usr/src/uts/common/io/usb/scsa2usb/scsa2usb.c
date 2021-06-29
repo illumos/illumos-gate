@@ -78,7 +78,7 @@ static int	scsa2usb_info(dev_info_t *, ddi_info_cmd_t, void *,
 						void **);
 static int	scsa2usb_detach(dev_info_t *, ddi_detach_cmd_t);
 static int	scsa2usb_cleanup(dev_info_t *, scsa2usb_state_t *);
-static void	scsa2usb_validate_attrs(scsa2usb_state_t *);
+static void	scsa2usb_detect_quirks(scsa2usb_state_t *);
 static void	scsa2usb_create_luns(scsa2usb_state_t *);
 static int	scsa2usb_is_usb(dev_info_t *);
 static void	scsa2usb_fake_inquiry(scsa2usb_state_t *,
@@ -124,9 +124,9 @@ static int	scsa2usb_scsi_bus_unconfig(dev_info_t *, uint_t,
 /* functions for command and transport support */
 static void	scsa2usb_prepare_pkt(scsa2usb_state_t *, struct scsi_pkt *);
 static int	scsa2usb_cmd_transport(scsa2usb_state_t *, scsa2usb_cmd_t *);
-static int	scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *,
-		    scsa2usb_cmd_t *, uchar_t);
-static int	scsa2usb_check_ufi_blacklist_attrs(scsa2usb_state_t *, uchar_t,
+static int	scsa2usb_check_bulkonly_quirks(scsa2usb_state_t *,
+		    scsa2usb_cmd_t *);
+static int	scsa2usb_check_ufi_quirks(scsa2usb_state_t *,
 		    scsa2usb_cmd_t *);
 static int	scsa2usb_handle_scsi_cmd_sub_class(scsa2usb_state_t *,
 		    scsa2usb_cmd_t *, struct scsi_pkt *);
@@ -262,71 +262,75 @@ static char *scsa2usb_cmds[] = {
 
 
 /*
- * Mass-Storage devices masquerade as "sd" disks.
+ * Mass-Storage devices masquerade as "sd" disks.  These devices may not
+ * support all SCSI CDBs in their entirety due to implementation
+ * limitations.
  *
- * These devices may not support all SCSI CDBs in their
- * entirety due to their hardware implementation limitations.
- *
- * As such, following is a list of some of the black-listed
- * devices w/ the attributes that they do not support.
- * (See scsa2usb.h for description on each attribute)
+ * The following table contains a list of quirks for devices that are known to
+ * misbehave.  See the comments in scsa2usb.h for a description of each
+ * quirk attribute.
  */
-#define	X	((uint16_t)(-1))
 
-static struct blacklist {
-	uint16_t	idVendor;	/* vendor ID			*/
-	uint16_t	idProduct;	/* product ID			*/
-	uint16_t	bcdDevice;	/* device release number in bcd */
-	uint16_t	attributes;	/* attributes to blacklist	*/
-} scsa2usb_blacklist[] = {
+/*
+ * Either the product ID (q_pid) or the revision number (q_rev) can be a
+ * wildcard match using this constant:
+ */
+#define	X	UINT16_MAX
+
+static struct quirk {
+	uint16_t	q_vid;	/* Vendor ID */
+	uint16_t	q_pid;	/* Product ID */
+	uint16_t	q_rev;	/* Device revision number in BCD */
+	uint16_t	q_attr;	/* Quirk attributes for this device */
+} scsa2usb_quirks[] = {
 	/* Iomega Zip100 drive (prototype) with flaky bridge */
-	{MS_IOMEGA_VID, MS_IOMEGA_PID1_ZIP100, 0,
+	{MS_IOMEGA_VID, MS_IOMEGA_PID1_ZIP100, X,
 	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_PM},
 
 	/* Iomega Zip100 drive (newer model) with flaky bridge */
-	{MS_IOMEGA_VID, MS_IOMEGA_PID2_ZIP100, 0,
+	{MS_IOMEGA_VID, MS_IOMEGA_PID2_ZIP100, X,
 	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_PM},
 
 	/* Iomega Zip100 drive (newer model) with flaky bridge */
-	{MS_IOMEGA_VID, MS_IOMEGA_PID3_ZIP100, 0,
+	{MS_IOMEGA_VID, MS_IOMEGA_PID3_ZIP100, X,
 	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_PM},
 
 	/* Iomega Zip250 drive */
-	{MS_IOMEGA_VID, MS_IOMEGA_PID_ZIP250, 0, SCSA2USB_ATTRS_GET_LUN},
+	{MS_IOMEGA_VID, MS_IOMEGA_PID_ZIP250, X, SCSA2USB_ATTRS_GET_LUN},
 
 	/* Iomega Clik! drive */
-	{MS_IOMEGA_VID, MS_IOMEGA_PID_CLIK, 0,
+	{MS_IOMEGA_VID, MS_IOMEGA_PID_CLIK, X,
 	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_START_STOP},
 
 	/* Kingston DataTraveler Stick / PNY Attache Stick */
-	{MS_TOSHIBA_VID, MS_TOSHIBA_PID0, 0,
+	{MS_TOSHIBA_VID, MS_TOSHIBA_PID0, X,
 	    SCSA2USB_ATTRS_GET_LUN},
 
 	/* PNY Floppy drive */
-	{MS_PNY_VID, MS_PNY_PID0, 0,
+	{MS_PNY_VID, MS_PNY_PID0, X,
 	    SCSA2USB_ATTRS_GET_LUN},
 
 	/* SMSC floppy Device - and its clones */
-	{MS_SMSC_VID, X, 0, SCSA2USB_ATTRS_START_STOP},
+	{MS_SMSC_VID, X, X, SCSA2USB_ATTRS_START_STOP},
 
 	/* Hagiwara SmartMedia Device */
-	{MS_HAGIWARA_SYS_COM_VID, MS_HAGIWARA_SYSCOM_PID1, 0,
+	{MS_HAGIWARA_SYS_COM_VID, MS_HAGIWARA_SYSCOM_PID1, X,
 	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_START_STOP},
 
 	/* Hagiwara CompactFlash Device */
-	{MS_HAGIWARA_SYS_COM_VID, MS_HAGIWARA_SYSCOM_PID2, 0,
+	{MS_HAGIWARA_SYS_COM_VID, MS_HAGIWARA_SYSCOM_PID2, X,
 	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_START_STOP},
 
 	/* Hagiwara SmartMedia/CompactFlash Combo Device */
-	{MS_HAGIWARA_SYS_COM_VID, MS_HAGIWARA_SYSCOM_PID3, 0,
+	{MS_HAGIWARA_SYS_COM_VID, MS_HAGIWARA_SYSCOM_PID3, X,
 	    SCSA2USB_ATTRS_START_STOP},
 
 	/* Hagiwara new SM Device */
-	{MS_HAGIWARA_SYS_COM_VID, MS_HAGIWARA_SYSCOM_PID4, 0,
+	{MS_HAGIWARA_SYS_COM_VID, MS_HAGIWARA_SYSCOM_PID4, X,
 	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_START_STOP},
 
 	/* Hagiwara new CF Device */
-	{MS_HAGIWARA_SYS_COM_VID, MS_HAGIWARA_SYSCOM_PID5, 0,
+	{MS_HAGIWARA_SYS_COM_VID, MS_HAGIWARA_SYSCOM_PID5, X,
 	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_START_STOP},
 
 	/* Mitsumi CD-RW Device(s) */
@@ -334,62 +338,63 @@ static struct blacklist {
 	    SCSA2USB_ATTRS_GET_CONF | SCSA2USB_ATTRS_GET_PERF},
 
 	/* Neodio Technologies Corporation SM/CF/MS/SD Combo Device */
-	{MS_NEODIO_VID, MS_NEODIO_DEVICE_3050, 0,
+	{MS_NEODIO_VID, MS_NEODIO_DEVICE_3050, X,
 	    SCSA2USB_ATTRS_MODE_SENSE },
 
 	/* dumb flash devices */
-	{MS_SONY_FLASH_VID, MS_SONY_FLASH_PID, 0,
+	{MS_SONY_FLASH_VID, MS_SONY_FLASH_PID, X,
 	    SCSA2USB_ATTRS_REDUCED_CMD},
 
-	{MS_TREK_FLASH_VID, MS_TREK_FLASH_PID, 0,
+	{MS_TREK_FLASH_VID, MS_TREK_FLASH_PID, X,
 	    SCSA2USB_ATTRS_REDUCED_CMD},
 
-	{MS_PENN_FLASH_VID, MS_PENN_FLASH_PID, 0,
+	{MS_PENN_FLASH_VID, MS_PENN_FLASH_PID, X,
 	    SCSA2USB_ATTRS_REDUCED_CMD},
 
 	/* SimpleTech UCF-100 CF Device */
-	{MS_SIMPLETECH_VID, MS_SIMPLETECH_PID1, 0,
+	{MS_SIMPLETECH_VID, MS_SIMPLETECH_PID1, X,
 	    SCSA2USB_ATTRS_REDUCED_CMD},
 
 	{MS_ADDONICS_CARD_READER_VID, MS_ADDONICS_CARD_READER_PID,
-	    0, SCSA2USB_ATTRS_REDUCED_CMD},
+	    X, SCSA2USB_ATTRS_REDUCED_CMD},
 
 	/* Acomdata 80GB USB/1394 Hard Disk */
-	{MS_ACOMDATA_VID, MS_ACOMDATA_PID1, 0,
+	{MS_ACOMDATA_VID, MS_ACOMDATA_PID1, X,
 	    SCSA2USB_ATTRS_USE_CSW_RESIDUE},
 
 	/* OTi6828 Flash Disk */
-	{MS_OTI_VID, MS_OTI_DEVICE_6828, 0,
+	{MS_OTI_VID, MS_OTI_DEVICE_6828, X,
 	    SCSA2USB_ATTRS_USE_CSW_RESIDUE},
 
 	/* AMI Virtual Floppy */
-	{MS_AMI_VID, MS_AMI_VIRTUAL_FLOPPY, 0,
+	{MS_AMI_VID, MS_AMI_VIRTUAL_FLOPPY, X,
 	    SCSA2USB_ATTRS_NO_MEDIA_CHECK},
 
 	/* ScanLogic USB Storage Device */
-	{MS_SCANLOGIC_VID, MS_SCANLOGIC_PID1, 0,
+	{MS_SCANLOGIC_VID, MS_SCANLOGIC_PID1, X,
 	    SCSA2USB_ATTRS_NO_CAP_ADJUST},
 
 	/* Super Top USB 2.0 IDE Device */
-	{MS_SUPERTOP_VID, MS_SUPERTOP_DEVICE_6600, 0,
+	{MS_SUPERTOP_VID, MS_SUPERTOP_DEVICE_6600, X,
 	    SCSA2USB_ATTRS_USE_CSW_RESIDUE},
 
 	/* Aigo Miniking Device NEHFSP14 */
-	{MS_AIGO_VID, MS_AIGO_DEVICE_6981, 0,
+	{MS_AIGO_VID, MS_AIGO_DEVICE_6981, X,
 	    SCSA2USB_ATTRS_USE_CSW_RESIDUE},
 
 	/* Alcor Micro Corp 6387 flash disk */
-	{MS_ALCOR_VID, MS_ALCOR_PID0, 0,
+	{MS_ALCOR_VID, MS_ALCOR_PID0, X,
 	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_USE_CSW_RESIDUE},
 
 	/* Western Digital External HDD */
-	{MS_WD_VID, MS_WD_PID, 0,
-	    SCSA2USB_ATTRS_INQUIRY_EVPD}
+	{MS_WD_VID, MS_WD_PID, X,
+	    SCSA2USB_ATTRS_INQUIRY_EVPD},
+
+	/* Insyde Virtual CD-ROM */
+	{MS_INSYDE_VID, MS_INSYDE_PID_CDROM, X,
+	    SCSA2USB_ATTRS_MODE_SENSE},
 };
 
-
-#define	N_SCSA2USB_BLACKLIST (sizeof (scsa2usb_blacklist))/ \
-				sizeof (struct blacklist)
 
 /*
  * Attribute values can be overridden by values
@@ -705,9 +710,13 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_enter(&scsa2usbp->scsa2usb_mutex);
 	scsa2usbp->scsa2usb_dip		= dip;
 	scsa2usbp->scsa2usb_instance	= instance;
+	/*
+	 * Devices begin with all attributes enabled.  Attributes may be
+	 * disabled later through detected quirks or through the configuration
+	 * file.
+	 */
 	scsa2usbp->scsa2usb_attrs	= SCSA2USB_ALL_ATTRS;
 	scsa2usbp->scsa2usb_dev_data	= dev_data;
-
 
 	/* save the default pipe handle */
 	scsa2usbp->scsa2usb_default_pipe = dev_data->dev_default_ph;
@@ -874,10 +883,7 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	/*
-	 * Validate the black-listed attributes
-	 */
-	scsa2usb_validate_attrs(scsa2usbp);
+	scsa2usb_detect_quirks(scsa2usbp);
 
 	/* Print the serial number from the registration data */
 	if (scsa2usbp->scsa2usb_dev_data->dev_serial) {
@@ -1733,30 +1739,34 @@ scsa2usb_strtok_r(char *p, char *sep, char **lasts)
 
 
 /*
- * scsa2usb_validate_attrs:
- *	many devices have BO/CB/CBI protocol support issues.
- *	use vendor/product info to reset the
- *	individual erroneous attributes
- *
- * NOTE: we look at only device at a time (at attach time)
+ * Some devices are not complete or compatible implementations of the USB mass
+ * storage protocols, and need special handling.  This routine checks various
+ * aspects of the device against internal lists of quirky hardware.
  */
 static void
-scsa2usb_validate_attrs(scsa2usb_state_t *scsa2usbp)
+scsa2usb_detect_quirks(scsa2usb_state_t *scsa2usbp)
 {
-	int i, mask;
+	int mask;
 	usb_dev_descr_t *desc = scsa2usbp->scsa2usb_dev_data->dev_descr;
 
 	if (!SCSA2USB_IS_BULK_ONLY(scsa2usbp)) {
 		scsa2usbp->scsa2usb_attrs &= ~SCSA2USB_ATTRS_GET_LUN;
 	}
 
-	/* determine if this device is on the blacklist */
-	for (i = 0; i < N_SCSA2USB_BLACKLIST; i++) {
-		if ((scsa2usb_blacklist[i].idVendor == desc->idVendor) &&
-		    ((scsa2usb_blacklist[i].idProduct == desc->idProduct) ||
-		    (scsa2usb_blacklist[i].idProduct == X))) {
-			scsa2usbp->scsa2usb_attrs &=
-			    ~(scsa2usb_blacklist[i].attributes);
+	/*
+	 * Determine if this device is on the quirks list:
+	 */
+	for (uint_t i = 0; i < ARRAY_SIZE(scsa2usb_quirks); i++) {
+		struct quirk *q = &scsa2usb_quirks[i];
+
+		if (q->q_vid == desc->idVendor &&
+		    (q->q_pid == desc->idProduct || q->q_pid == X) &&
+		    (q->q_rev == desc->bcdDevice || q->q_rev == X)) {
+			/*
+			 * Remove any attribute bits specified in the quirks
+			 * table:
+			 */
+			scsa2usbp->scsa2usb_attrs &= ~(q->q_attr);
 			break;
 		}
 	}
@@ -3047,9 +3057,6 @@ scsa2usb_force_invalid_request(scsa2usb_state_t *scsa2usbp,
 }
 
 
-/*
- * scsa2usb_cmd_transport:
- */
 static int
 scsa2usb_cmd_transport(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 {
@@ -3065,13 +3072,15 @@ scsa2usb_cmd_transport(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 
 	pkt = scsa2usbp->scsa2usb_cur_pkt = cmd->cmd_pkt;
 
-	/* check black-listed attrs first */
+	/*
+	 * Check per-device quirks first:
+	 */
 	if (SCSA2USB_IS_BULK_ONLY(scsa2usbp)) {
-		transport = scsa2usb_check_bulkonly_blacklist_attrs(scsa2usbp,
-		    cmd, pkt->pkt_cdbp[0]);
+		transport = scsa2usb_check_bulkonly_quirks(scsa2usbp, cmd);
 	} else if (SCSA2USB_IS_CB(scsa2usbp) || SCSA2USB_IS_CBI(scsa2usbp)) {
-		transport =  scsa2usb_check_ufi_blacklist_attrs(scsa2usbp,
-		    pkt->pkt_cdbp[0], cmd);
+		transport = scsa2usb_check_ufi_quirks(scsa2usbp, cmd);
+	} else {
+		return (TRAN_FATAL_ERROR);
 	}
 
 	/* just accept the command or return error */
@@ -3119,22 +3128,14 @@ scsa2usb_cmd_transport(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 
 
 /*
- * scsa2usb_check_bulkonly_blacklist_attrs:
- *	validate "scsa2usb_blacklist_attrs" (see scsa2usb.h)
- *	if blacklisted attrs match accept the request
- *	attributes checked are:-
- *		SCSA2USB_ATTRS_START_STOP
+ * Check this Bulk Only command against the quirks for this particular device.
+ * Returns a transport disposition.
  */
 int
-scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *scsa2usbp,
-    scsa2usb_cmd_t *cmd, uchar_t opcode)
+scsa2usb_check_bulkonly_quirks(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 {
 	struct scsi_inquiry *inq =
 	    &scsa2usbp->scsa2usb_lun_inquiry[cmd->cmd_pkt->pkt_address.a_lun];
-
-	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
-	    "scsa2usb_check_bulkonly_blacklist_attrs: opcode = %s",
-	    scsi_cname(opcode, scsa2usb_cmds));
 
 	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
 
@@ -3142,7 +3143,7 @@ scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *scsa2usbp,
 	 * decode and convert the packet
 	 * for most cmds, we can bcopy the cdb
 	 */
-	switch (opcode) {
+	switch (cmd->cmd_pkt->pkt_cdbp[0]) {
 	case SCMD_DOORLOCK:
 		if (!(scsa2usbp->scsa2usb_attrs & SCSA2USB_ATTRS_DOORLOCK)) {
 
@@ -3574,23 +3575,17 @@ scsa2usb_do_tur(scsa2usb_state_t *scsa2usbp, struct scsi_address *ap)
 
 
 /*
- * scsa2usb_check_ufi_blacklist_attrs:
- *	validate "scsa2usb_blacklist_attrs" (see scsa2usb.h)
- *	if blacklisted attrs match accept the request
- *	attributes checked are:-
- *		SCSA2USB_ATTRS_GET_CONF
- *		SCSA2USB_ATTRS_GET_PERF
- *		SCSA2USB_ATTRS_GET_START_STOP
+ * Check this UFI command against the quirks for this particular device.
+ * Returns a transport disposition.
  */
 static int
-scsa2usb_check_ufi_blacklist_attrs(scsa2usb_state_t *scsa2usbp, uchar_t opcode,
-    scsa2usb_cmd_t *cmd)
+scsa2usb_check_ufi_quirks(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 {
-	int	rval = SCSA2USB_TRANSPORT;
+	int rval = SCSA2USB_TRANSPORT;
 
 	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
 
-	switch (opcode) {
+	switch (cmd->cmd_pkt->pkt_cdbp[0]) {
 	case SCMD_PRIN:
 	case SCMD_PROUT:
 		rval = SCSA2USB_JUST_ACCEPT;
@@ -3667,7 +3662,7 @@ int
 scsa2usb_handle_ufi_subclass_cmd(scsa2usb_state_t *scsa2usbp,
     scsa2usb_cmd_t *cmd, struct scsi_pkt *pkt)
 {
-	uchar_t opcode =  pkt->pkt_cdbp[0];
+	uchar_t opcode = pkt->pkt_cdbp[0];
 
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_handle_ufi_subclass_cmd: cmd = 0x%p pkt = 0x%p",
@@ -5600,13 +5595,11 @@ scsa2usb_create_pm_components(dev_info_t *dip, scsa2usb_state_t *scsa2usbp)
 	    (void *)dip, (void *)scsa2usbp);
 
 	/*
-	 * determine if this device is on the blacklist
-	 * or if a conf file entry has disabled PM
+	 * Check if power management is disabled by a per-device quirk:
 	 */
 	if ((scsa2usbp->scsa2usb_attrs & SCSA2USB_ATTRS_PM) == 0) {
 		USB_DPRINTF_L2(DPRINT_MASK_PM, scsa2usbp->scsa2usb_log_handle,
 		    "device cannot be power managed");
-
 		return;
 	}
 

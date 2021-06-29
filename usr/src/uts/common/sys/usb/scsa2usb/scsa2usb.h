@@ -56,7 +56,9 @@ extern "C" {
  */
 #define	SCSA2USB_MAX_BULK_XFER_SIZE	(64 * 1024)
 
-/* Blacklist some vendors whose devices could cause problems */
+/*
+ * Identify devices with quirks of implementation that we need to work around:
+ */
 #define	MS_HAGIWARA_SYS_COM_VID	0x693	/* VendorId of Hagiwara Sys-Com */
 #define	MS_HAGIWARA_SYSCOM_PID1	0x1	/* PID for SmartMedia(SM) device */
 #define	MS_HAGIWARA_SYSCOM_PID2	0x3	/* PID for CompactFlash(CF) device */
@@ -125,6 +127,13 @@ extern "C" {
 #define	MS_WD_PID   0x1001  /* PID for Western Digital USB External HDD */
 
 /*
+ * The virtual CD-ROM device emulated by at least some Insyde BMCs is not
+ * completely implemented.  It hangs when a MODE SENSE command is sent.
+ */
+#define	MS_INSYDE_VID		0xb1f	/* Vendor: Insyde Software Corp */
+#define	MS_INSYDE_PID_CDROM	0x03ea	/* Product: BMC Virtual CD-ROM */
+
+/*
  * The AMI virtual floppy device is not a real USB storage device, but
  * emulated by the SP firmware shipped together with important Sun x86
  * products such as Galaxy and Thumper platforms. The device causes
@@ -143,7 +152,7 @@ extern "C" {
  * Reducing timeout value to 1 second can help a little bit, but the delay
  * is still noticeable, because the target driver would make many retries
  * for this command. It is not desirable to mess with the target driver
- * for a broken USB device. So adding the device to the scsa2usb blacklist
+ * for a broken USB device. So adding the device to the scsa2usb quirks list
  * is the best choice we have.
  *
  * It is found that the READ CAPACITY failure only happens when there is
@@ -187,7 +196,7 @@ extern "C" {
  *		instead of highest logical block address on READ_CAPACITY cmd.
  *
  * NOTE: If a device simply STALLs the GET_MAX_LUN BO class-specific command
- * and recovers then it will not be added to the scsa2usb_blacklist[] table
+ * and recovers then it will not be added to the scsa2usb_quirks[] table
  * in scsa2usb.c. The other attributes will not be taken of the table unless
  * their inclusion causes a recovery and retries (thus seriously affecting
  * the driver performance).
@@ -508,10 +517,12 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", usb_bulk_req_t))
 	FORMG0COUNT(((union scsi_cdb *)(pktp)->pkt_cdbp), (cnt))
 
 
-/* transport related */
-#define	SCSA2USB_JUST_ACCEPT	0
-#define	SCSA2USB_TRANSPORT	1
-#define	SCSA2USB_REJECT		-1
+/*
+ * Transport dispositions for commands:
+ */
+#define	SCSA2USB_JUST_ACCEPT	0	/* Simulate command without device */
+#define	SCSA2USB_TRANSPORT	1	/* Send the command to the device */
+#define	SCSA2USB_REJECT		-1	/* Reject with immediate fatal error */
 
 /*
  * The scsa2usb_cpr_info data structure is used for cpr related
