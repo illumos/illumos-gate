@@ -389,6 +389,10 @@ static struct quirk {
 	/* Western Digital External HDD */
 	{MS_WD_VID, MS_WD_PID, X,
 	    SCSA2USB_ATTRS_INQUIRY_EVPD},
+
+	/* Insyde Virtual CD-ROM */
+	{MS_INSYDE_VID, MS_INSYDE_PID_CDROM, X,
+	    SCSA2USB_ATTRS_MODE_SENSE},
 };
 
 

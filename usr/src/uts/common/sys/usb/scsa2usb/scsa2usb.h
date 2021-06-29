@@ -127,6 +127,13 @@ extern "C" {
 #define	MS_WD_PID   0x1001  /* PID for Western Digital USB External HDD */
 
 /*
+ * The virtual CD-ROM device emulated by at least some Insyde BMCs is not
+ * completely implemented.  It hangs when a MODE SENSE command is sent.
+ */
+#define	MS_INSYDE_VID		0xb1f	/* Vendor: Insyde Software Corp */
+#define	MS_INSYDE_PID_CDROM	0x03ea	/* Product: BMC Virtual CD-ROM */
+
+/*
  * The AMI virtual floppy device is not a real USB storage device, but
  * emulated by the SP firmware shipped together with important Sun x86
  * products such as Galaxy and Thumper platforms. The device causes
