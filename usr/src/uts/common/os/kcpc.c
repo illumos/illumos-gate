@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -75,9 +76,10 @@ static uint32_t kcpc_nullctx_count;    /* # overflows in a thread with no ctx */
  */
 static int kcpc_nullctx_panic = 0;
 
-static void kcpc_lwp_create(kthread_t *t, kthread_t *ct);
-static void kcpc_restore(kcpc_ctx_t *ctx);
-static void kcpc_save(kcpc_ctx_t *ctx);
+static void kcpc_save(void *);
+static void kcpc_restore(void *);
+static void kcpc_lwp_create(void *, void *);
+static void kcpc_free(void *, int);
 static void kcpc_ctx_clone(kcpc_ctx_t *ctx, kcpc_ctx_t *cctx);
 static int kcpc_tryassign(kcpc_set_t *set, int starting_req, int *scratch);
 static kcpc_set_t *kcpc_dup_set(kcpc_set_t *set);
@@ -111,6 +113,14 @@ extern int kcpc_hw_load_pcbe(void);
  * Return value from kcpc_hw_load_pcbe()
  */
 static int kcpc_pcbe_error = 0;
+
+static const struct ctxop_template kcpc_ctxop_tpl = {
+	.ct_rev		= CTXOP_TPL_REV,
+	.ct_save	= kcpc_save,
+	.ct_restore	= kcpc_restore,
+	.ct_lwp_create	= kcpc_lwp_create,
+	.ct_free	= kcpc_free,
+};
 
 /*
  * Perform one-time initialization of kcpc framework.
@@ -318,8 +328,7 @@ kcpc_bind_thread(kcpc_set_t *set, kthread_t *t, int *subcode)
 	/*
 	 * Add a device context to the subject thread.
 	 */
-	installctx(t, ctx, kcpc_save, kcpc_restore, NULL,
-	    kcpc_lwp_create, NULL, kcpc_free, NULL);
+	ctxop_install(t, &kcpc_ctxop_tpl, ctx);
 
 	/*
 	 * Ask the backend to program the hardware.
@@ -547,7 +556,7 @@ kcpc_unbind(kcpc_set_t *set)
 		t = ctx->kc_thread;
 		/*
 		 * The context is thread-bound and therefore has a device
-		 * context.  It will be freed via removectx() calling
+		 * context.  It will be freed via ctxop_remove() calling
 		 * freectx() calling kcpc_free().
 		 */
 		if (t == curthread) {
@@ -560,15 +569,7 @@ kcpc_unbind(kcpc_set_t *set)
 			splx(save_spl);
 			kpreempt_enable();
 		}
-#ifdef DEBUG
-		if (removectx(t, ctx, kcpc_save, kcpc_restore, NULL,
-		    kcpc_lwp_create, NULL, kcpc_free) == 0)
-			panic("kcpc_unbind: context %p not preset on thread %p",
-			    (void *)ctx, (void *)t);
-#else
-		(void) removectx(t, ctx, kcpc_save, kcpc_restore, NULL,
-		    kcpc_lwp_create, NULL, kcpc_free);
-#endif /* DEBUG */
+		VERIFY3U(ctxop_remove(t, &kcpc_ctxop_tpl, ctx), !=, 0);
 		t->t_cpc_set = NULL;
 		t->t_cpc_ctx = NULL;
 	} else {
@@ -1215,8 +1216,9 @@ kcpc_overflow_ast()
  * Called when switching away from current thread.
  */
 static void
-kcpc_save(kcpc_ctx_t *ctx)
+kcpc_save(void *arg)
 {
+	kcpc_ctx_t *ctx = arg;
 	int err;
 	int save_spl;
 
@@ -1264,8 +1266,9 @@ kcpc_save(kcpc_ctx_t *ctx)
 }
 
 static void
-kcpc_restore(kcpc_ctx_t *ctx)
+kcpc_restore(void *arg)
 {
+	kcpc_ctx_t *ctx = arg;
 	int save_spl;
 
 	mutex_enter(&ctx->kc_lock);
@@ -1324,9 +1327,11 @@ kcpc_restore(kcpc_ctx_t *ctx)
  * it is switched off.
  */
 /*ARGSUSED*/
-void
-kcpc_idle_save(struct cpu *cp)
+static void
+kcpc_idle_save(void *arg)
 {
+	struct cpu *cp = arg;
+
 	/*
 	 * The idle thread shouldn't be run anywhere else.
 	 */
@@ -1348,9 +1353,11 @@ kcpc_idle_save(struct cpu *cp)
 	mutex_exit(&cp->cpu_cpc_ctxlock);
 }
 
-void
-kcpc_idle_restore(struct cpu *cp)
+static void
+kcpc_idle_restore(void *arg)
 {
+	struct cpu *cp = arg;
+
 	/*
 	 * The idle thread shouldn't be run anywhere else.
 	 */
@@ -1372,10 +1379,23 @@ kcpc_idle_restore(struct cpu *cp)
 	mutex_exit(&cp->cpu_cpc_ctxlock);
 }
 
+static const struct ctxop_template kcpc_idle_ctxop_tpl = {
+	.ct_rev		= CTXOP_TPL_REV,
+	.ct_save	= kcpc_idle_save,
+	.ct_restore	= kcpc_idle_restore,
+};
+
+void
+kcpc_idle_ctxop_install(kthread_t *t, struct cpu *cp)
+{
+	ctxop_install(t, &kcpc_idle_ctxop_tpl, cp);
+}
+
 /*ARGSUSED*/
 static void
-kcpc_lwp_create(kthread_t *t, kthread_t *ct)
+kcpc_lwp_create(void *parent, void *child)
 {
+	kthread_t *t = parent, *ct = child;
 	kcpc_ctx_t	*ctx = t->t_cpc_ctx, *cctx;
 	int		i;
 
@@ -1424,8 +1444,7 @@ kcpc_lwp_create(kthread_t *t, kthread_t *ct)
 		aston(ct);
 	}
 
-	installctx(ct, cctx, kcpc_save, kcpc_restore,
-	    NULL, kcpc_lwp_create, NULL, kcpc_free, NULL);
+	ctxop_install(ct, &kcpc_ctxop_tpl, cctx);
 }
 
 /*
@@ -1462,8 +1481,9 @@ kcpc_lwp_create(kthread_t *t, kthread_t *ct)
 
 /*ARGSUSED*/
 void
-kcpc_free(kcpc_ctx_t *ctx, int isexec)
+kcpc_free(void *arg, int isexec)
 {
+	kcpc_ctx_t *ctx = arg;
 	int		i;
 	kcpc_set_t	*set = ctx->kc_set;
 
@@ -1542,6 +1562,12 @@ kcpc_free(kcpc_ctx_t *ctx, int isexec)
 	kmem_free(set->ks_data, set->ks_nreqs * sizeof (uint64_t));
 	kcpc_ctx_free(ctx);
 	kcpc_free_set(set);
+}
+
+void
+kcpc_free_cpu(kcpc_ctx_t *ctx)
+{
+	kcpc_free(ctx, 0);
 }
 
 /*

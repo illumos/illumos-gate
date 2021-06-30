@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2021 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -81,9 +82,9 @@ static size_t	sc_bitmap_len;		/* # of bits in allocation bitmap */
 static size_t	sc_bitmap_words;	/* # of words in allocation bitmap */
 
 /* Context ops */
-static void	schedctl_save(sc_shared_t *);
-static void	schedctl_restore(sc_shared_t *);
-static void	schedctl_fork(kthread_t *, kthread_t *);
+static void schedctl_save(void *);
+static void schedctl_restore(void *);
+static void schedctl_fork(void *, void *);
 
 /* Functions for handling shared pages */
 static int	schedctl_shared_alloc(sc_shared_t **, uintptr_t *);
@@ -91,6 +92,13 @@ static sc_page_ctl_t *schedctl_page_lookup(sc_shared_t *);
 static int	schedctl_map(struct anon_map *, caddr_t *, caddr_t);
 static int	schedctl_getpage(struct anon_map **, caddr_t *);
 static void	schedctl_freepage(struct anon_map *, caddr_t);
+
+static const struct ctxop_template schedctl_ctxop_tpl = {
+	.ct_rev		= CTXOP_TPL_REV,
+	.ct_save	= schedctl_save,
+	.ct_restore	= schedctl_restore,
+	.ct_fork	= schedctl_fork,
+};
 
 /*
  * System call interface to scheduler activations.
@@ -112,8 +120,7 @@ schedctl(void)
 			return ((caddr_t)(uintptr_t)set_errno(error));
 		bzero(ssp, sizeof (*ssp));
 
-		installctx(t, ssp, schedctl_save, schedctl_restore,
-		    schedctl_fork, NULL, NULL, NULL, NULL);
+		ctxop_install(t, &schedctl_ctxop_tpl, ssp);
 
 		thread_lock(t);	/* protect against ts_tick and ts_update */
 		t->t_schedctl = ssp;
@@ -151,8 +158,7 @@ schedctl_lwp_cleanup(kthread_t *t)
 	 * Remove the context op to avoid the final call to
 	 * schedctl_save when switching away from this lwp.
 	 */
-	(void) removectx(t, ssp, schedctl_save, schedctl_restore,
-	    schedctl_fork, NULL, NULL, NULL);
+	(void) ctxop_remove(t, &schedctl_ctxop_tpl, ssp);
 
 	/*
 	 * Do not unmap the shared page until the process exits.
@@ -207,8 +213,10 @@ schedctl_proc_cleanup(void)
  * Save new thread state.
  */
 static void
-schedctl_save(sc_shared_t *ssp)
+schedctl_save(void *arg)
 {
+	sc_shared_t *ssp = arg;
+
 	ssp->sc_state = curthread->t_state;
 }
 
@@ -218,8 +226,10 @@ schedctl_save(sc_shared_t *ssp)
  * Save new thread state and CPU.
  */
 static void
-schedctl_restore(sc_shared_t *ssp)
+schedctl_restore(void *arg)
 {
+	sc_shared_t *ssp = arg;
+
 	ssp->sc_state = SC_ONPROC;
 	ssp->sc_cpu = CPU->cpu_id;
 }
@@ -230,8 +240,9 @@ schedctl_restore(sc_shared_t *ssp)
  * The child's threads must call schedctl() to get new shared mappings.
  */
 static void
-schedctl_fork(kthread_t *pt, kthread_t *ct)
+schedctl_fork(void *parent, void *child)
 {
+	kthread_t *pt = parent, *ct = child;
 	proc_t *pp = ttoproc(pt);
 	proc_t *cp = ttoproc(ct);
 	sc_page_ctl_t *pagep;

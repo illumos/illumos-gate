@@ -246,7 +246,7 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 			 * FPU context is still active, release the
 			 * ownership.
 			 */
-			fp_free(fpu, 0);
+			fp_free(fpu);
 		}
 	}
 	/*

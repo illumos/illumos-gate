@@ -124,7 +124,7 @@ extern void getfpregs32(klwp_t *, fpregset32_t *);
 
 struct fpu_ctx;
 
-extern void fp_free(struct fpu_ctx *, int);
+extern void fp_free(struct fpu_ctx *);
 extern void fp_save(struct fpu_ctx *);
 extern void fp_restore(struct fpu_ctx *);
 
@@ -133,8 +133,8 @@ extern int fpu_pentium_fdivbug;
 extern void sep_save(void *);
 extern void sep_restore(void *);
 
-extern void brand_interpositioning_enable(void);
-extern void brand_interpositioning_disable(void);
+extern void brand_interpositioning_enable(void *);
+extern void brand_interpositioning_disable(void *);
 
 struct regs;
 

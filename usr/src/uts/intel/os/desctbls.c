@@ -1116,7 +1116,7 @@ init_boot_gdt(user_desc_t *bgdt)
  * the branded entry points.
  */
 void
-brand_interpositioning_enable(void)
+brand_interpositioning_enable(void *arg __unused)
 {
 	gate_desc_t	*idt = CPU->cpu_idt;
 	int		i;
@@ -1171,7 +1171,7 @@ brand_interpositioning_enable(void)
  * the standard entry points, which bypass the interpositioning hooks.
  */
 void
-brand_interpositioning_disable(void)
+brand_interpositioning_disable(void *arg __unused)
 {
 	gate_desc_t	*idt = CPU->cpu_idt;
 	int i;

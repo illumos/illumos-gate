@@ -93,6 +93,17 @@ __FBSDID("$FreeBSD$");
 
 struct vlapic;
 
+/* Flags for vtc_status */
+#define	VTCS_FPU_RESTORED	1 /* guest FPU restored, host FPU saved */
+#define	VTCS_FPU_CTX_CRITICAL	2 /* in ctx where FPU restore cannot be lazy */
+
+typedef struct vm_thread_ctx {
+	struct vm	*vtc_vm;
+	int		vtc_vcpuid;
+	uint_t		vtc_status;
+	enum vcpu_ustate vtc_ustate;
+} vm_thread_ctx_t;
+
 /*
  * Initialization:
  * (a) allocated when vcpu is created
@@ -133,6 +144,8 @@ struct vcpu {
 	enum vcpu_ustate ustate;	/* (i) microstate for the vcpu */
 	hrtime_t	ustate_when;	/* (i) time of last ustate change */
 	uint64_t ustate_total[VU_MAX];	/* (o) total time spent in ustates */
+	vm_thread_ctx_t	vtc;		/* (o) thread state for ctxops */
+	struct ctxop	*ctxop;		/* (o) ctxop storage for vcpu */
 };
 
 #define	vcpu_lock_initialized(v) mtx_initialized(&((v)->mtx))
@@ -269,16 +282,13 @@ static void vcpu_notify_event_locked(struct vcpu *vcpu, vcpu_notify_t);
 static bool vcpu_sleep_bailout_checks(struct vm *vm, int vcpuid);
 static int vcpu_vector_sipi(struct vm *vm, int vcpuid, uint8_t vector);
 
-/* Flags for vtc_status */
-#define	VTCS_FPU_RESTORED	1 /* guest FPU restored, host FPU saved */
-#define	VTCS_FPU_CTX_CRITICAL	2 /* in ctx where FPU restore cannot be lazy */
-
-typedef struct vm_thread_ctx {
-	struct vm	*vtc_vm;
-	int		vtc_vcpuid;
-	uint_t		vtc_status;
-	enum vcpu_ustate vtc_ustate;
-} vm_thread_ctx_t;
+static void vmm_savectx(void *);
+static void vmm_restorectx(void *);
+static const struct ctxop_template vmm_ctxop_tpl = {
+	.ct_rev		= CTXOP_TPL_REV,
+	.ct_save	= vmm_savectx,
+	.ct_restore	= vmm_restorectx,
+};
 
 #ifdef KTR
 static const char *
@@ -313,6 +323,7 @@ vcpu_cleanup(struct vm *vm, int i, bool destroy)
 		vcpu->vie_ctx = NULL;
 		vmc_destroy(vcpu->vmclient);
 		vcpu->vmclient = NULL;
+		ctxop_free(vcpu->ctxop);
 	}
 }
 
@@ -337,6 +348,10 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 
 		vcpu->ustate = VU_INIT;
 		vcpu->ustate_when = gethrtime();
+
+		vcpu->vtc.vtc_vm = vm;
+		vcpu->vtc.vtc_vcpuid = vcpu_id;
+		vcpu->ctxop = ctxop_allocate(&vmm_ctxop_tpl, &vcpu->vtc);
 	} else {
 		vie_reset(vcpu->vie_ctx);
 		bzero(&vcpu->exitinfo, sizeof (vcpu->exitinfo));
@@ -2050,15 +2065,6 @@ vmm_restorectx(void *arg)
 
 }
 
-/*
- * If we're in removectx(), we might still have state to tidy up.
- */
-static void
-vmm_freectx(void *arg, int isexec)
-{
-	vmm_savectx(arg);
-}
-
 static int
 vm_entry_actions(struct vm *vm, int vcpuid, const struct vm_entry *entry,
     struct vm_exit *vme)
@@ -2147,7 +2153,6 @@ vm_run(struct vm *vm, int vcpuid, const struct vm_entry *entry)
 	struct vcpu *vcpu;
 	struct vm_exit *vme;
 	bool intr_disabled;
-	vm_thread_ctx_t vtc;
 	int affinity_type = CPU_CURRENT;
 
 	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
@@ -2160,11 +2165,8 @@ vm_run(struct vm *vm, int vcpuid, const struct vm_entry *entry)
 
 	vcpu_ustate_change(vm, vcpuid, VU_EMU_KERN);
 
-	vtc.vtc_vm = vm;
-	vtc.vtc_vcpuid = vcpuid;
-	vtc.vtc_status = 0;
-	installctx(curthread, &vtc, vmm_savectx, vmm_restorectx, NULL, NULL,
-	    NULL, vmm_freectx, NULL);
+	vcpu->vtc.vtc_status = 0;
+	ctxop_attach(curthread, vcpu->ctxop);
 
 	error = vm_entry_actions(vm, vcpuid, entry, vme);
 	if (error != 0) {
@@ -2193,11 +2195,11 @@ restart:
 	/* Force a trip through update_sregs to reload %fs/%gs and friends */
 	PCB_SET_UPDATE_SEGS(&ttolwp(curthread)->lwp_pcb);
 
-	if ((vtc.vtc_status & VTCS_FPU_RESTORED) == 0) {
+	if ((vcpu->vtc.vtc_status & VTCS_FPU_RESTORED) == 0) {
 		restore_guest_fpustate(vcpu);
-		vtc.vtc_status |= VTCS_FPU_RESTORED;
+		vcpu->vtc.vtc_status |= VTCS_FPU_RESTORED;
 	}
-	vtc.vtc_status |= VTCS_FPU_CTX_CRITICAL;
+	vcpu->vtc.vtc_status |= VTCS_FPU_CTX_CRITICAL;
 
 	vcpu_require_state(vm, vcpuid, VCPU_RUNNING);
 	error = VMRUN(vm->cookie, vcpuid, vcpu->nextrip);
@@ -2207,7 +2209,7 @@ restart:
 	 * Once clear of the delicate contexts comprising the VM_RUN handler,
 	 * thread CPU affinity can be loosened while other processing occurs.
 	 */
-	vtc.vtc_status &= ~VTCS_FPU_CTX_CRITICAL;
+	vcpu->vtc.vtc_status &= ~VTCS_FPU_CTX_CRITICAL;
 	thread_affinity_clear(curthread);
 	critical_exit();
 
@@ -2277,8 +2279,11 @@ restart:
 	}
 
 exit:
-	removectx(curthread, &vtc, vmm_savectx, vmm_restorectx, NULL, NULL,
-	    NULL, vmm_freectx);
+	kpreempt_disable();
+	ctxop_detach(curthread, vcpu->ctxop);
+	/* Make sure all of the needed vCPU context state is saved */
+	vmm_savectx(&vcpu->vtc);
+	kpreempt_enable();
 
 	VCPU_CTR2(vm, vcpuid, "retu %d/%d", error, vme->exitcode);
 

@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -718,11 +718,27 @@ extern	void	thread_free(kthread_t *);
 extern	void	thread_rele(kthread_t *);
 extern	void	thread_join(kt_did_t);
 extern	int	reaper(void);
-extern	struct ctxop *installctx_preallocate(void);
-extern	void	installctx(kthread_t *, void *, void (*)(), void (*)(),
-    void (*)(), void (*)(), void (*)(), void (*)(), struct ctxop *);
-extern	int	removectx(kthread_t *, void *, void (*)(), void (*)(),
-    void (*)(), void (*)(), void (*)(), void (*)());
+
+#define	CTXOP_TPL_REV	1
+
+struct ctxop_template {
+	uint32_t	ct_rev;
+	uint32_t	ct_pad;
+	void		(*ct_save)(void *);
+	void		(*ct_restore)(void *);
+	void		(*ct_fork)(void *, void *);
+	void		(*ct_lwp_create)(void *, void *);
+	void		(*ct_exit)(void *);
+	void		(*ct_free)(void *, int);
+};
+
+extern struct ctxop *ctxop_allocate(const struct ctxop_template *, void *);
+extern void ctxop_free(struct ctxop *);
+extern void ctxop_attach(kthread_t *, struct ctxop *);
+extern void ctxop_detach(kthread_t *, struct ctxop *);
+extern void ctxop_install(kthread_t *, const struct ctxop_template *, void *);
+extern int ctxop_remove(kthread_t *, const struct ctxop_template *, void *);
+
 extern	void	savectx(kthread_t *);
 extern	void	restorectx(kthread_t *);
 extern	void	forkctx(kthread_t *, kthread_t *);

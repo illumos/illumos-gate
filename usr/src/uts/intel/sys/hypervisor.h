@@ -154,8 +154,8 @@ extern void xen_set_segment_base(int, ulong_t);
 #endif	/* __amd64 */
 extern long xen_vcpu_up(processorid_t);
 extern long xen_vcpu_down(processorid_t);
-extern void xen_enable_user_iopl(void);
-extern void xen_disable_user_iopl(void);
+extern void xen_enable_user_iopl(void *);
+extern void xen_disable_user_iopl(void *);
 
 extern int xen_get_mc_physcpuinfo(xen_mc_logical_cpu_t *, uint_t *);
 extern uint_t xen_phys_ncpus;

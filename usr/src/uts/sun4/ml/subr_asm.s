@@ -270,7 +270,7 @@
 	mov	%o0, %gsr
 	SET_SIZE(_fp_write_pgsr)
 
-/*	
+/*
  * set_gsr(uint64_t buf, kfpu_t *fp)
  * Set the graphics status register info to fp from buf
  */
@@ -296,7 +296,7 @@
  * The Spitfire floating point code has been changed not to use install/
  * save/restore/fork/freectx() because of the special memcpy library
  * routines, which will lose too much performance if they have to go
- * through the fp_disabled trap (which used to call installctx()). So
+ * through the fp_disabled trap (which used to call ctxop_install()). So
  * now fp_save/fp_restore are called from resume, and they don't care
  * whether floating point was enabled from the user program via the
  * fp_enabled trap or from the memcpy library, which just turns on floating
@@ -315,7 +315,7 @@
  * setfpregs/xregs_setfpregs. But note that for saving and restoring
  * context, both *must* happen. For prmachdep, aka access from [k]adb,
  * it's OK if only one part happens.
- */ 
+ */
 
 /*
  * fp_save(kfpu_t *fp)
