@@ -25,6 +25,7 @@
  * Copyright (c) 2015 Joyent, Inc. All rights reserved.
  * Copyright 2020 Peter Tribble.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 #include <stdio.h>
@@ -784,9 +785,9 @@ static const ofmt_field_t aggr_x_fields[] = {
 /* name,	field width,	index		callback */
 { "LINK",	12,	AGGR_X_LINK,		print_xaggr_cb},
 { "PORT",	15,	AGGR_X_PORT,		print_xaggr_cb},
-{ "SPEED",	5,	AGGR_X_SPEED,		print_xaggr_cb},
-{ "DUPLEX",	10,	AGGR_X_DUPLEX,		print_xaggr_cb},
-{ "STATE",	10,	AGGR_X_STATE,		print_xaggr_cb},
+{ "SPEED",	9,	AGGR_X_SPEED,		print_xaggr_cb},
+{ "DUPLEX",	9,	AGGR_X_DUPLEX,		print_xaggr_cb},
+{ "STATE",	9,	AGGR_X_STATE,		print_xaggr_cb},
 { "ADDRESS",	19,	AGGR_X_ADDRESS,		print_xaggr_cb},
 { "PORTSTATE",	16,	AGGR_X_PORTSTATE,	print_xaggr_cb},
 { NULL,		0,	0,			NULL}}
@@ -857,9 +858,9 @@ static const ofmt_field_t phys_fields[] = {
 	offsetof(link_fields_buf_t, link_phys_media), print_default_cb},
 { "STATE",	11,
 	offsetof(link_fields_buf_t, link_phys_state), print_default_cb},
-{ "SPEED",	7,
+{ "SPEED",	9,
 	offsetof(link_fields_buf_t, link_phys_speed), print_default_cb},
-{ "DUPLEX",	10,
+{ "DUPLEX",	9,
 	offsetof(link_fields_buf_t, link_phys_duplex), print_default_cb},
 { "DEVICE",	13,
 	offsetof(link_fields_buf_t, link_phys_device), print_default_cb},
@@ -1038,7 +1039,7 @@ typedef struct vnic_fields_buf_s
 {
 	char vnic_link[DLPI_LINKNAME_MAX];
 	char vnic_over[DLPI_LINKNAME_MAX];
-	char vnic_speed[6];
+	char vnic_speed[10];
 	char vnic_macaddr[18];
 	char vnic_macaddrtype[19];
 	char vnic_vid[6];
@@ -1049,7 +1050,7 @@ static const ofmt_field_t vnic_fields[] = {
 	offsetof(vnic_fields_buf_t, vnic_link),	print_default_cb},
 { "OVER",		13,
 	offsetof(vnic_fields_buf_t, vnic_over),	print_default_cb},
-{ "SPEED",		7,
+{ "SPEED",		9,
 	offsetof(vnic_fields_buf_t, vnic_speed), print_default_cb},
 { "MACADDRESS",		18,
 	offsetof(vnic_fields_buf_t, vnic_macaddr), print_default_cb},
