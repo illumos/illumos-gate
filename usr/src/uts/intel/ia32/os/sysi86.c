@@ -20,12 +20,12 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
@@ -93,6 +93,9 @@ sysi86(short cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
 	 */
 	case SI86V86:
 		if (arg1 == V86SC_IOPL) {
+#if defined(__xpv)
+			struct ctxop *ctx;
+#endif
 			struct regs *rp = lwptoregs(ttolwp(curthread));
 			greg_t oldpl = rp->r_ps & PS_IOPL;
 			greg_t newpl = arg2 & PS_IOPL;
@@ -105,10 +108,11 @@ sysi86(short cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
 			    secpolicy_sys_config(CRED(), B_FALSE)) != 0)
 				return (set_errno(error));
 #if defined(__xpv)
+			ctx = installctx_preallocate();
 			kpreempt_disable();
 			installctx(curthread, NULL, xen_disable_user_iopl,
 			    xen_enable_user_iopl, NULL, NULL,
-			    xen_disable_user_iopl, NULL);
+			    xen_disable_user_iopl, NULL, ctx);
 			xen_enable_user_iopl();
 			kpreempt_enable();
 #else
@@ -398,14 +402,14 @@ ldt_savectx(proc_t *p)
 	 * selectors when context switching away from a process that
 	 * has a private ldt. Consider the following example:
 	 *
-	 * 	Wine creats a ldt descriptor and points a segment register
-	 * 	to it.
+	 *	Wine creats a ldt descriptor and points a segment register
+	 *	to it.
 	 *
 	 *	We then context switch away from wine lwp to kernel
 	 *	thread and hit breakpoint in kernel with kmdb
 	 *
 	 *	When we continue and resume from kmdb we will #gp
-	 * 	fault since kmdb will have saved the stale ldt selector
+	 *	fault since kmdb will have saved the stale ldt selector
 	 *	from wine and will try to restore it but we are no longer in
 	 *	the context of the wine process and do not have our
 	 *	ldtr register pointing to the private ldt.

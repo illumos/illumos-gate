@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1025,7 +1025,28 @@ reapq_add(kthread_t *t)
 }
 
 /*
+ * Provide an allocation function for callers of installctx() that, for
+ * reasons of incomplete context-op initialization, must call installctx()
+ * in a kpreempt_disable() block.  The caller, therefore, must call this
+ * without being in such a block.
+ */
+struct ctxop *
+installctx_preallocate(void)
+{
+	/*
+	 * NOTE: We could ASSERT/VERIFY that we are not in a place where
+	 * a KM_SLEEP allocation could block indefinitely.
+	 *
+	 * ASSERT(curthread->t_preempt == 0);
+	 */
+
+	return (kmem_alloc(sizeof (struct ctxop), KM_SLEEP));
+}
+
+/*
  * Install thread context ops for the current thread.
+ * The caller can pass in a preallocated struct ctxop, eliminating the need
+ * for the requirement of entering with kernel preemption still enabled.
  */
 void
 installctx(
@@ -1036,11 +1057,12 @@ installctx(
 	void	(*fork)(void *, void *),
 	void	(*lwp_create)(void *, void *),
 	void	(*exit)(void *),
-	void	(*free)(void *, int))
+	void	(*free)(void *, int),
+	struct ctxop *ctx)
 {
-	struct ctxop *ctx;
+	if (ctx == NULL)
+		ctx = kmem_alloc(sizeof (struct ctxop), KM_SLEEP);
 
-	ctx = kmem_alloc(sizeof (struct ctxop), KM_SLEEP);
 	ctx->save_op = save;
 	ctx->restore_op = restore;
 	ctx->fork_op = fork;

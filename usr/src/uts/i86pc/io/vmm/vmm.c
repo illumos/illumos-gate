@@ -2223,7 +2223,7 @@ vm_run(struct vm *vm, int vcpuid, const struct vm_entry *entry)
 	vtc.vtc_vcpuid = vcpuid;
 	vtc.vtc_status = 0;
 	installctx(curthread, &vtc, vmm_savectx, vmm_restorectx, NULL, NULL,
-	    NULL, vmm_freectx);
+	    NULL, vmm_freectx, NULL);
 
 	error = vm_entry_actions(vm, vcpuid, entry, vme);
 	if (error != 0) {

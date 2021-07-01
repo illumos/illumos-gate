@@ -322,7 +322,8 @@ int zfs_deadman_enabled = -1;
  * the FPU state?  This is currently off by default due to stability issues in
  * the kernel FPU routines; e.g., see bug 13717.
  */
-int zfs_fpu_enabled = 0;
+/* XXX SmartOS now includes fixes for 13902 and 13915, so re-enable it. */
+int zfs_fpu_enabled = 1;
 #endif
 
 /*

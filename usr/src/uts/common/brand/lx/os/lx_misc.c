@@ -121,7 +121,7 @@ lx_exec()
 	lwpd->br_ntv_stack_current = 0;
 
 	installctx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL, lx_save,
-	    NULL);
+	    NULL, NULL);
 
 	/*
 	 * clear out the tls array
@@ -499,7 +499,7 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 	lwpd->br_lpid = NULL;
 
 	installctx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL,
-	    lx_save, NULL);
+	    lx_save, NULL, NULL);
 
 	/*
 	 * Install branded system call hooks for this LWP:
