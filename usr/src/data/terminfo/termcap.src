@@ -4653,7 +4653,7 @@ sun-type4|Sun Workstation console with type 4 keyboard:\
 sun-color|Sun Microsystems Workstation console with color support (IA systems):\
 	:Co#8:NC#3:pa#64:\
 	:AB=\E[4%dm:AF=\E[3%dm:DO=\E[%dB:LE=\E[%dD:RI=\E[%dC:\
-	:UP=\E[%dA:ho=\E[H:op=\E[0m:so=\E[1m:tc=sun:
+	:UP=\E[%dA:ho=\E[H:op=\E[0m:so=\E[7m:se=\E[27m:md=\E[1m:tc=sun:
 
 #### Iris consoles
 #
