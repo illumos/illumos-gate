@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
  * Copyright 2021 Toomas Soome <tsoome@me.com>
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 /*
@@ -1077,7 +1078,7 @@ tem_input_byte(struct tem_vt_state *tem, uint8_t c)
 static void
 tem_terminal_emulate(struct tem_vt_state *tem, uint8_t *buf, int len)
 {
-	if (tem->tvs_isactive)
+	if (tem->tvs_isactive && !tem->tvs_cursor_hidden)
 		tem_callback_cursor(tem, VIS_HIDE_CURSOR);
 
 	for (; len > 0; len--, buf++)
@@ -1088,7 +1089,7 @@ tem_terminal_emulate(struct tem_vt_state *tem, uint8_t *buf, int len)
 	 */
 	tem_send_data(tem);
 
-	if (tem->tvs_isactive)
+	if (tem->tvs_isactive && !tem->tvs_cursor_hidden)
 		tem_callback_cursor(tem, VIS_DISPLAY_CURSOR);
 }
 
@@ -1727,6 +1728,44 @@ tem_chkparam(struct tem_vt_state *tem, uint8_t ch)
 	tem->tvs_state = A_STATE_START;
 }
 
+static void
+tem_chkparam_qmark(struct tem_vt_state *tem, tem_char_t ch)
+{
+	switch (ch) {
+	case 'h': /* DEC private mode set */
+		tem_setparam(tem, 1, 1);
+		switch (tem->tvs_params[0]) {
+		case 25: /* show cursor */
+			/*
+			 * Note that cursor is not displayed either way
+			 * at this entry point.  Clearing the flag ensures
+			 * that on exit from tem_safe_terminal_emulate
+			 * we will display the cursor.
+			 */
+			tem_send_data(tem);
+			tem->tvs_cursor_hidden = false;
+			break;
+		}
+		break;
+	case 'l':
+		/* DEC private mode reset */
+		tem_setparam(tem, 1, 1);
+		switch (tem->tvs_params[0]) {
+		case 25: /* hide cursor */
+			/*
+			 * Note that the cursor is not displayed already.
+			 * This is true regardless of the flag state.
+			 * Setting this flag ensures we won't display it
+			 * on exit from tem_safe_terminal_emulate.
+			 */
+			tem_send_data(tem);
+			tem->tvs_cursor_hidden = true;
+			break;
+		}
+		break;
+	}
+	tem->tvs_state = A_STATE_START;
+}
 
 /*
  * Gather the parameters of an ANSI escape sequence
@@ -1738,9 +1777,25 @@ tem_getparams(struct tem_vt_state *tem, uint8_t ch)
 		tem->tvs_paramval = ((tem->tvs_paramval * 10) + (ch - '0'));
 		tem->tvs_gotparam = true;  /* Remember got parameter */
 		return; /* Return immediately */
-	} else if (tem->tvs_state == A_STATE_CSI_EQUAL ||
-	    tem->tvs_state == A_STATE_CSI_QMARK) {
+	} else if (tem->tvs_state == A_STATE_CSI_EQUAL) {
 		tem->tvs_state = A_STATE_START;
+	} else if (tem->tvs_state == A_STATE_CSI_QMARK) {
+		if (tem->tvs_curparam < TEM_MAXPARAMS) {
+			if (tem->tvs_gotparam) {
+				/* get the parameter value */
+				tem->tvs_params[tem->tvs_curparam] =
+				    tem->tvs_paramval;
+			}
+			tem->tvs_curparam++;
+		}
+		if (ch == ';') {
+			/* Restart parameter search */
+			tem->tvs_gotparam = false;
+			tem->tvs_paramval = 0; /* No parameter value yet */
+		} else {
+			/* Handle escape sequence */
+			tem_chkparam_qmark(tem, ch);
+		}
 	} else {
 		if (tem->tvs_curparam < TEM_MAXPARAMS) {
 			if (tem->tvs_gotparam) {
@@ -1754,7 +1809,7 @@ tem_getparams(struct tem_vt_state *tem, uint8_t ch)
 		if (ch == ';') {
 			/* Restart parameter search */
 			tem->tvs_gotparam = false;
-			tem->tvs_paramval = 0; /* No parame value yet */
+			tem->tvs_paramval = 0; /* No parameter value yet */
 		} else {
 			/* Handle escape sequence */
 			tem_chkparam(tem, ch);

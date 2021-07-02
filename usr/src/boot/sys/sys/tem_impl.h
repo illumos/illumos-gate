@@ -64,7 +64,7 @@ extern "C" {
 #define	TEM_ATTR(c)		(((c) & TEM_ATTR_MASK) << 21)
 #define	TEM_ATTR_ISSET(c, a)	((TEM_CHAR_ATTR(c) & (a)) == (a))
 
-#define	TEM_MAXPARAMS	5	/* maximum number of ANSI paramters */
+#define	TEM_MAXPARAMS	32	/* maximum number of ANSI paramters */
 #define	TEM_MAXFKEY	30	/* max length of function key with <ESC>Q */
 #define	MAX_TEM		2	/* max number of loadable terminal emulators */
 
@@ -207,6 +207,7 @@ struct tem_vt_state {
 
 	bool		tvs_isactive;
 	bool		tvs_initialized;	/* initialization flag */
+	bool		tvs_cursor_hidden;
 
 	list_node_t	tvs_list_node;
 };
