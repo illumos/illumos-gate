@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCF_SIMPLE_PROP_GET 3SCF "Nov 7, 2007"
+.TH SCF_SIMPLE_PROP_GET 3SCF "June 20, 2021"
 .SH NAME
 scf_simple_prop_get, scf_simple_prop_free, scf_simple_app_props_get,
 scf_simple_app_props_free, scf_simple_app_props_next,
@@ -15,7 +15,6 @@ scf_simple_prop_next_ustring, scf_simple_prop_next_opaque,
 scf_simple_prop_next_reset \- simplified property read interface to Service
 Configuration Facility
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
@@ -116,8 +115,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The simplified read interface to the Service Configuration Facility deals with
 properties and blocks of properties.
 .sp
@@ -182,7 +179,7 @@ reference into the \fBscf_simple_app_props_t\fR, its lifetime extends only
 until that structure is freed.
 .sp
 .LP
-The\fBscf_simple_app_props_search()\fR function queries for an exact match on a
+The \fBscf_simple_app_props_search()\fR function queries for an exact match on a
 property in a property group. It takes an apps prop object, a property group
 name, and a property name, and returns a property pointer. Because the property
 is a reference into the \fBscf_simple_app_props_t\fR, its lifetime extends only
@@ -230,8 +227,6 @@ The \fBscf_simple_prop_next_reset()\fR function resets iteration on a property,
 so that a call to one of the \fBscf_simple_prop_next_*()\fR functions returns
 the first value in the property.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBscf_simple_prop_get()\fR returns a pointer to an
 allocated \fBscf_simple_prop_t\fR. Otherwise, it returns \fINULL\fR.
 .sp
@@ -269,8 +264,6 @@ return a pointer to the next value in the property. After all values have been
 returned, NULL is returned and \fBSCF_ERROR_NONE\fR is set. On failure,
 \fINULL\fR is returned and the appropriate error value is set.
 .SH ERRORS
-.sp
-.LP
 The \fBscf_simple_prop_get()\fR and \fBscf_simple_app_props_get()\fR functions
 will fail if:
 .sp
@@ -405,7 +398,6 @@ The requested type does not match the property type.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSimple Property Get
 .sp
 .in +2
@@ -514,8 +506,6 @@ scf_simple_app_props_free(appprops);
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -532,6 +522,4 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibscf\fR(3LIB), \fBscf_error\fR(3SCF), \fBattributes\fR(5)

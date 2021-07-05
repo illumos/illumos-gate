@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TD_THR_GET_INFO 3C_DB "Oct 20, 1998"
+.TH TD_THR_GET_INFO 3C_DB "June 20, 2021"
 .SH NAME
 td_thr_get_info \- get thread information in libc_db library of interfaces
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... -lc_db [ \fIlibrary\fR... ]
 #include <proc_service.h>
@@ -17,10 +16,8 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lc_db [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBtd_thr_get_info()\fR function fills in the \fBtd_thrinfo_t\fR structure
-*\fIti_p\fR with values for the thread identified by  \fIth_p\fR.
+*\fIti_p\fR with values for the thread identified by \fIth_p\fR.
 .sp
 .LP
 The \fBtd_thrinfo_t\fR structure contains the following fields:
@@ -129,7 +126,7 @@ The \fBlibc_db\fR library cannot determine the state of the thread.
 \fB\fBTD_THR_STOPPED\fR \fR
 .ad
 .RS 26n
-The thread has been stopped by a call to  \fBthr_suspend\fR(3C).
+The thread has been stopped by a call to \fBthr_suspend\fR(3C).
 .RE
 
 .sp
@@ -147,7 +144,7 @@ The thread is runnable, but it is not currently assigned to an \fBLWP\fR.
 \fB\fBTD_THR_ACTIVE\fR \fR
 .ad
 .RS 26n
-The thread is currently executing on an  \fBLWP\fR.
+The thread is currently executing on an \fBLWP\fR.
 .RE
 
 .sp
@@ -175,7 +172,7 @@ The thread is not currently runnable.
 \fB\fBTD_THR_STOPPED_ASLEEP\fR \fR
 .ad
 .RS 26n
-The thread is both blocked by  \fBTD_THR_SLEEP\fR and stopped by a call to
+The thread is both blocked by \fBTD_THR_SLEEP\fR and stopped by a call to
 \fBtd_thr_dbsuspend\fR(3C_DB).
 .RE
 
@@ -212,8 +209,8 @@ The \fBti_pri\fR member is the thread's priority as it would be returned by
 .sp
 .LP
 The \fBti_lid\fR member is the ID of the \fBLWP\fR executing this thread, or
-the ID of the  \fBLWP\fR that last executed this thread, if this thread is not
-currently assigned to an\fBLWP\fR.
+the ID of the \fBLWP\fR that last executed this thread, if this thread is not
+currently assigned to an \fBLWP\fR.
 .sp
 .LP
 The \fBti_sigmask\fR member is this thread's signal mask. See
@@ -235,7 +232,6 @@ regular priority.
 .LP
 The \fBti_events\fR member is the bitmap of events enabled for this thread.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBTD_OK\fR\fR
@@ -272,8 +268,6 @@ The call did not complete successfully.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
 
@@ -288,8 +282,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibc_db\fR(3LIB), \fBtd_ta_thr_iter\fR(3C_DB),
 \fBtd_thr_dbsuspend\fR(3C_DB), \fBthr_create\fR(3C), \fBthr_getprio\fR(3C),
 \fBthr_join\fR(3C), \fBthr_sigsetmask\fR(3C), \fBthr_suspend\fR(3C),

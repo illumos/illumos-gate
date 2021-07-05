@@ -4,30 +4,26 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UDFS 7FS "Mar 29, 1999"
+.TH UDFS 7FS "June 20, 2021"
 .SH NAME
 udfs \- universal disk format file system
 .SH DESCRIPTION
-.sp
-.LP
 The \fBudfs\fR file system is a file system type that allows user access to
 files on Universal Disk Format (UDF) disks from within the Solaris operating
-environment. Once mounted,  a \fBudfs\fR file system provides standard Solaris
+environment. Once mounted, a \fBudfs\fR file system provides standard Solaris
 file system operations and semantics. That is, users can read files, write
-files,  and list files in a directory on a UDF device and applications can use
+files, and list files in a directory on a UDF device and applications can use
 standard UNIX system calls on these files and directories.
 .sp
 .LP
 Because \fBudfs\fR is a platform-independent file system, the same media can be
 written to and read from by any operating system or vendor.
 .SS "Mounting File Systems"
-.sp
-.LP
 \fBudfs\fR file systems are mounted using:
 .sp
 .in +2
 .nf
-mount\fB-F\fR udfs -o rw/ro device-special
+mount -F udfs -o rw/ro device-special
 .fi
 .in -2
 .sp
@@ -58,20 +54,16 @@ file:
 
 .sp
 .LP
-The \fBudfs\fR file system provides read-only support for ROM,  RAM,  and
-sequentially-recordable media and  read-write  support on RAM media.
+The \fBudfs\fR file system provides read-only support for ROM, RAM, and
+sequentially-recordable media and read-write support on RAM media.
 .sp
 .LP
 The \fBudfs\fR file system also supports regular files, directories, and
 symbolic links, as well as device nodes such as block, character, FIFO, and
 Socket.
 .SH SEE ALSO
-.sp
-.LP
 \fBmount\fR(1M), \fBmount_udfs\fR(1M), \fBvfstab\fR(4)
 .SH NOTES
-.sp
-.LP
 Invalid characters such as "\fINULL\fR" and "\fB/\fR" and invalid file names
 such as "\fB\&.\fR" and "\fB\&..\fR" will be translated according to the
 following rule:

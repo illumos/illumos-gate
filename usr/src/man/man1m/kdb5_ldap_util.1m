@@ -4,34 +4,27 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KDB5_LDAP_UTIL 1M "Aug 28, 2007"
+.TH KDB5_LDAP_UTIL 1M "June 20, 2021"
 .SH NAME
 kdb5_ldap_util \- Kerberos configuration utility
 .SH SYNOPSIS
-.LP
 .nf
 \fBkdb5_ldap_util\fR  [\fB-D\fR \fIuser_dn\fR [\fB-w\fR \fIpasswd\fR]] [\fB-H\fR \fIldap_uri\fR] \fIcommand\fR
      [\fIcommand_options\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBkdb5_ldap_util\fR utility allows an administrator to manage realms,
 Kerberos services, and ticket policies. The utility offers a set of general
 options, described under OPTIONS, and a set of commands, which, in turn, have
 their own options. Commands and their options are described in their own
 subsections, below.
 .SH OPTIONS
-.sp
-.LP
 \fBkdb5_ldap_util\fR has a small set of general options that apply to the
 \fBkdb5_ldap_util\fR utility itself and a larger number of options that apply
 to specific commands. A number of these command-specific options apply to
 multiple commands and are described in their own section, below.
 .SS "General Options"
-.sp
-.LP
 The following general options are supported:
 .sp
 .ne 2
@@ -65,8 +58,6 @@ Specifies the password of \fIuser_dn\fR. This option is not recommended.
 .RE
 
 .SS "Common Command-specific Options"
-.sp
-.LP
 The following options apply to a number of \fBkdb5_ldap_util\fR commands.
 .sp
 .ne 2
@@ -134,13 +125,9 @@ Specifies the Kerberos realm of the database; by default the realm returned by
 .RE
 
 .SH \fBkdb5_ldap_util\fR COMMANDS
-.sp
-.LP
 The \fBkdb5_ldap_util\fR utility comprises a set of commands, each with its own
 set of options. These commands are described in the following subsections.
 .SS "The \fBcreate\fR Command"
-.sp
-.LP
 The \fBcreate\fR command creates a realm in a directory. The command has the
 following syntax:
 .sp
@@ -292,8 +279,6 @@ these flags.
 .RE
 
 .SS "The \fBmodify\fR Command"
-.sp
-.LP
 The \fBmodify\fR command modifies the attributes of a realm. The command has
 the following syntax:
 .sp
@@ -388,8 +373,6 @@ these flags.
 .RE
 
 .SS "The \fBview\fR Command"
-.sp
-.LP
 The \fBview\fR command displays the attributes of a realm. The command has the
 following syntax:
 .sp
@@ -414,8 +397,6 @@ See "Common Command-specific Options," above.
 .RE
 
 .SS "The \fBdestroy\fR Command"
-.sp
-.LP
 The \fBdestroy\fR command destroys a realm, including the master key stash
 file. The command has the following syntax:
 .sp
@@ -450,8 +431,6 @@ See "Common Command-specific Options," above.
 .RE
 
 .SS "The \fBlist\fR Command"
-.sp
-.LP
 The \fBlist\fR command displays the names of realms. The command has the
 following syntax:
 .sp
@@ -466,8 +445,6 @@ list
 .LP
 The \fBlist\fR command has no options.
 .SS "The \fBstashsrvpw\fR Command"
-.sp
-.LP
 The \fBstashsrvpw\fR command enables you to store the password for service
 object in a  file so that a KDC and Administration server can use it to
 authenticate to the LDAP server. The command has the following syntax:
@@ -512,8 +489,6 @@ to be stored in file.
 .RE
 
 .SS "The \fBcreate_policy\fR Command"
-.sp
-.LP
 The \fBcreate_policy\fR command creates a ticket policy in a directory. The
 command has the following syntax:
 .sp
@@ -586,8 +561,6 @@ Specifies the name of the ticket policy.
 .RE
 
 .SS "The \fBmodify_policy\fR Command"
-.sp
-.LP
 The \fBmodify_policy\fR command modifies the attributes of a ticket policy. The
 command has the following syntax:
 .sp
@@ -608,8 +581,6 @@ modify_policy \e
 The \fBmodify_policy\fR command has the same options and argument as those for
 the \fBcreate_policy\fR command.
 .SS "The \fBview_policy\fR Command"
-.sp
-.LP
 The \fBview_policy\fR command displays the attributes of a ticket policy. The
 command has the following syntax:
 .sp
@@ -644,8 +615,6 @@ Specifies the name of the ticket policy.
 .RE
 
 .SS "The \fBdestroy_policy\fR Command"
-.sp
-.LP
 The \fBdestroy_policy\fR command destroys an existing ticket policy. The
 command has the following syntax:
 .sp
@@ -692,8 +661,6 @@ Specifies the name of the ticket policy.
 .RE
 
 .SS "The \fBlist_policy\fR Command"
-.sp
-.LP
 The \fBlist_policy\fR command lists the ticket policies in the default or a
 specified realm. The command has the following syntax:
 .sp
@@ -718,8 +685,6 @@ See "Common Command-specific Options," above.
 .RE
 
 .SH TICKET FLAGS
-.sp
-.LP
 A number of \fBkdb5_ldap_util\fR commands have \fBticket_flag\fR options. These
 flags are described as follows:
 .sp
@@ -876,7 +841,6 @@ flag.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBcreate\fR
 .sp
 .LP
@@ -892,7 +856,7 @@ Initializing database for realm 'ATHENA.MIT.EDU'
 You will be prompted for the database Master Password.
 It is important that you NOT FORGET this password.
 Enter KDC database master key: \fImaster key entered\fR
-Re-enter KDC database master key to verify: \fImaster key re-entered\fRjjjjjj
+Re-enter KDC database master key to verify: \fImaster key re-entered\fR
 .fi
 .in -2
 .sp
@@ -1196,8 +1160,6 @@ cn=service-pwd,o=org
 .sp
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1212,6 +1174,4 @@ Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBkinit\fR(1), \fBkadmin\fR(1M), \fBkdc.conf\fR(4), \fBattributes\fR(5)

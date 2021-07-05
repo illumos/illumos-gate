@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PCFS 7FS "Nov 6, 2007"
+.TH PCFS 7FS "June 20, 2021"
 .SH NAME
 pcfs \- FAT formatted file system
 .SH SYNOPSIS
@@ -99,7 +99,7 @@ if the following line is in your \fB/etc/vfstab\fR file:
 .sp
 .in +2
 .nf
-\fIdevice-special\fR - \fIdirectory-name\fRpcfs \(mi no rw
+\fIdevice-special\fR - \fIdirectory-name\fR pcfs \(mi no rw
 .fi
 .in -2
 
@@ -131,7 +131,7 @@ if the following line is in your \fB/etc/vfstab\fR file:
 .sp
 .in +2
 .nf
-\fIdevice-special\fR:\fIlogical_drive\fR \fB\(mi\fR \fIdirectory-name\fR \fBpcfs \(mi no rw\fR
+\fIdevice-special\fR:\fIlogical_drive\fR \fB\(mi\fR \fIdirectory-name\fR pcfs \(mi no rw
 .fi
 .in -2
 
@@ -404,16 +404,25 @@ result in the more descriptive short names:
 \fB\fB/usr/lib/fs/pcfs/mount\fR\fR
 .ad
 .RS 26n
-\fBpcfs\fR \fBmount\fR command
+\fBpcfs\fR \fBmount\fR command.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB/usr/kernel/fs/pcfs\fR\fR
+\fB\fB/usr/kernel/fs/amd64/pcfs\fR\fR
 .ad
 .RS 26n
-32-bit kernel module
+64-bit kernel module (x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/kernel/fs/sparcv9/pcfs\fR\fR
+.ad
+.RS 26n
+64-bit kernel module (SPARC).
 .RE
 
 .SH ENVIRONMENT VARIABLES

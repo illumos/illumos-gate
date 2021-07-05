@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TERMINFO 4 "December 28, 2020"
+.TH TERMINFO 4 "June 20, 2021"
 .SH NAME
 terminfo \- terminal and printer capability database
 .SH SYNOPSIS
@@ -56,15 +56,15 @@ escaped by using a backslash. Each device entry has the following format:
 .LP
 The first line, commonly referred to as the header line, must begin in column
 one and must contain at least two aliases separated by vertical bars. The last
-field in the header line must be the  long name of the device and it may
+field in the header line must be the long name of the device and it may
 contain any string. Alias names must be unique in the \fBterminfo\fR database
-and they must conform to system file naming  conventions. See \fBtic\fR(1M).
+and they must conform to system file naming conventions. See \fBtic\fR(1M).
 They cannot, for example, contain white space or slashes.
 .sp
 .LP
 Every device must be assigned a name, such as "vt100". Device names (except the
 long name) should be chosen using the following conventions. The name should
-not contain hyphens because hyphens are  reserved for use when adding suffixes
+not contain hyphens because hyphens are reserved for use when adding suffixes
 that indicate special modes.
 .sp
 .LP
@@ -107,7 +107,7 @@ The \fBterminfo\fR reference manual page is organized in two sections:
 \fBPART 2: PRINTER CAPABILITIES\fR
 .RE
 .SS "PART 1: DEVICE CAPABILITIES"
-Capabilities in \fBterminfo\fR are of three types:  Boolean capabilities (which
+Capabilities in \fBterminfo\fR are of three types: Boolean capabilities (which
 show that a device has or does not have a particular feature), numeric
 capabilities (which quantify particular features of a device), and string
 capabilities (which provide sequences that can be used to perform particular
@@ -942,7 +942,7 @@ complex entries in the \fBterminfo\fR file as of this writing.
 
 .SS "Types of Capabilities in the Sample Entry"
 The sample entry shows the formats for the three types of \fBterminfo\fR
-capabilities listed:  Boolean, numeric, and string. All capabilities specified
+capabilities listed: Boolean, numeric, and string. All capabilities specified
 in the \fBterminfo\fR source file must be followed by commas, including the
 last capability in the source file. In \fBterminfo\fR source files,
 capabilities are referenced by their capability names (as shown in the previous
@@ -964,7 +964,7 @@ sequence) are listed by a two- to five-character capname, an `=', and a string
 ended by the next occurrence of a comma. A delay in milliseconds may appear
 anywhere in such a capability, preceded by \fB$\fR and enclosed in angle
 brackets, as in \fBel=\eEK$<3>\fR. Padding characters are supplied by
-\fBtput\fR. The delay can be any of the following:  a number, a number followed
+\fBtput\fR. The delay can be any of the following: a number, a number followed
 by an asterisk, such as \fB5*\fR, a number followed by a slash, such as
 \fB5/\fR, or a number followed by both, such as \fB5*/\fR. A `\fB*\fR\fB\&'\fR
 shows that the padding required is proportional to the number of lines affected
@@ -1240,7 +1240,7 @@ push strlen(pop)
 .ad
 .sp .6
 .RS 4n
-arithmetic (\fB%m\fR is mod):  push(pop integer2 op pop integer1)
+arithmetic (\fB%m\fR is mod): push(pop integer2 op pop integer1)
 .RE
 
 .sp
@@ -1250,7 +1250,7 @@ arithmetic (\fB%m\fR is mod):  push(pop integer2 op pop integer1)
 .ad
 .sp .6
 .RS 4n
-bit operations:  push(pop integer2 op pop integer1)
+bit operations: push(pop integer2 op pop integer1)
 .RE
 
 .sp
@@ -1260,7 +1260,7 @@ bit operations:  push(pop integer2 op pop integer1)
 .ad
 .sp .6
 .RS 4n
-logical operations:  push(pop integer2 op pop integer1)
+logical operations: push(pop integer2 op pop integer1)
 .RE
 
 .sp
@@ -1270,7 +1270,7 @@ logical operations:  push(pop integer2 op pop integer1)
 .ad
 .sp .6
 .RS 4n
-logical operations:  and, or
+logical operations: and, or
 .RE
 
 .sp
@@ -1280,7 +1280,7 @@ logical operations:  and, or
 .ad
 .sp .6
 .RS 4n
-unary operations:  push(op pop)
+unary operations: push(op pop)
 .RE
 
 .sp
@@ -1828,7 +1828,7 @@ Now write down the characters left to right, as in
 In addition, \fBterminfo\fR allows you to define multiple character sets. See
 Section 2-5 for details.
 .SS "Section 1-13: Color Manipulation"
-Let us define two methods of color manipulation:  the Tektronix method and the
+Let us define two methods of color manipulation: the Tektronix method and the
 HP method. The Tektronix method uses a set of N predefined colors (usually 8)
 from which a user can select "current" foreground and background colors. Thus a
 terminal can support up to N colors mixed into N*N color-pairs to be displayed
@@ -1844,7 +1844,7 @@ and color-pairs that can be displayed on the screen at the same time. If a
 terminal can change the definition of a color (for example, the Tektronix 4100
 and 4200 series terminals), this should be specified with \fBccc\fR (can change
 color). To change the definition of a color (Tektronix 4200 method), use
-\fBinitc\fR (initialize color). It requires four arguments:  color number
+\fBinitc\fR (initialize color). It requires four arguments: color number
 (ranging from 0 to \fBcolors\fR\(mi1) and three RGB (red, green, and blue)
 values or three HLS colors (Hue, Lightness, Saturation). Ranges of RGB and HLS
 values are terminal dependent.
@@ -1863,9 +1863,9 @@ different from RGB and HLS, a mapping to either RGB or HLS must be developed.
 .LP
 To set current foreground or background to a given color, use \fBsetaf\fR (set
 ANSI foreground) and \fBsetab\fR (set ANSI background). They require one
-parameter:  the number of the color. To initialize a color-pair (HP method),
-use \fBinitp\fR (initialize pair). It requires seven parameters:  the number of
-a color-pair (range=0 to \fBpairs\fR\(mi1), and six RGB values:  three for the
+parameter: the number of the color. To initialize a color-pair (HP method),
+use \fBinitp\fR (initialize pair). It requires seven parameters: the number of
+a color-pair (range=0 to \fBpairs\fR\(mi1), and six RGB values: three for the
 foreground followed by three for the background. (Each of these groups of three
 should be in the order RGB.) When \fBinitc\fR or \fBinitp\fR are used, RGB or
 HLS arguments should be in the order "red, green, blue" or "hue, lightness,
@@ -2209,8 +2209,8 @@ Using any of the control sequences in these strings will imply a change in some
 of the values of \fBorc\fR, \fBorhi\fR, \fBorl\fR, and \fBorvi\fR. Also, the
 distance moved when a wide character is printed, \fBwidcs\fR, changes in
 relation to \fBorc\fR. The distance moved when a character is printed in micro
-mode, \fBmcs\fR, changes similarly, with one exception:  if the distance is 0
-or 1, then no change is assumed (see items marked with  * in the following
+mode, \fBmcs\fR, changes similarly, with one exception: if the distance is 0
+or 1, then no change is assumed (see items marked with * in the following
 table).
 .sp
 .LP
@@ -2336,7 +2336,7 @@ mode.
 .LP
 The movement made when a character is printed in the rightmost position varies
 among printers. Some make no movement, some move to the beginning of the next
-line, others move to the beginning of the same line. \fBterminfo\fRhas boolean
+line, others move to the beginning of the same line. \fBterminfo\fR has boolean
 capabilities for describing all three cases.
 .sp
 .in +2
@@ -2425,7 +2425,7 @@ Miscellaneous Motion Strings
 .sp
 
 .SS "Margins"
-\fBterminfo\fR provides two strings for setting margins on terminals:  one for
+\fBterminfo\fR provides two strings for setting margins on terminals: one for
 the left and one for the right margin. Printers, however, have two additional
 margins, for the top and bottom margins of each page. Furthermore, some
 printers require not using motion strings to move the current position to a
@@ -2912,6 +2912,6 @@ The most effective way to prepare a terminal description is by imitating the
 description of a similar terminal in \fBterminfo\fR and to build up a
 description gradually, using partial descriptions with a screen oriented
 editor, such as \fBvi\fR, to check that they are correct. To easily test a new
-terminal description the environment variable \fBTERMINFO\fR  can be set to the
+terminal description the environment variable \fBTERMINFO\fR can be set to the
 pathname of a directory containing the compiled description, and programs will
 look there rather than in \fB/usr/share/lib/terminfo\fR.

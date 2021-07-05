@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_SM_OPEN_SESSION 3PAM "Oct 13, 1998"
+.TH PAM_SM_OPEN_SESSION 3PAM "June 20, 2021"
 .SH NAME
 pam_sm_open_session, pam_sm_close_session \- service provider implementation
 for pam_open_session and pam_close_session
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ]  \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
 #include <security/pam_appl.h>
@@ -27,17 +26,15 @@ for pam_open_session and pam_close_session
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 In response to a call to \fBpam_open_session\fR(3PAM) and
-\fBpam_close_session\fR(3PAM), the  \fBPAM\fR framework calls
+\fBpam_close_session\fR(3PAM), the \fBPAM\fR framework calls
 \fBpam_sm_open_session()\fR and \fBpam_sm_close_session()\fR, respectively from
 the modules listed in the \fBpam.conf\fR(4) file.  The session management
 provider supplies the back-end functionality for this interface function.
 .sp
 .LP
 The \fBpam_sm_open_session()\fR function is called to initiate session
-management. The\fBpam_sm_close_session()\fR function is invoked when a session
+management. The \fBpam_sm_close_session()\fR function is invoked when a session
 has terminated. The argument \fIpamh\fR is an authentication handle. The
 following flag may be set in the \fIflags\fR field:
 .sp
@@ -57,9 +54,7 @@ options, which are interpreted and processed by the session management service.
 If an unknown option is passed in, an error should be logged through
 \fBsyslog\fR(3C) and the option ignored.
 .SH RETURN VALUES
-.sp
-.LP
-Upon successful completion,  \fBPAM_SUCCESS\fR should be returned. The
+Upon successful completion, \fBPAM_SUCCESS\fR should be returned. The
 following values may also be returned upon error:
 .sp
 .ne 2
@@ -76,13 +71,11 @@ Cannot make or remove an entry for the specified session.
 \fB\fBPAM_IGNORE\fR\fR
 .ad
 .RS 19n
-Ignore underlying session module regardless of whether the control  flag is
+Ignore underlying session module regardless of whether the control flag is
 \fIrequired\fR, \fIoptional\fR or \fIsufficient\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
 
@@ -99,12 +92,8 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBpam\fR(3PAM), \fBpam_open_session\fR(3PAM), \fBsyslog\fR(3C),
 \fBlibpam\fR(3LIB), \fBpam.conf\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
-The interfaces in  \fBlibpam\fR are MT-Safe only if each thread within the
-multithreaded application uses its own  \fBPAM\fR handle.
+The interfaces in \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.

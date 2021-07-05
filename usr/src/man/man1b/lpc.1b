@@ -1,17 +1,15 @@
 '\" te
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Copyright (c) 2006 Sun Microsystems, Inc. All Rights Reserved.
-.TH LPC 1B "Feb 25, 2017"
+.TH LPC 1B "June 20, 2021"
 .SH NAME
 lpc \- line printer control program
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/ucb/lpc\fR [\fIcommand\fR [\fIparameter\fR...]]
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBlpc\fR utility controls the operation of local printers.
 .sp
 .LP
@@ -50,7 +48,6 @@ arguments causes it to run interactively, prompting the user for \fBlpc\fR
 commands with \fBlpc>\fR. By redirecting the standard input, \fBlpc\fR can read
 commands from a file.
 .SH USAGE
-.LP
 \fBlpc\fR commands can be typed in their entirety or abbreviated to an
 unambiguous substring. Some \fBlpc\fR commands are available to all users;
 others are available only to super-users.
@@ -134,7 +131,7 @@ names.
 .sp .6
 .RS 4n
 Turns off the print queue for \fIprinter\fR. Prevents new printer jobs from
-being entered into the print queue for \fIprinter\fRby \fBlpr\fR(1B). \fBall\fR
+being entered into the print queue for \fIprinter\fR by \fBlpr\fR(1B). \fBall\fR
 specifies that this command is performed on all locally attached printers.
 \fIprinter\fR indicates this command is performed on specific printers. Specify
 \fIprinter\fR as an atomic name. See \fBprinters.conf\fR(4) for information
@@ -247,7 +244,6 @@ conventions for atomic names.
 .RE
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -304,7 +300,6 @@ LDAP version of \fB/etc/printers.conf\fR
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -319,16 +314,13 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.LP
 \fBlpq\fR(1B), \fBlpr\fR(1B), \fBlprm\fR(1B), \fBlpstat\fR(1),
 \fBlpsched\fR(1M), \fBlpshut\fR(1M), \fBsvcadm\fR(1M), \fBprinters.conf\fR(4),
 \fBattributes\fR(5)
 .SH DIAGNOSTICS
-.LP
 Use the \fBsvcs\fR(1) utility to check if \fBsvc:/application/print/server\fR
 is running. If it is not running, use \fBsvcadm enable
 svc:/application/print/server\fR to start \fBlpsched\fR. See \fBsvcadm\fR(1M).
 .SH NOTES
-.LP
 When IPP is in use, the user is prompted for a passphrase if the remote print
 service is configured to require authentication.

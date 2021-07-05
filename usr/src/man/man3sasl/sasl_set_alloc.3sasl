@@ -5,11 +5,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SASL_SET_ALLOC 3SASL "Oct 22, 2003"
+.TH SASL_SET_ALLOC 3SASL "June 20, 2021"
 .SH NAME
 sasl_set_alloc \- set the memory allocation functions used by the SASL library
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsasl\fR   [ \fIlibrary\fR ... ]
 #include <sasl/sasl.h>
@@ -19,12 +18,9 @@ sasl_set_alloc \- set the memory allocation functions used by the SASL library
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 Use the \fBsasl_set_alloc()\fR interface to set the memory allocation routines
 that the SASL library and plug-ins will use.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIc\fR\fR
@@ -48,7 +44,7 @@ A pointer to a \fBfree()\fR function
 \fB\fIm\fR\fR
 .ad
 .RS 5n
-A pointer to a\fBmalloc()\fR function
+A pointer to a \fBmalloc()\fR function
 .RE
 
 .sp
@@ -61,12 +57,8 @@ A pointer to a \fBrealloc()\fR function
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 \fBsasl_set_alloc()\fR has no return values.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -83,11 +75,7 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
 While most of \fBlibsasl\fR is MT-Safe, \fBsasl_set_*\fR modifies the global
 state and should be considered Unsafe.

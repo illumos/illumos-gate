@@ -4,19 +4,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IN.RSHD 1M "Oct 29, 2015"
+.TH IN.RSHD 1M "June 20, 2021"
 .SH NAME
 in.rshd, rshd \- remote shell server
 .SH SYNOPSIS
-.LP
 .nf
 \fBin.rshd\fR [\fB-k5eciU\fR] [\fB-s\fR \fItos\fR] [\fB-S\fR \fIkeytab\fR] [\fB-M\fR \fIrealm\fR]
      [\fB-L\fR \fIenv_var\fR] \fIhost.port\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBin.rshd\fR is the server for the \fBrsh\fR(1) program. The server provides
 remote execution facilities with authentication based on Kerberos V5 or
 privileged port numbers.
@@ -135,8 +132,6 @@ passed to the normal login shell of the user. The \fBPATH\fR variable is set to
 \fBin.rshd\fR.
 .RE
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -225,7 +220,7 @@ Sets the \fBIP\fR \fBTOS\fR option.
 \fB\fB-S\fR \fIkeytab\fR\fR
 .ad
 .RS 14n
-Sets the \fBKRB5\fR keytab file to use. The\fB/etc/krb5/krb5.keytab\fR file is
+Sets the \fBKRB5\fR keytab file to use. The \fB/etc/krb5/krb5.keytab\fR file is
 used by default.
 .RE
 
@@ -240,8 +235,6 @@ Refuses connections that cannot be mapped to a name through the
 .RE
 
 .SH USAGE
-.sp
-.LP
 \fBrshd\fR and \fBin.rshd\fR are IPv6-enabled. See \fBip6\fR(7P). \fBIPv6\fR is
 not currently supported with Kerberos V5 authentication.
 .sp
@@ -257,8 +250,6 @@ svc:/network/shell:kshell (rshd with kerberos (ipv4 only))
 .sp
 
 .SH SECURITY
-.sp
-.LP
 \fBin.rshd\fR uses \fBpam\fR(3PAM) for authentication, account management, and
 session management. The \fBPAM\fR configuration policy, listed through
 \fB/etc/pam.conf\fR, specifies the modules to be used for \fBin.rshd\fR. Here
@@ -292,8 +283,6 @@ If there are no entries for the \fBrsh\fR service, then the entries for the
 \fBpam\fR(3PAM). For Kerberized \fBrsh\fR service, the appropriate \fBPAM\fR
 service name is \fBkrsh\fR.
 .SH FILES
-.sp
-.LP
 \fB/etc/hosts.equiv\fR
 .sp
 .ne 2
@@ -314,8 +303,6 @@ Kerberos configuration file.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBrsh\fR(1), \fBsvcs\fR(1), \fBinetadm\fR(1M),
 \fBinetd\fR(1M), \fBkadmin\fR(1M), \fBsvcadm\fR(1M), \fBpam\fR(3PAM),
 \fBgetnameinfo\fR(3SOCKET), \fBhosts\fR(4), \fBkrb5.conf\fR(4),
@@ -328,8 +315,6 @@ Kerberos configuration file.
 .LP
 \fI\fR
 .SH DIAGNOSTICS
-.sp
-.LP
 The following diagnostic messages are returned on the connection associated
 with \fBstderr\fR, after which any network connections are closed. An error is
 indicated by a leading byte with a value of 1 in step 8 above (\fB0\fR is
@@ -417,8 +402,6 @@ A \fIfork\fR by the server failed.
 .RE
 
 .SH NOTES
-.sp
-.LP
 The authentication procedure used here assumes the integrity of each client
 machine and the connecting medium. This is insecure, but it is useful in an
 "open" environment.

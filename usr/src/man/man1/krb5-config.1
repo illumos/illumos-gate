@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KRB5-CONFIG 1 "Aug 24, 2009"
+.TH KRB5-CONFIG 1 "June 20, 2021"
 .SH NAME
 krb5-config \- link against the installed Kerberos libraries
 .SH SYNOPSIS
-.LP
 .nf
 \fBkrb5-config\fR
      [\fB--all\fR | \fB--cflags\fR | \fB--exec-prefix\fR | \fB--help\fR | \fB--libs\fR \fIlibrary\fR |
@@ -15,13 +14,9 @@ krb5-config \- link against the installed Kerberos libraries
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBkrb5-config\fR identifies and displays the special flags that are needed to
 compile and link programs against the installed Kerberos libraries.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -109,7 +104,6 @@ Displays the version of the installed Kerberos implementation.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing the \fB--cflags\fR Option
 .sp
 .LP
@@ -126,7 +120,7 @@ The following example displays the C compiler flags needed to use
 .sp
 
 .LP
-\fBExample 2 \fRUsing the\fB--libs\fR Option
+\fBExample 2 \fRUsing the \fB--libs\fR Option
 .sp
 .LP
 The following example shows the C compiler options needed to link against
@@ -142,8 +136,6 @@ The following example shows the C compiler options needed to link against
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -164,8 +156,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -180,6 +170,4 @@ Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibgss\fR(3LIB), \fBlibkrb5\fR(3LIB), \fBattributes\fR(5)

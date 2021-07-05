@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NISLDAPMAPPING 4 "September 12, 2020"
+.TH NISLDAPMAPPING 4 "June 20, 2021"
 .SH NAME
 NISLDAPmapping \- mapping file used by the NIS server components
 .SH SYNOPSIS
@@ -33,7 +33,7 @@ customize your \fBNISLDAPmapping\fR file as you require.
 .sp
 .LP
 Each attribute defined below can be specified
-in\fB/var/yp/NISLDAPmappingLDAP\fR or as an LDAP attribute. If both are
+in \fB/var/yp/NISLDAPmapping\fR or as an LDAP attribute. If both are
 specified, then the attribute in \fB/var/yp/NISLDAPmapping\fR (including empty
 values) takes precedence.
 .sp
@@ -700,7 +700,7 @@ below, including examples of complex attribute to field conversions.
 .ad
 .sp .6
 .RS 4n
- Specifies how an LDAP attribute value is derived from a NIS entriy field
+ Specifies how an LDAP attribute value is derived from a NIS entry field
 value.
 .sp
 The syntax for the \fBnisLDAPattributeFromField\fR attribute is as follows:

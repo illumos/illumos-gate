@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HXGE 7D "Feb 10, 2007"
+.TH HXGE 7D "June 20, 2021"
 .SH NAME
 hxge \- Sun Blade 10 Gigabit Ethernet network driver
 .SH SYNOPSIS
-.LP
 .nf
 /dev/hxge*
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBhxge\fR Gigabit Ethernet driver is a multi-threaded, loadable, clonable,
 GLD-based STREAMS driver supporting the Data Link Provider Interface,
 \fBdlpi\fR(7P), on the Sun Blade Shared 10Gb Ethernet Interface.
@@ -29,14 +26,12 @@ The \fBhxge\fR driver functions include chip initialization, frame transmit and
 receive, flow classification, multicast and promiscuous support and error
 recovery and reporting in the blade domain.
 .SH APPLICATION PROGRAMMING INTERFACE
-.sp
-.LP
-The cloning character-special device, \fB/dev/hxge\fR, is used  to access Sun
+The cloning character-special device, \fB/dev/hxge\fR, is used to access Sun
 Blade Shared 10Gb Ethernet Interface devices installed within the system.
 .sp
 .LP
 The \fBhxge\fR driver is managed by the \fBdladm\fR(1M) command line utility,
-which allows VLANs to be defined on top of \fBhxge\fR  instances and for
+which allows VLANs to be defined on top of \fBhxge\fR instances and for
 \fBhxge\fR instances to be aggregated. See \fBdladm\fR(1M) for more details.
 .sp
 .LP
@@ -45,7 +40,7 @@ with a particular device (PPA). The PPA ID is interpreted as an unsigned
 integer data type and indicates the corresponding device instance (unit)
 number. The driver returns an error (DL_ERROR_ACK) if the PPA field value does
 not correspond to a valid device instance number for the system. The device is
-initialized  on  first  attach and de-initialized (stopped) at last detach
+initialized on first attach and de-initialized (stopped) at last detach
 .sp
 .LP
 The values returned by the driver in the DL_INFO_ACK primitive in response to a
@@ -103,8 +98,6 @@ defined 4 byte header.
 Once in the DL_ATTACHED state, you must send a DL_BIND_REQ to associate a
 particular Service Access Point (SAP) with the stream.
 .SH CONFIGURATION
-.sp
-.LP
 The link speed and mode are fixed at 10 Gbps full-duplex.
 .sp
 .LP
@@ -131,8 +124,8 @@ You can also use the \fBndd\fR(1M) command to configure the \fBhxge\fR driver
 at runtime to discard any classes of traffic.
 .sp
 .LP
-The \fBhxge\fRdriver supports the self-healing functionality of Solaris OS. By
-default it is configured to      DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE.
+The \fBhxge\fR driver supports self-healing functionality, see \fBfmd\fR(1M). By
+default it is configured to DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE.
 You configure the \fBhxge\fR driver by defining the fm-capable property in
 \fBhxge.conf\fR to other capabilities or to 0x0 to disable it entirely.
 .sp
@@ -144,22 +137,12 @@ command.
 The \fBhxge\fR driver also reports various hardware and software statistics
 data. You can view these statistics using the \fBkstat\fR(1M) command.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/hxge*\fR\fR
 .ad
 .RS 28n
 Special character device.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/hxge\fR\fR
-.ad
-.RS 28n
-32-bit device driver (x86).
 .RE
 
 .sp
@@ -190,8 +173,6 @@ Configuration file.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -206,10 +187,8 @@ Architecture	SPARC, x86
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBdladm\fR(1M), \fBifconfig\fR(1M), \fBkstat\fR(1M), \fBndd\fR(1M),
-\fBnetstat\fR(1M), \fBdriver.conf\fR(4), \fBattributes\fR(5),
+\fBdladm\fR(1M), \fBfmd\fR(1M), \fBifconfig\fR(1M), \fBkstat\fR(1M),
+\fBndd\fR(1M), \fBnetstat\fR(1M), \fBdriver.conf\fR(4), \fBattributes\fR(5),
 \fBstreamio\fR(7I), \fBdlpi\fR(7P)
 .sp
 .LP

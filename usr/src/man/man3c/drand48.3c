@@ -4,12 +4,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DRAND48 3C "Feb 11, 2015"
+.TH DRAND48 3C "June 20, 2021"
 .SH NAME
 drand48, erand48, lrand48, nrand48, mrand48, jrand48, srand48, seed48, lcong48
 \- generate uniformly distributed pseudo-random numbers
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdlib.h>
 
@@ -57,7 +56,6 @@ drand48, erand48, lrand48, nrand48, mrand48, jrand48, srand48, seed48, lcong48
 .fi
 
 .SH DESCRIPTION
-.LP
 This family of functions generates pseudo-random numbers using the well-known
 linear congruential algorithm and 48-bit integer arithmetic.
 .sp
@@ -68,11 +66,11 @@ double-precision floating-point values uniformly distributed over the interval
 .sp
 .LP
 Functions \fBlrand48()\fR and \fBnrand48()\fR return non-negative long integers
-uniformly distributed over the interval [0, 2  ^31 ].
+uniformly distributed over the interval [0, 2^31].
 .sp
 .LP
 Functions \fBmrand48()\fR and \fBjrand48()\fR return signed long integers
-uniformly distributed over the interval [-2 ^31  , 2 ^31  ].
+uniformly distributed over the interval [-2^31, 2^31].
 .sp
 .LP
 Functions \fBsrand48()\fR, \fBseed48()\fR, and \fBlcong48()\fR are
@@ -93,8 +91,8 @@ X(n+1)= (aX (n)+c)(mod m) n>=0.
 .sp
 .LP
 The parameter \fIm\fR = 2^48; hence 48-bit integer arithmetic is performed.
-Unless \fBlcong48()\fR has been invoked, the multiplier value \fIa\fRand the
-addend value \fIc\fRare given by
+Unless \fBlcong48()\fR has been invoked, the multiplier value \fIa\fR and the
+addend value \fIc\fR are given by
 .br
 .in +2
 \fIa\fR = 5DEECE66D(16) = 273673163155(8)
@@ -153,7 +151,6 @@ addend values, \fIa\fR and \fIc\fR, specified above.
 .LP
 For a more powerful random number generator, see \fBarc4random\fR(3C).
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -170,5 +167,4 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBarc4random\fR(3C), \fBrand\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

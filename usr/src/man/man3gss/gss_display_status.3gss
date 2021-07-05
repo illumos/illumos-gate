@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GSS_DISPLAY_STATUS 3GSS "Jan 14, 2003"
+.TH GSS_DISPLAY_STATUS 3GSS "June 20, 2021"
 .SH NAME
 gss_display_status \- convert a GSS-API status code to text
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ]
 #include <gssapi/gssapi.h>
@@ -19,8 +18,6 @@ gss_display_status \- convert a GSS-API status code to text
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBgss_display_status()\fR function enables an application to obtain a
 textual representation of a \fBGSS-API\fR status code for display to the user
 or for logging purposes.  Because some status values may indicate multiple
@@ -36,14 +33,12 @@ will return a non-zero value in this parameter if there are further messages to
 extract.
 .sp
 .LP
-The \fImessage_context\fR parameter contains all state information required  by
+The \fImessage_context\fR parameter contains all state information required by
 \fBgss_display_status()\fR to extract further messages from the
 \fIstatus_value\fR.  If a non-zero value is returned in this parameter, the
 application is not required to call \fBgss_display_status()\fR again unless
 subsequent messages are desired.
 .SH PARAMETERS
-.sp
-.LP
 The parameter descriptions for \fBgss_display_status()\fR follow:
 .sp
 .ne 2
@@ -95,7 +90,7 @@ Should be initialized to zero prior to the first call. On return from
 that additional messages may be extracted from the status code by means of
 subsequent calls to \fBgss_display_status()\fR, passing the same
 \fIstatus_value\fR, \fIstatus_type\fR, \fImech_type\fR, and
-\fImessage_context\fRparameters.
+\fImessage_context\fR parameters.
 .RE
 
 .sp
@@ -110,8 +105,6 @@ parameter must be freed by the application after use with a call to
 .RE
 
 .SH ERRORS
-.sp
-.LP
 The \fBgss_display_status()\fR function may return the following status codes:
 .sp
 .ne 2
@@ -154,9 +147,7 @@ of the \fIminor_status\fR parameter details the error condition.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -170,8 +161,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBgss_acquire_cred\fR(3GSS), \fBgss_release_buffer\fR(3GSS),
 \fBattributes\fR(5)
 .sp
