@@ -24,6 +24,8 @@
  *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -31,10 +33,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <synch.h>
-
-#include <kmfapiP.h>
-#include <ber_der.h>
-/* NSS related headers */
 
 #include <mps/nss.h>
 #include <mps/cert.h>
@@ -50,6 +48,9 @@
 #include <mps/pkcs12.h>
 #include <mps/p12plcy.h>
 #include <mps/prerror.h>
+
+#include <kmfapiP.h>
+#include <ber_der.h>
 
 #define	NSS_OK		0
 
