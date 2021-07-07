@@ -256,7 +256,7 @@ static	mii_ops_t atge_l1c_mii_ops = {
 	atge_l1c_mii_read,
 	atge_l1c_mii_write,
 	atge_mii_notify,
-	NULL
+	atge_l1c_mii_reset
 };
 
 /*
