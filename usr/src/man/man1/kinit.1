@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KINIT 1 "Nov 12, 2008"
+.TH KINIT 1 "June 20, 2021"
 .SH NAME
 kinit \- obtain and cache Kerberos ticket-granting ticket
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/kinit\fR [\fB-ARvV\fR] [\fB-p\fR | \fB-P\fR] [\fB-f\fR | \fB-F\fR] [\fB-a\fR] [\fB-c\fR \fIcache_name\fR]
      [\fB-k\fR [\fB-t\fR \fIkeytab_file\fR]] [\fB-l\fR \fIlifetime\fR]
@@ -17,7 +16,6 @@ kinit \- obtain and cache Kerberos ticket-granting ticket
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBkinit\fR command is used to obtain and cache an initial ticket-granting
 ticket (credential) for \fIprincipal\fR. This ticket is used for authentication
 by the Kerberos system. Only users with Kerberos principals can use the
@@ -46,7 +44,6 @@ Kerberos configuration file for \fIlifetime\fR and \fIrenewable_life\fR.
 The \fBkdestroy\fR(1) command can be used to destroy any active tickets before
 you end your login session.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -306,7 +303,7 @@ Valid URI types are \fBFILE\fR, \fBDIR\fR, \fBPKCS11\fR, \fBPKCS12\fR, and
 .RS 27n
 Specifies where to find trusted X509 anchor information.
 .sp
-Valid URI types are \fBFILE\fR and \fBDIR\fR. See the\fBPKINIT URI Types\fR
+Valid URI types are \fBFILE\fR and \fBDIR\fR. See the \fBPKINIT URI Types\fR
 section for details.
 .RE
 
@@ -338,7 +335,7 @@ This option has context-specific behavior.
 \fIfile-name\fR specifies the name of a PEM-format file containing the user's
 certificate. If \fIkey-file-name\fR is not specified, the user's private key is
 expected to be in \fIfile-name\fR as well. Otherwise, \fIkey-file-name\fR is
-the name of the file  containing the private key.
+the name of the file containing the private key.
 .RE
 
 .sp
@@ -431,7 +428,6 @@ been set to \fBFILE:/tmp/my_proxy.pem\fR.
 .RE
 
 .SS "Time Formats"
-.LP
 The following absolute time formats can be used for the \fB-s\fR
 \fIstart_time\fR option. The examples are based on the date and time of July 2,
 1999, 1:35:30 p.m.
@@ -524,7 +520,6 @@ Variable	Description
 .TE
 
 .SH ENVIRONMENT VARIABLES
-.LP
 \fBkinit\fR uses the following environment variable:
 .sp
 .ne 2
@@ -565,7 +560,6 @@ Default location for the local host's configuration file. See
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -583,11 +577,9 @@ Interface Stability	See below.
 .LP
 The command arguments are Evolving. The command output is Unstable.
 .SH SEE ALSO
-.LP
 \fBkdestroy\fR(1), \fBklist\fR(1), \fBkadmin\fR(1M), \fBktkt_warnd\fR(1M),
 \fBlibpkcs11\fR(3LIB), \fBkdc.conf\fR(4), \fBkrb5.conf\fR(4),
 \fBattributes\fR(5), \fBkerberos\fR(5), \fBkrb5envvar\fR(5), \fBpam_krb5\fR(5)
 .SH NOTES
-.LP
 On success, \fBkinit\fR notifies \fBktkt_warnd\fR(1M) to alert the user when
 the initial credentials (ticket-granting ticket) are about to expire.

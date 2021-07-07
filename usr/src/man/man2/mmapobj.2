@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MMAPOBJ 2 "Dec 1, 2008"
+.TH MMAPOBJ 2 "June 20, 2021"
 .SH NAME
 mmapobj \- map a file object in the appropriate manner
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/mman.h>
 
@@ -17,7 +16,6 @@ mmapobj \- map a file object in the appropriate manner
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIfd\fR\fR
@@ -97,8 +95,6 @@ request. Only the \fBMMOBJ_PADDING\fR request uses this argument. If
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmmapobj()\fR function establishes a set of mappings between a process's
 address space and a file.  By default, \fBmmapobj()\fR maps the whole file as a
 single, private, read-only mapping.  The \fBMMOBJ_INTERPRET\fR flag instructs
@@ -207,8 +203,6 @@ also include any non-file data that are required to provide \fBNOBITS\fR data
 \fImr_msize\fR bytes of memory but only \fImr_msize\fR bytes will be available
 to the caller of \fBmmapobj()\fR.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, 0 is returned and \fIelements\fR contains the
 number of program headers that are mapped for \fIfd\fR. The data describing
 these elements are copied to storage such that the first \fIelements\fR members
@@ -218,8 +212,6 @@ of the storage array contain valid mapping data.
 On failure, -1 is returned and \fBerrno\fR is set to indicate the error. No
 data is copied to storage.
 .SH ERRORS
-.sp
-.LP
 The \fBmmapobj()\fR function will fail if:
 .sp
 .ne 2
@@ -290,7 +282,7 @@ address.
 .RS 14n
 The \fIflags\fR argument contains an invalid flag.
 .sp
-\fBMMOBJ_PADDING\fR was not specified in \fIflags\fRand \fIarg\fR was non-null.
+\fBMMOBJ_PADDING\fR was not specified in \fIflags\fR and \fIarg\fR was non-null.
 .RE
 
 .sp
@@ -341,8 +333,6 @@ object.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -359,8 +349,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBld.so.1\fR(1), \fBfcntl\fR(2), \fBmemcntl\fR(2), \fBmmap\fR(2),
 \fBmprotect\fR(2), \fBmunmap\fR(2), \fBelf\fR(3ELF), \fBmadvise\fR(3C),
 \fBmlockall\fR(3C), \fBmsync\fR(3C), \fBa.out\fR(4), \fBattributes\fR(5)

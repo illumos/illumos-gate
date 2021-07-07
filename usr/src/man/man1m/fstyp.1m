@@ -4,18 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FSTYP 1M "Dec 19, 2007"
+.TH FSTYP 1M "June 20, 2021"
 .SH NAME
 fstyp \- determine file system type
 .SH SYNOPSIS
-.LP
 .nf
 \fBfstyp\fR [\fB-a\fR | \fB-v\fR] \fIspecial\fR [:\fIlogical-drive\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBfstyp\fR allows the user to determine the file system type of unmounted file
 systems using heuristic programs.
 .sp
@@ -34,7 +31,6 @@ status is \fB2\fR. Other errors are printed in the same format.
 This command is unreliable and its results should not be used to make any
 decisions about subsequent use of a storage device or disk partition.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-a\fR\fR
@@ -150,20 +146,14 @@ superblock and varies across different \fIFSTypes\fR. See \fBufs\fR(7FS),
 .RE
 
 .SH USAGE
-.sp
-.LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBfstyp\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH SEE ALSO
-.sp
-.LP
 \fBfsck\fR(1M), \fBmkfs_ufs\fR(1M), \fBtunefs\fR(1M), \fBattributes\fR(5),
 \fBlibfstyp\fR(3LIB), \fBlargefile\fR(5), \fBhsfs\fR(7FS), \fBufs\fR(7FS),
 \fBpcfs\fR(7FS)
 .SH NOTES
-.sp
-.LP
-The use of heuristics implies that the result of\fBfstyp\fR is not guaranteed
+The use of heuristics implies that the result of \fBfstyp\fR is not guaranteed
 to be accurate.
 .sp
 .LP

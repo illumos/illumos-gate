@@ -2302,6 +2302,12 @@ h platform/i86pc/ucode/GenuineIntel/00050654-04=platform/i86pc/ucode/GenuineInte
 h platform/i86pc/ucode/GenuineIntel/00050654-10=platform/i86pc/ucode/GenuineIntel/00050654-01
 h platform/i86pc/ucode/GenuineIntel/00050654-20=platform/i86pc/ucode/GenuineIntel/00050654-01
 h platform/i86pc/ucode/GenuineIntel/00050654-80=platform/i86pc/ucode/GenuineIntel/00050654-01
+f platform/i86pc/ucode/GenuineIntel/00050655-01 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/00050655-02=platform/i86pc/ucode/GenuineIntel/00050655-01
+h platform/i86pc/ucode/GenuineIntel/00050655-04=platform/i86pc/ucode/GenuineIntel/00050655-01
+h platform/i86pc/ucode/GenuineIntel/00050655-10=platform/i86pc/ucode/GenuineIntel/00050655-01
+h platform/i86pc/ucode/GenuineIntel/00050655-20=platform/i86pc/ucode/GenuineIntel/00050655-01
+h platform/i86pc/ucode/GenuineIntel/00050655-80=platform/i86pc/ucode/GenuineIntel/00050655-01
 f platform/i86pc/ucode/GenuineIntel/00050656-01 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/00050656-02=platform/i86pc/ucode/GenuineIntel/00050656-01
 h platform/i86pc/ucode/GenuineIntel/00050656-04=platform/i86pc/ucode/GenuineIntel/00050656-01
@@ -2325,7 +2331,6 @@ h platform/i86pc/ucode/GenuineIntel/0005065B-20=platform/i86pc/ucode/GenuineInte
 h platform/i86pc/ucode/GenuineIntel/0005065B-80=platform/i86pc/ucode/GenuineIntel/0005065B-01
 f platform/i86pc/ucode/GenuineIntel/00050662-10 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/00050663-10 0444 root sys
-f platform/i86pc/ucode/GenuineIntel/00060663-80 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/00050664-10 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/00050665-10 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000506C2-01 0444 root sys
@@ -2338,11 +2343,28 @@ h platform/i86pc/ucode/GenuineIntel/000506E3-04=platform/i86pc/ucode/GenuineInte
 h platform/i86pc/ucode/GenuineIntel/000506E3-10=platform/i86pc/ucode/GenuineIntel/000506E3-02
 h platform/i86pc/ucode/GenuineIntel/000506E3-20=platform/i86pc/ucode/GenuineIntel/000506E3-02
 f platform/i86pc/ucode/GenuineIntel/000506F1-01 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/00060663-80 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000606A5-01 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/000606A5-02=platform/i86pc/ucode/GenuineIntel/000606A5-01
+h platform/i86pc/ucode/GenuineIntel/000606A5-04=platform/i86pc/ucode/GenuineIntel/000606A5-01
+h platform/i86pc/ucode/GenuineIntel/000606A5-80=platform/i86pc/ucode/GenuineIntel/000606A5-01
+f platform/i86pc/ucode/GenuineIntel/000606A6-01 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/000606A6-02=platform/i86pc/ucode/GenuineIntel/000606A6-01
+h platform/i86pc/ucode/GenuineIntel/000606A6-04=platform/i86pc/ucode/GenuineIntel/000606A6-01
+h platform/i86pc/ucode/GenuineIntel/000606A6-80=platform/i86pc/ucode/GenuineIntel/000606A6-01
 f platform/i86pc/ucode/GenuineIntel/000706A1-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000706A8-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000706E5-80 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/00080664-01 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/00080665-01=platform/i86pc/ucode/GenuineIntel/00080664-01
 f platform/i86pc/ucode/GenuineIntel/000806A1-10 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000806C1-80 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000806C2-02 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/000806C2-40=platform/i86pc/ucode/GenuineIntel/000806C2-02
+h platform/i86pc/ucode/GenuineIntel/000806C2-80=platform/i86pc/ucode/GenuineIntel/000806C2-02
+f platform/i86pc/ucode/GenuineIntel/000806D1-02 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/000806D1-40=platform/i86pc/ucode/GenuineIntel/000806D1-02
+h platform/i86pc/ucode/GenuineIntel/000806D1-80=platform/i86pc/ucode/GenuineIntel/000806D1-02
 f platform/i86pc/ucode/GenuineIntel/000806E9-10 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000806E9-40 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/000806E9-80=platform/i86pc/ucode/GenuineIntel/000806E9-40
@@ -2354,6 +2376,8 @@ h platform/i86pc/ucode/GenuineIntel/000806EB-80=platform/i86pc/ucode/GenuineInte
 f platform/i86pc/ucode/GenuineIntel/000806EC-04 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/000806EC-10=platform/i86pc/ucode/GenuineIntel/000806EC-04
 h platform/i86pc/ucode/GenuineIntel/000806EC-80=platform/i86pc/ucode/GenuineIntel/000806EC-04
+f platform/i86pc/ucode/GenuineIntel/00090661-01 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000906C0-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000906E9-02 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/000906E9-08=platform/i86pc/ucode/GenuineIntel/000906E9-02
 h platform/i86pc/ucode/GenuineIntel/000906E9-20=platform/i86pc/ucode/GenuineIntel/000906E9-02
@@ -2371,6 +2395,7 @@ f platform/i86pc/ucode/GenuineIntel/000A0655-02 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/000A0655-20=platform/i86pc/ucode/GenuineIntel/000A0653-02
 f platform/i86pc/ucode/GenuineIntel/000A0660-80 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000A0661-80 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000A0671-02 0444 root sys
 d proc 0755 root root
 d root 0755 root root
 f root/.bash_profile 0644 root root

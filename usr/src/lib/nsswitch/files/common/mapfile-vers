@@ -1,5 +1,6 @@
 #
 # Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -46,11 +47,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 		_nss_files_bootparams_constr;
 		_nss_files_auth_attr_constr;
 		_nss_files_audit_user_constr;
- 		_nss_files_ethers_constr;
+		_nss_files_ethers_constr;
 		_nss_files_exec_attr_constr;
 		_nss_files_group_constr;
 		_nss_files_hosts_constr;
 		_nss_files_ipnodes_constr;
+		_nss_files_netgroup_constr;
 		_nss_files_netmasks_constr;
 		_nss_files_networks_constr;
 		_nss_files_passwd_constr;

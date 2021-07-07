@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IKECERT 1M "April 9, 2016"
+.TH IKECERT 1M "June 20, 2021"
 .SH NAME
 ikecert \- manipulates the machine's on-filesystem public-key certificate
 databases
 .SH SYNOPSIS
-.LP
 .nf
 \fBikecert\fR certlocal
      [\fB-a\fR | \fB-e\fR | \fB-h\fR | \fB-k\fR | \fB-l\fR | \fB-r\fR | \fB-U\fR | \fB-C\fR | \fB-L\fR]
@@ -35,7 +34,6 @@ databases
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBikecert\fR command manipulates the machine's on-filesystem public-key
 certificate databases. See the "Files" section, below.
 .sp
@@ -72,7 +70,6 @@ repository.
 The only supported PKCS#11 library and hardware is the Sun Cryptographic
 Accelerator 4000.
 .SH OPTIONS
-.LP
 Except for \fBtokens\fR, each subcommand requires one option, possibly followed
 by one or more option-specific arguments.
 .sp
@@ -234,7 +231,7 @@ matches in the database is extracted. See \fBNOTES\fR, below, for details on
 When specified with the \fBcertlocal\fR subcommand, this option generates a IKE
 public/private key pair and adds it into the local ID database. It also
 generates a certificate request and sends that to standard output. For details
-on the above options see  for details on the \fIdname\fR argument and see
+on the above options see for details on the \fIdname\fR argument and see
 ALTERNATIVE NAMES for details on the \fIaltname\fR argument(s) to this command.
 .sp
 If \fB-T\fR is specified, the hardware token will generate the pair of keys.
@@ -331,7 +328,7 @@ The list displays the identity string of the certificates, as well as, the
 private key if in the key database. The \fB-v\fR switches the output to a
 verbose mode where the entire certificate is printed.
 .sp
-If the matching ceritifcate is on a hardware token, the token ID is also
+If the matching certificate is on a hardware token, the token ID is also
 listed.
 .RE
 
@@ -346,7 +343,7 @@ When specified with the \fBcertrldb\fR subcommand, this option lists the CRLs
 in the IKE database along with any certificates that reside in the database and
 match the Issuer Name. \fBcertspec\fR can be used to specify to list a specific
 CRL. The \fB-v\fR option switches the output to a verbose mode where the entire
-certificate is printed. See \fBNOTES\fR, below, for details on\fBcertspec\fR
+certificate is printed. See \fBNOTES\fR, below, for details on \fBcertspec\fR
 patterns.
 .RE
 
@@ -541,7 +538,6 @@ token with \fBikeadm\fR(1M) once \fBin.iked\fR(1M) is running.
 .RE
 
 .SH PARAMETERS
-.LP
 The following parameters are supported:
 .sp
 .ne 2
@@ -726,7 +722,6 @@ instance.
 .RE
 
 .SH SECURITY
-.LP
 This command can save private keys of a public-private key pair into a file.
 Any exposure of a private key may lead to compromise if the key is somehow
 obtained by an adversary.
@@ -748,7 +743,6 @@ Refer to the afterword by Matt Blaze in Bruce Schneier's \fIApplied
 Cryptography: Protocols, Algorithms, and Source Code in C\fR for additional
 information.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRGenerating a Self-Signed Certificate
 .sp
 .LP
@@ -809,7 +803,6 @@ example# \fB# ikecert certlocal -kc -m 1024 -t rsa-md5 -T vca0-keystore \e
 .sp
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -874,7 +867,6 @@ Consulted for the pathname of a PKCS#11 library.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -889,7 +881,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.LP
 \fBikeadm\fR(1M), \fBin.iked\fR(1M), \fBgetdate\fR(3C), \fBike.config\fR(4),
 \fBattributes\fR(5), \fBpkcs11_softtoken\fR(5)
 .sp
@@ -901,7 +892,6 @@ Code in C\fR. Second Edition. John Wiley & Sons. New York, NY. 1996.
 RSA Labs, PKCS#11 v2.11: \fICryptographic Token Interface Standards\fR,
 November 2001.
 .SH NOTES
-.LP
 The following is the validity date and time syntax when the \fB-F\fR or
 \fB-S\fR flags are used:
 .sp

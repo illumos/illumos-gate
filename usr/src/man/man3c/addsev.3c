@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ADDSEV 3C "Dec 29, 1996"
+.TH ADDSEV 3C "June 20, 2021"
 .SH NAME
 addsev \- define additional severities
 .SH SYNOPSIS
-.LP
 .nf
 #include <pfmt.h>
 
@@ -15,8 +14,6 @@ addsev \- define additional severities
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBaddsev()\fR function defines additional severities for use in subsequent
 calls to \fBpfmt\fR(3C) or \fBlfmt\fR(3C). It associates an integer value
 \fIint_val\fR in the range [5-255] with a character \fIstring\fR, overwriting
@@ -27,19 +24,14 @@ If \fIint_val\fR is OR-ed with the \fIflags\fR argument passed to subsequent
 calls to \fBpfmt()\fR or \fBlfmt()\fR, \fIstring\fR will be used as severity.
 Passing a null \fIstring\fR removes the severity.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBaddsev()\fR returns \fB0\fR.  Otherwise it
-returns\fB\(mi1\fR\&.
+returns \fB\(mi1\fR\&.
 .SH USAGE
-.sp
-.LP
 Only the standard severities are automatically displayed for the locale in
 effect at runtime. An application must provide the means for displaying
 locale-specific versions of add-on severities. Add-on severities are only
 effective within the applications defining them.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRExample of \fBaddsev()\fR function.
 .sp
 .LP
@@ -69,8 +61,6 @@ APPL: PANIC: Cannot locate database
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -85,6 +75,4 @@ MT-Level	MT-safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBgettxt\fR(3C), \fBlfmt\fR(3C), \fBpfmt\fR(3C), \fBattributes\fR(5)

@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDTERM 7M "Jun 7, 1999"
+.TH LDTERM 7M "June 20, 2021"
 .SH NAME
 ldterm \- standard STREAMS terminal line discipline module
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 .fi
@@ -24,8 +23,6 @@ int ioctl(\fIfd\fR,I_PUSH,"ldterm");
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBldterm\fR STREAMS module provides most of the \fBtermio\fR(7I) terminal
 interface.  The \fBvis \fRmodule does not perform the low-level device control
 functions specified by flags in the \fBc_cflag\fR word of the
@@ -47,8 +44,6 @@ codesets.
 The remainder of this section describes the processing of various \fBSTREAMS\fR
 messages on the read- and write-side.
 .SS "Read-side Behavior"
-.sp
-.LP
 Various types of STREAMS messages are processed as follows:
 .sp
 .ne 2
@@ -91,8 +86,6 @@ downstream.
 .LP
 All other messages are passed upstream unchanged.
 .SS "Write-side Behavior"
-.sp
-.LP
 Various types of \fBSTREAMS\fR messages are processed as follows:
 .sp
 .ne 2
@@ -178,8 +171,6 @@ are augmented if necessary, and the message is passed upstream.
 .LP
 All other messages are passed downstream unchanged.
 .SH IOCTLS
-.sp
-.LP
 \fBThe \fR\fBldterm module\fR  processes the following \fBTRANSPARENT\fR
 ioctls. All others are passed downstream.
 .sp
@@ -264,9 +255,9 @@ This call takes a pointer to an \fBeucioc\fR structure, and uses it to set the
 \fBEUC\fR line discipline's local definition for the code set widths to be used
 for subsequent operations. Within the stream, the line discipline may
 optionally notify other modules of this setting using \fBM_CTL\fR messages.
-When this call is received and the \fBeucioc\fRstructure contains valid data,
+When this call is received and the \fBeucioc\fR structure contains valid data,
 the line discipline changes into \fBEUC \fRhandling mode once the
-\fBeucioc\fRdata is completely transferred to an internal data structure.
+\fBeucioc\fR data is completely transferred to an internal data structure.
 .RE
 
 .sp
@@ -283,8 +274,6 @@ is meaningless.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBtermios\fR(3C), \fBconsole\fR(7D), \fBtermio\fR(7I)
 .sp
 .LP

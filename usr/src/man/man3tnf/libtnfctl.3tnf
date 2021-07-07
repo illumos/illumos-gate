@@ -3,20 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBTNFCTL 3TNF "Mar 1, 2004"
+.TH LIBTNFCTL 3TNF "June 20, 2021"
 .SH NAME
 libtnfctl \- library for TNF probe control in a process or the kernel
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ltnfctl\fR [ \fIlibrary\fR ... ]
 #include <tnf/tnfctl.h>
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-The \fBlibtnfctl\fR library provides an  \fBAPI\fR to control  \fBTNF\fR
+The \fBlibtnfctl\fR library provides an \fBAPI\fR to control \fBTNF\fR
 ("Trace Normal Form") probes within a process or the kernel. See
 \fBtracing\fR(3TNF) for an overview of the Solaris tracing architecture. The
 client of \fBlibtnfctl\fR controls probes in one of four modes:
@@ -36,7 +33,7 @@ own probes.
 \fBdirect mode\fR
 .ad
 .RS 17n
-The target is a separate process; a client can either  \fBexec\fR(2) a program
+The target is a separate process; a client can either \fBexec\fR(2) a program
 or attach to a running process for probe control. The \fBlibtnfctl\fR library
 uses \fBproc\fR(4) on the target process for probe and process control in this
 mode, and additionally provides basic process control features.
@@ -49,7 +46,7 @@ mode, and additionally provides basic process control features.
 .ad
 .RS 17n
 The target is a separate process, but the controlling process is already using
-\fBproc\fR(4) to control the target, and hence  \fBlibtnfctl\fR cannot use
+\fBproc\fR(4) to control the target, and hence \fBlibtnfctl\fR cannot use
 those interfaces directly.  Use this mode to control probes from within a
 debugger. In this mode, the client must provide a set of functions that
 \fBlibtnfctl\fR can use to query and update the target process.
@@ -94,10 +91,10 @@ These interfaces create handles in the specified modes:
 .TS
 l l l l l
 l l l l l .
-\fBtnfctl_internal_open()\fR	INT			
-\fBtnfctl_exec_open()\fR		D		
-\fBtnfctl_pid_open()\fR		D		
-\fBtnfctl_indirect_open()\fR			IND	
+\fBtnfctl_internal_open()\fR	INT
+\fBtnfctl_exec_open()\fR		D
+\fBtnfctl_pid_open()\fR		D
+\fBtnfctl_indirect_open()\fR			IND
 \fBtnfctl_kernel_open()\fR				K
 .TE
 
@@ -110,9 +107,9 @@ These interfaces are used with the specified modes:
 .TS
 l l l l l
 l l l l l .
-\fBtnfctl_continue()\fR		D		
-\fBtnfctl_probe_connect()\fR	INT	D	IND	
-\fBtnfctl_probe_disconnect_all ()\fR	INT	D	IND	
+\fBtnfctl_continue()\fR		D
+\fBtnfctl_probe_connect()\fR	INT	D	IND
+\fBtnfctl_probe_disconnect_all ()\fR	INT	D	IND
 \fBtnfctl_trace_attrs_get()\fR	INT	D	IND	K
 \fBtnfctl_buffer_alloc()\fR	INT	D	IND	K
 \fBtnfctl_register_funcs()\fR	INT	D	IND	K
@@ -166,7 +163,7 @@ opportunity to do one-time processing for each probe.
 .LP
 The \fBtnfctl_check_libs()\fR function is used primarily in indirect mode to
 check whether any new probes have appeared, that is, they have been made
-available by  \fBdlopen\fR(3C), or have disappeared, that is, they have
+available by \fBdlopen\fR(3C), or have disappeared, that is, they have
 disassociated from the process by \fBdlclose\fR(3C).
 .sp
 .LP
@@ -189,10 +186,10 @@ status of a probe, such as whether it is currently enabled.
 .sp
 .LP
 The \fBtnfctl_trace_attrs_get()\fR function returns information about the
-tracing session, such as the  size of the trace buffer or trace file.
+tracing session, such as the size of the trace buffer or trace file.
 .sp
 .LP
-The \fBtnfctl_strerror()\fR function maps a  \fBtnfctl\fR error code to a
+The \fBtnfctl_strerror()\fR function maps a \fBtnfctl\fR error code to a
 string, for reporting purposes.
 .sp
 .LP
@@ -213,13 +210,9 @@ cluttering up the kernel's trace buffer.
 The \fBtnfctl_buffer_dealloc()\fR function deallocates the kernel's internal
 trace buffer.
 .SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, these functions return\fBTNFCTL_ERR_NONE\fR.
+Upon successful completion, these functions return \fBTNFCTL_ERR_NONE\fR.
 .SH ERRORS
-.sp
-.LP
-The error codes for  \fBlibtnfctl\fR are:
+The error codes for \fBlibtnfctl\fR are:
 .sp
 .ne 2
 .na
@@ -419,8 +412,6 @@ Error code reserved for user.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -435,8 +426,6 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBprex\fR(1), \fBexec\fR(2), \fBdlclose\fR(3C), \fBdlopen\fR(3C),
 \fBTNF_PROBE\fR(3TNF), \fBtnfctl_buffer_alloc\fR(3TNF),
 \fBtnfctl_buffer_dealloc\fR(3TNF), \fBtnfctl_check_libs\fR(3TNF),
@@ -457,11 +446,9 @@ MT Level	MT-Safe with exceptions
 .LP
 \fILinker and Libraries Guide\fR
 .SH NOTES
-.sp
-.LP
-This  \fBAPI\fR is MT-Safe.  Multiple threads may concurrently operate on
+This \fBAPI\fR is MT-Safe.  Multiple threads may concurrently operate on
 independent \fBtnfctl\fR handles, which is the typical behavior expected.  The
 \fBlibtnfctl\fR library does not support multiple threads operating on the same
 \fBtnfctl\fR handle.  If this is desired, it is the client's responsibility to
-implement  locking to ensure that two threads that use the same \fBtnfctl\fR
+implement locking to ensure that two threads that use the same \fBtnfctl\fR
 handle are not simultaneously in a \fBlibtnfctl\fR interface.

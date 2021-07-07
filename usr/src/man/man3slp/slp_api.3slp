@@ -3,25 +3,22 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SLP_API 3SLP "Jan 16, 2003"
+.TH SLP_API 3SLP "June 20, 2021"
 .SH NAME
 slp_api \- Service Location Protocol Application Programming Interface
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-l\fRslp  [ \fIlibrary\fR ... ]
 #include <slp.h>
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-The \fBslp_api\fR is a C  language  binding  that  maps directly into the
-Service  Location Protocol ("\fBSLP\fR") defined  by  \fIRFC 2614\fR. This
-implementation requires minimal overhead. With  the exception  of the
-\fBSLPDereg()\fR and \fBSLPDelAttrs()\fR functions,  which  map into  different
-uses  of  the  \fBSLP\fR deregister  request, there is  one C  language
-function  per protocol  request.   Parameters are for the most part character
+The \fBslp_api\fR is a C language binding that maps directly into the
+Service Location Protocol ("\fBSLP\fR") defined by \fIRFC 2614\fR. This
+implementation requires minimal overhead. With the exception of the
+\fBSLPDereg()\fR and \fBSLPDelAttrs()\fR functions, which map into different
+uses of the \fBSLP\fR deregister request, there is one C language
+function per protocol request.   Parameters are for the most part character
 buffers.  Memory management is kept simple because the client allocates most
 memory and client callback functions are required to copy incoming parameters
 into memory allocated by the client code. Any memory returned directly from the
@@ -43,15 +40,13 @@ non-\fINULL\fR. Some parameters may have other restrictions.  If any parameter
 fails to satisfy the restrictions on its value, the operation returns a
 \fBPARAMETER_BAD\fR error.
 .SS "Syntax for String Parameters"
-.sp
-.LP
 Query strings, attribute registration lists, attribute deregistration lists,
 scope lists, and attribute selection lists follow the syntax described in
 \fIRFC 2608\fR. The \fBAPI\fR reflects the strings passed from clients directly
-into protocol  requests, and reflects out strings returned from protocol
+into protocol requests, and reflects out strings returned from protocol
 replies directly to clients. As a consequence, clients are responsible for
 formatting request strings, including escaping and converting opaque values to
-escaped byte-encoded strings. Similarly, on output, clients are required  to
+escaped byte-encoded strings. Similarly, on output, clients are required to
 unescape strings and convert escaped string-encoded opaques to binary. The
 \fBSLPEscape()\fR and \fBSLPUnescape()\fR functions can be used for escaping
 \fBSLP\fR reserved characters, but they perform no opaque processing.
@@ -65,8 +60,6 @@ consists of a backslash followed by the two hexadecimal digits encoding the
 byte. An example is "\fB\e2c\fR" for the byte \fB0x2c\fR. Clients handle opaque
 processing themselves, since the algorithm is relatively simple and uniform.
 .SS "System Properties"
-.sp
-.LP
 The system properties established in \fBslp.conf\fR(4), the configuration file,
 are accessible through the \fBSLPGetProperty()\fR and \fBSLPSetProperty()\fR
 functions. The \fBSLPSetProperty()\fR function modifies properties only in the
@@ -75,7 +68,7 @@ property is used and, as with parsing the configuration file, are logged at the
 \fBLOG_INFO\fR priority. Program execution continues without interruption by
 substituting the default for the erroneous parameter. In general, individual
 agents should rarely be required to override these properties, since they
-reflect properties of the \fBSLP\fR network that are not  of concern to
+reflect properties of the \fBSLP\fR network that are not of concern to
 individual agents. If changes are required, system administrators should modify
 the configuration file.
 .sp
@@ -83,8 +76,6 @@ the configuration file.
 Properties are global to the process, affecting all threads and all handles
 created with \fBSLPOpen()\fR.
 .SS "Memory Management"
-.sp
-.LP
 The only \fBAPI\fR functions that return memory specifically requiring
 deallocation on the part of the client are \fBSLPParseSrvURL()\fR,
 \fBSLPFindScope()\fR, \fBSLPEscape()\fR, and \fBSLPUnescape()\fR. Free this
@@ -97,8 +88,6 @@ retained by the client code. Otherwise, crashes are possible. Clients must copy
 data out of the callback parameters. No other use of the memory in callback
 parameters is allowed.
 .SS "Asynchronous and Incremental Return Semantics"
-.sp
-.LP
 If a handle parameter to an \fBAPI\fR function is opened asynchronously, the
 \fBAPI\fR function calls on the handle to check the other parameters, opens the
 appropriate operation, and returns immediately. If an error occurs in the
@@ -112,7 +101,7 @@ occurred during the operation.
 The callback function is called whenever the \fBAPI\fR library has results to
 report. The callback code is required to check the error code parameter before
 looking at the other parameters. If the error code is not \fBSLP_OK\fR, the
-other parameters  may be \fINULL\fR or otherwise invalid. The \fBAPI\fR library
+other parameters may be \fINULL\fR or otherwise invalid. The \fBAPI\fR library
 can terminate any outstanding operation on which an error occurs. The callback
 code can similarly indicate that the operation should be terminated by passing
 back \fBSLP_FALSE\fR to indicate that it is not interested in receiving more
@@ -172,19 +161,14 @@ replies has been collected and returned.
 .RE
 
 .SS "Configuration Files"
-.sp
-.LP
 The \fBAPI\fR library reads \fBslp.conf\fR(4), the default configuration file,
 to obtain the operating parameters. You can specify the location of this file
 with the \fBSLP_CONF_FILE\fR environment variable. If you do not set this
 variable, or the file it refers to is invalid, the \fBAPI\fR will use the
 default configuration file at \fB/etc/inet/slp.conf\fR instead.
 .SS "Data Structures"
-.sp
-.LP
 The data structures used by the \fBSLP\fR \fBAPI\fR are as follows:
 .SS "The URL Lifetime Type"
-.sp
 .in +2
 .nf
 typedef enum {
@@ -196,14 +180,13 @@ typedef enum {
 
 .sp
 .LP
-The enumeration \fBSLPURLLifetime\fR  contains  \fBURL\fR  lifetime values, in
+The enumeration \fBSLPURLLifetime\fR contains \fBURL\fR lifetime values, in
 seconds, that are frequently used. \fBSLP_LIFETIME_DEFAULT\fR is 3 hours, while
-\fBSLP_LIFETIME_MAXIMUM\fR is  18 hours, which corresponds to the maximum size
+\fBSLP_LIFETIME_MAXIMUM\fR is 18 hours, which corresponds to the maximum size
 of the \fBlifetime\fR field in \fBSLP\fR messages. Note that on registration
 \fBSLP_LIFETIME_MAXIMUM\fR causes the advertisement to be continually
 reregistered until the process exits.
 .SS "The SLPBoolean Type"
-.sp
 .in +2
 .nf
 typedef enum {
@@ -217,7 +200,6 @@ typedef enum {
 .LP
 The enumeration \fBSLPBoolean\fR is used as a Boolean flag.
 .SS "The Service URL Structure"
-.sp
 .in +2
 .nf
 typedef struct srvurl {
@@ -291,7 +273,6 @@ differentiation of the service.
 .RE
 
 .SS "The SLPHandle"
-.sp
 .in +2
 .nf
 typedef void* SLPHandle;
@@ -304,8 +285,6 @@ The \fBSLPHandle\fR type is returned by \fBSLPOpen()\fR and is a parameter to
 all \fBSLP\fR functions. It serves as a handle for all resources allocated on
 behalf of the process by the \fBSLP\fR library. The type is opaque.
 .SS "Callbacks"
-.sp
-.LP
 Include a function pointer to a callback function specific to a particular
 \fBAPI\fR operation in the parameter list when the \fBAPI\fR function is
 invoked. The callback function is called with the results of the operation in
@@ -327,7 +306,6 @@ should continue processing the operation. If the value returned from the
 callback is \fBSLP_TRUE\fR, asynchronous operations are terminated. Synchronous
 operations ignore the return since the operation is already complete.
 .SS "\fBSLPRegReport()\fR"
-.sp
 .in +2
 .nf
 typedef void SLPRegReport(SLPHandle hSLP,
@@ -347,7 +325,7 @@ callback has the following parameters:
 \fB\fIhSLP\fR\fR
 .ad
 .RS 12n
-The\fBSLPHandle()\fR used to initiate the operation.
+The \fBSLPHandle()\fR used to initiate the operation.
 .RE
 
 .sp
@@ -370,7 +348,6 @@ function, starting the operation. It may be \fINULL\fR.
 .RE
 
 .SS "\fBSLPSrvTypeCallback()\fR"
-.sp
 .in +2
 .nf
 typedef SLPBoolean SLPSrvTypeCallback(SLPHandle hSLP,
@@ -423,12 +400,11 @@ terminate the outstanding operation.
 \fB\fIpvCookie\fR\fR
 .ad
 .RS 14n
-emory passed down from the client code that called the original \fBAPI\fR
+Memory passed down from the client code that called the original \fBAPI\fR
 function, starting the operation. It can be \fINULL\fR.
 .RE
 
 .SS "SLPSrvURLCallback"
-.sp
 .in +2
 .nf
 typedef SLPBoolean SLPSrvURLCallback(SLPHandle hSLP,
@@ -496,7 +472,6 @@ function, starting the operation. It can be \fINULL\fR.
 .RE
 
 .SS "SLPAttrCallback"
-.sp
 .in +2
 .nf
 typedef SLPBoolean SLPAttrCallback(SLPHandle hSLP,
@@ -575,8 +550,6 @@ function, starting the operation. It can be \fINULL\fR.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 An interface that is part of the \fBSLP\fR \fBAPI\fR may return one of the
 following values.
 .sp
@@ -741,7 +714,7 @@ If the network cannot initialize properly, this error is returned.
 \fB\fBSLP_MEMORY_ALLOC_FAILED\fR\fR
 .ad
 .RS 30n
-If the \fBAPI\fR fails to allocate memory, the operationis aborted and returns
+If the \fBAPI\fR fails to allocate memory, the operation is aborted and returns
 this.
 .RE
 
@@ -751,7 +724,7 @@ this.
 \fB\fBSLP_PARAMETER_BAD\fR\fR
 .ad
 .RS 30n
-If a parameter passed into an interface is bad, this  error is returned.
+If a parameter passed into an interface is bad, this error is returned.
 .RE
 
 .sp
@@ -787,7 +760,6 @@ If an attempt is made to do so, this error is returned from the called
 .RE
 
 .SH LIST OF ROUTINES
-.sp
 .ne 2
 .na
 \fB\fBSLPOpen()\fR\fR
@@ -941,12 +913,8 @@ free memory
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 When \fBSLP_CONF_FILE\fR is set, use this file for configuration.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -963,8 +931,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBslpd\fR(1M), \fBslp.conf\fR(4), \fBslpd.reg\fR(4), \fBattributes\fR(5)
 .sp
 .LP

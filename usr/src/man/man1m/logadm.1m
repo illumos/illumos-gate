@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOGADM 1M "May 23, 2007"
+.TH LOGADM 1M "June 20, 2021"
 .SH NAME
 logadm \- manage endlessly growing log files
 .SH SYNOPSIS
-.LP
 .nf
 \fBlogadm\fR
 .fi
@@ -18,8 +17,6 @@ logadm \- manage endlessly growing log files
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBlogadm\fR is a general log rotation tool that is suitable for running from
 \fBcron\fR(1M).
 .sp
@@ -106,16 +103,14 @@ owner, group ID, and permissions match the original file.
 .LP
 Three options control when old log files are expired: \fB-A\fR age \fB-C\fR
 count \fB-S\fR size. These options expire the oldest log files until a
-particular condition or conditions are met. For example, the combination
-\fB\fR\fB-C\fR \fB5\fR and the \fB\fR\fB-S\fR \fB10m\fR options expires old log
-files until there are no more than 5 of the \fBand\fR their combined disk usage
+particular condition or conditions are met. For example, the combination of the
+\fB\fR\fB-C\fR \fB5\fR and \fB\fR\fB-S\fR \fB10m\fR options expires old log
+files until there are no more than 5 of them \fBand\fR their combined disk usage
 is no more than 10 megabytes. If none of these options are specified, the
 default expiration is \fB\fR\fB-C\fR \fB10\fR which keeps ten old log files. If
 no files are to be expired, use \fB\fR\fB-C\fR \fB0\fR to prevent expiration by
 default.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -224,7 +219,7 @@ expire it.
 after \fIcmd\fR completes. If the old log file is not removed or renamed by the
 \fIcmd\fR, \fBlogadm\fR considers it for expiration the next time that it runs
 on the specified log file. If present, the keyword \fB$file\fR is expanded in
-the specified \fIcmd\fRto the name of the file being expired.
+the specified \fIcmd\fR to the name of the file being expired.
 .sp
 This option is useful for tasks such as mailing old log files to
 administrators, or copying old log files to long term storage.
@@ -698,8 +693,6 @@ suffix of \fB\&.gz\fR.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -714,7 +707,6 @@ is the same as the actual log file name.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRRotating a File and Keeping Previous Versions
 .sp
 .LP
@@ -873,7 +865,6 @@ logadm -w apache /var/apache/logs/*_log
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/logadm.conf\fR\fR
@@ -884,8 +875,6 @@ configuration file for \fBlogadm\fR command
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -900,14 +889,10 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBchgrp\fR(1), \fBchmod\fR(1), \fBchown\fR(1), \fBcsh\fR(1), \fBgzip\fR(1),
 \fBcron\fR(1M), \fBctime\fR(3C), \fBstrftime\fR(3C), \fBlogadm.conf\fR(4),
 \fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
 When \fBlogadm\fR applies expire conditions (supplied by the \fB-A\fR,
 \fB-C\fR, and \fB-S\fR options), it deletes files, the oldest first, until the
 conditions are satisfied. If the template used for naming the old logs

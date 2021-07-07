@@ -1,6 +1,7 @@
 /*
  *  GRUB  --  GRand Unified Bootloader
  *  Copyright (C) 1999,2000,2001,2002,2003,2004  Free Software Foundation, Inc.
+ *  Copyright 2021 RackTop Systems, Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -1525,13 +1526,13 @@ vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath,
  *	ERR_* - failure
  */
 static int
-check_pool_label(uint64_t sector, char *stack, char *outdevid,
-    char *outpath, uint64_t *outguid, uint64_t *outashift, uint64_t *outversion)
+check_pool_label(uint64_t sector, char *stack, char *outdevid, char *outpath,
+    uint64_t *outguid, uint64_t *outdiskguid, uint64_t *outashift,
+    uint64_t *outversion)
 {
 	vdev_phys_t *vdev;
 	uint64_t pool_state, txg = 0;
 	char *nvlist, *nv, *features;
-	uint64_t diskguid;
 
 	sector += (VDEV_SKIP_SIZE >> SPA_MINBLOCKSHIFT);
 
@@ -1572,13 +1573,13 @@ check_pool_label(uint64_t sector, char *stack, char *outdevid,
 	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_VDEV_TREE, &nv,
 	    DATA_TYPE_NVLIST, NULL))
 		return (ERR_FSYS_CORRUPT);
-	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_GUID, &diskguid,
+	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_GUID, outdiskguid,
 	    DATA_TYPE_UINT64, NULL))
 		return (ERR_FSYS_CORRUPT);
 	if (nvlist_lookup_value(nv, ZPOOL_CONFIG_ASHIFT, outashift,
 	    DATA_TYPE_UINT64, NULL) != 0)
 		return (ERR_FSYS_CORRUPT);
-	if (vdev_get_bootpath(nv, diskguid, outdevid, outpath, 0))
+	if (vdev_get_bootpath(nv, *outdiskguid, outdevid, outpath, 0))
 		return (ERR_NO_BOOTPATH);
 	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_POOL_GUID, outguid,
 	    DATA_TYPE_UINT64, NULL))
@@ -1627,7 +1628,7 @@ zfs_mount(void)
 	objset_phys_t *osp;
 	char tmp_bootpath[MAXNAMELEN];
 	char tmp_devid[MAXNAMELEN];
-	uint64_t tmp_guid, ashift, version;
+	uint64_t tmp_guid, tmp_vdev, ashift, version;
 	uint64_t adjpl = (uint64_t)part_length << SPA_MINBLOCKSHIFT;
 	int err = errnum; /* preserve previous errnum state */
 
@@ -1669,8 +1670,8 @@ zfs_mount(void)
 		    0, VDEV_UBERBLOCK_RING, ub_array) == 0)
 			continue;
 
-		if (check_pool_label(sector, stack, tmp_devid,
-		    tmp_bootpath, &tmp_guid, &ashift, &version))
+		if (check_pool_label(sector, stack, tmp_devid, tmp_bootpath,
+		    &tmp_guid, &tmp_vdev, &ashift, &version))
 			continue;
 
 		if (pool_guid == 0)
@@ -1695,6 +1696,8 @@ zfs_mount(void)
 		grub_memmove(&current_uberblock, ubbest, sizeof (uberblock_t));
 		grub_memmove(current_bootpath, tmp_bootpath, MAXNAMELEN);
 		grub_memmove(current_devid, tmp_devid, grub_strlen(tmp_devid));
+		current_bootguid = tmp_guid;
+		current_bootvdev = tmp_vdev;
 		is_zfs_mount = 1;
 		return (1);
 	}

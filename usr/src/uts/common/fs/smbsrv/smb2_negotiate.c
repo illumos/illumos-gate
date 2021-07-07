@@ -487,13 +487,13 @@ smb31_decode_neg_ctxs(smb_request_t *sr, smb2_neg_ctxs_t *neg_ctxs)
 	switch (cipher) {
 	case SMB3_CIPHER_AES128_GCM:
 		if (encrypt_gcm_enabled) {
-			s->smb31_enc_cipherid = cipher;
+			s->smb31_enc_cipherid = SMB3_CIPHER_AES128_GCM;
 			break;
 		}
 		/* FALLTHROUGH */
 	case SMB3_CIPHER_AES128_CCM:
 		if (encrypt_ccm_enabled) {
-			s->smb31_enc_cipherid = cipher;
+			s->smb31_enc_cipherid = SMB3_CIPHER_AES128_CCM;
 			break;
 		}
 		/* FALLTHROUGH */

@@ -2,6 +2,7 @@
 /*
  *  GRUB  --  GRand Unified Bootloader
  *  Copyright (C) 1999,2000,2001,2002,2003,2004  Free Software Foundation, Inc.
+ *  Copyright 2021 RackTop Systems, Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -121,6 +122,8 @@ init_config (void)
   current_bootpath[0] = '\0';
   current_bootfs_obj = 0;
   current_devid[0] = '\0';
+  current_bootguid = 0;
+  current_bootvdev = 0;
   is_zfs_mount = 0;
 }
 

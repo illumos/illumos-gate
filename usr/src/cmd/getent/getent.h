@@ -40,6 +40,7 @@ extern "C" {
 #define	EXC_SYNTAX		1
 #define	EXC_NAME_NOT_FOUND	2
 #define	EXC_ENUM_NOT_SUPPORTED	3
+#define	EXC_ERROR		4
 
 extern int dogetpw(const char **);
 extern int dogetsp(const char **);
@@ -56,6 +57,7 @@ extern int dogetauthattr(const char **);
 extern int dogetexecattr(const char **);
 extern int dogetprofattr(const char **);
 extern int dogetuserattr(const char **);
+extern int dogetnetgr(const char **);
 
 #ifdef	__cplusplus
 }

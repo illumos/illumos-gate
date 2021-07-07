@@ -4,13 +4,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAP_ENTRY2TEXT 3LDAP "Jan 27, 2002"
+.TH LDAP_ENTRY2TEXT 3LDAP "June 20, 2021"
 .SH NAME
 ldap_entry2text, ldap_entry2text_search, ldap_entry2html,
 ldap_entry2html_search, ldap_vals2html, ldap_vals2text \- LDAP entry display
 functions
 .SH SYNOPSIS
-.LP
 .nf
 cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
 #include <lber.h>
@@ -78,8 +77,6 @@ cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions use the LDAP display template functions (see
 \fBldap_disptmpl\fR(3LDAP) and \fBldaptemplates.conf\fR(4)) to produce a
 plain text or an HyperText Markup Language (HTML) display of an entry or a set
@@ -152,13 +149,13 @@ HTML document.
 .sp
 .LP
 \fBldap_entry2text_search()\fR is similar to \fBldap_entry2text\fR, and all of
-the like-named parameters have the same meaning except as noted below.   If
+the like-named parameters have the same meaning except as noted below.  If
 \fIbase\fR is not \fINULL\fR, it is the search base to use when executing
 search actions.  If it is \fINULL\fR, search action template items are ignored.
 If \fIentry\fR is not \fINULL\fR, it should contain the \fIobjectClass\fR
 attribute values for the entry to be displayed.  If \fIentry\fR is \fINULL\fR,
-\fIdn\fR must not be \fINULL\fR, and  \fBldap_entry2text_search\fR will
-retrieve the  \fBobjectClass\fR values itself by calling \fBldap_search_s.\fR
+\fIdn\fR must not be \fINULL\fR, and \fBldap_entry2text_search\fR will
+retrieve the \fBobjectClass\fR values itself by calling \fBldap_search_s.\fR
 \fBldap_entry2text_search\fR will determine the appropriate display template to
 use by calling \fBldap_oc2template\fR, and will call \fBldap_search_s\fR to
 retrieve any attribute values to be displayed.  The \fItmpllist\fR parameter is
@@ -178,7 +175,7 @@ string shown next to the values (usually a friendly form of an LDAP attribute
 name). \fIlabelwidth\fR specifies the label margin, which is the number of
 blank spaces displayed to the left of the values. If zero is passed, a default
 label width is used. \fIsyntaxid\fR is a display template attribute syntax
-identifier (see  \fBldap_disptmpl\fR(3LDAP) for a list of the pre-defined
+identifier (see \fBldap_disptmpl\fR(3LDAP) for a list of the pre-defined
 \fBLDAP_SYN_...\fR values).
 .sp
 .LP
@@ -187,7 +184,7 @@ behaves exactly like ldap_entry2text(3LDAP), except for the formatted output
 and the addition of two parameters. \fIurlprefix\fR is the starting text to use
 when constructing an LDAP URL.  The default is the string \fIldap:///\fR The
 second additional parameter, \fIbase,\fR the search base to use when executing
-search actions.  If it is  \fINULL\fR, search action template items are
+search actions.  If it is \fINULL\fR, search action template items are
 ignored.
 .sp
 .LP
@@ -198,22 +195,16 @@ when constructing an LDAP URL.  The default is the string \fIldap:///\fR
 .sp
 .LP
 \fBldap_vals2html\fR behaves exactly like
-\fBldap_vals2text\fR,\fBexcept\fRHTML\fBoutput\fRis and one additional
+\fBldap_vals2text\fR, except HTML output is produced and one additional
 parameter is required. \fIurlprefix\fR is the starting text to use when
 constructing an LDAP URL. The default is the string \fIldap:///\fR
 .SH ERRORS
-.sp
-.LP
 These functions all return an LDAP error code. \fBLDAP_SUCCESS\fR is returned
 if no error occurs. See \fBldap_error\fR(3LDAP) for details. The \fIld_errno\fR
 field of the \fIld\fR parameter is also set to indicate the error.
 .SH FILES
-.sp
-.LP
 \fBETCDIR/ldaptemplates.conf\fR
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -227,7 +218,5 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBldap\fR(3LDAP), \fBldap_disptmpl\fR(3LDAP), \fBldaptemplates.conf\fR(4) ,
 \fBattributes\fR(5)

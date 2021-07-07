@@ -36,7 +36,6 @@
 passwd:     files nis
 group:      files nis
 
-# consult /etc "files" only if nis is down. 
 hosts:      files nis
 
 # Note that IPv4 addresses are searched for in all of the ipnodes databases
@@ -51,7 +50,7 @@ netmasks:   files nis
 bootparams: files nis
 publickey:  files nis
 
-netgroup:   nis
+netgroup:   files nis
 
 automount:  files nis
 aliases:    files nis

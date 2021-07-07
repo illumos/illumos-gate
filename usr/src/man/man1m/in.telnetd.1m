@@ -4,18 +4,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IN.TELNETD 1M "Oct 29, 2015"
+.TH IN.TELNETD 1M "June 20, 2021"
 .SH NAME
 in.telnetd, telnetd \- DARPA TELNET protocol server
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/in.telnetd\fR [\fB-a\fR \fIauthmode\fR] [\fB-EXUh\fR] [\fB-s\fR \fItos\fR]
      [\fB-S\fR \fIkeytab\fR] [\fB-M\fR \fIrealm\fR]
 .fi
 
 .SH DESCRIPTION
-.LP
 \fBin.telnetd\fR is a server that supports the \fBDARPA\fR standard
 \fBTELNET\fR virtual terminal protocol. \fBin.telnetd\fR is normally invoked in
 the internet server (see \fBinetd\fR(1M)), for requests to connect to the
@@ -93,7 +91,6 @@ BANNER=""
 .in -2
 
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -192,7 +189,7 @@ Sets the \fBIP\fR \fBTOS\fR option.
 \fB\fB-S\fR \fIkeytab\fR\fR
 .ad
 .RS 15n
-Sets the \fBKRB5\fR keytab file to use. The\fB/etc/krb5/krb5.keytab\fR file is
+Sets the \fBKRB5\fR keytab file to use. The \fB/etc/krb5/krb5.keytab\fR file is
 used by default.
 .RE
 
@@ -216,10 +213,8 @@ Disables Kerberos V5 authentication support negotiation.
 .RE
 
 .SH USAGE
-.LP
 \fBtelnetd\fR and \fBin.telnetd\fR are IPv6-enabled. See \fBip6\fR(7P).
 .SH SECURITY
-.LP
 \fBin.telnetd\fR can authenticate using Kerberos V5 authentication,
 \fBpam\fR(3PAM), or both. By default, the telnet server will accept valid
 Kerberos V5 authentication credentials from a \fBtelnet\fR client that supports
@@ -294,7 +289,6 @@ For a Kerberized telnet service, the correct \fBPAM\fR service name is
 .RE
 
 .SH SEE ALSO
-.LP
 \fBlogin\fR(1), \fBsvcs\fR(1), \fBtelnet\fR(1),
 \fBinetadm\fR(1M), \fBinetd\fR(1M), \fBkadmin\fR(1M), \fBsvcadm\fR(1M),
 \fBpam\fR(3PAM), \fBgetnameinfo\fR(3SOCKET), \fBissue\fR(4),
@@ -355,7 +349,6 @@ Ts'o, T., \fITelnet Data Encryption Option, RFC 2946\fR. September 2000.
 Ts'o, T., \fITelnet Encryption: DES 64 bit Cipher Feedback, RFC 2952\fR.
 September 2000.
 .SH NOTES
-.LP
 Some \fBTELNET\fR commands are only partially implemented.
 .sp
 .LP

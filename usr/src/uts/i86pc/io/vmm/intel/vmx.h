@@ -137,13 +137,14 @@ typedef enum {
 struct vmx {
 	struct vmcs	vmcs[VM_MAXCPU];	/* one vmcs per virtual cpu */
 	struct apic_page apic_page[VM_MAXCPU];	/* one apic page per vcpu */
-	char		msr_bitmap[PAGE_SIZE];
+	uint8_t		*msr_bitmap[VM_MAXCPU];	/* one MSR bitmap per vCPU */
 	struct pir_desc	pir_desc[VM_MAXCPU];
 	uint64_t	guest_msrs[VM_MAXCPU][GUEST_MSR_NUM];
 	uint64_t	host_msrs[VM_MAXCPU][GUEST_MSR_NUM];
 	uint64_t	tsc_offset_active[VM_MAXCPU];
 	vmcs_state_t	vmcs_state[VM_MAXCPU];
 	uintptr_t	vmcs_pa[VM_MAXCPU];
+	void		*apic_access_page;
 	struct vmxctx	ctx[VM_MAXCPU];
 	struct vmxcap	cap[VM_MAXCPU];
 	struct vmxstate	state[VM_MAXCPU];

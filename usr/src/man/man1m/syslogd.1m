@@ -4,19 +4,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYSLOGD 1M "Oct 17, 2013"
+.TH SYSLOGD 1M "June 20, 2021"
 .SH NAME
 syslogd \- log system messages
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/syslogd\fR [\fB-d\fR] [\fB-f\fR \fIconfigfile\fR] [\fB-m\fR \fImarkinterval\fR]
      [\fB-p\fR \fIpath\fR] [\fB-t\fR | \fB-T\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBsyslogd\fR reads and forwards system messages to the appropriate log files
 or users, depending upon the priority of a message and the system facility from
 which it originates. The configuration file \fB/etc/syslog.conf\fR (see
@@ -99,8 +96,6 @@ equivalent to the \fB-t\fR command-line option. The default value for
 .RE
 
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -168,7 +163,6 @@ messages. See \fBEXAMPLES\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR\fBsyslogd\fR Output Without Message ID Generation Enabled
 .sp
 .LP
@@ -189,7 +183,7 @@ Sep 29 21:41:18 cathy unix: alloc /: file system full
 .LP
 The following example shows the output from \fBsyslogd\fR when message \fBID\fR
 generation \fBis\fR enabled. The message \fBID\fR is displayed when writing to
-log file\fB/var/adm/messages\fR.
+log file \fB/var/adm/messages\fR.
 
 .sp
 .in +2
@@ -233,7 +227,6 @@ systems.
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/syslog.conf\fR\fR
@@ -305,14 +298,10 @@ Network services for each transport
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlogger\fR(1), \fBsvcs\fR(1), \fBmsgid\fR(1M), \fBsvcadm\fR(1M),
 \fBsvccfg\fR(1M), \fBsyslog\fR(3C), \fBsyslog.conf\fR(4), \fBattributes\fR(5),
 \fBsignal.h\fR(3HEAD), \fBsmf\fR(5), \fBlog\fR(7D)
 .SH NOTES
-.sp
-.LP
 The \fBmark\fR message is a system time stamp, and so it is only defined for
 the system on which \fBsyslogd\fR is running. It can not be forwarded to other
 systems.

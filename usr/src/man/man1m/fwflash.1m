@@ -1,10 +1,11 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2021 Peter Tribble
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FWFLASH 1M "June 9, 2020"
+.TH FWFLASH 1M "June 20, 2021"
 .SH NAME
 fwflash \- firmware query and update utility
 .SH SYNOPSIS
@@ -47,7 +48,7 @@ The following options are supported:
 An optional parameter, valid only when used with the \fB-l\fR option. This
 option causes the command to list only devices of a specific class type.
 Currently supported classes are \fBIB\fR, \fBses\fR, \fBsd\fR, \fBufm\fR, or
-\fBALL\fR. If \fB-c\fR is not specified for the \fB-l\fRoption, the class
+\fBALL\fR. If \fB-c\fR is not specified for the \fB-l\fR option, the class
 defaults to \fBALL\fR.
 .RE
 
@@ -58,8 +59,8 @@ defaults to \fBALL\fR.
 .ad
 .sp .6
 .RS 4n
-The \fIdev_path\fR is absolute path name of the device that the user wants to
-modify with the \fB-f\fRor \fB-r\fR operation. If the device cannot be found,
+The \fIdev_path\fR is the absolute path name of the device that the user wants
+to modify with the \fB-f\fR or \fB-r\fR option. If the device cannot be found,
 the command fails. If the \fB-d\fR option is specified, then either \fB-f\fR or
 \fB-r\fR must also be specified.
 .RE
@@ -105,7 +106,7 @@ Display the command line usage message for \fBfwflash\fR.
 List the devices on a system available for firmware upgrade and display
 information specific to each device or device class.
 .sp
-For InfiniBand (IB) devices, the list operation  displays the \fBguid\fRs
+For InfiniBand (IB) devices, the list operation displays the \fBguid\fRs
 (Globally Unique Identifier) currently set for the HCA, as well as the current
 firmware revision installed. There are four separate \fBguid\fRs on the HCA;
 two of them can be set with the same value.
@@ -152,7 +153,7 @@ Display \fBfwflash\fR version information and exit.
 .ad
 .sp .6
 .RS 4n
-Valid only when a flash read (\fB-r\fR) or write (\fB-f\fR) operation is
+Valid only when a flash read (\fB-r\fR) or write (\fB-f\fR) option is
 specified. This option causes \fBfwflash\fR not to prompt for confirmation
 during operation and operate non-interactively. Note that there is no option
 that allows you to forcibly flash an incompatible firmware image onto a device.
@@ -162,8 +163,8 @@ that allows you to forcibly flash an incompatible firmware image onto a device.
 \fBExample 1 \fREntering Command Without Arguments
 .sp
 .LP
-The following command shows \fBfwflash\fR when the command is entered without
-arguments.
+The following command shows \fBfwflash\fR output when the command is entered
+without arguments.
 
 .sp
 .in +2

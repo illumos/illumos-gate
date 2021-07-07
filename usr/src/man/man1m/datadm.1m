@@ -3,18 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DATADM 1M "May 13, 2017"
+.TH DATADM 1M "June 20, 2021"
 .SH NAME
 datadm \- maintain DAT static registry file
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/datadm\fR [\fB-v\fR] [\fB-u\fR] [\fB-a\fR service_provider.conf]
      [\fB-r\fR service_provider.conf]
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBdatadm\fR utility maintains the DAT static registry file,
 \fBdat.conf\fR(4).
 .sp
@@ -29,7 +27,6 @@ a system after its installation. You can use \fBdatadm\fR to update the
 interface adapters for all the service providers currently installed is
 regenerated.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -73,7 +70,6 @@ Display the DAT static registry file, \fBdat.conf\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fREnumerating a Device Entry
 .sp
 .LP
@@ -115,8 +111,8 @@ each port, there are two IPoIB device instances, \fBibd0\fR and \fBibd1\fR:
 .sp
 .LP
 Running the command, \fBdatadm -a /usr/share/dat/SUNWudaplt.conf\fR appends two
-new entries (if they do not already exists]) in the
-\fB/etc/dat/dat.conf\fRfile:
+new entries (if they do not already exist) in the
+\fB/etc/dat/dat.conf\fR file:
 
 .sp
 .in +2
@@ -181,7 +177,6 @@ DAT static registry file
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -196,6 +191,5 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.LP
 \fBlibdat\fR(3LIB), \fBdat.conf\fR(4),
 \fBservice_provider.conf\fR(4), \fBattributes\fR(5)
