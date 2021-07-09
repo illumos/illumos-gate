@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 /*
@@ -181,9 +181,10 @@ smb_versions[] = {
  * Supported encryption ciphers.
  */
 static struct str_val
-smb31_encrypt_ciphers[] = {
-	{ "aes128-ccm",	SMB3_CIPHER_AES128_CCM },	/* SMB 3.x */
-	{ "aes128-gcm",	SMB3_CIPHER_AES128_GCM },	/* SMB 3.1.1 */
+smb31_enc_ciphers[] = {
+	{ "aes128-ccm",	SMB3_CIPHER_FLAG_AES128_CCM },	/* SMB 3.x */
+	{ "aes128-gcm",	SMB3_CIPHER_FLAG_AES128_GCM },	/* SMB 3.1.1 */
+	{ "all",	SMB3_ALL_CIPHERS },
 	{ NULL,		0 }
 };
 
@@ -1280,26 +1281,44 @@ smb_config_check_protocol(char *value)
  * Only SMB 3.x supports encryption.
  * SMB 3.0.2 uses AES128-CCM only.
  * SMB 3.1.1 - AES128-CCM or AES128-GCM.
+ * This function returns bitmask for enabled ciphers
  */
 uint16_t
 smb31_config_get_encrypt_cipher(void)
 {
 	uint32_t max_proto = smb_config_get_max_protocol();
-	uint16_t cipher = SMB3_CIPHER_AES128_GCM; /* by default AES128-GCM */
-	char str[12];
+	uint16_t cipher = 0;
+	char str[50];
 	int i;
 
+	/* SMB 3.0 supports only AES-128-CCM */
 	if (max_proto < SMB_VERS_3_11)
-		return (SMB3_CIPHER_NONE);
+		return (SMB3_CIPHER_FLAG_AES128_CCM);
 
 	/* SMB 3.1.1 */
 	if (smb_config_getstr(SMB_CI_ENCRYPT_CIPHER, str, sizeof (str))
 	    == SMBD_SMF_OK) {
-		for (i = 0; smb31_encrypt_ciphers[i].str != NULL; i++) {
-			if (strcmp(str, smb31_encrypt_ciphers[i].str) == 0)
-				cipher = smb31_encrypt_ciphers[i].val;
-		}
+		char *s = str;
+		char *p = NULL;
+
+		do {
+			p = strchr(s, ',');
+			if (p != NULL)
+				*p++ = '\0';
+
+			/* # of ciphers too small - don't care about O(n2) */
+			for (i = 0; smb31_enc_ciphers[i].str != NULL; i++) {
+				if (strcmp(s, smb31_enc_ciphers[i].str) == 0)
+					cipher |= smb31_enc_ciphers[i].val;
+			}
+
+			if (p != NULL)
+				s = p;
+		} while (p != NULL && *s != '\0');
 	}
+
+	if (cipher == 0)
+		cipher = SMB3_ALL_CIPHERS;
 
 	return (cipher);
 }
