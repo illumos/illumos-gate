@@ -6154,9 +6154,6 @@ zfs_do_holds(int argc, char **argv)
 	 */
 	print_holds(scripted, cb.cb_max_namelen, cb.cb_max_taglen, nvl);
 
-	if (nvlist_empty(nvl))
-		(void) printf(gettext("no datasets available\n"));
-
 	nvlist_free(nvl);
 
 	return (0 != errors);
