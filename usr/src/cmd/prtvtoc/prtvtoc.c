@@ -29,6 +29,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2021 Jason King
  */
 
 /*
@@ -555,6 +556,9 @@ puttable(struct dk_geom *geom, struct extvtoc *vtoc, freemap_t *freemap,
 
 	cylsize = (geom->dkg_nsect) * (geom->dkg_nhead);
 	if (!hflag && !sflag) {
+		u_longlong_t asectors = (u_longlong_t)cylsize * geom->dkg_ncyl;
+		u_longlong_t sectors = (u_longlong_t)cylsize * geom->dkg_pcyl;
+
 		(void) printf("* %s", name);
 		if (vtoc->v_volume[0] != '\0')
 			(void) printf(" (volume \"%.8s\")", vtoc->v_volume);
@@ -567,6 +571,8 @@ puttable(struct dk_geom *geom, struct extvtoc *vtoc, freemap_t *freemap,
 		(void) printf("* %11lu sectors/cylinder\n", cylsize);
 		(void) printf("* %11u cylinders\n", geom->dkg_pcyl);
 		(void) printf("* %11u accessible cylinders\n", geom->dkg_ncyl);
+		(void) printf("* %11llu sectors\n", sectors);
+		(void) printf("* %11llu accessible sectors\n", asectors);
 		(void) printf("*\n* Flags:\n");
 		(void) printf("*   1: unmountable\n");
 		(void) printf("*  10: read-only\n*\n");
