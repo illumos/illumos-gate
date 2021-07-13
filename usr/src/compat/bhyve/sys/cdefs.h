@@ -12,6 +12,7 @@
 /*
  * Copyright 2013 Pluribus Networks Inc.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _COMPAT_FREEBSD_SYS_CDEFS_H_
@@ -59,6 +60,12 @@
 #define	_Alignof(x)		alignof(x)
 #else
 #define	_Alignof(x)		__alignof(x)
+#endif
+
+#if defined(__cplusplus) && __cplusplus >= 201103L
+#define	_Noreturn		[[noreturn]]
+#else
+#define	_Noreturn		__dead2
 #endif
 
 #if !__has_extension(c_static_assert)

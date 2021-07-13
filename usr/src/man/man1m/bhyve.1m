@@ -258,7 +258,9 @@ emulation is identical but uses a PCI vendor ID of
 .It Li passthru
 PCI pass-through device.
 .It Li virtio-net-viona
-Virtio network interface.
+Accelerated Virtio network interface.
+.It Li virtio-net
+Legacy Virtio network interface.
 .It Li virtio-blk
 Virtio block storage interface.
 .It Li virtio-rnd
@@ -295,7 +297,7 @@ If
 is not specified, the device emulation has no backend and can be
 considered unconnected.
 .Pp
-Host Bridge Devices
+.Sy Host Bridge Devices
 .Bl -tag -width 10n
 .It Cm model Ns = Ns Ar model
 Specify a hostbridge model to emulate.
@@ -324,7 +326,7 @@ and
 .Va devid
 must be specified.
 .Pp
-Network backends:
+.Sy Accelerated Virtio Network Backends :
 .Bl -tag -width 10n
 .It Oo Cm vnic Ns = Oc Ns Ar vnic Ns Oo , Ns Cm feature_mask Ns = Ns Ar mask Oc
 .Pp
@@ -337,7 +339,30 @@ Bits set in the
 value are removed from the advertised features.
 .El
 .Pp
-Block storage devices:
+.Sy Other Network Backends :
+.Bl -tag -width 10n
+.It Oo Cm vnic Ns = Oc Ns Ar vnic Ns Oo , Ns Ar network-backend-options Oc
+.Pp
+.Ar vnic
+is the name of a configured virtual NIC on the system.
+.El
+.Pp
+The
+.Ar network-backend-options
+are:
+.Bl -tag -width 8n
+.It Cm promiscphys
+Enable promiscuous mode at the physical level (default: false)
+.It Cm promiscsap
+Enable promiscuous mode at the SAP level (default: true)
+.It Cm promiscmulti
+Enable promiscuous mode for all multicast addresses (default: true)
+.It Cm promiscrxonly
+The selected promiscuous modes are only enabled for received traffic
+(default: true).
+.El
+.Pp
+.Sy Block storage devices :
 .Bl -tag -width 10n
 .It Pa /filename Ns Oo , Ns Ar block-device-options Oc
 .It Pa /dev/xxx Ns Oo , Ns Ar block-device-options Oc
@@ -376,7 +401,7 @@ process.
 Use the host TTY device for serial port I/O.
 .El
 .Pp
-Boot ROM device:
+.Sy Boot ROM device :
 .Bl -tag -width 10n
 .It Pa romfile
 Map
@@ -384,7 +409,7 @@ Map
 in the guest address space reserved for boot firmware.
 .El
 .Pp
-Pass-through devices:
+.Sy Pass-through devices :
 .Bl -tag -width 10n
 .It Pa /dev/ppt Ns Ar N
 Connect to a PCI device on the host identified by the specificed path.
@@ -398,7 +423,7 @@ The host device must have been previously attached to the
 .Sy ppt
 driver.
 .Pp
-Virtio console devices:
+.Sy Virtio console devices :
 .Bl -tag -width 10n
 .It Li port1= Ns Pa /path/to/port1.sock Ns ,anotherport= Ns Pa ...
 A maximum of 16 ports per device can be created.
@@ -423,7 +448,7 @@ Emergency write is advertised, but no-op at present.
 .El
 .El
 .Pp
-Framebuffer devices:
+.Sy Framebuffer devices :
 .Bl -tag -width 10n
 .It Xo
 .Sm off
@@ -503,14 +528,14 @@ the session over an encrypted channel provided by IPsec or SSH.
 .El
 .El
 .Pp
-xHCI USB devices:
+.Sy xHCI USB devices :
 .Bl -tag -width 10n
 .It Li tablet
 A USB tablet device which provides precise cursor synchronization
 when using VNC.
 .El
 .Pp
-NVMe devices:
+.Sy NVMe devices :
 .Bl -tag -width 10n
 .It Li path
 Accepted device paths are:
@@ -531,7 +556,7 @@ Sector size (defaults to blockif sector size).
 Serial number with maximum 20 characters.
 .El
 .Pp
-AHCI devices:
+.Sy AHCI devices :
 .Bl -tag -width 10n
 .It Li nmrr
 Nominal Media Rotation Rate, known as RPM. value 1 will indicate device as Solid State Disk. default value is 0, not report.

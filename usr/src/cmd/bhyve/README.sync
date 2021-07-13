@@ -19,11 +19,6 @@ Date:   Wed Mar 24 09:29:15 2021 -0700
 
 Divergence Notes:
 
-A previous sync skipped commit 0ff7076bdbc6dae5ea44c0acdb567e1cede199d1 which
-introduced a generic backend functionality to network devices.  Without that in
-place, subsequent updates reflect the absence of that subsystem.  Integrating
-net backends has not been a priority, given the common use of viona on illumos.
-
 The draft Save/Restore functionality, added in FreeBSD commit
 483d953a86a2507355f8287c5107dc827a0ff516, has not been synced into illumos bhyve
 yet.  It is not built by default in FreeBSD, so we're not interested in taking

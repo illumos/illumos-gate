@@ -51,7 +51,9 @@ ssize_t	netbe_recv(net_backend_t *be, const struct iovec *iov, int iovcnt);
 ssize_t	netbe_rx_discard(net_backend_t *be);
 void	netbe_rx_disable(net_backend_t *be);
 void	netbe_rx_enable(net_backend_t *be);
-
+#ifndef __FreeBSD__
+int	netbe_get_mac(net_backend_t *, void *, size_t *);
+#endif
 
 /*
  * Network device capabilities taken from the VirtIO standard.
