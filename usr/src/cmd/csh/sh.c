@@ -4,7 +4,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -125,7 +125,7 @@ main(int c, char **av)
 	tchar s_prompt[MAXHOSTNAMELEN+3];
 	char *c_max_var_len;
 	int c_max_var_len_size;
-	bool intact;
+	bool intact = 0;
 
 	/*
 	 * set up the error exit, if there is an error before
@@ -322,7 +322,7 @@ main(int c, char **av)
 			nofile++;
 			break;
 #ifdef TRACE
-		case 'T':		/* -T 	trace switch on */
+		case 'T':		/* -T	trace switch on */
 			trace_init();
 			break;
 #endif
@@ -632,7 +632,7 @@ srccat(tchar *cp, tchar *dp)
 
 /*
  * Source to the file which is the catenation of the argument names.
- * 	This one does not check the ownership.
+ *	This one does not check the ownership.
  */
 void
 srccat_inlogin(tchar *cp, tchar *dp)
