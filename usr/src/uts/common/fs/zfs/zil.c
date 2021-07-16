@@ -1611,7 +1611,7 @@ zil_lwb_commit(zilog_t *zilog, itx_t *itx, lwb_t *lwb)
 	lr_t *lrcb, *lrc;
 	lr_write_t *lrwb, *lrw;
 	char *lr_buf;
-	uint64_t dlen, dnow, lwb_sp, reclen, txg;
+	uint64_t dlen, dnow, dpad, lwb_sp, reclen, txg;
 
 	ASSERT(MUTEX_HELD(&zilog->zl_issuer_lock));
 	ASSERT3P(lwb, !=, NULL);
@@ -1645,8 +1645,9 @@ zil_lwb_commit(zilog_t *zilog, itx_t *itx, lwb_t *lwb)
 	if (lrc->lrc_txtype == TX_WRITE && itx->itx_wr_state == WR_NEED_COPY) {
 		dlen = P2ROUNDUP_TYPED(
 		    lrw->lr_length, sizeof (uint64_t), uint64_t);
+		dpad = dlen - lrw->lr_length;
 	} else {
-		dlen = 0;
+		dlen = dpad = 0;
 	}
 	reclen = lrc->lrc_reclen;
 	zilog->zl_cur_used += (reclen + dlen);
@@ -1730,6 +1731,9 @@ cont:
 			 */
 			error = zilog->zl_get_data(itx->itx_private,
 			    lrwb, dbuf, lwb, lwb->lwb_write_zio);
+			if (dbuf != NULL && error == 0 && dnow == dlen)
+				/* Zero any padding bytes in the last block. */
+				bzero((char *)dbuf + lrwb->lr_length, dpad);
 
 			/*
 			 * A later piece of a split write can be gone even
@@ -1800,16 +1804,18 @@ cont:
 }
 
 itx_t *
-zil_itx_create(uint64_t txtype, size_t lrsize)
+zil_itx_create(uint64_t txtype, size_t olrsize)
 {
+	size_t lrsize;
 	itx_t *itx;
 
-	lrsize = P2ROUNDUP_TYPED(lrsize, sizeof (uint64_t), size_t);
+	lrsize = P2ROUNDUP_TYPED(olrsize, sizeof (uint64_t), size_t);
 
 	itx = kmem_alloc(offsetof(itx_t, itx_lr) + lrsize, KM_SLEEP);
 	itx->itx_lr.lrc_txtype = txtype;
 	itx->itx_lr.lrc_reclen = lrsize;
 	itx->itx_lr.lrc_seq = 0;	/* defensive */
+	bzero((char *)&itx->itx_lr + olrsize, lrsize - olrsize);
 	itx->itx_sync = B_TRUE;		/* default is synchronous */
 
 	return (itx);
