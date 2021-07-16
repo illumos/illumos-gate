@@ -541,7 +541,7 @@ print_stats(nscd_cfg_stat_cache_t *statsp)
 	    statsp->invalidate_count);
 
 	_NSC_GET_HITRATE(statsp);
-	(void) fprintf(stdout, gettext("\t cache hit rate: %10.1f\n"),
+	(void) fprintf(stdout, gettext("\t cache hit rate: %.1f\n"),
 	    statsp->hitrate);
 }
 
