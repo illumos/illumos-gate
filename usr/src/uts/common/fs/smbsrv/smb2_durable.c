@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -179,6 +179,8 @@ preserve_some:
 	/* preserve_opens == SMB2_DH_PRESERVE_SOME */
 
 	switch (of->dh_vers) {
+		uint32_t ol_state;
+
 	case SMB2_RESILIENT:
 		return (B_TRUE);
 
@@ -188,7 +190,11 @@ preserve_some:
 		/* FALLTHROUGH */
 	case SMB2_DURABLE_V1:
 		/* IS durable (v1 or v2) */
-		if ((of->f_oplock.og_state & (OPLOCK_LEVEL_BATCH |
+		if (of->f_lease != NULL)
+			ol_state = of->f_lease->ls_state;
+		else
+			ol_state = of->f_oplock.og_state;
+		if ((ol_state & (OPLOCK_LEVEL_BATCH |
 		    OPLOCK_LEVEL_CACHE_HANDLE)) != 0)
 			return (B_TRUE);
 		/* FALLTHROUGH */
@@ -360,6 +366,12 @@ smb2_dh_import_share(void *arg)
 			break;
 
 		/*
+		 * If the server's stopping, no point importing.
+		 */
+		if (smb_server_is_stopping(sr->sr_server))
+			break;
+
+		/*
 		 * Read a stream name and info
 		 */
 		rc = smb_odir_read_streaminfo(sr, od, str_info, &eof);
@@ -392,6 +404,7 @@ smb2_dh_import_share(void *arg)
 			of = NULL;
 		}
 		sr->fid_ofile = NULL;
+		smb_llist_flush(&sr->tid_tree->t_ofile_list);
 
 	} while (!eof);
 
