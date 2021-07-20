@@ -384,7 +384,7 @@ static int
 prtvtoc(char *devname)
 {
 	int fd;
-	int idx;
+	int idx = 0;
 	freemap_t *freemap;
 	struct stat sb;
 	struct extvtoc vtoc;
