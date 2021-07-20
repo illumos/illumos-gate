@@ -298,7 +298,7 @@ static int
 findversion(int index, uchar_t *version)
 /*ARGSUSED*/
 {
-int fd, ntries;
+int fd = 0, ntries;
 struct socal_fm_version	*buffer;
 char	socal[MAXNAMELEN];
 char	fp[MAXNAMELEN];
@@ -595,7 +595,7 @@ getbootdev(unsigned int verbose)
 {
 	char *df = "df /";
 	FILE *ptr;
-	char *p, *p1;
+	char *p = NULL, *p1;
 	char bootdev[PATH_MAX];
 	char buf[BUFSIZ];
 	int foundroot = 0;
@@ -917,7 +917,7 @@ loadsocpath(const char *pathname, int *devcnt)
 	int ret = 0;
 	int len;
 	int len_tmp;
-	char *sp;
+	char *sp = NULL;
 	char *sp_tmp;
 	char buffer[PATH_MAX];
 

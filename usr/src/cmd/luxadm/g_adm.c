@@ -3480,7 +3480,7 @@ non_encl_probe()
 WWN_list	*wwn_list, *wwn_listh, *inner, *l1;
 int		err = 0;
 char		lun_a[MAXPATHLEN], lun_b[MAXPATHLEN], temppath[MAXPATHLEN];
-char		*tempptra, *tempptrb, *tempptr;
+char		*tempptra = NULL, *tempptrb, *tempptr;
 mp_pathlist_t	pathlist;
 int		compare_result, retr_outer = 0;
 ddi_devid_t	devid1 = NULL, devid2 = NULL;
@@ -3866,7 +3866,7 @@ int			offset, mode_data_avail = 0;
 int			no_path_flag = 0, err = 0;
 L_state			l_state;
 Mode_header_10		*mode_header_ptr = NULL;
-struct mode_page	*pg_hdr;
+struct mode_page	*pg_hdr = NULL;
 
 	/*
 	 * Do a quick check to see if its the same path as in last call.
@@ -4105,7 +4105,7 @@ int			path_a_found = 0, path_b_found = 0, argpwwn = 0,
 			argnwwn = 0, pathcnt = 1;
 L_inquiry		local_inq;
 Mode_header_10		*mode_header_ptr;
-struct mode_page	*pg_hdr;
+struct mode_page	*pg_hdr = NULL;
 WWN_list		*wwn_list, *wwn_list_ptr, *list_start;
 char			temppath[MAXPATHLEN], last_logical_path[MAXPATHLEN];
 mp_pathlist_t		pathlist;
@@ -5860,7 +5860,7 @@ L_disk_state		l_disk_state;
 struct dlist		*mlist;
 int			offset, mode_data_avail, err = 0;
 Mode_header_10		*mode_header_ptr;
-struct mode_page	*pg_hdr;
+struct mode_page	*pg_hdr = NULL;
 WWN_list		*wwn_list, *list_start, *wwn_list_ptr;
 WWN_list		*wwn_list_find;
 int			found = 0;
@@ -6094,7 +6094,7 @@ struct dlist	*mlist;
 struct	my_mode_caching	*pg8_buf;
 int		err;
 L_inquiry	inq;
-hrtime_t	start_time, end_time;
+hrtime_t	start_time = 0, end_time;
 char		*envdb = NULL;
 int		peripheral_qual;
 L_inquiry80	inq80;
