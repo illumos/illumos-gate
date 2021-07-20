@@ -76,6 +76,3 @@ $(ROOT)/usr/lib/$(MACH64)/$(DYNLIB1):= \
 $(ROOT)/etc/lib/$(DYNLIB1) := COMPATLINKTARGET= ../../lib/$(DYNLIB1)
 
 all: $(DYNLIB1)
-
-pics/getnetgrent.o := CERRWARN=
-pics/getnetgrent.o := SMATCH=
