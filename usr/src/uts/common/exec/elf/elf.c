@@ -27,6 +27,7 @@
 /*	   All Rights Reserved	*/
 /*
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -1620,8 +1621,10 @@ copy_scn(Shdr *src, vnode_t *src_vp, Shdr *dst, vnode_t *dst_vp, Off *doffset,
 
 #ifdef _ELF32_COMPAT
 extern size_t elf_datasz_max;
+extern size_t elf_zeropg_sz;
 #else
 size_t elf_datasz_max = 1 * 1024 * 1024;
+size_t elf_zeropg_sz = 4 * 1024;
 #endif
 
 /*
@@ -1705,8 +1708,10 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 		off = ehdr.e_shentsize;
 		for (j = 1; j < nshdrs; j++, off += ehdr.e_shentsize) {
 			Shdr *symtab = NULL, *strtab;
+			size_t allocsz;
 
 			shdr = (Shdr *)(shbase + off);
+			allocsz = MIN(shdr->sh_size, elf_datasz_max);
 
 			if (shdr->sh_name >= shstrsize)
 				continue;
@@ -1725,12 +1730,11 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 				}
 
 				if (v != NULL && i < nv - 1) {
-					if (shdr->sh_size > datasz &&
-					    shdr->sh_size <= elf_datasz_max) {
+					if (allocsz > datasz) {
 						if (data != NULL)
 							kmem_free(data, datasz);
 
-						datasz = shdr->sh_size;
+						datasz = allocsz;
 						data = kmem_alloc(datasz,
 						    KM_SLEEP);
 					}
@@ -1795,12 +1799,12 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 				if (v != NULL && i < nv - 2) {
 					sz = MAX(symtab->sh_size,
 					    strtab->sh_size);
-					if (sz > datasz &&
-					    sz <= elf_datasz_max) {
+					allocsz = MIN(sz, elf_datasz_max);
+					if (allocsz > datasz) {
 						if (data != NULL)
 							kmem_free(data, datasz);
 
-						datasz = sz;
+						datasz = allocsz;
 						data = kmem_alloc(datasz,
 						    KM_SLEEP);
 					}
@@ -1934,6 +1938,7 @@ elfcore(vnode_t *vp, proc_t *p, cred_t *credp, rlim64_t rlimit, int sig,
 	size_t phdrsz, shdrsz;
 	Ehdr *ehdr;
 	Phdr *v;
+	void *zeropg = NULL;
 	caddr_t brkbase;
 	size_t brksize;
 	caddr_t stkbase;
@@ -2215,6 +2220,13 @@ exclude:
 			continue;
 
 		/*
+		 * If we hit a region that was mapped PROT_NONE then we cannot
+		 * continue dumping this normally as the kernel would be unable
+		 * to read from the page and that would result in us failing to
+		 * dump the page. As such, any region mapped PROT_NONE, we dump
+		 * as a zero-filled page such that this is still represented in
+		 * the map.
+		 *
 		 * If dumping out this segment fails, rather than failing
 		 * the core dump entirely, we reset the size of the mapping
 		 * to zero to indicate that the data is absent from the core
@@ -2222,10 +2234,36 @@ exclude:
 		 * this from mappings that were excluded due to the core file
 		 * content settings.
 		 */
-		if ((error = core_seg(p, vp, v[i].p_offset,
-		    (caddr_t)(uintptr_t)v[i].p_vaddr, v[i].p_filesz,
-		    rlimit, credp)) == 0) {
-			continue;
+		if ((v[i].p_flags & (PF_R | PF_W | PF_X)) == 0) {
+			size_t towrite = v[i].p_filesz;
+			size_t curoff = 0;
+
+			if (zeropg == NULL) {
+				zeropg = kmem_zalloc(elf_zeropg_sz, KM_SLEEP);
+			}
+
+			error = 0;
+			while (towrite != 0) {
+				size_t len = MIN(towrite, elf_zeropg_sz);
+
+				error = core_write(vp, UIO_SYSSPACE,
+				    v[i].p_offset + curoff, zeropg, len, rlimit,
+				    credp);
+				if (error != 0)
+					break;
+
+				towrite -= len;
+				curoff += len;
+			}
+
+			if (error == 0)
+				continue;
+		} else {
+			error = core_seg(p, vp, v[i].p_offset,
+			    (caddr_t)(uintptr_t)v[i].p_vaddr, v[i].p_filesz,
+			    rlimit, credp);
+			if (error == 0)
+				continue;
 		}
 
 		if ((sig = lwp->lwp_cursig) == 0) {
@@ -2345,6 +2383,9 @@ exclude:
 	}
 
 done:
+	if (zeropg != NULL) {
+		kmem_free(zeropg, elf_zeropg_sz);
+	}
 	kmem_free(bigwad, bigsize);
 	return (error);
 }

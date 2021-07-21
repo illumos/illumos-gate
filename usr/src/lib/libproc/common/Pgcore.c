@@ -28,6 +28,7 @@
  * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #define	_STRUCTURED_PROC	1
@@ -920,6 +921,18 @@ dump_map(void *data, const prmap_t *pmp, const char *name)
 	n = 0;
 	while (n < pmp->pr_size) {
 		size_t csz = MIN(pmp->pr_size - n, pgc->pgc_chunksz);
+		ssize_t ret;
+
+		/*
+		 * If we happen to have a PROT_NONE mapping, don't try to read
+		 * from the address space.
+		 */
+		if ((pmp->pr_mflags & (MA_READ | MA_WRITE | MA_EXEC)) == 0) {
+			bzero(pgc->pgc_chunk, csz);
+			ret = csz;
+		} else {
+			ret = Pread(P, pgc->pgc_chunk, csz, pmp->pr_vaddr + n);
+		}
 
 		/*
 		 * If we can't read out part of the victim's address
@@ -929,8 +942,7 @@ dump_map(void *data, const prmap_t *pmp, const char *name)
 		 * PF_SUNW_FAILURE flag and store the errno where the
 		 * mapping would have been.
 		 */
-		if (Pread(P, pgc->pgc_chunk, csz, pmp->pr_vaddr + n) != csz ||
-		    gc_pwrite64(pgc->pgc_fd, pgc->pgc_chunk, csz,
+		if (ret != csz || gc_pwrite64(pgc->pgc_fd, pgc->pgc_chunk, csz,
 		    *pgc->pgc_doff + n) != 0) {
 			int err = errno;
 			(void) gc_pwrite64(pgc->pgc_fd, &err, sizeof (err),
