@@ -20,6 +20,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -40,6 +42,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/types.h>
+#include <sys/isa_defs.h>
 
 #include "ipmp.h"
 #include "ipmp_mpathd.h"
@@ -123,14 +126,17 @@ ipmp_readtlv(int fd, ipmp_infotype_t *typep, size_t *lenp, void **valuep,
 {
 	int	retval;
 	void	*value;
+	uint32_t tlen;
 
 	retval = ipmp_read(fd, typep, sizeof (*typep), endtp);
 	if (retval != IPMP_SUCCESS)
 		return (retval);
 
-	retval = ipmp_read(fd, lenp, sizeof (*lenp), endtp);
+	retval = ipmp_read(fd, &tlen, sizeof (tlen), endtp);
 	if (retval != IPMP_SUCCESS)
 		return (retval);
+
+	*lenp = tlen;
 
 	value = malloc(*lenp);
 	if (value == NULL) {
@@ -187,16 +193,24 @@ int
 ipmp_writetlv(int fd, ipmp_infotype_t type, size_t len, void *value)
 {
 	int	retval;
+	uint32_t tlen;
+
+#if defined(_LP64)
+	if (len > UINT32_MAX)
+		return (IPMP_EPROTO);
+#endif
+
+	tlen = (uint32_t)len;
 
 	retval = ipmp_write(fd, &type, sizeof (type));
 	if (retval != IPMP_SUCCESS)
 		return (retval);
 
-	retval = ipmp_write(fd, &len, sizeof (len));
+	retval = ipmp_write(fd, &tlen, sizeof (uint32_t));
 	if (retval != IPMP_SUCCESS)
 		return (retval);
 
-	return (ipmp_write(fd, value, len));
+	return (ipmp_write(fd, value, tlen));
 }
 
 /*

@@ -20,6 +20,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef	_IPMP_MPATHD_H
@@ -59,11 +61,14 @@ enum {
 typedef enum {
 	IPMP_GROUPLIST	= 1,
 	IPMP_GROUPINFO	= 2,
-	IPMP_IFINFO	= 3,
-	IPMP_IFLIST	= 4,
-	IPMP_SNAP	= 5,
-	IPMP_ADDRLIST	= 6,
-	IPMP_ADDRINFO	= 7
+	IPMP_GROUPCNT	= 3,
+	IPMP_IFINFO	= 4,
+	IPMP_IFLIST	= 5,
+	IPMP_IFCNT	= 6,
+	IPMP_ADDRLIST	= 7,
+	IPMP_ADDRINFO	= 8,
+	IPMP_ADDRCNT	= 9,
+	IPMP_SNAP	= 10
 } ipmp_infotype_t;
 
 /*
@@ -79,7 +84,7 @@ typedef struct mi_ping {
  * offline that must exist for the operation to succeed.
  */
 typedef struct mi_offline {
-	uint32_t 	mio_command;
+	uint32_t	mio_command;
 	char		mio_ifname[LIFNAMSIZ];
 	uint32_t	mio_min_redundancy;
 } mi_offline_t;

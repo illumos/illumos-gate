@@ -20,6 +20,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -250,6 +252,37 @@ ipmp_freegrouplist(ipmp_grouplist_t *grlistp)
 }
 
 /*
+ * Convert a ipmp_groupinfo_xfer_t used for communication with in.mpathd
+ * into a newly allocated ipmp_groupinfo_t. Free the ipmp_groupinfo_xfer_t,
+ * regardless of failure.
+ */
+static ipmp_groupinfo_t *
+ipmp_convertgroupinfo(ipmp_groupinfo_xfer_t *grxferp)
+{
+	ipmp_groupinfo_t *grinfop;
+
+	grinfop = calloc(1, sizeof (ipmp_groupinfo_t));
+	if (grinfop != NULL) {
+		memcpy(grinfop->gr_name, grxferp->grx_name,
+		    sizeof (grinfop->gr_name));
+		grinfop->gr_sig = grxferp->grx_sig;
+		grinfop->gr_state = grxferp->grx_state;
+		memcpy(grinfop->gr_ifname, grxferp->grx_ifname,
+		    sizeof (grinfop->gr_ifname));
+		memcpy(grinfop->gr_m4ifname, grxferp->grx_m4ifname,
+		    sizeof (grinfop->gr_m4ifname));
+		memcpy(grinfop->gr_m6ifname, grxferp->grx_m6ifname,
+		    sizeof (grinfop->gr_m6ifname));
+		memcpy(grinfop->gr_bcifname, grxferp->grx_bcifname,
+		    sizeof (grinfop->gr_bcifname));
+		grinfop->gr_fdt = grxferp->grx_fdt;
+	}
+
+	free(grxferp);
+
+	return (grinfop);
+}
+/*
  * Using `handle', get the group information associated with group `name' and
  * store the results in a dynamically allocated buffer pointed to by
  * `*grinfopp'.  Returns an IPMP error code.
@@ -262,6 +295,7 @@ ipmp_getgroupinfo(ipmp_handle_t handle, const char *name,
 	int		retval;
 	struct timeval	end;
 	ipmp_groupinfo_t *grinfop;
+	ipmp_groupinfo_xfer_t *grxferp;
 
 	if (statep->st_snap != NULL) {
 		grinfop = ipmp_snap_getgroupinfo(statep->st_snap, name);
@@ -276,9 +310,13 @@ ipmp_getgroupinfo(ipmp_handle_t handle, const char *name,
 	if (retval != IPMP_SUCCESS)
 		return (retval);
 
-	retval = ipmp_readinfo(statep, IPMP_GROUPINFO, (void **)grinfopp, &end);
+	retval = ipmp_readinfo(statep, IPMP_GROUPINFO, (void **)&grxferp, &end);
 	if (retval != IPMP_SUCCESS)
 		return (ipmp_querydone(statep, retval));
+
+	*grinfopp = ipmp_convertgroupinfo(grxferp);
+	if (*grinfopp == NULL)
+		return (ipmp_querydone(statep, IPMP_ENOMEM));
 
 	retval = ipmp_readgroupinfo_lists(statep, *grinfopp, &end);
 	if (retval != IPMP_SUCCESS)
@@ -299,6 +337,48 @@ ipmp_freegroupinfo(ipmp_groupinfo_t *grinfop)
 }
 
 /*
+ * Convert a ipmp_ifinfo_xfer_t used for communication with in.mpathd
+ * into a newly allocated ipmp_ifinfo_t. Free the ipmp_ifinfo_xfer_t,
+ * regardless of failure.
+ */
+static ipmp_ifinfo_t *
+ipmp_convertifinfo(ipmp_ifinfo_xfer_t *ifxferp)
+{
+	ipmp_ifinfo_t *ifinfop;
+
+	ifinfop = calloc(1, sizeof (ipmp_ifinfo_t));
+	if (ifinfop != NULL) {
+		memcpy(ifinfop->if_name, ifxferp->ifx_name,
+		    sizeof (ifinfop->if_name));
+		memcpy(ifinfop->if_group, ifxferp->ifx_group,
+		    sizeof (ifinfop->if_group));
+		ifinfop->if_state = ifxferp->ifx_state;
+		ifinfop->if_type = ifxferp->ifx_type;
+		ifinfop->if_linkstate = ifxferp->ifx_linkstate;
+		ifinfop->if_probestate = ifxferp->ifx_probestate;
+		ifinfop->if_flags = ifxferp->ifx_flags;
+		memcpy(ifinfop->if_targinfo4.it_name,
+		    ifxferp->ifx_targinfo4.itx_name,
+		    sizeof (ifinfop->if_targinfo4.it_name));
+		ifinfop->if_targinfo4.it_testaddr =
+		    ifxferp->ifx_targinfo4.itx_testaddr;
+		ifinfop->if_targinfo4.it_targmode =
+		    ifxferp->ifx_targinfo4.itx_targmode;
+		memcpy(ifinfop->if_targinfo6.it_name,
+		    ifxferp->ifx_targinfo6.itx_name,
+		    sizeof (ifinfop->if_targinfo6.it_name));
+		ifinfop->if_targinfo6.it_testaddr =
+		    ifxferp->ifx_targinfo6.itx_testaddr;
+		ifinfop->if_targinfo6.it_targmode =
+		    ifxferp->ifx_targinfo6.itx_targmode;
+	}
+
+	free(ifxferp);
+
+	return (ifinfop);
+}
+
+/*
  * Using `handle', get the interface information associated with interface
  * `name' and store the results in a dynamically allocated buffer pointed to
  * by `*ifinfopp'.  Returns an IPMP error code.
@@ -308,6 +388,7 @@ ipmp_getifinfo(ipmp_handle_t handle, const char *name, ipmp_ifinfo_t **ifinfopp)
 {
 	ipmp_state_t	*statep = handle;
 	ipmp_ifinfo_t	*ifinfop;
+	ipmp_ifinfo_xfer_t *ifxferp;
 	int		retval;
 	struct timeval	end;
 
@@ -324,9 +405,13 @@ ipmp_getifinfo(ipmp_handle_t handle, const char *name, ipmp_ifinfo_t **ifinfopp)
 	if (retval != IPMP_SUCCESS)
 		return (retval);
 
-	retval = ipmp_readinfo(statep, IPMP_IFINFO, (void **)ifinfopp, &end);
+	retval = ipmp_readinfo(statep, IPMP_IFINFO, (void **)&ifxferp, &end);
 	if (retval != IPMP_SUCCESS)
 		return (ipmp_querydone(statep, retval));
+
+	*ifinfopp = ipmp_convertifinfo(ifxferp);
+	if (*ifinfopp == NULL)
+		return (ipmp_querydone(statep, IPMP_ENOMEM));
 
 	retval = ipmp_readifinfo_lists(statep, *ifinfopp, &end);
 	if (retval != IPMP_SUCCESS)
@@ -407,9 +492,9 @@ static boolean_t
 ipmp_checktlv(ipmp_infotype_t type, size_t len, void *value)
 {
 	ipmp_iflist_t		*iflistp;
-	ipmp_ifinfo_t		*ifinfop;
+	ipmp_ifinfo_xfer_t	*ifxferp;
 	ipmp_grouplist_t	*grlistp;
-	ipmp_groupinfo_t	*grinfop;
+	ipmp_groupinfo_xfer_t	*grxferp;
 	ipmp_addrlist_t		*adlistp;
 	unsigned int		i;
 
@@ -438,12 +523,12 @@ ipmp_checktlv(ipmp_infotype_t type, size_t len, void *value)
 		break;
 
 	case IPMP_IFINFO:
-		ifinfop = (ipmp_ifinfo_t *)value;
-		if (len != sizeof (ipmp_ifinfo_t))
+		ifxferp = (ipmp_ifinfo_xfer_t *)value;
+		if (len != sizeof (ipmp_ifinfo_xfer_t))
 			return (B_FALSE);
 
-		if (!hasnulbyte(ifinfop->if_name, LIFNAMSIZ) ||
-		    !hasnulbyte(ifinfop->if_group, LIFGRNAMSIZ))
+		if (!hasnulbyte(ifxferp->ifx_name, LIFNAMSIZ) ||
+		    !hasnulbyte(ifxferp->ifx_group, LIFGRNAMSIZ))
 			return (B_FALSE);
 		break;
 
@@ -459,16 +544,18 @@ ipmp_checktlv(ipmp_infotype_t type, size_t len, void *value)
 		break;
 
 	case IPMP_GROUPINFO:
-		grinfop = (ipmp_groupinfo_t *)value;
-		if (len != sizeof (ipmp_groupinfo_t))
+		grxferp = (ipmp_groupinfo_xfer_t *)value;
+		if (len != sizeof (ipmp_groupinfo_xfer_t))
 			return (B_FALSE);
 
-		if (!hasnulbyte(grinfop->gr_name, LIFGRNAMSIZ))
+		if (!hasnulbyte(grxferp->grx_name, LIFGRNAMSIZ))
 			return (B_FALSE);
 		break;
 
-	case IPMP_SNAP:
-		if (len != sizeof (ipmp_snap_t))
+	case IPMP_ADDRCNT:
+	case IPMP_GROUPCNT:
+	case IPMP_IFCNT:
+		if (len != sizeof (uint32_t))
 			return (B_FALSE);
 		break;
 
@@ -995,12 +1082,15 @@ ipmp_snap_getaddrinfo(ipmp_snap_t *snap, const char *grname,
 static int
 ipmp_snap_take(ipmp_state_t *statep, ipmp_snap_t **snapp)
 {
-	ipmp_snap_t	*snap, *osnap;
+	uint64_t	naddr, ngroup, nif;
+	ipmp_snap_t	*snap;
 	ipmp_infotype_t	type;
 	int		retval;
 	size_t		len;
 	void		*infop;
 	struct timeval	end;
+
+	naddr = ngroup = nif = UINT64_MAX;
 
 	snap = ipmp_snap_create();
 	if (snap == NULL)
@@ -1012,18 +1102,12 @@ ipmp_snap_take(ipmp_state_t *statep, ipmp_snap_t **snapp)
 		return (retval);
 	}
 
-	retval = ipmp_readinfo(statep, IPMP_SNAP, (void **)&osnap, &end);
-	if (retval != IPMP_SUCCESS) {
-		ipmp_snap_free(snap);
-		return (ipmp_querydone(statep, retval));
-	}
-
 	/*
-	 * Using the information in the `osnap' snapshot, build up our own
-	 * snapshot.  We know there will always be at least one TLV (for
-	 * IPMP_GROUPLIST).  If we receive anything illogical (e.g., more than
-	 * the expected number of interfaces), then bail out.  However, to a
-	 * large extent we have to trust the information sent by in.mpathd.
+	 * Build up our snapshot.  We know there will always be at least four
+	 * TLVs for IPMP_GROUPLIST, IPMP_IFCNT, IPMP_GROUPCNT, and IPMP_ADDRCNT.
+	 * If we receive anything illogical (e.g., more than the expected number
+	 * of interfaces), then bail out.  However, to a large extent we have to
+	 * trust the information sent by in.mpathd.
 	 */
 	do {
 		infop = NULL;
@@ -1046,8 +1130,14 @@ ipmp_snap_take(ipmp_state_t *statep, ipmp_snap_t **snapp)
 			break;
 
 		case IPMP_IFINFO:
-			if (snap->sn_nif == osnap->sn_nif) {
+			if (snap->sn_nif == nif) {
 				retval = IPMP_EPROTO;
+				break;
+			}
+
+			infop = ipmp_convertifinfo(infop);
+			if (infop == NULL) {
+				retval = IPMP_ENOMEM;
 				break;
 			}
 
@@ -1066,7 +1156,7 @@ ipmp_snap_take(ipmp_state_t *statep, ipmp_snap_t **snapp)
 			break;
 
 		case IPMP_ADDRINFO:
-			if (snap->sn_naddr == osnap->sn_naddr) {
+			if (snap->sn_naddr == naddr) {
 				retval = IPMP_EPROTO;
 				break;
 			}
@@ -1079,8 +1169,14 @@ ipmp_snap_take(ipmp_state_t *statep, ipmp_snap_t **snapp)
 			break;
 
 		case IPMP_GROUPINFO:
-			if (snap->sn_ngroup == osnap->sn_ngroup) {
+			if (snap->sn_ngroup == ngroup) {
 				retval = IPMP_EPROTO;
+				break;
+			}
+
+			infop = ipmp_convertgroupinfo(infop);
+			if (infop == NULL) {
+				retval = IPMP_ENOMEM;
 				break;
 			}
 
@@ -1098,6 +1194,33 @@ ipmp_snap_take(ipmp_state_t *statep, ipmp_snap_t **snapp)
 			}
 			break;
 
+		case IPMP_ADDRCNT:
+			if (naddr != UINT64_MAX) {
+				retval = IPMP_EPROTO;
+				break;
+			}
+
+			naddr = *(uint32_t *)infop;
+			break;
+
+		case IPMP_GROUPCNT:
+			if (ngroup != UINT64_MAX) {
+				retval = IPMP_EPROTO;
+				break;
+			}
+
+			ngroup = *(uint32_t *)infop;
+			break;
+
+		case IPMP_IFCNT:
+			if (nif != UINT64_MAX) {
+				retval = IPMP_EPROTO;
+				break;
+			}
+
+			nif = *(uint32_t *)infop;
+			break;
+
 		default:
 			retval = IPMP_EPROTO;
 			break;
@@ -1105,15 +1228,12 @@ ipmp_snap_take(ipmp_state_t *statep, ipmp_snap_t **snapp)
 fail:
 		if (retval != IPMP_SUCCESS) {
 			free(infop);
-			free(osnap);
 			ipmp_snap_free(snap);
 			return (ipmp_querydone(statep, retval));
 		}
-	} while (snap->sn_grlistp == NULL || snap->sn_nif < osnap->sn_nif ||
-	    snap->sn_ngroup < osnap->sn_ngroup ||
-	    snap->sn_naddr < osnap->sn_naddr);
+	} while (snap->sn_grlistp == NULL || snap->sn_nif < nif ||
+	    snap->sn_ngroup < ngroup || snap->sn_naddr < naddr);
 
-	free(osnap);
 	*snapp = snap;
 	return (ipmp_querydone(statep, IPMP_SUCCESS));
 }
