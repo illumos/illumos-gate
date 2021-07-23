@@ -213,7 +213,7 @@ extern "C" {
 	pushq	%r8;							\
 	pushq	%r9;							\
 	pushq	%r10;							\
-	TRAP_INSTR;	/* clear upcall mask, force upcall */ 		\
+	TRAP_INSTR;	/* clear upcall mask, force upcall */		\
 	popq	%r10;							\
 	popq	%r9;							\
 	popq	%r8;							\
@@ -385,6 +385,18 @@ extern "C" {
 #define	SYSRETQ	HYPERVISOR_IRET(0)
 #define	SYSRETL	ud2		/* 32-bit syscall/sysret not supported */
 #define	SWAPGS	/* empty - handled in hypervisor */
+
+/*
+ * As of GNU binutils 2.37, the assembler has split the 'sysexit' instruction
+ * into 'sysexitl' and 'sysexitq'. Using a plain 'sysexit' is interpreted as
+ * 'sysexitl' but comes with a warning about the assumption being made. Since
+ * all warnings are treated as errors in the kernel build, this results in a
+ * build failure. Unfortunately the desired 'sysexitl' cannot be used since
+ * older versions of the GNU assembler do not understand it.
+ * The following macro emits the correct byte sequence for 'sysexitl' on this
+ * platform.
+ */
+#define	SYSEXITL .byte 0x0f, 0x35
 
 #elif defined(__i386)
 

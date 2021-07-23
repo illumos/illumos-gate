@@ -407,7 +407,7 @@ tr_sysc_ret_start:
 2:
 	swapgs
 	sti
-	sysexit
+	SYSEXITL
 	SET_SIZE(tr_sysexit)
 
 .global	tr_sysc_ret_end

@@ -488,8 +488,8 @@ char		ses_path[MAXPATHLEN], dev_path[MAXPATHLEN];
 char		*path_phys = NULL, code, node_wwn_s[WWN_S_LEN];
 char		inq_path[MAXNAMELEN], *ptr = NULL;
 uchar_t		node_wwn[WWN_SIZE], port_wwn[WWN_SIZE];
-int		tid, slot, path_index, dtype, f_r, err = 0;
-int		al_pa, i, dev_location, found_nullwwn = 0;
+int		tid, slot = 0, path_index, dtype, f_r, err = 0;
+int		al_pa, i, dev_location = 0, found_nullwwn = 0;
 int		busy_flag = 0, reserve_flag = 0, action = 0;
 int		pathcnt = 1;
 L_state		l_state;
@@ -499,7 +499,7 @@ WWN_list	*wwn_list = NULL;
 Box_list	*box_list;
 Hotplug_Devlist	*disk_list, *disk_list_head, *disk_list_tail;
 Hotplug_Devlist	*bsyRsrv_dskLst_head, *bsyRsrv_dskLst_tail;
-int		enc_type;
+int		enc_type = 0;
 L_inquiry   inq;
 char	    *physpath;
 Path_struct *p_pathstruct;
@@ -1262,7 +1262,7 @@ hotplug_e(int todo, char **argv, int verbose_flag, int force_flag)
 char		*path_phys = NULL;
 char		bus_path[MAXPATHLEN];
 char		*ptr;
-int		exit_code;
+int		exit_code = 1;
 devctl_hdl_t	dcp;
 uint_t		devstate;
 int		i = 0, pathcnt = 1;
@@ -1725,7 +1725,7 @@ h_post_hotplug_sena(Hotplug_Devlist *hotplug_dev,
 			WWN_list *wwn_list, int todo,
 			int verbose_flag, int force_flag, int enc_type)
 {
-char			*ses_path, *dev_path = NULL, device_name[MAXNAMELEN];
+char			*ses_path = NULL, *dev_path = NULL, device_name[MAXNAMELEN];
 int			tid, slot, f_r, al_pa, timeout = 0;
 uchar_t			port_wwn[WWN_SIZE], node_wwn[WWN_SIZE];
 char			code;

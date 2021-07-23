@@ -399,7 +399,7 @@ static int
 q_findversion(int verbose, int index, uchar_t *version, uint16_t *chip_id)
 /*ARGSUSED*/
 {
-	int fd, ntries;
+	int fd = -1, ntries;
 	struct	ifp_fm_version *version_buffer = NULL;
 	char	prom_ver[100] = { 0 };
 	char	mcode_ver[100] = { 0 };
@@ -772,7 +772,7 @@ q_load_file(int fcode_fd, char *device)
 	ifp_download_t	*download_p = NULL;
 	fcio_t		fcio;
 	uint16_t	file_id = 0;
-	uchar_t		*bin;
+	uchar_t		*bin = NULL;
 
 	if (lseek(fcode_fd, 0, SEEK_SET) == -1) {
 		perror(MSGSTR(21022, "seek"));

@@ -1,636 +1,658 @@
-'\" te
+.\"
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NVLIST_ALLOC 9F "Feb 15, 2016"
-.SH NAME
-nvlist_alloc, nvlist_free, nvlist_size, nvlist_pack, nvlist_unpack, nvlist_dup,
-nv_alloc_init, nv_alloc_fini, nvlist_xalloc, nvlist_xpack, nvlist_xunpack,
-nvlist_xdup, nvlist_merge \- Manage a name-value pair list
-.SH SYNOPSIS
-.nf
-#include <sys/nvpair.h>
-
-List Manipulation:
-
-\fBint\fR \fBnvlist_alloc\fR(\fBnvlist_t **\fR\fInvlp\fR, \fBuint_t\fR \fInvflag\fR,
-     \fBint\fR \fIkmflag\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBnvlist_xalloc\fR(\fBnvlist_t **\fR\fInvlp\fR, \fBuint_t\fR \fInvflag\fR, \fBnv_alloc_t *\fR\fInva\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBnvlist_free\fR(\fBnvlist_t *\fR\fInvl\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBnvlist_size\fR(\fBnvlist_t *\fR\fInvl\fR, \fBsize_t *\fR\fIsize\fR, \fBint\fR \fIencoding\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBnvlist_pack\fR(\fBnvlist_t *\fR\fInvl\fR, \fBchar **\fR\fIbufp\fR, \fBsize_t *\fR\fIbuflen\fR, \fBint\fR \fIencoding\fR,
-     \fBint\fR \fIflag\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBnvlist_xpack\fR(\fBnvlist_t *\fR\fInvl\fR, \fBchar **\fR\fIbufp\fR, \fBsize_t *\fR\fIbuflen\fR, \fBint\fR \fIencoding\fR,
-     \fBnv_alloc_t *\fR\fInva\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBnvlist_unpack\fR(\fBchar *\fR\fIbuf\fR, \fBsize_t\fR \fIbuflen\fR, \fBnvlist_t **\fR\fInvlp\fR, \fBint\fR \fIflag\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBnvlist_xunpack\fR(\fBchar *\fR\fIbuf\fR, \fBsize_t\fR \fIbuflen\fR, \fBnvlist_t **\fR\fInvlp\fR,
-     \fBnv_alloc_t *\fR\fInva\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBnvlist_dup\fR(\fBnvlist_t *\fR\fInvl\fR, \fBnvlist_t **\fR\fInvlp\fR, \fBint\fR \fIflag\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBnvlist_xdup\fR(\fBnvlist_t *\fR\fInvl\fR, \fBnvlist_t **\fR\fInvlp\fR, \fBnv_alloc_t *\fR\fInva\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBnvlist_merge\fR(\fBnvlist_t *\fR\fIdst\fR, \fBnvlist_t *\fR\fInvl\fR, \fBint\fR \fIflag\fR);
-.fi
-
-.LP
-.nf
-Pluggable Allocator Configuration:
-
-\fBnv_alloc_t *\fR\fBnvlist_lookup_nv_alloc\fR(\fBnvlist_t *);\fR
-.fi
-
-.LP
-.nf
-\fBint\fR \fBnv_alloc_init\fR(\fBnv_alloc_t *\fR\fInva\fR,
-     \fBconst nv_alloc_ops_t *\fR \fInvo,\fR/* args */ ...);
-.fi
-
-.LP
-.nf
-\fBvoid\fR  \fBnv_alloc_reset\fR(\fBnv_alloc_t  *\fR\fInva\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR  \fBnv_alloc_fini\fR(\fBnv_alloc_t *\fR\fInva\fR);
-.fi
-
-.LP
-.nf
-Pluggable Allocation Initialization with Fixed Allocator:
-
-\fBint\fR \fBnv_alloc_init\fR(\fBnv_alloc_t *\fR\fInva\fR,
-     \fBnv_fixed_ops\fR, \fBvoid *\fR \fIbufptr\fR,  \fBsize_t\fR sz);
-.fi
-
-.SH INTERFACE LEVEL
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" Copyright 2021 Oxide Computer Company
+.Dd June 12, 2021
+.Dt NVLIST_ALLOC 9F
+.Os
+.Sh NAME
+.Nm nvlist_alloc ,
+.Nm nvlist_free ,
+.Nm nvlist_size ,
+.Nm nvlist_pack ,
+.Nm nvlist_unpack ,
+.Nm nvlist_dup ,
+.Nm nv_alloc_init ,
+.Nm nv_alloc_fini ,
+.Nm nvlist_xalloc ,
+.Nm nvlist_xpack ,
+.Nm nvlist_xunpack ,
+.Nm nvlist_xdup ,
+.Nm nvlist_merge
+.Nd Manage a name-value pair list
+.Sh SYNOPSIS
+.In sys/nvpair.h
+.Ss List Manipulation
+.Ft int
+.Fo nvlist_alloc
+.Fa "nvlist_t **nvlp"
+.Fa "uint_t nvflag"
+.Fa "int kmflag"
+.Fc
+.Ft int
+.Fo nvlist_xalloc
+.Fa "nvlist_t **nvlp"
+.Fa "uint_t nvflag"
+.Fa "nv_alloc_t *nva"
+.Fc
+.Ft void
+.Fo nvlist_free
+.Fa "nvlist_t *nvl"
+.Fc
+.Ft int
+.Fo nvlist_size
+.Fa "nvlist_t *nvl"
+.Fa "size_t *size"
+.Fa "int encoding"
+.Fc
+.Ft int
+.Fo nvlist_pack
+.Fa "nvlist_t *nvl"
+.Fa "char **bufp"
+.Fa "size_t *buflen"
+.Fa "int encoding"
+.Fa "int flag"
+.Fc
+.Ft int
+.Fo nvlist_xpack
+.Fa "nvlist_t *nvl"
+.Fa "char **bufp"
+.Fa "size_t *buflen"
+.Fa "int encoding"
+.Fa "nv_alloc_t *nva"
+.Fc
+.Ft int
+.Fo nvlist_unpack
+.Fa "char *buf"
+.Fa "size_t buflen"
+.Fa "nvlist_t **nvlp"
+.Fa "int kmflag"
+.Fc
+.Ft int
+.Fo nvlist_xunpack
+.Fa "char *buf"
+.Fa size_t buflen"
+.Fa nvlist_t **nvlp"
+.Fa nv_alloc_t *nva"
+.Fc
+.Ft int
+.Fo nvlist_dup
+.Fa "nvlist_t *nvl"
+.Fa "nvlist_t **nvlp"
+.Fa "int kmflag"
+.Fc
+.Ft int
+.Fo nvlist_xdup
+.Fa "nvlist_t *nvl"
+.Fa "nvlist_t **nvlp"
+.Fa "nv_alloc_t *nva"
+.Fc
+.Ft int
+.Fo nvlist_merge
+.Fa "nvlist_t *dst"
+.Fa "nvlist_t *nvl"
+.Fa "int kmflag"
+.Fc
+.Ss Pluggable Allocator Configuration
+.Ft "nv_alloc_t *"
+.Fo nvlist_lookup_nv_alloc
+.Fa "nvlist_t *nvl"
+.Fc
+.Ft int
+.Fo nv_alloc_init
+.Fa "nv_alloc_t *nva"
+.Fa "const nv_alloc_ops_t *nvo"
+.Fa "..."
+.Fc
+.Ft void
+.Fo nv_alloc_reset
+.Fa "nv_alloc_t *nva"
+.Fc
+.Ft void
+.Fo nv_alloc_fini
+.Fa "nv_alloc_t *nva"
+.Fc
+.Ss Pluggable Allocation Initialization with Fixed Allocator
+.Ft int
+.Fo nv_alloc_init
+.Fa "nv_alloc_t *nva"
+.Fa "nv_fixed_ops"
+.Fa "void *bufptr"
+.Fa "sz"
+.Fc
+.Sh INTERFACE LEVEL
 illumos DDI specific (illumos DDI)
-.SH PARAMETERS
-.ne 2
-.na
-\fB\fInvlp\fR\fR
-.ad
-.RS 12n
-Address of a pointer to list of name-value pairs (\fBnvlist_t\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fInvflag\fR\fR
-.ad
-.RS 12n
-Specify bit fields defining \fBnvlist_t\fR properties:
-.sp
-.ne 2
-.na
-\fB\fBNV_UNIQUE_NAME\fR\fR
-.ad
-.RS 23n
-\fBnvpair\fR names are unique.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNV_UNIQUE_NAME_TYPE\fR\fR
-.ad
-.RS 23n
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa nvlp
+Address of a pointer to list of name-value pairs
+.Pq Ft nvlist_t .
+.It Fa nvflag
+Specify bit fields defining
+.Ft nvlist_t
+properties:
+.Bl -tag -width Dv
+.It Dv NV_UNIQUE_NAME
+nvpair names are unique.
+.It Dv NV_UNIQUE_NAME_TYPE
 Name-data type combination is unique
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIkmflag\fR\fR
-.ad
-.RS 12n
-Kernel memory allocation policy, either \fBKM_SLEEP\fR or \fBKM_NOSLEEP\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fInvl\fR\fR
-.ad
-.RS 12n
-\fBnvlist_t\fR to be processed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIdst\fR\fR
-.ad
-.RS 12n
-Destination \fBnvlist_t\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIsize\fR\fR
-.ad
-.RS 12n
+.El
+.It Fa kmflag
+Kernel memory allocation policy, either
+.Dv KM_SLEEP
+or
+.Dv KM_NOSLEEP .
+.It Fa nvl
+.Ft nvlist_t
+to be processed.
+.It Fa dst
+Destination
+.Ft nvlist_t .
+.It Fa size
 Pointer to buffer to contain the encoded size.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIbufp\fR\fR
-.ad
-.RS 12n
-Address of buffer to pack \fBnvlist\fR into. Must be 8-byte aligned. If NULL,
+.It Fa bufp
+Address of buffer to pack nvlist into.
+Must be 8-byte aligned.
+If
+.Dv NULL ,
 library will allocate memory.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIbuf\fR\fR
-.ad
-.RS 12n
-Buffer containing packed \fBnvlist_t\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIbuflen\fR\fR
-.ad
-.RS 12n
-Size of buffer \fIbufp\fR or \fIbuf\fR points to.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIencoding\fR\fR
-.ad
-.RS 12n
+.It buf
+Buffer containing packed
+.Ft nvlist_t .
+.It buflen buflen
+Size of buffer
+.Fa bufp
+or
+.Fa buf
+points to.
+.It Fa encoding
 Encoding method for packing.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fInvo\fR\fR
-.ad
-.RS 12n
-Pluggable allocator operations pointer (nv_alloc_ops_t).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fInva\fR\fR
-.ad
-.RS 12n
-Points to a nv_alloc_t structure to be used for the specified \fBnvlist_t\fR.
-.RE
-
-.SH DESCRIPTION
-List Manipulation:
-.sp
-.LP
-The \fBnvlist_alloc()\fR function allocates a new name-value pair list and
-updates \fInvlp\fR to point to the handle. The argument \fInvflag\fR specifies
-\fBnvlist_t\fR properties to remain persistent across packing, unpacking, and
-duplication.
-.sp
-.LP
-If \fBNV_UNIQUE_NAME\fR is specified for nvflag, existing nvpairs with matching
-names are removed before the new nvpair is added. If \fBNV_UNIQUE_NAME_TYPE\fR
+.It Fa nvo
+Pluggable allocator operations pointer
+.Pq Ft nv_alloc_ops_t .
+.It nva
+Points to a
+.Ft nv_alloc_t
+structure to be used for the specified
+.Ft nvlist_t .
+.El
+.Sh DESCRIPTION
+.Ss List Manipulation
+The
+.Fn nvlist_alloc
+function allocates a new name-value pair list and updates
+.Fa nvlp
+to point to the handle.
+The argument
+.Fa nvflag
+specifies
+.Ft nvlist_t
+properties to remain persistent across packing, unpacking, and duplication.
+.Pp
+If
+.Dv NV_UNIQUE_NAME
+is specified for nvflag, existing nvpairs with matching names are removed
+before the new nvpair is added.
+If
+.Dv NV_UNIQUE_NAME_TYPE
 is specified for nvflag, existing nvpairs with matching names and data types
-are removed before the new nvpair is added. See \fBnvlist_add_byte\fR(9F) for
-more details.
-.sp
-.LP
-The \fBnvlist_xalloc()\fR function differs from \fBnvlist_alloc()\fR in that
-\fBnvlist_xalloc()\fR can use a different allocator, as described in the
-Pluggable Allocators section.
-.sp
-.LP
-The \fBnvlist_free()\fR function frees a name-value pair list. If \fInvl\fR
+are removed before the new nvpair is added.
+See
+.Xr nvlist_add_byte 9F
+for more details.
+.Pp
+The
+.Fn nvlist_xalloc
+function differs from
+.Fn nvlist_alloc
+in that
+.Fn nvlist_xalloc
+can use a different allocator, as described in the
+.Sx Pluggable Allocators
+section.
+.Pp
+The
+.Fn nvlist_free
+function frees a name-value pair list.
+If
+.Fa nvl
 is a null pointer, no action occurs.
-.sp
-.LP
-The \fBnvlist_size()\fR function returns the minimum size of a contiguous
-buffer large enough to pack \fInvl\fR. The \fIencoding\fR parameter specifies
-the method of encoding when packing \fInvl\fR. Supported encoding methods are:
-.sp
-.ne 2
-.na
-\fB\fBNV_ENCODE_NATIVE\fR\fR
-.ad
-.RS 20n
-Straight \fBbcopy()\fR as described in \fBbcopy\fR(9F).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNV_ENCODE_XDR\fR\fR
-.ad
-.RS 20n
+.Pp
+The
+.Fn nvlist_size
+function returns the minimum size of a contiguous buffer large enough to pack
+.Fa nvl .
+The
+.Fa encoding
+parameter specifies the method of encoding when packing
+.Fa nvl
+Supported encoding methods are:
+.Bl -tag -width Dv -offset indent
+.It Dv NV_ENCODE_NATIVE
+Straight
+.Fn bcopy
+as described in
+.Xr bcopy 9F .
+.It Dv NV_ENCODE_XDR
 Use XDR encoding, suitable for sending to another host.
-.RE
-
-.sp
-.LP
-The \fBnvlist_pack()\fR function packs \fInvl\fR into contiguous memory
-starting at *\fIbufp\fR. The \fIencoding\fR parameter specifies the method of
-encoding (see above).
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If *\fIbufp\fR is not NULL, *\fIbufp\fR is expected to be a caller-allocated
-buffer of size *\fIbuflen\fR. The \fIkmflag\fR argument is ignored.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If *\fIbufp\fR is NULL, the library allocates memory and updates *\fIbufp\fR to
-point to the memory and updates *\fIbuflen\fR to contain the size of the
-allocated memory. The value of \fIkmflag\fR indicates the memory allocation
-policy
-.RE
-.sp
-.LP
-The \fBnvlist_xpack()\fR function differs from \fBnvlist_pack()\fR in that
-\fBnvlist_xpack()\fR can use a different allocator.
-.sp
-.LP
-The \fBnvlist_unpack()\fR function takes a buffer with a packed \fBnvlist_t\fR
-and unpacks it into a searchable \fBnvlist_t\fR. The library allocates memory
-for \fBnvlist_t\fR. The caller is responsible for freeing the memory by calling
-\fBnvlist_free()\fR.
-.sp
-.LP
-The \fBnvlist_xunpack()\fR function differs from \fBnvlist_unpack()\fR in that
-\fBnvlist_xunpack()\fR can use a different allocator.
-.sp
-.LP
-The \fBnvlist_dup()\fR function makes a copy of \fInvl\fR and updates
-\fInvlp\fR to point to the copy.
-.sp
-.LP
-The \fBnvlist_xdup()\fR function differs from \fBnvlist_dup()\fR in that
-\fBnvlist_xdup()\fR can use a different allocator.
-.sp
-.LP
-The \fBnvlist_merge()\fR function adds copies of all name-value pairs from
-\fBnvlist_t\fR \fInvl\fR to \fBnvlist_t dst\fR. Name-value pairs in dst are
-replaced with name-value pairs from \fBnvl\fR which have identical names (if
-dst has the type \fBNV_UNIQUE_NAME\fR), or identical names and types (if dst
-has the type \fBNV_UNIQUE_NAME_TYPE\fR).
-.sp
-.LP
-The \fBnvlist_lookup_nv_alloc()\fR function retrieves the pointer to the
-allocator used when manipulating a name-value pair list.
-.SS "PLUGGABLE ALLOCATORS"
-Using Pluggable Allocators:
-.sp
-.LP
-The \fBnv_alloc_init()\fR, \fBnv_alloc_reset()\fR and \fBnv_alloc_fini()\fR
+.El
+.Pp
+The
+.Fn nvlist_pack
+function packs
+.Fa nvl
+into contiguous memory starting at
+.Pf * Fa bufp .
+The
+.Fa encoding
+parameter specifies the method of encoding (see above).
+.Bl -bullet -offset indent
+.It
+If
+.Pf * Fa bufp
+is not
+.Dv NULL ,
+.Pf * Fa bufp
+is expected to be a caller-allocated buffer of size
+.Pf * Fa buflen .
+The
+.Fa kmflag
+argument is ignored.
+.It
+If
+.Pf * Fa bufp
+is
+.Dv NULL ,
+the library allocates memory and updates
+.Pf * Fa bufp
+to point to the memory and updates
+.Pf * Fa buflen
+to contain the size of the allocated memory.
+The value of
+.Fa kmflag
+indicates the memory allocation policy
+.El
+.Pp
+The
+.Fn nvlist_xpack
+function differs from
+.Fn nvlist_pack
+in that
+.Fn nvlist_xpack
+can use a different allocator.
+.Pp
+The
+.Fn nvlist_unpack
+function takes a buffer with a packed
+.Ft nvlist_t
+and unpacks it into a searchable
+.Ft nvlist_t .
+The library allocates memory for
+.Ft nvlist_t .
+The caller is responsible for freeing the memory by calling
+.Fn nvlist_free
+.Pp
+The
+.Fn nvlist_xunpack
+function differs from
+.Fn nvlist_unpack
+in that
+.Fn nvlist_xunpack
+can use a different allocator.
+.Pp
+The
+.Fn nvlist_dup
+function makes a copy of
+.Fa nvl
+and updates
+.Fa nvlp
+to point to the copy.
+.Pp
+The
+.Fn nvlist_xdup
+function differs from
+.Fn nvlist_dup
+in that
+.Fn nvlist_xdup
+can use a different allocator.
+.Pp
+The
+.Fn nvlist_merge
+function adds copies of all name-value pairs from
+.Fa "nvlist_t nvl"
+to
+.Fa "nvlist_t dst" .
+Name-value pairs in
+.Fa dst
+are replaced with name-value pairs from
+.Fa nvl
+which have identical names
+.Po
+if
+.Fa dst
+has the type
+.Dv NV_UNIQUE_NAME
+.Pc
+or identical names and types
+.Po
+if
+.Fa dst
+has the type
+.Dv NV_UNIQUE_NAME_TYPE
+.Pc .
+.Pp
+The
+.Fn nvlist_lookup_nv_alloc
+function retrieves the pointer to the allocator used when manipulating a
+name-value pair list.
+.Ss "Pluggable Allocators"
+The
+.Fn nv_alloc_init ,
+.Fn nv_alloc_reset ,
+and
+.Fn nv_alloc_fini
 functions provide an interface that specifies the allocator to be used when
 manipulating a name-value pair list.
-.sp
-.LP
-The \fBnv_alloc_init()\fR determines allocator properties and puts them into
-the \fInva\fR argument. You need to specify the \fInv_arg\fR argument, the
-\fInvo\fR argument and an optional variable argument list.  The optional
-arguments are passed to the (*\fBnv_ao_init()\fR) function.
-.sp
-.LP
-The \fInva\fR argument must be passed to \fBnvlist_xalloc()\fR,
-\fBnvlist_xpack()\fR, \fBnvlist_xunpack()\fR and \fBnvlist_xdup()\fR.
-.sp
-.LP
-The \fBnv_alloc_reset()\fR function resets the allocator properties to the data
-specified by \fBnv_alloc_init()\fR. When no (*\fBnv_ao_reset()\fR) function is
-specified, \fBnv_alloc_reset()\fR is without effect.
-.sp
-.LP
-The \fBnv_alloc_fini()\fR destroys the allocator properties determined by
-\fBnv_alloc_init()\fR. When a (*\fBnv_ao_fini()\fR) routine is specified, it is
-called from \fBnv_alloc_fini()\fR.
-.sp
-.LP
+.Pp
+The
+.Fn nv_alloc_init
+determines allocator properties and puts them into
+the
+.Fa nva
+argument.
+You need to specify the
+.Fa nv_arg
+argument, the
+.Fa nvo
+argument and an optional variable argument list.
+The optional arguments are passed to the
+.Pf * Fn nv_ao_init
+function.
+.Pp
+The
+.Fa nva
+argument must be passed to
+.Fn nvlist_xalloc ,
+.Fn nvlist_xpack ,
+.Fn nvlist_xunpack ,
+and
+.Fn nvlist_xdup .
+.Pp
+The
+.Fn nv_alloc_reset
+function resets the allocator properties to the data specified by
+.Fn nv_alloc_init .
+When no
+.Pf * Fn nv_ao_reset
+function is specified,
+.Fn nv_alloc_reset
+is without effect.
+.Pp
+The
+.Fn nv_alloc_fini
+destroys the allocator properties determined by
+.Fn nv_alloc_init .
+When a
+.Pf * Fn nv_ao_fini
+routine is specified, it is
+called from
+.Fn nv_alloc_fini .
+.Pp
 The disposition of the allocated objects and the memory used to store them is
 left to the allocator implementation.
-.sp
-.LP
-The `nv_alloc_sleep' and `nv_alloc_nosleep' nv_alloc_t pointers may be used
-with nvlist_xalloc to mimic the behavior of nvlist_alloc with KM_SLEEP and
-KM_NOSLEEP, respectively.
-.sp
-.in +2
-.nf
-o  nv_alloc_nosleep
-o  nv_alloc_sleep
-.fi
-.in -2
-
-.sp
-.LP
+.Pp
+The
+.Va nv_alloc_sleep
+and
+.Va nv_alloc_nosleep
+.Ft nv_alloc_t
+pointers may be used with
+.Fn nvlist_xalloc
+to mimic the behavior of
+.Fn nvlist_alloc
+with
+.Dv KM_SLEEP and
+.Dv KM_NOSLEEP ,
+respectively.
+.Pp
 The nvpair framework provides a fixed-buffer allocator, accessible via
-nv_fixed_ops.
-.sp
-.in +2
-.nf
-o  nv_fixed_ops
-.fi
-.in -2
-
-.sp
-.LP
+.Pp
 Given a buffer size and address, the fixed-buffer allocator allows for the
-creation of nvlists in contexts where malloc or kmem_alloc services may not be
-available. The fixed-buffer allocator is designed primarily to support the
-creation of nvlists.
-.sp
-.LP
-Memory freed using \fBnvlist_free()\fR, pair-removal, or similar routines is
-not reclaimed.
-.sp
-.LP
-When used to initialize the fixed-buffer allocator, nv_alloc_init should be
-called as follows:
-.sp
-.in +2
-.nf
-int nv_alloc_init(nv_alloc_t *nva, const nv_alloc_ops_t *nvo,
-    void *bufptr, size_t sz);
-.fi
-.in -2
-
-.sp
-.LP
-When invoked on a fixed-buffer, the \fBnv_alloc_reset()\fR function resets the
-fixed buffer and prepares it for re-use. The framework consumer is responsible
-for freeing the buffer passed to \fBnv_alloc_init()\fR.
-.SS "CREATING PLUGGABLE ALLOCATORS"
-Any producer of name-value pairs may possibily specify his own allocator
-routines. You must provide the following pluggable allocator operations in the
-allocator implementation.
-.sp
-.in +2
-.nf
+creation of nvlists in contexts where
+.Xr malloc 3C
+or
+.Xr kmem_alloc 9F
+services may not be available.
+The fixed-buffer allocator is designed primarily to support the creation of
+nvlists.
+.Pp
+Memory freed using
+.Fn nvlist_free ,
+pair-removal, or similar routines is not reclaimed.
+.Pp
+When used to initialize the fixed-buffer allocator,
+.Fn nv_alloc_init
+should be called as follows:
+.Pp
+.Fo nv_alloc_init
+.Fa "nv_alloc_t *nva"
+.Fa "nv_fixed_ops"
+.Fa "void *bufptr"
+.Fa "size_t sz"
+.Fc .
+.Pp
+When invoked on a fixed-buffer, the
+\fBnv_alloc_reset()\fR
+function resets the fixed buffer and prepares it for re-use.
+The framework consumer is responsible for freeing the buffer passed to
+\fBnv_alloc_init()\fR.
+.Ss Creating Pluggable Allocators
+Any producer of name-value pairs may possibly specify his own allocator
+routines.
+You must provide the following pluggable allocator operations in the allocator
+implementation.
+.Bd -literal -offset indent
 int (*nv_ao_init)(nv_alloc_t *nva, va_list nv_valist);
 void (*nv_ao_fini)(nv_alloc_t *nva);
 void *(*nv_ao_alloc)(nv_alloc_t *nva, size_t sz);
 void (*nv_ao_reset)(nv_alloc_t *nva);
 void (*nv_ao_free)(nv_alloc_t *nva, void *buf, size_t sz);
-.fi
-.in -2
-
-.sp
-.LP
-The \fInva\fR argument of the allocator implementation is always the first
-argument.
-.sp
-.LP
-The optional (*\fBnv_ao_init()\fR ) function is responsible for filling the
-data specified by \fBnv_alloc_init()\fR into the \fBnva_arg()\fR argument.  The
-(*\fBnv_ao_init()\fR) function is called only when \fBnv_alloc_init()\fR is
-executed.
-.sp
-.LP
-The optional (*\fBnv_ao_fini()\fR) function is responsible for the cleanup of
-the allocator implementation. It is called by \fBnv_alloc_fini()\fR.
-.sp
-.LP
-The required (*\fBnv_ao_alloc()\fR) function is used in the nvpair allocation
-framework for memory allocation. The sz argument specifies the size of the
-requested buffer.
-.sp
-.LP
-The optional (*\fBnv_ao_reset()\fR) function is responsible for resetting the
-nva_arg argument to the data specified by \fBnv_alloc_init()\fR.
-.sp
-.LP
-The required (*\fBnv_ao_free()\fR) function is used in the nvpair allocator
-framework for memory de-allocation. The argument buf is a pointer to a block
-previously allocated by (*\fBnv_ao_alloc()\fR) function. The size argument sz
+.Ed
+.Pp
+The
+.Fa nva
+argument of the allocator implementation is always the first argument.
+.Pp
+The optional
+.Pf * Fn nv_ao_init
+function is responsible for filling the data specified by
+.Fn nv_alloc_init
+into the
+.Fa nva_arg
+member.
+ The
+.Pf * Fn nv_ao_init
+function is called only when
+.Fn nv_alloc_init
+is executed.
+.Pp
+The optional
+.Pf * Fn nv_ao_fini
+function is responsible for the cleanup of the allocator implementation.
+It is called by
+.Fn nv_alloc_fini .
+.Pp
+The required
+.Pf * Fn nv_ao_alloc
+function is used in the nvpair allocation framework for memory allocation.
+The
+.Fa sz
+argument specifies the size of the requested buffer.
+.Pp
+The optional
+.Pf * Fn nv_ao_reset
+function is responsible for resetting the
+.Fa nva_arg
+member to the data specified by
+.Fn nv_alloc_init .
+.Pp
+The required
+.Pf * Fn nv_ao_free
+function is used in the nvpair allocator framework for memory de-allocation.
+The argument
+.Fa buf
+is a pointer to a block
+previously allocated by
+.Pf * Fn nv_ao_alloc
+function.
+The size argument
+.Fa sz
 must exactly match the original allocation.
-.sp
-.LP
+.Pp
 The disposition of the allocated objects and the memory used to store them is
 left to the allocator implementation.
-.SH RETURN VALUES
-For \fBnvlist_alloc()\fR, \fBnvlist_dup()\fR, \fBnvlist_xalloc()\fR, and
-\fBnvlist_xdup()\fR:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 10n
-success
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-invalid argument
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 10n
-insufficient memory
-.RE
-
-.sp
-.LP
-For \fBnvlist_pack()\fR, \fBnvlist_unpack()\fR, \fBnvlist_xpack()\fR, and
-\fBnvlist_xunpack()\fR:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 11n
-success
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 11n
-invalid argument
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 11n
-insufficient memory
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 11n
-encode/decode error
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOTSUP\fR\fR
-.ad
-.RS 11n
-encode/decode method not supported
-.RE
-
-.sp
-.LP
-For \fBnvlist_size()\fR:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 10n
-success
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-invalid argument
-.RE
-
-.sp
-.LP
-For \fBnvlist_lookup_nv_alloc()\fR:
-.sp
-.LP
-pointer to the allocator
-.SH USAGE
-The fixed-buffer allocator is very simple allocator. It uses a pre-allocated
-buffer for memory allocations and it can be used in interrupt context. You are
-responsible for allocation and de-allocation for the pre-allocated buffer.
-.SH EXAMPLES
-.in +2
-.nf
-  /*
-   * using the fixed-buffer allocator.
-   */
-   #include <sys/nvpair.h>
-
-  /* initialize the nvpair allocator framework */
-  static nv_alloc_t *
-  init(char *buf, size_t size)
-  {
-       nv_alloc_t *nvap;
-
-       if ((nvap = kmem_alloc(sizeof(nv_alloc_t), KM_SLEEP)) == NULL)
-           return (NULL);
-
-       if (nv_alloc_init(nvap, nv_fixed_ops, buf, size) == 0)
-           return (nvap);
-
-       return (NULL);
-   }
-
-   static void
-   fini(nv_alloc_t *nvap)
-   {
-         nv_alloc_fini(nvap);
-         kmem_free(nvap, sizeof(nv_alloc_t));
-   }
-    static int
-    interrupt_context(nv_alloc_t *nva)
-    {
-       nvlist_t *nvl;
-       int error;
-
-       if ((error = nvlist_xalloc(&nvl, NV_UNIQUE_NAME, nva)) != 0)
-            return (-1);
-
-       if ((error = nvlist_add_int32(nvl, "name", 1234)) == 0)
-            error = send_nvl(nvl);
-
-       nvlist_free(nvl);
-       return (error);
-      }
-.fi
-.in -2
-
-.SH CONTEXT
-The \fBnvlist_alloc()\fR, \fBnvlist_pack()\fR, \fBnvlist_unpack()\fR, and
-\fBnvlist_dup()\fR functions can be called from interrupt context only if the
-\fBKM_NOSLEEP\fR flag is set. They can be called from user context with any
-valid flag.
-.sp
-.LP
-The \fBnvlist_xalloc()\fR, \fBnvlist_xpack()\fR, \fBnvlist_xunpack()\fR, and
-\fBnvlist_xdup()\fR functions can be called from interrupt context only if (1)
-the default allocator is used and the \fBKM_NOSLEEP\fR flag is set or (2) the
-specified allocator did not sleep for free memory (for example, it uses a
-pre-allocated buffer for memory allocations).
-.sp
-.LP
+.Sh CONTEXT
+The
+.Fn nvlist_alloc ,
+.Fn nvlist_pack ,
+.Fn nvlist_unpack ,
+and
+.Fn nvlist_dup
+functions can be called from interrupt context only if the
+.Dv KM_NOSLEEP
+flag is set.
+They can be called from user context with any valid flag.
+.Pp
+The
+.Fn nvlist_xalloc ,
+.Fn nvlist_xpack ,
+.Fn nvlist_xunpack ,
+and
+.Fn nvlist_xdup
+functions can be called from interrupt context only if
+.Pq 1
+the default allocator is used and the
+.Dv KM_NOSLEEP
+flag is set or
+.Pq 2
+the specified allocator did not sleep for free memory
+.Pq for example, it uses a pre-allocated buffer for memory allocations .
+.Pp
 These functions can be called from user or kernel context with any valid flag.
+.Sh RETURN VALUES
+For
+.Fn nvlist_alloc ,
+.Fn nvlist_dup ,
+.Fn nvlist_xalloc ,
+and
+.Fn nvlist_xdup :
+.Bl -tag -width Er
+.It Er 0
+success
+.It Er EINVAL
+invalid argument
+.It Er ENOMEM
+insufficient memory
+.El
+.Pp
+For
+.Fn nvlist_pack ,
+.Fn nvlist_unpack ,
+.Fn nvlist_xpack ,
+and
+.Fn nvlist_xunpack :
+.Bl -tag -width Er
+.It Sy 0
+success
+.It Er EINVAL
+invalid argument
+.It Er ENOMEM
+insufficient memory
+.It Er EFAULT
+encode/decode error
+.It Er ENOTSUP
+encode/decode method not supported
+.El
+.Pp
+For
+.Fn nvlist_size :
+.Bl -tag -width Er
+.It Sy 0
+success
+.It Er EINVAL
+.El
+.Pp
+The
+.Fn nvlist_lookup_nv_alloc
+function returns a pointer to the allocator or
+.Dv NULL
+if there is no allocator.
+.Sh USAGE
+The fixed-buffer allocator is very simple allocator.
+It uses a pre-allocated buffer for memory allocations and it can be used in
+interrupt context.
+You are responsible for allocation and de-allocation for the pre-allocated
+buffer.
+.Sh EXAMPLES
+.Sy Example 1
+Using the fixed-buffer allocator
+.Bd -literal -offset indent
+#include <sys/nvpair.h>
+
+/* initialize the nvpair allocator framework */
+static nv_alloc_t *
+init(char *buf, size_t size)
+{
+	nv_alloc_t *nvap;
+
+	if ((nvap = kmem_alloc(sizeof(nv_alloc_t), KM_SLEEP)) == NULL)
+	   return (NULL);
+
+	if (nv_alloc_init(nvap, nv_fixed_ops, buf, size) == 0)
+	   return (nvap);
+
+	return (NULL);
+}
+
+static void
+fini(nv_alloc_t *nvap)
+{
+	nv_alloc_fini(nvap);
+	kmem_free(nvap, sizeof(nv_alloc_t));
+}
+
+static int
+interrupt_context(nv_alloc_t *nva)
+{
+	nvlist_t *nvl;
+	int error;
+
+	if ((error = nvlist_xalloc(&nvl, NV_UNIQUE_NAME, nva)) != 0)
+	    return (-1);
+
+	if ((error = nvlist_add_int32(nvl, "name", 1234)) == 0)
+	    error = send_nvl(nvl);
+
+	nvlist_free(nvl);
+	return (error);
+}
+.Ed
+.Sh SEE ALSO
+.Xr bcopy 9F ,
+.Xr kmem_alloc 9F ,
+.Xr nvlist_add_byte 9F
