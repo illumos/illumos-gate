@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2021 Jason King
  */
 
 /*
@@ -50,8 +51,8 @@
 #include <sys/hsvc.h>
 #endif
 
-#include <tss/platform.h> 	/* from SUNWtss */
-#include <tss/tpm.h> 		/* from SUNWtss */
+#include <tss/platform.h>	/* from SUNWtss */
+#include <tss/tpm.h>		/* from SUNWtss */
 
 #include "tpm_tis.h"
 #include "tpm_ddi.h"
@@ -415,14 +416,13 @@ tpm_get_timeouts(tpm_state_t *tpm)
 		0, 0, 0, 4,	/* SUB_CAP size in bytes */
 		0, 0, 1, 21	/* TPM_CAP_PROP_TIS_TIMEOUT(0x115) */
 	};
-	char *myname = "tpm_get_timeout";
 
 	ASSERT(tpm != NULL);
 
 	ret = itpm_command(tpm, buf, sizeof (buf));
 	if (ret != DDI_SUCCESS) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: itpm_command failed", myname);
+		cmn_err(CE_WARN, "!%s: itpm_command failed", __func__);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -438,7 +438,7 @@ tpm_get_timeouts(tpm_state_t *tpm)
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: capability response size should be %d"
 		    "instead len = %d",
-		    myname, (int)(4 * sizeof (uint32_t)), (int)len);
+		    __func__, (int)(4 * sizeof (uint32_t)), (int)len);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -489,7 +489,8 @@ tpm_get_timeouts(tpm_state_t *tpm)
  * TPM_GetCapability (TPM Main Part 3 Rev. 94, pg.38)
  */
 static int
-tpm_get_duration(tpm_state_t *tpm) {
+tpm_get_duration(tpm_state_t *tpm)
+{
 	int ret;
 	uint32_t duration;
 	uint32_t len;
@@ -501,7 +502,6 @@ tpm_get_duration(tpm_state_t *tpm) {
 		0, 0, 0, 4,	/* SUB_CAP size in bytes */
 		0, 0, 1, 32	/* TPM_CAP_PROP_TIS_DURATION(0x120) */
 	};
-	char *myname = "tpm_get_duration";
 
 	ASSERT(tpm != NULL);
 
@@ -509,7 +509,7 @@ tpm_get_duration(tpm_state_t *tpm) {
 	if (ret != DDI_SUCCESS) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: itpm_command failed with ret code: 0x%x",
-			myname, ret);
+		    __func__, ret);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -525,7 +525,7 @@ tpm_get_duration(tpm_state_t *tpm) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: capability response should be %d, "
 		    "instead, it's %d",
-		    myname, (int)(3 * sizeof (uint32_t)), (int)len);
+		    __func__, (int)(3 * sizeof (uint32_t)), (int)len);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -566,7 +566,8 @@ tpm_get_duration(tpm_state_t *tpm) {
  * TPM_GetCapability (TPM Main Part 3 Rev. 94, pg.38)
  */
 static int
-tpm_get_version(tpm_state_t *tpm) {
+tpm_get_version(tpm_state_t *tpm)
+{
 	int ret;
 	uint32_t len;
 	char vendorId[5];
@@ -578,7 +579,6 @@ tpm_get_version(tpm_state_t *tpm) {
 		0, 0, 0, 0x1A,	/* TPM_CAP_VERSION_VAL */
 		0, 0, 0, 0,	/* SUB_CAP size in bytes */
 	};
-	char *myname = "tpm_get_version";
 
 	ASSERT(tpm != NULL);
 
@@ -586,7 +586,7 @@ tpm_get_version(tpm_state_t *tpm) {
 	if (ret != DDI_SUCCESS) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: itpm_command failed with ret code: 0x%x",
-			myname, ret);
+		    __func__, ret);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -599,7 +599,7 @@ tpm_get_version(tpm_state_t *tpm) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: capability response should be greater"
 		    " than %d, instead, it's %d",
-		    myname, TPM_CAP_VERSION_INFO_SIZE, len);
+		    __func__, TPM_CAP_VERSION_INFO_SIZE, len);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -627,7 +627,7 @@ tpm_get_version(tpm_state_t *tpm) {
 	if (tpm->vers_info.version.major != 1 &&
 	    tpm->vers_info.version.minor != 2) {
 		cmn_err(CE_WARN, "!%s: Unsupported TPM version (%d.%d)",
-		    myname,
+		    __func__,
 		    tpm->vers_info.version.major,		/* Version */
 		    tpm->vers_info.version.minor);
 		return (DDI_FAILURE);
@@ -642,20 +642,20 @@ tpm_get_version(tpm_state_t *tpm) {
  * For details see Section 4.2 of TPM Main Part 3 Command Specification
  */
 static int
-tpm_continue_selftest(tpm_state_t *tpm) {
+tpm_continue_selftest(tpm_state_t *tpm)
+{
 	int ret;
 	uint8_t buf[10] = {
 		0, 193,		/* TPM_TAG_RQU COMMAND */
 		0, 0, 0, 10,	/* paramsize in bytes */
 		0, 0, 0, 83	/* TPM_ORD_ContinueSelfTest */
 	};
-	char *myname = "tpm_continue_selftest";
 
 	/* Need a longer timeout */
 	ret = itpm_command(tpm, buf, sizeof (buf));
 	if (ret != DDI_SUCCESS) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: itpm_command failed", myname);
+		cmn_err(CE_WARN, "!%s: itpm_command failed", __func__);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -673,28 +673,27 @@ static clock_t
 tpm_get_ordinal_duration(tpm_state_t *tpm, uint8_t ordinal)
 {
 	uint8_t index;
-	char *myname = "tpm_get_ordinal_duration";
 
 	ASSERT(tpm != NULL);
 
 	/* Default and failure case for IFX */
 	/* Is it a TSC_ORDINAL? */
 	if (ordinal & TSC_ORDINAL_MASK) {
-		if (ordinal > TSC_ORDINAL_MAX) {
+		if (ordinal >= TSC_ORDINAL_MAX) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
 			    "!%s: tsc ordinal: %d exceeds MAX: %d",
-			    myname, ordinal, TSC_ORDINAL_MAX);
+			    __func__, ordinal, TSC_ORDINAL_MAX);
 #endif
 			return (0);
 		}
 		index = tsc_ords_duration[ordinal];
 	} else {
-		if (ordinal > TPM_ORDINAL_MAX) {
+		if (ordinal >= TPM_ORDINAL_MAX) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
 			    "!%s: ordinal %d exceeds MAX: %d",
-			    myname, ordinal, TPM_ORDINAL_MAX);
+			    __func__, ordinal, TPM_ORDINAL_MAX);
 #endif
 			return (0);
 		}
@@ -704,7 +703,7 @@ tpm_get_ordinal_duration(tpm_state_t *tpm, uint8_t ordinal)
 	if (index > TPM_DURATION_MAX_IDX) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: duration index '%d' is out of bounds",
-		    myname, index);
+		    __func__, index);
 #endif
 		return (0);
 	}
@@ -721,7 +720,6 @@ itpm_command(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz)
 {
 	int ret;
 	uint32_t count;
-	char *myname = "itpm_command";
 
 	ASSERT(tpm != NULL && buf != NULL);
 
@@ -731,7 +729,7 @@ itpm_command(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz)
 	if (count == 0 || (count > bufsiz)) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: invalid byte count value "
-		    "(%d > bufsiz %d)", myname, (int)count, (int)bufsiz);
+		    "(%d > bufsiz %d)", __func__, (int)count, (int)bufsiz);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -741,7 +739,7 @@ itpm_command(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz)
 	if (ret != DDI_SUCCESS) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: tis_send_data failed with error %x",
-		    myname, ret);
+		    __func__, ret);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -753,7 +751,7 @@ itpm_command(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz)
 	ret = tis_recv_data(tpm, buf, bufsiz);
 	if (ret < TPM_HEADER_SIZE) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: tis_recv_data failed", myname);
+		cmn_err(CE_WARN, "!%s: tis_recv_data failed", __func__);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -762,12 +760,12 @@ itpm_command(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz)
 	ret = load32(buf, TPM_RETURN_OFFSET);
 	if (ret != TPM_SUCCESS) {
 		if (ret == TPM_E_DEACTIVATED)
-			cmn_err(CE_WARN, "!%s: TPM is deactivated", myname);
+			cmn_err(CE_WARN, "!%s: TPM is deactivated", __func__);
 		else if (ret == TPM_E_DISABLED)
-			cmn_err(CE_WARN, "!%s: TPM is disabled", myname);
+			cmn_err(CE_WARN, "!%s: TPM is disabled", __func__);
 		else
 			cmn_err(CE_WARN, "!%s: TPM error code 0x%0x",
-			    myname, ret);
+			    __func__, ret);
 		return (DDI_FAILURE);
 	}
 
@@ -782,7 +780,8 @@ itpm_command(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz)
  * Returns: 0 if error, burst count if sucess
  */
 static uint16_t
-tpm_get_burstcount(tpm_state_t *tpm) {
+tpm_get_burstcount(tpm_state_t *tpm)
+{
 	clock_t stop;
 	uint16_t burstcnt;
 
@@ -817,12 +816,14 @@ tpm_get_burstcount(tpm_state_t *tpm) {
  * (checked in the calling function)
  */
 static void
-tpm_set_ready(tpm_state_t *tpm) {
+tpm_set_ready(tpm_state_t *tpm)
+{
 	tpm_put8(tpm, TPM_STS, TPM_STS_CMD_READY);
 }
 
 static int
-receive_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
+receive_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz)
+{
 	int size = 0;
 	int retried = 0;
 	uint8_t stsbits;
@@ -832,10 +833,9 @@ receive_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 
 	ASSERT(tpm != NULL && buf != NULL);
 retry:
-	while (size < bufsiz &&
-		(tpm_wait_for_stat(tpm,
-		    (TPM_STS_DATA_AVAIL|TPM_STS_VALID),
-		    tpm->timeout_c) == DDI_SUCCESS)) {
+	while (size < bufsiz && (tpm_wait_for_stat(tpm,
+	    (TPM_STS_DATA_AVAIL|TPM_STS_VALID),
+	    tpm->timeout_c) == DDI_SUCCESS)) {
 		/*
 		 * Burstcount should be available within TIMEOUT_D
 		 * after STS is set to valid
@@ -862,12 +862,12 @@ retry:
 
 /* Receive the data from the TPM */
 static int
-tis_recv_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
+tis_recv_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz)
+{
 	int ret;
 	int size = 0;
 	uint32_t expected, status;
 	uint32_t cmdresult;
-	char *myname = "tis_recv_data";
 
 	ASSERT(tpm != NULL && buf != NULL);
 
@@ -876,7 +876,7 @@ tis_recv_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: received data should contain at least "
 		    "the header which is %d bytes long",
-		    myname, TPM_HEADER_SIZE);
+		    __func__, TPM_HEADER_SIZE);
 #endif
 		goto OUT;
 	}
@@ -886,7 +886,7 @@ tis_recv_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 	if (size < TPM_HEADER_SIZE) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: recv TPM_HEADER failed, size = %d",
-		    myname, size);
+		    __func__, size);
 #endif
 		goto OUT;
 	}
@@ -899,7 +899,7 @@ tis_recv_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: paramSize is bigger "
 		    "than the requested size: paramSize=%d bufsiz=%d result=%d",
-		    myname, (int)expected, (int)bufsiz, cmdresult);
+		    __func__, (int)expected, (int)bufsiz, cmdresult);
 #endif
 		goto OUT;
 	}
@@ -910,7 +910,7 @@ tis_recv_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 	if (size < expected) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: received data length (%d) "
-		    "is less than expected (%d)", myname, size, expected);
+		    "is less than expected (%d)", __func__, size, expected);
 #endif
 		goto OUT;
 	}
@@ -922,7 +922,7 @@ tis_recv_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 	if (ret != DDI_SUCCESS) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: TPM didn't set stsValid after its I/O: "
-		    "status = 0x%08X", myname, status);
+		    "status = 0x%08X", __func__, status);
 #endif
 		goto OUT;
 	}
@@ -931,7 +931,7 @@ tis_recv_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 	if (status & TPM_STS_DATA_AVAIL) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: TPM_STS_DATA_AVAIL is set:0x%08X",
-		    myname, status);
+		    __func__, status);
 #endif
 		goto OUT;
 	}
@@ -952,19 +952,19 @@ OUT:
  * Send the data (TPM commands) to the Data IO register
  */
 static int
-tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
+tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz)
+{
 	int ret;
 	uint8_t status;
 	uint16_t burstcnt;
 	uint32_t ordinal;
 	size_t count = 0;
-	char *myname = "tis_send_data";
 
 	ASSERT(tpm != NULL && buf != NULL);
 
 	if (bufsiz == 0) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: bufsiz arg is zero", myname);
+		cmn_err(CE_WARN, "!%s: bufsiz arg is zero", __func__);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -980,7 +980,7 @@ tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 			cmn_err(CE_WARN, "!%s: could not put the TPM "
 			    "in the command ready state:"
 			    "tpm_wait_for_stat returned error",
-			    myname);
+			    __func__);
 #endif
 			goto FAIL;
 		}
@@ -997,7 +997,7 @@ tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 		if (burstcnt == 0) {
 #ifdef DEBUG
 			cmn_err(CE_WARN, "!%s: tpm_get_burstcnt returned error",
-			    myname);
+			    __func__);
 #endif
 			ret = DDI_FAILURE;
 			goto FAIL;
@@ -1013,7 +1013,7 @@ tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 		if (ret != DDI_SUCCESS) {
 #ifdef DEBUG
 			cmn_err(CE_WARN, "!%s: TPM didn't enter STS_VALID "
-			    "state", myname);
+			    "state", __func__);
 #endif
 			goto FAIL;
 		}
@@ -1029,7 +1029,7 @@ tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 	if (ret == DDI_FAILURE) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: tpm didn't enter STS_VALID state",
-		    myname);
+		    __func__);
 #endif
 		goto FAIL;
 	}
@@ -1039,7 +1039,7 @@ tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 	if ((status & TPM_STS_DATA_EXPECT) != 0) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: DATA_EXPECT should not be set after "
-		    "writing the last byte: status=0x%08X", myname, status);
+		    "writing the last byte: status=0x%08X", __func__, status);
 #endif
 		ret = DDI_FAILURE;
 		goto FAIL;
@@ -1063,13 +1063,13 @@ tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 		    !(status & TPM_STS_VALID)) {
 			cmn_err(CE_WARN, "!%s: TPM not ready or valid "
 			    "(ordinal = %d timeout = %ld status = 0x%0x)",
-			    myname, ordinal,
+			    __func__, ordinal,
 			    tpm_get_ordinal_duration(tpm, ordinal),
 			    status);
 		} else {
 			cmn_err(CE_WARN, "!%s: tpm_wait_for_stat "
 			    "(DATA_AVAIL | VALID) failed status = 0x%0X",
-			    myname, status);
+			    __func__, status);
 		}
 #endif
 		goto FAIL;
@@ -1086,7 +1086,8 @@ FAIL:
  * Clear XrequestUse and Xactivelocality, where X is the current locality
  */
 static void
-tis_release_locality(tpm_state_t *tpm, char locality, int force) {
+tis_release_locality(tpm_state_t *tpm, char locality, int force)
+{
 	ASSERT(tpm != NULL && locality >= 0 && locality < 5);
 
 	if (force ||
@@ -1106,7 +1107,8 @@ tis_release_locality(tpm_state_t *tpm, char locality, int force) {
  * Use TPM_ACCESS register and the masks TPM_ACCESS_VALID,TPM_ACTIVE_LOCALITY
  */
 static int
-tis_check_active_locality(tpm_state_t *tpm, char locality) {
+tis_check_active_locality(tpm_state_t *tpm, char locality)
+{
 	uint8_t access_bits;
 	uint8_t old_locality;
 
@@ -1131,10 +1133,10 @@ tis_check_active_locality(tpm_state_t *tpm, char locality) {
 
 /* Request the TPM to be in the given locality */
 static int
-tis_request_locality(tpm_state_t *tpm, char locality) {
+tis_request_locality(tpm_state_t *tpm, char locality)
+{
 	clock_t timeout;
 	int ret;
-	char *myname = "tis_request_locality";
 
 	ASSERT(tpm != NULL && locality >= 0 && locality < 5);
 
@@ -1150,13 +1152,12 @@ tis_request_locality(tpm_state_t *tpm, char locality) {
 	timeout = ddi_get_lbolt() + tpm->timeout_a;
 
 	/* Using polling */
-	while (tis_check_active_locality(tpm, locality)
-		!= DDI_SUCCESS) {
+	while (tis_check_active_locality(tpm, locality) != DDI_SUCCESS) {
 		if (ddi_get_lbolt() >= timeout) {
 #ifdef DEBUG
 			cmn_err(CE_WARN, "!%s: (interrupt-disabled) "
 			    "tis_request_locality timed out (timeout_a = %ld)",
-			    myname, tpm->timeout_a);
+			    __func__, tpm->timeout_a);
 #endif
 			return (DDI_FAILURE);
 		}
@@ -1169,13 +1170,14 @@ tis_request_locality(tpm_state_t *tpm, char locality) {
 
 /* Read the status register */
 static uint8_t
-tis_get_status(tpm_state_t *tpm) {
+tis_get_status(tpm_state_t *tpm)
+{
 	return (tpm_get8(tpm, TPM_STS));
 }
 
 static int
-tpm_wait_for_stat(tpm_state_t *tpm, uint8_t mask, clock_t timeout) {
-	char *myname = "tpm_wait_for_stat";
+tpm_wait_for_stat(tpm_state_t *tpm, uint8_t mask, clock_t timeout)
+{
 	clock_t absolute_timeout = ddi_get_lbolt() + timeout;
 
 	/* Using polling */
@@ -1185,7 +1187,7 @@ tpm_wait_for_stat(tpm_state_t *tpm, uint8_t mask, clock_t timeout) {
 #ifdef DEBUG
 			cmn_err(CE_WARN, "!%s: using "
 			    "polling - reached timeout (%ld usecs)",
-			    myname, drv_hztousec(timeout));
+			    __func__, drv_hztousec(timeout));
 #endif
 			return (DDI_FAILURE);
 		}
@@ -1202,10 +1204,10 @@ tpm_wait_for_stat(tpm_state_t *tpm, uint8_t mask, clock_t timeout) {
  * 3. Determine timeouts and commands duration
  */
 static int
-tis_init(tpm_state_t *tpm) {
+tis_init(tpm_state_t *tpm)
+{
 	uint32_t intf_caps;
 	int ret;
-	char *myname = "tis_init";
 
 	/*
 	 * Temporarily set up timeouts before we get the real timeouts
@@ -1233,7 +1235,7 @@ tis_init(tpm_state_t *tpm) {
 	/* Upper 3 bytes should always return 0 */
 	if (intf_caps & 0x7FFFFF00) {
 		cmn_err(CE_WARN, "!%s: bad intf_caps value 0x%0X",
-		    myname, intf_caps);
+		    __func__, intf_caps);
 		return (DDI_FAILURE);
 	}
 
@@ -1241,12 +1243,12 @@ tis_init(tpm_state_t *tpm) {
 	if (!(intf_caps & TPM_INTF_INT_LOCALITY_CHANGE_INT)) {
 		cmn_err(CE_WARN,
 		    "!%s: Mandatory capability Locality Change Int "
-		    "not supported", myname);
+		    "not supported", __func__);
 		return (DDI_FAILURE);
 	}
 	if (!(intf_caps & TPM_INTF_INT_DATA_AVAIL_INT)) {
 		cmn_err(CE_WARN, "!%s: Mandatory capability Data Available Int "
-		    "not supported.", myname);
+		    "not supported.", __func__);
 		return (DDI_FAILURE);
 	}
 
@@ -1256,7 +1258,7 @@ tis_init(tpm_state_t *tpm) {
 	 */
 	ret = tis_request_locality(tpm, DEFAULT_LOCALITY);
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "!%s: Unable to request locality %d", myname,
+		cmn_err(CE_WARN, "!%s: Unable to request locality %d", __func__,
 		    DEFAULT_LOCALITY);
 		return (DDI_FAILURE);
 	} /* Now we can refer to the locality as tpm->locality */
@@ -1267,20 +1269,20 @@ tis_init(tpm_state_t *tpm) {
 	/* Get the real timeouts from the TPM */
 	ret = tpm_get_timeouts(tpm);
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "!%s: tpm_get_timeouts error", myname);
+		cmn_err(CE_WARN, "!%s: tpm_get_timeouts error", __func__);
 		return (DDI_FAILURE);
 	}
 
 	ret = tpm_get_duration(tpm);
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "!%s: tpm_get_duration error", myname);
+		cmn_err(CE_WARN, "!%s: tpm_get_duration error", __func__);
 		return (DDI_FAILURE);
 	}
 
 	/* This gets the TPM version information */
 	ret = tpm_get_version(tpm);
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "!%s: tpm_get_version error", myname);
+		cmn_err(CE_WARN, "!%s: tpm_get_version error", __func__);
 		return (DDI_FAILURE);
 	}
 
@@ -1290,7 +1292,7 @@ tis_init(tpm_state_t *tpm) {
 	 */
 	ret = tpm_continue_selftest(tpm);
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "!%s: tpm_continue_selftest error", myname);
+		cmn_err(CE_WARN, "!%s: tpm_continue_selftest error", __func__);
 		return (DDI_FAILURE);
 	}
 	return (DDI_SUCCESS);
@@ -1384,7 +1386,6 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #ifndef sun4v
 	int idx, nregs;
 #endif
-	char *myname = "tpm_attach";
 	tpm_state_t *tpm = NULL;
 
 	ASSERT(dip != NULL);
@@ -1402,7 +1403,7 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #ifdef DEBUG
 				cmn_err(CE_WARN,
 				    "!%s: cannot get state information.",
-				    myname);
+				    __func__);
 #endif
 				return (DDI_FAILURE);
 			}
@@ -1411,7 +1412,7 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #ifdef DEBUG
 			cmn_err(CE_WARN,
 			    "!%s: cannot allocate state information.",
-			    myname);
+			    __func__);
 #endif
 			return (DDI_FAILURE);
 		}
@@ -1421,14 +1422,15 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (tpm == NULL) {
 #ifdef DEBUG
 			cmn_err(CE_WARN, "!%s: cannot get state information.",
-			    myname);
+			    __func__);
 #endif
 			return (DDI_FAILURE);
 		}
 		return (tpm_resume(tpm));
 	default:
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: cmd %d is not implemented", myname, cmd);
+		cmn_err(CE_WARN, "!%s: cmd %d is not implemented", __func__,
+		    cmd);
 #endif
 		ret = DDI_FAILURE;
 		goto FAIL;
@@ -1441,7 +1443,7 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ret = hsvc_register(&hsvc_tpm, &hsvc_tpm_minor);
 	if (ret != 0) {
 		cmn_err(CE_WARN, "!%s: failed to register with "
-		    "hypervisor: 0x%0x", myname, ret);
+		    "hypervisor: 0x%0x", __func__, ret);
 		goto FAIL;
 	}
 	tpm->flags |= TPM_HSVC_REGISTERED;
@@ -1491,7 +1493,7 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ret != DDI_SUCCESS) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: tis_init() failed with error %d",
-		    myname, ret);
+		    __func__, ret);
 #endif
 
 		/* We need to clean up the ddi_regs_map_setup call */
@@ -1534,7 +1536,7 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    DDI_PSEUDO, 0);
 	if (ret != DDI_SUCCESS) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: ddi_create_minor_node failed", myname);
+		cmn_err(CE_WARN, "!%s: ddi_create_minor_node failed", __func__);
 #endif
 		goto FAIL;
 	}
@@ -1544,7 +1546,7 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* register RNG with kcf */
 	if (tpmrng_register(tpm) != DDI_SUCCESS)
 		cmn_err(CE_WARN, "!%s: tpm RNG failed to register with kcf",
-		    myname);
+		    __func__);
 #endif
 
 	return (DDI_SUCCESS);
@@ -1629,7 +1631,6 @@ tpm_suspend(tpm_state_t *tpm)
 static int
 tpm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	char *myname = "tpm_detach";
 	int instance;
 	tpm_state_t *tpm;
 
@@ -1642,7 +1643,7 @@ tpm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if ((tpm = ddi_get_soft_state(statep, instance)) == NULL) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: stored pointer to tpm state is NULL",
-		    myname);
+		    __func__);
 #endif
 		return (ENXIO);
 	}
@@ -1655,7 +1656,7 @@ tpm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (tpm_suspend(tpm));
 	default:
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: case %d not implemented", myname, cmd);
+		cmn_err(CE_WARN, "!%s: case %d not implemented", __func__, cmd);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -1674,7 +1675,6 @@ tpm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 static int
 tpm_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 {
-	char *myname = "tpm_getinfo";
 	int instance;
 	tpm_state_t *tpm;
 
@@ -1682,7 +1682,7 @@ tpm_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 	if ((tpm = ddi_get_soft_state(statep, instance)) == NULL) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: stored pointer to tpm state is NULL",
-		    myname);
+		    __func__);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -1696,7 +1696,8 @@ tpm_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 		break;
 	default:
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: cmd %d is not implemented", myname, cmd);
+		cmn_err(CE_WARN, "!%s: cmd %d is not implemented", __func__,
+		    cmd);
 #endif
 		return (DDI_FAILURE);
 	}
@@ -1711,7 +1712,6 @@ tpm_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 static int
 tpm_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 {
-	char *myname = "tpm_open";
 	int instance;
 	tpm_state_t *tpm;
 
@@ -1721,14 +1721,14 @@ tpm_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	if ((tpm = ddi_get_soft_state(statep, instance)) == NULL) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: stored pointer to tpm state is NULL",
-		    myname);
+		    __func__);
 #endif
 		return (ENXIO);
 	}
 	if (otyp != OTYP_CHR) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: otyp(%d) != OTYP_CHR(%d)",
-		    myname, otyp, OTYP_CHR);
+		    __func__, otyp, OTYP_CHR);
 #endif
 		return (EINVAL);
 	}
@@ -1738,7 +1738,7 @@ tpm_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	if (tpm->dev_held) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: the device is already being used",
-		    myname);
+		    __func__);
 #endif
 		mutex_exit(&tpm->dev_lock);
 		return (EBUSY);
@@ -1755,7 +1755,6 @@ tpm_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 static int
 tpm_close(dev_t dev, int flag, int otyp, cred_t *cred)
 {
-	char *myname = "tpm_close";
 	int instance;
 	tpm_state_t *tpm;
 
@@ -1763,14 +1762,14 @@ tpm_close(dev_t dev, int flag, int otyp, cred_t *cred)
 	if ((tpm = ddi_get_soft_state(statep, instance)) == NULL) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: stored pointer to tpm state is NULL",
-		    myname);
+		    __func__);
 #endif
 		return (ENXIO);
 	}
 	if (otyp != OTYP_CHR) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: otyp(%d) != OTYP_CHR(%d)",
-		    myname, otyp, OTYP_CHR);
+		    __func__, otyp, OTYP_CHR);
 #endif
 		return (EINVAL);
 	}
@@ -1792,7 +1791,6 @@ tpm_read(dev_t dev, struct uio *uiop, cred_t *credp)
 {
 	int ret;
 	uint32_t size;
-	char *myname = "tpm_read";
 	int instance;
 	tpm_state_t *tpm;
 
@@ -1800,13 +1798,13 @@ tpm_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	if ((tpm = ddi_get_soft_state(statep, instance)) == NULL) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: stored pointer to tpm state is NULL",
-		    myname);
+		    __func__);
 #endif
 		return (ENXIO);
 	}
 	if (uiop == NULL) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: passed in uiop is NULL", myname);
+		cmn_err(CE_WARN, "!%s: passed in uiop is NULL", __func__);
 #endif
 		return (EFAULT);
 	}
@@ -1824,7 +1822,7 @@ tpm_read(dev_t dev, struct uio *uiop, cred_t *credp)
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: read_in data is bigger "
 		    "than tpm->bufsize:read in:%d, bufsiz:%d",
-		    myname, (int)uiop->uio_resid, (int)tpm->bufsize);
+		    __func__, (int)uiop->uio_resid, (int)tpm->bufsize);
 #endif
 		ret = EIO;
 		goto OUT;
@@ -1833,7 +1831,7 @@ tpm_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	ret = tis_recv_data(tpm, tpm->iobuf, tpm->bufsize);
 	if (ret < TPM_HEADER_SIZE) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: tis_recv_data returned error", myname);
+		cmn_err(CE_WARN, "!%s: tis_recv_data returned error", __func__);
 #endif
 		ret = EIO;
 		goto OUT;
@@ -1844,7 +1842,7 @@ tpm_read(dev_t dev, struct uio *uiop, cred_t *credp)
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: tis_recv_data:"
 		    "expected size=%d, actually read=%d",
-		    myname, size, ret);
+		    __func__, size, ret);
 #endif
 		ret = EIO;
 		goto OUT;
@@ -1854,7 +1852,7 @@ tpm_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	ret = uiomove(tpm->iobuf, size, UIO_READ, uiop);
 	if (ret) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: uiomove returned error", myname);
+		cmn_err(CE_WARN, "!%s: uiomove returned error", __func__);
 #endif
 		goto OUT;
 	}
@@ -1876,7 +1874,6 @@ tpm_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	int ret;
 	size_t len;
 	uint32_t size;
-	char *myname = "tpm_write";
 	int instance;
 	tpm_state_t *tpm;
 
@@ -1884,14 +1881,14 @@ tpm_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	if ((tpm = ddi_get_soft_state(statep, instance)) == NULL) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: stored pointer to tpm state is NULL",
-		    myname);
+		    __func__);
 #endif
 		return (ENXIO);
 	}
 
 	if (uiop == NULL) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: passed in uiop is NULL", myname);
+		cmn_err(CE_WARN, "!%s: passed in uiop is NULL", __func__);
 #endif
 		return (EFAULT);
 	}
@@ -1901,7 +1898,7 @@ tpm_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	len = uiop->uio_resid;
 	if (len == 0) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: requested read of len 0", myname);
+		cmn_err(CE_WARN, "!%s: requested read of len 0", __func__);
 #endif
 		return (0);
 	}
@@ -1918,7 +1915,7 @@ tpm_write(dev_t dev, struct uio *uiop, cred_t *credp)
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: uiomove returned error"
 		    "while getting the the header",
-		    myname);
+		    __func__);
 #endif
 		goto OUT;
 	}
@@ -1931,7 +1928,7 @@ tpm_write(dev_t dev, struct uio *uiop, cred_t *credp)
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: size %d is greater than "
 		    "the tpm input buffer size %d",
-		    myname, (int)size, (int)tpm->bufsize);
+		    __func__, (int)size, (int)tpm->bufsize);
 #endif
 		ret = ENXIO;
 		goto OUT;
@@ -1944,7 +1941,7 @@ tpm_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	if (ret) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "!%s: uiomove returned error"
-		    "while getting the rest of the command", myname);
+		    "while getting the rest of the command", __func__);
 #endif
 		goto OUT;
 	}
@@ -1953,7 +1950,7 @@ tpm_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	ret = tis_send_data(tpm, tpm->iobuf, size);
 	if (ret != DDI_SUCCESS) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "!%s: tis_send_data returned error", myname);
+		cmn_err(CE_WARN, "!%s: tis_send_data returned error", __func__);
 #endif
 		ret = EFAULT;
 		goto OUT;
@@ -2028,8 +2025,8 @@ strncpy_spacepad(uchar_t *s1, char *s2, int n)
 /*ARGSUSED*/
 static int
 tpmrng_ext_info(crypto_provider_handle_t prov,
-	crypto_provider_ext_info_t *ext_info,
-	crypto_req_handle_t cfreq)
+    crypto_provider_ext_info_t *ext_info,
+    crypto_req_handle_t cfreq)
 {
 	tpm_state_t *tpm = (tpm_state_t *)prov;
 	char buf[64];
@@ -2076,7 +2073,7 @@ static int
 tpmrng_register(tpm_state_t *tpm)
 {
 	int		ret;
-	char 		ID[64];
+	char		ID[64];
 	crypto_mech_name_t	*rngmech;
 
 	ASSERT(tpm != NULL);
@@ -2141,7 +2138,7 @@ tpmrng_seed_random(crypto_provider_handle_t provider, crypto_session_id_t sid,
 		0, 193,		/* TPM_TAG_RQU COMMAND */
 		0, 0, 0, 0x0A,	/* paramsize in bytes */
 		0, 0, 0, TPM_ORD_StirRandom,
-		0, 0, 0, 0 	/* number of input bytes (< 256) */
+		0, 0, 0, 0	/* number of input bytes (< 256) */
 	};
 	uint32_t buflen;
 
