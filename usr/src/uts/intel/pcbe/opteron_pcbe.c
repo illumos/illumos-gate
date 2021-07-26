@@ -513,7 +513,9 @@ static char amd_fam_17h_zen2_reg[] = "See \"Preliminary Processor Programming "
 "amd_f17h_zen2_events(3CPC)";
 static char amd_fam_19h_zen3_reg[] = "See \"Preliminary Processor Programming "
 "Reference (PPR) for AMD Family 19h Model 01h, Revision B1 Processors Volume "
-"1 of 2 (AMD publication 55898) and amd_f17h_zen3_events(3CPC)";
+"1 of 2\" (AMD publication 55898), \"Processor Programming Reference (PPR) "
+"for AMD Family 19h Model 21h, Revision B0 Processors\" (AMD publication "
+"56214), and amd_f17h_zen3_events(3CPC)";
 
 static char amd_pcbe_impl_name[64];
 static char *amd_pcbe_cpuref;
@@ -628,7 +630,8 @@ opt_pcbe_init(void)
 		amd_pcbe_cpuref = amd_fam_17h_zen2_reg;
 		amd_events = opteron_pcbe_f17h_zen2_events;
 		amd_generic_events = family_17h_zen2_papi_events;
-	} else if (amd_family == 0x19 && amd_model <= 0xf) {
+	} else if (amd_family == 0x19 && (amd_model <= 0xf ||
+	    (amd_model >= 0x20 && amd_model <= 0x2f))) {
 		amd_pcbe_cpuref = amd_fam_19h_zen3_reg;
 		amd_events = opteron_pcbe_f19h_zen3_events;
 		amd_generic_events = family_19h_zen3_papi_events;
