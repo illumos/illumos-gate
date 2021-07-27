@@ -163,18 +163,6 @@ void *vmspace_find_kva(struct vmspace *, uintptr_t, size_t);
 void vmm_arena_init(void);
 void vmm_arena_fini(void);
 
-struct vmm_pt_ops {
-	void * (*vpo_init)(uint64_t *);
-	void (*vpo_free)(void *);
-	uint64_t (*vpo_wired_cnt)(void *);
-	int (*vpo_is_wired)(void *, uint64_t, uint_t *);
-	int (*vpo_map)(void *, uint64_t, pfn_t, uint_t, uint_t, uint8_t);
-	uint64_t (*vpo_unmap)(void *, uint64_t, uint64_t);
-};
-
-extern struct vmm_pt_ops ept_ops;
-extern struct vmm_pt_ops rvi_ops;
-
 typedef int (*pmap_pinit_t)(struct pmap *pmap);
 
 struct vmspace *vmspace_alloc(vm_offset_t, vm_offset_t, pmap_pinit_t);
