@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2020 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2021 Oxide Computer Company
  */
@@ -476,7 +476,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_MUNMAP_MEMSEG:
 	case VM_WRLOCK_CYCLE:
 	case VM_PMTMR_LOCATE:
-	case VM_ARC_RESV:
 		vmm_write_lock(sc);
 		lock_type = LOCK_WRITE_HOLD;
 		break;
@@ -1412,9 +1411,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		 */
 		break;
 	}
-	case VM_ARC_RESV:
-		error = vm_arc_resv(sc->vmm_vm, (uint64_t)arg);
-		break;
+
 	default:
 		error = ENOTTY;
 		break;
@@ -2189,7 +2186,7 @@ vmm_is_supported(intptr_t arg)
 	}
 
 	if (r != 0 && arg != (intptr_t)NULL) {
-		if (copyoutstr(msg, (char *)arg, strlen(msg), NULL) != 0)
+		if (copyoutstr(msg, (char *)arg, strlen(msg) + 1, NULL) != 0)
 			return (EFAULT);
 	}
 	return (r);

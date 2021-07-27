@@ -38,8 +38,8 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2021 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -189,7 +189,6 @@ struct vm {
 	uint16_t	threads;		/* (o) num of threads/core */
 	uint16_t	maxcpus;		/* (o) max pluggable cpus */
 	uint64_t	boot_tsc_offset;	/* (i) TSC offset at VM boot */
-	size_t		arc_resv;		/* # of pages take from ARC */
 
 	struct ioport_config ioports;		/* (o) ioport handling */
 };
@@ -274,9 +273,6 @@ static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
 static void vcpu_notify_event_locked(struct vcpu *vcpu, vcpu_notify_t);
 static bool vcpu_sleep_bailout_checks(struct vm *vm, int vcpuid);
 static int vcpu_vector_sipi(struct vm *vm, int vcpuid, uint8_t vector);
-
-extern int arc_virt_machine_reserve(size_t);
-extern void arc_virt_machine_release(size_t);
 
 /* Flags for vtc_status */
 #define	VTCS_FPU_RESTORED	1 /* guest FPU restored, host FPU saved */
@@ -623,9 +619,6 @@ vm_cleanup(struct vm *vm, bool destroy)
 
 		VMSPACE_FREE(vm->vmspace);
 		vm->vmspace = NULL;
-
-		arc_virt_machine_release(vm->arc_resv);
-		vm->arc_resv = 0;
 	}
 }
 
@@ -3661,20 +3654,5 @@ vmm_kstat_update_vcpu(struct kstat *ksp, int rw)
 	vvk->vvk_time_emu_user.value.ui64 = vcpu->ustate_total[VU_EMU_USER];
 	vvk->vvk_time_sched.value.ui64 = vcpu->ustate_total[VU_SCHED];
 
-	return (0);
-}
-
-int
-vm_arc_resv(struct vm *vm, uint64_t len)
-{
-	/* Since we already have the compat macros included, we use those */
-	size_t pages = (size_t)roundup2(len, PAGE_SIZE) >> PAGE_SHIFT;
-	int err = 0;
-
-	err = arc_virt_machine_reserve(pages);
-	if (err != 0)
-		return (err);
-
-	vm->arc_resv += pages;
 	return (0);
 }

@@ -11,7 +11,7 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
-# Copyright 2020 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -43,6 +43,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #	Overrides and additions
 #
 
+
 # 3rd party code
 SMOFF += all_func_returns
 
@@ -59,7 +60,7 @@ AS_INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(OBJS_DIR)
 # enable collection of VMM statistics
 CFLAGS		+= -DVMM_KEEP_STATS
 
-LDFLAGS         += -N misc/acpica -N misc/pcie -N fs/dev -N fs/zfs
+LDFLAGS         += -N misc/acpica -N misc/pcie -N fs/dev
 LDFLAGS         += -z type=kmod -M $(MAPFILE)
 
 OFFSETS_VMX	= $(CONF_SRCDIR)/intel/offsets.in
