@@ -34,20 +34,14 @@ HEADERS= $(FICLDIR)/ficl.h $(FICLDIR)/ficlplatform/unix.h ../ficllocal.h
 #
 
 # disable inner loop variable 'fw' check
-vm.o := SMOFF += check_check_deref
-
-.PARALLEL:
+objs/vm.o := SMOFF += check_check_deref
+pics/vm.o := SMOFF += check_check_deref
 
 MAJOR = 4
 MINOR = 1.0
 
-lib: libficl.a
-
-vm.o := CFLAGS += -_gcc=-Wno-clobbered
-
-# static library build
-libficl.a: $(OBJECTS)
-	$(AR) $(ARFLAGS) libficl.a $(OBJECTS)
+objs/vm.o := CFLAGS += -_gcc=-Wno-clobbered
+pics/vm.o := CFLAGS += -_gcc=-Wno-clobbered
 
 machine:
 	$(RM) machine
@@ -57,17 +51,17 @@ x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
 
-%.o:	../softcore/%.c $(HEADERS)
-	$(COMPILE.c) $<
+objs/%.o pics/%.o:	../softcore/%.c $(HEADERS)
+	$(COMPILE.c) -o $@ $<
 
-%.o:	$(FICLDIR)/%.c $(HEADERS)
-	$(COMPILE.c) $<
+objs/%.o pics/%.o:	$(FICLDIR)/%.c $(HEADERS)
+	$(COMPILE.c) -o $@ $<
 
-%.o:	$(FICLDIR)/ficlplatform/%.c $(HEADERS)
-	$(COMPILE.c) $<
+objs/%.o pics/%.o:	$(FICLDIR)/ficlplatform/%.c $(HEADERS)
+	$(COMPILE.c) -o $@ $<
 
 #
 #       generic cleanup code
 #
 clobber clean:	FRC
-	$(RM) *.o *.a libficl.* ficl machine x86
+	$(RM) $(CLEANFILES) machine x86

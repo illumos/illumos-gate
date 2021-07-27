@@ -14,6 +14,6 @@
 #
 
 # Options used when building app-specific efi components
-CFLAGS +=	-_gcc=-fshort-wchar
+CFLAGS +=	-_gcc=-fshort-wchar $(C_BIGPICFLAGS)
 
 .PARALLEL:

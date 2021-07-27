@@ -14,6 +14,8 @@
 # Copyright 2016 RackTop Systems.
 #
 
+include $(SRC)/Makefile.master
+
 MACHINE=	$(MACH)
 EFIPROG=	loader32.efi
 
@@ -27,8 +29,6 @@ LDFLAGS +=	-znocombreloc
 efi_main.o := CPPFLAGS += -DLOADER_EFI=L\"loader32.efi\"
 CFLAGS +=	-m32
 CCASFLAGS +=	-m32
-
-CLEANFILES +=	machine x86 $(EFIPROG)
 
 $(OBJS):	machine x86
 

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
+ * Copyright 2021, Tintri by DDN. All rights reserved.
  */
 #ifndef _LIBIPADM_H
 #define	_LIBIPADM_H
@@ -205,13 +206,26 @@ typedef enum {
 	IFIS_DISABLED		/* Interface has been disabled. */
 } ipadm_if_state_t;
 
+/*
+ * Declare ipadm_if_info_list_t as a container for ipadm_if_info_t.
+ *
+ * ipadm_if_info_t used to have a list pointer ifi_next for linking a number
+ * of ipadm_if_info_t's together. Even though this linking wasn't used in the
+ * data exchange between ipmgmtd and libipadm, this meant the structure wasn't
+ * safe for passing through the door between 32bit and 64bit processes.
+ */
 typedef struct ipadm_if_info_s {
-	struct ipadm_if_info_s	*ifi_next;
 	char			ifi_name[LIFNAMSIZ];	/* interface name */
 	ipadm_if_state_t	ifi_state;		/* see above */
 	uint_t			ifi_cflags;		/* current flags */
 	uint_t			ifi_pflags;		/* persistent flags */
 } ipadm_if_info_t;
+
+typedef struct ipadm_if_info_list_s {
+	struct ipadm_if_info_list_s	*ifil_next;
+	ipadm_if_info_t			ifil_ifi;
+} ipadm_if_info_list_t;
+
 
 /* ipadm_if_info_t flags */
 #define	IFIF_BROADCAST		0x00000001
@@ -279,8 +293,8 @@ extern ipadm_status_t	ipadm_disable_if(ipadm_handle_t, const char *,
 			    uint32_t);
 extern ipadm_status_t	ipadm_enable_if(ipadm_handle_t, const char *, uint32_t);
 extern ipadm_status_t	ipadm_if_info(ipadm_handle_t, const char *,
-			    ipadm_if_info_t **, uint32_t, int64_t);
-extern void		ipadm_free_if_info(ipadm_if_info_t *);
+			    ipadm_if_info_list_t **, uint32_t, int64_t);
+extern void		ipadm_free_if_info(ipadm_if_info_list_t *);
 extern ipadm_status_t	ipadm_delete_if(ipadm_handle_t, const char *,
 			    sa_family_t, uint32_t);
 extern void		ipadm_if_move(ipadm_handle_t, const char *);
@@ -362,7 +376,7 @@ extern ipadm_status_t	ipadm_get_prop(ipadm_handle_t, const char *, char *,
 /*
  * miscellaneous helper functions.
  */
-extern const char 	*ipadm_status2str(ipadm_status_t);
+extern const char	*ipadm_status2str(ipadm_status_t);
 extern int		ipadm_str2nvlist(const char *, nvlist_t **, uint_t);
 extern size_t		ipadm_nvlist2str(nvlist_t *, char *, size_t);
 extern char		*ipadm_proto2str(uint_t);

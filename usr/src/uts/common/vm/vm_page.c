@@ -23,6 +23,7 @@
  * Copyright (c) 2015, Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T */
@@ -3922,6 +3923,60 @@ page_pp_unlock(
 }
 
 /*
+ * This routine reserves availrmem for npages.
+ * It returns 1 on success or 0 on failure.
+ *
+ * flags: KM_NOSLEEP or KM_SLEEP
+ * cb_wait: called to induce delay when KM_SLEEP reservation requires kmem
+ *     reaping to potentially succeed.  If the callback returns 0, the
+ *     reservation attempts will cease to repeat and page_xresv() may
+ *     report a failure.  If cb_wait is NULL, the traditional delay(hz/2)
+ *     behavior will be used while waiting for a reap.
+ */
+int
+page_xresv(pgcnt_t npages, uint_t flags, int (*cb_wait)(void))
+{
+	mutex_enter(&freemem_lock);
+	if (availrmem >= tune.t_minarmem + npages) {
+		availrmem -= npages;
+		mutex_exit(&freemem_lock);
+		return (1);
+	} else if ((flags & KM_NOSLEEP) != 0) {
+		mutex_exit(&freemem_lock);
+		return (0);
+	}
+	mutex_exit(&freemem_lock);
+
+	/*
+	 * We signal memory pressure to the system by elevating 'needfree'.
+	 * Processes such as kmem reaping, pageout, and ZFS ARC shrinking can
+	 * then respond to said pressure by freeing pages.
+	 */
+	page_needfree(npages);
+	int nobail = 1;
+	do {
+		kmem_reap();
+		if (cb_wait == NULL) {
+			delay(hz >> 2);
+		} else {
+			nobail = cb_wait();
+		}
+
+		mutex_enter(&freemem_lock);
+		if (availrmem >= tune.t_minarmem + npages) {
+			availrmem -= npages;
+			mutex_exit(&freemem_lock);
+			page_needfree(-(spgcnt_t)npages);
+			return (1);
+		}
+		mutex_exit(&freemem_lock);
+	} while (nobail != 0);
+	page_needfree(-(spgcnt_t)npages);
+
+	return (0);
+}
+
+/*
  * This routine reserves availrmem for npages;
  *	flags: KM_NOSLEEP or KM_SLEEP
  *	returns 1 on success or 0 on failure
@@ -3929,22 +3984,7 @@ page_pp_unlock(
 int
 page_resv(pgcnt_t npages, uint_t flags)
 {
-	mutex_enter(&freemem_lock);
-	while (availrmem < tune.t_minarmem + npages) {
-		if (flags & KM_NOSLEEP) {
-			mutex_exit(&freemem_lock);
-			return (0);
-		}
-		mutex_exit(&freemem_lock);
-		page_needfree(npages);
-		kmem_reap();
-		delay(hz >> 2);
-		page_needfree(-(spgcnt_t)npages);
-		mutex_enter(&freemem_lock);
-	}
-	availrmem -= npages;
-	mutex_exit(&freemem_lock);
-	return (1);
+	return (page_xresv(npages, flags, NULL));
 }
 
 /*

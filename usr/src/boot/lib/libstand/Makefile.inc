@@ -21,25 +21,25 @@
 #
 
 # standalone components and stuff we have modified locally
-SRCS=	$(ZLIB)/gzguts.h $(ZLIB)/zutil.h
+SRCS +=	$(ZLIB)/gzguts.h $(ZLIB)/zutil.h
 SRCS += $(SASRC)/__main.c $(SASRC)/abort.c $(SASRC)/assert.c
 SRCS +=	$(SASRC)/bcd.c $(SASRC)/environment.c
 SRCS += $(SASRC)/getopt.c $(SASRC)/random.c
 SRCS += $(SASRC)/sbrk.c $(SASRC)/twiddle.c
 SRCS += $(SASRC)/zalloc.c $(SASRC)/zalloc_malloc.c
 
-OBJS=	__main.o abort.o assert.o bcd.o environment.o \
+OBJECTS += __main.o abort.o assert.o bcd.o environment.o \
 	getopt.o gets.o globals.o pager.o panic.o printf.o \
 	strdup.o strerror.o strtol.o strtoll.o strtoul.o strtoull.o random.o \
 	sbrk.o twiddle.o zalloc.o zalloc_malloc.o
 
 # private (pruned) versions of libc string functions
 SRCS +=	$(SASRC)/strcasecmp.c
-OBJS +=	strcasecmp.o
+OBJECTS += strcasecmp.o
 
 # from libc
 SRCS += $(LIBSRC)/libc/net/ntoh.c
-OBJS += ntoh.o
+OBJECTS += ntoh.o
 
 # string functions from libc
 SRCS +=	$(LIBSRC)/libc/string/bcmp.c $(LIBSRC)/libc/string/bcopy.c
@@ -61,7 +61,7 @@ SRCS +=	$(LIBSRC)/libc/string/swab.c
 
 SRCS += $(SASRC)/qdivrem.c
 
-OBJS +=	bcmp.o bcopy.o bzero.o ffs.o fls.o \
+OBJECTS += bcmp.o bcopy.o bzero.o ffs.o fls.o \
 	memccpy.o memchr.o memcmp.o memcpy.o memmove.o memset.o \
 	qdivrem.o strcat.o strchr.o strcmp.o strcpy.o stpcpy.o stpncpy.o \
 	strcspn.o strlcat.o strlcpy.o strlen.o strncat.o strncmp.o strncpy.o \
@@ -75,22 +75,57 @@ SRCS += $(LIBSRC)/libc/uuid/uuid_is_nil.c
 SRCS += $(SASRC)/uuid_from_string.c
 SRCS += $(SASRC)/uuid_to_string.c
 
-OBJS += uuid_create_nil.o uuid_equal.o uuid_from_string.o uuid_is_nil.o \
+OBJECTS += uuid_create_nil.o uuid_equal.o uuid_from_string.o uuid_is_nil.o \
 	uuid_to_string.o
 
 # decompression functionality from libbz2
 # NOTE: to actually test this functionality after libbz2 upgrade compile
 # loader(8) with LOADER_BZIP2_SUPPORT defined
-_bzlib.o _crctable.o _decompress.o _huffman.o _randtable.o bzipfs.o \
-:= CFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+objs/_bzlib.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+objs/_bzlib.o := CPPFLAGS += -I$(SRC)/common/bzip2
+objs/_bzlib.o: libstand_bzlib_private.h
+pics/_bzlib.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+pics/_bzlib.o := CPPFLAGS += -I$(SRC)/common/bzip2
+pics/_bzlib.o: libstand_bzlib_private.h
+objs/_crctable.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+objs/_crctable.o := CPPFLAGS += -I$(SRC)/common/bzip2
+objs/_crctable.o: libstand_bzlib_private.h
+pics/_crctable.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+pics/_crctable.o := CPPFLAGS += -I$(SRC)/common/bzip2
+pics/_crctable.o: libstand_bzlib_private.h
+objs/_decompress.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+objs/_decompress.o := CPPFLAGS += -I$(SRC)/common/bzip2
+objs/_decompress.o: libstand_bzlib_private.h
+pics/_decompress.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+pics/_decompress.o := CPPFLAGS += -I$(SRC)/common/bzip2
+pics/_decompress.o: libstand_bzlib_private.h
+objs/_huffman.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+objs/_huffman.o := CPPFLAGS += -I$(SRC)/common/bzip2
+objs/_huffman.o: libstand_bzlib_private.h
+pics/_huffman.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+pics/_huffman.o := CPPFLAGS += -I$(SRC)/common/bzip2
+pics/_huffman.o: libstand_bzlib_private.h
+objs/_randtable.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+objs/_randtable.o := CPPFLAGS += -I$(SRC)/common/bzip2
+objs/_randtable.o: libstand_bzlib_private.h
+pics/_randtable.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+pics/_randtable.o := CPPFLAGS += -I$(SRC)/common/bzip2
+pics/_randtable.o: libstand_bzlib_private.h
+objs/bzipfs.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+objs/bzipfs.o := CPPFLAGS += -I$(SRC)/common/bzip2
+objs/bzipfs.o: libstand_bzlib_private.h
+pics/bzipfs.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+pics/bzipfs.o := CPPFLAGS += -I$(SRC)/common/bzip2
+pics/bzipfs.o: libstand_bzlib_private.h
 SRCS +=	libstand_bzlib_private.h
 
 # too hairy
-_inflate.o := SMATCH=off
+objs/_inflate.o := SMATCH=off
+pics/_inflate.o := SMATCH=off
 
 SRCS +=	_bzlib.c _crctable.c _decompress.c _huffman.c _randtable.c
-OBJS +=	_bzlib.o _crctable.o _decompress.o _huffman.o _randtable.o
-CLEANFILES +=	_bzlib.c _crctable.c _decompress.c _huffman.c _randtable.c
+OBJECTS += _bzlib.o _crctable.o _decompress.o _huffman.o _randtable.o
+CLEANFILES += _bzlib.c _crctable.c _decompress.c _huffman.c _randtable.c
 
 _bzlib.c: $(SRC)/common/bzip2/bzlib.c
 	sed "s|bzlib_private\.h|libstand_bzlib_private.h|" $^ > $@
@@ -112,11 +147,33 @@ libstand_bzlib_private.h: $(SRC)/common/bzip2/bzlib_private.h
 	sed -e 's|<stdlib.h>|"stand.h"|' $^ > $@
 
 # decompression functionality from zlib
-adler32.o crc32.o _infback.o _inffast.o _inflate.o _inftrees.o _zutil.o \
-gzipfs.o gzip.o := CPPFLAGS += -I$(ZLIB)
+objs/adler32.o := CPPFLAGS += -I$(ZLIB)
+pics/adler32.o := CPPFLAGS += -I$(ZLIB)
+objs/crc32.o := CPPFLAGS += -I$(ZLIB)
+pics/crc32.o := CPPFLAGS += -I$(ZLIB)
+objs/_infback.o := CPPFLAGS += -I$(ZLIB)
+pics/_infback.o := CPPFLAGS += -I$(ZLIB)
+objs/_infback.o pics/_infback.o: libstand_zutil.h libstand_gzguts.h
+objs/_inffast.o := CPPFLAGS += -I$(ZLIB)
+pics/_inffast.o := CPPFLAGS += -I$(ZLIB)
+objs/_inffast.o pics/_inffast.o: libstand_zutil.h libstand_gzguts.h
+objs/_inflate.o := CPPFLAGS += -I$(ZLIB)
+pics/_inflate.o := CPPFLAGS += -I$(ZLIB)
+objs/_inflate.o pics/_inflate.o: libstand_zutil.h libstand_gzguts.h
+objs/_inftrees.o := CPPFLAGS += -I$(ZLIB)
+pics/_inftrees.o := CPPFLAGS += -I$(ZLIB)
+objs/_inftrees.o pics/_inftrees.o: libstand_zutil.h libstand_gzguts.h
+objs/_zutil.o := CPPFLAGS += -I$(ZLIB)
+pics/_zutil.o := CPPFLAGS += -I$(ZLIB)
+objs/_zutil.o pics/_zutil.o: libstand_zutil.h libstand_gzguts.h
+objs/gzipfs.o := CPPFLAGS += -I$(ZLIB)
+pics/gzipfs.o := CPPFLAGS += -I$(ZLIB)
+objs/gzip.o := CPPFLAGS += -I$(ZLIB)
+pics/gzip.o := CPPFLAGS += -I$(ZLIB)
+
 SRCS +=	$(ZLIB)/adler32.c $(ZLIB)/crc32.c \
 	libstand_zutil.h libstand_gzguts.h
-OBJS +=	adler32.o crc32.o
+OBJECTS += adler32.o crc32.o
 
 _infback.c: $(ZLIB)/infback.c
 	sed -e "s|zutil\.h|libstand_zutil.h|" \
@@ -140,8 +197,8 @@ _zutil.c: $(ZLIB)/zutil.c
 	    $^ > $@
 
 SRCS +=	_infback.c _inffast.c _inflate.c _inftrees.c _zutil.c
-OBJS +=	_infback.o _inffast.o _inflate.o _inftrees.o _zutil.o
-CLEANFILES +=	_infback.c _inffast.c _inflate.c _inftrees.c _zutil.c
+OBJECTS += _infback.o _inffast.o _inflate.o _inftrees.o _zutil.o
+CLEANFILES += _infback.c _inffast.c _inflate.c _inftrees.c _zutil.c
 
 # depend on stand.h being able to be included multiple times
 libstand_zutil.h: $(ZLIB)/zutil.h
@@ -163,9 +220,10 @@ libstand_gzguts.h: $(ZLIB)/gzguts.h
 CLEANFILES += libstand_zutil.h libstand_gzguts.h
 
 # lz4 decompression functionality
-lz4.o := CPPFLAGS += -I$(LZ4)
+pics/lz4.o := CPPFLAGS += -I$(LZ4)
+objs/lz4.o := CPPFLAGS += -I$(LZ4)
 SRCS += $(LZ4)/lz4.c
-OBJS += lz4.o
+OBJECTS += lz4.o
 
 # io routines
 SRCS +=	$(SASRC)/closeall.c $(SASRC)/dev.c \
@@ -174,7 +232,7 @@ SRCS +=	$(SASRC)/closeall.c $(SASRC)/dev.c \
 	$(SASRC)/lseek.c $(SASRC)/open.c $(SASRC)/read.c \
 	$(SASRC)/write.c $(SASRC)/readdir.c
 
-OBJS +=	closeall.o dev.o ioctl.o nullfs.o stat.o fstat.o close.o lseek.o \
+OBJECTS += closeall.o dev.o ioctl.o nullfs.o stat.o fstat.o close.o lseek.o \
 	open.o read.o write.o readdir.o
 
 # network routines
@@ -182,12 +240,12 @@ SRCS +=	$(SASRC)/arp.c $(SASRC)/ether.c $(SASRC)/ip.c \
 	$(SASRC)/inet_ntoa.c $(SASRC)/in_cksum.c \
 	$(SASRC)/net.c $(SASRC)/udp.c $(SASRC)/netif.c \
 	$(SASRC)/rpc.c
-OBJS +=	arp.o ether.o ip.o inet_ntoa.o in_cksum.o net.o udp.o netif.o rpc.o
+OBJECTS += arp.o ether.o ip.o inet_ntoa.o in_cksum.o net.o udp.o netif.o rpc.o
 
 # network info services:
 SRCS +=	$(SASRC)/bootp.c $(SASRC)/rarp.c \
 	$(SASRC)/bootparam.c
-OBJS +=	bootp.o rarp.o bootparam.o
+OBJECTS += bootp.o rarp.o bootparam.o
 
 # boot filesystems
 SRCS +=	$(SASRC)/ufs.c
@@ -197,12 +255,16 @@ SRCS += $(SASRC)/tftp.c
 SRCS += $(SASRC)/gzipfs.c
 SRCS += $(SASRC)/bzipfs.c
 SRCS += $(SASRC)/dosfs.c
-OBJS +=	ufs.o
-OBJS +=	nfs.o
-OBJS +=	cd9660.o
-OBJS +=	tftp.o
-OBJS +=	gzipfs.o
-OBJS += bzipfs.o
-OBJS += dosfs.o
-#
-.PARALLEL:
+OBJECTS += ufs.o
+OBJECTS += nfs.o
+OBJECTS += cd9660.o
+OBJECTS += tftp.o
+OBJECTS += gzipfs.o
+OBJECTS += bzipfs.o
+OBJECTS += dosfs.o
+
+# utility
+SRCS += (SRC)/common/util/explicit_bzero.c
+SRCS += (SRC)/common/util/memmem.c
+OBJECTS += explicit_bzero.o
+OBJECTS += memmem.o

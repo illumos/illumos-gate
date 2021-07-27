@@ -14,25 +14,26 @@
 # Copyright 2016 RackTop Systems.
 #
 
+include $(SRC)/Makefile.master
+
 MACHINE=	$(MACH)
 LIBRARY=	libstand.a
+DYNLIB=		libstand_pics.a
 
-all install:	$(LIBRARY)
+all install:	$(LIBRARY) $(DYNLIB)
 
 include ../Makefile.com
 
 CFLAGS +=	-m32
 CCASFLAGS +=	-m32
 
-CLEANFILES += x86
-
 # _setjmp/_longjmp
 SRCS += $(SASRC)/i386/_setjmp.S
-OBJS += _setjmp.o
+OBJECTS += _setjmp.o
 
-$(LIBRARY): $(SRCS) $(OBJS)
+pics/%.o objs/%.o: $(SASRC)/i386/%.S
+	$(COMPILE.S) -o $@ $<
 
-$(OBJS): machine x86
+include $(SRC)/boot/sys/boot/Makefile.lib
 
-%.o: $(SASRC)/i386/%.S
-	$(COMPILE.S) $<
+FRC:

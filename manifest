@@ -10325,6 +10325,7 @@ f usr/lib/reparse/reparsed 0555 root sys
 f usr/lib/rpcsec.so.1 0755 root bin
 s usr/lib/rpcsec.so=rpcsec.so.1
 s usr/lib/rsh=../bin/ksh93
+f usr/lib/rsrvrctl 0555 root sys
 d usr/lib/sa 0755 root bin
 f usr/lib/sa/sa1 0555 root bin
 f usr/lib/sa/sa2 0555 root bin

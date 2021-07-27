@@ -105,47 +105,38 @@ SRCS +=	$(ZFSSRC)/devicename_stubs.c
 OBJS +=	devicename_stubs.o
 
 BOOT_COMCONSOLE_PORT= 0x3f8
-CFLAGS +=	-DCOMPORT=${BOOT_COMCONSOLE_PORT}
+CPPFLAGS +=	-DCOMPORT=${BOOT_COMCONSOLE_PORT}
 
 BOOT_COMCONSOLE_SPEED= 9600
-CFLAGS +=	-DCOMSPEED=${BOOT_COMCONSOLE_SPEED}
+CPPFLAGS +=	-DCOMSPEED=${BOOT_COMCONSOLE_SPEED}
 
 # Make the disk code more talkative
-# CFLAGS+= -DDISK_DEBUG
+# CPPFLAGS+= -DDISK_DEBUG
 
 # Export serial numbers, UUID, and asset tag from loader.
-smbios.o := CFLAGS += -DSMBIOS_SERIAL_NUMBERS
+smbios.o := CPPFLAGS += -DSMBIOS_SERIAL_NUMBERS
 # Use little-endian UUID format as defined in SMBIOS 2.6.
-smbios.o := CFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
+smbios.o := CPPFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
 # Use network-endian UUID format for backward compatibility.
-#CFLAGS += -DSMBIOS_NETWORK_ENDIAN_UUID
+#CPPFLAGS += -DSMBIOS_NETWORK_ENDIAN_UUID
 
 # XXX: make alloca() useable
-CFLAGS += -Dalloca=__builtin_alloca
+CPPFLAGS += -Dalloca=__builtin_alloca
 
-CFLAGS +=	-I$(SRC)/common/ficl -I../../libficl \
+CPPFLAGS +=	-I$(SRC)/common/ficl -I../../libficl \
 		-I../../common -I../common \
 		-I../btx/lib \
 		-I$(SRC)/uts/intel/sys/acpi \
 		-I../../.. -I.
 # the location of libstand
-CFLAGS +=	-I../../../../lib/libstand/
+CPPFLAGS +=	-I../../../../lib/libstand/
 
 multiboot.o := CPPFLAGS += -I../../../cddl/boot/zfs
 multiboot2.o := CPPFLAGS += -I../../../cddl/boot/zfs
 devicename.o := CPPFLAGS += -I../../../cddl/boot/zfs
 devicename_stubs.o := CPPFLAGS += -I../../../cddl/boot/zfs
 
-# Handle FreeBSD specific %b and %D printf format specifiers
-#FORMAT_EXTENSIONS=-D__printf__=__freebsd_kprintf__
-#CFLAGS += ${FORMAT_EXTENSIONS}
-
 CLEANFILES +=	machine x86
-
-# XXX: clang integrated-as doesn't grok .codeNN directives yet
-# CFLAGS.amd64_tramp.S=	${CLANG_NO_IAS}
-# CFLAGS.multiboot_tramp.S=	${CLANG_NO_IAS}
-# CFLAGS +=		${CFLAGS.${.IMPSRC:T}}
 
 include ../Makefile.inc
 

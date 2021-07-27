@@ -13,8 +13,6 @@
 # Copyright 2015 Toomas Soome <tsoome@me.com>
 #
 
-.KEEP_STATE:
-
 include $(SRC)/Makefile.master
 
 SUBDIRS = $(MACH) $(MACH64)
@@ -24,9 +22,9 @@ clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
 install	:=	TARGET = install
 
-all clean clobber: $(SUBDIRS)
+.KEEP_STATE:
 
-install: all
+all clean clobber install: $(SUBDIRS)
 
 .PARALLEL:
 

@@ -21,32 +21,32 @@ SRCS +=		$(COMDIR)/edonr/edonr.c
 SRCS +=		$(COMDIR)/skein/skein.c
 SRCS +=		$(COMDIR)/skein/skein_iv.c
 SRCS +=		$(COMDIR)/skein/skein_block.c
-OBJS +=		digest.o
-OBJS +=		sha1.o
-OBJS +=		edonr.o
-OBJS +=		skein.o
-OBJS +=		skein_iv.o
-OBJS +=		skein_block.o
+OBJECTS +=	digest.o
+OBJECTS +=	sha1.o
+OBJECTS +=	edonr.o
+OBJECTS +=	skein.o
+OBJECTS +=	skein_iv.o
+OBJECTS +=	skein_block.o
 
-digest.o := CPPFLAGS +=	-I../../common
+objs/digest.o pics/digest.o := CPPFLAGS +=	-I../../common
 
 # Do not unroll skein loops, reduce code size
-skein_block.o := CPPFLAGS +=	-DSKEIN_LOOP=111
+objs/skein_block.o pics/skein_block.o := CPPFLAGS +=	-DSKEIN_LOOP=111
 
-%.o:	$(COMDIR)/edonr/%.c
+objs/%.o pics/%.o:	$(COMDIR)/edonr/%.c
 	$(COMPILE.c) -o $@ $<
 
-%.o:	$(COMDIR)/skein/%.c
+objs/%.o pics/%.o:	$(COMDIR)/skein/%.c
 	$(COMPILE.c) -o $@ $<
 
-%.o:	$(CRYPTOSRC)/%.c
+objs/%.o pics/%.o:	$(CRYPTOSRC)/%.c
 	$(COMPILE.c) -o $@ $<
 
-%.o:	$(COMDIR)/sha1/%.c
-	$(COMPILE.c) $<
+objs/%.o pics/%.o:	$(COMDIR)/sha1/%.c
+	$(COMPILE.c) -o $@ $<
 
 sha1-x86_64.s: $(COMDIR)/sha1/amd64/sha1-x86_64.pl
 	$(PERL) $? $@
 
-sha1-x86_64.o: sha1-x86_64.s
+pics/sha1-x86_64.o: sha1-x86_64.s
 	$(COMPILE.s) -o $@ ${@F:.o=.s}

@@ -30,8 +30,8 @@
  * Copyright (c) 2017, 2019, Datto Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2017, Intel Corporation.
- * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -1731,13 +1731,15 @@ spa_load_l2cache(spa_t *spa)
 
 	ASSERT(spa_config_held(spa, SCL_ALL, RW_WRITER) == SCL_ALL);
 
+	nl2cache = 0;
+	newvdevs = NULL;
 	if (sav->sav_config != NULL) {
 		VERIFY(nvlist_lookup_nvlist_array(sav->sav_config,
 		    ZPOOL_CONFIG_L2CACHE, &l2cache, &nl2cache) == 0);
-		newvdevs = kmem_alloc(nl2cache * sizeof (void *), KM_SLEEP);
-	} else {
-		nl2cache = 0;
-		newvdevs = NULL;
+		if (nl2cache > 0) {
+			newvdevs = kmem_alloc(
+			    nl2cache * sizeof (void *), KM_SLEEP);
+		}
 	}
 
 	oldvdevs = sav->sav_vdevs;
@@ -1829,7 +1831,11 @@ spa_load_l2cache(spa_t *spa)
 	VERIFY(nvlist_remove(sav->sav_config, ZPOOL_CONFIG_L2CACHE,
 	    DATA_TYPE_NVLIST_ARRAY) == 0);
 
-	l2cache = kmem_alloc(sav->sav_count * sizeof (void *), KM_SLEEP);
+	l2cache = NULL;
+	if (sav->sav_count > 0) {
+		l2cache = kmem_alloc(
+		    sav->sav_count * sizeof (void *), KM_SLEEP);
+	}
 	for (i = 0; i < sav->sav_count; i++)
 		l2cache[i] = vdev_config_generate(spa,
 		    sav->sav_vdevs[i], B_TRUE, VDEV_CONFIG_L2CACHE);

@@ -23,7 +23,6 @@
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 2010, Intel Corporation.
-# Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2021 Oxide Computer Company
@@ -117,7 +116,6 @@ CORE_OBJS +=			\
 	pmem.o			\
 	ppage.o			\
 	pwrnow.o		\
-	seg_vmm.o		\
 	smt.o			\
 	speedstep.o		\
 	ssp.o			\
@@ -271,6 +269,8 @@ VMM_OBJS += vmm.o \
 	svm_support.o \
 	amdv.o \
 	vmm_gpt.o \
+	seg_vmm.o \
+	vmm_reservoir.o \
 	vmm_sol_vm.o \
 	vmm_sol_glue.o \
 	vmm_sol_ept.o \

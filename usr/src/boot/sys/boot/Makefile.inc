@@ -49,14 +49,14 @@ AS_CPPFLAGS=
 CPPFLAGS=	-D_STANDALONE -_gcc=-nostdinc
 CFLAGS64=	-_gcc=-mno-red-zone
 
-CFLAGS=		-_gcc=-Os -_gcc=-fPIC -_gcc=-ffreestanding -_gcc=-fno-builtin
+CFLAGS=		-_gcc=-Os -_gcc=-ffreestanding -_gcc=-fno-builtin
 CFLAGS +=	-_gcc=-ffunction-sections -_gcc=-fdata-sections
 CFLAGS +=	-_gcc=-mno-mmx -_gcc=-mno-3dnow -_gcc=-mno-sse -_gcc=-mno-sse2
 CFLAGS +=	-_gcc=-mno-sse3 -_gcc=-msoft-float
 CFLAGS +=	-_gcc=-mno-avx -_gcc=-mno-aes
 CFLAGS +=	-_gcc=-Wall
 CFLAGS +=	$(CCNOAUTOINLINE) $(CCNOREORDER) $(CSTD_GNU99)
-CCASFLAGS=	-fPIC -Wa,--divide
+CCASFLAGS=	-Wa,--divide
 ASFLAGS=	--divide
 
 SMATCH_ =
@@ -64,11 +64,11 @@ SMATCH_on =
 SMATCH_off = -_smatch=off
 
 # SMATCH_ARGS will bring in set of -Wno-* options.
-#CFLAGS +=	$(SMATCH_ARGS:%=-_smatch=%)
+SMATCH_ARGS =	--timeout=0
+CFLAGS +=	$(SMATCH_ARGS:%=-_smatch=%)
 CFLAGS +=	$(SMOFF:%=-_smatch=--disable=%)
 CFLAGS +=	$(SMATCH_$(MACHINE))
 CFLAGS +=	$(SMATCH_$(SMATCH))
-CFLAGS +=	-_smatch=--timeout=0
 
 COMPILE.S=	$(CC) $(SMATCH_off) $(CCASFLAGS) $(CPPFLAGS) -c
 

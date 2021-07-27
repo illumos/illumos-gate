@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef _VMM_H_
@@ -124,20 +124,12 @@ enum x2apic_state {
 
 /*
  * illumos doesn't have a limitation based on SPECNAMELEN like FreeBSD does.
- * Instead of picking an arbitrary value we will just rely on the same
- * calculation that's made below. If this calculation ever changes we need to
- * update the the VM_MAX_NAMELEN mapping in the bhyve brand's boot.c file.
+ * To simplify structure definitions, an arbitrary limit has been chosen.
+ * This same limit is used for memory segment names
  */
 
-#define VM_MAX_PREFIXLEN 10
-#define VM_MAX_SUFFIXLEN 15
-#define VM_MIN_NAMELEN   6
-#define VM_MAX_NAMELEN \
-    (SPECNAMELEN - VM_MAX_PREFIXLEN - VM_MAX_SUFFIXLEN - 1)
-
-#ifdef _KERNEL
-CTASSERT(VM_MAX_NAMELEN >= VM_MIN_NAMELEN);
-#endif
+#define	VM_MAX_NAMELEN		128
+#define	VM_MAX_SEG_NAMELEN	128
 
 #define	VM_MAXCPU	32			/* maximum virtual cpus */
 
@@ -388,5 +380,13 @@ struct vm_entry {
 };
 
 int vm_restart_instruction(void *vm, int vcpuid);
+
+enum vm_create_flags {
+	/*
+	 * Allocate guest memory segments from existing reservoir capacity,
+	 * rather than attempting to create transient allocations.
+	 */
+	VCF_RESERVOIR_MEM = (1 << 0),
+};
 
 #endif	/* _VMM_H_ */

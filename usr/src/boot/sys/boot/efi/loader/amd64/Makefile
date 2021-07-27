@@ -14,6 +14,8 @@
 # Copyright 2016 RackTop Systems.
 #
 
+include $(SRC)/Makefile.master
+
 MACHINE=	$(MACH64)
 EFIPROG=	loader64.efi
 

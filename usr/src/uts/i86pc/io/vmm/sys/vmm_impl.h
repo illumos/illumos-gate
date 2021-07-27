@@ -40,7 +40,7 @@
 struct vmm_devmem_entry {
 	list_node_t	vde_node;
 	int		vde_segid;
-	char		vde_name[SPECNAMELEN + 1];
+	char		vde_name[VM_MAX_SEG_NAMELEN];
 	size_t		vde_len;
 	off_t		vde_off;
 };

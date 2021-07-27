@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -109,12 +109,31 @@ struct vmctx {
 #ifdef	__FreeBSD__
 #define	CREATE(x)  sysctlbyname("hw.vmm.create", NULL, NULL, (x), strlen((x)))
 #define	DESTROY(x) sysctlbyname("hw.vmm.destroy", NULL, NULL, (x), strlen((x)))
-#else
-#define	CREATE(x)	vm_do_ctl(VMM_CREATE_VM, (x))
-#define	DESTROY(x)	vm_do_ctl(VMM_DESTROY_VM, (x))
 
+int
+vm_create(const char *name)
+{
+	/* Try to load vmm(4) module before creating a guest. */
+	if (modfind("vmm") < 0)
+		kldload("vmm");
+	return (CREATE((char *)name));
+}
+
+void
+vm_destroy(struct vmctx *vm)
+{
+	assert(vm != NULL);
+
+	if (vm->fd >= 0)
+		close(vm->fd);
+	DESTROY(vm->name);
+
+	free(vm);
+}
+
+#else
 static int
-vm_do_ctl(int cmd, const char *name)
+vm_do_ctl(int cmd, void *req)
 {
 	int ctl_fd;
 
@@ -123,7 +142,7 @@ vm_do_ctl(int cmd, const char *name)
 		return (-1);
 	}
 
-	if (ioctl(ctl_fd, cmd, name) == -1) {
+	if (ioctl(ctl_fd, cmd, req) == -1) {
 		int err = errno;
 
 		/* Do not lose ioctl errno through the close(2) */
@@ -134,6 +153,46 @@ vm_do_ctl(int cmd, const char *name)
 	(void) close(ctl_fd);
 
 	return (0);
+}
+
+int
+vm_create(const char *name, uint64_t flags)
+{
+	struct vm_create_req req;
+
+	(void) strncpy(req.name, name, VM_MAX_NAMELEN);
+	req.flags = flags;
+
+	return (vm_do_ctl(VMM_CREATE_VM, &req));
+}
+
+void
+vm_close(struct vmctx *vm)
+{
+	assert(vm != NULL);
+	assert(vm->fd >= 0);
+
+	(void) close(vm->fd);
+
+	free(vm);
+}
+
+void
+vm_destroy(struct vmctx *vm)
+{
+	struct vm_destroy_req req;
+
+	assert(vm != NULL);
+
+	if (vm->fd >= 0) {
+		(void) close(vm->fd);
+		vm->fd = -1;
+	}
+
+	(void) strncpy(req.name, vm->name, VM_MAX_NAMELEN);
+	(void) vm_do_ctl(VMM_DESTROY_VM, &req);
+
+	free(vm);
 }
 #endif
 
@@ -153,17 +212,6 @@ vm_device_open(const char *name)
 
 	free(vmfile);
 	return (fd);
-}
-
-int
-vm_create(const char *name)
-{
-#ifdef __FreeBSD__
-	/* Try to load vmm(4) module before creating a guest. */
-	if (modfind("vmm") < 0)
-		kldload("vmm");
-#endif
-	return (CREATE((char *)name));
 }
 
 struct vmctx *
@@ -189,30 +237,6 @@ err:
 	return (NULL);
 }
 
-#ifndef __FreeBSD__
-void
-vm_close(struct vmctx *vm)
-{
-	assert(vm != NULL);
-	assert(vm->fd >= 0);
-
-	(void) close(vm->fd);
-
-	free(vm);
-}
-#endif
-
-void
-vm_destroy(struct vmctx *vm)
-{
-	assert(vm != NULL);
-
-	if (vm->fd >= 0)
-		close(vm->fd);
-	DESTROY(vm->name);
-
-	free(vm);
-}
 
 int
 vm_parse_memsize(const char *optarg, size_t *ret_memsize)
