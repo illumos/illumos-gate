@@ -211,6 +211,8 @@ struct vm_page {
 #define	VMC_IS_ACTIVE(vmc)	(((vmc)->vmc_state & VCS_ACTIVE) != 0)
 
 static vmspace_mapping_t *vm_mapping_find(vmspace_t *, uintptr_t, size_t);
+static void vmspace_hold_enter(vmspace_t *);
+static void vmspace_hold_exit(vmspace_t *, bool);
 static void vmc_space_hold(vm_client_t *);
 static void vmc_space_release(vm_client_t *, bool);
 static void vmc_space_invalidate(vm_client_t *, uintptr_t, size_t, uint64_t);
@@ -291,6 +293,39 @@ uint64_t
 vmspace_resident_count(vmspace_t *vms)
 {
 	return (vms->vms_pages_mapped);
+}
+
+void
+vmspace_track_dirty(vmspace_t *vms, uint64_t gpa, size_t len, uint8_t *bitmap)
+{
+	/*
+	 * Accumulate dirty bits into the given bit vector.  Note that this
+	 * races both against hardware writes from running VCPUs and
+	 * reflections from userspace.
+	 */
+	for (size_t offset = 0; offset < len; offset += PAGESIZE) {
+		bool bit = false;
+		uint64_t *entry = vmm_gpt_lookup(vms->vms_gpt, gpa + offset);
+		if (entry != NULL)
+			bit = vmm_gpt_reset_dirty(vms->vms_gpt, entry, false);
+		uint64_t pfn_offset = offset >> PAGESHIFT;
+		size_t bit_offset = pfn_offset / 8;
+		size_t bit_index = pfn_offset % 8;
+		bitmap[bit_offset] |= (bit << bit_index);
+	}
+
+	/*
+	 * Now invalidate those bits and shoot down address spaces that
+	 * may have them cached.
+	 */
+	vmspace_hold_enter(vms);
+	vms->vms_pt_gen++;
+	for (vm_client_t *vmc = list_head(&vms->vms_clients);
+	    vmc != NULL;
+	    vmc = list_next(&vms->vms_clients, vmc)) {
+		vmc_space_invalidate(vmc, gpa, len, vms->vms_pt_gen);
+	}
+	vmspace_hold_exit(vms, true);
 }
 
 static pfn_t
