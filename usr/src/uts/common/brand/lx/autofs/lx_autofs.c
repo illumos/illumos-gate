@@ -2208,6 +2208,9 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	if (error != ENOENT)
 		return (error);
 
+	if (flags & __FLXNOAUTO)
+		return (ENOENT);
+
 	if (data->lav_catatonic)
 		return (ENOENT);
 

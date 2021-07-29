@@ -22,18 +22,11 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
  * lx_proc -- a Linux-compatible /proc for the LX brand
- *
- * We have -- confusingly -- two implementations of Linux /proc.  One is to
- * support native (but Linux-borne) programs that wish to view the native
- * system through the Linux /proc model; the other -- this one -- is to
- * support Linux binaries via the LX brand.  These two implementations differ
- * greatly in their aspirations (and their willingness to bend the truth
- * of the system to accommodate those aspirations); they should not be unified.
  */
 
 #include <sys/cpupart.h>
@@ -136,6 +129,7 @@ static vnode_t *lxpr_lookup_procdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_piddir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_not_a_dir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_fddir(vnode_t *, char *);
+static vnode_t *lxpr_lookup_fdinfodir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_netdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sysdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_fsdir(vnode_t *, char *);
@@ -153,6 +147,7 @@ static int lxpr_readdir_procdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_piddir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_not_a_dir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_fddir(lxpr_node_t *, uio_t *, int *);
+static int lxpr_readdir_fdinfodir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_netdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sysdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_fsdir(lxpr_node_t *, uio_t *, int *);
@@ -175,6 +170,7 @@ static void lxpr_read_devices(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_diskstats(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_isdir(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_fd(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_fdinfo(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_filesystems(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_kmsg(lxpr_node_t *, lxpr_uiobuf_t *, ldi_handle_t);
 static void lxpr_read_loadavg(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -425,6 +421,7 @@ static lxpr_dirent_t piddir[] = {
 	{ LXPR_PID_STATUS,	"status" },
 	{ LXPR_PID_TASKDIR,	"task" },
 	{ LXPR_PID_FDDIR,	"fd" },
+	{ LXPR_PID_FDINFODIR,	"fdinfo" },
 	{ LXPR_PID_UIDMAP,	"uid_map" }
 };
 
@@ -455,6 +452,7 @@ static lxpr_dirent_t tiddir[] = {
 	{ LXPR_PID_STATM,	"statm" },
 	{ LXPR_PID_TID_STATUS,	"status" },
 	{ LXPR_PID_FDDIR,	"fd" },
+	{ LXPR_PID_FDINFODIR,	"fdinfo" },
 	{ LXPR_PID_UIDMAP,	"uid_map" }
 };
 
@@ -793,7 +791,6 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 /*
  * lxpr_close(): Vnode operation for VOP_CLOSE()
  */
-/* ARGSUSED */
 static int
 lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
     caller_context_t *ct)
@@ -844,6 +841,8 @@ static void (*lxpr_read_function[])() = {
 	lxpr_read_isdir,		/* /proc/<pid>/task/nn	*/
 	lxpr_read_isdir,		/* /proc/<pid>/fd	*/
 	lxpr_read_fd,			/* /proc/<pid>/fd/nn	*/
+	lxpr_read_isdir,		/* /proc/<pid>/fdinfo	*/
+	lxpr_read_fdinfo,		/* /proc/<pid>/fdinfo/nn	*/
 	lxpr_read_pid_id_map,		/* /proc/<pid>/uid_map	*/
 	lxpr_read_pid_auxv,		/* /proc/<pid>/task/<tid>/auxv	*/
 	lxpr_read_pid_cgroup,		/* /proc/<pid>/task/<tid>/cgroup */
@@ -867,6 +866,8 @@ static void (*lxpr_read_function[])() = {
 	lxpr_read_pid_tid_status,	/* /proc/<pid>/task/<tid>/status */
 	lxpr_read_isdir,		/* /proc/<pid>/task/<tid>/fd	*/
 	lxpr_read_fd,			/* /proc/<pid>/task/<tid>/fd/nn	*/
+	lxpr_read_isdir,		/* /proc/<pid>/task/<tid>/fdinfo */
+	lxpr_read_fdinfo,		/* /proc/<pid>/task/<tid>/fdinfo/nn */
 	lxpr_read_pid_id_map,		/* /proc/<pid>/task/<tid>/uid_map */
 	lxpr_read_cgroups,		/* /proc/cgroups	*/
 	lxpr_read_cmdline,		/* /proc/cmdline	*/
@@ -1014,6 +1015,8 @@ static vnode_t *(*lxpr_lookup_function[])() = {
 	lxpr_lookup_task_tid_dir,	/* /proc/<pid>/task/nn	*/
 	lxpr_lookup_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/fd/nn	*/
+	lxpr_lookup_fdinfodir,		/* /proc/<pid>/fdinfo	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/fdinfo/nn */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/uid_map	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/auxv	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cgroup */
@@ -1037,6 +1040,8 @@ static vnode_t *(*lxpr_lookup_function[])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/status */
 	lxpr_lookup_fddir,		/* /proc/<pid>/task/<tid>/fd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/fd/nn	*/
+	lxpr_lookup_fdinfodir,		/* /proc/<pid>/task/<tid>/fdinfo */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/fdinfo/nn */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/uid_map */
 	lxpr_lookup_not_a_dir,		/* /proc/cgroups	*/
 	lxpr_lookup_not_a_dir,		/* /proc/cmdline	*/
@@ -1184,6 +1189,8 @@ static int (*lxpr_readdir_function[])() = {
 	lxpr_readdir_task_tid_dir,	/* /proc/<pid>/task/nn	*/
 	lxpr_readdir_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/fd/nn	*/
+	lxpr_readdir_fdinfodir,		/* /proc/<pid>/fdinfo	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/fdinfo/nn */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/uid_map	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/auxv	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cgroup */
@@ -1207,6 +1214,8 @@ static int (*lxpr_readdir_function[])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/status */
 	lxpr_readdir_fddir,		/* /proc/<pid>/task/<tid>/fd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/fd/nn	*/
+	lxpr_readdir_fdinfodir,		/* /proc/<pid>/task/<tid>/fdinfo */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/fdinfo/nn */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/uid_map */
 	lxpr_readdir_not_a_dir,		/* /proc/cgroups	*/
 	lxpr_readdir_not_a_dir,		/* /proc/cmdline	*/
@@ -1331,7 +1340,6 @@ CTASSERT(ARRAY_SIZE(lxpr_readdir_function) == LXPR_NFILES);
  * (at least in general, and certainly the difference is unlikely to be enough
  * to justify have different routines for 32 and 64 bit reads
  */
-/* ARGSUSED */
 static int
 lxpr_read(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
     caller_context_t *ct)
@@ -1393,21 +1401,18 @@ lxpr_read(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
  * - empty file
  * - wait to be able to read a file that will never have anything to read
  */
-/* ARGSUSED */
 static void
 lxpr_read_isdir(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	lxpr_uiobuf_seterr(uiobuf, EISDIR);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_invalid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	lxpr_uiobuf_seterr(uiobuf, EINVAL);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_empty(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -1589,7 +1594,6 @@ lxpr_read_pid_tid_comm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%s\n", buf);
 }
 
-/* ARGSUSED */
 static int
 lxpr_write_pid_tid_comm(lxpr_node_t *lxpnp, struct uio *uio, struct cred *cr,
     caller_context_t *ct)
@@ -2238,6 +2242,58 @@ lxpr_enumerate_mounts(zone_t *zone)
 	return (result);
 }
 
+static uint_t
+lxpr_get_mountid(zone_t *zone, vfs_t *match_vfsp)
+{
+	lx_zone_data_t *lxzd = ztolxzd(zone);
+	vfs_t *vfsp, *vfslist;
+	uint_t mount_id;
+
+	if (match_vfsp == NULL)
+		return (0);
+
+	/* Mount IDs start at 15 for the root, see lxpr_enumerate_mounts() */
+	mount_id = 15;
+
+	ASSERT(zone != global_zone);
+	ASSERT(lxzd != NULL);
+	ASSERT(lxzd->lxzd_vdisks != NULL);
+
+	if (zone->zone_rootvp->v_vfsp == match_vfsp)
+		return (mount_id);
+
+	vfs_list_read_lock();
+
+	vfsp = vfslist = zone->zone_vfslist;
+
+	do {
+		if (vfsp == zone->zone_rootvp->v_vfsp)
+			continue;
+
+		if (vfsp == NULL)
+			break;
+
+		/* Skip mounts we shouldn't show */
+		if ((vfsp->vfs_flag & VFS_NOMNTTAB) != 0) {
+			vfsp = vfsp->vfs_zone_next;
+			continue;
+		}
+
+		mount_id++;
+
+		if (vfsp == match_vfsp) {
+			vfs_list_unlock();
+			return (mount_id);
+		}
+
+		vfsp = vfsp->vfs_zone_next;
+	} while (vfsp != vfslist);
+
+	vfs_list_unlock();
+
+	return (0);
+}
+
 /*
  * lxpr_read_pid_mountinfo(): information about process mount points.
  */
@@ -2860,7 +2916,6 @@ lxpr_read_pid_tid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    cpu						/* 39 */);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_arp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -3042,7 +3097,6 @@ lxpr_read_net_dev(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	kmem_free(ksr, sidx);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_dev_mcast(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -3061,7 +3115,6 @@ lxpr_inet6_out(const in6_addr_t *addr, char buf[33])
 	buf[32] = '\0';
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_if_inet6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -3102,19 +3155,16 @@ lxpr_read_net_if_inet6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	netstack_rele(ns);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_igmp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_ip_mr_cache(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_ip_mr_vif(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -3159,7 +3209,6 @@ lxpr_format_route_ipv6(ire_t *ire, lxpr_uiobuf_t *uiobuf)
 	    name);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_ipv6_route(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -3180,19 +3229,16 @@ lxpr_read_net_ipv6_route(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	netstack_rele(ns);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_mcfilter(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_netstat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_raw(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -3222,7 +3268,7 @@ lxpr_format_route_ipv4(ire_t *ire, lxpr_uiobuf_t *uiobuf)
 	/*
 	 * Search for a suitable IRE for naming purposes.
 	 * On Linux, the default route is typically associated with the
-	 * interface used to access gateway.  The default IRE on Illumos
+	 * interface used to access gateway.  The default IRE on illumos
 	 * typically lacks an ill reference but its parent might have one.
 	 */
 	nire = ire;
@@ -3267,7 +3313,6 @@ lxpr_format_route_ipv4(ire_t *ire, lxpr_uiobuf_t *uiobuf)
 	    ire->ire_metrics.iulp_rtt);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_route(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -3291,19 +3336,16 @@ lxpr_read_net_route(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	netstack_rele(ns);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_rpc(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_rt_cache(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_sockstat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -3453,7 +3495,6 @@ lxpr_read_net_snmp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	kmem_free(ksr, sidx);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_net_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -3861,7 +3902,6 @@ lxpr_read_net_unix(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 #define	LX_KMSG_PRI	"<0>"
 
-/* ARGSUSED */
 static void
 lxpr_read_kmsg(lxpr_node_t *lxpnp, struct lxpr_uiobuf *uiobuf, ldi_handle_t lh)
 {
@@ -4052,7 +4092,6 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * Note: we currently also use this for /proc/{pid}/mounts since we don't
  * yet support mount namespaces.
  */
-/* ARGSUSED */
 static void
 lxpr_read_mounts(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4130,7 +4169,6 @@ nextp:
  * /proc/diskstats, and also because "fdisk -l" and a few other things look
  * here to find all disks on the system.
  */
-/* ARGSUSED */
 static void
 lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4163,7 +4201,6 @@ lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * the expected Linux major numbers. See lx devfs where some of the major
  * numbers have no defined constants.
  */
-/* ARGSUSED */
 static void
 lxpr_read_devices(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4186,7 +4223,6 @@ lxpr_read_devices(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * See the block comment above the per-device output-generating line for the
  * details of the format.
  */
-/* ARGSUSED */
 static void
 lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4315,7 +4351,6 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 /*
  * lxpr_read_version(): read the contents of the "version" file.
  */
-/* ARGSUSED */
 static void
 lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4350,7 +4385,6 @@ lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    version);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_vmstat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4405,7 +4439,6 @@ lxpr_read_vmstat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * lxpr_read_stat(): read the contents of the "stat" file.
  *
  */
-/* ARGSUSED */
 static void
 lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4603,7 +4636,6 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * It is important to use formatting identical to the Linux implementation
  * so that consumers do not break. See swap_show() in mm/swapfile.c.
  */
-/* ARGSUSED */
 static void
 lxpr_read_swaps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4636,7 +4668,6 @@ lxpr_read_swaps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_fs_aiomax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4644,7 +4675,6 @@ lxpr_read_sys_fs_aiomax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%llu\n", LX_AIO_MAX_NR);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_fs_aionr(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4670,7 +4700,6 @@ lxpr_read_sys_fs_aionr(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * (zone's proc limit) * (process.max-file-descriptor rctl privileged limit).
  * The privileged rctl limit is the same as rlim_fd_max.
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_fs_filemax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4694,7 +4723,6 @@ lxpr_read_sys_fs_filemax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * number of files in use within a zone, so we approximate that value by
  * looking at the current "fi_nfiles" value for each process in the zone.
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_fs_filenr(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4742,7 +4770,6 @@ extern int inotify_maxevents;
 extern int inotify_maxinstances;
 extern int inotify_maxwatches;
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_fs_inotify_max_queued_events(lxpr_node_t *lxpnp,
     lxpr_uiobuf_t *uiobuf)
@@ -4751,7 +4778,6 @@ lxpr_read_sys_fs_inotify_max_queued_events(lxpr_node_t *lxpnp,
 	lxpr_uiobuf_printf(uiobuf, "%d\n", inotify_maxevents);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_fs_inotify_max_user_instances(lxpr_node_t *lxpnp,
     lxpr_uiobuf_t *uiobuf)
@@ -4760,7 +4786,6 @@ lxpr_read_sys_fs_inotify_max_user_instances(lxpr_node_t *lxpnp,
 	lxpr_uiobuf_printf(uiobuf, "%d\n", inotify_maxinstances);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_fs_inotify_max_user_watches(lxpr_node_t *lxpnp,
     lxpr_uiobuf_t *uiobuf)
@@ -4769,7 +4794,6 @@ lxpr_read_sys_fs_inotify_max_user_watches(lxpr_node_t *lxpnp,
 	lxpr_uiobuf_printf(uiobuf, "%d\n", inotify_maxwatches);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_fs_pipe_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4786,7 +4810,6 @@ lxpr_read_sys_fs_pipe_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", pipe_max);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_caplcap(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4794,7 +4817,6 @@ lxpr_read_sys_kernel_caplcap(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", LX_CAP_MAX_VALID);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_corepatt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4837,7 +4859,6 @@ lxpr_read_sys_kernel_corepatt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%s\n", tr);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_hostname(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4845,7 +4866,6 @@ lxpr_read_sys_kernel_hostname(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%s\n", uts_nodename());
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_msgmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4862,7 +4882,6 @@ lxpr_read_sys_kernel_msgmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", val);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_msgmnb(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4878,7 +4897,6 @@ lxpr_read_sys_kernel_msgmnb(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)val);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_msgmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4894,7 +4912,6 @@ lxpr_read_sys_kernel_msgmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)val);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4902,7 +4919,6 @@ lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", ngroups_max);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_osrel(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4920,7 +4936,6 @@ lxpr_read_sys_kernel_osrel(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%s\n", version);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_pid_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -4983,7 +4998,6 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 /*
  * The amount of entropy available (in bits).
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_rand_entavl(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5011,7 +5025,6 @@ lxpr_read_sys_kernel_rand_uuid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%s\n", uuid);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_sem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5041,7 +5054,6 @@ lxpr_read_sys_kernel_sem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    vmsl, vmns, vopm, vmni);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_shmall(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5058,7 +5070,6 @@ lxpr_read_sys_kernel_shmall(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)btop(val));
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_shmmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5077,7 +5088,6 @@ lxpr_read_sys_kernel_shmmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)val);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_shmmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5096,7 +5106,6 @@ lxpr_read_sys_kernel_shmmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)val);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_kernel_threads_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5104,7 +5113,6 @@ lxpr_read_sys_kernel_threads_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", LXPTOZ(lxpnp)->zone_nlwps_ctl);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_core_somaxc(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5135,7 +5143,6 @@ lxpr_read_sys_net_core_somaxc(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  *
  * Note that the Linux setting is the inverse of the illumos value.
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_icmp_eib(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5165,7 +5172,6 @@ lxpr_read_sys_net_ipv4_icmp_eib(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * in lx at this time, thus we do not support Linux-ABI methods for
  * enabling/disabling forwarding, and this is always 0.
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_ip_forward(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5182,7 +5188,6 @@ lxpr_read_sys_net_ipv4_ip_forward(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * illumos: tcp_smallest_anon_port & tcp_largest_anon_port
  * Not in tcp(7p) man page.
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_ip_lport_range(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5259,7 +5264,6 @@ lxpr_read_sys_net_ipv4_tcp_cc_curr(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * in the tcp_input_data() function on the use of tcp_fin_wait_2_flush_interval.
  * The value is in milliseconds.
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_fin_to(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5293,7 +5297,6 @@ lxpr_read_sys_net_ipv4_tcp_fin_to(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * 9 times (giving a total of 11.25 minutes) so we emulate this by dividing out
  * tcps_keepalive_abort_interval by 9.
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_ka_int(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5324,7 +5327,6 @@ lxpr_read_sys_net_ipv4_tcp_ka_int(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * The interval for sending out the first probe in milliseconds. The default is
  * two hours.
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5353,7 +5355,6 @@ lxpr_read_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  *
  * illumos: tcp_conn_req_max_q0
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_max_syn_bl(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5396,7 +5397,6 @@ lxpr_read_sys_net_ipv4_tcp_max_syn_bl(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * The interval_max value is the maximum RTO in ms.
  * The extra value is an extra time (in ms) to add in to the RTO.
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_retry2(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5436,7 +5436,6 @@ lxpr_read_sys_net_ipv4_tcp_retry2(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  *    tcp_xmit_hiwat is the default TCP send window size
  *    tcp_max_buf is the maximum TCP send and receive buffer size
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_rwmem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5476,7 +5475,6 @@ lxpr_read_sys_net_ipv4_tcp_rwmem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * tcp_sack_permitted 0 == disabled, 1 == no initiate but accept,
  * 2 == initiate and accept. default is 2.
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_sack(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5509,7 +5507,6 @@ lxpr_read_sys_net_ipv4_tcp_sack(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * window scale option will be set only if the user has requested a send or
  * receive window larger than 64K. The default value of is 1.
  */
-/* ARGSUSED */
 static void
 lxpr_read_sys_net_ipv4_tcp_winscale(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5573,7 +5570,6 @@ lxpr_read_sys_vm_dirty(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", val);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_vm_max_map_cnt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5582,7 +5578,6 @@ lxpr_read_sys_vm_max_map_cnt(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", 16777215);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_vm_minfr_kb(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5590,7 +5585,6 @@ lxpr_read_sys_vm_minfr_kb(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", 0);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_vm_nhpages(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5598,7 +5592,6 @@ lxpr_read_sys_vm_nhpages(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", 0);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5606,7 +5599,6 @@ lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%d\n", 0);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_sys_vm_swappiness(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5620,7 +5612,6 @@ lxpr_read_sys_vm_swappiness(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * format is: "%.2lf, %.2lf",uptime_secs, idle_secs
  * Use fixed point arithmetic to get 2 decimal places
  */
-/* ARGSUSED */
 static void
 lxpr_read_uptime(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -5685,7 +5676,6 @@ lxpr_read_uptime(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * cgroup subsystems as being installed. The commented example below shows
  * how to print a subsystem entry.
  */
-/* ARGSUSED */
 static void
 lxpr_read_cgroups(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -6000,7 +5990,6 @@ lx_cpuinfo_mapping_t lx_cpuinfo_mappings[] = {
 #define	LX_CPUINFO_MAPPING_MAX	\
 	(sizeof (lx_cpuinfo_mappings) / sizeof (lx_cpuinfo_mappings[0]))
 
-/* ARGSUSED */
 static void
 lxpr_read_cpuinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -6131,7 +6120,6 @@ lxpr_read_cpuinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	mutex_exit(&cpu_lock);
 }
 
-/* ARGSUSED */
 static void
 lxpr_read_fd(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -6139,12 +6127,71 @@ lxpr_read_fd(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_seterr(uiobuf, EFAULT);
 }
 
+static void
+lxpr_read_fdinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	zone_t *zone = LXPTOZ(lxpnp);
+	proc_t *p;
+	file_t *fp;
+	vnode_t *vp;
+	offset_t off;
+	short uf_flag;
+	int fd;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_FDINFO_FD);
+
+	p = lxpr_lock(lxpnp, NO_ZOMB);
+	if (p == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, EINVAL);
+		return;
+	}
+
+	if ((p->p_flag & SSYS) || p->p_as == &kas) {
+		lxpr_uiobuf_seterr(uiobuf, EFAULT);
+		lxpr_unlock(p);
+		return;
+	}
+
+	fd = lxpnp->lxpr_desc;
+
+	fp = lxpr_getf(p, fd, &uf_flag);
+	if (fp == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENOENT);
+		lxpr_unlock(p);
+		return;
+	}
+	vp = fp->f_vnode;
+
+	/*
+	 * Check that the offset value in the underlying file_t is plausible
+	 * and reset to 0 if not.
+	 */
+	if (fp->f_offset == -1) {
+		off = 0;
+	} else {
+		off = fp->f_offset;
+		if (VOP_SEEK(vp, 0, &off, NULL) != 0)
+			off = 0;
+	}
+
+	lxpr_uiobuf_printf(uiobuf, "pos:\t%ld\n", off);
+	lxpr_uiobuf_printf(uiobuf, "flags:\t0%o\n",
+	    lxpr_open_flags_convert(uf_flag,
+	    fp->f_flag2 << 16 | fp->f_flag));
+	lxpr_uiobuf_printf(uiobuf, "mnt_id:\t%u\n",
+	    lxpr_get_mountid(zone, vp->v_vfsp));
+
+	/* Could show additional fields based on vp->v_type */
+
+	lxpr_releasef(p, fd);
+	lxpr_unlock(p);
+}
+
 /*
  * Report a list of file systems loaded in the kernel. We only report the ones
  * which we support and which may be checked by various components to see if
  * they are loaded.
  */
-/* ARGSUSED */
 static void
 lxpr_read_filesystems(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -6269,6 +6316,10 @@ lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		 */
 		if ((flags & FOLLOW) == 0)
 			vap->va_type = VLNK;
+	case LXPR_PID_FDINFO_FD:
+	case LXPR_PID_TID_FDINFO_FD:
+		/* Linux leaves the file size for these as 0 */
+		break;
 	default:
 		break;
 	}
@@ -6401,7 +6452,6 @@ lxpr_doaccess(lxpr_node_t *lxpnp, boolean_t shallow, int mode, int flags,
 	return (EACCES);
 }
 
-/* ARGSUSED */
 static vnode_t *
 lxpr_lookup_not_a_dir(vnode_t *dp, char *comp)
 {
@@ -6411,7 +6461,6 @@ lxpr_lookup_not_a_dir(vnode_t *dp, char *comp)
 /*
  * lxpr_lookup(): Vnode operation for VOP_LOOKUP()
  */
-/* ARGSUSED */
 static int
 lxpr_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
     int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
@@ -6649,6 +6698,15 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 }
 
 static vnode_t *
+lxpr_lookup_fdinfodir(vnode_t *dp, char *comp)
+{
+	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_PID_FDINFODIR ||
+	    VTOLXP(dp)->lxpr_type == LXPR_PID_TID_FDINFODIR);
+
+	return (lxpr_lookup_fdinfonode(dp, comp));
+}
+
+static vnode_t *
 lxpr_lookup_netdir(vnode_t *dp, char *comp)
 {
 	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_NETDIR);
@@ -6790,7 +6848,6 @@ lxpr_lookup_sys_fs_inotifydir(vnode_t *dp, char *comp)
 /*
  * lxpr_readdir(): Vnode operation for VOP_READDIR()
  */
-/* ARGSUSED */
 static int
 lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp,
     caller_context_t *ct, int flags)
@@ -6832,7 +6889,6 @@ lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp,
 	return (lxpr_readdir_function[type](lxpnp, uiop, eofp));
 }
 
-/* ARGSUSED */
 static int
 lxpr_readdir_not_a_dir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 {
@@ -7267,7 +7323,8 @@ lxpr_readdir_task_tid_dir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 }
 
 static int
-lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+lxpr_readdir_fdlist(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp,
+    lxpr_nodetype_t inodetype)
 {
 	/* bp holds one dirent64 structure */
 	longlong_t bp[DIRENT64_RECLEN(LXPNSIZ) / sizeof (longlong_t)];
@@ -7279,8 +7336,13 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	proc_t *p;
 	uf_info_t *fip;
 
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_FDDIR ||
-	    lxpnp->lxpr_type == LXPR_PID_TID_FDDIR);
+	ASSERT(
+	    (inodetype == LXPR_PID_FD_FD && (
+	    lxpnp->lxpr_type == LXPR_PID_FDDIR ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_FDDIR)) ||
+	    (inodetype == LXPR_PID_FDINFO_FD && (
+	    lxpnp->lxpr_type == LXPR_PID_FDINFODIR ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_FDINFODIR)));
 
 	oresid = uiop->uio_resid;
 
@@ -7345,7 +7407,7 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 		if (fip->fi_list[fd].uf_file == NULL)
 			continue;
 
-		dirent->d_ino = lxpr_inode(LXPR_PID_FD_FD, p->p_pid, fd);
+		dirent->d_ino = lxpr_inode(inodetype, p->p_pid, fd);
 		len = snprintf(dirent->d_name, LXPNSIZ, "%d", fd);
 		ASSERT(len < LXPNSIZ);
 		reclen = DIRENT64_RECLEN(len);
@@ -7377,6 +7439,18 @@ out:
 	mutex_enter(&p->p_lock);
 	lxpr_unlock(p);
 	return (error);
+}
+
+static int
+lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+{
+	return (lxpr_readdir_fdlist(lxpnp, uiop, eofp, LXPR_PID_FD_FD));
+}
+
+static int
+lxpr_readdir_fdinfodir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+{
+	return (lxpr_readdir_fdlist(lxpnp, uiop, eofp, LXPR_PID_FDINFO_FD));
 }
 
 static int
@@ -7491,7 +7565,6 @@ lxpr_tokenize_num(char *str, long *pv, char **ep)
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 lxpr_write_tcp_property(lxpr_node_t *lxpnp, struct uio *uio,
     struct cred *cr, caller_context_t *ct, char *prop,
@@ -7644,7 +7717,6 @@ lxpr_xlate_sack(char *val, int size)
  * We're updating a property on the ip stack so we can't reuse
  * lxpr_write_tcp_property.
  */
-/* ARGSUSED */
 static int
 lxpr_write_sys_net_ipv4_icmp_eib(lxpr_node_t *lxpnp, struct uio *uio,
     struct cred *cr, caller_context_t *ct)
@@ -7702,7 +7774,6 @@ lxpr_write_sys_net_ipv4_icmp_eib(lxpr_node_t *lxpnp, struct uio *uio,
  * set two properties on the netstack_tcp, so we can't reuse
  * lxpr_write_tcp_property.
  */
-/* ARGSUSED */
 static int
 lxpr_write_sys_net_ipv4_ip_lport_range(lxpr_node_t *lxpnp, struct uio *uio,
     struct cred *cr, caller_context_t *ct)
@@ -7785,7 +7856,6 @@ lxpr_write_sys_net_ipv4_ip_lport_range(lxpr_node_t *lxpnp, struct uio *uio,
  *
  * See the Linux tcp(7) man page.
  */
-/* ARGSUSED */
 static int
 lxpr_write_sys_net_ipv4_tcp_rwmem(lxpr_node_t *lxpnp, struct uio *uio,
     struct cred *cr, caller_context_t *ct)
@@ -7952,7 +8022,6 @@ lxpr_write_sys_net_ipv4_tcp_winscale(lxpr_node_t *lxpnp, struct uio *uio,
 	    NULL));
 }
 
-/* ARGSUSED */
 static int
 lxpr_write_sys_fs_pipe_max(lxpr_node_t *lxpnp, struct uio *uio,
     struct cred *cr, caller_context_t *ct)
@@ -8005,7 +8074,6 @@ lxpr_write_sys_fs_pipe_max(lxpr_node_t *lxpnp, struct uio *uio,
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 lxpr_write_sys_kernel_corepatt(lxpr_node_t *lxpnp, struct uio *uio,
     struct cred *cr, caller_context_t *ct)
@@ -8066,7 +8134,6 @@ lxpr_write_sys_kernel_corepatt(lxpr_node_t *lxpnp, struct uio *uio,
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 lxpr_write_pid_loginuid(lxpr_node_t *lxpnp, struct uio *uio, struct cred *cr,
     caller_context_t *ct)
@@ -8167,12 +8234,11 @@ lxpr_readlink_exe(lxpr_node_t *lxpnp, char *buf, size_t size, cred_t *cr)
 /*
  * lxpr_readlink(): Vnode operation for VOP_READLINK()
  */
-/* ARGSUSED */
 static int
 lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 {
-	char bp[MAXPATHLEN + 1];
-	size_t buflen = sizeof (bp);
+	char *bp;
+	size_t buflen, klen;
 	lxpr_node_t *lxpnp = VTOLXP(vp);
 	vnode_t *rvp = lxpnp->lxpr_realvp;
 	pid_t pid;
@@ -8199,11 +8265,14 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 	if (vp->v_type != VLNK && lxpnp->lxpr_type != LXPR_PID_FD_FD)
 		return (EINVAL);
 
+	buflen = klen = MAXPATHLEN + 1;
+	bp = kmem_alloc(klen, KM_SLEEP);
+
 	/* Try to produce a symlink name for anything that has a realvp */
 	if (rvp != NULL) {
 		error = lxpr_doaccess(lxpnp, B_TRUE, VREAD, 0, cr, ct);
 		if (error != 0)
-			return (error);
+			goto out;
 
 		error = vnodetopath(NULL, rvp, bp, buflen, cr);
 
@@ -8221,7 +8290,7 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 			 */
 			if (lxpnp->lxpr_type != LXPR_PID_FD_FD ||
 			    lxpr_readlink_fdnode(lxpnp, bp, buflen) != 0) {
-				return (error);
+				goto out;
 			}
 		}
 	} else {
@@ -8239,18 +8308,24 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 		case LXPR_PID_CURDIR:
 		case LXPR_PID_ROOTDIR:
 		case LXPR_PID_EXE:
-			return (EACCES);
+			error = EACCES;
+			goto out;
 		default:
 			/*
 			 * Need to return error so that nothing thinks
 			 * that the symlink is empty and hence "."
 			 */
-			return (EINVAL);
+			error = EINVAL;
+			goto out;
 		}
 	}
 
 	/* copy the link data to user space */
-	return (uiomove(bp, strlen(bp), UIO_READ, uiop));
+	error = uiomove(bp, strlen(bp), UIO_READ, uiop);
+
+out:
+	kmem_free(bp, klen);
+	return (error);
 }
 
 
@@ -8259,7 +8334,6 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
  * Vnode is no longer referenced, deallocate the file
  * and all its resources.
  */
-/* ARGSUSED */
 static void
 lxpr_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
@@ -8322,7 +8396,6 @@ lxpr_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 /* Pollhead for fake POLLET support below */
 static struct pollhead lxpr_pollhead;
 
-/* ARGSUSED */
 static int
 lxpr_poll(vnode_t *vp, short ev, int anyyet, short *reventsp,
     pollhead_t **phpp, caller_context_t *ct)
@@ -8358,7 +8431,6 @@ lxpr_poll(vnode_t *vp, short ev, int anyyet, short *reventsp,
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 lxpr_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
     caller_context_t *ct)
@@ -8383,7 +8455,6 @@ lxpr_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 }
 
 /* Needed for writable files which are first "truncated" */
-/* ARGSUSED */
 static int
 lxpr_space(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
     cred_t *cred, caller_context_t *ct)
@@ -8402,7 +8473,6 @@ lxpr_space(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
  * Needed for writable files which are first "truncated". We only support
  * truncation.
  */
-/* ARGSUSED */
 static int
 lxpr_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
     caller_context_t *ct)
@@ -8420,7 +8490,6 @@ lxpr_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 /*
  * We need to allow open with O_CREAT for the writable files.
  */
-/* ARGSUSED */
 static int
 lxpr_create(vnode_t *dvp, char *nm, vattr_t *vap, enum vcexcl exclusive,
     int mode, vnode_t **vpp, cred_t *cr, int flag, caller_context_t *ct,

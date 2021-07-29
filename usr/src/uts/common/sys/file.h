@@ -125,6 +125,11 @@ typedef struct fpollinfo {
  * Private interface for lx O_PATH|O_NOFOLLOW emulation for symlinks.
  */
 #define	__FLXPATH	0x80000000
+/*
+ * Private interface for lx fstatat(AT_NO_AUTOMOUNT) emulation.
+ * Since usage is disjoint, the __FLXPATH bit is re-used.
+ */
+#define	__FLXNOAUTO	0x80000000
 
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 

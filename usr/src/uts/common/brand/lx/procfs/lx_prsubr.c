@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -35,7 +36,9 @@
 #include <sys/vmsystm.h>
 #include <sys/prsystm.h>
 #include <sys/brand.h>
+#include <sys/fcntl.h>
 #include <sys/lx_brand.h>
+#include <sys/lx_fcntl.h>
 
 #include "lx_proc.h"
 
@@ -352,6 +355,62 @@ lxpr_unlock(proc_t *p)
 	mutex_exit(&p->p_lock);
 }
 
+file_t *
+lxpr_getf(proc_t *p, uint_t fd, short *flag)
+{
+	uf_entry_t *ufp;
+	uf_info_t *fip;
+	file_t *fp;
+
+	ASSERT(MUTEX_HELD(&p->p_lock) && (p->p_proc_flag & P_PR_LOCK));
+
+	fip = P_FINFO(p);
+
+	if (fd >= fip->fi_nfiles)
+		return (NULL);
+
+	/*
+	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
+	 * going away while we dereference into fi_list.
+	 */
+	mutex_exit(&p->p_lock);
+	mutex_enter(&fip->fi_lock);
+	UF_ENTER(ufp, fip, fd);
+	if ((fp = ufp->uf_file) != NULL && fp->f_count > 0) {
+		if (flag != NULL)
+			*flag = ufp->uf_flag;
+		ufp->uf_refcnt++;
+	} else {
+		fp = NULL;
+	}
+	UF_EXIT(ufp);
+	mutex_exit(&fip->fi_lock);
+	mutex_enter(&p->p_lock);
+
+	return (fp);
+}
+
+void
+lxpr_releasef(proc_t *p, uint_t fd)
+{
+	uf_entry_t *ufp;
+	uf_info_t *fip;
+
+	ASSERT(MUTEX_HELD(&p->p_lock) && (p->p_proc_flag & P_PR_LOCK));
+
+	fip = P_FINFO(p);
+
+	mutex_exit(&p->p_lock);
+	mutex_enter(&fip->fi_lock);
+	UF_ENTER(ufp, fip, fd);
+	ASSERT3U(ufp->uf_refcnt, >, 0);
+	ufp->uf_refcnt--;
+	UF_EXIT(ufp);
+	mutex_exit(&fip->fi_lock);
+	mutex_enter(&p->p_lock);
+}
+
+
 void
 lxpr_initnodecache()
 {
@@ -366,7 +425,6 @@ lxpr_fininodecache()
 	kmem_cache_destroy(lxpr_node_cache);
 }
 
-/* ARGSUSED */
 static int
 lxpr_node_constructor(void *buf, void *un, int kmflags)
 {
@@ -383,7 +441,6 @@ lxpr_node_constructor(void *buf, void *un, int kmflags)
 	return (0);
 }
 
-/* ARGSUSED */
 static void
 lxpr_node_destructor(void *buf, void *un)
 {
@@ -586,8 +643,17 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 		vp->v_type = VLNK;
 		break;
 
+	case LXPR_PID_FDINFO_FD:
+	case LXPR_PID_TID_FDINFO_FD:
+		ASSERT(p != NULL);
+		lxpnp->lxpr_mode = 0400;	/* read by owner only */
+		vp->v_type = VREG;
+		break;
+
 	case LXPR_PID_FDDIR:
 	case LXPR_PID_TID_FDDIR:
+	case LXPR_PID_FDINFODIR:
+	case LXPR_PID_TID_FDINFODIR:
 		ASSERT(p != NULL);
 		vp->v_type = VDIR;
 		lxpnp->lxpr_mode = 0500;	/* read-search by owner only */
@@ -661,6 +727,27 @@ lxpr_freenode(lxpr_node_t *lxpnp)
 	kmem_cache_free(lxpr_node_cache, lxpnp);
 }
 
+static int
+lxpr_parse_fdnode_num(const char *name)
+{
+	char *endptr = NULL;
+	long num;
+	int fd;
+
+	if (ddi_strtol(name, &endptr, 10, &num) != 0) {
+		return (-1);
+	} else if (name[0] < '0' || name[0] > '9' || *endptr != '\0') {
+		/*
+		 * ddi_strtol allows leading spaces and trailing garbage
+		 * We do not tolerate such foolishness.
+		 */
+		return (-1);
+	} else if ((fd = (int)num) < 0) {
+		return (-1);
+	}
+	return (fd);
+}
+
 /*
  * Attempt to locate vnode for /proc/<pid>/fd/<#>.
  */
@@ -669,34 +756,20 @@ lxpr_lookup_fdnode(vnode_t *dvp, const char *name)
 {
 	lxpr_node_t *lxdp = VTOLXP(dvp);
 	lxpr_node_t *lxfp;
-	char *endptr = NULL;
-	long num;
 	int fd;
 	proc_t *p;
 	vnode_t *vp = NULL;
 	file_t *fp;
-	uf_entry_t *ufp;
-	uf_info_t *fip;
 
 	ASSERT(lxdp->lxpr_type == LXPR_PID_FDDIR ||
 	    lxdp->lxpr_type == LXPR_PID_TID_FDDIR);
 
-	if (ddi_strtol(name, &endptr, 10, &num) != 0) {
+	if ((fd = lxpr_parse_fdnode_num(name)) == -1)
 		return (NULL);
-	} else if (name[0] < '0' || name[0] > '9' || *endptr != '\0') {
-		/*
-		 * ddi_strtol allows leading spaces and trailing garbage
-		 * We do not tolerate such foolishness.
-		 */
-		return (NULL);
-	} else if ((fd = (int)num) < 0) {
-		return (NULL);
-	}
 
 	/* Lock the owner process */
-	if ((p = lxpr_lock(lxdp, NO_ZOMB)) == NULL) {
+	if ((p = lxpr_lock(lxdp, NO_ZOMB)) == NULL)
 		return (NULL);
-	}
 
 	/* Not applicable to processes which are system-owned. */
 	if (p->p_as == &kas) {
@@ -706,50 +779,38 @@ lxpr_lookup_fdnode(vnode_t *dvp, const char *name)
 
 	lxfp = lxpr_getnode(dvp, LXPR_PID_FD_FD, p, fd);
 
-	/*
-	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
-	 * going away while we dereference into fi_list.
-	 */
-	fip = P_FINFO(p);
-	mutex_exit(&p->p_lock);
-	mutex_enter(&fip->fi_lock);
-	if (fd < fip->fi_nfiles) {
-		UF_ENTER(ufp, fip, fd);
-		if ((fp = ufp->uf_file) != NULL) {
-			vp = fp->f_vnode;
-			VN_HOLD(vp);
-		}
-		UF_EXIT(ufp);
+	if ((fp = lxpr_getf(p, fd, NULL)) != NULL) {
+		vp = fp->f_vnode;
+		VN_HOLD(vp);
+		lxpr_releasef(p, fd);
 	}
-	mutex_exit(&fip->fi_lock);
 
 	if (vp == NULL) {
-		mutex_enter(&p->p_lock);
 		lxpr_unlock(p);
 		lxpr_freenode(lxfp);
 		return (NULL);
-	} else {
-		/*
-		 * Fill in the lxpr_node so future references will be able to
-		 * find the underlying vnode. The vnode is held on the realvp.
-		 */
-		lxfp->lxpr_realvp = vp;
-
-		/*
-		 * For certain entries (sockets, pipes, etc), Linux expects a
-		 * bogus-named symlink.  If that's the case, report the type as
-		 * VNON to bypass link-following elsewhere in the vfs system.
-		 *
-		 * See lxpr_readlink for more details.
-		 */
-		if (lxpr_readlink_fdnode(lxfp, NULL, 0) == 0)
-			LXPTOV(lxfp)->v_type = VNON;
 	}
 
-	mutex_enter(&p->p_lock);
+	/*
+	 * Fill in the lxpr_node so future references will be able to
+	 * find the underlying vnode. The vnode is held on the realvp.
+	 */
+	lxfp->lxpr_realvp = vp;
+	vp = LXPTOV(lxfp);
+
+	/*
+	 * For certain entries (sockets, pipes, etc), Linux expects a
+	 * bogus-named symlink.  If that's the case, report the type as
+	 * VNON to bypass link-following elsewhere in the vfs system.
+	 *
+	 * See lxpr_readlink for more details.
+	 */
+	if (lxpr_readlink_fdnode(lxfp, NULL, 0) == 0)
+		vp->v_type = VNON;
+
 	lxpr_unlock(p);
-	ASSERT(LXPTOV(lxfp) != NULL);
-	return (LXPTOV(lxfp));
+	ASSERT(vp != NULL);
+	return (vp);
 }
 
 /*
@@ -784,7 +845,95 @@ lxpr_readlink_fdnode(lxpr_node_t *lxpnp, char *bp, size_t len)
 }
 
 /*
- * Translate a Linux core_pattern path to a native Illumos one, by replacing
+ * Attempt to locate vnode for /proc/<pid>/fdinfo/<#>.
+ */
+vnode_t *
+lxpr_lookup_fdinfonode(vnode_t *dvp, const char *name)
+{
+	lxpr_node_t *lxdp = VTOLXP(dvp);
+	lxpr_node_t *lxfp;
+	proc_t *p;
+	int fd;
+
+	ASSERT(lxdp->lxpr_type == LXPR_PID_FDINFODIR);
+
+	if ((fd = lxpr_parse_fdnode_num(name)) == -1)
+		return (NULL);
+
+	/* Lock the owner process */
+	if ((p = lxpr_lock(lxdp, NO_ZOMB)) == NULL)
+		return (NULL);
+
+	/* Not applicable to processes which are system-owned. */
+	if (p->p_as == &kas) {
+		lxpr_unlock(p);
+		return (NULL);
+	}
+
+	lxfp = lxpr_getnode(dvp, LXPR_PID_FDINFO_FD, p, fd);
+
+	lxpr_unlock(p);
+	ASSERT(LXPTOV(lxfp) != NULL);
+	return (LXPTOV(lxfp));
+}
+
+/*
+ * Translate native file flags to Linux open flags.
+ */
+int
+lxpr_open_flags_convert(offset_t uf_flag, uint32_t f_flag)
+{
+	int flags = 0;
+
+	switch (f_flag & (FREAD | FWRITE)) {
+	case FREAD:
+		flags = LX_O_RDONLY;
+		break;
+	case FWRITE:
+		flags = LX_O_WRONLY;
+		break;
+	case FREAD | FWRITE:
+		flags = LX_O_RDWR;
+		break;
+	}
+
+	if (f_flag & FNDELAY)
+		flags |= LX_O_NDELAY;
+	if (f_flag & FAPPEND)
+		flags |= LX_O_APPEND;
+	if (f_flag & FSYNC)
+		flags |= LX_O_SYNC;
+	if (f_flag & FNONBLOCK)
+		flags |= LX_O_NONBLOCK;
+
+	if (f_flag & FCREAT)
+		flags |= LX_O_CREAT;
+	if (f_flag & FTRUNC)
+		flags |= LX_O_TRUNC;
+	if (f_flag & FEXCL)
+		flags |= LX_O_EXCL;
+	if (f_flag & FASYNC)
+		flags |= LX_O_ASYNC;
+	if (f_flag & FOFFMAX)
+		flags |= LX_O_LARGEFILE;
+	if (f_flag & FNOCTTY)
+		flags |= LX_O_NOCTTY;
+	if (f_flag & FNOFOLLOW)
+		flags |= LX_O_NOFOLLOW;
+
+	if (f_flag & FDIRECT)
+		flags |= LX_O_DIRECT;
+	if (f_flag & __FLXPATH)
+		flags |= LX_O_PATH;
+
+	if (uf_flag & FD_CLOEXEC)
+		flags |= LX_O_CLOEXEC;
+
+	return (flags);
+}
+
+/*
+ * Translate a Linux core_pattern path to a native illumos one, by replacing
  * the appropriate % escape sequences.
  *
  * Any % escape sequences that are not recognised are double-escaped so that
@@ -854,7 +1003,7 @@ lxpr_core_path_l2s(const char *inp, char *outp, size_t outsz)
 }
 
 /*
- * Translate an Illumos core pattern path back to Linux format.
+ * Translate an illumos core pattern path back to Linux format.
  */
 int
 lxpr_core_path_s2l(const char *inp, char *outp, size_t outsz)

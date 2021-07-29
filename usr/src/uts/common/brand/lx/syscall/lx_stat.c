@@ -393,7 +393,7 @@ lx_fstatat64(int fd, char *name, void *outp, int flag)
 	vnode_t *vp = NULL;
 	cred_t *cr = NULL;
 	model_t model = get_udatamodel();
-	enum symfollow follow = FOLLOW;
+	int follow = FOLLOW;
 	int error;
 	char c;
 
@@ -403,17 +403,12 @@ lx_fstatat64(int fd, char *name, void *outp, int flag)
 	if ((flag & ~LX_FSTATAT_ALLOWED) != 0) {
 		return (set_errno(EINVAL));
 	}
-	if ((flag & LX_AT_NO_AUTOMOUNT) != 0) {
-		/*
-		 * While AT_NO_AUTOMOUNT is a legal flag for fstatat64, it is
-		 * not yet supported by lx_autofs.
-		 */
-		lx_unsupported("fstatat(AT_NO_AUTOMOUNT)");
-		return (set_errno(EINVAL));
-	}
 	if ((flag & LX_AT_SYMLINK_NOFOLLOW) != 0) {
 		follow = NO_FOLLOW;
 	}
+
+	if ((flag & LX_AT_NO_AUTOMOUNT) != 0)
+		follow |= __FLXNOAUTO;
 
 	if (copyin(name, &c, sizeof (c)) != 0) {
 		return (set_errno(EFAULT));

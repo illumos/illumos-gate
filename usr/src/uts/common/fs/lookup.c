@@ -246,6 +246,9 @@ lookuppnvp(
 		pp = &presrvd;
 	}
 
+	if (flags & __FLXNOAUTO)
+		lookup_flags |= __FLXNOAUTO;
+
 	if (auditing)
 		audit_anchorpath(pnp, vp == rootvp);
 
