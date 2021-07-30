@@ -4542,7 +4542,11 @@ pkinit_find_private_key(pkinit_identity_crypto_context id_cryptoctx,
     CK_ATTRIBUTE attrs[4];
     CK_ULONG count;
     CK_KEY_TYPE keytype;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    const RSA *rsa;
+#else
     RSA *rsa;
+#endif
     unsigned int nattrs = 0;
     int r;
 #ifdef PKINIT_USE_KEY_USAGE

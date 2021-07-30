@@ -140,7 +140,9 @@ static uchar_t G[] = { 0x00, 0x62, 0x6d, 0x02, 0x78, 0x39, 0xea, 0x0a,
  * Declare some new macros for managing stacks of EVP_PKEYS.
  */
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+/* BEGIN CSTYLED */
 DECLARE_STACK_OF(EVP_PKEY)
+/* END CSTYLED */
 
 #define	sk_EVP_PKEY_new_null() SKM_sk_new_null(EVP_PKEY)
 #define	sk_EVP_PKEY_free(st) SKM_sk_free(EVP_PKEY, (st))
@@ -151,7 +153,9 @@ DECLARE_STACK_OF(EVP_PKEY)
 	(free_func))
 
 #else
+/* BEGIN CSTYLED */
 DEFINE_STACK_OF(EVP_PKEY)
+/* END CSTYLED */
 #endif
 
 mutex_t init_lock = DEFAULTMUTEX;
@@ -1388,8 +1392,13 @@ ssl_write_key(KMF_HANDLE *kmfh, KMF_ENCODE_FORMAT format, BIO *out,
     KMF_CREDENTIAL *cred, EVP_PKEY *pkey, boolean_t private)
 {
 	int rv = 0;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+	const RSA *rsa;
+	const DSA *dsa;
+#else
 	RSA *rsa;
 	DSA *dsa;
+#endif
 
 	if (pkey == NULL || out == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -2066,8 +2075,13 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 
 	case KMF_CERT_PUBKEY_DATA:
 		{
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+			const RSA *rsa;
+			const DSA *dsa;
+#else
 			RSA *rsa;
 			DSA *dsa;
+#endif
 
 			EVP_PKEY *pkey = X509_get_pubkey(xcert);
 			if (pkey == NULL) {

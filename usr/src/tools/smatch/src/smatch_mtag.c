@@ -46,7 +46,7 @@
 #include "smatch_slist.h"
 #include "smatch_extra.h"
 
-#include <openssl/md5.h>
+#include <md5.h>
 
 static int my_id;
 
@@ -54,13 +54,10 @@ mtag_t str_to_mtag(const char *str)
 {
 	unsigned char c[MD5_DIGEST_LENGTH];
 	unsigned long long *tag = (unsigned long long *)&c;
-	MD5_CTX mdContext;
 	int len;
 
 	len = strlen(str);
-	MD5_Init(&mdContext);
-	MD5_Update(&mdContext, str, len);
-	MD5_Final(c, &mdContext);
+	md5_calc(c, str, len);
 
 	*tag &= ~MTAG_ALIAS_BIT;
 	*tag &= ~MTAG_OFFSET_MASK;
