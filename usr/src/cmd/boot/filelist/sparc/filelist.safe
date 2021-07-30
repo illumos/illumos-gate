@@ -1,4 +1,3 @@
-etc/cluster/nodeid
 etc/dacf\.conf
 etc/devices/devid_cache
 etc/devices/mdi_ib_cache
@@ -6,7 +5,6 @@ etc/devices/mdi_scsi_vhci_cache
 etc/devices/retire_store
 etc/driver_aliases
 etc/driver_classes
-etc/mach
 etc/name_to_major
 etc/name_to_sysnum
 etc/path_to_inst

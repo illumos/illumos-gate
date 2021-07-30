@@ -210,6 +210,7 @@ $(i386_ONLY)file path=lib/$(ARCH64)/libfdisk.so.1
 file path=lib/$(ARCH64)/libgen.so.1
 file path=lib/$(ARCH64)/libinetutil.so.1
 file path=lib/$(ARCH64)/libintl.so.1
+file path=lib/$(ARCH64)/libipadm.so.1
 file path=lib/$(ARCH64)/libkmf.so.1
 file path=lib/$(ARCH64)/libkmfberder.so.1
 file path=lib/$(ARCH64)/libkstat.so.1

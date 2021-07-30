@@ -1307,6 +1307,8 @@ f lib/amd64/libinetutil.so.1 0755 root bin
 s lib/amd64/libinetutil.so=libinetutil.so.1
 f lib/amd64/libintl.so.1 0755 root bin
 s lib/amd64/libintl.so=libintl.so.1
+f lib/amd64/libipadm.so.1 0755 root bin
+s lib/amd64/libipadm.so=libipadm.so.1
 f lib/amd64/libkmf.so.1 0755 root bin
 s lib/amd64/libkmf.so=libkmf.so.1
 f lib/amd64/libkmfberder.so.1 0755 root bin
@@ -5301,6 +5303,8 @@ s usr/lib/amd64/libinetutil.so.1=../../../lib/amd64/libinetutil.so.1
 s usr/lib/amd64/libinetutil.so=../../../lib/amd64/libinetutil.so.1
 s usr/lib/amd64/libintl.so.1=../../../lib/amd64/libintl.so.1
 s usr/lib/amd64/libintl.so=../../../lib/amd64/libintl.so.1
+s usr/lib/amd64/libipadm.so.1=../../lib/amd64/libipadm.so.1
+s usr/lib/amd64/libipadm.so=../../lib/amd64/libipadm.so.1
 f usr/lib/amd64/libipd.so.1 0755 root bin
 s usr/lib/amd64/libipd.so=libipd.so.1
 f usr/lib/amd64/libipmi.so.1 0755 root bin

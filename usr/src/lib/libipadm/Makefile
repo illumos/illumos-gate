@@ -22,6 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
 include $(SRC)/lib/Makefile.lib
@@ -29,10 +30,19 @@ include $(SRC)/lib/Makefile.lib
 HDRS =		libipadm.h ipadm_ndpd.h ipadm_ipmgmt.h
 HDRDIR =	common
 SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 POFILE =	libipadm.po
 MSGFILES =	common/libipadm.c common/ipadm_prop.c common/ipadm_persist.c \
 		common/ipadm_addr.c common/ipadm_if.c common/ipadm_ndpd.c
 XGETFLAGS =     -a -x libipadm.xcl
+
+TYPECHECK_LIB = libipadm.so.1
+TYPELIST = \
+	   ipmgmt_aobjop_rval_t \
+	   ipmgmt_get_rval_t \
+	   ipmgmt_getif_rval_t \
+	   ipmgmt_getprop_rval_t \
+	   ipmgmt_retval_t
 
 all :=		TARGET = all
 clean :=	TARGET = clean
@@ -45,7 +55,7 @@ all clean clobber install: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 
-check:		$(CHECKHDRS)
+check:		$(CHECKHDRS) $(TYPECHECK)
 
 $(POFILE):	pofile_MSGFILES
 

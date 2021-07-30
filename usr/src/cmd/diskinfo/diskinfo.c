@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2018 Joyent Inc., All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -270,7 +271,15 @@ enumerate_disks(di_opts_t *opts)
 			continue;
 		}
 
-		mattrs = dm_get_attributes(media[i], &err);
+		/*
+		 * The attributes depend on us being able to get the media
+		 * info with DKIOCGMEDIAINFO which may not be the case for
+		 * disks which are failing.
+		 */
+		if ((mattrs = dm_get_attributes(media[i], &err)) == NULL) {
+			continue;
+		}
+
 		err = nvlist_lookup_uint64(mattrs, DM_SIZE, &size);
 		assert(err == 0);
 		err = nvlist_lookup_uint32(mattrs, DM_BLOCKSIZE, &blocksize);

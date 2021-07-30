@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2021 Racktop Systems, Inc.
  */
 
 /*
@@ -1185,7 +1186,7 @@ ip_select_route(const in6_addr_t *v6dst, const in6_addr_t v6src,
 		return (ire);
 	}
 
-	/* Now for unicast */
+	/* Now for unicast and broadcast */
 	if (ixa->ixa_ifindex != 0 || (ixaflags & IXAF_SCOPEID_SET)) {
 		if (ixaflags & IXAF_SCOPEID_SET) {
 			/* sin6_scope_id takes precedence over ixa_ifindex */
@@ -1224,7 +1225,7 @@ ip_select_route(const in6_addr_t *v6dst, const in6_addr_t v6src,
 		 * we check that IP_BOUND_IF, IP_PKTINFO, etc specify
 		 * an interface that is consistent with the source address.
 		 */
-		if (src_multihoming == 2 &&
+		if (verify_src && src_multihoming == 2 &&
 		    !ip_verify_src_on_ill(v6src, ill, ixa->ixa_zoneid)) {
 			if (errorp != NULL)
 				*errorp = EADDRNOTAVAIL;
