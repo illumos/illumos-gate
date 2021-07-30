@@ -69,8 +69,20 @@ BEGIN {
 	}
 }
 
+#
+# We need to clamp the maximum number of threads that we use. Because
+# this program is mostly an exercise in fork1, more threads doesn't
+# actually help us after a certain point as we just spend more and more
+# time trying to stop all of our LWPs than making forward progress.
+# We've seen experimentally on both 2P systems with 128 cores and 1P
+# systems with 16 cores that around 8 threads is a relative sweet spot.
+#
 chomp (my $NPROCESSORS_ONLN = `getconf NPROCESSORS_ONLN 2>/dev/null` || 1);
 my $max_threads = $ENV{DMAKE_MAX_JOBS} || $NPROCESSORS_ONLN;
+if ($max_threads > 8) {
+	$max_threads = 8;
+}
+
 my $tq;
 
 if ($Config{useithreads}) {
