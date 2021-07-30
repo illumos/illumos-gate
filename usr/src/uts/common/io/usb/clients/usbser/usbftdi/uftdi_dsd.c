@@ -246,6 +246,7 @@ uftdi_attach(ds_attach_info_t *aip)
 		case USB_PRODUCT_FTDI_PCMSFU:
 		case USB_PRODUCT_FTDI_EMCU2H:
 		case USB_PRODUCT_FTDI_232EX:
+		case USB_PRODUCT_FTDI_232H:
 			break;
 		default:
 			recognized = B_FALSE;
