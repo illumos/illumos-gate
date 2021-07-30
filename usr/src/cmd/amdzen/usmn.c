@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -28,28 +28,46 @@
 #include <usmn.h>
 
 static boolean_t
-usmn_read(int fd, const char *addr)
+usmn_parse_uint32(const char *str, uint32_t *valp)
 {
-	unsigned long long l;
+	long long l;
 	char *eptr;
-	usmn_reg_t usr;
 
 	errno = 0;
-	l = strtoull(addr, &eptr, 16);
-	if (errno != 0 || *eptr != '\0' || l > UINT32_MAX) {
-		warnx("failed to parse %s: invalid string or address", addr);
+	l = strtoll(str, &eptr, 16);
+	if (errno != 0 || *eptr != '\0') {
+		warnx("failed to parse string '%s'", str);
 		return (B_FALSE);
 	}
 
-	usr.usr_addr = (uint32_t)l;
-	usr.usr_data = 0;
-
-	if (ioctl(fd, USMN_READ, &usr) != 0) {
-		warn("failed to read SMN at 0x%x", usr.usr_addr);
+	if (l < 0 || l > UINT32_MAX) {
+		warnx("value %s is outside the valid range [0, UINT32_MAX]",
+		    str);
 		return (B_FALSE);
 	}
 
-	(void) printf("0x%x: 0x%x\n", usr.usr_addr, usr.usr_data);
+	*valp = (uint32_t)l;
+	return (B_TRUE);
+}
+
+static boolean_t
+usmn_op(boolean_t do_write, int fd, const char *addr, uint32_t value)
+{
+	usmn_reg_t usr;
+
+	usr.usr_data = value;
+	if (!usmn_parse_uint32(addr, &usr.usr_addr)) {
+		return (B_FALSE);
+	}
+
+	if (ioctl(fd, do_write ? USMN_WRITE : USMN_READ, &usr) != 0) {
+		warn("SMN ioctl failed at 0x%x", usr.usr_addr);
+		return (B_FALSE);
+	}
+
+	if (!do_write) {
+		(void) printf("0x%x: 0x%x\n", usr.usr_addr, usr.usr_data);
+	}
 	return (B_TRUE);
 }
 
@@ -58,15 +76,23 @@ main(int argc, char *argv[])
 {
 	int i, c, fd, ret;
 	const char *device = NULL;
+	boolean_t do_write = B_FALSE;
+	uint32_t wval = 0;
 
-	while ((c = getopt(argc, argv, "d:")) != -1) {
+	while ((c = getopt(argc, argv, "d:w:")) != -1) {
 		switch (c) {
 		case 'd':
 			device = optarg;
 			break;
+		case 'w':
+			do_write = B_TRUE;
+			if (!usmn_parse_uint32(optarg, &wval)) {
+				return (EXIT_FAILURE);
+			}
+			break;
 		default:
-			(void) fprintf(stderr, "Usage: usmn -d device addr "
-			    "[addr]...\n"
+			(void) fprintf(stderr, "Usage: usmn -d device "
+			    "[-w value] addr [addr]...\n"
 			    "Note: All addresses are interpreted as hex\n");
 			return (2);
 		}
@@ -80,21 +106,24 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	if (argc == 0) {
-		errx(EXIT_FAILURE, "missing registers to read");
+		errx(EXIT_FAILURE, "at least one register must be specified");
 	}
 
-	if ((fd = open(device, O_RDONLY)) < 0) {
+	if (do_write && argc != 1) {
+		errx(EXIT_FAILURE, "can only write to a single register");
+	}
+
+	if ((fd = open(device, do_write ? O_RDWR : O_RDONLY)) < 0) {
 		err(EXIT_FAILURE, "failed to open %s", device);
 	}
 
 	ret = EXIT_SUCCESS;
 	for (i = 0; i < argc; i++) {
-		if (!usmn_read(fd, argv[i])) {
+		if (!usmn_op(do_write, fd, argv[i], wval)) {
 			ret = EXIT_FAILURE;
 		}
 	}
 
 	(void) close(fd);
-
 	return (ret);
 }
