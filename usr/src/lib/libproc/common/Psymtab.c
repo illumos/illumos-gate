@@ -298,10 +298,8 @@ file_info_free(struct ps_prochandle *P, file_info_t *fptr)
 			(void) elf_end(fptr->file_dbgelf);
 		if (fptr->file_dbgfile >= 0)
 			(void) close(fptr->file_dbgfile);
-		if (fptr->file_ctfp) {
-			ctf_close(fptr->file_ctfp);
-			free(fptr->file_ctf_buf);
-		}
+		ctf_close(fptr->file_ctfp);
+		free(fptr->file_ctf_buf);
 		if (fptr->file_saddrs)
 			free(fptr->file_saddrs);
 		free(fptr);
