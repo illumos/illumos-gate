@@ -636,14 +636,13 @@ count_sections(pgcore_t *pgc)
 {
 	struct ps_prochandle *P = pgc->P;
 	file_info_t *fptr;
-	uint_t cnt;
 	uint_t nshdrs = 0;
 
 	if (!(pgc->pgc_content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB)))
 		return (0);
 
-	fptr = list_next(&P->file_head);
-	for (cnt = P->num_files; cnt > 0; cnt--, fptr = list_next(fptr)) {
+	for (fptr = list_head(&P->file_head); fptr != NULL;
+	    fptr = list_next(&P->file_head, fptr)) {
 		int hit_symtab = 0;
 
 		Pbuild_file_symtab(P, fptr);
@@ -773,14 +772,13 @@ dump_sections(pgcore_t *pgc)
 {
 	struct ps_prochandle *P = pgc->P;
 	file_info_t *fptr;
-	uint_t cnt;
 	uint_t index = 1;
 
 	if (!(pgc->pgc_content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB)))
 		return (0);
 
-	fptr = list_next(&P->file_head);
-	for (cnt = P->num_files; cnt > 0; cnt--, fptr = list_next(fptr)) {
+	for (fptr = list_head(&P->file_head); fptr != NULL;
+	    fptr = list_next(&P->file_head, fptr)) {
 		int hit_symtab = 0;
 
 		Pbuild_file_symtab(P, fptr);

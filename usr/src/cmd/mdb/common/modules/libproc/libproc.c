@@ -22,6 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2021 Oxide Computer Company
+ */
 
 #include <libproc.h>
 #include <Pcontrol.h>
@@ -221,32 +224,19 @@ pr_addr2map(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
  *
  * Given a ps_prochandle_t, walk all its file_info_t structures.
  */
-typedef struct {
-	uintptr_t	fiw_next;
-	int		fiw_count;
-} file_info_walk_t;
-
 static int
 pr_file_info_walk_init(mdb_walk_state_t *wsp)
 {
-	ps_prochandle_t psp;
-	file_info_walk_t *fiw;
-
 	if (wsp->walk_addr == 0) {
 		mdb_warn("pr_file_info doesn't support global walks\n");
 		return (WALK_ERR);
 	}
 
-	if (mdb_vread(&psp, sizeof (ps_prochandle_t), wsp->walk_addr) == -1) {
-		mdb_warn("failed to read ps_prochandle at %p", wsp->walk_addr);
+	wsp->walk_addr += offsetof(ps_prochandle_t, file_head);
+	if (mdb_layered_walk("list", wsp) == -1) {
+		mdb_warn("failed to walk layered 'list'");
 		return (WALK_ERR);
 	}
-
-	fiw = mdb_alloc(sizeof (file_info_walk_t), UM_SLEEP);
-
-	fiw->fiw_next = (uintptr_t)psp.file_head.list_forw;
-	fiw->fiw_count = psp.num_files;
-	wsp->walk_data = fiw;
 
 	return (WALK_NEXT);
 }
@@ -254,31 +244,8 @@ pr_file_info_walk_init(mdb_walk_state_t *wsp)
 static int
 pr_file_info_walk_step(mdb_walk_state_t *wsp)
 {
-	file_info_walk_t *fiw = wsp->walk_data;
-	file_info_t f;
-	int status;
-
-	if (fiw->fiw_count == 0)
-		return (WALK_DONE);
-
-	if (mdb_vread(&f, sizeof (file_info_t), fiw->fiw_next) == -1) {
-		mdb_warn("failed to read file_info_t at %p", fiw->fiw_next);
-		return (WALK_ERR);
-	}
-
-	status = wsp->walk_callback(fiw->fiw_next, &f, wsp->walk_cbdata);
-
-	fiw->fiw_next = (uintptr_t)f.file_list.list_forw;
-	fiw->fiw_count--;
-
-	return (status);
-}
-
-static void
-pr_file_info_walk_fini(mdb_walk_state_t *wsp)
-{
-	file_info_walk_t *fiw = wsp->walk_data;
-	mdb_free(fiw, sizeof (file_info_walk_t));
+	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_layer,
+	    wsp->walk_cbdata));
 }
 
 /*
@@ -358,8 +325,7 @@ static const mdb_dcmd_t dcmds[] = {
 
 static const mdb_walker_t walkers[] = {
 	{ "pr_file_info", "given a ps_prochandle, walk its file_info "
-	    "structures", pr_file_info_walk_init, pr_file_info_walk_step,
-	    pr_file_info_walk_fini },
+	    "structures", pr_file_info_walk_init, pr_file_info_walk_step },
 	{ "pr_map_info", "given a ps_prochandle, walk its map_info structures",
 	    pr_map_info_walk_init, pr_map_info_walk_step,
 	    pr_map_info_walk_fini },

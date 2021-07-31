@@ -28,6 +28,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2015, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -501,6 +502,7 @@ Pxcreate(const char *file,	/* executable file name */
 	P->agentstatfd = -1;
 	Pinit_ops(&P->ops, &P_live_ops);
 	Pinitsym(P);
+	Pinitfd(P);
 
 	/*
 	 * Open the /proc/pid files.
@@ -804,6 +806,7 @@ again:	/* Come back here if we lose it in the Window of Vulnerability */
 	P->agentstatfd = -1;
 	Pinit_ops(&P->ops, &P_live_ops);
 	Pinitsym(P);
+	Pinitfd(P);
 
 	/*
 	 * Open the /proc/pid files
@@ -1182,6 +1185,7 @@ void
 Pfree(struct ps_prochandle *P)
 {
 	uint_t i;
+	fd_info_t *fip;
 
 	if (P->ucaddrs != NULL) {
 		free(P->ucaddrs);
@@ -1199,12 +1203,9 @@ Pfree(struct ps_prochandle *P)
 		free(P->hashtab);
 	}
 
-	while (P->num_fd > 0) {
-		fd_info_t *fip = list_next(&P->fd_head);
-		list_unlink(fip);
+	while ((fip = list_remove_head(&P->fd_head)) != NULL) {
 		proc_fdinfo_free(fip->fd_info);
 		free(fip);
-		P->num_fd--;
 	}
 	(void) mutex_unlock(&P->proc_lock);
 	(void) mutex_destroy(&P->proc_lock);
@@ -1673,7 +1674,7 @@ Prelease(struct ps_prochandle *P, int flags)
 	}
 
 	if (P->state == PS_IDLE) {
-		file_info_t *fptr = list_next(&P->file_head);
+		file_info_t *fptr = list_head(&P->file_head);
 		dprintf("Prelease: releasing handle %p PS_IDLE of file %s\n",
 		    (void *)P, fptr->file_pname);
 		Pfree(P);
@@ -2964,10 +2965,10 @@ Plwp_iter(struct ps_prochandle *P, proc_lwp_f *func, void *cd)
 	 */
 	if (P->state == PS_DEAD) {
 		core_info_t *core = P->data;
-		lwp_info_t *lwp = list_prev(&core->core_lwp_head);
-		uint_t i;
+		lwp_info_t *lwp;
 
-		for (i = 0; i < core->core_nlwp; i++, lwp = list_prev(lwp)) {
+		for (lwp = list_tail(&core->core_lwp_head); lwp != NULL;
+		    lwp = list_prev(&core->core_lwp_head, lwp)) {
 			if (lwp->lwp_psinfo.pr_sname != 'Z' &&
 			    (rv = func(cd, &lwp->lwp_status)) != 0)
 				break;
@@ -3036,10 +3037,10 @@ retry:
 	 */
 	if (P->state == PS_DEAD) {
 		core_info_t *core = P->data;
-		lwp_info_t *lwp = list_prev(&core->core_lwp_head);
-		uint_t i;
+		lwp_info_t *lwp;
 
-		for (i = 0; i < core->core_nlwp; i++, lwp = list_prev(lwp)) {
+		for (lwp = list_tail(&core->core_lwp_head); lwp != NULL;
+		    lwp = list_prev(&core->core_lwp_head, lwp)) {
 			sp = (lwp->lwp_psinfo.pr_sname == 'Z')? NULL :
 			    &lwp->lwp_status;
 			if ((rv = func(cd, sp, &lwp->lwp_psinfo)) != 0)
@@ -3949,6 +3950,7 @@ Pgrab_ops(pid_t pid, void *data, const ps_ops_t *ops, int flags)
 	P->agentctlfd = -1;
 	P->agentstatfd = -1;
 	Pinitsym(P);
+	Pinitfd(P);
 	P->data = data;
 	Pread_status(P);
 

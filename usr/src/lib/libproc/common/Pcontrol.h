@@ -27,6 +27,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef	_PCONTROL_H
@@ -48,6 +49,7 @@
 #include <libproc.h>
 #include <thread.h>
 #include <sys/secflags.h>
+#include <sys/list.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -94,7 +96,7 @@ typedef struct sym_tbl {	/* symbol table */
 } sym_tbl_t;
 
 typedef struct file_info {	/* symbol information for a mapped file */
-	plist_t	file_list;	/* linked list */
+	list_node_t file_list;	/* linked list */
 	char	file_pname[PATH_MAX];	/* name from prmap_t */
 	struct map_info *file_map;	/* primary (text) mapping */
 	int	file_ref;	/* references from map_info_t structures */
@@ -136,7 +138,7 @@ typedef struct map_info {	/* description of an address space mapping */
 } map_info_t;
 
 typedef struct lwp_info {	/* per-lwp information from core file */
-	plist_t	lwp_list;	/* linked list */
+	list_node_t lwp_list;	/* linked list */
 	lwpid_t	lwp_id;		/* lwp identifier */
 	lwpsinfo_t lwp_psinfo;	/* /proc/<pid>/lwp/<lwpid>/lwpsinfo data */
 	lwpstatus_t lwp_status;	/* /proc/<pid>/lwp/<lwpid>/lwpstatus data */
@@ -149,7 +151,7 @@ typedef struct lwp_info {	/* per-lwp information from core file */
 } lwp_info_t;
 
 typedef struct fd_info {
-	plist_t	fd_list;	/* linked list */
+	list_node_t fd_list;	/* linked list */
 	prfdinfo_t *fd_info;	/* fd info */
 } fd_info_t;
 
@@ -157,9 +159,8 @@ typedef struct core_info {	/* information specific to core files */
 	char core_dmodel;	/* data model for core file */
 	char core_osabi;	/* ELF OS ABI */
 	int core_errno;		/* error during initialization if != 0 */
-	plist_t core_lwp_head;	/* head of list of lwp info */
+	list_t core_lwp_head;	/* head of list of lwp info */
 	lwp_info_t *core_lwp;	/* current lwp information */
-	uint_t core_nlwp;	/* number of lwp's in list */
 	off64_t core_size;	/* size of core file in bytes */
 	char *core_platform;	/* platform string from core file */
 	struct utsname *core_uts;	/* uname(2) data from core file */
@@ -224,7 +225,7 @@ struct ps_prochandle {
 	size_t	map_count;	/* number of mappings */
 	size_t	map_alloc;	/* number of mappings allocated */
 	uint_t	num_files;	/* number of file elements in file_info */
-	plist_t	file_head;	/* head of mapped files w/ symbol table info */
+	list_t	file_head;	/* head of mapped files w/ symbol table info */
 	char	*execname;	/* name of the executable file */
 	auxv_t	*auxv;		/* the process's aux vector */
 	int	nauxv;		/* number of aux vector entries */
@@ -235,8 +236,7 @@ struct ps_prochandle {
 	uintptr_t *ucaddrs;	/* ucontext-list addresses */
 	uint_t	ucnelems;	/* number of elements in the ucaddrs list */
 	char	*zoneroot;	/* cached path to zone root */
-	plist_t	fd_head;	/* head of file desc info list */
-	int	num_fd;		/* number of file descs in list */
+	list_t	fd_head;	/* head of file desc info list */
 	uintptr_t map_missing;	/* first missing mapping in core due to sig */
 	siginfo_t killinfo;	/* signal that interrupted core dump */
 	psinfo_t spymaster;	/* agent LWP's spymaster, if any */
@@ -274,6 +274,7 @@ extern	int	dupfd(int, int);
 extern	int	set_minfd(void);
 extern	int	Pscantext(struct ps_prochandle *);
 extern	void	Pinitsym(struct ps_prochandle *);
+extern	void	Pinitfd(struct ps_prochandle *);
 extern	void	Preadauxvec(struct ps_prochandle *);
 extern	void	optimize_symtab(sym_tbl_t *);
 extern	void	Pbuild_file_symtab(struct ps_prochandle *, file_info_t *);

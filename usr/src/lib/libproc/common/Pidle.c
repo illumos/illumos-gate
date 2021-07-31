@@ -191,6 +191,7 @@ Pgrab_file(const char *fname, int *perr)
 	P->info_valid = -1;
 	Pinit_ops(&P->ops, &P_idle_ops);
 	Pinitsym(P);
+	Pinitfd(P);
 
 	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
 		*perr = G_ELF;
@@ -241,7 +242,7 @@ Pgrab_file(const char *fname, int *perr)
 	}
 
 	P->num_files++;
-	list_link(fp, &P->file_head);
+	list_insert_head(&P->file_head, fp);
 
 	if (gelf_getehdr(elf, &ehdr) == NULL) {
 		*perr = G_STRANGE;

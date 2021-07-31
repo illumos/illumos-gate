@@ -23,6 +23,7 @@
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -197,7 +198,7 @@ file_info_new(struct ps_prochandle *P, map_info_t *mptr)
 	if ((fptr = calloc(1, sizeof (file_info_t))) == NULL)
 		return (NULL);
 
-	list_link(fptr, &P->file_head);
+	list_insert_tail(&P->file_head, fptr);
 	(void) strcpy(fptr->file_pname, mptr->map_pmap.pr_mapname);
 	mptr->map_file = fptr;
 	fptr->file_ref = 1;
@@ -262,7 +263,7 @@ static void
 file_info_free(struct ps_prochandle *P, file_info_t *fptr)
 {
 	if (--fptr->file_ref == 0) {
-		list_unlink(fptr);
+		list_remove(&P->file_head, fptr);
 		if (fptr->file_symtab.sym_elf) {
 			(void) elf_end(fptr->file_symtab.sym_elf);
 			free(fptr->file_symtab.sym_elfmem);
@@ -591,12 +592,11 @@ void
 Pupdate_syms(struct ps_prochandle *P)
 {
 	file_info_t *fptr;
-	int i;
 
 	Pupdate_maps(P);
 
-	for (i = 0, fptr = list_next(&P->file_head); i < P->num_files;
-	    i++, fptr = list_next(fptr)) {
+	for (fptr = list_head(&P->file_head); fptr != NULL;
+	    fptr = list_next(&P->file_head, fptr)) {
 		Pbuild_file_symtab(P, fptr);
 		(void) Pbuild_file_ctf(P, fptr);
 	}
@@ -856,7 +856,7 @@ Plmid_to_ctf(struct ps_prochandle *P, Lmid_t lmid, const char *name)
 	 */
 	if (P->state == PS_IDLE && name == PR_OBJ_EXEC && P->info_valid == 1 &&
 	    P->num_files == 1 && P->mappings == NULL) {
-		fptr = list_next(&P->file_head);
+		fptr = list_head(&P->file_head);
 	}
 
 	if (fptr == NULL) {
@@ -990,7 +990,6 @@ build_map_symtab(struct ps_prochandle *P, map_info_t *mptr)
 {
 	prmap_t *pmap = &mptr->map_pmap;
 	file_info_t *fptr;
-	uint_t i;
 
 	if ((fptr = mptr->map_file) != NULL) {
 		Pbuild_file_symtab(P, fptr);
@@ -1004,8 +1003,8 @@ build_map_symtab(struct ps_prochandle *P, map_info_t *mptr)
 	 * Attempt to find a matching file.
 	 * (A file can be mapped at several different addresses.)
 	 */
-	for (i = 0, fptr = list_next(&P->file_head); i < P->num_files;
-	    i++, fptr = list_next(fptr)) {
+	for (fptr = list_head(&P->file_head); fptr != NULL;
+	    fptr = list_next(&P->file_head, fptr)) {
 		if (strcmp(fptr->file_pname, pmap->pr_mapname) == 0 &&
 		    fptr->file_lo && is_mapping_in_file(P, mptr, fptr)) {
 			mptr->map_file = fptr;
@@ -2907,7 +2906,7 @@ Pxlookup_by_name(
 		/* create all the file_info_t's for all the mappings */
 		(void) Prd_agent(P);
 		cnt = P->num_files;
-		fptr = list_next(&P->file_head);
+		fptr = list_head(&P->file_head);
 	} else {
 		cnt = 1;
 		if ((mptr = object_name_to_map(P, lmid, oname)) == NULL ||
@@ -2922,7 +2921,7 @@ Pxlookup_by_name(
 	 * This means that a name such as "puts" will match the puts function
 	 * in libc instead of matching the puts PLT entry in the a.out file.
 	 */
-	for (; cnt > 0; cnt--, fptr = list_next(fptr)) {
+	for (; cnt > 0; cnt--, fptr = list_next(&P->file_head, fptr)) {
 		Pbuild_file_symtab(P, fptr);
 
 		if (fptr->file_elf == NULL)
@@ -3040,14 +3039,13 @@ i_Pobject_iter(struct ps_prochandle *P, boolean_t lmresolve,
 {
 	map_info_t *mptr;
 	file_info_t *fptr;
-	uint_t cnt;
 	int rc = 0;
 
 	(void) Prd_agent(P); /* create file_info_t's for all the mappings */
 	Pupdate_maps(P);
 
-	for (cnt = P->num_files, fptr = list_next(&P->file_head);
-	    cnt; cnt--, fptr = list_next(fptr)) {
+	for (fptr = list_head(&P->file_head); fptr != NULL;
+	    fptr = list_next(&P->file_head, fptr)) {
 		const char *lname;
 
 		if (lmresolve && (fptr->file_rname != NULL))
@@ -3354,7 +3352,8 @@ void
 Pinitsym(struct ps_prochandle *P)
 {
 	P->num_files = 0;
-	list_link(&P->file_head, NULL);
+	list_create(&P->file_head, sizeof (file_info_t),
+	    offsetof(file_info_t, file_list));
 }
 
 /*

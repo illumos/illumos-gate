@@ -28,6 +28,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2015 Gary Mills
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -213,11 +214,9 @@ Pfini_core(struct ps_prochandle *P, void *data)
 
 	if (core != NULL) {
 		extern void __priv_free_info(void *);
-		lwp_info_t *nlwp, *lwp = list_next(&core->core_lwp_head);
-		int i;
+		lwp_info_t *lwp;
 
-		for (i = 0; i < core->core_nlwp; i++, lwp = nlwp) {
-			nlwp = list_next(lwp);
+		while ((lwp = list_remove_head(&core->core_lwp_head)) != NULL) {
 #ifdef __sparc
 			if (lwp->lwp_gwins != NULL)
 				free(lwp->lwp_gwins);
@@ -348,11 +347,10 @@ static lwp_info_t *
 lwpid2info(struct ps_prochandle *P, lwpid_t id)
 {
 	core_info_t *core = P->data;
-	lwp_info_t *lwp = list_next(&core->core_lwp_head);
-	lwp_info_t *next;
-	uint_t i;
+	lwp_info_t *lwp, *prev;
 
-	for (i = 0; i < core->core_nlwp; i++, lwp = list_next(lwp)) {
+	for (lwp = list_head(&core->core_lwp_head); lwp != NULL;
+	    lwp = list_next(&core->core_lwp_head, lwp)) {
 		if (lwp->lwp_id == id) {
 			core->core_lwp = lwp;
 			return (lwp);
@@ -362,15 +360,14 @@ lwpid2info(struct ps_prochandle *P, lwpid_t id)
 		}
 	}
 
-	next = lwp;
+	prev = lwp;
 	if ((lwp = calloc(1, sizeof (lwp_info_t))) == NULL)
 		return (NULL);
 
-	list_link(lwp, next);
+	list_insert_before(&core->core_lwp_head, prev, lwp);
 	lwp->lwp_id = id;
 
 	core->core_lwp = lwp;
-	core->core_nlwp++;
 
 	return (lwp);
 }
@@ -2396,6 +2393,7 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 	Pinit_ops(&P->ops, &P_core_ops);
 
 	Pinitsym(P);
+	Pinitfd(P);
 
 	/*
 	 * Fstat and open the core file and make sure it is a valid ELF core.
@@ -2418,7 +2416,8 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 	}
 
 	P->data = core_info;
-	list_link(&core_info->core_lwp_head, NULL);
+	list_create(&core_info->core_lwp_head, sizeof (lwp_info_t),
+	    offsetof(lwp_info_t, lwp_list));
 	core_info->core_size = stbuf.st_size;
 	/*
 	 * In the days before adjustable core file content, this was the
@@ -2611,17 +2610,15 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 
 #ifdef __x86
 	if (from_linux) {
-		size_t tcount, pid;
+		size_t pid;
 		lwp_info_t *lwp;
 
 		P->status.pr_dmodel = core_info->core_dmodel;
 
-		lwp = list_next(&core_info->core_lwp_head);
-
 		pid = P->status.pr_pid;
 
-		for (tcount = 0; tcount < core_info->core_nlwp;
-		    tcount++, lwp = list_next(lwp)) {
+		for (lwp = list_head(&core_info->core_lwp_head); lwp != NULL;
+		    lwp = list_next(&core_info->core_lwp_head, lwp)) {
 			dprintf("Linux thread with id %d\n", lwp->lwp_id);
 
 			/*
@@ -2810,7 +2807,7 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 
 			(void) memset(fp, 0, sizeof (file_info_t));
 
-			list_link(fp, &P->file_head);
+			list_insert_head(&P->file_head, fp);
 			tmp->map_file = fp;
 			P->num_files++;
 

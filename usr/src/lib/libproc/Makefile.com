@@ -30,6 +30,7 @@ LIBRARY = libproc.a
 VERS = .1
 
 CMNOBJS =	\
+	list.o		\
 	P32ton.o	\
 	Pcontrol.o	\
 	Pcore.o		\
@@ -122,6 +123,6 @@ objs/%.o pics/%.o: %.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-objs/%.o pics/%.o: $(SRC)/common/saveargs/%.c
+objs/%.o pics/%.o: $(SRC)/common/list/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
