@@ -1210,6 +1210,8 @@ Pfree(struct ps_prochandle *P)
 	(void) mutex_unlock(&P->proc_lock);
 	(void) mutex_destroy(&P->proc_lock);
 
+	free(P->zoneroot);
+
 	if (P->agentctlfd >= 0)
 		(void) close(P->agentctlfd);
 	if (P->agentstatfd >= 0)
