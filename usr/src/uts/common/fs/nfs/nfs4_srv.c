@@ -32,6 +32,7 @@
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2019 Nexenta Systems, Inc.
  * Copyright 2019 Nexenta by DDN, Inc.
+ * Copyright 2021 Racktop Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -5840,13 +5841,12 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 	ASSERT(exi == NULL);
 	ASSERT(cr == NULL);
 
-	cr = crget();
+	cr = svc_xprt_cred(req->rq_xprt);
 	ASSERT(cr != NULL);
 
 	if (sec_svc_getcred(req, cr, &cs.principal, &cs.nfsflavor) == 0) {
 		DTRACE_NFSV4_2(compound__start, struct compound_state *,
 		    &cs, COMPOUND4args *, args);
-		crfree(cr);
 		DTRACE_NFSV4_2(compound__done, struct compound_state *,
 		    &cs, COMPOUND4res *, resp);
 		svcerr_badcred(req->rq_xprt);
@@ -5965,8 +5965,6 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 	if (cs.saved_fh.nfs_fh4_val)
 		kmem_free(cs.saved_fh.nfs_fh4_val, NFS4_FHSIZE);
 
-	if (cs.basecr)
-		crfree(cs.basecr);
 	if (cs.cr)
 		crfree(cs.cr);
 	/*

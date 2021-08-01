@@ -1158,6 +1158,9 @@ extern SVCXPRT *svc_clone_init(void);
 extern void svc_clone_free(SVCXPRT *);
 extern void svc_clone_link(SVCMASTERXPRT *, SVCXPRT *, SVCXPRT *);
 extern void svc_clone_unlink(SVCXPRT *);
+
+/* Get cached preallocated cred */
+extern cred_t *svc_xprt_cred(SVCXPRT *);
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus
