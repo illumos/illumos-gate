@@ -3,7 +3,7 @@
 .\" Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-.\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2021 Oxide Computer Company
 .\" Copyright 1989 AT&T
 .\"
 .\" The contents of this file are subject to the terms of the
@@ -21,7 +21,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd October 31, 2020
+.Dd August 3, 2021
 .Dt CORE 4
 .Os
 .Sh NAME
@@ -548,7 +548,7 @@ entry for more details.
 Depending on the
 .Xr coreadm 1M
 settings, the section header of an ELF core file can contain entries for CTF,
-symbol table, and string table sections.
+DWARF debug information, symbol table, and string table sections.
 The
 .Fa sh_addr
 fields are set to the base address of the first mapping of the load object that

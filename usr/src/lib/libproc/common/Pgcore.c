@@ -33,6 +33,7 @@
 
 #define	_STRUCTURED_PROC	1
 
+#include <assert.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
@@ -46,38 +47,13 @@
 #include <sys/systeminfo.h>
 #include <sys/proc.h>
 #include <sys/utsname.h>
+#include <core_shstrtab.h>
 
 #include <sys/old_procfs.h>
 
 #include "Pcontrol.h"
 #include "P32ton.h"
 #include "proc_fd.h"
-
-typedef enum {
-	STR_NONE,
-	STR_CTF,
-	STR_SYMTAB,
-	STR_DYNSYM,
-	STR_STRTAB,
-	STR_DYNSTR,
-	STR_SHSTRTAB,
-	STR_NUM
-} shstrtype_t;
-
-static const char *shstrtab_data[] = {
-	"",
-	".SUNW_ctf",
-	".symtab",
-	".dynsym",
-	".strtab",
-	".dynstr",
-	".shstrtab"
-};
-
-typedef struct shstrtab {
-	int	sst_ndx[STR_NUM];
-	int	sst_cur;
-} shstrtab_t;
 
 typedef struct {
 	struct ps_prochandle *P;
@@ -118,33 +94,6 @@ gc_pwrite64(int fd, const void *buf, size_t len, off64_t off)
 	}
 
 	return (0);
-}
-
-static void
-shstrtab_init(shstrtab_t *s)
-{
-	bzero(&s->sst_ndx, sizeof (s->sst_ndx));
-	s->sst_cur = 1;
-}
-
-static int
-shstrtab_ndx(shstrtab_t *s, shstrtype_t type)
-{
-	int ret;
-
-	if ((ret = s->sst_ndx[type]) != 0 || type == STR_NONE)
-		return (ret);
-
-	ret = s->sst_ndx[type] = s->sst_cur;
-	s->sst_cur += strlen(shstrtab_data[type]) + 1;
-
-	return (ret);
-}
-
-static size_t
-shstrtab_size(const shstrtab_t *s)
-{
-	return (s->sst_cur);
 }
 
 int
@@ -631,6 +580,51 @@ iter_fd(void *data, const prfdinfo_t *fdinfo)
 	return (0);
 }
 
+/*
+ * Look for sections that begin with the string '.debug_'. In particular, this
+ * will catch all DWARF related sections and it will catch those that different
+ * folks use that are not related to DWARF, but still begin with this prefix
+ * (e.g. .debug_gdb_scripts). Notably though, this does not catch something like
+ * stabs (though it could). This really is filtering based on the section name,
+ * less so intent.
+ */
+static boolean_t
+is_debug_section(file_info_t *fptr, GElf_Shdr *shdr)
+{
+	if (shdr->sh_name == 0 || shdr->sh_name > fptr->file_shstrsz)
+		return (B_FALSE);
+
+	if (strncmp(fptr->file_shstrs + shdr->sh_name, ".debug_",
+	    strlen(".debug_")) != 0) {
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+static uint_t
+count_debug(file_info_t *fptr)
+{
+	uint_t count = 0;
+	Elf_Scn *scn = NULL;
+
+	if (fptr->file_elf == NULL || fptr->file_shstrsz <= 1) {
+		return (0);
+	}
+
+	while ((scn = elf_nextscn(fptr->file_elf, scn)) != NULL) {
+		GElf_Shdr shdr;
+
+		if (gelf_getshdr(scn, &shdr) == NULL)
+			continue;
+
+		if (is_debug_section(fptr, &shdr))
+			count++;
+	}
+
+	return (count);
+}
+
 static uint_t
 count_sections(pgcore_t *pgc)
 {
@@ -638,8 +632,10 @@ count_sections(pgcore_t *pgc)
 	file_info_t *fptr;
 	uint_t nshdrs = 0;
 
-	if (!(pgc->pgc_content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB)))
+	if (!(pgc->pgc_content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB |
+	    CC_CONTENT_DEBUG))) {
 		return (0);
+	}
 
 	for (fptr = list_head(&P->file_head); fptr != NULL;
 	    fptr = list_next(&P->file_head, fptr)) {
@@ -671,13 +667,16 @@ count_sections(pgcore_t *pgc)
 		    fptr->file_symtab.sym_strs != NULL) {
 			nshdrs += 2;
 		}
+
+		if ((pgc->pgc_content & CC_CONTENT_DEBUG) != 0)
+			nshdrs += count_debug(fptr);
 	}
 
 	return (nshdrs == 0 ? 0 : nshdrs + 2);
 }
 
 static int
-write_shdr(pgcore_t *pgc, shstrtype_t name, uint_t type, ulong_t flags,
+write_shdr(pgcore_t *pgc, const char *name, uint_t type, ulong_t flags,
     uintptr_t addr, ulong_t offset, size_t size, uint_t link, uint_t info,
     uintptr_t addralign, uintptr_t entsize)
 {
@@ -685,7 +684,9 @@ write_shdr(pgcore_t *pgc, shstrtype_t name, uint_t type, ulong_t flags,
 		Elf32_Shdr shdr;
 
 		bzero(&shdr, sizeof (shdr));
-		shdr.sh_name = shstrtab_ndx(&pgc->pgc_shstrtab, name);
+		if (!shstrtab_ndx(&pgc->pgc_shstrtab, name, &shdr.sh_name)) {
+			return (-1);
+		}
 		shdr.sh_type = type;
 		shdr.sh_flags = flags;
 		shdr.sh_addr = (Elf32_Addr)addr;
@@ -706,7 +707,9 @@ write_shdr(pgcore_t *pgc, shstrtype_t name, uint_t type, ulong_t flags,
 		Elf64_Shdr shdr;
 
 		bzero(&shdr, sizeof (shdr));
-		shdr.sh_name = shstrtab_ndx(&pgc->pgc_shstrtab, name);
+		if (!shstrtab_ndx(&pgc->pgc_shstrtab, name, &shdr.sh_name)) {
+			return (-1);
+		}
 		shdr.sh_type = type;
 		shdr.sh_flags = flags;
 		shdr.sh_addr = addr;
@@ -747,9 +750,9 @@ dump_symtab(pgcore_t *pgc, file_info_t *fptr, uint_t index, int dynsym)
 	    *pgc->pgc_doff) != 0)
 		return (-1);
 
-	if (write_shdr(pgc, symname, symtype, 0, addr, *pgc->pgc_doff, size,
-	    index + 1, sym->sym_hdr_pri.sh_info, sym->sym_hdr_pri.sh_addralign,
-	    sym->sym_hdr_pri.sh_entsize) != 0)
+	if (write_shdr(pgc, shstrtab_data[symname], symtype, 0, addr,
+	    *pgc->pgc_doff, size, index + 1, sym->sym_hdr_pri.sh_info,
+	    sym->sym_hdr_pri.sh_addralign, sym->sym_hdr_pri.sh_entsize) != 0)
 		return (-1);
 
 	*pgc->pgc_doff += roundup(size, 8);
@@ -758,11 +761,53 @@ dump_symtab(pgcore_t *pgc, file_info_t *fptr, uint_t index, int dynsym)
 	if (gc_pwrite64(pgc->pgc_fd, sym->sym_strs, size, *pgc->pgc_doff) != 0)
 		return (-1);
 
-	if (write_shdr(pgc, strname, SHT_STRTAB, SHF_STRINGS, addr,
-	    *pgc->pgc_doff, size, 0, 0, 1, 0) != 0)
+	if (write_shdr(pgc, shstrtab_data[strname], SHT_STRTAB, SHF_STRINGS,
+	    addr, *pgc->pgc_doff, size, 0, 0, 1, 0) != 0)
 		return (-1);
 
 	*pgc->pgc_doff += roundup(size, 8);
+
+	return (0);
+}
+
+static int
+dump_debug(pgcore_t *pgc, file_info_t *fptr, uint_t *indexp)
+{
+	Elf_Scn *scn = NULL;
+
+	if (fptr->file_elf == NULL || fptr->file_shstrsz <= 1) {
+		return (0);
+	}
+
+	while ((scn = elf_nextscn(fptr->file_elf, scn)) != NULL) {
+		GElf_Shdr shdr;
+		Elf_Data *data;
+
+		if (gelf_getshdr(scn, &shdr) == NULL)
+			continue;
+
+		if (!is_debug_section(fptr, &shdr))
+			continue;
+
+		if ((data = elf_getdata(scn, NULL)) == NULL) {
+			return (-1);
+		}
+
+		if (gc_pwrite64(pgc->pgc_fd, data->d_buf, data->d_size,
+		    *pgc->pgc_doff) != 0)
+			return (-1);
+
+		if (write_shdr(pgc, fptr->file_shstrs + shdr.sh_name,
+		    shdr.sh_type, shdr.sh_flags,
+		    fptr->file_map->map_pmap.pr_vaddr, *pgc->pgc_doff,
+		    data->d_size, 0, shdr.sh_info, shdr.sh_addralign,
+		    shdr.sh_entsize) != 0) {
+			return (-1);
+		}
+
+		*indexp = *indexp + 1;
+		*pgc->pgc_doff += roundup(data->d_size, 8);
+	}
 
 	return (0);
 }
@@ -774,8 +819,10 @@ dump_sections(pgcore_t *pgc)
 	file_info_t *fptr;
 	uint_t index = 1;
 
-	if (!(pgc->pgc_content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB)))
+	if (!(pgc->pgc_content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB |
+	    CC_CONTENT_DEBUG))) {
 		return (0);
+	}
 
 	for (fptr = list_head(&P->file_head); fptr != NULL;
 	    fptr = list_next(&P->file_head, fptr)) {
@@ -820,9 +867,10 @@ dump_sections(pgcore_t *pgc)
 			    fptr->file_ctf_size, *pgc->pgc_doff) != 0)
 				return (-1);
 
-			if (write_shdr(pgc, STR_CTF, SHT_PROGBITS, 0,
-			    fptr->file_map->map_pmap.pr_vaddr, *pgc->pgc_doff,
-			    fptr->file_ctf_size, symindex, 0, 4, 0) != 0)
+			if (write_shdr(pgc, shstrtab_data[STR_CTF],
+			    SHT_PROGBITS, 0, fptr->file_map->map_pmap.pr_vaddr,
+			    *pgc->pgc_doff, fptr->file_ctf_size, symindex, 0,
+			    4, 0) != 0)
 				return (-1);
 
 			index++;
@@ -836,6 +884,11 @@ dump_sections(pgcore_t *pgc)
 			if (dump_symtab(pgc, fptr, index, 0) != 0)
 				return (-1);
 			index += 2;
+		}
+
+		if ((pgc->pgc_content & CC_CONTENT_DEBUG) != 0 &&
+		    dump_debug(pgc, fptr, &index) != 0) {
+			return (-1);
 		}
 	}
 
@@ -995,7 +1048,6 @@ write_shstrtab(struct ps_prochandle *P, pgcore_t *pgc)
 	off64_t off = *pgc->pgc_doff;
 	size_t size = 0;
 	shstrtab_t *s = &pgc->pgc_shstrtab;
-	int i, ndx;
 
 	if (shstrtab_size(s) == 1)
 		return (0);
@@ -1003,19 +1055,21 @@ write_shstrtab(struct ps_prochandle *P, pgcore_t *pgc)
 	/*
 	 * Preemptively stick the name of the shstrtab in the string table.
 	 */
-	(void) shstrtab_ndx(&pgc->pgc_shstrtab, STR_SHSTRTAB);
+	if (!shstrtab_ndx(&pgc->pgc_shstrtab,
+	    shstrtab_data[STR_SHSTRTAB], NULL)) {
+		return (1);
+	}
 	size = shstrtab_size(s);
 
 	/*
 	 * Dump all the strings that we used being sure we include the
 	 * terminating null character.
 	 */
-	for (i = 0; i < STR_NUM; i++) {
-		if ((ndx = s->sst_ndx[i]) != 0 || i == STR_NONE) {
-			const char *str = shstrtab_data[i];
-			size_t len = strlen(str) + 1;
-			if (gc_pwrite64(pgc->pgc_fd, str, len, off + ndx) != 0)
-				return (1);
+	for (shstrtab_ent_t *ent = list_head(&s->sst_names); ent != NULL;
+	    ent = list_next(&s->sst_names, ent)) {
+		if (gc_pwrite64(pgc->pgc_fd, ent->sste_name, ent->sste_len,
+		    off + ent->sste_offset) != 0) {
+			return (1);
 		}
 	}
 
@@ -1023,7 +1077,10 @@ write_shstrtab(struct ps_prochandle *P, pgcore_t *pgc)
 		Elf32_Shdr shdr;
 
 		bzero(&shdr, sizeof (shdr));
-		shdr.sh_name = shstrtab_ndx(&pgc->pgc_shstrtab, STR_SHSTRTAB);
+		if (!shstrtab_ndx(&pgc->pgc_shstrtab,
+		    shstrtab_data[STR_SHSTRTAB], &shdr.sh_name)) {
+			return (1);
+		}
 		shdr.sh_size = size;
 		shdr.sh_offset = *pgc->pgc_doff;
 		shdr.sh_addralign = 1;
@@ -1040,7 +1097,10 @@ write_shstrtab(struct ps_prochandle *P, pgcore_t *pgc)
 		Elf64_Shdr shdr;
 
 		bzero(&shdr, sizeof (shdr));
-		shdr.sh_name = shstrtab_ndx(&pgc->pgc_shstrtab, STR_SHSTRTAB);
+		if (!shstrtab_ndx(&pgc->pgc_shstrtab,
+		    shstrtab_data[STR_SHSTRTAB], &shdr.sh_name)) {
+			return (1);
+		}
 		shdr.sh_size = size;
 		shdr.sh_offset = *pgc->pgc_doff;
 		shdr.sh_addralign = 1;
@@ -1088,6 +1148,7 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 	(void) Prd_agent(P);
 	(void) Ppsinfo(P);
 
+	(void) memset(&pgc, 0, sizeof (pgc));
 	pgc.P = P;
 	pgc.pgc_fd = fd;
 	pgc.pgc_poff = &poff;
@@ -1098,7 +1159,9 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 	if ((pgc.pgc_chunk = malloc(pgc.pgc_chunksz)) == NULL)
 		return (-1);
 
-	shstrtab_init(&pgc.pgc_shstrtab);
+	if (!shstrtab_init(&pgc.pgc_shstrtab)) {
+		goto err;
+	}
 
 	/*
 	 * There are two PT_NOTE program headers for ancillary data, and
@@ -1246,7 +1309,7 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 	/*
 	 * Write the zero indexed section if it exists.
 	 */
-	if (nshdrs > 0 && write_shdr(&pgc, STR_NONE, 0, 0, 0, 0,
+	if (nshdrs > 0 && write_shdr(&pgc, shstrtab_data[STR_NONE], 0, 0, 0, 0,
 	    nshdrs >= SHN_LORESERVE ? nshdrs : 0,
 	    nshdrs - 1 >= SHN_LORESERVE ? nshdrs - 1 : 0,
 	    nphdrs >= PN_XNUM ? nphdrs : 0, 0, 0) != 0)
@@ -1536,6 +1599,7 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 		goto err;
 
 	free(pgc.pgc_chunk);
+	shstrtab_fini(&pgc.pgc_shstrtab);
 
 	return (0);
 
@@ -1545,6 +1609,7 @@ err:
 	 */
 	(void) ftruncate64(fd, 0);
 	free(pgc.pgc_chunk);
+	shstrtab_fini(&pgc.pgc_shstrtab);
 
 	return (-1);
 }
@@ -1563,6 +1628,7 @@ static const char *content_str[] = {
 	"dism",		/* CC_CONTENT_DISM */
 	"ctf",		/* CC_CONTENT_CTF */
 	"symtab",	/* CC_CONTENT_SYMTAB */
+	"debug"		/* CC_CONTENT_DEBUG */
 };
 
 static uint_t ncontent_str = sizeof (content_str) / sizeof (content_str[0]);

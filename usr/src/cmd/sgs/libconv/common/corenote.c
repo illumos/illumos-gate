@@ -26,7 +26,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2018 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -1062,6 +1062,7 @@ conv_cnote_auxv_af(Word flags, Conv_fmt_flags_t fmt_flags,
 	MSG_CC_CONTENT_DISM_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 	MSG_CC_CONTENT_CTF_SIZE		+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 	MSG_CC_CONTENT_SYMTAB_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+	MSG_CC_CONTENT_DEBUG_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 	CONV_INV_BUFSIZE		+ CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 /*
@@ -1078,6 +1079,15 @@ conv_cnote_auxv_af(Word flags, Conv_fmt_flags_t fmt_flags,
 #define	REPORT_BUFSIZE CCFLGSZ
 #include "report_bufsize.h"
 #error "CONV_CNOTE_CC_CONTENT_BUFSIZE does not match CCFLGSZ"
+#endif
+
+/*
+ * This is required to work around tools ld bootstrapping issues where
+ * CC_CONTENT_DEBUG is not present. When an illumos sysroot has this present it
+ * will probably be safe to remove this.
+ */
+#ifndef	CC_CONTENT_DEBUG
+#define	CC_CONTENT_DEBUG	0x2000ULL
 #endif
 
 const char *
@@ -1112,6 +1122,7 @@ conv_cnote_cc_content(Lword flags, Conv_fmt_flags_t fmt_flags,
 		{ (Word) CC_CONTENT_DISM,	MSG_CC_CONTENT_DISM },
 		{ (Word) CC_CONTENT_CTF,	MSG_CC_CONTENT_CTF },
 		{ (Word) CC_CONTENT_SYMTAB,	MSG_CC_CONTENT_SYMTAB },
+		{ (Word) CC_CONTENT_DEBUG,	MSG_CC_CONTENT_DEBUG },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {

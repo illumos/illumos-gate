@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved.
+.\"  Copyright 2021 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH COREADM 1M "Feb 28, 2014"
+.TH COREADM 1M "August 3, 2021"
 .SH NAME
 coreadm \- core file administration
 .SH SYNOPSIS
-.LP
 .nf
 \fBcoreadm\fR [\fB-g\fR \fIpattern\fR] [\fB-G\fR \fIcontent\fR] [\fB-i\fR \fIpattern\fR] [\fB-I\fR \fIcontent\fR]
      [\fB-d\fR \fIoption\fR]... [\fB-e\fR \fIoption\fR]...
@@ -19,8 +19,6 @@ coreadm \- core file administration
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBcoreadm\fR specifies the name and location of core files produced by
 abnormally-terminating processes. See \fBcore\fR(4).
 .sp
@@ -189,6 +187,20 @@ CTF type information sections for loaded object files
 .sp .6
 .RS 4n
 Writable private file mappings
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdebug\fR\fR
+.ad
+.sp .6
+.RS 4n
+Debug sections, commonly DWARF. All sections that begin with '.debug_'.
+Note, this does capture non-DWARF related sections that begin with the
+string pattern; however, at this time other debug formats such as STABS
+are not included. Other debug formats would be included here in the
+future.
 .RE
 
 .sp
@@ -370,8 +382,6 @@ address space to which the current nonprivileged owner of the process should
 not have access. If \fBsetid\fR core files are enabled, they are created mode
 \fB600\fR and owned by the superuser.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -562,8 +572,6 @@ file content to \fIcontent\fR on the parent process (usually the shell that ran
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -576,7 +584,6 @@ process-\fBID\fR
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSetting the Core File Name Pattern
 .sp
 .LP
@@ -634,7 +641,6 @@ example# coreadm -G all -g /var/cores/%d/%f.%p.%n
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/cores\fR\fR
@@ -645,8 +651,6 @@ Directory provided for global core file storage.
 .RE
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -680,15 +684,11 @@ Invalid command-line options were specified.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBgcore\fR(1), \fBpfexec\fR(1), \fBsvcs\fR(1), \fBinit\fR(1M),
 \fBsvcadm\fR(1M), \fBexec\fR(2), \fBfork\fR(2), \fBsetuid\fR(2), \fBtime\fR(2),
 \fBsyslog\fR(3C), \fBcore\fR(4), \fBprof_attr\fR(4), \fBuser_attr\fR(4),
 \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
-.sp
-.LP
 In a local (non-global) zone, the global settings apply to processes running in
 that zone. In addition, the global zone's apply to processes run in any zone.
 .sp

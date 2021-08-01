@@ -56,6 +56,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+INC_PATH	+= -I$(SRC)/common/core
 
 #
 #	Overrides.

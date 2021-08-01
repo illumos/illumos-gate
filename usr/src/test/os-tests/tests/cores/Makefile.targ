@@ -1,0 +1,48 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2021 Oxide Computer Company
+#
+
+$(ROOTOPTDIR):
+	$(INS.dir)
+
+$(ROOTOPTCORE): $(ROOTOPTDIR)
+	$(INS.dir)
+
+$(ROOTOPTCORE)/%: %
+	$(INS.file)
+
+$(ROOTOPTCORE)/%: %.ksh
+	$(INS.rename)
+
+%.32.o: %.c
+	$(COMPILE.c) $< -o $@
+	$(POST_PROCESS_O)
+
+%.64.o: %.c
+	$(COMPILE64.c) $< -o $@
+	$(POST_PROCESS_O)
+
+%.64: %.64.o
+	$(LINK64.c) -o $@ $< $(LDLIBS64)
+	$(POST_PROCESS)
+
+%.32: %.32.o
+	$(LINK.c) -o $@ $< $(LDLIBS)
+	$(POST_PROCESS)
+
+clobber: clean
+	$(RM) $(PROGS32) $(PROGS64)
+
+clean:
+	$(RM) $(ALLOBJS)

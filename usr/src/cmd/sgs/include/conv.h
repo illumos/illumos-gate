@@ -27,7 +27,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2016 RackTop Systems.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef	_CONV_H
@@ -379,7 +379,7 @@ typedef union {
 } Conv_cnote_ss_flags_buf_t;
 
 /* conv_cnote_cc_content() */
-#define	CONV_CNOTE_CC_CONTENT_BUFSIZE	97
+#define	CONV_CNOTE_CC_CONTENT_BUFSIZE	103
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_CNOTE_CC_CONTENT_BUFSIZE];

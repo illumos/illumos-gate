@@ -69,6 +69,8 @@
 #include <sys/siginfo.h>
 #include <sys/random.h>
 
+#include <core_shstrtab.h>
+
 #if defined(__x86)
 #include <sys/comm_page_util.h>
 #include <sys/fp.h>
@@ -90,69 +92,6 @@ static size_t elfsize(Ehdr *, int, caddr_t, uintptr_t *);
 static int mapelfexec(vnode_t *, Ehdr *, int, caddr_t,
     Phdr **, Phdr **, Phdr **, Phdr **, Phdr *,
     caddr_t *, caddr_t *, intptr_t *, intptr_t *, size_t, long *, size_t *);
-
-typedef enum {
-	STR_CTF,
-	STR_SYMTAB,
-	STR_DYNSYM,
-	STR_STRTAB,
-	STR_DYNSTR,
-	STR_SHSTRTAB,
-	STR_NUM
-} shstrtype_t;
-
-static const char *shstrtab_data[] = {
-	".SUNW_ctf",
-	".symtab",
-	".dynsym",
-	".strtab",
-	".dynstr",
-	".shstrtab"
-};
-
-typedef struct shstrtab {
-	int	sst_ndx[STR_NUM];
-	int	sst_cur;
-} shstrtab_t;
-
-static void
-shstrtab_init(shstrtab_t *s)
-{
-	bzero(&s->sst_ndx, sizeof (s->sst_ndx));
-	s->sst_cur = 1;
-}
-
-static int
-shstrtab_ndx(shstrtab_t *s, shstrtype_t type)
-{
-	int ret;
-
-	if ((ret = s->sst_ndx[type]) != 0)
-		return (ret);
-
-	ret = s->sst_ndx[type] = s->sst_cur;
-	s->sst_cur += strlen(shstrtab_data[type]) + 1;
-
-	return (ret);
-}
-
-static size_t
-shstrtab_size(const shstrtab_t *s)
-{
-	return (s->sst_cur);
-}
-
-static void
-shstrtab_dump(const shstrtab_t *s, char *buf)
-{
-	int i, ndx;
-
-	*buf = '\0';
-	for (i = 0; i < STR_NUM; i++) {
-		if ((ndx = s->sst_ndx[i]) != 0)
-			(void) strcpy(buf + ndx, shstrtab_data[i]);
-	}
-}
 
 static int
 dtrace_safe_phdr(Phdr *phdrp, struct uarg *args, uintptr_t base)
@@ -1647,8 +1586,10 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 	struct as *as = p->p_as;
 	int error = 0;
 
-	if (v != NULL)
-		shstrtab_init(&shstrtab);
+	if (!shstrtab_init(&shstrtab)) {
+		error = ENOMEM;
+		goto done;
+	}
 
 	i = 1;
 	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg)) {
@@ -1739,8 +1680,12 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 						    KM_SLEEP);
 					}
 
-					v[i].sh_name = shstrtab_ndx(&shstrtab,
-					    STR_CTF);
+					if (!shstrtab_ndx(&shstrtab,
+					    shstrtab_data[STR_CTF],
+					    &v[i].sh_name)) {
+						error = ENOMEM;
+						goto done;
+					}
 					v[i].sh_addr = (Addr)(uintptr_t)saddr;
 					v[i].sh_type = SHT_PROGBITS;
 					v[i].sh_addralign = 4;
@@ -1781,6 +1726,59 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 					continue;
 
 				symtab = shdr;
+			} else if (strncmp(name, ".debug_",
+			    strlen(".debug_")) == 0) {
+				/*
+				 * The design of the above check is intentional.
+				 * In particular, we want to capture any
+				 * sections that begin with '.debug_' for a few
+				 * reasons:
+				 *
+				 * 1) Various revisions to the DWARF spec end up
+				 * changing the set of section headers that
+				 * exist. This ensures that we don't need to
+				 * change the kernel to get a new version.
+				 *
+				 * 2) Other software uses .debug_ sections for
+				 * things which aren't DWARF. This allows them
+				 * to be captured as well.
+				 */
+				if ((content & CC_CONTENT_DEBUG) == 0)
+					continue;
+
+				if (v != NULL && i < nv - 1) {
+					if (allocsz > datasz) {
+						if (data != NULL)
+							kmem_free(data, datasz);
+
+						datasz = allocsz;
+						data = kmem_alloc(datasz,
+						    KM_SLEEP);
+					}
+
+					if (!shstrtab_ndx(&shstrtab,
+					    name, &v[i].sh_name)) {
+						error = ENOMEM;
+						goto done;
+					}
+					v[i].sh_addr = (Addr)(uintptr_t)saddr;
+					v[i].sh_type = shdr->sh_type;
+					v[i].sh_addralign = shdr->sh_addralign;
+					*doffsetp = roundup(*doffsetp,
+					    v[i].sh_addralign);
+					v[i].sh_offset = *doffsetp;
+					v[i].sh_size = shdr->sh_size;
+					v[i].sh_link = 0;
+					v[i].sh_entsize = shdr->sh_entsize;
+					v[i].sh_info = shdr->sh_info;
+
+					copy_scn(shdr, mvp, &v[i], vp,
+					    doffsetp, data, datasz, credp,
+					    rlimit);
+				}
+
+				i++;
+				continue;
 			}
 
 			if (symtab != NULL) {
@@ -1810,15 +1808,31 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 					}
 
 					if (symtab->sh_type == SHT_DYNSYM) {
-						v[i].sh_name = shstrtab_ndx(
-						    &shstrtab, STR_DYNSYM);
-						v[i + 1].sh_name = shstrtab_ndx(
-						    &shstrtab, STR_DYNSTR);
+						if (!shstrtab_ndx(&shstrtab,
+						    shstrtab_data[STR_DYNSYM],
+						    &v[i].sh_name)) {
+							error = ENOMEM;
+							goto done;
+						}
+						if (!shstrtab_ndx(&shstrtab,
+						    shstrtab_data[STR_DYNSTR],
+						    &v[i + 1].sh_name)) {
+							error = ENOMEM;
+							goto done;
+						}
 					} else {
-						v[i].sh_name = shstrtab_ndx(
-						    &shstrtab, STR_SYMTAB);
-						v[i + 1].sh_name = shstrtab_ndx(
-						    &shstrtab, STR_STRTAB);
+						if (!shstrtab_ndx(&shstrtab,
+						    shstrtab_data[STR_SYMTAB],
+						    &v[i].sh_name)) {
+							error = ENOMEM;
+							goto done;
+						}
+						if (!shstrtab_ndx(&shstrtab,
+						    shstrtab_data[STR_STRTAB],
+						    &v[i + 1].sh_name)) {
+							error = ENOMEM;
+							goto done;
+						}
 					}
 
 					v[i].sh_type = symtab->sh_type;
@@ -1887,7 +1901,11 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 		goto done;
 	}
 
-	v[i].sh_name = shstrtab_ndx(&shstrtab, STR_SHSTRTAB);
+	if (!shstrtab_ndx(&shstrtab, shstrtab_data[STR_SHSTRTAB],
+	    &v[i].sh_name)) {
+		error = ENOMEM;
+		goto done;
+	}
 	v[i].sh_size = shstrtab_size(&shstrtab);
 	v[i].sh_addralign = 1;
 	*doffsetp = roundup(*doffsetp, v[i].sh_addralign);
@@ -1915,6 +1933,8 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 done:
 	if (data != NULL)
 		kmem_free(data, datasz);
+
+	shstrtab_fini(&shstrtab);
 
 	return (error);
 }
@@ -1961,7 +1981,7 @@ top:
 	 * Count the number of section headers we're going to need.
 	 */
 	nshdrs = 0;
-	if (content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB)) {
+	if (content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB | CC_CONTENT_DEBUG)) {
 		(void) process_scns(content, p, credp, NULL, NULL, 0, 0,
 		    NULL, &nshdrs);
 	}

@@ -1056,7 +1056,7 @@ RTLS_OBJS +=	rtls.o
 #
 AOUTEXEC_OBJS +=aout.o
 
-ELFEXEC_OBJS +=	elf.o elf_notes.o old_notes.o
+ELFEXEC_OBJS +=	elf.o elf_notes.o old_notes.o core_shstrtab.o
 
 INTPEXEC_OBJS +=intp.o
 
