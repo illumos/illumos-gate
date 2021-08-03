@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -213,13 +213,20 @@ amdzen_df_read64(amdzen_t *azn, amdzen_df_t *df, uint8_t inst, uint8_t func,
 	return (amdzen_stub_get64(df->adf_funcs[4], AMDZEN_DF_F4_FICAD_LO));
 }
 
-
 static uint32_t
 amdzen_smn_read32(amdzen_t *azn, amdzen_df_t *df, uint32_t reg)
 {
 	VERIFY(MUTEX_HELD(&azn->azn_mutex));
 	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, reg);
 	return (amdzen_stub_get32(df->adf_nb, AMDZEN_NB_SMN_DATA));
+}
+
+static void
+amdzen_smn_write32(amdzen_t *azn, amdzen_df_t *df, uint32_t reg, uint32_t val)
+{
+	VERIFY(MUTEX_HELD(&azn->azn_mutex));
+	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, reg);
+	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_DATA, val);
 }
 
 static amdzen_df_t *
@@ -272,6 +279,30 @@ amdzen_c_smn_read32(uint_t dfno, uint32_t reg, uint32_t *valp)
 	mutex_exit(&azn->azn_mutex);
 	return (0);
 }
+
+int
+amdzen_c_smn_write32(uint_t dfno, uint32_t reg, uint32_t val)
+{
+	amdzen_df_t *df;
+	amdzen_t *azn = amdzen_data;
+
+	mutex_enter(&azn->azn_mutex);
+	df = amdzen_df_find(azn, dfno);
+	if (df == NULL) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOENT);
+	}
+
+	if ((df->adf_flags & AMDZEN_DF_F_FOUND_NB) == 0) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENXIO);
+	}
+
+	amdzen_smn_write32(azn, df, reg, val);
+	mutex_exit(&azn->azn_mutex);
+	return (0);
+}
+
 
 uint_t
 amdzen_c_df_count(void)

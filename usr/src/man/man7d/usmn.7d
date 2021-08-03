@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2021 Oxide Computer Company
 .\"
-.Dd September 1, 2020
+.Dd July 30, 2021
 .Dt USMN 7D
 .Os
 .Sh NAME
@@ -22,16 +22,21 @@
 .Sh DESCRIPTION
 The
 .Nm
-driver provides the ability to read data from the AMD system management
-network
+driver provides the ability to read and write data from the AMD System
+Management Network
 .Pq SMN
 on AMD Family 17h
 .Pq Zen, Zen+, and Zen 2
+and AMD Family 19h
+.Pq Zen 3
 processors.
 .Pp
 This driver is intended strictly for facilitating platform development
-and is not recommended for systems that aren't doing kernel development
-on AMD Zen platforms.
+and is not recommended for systems that aren't doing kernel and platform
+development on AMD Zen platforms.
+Arbitrary writes to the SMN can severely damage and destabilize the system.
+If you do not need access to the SMN, then this driver should not be
+present on the system.
 .Sh SEE ALSO
 .Xr amdzen 7D ,
 .Xr zen_udf 7D

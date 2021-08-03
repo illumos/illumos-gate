@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -97,7 +97,22 @@ usmn_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	if (cmd == USMN_READ) {
 		int ret;
 
+		if ((mode & FREAD) == 0) {
+			return (EINVAL);
+		}
+
 		ret = amdzen_c_smn_read32(dfno, usr.usr_addr, &usr.usr_data);
+		if (ret != 0) {
+			return (ret);
+		}
+	} else if (cmd == USMN_WRITE) {
+		int ret;
+
+		if ((mode & FWRITE) == 0) {
+			return (EINVAL);
+		}
+
+		ret = amdzen_c_smn_write32(dfno, usr.usr_addr, usr.usr_data);
 		if (ret != 0) {
 			return (ret);
 		}
@@ -105,7 +120,8 @@ usmn_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		return (ENOTSUP);
 	}
 
-	if (ddi_copyout(&usr, (void *)arg, sizeof (usr), mode & FKIOCTL) != 0) {
+	if (cmd == USMN_READ &&
+	    ddi_copyout(&usr, (void *)arg, sizeof (usr), mode & FKIOCTL) != 0) {
 		return (EFAULT);
 	}
 

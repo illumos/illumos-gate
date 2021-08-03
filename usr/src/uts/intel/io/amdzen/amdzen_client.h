@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef _AMDZEN_CLIENT_H
@@ -27,6 +27,7 @@ extern "C" {
 #endif
 
 extern int amdzen_c_smn_read32(uint_t, uint32_t, uint32_t *);
+extern int amdzen_c_smn_write32(uint_t, uint32_t, uint32_t);
 extern uint_t amdzen_c_df_count(void);
 extern int amdzen_c_df_read32(uint_t, uint8_t, uint8_t, uint16_t, uint32_t *);
 extern int amdzen_c_df_read64(uint_t, uint8_t, uint8_t, uint16_t, uint64_t *);
