@@ -42,6 +42,7 @@ PROGS = \
 	endian \
 	env-7076 \
 	fnmatch \
+	memchr \
 	memset_s \
 	posix_memalign \
 	printf-9511 \

@@ -1,144 +1,253 @@
-'\" te
+.\"
 .\" Copyright (c) 2014, Joyent, Inc.
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MEMORY 3C "Feb 4, 2009"
-.SH NAME
-memory, memccpy, memchr, memcmp, memcpy, memmem, memmove, memset \- memory operations
-.SH SYNOPSIS
-.LP
-.nf
-#include <string.h>
-
-\fBvoid *\fR\fBmemccpy\fR(\fBvoid *restrict\fR \fIs1\fR, \fBconst void *restrict\fR \fIs2\fR,
-     \fBint\fR \fIc\fR, \fBsize_t\fR \fIn\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBmemchr\fR(\fBconst void *\fR\fIs\fR, \fBint\fR \fIc\fR, \fBsize_t\fR \fIn\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBmemcmp\fR(\fBconst void *\fR\fIs1\fR, \fBconst void *\fR\fIs2\fR, \fBsize_t\fR \fIn\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBmemcpy\fR(\fBvoid *restrict\fR \fIs1\fR, \fBconst void *restrict\fR \fIs2\fR, \fBsize_t\fR \fIn\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBmemmem\fR(\fBconst void *\fR\fIl\fR, \fBsize_t\fR \fIl_len\fR, \fBconst void *\fR\fIs\fR, \fBsize_t\fR \fIs_len\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBmemmove\fR(\fBvoid *\fR\fIs1\fR, \fBconst void *\fR\fIs2\fR, \fBsize_t\fR \fIn\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBmemset\fR(\fBvoid *\fR\fIs\fR, \fBint\fR \fIc\fR, \fBsize_t\fR \fIn\fR);
-.fi
-
-.SS "ISO C++"
-.LP
-.nf
-#include <string.h>
-
-\fBconst void *\fR\fBmemchr\fR(\fBconst void *\fR\fIs\fR, \fBint\fR \fIc\fR, \fBsize_t\fR \fIn\fR);
-.fi
-
-.LP
-.nf
-#include <cstring>
-
-\fBvoid *std::\fR\fBmemchr\fR(\fBvoid *\fR\fIs\fR, \fBint\fR \fIc\fR, \fBsize_t\fR \fIn\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd August 6, 2021
+.Dt MEMORY 3C
+.Os
+.Sh NAME
+.Nm memory ,
+.Nm memccpy ,
+.Nm memchr ,
+.Nm memcmp ,
+.Nm memcpy ,
+.Nm memmem ,
+.Nm memmove ,
+.Nm memrchr ,
+.Nm memset
+.Nd memory operations
+.Sh SYNOPSIS
+.In string.h
+.Ft "void *"
+.Fo memccpy
+.Fa "void *restrict s1"
+.Fa "const void *restrict s2"
+.Fa "int c"
+.Fa "size_t n"
+.Fc
+.Ft "void *"
+.Fo memchr
+.Fa "void *s",
+.Fa "int c"
+.Fa "size_t n"
+.Fc
+.Ft int
+.Fo memcmp
+.Fa "const void *s1"
+.Fa "const void *s2"
+.Fa "size_t n"
+.Fc
+.Ft "void *"
+.Fo memcpy
+.Fa "void *restrict s1"
+.Fa "const void *restrict s2"
+.Fa "size_t n"
+.Fc
+.Ft "void *"
+.Fo memmem
+.Fa "const void *l"
+.Fa "size_t l_len"
+.Fa "const void *s"
+.Fa "size_t s_len"
+.Fc
+.Ft "void *"
+.Fo memmove
+.Fa "void *s1"
+.Fa "const void *s2"
+.Fa "size_t n"
+.Fc
+.Ft "void *"
+.Fo memrchr
+.Fa "void *s",
+.Fa "int c"
+.Fa "size_t n"
+.Fc
+.Ft "void *"
+.Fo memset
+.Fa "void *s"
+.Fa int c
+.Fa "size_t n"
+.Fc
+.Sh DESCRIPTION
 These functions operate as efficiently as possible on memory areas (arrays of
-bytes bounded by a count, not terminated by a null character). They do not
-check for the overflow of any receiving memory area.
-.sp
-.LP
-The \fBmemccpy()\fR function copies bytes from memory area \fIs2\fR into
-\fIs1\fR, stopping after the first occurrence of \fIc\fR (converted to an
-\fBunsigned char\fR) has been copied, or after \fIn\fR bytes have been copied,
-whichever comes first. It returns a pointer to the byte after the copy of
-\fIc\fR in \fIs1\fR, or a null pointer if \fIc\fR was not found in the first
-\fIn\fR bytes of \fIs2\fR.
-.sp
-.LP
-The \fBmemchr()\fR function returns a pointer to the first occurrence of
-\fIc\fR (converted to an \fBunsigned char\fR) in the first \fIn\fR bytes (each
-interpreted as an \fBunsigned char\fR) of memory area \fIs\fR, or a null
-pointer if \fIc\fR does not occur.
-.sp
-.LP
-The \fBmemcmp()\fR function compares its arguments, looking at the first
-\fIn\fR bytes (each interpreted as an \fBunsigned char\fR), and returns an
-integer less than, equal to, or greater than 0, according as \fIs1\fR is
-lexicographically less than, equal to, or greater than \fIs2\fR when taken to
-be unsigned characters.
-.sp
-.LP
-The \fBmemcpy()\fR function copies \fIn\fR bytes from memory area \fIs2\fR to
-\fIs1\fR. It returns \fIs1\fR. If copying takes place between objects that
-overlap, the behavior is undefined.
-.sp
-.LP
-The \fBmemmem()\fR function searches for the \fIs_len\fR long byte pattern
-\fIs\fR in the memory region starting at \fIl\fR for \fIl_len\fR bytes. If a
-match is found, a pointer to the starting location in \fIl\fR is returned. If no
-match is found, \fIl_len\fR is zero, \fIs_len\fR is zero, or \fIl_len\fR is less
-than \fIs_len\fR, then a null pointer is return.
-.sp
-.LP
-The \fBmemmove()\fR function copies \fIn\fR bytes from memory area \fIs2\fR to
-memory area \fIs1\fR. Copying between objects that overlap will take place
-correctly. It returns \fIs1\fR.
-.sp
-.LP
-The \fBmemset()\fR function sets the first \fIn\fR bytes in memory area \fIs\fR
-to the value of \fIc\fR (converted to an \fBunsigned char\fR). It returns
-\fIs\fR.
-.SH USAGE
-.LP
-Using \fBmemcpy()\fR might be faster than using \fBmemmove()\fR if the
+bytes bounded by a count, not terminated by a null character).
+They do not check for the overflow of any receiving memory area.
+.Pp
+The
+.Fn memccpy
+function copies bytes from memory area
+.Fa s2
+into
+.Fa s1 ,
+stopping after the first occurrence of
+.Fa c
+.Po
+converted to an
+.Vt unsigned char
+.Pc
+has been copied, or after
+.Fa n
+bytes have been copied, whichever comes first.
+It returns a pointer to the byte after the copy of
+.Fa c
+in
+.Fa s1 ,
+or a
+.Dv NULL
+pointer if
+.Fa c
+was not found in the first
+.Fa n
+bytes of
+.Fa s2 .
+.Pp
+The
+.Fn memchr
+function returns a pointer to the first occurrence of
+.Fa c
+.Po
+converted to an
+.Vt unsigned char
+.Pc
+in the first
+.Fa n
+bytes
+.Po
+each interpreted as an
+.Vt unsigned char
+.Pc
+of memory area
+.Fa s ,
+or a
+.Dv NULL
+pointer if
+.Fa c
+does not occur.
+.Pp
+The
+.Fn memrchr
+function behaves similarly to the
+.Fn memchr
+function, except that the memory area is searched in reverse from the
+last byte.
+.Pp
+The
+.Fn memcmp
+function compares its arguments, looking at the first
+.Fa n
+bytes
+.Po
+each interpreted as an
+.Vt unsigned char
+.Pc ,
+and returns an integer less than, equal to, or greater than 0, according as
+.Fa s1
+is less than, equal to, or greater than
+.Fa s2
+when taken to be unsigned characters.
+.Pp
+The
+.Fn memcpy
+function copies
+.Fa n
+bytes from memory area
+.Fa s2
+to
+.Fa s1
+It returns
+.Fa s1 .
+If copying takes place between objects that overlap, the behavior is undefined.
+In such cases, use
+.Fn memmove
+instead.
+.Pp
+The
+.Fn memmem
+function searches for the
+.Fa s_len
+long byte pattern
+.Fa s
+in the memory region starting at
+.Fa l
+for
+.Fa l_len
+bytes.
+If a match is found, a pointer to the starting location in
+.Fa l
+is returned.
+If no match is found,
+.Fa l_len
+is zero,
+.Fa s_len
+is zero, or
+.Fa l_len
+is less than
+.Fa s_len
+then a
+.Dv NULL
+pointer is return.
+.Pp
+The
+.Fn memmove
+function copies
+.Fa n
+bytes from memory area
+.Fa s2
+to memory area
+.Fa s1 .
+Copying between objects that overlap will take place correctly.
+It returns
+.Fa s1 .
+.Pp
+The
+.Fn memset
+function sets the first
+.Fa n
+bytes in memory area
+.Fa s
+to the value of
+.Fa c
+.Po
+converted to an
+.Vt unsigned char
+.Pc .
+It returns
+.Fa s .
+.Sh USAGE
+Using
+.Fn memcpy
+might be faster than using
+.Fn memmove
+if the
 application knows that the objects being copied do not overlap.
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Stable
-_
-MT-Level	MT-Safe
-_
-Standard	See \fBstandards\fR(5).
-.TE
-
-.SH SEE ALSO
-.LP
-\fBstring\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
-.SH NOTES
-.LP
-Overlap between objects being copied can arise even when their (virtual)
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr string 3C ,
+.Xr attributes 5 ,
+.Xr standards 5
+.Sh NOTES
+Overlap between objects being copied can arise even when their
+.Pq virtual
 address ranges appear to be disjoint; for example, as a result of
 memory-mapping overlapping portions of the same underlying file, or of
 attaching the same shared memory segment more than once.
