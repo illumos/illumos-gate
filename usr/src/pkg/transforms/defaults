@@ -58,7 +58,6 @@
 # Catch some of the collections of largely read-only files
 #
 <transform file path=usr/lib/help/.+ -> default mode 0444>
-<transform file path=usr/share/doc/ksh/.+ -> default mode 0644>
 <transform file path=usr/share/ipfilter/.+ -> default mode 0644>
 <transform file path=usr/share/lib/ccs/.+ -> default mode 0644>
 <transform file path=usr/share/lib/java/.+ -> default mode 0644>

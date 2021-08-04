@@ -250,7 +250,6 @@ dir path=usr/sbin
 $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
 dir path=usr/share
-dir path=usr/share/doc group=other
 dir path=usr/share/lib
 dir path=usr/share/lib/mailx
 dir path=usr/share/lib/pub
