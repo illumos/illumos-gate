@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -50,6 +51,12 @@
  *	       to nvlist, will contain following nvpairs
  *			wait:	DATA_TYPE_INT32
  *			primary: DATA_TYPE_BOOLEAN
+ *
+ *  IPADM_NVP_FAMILIES - value holds interface families and when converted
+ *	       to nvlist, will be a DATA_TYPE_UINT16_ARRAY
+ *
+ *  IPADM_NVP_MIFNAMES - value holds IPMP group members and when converted
+ *	       to nvlist, will be a DATA_TYPE_STRING_ARRAY
  *
  *  default  - value is a single entity and when converted to nvlist, will
  *	       contain nvpair of type DATA_TYPE_STRING. nvpairs private to
@@ -88,21 +95,23 @@ static int ipadm_process_db_line(db_wfunc_t *, void *, FILE *fp, FILE *nfp,
 /*
  * convert nvpair to a "name=value" string for writing to the DB.
  */
-typedef size_t  ipadm_wfunc_t(nvpair_t *, char *, size_t);
+typedef size_t ipadm_wfunc_t(nvpair_t *, char *, size_t);
 
 /*
  * ipadm_rfunc_t takes (`name', `value') and adds the appropriately typed
  * nvpair to the nvlist.
  */
-typedef void  ipadm_rfunc_t(nvlist_t *, char *name, char *value);
+typedef ipadm_status_t ipadm_rfunc_t(nvlist_t *, char *, char *);
 
 static ipadm_rfunc_t	i_ipadm_str_dbline2nvl, i_ipadm_ip4_dbline2nvl,
 			i_ipadm_ip6_dbline2nvl, i_ipadm_intfid_dbline2nvl,
-			i_ipadm_dhcp_dbline2nvl;
+			i_ipadm_dhcp_dbline2nvl, i_ipadm_families_dbline2nvl,
+			i_ipadm_groupmembers_dbline2nvl;
 
 static ipadm_wfunc_t	i_ipadm_str_nvp2dbline, i_ipadm_ip4_nvp2dbline,
 			i_ipadm_ip6_nvp2dbline, i_ipadm_intfid_nvp2dbline,
-			i_ipadm_dhcp_nvp2dbline;
+			i_ipadm_dhcp_nvp2dbline, i_ipadm_families_nvp2dbline,
+			i_ipadm_groupmembers_nvp2dbline;
 
 /*
  * table of function pointers to read/write formatted entries from/to
@@ -120,6 +129,10 @@ static ipadm_conf_ent_t ipadm_conf_ent[] = {
 	{ IPADM_NVP_INTFID, i_ipadm_intfid_nvp2dbline,
 	    i_ipadm_intfid_dbline2nvl },
 	{ IPADM_NVP_DHCP, i_ipadm_dhcp_nvp2dbline, i_ipadm_dhcp_dbline2nvl },
+	{ IPADM_NVP_FAMILIES, i_ipadm_families_nvp2dbline,
+	    i_ipadm_families_dbline2nvl },
+	{ IPADM_NVP_MIFNAMES, i_ipadm_groupmembers_nvp2dbline,
+	    i_ipadm_groupmembers_dbline2nvl},
 	{ NULL,	i_ipadm_str_nvp2dbline,	i_ipadm_str_dbline2nvl }
 };
 
@@ -259,7 +272,7 @@ static size_t
 i_ipadm_dhcp_nvp2dbline(nvpair_t *nvp, char *buf, size_t buflen)
 {
 	char		addrbuf[IPADM_STRSIZE];
-	int32_t 	wait;
+	int32_t		wait;
 	boolean_t	primary;
 	nvlist_t	*v;
 
@@ -328,13 +341,13 @@ ipadm_nvlist2str(nvlist_t *nvl, char *buf, size_t buflen)
  * Adds a nvpair, using the `name' and `value', to the nvlist in `nvl'.
  * The value will be interpreted as explained at the top of this file.
  */
-static void
+static ipadm_status_t
 i_ipadm_add_nvpair(nvlist_t *nvl, char *name, char *value)
 {
 	ipadm_conf_ent_t	*ipent;
 
 	ipent = i_ipadm_find_conf_type(name);
-	(*ipent->ipent_rfunc)(nvl, name, value);
+	return ((*ipent->ipent_rfunc)(nvl, name, value));
 }
 
 /*
@@ -467,14 +480,18 @@ i_ipadm_add_dhcp2nvl(nvlist_t *nvl, boolean_t primary, int32_t wait)
 /*
  * Add (name, value) as an nvpair of type DATA_TYPE_STRING to nvlist.
  */
-static void
+static ipadm_status_t
 i_ipadm_str_dbline2nvl(nvlist_t *nvl, char *name, char *value)
 {
+	int err;
+
 	/* if value is NULL create an empty node */
 	if (value == NULL)
-		(void) nvlist_add_string(nvl, name, "");
+		err = nvlist_add_string(nvl, name, "");
 	else
-		(void) nvlist_add_string(nvl, name, value);
+		err = nvlist_add_string(nvl, name, value);
+
+	return (ipadm_errno2status(err));
 }
 
 /*
@@ -484,7 +501,7 @@ i_ipadm_str_dbline2nvl(nvlist_t *nvl, char *name, char *value)
  * This function will add an nvlist with the hostname information in
  * nvpairs to the nvlist in `nvl'.
  */
-static void
+static ipadm_status_t
 i_ipadm_ip4_dbline2nvl(nvlist_t *nvl, char *name, char *value)
 {
 	char			*cp, *hname;
@@ -507,7 +524,7 @@ i_ipadm_ip4_dbline2nvl(nvlist_t *nvl, char *name, char *value)
 		(void) strlcpy(ipaddr.ipadm_static_dname, cp,
 		    sizeof (ipaddr.ipadm_static_dname));
 	}
-	(void) i_ipadm_add_ipaddr2nvl(nvl, &ipaddr);
+	return (i_ipadm_add_ipaddr2nvl(nvl, &ipaddr));
 }
 
 /*
@@ -517,7 +534,7 @@ i_ipadm_ip4_dbline2nvl(nvlist_t *nvl, char *name, char *value)
  * This function will add an nvlist with the hostname information in
  * nvpairs to the nvlist in `nvl'.
  */
-static void
+static ipadm_status_t
 i_ipadm_ip6_dbline2nvl(nvlist_t *nvl, char *name, char *value)
 {
 	char			*cp, *hname;
@@ -540,7 +557,7 @@ i_ipadm_ip6_dbline2nvl(nvlist_t *nvl, char *name, char *value)
 		(void) strlcpy(ipaddr.ipadm_static_dname, cp,
 		    sizeof (ipaddr.ipadm_static_dname));
 	}
-	(void) i_ipadm_add_ipaddr2nvl(nvl, &ipaddr);
+	return (i_ipadm_add_ipaddr2nvl(nvl, &ipaddr));
 }
 
 /*
@@ -548,7 +565,7 @@ i_ipadm_ip6_dbline2nvl(nvlist_t *nvl, char *name, char *value)
  * This function will add an nvlist with the address object information in
  * nvpairs to the nvlist in `nvl'.
  */
-static void
+static ipadm_status_t
 i_ipadm_intfid_dbline2nvl(nvlist_t *nvl, char *name, char *value)
 {
 	char			*cp;
@@ -577,7 +594,7 @@ i_ipadm_intfid_dbline2nvl(nvlist_t *nvl, char *name, char *value)
 	errno = 0;
 	ipaddr.ipadm_intfidlen = (uint32_t)strtoul(prefixlen, &endp, 10);
 	if (*endp != '\0' || errno != 0)
-		return;
+		return (ipadm_errno2status(errno));
 
 	stateless = cp;
 	stateful = strchr(stateless, ',');
@@ -587,7 +604,7 @@ i_ipadm_intfid_dbline2nvl(nvlist_t *nvl, char *name, char *value)
 	ipaddr.ipadm_stateful = (strcmp(stateful, "yes") == 0);
 
 	/* Add all of it to the given nvlist */
-	(void) i_ipadm_add_intfid2nvl(nvl, &ipaddr);
+	return (i_ipadm_add_intfid2nvl(nvl, &ipaddr));
 }
 
 /*
@@ -595,7 +612,7 @@ i_ipadm_intfid_dbline2nvl(nvlist_t *nvl, char *name, char *value)
  * This function will add an nvlist with the dhcp address object information in
  * nvpairs to the nvlist in `nvl'.
  */
-static void
+static ipadm_status_t
 i_ipadm_dhcp_dbline2nvl(nvlist_t *nvl, char *name, char *value)
 {
 	char		*cp;
@@ -610,39 +627,194 @@ i_ipadm_dhcp_dbline2nvl(nvlist_t *nvl, char *name, char *value)
 	errno = 0;
 	wait_time = strtol(value, &endp, 10);
 	if (*endp != '\0' || errno != 0)
-		return;
+		return (ipadm_errno2status(errno));
 	primary = (strcmp(cp, "yes") == 0);
-	(void) i_ipadm_add_dhcp2nvl(nvl, primary, (int32_t)wait_time);
+	return (i_ipadm_add_dhcp2nvl(nvl, primary, (int32_t)wait_time));
+}
+
+/*
+ * Input 'nvp': name = IPADM_NVP_FAMILIES and value = array of 'uint16_t'
+ *
+ *
+ */
+static size_t
+i_ipadm_families_nvp2dbline(nvpair_t *nvp, char *buf, size_t buflen)
+{
+	uint_t nelem = 0;
+	uint16_t *elem;
+
+	assert(nvpair_type(nvp) == DATA_TYPE_UINT16_ARRAY);
+
+	if (nvpair_value_uint16_array(nvp,
+	    &elem, &nelem) != 0) {
+		buf[0] = '\0';
+		return (0);
+	}
+
+	assert(nelem != 0 || nelem > 2);
+
+	if (nelem == 1) {
+		return (snprintf(buf, buflen, "%s=%d",
+		    nvpair_name(nvp), elem[0]));
+	} else {
+		return (snprintf(buf, buflen, "%s=%d,%d",
+		    nvpair_name(nvp), elem[0], elem[1]));
+	}
+}
+
+/*
+ * name = IPADM_NVP_FAMILIES and value = <FAMILY>[,FAMILY]
+ *
+ * output nvp: name = IPADM_NVP_FAMILIES and value = array of 'uint16_t'
+ *
+ */
+static ipadm_status_t
+i_ipadm_families_dbline2nvl(nvlist_t *nvl, char *name, char *value)
+{
+	uint16_t	families[2];
+	uint_t	nelem = 0;
+	char	*val, *lasts;
+
+	if ((val = strtok_r(value,
+	    ",", &lasts)) != NULL) {
+		families[0] = atoi(val);
+		nelem++;
+		if ((val = strtok_r(NULL,
+		    ",", &lasts)) != NULL) {
+			families[1] = atoi(val);
+			nelem++;
+		}
+		return (ipadm_errno2status(nvlist_add_uint16_array(nvl,
+		    IPADM_NVP_FAMILIES, families, nelem)));
+	}
+
+	return (IPADM_INVALID_ARG);
+}
+
+/*
+ * input nvp: name = IPADM_NVP_MIFNAMES and value = array of 'char *'
+ *
+ *
+ */
+static size_t
+i_ipadm_groupmembers_nvp2dbline(nvpair_t *nvp, char *buf, size_t buflen)
+{
+	uint_t nelem = 0;
+	char **elem;
+	size_t n;
+
+	assert(nvpair_type(nvp) == DATA_TYPE_STRING_ARRAY);
+
+	if (nvpair_value_string_array(nvp,
+	    &elem, &nelem) != 0) {
+		buf[0] = '\0';
+		return (0);
+	}
+
+	assert(nelem != 0);
+
+	n = snprintf(buf, buflen, "%s=", IPADM_NVP_MIFNAMES);
+	if (n >= buflen)
+		return (n);
+
+	while (nelem-- > 0) {
+		n = strlcat(buf, elem[nelem], buflen);
+		if (nelem > 0)
+			n = strlcat(buf, ",", buflen);
+
+		if (n > buflen)
+			return (n);
+	}
+
+	return (n);
+}
+
+/*
+ * name = IPADM_NVP_MIFNAMES and value = <if_name>[,if_name]
+ *
+ * output nvp: name = IPADM_NVP_MIFNAMES and value = array of 'char *'
+ */
+static ipadm_status_t
+i_ipadm_groupmembers_dbline2nvl(nvlist_t *nvl, char *name, char *value)
+{
+	char	**members = NULL;
+	char	*member = NULL;
+	char	*val, *lasts;
+	uint_t	m_cnt = 0;
+	ipadm_status_t	ret = IPADM_SUCCESS;
+
+	assert(strcmp(name, IPADM_NVP_MIFNAMES) == 0 && value != NULL);
+
+	for (val = strtok_r(value, ",", &lasts);
+	    val != NULL;
+	    val = strtok_r(NULL, ",", &lasts)) {
+		if ((m_cnt % 4) == 0) {
+			char **tmp = recallocarray(members, m_cnt, m_cnt + 4,
+			    sizeof (char *));
+
+			if (tmp == NULL) {
+				ret = IPADM_NO_MEMORY;
+				goto fail;
+			}
+
+			members = tmp;
+		}
+
+		member = calloc(1, LIFNAMSIZ);
+
+		if (member == NULL) {
+			ret = IPADM_NO_MEMORY;
+			goto fail;
+		}
+
+		(void) strlcpy(member, val, LIFNAMSIZ);
+		members[m_cnt++] = member;
+
+	}
+
+	if ((ret = ipadm_errno2status(nvlist_add_string_array(nvl,
+	    IPADM_NVP_MIFNAMES, members, m_cnt))) != IPADM_SUCCESS)
+		goto fail;
+
+fail:
+	while (m_cnt-- > 0) {
+		free(members[m_cnt]);
+	}
+
+	free(members);
+
+	return (ret);
 }
 
 /*
  * Parses the buffer, for name-value pairs and creates nvlist. The value
  * is always considered to be a string.
  */
-int
+ipadm_status_t
 ipadm_str2nvlist(const char *inbuf, nvlist_t **ipnvl, uint_t flags)
 {
+	ipadm_status_t	status;
 	char	*nv, *name, *val, *buf, *cp, *sep;
 	int	err;
 
 	if (inbuf == NULL || inbuf[0] == '\0' || ipnvl == NULL)
-		return (EINVAL);
+		return (IPADM_INVALID_ARG);
 	*ipnvl = NULL;
 
 	/*
 	 * If IPADM_NORVAL is set, then `inbuf' should be comma delimited values
 	 */
 	if ((flags & IPADM_NORVAL) && strchr(inbuf, '=') != NULL)
-		return (EINVAL);
+		return (IPADM_INVALID_ARG);
 
 	if ((cp = buf = strdup(inbuf)) == NULL)
-		return (errno);
+		return (ipadm_errno2status(errno));
 
 	while (isspace(*buf))
 		buf++;
 
 	if (*buf == '\0') {
-		err = EINVAL;
+		status = IPADM_INVALID_ARG;
 		goto fail;
 	}
 
@@ -658,22 +830,26 @@ ipadm_str2nvlist(const char *inbuf, nvlist_t **ipnvl, uint_t flags)
 		if ((val = strchr(nv, '=')) != NULL)
 			*val++ = '\0';
 		if (*ipnvl == NULL &&
-		    (err = nvlist_alloc(ipnvl, NV_UNIQUE_NAME, 0)) != 0)
+		    (err = nvlist_alloc(ipnvl, NV_UNIQUE_NAME, 0)) != 0) {
+			status = ipadm_errno2status(err);
 			goto fail;
+		}
 		if (nvlist_exists(*ipnvl, name)) {
-			err = EEXIST;
+			status = IPADM_EXISTS;
 			goto fail;
 		}
 		/* Add the extracted nvpair to the nvlist `ipnvl'. */
-		(void) i_ipadm_add_nvpair(*ipnvl, name, val);
+		status = i_ipadm_add_nvpair(*ipnvl, name, val);
+		if (status != IPADM_SUCCESS)
+			goto fail;
 	}
 	free(cp);
-	return (0);
+	return (IPADM_SUCCESS);
 fail:
 	free(cp);
 	nvlist_free(*ipnvl);
 	*ipnvl = NULL;
-	return (err);
+	return (status);
 }
 
 /*

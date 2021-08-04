@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
 #
@@ -41,6 +42,7 @@ $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
+	ipadm_add_ipmp_member;
 	ipadm_add_aobjname;
 	ipadm_addr_info;
 	ipadm_check_auth;
@@ -79,6 +81,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ipadm_open_arp_on_udp;
 	ipadm_proto2str;
 	ipadm_refresh_addr;
+	ipadm_remove_ipmp_member;
 	ipadm_rw_db;
 	ipadm_set_addr;
 	ipadm_set_addrprop;

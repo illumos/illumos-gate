@@ -21,11 +21,10 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2017 Gary Mills
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
- * Copyright 2021, Tintri by DDN. All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -40,6 +39,8 @@
 #include <libdllink.h>
 #include <libinetutil.h>
 #include <libipadm.h>
+#include <ipmp.h>
+#include <ipmp_admin.h>
 #include <locale.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -53,21 +54,25 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <zone.h>
+#include <sys/list.h>
+#include <stddef.h>
 
 #define	STR_UNKNOWN_VAL	"?"
 #define	LIFC_DEFAULT	(LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES |\
 			LIFC_UNDER_IPMP)
 
+static void do_create_ip_common(int, char **, const char *, uint32_t);
+
 typedef void cmdfunc_t(int, char **, const char *);
 static cmdfunc_t do_help;
-static cmdfunc_t do_create_if, do_delete_if, do_enable_if, do_disable_if;
-static cmdfunc_t do_show_if;
-static cmdfunc_t do_set_prop, do_show_prop, do_set_ifprop;
-static cmdfunc_t do_show_ifprop, do_reset_ifprop, do_reset_prop;
-static cmdfunc_t do_show_addrprop, do_set_addrprop, do_reset_addrprop;
-static cmdfunc_t do_create_addr, do_delete_addr, do_show_addr;
-static cmdfunc_t do_enable_addr, do_disable_addr;
-static cmdfunc_t do_up_addr, do_down_addr, do_refresh_addr;
+static cmdfunc_t do_create_ip, do_delete_ip;
+static cmdfunc_t do_create_ipmp, do_add_ipmp, do_remove_ipmp;
+static cmdfunc_t do_disable_if, do_enable_if, do_show_if;
+static cmdfunc_t do_set_ifprop, do_reset_ifprop, do_show_ifprop;
+static cmdfunc_t do_create_addr, do_delete_addr, do_show_addr, do_refresh_addr;
+static cmdfunc_t do_disable_addr, do_enable_addr, do_down_addr, do_up_addr;
+static cmdfunc_t do_set_addrprop, do_reset_addrprop, do_show_addrprop;
+static cmdfunc_t do_set_prop, do_reset_prop, do_show_prop;
 
 typedef struct	cmd {
 	char		*c_name;
@@ -78,12 +83,28 @@ typedef struct	cmd {
 static cmd_t	cmds[] = {
 	{ "help",	do_help,	NULL },
 	/* interface management related sub-commands */
-	{ "create-if",	do_create_if,	"\tcreate-if\t[-t] <interface>"	},
-	{ "disable-if",	do_disable_if,	"\tdisable-if\t-t <interface>"	},
-	{ "enable-if",	do_enable_if,	"\tenable-if\t-t <interface>"	},
-	{ "delete-if",	do_delete_if,	"\tdelete-if\t<interface>"	},
-	{ "show-if",	do_show_if,
+	{ "create-if", do_create_ip, "\tcreate-if\t[-t] <interface>"	},
+	{ "create-ip", do_create_ip, "\tcreate-ip\t[-t] <interface>"	},
+	{ "delete-if", do_delete_ip, "\tdelete-if\t<interface>\n"	},
+	{ "delete-ip", do_delete_ip, "\tdelete-ip\t<interface>\n"	},
+
+	{ "create-ipmp", do_create_ipmp,
+	    "\tcreate-ipmp\t[-t] [-i <interface>[,<interface>]...] "
+	    "<ipmp-interface>"						},
+	{ "delete-ipmp", do_delete_ip,
+	    "\tdelete-ipmp\t<ipmp-interface>"				},
+	{ "add-ipmp", do_add_ipmp,
+	    "\tadd-ipmp\t[-t] -i <interface>[,<interface>]... "
+	    "<ipmp-interface>"						},
+	{ "remove-ipmp", do_remove_ipmp,
+	    "\tremove-ipmp\t[-t] -i <interface>[,<interface>]... "
+	    "<ipmp-interface>\n"					},
+
+	{ "disable-if", do_disable_if, "\tdisable-if\t-t <interface>"	},
+	{ "enable-if", do_enable_if, "\tenable-if\t-t <interface>"	},
+	{ "show-if", do_show_if,
 	    "\tshow-if\t\t[[-p] -o <field>,...] [<interface>]\n"	},
+
 	{ "set-ifprop",	do_set_ifprop,
 	    "\tset-ifprop\t[-t] -p <prop>=<value[,...]> -m <protocol> "
 	    "<interface>"						},
@@ -101,14 +122,15 @@ static cmd_t	cmds[] = {
 	    "\t\t\t[-1] [-h <hostname>] <addrobj>\n"
 	    "\tcreate-addr\t[-t] -T addrconf [-i interface-id]\n"
 	    "\t\t\t[-p {stateful|stateless}={yes|no}] <addrobj>" },
-	{ "down-addr",	do_down_addr,	"\tdown-addr\t[-t] <addrobj>"	},
-	{ "up-addr",	do_up_addr,	"\tup-addr\t\t[-t] <addrobj>"	},
-	{ "disable-addr", do_disable_addr, "\tdisable-addr\t-t <addrobj>" },
-	{ "enable-addr", do_enable_addr, "\tenable-addr\t-t <addrobj>"	},
-	{ "refresh-addr", do_refresh_addr, "\trefresh-addr\t[-i] <addrobj>" },
 	{ "delete-addr", do_delete_addr, "\tdelete-addr\t[-r] <addrobj>" },
-	{ "show-addr",	do_show_addr,
-	    "\tshow-addr\t[[-p] -o <field>,...] [<addrobj>]\n"		},
+	{ "show-addr", do_show_addr,
+	    "\tshow-addr\t[[-p] -o <field>,...] [<addrobj>]"		},
+	{ "refresh-addr", do_refresh_addr, "\trefresh-addr\t[-i] <addrobj>" },
+	{ "down-addr", do_down_addr, "\tdown-addr\t[-t] <addrobj>"	},
+	{ "up-addr", do_up_addr, "\tup-addr\t\t[-t] <addrobj>"	},
+	{ "disable-addr", do_disable_addr, "\tdisable-addr\t-t <addrobj>" },
+	{ "enable-addr", do_enable_addr, "\tenable-addr\t-t <addrobj>\n" },
+
 	{ "set-addrprop", do_set_addrprop,
 	    "\tset-addrprop\t[-t] -p <prop>=<value[,...]> <addrobj>"	},
 	{ "reset-addrprop", do_reset_addrprop,
@@ -118,11 +140,11 @@ static cmd_t	cmds[] = {
 	    "<addrobj>\n"						},
 
 	/* protocol properties related sub-commands */
-	{ "set-prop",	do_set_prop,
+	{ "set-prop", do_set_prop,
 	    "\tset-prop\t[-t] -p <prop>[+|-]=<value[,...]> <protocol>"	},
-	{ "reset-prop",	do_reset_prop,
+	{ "reset-prop", do_reset_prop,
 	    "\treset-prop\t[-t] -p <prop> <protocol>"			},
-	{ "show-prop",	do_show_prop,
+	{ "show-prop", do_show_prop,
 	    "\tshow-prop\t[[-c] -o <field>,...] [-p <prop>,...]"
 	    " [protocol]"						}
 };
@@ -282,7 +304,7 @@ typedef struct show_addr_args_s {
 
 typedef struct show_if_args_s {
 	show_if_state_t *si_state;
-	ipadm_if_info_list_t *si_info;
+	ipadm_if_info_t *si_info;
 } show_if_args_t;
 
 typedef enum {
@@ -296,6 +318,7 @@ typedef enum {
 
 typedef enum {
 	SI_IFNAME,
+	SI_IFCLASS,
 	SI_STATE,
 	SI_CURRENT,
 	SI_PERSISTENT
@@ -315,6 +338,7 @@ static ofmt_field_t show_addr_fields[] = {
 static ofmt_field_t show_if_fields[] = {
 /* name,	field width,	id,		callback */
 { "IFNAME",	11,		SI_IFNAME,	print_si_cb},
+{ "CLASS",	10,		SI_IFCLASS,	print_si_cb},
 { "STATE",	9,		SI_STATE,	print_si_cb},
 { "CURRENT",	13,		SI_CURRENT,	print_si_cb},
 { "PERSISTENT",	11,		SI_PERSISTENT,	print_si_cb},
@@ -327,6 +351,11 @@ typedef struct intf_mask {
 	uint64_t	bits;
 	uint64_t	mask;
 } fmask_t;
+
+typedef enum {
+    IPMP_ADD_MEMBER,
+    IPMP_REMOVE_MEMBER
+} ipmp_action_t;
 
 /*
  * Handle to libipadm. Opened in main() before the sub-command specific
@@ -349,6 +378,9 @@ static void	warn_ipadmerr(ipadm_status_t, const char *, ...);
 static void	ipadm_check_propstr(const char *, boolean_t, const char *);
 static void	process_misc_addrargs(int, char **, const char *, int *,
 		    uint32_t *);
+static void	do_action_ipmp(char *, ipadm_ipmp_members_t *, ipmp_action_t,
+    uint32_t);
+
 
 static void
 usage(int ret)
@@ -419,19 +451,17 @@ main(int argc, char *argv[])
 }
 
 /*
- * Create an IP interface for which no saved configuration exists in the
- * persistent store.
+ * Create regular IP interface or IPMP group interface
  */
 static void
-do_create_if(int argc, char *argv[], const char *use)
+do_create_ip_common(int argc, char *argv[], const char *use, uint32_t flags)
 {
 	ipadm_status_t	status;
 	int		option;
-	uint32_t	flags = IPADM_OPT_PERSIST|IPADM_OPT_ACTIVE;
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":t", if_longopts,
-	    NULL)) != -1) {
+	while ((option = getopt_long(argc, argv,
+	    ":t", if_longopts, NULL)) != -1) {
 		switch (option) {
 		case 't':
 			/*
@@ -444,13 +474,196 @@ do_create_if(int argc, char *argv[], const char *use)
 			die_opterr(optopt, option, use);
 		}
 	}
-	if (optind != (argc - 1))
-		die("Usage: %s", use);
+	if (optind != (argc - 1)) {
+		if (use != NULL)
+			die("usage: %s", use);
+		else
+			die(NULL);
+	}
 	status = ipadm_create_if(iph, argv[optind], AF_UNSPEC, flags);
 	if (status != IPADM_SUCCESS) {
 		die("Could not create %s : %s",
 		    argv[optind], ipadm_status2str(status));
 	}
+}
+
+/*
+ * Helpers to parse options into ipadm_ipmp_members_t list, and to free it.
+ */
+static ipadm_ipmp_members_t *
+get_ipmp_members(int argc, char *argv[], const char *use, uint32_t *flags)
+{
+	ipadm_ipmp_members_t *members = NULL;
+	ipadm_ipmp_member_t *member;
+	char *ifname;
+	int option;
+
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":i:", if_longopts, NULL)) !=
+	    -1) {
+		switch (option) {
+		case 't':
+			*flags &= ~IPADM_OPT_PERSIST;
+			break;
+		case 'i':
+			if (members == NULL) {
+				members = calloc(1,
+				    sizeof (ipadm_ipmp_members_t));
+				if (members == NULL)
+					die("insufficient memory");
+				list_create(members,
+				    sizeof (ipadm_ipmp_member_t),
+				    offsetof(ipadm_ipmp_member_t, node));
+			}
+
+			for (ifname = strtok(optarg, ",");
+			    ifname != NULL;
+			    ifname = strtok(NULL, ",")) {
+				if ((member = calloc(1,
+				    sizeof (ipadm_ipmp_member_t))) == NULL)
+					die("insufficient memory");
+
+				if (strlcpy(member->if_name, ifname,
+				    sizeof (member->if_name)) >= LIFNAMSIZ)
+					die("Incorrect length of interface "
+					    "name: %s", ifname);
+
+				list_insert_tail(members, member);
+			}
+			break;
+		default:
+			die_opterr(optopt, option, use);
+		}
+	}
+
+	if (optind != (argc - 1))
+		die("Usage: %s", use);
+
+	if (members != NULL && list_is_empty(members)) {
+		free(members);
+		members = NULL;
+	}
+
+	return (members);
+}
+
+static void
+free_ipmp_members(ipadm_ipmp_members_t *members)
+{
+	ipadm_ipmp_member_t *member;
+
+	while ((member = list_remove_head(members)) != NULL)
+		free(member);
+
+	list_destroy(members);
+
+	free(members);
+}
+
+/*
+ * Create an IPMP group interface for which no saved configuration
+ * exists in the persistent store.
+ */
+static void
+do_create_ipmp(int argc, char *argv[], const char *use)
+{
+	uint32_t flags = IPADM_OPT_PERSIST | IPADM_OPT_ACTIVE | IPADM_OPT_IPMP;
+	ipadm_ipmp_members_t *members = NULL;
+	ipmp_handle_t ipmp_handle;
+	int retval;
+
+	retval = ipmp_open(&ipmp_handle);
+	if (retval != IPMP_SUCCESS) {
+		die("Could not create IPMP handle: %s",
+		    ipadm_status2str(retval));
+	}
+
+	retval = ipmp_ping_daemon(ipmp_handle);
+	ipmp_close(ipmp_handle);
+
+	if (retval != IPMP_SUCCESS) {
+		die("Cannot ping in.mpathd: %s", ipmp_errmsg(retval));
+	}
+
+	members = get_ipmp_members(argc, argv, use, &flags);
+
+	do_create_ip_common(argc, argv, use, flags);
+
+	if (members != NULL) {
+		do_action_ipmp(argv[optind], members, IPMP_ADD_MEMBER, flags);
+		free_ipmp_members(members);
+	}
+}
+
+static void
+do_add_ipmp(int argc, char *argv[], const char *use)
+{
+	uint32_t flags = IPADM_OPT_PERSIST | IPADM_OPT_ACTIVE;
+	ipadm_ipmp_members_t *members;
+
+	members = get_ipmp_members(argc, argv, use, &flags);
+
+	if (members == NULL)
+		die_opterr(optopt, ':', use);
+
+	do_action_ipmp(argv[optind], members, IPMP_ADD_MEMBER, flags);
+	free_ipmp_members(members);
+}
+
+static void
+do_remove_ipmp(int argc, char *argv[], const char *use)
+{
+	uint32_t flags = IPADM_OPT_PERSIST | IPADM_OPT_ACTIVE;
+	ipadm_ipmp_members_t *members;
+
+	members = get_ipmp_members(argc, argv, use, &flags);
+
+	if (members == NULL)
+		die_opterr(optopt, ':', use);
+
+	do_action_ipmp(argv[optind], members, IPMP_REMOVE_MEMBER, flags);
+	free_ipmp_members(members);
+}
+
+static void
+do_action_ipmp(char *ipmp, ipadm_ipmp_members_t *members, ipmp_action_t action,
+    uint32_t flags)
+{
+	ipadm_status_t (*func)(ipadm_handle_t, const char *, const char *,
+	    uint32_t);
+	ipadm_status_t  status;
+	ipadm_ipmp_member_t *member;
+	char *ifname;
+	const char *msg;
+
+	if (action == IPMP_ADD_MEMBER) {
+		func = ipadm_add_ipmp_member;
+		msg = "Cannot add interface '%s' to IPMP interface '%s': %s";
+	} else {
+		func = ipadm_remove_ipmp_member;
+		msg = "Cannot remove interface '%s' from IPMP interface '%s': "
+		    "%s";
+	}
+
+	while ((member = list_remove_head(members)) != NULL) {
+		ifname = member->if_name;
+
+		status = func(iph, ipmp, ifname, flags);
+		if (status != IPADM_SUCCESS)
+			die(msg, ifname, ipmp, ipadm_status2str(status));
+	}
+}
+
+/*
+ * Create an IP interface for which no saved configuration exists in the
+ * persistent store.
+ */
+static void
+do_create_ip(int argc, char *argv[], const char *use)
+{
+	do_create_ip_common(argc, argv, use,
+	    IPADM_OPT_PERSIST | IPADM_OPT_ACTIVE);
 }
 
 /*
@@ -480,7 +693,7 @@ do_enable_if(int argc, char *argv[], const char *use)
  * Remove an IP interface from both active and persistent configuration.
  */
 static void
-do_delete_if(int argc, char *argv[], const char *use)
+do_delete_ip(int argc, char *argv[], const char *use)
 {
 	ipadm_status_t	status;
 	uint32_t	flags = IPADM_OPT_ACTIVE|IPADM_OPT_PERSIST;
@@ -687,7 +900,7 @@ do_show_ifprop(int argc, char **argv, const char *use)
 	uint_t		proto;
 	boolean_t	m_arg = _B_FALSE;
 	char		*protostr;
-	ipadm_if_info_list_t *ifinfo, *ifl;
+	ipadm_if_info_t	*ifinfo, *ifp;
 	ipadm_status_t	status;
 	show_prop_state_t state;
 
@@ -751,9 +964,8 @@ do_show_ifprop(int argc, char **argv, const char *use)
 	if (status != IPADM_SUCCESS)
 		die("Error retrieving interface(s): %s",
 		    ipadm_status2str(status));
-	for (ifl = ifinfo; ifl != NULL; ifl = ifl->ifil_next) {
-		(void) strlcpy(state.sps_ifname, ifl->ifil_ifi.ifi_name,
-		    LIFNAMSIZ);
+	for (ifp = ifinfo; ifp != NULL; ifp = ifp->ifi_next) {
+		(void) strlcpy(state.sps_ifname, ifp->ifi_name, LIFNAMSIZ);
 		state.sps_proto = proto;
 		show_properties(&state, IPADMPROP_CLASS_IF);
 	}
@@ -1057,14 +1269,16 @@ die(const char *format, ...)
 {
 	va_list alist;
 
-	format = gettext(format);
-	(void) fprintf(stderr, "%s: ", progname);
+	if (format != NULL) {
+		format = gettext(format);
+		(void) fprintf(stderr, "%s: ", progname);
 
-	va_start(alist, format);
-	(void) vfprintf(stderr, format, alist);
-	va_end(alist);
+		va_start(alist, format);
+		(void) vfprintf(stderr, format, alist);
+		va_end(alist);
 
-	(void) putchar('\n');
+		(void) putchar('\n');
+	}
 
 	ipadm_destroy_addrobj(ipaddr);
 	ipadm_close(iph);
@@ -1624,7 +1838,7 @@ flags2str(uint64_t flags, fmask_t *tbl, boolean_t is_bits,
 static boolean_t
 is_from_gz(const char *lifname)
 {
-	ipadm_if_info_list_t	*if_info;
+	ipadm_if_info_t		*if_info;
 	char			phyname[LIFNAMSIZ], *cp;
 	boolean_t		ret = _B_FALSE;
 	ipadm_status_t		status;
@@ -1647,7 +1861,7 @@ is_from_gz(const char *lifname)
 	if (status != IPADM_SUCCESS)
 		return (ret);
 
-	if (if_info->ifil_ifi.ifi_cflags & IFIF_L3PROTECT)
+	if (if_info->ifi_cflags & IFIF_L3PROTECT)
 		ret = _B_TRUE;
 	ipadm_free_if_info(if_info);
 	return (ret);
@@ -1902,8 +2116,8 @@ static boolean_t
 print_si_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 {
 	show_if_args_t		*arg = ofarg->ofmt_cbarg;
-	ipadm_if_info_list_t	*ifinfo = arg->si_info;
-	char			*ifname = ifinfo->ifil_ifi.ifi_name;
+	ipadm_if_info_t		*ifinfo = arg->si_info;
+	char			*ifname = ifinfo->ifi_name;
 	fmask_t intf_state[] = {
 		{ "ok",		IFIS_OK,	IPADM_ALL_BITS},
 		{ "down",	IFIS_DOWN,	IPADM_ALL_BITS},
@@ -1933,22 +2147,33 @@ print_si_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 		{ "6",	IFIF_IPV6,		IFIF_IPV6	},
 		{ NULL,	0,			0		}
 	};
+	fmask_t intf_class[] = {
+		{ "IP",		IPADM_IF_CLASS_REGULAR, IPADM_ALL_BITS},
+		{ "IPMP",	IPADM_IF_CLASS_IPMP,    IPADM_ALL_BITS},
+		{ "VIRTUAL",	IPADM_IF_CLASS_VIRTUAL, IPADM_ALL_BITS},
+		{ "UNKNOWN",	IPADM_IF_CLASS_UNKNOWN, IPADM_ALL_BITS},
+		{ NULL,	0,	0}
+	};
 
 	buf[0] = '\0';
 	switch (ofarg->ofmt_id) {
 	case SI_IFNAME:
 		(void) snprintf(buf, bufsize, "%s", ifname);
 		break;
+	case SI_IFCLASS:
+		flags2str(ifinfo->ifi_class, intf_class, _B_FALSE,
+		    buf, bufsize);
+		break;
 	case SI_STATE:
-		flags2str(ifinfo->ifil_ifi.ifi_state, intf_state, _B_FALSE,
+		flags2str(ifinfo->ifi_state, intf_state, _B_FALSE,
 		    buf, bufsize);
 		break;
 	case SI_CURRENT:
-		flags2str(ifinfo->ifil_ifi.ifi_cflags, intf_cflags, _B_TRUE,
+		flags2str(ifinfo->ifi_cflags, intf_cflags, _B_TRUE,
 		    buf, bufsize);
 		break;
 	case SI_PERSISTENT:
-		flags2str(ifinfo->ifil_ifi.ifi_pflags, intf_pflags, _B_TRUE,
+		flags2str(ifinfo->ifi_pflags, intf_pflags, _B_TRUE,
 		    buf, bufsize);
 		break;
 	default:
@@ -1969,7 +2194,7 @@ do_show_if(int argc, char *argv[], const char *use)
 	ipadm_status_t		status;
 	show_if_state_t		state;
 	char			*fields_str = NULL;
-	ipadm_if_info_list_t	*if_info, *ptr;
+	ipadm_if_info_t		*if_info, *ptr;
 	show_if_args_t		sargs;
 	int			option;
 	ofmt_handle_t		ofmt;
@@ -2014,7 +2239,7 @@ do_show_if(int argc, char *argv[], const char *use)
 		    ipadm_status2str(status));
 	}
 
-	for (ptr = if_info; ptr != NULL; ptr = ptr->ifil_next) {
+	for (ptr = if_info; ptr != NULL; ptr = ptr->ifi_next) {
 		sargs.si_info = ptr;
 		ofmt_print(state.si_ofmt, &sargs);
 	}

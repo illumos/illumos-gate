@@ -19,12 +19,13 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Milan Jurik. All rights reserved.
+
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Milan Jurik. All rights reserved.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
 . /lib/svc/share/smf_include.sh
@@ -32,8 +33,8 @@
 
 #
 # In a shared-IP zone we need this service to be up, but all of the work
-# it tries to do is irrelevant (and will actually lead to the service 
-# failing if we try to do it), so just bail out. 
+# it tries to do is irrelevant (and will actually lead to the service
+# failing if we try to do it), so just bail out.
 # In the global zone and exclusive-IP zones we proceed.
 #
 smf_configure_ip || exit $SMF_EXIT_OK
@@ -50,14 +51,14 @@ if smf_is_globalzone; then
 	# Update PVID on interfaces configured with VLAN 1
 	update_pvid
 
-	# 
+	#
 	# Upgrade handling. The upgrade file consists of a series of dladm(1M)
 	# commands. Note that after we are done, we cannot rename the upgrade
 	# script file as the file system is still read-only at this point.
 	# Defer this to the manifest-import service.
 	#
 	upgrade_script=/var/svc/profile/upgrade_datalink
-	if [ -f "${upgrade_script}" ]; then 
+	if [ -f "${upgrade_script}" ]; then
 		. "${upgrade_script}"
 	fi
 
@@ -230,11 +231,11 @@ fi
 if [ -n "$ipmp_list" ]; then
 	set -- $ipmp_list
 	while [ $# -gt 0 ]; do
-	    	if /sbin/ifconfig $1 ipmp; then
+		if /sbin/ifconfig $1 ipmp; then
 			ipmp_created="$ipmp_created $1"
 		else
 			ipmp_failed="$ipmp_failed $1"
-		fi	
+		fi
 		shift
 	done
 	[ -n "$ipmp_failed" ] && warn_failed_ifs "create IPv4 IPMP" \
@@ -296,15 +297,30 @@ fi
 if [ -n "$ipmp6_list" ]; then
 	set -- $ipmp6_list
 	while [ $# -gt 0 ]; do
-	    	if /sbin/ifconfig $1 inet6 ipmp; then
+		if /sbin/ifconfig $1 inet6 ipmp; then
 			ipmp6_created="$ipmp6_created $1"
 		else
 			ipmp6_failed="$ipmp6_failed $1"
- 		fi
+		fi
 		shift
 	done
 	[ -n "$ipmp6_failed" ] && warn_failed_ifs "create IPv6 IPMP" \
 	    "$ipmp6_failed"
+fi
+
+#
+# Upgrade ipadm.conf.
+#
+if /usr/bin/grep -q _family /etc/ipadm/ipadm.conf; then
+	oldifs=$(/usr/bin/sed -En \
+	    's/^_ifname=([a-z0-9]+);_family=[0-9]+;$/\1/p' \
+	    /etc/ipadm/ipadm.conf | /usr/bin/sort -u)
+	/usr/bin/sed -i '/_family/d' /etc/ipadm/ipadm.conf
+	for oldif in $oldifs; do
+		/usr/bin/printf \
+		    "_ifname=%s;_ifclass=0;_families=2,26;\n" \
+		    $oldif >> /etc/ipadm/ipadm.conf
+	done
 fi
 
 #
@@ -333,7 +349,7 @@ for showif_output in `/sbin/ipadm show-if -p -o ifname,state,current`; do
 			    "ignoring ipadm configuration" > /dev/msglog
 			continue;
 		else
-			echo "Ignoring /etc/hostname*.$intf" > /dev/msglog 
+			echo "Ignoring /etc/hostname*.$intf" > /dev/msglog
 			/sbin/ifconfig $intf unplumb > /dev/null 2>&1
 			/sbin/ifconfig $intf inet6 unplumb > /dev/null 2>&1
 		fi
@@ -524,7 +540,7 @@ fi
 
 # Any non-loopback IPv4 interfaces with usable addresses up?
 if [ -n "`/sbin/ifconfig -a4u`" ]; then
-    	/sbin/ifconfig -a4u | while read intf addr rest; do
+	/sbin/ifconfig -a4u | while read intf addr rest; do
 		[ $intf = inet ] && [ $addr != 127.0.0.1 ] &&
 		[ $addr != 0.0.0.0 ] && exit $SMF_EXIT_OK
 	done && exit $SMF_EXIT_OK

@@ -22,6 +22,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
 LIBRARY = libipadm.a
@@ -36,7 +37,7 @@ include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -linetutil -lsocket -ldlpi -lnvpair -ldhcpagent \
-		-ldladm -lsecdb -ldhcputil
+		-ldladm -lsecdb -ldhcputil -lipmp -lcmdutils
 
 SRCDIR =	../common
 

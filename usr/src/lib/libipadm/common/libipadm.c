@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -528,39 +528,6 @@ i_ipadm_is_6to4(ipadm_handle_t iph, char *ifname)
 }
 
 /*
- * Returns B_TRUE if `ifname' represents an IPMP underlying interface.
- */
-boolean_t
-i_ipadm_is_under_ipmp(ipadm_handle_t iph, const char *ifname)
-{
-	struct lifreq	lifr;
-
-	(void) strlcpy(lifr.lifr_name, ifname, sizeof (lifr.lifr_name));
-	if (ioctl(iph->iph_sock, SIOCGLIFGROUPNAME, (caddr_t)&lifr) < 0) {
-		if (ioctl(iph->iph_sock6, SIOCGLIFGROUPNAME,
-		    (caddr_t)&lifr) < 0) {
-			return (B_FALSE);
-		}
-	}
-	return (lifr.lifr_groupname[0] != '\0');
-}
-
-/*
- * Returns B_TRUE if `ifname' represents an IPMP meta-interface.
- */
-boolean_t
-i_ipadm_is_ipmp(ipadm_handle_t iph, const char *ifname)
-{
-	uint64_t flags;
-
-	if (i_ipadm_get_flags(iph, ifname, AF_INET, &flags) != IPADM_SUCCESS &&
-	    i_ipadm_get_flags(iph, ifname, AF_INET6, &flags) != IPADM_SUCCESS)
-		return (B_FALSE);
-
-	return ((flags & IFF_IPMP) != 0);
-}
-
-/*
  * For a given interface name, ipadm_if_enabled() checks if v4
  * or v6 or both IP interfaces exist in the active configuration.
  */
@@ -693,40 +660,82 @@ i_ipadm_init_ifobj(ipadm_handle_t iph, const char *ifname, nvlist_t *ifnvl)
 {
 	nvlist_t	*nvl = NULL;
 	nvpair_t	*nvp;
-	char		*afstr;
-	ipadm_status_t	status;
+	ipadm_status_t	status = IPADM_ENXIO;
 	ipadm_status_t	ret_status = IPADM_SUCCESS;
 	char		newifname[LIFNAMSIZ];
 	char		*aobjstr;
-	sa_family_t	af = AF_UNSPEC;
-	boolean_t	is_ngz = (iph->iph_zoneid != GLOBAL_ZONEID);
+	uint16_t	*afs;
+	char		*gifname;
+	uint_t		nelem = 0;
+	boolean_t	init_from_gz = B_FALSE;
+	boolean_t	move_to_group = B_FALSE;
 
 	(void) strlcpy(newifname, ifname, sizeof (newifname));
+
 	/*
-	 * First plumb the given interface and then apply all the persistent
-	 * interface properties and then instantiate any persistent addresses
-	 * objects on that interface.
+	 * First go through the ifnvl nvlist looking for nested nvlist
+	 * containing interface class and address families.
+	 */
+	for (nvp = nvlist_next_nvpair(ifnvl, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(ifnvl, nvp)) {
+		char *icstr;
+		char **mifnames;
+		uint32_t ipadm_flags = IPADM_OPT_ACTIVE;
+
+		if (nvpair_value_nvlist(nvp, &nvl) != 0 ||
+		    nvlist_lookup_uint16_array(nvl, IPADM_NVP_FAMILIES,
+		    &afs, &nelem) != 0)
+			continue;
+
+		/* Check if this is IPMP group interface */
+		if (nvlist_lookup_string(nvl, IPADM_NVP_IFCLASS,
+		    &icstr) == 0 && atoi(icstr) == IPADM_IF_CLASS_IPMP)
+			ipadm_flags |= IPADM_OPT_IPMP;
+
+		/* Create interfaces for address families specified */
+		while (nelem-- > 0) {
+			uint16_t af = afs[nelem];
+
+			assert(af == AF_INET || af == AF_INET6);
+
+			status = i_ipadm_plumb_if(iph, newifname, af,
+			    ipadm_flags);
+			if (status == IPADM_IF_EXISTS)
+				status = IPADM_SUCCESS;
+			if (status != IPADM_SUCCESS)
+				return (status);
+		}
+		if (nvlist_lookup_string(nvl, IPADM_NVP_GIFNAME,
+		    &gifname) == 0) {
+			/*
+			 * IPMP underlying interface. Move to the
+			 * specified IPMP group.
+			 */
+			move_to_group = B_TRUE;
+		} else if ((ipadm_flags & IPADM_OPT_IPMP) &&
+		    nvlist_lookup_string_array(nvl, IPADM_NVP_MIFNAMES,
+		    &mifnames, &nelem) == 0) {
+			/* Non-empty IPMP group interface */
+			while (nelem-- > 0) {
+				(void) ipadm_add_ipmp_member(iph, newifname,
+				    mifnames[nelem], IPADM_OPT_ACTIVE);
+			}
+		}
+		if (iph->iph_zoneid != GLOBAL_ZONEID)
+			init_from_gz = B_TRUE;
+	}
+
+	if (status != IPADM_SUCCESS)
+		return (status);
+
+	/*
+	 * Go through the ifnvl nvlist again, applying persistent configuration.
 	 */
 	for (nvp = nvlist_next_nvpair(ifnvl, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(ifnvl, nvp)) {
 		if (nvpair_value_nvlist(nvp, &nvl) != 0)
 			continue;
-
-		if (nvlist_lookup_string(nvl, IPADM_NVP_FAMILY, &afstr) == 0) {
-			status = i_ipadm_plumb_if(iph, newifname, atoi(afstr),
-			    IPADM_OPT_ACTIVE);
-			/*
-			 * If the interface is already plumbed, we should
-			 * ignore this error because there might be address
-			 * address objects on that interface that needs to
-			 * be enabled again.
-			 */
-			if (status == IPADM_IF_EXISTS)
-				status = IPADM_SUCCESS;
-
-			if (is_ngz)
-				af = atoi(afstr);
-		} else if (nvlist_lookup_string(nvl, IPADM_NVP_AOBJNAME,
+		if (nvlist_lookup_string(nvl, IPADM_NVP_AOBJNAME,
 		    &aobjstr) == 0) {
 			/*
 			 * For addresses, we need to relocate addrprops from the
@@ -737,10 +746,12 @@ i_ipadm_init_ifobj(ipadm_handle_t iph, const char *ifname, nvlist_t *ifnvl)
 			    nvlist_exists(nvl, IPADM_NVP_DHCP)) {
 				status = i_ipadm_merge_addrprops_from_nvl(ifnvl,
 				    nvl, aobjstr);
+
 				if (status != IPADM_SUCCESS)
 					continue;
 			}
 			status = i_ipadm_init_addrobj(iph, nvl);
+
 			/*
 			 * If this address is in use on some other interface,
 			 * we want to record an error to be returned as
@@ -751,15 +762,17 @@ i_ipadm_init_ifobj(ipadm_handle_t iph, const char *ifname, nvlist_t *ifnvl)
 				ret_status = IPADM_ALL_ADDRS_NOT_ENABLED;
 				status = IPADM_SUCCESS;
 			}
-		} else {
-			assert(nvlist_exists(nvl, IPADM_NVP_PROTONAME));
+		} else if (nvlist_exists(nvl, IPADM_NVP_PROTONAME) == B_TRUE) {
 			status = i_ipadm_init_ifprop(iph, nvl);
 		}
 		if (status != IPADM_SUCCESS)
 			return (status);
 	}
-
-	if (is_ngz && af != AF_UNSPEC)
+	if (move_to_group) {
+		(void) ipadm_add_ipmp_member(iph, gifname, newifname,
+		    IPADM_OPT_ACTIVE);
+	}
+	if (init_from_gz)
 		ret_status = ipadm_init_net_from_gz(iph, newifname, NULL);
 	return (ret_status);
 }
@@ -779,8 +792,9 @@ i_ipadm_init_ifs(ipadm_handle_t iph, const char *ifs, nvlist_t **allifs)
 	int			err;
 	ipadm_status_t		status = IPADM_SUCCESS;
 
-	if ((err = ipadm_str2nvlist(ifs, &nvl, IPADM_NORVAL)) != 0)
-		return (ipadm_errno2status(err));
+	status = ipadm_str2nvlist(ifs, &nvl, IPADM_NORVAL);
+	if (status != IPADM_SUCCESS)
+		return (status);
 
 	err = nvlist_pack(nvl, &nvlbuf, &nvlsize, NV_ENCODE_NATIVE, 0);
 	if (err != 0) {
@@ -957,6 +971,36 @@ reopen:
 			err = EBADE;
 	}
 	return (err);
+}
+
+/*
+ * A helper that is used by i_ipadm_get_db_addr and i_ipadm_get_db_if
+ * to do a door_call to ipmgmtd, that should return persistent information
+ * about interfaces or/and addresses from ipadm DB
+ */
+ipadm_status_t
+i_ipadm_call_ipmgmtd(ipadm_handle_t iph, void *garg, size_t garg_size,
+    nvlist_t **onvl)
+{
+	ipmgmt_get_rval_t	*rvalp;
+	int			err;
+	size_t			nvlsize;
+	char			*nvlbuf;
+
+	rvalp = malloc(sizeof (ipmgmt_get_rval_t));
+	if (rvalp == NULL)
+		return (IPADM_NO_MEMORY);
+
+	err = ipadm_door_call(iph, garg, garg_size, (void **)&rvalp,
+	    sizeof (*rvalp), B_TRUE);
+	if (err == 0) {
+		nvlsize = rvalp->ir_nvlsize;
+		nvlbuf = (char *)rvalp + sizeof (ipmgmt_get_rval_t);
+		err = nvlist_unpack(nvlbuf, nvlsize, onvl, 0);
+	}
+	free(rvalp);
+
+	return (ipadm_errno2status(err));
 }
 
 /*

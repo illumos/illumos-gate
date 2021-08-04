@@ -350,6 +350,7 @@ file path=lib/svc/manifest/network/ldap/client.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-initial.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-install.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-ipmgmt.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-ipmp.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-ipqos.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-iptun.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-location.xml group=sys mode=0444
@@ -439,6 +440,7 @@ file path=lib/svc/method/mpxio-upgrade mode=0555
 file path=lib/svc/method/net-init mode=0555
 file path=lib/svc/method/net-install mode=0555
 file path=lib/svc/method/net-ipmgmt mode=0555
+file path=lib/svc/method/net-ipmp mode=0555
 file path=lib/svc/method/net-ipqos mode=0555
 file path=lib/svc/method/net-iptun mode=0555
 file path=lib/svc/method/net-loc mode=0555
@@ -504,7 +506,6 @@ file path=sbin/fiocompress mode=0555
 file path=sbin/hostconfig mode=0555
 file path=sbin/ifconfig mode=0555
 file path=sbin/ifparse mode=0555
-link path=sbin/in.mpathd target=../lib/inet/in.mpathd
 file path=sbin/init group=sys mode=0555
 $(i386_ONLY)file path=sbin/installgrub group=sys mode=0555
 file path=sbin/ipmpstat mode=0555
@@ -1182,7 +1183,6 @@ file path=usr/lib/inet/certdb mode=0555
 file path=usr/lib/inet/certlocal mode=0555
 file path=usr/lib/inet/certrldb mode=0555
 hardlink path=usr/lib/inet/in.iked target=../../../usr/lib/isaexec
-link path=usr/lib/inet/in.mpathd target=../../../lib/inet/in.mpathd
 file path=usr/lib/inet/inetd mode=0555
 file path=usr/lib/intrd mode=0555
 file path=usr/lib/isaexec mode=0555

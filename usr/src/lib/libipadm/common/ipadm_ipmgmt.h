@@ -58,6 +58,10 @@ extern "C" {
  */
 #define	IPADM_NVP_PROTONAME	"_protocol"	/* protocol name */
 #define	IPADM_NVP_IFNAME	"_ifname"	/* interface name */
+#define	IPADM_NVP_IFCLASS	"_ifclass"	/* interface class */
+#define	IPADM_NVP_FAMILIES	"_families"	/* interface families */
+#define	IPADM_NVP_GIFNAME	"_gifname"	/* IPMP group interface name */
+#define	IPADM_NVP_MIFNAMES	"_mifnames"	/* IPMP group members */
 #define	IPADM_NVP_AOBJNAME	"_aobjname"	/* addrobj name */
 #define	IPADM_NVP_FAMILY	"_family"	/* address family */
 #define	IPADM_NVP_IPV4ADDR	"_ipv4addr"	/* name of IPv4 addr nvlist */
@@ -109,6 +113,38 @@ typedef	struct	ipadm_dbwrite_cbarg_s {
 #define	IPMGMT_DOOR		"/etc/svc/volatile/ipadm/ipmgmt_door"
 #define	MAXPROTONAMELEN		32
 
+/*
+ * ia_flags used inside the arguments for interface/address commands
+ *
+ *	- APPEND updates the multi-valued ipadm DB entry with a new value
+ *	- REMOVE updates the multi-valued ipadm DB entry by removing a value
+ *	- ACTIVE updates the running configuration
+ *	- PERSIST updates the permanent data store
+ *	- INIT indicates that operation being performed is under init context
+ *	- PROPS_ONLY indicates the update changes the running configuration of
+ *	  "props" data on the interface/address object. The props are cached
+ *	  there on the parent, so a PROPS_ONLY change does not affect the
+ *	  ACTIVE/PERSIST state of the parent.
+ *
+ * These two flags are used by ipmgmt_db_update_if function,
+ * because it can be used to update more that one DB line
+ * and we need to be sure that we finished all operations,
+ * after the operation has finished the related flag is cleared
+ *
+ *  - UPDATE_IF - used when we need to update IPADM_NVP_FAMILIES and
+ *                IPADM_NVP_MIFNAMES fields
+ *  - UPDATE_IPMP - used when we need to update IPADM_NVP_GIFNAME
+ */
+#define	IPMGMT_APPEND	0x00000001
+#define	IPMGMT_REMOVE	0x00000002
+#define	IPMGMT_ACTIVE	0x00000004
+#define	IPMGMT_PERSIST	0x00000008
+#define	IPMGMT_INIT	0x00000010
+#define	IPMGMT_PROPS_ONLY   0x00000020
+#define	IPMGMT_UPDATE_IF    0x00000040
+#define	IPMGMT_UPDATE_IPMP  0x00000080
+
+
 /* door call command type */
 typedef enum {
 	IPMGMT_CMD_SETPROP = 1,		/* persist property */
@@ -125,7 +161,8 @@ typedef enum {
 	IPMGMT_CMD_ADDROBJ_SETLIFNUM,	/* set lifnum on the addrobj */
 	IPMGMT_CMD_ADDROBJ_ADD,		/* add addr. object to addrobj map */
 	IPMGMT_CMD_LIF2ADDROBJ,		/* lifname to addrobj mapping */
-	IPMGMT_CMD_AOBJNAME2ADDROBJ	/* aobjname to addrobj mapping */
+	IPMGMT_CMD_AOBJNAME2ADDROBJ,	/* aobjname to addrobj mapping */
+	IPMGMT_CMD_IPMP_UPDATE  /* update IPMP group members */
 } ipmgmt_door_cmd_type_t;
 
 /*
@@ -147,13 +184,6 @@ typedef struct ipmgmt_prop_arg_s {
 	char			ia_pname[MAXPROPNAMELEN];
 	char			ia_pval[MAXPROPVALLEN];
 } ipmgmt_prop_arg_t;
-/*
- * ia_flags used in ipmgmt_prop_arg_t.
- *	- APPEND updates the multi-valued property entry with a new value
- *	- REDUCE updates the multi-valued property entry by removing a value
- */
-#define	IPMGMT_APPEND	0x00000001
-#define	IPMGMT_REMOVE	0x00000002
 
 /*
  * ipadm_addr_type_t-specific values that are cached in ipmgmtd and can
@@ -182,6 +212,7 @@ typedef struct ipmgmt_if_arg_s {
 	uint32_t		ia_flags;
 	char			ia_ifname[LIFNAMSIZ];
 	sa_family_t		ia_family;
+	ipadm_if_class_t	ia_ifclass;
 } ipmgmt_if_arg_t;
 
 /* IPMGMT_CMD_INITIF door_call argument structure */
@@ -192,6 +223,14 @@ typedef struct ipmgmt_initif_arg_s {
 	size_t		ia_nvlsize;
 	/* packed nvl follows */
 } ipmgmt_initif_arg_t;
+
+/* IPMGMT_CMD_IPMP_UPDATE door_call argument structure */
+typedef struct ipmgmt_ipmp_update_arg_s {
+	ipmgmt_door_cmd_type_t	ia_cmd;
+	uint32_t	ia_flags;
+	char		ia_gifname[LIFNAMSIZ]; /* group interface name */
+	char	ia_mifname[LIFNAMSIZ]; /* group's member interface name */
+} ipmgmt_ipmp_update_arg_t;
 
 /* IPMGMT_CMD_SETADDR door_call argument */
 typedef struct ipmgmt_setaddr_arg_s {
@@ -231,22 +270,6 @@ typedef struct ipmgmt_aobjop_arg_s {
 	sa_family_t		ia_family;
 	ipadm_addr_type_t	ia_atype;
 } ipmgmt_aobjop_arg_t;
-
-/*
- * ia_flags used inside the arguments for interface/address commands
- *	- ACTIVE updates the running configuration
- *	- PERSIST updates the permanent data store
- *	- INIT	indicates that operation being performed is under init
- *		    context
- *	- PROPS_ONLY indicates the update changes the running configuration of
- *		    "props" data on the interface/address object. The props are
- *		    cached there on the parent, so a PROPS_ONLY change does not
- *		    affect the ACTIVE/PERSIST state of the parent.
- */
-#define	IPMGMT_ACTIVE		0x00000001
-#define	IPMGMT_PERSIST		0x00000002
-#define	IPMGMT_INIT		0x00000004
-#define	IPMGMT_PROPS_ONLY		0x00000008
 
 /* door call return value */
 typedef struct ipmgmt_retval_s {

@@ -23,6 +23,9 @@
 # Use is subject to license terms.
 #
 # Copyright 2020 Joyent, Inc.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+#
+#
 
 PROG =		ipadm
 ROOTFS_PROG =	$(PROG)
@@ -39,7 +42,7 @@ COMMONSRCS=	$(CMDINETCOMMONDIR)/$(COMMONOBJS:%.o=%.c)
 SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 
 CPPFLAGS +=	-I$(CMDINETCOMMONDIR)
-LDLIBS +=       -lofmt -linetutil -lipadm -lnvpair
+LDLIBS +=       -lofmt -linetutil -lipadm -lnvpair -lipmp -lcmdutils
 LINTFLAGS +=	-m
 
 ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)

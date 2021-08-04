@@ -18,10 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _LIBIPADM_IMPL_H
@@ -32,6 +34,7 @@ extern "C" {
 #endif
 
 #include <sys/socket.h>
+#include <sys/list.h>
 #include <net/if.h>
 #include <libipadm.h>
 #include <libdladm.h>
@@ -52,6 +55,11 @@ extern "C" {
 /* mask for flags accepted by libipadm functions */
 #define	IPADM_COMMON_OPT_MASK	(IPADM_OPT_ACTIVE | IPADM_OPT_PERSIST)
 
+typedef enum {
+    IPADM_ADD_IPMP,
+    IPADM_REMOVE_IPMP
+} ipadm_ipmp_op_t;
+
 /* Opaque library handle */
 struct ipadm_handle {
 	int		iph_sock;	/* socket to interface */
@@ -65,7 +73,7 @@ struct ipadm_handle {
 };
 
 struct ipadm_addrobj_s {
-	char 			ipadm_ifname[LIFNAMSIZ];
+	char			ipadm_ifname[LIFNAMSIZ];
 	int32_t			ipadm_lifnum;
 	char			ipadm_aobjname[IPADM_AOBJSIZ];
 	ipadm_addr_type_t	ipadm_atype;
@@ -154,15 +162,15 @@ extern ipadm_status_t	i_ipadm_delete_addr(ipadm_handle_t, ipadm_addrobj_t);
 extern int		i_ipadm_strioctl(int, int, char *, int);
 extern boolean_t	i_ipadm_is_loopback(const char *);
 extern boolean_t	i_ipadm_is_vni(const char *);
-extern boolean_t	i_ipadm_is_ipmp(ipadm_handle_t, const char *);
-extern boolean_t	i_ipadm_is_under_ipmp(ipadm_handle_t, const char *);
 extern boolean_t	i_ipadm_is_6to4(ipadm_handle_t, char *);
 extern boolean_t	i_ipadm_validate_ifname(ipadm_handle_t, const char *);
 extern ipadm_status_t	ipadm_errno2status(int);
 extern int		ipadm_door_call(ipadm_handle_t, void *, size_t, void **,
 			    size_t, boolean_t);
-extern boolean_t 	ipadm_if_enabled(ipadm_handle_t, const char *,
+extern boolean_t	ipadm_if_enabled(ipadm_handle_t, const char *,
 			    sa_family_t);
+extern ipadm_status_t i_ipadm_call_ipmgmtd(ipadm_handle_t, void *,
+	    size_t, nvlist_t **);
 
 /* ipadm_ndpd.c */
 extern	ipadm_status_t	i_ipadm_create_ipv6addrs(ipadm_handle_t,
@@ -187,6 +195,8 @@ extern ipadm_status_t	i_ipadm_get_persist_propval(ipadm_handle_t,
 			    const void *);
 
 /* ipadm_addr.c */
+extern ipadm_status_t	i_ipadm_active_addr_info(ipadm_handle_t, const char *,
+			    ipadm_addr_info_t **, uint32_t, int64_t);
 extern void		i_ipadm_init_addr(ipadm_addrobj_t, const char *,
 			    const char *, ipadm_addr_type_t);
 extern ipadm_status_t	i_ipadm_merge_addrprops_from_nvl(nvlist_t *, nvlist_t *,
@@ -230,6 +240,12 @@ extern ipadm_status_t	i_ipadm_delete_ifobj(ipadm_handle_t, const char *,
 			    sa_family_t, boolean_t);
 extern int		i_ipadm_get_lnum(const char *);
 
+extern ipadm_status_t i_ipadm_set_groupname_active(ipadm_handle_t,
+	    const char *, const char *);
+extern ipadm_status_t i_ipadm_get_groupname_active(ipadm_handle_t,
+	    const char *, char *, size_t);
+extern boolean_t i_ipadm_is_under_ipmp(ipadm_handle_t, const char *);
+extern boolean_t i_ipadm_is_ipmp(ipadm_handle_t, const char *);
 #ifdef	__cplusplus
 }
 #endif

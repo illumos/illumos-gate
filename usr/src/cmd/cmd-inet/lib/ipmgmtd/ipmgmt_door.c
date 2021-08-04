@@ -43,6 +43,9 @@
 #include <libnvpair.h>
 #include "ipmgmt_impl.h"
 
+
+static void ipmgmt_common_handler(char *, char *, db_wfunc_t *);
+
 /* Handler declaration for each door command */
 typedef void ipmgmt_door_handler_t(void *argp);
 
@@ -56,7 +59,8 @@ static ipmgmt_door_handler_t	ipmgmt_getaddr_handler,
 				ipmgmt_resetif_handler,
 				ipmgmt_resetprop_handler,
 				ipmgmt_setaddr_handler,
-				ipmgmt_setprop_handler;
+				ipmgmt_setprop_handler,
+				ipmgmt_ipmp_update_handler;
 
 typedef struct ipmgmt_door_info_s {
 	uint_t			idi_cmd;
@@ -81,6 +85,7 @@ static ipmgmt_door_info_t i_ipmgmt_door_info_tbl[] = {
 	{ IPMGMT_CMD_ADDROBJ_ADD,	B_TRUE,  ipmgmt_aobjop_handler },
 	{ IPMGMT_CMD_AOBJNAME2ADDROBJ,	B_FALSE, ipmgmt_aobjop_handler },
 	{ IPMGMT_CMD_LIF2ADDROBJ,	B_FALSE, ipmgmt_aobjop_handler },
+	{ IPMGMT_CMD_IPMP_UPDATE,	B_FALSE, ipmgmt_ipmp_update_handler},
 	{ 0, 0, NULL },
 };
 
@@ -593,6 +598,10 @@ ipmgmt_resetif_handler(void *argp)
 
 	cbarg.cb_family = rargp->ia_family;
 	cbarg.cb_ifname = rargp->ia_ifname;
+
+	cbarg.cb_ipv4exists = B_TRUE;
+	cbarg.cb_ipv6exists = B_TRUE;
+
 	if (flags & IPMGMT_PERSIST)
 		err = ipmgmt_db_walk(ipmgmt_db_resetif, &cbarg,
 		    IPADM_DB_DELETE);
@@ -654,59 +663,10 @@ ipmgmt_resetaddr_handler(void *argp)
 static void
 ipmgmt_getaddr_handler(void *argp)
 {
-	size_t			buflen, onvlsize;
-	char			*buf, *onvlbuf;
-	ipmgmt_getaddr_arg_t	*gargp = argp;
-	ipmgmt_getaddr_cbarg_t	cbarg;
-	ipmgmt_get_rval_t	rval, *rvalp = &rval;
-	int			err = 0;
+	ipmgmt_getaddr_arg_t    *gargp = argp;
 
-	cbarg.cb_ifname = gargp->ia_ifname;
-	cbarg.cb_aobjname = gargp->ia_aobjname;
-	cbarg.cb_ocnt = 0;
-	if (nvlist_alloc(&cbarg.cb_onvl, NV_UNIQUE_NAME, 0) != 0)
-		goto fail;
-	err = ipmgmt_db_walk(ipmgmt_db_getaddr, &cbarg, IPADM_DB_READ);
-	if (err == ENOENT && cbarg.cb_ocnt > 0) {
-		/*
-		 * If there is atleast one entry in the nvlist,
-		 * do not return error.
-		 */
-		err = 0;
-	}
-	if (err != 0)
-		goto fail;
-
-	if ((err = nvlist_size(cbarg.cb_onvl, &onvlsize,
-	    NV_ENCODE_NATIVE)) != 0) {
-		goto fail;
-	}
-
-	if (onvlsize > (UINT32_MAX - sizeof (ipmgmt_get_rval_t)))
-		goto fail;
-
-	buflen = onvlsize + sizeof (ipmgmt_get_rval_t);
-	/*
-	 * We cannot use malloc() here because door_return never returns, and
-	 * memory allocated by malloc() would get leaked. Use alloca() instead.
-	 */
-	buf = alloca(buflen);
-	onvlbuf = buf + sizeof (ipmgmt_get_rval_t);
-	if ((err = nvlist_pack(cbarg.cb_onvl, &onvlbuf, &onvlsize,
-	    NV_ENCODE_NATIVE, 0)) != 0) {
-		goto fail;
-	}
-	nvlist_free(cbarg.cb_onvl);
-	rvalp = (ipmgmt_get_rval_t *)(void *)buf;
-	rvalp->ir_err = 0;
-	rvalp->ir_nvlsize = onvlsize;
-
-	(void) door_return(buf, buflen, NULL, 0);
-	return;
-fail:
-	nvlist_free(cbarg.cb_onvl);
-	rvalp->ir_err = err;
-	(void) door_return((char *)rvalp, sizeof (*rvalp), NULL, 0);
+	ipmgmt_common_handler(gargp->ia_ifname, gargp->ia_aobjname,
+	    ipmgmt_db_getaddr);
 }
 
 /*
@@ -727,65 +687,20 @@ ipmgmt_resetprop_handler(void *argp)
 }
 
 /*
- * Handles the door command IPMGMT_CMD_GETIF. It retrieves the name of all the
- * persisted interfaces and the IP protocols (IPv4 or IPv6) they support.
+ * Handles the door command IPMGMT_CMD_GETIF. It retrieves the names of all
+ * persisted interfaces and the IP protocol families (IPv4 or IPv6) they
+ * support. Returns the info as a nvlist using door_return() from
+ * ipmgmt_common_handler().
  */
 static void
 ipmgmt_getif_handler(void *argp)
 {
-	ipmgmt_getif_arg_t	*getif = argp;
-	ipmgmt_getif_rval_t	*rvalp;
-	ipmgmt_retval_t		rval;
-	ipmgmt_getif_cbarg_t	cbarg;
-	ipadm_if_info_list_t	*ifl, *curifl;
-	ipadm_if_info_t		*ifp, *rifp;
-	int			i, err = 0, count = 0;
-	size_t			rbufsize;
+	ipmgmt_getif_arg_t  *getif = argp;
 
 	assert(getif->ia_cmd == IPMGMT_CMD_GETIF);
 
-	bzero(&cbarg, sizeof (cbarg));
-	cbarg.cb_ifname = getif->ia_ifname;
-	err = ipmgmt_db_walk(ipmgmt_db_getif, &cbarg, IPADM_DB_READ);
-	if (err == ENOENT && cbarg.cb_ifinfo) {
-		/*
-		 * If there is atleast one entry in the nvlist,
-		 * do not return error.
-		 */
-		err = 0;
-	}
-	if (err != 0) {
-		rval.ir_err = err;
-		(void) door_return((char *)&rval, sizeof (rval), NULL, 0);
-		return;
-	}
-
-	/* allocate sufficient buffer to return the interface info */
-	for (ifl = cbarg.cb_ifinfo; ifl != NULL; ifl = ifl->ifil_next)
-		++count;
-	rbufsize = sizeof (*rvalp) + count * sizeof (*ifp);
-	rvalp = alloca(rbufsize);
-	bzero(rvalp, rbufsize);
-
-	rvalp->ir_ifcnt = count;
-	rifp = rvalp->ir_ifinfo;
-	ifl = cbarg.cb_ifinfo;
-
-	/*
-	 * copy the interface info to buffer allocated on stack. The reason
-	 * we do this is to avoid memory leak, as door_return() would never
-	 * return
-	 */
-	for (i = 0; i < count; i++) {
-		ifp = &ifl->ifil_ifi;
-		rifp = rvalp->ir_ifinfo + i;
-		(void) bcopy(ifp, rifp, sizeof (*rifp));
-		curifl = ifl->ifil_next;
-		free(ifl);
-		ifl = curifl;
-	}
-	rvalp->ir_err = err;
-	(void) door_return((char *)rvalp, rbufsize, NULL, 0);
+	ipmgmt_common_handler(getif->ia_ifname, NULL,
+	    ipmgmt_db_getif);
 }
 
 /*
@@ -819,7 +734,7 @@ ipmgmt_initif_handler(void *argp)
 	err = ipmgmt_db_walk(ipmgmt_db_initif, &cbarg, IPADM_DB_READ);
 	if (err == ENOENT && cbarg.cb_ocnt > 0) {
 		/*
-		 * If there is atleast one entry in the nvlist,
+		 * If there is at least one entry in the nvlist,
 		 * do not return error.
 		 */
 		err = 0;
@@ -863,10 +778,10 @@ int
 ipmgmt_persist_if(ipmgmt_if_arg_t *sargp)
 {
 	ipadm_dbwrite_cbarg_t	cb;
-	uint32_t		flags = sargp->ia_flags;
-	nvlist_t		*nvl = NULL;
-	int			err = 0;
-	char			strval[IPMGMT_STRSIZE];
+	uint32_t	flags = sargp->ia_flags;
+	nvlist_t	*nvl = NULL;
+	char	strval[IPMGMT_STRSIZE];
+	int	err = 0;
 
 	if (!(flags & IPMGMT_PERSIST) || sargp->ia_family == AF_UNSPEC ||
 	    sargp->ia_ifname[0] == '\0') {
@@ -875,16 +790,163 @@ ipmgmt_persist_if(ipmgmt_if_arg_t *sargp)
 	}
 	if ((err = nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0)) != 0)
 		goto ret;
+
 	if ((err = nvlist_add_string(nvl, IPADM_NVP_IFNAME,
 	    sargp->ia_ifname)) != 0)
 		goto ret;
-	(void) snprintf(strval, IPMGMT_STRSIZE, "%d", sargp->ia_family);
-	if ((err = nvlist_add_string(nvl, IPADM_NVP_FAMILY, strval)) != 0)
+
+	if ((err = ipmgmt_update_family_nvp(nvl, sargp->ia_family,
+	    IPMGMT_APPEND)) != 0)
 		goto ret;
+
+	(void) snprintf(strval, IPMGMT_STRSIZE, "%d", sargp->ia_ifclass);
+	if ((err = nvlist_add_string(nvl, IPADM_NVP_IFCLASS, strval)) != 0)
+		goto ret;
+
 	cb.dbw_nvl = nvl;
-	cb.dbw_flags = 0;
-	err = ipmgmt_db_walk(ipmgmt_db_add, &cb, IPADM_DB_WRITE);
+	cb.dbw_flags = IPMGMT_APPEND | IPMGMT_UPDATE_IF;
+	err = ipmgmt_db_walk(ipmgmt_db_update_if, &cb, IPADM_DB_WRITE);
 ret:
 	nvlist_free(nvl);
 	return (err);
+}
+
+/*
+ * The helper for ipmgmt_getif_handler and ipmgmt_getaddr_handler
+ */
+static void
+ipmgmt_common_handler(char *if_name, char *aobj_name, db_wfunc_t worker)
+{
+	size_t			buflen, onvlsize;
+	char			*buf, *onvlbuf;
+	ipmgmt_get_cbarg_t	cbarg;
+	ipmgmt_get_rval_t	rval, *rvalp = &rval;
+	int			err = 0;
+
+	cbarg.cb_ifname = if_name;
+	cbarg.cb_aobjname = aobj_name;
+	cbarg.cb_ocnt = 0;
+
+	if (nvlist_alloc(&cbarg.cb_onvl, NV_UNIQUE_NAME, 0) != 0)
+		goto fail;
+
+	err = ipmgmt_db_walk(worker, &cbarg, IPADM_DB_READ);
+	if (err == ENOENT && cbarg.cb_ocnt > 0) {
+		/*
+		 * If there is at least one entry in the nvlist,
+		 * do not return error.
+		 */
+		err = 0;
+	}
+	if (err != 0)
+		goto fail;
+
+	if ((err = nvlist_size(cbarg.cb_onvl, &onvlsize,
+	    NV_ENCODE_NATIVE)) != 0)
+		goto fail;
+
+	if (onvlsize > (UINT32_MAX - sizeof (ipmgmt_get_rval_t)))
+		goto fail;
+
+	buflen = onvlsize + sizeof (ipmgmt_get_rval_t);
+	/*
+	 * We cannot use malloc() here because door_return never returns, and
+	 * memory allocated by malloc() would get leaked. Use alloca() instead.
+	 */
+	buf = alloca(buflen);
+	onvlbuf = buf + sizeof (ipmgmt_get_rval_t);
+	if ((err = nvlist_pack(cbarg.cb_onvl, &onvlbuf,
+	    &onvlsize, NV_ENCODE_NATIVE, 0)) != 0)
+		goto fail;
+
+	nvlist_free(cbarg.cb_onvl);
+	rvalp = (ipmgmt_get_rval_t *)(void *)buf;
+	rvalp->ir_err = 0;
+	rvalp->ir_nvlsize = onvlsize;
+
+	(void) door_return(buf, buflen, NULL, 0);
+
+fail:
+	nvlist_free(cbarg.cb_onvl);
+	rvalp->ir_err = err;
+	(void) door_return((char *)rvalp, sizeof (*rvalp), NULL, 0);
+}
+
+/*
+ * Handles the door command IPMGMT_CMD_IPMP_UPDATE
+ */
+static void
+ipmgmt_ipmp_update_handler(void *argp)
+{
+	ipmgmt_ipmp_update_arg_t *uargp = argp;
+	ipmgmt_retval_t	rval;
+	ipadm_dbwrite_cbarg_t	cb;
+
+	boolean_t	gif_exists;
+	char		gifname[LIFNAMSIZ];
+	nvlist_t	*nvl = NULL;
+	uint32_t	flags = uargp->ia_flags;
+	int		err = 0;
+
+	assert(uargp->ia_cmd == IPMGMT_CMD_IPMP_UPDATE);
+
+	gif_exists = ipmgmt_persist_if_exists(uargp->ia_gifname,
+	    AF_UNSPEC);
+
+	if (!ipmgmt_persist_if_exists(uargp->ia_mifname, AF_UNSPEC)) {
+		err = EINVAL;
+		goto ret;
+	}
+
+	ipmgmt_get_group_interface(uargp->ia_mifname, gifname, LIFNAMSIZ);
+
+	if (flags & IPMGMT_APPEND) {
+		/* Group interface should be available in the DB */
+		if (!gif_exists) {
+			err = ENOENT;
+			goto ret;
+		}
+
+		if (gifname[0] != '\0') {
+			err = EEXIST;
+			goto ret;
+		}
+	}
+
+	if (flags & IPMGMT_REMOVE) {
+		/* We cannot remove something that does not exist */
+		if (!gif_exists || gifname[0] == '\0') {
+			err = ENOENT;
+			goto ret;
+		}
+		if (strcmp(uargp->ia_gifname, gifname) != 0) {
+			err = EINVAL;
+			goto ret;
+		}
+	}
+
+	if (flags & IPMGMT_PERSIST) {
+		if ((err = nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0)) != 0)
+			goto ret;
+
+		if ((err = nvlist_add_string(nvl, IPADM_NVP_IFNAME,
+		    uargp->ia_gifname)) != 0)
+			goto ret;
+
+		if ((err = nvlist_add_string(nvl, IPADM_NVP_MIFNAMES,
+		    uargp->ia_mifname)) != 0)
+			goto ret;
+
+		if ((err = nvlist_add_string(nvl, IPADM_NVP_GIFNAME,
+		    uargp->ia_gifname)) != 0)
+			goto ret;
+
+		cb.dbw_nvl = nvl;
+		cb.dbw_flags = flags | IPMGMT_UPDATE_IF | IPMGMT_UPDATE_IPMP;
+		err = ipmgmt_db_walk(ipmgmt_db_update_if, &cb, IPADM_DB_WRITE);
+	}
+ret:
+	nvlist_free(nvl);
+	rval.ir_err = err;
+	(void) door_return((char *)&rval, sizeof (rval), NULL, 0);
 }

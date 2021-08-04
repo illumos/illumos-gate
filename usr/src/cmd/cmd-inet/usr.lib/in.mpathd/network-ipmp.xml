@@ -1,0 +1,78 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+
+<!--
+ Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source.  A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+
+        NOTE:  This service manifest is not editable; its contents will
+        be overwritten by package or patch operations, including
+        operating system upgrade.  Make customizations in a different
+        file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:ipmp'>
+
+<service
+	name='network/ipmp'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='true' />
+
+	<dependency name='loopback' grouping='require_all' restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/network/loopback' />
+	</dependency>
+
+	<dependent name='network-physical' grouping='optional_all'
+	    restart_on='none'>
+		<service_fmri value='svc:/network/physical:default' />
+	</dependent>
+
+	<exec_method type='method' name='start' exec='/lib/svc/method/net-ipmp'
+	    timeout_seconds='60'>
+	</exec_method>
+
+	<exec_method type='method' name='stop' exec=':kill'
+	    timeout_seconds='60'>
+	</exec_method>
+
+	<exec_method type='method' name='refresh' exec=':kill -HUP'
+	    timeout_seconds='60'>
+	</exec_method>
+
+	<property_group name='config' type='application'>
+		<propval name='action_authorization' type='astring'
+		    value='solaris.smf.manage.ipmp' />
+	</property_group>
+
+	<property_group name='general' type='framework'>
+		<propval name='action_authorization' type='astring'
+		    value='solaris.smf.manage.ipmp' />
+		<propval name='value_authorization' type='astring'
+		    value='solaris.smf.manage.ipmp' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				IP MultiPathing
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='in.mpathd' section='1M' />
+		</documentation>
+	</template>
+</service>
+</service_bundle>

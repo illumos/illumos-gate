@@ -18,13 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2021, Tintry by DDN. All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <errno.h>
 #include <sys/sockio.h>
+#include <sys/list.h>
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
@@ -37,6 +39,7 @@
 #include <limits.h>
 #include <zone.h>
 #include <ipadm_ndpd.h>
+#include <ipmp_query.h>
 #include "libipadm_impl.h"
 
 static ipadm_status_t	i_ipadm_slifname_arp(char *, uint64_t, int);
@@ -45,7 +48,22 @@ static ipadm_status_t	i_ipadm_slifname(ipadm_handle_t, char *, char *,
 static ipadm_status_t	i_ipadm_create_ipmp_peer(ipadm_handle_t, char *,
 			    sa_family_t);
 static ipadm_status_t	i_ipadm_persist_if(ipadm_handle_t, const char *,
-			    sa_family_t);
+			    sa_family_t, uint32_t);
+static ipadm_status_t   i_ipadm_allocate_ifinfo(ipadm_if_info_t **);
+static ipadm_status_t	i_ipadm_get_db_if(ipadm_handle_t, const char *,
+			    nvlist_t **);
+static ipadm_status_t i_ipadm_nvl2ifinfo(nvlist_t *, ipadm_if_info_t **);
+static ipadm_status_t i_ipadm_fill_cmembers(char *, ipadm_ipmp_members_t *);
+static ipadm_status_t i_ipadm_fill_pmembers(nvlist_t *, ipadm_ipmp_members_t *);
+static ipadm_status_t i_ipadm_add_persistent_if_info(ipadm_if_info_t *,
+		    ipadm_if_info_t *);
+static void i_ipadm_free_ipmp_members(ipadm_ipmp_members_t *);
+static ipadm_status_t i_ipadm_persist_update_ipmp(ipadm_handle_t, const char *,
+	const char *,
+	ipadm_ipmp_op_t);
+static ipadm_status_t i_ipadm_update_ipmp(ipadm_handle_t, const char *,
+	const char *, uint32_t,
+	ipadm_ipmp_op_t);
 
 /*
  * Returns B_FALSE if the interface in `ifname' has at least one address that is
@@ -83,17 +101,17 @@ i_ipadm_is_if_down(char *ifname, struct ifaddrs *ifa)
  */
 static ipadm_status_t
 i_ipadm_active_if_info(ipadm_handle_t iph, const char *ifname,
-    ipadm_if_info_list_t **if_info, int64_t lifc_flags)
+    ipadm_if_info_t **if_info, int64_t lifc_flags)
 {
 	struct lifreq	*buf;
 	struct lifreq	*lifrp;
 	struct lifreq	lifrl;
-	ipadm_if_info_list_t *ifl, *last = NULL;
+	ipadm_if_info_t	*last = NULL;
 	ipadm_if_info_t	*ifp;
 	int		s;
 	int		n;
 	int		numifs;
-	ipadm_status_t	status;
+	ipadm_status_t	status = IPADM_SUCCESS;
 
 	*if_info = NULL;
 	/*
@@ -118,26 +136,23 @@ i_ipadm_active_if_info(ipadm_handle_t iph, const char *ifname,
 		 * Check if the interface already exists in our list.
 		 * If it already exists, we need to update its flags.
 		 */
-		for (ifl = *if_info; ifl != NULL; ifl = ifl->ifil_next) {
-			ifp = &ifl->ifil_ifi;
+		for (ifp = *if_info; ifp != NULL; ifp = ifp->ifi_next) {
 			if (strcmp(lifrp->lifr_name, ifp->ifi_name) == 0)
 				break;
 		}
-		if (ifl == NULL) {
-			ifl = calloc(1, sizeof (ipadm_if_info_list_t));
-			if (ifl == NULL) {
-				status = ipadm_errno2status(errno);
-				goto fail;
-			}
-			ifp = &ifl->ifil_ifi;
+		if (ifp == NULL) {
+			if ((status =
+			    i_ipadm_allocate_ifinfo(&ifp)) != IPADM_SUCCESS)
+					break;
+
 			(void) strlcpy(ifp->ifi_name, lifrp->lifr_name,
 			    sizeof (ifp->ifi_name));
-			/* Update the `ifil_next' pointer for this new node */
+			/* Update the `ifi_next' pointer for this new node */
 			if (*if_info == NULL)
-				*if_info = ifl;
+				*if_info = ifp;
 			else
-				last->ifil_next = ifl;
-			last = ifl;
+				last->ifi_next = ifp;
+			last = ifp;
 		}
 
 		/*
@@ -150,16 +165,24 @@ i_ipadm_active_if_info(ipadm_handle_t iph, const char *ifname,
 		    iph->iph_sock : iph->iph_sock6;
 		if (ioctl(s, SIOCGLIFFLAGS, (caddr_t)&lifrl) < 0)
 			continue;
+
+		/* a regular interface by default */
+		ifp->ifi_class = IPADM_IF_CLASS_REGULAR;
+
 		if (lifrl.lifr_flags & IFF_BROADCAST)
 			ifp->ifi_cflags |= IFIF_BROADCAST;
 		if (lifrl.lifr_flags & IFF_MULTICAST)
 			ifp->ifi_cflags |= IFIF_MULTICAST;
 		if (lifrl.lifr_flags & IFF_POINTOPOINT)
 			ifp->ifi_cflags |= IFIF_POINTOPOINT;
-		if (lifrl.lifr_flags & IFF_VIRTUAL)
+		if (lifrl.lifr_flags & IFF_VIRTUAL) {
 			ifp->ifi_cflags |= IFIF_VIRTUAL;
-		if (lifrl.lifr_flags & IFF_IPMP)
+			ifp->ifi_class = IPADM_IF_CLASS_VIRTUAL;
+		}
+		if (lifrl.lifr_flags & IFF_IPMP) {
 			ifp->ifi_cflags |= IFIF_IPMP;
+			ifp->ifi_class = IPADM_IF_CLASS_IPMP;
+		}
 		if (lifrl.lifr_flags & IFF_STANDBY)
 			ifp->ifi_cflags |= IFIF_STANDBY;
 		if (lifrl.lifr_flags & IFF_INACTIVE)
@@ -174,13 +197,25 @@ i_ipadm_active_if_info(ipadm_handle_t iph, const char *ifname,
 			ifp->ifi_cflags |= IFIF_IPV6;
 		if (lifrl.lifr_flags & IFF_L3PROTECT)
 			ifp->ifi_cflags |= IFIF_L3PROTECT;
+
+		/*
+		 * Retrieve active IPMP members. This may fail in in.mpathd if
+		 * the IPMP interface has just been created with no members.
+		 * Hence, ignore errors, cmembers will just be empty.
+		 */
+		if (ifp->ifi_class == IPADM_IF_CLASS_IPMP) {
+			if (ioctl(s, SIOCGLIFGROUPNAME, (caddr_t)&lifrl) == 0) {
+				(void) i_ipadm_fill_cmembers(
+				    lifrl.lifr_groupname,
+				    &ifp->ifi_ipmp_cmembers);
+			}
+		}
 	}
 	free(buf);
-	return (IPADM_SUCCESS);
-fail:
-	free(buf);
-	ipadm_free_if_info(*if_info);
-	*if_info = NULL;
+	if (status != IPADM_SUCCESS) {
+		ipadm_free_if_info(*if_info);
+		*if_info = NULL;
+	}
 	return (status);
 }
 
@@ -191,51 +226,150 @@ fail:
  */
 static ipadm_status_t
 i_ipadm_persist_if_info(ipadm_handle_t iph, const char *ifname,
-    ipadm_if_info_list_t **if_info)
+    ipadm_if_info_t **if_info)
 {
-	ipadm_status_t		status = IPADM_SUCCESS;
-	ipmgmt_getif_arg_t	getif;
-	ipmgmt_getif_rval_t	*rvalp;
-	ipadm_if_info_t		*ifp;
-	ipadm_if_info_list_t	*curr, *prev = NULL;
-	int			i = 0, err = 0;
-
-	bzero(&getif, sizeof (getif));
-	if (ifname != NULL)
-		(void) strlcpy(getif.ia_ifname, ifname, LIFNAMSIZ);
-	getif.ia_cmd = IPMGMT_CMD_GETIF;
+	ipadm_status_t	status = IPADM_SUCCESS;
+	nvlist_t	*ifs_info_nvl;
 
 	*if_info = NULL;
 
-	if ((rvalp = malloc(sizeof (ipmgmt_getif_rval_t))) == NULL)
-		return (ipadm_errno2status(errno));
-	err = ipadm_door_call(iph, &getif, sizeof (getif), (void **)&rvalp,
-	    sizeof (*rvalp), B_TRUE);
-	if (err == ENOENT) {
-		free(rvalp);
-		if (ifname != NULL)
-			return (ipadm_errno2status(err));
-		return (IPADM_SUCCESS);
-	} else if (err != 0) {
-		free(rvalp);
-		return (ipadm_errno2status(err));
-	}
+	if ((status = i_ipadm_get_db_if(iph,
+	    ifname, &ifs_info_nvl)) != IPADM_SUCCESS)
+		return (status);
 
-	ifp = rvalp->ir_ifinfo;
-	for (i = 0; i < rvalp->ir_ifcnt; i++) {
-		ifp = rvalp->ir_ifinfo + i;
-		if ((curr = malloc(sizeof (*curr))) == NULL) {
-			status = ipadm_errno2status(errno);
-			ipadm_free_if_info(prev);
+	assert(ifs_info_nvl != NULL);
+
+	return (i_ipadm_nvl2ifinfo(ifs_info_nvl, if_info));
+}
+
+static ipadm_status_t
+i_ipadm_nvl2ifinfo(nvlist_t *ifs_info_nvl, ipadm_if_info_t **if_info)
+{
+	ipadm_if_info_t *ific = NULL, *ifil = NULL;
+	nvlist_t	*if_info_nvl;
+	nvpair_t	*nvp;
+	char		*strval;
+	ipadm_status_t	status = IPADM_SUCCESS;
+	uint16_t	*families;
+	uint_t		nelem = 0;
+
+	for (nvp = nvlist_next_nvpair(ifs_info_nvl, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(ifs_info_nvl, nvp)) {
+		if (nvpair_value_nvlist(nvp, &if_info_nvl) != 0)
+			continue;
+
+		status = i_ipadm_allocate_ifinfo(&ific);
+		if (status != IPADM_SUCCESS) {
+			ipadm_free_if_info(*if_info);
 			break;
 		}
-		(void) bcopy(ifp, &curr->ifil_ifi, sizeof (*ifp));
-		curr->ifil_next = prev;
-		prev = curr;
+		if (nvlist_lookup_string(if_info_nvl, IPADM_NVP_IFNAME,
+		    &strval) != 0) {
+			ipadm_free_if_info(ific);
+			ific = NULL;
+			continue;
+		}
+		(void) strlcpy(ific->ifi_name, strval,
+		    sizeof (ific->ifi_name));
+
+		if (nvlist_lookup_uint16_array(if_info_nvl,
+		    IPADM_NVP_FAMILIES, &families, &nelem) == 0) {
+			while (nelem-- > 0) {
+				if (families[nelem] == AF_INET)
+					ific->ifi_pflags |= IFIF_IPV4;
+				else if (families[nelem] == AF_INET6)
+					ific->ifi_pflags |= IFIF_IPV6;
+			}
+		}
+
+		if (nvlist_lookup_string(if_info_nvl,
+		    IPADM_NVP_IFCLASS, &strval) == 0)
+			ific->ifi_class = atoi(strval);
+		else
+			ific->ifi_class = IPADM_IF_CLASS_REGULAR;
+
+		if (ific->ifi_class == IPADM_IF_CLASS_IPMP)
+			/* do not expect any failures there */
+			(void) i_ipadm_fill_pmembers(if_info_nvl,
+			    &ific->ifi_ipmp_pmembers);
+
+		if (*if_info == NULL)
+			*if_info = ific;
+		else
+			ifil->ifi_next = ific;
+		ifil = ific;
 	}
-	*if_info = curr;
-	free(rvalp);
+
+	nvlist_free(ifs_info_nvl);
 	return (status);
+}
+
+/*
+ * Fill the ipadm_if_info_t->ifi_ipmp_pmembers by info from
+ * ipadm DB
+ */
+static ipadm_status_t
+i_ipadm_fill_pmembers(nvlist_t *if_info_nvl, ipadm_ipmp_members_t *pmembers)
+{
+	uint_t	nelem = 0;
+	char	**members;
+	ipadm_ipmp_member_t *ipmp_member;
+
+	if (nvlist_lookup_string_array(if_info_nvl, IPADM_NVP_MIFNAMES,
+	    &members, &nelem) != 0)
+		return (IPADM_SUCCESS);
+
+	while (nelem-- > 0) {
+		if ((ipmp_member = calloc(1,
+		    sizeof (ipadm_ipmp_member_t))) == NULL)
+			return (ipadm_errno2status(errno));
+
+		(void) strlcpy(ipmp_member->if_name, members[nelem],
+		    sizeof (ipmp_member->if_name));
+		list_insert_tail(pmembers, ipmp_member);
+	}
+	return (IPADM_SUCCESS);
+}
+
+/*
+ * Fill the ipadm_if_info_t->ifi_ipmp_cmembers by info from
+ * kernel (libipmp is used to retrieve the required info)
+ */
+static ipadm_status_t
+i_ipadm_fill_cmembers(char *grname, ipadm_ipmp_members_t *cmembers)
+{
+	ipmp_handle_t ipmp_handle;
+	ipmp_groupinfo_t *grinfo;
+	ipmp_iflist_t *iflistp;
+	ipadm_ipmp_member_t *ipmp_member;
+	ipadm_status_t ipadm_status = IPADM_SUCCESS;
+	int i;
+
+	if (ipmp_open(&ipmp_handle) != IPMP_SUCCESS)
+		return (IPADM_FAILURE);
+
+	if (ipmp_getgroupinfo(ipmp_handle, grname, &grinfo) != IPMP_SUCCESS) {
+		ipadm_status = IPADM_FAILURE;
+		goto fail2;
+	}
+
+	iflistp = grinfo->gr_iflistp;
+	for (i = 0; i < iflistp->il_nif; i++) {
+		if ((ipmp_member = calloc(1,
+		    sizeof (ipadm_ipmp_member_t))) == NULL) {
+			ipadm_status = ipadm_errno2status(errno);
+			goto fail1;
+		}
+		(void) strlcpy(ipmp_member->if_name, iflistp->il_ifs[i],
+		    sizeof (ipmp_member->if_name));
+		list_insert_tail(cmembers, ipmp_member);
+	}
+
+fail1:
+	ipmp_freegroupinfo(grinfo);
+fail2:
+	ipmp_close(ipmp_handle);
+	return (ipadm_status);
 }
 
 /*
@@ -246,16 +380,14 @@ i_ipadm_persist_if_info(ipadm_handle_t iph, const char *ifname,
  */
 ipadm_status_t
 i_ipadm_get_all_if_info(ipadm_handle_t iph, const char *ifname,
-    ipadm_if_info_list_t **if_info, int64_t lifc_flags)
+    ipadm_if_info_t **if_info, int64_t lifc_flags)
 {
 	ipadm_status_t	status;
-	ipadm_if_info_list_t *aifinfo = NULL;
-	ipadm_if_info_list_t *pifinfo = NULL;
-	ipadm_if_info_list_t *last = NULL;
-	ipadm_if_info_list_t *aifl;
-	ipadm_if_info_list_t *pifl;
+	ipadm_if_info_t	*aifinfo = NULL;
+	ipadm_if_info_t	*pifinfo = NULL;
 	ipadm_if_info_t	*aifp;
 	ipadm_if_info_t	*pifp;
+	ipadm_if_info_t	*last = NULL;
 	struct ifaddrs	*ifa;
 	struct ifaddrs	*ifap;
 
@@ -275,9 +407,7 @@ retry:
 			status = ipadm_errno2status(errno);
 			goto fail;
 		}
-		for (aifl = aifinfo; aifl != NULL; aifl = aifl->ifil_next) {
-			aifp = &aifl->ifil_ifi;
-
+		for (aifp = aifinfo; aifp != NULL; aifp = aifp->ifi_next) {
 			/*
 			 * Find the `ifaddrs' structure from `ifa'
 			 * for this interface. We need the IFF_* flags
@@ -307,8 +437,8 @@ retry:
 				aifp->ifi_state = IFIS_DOWN;
 			else
 				aifp->ifi_state = IFIS_OK;
-			if (aifl->ifil_next == NULL)
-				last = aifl;
+			if (aifp->ifi_next == NULL)
+				last = aifp;
 		}
 		freeifaddrs(ifa);
 	}
@@ -322,37 +452,55 @@ retry:
 	}
 	if (status != IPADM_SUCCESS)
 		goto fail;
+
 	/*
-	 * If a persistent interface is also found in `aifinfo', update
+	 * Process the persistent interface information.
+	 *
+	 * First try to get the persistent "standby" property, as that isn't
+	 * retrieved by i_ipadm_persist_if_info().
+	 *
+	 * Next, if a persistent interface is also found in `aifinfo', update
 	 * its entry in `aifinfo' with the persistent information from
 	 * `pifinfo'. If an interface is found in `pifinfo', but not in
 	 * `aifinfo', it means that this interface was disabled. We should
 	 * add this interface to `aifinfo' and set it state to IFIF_DISABLED.
 	 */
-	for (pifl = pifinfo; pifl != NULL; pifl = pifl->ifil_next) {
-		pifp = &pifl->ifil_ifi;
-		for (aifl = aifinfo; aifl != NULL; aifl = aifl->ifil_next) {
-			aifp = &aifl->ifil_ifi;
+	for (pifp = pifinfo; pifp != NULL; pifp = pifp->ifi_next) {
+		char buf[10] = "";
+		uint_t bufsize = sizeof (buf);
+
+		status = ipadm_get_ifprop(iph, pifp->ifi_name, "standby", buf,
+		    &bufsize, MOD_PROTO_IP, IPADM_OPT_PERSIST);
+
+		if (status == IPADM_SUCCESS && strcmp(buf, "on") == 0)
+			pifp->ifi_pflags |= IFIF_STANDBY;
+
+		for (aifp = aifinfo; aifp != NULL; aifp = aifp->ifi_next) {
 			if (strcmp(aifp->ifi_name, pifp->ifi_name) == 0) {
-				aifp->ifi_pflags = pifp->ifi_pflags;
 				break;
 			}
 		}
-		if (aifl == NULL) {
-			aifl = malloc(sizeof (ipadm_if_info_list_t));
-			if (aifl == NULL) {
-				status = ipadm_errno2status(errno);
+
+		if (aifp == NULL) {
+			if ((status =
+			    i_ipadm_allocate_ifinfo(&aifp)) != IPADM_SUCCESS)
 				goto fail;
-			}
-			*aifl = *pifl;
-			aifl->ifil_next = NULL;
-			aifl->ifil_ifi.ifi_state = IFIS_DISABLED;
+
+			(void) strlcpy(aifp->ifi_name, pifp->ifi_name,
+			    sizeof (aifp->ifi_name));
+
+			aifp->ifi_next = NULL;
+			aifp->ifi_state = IFIS_DISABLED;
 			if (last != NULL)
-				last->ifil_next = aifl;
+				last->ifi_next = aifp;
 			else
-				aifinfo = aifl;
-			last = aifl;
+				aifinfo = aifp;
+			last = aifp;
 		}
+
+		if ((status = i_ipadm_add_persistent_if_info(aifp,
+		    pifp)) != IPADM_SUCCESS)
+			goto fail;
 	}
 	*if_info = aifinfo;
 	ipadm_free_if_info(pifinfo);
@@ -362,6 +510,75 @@ fail:
 	ipadm_free_if_info(aifinfo);
 	ipadm_free_if_info(pifinfo);
 	return (status);
+}
+
+/*
+ * Updates active if_info by data from persistent if_info
+ */
+static ipadm_status_t
+i_ipadm_add_persistent_if_info(ipadm_if_info_t *aifp, ipadm_if_info_t *pifp)
+{
+	ipadm_ipmp_member_t *pp_ipmp_member, *ap_ipmp_member;
+
+	ipadm_ipmp_members_t *apmembers = &aifp->ifi_ipmp_pmembers;
+	ipadm_ipmp_members_t *ppmembers = &pifp->ifi_ipmp_pmembers;
+
+	aifp->ifi_pflags = pifp->ifi_pflags;
+	aifp->ifi_class = pifp->ifi_class;
+
+	for (pp_ipmp_member = list_head(ppmembers); pp_ipmp_member;
+	    pp_ipmp_member = list_next(ppmembers, pp_ipmp_member)) {
+		if ((ap_ipmp_member = calloc(1,
+		    sizeof (ipadm_ipmp_member_t))) == NULL)
+			return (ipadm_errno2status(errno));
+
+		(void) strlcpy(ap_ipmp_member->if_name,
+		    pp_ipmp_member->if_name,
+		    sizeof (ap_ipmp_member->if_name));
+
+		list_insert_tail(apmembers, ap_ipmp_member);
+	}
+	return (IPADM_SUCCESS);
+}
+
+static ipadm_status_t
+i_ipadm_allocate_ifinfo(ipadm_if_info_t **if_info)
+{
+	*if_info = calloc(1, sizeof (ipadm_if_info_t));
+	if (*if_info == NULL)
+		return (ipadm_errno2status(errno));
+
+	/* List of active (current) members */
+	list_create(&((*if_info)->ifi_ipmp_cmembers),
+	    sizeof (ipadm_ipmp_member_t),
+	    offsetof(ipadm_ipmp_member_t, node));
+
+	/* List of persistent members */
+	list_create(&((*if_info)->ifi_ipmp_pmembers),
+	    sizeof (ipadm_ipmp_member_t),
+	    offsetof(ipadm_ipmp_member_t, node));
+
+	return (IPADM_SUCCESS);
+}
+
+/*
+ * Reads all the interface lines from the persistent DB into the nvlist `onvl',
+ * when `ifname' is NULL.
+ * If an `ifname' is specified, then the interface line corresponding to
+ * that name will be returned.
+ */
+static ipadm_status_t
+i_ipadm_get_db_if(ipadm_handle_t iph, const char *ifname, nvlist_t **onvl)
+{
+	ipmgmt_getif_arg_t	garg;
+
+	/* Populate the door_call argument structure */
+	bzero(&garg, sizeof (garg));
+	garg.ia_cmd = IPMGMT_CMD_GETIF;
+	if (ifname != NULL)
+		(void) strlcpy(garg.ia_ifname, ifname, sizeof (garg.ia_ifname));
+
+	return (i_ipadm_call_ipmgmtd(iph, (void *) &garg, sizeof (garg), onvl));
 }
 
 int
@@ -385,7 +602,7 @@ ipadm_status_t
 i_ipadm_if_pexists(ipadm_handle_t iph, const char *ifname, sa_family_t af,
     boolean_t *exists)
 {
-	ipadm_if_info_list_t	*ifinfo;
+	ipadm_if_info_t	*ifinfo;
 	ipadm_status_t	status;
 
 	/*
@@ -400,10 +617,10 @@ i_ipadm_if_pexists(ipadm_handle_t iph, const char *ifname, sa_family_t af,
 	status = i_ipadm_persist_if_info(iph, ifname, &ifinfo);
 	if (status == IPADM_SUCCESS) {
 		*exists = ((af == AF_INET &&
-		    (ifinfo->ifil_ifi.ifi_pflags & IFIF_IPV4)) ||
+		    (ifinfo->ifi_pflags & IFIF_IPV4)) ||
 		    (af == AF_INET6 &&
-		    (ifinfo->ifil_ifi.ifi_pflags & IFIF_IPV6)));
-		free(ifinfo);
+		    (ifinfo->ifi_pflags & IFIF_IPV6)));
+		ipadm_free_if_info(ifinfo);
 	} else if (status == IPADM_NOTFOUND) {
 		status = IPADM_SUCCESS;
 		*exists = B_FALSE;
@@ -742,7 +959,8 @@ i_ipadm_plumb_if(ipadm_handle_t iph, char *ifname, sa_family_t af,
 			if (ioctl(sock, SIOCSLIFADDR, (caddr_t)&lifr) < 0)
 				return (ipadm_errno2status(errno));
 			if (is_persistent) {
-				status = i_ipadm_persist_if(iph, ifname, af);
+				status = i_ipadm_persist_if(iph,
+				    ifname, af, ipadm_flags);
 				if (status != IPADM_SUCCESS) {
 					(void) i_ipadm_delete_if(iph, ifname,
 					    af, IPADM_OPT_ACTIVE);
@@ -923,7 +1141,8 @@ done:
 		 * interface in persistent DB.
 		 */
 		if (is_persistent) {
-			status = i_ipadm_persist_if(iph, newif, af);
+			status = i_ipadm_persist_if(iph,
+			    newif, af, ipadm_flags);
 			if (status != IPADM_SUCCESS) {
 				(void) i_ipadm_delete_if(iph, newif, af,
 				    IPADM_OPT_ACTIVE);
@@ -1156,13 +1375,19 @@ done:
  * persistent DB.
  */
 static ipadm_status_t
-i_ipadm_persist_if(ipadm_handle_t iph, const char *ifname, sa_family_t af)
+i_ipadm_persist_if(ipadm_handle_t iph, const char *ifname, sa_family_t af,
+    uint32_t ipadm_flags)
 {
 	ipmgmt_if_arg_t		ifarg;
 	int			err;
 
 	(void) strlcpy(ifarg.ia_ifname, ifname, sizeof (ifarg.ia_ifname));
 	ifarg.ia_family = af;
+	if (ipadm_flags & IPADM_OPT_IPMP)
+		ifarg.ia_ifclass = IPADM_IF_CLASS_IPMP;
+	else
+		ifarg.ia_ifclass = IPADM_IF_CLASS_REGULAR;
+
 	ifarg.ia_cmd = IPMGMT_CMD_SETIF;
 	ifarg.ia_flags = IPMGMT_PERSIST;
 	err = ipadm_door_call(iph, &ifarg, sizeof (ifarg), NULL, 0, B_FALSE);
@@ -1355,6 +1580,109 @@ ipadm_create_if(ipadm_handle_t iph, char *ifname, sa_family_t af,
 	return (IPADM_SUCCESS);
 }
 
+ipadm_status_t
+ipadm_add_ipmp_member(ipadm_handle_t iph, const char *gifname,
+    const char *mifname, uint32_t ipadm_flags)
+{
+	return (i_ipadm_update_ipmp(iph, gifname, mifname,
+	    ipadm_flags, IPADM_ADD_IPMP));
+}
+
+ipadm_status_t
+ipadm_remove_ipmp_member(ipadm_handle_t iph, const char *gifname,
+    const char *mifname, uint32_t ipadm_flags)
+{
+	return (i_ipadm_update_ipmp(iph, gifname, mifname,
+	    ipadm_flags, IPADM_REMOVE_IPMP));
+}
+
+/*
+ * Updates active IPMP configuration according to the specified
+ * command. It also persists the configuration if IPADM_OPT_PERSIST
+ * is set in `ipadm_flags'.
+ */
+static ipadm_status_t
+i_ipadm_update_ipmp(ipadm_handle_t iph, const char *gifname,
+    const char *mifname, uint32_t ipadm_flags, ipadm_ipmp_op_t op)
+{
+	ipadm_status_t status;
+	char	groupname1[LIFGRNAMSIZ];
+	char	groupname2[LIFGRNAMSIZ];
+
+	/* Check for the required authorization */
+	if (!ipadm_check_auth())
+		return (IPADM_EAUTH);
+
+	if (!(ipadm_flags & IPADM_OPT_ACTIVE) ||
+	    gifname == NULL || mifname == NULL)
+		return (IPADM_INVALID_ARG);
+
+	if (!ipadm_if_enabled(iph, gifname, AF_UNSPEC) ||
+	    !ipadm_if_enabled(iph, mifname, AF_UNSPEC))
+		return (IPADM_OP_DISABLE_OBJ);
+
+	if (!i_ipadm_is_ipmp(iph, gifname))
+		return (IPADM_INVALID_ARG);
+
+	if (op == IPADM_ADD_IPMP && i_ipadm_is_under_ipmp(iph, mifname))
+		return (IPADM_IF_INUSE);
+
+	if ((status = i_ipadm_get_groupname_active(iph, gifname,
+	    groupname2, sizeof (groupname2))) != IPADM_SUCCESS)
+		return (status);
+
+	if (op == IPADM_REMOVE_IPMP) {
+		if ((status = i_ipadm_get_groupname_active(iph, mifname,
+		    groupname1, sizeof (groupname1))) != IPADM_SUCCESS)
+			return (status);
+
+		if (groupname1[0] == '\0' ||
+		    strcmp(groupname1, groupname2) != 0)
+			return (IPADM_INVALID_ARG);
+
+		groupname2[0] = '\0';
+	}
+
+	if ((ipadm_flags & IPADM_OPT_PERSIST) &&
+	    (status = i_ipadm_persist_update_ipmp(iph, gifname,
+	    mifname, op)) != IPADM_SUCCESS)
+		return (status);
+
+	return (i_ipadm_set_groupname_active(iph, mifname, groupname2));
+}
+
+/*
+ * Call the ipmgmtd to update the IPMP configuration in ipadm DB.
+ * After this call the DB will know that mifname is under gifname and
+ * gifname has a member, which name is mifname.
+ */
+static ipadm_status_t
+i_ipadm_persist_update_ipmp(ipadm_handle_t iph, const char *gifname,
+    const char *mifname, ipadm_ipmp_op_t op)
+{
+	ipmgmt_ipmp_update_arg_t args;
+	int err;
+
+	assert(op == IPADM_ADD_IPMP || op == IPADM_REMOVE_IPMP);
+
+	bzero(&args, sizeof (ipmgmt_ipmp_update_arg_t));
+
+	args.ia_cmd = IPMGMT_CMD_IPMP_UPDATE;
+
+	(void) strlcpy(args.ia_gifname, gifname, sizeof (args.ia_gifname));
+	(void) strlcpy(args.ia_mifname, mifname, sizeof (args.ia_mifname));
+
+	if (op == IPADM_ADD_IPMP)
+		args.ia_flags = IPMGMT_APPEND;
+	else
+		args.ia_flags = IPMGMT_REMOVE;
+
+	args.ia_flags |= IPMGMT_PERSIST;
+
+	err = ipadm_door_call(iph, &args, sizeof (args), NULL, 0, B_FALSE);
+	return (ipadm_errno2status(err));
+}
+
 /*
  * Deletes the interface in `ifname'. Removes both IPv4 and IPv6 interfaces
  * when `af' = AF_UNSPEC.
@@ -1426,7 +1754,7 @@ ipadm_delete_if(ipadm_handle_t iph, const char *ifname, sa_family_t af,
  */
 ipadm_status_t
 ipadm_if_info(ipadm_handle_t iph, const char *ifname,
-    ipadm_if_info_list_t **if_info, uint32_t flags, int64_t lifc_flags)
+    ipadm_if_info_t **if_info, uint32_t flags, int64_t lifc_flags)
 {
 	ipadm_status_t	status;
 	ifspec_t	ifsp;
@@ -1452,14 +1780,27 @@ ipadm_if_info(ipadm_handle_t iph, const char *ifname,
  * Frees the linked list allocated by ipadm_if_info().
  */
 void
-ipadm_free_if_info(ipadm_if_info_list_t *ifinfo)
+ipadm_free_if_info(ipadm_if_info_t *ifinfo)
 {
-	ipadm_if_info_list_t	*ifinfo_next;
+	ipadm_if_info_t	*ifinfo_next;
 
 	for (; ifinfo != NULL; ifinfo = ifinfo_next) {
-		ifinfo_next = ifinfo->ifil_next;
+		ifinfo_next = ifinfo->ifi_next;
+		i_ipadm_free_ipmp_members(&ifinfo->ifi_ipmp_cmembers);
+		i_ipadm_free_ipmp_members(&ifinfo->ifi_ipmp_pmembers);
 		free(ifinfo);
 	}
+}
+
+static void
+i_ipadm_free_ipmp_members(ipadm_ipmp_members_t *ipmp_members)
+{
+	ipadm_ipmp_member_t *ipmp_member;
+
+	while ((ipmp_member = list_remove_head(ipmp_members)) != NULL)
+		free(ipmp_member);
+
+	list_destroy(ipmp_members);
 }
 
 /*
@@ -1469,6 +1810,7 @@ ipadm_free_if_info(ipadm_if_info_list_t *ifinfo)
 ipadm_status_t
 ipadm_enable_if(ipadm_handle_t iph, const char *ifname, uint32_t flags)
 {
+	boolean_t	set_init = B_FALSE;
 	nvlist_t	*ifnvl;
 	ipadm_status_t	status;
 	ifspec_t	ifsp;
@@ -1489,9 +1831,9 @@ ipadm_enable_if(ipadm_handle_t iph, const char *ifname, uint32_t flags)
 	 * Return early by checking if the interface is already enabled.
 	 */
 	if (ipadm_if_enabled(iph, ifname, AF_INET) &&
-	    ipadm_if_enabled(iph, ifname, AF_INET6)) {
+	    ipadm_if_enabled(iph, ifname, AF_INET6))
 		return (IPADM_IF_EXISTS);
-	}
+
 	/*
 	 * Enable the interface and restore all its interface properties
 	 * and address objects.
@@ -1504,13 +1846,23 @@ ipadm_enable_if(ipadm_handle_t iph, const char *ifname, uint32_t flags)
 	/*
 	 * ipadm_enable_if() does exactly what ipadm_init_ifs() does,
 	 * but only for one interface. We need to set IPH_INIT because
-	 * ipmgmtd daemon does not have to write the interface to persistent
-	 * db. The interface is already available in persistent db
-	 * and we are here to re-enable the persistent configuration.
+	 * ipmgmtd daemon does not have to write the interface to the
+	 * persistent db. The interface is already available in the
+	 * persistent db and we are here to re-enable the persistent
+	 * configuration.
+	 *
+	 * But we need to make sure we're not accidentally clearing an
+	 * IPH_INIT flag that was already set when we were called.
 	 */
-	iph->iph_flags |= IPH_INIT;
+	if ((iph->iph_flags & IPH_INIT) == 0) {
+		iph->iph_flags |= IPH_INIT;
+		set_init = B_TRUE;
+	}
+
 	status = i_ipadm_init_ifobj(iph, ifname, ifnvl);
-	iph->iph_flags &= ~IPH_INIT;
+
+	if (set_init)
+		iph->iph_flags &= ~IPH_INIT;
 
 	nvlist_free(ifnvl);
 	return (status);
@@ -1558,10 +1910,13 @@ ipadm_disable_if(ipadm_handle_t iph, const char *ifname, uint32_t flags)
 }
 
 /*
- * This workaround is until libipadm supports IPMP and is required whenever an
- * interface is moved into an IPMP group. Since libipadm doesn't support IPMP
- * yet, we will have to update the daemon's in-memory mapping of
- * `aobjname' to 'lifnum'.
+ * FIXME Remove this when ifconfig(1M) is updated to use IPMP support
+ * in libipadm.
+ */
+/*
+ * This workaround is required by ifconfig(1M) whenever an
+ * interface is moved into an IPMP group to update the daemon's
+ * in-memory mapping of `aobjname' to 'lifnum'.
  *
  * For `IPMGMT_ACTIVE' case, i_ipadm_delete_ifobj() would only fail if
  * door_call(3C) fails. Also, there is no use in returning error because
@@ -1572,4 +1927,133 @@ ipadm_if_move(ipadm_handle_t iph, const char *ifname)
 {
 	(void) i_ipadm_delete_ifobj(iph, ifname, AF_INET, B_FALSE);
 	(void) i_ipadm_delete_ifobj(iph, ifname, AF_INET6, B_FALSE);
+}
+
+ipadm_status_t
+i_ipadm_set_groupname_active(ipadm_handle_t iph, const char *ifname,
+    const char *groupname)
+{
+	struct lifreq   lifr;
+	ipadm_addr_info_t *addrinfo, *ia;
+	ipadm_status_t	status = IPADM_SUCCESS;
+
+	(void) memset(&lifr, 0, sizeof (lifr));
+
+	(void) strlcpy(lifr.lifr_name, ifname, sizeof (lifr.lifr_name));
+	(void) strlcpy(lifr.lifr_groupname, groupname,
+	    sizeof (lifr.lifr_groupname));
+
+	/* Disable all addresses on the interface */
+	(void) i_ipadm_active_addr_info(iph, ifname, &addrinfo,
+	    IPADM_OPT_ACTIVE | IPADM_OPT_ZEROADDR, IFF_UP | IFF_DUPLICATE);
+
+	for (ia = addrinfo; ia != NULL; ia = IA_NEXT(ia)) {
+		if (strlen(ia->ia_aobjname) > 0) {
+			(void) ipadm_disable_addr(iph, ia->ia_aobjname, 0);
+		} else {
+			/*
+			 * There's an address on this interfaces with no
+			 * corresponding addrobj. Just clear IFF_UP.
+			 */
+			(void) i_ipadm_set_flags(iph, ifname,
+			    addrinfo->ia_ifa.ifa_addr->sa_family, 0, IFF_UP);
+		}
+	}
+
+	if (ioctl(iph->iph_sock, SIOCSLIFGROUPNAME, (caddr_t)&lifr) == -1 &&
+	    ioctl(iph->iph_sock6, SIOCSLIFGROUPNAME, (caddr_t)&lifr) == -1)
+		status = ipadm_errno2status(errno);
+
+	/* Enable all addresses on the interface */
+	for (ia = addrinfo; ia != NULL; ia = IA_NEXT(ia)) {
+		if (strlen(ia->ia_aobjname) > 0) {
+			(void) ipadm_enable_addr(iph, ia->ia_aobjname, 0);
+		} else {
+			/*
+			 * There's an address on this interfaces with no
+			 * corresponding addrobj. Just set IFF_UP.
+			 */
+			(void) i_ipadm_set_flags(iph, ifname,
+			    addrinfo->ia_ifa.ifa_addr->sa_family, IFF_UP, 0);
+		}
+	}
+
+	if (status == IPADM_SUCCESS) {
+		if (groupname[0] == '\0') {
+			/*
+			 * If interface was removed from IPMP group, unset the
+			 * DEPRECATED and NOFAILOVER flags.
+			 */
+			(void) i_ipadm_set_flags(iph, ifname, AF_INET, 0,
+			    IFF_DEPRECATED | IFF_NOFAILOVER);
+			(void) i_ipadm_set_flags(iph, ifname, AF_INET6, 0,
+			    IFF_DEPRECATED | IFF_NOFAILOVER);
+		} else if (addrinfo == NULL) {
+			/*
+			 * If interface was added to IPMP group and there are no
+			 * active addresses, explicitly bring it up to be used
+			 * for link-based IPMP configuration.
+			 */
+			(void) i_ipadm_set_flags(iph, ifname, AF_INET,
+			    IFF_UP, 0);
+			(void) i_ipadm_set_flags(iph, ifname, AF_INET6,
+			    IFF_UP, 0);
+		}
+	}
+
+	ipadm_free_addr_info(addrinfo);
+
+	return (status);
+}
+
+ipadm_status_t
+i_ipadm_get_groupname_active(ipadm_handle_t iph, const char *ifname,
+    char *groupname, size_t size)
+{
+	struct lifreq   lifr;
+
+	(void) memset(&lifr, 0, sizeof (lifr));
+
+	(void) strlcpy(lifr.lifr_name, ifname, sizeof (lifr.lifr_name));
+
+	if (ioctl(iph->iph_sock, SIOCGLIFGROUPNAME, (caddr_t)&lifr) == -1 &&
+	    ioctl(iph->iph_sock6, SIOCGLIFGROUPNAME, (caddr_t)&lifr) == -1)
+		return (ipadm_errno2status(errno));
+
+	(void) strlcpy(groupname, lifr.lifr_groupname, size);
+
+	return (IPADM_SUCCESS);
+}
+
+/*
+ * Returns B_TRUE if `ifname' represents an IPMP underlying interface.
+ */
+boolean_t
+i_ipadm_is_under_ipmp(ipadm_handle_t iph, const char *ifname)
+{
+
+	char	groupname[LIFGRNAMSIZ];
+
+	if (i_ipadm_get_groupname_active(iph, ifname, groupname,
+	    sizeof (groupname)) != IPADM_SUCCESS ||
+	    groupname[0] == '\0' ||
+	    strcmp(ifname, groupname) == 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * Returns B_TRUE if `ifname' represents an IPMP group interface.
+ */
+boolean_t
+i_ipadm_is_ipmp(ipadm_handle_t iph, const char *ifname)
+{
+	uint64_t flags;
+
+	if (i_ipadm_get_flags(iph, ifname, AF_INET, &flags) != IPADM_SUCCESS &&
+	    i_ipadm_get_flags(iph, ifname, AF_INET6, &flags) != IPADM_SUCCESS)
+		return (B_FALSE);
+
+	return ((flags & IFF_IPMP) != 0);
 }

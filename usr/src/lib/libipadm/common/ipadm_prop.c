@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, 2017 by Delphix. All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -144,6 +146,11 @@ static ipadm_prop_desc_t ipadm_ip_prop_table[] = {
 	{ "hostmodel", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_IPV4, 0,
 	    i_ipadm_set_hostmodel, i_ipadm_get_hostmodel,
 	    i_ipadm_get_hostmodel },
+
+	{ "standby", NULL, IPADMPROP_CLASS_IF, MOD_PROTO_IP, 0,
+	    i_ipadm_set_ifprop_flags, i_ipadm_get_onoff,
+	    i_ipadm_get_ifprop_flags },
+
 
 	{ NULL, NULL, 0, 0, 0, NULL, NULL, NULL }
 };
@@ -598,7 +605,8 @@ i_ipadm_set_ifprop_flags(ipadm_handle_t iph, const void *arg,
 		    strcmp(pdp->ipd_name, "arp") == 0 ||
 		    strcmp(pdp->ipd_name, "nud") == 0) {
 			pval = IPADM_ONSTR;
-		} else if (strcmp(pdp->ipd_name, "forwarding") == 0) {
+		} else if (strcmp(pdp->ipd_name, "forwarding") == 0 ||
+		    strcmp(pdp->ipd_name, "standby") == 0) {
 			pval = IPADM_OFFSTR;
 		} else {
 			return (IPADM_PROP_UNKNOWN);
@@ -632,6 +640,11 @@ i_ipadm_set_ifprop_flags(ipadm_handle_t iph, const void *arg,
 			on_flags = IFF_ROUTER;
 		else
 			off_flags = IFF_ROUTER;
+	} else if (strcmp(pdp->ipd_name, "standby") == 0) {
+		if (on)
+			on_flags = IFF_STANDBY;
+		else
+			off_flags = IFF_STANDBY;
 	}
 
 	if (on_flags || off_flags)  {
@@ -649,7 +662,6 @@ i_ipadm_set_eprivport(ipadm_handle_t iph, const void *arg,
 	nvlist_t	*portsnvl = NULL;
 	nvpair_t	*nvp;
 	ipadm_status_t	status = IPADM_SUCCESS;
-	int		err;
 	uint_t		count = 0;
 
 	if (flags & IPADM_OPT_DEFAULT) {
@@ -657,8 +669,8 @@ i_ipadm_set_eprivport(ipadm_handle_t iph, const void *arg,
 		return (i_ipadm_set_prop(iph, arg, pdp, pval, proto, flags));
 	}
 
-	if ((err = ipadm_str2nvlist(pval, &portsnvl, IPADM_NORVAL)) != 0)
-		return (ipadm_errno2status(err));
+	if ((status = ipadm_str2nvlist(pval, &portsnvl, IPADM_NORVAL)) != 0)
+		return (status);
 
 	/* count the number of ports */
 	for (nvp = nvlist_next_nvpair(portsnvl, NULL); nvp != NULL;
@@ -941,7 +953,7 @@ i_ipadm_get_usesrc(ipadm_handle_t iph, const void *arg,
 	struct lifreq	lifr;
 	const char	*ifname = arg;
 	int		s;
-	char 		if_name[IF_NAMESIZE];
+	char		if_name[IF_NAMESIZE];
 	size_t		nbytes;
 
 	switch (valtype) {
@@ -984,8 +996,8 @@ i_ipadm_get_ifprop_flags(ipadm_handle_t iph, const void *arg,
     ipadm_prop_desc_t *pdp, char *buf, uint_t *bufsize, uint_t proto,
     uint_t valtype)
 {
-	uint64_t 	intf_flags;
-	char 		*val;
+	uint64_t	intf_flags;
+	char		*val;
 	size_t		nbytes;
 	const char	*ifname = arg;
 	sa_family_t	af;
@@ -1000,7 +1012,8 @@ i_ipadm_get_ifprop_flags(ipadm_handle_t iph, const void *arg,
 		    strcmp(pdp->ipd_name, "arp") == 0 ||
 		    strcmp(pdp->ipd_name, "nud") == 0) {
 			val = IPADM_ONSTR;
-		} else if (strcmp(pdp->ipd_name, "forwarding") == 0) {
+		} else if (strcmp(pdp->ipd_name, "forwarding") == 0 ||
+		    strcmp(pdp->ipd_name, "standby") == 0) {
 			val = IPADM_OFFSTR;
 		} else {
 			return (IPADM_PROP_UNKNOWN);
@@ -1025,6 +1038,9 @@ i_ipadm_get_ifprop_flags(ipadm_handle_t iph, const void *arg,
 				val = IPADM_ONSTR;
 		} else if (strcmp(pdp->ipd_name, "nud") == 0) {
 			if (!(intf_flags & IFF_NONUD))
+				val = IPADM_ONSTR;
+		} else if (strcmp(pdp->ipd_name, "standby") == 0) {
+			if (intf_flags & IFF_STANDBY)
 				val = IPADM_ONSTR;
 		}
 		nbytes = snprintf(buf, *bufsize, "%s", val);
@@ -1060,7 +1076,7 @@ i_ipadm_get_prop(ipadm_handle_t iph, const void *arg,
 	ipadm_status_t	status = IPADM_SUCCESS;
 	const char	*ifname = arg;
 	mod_ioc_prop_t	*mip;
-	char 		*pname = pdp->ipd_name;
+	char		*pname = pdp->ipd_name;
 	uint_t		iocsize;
 
 	/* allocate sufficient ioctl buffer to retrieve value */
@@ -1154,7 +1170,7 @@ i_ipadm_populate_proparg(ipmgmt_prop_arg_t *pargp, ipadm_prop_desc_t *pdp,
  * for a given protocol `proto'. The property name is in `pname'.
  *
  * `valtype' determines the type of value that will be retrieved.
- * 	IPADM_OPT_ACTIVE -	current value of the property (active config)
+ *	IPADM_OPT_ACTIVE -	current value of the property (active config)
  *	IPADM_OPT_PERSIST -	value of the property from persistent store
  *	IPADM_OPT_DEFAULT -	default hard coded value (boot-time value)
  *	IPADM_OPT_PERM -	read/write permissions for the value
@@ -1302,9 +1318,9 @@ i_ipadm_set_prop(ipadm_handle_t iph, const void *arg,
 {
 	ipadm_status_t	status = IPADM_SUCCESS;
 	const char	*ifname = arg;
-	mod_ioc_prop_t 	*mip;
-	char 		*pname = pdp->ipd_name;
-	uint_t 		valsize, iocsize;
+	mod_ioc_prop_t	*mip;
+	char		*pname = pdp->ipd_name;
+	uint_t		valsize, iocsize;
 	uint_t		iocflags = 0;
 
 	if (flags & IPADM_OPT_DEFAULT) {
@@ -1365,7 +1381,7 @@ i_ipadm_setprop_common(ipadm_handle_t iph, const char *ifname,
     const char *pname, const char *buf, uint_t proto, uint_t pflags)
 {
 	ipadm_status_t		status = IPADM_SUCCESS;
-	boolean_t 		persist = (pflags & IPADM_OPT_PERSIST);
+	boolean_t		persist = (pflags & IPADM_OPT_PERSIST);
 	boolean_t		reset = (pflags & IPADM_OPT_DEFAULT);
 	ipadm_prop_desc_t	*pdp;
 	boolean_t		is_if = (ifname != NULL);
@@ -1701,8 +1717,7 @@ i_ipadm_persist_propval(ipadm_handle_t iph, ipadm_prop_desc_t *pdp,
  * This is called from ipadm_set_ifprop() to validate the set operation.
  * It does the following steps:
  * 1. Validates the interface name.
- * 2. Fails if it is an IPMP meta-interface or an underlying interface.
- * 3. In case of a persistent operation, verifies that the
+ * 2. In case of a persistent operation, verifies that the
  *	interface is persistent.
  */
 static ipadm_status_t
@@ -1719,12 +1734,6 @@ i_ipadm_validate_if(ipadm_handle_t iph, const char *ifname,
 		return (IPADM_INVALID_ARG);
 
 	af = (proto == MOD_PROTO_IPV6 ? AF_INET6 : AF_INET);
-	/*
-	 * Setting properties on an IPMP meta-interface or underlying
-	 * interface is not supported.
-	 */
-	if (i_ipadm_is_ipmp(iph, ifname) || i_ipadm_is_under_ipmp(iph, ifname))
-		return (IPADM_NOTSUP);
 
 	/* Check if interface exists in the persistent configuration. */
 	status = i_ipadm_if_pexists(iph, ifname, af, &p_exists);
