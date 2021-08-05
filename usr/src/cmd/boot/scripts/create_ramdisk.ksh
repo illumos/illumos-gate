@@ -221,29 +221,8 @@ function ufs_getsize
 	[ $compress = yes ] && (( total_size = total_size / 2 ))
 }
 
-function create_ufs_archive
+function calculate_sizes_and_locations
 {
-	typeset archive="$ALT_ROOT/$BOOT_ARCHIVE"
-
-	[ "$compress" = yes ] && \
-	    echo "updating $archive (UFS)" || \
-	    echo "updating $archive (UFS-nocompress)"
-
-	#
-	# We use /tmp/ for scratch space now.  This will be changed later to
-	# $ALT_ROOT/var/tmp if there is insufficient space in /tmp/.
-	#
-	rddir="/tmp/create_ramdisk.$$.tmp"
-	new_rddir=
-	rm -rf "$rddir"
-	mkdir "$rddir" || fatal_error "Could not create directory $rddir"
-
-	# Clean up upon exit.
-	trap 'ufs_cleanup' EXIT
-
-	list="$rddir/filelist"
-
-	cd "/$ALT_ROOT" || fatal_error "Cannot chdir to $ALT_ROOT"
 	find $filelist -print 2>/dev/null | while read path; do
 		if [ -d "$path" ]; then
 			size=`ls -lLd "$path" | nawk '
@@ -279,6 +258,32 @@ function create_ufs_archive
 		rddir="$new_rddir"
 		new_rddir=
 	fi
+}
+
+function create_ufs_archive
+{
+	typeset archive="$ALT_ROOT/$BOOT_ARCHIVE"
+
+	[ "$compress" = yes ] && \
+	    echo "updating $archive (UFS)" || \
+	    echo "updating $archive (UFS-nocompress)"
+
+	#
+	# We use /tmp/ for scratch space now.  This will be changed later to
+	# $ALT_ROOT/var/tmp if there is insufficient space in /tmp/.
+	#
+	rddir="/tmp/create_ramdisk.$$.tmp"
+	new_rddir=
+	rm -rf "$rddir"
+	mkdir "$rddir" || fatal_error "Could not create directory $rddir"
+
+	# Clean up upon exit.
+	trap 'ufs_cleanup' EXIT
+
+	list="$rddir/filelist"
+
+	cd "/$ALT_ROOT" || fatal_error "Cannot chdir to $ALT_ROOT"
+	calculate_sizes_and_locations
 
 	rdfile="$rddir/rd.file"
 	rdmnt="$rddir/rd.mount"
@@ -362,7 +367,15 @@ function create_ufs_archive
 
 function cpio_cleanup
 {
-	rm -f "$tarchive" "$tarchive.cpio" "$tarchive.hash"
+	rm -f "$tarchive" "$tarchive.cpio" "$tarchive.hash" "$tarchive.head"
+	[ -n "$rddir" ] && rm -fr "$rddir" 2> /dev/null
+}
+
+function create_hash
+{
+	[ -x /usr/bin/digest ] \
+	    && /usr/bin/digest -a sha1 "$tarchive.cpio" > "$tarchive.hash" \
+	    || print -u2 "Failed to create sha1 hash of $tarchive"
 }
 
 function create_cpio_archive
@@ -371,7 +384,10 @@ function create_cpio_archive
 
 	echo "updating $archive (CPIO)"
 
+	rddir="/tmp/create_ramdisk.$$.tmp"
 	tarchive="$archive.$$.new"
+	rm -rf "$rddir"
+	mkdir "$rddir" || fatal_error "Could not create directory $rddir"
 
 	# Clean up upon exit.
 	trap 'cpio_cleanup' EXIT
@@ -381,18 +397,57 @@ function create_cpio_archive
 	touch "$tarchive" \
 	    || fatal_error "Cannot create temporary archive $tarchive"
 
-	find $filelist 2>/dev/null | cpio -qo -H odc > "$tarchive.cpio" \
-	    || fatal_error "Problem creating archive"
+	if [ $ISA = sparc ] ; then
+		# compression does not work (yet?).
+		# The krtld does not support gzip but fiocompress
+		# does not seem to work either.
+		compress="no"
+		list="$rddir/filelist"
 
-	[ -x /usr/bin/digest ] \
-	    && /usr/bin/digest -a sha1 "$tarchive.cpio" \
-	    > "$tarchive.hash"
+		calculate_sizes_and_locations
 
-	if [ -x "$GZIP_CMD" ]; then
-		$GZIP_CMD -c "$tarchive.cpio" > "$tarchive"
-		rm -f "$tarchive.cpio"
+		rdmnt="$rddir/rd.mount"
+		mkdir "$rdmnt"
+
+		copy_files "$list"
+
+		cd "$rdmnt"
+		find . 2>/dev/null | \
+		    cpio -qo -H odc > "$tarchive.cpio" \
+		    || fatal_error "Problem creating archive"
+		cd "/$ALT_ROOT" || fatal_error "Cannot chdir to $ALT_ROOT"
+
+		bb="/$ALT_ROOT/platform/$PLATFORM/lib/fs/cpio/bootblk"
+
+		# The SPARC boot code is assuming 8KB of boot data.
+		# This is originating from disk layout and UFS limits.
+		# Therefore we have 512B reserved space for disk label,
+		# and 7.5KB for boot program. With 512B blocks, this is
+		# 1 + 15 blocks.
+		dd if=/dev/zero of="$tarchive.head" bs=512 count=16 2>&1 \
+		    || fatal_error "Cannot create header"
+		dd if=$bb of="$tarchive.head" bs=512 oseek=1 count=15 \
+		    conv=sync 2>&1 \
+		    || fatal_error "Cannot install boot block"
+		cat "$tarchive.head" "$tarchive.cpio" > "$tarchive" \
+		    || fatal_error "Cannot update boot archive"
+		rm -f "$tarchive.head" "$tarchive.cpio"
 	else
-		mv "$tarchive.cpio" "$tarchive"
+		find $filelist 2>/dev/null | \
+		    cpio -qo -H odc > "$tarchive.cpio" \
+		    || fatal_error "Problem creating archive"
+
+		# If hash is supported, it must be created before gzipping the archive.
+		# The boot loader will uncompress the archive, and the hash
+		# will be verified against the uncompressed data.
+		create_hash
+
+		if [ -x "$GZIP_CMD" ]; then
+			$GZIP_CMD -c "$tarchive.cpio" > "$tarchive"
+			rm -f "$tarchive.cpio"
+		else
+			mv "$tarchive.cpio" "$tarchive"
+		fi
 	fi
 
 	# Move new archive into place

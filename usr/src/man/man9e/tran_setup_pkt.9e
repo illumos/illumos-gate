@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TRAN_SETUP_PKT 9E "Mar 13, 2016"
+.TH TRAN_SETUP_PKT 9E "July 31, 2021"
 .SH NAME
 tran_setup_pkt, tran_teardown_pkt, tran_pkt_constructor, tran_pkt_destructor \-
 SCSI HBA packet allocation and deallocation
@@ -80,7 +80,7 @@ Either \fBKM_SLEEP\fR or \fBKM_NOSLEEP\fR.
 .RE
 
 .SH DESCRIPTION
-The \fBtran_setup_pkt()\fR and \fBtran_destroy_pkt()\fR vectors in the
+The \fBtran_setup_pkt()\fR and \fBtran_teardown_pkt()\fR vectors in the
 \fBscsi_hba_tran\fR(9S) structure are alternatives to the \fBtran_init_pkt()\fR
 and \fBtran_destroy_pkt()\fR entry points. They are initialized during the
 \fBHBA\fR driver's \fBattach\fR(9E) and they are used when a target driver

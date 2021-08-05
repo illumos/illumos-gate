@@ -20,7 +20,7 @@
 #
 
 PROG = smatch
-SPARSE_VERSION = 0.6.1-rc1-il-5
+SPARSE_VERSION = 0.6.1-rc1-il-7
 
 include ../Makefile.tools
 
@@ -46,7 +46,7 @@ CFLAGS += -DGCC_BASE='"/no/such/dir"'
 CFLAGS += -DMULTIARCH_TRIPLET=NULL
 
 LDCHECKS = $(ZASSERTDEFLIB) $(ZGUIDANCE) $(ZFATALWARNINGS)
-LDLIBS += $(ZLAZYLOAD) $(ZDIRECT) -lsqlite3 -lcrypto -lgcc -lm -lc
+LDLIBS += $(ZLAZYLOAD) $(ZDIRECT) -lsqlite3 -lmd -lgcc -lm -lc
 LDFLAGS = $(MAPFILE.NES:%=-Wl,-M%)
 
 #
@@ -58,7 +58,7 @@ LDFLAGS = $(MAPFILE.NES:%=-Wl,-M%)
 LDFLAGS += -L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib
 LDFLAGS += -L$(NATIVE_ADJUNCT)/lib/$(MACH64) -R$(NATIVE_ADJUNCT)/lib/$(MACH64)
 
-NATIVE_LIBS += libsqlite3.so libcrypto.so libm.so libc.so
+NATIVE_LIBS += libsqlite3.so libmd.so libm.so libc.so
 LDFLAGS += $(NATIVE_LIBS:%=$(ZASSERTDEFLIB)=%)
 
 CPPFLAGS += -nostdinc

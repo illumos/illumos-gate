@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _SYS_SMP_IMPLDEFS_H
@@ -98,7 +98,6 @@ extern void (*kdisetsoftint)(int, struct av_softinfo *);
 extern uint_t xc_serv(caddr_t, caddr_t); /* cross call service routine	*/
 extern void av_set_softint_pending();	/* set software interrupt pending */
 extern void kdi_av_set_softint_pending(); /* kmdb private entry point */
-extern void microfind(void);	/* initialize tenmicrosec		*/
 
 /* map physical address							*/
 

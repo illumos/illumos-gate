@@ -25,7 +25,7 @@
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2020 Oxide Computer Company
  */
 
@@ -65,6 +65,7 @@
 #include <sys/sunndi.h>
 #include <sys/cpc_pcbe.h>
 #include <sys/prom_debug.h>
+#include <sys/tsc.h>
 
 
 #define	OFFSETOF(s, m)		(size_t)(&(((s *)0)->m))
@@ -103,7 +104,6 @@ static int mach_cpu_create_devinfo(cpu_t *cp, dev_info_t **dipp);
  *	External reference functions
  */
 extern void return_instr();
-extern uint64_t freq_tsc(uint32_t *);
 #if defined(__i386)
 extern uint64_t freq_notsc(uint32_t *);
 #endif
@@ -1216,28 +1216,14 @@ uint64_t cpu_freq_hz;	/* measured (in hertz) */
 int xpv_cpufreq_workaround = 1;
 int xpv_cpufreq_verbose = 0;
 
-#else	/* __xpv */
-
-static uint64_t
-mach_calchz(uint32_t pit_counter, uint64_t *processor_clks)
-{
-	uint64_t cpu_hz;
-
-	if ((pit_counter == 0) || (*processor_clks == 0) ||
-	    (*processor_clks > (((uint64_t)-1) / PIT_HZ)))
-		return (0);
-
-	cpu_hz = ((uint64_t)PIT_HZ * *processor_clks) / pit_counter;
-
-	return (cpu_hz);
-}
-
 #endif	/* __xpv */
 
 static uint64_t
 mach_getcpufreq(void)
 {
-#if defined(__xpv)
+#ifndef __xpv
+	return (tsc_get_freq());
+#else
 	vcpu_time_info_t *vti = &CPU->cpu_m.mcpu_vcpu_info->time;
 	uint64_t cpu_hz;
 
@@ -1276,37 +1262,6 @@ mach_getcpufreq(void)
 		    vti->tsc_to_system_mul, vti->tsc_shift, cpu_hz);
 
 	return (cpu_hz);
-#else	/* __xpv */
-	uint32_t pit_counter;
-	uint64_t processor_clks;
-
-	if (is_x86_feature(x86_featureset, X86FSET_TSC)) {
-		/*
-		 * We have a TSC. freq_tsc() knows how to measure the number
-		 * of clock cycles sampled against the PIT.
-		 */
-		ulong_t flags = clear_int_flag();
-		processor_clks = freq_tsc(&pit_counter);
-		restore_int_flag(flags);
-		return (mach_calchz(pit_counter, &processor_clks));
-	} else if (x86_vendor == X86_VENDOR_Cyrix || x86_type == X86_TYPE_P5) {
-#if defined(__amd64)
-		panic("mach_getcpufreq: no TSC!");
-#elif defined(__i386)
-		/*
-		 * We are a Cyrix based on a 6x86 core or an Intel Pentium
-		 * for which freq_notsc() knows how to measure the number of
-		 * elapsed clock cycles sampled against the PIT
-		 */
-		ulong_t flags = clear_int_flag();
-		processor_clks = freq_notsc(&pit_counter);
-		restore_int_flag(flags);
-		return (mach_calchz(pit_counter, &processor_clks));
-#endif	/* __i386 */
-	}
-
-	/* We do not know how to calculate cpu frequency for this cpu. */
-	return (0);
 #endif	/* __xpv */
 }
 
@@ -1452,21 +1407,18 @@ mach_clkinit(int preferred_mode, int *set_mode)
 
 	cpu_freq = machhztomhz(cpu_freq_hz);
 
-	if (!is_x86_feature(x86_featureset, X86FSET_TSC) || (cpu_freq == 0))
-		tsc_gethrtime_enable = 0;
+	/*
+	 * For most systems, we retain the default TSC-based gethrtime()
+	 * implementation that was initialized early in the boot process.
+	 */
+#ifdef __xpv
+	if (pops->psm_hrtimeinit)
+		(*pops->psm_hrtimeinit)();
+	gethrtimef = pops->psm_gethrtime;
+	gethrtimeunscaledf = gethrtimef;
+	/* scalehrtimef will remain dummy */
 
-#ifndef __xpv
-	if (tsc_gethrtime_enable) {
-		tsc_hrtimeinit(cpu_freq_hz);
-	} else
-#endif
-	{
-		if (pops->psm_hrtimeinit)
-			(*pops->psm_hrtimeinit)();
-		gethrtimef = pops->psm_gethrtime;
-		gethrtimeunscaledf = gethrtimef;
-		/* scalehrtimef will remain dummy */
-	}
+#endif /* __xpv */
 
 	mach_fixcpufreq();
 

@@ -27,6 +27,7 @@
 /*	   All Rights Reserved	*/
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -94,12 +95,14 @@ static int mapelfexec(vnode_t *, Ehdr *, uint_t, caddr_t, Phdr **, Phdr **,
 #ifdef _ELF32_COMPAT
 /* Link against the non-compat instances when compiling the 32-bit version. */
 extern size_t elf_datasz_max;
+extern size_t elf_zeropg_sz;
 extern void elf_ctx_resize_scratch(elf_core_ctx_t *, size_t);
 extern uint_t elf_nphdr_max;
 extern uint_t elf_nshdr_max;
 extern size_t elf_shstrtab_max;
 #else
 size_t elf_datasz_max = 1 * 1024 * 1024;
+size_t elf_zeropg_sz = 4 * 1024;
 uint_t elf_nphdr_max = 1000;
 uint_t elf_nshdr_max = 10000;
 size_t elf_shstrtab_max = 100 * 1024;
@@ -2264,7 +2267,7 @@ elfcore(vnode_t *vp, proc_t *p, cred_t *credp, rlim64_t rlimit, int sig,
 	uint_t i, nphdrs, nshdrs;
 	struct seg *seg;
 	struct as *as = p->p_as;
-	void *bigwad;
+	void *bigwad, *zeropg = NULL;
 	size_t bigsize, phdrsz, shdrsz;
 	Ehdr *ehdr;
 	Phdr *phdr;
@@ -2576,6 +2579,13 @@ exclude:
 			continue;
 
 		/*
+		 * If we hit a region that was mapped PROT_NONE then we cannot
+		 * continue dumping this normally as the kernel would be unable
+		 * to read from the page and that would result in us failing to
+		 * dump the page. As such, any region mapped PROT_NONE, we dump
+		 * as a zero-filled page such that this is still represented in
+		 * the map.
+		 *
 		 * If dumping out this segment fails, rather than failing
 		 * the core dump entirely, we reset the size of the mapping
 		 * to zero to indicate that the data is absent from the core
@@ -2583,11 +2593,34 @@ exclude:
 		 * this from mappings that were excluded due to the core file
 		 * content settings.
 		 */
-		if ((error = core_seg(p, vp, phdr[i].p_offset,
-		    (caddr_t)(uintptr_t)phdr[i].p_vaddr, phdr[i].p_filesz,
-		    rlimit, credp)) == 0) {
-			continue;
+		if ((phdr[i].p_flags & (PF_R | PF_W | PF_X)) == 0) {
+			size_t towrite = phdr[i].p_filesz;
+			size_t curoff = 0;
+
+			if (zeropg == NULL) {
+				zeropg = kmem_zalloc(elf_zeropg_sz, KM_SLEEP);
+			}
+
+			error = 0;
+			while (towrite != 0) {
+				size_t len = MIN(towrite, elf_zeropg_sz);
+
+				error = core_write(vp, UIO_SYSSPACE,
+				    phdr[i].p_offset + curoff, zeropg, len,
+				    rlimit, credp);
+				if (error != 0)
+					break;
+
+				towrite -= len;
+				curoff += len;
+			}
+		} else {
+			error = core_seg(p, vp, phdr[i].p_offset,
+			    (caddr_t)(uintptr_t)phdr[i].p_vaddr,
+			    phdr[i].p_filesz, rlimit, credp);
 		}
+		if (error == 0)
+			continue;
 
 		if ((sig = lwp->lwp_cursig) == 0) {
 			/*
