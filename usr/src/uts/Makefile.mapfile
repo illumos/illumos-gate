@@ -11,6 +11,7 @@
 
 #
 # Copyright 2016 Joyent, Inc.
+# Copyright 2021 Oxide Computer Company
 #
 
 #
@@ -41,3 +42,8 @@ DTRACE_AWK_FILE = $(MAPBASE)/dtrace.mapfile.awk
 
 $(OBJS_DIR)/dtrace.mapfile: $(OBJECTS) $(DTRACE_AWK_FILE)
 	$(NM) -u $(OBJECTS) | $(AWK) -f $(DTRACE_AWK_FILE) > $@
+
+#
+# Make sure that we don't leave behind the DTrace related mapfiles.
+#
+CLEANFILES += $(DTRACE_MAPFILE)
