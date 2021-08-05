@@ -2732,6 +2732,8 @@ exclude:
 	}
 
 done:
+	if (zeropg != NULL)
+		kmem_free(zeropg, elf_zeropg_sz);
 	if (ctx.ecc_bufsz != 0) {
 		kmem_free(ctx.ecc_buf, ctx.ecc_bufsz);
 	}
