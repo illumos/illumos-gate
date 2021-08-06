@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/eventfd.h>
@@ -57,11 +58,17 @@ eventfd(unsigned int initval, int flags)
 int
 eventfd_read(int fd, eventfd_t *valp)
 {
-	return (read(fd, valp, sizeof (*valp)) < sizeof (*valp) ? -1 : 0);
+	ssize_t ret = read(fd, valp, sizeof (*valp));
+	if (ret == -1 || (size_t)ret < sizeof (*valp))
+		return (-1);
+	return (0);
 }
 
 int
 eventfd_write(int fd, eventfd_t val)
 {
-	return (write(fd, &val, sizeof (val)) < sizeof (val) ? -1 : 0);
+	ssize_t ret = write(fd, &val, sizeof (val));
+	if (ret == -1 || (size_t)ret < sizeof (val))
+		return (-1);
+	return (0);
 }
