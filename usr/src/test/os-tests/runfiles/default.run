@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
@@ -27,6 +27,9 @@ outputdir = /var/tmp/test_results
 [/opt/os-tests/tests/poll_test]
 user = root
 tests = ['poll_test', 'epoll_test']
+
+[/opt/os-tests/tests/eventfd.32]
+[/opt/os-tests/tests/eventfd.64]
 
 [/opt/os-tests/tests/odirectory.32]
 [/opt/os-tests/tests/odirectory.64]

@@ -13,7 +13,7 @@
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
@@ -53,6 +53,8 @@ file path=opt/os-tests/tests/ddi_ufm/ufm-test mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-cleanup mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-setup mode=0555
 file path=opt/os-tests/tests/epoll_test mode=0555
+file path=opt/os-tests/tests/eventfd.32 mode=0555
+file path=opt/os-tests/tests/eventfd.64 mode=0555
 file path=opt/os-tests/tests/file-locking/acquire-lock.32 mode=0555
 file path=opt/os-tests/tests/file-locking/acquire-lock.64 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.32 mode=0555
