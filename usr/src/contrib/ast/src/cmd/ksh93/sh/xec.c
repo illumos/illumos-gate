@@ -503,8 +503,8 @@ int sh_debug(Shell_t *shp, const char *trap, const char *name, const char *subsc
 	Stk_t			*stkp=shp->stk;
 	struct sh_scoped	savst;
 	Namval_t		*np = SH_COMMANDNOD;
-	char			*sav = stkptr(stkp,0);
 	int			n=4, offset=stktell(stkp);
+	char			*sav = stkfreeze(stkp,0);
 	const char		*cp = "+=( ";
 	Sfio_t			*iop = stkstd;
 	short			level;
@@ -559,7 +559,7 @@ int sh_debug(Shell_t *shp, const char *trap, const char *name, const char *subsc
 	nv_putval(SH_FUNNAMENOD,shp->st.funname,NV_NOFREE);
 	shp->st = savst;
 	if(sav != stkptr(stkp,0))
-		stkset(stkp,sav,0);
+		stkset(stkp,sav,offset);
 	else
 		stkseek(stkp,offset);
 	return(n);
@@ -990,7 +990,7 @@ int sh_exec(register const Shnode_t *t, int flags)
 		int		ntflag = 0;
 #endif
 		int		topfd = shp->topfd;
-		char 		*sav=stkptr(stkp,0);
+		char 		*sav=stkfreeze(stkp,0);
 		char		*cp=0, **com=0, *comn;
 		int		argn;
 		int 		skipexitset = 0;

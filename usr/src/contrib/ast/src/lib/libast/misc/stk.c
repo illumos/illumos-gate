@@ -331,9 +331,9 @@ int stkon(register Sfio_t * stream, register char* loc)
 }
 /*
  * reset the bottom of the current stack back to <loc>
- * if <loc> is not in this stack, then the stack is reset to the beginning
+ * if <loc> is null, then the stack is reset to the beginning
+ * if <loc> is not in this stack, the program dumps core
  * otherwise, the top of the stack is set to stkbot+<offset>
- *
  */
 char *stkset(register Sfio_t * stream, register char* loc, size_t offset)
 {
@@ -377,6 +377,9 @@ char *stkset(register Sfio_t * stream, register char* loc, size_t offset)
 			break;
 		frames++;
 	}
+	/* not found: produce a useful stack trace now instead of a useless one later */
+	if(loc)
+		abort();
 	/* set stack back to the beginning */
 	cp = (char*)(fp+1);
 	if(frames)
@@ -503,7 +506,7 @@ static char *stkgrow(register Sfio_t *stream, size_t size)
 	register char *cp, *dp=0;
 	register size_t m = stktell(stream);
 	size_t endoff;
-	char *end=0;
+	char *end=0, *oldbase=0;
 	int nn=0,add=1;
 	n += (m + sizeof(struct frame)+1);
 	if(sp->stkflags&STK_SMALL)
@@ -519,6 +522,7 @@ static char *stkgrow(register Sfio_t *stream, size_t size)
 		dp=sp->stkbase;
 		sp->stkbase = ((struct frame*)dp)->prev;
 		end = fp->end;
+		oldbase = dp;
 	}
 	endoff = end - dp;
 	cp = newof(dp, char, n, nn*sizeof(char*));
@@ -545,10 +549,10 @@ static char *stkgrow(register Sfio_t *stream, size_t size)
 	if(fp->nalias=nn)
 	{
 		fp->aliases = (char**)fp->end;
-		if(end && nn>1)
-			memmove(fp->aliases,end,(nn-1)*sizeof(char*));
+		if(end && nn>add)
+			memmove(fp->aliases,end,(nn-add)*sizeof(char*));
 		if(add)
-			fp->aliases[nn-1] = dp + roundof(sizeof(struct frame),STK_ALIGN);
+			fp->aliases[nn-1] = oldbase + roundof(sizeof(struct frame),STK_ALIGN);
 	}
 	if(m && !dp)
 	{
