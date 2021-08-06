@@ -2026,6 +2026,7 @@ top:
 	 * extended formats and put the real values in the section header
 	 * as index 0.
 	 */
+	ehdr->e_ident[EI_VERSION] = EV_CURRENT;
 	ehdr->e_version = EV_CURRENT;
 	ehdr->e_ehsize = sizeof (Ehdr);
 
