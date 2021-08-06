@@ -139,6 +139,25 @@ create chaincmd 1030 chars allot
 ;
 
 \
+\ Platform-image selection for standalone SmartOS is mostly in pi.rc.
+\ We will also steal a boot environment routine in pi_draw_screen (way below).
+
+: init_pi ( -- )
+	s" bootpi" getenv? 0= if
+		s" default" s" bootpi" setenv
+	then
+
+	\ Reset the "options" text to show current bootpi selected.
+	s" set menu_optionstext=${pitext}${bootpi}" evaluate 
+	s" set pimenu_optionstext=${pitext}${bootpi}" evaluate 
+;
+
+\ Shorter than inlining this in pi.rc.
+: pi_unload ( -- )
+	s" unload" evaluate
+;
+
+\
 \ Single User Mode
 \
 
@@ -584,6 +603,17 @@ create chaincmd 1030 chars allot
 	draw-beastie	\ Draw FreeBSD logo at right (in beastie.4th)
 	draw-brand	\ Draw brand.4th logo at top (in brand.4th)
 	menu-init	\ Initialize menu and draw bounding box (in menu.4th)
+;
+
+\ PI reuse of be_draw_screen, plus some other things to be used by pi.rc.
+
+: pi_draw_screen ( -- TRUE )
+	\ So we can make SURE we have the current boot PI on display.
+	init_pi
+
+	be_draw_screen
+	menu-redraw
+	TRUE
 ;
 
 \

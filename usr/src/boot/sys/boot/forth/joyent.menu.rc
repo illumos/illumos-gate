@@ -52,6 +52,11 @@ set mainmenu_keycode[4]=111
 set mainansi_caption[4]="Configure Boot ^[1mO^[mptions..."
 
 \
+\ If available, load the "Platform Image Selection" option.
+\
+try-include /os/pi.rc
+
+\
 \ BOOT OPTIONS MENU
 \
 
