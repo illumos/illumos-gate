@@ -33,10 +33,6 @@ set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/demo
 dir path=usr/demo/ELF
-dir path=usr/demo/ksh
-dir path=usr/demo/ksh/bin
-dir path=usr/demo/ksh/fun
-dir path=usr/demo/ksh/src
 dir path=usr/demo/libexacct
 dir path=usr/demo/librtld_db
 dir path=usr/demo/librtld_db/amd64
@@ -55,57 +51,6 @@ file path=usr/demo/ELF/dcom.c
 file path=usr/demo/ELF/dispsyms.c
 file path=usr/demo/ELF/pcom.c
 file path=usr/demo/ELF/tpcom.c
-file path=usr/demo/ksh/bin/cpvprint mode=0755
-file path=usr/demo/ksh/bin/crawlsrccomments mode=0755
-file path=usr/demo/ksh/bin/filemutexdemo1 mode=0755
-file path=usr/demo/ksh/bin/filetree1 mode=0755
-file path=usr/demo/ksh/bin/gnaw mode=0755
-file path=usr/demo/ksh/bin/mandelbrotset1 mode=0755
-file path=usr/demo/ksh/bin/multifollow mode=0755
-file path=usr/demo/ksh/bin/numtree1 mode=0755
-file path=usr/demo/ksh/bin/primenumbers1 mode=0755
-file path=usr/demo/ksh/bin/rssread mode=0755
-file path=usr/demo/ksh/bin/shcalc mode=0755
-file path=usr/demo/ksh/bin/shircbot mode=0755
-file path=usr/demo/ksh/bin/shlint mode=0755
-file path=usr/demo/ksh/bin/shman mode=0755
-file path=usr/demo/ksh/bin/shnote mode=0755
-file path=usr/demo/ksh/bin/shpiano mode=0755
-file path=usr/demo/ksh/bin/shtinyurl mode=0755
-file path=usr/demo/ksh/bin/shtwitter mode=0755
-file path=usr/demo/ksh/bin/simplefileattributetree1 mode=0755
-file path=usr/demo/ksh/bin/simplefiletree1 mode=0755
-file path=usr/demo/ksh/bin/svcproptree1 mode=0755
-file path=usr/demo/ksh/bin/termclock mode=0755
-file path=usr/demo/ksh/bin/test_net_sctp mode=0755
-file path=usr/demo/ksh/bin/xmldocumenttree1 mode=0755
-file path=usr/demo/ksh/fun/dirs mode=0755
-file path=usr/demo/ksh/fun/popd mode=0755
-file path=usr/demo/ksh/fun/pushd mode=0755
-file path=usr/demo/ksh/src/cpvprint.sh
-file path=usr/demo/ksh/src/crawlsrccomments.sh
-file path=usr/demo/ksh/src/filemutexdemo1.sh
-file path=usr/demo/ksh/src/filetree1.sh
-file path=usr/demo/ksh/src/gnaw.sh
-file path=usr/demo/ksh/src/mandelbrotset1.sh
-file path=usr/demo/ksh/src/multifollow.sh
-file path=usr/demo/ksh/src/numtree1.sh
-file path=usr/demo/ksh/src/primenumbers1.sh
-file path=usr/demo/ksh/src/rssread.sh
-file path=usr/demo/ksh/src/shcalc.sh
-file path=usr/demo/ksh/src/shircbot.sh
-file path=usr/demo/ksh/src/shlint.sh
-file path=usr/demo/ksh/src/shman.sh
-file path=usr/demo/ksh/src/shnote.sh
-file path=usr/demo/ksh/src/shpiano.sh
-file path=usr/demo/ksh/src/shtinyurl.sh
-file path=usr/demo/ksh/src/shtwitter.sh
-file path=usr/demo/ksh/src/simplefileattributetree1.sh
-file path=usr/demo/ksh/src/simplefiletree1.sh
-file path=usr/demo/ksh/src/svcproptree1.sh
-file path=usr/demo/ksh/src/termclock.sh
-file path=usr/demo/ksh/src/test_net_sctp.sh
-file path=usr/demo/ksh/src/xmldocumenttree1.sh
 file path=usr/demo/libexacct/Makefile
 file path=usr/demo/libexacct/README
 file path=usr/demo/libexacct/exdump.c

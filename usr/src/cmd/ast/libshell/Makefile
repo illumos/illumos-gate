@@ -62,7 +62,5 @@ FRC:
 
 ASTSRC= $(CONTRIB)/ast/src/cmd/ksh93
 include Makefile.tests
-include Makefile.demo
-include Makefile.doc
 
 include $(SRC)/lib/Makefile.targ
