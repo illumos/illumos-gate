@@ -30,7 +30,7 @@ CPPFLAGS += -I$(SRC)/lib/gss_mechs/mech_krb5/include \
 	-DHAVE_SYS_TIMEB_H=1 -DHAVE_ALLOCA_H=1 -DHAVE_FTIME=1 \
 	-DHAVE_TIMEZONE -DUSE_KADM5_API_VERSION=2
 
-COPTFLAG += $(XESS) #-I$(KINCDIR) 
+COPTFLAG += $(XESS) #-I$(KINCDIR)
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-variable
@@ -47,7 +47,7 @@ LDLIBS += $(KMECHLIB) $(KCLNTLIB)
 
 all: $(PROG)
 
-$(PROG):	$(OBJS) 
+$(PROG):	$(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -55,8 +55,6 @@ install: $(KRB5PROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../../../Makefile.targ
 

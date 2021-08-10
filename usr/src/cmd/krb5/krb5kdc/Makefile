@@ -30,7 +30,7 @@ DEFS =  -DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 \
 	-DHAVE_NETINET_IN_H=1 -DHAVE_INET_NTOP=1 \
 	-DHAVE_SYS_SOCKIO_H=1 -DHAVE_SYS_SELECT_H=1
 
-CLOBBERFILES += $(RSRC) 
+CLOBBERFILES += $(RSRC)
 
 include ../../Makefile.cmd
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
@@ -49,7 +49,7 @@ CPPFLAGS += \
 	-I$(SRC)/lib/gss_mechs/mech_krb5/include \
 	-I$(SRC)/lib/gss_mechs/mech_krb5/include/krb5\
 	-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
-	-DHAVE_SYSLOG_H=1 
+	-DHAVE_SYSLOG_H=1
 
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-unused-function
@@ -66,9 +66,9 @@ LDLIBS += -L$(ROOT_KLIBDIR) -L$(KRB5LIB) \
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
-$(PROG):       $(OBJS)  
+$(PROG):       $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -80,8 +80,6 @@ check:	$(CHKMANIFEST)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../../Makefile.targ
 

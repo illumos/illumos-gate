@@ -61,7 +61,6 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include \
 	-I$(SRC)/uts/common/gssapi/include  \
 	-I$(SRC)/uts/common/gssapi/mechs/krb5/include
 
-CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-function
 
@@ -108,7 +107,5 @@ $(USRLIBSEC)/%: %
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 include ../../../Makefile.targ

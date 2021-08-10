@@ -6,7 +6,7 @@
 
 PROG= kadmin kadmin.local
 SHFILES= k5srvutil
-CLOBBERFILES= $(SHFILES) 
+CLOBBERFILES= $(SHFILES)
 
 KRB5SBINSHFILES= $(SHFILES:%=$(KRB5SBIN)/%)
 
@@ -40,7 +40,7 @@ CERRWARN += -_gcc=-Wno-unused-variable
 
 SMATCH=off
 
-COPTFLAG += $(XESS) #-I$(KINCDIR) 
+COPTFLAG += $(XESS) #-I$(KINCDIR)
 
 SHAREDLIBS = -lmech_krb5 -lss
 
@@ -72,8 +72,6 @@ install: $(KRB5SBINPROG) $(KRB5SBINSHFILES)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../../../Makefile.targ
 

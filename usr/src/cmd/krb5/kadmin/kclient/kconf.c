@@ -82,7 +82,7 @@ end_list(struct profile_string_list *list, char ***ret_list)
 static errcode_t
 add_to_list(struct profile_string_list *list, const char *str)
 {
-	char 	*newstr, **newlist;
+	char	*newstr, **newlist;
 	int	newmax;
 
 	if (list->num + 1 >= list->max) {
@@ -122,6 +122,11 @@ main(int argc, char **argv)
 	boolean_t	set_change = FALSE;
 	struct profile_string_list values;
 
+	file = NULL;
+	domain = NULL;
+	master = NULL;
+	kdcs = NULL;
+	realm = NULL;
 	(void) setlocale(LC_ALL, "");
 
 #if !defined(TEXT_DOMAIN)

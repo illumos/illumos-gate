@@ -19,8 +19,8 @@ CERRWARN += -_gcc=-Wno-parentheses
 # not linted
 SMATCH=off
 
-POFILE = kdestroy.po 
-POFILES = generic.po 
+POFILE = kdestroy.po
+POFILES = generic.po
 
 CPPFLAGS += -I../../../lib/gss_mechs/mech_krb5/include \
 		-I$(SRC)/uts/common/gssapi/mechs/krb5/include
@@ -35,11 +35,11 @@ LDLIBS += $(KMECHLIB)
 .KEEP_STATE:
 all: $(PROG)
 
-krpc_sys.o: krpc_sys.c 
+krpc_sys.o: krpc_sys.c
 	$(COMPILE.c)  -o  $@ krpc_sys.c
 	$(POST_PROCESS_O)
 
-$(PROG):       $(OBJS)  
+$(PROG):       $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -48,17 +48,15 @@ install: $(KRB5PROG)
 clean:
 	$(RM) $(OBJS)
 
-lint: lint_SRCS
-
 include ../../Makefile.targ
 
-$(POFILE): $(DERIVED_FILES) .WAIT $(POFILES) 
-	$(RM) $@ 
-	$(CAT) $(POFILES) > $@ 
+$(POFILE): $(DERIVED_FILES) .WAIT $(POFILES)
+	$(RM) $@
+	$(CAT) $(POFILES) > $@
 
-generic.po: 
-	$(RM) messages.po 
-	$(XGETTEXT) $(XGETFLAGS) `($(GREP) -l gettext *.[ch] || echo /dev/null)` 
-	$(SED) "/^domain/d" messages.po > $@ 
-	$(RM) messages.po 
+generic.po:
+	$(RM) messages.po
+	$(XGETTEXT) $(XGETFLAGS) `($(GREP) -l gettext *.[ch] || echo /dev/null)`
+	$(SED) "/^domain/d" messages.po > $@
+	$(RM) messages.po
 

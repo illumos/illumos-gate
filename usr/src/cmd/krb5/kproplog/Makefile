@@ -61,8 +61,6 @@ $(OBJS): iprop.h
 
 install:	$(KRB5SBINPROG)
 
-lint:	$(ISRC) .WAIT lint_SRCS
-
 clean:
 	$(RM) $(OBJS) $(DERIVED_OBJS) $(ISRC)
 

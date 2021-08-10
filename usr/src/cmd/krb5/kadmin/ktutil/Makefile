@@ -24,7 +24,7 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include \
 	-DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 -DHAVE_UNISTD_H=1 \
 	-DHAVE_SYS_TIMEB_H=1 -DHAVE_ALLOCA_H=1 -DHAVE_FTIME=1 \
 	 -DHAVE_TIMEZONE
-COPTFLAG += $(XESS) #-I$(KINCDIR) 
+COPTFLAG += $(XESS) #-I$(KINCDIR)
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-unused-function
@@ -39,7 +39,7 @@ LDLIBS += $(KMECHLIB) $(ROOT)$(KERBLIBDIR)/libss.so
 
 all: $(PROG)
 
-ktutil:	$(OBJS) 
+ktutil:	$(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -47,8 +47,6 @@ install: $(KRB5PROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../../../Makefile.targ
 

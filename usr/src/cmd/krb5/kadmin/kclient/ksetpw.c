@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Portions Copyright 2021, Chris Fraire <cfraire@me.com>.
  */
 
 #include <stdio.h>
@@ -50,12 +51,12 @@ main(int argc, char **argv)
 {
 	krb5_context ctx = NULL;
 	krb5_error_code code = 0;
-	krb5_enctype *enctypes;
+	krb5_enctype *enctypes = NULL;
 	int enctype_count = 0;
 	krb5_ccache cc = NULL;
 	krb5_keytab kt = NULL;
 	krb5_kvno kvno = 1;
-	krb5_principal victim, salt;
+	krb5_principal victim, salt = NULL;
 	char c, *vprincstr, *ktname, *token, *lasts, *newpw;
 	int result_code, i, len, nflag = 0;
 	krb5_data result_code_string, result_string;
@@ -113,7 +114,7 @@ main(int argc, char **argv)
 			break;
 		case 'e':
 			len = strlen(optarg);
-			token = strtok_r(optarg, ",\t,", &lasts);
+			token = strtok_r(optarg, ",\t ", &lasts);
 
 			if (token == NULL)
 				usage();
@@ -244,6 +245,9 @@ main(int argc, char **argv)
 	if (enctype_count && (code = kt_remove_entries(ctx, kt, victim)))
 		goto error;
 
+	if (salt == NULL)
+		salt = victim;
+
 	for (i = 0; i < enctype_count; i++)
 		kt_add_entry(ctx, kt, victim, salt, enctypes[i], kvno, newpw);
 
@@ -327,16 +331,17 @@ kt_remove_entries(krb5_context ctx, krb5_keytab kt, const krb5_principal princ)
 static
 void
 kt_add_entry(krb5_context ctx, krb5_keytab kt, const krb5_principal princ,
-	const krb5_principal sprinc, krb5_enctype enctype, krb5_kvno kvno,
-	const char *pw)
+    const krb5_principal sprinc, krb5_enctype enctype, krb5_kvno kvno,
+    const char *pw)
 {
 	krb5_keytab_entry *entry;
 	krb5_data password, salt;
 	krb5_keyblock key;
 	krb5_error_code code;
-	char buf[100];
+	char enctype_name[100];
 
-	if ((code = krb5_enctype_to_string(enctype, buf, sizeof (buf)))) {
+	if ((code = krb5_enctype_to_string(enctype, enctype_name,
+	    sizeof (enctype_name)))) {
 		com_err(whoami, code, gettext("Enctype %d has no name!"),
 		    enctype);
 		return;
@@ -353,15 +358,15 @@ kt_add_entry(krb5_context ctx, krb5_keytab kt, const krb5_principal princ,
 
 	if ((code = krb5_principal2salt(ctx, sprinc, &salt)) != 0) {
 		com_err(whoami, code,
-		    gettext("Could not compute salt for %s"), enctype);
+		    gettext("Could not compute salt for %s"), enctype_name);
 		return;
 	}
 
 	code = krb5_c_string_to_key(ctx, enctype, &password, &salt, &key);
 
 	if (code != 0) {
-		com_err(whoami, code, gettext("Could not compute salt for %s"),
-		    enctype);
+		com_err(whoami, code,
+		    gettext("Could not convert to key for %s"), enctype_name);
 		krb5_xfree(salt.data);
 		return;
 	}
