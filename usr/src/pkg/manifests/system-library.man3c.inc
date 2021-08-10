@@ -16,7 +16,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Jason King
 # Copyright 2020 Joyent, Inc.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 file path=usr/share/man/man3c/__fbufsize.3c
@@ -796,6 +796,8 @@ link path=usr/share/man/man3c/errx.3c target=err.3c
 link path=usr/share/man/man3c/etext.3c target=end.3c
 link path=usr/share/man/man3c/euccol.3c target=euclen.3c
 link path=usr/share/man/man3c/eucscol.3c target=euclen.3c
+link path=usr/share/man/man3c/eventfd_read.3c target=eventfd.3c
+link path=usr/share/man/man3c/eventfd_write.3c target=eventfd.3c
 link path=usr/share/man/man3c/explicit_bzero.3c target=bstring.3c
 link path=usr/share/man/man3c/extended_to_decimal.3c \
     target=floating_to_decimal.3c

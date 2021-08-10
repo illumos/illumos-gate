@@ -10,12 +10,15 @@
 .\"
 .\"
 .\" Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd March 26, 2017
+.Dd August 10, 2021
 .Dt EVENTFD 3C
 .Os
 .Sh NAME
-.Nm eventfd
+.Nm eventfd ,
+.Nm eventfd_read ,
+.Nm eventfd_write
 .Nd create a file descriptor for event notification
 .Sh SYNOPSIS
 .In sys/eventfd.h
@@ -23,6 +26,16 @@
 .Fo eventfd
 .Fa "unsigned int initval"
 .Fa "int flags"
+.Fc
+.Ft int
+.Fo eventfd_read
+.Fa "int fd"
+.Fa "eventfd_t *valp"
+.Fc
+.Ft int
+.Fo eventfd_write
+.Fa "int fd"
+.Fa "eventfd_t val"
 .Fc
 .Sh DESCRIPTION
 The
@@ -33,10 +46,12 @@ instance that has an associated 64-bit unsigned counter.
 It returns a file descriptor that can be operated upon via
 .Xr read 2 ,
 .Xr write 2
-and the facilities that notify of file descriptor activity (e.g.,
+and the facilities that notify of file descriptor activity
+.Po e.g. ,
 .Xr poll 2 ,
 .Xr port_get 3C ,
-.Xr epoll_wait 3C Ns ).
+.Xr epoll_wait 3C Ns
+.Pc .
 To dispose of the instance,
 .Xr close 2
 should be called on the file descriptor.
@@ -45,36 +60,35 @@ The
 .Fa initval
 argument specifies the initial value of the 64-bit counter associated with the
 instance.
-(Note that this limits the initial value to be a 32-bit quantity despite the
-fact that the underlying counter is 64-bit.)
+.Po
+Note that this limits the initial value to be a 32-bit quantity despite the
+fact that the underlying counter is 64-bit
+.Pc .
 .Pp
-The \fIflags\fR argument specifies additional parameters for the
-instance, and can have any of the following values:
-.Bl -hang -width Ds
-.It Sy EFD_CLOEXEC
-.Bd -filled -compact
+The
+.Fa flags
+argument specifies additional parameters for the instance, and can have any of
+the following values:
+.Bl -tag -width Ds
+.It Dv EFD_CLOEXEC
 Instance will be closed upon an
 .Xr exec 2 ;
 see
 .Xr open 2 Ns 's
 description of
-.Sy O_CLOEXEC .
-.Ed
-.It Sy EFD_NONBLOCK
-.Bd -filled -compact
+.Dv O_CLOEXEC .
+.It Dv EFD_NONBLOCK
 Instance will be set to be non-blocking.
 A
 .Xr read 2
 on an
-.Sy eventfd
+.Nm eventfd
 instance that has been initialized with
-.Sy EFD_NONBLOCK
+.Dv EFD_NONBLOCK
 will return
-.Sy EAGAIN
+.Er EAGAIN
 in lieu of blocking if the count associated with the instance is zero.
-.Ed
-.It EFD_SEMAPHORE
-.Bd -filled -compact
+.It Dv EFD_SEMAPHORE
 Provide counting semaphore semantics whereby a
 .Xr read 2
 will atomically decrement rather than atomically clear the count when it
@@ -82,93 +96,127 @@ becomes non-zero.
 See below for details on
 .Xr read 2
 semantics.
-.Ed
 .El
 .Pp
 The following operations can be performed upon an
-.Sy eventfd
+.Nm eventfd
 instance:
-.Bl -hang -width Ds
-.It Sy read(2)
-.Bd -filled -compact
+.Bl -tag -width Ds
+.It Xr read 2
 Atomically reads and modifies the value of the 64-bit counter associated
 with the instance.
 The precise semantics of
 .Xr read 2
 depend on the disposition of
-.Sy EFD_SEMAPHORE
+.Dv EFD_SEMAPHORE
 with
 respect to the instance: if
-.Sy EFD_SEMAPHORE
+.Dv EFD_SEMAPHORE
 was set when the instance was created,
 .Xr read 2
 will
 .Em atomically decrement
-the counter if (and when) it is non-zero, copying the value 1 to the eight
-byte buffer passed to the system call; if
-.Sy EFD_SEMAPHORE
+the counter if
+.Pq and when
+it is non-zero, copying the value 1 to the eight byte buffer passed to the
+system call; if
+.Dv EFD_SEMAPHORE
 was not set,
 .Xr read 2
 will
 .Em atomically clear
-the counter if (and when) it is non-zero, copying the former value of the
-counter to the eight byte buffer passed to the
-system call.
+the counter if
+.Pq and when
+it is non-zero, copying the former value of the counter to the eight byte
+buffer passed to the system call.
 In either case,
 .Xr read 2
 will block if the counter is
-zero (or return
-.Sy EAGAIN
+zero
+.Po or return
+.Er EAGAIN
 if the instance was created with
-.Sy EFD_NONBLOCK Ns ).
+.Dv EFD_NONBLOCK
+.Pc .
 If the buffer specified to
 .Xr read 2
 is less than
 eight bytes in length,
-.Sy EINVAL
+.Er EINVAL
 will be returned.
-.Ed
-.It Sy write(2)
-.Bd -filled -compact
+.It Xr write 2
 Atomically adds the 64-bit value pointed to by the buffer to the 64-bit
 counter associated with the instance.
 If the resulting value would overflow, the
 .Xr write 2
 will block until the value would not overflow
-(or return
-.Sy EAGAIN
-EAGAIN if the instance was created with
-.Sy EFD_NONBLOCK Ns ).
+.Po or return
+.Er EAGAIN
+if the instance was created with
+.Dv EFD_NONBLOCK
+.Pc .
 If the buffer specified to
 .Xr write 2
 is less than eight bytes in length,
-.Sy EINVAL
+.Er EINVAL
 will be returned.
-.Ed
-.It Sy poll(2), port_get(3C), epoll_wait(3C)
-.Bd -filled -compact
+.It Xo
+.Xr poll 2 ,
+.Xr port_get 3C ,
+.Xr  epoll_wait 3C
+.Xc
 Provide notification when the 64-bit counter associated
 with the instance is ready for reading or writing, as specified.
 If the 64-bit value associated with the instance is non-zero,
-.Sy POLLIN
+.Dv POLLIN
 and
-.Sy POLLRDNORM
+.Dv POLLRDNORM
 will be set; if the value 1 can be added the value
 without blocking,
-.Sy POLLOUT
+.Dv POLLOUT
 and
-.Sy POLLWRNORM
+.Dv POLLWRNORM
 will be set.
-.Ed
 .El
+.Pp
+.Fn eventfd_read
+and
+.Fn eventfd_write
+are provided for compatibility with
+.Sy glibc
+and are wrappers around
+.Xr read 2
+and
+.Xr write 2 ,
+respectively.
+They return
+.Sy 0
+if the correct number of bytes was transferred and
+.Sy -1
+otherwise.
+These functions may return
+.Sy -1
+without setting
+.Va errno .
 .Sh RETURN VALUES
-Upon successful completion, a file descriptor associated with the instance
-is returned.
+Upon successful completion,
+.Fn eventfd
+returns a file descriptor associated with the instance.
 Otherwise,
 .Sy -1
 is returned and
-.Sy errno
+.Va errno
 is set to indicate the error.
+.Pp
+Upon successful completion,
+.Fn eventfd_read
+and
+.Fn eventfd_write
+return
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned.
 .Sh ERRORS
 The
 .Fn eventfd
@@ -185,6 +233,8 @@ file descriptors open in the calling process.
 .El
 .Sh SEE ALSO
 .Xr poll 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
 .Xr epoll_wait 3C ,
 .Xr port_get 3C ,
 .Xr eventfd 5

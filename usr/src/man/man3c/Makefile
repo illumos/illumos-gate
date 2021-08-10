@@ -16,7 +16,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2020 Joyent, Inc.
 # Copyright 2018 Jason King
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/Makefile.master
@@ -795,6 +795,8 @@ MANLINKS=	FD_CLR.3c				\
 		etext.3c				\
 		euccol.3c				\
 		eucscol.3c				\
+		eventfd_read.3c				\
+		eventfd_write.3c			\
 		explicit_bzero.3c			\
 		extended_to_decimal.3c			\
 		fconvert.3c				\
@@ -1754,6 +1756,9 @@ warnx.3c				:= LINKSRC = err.3c
 
 euccol.3c				:= LINKSRC = euclen.3c
 eucscol.3c				:= LINKSRC = euclen.3c
+
+eventfd_read.3c				:= LINKSRC = eventfd.3c
+eventfd_write.3c			:= LINKSRC = eventfd.3c
 
 _exithandle.3c				:= LINKSRC = exit.3c
 
