@@ -2402,6 +2402,7 @@ top:
 		ehdr->e_shentsize = sizeof (Shdr);
 	}
 
+	ehdr->e_ident[EI_VERSION] = EV_CURRENT;
 	ehdr->e_version = EV_CURRENT;
 	ehdr->e_ehsize = sizeof (Ehdr);
 	ehdr->e_phoff = poffset;

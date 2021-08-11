@@ -22,6 +22,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2021 Jason King
 
 UTSBASE	= $(SRC)/uts
 
@@ -60,9 +61,6 @@ CPPFLAGS	+= -I$(ROOT)/usr/include
 CPPFLAGS	+= -I$(ADJUNCT_PROTO)/usr/include
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-
-# needs work
-$(OBJS_DIR)/tpm.o := SMOFF += index_overflow
 
 #
 #	Default build targets.
