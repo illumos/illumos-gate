@@ -1909,7 +1909,8 @@ vioif_select_interrupt_types(void)
 		return (vioif_allowed_int_types);
 	}
 
-	if ((id = smbios_info_system(ksmbios, &sys)) == SMB_ERR ||
+	if (ksmbios == NULL ||
+	    (id = smbios_info_system(ksmbios, &sys)) == SMB_ERR ||
 	    smbios_info_common(ksmbios, id, &info) == SMB_ERR) {
 		/*
 		 * The system may not have valid SMBIOS data, so ignore a
