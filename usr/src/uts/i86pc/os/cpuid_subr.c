@@ -34,7 +34,7 @@
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -656,6 +656,21 @@ static const struct amd_rev_mapent {
 	 */
 	{ 0x18, 0x00, 0x00, 0x1, 0x1, X86_CHIPREV_HYGON_18_DN_A1, "DN_A1",
 	    A_SKTS_18 },
+
+	/*
+	 * =============== AuthenticAMD Family 0x19 ===============
+	 */
+	{ 0x19, 0x00, 0x00, 0x0, 0x0, X86_CHIPREV_AMD_19_GN_A0, "GN-A0",
+	    A_SKTS_19 },
+	{ 0x19, 0x01, 0x01, 0x0, 0x0, X86_CHIPREV_AMD_19_GN_B0, "GN-B0",
+	    A_SKTS_19 },
+	{ 0x19, 0x01, 0x01, 0x1, 0x1, X86_CHIPREV_AMD_19_GN_B1, "GN-B1",
+	    A_SKTS_19 },
+
+	{ 0x19, 0x21, 0x21, 0x0, 0x0, X86_CHIPREV_AMD_19_VMR_B0, "VMR-B0",
+	    A_SKTS_20 },
+	{ 0x19, 0x21, 0x21, 0x2, 0x2, X86_CHIPREV_AMD_19_VMR_B1, "VMR-B1",
+	    A_SKTS_20 },
 };
 
 /*

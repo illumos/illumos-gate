@@ -187,7 +187,7 @@ smbd_dc_monitor(void *arg)
 static int
 smbd_dc_check(smb_domainex_t *di)
 {
-	struct sockaddr sa;
+	struct sockaddr_storage sa;
 	int salen = 0;
 	int sock = -1;
 	int tmo = 5 * 1000;	/* 5 sec. */
@@ -223,7 +223,7 @@ smbd_dc_check(smb_domainex_t *di)
 	(void) setsockopt(sock, IPPROTO_TCP,
 	    TCP_CONN_ABORT_THRESHOLD, &tmo, sizeof (tmo));
 
-	rc = connect(sock, &sa, salen);
+	rc = connect(sock, (const struct sockaddr *)&sa, salen);
 	if (rc < 0)
 		rc = errno;
 
