@@ -25,6 +25,7 @@
  * Copyright (c) 2013, 2017 by Delphix. All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -2406,6 +2407,7 @@ tcp_init_values(tcp_t *tcp, tcp_t *parent)
 
 		tcp->tcp_fin_wait_2_flush_interval =
 		    parent->tcp_fin_wait_2_flush_interval;
+		tcp->tcp_quickack = parent->tcp_quickack;
 
 		tcp->tcp_ka_interval = parent->tcp_ka_interval;
 		tcp->tcp_ka_abort_thres = parent->tcp_ka_abort_thres;

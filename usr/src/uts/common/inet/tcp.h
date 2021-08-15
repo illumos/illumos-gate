@@ -24,6 +24,7 @@
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -246,12 +247,13 @@ typedef struct tcp_s {
 		tcp_accept_error : 1,	/* Error during TLI accept */
 		tcp_send_discon_ind : 1, /* TLI accept err, send discon ind */
 		tcp_cork : 1,		/* tcp_cork option */
+		tcp_quickack : 1,	/* Send acks immediately */
 		tcp_tconnind_started : 1, /* conn_ind message is being sent */
 
 		tcp_lso :1,		/* Lower layer is capable of LSO */
 		tcp_is_wnd_shrnk : 1,	/* Window has shrunk */
 
-		tcp_pad_to_bit_31 : 18;
+		tcp_pad_to_bit_31 : 17;
 
 	uint32_t	tcp_initial_pmtu; /* Initial outgoing Path MTU. */
 
