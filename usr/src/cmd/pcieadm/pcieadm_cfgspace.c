@@ -4903,8 +4903,8 @@ pcieadm_save_cfgspace_cb(di_node_t devi, void *arg)
 void
 pcieadm_save_cfgspace_usage(FILE *f)
 {
-	(void) fprintf(f, "\tsave-devs\t-d device output-file\n");
-	(void) fprintf(f, "\tsave-devs\t-a output-directory\n");
+	(void) fprintf(f, "\tsave-cfgspace\t-d device output-file\n");
+	(void) fprintf(f, "\tsave-cfgspace\t-a output-directory\n");
 }
 
 static void
