@@ -822,12 +822,24 @@ vm_suspend(struct vmctx *ctx, enum vm_suspend_how how)
 	return (ioctl(ctx->fd, VM_SUSPEND, &vmsuspend));
 }
 
+#ifndef __FreeBSD__
+int
+vm_reinit(struct vmctx *ctx, uint64_t flags)
+{
+	struct vm_reinit reinit = {
+		.flags = flags
+	};
+
+	return (ioctl(ctx->fd, VM_REINIT, &reinit));
+}
+#else
 int
 vm_reinit(struct vmctx *ctx)
 {
 
 	return (ioctl(ctx->fd, VM_REINIT, 0));
 }
+#endif
 
 int
 vm_inject_exception(struct vmctx *ctx, int vcpu, int vector, int errcode_valid,

@@ -117,7 +117,7 @@ extern struct vmm_ops vmm_ops_amd;
 
 int vm_create(const char *name, uint64_t flags, struct vm **retvm);
 void vm_destroy(struct vm *vm);
-int vm_reinit(struct vm *vm);
+int vm_reinit(struct vm *vm, uint64_t);
 const char *vm_name(struct vm *vm);
 uint16_t vm_get_maxcpus(struct vm *vm);
 void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,

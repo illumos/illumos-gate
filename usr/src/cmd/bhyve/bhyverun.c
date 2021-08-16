@@ -1307,7 +1307,11 @@ do_open(const char *vmname)
 #endif
  
 	if (reinit) {
+#ifndef __FreeBSD__
+		error = vm_reinit(ctx, 0);
+#else
 		error = vm_reinit(ctx);
+#endif
 		if (error) {
 			perror("vm_reinit");
 			exit(4);
