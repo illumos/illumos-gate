@@ -23,30 +23,29 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/promif.h>
 #include <sys/promimpl.h>
 #include <sys/archsystm.h>
 #include <sys/reboot.h>
 #include <sys/kdi.h>
 
-/*
- * The Intel cpu does not have an underlying monitor.
- * So, we emulate the best we can.....
- */
-
 void
-prom_enter_mon(void)
+prom_panic(char *s)
 {
-#if defined(_KMDB)
-	prom_exit_to_mon();
-#endif
+	const char fmt[] = "%s: prom_panic: %s\n";
 
+	if (s == NULL)
+		s = "unknown panic";
+
+#if defined(_KMDB)
+	prom_printf(fmt, "kmdb", s);
+#elif defined(_KERNEL)
+	prom_printf(fmt, "kernel", s);
 	if (boothowto & RB_DEBUG)
 		kmdb_enter();
-	else {
-		prom_printf("Press any key to continue.");
-		(void) prom_getchar();
-	}
+#else
+#error	"configuration error"
+#endif
+	prom_reboot_prompt();
+	prom_reboot(NULL);
 }

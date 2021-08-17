@@ -27,12 +27,23 @@
 #ifndef	_SYS_REG_H
 #define	_SYS_REG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#if defined(__i386) || defined(__amd64)
+/*
+ * This file only exists for i386 backwards compatibility.
+ * Kernel code should not include it.
+ */
 
-#include <ia32/sys/reg.h>
+#ifdef _KERNEL
+#error "kernel include of reg.h"
+#else
+#include <sys/regset.h>
+#endif	/* _KERNEL */
 
+#ifdef __cplusplus
+}
 #endif
 
 #endif	/* _SYS_REG_H */

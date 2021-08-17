@@ -186,7 +186,7 @@ extern void *plat_traceback(void *);
  * The following two macros are the four byte instruction sequence of stac, nop
  * and clac, nop. These are used in startup_smap() and hotinline_smap() as a
  * part of properly setting up the valid instructions. For more information on
- * SMAP, see uts/intel/ia32/ml/copy.s, uts/i86pc/os/machdep.c and
+ * SMAP, see uts/intel/ml/copy.s, uts/i86pc/os/machdep.c and
  * uts/common/os/modctl.c.
  *
  * Note that smap_disable and smap_enable are resolved to stubs at compile time,

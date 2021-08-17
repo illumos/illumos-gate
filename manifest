@@ -3274,17 +3274,17 @@ f usr/include/gssapi/gssapi_ext.h 0644 root bin
 f usr/include/hbaapi.h 0644 root bin
 d usr/include/ia32 0755 root bin
 d usr/include/ia32/sys 0755 root bin
-f usr/include/ia32/sys/asm_linkage.h 0644 root bin
+s usr/include/ia32/sys/asm_linkage.h=../../sys/asm_linkage.h
 f usr/include/ia32/sys/kdi_regs.h 0644 root bin
-f usr/include/ia32/sys/machtypes.h 0644 root bin
+s usr/include/ia32/sys/machtypes.h=../../sys/machtypes.h
 f usr/include/ia32/sys/privmregs.h 0644 root bin
 f usr/include/ia32/sys/privregs.h 0644 root bin
-f usr/include/ia32/sys/psw.h 0644 root bin
-f usr/include/ia32/sys/pte.h 0644 root bin
-f usr/include/ia32/sys/reg.h 0644 root bin
-f usr/include/ia32/sys/stack.h 0644 root bin
-f usr/include/ia32/sys/trap.h 0644 root bin
-f usr/include/ia32/sys/traptrace.h 0644 root bin
+s usr/include/ia32/sys/psw.h=../../sys/psw.h
+s usr/include/ia32/sys/pte.h=../../sys/pte.h
+s usr/include/ia32/sys/reg.h=../../sys/reg.h
+s usr/include/ia32/sys/stack.h=../../sys/stack.h
+s usr/include/ia32/sys/trap.h=../../sys/trap.h
+s usr/include/ia32/sys/traptrace.h=../../sys/traptrace.h
 f usr/include/iconv.h 0644 root bin
 f usr/include/idmap.h 0644 root bin
 f usr/include/ieeefp.h 0644 root bin

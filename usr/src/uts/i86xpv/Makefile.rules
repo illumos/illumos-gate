@@ -177,7 +177,7 @@ $(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/%.c
 $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/os/%.c
 	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
-$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/intel/ia32/ml/%.s
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/intel/ml/%.s
 	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
 
 $(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/i386/%.s
