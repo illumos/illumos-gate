@@ -101,14 +101,15 @@ struct vmm_lease {
 	list_node_t		vml_node;
 	struct vm		*vml_vm;
 	boolean_t		vml_expired;
+	boolean_t		vml_break_deferred;
 	boolean_t		(*vml_expire_func)(void *);
 	void			*vml_expire_arg;
-	list_node_t		vml_expire_node;
 	struct vmm_hold		*vml_hold;
 };
 
 static int vmm_drv_block_hook(vmm_softc_t *, boolean_t);
-static void vmm_lease_break_locked(vmm_softc_t *, vmm_lease_t *);
+static void vmm_lease_block(vmm_softc_t *);
+static void vmm_lease_unblock(vmm_softc_t *);
 static int vmm_kstat_alloc(vmm_softc_t *, minor_t, const cred_t *);
 static void vmm_kstat_init(vmm_softc_t *);
 static void vmm_kstat_fini(vmm_softc_t *);
@@ -335,44 +336,11 @@ vmm_write_lock(vmm_softc_t *sc)
 		vcpu_lock_one(sc, vcpu);
 	}
 
-	mutex_enter(&sc->vmm_lease_lock);
-	VERIFY3U(sc->vmm_lease_blocker, !=, UINT_MAX);
-	sc->vmm_lease_blocker++;
-	if (sc->vmm_lease_blocker == 1) {
-		list_t *list = &sc->vmm_lease_list;
-		vmm_lease_t *lease = list_head(list);
-
-		while (lease != NULL) {
-			boolean_t sync_break = B_FALSE;
-
-			if (!lease->vml_expired) {
-				void *arg = lease->vml_expire_arg;
-				lease->vml_expired = B_TRUE;
-				sync_break = lease->vml_expire_func(arg);
-			}
-
-			if (sync_break) {
-				vmm_lease_t *next;
-
-				/*
-				 * These leases which are synchronously broken
-				 * result in vmm_read_unlock() calls from a
-				 * different thread than the corresponding
-				 * vmm_read_lock().  This is acceptable, given
-				 * that the rwlock underpinning the whole
-				 * mechanism tolerates the behavior.  This
-				 * flexibility is _only_ afforded to VM read
-				 * lock (RW_READER) holders.
-				 */
-				next = list_next(list, lease);
-				vmm_lease_break_locked(sc, lease);
-				lease = next;
-			} else {
-				lease = list_next(list, lease);
-			}
-		}
-	}
-	mutex_exit(&sc->vmm_lease_lock);
+	/*
+	 * Block vmm_drv leases from being acquired or held while the VM write
+	 * lock is held.
+	 */
+	vmm_lease_block(sc);
 
 	rw_enter(&sc->vmm_rwlock, RW_WRITER);
 	/*
@@ -389,13 +357,8 @@ vmm_write_unlock(vmm_softc_t *sc)
 {
 	int maxcpus;
 
-	mutex_enter(&sc->vmm_lease_lock);
-	VERIFY3U(sc->vmm_lease_blocker, !=, 0);
-	sc->vmm_lease_blocker--;
-	if (sc->vmm_lease_blocker == 0) {
-		cv_broadcast(&sc->vmm_lease_cv);
-	}
-	mutex_exit(&sc->vmm_lease_lock);
+	/* Allow vmm_drv leases to be acquired once write lock is dropped */
+	vmm_lease_unblock(sc);
 
 	/*
 	 * The VM write lock _must_ be released from the same thread it was
@@ -1715,6 +1678,7 @@ vmm_drv_lease_sign(vmm_hold_t *hold, boolean_t (*expiref)(void *), void *arg)
 	lease->vml_expire_func = expiref;
 	lease->vml_expire_arg = arg;
 	lease->vml_expired = B_FALSE;
+	lease->vml_break_deferred = B_FALSE;
 	lease->vml_hold = hold;
 	/* cache the VM pointer for one less pointer chase */
 	lease->vml_vm = sc->vmm_vm;
@@ -1740,15 +1704,123 @@ vmm_lease_break_locked(vmm_softc_t *sc, vmm_lease_t *lease)
 	kmem_free(lease, sizeof (*lease));
 }
 
+static void
+vmm_lease_block(vmm_softc_t *sc)
+{
+	mutex_enter(&sc->vmm_lease_lock);
+	VERIFY3U(sc->vmm_lease_blocker, !=, UINT_MAX);
+	sc->vmm_lease_blocker++;
+	if (sc->vmm_lease_blocker == 1) {
+		list_t *list = &sc->vmm_lease_list;
+		vmm_lease_t *lease = list_head(list);
+
+		while (lease != NULL) {
+			void *arg = lease->vml_expire_arg;
+			boolean_t (*expiref)(void *) = lease->vml_expire_func;
+			boolean_t sync_break = B_FALSE;
+
+			/*
+			 * Since the lease expiration notification may
+			 * need to take locks which would deadlock with
+			 * vmm_lease_lock, drop it across the call.
+			 *
+			 * We are the only one allowed to manipulate
+			 * vmm_lease_list right now, so it is safe to
+			 * continue iterating through it after
+			 * reacquiring the lock.
+			 */
+			lease->vml_expired = B_TRUE;
+			mutex_exit(&sc->vmm_lease_lock);
+			sync_break = expiref(arg);
+			mutex_enter(&sc->vmm_lease_lock);
+
+			if (sync_break) {
+				vmm_lease_t *next;
+
+				/*
+				 * These leases which are synchronously broken
+				 * result in vmm_read_unlock() calls from a
+				 * different thread than the corresponding
+				 * vmm_read_lock().  This is acceptable, given
+				 * that the rwlock underpinning the whole
+				 * mechanism tolerates the behavior.  This
+				 * flexibility is _only_ afforded to VM read
+				 * lock (RW_READER) holders.
+				 */
+				next = list_next(list, lease);
+				vmm_lease_break_locked(sc, lease);
+				lease = next;
+			} else {
+				lease = list_next(list, lease);
+			}
+		}
+
+		/* Process leases which were not broken synchronously. */
+		while (!list_is_empty(list)) {
+			/*
+			 * Although the nested loops are quadratic, the number
+			 * of leases is small.
+			 */
+			lease = list_head(list);
+			while (lease != NULL) {
+				vmm_lease_t *next = list_next(list, lease);
+				if (lease->vml_break_deferred) {
+					vmm_lease_break_locked(sc, lease);
+				}
+				lease = next;
+			}
+			if (list_is_empty(list)) {
+				break;
+			}
+			cv_wait(&sc->vmm_lease_cv, &sc->vmm_lease_lock);
+		}
+		/* Wake anyone else waiting for the lease list to be empty  */
+		cv_broadcast(&sc->vmm_lease_cv);
+	} else {
+		list_t *list = &sc->vmm_lease_list;
+
+		/*
+		 * Some other thread beat us to the duty of lease cleanup.
+		 * Wait until that is complete.
+		 */
+		while (!list_is_empty(list)) {
+			cv_wait(&sc->vmm_lease_cv, &sc->vmm_lease_lock);
+		}
+	}
+	mutex_exit(&sc->vmm_lease_lock);
+}
+
+static void
+vmm_lease_unblock(vmm_softc_t *sc)
+{
+	mutex_enter(&sc->vmm_lease_lock);
+	VERIFY3U(sc->vmm_lease_blocker, !=, 0);
+	sc->vmm_lease_blocker--;
+	if (sc->vmm_lease_blocker == 0) {
+		cv_broadcast(&sc->vmm_lease_cv);
+	}
+	mutex_exit(&sc->vmm_lease_lock);
+}
+
 void
 vmm_drv_lease_break(vmm_hold_t *hold, vmm_lease_t *lease)
 {
 	vmm_softc_t *sc = hold->vmh_sc;
 
 	VERIFY3P(hold, ==, lease->vml_hold);
+	VERIFY(!lease->vml_break_deferred);
 
 	mutex_enter(&sc->vmm_lease_lock);
-	vmm_lease_break_locked(sc, lease);
+	if (sc->vmm_lease_blocker == 0) {
+		vmm_lease_break_locked(sc, lease);
+	} else {
+		/*
+		 * Defer the lease-breaking to whichever thread is currently
+		 * cleaning up all leases as part of a vmm_lease_block() call.
+		 */
+		lease->vml_break_deferred = B_TRUE;
+		cv_broadcast(&sc->vmm_lease_cv);
+	}
 	mutex_exit(&sc->vmm_lease_lock);
 }
 

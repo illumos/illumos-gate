@@ -99,7 +99,9 @@ viona_ring_lease_expire_cb(void *arg)
 {
 	viona_vring_t *ring = arg;
 
+	mutex_enter(&ring->vr_lock);
 	cv_broadcast(&ring->vr_cv);
+	mutex_exit(&ring->vr_lock);
 
 	/* The lease will be broken asynchronously. */
 	return (B_FALSE);
