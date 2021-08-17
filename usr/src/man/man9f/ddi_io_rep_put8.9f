@@ -5,8 +5,8 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH DDI_IO_REP_PUT8 9F "Nov 1, 2005"
 .SH NAME
-ddi_io_rep_put8, ddi_io_rep_put16, ddi_io_rep_put32, ddi_io_rep_putb,
-ddi_io_rep_putl, ddi_io_rep_putw \- write multiple data to the mapped device
+ddi_io_rep_put8, ddi_io_rep_put16, ddi_io_rep_put32
+ \- write multiple data to the mapped device
 register in I/O space
 .SH SYNOPSIS
 .nf
@@ -37,10 +37,7 @@ illumos DDI specific (illumos DDI). The \fBddi_io_rep_put8()\fR,
 \fBddi_io_rep_putl()\fR, and \fBddi_io_rep_putw()\fR functions are obsolete.
 The \fBddi_rep_put8\fR(9F) function replaces \fBddi_io_rep_put8()\fR. The
 \fBddi_rep_put16\fR(9F) function replaces \fBddi_io_rep_put16()\fR. The
-\fBddi_rep_put32\fR(9F) function replaces \fBddi_io_rep_put32()\fR. The
-\fBddi_rep_put8\fR(9F) function replaces \fBddi_io_rep_putb()\fR. The
-\fBddi_rep_put32\fR(9F) function replaces \fBddi_io_rep_putl()\fR. The
-\fBddi_rep_put16\fR(9F) function replaces \fBddi_io_rep_putw()\fR.
+\fBddi_rep_put32\fR(9F) function replaces \fBddi_io_rep_put32()\fR.
 .SH PARAMETERS
 .ne 2
 .na

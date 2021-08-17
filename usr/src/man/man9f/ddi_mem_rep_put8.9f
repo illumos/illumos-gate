@@ -6,8 +6,7 @@
 .TH DDI_MEM_REP_PUT8 9F "Nov 1, 2005"
 .SH NAME
 ddi_mem_rep_put8, ddi_mem_rep_put16, ddi_mem_rep_put32, ddi_mem_rep_put64,
-ddi_mem_rep_putb, ddi_mem_rep_putl, ddi_mem_rep_putll, ddi_mem_rep_putw \-
-write multiple data to mapped device in the memory space or allocated DMA
+\- write multiple data to mapped device in the memory space or allocated DMA
 memory
 .SH SYNOPSIS
 .nf
@@ -41,16 +40,11 @@ memory
 .SH INTERFACE LEVEL
 illumos DDI specific (illumos DDI). The \fBddi_mem_rep_put8()\fR,
 \fBddi_mem_rep_put16()\fR, \fBddi_mem_rep_put32()\fR,
-\fBddi_mem_rep_put64()\fR, \fBddi_mem_rep_putb()\fR, \fBddi_mem_rep_putl()\fR,
-\fBddi_mem_rep_putll()\fR, and \fBddi_mem_rep_putw()\fR functions are obsolete.
+and \fBddi_mem_rep_put64()\fR functions are obsolete.
 The \fBddi_rep_put8\fR(9F) function replaces \fBddi_mem_rep_put8()\fR. The
 \fBddi_rep_put16\fR(9F) function replaces \fBddi_mem_rep_put16()\fR. The
 \fBddi_rep_put32\fR(9F) function replaces \fBddi_mem_rep_put32()\fR. The
-\fBddi_rep_put64\fR(9F) function replaces \fBddi_mem_rep_put64()\fR. The
-\fBddi_rep_put8\fR(9F) function replaces \fBddi_mem_rep_putb()\fR. The
-\fBddi_rep_put32\fR(9F) function replaces \fBddi_mem_rep_putl()\fR. The
-\fBddi_rep_put64\fR(9F) function replaces \fBddi_mem_rep_putll()\fR. The
-\fBddi_rep_put16\fR(9F) function replaces \fBddi_mem_rep_putw()\fR.
+\fBddi_rep_put64\fR(9F) function replaces \fBddi_mem_rep_put64()\fR.
 .SH PARAMETERS
 .ne 2
 .na

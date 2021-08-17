@@ -5,9 +5,8 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH DDI_MEM_PUT8 9F "Nov 1, 2005"
 .SH NAME
-ddi_mem_put8, ddi_mem_put16, ddi_mem_put32, ddi_mem_put64, ddi_mem_putb,
-ddi_mem_putw, ddi_mem_putl, ddi_mem_putll \- write data to mapped device in the
-memory space or allocated DMA memory
+ddi_mem_put8, ddi_mem_put16, ddi_mem_put32, ddi_mem_put64,
+\- write data to mapped device in the memory space or allocated DMA memory
 .SH SYNOPSIS
 .nf
 #include <sys/ddi.h>
@@ -73,11 +72,7 @@ illumos DDI specific (illumos DDI). The \fBddi_mem_put8()\fR,
 replaces \fBddi_mem_put8()\fR. The \fBddi_put16\fR(9F) function replaces
 \fBddi_mem_put16()\fR. The \fBddi_put32\fR(9F) function replaces
 \fBddi_mem_put32()\fR. The \fBddi_put64\fR(9F) function replaces
-\fBddi_mem_put64()\fR. The \fBddi_put8\fR(9F) function replaces
-\fBddi_mem_putb()\fR. The \fBddi_put32\fR(9F) function replaces
-\fBddi_mem_putl()\fR. The \fBddi_put64\fR(9F) function replaces
-\fBddi_mem_putll()\fR. The \fBddi_put16\fR(9F) function replaces
-\fBddi_mem_putw()\fR.
+\fBddi_mem_put64()\fR.
 .SH DESCRIPTION
 These routines generate a write of various sizes to memory space or allocated
 \fBDMA \fRmemory. The \fBddi_mem_put8()\fR, \fBddi_mem_put16()\fR,

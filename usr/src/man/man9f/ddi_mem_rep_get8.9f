@@ -6,8 +6,7 @@
 .TH DDI_MEM_REP_GET8 9F "Nov 1, 2005"
 .SH NAME
 ddi_mem_rep_get8, ddi_mem_rep_get16, ddi_mem_rep_get32, ddi_mem_rep_get64,
-ddi_mem_rep_getb, ddi_mem_rep_getl, ddi_mem_rep_getll, ddi_mem_rep_getw \- read
-multiple data from mapped device in the memory space or allocated DMA memory
+\- read multiple data from mapped device in the memory space or allocated DMA memory
 .SH SYNOPSIS
 .nf
 #include <sys/ddi.h>
@@ -49,11 +48,7 @@ illumos DDI specific (illumos DDI). The \fBddi_mem_rep_get8()\fR,
 The \fBddi_rep_get8\fR(9F) function replaces \fBddi_mem_rep_get8()\fR. The
 \fBddi_rep_get16\fR(9F) function replaces \fBddi_mem_rep_get16()\fR. The
 \fBddi_rep_get32\fR(9F) function replaces \fBddi_mem_rep_get32()\fR. The
-\fBddi_rep_get64\fR(9F) function replaces \fBddi_mem_rep_get64()\fR. The
-\fBddi_rep_get8\fR(9F) function replaces \fBddi_mem_rep_getb()\fR. The
-\fBddi_rep_get32\fR(9F) function replaces \fBddi_mem_rep_getl()\fR. The
-\fBddi_rep_get64\fR(9F) function replaces \fBddi_mem_rep_getll()\fR. The
-\fBddi_rep_get16\fR(9F) function replaces \fBddi_mem_rep_getw()\fR.
+\fBddi_rep_get64\fR(9F) function replaces \fBddi_mem_rep_get64()\fR.
 .SH PARAMETERS
 .ne 2
 .na

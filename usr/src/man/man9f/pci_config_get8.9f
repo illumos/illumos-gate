@@ -7,9 +7,7 @@
 .SH NAME
 pci_config_get8, pci_config_get16, pci_config_get32, pci_config_get64,
 pci_config_put8, pci_config_put16, pci_config_put32, pci_config_put64,
-pci_config_getb, pci_config_getl, pci_config_getll, pci_config_getw,
-pci_config_putb, pci_config_putl, pci_config_putll, pci_config_putw \- read or
-write single datum of various sizes to the PCI Local Bus Configuration space
+\- read or write single datum of various sizes to the PCI Local Bus Configuration space
 .SH SYNOPSIS
 .nf
 #include <sys/ddi.h>
@@ -133,9 +131,7 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	T{
-\fBpci_config_getb()\fR, \fBpci_config_getl()\fR, \fBpci_config_getll()\fR, \fBpci_config_getw()\fR, \fBpci_config_putb()\fR, \fBpci_config_putl()\fR, \fBpci_config_putll()\fR, \fBpci_config_putw()\fR are Obsolete \fBpci_config_get8()\fR, \fBpci_config_get16()\fR, \fBpci_config_get32()\fR, \fBpci_config_get64()\fR, \fBpci_config_put8()\fR, \fBpci_config_put16()\fR, \fBpci_config_put32()\fR, \fBpci_config_put64()\fR are Committed
-T}
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
