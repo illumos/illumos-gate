@@ -37,7 +37,7 @@
 caddr_t
 comm_page_mapin()
 {
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	proc_t *p = curproc;
 	caddr_t addr = (caddr_t)COMM_PAGE_ALIGN;
 	size_t len = COMM_PAGE_SIZE;
@@ -56,7 +56,7 @@ comm_page_mapin()
 		return (NULL);
 	}
 	return (addr);
-#else /* defined(__amd64) && !defined(__xpv) */
+#else /* !defined(__xpv) */
 	return (NULL);
-#endif /* defined(__amd64) && !defined(__xpv) */
+#endif /* !defined(__xpv) */
 }

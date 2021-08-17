@@ -52,11 +52,7 @@
 #include <vm/hat_i86.h>
 
 /* XXX: need to add a PAE version too, if we ever support both PAE and non */
-#if defined(__i386)
-#define	XPV_FILENAME	"/boot/xen-syms"
-#else
 #define	XPV_FILENAME	"/boot/amd64/xen-syms"
-#endif
 #define	XPV_MODNAME	"xpv"
 
 int xpv_panicking = 0;
@@ -464,13 +460,11 @@ xpv_traceback(void *fpreg)
 	return (showstack(fpreg, 1));
 }
 
-#if defined(__amd64)
 static void
 xpv_panic_hypercall(ulong_t call)
 {
 	panic("Illegally issued hypercall %d during panic!\n", (int)call);
 }
-#endif
 
 void
 xpv_die(struct regs *rp)
@@ -557,11 +551,9 @@ switch_to_xpv_panic_idt()
 	idtr.dtr_limit = sizeof (xpv_panic_idt) - 1;
 	wr_idtr(&idtr);
 
-#if defined(__amd64)
 	/* Catch any hypercalls. */
 	wrmsr(MSR_AMD_LSTAR, (uintptr_t)xpv_panic_hypercall);
 	wrmsr(MSR_AMD_CSTAR, (uintptr_t)xpv_panic_hypercall);
-#endif
 }
 
 static void
@@ -666,9 +658,7 @@ xpv_do_panic(void *arg)
 	struct panic_info *pip = (struct panic_info *)arg;
 	int l;
 	struct cregs creg;
-#if defined(__amd64)
 	extern uintptr_t postbootkernelbase;
-#endif
 
 	if (xpv_panicking++ > 0)
 		panic("multiple calls to xpv_do_panic()");
@@ -685,7 +675,6 @@ xpv_do_panic(void *arg)
 	 */
 	(void) panic_trigger(&panic_quiesce);
 
-#if defined(__amd64)
 	/*
 	 * bzero() and bcopy() get unhappy when asked to operate on
 	 * addresses outside of the kernel.  At this point Xen is really a
@@ -693,7 +682,6 @@ xpv_do_panic(void *arg)
 	 * the kernel starts.
 	 */
 	postbootkernelbase = xen_virt_start;
-#endif
 
 #if defined(HYPERVISOR_VIRT_END)
 	xpv_end = HYPERVISOR_VIRT_END;
@@ -729,7 +717,6 @@ xpv_do_panic(void *arg)
 
 	xpv_panic_info = pip;
 
-#if defined(__amd64)
 	kpm1_low = (uintptr_t)xpv_panic_info->pi_ram_start;
 	if (xpv_panic_info->pi_xen_start == NULL) {
 		kpm1_high = (uintptr_t)xpv_panic_info->pi_ram_end;
@@ -738,16 +725,13 @@ xpv_do_panic(void *arg)
 		kpm2_low = (uintptr_t)xpv_panic_info->pi_xen_end;
 		kpm2_high = (uintptr_t)xpv_panic_info->pi_ram_end;
 	}
-#endif
 
 	/*
 	 * Make sure we are running on the Solaris %gs.  The Xen panic code
 	 * should already have set up the GDT properly.
 	 */
 	xpv_panic_resetgs();
-#if defined(__amd64)
 	wrmsr(MSR_AMD_GSBASE, (uint64_t)&cpus[0]);
-#endif
 
 	xpv_panic_time_init();
 
@@ -771,10 +755,6 @@ xpv_do_panic(void *arg)
 	xpv_panic_cr3 = creg.cr_cr3;
 	for (l = mmu.max_level; l >= 0; l--)
 		xpv_panic_nptes[l] = mmu.ptes_per_table;
-#ifdef __i386
-	if (mmu.pae_hat)
-		xpv_panic_nptes[mmu.max_level] = 4;
-#endif
 
 	/* Add the fake Xen module to the module list */
 	if (xpv_module != NULL) {
@@ -823,11 +803,7 @@ init_xen_module()
 	Shdr *shp, *ctf_shp;
 	char *names = NULL;
 	size_t n, namesize, text_align, data_align;
-#if defined(__amd64)
 	const char machine = EM_AMD64;
-#else
-	const char machine = EM_386;
-#endif
 
 	/* Allocate and init the module structure */
 	mp = kmem_zalloc(sizeof (*mp), KM_SLEEP);

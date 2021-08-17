@@ -1999,7 +1999,7 @@ anon_map_getpages(
 	uint_t		vpprot;
 	int		upsize = (szc < seg->s_szc);
 
-#if !defined(__i386) && !defined(__amd64)
+#if !defined(__x86)
 	ASSERT(seg->s_szc != 0);
 #endif
 	ASSERT(szc <= seg->s_szc);

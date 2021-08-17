@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dada/dada.h>
 #include <sys/vtrace.h>
 
@@ -56,12 +54,12 @@ static ddi_dma_attr_t standard_dma_attr = {
 
 struct buf *
 dcd_alloc_consistent_buf(struct dcd_address *ap,
-	struct buf *in_bp, size_t datalen, uint_t bflags,
-	int (*callback)(caddr_t), caddr_t callback_arg)
+    struct buf *in_bp, size_t datalen, uint_t bflags,
+    int (*callback)(caddr_t), caddr_t callback_arg)
 {
 
 	dev_info_t	*pdip;
-	struct	buf 	*bp;
+	struct	buf	*bp;
 	int		kmflag;
 	size_t		rlen;
 
@@ -117,29 +115,29 @@ dcd_free_consistent_buf(struct buf *bp)
 
 struct dcd_pkt *
 dcd_init_pkt(struct dcd_address *ap, struct dcd_pkt *in_pktp,
-	struct buf *bp, int cmdlen, int statuslen, int pplen,
-	int flags, int (*callback)(caddr_t), caddr_t callback_arg)
+    struct buf *bp, int cmdlen, int statuslen, int pplen,
+    int flags, int (*callback)(caddr_t), caddr_t callback_arg)
 {
 	struct dcd_pkt *pktp;
 	dcd_hba_tran_t	*tranp = ap->a_hba_tran;
 	int		(*func)(caddr_t);
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	if (flags & PKT_CONSISTENT_OLD) {
 		flags &= ~PKT_CONSISTENT_OLD;
 		flags |= PKT_CONSISTENT;
 	}
-#endif	/* __i386 || __amd64 */
+#endif	/* __x86 */
 
 	func = (callback == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC;
 
 	pktp = (*tranp->tran_init_pkt)(ap, in_pktp, bp, cmdlen,
-		statuslen, pplen, flags, func, NULL);
+	    statuslen, pplen, flags, func, NULL);
 
 	if (pktp == NULL) {
 		if (callback != NULL_FUNC && callback != SLEEP_FUNC) {
 			ddi_set_callback(callback, callback_arg,
-				&dcd_callback_id);
+			    &dcd_callback_id);
 		}
 	}
 
@@ -162,7 +160,7 @@ dcd_destroy_pkt(struct dcd_pkt *pkt)
 
 struct dcd_pkt *
 dcd_resalloc(struct dcd_address *ap, int cmdlen, int statuslen,
-	ataopaque_t dmatoken, int (*callback)())
+    ataopaque_t dmatoken, int (*callback)())
 {
 
 	register struct dcd_pkt *pkt;
@@ -172,7 +170,7 @@ dcd_resalloc(struct dcd_address *ap, int cmdlen, int statuslen,
 
 	func = (callback == SLEEP_FUNC) ? SLEEP_FUNC: NULL_FUNC;
 	pkt = (*tranp->tran_init_pkt) (ap, NULL, (struct buf *)dmatoken,
-		cmdlen, statuslen, 0, 0, func, NULL);
+	    cmdlen, statuslen, 0, 0, func, NULL);
 
 	if (pkt == NULL) {
 		if (callback != NULL_FUNC && callback != SLEEP_FUNC) {
@@ -185,18 +183,18 @@ dcd_resalloc(struct dcd_address *ap, int cmdlen, int statuslen,
 
 struct dcd_pkt *
 dcd_pktalloc(struct dcd_address *ap, int cmdlen, int statuslen,
-	int (*callback)())
+    int (*callback)())
 {
 
-	struct dcd_pkt 	*pkt;
+	struct dcd_pkt		*pkt;
 	struct dcd_hba_tran	*tran = ap->a_hba_tran;
-	register int 		(*func)(caddr_t);
+	register int		(*func)(caddr_t);
 
 
 	func = (callback == SLEEP_FUNC) ? SLEEP_FUNC: NULL_FUNC;
 
 	pkt = (*tran->tran_init_pkt) (ap, NULL, NULL, cmdlen, statuslen,
-		0, 0, func, NULL);
+	    0, 0, func, NULL);
 	if (pkt == NULL) {
 		if (callback != NULL_FUNC && callback != SLEEP_FUNC) {
 			ddi_set_callback(callback, NULL, &dcd_callback_id);
@@ -216,7 +214,7 @@ dcd_dmaget(struct dcd_pkt *pkt, ataopaque_t dmatoken, int (*callback)())
 	func = (callback == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC;
 
 	new_pkt = (*P_TO_TRAN(pkt)->tran_init_pkt) (&pkt->pkt_address,
-		pkt, (struct buf *)dmatoken, 0, 0, 0, 0, func, NULL);
+	    pkt, (struct buf *)dmatoken, 0, 0, 0, 0, func, NULL);
 
 	ASSERT(new_pkt == pkt || new_pkt == NULL);
 	if (new_pkt == NULL) {

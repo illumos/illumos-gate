@@ -48,10 +48,10 @@
 	 *
 	 * On amd64 the stack frame for events is exactly that of an hardware
 	 * interrupt with the addition of rcx and r11.
-	 * 
+	 *
 	 * The stack frame for a failsafe callback is augmented with saved
 	 * values for segment registers:
-	 * 
+	 *
 	 * amd64
 	 *	%rcx, %r11, %ds, %es, %fs, %gs, %rip, %cs, %rflags,
 	 *      [, %oldrsp, %oldss ]
@@ -64,8 +64,6 @@
 	 * We will construct a fully fledged 'struct regs' and call trap
 	 * with a #gp fault.
 	 */
-
-#if defined(__amd64)
 
 	ENTRY(xen_failsafe_callback)
 
@@ -128,54 +126,6 @@
 	jmp	_sys_rtt
 	SET_SIZE(xen_failsafe_callback)
 
-#elif defined(__i386)
-
-	ENTRY(xen_failsafe_callback)
-
-	/*
-	 * drop ds, es, fs and gs
-	 */
-	addl    $_CONST(_MUL(4, CLONGSIZE)), %esp /* see comment for 64-bit */
-
-	pushl	$0	/* dummy error (see comment for 64-bit) */
-	pushl	$T_GPFLT
-
-	INTR_PUSH
-	INTGATE_INIT_KERNEL_FLAGS	/* (set kernel flag values) */
-
-	/*
-	 * The fact were here is because HYPERVISOR_IRET to userland
-	 * failed due to a bad %cs value. Rewrite %cs, %ss and %eip
-	 * on the stack so trap will know to handle this with
-	 * kern_gpfault and kill the currently running process.
-	 */
-	movl	$KCS_SEL, REGOFF_CS(%esp)
-	movl	$KDS_SEL, REGOFF_SS(%esp)
-	leal	nopop_sys_rtt_syscall, %edi
-	movl	%edi, REGOFF_EIP(%esp)
-
-	TRACE_PTR(%edi, %ebx, %ebx, %ecx, $TT_EVENT) /* Uses labels 8 and 9 */
-	TRACE_REGS(%edi, %esp, %ebx, %ecx)	/* Uses label 9 */
-	TRACE_STAMP(%edi)		/* Clobbers %eax, %edx, uses 9 */
-
-	movl	%esp, %ebp
-
-	TRACE_STACK(%edi)
-
-	ENABLE_INTR_FLAGS
-
-	pushl	%gs:CPU_ID
-	pushl	$0
-	pushl	%ebp
-	call	trap		/* trap(rp, addr, cpuid) handles all traps */
-	addl	$12, %esp
-	jmp	_sys_rtt
-	SET_SIZE(xen_failsafe_callback)
-
-#endif	/* __i386 */
-
-#if defined(__amd64)
-
 	ENTRY(xen_callback)
 	XPV_TRAP_POP
 
@@ -201,32 +151,3 @@
 	/*NOTREACHED*/
 
 	SET_SIZE(xen_callback)
-
-#elif defined(__i386)
-
-	ENTRY(xen_callback)
-	pushl	$0			/* dummy error */
-	pushl	$T_AST
-
-	INTR_PUSH
-	INTGATE_INIT_KERNEL_FLAGS	/* (set kernel flag values) */
-
-	TRACE_PTR(%edi, %ebx, %ebx, %ecx, $TT_EVENT) /* Uses labels 8 and 9 */
-	TRACE_REGS(%edi, %esp, %ebx, %ecx)	/* Uses label 9 */
-	TRACE_STAMP(%edi)		/* Clobbers %eax, %edx, uses 9 */
-
-	movl	%esp, %ebp
-
-	TRACE_STACK(%edi)
-
-	pushl	%edi			/* pass trap trace record pointer */
-	pushl	%ebp			/* pass struct regs pointer */
-	call	xen_callback_handler
-	addl	$8, %esp
-
-	jmp	_sys_rtt_ints_disabled
-	/*NOTREACHED*/
-
-	SET_SIZE(xen_callback)
-
-#endif	/* __i386 */

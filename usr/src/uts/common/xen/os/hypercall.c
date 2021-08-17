@@ -91,18 +91,6 @@ HYPERVISOR_set_callbacks(ulong_t event_address, ulong_t failsafe_address,
 	    event_address, failsafe_address, syscall_address));
 }
 
-#elif defined(__i386)
-
-long
-HYPERVISOR_set_callbacks(
-    ulong_t event_selector, ulong_t event_address,
-    ulong_t failsafe_selector, ulong_t failsafe_address)
-{
-	return (__hypercall4(__HYPERVISOR_set_callbacks,
-	    event_selector, event_address,
-	    failsafe_selector, failsafe_address));
-}
-
 #endif	/* __amd64 */
 
 long
@@ -129,12 +117,6 @@ HYPERVISOR_update_descriptor(maddr_t ma, uint64_t desc)
 #if defined(__amd64)
 
 	return (__hypercall2(__HYPERVISOR_update_descriptor, ma, desc));
-
-#elif defined(__i386)
-
-	return (__hypercall4(__HYPERVISOR_update_descriptor,
-	    (ulong_t)ma, (ulong_t)(ma >>32),
-	    (ulong_t)desc, (ulong_t)(desc >> 32)));
 
 #endif
 }
@@ -165,12 +147,7 @@ HYPERVISOR_update_va_mapping(ulong_t va, uint64_t new_pte, ulong_t flags)
 	return (__hypercall3_int(__HYPERVISOR_update_va_mapping, va,
 	    new_pte, flags));
 
-#elif defined(__i386)
-
-	return (__hypercall4_int(__HYPERVISOR_update_va_mapping, va,
-	    (ulong_t)new_pte, (ulong_t)(new_pte >> 32), flags));
-
-#endif	/* __i386 */
+#endif	/* __amd64 */
 }
 
 /*
@@ -184,14 +161,7 @@ HYPERVISOR_set_timer_op(uint64_t timeout)
 
 	return (__hypercall1(__HYPERVISOR_set_timer_op, timeout));
 
-#elif defined(__i386)
-
-	uint32_t timeout_hi = (uint32_t)(timeout >> 32);
-	uint32_t timeout_lo = (uint32_t)timeout;
-	return (__hypercall2(__HYPERVISOR_set_timer_op,
-	    (ulong_t)timeout_lo, (ulong_t)timeout_hi));
-
-#endif	/* __i386 */
+#endif	/* __amd64 */
 }
 
 /* *** __HYPERVISOR_event_channel_op_compat *** OBSOLETED */
@@ -243,13 +213,7 @@ HYPERVISOR_update_va_mapping_otherdomain(ulong_t va,
 	return (__hypercall4_int(__HYPERVISOR_update_va_mapping_otherdomain,
 	    va, new_pte, flags, (ulong_t)domain_id));
 
-#elif defined(__i386)
-
-	return (__hypercall5_int(__HYPERVISOR_update_va_mapping_otherdomain,
-	    va, (ulong_t)new_pte, (ulong_t)(new_pte >> 32), flags,
-	    (ulong_t)domain_id));
-
-#endif	/* __i386 */
+#endif	/* __amd64 */
 }
 
 /*

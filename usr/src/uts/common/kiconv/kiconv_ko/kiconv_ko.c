@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
@@ -83,7 +81,7 @@ close_fr_ko(void *s)
  */
 static size_t
 kiconv_fr_euckr(void *kcd, char **inbuf, size_t *inbufleft,
-	char **outbuf, size_t *outbufleft, int *errno)
+    char **outbuf, size_t *outbufleft, int *errno)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -169,7 +167,7 @@ kiconv_fr_euckr(void *kcd, char **inbuf, size_t *inbufleft,
  */
 static size_t
 kiconvstr_fr_euckr(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -251,7 +249,7 @@ REPLACE_INVALID:
  */
 static size_t
 kiconv_fr_uhc(void *kcd, char **inbuf, size_t *inbufleft,
-	char **outbuf, size_t *outbufleft, int *errno)
+    char **outbuf, size_t *outbufleft, int *errno)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -337,7 +335,7 @@ kiconv_fr_uhc(void *kcd, char **inbuf, size_t *inbufleft,
  */
 static size_t
 kiconvstr_fr_uhc(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -419,7 +417,7 @@ REPLACE_INVALID:
  */
 static size_t
 kiconv_to_euckr(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	return (kiconv_utf8_to_cck(kcd, inbuf, inbytesleft, outbuf,
 	    outbytesleft, errno, utf8_to_euckr));
@@ -430,7 +428,7 @@ kiconv_to_euckr(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 static size_t
 kiconv_to_uhc(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	return (kiconv_utf8_to_cck(kcd, inbuf, inbytesleft, outbuf,
 	    outbytesleft, errno, utf8_to_uhc));
@@ -441,7 +439,7 @@ kiconv_to_uhc(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 static size_t
 kiconvstr_to_euckr(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	return kiconvstr_utf8_to_cck((uchar_t *)inarray, inlen,
 	    (uchar_t *)outarray, outlen, flag, errno, utf8_to_euckr);
@@ -452,7 +450,7 @@ kiconvstr_to_euckr(char *inarray, size_t *inlen, char *outarray,
  */
 static size_t
 kiconvstr_to_uhc(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	return kiconvstr_utf8_to_cck((uchar_t *)inarray, inlen,
 	    (uchar_t *)outarray, outlen, flag, errno, utf8_to_uhc);
@@ -464,7 +462,7 @@ kiconvstr_to_uhc(char *inarray, size_t *inlen, char *outarray,
  */
 static int8_t
 utf8_to_ko(uint32_t utf8, uchar_t *ob, uchar_t *obtail, size_t *ret_val,
-	kiconv_table_t *table, size_t nitems)
+    kiconv_table_t *table, size_t nitems)
 {
 	size_t	index;
 	size_t	kocode;
@@ -512,7 +510,7 @@ utf8_to_ko(uint32_t utf8, uchar_t *ob, uchar_t *obtail, size_t *ret_val,
 /* ARGSUSED */
 static int8_t
 utf8_to_uhc(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
-	uchar_t *ob, uchar_t *obtail, size_t *ret_val)
+    uchar_t *ob, uchar_t *obtail, size_t *ret_val)
 {
 	return (utf8_to_ko(utf8, ob, obtail, ret_val, kiconv_utf8_uhc,
 	    KICONV_UTF8_UHC_MAX));
@@ -524,7 +522,7 @@ utf8_to_uhc(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
 /* ARGSUSED */
 static int8_t
 utf8_to_euckr(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
-	uchar_t *ob, uchar_t *obtail, size_t *ret_val)
+    uchar_t *ob, uchar_t *obtail, size_t *ret_val)
 {
 	return (utf8_to_ko(utf8, ob, obtail, ret_val, kiconv_utf8_euckr,
 	    KICONV_UTF8_EUCKR_MAX));
@@ -535,7 +533,7 @@ utf8_to_euckr(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
  */
 static int8_t
 ko_to_utf8(uint32_t ko_val, uchar_t *ob, uchar_t *obtail, size_t *ret_val,
-	kiconv_table_array_t *table, size_t nitems)
+    kiconv_table_array_t *table, size_t nitems)
 {
 	size_t	index;
 	int8_t	sz;

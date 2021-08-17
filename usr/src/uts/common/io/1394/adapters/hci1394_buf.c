@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_buf.c
  *   These routines handle IO mapped memory.  They include routines to alloc and
@@ -65,7 +63,7 @@ hci1394_buf_attr_get(ddi_dma_attr_t *dma_attr)
 	dma_attr->dma_attr_granular = 4;
 	dma_attr->dma_attr_flags = 0;
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	/* XXX - Not sure why x86 wants the dma_attr_seg to be 0x7FFF?? */
 	dma_attr->dma_attr_seg = (uint64_t)0x7FFF;
 #endif

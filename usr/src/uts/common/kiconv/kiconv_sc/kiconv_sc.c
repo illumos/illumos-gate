@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
@@ -92,7 +90,7 @@ close_fr_sc(void *s)
  */
 size_t
 kiconv_to_gb18030(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 
 	return kiconv_utf8_to_cck(kcd, inbuf, inbytesleft, outbuf,
@@ -104,7 +102,7 @@ kiconv_to_gb18030(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 size_t
 kiconvstr_to_gb18030(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	return kiconvstr_utf8_to_cck((uchar_t *)inarray, inlen,
 	    (uchar_t *)outarray, outlen, flag, errno, utf8_to_gb18030);
@@ -115,7 +113,7 @@ kiconvstr_to_gb18030(char *inarray, size_t *inlen, char *outarray,
  */
 size_t
 kiconv_fr_gb18030(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -212,7 +210,7 @@ kiconv_fr_gb18030(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 size_t
 kiconvstr_fr_gb18030(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -322,7 +320,7 @@ REPLACE_INVALID:
  */
 size_t
 kiconv_to_gbk(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 
 	return kiconv_utf8_to_cck(kcd, inbuf, inbytesleft, outbuf,
@@ -334,7 +332,7 @@ kiconv_to_gbk(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 size_t
 kiconvstr_to_gbk(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	return kiconvstr_utf8_to_cck((uchar_t *)inarray, inlen,
 	    (uchar_t *)outarray, outlen, flag, errno, utf8_to_gbk);
@@ -345,7 +343,7 @@ kiconvstr_to_gbk(char *inarray, size_t *inlen, char *outarray,
  */
 size_t
 kiconv_fr_gbk(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -431,7 +429,7 @@ kiconv_fr_gbk(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 size_t
 kiconvstr_fr_gbk(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -511,7 +509,7 @@ REPLACE_INVALID:
  */
 size_t
 kiconv_to_euccn(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	return kiconv_utf8_to_cck(kcd, inbuf, inbytesleft, outbuf,
 	    outbytesleft, errno, utf8_to_gb2312);
@@ -522,7 +520,7 @@ kiconv_to_euccn(void *kcd, char **inbuf, size_t *inbytesleft,
  */
 size_t
 kiconvstr_to_euccn(char *inarray, size_t *inlen, char *outarray,
-	size_t *outlen, int flag, int *errno)
+    size_t *outlen, int flag, int *errno)
 {
 	return kiconvstr_utf8_to_cck((uchar_t *)inarray, inlen,
 	    (uchar_t *)outarray, outlen, flag, errno, utf8_to_gb2312);
@@ -533,7 +531,7 @@ kiconvstr_to_euccn(char *inarray, size_t *inlen, char *outarray,
  */
 size_t
 kiconv_fr_euccn(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -695,7 +693,7 @@ REPLACE_INVALID:
  */
 static int8_t
 gb2312_to_utf8(uchar_t b1, uchar_t b2, uchar_t *ob, uchar_t *obtail,
-	size_t *ret_val)
+    size_t *ret_val)
 {
 	size_t	index;
 	int8_t	sz;
@@ -738,7 +736,7 @@ gb2312_to_utf8(uchar_t b1, uchar_t b2, uchar_t *ob, uchar_t *obtail,
  */
 static int8_t
 gbk_to_utf8(uint32_t gbk_val, uchar_t *ob, uchar_t *obtail, size_t *ret_val,
-	boolean_t isgbk4)
+    boolean_t isgbk4)
 {
 	size_t	index;
 	int8_t	sz;
@@ -800,9 +798,9 @@ gbk_to_utf8(uint32_t gbk_val, uchar_t *ob, uchar_t *obtail, size_t *ret_val,
 /* ARGSUSED */
 static int8_t
 utf8_to_gb18030(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
-	uchar_t *ob, uchar_t *obtail, size_t *ret)
+    uchar_t *ob, uchar_t *obtail, size_t *ret)
 {
-	size_t 		index;
+	size_t		index;
 	int8_t		gbklen;
 	uint32_t	gbkcode;
 
@@ -853,9 +851,9 @@ utf8_to_gb18030(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
 /* ARGSUSED */
 static int8_t
 utf8_to_gbk(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
-	uchar_t *ob, uchar_t *obtail, size_t *ret)
+    uchar_t *ob, uchar_t *obtail, size_t *ret)
 {
-	size_t 		index;
+	size_t		index;
 	int8_t		gbklen;
 	uint32_t	gbkcode;
 
@@ -894,7 +892,7 @@ utf8_to_gbk(uint32_t utf8, uchar_t **inbuf, uchar_t *ibtail,
 /* ARGSUSED */
 static int8_t
 utf8_to_gb2312(uint32_t utf8, uchar_t **inbuf, uchar_t *intail,
-	uchar_t *ob, uchar_t *obtail, size_t *ret)
+    uchar_t *ob, uchar_t *obtail, size_t *ret)
 {
 	size_t		index;
 	int8_t		gblen;

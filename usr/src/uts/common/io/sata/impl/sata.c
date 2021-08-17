@@ -12920,13 +12920,8 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 	}
 
 	if (sdinfo->satadrv_type == SATA_DTYPE_ATADISK) {
-#ifdef __i386
-		(void) sprintf(msg_buf, "\tcapacity = %llu sectors\n",
-		    sdinfo->satadrv_capacity);
-#else
 		(void) sprintf(msg_buf, "\tcapacity = %lu sectors\n",
 		    sdinfo->satadrv_capacity);
-#endif
 		cmn_err(CE_CONT, "?%s", msg_buf);
 	}
 }

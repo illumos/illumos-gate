@@ -317,10 +317,6 @@ apic_init(void)
 
 	apic_pir_vect = apic_get_ipivect(XC_CPUPOKE_PIL, -1);
 
-#if !defined(__amd64)
-	if (cpuid_have_cr8access(CPU))
-		apic_have_32bit_cr8 = 1;
-#endif
 }
 
 static void

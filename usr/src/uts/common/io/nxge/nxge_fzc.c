@@ -268,8 +268,8 @@ nxge_fzc_intr_sid_set(p_nxge_t nxgep)
  *	guest domain, who cannot access these registers.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to initialize.
+ *	nxgep
+ *	channel		The channel to initialize.
  *
  * NPI_NXGE function calls:
  *	nxge_init_fzc_rdc_pages()
@@ -377,8 +377,8 @@ nxge_init_fzc_rdc(p_nxge_t nxgep, uint16_t channel)
  *	Initialize all per-channel FZC_DMC registers.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to start
+ *	nxgep
+ *	channel		The channel to start
  *
  * NPI_NXGE function calls:
  *	nxge_init_hv_fzc_rxdma_channel_pages()
@@ -454,10 +454,10 @@ nxge_init_fzc_rxdma_channel(p_nxge_t nxgep, uint16_t channel)
  *	a guest domain, to whom this RDC has been loaned.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to initialize.
- * 	page0		Logical page 0 definition.
- * 	page1		Logical page 1 definition.
+ *	nxgep
+ *	channel		The channel to initialize.
+ *	page0		Logical page 0 definition.
+ *	page1		Logical page 1 definition.
  *
  * Notes:
  *	I think that this function can be called from any
@@ -531,7 +531,7 @@ nxge_init_fzc_rdc_pages(
 /*ARGSUSED*/
 nxge_status_t
 nxge_init_fzc_rxdma_channel_pages(p_nxge_t nxgep,
-		uint16_t channel, p_rx_rbr_ring_t rbrp)
+    uint16_t channel, p_rx_rbr_ring_t rbrp)
 {
 	npi_handle_t		handle;
 	dma_log_page_t		cfg;
@@ -587,7 +587,7 @@ nxge_init_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 /*ARGSUSED*/
 nxge_status_t
 nxge_init_fzc_rxdma_channel_red(p_nxge_t nxgep,
-	uint16_t channel, p_rx_rcr_ring_t rcr_p)
+    uint16_t channel, p_rx_rcr_ring_t rcr_p)
 {
 	npi_handle_t		handle;
 	rdc_red_para_t		red;
@@ -626,8 +626,8 @@ nxge_init_fzc_rxdma_channel_red(p_nxge_t nxgep,
  *	guest domain, who cannot access these registers.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to initialize.
+ *	nxgep
+ *	channel		The channel to initialize.
  *
  * NPI_NXGE function calls:
  *	nxge_init_fzc_tdc_pages()
@@ -709,7 +709,7 @@ nxge_init_fzc_tdc(p_nxge_t nxgep, uint16_t channel)
 /*ARGSUSED*/
 nxge_status_t
 nxge_init_fzc_txdma_channel(p_nxge_t nxgep, uint16_t channel,
-	p_tx_ring_t tx_ring_p, p_tx_mbox_t mbox_p)
+    p_tx_ring_t tx_ring_p, p_tx_mbox_t mbox_p)
 {
 	nxge_status_t	status = NXGE_OK;
 
@@ -791,14 +791,6 @@ nxge_init_fzc_rx_common(p_nxge_t nxgep)
 	if (rs != NPI_SUCCESS)
 		return (NXGE_ERROR | rs);
 
-#if defined(__i386)
-	rs = npi_rxdma_cfg_32bitmode_enable(handle);
-	if (rs != NPI_SUCCESS)
-		return (NXGE_ERROR | rs);
-	rs = npi_txdma_mode32_set(handle, B_TRUE);
-	if (rs != NPI_SUCCESS)
-		return (NXGE_ERROR | rs);
-#endif
 
 	/*
 	 * Enable WRED and program an initial value.
@@ -970,10 +962,10 @@ nxge_init_fzc_rxdma_port(p_nxge_t nxgep)
 	npi_handle_t		handle;
 	p_nxge_dma_pt_cfg_t	p_all_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
-	hostinfo_t 		hostinfo;
+	hostinfo_t		hostinfo;
 	int			i;
 	npi_status_t		rs = NPI_SUCCESS;
-	p_nxge_class_pt_cfg_t 	p_class_cfgp;
+	p_nxge_class_pt_cfg_t	p_class_cfgp;
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_init_fzc_rxdma_port"));
 
 	p_all_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
@@ -1050,10 +1042,10 @@ nxge_fzc_dmc_def_port_rdc(p_nxge_t nxgep, uint8_t port, uint16_t rdc)
  *	a guest domain, to whom this TDC has been loaned.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to initialize.
- * 	page0		Logical page 0 definition.
- * 	page1		Logical page 1 definition.
+ *	nxgep
+ *	channel		The channel to initialize.
+ *	page0		Logical page 0 definition.
+ *	page1		Logical page 1 definition.
  *
  * Notes:
  *	I think that this function can be called from any
@@ -1126,7 +1118,7 @@ nxge_init_fzc_tdc_pages(
 
 nxge_status_t
 nxge_init_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
-	p_tx_ring_t tx_ring_p)
+    p_tx_ring_t tx_ring_p)
 {
 	npi_handle_t		handle;
 	dma_log_page_t		cfg;
@@ -1195,7 +1187,7 @@ nxge_init_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 
 nxge_status_t
 nxge_init_fzc_txdma_channel_drr(p_nxge_t nxgep, uint16_t channel,
-	p_tx_ring_t tx_ring_p)
+    p_tx_ring_t tx_ring_p)
 {
 	npi_status_t	rs = NPI_SUCCESS;
 	npi_handle_t	handle;
@@ -1231,9 +1223,9 @@ nxge_fzc_sys_err_mask_set(p_nxge_t nxgep, uint64_t mask)
  *	Configure a TDC's logical pages.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to initialize.
- * 	tx_ring_p	The transmit ring.
+ *	nxgep
+ *	channel		The channel to initialize.
+ *	tx_ring_p	The transmit ring.
  *
  * Notes:
  *	I think that this function can be called from any
@@ -1249,7 +1241,7 @@ nxge_fzc_sys_err_mask_set(p_nxge_t nxgep, uint64_t mask)
 #if defined(sun4v) && defined(NIU_LP_WORKAROUND)
 nxge_status_t
 nxge_init_hv_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
-	p_tx_ring_t tx_ring_p)
+    p_tx_ring_t tx_ring_p)
 {
 	int			err;
 	uint64_t		hverr;
@@ -1390,7 +1382,7 @@ nxge_init_hv_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 /*ARGSUSED*/
 nxge_status_t
 nxge_init_hv_fzc_rxdma_channel_pages(p_nxge_t nxgep,
-		uint16_t channel, p_rx_rbr_ring_t rbrp)
+    uint16_t channel, p_rx_rbr_ring_t rbrp)
 {
 	int			err;
 	uint64_t		hverr;

@@ -194,11 +194,7 @@ static ddi_dma_attr_t fastboot_below_1G_dma_attr = {
 static ddi_dma_attr_t fastboot_dma_attr = {
 	DMA_ATTR_V0,
 	0x0000000008000000ULL,	/* dma_attr_addr_lo: 128MB */
-#ifdef	__amd64
 	0xFFFFFFFFFFFFFFFFULL,	/* dma_attr_addr_hi: 2^64B */
-#else
-	0x0000000FFFFFFFFFULL,	/* dma_attr_addr_hi: 64GB */
-#endif	/* __amd64 */
 	0x00000000FFFFFFFFULL,	/* dma_attr_count_max */
 	0x0000000000001000ULL,	/* dma_attr_align: 4KB */
 	1,			/* dma_attr_burstsize */
@@ -322,12 +318,8 @@ fastboot_map_with_size(fastboot_info_t *nk, uintptr_t vstart, paddr_t pstart,
 			 * Program with either valid bit or PTP bits.
 			 */
 			if (l == nk->fi_top_level) {
-#ifdef	__amd64
 				ASSERT(nk->fi_top_level == 3);
 				table[index] = nk->fi_next_table_pa | ptp_bits;
-#else
-				table[index] = nk->fi_next_table_pa | PT_VALID;
-#endif	/* __amd64 */
 			} else {
 				table[index] = nk->fi_next_table_pa | ptp_bits;
 			}
@@ -605,11 +597,7 @@ fastboot_init_fields(fastboot_info_t *nk)
 		nk->fi_shift_amt = fastboot_shift_amt_pae;
 		nk->fi_ptes_per_table = 512;
 		nk->fi_lpagesize = (2 << 20);	/* 2M */
-#ifdef	__amd64
 		nk->fi_top_level = 3;
-#else
-		nk->fi_top_level = 2;
-#endif	/* __amd64 */
 	}
 }
 
@@ -1227,11 +1215,7 @@ load_kernel_retry:
 	 * address as we do the copying.
 	 */
 	if (newkernel.fi_has_pae) {
-#ifdef	__amd64
 		size_t size = MMU_PAGESIZE * 5;
-#else
-		size_t size = MMU_PAGESIZE * 4;
-#endif	/* __amd64 */
 
 		if (newkernel.fi_pagetable_size && newkernel.fi_pagetable_size
 		    < size) {

@@ -388,7 +388,7 @@ opromioctl_cb(void *avp, int has_changed)
 	 * and weed out unsupported commands on x86 platform
 	 */
 	switch (cmd) {
-#if !defined(__i386) && !defined(__amd64)
+#if !defined(__x86)
 	case OPROMLISTKEYSLEN:
 		valsize = prom_asr_list_keys_len();
 		opp = (struct openpromio *)kmem_zalloc(
@@ -458,12 +458,12 @@ opromioctl_cb(void *avp, int has_changed)
 
 	case OPROMSETOPT:
 	case OPROMSETOPT2:
-#if !defined(__i386) && !defined(__amd64)
+#if !defined(__x86)
 		if (mode & FWRITE) {
 			node_id = options_nodeid;
 			break;
 		}
-#endif /* !__i386 && !__amd64 */
+#endif /* !__x86 */
 		return (EPERM);
 
 	case OPROMNEXT:
@@ -488,10 +488,10 @@ opromioctl_cb(void *avp, int has_changed)
 	case OPROMGETVERSION:
 	case OPROMPATH2DRV:
 	case OPROMPROM2DEVNAME:
-#if !defined(__i386) && !defined(__amd64)
+#if !defined(__x86)
 	case OPROMGETFBNAME:
 	case OPROMDEV2PROMNAME:
-#endif	/* !__i386 && !__amd64 */
+#endif	/* !__x86 */
 		if ((mode & FREAD) == 0) {
 			return (EPERM);
 		}
@@ -744,7 +744,7 @@ opromioctl_cb(void *avp, int has_changed)
 		}
 		(void) strcpy(opp->oprom_array, bpath);
 
-#elif defined(__i386) || defined(__amd64)
+#elif defined(__x86)
 
 		extern char saved_cmdline[];
 		valsize = strlen(saved_cmdline) + 1;
@@ -864,7 +864,7 @@ opromioctl_cb(void *avp, int has_changed)
 			error = EFAULT;
 		break;
 
-#if !defined(__i386) && !defined(__amd64)
+#if !defined(__x86)
 	case OPROMGETFBNAME:
 		/*
 		 * Return stdoutpath, if it's a frame buffer.
@@ -977,7 +977,7 @@ opromioctl_cb(void *avp, int has_changed)
 
 		break;
 	}
-#endif	/* !__i386 && !__amd64 */
+#endif	/* !__x86 */
 	}	/* switch (cmd)	*/
 
 	kmem_free(opp, userbufsize + sizeof (uint_t) + 1);

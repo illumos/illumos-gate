@@ -389,7 +389,6 @@ lwp_setsp(klwp_t *lwp, caddr_t sp)
 void
 lwp_forkregs(klwp_t *lwp, klwp_t *clwp)
 {
-#if defined(__amd64)
 	struct pcb *pcb = &clwp->lwp_pcb;
 	struct regs *rp = lwptoregs(lwp);
 
@@ -402,7 +401,6 @@ lwp_forkregs(klwp_t *lwp, klwp_t *clwp)
 		lwptot(clwp)->t_post_sys = 1;
 	}
 	ASSERT(lwptot(clwp)->t_post_sys);
-#endif
 
 	fp_lwp_dup(clwp);
 
@@ -461,7 +459,6 @@ lwp_pcb_exit(void)
 void
 lwp_segregs_save(klwp_t *lwp)
 {
-#if defined(__amd64)
 	pcb_t *pcb = &lwp->lwp_pcb;
 	struct regs *rp;
 
@@ -485,7 +482,6 @@ lwp_segregs_save(klwp_t *lwp)
 		PCB_SET_UPDATE_SEGS(pcb);
 		lwp->lwp_thread->t_post_sys = 1;
 	}
-#endif	/* __amd64 */
 
 #if !defined(__xpv)	/* XXPV not sure if we can re-read gdt? */
 	ASSERT(bcmp(&CPU->cpu_gdt[GDT_LWPFS], &lwp->lwp_pcb.pcb_fsdesc,
@@ -494,8 +490,6 @@ lwp_segregs_save(klwp_t *lwp)
 	    sizeof (lwp->lwp_pcb.pcb_gsdesc)) == 0);
 #endif
 }
-
-#if defined(__amd64)
 
 /*
  * Update the segment registers with new values from the pcb.
@@ -675,7 +669,6 @@ reset_sregs(void)
 	__set_fs(KFS_SEL);
 }
 
-#endif	/* __amd64 */
 
 #ifdef _SYSCALL32_IMPL
 
@@ -870,12 +863,7 @@ lwp_installctx(klwp_t *lwp)
 	 * it to the lwp's kernel stack pointer (kstktop).
 	 */
 	if (is_x86_feature(x86_featureset, X86FSET_SEP)) {
-#if defined(__amd64)
 		caddr_t kstktop = (caddr_t)lwp->lwp_regs;
-#elif defined(__i386)
-		caddr_t kstktop = ((caddr_t)lwp->lwp_regs - MINFRAME) +
-		    SA(sizeof (struct regs) + MINFRAME);
-#endif
 		ASSERT(removectx(t, kstktop,
 		    sep_save, sep_restore, NULL, NULL, NULL, NULL) == 0);
 
@@ -925,8 +913,6 @@ setregs(uarg_t *args)
 	rp->r_sp = sp;
 	rp->r_pc = args->entry;
 	rp->r_ps = PSL_USER;
-
-#if defined(__amd64)
 
 	pcb->pcb_fs = pcb->pcb_gs = 0;
 	pcb->pcb_fsbase = pcb->pcb_gsbase = 0;
@@ -978,27 +964,6 @@ setregs(uarg_t *args)
 	pcb->pcb_ds = rp->r_ds;
 	pcb->pcb_es = rp->r_es;
 	PCB_SET_UPDATE_SEGS(pcb);
-
-#elif defined(__i386)
-
-	rp->r_cs = UCS_SEL;
-	rp->r_ds = rp->r_es = UDS_SEL;
-
-	/*
-	 * Arrange that the virtualized %fs and %gs GDT descriptors
-	 * have a well-defined initial state (present, ring 3
-	 * and of type data).
-	 */
-	pcb->pcb_fsdesc = pcb->pcb_gsdesc = zero_udesc;
-
-	/*
-	 * For %gs we need to reset LWP_GSBASE in pcb and the
-	 * per-cpu GDT descriptor. thrptr is either NULL
-	 * or a value used by DTrace.
-	 */
-	if (args->thrptr)
-		(void) lwp_setprivate(lwp, _LWP_GSBASE, args->thrptr);
-#endif
 
 	lwp->lwp_eosys = JUSTRETURN;
 	t->t_post_sys = 1;

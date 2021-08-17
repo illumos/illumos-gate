@@ -320,7 +320,6 @@ kdi_flush_caches(void)
 size_t
 kdi_range_is_nontoxic(uintptr_t va, size_t sz, int write)
 {
-#if defined(__amd64)
 	extern uintptr_t toxic_addr;
 	extern size_t	toxic_size;
 
@@ -339,18 +338,4 @@ kdi_range_is_nontoxic(uintptr_t va, size_t sz, int write)
 		return (va < hole_start ? hole_start - va : 0);
 
 	return (sz);
-
-#elif defined(__i386)
-	extern void *device_arena_contains(void *, size_t, size_t *);
-	uintptr_t v;
-
-	v = (uintptr_t)device_arena_contains((void *)va, sz, NULL);
-	if (v == 0)
-		return (sz);
-	else if (v <= va)
-		return (0);
-	else
-		return (v - va);
-
-#endif	/* __i386 */
 }

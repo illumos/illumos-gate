@@ -76,7 +76,7 @@
 #include <vm/kboot_mmu.h>
 #endif
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 #include <sys/immu.h>
 #endif
 
@@ -87,13 +87,11 @@
  */
 #ifdef	DEBUG
 int rootnex_alloc_check_parms = 1;
-int rootnex_bind_check_parms = 1;
 int rootnex_bind_check_inuse = 1;
 int rootnex_unbind_verify_buffer = 0;
 int rootnex_sync_check_parms = 1;
 #else
 int rootnex_alloc_check_parms = 0;
-int rootnex_bind_check_parms = 0;
 int rootnex_bind_check_inuse = 0;
 int rootnex_unbind_verify_buffer = 0;
 int rootnex_sync_check_parms = 0;
@@ -120,23 +118,15 @@ int rootnex_sync_ignore_params = 0;
 
 /*
  * For the 64-bit kernel, pre-alloc enough cookies for a 256K buffer plus 1
- * page for alignment. For the 32-bit kernel, pre-alloc enough cookies for a
- * 64K buffer plus 1 page for alignment (we have less kernel space in a 32-bit
- * kernel). Allocate enough windows to handle a 256K buffer w/ at least 65
- * sgllen DMA engine, and enough copybuf buffer state pages to handle 2 pages
- * (< 8K). We will still need to allocate the copy buffer during bind though
- * (if we need one). These can only be modified in /etc/system before rootnex
- * attach.
+ * page for alignment.  Allocate enough windows to handle a 256K buffer w/ at
+ * least 65 sgllen DMA engine, and enough copybuf buffer state pages to handle
+ * 2 pages (< 8K). We will still need to allocate the copy buffer during bind
+ * though (if we need one). These can only be modified in /etc/system before
+ * rootnex attach.
  */
-#if defined(__amd64)
 int rootnex_prealloc_cookies = 65;
 int rootnex_prealloc_windows = 4;
 int rootnex_prealloc_copybuf = 2;
-#else
-int rootnex_prealloc_cookies = 33;
-int rootnex_prealloc_windows = 4;
-int rootnex_prealloc_copybuf = 2;
-#endif
 
 /* driver global state */
 static rootnex_state_t *rootnex_state;
@@ -235,7 +225,7 @@ static int rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp);
 static int rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle);
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 static void rootnex_coredma_reset_cookies(dev_info_t *dip,
     ddi_dma_handle_t handle);
 static int rootnex_coredma_get_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
@@ -252,7 +242,7 @@ static int rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, uint_t win, off_t *offp, size_t *lenp,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp);
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 static int rootnex_coredma_hdl_setprivate(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, void *v);
 static void *rootnex_coredma_hdl_getprivate(dev_info_t *dip, dev_info_t *rdip,
@@ -323,7 +313,7 @@ static struct modlinkage rootnex_modlinkage = {
 	NULL
 };
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 static iommulib_nexops_t iommulib_nexops = {
 	IOMMU_NEXOPS_VERSION,
 	"Rootnex IOMMU ops Vers 1.1",
@@ -381,8 +371,6 @@ static int rootnex_unmap_regspec(ddi_map_req_t *mp, caddr_t *vaddrp);
 static int rootnex_map_handle(ddi_map_req_t *mp);
 static void rootnex_clean_dmahdl(ddi_dma_impl_t *hp);
 static int rootnex_valid_alloc_parms(ddi_dma_attr_t *attr, uint_t maxsegsize);
-static int rootnex_valid_bind_parms(ddi_dma_req_t *dmareq,
-    ddi_dma_attr_t *attr);
 static void rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
     rootnex_sglinfo_t *sglinfo);
 static void rootnex_dvma_get_sgl(ddi_dma_obj_t *dmar_object,
@@ -466,7 +454,7 @@ rootnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_ATTACH:
 		break;
 	case DDI_RESUME:
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 		return (immu_unquiesce());
 #else
 		return (DDI_SUCCESS);
@@ -515,7 +503,7 @@ rootnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Initialize rootnex event handle */
 	i_ddi_rootnex_init_events(dip);
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	e = iommulib_nexus_register(dip, &iommulib_nexops,
 	    &rootnex_state->r_iommulib_handle);
 
@@ -536,7 +524,7 @@ rootnex_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	switch (cmd) {
 	case DDI_SUSPEND:
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 		return (immu_quiesce());
 #else
 		return (DDI_SUCCESS);
@@ -1875,7 +1863,7 @@ rootnex_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
     int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
 {
 	int retval = DDI_SUCCESS;
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 
 	if (IOMMU_UNITIALIZED(rdip)) {
 		retval = iommulib_nex_open(dip, rdip);
@@ -1946,7 +1934,7 @@ rootnex_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 	int ret;
 
 	ndi_fmc_remove(rdip, DMA_HANDLE, handle);
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	if (IOMMU_USED(rdip))
 		ret = iommulib_nexdma_freehdl(dip, rdip, handle);
 	else
@@ -1967,7 +1955,7 @@ rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 {
 	rootnex_sglinfo_t *sinfo;
 	ddi_dma_obj_t *dmao;
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	struct dvmaseg *dvs;
 	ddi_dma_cookie_t *cookie;
 #endif
@@ -2017,20 +2005,10 @@ rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 		mutex_exit(&dma->dp_mutex);
 	}
 
-	/* check the ddi_dma_attr arg to make sure it makes a little sense */
-	if (rootnex_bind_check_parms) {
-		e = rootnex_valid_bind_parms(dmareq, attr);
-		if (e != DDI_SUCCESS) {
-			ROOTNEX_DPROF_INC(&rootnex_cnt[ROOTNEX_CNT_BIND_FAIL]);
-			rootnex_clean_dmahdl(hp);
-			return (e);
-		}
-	}
-
 	/* save away the original bind info */
 	dma->dp_dma = dmareq->dmar_object;
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	if (IOMMU_USED(rdip)) {
 		dmao = &dma->dp_dvma;
 		e = iommulib_nexdma_mapobject(dip, rdip, handle, dmareq, dmao);
@@ -2211,7 +2189,7 @@ fast:
 	 * Clean up and return an error.
 	 */
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 
 	if (dma->dp_dvma_used) {
 		(void) iommulib_nexdma_unmapobject(dip, rdip, handle,
@@ -2221,7 +2199,7 @@ fast:
 #endif
 		e = rootnex_bind_slowpath(hp, dmareq, dma, attr, &dma->dp_dma,
 		    kmflag);
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	}
 #endif
 	if ((e != DDI_DMA_MAPPED) && (e != DDI_DMA_PARTIAL_MAP)) {
@@ -2284,7 +2262,7 @@ rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
 	int ret;
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	if (IOMMU_USED(rdip))
 		ret = iommulib_nexdma_bindhdl(dip, rdip, handle, dmareq,
 		    cookiep, ccountp);
@@ -2338,7 +2316,7 @@ rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	rootnex_teardown_copybuf(dma);
 	rootnex_teardown_windows(dma);
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	if (IOMMU_USED(rdip) && dma->dp_dvma_used)
 		(void) iommulib_nexdma_unmapobject(dip, rdip, handle,
 		    &dma->dp_dvma);
@@ -2377,7 +2355,7 @@ rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 {
 	int ret;
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	if (IOMMU_USED(rdip))
 		ret = iommulib_nexdma_unbindhdl(dip, rdip, handle);
 	else
@@ -2390,7 +2368,7 @@ rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	return (ret);
 }
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 
 static int
 rootnex_coredma_get_sleep_flags(ddi_dma_handle_t handle)
@@ -2666,10 +2644,6 @@ rootnex_clean_dmahdl(ddi_dma_impl_t *hp)
 	dma->dp_partial_required = B_FALSE;
 	dma->dp_trim_required = B_FALSE;
 	dma->dp_sglinfo.si_copybuf_req = 0;
-#if !defined(__amd64)
-	dma->dp_cb_remaping = B_FALSE;
-	dma->dp_kva = NULL;
-#endif
 
 	/* FMA related initialization */
 	hp->dmai_fault = 0;
@@ -2722,28 +2696,6 @@ rootnex_valid_alloc_parms(ddi_dma_attr_t *attr, uint_t maxsegmentsize)
 	}
 	return (DDI_SUCCESS);
 }
-
-/*
- * rootnex_valid_bind_parms()
- *    Called in ddi_dma_*_bind_handle path to validate its parameters.
- */
-/* ARGSUSED */
-static int
-rootnex_valid_bind_parms(ddi_dma_req_t *dmareq, ddi_dma_attr_t *attr)
-{
-#if !defined(__amd64)
-	/*
-	 * we only support up to a 2G-1 transfer size on 32-bit kernels so
-	 * we can track the offset for the obsoleted interfaces.
-	 */
-	if (dmareq->dmar_object.dmao_size > 0x7FFFFFFF) {
-		return (DDI_DMA_TOOBIG);
-	}
-#endif
-
-	return (DDI_SUCCESS);
-}
-
 
 /*
  * rootnex_need_bounce_seg()
@@ -3073,16 +3025,7 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 			}
 			sgl[cnt].dmac_laddress = raddr;
 			sgl[cnt].dmac_size = psize;
-#if defined(__amd64)
 			sgl[cnt].dmac_type = ROOTNEX_USES_COPYBUF;
-#else
-			/*
-			 * save the buf offset for 32-bit kernel. used in the
-			 * obsoleted interfaces.
-			 */
-			sgl[cnt].dmac_type = ROOTNEX_USES_COPYBUF |
-			    (dmar_object->dmao_size - size);
-#endif
 			/* if this isn't the last cookie, go to the next one */
 			if ((cnt + 1) < sglinfo->si_max_pages) {
 				cnt++;
@@ -3112,15 +3055,7 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 			/* save the cookie information */
 			sgl[cnt].dmac_laddress = raddr;
 			sgl[cnt].dmac_size = psize;
-#if defined(__amd64)
 			sgl[cnt].dmac_type = 0;
-#else
-			/*
-			 * save the buf offset for 32-bit kernel. used in the
-			 * obsoleted interfaces.
-			 */
-			sgl[cnt].dmac_type = dmar_object->dmao_size - size;
-#endif
 
 		/*
 		 * this page didn't need the copy buffer, it is physically
@@ -3482,9 +3417,6 @@ rootnex_setup_copybuf(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 	size_t max_copybuf;
 	int cansleep;
 	int e;
-#if !defined(__amd64)
-	int vmflag;
-#endif
 
 	ASSERT(!dma->dp_dvma_used);
 
@@ -3500,30 +3432,6 @@ rootnex_setup_copybuf(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 	dma->dp_copybuf_size = MIN(sinfo->si_copybuf_req, max_copybuf);
 	ASSERT((dma->dp_copybuf_size & MMU_PAGEOFFSET) == 0);
 
-#if !defined(__amd64)
-	/*
-	 * if we don't have kva space to copy to/from, allocate the KVA space
-	 * now. We only do this for the 32-bit kernel. We use seg kpm space for
-	 * the 64-bit kernel.
-	 */
-	if ((dmareq->dmar_object.dmao_type == DMA_OTYP_PAGES) ||
-	    (dmareq->dmar_object.dmao_obj.virt_obj.v_as != NULL)) {
-
-		/* convert the sleep flags */
-		if (dmareq->dmar_fp == DDI_DMA_SLEEP) {
-			vmflag = VM_SLEEP;
-		} else {
-			vmflag = VM_NOSLEEP;
-		}
-
-		/* allocate Kernel VA space that we can bcopy to/from */
-		dma->dp_kva = vmem_alloc(heap_arena, dma->dp_copybuf_size,
-		    vmflag);
-		if (dma->dp_kva == NULL) {
-			return (DDI_DMA_NORESOURCES);
-		}
-	}
-#endif
 
 	/* convert the sleep flags */
 	if (dmareq->dmar_fp == DDI_DMA_SLEEP) {
@@ -3551,12 +3459,6 @@ rootnex_setup_copybuf(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 	e = i_ddi_mem_alloc(dma->dp_dip, &lattr, dma->dp_copybuf_size, cansleep,
 	    0, NULL, &dma->dp_cbaddr, &dma->dp_cbsize, NULL);
 	if (e != DDI_SUCCESS) {
-#if !defined(__amd64)
-		if (dma->dp_kva != NULL) {
-			vmem_free(heap_arena, dma->dp_kva,
-			    dma->dp_copybuf_size);
-		}
-#endif
 		return (DDI_DMA_NORESOURCES);
 	}
 
@@ -3728,13 +3630,6 @@ rootnex_setup_windows(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 		dma->dp_pgmap = (rootnex_pgmap_t *)(((uintptr_t)
 		    &dma->dp_window[dma->dp_max_win] + 0x7) & ~0x7);
 
-#if !defined(__amd64)
-		/*
-		 * make sure all pm_mapped, pm_vaddr, and pm_pp are set to
-		 * false/NULL. Should be quicker to bzero vs loop and set.
-		 */
-		bzero(dma->dp_pgmap, copy_state_size);
-#endif
 	} else {
 		dma->dp_pgmap = NULL;
 	}
@@ -3750,28 +3645,6 @@ rootnex_setup_windows(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 static void
 rootnex_teardown_copybuf(rootnex_dma_t *dma)
 {
-#if !defined(__amd64)
-	int i;
-
-	/*
-	 * if we allocated kernel heap VMEM space, go through all the pages and
-	 * map out any of the ones that we're mapped into the kernel heap VMEM
-	 * arena. Then free the VMEM space.
-	 */
-	if (dma->dp_kva != NULL) {
-		for (i = 0; i < dma->dp_sglinfo.si_max_pages; i++) {
-			if (dma->dp_pgmap[i].pm_mapped) {
-				hat_unload(kas.a_hat, dma->dp_pgmap[i].pm_kaddr,
-				    MMU_PAGESIZE, HAT_UNLOAD);
-				dma->dp_pgmap[i].pm_mapped = B_FALSE;
-			}
-		}
-
-		vmem_free(heap_arena, dma->dp_kva, dma->dp_copybuf_size);
-	}
-
-#endif
-
 	/* if we allocated a copy buffer, free it */
 	if (dma->dp_cbaddr != NULL) {
 		i_ddi_mem_free(dma->dp_cbaddr, NULL);
@@ -3816,9 +3689,6 @@ rootnex_init_win(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 	window->wd_trim.tr_trim_last = B_FALSE;
 	window->wd_trim.tr_first_copybuf_win = B_FALSE;
 	window->wd_trim.tr_last_copybuf_win = B_FALSE;
-#if !defined(__amd64)
-	window->wd_remap_copybuf = dma->dp_cb_remaping;
-#endif
 }
 
 
@@ -3840,11 +3710,7 @@ rootnex_setup_cookie(ddi_dma_obj_t *dmar_object, rootnex_dma_t *dma,
 	uint_t pidx;
 	uint_t pcnt;
 	off_t poff;
-#if defined(__amd64)
 	pfn_t pfn;
-#else
-	page_t **pplist;
-#endif
 
 	ASSERT(dmar_object->dmao_type != DMA_OTYP_DVADDR);
 
@@ -3871,10 +3737,8 @@ rootnex_setup_cookie(ddi_dma_obj_t *dmar_object, rootnex_dma_t *dma,
 		 * pfn which we'll use with seg kpm.
 		 */
 		poff = cookie->dmac_laddress & MMU_PAGEOFFSET;
-#if defined(__amd64)
 		/* mfn_to_pfn() is a NOP on i86pc */
 		pfn = mfn_to_pfn(cookie->dmac_laddress >> MMU_PAGESHIFT);
-#endif /* __amd64 */
 
 		/* figure out if the copybuf size is a power of 2 */
 		if (!ISP2(dma->dp_copybuf_size)) {
@@ -3927,100 +3791,14 @@ rootnex_setup_cookie(ddi_dma_obj_t *dmar_object, rootnex_dma_t *dma,
 			dma->dp_pgmap[pidx].pm_kaddr = (caddr_t)(((uintptr_t)
 			    dmar_object->dmao_obj.virt_obj.v_addr + cur_offset)
 			    & MMU_PAGEMASK);
-#if !defined(__amd64)
-			/*
-			 * we didn't need to, and will never need to map this
-			 * page.
-			 */
-			dma->dp_pgmap[pidx].pm_mapped = B_FALSE;
-#endif
 
 		/* we don't have a kernel VA. We need one for the bcopy. */
 		} else {
-#if defined(__amd64)
 			/*
 			 * for the 64-bit kernel, it's easy. We use seg kpm to
 			 * get a Kernel VA for the corresponding pfn.
 			 */
 			dma->dp_pgmap[pidx].pm_kaddr = hat_kpm_pfn2va(pfn);
-#else
-			/*
-			 * for the 32-bit kernel, this is a pain. First we'll
-			 * save away the page_t or user VA for this page. This
-			 * is needed in rootnex_dma_win() when we switch to a
-			 * new window which requires us to re-map the copy
-			 * buffer.
-			 */
-			pplist = dmar_object->dmao_obj.virt_obj.v_priv;
-			if (dmar_object->dmao_type == DMA_OTYP_PAGES) {
-				dma->dp_pgmap[pidx].pm_pp = *cur_pp;
-				dma->dp_pgmap[pidx].pm_vaddr = NULL;
-			} else if (pplist != NULL) {
-				dma->dp_pgmap[pidx].pm_pp = pplist[pidx];
-				dma->dp_pgmap[pidx].pm_vaddr = NULL;
-			} else {
-				dma->dp_pgmap[pidx].pm_pp = NULL;
-				dma->dp_pgmap[pidx].pm_vaddr = (caddr_t)
-				    (((uintptr_t)
-				    dmar_object->dmao_obj.virt_obj.v_addr +
-				    cur_offset) & MMU_PAGEMASK);
-			}
-
-			/*
-			 * save away the page aligned virtual address which was
-			 * allocated from the kernel heap arena (taking into
-			 * account if we need more copy buffer than we alloced
-			 * and use multiple windows to handle this, i.e. &,%).
-			 * NOTE: there isn't and physical memory backing up this
-			 * virtual address space currently.
-			 */
-			if ((*copybuf_used + MMU_PAGESIZE) <=
-			    dma->dp_copybuf_size) {
-				dma->dp_pgmap[pidx].pm_kaddr = (caddr_t)
-				    (((uintptr_t)dma->dp_kva + *copybuf_used) &
-				    MMU_PAGEMASK);
-			} else {
-				if (copybuf_sz_power_2) {
-					dma->dp_pgmap[pidx].pm_kaddr = (caddr_t)
-					    (((uintptr_t)dma->dp_kva +
-					    (*copybuf_used &
-					    (dma->dp_copybuf_size - 1))) &
-					    MMU_PAGEMASK);
-				} else {
-					dma->dp_pgmap[pidx].pm_kaddr = (caddr_t)
-					    (((uintptr_t)dma->dp_kva +
-					    (*copybuf_used %
-					    dma->dp_copybuf_size)) &
-					    MMU_PAGEMASK);
-				}
-			}
-
-			/*
-			 * if we haven't used up the available copy buffer yet,
-			 * map the kva to the physical page.
-			 */
-			if (!dma->dp_cb_remaping && ((*copybuf_used +
-			    MMU_PAGESIZE) <= dma->dp_copybuf_size)) {
-				dma->dp_pgmap[pidx].pm_mapped = B_TRUE;
-				if (dma->dp_pgmap[pidx].pm_pp != NULL) {
-					i86_pp_map(dma->dp_pgmap[pidx].pm_pp,
-					    dma->dp_pgmap[pidx].pm_kaddr);
-				} else {
-					i86_va_map(dma->dp_pgmap[pidx].pm_vaddr,
-					    sinfo->si_asp,
-					    dma->dp_pgmap[pidx].pm_kaddr);
-				}
-
-			/*
-			 * we've used up the available copy buffer, this page
-			 * will have to be mapped during rootnex_dma_win() when
-			 * we switch to a new window which requires a re-map
-			 * the copy buffer. (32-bit kernel only)
-			 */
-			} else {
-				dma->dp_pgmap[pidx].pm_mapped = B_FALSE;
-			}
-#endif
 			/* go to the next page_t */
 			if (dmar_object->dmao_type == DMA_OTYP_PAGES) {
 				*cur_pp = (*cur_pp)->p_next;
@@ -4044,16 +3822,6 @@ rootnex_setup_cookie(ddi_dma_obj_t *dmar_object, rootnex_dma_t *dma,
 		pcnt = mmu_btopr(cookie->dmac_size + poff);
 
 		while (pcnt > 0) {
-#if !defined(__amd64)
-			/*
-			 * the 32-bit kernel doesn't have seg kpm, so we need
-			 * to map in the driver buffer (if it didn't come down
-			 * with a kernel VA) on the fly. Since this page doesn't
-			 * use the copy buffer, it's not, or will it ever, have
-			 * to be mapped in.
-			 */
-			dma->dp_pgmap[pidx].pm_mapped = B_FALSE;
-#endif
 			dma->dp_pgmap[pidx].pm_uses_copybuf = B_FALSE;
 
 			/*
@@ -4238,15 +4006,6 @@ rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 	 */
 	ASSERT(cookie->dmac_size <= MMU_PAGESIZE);
 
-	/*
-	 * from now on, all new windows in this bind need to be re-mapped during
-	 * ddi_dma_getwin() (32-bit kernel only). i.e. we ran out out copybuf
-	 * space...
-	 */
-#if !defined(__amd64)
-	dma->dp_cb_remaping = B_TRUE;
-#endif
-
 	/* reset copybuf used */
 	*copybuf_used = 0;
 
@@ -4342,10 +4101,6 @@ rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 		(*windowp)->wd_trim.tr_last_pidx = pidx;
 		(*windowp)->wd_trim.tr_last_cbaddr =
 		    dma->dp_pgmap[pidx].pm_cbaddr;
-#if !defined(__amd64)
-		(*windowp)->wd_trim.tr_last_kaddr =
-		    dma->dp_pgmap[pidx].pm_kaddr;
-#endif
 	}
 
 	/* save the buffer offsets for the next window */
@@ -4390,9 +4145,6 @@ rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 		(*windowp)->wd_trim.tr_first_paddr =
 		    ROOTNEX_PADDR_TO_RBASE(paddr);
 
-#if !defined(__amd64)
-		(*windowp)->wd_trim.tr_first_kaddr = dma->dp_kva;
-#endif
 		/* account for the cookie copybuf usage in the new window */
 		*copybuf_used += MMU_PAGESIZE;
 
@@ -4425,10 +4177,6 @@ rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 		    dma->dp_pgmap[pidx + 1].pm_cbaddr)) + poff;
 		cookie->dmac_laddress = ROOTNEX_PADDR_TO_RBASE(paddr);
 
-#if !defined(__amd64)
-		ASSERT(dma->dp_pgmap[pidx + 1].pm_mapped == B_FALSE);
-		dma->dp_pgmap[pidx + 1].pm_kaddr += MMU_PAGESIZE;
-#endif
 	} else {
 		/* go back to the current cookie */
 		cookie++;
@@ -4668,7 +4416,7 @@ static int
 rootnex_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
     off_t off, size_t len, uint_t cache_flags)
 {
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	if (IOMMU_USED(rdip)) {
 		return (iommulib_nexdma_sync(dip, rdip, handle, off, len,
 		    cache_flags));
@@ -4740,21 +4488,10 @@ rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	ddi_dma_impl_t *hp;
 	rootnex_dma_t *dma;
 	ddi_dma_obj_t *dmao;
-#if !defined(__amd64)
-	rootnex_sglinfo_t *sinfo;
-	rootnex_pgmap_t *pmap;
-	uint_t pidx;
-	uint_t pcnt;
-	off_t poff;
-	int i;
-#endif
 
 
 	hp = (ddi_dma_impl_t *)handle;
 	dma = (rootnex_dma_t *)hp->dmai_private;
-#if !defined(__amd64)
-	sinfo = &dma->dp_sglinfo;
-#endif
 
 	/* If we try and get a window which doesn't exist, return failure */
 	if (win >= hp->dmai_nwin) {
@@ -4794,41 +4531,6 @@ rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 		    DDI_DMA_SYNC_FORCPU);
 	}
 
-#if !defined(__amd64)
-	/*
-	 * before we move to the next window, if we need to re-map, unmap all
-	 * the pages in this window.
-	 */
-	if (dma->dp_cb_remaping) {
-		/*
-		 * If we switch to this window again, we'll need to map in
-		 * on the fly next time.
-		 */
-		window->wd_remap_copybuf = B_TRUE;
-
-		/*
-		 * calculate the page index into the buffer where this window
-		 * starts, and the number of pages this window takes up.
-		 */
-		pidx = (sinfo->si_buf_offset + window->wd_offset) >>
-		    MMU_PAGESHIFT;
-		poff = (sinfo->si_buf_offset + window->wd_offset) &
-		    MMU_PAGEOFFSET;
-		pcnt = mmu_btopr(window->wd_size + poff);
-		ASSERT((pidx + pcnt) <= sinfo->si_max_pages);
-
-		/* unmap pages which are currently mapped in this window */
-		for (i = 0; i < pcnt; i++) {
-			if (dma->dp_pgmap[pidx].pm_mapped) {
-				hat_unload(kas.a_hat,
-				    dma->dp_pgmap[pidx].pm_kaddr, MMU_PAGESIZE,
-				    HAT_UNLOAD);
-				dma->dp_pgmap[pidx].pm_mapped = B_FALSE;
-			}
-			pidx++;
-		}
-	}
-#endif
 
 	/*
 	 * Move to the new window.
@@ -4842,18 +4544,9 @@ rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	if (trim->tr_trim_first) {
 		window->wd_first_cookie->dmac_laddress = trim->tr_first_paddr;
 		window->wd_first_cookie->dmac_size = trim->tr_first_size;
-#if !defined(__amd64)
-		window->wd_first_cookie->dmac_type =
-		    (window->wd_first_cookie->dmac_type &
-		    ROOTNEX_USES_COPYBUF) + window->wd_offset;
-#endif
 		if (trim->tr_first_copybuf_win) {
 			dma->dp_pgmap[trim->tr_first_pidx].pm_cbaddr =
 			    trim->tr_first_cbaddr;
-#if !defined(__amd64)
-			dma->dp_pgmap[trim->tr_first_pidx].pm_kaddr =
-			    trim->tr_first_kaddr;
-#endif
 		}
 	}
 	if (trim->tr_trim_last) {
@@ -4862,10 +4555,6 @@ rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 		if (trim->tr_last_copybuf_win) {
 			dma->dp_pgmap[trim->tr_last_pidx].pm_cbaddr =
 			    trim->tr_last_cbaddr;
-#if !defined(__amd64)
-			dma->dp_pgmap[trim->tr_last_pidx].pm_kaddr =
-			    trim->tr_last_kaddr;
-#endif
 		}
 	}
 
@@ -4883,66 +4572,6 @@ rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	hp->dmai_curcookie = 1;
 	hp->dmai_cookie++;
 
-#if !defined(__amd64)
-	/* re-map copybuf if required for this window */
-	if (dma->dp_cb_remaping) {
-		/*
-		 * calculate the page index into the buffer where this
-		 * window starts.
-		 */
-		pidx = (sinfo->si_buf_offset + window->wd_offset) >>
-		    MMU_PAGESHIFT;
-		ASSERT(pidx < sinfo->si_max_pages);
-
-		/*
-		 * the first page can get unmapped if it's shared with the
-		 * previous window. Even if the rest of this window is already
-		 * mapped in, we need to still check this one.
-		 */
-		pmap = &dma->dp_pgmap[pidx];
-		if ((pmap->pm_uses_copybuf) && (pmap->pm_mapped == B_FALSE)) {
-			if (pmap->pm_pp != NULL) {
-				pmap->pm_mapped = B_TRUE;
-				i86_pp_map(pmap->pm_pp, pmap->pm_kaddr);
-			} else if (pmap->pm_vaddr != NULL) {
-				pmap->pm_mapped = B_TRUE;
-				i86_va_map(pmap->pm_vaddr, sinfo->si_asp,
-				    pmap->pm_kaddr);
-			}
-		}
-		pidx++;
-
-		/* map in the rest of the pages if required */
-		if (window->wd_remap_copybuf) {
-			window->wd_remap_copybuf = B_FALSE;
-
-			/* figure out many pages this window takes up */
-			poff = (sinfo->si_buf_offset + window->wd_offset) &
-			    MMU_PAGEOFFSET;
-			pcnt = mmu_btopr(window->wd_size + poff);
-			ASSERT(((pidx - 1) + pcnt) <= sinfo->si_max_pages);
-
-			/* map pages which require it */
-			for (i = 1; i < pcnt; i++) {
-				pmap = &dma->dp_pgmap[pidx];
-				if (pmap->pm_uses_copybuf) {
-					ASSERT(pmap->pm_mapped == B_FALSE);
-					if (pmap->pm_pp != NULL) {
-						pmap->pm_mapped = B_TRUE;
-						i86_pp_map(pmap->pm_pp,
-						    pmap->pm_kaddr);
-					} else if (pmap->pm_vaddr != NULL) {
-						pmap->pm_mapped = B_TRUE;
-						i86_va_map(pmap->pm_vaddr,
-						    sinfo->si_asp,
-						    pmap->pm_kaddr);
-					}
-				}
-				pidx++;
-			}
-		}
-	}
-#endif
 
 	/* if the new window uses the copy buffer, sync it for the device */
 	if ((window->wd_dosync) && (hp->dmai_rflags & DDI_DMA_WRITE)) {
@@ -4963,7 +4592,7 @@ rootnex_dma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
     uint_t win, off_t *offp, size_t *lenp, ddi_dma_cookie_t *cookiep,
     uint_t *ccountp)
 {
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	if (IOMMU_USED(rdip)) {
 		return (iommulib_nexdma_win(dip, rdip, handle, win, offp, lenp,
 		    cookiep, ccountp));
@@ -4974,7 +4603,7 @@ rootnex_dma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	    cookiep, ccountp));
 }
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 /*ARGSUSED*/
 static int
 rootnex_coredma_hdl_setprivate(dev_info_t *dip, dev_info_t *rdip,
@@ -5156,7 +4785,7 @@ rootnex_dma_check(dev_info_t *dip, const void *handle, const void *addr,
 static int
 rootnex_quiesce(dev_info_t *dip)
 {
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	return (immu_quiesce());
 #else
 	return (DDI_SUCCESS);

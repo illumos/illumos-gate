@@ -186,7 +186,7 @@ thread_init(void)
 		mutex_init(lp, NULL, MUTEX_DEFAULT, NULL);
 	}
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	thread_cache = kmem_cache_create("thread_cache", sizeof (kthread_t),
 	    PTR24_ALIGN, NULL, NULL, NULL, NULL, NULL, 0);
 
@@ -1523,7 +1523,7 @@ thread_create_intr(struct cpu *cp)
 	tp->t_bind_cpu = PBIND_NONE;	/* no USER-requested binding */
 	tp->t_bind_pset = PS_NONE;
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	tp->t_stk -= STACK_ALIGN;
 	*(tp->t_stk) = 0;		/* terminate intr thread stack */
 #endif
@@ -2220,7 +2220,7 @@ stkinfo_end(kthread_t *t)
 	/* search until no pattern in the stack */
 	if (t->t_stk > t->t_stkbase) {
 		/* stack grows down */
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 		/*
 		 * 6 longs are pushed on stack, see thread_load(). Skip
 		 * them, so if kthread has never run, percent is zero.

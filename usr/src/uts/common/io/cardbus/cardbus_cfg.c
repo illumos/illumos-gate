@@ -28,8 +28,6 @@
  * From "@(#)pcicfg.c   1.31    99/06/18 SMI"
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Cardbus configurator
  */
@@ -1264,7 +1262,7 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 	io_request->ra_len += cardbus_min_spare_io;
 	if (io_request->ra_len) {
 
-#if defined(__x86) || defined(__amd64)
+#if defined(__x86)
 		io_request->ra_boundbase = 0x1000;
 		io_request->ra_boundlen = 0xefff;
 #else
@@ -3229,7 +3227,7 @@ cardbus_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
 		cardbus_err(dip, 8,
 		    "cardbus_config_setup PCICFG_NODEVICE\n");
 		ret = PCICFG_NODEVICE;
-#elif defined(__x86) || defined(__amd64)
+#elif defined(__x86)
 	if (ddi_get16(*handle, (uint16_t *)cfgaddr) == 0xffff) {
 		cardbus_err(dip, 8,
 		    "cardbus_config_setup PCICFG_NODEVICE\n");

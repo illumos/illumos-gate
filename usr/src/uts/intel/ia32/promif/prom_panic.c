@@ -39,12 +39,7 @@ prom_panic(char *s)
 	if (s == NULL)
 		s = "unknown panic";
 
-#if defined(I386BOOT)
-	prom_printf(fmt, "boot", s);
-	for (;;)
-		continue;
-	/*NOTREACHED*/
-#elif defined(_KMDB)
+#if defined(_KMDB)
 	prom_printf(fmt, "kmdb", s);
 #elif defined(_KERNEL)
 	prom_printf(fmt, "kernel", s);

@@ -71,7 +71,7 @@
 #include <sys/ctfs_impl.h>
 #include <sys/ctfs.h>
 
-#if defined(__i386) || defined(__i386_COMPAT)
+#if defined(__i386_COMPAT)
 #include <sys/sysi86.h>
 #endif
 
@@ -133,6 +133,7 @@ prctioctl(prnode_t *pnp, int cmd, intptr_t arg, int flag, cred_t *cr)
 /*
  * Control operations (lots).
  */
+/* BEGIN CSTYLED */
 /*ARGSUSED*/
 #ifdef _SYSCALL32_IMPL
 static int
@@ -144,6 +145,7 @@ prioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
     int *rvalp, caller_context_t *ct)
 #endif	/* _SYSCALL32_IMPL */
 {
+/* END CSTYLED */
 	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
 	caddr_t cmaddr = (caddr_t)arg;
 	proc_t *p;
@@ -275,11 +277,11 @@ prioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 	case PIOCAUXV:
 		break;
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	case PIOCNLDT:
 	case PIOCLDT:
 		break;
-#endif	/* __i386 || __amd64 */
+#endif	/* __x86 */
 
 #if defined(__sparc)
 	case PIOCGWIN:
@@ -1235,7 +1237,7 @@ startover:
 		break;
 	}
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	case PIOCNLDT:		/* get number of LDT entries */
 	{
 		int n;
@@ -1290,7 +1292,7 @@ startover:
 		kmem_free(ssd, (n+1) * sizeof (*ssd));
 		break;
 	}
-#endif	/* __i386 || __amd64 */
+#endif	/* __x86 */
 
 #if defined(__sparc)
 	case PIOCGWIN:		/* get gwindows_t (see sys/reg.h) */
@@ -1830,11 +1832,11 @@ prioctl32(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 	case PIOCAUXV:
 		break;
 
-#if defined(__i386) || defined(__i386_COMPAT)
+#if defined(__i386_COMPAT)
 	case PIOCNLDT:
 	case PIOCLDT:
 		break;
-#endif	/* __i386 || __i386_COMPAT */
+#endif	/* __i386_COMPAT */
 
 #if defined(__sparc)
 	case PIOCGWIN:
@@ -2867,7 +2869,7 @@ startover:
 		break;
 	}
 
-#if defined(__i386) || defined(__i386_COMPAT)
+#if defined(__i386_COMPAT)
 	case PIOCNLDT:		/* get number of LDT entries */
 	{
 		int n;
@@ -2922,7 +2924,7 @@ startover:
 		kmem_free(ssd, (n+1) * sizeof (*ssd));
 		break;
 	}
-#endif	/* __i386 || __i386_COMPAT */
+#endif	/* __i386_COMPAT */
 
 #if defined(__sparc)
 	case PIOCGWIN:		/* get gwindows_t (see sys/reg.h) */

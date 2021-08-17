@@ -513,17 +513,8 @@ const struct fxsave_state sse_initial = {
 	0,		/* fx_fsw */
 	0,		/* fx_fctw */
 	0,		/* fx_fop */
-#if defined(__amd64)
 	0,		/* fx_rip */
 	0,		/* fx_rdp */
-#else
-	0,		/* fx_eip */
-	0,		/* fx_cs */
-	0,		/* __fx_ign0 */
-	0,		/* fx_dp */
-	0,		/* fx_ds */
-	0,		/* __fx_ign1 */
-#endif /* __amd64 */
 	SSE_MXCSR_INIT	/* fx_mxcsr */
 	/* rest of structure is zero */
 };
@@ -541,17 +532,8 @@ const struct xsave_state avx_initial = {
 		0,		/* fx_fsw */
 		0,		/* fx_fctw */
 		0,		/* fx_fop */
-#if defined(__amd64)
 		0,		/* fx_rip */
 		0,		/* fx_rdp */
-#else
-		0,		/* fx_eip */
-		0,		/* fx_cs */
-		0,		/* __fx_ign0 */
-		0,		/* fx_dp */
-		0,		/* fx_ds */
-		0,		/* __fx_ign1 */
-#endif /* __amd64 */
 		SSE_MXCSR_INIT	/* fx_mxcsr */
 		/* rest of structure is zero */
 	},

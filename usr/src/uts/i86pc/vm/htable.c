@@ -671,7 +671,7 @@ htable_steal(uint_t cnt, boolean_t reap)
 				if (ht->ht_hat == NULL)
 					continue;
 				ASSERT(ht->ht_hat == hat);
-#if defined(__xpv) && defined(__amd64)
+#if defined(__xpv)
 				ASSERT(!(ht->ht_flags & HTABLE_COPIED));
 				if (ht->ht_level == mmu.max_level) {
 					ptable_free(hat->hat_user_ptable);
@@ -870,7 +870,7 @@ htable_alloc(
 			if (is_bare) {
 				ptable_free(ht->ht_pfn);
 				ht->ht_pfn = PFN_INVALID;
-#if defined(__xpv) && defined(__amd64)
+#if defined(__xpv)
 			/*
 			 * make stolen page table writable again in kpm
 			 */
@@ -891,7 +891,7 @@ htable_alloc(
 	if (ht == NULL)
 		panic("htable_alloc(): couldn't steal\n");
 
-#if defined(__amd64) && defined(__xpv)
+#if defined(__xpv)
 	/*
 	 * Under the 64-bit hypervisor, we have 2 top level page tables.
 	 * If this allocation fails, we'll resort to stealing.
@@ -960,7 +960,7 @@ htable_alloc(
 	if (need_to_zero)
 		x86pte_zero(ht, 0, mmu.ptes_per_table);
 
-#if defined(__amd64) && defined(__xpv)
+#if defined(__xpv)
 	if (!is_bare && kpm_vbase) {
 		(void) xen_kpm_page(ht->ht_pfn, PT_VALID);
 		if (level == mmu.max_level)
@@ -1006,7 +1006,7 @@ htable_free(htable_t *ht)
 		ASSERT(ht->ht_pfn != PFN_INVALID);
 	} else if (!(ht->ht_flags & HTABLE_COPIED)) {
 		ptable_free(ht->ht_pfn);
-#if defined(__amd64) && defined(__xpv)
+#if defined(__xpv)
 		if (ht->ht_level == mmu.max_level && hat != NULL) {
 			ptable_free(hat->hat_user_ptable);
 			hat->hat_user_ptable = PFN_INVALID;
@@ -1158,12 +1158,7 @@ link_ptp(htable_t *higher, htable_t *new, uintptr_t vaddr)
 	 *
 	 * We also need to do this for the kernel hat on PAE 32 bit kernel.
 	 */
-	if (
-#ifdef __i386
-	    (higher->ht_hat == kas.a_hat &&
-	    higher->ht_level == higher->ht_hat->hat_max_level) ||
-#endif
-	    (higher->ht_flags & HTABLE_COPIED))
+	if ((higher->ht_flags & HTABLE_COPIED) != 0)
 		hat_tlb_inval(higher->ht_hat, DEMAP_ALL_ADDR);
 }
 
@@ -1297,7 +1292,6 @@ htable_lookup(hat_t *hat, uintptr_t vaddr, level_t level)
 	ASSERT(level <= TOP_LEVEL(hat));
 
 	if (level == TOP_LEVEL(hat)) {
-#if defined(__amd64)
 		/*
 		 * 32 bit address spaces on 64 bit kernels need to check
 		 * for overflow of the 32 bit address space
@@ -1305,7 +1299,6 @@ htable_lookup(hat_t *hat, uintptr_t vaddr, level_t level)
 		if ((hat->hat_flags & HAT_COPIED_32) &&
 		    vaddr >= ((uint64_t)1 << 32))
 			return (NULL);
-#endif
 		base = 0;
 	} else {
 		base = vaddr & LEVEL_MASK(level + 1);
@@ -1550,16 +1543,12 @@ htable_attach(
 		if (offset > kernelbase)
 			offset -= kernelbase;
 		offset <<= MMU_PAGESHIFT;
-#if defined(__amd64)
 		offset += mmu.hole_start;	/* something in VA hole */
-#else
-		offset += 1ULL << 40;		/* something > 4 Gig */
-#endif
 		ASSERT(page_exists(&kvp, offset) == NULL);
 		(void) page_hashin(pp, &kvp, offset, NULL);
 	}
 	page_downgrade(pp);
-#if defined(__xpv) && defined(__amd64)
+#if defined(__xpv)
 	/*
 	 * Record in the page_t that is a pagetable for segkpm setup.
 	 */
@@ -1655,13 +1644,11 @@ htable_scan(htable_t *ht, uintptr_t *vap, uintptr_t eaddr)
 		found_pte = GET_PTE((x86pte_t *)pte_ptr);
 	x86pte_release_pagetable(ht);
 
-#if defined(__amd64)
 	/*
 	 * deal with VA hole on amd64
 	 */
 	if (l == mmu.max_level && va >= mmu.hole_start && va <= mmu.hole_end)
 		va = mmu.hole_end + va - mmu.hole_start;
-#endif /* __amd64 */
 
 	*vap = va;
 	return (found_pte);
@@ -1843,11 +1830,7 @@ htable_init()
 	 * To save on kernel VA usage, we avoid debug information in 32 bit
 	 * kernels.
 	 */
-#if defined(__amd64)
 	int	kmem_flags = KMC_NOHASH;
-#elif defined(__i386)
-	int	kmem_flags = KMC_NOHASH | KMC_NODEBUG;
-#endif
 
 	/*
 	 * initialize kmem caches
@@ -1886,10 +1869,8 @@ htable_e2va(htable_t *ht, uint_t entry)
 	/*
 	 * Need to skip over any VA hole in top level table
 	 */
-#if defined(__amd64)
 	if (ht->ht_level == mmu.max_level && va >= mmu.hole_start)
 		va += ((mmu.hole_end - mmu.hole_start) + 1);
-#endif
 
 	return (va);
 }
@@ -1922,26 +1903,6 @@ x86pte_cpu_fini(cpu_t *cpu)
 	kmem_free(hci, sizeof (*hci));
 	cpu->cpu_hat_info = NULL;
 }
-
-#ifdef __i386
-/*
- * On 32 bit kernels, loading a 64 bit PTE is a little tricky
- */
-x86pte_t
-get_pte64(x86pte_t *ptr)
-{
-	volatile uint32_t *p = (uint32_t *)ptr;
-	x86pte_t t;
-
-	ASSERT(mmu.pae_hat != 0);
-	for (;;) {
-		t = p[0];
-		t |= (uint64_t)p[1] << 32;
-		if ((t & 0xffffffff) == p[0])
-			return (t);
-	}
-}
-#endif /* __i386 */
 
 /*
  * Disable preemption and establish a mapping to the pagetable with the
@@ -2205,7 +2166,6 @@ x86pte_cas(htable_t *ht, uint_t entry, x86pte_t old, x86pte_t new)
 		t[0].ptr = ma | MMU_NORMAL_PT_UPDATE;
 		t[0].val = new;
 
-#if defined(__amd64)
 		/*
 		 * On the 64-bit hypervisor we need to maintain the user mode
 		 * top page table too.
@@ -2217,7 +2177,6 @@ x86pte_cas(htable_t *ht, uint_t entry, x86pte_t old, x86pte_t new)
 			t[1].val = new;
 			++cnt;
 		}
-#endif	/* __amd64 */
 
 		if (HYPERVISOR_mmu_update(t, cnt, &count, DOMID_SELF))
 			panic("HYPERVISOR_mmu_update() failed");
@@ -2430,13 +2389,11 @@ x86pte_copy(htable_t *src, htable_t *dest, uint_t entry, uint_t count)
 		if (pte != 0) {
 			set_pteval(pfn_to_pa(dest->ht_pfn), entry,
 			    dest->ht_level, pte);
-#ifdef __amd64
 			if (dest->ht_level == mmu.max_level &&
 			    htable_e2va(dest, entry) < HYPERVISOR_VIRT_END)
 				set_pteval(
 				    pfn_to_pa(dest->ht_hat->hat_user_ptable),
 				    entry, dest->ht_level, pte);
-#endif
 		}
 		--count;
 		++entry;
@@ -2484,12 +2441,7 @@ x86pte_zero(htable_t *dest, uint_t entry, uint_t count)
 
 	size = count << mmu.pte_size_shift;
 	ASSERT(size > BLOCKZEROALIGN);
-#ifdef __i386
-	if (!is_x86_feature(x86_featureset, X86FSET_SSE2))
-		bzero(dst_va, size);
-	else
-#endif
-		block_zero_no_xmm(dst_va, size);
+	block_zero_no_xmm(dst_va, size);
 
 #ifdef __xpv
 	if (kpm_vbase == NULL) {

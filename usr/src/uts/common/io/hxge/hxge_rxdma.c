@@ -351,11 +351,7 @@ hxge_rxbuf_pp_to_vp(p_hxge_t hxgep, p_rx_rbr_ring_t rbr_p,
 	    "==> hxge_rxbuf_pp_to_vp: buf_pp $%p btype %d",
 	    pkt_buf_addr_pp, pktbufsz_type));
 
-#if defined(__i386)
-	pktbuf_pp = (uint64_t)(uint32_t)pkt_buf_addr_pp;
-#else
 	pktbuf_pp = (uint64_t)pkt_buf_addr_pp;
-#endif
 
 	switch (pktbufsz_type) {
 	case 0:
@@ -548,13 +544,8 @@ found_index:
 	    "block_index %d ",
 	    total_index, dvma_addr, offset, block_size, block_index));
 
-#if defined(__i386)
-	*pkt_buf_addr_p = (uint64_t *)((uint32_t)bufinfo[anchor_index].kaddr +
-	    (uint32_t)offset);
-#else
 	*pkt_buf_addr_p = (uint64_t *)((uint64_t)bufinfo[anchor_index].kaddr +
 	    offset);
-#endif
 
 	HXGE_DEBUG_MSG((hxgep, RX2_CTL,
 	    "==> hxge_rxbuf_pp_to_vp: "
@@ -1697,13 +1688,8 @@ hxge_receive_packet(p_hxge_t hxgep, p_rx_rcr_ring_t rcr_p,
 
 	pktbufsz_type = ((rcr_entry & RCR_PKTBUFSZ_MASK) >>
 	    RCR_PKTBUFSZ_SHIFT);
-#if defined(__i386)
-	pkt_buf_addr_pp = (uint64_t *)(uint32_t)((rcr_entry &
-	    RCR_PKT_BUF_ADDR_MASK) << RCR_PKT_BUF_ADDR_SHIFT);
-#else
 	pkt_buf_addr_pp = (uint64_t *)((rcr_entry & RCR_PKT_BUF_ADDR_MASK) <<
 	    RCR_PKT_BUF_ADDR_SHIFT);
-#endif
 
 	HXGE_DEBUG_MSG((hxgep, RX2_CTL,
 	    "==> hxge_receive_packet: entryp $%p entry 0x%0llx "
@@ -1733,13 +1719,8 @@ hxge_receive_packet(p_hxge_t hxgep, p_rx_rcr_ring_t rcr_p,
 	}
 
 	/* shift 6 bits to get the full io address */
-#if defined(__i386)
-	pkt_buf_addr_pp = (uint64_t *)((uint32_t)pkt_buf_addr_pp <<
-	    RCR_PKT_BUF_ADDR_SHIFT_FULL);
-#else
 	pkt_buf_addr_pp = (uint64_t *)((uint64_t)pkt_buf_addr_pp <<
 	    RCR_PKT_BUF_ADDR_SHIFT_FULL);
-#endif
 	HXGE_DEBUG_MSG((hxgep, RX2_CTL,
 	    "==> (rbr) hxge_receive_packet: entry 0x%0llx "
 	    "full pkt_buf_addr_pp $%p l2_len %d",
@@ -2746,13 +2727,8 @@ hxge_map_rxdma_channel_cfg_ring(p_hxge_t hxgep, uint16_t dma_channel,
 	rcrp->comp_wt_index = 0;
 	rcrp->rcr_desc_rd_head_p = rcrp->rcr_desc_first_p =
 	    (p_rcr_entry_t)DMA_COMMON_VPTR(rcrp->rcr_desc);
-#if defined(__i386)
-	rcrp->rcr_desc_rd_head_pp = rcrp->rcr_desc_first_pp =
-	    (p_rcr_entry_t)(uint32_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
-#else
 	rcrp->rcr_desc_rd_head_pp = rcrp->rcr_desc_first_pp =
 	    (p_rcr_entry_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
-#endif
 	rcrp->rcr_desc_last_p = rcrp->rcr_desc_rd_head_p +
 	    (hxge_port_rcr_size - 1);
 	rcrp->rcr_desc_last_pp = rcrp->rcr_desc_rd_head_pp +
@@ -2960,19 +2936,11 @@ hxge_map_rxdma_channel_buf_ring(p_hxge_t hxgep, uint16_t channel,
 	for (i = 0; i < rbrp->num_blocks; i++, dma_bufp++) {
 		bsize = dma_bufp->block_size;
 		nblocks = dma_bufp->nblocks;
-#if defined(__i386)
-		ring_info->buffer[i].dvma_addr = (uint32_t)dma_bufp->ioaddr_pp;
-#else
 		ring_info->buffer[i].dvma_addr = (uint64_t)dma_bufp->ioaddr_pp;
-#endif
 		ring_info->buffer[i].buf_index = i;
 		ring_info->buffer[i].buf_size = dma_bufp->alength;
 		ring_info->buffer[i].start_index = index;
-#if defined(__i386)
-		ring_info->buffer[i].kaddr = (uint32_t)dma_bufp->kaddrp;
-#else
 		ring_info->buffer[i].kaddr = (uint64_t)dma_bufp->kaddrp;
-#endif
 
 		HXGE_DEBUG_MSG((hxgep, MEM2_CTL,
 		    " hxge_map_rxdma_channel_buf_ring: map channel %d "
@@ -3641,13 +3609,8 @@ hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 	rcrp->comp_wt_index = 0;
 	rcrp->rcr_desc_rd_head_p = rcrp->rcr_desc_first_p =
 	    (p_rcr_entry_t)DMA_COMMON_VPTR(rcrp->rcr_desc);
-#if defined(__i386)
-	rcrp->rcr_desc_rd_head_pp = rcrp->rcr_desc_first_pp =
-	    (p_rcr_entry_t)(uint32_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
-#else
 	rcrp->rcr_desc_rd_head_pp = rcrp->rcr_desc_first_pp =
 	    (p_rcr_entry_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
-#endif
 
 	rcrp->rcr_desc_last_p = rcrp->rcr_desc_rd_head_p +
 	    (hxge_port_rcr_size - 1);

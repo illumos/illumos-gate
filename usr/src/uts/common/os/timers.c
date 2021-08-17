@@ -1211,7 +1211,7 @@ hrt2ts(hrtime_t hrt, timestruc_t *tsp)
 hrtime_t
 ts2hrt(const timestruc_t *tsp)
 {
-#if defined(__amd64) || defined(__i386)
+#if defined(__x86)
 	/*
 	 * On modern x86 CPUs, the simple version is faster.
 	 */
@@ -1232,7 +1232,7 @@ ts2hrt(const timestruc_t *tsp)
 	hrt = (hrt << 7) - hrt - hrt - hrt;
 	hrt = (hrt << 9) + tsp->tv_nsec;
 	return (hrt);
-#endif /* defined(__amd64) || defined(__i386) */
+#endif /* defined(__x86) */
 }
 
 /*

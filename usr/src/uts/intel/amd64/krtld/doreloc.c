@@ -51,7 +51,7 @@
  *		target and linker host use different byte ordering,
  *		but such code is a waste when running natively.
  */
-#if !defined(DO_RELOC_LIBLD) || defined(__i386) || defined(__amd64)
+#if !defined(DO_RELOC_LIBLD) || defined(__x86)
 #define	DORELOC_NATIVE
 #endif
 
@@ -183,6 +183,7 @@ const Rel_entry	reloc_table[R_AMD64_NUM] = {
 #define	ZEROEXBITS	0xffffffff00000000ULL
 #define	SIGNEXBITS	0xffffffff80000000ULL
 
+/* BEGIN CSTYLED */
 #if defined(_KERNEL)
 #define	lml	0		/* Needed by arglist of REL_ERR_* macros */
 int
@@ -200,6 +201,7 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
     const char *file, void *lml)
 #endif
 {
+/* END CSTYLED */
 #ifdef DO_RELOC_LIBLD
 #define	sym (* rel_desc_sname_func)(rdesc)
 	uchar_t	rtype = rdesc->rel_rtype;

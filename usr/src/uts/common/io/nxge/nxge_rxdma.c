@@ -406,7 +406,7 @@ nxge_init_rxdma_channel_cntl_stat(p_nxge_t nxgep, uint16_t channel,
  *	Set the default RDC for an RDC Group (Table)
  *
  * Arguments:
- * 	nxgep
+ *	nxgep
  *	rdcgrp	The group to modify
  *	rdc	The new default RDC.
  *
@@ -487,7 +487,7 @@ nxge_rxdma_cfg_port_default_rdc(p_nxge_t nxgep, uint8_t port, uint8_t rdc)
 
 nxge_status_t
 nxge_rxdma_cfg_rcr_threshold(p_nxge_t nxgep, uint8_t channel,
-				    uint16_t pkts)
+    uint16_t pkts)
 {
 	npi_status_t	rs = NPI_SUCCESS;
 	npi_handle_t	handle;
@@ -506,7 +506,7 @@ nxge_rxdma_cfg_rcr_threshold(p_nxge_t nxgep, uint8_t channel,
 
 nxge_status_t
 nxge_rxdma_cfg_rcr_timeout(p_nxge_t nxgep, uint8_t channel,
-			    uint16_t tout, uint8_t enable)
+    uint16_t tout, uint8_t enable)
 {
 	npi_status_t	rs = NPI_SUCCESS;
 	npi_handle_t	handle;
@@ -531,7 +531,7 @@ nxge_enable_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
     p_rx_rbr_ring_t rbr_p, p_rx_rcr_ring_t rcr_p, p_rx_mbox_t mbox_p)
 {
 	npi_handle_t		handle;
-	rdc_desc_cfg_t 		rdc_desc;
+	rdc_desc_cfg_t		rdc_desc;
 	p_rcrcfig_b_t		cfgb_p;
 	npi_status_t		rs = NPI_SUCCESS;
 
@@ -697,20 +697,20 @@ nxge_rxdma_channel_rcrflush(p_nxge_t nxgep, uint8_t channel)
 /*ARGSUSED*/
 nxge_status_t
 nxge_rxbuf_pp_to_vp(p_nxge_t nxgep, p_rx_rbr_ring_t rbr_p,
-	uint8_t pktbufsz_type, uint64_t *pkt_buf_addr_pp,
-	uint64_t **pkt_buf_addr_p, uint32_t *bufoffset, uint32_t *msg_index)
+    uint8_t pktbufsz_type, uint64_t *pkt_buf_addr_pp,
+    uint64_t **pkt_buf_addr_p, uint32_t *bufoffset, uint32_t *msg_index)
 {
 	int			bufsize;
 	uint64_t		pktbuf_pp;
-	uint64_t 		dvma_addr;
-	rxring_info_t 		*ring_info;
-	int 			base_side, end_side;
-	int 			r_index, l_index, anchor_index;
-	int 			found, search_done;
+	uint64_t		dvma_addr;
+	rxring_info_t		*ring_info;
+	int			base_side, end_side;
+	int			r_index, l_index, anchor_index;
+	int			found, search_done;
 	uint32_t offset, chunk_size, block_size, page_size_mask;
 	uint32_t chunk_index, block_index, total_index;
-	int 			max_iterations, iteration;
-	rxbuf_index_info_t 	*bufinfo;
+	int			max_iterations, iteration;
+	rxbuf_index_info_t	*bufinfo;
 
 	NXGE_DEBUG_MSG((nxgep, RX2_CTL, "==> nxge_rxbuf_pp_to_vp"));
 
@@ -718,11 +718,7 @@ nxge_rxbuf_pp_to_vp(p_nxge_t nxgep, p_rx_rbr_ring_t rbr_p,
 	    "==> nxge_rxbuf_pp_to_vp: buf_pp $%p btype %d",
 	    pkt_buf_addr_pp,
 	    pktbufsz_type));
-#if defined(__i386)
-	pktbuf_pp = (uint64_t)(uint32_t)pkt_buf_addr_pp;
-#else
 	pktbuf_pp = (uint64_t)pkt_buf_addr_pp;
-#endif
 
 	switch (pktbufsz_type) {
 	case 0:
@@ -778,7 +774,7 @@ nxge_rxbuf_pp_to_vp(p_nxge_t nxgep, p_rx_rbr_ring_t rbr_p,
 		 * the block has been processed.
 		 * As three block sizes are supported, three hints
 		 * are kept. The idea behind the hints is that once
-		 * the hardware  uses a block for a buffer  of that
+		 * the hardware	 uses a block for a buffer  of that
 		 * size, it will use it exclusively for that size
 		 * and will use it until it is exhausted. It is assumed
 		 * that there would a single block being used for the same
@@ -816,7 +812,7 @@ nxge_rxbuf_pp_to_vp(p_nxge_t nxgep, p_rx_rbr_ring_t rbr_p,
 			 * the search algorithm uses a binary tree search
 			 * algorithm. It assumes that the information is
 			 * already sorted with increasing order
-			 * info[0] < info[1] < info[2]  .... < info[n-1]
+			 * info[0] < info[1] < info[2]	.... < info[n-1]
 			 * where n is the size of the information array
 			 */
 		r_index = rbr_p->num_blocks - 1;
@@ -948,13 +944,8 @@ found_index:
 	    total_index, dvma_addr,
 	    offset, block_size,
 	    block_index));
-#if defined(__i386)
-	*pkt_buf_addr_p = (uint64_t *)((uint32_t)bufinfo[anchor_index].kaddr +
-	    (uint32_t)offset);
-#else
 	*pkt_buf_addr_p = (uint64_t *)((uint64_t)bufinfo[anchor_index].kaddr +
 	    (uint64_t)offset);
-#endif
 
 	NXGE_DEBUG_MSG((nxgep, RX2_CTL,
 	    "==> nxge_rxbuf_pp_to_vp: "
@@ -1159,10 +1150,10 @@ void
 nxge_rxdma_regs_dump(p_nxge_t nxgep, int rdc)
 {
 	npi_handle_t		handle;
-	rbr_stat_t 		rbr_stat;
-	addr44_t 		hd_addr;
-	addr44_t 		tail_addr;
-	uint16_t 		qlen;
+	rbr_stat_t		rbr_stat;
+	addr44_t		hd_addr;
+	addr44_t		tail_addr;
+	uint16_t		qlen;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 	    "==> nxge_rxdma_regs_dump: rdc channel %d", rdc));
@@ -1172,13 +1163,8 @@ nxge_rxdma_regs_dump(p_nxge_t nxgep, int rdc)
 	/* RBR head */
 	hd_addr.addr = 0;
 	(void) npi_rxdma_rdc_rbr_head_get(handle, rdc, &hd_addr);
-#if defined(__i386)
-	printf("nxge_rxdma_regs_dump: got hdptr $%p \n",
-	    (void *)(uint32_t)hd_addr.addr);
-#else
 	printf("nxge_rxdma_regs_dump: got hdptr $%p \n",
 	    (void *)hd_addr.addr);
-#endif
 
 	/* RBR stats */
 	(void) npi_rxdma_rdc_rbr_stat_get(handle, rdc, &rbr_stat);
@@ -1187,13 +1173,8 @@ nxge_rxdma_regs_dump(p_nxge_t nxgep, int rdc)
 	/* RCR tail */
 	tail_addr.addr = 0;
 	(void) npi_rxdma_rdc_rcr_tail_get(handle, rdc, &tail_addr);
-#if defined(__i386)
-	printf("nxge_rxdma_regs_dump: got tail ptr $%p \n",
-	    (void *)(uint32_t)tail_addr.addr);
-#else
 	printf("nxge_rxdma_regs_dump: got tail ptr $%p \n",
 	    (void *)tail_addr.addr);
-#endif
 
 	/* RCR qlen */
 	(void) npi_rxdma_rdc_rcr_qlen_get(handle, rdc, &qlen);
@@ -1348,18 +1329,18 @@ void
 nxge_rxdma_fix_channel(p_nxge_t nxgep, uint16_t channel)
 {
 	int			ndmas;
-	p_rx_rbr_rings_t 	rx_rbr_rings;
+	p_rx_rbr_rings_t	rx_rbr_rings;
 	p_rx_rbr_ring_t		*rbr_rings;
-	p_rx_rcr_rings_t 	rx_rcr_rings;
+	p_rx_rcr_rings_t	rx_rcr_rings;
 	p_rx_rcr_ring_t		*rcr_rings;
-	p_rx_mbox_areas_t 	rx_mbox_areas_p;
+	p_rx_mbox_areas_t	rx_mbox_areas_p;
 	p_rx_mbox_t		*rx_mbox_p;
 	p_nxge_dma_pool_t	dma_buf_poolp;
 	p_nxge_dma_pool_t	dma_cntl_poolp;
-	p_rx_rbr_ring_t 	rbrp;
-	p_rx_rcr_ring_t 	rcrp;
-	p_rx_mbox_t 		mboxp;
-	p_nxge_dma_common_t 	dmap;
+	p_rx_rbr_ring_t		rbrp;
+	p_rx_rcr_ring_t		rcrp;
+	p_rx_mbox_t		mboxp;
+	p_nxge_dma_common_t	dmap;
 	nxge_status_t		status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rxdma_fix_channel"));
@@ -1509,9 +1490,9 @@ nxge_rxdma_get_rcr_ring(p_nxge_t nxgep, uint16_t channel)
 static p_rx_msg_t
 nxge_allocb(size_t size, uint32_t pri, p_nxge_dma_common_t dmabuf_p)
 {
-	p_rx_msg_t nxge_mp 		= NULL;
+	p_rx_msg_t nxge_mp		= NULL;
 	p_nxge_dma_common_t		dmamsg_p;
-	uchar_t 			*buffer;
+	uchar_t				*buffer;
 
 	nxge_mp = KMEM_ZALLOC(sizeof (rx_msg_t), KM_NOSLEEP);
 	if (nxge_mp == NULL) {
@@ -2193,7 +2174,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 	uint32_t		error_disp_cnt;
 	uint32_t		msg_index;
 	p_rx_rbr_ring_t		rx_rbr_p;
-	p_rx_msg_t 		*rx_msg_ring_p;
+	p_rx_msg_t		*rx_msg_ring_p;
 	p_rx_msg_t		rx_msg_p;
 	uint16_t		sw_offset_bytes = 0, hdr_size = 0;
 	nxge_status_t		status = NXGE_OK;
@@ -2222,13 +2203,8 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 	pktbufsz_type = ((rcr_entry & RCR_PKTBUFSZ_MASK) >>
 	    RCR_PKTBUFSZ_SHIFT);
-#if defined(__i386)
-	pkt_buf_addr_pp = (uint64_t *)(uint32_t)((rcr_entry &
-	    RCR_PKT_BUF_ADDR_MASK) << RCR_PKT_BUF_ADDR_SHIFT);
-#else
 	pkt_buf_addr_pp = (uint64_t *)((rcr_entry & RCR_PKT_BUF_ADDR_MASK) <<
 	    RCR_PKT_BUF_ADDR_SHIFT);
-#endif
 
 	channel = rcr_p->rdc;
 
@@ -2281,13 +2257,8 @@ nxge_receive_packet(p_nxge_t nxgep,
 	l2_len -= ETHERFCSL;
 
 	/* shift 6 bits to get the full io address */
-#if defined(__i386)
-	pkt_buf_addr_pp = (uint64_t *)((uint32_t)pkt_buf_addr_pp <<
-	    RCR_PKT_BUF_ADDR_SHIFT_FULL);
-#else
 	pkt_buf_addr_pp = (uint64_t *)((uint64_t)pkt_buf_addr_pp <<
 	    RCR_PKT_BUF_ADDR_SHIFT_FULL);
-#endif
 	NXGE_DEBUG_MSG((nxgep, RX2_CTL,
 	    "==> (rbr) nxge_receive_packet: entry 0x%0llx "
 	    "full pkt_buf_addr_pp $%p l2_len %d",
@@ -3137,8 +3108,8 @@ nxge_rx_err_evnts(p_nxge_t nxgep, int channel, rx_dma_ctl_stat_t cs)
  *	This code appears to setup some Hypervisor variables.
  *
  * Arguments:
- * 	nxgep
- * 	channel
+ *	nxgep
+ *	channel
  *
  * Notes:
  *	What does NIU_LP_WORKAROUND mean?
@@ -3195,8 +3166,8 @@ nxge_rdc_hvio_setup(
  *	Map an RDC into our kernel space.
  *
  * Arguments:
- * 	nxgep
- * 	channel	The channel to map.
+ *	nxgep
+ *	channel	The channel to map.
  *
  * Notes:
  *	1. Allocate & initialise a memory pool, if necessary.
@@ -3403,13 +3374,13 @@ nxge_map_rxdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
     p_nxge_dma_common_t *dma_cntl_p, p_rx_rbr_ring_t *rbr_p,
     p_rx_rcr_ring_t *rcr_p, p_rx_mbox_t *rx_mbox_p)
 {
-	p_rx_rbr_ring_t 	rbrp;
-	p_rx_rcr_ring_t 	rcrp;
-	p_rx_mbox_t 		mboxp;
-	p_nxge_dma_common_t 	cntl_dmap;
-	p_nxge_dma_common_t 	dmap;
-	p_rx_msg_t 		*rx_msg_ring;
-	p_rx_msg_t 		rx_msg_p;
+	p_rx_rbr_ring_t		rbrp;
+	p_rx_rcr_ring_t		rcrp;
+	p_rx_mbox_t		mboxp;
+	p_nxge_dma_common_t	cntl_dmap;
+	p_nxge_dma_common_t	dmap;
+	p_rx_msg_t		*rx_msg_ring;
+	p_rx_msg_t		rx_msg_p;
 	p_rbr_cfig_a_t		rcfga_p;
 	p_rbr_cfig_b_t		rcfgb_p;
 	p_rcrcfig_a_t		cfga_p;
@@ -3422,7 +3393,7 @@ nxge_map_rxdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	uint32_t		bkaddr;
 	nxge_status_t		status = NXGE_OK;
 	int			i;
-	uint32_t 		nxge_port_rcr_size;
+	uint32_t		nxge_port_rcr_size;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 	    "==> nxge_map_rxdma_channel_cfg_ring"));
@@ -3597,13 +3568,8 @@ nxge_map_rxdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	rcrp->comp_wt_index = 0;
 	rcrp->rcr_desc_rd_head_p = rcrp->rcr_desc_first_p =
 	    (p_rcr_entry_t)DMA_COMMON_VPTR(rcrp->rcr_desc);
-#if defined(__i386)
-	rcrp->rcr_desc_rd_head_pp = rcrp->rcr_desc_first_pp =
-	    (p_rcr_entry_t)(uint32_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
-#else
 	rcrp->rcr_desc_rd_head_pp = rcrp->rcr_desc_first_pp =
 	    (p_rcr_entry_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
-#endif
 
 	rcrp->rcr_desc_last_p = rcrp->rcr_desc_rd_head_p +
 	    (nxge_port_rcr_size - 1);
@@ -3757,11 +3723,11 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
     p_nxge_dma_common_t *dma_buf_p,
     p_rx_rbr_ring_t *rbr_p, uint32_t num_chunks)
 {
-	p_rx_rbr_ring_t 	rbrp;
-	p_nxge_dma_common_t 	dma_bufp, tmp_bufp;
-	p_rx_msg_t 		*rx_msg_ring;
-	p_rx_msg_t 		rx_msg_p;
-	p_mblk_t 		mblk_p;
+	p_rx_rbr_ring_t		rbrp;
+	p_nxge_dma_common_t	dma_bufp, tmp_bufp;
+	p_rx_msg_t		*rx_msg_ring;
+	p_rx_msg_t		rx_msg_p;
+	p_mblk_t		mblk_p;
 
 	rxring_info_t *ring_info;
 	nxge_status_t		status = NXGE_OK;
@@ -3853,24 +3819,16 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	    rbrp->block_size, nxgep->rx_default_block_size,
 	    nxge_rbr_size, nxge_rbr_spare_size));
 
-	/* Map in buffers from the buffer pool.  */
+	/* Map in buffers from the buffer pool.	 */
 	index = 0;
 	for (i = 0; i < rbrp->num_blocks; i++, dma_bufp++) {
 		bsize = dma_bufp->block_size;
 		nblocks = dma_bufp->nblocks;
-#if defined(__i386)
-		ring_info->buffer[i].dvma_addr = (uint32_t)dma_bufp->ioaddr_pp;
-#else
 		ring_info->buffer[i].dvma_addr = (uint64_t)dma_bufp->ioaddr_pp;
-#endif
 		ring_info->buffer[i].buf_index = i;
 		ring_info->buffer[i].buf_size = dma_bufp->alength;
 		ring_info->buffer[i].start_index = index;
-#if defined(__i386)
-		ring_info->buffer[i].kaddr = (uint32_t)dma_bufp->kaddrp;
-#else
 		ring_info->buffer[i].kaddr = (uint64_t)dma_bufp->kaddrp;
-#endif
 
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 		    " nxge_map_rxdma_channel_buf_ring: map channel %d "
@@ -3984,9 +3942,9 @@ static void
 nxge_unmap_rxdma_channel_buf_ring(p_nxge_t nxgep,
     p_rx_rbr_ring_t rbr_p)
 {
-	p_rx_msg_t 		*rx_msg_ring;
-	p_rx_msg_t 		rx_msg_p;
-	rxring_info_t 		*ring_info;
+	p_rx_msg_t		*rx_msg_ring;
+	p_rx_msg_t		rx_msg_p;
+	rxring_info_t		*ring_info;
 	int			i;
 	uint32_t		size;
 #ifdef	NXGE_DEBUG
@@ -4083,7 +4041,7 @@ nxge_unmap_rxdma_channel_buf_ring(p_nxge_t nxgep,
  * nxge_rxdma_hw_start_common
  *
  * Arguments:
- * 	nxgep
+ *	nxgep
  *
  * Notes:
  *
@@ -4125,11 +4083,11 @@ static nxge_status_t
 nxge_rxdma_hw_start(p_nxge_t nxgep, int channel)
 {
 	int			i, ndmas;
-	p_rx_rbr_rings_t 	rx_rbr_rings;
+	p_rx_rbr_rings_t	rx_rbr_rings;
 	p_rx_rbr_ring_t		*rbr_rings;
-	p_rx_rcr_rings_t 	rx_rcr_rings;
+	p_rx_rcr_rings_t	rx_rcr_rings;
 	p_rx_rcr_ring_t		*rcr_rings;
-	p_rx_mbox_areas_t 	rx_mbox_areas_p;
+	p_rx_mbox_areas_t	rx_mbox_areas_p;
 	p_rx_mbox_t		*rx_mbox_p;
 	nxge_status_t		status = NXGE_OK;
 
@@ -4189,8 +4147,8 @@ nxge_rxdma_hw_start(p_nxge_t nxgep, int channel)
 static void
 nxge_rxdma_hw_stop(p_nxge_t nxgep, int channel)
 {
-	p_rx_rbr_rings_t 	rx_rbr_rings;
-	p_rx_rcr_rings_t 	rx_rcr_rings;
+	p_rx_rbr_rings_t	rx_rbr_rings;
+	p_rx_rcr_rings_t	rx_rcr_rings;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_hw_stop"));
 
@@ -4218,7 +4176,6 @@ nxge_rxdma_hw_stop(p_nxge_t nxgep, int channel)
 static nxge_status_t
 nxge_rxdma_start_channel(p_nxge_t nxgep, uint16_t channel,
     p_rx_rbr_ring_t rbr_p, p_rx_rcr_ring_t rcr_p, p_rx_mbox_t mbox_p)
-
 {
 	npi_handle_t		handle;
 	npi_status_t		rs = NPI_SUCCESS;
@@ -4231,8 +4188,8 @@ nxge_rxdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "nxge_rxdma_start_channel: "
-		"npi handle addr $%p acc $%p",
-		nxgep->npi_handle.regp, nxgep->npi_handle.regh));
+	    "npi handle addr $%p acc $%p",
+	    nxgep->npi_handle.regp, nxgep->npi_handle.regh));
 
 	/* Reset RXDMA channel, but not if you're a guest. */
 	if (!isLDOMguest(nxgep)) {
@@ -4264,14 +4221,14 @@ nxge_rxdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 		status = nxge_init_fzc_rxdma_channel(nxgep, channel);
 		if (status != NXGE_OK) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"==> nxge_rxdma_start_channel: "
-				"init fzc rxdma failed (0x%08x channel %d)",
-				status, channel));
+			    "==> nxge_rxdma_start_channel: "
+			    "init fzc rxdma failed (0x%08x channel %d)",
+			    status, channel));
 			return (status);
 		}
 
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			"==> nxge_rxdma_start_channel: fzc done"));
+		    "==> nxge_rxdma_start_channel: fzc done"));
 	}
 
 	/* Set up the interrupt event masks. */
@@ -4281,17 +4238,17 @@ nxge_rxdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 	    &ent_mask);
 	if (rs != NPI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_rxdma_start_channel: "
-			"init rxdma event masks failed "
-			"(0x%08x channel %d)",
-			status, channel));
+		    "==> nxge_rxdma_start_channel: "
+		    "init rxdma event masks failed "
+		    "(0x%08x channel %d)",
+		    status, channel));
 		return (NXGE_ERROR | rs);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		"==> nxge_rxdma_start_channel: "
-		"event done: channel %d (mask 0x%016llx)",
-		channel, ent_mask.value));
+	    "==> nxge_rxdma_start_channel: "
+	    "event done: channel %d (mask 0x%016llx)",
+	    channel, ent_mask.value));
 
 	/* Initialize the receive DMA control and status register */
 	cs.value = 0;
@@ -4301,17 +4258,17 @@ nxge_rxdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 	cs.bits.hdw.rbr_empty = 1;
 	status = nxge_init_rxdma_channel_cntl_stat(nxgep, channel, &cs);
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_start_channel: "
-		"channel %d rx_dma_cntl_stat 0x%0016llx", channel, cs.value));
+	    "channel %d rx_dma_cntl_stat 0x%0016llx", channel, cs.value));
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_rxdma_start_channel: "
-			"init rxdma control register failed (0x%08x channel %d",
-			status, channel));
+		    "==> nxge_rxdma_start_channel: "
+		    "init rxdma control register failed (0x%08x channel %d",
+		    status, channel));
 		return (status);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_start_channel: "
-		"control done - channel %d cs 0x%016llx", channel, cs.value));
+	    "control done - channel %d cs 0x%016llx", channel, cs.value));
 
 	/*
 	 * Load RXDMA descriptors, buffers, mailbox,
@@ -4346,19 +4303,19 @@ nxge_rxdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 
 	ent_mask.value = 0;
 	ent_mask.value |= (RX_DMA_ENT_MSK_WRED_DROP_MASK |
-				RX_DMA_ENT_MSK_PTDROP_PKT_MASK);
+	    RX_DMA_ENT_MSK_PTDROP_PKT_MASK);
 	rs = npi_rxdma_event_mask(handle, OP_SET, channel,
-			&ent_mask);
+	    &ent_mask);
 	if (rs != NPI_SUCCESS) {
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-			"==> nxge_rxdma_start_channel: "
-			"init rxdma event masks failed (0x%08x channel %d)",
-			status, channel));
+		    "==> nxge_rxdma_start_channel: "
+		    "init rxdma event masks failed (0x%08x channel %d)",
+		    status, channel));
 		return (NXGE_ERROR | rs);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_rxdma_start_channel: "
-		"control done - channel %d cs 0x%016llx", channel, cs.value));
+	    "control done - channel %d cs 0x%016llx", channel, cs.value));
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_rxdma_start_channel"));
 
@@ -4553,7 +4510,7 @@ nxge_rxdma_handle_sys_errors(p_nxge_t nxgep)
 
 static nxge_status_t
 nxge_rxdma_handle_port_errors(p_nxge_t nxgep, uint32_t ipp_status,
-							uint32_t zcp_status)
+    uint32_t zcp_status)
 {
 	boolean_t		rxport_fatal = B_FALSE;
 	p_nxge_rdc_sys_stats_t	statsp;
@@ -4669,13 +4626,8 @@ nxge_rxdma_fatal_err_recover(p_nxge_t nxgep, uint16_t channel)
 	rcrp->comp_wt_index = 0;
 	rcrp->rcr_desc_rd_head_p = rcrp->rcr_desc_first_p =
 	    (p_rcr_entry_t)DMA_COMMON_VPTR(rcrp->rcr_desc);
-#if defined(__i386)
-	rcrp->rcr_desc_rd_head_pp = rcrp->rcr_desc_first_pp =
-	    (p_rcr_entry_t)(uint32_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
-#else
 	rcrp->rcr_desc_rd_head_pp = rcrp->rcr_desc_first_pp =
 	    (p_rcr_entry_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
-#endif
 
 	rcrp->rcr_desc_last_p = rcrp->rcr_desc_rd_head_p +
 	    (nxge_port_rcr_size - 1);
@@ -4877,13 +4829,8 @@ nxge_rxdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 			cs.bits.hdw.rbrlogpage = 1;
 		else if (err_id == NXGE_FM_EREPORT_RDMC_CFIGLOGPAGE)
 			cs.bits.hdw.cfiglogpage = 1;
-#if defined(__i386)
-		cmn_err(CE_NOTE, "!Write 0x%llx to RX_DMA_CTL_STAT_DBG_REG\n",
-		    cs.value);
-#else
 		cmn_err(CE_NOTE, "!Write 0x%lx to RX_DMA_CTL_STAT_DBG_REG\n",
 		    cs.value);
-#endif
 		RXDMA_REG_WRITE64(nxgep->npi_handle, RX_DMA_CTL_STAT_DBG_REG,
 		    chan, cs.value);
 		break;
@@ -4897,15 +4844,9 @@ nxge_rxdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 			cdfs.bits.ldw.zcp_eop_err = (1 << nxgep->mac.portnum);
 		else if (err_id == NXGE_FM_EREPORT_RDMC_IPP_EOP_ERR)
 			cdfs.bits.ldw.ipp_eop_err = (1 << nxgep->mac.portnum);
-#if defined(__i386)
-		cmn_err(CE_NOTE,
-		    "!Write 0x%llx to RX_CTL_DAT_FIFO_STAT_DBG_REG\n",
-		    cdfs.value);
-#else
 		cmn_err(CE_NOTE,
 		    "!Write 0x%lx to RX_CTL_DAT_FIFO_STAT_DBG_REG\n",
 		    cdfs.value);
-#endif
 		NXGE_REG_WR64(nxgep->npi_handle,
 		    RX_CTL_DAT_FIFO_STAT_DBG_REG, cdfs.value);
 		break;
@@ -4919,7 +4860,7 @@ nxge_rxdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 static void
 nxge_rxdma_databuf_free(p_rx_rbr_ring_t rbr_p)
 {
-	rxring_info_t 		*ring_info;
+	rxring_info_t		*ring_info;
 	int			index;
 	uint32_t		chunk_size;
 	uint64_t		kaddr;
@@ -4983,11 +4924,7 @@ nxge_free_buf(buf_alloc_type_t alloc_type, uint64_t kaddr, uint32_t buf_size)
 		NXGE_DEBUG_MSG((NULL, DMA_CTL,
 		    "==> nxge_free_buf: freeing kmem $%p size %d",
 		    kaddr, buf_size));
-#if defined(__i386)
-		KMEM_FREE((void *)(uint32_t)kaddr, buf_size);
-#else
 		KMEM_FREE((void *)kaddr, buf_size);
-#endif
 		break;
 
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)

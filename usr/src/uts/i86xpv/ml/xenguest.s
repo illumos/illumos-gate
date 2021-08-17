@@ -48,7 +48,4 @@
 	NOTE("Xen", XEN_ELFNOTE_GUEST_OS, .string, "Solaris")
 	NOTE("Xen", XEN_ELFNOTE_VIRT_BASE, .4byte, 0x40000000)
 	NOTE("Xen", XEN_ELFNOTE_PADDR_OFFSET, .4byte, 0x40000000)
-#if defined(__i386)
-	NOTE("Xen", XEN_ELFNOTE_PAE_MODE, .string, "yes,bimodal")
-#endif
 

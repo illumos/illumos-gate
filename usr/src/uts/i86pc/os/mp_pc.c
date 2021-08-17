@@ -122,16 +122,13 @@ mach_cpucontext_fini(void)
 	    HAT_UNLOAD);
 }
 
-#if defined(__amd64)
 extern void *long_mode_64(void);
-#endif	/* __amd64 */
 
 /*ARGSUSED*/
 void
 rmp_gdt_init(rm_platter_t *rm)
 {
 
-#if defined(__amd64)
 	/* Use the kas address space for the CPU startup thread. */
 	if (mmu_ptob(kas.a_hat->hat_htable->ht_pfn) > 0xffffffffUL) {
 		panic("Cannot initialize CPUs; kernel's 64-bit page tables\n"
@@ -167,7 +164,6 @@ rmp_gdt_init(rm_platter_t *rm)
 	rm->rm_longmode64_addr = rm_platter_pa +
 	    (uint32_t)((uintptr_t)long_mode_64 -
 	    (uintptr_t)real_mode_start_cpu);
-#endif	/* __amd64 */
 }
 
 static void *
@@ -190,7 +186,6 @@ mach_cpucontext_alloc_tables(struct cpu *cp)
 
 	ntss = cp->cpu_tss = &ct->ct_tss;
 
-#if defined(__amd64)
 	uintptr_t va;
 	size_t len;
 
@@ -243,21 +238,6 @@ mach_cpucontext_alloc_tables(struct cpu *cp)
 		hati_cpu_punchin(cp, (uintptr_t)ntss, PROT_READ);
 	}
 
-#elif defined(__i386)
-
-	ntss->tss_esp0 = ntss->tss_esp1 = ntss->tss_esp2 = ntss->tss_esp =
-	    (uint32_t)&ct->ct_stack1[sizeof (ct->ct_stack1)];
-
-	ntss->tss_ss0 = ntss->tss_ss1 = ntss->tss_ss2 = ntss->tss_ss = KDS_SEL;
-
-	ntss->tss_eip = (uint32_t)cp->cpu_thread->t_pc;
-
-	ntss->tss_cs = KCS_SEL;
-	ntss->tss_ds = ntss->tss_es = KDS_SEL;
-	ntss->tss_fs = KFS_SEL;
-	ntss->tss_gs = KGS_SEL;
-
-#endif	/* __i386 */
 
 	/*
 	 * Set I/O bit map offset equal to size of TSS segment limit

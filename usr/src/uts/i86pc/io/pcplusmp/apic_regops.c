@@ -54,8 +54,8 @@ static void local_apic_write_int_cmd(uint32_t cpu_id, uint32_t cmd1);
  *   xAPIC global enable    X2APIC enable         Description
  *   (IA32_APIC_BASE[11])   (IA32_APIC_BASE[10])
  * -----------------------------------------------------------
- *      0 			0 	APIC is disabled
- * 	0			1	Invalid
+ *	0			0	APIC is disabled
+ *	0			1	Invalid
  *	1			0	APIC is enabled in xAPIC mode
  *	1			1	APIC is enabled in X2APIC mode
  * -----------------------------------------------------------
@@ -74,8 +74,6 @@ apic_reg_ops_t local_apic_regs_ops = {
 	local_apic_write_int_cmd,
 	apic_send_EOI,
 };
-
-int apic_have_32bit_cr8 = 0;
 
 /* The default ops is local APIC (Memory Mapped IO) */
 apic_reg_ops_t *apic_reg_ops = &local_apic_regs_ops;
@@ -104,26 +102,13 @@ local_apic_write(uint32_t reg, uint64_t value)
 static int
 get_local_apic_pri(void)
 {
-#if defined(__amd64)
 	return ((int)getcr8());
-#else
-	if (apic_have_32bit_cr8)
-		return ((int)getcr8());
-	return (apicadr[APIC_TASK_REG]);
-#endif
 }
 
 static void
 local_apic_write_task_reg(uint64_t value)
 {
-#if defined(__amd64)
 	setcr8((ulong_t)(value >> APIC_IPL_SHIFT));
-#else
-	if (apic_have_32bit_cr8)
-		setcr8((ulong_t)(value >> APIC_IPL_SHIFT));
-	else
-		apicadr[APIC_TASK_REG] = (uint32_t)value;
-#endif
 }
 
 static void

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rge.h"
 
 #define	RGE_DBG		RGE_DBG_STATS	/* debug flag for this code	*/
@@ -55,7 +53,7 @@ static const rge_ksindex_t rge_driverinfo[] = {
 	{ 14,		"chip_reset"		},
 	{ 15,		"phy_reset"		},
 	{ 16,		"loop_mode"		},
-	{ -1,		NULL 			}
+	{ -1,		NULL			}
 };
 
 static int
@@ -93,7 +91,7 @@ rge_driverinfo_update(kstat_t *ksp, int flag)
 
 static kstat_t *
 rge_setup_named_kstat(rge_t *rgep, int instance, char *name,
-	const rge_ksindex_t *ksip, size_t size, int (*update)(kstat_t *, int))
+    const rge_ksindex_t *ksip, size_t size, int (*update)(kstat_t *, int))
 {
 	kstat_t *ksp;
 	kstat_named_t *knp;
@@ -102,7 +100,7 @@ rge_setup_named_kstat(rge_t *rgep, int instance, char *name,
 
 	size /= sizeof (rge_ksindex_t);
 	ksp = kstat_create(RGE_DRIVER_NAME, instance, name, "net",
-		KSTAT_TYPE_NAMED, size-1, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_NAMED, size-1, KSTAT_FLAG_PERSISTENT);
 	if (ksp == NULL)
 		return (NULL);
 
@@ -137,8 +135,8 @@ void
 rge_init_kstats(rge_t *rgep, int instance)
 {
 	rgep->rge_kstats[RGE_KSTAT_DRIVER] = rge_setup_named_kstat(rgep,
-		instance, "driverinfo", rge_driverinfo,
-		sizeof (rge_driverinfo), rge_driverinfo_update);
+	    instance, "driverinfo", rge_driverinfo,
+	    sizeof (rge_driverinfo), rge_driverinfo_update);
 }
 
 void

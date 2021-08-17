@@ -90,13 +90,6 @@ syslwp_create(ucontext_t *ucp, int flags, id_t *new_lwp)
 		if (copyin(ucp, &uc, sizeof (ucontext_t)))
 			return (set_errno(EFAULT));
 		sigutok(&uc.uc_sigmask, &sigmask);
-#if defined(__i386)
-		/*
-		 * libc stashed thrptr into unused kernel %sp.
-		 * See setup_context() in libc.
-		 */
-		thrptr = (uint32_t)uc.uc_mcontext.gregs[ESP];
-#endif
 	}
 #ifdef _SYSCALL32_IMPL
 	else {

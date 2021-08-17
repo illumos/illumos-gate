@@ -61,7 +61,7 @@ extern uint64_t npi_debug_level;
 #define	SET_RX_INTR_PKTS 2
 
 #define	BASE_ANY	0
-#define	BASE_BINARY 	2
+#define	BASE_BINARY	2
 #define	BASE_HEX	16
 #define	BASE_DECIMAL	10
 #define	ALL_FF_64	0xFFFFFFFFFFFFFFFFULL
@@ -538,15 +538,15 @@ static nxge_param_t	nxge_param_arr[] = {
 		0, 0x0fffffff, 0x0fffffff, 0, "end", "end"},
 };
 
-extern void 		*nxge_list;
+extern void		*nxge_list;
 
 void
 nxge_get_param_soft_properties(p_nxge_t nxgep)
 {
 
-	p_nxge_param_t 		param_arr;
-	uint_t 			prop_len;
-	int 			i, j;
+	p_nxge_param_t		param_arr;
+	uint_t			prop_len;
+	int			i, j;
 	uint32_t		param_count;
 	uint32_t		*int_prop_val;
 
@@ -571,12 +571,7 @@ nxge_get_param_soft_properties(p_nxge_t nxgep)
 
 				if (prop_len > NXGE_PARAM_ARRAY_INIT_SIZE)
 					prop_len = NXGE_PARAM_ARRAY_INIT_SIZE;
-#if defined(__i386)
-				cfg_value =
-				    (uint32_t *)(int32_t)param_arr[i].value;
-#else
 				cfg_value = (uint32_t *)param_arr[i].value;
-#endif
 				for (j = 0; j < prop_len; j++) {
 					cfg_value[j] = int_prop_val[j];
 				}
@@ -757,19 +752,9 @@ nxge_init_param(p_nxge_t nxgep)
 			alloc_count = NXGE_PARAM_ARRAY_INIT_SIZE;
 			alloc_size = alloc_count * sizeof (uint64_t);
 			param_arr[i].value =
-#if defined(__i386)
-			    (uint64_t)(uint32_t)KMEM_ZALLOC(alloc_size,
-			    KM_SLEEP);
-#else
-			(uint64_t)KMEM_ZALLOC(alloc_size, KM_SLEEP);
-#endif
+			    (uint64_t)KMEM_ZALLOC(alloc_size, KM_SLEEP);
 			param_arr[i].old_value =
-#if defined(__i386)
-			    (uint64_t)(uint32_t)KMEM_ZALLOC(alloc_size,
-			    KM_SLEEP);
-#else
-			(uint64_t)KMEM_ZALLOC(alloc_size, KM_SLEEP);
-#endif
+			    (uint64_t)KMEM_ZALLOC(alloc_size, KM_SLEEP);
 			param_arr[i].type |=
 			    (alloc_count << NXGE_PARAM_ARRAY_ALLOC_SHIFT);
 		}
@@ -814,19 +799,9 @@ nxge_destroy_param(p_nxge_t nxgep)
 			    NXGE_PARAM_ARRAY_ALLOC_SHIFT);
 			free_count = NXGE_PARAM_ARRAY_INIT_SIZE;
 			free_size = sizeof (uint64_t) * free_count;
-#if defined(__i386)
-			KMEM_FREE((void *)(uint32_t)nxgep->param_arr[i].value,
-			    free_size);
-#else
 			KMEM_FREE((void *)nxgep->param_arr[i].value, free_size);
-#endif
-#if defined(__i386)
-			KMEM_FREE((void *)(uint32_t)
-			    nxgep->param_arr[i].old_value, free_size);
-#else
 			KMEM_FREE((void *)nxgep->param_arr[i].old_value,
 			    free_size);
-#endif
 		}
 
 	KMEM_FREE(nxgep->param_arr, sizeof (nxge_param_arr));
@@ -1040,9 +1015,9 @@ nxge_param_get_rxdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
 	int			buff_alloc_size = NXGE_NDD_INFODUMP_BUFF_SIZE;
-	p_rx_rcr_rings_t 	rx_rcr_rings;
+	p_rx_rcr_rings_t	rx_rcr_rings;
 	p_rx_rcr_ring_t		*rcr_rings;
-	p_rx_rbr_rings_t 	rx_rbr_rings;
+	p_rx_rbr_rings_t	rx_rbr_rings;
 	p_rx_rbr_ring_t		*rbr_rings;
 	nxge_grp_set_t		*set;
 
@@ -1366,16 +1341,8 @@ nxge_param_set_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 		NXGE_DEBUG_MSG((nxgep, NDD_CTL,
 		    " nxge_param_set_mac_rdcgrp mapping"
 		    " id %d grp %d", mac_map->param_id, mac_map->map_to));
-#if defined(__i386)
-		val_ptr = (uint32_t *)(uint32_t)pa->value;
-#else
 		val_ptr = (uint32_t *)pa->value;
-#endif
-#if defined(__i386)
-		old_val_ptr = (uint32_t *)(uint32_t)pa->old_value;
-#else
 		old_val_ptr = (uint32_t *)pa->old_value;
-#endif
 		if (val_ptr[mac_map->param_id] != cfg_value) {
 			old_val_ptr[mac_map->param_id] =
 			    val_ptr[mac_map->param_id];
@@ -1451,16 +1418,8 @@ nxge_param_set_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 		    "nxge_param_set_vlan_rdcgrp mapping"
 		    " id %d grp %d",
 		    vmap->param_id, vmap->map_to));
-#if defined(__i386)
-		val_ptr = (uint32_t *)(uint32_t)pa->value;
-#else
 		val_ptr = (uint32_t *)pa->value;
-#endif
-#if defined(__i386)
-		old_val_ptr = (uint32_t *)(uint32_t)pa->old_value;
-#else
 		old_val_ptr = (uint32_t *)pa->old_value;
-#endif
 
 		/* search to see if this vlan id is already configured */
 		for (i = 0; i < cfgd_vlans; i++) {
@@ -1528,13 +1487,13 @@ nxge_param_get_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
     mblk_t *mp, caddr_t cp)
 {
 
-	uint_t 			print_len, buf_len;
+	uint_t			print_len, buf_len;
 	p_mblk_t		np;
 	int			i;
 	uint32_t		*val_ptr;
 	nxge_param_map_t	*vmap;
 	p_nxge_param_t		pa = (p_nxge_param_t)cp;
-	p_nxge_class_pt_cfg_t 	p_class_cfgp;
+	p_nxge_class_pt_cfg_t	p_class_cfgp;
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
 	uint64_t		cfgd_vlans = 0;
@@ -1568,11 +1527,7 @@ nxge_param_get_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 	    " Prefernce\n", i);
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
-#if defined(__i386)
-	val_ptr = (uint32_t *)(uint32_t)pa->value;
-#else
 	val_ptr = (uint32_t *)pa->value;
-#endif
 
 	for (i = 0; i < cfgd_vlans; i++) {
 		vmap = (nxge_param_map_t *)&val_ptr[i];
@@ -1602,7 +1557,7 @@ nxge_param_get_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 	uint_t			print_len, buf_len;
 	p_mblk_t		np;
 	int			i;
-	p_nxge_class_pt_cfg_t 	p_class_cfgp;
+	p_nxge_class_pt_cfg_t	p_class_cfgp;
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
 	nxge_mv_cfg_t		*mac_host_info;
@@ -2120,7 +2075,7 @@ nxge_param_get_debug_flag(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_debug_flag"));
 
 	if (pa->value > 0xffffffff)
-		(void) mi_mpprintf(mp, "%x%x",  (int)(pa->value >> 32),
+		(void) mi_mpprintf(mp, "%x%x",	(int)(pa->value >> 32),
 		    (int)(pa->value & 0xffffffff));
 	else
 		(void) mi_mpprintf(mp, "%x", (int)pa->value);
@@ -2305,10 +2260,10 @@ nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
 	int			buff_alloc_size = NXGE_NDD_INFODUMP_BUFF_8K;
-	p_tx_ring_t 		*tx_rings;
-	p_rx_rcr_rings_t 	rx_rcr_rings;
+	p_tx_ring_t		*tx_rings;
+	p_rx_rcr_rings_t	rx_rcr_rings;
 	p_rx_rcr_ring_t		*rcr_rings;
-	p_rx_rbr_rings_t 	rx_rbr_rings;
+	p_rx_rbr_rings_t	rx_rbr_rings;
 	p_rx_rbr_ring_t		*rbr_rings;
 
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL,
@@ -2353,11 +2308,7 @@ nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 
 	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 	block = 0;
-#if defined(__i386)
-	base = (uint64_t)(uint32_t)nxgep->dev_regs->nxge_regp;
-#else
 	base = (uint64_t)nxgep->dev_regs->nxge_regp;
-#endif
 	while (reg_block[block].offset != ALL_FF_32) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 		    "%9s\t 0x%llx\n",
@@ -2457,12 +2408,12 @@ nxge_set_default(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, char *value,
 boolean_t
 nxge_param_link_update(p_nxge_t nxgep)
 {
-	p_nxge_param_t 		param_arr;
-	nxge_param_index_t 	i;
-	boolean_t 		update_xcvr;
-	boolean_t 		update_dev;
-	int 			instance;
-	boolean_t 		status = B_TRUE;
+	p_nxge_param_t		param_arr;
+	nxge_param_index_t	i;
+	boolean_t		update_xcvr;
+	boolean_t		update_dev;
+	int			instance;
+	boolean_t		status = B_TRUE;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_link_update"));
 
@@ -2521,7 +2472,7 @@ nxge_param_hw_update_exit:
  * synchronize the  adv* and en* parameters.
  *
  * See comments in <sys/dld.h> for details of the *_en_*
- * parameters.  The usage of ndd for setting adv parameters will
+ * parameters.	The usage of ndd for setting adv parameters will
  * synchronize all the en parameters with the nxge parameters,
  * implicitly disabling any settings made via dladm.
  */

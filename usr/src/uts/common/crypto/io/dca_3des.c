@@ -38,7 +38,7 @@
 #include <sys/crypto/spi.h>
 #include <sys/crypto/dca.h>
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 #include <sys/byteorder.h>
 #define	UNALIGNED_POINTERS_PERMITTED
 #endif

@@ -78,13 +78,11 @@ kdi_gdt2cpu(uintptr_t gdtbase)
 	return (NULL);
 }
 
-#if defined(__amd64)
 uintptr_t
 kdi_gdt2gsbase(uintptr_t gdtbase)
 {
 	return ((uintptr_t)kdi_gdt2cpu(gdtbase));
 }
-#endif
 
 static uintptr_t
 kdi_get_userlimit(void)

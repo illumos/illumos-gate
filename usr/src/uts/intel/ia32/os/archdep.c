@@ -99,17 +99,8 @@ fnsave_to_fxsave(const struct fnsave_state *fn, struct fxsave_state *fx)
 
 	fx->fx_fop = fn->f_fop;
 
-#if defined(__amd64)
 	fx->fx_rip = (uint64_t)fn->f_eip;
 	fx->fx_rdp = (uint64_t)fn->f_dp;
-#else
-	fx->fx_eip = fn->f_eip;
-	fx->fx_cs = fn->f_cs;
-	fx->__fx_ign0 = 0;
-	fx->fx_dp = fn->f_dp;
-	fx->fx_ds = fn->f_ds;
-	fx->__fx_ign1 = 0;
-#endif
 }
 
 /*
@@ -167,17 +158,10 @@ fxsave_to_fnsave(const struct fxsave_state *fx, struct fnsave_state *fn)
 	fn->f_fop = fx->fx_fop;
 
 	fn->__f_ign2 = 0;
-#if defined(__amd64)
 	fn->f_eip = (uint32_t)fx->fx_rip;
 	fn->f_cs = U32CS_SEL;
 	fn->f_dp = (uint32_t)fx->fx_rdp;
 	fn->f_ds = UDS_SEL;
-#else
-	fn->f_eip = fx->fx_eip;
-	fn->f_cs = fx->fx_cs;
-	fn->f_dp = fx->fx_dp;
-	fn->f_ds = fx->fx_ds;
-#endif
 	fn->__f_ign3 = 0;
 }
 
@@ -187,15 +171,7 @@ fxsave_to_fnsave(const struct fxsave_state *fx, struct fnsave_state *fn)
 static void
 fpregset_to_fxsave(const fpregset_t *fp, struct fxsave_state *fx)
 {
-#if defined(__amd64)
 	bcopy(fp, fx, sizeof (*fx));
-#else
-	const struct _fpchip_state *fc = &fp->fp_reg_set.fpchip_state;
-
-	fnsave_to_fxsave((const struct fnsave_state *)fc, fx);
-	fx->fx_mxcsr = fc->mxcsr;
-	bcopy(&fc->xmm[0], &fx->fx_xmm[0], sizeof (fc->xmm));
-#endif
 	/*
 	 * avoid useless #gp exceptions - mask reserved bits
 	 */
@@ -208,15 +184,7 @@ fpregset_to_fxsave(const fpregset_t *fp, struct fxsave_state *fx)
 static void
 fxsave_to_fpregset(const struct fxsave_state *fx, fpregset_t *fp)
 {
-#if defined(__amd64)
 	bcopy(fx, fp, sizeof (*fx));
-#else
-	struct _fpchip_state *fc = &fp->fp_reg_set.fpchip_state;
-
-	fxsave_to_fnsave(fx, (struct fnsave_state *)fc);
-	fc->mxcsr = fx->fx_mxcsr;
-	bcopy(&fx->fx_xmm[0], &fc->xmm[0], sizeof (fc->xmm));
-#endif
 }
 
 #if defined(_SYSCALL32_IMPL)
@@ -290,12 +258,6 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 	 */
 
 	switch (fp_save_mech) {
-#if defined(__i386)
-	case FP_FNSAVE:
-		bcopy(fp, fpu->fpu_regs.kfpu_u.kfpu_fn,
-		    sizeof (*fpu->fpu_regs.kfpu_u.kfpu_fn));
-		break;
-#endif
 	case FP_FXSAVE:
 		fpregset_to_fxsave(fp, fpu->fpu_regs.kfpu_u.kfpu_fx);
 		fpu->fpu_regs.kfpu_xstatus =
@@ -355,12 +317,6 @@ getfpregs(klwp_t *lwp, fpregset_t *fp)
 		 * Cases 1 and 3.
 		 */
 		switch (fp_save_mech) {
-#if defined(__i386)
-		case FP_FNSAVE:
-			bcopy(fpu->fpu_regs.kfpu_u.kfpu_fn, fp,
-			    sizeof (*fpu->fpu_regs.kfpu_u.kfpu_fn));
-			break;
-#endif
 		case FP_FXSAVE:
 			fxsave_to_fpregset(fpu->fpu_regs.kfpu_u.kfpu_fx, fp);
 			fp->fp_reg_set.fpchip_state.xstatus =
@@ -382,11 +338,6 @@ getfpregs(klwp_t *lwp, fpregset_t *fp)
 		 * Case 2.
 		 */
 		switch (fp_save_mech) {
-#if defined(__i386)
-		case FP_FNSAVE:
-			bcopy(&x87_initial, fp, sizeof (x87_initial));
-			break;
-#endif
 		case FP_FXSAVE:
 		case FP_XSAVE:
 			/*
@@ -442,7 +393,6 @@ void
 getgregs(klwp_t *lwp, gregset_t grp)
 {
 	struct regs *rp = lwptoregs(lwp);
-#if defined(__amd64)
 	struct pcb *pcb = &lwp->lwp_pcb;
 	int thisthread = lwptot(lwp) == curthread;
 
@@ -485,9 +435,6 @@ getgregs(klwp_t *lwp, gregset_t grp)
 	grp[REG_SS] = rp->r_ss;
 	grp[REG_RFL] = rp->r_rfl;
 	grp[REG_RSP] = rp->r_rsp;
-#else
-	bcopy(&rp->r_gs, grp, sizeof (gregset_t));
-#endif
 }
 
 #if defined(_SYSCALL32_IMPL)
@@ -647,7 +594,6 @@ fix_segreg(greg_t sr, int iscs, model_t datamodel)
 		else
 			return (0);
 
-#if defined(__amd64)
 	/*
 	 * If lwp attempts to switch data model then force their
 	 * code selector to be null selector.
@@ -661,9 +607,6 @@ fix_segreg(greg_t sr, int iscs, model_t datamodel)
 	case UCS_SEL:
 		if (datamodel == DATAMODEL_ILP32)
 			return (0 | SEL_UPL);
-#elif defined(__i386)
-	case UCS_SEL:
-#endif
 	/*FALLTHROUGH*/
 	case UDS_SEL:
 	case LWPFS_SEL:
@@ -696,7 +639,6 @@ fix_segreg(greg_t sr, int iscs, model_t datamodel)
 	 * 64-bit processes get the null gdt selector since they
 	 * are not allowed to have a private LDT.
 	 */
-#if defined(__amd64)
 	if (datamodel == DATAMODEL_ILP32) {
 		return (sr | SEL_TI_LDT | SEL_UPL);
 	} else {
@@ -706,9 +648,6 @@ fix_segreg(greg_t sr, int iscs, model_t datamodel)
 			return (0);
 	}
 
-#elif defined(__i386)
-	return (sr | SEL_TI_LDT | SEL_UPL);
-#endif
 }
 
 /*
@@ -720,12 +659,10 @@ setgregs(klwp_t *lwp, gregset_t grp)
 	struct regs *rp = lwptoregs(lwp);
 	model_t	datamodel = lwp_getdatamodel(lwp);
 
-#if defined(__amd64)
 	struct pcb *pcb = &lwp->lwp_pcb;
 	int thisthread = lwptot(lwp) == curthread;
 
 	if (datamodel == DATAMODEL_NATIVE) {
-
 		if (thisthread)
 			(void) save_syscall_args();	/* copy the args */
 
@@ -825,27 +762,6 @@ setgregs(klwp_t *lwp, gregset_t grp)
 	 */
 	rp->r_rfl = (rp->r_rfl & ~PSL_USERMASK) |
 	    (grp[REG_RFL] & PSL_USERMASK);
-
-#elif defined(__i386)
-
-	/*
-	 * Only certain bits of the flags register can be modified.
-	 */
-	grp[EFL] = (rp->r_efl & ~PSL_USERMASK) | (grp[EFL] & PSL_USERMASK);
-
-	/*
-	 * Copy saved registers from user stack.
-	 */
-	bcopy(grp, &rp->r_gs, sizeof (gregset_t));
-
-	rp->r_cs = fix_segreg(rp->r_cs, IS_CS, datamodel);
-	rp->r_ss = fix_segreg(rp->r_ss, IS_NOT_CS, datamodel);
-	rp->r_ds = fix_segreg(rp->r_ds, IS_NOT_CS, datamodel);
-	rp->r_es = fix_segreg(rp->r_es, IS_NOT_CS, datamodel);
-	rp->r_fs = fix_segreg(rp->r_fs, IS_NOT_CS, datamodel);
-	rp->r_gs = fix_segreg(rp->r_gs, IS_NOT_CS, datamodel);
-
-#endif	/* __i386 */
 }
 
 /*
@@ -938,10 +854,8 @@ elfheadcheck(
 {
 	if (e_data != ELFDATA2LSB)
 		return (0);
-#if defined(__amd64)
 	if (e_machine == EM_AMD64)
 		return (1);
-#endif
 	return (e_machine == EM_386);
 }
 
@@ -975,7 +889,6 @@ bind_hwcap(void)
 	auxv_hwcap_2 = (auxv_hwcap_include_2 | cpu_hwcap_flags[1]) &
 	    ~auxv_hwcap_exclude_2;
 
-#if defined(__amd64)
 	/*
 	 * On AMD processors, sysenter just doesn't work at all
 	 * when the kernel is in long mode.  On IA-32e processors
@@ -986,12 +899,6 @@ bind_hwcap(void)
 	 * 32-bit lwp ...
 	 */
 	auxv_hwcap &= ~AV_386_SEP;
-#else
-	/*
-	 * 32-bit processes can -always- use the lahf/sahf instructions
-	 */
-	auxv_hwcap |= AV_386_AHF;
-#endif
 
 	if (auxv_hwcap_include || auxv_hwcap_exclude || auxv_hwcap_include_2 ||
 	    auxv_hwcap_exclude_2) {
@@ -1021,7 +928,6 @@ bind_hwcap(void)
 	auxv_hwcap32_2 = (auxv_hwcap32_include_2 | cpu_hwcap_flags[1]) &
 	    ~auxv_hwcap32_exclude_2;
 
-#if defined(__amd64)
 	/*
 	 * If this is an amd64 architecture machine from Intel, then
 	 * syscall -doesn't- work in compatibility mode, only sysenter does.
@@ -1040,7 +946,6 @@ bind_hwcap(void)
 	 * 32-bit processes can -never- use fsgsbase instructions.
 	 */
 	auxv_hwcap32_2 &= ~AV_386_2_FSGSBASE;
-#endif
 
 	if (auxv_hwcap32_include || auxv_hwcap32_exclude ||
 	    auxv_hwcap32_include_2 || auxv_hwcap32_exclude_2) {
@@ -1093,7 +998,6 @@ panic_saveregs(panic_data_t *pdp, struct regs *rp)
 
 	getcregs(&creg);
 
-#if defined(__amd64)
 	PANICNVADD(pnv, "rdi", rp->r_rdi);
 	PANICNVADD(pnv, "rsi", rp->r_rsi);
 	PANICNVADD(pnv, "rdx", rp->r_rdx);
@@ -1126,29 +1030,6 @@ panic_saveregs(panic_data_t *pdp, struct regs *rp)
 	PANICNVADD(pnv, "gdt_lo", (uint64_t)(creg.cr_gdt._l[0]));
 	PANICNVADD(pnv, "idt_hi", (uint64_t)(creg.cr_idt._l[3]));
 	PANICNVADD(pnv, "idt_lo", (uint64_t)(creg.cr_idt._l[0]));
-#elif defined(__i386)
-	PANICNVADD(pnv, "gs", (uint32_t)rp->r_gs);
-	PANICNVADD(pnv, "fs", (uint32_t)rp->r_fs);
-	PANICNVADD(pnv, "es", (uint32_t)rp->r_es);
-	PANICNVADD(pnv, "ds", (uint32_t)rp->r_ds);
-	PANICNVADD(pnv, "edi", (uint32_t)rp->r_edi);
-	PANICNVADD(pnv, "esi", (uint32_t)rp->r_esi);
-	PANICNVADD(pnv, "ebp", (uint32_t)rp->r_ebp);
-	PANICNVADD(pnv, "esp", (uint32_t)rp->r_esp);
-	PANICNVADD(pnv, "ebx", (uint32_t)rp->r_ebx);
-	PANICNVADD(pnv, "edx", (uint32_t)rp->r_edx);
-	PANICNVADD(pnv, "ecx", (uint32_t)rp->r_ecx);
-	PANICNVADD(pnv, "eax", (uint32_t)rp->r_eax);
-	PANICNVADD(pnv, "trapno", (uint32_t)rp->r_trapno);
-	PANICNVADD(pnv, "err", (uint32_t)rp->r_err);
-	PANICNVADD(pnv, "eip", (uint32_t)rp->r_eip);
-	PANICNVADD(pnv, "cs", (uint32_t)rp->r_cs);
-	PANICNVADD(pnv, "eflags", (uint32_t)rp->r_efl);
-	PANICNVADD(pnv, "uesp", (uint32_t)rp->r_uesp);
-	PANICNVADD(pnv, "ss", (uint32_t)rp->r_ss);
-	PANICNVADD(pnv, "gdt", creg.cr_gdt);
-	PANICNVADD(pnv, "idt", creg.cr_idt);
-#endif	/* __i386 */
 
 	PANICNVADD(pnv, "ldt", creg.cr_ldt);
 	PANICNVADD(pnv, "task", creg.cr_task);
@@ -1163,56 +1044,6 @@ panic_saveregs(panic_data_t *pdp, struct regs *rp)
 
 #define	TR_ARG_MAX 6	/* Max args to print, same as SPARC */
 
-#if !defined(__amd64)
-
-/*
- * Given a return address (%eip), determine the likely number of arguments
- * that were pushed on the stack prior to its execution.  We do this by
- * expecting that a typical call sequence consists of pushing arguments on
- * the stack, executing a call instruction, and then performing an add
- * on %esp to restore it to the value prior to pushing the arguments for
- * the call.  We attempt to detect such an add, and divide the addend
- * by the size of a word to determine the number of pushed arguments.
- *
- * If we do not find such an add, we punt and return TR_ARG_MAX. It is not
- * possible to reliably determine if a function took no arguments (i.e. was
- * void) because assembler routines do not reliably perform an add on %esp
- * immediately upon returning (eg. _sys_call()), so returning TR_ARG_MAX is
- * safer than returning 0.
- */
-static ulong_t
-argcount(uintptr_t eip)
-{
-	const uint8_t *ins = (const uint8_t *)eip;
-	ulong_t n;
-
-	enum {
-		M_MODRM_ESP = 0xc4,	/* Mod/RM byte indicates %esp */
-		M_ADD_IMM32 = 0x81,	/* ADD imm32 to r/m32 */
-		M_ADD_IMM8  = 0x83	/* ADD imm8 to r/m32 */
-	};
-
-	if (eip < KERNELBASE || ins[1] != M_MODRM_ESP)
-		return (TR_ARG_MAX);
-
-	switch (ins[0]) {
-	case M_ADD_IMM32:
-		n = ins[2] + (ins[3] << 8) + (ins[4] << 16) + (ins[5] << 24);
-		break;
-
-	case M_ADD_IMM8:
-		n = ins[2];
-		break;
-
-	default:
-		return (TR_ARG_MAX);
-	}
-
-	n /= sizeof (long);
-	return (MIN(n, TR_ARG_MAX));
-}
-
-#endif	/* !__amd64 */
 
 /*
  * Print a stack backtrace using the specified frame pointer.  We delay two
@@ -1227,7 +1058,6 @@ argcount(uintptr_t eip)
 
 extern char *dump_stack_scratch;
 
-#if defined(__amd64)
 
 void
 traceback(caddr_t fpreg)
@@ -1319,142 +1149,6 @@ out:
 	}
 }
 
-#elif defined(__i386)
-
-void
-traceback(caddr_t fpreg)
-{
-	struct frame *fp = (struct frame *)fpreg;
-	struct frame *nextfp, *minfp, *stacktop;
-	uintptr_t pc, nextpc;
-	uint_t	  offset = 0;
-	uint_t	  next_offset = 0;
-	char	    stack_buffer[1024];
-
-	cpu_t *cpu;
-
-	/*
-	 * args[] holds TR_ARG_MAX hex long args, plus ", " or '\0'.
-	 */
-	char args[TR_ARG_MAX * 2 + 8], *p;
-
-	int on_intr;
-	ulong_t off;
-	char *sym;
-
-	if (!panicstr)
-		printf("traceback: %%fp = %p\n", (void *)fp);
-
-	if (panicstr && !dump_stack_scratch) {
-		printf("Warning - stack not written to the dumpbuf\n");
-	}
-
-	/*
-	 * If we are panicking, all high-level interrupt information in
-	 * CPU was overwritten.  panic_cpu has the correct values.
-	 */
-	kpreempt_disable();			/* prevent migration */
-
-	cpu = (panicstr && CPU->cpu_id == panic_cpu.cpu_id)? &panic_cpu : CPU;
-
-	if ((on_intr = CPU_ON_INTR(cpu)) != 0)
-		stacktop = (struct frame *)(cpu->cpu_intr_stack + SA(MINFRAME));
-	else
-		stacktop = (struct frame *)curthread->t_stk;
-
-	kpreempt_enable();
-
-	fp = (struct frame *)plat_traceback(fpreg);
-	if ((uintptr_t)fp < KERNELBASE)
-		goto out;
-
-	minfp = fp;	/* Baseline minimum frame pointer */
-	pc = fp->fr_savpc;
-	fp = (struct frame *)fp->fr_savfp;
-
-	while ((uintptr_t)fp >= KERNELBASE) {
-		ulong_t argc;
-		long *argv;
-
-		if (fp <= minfp || fp >= stacktop) {
-			if (on_intr) {
-				/*
-				 * Hop from interrupt stack to thread stack.
-				 */
-				stacktop = (struct frame *)curthread->t_stk;
-				minfp = (struct frame *)curthread->t_stkbase;
-				on_intr = 0;
-				continue;
-			}
-			break; /* we're outside of the expected range */
-		}
-
-		if ((uintptr_t)fp & (STACK_ALIGN - 1)) {
-			printf("  >> mis-aligned %%fp = %p\n", (void *)fp);
-			break;
-		}
-
-		nextpc = fp->fr_savpc;
-		nextfp = (struct frame *)fp->fr_savfp;
-		argc = argcount(nextpc);
-		argv = (long *)((char *)fp + sizeof (struct frame));
-
-		args[0] = '\0';
-		p = args;
-		while (argc-- > 0 && argv < (long *)stacktop) {
-			p += snprintf(p, args + sizeof (args) - p,
-			    "%s%lx", (p == args) ? "" : ", ", *argv++);
-		}
-
-		if ((sym = kobj_getsymname(pc, &off)) != NULL) {
-			printf("%08lx %s:%s+%lx (%s)\n", (uintptr_t)fp,
-			    mod_containing_pc((caddr_t)pc), sym, off, args);
-			(void) snprintf(stack_buffer, sizeof (stack_buffer),
-			    "%s:%s+%lx (%s) | ",
-			    mod_containing_pc((caddr_t)pc), sym, off, args);
-
-		} else {
-			printf("%08lx %lx (%s)\n",
-			    (uintptr_t)fp, pc, args);
-			(void) snprintf(stack_buffer, sizeof (stack_buffer),
-			    "%lx (%s) | ", pc, args);
-
-		}
-
-		if (panicstr && dump_stack_scratch) {
-			next_offset = offset + strlen(stack_buffer);
-			if (next_offset < STACK_BUF_SIZE) {
-				bcopy(stack_buffer, dump_stack_scratch + offset,
-				    strlen(stack_buffer));
-				offset = next_offset;
-			} else {
-				/*
-				 * In attempting to save the panic stack
-				 * to the dumpbuf we have overflowed that area.
-				 * Print a warning and continue to printf the
-				 * stack to the msgbuf
-				 */
-				printf("Warning: stack in the dumpbuf"
-				    " may be incomplete\n");
-				offset = next_offset;
-			}
-		}
-
-		minfp = fp;
-		pc = nextpc;
-		fp = nextfp;
-	}
-out:
-	if (!panicstr) {
-		printf("end of traceback\n");
-		DELAY(2 * MICROSEC);
-	} else if (dump_stack_scratch) {
-		dump_stack_scratch[offset] = '\0';
-	}
-
-}
-
-#endif	/* __i386 */
 
 /*
  * Generate a stack backtrace from a saved register set.
@@ -1509,7 +1203,6 @@ gethrestime(timespec_t *tp)
 	gethrestimef(tp);
 }
 
-#if defined(__amd64)
 /*
  * Part of the implementation of hres_tick(); this routine is
  * easier in C than assembler .. called with the hres_lock held.
@@ -1552,7 +1245,6 @@ __adj_hrestime(void)
 		hrestime.tv_nsec -= NANOSEC;
 	}
 }
-#endif
 
 /*
  * Wrapper functions to maintain backwards compability

@@ -31,9 +31,9 @@
 #include	<sys/nxge/nxge_rxdma.h>
 #include	<sys/pcie.h>
 
-uint32_t 	nxge_use_partition = 0;		/* debug partition flag */
-uint32_t 	nxge_dma_obp_props_only = 1;	/* use obp published props */
-uint32_t 	nxge_use_rdc_intr = 1;		/* debug to assign rdc intr */
+uint32_t	nxge_use_partition = 0;		/* debug partition flag */
+uint32_t	nxge_dma_obp_props_only = 1;	/* use obp published props */
+uint32_t	nxge_use_rdc_intr = 1;		/* debug to assign rdc intr */
 /*
  * PSARC/2007/453 MSI-X interrupt limit override
  */
@@ -92,16 +92,16 @@ uint32_t	nxge_cksum_offload = 0;
  * Globals: tunable parameters (/etc/system or adb)
  *
  */
-uint32_t 	nxge_rbr_size = NXGE_RBR_RBB_DEFAULT;
-uint32_t 	nxge_rbr_spare_size = 0;
-uint32_t 	nxge_rcr_size = NXGE_RCR_DEFAULT;
+uint32_t	nxge_rbr_size = NXGE_RBR_RBB_DEFAULT;
+uint32_t	nxge_rbr_spare_size = 0;
+uint32_t	nxge_rcr_size = NXGE_RCR_DEFAULT;
 uint16_t	nxge_rdc_buf_offset = SW_OFFSET_NO_OFFSET;
-uint32_t 	nxge_tx_ring_size = NXGE_TX_RING_DEFAULT;
-boolean_t 	nxge_no_msg = B_TRUE;		/* control message display */
-uint32_t 	nxge_no_link_notify = 0;	/* control DL_NOTIFY */
-uint32_t 	nxge_bcopy_thresh = TX_BCOPY_MAX;
-uint32_t 	nxge_dvma_thresh = TX_FASTDVMA_MIN;
-uint32_t 	nxge_dma_stream_thresh = TX_STREAM_MIN;
+uint32_t	nxge_tx_ring_size = NXGE_TX_RING_DEFAULT;
+boolean_t	nxge_no_msg = B_TRUE;		/* control message display */
+uint32_t	nxge_no_link_notify = 0;	/* control DL_NOTIFY */
+uint32_t	nxge_bcopy_thresh = TX_BCOPY_MAX;
+uint32_t	nxge_dvma_thresh = TX_FASTDVMA_MIN;
+uint32_t	nxge_dma_stream_thresh = TX_STREAM_MIN;
 uint32_t	nxge_jumbo_mtu	= TX_JUMBO_MTU;
 nxge_tx_mode_t	nxge_tx_scheme = NXGE_USE_SERIAL;
 
@@ -127,14 +127,7 @@ nxge_rxbuf_threshold_t nxge_rx_threshold_hi = NXGE_RX_COPY_6;
 nxge_rxbuf_type_t nxge_rx_buf_size_type = RCR_PKTBUFSZ_0;
 nxge_rxbuf_threshold_t nxge_rx_threshold_lo = NXGE_RX_COPY_3;
 
-/* Use kmem_alloc() to allocate data buffers. */
-#if defined(__sparc)
 uint32_t	nxge_use_kmem_alloc = 1;
-#elif defined(__i386)
-uint32_t	nxge_use_kmem_alloc = 0;
-#else
-uint32_t	nxge_use_kmem_alloc = 1;
-#endif
 
 rtrace_t npi_rtracebuf;
 
@@ -394,12 +387,12 @@ uint64_t nxge_debug_level;
  * devices present in the system. The lock exists to guarantee
  * mutually exclusive access to the list.
  */
-void 			*nxge_list = NULL;
+void			*nxge_list = NULL;
 void			*nxge_hw_list = NULL;
-nxge_os_mutex_t 	nxge_common_lock;
-nxge_os_mutex_t 	nxgedebuglock;
+nxge_os_mutex_t		nxge_common_lock;
+nxge_os_mutex_t		nxgedebuglock;
 
-extern uint64_t 	npi_debug_level;
+extern uint64_t		npi_debug_level;
 
 extern nxge_status_t	nxge_ldgv_init(p_nxge_t, int *, int *);
 extern nxge_status_t	nxge_ldgv_init_n2(p_nxge_t, int *, int *);
@@ -764,7 +757,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    &prop_len) != DDI_PROP_SUCCESS) {
 			goto nxge_attach_fail5;
 		}
-		if (prop_len !=  ETHERADDRL) {
+		if (prop_len !=	 ETHERADDRL) {
 			ddi_prop_free(prop_val);
 			goto nxge_attach_fail5;
 		}
@@ -920,9 +913,9 @@ nxge_attach_exit:
 static int
 nxge_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	int 		status = DDI_SUCCESS;
-	int 		instance;
-	p_nxge_t 	nxgep = NULL;
+	int		status = DDI_SUCCESS;
+	int		instance;
+	p_nxge_t	nxgep = NULL;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_detach"));
 	instance = ddi_get_instance(dip);
@@ -1185,11 +1178,11 @@ static nxge_status_t
 nxge_map_regs(p_nxge_t nxgep)
 {
 	int		ddi_status = DDI_SUCCESS;
-	p_dev_regs_t 	dev_regs;
+	p_dev_regs_t	dev_regs;
 	char		buf[MAXPATHLEN + 1];
-	char 		*devname;
+	char		*devname;
 #ifdef	NXGE_DEBUG
-	char 		*sysname;
+	char		*sysname;
 #endif
 	off_t		regsize;
 	nxge_status_t	status = NXGE_OK;
@@ -1237,8 +1230,8 @@ nxge_map_regs(p_nxge_t nxgep)
 		    nxgep->function_num));
 	} else {
 		int		*prop_val;
-		uint_t 		prop_len;
-		uint8_t 	func_num;
+		uint_t		prop_len;
+		uint8_t		func_num;
 
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip,
 		    0, "reg",
@@ -1989,7 +1982,7 @@ nxge_test_map_regs(p_nxge_t nxgep)
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 		    "PCI BAR: base 0x%x base14 0x%x base 18 0x%x "
 		    "bar1c 0x%x",
-		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base,   0),
+		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base,	  0),
 		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base14, 0),
 		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base18, 0),
 		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base1c, 0)));
@@ -2010,9 +2003,9 @@ nxge_test_map_regs(p_nxge_t nxgep)
 		    "first  0x%llx second 0x%llx third 0x%llx "
 		    "last 0x%llx ",
 		    NXGE_PIO_READ64(dev_handle,
-		    (uint64_t *)(dev_ptr + 0),  0),
+		    (uint64_t *)(dev_ptr + 0),	0),
 		    NXGE_PIO_READ64(dev_handle,
-		    (uint64_t *)(dev_ptr + 8),  0),
+		    (uint64_t *)(dev_ptr + 8),	0),
 		    NXGE_PIO_READ64(dev_handle,
 		    (uint64_t *)(dev_ptr + 16), 0),
 		    NXGE_PIO_READ64(cfg_handle,
@@ -2100,10 +2093,10 @@ nxge_destroy_dev(p_nxge_t nxgep)
 static nxge_status_t
 nxge_setup_system_dma_pages(p_nxge_t nxgep)
 {
-	int 			ddi_status = DDI_SUCCESS;
-	uint_t 			count;
-	ddi_dma_cookie_t 	cookie;
-	uint_t 			iommu_pagesize;
+	int			ddi_status = DDI_SUCCESS;
+	uint_t			count;
+	ddi_dma_cookie_t	cookie;
+	uint_t			iommu_pagesize;
 	nxge_status_t		status = NXGE_OK;
 
 	NXGE_ERROR_MSG((nxgep, DDI_CTL, "==> nxge_setup_system_dma_pages"));
@@ -2255,7 +2248,7 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 	p_nxge_dma_common_t	*dma_buf_p;
 	p_nxge_dma_pool_t	dma_cntl_poolp;
 	p_nxge_dma_common_t	*dma_cntl_p;
-	uint32_t 		*num_chunks; /* per dma */
+	uint32_t		*num_chunks; /* per dma */
 	nxge_status_t		status = NXGE_OK;
 
 	uint32_t		nxge_port_rbr_size;
@@ -2432,8 +2425,8 @@ nxge_alloc_rx_mem_pool_exit:
  *	Allocate buffers for an RDC.
  *
  * Arguments:
- * 	nxgep
- * 	channel	The channel to map into our kernel space.
+ *	nxgep
+ *	channel	The channel to map into our kernel space.
  *
  * Notes:
  *
@@ -2460,7 +2453,7 @@ nxge_alloc_rxb(
 
 	nxge_dma_common_t	**data;
 	nxge_dma_common_t	**control;
-	uint32_t 		*num_chunks;
+	uint32_t		*num_chunks;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_rbb"));
 
@@ -2515,7 +2508,7 @@ nxge_free_rxb(
 {
 	nxge_dma_common_t	*data;
 	nxge_dma_common_t	*control;
-	uint32_t 		num_chunks;
+	uint32_t		num_chunks;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_rbb"));
 
@@ -2590,10 +2583,10 @@ nxge_free_rx_mem_pool(p_nxge_t nxgep)
 
 static nxge_status_t
 nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
-	p_nxge_dma_common_t *dmap,
-	size_t alloc_size, size_t block_size, uint32_t *num_chunks)
+    p_nxge_dma_common_t *dmap,
+    size_t alloc_size, size_t block_size, uint32_t *num_chunks)
 {
-	p_nxge_dma_common_t 	rx_dmap;
+	p_nxge_dma_common_t	rx_dmap;
 	nxge_status_t		status = NXGE_OK;
 	size_t			total_alloc_size;
 	size_t			allocated = 0;
@@ -2629,7 +2622,7 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	/* For Neptune, use kmem_alloc if the kmem flag is set. */
 	if (nxgep->niu_type != N2_NIU && nxge_use_kmem_alloc) {
 		use_kmem_alloc = B_TRUE;
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 		size_index = 0;
 #endif
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
@@ -2772,7 +2765,7 @@ static nxge_status_t
 nxge_alloc_rx_cntl_dma(p_nxge_t nxgep, uint16_t dma_channel,
     p_nxge_dma_common_t *dmap, size_t size)
 {
-	p_nxge_dma_common_t 	rx_dmap;
+	p_nxge_dma_common_t	rx_dmap;
 	nxge_status_t		status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_rx_cntl_dma"));
@@ -2884,8 +2877,8 @@ nxge_tdc_sizes(
  *	Allocate buffers for an TDC.
  *
  * Arguments:
- * 	nxgep
- * 	channel	The channel to map into our kernel space.
+ *	nxgep
+ *	channel	The channel to map into our kernel space.
  *
  * Notes:
  *
@@ -2909,7 +2902,7 @@ nxge_alloc_txb(
 {
 	nxge_dma_common_t	**dma_buf_p;
 	nxge_dma_common_t	**dma_cntl_p;
-	uint32_t 		*num_chunks;
+	uint32_t		*num_chunks;
 	nxge_status_t		status = NXGE_OK;
 
 	nxge_tdc_sizes_t	sizes;
@@ -2969,7 +2962,7 @@ nxge_free_txb(
 {
 	nxge_dma_common_t	*data;
 	nxge_dma_common_t	*control;
-	uint32_t 		num_chunks;
+	uint32_t		num_chunks;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_free_txb"));
 
@@ -2998,7 +2991,7 @@ nxge_free_txb(
  *	The per-channel (TDC) data structures are allocated when needed.
  *
  * Arguments:
- * 	nxgep
+ *	nxgep
  *
  * Notes:
  *
@@ -3099,7 +3092,7 @@ nxge_alloc_tx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
     p_nxge_dma_common_t *dmap, size_t alloc_size,
     size_t block_size, uint32_t *num_chunks)
 {
-	p_nxge_dma_common_t 	tx_dmap;
+	p_nxge_dma_common_t	tx_dmap;
 	nxge_status_t		status = NXGE_OK;
 	size_t			total_alloc_size;
 	size_t			allocated = 0;
@@ -3214,7 +3207,7 @@ nxge_status_t
 nxge_alloc_tx_cntl_dma(p_nxge_t nxgep, uint16_t dma_channel,
     p_nxge_dma_common_t *dmap, size_t size)
 {
-	p_nxge_dma_common_t 	tx_dmap;
+	p_nxge_dma_common_t	tx_dmap;
 	nxge_status_t		status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_alloc_tx_cntl_dma"));
@@ -3269,7 +3262,7 @@ nxge_free_tx_cntl_dma(p_nxge_t nxgep, p_nxge_dma_common_t dmap)
  *	is stopped.
  *
  * Arguments:
- * 	nxgep
+ *	nxgep
  *
  * Notes:
  *
@@ -3332,11 +3325,11 @@ nxge_free_tx_mem_pool(p_nxge_t nxgep)
 /*ARGSUSED*/
 static nxge_status_t
 nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
-	struct ddi_dma_attr *dma_attrp,
-	size_t length, ddi_device_acc_attr_t *acc_attr_p, uint_t xfer_flags,
-	p_nxge_dma_common_t dma_p)
+    struct ddi_dma_attr *dma_attrp,
+    size_t length, ddi_device_acc_attr_t *acc_attr_p, uint_t xfer_flags,
+    p_nxge_dma_common_t dma_p)
 {
-	caddr_t 		kaddrp;
+	caddr_t			kaddrp;
 	int			ddi_status = DDI_SUCCESS;
 	boolean_t		contig_alloc_type;
 	boolean_t		kmem_alloc_type;
@@ -3568,18 +3561,9 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 	dma_p->kaddrp = kaddrp;
 	dma_p->last_kaddrp = (unsigned char *)kaddrp +
 	    dma_p->alength - RXBUF_64B_ALIGNED;
-#if defined(__i386)
-	dma_p->ioaddr_pp =
-	    (unsigned char *)(uint32_t)dma_p->dma_cookie.dmac_laddress;
-#else
 	dma_p->ioaddr_pp = (unsigned char *)dma_p->dma_cookie.dmac_laddress;
-#endif
 	dma_p->last_ioaddr_pp =
-#if defined(__i386)
-	    (unsigned char *)(uint32_t)dma_p->dma_cookie.dmac_laddress +
-#else
 	    (unsigned char *)dma_p->dma_cookie.dmac_laddress +
-#endif
 	    dma_p->alength - RXBUF_64B_ALIGNED;
 
 	NPI_DMA_ACC_HANDLE_SET(dma_p, dma_p->acc_handle);
@@ -3728,11 +3712,7 @@ nxge_dma_free_rx_data_buf(p_nxge_dma_common_t dma_p)
 		    dma_p->kmem_alloc_type,
 		    dma_p->orig_alength,
 		    dma_p->alength, dma_p->alength));
-#if defined(__i386)
-		kaddr = (uint64_t)(uint32_t)dma_p->kaddrp;
-#else
 		kaddr = (uint64_t)dma_p->kaddrp;
-#endif
 		buf_size = dma_p->orig_alength;
 		NXGE_DEBUG_MSG((NULL, DMA_CTL,
 		    "nxge_dma_free_rx_data_buf: free dmap $%p "
@@ -3759,7 +3739,7 @@ nxge_dma_free_rx_data_buf(p_nxge_dma_common_t dma_p)
 static int
 nxge_m_start(void *arg)
 {
-	p_nxge_t 	nxgep = (p_nxge_t)arg;
+	p_nxge_t	nxgep = (p_nxge_t)arg;
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_start"));
 
@@ -3874,7 +3854,7 @@ nxge_check_groups_stopped(p_nxge_t nxgep)
 static void
 nxge_m_stop(void *arg)
 {
-	p_nxge_t 	nxgep = (p_nxge_t)arg;
+	p_nxge_t	nxgep = (p_nxge_t)arg;
 	boolean_t	groups_stopped;
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_stop"));
@@ -3940,8 +3920,8 @@ nxge_m_stop(void *arg)
 static int
 nxge_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 {
-	p_nxge_t 	nxgep = (p_nxge_t)arg;
-	struct 		ether_addr addrp;
+	p_nxge_t	nxgep = (p_nxge_t)arg;
+	struct		ether_addr addrp;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "==> nxge_m_multicst: add %d", add));
@@ -3969,7 +3949,7 @@ nxge_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 static int
 nxge_m_promisc(void *arg, boolean_t on)
 {
-	p_nxge_t 	nxgep = (p_nxge_t)arg;
+	p_nxge_t	nxgep = (p_nxge_t)arg;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "==> nxge_m_promisc: on %d", on));
@@ -3987,13 +3967,13 @@ nxge_m_promisc(void *arg, boolean_t on)
 }
 
 static void
-nxge_m_ioctl(void *arg,  queue_t *wq, mblk_t *mp)
+nxge_m_ioctl(void *arg,	 queue_t *wq, mblk_t *mp)
 {
-	p_nxge_t 	nxgep = (p_nxge_t)arg;
-	struct 		iocblk *iocp;
-	boolean_t 	need_privilege;
-	int 		err;
-	int 		cmd;
+	p_nxge_t	nxgep = (p_nxge_t)arg;
+	struct		iocblk *iocp;
+	boolean_t	need_privilege;
+	int		err;
+	int		cmd;
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_ioctl"));
 
@@ -4136,7 +4116,7 @@ nxge_mmac_kstat_update(p_nxge_t nxgep, int slot, boolean_t factory)
  */
 static int
 nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, int slot,
-	int rdctbl, boolean_t usetbl)
+    int rdctbl, boolean_t usetbl)
 {
 	uint8_t addrn;
 	uint8_t portn;
@@ -4197,11 +4177,11 @@ nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, int slot,
 /*
  * nxeg_m_mmac_add_g() - find an unused address slot, set the address
  * value to the one specified, enable the port to start filtering on
- * the new MAC address.  Returns 0 on success.
+ * the new MAC address.	 Returns 0 on success.
  */
 int
 nxge_m_mmac_add_g(void *arg, const uint8_t *maddr, int rdctbl,
-	boolean_t usetbl)
+    boolean_t usetbl)
 {
 	p_nxge_t nxgep = arg;
 	int slot;
@@ -4230,13 +4210,13 @@ nxge_m_mmac_add_g(void *arg, const uint8_t *maddr, int rdctbl,
 	}
 
 	/*
-	 * 	Search for the first available slot. Because naddrfree
+	 *	Search for the first available slot. Because naddrfree
 	 * is not zero, we are guaranteed to find one.
 	 *	Each of the first two ports of Neptune has 16 alternate
 	 * MAC slots but only the first 7 (of 15) slots have assigned factory
 	 * MAC addresses. We first search among the slots without bundled
 	 * factory MACs. If we fail to find one in that range, then we
-	 * search the slots with bundled factory MACs.  A factory MAC
+	 * search the slots with bundled factory MACs.	A factory MAC
 	 * will be wasted while the slot is used with a user MAC address.
 	 * But the slot could be used by factory MAC again after calling
 	 * nxge_m_mmac_remove and nxge_m_mmac_reserve.
@@ -4418,7 +4398,7 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 
 		mutex_enter(nxgep->genlock);
 		if (cap_rings->mr_type == MAC_RING_TYPE_RX) {
-			if (isLDOMguest(nxgep))  {
+			if (isLDOMguest(nxgep))	 {
 				cap_rings->mr_group_type =
 				    MAC_GROUP_TYPE_STATIC;
 				cap_rings->mr_rnum =
@@ -4697,7 +4677,7 @@ static int
 nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, void *pr_val)
 {
-	nxge_t 		*nxgep = barg;
+	nxge_t		*nxgep = barg;
 	p_nxge_param_t	param_arr = nxgep->param_arr;
 	p_nxge_stats_t	statsp = nxgep->statsp;
 
@@ -4864,7 +4844,7 @@ nxge_priv_propinfo(const char *pr_name, mac_prop_info_handle_t prh)
 		(void) snprintf(valstr, sizeof (valstr),
 		    "%d", RXDMA_RCR_PTHRES_DEFAULT);
 
-	} else 	if (strcmp(pr_name, "_class_opt_ipv4_tcp") == 0 ||
+	} else	if (strcmp(pr_name, "_class_opt_ipv4_tcp") == 0 ||
 	    strcmp(pr_name, "_class_opt_ipv4_udp") == 0 ||
 	    strcmp(pr_name, "_class_opt_ipv4_ah") == 0 ||
 	    strcmp(pr_name, "_class_opt_ipv4_sctp") == 0 ||
@@ -4878,7 +4858,7 @@ nxge_priv_propinfo(const char *pr_name, mac_prop_info_handle_t prh)
 	} else if (strcmp(pr_name, "_soft_lso_enable") == 0) {
 		(void) snprintf(valstr, sizeof (valstr), "%d", 0);
 
-	} else 	if (strcmp(pr_name, "_adv_10gfdx_cap") == 0) {
+	} else	if (strcmp(pr_name, "_adv_10gfdx_cap") == 0) {
 		(void) snprintf(valstr, sizeof (valstr), "%d", 1);
 
 	} else if (strcmp(pr_name, "_adv_pause_cap") == 0) {
@@ -5440,7 +5420,7 @@ DDI_DEFINE_STREAM_OPS(nxge_dev_ops, nulldev, nulldev, nxge_attach, nxge_detach,
 /*
  * Module linkage information for the kernel.
  */
-static struct modldrv 	nxge_modldrv = {
+static struct modldrv	nxge_modldrv = {
 	&mod_driverops,
 	NXGE_DESC_VER,
 	&nxge_dev_ops
@@ -5579,7 +5559,7 @@ nxge_rx_ring_start(mac_ring_driver_t rdriver, uint64_t mr_gen_num)
 	int			i;
 
 	channel = nxgep->pt_config.hw_config.start_rdc + rhp->index;
-	ring =  nxgep->rx_rcr_rings->rcr_rings[channel];
+	ring =	nxgep->rx_rcr_rings->rcr_rings[channel];
 
 	MUTEX_ENTER(&ring->lock);
 
@@ -5616,7 +5596,7 @@ nxge_rx_ring_stop(mac_ring_driver_t rdriver)
 	p_rx_rcr_ring_t		ring;
 
 	channel = nxgep->pt_config.hw_config.start_rdc + rhp->index;
-	ring =  nxgep->rx_rcr_rings->rcr_rings[channel];
+	ring =	nxgep->rx_rcr_rings->rcr_rings[channel];
 
 	MUTEX_ENTER(&ring->lock);
 	ASSERT(ring->started == B_TRUE);
@@ -6664,7 +6644,7 @@ static int
 nxge_init_common_dev(p_nxge_t nxgep)
 {
 	p_nxge_hw_list_t	hw_p;
-	dev_info_t 		*p_dip;
+	dev_info_t		*p_dip;
 
 	ASSERT(nxgep != NULL);
 
@@ -6785,7 +6765,7 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 	p_nxge_hw_list_t	hw_p, h_hw_p;
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
-	dev_info_t 		*p_dip;
+	dev_info_t		*p_dip;
 
 	ASSERT(nxgep != NULL);
 

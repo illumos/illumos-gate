@@ -31,23 +31,23 @@
 #include <npi_tx_wr64.h>
 #include <sys/llc1.h>
 
-uint32_t 	nxge_reclaim_pending = TXDMA_RECLAIM_PENDING_DEFAULT;
+uint32_t	nxge_reclaim_pending = TXDMA_RECLAIM_PENDING_DEFAULT;
 uint32_t	nxge_tx_minfree = 64;
 uint32_t	nxge_tx_intr_thres = 0;
 uint32_t	nxge_tx_max_gathers = TX_MAX_GATHER_POINTERS;
 uint32_t	nxge_tx_tiny_pack = 1;
 uint32_t	nxge_tx_use_bcopy = 1;
 
-extern uint32_t 	nxge_tx_ring_size;
-extern uint32_t 	nxge_bcopy_thresh;
-extern uint32_t 	nxge_dvma_thresh;
-extern uint32_t 	nxge_dma_stream_thresh;
-extern dma_method_t 	nxge_force_dma;
+extern uint32_t		nxge_tx_ring_size;
+extern uint32_t		nxge_bcopy_thresh;
+extern uint32_t		nxge_dvma_thresh;
+extern uint32_t		nxge_dma_stream_thresh;
+extern dma_method_t	nxge_force_dma;
 extern uint32_t		nxge_cksum_offload;
 
 /* Device register access attributes for PIO.  */
 extern ddi_device_acc_attr_t nxge_dev_reg_acc_attr;
-/* Device descriptor access attributes for DMA.  */
+/* Device descriptor access attributes for DMA.	 */
 extern ddi_device_acc_attr_t nxge_dev_desc_dma_acc_attr;
 /* Device buffer access attributes for DMA.  */
 extern ddi_device_acc_attr_t nxge_dev_buf_dma_acc_attr;
@@ -220,7 +220,7 @@ nxge_uninit_txdma_channel_exit:
 
 void
 nxge_setup_dma_common(p_nxge_dma_common_t dest_p, p_nxge_dma_common_t src_p,
-	uint32_t entries, uint32_t size)
+    uint32_t entries, uint32_t size)
 {
 	size_t		tsize;
 	*dest_p = *src_p;
@@ -242,9 +242,9 @@ nxge_setup_dma_common(p_nxge_dma_common_t dest_p, p_nxge_dma_common_t src_p,
  *	Reset a TDC.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to reset.
- * 	reg_data	The current TX_CS.
+ *	nxgep
+ *	channel		The channel to reset.
+ *	reg_data	The current TX_CS.
  *
  * Notes:
  *
@@ -297,9 +297,9 @@ nxge_reset_txdma_channel(p_nxge_t nxgep, uint16_t channel, uint64_t reg_data)
  *	Enable interrupts for a set of events.
  *
  * Arguments:
- * 	nxgep
- * 	channel	The channel to map.
- * 	mask_p	The events to enable.
+ *	nxgep
+ *	channel	The channel to map.
+ *	mask_p	The events to enable.
  *
  * Notes:
  *
@@ -314,7 +314,7 @@ nxge_reset_txdma_channel(p_nxge_t nxgep, uint16_t channel, uint64_t reg_data)
  */
 nxge_status_t
 nxge_init_txdma_channel_event_mask(p_nxge_t nxgep, uint16_t channel,
-		p_tx_dma_ent_msk_t mask_p)
+    p_tx_dma_ent_msk_t mask_p)
 {
 	npi_handle_t		handle;
 	npi_status_t		rs = NPI_SUCCESS;
@@ -338,8 +338,8 @@ nxge_init_txdma_channel_event_mask(p_nxge_t nxgep, uint16_t channel,
  *	Stop a TDC.  If at first we don't succeed, inject an error.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to stop.
+ *	nxgep
+ *	channel		The channel to stop.
  *
  * Notes:
  *
@@ -354,7 +354,7 @@ nxge_init_txdma_channel_event_mask(p_nxge_t nxgep, uint16_t channel,
  */
 nxge_status_t
 nxge_init_txdma_channel_cntl_stat(p_nxge_t nxgep, uint16_t channel,
-	uint64_t reg_data)
+    uint64_t reg_data)
 {
 	npi_handle_t		handle;
 	npi_status_t		rs = NPI_SUCCESS;
@@ -380,10 +380,10 @@ nxge_init_txdma_channel_cntl_stat(p_nxge_t nxgep, uint16_t channel,
  *	Enable a TDC.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to enable.
- * 	tx_desc_p	channel's transmit descriptor ring.
- * 	mbox_p		channel's mailbox,
+ *	nxgep
+ *	channel		The channel to enable.
+ *	tx_desc_p	channel's transmit descriptor ring.
+ *	mbox_p		channel's mailbox,
  *
  * Notes:
  *
@@ -403,7 +403,7 @@ nxge_init_txdma_channel_cntl_stat(p_nxge_t nxgep, uint16_t channel,
  */
 nxge_status_t
 nxge_enable_txdma_channel(p_nxge_t nxgep,
-	uint16_t channel, p_tx_ring_t tx_desc_p, p_tx_mbox_t mbox_p)
+    uint16_t channel, p_tx_ring_t tx_desc_p, p_tx_mbox_t mbox_p)
 {
 	npi_handle_t		handle;
 	npi_status_t		rs = NPI_SUCCESS;
@@ -451,21 +451,21 @@ nxge_enable_txdma_channel(p_nxge_t nxgep,
 
 void
 nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
-		boolean_t l4_cksum, int pkt_len, uint8_t npads,
-		p_tx_pkt_hdr_all_t pkthdrp,
-		t_uscalar_t start_offset,
-		t_uscalar_t stuff_offset)
+    boolean_t l4_cksum, int pkt_len, uint8_t npads,
+    p_tx_pkt_hdr_all_t pkthdrp,
+    t_uscalar_t start_offset,
+    t_uscalar_t stuff_offset)
 {
 	p_tx_pkt_header_t	hdrp;
-	p_mblk_t 		nmp;
+	p_mblk_t		nmp;
 	uint64_t		tmp;
-	size_t 			mblk_len;
-	size_t 			iph_len;
-	size_t 			hdrs_size;
+	size_t			mblk_len;
+	size_t			iph_len;
+	size_t			hdrs_size;
 	uint8_t			hdrs_buf[sizeof (struct ether_header) +
 	    64 + sizeof (uint32_t)];
 	uint8_t			*cursor;
-	uint8_t 		*ip_buf;
+	uint8_t			*ip_buf;
 	uint16_t		eth_type;
 	uint8_t			ipproto;
 	boolean_t		is_vlan = B_FALSE;
@@ -744,7 +744,7 @@ fill_tx_header_done:
 p_mblk_t
 nxge_tx_pkt_header_reserve(p_mblk_t mp, uint8_t *npads)
 {
-	p_mblk_t 		newmp = NULL;
+	p_mblk_t		newmp = NULL;
 
 	if ((newmp = allocb(TX_PKT_HEADER_SIZE, BPRI_MED)) == NULL) {
 		NXGE_DEBUG_MSG((NULL, TX_CTL,
@@ -772,11 +772,11 @@ nxge_tx_pkt_header_reserve(p_mblk_t mp, uint8_t *npads)
 int
 nxge_tx_pkt_nmblocks(p_mblk_t mp, int *tot_xfer_len_p)
 {
-	uint_t 			nmblks;
+	uint_t			nmblks;
 	ssize_t			len;
-	uint_t 			pkt_len;
-	p_mblk_t 		nmp, bmp, tmp;
-	uint8_t 		*b_wptr;
+	uint_t			pkt_len;
+	p_mblk_t		nmp, bmp, tmp;
+	uint8_t			*b_wptr;
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
 	    "==> nxge_tx_pkt_nmblocks: mp $%p rptr $%p wptr $%p "
@@ -900,18 +900,18 @@ nxge_tx_pkt_nmblocks(p_mblk_t mp, int *tot_xfer_len_p)
 boolean_t
 nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 {
-	boolean_t 		status = B_TRUE;
+	boolean_t		status = B_TRUE;
 	p_nxge_dma_common_t	tx_desc_dma_p;
 	nxge_dma_common_t	desc_area;
-	p_tx_desc_t 		tx_desc_ring_vp;
-	p_tx_desc_t 		tx_desc_p;
-	p_tx_desc_t 		tx_desc_pp;
-	tx_desc_t 		r_tx_desc;
-	p_tx_msg_t 		tx_msg_ring;
-	p_tx_msg_t 		tx_msg_p;
+	p_tx_desc_t		tx_desc_ring_vp;
+	p_tx_desc_t		tx_desc_p;
+	p_tx_desc_t		tx_desc_pp;
+	tx_desc_t		r_tx_desc;
+	p_tx_msg_t		tx_msg_ring;
+	p_tx_msg_t		tx_msg_p;
 	npi_handle_t		handle;
 	tx_ring_hdl_t		tx_head;
-	uint32_t 		pkt_len;
+	uint32_t		pkt_len;
 	uint_t			tx_rd_index;
 	uint16_t		head_index, tail_index;
 	uint8_t			tdc;
@@ -924,7 +924,7 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 	status = ((tx_ring_p->descs_pending < nxge_reclaim_pending) &&
 	    (nmblks != 0));
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-	    "==> nxge_txdma_reclaim: pending %d  reclaim %d nmblks %d",
+	    "==> nxge_txdma_reclaim: pending %d	 reclaim %d nmblks %d",
 	    tx_ring_p->descs_pending, nxge_reclaim_pending,
 	    nmblks));
 	if (!status) {
@@ -1103,8 +1103,8 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
  *	Process a TDC interrupt
  *
  * Arguments:
- * 	arg1	A Logical Device state Vector (LSV) data structure.
- * 	arg2	nxge_t *
+ *	arg1	A Logical Device state Vector (LSV) data structure.
+ *	arg2	nxge_t *
  *
  * Notes:
  *
@@ -1132,11 +1132,11 @@ nxge_tx_intr(char *arg1, char *arg2)
 	uint32_t		vindex;
 	npi_handle_t		handle;
 	tx_cs_t			cs;
-	p_tx_ring_t 		*tx_rings;
-	p_tx_ring_t 		tx_ring_p;
+	p_tx_ring_t		*tx_rings;
+	p_tx_ring_t		tx_ring_p;
 	npi_status_t		rs = NPI_SUCCESS;
-	uint_t 			serviced = DDI_INTR_UNCLAIMED;
-	nxge_status_t 		status = NXGE_OK;
+	uint_t			serviced = DDI_INTR_UNCLAIMED;
+	nxge_status_t		status = NXGE_OK;
 
 	if (ldvp == NULL) {
 		NXGE_DEBUG_MSG((NULL, INT_CTL,
@@ -1291,8 +1291,8 @@ nxge_txdma_channel_disable(
  *	Toggle all TDCs on (enable) or off (disable).
  *
  * Arguments:
- * 	nxgep
- * 	enable	Enable or disable a TDC.
+ *	nxgep
+ *	enable	Enable or disable a TDC.
  *
  * Notes:
  *
@@ -1401,8 +1401,8 @@ nxge_txdma_disable_channel(p_nxge_t nxgep, uint16_t channel)
  *	Stop a TDC.  If at first we don't succeed, inject an error.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to stop.
+ *	nxgep
+ *	channel		The channel to stop.
  *
  * Notes:
  *
@@ -1640,7 +1640,7 @@ nxge_txdma_hw_kick_channel(p_nxge_t nxgep, p_tx_ring_t ring_p, uint16_t channel)
  *	Check the state of all TDCs belonging to nxgep.
  *
  * Arguments:
- * 	nxgep
+ *	nxgep
  *
  * Notes:
  *	Called by nxge_hw.c:nxge_check_hw_state().
@@ -1682,9 +1682,9 @@ nxge_check_tx_hang_exit:
  *	Reset a TDC.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to reset.
- * 	reg_data	The current TX_CS.
+ *	nxgep
+ *	channel		The channel to reset.
+ *	reg_data	The current TX_CS.
  *
  * Notes:
  *	Called by nxge_check_tx_hang()
@@ -1754,9 +1754,9 @@ nxge_txdma_hung(p_nxge_t nxgep)
  *	Reset a TDC.
  *
  * Arguments:
- * 	nxgep
- * 	ring		<channel>'s ring.
- * 	channel		The channel to reset.
+ *	nxgep
+ *	ring		<channel>'s ring.
+ *	channel		The channel to reset.
  *
  * Notes:
  *	Called by nxge_txdma.c:nxge_txdma_hung()
@@ -1838,9 +1838,9 @@ nxge_txdma_channel_hung(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, uint16_t channel)
  *	Disable a TDC.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to reset.
- * 	reg_data	The current TX_CS.
+ *	nxgep
+ *	channel		The channel to reset.
+ *	reg_data	The current TX_CS.
  *
  * Notes:
  *	Called by nxge_check_tx_hang()
@@ -1890,8 +1890,8 @@ nxge_fixup_hung_txdma_rings(p_nxge_t nxgep)
  *	'Fix' a hung TDC.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to fix.
+ *	nxgep
+ *	channel		The channel to fix.
  *
  * Notes:
  *	Called by nxge_fixup_hung_txdma_rings()
@@ -1941,7 +1941,7 @@ nxge_txdma_fix_hung_channel(p_nxge_t nxgep, uint16_t channel)
 /*ARGSUSED*/
 void
 nxge_txdma_fixup_hung_channel(p_nxge_t nxgep, p_tx_ring_t ring_p,
-	uint16_t channel)
+    uint16_t channel)
 {
 	npi_handle_t		handle;
 	tdmc_intr_dbg_t		intr_dbg;
@@ -2092,9 +2092,9 @@ void
 nxge_txdma_regs_dump(p_nxge_t nxgep, int channel)
 {
 	npi_handle_t		handle;
-	tx_ring_hdl_t 		hdl;
-	tx_ring_kick_t 		kick;
-	tx_cs_t 		cs;
+	tx_ring_hdl_t		hdl;
+	tx_ring_kick_t		kick;
+	tx_cs_t			cs;
 	txc_control_t		control;
 	uint32_t		bitmap = 0;
 	uint32_t		burst = 0;
@@ -2141,11 +2141,7 @@ nxge_txdma_regs_dump(p_nxge_t nxgep, int channel)
 		ipp_status_t status;
 
 		(void) npi_ipp_get_status(handle, nxgep->function_num, &status);
-#if defined(__i386)
-		printf("\n\tIPP status 0x%llux\n", (uint64_t)status.value);
-#else
 		printf("\n\tIPP status 0x%lux\n", (uint64_t)status.value);
-#endif
 	}
 }
 
@@ -2155,8 +2151,8 @@ nxge_txdma_regs_dump(p_nxge_t nxgep, int channel)
  *	I'm not exactly sure what this code does.
  *
  * Arguments:
- * 	nxgep
- * 	channel	The channel to map.
+ *	nxgep
+ *	channel	The channel to map.
  *
  * Notes:
  *
@@ -2173,7 +2169,7 @@ nxge_tdc_hvio_setup(
 {
 	nxge_dma_common_t	*data;
 	nxge_dma_common_t	*control;
-	tx_ring_t 		*ring;
+	tx_ring_t		*ring;
 
 	ring = nxgep->tx_rings->rings[channel];
 	data = nxgep->tx_buf_pool_p->dma_buf_pool_p[channel];
@@ -2215,7 +2211,7 @@ nxge_map_txdma(p_nxge_t nxgep, int channel)
 {
 	nxge_dma_common_t	**pData;
 	nxge_dma_common_t	**pControl;
-	tx_ring_t 		**pRing, *ring;
+	tx_ring_t		**pRing, *ring;
 	tx_mbox_t		**mailbox;
 	uint32_t		num_chunks;
 
@@ -2283,11 +2279,11 @@ nxge_map_txdma(p_nxge_t nxgep, int channel)
 
 static nxge_status_t
 nxge_map_txdma_channel(p_nxge_t nxgep, uint16_t channel,
-	p_nxge_dma_common_t *dma_buf_p,
-	p_tx_ring_t *tx_desc_p,
-	uint32_t num_chunks,
-	p_nxge_dma_common_t *dma_cntl_p,
-	p_tx_mbox_t *tx_mbox_p)
+    p_nxge_dma_common_t *dma_buf_p,
+    p_tx_ring_t *tx_desc_p,
+    uint32_t num_chunks,
+    p_nxge_dma_common_t *dma_cntl_p,
+    p_tx_mbox_t *tx_mbox_p)
 {
 	int	status = NXGE_OK;
 
@@ -2370,8 +2366,8 @@ nxge_unmap_txdma_channel(p_nxge_t nxgep, uint16_t channel)
  *	This function allocates all of the per-channel data structures.
  *
  * Arguments:
- * 	nxgep
- * 	dma_channel	The channel to map.
+ *	nxgep
+ *	dma_channel	The channel to map.
  *	dma_cntl_p
  *	tx_ring_p	dma_channel's transmit ring
  *	tx_mbox_p	dma_channel's mailbox
@@ -2390,13 +2386,13 @@ nxge_unmap_txdma_channel(p_nxge_t nxgep, uint16_t channel)
 /*ARGSUSED*/
 static void
 nxge_map_txdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
-	p_nxge_dma_common_t *dma_cntl_p,
-	p_tx_ring_t tx_ring_p,
-	p_tx_mbox_t *tx_mbox_p)
+    p_nxge_dma_common_t *dma_cntl_p,
+    p_tx_ring_t tx_ring_p,
+    p_tx_mbox_t *tx_mbox_p)
 {
-	p_tx_mbox_t 		mboxp;
-	p_nxge_dma_common_t 	cntl_dmap;
-	p_nxge_dma_common_t 	dmap;
+	p_tx_mbox_t		mboxp;
+	p_nxge_dma_common_t	cntl_dmap;
+	p_nxge_dma_common_t	dmap;
 	p_tx_rng_cfig_t		tx_ring_cfig_p;
 	p_tx_ring_kick_t	tx_ring_kick_p;
 	p_tx_cs_t		tx_cs_p;
@@ -2491,7 +2487,7 @@ nxge_map_txdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 /*ARGSUSED*/
 static void
 nxge_unmap_txdma_channel_cfg_ring(p_nxge_t nxgep,
-	p_tx_ring_t tx_ring_p, p_tx_mbox_t tx_mbox_p)
+    p_tx_ring_t tx_ring_p, p_tx_mbox_t tx_mbox_p)
 {
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
 	    "==> nxge_unmap_txdma_channel_cfg_ring: channel %d",
@@ -2508,8 +2504,8 @@ nxge_unmap_txdma_channel_cfg_ring(p_nxge_t nxgep,
  *
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to map.
+ *	nxgep
+ *	channel		The channel to map.
  *	dma_buf_p
  *	tx_desc_p	channel's descriptor ring
  *	num_chunks
@@ -2527,19 +2523,19 @@ nxge_unmap_txdma_channel_cfg_ring(p_nxge_t nxgep,
  */
 static nxge_status_t
 nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
-	p_nxge_dma_common_t *dma_buf_p,
-	p_tx_ring_t *tx_desc_p, uint32_t num_chunks)
+    p_nxge_dma_common_t *dma_buf_p,
+    p_tx_ring_t *tx_desc_p, uint32_t num_chunks)
 {
-	p_nxge_dma_common_t 	dma_bufp, tmp_bufp;
-	p_nxge_dma_common_t 	dmap;
+	p_nxge_dma_common_t	dma_bufp, tmp_bufp;
+	p_nxge_dma_common_t	dmap;
 	nxge_os_dma_handle_t	tx_buf_dma_handle;
-	p_tx_ring_t 		tx_ring_p;
-	p_tx_msg_t 		tx_msg_ring = NULL;
+	p_tx_ring_t		tx_ring_p;
+	p_tx_msg_t		tx_msg_ring = NULL;
 	nxge_status_t		status = NXGE_OK;
 	int			ddi_status = DDI_SUCCESS;
 	int			i, j, index = 0;
 	uint32_t		size = 0, bsize;
-	uint32_t 		nblocks, nmsgs;
+	uint32_t		nblocks, nmsgs;
 	char			qname[TASKQ_NAMELEN];
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
@@ -2698,8 +2694,8 @@ nxge_map_txdma_channel_buf_ring_exit:
 static void
 nxge_unmap_txdma_channel_buf_ring(p_nxge_t nxgep, p_tx_ring_t tx_ring_p)
 {
-	p_tx_msg_t 		tx_msg_ring;
-	p_tx_msg_t 		tx_msg_p;
+	p_tx_msg_t		tx_msg_ring;
+	p_tx_msg_t		tx_msg_p;
 	int			i;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
@@ -2762,9 +2758,9 @@ nxge_unmap_txdma_channel_buf_ring(p_nxge_t nxgep, p_tx_ring_t tx_ring_p)
 static nxge_status_t
 nxge_txdma_hw_start(p_nxge_t nxgep, int channel)
 {
-	p_tx_rings_t 		tx_rings;
-	p_tx_ring_t 		*tx_desc_rings;
-	p_tx_mbox_areas_t 	tx_mbox_areas_p;
+	p_tx_rings_t		tx_rings;
+	p_tx_ring_t		*tx_desc_rings;
+	p_tx_mbox_areas_t	tx_mbox_areas_p;
 	p_tx_mbox_t		*tx_mbox_p;
 	nxge_status_t		status = NXGE_OK;
 
@@ -2823,10 +2819,10 @@ nxge_txdma_hw_start_exit:
  *	Start a TDC.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to start.
- * 	tx_ring_p	channel's transmit descriptor ring.
- * 	tx_mbox_p	channel' smailbox.
+ *	nxgep
+ *	channel		The channel to start.
+ *	tx_ring_p	channel's transmit descriptor ring.
+ *	tx_mbox_p	channel' smailbox.
  *
  * Notes:
  *
@@ -2844,12 +2840,11 @@ nxge_txdma_hw_start_exit:
 static nxge_status_t
 nxge_txdma_start_channel(p_nxge_t nxgep, uint16_t channel,
     p_tx_ring_t tx_ring_p, p_tx_mbox_t tx_mbox_p)
-
 {
 	nxge_status_t		status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_txdma_start_channel (channel %d)", channel));
+	    "==> nxge_txdma_start_channel (channel %d)", channel));
 	/*
 	 * TXDMA/TXC must be in stopped state.
 	 */
@@ -2861,11 +2856,11 @@ nxge_txdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 	tx_ring_p->tx_cs.value = 0;
 	tx_ring_p->tx_cs.bits.ldw.rst = 1;
 	status = nxge_reset_txdma_channel(nxgep, channel,
-			tx_ring_p->tx_cs.value);
+	    tx_ring_p->tx_cs.value);
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_txdma_start_channel (channel %d)"
-			" reset channel failed 0x%x", channel, status));
+		    "==> nxge_txdma_start_channel (channel %d)"
+		    " reset channel failed 0x%x", channel, status));
 		goto nxge_txdma_start_channel_exit;
 	}
 
@@ -2898,7 +2893,7 @@ nxge_txdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 	 * enable each DMA channel.
 	 */
 	status = nxge_enable_txdma_channel(nxgep, channel,
-			tx_ring_p, tx_mbox_p);
+	    tx_ring_p, tx_mbox_p);
 	if (status != NXGE_OK) {
 		goto nxge_txdma_start_channel_exit;
 	}
@@ -2915,10 +2910,10 @@ nxge_txdma_start_channel_exit:
  *	Stop a TDC.
  *
  * Arguments:
- * 	nxgep
- * 	channel		The channel to stop.
- * 	tx_ring_p	channel's transmit descriptor ring.
- * 	tx_mbox_p	channel' smailbox.
+ *	nxgep
+ *	channel		The channel to stop.
+ *	tx_ring_p	channel's transmit descriptor ring.
+ *	tx_mbox_p	channel' smailbox.
  *
  * Notes:
  *
@@ -3016,8 +3011,8 @@ nxge_txdma_stop_channel_exit:
  *	Get the ring for a TDC.
  *
  * Arguments:
- * 	nxgep
- * 	channel
+ *	nxgep
+ *	channel
  *
  * Notes:
  *
@@ -3069,8 +3064,8 @@ return_null:
  *	Get the mailbox for a TDC.
  *
  * Arguments:
- * 	nxgep
- * 	channel
+ *	nxgep
+ *	channel
  *
  * Notes:
  *
@@ -3132,10 +3127,10 @@ return_null:
  *	Recover a TDC.
  *
  * Arguments:
- * 	nxgep
- * 	index	The index to the TDC ring.
- * 	ldvp	Used to get the channel number ONLY.
- * 	cs	A copy of the bits from TX_CS.
+ *	nxgep
+ *	index	The index to the TDC ring.
+ *	ldvp	Used to get the channel number ONLY.
+ *	cs	A copy of the bits from TX_CS.
  *
  * Notes:
  *	Calling tree:
@@ -3161,8 +3156,8 @@ nxge_tx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp, tx_cs_t cs)
 	npi_handle_t		handle;
 	npi_status_t		rs;
 	uint8_t			channel;
-	p_tx_ring_t 		*tx_rings;
-	p_tx_ring_t 		tx_ring_p;
+	p_tx_ring_t		*tx_rings;
+	p_tx_ring_t		tx_ring_p;
 	p_nxge_tx_ring_stats_t	tdc_stats;
 	boolean_t		txchan_fatal = B_FALSE;
 	nxge_status_t		status = NXGE_OK;
@@ -3404,7 +3399,7 @@ fail:
  *	Attempt to recover from a fatal port error.
  *
  * Arguments:
- * 	nxgep
+ *	nxgep
  *
  * Notes:
  *	How would a guest do this?
@@ -3601,9 +3596,9 @@ fail:
  *	Inject an error into a TDC.
  *
  * Arguments:
- * 	nxgep
- * 	err_id	The error to inject.
- * 	chan	The channel to inject into.
+ *	nxgep
+ *	err_id	The error to inject.
+ *	chan	The channel to inject into.
  *
  * Notes:
  *	This is called from nxge_main.c:nxge_err_inject()
@@ -3673,13 +3668,8 @@ nxge_txdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 			tdi.bits.ldw.conf_part_err = 1;
 		else if (err_id == NXGE_FM_EREPORT_TDMC_PKT_PRT_ERR)
 			tdi.bits.ldw.pkt_part_err = 1;
-#if defined(__i386)
-		cmn_err(CE_NOTE, "!Write 0x%llx to TDMC_INTR_DBG_REG\n",
-		    tdi.value);
-#else
 		cmn_err(CE_NOTE, "!Write 0x%lx to TDMC_INTR_DBG_REG\n",
 		    tdi.value);
-#endif
 		TXDMA_REG_WRITE64(nxgep->npi_handle, TDMC_INTR_DBG_REG,
 		    chan, tdi.value);
 

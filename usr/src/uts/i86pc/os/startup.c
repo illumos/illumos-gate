@@ -168,7 +168,7 @@ static char hostid_file[] = "/etc/hostid";
 
 void *gfx_devinfo_list;
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 extern void immu_startup(void);
 #endif
 
@@ -198,29 +198,6 @@ static void layout_kernel_va(void);
 /*
  * Declare these as initialized data so we can patch them.
  */
-#ifdef __i386
-
-/*
- * Due to virtual address space limitations running in 32 bit mode, restrict
- * the amount of physical memory configured to a max of PHYSMEM pages (16g).
- *
- * If the physical max memory size of 64g were allowed to be configured, the
- * size of user virtual address space will be less than 1g. A limited user
- * address space greatly reduces the range of applications that can run.
- *
- * If more physical memory than PHYSMEM is required, users should preferably
- * run in 64 bit mode which has far looser virtual address space limitations.
- *
- * If 64 bit mode is not available (as in IA32) and/or more physical memory
- * than PHYSMEM is required in 32 bit mode, physmem can be set to the desired
- * value or to 0 (to configure all available memory) via eeprom(1M). kernelbase
- * should also be carefully tuned to balance out the need of the user
- * application while minimizing the risk of kernel heap exhaustion due to
- * kernelbase being set too high.
- */
-#define	PHYSMEM	0x400000
-
-#else /* __amd64 */
 
 /*
  * For now we can handle memory with physical addresses up to about
@@ -234,7 +211,6 @@ static void layout_kernel_va(void);
 #define	PHYSMEM			PHYSMEM_MAX64
 #define	AMD64_VA_HOLE_END	0xFFFF800000000000ul
 
-#endif /* __amd64 */
 
 pgcnt_t physmem = PHYSMEM;
 pgcnt_t obp_pages;	/* Memory used by PROM for its text and data */
@@ -259,9 +235,7 @@ uintptr_t hole_start, hole_end;
 caddr_t kpm_vbase;
 size_t  kpm_size;
 static int kpm_desired;
-#ifdef __amd64
 static uintptr_t segkpm_base = (uintptr_t)SEGKPM_BASE;
-#endif
 
 /*
  * Configuration parameters set at boot time.
@@ -285,11 +259,7 @@ char kern_bootfile[OBP_MAXPATHLEN];
  * heap.  The optimization of allocating zio buffers from their own segment is
  * only valid on 64-bit kernels.
  */
-#if defined(__amd64)
 int segzio_fromheap = 0;
-#else
-int segzio_fromheap = 1;
-#endif
 
 /*
  * Give folks an escape hatch for disabling SMAP via kmdb. Doesn't work
@@ -616,18 +586,11 @@ static size_t	textrepl_min_gb = 10;
  * on 64 bit we use a predifined VA range for mapping devices in the kernel
  * on 32 bit the mappings are intermixed in the heap, so we use a bit map
  */
-#ifdef __amd64
 
 vmem_t		*device_arena;
 uintptr_t	toxic_addr = (uintptr_t)NULL;
 size_t		toxic_size = 1024 * 1024 * 1024; /* Sparc uses 1 gig too */
 
-#else	/* __i386 */
-
-ulong_t		*toxic_bit_map;	/* one bit for each 4k of VA in heap_arena */
-size_t		toxic_bit_map_len = 0;	/* in bits */
-
-#endif	/* __i386 */
 
 int prom_debug;
 
@@ -768,9 +731,7 @@ startup(void)
 	 * Make sure that nobody tries to use sekpm until we have
 	 * initialized it properly.
 	 */
-#if defined(__amd64)
 	kpm_desired = 1;
-#endif
 	kpm_enable = 0;
 	CPUSET_ONLY(cpu_ready_set, 0);	/* cpu 0 is boot cpu */
 
@@ -1117,23 +1078,6 @@ startup_memlist(void)
 	 */
 	mmu_init();
 
-#ifdef	__i386
-	/*
-	 * physmax is lowered if there is more memory than can be
-	 * physically addressed in 32 bit (PAE/non-PAE) modes.
-	 */
-	if (mmu.pae_hat) {
-		if (PFN_ABOVE64G(physmax)) {
-			physinstalled -= (physmax - (PFN_64G - 1));
-			physmax = PFN_64G - 1;
-		}
-	} else {
-		if (PFN_ABOVE4G(physmax)) {
-			physinstalled -= (physmax - (PFN_4G - 1));
-			physmax = PFN_4G - 1;
-		}
-	}
-#endif
 
 	startup_build_mem_nodes(bootops->boot_mem->physinstalled);
 
@@ -1400,13 +1344,11 @@ startup_memlist(void)
 
 	PRM_DEBUG(valloc_sz);
 
-#if defined(__amd64)
 	if ((availrmem >> (30 - MMU_PAGESHIFT)) >=
 	    textrepl_min_gb && l2cache_sz <= 2 << 20) {
 		extern size_t textrepl_size_thresh;
 		textrepl_size_thresh = (16 << 20) - 1;
 	}
-#endif
 }
 
 /*
@@ -1422,46 +1364,16 @@ startup_kmem(void)
 
 	PRM_POINT("startup_kmem() starting...");
 
-#if defined(__amd64)
 	if (eprom_kernelbase && eprom_kernelbase != KERNELBASE)
 		cmn_err(CE_NOTE, "!kernelbase cannot be changed on 64-bit "
 		    "systems.");
 	kernelbase = segkpm_base - KERNEL_REDZONE_SIZE;
 	core_base = (uintptr_t)COREHEAP_BASE;
 	core_size = (size_t)MISC_VA_BASE - COREHEAP_BASE;
-#else	/* __i386 */
-	/*
-	 * We configure kernelbase based on:
-	 *
-	 * 1. user specified kernelbase via eeprom command. Value cannot exceed
-	 *    KERNELBASE_MAX. we large page align eprom_kernelbase
-	 *
-	 * 2. Default to KERNELBASE and adjust to 2X less the size for page_t.
-	 *    On large memory systems we must lower kernelbase to allow
-	 *    enough room for page_t's for all of memory.
-	 *
-	 * The value set here, might be changed a little later.
-	 */
-	if (eprom_kernelbase) {
-		kernelbase = eprom_kernelbase & mmu.level_mask[1];
-		if (kernelbase > KERNELBASE_MAX)
-			kernelbase = KERNELBASE_MAX;
-	} else {
-		kernelbase = (uintptr_t)KERNELBASE;
-		kernelbase -= ROUND_UP_4MEG(2 * valloc_sz);
-	}
-	ASSERT((kernelbase & mmu.level_offset[1]) == 0);
-	core_base = valloc_base;
-	core_size = 0;
-#endif	/* __i386 */
 
 	PRM_DEBUG(core_base);
 	PRM_DEBUG(core_size);
 	PRM_DEBUG(kernelbase);
-
-#if defined(__i386)
-	segkp_fromheap = 1;
-#endif	/* __i386 */
 
 	ekernelheap = (char *)core_base;
 	PRM_DEBUG(ekernelheap);
@@ -1479,13 +1391,9 @@ startup_kmem(void)
 
 	*(uintptr_t *)&_kernelbase = kernelbase;
 	*(uintptr_t *)&_userlimit = kernelbase;
-#if defined(__amd64)
 	*(uintptr_t *)&_userlimit -= KERNELBASE - USERLIMIT;
 #if !defined(__xpv)
 	kpti_kbase = kernelbase;
-#endif
-#else
-	*(uintptr_t *)&_userlimit32 = _userlimit;
 #endif
 	PRM_DEBUG(_kernelbase);
 	PRM_DEBUG(_userlimit);
@@ -1495,17 +1403,6 @@ startup_kmem(void)
 	mmu_calc_user_slots();
 
 	layout_kernel_va();
-
-#if defined(__i386)
-	/*
-	 * If segmap is too large we can push the bottom of the kernel heap
-	 * higher than the base.  Or worse, it could exceed the top of the
-	 * VA space entirely, causing it to wrap around.
-	 */
-	if (kernelheap >= ekernelheap || (uintptr_t)kernelheap < kernelbase)
-		panic("too little address space available for kernelheap,"
-		    " use eeprom for lower kernelbase or smaller segmapsize");
-#endif	/* __i386 */
 
 	/*
 	 * Initialize the kernel heap. Note 3rd argument must be > 1st.
@@ -1549,12 +1446,6 @@ startup_kmem(void)
 		    (npages == PHYSMEM ? "Due to virtual address space " : ""),
 		    npages, orig_npages);
 	}
-#if defined(__i386)
-	if (eprom_kernelbase && (eprom_kernelbase != kernelbase))
-		cmn_err(CE_WARN, "kernelbase value, User specified 0x%lx, "
-		    "System using 0x%lx",
-		    (uintptr_t)eprom_kernelbase, (uintptr_t)kernelbase);
-#endif
 
 #ifdef	KERNELBASE_ABI_MIN
 	if (kernelbase < (uintptr_t)KERNELBASE_ABI_MIN) {
@@ -2076,28 +1967,11 @@ startup_vm(void)
 	 */
 	cpuid_pass3(CPU);
 
-#if defined(__amd64)
-
 	/*
 	 * Create the device arena for toxic (to dtrace/kmdb) mappings.
 	 */
 	device_arena = vmem_create("device", (void *)toxic_addr,
 	    toxic_size, MMU_PAGESIZE, NULL, NULL, NULL, 0, VM_SLEEP);
-
-#else	/* __i386 */
-
-	/*
-	 * allocate the bit map that tracks toxic pages
-	 */
-	toxic_bit_map_len = btop((ulong_t)(valloc_base - kernelbase));
-	PRM_DEBUG(toxic_bit_map_len);
-	toxic_bit_map =
-	    kmem_zalloc(BT_SIZEOFMAP(toxic_bit_map_len), KM_NOSLEEP);
-	ASSERT(toxic_bit_map != NULL);
-	PRM_DEBUG(toxic_bit_map);
-
-#endif	/* __i386 */
-
 
 	/*
 	 * Now that we've got more VA, as well as the ability to allocate from
@@ -2411,15 +2285,6 @@ post_startup(void)
 	(void) modload("fs", "procfs");
 
 	(void) i_ddi_attach_hw_nodes("pit_beep");
-
-#if defined(__i386)
-	/*
-	 * Check for required functional Floating Point hardware,
-	 * unless FP hardware explicitly disabled.
-	 */
-	if (fpu_exists && (fpu_pentium_fdivbug || fp_kind == FP_NO))
-		halt("No working FP hardware found");
-#endif
 
 	maxmem = freemem;
 
@@ -3225,9 +3090,7 @@ setx86isalist(void)
 	tp = kmem_alloc(TBUFSIZE, KM_SLEEP);
 	*tp = '\0';
 
-#if defined(__amd64)
 	(void) strcpy(tp, "amd64 ");
-#endif
 
 	switch (x86_vendor) {
 	case X86_VENDOR_Intel:
@@ -3267,9 +3130,6 @@ setx86isalist(void)
 #undef TBUFSIZE
 }
 
-
-#ifdef __amd64
-
 void *
 device_arena_alloc(size_t size, int vm_flag)
 {
@@ -3281,101 +3141,3 @@ device_arena_free(void *vaddr, size_t size)
 {
 	vmem_free(device_arena, vaddr, size);
 }
-
-#else /* __i386 */
-
-void *
-device_arena_alloc(size_t size, int vm_flag)
-{
-	caddr_t	vaddr;
-	uintptr_t v;
-	size_t	start;
-	size_t	end;
-
-	vaddr = vmem_alloc(heap_arena, size, vm_flag);
-	if (vaddr == NULL)
-		return (NULL);
-
-	v = (uintptr_t)vaddr;
-	ASSERT(v >= kernelbase);
-	ASSERT(v + size <= valloc_base);
-
-	start = btop(v - kernelbase);
-	end = btop(v + size - 1 - kernelbase);
-	ASSERT(start < toxic_bit_map_len);
-	ASSERT(end < toxic_bit_map_len);
-
-	while (start <= end) {
-		BT_ATOMIC_SET(toxic_bit_map, start);
-		++start;
-	}
-	return (vaddr);
-}
-
-void
-device_arena_free(void *vaddr, size_t size)
-{
-	uintptr_t v = (uintptr_t)vaddr;
-	size_t	start;
-	size_t	end;
-
-	ASSERT(v >= kernelbase);
-	ASSERT(v + size <= valloc_base);
-
-	start = btop(v - kernelbase);
-	end = btop(v + size - 1 - kernelbase);
-	ASSERT(start < toxic_bit_map_len);
-	ASSERT(end < toxic_bit_map_len);
-
-	while (start <= end) {
-		ASSERT(BT_TEST(toxic_bit_map, start) != 0);
-		BT_ATOMIC_CLEAR(toxic_bit_map, start);
-		++start;
-	}
-	vmem_free(heap_arena, vaddr, size);
-}
-
-/*
- * returns 1st address in range that is in device arena, or NULL
- * if len is not NULL it returns the length of the toxic range
- */
-void *
-device_arena_contains(void *vaddr, size_t size, size_t *len)
-{
-	uintptr_t v = (uintptr_t)vaddr;
-	uintptr_t eaddr = v + size;
-	size_t start;
-	size_t end;
-
-	/*
-	 * if called very early by kmdb, just return NULL
-	 */
-	if (toxic_bit_map == NULL)
-		return (NULL);
-
-	/*
-	 * First check if we're completely outside the bitmap range.
-	 */
-	if (v >= valloc_base || eaddr < kernelbase)
-		return (NULL);
-
-	/*
-	 * Trim ends of search to look at only what the bitmap covers.
-	 */
-	if (v < kernelbase)
-		v = kernelbase;
-	start = btop(v - kernelbase);
-	end = btop(eaddr - kernelbase);
-	if (end >= toxic_bit_map_len)
-		end = toxic_bit_map_len;
-
-	if (bt_range(toxic_bit_map, &start, &end, end) == 0)
-		return (NULL);
-
-	v = kernelbase + ptob(start);
-	if (len != NULL)
-		*len = ptob(end - start);
-	return ((void *)v);
-}
-
-#endif	/* __i386 */

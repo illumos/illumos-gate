@@ -357,11 +357,6 @@ apix_init()
 
 	apix_softinit();
 
-#if !defined(__amd64)
-	if (cpuid_have_cr8access(CPU))
-		apic_have_32bit_cr8 = 1;
-#endif
-
 	apic_pir_vect = apix_get_ipivect(XC_CPUPOKE_PIL, -1);
 
 	/*

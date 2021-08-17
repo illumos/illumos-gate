@@ -61,7 +61,7 @@
 #include <sys/archsystm.h>
 #include <sys/sdt.h>
 #include <sys/smt.h>
-#if defined(__x86) || defined(__amd64)
+#if defined(__x86)
 #include <sys/x86_archext.h>
 #endif
 #include <sys/callo.h>

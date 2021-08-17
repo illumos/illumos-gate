@@ -516,12 +516,7 @@ npi_mac_dump_regs(npi_handle_t handle, uint8_t port)
 		    "\nXMAC Register Dump for port %d\n",
 		    port));
 		for (i = 0; i < num_regs; i++) {
-#if defined(__i386)
-			XMAC_REG_RD(handle, port, (uint32_t)xmac_offset[i],
-			    &value);
-#else
 			XMAC_REG_RD(handle, port, xmac_offset[i], &value);
-#endif
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
 			    "%08llx %s\t %08llx \n",
 			    (XMAC_REG_ADDR((port), (xmac_offset[i]))),
@@ -540,12 +535,7 @@ npi_mac_dump_regs(npi_handle_t handle, uint8_t port)
 		    "\nBMAC Register Dump for port %d\n",
 		    port));
 		for (i = 0; i < num_regs; i++) {
-#if defined(__i386)
-			BMAC_REG_RD(handle, port, (uint32_t)bmac_offset[i],
-			    &value);
-#else
 			BMAC_REG_RD(handle, port, bmac_offset[i], &value);
-#endif
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
 			    "%08llx %s\t %08llx \n",
 			    (BMAC_REG_ADDR((port), (bmac_offset[i]))),
@@ -638,7 +628,7 @@ npi_mac_mif_link_intr_disable(npi_handle_t handle, uint8_t portn)
 
 npi_status_t
 npi_mac_hashtab_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
-			uint8_t entryn, uint16_t *data)
+    uint8_t entryn, uint16_t *data)
 {
 	uint64_t val;
 
@@ -679,7 +669,7 @@ npi_mac_hashtab_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 
 npi_status_t
 npi_mac_hostinfo_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
-				uint8_t entryn, hostinfo_t *hostinfo)
+    uint8_t entryn, hostinfo_t *hostinfo)
 {
 	ASSERT((op == OP_GET) || (op == OP_SET));
 	ASSERT(IS_PORT_NUM_VALID(portn));
@@ -813,7 +803,7 @@ npi_mac_altaddr_disable(npi_handle_t handle, uint8_t portn, uint8_t addrn)
 
 npi_status_t
 npi_mac_altaddr_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
-			uint8_t entryn, npi_mac_addr_t *data)
+    uint8_t entryn, npi_mac_addr_t *data)
 {
 	uint64_t val0, val1, val2;
 
@@ -889,7 +879,7 @@ npi_mac_altaddr_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 
 npi_status_t
 npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
-			npi_attr_t *attrp)
+    npi_attr_t *attrp)
 {
 	uint64_t val = 0;
 	uint32_t attr;
@@ -1805,7 +1795,7 @@ npi_xmac_reset(npi_handle_t handle, uint8_t portn, npi_mac_reset_t mode)
 
 npi_status_t
 npi_xmac_xif_config(npi_handle_t handle, config_op_t op, uint8_t portn,
-			xmac_xif_config_t config)
+    xmac_xif_config_t config)
 {
 	uint64_t val = 0;
 
@@ -1940,7 +1930,7 @@ npi_xmac_xif_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_xmac_tx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
-			xmac_tx_config_t config)
+    xmac_tx_config_t config)
 {
 	uint64_t val = 0;
 
@@ -2023,7 +2013,7 @@ npi_xmac_tx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_xmac_rx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
-			xmac_rx_config_t config)
+    xmac_rx_config_t config)
 {
 	uint64_t val = 0;
 
@@ -2169,7 +2159,7 @@ npi_xmac_rx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_xmac_tx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
-		    xmac_tx_iconfig_t iconfig)
+    xmac_tx_iconfig_t iconfig)
 {
 	uint64_t val = 0;
 
@@ -2219,7 +2209,7 @@ npi_xmac_tx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_xmac_rx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
-		    xmac_rx_iconfig_t iconfig)
+    xmac_rx_iconfig_t iconfig)
 {
 	uint64_t val = 0;
 
@@ -2269,7 +2259,7 @@ npi_xmac_rx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_xmac_ctl_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
-			xmac_ctl_iconfig_t iconfig)
+    xmac_ctl_iconfig_t iconfig)
 {
 	uint64_t val = 0;
 
@@ -2320,7 +2310,7 @@ npi_xmac_ctl_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_xmac_tx_get_istatus(npi_handle_t handle, uint8_t portn,
-			xmac_tx_iconfig_t *istatus)
+    xmac_tx_iconfig_t *istatus)
 {
 	uint64_t val;
 
@@ -2334,7 +2324,7 @@ npi_xmac_tx_get_istatus(npi_handle_t handle, uint8_t portn,
 
 npi_status_t
 npi_xmac_rx_get_istatus(npi_handle_t handle, uint8_t portn,
-			xmac_rx_iconfig_t *istatus)
+    xmac_rx_iconfig_t *istatus)
 {
 	uint64_t val;
 
@@ -2348,7 +2338,7 @@ npi_xmac_rx_get_istatus(npi_handle_t handle, uint8_t portn,
 
 npi_status_t
 npi_xmac_ctl_get_istatus(npi_handle_t handle, uint8_t portn,
-			xmac_ctl_iconfig_t *istatus)
+    xmac_ctl_iconfig_t *istatus)
 {
 	uint64_t val;
 
@@ -2416,7 +2406,7 @@ npi_xmac_xpcs_disable(npi_handle_t handle, uint8_t portn)
 
 npi_status_t
 npi_xmac_xpcs_read(npi_handle_t handle, uint8_t portn, uint8_t xpcs_reg,
-			uint32_t *value)
+    uint32_t *value)
 {
 	uint32_t reg;
 	uint64_t val;
@@ -2496,7 +2486,7 @@ npi_xmac_xpcs_read(npi_handle_t handle, uint8_t portn, uint8_t xpcs_reg,
 
 npi_status_t
 npi_xmac_xpcs_write(npi_handle_t handle, uint8_t portn, uint8_t xpcs_reg,
-			uint32_t value)
+    uint32_t value)
 {
 	uint32_t reg;
 	uint64_t val;
@@ -2609,7 +2599,7 @@ npi_mac_pcs_reset(npi_handle_t handle, uint8_t portn)
 
 npi_status_t
 npi_mac_get_link_status(npi_handle_t handle, uint8_t portn,
-			boolean_t *link_up)
+    boolean_t *link_up)
 {
 	uint64_t val;
 
@@ -2628,7 +2618,7 @@ npi_mac_get_link_status(npi_handle_t handle, uint8_t portn,
 
 npi_status_t
 npi_bmac_tx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
-			bmac_tx_config_t config)
+    bmac_tx_config_t config)
 {
 	uint64_t val = 0;
 
@@ -2694,7 +2684,7 @@ npi_bmac_tx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_bmac_rx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
-			bmac_rx_config_t config)
+    bmac_rx_config_t config)
 {
 	uint64_t val = 0;
 
@@ -2808,7 +2798,7 @@ npi_bmac_rx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_bmac_rx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
-		    bmac_rx_iconfig_t iconfig)
+    bmac_rx_iconfig_t iconfig)
 {
 	uint64_t val = 0;
 
@@ -2858,7 +2848,7 @@ npi_bmac_rx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_bmac_xif_config(npi_handle_t handle, config_op_t op, uint8_t portn,
-		    bmac_xif_config_t config)
+    bmac_xif_config_t config)
 {
 	uint64_t val = 0;
 
@@ -2956,7 +2946,7 @@ npi_bmac_xif_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_bmac_tx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
-		    bmac_tx_iconfig_t iconfig)
+    bmac_tx_iconfig_t iconfig)
 {
 	uint64_t val = 0;
 
@@ -3006,7 +2996,7 @@ npi_bmac_tx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_bmac_ctl_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
-			bmac_ctl_iconfig_t iconfig)
+    bmac_ctl_iconfig_t iconfig)
 {
 	uint64_t val = 0;
 
@@ -3056,7 +3046,7 @@ npi_bmac_ctl_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 npi_status_t
 npi_bmac_tx_get_istatus(npi_handle_t handle, uint8_t portn,
-			bmac_tx_iconfig_t *istatus)
+    bmac_tx_iconfig_t *istatus)
 {
 	uint64_t val = 0;
 
@@ -3070,7 +3060,7 @@ npi_bmac_tx_get_istatus(npi_handle_t handle, uint8_t portn,
 
 npi_status_t
 npi_bmac_rx_get_istatus(npi_handle_t handle, uint8_t portn,
-			bmac_rx_iconfig_t *istatus)
+    bmac_rx_iconfig_t *istatus)
 {
 	uint64_t val = 0;
 
@@ -3084,7 +3074,7 @@ npi_bmac_rx_get_istatus(npi_handle_t handle, uint8_t portn,
 
 npi_status_t
 npi_bmac_ctl_get_istatus(npi_handle_t handle, uint8_t portn,
-				bmac_ctl_iconfig_t *istatus)
+    bmac_ctl_iconfig_t *istatus)
 {
 	uint64_t val = 0;
 
@@ -3098,7 +3088,7 @@ npi_bmac_ctl_get_istatus(npi_handle_t handle, uint8_t portn,
 
 npi_status_t
 npi_mac_mif_mdio_read(npi_handle_t handle, uint8_t portn, uint8_t device,
-			uint16_t xcvr_reg, uint16_t *value)
+    uint16_t xcvr_reg, uint16_t *value)
 {
 	mif_frame_t frame;
 	uint_t delay;
@@ -3160,7 +3150,7 @@ npi_mac_mif_mdio_read(npi_handle_t handle, uint8_t portn, uint8_t device,
 
 npi_status_t
 npi_mac_mif_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
-			uint16_t *value)
+    uint16_t *value)
 {
 	mif_frame_t frame;
 	uint_t delay;
@@ -3189,7 +3179,7 @@ npi_mac_mif_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 
 npi_status_t
 npi_mac_mif_mdio_write(npi_handle_t handle, uint8_t portn, uint8_t device,
-			uint16_t xcvr_reg, uint16_t value)
+    uint16_t xcvr_reg, uint16_t value)
 {
 	mif_frame_t frame;
 	uint_t delay;
@@ -3247,7 +3237,7 @@ npi_mac_mif_mdio_write(npi_handle_t handle, uint8_t portn, uint8_t device,
 
 npi_status_t
 npi_mac_mif_mii_write(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
-			uint16_t value)
+    uint16_t value)
 {
 	mif_frame_t frame;
 	uint_t delay;
@@ -3276,7 +3266,7 @@ npi_mac_mif_mii_write(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 
 npi_status_t
 npi_mac_pcs_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
-			uint16_t *value)
+    uint16_t *value)
 {
 	pcs_anar_t pcs_anar;
 	pcs_anar_t pcs_anlpar;
@@ -3361,7 +3351,7 @@ npi_mac_pcs_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 
 npi_status_t
 npi_mac_pcs_mii_write(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
-			uint16_t value)
+    uint16_t value)
 {
 	pcs_anar_t pcs_anar;
 	mii_anar_t anar;
@@ -3406,7 +3396,7 @@ npi_mac_pcs_mii_write(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 
 npi_status_t
 npi_mac_mif_link_intr_enable(npi_handle_t handle, uint8_t portn,
-				uint8_t xcvr_reg, uint16_t mask)
+    uint8_t xcvr_reg, uint16_t mask)
 {
 	mif_cfg_t mif_cfg;
 
@@ -3425,7 +3415,7 @@ npi_mac_mif_link_intr_enable(npi_handle_t handle, uint8_t portn,
 
 	mif_cfg.bits.w0.phy_addr = portn;		/* Port number */
 	mif_cfg.bits.w0.reg_addr = xcvr_reg;		/* Register address */
-	mif_cfg.bits.w0.indirect_md = 0; 		/* Clause 22 */
+	mif_cfg.bits.w0.indirect_md = 0;		/* Clause 22 */
 	mif_cfg.bits.w0.poll_en = 1;
 
 	MIF_REG_WR(handle, MIF_MASK_REG, ~mask);
@@ -3438,7 +3428,7 @@ npi_mac_mif_link_intr_enable(npi_handle_t handle, uint8_t portn,
 
 npi_status_t
 npi_mac_mif_mdio_link_intr_enable(npi_handle_t handle, uint8_t portn,
-			uint8_t device, uint16_t xcvr_reg, uint16_t mask)
+    uint8_t device, uint16_t xcvr_reg, uint16_t mask)
 {
 	mif_cfg_t mif_cfg;
 	mif_frame_t frame;
@@ -3465,7 +3455,7 @@ npi_mac_mif_mdio_link_intr_enable(npi_handle_t handle, uint8_t portn,
 
 	mif_cfg.bits.w0.phy_addr = portn;		/* Port number */
 	mif_cfg.bits.w0.reg_addr = device;		/* Register address */
-	mif_cfg.bits.w0.indirect_md = 1; 		/* Clause 45 */
+	mif_cfg.bits.w0.indirect_md = 1;		/* Clause 45 */
 	mif_cfg.bits.w0.poll_en = 1;
 
 	MIF_REG_WR(handle, MIF_MASK_REG, ~mask);

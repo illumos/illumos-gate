@@ -463,13 +463,11 @@ static struct ddi_device_acc_attr dca_devattr = {
 	DDI_STRICTORDER_ACC
 };
 
-#if !defined(i386) && !defined(__i386)
 static struct ddi_device_acc_attr dca_bufattr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_NEVERSWAP_ACC,
 	DDI_STRICTORDER_ACC
 };
-#endif
 
 static struct ddi_dma_attr dca_dmaattr = {
 	DMA_ATTR_V0,		/* dma_attr_version */
@@ -481,7 +479,7 @@ static struct ddi_dma_attr dca_dmaattr = {
 	0x1,			/* dma_attr_minxfer */
 	0x00ffffffUL,		/* dma_attr_maxxfer */
 	0xffffffffUL,		/* dma_attr_seg */
-#if defined(i386) || defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	512,			/* dma_attr_sgllen */
 #else
 	1,			/* dma_attr_sgllen */
@@ -1667,24 +1665,6 @@ dca_newreq(dca_t *dca)
 	 * for driver hardening, allocate in whole pages.
 	 */
 	size = ROUNDUP(MAXPACKET, dca->dca_pagesize);
-#if defined(i386) || defined(__i386)
-	/*
-	 * Use kmem_alloc instead of ddi_dma_mem_alloc here since the latter
-	 * may fail on x86 platform if a physically contiguous memory chunk
-	 * cannot be found. From initial testing, we did not see performance
-	 * degradation as seen on Sparc.
-	 */
-	if ((reqp->dr_ibuf_kaddr = kmem_alloc(size, KM_SLEEP)) == NULL) {
-		dca_error(dca, "unable to alloc request ibuf memory");
-		dca_destroyreq(reqp);
-		return (NULL);
-	}
-	if ((reqp->dr_obuf_kaddr = kmem_alloc(size, KM_SLEEP)) == NULL) {
-		dca_error(dca, "unable to alloc request obuf memory");
-		dca_destroyreq(reqp);
-		return (NULL);
-	}
-#else
 	/*
 	 * We could kmem_alloc for Sparc too. However, it gives worse
 	 * performance when transferring more than one page data. For example,
@@ -1711,7 +1691,6 @@ dca_newreq(dca_t *dca)
 		dca_destroyreq(reqp);
 		return (NULL);
 	}
-#endif
 
 	/* Skip the used portion in the context page */
 	reqp->dr_offset = CTX_MAXLENGTH;
@@ -1745,10 +1724,6 @@ dca_newreq(dca_t *dca)
 void
 dca_destroyreq(dca_request_t *reqp)
 {
-#if defined(i386) || defined(__i386)
-	dca_t		*dca = reqp->dr_dca;
-	size_t		size = ROUNDUP(MAXPACKET, dca->dca_pagesize);
-#endif
 
 	/*
 	 * Clean up DMA for the context structure.
@@ -1768,19 +1743,6 @@ dca_destroyreq(dca_request_t *reqp)
 	/*
 	 * Clean up DMA for the scratch buffer.
 	 */
-#if defined(i386) || defined(__i386)
-	if (reqp->dr_ibuf_dmah) {
-		(void) ddi_dma_unbind_handle(reqp->dr_ibuf_dmah);
-		ddi_dma_free_handle(&reqp->dr_ibuf_dmah);
-	}
-	if (reqp->dr_obuf_dmah) {
-		(void) ddi_dma_unbind_handle(reqp->dr_obuf_dmah);
-		ddi_dma_free_handle(&reqp->dr_obuf_dmah);
-	}
-
-	kmem_free(reqp->dr_ibuf_kaddr, size);
-	kmem_free(reqp->dr_obuf_kaddr, size);
-#else
 	if (reqp->dr_ibuf_paddr) {
 		(void) ddi_dma_unbind_handle(reqp->dr_ibuf_dmah);
 	}
@@ -1801,7 +1763,6 @@ dca_destroyreq(dca_request_t *reqp)
 	if (reqp->dr_obuf_dmah) {
 		ddi_dma_free_handle(&reqp->dr_obuf_dmah);
 	}
-#endif
 	/*
 	 * These two DMA handles should have been unbinded in
 	 * dca_unbindchains() function

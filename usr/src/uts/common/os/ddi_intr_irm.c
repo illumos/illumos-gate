@@ -34,7 +34,7 @@
 #include <sys/sunndi.h>
 #include <sys/ndi_impldefs.h>	/* include prototypes */
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 /*
  * MSI-X allocation limit.
  */
@@ -767,7 +767,7 @@ i_ddi_irm_set_cb(dev_info_t *dip, boolean_t has_cb_flag)
 		/* Determine new request size */
 		nreq = MIN(req_p->ireq_nreq, pool_p->ipool_defsz);
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 		/* Use the default static limit for non-IRM drivers */
 		if (req_p->ireq_type == DDI_INTR_TYPE_MSIX)
 			nreq = MIN(nreq, ddi_msix_alloc_limit);

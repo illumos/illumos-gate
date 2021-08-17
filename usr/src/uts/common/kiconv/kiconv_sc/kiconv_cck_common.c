@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
@@ -37,8 +35,6 @@
 #include <sys/u8_textprep.h>
 #include <sys/kiconv.h>
 #include <sys/kiconv_cck_common.h>
-
-/*LINTLIBRARY*/
 
 /*
  * Common kiconv_open method for UTF-8 -> CCK conversion.
@@ -74,8 +70,8 @@ kiconv_close_to_cck(void *kcd)
  */
 size_t
 kiconv_utf8_to_cck(void *kcd, char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft, int *errno,
-	kiconv_utf8tocck_t ptr_utf8tocck)
+    char **outbuf, size_t *outbytesleft, int *errno,
+    kiconv_utf8tocck_t ptr_utf8tocck)
 {
 	uchar_t		*ib;
 	uchar_t		*ob;
@@ -190,7 +186,7 @@ ILLEGAL_CHAR_ERR:
 
 size_t
 kiconvstr_utf8_to_cck(uchar_t *ib, size_t *inlen, uchar_t *ob, size_t *outlen,
-	int flag, int *errno, kiconv_utf8tocck_t ptr_utf8tocck)
+    int flag, int *errno, kiconv_utf8tocck_t ptr_utf8tocck)
 {
 	uchar_t		*ibtail;
 	uchar_t		*obtail;

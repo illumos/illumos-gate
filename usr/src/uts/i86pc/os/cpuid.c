@@ -5482,17 +5482,12 @@ cpuid_pass4(cpu_t *cpu, uint_t *hwcap_out)
 
 		if (!is_x86_feature(x86_featureset, X86FSET_NX))
 			*edx &= ~CPUID_AMD_EDX_NX;
-#if !defined(__amd64)
-		*edx &= ~CPUID_AMD_EDX_LM;
-#endif
 		/*
 		 * Now map the supported feature vector to
 		 * things that we think userland will care about.
 		 */
-#if defined(__amd64)
 		if (*edx & CPUID_AMD_EDX_SYSC)
 			hwcap_flags |= AV_386_AMD_SYSC;
-#endif
 		if (*edx & CPUID_AMD_EDX_MMXamd)
 			hwcap_flags |= AV_386_AMD_MMX;
 		if (*edx & CPUID_AMD_EDX_3DNow)
@@ -5857,26 +5852,6 @@ cpuid_get_cores_per_compunit(cpu_t *cpu)
 	return (cpu->cpu_m.mcpu_cpi->cpi_cores_per_compunit);
 }
 
-/*ARGSUSED*/
-int
-cpuid_have_cr8access(cpu_t *cpu)
-{
-#if defined(__amd64)
-	return (1);
-#else
-	struct cpuid_info *cpi;
-
-	ASSERT(cpu != NULL);
-	cpi = cpu->cpu_m.mcpu_cpi;
-	if ((cpi->cpi_vendor == X86_VENDOR_AMD ||
-	    cpi->cpi_vendor == X86_VENDOR_HYGON) &&
-	    cpi->cpi_maxeax >= 1 &&
-	    (CPI_FEATURES_XTD_ECX(cpi) & CPUID_AMD_ECX_CR8D) != 0)
-		return (1);
-	return (0);
-#endif
-}
-
 uint32_t
 cpuid_get_apicid(cpu_t *cpu)
 {
@@ -6112,11 +6087,7 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 86:
 		return (SH_C0(eax) || CG(eax));
 	case 88:
-#if !defined(__amd64)
-		return (0);
-#else
 		return (B(eax) || SH_C0(eax));
-#endif
 	case 89:
 		return (cpi->cpi_family < 0x10);
 	case 90:
@@ -6129,11 +6100,7 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 94:
 		return (B(eax) || SH_C0(eax) || CG(eax));
 	case 95:
-#if !defined(__amd64)
-		return (0);
-#else
 		return (B(eax) || SH_C0(eax));
-#endif
 	case 96:
 		return (B(eax) || SH_C0(eax) || CG(eax));
 	case 97:
@@ -6228,11 +6195,7 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 		    DR_B2(eax) || RB_C0(eax));
 
 	case 721:
-#if defined(__amd64)
 		return (cpi->cpi_family == 0x10 || cpi->cpi_family == 0x12);
-#else
-		return (0);
-#endif
 
 	default:
 		return (-1);
@@ -7501,7 +7464,7 @@ cpuid_deadline_tsc_supported(void)
 	}
 }
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 /*
  * Patch in versions of bcopy for high performance Intel Nhm processors
  * and later...
@@ -7522,7 +7485,7 @@ patch_memops(uint_t vendor)
 		}
 	}
 }
-#endif  /* __amd64 && !__xpv */
+#endif  /*  !__xpv */
 
 /*
  * We're being asked to tell the system how many bits are required to represent

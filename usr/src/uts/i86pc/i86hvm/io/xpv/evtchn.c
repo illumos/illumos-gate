@@ -53,11 +53,7 @@ static volatile ulong_t *pending_events;
 static volatile ulong_t *masked_events;
 
 /* log2(NBBY * sizeof (ulong)) */
-#ifdef __amd64
 #define	EVTCHN_SHIFT	6
-#else /* __i386 */
-#define	EVTCHN_SHIFT	5
-#endif
 
 /* Atomically get and clear a ulong from memory. */
 #define	GET_AND_CLEAR(src, targ) {				\
