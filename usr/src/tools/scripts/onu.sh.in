@@ -104,7 +104,7 @@ prepare_image()
 	print "**\n** Preparing for ONU from $distribution\n**"
 
 	case $distribution in
-	    omnios)
+	    omnios|helios)
 		# This removes files from the image that cause conflicts with
 		# stock illumos-gate, and removes omnios-only kernel drivers
 		# etc.
@@ -162,7 +162,7 @@ case $distribution in
     openindiana)
 	nlbrand=nlipkg
 	;;
-    omnios)
+    omnios|helios)
 	nlbrand=ipkg
 	;;
     *)

@@ -52,10 +52,10 @@ static lwp_info_t *
 getlwpcore(struct ps_prochandle *P, lwpid_t lwpid)
 {
 	core_info_t *core = P->data;
-	lwp_info_t *lwp = list_next(&core->core_lwp_head);
-	uint_t i;
+	lwp_info_t *lwp;
 
-	for (i = 0; i < core->core_nlwp; i++, lwp = list_next(lwp)) {
+	for (lwp = list_head(&core->core_lwp_head); lwp != NULL;
+	    lwp = list_next(&core->core_lwp_head, lwp)) {
 		if (lwp->lwp_id == lwpid)
 			return (lwp);
 	}

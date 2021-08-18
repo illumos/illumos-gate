@@ -15,6 +15,7 @@
 /*
  * Copyright (c) 2013 Joyent, Inc.  All Rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <limits.h>
@@ -24,6 +25,7 @@
 #include <dirent.h>
 #include <ctype.h>
 #include <string.h>
+#include <stddef.h>
 #include <sys/mkdev.h>
 
 #include "libproc.h"
@@ -34,6 +36,13 @@
  * Pfdinfo.c - obtain open file information.
  */
 
+void
+Pinitfd(struct ps_prochandle *P)
+{
+	list_create(&P->fd_head, sizeof (fd_info_t),
+	    offsetof(fd_info_t, fd_list));
+}
+
 /*
  * Allocate an fd_info structure and stick it on the list.
  * (Unless one already exists.)  The list is sorted in
@@ -43,16 +52,10 @@
 fd_info_t *
 Pfd2info(struct ps_prochandle *P, int fd)
 {
-	fd_info_t	*fip = list_next(&P->fd_head);
-	fd_info_t	*next;
-	int i;
+	fd_info_t	*fip, *next = NULL;
 
-	if (fip == NULL) {
-		list_link(&P->fd_head, NULL);
-		fip = list_next(&P->fd_head);
-	}
-
-	for (i = 0; i < P->num_fd; i++, fip = list_next(fip)) {
+	for (fip = list_head(&P->fd_head); fip != NULL;
+	    fip = list_next(&P->fd_head, fip)) {
 		if (fip->fd_info == NULL)
 			continue;
 
@@ -68,8 +71,7 @@ Pfd2info(struct ps_prochandle *P, int fd)
 	if ((fip = calloc(1, sizeof (*fip))) == NULL)
 		return (NULL);
 
-	list_link(fip, next ? next : (void *)&(P->fd_head));
-	P->num_fd++;
+	list_insert_before(&P->fd_head, next, fip);
 	return (fip);
 }
 
@@ -108,7 +110,7 @@ load_fdinfo(struct ps_prochandle *P)
 	 * This is an edge case it isn't worth adding additional state to
 	 * to eliminate.
 	 */
-	if (P->num_fd > 0)
+	if (!list_is_empty(&P->fd_head))
 		return;
 
 	if (P->state == PS_DEAD || P->state == PS_IDLE)
@@ -128,9 +130,8 @@ Pfdinfo_iter(struct ps_prochandle *P, proc_fdinfo_f *func, void *cd)
 
 	/* NB: We walk the list backwards. */
 
-	for (fip = list_prev(&P->fd_head);
-	    fip != (void *)&P->fd_head && fip != NULL;
-	    fip = list_prev(fip)) {
+	for (fip = list_tail(&P->fd_head); fip != NULL;
+	    fip = list_prev(&P->fd_head, fip)) {
 		if ((rv = func(cd, fip->fd_info)) != 0)
 			return (rv);
 	}

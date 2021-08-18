@@ -22,10 +22,10 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-MODULE = libcmdutils.so
+MODULE = list.so
 MDBTGT = proc
 
-MODSRCS = libcmdutils.c \
+MODSRCS = listmod.c \
 	  list.c
 
 include ../../../../Makefile.cmd

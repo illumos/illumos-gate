@@ -177,10 +177,10 @@ ps_lgetxregsize(struct ps_prochandle *P, lwpid_t lwpid, int *xrsize)
 
 	if (P->state == PS_DEAD) {
 		core_info_t *core = P->data;
-		lwp_info_t *lwp = list_next(&core->core_lwp_head);
-		uint_t i;
+		lwp_info_t *lwp;
 
-		for (i = 0; i < core->core_nlwp; i++, lwp = list_next(lwp)) {
+		for (lwp = list_head(&core->core_lwp_head); lwp != NULL;
+		    lwp = list_next(&core->core_lwp_head, lwp)) {
 			if (lwp->lwp_id == lwpid) {
 				if (lwp->lwp_xregs != NULL)
 					*xrsize = sizeof (prxregset_t);
@@ -332,7 +332,7 @@ ps_pbrandname(struct ps_prochandle *P, char *buf, size_t len)
  */
 ps_err_e
 ps_pglobal_lookup(struct ps_prochandle *P, const char *object_name,
-	const char *sym_name, psaddr_t *sym_addr)
+    const char *sym_name, psaddr_t *sym_addr)
 {
 	GElf_Sym sym;
 
@@ -355,7 +355,7 @@ ps_pglobal_lookup(struct ps_prochandle *P, const char *object_name,
  */
 ps_err_e
 ps_pglobal_sym(struct ps_prochandle *P, const char *object_name,
-	const char *sym_name, ps_sym_t *symp)
+    const char *sym_name, ps_sym_t *symp)
 {
 #if defined(_ILP32)
 	GElf_Sym sym;

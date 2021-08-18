@@ -35,23 +35,6 @@ extern "C" {
 #endif
 
 /*
- * Circular doubly-linked list:
- */
-typedef struct P_list {
-	struct P_list	*list_forw;
-	struct P_list	*list_back;
-} plist_t;
-
-/*
- * Routines to manipulate linked lists:
- */
-extern void list_link(void *, void *);
-extern void list_unlink(void *);
-
-#define	list_next(elem)	(void *)(((plist_t *)(elem))->list_forw)
-#define	list_prev(elem)	(void *)(((plist_t *)(elem))->list_back)
-
-/*
  * Routines to manipulate sigset_t, fltset_t, or sysset_t.
  */
 extern void prset_fill(void *, size_t);

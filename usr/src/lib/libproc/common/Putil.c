@@ -37,40 +37,6 @@
 #include "Putil.h"
 
 /*
- * Place the new element on the list prior to the existing element.
- */
-void
-list_link(void *new, void *existing)
-{
-	plist_t *p = new;
-	plist_t *q = existing;
-
-	if (q) {
-		p->list_forw = q;
-		p->list_back = q->list_back;
-		q->list_back->list_forw = p;
-		q->list_back = p;
-	} else {
-		p->list_forw = p->list_back = p;
-	}
-}
-
-/*
- * Unchain the specified element from a list.
- */
-void
-list_unlink(void *old)
-{
-	plist_t *p = old;
-
-	if (p->list_forw != p) {
-		p->list_back->list_forw = p->list_forw;
-		p->list_forw->list_back = p->list_back;
-	}
-	p->list_forw = p->list_back = p;
-}
-
-/*
  * Routines to manipulate sigset_t, fltset_t, or sysset_t.  These routines
  * are provided as equivalents for the <sys/procfs.h> macros prfillset,
  * premptyset, praddset, and prdelset.  These functions are preferable

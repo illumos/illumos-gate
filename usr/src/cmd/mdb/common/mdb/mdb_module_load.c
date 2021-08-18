@@ -23,6 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -180,6 +181,16 @@ module_load(void *fp, const mdb_map_t *map, const char *fullname)
 		 * object, and explicitly load the "libc.so" dmod.
 		 */
 		return (module_load(fp, map, "libc.so.1"));
+	}
+
+	if (strstr(fullname, "ld.so") != NULL) {
+		/*
+		 * This is even more of a kludge. But if we find something has
+		 * basically tried to load ld, we will always implicitly load
+		 * the list dmod because several binaries and libraries just
+		 * build it as a .o and include it in their ELF object.
+		 */
+		(void) mdb_module_load("list", mld->mld_mode);
 	}
 
 	return (0);

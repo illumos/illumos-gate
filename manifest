@@ -10158,7 +10158,6 @@ d usr/lib/mdb/proc/amd64 0755 root sys
 f usr/lib/mdb/proc/amd64/ld.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libavl.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libc.so 0555 root sys
-f usr/lib/mdb/proc/amd64/libcmdutils.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libnvpair.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libproc.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libpython2.6.so 0555 root sys
@@ -10168,6 +10167,7 @@ f usr/lib/mdb/proc/amd64/libtopo.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libumem.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libuutil.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libzpool.so 0555 root sys
+f usr/lib/mdb/proc/amd64/list.so 0555 root sys
 f usr/lib/mdb/proc/amd64/mdb_ds.so 0555 root sys
 f usr/lib/mdb/proc/amd64/mdb_test.so 0555 root sys
 f usr/lib/mdb/proc/eft.so 0555 root sys
@@ -10175,7 +10175,6 @@ f usr/lib/mdb/proc/fmd.so 0555 root sys
 f usr/lib/mdb/proc/ld.so 0555 root sys
 f usr/lib/mdb/proc/libavl.so 0555 root sys
 f usr/lib/mdb/proc/libc.so 0555 root sys
-f usr/lib/mdb/proc/libcmdutils.so 0555 root sys
 f usr/lib/mdb/proc/libmlsvc.so 0555 root sys
 f usr/lib/mdb/proc/libnvpair.so 0555 root sys
 f usr/lib/mdb/proc/libproc.so 0555 root sys
@@ -10186,6 +10185,7 @@ f usr/lib/mdb/proc/libtopo.so 0555 root sys
 f usr/lib/mdb/proc/libumem.so 0555 root sys
 f usr/lib/mdb/proc/libuutil.so 0555 root sys
 f usr/lib/mdb/proc/libzpool.so 0555 root sys
+f usr/lib/mdb/proc/list.so 0555 root sys
 f usr/lib/mdb/proc/mdb_ds.so 0555 root sys
 f usr/lib/mdb/proc/mdb_test.so 0555 root sys
 f usr/lib/mdb/proc/svc.configd.so 0555 root sys

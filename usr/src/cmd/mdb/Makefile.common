@@ -34,7 +34,6 @@ COMMON_MODULES_PROC = \
 	dof \
 	libavl \
 	libc \
-	libcmdutils \
 	libfknsmb \
 	libfksmbfs \
 	libfksmbsrv \
@@ -47,6 +46,7 @@ COMMON_MODULES_PROC = \
 	libumem \
 	libuutil \
 	libzpool \
+	list \
 	mdb_ds \
 	mdb_test
 

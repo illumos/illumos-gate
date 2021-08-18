@@ -236,11 +236,11 @@ read_gwin(struct ps_prochandle *P, struct rwindow *rwp, uintptr_t sp)
 
 	if (P->state == PS_DEAD) {
 		core_info_t *core = P->data;
-		lwp_info_t *lwp = list_next(&core->core_lwp_head);
-		uint_t n;
+		lwp_info_t *lwp;
 		int i;
 
-		for (n = 0; n < core->core_nlwp; n++, lwp = list_next(lwp)) {
+		for (lwp = list_head(&core->core_lwp_head); lwp != NULL;
+		    lwp = list_next(&core->core_lwp_head, lwp)) {
 			gwindows_t *gwin = lwp->lwp_gwins;
 
 			if (gwin == NULL)
@@ -335,7 +335,7 @@ ucontext_32_to_prgregs(const ucontext32_t *src, prgregset_t dst)
 
 int
 Pstack_iter(struct ps_prochandle *P, const prgregset_t regs,
-	proc_stack_f *func, void *arg)
+    proc_stack_f *func, void *arg)
 {
 	prgreg_t *prevfp = NULL;
 	uint_t pfpsize = 0;
