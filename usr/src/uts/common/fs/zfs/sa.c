@@ -24,7 +24,6 @@
  * Portions Copyright 2011 iXsystems, Inc
  * Copyright (c) 2013, 2017 by Delphix. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
- * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2019 Joyent, Inc.
  */

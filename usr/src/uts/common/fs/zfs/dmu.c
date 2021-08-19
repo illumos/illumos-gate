@@ -2340,6 +2340,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 			    ZCHECKSUM_FLAG_DEDUP))
 				dedup_verify = B_TRUE;
 		}
+
 		/*
 		 * Enable nopwrite if we have secure enough checksum
 		 * algorithm (see comment in zio_nop_write) and

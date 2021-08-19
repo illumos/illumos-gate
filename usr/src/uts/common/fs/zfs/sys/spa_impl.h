@@ -25,7 +25,6 @@
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  * Copyright 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2017 Datto Inc.
- * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2017, Intel Corporation.
  * Copyright 2019 Joyent, Inc.
  */

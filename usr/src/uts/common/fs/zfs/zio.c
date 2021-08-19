@@ -24,7 +24,6 @@
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
- * Copyright (c) 2019 Joyent, Inc.
  * Copyright (c) 2017, Intel Corporation.
  * Copyright 2020 Joyent, Inc.
  */
