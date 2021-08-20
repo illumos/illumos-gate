@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include "stand.h"
@@ -34,9 +33,10 @@ struct dirent *
 readdirfd(int fd)
 {
 	static struct dirent dir;		/* XXX not thread safe */
-	struct open_file *f = &files[fd];
+	struct open_file *f;
 
-	if ((unsigned)fd >= SOPEN_MAX || !(f->f_flags & F_READ)) {
+	f = fd2open_file(fd);
+	if (f == NULL || !(f->f_flags & F_READ)) {
 		errno = EBADF;
 		return (NULL);
 	}

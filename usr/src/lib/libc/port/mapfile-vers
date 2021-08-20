@@ -78,6 +78,11 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.39 {
+    protected:
+	memrchr;
+} ILLUMOS_0.38;
+
 SYMBOL_VERSION ILLUMOS_0.38 {
     protected:
 	getgrouplist;

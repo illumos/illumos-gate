@@ -38,9 +38,10 @@
 int
 fstat(int fd, struct stat *sb)
 {
-	struct open_file *f = &files[fd];
+	struct open_file *f;
 
-	if ((unsigned)fd >= SOPEN_MAX || f->f_flags == 0) {
+	f = fd2open_file(fd);
+	if (f == NULL || f->f_flags == 0) {
 		errno = EBADF;
 		return (-1);
 	}

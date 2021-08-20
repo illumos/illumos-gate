@@ -121,6 +121,7 @@ extern int fls(int);
 extern int flsl(long);
 extern int flsll(long long);
 extern void *memmem(const void *, size_t, const void *, size_t);
+extern void *memrchr(const void *, int, size_t);
 extern char *strcasestr(const char *, const char *);
 extern char *strnstr(const char *, const char *, size_t);
 extern size_t strlcpy(char *, const char *, size_t);
@@ -130,7 +131,7 @@ extern char *strchrnul(const char *, int);
 extern char *strcasestr_l(const char *, const char *, locale_t);
 extern int strcasecmp(const char *, const char *);
 extern int strncasecmp(const char *, const char *, size_t);
-#endif /* defined(__EXTENSIONS__)... */
+#endif /* !defined(__STRICT_SYMBOLS) */
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \

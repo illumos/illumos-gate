@@ -46,7 +46,19 @@
 #include "net.h"
 #include "netif.h"
 
-struct iodesc sockets[SOPEN_MAX];
+typedef TAILQ_HEAD(socket_list, iodesc) socket_list_t;
+
+/*
+ * Open socket list. The current implementation and assumption is,
+ * we only remove entries from tail and we only add new entries to tail.
+ * This decision is to keep iodesc id management simple - we get list
+ * entries ordered by continiously growing io_id field.
+ * If we do have multiple sockets open and we do close socket not from tail,
+ * this entry will be marked unused. netif_open() will reuse unused entry, or
+ * netif_close() will free all unused tail entries.
+ */
+static socket_list_t sockets = TAILQ_HEAD_INITIALIZER(sockets);
+
 #ifdef NETIF_DEBUG
 int netif_debug = 0;
 #endif
@@ -258,32 +270,67 @@ netif_put(struct iodesc *desc, void *pkt, size_t len)
 	return (rv);
 }
 
+/*
+ * socktodesc_impl:
+ *
+ * Walk socket list and return pointer to iodesc structure.
+ * if id is < 0, return first unused iodesc.
+ */
+static struct iodesc *
+socktodesc_impl(int socket)
+{
+	struct iodesc *s;
+
+	TAILQ_FOREACH(s, &sockets, io_link) {
+		/* search by socket id */
+		if (socket >= 0) {
+			if (s->io_id == socket)
+				break;
+			continue;
+		}
+		/* search for first unused entry */
+		if (s->io_netif == NULL)
+			break;
+	}
+	return (s);
+}
+
 struct iodesc *
 socktodesc(int sock)
 {
-	if (sock >= SOPEN_MAX) {
+	struct iodesc *desc;
+
+	if (sock < 0)
+		desc = NULL;
+	else
+		desc = socktodesc_impl(sock);
+
+	if (desc == NULL)
 		errno = EBADF;
-		return (NULL);
-	}
-	return (&sockets[sock]);
+
+	return (desc);
 }
 
 int
 netif_open(void *machdep_hint)
 {
-	int fd;
 	struct iodesc *s;
 	struct netif *nif;
 
 	/* find a free socket */
-	for (fd = 0, s = sockets; fd < SOPEN_MAX; fd++, s++)
-		if (s->io_netif == (struct netif *)0)
-			goto fnd;
-	errno = EMFILE;
-	return (-1);
+	s = socktodesc_impl(-1);
+	if (s == NULL) {
+		struct iodesc *last;
 
-fnd:
-	bzero(s, sizeof (*s));
+		s = calloc(1, sizeof (*s));
+		if (s == NULL)
+			return (-1);
+		last = TAILQ_LAST(&sockets, socket_list);
+		if (last != NULL)
+			s->io_id = last->io_id + 1;
+		TAILQ_INSERT_TAIL(&sockets, s, io_link);
+	}
+
 	netif_init();
 	nif = netif_select(machdep_hint);
 	if (!nif)
@@ -296,18 +343,43 @@ fnd:
 	}
 	netif_attach(nif, s, machdep_hint);
 
-	return (fd);
+	return (s->io_id);
 }
 
 int
 netif_close(int sock)
 {
-	if (sock >= SOPEN_MAX) {
-		errno = EBADF;
+	struct iodesc *s, *last;
+	int err;
+
+	err = 0;
+	s = socktodesc_impl(sock);
+	if (s == NULL || sock < 0) {
+		err = EBADF;
 		return (-1);
 	}
-	netif_detach(sockets[sock].io_netif);
-	sockets[sock].io_netif = (struct netif *)0;
+	netif_detach(s->io_netif);
+
+	bzero(&s->destip, sizeof (s->destip));
+	bzero(&s->myip, sizeof (s->myip));
+	s->destport = 0;
+	s->myport = 0;
+	s->xid = 0;
+	bzero(s->myea, sizeof (s->myea));
+	s->io_netif = NULL;
+
+	/* free unused entries from tail. */
+	TAILQ_FOREACH_REVERSE_SAFE(last, &sockets, socket_list, io_link, s) {
+		if (last->io_netif != NULL)
+			break;
+		TAILQ_REMOVE(&sockets, last, io_link);
+		free(last);
+	}
+
+	if (err) {
+		errno = err;
+		return (-1);
+	}
 
 	return (0);
 }

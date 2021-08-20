@@ -506,6 +506,7 @@ PORTGEN=			\
 	madvise.o		\
 	malloc.o		\
 	memalign.o		\
+	memrchr.o		\
 	memset_s.o		\
 	mkdev.o			\
 	mkdtemp.o		\
