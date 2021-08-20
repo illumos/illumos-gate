@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -87,6 +87,7 @@ main(int argc, char *argv[])
 		warnx("missing required arguments");
 		(void) fprintf(stderr, "Usage: udf [-l] -d device -f func -i "
 		    "inst -r reg\n");
+		exit(2);
 	}
 
 	errno = 0;
