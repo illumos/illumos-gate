@@ -50,6 +50,29 @@ MSGFILES =	common/libdladm.c common/linkprop.c common/secobj.c	\
 
 XGETFLAGS =     -a -x libdladm.xcl
 
+TYPECHECK_LIB = libdladm.so.1
+TYPELIST = \
+	   dlmgmt_door_setattr_t \
+	   dlmgmt_door_createid_t \
+	   dlmgmt_door_destroyid_t \
+	   dlmgmt_door_remapid_t \
+	   dlmgmt_door_upid_t \
+	   dlmgmt_door_createconf_t \
+	   dlmgmt_door_setattr_t \
+	   dlmgmt_door_unsetattr_t \
+	   dlmgmt_door_writeconf_t \
+	   dlmgmt_door_removeconf_t \
+	   dlmgmt_door_destroyconf_t \
+	   dlmgmt_door_openconf_t \
+	   dlmgmt_door_getconfsnapshot_t \
+	   dlmgmt_door_getattr_t \
+	   dlmgmt_createconf_retval_t \
+	   dlmgmt_openconf_retval_t \
+	   dlmgmt_getconfsnapshot_retval_t \
+	   dlmgmt_door_zoneboot_t \
+	   dlmgmt_remapid_retval_t \
+	   dlmgmt_createid_retval_t
+
 all :=		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
@@ -61,7 +84,7 @@ all clean clobber install: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 
-check:		$(CHECKHDRS)
+check:		$(CHECKHDRS) $(TYPECHECK)
 
 $(POFILE):	pofile_MSGFILES
 

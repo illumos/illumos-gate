@@ -658,7 +658,7 @@ dladm_set_conf_field(dladm_handle_t handle, dladm_conf_t conf, const char *attr,
 	setattr.ld_cmd = DLMGMT_CMD_SETATTR;
 	setattr.ld_confid = conf.ds_confid;
 	(void) strlcpy(setattr.ld_attr, attr, MAXLINKATTRLEN);
-	setattr.ld_attrsz = attrsz;
+	setattr.ld_attrsz = (uint32_t)attrsz;
 	setattr.ld_type = type;
 	bcopy(attrval, &setattr.ld_attrval, attrsz);
 
