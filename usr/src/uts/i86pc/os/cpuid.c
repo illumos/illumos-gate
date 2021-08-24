@@ -510,8 +510,9 @@
  * generations of topology. There's the basic topology that has been used in
  * family 0xf+ (Opteron, Athlon64), there's the topology that was introduced
  * with family 0x15 (Bulldozer), and there's the topology that was introduced
- * with family 0x17 (Zen). AMD also has some additional terminology that's worth
- * talking about.
+ * with family 0x17 (Zen), evolved more dramatically in Zen 2 (still family
+ * 0x17), and tweaked slightly in Zen 3 (family 19h). AMD also has some
+ * additional terminology that's worth talking about.
  *
  * Until the introduction of family 0x17 (Zen), AMD did not implement something
  * that they considered SMT. Whether or not the AMD processors have SMT
@@ -647,6 +648,129 @@
  *  to PCIe devices and other I/O, by the 'P' character. Because each Zeppelin
  *  die is made up of two core complexes, we have multiple different NUMA
  *  domains that we care about for these systems.
+ *
+ * ZEN 2
+ *
+ *	Zen 2 changes things in a dramatic way from Zen 1. Whereas in Zen 1
+ *	each Zeppelin Die had its own I/O die, that has been moved out of the
+ *	core complex in Zen 2. The actual core complex looks pretty similar, but
+ *	now the die actually looks much simpler:
+ *
+ *      +--------------------------------------------------------+
+ *      | Zen 2 Core Complex Die    HH                           |
+ *      |                           HH                           |
+ *      |          +-----------+    HH    +-----------+          |
+ *      |          |           |    HH    |           |          |
+ *      |          |    Core   |==========|    Core   |          |
+ *      |          |  Complex  |==========|  Complex  |          |
+ *      |          |           |    HH    |           |          |
+ *      |          +-----------+    HH    +-----------+          |
+ *      |                           HH                           |
+ *      |                           HH                           |
+ *      +--------------------------------------------------------+
+ *
+ *	From here, when we add the central I/O die, this changes things a bit.
+ *	Each die is connected to the I/O die, rather than trying to interconnect
+ *	them directly. The following image takes the same Zen 1 image that we
+ *	had earlier and shows what it looks like with the I/O die instead:
+ *
+ *                                 PP    PP
+ *                                 PP    PP
+ *           +---------------------PP----PP---------------------+
+ *           |                     PP    PP                     |
+ *           |  +-----------+      PP    PP      +-----------+  |
+ *           |  |           |      PP    PP      |           |  |
+ *           |  |   Zen 2   |    +-PP----PP-+    |   Zen 2   |  |
+ *           |  |    Die   _|    | PP    PP |    |_   Die    |  |
+ *           |  |         |o|oooo|          |oooo|o|         |  |
+ *           |  +-----------+    |          |    +-----------+  |
+ *           |                   |   I/O    |                   |
+ *       MMMMMMMMMMMMMMMMMMMMMMMMMM  Die   MMMMMMMMMMMMMMMMMMMMMMMMMM
+ *       MMMMMMMMMMMMMMMMMMMMMMMMMM        MMMMMMMMMMMMMMMMMMMMMMMMMM
+ *           |                   |          |                   |
+ *       MMMMMMMMMMMMMMMMMMMMMMMMMM        MMMMMMMMMMMMMMMMMMMMMMMMMM
+ *       MMMMMMMMMMMMMMMMMMMMMMMMMM        MMMMMMMMMMMMMMMMMMMMMMMMMM
+ *           |                   |          |                   |
+ *           |  +-----------+    |          |    +-----------+  |
+ *           |  |         |o|oooo| PP    PP |oooo|o|         |  |
+ *           |  |   Zen 2  -|    +-PP----PP-+    |-  Zen 2   |  |
+ *           |  |    Die    |      PP    PP      |    Die    |  |
+ *           |  |           |      PP    PP      |           |  |
+ *           |  +-----------+      PP    PP      +-----------+  |
+ *           |                     PP    PP                     |
+ *           +---------------------PP----PP---------------------+
+ *                                 PP    PP
+ *                                 PP    PP
+ *
+ *	The above has four core complex dies installed, though the Zen 2 EPYC
+ *	and ThreadRipper parts allow for up to eight, while the Ryzen parts
+ *	generally only have one to two. The more notable difference here is how
+ *	everything communicates. Note that memory and PCIe come out of the
+ *	central die. This changes the way that one die accesses a resource. It
+ *	basically always has to go to the I/O die, where as in Zen 1 it may have
+ *	satisfied it locally. In general, this ends up being a better strategy
+ *	for most things, though it is possible to still treat everything in four
+ *	distinct NUMA domains with each Zen 2 die slightly closer to some memory
+ *	and PCIe than otherwise. This also impacts the 'amdzen' nexus driver as
+ *	now there is only one 'node' present.
+ *
+ * ZEN 3
+ *
+ *	From an architectural perspective, Zen 3 is a much smaller change from
+ *	Zen 2 than Zen 2 was from Zen 1, though it makes up for most of that in
+ *	its microarchitectural changes. The biggest thing for us is how the die
+ *	changes. In Zen 1 and Zen 2, each core complex still had its own L3
+ *	cache. However, in Zen 3, the L3 is now shared between the entire core
+ *	complex die and is no longer partitioned between each core complex. This
+ *	means that all cores on the die can share the same L3 cache. Otherwise,
+ *	the general layout of the overall package with various core complexes
+ *	and an I/O die stays the same. Here's what the Core Complex Die looks
+ *	like in a bit more detail:
+ *
+ *               +-------------------------------------------------+
+ *               | Zen 3 Core Complex Die                          |
+ *               | +-------------------+    +-------------------+  |
+ *               | | Core       +----+ |    | Core       +----+ |  |
+ *               | | +--------+ | L2 | |    | +--------+ | L2 | |  |
+ *               | | | Thread | +----+ |    | | Thread | +----+ |  |
+ *               | | +--------+-+ +--+ |    | +--------+-+ +--+ |  |
+ *               | |   | Thread | |L1| |    |   | Thread | |L1| |  |
+ *               | |   +--------+ +--+ |    |   +--------+ +--+ |  |
+ *               | +-------------------+    +-------------------+  |
+ *               | +-------------------+    +-------------------+  |
+ *               | | Core       +----+ |    | Core       +----+ |  |
+ *               | | +--------+ | L2 | |    | +--------+ | L2 | |  |
+ *               | | | Thread | +----+ |    | | Thread | +----+ |  |
+ *               | | +--------+-+ +--+ |    | +--------+-+ +--+ |  |
+ *               | |   | Thread | |L1| |    |   | Thread | |L1| |  |
+ *               | |   +--------+ +--+ |    |   +--------+ +--+ |  |
+ *               | +-------------------+    +-------------------+  |
+ *               |                                                 |
+ *               | +--------------------------------------------+  |
+ *               | |                 L3 Cache                   |  |
+ *               | +--------------------------------------------+  |
+ *               |                                                 |
+ *               | +-------------------+    +-------------------+  |
+ *               | | Core       +----+ |    | Core       +----+ |  |
+ *               | | +--------+ | L2 | |    | +--------+ | L2 | |  |
+ *               | | | Thread | +----+ |    | | Thread | +----+ |  |
+ *               | | +--------+-+ +--+ |    | +--------+-+ +--+ |  |
+ *               | |   | Thread | |L1| |    |   | Thread | |L1| |  |
+ *               | |   +--------+ +--+ |    |   +--------+ +--+ |  |
+ *               | +-------------------+    +-------------------+  |
+ *               | +-------------------+    +-------------------+  |
+ *               | | Core       +----+ |    | Core       +----+ |  |
+ *               | | +--------+ | L2 | |    | +--------+ | L2 | |  |
+ *               | | | Thread | +----+ |    | | Thread | +----+ |  |
+ *               | | +--------+-+ +--+ |    | +--------+-+ +--+ |  |
+ *               | |   | Thread | |L1| |    |   | Thread | |L1| |  |
+ *               | |   +--------+ +--+ |    |   +--------+ +--+ |  |
+ *               | +-------------------+    +-------------------+  |
+ *               +-------------------------------------------------+
+ *
+ *	While it is not pictured, there are connections from the die to the
+ *	broader data fabric and additional functional blocks to support that
+ *	communication and coherency.
  *
  * CPUID LEAVES
  *
