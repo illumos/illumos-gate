@@ -815,11 +815,10 @@ vq_pushchain_many(viona_vring_t *ring, uint_t num_bufs, used_elem_t *elem)
 
 	uidx = ring->vr_cur_uidx;
 
-	for (uint_t i = 0; i < num_bufs; i++) {
+	for (uint_t i = 0; i < num_bufs; i++, uidx++) {
 		vq_write_used_ent(ring, uidx & ring->vr_mask, elem[i].id,
 		    elem[i].len);
 	}
-	uidx += num_bufs;
 
 	membar_producer();
 	vq_write_used_idx(ring, uidx);
