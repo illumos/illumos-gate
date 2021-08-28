@@ -1341,6 +1341,7 @@ mDNSlocal int SetupInterfaceList(mDNS *const m)
                 int ifIndex = if_nametoindex(i->ifa_name);
                 if (ifIndex == 0)
                 {
+                    i = i->ifa_next;
                     continue;
                 }
                 if (i->ifa_flags & IFF_LOOPBACK)
