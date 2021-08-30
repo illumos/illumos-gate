@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH REBOOT 1M "Feb 21, 2016"
+.TH REBOOT 1M "August 29, 2021"
 .SH NAME
 reboot \- restart the operating system
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/reboot\fR [\fB-dlnq\fR] [\fIboot_arguments\fR]
 .fi
@@ -19,7 +18,6 @@ reboot \- restart the operating system
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBreboot\fR utility restarts the kernel. The kernel is loaded into memory
 by the PROM monitor, which transfers control to the loaded kernel.
 .sp
@@ -48,7 +46,6 @@ options are present.
 .LP
 Normally, the system reboots itself at power-up or after crashes.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -147,7 +144,6 @@ first.
 .RE
 
 .SH OPERANDS
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -159,14 +155,13 @@ The following operands are supported:
 An optional \fIboot_arguments\fR specifies arguments to the \fBuadmin\fR(2)
 function that are passed to the boot program and kernel upon restart. The form
 and list of arguments is described in the \fBboot\fR(1M) and \fBkernel\fR(1M)
-man pages.. If the arguments are specified, whitespace between them is replaced
+man pages. If the arguments are specified, whitespace between them is replaced
 by single spaces unless the whitespace is quoted for the shell. If the
 \fIboot_arguments\fR begin with a hyphen, they must be preceded by the \fB--\fR
 delimiter (two hyphens) to denote the end of the \fBreboot\fR argument list.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRPassing the \fB-r\fR and \fB-v\fR Arguments to \fBboot\fR
 .sp
 .LP
@@ -354,13 +349,11 @@ login accounting file
 .RE
 
 .SH SEE ALSO
-.LP
 \fBmdb\fR(1), \fBboot\fR(1M), \fBdumpadm\fR(1M), \fBfsck\fR(1M),
 \fBhalt\fR(1M), \fBinit\fR(1M), \fBkernel\fR(1M), \fBshutdown\fR(1M),
 \fBsvcadm\fR(1M), \fBsvccfg\fR(1M), \fBsync\fR(1M), \fBsyslogd\fR(1M),
 \fBsync\fR(2), \fBuadmin\fR(2), \fBreboot\fR(3C), \fBattributes\fR(5)
 .SH NOTES
-.LP
 The \fBreboot\fR utility does not execute the scripts in
 \fB/etc/rc\fInum\fR.d\fR or execute shutdown actions in \fBinittab\fR(4). To
 ensure a complete shutdown of system services, use \fBshutdown\fR(1M) or

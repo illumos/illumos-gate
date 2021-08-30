@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RSM_MEMSEG_IMPORT_SET_MODE 3RSM "Jun 8, 2001"
+.TH RSM_MEMSEG_IMPORT_SET_MODE 3RSM "August 29, 2021"
 .SH NAME
 rsm_memseg_import_set_mode, rsm_memseg_import_get_mode \- set or get mode for
 barrier scoping
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
 #include <rsmapi.h>
@@ -24,12 +23,10 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The  \fBrsm_memseg_import_set_mode()\fR function provides support for optional
 explicit barrier scoping in the functions described on the
 \fBrsm_memseg_import_get\fR(3RSM) and \fBrsm_memseg_import_put\fR(3RSM) manual
-pages.. The two valid barrier modes are \fBRSM_BARRIER_MODE_EXPLICIT\fR and
+pages. The two valid barrier modes are \fBRSM_BARRIER_MODE_EXPLICIT\fR and
 \fBRSM_BARRIER_MODE_IMPLICIT\fR. By default, the barrier mode is set to
 \fBRSM_BARRIER_MODE_IMPLICIT\fR. When the mode is
 \fBRSM_BARRIER_MODE_IMPLICIT\fR, an implicit barrier open and barrier close is
@@ -41,13 +38,9 @@ before any barrier operations, either implicit or explicit, are used.
 The \fBrsm_memseg_import_get_mode()\fR function obtains the current value of
 the mode used for barrier scoping in put functions.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, these functions return 0. Otherwise, an error value
 is returned to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBrsm_memseg_import_set_mode()\fR and \fBrsm_memseg_import_get_mode()\fR
 functions can return the following errors:
 .sp
@@ -60,8 +53,6 @@ Invalid segment handle.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -78,7 +69,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBrsm_memseg_import_get\fR(3RSM), \fBrsm_memseg_import_init_barrier\fR(3RSM),
 \fBrsm_memseg_import_put\fR(3RSM), \fBattributes\fR(5)

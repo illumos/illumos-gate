@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TNFCTL_INDIRECT_OPEN 3TNF "Mar 1, 2004"
+.TH TNFCTL_INDIRECT_OPEN 3TNF "August 29, 2021"
 .SH NAME
 tnfctl_indirect_open, tnfctl_check_libs \- control probes of another process
 where caller provides /proc functionality
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ltnfctl\fR [ \fIlibrary\fR ... ]
 #include <tnf/tnfctl.h>
@@ -23,8 +22,6 @@ where caller provides /proc functionality
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The interfaces  \fBtnfctl_indirect_open()\fR and \fBtnfctl_check_libs()\fR are
 used to control probes in another process where the \fBlibtnfctl\fR(3TNF)
 client has already opened  \fBproc\fR(4) on the target process. An example of
@@ -61,7 +58,7 @@ struct tnfctl_ind_config {
 .LP
 The first field  \fIp_read\fR is the address of a function that can read
 \fBsize\fR bytes at address \fIaddr\fR in the target image into the buffer
-\fIbuf\fR. The function should return  \fB0\fR upon success.. The second field
+\fIbuf\fR. The function should return  \fB0\fR upon success. The second field
 \fIp_write\fR is the address of a function that can write  \fBsize\fR bytes at
 address \fIaddr\fR in the target image from the buffer \fIbuf\fR. The function
 should return \fB0\fR upon success. The third field \fIp_getpid\fR is the
@@ -92,7 +89,7 @@ typedef struct tnfctl_ind_obj_info {
 	int     objfd;			/* -1 indicates fd not available */
 	paddr_t text_base;		/* virtual addr of text segment */
 	paddr_t data_base;		/* virtual addr of data segment */
-	const char *objname;    	/* null-term. pathname to loadobj */
+	const char *objname;		/* null-term. pathname to loadobj */
 } tnfctl_ind_obj_info_t;
 .fi
 .in -2
@@ -114,13 +111,9 @@ indirect mode, call \fBtnfctl_check_libs()\fR when such events occur to make
 harmless. It is also harmless to call \fBtnfctl_check_libs()\fR when no such
 events have occurred.
 .SH RETURN VALUES
-.sp
-.LP
 \fBtnfctl_indirect_open()\fR and \fBtnfctl_check_libs()\fR return
 \fBTNFCTL_ERR_NONE\fR upon success.
 .SH ERRORS
-.sp
-.LP
 The following error codes apply to  \fBtnfctl_indirect_open()\fR:
 .sp
 .ne 2
@@ -180,8 +173,6 @@ An internal error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -196,8 +187,6 @@ MT Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBprex\fR(1), \fBTNF_PROBE\fR(3TNF), \fBdlclose\fR(3C), \fBdlopen\fR(3C),
 \fBlibtnfctl\fR(3TNF), \fBtnfctl_probe_enable\fR(3TNF),
 \fBtnfctl_probe_trace\fR(3TNF), \fBtracing\fR(3TNF), \fBproc\fR(4),
@@ -206,8 +195,6 @@ MT Level	MT-Safe
 .LP
 \fILinker and Libraries Guide\fR
 .SH NOTES
-.sp
-.LP
 \fBtnfctl_indirect_open()\fR should only be called after the dynamic linker has
 mapped in all the libraries (rtld sync point) and called only after the process
 is stopped. Indirect process probe control assumes the target process is

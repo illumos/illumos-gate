@@ -4,12 +4,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAP_ERROR 3LDAP "Nov 11, 2008"
+.TH LDAP_ERROR 3LDAP "August 29, 2021"
 .SH NAME
 ldap_error, ldap_err2string, ldap_perror, ldap_result2error \- LDAP protocol
 error handling functions
 .SH SYNOPSIS
-.LP
 .nf
 cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
 #include <lber.h>
@@ -29,8 +28,6 @@ cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions interpret the error codes that are returned by the LDAP API
 routines. The \fBldap_perror()\fR and \fBldap_result2error()\fR functions are
 deprecated for all new development. Use \fBldap_err2string()\fR instead.
@@ -58,8 +55,6 @@ indicates that the \fIres\fR parameter should be freed by a call to
 Similar to the way \fBperror\fR(3C) works, the \fBldap_perror()\fR function can
 be called to print an indication of the error to standard error.
 .SH ERRORS
-.sp
-.LP
 The possible values for an LDAP error code are:
 .sp
 .ne 2
@@ -518,7 +513,7 @@ A memory allocation call failed in an LDAP library function, for example,
 .ad
 .sp .6
 .RS 4n
-The LDAP client has either lost its connetion to an LDAP server or it cannot
+The LDAP client has either lost its connection to an LDAP server or it cannot
 establish a connection.
 .RE
 
@@ -529,7 +524,7 @@ establish a connection.
 .ad
 .sp .6
 .RS 4n
-The requested functionality is not supported., for example, when an LDAPv2
+The requested functionality is not supported, for example, when an LDAPv2
 client requests some LDAPv3 functionality.
 .RE
 
@@ -586,8 +581,6 @@ servers that the client can hop through to retrieve data.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -602,8 +595,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBfflush\fR(3C), \fBldap\fR(3LDAP), \fBldap_bind\fR(3LDAP),
 \fBldap_result\fR(3LDAP), \fBldap_parse_extended_result\fR(3LDAP),
 \fBldap_parse_result\fR(3LDAP), \fBldap_parse_sasl_bind_result\fR(3LDAP),

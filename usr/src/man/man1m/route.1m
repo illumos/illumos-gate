@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ROUTE 1M "May 13, 2017"
+.TH ROUTE 1M "August 29, 2021"
 .SH NAME
 route \- manually manipulate the routing tables
 .SH SYNOPSIS
@@ -322,7 +322,7 @@ _
 
 .sp
 .LP
-Two modifiers avoid confusion between addresses and keywords (for example.,
+Two modifiers avoid confusion between addresses and keywords (for example,
 \fBhost\fR used as a symbolic host name). You can distinguish a
 \fIdestination\fR by preceding it with the \fB-dst\fR modifier. You can
 distinguish a gateway address by using the \fB-gateway\fR modifier. If the
@@ -458,7 +458,7 @@ _
 Pretend route was added by kernel or routing daemon
 T}
 \fB-reject\fR	\fBRTF_REJECT\fR	Emit an ICMP unreachable when matched
-\fB-blackhole\fR	\fBRTF_BLACKHOLE\fR	Silently discard packets duing updates
+\fB-blackhole\fR	\fBRTF_BLACKHOLE\fR	Silently discard packets during updates
 \fB-proto1\fR	\fBRTF_PROTO1\fR	Set protocol specific routing flag #1
 \fB-proto2\fR	\fBRTF_PROTO2\fR	Set protocol specific routing flag #2
 \fB-private\fR	\fBRTF_PRIVATE\fR	Do not advertise this route

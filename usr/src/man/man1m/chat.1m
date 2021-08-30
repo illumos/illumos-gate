@@ -4,23 +4,20 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CHAT 1M "April 9, 2016"
+.TH CHAT 1M "August 29, 2021"
 .SH NAME
 chat \- automated conversational exchange tool
 .SH SYNOPSIS
-.LP
 .nf
 \fBchat\fR [\fIoptions\fR] \fIscript\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBchat\fR program implements a conversational text-based exchange between
 the computer and any serial device, including (but not limited to) a modem, an
 ISDN TA, and the remote peer itself, establishing a connection between the
 Point-To-Point Protocol daemon (\fBpppd\fR) and the remote \fBpppd\fR process.
 .SH OPTIONS
-.LP
 The  \fBchat\fR command supports the following options:
 .sp
 .ne 2
@@ -43,7 +40,7 @@ or horizontal tab characters to separate the strings.
 Set the timeout for the expected string to be received. If the string is not
 received within the time limit, the reply string is not sent. If specified,
 a 'subexpect' (alternate reply) string can be sent. Otherwise, if no alternate
-reply strings remain, the \fBchat\fR script fails.. A failed script will cause
+reply strings remain, the \fBchat\fR script fails. A failed script will cause
 the  \fBchat\fR program to terminate with a non-zero error code.
 .RE
 
@@ -159,7 +156,6 @@ is included as parameters to the \fBchat\fR program.
 
 .SH EXTENDED DESCRIPTION
 .SS "Chat Script"
-.LP
 The \fBchat\fR script defines communications. A script consists of one or more
 "expect-send" pairs of strings separated by spaces, with an optional
 "subexpect-subsend" string pair, separated by a dash (as in the following
@@ -208,7 +204,7 @@ ogin: ppp ssword: hello2u2
 
 .sp
 .LP
-The example can be intrepreted as: expect ogin:, send ppp, expect ...ssword:,
+The example can be interpreted as: expect ogin:, send ppp, expect ...ssword:,
 send hello2u2.
 .sp
 .LP
@@ -230,7 +226,6 @@ return sequence is sent and then the script looks for login: again. If line
 noise obscures the first login prompt, send the empty line to generate a login
 prompt again.
 .SS "Comments"
-.LP
 Comments can be embedded in the \fBchat\fR script. Comment lines are ignored by
 the chat program. A comment starts with the hash ("#") character in column one.
 If a \fB#\fR character is expected as the first character of the expect
@@ -245,7 +240,6 @@ with a \fB#\fR character, write something like this:
 .in -2
 
 .SS "Sending Data From A File"
-.LP
 If the string to send begins with an at sign ("@"), the remainder of the string
 is interpreted as the name of the file that contains the string. If the last
 character of the data read is a newline, it is removed. The file can be a named
@@ -253,7 +247,6 @@ pipe (or fifo) instead of a regular file. This enables \fBchat\fR to
 communicate with another program, for example, a program to prompt the user and
 receive a password typed in.
 .SS "Abort "
-.LP
 Many modems report the status of a call as a string. These status strings are
 often "CONNECTED" or "NO CARRIER" or "BUSY." If the modem fails to connect to
 the remote, you can terminate the script. Abort strings may be specified in the
@@ -275,12 +268,10 @@ sends the string BUSY, causing the string to match the abort character
 sequence. The script fails because it found a match to the abort string. If the
 NO CARRIER string is received, it aborts for the same reason.
 .SS "Clr_Abort "
-.LP
 The CLR_ABORT sequence clears previously set ABORT strings. ABORT strings are
 kept in an array of a pre-determined size; CLR_ABORT reclaims the space for
 cleared entries, enabling new strings to use that space.
 .SS "Say "
-.LP
 The SAY string enables the script to send strings to a user at a terminal via
 standard error. If \fBchat\fR is being run by \fBpppd\fR and \fBpppd\fR is
 running as a daemon (detached from its controlling terminal), standard error is
@@ -326,7 +317,6 @@ Logged in OK ...
 .in -2
 
 .SS "Report"
-.LP
 REPORT is similar to the ABORT string. With REPORT, however, strings and all
 characters to the next control character (such as a carriage return), are
 written to the report file.
@@ -359,12 +349,10 @@ remainder of the script is executed. In addition, the program writes the string
 CONNECT to the report file (specified by \fB-r\fR) in addition to any
 characters that follow.
 .SS "Clr_Report"
-.LP
 CLR_REPORT clears previously set REPORT strings. REPORT strings are kept in an
 array of a pre-determined size; CLR_REPORT reclaims the space for cleared
 entries so that new strings can use that space.
 .SS "Echo"
-.LP
 ECHO determines if modem output is echoed to \fBstderr\fR. This option may be
 set with the \fB-e\fR option, but can also be controlled by the ECHO keyword.
 The "expect-send" pair  ECHO ON enables echoing, and ECHO OFF disables it. With
@@ -389,7 +377,6 @@ ogin:   account
 All output resulting from modem configuration and dialing is not visible, but
 output is echoed beginning with the CONNECT (or BUSY) message.
 .SS "Hangup"
-.LP
 The HANGUP option determines if a modem hangup is considered as an error.
 HANGUP is useful for dialing systems that hang up and call your system back.
 HANGUP can be ON or OFF. When HANGUP is set to OFF and the modem hangs up (for
@@ -419,7 +406,6 @@ ABORT   'BUSY'
 .in -2
 
 .SS "Timeout"
-.LP
 The initial timeout value is 45 seconds. Use the \fB-t\fR parameter to change
 the initial timeout value.
 .sp
@@ -448,21 +434,18 @@ prompt.
 .LP
 Once changed, the timeout value remains in effect until it is changed again.
 .SS " EOT"
-.LP
 The EOT special reply string instructs the \fBchat\fR program to send an EOT
 character to the remote. This is equivalent to using ^D\ec as the reply string.
 The EOT string normally indicates the end-of-file character sequence. A return
 character is not sent following the EOT. The EOT sequence can embedded into the
 send string using the sequence ^D.
 .SS " BREAK"
-.LP
 The BREAK special reply string sends a break condition. The break is a special
 transmitter signal. Many UNIX systems handle break by cycling through available
 bit rates, and sending break is often needed when the remote system does not
 support autobaud. BREAK is equivalent to using \eK\ec as the reply string.
 You embed the break sequence into the send string using the \eK sequence.
 .SS "Escape Sequences"
-.LP
 Expect and reply strings can contain escape sequences. Reply strings accept all
 escape sequences, while expect strings accept most sequences. A list of escape
 sequences is presented below. Sequences that are not accepted by expect strings
@@ -637,14 +620,12 @@ in expect.)
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.LP
 Environment variables are available within \fBchat\fR scripts if the \fB-E\fR
 option is specified on the command line. The metacharacter \fB$\fR introduces
 the name of the environment variable to substitute. If the substitution fails
 because the requested environment variable is not set, nothing is replaced for
 the variable.
 .SH EXIT STATUS
-.LP
 The \fBchat\fR program terminates with the following completion codes:
 .sp
 .ne 2
@@ -741,7 +722,6 @@ possible to decide if the string "BUSY" was received from the modem versus "NO
 DIALTONE." While the first event may be retried, the second probably will not
 succeed during a retry.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
 
@@ -756,7 +736,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.LP
 \fBsleep\fR(1), \fBuucp\fR(1C), \fBpppd\fR(1M), \fBuucico\fR(1M),
 \fBsyslog\fR(3C), \fBattributes\fR(5)
 .sp
