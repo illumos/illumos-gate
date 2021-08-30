@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd October 3, 2020
+.Dd August 28, 2021
 .Dt VIOBLK 7D
 .Os
 .Sh NAME
@@ -64,7 +64,7 @@ for discovering devices,
 for manipulating partition tables,
 .Xr iostat 1M
 for seeing device I/O statistics, and a subset of the
-.Xr dkio 7IO
+.Xr dkio 7I
 ioctl requests to retrieve information about the device.
 .Sh ARCHITECTURE
 The

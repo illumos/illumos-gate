@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2019 Joyent, Inc.
 .\"
-.Dd July 15, 2019
+.Dd August 28, 2021
 .Dt SYSEVENTS 3SYSEVENT
 .Os
 .Sh NAME
@@ -77,7 +77,7 @@ Indicates the ID of the zone that the data link belongs to.
 .El
 .Sh INTERFACE STABILITY
 While the library interface in
-.Xr libsysevent 3SYSEVENT
+.Xr libsysevent 3LIB
 is committed, unless otherwise indicated the events, classes, their
 payloads, are private and subject to change at any time.
 .Sh SEE ALSO

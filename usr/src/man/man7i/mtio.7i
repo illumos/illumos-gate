@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd August 31, 2018
+.Dd August 28, 2021
 .Dt MTIO 7I
 .Os
 .Sh NAME
@@ -166,7 +166,7 @@ The
 .Sx Read Operation
 and
 .Sx Write Operation
-subsections contain more pertinent information reguarding persistent error handling.
+subsections contain more pertinent information regarding persistent error handling.
 .Ss "Read Operation"
 The
 .Xr read 2
@@ -543,7 +543,7 @@ struct mtdrivetype {
  */
  typedef enum {
        ST_NO_EOF,
-       ST_EOF_PENDING,         /* filemrk pending */
+       ST_EOF_PENDING,         /* filemark pending */
        ST_EOF,                 /* at filemark */
        ST_EOT_PENDING,         /* logical eot pend.  */
        ST_EOT,                 /* at logical eot */
@@ -841,7 +841,7 @@ target driver may continue to return a
 .Dq drive needs cleaning
 status unless an
 .Dv MTIOCGE
-.Xr ioct 2
+.Xr ioctl 2
 call is made while the cleaning media is in the drive.
 .Pp
 The
@@ -1082,11 +1082,11 @@ past double EOF marks which otherwise indicate End-Of-recorded-media (EOM) in
 the case of 1/2\(dq reel tape drives.
 As an argument, it takes a pointer to an integer.
 If 0 (zero) is the specified integer, then double EOF marks indicate
-End-Of-recodred-media (EOD).
+End-Of-recorded-media (EOM).
 If 1 is the specified integer, the double EOF marks no longer indicate EOM,
 thus allowing applications to read past two EOF marks.
 In this case it is the responsibility of the application to detect
-end-of-recorded-media (EOM).
+End-Of-recorded-media (EOM).
 The specified tape behavior will be in effect until the device is closed.
 .Pp
 For example:
