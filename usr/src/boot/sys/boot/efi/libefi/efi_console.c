@@ -154,15 +154,18 @@ plat_stdout_is_framebuffer(void)
 void
 plat_tem_hide_prom_cursor(void)
 {
-	conout->EnableCursor(conout, FALSE);
+	if (has_boot_services)
+		conout->EnableCursor(conout, FALSE);
 }
 
 static void
 plat_tem_display_prom_cursor(screen_pos_t row, screen_pos_t col)
 {
 
-	conout->SetCursorPosition(conout, col, row);
-	conout->EnableCursor(conout, TRUE);
+	if (has_boot_services) {
+		conout->SetCursorPosition(conout, col, row);
+		conout->EnableCursor(conout, TRUE);
+	}
 }
 
 void
@@ -297,6 +300,9 @@ efi_text_cons_clear(struct vis_consclear *ca)
 	UINTN attr = conout->Mode->Attribute & 0x0F;
 	uint8_t bg;
 
+	if (!has_boot_services)
+		return (0);
+
 	bg = solaris_color_to_efi_color[ca->bg_color.four & 0xF] & 0x7;
 
 	attr = EFI_TEXT_ATTR(attr, bg);
@@ -314,6 +320,9 @@ efi_text_cons_copy(struct vis_conscopy *ma)
 {
 	UINTN col, row;
 
+	if (!has_boot_services)
+		return;
+
 	col = 0;
 	row = ma->e_row;
 	conout->SetCursorPosition(conout, col, row);
@@ -330,6 +339,9 @@ efi_text_cons_display(struct vis_consdisplay *da)
 	tem_char_t *data;
 	uint8_t fg, bg;
 	int i;
+
+	if (!has_boot_services)
+		return;
 
 	(void) conout->QueryMode(conout, conout->Mode->Mode, &col, &row);
 
@@ -696,6 +708,9 @@ efi_cons_getchar(struct console *cp)
 	if ((c = keybuf_getchar()) != 0)
 		return (c);
 
+	if (!has_boot_services)
+		return (-1);
+
 	ecd = cp->c_private;
 	key_pending = 0;
 
@@ -720,6 +735,9 @@ efi_cons_poll(struct console *cp)
 
 	if (keybuf_ischar() || key_pending)
 		return (1);
+
+	if (!has_boot_services)
+		return (0);
 
 	ecd = cp->c_private;
 	coninex = ecd->ecd_coninex;

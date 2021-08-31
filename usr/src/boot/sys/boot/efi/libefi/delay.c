@@ -34,5 +34,6 @@ void delay(int);
 void
 delay(int usecs)
 {
-	BS->Stall(usecs);
+	if (has_boot_services)
+		BS->Stall(usecs);
 }

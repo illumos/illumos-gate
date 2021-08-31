@@ -836,13 +836,16 @@ gfxfb_blt(void *BltBuffer, GFXFB_BLT_OPERATION BltOperation,
 	int rv;
 #if defined(EFI)
 	EFI_STATUS status;
+	EFI_TPL tpl;
 	extern EFI_GRAPHICS_OUTPUT *gop;
 
 	/*
 	 * We assume Blt() does work, if not, we will need to build
 	 * exception list case by case.
+	 * Once boot services are off, we can not use GOP Blt().
 	 */
-	if (gop != NULL) {
+	if (gop != NULL && has_boot_services) {
+		tpl = BS->RaiseTPL(TPL_NOTIFY);
 		switch (BltOperation) {
 		case GfxFbBltVideoFill:
 			status = gop->Blt(gop, BltBuffer, EfiBltVideoFill,
@@ -889,6 +892,7 @@ gfxfb_blt(void *BltBuffer, GFXFB_BLT_OPERATION BltOperation,
 			break;
 		}
 
+		BS->RestoreTPL(tpl);
 		return (rv);
 	}
 #endif
@@ -929,21 +933,12 @@ gfx_fb_cons_clear(struct vis_consclear *ca)
 {
 	int rv;
 	uint32_t width, height;
-#if defined(EFI)
-	EFI_TPL tpl;
-#endif
 
 	width = gfx_fb.framebuffer_common.framebuffer_width;
 	height = gfx_fb.framebuffer_common.framebuffer_height;
 
-#if defined(EFI)
-	tpl = BS->RaiseTPL(TPL_NOTIFY);
-#endif
 	rv = gfxfb_blt(&ca->bg_color, GfxFbBltVideoFill, 0, 0,
 	    0, 0, width, height, 0);
-#if defined(EFI)
-	BS->RestoreTPL(tpl);
-#endif
 
 	return (rv);
 }
@@ -952,20 +947,12 @@ void
 gfx_fb_cons_copy(struct vis_conscopy *ma)
 {
 	uint32_t width, height;
-#if defined(EFI)
-	EFI_TPL tpl;
-
-	tpl = BS->RaiseTPL(TPL_NOTIFY);
-#endif
 
 	width = ma->e_col - ma->s_col + 1;
 	height = ma->e_row - ma->s_row + 1;
 
 	(void) gfxfb_blt(NULL, GfxFbBltVideoToVideo, ma->s_col, ma->s_row,
 	    ma->t_col, ma->t_row, width, height, 0);
-#if defined(EFI)
-	BS->RestoreTPL(tpl);
-#endif
 }
 
 /*
@@ -1044,7 +1031,6 @@ gfx_fb_cons_display(struct vis_consdisplay *da)
 {
 #if defined(EFI)
 	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *BltBuffer;
-	EFI_TPL tpl;
 #else
 	struct paletteentry *BltBuffer;
 #endif
@@ -1076,9 +1062,6 @@ gfx_fb_cons_display(struct vis_consdisplay *da)
 	if (BltBuffer == NULL)
 		return;
 
-#if defined(EFI)
-	tpl = BS->RaiseTPL(TPL_NOTIFY);
-#endif
 	if (gfxfb_blt(BltBuffer, GfxFbBltVideoToBltBuffer,
 	    da->col, da->row, 0, 0, da->width, da->height, 0) == 0) {
 		bitmap_cpy(BltBuffer, da->data, da->width * da->height);
@@ -1086,9 +1069,6 @@ gfx_fb_cons_display(struct vis_consdisplay *da)
 		    0, 0, da->col, da->row, da->width, da->height, 0);
 	}
 
-#if defined(EFI)
-	BS->RestoreTPL(tpl);
-#endif
 	if (BltBuffer != GlyphBuffer)
 		free(BltBuffer);
 }
@@ -1129,11 +1109,6 @@ gfx_fb_display_cursor(struct vis_conscursor *ca)
 #endif
 		uint32_t p32;
 	} fg, bg;
-#if defined(EFI)
-	EFI_TPL tpl;
-
-	tpl = BS->RaiseTPL(TPL_NOTIFY);
-#endif
 
 	bcopy(&ca->fg_color, &fg.p32, sizeof (fg.p32));
 	bcopy(&ca->bg_color, &bg.p32, sizeof (bg.p32));
@@ -1146,10 +1121,6 @@ gfx_fb_display_cursor(struct vis_conscursor *ca)
 		(void) gfxfb_blt(GlyphBuffer, GfxFbBltBufferToVideo, 0, 0,
 		    ca->col, ca->row, ca->width, ca->height, 0);
 	}
-
-#if defined(EFI)
-	BS->RestoreTPL(tpl);
-#endif
 }
 
 /*

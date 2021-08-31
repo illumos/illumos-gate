@@ -76,6 +76,7 @@ static bool keep_bs = false;
 static bool have_framebuffer = false;
 static vm_offset_t load_addr;
 static vm_offset_t entry_addr;
+bool has_boot_services = true;
 
 /*
  * Validate tags in info request. This function is provided just to
@@ -1223,8 +1224,10 @@ multiboot2_exec(struct preloaded_file *fp)
 				break;
 
 			status = BS->ExitBootServices(IH, key);
-			if (status == EFI_SUCCESS)
+			if (status == EFI_SUCCESS) {
+				has_boot_services = false;
 				break;
+			}
 			i--;
 		}
 		if (status != EFI_SUCCESS) {
