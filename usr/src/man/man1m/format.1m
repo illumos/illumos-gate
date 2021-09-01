@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FORMAT 1M "Sep 25, 2008"
+.TH FORMAT 1M "August 29, 2021"
 .SH NAME
 format \- disk partitioning and maintenance utility
 .SH SYNOPSIS
-.LP
 .nf
 \fBformat\fR [\fB-f\fR \fIcommand-file\fR] [\fB-l\fR \fIlog-file\fR] [\fB-x\fR \fIdata-file\fR]
      [\fB-d\fR \fIdisk-name\fR] [\fB-t\fR \fIdisk-type\fR] [\fB-p\fR \fIpartition-name\fR]
@@ -16,8 +15,6 @@ format \- disk partitioning and maintenance utility
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBformat\fR enables you to format, label, repair, and analyze disks on your
 system. Unlike previous disk maintenance programs, \fBformat\fR runs under
 SunOS. Because there are limitations to what can be done to the system disk
@@ -49,8 +46,6 @@ Removable media devices are listed only when users execute \fBformat\fR in
 expert mode (option \fB-e\fR). This feature is provided for backward
 compatibility. Use \fBrmformat\fR(1) for rewritable removable media devices.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -163,8 +158,6 @@ Use the list of disks contained in \fIdata-file\fR.
 .RE
 
 .SH USAGE
-.sp
-.LP
 When you invoke format with no options or with the \fB-e\fR, \fB-l\fR,
 \fB-m\fR, \fB-M\fR, or \fB-s\fR options, the program displays a numbered list
 of available disks and prompts you to specify a disk by list number. If the
@@ -209,7 +202,7 @@ Search for backup labels.
 .RS 13n
 Enable, disable, and query the state of the write cache and read cache. This
 menu item only appears when \fBformat\fR is invoked with the \fB-e\fR option,
-and is only supported on \fBSCSI\fR devices..
+and is only supported on \fBSCSI\fR devices.
 .RE
 
 .sp
@@ -365,7 +358,6 @@ Label the disk with a new eight character volume name.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .ne 2
 .na
 \fB\fBFORMAT_PATH\fR\fR
@@ -377,7 +369,6 @@ definitions. If a directory is specified, \fBformat\fR searches for the file
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/format.dat\fR\fR
@@ -387,20 +378,14 @@ default data file
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBfmthard\fR(1M), \fBprtvtoc\fR(1M), \fBrmformat\fR(1), \fBformat.dat\fR(4),
 \fBattributes\fR(5), \fBsd\fR(7D)
 .sp
 .LP
 \fI\fR
 .SS "x86 Only"
-.sp
-.LP
 \fBfdisk\fR(1M)
 .SH WARNINGS
-.sp
-.LP
 When the \fBformat\fR function is selected to format the Maxtor 207MB disk, the
 following message displays:
 .sp
@@ -434,8 +419,6 @@ than 2 TB. When \fBformat\fR is invoked with the \fB-e\fR option, on writing
 the label, the label type can be chosen. Booting is not currently supported on
 a disk with an EFI label.
 .SH NOTES
-.sp
-.LP
 \fBformat\fR provides a help facility you can use whenever format is expecting
 input. You can request help about what information is expected by simply
 entering a question mark (\fB?\fR) and \fBformat\fR prints a brief description

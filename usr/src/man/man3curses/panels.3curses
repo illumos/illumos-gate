@@ -4,18 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PANELS 3CURSES "Dec 31, 1996"
+.TH PANELS 3CURSES "August 28, 2021"
 .SH NAME
 panels \- character based panels package
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <panel.h>\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpanel\fR library is built using the \fBcurses\fR library, and any
 program using \fBpanels\fR routines must call one of the \fBcurses\fR
 initialization routines such as \fBinitscr\fR. A program using these routines
@@ -35,8 +32,6 @@ The \fBpanels\fR package allows the applications programmer to create panels,
 fetch and set their associated windows, shuffle panels in the deck, and
 manipulate panels in other ways.
 .SS "Routine Name Index"
-.sp
-.LP
 The following table lists each \fBpanels\fR routine and the name of the manual
 page on which it is described.
 .sp
@@ -64,14 +59,10 @@ update_panels	\fBpanel_update\fR(3CURSES)
 .TE
 
 .SH RETURN VALUES
-.sp
-.LP
 Each \fBpanels\fR routine that returns a pointer to an object returns
 \fBNULL\fR if an error occurs. Each panel routine that returns an integer,
 returns \fBOK\fR if it executes successfully and \fBERR\fR if it does not.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -86,12 +77,8 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBcurses\fR(3CURSES), \fBattributes\fR(5) and 3X pages whose names begin
+\fBcurses\fR(3CURSES), \fBattributes\fR(5) and 3CURSES pages whose names begin
 "panel_" for detailed routine descriptions.
 .SH NOTES
-.sp
-.LP
 The header \fB<panel.h>\fR automatically includes the header
 \fB<curses.h>\fR\&.

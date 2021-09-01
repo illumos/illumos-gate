@@ -3,17 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FSDB_UDFS 1M "Nov 26, 2017"
+.TH FSDB_UDFS 1M "August 29, 2021"
 .SH NAME
 fsdb_udfs \- udfs file system debugger
 .SH SYNOPSIS
-.LP
 .nf
 \fBfsdb \fR [\fB-F\fR] udfs [\fIgeneric_option\fR] [\fB-o \fR\fIspecific_option\fR] \fIspecial\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBfsdb_udfs\fR command is an interactive tool that can be used to patch up
 a damaged \fBudfs\fR file system. \fBfsdb_udfs\fR has conversions to translate
 block and i-numbers into their corresponding disk addresses. Mnemonic offsets
@@ -38,7 +36,6 @@ with the \fB-w\fR option.
 Wherever possible, \fBadb\fR-like syntax has been adopted to promote the use of
 \fBfsdb\fR through familiarity.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -87,7 +84,6 @@ Display usage.
 .RE
 
 .SH USAGE
-.LP
 Numbers are considered hexadecimal by default. The user has control over how
 data is to be displayed or accepted. The \fBbase\fR command displays or sets
 the input and output base. Once set, all input defaults to this base and all
@@ -220,7 +216,6 @@ or
 .LP
 is again synonymous.
 .SS "Expressions"
-.LP
 The following symbols are recognized by \fBfsdb\fR:
 .sp
 .ne 2
@@ -390,7 +385,6 @@ of the address pointed to by dot by expression \fIe\fR.
 .RE
 
 .SS "Commands"
-.LP
 A command must be prefixed by a colon (\fB:\fR). Only enough letters of the
 command to uniquely distinguish it are needed. Multiple commands can be entered
 on one line by  separating them by a SPACE, TAB, or semicolon (\fB;\fR).
@@ -577,7 +571,6 @@ Escape to the shell.
 .RE
 
 .SS "Inode Commands"
-.LP
 In addition to the above commands, several other commands deal with inode
 fields and operate directly on the current inode (they still require the colon
 (\fB:\fR). They can be used to more easily display or change the particular
@@ -699,7 +692,7 @@ allows you to change or display the directory name. For example,
 
 gets the \fB7\fRth directory entry of the current inode and changes its name to
 \fBfoo\fR. Directory names cannot be made larger than the field allows. If an
-attempt is made to make a directory name larger than the field allows,, the
+attempt is made to make a directory name larger than the field allows, the
 string is truncated to fit and a warning message is displayed.
 .RE
 
@@ -731,7 +724,6 @@ Unique \fBID\fR
 .RE
 
 .SS "Formatted Output"
-.LP
 Formatted output comes in two styles and many format types. The two styles of
 formatted output are: structured and unstructured. Structured output is used to
 display inodes, directories, and so forth. Unstructured output displays raw
@@ -810,7 +802,6 @@ Display as hexadecimal shorts or longs.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing fsdb as a calculator for complex arithmetic
 .sp
 .LP
@@ -826,7 +817,7 @@ of using \fBfsdb\fR as a calculator for complex arithmetic.
 .sp
 
 .LP
-\fBExample 2 \fRUsing fsdb to display an i-number in inode fomat
+\fBExample 2 \fRUsing fsdb to display an i-number in inode format
 .sp
 .LP
 The following command displays the i-number \fB386\fR in inode format.\fB386\fR
@@ -912,7 +903,7 @@ associated with the current inode.
 .sp
 
 .LP
-\fBExample 8 \fRUsing fsdb to display the directory enteries for the root inode
+\fBExample 8 \fRUsing fsdb to display the directory entries for the root inode
 .sp
 .LP
 The following command displays the first block's directory entries for the root
@@ -1012,5 +1003,4 @@ address \fB1c92434\fR.
 .sp
 
 .SH SEE ALSO
-.LP
 \fBclri\fR(1M), \fBfsck_udfs\fR(1M), \fBdir\fR(4),  \fBattributes\fR(5)

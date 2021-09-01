@@ -334,14 +334,17 @@ viona_recv_merged(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 
 	/*
 	 * If there is any space remaining in the first buffer after writing
-	 * the header, fill it with frame data.
+	 * the header, fill it with frame data.  The size of the header itself
+	 * is accounted for later.
 	 */
 	if (iov[0].iov_len > hdr_sz) {
 		buf = iov[0].iov_base + hdr_sz;
 		len = iov[0].iov_len - hdr_sz;
 
-		chunk += viona_copy_mblk(mp, copied, buf, len, &end);
-		copied += chunk;
+		size_t copy_len;
+		copy_len = viona_copy_mblk(mp, copied, buf, len, &end);
+		chunk += copy_len;
+		copied += copy_len;
 	}
 	i = 1;
 
@@ -350,8 +353,10 @@ viona_recv_merged(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 			buf = iov[i].iov_base;
 			len = iov[i].iov_len;
 
-			chunk += viona_copy_mblk(mp, copied, buf, len, &end);
-			copied += chunk;
+			size_t copy_len;
+			copy_len = viona_copy_mblk(mp, copied, buf, len, &end);
+			chunk += copy_len;
+			copied += copy_len;
 			i++;
 		}
 

@@ -4,18 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FORMS 3CURSES "Dec 31, 1996"
+.TH FORMS 3CURSES "August 28, 2021"
 .SH NAME
 forms \- character based forms package
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <form.h>\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBform\fR library is built using the \fBcurses\fR library, and any program
 using \fBforms\fR routines must call one of the \fBcurses\fR initialization
 routines such as \fBinitscr\fR. A program using these routines must be compiled
@@ -30,8 +27,6 @@ fieldtype routines, which are used to create new field types for validating
 fields; and form routines, which are used to create and customize forms, assign
 pre/post processing functions, and display and interact with forms.
 .SS "Current Default Values for Field Attributes"
-.sp
-.LP
 The \fBforms\fR package establishes initial current default values for field
 attributes. During field initialization, each field attribute is assigned the
 current default value for that attribute. An application can change or retrieve
@@ -42,8 +37,6 @@ default field attribute value, subsequent fields created using
 previously created fields are not changed if a current default attribute value
 is changed.)
 .SS "Routine Name Index"
-.sp
-.LP
 The following table lists each \fBforms\fR routine and the name of the manual
 page on which it is described.
 .sp
@@ -61,7 +54,7 @@ page on which it is described.
 \fBcurrent_field\fR
 .ad
 .RS 25n
-form_page(3X)
+form_page(3CURSES)
 .RE
 
 .sp
@@ -70,7 +63,7 @@ form_page(3X)
 \fBdata_ahead\fR
 .ad
 .RS 25n
-form_data(3X)
+form_data(3CURSES)
 .RE
 
 .sp
@@ -79,7 +72,7 @@ form_data(3X)
 \fBdata_behind\fR
 .ad
 .RS 25n
-form_data(3X)
+form_data(3CURSES)
 .RE
 
 .sp
@@ -88,7 +81,7 @@ form_data(3X)
 \fBdup_field\fR
 .ad
 .RS 25n
-form_field_new(3X)
+form_field_new(3CURSES)
 .RE
 
 .sp
@@ -97,7 +90,7 @@ form_field_new(3X)
 \fBdynamic_field_info\fR
 .ad
 .RS 25n
-form_field_info(3X)
+form_field_info(3CURSES)
 .RE
 
 .sp
@@ -106,7 +99,7 @@ form_field_info(3X)
 \fBfield_arg\fR
 .ad
 .RS 25n
-form_field_validation(3X)
+form_field_validation(3CURSES)
 .RE
 
 .sp
@@ -115,7 +108,7 @@ form_field_validation(3X)
 \fBfield_back\fR
 .ad
 .RS 25n
-form_field_attributes(3X)
+form_field_attributes(3CURSES)
 .RE
 
 .sp
@@ -124,7 +117,7 @@ form_field_attributes(3X)
 \fBfield_buffer\fR
 .ad
 .RS 25n
-form_field_buffer(3X)
+form_field_buffer(3CURSES)
 .RE
 
 .sp
@@ -133,7 +126,7 @@ form_field_buffer(3X)
 \fBfield_count\fR
 .ad
 .RS 25n
-form_field(3X)
+form_field(3CURSES)
 .RE
 
 .sp
@@ -142,7 +135,7 @@ form_field(3X)
 \fBfield_fore\fR
 .ad
 .RS 25n
-form_field_attributes(3X)
+form_field_attributes(3CURSES)
 .RE
 
 .sp
@@ -151,7 +144,7 @@ form_field_attributes(3X)
 \fBfield_index\fR
 .ad
 .RS 25n
-form_page(3X)
+form_page(3CURSES)
 .RE
 
 .sp
@@ -160,7 +153,7 @@ form_page(3X)
 \fBfield_info\fR
 .ad
 .RS 25n
-form_field_info(3X)
+form_field_info(3CURSES)
 .RE
 
 .sp
@@ -169,7 +162,7 @@ form_field_info(3X)
 \fBfield_init\fR
 .ad
 .RS 25n
-form_hook(3X)
+form_hook(3CURSES)
 .RE
 
 .sp
@@ -178,7 +171,7 @@ form_hook(3X)
 \fBfield_just\fR
 .ad
 .RS 25n
-form_field_just(3X)
+form_field_just(3CURSES)
 .RE
 
 .sp
@@ -187,7 +180,7 @@ form_field_just(3X)
 \fBfield_opts\fR
 .ad
 .RS 25n
-form_field_opts(3X)
+form_field_opts(3CURSES)
 .RE
 
 .sp
@@ -196,7 +189,7 @@ form_field_opts(3X)
 \fBfield_opts_off\fR
 .ad
 .RS 25n
-form_field_opts(3X)
+form_field_opts(3CURSES)
 .RE
 
 .sp
@@ -205,7 +198,7 @@ form_field_opts(3X)
 \fBfield_opts_on\fR
 .ad
 .RS 25n
-form_field_opts(3X)
+form_field_opts(3CURSES)
 .RE
 
 .sp
@@ -214,7 +207,7 @@ form_field_opts(3X)
 \fBfield_pad\fR
 .ad
 .RS 25n
-form_field_attributes(3X)
+form_field_attributes(3CURSES)
 .RE
 
 .sp
@@ -223,7 +216,7 @@ form_field_attributes(3X)
 \fBfield_status\fR
 .ad
 .RS 25n
-form_field_buffer(3X)
+form_field_buffer(3CURSES)
 .RE
 
 .sp
@@ -232,7 +225,7 @@ form_field_buffer(3X)
 \fBfield_term\fR
 .ad
 .RS 25n
-form_hook(3X)
+form_hook(3CURSES)
 .RE
 
 .sp
@@ -241,7 +234,7 @@ form_hook(3X)
 \fBfield_type\fR
 .ad
 .RS 25n
-form_field_validation(3X)
+form_field_validation(3CURSES)
 .RE
 
 .sp
@@ -250,7 +243,7 @@ form_field_validation(3X)
 \fBfield_userptr\fR
 .ad
 .RS 25n
-form_field_userptr(3X)
+form_field_userptr(3CURSES)
 .RE
 
 .sp
@@ -259,7 +252,7 @@ form_field_userptr(3X)
 \fBform_driver\fR
 .ad
 .RS 25n
-form_driver(3X)
+form_driver(3CURSES)
 .RE
 
 .sp
@@ -268,7 +261,7 @@ form_driver(3X)
 \fBform_fields\fR
 .ad
 .RS 25n
-form_field(3X)
+form_field(3CURSES)
 .RE
 
 .sp
@@ -277,7 +270,7 @@ form_field(3X)
 \fBform_init\fR
 .ad
 .RS 25n
-form_hook(3X)
+form_hook(3CURSES)
 .RE
 
 .sp
@@ -286,7 +279,7 @@ form_hook(3X)
 \fBform_opts\fR
 .ad
 .RS 25n
-form_opts(3X)
+form_opts(3CURSES)
 .RE
 
 .sp
@@ -295,7 +288,7 @@ form_opts(3X)
 \fBform_opts_off\fR
 .ad
 .RS 25n
-form_opts(3X)
+form_opts(3CURSES)
 .RE
 
 .sp
@@ -304,7 +297,7 @@ form_opts(3X)
 \fBform_opts_on\fR
 .ad
 .RS 25n
-form_opts(3X)
+form_opts(3CURSES)
 .RE
 
 .sp
@@ -313,7 +306,7 @@ form_opts(3X)
 \fBform_page\fR
 .ad
 .RS 25n
-form_page(3X)
+form_page(3CURSES)
 .RE
 
 .sp
@@ -322,7 +315,7 @@ form_page(3X)
 \fBform_sub\fR
 .ad
 .RS 25n
-form_win(3X)
+form_win(3CURSES)
 .RE
 
 .sp
@@ -331,7 +324,7 @@ form_win(3X)
 \fBform_term\fR
 .ad
 .RS 25n
-form_hook(3X)
+form_hook(3CURSES)
 .RE
 
 .sp
@@ -340,7 +333,7 @@ form_hook(3X)
 \fBform_userptr\fR
 .ad
 .RS 25n
-form_userptr(3X)
+form_userptr(3CURSES)
 .RE
 
 .sp
@@ -349,7 +342,7 @@ form_userptr(3X)
 \fBform_win\fR
 .ad
 .RS 25n
-form_win(3X)
+form_win(3CURSES)
 .RE
 
 .sp
@@ -358,7 +351,7 @@ form_win(3X)
 \fBfree_field\fR
 .ad
 .RS 25n
-form_field_new(3X)
+form_field_new(3CURSES)
 .RE
 
 .sp
@@ -367,7 +360,7 @@ form_field_new(3X)
 \fBfree_fieldtype\fR
 .ad
 .RS 25n
-form_fieldtype(3X)
+form_fieldtype(3CURSES)
 .RE
 
 .sp
@@ -376,7 +369,7 @@ form_fieldtype(3X)
 \fBfree_form\fR
 .ad
 .RS 25n
-form_new(3X)
+form_new(3CURSES)
 .RE
 
 .sp
@@ -385,7 +378,7 @@ form_new(3X)
 \fBlink_field\fR
 .ad
 .RS 25n
-form_field_new(3X)
+form_field_new(3CURSES)
 .RE
 
 .sp
@@ -394,7 +387,7 @@ form_field_new(3X)
 \fBlink_fieldtype\fR
 .ad
 .RS 25n
-form_fieldtype(3X)
+form_fieldtype(3CURSES)
 .RE
 
 .sp
@@ -403,7 +396,7 @@ form_fieldtype(3X)
 \fBmove_field\fR
 .ad
 .RS 25n
-form_field(3X)
+form_field(3CURSES)
 .RE
 
 .sp
@@ -412,7 +405,7 @@ form_field(3X)
 \fBnew_field\fR
 .ad
 .RS 25n
-form_field_new(3X)
+form_field_new(3CURSES)
 .RE
 
 .sp
@@ -421,7 +414,7 @@ form_field_new(3X)
 \fBnew_fieldtype\fR
 .ad
 .RS 25n
-form_fieldtype(3X)
+form_fieldtype(3CURSES)
 .RE
 
 .sp
@@ -430,7 +423,7 @@ form_fieldtype(3X)
 \fBnew_form\fR
 .ad
 .RS 25n
-form_new(3X)
+form_new(3CURSES)
 .RE
 
 .sp
@@ -439,7 +432,7 @@ form_new(3X)
 \fBnew_page\fR
 .ad
 .RS 25n
-form_new_page(3X)
+form_new_page(3CURSES)
 .RE
 
 .sp
@@ -448,7 +441,7 @@ form_new_page(3X)
 \fBpos_form_cursor\fR
 .ad
 .RS 25n
-form_cursor(3X)
+form_cursor(3CURSES)
 .RE
 
 .sp
@@ -457,7 +450,7 @@ form_cursor(3X)
 \fBpost_form\fR
 .ad
 .RS 25n
-form_post(3X)
+form_post(3CURSES)
 .RE
 
 .sp
@@ -466,7 +459,7 @@ form_post(3X)
 \fBscale_form\fR
 .ad
 .RS 25n
-form_win(3X)
+form_win(3CURSES)
 .RE
 
 .sp
@@ -475,7 +468,7 @@ form_win(3X)
 \fBset_current_field\fR
 .ad
 .RS 25n
-form_page(3X)
+form_page(3CURSES)
 .RE
 
 .sp
@@ -484,7 +477,7 @@ form_page(3X)
 \fBset_field_back\fR
 .ad
 .RS 25n
-form_field_attributes(3X)
+form_field_attributes(3CURSES)
 .RE
 
 .sp
@@ -493,7 +486,7 @@ form_field_attributes(3X)
 \fBset_field_buffer\fR
 .ad
 .RS 25n
-form_field_buffer(3X)
+form_field_buffer(3CURSES)
 .RE
 
 .sp
@@ -502,7 +495,7 @@ form_field_buffer(3X)
 \fBset_field_fore\fR
 .ad
 .RS 25n
-form_field_attributes(3X)
+form_field_attributes(3CURSES)
 .RE
 
 .sp
@@ -511,7 +504,7 @@ form_field_attributes(3X)
 \fBset_field_init\fR
 .ad
 .RS 25n
-form_hook(3X)
+form_hook(3CURSES)
 .RE
 
 .sp
@@ -520,7 +513,7 @@ form_hook(3X)
 \fB set_field_just\fR
 .ad
 .RS 25n
-form_field_just(3X)
+form_field_just(3CURSES)
 .RE
 
 .sp
@@ -529,7 +522,7 @@ form_field_just(3X)
 \fBset_field_opts\fR
 .ad
 .RS 25n
-form_field_opts(3X)
+form_field_opts(3CURSES)
 .RE
 
 .sp
@@ -538,7 +531,7 @@ form_field_opts(3X)
 \fBset_field_pad\fR
 .ad
 .RS 25n
-form_field_attributes(3X)
+form_field_attributes(3CURSES)
 .RE
 
 .sp
@@ -547,7 +540,7 @@ form_field_attributes(3X)
 \fBset_field_status\fR
 .ad
 .RS 25n
-form_field_buffer(3X)
+form_field_buffer(3CURSES)
 .RE
 
 .sp
@@ -556,7 +549,7 @@ form_field_buffer(3X)
 \fBset_field_term\fR
 .ad
 .RS 25n
-form_hook(3X)
+form_hook(3CURSES)
 .RE
 
 .sp
@@ -565,7 +558,7 @@ form_hook(3X)
 \fBset_field_type\fR
 .ad
 .RS 25n
-form_field_validation(3X)
+form_field_validation(3CURSES)
 .RE
 
 .sp
@@ -574,7 +567,7 @@ form_field_validation(3X)
 \fBset_field_userptr\fR
 .ad
 .RS 25n
-form_field_userptr(3X)
+form_field_userptr(3CURSES)
 .RE
 
 .sp
@@ -583,7 +576,7 @@ form_field_userptr(3X)
 \fBset_fieldtype_arg\fR
 .ad
 .RS 25n
-form_fieldtype(3X)
+form_fieldtype(3CURSES)
 .RE
 
 .sp
@@ -592,7 +585,7 @@ form_fieldtype(3X)
 \fBset_fieldtype_choice\fR
 .ad
 .RS 25n
-form_fieldtype(3X)
+form_fieldtype(3CURSES)
 .RE
 
 .sp
@@ -601,7 +594,7 @@ form_fieldtype(3X)
 \fBset_form_fields\fR
 .ad
 .RS 25n
-form_field(3X)
+form_field(3CURSES)
 .RE
 
 .sp
@@ -610,7 +603,7 @@ form_field(3X)
 \fBset_form_init\fR
 .ad
 .RS 25n
-form_hook(3X)
+form_hook(3CURSES)
 .RE
 
 .sp
@@ -619,7 +612,7 @@ form_hook(3X)
 \fBset_form_opts\fR
 .ad
 .RS 25n
-form_opts(3X)
+form_opts(3CURSES)
 .RE
 
 .sp
@@ -628,7 +621,7 @@ form_opts(3X)
 \fBset_form_page\fR
 .ad
 .RS 25n
-form_page(3X)
+form_page(3CURSES)
 .RE
 
 .sp
@@ -637,7 +630,7 @@ form_page(3X)
 \fBset_form_sub\fR
 .ad
 .RS 25n
-form_win(3X)
+form_win(3CURSES)
 .RE
 
 .sp
@@ -646,7 +639,7 @@ form_win(3X)
 \fBset_form_term\fR
 .ad
 .RS 25n
-form_hook(3X)
+form_hook(3CURSES)
 .RE
 
 .sp
@@ -655,7 +648,7 @@ form_hook(3X)
 \fBset_form_userptr\fR
 .ad
 .RS 25n
-form_userptr(3X)
+form_userptr(3CURSES)
 .RE
 
 .sp
@@ -664,7 +657,7 @@ form_userptr(3X)
 \fBset_form_win\fR
 .ad
 .RS 25n
-form_win(3X)
+form_win(3CURSES)
 .RE
 
 .sp
@@ -673,7 +666,7 @@ form_win(3X)
 \fBset_max_field\fR
 .ad
 .RS 25n
-form_field_buffer(3X)
+form_field_buffer(3CURSES)
 .RE
 
 .sp
@@ -682,7 +675,7 @@ form_field_buffer(3X)
 \fBset_new_page\fR
 .ad
 .RS 25n
-form_new_page(3X)
+form_new_page(3CURSES)
 .RE
 
 .sp
@@ -691,12 +684,10 @@ form_new_page(3X)
 \fBunpost_form\fR
 .ad
 .RS 25n
-form_post(3X)
+form_post(3CURSES)
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 Routines that return a pointer always return \fINULL\fR on error. Routines that
 return an integer return one of the following:
 .sp
@@ -817,8 +808,6 @@ An unknown request was passed to the form driver.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -833,11 +822,7 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcurses\fR(3CURSES), \fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
 The header \fB<form.h>\fR automatically includes the headers  \fB<eti.h>\fR and
 \fB<curses.h>\fR\&.

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 Joyent, Inc.
 .\"
-.Dd November 22, 2020
+.Dd August 28, 2021
 .Dt GETGROUPLIST 3C
 .Os
 .Sh NAME
@@ -121,7 +121,7 @@ values on failure, however their implementations show that
 may be set on failure.
 Software using
 .Fn getgrouplist
-should be aware of these differences when attemping to write portable
+should be aware of these differences when attempting to write portable
 software.
 .Sh EXAMPLES
 .Sy Example 1
@@ -200,8 +200,8 @@ may be larger than the value returned by a successful call to
 .Sy MT-Safe
 .Sh SEE ALSO
 .Xr groups 1 ,
+.Xr getgroups 2 ,
 .Xr getuid 2 ,
 .Xr getgrnam 3C ,
-.Xr getgroups 3C ,
 .Xr initgroups 3C ,
 .Xr limits.h 3HEAD

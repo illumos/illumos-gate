@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UPDATE_DRV 1M "Feb 10, 2009"
+.TH UPDATE_DRV 1M "August 29, 2021"
 .SH NAME
 update_drv \- modify device driver attributes
 .SH SYNOPSIS
-.LP
 .nf
 \fBupdate_drv\fR [\fB-f\fR | \fB-v\fR] [\fB-n\fR] \fIdriver_module\fR
 .fi
@@ -25,8 +24,6 @@ update_drv \- modify device driver attributes
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBupdate_drv\fR command informs the system about attribute changes to an
 installed device driver. It can be used to re-read the \fBdriver.conf\fR(4)
 file, or to add, modify, or delete a driver's minor node permissions or
@@ -44,8 +41,6 @@ Upon successfully updating the permissions, only the new driver minor nodes get
 created with the modified set of file permissions. Existing driver minor nodes
 do not get modified.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -170,7 +165,7 @@ With the \fB-a\fR option, policy is a white-space separated list of complete
 device policies. For the \fB-d\fR option, policy is a white space separated
 list of minor device specifications. The minor device specifications are
 matched exactly against the entries in \fB/etc/security/device_policy\fR, that
-is., no wildcard matching is performed.
+is, no wildcard matching is performed.
 .RE
 
 .sp
@@ -197,11 +192,10 @@ Verbose.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAdding or Modifying an Existing Minor Permissions Entry
 .sp
 .LP
-The following command adds or modifies the exisitng minor permissions entry of
+The following command adds or modifies the existing minor permissions entry of
 the \fBclone\fR driver:
 
 .sp
@@ -287,8 +281,6 @@ example#   update_drv -a -i '"/pci@8,600000/SUNW,qlc@4"' qlt
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -311,13 +303,9 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBadd_drv\fR(1M), \fBmodunload\fR(1M), \fBrem_drv\fR(1M),
 \fBdriver.conf\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5)
 .SH NOTES
-.sp
-.LP
 If \fB-a\fR or \fB-d\fR options are specified, \fBupdate_drv\fR does not reread
 the \fBdriver.conf\fR file.
 .sp

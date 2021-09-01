@@ -4,18 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MENUS 3CURSES "Dec 31, 1996"
+.TH MENUS 3CURSES "August 28, 2021"
 .SH NAME
 menus \- character based menus package
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <menu.h>\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmenu\fR library is built using the \fBcurses\fR library, and any program
 using menus routines must call one of the \fBcurses\fR initialization routines,
 such as \fBinitscr\fR. A program using these routines must be compiled with
@@ -28,8 +25,6 @@ package includes: item routines, which are used to create and customize menu
 items; and menu routines, which are used to create and customize menus, assign
 pre- and post-processing routines, and display and interact with menus.
 .SS "Current Default Values for Item Attributes"
-.sp
-.LP
 The menus package establishes initial current default values for item
 attributes. During item initialization, each item attribute is assigned the
 current default value for that attribute. An application can change or retrieve
@@ -39,8 +34,6 @@ default item attribute value, subsequent items created using \fBnew_item()\fR
 will have the new default attribute value. The attributes of previously created
 items are not changed if a current default attribute value is changed.
 .SS "Routine Name Index"
-.sp
-.LP
 The following table lists each menus routine and the name of the manual page on
 which it is described.
 .sp
@@ -50,71 +43,69 @@ which it is described.
 c c
 l l .
 \fBMenus Routine Name\fR	\fBManual Page Name\fR
-\fBcurrent_item\fR	\fBmenu_item_current(3X)\fR
-\fBfree_item\fR	\fBmenu_item_new(3X)\fR
-\fBfree_menu\fR	\fBmenu_new(3X)\fR
-\fBitem_count\fR	\fBmenu_items(3X)\fR
-\fBitem_description\fR	\fBmenu_item_name(3X)\fR
-\fBitem_index\fR	\fBmenu_item_current(3X)\fR
-\fBitem_init\fR	\fBmenu_hook(3X)\fR
-\fBitem_name\fR	\fBmenu_item_name(3X)\fR
-\fBitem_opts\fR	\fBmenu_item_opts(3X)\fR
-\fBitem_opts_off\fR	\fBmenu_item_opts(3X)\fR
-\fBitem_opts_on\fR	\fBmenu_item_opts(3X)\fR
-\fBitem_term\fR	\fBmenu_hook(3X)\fR
-\fBitem_userptr\fR	\fBmenu_item_userptr(3X)\fR
-\fBitem_value\fR	\fBmenu_item_value(3X)\fR
-\fBitem_visible\fR	\fBmenu_item_visible(3X)\fR
-\fBmenu_back\fR	\fBmenu_attributes(3X)\fR
-\fBmenu_driver\fR	\fBmenu_driver(3X)\fR
-\fBmenu_fore\fR	\fBmenu_attributes(3X)\fR
-\fBmenu_format\fR	\fBmenu_format(3X)\fR
-\fBmenu_grey\fR	\fBmenu_attributes(3X)\fR
-\fBmenu_init\fR	\fBmenu_hook(3X)\fR
-\fBmenu_items\fR	\fBmenu_items(3X)\fR
-\fBmenu_mark\fR	\fBmenu_mark(3X)\fR
-\fBmenu_opts\fR	\fBmenu_opts(3X)\fR
-\fBmenu_opts_off\fR	\fBmenu_opts(3X)\fR
-\fBmenu_opts_on\fR	\fBmenu_opts(3X)\fR
-\fBmenu_pad\fR	\fBmenu_attributes(3X)\fR
-\fBmenu_pattern\fR	\fBmenu_pattern(3X)\fR
-\fBmenu_sub\fR	\fBmenu_win(3X)\fR
-\fBmenu_term\fR	\fBmenu_hook(3X)\fR
-\fBmenu_userptr\fR	\fBmenu_userptr(3X)\fR
-\fBmenu_win\fR	\fBmenu_win(3X)\fR
-\fBnew_item\fR	\fBmenu_item_new(3X)\fR
-\fBnew_menu\fR	\fBmenu_new(3X)\fR
-\fBpos_menu_cursor\fR	\fBmenu_cursor(3X)\fR
-\fBpost_menu\fR	\fBmenu_post(3X)\fR
-\fBscale_menu\fR	\fBmenu_win(3X)\fR
-\fBset_current_item\fR	\fBmenu_item_current(3X)\fR
-\fBset_item_init\fR	\fBmenu_hook(3X)\fR
-\fBset_item_opts\fR	\fBmenu_item_opts(3X)\fR
-\fBset_item_term\fR	\fBmenu_hook(3X)\fR
-\fBset_item_userptr\fR	\fBmenu_item_userptr(3X)\fR
-\fBset_item_value\fR	\fBmenu_item_value(3X)\fR
-\fBset_menu_back\fR	\fBmenu_attributes(3X)\fR
-\fBset_menu_fore\fR	\fBmenu_attributes(3X)\fR
-\fBset_menu_format\fR	\fBmenu_format(3X)\fR
-\fBset_menu_grey\fR	\fBmenu_attributes(3X)\fR
-\fBset_menu_init\fR	\fBmenu_hook(3X)\fR
-\fBset_menu_items\fR	\fBmenu_items(3X)\fR
-\fBset_menu_mark\fR	\fBmenu_mark(3X)\fR
-\fBset_menu_opts\fR	\fBmenu_opts(3X)\fR
-\fBset_menu_pad\fR	\fBmenu_attributes(3X)\fR
-\fBset_menu_pattern\fR	\fBmenu_pattern(3X)\fR
-\fBset_menu_sub\fR	\fBmenu_win(3X)\fR
-\fBset_menu_term\fR	\fBmenu_hook(3X)\fR
-\fBset_menu_userptr\fR	\fBmenu_userptr(3X)\fR
-\fBset_menu_win\fR	\fBmenu_win(3X)\fR
-\fBset_top_row\fR	\fBmenu_item_current(3X)\fR
-\fBtop_row\fR	\fBmenu_item_current(3X)\fR
-\fBunpost_menu\fR	\fBmenu_post(3X)\fR
+\fBcurrent_item\fR	\fBmenu_item_current(3CURSES)\fR
+\fBfree_item\fR	\fBmenu_item_new(3CURSES)\fR
+\fBfree_menu\fR	\fBmenu_new(3CURSES)\fR
+\fBitem_count\fR	\fBmenu_items(3CURSES)\fR
+\fBitem_description\fR	\fBmenu_item_name(3CURSES)\fR
+\fBitem_index\fR	\fBmenu_item_current(3CURSES)\fR
+\fBitem_init\fR	\fBmenu_hook(3CURSES)\fR
+\fBitem_name\fR	\fBmenu_item_name(3CURSES)\fR
+\fBitem_opts\fR	\fBmenu_item_opts(3CURSES)\fR
+\fBitem_opts_off\fR	\fBmenu_item_opts(3CURSES)\fR
+\fBitem_opts_on\fR	\fBmenu_item_opts(3CURSES)\fR
+\fBitem_term\fR	\fBmenu_hook(3CURSES)\fR
+\fBitem_userptr\fR	\fBmenu_item_userptr(3CURSES)\fR
+\fBitem_value\fR	\fBmenu_item_value(3CURSES)\fR
+\fBitem_visible\fR	\fBmenu_item_visible(3CURSES)\fR
+\fBmenu_back\fR	\fBmenu_attributes(3CURSES)\fR
+\fBmenu_driver\fR	\fBmenu_driver(3CURSES)\fR
+\fBmenu_fore\fR	\fBmenu_attributes(3CURSES)\fR
+\fBmenu_format\fR	\fBmenu_format(3CURSES)\fR
+\fBmenu_grey\fR	\fBmenu_attributes(3CURSES)\fR
+\fBmenu_init\fR	\fBmenu_hook(3CURSES)\fR
+\fBmenu_items\fR	\fBmenu_items(3CURSES)\fR
+\fBmenu_mark\fR	\fBmenu_mark(3CURSES)\fR
+\fBmenu_opts\fR	\fBmenu_opts(3CURSES)\fR
+\fBmenu_opts_off\fR	\fBmenu_opts(3CURSES)\fR
+\fBmenu_opts_on\fR	\fBmenu_opts(3CURSES)\fR
+\fBmenu_pad\fR	\fBmenu_attributes(3CURSES)\fR
+\fBmenu_pattern\fR	\fBmenu_pattern(3CURSES)\fR
+\fBmenu_sub\fR	\fBmenu_win(3CURSES)\fR
+\fBmenu_term\fR	\fBmenu_hook(3CURSES)\fR
+\fBmenu_userptr\fR	\fBmenu_userptr(3CURSES)\fR
+\fBmenu_win\fR	\fBmenu_win(3CURSES)\fR
+\fBnew_item\fR	\fBmenu_item_new(3CURSES)\fR
+\fBnew_menu\fR	\fBmenu_new(3CURSES)\fR
+\fBpos_menu_cursor\fR	\fBmenu_cursor(3CURSES)\fR
+\fBpost_menu\fR	\fBmenu_post(3CURSES)\fR
+\fBscale_menu\fR	\fBmenu_win(3CURSES)\fR
+\fBset_current_item\fR	\fBmenu_item_current(3CURSES)\fR
+\fBset_item_init\fR	\fBmenu_hook(3CURSES)\fR
+\fBset_item_opts\fR	\fBmenu_item_opts(3CURSES)\fR
+\fBset_item_term\fR	\fBmenu_hook(3CURSES)\fR
+\fBset_item_userptr\fR	\fBmenu_item_userptr(3CURSES)\fR
+\fBset_item_value\fR	\fBmenu_item_value(3CURSES)\fR
+\fBset_menu_back\fR	\fBmenu_attributes(3CURSES)\fR
+\fBset_menu_fore\fR	\fBmenu_attributes(3CURSES)\fR
+\fBset_menu_format\fR	\fBmenu_format(3CURSES)\fR
+\fBset_menu_grey\fR	\fBmenu_attributes(3CURSES)\fR
+\fBset_menu_init\fR	\fBmenu_hook(3CURSES)\fR
+\fBset_menu_items\fR	\fBmenu_items(3CURSES)\fR
+\fBset_menu_mark\fR	\fBmenu_mark(3CURSES)\fR
+\fBset_menu_opts\fR	\fBmenu_opts(3CURSES)\fR
+\fBset_menu_pad\fR	\fBmenu_attributes(3CURSES)\fR
+\fBset_menu_pattern\fR	\fBmenu_pattern(3CURSES)\fR
+\fBset_menu_sub\fR	\fBmenu_win(3CURSES)\fR
+\fBset_menu_term\fR	\fBmenu_hook(3CURSES)\fR
+\fBset_menu_userptr\fR	\fBmenu_userptr(3CURSES)\fR
+\fBset_menu_win\fR	\fBmenu_win(3CURSES)\fR
+\fBset_top_row\fR	\fBmenu_item_current(3CURSES)\fR
+\fBtop_row\fR	\fBmenu_item_current(3CURSES)\fR
+\fBunpost_menu\fR	\fBmenu_post(3CURSES)\fR
 .TE
 
 .SH RETURN VALUES
-.sp
-.LP
 Routines that return pointers always return \fINULL\fR on error. Routines that
 return an integer return one of the following:
 .sp
@@ -235,8 +226,6 @@ The menu driver could not process the request.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -251,11 +240,7 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcurses\fR(3CURSES), \fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
 The header \fB<menu.h>\fR automatically includes the headers  \fB<eti.h>\fR and
 \fB<curses.h>\fR\&.
