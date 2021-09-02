@@ -219,11 +219,13 @@ typedef struct smb2_negotiate_ctx {
 #define	SMB31_PREAUTH_CTX_SALT_LEN	32
 
 /*
- * SMB 3.1.1 specifies the only hashing algorithm - SHA-512 and
+ * SMB 3.1.1 originally specified a single hashing algorithm - SHA-512 - and
  * two encryption ones - AES-128-CCM and AES-128-GCM.
+ * Windows Server 2022 and Windows 11 introduced two further encryption
+ * algorithms - AES-256-CCM and AES-256-GCM.
  */
 #define	MAX_HASHID_NUM	(1)
-#define	MAX_CIPHER_NUM	(2)
+#define	MAX_CIPHER_NUM	(4)
 
 typedef struct smb2_preauth_integrity_caps {
 	uint16_t	picap_hash_count;
