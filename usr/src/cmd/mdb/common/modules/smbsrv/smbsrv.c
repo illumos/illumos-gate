@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -2142,9 +2143,12 @@ smbsrv_leases_dcmd(uintptr_t addr, uint_t flags, int argc,
 typedef struct mdb_smb_lease {
 	struct smb_node		*ls_node;
 	uint32_t		ls_refcnt;
+	uint32_t		ls_state;
 	uint16_t		ls_epoch;
 	uint8_t			ls_key[SMB_LEASE_KEY_SZ];
 } mdb_smb_lease_t;
+
+static const mdb_bitmask_t oplock_bits[];
 
 static int
 smblease_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -2178,6 +2182,8 @@ smblease_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_printf("SMB Node: %p\n", ls->ls_node);
 			mdb_printf("Refcount: %u\n", ls->ls_refcnt);
 			mdb_printf("Epoch: %u\n", ls->ls_epoch);
+			mdb_printf("State: 0x%x <%b>\n",
+			    ls->ls_state, ls->ls_state, oplock_bits);
 
 			mdb_printf("Key: [");
 			for (i = 0; i < SMB_LEASE_KEY_SZ; i++) {
@@ -2190,12 +2196,15 @@ smblease_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			if (DCMD_HDRSPEC(flags))
 				mdb_printf(
 				    "%<b>%<u>"
-				    "%-?s "
-				    "%-?s "
-				    "%-?s%</u>%</b>\n",
-				    "LEASE", "SMB NODE", "KEY");
+				    "%-?s %-?s %-?s %-?s"
+				    "%</u>%</b>\n",
+				    "LEASE", "SMB NODE", "STATE", "KEY");
 
-			mdb_printf("%?p %-p [", addr, ls->ls_node);
+			mdb_printf("%?p ", addr);
+			mdb_printf("%-?p ", ls->ls_node);
+			mdb_printf("%#-?x ", ls->ls_state);
+
+			mdb_printf("[");
 			for (i = 0; i < 8; i++) {
 				mdb_printf(" %02x", ls->ls_key[i] & 0xFF);
 			}
