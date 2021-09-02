@@ -1082,7 +1082,7 @@ $if _ELF64
 	_ast_conf_data		{
 				  ASSERT = {
 					  TYPE = OBJECT;
-					  SIZE = 27440;
+					  SIZE = 31440;
 					};
 				};
 $elif _ELF32
@@ -1138,9 +1138,9 @@ $elif _ELF32
 				  ASSERT = {
 					  TYPE = OBJECT;
 					$if _x86
-					  SIZE = 23324;
+					  SIZE = 26724;
 					$elif _sparc
-					  SIZE = 27440;
+					  SIZE = 31440;
 					$else
 					$error Unknown architecture
 					$endif
@@ -1164,7 +1164,7 @@ $endif
 	_ast_conf_prefix	{
 				  ASSERT = {
 					  TYPE = OBJECT;
-					  SIZE = 374;
+					  SIZE = 396;
 					};
 				};
 	_ccmap;

@@ -36,7 +36,8 @@
 #define CONF_XPG	9
 #define CONF_GNU	10
 #define CONF_TRUSTEDBSD	11
-#define CONF_call	12
+#define CONF_SOL	12
+#define CONF_call	13
 
 #define _pth_getconf	"/usr/bin/getconf"
 #define _pth_getconf_a	"-a"

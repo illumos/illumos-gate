@@ -53,19 +53,21 @@ IFFEC=		$(IFFECC) $(IFFECPPFLAGS) $(IFFECFLAGS) \
 		$(IFFELDFLAGS) $(IFFELIBS)
 IFFEFLAGS=	-v -R $(ROOT)
 
+IFFEPATH=	$(AST_TOOLS):/usr/bin:/usr/sbin:/sbin
+
 FEATURE/% := SHADOW_CCS=
 
 FEATURE/%: $(ASTSRC)/features/%
-	PATH=$(AST_TOOLS):$$PATH \
+	PATH=$(IFFEPATH) \
 	    $(AST_IFFE) $(IFFEFLAGS) -c '$(IFFEC)' run $< $(IFFE_EXTRA)
 	$(POST_PROCESS_AST)
 
 FEATURE/%: $(ASTSRC)/features/%.c
-	PATH=$(AST_TOOLS):$$PATH \
+	PATH=$(IFFEPATH) \
 	    $(AST_IFFE) $(IFFEFLAGS) -c '$(IFFEC)' run $< $(IFFE_EXTRA)
 	$(POST_PROCESS_AST)
 
 FEATURE/%: $(ASTSRC)/features/%.sh
-	PATH=$(AST_TOOLS):$$PATH \
+	PATH=$(IFFEPATH) \
 	    $(AST_IFFE) $(IFFEFLAGS) -c '$(IFFEC)' run $< $(IFFE_EXTRA)
 	$(POST_PROCESS_AST)
