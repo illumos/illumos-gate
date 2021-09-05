@@ -46,8 +46,9 @@
 
 typedef struct segvmm_data {
 	krwlock_t	svmd_lock;
-	vm_object_t	svmd_obj;
-	uintptr_t	svmd_obj_off;
+	vm_object_t	*svmd_vmo;
+	vm_client_t	*svmd_vmc;
+	uintptr_t	svmd_off;
 	uchar_t		svmd_prot;
 	size_t		svmd_softlockcnt;
 } segvmm_data_t;
@@ -104,9 +105,41 @@ static struct seg_ops segvmm_ops = {
 	.inherit	= seg_inherit_notsup
 };
 
+/*
+ * Unload a region from the HAT for A/D tracking.
+ */
+static void
+segvmm_invalidate(void *arg, uintptr_t gpa, size_t sz)
+{
+	struct seg *seg = arg;
+	segvmm_data_t *svmd = seg->s_data;
+
+	/*
+	 * Invalidations are only necessary (and configured) for vmspace
+	 * mappings.  Direct vm_object mappings are not involved.
+	 */
+	ASSERT3P(svmd->svmd_vmo, ==, NULL);
+
+	/*
+	 * The region being invalidated may overlap with all, some, or none of
+	 * this segment.  We are only concerned about that overlap.
+	 */
+	const uintptr_t start = MAX(gpa, svmd->svmd_off);
+	const uintptr_t end = MIN(gpa + sz, svmd->svmd_off + seg->s_size);
+	if (start >= end) {
+		return;
+	}
+	ASSERT(start >= svmd->svmd_off && end <= svmd->svmd_off + seg->s_size);
+	ASSERT(start >= gpa && end <= gpa + sz);
+	const caddr_t unload_va = seg->s_base + (start - svmd->svmd_off);
+	const size_t unload_sz = (end - start);
+	ASSERT3U(unload_sz, <=, seg->s_size);
+
+	hat_unload(seg->s_as->a_hat, unload_va, unload_sz, HAT_UNLOAD);
+}
 
 /*
- * Create a kernel/user-mapped segment.  ->kaddr is the segkvmm mapping.
+ * Create a VMM-memory-backed segment.
  */
 int
 segvmm_create(struct seg **segpp, void *argsp)
@@ -115,17 +148,35 @@ segvmm_create(struct seg **segpp, void *argsp)
 	segvmm_crargs_t *cra = argsp;
 	segvmm_data_t *data;
 
+	VERIFY((cra->vmo == NULL && cra->vmc != NULL) ||
+	    (cra->vmo != NULL && cra->vmc == NULL));
+	VERIFY(cra->prot & PROT_USER);
+	VERIFY0(cra->offset & PAGEOFFSET);
+
 	data = kmem_zalloc(sizeof (*data), KM_SLEEP);
 	rw_init(&data->svmd_lock, NULL, RW_DEFAULT, NULL);
-	data->svmd_obj = cra->obj;
-	data->svmd_obj_off = cra->offset;
-	data->svmd_prot = cra->prot;
-
-	/* Grab a hold on the VM object for the duration of this seg mapping */
-	vm_object_reference(data->svmd_obj);
+	data->svmd_off = cra->offset;
+	data->svmd_prot = cra->prot & ~PROT_USER;
 
 	seg->s_ops = &segvmm_ops;
 	seg->s_data = data;
+
+	if (cra->vmo != NULL) {
+		data->svmd_vmo = cra->vmo;
+		/* Grab a hold on the VM object for the lifetime of segment */
+		vm_object_reference(data->svmd_vmo);
+	} else {
+		int err;
+
+		data->svmd_vmc = cra->vmc;
+		err = vmc_set_inval_cb(data->svmd_vmc, segvmm_invalidate, seg);
+		if (err != 0) {
+			seg->s_ops = NULL;
+			seg->s_data = NULL;
+			kmem_free(data, sizeof (*data));
+			return (err);
+		}
+	}
 	return (0);
 }
 
@@ -139,15 +190,34 @@ segvmm_dup(struct seg *seg, struct seg *newseg)
 
 	newsvmd = kmem_zalloc(sizeof (segvmm_data_t), KM_SLEEP);
 	rw_init(&newsvmd->svmd_lock, NULL, RW_DEFAULT, NULL);
-	newsvmd->svmd_obj = svmd->svmd_obj;
-	newsvmd->svmd_obj_off = svmd->svmd_obj_off;
+	newsvmd->svmd_off = svmd->svmd_off;
 	newsvmd->svmd_prot = svmd->svmd_prot;
-
-	/* Grab another hold for the duplicate segment */
-	vm_object_reference(svmd->svmd_obj);
 
 	newseg->s_ops = seg->s_ops;
 	newseg->s_data = newsvmd;
+
+	if (svmd->svmd_vmo != NULL) {
+		/* Grab another hold for the duplicate segment */
+		vm_object_reference(svmd->svmd_vmo);
+		newsvmd->svmd_vmo = svmd->svmd_vmo;
+	} else {
+		int err;
+
+		newsvmd->svmd_vmc = vmc_clone(svmd->svmd_vmc);
+		/*
+		 * The cloned client does not inherit the invalidation
+		 * configuration, so attempt to set it here for the new segment.
+		 */
+		err = vmc_set_inval_cb(newsvmd->svmd_vmc, segvmm_invalidate,
+		    newseg);
+		if (err != 0) {
+			newseg->s_ops = NULL;
+			newseg->s_data = NULL;
+			kmem_free(newsvmd, sizeof (*newsvmd));
+			return (err);
+		}
+	}
+
 	return (0);
 }
 
@@ -169,9 +239,6 @@ segvmm_unmap(struct seg *seg, caddr_t addr, size_t len)
 	/* Unconditionally unload the entire segment range.  */
 	hat_unload(seg->s_as->a_hat, addr, len, HAT_UNLOAD_UNMAP);
 
-	/* Release the VM object hold this segment possessed */
-	vm_object_deallocate(svmd->svmd_obj);
-
 	seg_free(seg);
 	return (0);
 }
@@ -179,35 +246,93 @@ segvmm_unmap(struct seg *seg, caddr_t addr, size_t len)
 static void
 segvmm_free(struct seg *seg)
 {
-	segvmm_data_t *data = seg->s_data;
+	segvmm_data_t *svmd = seg->s_data;
 
-	ASSERT(data != NULL);
+	ASSERT(svmd != NULL);
 
-	rw_destroy(&data->svmd_lock);
-	VERIFY(data->svmd_softlockcnt == 0);
-	kmem_free(data, sizeof (*data));
+	if (svmd->svmd_vmo != NULL) {
+		/* Release the VM object hold this segment possessed */
+		vm_object_release(svmd->svmd_vmo);
+		svmd->svmd_vmo = NULL;
+	} else {
+		vmc_destroy(svmd->svmd_vmc);
+		svmd->svmd_vmc = NULL;
+	}
+	rw_destroy(&svmd->svmd_lock);
+	VERIFY(svmd->svmd_softlockcnt == 0);
+	kmem_free(svmd, sizeof (*svmd));
 	seg->s_data = NULL;
 }
 
 static int
-segvmm_fault_in(struct hat *hat, struct seg *seg, uintptr_t va, size_t len)
+segvmm_fault_obj(struct hat *hat, struct seg *seg, uintptr_t va, size_t len)
 {
 	segvmm_data_t *svmd = seg->s_data;
 	const uintptr_t end = va + len;
-	const uintptr_t prot = svmd->svmd_prot;
+	const int prot = svmd->svmd_prot;
+	const int uprot = prot | PROT_USER;
+	vm_object_t *vmo = svmd->svmd_vmo;
+
+	ASSERT(vmo != NULL);
 
 	va &= PAGEMASK;
-	uintptr_t off = va - (uintptr_t)seg->s_base;
+	uintptr_t off = va - (uintptr_t)seg->s_base + svmd->svmd_off;
 	do {
 		pfn_t pfn;
 
-		pfn = vm_object_pfn(svmd->svmd_obj, off);
+		pfn = vm_object_pfn(vmo, off);
 		if (pfn == PFN_INVALID) {
-			return (-1);
+			return (FC_NOMAP);
 		}
 
 		/* Ignore any large-page possibilities for now */
-		hat_devload(hat, (caddr_t)va, PAGESIZE, pfn, prot, HAT_LOAD);
+		hat_devload(hat, (caddr_t)va, PAGESIZE, pfn, uprot, HAT_LOAD);
+		va += PAGESIZE;
+		off += PAGESIZE;
+	} while (va < end);
+
+	return (0);
+}
+
+static int
+segvmm_fault_space(struct hat *hat, struct seg *seg, uintptr_t va, size_t len)
+{
+	segvmm_data_t *svmd = seg->s_data;
+	const uintptr_t end = va + len;
+	const int prot = svmd->svmd_prot;
+	const int uprot = prot | PROT_USER;
+	vm_client_t *vmc = svmd->svmd_vmc;
+
+	ASSERT(vmc != NULL);
+
+	va &= PAGEMASK;
+	uintptr_t off = va - (uintptr_t)seg->s_base + svmd->svmd_off;
+
+	do {
+		vm_page_t *vmp;
+		pfn_t pfn;
+
+		vmp = vmc_hold(vmc, off, prot);
+		if (vmp == NULL) {
+			return (FC_NOMAP);
+		}
+
+		pfn = vmp_get_pfn(vmp);
+		ASSERT3U(pfn, !=, PFN_INVALID);
+
+		/* Ignore any large-page possibilities for now */
+		hat_devload(hat, (caddr_t)va, PAGESIZE, pfn, uprot, HAT_LOAD);
+
+		if (vmp_release(vmp)) {
+			/*
+			 * Region was unmapped from vmspace while we were
+			 * loading it into this AS.  Communicate it as if it
+			 * were a fault.
+			 */
+			hat_unload(hat, (caddr_t)va, PAGESIZE, HAT_UNLOAD);
+			return (FC_NOMAP);
+		}
+
 		va += PAGESIZE;
 		off += PAGESIZE;
 	} while (va < end);
@@ -218,7 +343,7 @@ segvmm_fault_in(struct hat *hat, struct seg *seg, uintptr_t va, size_t len)
 /* ARGSUSED */
 static faultcode_t
 segvmm_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
-    enum fault_type type, enum seg_rw tw)
+    enum fault_type type, enum seg_rw rw)
 {
 	segvmm_data_t *svmd = seg->s_data;
 	int err = 0;
@@ -244,7 +369,11 @@ segvmm_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 	VERIFY(type == F_INVAL || type == F_SOFTLOCK);
 	rw_enter(&svmd->svmd_lock, RW_WRITER);
 
-	err = segvmm_fault_in(hat, seg, (uintptr_t)addr, len);
+	if (svmd->svmd_vmo != NULL) {
+		err = segvmm_fault_obj(hat, seg, (uintptr_t)addr, len);
+	} else {
+		err = segvmm_fault_space(hat, seg, (uintptr_t)addr, len);
+	}
 	if (type == F_SOFTLOCK && err == 0) {
 		size_t nval = svmd->svmd_softlockcnt + btop(len);
 
@@ -426,8 +555,8 @@ segvmm_getmemid(struct seg *seg, caddr_t addr, memid_t *memidp)
 {
 	segvmm_data_t *svmd = seg->s_data;
 
-	memidp->val[0] = (uintptr_t)svmd->svmd_obj;
-	memidp->val[1] = (uintptr_t)(addr - seg->s_base) + svmd->svmd_obj_off;
+	memidp->val[0] = (uintptr_t)svmd->svmd_vmo;
+	memidp->val[1] = (uintptr_t)(addr - seg->s_base) + svmd->svmd_off;
 	return (0);
 }
 

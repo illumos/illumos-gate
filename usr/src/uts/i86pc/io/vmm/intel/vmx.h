@@ -39,15 +39,13 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2018 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef _VMX_H_
 #define	_VMX_H_
 
 #include "vmcs.h"
-
-struct pmap;
 
 struct vmxctx {
 	uint64_t	guest_rdi;		/* Guest state */
@@ -82,12 +80,6 @@ struct vmxctx {
 	int		host_tf;
 
 	int		inst_fail_status;
-
-	/*
-	 * The pmap needs to be deactivated in vmx_enter_guest()
-	 * so keep a copy of the 'pmap' in each vmxctx.
-	 */
-	struct pmap	*pmap;
 };
 
 struct vmxcap {
@@ -151,7 +143,7 @@ struct vmx {
 	uint64_t	eptp;
 	enum vmx_caps	vmx_caps;
 	struct vm	*vm;
-	long		eptgen[MAXCPU];		/* cached pmap->pm_eptgen */
+	uint64_t	eptgen[MAXCPU];		/* cached vmspace generation */
 };
 CTASSERT((offsetof(struct vmx, vmcs) & PAGE_MASK) == 0);
 CTASSERT((offsetof(struct vmx, msr_bitmap) & PAGE_MASK) == 0);

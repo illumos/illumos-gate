@@ -151,35 +151,7 @@ ENTRY_NP(vmx_enter_guest)
 	movq	%rdi, %r12	/* vmxctx */
 	movq	%rsi, %r13	/* vmx */
 	movl	%edx, %r14d	/* launch state */
-	movq	VMXCTX_PMAP(%rdi), %rbx
 
-	/* Activate guest pmap on this cpu. */
-	leaq	PM_ACTIVE(%rbx), %rdi
-	movl	%gs:CPU_ID, %esi
-	call	cpuset_atomic_add
-	movq	%r12, %rdi
-
-	/*
-	 * If 'vmx->eptgen[curcpu]' is not identical to 'pmap->pm_eptgen'
-	 * then we must invalidate all mappings associated with this EPTP.
-	 */
-	movq	PM_EPTGEN(%rbx), %r10
-	movl	%gs:CPU_ID, %eax
-	cmpq	%r10, VMX_EPTGEN(%r13, %rax, 8)
-	je	guest_restore
-
-	/* Refresh 'vmx->eptgen[curcpu]' */
-	movq	%r10, VMX_EPTGEN(%r13, %rax, 8)
-
-	/* Setup the invept descriptor on the host stack */
-	pushq	$0x0
-	pushq	VMX_EPTP(%r13)
-	movl	$0x1, %eax	/* Single context invalidate */
-	invept	(%rsp), %rax
-	leaq	0x10(%rsp), %rsp
-	jbe	invept_error		/* Check invept instruction error */
-
-guest_restore:
 	/* Write the current %rsp into the VMCS to be restored on vmexit */
 	movl	$VMCS_HOST_RSP, %eax
 	vmwrite	%rsp, %rax
@@ -217,22 +189,12 @@ do_launch:
 vmwrite_error:
 	movl	$VMX_VMWRITE_ERROR, %eax
 	jmp	decode_inst_error
-invept_error:
-	movl	$VMX_INVEPT_ERROR, %eax
-	jmp	decode_inst_error
 decode_inst_error:
 	movl	$VM_FAIL_VALID, %r11d
 	jz	inst_error
 	movl	$VM_FAIL_INVALID, %r11d
 inst_error:
 	movl	%r11d, VMXCTX_INST_FAIL_STATUS(%rdi)
-
-	movq	VMXCTX_PMAP(%rdi), %rdi
-	leaq	PM_ACTIVE(%rdi), %rdi
-	movl	%gs:CPU_ID, %esi
-	movq	%rax, %r12
-	call	cpuset_atomic_del
-	movq	%r12, %rax
 
 	movq	VMXSTK_RBX(%rsp), %rbx
 	movq	VMXSTK_R12(%rsp), %r12
@@ -255,12 +217,6 @@ inst_error:
 ALTENTRY(vmx_exit_guest)
 	/* Save guest state that is not automatically saved in the vmcs. */
 	VMX_GUEST_SAVE
-
-	/* Deactivate guest pmap on this cpu. */
-	movq	VMXCTX_PMAP(%rdi), %rdi
-	leaq	PM_ACTIVE(%rdi), %rdi
-	movl	%gs:CPU_ID, %esi
-	call	cpuset_atomic_del
 
 	/*
 	 * This will return to the caller of 'vmx_enter_guest()' with a return
@@ -286,12 +242,6 @@ SET_SIZE(vmx_enter_guest)
 ALTENTRY(vmx_exit_guest_flush_rsb)
 	/* Save guest state that is not automatically saved in the vmcs. */
 	VMX_GUEST_SAVE
-
-	/* Deactivate guest pmap on this cpu. */
-	movq	VMXCTX_PMAP(%rdi), %rdi
-	leaq	PM_ACTIVE(%rdi), %rdi
-	movl	%gs:CPU_ID, %esi
-	call	cpuset_atomic_del
 
 	VMX_GUEST_FLUSH_SCRATCH
 

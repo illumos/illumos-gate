@@ -42,7 +42,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/pciio.h>
-#include <sys/smp.h>
 #include <sys/sysctl.h>
 
 #include <dev/pci/pcivar.h>

@@ -19,7 +19,6 @@
 #include <sys/systm.h>
 #include <sys/cpuvar.h>
 
-#include <machine/pmap.h>
 #include <machine/vmm.h>
 #include <sys/vmm_vm.h>
 
@@ -43,18 +42,6 @@ vmxctx
 	guest_r15		VMXCTX_GUEST_R15
 	guest_cr2		VMXCTX_GUEST_CR2
 	inst_fail_status	VMXCTX_INST_FAIL_STATUS
-	pmap			VMXCTX_PMAP
-
-vmx
-	eptgen		VMX_EPTGEN
-	eptp		VMX_EPTP
-
-pmap
-	pm_active	PM_ACTIVE
-	pm_eptgen	PM_EPTGEN
-
-cpu
-	cpu_id
 
 \#define	VM_SUCCESS		0
 \#define	VM_FAIL_INVALID		1

@@ -100,6 +100,7 @@ struct vmm_hold {
 struct vmm_lease {
 	list_node_t		vml_node;
 	struct vm		*vml_vm;
+	vm_client_t		*vml_vmclient;
 	boolean_t		vml_expired;
 	boolean_t		vml_break_deferred;
 	boolean_t		(*vml_expire_func)(void *);
@@ -444,7 +445,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		lock_type = LOCK_WRITE_HOLD;
 		break;
 
-	case VM_GET_GPA_PMAP:
 	case VM_GET_MEMSEG:
 	case VM_MMAP_GETNEXT:
 	case VM_LAPIC_IRQ:
@@ -465,6 +465,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		lock_type = LOCK_READ_HOLD;
 		break;
 
+	case VM_GET_GPA_PMAP:
 	case VM_IOAPIC_PINCOUNT:
 	case VM_SUSPEND:
 	default:
@@ -1127,18 +1128,11 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		break;
 	}
 	case VM_GET_GPA_PMAP: {
-		struct vm_gpa_pte gpapte;
-
-		if (ddi_copyin(datap, &gpapte, sizeof (gpapte), md)) {
-			error = EFAULT;
-			break;
-		}
-#ifdef __FreeBSD__
-		/* XXXJOY: add function? */
-		pmap_get_mapping(vmspace_pmap(vm_get_vmspace(sc->vmm_vm)),
-		    gpapte.gpa, gpapte.pte, &gpapte.ptenum);
-#endif
-		error = 0;
+		/*
+		 * Until there is a necessity to leak EPT/RVI PTE values to
+		 * userspace, this will remain unimplemented
+		 */
+		error = EINVAL;
 		break;
 	}
 	case VM_GET_HPET_CAPABILITIES: {
@@ -1690,6 +1684,7 @@ vmm_drv_lease_sign(vmm_hold_t *hold, boolean_t (*expiref)(void *), void *arg)
 	lease->vml_hold = hold;
 	/* cache the VM pointer for one less pointer chase */
 	lease->vml_vm = sc->vmm_vm;
+	lease->vml_vmclient = vmspace_client_alloc(vm_get_vmspace(sc->vmm_vm));
 
 	mutex_enter(&sc->vmm_lease_lock);
 	while (sc->vmm_lease_blocker != 0) {
@@ -1709,6 +1704,7 @@ vmm_lease_break_locked(vmm_softc_t *sc, vmm_lease_t *lease)
 
 	list_remove(&sc->vmm_lease_list, lease);
 	vmm_read_unlock(sc);
+	vmc_destroy(lease->vml_vmclient);
 	kmem_free(lease, sizeof (*lease));
 }
 
@@ -1841,9 +1837,30 @@ vmm_drv_lease_expired(vmm_lease_t *lease)
 void *
 vmm_drv_gpa2kva(vmm_lease_t *lease, uintptr_t gpa, size_t sz)
 {
-	ASSERT(lease != NULL);
+	vm_page_t *vmp;
+	void *res = NULL;
 
-	return (vmspace_find_kva(vm_get_vmspace(lease->vml_vm), gpa, sz));
+	ASSERT(lease != NULL);
+	ASSERT3U(sz, ==, PAGESIZE);
+	ASSERT0(gpa & PAGEOFFSET);
+
+	vmp = vmc_hold(lease->vml_vmclient, gpa, PROT_READ | PROT_WRITE);
+	/*
+	 * Break the rules for now and just extract the pointer.  This is
+	 * nominally safe, since holding a driver lease on the VM read-locks it.
+	 *
+	 * A pointer which would otherwise be at risk of being a use-after-free
+	 * vector is made safe since actions such as vmspace_unmap() require
+	 * acquisition of the VM write-lock, (causing all driver leases to be
+	 * broken) allowing the consumers to cease their access prior to
+	 * modification of the vmspace.
+	 */
+	if (vmp != NULL) {
+		res = vmp_get_writable(vmp);
+		vmp_release(vmp);
+	}
+
+	return (res);
 }
 
 int
@@ -2191,6 +2208,14 @@ vmm_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	minor_t		minor;
 	vmm_softc_t	*sc;
 
+	/*
+	 * Forbid running bhyve in a 32-bit process until it has been tested and
+	 * verified to be safe.
+	 */
+	if (curproc->p_model != DATAMODEL_LP64) {
+		return (EFBIG);
+	}
+
 	minor = getminor(*devp);
 	if (minor == VMM_CTL_MINOR) {
 		/*
@@ -2330,6 +2355,14 @@ vmm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	vmm_softc_t	*sc;
 	minor_t		minor;
 
+	/*
+	 * Forbid running bhyve in a 32-bit process until it has been tested and
+	 * verified to be safe.
+	 */
+	if (curproc->p_model != DATAMODEL_LP64) {
+		return (EFBIG);
+	}
+
 	/* The structs in bhyve ioctls assume a 64-bit datamodel */
 	if (ddi_model_convert_from(mode & FMODELS) != DDI_MODEL_NONE) {
 		return (ENOTSUP);
@@ -2356,10 +2389,7 @@ vmm_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 {
 	vmm_softc_t *sc;
 	const minor_t minor = getminor(dev);
-	struct vm *vm;
 	int err;
-	vm_object_t vmo = NULL;
-	struct vmspace *vms;
 
 	if (minor == VMM_CTL_MINOR) {
 		return (ENODEV);
@@ -2380,31 +2410,23 @@ vmm_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 	/* Grab read lock on the VM to prevent any changes to the memory map */
 	vmm_read_lock(sc);
 
-	vm = sc->vmm_vm;
-	vms = vm_get_vmspace(vm);
 	if (off >= VM_DEVMEM_START) {
 		int segid;
-		off_t map_off = 0;
+		off_t segoff;
 
 		/* Mapping a devmem "device" */
-		if (!vmmdev_devmem_segid(sc, off, len, &segid, &map_off)) {
+		if (!vmmdev_devmem_segid(sc, off, len, &segid, &segoff)) {
 			err = ENODEV;
-			goto out;
+		} else {
+			err = vm_segmap_obj(sc->vmm_vm, segid, segoff, len, as,
+			    addrp, prot, maxprot, flags);
 		}
-		err = vm_get_memseg(vm, segid, NULL, NULL, &vmo);
-		if (err != 0) {
-			goto out;
-		}
-		err = vm_segmap_obj(vmo, map_off, len, as, addrp, prot, maxprot,
-		    flags);
 	} else {
 		/* Mapping a part of the guest physical space */
-		err = vm_segmap_space(vms, off, as, addrp, len, prot, maxprot,
-		    flags);
+		err = vm_segmap_space(sc->vmm_vm, off, as, addrp, len, prot,
+		    maxprot, flags);
 	}
 
-
-out:
 	vmm_read_unlock(sc);
 	return (err);
 }

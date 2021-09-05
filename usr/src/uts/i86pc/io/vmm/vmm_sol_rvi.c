@@ -28,12 +28,6 @@
 #include <sys/vmm_gpt.h>
 #include <sys/vmm_vm.h>
 
-typedef struct rvi_map rvi_map_t;
-struct rvi_map {
-	vmm_gpt_t	*rm_gpt;
-	kmutex_t	rm_lock;
-};
-
 static inline uint64_t
 rvi_prot(uint_t prot)
 {
@@ -145,7 +139,13 @@ rvi_reset_accessed(uint64_t *entry, bool on)
 	return (rvi_reset_bits(entry, (PT_MOD | PT_REF), on ? PT_REF : 0));
 }
 
-static vmm_pte_ops_t rvi_pte_ops = {
+static uint64_t
+rvi_get_pmtp(pfn_t root_pfn)
+{
+	return (root_pfn << PAGESHIFT);
+}
+
+vmm_pte_ops_t rvi_pte_ops = {
 	.vpeo_map_table		= rvi_map_table,
 	.vpeo_map_page		= rvi_map_page,
 	.vpeo_pte_pfn		= rvi_pte_pfn,
@@ -153,101 +153,5 @@ static vmm_pte_ops_t rvi_pte_ops = {
 	.vpeo_pte_prot		= rvi_pte_prot,
 	.vpeo_reset_dirty	= rvi_reset_dirty,
 	.vpeo_reset_accessed	= rvi_reset_accessed,
-};
-
-vmm_gpt_t *
-rvi_create(void)
-{
-	return (vmm_gpt_alloc(&rvi_pte_ops));
-}
-
-static void *
-rvi_ops_create(uintptr_t *root_kaddr)
-{
-	rvi_map_t *map;
-
-	map = kmem_zalloc(sizeof (*map), KM_SLEEP);
-	mutex_init(&map->rm_lock, NULL, MUTEX_DEFAULT, NULL);
-	map->rm_gpt = rvi_create();
-	*root_kaddr = (uintptr_t)vmm_gpt_root_kaddr(map->rm_gpt);
-
-	return (map);
-}
-
-static void
-rvi_ops_destroy(void *arg)
-{
-	rvi_map_t *map = arg;
-
-	if (map != NULL) {
-		vmm_gpt_free(map->rm_gpt);
-		mutex_destroy(&map->rm_lock);
-		kmem_free(map, sizeof (*map));
-	}
-}
-
-static uint64_t
-rvi_ops_wired_count(void *arg)
-{
-	rvi_map_t *map = arg;
-	uint64_t res;
-
-	mutex_enter(&map->rm_lock);
-	res = vmm_gpt_mapped_count(map->rm_gpt);
-	mutex_exit(&map->rm_lock);
-
-	return (res);
-}
-
-static int
-rvi_ops_is_wired(void *arg, uint64_t gpa, uint_t *protp)
-{
-	rvi_map_t *map = arg;
-	bool mapped;
-
-	mutex_enter(&map->rm_lock);
-	mapped = vmm_gpt_is_mapped(map->rm_gpt, gpa, protp);
-	mutex_exit(&map->rm_lock);
-
-	return (mapped ? 0 : -1);
-}
-
-static int
-rvi_ops_map(void *arg, uint64_t gpa, pfn_t pfn, uint_t _lvl, uint_t prot,
-    uint8_t attr)
-{
-	rvi_map_t *map = arg;
-
-	ASSERT((prot & PROT_READ) != 0);
-	ASSERT3U((prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)), ==, 0);
-
-	mutex_enter(&map->rm_lock);
-	vmm_gpt_populate_entry(map->rm_gpt, gpa);
-	(void) vmm_gpt_map(map->rm_gpt, gpa, pfn, prot, attr);
-	mutex_exit(&map->rm_lock);
-
-	return (0);
-}
-
-static uint64_t
-rvi_ops_unmap(void *arg, uint64_t start, uint64_t end)
-{
-	rvi_map_t *map = arg;
-	size_t unmapped = 0;
-
-	mutex_enter(&map->rm_lock);
-	unmapped = vmm_gpt_unmap_region(map->rm_gpt, start, end);
-	vmm_gpt_vacate_region(map->rm_gpt, start, end);
-	mutex_exit(&map->rm_lock);
-
-	return ((uint64_t)unmapped);
-}
-
-struct vmm_pt_ops rvi_ops = {
-	.vpo_init		= rvi_ops_create,
-	.vpo_free		= rvi_ops_destroy,
-	.vpo_wired_cnt		= rvi_ops_wired_count,
-	.vpo_is_wired		= rvi_ops_is_wired,
-	.vpo_map		= rvi_ops_map,
-	.vpo_unmap		= rvi_ops_unmap,
+	.vpeo_get_pmtp		= rvi_get_pmtp,
 };

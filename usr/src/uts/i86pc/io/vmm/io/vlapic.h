@@ -72,9 +72,9 @@ vcpu_notify_t vlapic_set_intr_ready(struct vlapic *vlapic, int vector,
 /*
  * Post an interrupt to the vcpu running on 'hostcpu'. This will use a
  * hardware assist if available (e.g. Posted Interrupt) or fall back to
- * sending an 'ipinum' to interrupt the 'hostcpu'.
+ * sending an IPI to interrupt the 'hostcpu'.
  */
-void vlapic_post_intr(struct vlapic *vlapic, int hostcpu, int ipinum);
+void vlapic_post_intr(struct vlapic *vlapic, int hostcpu);
 
 void vlapic_fire_cmci(struct vlapic *vlapic);
 int vlapic_trigger_lvt(struct vlapic *vlapic, int vector);
