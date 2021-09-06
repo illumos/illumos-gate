@@ -672,7 +672,6 @@ $(i386_ONLY)file path=usr/bin/$(ARCH32)/prstat mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/ps mode=0555
 file path=usr/bin/$(ARCH32)/savecore mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/setuname mode=0555
-$(i386_ONLY)file path=usr/bin/$(ARCH32)/uptime mode=4555
 file path=usr/bin/$(ARCH64)/amt mode=0555
 file path=usr/bin/$(ARCH64)/crle mode=0555
 file path=usr/bin/$(ARCH64)/decrypt mode=0555
@@ -686,7 +685,6 @@ file path=usr/bin/$(ARCH64)/prstat mode=0555
 file path=usr/bin/$(ARCH64)/ps mode=0555
 file path=usr/bin/$(ARCH64)/savecore mode=0555
 file path=usr/bin/$(ARCH64)/setuname mode=0555
-file path=usr/bin/$(ARCH64)/uptime mode=4555
 $(i386_ONLY)file path=usr/bin/addbadsec mode=0555
 file path=usr/bin/amt mode=0555
 file path=usr/bin/arch mode=0555
@@ -849,6 +847,7 @@ file path=usr/bin/userattr mode=0555
 file path=usr/bin/uuidgen mode=0555
 file path=usr/bin/vmstat mode=0555
 file path=usr/bin/vtfontcvt mode=0555
+file path=usr/bin/w mode=4555
 file path=usr/bin/which mode=0555
 file path=usr/bin/who mode=0555
 file path=usr/bin/wracct mode=0555
@@ -1409,10 +1408,8 @@ hardlink path=sbin/rc5 target=../sbin/rc0
 hardlink path=sbin/rc6 target=../sbin/rc0
 hardlink path=usr/bin/$(ARCH32)/encrypt target=decrypt
 hardlink path=usr/bin/$(ARCH32)/mac target=digest
-$(i386_ONLY)hardlink path=usr/bin/$(ARCH32)/w target=uptime
 hardlink path=usr/bin/$(ARCH64)/encrypt target=decrypt
 hardlink path=usr/bin/$(ARCH64)/mac target=digest
-hardlink path=usr/bin/$(ARCH64)/w target=uptime
 hardlink path=usr/bin/decrypt target=../../usr/lib/isaexec
 hardlink path=usr/bin/digest target=../../usr/lib/isaexec
 hardlink path=usr/bin/dispgid target=../../usr/bin/ckgid
@@ -1439,9 +1436,8 @@ hardlink path=usr/bin/red target=../../usr/bin/ed
 hardlink path=usr/bin/savecore target=../../usr/lib/isaexec
 hardlink path=usr/bin/setuname target=../../usr/lib/isaexec
 hardlink path=usr/bin/touch target=../../usr/bin/settime
-hardlink path=usr/bin/uptime target=../../usr/lib/isaexec
+hardlink path=usr/bin/uptime target=w
 hardlink path=usr/bin/vedit target=../has/bin/edit
-hardlink path=usr/bin/w target=../../usr/lib/isaexec
 hardlink path=usr/has/bin/ex target=edit
 hardlink path=usr/has/bin/pfsh target=../../bin/pfexec
 hardlink path=usr/has/bin/vedit target=edit
