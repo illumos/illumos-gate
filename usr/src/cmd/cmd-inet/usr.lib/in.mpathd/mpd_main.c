@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include "mpd_defs.h"
@@ -582,7 +584,7 @@ select_test_ifs(void)
 	struct phyint_instance	*pii;
 	struct phyint_instance	*next_pii;
 	struct logint		*li;
-	struct logint  		*probe_logint;
+	struct logint		*probe_logint;
 	boolean_t		target_scan_reqd = _B_FALSE;
 	int			rating;
 
@@ -793,7 +795,7 @@ static void
 check_testconfig(void)
 {
 	struct phyint	*pi;
-	struct logint  	*li;
+	struct logint	*li;
 	char		abuf[INET6_ADDRSTRLEN];
 	int		pri;
 
@@ -2524,11 +2526,12 @@ process_query(int fd, mi_query_t *miq)
 		if (retval != IPMP_SUCCESS)
 			goto out;
 
-		retval = ipmp_writetlv(fd, IPMP_SNAP, sizeof (*snap), snap);
+		retval = send_grouplist(fd, snap->sn_grlistp);
 		if (retval != IPMP_SUCCESS)
 			goto out;
 
-		retval = send_grouplist(fd, snap->sn_grlistp);
+		retval = ipmp_writetlv(fd, IPMP_IFCNT, sizeof (uint32_t),
+		    &snap->sn_nif);
 		if (retval != IPMP_SUCCESS)
 			goto out;
 
@@ -2539,12 +2542,22 @@ process_query(int fd, mi_query_t *miq)
 				goto out;
 		}
 
+		retval = ipmp_writetlv(fd, IPMP_GROUPCNT, sizeof (uint32_t),
+		    &snap->sn_ngroup);
+		if (retval != IPMP_SUCCESS)
+			goto out;
+
 		grlp = snap->sn_grinfolistp;
 		for (; grlp != NULL; grlp = grlp->grl_next) {
 			retval = send_groupinfo(fd, grlp->grl_grinfop);
 			if (retval != IPMP_SUCCESS)
 				goto out;
 		}
+
+		retval = ipmp_writetlv(fd, IPMP_ADDRCNT, sizeof (uint32_t),
+		    &snap->sn_naddr);
+		if (retval != IPMP_SUCCESS)
+			goto out;
 
 		adlp = snap->sn_adinfolistp;
 		for (; adlp != NULL; adlp = adlp->adl_next) {
@@ -2572,9 +2585,32 @@ send_groupinfo(int fd, ipmp_groupinfo_t *grinfop)
 {
 	ipmp_iflist_t	*iflistp = grinfop->gr_iflistp;
 	ipmp_addrlist_t	*adlistp = grinfop->gr_adlistp;
+	ipmp_groupinfo_xfer_t grxfer;
 	unsigned int	retval;
 
-	retval = ipmp_writetlv(fd, IPMP_GROUPINFO, sizeof (*grinfop), grinfop);
+	/*
+	 * We can't directly transfer an ipmp_groupinfo_t due to the embedded
+	 * pointers to ipmp_iflist_t and ipmp_addr_list_t. Copy the data over
+	 * to a temporary transfer structure that doesn't have these embedded
+	 * pointers.
+	 */
+	memset(&grxfer, 0, sizeof (grxfer));
+
+	grxfer.grx_sig = grinfop->gr_sig;
+	grxfer.grx_state = grinfop->gr_state;
+	grxfer.grx_fdt = grinfop->gr_fdt;
+
+	memcpy(grxfer.grx_name, grinfop->gr_name, sizeof (grxfer.grx_name));
+	memcpy(grxfer.grx_ifname, grinfop->gr_ifname,
+	    sizeof (grxfer.grx_ifname));
+	memcpy(grxfer.grx_m4ifname, grinfop->gr_m4ifname,
+	    sizeof (grxfer.grx_m4ifname));
+	memcpy(grxfer.grx_m6ifname, grinfop->gr_m6ifname,
+	    sizeof (grxfer.grx_m6ifname));
+	memcpy(grxfer.grx_bcifname, grinfop->gr_bcifname,
+	    sizeof (grxfer.grx_bcifname));
+
+	retval = ipmp_writetlv(fd, IPMP_GROUPINFO, sizeof (grxfer), &grxfer);
 	if (retval != IPMP_SUCCESS)
 		return (retval);
 
@@ -2596,9 +2632,35 @@ send_ifinfo(int fd, ipmp_ifinfo_t *ifinfop)
 {
 	ipmp_addrlist_t	*adlist4p = ifinfop->if_targinfo4.it_targlistp;
 	ipmp_addrlist_t	*adlist6p = ifinfop->if_targinfo6.it_targlistp;
+	ipmp_ifinfo_xfer_t ifxfer;
 	unsigned int	retval;
 
-	retval = ipmp_writetlv(fd, IPMP_IFINFO, sizeof (*ifinfop), ifinfop);
+	/*
+	 * We can't directly tranfer an ipmp_ifinfo_t due to the embedded
+	 * ipmp_addrlist_t pointer in if_targinfo_t. Copy the data over to
+	 * a temporary transfer structure that doesn't have that embedded
+	 * pointer.
+	 */
+	memset(&ifxfer, 0, sizeof (ifxfer));
+
+	ifxfer.ifx_state = ifinfop->if_state;
+	ifxfer.ifx_type = ifinfop->if_type;
+	ifxfer.ifx_linkstate = ifinfop->if_linkstate;
+	ifxfer.ifx_probestate = ifinfop->if_probestate;
+	ifxfer.ifx_flags = ifinfop->if_flags;
+	ifxfer.ifx_targinfo4.itx_testaddr = ifinfop->if_targinfo4.it_testaddr;
+	ifxfer.ifx_targinfo4.itx_targmode = ifinfop->if_targinfo4.it_targmode;
+	ifxfer.ifx_targinfo6.itx_testaddr = ifinfop->if_targinfo6.it_testaddr;
+	ifxfer.ifx_targinfo6.itx_targmode = ifinfop->if_targinfo6.it_targmode;
+
+	memcpy(ifxfer.ifx_name, ifinfop->if_name, sizeof (ifxfer.ifx_name));
+	memcpy(ifxfer.ifx_group, ifinfop->if_group, sizeof (ifxfer.ifx_group));
+	memcpy(ifxfer.ifx_targinfo4.itx_name, ifinfop->if_targinfo4.it_name,
+	    sizeof (ifxfer.ifx_targinfo4.itx_name));
+	memcpy(ifxfer.ifx_targinfo6.itx_name, ifinfop->if_targinfo6.it_name,
+	    sizeof (ifxfer.ifx_targinfo6.itx_name));
+
+	retval = ipmp_writetlv(fd, IPMP_IFINFO, sizeof (ifxfer), &ifxfer);
 	if (retval != IPMP_SUCCESS)
 		return (retval);
 
@@ -2701,7 +2763,6 @@ daemonize(void)
  */
 static int
 closefunc(void *not_used, int fd)
-/* ARGSUSED */
 {
 	if (fd != lsock_v4 && fd != lsock_v6)
 		(void) close(fd);

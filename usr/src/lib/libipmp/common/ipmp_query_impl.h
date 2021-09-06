@@ -20,6 +20,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _IPMP_QUERY_IMPL_H
@@ -69,9 +71,9 @@ typedef struct ipmp_snap {
 	ipmp_groupinfolist_t	*sn_grinfolistp;
 	ipmp_ifinfolist_t	*sn_ifinfolistp;
 	ipmp_addrinfolist_t	*sn_adinfolistp;
-	unsigned int		sn_ngroup;
-	unsigned int		sn_nif;
-	unsigned int		sn_naddr;
+	uint32_t		sn_ngroup;
+	uint32_t		sn_nif;
+	uint32_t		sn_naddr;
 } ipmp_snap_t;
 
 /*

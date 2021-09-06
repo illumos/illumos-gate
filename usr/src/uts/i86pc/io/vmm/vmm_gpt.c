@@ -359,12 +359,12 @@ vmm_gpt_populate_entry(vmm_gpt_t *gpt, uint64_t gpa)
 
 /*
  * Ensures that PTEs for the region of address space bounded by
- * [start, end] exist in the tree.
+ * [start, end) exist in the tree.
  */
 void
 vmm_gpt_populate_region(vmm_gpt_t *gpt, uint64_t start, uint64_t end)
 {
-	for (uint64_t page = start; page <= end; page += PAGESIZE) {
+	for (uint64_t page = start; page < end; page += PAGESIZE) {
 		vmm_gpt_populate_entry(gpt, page);
 	}
 }
@@ -451,13 +451,13 @@ vmm_gpt_vacate_entry(vmm_gpt_t *gpt, uint64_t gpa)
 
 /*
  * Cleans up the unused inner nodes in the GPT for a region of guest
- * physical address space bounded by `start` and `end`.  The region
- * must map no pages.
+ * physical address space bounded by [start..end).  The region must
+ * map no pages.
  */
 void
 vmm_gpt_vacate_region(vmm_gpt_t *gpt, uint64_t start, uint64_t end)
 {
-	for (uint64_t page = start; page <= end; page += PAGESIZE) {
+	for (uint64_t page = start; page < end; page += PAGESIZE) {
 		vmm_gpt_vacate_entry(gpt, page);
 	}
 }
@@ -488,14 +488,14 @@ vmm_gpt_unmap(vmm_gpt_t *gpt, uint64_t gpa)
 
 /*
  * Un-maps the region of guest physical address space bounded by
- * start and end.  Returns the number of pages that are unmapped.
+ * [start..end).  Returns the number of pages that are unmapped.
  */
 size_t
 vmm_gpt_unmap_region(vmm_gpt_t *gpt, uint64_t start, uint64_t end)
 {
 	size_t n = 0;
 
-	for (uint64_t page = start; page <= end; page += PAGESIZE) {
+	for (uint64_t page = start; page < end; page += PAGESIZE) {
 		if (vmm_gpt_unmap(gpt, page) != 0)
 			n++;
 	}

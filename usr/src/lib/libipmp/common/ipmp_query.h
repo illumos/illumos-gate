@@ -20,6 +20,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _IPMP_QUERY_H
@@ -60,7 +62,7 @@ typedef enum ipmp_if_linkstate {
 typedef enum ipmp_if_flags {
 	IPMP_IFFLAG_INACTIVE	= 0x1,
 	IPMP_IFFLAG_HWADDRDUP	= 0x2,
-	IPMP_IFFLAG_ACTIVE 	= 0x4,
+	IPMP_IFFLAG_ACTIVE	= 0x4,
 	IPMP_IFFLAG_DOWN	= 0x8
 } ipmp_if_flags_t;
 
@@ -84,6 +86,7 @@ typedef enum ipmp_if_targmode {
 typedef struct ipmp_grouplist {
 	uint64_t	gl_sig;
 	unsigned int	gl_ngroup;
+	uint32_t	gl_pad;
 	char		gl_groups[1][LIFGRNAMSIZ];
 } ipmp_grouplist_t;
 
@@ -106,6 +109,7 @@ typedef struct ipmp_iflist {
  */
 typedef struct ipmp_addrlist {
 	unsigned int		al_naddr;
+	uint32_t		al_pad;
 	struct sockaddr_storage al_addrs[1];
 } ipmp_addrlist_t;
 
@@ -113,7 +117,8 @@ typedef struct ipmp_addrlist {
 	IPMP_LIST_SIZE(addrlist, sizeof (struct sockaddr_storage), naddr)
 
 /*
- * Data type describing the state of an IPMP group.
+ * Data type describing the state of an IPMP group, and a subset data type
+ * used for communication between libipmp and in.mpathd.
  */
 typedef struct ipmp_groupinfo {
 	char			gr_name[LIFGRNAMSIZ];
@@ -128,8 +133,20 @@ typedef struct ipmp_groupinfo {
 	unsigned int		gr_fdt;
 } ipmp_groupinfo_t;
 
+typedef struct ipmp_groupinfo_xfer {
+	char			grx_name[LIFGRNAMSIZ];
+	uint64_t		grx_sig;
+	ipmp_group_state_t	grx_state;
+	char			grx_ifname[LIFNAMSIZ];
+	char			grx_m4ifname[LIFNAMSIZ];
+	char			grx_m6ifname[LIFNAMSIZ];
+	char			grx_bcifname[LIFNAMSIZ];
+	unsigned int		grx_fdt;
+} ipmp_groupinfo_xfer_t;
+
 /*
- * Data type describing IPMP target information for a particular interface.
+ * Data type describing IPMP target information for a particular interface,
+ * and a subset data type used for communication between libipmp and in.mpathd.
  */
 typedef struct ipmp_targinfo {
 	char			it_name[LIFNAMSIZ];
@@ -138,8 +155,17 @@ typedef struct ipmp_targinfo {
 	ipmp_addrlist_t		*it_targlistp;
 } ipmp_targinfo_t;
 
+typedef struct ipmp_targinfo_xfer {
+	char			itx_name[LIFNAMSIZ];
+	struct sockaddr_storage	itx_testaddr;
+	ipmp_if_targmode_t	itx_targmode;
+	uint32_t		itx_pad;
+} ipmp_targinfo_xfer_t;
+
+
 /*
- * Data type describing the IPMP-related state of an interface.
+ * Data type describing the IPMP-related state of an interface, and a subset
+ * data type used for communication between libipmp and in.mpathd.
  */
 typedef struct ipmp_ifinfo {
 	char			if_name[LIFNAMSIZ];
@@ -153,6 +179,20 @@ typedef struct ipmp_ifinfo {
 	ipmp_targinfo_t		if_targinfo6;
 } ipmp_ifinfo_t;
 
+typedef struct ipmp_ifinfo_xfer {
+	char			ifx_name[LIFNAMSIZ];
+	char			ifx_group[LIFGRNAMSIZ];
+	ipmp_if_state_t		ifx_state;
+	ipmp_if_type_t		ifx_type;
+	ipmp_if_linkstate_t	ifx_linkstate;
+	ipmp_if_probestate_t	ifx_probestate;
+	ipmp_if_flags_t		ifx_flags;
+	uint32_t		ifx_pad;
+	ipmp_targinfo_xfer_t	ifx_targinfo4;
+	ipmp_targinfo_xfer_t	ifx_targinfo6;
+} ipmp_ifinfo_xfer_t;
+
+
 /*
  * Data type describing an IPMP data address.
  */
@@ -161,6 +201,7 @@ typedef struct ipmp_addrinfo {
 	ipmp_addr_state_t	ad_state;
 	char			ad_group[LIFGRNAMSIZ];
 	char			ad_binding[LIFNAMSIZ];
+	uint32_t		ad_pad;
 } ipmp_addrinfo_t;
 
 typedef enum {
