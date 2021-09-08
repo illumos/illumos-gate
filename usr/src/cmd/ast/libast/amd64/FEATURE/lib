@@ -124,7 +124,6 @@
 #define _mem_dd_fd_DIR	1	/* dd_fd is a member of DIR */
 #define _sys_filio	1	/* #include <sys/filio.h> ok */
 #define _sys_jioctl	1	/* #include <sys/jioctl.h> ok */
-#define _sys_localedef	1	/* #include <sys/localedef.h> ok */
 #define _sys_resource	1	/* #include <sys/resource.h> ok */
 #define _sys_socket	1	/* #include <sys/socket.h> ok */
 #define _sys_stream	1	/* #include <sys/stream.h> ok */

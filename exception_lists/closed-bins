@@ -65,6 +65,8 @@
 ./usr/has/bin
 ./usr/has/bin/patch
 ./usr/include/sys/agp
+./usr/include/sys/lc_core.h
+./usr/include/sys/localedef.h
 ./usr/include/sys/lvm
 ./usr/include/sys/pcmcia
 ./usr/include/sys/usb/clients/hwarc

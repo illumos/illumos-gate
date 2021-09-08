@@ -215,6 +215,8 @@ typedef struct ds_port {
 
 typedef ulong_t ds_portset_t[DS_PORTSET_SIZE];
 
+extern ds_port_t ds_ports[DS_MAX_PORTS];
+extern ds_portset_t ds_allports;
 extern ds_portset_t ds_nullport;
 
 #define	DS_PORTID_INVALID		((uint64_t)-1)
@@ -339,6 +341,8 @@ typedef struct ds_svcs {
 
 /* enable/disable taskq processing */
 extern boolean_t ds_enabled;
+
+extern ds_svcs_t ds_svcs;
 
 /*
  * DS Message Logging

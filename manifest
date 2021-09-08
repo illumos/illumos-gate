@@ -1309,6 +1309,8 @@ f lib/amd64/libintl.so.1 0755 root bin
 s lib/amd64/libintl.so=libintl.so.1
 f lib/amd64/libipadm.so.1 0755 root bin
 s lib/amd64/libipadm.so=libipadm.so.1
+f lib/amd64/libipmp.so.1 0755 root bin
+s lib/amd64/libipmp.so=libipmp.so.1
 f lib/amd64/libkmf.so.1 0755 root bin
 s lib/amd64/libkmf.so=libkmf.so.1
 f lib/amd64/libkmfberder.so.1 0755 root bin
@@ -4429,7 +4431,6 @@ f usr/include/sys/kstat.h 0644 root bin
 f usr/include/sys/kstr.h 0644 root bin
 f usr/include/sys/ksyms.h 0644 root bin
 f usr/include/sys/ksynch.h 0644 root bin
-f usr/include/sys/lc_core.h 0644 root bin
 f usr/include/sys/ldterm.h 0644 root bin
 f usr/include/sys/lgrp.h 0644 root bin
 f usr/include/sys/lgrp_user.h 0644 root bin
@@ -4442,7 +4443,6 @@ f usr/include/sys/list.h 0644 root bin
 f usr/include/sys/list_impl.h 0644 root bin
 f usr/include/sys/llc1.h 0644 root bin
 f usr/include/sys/loadavg.h 0644 root bin
-f usr/include/sys/localedef.h 0644 root bin
 f usr/include/sys/lock.h 0644 root bin
 f usr/include/sys/lockfs.h 0644 root bin
 f usr/include/sys/lockstat.h 0644 root bin
@@ -5309,6 +5309,8 @@ f usr/lib/amd64/libipd.so.1 0755 root bin
 s usr/lib/amd64/libipd.so=libipd.so.1
 f usr/lib/amd64/libipmi.so.1 0755 root bin
 s usr/lib/amd64/libipmi.so=libipmi.so.1
+f usr/lib/amd64/libipmp.so.1 0755 root bin
+s usr/lib/amd64/libipmp.so=libipmp.so.1
 f usr/lib/amd64/libipp.so.1 0755 root bin
 s usr/lib/amd64/libipp.so=libipp.so.1
 f usr/lib/amd64/libipsecutil.so.1 0755 root bin

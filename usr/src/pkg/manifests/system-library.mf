@@ -211,6 +211,7 @@ file path=lib/$(ARCH64)/libgen.so.1
 file path=lib/$(ARCH64)/libinetutil.so.1
 file path=lib/$(ARCH64)/libintl.so.1
 file path=lib/$(ARCH64)/libipadm.so.1
+file path=lib/$(ARCH64)/libipmp.so.1
 file path=lib/$(ARCH64)/libkmf.so.1
 file path=lib/$(ARCH64)/libkmfberder.so.1
 file path=lib/$(ARCH64)/libkstat.so.1
@@ -633,6 +634,7 @@ link path=lib/$(ARCH64)/libelf.so target=libelf.so.1
 $(i386_ONLY)link path=lib/$(ARCH64)/libfdisk.so target=libfdisk.so.1
 link path=lib/$(ARCH64)/libgen.so target=libgen.so.1
 link path=lib/$(ARCH64)/libintl.so target=libintl.so.1
+link path=lib/$(ARCH64)/libipmp.so target=libipmp.so.1
 link path=lib/$(ARCH64)/libkmf.so target=libkmf.so.1
 link path=lib/$(ARCH64)/libkmfberder.so target=libkmfberder.so.1
 link path=lib/$(ARCH64)/libkstat.so target=libkstat.so.1

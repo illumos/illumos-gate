@@ -55,27 +55,6 @@
 #include <sys/ds_impl.h>
 
 /*
- * All DS ports in the system
- *
- * The list of DS ports is read in from the MD when the DS module is
- * initialized and is never modified. This eliminates the need for
- * locking to access the port array itself. Access to the individual
- * ports are synchronized at the port level.
- */
-ds_port_t	ds_ports[DS_MAX_PORTS];
-ds_portset_t	ds_allports;	/* all DS ports in the system */
-
-/*
- * Table of registered services
- *
- * Locking: Accesses to the table of services are synchronized using
- *   a mutex lock. The reader lock must be held when looking up service
- *   information in the table. The writer lock must be held when any
- *   service information is being modified.
- */
-ds_svcs_t	ds_svcs;
-
-/*
  * Taskq for internal task processing
  */
 static taskq_t *ds_taskq;
