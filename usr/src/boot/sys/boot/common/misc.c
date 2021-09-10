@@ -25,11 +25,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <string.h>
 #include <stand.h>
 #include <bootstrap.h>
+#ifndef BOOT2
+#include <machine/cpufunc.h>
+#include "ficl.h"
+#endif
 
 /*
  * Concatenate the (argc) elements of (argv) into a single string, and return
@@ -55,7 +57,7 @@ unargv(int argc, char *argv[])
 	if (i < (argc - 1))
 	  strcat(cp, " ");
     }
-	  
+
     return(cp);
 }
 
@@ -67,7 +69,7 @@ strlenout(vm_offset_t src)
 {
     char	c;
     size_t	len;
-    
+
     for (len = 0; ; len++) {
 	archsw.arch_copyout(src++, &c, 1);
 	if (c == 0)
@@ -83,7 +85,7 @@ char *
 strdupout(vm_offset_t str)
 {
     char	*result, *cp;
-    
+
     result = malloc(strlenout(str) + 1);
     for (cp = result; ;cp++) {
 	archsw.arch_copyout(str++, cp, 1);
@@ -181,7 +183,7 @@ hexdump(caddr_t region, size_t len)
     pager_open();
     for (line = region; line < (region + len); line += 16) {
 	emit("%08lx  ", (long) line);
-	
+
 	for (x = 0; x < 16; x++) {
 	    if ((line + x) < (region + len)) {
 		emit("%02x ", *(u_int8_t *)(line + x));
@@ -217,3 +219,50 @@ dev_cleanup(void)
 	if (devsw[i]->dv_cleanup != NULL)
 	    (devsw[i]->dv_cleanup)();
 }
+
+#ifndef BOOT2
+/*
+ * outb ( port# c -- )
+ * Store a byte to I/O port number port#
+ */
+static void
+ficlOutb(ficlVm *pVM)
+{
+	uint8_t c;
+	uint32_t port;
+
+	port = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
+	c = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	outb(port, c);
+}
+
+/*
+ * inb ( port# -- c )
+ * Fetch a byte from I/O port number port#
+ */
+static void
+ficlInb(ficlVm *pVM)
+{
+	uint8_t c;
+	uint32_t port;
+
+	port = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
+	c = inb(port);
+	ficlStackPushInteger(ficlVmGetDataStack(pVM), c);
+}
+
+static void
+ficlCompileCpufunc(ficlSystem *pSys)
+{
+	ficlDictionary *dp = ficlSystemGetDictionary(pSys);
+
+	FICL_SYSTEM_ASSERT(pSys, dp);
+
+	(void) ficlDictionarySetPrimitive(dp, "outb", ficlOutb,
+	    FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dp, "inb", ficlInb,
+	    FICL_WORD_DEFAULT);
+}
+
+FICL_COMPILE_SET(ficlCompileCpufunc);
+#endif
