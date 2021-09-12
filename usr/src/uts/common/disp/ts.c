@@ -51,7 +51,6 @@
 #include <sys/vtrace.h>
 #include <sys/vmsystm.h>
 #include <sys/schedctl.h>
-#include <sys/tnf_probe.h>
 #include <sys/atomic.h>
 #include <sys/policy.h>
 #include <sys/sdt.h>
@@ -1425,9 +1424,6 @@ ts_preempt(kthread_t *t)
 			}
 			schedctl_set_nopreempt(t, 0);
 			DTRACE_SCHED1(schedctl__preempt, kthread_t *, t);
-			TNF_PROBE_2(schedctl_preempt, "schedctl TS ts_preempt",
-			    /* CSTYLED */, tnf_pid, pid, ttoproc(t)->p_pid,
-			    tnf_lwpid, lwpid, t->t_tid);
 			/*
 			 * Fall through and be preempted below.
 			 */
@@ -1689,10 +1685,6 @@ ts_tick(kthread_t *t)
 
 			DTRACE_SCHED1(schedctl__failsafe,
 			    kthread_t *, t);
-			TNF_PROBE_2(schedctl_failsafe,
-			    "schedctl TS ts_tick", /* CSTYLED */,
-			    tnf_pid, pid, ttoproc(t)->p_pid,
-			    tnf_lwpid, lwpid, t->t_tid);
 		}
 		tspp->ts_flags &= ~TSRESTORE;
 		tspp->ts_cpupri = ts_dptbl[tspp->ts_cpupri].ts_tqexp;

@@ -82,7 +82,7 @@ struct proginfo {
 #define	KOBJ_INTERP	0x0008	/* the interpreter module */
 #define	KOBJ_PRIM	0x0010	/* a primary kernel module */
 #define	KOBJ_RESOLVED	0x0020	/* fully resolved */
-#define	KOBJ_TNF_PROBE	0x0040	/* Contains TNF probe(s) */
+/*			0x0040	unused. */
 #define	KOBJ_RELOCATED	0x0080	/* relocation completed */
 #define	KOBJ_NOPARENTS	0x0200	/* nothing can depend on this module */
 #define	KOBJ_IGNMULDEF	0x0400	/* ignore dups during sym resolution */

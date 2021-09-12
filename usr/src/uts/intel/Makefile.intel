@@ -336,7 +336,6 @@ DRV_KMODS	+= tcp
 DRV_KMODS	+= tcp6
 DRV_KMODS	+= timerfd
 DRV_KMODS	+= tl
-DRV_KMODS	+= tnf
 DRV_KMODS	+= tpm
 DRV_KMODS	+= trill
 DRV_KMODS	+= udp

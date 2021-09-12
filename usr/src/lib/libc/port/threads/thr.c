@@ -1215,11 +1215,6 @@ set_thread_vars()
 	}
 }
 
-/* PROBE_SUPPORT begin */
-#pragma weak __tnf_probe_notify
-extern void __tnf_probe_notify(void);
-/* PROBE_SUPPORT end */
-
 /* same as atexit() but private to the library */
 extern int _atexit(void (*)(void));
 
@@ -1528,11 +1523,6 @@ libc_init(void)
 	 */
 	libc__xpg4 = __xpg4;
 	libc__xpg6 = __xpg6;
-
-	/* PROBE_SUPPORT begin */
-	if (self->ul_primarymap && __tnf_probe_notify != NULL)
-		__tnf_probe_notify();
-	/* PROBE_SUPPORT end */
 
 	init_sigev_thread();
 	init_aio();

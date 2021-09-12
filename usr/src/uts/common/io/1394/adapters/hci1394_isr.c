@@ -62,18 +62,11 @@ hci1394_isr_init(hci1394_state_t *soft_state)
 {
 	int status;
 
-
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_init_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* This driver does not support running at a high level interrupt */
 	status = ddi_intr_hilevel(soft_state->drvinfo.di_dip, 0);
 	if (status != 0) {
-		TNF_PROBE_1(hci1394_isr_init_hli_fail,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_string, errmsg,
-		    "High Level interrupts not supported");
-		TNF_PROBE_0_DEBUG(hci1394_isr_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -81,14 +74,8 @@ hci1394_isr_init(hci1394_state_t *soft_state)
 	status = ddi_get_iblock_cookie(soft_state->drvinfo.di_dip, 0,
 	    &soft_state->drvinfo.di_iblock_cookie);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_isr_init_gic_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_isr_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_isr_init_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -103,11 +90,8 @@ void
 hci1394_isr_fini(hci1394_state_t *soft_state)
 {
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_fini_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* nothing to do right now */
-
-	TNF_PROBE_0_DEBUG(hci1394_isr_fini_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -125,13 +109,7 @@ hci1394_isr_handler_init(hci1394_state_t *soft_state)
 	/* Initialize interrupt handler */
 	status = ddi_add_intr(soft_state->drvinfo.di_dip, 0, NULL, NULL,
 	    hci1394_isr, (caddr_t)soft_state);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_isr_handler_init_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		return (DDI_FAILURE);
-	}
-
-	return (DDI_SUCCESS);
+	return (status);
 }
 
 
@@ -159,8 +137,6 @@ void
 hci1394_isr_mask_setup(hci1394_state_t *soft_state)
 {
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_mask_setup_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	/* start off with all interrupts cleared/disabled */
 	hci1394_ohci_ir_intr_disable(soft_state->ohci, 0xFFFFFFFF);
@@ -178,9 +154,6 @@ hci1394_isr_mask_setup(hci1394_state_t *soft_state)
 	    OHCI_INTR_RQPKT | OHCI_INTR_RSPKT | OHCI_INTR_ISOCH_TX |
 	    OHCI_INTR_ISOCH_RX | OHCI_INTR_POST_WR_ERR | OHCI_INTR_PHY |
 	    OHCI_INTR_LOCK_RESP_ERR));
-
-	TNF_PROBE_0_DEBUG(hci1394_isr_mask_setup_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -205,7 +178,6 @@ hci1394_isr(caddr_t parm)
 	soft_state = (hci1394_state_t *)parm;
 
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_enter, HCI1394_TNF_HAL_STACK, "");
 
 	if (hci1394_state(&soft_state->drvinfo) == HCI1394_SHUTDOWN)
 		return (DDI_INTR_UNCLAIMED);
@@ -317,8 +289,6 @@ hci1394_isr(caddr_t parm)
 		    HCI1394_BUS_RESET)) {
 			if (soft_state->drvinfo.di_gencnt !=
 			    hci1394_ohci_current_busgen(soft_state->ohci)) {
-				TNF_PROBE_0(hci1394_isr_busgen_claim,
-				    HCI1394_TNF_HAL, "");
 				status = DDI_INTR_CLAIMED;
 			}
 		}
@@ -330,8 +300,6 @@ hci1394_isr(caddr_t parm)
 		interrupt_event = hci1394_ohci_intr_asserted(
 		    soft_state->ohci);
 	} while (interrupt_event != 0);
-
-	TNF_PROBE_0_DEBUG(hci1394_isr_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (status);
 }
@@ -350,8 +318,6 @@ hci1394_isr_bus_reset(hci1394_state_t *soft_state)
 
 
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_bus_reset_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Set the driver state to reset.  If we cannot, we have been shutdown.
@@ -393,9 +359,6 @@ hci1394_isr_bus_reset(hci1394_state_t *soft_state)
 	/* Inform Services Layer about Bus Reset */
 	h1394_bus_reset(soft_state->drvinfo.di_sl_private,
 	    (void **)&soft_state->sl_selfid_buf);
-
-	TNF_PROBE_0_DEBUG(hci1394_isr_bus_reset_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -421,7 +384,6 @@ hci1394_isr_self_id(hci1394_state_t *soft_state)
 
 
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_self_id_enter, HCI1394_TNF_HAL_STACK, "");
 
 	soft_state->drvinfo.di_stats.st_selfid_count++;
 
@@ -441,18 +403,12 @@ hci1394_isr_self_id(hci1394_state_t *soft_state)
 	 * interrupt every bus reset.
 	 */
 	status = hci1394_ohci_phy_read(soft_state->ohci, 5, &phy_status);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_isr_self_id_pr_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-	} else {
+	if (status == DDI_SUCCESS) {
 		phy_status |= OHCI_PHY_LOOP_ERR | OHCI_PHY_PWRFAIL_ERR |
 		    OHCI_PHY_TIMEOUT_ERR | OHCI_PHY_PORTEVT_ERR;
 		status = hci1394_ohci_phy_write(soft_state->ohci, 5,
 		    phy_status);
-		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_isr_self_id_pw_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-		} else {
+		if (status == DDI_SUCCESS) {
 			/*
 			 * Re-enable PHY interrupt. We disable the PHY interrupt
 			 *  when we get one so that we do not get stuck in the
@@ -465,8 +421,6 @@ hci1394_isr_self_id(hci1394_state_t *soft_state)
 
 	/* See if either AT active bit is set */
 	if (hci1394_ohci_at_active(soft_state->ohci) == B_TRUE) {
-		TNF_PROBE_1(hci1394_isr_self_id_as_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "AT ACTIVE still set");
 		saw_error = B_TRUE;
 	}
 
@@ -477,8 +431,6 @@ hci1394_isr_self_id(hci1394_state_t *soft_state)
 	/* Read node info and test for Invalid Node ID */
 	hci1394_ohci_nodeid_info(soft_state->ohci, &node_id, &nodeid_error);
 	if (nodeid_error == B_TRUE) {
-		TNF_PROBE_1(hci1394_isr_self_id_ni_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "saw invalid NodeID");
 		saw_error = B_TRUE;
 	}
 
@@ -491,8 +443,6 @@ hci1394_isr_self_id(hci1394_state_t *soft_state)
 
 	/* Test for selfid error */
 	if (selfid_error == B_TRUE) {
-		TNF_PROBE_1(hci1394_isr_self_id_si_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "saw invalid SelfID");
 		saw_error = B_TRUE;
 	}
 
@@ -501,8 +451,6 @@ hci1394_isr_self_id(hci1394_state_t *soft_state)
 	 * we should have another selfid int coming later.
 	 */
 	if ((saw_error == B_FALSE) && (selfid_size == 0)) {
-		TNF_PROBE_0_DEBUG(hci1394_isr_self_id_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return;
 	}
 
@@ -511,8 +459,6 @@ hci1394_isr_self_id(hci1394_state_t *soft_state)
 	 * count in register.
 	 */
 	if (hci1394_ohci_selfid_buf_current(soft_state->ohci) == B_FALSE) {
-		TNF_PROBE_0_DEBUG(hci1394_isr_self_id_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return;
 	}
 
@@ -544,8 +490,6 @@ hci1394_isr_self_id(hci1394_state_t *soft_state)
 			 * If we fail reading from PHY, put invalid data into
 			 * the selfid buffer so the SL will reset the bus again.
 			 */
-			TNF_PROBE_0(hci1394_isr_self_id_pi_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
 			selfid_buf_p[0] = 0xFFFFFFFF;
 			selfid_buf_p[1] = 0xFFFFFFFF;
 		} else {
@@ -564,8 +508,6 @@ hci1394_isr_self_id(hci1394_state_t *soft_state)
 	 */
 	if (soft_state->drvinfo.di_gencnt !=
 	    hci1394_ohci_current_busgen(soft_state->ohci)) {
-		TNF_PROBE_0_DEBUG(hci1394_isr_self_id_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return;
 	}
 
@@ -642,8 +584,6 @@ hci1394_isr_self_id(hci1394_state_t *soft_state)
 
 	/* enable bus reset interrupt */
 	hci1394_ohci_intr_enable(soft_state->ohci, OHCI_INTR_BUS_RESET);
-
-	TNF_PROBE_0_DEBUG(hci1394_isr_self_id_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -664,8 +604,6 @@ hci1394_isr_isoch_ir(hci1394_state_t *soft_state)
 
 
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_isoch_ir_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	num_ir_contexts = hci1394_isoch_recv_count_get(soft_state->isoch);
 
@@ -694,7 +632,6 @@ hci1394_isr_isoch_ir(hci1394_state_t *soft_state)
 			mask <<= 1;
 		}
 	}
-	TNF_PROBE_0_DEBUG(hci1394_isr_isoch_ir_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -715,8 +652,6 @@ hci1394_isr_isoch_it(hci1394_state_t *soft_state)
 
 
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_isoch_it_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	num_it_contexts = hci1394_isoch_xmit_count_get(soft_state->isoch);
 
@@ -746,7 +681,6 @@ hci1394_isr_isoch_it(hci1394_state_t *soft_state)
 			mask <<= 1;
 		}
 	}
-	TNF_PROBE_0_DEBUG(hci1394_isr_isoch_it_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -759,12 +693,8 @@ static void
 hci1394_isr_atreq_complete(hci1394_state_t *soft_state)
 {
 	boolean_t request_available;
-	int status;
-
 
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_atreq_complete_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	hci1394_ohci_intr_clear(soft_state->ohci, OHCI_INTR_REQ_TX_CMPLT);
 
@@ -778,16 +708,9 @@ hci1394_isr_atreq_complete(hci1394_state_t *soft_state)
 		 * Process a single request. Do not flush Q. That is only
 		 * done during bus reset processing.
 		 */
-		status = hci1394_async_atreq_process(soft_state->async, B_FALSE,
+		(void) hci1394_async_atreq_process(soft_state->async, B_FALSE,
 		    &request_available);
-		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_isr_atreq_complete_pr_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-		}
 	} while (request_available == B_TRUE);
-
-	TNF_PROBE_0_DEBUG(hci1394_isr_atreq_complete_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -802,11 +725,8 @@ static void
 hci1394_isr_arresp(hci1394_state_t *soft_state)
 {
 	boolean_t response_available;
-	int status;
-
 
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_arresp_enter, HCI1394_TNF_HAL_STACK, "");
 
 	hci1394_ohci_intr_clear(soft_state->ohci, OHCI_INTR_RSPKT);
 
@@ -820,15 +740,9 @@ hci1394_isr_arresp(hci1394_state_t *soft_state)
 	 * would still be pending.
 	 */
 	do {
-		status = hci1394_async_arresp_process(soft_state->async,
+		(void) hci1394_async_arresp_process(soft_state->async,
 		    &response_available);
-		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_isr_arresp_pr_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-		}
 	} while (response_available == B_TRUE);
-
-	TNF_PROBE_0_DEBUG(hci1394_isr_arresp_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -841,11 +755,8 @@ static void
 hci1394_isr_arreq(hci1394_state_t *soft_state)
 {
 	boolean_t request_available;
-	int status;
-
 
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_arreq_enter, HCI1394_TNF_HAL_STACK, "");
 
 	hci1394_ohci_intr_clear(soft_state->ohci, OHCI_INTR_RQPKT);
 
@@ -857,15 +768,9 @@ hci1394_isr_arreq(hci1394_state_t *soft_state)
 	 * and processed it. The interrupt would still be pending.
 	 */
 	do {
-		status = hci1394_async_arreq_process(soft_state->async,
+		(void) hci1394_async_arreq_process(soft_state->async,
 		    &request_available);
-		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_isr_arreq_pr_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-		}
 	} while (request_available == B_TRUE);
-
-	TNF_PROBE_0_DEBUG(hci1394_isr_arreq_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -881,12 +786,8 @@ static void
 hci1394_isr_atresp_complete(hci1394_state_t *soft_state)
 {
 	boolean_t response_available;
-	int status;
-
 
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isr_atresp_complete_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	hci1394_ohci_intr_clear(soft_state->ohci, OHCI_INTR_RESP_TX_CMPLT);
 
@@ -902,14 +803,7 @@ hci1394_isr_atresp_complete(hci1394_state_t *soft_state)
 		 * Process a single response. Do not flush Q. That is only
 		 * done during bus reset processing.
 		 */
-		status = hci1394_async_atresp_process(soft_state->async,
+		(void) hci1394_async_atresp_process(soft_state->async,
 		    B_FALSE, &response_available);
-		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_isr_atresp_complete_pr_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-		}
 	} while (response_available == B_TRUE);
-
-	TNF_PROBE_0_DEBUG(hci1394_isr_atresp_complete_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }

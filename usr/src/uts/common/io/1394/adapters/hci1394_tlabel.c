@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_tlabel.h
  *   These routines track the tlabel usage for a 1394 adapter.
@@ -56,7 +54,6 @@ hci1394_tlabel_init(hci1394_drvinfo_t *drvinfo, hrtime_t reclaim_time_nS,
 
 
 	ASSERT(tlabel_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_init_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* alloc space for tlabel data */
 	tstruct = kmem_alloc(sizeof (hci1394_tlabel_t), KM_SLEEP);
@@ -84,8 +81,6 @@ hci1394_tlabel_init(hci1394_drvinfo_t *drvinfo, hrtime_t reclaim_time_nS,
 	 * initialization)
 	 */
 	hci1394_tlabel_reset(tstruct);
-
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_init_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -102,7 +97,6 @@ hci1394_tlabel_fini(hci1394_tlabel_handle_t *tlabel_handle)
 
 
 	ASSERT(tlabel_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_fini_enter, HCI1394_TNF_HAL_STACK, "");
 
 	tstruct = (hci1394_tlabel_t *)*tlabel_handle;
 
@@ -111,8 +105,6 @@ hci1394_tlabel_fini(hci1394_tlabel_handle_t *tlabel_handle)
 
 	/* set handle to null.  This helps catch bugs. */
 	*tlabel_handle = NULL;
-
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_fini_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -136,8 +128,6 @@ hci1394_tlabel_alloc(hci1394_tlabel_handle_t tlabel_handle, uint_t destination,
 
 	ASSERT(tlabel_handle != NULL);
 	ASSERT(tlabel_info != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_alloc_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* copy destination into tlabel_info */
 	tlabel_info->tbi_destination = destination;
@@ -178,10 +168,6 @@ hci1394_tlabel_alloc(hci1394_tlabel_handle_t tlabel_handle, uint_t destination,
 
 			/* clear the bad list */
 			bad = 0;
-
-			TNF_PROBE_1(hci1394_tlabel_free_bad,
-			    HCI1394_TNF_HAL_ERROR, "", tnf_uint, nodeid,
-			    node_number);
 		}
 	}
 
@@ -197,11 +183,6 @@ hci1394_tlabel_alloc(hci1394_tlabel_handle_t tlabel_handle, uint_t destination,
 		if ((free & ((uint64_t)1 << last)) != 0) {
 			/* we are using this tlabel */
 			tlabel_info->tbi_tlabel = last;
-
-			TNF_PROBE_2_DEBUG(hci1394_tlabel_alloc,
-			    HCI1394_TNF_HAL_TLABEL, "", tnf_uint, nodeid,
-			    node_number, tnf_uint, alloced_tlabel,
-			    tlabel_info->tbi_tlabel);
 
 			/* take it out of the free list */
 			free = free & ~((uint64_t)1 << last);
@@ -224,9 +205,6 @@ hci1394_tlabel_alloc(hci1394_tlabel_handle_t tlabel_handle, uint_t destination,
 
 			/* unlock the tlabel structure */
 			mutex_exit(&tlabel_handle->tb_mutex);
-
-			TNF_PROBE_0_DEBUG(hci1394_tlabel_alloc_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 
@@ -249,10 +227,6 @@ hci1394_tlabel_alloc(hci1394_tlabel_handle_t tlabel_handle, uint_t destination,
 
 	mutex_exit(&tlabel_handle->tb_mutex);
 
-	TNF_PROBE_1(hci1394_tlabel_alloc_empty, HCI1394_TNF_HAL_ERROR, "",
-	    tnf_string, errmsg, "No more tlabels left to alloc");
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_alloc_exit, HCI1394_TNF_HAL_STACK, "");
-
 	return (DDI_FAILURE);
 }
 
@@ -273,15 +247,10 @@ hci1394_tlabel_free(hci1394_tlabel_handle_t tlabel_handle,
 	ASSERT(tlabel_handle != NULL);
 	ASSERT(tlabel_info != NULL);
 	ASSERT(tlabel_info->tbi_tlabel <= TLABEL_MASK);
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_free_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* figure out what node and tlabel we are using */
 	node_number = IEEE1394_NODE_NUM(tlabel_info->tbi_destination);
 	tlabel = tlabel_info->tbi_tlabel;
-
-	TNF_PROBE_2_DEBUG(hci1394_tlabel_free,
-	    HCI1394_TNF_HAL_TLABEL, "", tnf_uint, nodeid, node_number,
-	    tnf_uint, freed_tlabel, tlabel_info->tbi_tlabel);
 
 	mutex_enter(&tlabel_handle->tb_mutex);
 
@@ -295,8 +264,6 @@ hci1394_tlabel_free(hci1394_tlabel_handle_t tlabel_handle,
 	tlabel_handle->tb_free[node_number] |= ((uint64_t)1 << tlabel);
 
 	mutex_exit(&tlabel_handle->tb_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_free_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -316,8 +283,6 @@ hci1394_tlabel_register(hci1394_tlabel_handle_t tlabel_handle,
 	ASSERT(tlabel_handle != NULL);
 	ASSERT(tlabel_info != NULL);
 	ASSERT(tlabel_info->tbi_tlabel <= TLABEL_MASK);
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_register_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* figure out what node and tlabel we are using */
 	node_number = IEEE1394_NODE_NUM(tlabel_info->tbi_destination);
@@ -329,9 +294,6 @@ hci1394_tlabel_register(hci1394_tlabel_handle_t tlabel_handle,
 	tlabel_handle->tb_lookup[node_number][tlabel] = cmd;
 
 	mutex_exit(&tlabel_handle->tb_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_register_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -353,8 +315,6 @@ hci1394_tlabel_lookup(hci1394_tlabel_handle_t tlabel_handle,
 	ASSERT(tlabel_info != NULL);
 	ASSERT(cmd != NULL);
 	ASSERT(tlabel_info->tbi_tlabel <= TLABEL_MASK);
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_lookup_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* figure out what node and tlabel we are using */
 	node_number = IEEE1394_NODE_NUM(tlabel_info->tbi_destination);
@@ -369,13 +329,6 @@ hci1394_tlabel_lookup(hci1394_tlabel_handle_t tlabel_handle,
 	*cmd = tlabel_handle->tb_lookup[node_number][tlabel];
 
 	mutex_exit(&tlabel_handle->tb_mutex);
-
-	TNF_PROBE_2_DEBUG(hci1394_tlabel_lookup,
-	    HCI1394_TNF_HAL_TLABEL, "", tnf_uint, nodeid, node_number,
-	    tnf_uint, lookup_tlabel, tlabel_info->tbi_tlabel);
-
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_lookup_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -396,16 +349,12 @@ hci1394_tlabel_bad(hci1394_tlabel_handle_t tlabel_handle,
 
 	ASSERT(tlabel_handle != NULL);
 	ASSERT(tlabel_info != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_bad_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* figure out what node and tlabel we are using */
 	node_number = IEEE1394_NODE_NUM(tlabel_info->tbi_destination);
 	tlabel = tlabel_info->tbi_tlabel & TLABEL_MASK;
 
 	mutex_enter(&tlabel_handle->tb_mutex);
-
-	TNF_PROBE_2(hci1394_tlabel_timeout, HCI1394_TNF_HAL_ERROR, "", tnf_uint,
-	    nodeid, node_number, tnf_uint, bad_tlabel, tlabel_info->tbi_tlabel);
 
 	/*
 	 * Put the tlabel in the bad list and NULL out the (void *) in the
@@ -421,8 +370,6 @@ hci1394_tlabel_bad(hci1394_tlabel_handle_t tlabel_handle,
 	tlabel_handle->tb_lookup[node_number][tlabel] = NULL;
 
 	mutex_exit(&tlabel_handle->tb_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_bad_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -440,12 +387,8 @@ hci1394_tlabel_reset(hci1394_tlabel_handle_t tlabel_handle)
 
 
 	ASSERT(tlabel_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_reset_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&tlabel_handle->tb_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_reset, HCI1394_TNF_HAL_TLABEL, "");
 
 	/* Bus reset optimization. handle broadcast writes separately */
 	if (tlabel_handle->tb_bcast_sent == B_TRUE) {
@@ -481,8 +424,6 @@ hci1394_tlabel_reset(hci1394_tlabel_handle_t tlabel_handle)
 	tlabel_handle->tb_bcast_sent = B_FALSE;
 
 	mutex_exit(&tlabel_handle->tb_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_reset_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -504,8 +445,6 @@ hci1394_tlabel_set_reclaim_time(hci1394_tlabel_handle_t tlabel_handle,
     hrtime_t reclaim_time_nS)
 {
 	ASSERT(tlabel_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_set_reclaim_time_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * We do not need to lock the tlabel structure in this because we are
@@ -513,7 +452,4 @@ hci1394_tlabel_set_reclaim_time(hci1394_tlabel_handle_t tlabel_handle,
 	 * we may need to add calls to lock() and unlock().
 	 */
 	tlabel_handle->tb_reclaim_time = reclaim_time_nS;
-
-	TNF_PROBE_0_DEBUG(hci1394_tlabel_set_reclaim_time_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }

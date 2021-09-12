@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_ioctl.c
  *   Test ioctl's to support test/debug of the 1394 HW. hci1394_ioctl_enum_t is
@@ -91,22 +89,13 @@ hci1394_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	int instance;
 	int status;
 
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_enter, HCI1394_TNF_HAL_STACK, "");
-
 	instance = getminor(dev);
 	if (instance == -1) {
-		TNF_PROBE_0(hci1394_ioctl_gm_fail, HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (EBADF);
 	}
 
 	soft_state = ddi_get_soft_state(hci1394_statep, instance);
 	if (soft_state == NULL) {
-		TNF_PROBE_0(hci1394_ioctl_gss_fail, HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (EBADF);
 	}
 
@@ -161,8 +150,6 @@ hci1394_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		break;
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_exit, HCI1394_TNF_HAL_STACK, "");
-
 	return (status);
 }
 
@@ -176,20 +163,13 @@ hci1394_ioctl_wrreg(hci1394_state_t *soft_state, void *arg, int mode)
 
 	ASSERT(soft_state != NULL);
 	ASSERT(arg != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_wrreg_enter, HCI1394_TNF_HAL_STACK, "");
 
 	status = ddi_copyin(arg, &wrreg, sizeof (hci1394_ioctl_wrreg_t), mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_wrreg_ci_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_wrreg_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
 
 	hci1394_ohci_reg_write(soft_state->ohci, wrreg.addr, wrreg.data);
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_wrreg_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (0);
 }
@@ -204,14 +184,9 @@ hci1394_ioctl_rdreg(hci1394_state_t *soft_state, void *arg, int mode)
 
 	ASSERT(soft_state != NULL);
 	ASSERT(arg != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_rdreg_enter, HCI1394_TNF_HAL_STACK, "");
 
 	status = ddi_copyin(arg, &rdreg, sizeof (hci1394_ioctl_rdreg_t), mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_rdreg_ci_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_rdreg_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
 
@@ -219,14 +194,8 @@ hci1394_ioctl_rdreg(hci1394_state_t *soft_state, void *arg, int mode)
 
 	status = ddi_copyout(&rdreg, arg, sizeof (hci1394_ioctl_rdreg_t), mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_rdreg_c0_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_rdreg_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_rdreg_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (0);
 }
@@ -241,30 +210,18 @@ hci1394_ioctl_wrvreg(hci1394_state_t *soft_state, void *arg, int mode)
 
 	ASSERT(soft_state != NULL);
 	ASSERT(arg != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_wrvreg_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	status = ddi_copyin(arg, &wrvreg, sizeof (hci1394_ioctl_wrvreg_t),
 	    mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_wrvreg_ci_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_wrvreg_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
 
 	status = hci1394_vendor_reg_write(soft_state->vendor,
 	    wrvreg.regset, wrvreg.addr, wrvreg.data);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ioctl_wrvreg_vrw_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_wrvreg_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EINVAL);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_wrvreg_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (0);
 }
@@ -279,40 +236,24 @@ hci1394_ioctl_rdvreg(hci1394_state_t *soft_state, void *arg, int mode)
 
 	ASSERT(soft_state != NULL);
 	ASSERT(arg != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_rdvreg_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	status = ddi_copyin(arg, &rdvreg, sizeof (hci1394_ioctl_rdvreg_t),
 	    mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_rdvreg_ci_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_rdvreg_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
 
 	status = hci1394_vendor_reg_read(soft_state->vendor,
 	    rdvreg.regset, rdvreg.addr, &rdvreg.data);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ioctl_rdvreg_vrr_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_rdvreg_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EINVAL);
 	}
 
 	status = ddi_copyout(&rdvreg, arg, sizeof (hci1394_ioctl_rdvreg_t),
 	    mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_rdvreg_co_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_rdvreg_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_rdvreg_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (0);
 }
@@ -327,23 +268,14 @@ hci1394_ioctl_selfid_cnt(hci1394_state_t *soft_state, void *arg, int mode)
 
 	ASSERT(soft_state != NULL);
 	ASSERT(arg != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_selfid_cnt_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	selfid_cnt.count = soft_state->drvinfo.di_stats.st_selfid_count;
 
 	status = ddi_copyout(&selfid_cnt, arg,
 	    sizeof (hci1394_ioctl_selfid_cnt_t), mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_selfid_cnt_co_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_selfid_cnt_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_selfid_cnt_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (0);
 }
@@ -358,23 +290,14 @@ hci1394_ioctl_busgen_cnt(hci1394_state_t *soft_state, void *arg, int mode)
 
 	ASSERT(soft_state != NULL);
 	ASSERT(arg != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_busgen_cnt_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	busgen_cnt.count = hci1394_ohci_current_busgen(soft_state->ohci);
 
 	status = ddi_copyout(&busgen_cnt, arg,
 	    sizeof (hci1394_ioctl_busgen_cnt_t), mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_busgen_cnt_co_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_busgen_cnt_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_busgen_cnt_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (0);
 }
@@ -389,28 +312,17 @@ hci1394_ioctl_wrphy(hci1394_state_t *soft_state, void *arg, int mode)
 
 	ASSERT(soft_state != NULL);
 	ASSERT(arg != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_wrphy_enter, HCI1394_TNF_HAL_STACK, "");
 
 	status = ddi_copyin(arg, &wrphy, sizeof (hci1394_ioctl_wrphy_t), mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_wrphy_ci_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_wrphy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
 
 	status = hci1394_ohci_phy_write(soft_state->ohci, wrphy.addr,
 	    wrphy.data);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ioctl_wrphy_pw_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_wrphy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EINVAL);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_wrphy_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (0);
 }
@@ -425,37 +337,22 @@ hci1394_ioctl_rdphy(hci1394_state_t *soft_state, void *arg, int mode)
 
 	ASSERT(soft_state != NULL);
 	ASSERT(arg != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_rdphy_enter, HCI1394_TNF_HAL_STACK, "");
 
 	status = ddi_copyin(arg, &rdphy, sizeof (hci1394_ioctl_rdphy_t), mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_rdphy_ci_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_rdphy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
 
 	status = hci1394_ohci_phy_read(soft_state->ohci, rdphy.addr,
 	    &rdphy.data);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ioctl_rdphy_pr_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_rdphy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EINVAL);
 	}
 
 	status = ddi_copyout(&rdphy, arg, sizeof (hci1394_ioctl_rdphy_t), mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_rdphy_co_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_rdphy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_rdphy_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (0);
 }
@@ -470,8 +367,6 @@ hci1394_ioctl_hbainfo(hci1394_state_t *soft_state, void *arg, int mode)
 
 	ASSERT(soft_state != NULL);
 	ASSERT(arg != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_hbainfo_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	hbainfo.pci_vendor_id = soft_state->vendor_info.vendor_id;
 	hbainfo.pci_device_id = soft_state->vendor_info.device_id;
@@ -483,15 +378,8 @@ hci1394_ioctl_hbainfo(hci1394_state_t *soft_state, void *arg, int mode)
 	status = ddi_copyout(&hbainfo, arg, sizeof (hci1394_ioctl_hbainfo_t),
 	    mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_hbainfo_co_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_hbainfo_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_hbainfo_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (0);
 }
@@ -511,8 +399,6 @@ hci1394_ioctl_read_selfid(hci1394_state_t *soft_state, void *arg, int mode)
 
 	ASSERT(soft_state != NULL);
 	ASSERT(arg != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_read_selfid_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 #ifdef	_MULTI_DATAMODEL
 	switch (ddi_model_convert_from(mode & FMODELS)) {
@@ -523,10 +409,6 @@ hci1394_ioctl_read_selfid(hci1394_state_t *soft_state, void *arg, int mode)
 		status = ddi_copyin(arg, &read_selfid32,
 		    sizeof (hci1394_ioctl_readselfid32_t), mode);
 		if (status != 0) {
-			TNF_PROBE_0(hci1394_ioctl_read_selfid_ci_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_ioctl_read_selfid_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (EFAULT);
 		}
 
@@ -551,10 +433,6 @@ hci1394_ioctl_read_selfid(hci1394_state_t *soft_state, void *arg, int mode)
 	status = ddi_copyin(arg, &read_selfid,
 	    sizeof (hci1394_ioctl_read_selfid_t), mode);
 	if (status != 0) {
-		TNF_PROBE_0(hci1394_ioctl_read_selfid_ci_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_read_selfid_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EFAULT);
 	}
 
@@ -563,10 +441,6 @@ hci1394_ioctl_read_selfid(hci1394_state_t *soft_state, void *arg, int mode)
 	 * can hold.  count is in quadlets and max_selfid_size is in bytes.
 	 */
 	if ((read_selfid.count * 4) > OHCI_MAX_SELFID_SIZE) {
-		TNF_PROBE_0(hci1394_ioctl_read_selfid_cnt_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EINVAL);
 	}
 
@@ -582,16 +456,9 @@ hci1394_ioctl_read_selfid(hci1394_state_t *soft_state, void *arg, int mode)
 		/* copy the selfid word into the user buffer */
 		status = ddi_copyout(&data, &read_selfid.buf[offset], 4, mode);
 		if (status != 0) {
-			TNF_PROBE_0(hci1394_ioctl_read_selfid_co_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_ioctl_read_selfid_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (EFAULT);
 		}
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_read_selfid_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (0);
 }
@@ -609,18 +476,12 @@ hci1394_ioctl_read_selfid32(hci1394_state_t *soft_state,
 
 	ASSERT(soft_state != NULL);
 	ASSERT(read_selfid != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_read_selfid32_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * make sure we are not trying to copy more data than the selfid buffer
 	 * can hold.  count is in quadlets and max_selfid_size is in bytes.
 	 */
 	if ((read_selfid->count * 4) > OHCI_MAX_SELFID_SIZE) {
-		TNF_PROBE_0(hci1394_ioctl_read_selfid32_cnt_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ioctl_read_selfid32_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (EINVAL);
 	}
 
@@ -637,16 +498,9 @@ hci1394_ioctl_read_selfid32(hci1394_state_t *soft_state,
 		    (void *)(uintptr_t)(read_selfid->buf + (offset * 4)),
 		    4, mode);
 		if (status != 0) {
-			TNF_PROBE_0(hci1394_ioctl_read_selfid32_co_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_ioctl_read_selfid32_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (EFAULT);
 		}
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ioctl_read_selfid32_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (0);
 }

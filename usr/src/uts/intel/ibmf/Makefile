@@ -52,8 +52,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides
 #
 
-#DEBUG_DEFS_DBG32 += -DTNF_DEBUG
-
 #
 # For now, disable these warnings; maintainers should endeavor
 # to investigate and remove these for maximum coverage.

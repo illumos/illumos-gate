@@ -37,7 +37,6 @@
 #include <sys/crypto/api.h>
 #include <sys/crypto/spi.h>
 #include <sys/crypto/ioctl.h>
-#include <sys/tnf_probe.h>
 #include <sys/atomic.h>
 #include <sys/project.h>
 #include <sys/taskq.h>

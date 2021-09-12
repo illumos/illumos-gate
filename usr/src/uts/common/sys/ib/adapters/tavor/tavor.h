@@ -34,8 +34,6 @@
  *    structure and for proper attach() and detach() processing.  Also
  *    includes all the other Tavor header files (and so is the only header
  *    file that is directly included by the Tavor source files).
- *    Additionally, this file contains some defines and macros used by
- *    Tavor TNF tracing mechanism.
  *    Lastly, this file includes everything necessary for implementing the
  *    devmap interface and for maintaining the "mapped resource database".
  */
@@ -44,7 +42,6 @@
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/tnf_probe.h>
 #include <sys/taskq.h>
 
 #include <sys/ib/ibtl/ibci.h>
@@ -74,25 +71,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/*
- * The following defines and macros are used for Tavor TNF tracing
- * Note: TAVOR_TNF_FAIL is used in routines which has many failure cases.
- * It will initialize the "errormsg" and "status" variables (both of which
- * must be declared locally in the routines where this macro is used) for use
- * in a later TNF probe and return from routine.
- */
-#define	TAVOR_TNF_ERROR			"tavor tavor_error "
-#define	TAVOR_TNF_TRACE			"tavor tavor_trace "
-#define	TAVOR_TNF_ENTER(func)						\
-	TNF_PROBE_0_DEBUG(func##_start, TAVOR_TNF_TRACE, "")
-#define	TAVOR_TNF_EXIT(func)						\
-	TNF_PROBE_0_DEBUG(func##_end, TAVOR_TNF_TRACE, "")
-#define	TAVOR_TNF_FAIL(s, e)						\
-{									\
-	errormsg = (e);							\
-	status = (s);							\
-}
 
 #define	TAVOR_VPD_HDR_DWSIZE		0x10 /* 16 Dwords */
 #define	TAVOR_VPD_HDR_BSIZE		0x40 /* 64 Bytes */
@@ -739,7 +717,7 @@ typedef struct tavor_umap_db_query_s {
 	tavor_umap_db_common_t	tqdb_common;
 } tavor_umap_db_query_t;
 _NOTE(MUTEX_PROTECTS_DATA(tavor_umap_db_s::tdl_umapdb_lock,
-    tavor_umap_db_entry_s::tdbe_avlnode 
+    tavor_umap_db_entry_s::tdbe_avlnode
     tavor_umap_db_entry_s::tdbe_common.tdb_key
     tavor_umap_db_entry_s::tdbe_common.tdb_value
     tavor_umap_db_entry_s::tdbe_common.tdb_type

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_ixl_isr.c
  *    Isochronous IXL Interrupt Service Routines.
@@ -37,9 +35,6 @@
 
 #include <sys/types.h>
 #include <sys/conf.h>
-
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/h1394.h>
 #include <sys/1394/ixl1394.h>
 #include <sys/1394/adapters/hci1394.h>
@@ -70,9 +65,6 @@ hci1394_ixl_interrupt(hci1394_state_t *soft_statep,
 	uint_t	status;
 	int	retcode;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_interrupt_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	status = 1;
 
 	/* acquire the interrupt processing context mutex */
@@ -85,32 +77,18 @@ hci1394_ixl_interrupt(hci1394_state_t *soft_statep,
 	if (ctxtp->intr_flags & HCI1394_ISO_CTXT_INUPDATE) {
 		retcode = HCI1394_IXL_INTR_INUPDATE;
 		status = 0;
-		TNF_PROBE_1_DEBUG(hci1394_ixl_interrupt_error,
-		    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, errmsg,
-		    "HCI1394_IXL_INTR_INUPDATE");
-
 	} else if (ctxtp->intr_flags & HCI1394_ISO_CTXT_ININTR) {
 		/* else fatal error if inter processing already in progress */
 		retcode = HCI1394_IXL_INTR_ININTR;
 		status = 0;
-		TNF_PROBE_1(hci1394_ixl_interrupt_error,
-		    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, errmsg,
-		    "HCI1394_IXL_INTR_ININTR");
-
 	} else if (ctxtp->intr_flags & HCI1394_ISO_CTXT_INCALL) {
 		/* else fatal error if callback in progress flag is set */
 		retcode = HCI1394_IXL_INTR_INCALL;
 		status = 0;
-		TNF_PROBE_1_DEBUG(hci1394_ixl_interrupt_error,
-		    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, errmsg,
-		    "HCI1394_IXL_INTR_INCALL");
 	} else if (!in_stop && (ctxtp->intr_flags & HCI1394_ISO_CTXT_STOP)) {
 		/* context is being stopped */
 		retcode = HCI1394_IXL_INTR_STOP;
 		status = 0;
-		TNF_PROBE_1_DEBUG(hci1394_ixl_interrupt_error,
-		    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, errmsg,
-		    "HCI1394_IXL_INTR_STOP");
 	}
 
 	/*
@@ -144,9 +122,6 @@ hci1394_ixl_interrupt(hci1394_state_t *soft_statep,
 	if (retcode == HCI1394_IXL_INTR_DMALOST) {
 		hci1394_do_stop(soft_statep, ctxtp, B_TRUE, ID1394_FAIL);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_interrupt_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 }
 
 /*
@@ -169,9 +144,6 @@ hci1394_ixl_dma_sync(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp)
 	boolean_t	isdone;
 
 	void (*callback)(opaque_t, struct ixl1394_callback *);
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_dma_sync_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	ASSERT(MUTEX_NOT_HELD(&ctxtp->intrprocmutex));
 
@@ -204,8 +176,6 @@ hci1394_ixl_dma_sync(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp)
 			    ixlp, &ixlnextp, &timestamp, &donecode);
 
 			if (isdone == B_TRUE) {
-				TNF_PROBE_0_DEBUG(hci1394_ixl_dma_sync_exit,
-					HCI1394_TNF_HAL_STACK_ISOCH, "");
 				return (donecode);
 			}
 
@@ -265,9 +235,6 @@ hci1394_ixl_dma_sync(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp)
 	 */
 	if ((ixlp != NULL) && (ixlp->ixl_opcode == IXL1394_OP_JUMP_U)) {
 		ctxtp->ixl_execp = ixlp;
-		TNF_PROBE_1_DEBUG(hci1394_ixl_dma_sync_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-		    "INTR_NOERROR");
 		return (HCI1394_IXL_INTR_NOERROR);
 	}
 
@@ -281,15 +248,10 @@ hci1394_ixl_dma_sync(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp)
 
 	/* return stopped status if at end of IXL cmds & context stopped */
 	if (HCI1394_ISOCH_CTXT_ACTIVE(soft_statep, ctxtp) == 0) {
-		TNF_PROBE_1_DEBUG(hci1394_ixl_dma_sync_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-		    "INTR_DMASTOP");
 		return (HCI1394_IXL_INTR_DMASTOP);
 	}
 
 	/* else interrupt processing is lost */
-	TNF_PROBE_1_DEBUG(hci1394_ixl_dma_sync_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg, "INTR_DMALOST");
 	return (HCI1394_IXL_INTR_DMALOST);
 }
 
@@ -317,10 +279,6 @@ hci1394_ixl_intr_check_xfer(hci1394_state_t *soft_statep,
 	hci1394_xfer_ctl_t  *xferctlp;
 	uint16_t	    ixldepth;
 	uint16_t	    ixlopcode;
-
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_intr_check_xfer_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	*donecodep = 0;
 	dma_advances = 0;
@@ -390,11 +348,6 @@ hci1394_ixl_intr_check_xfer(hci1394_state_t *soft_statep,
 				 * processing is lost
 				 */
 				*donecodep = HCI1394_IXL_INTR_DMALOST;
-
-				TNF_PROBE_1_DEBUG(
-				    hci1394_ixl_intr_check_xfer_exit,
-				    HCI1394_TNF_HAL_STACK_ISOCH, "",
-				    tnf_string, msg, "INTR_DMALOST");
 				return (B_TRUE);
 			}
 		}
@@ -414,10 +367,6 @@ hci1394_ixl_intr_check_xfer(hci1394_state_t *soft_statep,
 			ctxtp->rem_noadv_intrs = 0;
 
 			*donecodep = HCI1394_IXL_INTR_DMASTOP;
-
-			TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_xfer_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-			    "INTR_DMASTOP");
 			return (B_TRUE);
 		}
 
@@ -441,11 +390,6 @@ hci1394_ixl_intr_check_xfer(hci1394_state_t *soft_statep,
 				}
 
 				*donecodep = HCI1394_IXL_INTR_NOERROR;
-
-				TNF_PROBE_1_DEBUG(
-				    hci1394_ixl_intr_check_xfer_exit,
-				    HCI1394_TNF_HAL_STACK_ISOCH, "",
-				    tnf_string, msg, "INTR_NOERROR");
 				return (B_TRUE);
 			}
 
@@ -473,19 +417,10 @@ hci1394_ixl_intr_check_xfer(hci1394_state_t *soft_statep,
 			 */
 			if (ctxtp->rem_noadv_intrs == 0) {
 				*donecodep = HCI1394_IXL_INTR_NOADV;
-
-				TNF_PROBE_1_DEBUG(
-				    hci1394_ixl_intr_check_xfer_exit,
-				    HCI1394_TNF_HAL_STACK_ISOCH, "",
-				    tnf_string, msg, "INTR_NOADV");
 				return (B_TRUE);
 			}
 
 			*donecodep = HCI1394_IXL_INTR_NOERROR;
-
-			TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_xfer_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-			    "INTR_NOERROR2");
 			return (B_TRUE);
 		}
 
@@ -521,9 +456,6 @@ hci1394_ixl_intr_check_xfer(hci1394_state_t *soft_statep,
 		ctxtp->rem_noadv_intrs = ctxtp->max_noadv_intrs;
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_intr_check_xfer_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	/* continue to process next IXL command */
 	return (B_FALSE);
 }
@@ -546,7 +478,6 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 	uint32_t	    desc_status;
 	hci1394_desc_t	    *hcidescp;
 	off_t		    hcidesc_off;
-	int		    err;
 	uint32_t	    dma_cmd_cur_loc;
 	uint32_t	    dma_cmd_last_loc;
 	uint32_t	    dma_loc_check_enabled;
@@ -558,9 +489,6 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 	uint16_t	    skipdepth;
 	ixl1394_command_t   *skipdestp;
 	ixl1394_command_t   *skipxferp;
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_intr_check_done_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	/*
 	 * start looking through the IXL list from the xfer start command where
@@ -607,15 +535,9 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 	    ((dma_cmd_cur_loc >= dmastartp) && (dma_cmd_cur_loc < dmaendp))) {
 
 		if (HCI1394_ISOCH_CTXT_ACTIVE(soft_statep, ctxtp) == 0) {
-			TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-			    "CHECK_STOP");
 			return (IXL_CHECK_STOP);
 		}
 
-		TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-		    "CHECK_DONE");
 		return (IXL_CHECK_DONE);
 	}
 
@@ -629,21 +551,12 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 		 * else return location indeterminate
 		 */
 		if (HCI1394_ISOCH_CTXT_ACTIVE(soft_statep, ctxtp) == 0) {
-			TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-			    "CHECK_STOP");
 			return (IXL_CHECK_STOP);
 		}
 		if (!dma_loc_check_enabled) {
-			TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-			    "CHECK_DONE");
 			return (IXL_CHECK_DONE);
 		}
 
-		TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-		    "CHECK_LOST");
 		return (IXL_CHECK_LOST);
 	}
 
@@ -657,13 +570,8 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 	hcidesc_off = (off_t)hcidescp - (off_t)dma->dma_buf->bi_kaddr;
 
 	/* Sync the descriptor before we get the status */
-	err = ddi_dma_sync(dma_hdl, hcidesc_off, sizeof (hci1394_desc_t),
+	(void) ddi_dma_sync(dma_hdl, hcidesc_off, sizeof (hci1394_desc_t),
 	    DDI_DMA_SYNC_FORCPU);
-	if (err != DDI_SUCCESS) {
-		TNF_PROBE_1(hci1394_ixl_intr_check_done_error,
-		    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, errmsg,
-		    "dma_sync() failed");
-	}
 	desc_status = ddi_get32(acc_hdl, &hcidescp->status);
 
 	if ((desc_status & DESC_XFER_ACTIVE_MASK) != 0) {
@@ -672,9 +580,6 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 		 * if status is now set here, return skipped, to cause calling
 		 * function to continue, even though location hasn't changed
 		 */
-		TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-		    "CHECK_SKIP");
 		return (IXL_CHECK_SKIP);
 	}
 
@@ -722,24 +627,13 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 			 */
 			if (HCI1394_ISOCH_CTXT_ACTIVE(soft_statep, ctxtp) ==
 			    0) {
-				TNF_PROBE_1_DEBUG(
-					hci1394_ixl_intr_check_done_exit,
-					HCI1394_TNF_HAL_STACK_ISOCH, "",
-					tnf_string, msg, "CHECK_STOP");
 				return (IXL_CHECK_STOP);
 			}
 
 			if (!dma_loc_check_enabled) {
-				TNF_PROBE_1_DEBUG(
-					hci1394_ixl_intr_check_done_exit,
-					HCI1394_TNF_HAL_STACK_ISOCH, "",
-					tnf_string, msg, "CHECK_DONE");
 				return (IXL_CHECK_DONE);
 			}
 
-			TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-			    "CHECK_LOST");
 			return (IXL_CHECK_LOST);
 
 		case IXL1394_SKIP_TO_NEXT:
@@ -808,23 +702,12 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 			 */
 			if (HCI1394_ISOCH_CTXT_ACTIVE(soft_statep, ctxtp) ==
 			    0) {
-				TNF_PROBE_1_DEBUG(
-					hci1394_ixl_intr_check_done_exit,
-					HCI1394_TNF_HAL_STACK_ISOCH, "",
-					tnf_string, msg, "CHECK_STOP");
 				return (IXL_CHECK_STOP);
 			}
 
 			if (!dma_loc_check_enabled) {
-				TNF_PROBE_1_DEBUG(
-					hci1394_ixl_intr_check_done_exit,
-					HCI1394_TNF_HAL_STACK_ISOCH, "",
-					tnf_string, msg, "CHECK_DONE");
 				return (IXL_CHECK_DONE);
 			}
-			TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-			    "CHECK_LOST");
 			return (IXL_CHECK_LOST);
 		}
 
@@ -840,13 +723,8 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 		hcidesc_off = (off_t)hcidescp - (off_t)dma->dma_buf->bi_kaddr;
 
 		/* Sync the descriptor before we get the status */
-		err = ddi_dma_sync(dma_hdl, hcidesc_off,
+		(void) ddi_dma_sync(dma_hdl, hcidesc_off,
 		    sizeof (hci1394_desc_t), DDI_DMA_SYNC_FORCPU);
-		if (err != DDI_SUCCESS) {
-			TNF_PROBE_1(hci1394_ixl_intr_check_done_error,
-			    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, errmsg,
-			    "dma_sync() failed");
-		}
 		desc_status = ddi_get32(acc_hdl, &hcidescp->status);
 
 		if ((desc_status & DESC_XFER_ACTIVE_MASK) != 0) {
@@ -860,9 +738,6 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 			ctxtp->ixl_execp = skipdestp;
 			ctxtp->ixl_exec_depth = skipdepth;
 
-			TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-			    "CHECK_SKIP");
 			return (IXL_CHECK_SKIP);
 		}
 
@@ -880,10 +755,6 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 			/* if the context is stopped, return stopped */
 			if (HCI1394_ISOCH_CTXT_ACTIVE(soft_statep, ctxtp) ==
 			    0) {
-				TNF_PROBE_1_DEBUG(
-					hci1394_ixl_intr_check_done_exit,
-					HCI1394_TNF_HAL_STACK_ISOCH, "",
-					tnf_string, msg, "CHECK STOP");
 				return (IXL_CHECK_STOP);
 			}
 			/*
@@ -894,9 +765,6 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 			ctxtp->ixl_execp = skipdestp;
 			ctxtp->ixl_exec_depth = skipdepth;
 
-			TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-			    "CHECK_SKIP");
 			return (IXL_CHECK_SKIP);
 		}
 
@@ -921,20 +789,12 @@ hci1394_ixl_intr_check_done(hci1394_state_t *soft_statep,
 	 */
 
 	if (HCI1394_ISOCH_CTXT_ACTIVE(soft_statep, ctxtp) == 0) {
-		TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-		    "CHECK_STOP");
 		return (IXL_CHECK_STOP);
 	}
 	if (!dma_loc_check_enabled) {
-		TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-		    "CHECK_DONE");
 		return (IXL_CHECK_DONE);
 	}
 
-	TNF_PROBE_1_DEBUG(hci1394_ixl_intr_check_done_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg, "CHECK_LOST");
 	return (IXL_CHECK_LOST);
 }
 
@@ -954,8 +814,6 @@ hci1394_isoch_cycle_inconsistent(hci1394_state_t *soft_statep)
 	hci1394_iso_ctxt_t *ctxtp; 	/* current context */
 
 	ASSERT(soft_statep);
-	TNF_PROBE_0_DEBUG(hci1394_isoch_cycle_inconsistent_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	hci1394_ohci_intr_clear(soft_statep->ohci, OHCI_INTR_CYC_INCONSISTENT);
 
@@ -1022,13 +880,7 @@ hci1394_isoch_cycle_inconsistent(hci1394_state_t *soft_statep)
 		cmn_err(CE_NOTE, "!hci1394(%d): cycle_inconsistent interrupt "
 		    "disabled until next bus reset",
 		    soft_statep->drvinfo.di_instance);
-		TNF_PROBE_1(hci1394_isoch_cycle_inconsistent_error,
-		    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, msg,
-		    "CYCLE_INCONSISTENT intr disabled until next bus reset");
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_isoch_cycle_inconsistent_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 }
 
 
@@ -1047,8 +899,6 @@ hci1394_isoch_cycle_lost(hci1394_state_t *soft_statep)
 	hci1394_iso_ctxt_t *ctxtp; 	/* current context */
 
 	ASSERT(soft_statep);
-	TNF_PROBE_0_DEBUG(hci1394_isoch_cycle_lost_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	hci1394_ohci_intr_clear(soft_statep->ohci, OHCI_INTR_CYC_LOST);
 
@@ -1115,11 +965,5 @@ hci1394_isoch_cycle_lost(hci1394_state_t *soft_statep)
 		cmn_err(CE_NOTE, "!hci1394(%d): cycle_lost interrupt "
 		    "disabled until next bus reset",
 		    soft_statep->drvinfo.di_instance);
-		TNF_PROBE_1(hci1394_isoch_cycle_lost_error,
-		    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, msg,
-		    "CYCLE_LOST intr disabled until next bus reset");
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_isoch_cycle_lost_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 }

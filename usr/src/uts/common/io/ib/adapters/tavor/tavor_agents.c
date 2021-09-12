@@ -63,14 +63,11 @@ int
 tavor_agent_handlers_init(tavor_state_t *state)
 {
 	int		status;
-	char		*errormsg, *rsrc_name;
-
-	TAVOR_TNF_ENTER(tavor_agent_handlers_init);
+	char		*rsrc_name;
 
 	/* Determine if we need to register any agents with the IBMF */
 	if ((state->ts_cfg_profile->cp_qp0_agents_in_fw) &&
 	    (state->ts_cfg_profile->cp_qp1_agents_in_fw)) {
-		TAVOR_TNF_EXIT(tavor_agent_handlers_init);
 		return (DDI_SUCCESS);
 	}
 
@@ -84,8 +81,6 @@ tavor_agent_handlers_init(tavor_state_t *state)
 	/* Initialize the Tavor IB management agent list */
 	status = tavor_agent_list_init(state);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(DDI_FAILURE, "failed agent list init");
 		goto agentsinit_fail;
 	}
 
@@ -99,8 +94,6 @@ tavor_agent_handlers_init(tavor_state_t *state)
 	    rsrc_name, TAVOR_TASKQ_NTHREADS, TASKQ_DEFAULTPRI, 0);
 	if (state->ts_taskq_agents == NULL) {
 		tavor_agent_list_fini(state);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(DDI_FAILURE, "failed task queue");
 		goto agentsinit_fail;
 	}
 
@@ -109,20 +102,14 @@ tavor_agent_handlers_init(tavor_state_t *state)
 	if (status != DDI_SUCCESS) {
 		ddi_taskq_destroy(state->ts_taskq_agents);
 		tavor_agent_list_fini(state);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(DDI_FAILURE, "failed IBMF register");
 		goto agentsinit_fail;
 	}
 
 	kmem_free(rsrc_name, TAVOR_RSRC_NAME_MAXLEN);
-	TAVOR_TNF_EXIT(tavor_agent_handlers_init);
 	return (DDI_SUCCESS);
 
 agentsinit_fail:
 	kmem_free(rsrc_name, TAVOR_RSRC_NAME_MAXLEN);
-	TNF_PROBE_1(tavor_agent_handlers_init_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_agent_handlers_init);
 	return (status);
 }
 
@@ -136,21 +123,15 @@ tavor_agent_handlers_fini(tavor_state_t *state)
 {
 	int		status;
 
-	TAVOR_TNF_ENTER(tavor_agent_handlers_fini);
-
 	/* Determine if we need to unregister any agents from the IBMF */
 	if ((state->ts_cfg_profile->cp_qp0_agents_in_fw) &&
 	    (state->ts_cfg_profile->cp_qp1_agents_in_fw)) {
-		TAVOR_TNF_EXIT(tavor_agent_handlers_fini);
 		return (DDI_SUCCESS);
 	}
 
 	/* Now attempt to unregister all of the agents from the IBMF */
 	status = tavor_agent_unregister_all(state, state->ts_num_agents);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(tavor_agent_handlers_fini_unreg_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_agent_handlers_fini);
 		return (DDI_FAILURE);
 	}
 
@@ -167,7 +148,6 @@ tavor_agent_handlers_fini(tavor_state_t *state)
 	/* Teardown the Tavor IB management agent list */
 	tavor_agent_list_fini(state);
 
-	TAVOR_TNF_EXIT(tavor_agent_handlers_fini);
 	return (DDI_SUCCESS);
 }
 
@@ -184,9 +164,6 @@ tavor_agent_request_cb(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 	tavor_agent_list_t		*curr;
 	tavor_state_t			*state;
 	int				status;
-	int				ibmf_status;
-
-	TAVOR_TNF_ENTER(tavor_agent_request_cb);
 
 	curr  = (tavor_agent_list_t *)args;
 	state = curr->agl_state;
@@ -200,15 +177,7 @@ tavor_agent_request_cb(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 	cb_args = (tavor_agent_handler_arg_t *)kmem_zalloc(
 	    sizeof (tavor_agent_handler_arg_t), KM_NOSLEEP);
 	if (cb_args == NULL) {
-		ibmf_status = ibmf_free_msg(ibmf_handle, &msgp);
-		if (ibmf_status != IBMF_SUCCESS) {
-			TNF_PROBE_1(tavor_agent_request_cb_ibmf_free_msg_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, ibmf_status,
-			    ibmf_status);
-		}
-		TNF_PROBE_0(tavor_agent_request_cb_kma_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_agent_request_cb);
+		(void) ibmf_free_msg(ibmf_handle, &msgp);
 		return;
 	}
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*cb_args))
@@ -227,16 +196,8 @@ tavor_agent_request_cb(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 	    tavor_agent_handle_req, cb_args, DDI_NOSLEEP);
 	if (status == DDI_FAILURE) {
 		kmem_free(cb_args, sizeof (tavor_agent_handler_arg_t));
-		ibmf_status = ibmf_free_msg(ibmf_handle, &msgp);
-		if (ibmf_status != IBMF_SUCCESS) {
-			TNF_PROBE_1(tavor_agent_request_cb_ibmf_free_msg_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, ibmf_status,
-			    ibmf_status);
-		}
-		TNF_PROBE_0(tavor_agent_request_cb_taskq_fail,
-		    TAVOR_TNF_ERROR, "");
+		(void) ibmf_free_msg(ibmf_handle, &msgp);
 	}
-	TAVOR_TNF_EXIT(tavor_agent_request_cb);
 }
 
 /*
@@ -256,8 +217,6 @@ tavor_agent_handle_req(void *cb_args)
 	ibmf_retrans_t			retrans;
 	uint_t				port;
 	int				status;
-
-	TAVOR_TNF_ENTER(tavor_agent_handle_req);
 
 	/* Extract the necessary info from the callback args parameter */
 	agent_args  = (tavor_agent_handler_arg_t *)cb_args;
@@ -314,9 +273,6 @@ tavor_agent_handle_req(void *cb_args)
 			    (status != TAVOR_CMD_INSUFF_RSRC)) {
 				cmn_err(CE_CONT, "Tavor: MAD_IFC (port %02d) "
 				    "command failed: %08x\n", port, status);
-				TNF_PROBE_1(tavor_agent_handle_req_madifc_fail,
-				    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status,
-				    status);
 			}
 
 			/* finish cleanup */
@@ -349,27 +305,18 @@ tavor_agent_handle_req(void *cb_args)
 	status = ibmf_msg_transport(ibmf_handle, IBMF_QP_HANDLE_DEFAULT,
 	    msgp, &retrans, tavor_agent_response_cb, state, 0);
 	if (status != IBMF_SUCCESS) {
-		TNF_PROBE_1(tavor_ibmf_send_msg_fail, TAVOR_TNF_ERROR, "",
-		    tnf_uint, ibmf_status, status);
 		goto tavor_agent_handle_req_skip_response;
 	}
 
 	/* Free up the callback args parameter */
 	kmem_free(agent_args, sizeof (tavor_agent_handler_arg_t));
-	TAVOR_TNF_EXIT(tavor_agent_handle_req);
 	return;
 
 tavor_agent_handle_req_skip_response:
 	/* Free up the ibmf message */
 	status = ibmf_free_msg(ibmf_handle, &msgp);
-	if (status != IBMF_SUCCESS) {
-		TNF_PROBE_1(tavor_agent_handle_req_ibmf_free_msg_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, ibmf_status,
-		    status);
-	}
 	/* Free up the callback args parameter */
 	kmem_free(agent_args, sizeof (tavor_agent_handler_arg_t));
-	TAVOR_TNF_EXIT(tavor_agent_handle_req);
 }
 
 
@@ -382,22 +329,12 @@ static void
 tavor_agent_response_cb(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
     void *args)
 {
-	int		status;
-
-	TAVOR_TNF_ENTER(tavor_agent_response_cb);
-
 	/*
 	 * It is the responsibility of each IBMF callback recipient to free
 	 * the packets that it has been given.  Now that we are in the
 	 * response callback, we can be assured that it is safe to do so.
 	 */
-	status = ibmf_free_msg(ibmf_handle, &msgp);
-	if (status != IBMF_SUCCESS) {
-		TNF_PROBE_1(tavor_agent_response_cb_ibmf_free_msg_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, ibmf_status, status);
-	}
-
-	TAVOR_TNF_EXIT(tavor_agent_response_cb);
+	(void) ibmf_free_msg(ibmf_handle, &msgp);
 }
 
 
@@ -415,8 +352,6 @@ tavor_agent_list_init(tavor_state_t *state)
 	uint_t			num_bma_agents = 0;
 	uint_t			do_qp0, do_qp1;
 	int			i, j, indx;
-
-	TAVOR_TNF_ENTER(tavor_agent_list_init);
 
 	/*
 	 * Calculate the number of registered agents for each port
@@ -457,9 +392,6 @@ tavor_agent_list_init(tavor_state_t *state)
 	state->ts_agents = (tavor_agent_list_t *)kmem_zalloc(num_agents *
 	    sizeof (tavor_agent_list_t), KM_SLEEP);
 	if (state->ts_agents == NULL) {
-		TNF_PROBE_0(tavor_agent_list_init_kma_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_agent_list_init);
 		return (DDI_FAILURE);
 	}
 
@@ -490,7 +422,6 @@ tavor_agent_list_init(tavor_state_t *state)
 		}
 	}
 
-	TAVOR_TNF_EXIT(tavor_agent_list_init);
 	return (DDI_SUCCESS);
 }
 
@@ -502,13 +433,9 @@ tavor_agent_list_init(tavor_state_t *state)
 static void
 tavor_agent_list_fini(tavor_state_t *state)
 {
-	TAVOR_TNF_ENTER(tavor_agent_list_fini);
-
 	/* Free up the memory for the agent list entries */
 	kmem_free(state->ts_agents,
 	    state->ts_num_agents * sizeof (tavor_agent_list_t));
-
-	TAVOR_TNF_EXIT(tavor_agent_list_fini);
 }
 
 
@@ -524,8 +451,6 @@ tavor_agent_register_all(tavor_state_t *state)
 	ibmf_impl_caps_t	impl_caps;
 	ib_guid_t		nodeguid;
 	int			i, status, num_registered;
-
-	TAVOR_TNF_ENTER(tavor_agent_register_all);
 
 	/* Get the Tavor NodeGUID from the softstate */
 	nodeguid = state->ts_ibtfinfo.hca_attr->hca_node_guid;
@@ -548,8 +473,6 @@ tavor_agent_register_all(tavor_state_t *state)
 		status = ibmf_register(&ibmf_reg, IBMF_VERSION, 0,
 		    NULL, NULL, &curr->agl_ibmfhdl, &impl_caps);
 		if (status != IBMF_SUCCESS) {
-			TNF_PROBE_0(tavor_agent_register_all_ibmf_reg_fail,
-			    TAVOR_TNF_ERROR, "");
 			goto agents_reg_fail;
 		}
 
@@ -558,19 +481,15 @@ tavor_agent_register_all(tavor_state_t *state)
 		    IBMF_QP_HANDLE_DEFAULT, tavor_agent_request_cb, curr, 0);
 		if (status != IBMF_SUCCESS) {
 			(void) ibmf_unregister(&curr->agl_ibmfhdl, 0);
-			TNF_PROBE_0(tavor_agent_register_all_ibmf_cb_fail,
-			    TAVOR_TNF_ERROR, "");
 			goto agents_reg_fail;
 		}
 		num_registered++;
 	}
 
-	TAVOR_TNF_EXIT(tavor_agent_register_all);
 	return (DDI_SUCCESS);
 
 agents_reg_fail:
 	(void) tavor_agent_unregister_all(state, num_registered);
-	TAVOR_TNF_EXIT(tavor_agent_register_all);
 	return (DDI_FAILURE);
 }
 
@@ -585,8 +504,6 @@ tavor_agent_unregister_all(tavor_state_t *state, int num_reg)
 	tavor_agent_list_t	*curr;
 	int			i, status;
 
-	TAVOR_TNF_ENTER(tavor_agent_unregister_all);
-
 	/*
 	 * For each registered agent in the agent list, teardown the
 	 * callbacks from the IBMF and unregister.
@@ -598,23 +515,16 @@ tavor_agent_unregister_all(tavor_state_t *state, int num_reg)
 		status = ibmf_tear_down_async_cb(curr->agl_ibmfhdl,
 		    IBMF_QP_HANDLE_DEFAULT, 0);
 		if (status != IBMF_SUCCESS) {
-			TNF_PROBE_0(tavor_agents_unreg_teardown_cb_fail,
-			    TAVOR_TNF_ERROR, "");
-			TAVOR_TNF_EXIT(tavor_agent_unregister_all);
 			return (DDI_FAILURE);
 		}
 
 		/* Unregister the agent from the IBMF */
 		status = ibmf_unregister(&curr->agl_ibmfhdl, 0);
 		if (status != IBMF_SUCCESS) {
-			TNF_PROBE_0(tavor_agents_unreg_ibmf_fail,
-			    TAVOR_TNF_ERROR, "");
-			TAVOR_TNF_EXIT(tavor_agent_unregister_all);
 			return (DDI_FAILURE);
 		}
 	}
 
-	TAVOR_TNF_EXIT(tavor_agent_unregister_all);
 	return (DDI_SUCCESS);
 }
 

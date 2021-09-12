@@ -55,12 +55,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 
 #
-# Build with no debug TNF probes enabled (by default)
-#
-#DEBUG_DEFS_DBG32 += -DTNF_DEBUG
-#DEBUG_DEFS_DBG64 += -DTNF_DEBUG
-
-#
 # For now, disable these warnings; maintainers should endeavor
 # to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.

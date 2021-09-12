@@ -35,7 +35,6 @@
 #include <sys/sunddi.h>
 #include <sys/strsun.h>
 #include <sys/mkdev.h>
-#include <sys/tnf_probe.h>
 #include <sys/av/iec61883.h>
 #include <sys/1394/t1394.h>
 #include <sys/1394/targets/av1394/av1394_isoch.h>
@@ -295,17 +294,6 @@ enum {
 
 /* current interface version */
 #define	AV1394_IEC61883_VER		IEC61883_V1_0
-
-/* TNF probes */
-#define	AV1394_TNF_FCP			"1394 av1394 fcp "
-#define	AV1394_TNF_FCP_STACK		"1394 av1394 fcp stacktrace "
-#define	AV1394_TNF_FCP_ERROR		"1394 av1394 fcp error "
-#define	AV1394_TNF_ASYNC		"1394 av1394 async "
-#define	AV1394_TNF_ASYNC_STACK		"1394 av1394 async stacktrace "
-#define	AV1394_TNF_ASYNC_ERROR		"1394 av1394 async error "
-#define	AV1394_TNF_INST			"1394 av1394 inst "
-#define	AV1394_TNF_INST_STACK		"1394 av1394 inst stacktrace "
-#define	AV1394_TNF_INST_ERROR		"1394 av1394 inst error "
 
 /* misc */
 #define	NELEM(a)	(sizeof (a) / sizeof (*(a)))

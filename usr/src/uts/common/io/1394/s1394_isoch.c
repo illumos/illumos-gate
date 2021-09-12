@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * s1394_isoch.c
  *    1394 Services Layer Isochronous Communication Routines
@@ -38,8 +36,6 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/types.h>
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
 #include <sys/1394/h1394.h>
@@ -61,9 +57,6 @@ s1394_isoch_rsrc_realloc(s1394_hal_t *hal)
 	uint_t		  chnl_num;
 	int		  err;
 	int		  ret;
-
-	TNF_PROBE_0_DEBUG(s1394_isoch_rsrc_realloc_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 
 	/*
 	 * Get the current generation number - don't need the
@@ -170,14 +163,6 @@ s1394_isoch_rsrc_realloc(s1394_hal_t *hal)
 					/* Try to free up the bandwidth */
 					ret = s1394_bandwidth_free(hal,
 					    bw_alloc_units, generation, &err);
-					if ((ret == DDI_FAILURE) &&
-					    (err != CMD1394_EBUSRESET)) {
-						TNF_PROBE_1(
-						s1394_isoch_rsrc_realloc_error,
-						    S1394_TNF_SL_ISOCH_ERROR,
-						    "", tnf_string, msg,
-						    "Unable to free bandwidth");
-					}
 					/* Try the next Isoch CEC */
 					goto next_isoch_cec;
 				}
@@ -194,8 +179,6 @@ next_isoch_cec:
 
 	/* Unlock the Isoch CEC list */
 	mutex_exit(&hal->isoch_cec_list_mutex);
-	TNF_PROBE_0_DEBUG(s1394_isoch_rsrc_realloc_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 }
 
 /*
@@ -213,9 +196,6 @@ s1394_isoch_rsrc_realloc_notify(s1394_hal_t *hal)
 	s1394_isoch_cec_type_t	 type;
 	void (*rsrc_fail_callback)(t1394_isoch_cec_handle_t, opaque_t,
 				t1394_isoch_rsrc_error_t);
-
-	TNF_PROBE_0_DEBUG(s1394_isoch_rsrc_realloc_notify_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 
 	/* Lock the Isoch CEC list */
 	mutex_enter(&hal->isoch_cec_list_mutex);
@@ -297,8 +277,6 @@ s1394_isoch_rsrc_realloc_notify(s1394_hal_t *hal)
 
 	/* Unlock the Isoch CEC list */
 	mutex_exit(&hal->isoch_cec_list_mutex);
-	TNF_PROBE_0_DEBUG(s1394_isoch_rsrc_realloc_notify_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 }
 
 /*
@@ -325,9 +303,6 @@ s1394_channel_alloc(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 	int		i;
 	int		num_retries = S1394_ISOCH_ALLOC_RETRIES;
 
-	TNF_PROBE_0_DEBUG(s1394_channel_alloc_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	/* Lock the topology tree */
 	mutex_enter(&hal->topology_tree_mutex);
 
@@ -340,11 +315,6 @@ s1394_channel_alloc(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 	/* Make sure there is a valid IRM on the bus */
 	if (IRM_node == -1) {
 		*result = CMD1394_ERETRIES_EXCEEDED;
-		TNF_PROBE_1(s1394_channel_alloc_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "No IRM on the 1394 bus");
-		TNF_PROBE_0_DEBUG(s1394_channel_alloc_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -368,8 +338,6 @@ s1394_channel_alloc(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 			/* Check that the generation has not changed */
 			if (generation != hal->generation_count) {
 				*result = CMD1394_EBUSRESET;
-				TNF_PROBE_0_DEBUG(s1394_channel_alloc_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 
@@ -381,21 +349,11 @@ s1394_channel_alloc(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 			    offset, compare, swap, &old_value);
 			if (ret != DDI_SUCCESS) {
 				*result = CMD1394_EBUSRESET;
-				TNF_PROBE_1(s1394_channel_alloc_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Error in cswap32");
-				TNF_PROBE_0_DEBUG(s1394_channel_alloc_exit,
-				    "stacktrace 1394 s1394", "");
 				return (DDI_FAILURE);
 			}
 
 			if ((~old_value & channel_mask) != 0) {
 				*result = CMD1394_ERETRIES_EXCEEDED;
-				TNF_PROBE_1(s1394_channel_alloc_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Channels already taken");
-				TNF_PROBE_0_DEBUG(s1394_channel_alloc_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 
@@ -403,29 +361,17 @@ s1394_channel_alloc(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 				*result = CMD1394_CMDSUCCESS;
 				*old_channels = old_value;
 
-				TNF_PROBE_0_DEBUG(s1394_channel_alloc_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_SUCCESS);
 			}
 		} while (i--);
 
 		*result = CMD1394_ERETRIES_EXCEEDED;
-		TNF_PROBE_1(s1394_channel_alloc_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Retries exceeded");
-		TNF_PROBE_0_DEBUG(s1394_channel_alloc_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 
 	} else {
 		/* Remote */
 		if (s1394_alloc_cmd(hal, 0, &cmd) != DDI_SUCCESS) {
 			*result = CMD1394_EUNKNOWN_ERROR;
-			TNF_PROBE_1(s1394_channel_alloc_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Unable to allocate command");
-			TNF_PROBE_0_DEBUG(s1394_channel_alloc_exit,
-			    S1394_TNF_SL_ISOCH_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -460,13 +406,6 @@ s1394_channel_alloc(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 
 				if ((~(*old_channels) & channel_mask) != 0) {
 					*result = CMD1394_ERETRIES_EXCEEDED;
-					TNF_PROBE_1(s1394_channel_alloc_error,
-					    S1394_TNF_SL_ISOCH_ERROR, "",
-					    tnf_string, msg,
-					    "Channels already taken");
-					TNF_PROBE_0_DEBUG(
-					    s1394_channel_alloc_exit,
-					    S1394_TNF_SL_ISOCH_STACK, "");
 					ret = DDI_FAILURE;
 				} else {
 					*result = cmd->cmd_result;
@@ -475,8 +414,6 @@ s1394_channel_alloc(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 				/* Need to free the command */
 				(void) s1394_free_cmd(hal, &cmd);
 
-				TNF_PROBE_0_DEBUG(s1394_channel_alloc_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (ret);
 
 			} else {
@@ -484,11 +421,6 @@ s1394_channel_alloc(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 				/* Need to free the command */
 				(void) s1394_free_cmd(hal, &cmd);
 
-				TNF_PROBE_1(s1394_channel_alloc_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Error allocating isoch channel");
-				TNF_PROBE_0_DEBUG(s1394_channel_alloc_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 		} else {
@@ -497,11 +429,6 @@ s1394_channel_alloc(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 			/* Need to free the command */
 			(void) s1394_free_cmd(hal, &cmd);
 
-			TNF_PROBE_1(s1394_channel_alloc_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Error allocating isoch channel");
-			TNF_PROBE_0_DEBUG(s1394_channel_alloc_exit,
-			    S1394_TNF_SL_ISOCH_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
@@ -531,9 +458,6 @@ s1394_channel_free(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 	int		i;
 	int		num_retries = S1394_ISOCH_ALLOC_RETRIES;
 
-	TNF_PROBE_0_DEBUG(s1394_channel_free_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	/* Lock the topology tree */
 	mutex_enter(&hal->topology_tree_mutex);
 
@@ -546,11 +470,6 @@ s1394_channel_free(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 	/* Make sure there is a valid IRM on the bus */
 	if (IRM_node == -1) {
 		*result = CMD1394_ERETRIES_EXCEEDED;
-		TNF_PROBE_1(s1394_channel_free_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "No IRM on the 1394 bus");
-		TNF_PROBE_0_DEBUG(s1394_channel_free_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -574,8 +493,6 @@ s1394_channel_free(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 			/* Check that the generation has not changed */
 			if (generation != hal->generation_count) {
 				*result = CMD1394_EBUSRESET;
-				TNF_PROBE_0_DEBUG(s1394_channel_free_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 
@@ -587,40 +504,23 @@ s1394_channel_free(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 			    offset, compare, swap, &old_value);
 			if (ret != DDI_SUCCESS) {
 				*result = CMD1394_EBUSRESET;
-				TNF_PROBE_1(s1394_channel_free_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Error in cswap32");
-				TNF_PROBE_0_DEBUG(s1394_channel_free_exit,
-				    "stacktrace 1394 s1394", "");
 				return (DDI_FAILURE);
 			}
 
 			if (old_value == compare) {
 				*result = CMD1394_CMDSUCCESS;
 				*old_channels = old_value;
-				TNF_PROBE_0_DEBUG(s1394_channel_free_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_SUCCESS);
 			}
 		} while (i--);
 
 		*result = CMD1394_ERETRIES_EXCEEDED;
-		TNF_PROBE_1(s1394_channel_free_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Retries exceeded");
-		TNF_PROBE_0_DEBUG(s1394_channel_free_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 
 	} else {
 		/* Remote */
 		if (s1394_alloc_cmd(hal, 0, &cmd) != DDI_SUCCESS) {
 			*result = CMD1394_EUNKNOWN_ERROR;
-			TNF_PROBE_1(s1394_channel_free_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Unable to allocate command");
-			TNF_PROBE_0_DEBUG(s1394_channel_free_exit,
-			    S1394_TNF_SL_ISOCH_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -658,8 +558,6 @@ s1394_channel_free(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 				/* Need to free the command */
 				(void) s1394_free_cmd(hal, &cmd);
 
-				TNF_PROBE_0_DEBUG(s1394_channel_free_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_SUCCESS);
 
 			} else {
@@ -668,11 +566,6 @@ s1394_channel_free(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 				/* Need to free the command */
 				(void) s1394_free_cmd(hal, &cmd);
 
-				TNF_PROBE_1(s1394_channel_free_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Error freeing isoch channel");
-				TNF_PROBE_0_DEBUG(s1394_channel_free_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 		} else {
@@ -680,11 +573,6 @@ s1394_channel_free(s1394_hal_t *hal, uint32_t channel_mask, uint_t generation,
 			/* Need to free the command */
 			(void) s1394_free_cmd(hal, &cmd);
 
-			TNF_PROBE_1(s1394_channel_free_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Error freeing isoch channel");
-			TNF_PROBE_0_DEBUG(s1394_channel_free_exit,
-			    S1394_TNF_SL_ISOCH_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
@@ -715,9 +603,6 @@ s1394_bandwidth_alloc(s1394_hal_t *hal, uint32_t bw_alloc_units,
 	int		i;
 	int		num_retries = S1394_ISOCH_ALLOC_RETRIES;
 
-	TNF_PROBE_0_DEBUG(s1394_bandwidth_alloc_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	/* Lock the topology tree */
 	mutex_enter(&hal->topology_tree_mutex);
 
@@ -730,11 +615,6 @@ s1394_bandwidth_alloc(s1394_hal_t *hal, uint32_t bw_alloc_units,
 	/* Make sure there is a valid IRM on the bus */
 	if (IRM_node == -1) {
 		*result = CMD1394_ERETRIES_EXCEEDED;
-		TNF_PROBE_1(s1394_bandwidth_alloc_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "No IRM on the 1394 bus");
-		TNF_PROBE_0_DEBUG(s1394_bandwidth_alloc_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -753,8 +633,6 @@ s1394_bandwidth_alloc(s1394_hal_t *hal, uint32_t bw_alloc_units,
 			 */
 			if (generation != hal->generation_count) {
 				*result = CMD1394_EBUSRESET;
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_alloc_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 
@@ -765,11 +643,6 @@ s1394_bandwidth_alloc(s1394_hal_t *hal, uint32_t bw_alloc_units,
 				swap	= (uint32_t)temp_value;
 			} else {
 				*result = CMD1394_ERETRIES_EXCEEDED;
-				TNF_PROBE_1(s1394_bandwidth_alloc_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Retries exceeded");
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_alloc_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 
@@ -780,39 +653,22 @@ s1394_bandwidth_alloc(s1394_hal_t *hal, uint32_t bw_alloc_units,
 			    &old_value);
 			if (ret != DDI_SUCCESS) {
 				*result = CMD1394_EBUSRESET;
-				TNF_PROBE_1(s1394_bandwidth_alloc_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Error in cswap32");
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_alloc_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 
 			if (old_value == compare) {
 				*result = CMD1394_CMDSUCCESS;
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_alloc_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_SUCCESS);
 			}
 		} while (i--);
 
 		*result = CMD1394_ERETRIES_EXCEEDED;
-		TNF_PROBE_1(s1394_bandwidth_alloc_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Too many retries");
-		TNF_PROBE_0_DEBUG(s1394_bandwidth_alloc_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 
 	} else {
 		/* Remote */
 		if (s1394_alloc_cmd(hal, 0, &cmd) != DDI_SUCCESS) {
 			*result = CMD1394_EUNKNOWN_ERROR;
-			TNF_PROBE_1(s1394_bandwidth_alloc_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Unable to allocate command");
-			TNF_PROBE_0_DEBUG(s1394_bandwidth_alloc_exit,
-			    S1394_TNF_SL_ISOCH_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -837,8 +693,6 @@ s1394_bandwidth_alloc(s1394_hal_t *hal, uint32_t bw_alloc_units,
 				/* Need to free the command */
 				(void) s1394_free_cmd(hal, &cmd);
 
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_alloc_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_SUCCESS);
 
 			} else {
@@ -846,11 +700,6 @@ s1394_bandwidth_alloc(s1394_hal_t *hal, uint32_t bw_alloc_units,
 				/* Need to free the command */
 				(void) s1394_free_cmd(hal, &cmd);
 
-				TNF_PROBE_1(s1394_bandwidth_alloc_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Error allocating isoch bandwidth");
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_alloc_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 		} else {
@@ -858,11 +707,6 @@ s1394_bandwidth_alloc(s1394_hal_t *hal, uint32_t bw_alloc_units,
 			/* Need to free the command */
 			(void) s1394_free_cmd(hal, &cmd);
 
-			TNF_PROBE_1(s1394_bandwidth_alloc_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Error allocating isoch bandwidth");
-			TNF_PROBE_0_DEBUG(s1394_bandwidth_alloc_exit,
-			    S1394_TNF_SL_ISOCH_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
@@ -937,9 +781,6 @@ s1394_bandwidth_free(s1394_hal_t *hal, uint32_t bw_alloc_units,
 	int		i;
 	int		num_retries = S1394_ISOCH_ALLOC_RETRIES;
 
-	TNF_PROBE_0_DEBUG(s1394_bandwidth_free_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	/* Lock the topology tree */
 	mutex_enter(&hal->topology_tree_mutex);
 
@@ -952,11 +793,6 @@ s1394_bandwidth_free(s1394_hal_t *hal, uint32_t bw_alloc_units,
 	/* Make sure there is a valid IRM on the bus */
 	if (IRM_node == -1) {
 		*result = CMD1394_ERETRIES_EXCEEDED;
-		TNF_PROBE_1(s1394_bandwidth_free_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "No IRM on the 1394 bus");
-		TNF_PROBE_0_DEBUG(s1394_bandwidth_free_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -972,8 +808,6 @@ s1394_bandwidth_free(s1394_hal_t *hal, uint32_t bw_alloc_units,
 			/* Check that the generation has not changed */
 			if (generation != hal->generation_count) {
 				*result = CMD1394_EBUSRESET;
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_free_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 
@@ -984,11 +818,6 @@ s1394_bandwidth_free(s1394_hal_t *hal, uint32_t bw_alloc_units,
 				swap	= temp_value;
 			} else {
 				*result = CMD1394_ERETRIES_EXCEEDED;
-				TNF_PROBE_1(s1394_bandwidth_free_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Too many retries");
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_free_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 
@@ -999,39 +828,22 @@ s1394_bandwidth_free(s1394_hal_t *hal, uint32_t bw_alloc_units,
 			    &old_value);
 			if (ret != DDI_SUCCESS) {
 				*result = CMD1394_EBUSRESET;
-				TNF_PROBE_1(s1394_bandwidth_free_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Error in cswap32");
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_free_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 
 			if (old_value == compare) {
 				*result = CMD1394_CMDSUCCESS;
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_free_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_SUCCESS);
 			}
 		} while (i--);
 
 		*result = CMD1394_ERETRIES_EXCEEDED;
-		TNF_PROBE_1(s1394_bandwidth_free_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Retries exceeded");
-		TNF_PROBE_0_DEBUG(s1394_bandwidth_free_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 
 	} else {
 		/* Remote */
 		if (s1394_alloc_cmd(hal, 0, &cmd) != DDI_SUCCESS) {
 			*result = CMD1394_EUNKNOWN_ERROR;
-			TNF_PROBE_1(s1394_bandwidth_free_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Unable to allocate command");
-			TNF_PROBE_0_DEBUG(s1394_bandwidth_free_exit,
-			    S1394_TNF_SL_ISOCH_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -1057,8 +869,6 @@ s1394_bandwidth_free(s1394_hal_t *hal, uint32_t bw_alloc_units,
 				/* Need to free the command */
 				(void) s1394_free_cmd(hal, &cmd);
 
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_free_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_SUCCESS);
 
 			} else {
@@ -1066,11 +876,6 @@ s1394_bandwidth_free(s1394_hal_t *hal, uint32_t bw_alloc_units,
 				/* Need to free the command */
 				(void) s1394_free_cmd(hal, &cmd);
 
-				TNF_PROBE_1(s1394_bandwidth_free_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Error freeing isoch bandwidth");
-				TNF_PROBE_0_DEBUG(s1394_bandwidth_free_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 		} else {
@@ -1078,11 +883,6 @@ s1394_bandwidth_free(s1394_hal_t *hal, uint32_t bw_alloc_units,
 			/* Need to free the command */
 			(void) s1394_free_cmd(hal, &cmd);
 
-			TNF_PROBE_1(s1394_bandwidth_free_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Error freeing isoch bandwidth");
-			TNF_PROBE_0_DEBUG(s1394_bandwidth_free_exit,
-			    S1394_TNF_SL_ISOCH_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
@@ -1096,9 +896,6 @@ void
 s1394_isoch_cec_list_insert(s1394_hal_t *hal, s1394_isoch_cec_t *cec)
 {
 	s1394_isoch_cec_t *cec_temp;
-
-	TNF_PROBE_0_DEBUG(s1394_isoch_cec_list_insert_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 
 	ASSERT(MUTEX_HELD(&hal->isoch_cec_list_mutex));
 
@@ -1120,9 +917,6 @@ s1394_isoch_cec_list_insert(s1394_hal_t *hal, s1394_isoch_cec_t *cec)
 
 		hal->isoch_cec_list_head = cec;
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_isoch_cec_list_insert_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 }
 
 /*
@@ -1134,9 +928,6 @@ s1394_isoch_cec_list_remove(s1394_hal_t *hal, s1394_isoch_cec_t *cec)
 {
 	s1394_isoch_cec_t *prev_cec;
 	s1394_isoch_cec_t *next_cec;
-
-	TNF_PROBE_0_DEBUG(s1394_isoch_cec_list_remove_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 
 	ASSERT(MUTEX_HELD(&hal->isoch_cec_list_mutex));
 
@@ -1160,9 +951,6 @@ s1394_isoch_cec_list_remove(s1394_hal_t *hal, s1394_isoch_cec_t *cec)
 		if (hal->isoch_cec_list_tail == cec)
 			hal->isoch_cec_list_tail = prev_cec;
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_isoch_cec_list_remove_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 }
 
 /*
@@ -1176,9 +964,6 @@ s1394_isoch_cec_member_list_insert(s1394_hal_t *hal, s1394_isoch_cec_t *cec,
     s1394_isoch_cec_member_t *member)
 {
 	s1394_isoch_cec_member_t *member_temp;
-
-	TNF_PROBE_0_DEBUG(s1394_isoch_cec_member_list_insert_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 
 	ASSERT(MUTEX_HELD(&cec->isoch_cec_mutex));
 
@@ -1207,9 +992,6 @@ s1394_isoch_cec_member_list_insert(s1394_hal_t *hal, s1394_isoch_cec_t *cec,
 		member_temp->cec_mem_next = member;
 		cec->cec_member_list_tail = member;
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_isoch_cec_member_list_insert_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 }
 
 /*
@@ -1224,9 +1006,6 @@ s1394_isoch_cec_member_list_remove(s1394_hal_t *hal, s1394_isoch_cec_t *cec,
 {
 	s1394_isoch_cec_member_t *prev_member;
 	s1394_isoch_cec_member_t *next_member;
-
-	TNF_PROBE_0_DEBUG(s1394_isoch_cec_member_list_remove_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 
 	ASSERT(MUTEX_HELD(&cec->isoch_cec_mutex));
 
@@ -1251,7 +1030,4 @@ s1394_isoch_cec_member_list_remove(s1394_hal_t *hal, s1394_isoch_cec_t *cec,
 		if (cec->cec_member_list_tail == member)
 			cec->cec_member_list_tail = prev_member;
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_isoch_cec_member_list_remove_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 }

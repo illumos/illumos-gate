@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file implements the _init(9e), _info(9e) and _fini(9e) functions.
  */
@@ -53,11 +51,6 @@ extern int ibmf_fini();
 extern int ibmf_saa_impl_init();
 extern int ibmf_saa_impl_fini();
 
-#ifndef	NPROBE
-extern int tnf_mod_load(void);
-extern int tnf_mod_unload(struct modlinkage *mlp);
-#endif
-
 int
 _init()
 {
@@ -66,9 +59,6 @@ _init()
 	/* CONSTCOND */
 	ASSERT(NO_COMPETING_THREADS);
 
-#ifndef	NPROBE
-	(void) tnf_mod_load();
-#endif
 	ibmf_statep = &ibmf_state;
 
 	/*
@@ -77,39 +67,20 @@ _init()
 	 */
 	status = ibmf_saa_impl_init();
 	if (status != IBMF_SUCCESS) {
-		TNF_PROBE_1(_init_error, IBMF_TNF_ERROR, "", tnf_string, msg,
-		    "ibmf_saa_impl_init failed");
-
-#ifndef	NPROBE
-		(void) tnf_mod_unload(&ibmf_modlinkage);
-#endif
 		return (EACCES);
 	}
 
-
-
 	status = ibmf_init();
 	if (status != 0) {
-		TNF_PROBE_1(_init_error, IBMF_TNF_ERROR, "", tnf_string, msg,
-		    "ibmf_init failed");
-
 		(void) ibmf_saa_impl_fini();
 
-#ifndef	NPROBE
-		(void) tnf_mod_unload(&ibmf_modlinkage);
-#endif
 		return (EACCES);
 	}
 
 	status = mod_install(&ibmf_modlinkage);
 	if (status != 0) {
-		TNF_PROBE_2(_init_error, IBMF_TNF_ERROR, "", tnf_string, msg,
-		    "mod_install failed", tnf_uint, status, status);
-#ifndef NPROBE
-		(void) tnf_mod_unload(&ibmf_modlinkage);
-#endif
 		(void) ibmf_fini();
-		ibmf_statep = (ibmf_state_t *)NULL;
+		ibmf_statep = NULL;
 	}
 
 	return (status);
@@ -127,23 +98,15 @@ _fini()
 	int status;
 	status = mod_remove(&ibmf_modlinkage);
 	if (status != 0) {
-		TNF_PROBE_2(_fini_error, IBMF_TNF_ERROR, "", tnf_string, msg,
-		    "mod_remove failed", tnf_uint, status, status);
 		return (status);
 	}
 
 	status = ibmf_saa_impl_fini();
 	if (status != 0) {
-
-		TNF_PROBE_2(_fini_error, IBMF_TNF_ERROR, "", tnf_string, msg,
-		    "ibmf_saa fini failed", tnf_uint, status, status);
 		return (status);
 	}
 
 	(void) ibmf_fini();
-	ibmf_statep = (ibmf_state_t *)NULL;
-#ifndef	NPROBE
-	(void) tnf_mod_unload(&ibmf_modlinkage);
-#endif
+	ibmf_statep = NULL;
 	return (status);
 }

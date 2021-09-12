@@ -61,7 +61,6 @@
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/callb.h>
-#include <sys/tnf_probe.h>
 #include <sys/mem_cage.h>
 #include <sys/time.h>
 #include <sys/stdbool.h>

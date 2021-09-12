@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * dcam_frame.c
  *
@@ -38,7 +36,6 @@
 #include <sys/cmn_err.h>
 #include <sys/1394/targets/dcam1394/dcam.h>
 #include <sys/1394/targets/dcam1394/dcam_frame.h>
-#include <sys/tnf_probe.h>
 #include <sys/dcam/dcam1394_io.h>
 
 #include <sys/1394/targets/dcam1394/dcam_reg.h>

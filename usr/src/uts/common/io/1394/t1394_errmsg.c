@@ -24,15 +24,11 @@
  * All rights reserved.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * t1394_errmsg.c
  *    Utility function that targets can use to convert an error code into a
  *    printable string.
  */
-
-#include <sys/tnf_probe.h>
 
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
@@ -151,14 +147,7 @@ t1394_errmsg(int result, uint_t flags)
 	int err;
 	const char *msg = T1394_ERRMSG_EMPTY_STRING;
 
-	TNF_PROBE_1_DEBUG(t1394_errmsg_enter, S1394_TNF_SL_STACK, "",
-	    tnf_int, argument, result);
-
 	if (result > 0) {
-		TNF_PROBE_2(t1394_errmsg, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "invalid result argument",
-		    tnf_int, result, result);
-		TNF_PROBE_0_DEBUG(t1394_errmsg_exit, S1394_TNF_SL_STACK, "");
 		return (T1394_ERRMSG_EMPTY_STRING);
 	}
 
@@ -187,13 +176,7 @@ t1394_errmsg(int result, uint_t flags)
 	    (result <= -T1394_ECFG_LAST)) {
 		err = result - (-T1394_ECFG_FIRST);
 		msg = cfgrom_error_string[err];
-	} else {
-		TNF_PROBE_2(t1394_errmsg, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "invalid result argument",
-		    tnf_int, result, result);
 	}
-
-	TNF_PROBE_0_DEBUG(t1394_errmsg_exit, S1394_TNF_SL_STACK, "");
 
 	return (msg);
 }

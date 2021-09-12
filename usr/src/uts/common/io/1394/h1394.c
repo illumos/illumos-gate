@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * h1394.c
  *    1394 Services Layer HAL Interface
@@ -46,8 +44,6 @@
 #include <sys/disp.h>
 #include <sys/time.h>
 #include <sys/devctl.h>
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
 #include <sys/1394/h1394.h>
@@ -74,12 +70,9 @@ h1394_init(struct modlinkage *modlp)
 {
 	struct dev_ops	*devops;
 
-	TNF_PROBE_0_DEBUG(h1394_init_enter, S1394_TNF_SL_STACK, "");
-
 	devops = ((struct modldrv *)(modlp->ml_linkage[0]))->drv_dev_ops;
 	devops->devo_bus_ops = &nx1394_busops;
 
-	TNF_PROBE_0_DEBUG(h1394_init_exit, S1394_TNF_SL_STACK, "");
 	return (0);
 }
 
@@ -98,12 +91,8 @@ h1394_fini(struct modlinkage *modlp)
 {
 	struct dev_ops	*devops;
 
-	TNF_PROBE_0_DEBUG(h1394_fini_enter, S1394_TNF_SL_STACK, "");
-
 	devops = ((struct modldrv *)(modlp->ml_linkage[0]))->drv_dev_ops;
 	devops->devo_bus_ops = NULL;
-
-	TNF_PROBE_0_DEBUG(h1394_fini_enter, S1394_TNF_SL_STACK, "");
 }
 
 /*
@@ -130,8 +119,6 @@ h1394_attach(h1394_halinfo_t *halinfo, ddi_attach_cmd_t cmd, void **sl_private)
 	char		buf[32];
 	uint_t		cmd_size;
 
-	TNF_PROBE_0_DEBUG(h1394_attach_enter, S1394_TNF_SL_STACK, "");
-
 	ASSERT(sl_private != NULL);
 
 	/* If this is a DDI_RESUME, return success */
@@ -141,15 +128,8 @@ h1394_attach(h1394_halinfo_t *halinfo, ddi_attach_cmd_t cmd, void **sl_private)
 		if (hal->halinfo.phy == H1394_PHY_1394A)
 			(void) HAL_CALL(hal).set_contender_bit(
 			    hal->halinfo.hal_private);
-		TNF_PROBE_0_DEBUG(h1394_attach_exit, S1394_TNF_SL_STACK,
-		    "");
 		return (DDI_SUCCESS);
 	} else if (cmd != DDI_ATTACH) {
-		TNF_PROBE_2(h1394_attach_error, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "Invalid ddi_attach_cmd received",
-		    tnf_uint, attach_cmd, (uint_t)cmd);
-		TNF_PROBE_0_DEBUG(h1394_attach_exit, S1394_TNF_SL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -216,10 +196,6 @@ h1394_attach(h1394_halinfo_t *halinfo, ddi_attach_cmd_t cmd, void **sl_private)
 		/* Clean up before leaving */
 		s1394_cleanup_for_detach(hal, H1394_CLEANUP_LEVEL0);
 
-		TNF_PROBE_1(h1394_attach_error, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "Unable to define attach events");
-		TNF_PROBE_0_DEBUG(h1394_attach_exit, S1394_TNF_SL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -258,10 +234,6 @@ h1394_attach(h1394_halinfo_t *halinfo, ddi_attach_cmd_t cmd, void **sl_private)
 		/* Clean up before leaving */
 		s1394_cleanup_for_detach(hal, H1394_CLEANUP_LEVEL3);
 
-		TNF_PROBE_1(h1394_attach_error, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "Failure in s1394_kstat_init");
-		TNF_PROBE_0_DEBUG(h1394_attach_exit, S1394_TNF_SL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 	hal->hal_kstats->guid = hal->halinfo.guid;
@@ -276,9 +248,6 @@ h1394_attach(h1394_halinfo_t *halinfo, ddi_attach_cmd_t cmd, void **sl_private)
 		/* Clean up before leaving */
 		s1394_cleanup_for_detach(hal, H1394_CLEANUP_LEVEL4);
 
-		TNF_PROBE_1(h1394_attach_error, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "Failure in s1394_init_local_config_rom");
-		TNF_PROBE_0_DEBUG(h1394_attach_exit, S1394_TNF_SL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -288,10 +257,6 @@ h1394_attach(h1394_halinfo_t *halinfo, ddi_attach_cmd_t cmd, void **sl_private)
 		/* Clean up before leaving */
 		s1394_cleanup_for_detach(hal, H1394_CLEANUP_LEVEL5);
 
-		TNF_PROBE_1(h1394_attach_error, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "Invalid 1394 address space");
-		TNF_PROBE_0_DEBUG(h1394_attach_exit, S1394_TNF_SL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -301,10 +266,6 @@ h1394_attach(h1394_halinfo_t *halinfo, ddi_attach_cmd_t cmd, void **sl_private)
 		/* Clean up before leaving */
 		s1394_cleanup_for_detach(hal, H1394_CLEANUP_LEVEL6);
 
-		TNF_PROBE_1(h1394_attach_error, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "FCP initialization failure");
-		TNF_PROBE_0_DEBUG(h1394_attach_exit, S1394_TNF_SL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -332,7 +293,6 @@ h1394_attach(h1394_halinfo_t *halinfo, ddi_attach_cmd_t cmd, void **sl_private)
 	/* Fill in services layer private info */
 	*sl_private = (void *)hal;
 
-	TNF_PROBE_0_DEBUG(h1394_attach_exit, S1394_TNF_SL_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -356,8 +316,6 @@ h1394_detach(void **sl_private, ddi_detach_cmd_t cmd)
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(h1394_detach_enter, S1394_TNF_SL_STACK, "");
-
 	hal = (s1394_hal_t *)(*sl_private);
 
 	switch (cmd) {
@@ -376,14 +334,9 @@ h1394_detach(void **sl_private, ddi_detach_cmd_t cmd)
 		break;
 
 	default:
-		TNF_PROBE_2(h1394_attach_error, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "Invalid ddi_detach_cmd_t type specified",
-		    tnf_uint, detach_cmd, (uint_t)cmd);
-		TNF_PROBE_0_DEBUG(h1394_detach_exit, S1394_TNF_SL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
-	TNF_PROBE_0_DEBUG(h1394_detach_exit, S1394_TNF_SL_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -412,16 +365,9 @@ h1394_alloc_cmd(void *sl_private, uint_t flags, cmd1394_cmd_t **cmdp,
 	s1394_hal_t	 *hal;
 	s1394_cmd_priv_t *s_priv;
 
-	TNF_PROBE_0_DEBUG(h1394_alloc_cmd_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
-
 	hal = (s1394_hal_t *)sl_private;
 
 	if (s1394_alloc_cmd(hal, flags, cmdp) != DDI_SUCCESS) {
-		TNF_PROBE_1(h1394_alloc_cmd_error, S1394_TNF_SL_ARREQ_ERROR, "",
-		    tnf_string, msg, "Failed to allocate command structure");
-		TNF_PROBE_0_DEBUG(h1394_alloc_cmd_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -430,8 +376,6 @@ h1394_alloc_cmd(void *sl_private, uint_t flags, cmd1394_cmd_t **cmdp,
 
 	*hal_priv_ptr = &s_priv->hal_cmd_private;
 
-	TNF_PROBE_0_DEBUG(h1394_alloc_cmd_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 	return (DDI_SUCCESS);
 }
 
@@ -455,9 +399,6 @@ h1394_free_cmd(void *sl_private, cmd1394_cmd_t **cmdp)
 	s1394_hal_t	 *hal;
 	s1394_cmd_priv_t *s_priv;
 
-	TNF_PROBE_0_DEBUG(h1394_free_cmd_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
-
 	hal = (s1394_hal_t *)sl_private;
 
 	/* Get the Services Layer private area */
@@ -465,10 +406,6 @@ h1394_free_cmd(void *sl_private, cmd1394_cmd_t **cmdp)
 
 	/* Check that command isn't in use */
 	if (s_priv->cmd_in_use == B_TRUE) {
-		TNF_PROBE_1(h1394_free_cmd_error, S1394_TNF_SL_ARREQ_ERROR, "",
-		    tnf_string, msg,  "Attempted to free an in-use command");
-		TNF_PROBE_0_DEBUG(h1394_free_cmd_exit, S1394_TNF_SL_ARREQ_STACK,
-		    "");
 		ASSERT(s_priv->cmd_in_use == B_FALSE);
 		return (DDI_FAILURE);
 	}
@@ -481,8 +418,6 @@ h1394_free_cmd(void *sl_private, cmd1394_cmd_t **cmdp)
 	/* kstats - number of cmds freed */
 	hal->hal_kstats->cmd_free++;
 
-	TNF_PROBE_0_DEBUG(h1394_free_cmd_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 	return (DDI_SUCCESS);
 }
 
@@ -511,9 +446,6 @@ h1394_cmd_is_complete(void *sl_private, cmd1394_cmd_t *command_id,
 	s1394_hal_t	*hal;
 	dev_info_t	*dip;
 
-	TNF_PROBE_0_DEBUG(h1394_cmd_is_complete_enter,
-	    S1394_TNF_SL_ATREQ_ATRESP_STACK, "");
-
 	hal = (s1394_hal_t *)sl_private;
 
 	/* Is it AT_RESP or AT_REQ? */
@@ -536,14 +468,8 @@ h1394_cmd_is_complete(void *sl_private, cmd1394_cmd_t *command_id,
 		/* Disable the HAL */
 		s1394_hal_shutdown(hal, B_TRUE);
 
-		TNF_PROBE_1(h1394_cmd_is_complete_error,
-		    S1394_TNF_SL_ATREQ_ATRESP_ERROR, "",
-		    tnf_string, msg, "Invalid command type specified");
 		break;
 	}
-
-	TNF_PROBE_0_DEBUG(h1394_cmd_is_complete_exit,
-	    S1394_TNF_SL_ATREQ_ATRESP_STACK, "");
 }
 
 /*
@@ -563,8 +489,6 @@ h1394_bus_reset(void *sl_private, void **selfid_buf_addr)
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(h1394_bus_reset_enter, S1394_TNF_SL_BR_STACK, "");
-
 	hal = (s1394_hal_t *)sl_private;
 
 	mutex_enter(&hal->topology_tree_mutex);
@@ -581,11 +505,6 @@ h1394_bus_reset(void *sl_private, void **selfid_buf_addr)
 		hal->initiated_bus_reset = B_FALSE;
 		if (hal->num_bus_reset_till_fail > 0) {
 			hal->num_bus_reset_till_fail--;
-		} else {
-			TNF_PROBE_2(h1394_bus_reset_error,
-			    S1394_TNF_SL_BR_ERROR, "",
-			    tnf_string, msg, "Bus reset fail (too many resets)",
-			    tnf_uint, br_type, hal->initiated_br_reason);
 		}
 	} else {
 		hal->num_bus_reset_till_fail = NUM_BR_FAIL;
@@ -615,8 +534,6 @@ h1394_bus_reset(void *sl_private, void **selfid_buf_addr)
 	mutex_enter(&hal->bus_mgr_node_mutex);
 	hal->bus_mgr_node = -1;
 	mutex_exit(&hal->bus_mgr_node_mutex);
-
-	TNF_PROBE_0_DEBUG(h1394_bus_reset_exit, S1394_TNF_SL_BR_STACK, "");
 }
 
 /*
@@ -655,17 +572,12 @@ h1394_self_ids(void *sl_private, void *selfid_buf_addr, uint32_t selfid_size,
 	 * able to build the topology tree.
 	 * tree_processed indicates we read the config ROMs as needed.
 	 */
-	TNF_PROBE_1_DEBUG(h1394_self_ids_enter, S1394_TNF_SL_BR_STACK, "",
-	    tnf_uint, hal_generation, generation_count);
-
 	hal = (s1394_hal_t *)sl_private;
 
 	/* Lock the topology tree */
 	mutex_enter(&hal->topology_tree_mutex);
 	if (hal->hal_state == S1394_HAL_SHUTDOWN) {
 		mutex_exit(&hal->topology_tree_mutex);
-		TNF_PROBE_0_DEBUG(h1394_self_ids_exit, S1394_TNF_SL_BR_STACK,
-		    "");
 		return;
 	}
 
@@ -689,8 +601,6 @@ h1394_self_ids(void *sl_private, void *selfid_buf_addr, uint32_t selfid_size,
 	 */
 	if ((hal->topology_tree_valid == B_TRUE) &&
 	    (hal->topology_tree_processed == B_TRUE)) {
-		TNF_PROBE_0_DEBUG(h1394_self_ids_tree_copy,
-		    S1394_TNF_SL_BR_STACK, "");
 		/* Trees are switched after the copy completes */
 		s1394_copy_old_tree(hal);
 		tree_copied = B_TRUE;
@@ -705,9 +615,6 @@ h1394_self_ids(void *sl_private, void *selfid_buf_addr, uint32_t selfid_size,
 	hal->topology_tree_processed = B_FALSE;
 	hal->cfgroms_being_read = 0;
 
-	TNF_PROBE_0_DEBUG(h1394_self_ids_parse_selfid, S1394_TNF_SL_BR_STACK,
-	    "");
-
 	/*
 	 * Save the number of nodes prior to parsing the self id buffer.
 	 * We need this saved value while initializing the topology tree
@@ -720,10 +627,6 @@ h1394_self_ids(void *sl_private, void *selfid_buf_addr, uint32_t selfid_size,
 	    DDI_SUCCESS) {
 		/* Unlock the topology tree */
 		mutex_exit(&hal->topology_tree_mutex);
-		TNF_PROBE_1(h1394_self_ids_error, S1394_TNF_SL_BR_ERROR, "",
-		    tnf_string, msg, "Unable to parse selfID buffer");
-		TNF_PROBE_0_DEBUG(h1394_self_ids_exit, S1394_TNF_SL_BR_STACK,
-		    "");
 
 		/* kstats - SelfID buffer error */
 		hal->hal_kstats->selfid_buffer_error++;
@@ -732,8 +635,6 @@ h1394_self_ids(void *sl_private, void *selfid_buf_addr, uint32_t selfid_size,
 
 	/* Sort the SelfID packets by node number (if it's a 1995 PHY) */
 	if (hal->halinfo.phy == H1394_PHY_1995) {
-		TNF_PROBE_0_DEBUG(h1394_self_ids_sort, S1394_TNF_SL_BR_STACK,
-		    "");
 		s1394_sort_selfids(hal);
 	}
 
@@ -753,8 +654,6 @@ h1394_self_ids(void *sl_private, void *selfid_buf_addr, uint32_t selfid_size,
 		mutex_exit(&hal->cm_timer_mutex);
 	}
 
-	TNF_PROBE_0_DEBUG(h1394_self_ids_init_topology, S1394_TNF_SL_BR_STACK,
-	    "");
 	s1394_init_topology_tree(hal, tree_copied, saved_number_of_nodes);
 
 	/* Determine the 1394 bus gap count */
@@ -763,10 +662,6 @@ h1394_self_ids(void *sl_private, void *selfid_buf_addr, uint32_t selfid_size,
 	if (hal->gap_count == -1) {
 		/* Unlock the topology tree */
 		mutex_exit(&hal->topology_tree_mutex);
-		TNF_PROBE_1(h1394_self_ids_error, S1394_TNF_SL_BR_ERROR, "",
-		    tnf_string, msg, "Invalid gap counts in SelfID pkts");
-		TNF_PROBE_0_DEBUG(h1394_self_ids_exit, S1394_TNF_SL_BR_STACK,
-		    "");
 
 		/* kstats - SelfID buffer error (invalid gap counts) */
 		hal->hal_kstats->selfid_buffer_error++;
@@ -780,34 +675,18 @@ h1394_self_ids(void *sl_private, void *selfid_buf_addr, uint32_t selfid_size,
 		}
 	}
 
-	TNF_PROBE_1_DEBUG(h1394_self_ids_get_gap_count, S1394_TNF_SL_BR_STACK,
-	    "", tnf_uint, gap_count, hal->gap_count);
-
 	/* Determine the Isoch Resource Manager */
 	hal->IRM_node = s1394_get_isoch_rsrc_mgr(hal);
-
-	TNF_PROBE_1_DEBUG(h1394_self_ids_IRM_node, S1394_TNF_SL_BR_STACK, "",
-	    tnf_int, IRM_node, hal->IRM_node);
-
-	TNF_PROBE_0_DEBUG(h1394_self_ids_build_topology_tree,
-	    S1394_TNF_SL_BR_STACK, "");
 
 	/* Build the topology tree */
 	if (s1394_topology_tree_build(hal) != DDI_SUCCESS) {
 		/* Unlock the topology tree */
 		mutex_exit(&hal->topology_tree_mutex);
-		TNF_PROBE_1(h1394_self_ids_error, S1394_TNF_SL_BR_ERROR, "",
-		    tnf_string, msg, "Error building the topology tree");
-		TNF_PROBE_0_DEBUG(h1394_self_ids_exit, S1394_TNF_SL_BR_STACK,
-		    "");
 
 		/* kstats - SelfID buffer error (Invalid topology tree) */
 		hal->hal_kstats->selfid_buffer_error++;
 		return;		/* Error building topology tree from SelfIDs */
 	}
-
-	TNF_PROBE_0_DEBUG(h1394_self_ids_topology_CSRs, S1394_TNF_SL_BR_STACK,
-	    "");
 
 	/* Update the CSR topology_map */
 	s1394_CSR_topology_map_update(hal);
@@ -817,12 +696,6 @@ h1394_self_ids(void *sl_private, void *selfid_buf_addr, uint32_t selfid_size,
 
 	/* Determine the optimum gap count */
 	hal->optimum_gap_count = s1394_gap_count_optimize(diameter);
-
-	TNF_PROBE_1_DEBUG(h1394_self_ids_diameter_and_gap_count,
-	    S1394_TNF_SL_BR_STACK, "",
-	    tnf_uint, optimum_gap, hal->optimum_gap_count);
-
-	TNF_PROBE_0_DEBUG(h1394_self_ids_speed_map, S1394_TNF_SL_BR_STACK, "");
 
 	/* Fill in the speed map */
 	s1394_speed_map_fill(hal);
@@ -843,8 +716,6 @@ h1394_self_ids(void *sl_private, void *selfid_buf_addr, uint32_t selfid_size,
 			/* If only one bus reset occurred, match the trees */
 			if (((hal->old_generation_count + 1) % gen_rollover) ==
 			    generation_count) {
-				TNF_PROBE_0_DEBUG(h1394_self_ids_tree_matching,
-				    S1394_TNF_SL_BR_STACK, "");
 				s1394_match_tree_nodes(hal);
 			}
 		}
@@ -855,9 +726,6 @@ h1394_self_ids(void *sl_private, void *selfid_buf_addr, uint32_t selfid_size,
 
 	/* Wake up the bus reset processing thread */
 	s1394_tickle_bus_reset_thread(hal);
-
-	TNF_PROBE_0_DEBUG(h1394_self_ids_exit,
-	    S1394_TNF_SL_BR_STACK, "");
 }
 
 /*
@@ -890,9 +758,6 @@ h1394_read_request(void *sl_private, cmd1394_cmd_t *req)
 	uchar_t			*tmp_ptr;
 	void (*recv_read_req)(cmd1394_cmd_t *);
 
-	TNF_PROBE_0_DEBUG(h1394_read_request_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
-
 	hal = (s1394_hal_t *)sl_private;
 
 	/* Get the Services Layer private area */
@@ -921,11 +786,6 @@ h1394_read_request(void *sl_private, cmd1394_cmd_t *req)
 		/* Disable the HAL */
 		s1394_hal_shutdown(hal, B_TRUE);
 
-		TNF_PROBE_1(h1394_read_request_error,
-		    S1394_TNF_SL_ARREQ_ERROR, "",
-		    tnf_string, msg, "Invalid command type specified");
-		TNF_PROBE_0_DEBUG(h1394_read_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
 
@@ -935,17 +795,12 @@ h1394_read_request(void *sl_private, cmd1394_cmd_t *req)
 	/* Has the 1394 address been allocated? */
 	addr_blk = s1394_used_tree_search(hal, req->cmd_addr);
 
-	TNF_PROBE_0_DEBUG(h1394_read_request_addr_search,
-	    S1394_TNF_SL_ARREQ_STACK, "");
-
 	/* If it wasn't found, it isn't owned... */
 	if (addr_blk == NULL) {
 		/* Unlock the "used" tree */
 		mutex_exit(&hal->addr_space_used_mutex);
 		req->cmd_result = IEEE1394_RESP_ADDRESS_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(h1394_read_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
 
@@ -956,8 +811,6 @@ h1394_read_request(void *sl_private, cmd1394_cmd_t *req)
 		mutex_exit(&hal->addr_space_used_mutex);
 		req->cmd_result = IEEE1394_RESP_ADDRESS_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(h1394_read_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
 
@@ -967,8 +820,6 @@ h1394_read_request(void *sl_private, cmd1394_cmd_t *req)
 		mutex_exit(&hal->addr_space_used_mutex);
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(h1394_read_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
 
@@ -980,8 +831,6 @@ h1394_read_request(void *sl_private, cmd1394_cmd_t *req)
 		mutex_exit(&hal->addr_space_used_mutex);
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(h1394_read_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
 
@@ -1018,11 +867,6 @@ h1394_read_request(void *sl_private, cmd1394_cmd_t *req)
 				/* Disable the HAL */
 				s1394_hal_shutdown(hal, B_TRUE);
 
-				TNF_PROBE_1(h1394_read_request_error,
-				    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string,
-				    msg, "Error - mblk too small for request");
-				TNF_PROBE_0_DEBUG(h1394_read_request_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				return;
 			}
 			break;
@@ -1040,11 +884,6 @@ h1394_read_request(void *sl_private, cmd1394_cmd_t *req)
 			/* Disable the HAL */
 			s1394_hal_shutdown(hal, B_TRUE);
 
-			TNF_PROBE_1(h1394_read_request_error,
-			    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-			    "Invalid command type specified");
-			TNF_PROBE_0_DEBUG(h1394_read_request_exit,
-			    S1394_TNF_SL_ARREQ_STACK, "");
 			return;
 		}
 	}
@@ -1063,19 +902,12 @@ h1394_read_request(void *sl_private, cmd1394_cmd_t *req)
 	 * HAL.
 	 */
 	if (recv_read_req != NULL) {
-		TNF_PROBE_0_DEBUG(h1394_read_request_do_callback,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		recv_read_req(req);
 	} else {
 		req->cmd_result = IEEE1394_RESP_COMPLETE;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(h1394_read_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
-
-	TNF_PROBE_0_DEBUG(h1394_read_request_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 }
 
 /*
@@ -1111,9 +943,6 @@ h1394_write_request(void *sl_private, cmd1394_cmd_t *req)
 	boolean_t		write_error = B_FALSE;
 	void (*recv_write_req)(cmd1394_cmd_t *);
 
-	TNF_PROBE_0_DEBUG(h1394_write_request_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
-
 	hal = (s1394_hal_t *)sl_private;
 
 	/* Get the Services Layer private area */
@@ -1143,11 +972,6 @@ h1394_write_request(void *sl_private, cmd1394_cmd_t *req)
 		/* Disable the HAL */
 		s1394_hal_shutdown(hal, B_TRUE);
 
-		TNF_PROBE_1(h1394_write_request_error,
-		    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-		    "Invalid command type specified");
-		TNF_PROBE_0_DEBUG(h1394_write_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
 
@@ -1156,9 +980,6 @@ h1394_write_request(void *sl_private, cmd1394_cmd_t *req)
 
 	/* Has the 1394 address been allocated? */
 	addr_blk = s1394_used_tree_search(hal, req->cmd_addr);
-
-	TNF_PROBE_0_DEBUG(h1394_write_request_addr_search,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 
 	/* Is this a posted write request? */
 	posted_write = s1394_is_posted_write(hal, req->cmd_addr);
@@ -1207,13 +1028,9 @@ write_error_check:
 			/* Free the command - Pass it back to the HAL */
 			HAL_CALL(hal).response_complete(
 			    hal->halinfo.hal_private, req, h_priv);
-			TNF_PROBE_0_DEBUG(h1394_write_request_exit,
-			    S1394_TNF_SL_ARREQ_STACK, "");
 			return;
 		} else {
 			(void) s1394_send_response(hal, req);
-			TNF_PROBE_0_DEBUG(h1394_write_request_exit,
-			    S1394_TNF_SL_ARREQ_STACK, "");
 			return;
 		}
 	}
@@ -1248,11 +1065,6 @@ write_error_check:
 				/* Disable the HAL */
 				s1394_hal_shutdown(hal, B_TRUE);
 
-				TNF_PROBE_1(h1394_write_request_error,
-				    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string,
-				    msg, "Error - mblk too small for request");
-				TNF_PROBE_0_DEBUG(h1394_write_request_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				return;
 			}
 			break;
@@ -1270,11 +1082,6 @@ write_error_check:
 			/* Disable the HAL */
 			s1394_hal_shutdown(hal, B_TRUE);
 
-			TNF_PROBE_1(h1394_write_request_error,
-			    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-			    "Invalid command type specified");
-			TNF_PROBE_0_DEBUG(h1394_write_request_exit,
-			    S1394_TNF_SL_ARREQ_STACK, "");
 			return;
 		}
 	}
@@ -1296,19 +1103,12 @@ write_error_check:
 	 * HAL.
 	 */
 	if (recv_write_req != NULL) {
-		TNF_PROBE_0_DEBUG(h1394_write_request_do_callback,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		recv_write_req(req);
 	} else {
 		req->cmd_result = IEEE1394_RESP_COMPLETE;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(h1394_write_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
-
-	TNF_PROBE_0_DEBUG(h1394_write_request_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 }
 
 /*
@@ -1338,9 +1138,6 @@ h1394_lock_request(void *sl_private, cmd1394_cmd_t *req)
 	cmd1394_lock_type_t	lock_type;
 	void (*recv_lock_req)(cmd1394_cmd_t *);
 
-	TNF_PROBE_0_DEBUG(h1394_lock_request_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
-
 	hal = (s1394_hal_t *)sl_private;
 
 	/* Get the Services Layer private area */
@@ -1360,8 +1157,6 @@ h1394_lock_request(void *sl_private, cmd1394_cmd_t *req)
 		mutex_exit(&hal->addr_space_used_mutex);
 		req->cmd_result = IEEE1394_RESP_ADDRESS_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(h1394_lock_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
 
@@ -1392,11 +1187,6 @@ h1394_lock_request(void *sl_private, cmd1394_cmd_t *req)
 		/* Disable the HAL */
 		s1394_hal_shutdown(hal, B_TRUE);
 
-		TNF_PROBE_1(h1394_lock_request_error,
-		    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-		    "Invalid command type specified");
-		TNF_PROBE_0_DEBUG(h1394_lock_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
 
@@ -1405,8 +1195,6 @@ h1394_lock_request(void *sl_private, cmd1394_cmd_t *req)
 		mutex_exit(&hal->addr_space_used_mutex);
 		req->cmd_result = IEEE1394_RESP_ADDRESS_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(h1394_lock_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
 
@@ -1416,8 +1204,6 @@ h1394_lock_request(void *sl_private, cmd1394_cmd_t *req)
 		mutex_exit(&hal->addr_space_used_mutex);
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(h1394_lock_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
 
@@ -1517,11 +1303,6 @@ h1394_lock_request(void *sl_private, cmd1394_cmd_t *req)
 				mutex_exit(&hal->addr_space_used_mutex);
 				req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 				(void) s1394_send_response(hal, req);
-				TNF_PROBE_1(h1394_lock_request_error,
-				    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string,
-				    msg, "Invalid lock_type");
-				TNF_PROBE_0_DEBUG(h1394_lock_request_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				return;
 			}
 		} else {
@@ -1616,11 +1397,6 @@ h1394_lock_request(void *sl_private, cmd1394_cmd_t *req)
 				mutex_exit(&hal->addr_space_used_mutex);
 				req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 				(void) s1394_send_response(hal, req);
-				TNF_PROBE_1(h1394_lock_request_error,
-				    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string,
-				    msg, "Invalid lock_type");
-				TNF_PROBE_0_DEBUG(h1394_lock_request_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				return;
 			}
 		}
@@ -1640,19 +1416,12 @@ h1394_lock_request(void *sl_private, cmd1394_cmd_t *req)
 	 * HAL.
 	 */
 	if (recv_lock_req != NULL) {
-		TNF_PROBE_0_DEBUG(h1394_lock_request_do_callback,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		recv_lock_req(req);
 	} else {
 		req->cmd_result = IEEE1394_RESP_COMPLETE;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(h1394_lock_request_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return;
 	}
-
-	TNF_PROBE_0_DEBUG(h1394_lock_request_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 }
 
 /*
@@ -1676,16 +1445,12 @@ h1394_ioctl(void *sl_private, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 {
 	int	status;
 
-	TNF_PROBE_0_DEBUG(h1394_ioctl_enter, S1394_TNF_SL_IOCTL_STACK, "");
-
 	if ((cmd & DEVCTL_IOC) != DEVCTL_IOC)
 		return (EINVAL);
 
 	status = s1394_ioctl((s1394_hal_t *)sl_private, cmd, arg, mode,
 	    cred_p, rval_p);
 
-	TNF_PROBE_1_DEBUG(h1394_ioctl_exit, S1394_TNF_SL_IOCTL_STACK, "",
-	    tnf_int, status, status);
 	return (status);
 }
 
@@ -1711,13 +1476,7 @@ void
 h1394_phy_packet(void *sl_private, uint32_t *packet_data, uint_t quadlet_count,
 	uint_t timestamp)
 {
-	TNF_PROBE_0_DEBUG(h1394_phy_packet_enter, S1394_TNF_SL_STACK, "");
-
 	/* This interface is not yet implemented */
-	TNF_PROBE_1_DEBUG(h1394_phy_packet, S1394_TNF_SL_STACK, "",
-	    tnf_string, msg, "h1394_phy_packet: Received");
-
-	TNF_PROBE_0_DEBUG(h1394_phy_packet_exit, S1394_TNF_SL_STACK, "");
 }
 
 /*
@@ -1739,14 +1498,10 @@ h1394_error_detected(void *sl_private, h1394_error_t type, void *arg)
 	uint_t		hal_node_num;
 	uint_t		IRM_node_num;
 
-	TNF_PROBE_0_DEBUG(h1394_error_detected_enter, S1394_TNF_SL_STACK, "");
-
 	hal = (s1394_hal_t *)sl_private;
 
 	switch (type) {
 	case H1394_LOCK_RESP_ERR:
-		TNF_PROBE_1(h1394_error_detected, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "Lock response error");
 		/* If we are the IRM, then initiate a bus reset */
 		mutex_enter(&hal->topology_tree_mutex);
 		hal_node_num = IEEE1394_NODE_NUM(hal->node_id);
@@ -1757,14 +1512,9 @@ h1394_error_detected(void *sl_private, h1394_error_t type, void *arg)
 		break;
 
 	case H1394_POSTED_WR_ERR:
-		TNF_PROBE_2(h1394_error_detected, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "Posted write error detected",
-		    tnf_opaque, addr, ((h1394_posted_wr_err_t *)arg)->addr);
 		break;
 
 	case H1394_SELF_INITIATED_SHUTDOWN:
-		TNF_PROBE_1(h1394_error_detected, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "HAL self-initiated shutdown");
 		s1394_hal_shutdown(hal, B_FALSE);
 		break;
 
@@ -1776,16 +1526,9 @@ h1394_error_detected(void *sl_private, h1394_error_t type, void *arg)
 		hal->cm_timer = timeout(s1394_cycle_too_long_callback, hal,
 		    drv_usectohz(CYCLE_MASTER_TIMER * 1000));
 
-		TNF_PROBE_1(h1394_error_detected, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "Isochronous cycle too long error");
 		break;
 
 	default:
-		TNF_PROBE_2(h1394_error_detected, S1394_TNF_SL_ERROR, "",
-		    tnf_string, msg, "Unknown error type received",
-		    tnf_uint, type, type);
 		break;
 	}
-
-	TNF_PROBE_0_DEBUG(h1394_error_detected_exit, S1394_TNF_SL_STACK, "");
 }

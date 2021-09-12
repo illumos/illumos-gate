@@ -53,23 +53,14 @@ static int	av1394_cfgrom_rq(av1394_inst_t *, cmd1394_cmd_t *,
 		goto catch; \
 	}
 
-#define	AV1394_TNF_ENTER(func)	\
-	TNF_PROBE_0_DEBUG(func##_enter, AV1394_TNF_ASYNC_STACK, "");
-
-#define	AV1394_TNF_EXIT(func)	\
-	TNF_PROBE_0_DEBUG(func##_exit, AV1394_TNF_ASYNC_STACK, "");
-
 int
 av1394_cfgrom_init(av1394_inst_t *avp)
 {
 	av1394_cfgrom_t		*crp = &avp->av_a.a_cfgrom;
 	ddi_iblock_cookie_t	ibc = avp->av_attachinfo.iblock_cookie;
 
-	AV1394_TNF_ENTER(av1394_cfgrom_init);
-
 	rw_init(&crp->cr_rwlock, NULL, RW_DRIVER, ibc);
 
-	AV1394_TNF_EXIT(av1394_cfgrom_init);
 	return (DDI_SUCCESS);
 }
 
@@ -78,11 +69,7 @@ av1394_cfgrom_fini(av1394_inst_t *avp)
 {
 	av1394_cfgrom_t	*crp = &avp->av_a.a_cfgrom;
 
-	AV1394_TNF_ENTER(av1394_cfgrom_fini);
-
 	rw_destroy(&crp->cr_rwlock);
-
-	AV1394_TNF_EXIT(av1394_cfgrom_fini);
 }
 
 void
@@ -90,15 +77,11 @@ av1394_cfgrom_close(av1394_inst_t *avp)
 {
 	av1394_cfgrom_t	*crp = &avp->av_a.a_cfgrom;
 
-	AV1394_TNF_ENTER(av1394_cfgrom_close);
-
 	rw_enter(&crp->cr_rwlock, RW_WRITER);
 	if (crp->cr_parsed) {
 		av1394_cfgrom_unparse_rom(avp);
 	}
 	rw_exit(&crp->cr_rwlock);
-
-	AV1394_TNF_EXIT(av1394_cfgrom_close);
 }
 
 int
@@ -109,11 +92,8 @@ av1394_ioctl_node_get_bus_name(av1394_inst_t *avp, void *arg, int mode)
 	int		err;
 	int		ret = 0;
 
-	AV1394_TNF_ENTER(av1394_ioctl_node_get_bus_name);
-
 	err = t1394_alloc_cmd(avp->av_t1394_hdl, 0, &cmd);
 	if (err != DDI_SUCCESS) {
-		AV1394_TNF_EXIT(av1394_ioctl_node_get_bus_name);
 		return (ENOMEM);
 	}
 
@@ -127,7 +107,6 @@ av1394_ioctl_node_get_bus_name(av1394_inst_t *avp, void *arg, int mode)
 	err = t1394_free_cmd(avp->av_t1394_hdl, 0, &cmd);
 	ASSERT(err == DDI_SUCCESS);
 
-	AV1394_TNF_EXIT(av1394_ioctl_node_get_bus_name);
 	return (ret);
 }
 
@@ -140,11 +119,8 @@ av1394_ioctl_node_get_uid(av1394_inst_t *avp, void *arg, int mode)
 	int		err;
 	int		ret = 0;
 
-	AV1394_TNF_ENTER(av1394_ioctl_node_get_uid);
-
 	err = t1394_alloc_cmd(avp->av_t1394_hdl, 0, &cmd);
 	if (err != DDI_SUCCESS) {
-		AV1394_TNF_EXIT(av1394_ioctl_node_get_uid);
 		return (ENOMEM);
 	}
 
@@ -160,7 +136,6 @@ catch:
 	err = t1394_free_cmd(avp->av_t1394_hdl, 0, &cmd);
 	ASSERT(err == DDI_SUCCESS);
 
-	AV1394_TNF_EXIT(av1394_ioctl_node_get_uid);
 	return (ret);
 }
 
@@ -180,13 +155,10 @@ av1394_ioctl_node_get_text_leaf(av1394_inst_t *avp, void *arg, int mode)
 	uint32_t	spec, lang_id, desc_entry;
 	int		ret = 0;
 
-	AV1394_TNF_ENTER(av1394_ioctl_node_get_text_leaf);
-
 	/* copyin arguments */
 #ifdef _MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 		if (ddi_copyin(arg, &tl32, sizeof (tl32), mode) != 0) {
-			AV1394_TNF_EXIT(av1394_ioctl_node_get_text_leaf);
 			return (EFAULT);
 		}
 		n = tl32.tl_num;
@@ -194,7 +166,6 @@ av1394_ioctl_node_get_text_leaf(av1394_inst_t *avp, void *arg, int mode)
 	} else {
 #endif
 	if (ddi_copyin(arg, &tl, sizeof (tl), mode) != 0) {
-		AV1394_TNF_EXIT(av1394_ioctl_node_get_text_leaf);
 		return (EFAULT);
 	}
 	n = tl.tl_num;
@@ -214,7 +185,6 @@ av1394_ioctl_node_get_text_leaf(av1394_inst_t *avp, void *arg, int mode)
 		ret = av1394_cfgrom_parse_rom(avp);
 		if (ret != 0) {
 			rw_exit(&crp->cr_rwlock);
-			AV1394_TNF_EXIT(av1394_ioctl_node_get_text_leaf);
 			return (ret);
 		}
 	}
@@ -232,7 +202,6 @@ av1394_ioctl_node_get_text_leaf(av1394_inst_t *avp, void *arg, int mode)
 		ret = av1394_cfgrom_read_leaf(avp, pd->pd_tl[n].tl_addr, &bp);
 		if (ret != 0) {
 			rw_exit(&crp->cr_rwlock);
-			AV1394_TNF_EXIT(av1394_ioctl_node_get_text_leaf);
 			return (ret);
 		}
 		leaf_len = MBLKL(bp) / 4 - 2;
@@ -283,7 +252,6 @@ av1394_ioctl_node_get_text_leaf(av1394_inst_t *avp, void *arg, int mode)
 
 	freemsg(bp);
 
-	AV1394_TNF_EXIT(av1394_ioctl_node_get_text_leaf);
 	return (ret);
 }
 
@@ -495,7 +463,6 @@ av1394_cfgrom_read_leaf(av1394_inst_t *avp, uint64_t leaf_addr, mblk_t **bpp)
 
 	err = t1394_alloc_cmd(avp->av_t1394_hdl, 0, &cmd);
 	if (err != DDI_SUCCESS) {
-		AV1394_TNF_EXIT(av1394_ioctl_node_get_text_leaf);
 		return (ENOMEM);
 	}
 
@@ -510,8 +477,6 @@ av1394_cfgrom_read_leaf(av1394_inst_t *avp, uint64_t leaf_addr, mblk_t **bpp)
 	}
 
 	if ((bp = allocb(leaf_len * 4, BPRI_HI)) == NULL) {
-		TNF_PROBE_0(aav1394_cfgrom_read_leaf_error_allocb,
-		    AV1394_TNF_ASYNC_ERROR, "");
 		return (ENOMEM);
 	}
 
@@ -555,9 +520,6 @@ av1394_cfgrom_rq(av1394_inst_t *avp, cmd1394_cmd_t *cmd, uint64_t addr,
 		*rval = cmd->cmd_u.q.quadlet_data;
 		return (0);
 	} else {
-		TNF_PROBE_2(av1394_cfgrom_rq_error,
-		    AV1394_TNF_ASYNC_ERROR, "", tnf_int, err, err,
-		    tnf_int, result, cmd->cmd_result);
 		return (EIO);
 	}
 }

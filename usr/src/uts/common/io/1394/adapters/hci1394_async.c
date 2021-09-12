@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_async.c
  *    These routines manipulate the 1394 asynchronous dma engines.  This
@@ -157,7 +155,6 @@ hci1394_async_init(hci1394_drvinfo_t *drvinfo,
 	ASSERT(ohci_handle != NULL);
 	ASSERT(csr_handle != NULL);
 	ASSERT(async_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_init_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* alloc the space to keep track of the list */
 	async = kmem_alloc(sizeof (hci1394_async_t), KM_SLEEP);
@@ -215,10 +212,6 @@ hci1394_async_init(hci1394_drvinfo_t *drvinfo,
 		hci1394_tlabel_fini(&async->as_tlabel);
 		kmem_free(async, sizeof (hci1394_async_t));
 		*async_handle = NULL;
-		TNF_PROBE_0(hci1394_async_q_init_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_async_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -238,10 +231,6 @@ hci1394_async_init(hci1394_drvinfo_t *drvinfo,
 		hci1394_q_fini(&async->as_atreq_q);
 		kmem_free(async, sizeof (hci1394_async_t));
 		*async_handle = NULL;
-		TNF_PROBE_0(hci1394_async_q_init_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_async_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -262,10 +251,6 @@ hci1394_async_init(hci1394_drvinfo_t *drvinfo,
 		hci1394_q_fini(&async->as_arresp_q);
 		kmem_free(async, sizeof (hci1394_async_t));
 		*async_handle = NULL;
-		TNF_PROBE_0(hci1394_async_q_init_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_async_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -287,16 +272,10 @@ hci1394_async_init(hci1394_drvinfo_t *drvinfo,
 		hci1394_q_fini(&async->as_arreq_q);
 		kmem_free(async, sizeof (hci1394_async_t));
 		*async_handle = NULL;
-		TNF_PROBE_0(hci1394_async_q_init_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_async_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	*async_handle = async;
-
-	TNF_PROBE_0_DEBUG(hci1394_async_init_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -315,7 +294,6 @@ hci1394_async_fini(hci1394_async_handle_t *async_handle)
 
 
 	ASSERT(async_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_fini_enter, HCI1394_TNF_HAL_STACK, "");
 
 	async = (hci1394_async_t *)*async_handle;
 
@@ -331,8 +309,6 @@ hci1394_async_fini(hci1394_async_handle_t *async_handle)
 
 	/* set handle to null.  This helps catch bugs. */
 	*async_handle = NULL;
-
-	TNF_PROBE_0_DEBUG(hci1394_async_fini_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -346,17 +322,12 @@ void
 hci1394_async_suspend(hci1394_async_handle_t async_handle)
 {
 	ASSERT(async_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_suspend_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Flush out async DMA Q's */
 	hci1394_async_flush(async_handle);
 
 	/* Cancel any scheduled pending timeouts */
 	hci1394_tlist_timeout_cancel(async_handle->as_pending_list);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_suspend_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -370,16 +341,11 @@ int
 hci1394_async_resume(hci1394_async_handle_t async_handle)
 {
 	ASSERT(async_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_resume_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	hci1394_q_resume(async_handle->as_atreq_q);
 	hci1394_q_resume(async_handle->as_atresp_q);
 	hci1394_q_resume(async_handle->as_arreq_q);
 	hci1394_q_resume(async_handle->as_arresp_q);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_resume_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -408,7 +374,6 @@ void
 hci1394_async_flush(hci1394_async_handle_t async_handle)
 {
 	ASSERT(async_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_flush_enter, HCI1394_TNF_HAL_STACK, "");
 
 	hci1394_async_atreq_flush(async_handle);
 	hci1394_async_arresp_flush(async_handle);
@@ -416,8 +381,6 @@ hci1394_async_flush(hci1394_async_handle_t async_handle)
 	hci1394_async_arreq_flush(async_handle);
 	hci1394_async_atresp_flush(async_handle);
 	hci1394_tlabel_reset(async_handle->as_tlabel);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_flush_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -433,12 +396,8 @@ hci1394_async_pending_timeout_update(hci1394_async_handle_t async_handle,
     hrtime_t timeout)
 {
 	ASSERT(async_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_pending_timeout_update_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	hci1394_tlist_timeout_update(async_handle->as_pending_list, timeout);
 	hci1394_tlabel_set_reclaim_time(async_handle->as_tlabel, timeout);
-	TNF_PROBE_0_DEBUG(hci1394_async_pending_timeout_update_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -500,9 +459,6 @@ hci1394_async_atreq_process(hci1394_async_handle_t async_handle,
 	ASSERT(async_handle != NULL);
 	ASSERT(request_available != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_atreq_process_enter,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	/*
 	 * Get the next ATREQ that has completed (if one has). Space is free'd
 	 * up in atreq_q and atreq_data_q as part of this function call.
@@ -515,17 +471,12 @@ hci1394_async_atreq_process(hci1394_async_handle_t async_handle,
 	 */
 	if (qcmd == NULL) {
 		*request_available = B_FALSE;
-		TNF_PROBE_0_DEBUG(hci1394_async_atreq_process_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
 	/* There is a completed ATREQ, setup the HAL command pointer */
 	*request_available = B_TRUE;
 	hcicmd = (hci1394_async_cmd_t *)qcmd->qc_arg;
-
-	TNF_PROBE_1_DEBUG(hci1394_atreq_ack, HCI1394_TNF_HAL, "", tnf_uint,
-	    atreq_ack, qcmd->qc_status);
 
 	/* save away the command completed timestamp for the services layer */
 	hcicmd->ac_priv->ack_tstamp = qcmd->qc_timestamp;
@@ -557,17 +508,11 @@ hci1394_async_atreq_process(hci1394_async_handle_t async_handle,
 			    async_handle->as_drvinfo->di_sl_private,
 			    hcicmd->ac_cmd, H1394_AT_REQ,
 			    hcicmd->ac_status);
-			TNF_PROBE_0_DEBUG(hci1394_async_atreq_process_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		/*
 		 * This is a HW error.  Process the ACK like we never saw the
 		 * response. We will do this below.
 		 */
-		} else {
-			TNF_PROBE_1(hci1394_async_ack_fail,
-			    HCI1394_TNF_HAL_ERROR, "", tnf_string, errmsg,
-			    "response sent to non-pended ack");
 		}
 	}
 
@@ -582,8 +527,6 @@ hci1394_async_atreq_process(hci1394_async_handle_t async_handle,
 		hcicmd->ac_plist_node.tln_addr = hcicmd;
 		hci1394_tlist_add(async_handle->as_pending_list,
 		    &hcicmd->ac_plist_node);
-		TNF_PROBE_0_DEBUG(hci1394_async_atreq_process_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
@@ -608,11 +551,6 @@ hci1394_async_atreq_process(hci1394_async_handle_t async_handle,
 
 	case OHCI_EVT_MISSING_ACK:
 	case OHCI_EVT_TIMEOUT:
-		TNF_PROBE_3(hci1394_atreq_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, nodeid,
-		    IEEE1394_NODE_NUM(hcicmd->ac_tlabel.tbi_destination),
-		    tnf_uint, tx_tlabel, hcicmd->ac_tlabel.tbi_tlabel,
-		    tnf_uint, atreq_ack, qcmd->qc_status);
 		cmd_status = H1394_CMD_ETIMEOUT;
 		break;
 
@@ -620,56 +558,26 @@ hci1394_async_atreq_process(hci1394_async_handle_t async_handle,
 	case OHCI_ACK_BUSY_A:
 	case OHCI_ACK_BUSY_B:
 		cmd_status = H1394_CMD_EDEVICE_BUSY;
-		TNF_PROBE_3(hci1394_atreq_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, nodeid,
-		    IEEE1394_NODE_NUM(hcicmd->ac_tlabel.tbi_destination),
-		    tnf_uint, tx_tlabel, hcicmd->ac_tlabel.tbi_tlabel,
-		    tnf_uint, atreq_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_ACK_TARDY:
 		cmd_status = H1394_CMD_EDEVICE_POWERUP;
-		TNF_PROBE_3(hci1394_atreq_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, nodeid,
-		    IEEE1394_NODE_NUM(hcicmd->ac_tlabel.tbi_destination),
-		    tnf_uint, tx_tlabel, hcicmd->ac_tlabel.tbi_tlabel,
-		    tnf_uint, atreq_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_ACK_DATA_ERROR:
 		cmd_status = H1394_CMD_EDATA_ERROR;
-		TNF_PROBE_3(hci1394_atreq_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, nodeid,
-		    IEEE1394_NODE_NUM(hcicmd->ac_tlabel.tbi_destination),
-		    tnf_uint, tx_tlabel, hcicmd->ac_tlabel.tbi_tlabel,
-		    tnf_uint, atreq_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_ACK_TYPE_ERROR:
 		cmd_status = H1394_CMD_ETYPE_ERROR;
-		TNF_PROBE_3(hci1394_atreq_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, nodeid,
-		    IEEE1394_NODE_NUM(hcicmd->ac_tlabel.tbi_destination),
-		    tnf_uint, tx_tlabel, hcicmd->ac_tlabel.tbi_tlabel,
-		    tnf_uint, atreq_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_ACK_CONFLICT_ERROR:
 		cmd_status = H1394_CMD_ERSRC_CONFLICT;
-		TNF_PROBE_3(hci1394_atreq_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, nodeid,
-		    IEEE1394_NODE_NUM(hcicmd->ac_tlabel.tbi_destination),
-		    tnf_uint, tx_tlabel, hcicmd->ac_tlabel.tbi_tlabel,
-		    tnf_uint, atreq_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_ACK_ADDRESS_ERROR:
 		cmd_status = H1394_CMD_EADDR_ERROR;
-		TNF_PROBE_3(hci1394_atreq_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, nodeid,
-		    IEEE1394_NODE_NUM(hcicmd->ac_tlabel.tbi_destination),
-		    tnf_uint, tx_tlabel, hcicmd->ac_tlabel.tbi_tlabel,
-		    tnf_uint, atreq_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_EVT_UNDERRUN:
@@ -679,11 +587,6 @@ hci1394_async_atreq_process(hci1394_async_handle_t async_handle,
 	case OHCI_EVT_UNKNOWN:
 	default:
 		cmd_status = H1394_CMD_EUNKNOWN_ERROR;
-		TNF_PROBE_3(hci1394_atreq_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, nodeid,
-		    IEEE1394_NODE_NUM(hcicmd->ac_tlabel.tbi_destination),
-		    tnf_uint, tx_tlabel, hcicmd->ac_tlabel.tbi_tlabel,
-		    tnf_uint, atreq_ack, qcmd->qc_status);
 		break;
 	}
 
@@ -709,9 +612,6 @@ hci1394_async_atreq_process(hci1394_async_handle_t async_handle,
 	/* tell the services layer that the command has completed */
 	h1394_cmd_is_complete(async_handle->as_drvinfo->di_sl_private,
 	    hcicmd->ac_cmd, H1394_AT_REQ, cmd_status);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_atreq_process_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -739,9 +639,6 @@ hci1394_async_arresp_process(hci1394_async_handle_t async_handle,
 	ASSERT(async_handle != NULL);
 	ASSERT(response_available != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_arresp_process_enter,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	/*
 	 * See if there were any responses on ARRESP Q. A NULL means there
 	 * were no responses on the Q. This call does NOT free up space. We
@@ -751,8 +648,6 @@ hci1394_async_arresp_process(hci1394_async_handle_t async_handle,
 	hci1394_q_ar_next(async_handle->as_arresp_q, &addr);
 	if (addr == NULL) {
 		*response_available = B_FALSE;
-		TNF_PROBE_0_DEBUG(hci1394_async_arresp_process_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
@@ -780,10 +675,6 @@ hci1394_async_arresp_process(hci1394_async_handle_t async_handle,
 		    "unrecoverable error interrupt detected",
 		    async_handle->as_drvinfo->di_instance);
 		hci1394_shutdown(async_handle->as_drvinfo->di_dip);
-		TNF_PROBE_0(hci1394_async_arresp_read_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_arresp_process_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -798,13 +689,8 @@ hci1394_async_arresp_process(hci1394_async_handle_t async_handle,
 	 */
 	if (hcicmd == NULL) {
 		mutex_exit(&async_handle->as_atomic_lookup);
-		TNF_PROBE_0_DEBUG(hci1394_async_arresp_process_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
-
-	TNF_PROBE_1_DEBUG(hci1394_arresp_resp, HCI1394_TNF_HAL, "", tnf_uint,
-	    atresp_resp, hcicmd->ac_status);
 
 	/*
 	 * Make sure this is in the pending list. There is a small chance that
@@ -821,8 +707,6 @@ hci1394_async_arresp_process(hci1394_async_handle_t async_handle,
 		    &hcicmd->ac_plist_node);
 		if (status != DDI_SUCCESS) {
 			mutex_exit(&async_handle->as_atomic_lookup);
-			TNF_PROBE_0_DEBUG(hci1394_async_arresp_process_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 	}
@@ -878,8 +762,6 @@ hci1394_async_arresp_process(hci1394_async_handle_t async_handle,
 		break;
 	default:
 		cmd_status = H1394_CMD_EUNKNOWN_ERROR;
-		TNF_PROBE_1(hci1394_async_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, arresp_resp, hcicmd->ac_status);
 		break;
 	}
 
@@ -909,9 +791,6 @@ hci1394_async_arresp_process(hci1394_async_handle_t async_handle,
 		hcicmd->ac_status = cmd_status;
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_async_arresp_process_exit,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	return (DDI_SUCCESS);
 }
 
@@ -937,9 +816,6 @@ hci1394_async_arreq_process(hci1394_async_handle_t async_handle,
 	ASSERT(async_handle != NULL);
 	ASSERT(request_available != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_process_enter,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	/*
 	 * See if there were any requests on ARREQ Q. A NULL means there
 	 * were no requests on the Q. This call does NOT free up space. We
@@ -949,8 +825,6 @@ hci1394_async_arreq_process(hci1394_async_handle_t async_handle,
 	hci1394_q_ar_next(async_handle->as_arreq_q, &addr);
 	if (addr == NULL) {
 		*request_available = B_FALSE;
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_process_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
@@ -971,10 +845,6 @@ hci1394_async_arreq_process(hci1394_async_handle_t async_handle,
 		    "unrecoverable error interrupt detected",
 		    async_handle->as_drvinfo->di_instance);
 		hci1394_shutdown(async_handle->as_drvinfo->di_dip);
-		TNF_PROBE_0(hci1394_async_arreq_read_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_process_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -988,8 +858,6 @@ hci1394_async_arreq_process(hci1394_async_handle_t async_handle,
 	 * still may have other requests on the Q.
 	 */
 	if (hcicmd == NULL) {
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_process_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
@@ -1002,13 +870,8 @@ hci1394_async_arreq_process(hci1394_async_handle_t async_handle,
 	if (async_handle->as_flushing_arreq == B_TRUE) {
 		hci1394_async_response_complete(async_handle, hcicmd->ac_cmd,
 		    hcicmd->ac_priv);
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_process_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
-
-	TNF_PROBE_1_DEBUG(hci1394_arreq_ack, HCI1394_TNF_HAL, "", tnf_uint,
-	    arreq_ack, hcicmd->ac_status);
 
 	/*
 	 * We got a valid request that we were able to read in. Call into the
@@ -1049,13 +912,8 @@ hci1394_async_arreq_process(hci1394_async_handle_t async_handle,
 		/* free alloc'd command */
 		hci1394_async_response_complete(async_handle, hcicmd->ac_cmd,
 		    hcicmd->ac_priv);
-		TNF_PROBE_1(hci1394_async_arreq_tcode_err,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_uint, arreq_tcode, tcode);
 		break;
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_process_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -1083,9 +941,6 @@ hci1394_async_atresp_process(hci1394_async_handle_t async_handle,
 	ASSERT(async_handle != NULL);
 	ASSERT(response_available != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_atresp_process_enter,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	/*
 	 * Get the next ATRESP that has completed (if one has). Space is free'd
 	 * up in atresp_q and atresp_data_q as part of this function call.
@@ -1098,17 +953,12 @@ hci1394_async_atresp_process(hci1394_async_handle_t async_handle,
 	 */
 	if (qcmd == NULL) {
 		*response_available = B_FALSE;
-		TNF_PROBE_0_DEBUG(hci1394_async_atresp_process_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
 	/* There is a completed ATRESP, setup the HAL command pointer */
 	*response_available = B_TRUE;
 	hcicmd = (hci1394_async_cmd_t *)qcmd->qc_arg;
-
-	TNF_PROBE_1_DEBUG(hci1394_atresp_ack, HCI1394_TNF_HAL, "", tnf_uint,
-	    atresp_ack, qcmd->qc_status);
 
 	/* save away the command completed timestamp for the services layer */
 	hcicmd->ac_priv->ack_tstamp = qcmd->qc_timestamp;
@@ -1135,52 +985,36 @@ hci1394_async_atresp_process(hci1394_async_handle_t async_handle,
 	case OHCI_EVT_MISSING_ACK:
 	case OHCI_EVT_TIMEOUT:
 		cmd_status = H1394_CMD_ETIMEOUT;
-		TNF_PROBE_1(hci1394_atresp_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, atresp_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_ACK_BUSY_X:
 	case OHCI_ACK_BUSY_A:
 	case OHCI_ACK_BUSY_B:
 		cmd_status = H1394_CMD_EDEVICE_BUSY;
-		TNF_PROBE_1(hci1394_atresp_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, atresp_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_ACK_TARDY:
 		cmd_status = H1394_CMD_EDEVICE_POWERUP;
-		TNF_PROBE_1(hci1394_atresp_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, atresp_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_ACK_DATA_ERROR:
 		cmd_status = H1394_CMD_EDATA_ERROR;
-		TNF_PROBE_1(hci1394_atresp_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, atresp_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_ACK_TYPE_ERROR:
 		cmd_status = H1394_CMD_ETYPE_ERROR;
-		TNF_PROBE_1(hci1394_atresp_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, atresp_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_ACK_CONFLICT_ERROR:
 		cmd_status = H1394_CMD_ERSRC_CONFLICT;
-		TNF_PROBE_1(hci1394_atresp_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, atresp_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_ACK_ADDRESS_ERROR:
 		cmd_status = H1394_CMD_EADDR_ERROR;
-		TNF_PROBE_1(hci1394_atresp_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, atresp_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_EVT_UNKNOWN:
 		cmd_status = H1394_CMD_EUNKNOWN_ERROR;
-		TNF_PROBE_1(hci1394_atresp_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, atresp_ack, qcmd->qc_status);
 		break;
 
 	case OHCI_EVT_UNDERRUN:
@@ -1189,17 +1023,12 @@ hci1394_async_atresp_process(hci1394_async_handle_t async_handle,
 	case OHCI_EVT_DESCRIPTOR_READ:
 	default:
 		cmd_status = H1394_CMD_EUNKNOWN_ERROR;
-		TNF_PROBE_1(hci1394_atresp_ack_err, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, atresp_ack, qcmd->qc_status);
 		break;
 	}
 
 	/* tell the services layer that the command has completed */
 	h1394_cmd_is_complete(async_handle->as_drvinfo->di_sl_private,
 	    hcicmd->ac_cmd, H1394_AT_RESP, cmd_status);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_atresp_process_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -1243,9 +1072,6 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 	ASSERT(hcicmd != NULL);
 	ASSERT(size != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_enter,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	/* read in the arresp tcode */
 	quadlet = hci1394_q_ar_get32(async_handle->as_arresp_q, &pkt->q1);
 	*tcode = HCI1394_DESC_TCODE_GET(quadlet);
@@ -1254,10 +1080,6 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 	status = hci1394_async_arresp_size_get(*tcode,
 	    async_handle->as_arresp_q, &pkt->q1, size);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_async_arresp_read_size_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1280,12 +1102,6 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 	 */
 	*hcicmd = (hci1394_async_cmd_t *)command;
 	if ((*hcicmd) == NULL) {
-		TNF_PROBE_2(hci1394_invalid_tlabel, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, nodeid,
-		    IEEE1394_NODE_NUM(ac_tlabel.tbi_destination), tnf_uint,
-		    rx_tlabel, ac_tlabel.tbi_tlabel);
-		TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
@@ -1324,15 +1140,8 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 	if (ack != OHCI_ACK_COMPLETE) {
 		/* use the ack error instead of rcode for the command status */
 		(*hcicmd)->ac_status = ack | ASYNC_ARRESP_ACK_ERROR;
-		TNF_PROBE_1(hci1394_arresp_bad_ack, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_uint, arresp_ack, ack);
-		TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
-
-	TNF_PROBE_1_DEBUG(hci1394_atrresp_resp, HCI1394_TNF_HAL, "", tnf_uint,
-	    arresp_resp, rcode);
 
 	/*
 	 * If we get to this point we have gotten a valid ACK on the response
@@ -1341,8 +1150,6 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 	 * left to look at in the response. Return successfully.
 	 */
 	if (rcode != IEEE1394_RESP_COMPLETE) {
-		TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
@@ -1364,12 +1171,6 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 		if ((cmd->cmd_type != CMD1394_ASYNCH_WR_QUAD) &&
 		    (cmd->cmd_type != CMD1394_ASYNCH_WR_BLOCK)) {
 			(*hcicmd)->ac_status = H1394_CMD_EDEVICE_ERROR;
-			TNF_PROBE_2(hci1394_async_arresp_lockresp_fail,
-			    HCI1394_TNF_HAL_STACK, "", tnf_string, errmsg,
-			    "Invalid response sent for write request", tnf_uint,
-			    arresp_tcode, *tcode);
-			TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 		break;
@@ -1378,12 +1179,6 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 		/* make sure the ATREQ was a quadlet read */
 		if (cmd->cmd_type != CMD1394_ASYNCH_RD_QUAD) {
 			(*hcicmd)->ac_status = H1394_CMD_EDEVICE_ERROR;
-			TNF_PROBE_2(hci1394_async_arresp_lockresp_fail,
-			    HCI1394_TNF_HAL_STACK, "", tnf_string, errmsg,
-			    "Invalid response sent for qrd request", tnf_uint,
-			    arresp_tcode, *tcode);
-			TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 
@@ -1400,12 +1195,6 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 		/* make sure the ATREQ was a block read */
 		if (cmd->cmd_type != CMD1394_ASYNCH_RD_BLOCK) {
 			(*hcicmd)->ac_status = H1394_CMD_EDEVICE_ERROR;
-			TNF_PROBE_2(hci1394_async_arresp_lockresp_fail,
-			    HCI1394_TNF_HAL_STACK, "", tnf_string, errmsg,
-			    "Invalid response sent for brd request", tnf_uint,
-			    arresp_tcode, *tcode);
-			TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 
@@ -1418,13 +1207,6 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 		data_length = HCI1394_DESC_DATALEN_GET(quadlet);
 		if (data_length != cmd_priv->mblk.length) {
 			(*hcicmd)->ac_status = H1394_CMD_EDEVICE_ERROR;
-			TNF_PROBE_3(hci1394_async_arresp_brdsz_fail,
-			    HCI1394_TNF_HAL_STACK, "", tnf_string,
-			    errmsg, "Block read response size is bad",
-			    tnf_uint, requested_size, cmd_priv->mblk.length,
-			    tnf_uint, response_size, data_length);
-			TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 
@@ -1446,13 +1228,6 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 			 */
 			if (data_length != IEEE1394_QUADLET) {
 				(*hcicmd)->ac_status = H1394_CMD_EDEVICE_ERROR;
-				TNF_PROBE_2(hci1394_async_arresp_l32sz_fail,
-				    HCI1394_TNF_HAL_STACK, "", tnf_string,
-				    errmsg, "Invalid size for lock32 response",
-				    tnf_uint, data_size, data_length);
-				TNF_PROBE_0_DEBUG(
-				    hci1394_async_arresp_read_exit,
-				    HCI1394_TNF_HAL_STACK, "");
 				return (DDI_SUCCESS);
 			}
 
@@ -1475,13 +1250,6 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 			 */
 			if (data_length != IEEE1394_OCTLET) {
 				(*hcicmd)->ac_status = H1394_CMD_EDEVICE_ERROR;
-				TNF_PROBE_2(hci1394_async_arresp_l64sz_fail,
-				    HCI1394_TNF_HAL_STACK, "", tnf_string,
-				    errmsg, "Invalid size for lock64 response",
-				    tnf_uint, data_size, data_length);
-				TNF_PROBE_0_DEBUG(
-				    hci1394_async_arresp_read_exit,
-				    HCI1394_TNF_HAL_STACK, "");
 				return (DDI_SUCCESS);
 			}
 
@@ -1503,28 +1271,14 @@ hci1394_async_arresp_read(hci1394_async_handle_t async_handle,
 		 */
 		} else {
 			(*hcicmd)->ac_status = H1394_CMD_EDEVICE_ERROR;
-			TNF_PROBE_2(hci1394_async_arresp_lockresp_fail,
-			    HCI1394_TNF_HAL_STACK, "", tnf_string, errmsg,
-			    "Invalid response sent for lock request", tnf_uint,
-			    arresp_tcode, *tcode);
-			TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 		break;
 
 	default:
 		/* we got a tcode that we don't know about. Return error */
-		TNF_PROBE_2(hci1394_async_arresp_tcode_err,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_string, errmsg,
-		    "unknown ARRESP received", tnf_uint, arresp_tcode, *tcode);
-		TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_async_arresp_read_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -1559,9 +1313,6 @@ hci1394_async_arreq_read(hci1394_async_handle_t async_handle,
 	ASSERT(hcicmd != NULL);
 	ASSERT(size != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_enter,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	/* read in the arresp tcode */
 	quadlet = hci1394_q_ar_get32(async_handle->as_arreq_q, &pkt->q1);
 	*tcode = HCI1394_DESC_TCODE_GET(quadlet);
@@ -1574,10 +1325,6 @@ hci1394_async_arreq_read(hci1394_async_handle_t async_handle,
 	status = h1394_alloc_cmd(async_handle->as_drvinfo->di_sl_private,
 	    H1394_ALLOC_CMD_NOSLEEP, &cmd, &cmd_priv);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_async_arreq_read_cmdalloc_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1611,10 +1358,6 @@ hci1394_async_arreq_read(hci1394_async_handle_t async_handle,
 			hci1394_async_response_complete(async_handle, cmd,
 			    cmd_priv);
 			*hcicmd = NULL;
-			TNF_PROBE_0(hci1394_async_arreq_read_qrd_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 		break;
@@ -1633,10 +1376,6 @@ hci1394_async_arreq_read(hci1394_async_handle_t async_handle,
 			hci1394_async_response_complete(async_handle, cmd,
 			    cmd_priv);
 			*hcicmd = NULL;
-			TNF_PROBE_0(hci1394_async_arreq_read_qwr_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 		break;
@@ -1655,10 +1394,6 @@ hci1394_async_arreq_read(hci1394_async_handle_t async_handle,
 			hci1394_async_response_complete(async_handle, cmd,
 			    cmd_priv);
 			*hcicmd = NULL;
-			TNF_PROBE_0(hci1394_async_arreq_read_brd_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 		break;
@@ -1677,10 +1412,6 @@ hci1394_async_arreq_read(hci1394_async_handle_t async_handle,
 			hci1394_async_response_complete(async_handle, cmd,
 			    cmd_priv);
 			*hcicmd = NULL;
-			TNF_PROBE_0(hci1394_async_arreq_read_bwr_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 		break;
@@ -1699,10 +1430,6 @@ hci1394_async_arreq_read(hci1394_async_handle_t async_handle,
 			hci1394_async_response_complete(async_handle, cmd,
 			    cmd_priv);
 			*hcicmd = NULL;
-			TNF_PROBE_0(hci1394_async_arreq_read_lck_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 		break;
@@ -1721,10 +1448,6 @@ hci1394_async_arreq_read(hci1394_async_handle_t async_handle,
 			hci1394_async_response_complete(async_handle, cmd,
 			    cmd_priv);
 			*hcicmd = NULL;
-			TNF_PROBE_0(hci1394_async_arreq_read_phy_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 
@@ -1737,19 +1460,12 @@ hci1394_async_arreq_read(hci1394_async_handle_t async_handle,
 			hci1394_async_response_complete(async_handle, cmd,
 			    cmd_priv);
 			*hcicmd = NULL;
-			TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_SUCCESS);
 		}
 		break;
 
 	default:
 		/* we got a tcode that we don't know about. Return error */
-		TNF_PROBE_2(hci1394_async_arreq_tcode_err,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_string, errmsg,
-		    "unknown ARREQ received", tnf_uint, arreq_tcode, *tcode);
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1765,10 +1481,6 @@ hci1394_async_arreq_read(hci1394_async_handle_t async_handle,
 	    IEEE1394_TCODE_WRITE_BLOCK))) {
 		hci1394_async_response_complete(async_handle, cmd, cmd_priv);
 		*hcicmd = NULL;
-		TNF_PROBE_0(hci1394_async_arreq_read_bcast_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 
 	/*
@@ -1779,9 +1491,6 @@ hci1394_async_arreq_read(hci1394_async_handle_t async_handle,
 	    IEEE1394_BROADCAST_NODEID)) {
 		cmd->broadcast = 1;
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -1805,8 +1514,6 @@ hci1394_async_arreq_read_qrd(hci1394_async_handle_t async_handle,
 	ASSERT(pkt != NULL);
 	ASSERT(hcicmd != NULL);
 	ASSERT(size != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_qrd_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Setup shortcuts, command type, and size of request */
 	cmd = hcicmd->ac_cmd;
@@ -1831,11 +1538,6 @@ hci1394_async_arreq_read_qrd(hci1394_async_handle_t async_handle,
 	 */
 	if ((hcicmd->ac_status != OHCI_ACK_COMPLETE) &&
 	    (hcicmd->ac_status != OHCI_ACK_PENDING)) {
-		TNF_PROBE_1(hci1394_async_arreq_qrd_ack_fail,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_uint, arreq_ack,
-		    hcicmd->ac_status);
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_qrd_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1857,9 +1559,6 @@ hci1394_async_arreq_read_qrd(hci1394_async_handle_t async_handle,
 	cmd->cmd_addr = HCI1394_TO_ADDR_HI(quadlet);
 	quadlet = hci1394_q_ar_get32(async_handle->as_arreq_q, &pkt->q3);
 	cmd->cmd_addr |= HCI1394_TO_ADDR_LO(quadlet);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_qrd_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -1884,8 +1583,6 @@ hci1394_async_arreq_read_qwr(hci1394_async_handle_t async_handle,
 	ASSERT(pkt != NULL);
 	ASSERT(hcicmd != NULL);
 	ASSERT(size != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_qwr_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Setup shortcuts, command type, and size of request */
 	cmd = hcicmd->ac_cmd;
@@ -1910,11 +1607,6 @@ hci1394_async_arreq_read_qwr(hci1394_async_handle_t async_handle,
 	 */
 	if ((hcicmd->ac_status != OHCI_ACK_COMPLETE) &&
 	    (hcicmd->ac_status != OHCI_ACK_PENDING)) {
-		TNF_PROBE_1(hci1394_async_arreq_qwr_ack_fail,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_uint, arreq_ack,
-		    hcicmd->ac_status);
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_qwr_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1941,9 +1633,6 @@ hci1394_async_arreq_read_qwr(hci1394_async_handle_t async_handle,
 	    (uint8_t *)&cmd->cmd_u.q.quadlet_data, (uint8_t *)&pkt->q4,
 	    IEEE1394_QUADLET);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_qwr_exit,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	return (DDI_SUCCESS);
 }
 
@@ -1966,8 +1655,6 @@ hci1394_async_arreq_read_brd(hci1394_async_handle_t async_handle,
 	ASSERT(pkt != NULL);
 	ASSERT(hcicmd != NULL);
 	ASSERT(size != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_brd_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Setup shortcuts, command type, and size of request */
 	cmd = hcicmd->ac_cmd;
@@ -1992,11 +1679,6 @@ hci1394_async_arreq_read_brd(hci1394_async_handle_t async_handle,
 	 */
 	if ((hcicmd->ac_status != OHCI_ACK_COMPLETE) &&
 	    (hcicmd->ac_status != OHCI_ACK_PENDING)) {
-		TNF_PROBE_1(hci1394_async_arreq_brd_ack_fail,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_uint, arreq_ack,
-		    hcicmd->ac_status);
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_brd_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2019,16 +1701,9 @@ hci1394_async_arreq_read_brd(hci1394_async_handle_t async_handle,
 	cmd->cmd_u.b.blk_length = HCI1394_DESC_DATALEN_GET(quadlet);
 	cmd->cmd_u.b.data_block = allocb(cmd->cmd_u.b.blk_length, 0);
 	if (cmd->cmd_u.b.data_block == NULL) {
-		TNF_PROBE_0(hci1394_async_arreq_brd_mblk_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_brd_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 	hcicmd->ac_mblk_alloc = B_TRUE;
-
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_brd_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2053,8 +1728,6 @@ hci1394_async_arreq_read_bwr(hci1394_async_handle_t async_handle,
 	ASSERT(pkt != NULL);
 	ASSERT(hcicmd != NULL);
 	ASSERT(size != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_bwr_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Setup shortcuts, command type, and size of request. The size of the
@@ -2090,11 +1763,6 @@ hci1394_async_arreq_read_bwr(hci1394_async_handle_t async_handle,
 	 */
 	if ((hcicmd->ac_status != OHCI_ACK_COMPLETE) &&
 	    (hcicmd->ac_status != OHCI_ACK_PENDING)) {
-		TNF_PROBE_1(hci1394_async_arreq_bwr_ack_fail,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_uint, arreq_ack,
-		    hcicmd->ac_status);
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_bwr_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2115,10 +1783,6 @@ hci1394_async_arreq_read_bwr(hci1394_async_handle_t async_handle,
 	cmd->cmd_addr |= HCI1394_TO_ADDR_LO(quadlet);
 	cmd->cmd_u.b.data_block = allocb(cmd->cmd_u.b.blk_length, 0);
 	if (cmd->cmd_u.b.data_block == NULL) {
-		TNF_PROBE_0(hci1394_async_arreq_bwr_mblk_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_bwr_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 	hcicmd->ac_mblk_alloc = B_TRUE;
@@ -2130,9 +1794,6 @@ hci1394_async_arreq_read_bwr(hci1394_async_handle_t async_handle,
 
 	/* Update mblk_t wptr */
 	cmd->cmd_u.b.data_block->b_wptr += cmd->cmd_u.b.blk_length;
-
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_bwr_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2159,8 +1820,6 @@ hci1394_async_arreq_read_lck(hci1394_async_handle_t async_handle,
 	ASSERT(pkt != NULL);
 	ASSERT(hcicmd != NULL);
 	ASSERT(size != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_qrd_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Setup shortcuts, command type, and size of request. The size of the
@@ -2182,11 +1841,6 @@ hci1394_async_arreq_read_lck(hci1394_async_handle_t async_handle,
 		cmd->cmd_type = CMD1394_ASYNCH_LOCK_64;
 		cmd->cmd_u.l64.lock_type = HCI1394_DESC_EXTTCODE_GET(quadlet);
 	} else {
-		TNF_PROBE_2(hci1394_async_arreq_lck_sz_fail,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_string, errmsg,
-		    "unexpected length received", tnf_uint, locklen, length);
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2210,11 +1864,6 @@ hci1394_async_arreq_read_lck(hci1394_async_handle_t async_handle,
 	 */
 	if ((hcicmd->ac_status != OHCI_ACK_COMPLETE) &&
 	    (hcicmd->ac_status != OHCI_ACK_PENDING)) {
-		TNF_PROBE_1(hci1394_async_arreq_read_ack_fail,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_uint, arreq_ack,
-		    hcicmd->ac_status);
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2274,9 +1923,6 @@ hci1394_async_arreq_read_lck(hci1394_async_handle_t async_handle,
 		    cmd->cmd_u.l64.lock_type, cmd->cmd_u.l64.data_value);
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_qrd_exit,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	return (DDI_SUCCESS);
 }
 
@@ -2301,8 +1947,6 @@ hci1394_async_arreq_read_phy(hci1394_async_handle_t async_handle,
 	ASSERT(pkt != NULL);
 	ASSERT(hcicmd != NULL);
 	ASSERT(size != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_phy_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Setup shortcuts, command type, and size of request */
 	cmd = hcicmd->ac_cmd;
@@ -2335,8 +1979,6 @@ hci1394_async_arreq_read_phy(hci1394_async_handle_t async_handle,
 		    async_handle->as_ohci)) {
 			async_handle->as_flushing_arreq = B_FALSE;
 		}
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_phy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
@@ -2344,19 +1986,11 @@ hci1394_async_arreq_read_phy(hci1394_async_handle_t async_handle,
 
 	/* if there is a data error in the PHY packet, return failure */
 	if (data1 != ~data2) {
-		TNF_PROBE_2(hci1394_async_arreq_phy_xor_fail,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_opaque, first_quadlet,
-		    data1, tnf_opaque, second_quadlet, data2);
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_phy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	/* Copy the PHY quadlet to the command */
 	cmd->cmd_u.q.quadlet_data = data1;
-
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_read_phy_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2380,8 +2014,6 @@ hci1394_async_phy(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	ASSERT(cmd_priv != NULL);
 	ASSERT(result != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_phy_enter, HCI1394_TNF_HAL_STACK, "");
-
 	/*
 	 * make sure this call is during the current bus generation (i.e. no
 	 * bus resets have occured since this request was made.
@@ -2389,8 +2021,6 @@ hci1394_async_phy(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	if (cmd_priv->bus_generation != hci1394_ohci_current_busgen(
 	    async_handle->as_ohci)) {
 		*result = H1394_STATUS_INVALID_BUSGEN;
-		TNF_PROBE_0_DEBUG(hci1394_async_phy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2412,14 +2042,8 @@ hci1394_async_phy(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	status = hci1394_q_at(async_handle->as_atreq_q, &hcicmd->ac_qcmd,
 	    &header, DESC_PKT_HDRLEN_AT_PHY, result);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_async_phy_q_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_async_phy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_async_phy_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2444,8 +2068,6 @@ hci1394_async_write(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	ASSERT(cmd_priv != NULL);
 	ASSERT(result != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_write_enter, HCI1394_TNF_HAL_STACK, "");
-
 	/*
 	 * make sure this call is during the current bus generation (i.e. no
 	 * bus resets have occured since this request was made.
@@ -2453,8 +2075,6 @@ hci1394_async_write(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	if (cmd_priv->bus_generation != hci1394_ohci_current_busgen(
 	    async_handle->as_ohci)) {
 		*result = H1394_STATUS_INVALID_BUSGEN;
-		TNF_PROBE_0_DEBUG(hci1394_async_write_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2467,10 +2087,6 @@ hci1394_async_write(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	    &hcicmd->ac_tlabel);
 	if (status != DDI_SUCCESS) {
 		*result = H1394_STATUS_EMPTY_TLABEL;
-		TNF_PROBE_0(hci1394_async_write_tlb_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_write_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2512,10 +2128,6 @@ hci1394_async_write(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 		    &hcicmd->ac_qcmd, &header, DESC_PKT_HDRLEN_AT_WRITEQUAD,
 		    result);
 		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_async_write_q_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_write_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -2536,15 +2148,9 @@ hci1394_async_write(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 		    &hcicmd->ac_qcmd, &header, DESC_PKT_HDRLEN_AT_WRITEBLOCK,
 		    &cmd_priv->mblk, result);
 		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_async_write_qmblk_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_write_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_async_write_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2569,8 +2175,6 @@ hci1394_async_read(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	ASSERT(cmd_priv != NULL);
 	ASSERT(result != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_read_enter, HCI1394_TNF_HAL_STACK, "");
-
 	/*
 	 * make sure this call is during the current bus generation (i.e. no
 	 * bus resets have occured since this request was made.
@@ -2578,8 +2182,6 @@ hci1394_async_read(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	if (cmd_priv->bus_generation != hci1394_ohci_current_busgen(
 	    async_handle->as_ohci)) {
 		*result = H1394_STATUS_INVALID_BUSGEN;
-		TNF_PROBE_0_DEBUG(hci1394_async_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2592,10 +2194,6 @@ hci1394_async_read(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	    &hcicmd->ac_tlabel);
 	if (status != DDI_SUCCESS) {
 		*result = H1394_STATUS_EMPTY_TLABEL;
-		TNF_PROBE_0(hci1394_async_read_tlb_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2633,10 +2231,6 @@ hci1394_async_read(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 		    &hcicmd->ac_qcmd, &header, DESC_PKT_HDRLEN_AT_READQUAD,
 		    result);
 		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_async_read_q_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -2653,15 +2247,9 @@ hci1394_async_read(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 		    &hcicmd->ac_qcmd, &header, DESC_PKT_HDRLEN_AT_READBLOCK,
 		    result);
 		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_async_read_qb_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_read_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_async_read_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2690,8 +2278,6 @@ hci1394_async_lock(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	ASSERT(cmd_priv != NULL);
 	ASSERT(result != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_lock_enter, HCI1394_TNF_HAL_STACK, "");
-
 	/*
 	 * make sure this call is during the current bus generation (i.e. no
 	 * bus resets have occured since this request was made.
@@ -2699,8 +2285,6 @@ hci1394_async_lock(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	if (cmd_priv->bus_generation != hci1394_ohci_current_busgen(
 	    async_handle->as_ohci)) {
 		*result = H1394_STATUS_INVALID_BUSGEN;
-		TNF_PROBE_0_DEBUG(hci1394_async_lock_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2713,10 +2297,6 @@ hci1394_async_lock(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	    &hcicmd->ac_tlabel);
 	if (status != DDI_SUCCESS) {
 		*result = H1394_STATUS_EMPTY_TLABEL;
-		TNF_PROBE_0(hci1394_async_lock_tlb_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_lock_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2767,10 +2347,6 @@ hci1394_async_lock(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 		datap = (uint8_t *)data64;
 	} else {
 		*result = H1394_STATUS_INTERNAL_ERROR;
-		TNF_PROBE_0(hci1394_lock_length_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_lock_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2779,14 +2355,8 @@ hci1394_async_lock(hci1394_async_handle_t async_handle, cmd1394_cmd_t *cmd,
 	    &hcicmd->ac_qcmd, &header, DESC_PKT_HDRLEN_AT_LOCK, datap, size,
 	    result);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_async_lock_q_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_lock_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_async_lock_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2812,9 +2382,6 @@ hci1394_async_write_response(hci1394_async_handle_t async_handle,
 	ASSERT(cmd_priv != NULL);
 	ASSERT(result != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_write_response_enter,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	/*
 	 * make sure this call is during the current bus generation (i.e. no
 	 * bus resets have occured since this request was made.
@@ -2822,8 +2389,6 @@ hci1394_async_write_response(hci1394_async_handle_t async_handle,
 	if (cmd_priv->bus_generation != hci1394_ohci_current_busgen(
 	    async_handle->as_ohci)) {
 		*result = H1394_STATUS_INVALID_BUSGEN;
-		TNF_PROBE_0_DEBUG(hci1394_async_write_response_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2855,15 +2420,8 @@ hci1394_async_write_response(hci1394_async_handle_t async_handle,
 	status = hci1394_q_at(async_handle->as_atresp_q, &hcicmd->ac_qcmd,
 	    &header, DESC_PKT_HDRLEN_AT_WRITE_RESP, result);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_async_write_response_q_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_write_response_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_async_write_response_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2889,9 +2447,6 @@ hci1394_async_read_response(hci1394_async_handle_t async_handle,
 	ASSERT(cmd_priv != NULL);
 	ASSERT(result != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_read_response_enter,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	/*
 	 * make sure this call is during the current bus generation (i.e. no
 	 * bus resets have occured since this request was made.
@@ -2899,8 +2454,6 @@ hci1394_async_read_response(hci1394_async_handle_t async_handle,
 	if (cmd_priv->bus_generation != hci1394_ohci_current_busgen(
 	    async_handle->as_ohci)) {
 		*result = H1394_STATUS_INVALID_BUSGEN;
-		TNF_PROBE_0_DEBUG(hci1394_async_read_response_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2950,10 +2503,6 @@ hci1394_async_read_response(hci1394_async_handle_t async_handle,
 		    &hcicmd->ac_qcmd, &header, DESC_PKT_HDRLEN_AT_READQUAD_RESP,
 		    result);
 		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_async_read_response_q_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_read_response_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -2978,10 +2527,6 @@ hci1394_async_read_response(hci1394_async_handle_t async_handle,
 		    &hcicmd->ac_qcmd, &header,
 		    DESC_PKT_HDRLEN_AT_READBLOCK_RESP, result);
 		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_async_read_response_qbf_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_read_response_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -3005,16 +2550,9 @@ hci1394_async_read_response(hci1394_async_handle_t async_handle,
 		    &hcicmd->ac_qcmd, &header,
 		    DESC_PKT_HDRLEN_AT_READBLOCK_RESP, &cmd_priv->mblk, result);
 		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_async_read_response_qb_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_read_response_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_async_read_response_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -3044,9 +2582,6 @@ hci1394_async_lock_response(hci1394_async_handle_t async_handle,
 	ASSERT(cmd_priv != NULL);
 	ASSERT(result != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_lock_response_enter,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	/*
 	 * make sure this call is during the current bus generation (i.e. no
 	 * bus resets have occured since this request was made.
@@ -3054,8 +2589,6 @@ hci1394_async_lock_response(hci1394_async_handle_t async_handle,
 	if (cmd_priv->bus_generation != hci1394_ohci_current_busgen(
 	    async_handle->as_ohci)) {
 		*result = H1394_STATUS_INVALID_BUSGEN;
-		TNF_PROBE_0_DEBUG(hci1394_async_lock_response_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -3106,14 +2639,8 @@ hci1394_async_lock_response(hci1394_async_handle_t async_handle,
 		    &hcicmd->ac_qcmd, &header, DESC_PKT_HDRLEN_AT_LOCK_RESP,
 		    result);
 		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_q_alloc_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_async_lock_response_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
-		TNF_PROBE_0_DEBUG(hci1394_async_lock_response_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
@@ -3141,9 +2668,6 @@ hci1394_async_lock_response(hci1394_async_handle_t async_handle,
 		datap = (uint8_t *)&data64;
 	} else {
 		*result = H1394_STATUS_INTERNAL_ERROR;
-		TNF_PROBE_0(hci1394_lock_type_fail, HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_lock_response_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -3155,14 +2679,8 @@ hci1394_async_lock_response(hci1394_async_handle_t async_handle,
 	    &hcicmd->ac_qcmd, &header, DESC_PKT_HDRLEN_AT_LOCK_RESP, datap,
 	    size, result);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_q_alloc_fail, HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_async_lock_response_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_async_lock_response_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -3190,9 +2708,6 @@ hci1394_async_response_complete(hci1394_async_handle_t async_handle,
 	ASSERT(cmd != NULL);
 	ASSERT(cmd_priv != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_response_complete_enter,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	hcicmd = (hci1394_async_cmd_t *)cmd_priv->hal_overhead;
 
 	/* If we allocated an mblk for this command */
@@ -3209,9 +2724,6 @@ hci1394_async_response_complete(hci1394_async_handle_t async_handle,
 	/* free up the 1394 framework command */
 	(void) h1394_free_cmd((void *)async_handle->as_drvinfo->di_sl_private,
 	    &cmd);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_response_complete_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3236,8 +2748,6 @@ hci1394_async_pending_timeout(hci1394_tlist_node_t *node, void *arg)
 	async_handle = (hci1394_async_handle_t)arg;
 	ASSERT(async_handle != NULL);
 	ASSERT(node != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_pending_timeout_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	hcicmd = (hci1394_async_cmd_t *)node->tln_addr;
 
@@ -3264,9 +2774,6 @@ hci1394_async_pending_timeout(hci1394_tlist_node_t *node, void *arg)
 	/* Tell the Services Layer that the command has timed out */
 	h1394_cmd_is_complete(async_handle->as_drvinfo->di_sl_private,
 	    hcicmd->ac_cmd, H1394_AT_REQ, H1394_CMD_ETIMEOUT);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_pending_timeout_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3286,10 +2793,6 @@ hci1394_async_timeout_calc(hci1394_async_handle_t async_handle,
 	uint_t temp;
 	uint_t carry;
 	uint_t z;
-
-
-	TNF_PROBE_0_DEBUG(hci1394_async_timeout_calc_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Get the current split timeout */
 	split_timeout = hci1394_csr_split_timeout_get(async_handle->as_csr);
@@ -3330,9 +2833,6 @@ hci1394_async_timeout_calc(hci1394_async_handle_t async_handle,
 	    OHCI_CYCLE_SEC_MASK) + (carry << OHCI_CYCLE_SEC_SHIFT) + temp;
 	z = z & OHCI_TIMESTAMP_MASK;
 
-	TNF_PROBE_0_DEBUG(hci1394_async_timeout_calc_exit,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	return (z);
 }
 
@@ -3352,9 +2852,6 @@ hci1394_async_arresp_size_get(uint_t tcode, hci1394_q_handle_t q_handle,
 	ASSERT(q_handle != NULL);
 	ASSERT(addr != NULL);
 	ASSERT(size != NULL);
-
-	TNF_PROBE_0_DEBUG(hci1394_get_arresp_size_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	if (tcode == IEEE1394_TCODE_WRITE_RESP) {
 		*size = DESC_PKT_HDRLEN_AT_WRITE_RESP + IEEE1394_QUADLET;
@@ -3381,16 +2878,8 @@ hci1394_async_arresp_size_get(uint_t tcode, hci1394_q_handle_t q_handle,
 		*size = DESC_PKT_HDRLEN_AT_LOCK_RESP +
 		    HCI1394_ALIGN_QUAD(data_length) + IEEE1394_QUADLET;
 	} else {
-		TNF_PROBE_1(hci1394_async_arresp_size_tcode_err,
-		    HCI1394_TNF_HAL_ERROR,
-		    "unknown ARRESP received", tnf_uint, arresp_tcode, tcode);
-		TNF_PROBE_0_DEBUG(hci1394_get_arresp_size_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_get_arresp_size_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -3413,9 +2902,6 @@ hci1394_async_pending_list_flush(hci1394_async_handle_t async_handle)
 
 	ASSERT(async_handle != NULL);
 
-	TNF_PROBE_0_DEBUG(hci1394_async_pending_list_flush_enter,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	do {
 		/*
 		 * get the first node on the pending list. This routine also
@@ -3437,9 +2923,6 @@ hci1394_async_pending_list_flush(hci1394_async_handle_t async_handle)
 			    H1394_CMD_EBUSRESET);
 		}
 	} while (node != NULL);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_pending_list_flush_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3454,12 +2937,8 @@ hci1394_async_atreq_start(void *async, uint32_t command_ptr)
 {
 	hci1394_async_handle_t async_handle;
 	ASSERT(async != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_atreq_start_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	async_handle = (hci1394_async_handle_t)async;
 	hci1394_ohci_atreq_start(async_handle->as_ohci, command_ptr);
-	TNF_PROBE_0_DEBUG(hci1394_async_atreq_start_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3473,12 +2952,8 @@ hci1394_async_atreq_wake(void *async)
 {
 	hci1394_async_handle_t async_handle;
 	ASSERT(async != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_atreq_wake_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	async_handle = (hci1394_async_handle_t)async;
 	hci1394_ohci_atreq_wake(async_handle->as_ohci);
-	TNF_PROBE_0_DEBUG(hci1394_async_atreq_wake_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3493,12 +2968,8 @@ void
 hci1394_async_atreq_reset(hci1394_async_handle_t async_handle)
 {
 	ASSERT(async_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_atreq_reset_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	hci1394_ohci_atreq_stop(async_handle->as_ohci);
 	hci1394_q_stop(async_handle->as_atreq_q);
-	TNF_PROBE_0_DEBUG(hci1394_async_atreq_reset_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3511,12 +2982,8 @@ static void
 hci1394_async_atreq_flush(hci1394_async_handle_t async_handle)
 {
 	boolean_t request_available;
-	int status;
 
 	ASSERT(async_handle != NULL);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_atreq_flush_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Clear reqTxComplete interrupt */
 	hci1394_ohci_intr_clear(async_handle->as_ohci, OHCI_INTR_REQ_TX_CMPLT);
@@ -3529,16 +2996,9 @@ hci1394_async_atreq_flush(hci1394_async_handle_t async_handle)
 	 */
 	do {
 		/* Flush the atreq Q. Process all Q'd commands */
-		status = hci1394_async_atreq_process(async_handle,
+		(void) hci1394_async_atreq_process(async_handle,
 		    B_TRUE, &request_available);
-		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_async_atreq_process_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-		}
 	} while (request_available == B_TRUE);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_atreq_flush_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3553,12 +3013,8 @@ hci1394_async_arresp_start(void *async, uint32_t command_ptr)
 {
 	hci1394_async_handle_t async_handle;
 	ASSERT(async != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_arresp_start_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	async_handle = (hci1394_async_handle_t)async;
 	hci1394_ohci_arresp_start(async_handle->as_ohci, command_ptr);
-	TNF_PROBE_0_DEBUG(hci1394_async_arresp_start_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3572,12 +3028,8 @@ hci1394_async_arresp_wake(void *async)
 {
 	hci1394_async_handle_t async_handle;
 	ASSERT(async != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_arresp_wake_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	async_handle = (hci1394_async_handle_t)async;
 	hci1394_ohci_arresp_wake(async_handle->as_ohci);
-	TNF_PROBE_0_DEBUG(hci1394_async_arresp_wake_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3593,29 +3045,17 @@ static void
 hci1394_async_arresp_flush(hci1394_async_handle_t async_handle)
 {
 	boolean_t response_available;
-	int status;
-
 
 	ASSERT(async_handle != NULL);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_arresp_flush_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Clear reqTxComplete interrupt */
 	hci1394_ohci_intr_clear(async_handle->as_ohci, OHCI_INTR_RSPKT);
 
 	do {
 		/* Flush the arresp Q. Process all received commands */
-		status = hci1394_async_arresp_process(async_handle,
+		(void) hci1394_async_arresp_process(async_handle,
 		    &response_available);
-		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_async_arresp_process_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-		}
 	} while (response_available == B_TRUE);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_arresp_flush_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3630,12 +3070,8 @@ hci1394_async_arreq_start(void *async, uint32_t command_ptr)
 {
 	hci1394_async_handle_t async_handle;
 	ASSERT(async != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_start_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	async_handle = (hci1394_async_handle_t)async;
 	hci1394_ohci_arreq_start(async_handle->as_ohci, command_ptr);
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_start_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3649,12 +3085,8 @@ hci1394_async_arreq_wake(void *async)
 {
 	hci1394_async_handle_t async_handle;
 	ASSERT(async != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_wake_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	async_handle = (hci1394_async_handle_t)async;
 	hci1394_ohci_arreq_wake(async_handle->as_ohci);
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_wake_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3668,12 +3100,8 @@ static void
 hci1394_async_arreq_flush(hci1394_async_handle_t async_handle)
 {
 	boolean_t request_available;
-	int status;
-
 
 	ASSERT(async_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_flush_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * If the last bus reset token we have seen in
@@ -3685,8 +3113,6 @@ hci1394_async_arreq_flush(hci1394_async_handle_t async_handle)
 	 */
 	if (async_handle->as_phy_reset == hci1394_ohci_current_busgen(
 	    async_handle->as_ohci)) {
-		TNF_PROBE_0_DEBUG(hci1394_async_arreq_flush_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return;
 	}
 
@@ -3703,12 +3129,8 @@ hci1394_async_arreq_flush(hci1394_async_handle_t async_handle)
 	 * correct bus reset token.
 	 */
 	do {
-		status = hci1394_async_arreq_process(async_handle,
+		(void) hci1394_async_arreq_process(async_handle,
 		    &request_available);
-		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_isr_arreq_pr_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-		}
 	} while ((request_available == B_TRUE) &&
 	    (async_handle->as_flushing_arreq == B_TRUE));
 
@@ -3723,9 +3145,6 @@ hci1394_async_arreq_flush(hci1394_async_handle_t async_handle)
 	if (request_available == B_FALSE) {
 		hci1394_ohci_intr_clear(async_handle->as_ohci, OHCI_INTR_RQPKT);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_async_arreq_flush_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3740,12 +3159,8 @@ hci1394_async_atresp_start(void *async, uint32_t command_ptr)
 {
 	hci1394_async_handle_t async_handle;
 	ASSERT(async != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_atresp_start_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	async_handle = (hci1394_async_handle_t)async;
 	hci1394_ohci_atresp_start(async_handle->as_ohci, command_ptr);
-	TNF_PROBE_0_DEBUG(hci1394_async_atresp_start_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3759,12 +3174,8 @@ hci1394_async_atresp_wake(void *async)
 {
 	hci1394_async_handle_t async_handle;
 	ASSERT(async != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_atresp_wake_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	async_handle = (hci1394_async_handle_t)async;
 	hci1394_ohci_atresp_wake(async_handle->as_ohci);
-	TNF_PROBE_0_DEBUG(hci1394_async_atresp_wake_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3779,12 +3190,8 @@ void
 hci1394_async_atresp_reset(hci1394_async_handle_t async_handle)
 {
 	ASSERT(async_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_async_atresp_reset_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	hci1394_ohci_atresp_stop(async_handle->as_ohci);
 	hci1394_q_stop(async_handle->as_atresp_q);
-	TNF_PROBE_0_DEBUG(hci1394_async_atresp_reset_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3798,12 +3205,8 @@ static void
 hci1394_async_atresp_flush(hci1394_async_handle_t async_handle)
 {
 	boolean_t response_available;
-	int status;
 
 	ASSERT(async_handle != NULL);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_atresp_flush_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Clear respTxComplete interrupt */
 	hci1394_ohci_intr_clear(async_handle->as_ohci, OHCI_INTR_RESP_TX_CMPLT);
@@ -3811,16 +3214,9 @@ hci1394_async_atresp_flush(hci1394_async_handle_t async_handle)
 	/* Processes all AT responses */
 	do {
 		/* Flush the atresp Q. Process all Q'd commands */
-		status = hci1394_async_atresp_process(async_handle,
+		(void) hci1394_async_atresp_process(async_handle,
 		    B_TRUE, &response_available);
-		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_async_atresp_process_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-		}
 	} while (response_available == B_TRUE);
-
-	TNF_PROBE_0_DEBUG(hci1394_async_atresp_flush_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 /*

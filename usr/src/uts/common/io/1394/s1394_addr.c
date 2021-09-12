@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * s1394_addr.c
  *    1394 Address Space Routines
@@ -38,8 +36,6 @@
 #include <sys/sunddi.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
 #include <sys/1394/h1394.h>
@@ -90,9 +86,6 @@ s1394_request_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 	s1394_addr_space_blk_t	*new_blk;
 	uint64_t		amount_free;
 
-	TNF_PROBE_0_DEBUG(s1394_request_addr_blk_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
-
 	ASSERT(hal != NULL);
 
 	/* Lock the address space "free" list */
@@ -104,11 +97,6 @@ s1394_request_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 		/* Unlock the address space "free" list */
 		mutex_exit(&hal->addr_space_free_mutex);
 
-		TNF_PROBE_1(s1394_request_addr_blk_error,
-		    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-		    "1394 address space - no more memory");
-		TNF_PROBE_0_DEBUG(s1394_request_addr_blk_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -134,8 +122,6 @@ s1394_request_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 
 		s1394_addr_alloc_kstat(hal, addr_allocp->aa_address);
 
-		TNF_PROBE_0_DEBUG(s1394_request_addr_blk_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_SUCCESS);
 
 	} else {
@@ -145,10 +131,6 @@ s1394_request_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 		if (new_blk == NULL) {
 			/* Unlock the address space "free" list */
 			mutex_exit(&hal->addr_space_free_mutex);
-			TNF_PROBE_0(s1394_request_addr_blk_error,
-			    S1394_TNF_SL_ARREQ_ERROR, "");
-			TNF_PROBE_0_DEBUG(s1394_request_addr_blk_exit,
-			    S1394_TNF_SL_ARREQ_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -174,8 +156,6 @@ s1394_request_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 
 		s1394_addr_alloc_kstat(hal, addr_allocp->aa_address);
 
-		TNF_PROBE_0_DEBUG(s1394_request_addr_blk_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_SUCCESS);
 	}
 }
@@ -196,9 +176,6 @@ s1394_claim_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 	s1394_addr_space_blk_t	*middle_blk;
 	uint64_t		upper_bound;
 
-	TNF_PROBE_0_DEBUG(s1394_claim_addr_blk_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
-
 	ASSERT(hal != NULL);
 
 	/* Lock the address space "free" list */
@@ -212,11 +189,6 @@ s1394_claim_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 		/* Unlock the address space free list */
 		mutex_exit(&hal->addr_space_free_mutex);
 
-		TNF_PROBE_1(s1394_claim_addr_blk_error,
-		    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-		    "1394 address space - address unavailable");
-		TNF_PROBE_0_DEBUG(s1394_claim_addr_blk_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -251,8 +223,6 @@ s1394_claim_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				s1394_addr_alloc_kstat(hal,
 				    addr_allocp->aa_address);
 
-				TNF_PROBE_0_DEBUG(s1394_claim_addr_blk_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				return (DDI_SUCCESS);
 
 			} else {
@@ -268,11 +238,6 @@ s1394_claim_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				if (new_blk == NULL) {
 					/* Unlock the addr space "free" list */
 					mutex_exit(&hal->addr_space_free_mutex);
-					TNF_PROBE_0(s1394_claim_addr_blk_error,
-					    S1394_TNF_SL_ARREQ_ERROR, "");
-					TNF_PROBE_0_DEBUG(
-					    s1394_claim_addr_blk_exit,
-					    S1394_TNF_SL_ARREQ_STACK, "");
 					return (DDI_FAILURE);
 				}
 
@@ -298,8 +263,6 @@ s1394_claim_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				s1394_addr_alloc_kstat(hal,
 				    addr_allocp->aa_address);
 
-				TNF_PROBE_0_DEBUG(s1394_claim_addr_blk_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				return (DDI_SUCCESS);
 			}
 
@@ -317,11 +280,6 @@ s1394_claim_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				if (new_blk == NULL) {
 					/* Unlock the addr space "free" list */
 					mutex_exit(&hal->addr_space_free_mutex);
-					TNF_PROBE_0(s1394_claim_addr_blk_error,
-					    S1394_TNF_SL_ARREQ_ERROR, "");
-					TNF_PROBE_0_DEBUG
-					    (s1394_claim_addr_blk_exit,
-					    S1394_TNF_SL_ARREQ_STACK, "");
 					return (DDI_FAILURE);
 				}
 
@@ -347,8 +305,6 @@ s1394_claim_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				s1394_addr_alloc_kstat(hal,
 				    addr_allocp->aa_address);
 
-				TNF_PROBE_0_DEBUG(s1394_claim_addr_blk_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				return (DDI_SUCCESS);
 
 			} else {
@@ -364,11 +320,6 @@ s1394_claim_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				if (new_blk == NULL) {
 					/* Unlock the addr space "free" list */
 					mutex_exit(&hal->addr_space_free_mutex);
-					TNF_PROBE_0(s1394_claim_addr_blk_error,
-					    S1394_TNF_SL_ARREQ_ERROR, "");
-					TNF_PROBE_0_DEBUG(
-					    s1394_claim_addr_blk_exit,
-					    S1394_TNF_SL_ARREQ_STACK, "");
 					return (DDI_FAILURE);
 				}
 
@@ -380,11 +331,6 @@ s1394_claim_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 					mutex_exit(&hal->addr_space_free_mutex);
 					kmem_free(new_blk,
 					    sizeof (s1394_addr_space_blk_t));
-					TNF_PROBE_0(s1394_claim_addr_blk_error,
-					    S1394_TNF_SL_ARREQ_ERROR, "");
-					TNF_PROBE_0_DEBUG
-					    (s1394_claim_addr_blk_exit,
-					    S1394_TNF_SL_ARREQ_STACK, "");
 					return (DDI_FAILURE);
 				}
 
@@ -420,8 +366,6 @@ s1394_claim_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				s1394_addr_alloc_kstat(hal,
 				    addr_allocp->aa_address);
 
-				TNF_PROBE_0_DEBUG(s1394_claim_addr_blk_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				return (DDI_SUCCESS);
 			}
 		}
@@ -431,8 +375,6 @@ claim_error:
 	/* Unlock the address space free list */
 	mutex_exit(&hal->addr_space_free_mutex);
 
-	TNF_PROBE_0_DEBUG(s1394_claim_addr_blk_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 	return (DDI_FAILURE);
 }
 
@@ -444,9 +386,6 @@ claim_error:
 int
 s1394_free_addr_blk(s1394_hal_t *hal, s1394_addr_space_blk_t *blk)
 {
-	TNF_PROBE_0_DEBUG(s1394_free_addr_blk_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
-
 	/* Lock the address space "free" list */
 	mutex_enter(&hal->addr_space_free_mutex);
 
@@ -456,11 +395,6 @@ s1394_free_addr_blk(s1394_hal_t *hal, s1394_addr_space_blk_t *blk)
 	if (blk == NULL) {
 		/* Unlock the address space "free" list */
 		mutex_exit(&hal->addr_space_free_mutex);
-		TNF_PROBE_1(s1394_free_addr_blk_error,
-		    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-		    "Can't free block not found in used list");
-		TNF_PROBE_0_DEBUG(s1394_free_addr_blk_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -470,8 +404,6 @@ s1394_free_addr_blk(s1394_hal_t *hal, s1394_addr_space_blk_t *blk)
 	/* Unlock the address space "free" list */
 	mutex_exit(&hal->addr_space_free_mutex);
 
-	TNF_PROBE_0_DEBUG(s1394_free_addr_blk_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 	return (DDI_SUCCESS);
 }
 
@@ -492,9 +424,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 	s1394_addr_space_blk_t	*middle_blk;
 	uint64_t		upper_bound;
 
-	TNF_PROBE_0_DEBUG(s1394_reserve_addr_blk_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
-
 	ASSERT(hal != NULL);
 
 	/* Lock the address space "free" list */
@@ -507,11 +436,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 		/* Unlock the address space free list */
 		mutex_exit(&hal->addr_space_free_mutex);
 
-		TNF_PROBE_1(s1394_reserve_addr_blk_error,
-		    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-		    "1394 address space - address unavailable");
-		TNF_PROBE_0_DEBUG(s1394_reserve_addr_blk_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -520,8 +444,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 		/* Unlock the address space free list */
 		mutex_exit(&hal->addr_space_free_mutex);
 
-		TNF_PROBE_0_DEBUG(s1394_reserve_addr_blk_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -539,8 +461,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				/* Unlock the address space "free" list */
 				mutex_exit(&hal->addr_space_free_mutex);
 
-				TNF_PROBE_0_DEBUG(s1394_reserve_addr_blk_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				return (DDI_SUCCESS);
 
 			} else {
@@ -551,12 +471,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				if (new_blk == NULL) {
 					/* Unlock the addr space "free" list */
 					mutex_exit(&hal->addr_space_free_mutex);
-					TNF_PROBE_0(
-					    s1394_reserve_addr_blk_error,
-					    S1394_TNF_SL_ARREQ_ERROR, "");
-					TNF_PROBE_0_DEBUG(
-					    s1394_reserve_addr_blk_exit,
-					    S1394_TNF_SL_ARREQ_STACK, "");
 					return (DDI_FAILURE);
 				}
 
@@ -573,8 +487,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				/* Unlock the address space free list */
 				mutex_exit(&hal->addr_space_free_mutex);
 
-				TNF_PROBE_0_DEBUG(s1394_reserve_addr_blk_exit,
-				    "stacktrace 1394 s1394 arreq", "");
 				return (DDI_SUCCESS);
 			}
 
@@ -587,12 +499,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				if (new_blk == NULL) {
 					/* Unlock the addr space "free" list */
 					mutex_exit(&hal->addr_space_free_mutex);
-					TNF_PROBE_0(
-					    s1394_reserve_addr_blk_error,
-					    S1394_TNF_SL_ARREQ_ERROR, "");
-					TNF_PROBE_0_DEBUG(
-					    s1394_reserve_addr_blk_exit,
-					    S1394_TNF_SL_ARREQ_STACK, "");
 					return (DDI_FAILURE);
 				}
 
@@ -609,8 +515,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				/* Unlock the address space free list */
 				mutex_exit(&hal->addr_space_free_mutex);
 
-				TNF_PROBE_0_DEBUG(s1394_reserve_addr_blk_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				return (DDI_SUCCESS);
 
 			} else {
@@ -621,12 +525,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				if (new_blk == NULL) {
 					/* Unlock the addr space "free" list */
 					mutex_exit(&hal->addr_space_free_mutex);
-					TNF_PROBE_0(
-					    s1394_reserve_addr_blk_error,
-					    S1394_TNF_SL_ARREQ_ERROR, "");
-					TNF_PROBE_0_DEBUG(
-					    s1394_reserve_addr_blk_exit,
-					    S1394_TNF_SL_ARREQ_STACK, "");
 					return (DDI_FAILURE);
 				}
 
@@ -638,12 +536,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 					mutex_exit(&hal->addr_space_free_mutex);
 					kmem_free(new_blk,
 					    sizeof (s1394_addr_space_blk_t));
-					TNF_PROBE_0(
-					    s1394_reserve_addr_blk_error,
-					    S1394_TNF_SL_ARREQ_ERROR, "");
-					TNF_PROBE_0_DEBUG(
-					    s1394_reserve_addr_blk_exit,
-					    S1394_TNF_SL_ARREQ_STACK, "");
 					return (DDI_FAILURE);
 				}
 
@@ -666,8 +558,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 				/* Unlock the address space free list */
 				mutex_exit(&hal->addr_space_free_mutex);
 
-				TNF_PROBE_0_DEBUG(s1394_reserve_addr_blk_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				return (DDI_SUCCESS);
 			}
 		}
@@ -676,8 +566,6 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
 	/* Unlock the address space free list */
 	mutex_exit(&hal->addr_space_free_mutex);
 
-	TNF_PROBE_0_DEBUG(s1394_reserve_addr_blk_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 	return (DDI_FAILURE);
 }
 
@@ -702,9 +590,6 @@ s1394_init_addr_space(s1394_hal_t *hal)
 	uint64_t		hi;
 	int			i;
 	int			ret;
-
-	TNF_PROBE_0_DEBUG(s1394_init_addr_space_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 
 	/* Setup Address Space */
 	mutex_init(&hal->addr_space_free_mutex,
@@ -777,11 +662,6 @@ s1394_init_addr_space(s1394_hal_t *hal)
 			/* Unlock the address space free list */
 			mutex_exit(&hal->addr_space_free_mutex);
 			s1394_destroy_addr_space(hal);
-			TNF_PROBE_1(s1394_init_addr_space_error,
-			    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-			    "Invalid addr_type specified");
-			TNF_PROBE_0_DEBUG(s1394_init_addr_space_exit,
-			    S1394_TNF_SL_ARREQ_STACK, "");
 			return (DDI_FAILURE);
 		}
 		s1394_free_list_insert(hal, addr_blk);
@@ -793,11 +673,6 @@ s1394_init_addr_space(s1394_hal_t *hal)
 	/* Setup the necessary CSR space */
 	if (s1394_setup_CSR_space(hal) != DDI_SUCCESS) {
 		s1394_destroy_addr_space(hal);
-		TNF_PROBE_1(s1394_init_addr_space_error,
-		    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-		    "Failed in s1394_setup_CSR_space()");
-		TNF_PROBE_0_DEBUG(s1394_init_addr_space_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -813,11 +688,6 @@ s1394_init_addr_space(s1394_hal_t *hal)
 		if ((lo >= hal->physical_addr_lo) &&
 		    (hi <= hal->physical_addr_hi)) {
 			s1394_destroy_addr_space(hal);
-			TNF_PROBE_1(s1394_init_addr_space_error,
-			    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-			    "Attempted to reserve physical memory");
-			TNF_PROBE_0_DEBUG(s1394_init_addr_space_exit,
-			    S1394_TNF_SL_ARREQ_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -826,17 +696,10 @@ s1394_init_addr_space(s1394_hal_t *hal)
 		ret = s1394_reserve_addr_blk(hal, &addr_alloc);
 		if (ret != DDI_SUCCESS) {
 			s1394_destroy_addr_space(hal);
-			TNF_PROBE_1(s1394_init_addr_space_error,
-			    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-			    "Unable to reserve 1394 address");
-			TNF_PROBE_0_DEBUG(s1394_init_addr_space_exit,
-			    S1394_TNF_SL_ARREQ_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_init_addr_space_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 	return (DDI_SUCCESS);
 }
 
@@ -856,9 +719,6 @@ s1394_destroy_addr_space(s1394_hal_t *hal)
 	uint64_t		lo;
 	uint64_t		hi;
 	uint_t			length;
-
-	TNF_PROBE_0_DEBUG(s1394_destroy_addr_space_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 
 	/* Lock the address space "used" tree */
 	mutex_enter(&hal->addr_space_used_mutex);
@@ -917,9 +777,6 @@ s1394_destroy_addr_space(s1394_hal_t *hal)
 	/* Unlock & destroy the address space "free" list */
 	mutex_exit(&hal->addr_space_free_mutex);
 	mutex_destroy(&hal->addr_space_free_mutex);
-
-	TNF_PROBE_0_DEBUG(s1394_destroy_addr_space_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 }
 
 /*
@@ -935,9 +792,6 @@ s1394_free_list_insert(s1394_hal_t *hal, s1394_addr_space_blk_t *new_blk)
 	s1394_addr_space_blk_t	*curr_blk;
 	s1394_addr_space_blk_t	*left_blk;
 	s1394_addr_space_blk_t	*right_blk;
-
-	TNF_PROBE_0_DEBUG(s1394_free_list_insert_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 
 	ASSERT(MUTEX_HELD(&hal->addr_space_free_mutex));
 
@@ -1006,9 +860,6 @@ s1394_free_list_insert(s1394_hal_t *hal, s1394_addr_space_blk_t *new_blk)
 	new_blk->addr_enable = 0;
 	new_blk->kmem_bufp = NULL;
 	new_blk->addr_arg = NULL;
-
-	TNF_PROBE_0_DEBUG(s1394_free_list_insert_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 }
 
 /*
@@ -1021,9 +872,6 @@ s1394_free_list_search(s1394_hal_t *hal, uint64_t addr)
 {
 	s1394_addr_space_blk_t	*curr_blk;
 
-	TNF_PROBE_0_DEBUG(s1394_free_list_search_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
-
 	ASSERT(MUTEX_HELD(&hal->addr_space_free_mutex));
 
 	/* Start at the head of the list */
@@ -1035,8 +883,6 @@ s1394_free_list_search(s1394_hal_t *hal, uint64_t addr)
 			curr_blk = curr_blk->asb_right;
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_free_list_search_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 	return (curr_blk);
 }
 
@@ -1050,9 +896,6 @@ s1394_free_list_find(s1394_hal_t *hal, uint32_t type, uint32_t length)
 {
 	s1394_addr_space_blk_t	*curr_blk;
 	uint64_t		size;
-
-	TNF_PROBE_0_DEBUG(s1394_free_list_find_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 
 	ASSERT(MUTEX_HELD(&hal->addr_space_free_mutex));
 
@@ -1079,8 +922,6 @@ s1394_free_list_find(s1394_hal_t *hal, uint32_t type, uint32_t length)
 		curr_blk = curr_blk->asb_right;
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_free_list_find_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 	return (curr_blk);
 }
 
@@ -1094,9 +935,6 @@ s1394_free_list_delete(s1394_hal_t *hal, s1394_addr_space_blk_t *del_blk)
 {
 	s1394_addr_space_blk_t	*left_blk;
 	s1394_addr_space_blk_t	*right_blk;
-
-	TNF_PROBE_0_DEBUG(s1394_free_list_delete_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 
 	ASSERT(MUTEX_HELD(&hal->addr_space_free_mutex));
 
@@ -1114,8 +952,6 @@ s1394_free_list_delete(s1394_hal_t *hal, s1394_addr_space_blk_t *del_blk)
 	if (right_blk != NULL)
 		right_blk->asb_left = left_blk;
 
-	TNF_PROBE_0_DEBUG(s1394_free_list_delete_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 	return (del_blk);
 }
 
@@ -1136,9 +972,6 @@ s1394_used_tree_insert(s1394_hal_t *hal, s1394_addr_space_blk_t *x)
 {
 	s1394_addr_space_blk_t	*y;
 	s1394_addr_space_blk_t	**root;
-
-	TNF_PROBE_0_DEBUG(s1394_used_tree_insert_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 
 	/* Lock the "used" tree */
 	mutex_enter(&hal->addr_space_used_mutex);
@@ -1197,9 +1030,6 @@ s1394_used_tree_insert(s1394_hal_t *hal, s1394_addr_space_blk_t *x)
 
 	/* Unlock the "used" tree */
 	mutex_exit(&hal->addr_space_used_mutex);
-
-	TNF_PROBE_0_DEBUG(s1394_used_tree_insert_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 }
 
 /*
@@ -1213,9 +1043,6 @@ s1394_tree_insert(s1394_addr_space_blk_t **root, s1394_addr_space_blk_t *z)
 {
 	s1394_addr_space_blk_t	*y = NULL;
 	s1394_addr_space_blk_t	*x = *root;
-
-	TNF_PROBE_0_DEBUG(s1394_tree_insert_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 
 	while (x != NULL) {
 		y = x;
@@ -1235,9 +1062,6 @@ s1394_tree_insert(s1394_addr_space_blk_t **root, s1394_addr_space_blk_t *z)
 		y->asb_left = z;
 	else
 		y->asb_right = z;
-
-	TNF_PROBE_0_DEBUG(s1394_tree_insert_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 }
 
 /*
@@ -1251,16 +1075,11 @@ s1394_used_tree_search(s1394_hal_t *hal, uint64_t addr)
 {
 	s1394_addr_space_blk_t *curr_blk;
 
-	TNF_PROBE_0_DEBUG(s1394_used_tree_search_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
-
 	ASSERT(MUTEX_HELD(&hal->addr_space_used_mutex));
 
 	/* Search the HAL's "used" tree for this address */
 	curr_blk = s1394_tree_search(hal->addr_space_used_tree, addr);
 
-	TNF_PROBE_0_DEBUG(s1394_used_tree_search_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 	return (curr_blk);
 }
 
@@ -1272,9 +1091,6 @@ s1394_used_tree_search(s1394_hal_t *hal, uint64_t addr)
 static s1394_addr_space_blk_t *
 s1394_tree_search(s1394_addr_space_blk_t *x, uint64_t address)
 {
-	TNF_PROBE_0_DEBUG(s1394_tree_search_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
-
 	while (x != NULL) {
 		if (x->addr_lo > address)
 			x = x->asb_left;
@@ -1284,8 +1100,6 @@ s1394_tree_search(s1394_addr_space_blk_t *x, uint64_t address)
 			break;
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_tree_search_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 	return (x);
 }
 
@@ -1306,9 +1120,6 @@ s1394_used_tree_delete(s1394_hal_t *hal, s1394_addr_space_blk_t *z)
 	s1394_addr_space_blk_t	**root;
 	int			old_color;
 	int			side_of_x;
-
-	TNF_PROBE_0_DEBUG(s1394_used_tree_delete_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 
 	/* Lock the "used" tree */
 	mutex_enter(&hal->addr_space_used_mutex);
@@ -1396,8 +1207,6 @@ s1394_used_tree_delete(s1394_hal_t *hal, s1394_addr_space_blk_t *z)
 	/* Unlock the "used" tree */
 	mutex_exit(&hal->addr_space_used_mutex);
 
-	TNF_PROBE_0_DEBUG(s1394_used_tree_delete_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 	return (z);
 }
 
@@ -1412,9 +1221,6 @@ s1394_used_tree_delete_fixup(s1394_addr_space_blk_t **root,
     s1394_addr_space_blk_t *w, int side_of_x)
 {
 	boolean_t	first_time;
-
-	TNF_PROBE_0_DEBUG(s1394_used_tree_delete_fixup_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 
 	first_time = B_TRUE;
 	while ((x != *root) && ((x == NULL) || (x->asb_color == BLACK))) {
@@ -1510,9 +1316,6 @@ s1394_used_tree_delete_fixup(s1394_addr_space_blk_t **root,
 	}
 	if (x != NULL)
 		x->asb_color = BLACK;
-
-	TNF_PROBE_0_DEBUG(s1394_used_tree_delete_fixup_exit,
-	    S1394_TNF_SL_ARREQ_STACK, "");
 }
 
 /*
@@ -1525,9 +1328,6 @@ static void
 s1394_left_rotate(s1394_addr_space_blk_t **root, s1394_addr_space_blk_t *x)
 {
 	s1394_addr_space_blk_t	*y;
-
-	TNF_PROBE_0_DEBUG(s1394_left_rotate_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 
 	y = x->asb_right;
 	x->asb_right = y->asb_left;
@@ -1545,9 +1345,6 @@ s1394_left_rotate(s1394_addr_space_blk_t **root, s1394_addr_space_blk_t *x)
 
 	y->asb_left = x;
 	x->asb_parent = y;
-
-	TNF_PROBE_0_DEBUG(s1394_left_rotate_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 }
 
 /*
@@ -1560,9 +1357,6 @@ static void
 s1394_right_rotate(s1394_addr_space_blk_t **root, s1394_addr_space_blk_t *x)
 {
 	s1394_addr_space_blk_t	*y;
-
-	TNF_PROBE_0_DEBUG(s1394_right_rotate_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 
 	y = x->asb_left;
 	x->asb_left = y->asb_right;
@@ -1580,9 +1374,6 @@ s1394_right_rotate(s1394_addr_space_blk_t **root, s1394_addr_space_blk_t *x)
 
 	y->asb_right = x;
 	x->asb_parent = y;
-
-	TNF_PROBE_0_DEBUG(s1394_right_rotate_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 }
 
 /*
@@ -1592,14 +1383,9 @@ s1394_right_rotate(s1394_addr_space_blk_t **root, s1394_addr_space_blk_t *x)
 static s1394_addr_space_blk_t *
 s1394_tree_minimum(s1394_addr_space_blk_t *x)
 {
-	TNF_PROBE_0_DEBUG(s1394_tree_minimum_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
-
 	while (x->asb_left != NULL)
 		x = x->asb_left;
 
-	TNF_PROBE_0_DEBUG(s1394_tree_minimum_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 	return (x);
 }
 
@@ -1613,14 +1399,9 @@ s1394_tree_successor(s1394_addr_space_blk_t *x)
 {
 	s1394_addr_space_blk_t	*y;
 
-	TNF_PROBE_0_DEBUG(s1394_tree_successor_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
-
 	if (x->asb_right != NULL) {
 		y = s1394_tree_minimum(x->asb_right);
 
-		TNF_PROBE_0_DEBUG(s1394_tree_successor_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (y);
 	}
 
@@ -1630,8 +1411,6 @@ s1394_tree_successor(s1394_addr_space_blk_t *x)
 		y = y->asb_parent;
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_tree_successor_exit, S1394_TNF_SL_ARREQ_STACK,
-	    "");
 	return (y);
 }
 

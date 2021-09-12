@@ -116,13 +116,6 @@
 #include	<sys/fibre-channel/impl/fc_ulpif.h>
 #include	<sys/fibre-channel/ulp/fcip.h>
 
-/*
- * TNF Probe/trace facility include
- */
-#if defined(lint) || defined(FCIP_TNF_ENABLED)
-#include <sys/tnf_probe.h>
-#endif
-
 #define	FCIP_ESBALLOC
 
 /*
@@ -614,8 +607,6 @@ _init(void)
 {
 	int	rval;
 
-	FCIP_TNF_LOAD();
-
 	/*
 	 * Initialize the mutexs used by port attach and other callbacks.
 	 * The transport can call back into our port_attach_callback
@@ -665,7 +656,6 @@ _init(void)
 			rval = ENODEV;
 			break;
 		}
-		FCIP_TNF_UNLOAD(&modlinkage);
 		return (rval);
 	}
 
@@ -675,12 +665,10 @@ _init(void)
 		cv_destroy(&fcip_global_cv);
 		rw_destroy(&fcipstruplock);
 		(void) fc_ulp_remove(&fcip_modinfo);
-		FCIP_TNF_UNLOAD(&modlinkage);
 		return (rval);
 	}
 
 	if ((rval = mod_install(&modlinkage)) != 0) {
-		FCIP_TNF_UNLOAD(&modlinkage);
 		(void) fc_ulp_remove(&fcip_modinfo);
 		mutex_destroy(&fcip_global_mutex);
 		cv_destroy(&fcip_global_cv);
@@ -743,8 +731,6 @@ _fini(void)
 	cv_destroy(&fcip_global_cv);
 	ddi_soft_state_fini(&fcip_softp);
 
-	FCIP_TNF_UNLOAD(&modlinkage);
-
 	return (rval);
 }
 
@@ -792,9 +778,6 @@ fcip_port_attach(opaque_t ulp_handle, fc_ulp_port_info_t *port_info,
 		 */
 		ww_pn = &port_info->port_pwwn;
 
-		FCIP_TNF_PROBE_2((fcip_port_attach, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "port id bits",
-			tnf_opaque, nport_id, ww_pn->w.nport_id));
 		FCIP_DEBUG(FCIP_DEBUG_ATTACH, (CE_NOTE,
 		    "port id bits: 0x%x", ww_pn->w.nport_id));
 		/*
@@ -1025,9 +1008,6 @@ fcip_port_attach(opaque_t ulp_handle, fc_ulp_port_info_t *port_info,
 		goto done;
 
 	default:
-		FCIP_TNF_PROBE_2((fcip_port_attach, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "unknown command type",
-			tnf_uint, cmd, cmd));
 		FCIP_DEBUG(FCIP_DEBUG_ATTACH, (CE_WARN,
 		    "unknown cmd type 0x%x in port_attach", cmd));
 		rval = FC_FAILURE;
@@ -1280,10 +1260,6 @@ fcip_rt_update(struct fcip *fptr, fc_portmap_t *devlist, uint32_t listlen)
 	fc_portmap_t			*pmap;
 	char				wwn_buf[20];
 
-	FCIP_TNF_PROBE_2((fcip_rt_update, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter",
-		tnf_int, listlen, listlen));
-
 	ASSERT(!mutex_owned(&fptr->fcip_mutex));
 	mutex_enter(&fptr->fcip_rt_mutex);
 
@@ -1353,11 +1329,6 @@ add_new_entry:
 
 		ASSERT(hash_bucket < FCIP_RT_HASH_ELEMS);
 
-		FCIP_TNF_PROBE_2((fcip_rt_update, "cfip io", /* CSTYLED */,
-			tnf_string, msg,
-			"add new entry",
-			tnf_int, hashbucket, hash_bucket));
-
 		frp = (struct fcip_routing_table *)
 		    kmem_zalloc(sizeof (struct fcip_routing_table), KM_SLEEP);
 		/* insert at beginning of hash bucket */
@@ -1405,9 +1376,6 @@ update_entry:
 			(void) fcip_do_plogi(fptr, frp);
 		}
 
-		FCIP_TNF_BYTE_ARRAY(fcip_rt_update, "fcip io", "detail",
-			"new wwn in rt", pwwn,
-			&frp->fcipr_pwwn, sizeof (la_wwn_t));
 	}
 	mutex_exit(&fptr->fcip_rt_mutex);
 }
@@ -1422,25 +1390,11 @@ fcip_lookup_rtable(struct fcip *fptr, la_wwn_t *wwn, int matchflag)
 	struct fcip_routing_table	*frp = NULL;
 	int				hash_bucket;
 
-
-	FCIP_TNF_PROBE_1((fcip_lookup_rtable, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter"));
-	FCIP_TNF_BYTE_ARRAY(fcip_lookup_rtable, "fcip io", "detail",
-		"rtable lookup for", wwn,
-		&wwn->raw_wwn, sizeof (la_wwn_t));
-	FCIP_TNF_PROBE_2((fcip_lookup_rtable, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "match by",
-		tnf_int, matchflag, matchflag));
-
 	ASSERT(mutex_owned(&fptr->fcip_rt_mutex));
 
 	hash_bucket = FCIP_RT_HASH(wwn->raw_wwn);
 	frp = fptr->fcip_rtable[hash_bucket];
 	while (frp != NULL) {
-
-		FCIP_TNF_BYTE_ARRAY(fcip_lookup_rtable, "fcip io", "detail",
-			"rtable entry", nwwn,
-			&(frp->fcipr_nwwn.raw_wwn), sizeof (la_wwn_t));
 
 		if (fcip_wwn_compare(&frp->fcipr_pwwn, wwn, matchflag) == 0) {
 			break;
@@ -1448,9 +1402,6 @@ fcip_lookup_rtable(struct fcip *fptr, la_wwn_t *wwn, int matchflag)
 
 		frp = frp->fcipr_next;
 	}
-	FCIP_TNF_PROBE_2((fcip_lookup_rtable, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "lookup result",
-		tnf_opaque, frp, frp));
 	return (frp);
 }
 
@@ -1544,11 +1495,6 @@ fcip_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 				    FCIP_IN_CALLBACK | FCIP_ATTACHING |
 				    FCIP_SUSPENDED | FCIP_POWER_DOWN |
 				    FCIP_REG_INPROGRESS)) {
-					FCIP_TNF_PROBE_1((fcip_detach,
-					    "fcip io", /* CSTYLED */,
-					    tnf_string, msg,
-					    "fcip instance busy"));
-
 					mutex_exit(&fptr->fcip_mutex);
 					FCIP_DEBUG(FCIP_DEBUG_DETACH, (CE_WARN,
 					    "fcip instance busy"));
@@ -1641,10 +1587,6 @@ fcip_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 			FCIP_DEBUG(FCIP_DEBUG_DETACH,
 			    (CE_NOTE, "detaching port"));
-
-			FCIP_TNF_PROBE_1((fcip_detach,
-				"fcip io", /* CSTYLED */, tnf_string,
-				msg, "detaching port"));
 		}
 
 		/*
@@ -2277,11 +2219,6 @@ fcip_statec_cb(opaque_t ulp_handle, opaque_t phandle,
 
 	instance = ddi_get_instance(fport->fcipp_dip);
 
-	FCIP_TNF_PROBE_4((fcip_statec_cb, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "state change callback",
-		tnf_uint, instance, instance,
-		tnf_uint, S_ID, sid,
-		tnf_int, count, listlen));
 	FCIP_DEBUG(FCIP_DEBUG_ELS,
 	    (CE_NOTE, "fcip%d, state change callback: state:0x%x, "
 	    "S_ID:0x%x, count:0x%x", instance, port_state, sid, listlen));
@@ -2552,10 +2489,6 @@ fcip_els_cb(opaque_t ulp_handle, opaque_t phandle,
 	fptr->fcip_flags |= FCIP_IN_ELS_CB;
 	mutex_exit(&fptr->fcip_mutex);
 
-	FCIP_TNF_PROBE_2((fcip_els_cb, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "ELS callback",
-		tnf_uint, instance, instance));
-
 	FCIP_DEBUG(FCIP_DEBUG_ELS,
 	    (CE_NOTE, "fcip%d, ELS callback , ", instance));
 
@@ -2740,10 +2673,6 @@ fcip_handle_farp_request(struct fcip *fptr, la_els_farp_t *fcmd)
 
 	rval = fc_ulp_issue_els(fport->fcipp_handle, fc_pkt);
 	if (rval != FC_SUCCESS) {
-		FCIP_TNF_PROBE_2((fcip_handle_farp_request, "fcip io",
-		    /* CSTYLED */, tnf_string, msg,
-		    "fcip_transport of farp reply failed",
-		    tnf_uint, rval, rval));
 		FCIP_DEBUG(FCIP_DEBUG_ELS, (CE_WARN,
 		    "fcip_transport of farp reply failed 0x%x", rval));
 	}
@@ -2864,9 +2793,6 @@ fcip_data_cb(opaque_t ulp_handle, opaque_t phandle,
 	fptr->fcip_flags |= FCIP_IN_DATA_CB;
 	mutex_exit(&fptr->fcip_mutex);
 
-	FCIP_TNF_PROBE_2((fcip_data_cb, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "data callback",
-		tnf_int, instance, ddi_get_instance(fport->fcipp_dip)));
 	FCIP_DEBUG(FCIP_DEBUG_UPSTREAM,
 	    (CE_NOTE, "fcip%d, data callback",
 	    ddi_get_instance(fport->fcipp_dip)));
@@ -3084,8 +3010,6 @@ fcip_sendup_alloc_enque(struct fcip *fptr, mblk_t *mp, struct fcipstr *(*f)())
 	struct fcip_sendup_elem 	*msg_elem;
 	int				rval = FC_FAILURE;
 
-	FCIP_TNF_PROBE_1((fcip_sendup_alloc_enque, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "sendup msg enque"));
 	msg_elem = kmem_cache_alloc(fptr->fcip_sendup_cache, KM_NOSLEEP);
 	if (msg_elem == NULL) {
 		/* drop pkt to floor - update stats */
@@ -3196,9 +3120,6 @@ fcip_sendup_thr(void *arg)
 			break;
 		}
 
-		FCIP_TNF_PROBE_1((fcip_sendup_thr, "fcip io", /* CSTYLED */,
-		    tnf_string, msg, "fcip sendup thr - new msg"));
-
 		msg_elem = fptr->fcip_sendup_head;
 		fptr->fcip_sendup_head = msg_elem->fcipsu_next;
 		msg_elem->fcipsu_next = NULL;
@@ -3308,8 +3229,6 @@ fcip_sendup(struct fcip *fptr, mblk_t *mp, struct fcipstr *(*acceptfunc)())
 	fcph_network_hdr_t	*nhdr;
 	llc_snap_hdr_t		*snaphdr;
 
-	FCIP_TNF_PROBE_1((fcip_sendup, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "fcip sendup"));
 	nhdr = (fcph_network_hdr_t *)mp->b_rptr;
 	snaphdr =
 	    (llc_snap_hdr_t *)(mp->b_rptr + sizeof (fcph_network_hdr_t));
@@ -3330,8 +3249,6 @@ fcip_sendup(struct fcip *fptr, mblk_t *mp, struct fcipstr *(*acceptfunc)())
 
 	if ((slp = (*acceptfunc)(fcipstrup, fptr, type, dhostp)) == NULL) {
 		rw_exit(&fcipstruplock);
-		FCIP_TNF_PROBE_1((fcip_sendup, "fcip io", /* CSTYLED */,
-		    tnf_string, msg, "fcip sendup - no slp"));
 		freemsg(mp);
 		return;
 	}
@@ -3373,8 +3290,6 @@ fcip_sendup(struct fcip *fptr, mblk_t *mp, struct fcipstr *(*acceptfunc)())
 	} else {
 		freemsg(mp);
 	}
-	FCIP_TNF_PROBE_1((fcip_sendup, "fcip io", /* CSTYLED */,
-	    tnf_string, msg, "fcip sendup done"));
 
 	rw_exit(&fcipstruplock);
 }
@@ -3391,9 +3306,6 @@ static struct fcipstr *
 fcip_accept(struct fcipstr *slp, struct fcip *fptr, int type, la_wwn_t *dhostp)
 {
 	t_uscalar_t 	sap;
-
-	FCIP_TNF_PROBE_1((fcip_accept, "fcip io", /* CSTYLED */,
-	    tnf_string, msg, "fcip accept"));
 
 	for (; slp; slp = slp->sl_nextp) {
 		sap = slp->sl_sap;
@@ -3426,9 +3338,6 @@ fcip_addudind(struct fcip *fptr, mblk_t *mp, fcph_network_hdr_t *nhdr,
 
 	hdrlen = (sizeof (llc_snap_hdr_t) + sizeof (fcph_network_hdr_t));
 	mp->b_rptr += hdrlen;
-
-	FCIP_TNF_PROBE_1((fcip_addudind, "fcip io", /* CSTYLED */,
-	    tnf_string, msg, "fcip addudind"));
 
 	/*
 	 * Allocate an M_PROTO mblk for the DL_UNITDATA_IND.
@@ -3486,8 +3395,6 @@ fcip_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 	minor_t	minor;
 
 	FCIP_DEBUG(FCIP_DEBUG_DOWNSTREAM, (CE_NOTE, "in fcip_open"));
-	FCIP_TNF_PROBE_1((fcip_open, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter"));
 	/*
 	 * We need to ensure that the port driver is loaded before
 	 * we proceed
@@ -3577,8 +3484,6 @@ fcip_close(queue_t *rq, int flag, cred_t *credp)
 	struct fcipstr **prevslp;
 
 	FCIP_DEBUG(FCIP_DEBUG_DOWNSTREAM, (CE_NOTE, "in fcip_close"));
-	FCIP_TNF_PROBE_1((fcip_close, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter"));
 	ASSERT(rq);
 	/* we should also have the active stream pointer in q_ptr */
 	ASSERT(rq->q_ptr);
@@ -3635,8 +3540,6 @@ fcip_dodetach(struct fcipstr *slp)
 	struct fcip	*fptr;
 
 	FCIP_DEBUG(FCIP_DEBUG_DETACH, (CE_NOTE, "in fcip_dodetach"));
-	FCIP_TNF_PROBE_1((fcip_dodetach, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter"));
 	ASSERT(slp->sl_fcip != NULL);
 
 	fptr = slp->sl_fcip;
@@ -3741,8 +3644,6 @@ fcip_ioctl(queue_t *wq, mblk_t *mp)
 
 	FCIP_DEBUG(FCIP_DEBUG_DOWNSTREAM,
 	    (CE_NOTE, "in fcip ioctl : %d", iocp->ioc_cmd));
-	FCIP_TNF_PROBE_1((fcip_ioctl, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter"));
 
 	switch (iocp->ioc_cmd) {
 	case DLIOCRAW:
@@ -3887,110 +3788,77 @@ fcip_proto(queue_t *wq, mblk_t *mp)
 	dlp = (union DL_primitives *)mp->b_rptr;
 	prim = dlp->dl_primitive;		/* the DLPI command */
 
-	FCIP_TNF_PROBE_5((fcip_proto, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter",
-		tnf_opaque, wq, wq,
-		tnf_opaque, mp, mp,
-		tnf_opaque, MP_DB_TYPE, DB_TYPE(mp),
-		tnf_opaque, dl_primitive, dlp->dl_primitive));
-
 	FCIP_DEBUG(FCIP_DEBUG_INIT, (CE_NOTE, "dl_primitve : %x", prim));
 
 	mutex_enter(&slp->sl_lock);
 
 	switch (prim) {
 	case DL_UNITDATA_REQ:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "unit data request"));
 		FCIP_DEBUG(FCIP_DEBUG_DLPI, (CE_NOTE, "unit data request"));
 		fcip_udreq(wq, mp);
 		break;
 
 	case DL_ATTACH_REQ:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "Attach request"));
 		FCIP_DEBUG(FCIP_DEBUG_DLPI, (CE_NOTE, "Attach request"));
 		fcip_areq(wq, mp);
 		break;
 
 	case DL_DETACH_REQ:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "Detach request"));
 		FCIP_DEBUG(FCIP_DEBUG_DLPI, (CE_NOTE, "Detach request"));
 		fcip_dreq(wq, mp);
 		break;
 
 	case DL_BIND_REQ:
 		FCIP_DEBUG(FCIP_DEBUG_DLPI, (CE_NOTE, "Bind request"));
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "Bind request"));
 		fcip_breq(wq, mp);
 		break;
 
 	case DL_UNBIND_REQ:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "unbind request"));
 		FCIP_DEBUG(FCIP_DEBUG_DLPI, (CE_NOTE, "unbind request"));
 		fcip_ubreq(wq, mp);
 		break;
 
 	case DL_INFO_REQ:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "Info request"));
 		FCIP_DEBUG(FCIP_DEBUG_DLPI, (CE_NOTE, "Info request"));
 		fcip_ireq(wq, mp);
 		break;
 
 	case DL_SET_PHYS_ADDR_REQ:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "set phy addr request"));
 		FCIP_DEBUG(FCIP_DEBUG_DLPI,
 		    (CE_NOTE, "set phy addr request"));
 		fcip_spareq(wq, mp);
 		break;
 
 	case DL_PHYS_ADDR_REQ:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "phy addr request"));
 		FCIP_DEBUG(FCIP_DEBUG_DLPI, (CE_NOTE, "phy addr request"));
 		fcip_pareq(wq, mp);
 		break;
 
 	case DL_ENABMULTI_REQ:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "Enable Multicast request"));
 		FCIP_DEBUG(FCIP_DEBUG_DLPI,
 		    (CE_NOTE, "Enable Multicast request"));
 		dlerrorack(wq, mp, prim, DL_UNSUPPORTED, 0);
 		break;
 
 	case DL_DISABMULTI_REQ:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "Disable Multicast request"));
 		FCIP_DEBUG(FCIP_DEBUG_DLPI,
 		    (CE_NOTE, "Disable Multicast request"));
 		dlerrorack(wq, mp, prim, DL_UNSUPPORTED, 0);
 		break;
 
 	case DL_PROMISCON_REQ:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "Promiscuous mode ON request"));
 		FCIP_DEBUG(FCIP_DEBUG_DLPI,
 		    (CE_NOTE, "Promiscuous mode ON request"));
 		dlerrorack(wq, mp, prim, DL_UNSUPPORTED, 0);
 		break;
 
 	case DL_PROMISCOFF_REQ:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "Promiscuous mode OFF request"));
 		FCIP_DEBUG(FCIP_DEBUG_DLPI,
 		    (CE_NOTE, "Promiscuous mode OFF request"));
 		dlerrorack(wq, mp, prim, DL_UNSUPPORTED, 0);
 		break;
 
 	default:
-		FCIP_TNF_PROBE_1((fcip_proto, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "Unsupported request"));
 		dlerrorack(wq, mp, prim, DL_UNSUPPORTED, 0);
 		break;
 	}
@@ -4022,9 +3890,6 @@ fcip_wsrv(queue_t *wq)
 	slp = (struct fcipstr *)wq->q_ptr;
 	fptr = slp->sl_fcip;
 
-	FCIP_TNF_PROBE_2((fcip_wsrv, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter",
-		tnf_opaque, wq, wq));
 	FCIP_DEBUG(FCIP_DEBUG_DOWNSTREAM, (CE_NOTE, "fcip wsrv"));
 
 	while (mp = getq(wq)) {
@@ -4080,10 +3945,6 @@ fcip_start(queue_t *wq, mblk_t *mp, struct fcip *fptr,
 	fcip_port_info_t	*fport = fptr->fcip_port_info;
 	size_t			datalen;
 
-	FCIP_TNF_PROBE_4((fcip_start, "fcip io", /* CSTYLED */,
-	    tnf_string, msg, "enter", tnf_opaque, wq, wq,
-	    tnf_opaque, mp, mp,
-	    tnf_opaque, MP_DB_TYPE, DB_TYPE(mp)));
 	FCIP_DEBUG(FCIP_DEBUG_DOWNSTREAM, (CE_NOTE, "in fcipstart"));
 
 	ASSERT(fdestp != NULL);
@@ -4225,8 +4086,6 @@ static void
 fcip_fdestp_enqueue_pkt(struct fcip_dest *fdestp, fcip_pkt_t *fcip_pkt)
 {
 	ASSERT(mutex_owned(&fdestp->fcipd_mutex));
-	FCIP_TNF_PROBE_1((fcip_fdestp_enqueue_pkt, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "destp enq pkt"));
 
 	/*
 	 * Just hang it off the head of packet list
@@ -4325,9 +4184,6 @@ fcip_transport(fcip_pkt_t *fcip_pkt)
 	int			rval = FC_FAILURE;
 	struct fcip_routing_table *frp = NULL;
 
-	FCIP_TNF_PROBE_1((fcip_transport, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter"));
-
 	fptr = fcip_pkt->fcip_pkt_fptr;
 	fport = fptr->fcip_port_info;
 	fc_pkt = FCIP_PKT_TO_FC_PKT(fcip_pkt);
@@ -4346,13 +4202,9 @@ fcip_transport(fcip_pkt_t *fcip_pkt)
 	if ((fc_pkt->pkt_tran_type != FC_PKT_BROADCAST) &&
 	    (fc_pkt->pkt_pd == NULL)) {
 		mutex_exit(&fptr->fcip_mutex);
-		FCIP_TNF_PROBE_1((fcip_transport, "fcip io", /* CSTYLED */,
-		    tnf_string, msg, "fcip transport no pd"));
 		return (rval);
 	} else if (fptr->fcip_port_state == FCIP_PORT_OFFLINE) {
 		mutex_exit(&fptr->fcip_mutex);
-		FCIP_TNF_PROBE_1((fcip_transport, "fcip io", /* CSTYLED */,
-		    tnf_string, msg, "fcip transport port offline"));
 		return (FC_TRAN_BUSY);
 	}
 	mutex_exit(&fptr->fcip_mutex);
@@ -4370,16 +4222,8 @@ fcip_transport(fcip_pkt_t *fcip_pkt)
 				mutex_exit(&fptr->fcip_rt_mutex);
 				if (frp &&
 				    (frp->fcipr_state == FCIP_RT_INVALID)) {
-					FCIP_TNF_PROBE_1((fcip_transport,
-					    "fcip io", /* CSTYLED */,
-					    tnf_string, msg,
-					    "fcip transport - TRANBUSY"));
 					return (FC_TRAN_BUSY);
 				} else {
-					FCIP_TNF_PROBE_1((fcip_transport,
-					    "fcip io", /* CSTYLED */,
-					    tnf_string, msg,
-					    "fcip transport: frp unavailable"));
 					return (rval);
 				}
 			}
@@ -4417,8 +4261,6 @@ fcip_transport(fcip_pkt_t *fcip_pkt)
 		}
 	}
 
-	FCIP_TNF_PROBE_1((fcip_transport, "fcip io", /* CSTYLED */,
-	    tnf_string, msg, "fcip transport done"));
 	return (rval);
 }
 
@@ -4465,8 +4307,6 @@ fcip_pkt_callback(fc_packet_t *fc_pkt)
 		fcip_pkt_free(fcip_pkt, 1);
 	}
 
-	FCIP_TNF_PROBE_1((fcip_pkt_callback, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "pkt callback done"));
 	FCIP_DEBUG(FCIP_DEBUG_DOWNSTREAM, (CE_NOTE, "pkt callback done"));
 }
 
@@ -4509,10 +4349,6 @@ fcip_handle_topology(struct fcip *fptr)
 	 * topologies - we would probably not have a name server
 	 */
 
-	FCIP_TNF_PROBE_3((fcip_handle_topology, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter",
-		tnf_uint, port_state, fport->fcipp_pstate,
-		tnf_uint, topology, fport->fcipp_topology));
 	FCIP_DEBUG(FCIP_DEBUG_INIT, (CE_NOTE, "port state: %x, topology %x",
 		fport->fcipp_pstate, fport->fcipp_topology));
 
@@ -4688,8 +4524,6 @@ fcip_init_port(struct fcip *fptr)
 
 	ASSERT(fport != NULL);
 
-	FCIP_TNF_PROBE_1((fcip_init_port, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter"));
 	mutex_enter(&fptr->fcip_mutex);
 
 	/*
@@ -4720,10 +4554,6 @@ fcip_init_port(struct fcip *fptr)
 	 */
 	fptr->fcip_ub_nbufs = fcip_ub_nbufs;
 	tok_buf_size = sizeof (*fptr->fcip_ub_tokens) * fcip_ub_nbufs;
-
-	FCIP_TNF_PROBE_2((fcip_init_port, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "debug",
-		tnf_int, tokBufsize, tok_buf_size));
 
 	FCIP_DEBUG(FCIP_DEBUG_INIT,
 	    (CE_WARN, "tokBufsize: 0x%lx", tok_buf_size));
@@ -4756,8 +4586,6 @@ fcip_init_port(struct fcip *fptr)
 		goto done;
 
 	case FC_UB_ERROR:
-		FCIP_TNF_PROBE_1((fcip_init_port, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "invalid ub alloc request"));
 		FCIP_DEBUG(FCIP_DEBUG_INIT,
 		    (CE_WARN, "invalid ub alloc request !!"));
 		rval = FC_FAILURE;
@@ -4800,9 +4628,6 @@ fcip_init_port(struct fcip *fptr)
 		8, fcip_sendup_constructor, NULL, NULL, (void *)fport, NULL, 0);
 
 	if (fptr->fcip_xmit_cache == NULL) {
-		FCIP_TNF_PROBE_2((fcip_init_port, "fcip io", /* CSTYLED */,
-			tnf_string, msg, "unable to allocate xmit cache",
-			tnf_int, instance, fptr->fcip_instance));
 		FCIP_DEBUG(FCIP_DEBUG_INIT,
 		    (CE_WARN, "fcip%d unable to allocate xmit cache",
 		    fptr->fcip_instance));
@@ -5134,9 +4959,6 @@ fcip_ireq(queue_t *wq, mblk_t *mp)
 	FCIP_DEBUG(FCIP_DEBUG_DLPI,
 	    (CE_NOTE, "fcip_ireq: info request req rcvd"));
 
-	FCIP_TNF_PROBE_1((fcip_ireq, "fcip io", /* CSTYLED */,
-	    tnf_string, msg, "fcip ireq entered"));
-
 	if (MBLKL(mp) < DL_INFO_REQ_SIZE) {
 		dlerrorack(wq, mp, DL_INFO_REQ, DL_BADPRIM, 0);
 		return;
@@ -5198,9 +5020,6 @@ fcip_udreq(queue_t *wq, mblk_t *mp)
 	int			hdr_size;
 
 	FCIP_DEBUG(FCIP_DEBUG_DLPI, (CE_NOTE, "inside fcip_udreq"));
-
-	FCIP_TNF_PROBE_1((fcip_udreq, "fcip io", /* CSTYLED */,
-	    tnf_string, msg, "fcip udreq entered"));
 
 	slp = (struct fcipstr *)wq->q_ptr;
 
@@ -6915,8 +6734,6 @@ fcip_init_broadcast_pkt(fcip_pkt_t *fcip_pkt, void (*comp) (), int is_els)
 	uint32_t		sid;
 	uint32_t		did;
 
-	FCIP_TNF_PROBE_1((fcip_init_broadcast_pkt, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter"));
 	fc_pkt = FCIP_PKT_TO_FC_PKT(fcip_pkt);
 	fr_hdr = &fc_pkt->pkt_cmd_fhdr;
 	sid = fport->fcipp_sid.port_id;
@@ -7103,10 +6920,6 @@ fcip_get_broadcast_did(struct fcip *fptr)
 	uint32_t		did = 0;
 	uint32_t		sid;
 
-	FCIP_TNF_PROBE_2((fcip_get_broadcast_did, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "enter",
-		tnf_opaque, fptr, fptr));
-
 	sid = fport->fcipp_sid.port_id;
 
 	switch (fport->fcipp_topology) {
@@ -7172,9 +6985,6 @@ fcip_get_broadcast_did(struct fcip *fptr)
 		    fptr->fcip_instance));
 		break;
 	}
-	FCIP_TNF_PROBE_2((fcip_get_broadcast_did, "fcip io", /* CSTYLED */,
-		tnf_string, msg, "return",
-		tnf_opaque, did, did));
 
 	return (did);
 }
@@ -7485,12 +7295,6 @@ fcip_rte_remove_deferred(void *arg)
 				 */
 				fdestp->fcipd_rtable = NULL;
 				mutex_exit(&fdestp->fcipd_mutex);
-
-				FCIP_TNF_PROBE_2((fcip_rte_remove_deferred,
-					"fcip io", /* CSTYLED */,
-					tnf_string, msg,
-					"remove retired routing entry",
-					tnf_int, index, index));
 
 				if (frtp_prev == NULL) {
 					/* first element */

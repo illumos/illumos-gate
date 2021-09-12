@@ -40,7 +40,6 @@
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/tnf_probe.h>
 #include <sys/taskq.h>
 #include <sys/atomic.h>
 #ifdef FMA_TEST

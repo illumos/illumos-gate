@@ -376,7 +376,6 @@ GENUNIX_OBJS +=	\
 		timers.o	\
 		thread.o	\
 		tlabel.o	\
-		tnf_res.o	\
 		turnstile.o	\
 		tty_common.o	\
 		u8_textprep.o	\
@@ -943,9 +942,6 @@ STMF_SBD_OBJS += sbd.o sbd_scsi.o sbd_pgr.o sbd_zvol.o ats_copy_mgr.o
 SYSMSG_OBJS +=	sysmsg.o
 
 SES_OBJS +=	ses.o ses_sen.o ses_safte.o ses_ses.o
-
-TNF_OBJS +=	tnf_buf.o	tnf_trace.o	tnf_writer.o	trace_init.o \
-		trace_funcs.o	tnf_probe.o	tnf.o
 
 LOGINDMUX_OBJS += logindmux.o
 

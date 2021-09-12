@@ -1652,10 +1652,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/syscall/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/tnf/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/tsol/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

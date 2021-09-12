@@ -60,7 +60,6 @@
 #include <vm/page.h>
 #include <vm/pvn.h>
 #include <sys/vtrace.h>
-#include <sys/tnf_probe.h>
 #include <sys/fs/ufs_inode.h>
 #include <sys/fs/ufs_bio.h>
 #include <sys/fs/ufs_log.h>
@@ -1238,16 +1237,6 @@ biowait(struct buf *bp)
 	return (error);
 }
 
-static void
-biodone_tnf_probe(struct buf *bp)
-{
-	/* Kernel probe */
-	TNF_PROBE_3(biodone, "io blockio", /* CSTYLED */,
-	    tnf_device,		device,		bp->b_edev,
-	    tnf_diskaddr,	block,		bp->b_lblkno,
-	    tnf_opaque,		buf,		bp);
-}
-
 /*
  * Mark I/O complete on a buffer, release it if I/O is asynchronous,
  * and wake up anyone waiting for it.
@@ -1259,12 +1248,6 @@ biodone(struct buf *bp)
 		DTRACE_IO1(done, struct buf *, bp);
 		bp->b_flags &= ~B_STARTED;
 	}
-
-	/*
-	 * Call the TNF probe here instead of the inline code
-	 * to force our compiler to use the tail call optimization.
-	 */
-	biodone_tnf_probe(bp);
 
 	if (bp->b_iodone != NULL) {
 		(*(bp->b_iodone))(bp);
@@ -1330,10 +1313,6 @@ pageio_setup(struct page *pp, size_t len, struct vnode *vp, int flags)
 			if (lwp != NULL)
 				lwp->lwp_ru.majflt++;
 			CPU_STATS_ADDQ(cpup, vm, maj_fault, 1);
-			/* Kernel probe */
-			TNF_PROBE_2(major_fault, "vm pagefault", /* CSTYLED */,
-			    tnf_opaque,		vnode,		pp->p_vnode,
-			    tnf_offset,		offset,		pp->p_offset);
 		}
 		/*
 		 * Update statistics for pages being paged in
@@ -1360,11 +1339,6 @@ pageio_setup(struct page *pp, size_t len, struct vnode *vp, int flags)
 		CPU_STATS_EXIT_K();
 		TRACE_1(TR_FAC_VM, TR_PAGE_WS_IN,
 		    "page_ws_in:pp %p", pp);
-		/* Kernel probe */
-		TNF_PROBE_3(pagein, "vm pageio io", /* CSTYLED */,
-		    tnf_opaque,	vnode,	pp->p_vnode,
-		    tnf_offset,	offset,	pp->p_offset,
-		    tnf_size,	size,	len);
 	}
 
 	bp = kmem_zalloc(sizeof (struct buf), KM_SLEEP);

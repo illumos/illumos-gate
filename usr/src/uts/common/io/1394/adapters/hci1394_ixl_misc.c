@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_ixl_misc.c
  *    Isochronous IXL miscellaneous routines.
@@ -36,9 +34,6 @@
 #include <sys/kmem.h>
 #include <sys/types.h>
 #include <sys/conf.h>
-
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/h1394.h>
 #include <sys/1394/ixl1394.h>
 #include <sys/1394/adapters/hci1394.h>
@@ -70,9 +65,6 @@ hci1394_ixl_set_start(hci1394_iso_ctxt_t *ctxtp, ixl1394_command_t *ixlstp)
 
 	ixl1394_command_t  *ixl_exec_startp;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_set_start_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	/* if ixl start command is null, use first compiled ixl command */
 	if (ixlstp == NULL) {
 		ixlstp = ctxtp->ixl_firstp;
@@ -84,8 +76,6 @@ hci1394_ixl_set_start(hci1394_iso_ctxt_t *ctxtp, ixl1394_command_t *ixlstp)
 	 */
 	if ((ixlstp != ctxtp->ixl_firstp) && (ixlstp->ixl_opcode !=
 	    IXL1394_OP_LABEL)) {
-		TNF_PROBE_0_DEBUG(hci1394_ixl_set_start_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (-1);
 	}
 
@@ -107,14 +97,10 @@ hci1394_ixl_set_start(hci1394_iso_ctxt_t *ctxtp, ixl1394_command_t *ixlstp)
 		ctxtp->ixl_execp = ixlstp;
 		ctxtp->rem_noadv_intrs = ctxtp->max_noadv_intrs;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_set_start_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (0);
 	}
 
 	/* else no executeable xfer command found, return error */
-	TNF_PROBE_0_DEBUG(hci1394_ixl_set_start_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (1);
 }
 #ifdef _KERNEL
@@ -133,9 +119,6 @@ hci1394_ixl_reset_status(hci1394_iso_ctxt_t *ctxtp)
 	hci1394_xfer_ctl_t	*xferctlp;
 	uint_t			ixldepth;
 	uint16_t		timestamp;
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_reset_status_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	ixlnext = ctxtp->ixl_firstp;
 
@@ -169,9 +152,6 @@ hci1394_ixl_reset_status(hci1394_iso_ctxt_t *ctxtp)
 			ixldepth++;
 		}
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_reset_status_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 }
 #endif
 /*
@@ -201,9 +181,6 @@ hci1394_ixl_find_next_exec_xfer(ixl1394_command_t *ixl_start,
 	ixl1394_command_t *ixlp;
 	int ii;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_find_next_exec_xfer_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	ixlp = ixl_start;
 	xferfound = B_FALSE;
 	ii = HCI1394_IXL_MAX_SEQ_JUMPS;
@@ -232,13 +209,6 @@ hci1394_ixl_find_next_exec_xfer(ixl1394_command_t *ixl_start,
 
 			/* if exceeded tolerance, give up */
 			if (ii == 0) {
-				TNF_PROBE_1(
-				    hci1394_ixl_find_next_exec_xfer_error,
-				    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string,
-				    errmsg, "Infinite loop w/no xfers");
-				TNF_PROBE_0_DEBUG(
-				    hci1394_ixl_find_next_exec_xfer_exit,
-				    HCI1394_TNF_HAL_STACK_ISOCH, "");
 				return (DDI_FAILURE);
 			}
 			continue;
@@ -257,8 +227,6 @@ hci1394_ixl_find_next_exec_xfer(ixl1394_command_t *ixl_start,
 	/* return ixl xfer start command found, if any */
 	*next_exec_ixlpp = ixlp;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_find_next_exec_xfer_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (DDI_SUCCESS);
 }
 #ifdef _KERNEL
@@ -279,10 +247,6 @@ hci1394_ixl_check_status(hci1394_xfer_ctl_dma_t *dma, uint16_t ixlopcode,
 	ddi_dma_handle_t	dma_hdl;
 	uint32_t		desc_status;
 	uint32_t		desc_hdr;
-	int			err;
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_check_status_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	/* last dma descriptor in descriptor block from dma structure */
 	hcidescp = (hci1394_desc_t *)(dma->dma_descp);
@@ -294,13 +258,8 @@ hci1394_ixl_check_status(hci1394_xfer_ctl_dma_t *dma, uint16_t ixlopcode,
 	if ((ixlopcode & IXL1394_OPF_ONXMIT) != 0) {
 
 		/* Sync the descriptor before we get the status */
-		err = ddi_dma_sync(dma_hdl, hcidesc_off,
+		(void) ddi_dma_sync(dma_hdl, hcidesc_off,
 		    sizeof (hci1394_desc_t), DDI_DMA_SYNC_FORCPU);
-		if (err != DDI_SUCCESS) {
-			TNF_PROBE_1(hci1394_ixl_check_status_error,
-			    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, errmsg,
-			    "dma_sync() failed");
-		}
 		desc_status = ddi_get32(acc_hdl, &hcidescp->status);
 
 		/* check if status is set in last dma descriptor in block */
@@ -320,21 +279,12 @@ hci1394_ixl_check_status(hci1394_xfer_ctl_dma_t *dma, uint16_t ixlopcode,
 			ddi_put32(acc_hdl, &hcidescp->status, 0);
 
 			/* Sync descriptor for device (status was cleared) */
-			err = ddi_dma_sync(dma_hdl, hcidesc_off,
+			(void) ddi_dma_sync(dma_hdl, hcidesc_off,
 			    sizeof (hci1394_desc_t), DDI_DMA_SYNC_FORDEV);
-			if (err != DDI_SUCCESS) {
-				TNF_PROBE_1(hci1394_ixl_check_status_error,
-				    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string,
-				    errmsg, "dma_sync() failed");
-			}
 
-			TNF_PROBE_0_DEBUG(hci1394_ixl_check_status_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (1);
 		}
 		/* else, return dma descriptor block status not set */
-		TNF_PROBE_0_DEBUG(hci1394_ixl_check_status_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (0);
 	}
 
@@ -350,13 +300,8 @@ hci1394_ixl_check_status(hci1394_xfer_ctl_dma_t *dma, uint16_t ixlopcode,
 	while (hcicnt-- != 0) {
 
 		/* Sync the descriptor before we get the status */
-		err = ddi_dma_sync(dma_hdl, hcidesc_off,
+		(void) ddi_dma_sync(dma_hdl, hcidesc_off,
 		    hcicnt * sizeof (hci1394_desc_t), DDI_DMA_SYNC_FORCPU);
-		if (err != DDI_SUCCESS) {
-			TNF_PROBE_1(hci1394_ixl_check_status_error,
-			    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, errmsg,
-			    "dma_sync() failed");
-		}
 
 		desc_hdr = ddi_get32(acc_hdl, &hcidescp->hdr);
 
@@ -376,8 +321,6 @@ hci1394_ixl_check_status(hci1394_xfer_ctl_dma_t *dma, uint16_t ixlopcode,
 			 * descriptor block status set
 			 */
 			if (do_status_reset == B_FALSE) {
-				TNF_PROBE_0_DEBUG(hci1394_ixl_check_status_exit,
-				    HCI1394_TNF_HAL_STACK_ISOCH, "");
 				return (1);
 			}
 
@@ -389,28 +332,19 @@ hci1394_ixl_check_status(hci1394_xfer_ctl_dma_t *dma, uint16_t ixlopcode,
 			ddi_put32(acc_hdl, &hcidescp->status, desc_status);
 
 			/* Sync descriptor for device (status was cleared) */
-			err = ddi_dma_sync(dma_hdl, hcidesc_off,
+			(void) ddi_dma_sync(dma_hdl, hcidesc_off,
 			    sizeof (hci1394_desc_t), DDI_DMA_SYNC_FORDEV);
-			if (err != DDI_SUCCESS) {
-				TNF_PROBE_1(hci1394_ixl_check_status_error,
-				    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string,
-				    errmsg, "dma_sync() failed");
-			}
 
-			TNF_PROBE_0_DEBUG(hci1394_ixl_check_status_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (1);
 		} else {
 			/* else, set to evaluate next descriptor. */
 			hcidescp++;
 			hcidesc_off = (off_t)hcidescp -
-						(off_t)dma->dma_buf->bi_kaddr;
+			    (off_t)dma->dma_buf->bi_kaddr;
 		}
 	}
 
 	/* return input not complete status */
-	TNF_PROBE_0_DEBUG(hci1394_ixl_check_status_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (0);
 }
 #endif
@@ -421,14 +355,8 @@ hci1394_ixl_check_status(hci1394_xfer_ctl_dma_t *dma, uint16_t ixlopcode,
 void
 hci1394_ixl_cleanup(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp)
 {
-	TNF_PROBE_0_DEBUG(hci1394_ixl_cleanup_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	hci1394_delete_xfer_ctl((hci1394_xfer_ctl_t *)ctxtp->xcs_firstp);
 	hci1394_delete_dma_desc_mem(soft_statep, ctxtp->dma_firstp);
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_cleanup_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 }
 
 /*
@@ -443,9 +371,6 @@ hci1394_delete_dma_desc_mem(hci1394_state_t *soft_statep,
     hci1394_idma_desc_mem_t *dma_firstp)
 {
 	hci1394_idma_desc_mem_t *dma_next;
-
-	TNF_PROBE_0_DEBUG(hci1394_delete_dma_desc_mem_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	while (dma_firstp != NULL) {
 		dma_next = dma_firstp->dma_nextp;
@@ -471,8 +396,6 @@ hci1394_delete_dma_desc_mem(hci1394_state_t *soft_statep,
 		/* advance to next dma memory descriptor */
 		dma_firstp = dma_next;
 	}
-	TNF_PROBE_0_DEBUG(hci1394_delete_dma_desc_mem_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 }
 
 /*
@@ -483,9 +406,6 @@ void
 hci1394_delete_xfer_ctl(hci1394_xfer_ctl_t *xcsp)
 {
 	hci1394_xfer_ctl_t *delp;
-
-	TNF_PROBE_0_DEBUG(hci1394_delete_xfer_ctl_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	while ((delp = xcsp) != NULL) {
 		/* advance ptr to next xfer_ctl struct */
@@ -503,6 +423,4 @@ hci1394_delete_xfer_ctl(hci1394_xfer_ctl_t *xcsp)
 		free(delp);
 #endif
 	}
-	TNF_PROBE_0_DEBUG(hci1394_delete_xfer_ctl_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 }

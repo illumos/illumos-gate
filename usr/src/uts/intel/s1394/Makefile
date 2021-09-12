@@ -61,9 +61,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #ALL_BUILDS	= $(ALL_BUILDSONLY64)
 #DEF_BUILDS	= $(DEF_BUILDSONLY64)
 
-DEBUG_DEFS_DBG32 += -DTNF_DEBUG
-#DEBUG_DEFS_DBG64 += -DTNF_DEBUG
-
 #
 # For now, disable these warnings; maintainers should endeavor
 # to investigate and remove these for maximum coverage.

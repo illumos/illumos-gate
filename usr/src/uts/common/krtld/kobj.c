@@ -67,7 +67,6 @@
 #include <sys/fs/decomp.h>
 #include <sys/callb.h>
 #include <sys/cmn_err.h>
-#include <sys/tnf_probe.h>
 #include <sys/zmod.h>
 
 #include <krtld/reloc.h>
@@ -138,10 +137,6 @@ extern int alloc_gottable(struct module *, caddr_t *, caddr_t *);
 #if !defined(_OBP)
 extern int kobj_boot_mountroot(void);
 #endif
-
-static void tnf_unsplice_probes(uint_t, struct modctl *);
-extern tnf_probe_control_t *__tnf_probe_list_head;
-extern tnf_tag_data_t *__tnf_tag_list_head;
 
 extern int modrootloaded;
 extern int swaploaded;
@@ -257,13 +252,6 @@ static char *suppress_sym_list[] =
 
 /* indexed by KOBJ_NOTIFY_* */
 static kobj_notify_list_t *kobj_notifiers[KOBJ_NOTIFY_MAX + 1];
-
-/*
- * TNF probe management globals
- */
-tnf_probe_control_t	*__tnf_probe_list_head = NULL;
-tnf_tag_data_t		*__tnf_tag_list_head = NULL;
-int			tnf_changed_probe_list = 0;
 
 /*
  * Prefix for statically defined tracing (SDT) DTrace probes.
@@ -433,9 +421,8 @@ kobj_init(
 	 * about the executable. In particular, it does not read in, map or
 	 * otherwise look at the program headers. We fake all that up now.
 	 *
-	 * We do this early as DTrace static probes and tnf probes both call
-	 * undefined references.  We have to process those relocations before
-	 * calling any of them.
+	 * We do this early as DTrace static probes call undefined references.
+	 * We have to process those relocations before calling any of them.
 	 *
 	 * OBP tells kobj_start() where the ELF image is in memory, so it
 	 * synthesized bootaux before kobj_init() was called
@@ -4471,87 +4458,6 @@ expand_libmacro(char *tail, char *path, char *pathend)
 			return (NULL);
 	}
 	return (NULL);
-}
-
-static void
-tnf_add_notifyunload(kobj_notify_f *fp)
-{
-	kobj_notify_list_t *entry;
-
-	entry = kobj_alloc(sizeof (kobj_notify_list_t), KM_WAIT);
-	entry->kn_type = KOBJ_NOTIFY_MODUNLOADING;
-	entry->kn_func = fp;
-	(void) kobj_notify_add(entry);
-}
-
-/* ARGSUSED */
-static void
-tnf_unsplice_probes(uint_t what, struct modctl *mod)
-{
-	tnf_probe_control_t **p;
-	tnf_tag_data_t **q;
-	struct module *mp = mod->mod_mp;
-
-	if (!(mp->flags & KOBJ_TNF_PROBE))
-		return;
-
-	for (p = &__tnf_probe_list_head; *p; )
-		if (kobj_addrcheck(mp, (char *)*p) == 0)
-			*p = (*p)->next;
-		else
-			p = &(*p)->next;
-
-	for (q = &__tnf_tag_list_head; *q; )
-		if (kobj_addrcheck(mp, (char *)*q) == 0)
-			*q = (tnf_tag_data_t *)(*q)->tag_version;
-		else
-			q = (tnf_tag_data_t **)&(*q)->tag_version;
-
-	tnf_changed_probe_list = 1;
-}
-
-int
-tnf_splice_probes(int boot_load, tnf_probe_control_t *plist,
-    tnf_tag_data_t *tlist)
-{
-	int result = 0;
-	static int add_notify = 1;
-
-	if (plist) {
-		tnf_probe_control_t *pl;
-
-		for (pl = plist; pl->next; )
-			pl = pl->next;
-
-		if (!boot_load)
-			mutex_enter(&mod_lock);
-		tnf_changed_probe_list = 1;
-		pl->next = __tnf_probe_list_head;
-		__tnf_probe_list_head = plist;
-		if (!boot_load)
-			mutex_exit(&mod_lock);
-		result = 1;
-	}
-
-	if (tlist) {
-		tnf_tag_data_t *tl;
-
-		for (tl = tlist; tl->tag_version; )
-			tl = (tnf_tag_data_t *)tl->tag_version;
-
-		if (!boot_load)
-			mutex_enter(&mod_lock);
-		tl->tag_version = (tnf_tag_version_t *)__tnf_tag_list_head;
-		__tnf_tag_list_head = tlist;
-		if (!boot_load)
-			mutex_exit(&mod_lock);
-		result = 1;
-	}
-	if (!boot_load && result && add_notify) {
-		tnf_add_notifyunload(tnf_unsplice_probes);
-		add_notify = 0;
-	}
-	return (result);
 }
 
 char *kobj_file_buf;
