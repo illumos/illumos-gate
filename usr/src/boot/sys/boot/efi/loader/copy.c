@@ -110,7 +110,8 @@ memmap_find(EFI_MEMORY_DESCRIPTOR *map, size_t count, UINTN dsize,
  */
 vm_offset_t
 efi_physaddr(multiboot_tag_module_t *module, vm_offset_t addr,
-    EFI_MEMORY_DESCRIPTOR *map, size_t count, UINTN dsize, size_t size)
+    EFI_MEMORY_DESCRIPTOR *map, size_t count, UINTN dsize, vm_offset_t laddr,
+    size_t size)
 {
 	multiboot_tag_module_t *mp;
 	vm_offset_t off;
@@ -139,6 +140,13 @@ efi_physaddr(multiboot_tag_module_t *module, vm_offset_t addr,
 		mp = (multiboot_tag_module_t *)
 		    roundup((uintptr_t)mp + mp->mb_size, MULTIBOOT_TAG_ALIGN);
 	} while (off == 0);
+
+	/*
+	 * memmap_find failed to get us address, try to use load
+	 * address.
+	 */
+	if (off == 0 || off >= UINT32_MAX)
+		off = addr_verify(module, laddr, size);
 
 	return (off);
 }
