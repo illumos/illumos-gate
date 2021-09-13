@@ -1287,7 +1287,8 @@ multiboot2_exec(struct preloaded_file *fp)
 		 * fix the mb_mod_start and mb_mod_end.
 		 */
 		mp->mb_mod_start = efi_physaddr(module, tmp, map,
-		    map_size / desc_size, desc_size, mp->mb_mod_end);
+		    map_size / desc_size, desc_size, mfp->f_addr,
+		    mp->mb_mod_end);
 		if (mp->mb_mod_start == 0)
 			panic("Could not find memory for module");
 
@@ -1303,7 +1304,8 @@ multiboot2_exec(struct preloaded_file *fp)
 	chunk = &relocator->rel_chunklist[i++];
 	chunk->chunk_vaddr = (EFI_VIRTUAL_ADDRESS)(uintptr_t)mbi;
 	chunk->chunk_paddr = efi_physaddr(module, tmp, map,
-	    map_size / desc_size, desc_size, mbi->mbi_total_size);
+	    map_size / desc_size, desc_size, (uintptr_t)mbi,
+	    mbi->mbi_total_size);
 	chunk->chunk_size = mbi->mbi_total_size;
 	STAILQ_INSERT_TAIL(head, chunk, chunk_next);
 
