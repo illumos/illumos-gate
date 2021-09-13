@@ -40,7 +40,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -165,6 +165,7 @@ enum {
 	VIE_OP_TYPE_MOV,
 	VIE_OP_TYPE_MOVSX,
 	VIE_OP_TYPE_MOVZX,
+	VIE_OP_TYPE_MOV_CR,
 	VIE_OP_TYPE_AND,
 	VIE_OP_TYPE_OR,
 	VIE_OP_TYPE_SUB,
@@ -189,7 +190,8 @@ enum {
 #define	VIE_OP_F_IMM8		(1 << 1)  /* 8-bit immediate operand */
 #define	VIE_OP_F_MOFFSET	(1 << 2)  /* 16/32/64-bit immediate moffset */
 #define	VIE_OP_F_NO_MODRM	(1 << 3)
-#define	VIE_OP_F_NO_GLA_VERIFICATION (1 << 4)
+#define	VIE_OP_F_NO_GLA_VERIFICATION	(1 << 4)
+#define	VIE_OP_F_REG_REG	(1 << 5)  /* special-case for mov-cr */
 
 static const struct vie_op three_byte_opcodes_0f38[256] = {
 	[0xF7] = {
@@ -203,6 +205,16 @@ static const struct vie_op two_byte_opcodes[256] = {
 		.op_byte = 0x06,
 		.op_type = VIE_OP_TYPE_CLTS,
 		.op_flags = VIE_OP_F_NO_MODRM | VIE_OP_F_NO_GLA_VERIFICATION
+	},
+	[0x20] = {
+		.op_byte = 0x20,
+		.op_type = VIE_OP_TYPE_MOV_CR,
+		.op_flags = VIE_OP_F_REG_REG | VIE_OP_F_NO_GLA_VERIFICATION
+	},
+	[0x22] = {
+		.op_byte = 0x22,
+		.op_type = VIE_OP_TYPE_MOV_CR,
+		.op_flags = VIE_OP_F_REG_REG | VIE_OP_F_NO_GLA_VERIFICATION
 	},
 	[0xAE] = {
 		.op_byte = 0xAE,
@@ -378,6 +390,25 @@ static enum vm_reg_name gpr_map[16] = {
 	VM_REG_GUEST_R13,
 	VM_REG_GUEST_R14,
 	VM_REG_GUEST_R15
+};
+
+static enum vm_reg_name cr_map[16] = {
+	VM_REG_GUEST_CR0,
+	VM_REG_LAST,
+	VM_REG_GUEST_CR2,
+	VM_REG_GUEST_CR3,
+	VM_REG_GUEST_CR4,
+	VM_REG_LAST,
+	VM_REG_LAST,
+	VM_REG_LAST,
+	VM_REG_LAST,
+	VM_REG_LAST,
+	VM_REG_LAST,
+	VM_REG_LAST,
+	VM_REG_LAST,
+	VM_REG_LAST,
+	VM_REG_LAST,
+	VM_REG_LAST
 };
 
 static uint64_t size2mask[] = {
@@ -655,6 +686,112 @@ getandflags(int opsize, uint64_t x, uint64_t y)
 		return (getandflags32(x, y));
 	else
 		return (getandflags64(x, y));
+}
+
+static int
+vie_emulate_mov_cr(struct vie *vie, struct vm *vm, int vcpuid)
+{
+	uint64_t val;
+	int err;
+	enum vm_reg_name gpr = gpr_map[vie->rm];
+	enum vm_reg_name cr = cr_map[vie->reg];
+
+	uint_t size = 4;
+	if (vie->paging.cpu_mode == CPU_MODE_64BIT) {
+		size = 8;
+	}
+
+	switch (vie->op.op_byte) {
+	case 0x20:
+		/*
+		 * MOV control register (ModRM:reg) to reg (ModRM:r/m)
+		 * 20/r:	mov r32, CR0-CR7
+		 * 20/r:	mov r64, CR0-CR7
+		 * REX.R + 20/0:	mov r64, CR8
+		 */
+		if (vie->paging.cpl != 0) {
+			vm_inject_gp(vm, vcpuid);
+			vie->num_processed = 0;
+			return (0);
+		}
+		err = vm_get_register(vm, vcpuid, cr, &val);
+		if (err != 0) {
+			/* #UD for access to non-existent CRs */
+			vm_inject_ud(vm, vcpuid);
+			vie->num_processed = 0;
+			return (0);
+		}
+		err = vie_update_register(vm, vcpuid, gpr, val, size);
+		break;
+	case 0x22: {
+		/*
+		 * MOV reg (ModRM:r/m) to control register (ModRM:reg)
+		 * 22/r:	mov CR0-CR7, r32
+		 * 22/r:	mov CR0-CR7, r64
+		 * REX.R + 22/0:	mov CR8, r64
+		 */
+		uint64_t old, diff;
+
+		if (vie->paging.cpl != 0) {
+			vm_inject_gp(vm, vcpuid);
+			vie->num_processed = 0;
+			return (0);
+		}
+		err = vm_get_register(vm, vcpuid, cr, &old);
+		if (err != 0) {
+			/* #UD for access to non-existent CRs */
+			vm_inject_ud(vm, vcpuid);
+			vie->num_processed = 0;
+			return (0);
+		}
+		err = vm_get_register(vm, vcpuid, gpr, &val);
+		VERIFY0(err);
+		val &= size2mask[size];
+		diff = old ^ val;
+
+		switch (cr) {
+		case VM_REG_GUEST_CR0:
+			if ((diff & CR0_PG) != 0) {
+				uint64_t efer;
+
+				err = vm_get_register(vm, vcpuid,
+				    VM_REG_GUEST_EFER, &efer);
+				VERIFY0(err);
+
+				/* Keep the long-mode state in EFER in sync */
+				if ((val & CR0_PG) != 0 &&
+				    (efer & EFER_LME) != 0) {
+					efer |= EFER_LMA;
+				}
+				if ((val & CR0_PG) == 0 &&
+				    (efer & EFER_LME) != 0) {
+					efer &= ~EFER_LMA;
+				}
+
+				err = vm_set_register(vm, vcpuid,
+				    VM_REG_GUEST_EFER, efer);
+				VERIFY0(err);
+			}
+			/* TODO: enforce more of the #GP checks */
+			err = vm_set_register(vm, vcpuid, cr, val);
+			VERIFY0(err);
+			break;
+		case VM_REG_GUEST_CR2:
+		case VM_REG_GUEST_CR3:
+		case VM_REG_GUEST_CR4:
+			/* TODO: enforce more of the #GP checks */
+			err = vm_set_register(vm, vcpuid, cr, val);
+			break;
+		default:
+			/* The cr_map mapping should prevent this */
+			panic("invalid cr %d", cr);
+		}
+		break;
+	}
+	default:
+		return (EINVAL);
+	}
+	return (err);
 }
 
 static int
@@ -2311,6 +2448,9 @@ vie_emulate_other(struct vie *vie, struct vm *vm, int vcpuid)
 	case VIE_OP_TYPE_CLTS:
 		error = vie_emulate_clts(vie, vm, vcpuid);
 		break;
+	case VIE_OP_TYPE_MOV_CR:
+		error = vie_emulate_mov_cr(vie, vm, vcpuid);
+		break;
 	default:
 		error = EINVAL;
 		break;
@@ -3229,11 +3369,17 @@ static int
 decode_modrm(struct vie *vie, enum vm_cpu_mode cpu_mode)
 {
 	uint8_t x;
+	/*
+	 * Handling mov-to/from-cr is special since it is not issuing
+	 * mmio/pio requests and can be done in real mode.  We must bypass some
+	 * of the other existing decoding restrictions for it.
+	 */
+	const bool is_movcr = ((vie->op.op_flags & VIE_OP_F_REG_REG) != 0);
 
 	if (vie->op.op_flags & VIE_OP_F_NO_MODRM)
 		return (0);
 
-	if (cpu_mode == CPU_MODE_REAL)
+	if (cpu_mode == CPU_MODE_REAL && !is_movcr)
 		return (-1);
 
 	if (vie_peek(vie, &x))
@@ -3248,7 +3394,7 @@ decode_modrm(struct vie *vie, enum vm_cpu_mode cpu_mode)
 	 * fault. There has to be a memory access involved to cause the
 	 * EPT fault.
 	 */
-	if (vie->mod == VIE_MOD_DIRECT)
+	if (vie->mod == VIE_MOD_DIRECT && !is_movcr)
 		return (-1);
 
 	if ((vie->mod == VIE_MOD_INDIRECT && vie->rm == VIE_RM_DISP32) ||

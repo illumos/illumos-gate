@@ -2528,8 +2528,6 @@ f usr/bin/amd64/setuname 0555 root bin
 f usr/bin/amd64/sort 0555 root bin
 f usr/bin/amd64/strings 0555 root bin
 f usr/bin/amd64/truss 0555 root bin
-h usr/bin/amd64/uptime=usr/bin/amd64/w
-f usr/bin/amd64/w 4555 root bin
 f usr/bin/amd64/ztest 4555 root bin
 f usr/bin/amt 0555 root bin
 h usr/bin/apropos=usr/bin/man
@@ -2942,7 +2940,7 @@ h usr/bin/uniq=usr/bin/alias
 f usr/bin/units 0555 root bin
 f usr/bin/unix2dos 0555 root bin
 f usr/bin/unpack 0555 root bin
-h usr/bin/uptime=usr/lib/isaexec
+h usr/bin/uptime=w
 f usr/bin/userattr 0555 root bin
 f usr/bin/uudecode 0555 root uucp
 f usr/bin/uuencode 0555 root uucp
@@ -2953,7 +2951,7 @@ f usr/bin/vgrind 0555 root bin
 f usr/bin/vmstat 0555 root bin
 f usr/bin/vndstat 0555 root bin
 f usr/bin/vtfontcvt 0555 root bin
-h usr/bin/w=usr/lib/isaexec
+f usr/bin/w 4555 root bin
 h usr/bin/wait=usr/bin/alias
 h usr/bin/wc=usr/bin/alias
 h usr/bin/whatis=usr/bin/man

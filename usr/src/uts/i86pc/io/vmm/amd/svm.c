@@ -1350,7 +1350,14 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_EXTINT, 1);
 		handled = 1;
 		break;
-	case VMCB_EXIT_NMI:	/* external NMI */
+	case VMCB_EXIT_NMI:
+	case VMCB_EXIT_SMI:
+	case VMCB_EXIT_INIT:
+		/*
+		 * For external NMI/SMI and physical INIT interrupts, simply
+		 * continue execution, as those host events will be handled by
+		 * the physical CPU.
+		 */
 		handled = 1;
 		break;
 	case 0x40 ... 0x5F:

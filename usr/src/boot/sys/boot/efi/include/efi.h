@@ -60,6 +60,12 @@ Revision History
 #include "efitcp.h"
 #include "efipoint.h"
 #include "efiuga.h"
+#include <stdbool.h>
+
+/*
+ * Global variables
+ */
+extern bool has_boot_services;
 
 /*
  * illumos UUID
