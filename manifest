@@ -2940,7 +2940,7 @@ h usr/bin/uniq=usr/bin/alias
 f usr/bin/units 0555 root bin
 f usr/bin/unix2dos 0555 root bin
 f usr/bin/unpack 0555 root bin
-h usr/bin/uptime=w
+h usr/bin/uptime=usr/bin/w
 f usr/bin/userattr 0555 root bin
 f usr/bin/uudecode 0555 root uucp
 f usr/bin/uuencode 0555 root uucp
