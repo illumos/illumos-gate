@@ -30,8 +30,6 @@
  * the code in this file was borrowed from gssd.c
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <rpc/rpc.h>
 #include <sys/syslog.h>
@@ -66,17 +64,16 @@ extern bool_t loadConfigFile(void);
 int _rpcpmstart = 0;		/* Started by a port monitor ? */
 int _rpcfdtype;			/* Whether Stream or Datagram ? */
 int _rpcsvcdirty;		/* Still serving ? */
+mutex_t _svcstate_lock = ERRORCHECKMUTEX;
 
 char myhostname[MAXHOSTNAMELEN] = {0};
 char progname[MAXNAMELEN] = {0};
 
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 {
-	register SVCXPRT *transp;
+	SVCXPRT *transp;
 	extern int optind;
 	int c;
 	char mname[FMNAMESZ + 1];
@@ -103,7 +100,7 @@ char **argv;
 #endif /* DEBUG */
 	if (getuid()) {
 		(void) fprintf(stderr,
-			gettext("[%s] must be run as root\n"), argv[0]);
+		    gettext("[%s] must be run as root\n"), argv[0]);
 #ifdef DEBUG
 		(void) fprintf(stderr, gettext(" warning only\n"));
 #else /* !DEBUG */
@@ -113,11 +110,11 @@ char **argv;
 
 	while ((c = getopt(argc, argv, "d")) != -1)
 		switch (c) {
-		    case 'd':
+		case 'd':
 			/* turn on debugging */
 			kwarnd_debug = 1;
 			break;
-		    default:
+		default:
 			usage();
 		}
 
@@ -131,10 +128,8 @@ char **argv;
 	 * Started by inetd if name of module just below stream
 	 * head is either a sockmod or timod.
 	 */
-	if (!ioctl(0, I_LOOK, mname) &&
-		((strcmp(mname, "sockmod") == 0) ||
-			(strcmp(mname, "timod") == 0))) {
-
+	if (!ioctl(0, I_LOOK, mname) && ((strcmp(mname, "sockmod") == 0) ||
+	    (strcmp(mname, "timod") == 0))) {
 		char *netid;
 		struct netconfig *nconf;
 
@@ -151,9 +146,8 @@ char **argv;
 
 		if (strcmp(mname, "sockmod") == 0) {
 			if (ioctl(0, I_POP, 0) || ioctl(0, I_PUSH, "timod")) {
-				syslog(LOG_ERR,
-					gettext("could not get the "
-						"right module"));
+				syslog(LOG_ERR, gettext("could not get the "
+				    "right module"));
 				exit(1);
 			}
 		}
@@ -169,9 +163,8 @@ char **argv;
 		 * registered with rpcbind.
 		 */
 		if (!svc_reg(transp, KWARNPROG, KWARNVERS, kwarnprog_1, NULL)) {
-			syslog(LOG_ERR,
-				gettext("unable to register "
-					"(KWARNPROG, KWARNVERS)"));
+			syslog(LOG_ERR, gettext("unable to register "
+			    "(KWARNPROG, KWARNVERS)"));
 			exit(1);
 		}
 
@@ -200,11 +193,10 @@ char **argv;
 	(void) signal(SIGCHLD, SIG_IGN);
 
 	if (thr_create(NULL, 0,
-			(void *(*)(void *))kwarnd_check_warning_list, NULL,
-			THR_DETACHED | THR_DAEMON | THR_NEW_LWP,
-			NULL)) {
+	    (void *(*)(void *))kwarnd_check_warning_list, NULL,
+	    THR_DETACHED | THR_DAEMON | THR_NEW_LWP, NULL)) {
 		syslog(LOG_ERR,
-			gettext("unable to create cache_cleanup thread"));
+		    gettext("unable to create cache_cleanup thread"));
 		exit(1);
 	}
 

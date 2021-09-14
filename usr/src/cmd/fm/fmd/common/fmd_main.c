@@ -46,6 +46,7 @@
 #include <fmd.h>
 
 fmd_t fmd;
+mutex_t _svcstate_lock = ERRORCHECKMUTEX;
 
 /*
  * For DEBUG builds, we define a set of hooks for libumem that provide useful

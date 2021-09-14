@@ -69,6 +69,7 @@ extern void	init_dc_locator(void);
 extern void	fini_dc_locator(void);
 
 idmapd_state_t	_idmapdstate;
+mutex_t _svcstate_lock = ERRORCHECKMUTEX;
 
 SVCXPRT *xprt = NULL;
 
@@ -307,8 +308,6 @@ main(int argc, char **argv)
 			    "Unable to raise RLIMIT_NOFILE to %d",
 			    rl.rlim_cur);
 	}
-
-	(void) mutex_init(&_svcstate_lock, USYNC_THREAD, NULL);
 
 	if (_idmapdstate.daemon_mode == TRUE) {
 		if (daemonize_start() < 0) {

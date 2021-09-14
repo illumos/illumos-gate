@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USBSACM 7D "Nov 1, 2006"
+.TH USBSACM 7D "Aug 13, 2021"
 .SH NAME
 usbsacm \- USB communication device class ACM driver
 .SH SYNOPSIS
@@ -87,8 +87,10 @@ calls.
 .LP
 The input and output line speeds may be set to any of the following baud rates:
 75, 150, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200, 38400, 57600, 115200,
-230400 or 460800. The speeds cannot be set independently. For example, when the
-output speed is set, the input speed is automatically set to the same speed.
+230400, 460800, 921600, 1000000, 1152000, 1500000, 2000000, 2500000, 3000000,
+3500000, or 4000000. The speeds cannot be set independently. For example, when
+the output speed is set, the input speed is automatically set to the same
+speed.
 .SH ERRORS
 .sp
 .LP

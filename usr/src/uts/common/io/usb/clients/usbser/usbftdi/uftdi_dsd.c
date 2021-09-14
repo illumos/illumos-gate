@@ -680,6 +680,12 @@ uftdi_param2regs(uftdi_state_t *uf, ds_port_params_t *tp, uftdi_regs_t *ur)
 			case B921600:
 				ur->ur_baud = ftdi_8u232am_b921600;
 				break;
+			case B2000000:
+				ur->ur_baud = ftdi_8u232am_b2000000;
+				break;
+			case B3000000:
+				ur->ur_baud = ftdi_8u232am_b3000000;
+				break;
 			default:
 				USB_DPRINTF_L3(DPRINT_CTLOP, uf->uf_lh,
 				    "uftdi_param2regs: bad baud %d",

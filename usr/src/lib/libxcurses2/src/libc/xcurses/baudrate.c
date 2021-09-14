@@ -24,10 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/* LINTLIBRARY */
-
 /*
  * baudrate.c
  *
@@ -37,15 +33,6 @@
  *
  */
 
-#ifdef M_RCSID
-#ifndef lint
-static char rcsID[] =
-"$Header: /team/ps/sun_xcurses/archive/local_changes/xcurses/src/lib/"
-"libxcurses/src/libc/xcurses/rcs/baudrate.c 1.3 1998/06/04 19:55:42 "
-"cbates Exp $";
-#endif
-#endif
-
 #include <private.h>
 
 typedef struct {
@@ -54,23 +41,39 @@ typedef struct {
 } t_baud;
 
 static const t_baud speeds[] = {
-	{ B0, 0 },
-	{ B50, 50 },
-	{ B75, 75 },
-	{ B110, 110 },
-	{ B134, 134 },
-	{ B150, 150 },
-	{ B200, 200 },
-	{ B300, 300 },
-	{ B600, 600 },
-	{ B1200, 1200 },
-	{ B1800, 1800 },
-	{ B2400, 2400 },
-	{ B4800, 4800 },
-	{ B9600, 9600 },
-	{ B19200, 19200 },
-	{ B38400, 38400 },
-	{ (speed_t) -1, -1 }
+	{ B0,		0 },
+	{ B50,		50 },
+	{ B75,		75 },
+	{ B110,		110 },
+	{ B134,		134 },
+	{ B150,		150 },
+	{ B200,		200 },
+	{ B300,		300 },
+	{ B600,		600 },
+	{ B1200,	1200 },
+	{ B1800,	1800 },
+	{ B2400,	2400 },
+	{ B4800,	4800 },
+	{ B9600,	9600 },
+	{ B19200,	19200 },
+	{ B38400,	38400 },
+	{ B57600,	57600 },
+	{ B76800,	76800 },
+	{ B115200,	115200 },
+	{ B153600,	153600 },
+	{ B230400,	230400 },
+	{ B307200,	307200 },
+	{ B460800,	460800 },
+	{ B921600,	921600 },
+	{ B1000000,	1000000 },
+	{ B1152000,	1152000 },
+	{ B1500000,	1500000 },
+	{ B2000000,	2000000 },
+	{ B2500000,	2500000 },
+	{ B3000000,	3000000 },
+	{ B3500000,	3500000 },
+	{ B4000000,	4000000 },
+	{ (speed_t)-1,	-1 }
 };
 
 /*
@@ -85,9 +88,11 @@ baudrate(void)
 
 	value = cfgetospeed(PTERMIOS(_prog));
 
-	for (i = 0; speeds[i].speed != (speed_t) -1; ++i)
-		if (speeds[i].speed == value)
+	for (i = 0; speeds[i].speed != (speed_t) -1; ++i) {
+		if (speeds[i].speed == value) {
 			break;
+		}
+	}
 
 	return (speeds[i].value);
 }

@@ -15,7 +15,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd March 17, 2019
+.Dd August 13, 2021
 .Dt TERMIO 7I
 .Os
 .Sh NAME
@@ -1124,7 +1124,7 @@ field describes the hardware control of the terminal:
 .Bl -tag -width CIBAUDEXT -offset 2n
 .It Dv CBAUD
 Baud rate:
-.Bl -tag -width B460800 -compact
+.Bl -tag -width B4000000 -compact
 .It Dv B0
 Hang up
 .It Dv B50
@@ -1155,12 +1155,8 @@ Hang up
 9600 baud
 .It Dv B19200
 19200 baud
-.It Dv EXTA
-External A
 .It Dv B38400
 38400 baud
-.It Dv EXTB
-External B
 .It Dv B57600
 57600 baud
 .It Dv B76800
@@ -1175,6 +1171,24 @@ External B
 307200 baud
 .It Dv B460800
 460800 baud
+.It Dv B921600
+921600 baud
+.It Dv B1000000
+1000000 baud
+.It Dv B1152000
+1152000 baud
+.It Dv B1500000
+1500000 baud
+.It Dv B2000000
+2000000 baud
+.It Dv B2500000
+2500000 baud
+.It Dv B3000000
+3000000 baud
+.It Dv B3500000
+3500000 baud
+.It Dv B4000000
+4000000 baud
 .El
 .It Dv CSIZE
 Character size:

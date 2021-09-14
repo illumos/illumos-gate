@@ -36,48 +36,44 @@
 #include "uucp.h"
 
 static const struct sg_spds {
-	int	sp_val,
-		sp_name;
+	int sp_val;
+	int sp_name;
 } spds[] = {
-	{  50,   B50},
-	{  75,   B75},
-	{ 110,  B110},
-	{ 134,  B134},
-	{ 150,  B150},
-	{ 200,  B200},
-	{ 300,  B300},
-	{ 600,  B600},
-	{1200, B1200},
-	{1800, B1800},
-	{2400, B2400},
-	{4800, B4800},
-	{9600, B9600},
-#ifdef EXTA
-	{19200,	EXTA},
-#endif
-#ifdef B19200
-	{19200,	B19200},
-#endif
-#ifdef B38400
-	{38400,	B38400},
-#endif
-	{57600, B57600},
-	{76800, B76800},
-	{115200, B115200},
-	{153600, B153600},
-	{230400, B230400},
-	{307200, B307200},
-	{460800, B460800},
-	{921600, B921600},
-	{0,    0}
+	{ 50,		B50 },
+	{ 75,		B75 },
+	{ 110,		B110 },
+	{ 134,		B134 },
+	{ 150,		B150 },
+	{ 200,		B200 },
+	{ 300,		B300 },
+	{ 600,		B600 },
+	{ 1200,		B1200 },
+	{ 1800,		B1800 },
+	{ 2400,		B2400 },
+	{ 4800,		B4800 },
+	{ 9600,		B9600 },
+	{ 19200,	B19200 },
+	{ 38400,	B38400 },
+	{ 57600,	B57600 },
+	{ 76800,	B76800 },
+	{ 115200,	B115200 },
+	{ 153600,	B153600 },
+	{ 230400,	B230400 },
+	{ 307200,	B307200 },
+	{ 460800,	B460800 },
+	{ 921600,	B921600 },
+	{ 1000000,	B1000000 },
+	{ 1152000,	B1152000 },
+	{ 1500000,	B1500000 },
+	{ 2000000,	B2000000 },
+	{ 2500000,	B2500000 },
+	{ 3000000,	B3000000 },
+	{ 3500000,	B3500000 },
+	{ 4000000,	B4000000 },
+	{ 0,		0}
 };
 
-#define	PACKSIZE	64
 #define	HEADERSIZE	6
-
-#define	SNDFILE	'S'
-#define	RCVFILE 'R'
-#define	RESET	'X'
 
 static int Saved_line;		/* was savline() successful?	*/
 static int Saved_termios;	/* was termios saved?	*/
@@ -127,7 +123,7 @@ fixline(int tty, int spwant, int type)
 			ttbufs.c_cc[i] = ttbuf.c_cc[i];
 	}
 	if (spwant > 0) {
-		for (ps = spds; ps->sp_val; ps++)
+		for (ps = spds; ps->sp_val != 0; ps++)
 			if (ps->sp_val == spwant) {
 				speed = ps->sp_name;
 				break;
@@ -143,7 +139,7 @@ fixline(int tty, int spwant, int type)
 		ospeed = cfgetospeed(&ttbufs);
 		ttbufs.c_cflag &= 0xffff0000;
 		(void) cfsetospeed(&ttbufs, ospeed);
-		for (ps = spds; ps->sp_val; ps++)
+		for (ps = spds; ps->sp_val != 0; ps++)
 			if (ps->sp_name == ospeed) {
 				spwant = ps->sp_val;
 				break;

@@ -136,7 +136,8 @@ write_most(char *infile, int netflag, int nomain)
 "\t\t/* Number of requests being serviced */\n");
 
 			if (mtflag) {
-				f_print(fout, "mutex_t _svcstate_lock;");
+				f_print(fout, "%smutex_t _svcstate_lock;",
+				    nomain? "extern " : "");
 				f_print(fout,
 "\t\t/* lock for _rpcsvcstate, _rpcsvccount */\n");
 

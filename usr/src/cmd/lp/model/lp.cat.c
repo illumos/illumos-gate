@@ -673,11 +673,12 @@ sigterm()
  * baudrate() - RETURN BAUD RATE OF OUTPUT LINE
  */
 
-static int		baud_convert[] =
-{
-	0, 50, 75, 110, 135, 150, 200, 300, 600, 1200,
+static int baud_convert[] = {
+	0, 50, 75, 110, 134, 150, 200, 300, 600, 1200,
 	1800, 2400, 4800, 9600, 19200, 38400, 57600,
-	76800, 115200, 153600, 230400, 307200, 460800, 921600
+	76800, 115200, 153600, 230400, 307200, 460800, 921600,
+	1000000, 1152000, 1500000, 2000000, 2500000, 3000000,
+	3500000, 4000000
 };
 
 int
@@ -688,12 +689,14 @@ baudrate()
 	int			speed;
 
 	if (ioctl(1, TCGETS, &tms) < 0) {
-		if (ioctl(1, TCGETA, &tm) < 0)
+		if (ioctl(1, TCGETA, &tm) < 0) {
 			return (1200);
-		else
+		} else {
 			speed = tm.c_cflag&CBAUD;
-	} else
+		}
+	} else {
 		speed = cfgetospeed(&tms);
+	}
 
 	return (speed ? baud_convert[speed] : 1200);
 }

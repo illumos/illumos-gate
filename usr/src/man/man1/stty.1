@@ -45,7 +45,7 @@
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright (c) 2014, Joyent, Inc. All Rights Reserved
 .\"
-.TH STTY 1 "Dec 30, 2016"
+.TH STTY 1 "Aug 13, 2021"
 .SH NAME
 stty \- set the options for a terminal
 .SH SYNOPSIS
@@ -268,6 +268,18 @@ bytes per character, and screen or display columns per character.
 .na
 \fB153600 230400 307200 460800\fR
 .ad
+.br
+.na
+\fB921600 1000000 1152000 1500000 \fR
+.ad
+.br
+.na
+\fB2000000 2500000 3000000 3500000 \fR
+.ad
+.br
+.na
+\fB4000000
+.ad
 .sp .6
 .RS 4n
 Set terminal baud rate to the number given, if possible. (All speeds are not
@@ -290,6 +302,18 @@ supported by all hardware interfaces.)
 .br
 .na
 \fB153600 230400 307200 460800\fR
+.ad
+.br
+.na
+\fB921600 1000000 1152000 1500000 \fR
+.ad
+.br
+.na
+\fB2000000 2500000 3000000 3500000 \fR
+.ad
+.br
+.na
+\fB4000000
 .ad
 .sp .6
 .RS 4n
@@ -314,6 +338,18 @@ the input baud rate is specified by the value of the output baud rate.
 .br
 .na
 \fB153600 230400 307200 460800\fR
+.ad
+.br
+.na
+\fB921600 1000000 1152000 1500000 \fR
+.ad
+.br
+.na
+\fB2000000 2500000 3000000 3500000 \fR
+.ad
+.br
+.na
+\fB4000000
 .ad
 .sp .6
 .RS 4n
