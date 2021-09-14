@@ -47,17 +47,40 @@
  * character for each speed as returned by gtty.  Thus since 300
  * baud returns a 7, there are 33.3 milliseconds per char at 300 baud.
  */
-static	short	tmspc10[] =
-		{
-		    /* 0   50    75   110 134.5 150  200  300   baud */
-			0, 2000, 1333, 909, 743, 666, 500, 333,
-		    /* 600 1200 1800 2400 4800 9600 19200 38400 baud */
-			166, 83,  55,  41,  20,  10,   5,    2,
-		    /* 57600, 76800, 115200, 153600, 230400, 307200 baud */
-			2,	1,	1,	1,	1,	1,
-		    /* 460800, 921600 baud */
-			1,	1
-		};
+static short tmspc10[] = {
+	0,	/* 0 baud */
+	2000,	/* 50 baud */
+	1333,	/* 75 baud */
+	909,	/* 110 baud */
+	743,	/* 134 baud */
+	666,	/* 150 baud */
+	500,	/* 200 baud */
+	333,	/* 300 baud */
+	166,	/* 600 baud */
+	83,	/* 1200 baud */
+	55,	/* 1800 baud */
+	41,	/* 2400 baud */
+	20,	/* 4800 baud */
+	10,	/* 9600 baud */
+	5,	/* 19200 baud */
+	2,	/* 38400 baud */
+	2,	/* 57600 baud */
+	1,	/* 76800 baud */
+	1,	/* 115200 baud */
+	1,	/* 153600 baud */
+	1,	/* 230400 baud */
+	1,	/* 307200 baud */
+	1,	/* 460800 baud */
+	1,	/* 921600 baud */
+	1,	/* 1000000 baud */
+	1,	/* 1152000 baud */
+	1,	/* 1500000 baud */
+	1,	/* 2000000 baud */
+	1,	/* 2500000 baud */
+	1,	/* 3000000 baud */
+	1,	/* 3500000 baud */
+	1,	/* 4000000 baud */
+};
 
 /*
  * Insert a delay into the output stream for "delay/10" milliseconds.

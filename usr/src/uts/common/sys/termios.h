@@ -329,8 +329,8 @@ extern pid_t tcgetsid(int);
 /* Slots reserved for 386/XENIX compatibility - keyboard control */
 
 #define	TIOCKBON	(_TIOC|8)
-#define	TIOCKBOF 	(_TIOC|9)
-#define	KBENABLED 	(_TIOC|10)
+#define	TIOCKBOF	(_TIOC|9)
+#define	KBENABLED	(_TIOC|10)
 
 #ifndef IOCTYPE
 #define	IOCTYPE	0xff00
@@ -413,7 +413,7 @@ struct ppsclockev32 {
 #define	TIOCSETD	(tIOC|1)
 #define	TIOCHPCL	(tIOC|2)
 #define	TIOCGETP	(tIOC|8)
-#define	TIOCSETP  	(tIOC|9)
+#define	TIOCSETP	(tIOC|9)
 #define	TIOCSETN	(tIOC|10)
 #define	TIOCEXCL	(tIOC|13)
 #define	TIOCNXCL	(tIOC|14)
@@ -522,30 +522,38 @@ struct ppsclockev32 {
 /*
  * Speeds
  */
-#define	B0	0
-#define	B50	1
-#define	B75	2
-#define	B110	3
-#define	B134	4
-#define	B150	5
-#define	B200	6
-#define	B300	7
-#define	B600	8
-#define	B1200	9
-#define	B1800	10
-#define	B2400	11
-#define	B4800	12
-#define	B9600	13
-#define	B19200	14
-#define	B38400	15
-#define	B57600	16
-#define	B76800	17
-#define	B115200	18
-#define	B153600	19
-#define	B230400	20
-#define	B307200	21
-#define	B460800	22
-#define	B921600	23
+#define	B0		0
+#define	B50		1
+#define	B75		2
+#define	B110		3
+#define	B134		4
+#define	B150		5
+#define	B200		6
+#define	B300		7
+#define	B600		8
+#define	B1200		9
+#define	B1800		10
+#define	B2400		11
+#define	B4800		12
+#define	B9600		13
+#define	B19200		14
+#define	B38400		15
+#define	B57600		16
+#define	B76800		17
+#define	B115200		18
+#define	B153600		19
+#define	B230400		20
+#define	B307200		21
+#define	B460800		22
+#define	B921600		23
+#define	B1000000	24
+#define	B1152000	25
+#define	B1500000	26
+#define	B2000000	27
+#define	B2500000	28
+#define	B3000000	29
+#define	B3500000	30
+#define	B4000000	31
 
 #ifndef _SYS_TTOLD_H
 

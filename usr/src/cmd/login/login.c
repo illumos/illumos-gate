@@ -1539,7 +1539,8 @@ static char	*speeds[] = {
 	"0", "50", "75", "110", "134", "150", "200", "300",
 	"600", "1200", "1800", "2400", "4800", "9600", "19200", "38400",
 	"57600", "76800", "115200", "153600", "230400", "307200", "460800",
-	"921600"
+	"921600", "1000000", "1152000", "1500000", "2000000", "2500000", 
+	"3000000", "3500000", "4000000"
 };
 
 #define	NSPEEDS	(sizeof (speeds) / sizeof (speeds[0]))
@@ -1562,11 +1563,12 @@ doremoteterm(char *term)
 		if (cp)
 			*cp++ = '\0';
 
-		for (cpp = speeds; cpp < &speeds[NSPEEDS]; cpp++)
+		for (cpp = speeds; cpp < &speeds[NSPEEDS]; cpp++) {
 			if (strcmp(*cpp, speed) == 0) {
 				(void) cfsetospeed(&tp, cpp-speeds);
 				break;
 			}
+		}
 	}
 
 	tp.c_lflag |= ECHO|ICANON;

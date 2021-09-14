@@ -262,15 +262,15 @@ ushort_t asyspdtab[] = {
 	0x0,	/* 0x8002 (SMC chip) 230400 baud rate not supported */
 	0x0,	/* 307200 baud rate not supported */
 	0x0,	/* 0x8001 (SMC chip) 460800 baud rate not supported */
-	0x0,	/* unused */
-	0x0,	/* unused */
-	0x0,	/* unused */
-	0x0,	/* unused */
-	0x0,	/* unused */
-	0x0,	/* unused */
-	0x0,	/* unused */
-	0x0,	/* unused */
-	0x0,	/* unused */
+	0x0,	/* 921600 baud rate not supported */
+	0x0,	/* 1000000 baud rate not supported */
+	0x0,	/* 1152000 baud rate not supported */
+	0x0,	/* 1500000 baud rate not supported */
+	0x0,	/* 2000000 baud rate not supported */
+	0x0,	/* 2500000 baud rate not supported */
+	0x0,	/* 3000000 baud rate not supported */
+	0x0,	/* 3500000 baud rate not supported */
+	0x0,	/* 4000000 baud rate not supported */
 };
 
 static int asyrsrv(queue_t *q);
