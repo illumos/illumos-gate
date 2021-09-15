@@ -365,8 +365,8 @@ sort -u > $tmp.f
 {
 sed \
 	-e 's/[^ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789]/ /g' \
-	-e 's/[ 	][ 	]*/\n/g' \
-	`cat $tmp.f` 2>/dev/null |
+	-e 's/[ 	][ 	]*/%/g' \
+	`cat $tmp.f` 2>/dev/null | tr '%' '\n' | \
 	egrep '^(SI|_(CS|PC|SC|SI))_.'
 	case $CONF_getconf_a in
 	?*)	$CONF_getconf $CONF_getconf_a | sed 's,[=:    ].*,,'

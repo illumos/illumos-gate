@@ -30,7 +30,7 @@ clean_%: %
 	}
 
 conftab.c: $(ASTSRC)/comp/conf.tab
-	PATH=$(AST_TOOLS):$$PATH \
+	PATH=$(IFFEPATH) \
 	    $(SHELL) $(ASTSRC)/comp/conf.sh -v $(ASTSRC)/comp/conf.tab \
 	    $(IFFEC)
 conflim.h conftab.h: conftab.c
