@@ -157,6 +157,14 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/hotplug/pcicfg/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/imc/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/mc/imc/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/ipmi/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

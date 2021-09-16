@@ -351,3 +351,10 @@ AMDZEN_STUB_OBJS = amdzen_stub.o
 SMNTEMP_OBJS = smntemp.o
 USMN_OBJS = usmn.o
 ZEN_UDF_OBJS = zen_udf.o
+
+#
+# Intel Integrated Memory Controller
+# (Sandy Bridge - Cascade Lake)
+#
+IMC_OBJS =	imc.o imc_decode.o imc_dump.o
+IMCSTUB_OBJS =	imcstub.o

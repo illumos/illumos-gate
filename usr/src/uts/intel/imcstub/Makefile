@@ -17,9 +17,9 @@ UTSBASE = ../..
 
 MODULE		= imcstub
 OBJECTS		= $(IMCSTUB_OBJS:%=$(OBJS_DIR)/%)
-ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
-include $(UTSBASE)/i86pc/Makefile.i86pc
+include $(UTSBASE)/intel/Makefile.intel
 
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
@@ -38,4 +38,4 @@ clobber:	$(CLOBBER_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-include $(UTSBASE)/i86pc/Makefile.targ
+include $(UTSBASE)/intel/Makefile.targ
