@@ -37,6 +37,7 @@ CPPFLAGS =	-I$(SRC)/cmd/bhyve \
 		-I$(SRC)/lib/libdladm/common \
 		-DWITHOUT_CAPSICUM
 CPPFLAGS +=	-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64
+LDFLAGS +=	-lproc
 
 SMOFF += all_func_returns
 

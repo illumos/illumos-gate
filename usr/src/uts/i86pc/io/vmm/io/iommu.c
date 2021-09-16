@@ -54,7 +54,7 @@ static int iommu_avail;
 
 static int iommu_enable = 1;
 
-static struct iommu_ops *ops;
+static const struct iommu_ops *ops;
 static void *host_domain;
 #ifdef __FreeBSD__
 static eventhandler_tag add_tag, delete_tag;

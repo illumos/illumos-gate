@@ -4,20 +4,23 @@ public Git repository at https://git.freebsd.org/src.git
 The bhyve kernel module and its associated userland consumers have been updated
 to the latest upstream FreeBSD sources as of:
 
-commit 9f40a3be3d5dbddf782c3d1eeaadcd022a4dad01
-Author: John Baldwin <jhb@FreeBSD.org>
-Date:   Wed Mar 24 09:29:15 2021 -0700
+	commit 5ac4ac85ca20ce1f00c84502a65a3291bf416c18
+	Author: John Baldwin <jhb@FreeBSD.org>
+	Date:   Wed Sep 15 09:03:17 2021 -0700
 
-    bhyve hostbridge: Rename "device" property to "devid".
-
-    "device" is already used as the generic PCI-level name of the device
-    model to use (e.g. "hostbridge").  The result was that parsing
-    "hostbridge" as an integer failed and the host bridge used a device ID
-    of 0.  The EFI ROM asserts that the device ID of the hostbridge is not
-    0, so booting with the current EFI ROM was failing during the ROM
-    boot.
+	    Remove an always-true check.
+	    This fixes a -Wtype-limits error from GCC 9.
 
 Divergence Notes:
+
+The source code for the following components is present and included in
+syncs from FreeBSD, but currently disabled. See the comments in 'Makefile'
+for more details:
+
+	kernemu_dev
+	virtio-scsi
+	audio backend
+	virtio_input
 
 The draft Save/Restore functionality, added in FreeBSD commit
 483d953a86a2507355f8287c5107dc827a0ff516, has not been synced into illumos bhyve

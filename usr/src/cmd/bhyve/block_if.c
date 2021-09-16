@@ -71,9 +71,7 @@ __FBSDID("$FreeBSD$");
 #include "bhyverun.h"
 #include "config.h"
 #include "debug.h"
-#ifdef	__FreeBSD__
 #include "mevent.h"
-#endif
 #include "pci_emul.h"
 #include "block_if.h"
 
@@ -140,6 +138,9 @@ struct blockif_ctxt {
 	pthread_t		bc_btid[BLOCKIF_NUMTHR];
 	pthread_mutex_t		bc_mtx;
 	pthread_cond_t		bc_cond;
+	blockif_resize_cb	*bc_resize_cb;
+	void			*bc_resize_cb_arg;
+	struct mevent		*bc_resize_event;
 
 	/* Request elements and free/pending/busy queues */
 	TAILQ_HEAD(, blockif_elem) bc_freeq;       
@@ -367,9 +368,20 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 				err = errno;
 			else
 				br->br_resid = 0;
+		} else {
+			range.r_offset = br->br_offset;
+			range.r_len = br->br_resid;
+
+			while (range.r_len > 0) {
+				if (fspacectl(bc->bc_fd, SPACECTL_DEALLOC,
+				    &range, 0, &range) != 0) {
+					err = errno;
+					break;
+				}
+			}
+			if (err == 0)
+				br->br_resid = 0;
 		}
-		else
-			 err = EOPNOTSUPP;
 #else
 		else if (bc->bc_ischr) {
 			dkioc_free_list_t dfl = {
@@ -602,7 +614,7 @@ blockif_open(nvlist_t *nvl, const char *ident)
 
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_init(&rights, CAP_FSYNC, CAP_IOCTL, CAP_READ, CAP_SEEK,
-	    CAP_WRITE);
+	    CAP_WRITE, CAP_FSTAT, CAP_EVENT);
 	if (ro)
 		cap_rights_clear(&rights, CAP_FSYNC, CAP_WRITE);
 
@@ -636,6 +648,8 @@ blockif_open(nvlist_t *nvl, const char *ident)
 			geom = 1;
 	} else {
 		psectsz = sbuf.st_blksize;
+		/* Avoid fallback implementation */
+		candelete = fpathconf(fd, _PC_DEALLOC_PRESENT) == 1;
 	}
 #else
 	psectsz = sbuf.st_blksize;
@@ -786,6 +800,65 @@ err:
 	if (fd >= 0)
 		close(fd);
 	return (NULL);
+}
+
+static void
+blockif_resized(int fd, enum ev_type type, void *arg)
+{
+	struct blockif_ctxt *bc;
+	struct stat sb;
+
+	if (fstat(fd, &sb) != 0)
+		return;
+
+	bc = arg;
+	pthread_mutex_lock(&bc->bc_mtx);
+	if (sb.st_size != bc->bc_size) {
+		bc->bc_size = sb.st_size;
+		bc->bc_resize_cb(bc, bc->bc_resize_cb_arg, bc->bc_size);
+	}
+	pthread_mutex_unlock(&bc->bc_mtx);
+}
+
+int
+blockif_register_resize_callback(struct blockif_ctxt *bc, blockif_resize_cb *cb,
+    void *cb_arg)
+{
+	struct stat sb;
+	int err;
+#ifndef __FreeBSD__
+	err = 0;
+#endif
+
+	if (cb == NULL)
+		return (EINVAL);
+
+	pthread_mutex_lock(&bc->bc_mtx);
+	if (bc->bc_resize_cb != NULL) {
+		err = EBUSY;
+		goto out;
+	}
+
+	assert(bc->bc_closing == 0);
+
+	if (fstat(bc->bc_fd, &sb) != 0) {
+		err = errno;
+		goto out;
+	}
+
+	bc->bc_resize_event = mevent_add_flags(bc->bc_fd, EVF_VNODE,
+	    EVFF_ATTRIB, blockif_resized, bc);
+	if (bc->bc_resize_event == NULL) {
+		err = ENXIO;
+		goto out;
+	}
+
+	bc->bc_resize_cb = cb;
+	bc->bc_resize_cb_arg = cb_arg;
+out:
+	pthread_mutex_unlock(&bc->bc_mtx);
+
+	return (err);
 }
 
 static int
@@ -939,6 +1012,8 @@ blockif_close(struct blockif_ctxt *bc)
 	 */
 	pthread_mutex_lock(&bc->bc_mtx);
 	bc->bc_closing = 1;
+	if (bc->bc_resize_event != NULL)
+		mevent_disable(bc->bc_resize_event);
 	pthread_mutex_unlock(&bc->bc_mtx);
 	pthread_cond_broadcast(&bc->bc_cond);
 	for (i = 0; i < BLOCKIF_NUMTHR; i++)

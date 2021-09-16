@@ -234,42 +234,44 @@ usage(int code)
 
         fprintf(stderr,
 #ifdef	__FreeBSD__
-		"Usage: %s [-aehuwxACDHPSWY]\n"
+		"Usage: %s [-AaCDeHhPSuWwxY]\n"
 #else
-		"Usage: %s [-adehuwxACDHPSWY]\n"
+		"Usage: %s [-AaCDdeHhPSuWwxY]\n"
 #endif
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
-		"       %*s [-k <file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
 #ifdef	__FreeBSD__
-		"       %*s [-p vcpu:hostcpu] [-s <pci>] [-U uuid] [<vm>]\n"
+		"       %*s [-G port] [-k file] [-l lpc] [-m mem] [-o var=value]\n"
+		"       %*s [-p vcpu:hostcpu] [-r file] [-s pci] [-U uuid] vmname\n"
+
 #else
-		"       %*s [-s <pci>] [-U uuid] [<vm>]\n"
+		"       %*s [-k <file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
+		"       %*s [-s <pci>] [-U uuid] vmname\n"
 #endif
-		"       -a: local apic is in xAPIC mode (deprecated)\n"
 		"       -A: create ACPI tables\n"
-		"       -c: number of cpus and/or topology specification\n"
+		"       -a: local apic is in xAPIC mode (deprecated)\n"
 		"       -C: include guest memory in core file\n"
+		"       -c: number of cpus and/or topology specification\n"
+		"       -D: destroy on power-off\n"
 #ifndef __FreeBSD__
 	        "       -d: suspend cpu at boot\n"
 #endif
-		"       -D: destroy on power-off\n"
 		"       -e: exit on unhandled I/O access\n"
-		"       -h: help\n"
 		"       -H: vmexit from the guest on hlt\n"
+		"       -h: help\n"
 		"       -k: key=value flat config file\n"
 		"       -l: LPC device configuration\n"
 		"       -m: memory size\n"
 		"       -o: set config 'var' to 'value'\n"
+		"       -P: vmexit from the guest on pause\n"
 #ifdef	__FreeBSD__
 		"       -p: pin 'vcpu' to 'hostcpu'\n"
 #endif
-		"       -P: vmexit from the guest on pause\n"
-		"       -s: <slot,driver,configinfo> PCI slot config\n"
 		"       -S: guest memory cannot be swapped\n"
-		"       -u: RTC keeps UTC time\n"
+		"       -s: <slot,driver,configinfo> PCI slot config\n"
 		"       -U: uuid\n"
-		"       -w: ignore unimplemented MSRs\n"
+		"       -u: RTC keeps UTC time\n"
 		"       -W: force virtio to use single-vector MSI\n"
+		"       -w: ignore unimplemented MSRs\n"
 		"       -x: local apic is in x2APIC mode\n"
 		"       -Y: disable MPtable generation\n",
 		progname, (int)strlen(progname), "", (int)strlen(progname), "",
@@ -1368,6 +1370,30 @@ parse_simple_config_file(const char *path)
 }
 
 static void
+parse_gdb_options(char *optarg)
+{
+	const char *sport;
+	char *colon;
+
+	if (optarg[0] == 'w') {
+		set_config_bool("gdb.wait", true);
+		optarg++;
+	}
+
+	colon = strrchr(optarg, ':');
+	if (colon == NULL) {
+		sport = optarg;
+	} else {
+		*colon = '\0';
+		colon++;
+		sport = colon;
+		set_config_value("gdb.address", optarg);
+	}
+
+	set_config_value("gdb.port", sport);
+}
+
+static void
 set_defaults(void)
 {
 
@@ -1437,11 +1463,7 @@ main(int argc, char *argv[])
 			set_config_bool("memory.guest_in_core", true);
 			break;
 		case 'G':
-			if (optarg[0] == 'w') {
-				set_config_bool("gdb.wait", true);
-				optarg++;
-			}
-			set_config_value("gdb.port", optarg);
+			parse_gdb_options(optarg);
 			break;
 		case 'k':
 			parse_simple_config_file(optarg);
@@ -1620,22 +1642,16 @@ main(int argc, char *argv[])
 	if (get_config_bool("acpi_tables"))
 		vmgenc_init(ctx);
 
-	value = get_config_value("gdb.port");
 #ifdef __FreeBSD__
-	if (value != NULL)
-		init_gdb(ctx, atoi(value), get_config_bool_default("gdb.wait",
-		    false));
+	init_gdb(ctx);
 #else
 	if (value != NULL) {
 		int port = atoi(value);
 
-		if (port < 0) {
-			init_mdb(ctx,
-			    get_config_bool_default("gdb.wait", false));
-		} else {
-			init_gdb(ctx, port,
-			    get_config_bool_default("gdb.wait", false));
-		}
+		if (port < 0)
+			init_mdb(ctx);
+		else
+			init_gdb(ctx);
 	}
 #endif
 

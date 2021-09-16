@@ -1328,6 +1328,7 @@ usr/src/cmd/bhyve/block_if.[ch]
 usr/src/cmd/bhyve/bootrom.[ch]
 usr/src/cmd/bhyve/config.[ch]
 usr/src/cmd/bhyve/console.[ch]
+usr/src/cmd/bhyve/console.[ch]
 usr/src/cmd/bhyve/consport.c
 usr/src/cmd/bhyve/dbgport.[ch]
 usr/src/cmd/bhyve/debug.h
@@ -1360,6 +1361,7 @@ usr/src/cmd/bhyve/pci_uart.c
 usr/src/cmd/bhyve/pci_virtio_9p.c
 usr/src/cmd/bhyve/pci_virtio_block.c
 usr/src/cmd/bhyve/pci_virtio_console.c
+usr/src/cmd/bhyve/pci_virtio_input.c
 usr/src/cmd/bhyve/pci_virtio_net.c
 usr/src/cmd/bhyve/pci_virtio_rnd.c
 usr/src/cmd/bhyve/pci_virtio_scsi.c
