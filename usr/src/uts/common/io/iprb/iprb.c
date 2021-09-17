@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -787,10 +788,9 @@ iprb_cmd_submit(iprb_t *ip, uint16_t cmd)
 iprb_dma_t *
 iprb_cmd_next(iprb_t *ip)
 {
-	if (ip->cmd_count == NUM_TX) {
+	if (ip->cmd_count >= NUM_TX) {
 		return (NULL);
 	}
-	ASSERT(ip->cmd_count < NUM_TX);
 	return (&ip->cmds[ip->cmd_head]);
 }
 
@@ -960,6 +960,7 @@ iprb_start(iprb_t *ip)
 	/* Reset pointers */
 	ip->cmd_head = ip->cmd_tail = 0;
 	ip->cmd_last = NUM_TX - 1;
+	ip->cmd_count = 0;
 
 	if (iprb_cmd_ready(ip) != DDI_SUCCESS)
 		return (DDI_FAILURE);
@@ -975,7 +976,7 @@ iprb_start(iprb_t *ip)
 
 	/* Send a NOP.  This will be the first command seen by the device. */
 	cb = iprb_cmd_next(ip);
-	ASSERT(cb);
+	VERIFY3P(cb, !=, NULL);
 	if (iprb_cmd_submit(ip, CB_CMD_NOP) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
