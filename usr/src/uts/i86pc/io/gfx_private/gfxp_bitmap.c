@@ -424,12 +424,17 @@ bitmap_cons_display(struct gfxp_fb_softc *softc, struct vis_consdisplay *da)
 
 	/* write all scanlines in rectangle */
 	for (i = 0; i < da->height; i++) {
-		uint8_t *dest = fbp + i * console->fb.pitch;
+		uint8_t *dest = sfbp + i * console->fb.pitch;
 		uint8_t *src = da->data + i * size;
-		if (softc->mode == KD_TEXT)
-			bitmap_cpy(dest, src, size, console->fb.bpp);
-		dest = sfbp + i * console->fb.pitch;
+
+		/* alpha blend bitmap to shadow fb. */
 		bitmap_cpy(dest, src, size, console->fb.bpp);
+		if (softc->mode == KD_TEXT) {
+			/* Copy from shadow to fb. */
+			src = dest;
+			dest = fbp + i * console->fb.pitch;
+			(void) memcpy(dest, src, size);
+		}
 	}
 }
 
@@ -536,11 +541,10 @@ bitmap_display_cursor(struct gfxp_fb_softc *softc, struct vis_conscursor *ca)
 			fb8 = console->fb.fb + offset + i * pitch;
 			sfb8 = console->fb.shadow_fb + offset + i * pitch;
 			for (j = 0; j < size; j += 1) {
-				if (softc->mode == KD_TEXT) {
-					fb8[j] = (fb8[j] ^ (fg & 0xff)) ^
-					    (bg & 0xff);
-				}
 				sfb8[j] = (sfb8[j] ^ (fg & 0xff)) ^ (bg & 0xff);
+				if (softc->mode == KD_TEXT) {
+					fb8[j] = sfb8[j];
+				}
 			}
 		}
 		break;
@@ -556,12 +560,11 @@ bitmap_display_cursor(struct gfxp_fb_softc *softc, struct vis_conscursor *ca)
 			sfb16 = (uint16_t *)
 			    (console->fb.shadow_fb + offset + i * pitch);
 			for (j = 0; j < ca->width; j++) {
-				if (softc->mode == KD_TEXT) {
-					fb16[j] = (fb16[j] ^ (fg & 0xffff)) ^
-					    (bg & 0xffff);
-				}
 				sfb16[j] = (sfb16[j] ^ (fg & 0xffff)) ^
 				    (bg & 0xffff);
+				if (softc->mode == KD_TEXT) {
+					fb16[j] = sfb16[j];
+				}
 			}
 		}
 		break;
@@ -576,22 +579,17 @@ bitmap_display_cursor(struct gfxp_fb_softc *softc, struct vis_conscursor *ca)
 			fb8 = console->fb.fb + offset + i * pitch;
 			sfb8 = console->fb.shadow_fb + offset + i * pitch;
 			for (j = 0; j < size; j += 3) {
-				if (softc->mode == KD_TEXT) {
-					fb8[j] = (fb8[j] ^ ((fg >> 16) & 0xff))
-					    ^ ((bg >> 16) & 0xff);
-					fb8[j+1] =
-					    (fb8[j+1] ^ ((fg >> 8) & 0xff)) ^
-					    ((bg >> 8) & 0xff);
-					fb8[j+2] = (fb8[j+2] ^ (fg & 0xff)) ^
-					    (bg & 0xff);
-				}
-
 				sfb8[j] = (sfb8[j] ^ ((fg >> 16) & 0xff)) ^
 				    ((bg >> 16) & 0xff);
 				sfb8[j+1] = (sfb8[j+1] ^ ((fg >> 8) & 0xff)) ^
 				    ((bg >> 8) & 0xff);
 				sfb8[j+2] = (sfb8[j+2] ^ (fg & 0xff)) ^
 				    (bg & 0xff);
+				if (softc->mode == KD_TEXT) {
+					fb8[j] = sfb8[j];
+					fb8[j+1] = sfb8[j+1];
+					fb8[j+2] = sfb8[j+2];
+				}
 			}
 		}
 		break;
@@ -604,9 +602,9 @@ bitmap_display_cursor(struct gfxp_fb_softc *softc, struct vis_conscursor *ca)
 			sfb32 = (uint32_t *)
 			    (console->fb.shadow_fb + offset + i * pitch);
 			for (j = 0; j < ca->width; j++) {
-				if (softc->mode == KD_TEXT)
-					fb32[j] = (fb32[j] ^ fg) ^ bg;
 				sfb32[j] = (sfb32[j] ^ fg) ^ bg;
+				if (softc->mode == KD_TEXT)
+					fb32[j] = sfb32[j];
 			}
 		}
 		break;
