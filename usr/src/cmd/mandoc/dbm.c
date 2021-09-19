@@ -1,4 +1,4 @@
-/*	$Id: dbm.c,v 1.6 2018/11/19 19:22:07 schwarze Exp $ */
+/*	$Id: dbm.c,v 1.7 2019/07/01 22:56:24 schwarze Exp $ */
 /*
  * Copyright (c) 2016 Ingo Schwarze <schwarze@openbsd.org>
  *

@@ -1,7 +1,7 @@
-/*	$Id: read.c,v 1.213 2019/06/03 19:58:02 schwarze Exp $ */
+/* $Id: read.c,v 1.220 2021/06/27 17:57:54 schwarze Exp $ */
 /*
+ * Copyright (c) 2010-2020 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2008, 2009, 2010, 2011 Kristaps Dzonsons <kristaps@bsd.lv>
- * Copyright (c) 2010-2019 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2010, 2012 Joerg Sonnenberger <joerg@netbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -15,6 +15,12 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * Top-level functions of the mandoc(3) parser:
+ * Parser and input encoding selection, decompression,
+ * handling of input bytes, characters, lines, and files,
+ * handling of roff(7) loops and file inclusion,
+ * and steering of the various parsers.
  */
 #include "config.h"
 
@@ -41,6 +47,7 @@
 #include "mandoc_parse.h"
 #include "libmandoc.h"
 #include "roff_int.h"
+#include "tag.h"
 
 #define	REPARSE_LIMIT	1000
 
@@ -147,6 +154,7 @@ mparse_buf_r(struct mparse *curp, struct buf blk, size_t i, int start)
 	struct buf	*firstln, *lastln, *thisln, *loop;
 	char		*cp;
 	size_t		 pos; /* byte number in the ln buffer */
+	size_t		 spos; /* at the start of the current line parse */
 	int		 line_result, result;
 	int		 of;
 	int		 lnn; /* line number in the real file */
@@ -173,6 +181,7 @@ mparse_buf_r(struct mparse *curp, struct buf blk, size_t i, int start)
 			    curp->filenc & MPARSE_LATIN1)
 				curp->filenc = preconv_cue(&blk, i);
 		}
+		spos = pos;
 
 		while (i < blk.sz && (start || blk.buf[i] != '\0')) {
 
@@ -255,6 +264,8 @@ mparse_buf_r(struct mparse *curp, struct buf blk, size_t i, int start)
 		/* XXX Ugly hack to mark the end of the input. */
 
 		if (i == blk.sz || blk.buf[i] == '\0') {
+			if (pos + 2 > ln.sz)
+				resize_buf(&ln, 256);
 			ln.buf[pos++] = '\n';
 			ln.buf[pos] = '\0';
 		}
@@ -270,7 +281,8 @@ mparse_buf_r(struct mparse *curp, struct buf blk, size_t i, int start)
 
 		of = 0;
 rerun:
-		line_result = roff_parseln(curp->roff, curp->line, &ln, &of);
+		line_result = roff_parseln(curp->roff, curp->line,
+		    &ln, &of, start && spos == 0 ? pos : 0);
 
 		/* Process options. */
 
@@ -429,9 +441,8 @@ read_whole_file(struct mparse *curp, int fd, struct buf *fb, int *with_mmap)
 	int		 gzerrnum, retval;
 
 	if (fstat(fd, &st) == -1) {
-		mandoc_msg(MANDOCERR_FILE, 0, 0,
-		    "fstat: %s", strerror(errno));
-		return 0;
+		mandoc_msg(MANDOCERR_FSTAT, 0, 0, "%s", strerror(errno));
+		return -1;
 	}
 
 	/*
@@ -444,13 +455,13 @@ read_whole_file(struct mparse *curp, int fd, struct buf *fb, int *with_mmap)
 	if (curp->gzip == 0 && S_ISREG(st.st_mode)) {
 		if (st.st_size > 0x7fffffff) {
 			mandoc_msg(MANDOCERR_TOOLARGE, 0, 0, NULL);
-			return 0;
+			return -1;
 		}
 		*with_mmap = 1;
 		fb->sz = (size_t)st.st_size;
 		fb->buf = mmap(NULL, fb->sz, PROT_READ, MAP_SHARED, fd, 0);
 		if (fb->buf != MAP_FAILED)
-			return 1;
+			return 0;
 	}
 
 	if (curp->gzip) {
@@ -462,15 +473,15 @@ read_whole_file(struct mparse *curp, int fd, struct buf *fb, int *with_mmap)
 		 * which this function must not do.
 		 */
 		if ((fd = dup(fd)) == -1) {
-			mandoc_msg(MANDOCERR_FILE, 0, 0,
-			    "dup: %s", strerror(errno));
-			return 0;
+			mandoc_msg(MANDOCERR_DUP, 0, 0,
+			    "%s", strerror(errno));
+			return -1;
 		}
 		if ((gz = gzdopen(fd, "rb")) == NULL) {
-			mandoc_msg(MANDOCERR_FILE, 0, 0,
-			    "gzdopen: %s", strerror(errno));
+			mandoc_msg(MANDOCERR_GZDOPEN, 0, 0,
+			    "%s", strerror(errno));
 			close(fd);
-			return 0;
+			return -1;
 		}
 	} else
 		gz = NULL;
@@ -482,7 +493,7 @@ read_whole_file(struct mparse *curp, int fd, struct buf *fb, int *with_mmap)
 
 	*with_mmap = 0;
 	off = 0;
-	retval = 0;
+	retval = -1;
 	fb->sz = 0;
 	fb->buf = NULL;
 	for (;;) {
@@ -498,13 +509,13 @@ read_whole_file(struct mparse *curp, int fd, struct buf *fb, int *with_mmap)
 		    read(fd, fb->buf + (int)off, fb->sz - off);
 		if (ssz == 0) {
 			fb->sz = off;
-			retval = 1;
+			retval = 0;
 			break;
 		}
 		if (ssz == -1) {
 			if (curp->gzip)
 				(void)gzerror(gz, &gzerrnum);
-			mandoc_msg(MANDOCERR_FILE, 0, 0, "read: %s",
+			mandoc_msg(MANDOCERR_READ, 0, 0, "%s",
 			    curp->gzip && gzerrnum != Z_ERRNO ?
 			    zError(gzerrnum) : strerror(errno));
 			break;
@@ -513,10 +524,10 @@ read_whole_file(struct mparse *curp, int fd, struct buf *fb, int *with_mmap)
 	}
 
 	if (curp->gzip && (gzerrnum = gzclose(gz)) != Z_OK)
-		mandoc_msg(MANDOCERR_FILE, 0, 0, "gzclose: %s",
+		mandoc_msg(MANDOCERR_GZCLOSE, 0, 0, "%s",
 		    gzerrnum == Z_ERRNO ? strerror(errno) :
 		    zError(gzerrnum));
-	if (retval == 0) {
+	if (retval == -1) {
 		free(fb->buf);
 		fb->buf = NULL;
 	}
@@ -546,7 +557,7 @@ mparse_readfd(struct mparse *curp, int fd, const char *filename)
 
 	struct buf	 blk;
 	struct buf	*save_primary;
-	const char	*save_filename;
+	const char	*save_filename, *cp;
 	size_t		 offset;
 	int		 save_filenc, save_lineno;
 	int		 with_mmap;
@@ -554,8 +565,14 @@ mparse_readfd(struct mparse *curp, int fd, const char *filename)
 	if (recursion_depth > 64) {
 		mandoc_msg(MANDOCERR_ROFFLOOP, curp->line, 0, NULL);
 		return;
-	}
-	if (read_whole_file(curp, fd, &blk, &with_mmap) == 0)
+	} else if (recursion_depth == 0 &&
+	    (cp = strrchr(filename, '.')) != NULL &&
+            cp[1] >= '1' && cp[1] <= '9')
+                curp->man->filesec = cp[1];
+        else
+                curp->man->filesec = '\0';
+
+	if (read_whole_file(curp, fd, &blk, &with_mmap) == -1)
 		return;
 
 	/*
@@ -663,22 +680,26 @@ mparse_alloc(int options, enum mandoc_os os_e, const char *os_s)
 	}
 	curp->man->meta.first->tok = TOKEN_NONE;
 	curp->man->meta.os_e = os_e;
+	tag_alloc();
 	return curp;
 }
 
 void
 mparse_reset(struct mparse *curp)
 {
+	tag_free();
 	roff_reset(curp->roff);
 	roff_man_reset(curp->man);
 	free_buf_list(curp->secondary);
 	curp->secondary = NULL;
 	curp->gzip = 0;
+	tag_alloc();
 }
 
 void
 mparse_free(struct mparse *curp)
 {
+	tag_free();
 	roffhash_free(curp->man->mdocmac);
 	roffhash_free(curp->man->manmac);
 	roff_man_free(curp->man);
@@ -696,6 +717,7 @@ mparse_result(struct mparse *curp)
 			mdoc_validate(curp->man);
 		else
 			man_validate(curp->man);
+		tag_postprocess(curp->man, curp->man->meta.first);
 	}
 	return &curp->man->meta;
 }

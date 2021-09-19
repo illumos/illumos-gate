@@ -1,7 +1,7 @@
-/*	$Id: html.h,v 1.102 2019/03/01 10:57:18 schwarze Exp $ */
+/* $Id: html.h,v 1.109 2021/09/09 14:47:24 schwarze Exp $ */
 /*
+ * Copyright (c) 2017, 2018, 2019, 2020 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2008-2011, 2014 Kristaps Dzonsons <kristaps@bsd.lv>
- * Copyright (c) 2017, 2018, 2019 Ingo Schwarze <schwarze@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,23 +14,21 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * Internal interfaces for mandoc(1) HTML formatters.
+ * For use by the individual HTML formatters only.
  */
 
 enum	htmltag {
 	TAG_HTML,
 	TAG_HEAD,
-	TAG_BODY,
 	TAG_META,
-	TAG_TITLE,
-	TAG_DIV,
-	TAG_IDIV,
-	TAG_SECTION,
-	TAG_H1,
-	TAG_H2,
-	TAG_SPAN,
 	TAG_LINK,
-	TAG_BR,
-	TAG_A,
+	TAG_STYLE,
+	TAG_TITLE,
+	TAG_BODY,
+	TAG_DIV,
+	TAG_SECTION,
 	TAG_TABLE,
 	TAG_TR,
 	TAG_TD,
@@ -40,15 +38,21 @@ enum	htmltag {
 	TAG_DL,
 	TAG_DT,
 	TAG_DD,
+	TAG_H1,
+	TAG_H2,
 	TAG_P,
 	TAG_PRE,
-	TAG_VAR,
-	TAG_CITE,
+	TAG_A,
 	TAG_B,
-	TAG_I,
+	TAG_CITE,
 	TAG_CODE,
+	TAG_I,
 	TAG_SMALL,
-	TAG_STYLE,
+	TAG_SPAN,
+	TAG_VAR,
+	TAG_BR,
+	TAG_HR,
+	TAG_MARK,
 	TAG_MATH,
 	TAG_MROW,
 	TAG_MI,
@@ -67,15 +71,6 @@ enum	htmltag {
 	TAG_MUNDER,
 	TAG_MOVER,
 	TAG_MAX
-};
-
-enum	htmlfont {
-	HTMLFONT_NONE = 0,
-	HTMLFONT_BOLD,
-	HTMLFONT_ITALIC,
-	HTMLFONT_BI,
-	HTMLFONT_CW,
-	HTMLFONT_MAX
 };
 
 struct	tag {
@@ -111,8 +106,8 @@ struct	html {
 	char		 *base_includes; /* base for include href */
 	char		 *style; /* style-sheet URI */
 	struct tag	 *metaf; /* current open font scope */
-	enum htmlfont	  metal; /* last used font */
-	enum htmlfont	  metac; /* current font mode */
+	enum mandoc_esc	  metal; /* last used font */
+	enum mandoc_esc	  metac; /* current font mode */
 	int		  oflags; /* output options */
 #define	HTML_FRAGMENT	 (1 << 0) /* don't emit HTML/HEAD/BODY */
 #define	HTML_TOC	 (1 << 1) /* emit a table of contents */
@@ -128,10 +123,13 @@ void		  roff_html_pre(struct html *, const struct roff_node *);
 void		  print_gen_comment(struct html *, struct roff_node *);
 void		  print_gen_decls(struct html *);
 void		  print_gen_head(struct html *);
-void		  print_metaf(struct html *, enum mandoc_esc);
 struct tag	 *print_otag(struct html *, enum htmltag, const char *, ...);
+struct tag	 *print_otag_id(struct html *, enum htmltag, const char *,
+			struct roff_node *);
 void		  print_tagq(struct html *, const struct tag *);
 void		  print_stagq(struct html *, const struct tag *);
+void		  print_tagged_text(struct html *, const char *,
+			struct roff_node *);
 void		  print_text(struct html *, const char *);
 void		  print_tblclose(struct html *);
 void		  print_tbl(struct html *, const struct tbl_span *);
@@ -141,3 +139,4 @@ void		  print_endline(struct html *);
 void		  html_close_paragraph(struct html *);
 enum roff_tok	  html_fillmode(struct html *, enum roff_tok);
 char		 *html_make_id(const struct roff_node *, int);
+int		  html_setfont(struct html *, enum mandoc_esc);
