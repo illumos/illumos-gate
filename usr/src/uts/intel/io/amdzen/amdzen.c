@@ -146,7 +146,7 @@ static const uint16_t amdzen_nb_ids[] = {
 	0x15d0,
 	/* Family 17h/19h Rome, Milan, Matisse, Vermeer Zen 2/Zen 3 uarch */
 	0x1480,
-	/* Family 17h Renoir Models 60-6fh (Zen 2 uarch) */
+	/* Family 17h/19h Renoir, Cezanne Zen 2/3 uarch) */
 	0x1630
 };
 

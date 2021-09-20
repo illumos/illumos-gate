@@ -9,7 +9,7 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2021 Oxide Computer Company
 .\"
 .Dd September 26, 2020
 .Dt AMDZEN 7D
@@ -37,7 +37,7 @@ AMD Zen+ Colfax, Picasso, and Pinnacle Ridge
 AMD Zen 2 Castle Peak, Matisse, Rome, and Renoir
 .Pq Family 17h
 .It
-AMD Zen 3 Milan and Vermeer
+AMD Zen 3 Cezanne, Milan, and Vermeer
 .Pq Family 19h
 .El
 .Pp
