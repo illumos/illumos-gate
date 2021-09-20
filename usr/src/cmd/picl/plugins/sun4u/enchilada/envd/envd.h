@@ -27,8 +27,6 @@
 #ifndef	_ENVD_H
 #define	_ENVD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <libintl.h>
 
@@ -208,7 +206,7 @@ typedef int16_t tempr_t;
 #define	SENSOR_INT_AMB_1	"int-amb1"
 
 /* Bit Map of ADM 1031 Status 1/2 Registers */
-enum adm1031 {
+typedef enum adm1031 {
 	FANFAULT = 0x2,
 	REMOTEHIGH = 0x4,
 	REMOTELOW = 0x8,
@@ -218,7 +216,7 @@ enum adm1031 {
 } adm1031_t;
 
 /* ADM Stat 1/2 Mask */
-enum adm1031Mask {
+typedef enum adm1031Mask {
 	STAT1MASK = 0xdc,
 	STAT2MASK = 0x1c
 } adm1031Mask_t;
@@ -386,11 +384,11 @@ typedef struct env_sensor {
 	void		*fanp;
 	int		fd;			/* device file descriptor */
 	int		error;			/* error flag */
-	boolean_t 	present;		/* sensor present */
+	boolean_t	present;		/* sensor present */
 	tempr_t		cur_temp;		/* current temperature */
 	time_t		warning_tstamp;		/* last warning time (secs) */
 	time_t		shutdown_tstamp;	/* shutdown temp time (secs) */
-	boolean_t 	shutdown_initiated;	/* shutdown initated */
+	boolean_t	shutdown_initiated;	/* shutdown initated */
 	table_t		*crtbl;			/* Correction Table */
 	tempr_t		tmin;
 } env_sensor_t;
@@ -410,14 +408,14 @@ typedef struct env_disk {
 	int		current_temp;
 	int		ref_temp;
 	int		reliability_temp;
-	uchar_t  	high_shutdown;
-	uchar_t  	high_warning;
-	uchar_t  	low_warning;
-	uchar_t  	low_shutdown;
+	uchar_t		high_shutdown;
+	uchar_t		high_warning;
+	uchar_t		low_warning;
+	uchar_t		low_shutdown;
 	time_t		warning_start;		/* warning start time (secs) */
 	time_t		warning_tstamp;		/* last warning time (secs) */
 	time_t		shutdown_tstamp;	/* shutdown temp time (secs) */
-	boolean_t 	shutdown_initiated;	/* shutdown initated */
+	boolean_t	shutdown_initiated;	/* shutdown initated */
 } env_disk_t;
 
 extern	env_disk_t *disk_lookup(char *disk_name);
