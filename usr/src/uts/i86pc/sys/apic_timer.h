@@ -24,6 +24,8 @@
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _SYS_APIC_TIMER_H
@@ -70,6 +72,9 @@ extern int	apic_timer_init(int);
 extern void	apic_timer_reprogram(hrtime_t);
 extern void	apic_timer_enable(void);
 extern void	apic_timer_disable(void);
+
+extern hrtime_t	apic_timer_stop_count(void);
+extern void	apic_timer_restart(hrtime_t);
 
 #ifdef	__cplusplus
 }
