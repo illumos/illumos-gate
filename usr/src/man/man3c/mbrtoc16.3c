@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 Robert Mustacchi
 .\"
-.Dd April 23, 2020
+.Dd September 20, 2021
 .Dt MBRTOC16 3C
 .Os
 .Sh NAME
@@ -323,7 +323,7 @@ main(void)
         size_t ret;
         const char *uchar_str = "\exf0\ex9f\ex92\exa9";
 
-        (void) memset(&mbs, '\0', sizeof (mbs));
+        (void) memset(&mbs, 0, sizeof (mbs));
         (void) setlocale(LC_CTYPE, "en_US.UTF-8");
         ret = mbrtoc16(&first, uchar_str, strlen(uchar_str), &mbs);
         if (ret != strlen(uchar_str)) {
