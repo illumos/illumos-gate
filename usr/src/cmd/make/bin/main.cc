@@ -1906,6 +1906,10 @@ read_files_and_state(int argc, char **argv)
  *	Before reading makefile we do not know exactly which mode
  *	(posix or not) is used. So prepare two MAKEFLAGS strings
  *	for both posix and solaris modes because they are different.
+ *
+ *	Note: cw depends on short flags with no arguments appearing
+ *	first in MAKEFLAGS. If this behavior changes, cw will need to
+ *	be updated.
  */
 	INIT_STRING_FROM_STACK(makeflags_string, buffer);
 	INIT_STRING_FROM_STACK(makeflags_string_posix, buffer_posix);

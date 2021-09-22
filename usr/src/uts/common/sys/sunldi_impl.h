@@ -72,8 +72,8 @@ void ldi_init(void);
  * LDI streams linking interfaces
  */
 extern int ldi_mlink_lh(vnode_t *, int, intptr_t, cred_t *, int *);
-extern void ldi_mlink_fp(struct stdata *, struct file *, int, int);
-extern void ldi_munlink_fp(struct stdata *, struct file *, int);
+extern int ldi_mlink_fp(struct stdata *, struct file *, int, int);
+extern int ldi_munlink_fp(struct stdata *, struct file *, int);
 
 /*
  * LDI module identifier

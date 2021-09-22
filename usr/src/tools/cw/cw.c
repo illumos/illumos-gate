@@ -1439,13 +1439,33 @@ prepctx(cw_ictx_t *ctx)
 static int
 invoke(cw_ictx_t *ctx)
 {
-	char **newargv;
+	char **newargv, *makeflags;
 	int ac;
 	struct ae *a;
 
-	if ((newargv = calloc(sizeof (*newargv), ctx->i_ae->ael_argc + 1)) ==
-	    NULL)
+	newargv = calloc(ctx->i_ae->ael_argc + 1, sizeof (*newargv));
+	if (newargv == NULL)
 		nomem();
+
+	/*
+	 * Check to see if the silent make flag is present (-s), if so, do not
+	 * echo. The MAKEFLAGS environment variable is set by dmake. By
+	 * observation it appears to place short flags without any arguments
+	 * first followed by any long form flags or flags with arguments.
+	 */
+	makeflags = getenv("MAKEFLAGS");
+	if (makeflags != NULL) {
+		size_t makeflags_len = strlen(makeflags);
+		for (size_t i = 0; i < makeflags_len; i++) {
+			if (makeflags[i] == 's') {
+				ctx->i_flags &= ~CW_F_ECHO;
+				break;
+			}
+			/* end of short flags */
+			if (makeflags[i] == ' ')
+				break;
+		}
+	}
 
 	if (ctx->i_flags & CW_F_ECHO)
 		(void) fprintf(stderr, "+ ");
