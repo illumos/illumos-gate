@@ -1901,36 +1901,9 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 	 */
 	error = strdoioctl(stp, &strioc, FNATIVE,
 	    K_TO_K | STR_NOERROR | STR_NOSIG, crp, rvalp);
-	if (error != 0) {
-		lbfree(linkp);
+	if (error != 0)
+		goto cleanup;
 
-		if (!(passyncq->sq_flags & SQ_BLOCKED))
-			blocksq(passyncq, SQ_BLOCKED, 0);
-		/*
-		 * Restore the stream head queue and then remove
-		 * the passq. Turn off STPLEX before we turn on
-		 * the stream by removing the passq.
-		 */
-		rq->q_ptr = _WR(rq)->q_ptr = stpdown;
-		setq(rq, &strdata, &stwdata, NULL, QMTSAFE, SQ_CI|SQ_CO,
-		    B_TRUE);
-
-		mutex_enter(&stpdown->sd_lock);
-		stpdown->sd_flag &= ~STPLEX;
-		mutex_exit(&stpdown->sd_lock);
-
-		link_rempassthru(passq);
-
-		mutex_enter(&stpdown->sd_lock);
-		stpdown->sd_flag &= ~STRPLUMB;
-		/* Wakeup anyone waiting for STRPLUMB to clear. */
-		cv_broadcast(&stpdown->sd_monitor);
-		mutex_exit(&stpdown->sd_lock);
-
-		mutex_exit(&muxifier);
-		netstack_rele(ss->ss_netstack);
-		return (error);
-	}
 	mutex_enter(&fpdown->f_tlock);
 	fpdown->f_count++;
 	mutex_exit(&fpdown->f_tlock);
@@ -1942,9 +1915,16 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 
 	ASSERT((cmd == I_LINK) || (cmd == I_PLINK));
 	if (cmd == I_LINK) {
-		ldi_mlink_fp(stp, fpdown, lhlink, LINKNORMAL);
+		error = ldi_mlink_fp(stp, fpdown, lhlink, LINKNORMAL);
 	} else {
-		ldi_mlink_fp(stp, fpdown, lhlink, LINKPERSIST);
+		error = ldi_mlink_fp(stp, fpdown, lhlink, LINKPERSIST);
+	}
+
+	if (error != 0) {
+		mutex_enter(&fpdown->f_tlock);
+		fpdown->f_count--;
+		mutex_exit(&fpdown->f_tlock);
+		goto cleanup;
 	}
 
 	link_rempassthru(passq);
@@ -1976,6 +1956,36 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 	*rvalp = linkp->li_lblk.l_index;
 	netstack_rele(ss->ss_netstack);
 	return (0);
+
+cleanup:
+	lbfree(linkp);
+
+	if (!(passyncq->sq_flags & SQ_BLOCKED))
+		blocksq(passyncq, SQ_BLOCKED, 0);
+	/*
+	 * Restore the stream head queue and then remove
+	 * the passq. Turn off STPLEX before we turn on
+	 * the stream by removing the passq.
+	 */
+	rq->q_ptr = _WR(rq)->q_ptr = stpdown;
+	setq(rq, &strdata, &stwdata, NULL, QMTSAFE, SQ_CI|SQ_CO,
+	    B_TRUE);
+
+	mutex_enter(&stpdown->sd_lock);
+	stpdown->sd_flag &= ~STPLEX;
+	mutex_exit(&stpdown->sd_lock);
+
+	link_rempassthru(passq);
+
+	mutex_enter(&stpdown->sd_lock);
+	stpdown->sd_flag &= ~STRPLUMB;
+	/* Wakeup anyone waiting for STRPLUMB to clear. */
+	cv_broadcast(&stpdown->sd_monitor);
+	mutex_exit(&stpdown->sd_lock);
+
+	mutex_exit(&muxifier);
+	netstack_rele(ss->ss_netstack);
+	return (error);
 }
 
 int
@@ -2232,9 +2242,9 @@ munlink(stdata_t *stp, linkinfo_t *linkp, int flag, cred_t *crp, int *rvalp,
 
 	/* clean up the layered driver linkages */
 	if ((flag & LINKTYPEMASK) == LINKNORMAL) {
-		ldi_munlink_fp(stp, fpdown, LINKNORMAL);
+		VERIFY0(ldi_munlink_fp(stp, fpdown, LINKNORMAL));
 	} else {
-		ldi_munlink_fp(stp, fpdown, LINKPERSIST);
+		VERIFY0(ldi_munlink_fp(stp, fpdown, LINKPERSIST));
 	}
 
 	link_rempassthru(passq);
