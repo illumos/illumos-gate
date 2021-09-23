@@ -336,10 +336,32 @@ vmx_fix_cr0(ulong_t cr0)
 	return ((cr0 | cr0_ones_mask) & ~cr0_zeros_mask);
 }
 
+/*
+ * Given a live (VMCS-active) cr0 value, and its shadow counterpart, calculate
+ * the value observable from the guest.
+ */
+static ulong_t
+vmx_unshadow_cr0(uint64_t cr0, uint64_t shadow)
+{
+	return ((cr0 & ~cr0_ones_mask) |
+	    (shadow & (cr0_zeros_mask | cr0_ones_mask)));
+}
+
 static ulong_t
 vmx_fix_cr4(ulong_t cr4)
 {
 	return ((cr4 | cr4_ones_mask) & ~cr4_zeros_mask);
+}
+
+/*
+ * Given a live (VMCS-active) cr4 value, and its shadow counterpart, calculate
+ * the value observable from the guest.
+ */
+static ulong_t
+vmx_unshadow_cr4(uint64_t cr4, uint64_t shadow)
+{
+	return ((cr4 & ~cr4_ones_mask) |
+	    (shadow & (cr4_zeros_mask | cr4_ones_mask)));
 }
 
 static void
@@ -1555,6 +1577,14 @@ vmx_emulate_cr0_access(struct vmx *vmx, int vcpu, uint64_t exitqual)
 
 	crval = regval | cr0_ones_mask;
 	crval &= ~cr0_zeros_mask;
+
+	const uint64_t old = vmcs_read(VMCS_GUEST_CR0);
+	const uint64_t diff = crval ^ old;
+	/* Flush the TLB if the paging or write-protect bits are changing */
+	if ((diff & CR0_PG) != 0 || (diff & CR0_WP) != 0) {
+		vmx_invvpid(vmx, vcpu, vmx->ctx[vcpu].pmap, 1);
+	}
+
 	vmcs_write(VMCS_GUEST_CR0, crval);
 
 	if (regval & CR0_PG) {
@@ -2924,18 +2954,31 @@ vmx_getreg(void *arg, int vcpu, int reg, uint64_t *retval)
 		vmcs_load(vmx->vmcs_pa[vcpu]);
 	}
 
-	err = EINVAL;
+	err = 0;
 	if (reg == VM_REG_GUEST_INTR_SHADOW) {
 		uint64_t gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
 		*retval = (gi & HWINTR_BLOCKING) ? 1 : 0;
-		err = 0;
 	} else {
 		uint32_t encoding;
 
 		encoding = vmcs_field_encoding(reg);
-		if (encoding != VMCS_INVALID_ENCODING) {
+		switch (encoding) {
+		case VMCS_GUEST_CR0:
+			/* Take the shadow bits into account */
+			*retval = vmx_unshadow_cr0(vmcs_read(encoding),
+			    vmcs_read(VMCS_CR0_SHADOW));
+			break;
+		case VMCS_GUEST_CR4:
+			/* Take the shadow bits into account */
+			*retval = vmx_unshadow_cr4(vmcs_read(encoding),
+			    vmcs_read(VMCS_CR4_SHADOW));
+			break;
+		case VMCS_INVALID_ENCODING:
+			err = EINVAL;
+			break;
+		default:
 			*retval = vmcs_read(encoding);
-			err = 0;
+			break;
 		}
 	}
 
