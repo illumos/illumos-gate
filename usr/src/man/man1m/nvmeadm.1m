@@ -9,11 +9,10 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
-.\" Copyright 2019 Western Digital Corporation.
 .\" Copyright 2021 Oxide Computer Company
+.\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd March 24, 2021
+.Dd February 15, 2022
 .Dt NVMEADM 1M
 .Os
 .Sh NAME
@@ -532,13 +531,11 @@ nvme4: Get Features
 nvme3: Firmware Slot Information
   Active Firmware Slot:                     4
   Next Firmware Slot:                       4
-  Firmware Revision for Slot 1:             KNGND110
+  Firmware Revision for Slot 1:             KNGND110 (read-only)
   Firmware Revision for Slot 2:             KNGND110
   Firmware Revision for Slot 3:             KNGND110
   Firmware Revision for Slot 4:             KNGND112
   Firmware Revision for Slot 5:             KNGND110
-  Firmware Revision for Slot 6:             <Unused>
-  Firmware Revision for Slot 7:             <Unused>
 
 # nvmeadm -v load-firmware nvme3 KNGND113.bin
 1740544 bytes downloaded.
@@ -553,13 +550,11 @@ Slot 5 activated: NVM subsystem reset required - power cycle your system.
 nvme3: Firmware Slot Information
   Active Firmware Slot:                     4
   Next Firmware Slot:                       5
-  Firmware Revision for Slot 1:             KNGND110
+  Firmware Revision for Slot 1:             KNGND110 (read-only)
   Firmware Revision for Slot 2:             KNGND110
   Firmware Revision for Slot 3:             KNGND110
   Firmware Revision for Slot 4:             KNGND112
   Firmware Revision for Slot 5:             KNGND113
-  Firmware Revision for Slot 6:             <Unused>
-  Firmware Revision for Slot 7:             <Unused>
 .Ed
 .El
 .Sh INTERFACE STABILITY

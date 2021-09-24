@@ -10,14 +10,12 @@
  */
 
 /*
- * Copyright 2018 Nexenta Systems, Inc.
- * Copyright 2016 Tegile Systems, Inc. All rights reserved.
  * Copyright (c) 2016 The MathWorks, Inc.  All rights reserved.
  * Copyright 2020 Joyent, Inc.
- * Copyright 2019 Western Digital Corporation.
  * Copyright 2020 Racktop Systems.
  * Copyright 2022 Oxide Computer Company.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -4902,6 +4900,7 @@ nvme_ioctl_firmware_download(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	size_t len, copylen;
 	offset_t offset;
 	uintptr_t buf;
+	nvme_cqe_t cqe = { 0 };
 	nvme_sqe_t sqe = {
 	    .sqe_opc	= NVME_OPC_FW_IMAGE_LOAD
 	};
@@ -4927,6 +4926,9 @@ nvme_ioctl_firmware_download(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	len = nioc->n_len;
 	offset = nioc->n_arg;
 	buf = (uintptr_t)nioc->n_buf;
+
+	nioc->n_arg = 0;
+
 	while (len > 0 && rv == 0) {
 		/*
 		 * nvme_ioc_cmd() does not use SGLs or PRP lists.
@@ -4939,7 +4941,22 @@ nvme_ioctl_firmware_download(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 		sqe.sqe_cdw11 = (uint32_t)(offset >> NVME_DWORD_SHIFT);
 
 		rv = nvme_ioc_cmd(nvme, &sqe, B_TRUE, (void *)buf, copylen,
-		    FWRITE, NULL, nvme_admin_cmd_timeout);
+		    FWRITE, &cqe, nvme_admin_cmd_timeout);
+
+		/*
+		 * Regardless of whether the command succeeded or not, whether
+		 * there's an errno in rv to be returned, we'll return any
+		 * command-specific status code in n_arg.
+		 *
+		 * As n_arg isn't cleared in all other possible code paths
+		 * returning an error, we return the status code as a negative
+		 * value so it can be distinguished easily from whatever value
+		 * was passed in n_arg originally. This of course only works as
+		 * long as arguments passed in n_arg are less than INT64_MAX,
+		 * which they currently are.
+		 */
+		if (cqe.cqe_sf.sf_sct == NVME_CQE_SCT_SPECIFIC)
+			nioc->n_arg = (uint64_t)-cqe.cqe_sf.sf_sc;
 
 		buf += copylen;
 		offset += copylen;
@@ -4983,6 +5000,8 @@ nvme_ioctl_firmware_commit(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	case NVME_FWC_SAVE:
 	case NVME_FWC_SAVE_ACTIVATE:
 		timeout = nvme_commit_save_cmd_timeout;
+		if (slot == 1 && nvme->n_idctl->id_frmw.fw_readonly)
+			return (EROFS);
 		break;
 	case NVME_FWC_ACTIVATE:
 	case NVME_FWC_ACTIVATE_IMMED:
@@ -4996,9 +5015,23 @@ nvme_ioctl_firmware_commit(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	fc_dw10.b.fc_action = action;
 	sqe.sqe_cdw10 = fc_dw10.r;
 
+	nioc->n_arg = 0;
 	rv = nvme_ioc_cmd(nvme, &sqe, B_TRUE, NULL, 0, 0, &cqe, timeout);
 
-	nioc->n_arg = ((uint64_t)cqe.cqe_sf.sf_sct << 16) | cqe.cqe_sf.sf_sc;
+	/*
+	 * Regardless of whether the command succeeded or not, whether
+	 * there's an errno in rv to be returned, we'll return any
+	 * command-specific status code in n_arg.
+	 *
+	 * As n_arg isn't cleared in all other possible code paths
+	 * returning an error, we return the status code as a negative
+	 * value so it can be distinguished easily from whatever value
+	 * was passed in n_arg originally. This of course only works as
+	 * long as arguments passed in n_arg are less than INT64_MAX,
+	 * which they currently are.
+	 */
+	if (cqe.cqe_sf.sf_sct == NVME_CQE_SCT_SPECIFIC)
+		nioc->n_arg = (uint64_t)-cqe.cqe_sf.sf_sc;
 
 	/*
 	 * Let the DDI UFM subsystem know that the firmware information for
