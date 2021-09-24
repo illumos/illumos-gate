@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * TFTP User Program -- Protocol Machines
@@ -49,6 +47,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
@@ -84,8 +83,8 @@ static struct options {
 	{ NULL }
 };
 
-static char		optbuf[MAX_OPTVAL_LEN];
-static boolean_t	tsize_set;
+static char	optbuf[MAX_OPTVAL_LEN];
+static bool	tsize_set;
 
 static tftpbuf	ackbuf;
 static int	timeout;
@@ -115,9 +114,10 @@ tftp_sendfile(int fd, char *name, char *mode)
 {
 	struct tftphdr *ap;	/* data and ack packets */
 	struct tftphdr *dp;
-	int count = 0, size, n;
-	ushort_t block = 0;
-	off_t amount = 0;
+	int n;
+	volatile int count = 0, size;
+	volatile ushort_t block = 0;
+	volatile off_t amount = 0;
 	struct sockaddr_in6 from;
 	socklen_t fromlen;
 	int convert;	/* true if doing nl->crlf conversion */
@@ -190,7 +190,7 @@ tftp_sendfile(int fd, char *name, char *mode)
 			if (ap->th_opcode == ERROR) {
 				ap->th_code = ntohs(ap->th_code);
 				(void) fprintf(stderr,
-					"Error code %d", ap->th_code);
+				    "Error code %d", ap->th_code);
 				if (n > offsetof(struct tftphdr, th_data))
 					(void) fprintf(stderr, ": %.*s", n -
 					    offsetof(struct tftphdr, th_data),
@@ -242,12 +242,13 @@ tftp_recvfile(int fd, char *name, char *mode)
 {
 	struct tftphdr *ap;
 	struct tftphdr *dp;
-	ushort_t block = 1;
-	int n, size;
-	unsigned long amount = 0;
+	volatile ushort_t block = 1;
+	int n;
+	volatile int size;
+	volatile unsigned long amount = 0;
 	struct sockaddr_in6 from;
 	socklen_t fromlen;
-	boolean_t firsttrip = B_TRUE;
+	volatile bool firsttrip = true;
 	FILE *file;
 	int convert;	/* true if converting crlf -> lf */
 	int errcode;
@@ -272,7 +273,7 @@ tftp_recvfile(int fd, char *name, char *mode)
 	do {
 		(void) signal(SIGALRM, timer);
 		if (firsttrip) {
-			firsttrip = B_FALSE;
+			firsttrip = false;
 		} else {
 			ap->th_opcode = htons((ushort_t)ACK);
 			ap->th_block = htons((ushort_t)(block));
@@ -467,7 +468,7 @@ timeout_str(void)
 static char *
 tsize_str(void)
 {
-	if (tsize_set == B_FALSE)
+	if (tsize_set == false)
 		return (NULL);
 
 	(void) snprintf(optbuf, sizeof (optbuf), OFF_T_FMT, tsize);
@@ -531,7 +532,7 @@ tsize_handler(char *optstr)
 	longlong_t value;
 
 	/* Make sure the option was requested */
-	if (tsize_set == B_FALSE)
+	if (tsize_set == false)
 		return (EOPTNEG);
 	errno = 0;
 	value = strtoll(optstr, &endp, 10);
@@ -646,8 +647,9 @@ nak(int error)
 static void
 tpacket(char *s, struct tftphdr *tp, int n)
 {
-	static char *opcodes[] = \
-		{ "#0", "RRQ", "WRQ", "DATA", "ACK", "ERROR", "OACK" };
+	static char *opcodes[] = {
+	    "#0", "RRQ", "WRQ", "DATA", "ACK", "ERROR", "OACK"
+	};
 	char *cp, *file, *mode;
 	ushort_t op = ntohs(tp->th_opcode);
 	char *tpend;
