@@ -1152,7 +1152,7 @@ zvol_dumpio(zvol_state_t *zv, void *addr, uint64_t offset, uint64_t size,
 	    P2BOUNDARY(offset, size, zv->zv_volblocksize)) {
 		return (SET_ERROR(EINVAL));
 	}
-	ASSERT(size <= zv->zv_volblocksize);
+	VERIFY3U(size, <=, zv->zv_volblocksize);
 
 	/* Locate the extent this belongs to */
 	for (ze = list_head(&zv->zv_extents);
