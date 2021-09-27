@@ -22,6 +22,12 @@ LDLIBS	+= -lnvpair
 NATIVE_LIBS += libnvpair.so
 CPPFLAGS += -I$(SRC)/lib/json_nvlist/ -I$(SRC)/lib/libcustr/common
 
+#
+# While cpcgen doesn't do 64-bit I/O, builds on NFS in particular have
+# failed due to what is probably the use of 64-bit inodes.
+#
+CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+
 all: $(PROG)
 
 install: all .WAIT $(ROOTONBLDMACHPROG)
