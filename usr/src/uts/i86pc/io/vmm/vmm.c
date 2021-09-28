@@ -634,22 +634,42 @@ vm_destroy(struct vm *vm)
 }
 
 int
-vm_reinit(struct vm *vm)
+vm_reinit(struct vm *vm, uint64_t flags)
 {
-	int error;
+	/* A virtual machine can be reset only if all vcpus are suspended. */
+	if (CPU_CMP(&vm->suspended_cpus, &vm->active_cpus) != 0) {
+		if ((flags & VM_REINIT_F_FORCE_SUSPEND) == 0) {
+			return (EBUSY);
+		}
 
-	/*
-	 * A virtual machine can be reset only if all vcpus are suspended.
-	 */
-	if (CPU_CMP(&vm->suspended_cpus, &vm->active_cpus) == 0) {
-		vm_cleanup(vm, false);
-		vm_init(vm, false);
-		error = 0;
-	} else {
-		error = EBUSY;
+		/*
+		 * Force the VM (and all its vCPUs) into a suspended state.
+		 * This should be quick and easy, since the vm_reinit() call is
+		 * made while holding the VM write lock, which requires holding
+		 * all of the vCPUs in the VCPU_FROZEN state.
+		 */
+		(void) atomic_cmpset_int((uint_t *)&vm->suspend, 0,
+		    VM_SUSPEND_RESET);
+		for (uint_t i = 0; i < vm->maxcpus; i++) {
+			struct vcpu *vcpu = &vm->vcpu[i];
+
+			if (CPU_ISSET(i, &vm->suspended_cpus) ||
+			    !CPU_ISSET(i, &vm->active_cpus)) {
+				continue;
+			}
+
+			vcpu_lock(vcpu);
+			VERIFY3U(vcpu->state, ==, VCPU_FROZEN);
+			CPU_SET_ATOMIC(i, &vm->suspended_cpus);
+			vcpu_unlock(vcpu);
+		}
+
+		VERIFY0(CPU_CMP(&vm->suspended_cpus, &vm->active_cpus));
 	}
 
-	return (error);
+	vm_cleanup(vm, false);
+	vm_init(vm, false);
+	return (0);
 }
 
 const char *
@@ -1953,27 +1973,37 @@ vm_handle_wrmsr(struct vm *vm, int vcpuid, struct vm_exit *vme)
 int
 vm_suspend(struct vm *vm, enum vm_suspend_how how)
 {
-	int i;
-
 	if (how <= VM_SUSPEND_NONE || how >= VM_SUSPEND_LAST)
 		return (EINVAL);
 
 	if (atomic_cmpset_int((uint_t *)&vm->suspend, 0, how) == 0) {
-		VM_CTR2(vm, "virtual machine already suspended %d/%d",
-		    vm->suspend, how);
 		return (EALREADY);
 	}
-
-	VM_CTR1(vm, "virtual machine successfully suspended %d", how);
 
 	/*
 	 * Notify all active vcpus that they are now suspended.
 	 */
-	for (i = 0; i < vm->maxcpus; i++) {
-		if (CPU_ISSET(i, &vm->active_cpus))
-			vcpu_notify_event(vm, i);
-	}
+	for (uint_t i = 0; i < vm->maxcpus; i++) {
+		struct vcpu *vcpu = &vm->vcpu[i];
 
+		vcpu_lock(vcpu);
+		if (vcpu->state == VCPU_IDLE || vcpu->state == VCPU_FROZEN) {
+			/*
+			 * Any vCPUs not actively running or in HLT can be
+			 * marked as suspended immediately.
+			 */
+			if (CPU_ISSET(i, &vm->active_cpus)) {
+				CPU_SET_ATOMIC(i, &vm->suspended_cpus);
+			}
+		} else {
+			/*
+			 * Those which are running or in HLT will pick up the
+			 * suspended state after notification.
+			 */
+			vcpu_notify_event_locked(vcpu, VCPU_NOTIFY_EXIT);
+		}
+		vcpu_unlock(vcpu);
+	}
 	return (0);
 }
 
@@ -2198,8 +2228,6 @@ vm_run(struct vm *vm, int vcpuid, const struct vm_entry *entry)
 	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
 		return (EINVAL);
 	if (!CPU_ISSET(vcpuid, &vm->active_cpus))
-		return (EINVAL);
-	if (CPU_ISSET(vcpuid, &vm->suspended_cpus))
 		return (EINVAL);
 
 	pmap = vmspace_pmap(vm->vmspace);
@@ -3103,8 +3131,22 @@ vm_activate_cpu(struct vm *vm, int vcpuid)
 	if (CPU_ISSET(vcpuid, &vm->active_cpus))
 		return (EBUSY);
 
+	if (vm->suspend != 0) {
+		return (EBUSY);
+	}
+
 	VCPU_CTR0(vm, vcpuid, "activated");
 	CPU_SET_ATOMIC(vcpuid, &vm->active_cpus);
+
+	/*
+	 * It is possible that this vCPU was undergoing activation at the same
+	 * time that the VM was being suspended.  If that happens to be the
+	 * case, it should reflect the suspended state immediately.
+	 */
+	if (atomic_load_acq_int((uint_t *)&vm->suspend) != 0) {
+		CPU_SET_ATOMIC(vcpuid, &vm->suspended_cpus);
+	}
+
 	return (0);
 }
 

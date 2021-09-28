@@ -175,7 +175,11 @@ int	vm_get_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
 int	vm_run(struct vmctx *ctx, int vcpu, const struct vm_entry *vm_entry,
     struct vm_exit *vm_exit);
 int	vm_suspend(struct vmctx *ctx, enum vm_suspend_how how);
+#ifndef __FreeBSD__
+int	vm_reinit(struct vmctx *ctx, uint64_t);
+#else
 int	vm_reinit(struct vmctx *ctx);
+#endif
 int	vm_apicid2vcpu(struct vmctx *ctx, int apicid);
 int	vm_inject_exception(struct vmctx *ctx, int vcpu, int vector,
     int errcode_valid, uint32_t errcode, int restart_instruction);

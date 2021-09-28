@@ -466,6 +466,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		break;
 
 	case VM_IOAPIC_PINCOUNT:
+	case VM_SUSPEND:
 	default:
 		break;
 	}
@@ -515,7 +516,13 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		error = vm_suspend(sc->vmm_vm, vmsuspend.how);
 		break;
 	}
-	case VM_REINIT:
+	case VM_REINIT: {
+		struct vm_reinit reinit;
+
+		if (ddi_copyin(datap, &reinit, sizeof (reinit), md)) {
+			error = EFAULT;
+			break;
+		}
 		if ((error = vmm_drv_block_hook(sc, B_TRUE)) != 0) {
 			/*
 			 * The VM instance should be free of driver-attached
@@ -523,9 +530,10 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			 */
 			break;
 		}
-		error = vm_reinit(sc->vmm_vm);
+		error = vm_reinit(sc->vmm_vm, reinit.flags);
 		(void) vmm_drv_block_hook(sc, B_FALSE);
 		break;
+	}
 	case VM_STAT_DESC: {
 		struct vm_stat_desc statdesc;
 

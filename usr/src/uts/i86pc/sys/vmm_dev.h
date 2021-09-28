@@ -212,6 +212,12 @@ struct vm_suspend {
 	enum vm_suspend_how how;
 };
 
+#define	VM_REINIT_F_FORCE_SUSPEND	(1 << 0)
+
+struct vm_reinit {
+	uint64_t	flags;
+};
+
 struct vm_gla2gpa {
 	int		vcpuid;		/* inputs */
 	int		prot;		/* PROT_READ or PROT_WRITE */
