@@ -51,13 +51,11 @@ SECCONFIG	= device_policy priv_names
 BOOTIMAGE	= splashimage.xpm
 ALTBOOTIMAGE	= solaris.xpm	# Temporary, for compatibility
 BOOTENVRC	= bootenv.rc
-DEVMASTER	= master
 FILEMODE	= 644
 ROOTETC		= $(ROOT)/etc
 ROOTETCSEC	= $(ROOTETC)/security
 ROOTBOOT	= $(ROOT)/boot
 BOOTSOLARIS	= $(ROOTBOOT)/solaris
-BOOTDEVICEDB	= $(BOOTSOLARIS)/devicedb
 
 SRCFILES	= $(CONFIGFILES:%=$(SRCDIR)/%) $(SECCONFIG:%=$(SRCDIR)/%)
 SRCFILES	+= $(BOOTIMAGE:%=$(SRCDIR)/%)
@@ -66,7 +64,6 @@ SRCFILES	+= $(DEVMASTER:%=$(SRCDIR)/%)
 ROOTCONFIGFILES	= $(CONFIGFILES:%=$(ROOTETC)/%) $(SECCONFIG:%=$(ROOTETCSEC)/%)
 ROOTCONFIGFILES	+= $(BOOTIMAGE:%=$(ROOTBOOT)/%)
 ROOTCONFIGFILES	+= $(BOOTENVRC:%=$(BOOTSOLARIS)/%)
-ROOTCONFIGFILES	+= $(DEVMASTER:%=$(BOOTDEVICEDB)/%)
 ROOTALTBOOTIMAGE = $(ALTBOOTIMAGE:%=$(ROOTBOOT)/%)
 
 #
@@ -101,17 +98,10 @@ $(ROOTBOOT)/%: $(ROOTBOOT) $(SRCDIR)/%
 $(ROOTBOOT)/solaris.xpm: $(ROOTBOOT)/splashimage.xpm
 	$(RM) $@; $(LN) $(ROOTBOOT)/splashimage.xpm $@
 
-
 $(BOOTSOLARIS):
 	$(INS) -s -d -m $(DIRMODE) $@
 
 $(BOOTSOLARIS)/%: $(BOOTSOLARIS) $(SRCDIR)/%
-	$(INS.file)
-
-$(BOOTDEVICEDB):
-	$(INS) -s -d -m $(DIRMODE) $@
-
-$(BOOTDEVICEDB)/%: $(BOOTDEVICEDB) $(SRCDIR)/%
 	$(INS.file)
 
 $(SRCDIR)/priv_names: $(PRIVS_DEF) $(PRIVS_AWK)

@@ -19,12 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2018, Joyent, Inc.
- * Copyright (c) 2012 Gary Mills
- *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright (c) 2012 Gary Mills
+ * Copyright 2018, Joyent, Inc.
  * Copyright 2021 Racktop Systems, Inc.
  */
 
@@ -53,11 +52,9 @@ typedef struct intrs {
 	uint_t	i_alloc;
 } intrs_t;
 
-static char keyboard_alias[] = "keyboard";
-static char mouse_alias[] = "mouse";
-#define	ACPI_ENUM_DEBUG		"acpi_enum_debug"
+static uint32_t acpi_enum_debug = 0x00;
 #define	PARSE_RESOURCES_DEBUG	0x0001
-#define	MASTER_LOOKUP_DEBUG	0x0002
+#define	ISAPNP_LOOKUP_DEBUG	0x0002
 #define	DEVICES_NOT_ENUMED	0x0004
 #define	PARSE_RES_IRQ		0x0008
 #define	PARSE_RES_DMA		0x0010
@@ -66,9 +63,7 @@ static char mouse_alias[] = "mouse";
 #define	PARSE_RES_ADDRESS	0x0080
 #define	ISA_DEVICE_ENUM		0x1000
 #define	PROCESS_CIDS		0x2000
-static unsigned long acpi_enum_debug = 0x00;
 
-static char USED_RESOURCES[] = "used-resources";
 static dev_info_t *usedrdip = NULL;
 static intrs_t used_interrupts;
 static unsigned short used_dmas = 0;
@@ -164,7 +159,7 @@ add_used_io_mem(struct regspec *io, int io_count)
 	used_io_mem_t *used;
 
 	for (i = 0; i < io_count; i++) {
-		used = (used_io_mem_t *)kmem_zalloc(sizeof (used_io_mem_t),
+		used = kmem_zalloc(sizeof (used_io_mem_t),
 		    KM_SLEEP);
 		used->start_addr = io[i].regspec_addr;
 		used->length = io[i].regspec_size;
@@ -559,7 +554,7 @@ parse_resources(ACPI_HANDLE handle, dev_info_t *xdip, char *path)
 		return (status);
 		break;
 	}
-	io = (struct regspec *)kmem_zalloc(sizeof (struct regspec) *
+	io = kmem_zalloc(sizeof (struct regspec) *
 	    MAX_PARSED_ACPI_RESOURCES, KM_SLEEP);
 	current_ptr = buf.Pointer;
 	last_ptr = (char *)buf.Pointer + buf.Length;
@@ -678,7 +673,7 @@ parse_resources(ACPI_HANDLE handle, dev_info_t *xdip, char *path)
 
 /* keyboard mouse is under i8042, everything else under isa */
 static dev_info_t *
-get_bus_dip(char *nodename, dev_info_t *isa_dip)
+get_bus_dip(const char *nodename, dev_info_t *isa_dip)
 {
 	static dev_info_t *i8042_dip = NULL;
 	struct regspec i8042_regs[] = {
@@ -687,8 +682,8 @@ get_bus_dip(char *nodename, dev_info_t *isa_dip)
 	};
 	int i8042_intrs[] = {0x1, 0xc};
 
-	if (strcmp(nodename, keyboard_alias) != 0 &&
-	    strcmp(nodename, mouse_alias) != 0)
+	if (strcmp(nodename, "keyboard") != 0 &&
+	    strcmp(nodename, "mouse") != 0)
 		return (isa_dip);
 
 	if (i8042_dip)
@@ -704,27 +699,6 @@ get_bus_dip(char *nodename, dev_info_t *isa_dip)
 	    "unit-address", "1,60");
 	(void) ndi_devi_bind_driver(i8042_dip, 0);
 	return (i8042_dip);
-}
-
-/*
- * put content of properties (if any) to dev info tree at branch xdip
- * return non-zero if a "compatible" property was processed, zero otherwise
- *
- */
-static int
-process_properties(dev_info_t *xdip, property_t *properties)
-{
-	int	rv = 0;
-
-	while (properties != NULL) {
-		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
-		    properties->name, properties->value);
-		if (strcmp(properties->name, "compatible") == 0)
-			rv = 1;
-		properties = properties->next;
-	}
-
-	return (rv);
 }
 
 void
@@ -772,13 +746,13 @@ process_cids(ACPI_OBJECT *rv, device_id_t **dd)
 		switch (obj.Type) {
 		case ACPI_TYPE_INTEGER:
 			eisa_to_str(obj.Integer.Value, tmp_cidstr);
-			d = mf_alloc_device_id();
+			d = kmem_zalloc(sizeof (device_id_t), KM_SLEEP);
 			d->id = strdup(tmp_cidstr);
 			d->next = *dd;
 			*dd = d;
 			break;
 		case ACPI_TYPE_STRING:
-			d = mf_alloc_device_id();
+			d = kmem_zalloc(sizeof (device_id_t), KM_SLEEP);
 			d->id = strdup(obj.String.Pointer);
 			d->next = *dd;
 			*dd = d;
@@ -834,8 +808,7 @@ create_compatible_property(dev_info_t *dip, device_id_t *ids)
 		d = d->next;
 	}
 
-	/* create string array */
-	strs = (char **)kmem_zalloc(list_len * sizeof (char *), KM_SLEEP);
+	strs = kmem_zalloc(list_len * sizeof (char *), KM_SLEEP);
 	i = 0;
 	d = ids;
 	while (d != NULL) {
@@ -866,17 +839,16 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 {
 	_NOTE(ARGUNUSED(NestingLevel, b))
 
-	ACPI_BUFFER	rb;
-	ACPI_DEVICE_INFO *info = NULL;
-	char		*path = NULL;
-	char		*hidstr = NULL;
-	char		tmp_cidstr[8];	/* EISAID size */
-	dev_info_t	*dip = (dev_info_t *)a;
-	dev_info_t	*xdip = NULL;
-	device_id_t	*d, *device_ids = NULL;
-	const master_rec_t	*m;
-	int		compatible_present = 0;
-	int		status;
+	ACPI_BUFFER		rb;
+	ACPI_DEVICE_INFO	*info = NULL;
+	char			*path = NULL;
+	char			*hidstr = NULL;
+	char			tmp_cidstr[8];	/* EISAID size */
+	dev_info_t		*dip = (dev_info_t *)a;
+	dev_info_t		*xdip = NULL;
+	device_id_t		*d, *device_ids = NULL;
+	const isapnp_desc_t	*m;
+	int			status;
 
 	/*
 	 * get full ACPI pathname for object
@@ -947,13 +919,13 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 		switch (rv->Type) {
 		case ACPI_TYPE_INTEGER:
 			eisa_to_str(rv->Integer.Value, tmp_cidstr);
-			d = mf_alloc_device_id();
+			d = kmem_zalloc(sizeof (device_id_t), KM_SLEEP);
 			d->id = strdup(tmp_cidstr);
 			d->next = device_ids;
 			device_ids = d;
 			break;
 		case ACPI_TYPE_STRING:
-			d = mf_alloc_device_id();
+			d = kmem_zalloc(sizeof (device_id_t), KM_SLEEP);
 			d->id = strdup(rv->String.Pointer);
 			d->next = device_ids;
 			device_ids = d;
@@ -970,52 +942,33 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 	/*
 	 * Add _HID last so it's at the head of the list
 	 */
-	d = mf_alloc_device_id();
+	d = kmem_zalloc(sizeof (device_id_t), KM_SLEEP);
 	d->id = strdup(hidstr);
 	d->next = device_ids;
 	device_ids = d;
 
 	/*
-	 * master_file_lookup() expects _HID first in device_ids
+	 * isapnp_desc_lookup() expects _HID first in device_ids
 	 */
-	if ((m = master_file_lookup(device_ids)) !=  NULL) {
-		/* PNP description found in master table */
+	if ((m = isapnp_desc_lookup(device_ids)) !=  NULL) {
+		/* PNP description found in isapnp table */
 		if (!(strncmp(hidstr, "ACPI", 4))) {
 			dip = ddi_root_node();
 		} else {
-			dip = get_bus_dip(m->name, dip);
+			dip = get_bus_dip(m->ipnp_name, dip);
 		}
-		ndi_devi_alloc_sleep(dip, m->name,
+		ndi_devi_alloc_sleep(dip, m->ipnp_name,
 		    (pnode_t)DEVI_SID_NODEID, &xdip);
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
-		    "model", m->description);
-		compatible_present = process_properties(xdip, m->properties);
-	} else {
-		/* for ISA devices not known to the master file */
-		if (!(strncmp(hidstr, "PNP03", 5))) {
-			/* a keyboard device includes PNP03xx */
-			dip = get_bus_dip(keyboard_alias, dip);
-			ndi_devi_alloc_sleep(dip, keyboard_alias,
-			    (pnode_t)DEVI_SID_NODEID, &xdip);
+		    "model", (char *)m->ipnp_model);
+
+		if (m->ipnp_compat != NULL) {
 			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
-			    "compatible", "pnpPNP,303");
-			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
-			    "model", "PNP03xx keyboard");
-		} else {
-			if (!(strncmp(hidstr, "PNP0F", 5))) {
-				/* a mouse device include PNP0Fxx */
-				dip = get_bus_dip(mouse_alias, dip);
-				ndi_devi_alloc_sleep(dip, mouse_alias,
-				    (pnode_t)DEVI_SID_NODEID, &xdip);
-				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
-				    xdip, "compatible", "pnpPNP,f03");
-				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
-				    xdip, "model", "PNP0Fxx mouse");
-			} else {
-				(void) parse_resources(ObjHandle, xdip, path);
-				goto done;
-			}
+			    "compatible", (char *)m->ipnp_compat);
 		}
+	} else {
+		(void) parse_resources(ObjHandle, xdip, path);
+		goto done;
 	}
 
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip, "acpi-namespace",
@@ -1024,21 +977,14 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 	(void) parse_resources(ObjHandle, xdip, path);
 
 	/* Special processing for mouse and keyboard devices per IEEE 1275 */
-	/* if master entry doesn't contain "compatible" then we add default */
-	if (strcmp(m->name, keyboard_alias) == 0) {
+	if (strcmp(m->ipnp_name, "keyboard") == 0) {
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip, "reg", 0);
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
-		    "device-type", keyboard_alias);
-		if (!compatible_present)
-			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
-			    "compatible", "pnpPNP,303");
-	} else if (strcmp(m->name, mouse_alias) == 0) {
+		    "device-type", "keyboard");
+	} else if (strcmp(m->ipnp_name, "mouse") == 0) {
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip, "reg", 1);
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
-		    "device-type", mouse_alias);
-		if (!compatible_present)
-			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
-			    "compatible", "pnpPNP,f03");
+		    "device-type", "mouse");
 	}
 
 	/*
@@ -1057,7 +1003,10 @@ done:
 		device_id_t *next;
 
 		next = d->next;
-		mf_free_device_id(d);
+		if (d->id != NULL)
+			strfree(d->id);
+
+		kmem_free(d, sizeof (device_id_t));
 		d = next;
 	}
 
@@ -1131,7 +1080,7 @@ used_res_io_mem(char *nodename, int *count, used_io_mem_t **head)
 	int i;
 
 	*count *= 2;
-	io = (int *)kmem_zalloc(sizeof (int)*(*count), KM_SLEEP);
+	io = kmem_zalloc(sizeof (int)*(*count), KM_SLEEP);
 	for (i = 0; i < *count; i += 2) {
 		used_io_mem_t *prev;
 		if (used != NULL) {
@@ -1144,7 +1093,7 @@ used_res_io_mem(char *nodename, int *count, used_io_mem_t **head)
 	}
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, usedrdip,
 	    nodename, (int *)io, *count);
-	kmem_free(io, sizeof (int)*(*count));
+	kmem_free(io, sizeof (int) * (*count));
 	*head = NULL;
 }
 
@@ -1159,15 +1108,15 @@ acpi_isa_device_enum(dev_info_t *isa_dip)
 	char *acpi_prop;
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
-	    DDI_PROP_DONTPASS, ACPI_ENUM_DEBUG, &acpi_prop) ==
+	    DDI_PROP_DONTPASS, "acpi_enum_debug", &acpi_prop) ==
 	    DDI_PROP_SUCCESS) {
-		long data;
-		if (ddi_strtol(acpi_prop, NULL, 0, &data) == 0) {
-			acpi_enum_debug = (unsigned long)data;
+		unsigned long data;
+		if (ddi_strtoul(acpi_prop, NULL, 0, &data) == 0) {
+			acpi_enum_debug = (uint32_t)data;
 			e_ddi_prop_remove(DDI_DEV_T_NONE, ddi_root_node(),
-			    ACPI_ENUM_DEBUG);
+			    "acpi_enum_debug");
 			e_ddi_prop_update_int(DDI_DEV_T_NONE,
-			    ddi_root_node(), ACPI_ENUM_DEBUG, data);
+			    ddi_root_node(), "acpi_enum_debug", data);
 		}
 		ddi_prop_free(acpi_prop);
 	}
@@ -1177,21 +1126,25 @@ acpi_isa_device_enum(dev_info_t *isa_dip)
 	}
 
 	if (acpica_init() != AE_OK) {
-		cmn_err(CE_WARN, "!isa_enum: init failed");
-		/* Note, pickup by i8042 nexus */
+		cmn_err(CE_WARN, "!acpi_isa_device_enum: init failed");
+		/*
+		 * Note: `acpi-enum` is a private boolean property that is
+		 * respected both as a user-set property (by the isa nexus
+		 * which calls us), and set by us on failure (here) to
+		 * communicate to the i8042 nexus that ACPI enumeration has
+		 * not taken place and that it must enumerate.
+		 */
 		(void) e_ddi_prop_update_string(DDI_DEV_T_NONE,
 		    ddi_root_node(), "acpi-enum", "off");
 		return (0);
 	}
 
-	usedrdip = ddi_find_devinfo(USED_RESOURCES, -1, 0);
+	usedrdip = ddi_find_devinfo("used-resources", -1, 0);
 	if (usedrdip == NULL) {
-		ndi_devi_alloc_sleep(ddi_root_node(), USED_RESOURCES,
+		ndi_devi_alloc_sleep(ddi_root_node(), "used-resources",
 		    (pnode_t)DEVI_SID_NODEID, &usedrdip);
 
 	}
-
-	process_master_file();
 
 	/*
 	 * Do the actual enumeration.  Avoid AcpiGetDevices because it
@@ -1201,7 +1154,6 @@ acpi_isa_device_enum(dev_info_t *isa_dip)
 	(void) AcpiWalkNamespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
 	    UINT32_MAX, isa_acpi_callback, NULL, isa_dip, NULL);
 
-	free_master_data();
 	used_res_interrupts();
 	used_res_dmas();
 	used_res_io_mem("device-memory", &used_mem_count, &used_mem_head);

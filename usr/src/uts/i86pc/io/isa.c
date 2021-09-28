@@ -1206,13 +1206,20 @@ isa_enumerate(int reprogram)
 
 	ndi_devi_enter(isa_dip, &circ);
 
+	/*
+	 * Check whether ACPI enumeration is disabled.
+	 *
+	 * Note this property may also be set if ACPI ISA enumeration has
+	 * failed, to communicate that to the i8042 nexus.
+	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
 	    DDI_PROP_DONTPASS, "acpi-enum", &acpi_prop) == DDI_PROP_SUCCESS) {
+		/* 0 == match == false */
 		acpi_enum = strcmp("off", acpi_prop);
 		ddi_prop_free(acpi_prop);
 	}
 
-	if (acpi_enum) {
+	if (acpi_enum != 0) {
 		if (acpi_isa_device_enum(isa_dip)) {
 			ndi_devi_exit(isa_dip, circ);
 			if (isa_resource_setup() != NDI_SUCCESS) {
@@ -1246,7 +1253,6 @@ isa_enumerate(int reprogram)
 		    (pnode_t)DEVI_SID_NODEID, &xdip);
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
 		    "compatible", "pnpPNP,500");
-		/* This should be gotten from master file: */
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
 		    "model", "Standard PC COM port");
 		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
@@ -1346,7 +1352,6 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 			    (pnode_t)DEVI_SID_NODEID, &xdip);
 			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
 			    "compatible", "pnpPNP,500");
-			/* This should be gotten from master file: */
 			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
 			    "model", "Standard PC COM port");
 			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,

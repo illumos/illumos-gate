@@ -1535,7 +1535,10 @@ alloc_kb_mouse(dev_info_t *i8042_dip, int nodes_needed)
 	int acpi_off = 0;
 	char *acpi_prop;
 
-	/* don't alloc unless acpi is off */
+	/*
+	 * If ACPI enumeration is not disabled and has taken place, return
+	 * early and do nothing.
+	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
 	    DDI_PROP_DONTPASS, "acpi-enum", &acpi_prop) == DDI_PROP_SUCCESS) {
 		if (strcmp("off", acpi_prop) == 0) {

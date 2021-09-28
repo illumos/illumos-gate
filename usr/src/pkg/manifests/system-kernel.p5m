@@ -659,8 +659,7 @@ driver name=ufm perms="ufm 0666 root sys"
 $(i386_ONLY)driver name=vgatext \
     alias=pciclass,000100 \
     alias=pciclass,030000 \
-    alias=pciclass,030001 \
-    alias=pnpPNP,900
+    alias=pciclass,030001
 driver name=vnic perms="* 0666 root sys" clone_perms="vnic 0666 root sys"
 driver name=wc perms="* 0600 root sys"
 legacy pkg=SUNWckr \
