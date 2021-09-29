@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Inc.  All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  */
 
@@ -303,9 +303,7 @@ dfl_iter(dkioc_free_list_t *dfl, const dkioc_free_info_t *dfi, uint64_t max_off,
 			/*
 			 * This extent will put us over the limit on the number
 			 * of extents the device can accept. Dispatch what
-			 * we've accumulated so far, start a new
-			 * request, then re-evaluate this extent (in case
-			 * the extent on it's own is too large).
+			 * we've accumulated so far.
 			 */
 			if ((r = process_range(dfl, start_idx, i - start_idx,
 			    func, arg, kmflag)) != 0) {
@@ -313,8 +311,8 @@ dfl_iter(dkioc_free_list_t *dfl, const dkioc_free_info_t *dfi, uint64_t max_off,
 			}
 
 			start_idx = i;
-			n_segs = 0;
-			n_bytes = 0;
+			n_segs = 1;
+			n_bytes = len;
 			continue;
 		}
 

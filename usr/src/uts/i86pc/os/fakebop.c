@@ -911,7 +911,7 @@ bop_panic(const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	bop_printf(NULL, fmt, ap);
+	vbop_printf(NULL, fmt, ap);
 	va_end(ap);
 
 	bop_printf(NULL, "\nPress any key to reboot.\n");
