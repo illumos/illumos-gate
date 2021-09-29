@@ -87,6 +87,7 @@ typedef struct simnet_dev {
 	uint_t			sd_mac_len;
 	uchar_t			sd_mac_addr[MAXMACADDRLEN];
 	simnet_stats_t		sd_stats;
+	link_state_t		sd_ls;
 
 	/* Capabilities */
 	uint_t			sd_rx_cksum;
@@ -99,6 +100,7 @@ typedef struct simnet_dev {
 #define	SD_PROP_TX_ULP_CKSUM	"_tx_ulp_cksum"
 #define	SD_PROP_TX_IP_CKSUM	"_tx_ipv4_cksum"
 #define	SD_PROP_LSO		"_lso"
+#define	SD_PROP_LINKSTATE	"_linkstate"
 
 /* Simnet device flags */
 #define	SDF_SHUTDOWN	0x00000001	/* Device shutdown, no new ops */

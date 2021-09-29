@@ -403,6 +403,7 @@ simnet_ioc_create(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		return (EEXIST);
 	}
 
+	sdev->sd_ls = LINK_STATE_UNKNOWN;
 	sdev->sd_type = create_arg->sic_type;
 	sdev->sd_link_id = create_arg->sic_link_id;
 	sdev->sd_zoneid = crgetzoneid(cred);
@@ -435,6 +436,7 @@ simnet_ioc_create(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		goto exit;
 	}
 
+	sdev->sd_ls = LINK_STATE_UP;
 	mac_link_update(sdev->sd_mh, LINK_STATE_UP);
 	mac_tx_update(sdev->sd_mh);
 	list_insert_tail(&simnet_dev_list, sdev);
@@ -1316,6 +1318,22 @@ simnet_set_priv_prop_ether(simnet_dev_t *sdev, const char *name,
 		}
 
 		return (0);
+	} else if (strcmp(name, SD_PROP_LINKSTATE) == 0) {
+		if (val == NULL)
+			return (EINVAL);
+
+		if (strcmp(val, "up") == 0) {
+			sdev->sd_ls = LINK_STATE_UP;
+		} else if (strcmp(val, "down") == 0) {
+			sdev->sd_ls = LINK_STATE_DOWN;
+		} else if (strcmp(val, "unknown") == 0) {
+			sdev->sd_ls = LINK_STATE_UNKNOWN;
+		} else {
+			return (EINVAL);
+		}
+		mac_link_update(sdev->sd_mh, sdev->sd_ls);
+
+		return (0);
 	}
 
 	return (ENOTSUP);
@@ -1480,6 +1498,14 @@ simnet_get_priv_prop_ether(const simnet_dev_t *sdev, const char *name,
 		}
 	} else if (strcmp(name, SD_PROP_LSO) == 0) {
 		value = sdev->sd_lso ? "on" : "off";
+	} else if (strcmp(name, SD_PROP_LINKSTATE) == 0) {
+		if (sdev->sd_ls == LINK_STATE_UP) {
+			value = "up";
+		} else if (sdev->sd_ls == LINK_STATE_DOWN) {
+			value = "down";
+		} else {
+			value = "unknown";
+		}
 	} else {
 		return (ENOTSUP);
 	}
@@ -1640,6 +1666,9 @@ simnet_priv_propinfo_ether(const char *name, mac_prop_info_handle_t prh)
 	    strcmp(name, SD_PROP_TX_IP_CKSUM) == 0 ||
 	    strcmp(name, SD_PROP_LSO) == 0) {
 		mac_prop_info_set_default_str(prh, "off");
+	}
+	if (strcmp(name, SD_PROP_LINKSTATE) == 0) {
+		mac_prop_info_set_default_str(prh, "unknown");
 	}
 }
 
