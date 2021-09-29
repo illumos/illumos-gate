@@ -38,6 +38,7 @@ SUBDIRS =       \
 		$(SUBDIRS_$(MACH))
 
 PROGS = \
+	clock_gettime \
 	eventfd \
 	odirectory \
 	writev
@@ -53,6 +54,11 @@ ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
 
 odirectory.32 :=	LDLIBS += -lsocket
 odirectory.64 :=	LDLIBS64 += -lsocket
+
+clock_gettime.32 :=	LDLIBS += -lproc
+clock_gettime.32 :=	CSTD = $(CSTD_GNU99)
+clock_gettime.64 :=	LDLIBS64 += -lproc
+clock_gettime.64 :=	CSTD = $(CSTD_GNU99)
 
 writev.32 :=		CPPFLAGS += -D_FILE_OFFSET_BITS=64
 writev.32 :=		CSTD = $(CSTD_GNU99)

@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -216,4 +217,22 @@ proc_get_auxv(pid_t pid, auxv_t *pauxv, int naux)
 		(void) close(fd);
 	}
 	return (rv);
+}
+
+int
+proc_get_lwpsinfo(pid_t pid, uint_t thr, lwpsinfo_t *lwpip)
+{
+	char fname[PATH_MAX];
+	int fd;
+	int rv = -1;
+
+	(void) snprintf(fname, sizeof (fname), "%s/%d/lwp/%u/lwpsinfo",
+	    procfs_path, (int)pid, thr);
+	if ((fd = open(fname, O_RDONLY)) >= 0) {
+		if (read(fd, lwpip, sizeof (*lwpip)) == sizeof (*lwpip))
+			rv = 0;
+		(void) close(fd);
+	}
+	return (rv);
+
 }

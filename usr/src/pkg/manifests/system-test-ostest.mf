@@ -49,6 +49,8 @@ file path=kernel/drv/ksensor_test.conf group=sys
 file path=opt/os-tests/README mode=0444
 file path=opt/os-tests/bin/ostest mode=0555
 file path=opt/os-tests/runfiles/default.run mode=0444
+file path=opt/os-tests/tests/clock_gettime.32 mode=0555
+file path=opt/os-tests/tests/clock_gettime.64 mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-cleanup mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-setup mode=0555

@@ -151,6 +151,7 @@ file path=usr/share/man/man3proc/proc_fltset2str.3proc
 file path=usr/share/man/man3proc/proc_get_auxv.3proc
 file path=usr/share/man/man3proc/proc_get_cred.3proc
 file path=usr/share/man/man3proc/proc_get_fdinfo.3proc
+file path=usr/share/man/man3proc/proc_get_lwpsinfo.3proc
 file path=usr/share/man/man3proc/proc_get_priv.3proc
 file path=usr/share/man/man3proc/proc_get_psinfo.3proc
 file path=usr/share/man/man3proc/proc_get_status.3proc

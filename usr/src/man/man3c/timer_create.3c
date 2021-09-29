@@ -44,7 +44,7 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\"
-.TH TIMER_CREATE 3C "Mar 24, 2016"
+.TH TIMER_CREATE 3C "Oct 04, 2021"
 .SH NAME
 timer_create \- create a timer
 .SH SYNOPSIS
@@ -84,24 +84,6 @@ per-process timers. The following values for \fIclock_id\fR are supported:
 .ad
 .RS 18n
 wall clock
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCLOCK_VIRTUAL\fR\fR
-.ad
-.RS 18n
-user CPU usage clock
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCLOCK_PROF\fR\fR
-.ad
-.RS 18n
-user and system CPU usage clock
 .RE
 
 .sp

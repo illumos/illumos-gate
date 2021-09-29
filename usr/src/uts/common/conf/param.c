@@ -218,6 +218,8 @@ extern void deadman_init(void);
 extern void clock_timer_init(void);
 extern void clock_realtime_init(void);
 extern void clock_highres_init(void);
+extern void clock_thread_init(void);
+extern void clock_process_init(void);
 extern void clock_tick_mp_init(void);
 extern void cu_init(void);
 extern void callout_mp_init(void);
@@ -246,7 +248,9 @@ void	(*init_tbl[])(void) = {
 	clock_timer_init,
 	clock_realtime_init,
 	clock_highres_init,
-	0
+	clock_thread_init,
+	clock_process_init,
+	NULL
 };
 
 

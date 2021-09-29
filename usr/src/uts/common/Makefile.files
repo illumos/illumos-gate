@@ -129,7 +129,9 @@ GENUNIX_OBJS +=	\
 		class.o		\
 		clock.o		\
 		clock_highres.o	\
+		clock_process.o	\
 		clock_realtime.o\
+		clock_thread.o	\
 		close.o		\
 		compress.o	\
 		condvar.o	\
