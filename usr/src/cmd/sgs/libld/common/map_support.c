@@ -169,11 +169,11 @@ ld_map_ifl(Mapfile *mf)
 	if (mf->mf_ifl != NULL)
 		return (mf->mf_ifl);
 
-	if ((ifl = libld_calloc(sizeof (Ifl_desc), 1)) == NULL)
+	if ((ifl = libld_calloc(1, sizeof (Ifl_desc))) == NULL)
 		return (NULL);
 	ifl->ifl_name = mf->mf_name;
 	ifl->ifl_flags = (FLG_IF_MAPFILE | FLG_IF_NEEDED | FLG_IF_FILEREF);
-	if ((ifl->ifl_ehdr = libld_calloc(sizeof (Ehdr), 1)) == NULL)
+	if ((ifl->ifl_ehdr = libld_calloc(1, sizeof (Ehdr))) == NULL)
 		return (NULL);
 	ifl->ifl_ehdr->e_type = ET_REL;
 
@@ -472,7 +472,7 @@ ld_map_seg_size_symbol(Mapfile *mf, Sg_desc *sgp, Token eq_tok,
 	if ((sdp = ld_sym_find(symname, SYM_NOHASH, &where, ofl)) == NULL) {
 		Word hval;
 
-		if ((sym = libld_calloc(sizeof (Sym), 1)) == NULL)
+		if ((sym = libld_calloc(1, sizeof (Sym))) == NULL)
 			return (FALSE);
 		sym->st_shndx = SHN_ABS;
 		sym->st_size = 0;
@@ -532,7 +532,7 @@ ld_map_seg_alloc(const char *name, Word p_type, sg_flags_t sg_flags)
 {
 	Sg_desc	*sgp;
 
-	if ((sgp = libld_calloc(sizeof (Sg_desc), 1)) == NULL)
+	if ((sgp = libld_calloc(1, sizeof (Sg_desc))) == NULL)
 		return (NULL);
 	sgp->sg_phdr.p_type = p_type;
 	sgp->sg_name = name;
@@ -1100,7 +1100,7 @@ ld_map_sym_enter(Mapfile *mf, ld_map_ver_t *mv, ld_map_sym_t *ms, Ass_desc *ma)
 	}
 
 	if ((sdp = ld_sym_find(ms->ms_name, hash, &where, ofl)) == NULL) {
-		if ((sym = libld_calloc(sizeof (Sym), 1)) == NULL)
+		if ((sym = libld_calloc(1, sizeof (Sym))) == NULL)
 			return (FALSE);
 
 		sym->st_shndx = (Half)ms->ms_shndx;

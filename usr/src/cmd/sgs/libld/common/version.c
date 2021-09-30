@@ -58,7 +58,7 @@ ld_vers_desc(const char *name, Word hash, APlist **alpp)
 {
 	Ver_desc	*vdp;
 
-	if ((vdp = libld_calloc(sizeof (Ver_desc), 1)) == NULL)
+	if ((vdp = libld_calloc(1, sizeof (Ver_desc))) == NULL)
 		return ((Ver_desc *)S_ERROR);
 
 	vdp->vd_name = name;
@@ -80,8 +80,8 @@ ld_vers_desc(const char *name, Word hash, APlist **alpp)
 #define	_NUM_OF_VERS_	40	/* twice as big as the depth for libc version */
 typedef struct {
 	Ver_desc	**ver_stk;
-	int 		ver_sp;
-	int 		ver_lmt;
+	int		ver_sp;
+	int		ver_lmt;
 } Ver_Stack;
 
 static uintptr_t
@@ -146,7 +146,7 @@ vers_visit_children(Ofl_desc *ofl, Ver_desc *vp, int flag)
 	if (ver_stk.ver_sp >= ver_stk.ver_lmt) {
 		ver_stk.ver_lmt += _NUM_OF_VERS_;
 		if ((ver_stk.ver_stk = (Ver_desc **)
-		    libld_realloc((void *)ver_stk.ver_stk,
+		    libld_realloc(ver_stk.ver_stk,
 		    ver_stk.ver_lmt * sizeof (Ver_desc *))) == NULL)
 			return (S_ERROR);
 	}
@@ -172,7 +172,7 @@ ld_vers_check_defs(Ofl_desc *ofl)
 {
 	Aliste		idx1;
 	Ver_desc	*vdp;
-	uintptr_t 	is_cyclic = 0;
+	uintptr_t	is_cyclic = 0;
 
 	DBG_CALL(Dbg_ver_def_title(ofl->ofl_lml, ofl->ofl_name));
 
@@ -281,7 +281,7 @@ ld_vers_check_defs(Ofl_desc *ofl)
 			/*
 			 * If the symbol does not exist create it.
 			 */
-			if ((sym = libld_calloc(sizeof (Sym), 1)) == NULL)
+			if ((sym = libld_calloc(1, sizeof (Sym))) == NULL)
 				return (S_ERROR);
 
 			sym->st_shndx = SHN_ABS;
@@ -487,7 +487,7 @@ vers_index(Ofl_desc *ofl, Ifl_desc *ifl, int avail)
 	 * Allocate an index array large enough to hold all of the files
 	 * version descriptors.
 	 */
-	if ((vip = libld_calloc(sizeof (Ver_index), (count + 1))) == NULL)
+	if ((vip = libld_calloc((count + 1), sizeof (Ver_index))) == NULL)
 		return ((Ver_index *)S_ERROR);
 
 	for (APLIST_TRAVERSE(ifl->ifl_verdesc, idx1, vdp)) {
@@ -648,7 +648,7 @@ ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		const char	*name;
 		Ver_desc	*ivdp, *ovdp = NULL;
 		Word		hash;
-		Half 		cnt = vdf->vd_cnt;
+		Half		cnt = vdf->vd_cnt;
 		Half		ndx = vdf->vd_ndx;
 		Verdaux		*vdap = (Verdaux *)((uintptr_t)vdf +
 		    vdf->vd_aux);
@@ -893,7 +893,7 @@ ld_vers_need_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 void
 ld_vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
 {
-	Half 	vndx;
+	Half	vndx;
 
 	/*
 	 * A version symbol index of 0 implies the symbol is local.  A value of

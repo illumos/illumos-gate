@@ -228,7 +228,7 @@ pad_outfile(Ofl_desc *ofl)
 		 */
 		if (oscn && (phdr->p_type == PT_LOAD)) {
 			Elf_Data *	data;
-			size_t 		size;
+			size_t		size;
 
 			size = (size_t)(S_ROUND(offset, phdr->p_align) -
 			    offset);
@@ -238,7 +238,7 @@ pad_outfile(Ofl_desc *ofl)
 				    MSG_INTL(MSG_ELF_NEWDATA), ofl->ofl_name);
 				return (S_ERROR);
 			}
-			if ((data->d_buf = libld_calloc(size, 1)) == 0)
+			if ((data->d_buf = libld_calloc(1, size)) == NULL)
 				return (S_ERROR);
 
 			data->d_type = ELF_T_BYTE;

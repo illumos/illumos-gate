@@ -52,7 +52,7 @@
  *  ii.	A symbol reference may define a hidden or protected visibility.  The
  *	reference can only be bound to a definition within a relocatable object
  *	for this restricted visibility to be satisfied.  If the archive member
- * 	provides a definition of the same symbol type, this definition is
+ *	provides a definition of the same symbol type, this definition is
  *	taken.  The visibility of the defined symbol is irrelevant, as the most
  *	restrictive visibility of the reference and the definition will be
  *	applied to the final symbol.
@@ -66,7 +66,7 @@ process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 {
 	Sym	*syms, *osym = sdp->sd_sym;
 	Xword	symn, cnt;
-	char 	*strs;
+	char	*strs;
 
 	/*
 	 * Find the first symbol table in the archive member, obtain its
@@ -215,7 +215,7 @@ ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 	adp->ad_elf = elf;
 	adp->ad_start = start;
 	if (start) {
-		adp->ad_aux = libld_calloc(sizeof (Ar_aux), number);
+		adp->ad_aux = libld_calloc(number, sizeof (Ar_aux));
 		if (adp->ad_aux == NULL)
 			return ((Ar_desc *)S_ERROR);
 	} else {
@@ -646,8 +646,8 @@ ar_extract_bysym(const char *name, int fd, Ar_desc *adp,
 				 * allocate one.
 				 */
 				if (!amp) {
-					if ((amp = libld_calloc(sizeof (Ar_mem),
-					    1)) == NULL)
+					if ((amp = libld_calloc(1,
+					    sizeof (Ar_mem))) == NULL)
 						return (FALSE);
 					amp->am_elf = arelf;
 					amp->am_name = arname;

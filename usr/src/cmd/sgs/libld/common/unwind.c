@@ -177,11 +177,11 @@
  *     Augmentation Section              field 4 is not 0.
  *
  *     z:
- * 	size		   uleb128       Length of the remainder of the
- *				         Augmentation Section
+ *	size		   uleb128	 Length of the remainder of the
+ *					 Augmentation Section
  *
  *     P:
- * 	personality_enc    1	         Encoding specifier - preferred
+ *	personality_enc	   1		 Encoding specifier - preferred
  *					 value is a pc-relative, signed
  *				         4-byte
  *
@@ -191,14 +191,14 @@
  *				         entry for the personality
  *				         routine)
  *     R:
- * 	code_enc           1	      Non-default encoding for the
+ *	code_enc	   1	      Non-default encoding for the
  *				      code-pointers (FDE members
  *				      "initial_location" and "address_range"
  *				      and the operand for DW_CFA_set_loc)
  *				      - preferred value is pc-relative,
  *				      signed 4-byte.
  *     L:
- * 	lsda_enc	   1	      FDE augmentation bodies may contain
+ *	lsda_enc	   1	      FDE augmentation bodies may contain
  *				      LSDA pointers. If so they are
  *				      encoded as specified here -
  *				      preferred value is pc-relative,
@@ -257,7 +257,7 @@
  *
  *
  *     'z':
- * 	length		   uleb128       length of the remainder of the
+ *	length		   uleb128	 length of the remainder of the
  *				         FDE augmentation section
  *
  *
@@ -338,7 +338,7 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	/*
 	 * Allocate and initialize the Elf_Data structure.
 	 */
-	if ((elfdata = libld_calloc(sizeof (Elf_Data), 1)) == NULL)
+	if ((elfdata = libld_calloc(1, sizeof (Elf_Data))) == NULL)
 		return (S_ERROR);
 	elfdata->d_type = ELF_T_BYTE;
 	elfdata->d_align = ld_targ.t_m.m_word_align;
@@ -347,7 +347,7 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	/*
 	 * Allocate and initialize the Shdr structure.
 	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == NULL)
+	if ((shdr = libld_calloc(1, sizeof (Shdr))) == NULL)
 		return (S_ERROR);
 	shdr->sh_type = ld_targ.t_m.m_sht_unwind;
 	shdr->sh_flags = SHF_ALLOC;

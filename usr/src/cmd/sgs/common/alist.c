@@ -135,7 +135,7 @@ alist_insert(Alist **lpp, const void *datap, size_t size,
 			bsize = lp->al_size * lp->al_arritems * 2;
 			bsize = S_ROUND(bsize, sizeof (void *));
 			bsize = ALIST_OFF_DATA + bsize;
-			if ((lp = realloc((void *)lp, (size_t)bsize)) == 0)
+			if ((lp = realloc(lp, (size_t)bsize)) == NULL)
 				return (NULL);
 			lp->al_arritems *= 2;
 			*lpp = lp;
@@ -215,7 +215,7 @@ aplist_insert(APlist **lpp, const void *ptr, Aliste init_arritems, Aliste idx)
 
 		bsize = APLIST_OFF_DATA +
 		    (2 * sizeof (void *) * lp->apl_arritems);
-		if ((lp = realloc((void *)lp, (size_t)bsize)) == 0)
+		if ((lp = realloc(lp, (size_t)bsize)) == NULL)
 			return (NULL);
 		lp->apl_arritems *= 2;
 		*lpp = lp;
