@@ -45,8 +45,6 @@ $(PROG): $(SRCS)
 clean:
 	$(RM) $(PROG)
 
-lint: lint_SRCS
-
 install:	all $(ROOTCMD) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 check:		$(CHKMANIFEST)

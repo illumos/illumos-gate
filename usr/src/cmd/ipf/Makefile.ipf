@@ -25,8 +25,7 @@
 # Copyright (c) 2018, Joyent, Inc.
 
 
-LIBIPF=		../../lib/$(MACH)/libipf.a
-LIBIPF64=		../../lib/$(MACH64)/libipf.a
+LIBIPF=		../lib/libipf.a
 
 COMMONIPF=	$(SRC)/uts/common/inet/ipf
 KERNELIPF=	$(SRC)/uts/common/inet/pfil

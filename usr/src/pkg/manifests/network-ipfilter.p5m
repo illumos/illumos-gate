@@ -48,34 +48,16 @@ file path=usr/kernel/drv/$(ARCH64)/ipf group=sys
 file path=usr/kernel/drv/ipf.conf group=sys
 dir  path=usr/lib
 dir  path=usr/lib/ipf
-$(i386_ONLY)dir path=usr/lib/ipf/$(ARCH32) group=sys
-$(i386_ONLY)file path=usr/lib/ipf/$(ARCH32)/ipftest mode=0555
-dir  path=usr/lib/ipf/$(ARCH64) group=sys
-file path=usr/lib/ipf/$(ARCH64)/ipftest mode=0555
 file path=usr/lib/ipf/IPFILTER.LICENCE
-hardlink path=usr/lib/ipf/ipftest target=../../../usr/lib/isaexec
+file path=usr/lib/ipf/ipftest mode=0555
 file path=usr/lib/servinfo mode=0555
 dir  path=usr/sbin
-$(i386_ONLY)dir path=usr/sbin/$(ARCH32)
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/ipf mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/ipfs mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/ipfstat mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/ipmon mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/ipnat mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/ippool mode=0555
-dir  path=usr/sbin/$(ARCH64)
-file path=usr/sbin/$(ARCH64)/ipf mode=0555
-file path=usr/sbin/$(ARCH64)/ipfs mode=0555
-file path=usr/sbin/$(ARCH64)/ipfstat mode=0555
-file path=usr/sbin/$(ARCH64)/ipmon mode=0555
-file path=usr/sbin/$(ARCH64)/ipnat mode=0555
-file path=usr/sbin/$(ARCH64)/ippool mode=0555
-hardlink path=usr/sbin/ipf target=../../usr/lib/isaexec
-hardlink path=usr/sbin/ipfs target=../../usr/lib/isaexec
-hardlink path=usr/sbin/ipfstat target=../../usr/lib/isaexec
-hardlink path=usr/sbin/ipmon target=../../usr/lib/isaexec
-hardlink path=usr/sbin/ipnat target=../../usr/lib/isaexec
-hardlink path=usr/sbin/ippool target=../../usr/lib/isaexec
+file path=usr/sbin/ipf mode=0555
+file path=usr/sbin/ipfs mode=0555
+file path=usr/sbin/ipfstat mode=0555
+file path=usr/sbin/ipmon mode=0555
+file path=usr/sbin/ipnat mode=0555
+file path=usr/sbin/ippool mode=0555
 dir  path=usr/share
 dir  path=usr/share/ipfilter
 dir  path=usr/share/ipfilter/examples
