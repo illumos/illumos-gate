@@ -19,42 +19,56 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# Copyright (c) 2015 by Delphix. All rights reserved.
-#
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2017 RackTop Systems.
+# Copyright 2020 Joyent, Inc.
 
-PROG:sh=	basename `pwd`
+PROG=		ztest
 BASHPROG=	zloop
 ROOTBASHPROG=	$(ROOTBIN)/$(BASHPROG)
 
 CLOBBERFILES=	$(BASHPROG)
 
+OBJS= $(PROG).o
+
 include ../Makefile.cmd
+include ../Makefile.cmd.64
+include ../Makefile.ctf
 
-$(INTEL_BLD)SUBDIRS	= $(MACH)
-$(BUILD64)SUBDIRS	+= $(MACH64)
+INCS += -I../../lib/libzpool/common
+INCS += -I../../uts/common/fs/zfs
+INCS += -I../../uts/common/fs/zfs/lua
+INCS += -I../../common/zfs
+INCS += -I../../lib/libzutil/common
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+LDLIBS += -lumem -lzpool -lcmdutils -lm -lnvpair -lfakekernel -lzutil
+
+CSTD= $(CSTD_GNU99)
+CFLAGS += -g $(CCVERBOSE)
+CFLAGS64 += -g $(CCVERBOSE)
+CPPFLAGS.first = -I$(SRC)/lib/libfakekernel/common -D_FAKE_KERNEL
+CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS) -DDEBUG
+
+CERRWARN += -_gcc=-Wno-switch
+
+# false positive
+SMOFF += signed
+
+# needs work
+SMOFF += all_func_returns
 
 .KEEP_STATE:
 
-all lint:	$(SUBDIRS) $(BASHPROG)
+all: $(PROG) $(BASHPROG)
 
-clean clobber:	$(SUBDIRS)
+install: all $(ROOTPROG) $(ROOTBASHPROG)
 
-install:	$(SUBDIRS) $(ROOTBASHPROG)
-	-$(RM) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+clean:
+	$(RM) $(OBJS)
 
 include ../Makefile.targ
