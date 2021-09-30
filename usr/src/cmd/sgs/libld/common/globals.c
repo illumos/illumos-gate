@@ -33,6 +33,8 @@
 #include	"msg.h"
 #include	"_libld.h"
 
+Ld_heap		*ld_heap;	/* list of allocated blocks for */
+				/*	link-edit dynamic allocations */
 APlist		*lib_support;	/* list of support libraries specified */
 				/*	(-S option) */
 int		demangle_flag;	/* symbol demangling required */

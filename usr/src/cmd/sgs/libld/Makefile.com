@@ -113,15 +113,8 @@ LDLIBS +=	$(CONVLIBDIR) -lconv $(LDDBGLIBDIR) -llddbg \
 DYNFLAGS +=	$(VERSREF) '-R$$ORIGIN'
 
 # too hairy
-pics/sections32.o :=	SMATCH=off
-pics/sections64.o :=	SMATCH=off
-# confused about our strange allocation choices
-pics/syms32.o :=	SMOFF += check_kmalloc_wrong_size
-pics/syms64.o :=	SMOFF += check_kmalloc_wrong_size
-pics/entry32.o :=	SMOFF += check_kmalloc_wrong_size
-pics/entry64.o :=	SMOFF += check_kmalloc_wrong_size
-pics/relocate32.o :=	SMOFF += check_kmalloc_wrong_size
-pics/relocate64.o :=	SMOFF += check_kmalloc_wrong_size
+pics/sections32.o := SMATCH=off
+pics/sections64.o := SMATCH=off
 
 BLTDEFS =	msg.h
 BLTDATA =	msg.c
