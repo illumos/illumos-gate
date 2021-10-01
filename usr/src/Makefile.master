@@ -28,7 +28,7 @@
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2020 Joyent, Inc.
+# Copyright 2021 Joyent, Inc.
 # Copyright 2019 RackTop Systems.
 # Copyright 2020 Oxide Computer Company
 # Copyright 2020 Peter Tribble
@@ -708,6 +708,14 @@ NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
 
 NATIVE_CCFLAGS=	$(CCOPTFLAG) $($(NATIVE_MACH)_CCFLAGS) $(CCSOURCEDEBUGFLAGS) \
 		$(CCUSERFLAGS)
+
+NATIVE_CFLAGS64=	$(COPTFLAG64) $($(NATIVE_MACH64)_CFLAGS) $(CCMODE64) \
+		$(ILDOFF) $(CERRWARN) $(CSTD) $($(NATIVE_MACH64)_CCUNBOUND) \
+		$(IROPTFLAG64) $(CGLOBALSTATIC) $(CCNOAUTOINLINE) \
+		$(CCNOREORDER) $(CSOURCEDEBUGFLAGS) $(CUSERFLAGS64)
+
+NATIVE_CCFLAGS64=	$(CCOPTFLAG64) $($(NATIVE_MACH64)_CCFLAGS) \
+		$(CCSOURCEDEBUGFLAGS) $(CCUSERFLAGS64)
 
 DTEXTDOM=-DTEXT_DOMAIN=\"$(TEXT_DOMAIN)\"	# For messaging.
 DTS_ERRNO=-D_TS_ERRNO
