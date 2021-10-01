@@ -542,9 +542,19 @@ ld_ofl_cleanup(Ofl_desc *ofl)
 		Ar_aux		*aup;
 		Elf_Arsym	*arsym;
 
+		/*
+		 * Free up member information for normally processed archives.
+		 * Archives processed under -z allextract have no member
+		 * information or symbol table, and members have already been
+		 * dealt with as input files.
+		 */
+		if (adp->ad_allextract == TRUE)
+			continue;
+
 		for (arsym = adp->ad_start, aup = adp->ad_aux;
-		    arsym->as_name; ++arsym, ++aup) {
-			if ((aup->au_mem) && (aup->au_mem != FLG_ARMEM_PROC)) {
+		    (arsym->as_name != NULL); ++arsym, ++aup) {
+			if ((aup->au_mem != NULL) &&
+			    (aup->au_mem != FLG_ARMEM_PROC)) {
 				(void) elf_end(aup->au_mem->am_elf);
 
 				/*
