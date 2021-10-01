@@ -156,7 +156,7 @@ ld_main(int argc, char **argv, Half mach)
 	DBG_DELTATIME = DBG_TOTALTIME;
 
 	/* Output file descriptor */
-	if ((ofl = libld_calloc(1, sizeof (Ofl_desc))) == NULL)
+	if ((ofl = libld_calloc(1, sizeof (Ofl_desc))) == 0)
 		return (1);
 
 	/* Initialize target state */
@@ -175,7 +175,7 @@ ld_main(int argc, char **argv, Half mach)
 	/*
 	 * Build up linker version string
 	 */
-	if ((ofl->ofl_sgsid = libld_calloc(MSG_SGS_ID_SIZE +
+	if ((ofl->ofl_sgsid = (char *)libld_calloc(MSG_SGS_ID_SIZE +
 	    strlen(link_ver_string) + 1, 1)) == NULL)
 		return (1);
 	(void) strcpy(ofl->ofl_sgsid, MSG_ORIG(MSG_SGS_ID));
@@ -495,14 +495,15 @@ ld_main(int argc, char **argv, Half mach)
 		return (ld_exit(ofl));
 
 	/*
-	 * For performance reasons we didn't used to actually free up the
-	 * memory we'd allocated, since it'll be freed on exit.
+	 * For performance reasons we don't actually free up the memory we've
+	 * allocated, it will be freed when we exit.
 	 *
-	 * These calls does not free nearly as much memory as you would think
-	 * they do, unfortunately.
+	 * But the below line can be uncommented if/when we want to measure how
+	 * our memory consumption and freeing are doing.  We should be able to
+	 * free all the memory that has been allocated as part of the link-edit
+	 * process.
 	 */
-	ld_ofl_cleanup(ofl);
-	libld_free(ofl);
+	/* ld_ofl_cleanup(ofl); */
 	return (0);
 }
 
@@ -528,6 +529,7 @@ ifl_list_cleanup(APlist *apl)
 void
 ld_ofl_cleanup(Ofl_desc *ofl)
 {
+	Ld_heap		*chp, *php;
 	Ar_desc		*adp;
 	Aliste		idx;
 
@@ -559,8 +561,13 @@ ld_ofl_cleanup(Ofl_desc *ofl)
 	(void) elf_end(ofl->ofl_elf);
 	(void) elf_end(ofl->ofl_welf);
 
-	/*
-	 * Note that we don't free ofl itself here, just its contents.  The
-	 * ofl itself belongs to the caller.
-	 */
+	for (chp = ld_heap, php = NULL; chp; php = chp, chp = chp->lh_next) {
+		if (php)
+			(void) munmap((void *)php,
+			    (size_t)php->lh_end - (size_t)php);
+	}
+	if (php)
+		(void) munmap((void *)php, (size_t)php->lh_end - (size_t)php);
+
+	ld_heap = NULL;
 }
