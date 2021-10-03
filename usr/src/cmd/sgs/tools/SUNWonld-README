@@ -1677,3 +1677,5 @@ Bugid   Risk Synopsis
 14090	backout: turns over big rocks, discovers big bugs
 14152	ld(1) should be more careful about empty alists
 14127	ld(1) can double free when cleaning up
+14155	ld(1) string table merging could be much faster
+14157	ld(1) string table merging should follow gABI more closely
