@@ -14,7 +14,7 @@
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -41,7 +41,7 @@ function find_disks
 	typeset all_disks=$(echo '' | sudo -k format | awk \
 	    '/c[0-9]/ {print $2}')
 	typeset used_disks=$(zpool status | awk \
-	    '/c[0-9]+(t[0-9a-f]+)?d[0-9]+/ {print $1}' | sed -E \
+	    '/c[0-9]+(t[0-9a-fA-F]+)?d[0-9]+/ {print $1}' | sed -E \
 	    's/(s|p)[0-9]+//g')
 
 	typeset disk used avail_disks
