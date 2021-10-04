@@ -1267,9 +1267,13 @@ ldi_mlink_fp(struct stdata *stp, file_t *fpdown, int lhlink, int type)
 	major_t			major;
 	int			ret;
 
-	/* if the lower stream is not a device then return */
+	/*
+	 * If the lower stream is not a device then return but claim to have
+	 * succeeded, which matches our historical behaviour of just not
+	 * setting up LDI in this case.
+	 */
 	if (!vn_matchops(vp, spec_getvnodeops()))
-		return (EINVAL);
+		return (0);
 
 	ASSERT(!servicing_interrupt());
 
@@ -1387,9 +1391,13 @@ ldi_munlink_fp(struct stdata *stp, file_t *fpdown, int type)
 	major_t			major;
 	int			ret;
 
-	/* if the lower stream is not a device then return */
+	/*
+	 * If the lower stream is not a device then return but claim to have
+	 * succeeded, which matches our historical behaviour of just not
+	 * setting up LDI in this case.
+	 */
 	if (!vn_matchops(vp, spec_getvnodeops()))
-		return (EINVAL);
+		return (0);
 
 	ASSERT(!servicing_interrupt());
 
