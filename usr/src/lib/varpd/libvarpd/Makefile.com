@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2021 Joyent, Inc.
 #
 
 LIBRARY =	libvarpd.a
@@ -28,16 +28,12 @@ OBJECTS =	libvarpd.o \
 
 include ../../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lavl -lumem -lidspace -lnvpair -lmd5 -lrename \
 		-lbunyan
 CPPFLAGS +=	-I../common
 
 CERRWARN +=	-erroff=E_STRUCT_DERIVED_FROM_FLEX_MBR
-LINTFLAGS +=	-erroff=E_STRUCT_DERIVED_FROM_FLEX_MBR \
-		-erroff=E_BAD_PTR_CAST_ALIGN
-LINTFLAGS64  +=	-erroff=E_STRUCT_DERIVED_FROM_FLEX_MBR \
-		-erroff=E_BAD_PTR_CAST_ALIGN
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
@@ -47,7 +43,5 @@ SRCDIR =	../common
 .KEEP_STATE:
 
 all:	$(LIBS)
-
-lint:	lintcheck
 
 include ../../../Makefile.targ

@@ -32,11 +32,6 @@ CFLAGS += $(CCVERBOSE)
 LDLIBS += -lvarpd -lumem -lscf
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
-#
-# Our debug only umem related functions cause lint to get confused.
-#
-LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
-
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
@@ -50,8 +45,6 @@ $(PROG): $(OBJS)
 
 clean:
 	-$(RM) $(CLEANFILES)
-
-lint: lint_PROG
 
 %.o: ../%.c
 	$(COMPILE.c) $<

@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2020 Joyent, Inc.
+# Copyright 2021 Joyent, Inc.
 #
 
 LIBRARY =	libvarpd_direct.a
@@ -32,7 +32,5 @@ SRCDIR =	../common
 .KEEP_STATE:
 
 all:	$(LIBS)
-
-lint:	lintcheck
 
 include ../../../Makefile.targ

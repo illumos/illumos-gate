@@ -49,6 +49,4 @@ C99LMODE=	-Xc99=%all
 
 all:	$(LIBS)
 
-lint:	lintcheck
-
 include ../../../Makefile.targ
