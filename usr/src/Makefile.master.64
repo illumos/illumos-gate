@@ -23,6 +23,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2014 Joyent, Inc.  All rights reserved.
 # Copyright 2016 RackTop Systems.
+# Copyright 2021 Joyent, Inc.
 #
 
 # rebind basic build macros to 64-bit versions
@@ -39,6 +40,8 @@ COMPILE.b=	$(COMPILE64.b)
 LINK.c=		$(LINK64.c)
 LINK.cc=	$(LINK64.cc)
 LINT.c=		$(LINT64.c)
+NATIVE_CFLAGS=	$(NATIVE_CFLAGS64)
+NATIVE_CCFLAGS=	$(NATIVE_CCFLAGS64)
 
 CTF_FLAGS=	$(CTF_FLAGS_64)
 
@@ -64,6 +67,11 @@ CPP=		$(CPP64)
 AS=		$(AS64)
 LD=		$(LD64)
 LINT=		$(LINT64)
+NATIVECC=	$(NATIVECC64)
+NATIVECCC=	$(NATIVECCC64)
+NATIVECPP=	$(NATIVECPP64)
+NATIVEAS=	$(NATIVEAS64)
+NATIVELD=	$(NATIVELD64)
 
 BUILD.SO=	$(BUILD64.SO)
 BUILDCCC.SO=	$(BUILDCCC64.SO)
