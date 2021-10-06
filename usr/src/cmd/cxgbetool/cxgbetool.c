@@ -31,6 +31,7 @@
 #include <sys/byteorder.h>
 #include <inttypes.h>
 #include <sys/sysmacros.h>
+#include <err.h>
 
 #include "t4nex.h"
 #include "version.h"
@@ -116,22 +117,8 @@ static void usage(FILE *fp)
 	fprintf(fp,
 	    "\tdevlog                              show device log\n"
 	    "\tloadfw <FW image>                   Flash the FW image\n"
-	    "\tcudbg                               Chelsio Unified Debugger\n");
+	    "\tcudbg <option> [<args>]             Chelsio Unified Debugger\n");
 	exit(fp == stderr ? 1 : 0);
-}
-
-__NORETURN static void
-err(int code, const char *fmt, ...)
-{
-	va_list ap;
-	int e = errno;
-
-	va_start(ap, fmt);
-	fprintf(stderr, "error: ");
-	vfprintf(stderr, fmt, ap);
-	fprintf(stderr, ": %s\n", strerror(e));
-	va_end(ap);
-	exit(code);
 }
 
 static int
@@ -180,7 +167,7 @@ get_devlog(int argc, char *argv[], int start_arg, const char *iff_name)
 	}
 	if (rc) {
 		free(devlog);
-		err(1, "%s: can't get device log", __func__);
+		errx(1, "%s: can't get device log", __func__);
 	}
 
 	/* There are nentries number of entries in the buffer */
@@ -247,28 +234,31 @@ load_fw(int argc, char *argv[], int start_arg, const char *iff_name)
 	int fd;
 
 	if (argc != 4)
-		err(1, "incorrect number of arguments.");
+		errx(1, "incorrect number of arguments");
 
 	fd = open(fname, O_RDONLY);
 	if (fd < 0)
 		err(1, "%s: opening %s failed", __func__, fname);
 	if (fstat(fd, &sb) < 0) {
+		warn("%s: fstat %s failed", __func__, fname);
 		close(fd);
-		err(1, "%s: fstat %s failed", __func__, fname);
+		exit(1);
 	}
 	len = (size_t)sb.st_size;
 
 	fw = malloc(sizeof (struct t4_ldfw) + len);
 	if (!fw) {
-		close(fd);
-		err(1, "%s: %s allocate %ld bytes failed",
+		warn("%s: %s allocate %ld bytes failed",
 		    __func__, fname, sizeof (struct t4_ldfw) + len);
+		close(fd);
+		exit(1);
 	}
 
 	if (read(fd, fw->data, len) < len) {
+		warn("%s: %s read failed", __func__, fname);
 		close(fd);
 		free(fw);
-		err(1, "%s: %s read failed", __func__, fname);
+		exit(1);
 	}
 
 	close(fd);
@@ -356,7 +346,7 @@ do_collect(char *dbg_entity_list, const char *iff_name, const char *fname)
 	fd = open(fname, O_CREAT | O_TRUNC | O_EXCL | O_WRONLY,
 		  S_IRUSR | S_IRGRP | S_IROTH);
 	if (fd < 0) {
-		err(1, "%s: file open failed", __func__); 
+		err(1, "%s: file open failed", __func__);
 	}
 
 	write(fd, cudbg->data, cudbg->len);
@@ -595,9 +585,13 @@ get_cudbg(int argc, char *argv[], int start_arg, const char *iff_name)
 {
 	char *dbg_entity_list = NULL;
 	int rc = 0, option;
+
+	if (start_arg >= argc)
+		errx(1, "no option provided");
+
 	rc = check_option(argv[start_arg++]);
 	if (rc < 0) {
-		err(1, "%s:Invalid option provided", __func__);
+		errx(1, "%s:Invalid option provided", __func__);
 	}
 	option = rc;
 
@@ -608,16 +602,16 @@ get_cudbg(int argc, char *argv[], int start_arg, const char *iff_name)
 	}
 
 	if (argc < 5) {
-		err(1, "Invalid number of arguments\n");
+		errx(1, "Invalid number of arguments\n");
 	}
 	rc = get_entity_list(argv[start_arg++],
 			     &dbg_entity_list);
 	if (rc) {
-		err(1, "Error in parsing entity\n");
+		errx(1, "Error in parsing entity\n");
 	}
 
 	if (argc < 6) {
-		err(1, "File name is missing\n");
+		errx(1, "File name is missing\n");
 	}
 
 	switch (option) {
@@ -628,7 +622,7 @@ get_cudbg(int argc, char *argv[], int start_arg, const char *iff_name)
 			do_view(dbg_entity_list, argv[start_arg]);
 			break;
 		default:
-			err(1, "Wrong option provided\n");
+			errx(1, "Wrong option provided\n");
 	}
 
 	put_entity_list(dbg_entity_list);
