@@ -24,7 +24,7 @@
 .\"
 .\" Portions Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd March 18, 2021
+.Dd April 20, 2021
 .Dt BHYVE 1M
 .Os
 .Sh NAME
@@ -263,6 +263,8 @@ Accelerated Virtio network interface.
 Legacy Virtio network interface.
 .It Li virtio-blk
 Virtio block storage interface.
+.It Li virtio-9p
+Virtio 9p (VirtFS) interface.
 .It Li virtio-rnd
 Virtio random number generator interface.
 .It Li virtio-console
@@ -388,6 +390,24 @@ if not explicitly specified.
 Disable emulation of guest trim requests via
 .Dv DIOCGDELETE
 requests.
+.El
+.Pp
+9P devices:
+.Bl -tag -width 10n
+.It Xo
+.Sm off
+.Cm sharename Sy = Pa /path/to/share
+.Op Cm \&, Ar 9p-device-options
+.Sm on
+.Xc
+.El
+.Pp
+The
+.Ar 9p-device-options
+are:
+.Bl -tag -width 10n
+.It Cm ro
+Expose the share in read-only mode.
 .El
 .Pp
 TTY devices:

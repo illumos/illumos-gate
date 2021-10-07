@@ -5173,6 +5173,7 @@ s usr/lib/amd64/gss/mech_krb5.so=mech_krb5.so.1
 f usr/lib/amd64/gss/mech_spnego.so.1 0755 root bin
 s usr/lib/amd64/ld.so.1=../../../lib/amd64/ld.so.1
 f usr/lib/amd64/lddstub 0555 root bin
+f usr/lib/amd64/lib9p.so.1 0755 root bin
 f usr/lib/amd64/libHBAAPI.so.1 0755 root bin
 s usr/lib/amd64/libHBAAPI.so=libHBAAPI.so.1
 s usr/lib/amd64/libMPAPI.so.1=../../../lib/amd64/libMPAPI.so.1
