@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2017 RackTop Systems.
  * Copyright (c) 2018, Joyent, Inc.
  */
@@ -42,7 +42,7 @@ char *volatile panicstr;
 va_list  panicargs;
 char panicbuf[512];
 
-volatile int aok;
+int aok;
 
 static const int
 ce_flags[CE_IGNORE] = { SL_NOTE, SL_NOTE, SL_WARN, SL_FATAL };
@@ -190,4 +190,30 @@ void
 debug_enter(char *str)
 {
 	/* Just a place for a break point. */
+}
+
+int
+assfail(const char *a, const char *f, int l)
+{
+	if (!aok)
+		panic("assertion failed: %s, file: %s, line: %d", a, f, l);
+
+	fprintf(stderr, "ASSERTION CAUGHT: %s, file: %s, line: %d\n", a, f, l);
+
+	return (0);
+}
+
+void
+assfail3(const char *a, uintmax_t lv, const char *op, uintmax_t rv,
+    const char *f, int l)
+{
+	if (!aok) {
+		panic("assertion failed: %s (0x%llx %s 0x%llx), file: %s, "
+		    "line: %d", a, (u_longlong_t)lv, op, (u_longlong_t)rv,
+		    f, l);
+	}
+
+	fprintf(stderr, "ASSERTION CAUGHT: %s (0x%llx %s 0x%llx), file: %s, "
+	    "line: %d\n", a, (u_longlong_t)lv, op, (u_longlong_t)rv,
+	    f, l);
 }

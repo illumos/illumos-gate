@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2017 RackTop Systems.
 # Copyright 2019 Joyent, Inc.
 #
@@ -40,6 +40,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_curzone;
 
 	aok		{ FLAGS = NODIRECT };
+	assfail;
+	assfail3;
 	boot_time;
 	cmn_err;
 	copyin;
