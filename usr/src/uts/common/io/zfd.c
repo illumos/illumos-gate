@@ -126,9 +126,9 @@ static int zfd_detach(dev_info_t *, ddi_detach_cmd_t);
 
 static int zfd_open(queue_t *, dev_t *, int, int, cred_t *);
 static int zfd_close(queue_t *, int, cred_t *);
-static void zfd_wput(queue_t *, mblk_t *);
-static void zfd_rsrv(queue_t *);
-static void zfd_wsrv(queue_t *);
+static int zfd_wput(queue_t *, mblk_t *);
+static int zfd_rsrv(queue_t *);
+static int zfd_wsrv(queue_t *);
 
 /*
  * The instance number is encoded in the dev_t in the minor number; the lowest
@@ -168,7 +168,7 @@ static struct module_info zfd_info = {
 
 static struct qinit zfd_rinit = {
 	NULL,
-	(int (*)()) zfd_rsrv,
+	zfd_rsrv,
 	zfd_open,
 	zfd_close,
 	NULL,
@@ -177,8 +177,8 @@ static struct qinit zfd_rinit = {
 };
 
 static struct qinit zfd_winit = {
-	(int (*)()) zfd_wput,
-	(int (*)()) zfd_wsrv,
+	zfd_wput,
+	zfd_wsrv,
 	NULL,
 	NULL,
 	NULL,
@@ -831,7 +831,7 @@ zfd_tee_handler(zfd_state_t *zfds, unsigned char type, mblk_t *mp)
  * for consumption within the zone (i.e. the log stream can be read, but never
  * written to, by an application inside the zone).
  */
-static void
+static int
 zfd_wput(queue_t *qp, mblk_t *mp)
 {
 	unsigned char type = mp->b_datap->db_type;
@@ -855,20 +855,20 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 		case ZFD_MAKETTY:
 			zfds->zfd_tty = 1;
 			miocack(qp, mp, 0, 0);
-			return;
+			return (0);
 		case ZFD_EOF:
 			if (zfds->zfd_slave_rdq != NULL)
 				(void) putnextctl(zfds->zfd_slave_rdq,
 				    M_HANGUP);
 			miocack(qp, mp, 0, 0);
-			return;
+			return (0);
 		case ZFD_HAS_SLAVE:
 			if ((zfds->zfd_state & ZFD_STATE_SOPEN) != 0) {
 				miocack(qp, mp, 0, 0);
 			} else {
 				miocack(qp, mp, 0, ENOTTY);
 			}
-			return;
+			return (0);
 		case ZFD_MUX: {
 			/*
 			 * Setup the multiplexer configuration for the two
@@ -886,7 +886,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			if (iocbp->ioc_count != TRANSPARENT ||
 			    mp->b_cont == NULL) {
 				miocack(qp, mp, 0, EINVAL);
-				return;
+				return (0);
 			}
 
 			/* Get the primary slave minor device number */
@@ -896,7 +896,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			if ((prim_zfds = ddi_get_soft_state(zfd_soft_state,
 			    instance)) == NULL) {
 				miocack(qp, mp, 0, EINVAL);
-				return;
+				return (0);
 			}
 
 			/* Disallow changing primary/log once set. */
@@ -905,7 +905,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			    prim_zfds->zfd_muxt != ZFD_NO_MUX) {
 				mutex_exit(&zfd_mux_lock);
 				miocack(qp, mp, 0, EINVAL);
-				return;
+				return (0);
 			}
 
 			zfds->zfd_muxt = ZFD_LOG_STREAM;
@@ -917,7 +917,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			    void *, zfds);
 
 			miocack(qp, mp, 0, 0);
-			return;
+			return (0);
 			}
 		case ZFD_MUX_FLOWCON: {
 			/*
@@ -932,12 +932,12 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			if (iocbp->ioc_count != TRANSPARENT ||
 			    mp->b_cont == NULL) {
 				miocack(qp, mp, 0, EINVAL);
-				return;
+				return (0);
 			}
 
 			if (zfds->zfd_muxt != ZFD_LOG_STREAM) {
 				miocack(qp, mp, 0, EINVAL);
-				return;
+				return (0);
 			}
 			prim_zfds = zfds->zfd_inst_pri;
 
@@ -945,7 +945,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			val = *(int *)mp->b_cont->b_rptr;
 			if (val != 0 && val != 1) {
 				miocack(qp, mp, 0, EINVAL);
-				return;
+				return (0);
 			}
 
 			prim_zfds->zfd_allow_flowcon = (boolean_t)val;
@@ -954,7 +954,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 
 			DTRACE_PROBE1(zfd__mux__flowcon, void *, prim_zfds);
 			miocack(qp, mp, 0, 0);
-			return;
+			return (0);
 			}
 		default:
 			break;
@@ -984,7 +984,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			freemsg(mp);
 			break;
 		}
-		return;
+		return (0);
 	}
 
 	if (type >= QPCTL) {
@@ -1006,7 +1006,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 			break;
 		}
 		DBG1("done (hipri) wput, %s side", zfd_side(qp));
-		return;
+		return (0);
 	}
 
 	/*
@@ -1028,6 +1028,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 	}
 
 	DBG1("done wput, %s side", zfd_side(qp));
+	return (0);
 }
 
 /*
@@ -1043,7 +1044,7 @@ zfd_wput(queue_t *qp, mblk_t *mp)
  * Internally we've queued up the msgs that we've teed off to the log stream
  * so when we're invoked we need to pass these along.
  */
-static void
+static int
 zfd_rsrv(queue_t *qp)
 {
 	zfd_state_t *zfds;
@@ -1083,7 +1084,7 @@ zfd_rsrv(queue_t *qp)
 			}
 			flushq(qp, FLUSHALL);
 		}
-		return;
+		return (0);
 	}
 
 	/*
@@ -1093,9 +1094,10 @@ zfd_rsrv(queue_t *qp)
 	ASSERT(qp == zfds->zfd_master_rdq || qp == zfds->zfd_slave_rdq);
 	if (zfd_switch(qp) == NULL) {
 		DBG("zfd_rsrv: other side isn't listening\n");
-		return;
+		return (0);
 	}
 	qenable(WR(zfd_switch(qp)));
+	return (0);
 }
 
 /*
@@ -1108,7 +1110,7 @@ zfd_rsrv(queue_t *qp)
  * them via putnext(). Else, if queued messages cannot be sent, leave them
  * on this queue.
  */
-static void
+static int
 zfd_wsrv(queue_t *qp)
 {
 	queue_t *swq;
@@ -1129,7 +1131,7 @@ zfd_wsrv(queue_t *qp)
 				freemsg(mp);
 		}
 		flushq(qp, FLUSHALL);
-		return;
+		return (0);
 	}
 
 	swq = RD(zfd_switch(qp));
@@ -1151,4 +1153,5 @@ zfd_wsrv(queue_t *qp)
 			break;
 		}
 	}
+	return (0);
 }

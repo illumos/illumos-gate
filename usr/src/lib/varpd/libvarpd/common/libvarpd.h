@@ -67,7 +67,7 @@ extern int libvarpd_prop_set(varpd_prop_handle_t *, const void *, uint32_t);
 extern int libvarpd_door_server_create(varpd_handle_t *, const char *);
 extern void libvarpd_door_server_destroy(varpd_handle_t *);
 
-extern void libvarpd_overlay_lookup_run(varpd_handle_t *);
+extern void *libvarpd_overlay_lookup_run(void *);
 extern void libvarpd_overlay_lookup_quiesce(varpd_handle_t *);
 
 #ifdef __cplusplus

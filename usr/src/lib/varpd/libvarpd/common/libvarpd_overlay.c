@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 /*
@@ -283,15 +283,16 @@ libvarpd_overlay_lookup_handle(varpd_impl_t *vip)
 	    (varpd_query_handle_t *)vqp, otl, &otr->otr_answer);
 }
 
-void
-libvarpd_overlay_lookup_run(varpd_handle_t *vhp)
+/* Use "void *" for vhp here to play nicely with thr_create(). */
+void *
+libvarpd_overlay_lookup_run(void *vhp)
 {
 	varpd_impl_t *vip = (varpd_impl_t *)vhp;
 
 	mutex_enter(&vip->vdi_lock);
 	if (vip->vdi_lthr_quiesce == B_TRUE) {
 		mutex_exit(&vip->vdi_lock);
-		return;
+		return (NULL);
 	}
 	vip->vdi_lthr_count++;
 
@@ -306,6 +307,7 @@ libvarpd_overlay_lookup_run(varpd_handle_t *vhp)
 	vip->vdi_lthr_count--;
 	(void) cond_signal(&vip->vdi_lthr_cv);
 	mutex_exit(&vip->vdi_lock);
+	return (NULL);
 }
 
 void

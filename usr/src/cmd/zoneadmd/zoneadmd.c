@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -292,13 +292,27 @@ zerror(zlog_t *zlogp, boolean_t use_strerror, const char *fmt, ...)
 
 /*
  * Append src to dest, modifying dest in the process. Prefix src with
- * a space character if dest is a non-empty string.
+ * a space character if dest is a non-empty string. Assumes dest is already
+ * properly \0-terminated OR overruns destsize.
  */
 static void
-strnappend(char *dest, size_t n, const char *src)
+strnappend(char *dest, size_t destsize, const char *src)
 {
-	(void) snprintf(dest, n, "%s%s%s", dest,
-	    dest[0] == '\0' ? "" : " ", src);
+	size_t startpoint = strnlen(dest, destsize);
+
+	if (startpoint >= destsize - 1) {
+		/* We've run out of room.  Record something?! */
+		return;
+	}
+
+	if (startpoint > 0) {
+		/* Add the space per the function's intro comment. */
+		dest[startpoint] = ' ';
+		startpoint++;
+	}
+
+	/* Arguably we should check here too... */
+	(void) strlcpy(dest + startpoint, src, destsize - startpoint);
 }
 
 /*

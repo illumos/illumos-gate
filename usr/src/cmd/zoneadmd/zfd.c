@@ -1002,7 +1002,7 @@ open_fd(int id, int rw)
  * the zone, so the zoneadmd view is opposite (i.e. we write to the stdin fd
  * and read from the stdout/stderr fds).
  */
-static void
+static void *
 srvr(void *modearg)
 {
 	zfd_mode_t *mode = (zfd_mode_t *)modearg;
@@ -1027,7 +1027,7 @@ srvr(void *modearg)
 		if (pipe(eventstream) != 0) {
 			zerror(&logplat, B_TRUE, "failed to open logger "
 			    "control pipe");
-			return;
+			return (NULL);
 		}
 	}
 
@@ -1109,6 +1109,7 @@ death:
 	eventstream[1] = -1;
 	logstream_close(logout, B_FALSE);
 	logstream_close(logerr, B_FALSE);
+	return (NULL);
 }
 
 /*
@@ -1211,7 +1212,7 @@ create_log_thread(zlog_t *zlogp)
 		return;
 	}
 
-	res = thr_create(NULL, 0, (void * (*)(void *))srvr, (void *)&mode, 0,
+	res = thr_create(NULL, 0, srvr, (void *)&mode, 0,
 	    &logger_tid);
 	if (res != 0) {
 		zerror(zlogp, B_FALSE, "error %d creating logger thread", res);

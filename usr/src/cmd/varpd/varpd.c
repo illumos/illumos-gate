@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 /*
@@ -315,8 +315,7 @@ varpd_setup_lookup_threads(void)
 	for (i = 0; i < ncpus; i++) {
 		thread_t thr;
 
-		ret = thr_create(NULL, 0,
-		    (void *(*)(void *))libvarpd_overlay_lookup_run,
+		ret = thr_create(NULL, 0, libvarpd_overlay_lookup_run,
 		    varpd_handle, THR_DETACHED | THR_DAEMON, &thr);
 		if (ret != 0)
 			return (ret);
