@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 /*
@@ -24,7 +25,7 @@
 #include <arpa/inet.h>
 #include "dsgetdc.h"
 #include "ads_priv.h"
-#include <assert.h>
+#include <sys/debug.h>
 
 #define	DSGETDC_VALID_FLAGS ( \
 	DS_FORCE_REDISCOVERY | \
@@ -112,8 +113,7 @@ _DsGetDcName(const char *ComputerName,
 	 * We have taken pains to make these two the same.
 	 * DOMAIN_CONTROLLER_INFO / struct adspriv_dcinfo
 	 */
-	/* LINTED E_TRUE_LOGICAL_EXPR */
-	assert(sizeof (**dcinfo) == sizeof (res.DsGetDcNameRes_u.res0));
+	CTASSERT(sizeof (**dcinfo) == sizeof (res.DsGetDcNameRes_u.res0));
 	(void) memcpy(*dcinfo, &res.DsGetDcNameRes_u.res0, sizeof (**dcinfo));
 
 	/*
@@ -156,7 +156,7 @@ void
 DsFreeDcInfo(DOMAIN_CONTROLLER_INFO *dci)
 {
 	if (dci != NULL) {
-		xdr_free(xdr_DsGetDcNameRes, (char *)dci);
+		xdr_free(xdr_adspriv_dcinfo, (char *)dci);
 		free(dci);
 	}
 }
