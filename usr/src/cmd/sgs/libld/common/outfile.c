@@ -228,7 +228,7 @@ pad_outfile(Ofl_desc *ofl)
 		 */
 		if (oscn && (phdr->p_type == PT_LOAD)) {
 			Elf_Data *	data;
-			size_t 		size;
+			size_t		size;
 
 			size = (size_t)(S_ROUND(offset, phdr->p_align) -
 			    offset);
@@ -483,7 +483,7 @@ ld_create_outfile(Ofl_desc *ofl)
 					nseg++;
 			} else if (sgp->sg_flags & FLG_SG_EMPTY) {
 					nseg++;
-			} else if (sgp->sg_osdescs != NULL) {
+			} else if (aplist_nitems(sgp->sg_osdescs) != 0) {
 				if ((sgp->sg_flags & FLG_SG_PHREQ) == 0) {
 					/*
 					 * If this is a segment for which

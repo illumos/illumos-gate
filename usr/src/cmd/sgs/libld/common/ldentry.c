@@ -149,7 +149,7 @@ ld_map_out(Ofl_desc *ofl)
 		Aliste		idx;
 
 		if (((dfiles = sdp->sd_aux->sa_dfiles) == NULL) ||
-		    (aplist_nitems(dfiles) == 1))
+		    (aplist_nitems(dfiles) <= 1))
 			continue;
 
 		/*

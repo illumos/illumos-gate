@@ -389,7 +389,7 @@ update_osym(Ofl_desc *ofl)
 		Aliste	idx2;
 
 		if (phd->p_type == PT_LOAD) {
-			if (sgp->sg_osdescs != NULL) {
+			if (aplist_nitems(sgp->sg_osdescs) != 0) {
 				Word	_flags = phd->p_flags & (PF_W | PF_R);
 
 				if (_flags == PF_R)
@@ -580,7 +580,7 @@ update_osym(Ofl_desc *ofl)
 			 * no sections to establish an index for _end, so assign
 			 * it as an absolute.
 			 */
-			if (sgp->sg_osdescs != NULL) {
+			if (aplist_nitems(sgp->sg_osdescs) != 0) {
 				/*
 				 * Determine the last section for this segment.
 				 */
@@ -4173,7 +4173,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * section descriptors associated with them (ie. some form of
 		 * input section has been matched to this segment).
 		 */
-		if (sgp->sg_osdescs == NULL)
+		if (aplist_nitems(sgp->sg_osdescs) == 0)
 			continue;
 
 		/*
