@@ -41,6 +41,7 @@ struct nvme_process_arg {
 	char *npa_name;
 	char *npa_nsid;
 	int npa_found;
+	boolean_t npa_excl;
 	boolean_t npa_isns;
 	boolean_t npa_ignored;
 	boolean_t npa_interactive;
@@ -101,7 +102,7 @@ extern void nvme_print_feat_progress(uint64_t, void *, size_t,
 extern const char *nvme_fw_error(int, int);
 
 /* device node functions */
-extern int nvme_open(di_minor_t);
+extern int nvme_open(di_minor_t, boolean_t);
 extern void nvme_close(int);
 extern nvme_version_t *nvme_version(int);
 extern nvme_capabilities_t *nvme_capabilities(int);

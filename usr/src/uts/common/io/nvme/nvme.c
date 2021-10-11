@@ -109,6 +109,17 @@
  * minor nodes are open(9E), close(9E), and ioctl(9E). This serves as the
  * interface for the nvmeadm(8) utility.
  *
+ * Exclusive opens are required for certain ioctl(9E) operations that alter
+ * controller and/or namespace state. While different namespaces may be opened
+ * exclusively in parallel, an exclusive open of the controller minor node
+ * requires that no namespaces are currently open (exclusive or otherwise).
+ * Opening any namespace minor node (exclusive or otherwise) will fail while
+ * the controller minor node is opened exclusively by any other thread. Thus it
+ * is possible for one thread at a time to open the controller minor node
+ * exclusively, and keep it open while opening any namespace minor node of the
+ * same controller, exclusively or otherwise.
+ *
+ *
  *
  * Blkdev Interface:
  *
@@ -194,8 +205,9 @@
  * mutex is non-contentious but is required for implementation completeness
  * and safety.
  *
- * Each minor node has its own nm_mutex, which protects the open count nm_ocnt
- * and exclusive-open flag nm_oexcl.
+ * There is one mutex n_minor_mutex which protects all open flags nm_open and
+ * exclusive-open thread pointers nm_oexcl of each minor node associated with a
+ * controller and its namespaces.
  *
  *
  * Quiesce / Fast Reboot:
@@ -3167,8 +3179,6 @@ nvme_init(nvme_t *nvme)
 	    nvme->n_namespace_count, KM_SLEEP);
 
 	for (i = 0; i != nvme->n_namespace_count; i++) {
-		mutex_init(&nvme->n_ns[i].ns_minor.nm_mutex, NULL, MUTEX_DRIVER,
-		    NULL);
 		nvme->n_ns[i].ns_ignore = B_TRUE;
 		if (nvme_init_ns(nvme, i + 1) != DDI_SUCCESS)
 			goto fail;
@@ -3551,7 +3561,8 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	mutex_init(&nvme->n_minor.nm_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&nvme->n_minor_mutex, NULL, MUTEX_DRIVER, NULL);
+	nvme->n_progress |= NVME_MUTEX_INIT;
 
 	nvme->n_strict_version = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "strict-version", 1) == 1 ? B_TRUE : B_FALSE;
@@ -3772,12 +3783,10 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	ddi_remove_minor_node(dip, "devctl");
-	mutex_destroy(&nvme->n_minor.nm_mutex);
 
 	if (nvme->n_ns) {
 		for (i = 0; i != nvme->n_namespace_count; i++) {
 			ddi_remove_minor_node(dip, nvme->n_ns[i].ns_name);
-			mutex_destroy(&nvme->n_ns[i].ns_minor.nm_mutex);
 
 			if (nvme->n_ns[i].ns_bd_hdl) {
 				(void) bd_detach_handle(
@@ -3806,6 +3815,10 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	for (i = 0; i < nvme->n_cq_count; i++) {
 		if (nvme->n_cq[i]->ncq_cmd_taskq != NULL)
 			taskq_wait(nvme->n_cq[i]->ncq_cmd_taskq);
+	}
+
+	if (nvme->n_progress & NVME_MUTEX_INIT) {
+		mutex_destroy(&nvme->n_minor_mutex);
 	}
 
 	if (nvme->n_ioq_count > 0) {
@@ -4333,26 +4346,46 @@ nvme_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	if (nvme->n_dead)
 		return (EIO);
 
-	nm = nsid == 0 ? &nvme->n_minor : &nvme->n_ns[nsid - 1].ns_minor;
+	mutex_enter(&nvme->n_minor_mutex);
 
-	mutex_enter(&nm->nm_mutex);
-	if (nm->nm_oexcl) {
+	/*
+	 * First check the devctl node and error out if it's been opened
+	 * exclusively already by any other thread.
+	 */
+	if (nvme->n_minor.nm_oexcl != NULL &&
+	    nvme->n_minor.nm_oexcl != curthread) {
 		rv = EBUSY;
 		goto out;
 	}
 
+	nm = nsid == 0 ? &nvme->n_minor : &nvme->n_ns[nsid - 1].ns_minor;
+
 	if (flag & FEXCL) {
-		if (nm->nm_ocnt != 0) {
+		if (nm->nm_oexcl != NULL || nm->nm_open) {
 			rv = EBUSY;
 			goto out;
 		}
-		nm->nm_oexcl = B_TRUE;
+
+		/*
+		 * If at least one namespace is already open, fail the
+		 * exclusive open of the devctl node.
+		 */
+		if (nsid == 0) {
+			for (int i = 0; i != nvme->n_namespace_count; i++) {
+				if (nvme->n_ns[i].ns_minor.nm_open) {
+					rv = EBUSY;
+					goto out;
+				}
+			}
+		}
+
+		nm->nm_oexcl = curthread;
 	}
 
-	nm->nm_ocnt++;
+	nm->nm_open = B_TRUE;
 
 out:
-	mutex_exit(&nm->nm_mutex);
+	mutex_exit(&nvme->n_minor_mutex);
 	return (rv);
 
 }
@@ -4380,13 +4413,15 @@ nvme_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 	nm = nsid == 0 ? &nvme->n_minor : &nvme->n_ns[nsid - 1].ns_minor;
 
-	mutex_enter(&nm->nm_mutex);
-	if (nm->nm_oexcl)
-		nm->nm_oexcl = B_FALSE;
+	mutex_enter(&nvme->n_minor_mutex);
+	if (nm->nm_oexcl != NULL) {
+		ASSERT(nm->nm_oexcl == curthread);
+		nm->nm_oexcl = NULL;
+	}
 
-	ASSERT(nm->nm_ocnt > 0);
-	nm->nm_ocnt--;
-	mutex_exit(&nm->nm_mutex);
+	ASSERT(nm->nm_open);
+	nm->nm_open = B_FALSE;
+	mutex_exit(&nvme->n_minor_mutex);
 
 	return (0);
 }
@@ -4767,9 +4802,14 @@ nvme_ioctl_format(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	_NOTE(ARGUNUSED(mode));
 	nvme_format_nvm_t frmt = { 0 };
 	int c_nsid = nsid != 0 ? nsid - 1 : 0;
+	nvme_minor_state_t *nm;
 
 	if ((mode & FWRITE) == 0 || secpolicy_sys_config(cred_p, B_FALSE) != 0)
 		return (EPERM);
+
+	nm = nsid == 0 ? &nvme->n_minor : &nvme->n_ns[c_nsid].ns_minor;
+	if (nm->nm_oexcl != curthread)
+		return (EACCES);
 
 	frmt.r = nioc->n_arg & 0xffffffff;
 
@@ -4832,6 +4872,9 @@ nvme_ioctl_detach(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	if (nsid == 0)
 		return (EINVAL);
 
+	if (nvme->n_ns[nsid - 1].ns_minor.nm_oexcl != curthread)
+		return (EACCES);
+
 	if (nvme->n_ns[nsid - 1].ns_ignore)
 		return (0);
 
@@ -4855,6 +4898,9 @@ nvme_ioctl_attach(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 
 	if (nsid == 0)
 		return (EINVAL);
+
+	if (nvme->n_ns[nsid - 1].ns_minor.nm_oexcl != curthread)
+		return (EACCES);
 
 	/*
 	 * Identify namespace again, free old identify data.
