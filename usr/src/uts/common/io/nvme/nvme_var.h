@@ -12,6 +12,7 @@
 /*
  * Copyright 2016 The MathWorks, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2019 Unix Software Ltd.
  * Copyright 2021 Oxide Computer Company.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
@@ -41,6 +42,7 @@ extern "C" {
 #define	NVME_INTERRUPTS			0x10
 #define	NVME_UFM_INIT			0x20
 #define	NVME_MUTEX_INIT			0x40
+#define	NVME_MGMT_INIT			0x80
 
 #define	NVME_MIN_ADMIN_QUEUE_LEN	16
 #define	NVME_MIN_IO_QUEUE_LEN		16
@@ -213,6 +215,9 @@ struct nvme {
 
 	ksema_t n_abort_sema;
 
+	/* protects namespace management operations */
+	kmutex_t n_mgmt_mutex;
+
 	/* protects minor node operations */
 	kmutex_t n_minor_mutex;
 
@@ -283,6 +288,7 @@ struct nvme_namespace {
 	size_t ns_best_block_size;
 
 	boolean_t ns_ignore;
+	boolean_t ns_attached;
 
 	nvme_identify_nsid_t *ns_idns;
 
