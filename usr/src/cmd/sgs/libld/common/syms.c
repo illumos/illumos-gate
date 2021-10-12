@@ -2637,7 +2637,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 			if (shndx >= ifl->ifl_shnum) {
 				/*
-				 * Carry our some basic sanity checks
+				 * Carry out some basic sanity checks.
 				 * The symbol will not be carried forward to
 				 * the output file, which won't be a problem
 				 * unless a relocation is required against it.
@@ -2652,7 +2652,40 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			}
 
 			isp = ifl->ifl_isdesc[shndx];
-			if (isp && (isp->is_flags & FLG_IS_DISCARD)) {
+			if ((isp != NULL) &&
+			    (isp->is_flags & FLG_IS_DISCARD) &&
+			    (isp->is_flags & FLG_IS_COMDAT)) {
+				Sym *rsym;
+
+				/*
+				 * Replace the original symbol definition with
+				 * a symbol reference, so that resolution can
+				 * occur.
+				 *
+				 * It is common due to compiler issues or
+				 * build system intricacy for COMDAT groups to
+				 * refer to symbols of different visibility,
+				 * even though this is erroneous.  By
+				 * replacing the discarded members of these
+				 * groups with symbol references we allow
+				 * symbol resolution to occur and the most
+				 * restrictive visibility to be chosen.
+				 */
+				if ((rsym = libld_malloc(sizeof (Sym))) == NULL)
+					return (S_ERROR);
+
+				*rsym = *nsym;
+				rsym->st_shndx = shndx = SHN_UNDEF;
+				rsym->st_value = 0x0;
+				rsym->st_size = 0x0;
+
+				nsym = rsym;
+
+				sdflags |= FLG_SY_ISDISC;
+				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml, sdp));
+			} else if ((isp != NULL) &&
+			    (isp->is_flags & FLG_IS_DISCARD)) {
+				/* Discarded but not via COMDAT */
 				if ((sdp =
 				    libld_calloc(sizeof (Sym_desc), 1)) == NULL)
 					return (S_ERROR);
@@ -2668,7 +2701,6 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				sdp->sd_isc = isp;
 				sdp->sd_flags = FLG_SY_ISDISC;
 				ifl->ifl_oldndx[ndx] = sdp;
-
 				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml, sdp));
 				continue;
 			}

@@ -40,6 +40,10 @@ tests = ['got32x']
 arch = i86pc
 tests = ['gotpcrelx', 'rex_gotpcrelx']
 
+[/opt/elf-tests/tests/resolution/mixed-hidden-comdat]
+arch = i86pc
+tests = ['mixed-hidden-comdat']
+
 [/opt/elf-tests/tests/string-merge/]
 tests = ['simple']
 

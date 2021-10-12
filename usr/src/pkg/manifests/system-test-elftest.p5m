@@ -85,6 +85,18 @@ dir  path=opt/elf-tests/tests/relocs/i386
 dir  path=opt/elf-tests/tests/relocs/i386/got32x
 file path=opt/elf-tests/tests/relocs/i386/got32x/got32x mode=0555
 file path=opt/elf-tests/tests/relocs/i386/got32x/got32x.s mode=0444
+dir  path=opt/elf-tests/tests/resolution
+dir  path=opt/elf-tests/tests/resolution/mixed-hidden-comdat
+file path=opt/elf-tests/tests/resolution/mixed-hidden-comdat/Makefile.test \
+    mode=0444
+file path=opt/elf-tests/tests/resolution/mixed-hidden-comdat/README.md mode=0444
+file path=opt/elf-tests/tests/resolution/mixed-hidden-comdat/access.S mode=0444
+file path=opt/elf-tests/tests/resolution/mixed-hidden-comdat/hidden.s mode=0444
+file path=opt/elf-tests/tests/resolution/mixed-hidden-comdat/main.c mode=0444
+file \
+    path=opt/elf-tests/tests/resolution/mixed-hidden-comdat/mixed-hidden-comdat \
+    mode=0555
+file path=opt/elf-tests/tests/resolution/mixed-hidden-comdat/visible.s mode=0444
 dir  path=opt/elf-tests/tests/string-merge
 file path=opt/elf-tests/tests/string-merge/simple mode=0555
 file path=opt/elf-tests/tests/string-merge/str1.s mode=0444
