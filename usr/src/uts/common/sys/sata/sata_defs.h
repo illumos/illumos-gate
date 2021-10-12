@@ -23,6 +23,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 #ifndef _SATA_DEFS_H
@@ -827,10 +828,13 @@ struct mode_acoustic_management {
 	(x = (x & ~SCONTROL_IPM) | \
 	((new_val << SCONTROL_IPM_SHIFT) & SCONTROL_IPM))
 
+/* NB: IPM disable value is a bit-field (though not described) */
 #define	SCONTROL_IPM_NORESTRICT		0 /* No PM limit */
 #define	SCONTROL_IPM_DISABLE_PARTIAL	1 /* Disable partial */
 #define	SCONTROL_IPM_DISABLE_SLUMBER	2 /* Disable slumber */
 #define	SCONTROL_IPM_DISABLE_BOTH	3 /* Disable both */
+#define	SCONTROL_IPM_DISABLE_DEVSLEEP	4 /* Disable devsleep */
+#define	SCONTROL_IPM_DISABLE_ALL	7 /* Disable all PM */
 
 #define	SCONTROL_SPM_NORESTRICT		0 /* No PM limits */
 #define	SCONTROL_SPM_DO_PARTIAL		1 /* Go to partial */

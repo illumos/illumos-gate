@@ -24,6 +24,7 @@
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 /*
@@ -780,6 +781,10 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
 		    "hba capabilities extended = 0x%x", cap2_status);
+
+		if (cap2_status & AHCI_HBA_CAP2_SDS) {
+			ahci_ctlp->ahcictl_cap |= AHCI_CAP_SDS;
+		}
 	}
 
 	if (cap_status & AHCI_HBA_CAP_EMS) {
@@ -5934,7 +5939,7 @@ ahci_find_dev_signature(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
  * According to the spec, to reliably detect hot plug removals, software
  * must disable interface power management. Software should perform the
  * following initialization on a port after a device is attached:
- *   Set PxSCTL.IPM to 3h to disable interface state transitions
+ *   Set PxSCTL.IPM to 3h or 7h to disable interface state transitions
  *   Set PxCMD.ALPE to '0' to disable aggressive power management
  *   Disable device initiated interface power management by SET FEATURE
  *
@@ -5944,10 +5949,16 @@ static void
 ahci_disable_interface_pm(ahci_ctl_t *ahci_ctlp, uint8_t port)
 {
 	uint32_t port_scontrol, port_cmd_status;
+	uint32_t ipm;
 
 	port_scontrol = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxSCTL(ahci_ctlp, port));
-	SCONTROL_SET_IPM(port_scontrol, SCONTROL_IPM_DISABLE_BOTH);
+	if (ahci_ctlp->ahcictl_cap & AHCI_CAP_SDS) {
+		ipm = SCONTROL_IPM_DISABLE_ALL;
+	} else {
+		ipm = SCONTROL_IPM_DISABLE_BOTH;
+	}
+	SCONTROL_SET_IPM(port_scontrol, ipm);
 	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxSCTL(ahci_ctlp, port), port_scontrol);
 
