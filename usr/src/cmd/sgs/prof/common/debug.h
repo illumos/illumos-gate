@@ -23,8 +23,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 *	file: debug.h
 *	desc: Debug macros for the profiler.
@@ -39,11 +37,10 @@
 #define PROF_DEBUG 2
 #endif
 
-int	debug_value;
 #define DEBUG_EXP(exp)	exp; fflush(stdout)
 #define DEBUG_LOC(name)	printf("Location: %s\n",name); fflush(stdout)
 
-#define NO_DEBUG(exp)	
+#define NO_DEBUG(exp)
 #define NO_DEBUG_LOC(name)
 
 #else

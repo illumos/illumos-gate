@@ -72,7 +72,10 @@
 #include "sys/stat.h"
 #include "debug.h"
 
+
 #define	OLD_DEBUG(x)
+
+OLD_DEBUG(static int debug_value);
 
 #define	Print	(void) printf
 #define	Fprint	(void) fprintf
