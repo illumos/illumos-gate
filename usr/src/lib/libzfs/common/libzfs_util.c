@@ -1155,8 +1155,9 @@ str2shift(libzfs_handle_t *hdl, const char *buf)
 			break;
 	}
 	if (i == strlen(ends)) {
-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "invalid numeric suffix '%s'"), buf);
+		if (hdl != NULL)
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "invalid numeric suffix '%s'"), buf);
 		return (-1);
 	}
 
@@ -1166,10 +1167,11 @@ str2shift(libzfs_handle_t *hdl, const char *buf)
 	 */
 	if (buf[1] == '\0' || (toupper(buf[1]) == 'B' && buf[2] == '\0' &&
 	    toupper(buf[0]) != 'B'))
-		return (10*i);
+		return (10 * i);
 
-	zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-	    "invalid numeric suffix '%s'"), buf);
+	if (hdl != NULL)
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "invalid numeric suffix '%s'"), buf);
 	return (-1);
 }
 
