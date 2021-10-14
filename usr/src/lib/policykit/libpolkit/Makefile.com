@@ -43,12 +43,6 @@ CPPFLAGS +=	-DPACKAGE_LOCALE_DIR=\"/usr/lib/locale\"
 
 ROOTMAJLINK =	$(ROOTLIBDIR)/$(LIBRARY:.a=.so)$(VERS_MAJ)
 
-# glib2 >= 2.62 suppresses warnings about deprecated declarations in header
-# files using pragma "GCC diagnostic ignored \"-Wdeprecated-declarations\""
-# This is not supported before GCC 4.6 so just globally suppress these
-# warnings under the shadow compiler
-CERRWARN +=	-_gcc4=-Wno-deprecated-declarations
-
 # smatch has problems parsing the glib header files
 SMATCH=off
 

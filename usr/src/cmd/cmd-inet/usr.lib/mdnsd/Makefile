@@ -47,8 +47,7 @@ include	../../../Makefile.cmd
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc7=-Wno-expansion-to-defined
-CERRWARN +=	-_gcc10=-Wno-expansion-to-defined
+CERRWARN +=	-_gcc=-Wno-expansion-to-defined
 CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted
