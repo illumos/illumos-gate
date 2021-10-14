@@ -21,7 +21,7 @@
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/removal/removal.kshlib
 
-TMPDIR=${TMPDIR:-/tmp}
+TMPDIR=${TMPDIR:-$TEST_BASE_DIR}
 log_must mkfile $(($MINVDEVSIZE * 2)) $TMPDIR/dsk1
 log_must mkfile $(($MINVDEVSIZE * 2)) $TMPDIR/dsk2
 log_must mkfile $(($MINVDEVSIZE * 2)) $TMPDIR/dsk3
