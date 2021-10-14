@@ -26,7 +26,7 @@
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Argo Technologies SA
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Racktop Systems, Inc.
+ * Copyright 2022 Racktop Systems, Inc.
  */
 
 /*
@@ -3624,7 +3624,7 @@ sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
 #define	INQUIRY_BDC_PAGE	0xB1	/* Block Device Characteristics Page */
 					/* Code */
 #define	INQUIRY_ATA_INFO_PAGE	0x89	/* ATA Information Page Code */
-#define	INQUIRY_DEV_IDENTIFICATION_PAGE 0x83 /* Not needed yet */
+#define	INQUIRY_DEV_IDENTIFICATION_PAGE 0x83 /* Device identifiers */
 
 static int
 sata_txlt_inquiry(sata_pkt_txlate_t *spx)
@@ -3727,13 +3727,25 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 		page_buf[0] = peripheral_device_type;
 		page_buf[1] = INQUIRY_SUP_VPD_PAGE;
 		page_buf[2] = 0;
-		page_buf[3] = 4; /* page length */
 		page_buf[4] = INQUIRY_SUP_VPD_PAGE;
 		page_buf[5] = INQUIRY_USN_PAGE;
 		page_buf[6] = INQUIRY_BDC_PAGE;
-		page_buf[7] = INQUIRY_ATA_INFO_PAGE;
+		/*
+		 * If WWN info is present, provide a page for it.
+		 * Modern drives always have, but some legacy ones do not.
+		 */
+		if (sdinfo->satadrv_id.ai_naa_ieee_oui != 0) {
+			page_buf[3] = 5; /* page length */
+			page_buf[7] = INQUIRY_DEV_IDENTIFICATION_PAGE;
+			page_buf[8] = INQUIRY_ATA_INFO_PAGE;
+			count = 9;
+		} else {
+			page_buf[3] = 4; /* page length */
+			page_buf[7] = INQUIRY_ATA_INFO_PAGE;
+			count = 8;
+		}
 		/* Copy no more than requested */
-		count = MIN(bp->b_bcount, 8);
+		count = MIN(bp->b_bcount, count);
 		bcopy(page_buf, bp->b_un.b_addr, count);
 		break;
 
@@ -3899,12 +3911,32 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 		break;
 
 	case INQUIRY_DEV_IDENTIFICATION_PAGE:
-		/*
-		 * We may want to implement this page, when
-		 * identifiers are common for SATA devices
-		 * But not now.
-		 */
-		/*FALLTHROUGH*/
+		if (sdinfo->satadrv_id.ai_naa_ieee_oui != 0) {
+			/*
+			 * Page 83; SAT-5 requires this, and modern
+			 * SATA devices all support a WWN.
+			 */
+			page_buf[0] = peripheral_device_type;
+			page_buf[1] = INQUIRY_DEV_IDENTIFICATION_PAGE;
+			page_buf[2] = 0;
+			page_buf[3] = 12; /* remaining length */
+			page_buf[4] = 0x01; /* protocol 0, code set 1 */
+			page_buf[5] = 0x03; /* LUN, NAA type */
+			page_buf[6] = 0;
+			page_buf[7] = 0x08; /* length (64-bit WWN) */
+#ifdef	_LITTLE_ENDIAN
+			swab(&sdinfo->satadrv_id.ai_naa_ieee_oui, &page_buf[8],
+			    8);
+#else
+			bcopy(&sdinfo->statadrv_id.ai_naa_ieee_oui,
+			    &page_buf[8], 8);
+#endif
+			/* header + designator */
+			count = MIN(bp->b_bcount, 12 + 4);
+			bcopy(page_buf, bp->b_un.b_addr, count);
+			break;
+		}
+		/* FALLTHROUGH */
 
 	default:
 		/* Request for unsupported VPD page */
