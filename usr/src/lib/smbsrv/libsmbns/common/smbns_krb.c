@@ -68,7 +68,6 @@ smb_kinit(char *domain_name, char *principal_name, char *principal_passwd)
 	krb5_principal me = NULL;
 	krb5_creds my_creds;
 	krb5_error_code code;
-	const char *errmsg = NULL;
 	const char *doing = NULL;
 	smb_ads_status_t err;
 
@@ -115,11 +114,20 @@ smb_kinit(char *domain_name, char *principal_name, char *principal_passwd)
 	    principal_passwd, NULL, 0, (krb5_deltat)0,
 	    NULL, NULL);
 	if (code != 0) {
-		err = SMB_ADS_KRB5_GET_INIT_CREDS_PW;
 		doing = "smbns_krb: getting initial credentials";
+		switch (code) {
 
-		if (code == KRB5KRB_AP_ERR_BAD_INTEGRITY) {
-			errmsg = "smbns_krb: Password incorrect";
+		case KRB5KRB_AP_ERR_BAD_INTEGRITY:
+			err = SMB_ADS_KRB5_GET_INIT_CREDS_PW;
+			break;
+
+		case KRB5KRB_AP_ERR_SKEW:
+			err = SMB_ADS_KRB5_GET_INIT_CREDS_SKEW;
+			break;
+
+		default:
+			err = SMB_ADS_KRB5_GET_INIT_CREDS_OTHER;
+			break;
 		}
 
 		goto cleanup;
@@ -144,10 +152,7 @@ smb_kinit(char *domain_name, char *principal_name, char *principal_passwd)
 
 cleanup:
 	if (code != 0) {
-		if (errmsg == NULL)
-			smb_krb5_log_errmsg(ctx, doing, code);
-		else
-			syslog(LOG_ERR, "%s (%s)", doing, errmsg);
+		smb_krb5_log_errmsg(ctx, doing, code);
 	}
 
 	if (my_creds.client == me) {
