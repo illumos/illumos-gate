@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2019 Toomas Soome <tsoome@me.com>
+.\" Copyright 2021 Toomas Soome <tsoome@me.com>
 .\"
-.Dd Aug 28, 2019
+.Dd Oct 16, 2021
 .Dt INSTALLBOOT 1M
 .Os
 .Sh NAME
@@ -123,7 +123,7 @@ The x86 UEFI systems load and start boot loader program from
 .Sy /EFI/Boot
 directory of the EFI System Partition (ESP).
 The boot loader program in ESP is named
-.Sy bootx86.efi
+.Sy bootx64.efi
 for AMD64 system and
 .Sy bootia32.efi
 for i386 system.
@@ -134,7 +134,7 @@ boot program is only provided to support systems with 32-bit UEFI firmware,
 but which can support 64-bit mode.
 .Pp
 The
-.Sy bootx86.efi
+.Sy bootx64.efi
 is copied from
 .Sy /boot/loader64.efi
 and
