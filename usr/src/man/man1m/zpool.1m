@@ -24,10 +24,10 @@
 .\" Copyright 2017 Nexenta Systems, Inc.
 .\" Copyright (c) 2017 Datto Inc.
 .\" Copyright (c) 2018 George Melikov. All Rights Reserved.
-.\" Copyright 2020 Joyent, Inc.
+.\" Copyright 2021 Joyent, Inc.
 .\" Copyright (c) 2012 Cyril Plisko. All Rights Reserved.
 .\"
-.Dd April 29, 2020
+.Dd October 15, 2021
 .Dt ZPOOL 1M
 .Os
 .Sh NAME
@@ -504,10 +504,11 @@ configuration.
 The content of the cache devices is considered volatile, as is the case with
 other system caches.
 .Ss Pool checkpoint
-Before starting critical procedures that include destructive actions (e.g
-.Nm zfs Cm destroy
-), an administrator can checkpoint the pool's state and in the case of a
+Before starting critical procedures that include destructive actions
+.Pq e.g. zfs Cm destroy ,
+an administrator can checkpoint the pool's state and in the case of a
 mistake or failure, rewind the entire pool back to the checkpoint.
+The checkpoint is automatically discarded upon rewinding.
 Otherwise, the checkpoint can be discarded when the procedure has completed
 successfully.
 .Pp
@@ -527,14 +528,14 @@ To create a checkpoint for a pool:
 # zpool checkpoint pool
 .Ed
 .Pp
-To later rewind to its checkpointed state, you need to first export it and
-then rewind it during import:
+To later rewind to its checkpointed state (which also discards the checkpoint),
+you need to first export it and then rewind it during import:
 .Bd -literal
 # zpool export pool
 # zpool import --rewind-to-checkpoint pool
 .Ed
 .Pp
-To discard the checkpoint from a pool:
+To discard the checkpoint from a pool without rewinding:
 .Bd -literal
 # zpool checkpoint -d pool
 .Ed
@@ -1001,6 +1002,7 @@ Checkpoints the current state of
 .Ar pool
 , which can be later restored by
 .Nm zpool Cm import --rewind-to-checkpoint .
+Rewinding will also discard the checkpoint.
 The existence of a checkpoint in a pool prohibits the following
 .Nm zpool
 commands:
@@ -1022,7 +1024,8 @@ command reports how much space the checkpoint takes from the pool.
 .Bl -tag -width Ds
 .It Fl d, -discard
 Discards an existing checkpoint from
-.Ar pool .
+.Ar pool
+without rewinding.
 .El
 .It Xo
 .Nm
