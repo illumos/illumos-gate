@@ -241,10 +241,11 @@ extern void smb_update_netlogon_seqnum(void);
 
 /* See also: smb_joininfo_xdr() */
 typedef struct smb_joininfo {
+	uint32_t mode;
 	char domain_name[MAXHOSTNAMELEN];
+	char container_name[MAXHOSTNAMELEN];
 	char domain_username[SMB_USERNAME_MAXLEN + 1];
 	char domain_passwd[SMB_PASSWD_MAXLEN + 1];
-	uint32_t mode;
 } smb_joininfo_t;
 
 /* See also: smb_joinres_xdr() */

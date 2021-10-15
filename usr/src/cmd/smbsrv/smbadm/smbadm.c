@@ -100,7 +100,8 @@ static boolean_t smbadm_checkauth(const char *);
 
 static void smbadm_usage(boolean_t);
 static int smbadm_join_workgroup(const char *, boolean_t);
-static int smbadm_join_domain(const char *, const char *, boolean_t);
+static int smbadm_join_domain(const char *, const char *,
+    const char *, boolean_t);
 static void smbadm_extract_domain(char *, char **, char **);
 
 static int smbadm_join(int, char **);
@@ -246,11 +247,12 @@ smbadm_cmdusage(FILE *fp, smbadm_cmdinfo_t *cmd)
 	case HELP_JOIN:
 #if 0	/* Don't document "-p" yet, still needs work (NEX-11960) */
 		(void) fprintf(fp, gettext("\t%s [-y] -p <domain>\n"
-		    "\t%s [-y] -u <username domain>\n"
+		    "\t%s [-y] [-c container] -u <username domain>\n"
 		    "\t%s [-y] -w <workgroup>\n"),
 		    cmd->name, cmd->name, cmd->name);
 #else
-		(void) fprintf(fp, gettext("\t%s [-y] -u <username> <domain>\n"
+		(void) fprintf(fp, gettext(
+		    "\t%s [-y] [-c container] -u <username> <domain>\n"
 		    "\t%s [-y] -w <workgroup>\n"), cmd->name, cmd->name);
 #endif
 		return;
@@ -468,17 +470,21 @@ smbadm_join(int argc, char **argv)
 	char buf[MAXHOSTNAMELEN * 2];
 	char *domain = NULL;
 	char *username = NULL;
+	char *container = NULL;
 	uint32_t mode = 0;
 	boolean_t do_prompt = B_TRUE;
 	char option;
 
-	while ((option = getopt(argc, argv, "pu:wy")) != -1) {
+	while ((option = getopt(argc, argv, "c:pu:wy")) != -1) {
 		if (mode != 0) {
 			(void) fprintf(stderr, gettext(
 			    "join options are mutually exclusive\n"));
 			smbadm_usage(B_FALSE);
 		}
 		switch (option) {
+		case 'c':
+			container = optarg;
+			break;
 		case 'p':
 			mode = SMB_SECMODE_DOMAIN;
 			/* leave username = NULL */
@@ -524,7 +530,7 @@ smbadm_join(int argc, char **argv)
 	if (mode == SMB_SECMODE_WORKGRP) {
 		return (smbadm_join_workgroup(domain, do_prompt));
 	}
-	return (smbadm_join_domain(domain, username, do_prompt));
+	return (smbadm_join_domain(domain, container, username, do_prompt));
 }
 
 /*
@@ -574,7 +580,8 @@ smbadm_join_workgroup(const char *workgroup, boolean_t prompt)
  * to be appended to the username using '+' as a scripting convenience.
  */
 static int
-smbadm_join_domain(const char *domain, const char *username, boolean_t prompt)
+smbadm_join_domain(const char *domain, const char *container,
+    const char *username, boolean_t prompt)
 {
 	smb_joininfo_t jdi;
 	smb_joinres_t jdres;
@@ -587,6 +594,15 @@ smbadm_join_domain(const char *domain, const char *username, boolean_t prompt)
 	jdi.mode = SMB_SECMODE_DOMAIN;
 	(void) strlcpy(jdi.domain_name, domain, sizeof (jdi.domain_name));
 	(void) strtrim(jdi.domain_name, " \t\n");
+	if (container != NULL) {
+		if (strlcpy(jdi.container_name, container,
+		    sizeof (jdi.container_name)) >=
+		    sizeof (jdi.container_name)) {
+			(void) fprintf(stderr, gettext("container name is "
+			    "too long\n"));
+			smbadm_usage(B_FALSE);
+		}
+	}
 
 	if (smb_name_validate_domain(jdi.domain_name) != ERROR_SUCCESS) {
 		(void) fprintf(stderr, gettext("domain name is invalid\n"));
