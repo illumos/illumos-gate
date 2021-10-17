@@ -18,8 +18,34 @@
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
-SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
-SUBDIRS += demangle mergeq workq chown ctf smbios libjedec awk make sleep
-SUBDIRS += libcustr find mdb sed head pcidb pcieadm svr4pkg
+SUBDIRS =		\
+	ar		\
+	awk		\
+	chown		\
+	ctf		\
+	date		\
+	demangle	\
+	dis		\
+	dladm		\
+	find		\
+	grep_xpg4	\
+	head		\
+	iconv		\
+	libcustr	\
+	libjedec	\
+	libnvpair_json	\
+	libsff		\
+	make		\
+	mdb		\
+	mergeq		\
+	pcidb		\
+	pcieadm		\
+	printf		\
+	sed		\
+	sleep		\
+	smbios		\
+	svr4pkg		\
+	workq		\
+	xargs
 
 include $(SRC)/test/Makefile.com

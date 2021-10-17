@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved   */
 
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
@@ -27,6 +27,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include "inc.h"
@@ -131,25 +132,22 @@ main(int argc, char **argv, char *envp[])
 	if (cmd_info->opt_flgs & z_FLAG)
 		check_swap();
 
-	if (cmd_info->comfun == NULL) {
-		if ((cmd_info->opt_flgs & (d_FLAG | r_FLAG | q_FLAG |
-		    t_FLAG | p_FLAG | m_FLAG | x_FLAG)) == 0) {
-			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_01));
-			exit(1);
-		}
-	}
-
 	cmd_info->modified = (cmd_info->opt_flgs & s_FLAG);
 	fd = getaf(cmd_info);
 
-	if ((fd == -1) &&
-	    (cmd_info->opt_flgs &
-	    (d_FLAG | m_FLAG | p_FLAG | t_FLAG | x_FLAG)) ||
-	    ((cmd_info->opt_flgs & r_FLAG) &&
-	    (cmd_info->opt_flgs & (a_FLAG | b_FLAG)))) {
-		(void) fprintf(stderr, MSG_INTL(MSG_NOT_FOUND_AR),
-		    cmd_info->arnam);
-		exit(1);
+	if (fd == -1) {
+		boolean_t req_arg = (cmd_info->opt_flgs & (d_FLAG | m_FLAG |
+		    p_FLAG | t_FLAG | x_FLAG)) != 0;
+		boolean_t req_r = (cmd_info->opt_flgs & r_FLAG) &&
+		    (cmd_info->opt_flgs & (a_FLAG | b_FLAG));
+		boolean_t req_s = (cmd_info->opt_flgs & s_FLAG) &&
+		    (cmd_info->opt_flgs & r_FLAG) == 0;
+
+		if (req_arg || req_r || req_s) {
+			(void) fprintf(stderr, MSG_INTL(MSG_NOT_FOUND_AR),
+			    cmd_info->arnam);
+			exit(1);
+		}
 	}
 
 	(*cmd_info->comfun)(cmd_info);
@@ -299,11 +297,13 @@ setup(int argc, char *argv[], Cmd_info *cmd_info)
 			cmd_info->opt_flgs |= T_FLAG;
 			break;
 		case ':':
-			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_02), optopt);
+			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_OPERAND),
+			    optopt);
 			usage_err++;
 			break;
 		case '?':
-			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_03), optopt);
+			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_OPTION),
+			    optopt);
 			usage_err++;
 			break;
 		}
@@ -315,6 +315,44 @@ setup(int argc, char *argv[], Cmd_info *cmd_info)
 	cmd_info->arnam = argv[optind];
 	cmd_info->namv = &argv[optind+1];
 	cmd_info->namc = argc - optind - 1;
+
+	/*
+	 * GNU ar popularized the use of -s on its own which previously used to
+	 * require another command function. As such, we don't set a command
+	 * function when we encounter the -s flag because that might otherwise
+	 * clobber an existing one being set and would interrupt the detection
+	 * of multiple flags being used that way.
+	 *
+	 * If after processing everything, we find there's no command function
+	 * set and the -s flag has been set, then we can finally set a command
+	 * function. The command function for -t 'tcmd' is used in this case. It
+	 * knows to only print out data if -t has been specified.
+	 *
+	 * While ar has not traditionally been very stringent about using flags
+	 * in circumstances they aren't called for, we go ahead and check for
+	 * that now for this newer option.
+	 */
+	if (cmd_info->comfun == NULL) {
+		if ((cmd_info->opt_flgs & s_FLAG) != 0) {
+			if ((cmd_info->opt_flgs & ~(s_FLAG | v_FLAG)) != 0) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_USAGE_S_BAD_ARG));
+				exit(1);
+			}
+
+			if (cmd_info->namc > 0) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_USAGE_S_EXTRA_AR));
+				exit(1);
+			}
+
+			setcom(cmd_info, tcmd);
+		} else if ((cmd_info->opt_flgs & (d_FLAG | r_FLAG | q_FLAG |
+		    s_FLAG | t_FLAG | p_FLAG | m_FLAG | x_FLAG)) == 0) {
+			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_REQ_FLAG));
+			exit(1);
+		}
+	}
 }
 
 
@@ -325,8 +363,8 @@ setup(int argc, char *argv[], Cmd_info *cmd_info)
 static void
 setcom(Cmd_info *cmd_info, Cmd_func *fun)
 {
-	if (cmd_info->comfun != 0) {
-		(void) fprintf(stderr, MSG_INTL(MSG_USAGE_04));
+	if (cmd_info->comfun != NULL) {
+		(void) fprintf(stderr, MSG_INTL(MSG_USAGE_TOO_MANY));
 		exit(1);
 	}
 	cmd_info->comfun = fun;

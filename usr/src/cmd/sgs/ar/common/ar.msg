@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2021 Oxide Computer Company
 #
 
 @ _START_
@@ -32,8 +33,9 @@
 @ MSG_USAGE		"usage: ar -d[-SvV] archive file ...\n       \
 			 ar -m[-abiSvV] [posname] archive file ...\n       \
 			 ar -p[-vV][-sS] archive [file ...]\n       \
-			 ar -q[-cuvSV] [-abi] [posname] [file ...]\n       \
+			 ar -q[-cuvSV] [file ...]\n       \
 			 ar -r[-cuvSV] [-abi] [posname] [file ...]\n       \
+			 ar -s[-vV] archive\n       \
 			 ar -t[-vV][-sS] archive [file ...]\n       \
 			 ar -x[-vV][-sSCT] archive [file ...]\n"
 
@@ -41,12 +43,14 @@
 @ MSG_TOOBIG4G		"ar: archive size exceeds capabilities of 32-bit \
 			 process\n"
 
-@ MSG_USAGE_01		"ar: one of [drqtpmx] must be specified\n"
-@ MSG_USAGE_02		"ar: -%c requires an operand\n"
-@ MSG_USAGE_03		"ar: bad option: -%c\n"
-@ MSG_USAGE_04		"ar: only one of [drqtpmx] allowed\n"
-@ MSG_USAGE_05		"ar: abi not allowed with q\n"
-@ MSG_USAGE_06		"ar: %s taken as mandatory 'posname' with keys 'abi'\n"
+@ MSG_USAGE_REQ_FLAG	"ar: one of [drqstpmx] must be specified\n"
+@ MSG_USAGE_OPERAND	"ar: -%c requires an operand\n"
+@ MSG_USAGE_OPTION	"ar: bad option: -%c\n"
+@ MSG_USAGE_TOO_MANY	"ar: only one of [drqstpmx] allowed\n"
+@ MSG_USAGE_Q_BAD_ARG	"ar: abi not allowed with q\n"
+@ MSG_USAGE_POSNAME	"ar: %s taken as mandatory 'posname' with keys 'abi'\n"
+@ MSG_USAGE_S_BAD_ARG	"ar: bad option with -s, only -v and -V allowed\n"
+@ MSG_USAGE_S_EXTRA_AR	"ar: -s only supports a single archive file\n"
 
 @ MSG_INTERNAL_01	"ar: internal error: cannot tell whether file is \
 			 included in archive or not\n"
@@ -118,7 +122,7 @@
 @ MSG_STR_SYM64		"/SYM64/"
 
 # Format for full member header
-#	
+#
 @ MSG_MH_FORMAT		"%-16s%-12d%-6u%-6u%-8o%-10lld%-2s"
 
 @ MSG_FMT_VERSION	"ar: %s %s\n"

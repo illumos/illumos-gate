@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -33,36 +34,36 @@
  *
  * The archive file member header used in SunOS 4.1 archive files and
  * Solaris archive files are incompatible. The header file is:
- * 	/usr/include/ar.h, struct ar_hdr.
+ *	/usr/include/ar.h, struct ar_hdr.
  * The member ar_name[] in Solaris comforms with Standard and the
  * member name terminates with '/'. The SunOS's member does not terminate
  * with '/' character. A bug 4046054 was filed:
- * 	The ar command in Solaris 2.5.1 is incompatible with archives
- * 	created on 4.x.
+ *	The ar command in Solaris 2.5.1 is incompatible with archives
+ *	created on 4.x.
  *
  * To handle archive files created in SunOS 4.1 system on Solaris, the
  * following changes were made:
  *
- * 	1. file.c/writefile()
- * 		Before writing each member files into the output
- * 		archive file, ar_name[] is checked. If it is NULL,
- * 		it means that the original archive header for this
- * 		member was incompatible with Solaris format.
+ *	1. file.c/writefile()
+ *		Before writing each member files into the output
+ *		archive file, ar_name[] is checked. If it is NULL,
+ *		it means that the original archive header for this
+ *		member was incompatible with Solaris format.
  *
- * 		The original Solaris ar command ended up having
- * 		NULL name for the header. The change here uses the
- * 		ar_rawname, which is much closer to the original
- * 		name.
+ *		The original Solaris ar command ended up having
+ *		NULL name for the header. The change here uses the
+ *		ar_rawname, which is much closer to the original
+ *		name.
  *
- * 	2. cmd.c
- * 		For the p command, the code used to use only ar_longname
- * 		to seach the matching name. The member is set to NULL
- * 		if the archive member header was incompatible.
- * 		The ar_rawname is also used to find the matching member name.
+ *	2. cmd.c
+ *		For the p command, the code used to use only ar_longname
+ *		to seach the matching name. The member is set to NULL
+ *		if the archive member header was incompatible.
+ *		The ar_rawname is also used to find the matching member name.
  *
- * 		For commands to update the archive file, we do not
- * 		use ar_rawname, and just use the ar_longname. The commands are
- * 		r (replace), m (modify the position) and d (delete).
+ *		For commands to update the archive file, we do not
+ *		use ar_rawname, and just use the ar_longname. The commands are
+ *		r (replace), m (modify the position) and d (delete).
  */
 
 #include "inc.h"
@@ -90,7 +91,7 @@ rcmd(Cmd_info *cmd_info)
 	ARFILE		*backptr = NULL;
 	ARFILE		*endptr;
 	ARFILE		*moved_files;
-	ARFILE  	*prev_entry, *new_listhead, *new_listend;
+	ARFILE		*prev_entry, *new_listhead, *new_listend;
 	int		deleted;
 	struct stat	stbuf;
 	char		*gfile;
@@ -478,7 +479,8 @@ tcmd(Cmd_info *cmd_info)
 			 *	Refer to "Incompatible Archive Header"
 			 *	blocked comment at the beginning of this file.
 			 */
-			if (cmd_info->opt_flgs & v_FLAG) {
+			if ((cmd_info->opt_flgs & (t_FLAG | v_FLAG)) ==
+			    (t_FLAG | v_FLAG)) {
 				for (mp = &m[0]; mp < &m[9]; )
 					ar_select(*mp++, next->ar_mode);
 
@@ -495,17 +497,20 @@ tcmd(Cmd_info *cmd_info)
 				(void) fprintf(stdout,
 				    MSG_ORIG(MSG_FMT_SPSTRSP), buf);
 			}
-			if ((next->ar_longname[0] == 0) &&
-			    (next->ar_rawname[0] != 0))
-				(void) fprintf(stdout,
-				    MSG_ORIG(MSG_FMT_STRNL),
-				    trim(next->ar_rawname));
-			else
-				(void) fprintf(stdout,
-				    MSG_ORIG(MSG_FMT_STRNL),
-				    trim(next->ar_longname));
+			if (cmd_info->opt_flgs & t_FLAG) {
+				if ((next->ar_longname[0] == 0) &&
+				    (next->ar_rawname[0] != 0)) {
+					(void) fprintf(stdout,
+					    MSG_ORIG(MSG_FMT_STRNL),
+					    trim(next->ar_rawname));
+				} else {
+					(void) fprintf(stdout,
+					    MSG_ORIG(MSG_FMT_STRNL),
+					    trim(next->ar_longname));
+				}
+			}
 		}
-	} /* for */
+	}
 }
 
 void
@@ -514,7 +519,7 @@ qcmd(Cmd_info *cmd_info)
 	ARFILE *fptr;
 
 	if (cmd_info->opt_flgs & (a_FLAG | b_FLAG)) {
-		(void) fprintf(stderr, MSG_INTL(MSG_USAGE_05));
+		(void) fprintf(stderr, MSG_INTL(MSG_USAGE_Q_BAD_ARG));
 		exit(1);
 	}
 	for (fptr = getfile(cmd_info); fptr; fptr = getfile(cmd_info))
