@@ -327,6 +327,7 @@ pcieadm_show_devs_walk_cb(di_node_t node, void *arg)
 	char *path = NULL;
 	pcieadm_show_devs_t *psd = arg;
 	int ret = DI_WALK_CONTINUE;
+	char venstr[64], devstr[64];
 	pcieadm_show_devs_ofmt_t oarg;
 	pcidb_hdl_t *pcidb = psd->psd_pia->pia_pcidb;
 
@@ -376,6 +377,10 @@ pcieadm_show_devs_walk_cb(di_node_t node, void *arg)
 		    oarg.psdo_vid);
 		if (vend != NULL) {
 			oarg.psdo_vendor = pcidb_vendor_name(vend);
+		} else {
+			(void) snprintf(venstr, sizeof (venstr),
+			    "Unknown vendor: 0x%x", oarg.psdo_vid);
+			oarg.psdo_vendor = venstr;
 		}
 	}
 
@@ -385,7 +390,10 @@ pcieadm_show_devs_walk_cb(di_node_t node, void *arg)
 		    oarg.psdo_vid, oarg.psdo_did);
 		if (dev != NULL) {
 			oarg.psdo_device = pcidb_device_name(dev);
-
+		} else {
+			(void) snprintf(devstr, sizeof (devstr),
+			    "Unknown device: 0x%x", oarg.psdo_did);
+			oarg.psdo_device = devstr;
 		}
 	}
 
