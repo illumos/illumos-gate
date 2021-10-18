@@ -902,7 +902,7 @@ def find_tests(testrun, options):
 
 def filter_tests(testrun, options):
     try:
-        fh = open(options.logfile, "r")
+        fh = open(options.logfile, "r", errors='replace')
     except Exception as e:
         fail('%s' % e)
 

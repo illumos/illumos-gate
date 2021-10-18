@@ -43,23 +43,24 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2021 Oxide Computer Company
 .\"
-.TH TIME.H 3HEAD "Feb 5, 2008"
-.SH NAME
-time.h, time \- time types
-.SH SYNOPSIS
-.LP
-.nf
-#include <\fBtime.h\fR>
-.fi
-
-.SH DESCRIPTION
-.LP
-The <\fBtime.h\fR> header declares the structure \fBtm\fR, which includes the
-following members:
-.sp
-.in +2
-.nf
+.Dd October 4, 2021
+.Dt TIME.H 3HEAD
+.Os
+.Sh NAME
+.Nm time.h ,
+.Nm time
+.Nd time types
+.Sh SYNOPSIS
+.In time.h
+.Sh DESCRIPTION
+The
+.In time.h
+header declares the structure
+.Vt tm ,
+which includes the following members:
+.Bd -literal -offset indent
 int tm_sec     /* seconds [0,60] */
 int tm_min     /* minutes [0,59] */
 int tm_hour    /* hour [0,23] */
@@ -69,187 +70,157 @@ int tm_year    /* years since 1900 */
 int tm_wday    /* day of week [0,6] (Sunday =0) */
 int tm_yday    /* day of year [0,365] */
 int tm_isdst   /* daylight savings flag */
-.fi
-.in -2
-
-.sp
-.LP
-The value of \fBtm_isdst\fR is positive if Daylight Saving Time is in effect, 0
-if Daylight Saving Time is not in effect, and negative if the information is
-not available.
-.sp
-.LP
-The <\fBtime.h\fR> header defines the following symbolic names:
-.sp
-.ne 2
-.na
-\fB\fBNULL\fR\fR
-.ad
-.RS 28n
-Null pointer constant.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCLOCKS_PER_SEC\fR\fR
-.ad
-.RS 28n
-A number used to convert the value returned by the \fBclock()\fR function into
-seconds. See \fBclock\fR(3C).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCLOCK_PROCESS_CPUTIME_ID\fR\fR
-.ad
-.RS 28n
+.Ed
+.Pp
+The value of
+.Fa tm_isdst
+is positive if Daylight Saving Time is in effect, 0 if Daylight Saving
+Time is not in effect, and negative if the information is not available.
+.Pp
+The
+.In time.h
+header defines the following symbolic names:
+.Bl -tag -width Ds
+.It Dv CLOCK_MONOTONIC
+The identifier for the system-wide monotonic clock, which is defined as a clock
+whose value cannot be set with
+.Fn clock_settime
+and that cannot have backward clock jumps.
+The maximum possible clock jump is implementation-defined.
+See
+.Xr clock_settime 3C .
+.It Dv CLOCKS_PER_SEC
+A number used to convert the value returned by the
+.Fn clock
+function into seconds.
+See
+.Xr clock 3C .
+.It Dv CLOCK_PROCESS_CPUTIME_ID
 The identifier of the CPU-time clock associated with the process making a
-\fBclock()\fR or \fBtimer*()\fR function call.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCLOCK_THREAD_CPUTIME_ID\fR\fR
-.ad
-.RS 28n
+.Fn clock
+or
+.Fn timer_*
+function call.
+This clock includes both user and system CPU-time.
+.It Dv CLOCK_REALTIME
+The identifier of the system-wide realtime clock.
+.It Dv CLOCK_THREAD_CPUTIME_ID
 The identifier of the CPU-time clock associated with the thread making a
-\fBclock()\fR or \fBtimer*()\fR function call.
-.RE
-
-.sp
-.LP
-The <\fBtime.h\fR> header declares the \fBtimespec\fR structure, which has the
-following members:
-.sp
-.in +2
-.nf
+.Fn clock
+or
+.Fn timer_*
+function call.
+This clock includes both user and system CPU-time.
+.It Dv CLOCK_VIRTUAL
+The identifier of the CPU-time clock associated with the thread making a
+.Fn clock
+or
+.Fn timer_*
+function call.
+This clock only includes user CPU-time.
+.It Dv NULL
+Null pointer constant.
+.It Dv TIMER_ABSTIME
+Flag indicating time is absolute.
+For functions taking timer objects, this refers to the clock associated
+with the timer.
+.It Dv TIME_UTC
+The identifier for the system-wide realtime clock with no time zone
+translation.
+Used in
+.Fn timespec_get .
+.El
+.Pp
+The
+.In time.h
+header declares the
+.Vt timespec
+structure, which has the following members:
+.Bd -literal -offset indent
 time_t tv_sec     /* seconds */
 long   tv_nsec     /* nanoseconds */
-.fi
-.in -2
-
-.sp
-.LP
-The <\fBtime.h\fR> header declares the \fBitimerspec\fR structure, which has
-the following members:
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+The
+.In time.h
+header declares the
+.Vt itimerspec
+structure, which has the following members:
+.Bd -literal -offset indent
 struct timespec it_interval     /* timer period */
 struct timespec it_value     /* timer expiration */
-.fi
-.in -2
-
-.sp
-.LP
-The following manifest constants are defined:
-.sp
-.ne 2
-.na
-\fB\fBCLOCK_REALTIME\fR\fR
-.ad
-.RS 19n
-The identifier of the system-wide realtime clock.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIMER_ABSTIME\fR\fR
-.ad
-.RS 19n
-Flag indicating time is absolute. For functions taking timer objects, this
-refers to the clock associated with the timer.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCLOCK_MONOTONIC\fR\fR
-.ad
-.RS 19n
-The identifier for the system-wide monotonic clock, which is defined as a clock
-whose value cannot be set with \fBclock_settime()\fR and that cannot have
-backward clock jumps. The maximum possible clock jump is
-implementation-defined. See \fBclock_settime\fR(3C).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIME_UTC\fR\fR
-.ad
-.RS 19n
-The identifier for the system-wide realtime clock with no time zone
-translation. Used in \fBtimespec_get\fR().
-.RE
-
-.sp
-.LP
-The \fBclock_t\fR, \fBsize_t\fR, \fBtime_t\fR, \fBclockid_t\fR, and
-\fBtimer_t\fR types are defined as described in <\fBsys/types.h\fR>. See
-\fBtypes.h\fR(3HEAD).
-.sp
-.LP
-Although the value of \fBCLOCKS_PER_SEC\fR is required to be 1 million on all
-standard-conforming systems, it can be variable on other systems, and it should
-not be assumed that \fBCLOCKS_PER_SEC\fR is a compile-time constant.
-.sp
-.LP
-The <\fBtime.h\fR> header provides a declaration for \fBgetdate_err\fR.
-.sp
-.LP
+.Ed
+.Pp
+The
+.Vt clock_t ,
+.Vt size_t ,
+.Vt time_t ,
+.Vt clockid_t ,
+and
+.Vt timer_t
+types are defined as described in
+.In sys/types.h .
+See
+.Xr types.h 3HEAD .
+.Pp
+Although the value of
+.Dv CLOCKS_PER_SEC
+is required to be 1 million on all standard-conforming systems, it can
+be variable on other systems, and it should not be assumed that
+.Dv CLOCKS_PER_SEC
+is a compile-time constant.
+.Pp
+The
+.In time.h
+header provides a declaration for
+.Dv getdate_err .
+.Pp
 The following are declared as variables:
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
 extern int daylight;
 extern long timezone;
 extern char *tzname[];
-.fi
-.in -2
-
-.sp
-.LP
-Inclusion of the <\fBtime.h\fR> header can make visible all symbols from the
-<\fBsignal.h\fR> header.
-.SH USAGE
-.LP
-The range [0,60] for \fBtm_sec\fR allows for the occasional leap second.
-.sp
-.LP
-\fBtm_year\fR is a signed value; therefore, years before 1900 can be
-represented.
-.sp
-.LP
-To obtain the number of clock ticks per second returned by the \fBtimes()\fR
-function, applications should call \fBsysconf(_SC_CLK_TCK)\fR. See
-\fBtimes\fR(2) and \fBsysconf\fR(3C).
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-_
-Standard	See \fBstandards\fR(5).
-.TE
-
-.SH SEE ALSO
-.LP
-\fBtime\fR(2), \fButime\fR(2), \fBclock\fR(3C), \fBctime\fR(3C),
-\fBdifftime\fR(3C), \fBgetdate\fR(3C), \fBmktime\fR(3C),
-\fBstrftime\fR(3C), \fBstrptime\fR(3C), \fBtypes.h\fR(3HEAD),
-\fBclock_settime\fR(3C), \fBnanosleep\fR(3C), \fBtimer_create\fR(3C),
-\fBtimer_delete\fR(3C), \fBtimer_settime\fR(3C), \fBtimespec_get\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.Ed
+.Pp
+Inclusion of the
+.In time.h
+header can make visible all symbols from the
+.In signal.h
+header.
+.Sh USAGE
+The range [0,60] for
+.Fa tm_sec
+allows for the occasional leap second.
+.Pp
+.Fa tm_year
+is a signed value; therefore, years before 1900 can be represented.
+.Pp
+To obtain the number of clock ticks per second returned by the
+.Fn times
+function, applications should call
+.Fn sysconf "_SC_CLK_TCK" .
+See
+.Xr times 2
+and
+.Xr sysconf 3C .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr time 2 ,
+.Xr utime 2 ,
+.Xr clock 3C ,
+.Xr clock_settime 3C ,
+.Xr ctime 3C ,
+.Xr difftime 3C ,
+.Xr getdate 3C ,
+.Xr mktime 3C ,
+.Xr nanosleep 3C ,
+.Xr strftime 3C ,
+.Xr strptime 3C ,
+.Xr timer_create 3C ,
+.Xr timer_delete 3C ,
+.Xr timer_settime 3C ,
+.Xr timespec_get 3C ,
+.Xr types.h 3HEAD ,
+.Xr attributes 5 ,
+.Xr standards 5

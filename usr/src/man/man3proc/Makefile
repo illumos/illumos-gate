@@ -131,6 +131,7 @@ MANFILES=					\
 		proc_get_auxv.3proc		\
 		proc_get_cred.3proc		\
 		proc_get_fdinfo.3proc		\
+		proc_get_lwpsinfo.3proc		\
 		proc_get_priv.3proc		\
 		proc_get_psinfo.3proc		\
 		proc_get_status.3proc		\

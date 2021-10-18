@@ -34,6 +34,9 @@ tests = ['poll_test', 'epoll_test']
 [/opt/os-tests/tests/odirectory.32]
 [/opt/os-tests/tests/odirectory.64]
 
+[/opt/os-tests/tests/clock_gettime.32]
+[/opt/os-tests/tests/clock_gettime.64]
+
 [/opt/os-tests/tests/secflags]
 user = root
 tests = ['secflags_aslr',

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,39 +18,51 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2017 RackTop Systems.
+# Copyright 2020 Joyent, Inc.
 #
 
 PROG= zhack
+OBJS= $(PROG).o
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
+include ../Makefile.ctf
 
-$(INTEL_BLD)SUBDIRS	= $(MACH)
-$(BUILD64)SUBDIRS	+= $(MACH64)
+INCS +=	-I../../lib/libzpool/common
+INCS +=	-I../../uts/common/fs/zfs
+INCS +=	-I../../uts/common/fs/zfs/lua
+INCS +=	-I../../common/zfs
+INCS += -I../../lib/libzutil/common
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+LDLIBS += -lzpool -lumem -lnvpair -lzutil
+
+CSTD=	$(CSTD_GNU99)
+
+CFLAGS += $(CCVERBOSE)
+CFLAGS64 += $(CCVERBOSE)
+CPPFLAGS.first = -I$(SRC)/lib/libfakekernel/common -D_FAKE_KERNEL
+CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT -DDEBUG $(INCS)
 
 .KEEP_STATE:
 
-all clean clobber lint:	$(SUBDIRS)
+all: $(PROG)
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTUSRSBINPROG)
-	-$(LN) $(ISAEXEC) $(ROOTUSRSBINPROG)
+install: all $(ROOTUSRSBINPROG)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-FRC:
+clean:
+	$(RM) $(OBJS)
 
 include ../Makefile.targ

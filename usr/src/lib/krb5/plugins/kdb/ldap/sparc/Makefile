@@ -22,9 +22,13 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.com
+
+#
+# Default -xO3 will trigger inclusion of SSP, which we do not need here.
+# illumos issue #14135
+#
+sparc_COPTFLAG=	-O
 
 install: all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS)

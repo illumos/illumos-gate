@@ -23,30 +23,31 @@
 # Use is subject to license terms.
 #
 
-PROG:sh=	basename `pwd`
+PROG= zlook
+OBJS= $(PROG).o
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
+include ../Makefile.ctf
 
-$(INTEL_BLD)SUBDIRS	= $(MACH)
-$(BUILD64)SUBDIRS	+= $(MACH64)
+CSTD= $(CSTD_GNU99)
+CFLAGS += $(CCGDEBUG) $(CCVERBOSE)
+CFLAGS64 += $(CCGDEBUG) $(CCVERBOSE)
+CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 
-all clean clobber lint:	$(SUBDIRS)
+all: $(PROG)
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
+install: all $(ROOTPROG)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-FRC:
+clean:
+	$(RM) $(OBJS)
 
 include ../Makefile.targ

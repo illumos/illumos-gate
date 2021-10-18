@@ -1675,3 +1675,4 @@ Bugid   Risk Synopsis
 13487	want mapfile-based assertions about symbol properties (fix SPARC)
 14090	ld(1) could use a normal allocator
 14090	backout: turns over big rocks, discovers big bugs
+14152	ld(1) should be more careful about empty alists

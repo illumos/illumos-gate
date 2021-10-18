@@ -50,9 +50,10 @@ file path=kernel/drv/ksensor_test.conf group=sys
 file path=opt/os-tests/README mode=0444
 file path=opt/os-tests/bin/ostest mode=0555
 file path=opt/os-tests/runfiles/default.run mode=0444
-file path=opt/os-tests/tests/imc_test mode=0555
 file path=opt/os-tests/tests/OS-6097.32 mode=0555
 file path=opt/os-tests/tests/OS-6097.64 mode=0555
+file path=opt/os-tests/tests/clock_gettime.32 mode=0555
+file path=opt/os-tests/tests/clock_gettime.64 mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-cleanup mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-setup mode=0555
@@ -62,6 +63,7 @@ file path=opt/os-tests/tests/file-locking/acquire-lock.32 mode=0555
 file path=opt/os-tests/tests/file-locking/acquire-lock.64 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.32 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.64 mode=0555
+file path=opt/os-tests/tests/imc_test mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/i386/badseg mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/i386/badseg_exec mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/i386/ldt mode=0555

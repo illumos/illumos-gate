@@ -43,147 +43,245 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2021 Oxide Computer Company
 .\"
-.TH CLOCK_SETTIME 3C "Nov 26, 2017"
-.SH NAME
-clock_settime, clock_gettime, clock_getres \- high-resolution clock operations
-.SH SYNOPSIS
-.LP
-.nf
-#include <time.h>
-
-\fBint\fR \fBclock_settime\fR(\fBclockid_t\fR \fIclock_id\fR, \fBconst struct timespec *\fR\fItp\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBclock_gettime\fR(\fBclockid_t\fR \fIclock_id\fR, \fBstruct timespec *\fR\fItp\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBclock_getres\fR(\fBclockid_t\fR \fIclock_id\fR, \fBstruct timespec *\fR\fIres\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBclock_settime()\fR function sets the specified clock, \fIclock_id\fR, to
-the value specified by \fItp\fR. Time values that are between two consecutive
-non-negative integer multiples of the resolution of the specified clock are
-truncated down to the smaller multiple of the resolution.
-.sp
-.LP
-The \fBclock_gettime()\fR function returns the current value \fItp\fR for the
-specified clock, \fIclock_id\fR.
-.sp
-.LP
-The resolution of any clock can be obtained by calling \fBclock_getres()\fR.
-Clock resolutions are system-dependent and cannot be set by a process. If the
-argument \fIres\fR is not \fINULL\fR, the resolution of the specified clock is
-stored in the location pointed to by \fIres\fR. If \fIres\fR is \fINULL\fR, the
-clock resolution is not returned. If the time argument of \fBclock_settime()\fR
-is not a multiple of \fIres\fR, then the value is truncated to a multiple of
-\fIres\fR.
-.sp
-.LP
-A clock may be system wide (that is, visible to all processes) or per-process
-(measuring time that is meaningful only within a process).
-.sp
-.LP
-A \fIclock_id\fR of \fBCLOCK_REALTIME\fR is defined in <\fBtime.h\fR>. This
-clock represents the realtime clock for the system. For this clock, the values
-returned by \fBclock_gettime()\fR and specified by \fBclock_settime()\fR
-represent the amount of time (in seconds and nanoseconds) since the Epoch.
-Additional clocks may also be supported. The interpretation of time values for
-these clocks is unspecified.
-.sp
-.LP
-A \fIclock_id\fR of \fBCLOCK_HIGHRES\fR represents the non-adjustable,
-high-resolution clock for the system. For this clock, the value returned by
-\fBclock_gettime\fR(3C) represents the amount of time (in seconds and
-nanoseconds) since some arbitrary time in the past; it is not correlated in any
-way to the time of day, and thus is not subject to resetting or drifting by way
-of \fBadjtime\fR(2), \fBntp_adjtime\fR(2), \fBsettimeofday\fR(3C), or
-\fBclock_settime()\fR.  The time source for this clock is the same as that for
-\fBgethrtime\fR(3C).
-.sp
-.LP
-Additional clocks may also be supported. The interpretation of time values for
-these clocks is unspecified.
-.SH RETURN VALUES
-.LP
-Upon successful completion, \fB0\fR  is returned. Otherwise, \fB\(mi1\fR is
-returned and \fBerrno\fR is set to indicate the error.
-.SH ERRORS
-.LP
-The \fBclock_settime()\fR, \fBclock_gettime()\fR and \fBclock_getres()\fR
+.Dd October 3, 2021
+.Dt CLOCK_SETTIME 3C
+.Os
+.Sh NAME
+.Nm clock_settime ,
+.Nm clock_gettime ,
+.Nm clock_getres
+.Nd high-resolution clock operations
+.Sh SYNOPSIS
+.In time.h
+.Ft int
+.Fo clock_settime
+.Fa "clockid_t clock_id"
+.Fa "const struct timespec *tp"
+.Fc
+.Ft int
+.Fo clock_gettime
+.Fa "clockid_t clock_id"
+.Fa "struct timespec *tp"
+.Fc
+.Ft int
+.Fo clock_getres
+.Fa "clockid_t clock_id"
+.Fa "struct timespec *res"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn clock_settime
+function sets the specified clock,
+.Fa clock_id ,
+to the value specified by
+.Fa tp .
+Time values that are between two consecutive non-negative integer multiples of
+the resolution of the specified clock are truncated down to the smaller multiple
+of the resolution.
+.Pp
+The
+.Fn clock_gettime
+function returns the current value
+.Fa tp
+for the specified clock,
+.Fa clock_id .
+.Pp
+The resolution of any clock can be obtained by calling
+.Fn clock_getres
+Clock resolutions are system-dependent and cannot be set by a process.
+If the argument
+.Fa res
+is not
+.Dv NULL ,
+the resolution of the specified clock is stored in the location pointed to by
+.Fa res .
+If
+.Fa res
+is
+.Dv NULL ,
+the clock resolution is not returned.
+If the time argument of
+.Fn clock_settime
+is not a multiple of
+.Fa res ,
+then the value is truncated to a multiple of
+.Fa res .
+.Pp
+A clock may be system wide
+.Pq that is, visible to all processes
+or per-process
+.Pq measuring time that is meaningful only within a process .
+.Pp
+The following clocks are supported in the system and defined by
+including
+.In time.h :
+.Bl -tag -width Ds
+.It Dv CLOCK_REALTIME
+This clock represents the realtime clock for the system.
+For this clock, the values returned by
+.Fn clock_gettime
+and specified by
+.Fn clock_settime
+represent the amount of time
+.Pq in seconds and nanoseconds
+since the Epoch.
+.It Dv CLOCK_HIGHRES
+This clock represents the non-adjustable, high-resolution clock for the system.
+For this clock, the value returned by
+.Fn clock_gettime
+represents the amount of time (in seconds and nanoseconds) since some arbitrary
+time in the past; it is not correlated in any way to the time of day, and thus
+is not subject to resetting or drifting by way of
+.Xr adjtime 2 ,
+.Xr ntp adjtime 2 ,
+.Xr settimeofday 3C ,
+or
+.Fn clock_settime .
+The time source for this clock is the same as that for
+.Xr gethrtime 3C .
+.Pp
+It is not possible to set this clock with
+.Fn clock_settime .
+.Pp
+.Dv CLOCK_MONOTONIC
+is an alias for this clock.
+Other systems define a
+.Dv CLOCK_MONOTONIC_RAW
+for a high-resolution clock which is not subject to adjustments.
+.Dv CLOCK_HIGHRES
+is not subject to time of day adjustments and thus can always be safely
+used here.
+.It Dv CLOCK_VIRTUAL
+This clock represents the amount of CPU-time
+.Pq in seconds and nanoseconds
+that the calling thread has spent executing user code.
+This is the same as the
+.Fa pr_utime
+member of the
+.Vt prusage_t
+and
+.Fa pr_utime
+member of the
+.Vt lwpsinfo_t
+structure discussed in
+.Xr proc 4 .
+.Pp
+This clock cannot be set with
+.Fn clock_settime
+and has the same source as
+.Xr gethrvtime 3C .
+.It Dv CLOCK_THREAD_CPUTIME_ID
+This clock is similar to
+.Dv CLOCK_VIRTUAL ;
+however, it also includes the system time of the calling thread in
+addition to the user time.
+.Pp
+The system time is the same that is seen in the
+.Fa pr_stime
+member of the
+.Vt lwpsinfo_t
+structure discussed in
+.Xr proc 4    .
+System time includes both the system and trap microstates,
+.Fa pr_stime
+and
+.Fa pr_ttime
+of the
+.Vt prusage_t
+structure respectively.
+.Pp
+This clock cannot be set with
+.Fn clock_settime
+and it has an alias of
+.Dv CLOCK_PROF .
+.It Dv ClOCK_PROCESS_CPUTIME_ID
+This clock represents the total CPU-time that the process
+.Pq but not children
+has spent in both user and system time for the calling process.
+This is equivalent to the combination of the
+.Fa pr_utime
+and
+.Fa pr_stime
+members of the
+.Vt psinfo_t
+structure documented in
+.Xr proc 4 .
+.Pp
+This clock is not settable with
+.Fn clock_settime .
+.El
+.Sh RETURN VALUES
+Upon successful completion,
+.Sy 0
+is returned.
+Otherwise,
+.Sy -1
+is returned and
+.Va errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn clock_settime ,
+.Fn clock_gettime ,
+and
+.Fn clock_getres
 functions will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The \fIclock_id\fR argument does not specify a known clock.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOSYS\fR\fR
-.ad
-.RS 10n
-The functions \fBclock_settime()\fR, \fBclock_gettime()\fR, and
-\fBclock_getres()\fR are not supported by this implementation.
-.RE
-
-.sp
-.LP
-The \fBclock_settime()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The \fItp\fR argument to \fBclock_settime()\fR is outside the range for the
-given clock ID; or the \fItp\fR argument specified a nanosecond value less than
-zero or greater than or equal to 1000 million.
-.RE
-
-.sp
-.LP
-The \fBclock_settime()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEPERM\fR\fR
-.ad
-.RS 9n
+.Bl -tag -width Er
+.It Er EINVAL
+The
+.Fa clock_id
+argument does not specify a known clock.
+.It Er ENOSYS
+The functions
+.Fn \fBclock_settime ,
+.Fn \fBclock_gettime ,
+and
+.Fn clock_getres
+are not supported by this implementation.
+Note, this error should not occur here.
+.El
+.Pp
+The
+.Fn clock_settime
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The
+.Fa tp
+argument is outside the range for the given clock ID; or the
+.Fa tp
+argument specified a nanosecond value less than zero or greater than or
+equal to 1000 million.
+.Pp
+The clock specified by
+.Fa clock_id
+does not support being set.
+.El
+.Pp
+The
+.Fn clock_settime
+function may fail if:
+.Bl -tag -width Er
+.It Er EPERM
 The requesting process does not have the appropriate privilege to set the
 specified clock.
-.RE
-
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-_
-MT-Level	\fBclock_gettime()\fR is Async-Signal-Safe
-_
-Standard	See \fBstandards\fR(5).
-.TE
-
-.SH SEE ALSO
-.LP
-\fBtime\fR(2), \fBctime\fR(3C), \fBgethrtime\fR(3C), \fBtime.h\fR(3HEAD),
-\fBtimer_gettime\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Fn clock_gettime
+is
+.Sy Async-Signal-Safe
+.Sh SEE ALSO
+.Xr adjtime 2 ,
+.Xr ntp_adjtime 2 ,
+.Xr time 2 ,
+.Xr ctime 3C ,
+.Xr gethrtime 3C ,
+.Xr gethrvtime 3C ,
+.Xr settimeofday 3C ,
+.Xr timer_gettime 3C ,
+.Xr time.h 3HEAD ,
+.Xr proc 4

@@ -22,33 +22,43 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright 2017 RackTop Systems.
+# Copyright 2020 Joyent, Inc.
 #
 
-PROG:sh=	basename `pwd`
+PROG= zinject
+OBJS= $(PROG).o translate.o
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
+include ../Makefile.ctf
 
-$(INTEL_BLD)SUBDIRS	= $(MACH)
-$(BUILD64)SUBDIRS	+= $(MACH64)
+INCS +=	-I../../lib/libzpool/common
+INCS +=	-I../../uts/common/fs/zfs
+INCS +=	-I../../uts/common/fs/zfs/lua
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+LDLIBS += -lzfs -lnvpair
+
+CSTD=	$(CSTD_GNU99)
+
+CPPFLAGS.first = -I$(SRC)/lib/libfakekernel/common -D_FAKE_KERNEL
+CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
+
+CERRWARN += $(CNOWARN_UNINIT)
+CERRWARN += -_gcc=-Wno-switch
 
 .KEEP_STATE:
 
-all clean clobber lint:	$(SUBDIRS)
+all: $(PROG)
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTUSRSBINPROG)
-	-$(LN) $(ISAEXEC) $(ROOTUSRSBINPROG)
+install: all $(ROOTUSRSBINPROG)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-FRC:
+clean:
+	$(RM) $(OBJS)
 
 include ../Makefile.targ
