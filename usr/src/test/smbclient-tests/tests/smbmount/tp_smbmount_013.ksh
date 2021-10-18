@@ -56,7 +56,7 @@ smbmount_clean $TMNT
 smbmount_init $TMNT
 
 # XXX: Should get this user from config
-tc_uid="smmsp"
+tc_uid="listen"
 
 cmd="mount -F smbfs -o noprompt,noacl,uid=$tc_uid \
  //$TUSER:$TPASS@$server/public $TMNT"
