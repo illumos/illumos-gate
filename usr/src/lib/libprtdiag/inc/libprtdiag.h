@@ -41,7 +41,7 @@ extern "C" {
 #ifdef DEBUG
 #define	D_PRINTF printf
 #else
-#define	D_PRINTF
+#define	D_PRINTF(...)
 #endif
 
 #define	EXIT_MSG(msg, err) \

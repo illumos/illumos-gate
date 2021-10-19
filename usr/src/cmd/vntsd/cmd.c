@@ -232,7 +232,7 @@ acquire_write(vntsd_client_t *clientp)
 
 /* client_exit()  - disconnect client from the console. */
 static int
-client_exit(void)
+client_exit(vntsd_client_t *arg __unused)
 {
 	return (VNTSD_STATUS_RESELECT_CONS);
 }
@@ -250,7 +250,7 @@ static esctable_t  etable[] = {
 	{CNTRL('B'), "Send alternate break", genaltbrk},
 
 	/* exit */
-	{'.', "Exit from this console",  (e_func_t)client_exit},
+	{'.', "Exit from this console",  client_exit},
 
 	/* acquire write access */
 	{'w', "Force write access", acquire_write},

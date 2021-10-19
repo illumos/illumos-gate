@@ -116,7 +116,7 @@ static void sun4v_print_openprom_rev();
 
 int
 sun4v_display(Sys_tree *tree, Prom_node *root, int log,
-	picl_nodehdl_t plafh)
+    picl_nodehdl_t plafh)
 {
 	void *value;		/* used for opaque PROM data */
 	struct mem_total memory_total;	/* Total memory in system */
@@ -1792,7 +1792,7 @@ sun4v_print_fru_status_callback(picl_nodehdl_t nodeh, void *args)
 	}
 
 	if (is_fru_absent(nodeh))
-		strcpy(status, "Not present");
+		(void) strcpy(status, "Not present");
 
 	err = picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &parenth,
 	    sizeof (parenth));

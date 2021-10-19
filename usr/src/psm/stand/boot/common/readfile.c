@@ -64,7 +64,7 @@ int	npagesize = 0;
 uint_t	icache_flush = 0;
 char	*cpulist = NULL;
 char	*mmulist = NULL;
-char	*module_path;		/* path for kernel modules */
+extern char *module_path;		/* path for kernel modules */
 
 /*
  * This file gets compiled in LP64 (for sun4u) and ILP32 models.

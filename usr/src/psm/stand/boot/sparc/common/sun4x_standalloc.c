@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/saio.h>
 #include <sys/sysmacros.h>
@@ -45,10 +43,10 @@ extern struct memlist	*vfreelistp, *pfreelistp;
 extern	void		reset_alloc(void);
 extern	void		alloc_segment(caddr_t);
 
-caddr_t		memlistpage;
+extern caddr_t		memlistpage;
 caddr_t		le_page;
 caddr_t		ie_page;
-caddr_t 	scratchmemp;
+caddr_t		scratchmemp;
 extern int	pagesize;
 
 #define	N_FREELIST	20	/* keep the largest 20 free regions */

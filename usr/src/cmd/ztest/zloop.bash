@@ -20,19 +20,10 @@
 #
 
 set -x
-export BITS=64
 export UMEM_DEBUG=default,verbose
 export UMEM_LOGGING=transaction,contents
 set +x
 
-sparc_32=sparc
-sparc_64=sparcv9
-i386_32=i86
-i386_64=amd64
-ARCH=`uname -p`
-eval 'ARCHBITS=${'"${ARCH}_${BITS}"'}'
-BIN=$ROOT/usr/bin/${ARCHBITS}
-SBIN=$ROOT/usr/sbin/${ARCHBITS}
 DEFAULTWORKDIR=/var/tmp
 DEFAULTCOREDIR=/var/tmp/zloop
 
@@ -101,11 +92,6 @@ function store_core
 		echo "continuing..."
 	fi
 }
-
-set -x
-export PATH=${BIN}:${SBIN}
-export LD_LIBRARY_PATH=$ROOT/lib/$BITS:$ROOT/usr/lib/$BITS
-set +x
 
 # parse arguments
 # expected format: zloop [-t timeout] [-c coredir] [-- extra ztest args]
@@ -189,10 +175,10 @@ while [[ $timeout -eq 0 ]] || [[ $curtime -le $(($starttime + $timeout)) ]]; do
 	desc="$(/bin/date '+%m/%d %T') $cmd"
 	echo "$desc" | /bin/tee -a ztest.history
 	echo "$desc" >>ztest.out
-	$BIN/$cmd >>ztest.out 2>&1
+	/usr/bin/$cmd >>ztest.out 2>&1
 	ztrc=$?
 	/bin/egrep '===|WARNING' ztest.out >>ztest.history
-	$SBIN/zdb -U $workdir/zpool.cache -DD ztest >>ztest.ddt 2>&1
+	/usr/sbin/zdb -U $workdir/zpool.cache -DD ztest >>ztest.ddt 2>&1
 
 	store_core
 

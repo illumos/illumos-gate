@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -117,8 +115,8 @@ get_pci_device(Prom_node *pnode)
 {
 	void *value;
 
-	if ((value = get_prop_val(find_prop(pnode, "assigned-addresses"))) !=
-		NULL) {
+	value = get_prop_val(find_prop(pnode, "assigned-addresses"));
+	if (value != NULL) {
 		return (PCI_DEVICE(*(int *)value));
 	} else {
 		return (-1);
@@ -134,8 +132,8 @@ get_pci_to_pci_device(Prom_node *pnode)
 {
 	void *value;
 
-	if ((value = get_prop_val(find_prop(pnode, "reg"))) !=
-		NULL) {
+	value = get_prop_val(find_prop(pnode, "reg"));
+	if (value != NULL) {
 		return (PCI_DEVICE(*(int *)value));
 	} else {
 		return (-1);
@@ -187,7 +185,7 @@ insert_io_card(struct io_card *list, struct io_card *card)
 	newcard->next = NULL;
 
 	if (list == NULL)
-	return (newcard);
+		return (newcard);
 
 	/* Find the proper place in the list for the new card */
 	for (p = list, q = NULL; p != NULL; q = p, p = p->next) {
@@ -223,17 +221,17 @@ fmt_manf_id(unsigned int encoded_id, char *outbuf)
 	switch (manuf.fld.manf) {
 	case MANF_BROOKTREE:
 		(void) sprintf(outbuf, "%s %d, version %d", "Brooktree",
-			manuf.fld.partno, manuf.fld.version);
+		    manuf.fld.partno, manuf.fld.version);
 		break;
 
 	case MANF_MITSUBISHI:
 		(void) sprintf(outbuf, "%s %x, version %d", "Mitsubishi",
-			manuf.fld.partno, manuf.fld.version);
+		    manuf.fld.partno, manuf.fld.version);
 		break;
 
 	default:
 		(void) sprintf(outbuf, "JED code %d, Part num 0x%x, version %d",
-			manuf.fld.manf, manuf.fld.partno, manuf.fld.version);
+		    manuf.fld.manf, manuf.fld.partno, manuf.fld.version);
 	}
 	return (outbuf);
 }
@@ -315,12 +313,12 @@ display_io_cards(struct io_card *list)
 	if (banner == 0) {
 		log_printf("     Bus   Freq\n", 0);
 		log_printf("Brd  Type  MHz   Slot        "
-			"Name                          "
-			"Model", 0);
+		    "Name                          "
+		    "Model", 0);
 		log_printf("\n", 0);
 		log_printf("---  ----  ----  ----------  "
-			"----------------------------  "
-			"--------------------", 0);
+		    "----------------------------  "
+		    "--------------------", 0);
 		log_printf("\n", 0);
 		banner = 1;
 	}
@@ -400,10 +398,10 @@ display_ffb(Board_node *board, int table)
 			if (value != NULL)
 				if ((*(int *)value) & FFB_B_BUFF)
 					(void) sprintf(card.name,
-						"%s, Double Buffered", label);
+					    "%s, Double Buffered", label);
 				else
 					(void) sprintf(card.name,
-						"%s, Single Buffered", label);
+					    "%s, Single Buffered", label);
 
 			/*
 			 * Print model number only if board_type bit 2
@@ -414,7 +412,7 @@ display_ffb(Board_node *board, int table)
 			if (strcmp(type, AFB_NAME) == 0) {
 				if (((*(int *)value) & 0x4) != 0x4) {
 					value = get_prop_val(find_prop(fb,
-						    "model"));
+					    "model"));
 					if ((value != NULL) &&
 					    (strcmp(value,
 					    "SUNW,XXX-XXXX") != 0)) {
@@ -445,17 +443,17 @@ display_ffb(Board_node *board, int table)
 				value = get_prop_val(find_prop(fb, "portid"));
 
 			if (value == NULL)
-			    continue;
+				continue;
 
 			(void) sprintf(device, "%s@%x", type,
-				*(int *)value);
+			    *(int *)value);
 			if ((dirp = opendir("/devices")) == NULL)
 				continue;
 
 			while ((direntp = readdir(dirp)) != NULL) {
 				if (strstr(direntp->d_name, device) != NULL) {
 					(void) sprintf(device, "/devices/%s",
-						direntp->d_name);
+					    direntp->d_name);
 					fd = open(device, O_RDWR, 0666);
 					break;
 				}
@@ -473,12 +471,12 @@ display_ffb(Board_node *board, int table)
 
 			strap.ffb_strap_bits = fsi.ffb_strap_bits;
 			log_printf("\tBoard rev: %d\n",
-				(int)strap.fld.board_rev, 0);
+			    (int)strap.fld.board_rev, 0);
 			log_printf("\tFBC version: 0x%x\n", fsi.fbc_version, 0);
 			log_printf("\tDAC: %s\n",
-				fmt_manf_id(fsi.dac_version, device), 0);
+			    fmt_manf_id(fsi.dac_version, device), 0);
 			log_printf("\t3DRAM: %s\n",
-				fmt_manf_id(fsi.fbram_version, device), 0);
+			    fmt_manf_id(fsi.fbram_version, device), 0);
 			log_printf("\n", 0);
 		}
 
@@ -541,7 +539,7 @@ display_sbus(Board_node *board)
 			value = get_prop_val(find_prop(card_node, "status"));
 			if (value != NULL)
 				(void) strncpy(card.status, (char *)value,
-					MAXSTRLEN);
+				    MAXSTRLEN);
 
 			/* XXX - For now, don't display failed cards */
 			if (strstr(card.status, "fail") != NULL)
@@ -549,7 +547,7 @@ display_sbus(Board_node *board)
 
 			/* Now gather all of the node names for that card */
 			model = (char *)get_prop_val(find_prop(card_node,
-				"model"));
+			    "model"));
 			name = get_node_name(card_node);
 
 			if (name == NULL)
@@ -563,14 +561,14 @@ display_sbus(Board_node *board)
 			if ((card_node->child != NULL) &&
 			    (child_name != NULL)) {
 				value = get_prop_val(find_prop(card_node->child,
-					"device_type"));
+				    "device_type"));
 				if (value != NULL)
 					(void) sprintf(card.name, "%s/%s (%s)",
-						name, child_name,
-						(char *)value);
+					    name, child_name,
+					    (char *)value);
 				else
 					(void) sprintf(card.name, "%s/%s", name,
-						child_name);
+					    child_name);
 			} else {
 				(void) strncpy(card.name, name, MAXSTRLEN);
 			}
@@ -594,7 +592,7 @@ display_sbus(Board_node *board)
  */
 int
 populate_slot_name_arr(Prom_node *pci, int *slot_name_bits,
-			char **slot_name_arr, int num_slots)
+    char **slot_name_arr, int num_slots)
 {
 	int	i, j, bit_mask;
 	char	*value;
@@ -629,7 +627,7 @@ populate_slot_name_arr(Prom_node *pci, int *slot_name_bits,
 				slot_name_arr[i] = "";
 
 			D_PRINTF("\nslot_name_arr[%d] = [%s]", i,
-				slot_name_arr[i]);
+			    slot_name_arr[i]);
 		}
 		return (0);
 	} else {
@@ -716,21 +714,18 @@ get_pci_card_model(Prom_node *card_node, char *model)
 {
 	char	*name = get_prop_val(find_prop(card_node, "name"));
 	char	*value = get_prop_val(find_prop(card_node, "model"));
-	int 	pci_bridge = is_pci_bridge(card_node, name);
+	int	pci_bridge = is_pci_bridge(card_node, name);
 
 	if (value == NULL)
 		model[0] = '\0';
 	else
-		(void) sprintf(model, "%s",
-			(char *)value);
+		(void) sprintf(model, "%s", value);
 
 	if (pci_bridge) {
 		if (strlen(model) == 0)
-			(void) sprintf(model,
-				"%s", "pci-bridge");
+			(void) sprintf(model, "%s", "pci-bridge");
 		else
-			(void) sprintf(model,
-				"%s/pci-bridge", model);
+			(void) sprintf(model, "%s/pci-bridge", model);
 	}
 }
 
@@ -742,8 +737,7 @@ create_io_card_name(Prom_node *card_node, char *name, char *card_name)
 	char	buf[MAXSTRLEN];
 
 	if (value != NULL) {
-		(void) sprintf(buf, "%s-%s", name,
-			(char *)value);
+		(void) sprintf(buf, "%s-%s", name, value);
 	} else
 		(void) sprintf(buf, "%s", name);
 
@@ -754,16 +748,15 @@ create_io_card_name(Prom_node *card_node, char *name, char *card_name)
 	if ((card_node->child != NULL) &&
 	    (child_name != NULL)) {
 		value = get_prop_val(find_prop(card_node->child,
-			"device_type"));
+		    "device_type"));
 		if (value != NULL)
 			(void) sprintf(card_name, "%s/%s (%s)",
-				name, child_name,
-				(char *)value);
+			    name, child_name, value);
 		else
 			(void) sprintf(card_name, "%s/%s", name,
-				child_name);
+			    child_name);
 	} else {
-		(void) sprintf(card_name, "%s", (char *)name);
+		(void) sprintf(card_name, "%s", name);
 	}
 }
 
@@ -783,9 +776,8 @@ display_psycho_pci(Board_node *board)
 
 	Prom_node	*pci, *card_node, *pci_bridge_node = NULL;
 	char		*name;
-	int		slot_name_bits, pci_bridge_dev_no,
-			class_code, subclass_code,
-			pci_pci_bridge;
+	int		slot_name_bits, pci_bridge_dev_no, class_code,
+	    subclass_code, pci_pci_bridge;
 	char		*slot_name_arr[MAX_SLOTS_PER_IO_BD];
 
 	if (board == NULL)
@@ -810,11 +802,11 @@ display_psycho_pci(Board_node *board)
 		 */
 		if (find_prop(pci, "upa-portid") == NULL) {
 			if ((pci->parent->sibling != NULL) &&
-				(strcmp(get_prop_val(
-				find_prop(pci->parent->sibling,
-				"name")), PCI_NAME) == 0))
+			    (strcmp(get_prop_val(
+			    find_prop(pci->parent->sibling,
+			    "name")), PCI_NAME) == 0)) {
 				pci = pci->parent->sibling;
-			else {
+			} else {
 				pci = pci->parent->sibling;
 				continue;
 			}
@@ -822,8 +814,8 @@ display_psycho_pci(Board_node *board)
 
 		D_PRINTF("\n\n------->Looking at device [%s][%d] - [%s]\n",
 		    PCI_NAME, *((int *)get_prop_val(find_prop(
-			pci, "upa-portid"))),
-			get_prop_val(find_prop(pci, "model")));
+		    pci, "upa-portid"))),
+		    get_prop_val(find_prop(pci, "model")));
 
 		/* Skip all failed nodes for now */
 		if (node_failed(pci))
@@ -850,7 +842,7 @@ display_psycho_pci(Board_node *board)
 
 			/* If it doesn't have a name, skip it */
 			name = (char *)get_prop_val(
-				find_prop(card_node, "name"));
+			    find_prop(card_node, "name"));
 			if (name == NULL)
 				goto next_card;
 
@@ -905,11 +897,12 @@ display_psycho_pci(Board_node *board)
 			get_slot_number_str(&card, (char **)slot_name_arr,
 			    slot_name_bits);
 
-			if (slot_name_bits)
+			if (slot_name_bits) {
 				D_PRINTF("\nIO Card [%s] dev_no [%d] SlotStr "
 				    "[%s] slot [%s]", name, card.dev_no,
 				    slot_name_arr[card.dev_no],
 				    card.slot_str);
+			}
 
 			/* XXX - Don't know how to get status for PCI cards */
 			card.status[0] = '\0';
@@ -924,12 +917,12 @@ display_psycho_pci(Board_node *board)
 			value = get_prop_val(find_prop(pci, "clock-frequency"));
 			if (value != NULL && card.freq == -1)
 				card.freq = ((*(int *)value) + 500000)
-					/ 1000000;
+				    / 1000000;
 
 
 			/* Figure out how we want to display the name */
 			create_io_card_name(card_node, name,
-				(char *)&card.name);
+			    (char *)&card.name);
 
 			if (card.freq != -1)
 				card_list = insert_io_card(card_list, &card);
@@ -964,7 +957,7 @@ next_card:
 
 void
 get_slot_number_str(struct io_card *card, char **slot_name_arr,
-	int slot_name_bits)
+    int slot_name_bits)
 {
 	if (card->dev_no != -1) {
 		char	*slot;
@@ -983,7 +976,7 @@ get_slot_number_str(struct io_card *card, char **slot_name_arr,
 				(void) sprintf(card->slot_str, "-");
 		} else {
 			/* this is an on-board dev. */
-			sprintf(card->slot_str, "On-Board");
+			(void) sprintf(card->slot_str, "On-Board");
 		}
 
 	} else {
@@ -1007,7 +1000,7 @@ get_slot_number_str(struct io_card *card, char **slot_name_arr,
  */
 void
 distinguish_identical_io_cards(char *name, Prom_node *node,
-				struct io_card *card)
+    struct io_card *card)
 {
 	if ((name == NULL) || (node == NULL))
 		return;
@@ -1041,12 +1034,12 @@ decode_qlc_card_model_prop(Prom_node *card_node, struct io_card *card)
 		switch (id) {
 		case AMBER_SUBSYSTEM_ID:
 			(void) snprintf(card->model, MAX_QLC_MODEL_LEN, "%s",
-				AMBER_CARD_NAME);
+			    AMBER_CARD_NAME);
 			break;
 
 		case CRYSTAL_SUBSYSTEM_ID:
 			(void) snprintf(card->model, MAX_QLC_MODEL_LEN, "%s",
-				CRYSTAL_CARD_NAME);
+			    CRYSTAL_CARD_NAME);
 			break;
 
 		default:
@@ -1059,7 +1052,7 @@ decode_qlc_card_model_prop(Prom_node *card_node, struct io_card *card)
 			 */
 			if (strcmp(card->model, "") == 0) {
 				(void) snprintf(card->model, MAX_QLC_MODEL_LEN,
-					"0x%x", id);
+				    "0x%x", id);
 			}
 			break;
 		}

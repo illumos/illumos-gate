@@ -35,11 +35,11 @@ char *v2path, *kernname, *systype;
 char *my_own_name = "boot";
 char v2args_buf[V2ARGS_BUF_SZ];
 char *v2args = v2args_buf;
-char *mfg_name;
+extern char *mfg_name;
 char *impl_arch_name;
 char *bootp_response;
 char *module_path;
-int  cache_state;
+extern int  cache_state;
 uint64_t memlistextent;		/* replacement for old member of bootops */
 
 /*  These are the various memory lists */
