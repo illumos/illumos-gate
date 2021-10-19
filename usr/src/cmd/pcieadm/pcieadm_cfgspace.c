@@ -4382,7 +4382,11 @@ pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	{ PCIE_EXT_CAP_ID_NPEM, "npem", "Native PCIe Enclosure Management" },
 	{ PCIE_EXT_CAP_ID_PL32GT, "pl32g", "Physical Layer 32.0 GT/s" },
 	{ PCIE_EXT_CAP_ID_AP, "ap", "Alternative Protocol" },
-	{ PCIE_EXT_CAP_ID_SFI, "sfi", "System Firmware Intermediary" }
+	{ PCIE_EXT_CAP_ID_SFI, "sfi", "System Firmware Intermediary" },
+	{ PCIE_EXT_CAP_ID_SHDW_FUNC, "sfunc", "Shadow Functions" },
+	{ PCIE_EXT_CAP_ID_DOE, "doe", "Data Object Exchange" },
+	{ PCIE_EXT_CAP_ID_DEV3, "dev3", "Device 3" },
+	{ PCIE_EXT_CAP_ID_IDE, "ide", "Integrity and Data Encryption" }
 };
 
 static const pcieadm_pci_cap_t *

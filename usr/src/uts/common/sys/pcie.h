@@ -584,6 +584,10 @@ extern "C" {
 #define	PCIE_EXT_CAP_ID_PL32GT		0x2A	/* Physical Layer 32.0 GT/s */
 #define	PCIE_EXT_CAP_ID_AP		0x2B	/* Alternate Protocol */
 #define	PCIE_EXT_CAP_ID_SFI		0x2C	/* Sys. Firmware Intermediary */
+#define	PCIE_EXT_CAP_ID_SHDW_FUNC	0x2D	/* Shadow Functions */
+#define	PCIE_EXT_CAP_ID_DOE		0x2E	/* Data Object Exchange */
+#define	PCIE_EXT_CAP_ID_DEV3		0x2F	/* Device 3 */
+#define	PCIE_EXT_CAP_ID_IDE		0x30	/* Integrity and Data Encr. */
 
 /*
  * PCI-Express Advanced Error Reporting Extended Capability Offsets
