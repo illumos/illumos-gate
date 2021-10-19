@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -58,9 +59,15 @@ static const libjedec_test_t libjedec_expects[] = {
 	{ 0x08, 0x1F, "Shenzhen City Gcai Electronics" },
 	{ 0x08, 0xF1, "Asgard" },
 	{ 0x09, 0x13, "Raspberry Pi Trading Ltd." },
+	{ 0x09, 0xFE, "ALLFLASH Technology Limited" },
+	{ 0x0a, 0x2C, "Diamond" },
+	{ 0x0a, 0x6B, "Acer" },
+	{ 0x0b, 0xE6, "NUVIA Inc" },
+	{ 0x0c, 0xC4, "uFound" },
+	{ 0x0d, 0x8A, "Aerospace Science Memory Shenzhen" },
 	/* Various Failure cases */
 	{ 0x00, 0x05, NULL },
-	{ 0x09, 0xFE, NULL },
+	{ 0x0d, 0xFE, NULL },
 	{ 0x20, 0x01, NULL }
 };
 
@@ -78,7 +85,7 @@ main(void)
 			errs++;
 			(void) fprintf(stderr, "test %u failed, expected %s, "
 			    "but lookup failed\n", i,
-			    libjedec_expects[i].ljtt_vendor);
+			    libjedec_expects[i].ljtt_exp);
 		} else if (out != NULL && libjedec_expects[i].ljtt_exp ==
 		    NULL) {
 			errs++;
