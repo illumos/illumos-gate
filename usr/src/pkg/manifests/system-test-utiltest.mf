@@ -1849,7 +1849,9 @@ license usr/src/test/util-tests/tests/demangle/THIRDPARTYLICENSE.rust \
     license=usr/src/test/util-tests/tests/demangle/THIRDPARTYLICENSE.rust
 license usr/src/test/util-tests/tests/sed/bsd/THIRDPARTYLICENSE \
     license=usr/src/test/util-tests/tests/sed/bsd/THIRDPARTYLICENSE
+depend fmri=developer/dtrace type=require
 depend fmri=diagnostic/pci type=require
 depend fmri=locale/de type=require
+depend fmri=system/kernel/dtrace/providers type=require
 depend fmri=system/library/iconv/utf-8 type=require
 depend fmri=system/test/testrunner type=require

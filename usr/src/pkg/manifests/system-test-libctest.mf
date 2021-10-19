@@ -246,10 +246,12 @@ hardlink path=opt/libc-tests/tests/symbols/wctype_h target=setup
 license lic_CDDL license=lic_CDDL
 license usr/src/test/libc-tests/tests/regex/THIRDPARTYLICENSE \
     license=usr/src/test/libc-tests/tests/regex/THIRDPARTYLICENSE
+depend fmri=developer/dtrace type=require
 depend fmri=locale/ar type=require
 depend fmri=locale/de type=require
 depend fmri=locale/en type=require
 depend fmri=locale/en-extra type=require
 depend fmri=locale/ja type=require
 depend fmri=locale/ru type=require
+depend fmri=system/kernel/dtrace/providers type=require
 depend fmri=system/test/testrunner type=require
