@@ -49,11 +49,11 @@
  *	If the archive member simply contains another tentative definition,
  *	or a defined function symbol, then it will not be used.
  *
- *  ii.	A symbol reference may define a hidden or protected visibility.  The
+ *  ii.	A symbol reference may define a hidden or protected visibility.	 The
  *	reference can only be bound to a definition within a relocatable object
- *	for this restricted visibility to be satisfied.  If the archive member
- * 	provides a definition of the same symbol type, this definition is
- *	taken.  The visibility of the defined symbol is irrelevant, as the most
+ *	for this restricted visibility to be satisfied.	 If the archive member
+ *	provides a definition of the same symbol type, this definition is
+ *	taken.	The visibility of the defined symbol is irrelevant, as the most
  *	restrictive visibility of the reference and the definition will be
  *	applied to the final symbol.
  *
@@ -66,7 +66,7 @@ process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 {
 	Sym	*syms, *osym = sdp->sd_sym;
 	Xword	symn, cnt;
-	char 	*strs;
+	char	*strs;
 
 	/*
 	 * Find the first symbol table in the archive member, obtain its
@@ -214,6 +214,7 @@ ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 	adp->ad_name = name;
 	adp->ad_elf = elf;
 	adp->ad_start = start;
+	adp->ad_allextract = FALSE;
 	if (start) {
 		adp->ad_aux = libld_calloc(sizeof (Ar_aux), number);
 		if (adp->ad_aux == NULL)
@@ -796,16 +797,13 @@ ar_extract_all(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl,
 		}
 
 		*found = TRUE;
-
 	}
 
 	/*
-	 * As this archive was extracted by -z allextract, the ar_aux table
-	 * and elf descriptor can be freed.  Set ad_elf to NULL to mark the
-	 * archive is completely processed.
+	 * Mark this as having been completely processed, so we don't have do
+	 * work harder than necessary.
 	 */
-	(void) elf_end(adp->ad_elf);
-	adp->ad_elf = NULL;
+	adp->ad_allextract = TRUE;
 
 	return (TRUE);
 }
@@ -846,7 +844,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 	 * If this archive was processed with -z allextract, then all members
 	 * have already been extracted.
 	 */
-	if (adp->ad_elf == NULL)
+	if (adp->ad_allextract == TRUE)
 		return (TRUE);
 
 	if (ofl->ofl_flags1 & FLG_OF1_ALLEXRT) {
@@ -869,7 +867,6 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 		    rej.rej_name ? rej.rej_name : MSG_INTL(MSG_STR_UNKNOWN),
 		    conv_reject_desc(&rej, &rej_buf, ld_targ.t_m.m_mach));
 	}
-
 
 	return (TRUE);
 }

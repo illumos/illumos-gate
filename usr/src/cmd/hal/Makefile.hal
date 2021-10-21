@@ -75,11 +75,5 @@ CERRWARN +=		-_gcc=-Wno-parentheses
 CERRWARN +=		-_gcc=-Wno-address
 CERRWARN +=		-_gcc=-Wno-unused-function
 
-# glib2 >= 2.62 suppresses warnings about deprecated declarations in header
-# files using pragma "GCC diagnostic ignored \"-Wdeprecated-declarations\""
-# This is not supported before GCC 4.6 so just globally suppress these
-# warnings under the shadow compiler
-CERRWARN +=		-_gcc4=-Wno-deprecated-declarations
-
 # not linted
 SMATCH=off

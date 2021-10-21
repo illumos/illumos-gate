@@ -1524,6 +1524,7 @@ typedef struct ar_desc {
 	dev_t		ad_stdev;	/* device id and inode number for */
 	ino_t		ad_stino;	/*	multiple inclusion checks */
 	ofl_flag_t	ad_flags;	/* archive specific cmd line flags */
+	Boolean		ad_allextract;	/* archive has been allextract'ed */
 } Ar_desc;
 
 /*

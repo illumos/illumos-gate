@@ -1676,3 +1676,4 @@ Bugid   Risk Synopsis
 14090	ld(1) could use a normal allocator
 14090	backout: turns over big rocks, discovers big bugs
 14152	ld(1) should be more careful about empty alists
+14127	ld(1) can double free when cleaning up

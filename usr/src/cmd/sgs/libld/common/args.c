@@ -276,7 +276,7 @@ ld_rescan_archives(Ofl_desc *ofl, int isgrp, int end_arg_ndx)
 			 * If this archive was processed with -z allextract,
 			 * then all members have already been extracted.
 			 */
-			if (adp->ad_elf == NULL)
+			if (adp->ad_allextract == TRUE)
 				continue;
 
 			/*
