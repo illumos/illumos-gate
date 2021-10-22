@@ -69,4 +69,9 @@ $(POFILE):	$(TABFILES) do_pofile.sh
 		$(RM) $@
 		@/bin/sh do_pofile.sh > $@
 
+update:		FRC
+		./update_manifest $(TZFILES)
+
+FRC:
+
 include		$(SRC)/data/Makefile.targ

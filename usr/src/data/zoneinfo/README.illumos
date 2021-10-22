@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2014 Joyent, Inc.  All rights reserved.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 How to update the TZ database information.
@@ -60,20 +60,29 @@ to stage the zone files to proto, then run `./zonelint`. If it produces no
 output then you're okay.
 
 After that's done, you'll need to go through the more agonizing process of
-packaging. To do this, you'll want to look through the differences that have
-occurred in zone.tab.txt and backward. The contents of backward describe
-hardlinks that need to exist in packaging. Specifically, if you have a line in
-the form of:
+packaging. To do this, you'll want to look through the differences in "Link"
+lines in all files under $CODEMGR_WS/usr/src/data/zoneinfo/
+These "Link" lines describe hardlinks that need to exist in packaging.
+Specifically, if you have a line in the form of:
 
 LINK	Arda/Beleriand	Arda/Gondolin
 
 That instructs that Gondolin should be hardlinked to Beleriand. In IPS parlance
 that'd be:
 
-hardlink path=usr/share/lib/zoneinfo/Arda/Gondolin target=../Arda/Beleriand
+hardlink path=usr/share/lib/zoneinfo/Arda/Gondolin target=Beleriand
 
-The differences in zone.tab.txt describe the additions and removals of various
-file entries. If you're not friends with protocmp yet, this should help you out.
+The 'update' make target can help with this by automatically re-generating all
+of the hardlinks in the package manifest based on the Link lines found in the
+data files. Run 'make update' and then check the manifest file at
+$CODEMGR_WS/usr/src/pkg/manifests/system-data-zoneinfo.mf to ensure it has
+done the right thing.
+
+Other differences in files describe the addition and removal of various
+file entries. The update_manifest script will take care of files which have
+changed to links but others may need manual adjustment. If you're not friends
+with protocmp yet, this should help you out.
+
 Once both of those are done, you'll need to update the version of the package
 itself in the manifest. IANA releases these as <year><letter>, eg. 2013i.
 Instead, you need to encode that letter to its spot in the alphabet. So 2013i
