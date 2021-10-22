@@ -26,6 +26,7 @@
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Argo Technologies SA
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Racktop Systems, Inc.
  */
 
 /*
@@ -3640,6 +3641,12 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 	ushort_t rate;
 	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 
+	/*
+	 * sata_txlt_generic_pkt_info() and sata_get_device_info() require
+	 * cport_mutex to be held while they are called. sdinfo is also
+	 * protected by cport_mutex, so we hold cport_mutex until after we've
+	 * finished using sdinfo.
+	 */
 	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
@@ -3669,238 +3676,249 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 	/* Valid Inquiry request */
 	*scsipkt->pkt_scbp = STATUS_GOOD;
 
-	if (bp != NULL && bp->b_un.b_addr && bp->b_bcount) {
+	if (bp == NULL || bp->b_un.b_addr == NULL || bp->b_bcount == 0)
+		goto done;
 
-		/*
-		 * Because it is fully emulated command storing data
-		 * programatically in the specified buffer, release
-		 * preallocated DMA resources before storing data in the buffer,
-		 * so no unwanted DMA sync would take place.
-		 */
-		sata_scsi_dmafree(NULL, scsipkt);
+	/*
+	 * Because it is fully emulated command storing data
+	 * programatically in the specified buffer, release
+	 * preallocated DMA resources before storing data in the buffer,
+	 * so no unwanted DMA sync would take place.
+	 */
+	sata_scsi_dmafree(NULL, scsipkt);
 
-		if (!(scsipkt->pkt_cdbp[1] & EVPD)) {
-			/* Standard Inquiry Data request */
-			struct scsi_inquiry inq;
-			unsigned int bufsize;
+	if (!(scsipkt->pkt_cdbp[1] & EVPD)) {
+		/* Standard Inquiry Data request */
+		struct scsi_inquiry inq;
+		unsigned int bufsize;
 
-			sata_identdev_to_inquiry(spx->txlt_sata_hba_inst,
-			    sdinfo, (uint8_t *)&inq);
-			/* Copy no more than requested */
-			count = MIN(bp->b_bcount,
-			    sizeof (struct scsi_inquiry));
-			bufsize = scsipkt->pkt_cdbp[4];
-			bufsize |= scsipkt->pkt_cdbp[3] << 8;
-			count = MIN(count, bufsize);
-			bcopy(&inq, bp->b_un.b_addr, count);
+		sata_identdev_to_inquiry(spx->txlt_sata_hba_inst,
+		    sdinfo, (uint8_t *)&inq);
+		/* Copy no more than requested */
+		count = MIN(bp->b_bcount, sizeof (struct scsi_inquiry));
+		bufsize = scsipkt->pkt_cdbp[4];
+		bufsize |= scsipkt->pkt_cdbp[3] << 8;
+		count = MIN(count, bufsize);
+		bcopy(&inq, bp->b_un.b_addr, count);
 
-			scsipkt->pkt_state |= STATE_XFERRED_DATA;
-			scsipkt->pkt_resid = scsipkt->pkt_cdbp[4] > count ?
-			    bufsize - count : 0;
-		} else {
-			/*
-			 * peripheral_qualifier = 0;
-			 *
-			 * We are dealing only with HD and will be
-			 * dealing with CD/DVD devices soon
-			 */
-			uint8_t peripheral_device_type =
-			    sdinfo->satadrv_type == SATA_DTYPE_ATADISK ?
-			    DTYPE_DIRECT : DTYPE_RODIRECT;
-
-			bzero(page_buf, sizeof (page_buf));
-
-			switch ((uint_t)scsipkt->pkt_cdbp[2]) {
-			case INQUIRY_SUP_VPD_PAGE:
-				/*
-				 * Request for supported Vital Product Data
-				 * pages.
-				 */
-				page_buf[0] = peripheral_device_type;
-				page_buf[1] = INQUIRY_SUP_VPD_PAGE;
-				page_buf[2] = 0;
-				page_buf[3] = 4; /* page length */
-				page_buf[4] = INQUIRY_SUP_VPD_PAGE;
-				page_buf[5] = INQUIRY_USN_PAGE;
-				page_buf[6] = INQUIRY_BDC_PAGE;
-				page_buf[7] = INQUIRY_ATA_INFO_PAGE;
-				/* Copy no more than requested */
-				count = MIN(bp->b_bcount, 8);
-				bcopy(page_buf, bp->b_un.b_addr, count);
-				break;
-
-			case INQUIRY_USN_PAGE:
-				/*
-				 * Request for Unit Serial Number page.
-				 * Set-up the page.
-				 */
-				page_buf[0] = peripheral_device_type;
-				page_buf[1] = INQUIRY_USN_PAGE;
-				page_buf[2] = 0;
-				/* remaining page length */
-				page_buf[3] = SATA_ID_SERIAL_LEN;
-
-				/*
-				 * Copy serial number from Identify Device data
-				 * words into the inquiry page and swap bytes
-				 * when necessary.
-				 */
-				p = (uint8_t *)(sdinfo->satadrv_id.ai_drvser);
-#ifdef	_LITTLE_ENDIAN
-				swab(p, &page_buf[4], SATA_ID_SERIAL_LEN);
-#else
-				bcopy(p, &page_buf[4], SATA_ID_SERIAL_LEN);
-#endif
-				/*
-				 * Least significant character of the serial
-				 * number shall appear as the last byte,
-				 * according to SBC-3 spec.
-				 * Count trailing spaces to determine the
-				 * necessary shift length.
-				 */
-				p = &page_buf[SATA_ID_SERIAL_LEN + 4 - 1];
-				for (j = 0; j < SATA_ID_SERIAL_LEN; j++) {
-					if (*(p - j) != '\0' &&
-					    *(p - j) != '\040')
-						break;
-				}
-
-				/*
-				 * Shift SN string right, so that the last
-				 * non-blank character would appear in last
-				 * byte of SN field in the page.
-				 * 'j' is the shift length.
-				 */
-				for (i = 0;
-				    i < (SATA_ID_SERIAL_LEN - j) && j != 0;
-				    i++, p--)
-					*p = *(p - j);
-
-				/*
-				 * Add leading spaces - same number as the
-				 * shift size
-				 */
-				for (; j > 0; j--)
-					page_buf[4 + j - 1] = '\040';
-
-				count = MIN(bp->b_bcount,
-				    SATA_ID_SERIAL_LEN + 4);
-				bcopy(page_buf, bp->b_un.b_addr, count);
-				break;
-
-			case INQUIRY_BDC_PAGE:
-				/*
-				 * Request for Block Device Characteristics
-				 * page.  Set-up the page.
-				 */
-				page_buf[0] = peripheral_device_type;
-				page_buf[1] = INQUIRY_BDC_PAGE;
-				page_buf[2] = 0;
-				/* remaining page length */
-				page_buf[3] = SATA_ID_BDC_LEN;
-
-				rate = sdinfo->satadrv_id.ai_medrotrate;
-				page_buf[4] = (rate >> 8) & 0xff;
-				page_buf[5] = rate & 0xff;
-				page_buf[6] = 0;
-				page_buf[7] = sdinfo->satadrv_id.
-				    ai_nomformfactor & 0xf;
-
-				count = MIN(bp->b_bcount,
-				    SATA_ID_BDC_LEN + 4);
-				bcopy(page_buf, bp->b_un.b_addr, count);
-				break;
-
-			case INQUIRY_ATA_INFO_PAGE:
-				/*
-				 * Request for ATA Information page.
-				 */
-				page_buf[0] = peripheral_device_type;
-				page_buf[1] = INQUIRY_ATA_INFO_PAGE;
-				page_buf[2] = (SATA_ID_ATA_INFO_LEN >> 8) &
-				    0xff;
-				page_buf[3] = SATA_ID_ATA_INFO_LEN & 0xff;
-				/* page_buf[4-7] reserved */
-#ifdef  _LITTLE_ENDIAN
-				bcopy("ATA     ", &page_buf[8], 8);
-				swab(sdinfo->satadrv_id.ai_model,
-				    &page_buf[16], 16);
-				if (strncmp(&sdinfo->satadrv_id.ai_fw[4],
-				    "    ", 4) == 0) {
-					swab(sdinfo->satadrv_id.ai_fw,
-					    &page_buf[32], 4);
-				} else {
-					swab(&sdinfo->satadrv_id.ai_fw[4],
-					    &page_buf[32], 4);
-				}
-#else   /* _LITTLE_ENDIAN */
-				bcopy("ATA     ", &page_buf[8], 8);
-				bcopy(sdinfo->satadrv_id.ai_model,
-				    &page_buf[16], 16);
-				if (strncmp(&sdinfo->satadrv_id.ai_fw[4],
-				    "    ", 4) == 0) {
-					bcopy(sdinfo->satadrv_id.ai_fw,
-					    &page_buf[32], 4);
-				} else {
-					bcopy(&sdinfo->satadrv_id.ai_fw[4],
-					    &page_buf[32], 4);
-				}
-#endif  /* _LITTLE_ENDIAN */
-				/*
-				 * page_buf[36-55] which defines the device
-				 * signature is not defined at this
-				 * time.
-				 */
-
-				/* Set the command code */
-				if (sdinfo->satadrv_type ==
-				    SATA_DTYPE_ATADISK) {
-					page_buf[56] = SATAC_ID_DEVICE;
-				} else if (sdinfo->satadrv_type ==
-				    SATA_DTYPE_ATAPI) {
-					page_buf[56] = SATAC_ID_PACKET_DEVICE;
-				}
-				/*
-				 * If the command code, page_buf[56], is not
-				 * zero and if one of the identify commands
-				 * succeeds, return the identify data.
-				 */
-				if ((page_buf[56] != 0) &&
-				    (sata_fetch_device_identify_data(
-				    spx->txlt_sata_hba_inst, sdinfo) ==
-				    SATA_SUCCESS)) {
-					bcopy(&sdinfo->satadrv_id,
-					    &page_buf[60], sizeof (sata_id_t));
-				}
-
-				/* Need to copy out the page_buf to bp */
-				count = MIN(bp->b_bcount,
-				    SATA_ID_ATA_INFO_LEN + 4);
-				bcopy(page_buf, bp->b_un.b_addr, count);
-				break;
-
-			case INQUIRY_DEV_IDENTIFICATION_PAGE:
-				/*
-				 * We may want to implement this page, when
-				 * identifiers are common for SATA devices
-				 * But not now.
-				 */
-				/*FALLTHROUGH*/
-
-			default:
-				/* Request for unsupported VPD page */
-				*scsipkt->pkt_scbp = STATUS_CHECK;
-				sense = sata_arq_sense(spx);
-				sense->es_key = KEY_ILLEGAL_REQUEST;
-				sense->es_add_code =
-				    SD_SCSI_ASC_INVALID_FIELD_IN_CDB;
-				goto done;
-			}
-		}
 		scsipkt->pkt_state |= STATE_XFERRED_DATA;
 		scsipkt->pkt_resid = scsipkt->pkt_cdbp[4] > count ?
-		    scsipkt->pkt_cdbp[4] - count : 0;
+		    bufsize - count : 0;
+		goto done;
 	}
+
+	/*
+	 * peripheral_qualifier = 0;
+	 *
+	 * We are dealing only with HD and will be
+	 * dealing with CD/DVD devices soon
+	 */
+	uint8_t peripheral_device_type =
+	    sdinfo->satadrv_type == SATA_DTYPE_ATADISK ?
+	    DTYPE_DIRECT : DTYPE_RODIRECT;
+
+	bzero(page_buf, sizeof (page_buf));
+
+	switch ((uint_t)scsipkt->pkt_cdbp[2]) {
+	case INQUIRY_SUP_VPD_PAGE:
+		/*
+		 * Request for supported Vital Product Data pages.
+		 */
+		page_buf[0] = peripheral_device_type;
+		page_buf[1] = INQUIRY_SUP_VPD_PAGE;
+		page_buf[2] = 0;
+		page_buf[3] = 4; /* page length */
+		page_buf[4] = INQUIRY_SUP_VPD_PAGE;
+		page_buf[5] = INQUIRY_USN_PAGE;
+		page_buf[6] = INQUIRY_BDC_PAGE;
+		page_buf[7] = INQUIRY_ATA_INFO_PAGE;
+		/* Copy no more than requested */
+		count = MIN(bp->b_bcount, 8);
+		bcopy(page_buf, bp->b_un.b_addr, count);
+		break;
+
+	case INQUIRY_USN_PAGE:
+		/*
+		 * Request for Unit Serial Number page.
+		 * Set-up the page.
+		 */
+		page_buf[0] = peripheral_device_type;
+		page_buf[1] = INQUIRY_USN_PAGE;
+		page_buf[2] = 0;
+		/* remaining page length */
+		page_buf[3] = SATA_ID_SERIAL_LEN;
+
+		/*
+		 * Copy serial number from Identify Device data
+		 * words into the inquiry page and swap bytes
+		 * when necessary.
+		 */
+		p = (uint8_t *)(sdinfo->satadrv_id.ai_drvser);
+#ifdef	_LITTLE_ENDIAN
+		swab(p, &page_buf[4], SATA_ID_SERIAL_LEN);
+#else
+		bcopy(p, &page_buf[4], SATA_ID_SERIAL_LEN);
+#endif
+		/*
+		 * Least significant character of the serial
+		 * number shall appear as the last byte,
+		 * according to SBC-3 spec.
+		 * Count trailing spaces to determine the
+		 * necessary shift length.
+		 */
+		p = &page_buf[SATA_ID_SERIAL_LEN + 4 - 1];
+		for (j = 0; j < SATA_ID_SERIAL_LEN; j++) {
+			if (*(p - j) != '\0' && *(p - j) != '\040')
+				break;
+		}
+
+		/*
+		 * Shift SN string right, so that the last
+		 * non-blank character would appear in last
+		 * byte of SN field in the page.
+		 * 'j' is the shift length.
+		 */
+		for (i = 0; i < (SATA_ID_SERIAL_LEN - j) && j != 0; i++, p--)
+			*p = *(p - j);
+
+		/*
+		 * Add leading spaces - same number as the
+		 * shift size
+		 */
+		for (; j > 0; j--)
+			page_buf[4 + j - 1] = '\040';
+
+		count = MIN(bp->b_bcount, SATA_ID_SERIAL_LEN + 4);
+		bcopy(page_buf, bp->b_un.b_addr, count);
+		break;
+
+	case INQUIRY_BDC_PAGE:
+		/*
+		 * Request for Block Device Characteristics
+		 * page.  Set-up the page.
+		 */
+		page_buf[0] = peripheral_device_type;
+		page_buf[1] = INQUIRY_BDC_PAGE;
+		page_buf[2] = 0;
+		/* remaining page length */
+		page_buf[3] = SATA_ID_BDC_LEN;
+
+		rate = sdinfo->satadrv_id.ai_medrotrate;
+		page_buf[4] = (rate >> 8) & 0xff;
+		page_buf[5] = rate & 0xff;
+		page_buf[6] = 0;
+		page_buf[7] = sdinfo->satadrv_id.ai_nomformfactor & 0xf;
+
+		count = MIN(bp->b_bcount, SATA_ID_BDC_LEN + 4);
+		bcopy(page_buf, bp->b_un.b_addr, count);
+		break;
+
+	case INQUIRY_ATA_INFO_PAGE:
+		/*
+		 * Request for ATA Information page.
+		 */
+		page_buf[0] = peripheral_device_type;
+		page_buf[1] = INQUIRY_ATA_INFO_PAGE;
+		page_buf[2] = (SATA_ID_ATA_INFO_LEN >> 8) & 0xff;
+		page_buf[3] = SATA_ID_ATA_INFO_LEN & 0xff;
+		/* page_buf[4-7] reserved */
+#ifdef  _LITTLE_ENDIAN
+		bcopy("ATA     ", &page_buf[8], 8);
+		swab(sdinfo->satadrv_id.ai_model, &page_buf[16], 16);
+		if (strncmp(&sdinfo->satadrv_id.ai_fw[4], "    ", 4) == 0) {
+			swab(sdinfo->satadrv_id.ai_fw, &page_buf[32], 4);
+		} else {
+			swab(&sdinfo->satadrv_id.ai_fw[4], &page_buf[32], 4);
+		}
+#else   /* _LITTLE_ENDIAN */
+		bcopy("ATA     ", &page_buf[8], 8);
+		bcopy(sdinfo->satadrv_id.ai_model, &page_buf[16], 16);
+		if (strncmp(&sdinfo->satadrv_id.ai_fw[4], "    ", 4) == 0) {
+			bcopy(sdinfo->satadrv_id.ai_fw, &page_buf[32], 4);
+		} else {
+			bcopy(&sdinfo->satadrv_id.ai_fw[4], &page_buf[32], 4);
+		}
+#endif  /* _LITTLE_ENDIAN */
+		/*
+		 * page_buf[36-55] which defines the device
+		 * signature is not defined at this
+		 * time.
+		 */
+
+		/* Set the command code */
+		if (sdinfo->satadrv_type == SATA_DTYPE_ATADISK) {
+			page_buf[56] = SATAC_ID_DEVICE;
+		} else if (sdinfo->satadrv_type == SATA_DTYPE_ATAPI) {
+			page_buf[56] = SATAC_ID_PACKET_DEVICE;
+		}
+		/*
+		 * If the command code, page_buf[56], is not
+		 * zero and if one of the identify commands
+		 * succeeds, return the identify data.
+		 */
+		if (page_buf[56] != 0) {
+			sata_drive_info_t temp_info = {
+				.satadrv_addr = sdinfo->satadrv_addr,
+				.satadrv_type = sdinfo->satadrv_type,
+			};
+
+			/*
+			 * It appears calls to an HBA's start (sata_hba_start)
+			 * method (which sata_fetch_device_identify_data_retry()
+			 * calls) must not be done while holding cport_mutex.
+			 *
+			 * A packet's completion routine may call back into
+			 * the sata framework and deadlock (and all extant
+			 * calls to the HBA's start method either drop and
+			 * re-acquire cport_mutex, or never held cport_mutex).
+			 *
+			 * sdinfo is protected by cport_mutex, so we need to
+			 * obtain the SATA address and type from sdinfo
+			 * before releasing cport_mutex and submitting the
+			 * request. We reacquire cport_mutex to simplfy
+			 * cleanup after the done label.
+			 */
+			mutex_exit(cport_mutex);
+			(void) sata_fetch_device_identify_data(
+			    spx->txlt_sata_hba_inst, &temp_info);
+			mutex_enter(cport_mutex);
+
+			/*
+			 * If sata_fetch_device_identify_data()
+			 * fails, the bcopy() is harmless since we're copying
+			 * zeros back over zeros. If it succeeds, we're
+			 * copying over the portion of the response we need.
+			 */
+			bcopy(&temp_info.satadrv_id, &page_buf[60],
+			    sizeof (sata_id_t));
+		}
+
+		/* Need to copy out the page_buf to bp */
+		count = MIN(bp->b_bcount, SATA_ID_ATA_INFO_LEN + 4);
+		bcopy(page_buf, bp->b_un.b_addr, count);
+		break;
+
+	case INQUIRY_DEV_IDENTIFICATION_PAGE:
+		/*
+		 * We may want to implement this page, when
+		 * identifiers are common for SATA devices
+		 * But not now.
+		 */
+		/*FALLTHROUGH*/
+
+	default:
+		/* Request for unsupported VPD page */
+		*scsipkt->pkt_scbp = STATUS_CHECK;
+		sense = sata_arq_sense(spx);
+		sense->es_key = KEY_ILLEGAL_REQUEST;
+		sense->es_add_code = SD_SCSI_ASC_INVALID_FIELD_IN_CDB;
+		goto done;
+	}
+
+	scsipkt->pkt_state |= STATE_XFERRED_DATA;
+	scsipkt->pkt_resid = scsipkt->pkt_cdbp[4] > count ?
+	    scsipkt->pkt_cdbp[4] - count : 0;
+
 done:
 	mutex_exit(cport_mutex);
 
