@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  * Copyright 2020 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
@@ -346,6 +346,115 @@ proc_is_exiting(proc_t *p)
 }
 
 /*
+ * Return true if zone's init is restarted, false if exit processing should
+ * proceeed.
+ */
+static boolean_t
+zone_init_exit(zone_t *z, int why, int what)
+{
+	/*
+	 * Typically we don't let the zone's init exit unless zone_start_init()
+	 * failed its exec, or we are shutting down the zone or the machine,
+	 * although the various flags handled within this function will control
+	 * the behavior.
+	 *
+	 * Since we are single threaded, we don't need to lock the following
+	 * accesses to zone_proc_initpid.
+	 */
+	if (z->zone_boot_err != 0 ||
+	    zone_status_get(z) >= ZONE_IS_SHUTTING_DOWN ||
+	    zone_status_get(global_zone) >= ZONE_IS_SHUTTING_DOWN) {
+		/*
+		 * Clear the zone's init pid and proceed with exit processing.
+		 */
+		z->zone_proc_initpid = -1;
+		return (B_FALSE);
+	}
+
+	/*
+	 * There are a variety of configuration flags on the zone to control
+	 * init exit behavior.
+	 *
+	 * If the init process should be restarted, the "zone_restart_init"
+	 * member will be set.
+	 */
+	if (!z->zone_restart_init) {
+		/*
+		 * The zone has been set up to halt when init exits.
+		 */
+		(void) zone_kadmin(A_SHUTDOWN, AD_HALT, NULL, zone_kcred());
+		z->zone_proc_initpid = -1;
+		return (B_FALSE);
+	}
+
+	/*
+	 * At this point we know we're configured to restart init, but there
+	 * are various modifiers to that behavior.
+	 */
+
+	if (z->zone_reboot_on_init_exit) {
+		/*
+		 * Some init programs in branded zones do not tolerate a
+		 * restart in the traditional manner; setting
+		 * "zone_reboot_on_init_exit" will cause the entire zone to be
+		 * rebooted instead.
+		 */
+
+		if (z->zone_restart_init_0) {
+			/*
+			 * Some init programs in branded zones only want to
+			 * restart if they exit 0, otherwise the zone should
+			 * shutdown. Setting the "zone_restart_init_0" member
+			 * controls this behavior.
+			 */
+			if (why == CLD_EXITED && what == 0) {
+				/* Trigger a zone reboot */
+				(void) zone_kadmin(A_REBOOT, 0, NULL,
+				    zone_kcred());
+			} else {
+				/* Shutdown instead of reboot */
+				(void) zone_kadmin(A_SHUTDOWN, AD_HALT, NULL,
+				    zone_kcred());
+			}
+		} else {
+			/* Trigger a zone reboot */
+			(void) zone_kadmin(A_REBOOT, 0, NULL, zone_kcred());
+		}
+
+		z->zone_proc_initpid = -1;
+		return (B_FALSE);
+	}
+
+	if (z->zone_restart_init_0) {
+		/*
+		 * Some init programs in branded zones only want to restart if
+		 * they exit 0, otherwise the zone should shutdown. Setting the
+		 * "zone_restart_init_0" member controls this behavior.
+		 *
+		 * In this case we only restart init if it exited successfully.
+		 */
+		if (why == CLD_EXITED && what == 0 &&
+		    restart_init(what, why) == 0) {
+			return (B_TRUE);
+		}
+	} else {
+		/*
+		 * No restart modifiers on the zone, attempt to restart init.
+		 */
+		if (restart_init(what, why) == 0)
+			return (B_TRUE);
+	}
+
+	/*
+	 * The restart failed, or the criteria for a restart are not met;
+	 * the zone will shut down.
+	 */
+	(void) zone_kadmin(A_SHUTDOWN, AD_HALT, NULL, zone_kcred());
+	z->zone_proc_initpid = -1;
+	return (B_FALSE);
+}
+
+/*
  * Return value:
  *   1 - exitlwps() failed, call (or continue) lwp_exit()
  *   0 - restarting init.  Return through system call path
@@ -413,24 +522,9 @@ proc_exit(int why, int what)
 	 * following accesses to zone_proc_initpid.
 	 */
 	if (p->p_pid == z->zone_proc_initpid) {
-		if (z->zone_boot_err == 0 &&
-		    zone_status_get(z) < ZONE_IS_SHUTTING_DOWN &&
-		    zone_status_get(global_zone) < ZONE_IS_SHUTTING_DOWN) {
-			if (z->zone_restart_init == B_TRUE) {
-				if (restart_init(what, why) == 0)
-					return (0);
-			} else {
-				(void) zone_kadmin(A_SHUTDOWN, AD_HALT, NULL,
-				    CRED());
-			}
-		}
-
-		/*
-		 * Since we didn't or couldn't restart init, we clear
-		 * the zone's init state and proceed with exit
-		 * processing.
-		 */
-		z->zone_proc_initpid = -1;
+		/* If zone's init restarts, we're done here. */
+		if (zone_init_exit(z, why, what))
+			return (0);
 	}
 
 	lwp_pcb_exit();

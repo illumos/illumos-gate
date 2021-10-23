@@ -117,6 +117,8 @@ extern "C" {
 #define	ZONE_ATTR_NETWORK	17
 #define	ZONE_ATTR_INITNORESTART	20
 #define	ZONE_ATTR_SECFLAGS	21
+#define	ZONE_ATTR_INITRESTART0	22
+#define	ZONE_ATTR_INITREBOOT	23
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -555,6 +557,8 @@ typedef struct zone {
 	tsol_mlp_list_t zone_mlps;	/* MLPs on zone-private addresses */
 
 	boolean_t	zone_restart_init;	/* Restart init if it dies? */
+	boolean_t	zone_reboot_on_init_exit; /* Reboot if init dies? */
+	boolean_t	zone_restart_init_0;	/* Restart only if it exits 0 */
 	struct brand	*zone_brand;		/* zone's brand */
 	void		*zone_brand_data;	/* store brand specific data */
 	id_t		zone_defaultcid;	/* dflt scheduling class id */

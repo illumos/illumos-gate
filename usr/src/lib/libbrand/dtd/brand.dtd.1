@@ -212,17 +212,36 @@
 <!ATTLIST initname>
 
 <!--
-  restartinit
+  restartinit, restartinit0 and restartinitreboot
 
-    Boolean indicating that the program specified by the initname attr
-    should be restarted, or not, if it exits.  By default, the init program
-    will be restarted if this attribute is not provided.  Specifying false
-    for this attr will prevent that.
+    These three boolean elements control what action is taken when the
+    program specified by the 'initname' element exits.
 
-    It has no attributes.
+    The default values are:
+
+        restartinit:       true
+        restartinit0:      false
+        restartinitreboot: false
+
+    If 'restartinit' is set to false then the init process will never be
+    restarted and the zone will shut down once init exits. In this case, the
+    other restartinit elements are ignored.
+
+    When 'restartinit0' is set, init will only be restarted if it exited with
+    an exit status of 0, otherwise the zone will shut down.
+
+    If 'restartinitreboot' is set to true then whenever init should be
+    restarted, based on the other restartinit elements, the zone will instead
+    be rebooted.
+
+    These have no attributes.
 -->
 <!ELEMENT restartinit	(#PCDATA) >
 <!ATTLIST restartinit>
+<!ELEMENT restartinit0	(#PCDATA) >
+<!ATTLIST restartinit0>
+<!ELEMENT restartinitreboot	(#PCDATA) >
+<!ATTLIST restartinitreboot>
 
 <!--
   login_cmd
@@ -627,7 +646,7 @@
 
 -->
 <!ELEMENT privilege	(#PCDATA) >
-<!ATTLIST privilege	set	( default | prohibited | required ) #REQUIRED 
+<!ATTLIST privilege	set	( default | prohibited | required ) #REQUIRED
 			name	CDATA #REQUIRED
 			ip-type ( shared | exclusive ) "all" >
 
@@ -642,7 +661,9 @@
 		directory in which the configuration file is stored.
 -->
 
-<!ELEMENT brand		(modname?, initname, restartinit?, login_cmd,
+<!ELEMENT brand		(modname?, initname, restartinit?,
+			restartinit0?, restartinitreboot?,
+			login_cmd,
 			forcedlogin_cmd, user_cmd, install,
 			installopts?, boot?, sysboot?, halt?, shutdown?,
 			verify_cfg?, verify_adm?, postattach?, postclone?,
