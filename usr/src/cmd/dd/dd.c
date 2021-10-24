@@ -26,6 +26,7 @@
  * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -117,10 +118,10 @@
 /* Local routine declarations */
 
 static int	match(char *);
-static void		term();
-static unsigned long long	number();
-static unsigned char	*flsh();
-static void		stats();
+static void		term(int);
+static unsigned long long	number(long long);
+static unsigned char	*flsh(void);
+static void		stats(boolean_t);
 
 /* Local data definitions */
 
@@ -166,8 +167,20 @@ static unsigned char	*ibuf;		/* input buffer pointer */
 static unsigned char	*obuf;		/* output buffer pointer */
 
 static hrtime_t		startt;		/* hrtime copy started */
+static uint64_t		prog_secs;	/* number of seconds of progress */
 static unsigned long long	obytes;	/* output bytes */
 static sig_atomic_t	nstats;		/* do we need to output stats */
+
+typedef enum dd_status {
+	DD_STATUS_DEFAULT	= 0,
+	DD_STATUS_NONE		= 1 << 0,
+	DD_STATUS_PROGRESS	= 1 << 1,
+	DD_STATUS_NOXFER	= 1 << 2
+} dd_status_t;
+
+static dd_status_t	status_arg = DD_STATUS_DEFAULT;
+static boolean_t	stderr_tty = B_FALSE;
+static boolean_t	progress_printed = B_FALSE;
 
 /* This is an EBCDIC to ASCII conversion table	*/
 /* from a proposed BTL standard April 16, 1979	*/
@@ -726,6 +739,18 @@ main(int argc, char **argv)
 			}
 			continue;
 		}
+		if (match("status=")) {
+			if (match("none")) {
+				status_arg = DD_STATUS_NONE;
+			} else if (match("noxfer")) {
+				status_arg = DD_STATUS_NOXFER;
+			} else if (match("progress")) {
+				status_arg = DD_STATUS_PROGRESS;
+			} else {
+				goto badarg;
+			}
+			continue;
+		}
 		badarg:
 		(void) fprintf(stderr, "dd: %s \"%s\"\n",
 		    gettext("bad argument:"), string);
@@ -958,6 +983,14 @@ main(int argc, char **argv)
 		exit(2);
 	}
 
+	/*
+	 * Determine if stderr is a tty in case someone has invoked
+	 * status=progress
+	 */
+	if (isatty(STDERR_FILENO) == 1) {
+		stderr_tty = B_TRUE;
+	}
+
 	/* Skip input blocks */
 
 	while (skip) {
@@ -1010,10 +1043,11 @@ main(int argc, char **argv)
 	startt = gethrtime();
 
 	for (;;) {
-		if (nstats != 0) {
-			stats();
-			nstats = 0;
-		}
+		/*
+		 * Always call into the stats function which will check for
+		 * siginfo and related processing that needs to happen.
+		 */
+		stats(B_TRUE);
 
 		if ((count == 0 && ecount == B_FALSE) || (nifr+nipr < count)) {
 		/* If proceed on error is enabled, zero the input buffer */
@@ -1055,7 +1089,7 @@ main(int argc, char **argv)
 					}
 					term(2);
 				} else {
-					stats();
+					stats(B_FALSE);
 					ibc = ibs; /* assume a full block */
 				}
 			} else {
@@ -1802,7 +1836,7 @@ flsh(void)
 static void
 term(int c)
 {
-	stats();
+	stats(B_FALSE);
 	exit(c);
 }
 
@@ -1810,7 +1844,9 @@ term(int c)
 /*									*/
 /* Write record statistics onto standard error				*/
 /*									*/
-/* Args:	none							*/
+/* Args:	main_loop - whether or not we were called from the main */
+/*			    loop and need to consider the siginfo	*/
+/*			    handler or status=progress output		*/
 /* Global args:	nifr, nipr, nofr, nopr, ntrunc, obytes			*/
 /*									*/
 /* Return:	void							*/
@@ -1818,28 +1854,98 @@ term(int c)
 /* ********************************************************************	*/
 
 static void
-stats(void)
+stats(boolean_t main_loop)
 {
 	hrtime_t delta = gethrtime() - startt;
 	double secs = delta * 1e-9;
-	char nnum[NN_NUMBUF_SZ];
+	char bps[NN_NUMBUF_SZ], hobytes[NN_NUMBUF_SZ];
+	boolean_t is_progress = B_FALSE;
+	const char *head = "";
+	const char *tail = "\n";
 
-	(void) fprintf(stderr, gettext("%llu+%llu records in\n"), nifr, nipr);
-	(void) fprintf(stderr, gettext("%llu+%llu records out\n"), nofr, nopr);
-	if (ntrunc) {
-		(void) fprintf(stderr,
-		    gettext("%llu truncated record(s)\n"), ntrunc);
+	/*
+	 * If we've been asked to not print this, then never do.
+	 */
+	if (status_arg == DD_STATUS_NONE) {
+		return;
+	}
+
+	/*
+	 * If we came here from the main loop, then we need to go through and
+	 * determine if we need to do anything at all. There are two cases that
+	 * we will have to do something:
+	 *
+	 * 1) We were asked to by the siginfo handler
+	 * 2) We are here from the status=progress handler and enough time has
+	 *    elapsed since the last time we printed (e.g. 1s)
+	 *
+	 * We always let the siginfo handler take priority here.
+	 */
+	if (main_loop) {
+		if (nstats == 0 && status_arg != DD_STATUS_PROGRESS) {
+			return;
+		}
+
+		if (nstats == 0 && status_arg == DD_STATUS_PROGRESS) {
+			uint64_t num_secs = delta / NANOSEC;
+
+			if (num_secs <= prog_secs) {
+				return;
+			}
+
+			prog_secs = num_secs;
+			is_progress = B_TRUE;
+			if (stderr_tty) {
+				head = "\r";
+				tail = "";
+			}
+		}
+
+		if (nstats == 1) {
+			nstats = 0;
+		}
+	}
+
+	/*
+	 * When we output to a tty with status=progress we do so by only
+	 * emitting carriage returns and overwriting. This means that when we
+	 * come in here for any other reason we need to emit a new line so we
+	 * don't end up clobbering anything.
+	 *
+	 * The progress_printed boolean is basically here to make sure we have
+	 * actually printed out a status line that would cause us to need a new
+	 * line. If we finished say after a SIGINFO output but before the next
+	 * progress output this would result in an extraneous newline.
+	 */
+	if (!is_progress && status_arg == DD_STATUS_PROGRESS && stderr_tty &&
+	    progress_printed) {
+		(void) fputc('\n', stderr);
+	}
+
+	if (!is_progress) {
+		(void) fprintf(stderr, gettext("%llu+%llu records in\n"),
+		    nifr, nipr);
+		(void) fprintf(stderr, gettext("%llu+%llu records out\n"),
+		    nofr, nopr);
+		if (ntrunc) {
+			(void) fprintf(stderr,
+			    gettext("%llu truncated record(s)\n"), ntrunc);
+		}
 	}
 
 	/*
 	 * If we got here before we started copying somehow, don't bother
 	 * printing the rest.
 	 */
-	if (startt == 0)
+	if (startt == 0 || status_arg == DD_STATUS_NOXFER)
 		return;
 
-	nicenum((uint64_t)obytes / secs, nnum, sizeof (nnum));
+	nicenum_scale((uint64_t)obytes / secs, 1, bps, sizeof (bps),
+	    NN_UNIT_SPACE);
+	nicenum_scale(obytes, 1, hobytes, sizeof (hobytes), NN_UNIT_SPACE);
 	(void) fprintf(stderr,
-	    gettext("%llu bytes transferred in %.6f secs (%sB/sec)\n"),
-	    obytes, secs, nnum);
+	    gettext("%s%llu bytes (%siB) transferred in %.6f secs "
+	    "(%siB/sec)%s"), head, obytes, hobytes, secs, bps, tail);
+
+	progress_printed = is_progress;
 }
