@@ -1346,7 +1346,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 	}
 
 	/* See if this zone's brand should restart init if it dies. */
-	restart_init = brand_restartinit(bh);
+	restart_init = restartinit(bh);
 	restart_init0 = brand_restartinit0(bh);
 	restart_initreboot = brand_restartinitreboot(bh);
 

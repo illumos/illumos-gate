@@ -528,6 +528,13 @@ proc_exit(int why, int what)
 	}
 	mutex_exit(&p->p_lock);
 
+	/*
+	 * Don't let init exit unless zone_start_init() failed its exec, or
+	 * we are shutting down the zone or the machine.
+	 *
+	 * Since we are single threaded, we don't need to lock the
+	 * following accesses to zone_proc_initpid.
+	 */
 	if (p->p_pid == z->zone_proc_initpid) {
 		/* If zone's init restarts, we're done here. */
 		if (zone_init_exit(z, why, what))
@@ -558,19 +565,6 @@ proc_exit(int why, int what)
 		 */
 		BROP(p)->b_freelwp(lwp);
 		lwp_detach_brand_hdlrs(lwp);
-	}
-
-	/*
-	 * Don't let init exit unless zone_start_init() failed its exec, or
-	 * we are shutting down the zone or the machine.
-	 *
-	 * Since we are single threaded, we don't need to lock the
-	 * following accesses to zone_proc_initpid.
-	 */
-	if (p->p_pid == z->zone_proc_initpid) {
-		/* If zone's init restarts, we're done here. */
-		if (zone_init_exit(z, why, what))
-			return (0);
 	}
 
 	lwp_pcb_exit();
