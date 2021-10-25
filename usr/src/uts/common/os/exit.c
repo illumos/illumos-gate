@@ -166,7 +166,7 @@ restart_init_notify(zone_t *zone)
  * it failed.  As long as the given zone is still in the "running"
  * state, we will re-exec() init, but first we need to reset things
  * which are usually inherited across exec() but will break init's
- * assumption that it is being exec()'d from a virgin process.  Most
+ * assumption that it is being exec()'d from a virgin process.	Most
  * importantly this includes closing all file descriptors (exec only
  * closes those marked close-on-exec) and resetting signals (exec only
  * resets handled signals, and we need to clear any signals which
@@ -343,7 +343,7 @@ exit(int why, int what)
 	/*
 	 * If proc_exit() fails, then some other lwp in the process
 	 * got there first.  We just have to call lwp_exit() to allow
-	 * the other lwp to finish exiting the process.  Otherwise we're
+	 * the other lwp to finish exiting the process.	 Otherwise we're
 	 * restarting init, and should return.
 	 */
 	if (proc_exit(why, what) != 0) {
@@ -356,7 +356,7 @@ exit(int why, int what)
 
 /*
  * Set the SEXITING flag on the process, after making sure /proc does
- * not have it locked.  This is done in more places than proc_exit(),
+ * not have it locked.	This is done in more places than proc_exit(),
  * so it is a separate function.
  */
 void
@@ -471,9 +471,9 @@ zone_init_exit(zone_t *z, int why, int what)
 		}
 	}
 
-
 	/*
-	 * The restart failed, the zone will shut down.
+	 * The restart failed, or the criteria for a restart are not met;
+	 * the zone will shut down.
 	 */
 	z->zone_init_status = wstat(why, what);
 	(void) zone_kadmin(A_SHUTDOWN, AD_HALT, NULL, zone_kcred());
@@ -510,7 +510,7 @@ proc_exit(int why, int what)
 
 	/*
 	 * Stop and discard the process's lwps except for the current one,
-	 * unless some other lwp beat us to it.  If exitlwps() fails then
+	 * unless some other lwp beat us to it.	 If exitlwps() fails then
 	 * return and the calling lwp will call (or continue in) lwp_exit().
 	 */
 	proc_is_exiting(p);
@@ -558,6 +558,19 @@ proc_exit(int why, int what)
 		 */
 		BROP(p)->b_freelwp(lwp);
 		lwp_detach_brand_hdlrs(lwp);
+	}
+
+	/*
+	 * Don't let init exit unless zone_start_init() failed its exec, or
+	 * we are shutting down the zone or the machine.
+	 *
+	 * Since we are single threaded, we don't need to lock the
+	 * following accesses to zone_proc_initpid.
+	 */
+	if (p->p_pid == z->zone_proc_initpid) {
+		/* If zone's init restarts, we're done here. */
+		if (zone_init_exit(z, why, what))
+			return (0);
 	}
 
 	lwp_pcb_exit();
@@ -1005,7 +1018,7 @@ proc_exit(int why, int what)
 	 * curthread's proc pointer is changed to point to the 'sched'
 	 * process for the corresponding zone, except in the case when
 	 * the exiting process is in fact a zsched instance, in which
-	 * case the proc pointer is set to p0.  We do so, so that the
+	 * case the proc pointer is set to p0.	We do so, so that the
 	 * process still points at the right zone when we call the VN_RELE()
 	 * below.
 	 *
@@ -1089,7 +1102,7 @@ proc_exit(int why, int what)
 	/*
 	 * task_rele() may ultimately cause the zone to go away (or
 	 * may cause the last user process in a zone to go away, which
-	 * signals zsched to go away).  So prior to this call, we must
+	 * signals zsched to go away).	So prior to this call, we must
 	 * no longer point at zsched.
 	 */
 	t->t_procp = &p0;
