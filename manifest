@@ -11472,7 +11472,7 @@ f usr/share/lib/zoneinfo/America/Havana 0644 root bin
 f usr/share/lib/zoneinfo/America/Hermosillo 0644 root bin
 d usr/share/lib/zoneinfo/America/Indiana 0755 root bin
 f usr/share/lib/zoneinfo/America/Indiana/Indianapolis 0644 root bin
-h usr/share/lib/zoneinfo/America/Indiana/Knox 0644 root bin
+f usr/share/lib/zoneinfo/America/Indiana/Knox 0644 root bin
 f usr/share/lib/zoneinfo/America/Indiana/Marengo 0644 root bin
 f usr/share/lib/zoneinfo/America/Indiana/Petersburg 0644 root bin
 f usr/share/lib/zoneinfo/America/Indiana/Tell_City 0644 root bin
@@ -11550,7 +11550,7 @@ f usr/share/lib/zoneinfo/America/Scoresbysund 0644 root bin
 h usr/share/lib/zoneinfo/America/Shiprock=usr/share/lib/zoneinfo/US/Mountain
 f usr/share/lib/zoneinfo/America/Sitka 0644 root bin
 h usr/share/lib/zoneinfo/America/St_Barthelemy=usr/share/lib/zoneinfo/America/Puerto_Rico
-h usr/share/lib/zoneinfo/America/St_Johns=usr/share/lib/zoneinfo/America/Puerto_Rico
+f usr/share/lib/zoneinfo/America/St_Johns 0644 root bin
 h usr/share/lib/zoneinfo/America/St_Kitts=usr/share/lib/zoneinfo/America/Puerto_Rico
 h usr/share/lib/zoneinfo/America/St_Lucia=usr/share/lib/zoneinfo/America/Puerto_Rico
 h usr/share/lib/zoneinfo/America/St_Thomas=usr/share/lib/zoneinfo/America/Puerto_Rico
@@ -11571,14 +11571,14 @@ f usr/share/lib/zoneinfo/America/Yellowknife 0644 root bin
 d usr/share/lib/zoneinfo/Antarctica 0755 root bin
 f usr/share/lib/zoneinfo/Antarctica/Casey 0644 root bin
 f usr/share/lib/zoneinfo/Antarctica/Davis 0644 root bin
-h usr/share/lib/zoneinfo/Antarctica/DumontDUrville=usr/share/lib/zoneinfo/Pacific/Auckland
+h usr/share/lib/zoneinfo/Antarctica/DumontDUrville=usr/share/lib/zoneinfo/Pacific/Port_Moresby
 f usr/share/lib/zoneinfo/Antarctica/Macquarie 0644 root bin
 f usr/share/lib/zoneinfo/Antarctica/Mawson 0644 root bin
 h usr/share/lib/zoneinfo/Antarctica/McMurdo=usr/share/lib/zoneinfo/Pacific/Auckland
 f usr/share/lib/zoneinfo/Antarctica/Palmer 0644 root bin
 f usr/share/lib/zoneinfo/Antarctica/Rothera 0644 root bin
 f usr/share/lib/zoneinfo/Antarctica/South_Pole 0644 root bin
-h usr/share/lib/zoneinfo/Antarctica/Syowa=usr/lib/share/zoneinfo/Asia/Riyadh
+h usr/share/lib/zoneinfo/Antarctica/Syowa=usr/share/lib/zoneinfo/Asia/Riyadh
 f usr/share/lib/zoneinfo/Antarctica/Troll 0644 root bin
 f usr/share/lib/zoneinfo/Antarctica/Vostok 0644 root bin
 d usr/share/lib/zoneinfo/Arctic 0755 root bin
@@ -11688,7 +11688,7 @@ f usr/share/lib/zoneinfo/Atlantic/Azores 0644 root bin
 f usr/share/lib/zoneinfo/Atlantic/Bermuda 0644 root bin
 f usr/share/lib/zoneinfo/Atlantic/Canary 0644 root bin
 f usr/share/lib/zoneinfo/Atlantic/Cape_Verde 0644 root bin
-l usr/share/lib/zoneinfo/Atlantic/Faeroe=usr/share/lib/zoneinfo/Atlantic/Faroe
+h usr/share/lib/zoneinfo/Atlantic/Faeroe=usr/share/lib/zoneinfo/Atlantic/Faroe
 f usr/share/lib/zoneinfo/Atlantic/Faroe 0644 root bin
 h usr/share/lib/zoneinfo/Atlantic/Jan_Mayen=usr/share/lib/zoneinfo/Europe/Oslo
 f usr/share/lib/zoneinfo/Atlantic/Madeira 0644 root bin
@@ -11919,7 +11919,7 @@ h usr/share/lib/zoneinfo/Pacific/Pago_Pago=usr/share/lib/zoneinfo/US/Samoa
 f usr/share/lib/zoneinfo/Pacific/Palau 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Pitcairn 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Pohnpei 0644 root bin
-h usr/share/lib/zoneinfo/Pacific/Ponape=usr/share/lib/zoneinf/Pacific/Pohnpei
+h usr/share/lib/zoneinfo/Pacific/Ponape=usr/share/lib/zoneinfo/Pacific/Pohnpei
 f usr/share/lib/zoneinfo/Pacific/Port_Moresby 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Rarotonga 0644 root bin
 h usr/share/lib/zoneinfo/Pacific/Saipan=usr/share/lib/zoneinfo/Pacific/Guam
