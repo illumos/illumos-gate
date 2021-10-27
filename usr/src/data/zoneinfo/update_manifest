@@ -1,0 +1,98 @@
+#!/usr/bin/ksh
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source. A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+
+set -o errexit -o pipefail
+trap 'echo Error occured at line $LINENO' ERR
+
+if [[ ! -v CODEMGR_WS ]] || (($# < 1)); then
+	cat <<- EOM
+This script should be run within a bldenv by issuing 'make update' in
+\$CODEMGR_WS/usr/src/data/zoneinfo
+	EOM
+	exit 1
+fi
+
+MANIFEST=$CODEMGR_WS/usr/src/pkg/manifests/system-data-zoneinfo.mf
+PREFIX=usr/share/lib/zoneinfo
+
+if [[ ! -f "$MANIFEST" ]]; then
+	echo "Could not find $MANIFEST"
+	exit 1
+fi
+
+typeset -A links
+typeset -A targets
+for f in "$@"; do
+	if [[ ! -r "$f" ]]; then
+		echo "Could not read $f"
+		exit 1
+	fi
+	echo "+++ Processing input file $f"
+	grep '^Link' "$f" | tr -s '[:space:]' | \
+	    while IFS=$' \t' read _ tgt src _; do
+
+		osrc=$src
+		targets[$tgt]=1
+
+		printf "    %20s => %s\n" $src $tgt
+
+		while [[ $src == */* && ${src%%/*} == ${tgt%%/*} ]]; do
+			src=${src#*/}
+			tgt=${tgt#*/}
+		done
+
+		# On no matches, grep -o exits non-zero, hence the || true to
+		# satisfy the shell's errexit option.
+		sslashes=$(echo $src | grep -o / | wc -l || true)
+		r=
+		while ((sslashes-- > 0)); do
+			r+="../"
+		done
+		links[$osrc]="$r$tgt"
+	done
+done
+
+tmpf1=`mktemp`
+tmpf2=`mktemp`
+trap 'rm -f $tmpf1 $tmpf2' EXIT
+[[ -n "$tmpf1" && -f "$tmpf1" ]]
+[[ -n "$tmpf2" && -f "$tmpf2" ]]
+
+cp $MANIFEST $tmpf1
+pkgfmt -u $tmpf1
+
+echo "+++ Removing existing hardlinks from manifest"
+egrep -v "^hardlink " $tmpf1 > $tmpf2
+mv $tmpf2 $tmpf1
+
+echo "+++ Removing existing targets from manifest"
+for i in "${!links[@]}" "${!targets[@]}"; do
+	egrep -v "^file path=$PREFIX/$i\$" $tmpf1 > $tmpf2
+	mv $tmpf2 $tmpf1
+done
+
+echo "+++ Adding new entries to manifest"
+{
+	for i in "${!targets[@]}"; do
+		echo "file path=$PREFIX/$i"
+	done
+	for i in "${!links[@]}"; do
+		echo "hardlink path=$PREFIX/$i target=${links[$i]}"
+	done
+} >> $tmpf1
+
+echo "+++ Formatting manifest"
+pkgfmt -f v1 $tmpf1
+
+mv $tmpf1 $MANIFEST
+

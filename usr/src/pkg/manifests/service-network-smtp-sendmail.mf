@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri \
@@ -204,6 +204,7 @@ file path=usr/share/man/man1m/smrsh.1m
 file path=usr/share/man/man4/alias.4
 file path=usr/share/man/man4/aliases.4
 file path=usr/share/man/man4/sendmail.4
+group groupname=smmsp gid=25
 legacy pkg=SUNWsndmr desc="Sendmail Configuration Files" \
     name="Sendmail (root)"
 legacy pkg=SUNWsndmu desc="Sendmail Utilities" name="Sendmail (/usr)"
@@ -241,4 +242,7 @@ link path=usr/share/man/man4/addresses.4 target=aliases.4
 link path=usr/share/man/man4/forward.4 target=aliases.4
 link path=usr/share/man/man4/sendmail.cf.4 target=sendmail.4
 link path=usr/share/man/man4/submit.cf.4 target=sendmail.4
+user username=smmsp ftpuser=false \
+    gcos-field="SendMail Message Submission Program" group=smmsp home-dir=/ \
+    password=NP uid=25
 depend fmri=runtime/perl$(PERL_PKGVERS) type=require

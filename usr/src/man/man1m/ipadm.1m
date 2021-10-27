@@ -13,15 +13,17 @@
 .\" Copyright (c) 2013, 2017 by Delphix. All rights reserved.
 .\" Copyright 2018 Nexenta Systems, Inc.
 .\" Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
-.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd February 6, 2018
+.Dd October 20, 2021
 .Dt IPADM 1M
 .Os
 .Sh NAME
 .Nm ipadm
 .Nd configure IP interfaces, addresses and protocols
 .Sh SYNOPSIS
+.Nm
+.Ic help
 .Nm
 .Ic create-if
 .Op Fl t
@@ -182,8 +184,16 @@ this can be one of the following values:
 or
 .Cm udp .
 .Sh SUBCOMMANDS
+When invoked with no arguments,
+.Nm
+shows the current address properties, in the same way as
+.Nm
+.Ic show-addr .
+.Pp
 The following subcommands are supported:
 .Bl -tag -width Ds
+.It Nm Ic help
+Display brief command usage.
 .It Xo
 .Nm
 .Ic create-if

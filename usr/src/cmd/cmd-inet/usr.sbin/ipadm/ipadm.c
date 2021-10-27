@@ -26,6 +26,7 @@
  * Copyright 2017 Gary Mills
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  * Copyright 2021, Tintri by DDN. All rights reserved.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <arpa/inet.h>
@@ -58,6 +59,7 @@
 			LIFC_UNDER_IPMP)
 
 typedef void cmdfunc_t(int, char **, const char *);
+static cmdfunc_t do_help;
 static cmdfunc_t do_create_if, do_delete_if, do_enable_if, do_disable_if;
 static cmdfunc_t do_show_if;
 static cmdfunc_t do_set_prop, do_show_prop, do_set_ifprop;
@@ -74,6 +76,7 @@ typedef struct	cmd {
 } cmd_t;
 
 static cmd_t	cmds[] = {
+	{ "help",	do_help,	NULL },
 	/* interface management related sub-commands */
 	{ "create-if",	do_create_if,	"\tcreate-if\t[-t] <interface>"	},
 	{ "disable-if",	do_disable_if,	"\tdisable-if\t-t <interface>"	},
@@ -348,7 +351,7 @@ static void	process_misc_addrargs(int, char **, const char *, int *,
 		    uint32_t *);
 
 static void
-usage(void)
+usage(int ret)
 {
 	int	i;
 	cmd_t	*cmdp;
@@ -363,7 +366,13 @@ usage(void)
 
 	ipadm_destroy_addrobj(ipaddr);
 	ipadm_close(iph);
-	exit(1);
+	exit(ret);
+}
+
+static void
+do_help(int argc __unused, char **argv __unused, const char *use __unused)
+{
+	usage(0);
 }
 
 int
@@ -381,8 +390,10 @@ main(int argc, char *argv[])
 	else
 		progname++;
 
-	if (argc < 2)
-		usage();
+	if (argc < 2) {
+		argv[1] = "show-addr";
+		argc = 2;
+	}
 
 	status = ipadm_open(&iph, 0);
 	if (status != IPADM_SUCCESS) {
@@ -402,7 +413,7 @@ main(int argc, char *argv[])
 
 	(void) fprintf(stderr, gettext("%s: unknown subcommand '%s'\n"),
 	    progname, argv[1]);
-	usage();
+	usage(1);
 
 	return (0);
 }

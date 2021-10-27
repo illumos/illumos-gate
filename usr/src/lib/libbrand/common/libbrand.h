@@ -91,6 +91,7 @@ extern int brand_get_preuninstall(brand_handle_t, const char *, const char *,
     char *, size_t);
 extern int brand_get_query(brand_handle_t, const char *, const char *,
     char *, size_t);
+extern int brand_get_secflags(brand_handle_t, char *, size_t);
 extern int brand_get_uninstall(brand_handle_t, const char *, const char *,
     char *, size_t);
 extern int brand_get_validatesnap(brand_handle_t, const char *, const char *,
