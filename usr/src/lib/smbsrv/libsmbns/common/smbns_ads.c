@@ -1599,7 +1599,8 @@ smb_ads_lookup_computer_n_attr(smb_ads_handle_t *ah, smb_ads_avpair_t *avpair,
 {
 	char *attrs[3], filter[SMB_ADS_MAXBUFLEN];
 	LDAPMessage *res;
-	char sam_acct[SMB_SAMACCT_MAXLEN], sam_acct2[SMB_SAMACCT_MAXLEN];
+	char sam_acct[SMB_SAMACCT_MAXLEN];
+	char tmpbuf[SMB_ADS_MAXBUFLEN];
 	smb_ads_qstat_t rc;
 	int err;
 
@@ -1618,12 +1619,12 @@ smb_ads_lookup_computer_n_attr(smb_ads_handle_t *ah, smb_ads_avpair_t *avpair,
 		attrs[1] = avpair->avp_attr;
 	}
 
-	if (smb_ads_escape_search_filter_chars(sam_acct, sam_acct2) != 0)
+	if (smb_ads_escape_search_filter_chars(sam_acct, tmpbuf) != 0)
 		return (SMB_ADS_STAT_ERR);
 
 	(void) snprintf(filter, sizeof (filter),
-	    "(&(objectClass=computer)(%s=%s))", SMB_ADS_ATTR_SAMACCT,
-	    sam_acct2);
+	    "(&(objectClass=computer)(%s=%s))",
+	    SMB_ADS_ATTR_SAMACCT, tmpbuf);
 
 	syslog(LOG_DEBUG, "smbns: lookup_computer, "
 	    "dn=%s, scope=%d", dn, scope);
