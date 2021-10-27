@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2021 Oxide Computer Company
+ */
 
 /*
  * PCI Mechanism 1 low-level routines
@@ -50,7 +52,11 @@ pci_mech1_getb(int bus, int device, int function, int reg)
 	uint8_t val;
 	if (device == PCI_MECH1_SPEC_CYCLE_DEV &&
 	    function == PCI_MECH1_SPEC_CYCLE_FUNC) {
-		return (0xff);
+		return (PCI_EINVAL8);
+	}
+
+	if (reg > pci_iocfg_max_offset) {
+		return (PCI_EINVAL8);
 	}
 
 	mutex_enter(&pcicfg_mutex);
@@ -67,7 +73,11 @@ pci_mech1_getw(int bus, int device, int function, int reg)
 
 	if (device == PCI_MECH1_SPEC_CYCLE_DEV &&
 	    function == PCI_MECH1_SPEC_CYCLE_FUNC) {
-		return (0xffff);
+		return (PCI_EINVAL16);
+	}
+
+	if (reg > pci_iocfg_max_offset) {
+		return (PCI_EINVAL16);
 	}
 
 	mutex_enter(&pcicfg_mutex);
@@ -84,7 +94,11 @@ pci_mech1_getl(int bus, int device, int function, int reg)
 
 	if (device == PCI_MECH1_SPEC_CYCLE_DEV &&
 	    function == PCI_MECH1_SPEC_CYCLE_FUNC) {
-		return (0xffffffffu);
+		return (PCI_EINVAL32);
+	}
+
+	if (reg > pci_iocfg_max_offset) {
+		return (PCI_EINVAL32);
 	}
 
 	mutex_enter(&pcicfg_mutex);
@@ -102,6 +116,10 @@ pci_mech1_putb(int bus, int device, int function, int reg, uint8_t val)
 		return;
 	}
 
+	if (reg > pci_iocfg_max_offset) {
+		return;
+	}
+
 	mutex_enter(&pcicfg_mutex);
 	outl(PCI_CONFADD, PCI_CADDR1(bus, device, function, reg));
 	outb(PCI_CONFDATA | (reg & 0x3), val);
@@ -116,6 +134,10 @@ pci_mech1_putw(int bus, int device, int function, int reg, uint16_t val)
 		return;
 	}
 
+	if (reg > pci_iocfg_max_offset) {
+		return;
+	}
+
 	mutex_enter(&pcicfg_mutex);
 	outl(PCI_CONFADD, PCI_CADDR1(bus, device, function, reg));
 	outw(PCI_CONFDATA | (reg & 0x2), val);
@@ -127,6 +149,10 @@ pci_mech1_putl(int bus, int device, int function, int reg, uint32_t val)
 {
 	if (device == PCI_MECH1_SPEC_CYCLE_DEV &&
 	    function == PCI_MECH1_SPEC_CYCLE_FUNC) {
+		return;
+	}
+
+	if (reg > pci_iocfg_max_offset) {
 		return;
 	}
 

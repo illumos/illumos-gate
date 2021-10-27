@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2021 Oxide Computer Company
+ */
 
 /*
  * PCI Mechanism 2 primitives
@@ -32,6 +34,7 @@
 
 #include <sys/types.h>
 #include <sys/sunddi.h>
+#include <sys/pci.h>
 #include <sys/pci_impl.h>
 #include <sys/pci_cfgspace_impl.h>
 
@@ -56,7 +59,7 @@ pci_mech2_config_enable(uchar_t bus, uchar_t function)
 	old = inb(PCI_CSE_PORT);
 
 	outb(PCI_CSE_PORT,
-		PCI_MECH2_CONFIG_ENABLE | ((function & PCI_FUNC_MASK) << 1));
+	    PCI_MECH2_CONFIG_ENABLE | ((function & PCI_FUNC_MASK) << 1));
 	outb(PCI_FORW_PORT, bus);
 
 	return (old);
@@ -75,8 +78,8 @@ pci_mech2_getb(int bus, int device, int function, int reg)
 	uint8_t tmp;
 	uint8_t val;
 
-	if (device >= PCI_MAX_DEVS_2)
-		return (0xff);
+	if (device >= PCI_MAX_DEVS_2 || reg > pci_iocfg_max_offset)
+		return (PCI_EINVAL8);
 
 	tmp = pci_mech2_config_enable(bus, function);
 	val = inb(PCI_CADDR2(device, reg));
@@ -91,8 +94,8 @@ pci_mech2_getw(int bus, int device, int function, int reg)
 	uint8_t	tmp;
 	uint16_t val;
 
-	if (device >= PCI_MAX_DEVS_2)
-		return (0xffff);
+	if (device >= PCI_MAX_DEVS_2 || reg > pci_iocfg_max_offset)
+		return (PCI_EINVAL16);
 
 	tmp = pci_mech2_config_enable(bus, function);
 	val = inw(PCI_CADDR2(device, reg));
@@ -107,8 +110,8 @@ pci_mech2_getl(int bus, int device, int function, int reg)
 	uint8_t		tmp;
 	uint32_t	val;
 
-	if (device >= PCI_MAX_DEVS_2)
-		return (0xffffffffu);
+	if (device >= PCI_MAX_DEVS_2 || reg > pci_iocfg_max_offset)
+		return (PCI_EINVAL32);
 
 	tmp = pci_mech2_config_enable(bus, function);
 	val = inl(PCI_CADDR2(device, reg));
@@ -122,7 +125,7 @@ pci_mech2_putb(int bus, int device, int function, int reg, uint8_t val)
 {
 	uint8_t	tmp;
 
-	if (device >= PCI_MAX_DEVS_2)
+	if (device >= PCI_MAX_DEVS_2 || reg > pci_iocfg_max_offset)
 		return;
 
 	tmp = pci_mech2_config_enable(bus, function);
@@ -135,7 +138,7 @@ pci_mech2_putw(int bus, int device, int function, int reg, uint16_t val)
 {
 	uint8_t	tmp;
 
-	if (device >= PCI_MAX_DEVS_2)
+	if (device >= PCI_MAX_DEVS_2 || reg > pci_iocfg_max_offset)
 		return;
 
 	tmp = pci_mech2_config_enable(bus, function);
@@ -148,7 +151,7 @@ pci_mech2_putl(int bus, int device, int function, int reg, uint32_t val)
 {
 	uint8_t	tmp;
 
-	if (device >= PCI_MAX_DEVS_2)
+	if (device >= PCI_MAX_DEVS_2 || reg > pci_iocfg_max_offset)
 		return;
 
 	tmp = pci_mech2_config_enable(bus, function);

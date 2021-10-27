@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Advanced Micro Devices, Inc.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -98,7 +99,11 @@ pci_mech1_amd_getb(int bus, int device, int function, int reg)
 
 	if (device == PCI_MECH1_SPEC_CYCLE_DEV &&
 	    function == PCI_MECH1_SPEC_CYCLE_FUNC) {
-		return (0xff);
+		return (PCI_EINVAL8);
+	}
+
+	if (reg > pci_iocfg_max_offset) {
+		return (PCI_EINVAL8);
 	}
 
 	mutex_enter(&pcicfg_mutex);
@@ -115,7 +120,11 @@ pci_mech1_amd_getw(int bus, int device, int function, int reg)
 
 	if (device == PCI_MECH1_SPEC_CYCLE_DEV &&
 	    function == PCI_MECH1_SPEC_CYCLE_FUNC) {
-		return (0xffff);
+		return (PCI_EINVAL16);
+	}
+
+	if (reg > pci_iocfg_max_offset) {
+		return (PCI_EINVAL16);
 	}
 
 	mutex_enter(&pcicfg_mutex);
@@ -132,7 +141,11 @@ pci_mech1_amd_getl(int bus, int device, int function, int reg)
 
 	if (device == PCI_MECH1_SPEC_CYCLE_DEV &&
 	    function == PCI_MECH1_SPEC_CYCLE_FUNC) {
-		return (0xffffffffu);
+		return (PCI_EINVAL32);
+	}
+
+	if (reg > pci_iocfg_max_offset) {
+		return (PCI_EINVAL32);
 	}
 
 	mutex_enter(&pcicfg_mutex);

@@ -226,8 +226,6 @@ pci_cfgacc_check_io(pci_cfgacc_req_t *req)
 void
 pci_cfgacc_acc(pci_cfgacc_req_t *req)
 {
-	extern uint_t pci_iocfg_max_offset;
-
 	if (!req->write)
 		VAL64(req) = (uint64_t)-1;
 
