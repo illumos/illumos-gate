@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -18,21 +19,27 @@
 
 /*
  * This section of the library is dedicated to decoding the JEDEC vendor codes
- * as defined in JEP-106 AV (July 2017). The vendor code is encoded as a series
- * of continuation bytes and then the current vendor value. Each of the tables
- * below corresponds to one of the continuation values and is ordered based on
- * JEP-106.
+ * as defined in JEP-106 BD (October 2021). The vendor code is encoded as a
+ * series of continuation bytes and then the current vendor value. Each of the
+ * tables below corresponds to one of the continuation values and is ordered
+ * based on JEP-106. Note, the first batch of entries in JEP-106 Table 1 has
+ * zero continuations. Afterwards there is a group for each bank (which is based
+ * on the number of continuations present). Our table numbers match the spec
+ * (e.g. they are numbered after the 'bank' number), but means the continuation
+ * they fill is different.
  *
- * The value of a given vendor is encoded with a parity bit. That parity bit
- * is left intact.
+ * The value of a given vendor is encoded with a parity bit. That parity bit is
+ * left intact.
  */
+
+#define	LIBJEDEC_TABLE_SIZE	126
 
 typedef struct libjedec_vendor_pair {
 	const uint_t ljp_val;
 	const char *ljp_name;
 } libjedec_vendor_pair_t;
 
-static const libjedec_vendor_pair_t libjedec_vendors_0[126] = {
+static const libjedec_vendor_pair_t libjedec_vendors_1[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "AMD" },
 	{ 0x02, "AMI" },
 	{ 0x83, "Fairchild" },
@@ -56,7 +63,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_0[126] = {
 	{ 0x15, "NXP (Philips)" },
 	{ 0x16, "Synertek" },
 	{ 0x97, "Texas Instruments" },
-	{ 0x98, "Toshiba" },
+	{ 0x98, "Kioxia Corporation" },
 	{ 0x19, "Xicor" },
 	{ 0x1A, "Zilog" },
 	{ 0x9B, "Eurotechnique" },
@@ -101,7 +108,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_0[126] = {
 	{ 0xC2, "Macronix" },
 	{ 0x43, "Xerox" },
 	{ 0xC4, "Plus Logic" },
-	{ 0x45, "SanDisk Corporation" },
+	{ 0x45, "Western Digital Technologies Inc" },
 	{ 0x46, "Elan Circuit Tech." },
 	{ 0xC7, "European Silicon Str." },
 	{ 0xC8, "Apple Computer" },
@@ -114,7 +121,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_0[126] = {
 	{ 0x4F, "I3 Design System" },
 	{ 0xD0, "Klic" },
 	{ 0x51, "Crosspoint Solutions" },
-	{ 0x52, "Alliance Semiconductor" },
+	{ 0x52, "Alliance Memory Inc" },
 	{ 0xD3, "Tandem" },
 	{ 0x54, "Hewlett-Packard" },
 	{ 0xD5, "Integrated Silicon Solutions" },
@@ -161,7 +168,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_0[126] = {
 	{ 0xFE, "Numonyx Corporation" }
 };
 
-static const libjedec_vendor_pair_t libjedec_vendors_1[126] = {
+static const libjedec_vendor_pair_t libjedec_vendors_2[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "Cirrus Logic" },
 	{ 0x02, "National Instruments" },
 	{ 0x83, "ILC Data Device" },
@@ -290,7 +297,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_1[126] = {
 	{ 0xFE, "3COM" }
 };
 
-static const libjedec_vendor_pair_t libjedec_vendors_2[126] = {
+static const libjedec_vendor_pair_t libjedec_vendors_3[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "Camintonn Corporation" },
 	{ 0x02, "ISOA Incorporated" },
 	{ 0x83, "Agate Semiconductor" },
@@ -419,7 +426,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_2[126] = {
 	{ 0xFE, "Elpida" }
 };
 
-static const libjedec_vendor_pair_t libjedec_vendors_3[126] = {
+static const libjedec_vendor_pair_t libjedec_vendors_4[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "Solectron" },
 	{ 0x02, "Optosys Technologies" },
 	{ 0x83, "Buffalo (Formerly Melco)" },
@@ -548,7 +555,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_3[126] = {
 	{ 0xFE, "TeraChip" }
 };
 
-static const libjedec_vendor_pair_t libjedec_vendors_4[126] = {
+static const libjedec_vendor_pair_t libjedec_vendors_5[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "T-RAM Incorporated" },
 	{ 0x02, "Innovics Wireless" },
 	{ 0x83, "Teknovus" },
@@ -676,7 +683,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_4[126] = {
 	{ 0xFD, "Focus Enhancements" },
 	{ 0xFE, "Xyratex" }
 };
-static const libjedec_vendor_pair_t libjedec_vendors_5[126] = {
+static const libjedec_vendor_pair_t libjedec_vendors_6[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "Specular Networks" },
 	{ 0x02, "Patriot Memory (PDP Systems)" },
 	{ 0x83, "U-Chip Technology Corp." },
@@ -804,7 +811,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_5[126] = {
 	{ 0xFD, "VeriSilicon Microelectronics" },
 	{ 0xFE, "W5 Networks" }
 };
-static const libjedec_vendor_pair_t libjedec_vendors_6[126] = {
+static const libjedec_vendor_pair_t libjedec_vendors_7[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "MOVEKING" },
 	{ 0x02, "Mavrix Technology, Inc." },
 	{ 0x83, "CellGuide Ltd." },
@@ -933,7 +940,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_6[126] = {
 	{ 0xFE, "Triad Semiconductor, Inc." }
 };
 
-static const libjedec_vendor_pair_t libjedec_vendors_7[126] = {
+static const libjedec_vendor_pair_t libjedec_vendors_8[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "Siklu Communication Ltd." },
 	{ 0x02, "A Force Manufacturing Ltd." },
 	{ 0x83, "Strontium" },
@@ -1061,13 +1068,13 @@ static const libjedec_vendor_pair_t libjedec_vendors_7[126] = {
 	{ 0xFD, "Positivo BGH" },
 	{ 0xFE, "Intelligence Silicon Technology" }
 };
-static const libjedec_vendor_pair_t libjedec_vendors_8[126] = {
+static const libjedec_vendor_pair_t libjedec_vendors_9[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "3D PLUS" },
 	{ 0x02, "Diehl Aerospace" },
 	{ 0x83, "Fairchild" },
 	{ 0x04, "Mercury Systems" },
 	{ 0x85, "Sonics, Inc." },
-	{ 0x86, "GE Intelligent Platforms GmbH & Co." },
+	{ 0x86, "Emerson Automation Solutions" },
 	{ 0x07, "Shenzhen Jinge Information Co. Ltd." },
 	{ 0x08, "SCWW" },
 	{ 0x89, "Silicon Motion Inc." },
@@ -1098,7 +1105,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_8[126] = {
 	{ 0xA2, "TSP Global Co., Ltd." },
 	{ 0x23, "HighX" },
 	{ 0xA4, "Shenzhen Elicks Technology" },
-	{ 0x25, "ISSI/Chingis" },
+	{ 0x25, "XinKai/Silicon Kaiser" },
 	{ 0x26, "Google, Inc." },
 	{ 0xA7, "Dasima International Development" },
 	{ 0xA8, "Leahkinn Technology Limited" },
@@ -1115,7 +1122,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_8[126] = {
 	{ 0xB3, "Memorysolution GmbH" },
 	{ 0x34, "Silicon Integrated Systems Corporation" },
 	{ 0xB5, "Xiede" },
-	{ 0xB6, "Multilaser Components" },
+	{ 0xB6, "BRC" },
 	{ 0x37, "Flash Chi" },
 	{ 0x38, "Jone" },
 	{ 0xB9, "GCT Semiconductor Inc." },
@@ -1190,7 +1197,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_8[126] = {
 	{ 0xFE, "Starsway Technology Limited" }
 };
 
-static const libjedec_vendor_pair_t libjedec_vendors_9[68] = {
+static const libjedec_vendor_pair_t libjedec_vendors_10[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "Weltronics Co. LTD" },
 	{ 0x02, "VMware, Inc." },
 	{ 0x83, "Hewlett Packard Enterprise" },
@@ -1259,7 +1266,486 @@ static const libjedec_vendor_pair_t libjedec_vendors_9[68] = {
 	{ 0xC1, "Elmos Semiconductor AG" },
 	{ 0xC2, "Kllisre" },
 	{ 0x43, "Shenzhen Yuan Chuang Wei Tech" },
-	{ 0xC4, "Shenzhen Xingmem Technology" }
+	{ 0xC4, "Shenzhen Xingmem Technology Corp" },
+	{ 0x45, "Gold Key Technology Co Ltd" },
+	{ 0x46, "Habana Labs Ltd" },
+	{ 0xC7, "Hoodisk Electronics Co Ltd" },
+	{ 0xC8, "SemsoTai (SZ) Technology Co Ltd" },
+	{ 0x49, "OM Nanotech Pvt. Ltd" },
+	{ 0x4A, "Shenzhen Zhifeng Weiye Technology" },
+	{ 0xCB, "Xinshirui (Shenzhen) Electronics Co" },
+	{ 0x4C, "Guangzhou Zhong Hao Tian Electronic" },
+	{ 0xCD, "Shenzhen Longsys Electronics Co Ltd" },
+	{ 0xCE, "Deciso B.V." },
+	{ 0x4F, "Puya Semiconductor (Shenzhen)" },
+	{ 0xD0, "Shenzhen Veineda Technology Co Ltd" },
+	{ 0x51, "Antec Memory" },
+	{ 0x52, "Cortus SAS" },
+	{ 0xD3, "Dust Leopard" },
+	{ 0x54, "MyWo AS" },
+	{ 0xD5, "J&A Information Inc" },
+	{ 0xD6, "Shenzhen JIEPEI Technology Co Ltd" },
+	{ 0x57, "Heidelberg University" },
+	{ 0x58, "Flexxon PTE Ltd" },
+	{ 0xD9, "Wiliot" },
+	{ 0xDA, "Raysun Electronics International Ltd" },
+	{ 0x5B, "Aquarius Production Company LLC" },
+	{ 0xDC, "MACNICA DHW LTDA" },
+	{ 0x5D, "Intelimem" },
+	{ 0x5E, "Zbit Semiconductor Inc" },
+	{ 0xDF, "Shenzhen Technology Co Ltd" },
+	{ 0xE0, "Signalchip" },
+	{ 0x61, "Shenzen Recadata Storage Technology" },
+	{ 0x62, "Hyundai Technology" },
+	{ 0xE3, "Shanghai Fudi Investment Development" },
+	{ 0x64, "Aixi Technology" },
+	{ 0xE5, "Tecon MT" },
+	{ 0xE6, "Onda Electric Co Ltd" },
+	{ 0x67, "Jinshen" },
+	{ 0x68, "Kimtigo Semiconductor (HK) Limited" },
+	{ 0xE9, "IIT Madras" },
+	{ 0xEA, "Shenshan (Shenzhen) Electronic" },
+	{ 0x6B, "Hefei Core Storage Electronic Limited" },
+	{ 0xEC, "Colorful Technology Ltd" },
+	{ 0x6D, "Visenta (Xiamen) Technology Co Ltd" },
+	{ 0x6E, "Roa Logic BV" },
+	{ 0xEF, "NSITEXE Inc" },
+	{ 0x70, "Hong Kong Hyunion Electronics" },
+	{ 0xF1, "ASK Technology Group Limited" },
+	{ 0xF2, "GIGA-BYTE Technology Co Ltd" },
+	{ 0x73, "Terabyte Co Ltd" },
+	{ 0xF4, "Hyundai Inc" },
+	{ 0x75, "EXCELERAM" },
+	{ 0x76, "PsiKick" },
+	{ 0xF7, "Netac Technology Co Ltd" },
+	{ 0xF8, "PCCOOLER" },
+	{ 0x79, "Jiangsu Huacun Electronic Technology" },
+	{ 0x7A, "Shenzhen Micro Innovation Industry" },
+	{ 0xFB, "Beijing Tongfang Microelectronics Co" },
+	{ 0x7C, "XZN Storage Technology" },
+	{ 0xFD, "ChipCraft Sp. z.o.o." },
+	{ 0xFE, "ALLFLASH Technology Limited" },
+};
+
+static const libjedec_vendor_pair_t libjedec_vendors_11[LIBJEDEC_TABLE_SIZE] = {
+	{ 0x01, "Foerd Technology Co Ltd" },
+	{ 0x02, "KingSpec" },
+	{ 0x83, "Codasip GmbH" },
+	{ 0x04, "SL Link Co Ltd" },
+	{ 0x85, "Shenzhen Kefu Technology Co Limited" },
+	{ 0x86, "Shenzhen ZST Electronics Technology" },
+	{ 0x07, "Kyokuto Electronic Inc" },
+	{ 0x08, "Warrior Technology" },
+	{ 0x89, "TRINAMIC Motion Control GmbH & Co" },
+	{ 0x8A, "PixelDisplay Inc" },
+	{ 0x0B, "Shenzhen Futian District Bo Yueda Elec" },
+	{ 0x8C, "Richtek Power" },
+	{ 0x0D, "Shenzhen LianTeng Electronics Co Ltd" },
+	{ 0x0E, "AITC Memory" },
+	{ 0x8F, "UNIC Memory Technology Co Ltd" },
+	{ 0x10, "Shenzhen Huafeng Science Technology" },
+	{ 0x91, "CXMT" },
+	{ 0x92, "Guangzhou Xinyi Heng Computer Trading Firm" },
+	{ 0x13, "SambaNova Systems" },
+	{ 0x94, "V-GEN" },
+	{ 0x15, "Jump Trading" },
+	{ 0x16, "Ampere Computing" },
+	{ 0x97, "Shenzhen Zhongshi Technology Co Ltd" },
+	{ 0x98, "Shenzhen Zhongtian Bozhong Technology" },
+	{ 0x19, "Tri-Tech International" },
+	{ 0x1A, "Silicon Intergrated Systems Corporation" },
+	{ 0x9B, "Shenzhen HongDingChen Information" },
+	{ 0x1C, "Plexton Holdings Limited" },
+	{ 0x9D, "AMS (Jiangsu Advanced Memory Semi)" },
+	{ 0x9E, "Wuhan Jing Tian Interconnected Tech Co" },
+	{ 0x1F, "Axia Memory Technology" },
+	{ 0x20, "Chipset Technology Holding Limited" },
+	{ 0xA1, "Shenzhen Xinshida Technology Co Ltd" },
+	{ 0xA2, "Shenzhen Chuangshifeida Technology" },
+	{ 0x23, "Guangzhou MiaoYuanJi Technology" },
+	{ 0xA4, "ADVAN Inc" },
+	{ 0x25, "Shenzhen Qianhai Weishengda Electronic Commerce Company Ltd" },
+	{ 0x26, "Guangzhou Guang Xie Cheng Trading" },
+	{ 0xA7, "StarRam International Co Ltd" },
+	{ 0xA8, "Shen Zhen XinShenHua Tech Co Ltd" },
+	{ 0x29, "UltraMemory Inc" },
+	{ 0x2A, "New Coastline Global Tech Industry Co" },
+	{ 0xAB, "Sinker" },
+	{ 0x2C, "Diamond" },
+	{ 0xAD, "PUSKILL" },
+	{ 0xAE, "Guangzhou Hao Jia Ye Technology Co" },
+	{ 0x2F, "Ming Xin Limited" },
+	{ 0xB0, "Barefoot Networks" },
+	{ 0x31, "Biwin Semiconductor (HK) Co Ltd" },
+	{ 0x32, "UD INFO Corporation" },
+	{ 0xB3, "Trek Technology (S) PTE Ltd" },
+	{ 0x34, "Xiamen Kingblaze Technology Co Ltd" },
+	{ 0xB5, "Shenzhen Lomica Technology Co Ltd" },
+	{ 0xB6, "Nuclei System Technology Co Ltd" },
+	{ 0x37, "Wuhan Xun Zhan Electronic Technology" },
+	{ 0x38, "Shenzhen Ingacom Semiconductor Ltd" },
+	{ 0xB9, "Zotac Technology Ltd" },
+	{ 0xBA, "Foxline" },
+	{ 0x3B, "Shenzhen Farasia Science Technology" },
+	{ 0xBC, "Efinix Inc" },
+	{ 0x3D, "Hua Nan San Xian Technology Co Ltd" },
+	{ 0x3E, "Goldtech Electronics Co Ltd" },
+	{ 0xBF, "Shanghai Han Rong Microelectronics Co" },
+	{ 0x40, "Shenzhen Zhongguang Yunhe Trading" },
+	{ 0xC1, "Smart Shine(QingDao) Microelectronics" },
+	{ 0xC2, "Thermaltake Technology Co Ltd" },
+	{ 0x43, "Shenzhen O’Yang Maile Technology Ltd" },
+	{ 0xC4, "UPMEM" },
+	{ 0x45, "Chun Well Technology Holding Limited" },
+	{ 0x46, "Astera Labs Inc" },
+	{ 0xC7, "Winconway" },
+	{ 0xC8, "Advantech Co Ltd" },
+	{ 0x49, "Chengdu Fengcai Electronic Technology" },
+	{ 0x4A, "The Boeing Company" },
+	{ 0xCB, "Blaize Inc" },
+	{ 0x4C, "Ramonster Technology Co Ltd" },
+	{ 0xCD, "Wuhan Naonongmai Technology Co Ltd" },
+	{ 0xCE, "Shenzhen Hui ShingTong Technology" },
+	{ 0x4F, "Yourlyon" },
+	{ 0xD0, "Fabu Technology" },
+	{ 0x51, "Shenzhen Yikesheng Technology Co Ltd" },
+	{ 0x52, "NOR-MEM" },
+	{ 0xD3, "Cervoz Co Ltd" },
+	{ 0x54, "Bitmain Technologies Inc." },
+	{ 0xD5, "Facebook Inc" },
+	{ 0xD6, "Shenzhen Longsys Electronics Co Ltd" },
+	{ 0x57, "Guangzhou Siye Electronic Technology" },
+	{ 0x58, "Silergy" },
+	{ 0xD9, "Adamway" },
+	{ 0xDA, "PZG" },
+	{ 0x5B, "Shenzhen King Power Electronics" },
+	{ 0xDC, "Guangzhou ZiaoFu Tranding Co Ltd" },
+	{ 0x5D, "Shenzhen SKIHOTAR Semiconductor" },
+	{ 0x5E, "PulseRain Technology" },
+	{ 0xDF, "Seeker Technology Limited" },
+	{ 0xE0, "Shenzhen OSCOO Tech Co Ltd" },
+	{ 0x61, "Shenzhen Yze Technology Co Ltd" },
+	{ 0x62, "Shenzhen Jieshuo Electronic Commerce" },
+	{ 0xE3, "Gazda" },
+	{ 0x64, "Hua Wei Technology Co Ltd" },
+	{ 0xE5, "Esperanto Technologies" },
+	{ 0xE6, "JinSheng Electronic (Shenzhen) Co Ltd" },
+	{ 0x67, "Shenzhen Shi Bolunshuai Technology" },
+	{ 0x68, "Shanghai Rei Zuan Information Tech" },
+	{ 0xE9, "Fraunhofer IIS" },
+	{ 0xEA, "Kandou Bus SA" },
+	{ 0x6B, "Acer" },
+	{ 0xEC, "Artmem Technology Co Ltd" },
+	{ 0x6D, "Gstar Semiconductor Co Ltd" },
+	{ 0x6E, "ShineDisk" },
+	{ 0xEF, "Shenzhen CHN Technology Co Ltd" },
+	{ 0x70, "UnionChip Semiconductor Co Ltd" },
+	{ 0xF1, "Tanbassh" },
+	{ 0xF2, "Shenzhen Tianyu Jieyun Intl Logistics" },
+	{ 0x73, "MCLogic Inc" },
+	{ 0xF4, "Eorex Corporation" },
+	{ 0x75, "Arm Technology (China) Co Ltd" },
+	{ 0x76, "Lexar Co Limited" },
+	{ 0xF7, "QinetiQ Group plc" },
+	{ 0xF8, "Exascend" },
+	{ 0x79, "Hong Kong Hyunion Electronics Co Ltd" },
+	{ 0x7A, "Shenzhen Banghong Electronics Co Ltd" },
+	{ 0xFB, "MBit Wireless Inc" },
+	{ 0x7C, "Hex Five Security Inc" },
+	{ 0xFD, "ShenZhen Juhor Precision Tech Co Ltd" },
+	{ 0xFE, "Shenzhen Reeinno Technology Co Ltd" }
+};
+
+static const libjedec_vendor_pair_t libjedec_vendors_12[LIBJEDEC_TABLE_SIZE] = {
+	{ 0x01, "ABIT Electronics (Shenzhen) Co Ltd" },
+	{ 0x02, "Semidrive" },
+	{ 0x83, "MyTek Electronics Corp" },
+	{ 0x04, "Wxilicon Technology Co Ltd" },
+	{ 0x85, "Shenzhen Meixin Electronics Ltd" },
+	{ 0x86, "Ghost Wolf" },
+	{ 0x07, "LiSion Technologies Inc" },
+	{ 0x08, "Power Active Co Ltd" },
+	{ 0x89, "Pioneer High Fidelity Taiwan Co. Ltd" },
+	{ 0x8A, "LuoSilk" },
+	{ 0x0B, "Shenzhen Chuangshifeida Technology" },
+	{ 0x8C, "Black Sesame Technologies Inc" },
+	{ 0x0D, "Jiangsu Xinsheng Intelligent Technology" },
+	{ 0x0E, "MLOONG" },
+	{ 0x8F, "Quadratica LLC" },
+	{ 0x10, "Anpec Electronics" },
+	{ 0x91, "Xi’an Morebeck Semiconductor Tech Co" },
+	{ 0x92, "Kingbank Technology Co Ltd" },
+	{ 0x13, "ITRenew Inc" },
+	{ 0x94, "Shenzhen Eaget Innovation Tech Ltd" },
+	{ 0x15, "Jazer" },
+	{ 0x16, "Xiamen Semiconductor Investment Group" },
+	{ 0x97, "Guangzhou Longdao Network Tech Co" },
+	{ 0x98, "Shenzhen Futian SEC Electronic Market" },
+	{ 0x19, "Allegro Microsystems LLC" },
+	{ 0x1A, "Hunan RunCore Innovation Technology" },
+	{ 0x9B, "C-Corsa Technology" },
+	{ 0x1C, "Zhuhai Chuangfeixin Technology Co Ltd" },
+	{ 0x9D, "Beijing InnoMem Technologies Co Ltd" },
+	{ 0x9E, "YooTin" },
+	{ 0x1F, "Shenzhen Pengxiong Technology Co Ltd" },
+	{ 0x20, "Dongguan Yingbang Commercial Trading Co" },
+	{ 0xA1, "Shenzhen Ronisys Electronics Co Ltd" },
+	{ 0xA2, "Hongkong Xinlan Guangke Co Ltd" },
+	{ 0x23, "Apex Microelectronics Co Ltd" },
+	{ 0xA4, "Beijing Hongda Jinming Technology Co Ltd" },
+	{ 0x25, "Ling Rui Technology (Shenzhen) Co Ltd" },
+	{ 0x26, "Hongkong Hyunion Electronics Co Ltd" },
+	{ 0xA7, "Starsystems Inc" },
+	{ 0xA8, "Shenzhen Yingjiaxun Industrial Co Ltd" },
+	{ 0x29, "Dongguan Crown Code Electronic Commerce" },
+	{ 0x2A, "Monolithic Power Systems Inc" },
+	{ 0xAB, "WuHan SenNaiBo E-Commerce Co Ltd" },
+	{ 0x2C, "Hangzhou Hikstorage Technology Co" },
+	{ 0xAD, "Shenzhen Goodix Technology Co Ltd" },
+	{ 0xAE, "Aigo Electronic Technology Co Ltd" },
+	{ 0x2F, "Hefei Konsemi Storage Technology Co Ltd" },
+	{ 0xB0, "Cactus Technologies Limited" },
+	{ 0x31, "DSIN" },
+	{ 0x32, "Blu Wireless Technology" },
+	{ 0xB3, "Nanjing UCUN Technology Inc" },
+	{ 0x34, "Acacia Communications" },
+	{ 0xB5, "Beijinjinshengyihe Technology Co Ltd" },
+	{ 0xB6, "Zyzyx" },
+	{ 0x37, "T-HEAD Semiconductor Co Ltd" },
+	{ 0x38, "Shenzhen Hystou Technology Co Ltd" },
+	{ 0xB9, "Syzexion" },
+	{ 0xBA, "Kembona" },
+	{ 0x3B, "Qingdao Thunderobot Technology Co Ltd" },
+	{ 0xBC, "Morse Micro" },
+	{ 0x3D, "Shenzhen Envida Technology Co Ltd" },
+	{ 0x3E, "UDStore Solution Limited" },
+	{ 0xBF, "Shunlie" },
+	{ 0x40, "Shenzhen Xin Hong Rui Tech Ltd" },
+	{ 0xC1, "Shenzhen Yze Technology Co Ltd" },
+	{ 0xC2, "Shenzhen Huang Pu He Xin Technology" },
+	{ 0x43, "Xiamen Pengpai Microelectronics Co Ltd" },
+	{ 0xC4, "JISHUN" },
+	{ 0x45, "Shenzhen WODPOSIT Technology Co" },
+	{ 0x46, "Unistar" },
+	{ 0xC7, "UNICORE Electronic (Suzhou) Co Ltd" },
+	{ 0xC8, "Axonne Inc" },
+	{ 0x49, "Shenzhen SOVERECA Technology Co" },
+	{ 0x4A, "Dire Wolf" },
+	{ 0xCB, "Whampoa Core Technology Co Ltd" },
+	{ 0x4C, "CSI Halbleiter GmbH" },
+	{ 0xCD, "ONE Semiconductor" },
+	{ 0xCE, "SimpleMachines Inc" },
+	{ 0x4F, "Shenzhen Chengyi Qingdian Electronic" },
+	{ 0xD0, "Shenzhen Xinlianxin Network Technology" },
+	{ 0x51, "Vayyar Imaging Ltd" },
+	{ 0x52, "Paisen Network Technology Co Ltd" },
+	{ 0xD3, "Shenzhen Fengwensi Technology Co Ltd" },
+	{ 0x54, "Caplink Technology Limited" },
+	{ 0xD5, "JJT Solution Co Ltd" },
+	{ 0xD6, "HOSIN Global Electronics Co Ltd" },
+	{ 0x57, "Shenzhen KingDisk Century Technology" },
+	{ 0x58, "SOYO" },
+	{ 0xD9, "DIT Technology Co Ltd" },
+	{ 0xDA, "iFound" },
+	{ 0x5B, "Aril Computer Company" },
+	{ 0xDC, "ASUS" },
+	{ 0x5D, "Shenzhen Ruiyingtong Technology Co" },
+	{ 0x5E, "HANA Micron" },
+	{ 0xDF, "RANSOR" },
+	{ 0xE0, "Axiado Corporation" },
+	{ 0x61, "Tesla Corporation" },
+	{ 0x62, "Pingtouge (Shanghai) Semiconductor Co" },
+	{ 0xE3, "S3Plus Technologies SA" },
+	{ 0x64, "Integrated Silicon Solution Israel Ltd" },
+	{ 0xE5, "GreenWaves Technologies" },
+	{ 0xE6, "NUVIA Inc" },
+	{ 0x67, "Guangzhou Shuvrwine Technology Co" },
+	{ 0x68, "Shenzhen Hangshun Chip Technology" },
+	{ 0xE9, "Chengboliwei Electronic Business" },
+	{ 0xEA, "Kowin Memory Technology Co Ltd" },
+	{ 0x6B, "Euronet Technology Inc" },
+	{ 0xEC, "SCY" },
+	{ 0x6D, "Shenzhen Xinhongyusheng Electrical" },
+	{ 0x6E, "PICOCOM" },
+	{ 0xEF, "Shenzhen Toooogo Memory Technology" },
+	{ 0x70, "VLSI Solution" },
+	{ 0xF1, "Costar Electronics Inc" },
+	{ 0xF2, "Shenzhen Huatop Technology Co Ltd" },
+	{ 0x73, "Inspur Electronic Information Industry" },
+	{ 0xF4, "Shenzhen Boyuan Computer Technology" },
+	{ 0x75, "Beijing Welldisk Electronics Co Ltd" },
+	{ 0x76, "Suzhou EP Semicon Co Ltd" },
+	{ 0xF7, "Zhejiang Dahua Memory Technology" },
+	{ 0xF8, "Virtu Financial" },
+	{ 0x79, "Datotek International Co Ltd" },
+	{ 0x7A, "Telecom and Microelectronics Industries" },
+	{ 0xFB, "Echow Technology Ltd" },
+	{ 0x7C, "APEX-INFO" },
+	{ 0xFD, "Yingpark" },
+	{ 0xFE, "Shenzhen Bigway Tech Co Ltd" }
+};
+
+static const libjedec_vendor_pair_t libjedec_vendors_13[LIBJEDEC_TABLE_SIZE] = {
+	{ 0x01, "Beijing Haawking Technology Co Ltd" },
+	{ 0x02, "Open HW Group" },
+	{ 0x83, "JHICC" },
+	{ 0x04, "ncoder AG" },
+	{ 0x85, "ThinkTech Information Technology Co" },
+	{ 0x86, "Shenzhen Chixingzhe Technology Co Ltd" },
+	{ 0x07, "Biao Ram Technology Co Ltd" },
+	{ 0x08, "Shenzhen Kaizhuoyue Electronics Co Ltd" },
+	{ 0x89, "Shenzhen YC Storage Technology Co Ltd" },
+	{ 0x8A, "Shenzhen Chixingzhe Technology Co" },
+	{ 0x0B, "Wink Semiconductor  (Shenzhen) Co Ltd" },
+	{ 0x8C, "AISTOR" },
+	{ 0x0D, "Palma Ceia SemiDesign" },
+	{ 0x0E, "EM Microelectronic-Marin SA" },
+	{ 0x8F, "Shenzhen Monarch Memory Technology" },
+	{ 0x10, "Reliance Memory Inc" },
+	{ 0x91, "Jesis" },
+	{ 0x92, "Espressif Systems (Shanghai)  Co Ltd" },
+	{ 0x13, "Shenzhen Sati Smart Technology Co Ltd" },
+	{ 0x94, "NeuMem Co Ltd" },
+	{ 0x15, "Lifelong" },
+	{ 0x16, "Beijing Oitech Technology Co Ltd" },
+	{ 0x97, "Groupe LDLC" },
+	{ 0x98, "Semidynamics Technology Services SLU" },
+	{ 0x19, "swordbill" },
+	{ 0x1A, "YIREN" },
+	{ 0x9B, "Shenzhen Yinxiang Technology Co Ltd" },
+	{ 0x1C, "PoweV Electronic Technology Co Ltd" },
+	{ 0x9D, "LEORICE" },
+	{ 0x9E, "Waymo LLC" },
+	{ 0x1F, "Ventana Micro Systems" },
+	{ 0x20, "Hefei Guangxin Microelectronics Co Ltd" },
+	{ 0xA1, "Shenzhen Sooner Industrial Co Ltd" },
+	{ 0xA2, "Horizon Robotics" },
+	{ 0x23, "Tangem AG" },
+	{ 0xA4, "FuturePath Technology (Shenzhen) Co" },
+	{ 0x25, "RC Module" },
+	{ 0x26, "Timetec International Inc" },
+	{ 0xA7, "ICMAX Technologies Co Limited" },
+	{ 0xA8, "Lynxi Technologies Ltd Co" },
+	{ 0x29, "Guangzhou Taisupanke Computer Equipment" },
+	{ 0x2A, "Ceremorphic Inc" },
+	{ 0xAB, "Biwin Storage Technology Co Ltd" },
+	{ 0x2C, "Beijing ESWIN Computing Technology" },
+	{ 0xAD, "WeForce Co Ltd" },
+	{ 0xAE, "Shenzhen Fanxiang Information Technology" },
+	{ 0x2F, "Unisoc" },
+	{ 0xB0, "YingChu" },
+	{ 0x31, "GUANCUN" },
+	{ 0x32, "IPASON" },
+	{ 0xB3, "Ayar Labs" },
+	{ 0x34, "Amazon" },
+	{ 0xB5, "Shenzhen Xinxinshun Technology Co" },
+	{ 0xB6, "Galois Inc" },
+	{ 0x37, "Ubilite Inc" },
+	{ 0x38, "Shenzhen Quanxing Technology Co Ltd" },
+	{ 0xB9, "Group RZX Technology LTDA" },
+	{ 0xBA, "Yottac Technology (XI’AN) Cooperation" },
+	{ 0x3B, "Shenzhen RuiRen Technology Co Ltd" },
+	{ 0xBC, "Group Star Technology Co Ltd" },
+	{ 0x3D, "RWA (Hong Kong) Ltd" },
+	{ 0x3E, "Genesys Logic Inc" },
+	{ 0xBF, "T3 Robotics Inc." },
+	{ 0x40, "Biostar Microtech International Corp" },
+	{ 0xC1, "Shenzhen SXmicro Technology Co Ltd" },
+	{ 0xC2, "Shanghai Yili Computer Technology Co" },
+	{ 0x43, "Zhixin Semicoducotor Co Ltd" },
+	{ 0xC4, "uFound" },
+	{ 0x45, "Aigo Data Security Technology Co. Ltd" },
+	{ 0x46, ".GXore Technologies" },
+	{ 0xC7, "Shenzhen Pradeon Intelligent Technology" },
+	{ 0xC8, "Power LSI" },
+	{ 0x49, "PRIME" },
+	{ 0x4A, "Shenzhen Juyang Innovative Technology" },
+	{ 0xCB, "CERVO" },
+	{ 0x4C, "SiEngine Technology Co., Ltd." },
+	{ 0xCD, "Beijing Unigroup Tsingteng MicroSystem" },
+	{ 0xCE, "Brainsao GmbH" },
+	{ 0x4F, "Credo Technology Group Ltd" },
+	{ 0xD0, "Shanghai Biren Technology Co Ltd" },
+	{ 0x51, "Nucleu Semiconductor" },
+	{ 0x52, "Shenzhen Guangshuo Electronics Co Ltd" },
+	{ 0xD3, "ZhongsihangTechnology Co Ltd" },
+	{ 0x54, "Suzhou Mainshine Electronic Co Ltd." },
+	{ 0xD5, "Guangzhou Riss Electronic Technology" },
+	{ 0xD6, "Shenzhen Cloud Security Storage Co" },
+	{ 0x57, "ROG" },
+	{ 0x58, "Perceive" },
+	{ 0xD9, "e-peas" },
+	{ 0xDA, "Fraunhofer IPMS" },
+	{ 0x5B, "Shenzhen Daxinlang Electronic Tech Co" },
+	{ 0xDC, "Abacus Peripherals Private Limited" },
+	{ 0x5D, "OLOy Technology" },
+	{ 0x5E, "Wuhan P&S Semiconductor Co Ltd" },
+	{ 0xDF, "Sitrus Technology" },
+	{ 0xE0, "AnHui Conner Storage Co Ltd" },
+	{ 0x61, "Rochester Electronics" },
+	{ 0x62, "Wuxi Petabyte Technologies Co Ltd" },
+	{ 0xE3, "Star Memory" },
+	{ 0x64, "Agile Memory Technology Co Ltd" },
+	{ 0xE5, "MEJEC" },
+	{ 0xE6, "Rockchip Electronics Co Ltd" },
+	{ 0x67, "Dongguan Guanma e-commerce Co Ltd" },
+	{ 0x68, "Rayson Hi-Tech (SZ) Limited" },
+	{ 0xE9, "MINRES Technologies GmbH" },
+	{ 0xEA, "Himax Technologies Inc" },
+	{ 0x6B, "Shenzhen Cwinner Technology Co Ltd" },
+	{ 0xEC, "Tecmiyo" },
+	{ 0x6D, "Shenzhen Suhuicun Technology Co Ltd" },
+	{ 0x6E, "Vickter Electronics Co. Ltd." },
+	{ 0xEF, "lowRISC" },
+	{ 0x70, "EXEGate FZE" },
+	{ 0xF1, "Shenzhen 9 Chapter Technologies Co" },
+	{ 0xF2, "Addlink" },
+	{ 0x73, "Starsway" },
+	{ 0xF4, "Pensando Systems Inc." },
+	{ 0x75, "AirDisk" },
+	{ 0x76, "Shenzhen Speedmobile Technology Co" },
+	{ 0xF7, "PEZY Computing" },
+	{ 0xF8, "Extreme Engineering Solutions Inc" },
+	{ 0x79, "Shangxin Technology Co Ltd" },
+	{ 0x7A, "Shanghai Zhaoxin Semiconductor Co" },
+	{ 0xFB, "Xsight Labs Ltd" },
+	{ 0x7C, "Hangzhou Hikstorage Technology Co" },
+	{ 0xFD, "Dell Technologies" },
+	{ 0xFE, "Guangdong StarFive Technology Co" }
+};
+
+static const libjedec_vendor_pair_t libjedec_vendors_14[31] = {
+	{ 0x01, "TECOTON" },
+	{ 0x02, "Abko Co Ltd" },
+	{ 0x83, "Shenzhen Feisrike Technology Co Ltd" },
+	{ 0x04, "Shenzhen Sunhome Electronics Co Ltd" },
+	{ 0x85, "Global Mixed-mode Technology Inc" },
+	{ 0x86, "Shenzhen Weien Electronics Co. Ltd." },
+	{ 0x07, "Shenzhen Cooyes Technology Co Ltd" },
+	{ 0x08, "Keymos Electronics Co., Limited" },
+	{ 0x89, "E-Rockic Technology Company Limited" },
+	{ 0x8A, "Aerospace Science Memory Shenzhen" },
+	{ 0x0B, "Shenzhen Quanji Technology Co Ltd" },
+	{ 0x8C, "Dukosi" },
+	{ 0x0D, "Maxell Corporation of America" },
+	{ 0x0E, "Shenshen Xinxintao Electronics Co Ltd" },
+	{ 0x8F, "Zhuhai Sanxia Semiconductor Co Ltd" },
+	{ 0x10, "Groq Inc" },
+	{ 0x91, "AstraTek" },
+	{ 0x92, "Shenzhen Xinyuze Technology  Co Ltd" },
+	{ 0x13, "All Bit Semiconductor" },
+	{ 0x94, "ACFlow" },
+	{ 0x15, "Shenzhen Sipeed Technology Co Ltd" },
+	{ 0x16, "Linzhi Hong Kong Co Limited" },
+	{ 0x97, "Supreme Wise Limited" },
+	{ 0x98, "Blue Cheetah Analog Design Inc" },
+	{ 0x19, "Hefei Laiku Technology Co Ltd" },
+	{ 0x1A, "Zord" },
+	{ 0x9B, "SBO Hearing A/S" },
+	{ 0x1C, "Regent Sharp International Limited" },
+	{ 0x9D, "Permanent Potential Limited" },
+	{ 0x9E, "Creative World International Limited" },
+	{ 0x1F, "Base Creation International Limited" }
 };
 
 const char *
@@ -1268,46 +1754,67 @@ libjedec_vendor_string(uint_t cont, uint_t val)
 	const libjedec_vendor_pair_t *pairs;
 	uint_t i, nents;
 
+	/*
+	 * JEDEC tables are indexed starting at 1 to match the spec. Table 1
+	 * employs zero continuations, hence each entry here is basically
+	 * switched on table id - 1.
+	 */
 	switch (cont) {
 	case 0:
-		pairs = libjedec_vendors_0;
-		nents = ARRAY_SIZE(libjedec_vendors_0);
-		break;
-	case 1:
 		pairs = libjedec_vendors_1;
 		nents = ARRAY_SIZE(libjedec_vendors_1);
 		break;
-	case 2:
+	case 1:
 		pairs = libjedec_vendors_2;
 		nents = ARRAY_SIZE(libjedec_vendors_2);
 		break;
-	case 3:
+	case 2:
 		pairs = libjedec_vendors_3;
 		nents = ARRAY_SIZE(libjedec_vendors_3);
 		break;
-	case 4:
+	case 3:
 		pairs = libjedec_vendors_4;
 		nents = ARRAY_SIZE(libjedec_vendors_4);
 		break;
-	case 5:
+	case 4:
 		pairs = libjedec_vendors_5;
 		nents = ARRAY_SIZE(libjedec_vendors_5);
 		break;
-	case 6:
+	case 5:
 		pairs = libjedec_vendors_6;
 		nents = ARRAY_SIZE(libjedec_vendors_6);
 		break;
-	case 7:
+	case 6:
 		pairs = libjedec_vendors_7;
 		nents = ARRAY_SIZE(libjedec_vendors_7);
 		break;
-	case 8:
+	case 7:
 		pairs = libjedec_vendors_8;
 		nents = ARRAY_SIZE(libjedec_vendors_8);
 		break;
-	case 9:
+	case 8:
 		pairs = libjedec_vendors_9;
 		nents = ARRAY_SIZE(libjedec_vendors_9);
+		break;
+	case 9:
+		pairs = libjedec_vendors_10;
+		nents = ARRAY_SIZE(libjedec_vendors_10);
+		break;
+	case 10:
+		pairs = libjedec_vendors_11;
+		nents = ARRAY_SIZE(libjedec_vendors_11);
+		break;
+	case 11:
+		pairs = libjedec_vendors_12;
+		nents = ARRAY_SIZE(libjedec_vendors_12);
+		break;
+	case 12:
+		pairs = libjedec_vendors_13;
+		nents = ARRAY_SIZE(libjedec_vendors_13);
+		break;
+	case 13:
+		pairs = libjedec_vendors_14;
+		nents = ARRAY_SIZE(libjedec_vendors_14);
 		break;
 	default:
 		return (NULL);
