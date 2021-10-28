@@ -61,47 +61,56 @@
  * take special processing and shouldn't actually ever be passed to do_reloc().
  */
 const Rel_entry	reloc_table[R_AMD64_NUM] = {
-/* R_AMD64_NONE */	{0, FLG_RE_NOTREL, 0, 0, 0},
-/* R_AMD64_64 */	{0, FLG_RE_NOTREL, 8, 0, 0},
-/* R_AMD64_PC32 */	{0, FLG_RE_PCREL, 4, 0, 0},
-/* R_AMD64_GOT32 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
-/* R_AMD64_PLT32 */	{0, FLG_RE_PCREL | FLG_RE_PLTREL |
-			    FLG_RE_VERIFY | FLG_RE_SIGN, 4, 0, 0},
-/* R_AMD64_COPY */	{0, FLG_RE_NOTSUP, 0, 0, 0},	/* SPECIAL */
-/* R_AMD64_GLOB_DAT */	{0, FLG_RE_NOTREL, 8, 0, 0},
-/* R_AMD64_JUMP_SLOT */	{0, FLG_RE_NOTSUP, 0, 0, 0},	/* SPECIAL */
-/* R_AMD64_RELATIVE */	{0, FLG_RE_NOTREL, 8, 0, 0},
-/* R_AMD64_GOTPCREL */	{0, FLG_RE_GOTPC | FLG_RE_GOTADD, 4, 0, 0},
-/* R_AMD64_32 */	{0, FLG_RE_NOTREL, 4, 0, 0},
-/* R_AMD64_32S */	{0, FLG_RE_NOTREL, 4, 0, 0},
-/* R_AMD64_16 */	{0, FLG_RE_NOTREL, 2, 0, 0},
-/* R_AMD64_PC16 */	{0, FLG_RE_PCREL, 2, 0, 0},
-/* R_AMD64_8 */		{0, FLG_RE_NOTREL, 1, 0, 0},
-/* R_AMD64_PC8 */	{0, FLG_RE_PCREL, 1, 0, 0},
-/* R_AMD64_DTPMOD64 */	{0, FLG_RE_NOTREL, 8, 0, 0},
-/* R_AMD64_DTPOFF64 */	{0, FLG_RE_NOTREL, 8, 0, 0},
-/* R_AMD64_TPOFF64 */	{0, FLG_RE_NOTREL, 8, 0, 0},
-/* R_AMD64_TLSGD */	{0, FLG_RE_GOTPC | FLG_RE_GOTADD | FLG_RE_TLSGD,
-			    4, 0, 0},
-/* R_AMD64_TLSLD */	{0, FLG_RE_GOTPC | FLG_RE_GOTADD | FLG_RE_TLSLD,
-			    4, 0, 0},
-/* R_AMD64_DTPOFF32 */	{0, FLG_RE_TLSLD, 4},
-/* R_AMD64_GOTTPOFF */	{0, FLG_RE_GOTPC | FLG_RE_GOTADD | FLG_RE_TLSIE,
-			    4, 0, 0},
-/* R_AMD64_TPOFF32 */	{0, FLG_RE_TLSLE, 4, 0, 0},
-/* R_AMD64_PC64 */	{0, FLG_RE_PCREL, 8, 0, 0},
-/* R_AMD64_GOTOFF64 */	{0, FLG_RE_GOTREL, 8, 0, 0},
-/* R_AMD64_GOTPC32 */	{0, FLG_RE_PCREL | FLG_RE_GOTPC | FLG_RE_LOCLBND,
-			    4, 0, 0},
-/* R_AMD64_GOT64 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
-/* R_AMD64_GOTPCREL64 */	{FLG_RE_NOTSUP, 0, 0, 0},
-/* R_AMD64_GOTPC6 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
-/* R_AMD64_GOTPLT64 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
-/* R_AMD64_PLTOFF64 */	{0, FLG_RE_NOTSUP, 0, 0, 0},
-/* R_AMD64_SIZE32 */	{0, FLG_RE_SIZE, 4, 0, 0},
-/* R_AMD64_SIZE64 */	{0, FLG_RE_SIZE, 8, 0, 0}
+	[R_AMD64_NONE]		= {0, FLG_RE_NOTREL, 0, 0, 0},
+	[R_AMD64_64]		= {0, FLG_RE_NOTREL, 8, 0, 0},
+	[R_AMD64_PC32]		= {0, FLG_RE_PCREL, 4, 0, 0},
+	[R_AMD64_GOT32]		= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_PLT32]		= {0, FLG_RE_PCREL | FLG_RE_PLTREL |
+	    FLG_RE_VERIFY | FLG_RE_SIGN, 4, 0, 0},
+	[R_AMD64_COPY]		= {0, FLG_RE_NOTSUP, 0, 0, 0},	/* SPECIAL */
+	[R_AMD64_GLOB_DAT]	= {0, FLG_RE_NOTREL, 8, 0, 0},
+	[R_AMD64_JUMP_SLOT]	= {0, FLG_RE_NOTSUP, 0, 0, 0},	/* SPECIAL */
+	[R_AMD64_RELATIVE]	= {0, FLG_RE_NOTREL, 8, 0, 0},
+	[R_AMD64_GOTPCREL]	= {0, FLG_RE_GOTPC | FLG_RE_GOTADD, 4, 0, 0},
+	[R_AMD64_32]		= {0, FLG_RE_NOTREL, 4, 0, 0},
+	[R_AMD64_32S]		= {0, FLG_RE_NOTREL, 4, 0, 0},
+	[R_AMD64_16]		= {0, FLG_RE_NOTREL, 2, 0, 0},
+	[R_AMD64_PC16]		= {0, FLG_RE_PCREL, 2, 0, 0},
+	[R_AMD64_8]		= {0, FLG_RE_NOTREL, 1, 0, 0},
+	[R_AMD64_PC8]		= {0, FLG_RE_PCREL, 1, 0, 0},
+	[R_AMD64_DTPMOD64]	= {0, FLG_RE_NOTREL, 8, 0, 0},
+	[R_AMD64_DTPOFF64]	= {0, FLG_RE_NOTREL, 8, 0, 0},
+	[R_AMD64_TPOFF64]	= {0, FLG_RE_NOTREL, 8, 0, 0},
+	[R_AMD64_TLSGD]		= {0, FLG_RE_GOTPC | FLG_RE_GOTADD |
+	    FLG_RE_TLSGD, 4, 0, 0},
+	[R_AMD64_TLSLD]		= {0, FLG_RE_GOTPC | FLG_RE_GOTADD |
+	    FLG_RE_TLSLD, 4, 0, 0},
+	[R_AMD64_DTPOFF32]	= {0, FLG_RE_TLSLD, 4},
+	[R_AMD64_GOTTPOFF]	= {0, FLG_RE_GOTPC | FLG_RE_GOTADD |
+	    FLG_RE_TLSIE, 4, 0, 0},
+	[R_AMD64_TPOFF32]	= {0, FLG_RE_TLSLE, 4, 0, 0},
+	[R_AMD64_PC64]		= {0, FLG_RE_PCREL, 8, 0, 0},
+	[R_AMD64_GOTOFF64]	= {0, FLG_RE_GOTREL, 8, 0, 0},
+	[R_AMD64_GOTPC32]	= {0, FLG_RE_PCREL | FLG_RE_GOTPC |
+	    FLG_RE_LOCLBND, 4, 0, 0},
+	[R_AMD64_GOT64]		= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_GOTPCREL64]	= {FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_GOTPC64]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_GOTPLT64]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_PLTOFF64]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_SIZE32]	= {0, FLG_RE_SIZE, 4, 0, 0},
+	[R_AMD64_SIZE64]	= {0, FLG_RE_SIZE, 8, 0, 0},
+	[R_AMD64_GOTPC32_TLSDESC] = {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_TLSDESC_CALL]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_TLSDESC]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_IRELATIVE]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_RELATIVE64]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_UNKNOWN39]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_UNKNOWN40]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_GOTPCRELX]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_REX_GOTPCRELX]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
 };
-#if	(R_AMD64_NUM != (R_AMD64_SIZE64 + 1))
+#if	(R_AMD64_NUM != (R_AMD64_REX_GOTPCRELX + 1))
 #error	"R_AMD64_NUM has grown"
 #endif
 
@@ -110,42 +119,49 @@ const Rel_entry	reloc_table[R_AMD64_NUM] = {
  * We assume we wish to add the relocation amount, value, to the
  * value of the address already present at the offset.
  *
- * NAME			VALUE	FIELD		CALCULATION
+ * NAME				VALUE	FIELD		CALCULATION
  *
- * R_AMD64_NONE		 0	none		none
- * R_AMD64_64		 1	word64		S + A
- * R_AMD64_PC32		 2	word64		S + A
- * R_AMD64_GOT32	 3	word32		G + A
- * R_AMD64_PLT32	 4	word32		L + A - P
- * R_AMD64_COPY		 5	none		none
- * R_AMD64_GLOB_DAT	 6	word64		S
- * R_AMD64_JUMP_SLOT	 7	word64		S
- * R_AMD64_RELATIVE	 8	word64		B + A
- * R_AMD64_GOTPCREL	 9	word32		G + GOT + A - P
- * R_AMD64_32		10	word32		S + A
- * R_AMD64_32S		11	word32		S + A
- * R_AMD64_16		12	word16		S + A
- * R_AMD64_PC16		13	word16		S + A - P
- * R_AMD64_8		14	word8		S + A
- * R_AMD64_PC8		15	word8		S + A - P
- * R_AMD64_DTPMOD64	16	word64
- * R_AMD64_DTPOFF64	17	word64
- * R_AMD64_TPOFF64	18	word64
- * R_AMD64_TLSGD	19	word32
- * R_AMD64_TLSLD	20	word32
- * R_AMD64_DTPOFF32	21	word32
- * R_AMD64_GOTTPOFF	22	word32
- * R_AMD64_TPOFF32	23	word32
- * R_AMD64_PC64		24	word32		S + A - P
- * R_AMD64_GOTOFF64	25	word32		S + A - GOT
- * R_AMD64_GOTPC32	26	word32		GOT + A - P
- * R_AMD64_GOT64	27			reserved for future expansion
- * R_AMD64_GOTPCREL64	28			reserved for future expansion
- * R_AMD64_GOTPC64	29			reserved for future expansion
- * R_AMD64_GOTPLT64	30			reserved for future expansion
- * R_AMD64_PLTOFF64	31			reserved for future expansion
- * R_AMD64_SIZE32	32	word32		Z + A
- * R_AMD64_SIZE64	33	word64		Z + A
+ * R_AMD64_NONE			 0	none		none
+ * R_AMD64_64			 1	word64		S + A
+ * R_AMD64_PC32			 2	word64		S + A
+ * R_AMD64_GOT32		 3	word32		G + A
+ * R_AMD64_PLT32		 4	word32		L + A - P
+ * R_AMD64_COPY			 5	none		none
+ * R_AMD64_GLOB_DAT		 6	word64		S
+ * R_AMD64_JUMP_SLOT		 7	word64		S
+ * R_AMD64_RELATIVE		 8	word64		B + A
+ * R_AMD64_GOTPCREL		 9	word32		G + GOT + A - P
+ * R_AMD64_32			10	word32		S + A
+ * R_AMD64_32S			11	word32		S + A
+ * R_AMD64_16			12	word16		S + A
+ * R_AMD64_PC16			13	word16		S + A - P
+ * R_AMD64_8			14	word8		S + A
+ * R_AMD64_PC8			15	word8		S + A - P
+ * R_AMD64_DTPMOD64		16	word64
+ * R_AMD64_DTPOFF64		17	word64
+ * R_AMD64_TPOFF64		18	word64
+ * R_AMD64_TLSGD		19	word32
+ * R_AMD64_TLSLD		20	word32
+ * R_AMD64_DTPOFF32		21	word32
+ * R_AMD64_GOTTPOFF		22	word32
+ * R_AMD64_TPOFF32		23	word32
+ * R_AMD64_PC64			24	word32		S + A - P
+ * R_AMD64_GOTOFF64		25	word32		S + A - GOT
+ * R_AMD64_GOTPC32		26	word32		GOT + A - P
+ * R_AMD64_GOT64		27			future expansion
+ * R_AMD64_GOTPCREL64		28			future expansion
+ * R_AMD64_GOTPC64		29			future expansion
+ * R_AMD64_GOTPLT64		30			future expansion
+ * R_AMD64_PLTOFF64		31			future expansion
+ * R_AMD64_SIZE32		32	word32		Z + A
+ * R_AMD64_SIZE64		33	word64		Z + A
+ * R_AMD64_GOTPC32_TLSDESC	34	word32
+ * R_AMD64_TLSDESC_CALL		35	none
+ * R_AMD64_TLSDESC		36	word64*2
+ * R_AMD64_IRELATIVE		37	word64		indirect (B + A)
+ * R_AMD64_RELATIVE64		38	word64		B + A
+ * R_AMD64_GOTPCRELX		41	word32		G + GOT + A - P
+ * R_AMD64_REX_GOTPCRELX	42	word32		G + GOT + A - P
  *
  * Relocation calculations:
  *	A	Represents the addend used to compute the value of the

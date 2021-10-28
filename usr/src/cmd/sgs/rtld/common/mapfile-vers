@@ -78,24 +78,17 @@ SYMBOL_VERSION SUNWprivate_1.3 {
 	r_debug		{
 			  ASSERT = {
 				  TYPE = OBJECT;
-				  $if _x86 && _ELF32
-
+$if _x86 && _ELF32
 				  SIZE = 44;
-				  $elif _x86 && _ELF64
-
+$elif _x86 && _ELF64
 				  SIZE = 80;
-				  $elif _sparc && _ELF32
-
+$elif _sparc && _ELF32
 				  SIZE = 44;
-				  $elif _sparc && _ELF64
-
+$elif _sparc && _ELF64
 				  SIZE = 80;
-				  $else
-
-				  $error Unknown platform
-
-				  $endif
-
+$else
+$error Unknown platform
+$endif
 				};
 			};
 
@@ -104,18 +97,13 @@ SYMBOL_VERSION SUNWprivate_1.3 {
 	lml_main	{
 			  ASSERT = {
 				  TYPE = OBJECT;
-				  $if _ELF32
-
+$if _ELF32
 				  SIZE = addrsize[41];
-				  $elif _ELF64
-
+$elif _ELF64
 				  SIZE = addrsize[38];
-				  $else
-
-				  $error Unknown platform
-
-				  $endif
-
+$else
+$error Unknown platform
+$endif
 				};
 			};
 	lookup_sym;
@@ -171,13 +159,13 @@ $if _ELF32
 	reloc32_table	{
 			  ASSERT = {
 				  TYPE = OBJECT;
-				$if _x86
-				  SIZE = addrsize[117];
-				$elif _sparc
+$if _x86
+				  SIZE = addrsize[132];
+$elif _sparc
 				  SIZE = addrsize[264];
-				$else
-				$error Unknown architecture
-				$endif
+$else
+$error Unknown architecture
+$endif
 				};
 			};
 $elif _ELF64
@@ -185,13 +173,13 @@ $elif _ELF64
 	reloc64_table	{
 			  ASSERT = {
 				  TYPE = OBJECT;
-				$if _x86
-				  SIZE = addrsize[68];
-				$elif _sparc
+$if _x86
+				  SIZE = addrsize[86];
+$elif _sparc
 				  SIZE = addrsize[176];
-				$else
-				$error Unknown architecture
-				$endif
+$else
+$error Unknown architecture
+$endif
 				};
 			};
 $else

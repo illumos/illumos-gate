@@ -58,22 +58,27 @@ extern "C" {
 #define	R_386_PC16		21
 #define	R_386_8			22
 #define	R_386_PC8		23
-#define	R_386_UNKNOWN24		24
-#define	R_386_UNKNOWN25		25
-#define	R_386_UNKNOWN26		26
-#define	R_386_UNKNOWN27		27
-#define	R_386_UNKNOWN28		28
-#define	R_386_UNKNOWN29		29
-#define	R_386_UNKNOWN30		30
-#define	R_386_UNKNOWN31		31
+#define	R_386_TLS_GD_32		24
+#define	R_386_TLS_GD_PUSH	25
+#define	R_386_TLS_GD_CALL	26
+#define	R_386_TLS_GD_POP	27
+#define	R_386_TLS_LDM_32	28
+#define	R_386_TLS_LDM_PUSH	29
+#define	R_386_TLS_LDM_CALL	30
+#define	R_386_TLS_LDM_POP	31
 #define	R_386_TLS_LDO_32	32
-#define	R_386_UNKNOWN33		33
-#define	R_386_UNKNOWN34		34
+#define	R_386_TLS_IE_32		33
+#define	R_386_TLS_LE_32		34
 #define	R_386_TLS_DTPMOD32	35
 #define	R_386_TLS_DTPOFF32	36
-#define	R_386_UNKNOWN37		37
+#define	R_386_TLS_TPOFF32	37
 #define	R_386_SIZE32		38
-#define	R_386_NUM		39
+#define	R_386_TLS_GOTDESC	39
+#define	R_386_TLS_DESC_CALL	40
+#define	R_386_TLS_DESC		41
+#define	R_386_IRELATIVE		42
+#define	R_386_GOT32X		43
+#define	R_386_NUM		44
 
 #define	ELF_386_MAXPGSZ		0x10000	/* maximum page size */
 
