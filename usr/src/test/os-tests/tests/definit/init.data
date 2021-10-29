@@ -1,0 +1,77 @@
+#
+# This is a test input file for the 'definit' parser
+#
+  # comment indented with spaces
+	# comment indented with tabs
+	 # comment indented with both spaces and tabs
+ 	 	 # comment indented with alternating spaces and tabs
+# blank line follows
+
+# lines consisting of only spaces follow
+  
+	
+ 	
+	 
+  	  	
+# Simple assignment, variously indented
+TZ=UTC
+ TZSI=UTCSI
+	TZTI=UTCTI
+ 	TZSTI=UTCSTI
+	 TZTSI=UTCTSI
+ 	 	 	 TZMI=UTCMI
+; LEADING=semicolon
+
+# Quoted assignment, quotes do not have to match nor be balanced. They are
+# just stripped early in parsing.
+CMASK1="001"
+CMASK2='002'
+CMASK3='003"
+CMASK4="004'
+CMASK5="005
+CMASK6='006
+CMASK7=007"
+CMASK8=010'
+CMASK9='"'"'011 ''''''''''''''''  
+
+# Quoted with a semicolon
+QSC="test1;tryst2"
+QSCS='test3;tryst4'
+QSCSS='test5;tryst6"
+QSCSSS="test5;tryst6'
+
+# Multiple on one line
+MULTI1=multi1 MULTI2=multi2 MULTI3=multi3
+MULTIS1=multis1;MULTIS2=multis2;MULTIS3=multis3
+MULTISS1=multiss1; MULTISS2=multiss2; MULTISS3=multiss3
+MULTISSS1=multisss1 ; MULTISSS2=multisss2 ; MULTISSS3=multisss3
+	 SMULTI1=smulti1 SMULTI2=smulti2 SMULTI3=smulti3
+	 SMULTIS1=smultis1;SMULTIS2=smultis2;SMULTIS3=smultis3
+	 SMULTISS1=smultiss1; SMULTISS2=smultiss2; SMULTISS3=smultiss3
+	 SMULTISSS1=smultisss1 ; SMULTISSS2=smultisss2 ; SMULTISSS3=smultisss3
+
+# Tokens without = should be skipped
+PLAIN
+OK=1 NOEQUALS
+ANOTHER BAD=54 IGNORED
+
+# Tokens with a comment after, the comment will be parsed for tokens
+THIS=this 	# not a comment so if it includes THAT=that then it's found
+
+# Line which is at the maximum allowed length (512 characters including newline)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            Z=b
+
+# Lines which exceed the maximum allowed length (last item will be truncated)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            X=cccccc
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            YYYYYY=d
+
+# More complex examples
+UMEM_DEBUG="default"; MAXIMUS BOB=fred; SUE='test' BARNEY=dino
+
+# quoted value containing a space. NOTE this does not parse as you might expect
+# and will just result in 'SPACED=test1'. This is consistent with the way that
+# init and svc.startd have always interpreted a quoted value containing a space.
+SPACED="test1 test2"
+SPACED2="test3 test4 another=test5"
+

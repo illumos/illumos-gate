@@ -1,75 +1,141 @@
-'\" te
+'\"
+.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2014 Garrett D'Amore
 .\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INIT 4 "Mar 15, 2014"
-.SH NAME
-init \- set default system time zone and locale
-.SH SYNOPSIS
-.LP
-.nf
-\fB/etc/default/init\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-This file sets the time zone environment variable \fBTZ\fR, and the
-locale-related environment variables \fBLANG\fR, \fBLC_COLLATE\fR,
-\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_MONETARY\fR, \fBLC_NUMERIC\fR, and
-\fBLC_TIME\fR.
-.sp
-.LP
-\fB/etc/TIMEZONE\fR is a symbolic link to \fB/etc/default/init\fR.  This
-link exists for compatibility with legacy software, is obsolete, and may
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 7, 2021
+.Dt INIT 4
+.Os
+.Sh NAME
+.Nm init ,
+.Nm TIMEZONE
+.Nd set default system time zone and locale
+.Sh SYNOPSIS
+.Pa /etc/default/init
+.Pp
+.Pa /etc/TIMEZONE
+.Sh DESCRIPTION
+This file sets the time zone environment variable
+.Ev TZ ,
+and the locale-related environment variables
+.Ev LANG ,
+.Ev LC_COLLATE ,
+.Ev LC_CTYPE ,
+.Ev LC_MESSAGES ,
+.Ev LC_MONETARY ,
+.Ev LC_NUMERIC
+and
+.Ev LC_TIME .
+.Pp
+It can also be used to set any additional environment variables which should be
+present in all processes started by
+.Xr init 1M
+or
+.Xr svc.startd 1M ,
+and in any
+.Xr zoneadmd 1M
+daemons started automatically to support zone operations.
+.Pp
+The format of the file is a set of tokens of the form:
+.Pp
+.Dl Ar VAR Ns No \&= Ns Ar value
+.Pp
+where
+.Ar VAR
+is an environment variable and
+.Ar value
+is the value assigned to the variable.
+.Ar value
+can be enclosed in double quotes
+.Pq \&"
+or single quotes
+.Pq \&' ,
+however, these quotes cannot be part of the value.
+Neither
+.Ar VAR
+nor
+.Ar value
+may contain whitespace.
+Multiple
+.Ar VAR Ns No \&= Ns Ar value
+pairs can occur on the same line, separated by whitespace or a semicolon
+.Pq \&; ,
+but, for compatibility with existing software, the
+.Ev TZ
+variable
+.Em must
+appear on its own line with no leading whitespace.
+Comments are supported; each comment must be on its own line and begin with a
+hash
+.Pq #
+character.
+.Pp
+If the
+.Ev CMASK
+variable is specified, it is not passed to the environment but the value is
+used to set the initial umask that
+.Xr init 1M
+uses and that every other process inherits.
+The
+.Ev CMASK
+value is specified in octal and must be between 000 and 077 to be accepted; the
+value is silently ignored otherwise.
+If the value is missing or cannot be parsed as an octal number, then a value
+of 0 is assumed.
+A sequence of valid octal digits followed by other trailing characters will be
+treated as if the trailing characters were not present.
+.Pp
+For
+.Xr init 1M ,
+the number of environment variables that can be set is limited to 20.
+.Pp
+.Pa /etc/TIMEZONE
+is a symbolic link to
+.Pa /etc/default/init .
+This link exists for compatibility with legacy software, is obsolete, and may
 be removed in a future release.
-.sp
-.LP
-The number of environment variables that can be set from
-\fB/etc/default/init\fR is limited to 20.
-.sp
-.LP
-The format of the file is:
-.sp
-.in +2
-.nf
-\fIVAR\fR\fB=\fR\fIvalue\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-where \fIVAR\fR is a timezone environment variable and \fIvalue\fR is the value
-assigned to the variable. \fIvalue\fR can be enclosed in double quotes (") or
-single quotes (\&'). The double or single quotes cannot be part of the value.
-.SH SEE ALSO
-.sp
-.LP
-\fBinit\fR(1M), \fBrtc\fR(1M), \fBctime\fR(3C), \fBenviron\fR(5)
-.SH NOTES
-.sp
-.LP
-When changing the \fBTZ\fR setting on x86 systems, you must make a
-corresponding change to the \fB/etc/rtc_config\fR file to account for the new
-timezone setting. This can be accomplished by executing the following commands,
-followed by a reboot, to make the changes take effect:
-.sp
-.in +2
-.nf
-# rtc \fB-z\fR \fIzone-name\fR
-# rtc \fB-c\fR
-
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-where \fIzone-name\fR is the same name as the \fBTZ\fR variable setting.
-.sp
-.LP
-See \fBrtc\fR(1M) for information on the \fBrtc\fR command.
+.Sh SEE ALSO
+.Xr init 1M ,
+.Xr rtc 1M ,
+.Xr svc.startd 1M ,
+.Xr zoneadmd 1M ,
+.Xr ctime 3C ,
+.Xr environ 5
+.Sh NOTES
+When changing the
+.Ev TZ
+setting on x86 systems, you must make a corresponding change to the
+.Pa /etc/rtc_config
+file to account for the new timezone setting.
+This can be accomplished by executing the following commands, followed by a
+reboot, to make the changes take effect:
+.Bd -literal -offset indent
+# rtc -z zone-name
+# rtc -c
+.Ed
+.Pp
+where
+.Ar zone-name
+is the same name as the
+.Ev TZ
+variable setting.
+.Pp
+See
+.Xr rtc 1M
+for more information.

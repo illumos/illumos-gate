@@ -25,6 +25,7 @@
 #
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 
 PROG= init
 ROOTFS_PROG= $(PROG)
@@ -33,12 +34,13 @@ DEFAULTFILES= init.dfl
 
 include ../Makefile.cmd
 
-OBJS = init.o bootbanner.o
+OBJS = init.o bootbanner.o definit.o
 CSTD = $(CSTD_GNU99)
 LDLIBS += -lpam -lbsm -lcontract -lscf
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
 CLOBBERFILES= $(STATIC)
+CPPFLAGS += -I$(SRC)/common/definit
 CPPFLAGS += -DBOOTBANNER1='"$(BOOTBANNER1)"'
 CPPFLAGS += -DBOOTBANNER2='"$(BOOTBANNER2)"'
 CPPFLAGS += -DBOOTBANNER3='"$(BOOTBANNER3)"'
@@ -67,12 +69,17 @@ $(PROG):	$(OBJS)
 	$(POST_PROCESS)
 
 %.o:	$(SRC)/common/bootbanner/%.c
-	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o:	$(SRC)/common/definit/%.c
+	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
 test:
 	rtest $(PROG)
 
 clean:
+	$(RM) $(OBJS)
 
 include ../Makefile.targ

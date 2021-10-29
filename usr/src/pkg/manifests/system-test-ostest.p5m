@@ -49,6 +49,12 @@ dir  path=opt/os-tests/tests/ddi_ufm
 file path=opt/os-tests/tests/ddi_ufm/ufm-test mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-cleanup mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-setup mode=0555
+dir  path=opt/os-tests/tests/definit
+file path=opt/os-tests/tests/definit/definit mode=0555
+file path=opt/os-tests/tests/definit/definit_test.32 mode=0555
+file path=opt/os-tests/tests/definit/definit_test.64 mode=0555
+file path=opt/os-tests/tests/definit/init.data mode=0444
+file path=opt/os-tests/tests/definit/init.expected mode=0444
 file path=opt/os-tests/tests/epoll_test mode=0555
 file path=opt/os-tests/tests/eventfd.32 mode=0555
 file path=opt/os-tests/tests/eventfd.64 mode=0555

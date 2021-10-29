@@ -21,9 +21,11 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <assert.h>
+#include <definit.h>
 #include <libuutil.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,8 +44,6 @@
 #define	MAXCMDL		512
 #define	DEF_PATH	"PATH=/usr/sbin:/usr/bin"
 
-static char *ENVFILE	= "/etc/default/init"; /* Default env. */
-
 static char **glob_envp;	/* Array of environment strings */
 static int glob_env_n;		/* Number of environment slots allocated. */
 
@@ -57,12 +57,9 @@ static char zonename[ZONENAME_MAX];
 void
 init_env()
 {
-	int	i;
-	char	line[MAXCMDL];
-	FILE	*fp;
-	int	inquotes, length, wslength;
-	char	*tokp, *cp1, *cp2;
-	char	**newp;
+	void		*dstate;
+	const char	*tokp;
+	int		i;
 
 	glob_env_n = 16;
 	glob_envp = startd_alloc(sizeof (*glob_envp) * glob_env_n);
@@ -70,102 +67,51 @@ init_env()
 	glob_envp[0] = startd_alloc((unsigned)(strlen(DEF_PATH)+2));
 	(void) strcpy(glob_envp[0], DEF_PATH);
 
-	if ((fp = fopen(ENVFILE, "r")) == NULL) {
+	if (definit_open(DEFINIT_DEFAULT_FILE, &dstate) != 0) {
 		uu_warn("Cannot open %s. Environment not initialized.\n",
-		    ENVFILE);
+		    DEFINIT_DEFAULT_FILE);
 
 		glob_envp[1] = NULL;
 		return;
 	}
 
 	i = 1;
-
-	while (fgets(line, MAXCMDL - 1, fp) != NULL) {
-		/*
-		 * Toss newline
-		 */
-		length = strlen(line);
-		if (line[length - 1] == '\n')
-			line[length - 1] = '\0';
+	while ((tokp = definit_token(dstate)) != NULL) {
+		size_t length = strlen(tokp);
 
 		/*
-		 * Ignore blank or comment lines.
+		 * init already started us with this umask, and we
+		 * handled it in startd.c, so just skip it.
 		 */
-		if (line[0] == '#' || line[0] == '\0' ||
-		    (wslength = strspn(line, " \t\n")) == strlen(line) ||
-		    strchr(line, '#') == line + wslength)
+		if (strncmp(tokp, "CMASK=", 6) == 0 ||
+		    strncmp(tokp, "SMF_", 4) == 0) {
 			continue;
-
-		/*
-		 * First make a pass through the line and change
-		 * any non-quoted semi-colons to blanks so they
-		 * will be treated as token separators below.
-		 */
-		inquotes = 0;
-		for (cp1 = line; *cp1 != '\0'; cp1++) {
-			if (*cp1 == '"') {
-				if (inquotes == 0)
-					inquotes = 1;
-				else
-					inquotes = 0;
-			} else if (*cp1 == ';') {
-				if (inquotes == 0)
-					*cp1 = ' ';
-			}
 		}
 
+		glob_envp[i] = startd_alloc((unsigned)(length + 1));
+		(void) strcpy(glob_envp[i], tokp);
+
 		/*
-		 * Tokens within the line are separated by blanks
-		 *  and tabs.  For each token in the line which
-		 * contains a '=' we strip out any quotes and then
-		 * stick the token in the environment array.
+		 * Double the environment size whenever it is
+		 * full.
 		 */
-		if ((tokp = strtok(line, " \t")) == NULL)
-			continue;
+		if (++i == glob_env_n) {
+			char **newp;
 
-		do {
-			cp1 = strchr(tokp, '=');
-			if (cp1 == NULL || cp1 == tokp)
-				continue;
-			length = strlen(tokp);
-			while ((cp1 = strpbrk(tokp, "\"\'")) != NULL) {
-				for (cp2 = cp1; cp2 < &tokp[length]; cp2++)
-					*cp2 = *(cp2 + 1);
-				length--;
-			}
-
-			/*
-			 * init already started us with this umask, and we
-			 * handled it in startd.c, so just skip it.
-			 */
-			if (strncmp(tokp, "CMASK=", 6) == 0 ||
-			    strncmp(tokp, "SMF_", 4) == 0)
-				continue;
-
-			glob_envp[i] = startd_alloc((unsigned)(length + 1));
-			(void) strcpy(glob_envp[i], tokp);
-
-			/*
-			 * Double the environment size whenever it is
-			 * full.
-			 */
-			if (++i == glob_env_n) {
-				glob_env_n *= 2;
-				newp = startd_alloc(sizeof (*glob_envp) *
-				    glob_env_n);
-				(void) memcpy(newp, glob_envp,
-				    sizeof (*glob_envp) * glob_env_n / 2);
-				startd_free(glob_envp,
-				    sizeof (*glob_envp) * glob_env_n / 2);
-				glob_envp = newp;
-			}
-		} while ((tokp = strtok(NULL, " \t")) != NULL);
+			glob_env_n *= 2;
+			newp = startd_alloc(sizeof (*glob_envp) * glob_env_n);
+			(void) memcpy(newp, glob_envp,
+			    sizeof (*glob_envp) * glob_env_n / 2);
+			startd_free(glob_envp,
+			    sizeof (*glob_envp) * glob_env_n / 2);
+			glob_envp = newp;
+		}
 	}
-
-	startd_fclose(fp);
 
 	/* Append a null pointer to the environment array to mark its end. */
 	glob_envp[i] = NULL;
+
+	definit_close(dstate);
 
 	/*
 	 * Get the zonename once; it is used to set SMF_ZONENAME for methods.

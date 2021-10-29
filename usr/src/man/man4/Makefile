@@ -229,6 +229,7 @@ _MANLINKS=	addresses.4			\
 		pcie.4				\
 		qop.4				\
 		rhosts.4			\
+		TIMEZONE.4			\
 		sendmail.cf.4			\
 		snapshot_cache.4		\
 		submit.cf.4			\
@@ -257,6 +258,8 @@ snapshot_cache.4		:= LINKSRC = devices.4
 dir.4				:= LINKSRC = dir_ufs.4
 
 rhosts.4			:= LINKSRC = hosts.equiv.4
+
+TIMEZONE.4			:= LINKSRC = init.4
 
 hosts.allow.4			:= LINKSRC = hosts_access.4
 hosts.deny.4			:= LINKSRC = hosts_access.4

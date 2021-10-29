@@ -12,9 +12,11 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 file path=usr/share/man/man4/Intro.4
+link path=usr/share/man/man4/TIMEZONE.4 target=init.4
 file path=usr/share/man/man4/audit.log.4
 file path=usr/share/man/man4/audit_class.4
 file path=usr/share/man/man4/audit_event.4

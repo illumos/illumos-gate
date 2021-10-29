@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2020 Oxide Computer Company
  * Copyright (c) 2013 Gary Mills
  *
@@ -27,7 +28,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -108,6 +109,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <definit.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -239,14 +241,14 @@ static lvl_t lvls[] = {
 	{ LVLQ,		0,	'Q', 0					},
 	{ LVLQ,		0,	'q', 0					},
 	{ LVL0,		MASK0,	'0', LSEL_RUNLEVEL			},
-	{ LVL1, 	MASK1,	'1', LSEL_RUNLEVEL			},
-	{ LVL2, 	MASK2,	'2', LSEL_RUNLEVEL			},
-	{ LVL3, 	MASK3,	'3', LSEL_RUNLEVEL			},
-	{ LVL4, 	MASK4,	'4', LSEL_RUNLEVEL			},
-	{ LVL5, 	MASK5,	'5', LSEL_RUNLEVEL			},
-	{ LVL6, 	MASK6, 	'6', LSEL_RUNLEVEL			},
-	{ SINGLE_USER, 	MASKSU, 'S', LSEL_RUNLEVEL			},
-	{ SINGLE_USER, 	MASKSU, 's', LSEL_RUNLEVEL			},
+	{ LVL1,		MASK1,	'1', LSEL_RUNLEVEL			},
+	{ LVL2,		MASK2,	'2', LSEL_RUNLEVEL			},
+	{ LVL3,		MASK3,	'3', LSEL_RUNLEVEL			},
+	{ LVL4,		MASK4,	'4', LSEL_RUNLEVEL			},
+	{ LVL5,		MASK5,	'5', LSEL_RUNLEVEL			},
+	{ LVL6,		MASK6,	'6', LSEL_RUNLEVEL			},
+	{ SINGLE_USER,	MASKSU, 'S', LSEL_RUNLEVEL			},
+	{ SINGLE_USER,	MASKSU, 's', LSEL_RUNLEVEL			},
 	{ LVLa,		MASKa,	'a', 0					},
 	{ LVLb,		MASKb,	'b', 0					},
 	{ LVLc,		MASKc,	'c', 0					}
@@ -486,7 +488,7 @@ static char *INITTAB	 = "/etc/inittab";	/* Script file for "init" */
 static char *SYSTTY	 = "/dev/systty";	/* System Console */
 static char *SYSCON	 = "/dev/syscon";	/* Virtual System console */
 static char *IOCTLSYSCON = "/etc/ioctl.syscon";	/* Last syscon modes */
-static char *ENVFILE	 = "/etc/default/init";	/* Default env. */
+static char *ENVFILE	 = DEFINIT_DEFAULT_FILE; /* Default env. */
 static char *SU	= "/etc/sulogin";	/* Super-user program for single user */
 static char *SH	= "/sbin/sh";		/* Standard shell */
 
@@ -1527,7 +1529,7 @@ getcmd(struct CMD_LINE *cmd, char *shcmd)
 {
 	char	*ptr;
 	int	c, lastc, state;
-	char 	*ptr1;
+	char	*ptr1;
 	int	answer, i, proceed;
 	struct	stat	sbuf;
 	static char *actions[] = {
@@ -1930,16 +1932,14 @@ killproc(pid_t pid)
 /*
  * Set up the default environment for all procs to be forked from init.
  * Read the values from the /etc/default/init file, except for PATH.  If
- * there's not enough room in the environment array, the environment
- * lines that don't fit are silently discarded.
+ * there is not enough room in the environment array, the environment
+ * lines that don't fit are discarded and a message is written to the console.
  */
 void
 init_env()
 {
-	char	line[MAXCMDL];
-	FILE	*fp;
-	int	inquotes, length, wslength;
-	char	*tokp, *cp1, *cp2;
+	void		*dstate;
+	const char	*tokp;
 
 	glob_envp[0] = malloc((unsigned)(strlen(DEF_PATH)+2));
 	(void) strcpy(glob_envp[0], DEF_PATH);
@@ -1957,95 +1957,47 @@ init_env()
 		++glob_envn;
 	}
 
-	if ((fp = fopen(ENVFILE, "r")) == NULL) {
+	if (definit_open(ENVFILE, &dstate) != 0) {
 		console(B_TRUE,
 		    "Cannot open %s. Environment not initialized.\n",
 		    ENVFILE);
-	} else {
-		while (fgets(line, MAXCMDL - 1, fp) != NULL &&
-		    glob_envn < MAXENVENT - 2) {
-			/*
-			 * Toss newline
-			 */
-			length = strlen(line);
-			if (line[length - 1] == '\n')
-				line[length - 1] = '\0';
-
-			/*
-			 * Ignore blank or comment lines.
-			 */
-			if (line[0] == '#' || line[0] == '\0' ||
-			    (wslength = strspn(line, " \t\n")) ==
-			    strlen(line) ||
-			    strchr(line, '#') == line + wslength)
-				continue;
-
-			/*
-			 * First make a pass through the line and change
-			 * any non-quoted semi-colons to blanks so they
-			 * will be treated as token separators below.
-			 */
-			inquotes = 0;
-			for (cp1 = line; *cp1 != '\0'; cp1++) {
-				if (*cp1 == '"') {
-					if (inquotes == 0)
-						inquotes = 1;
-					else
-						inquotes = 0;
-				} else if (*cp1 == ';') {
-					if (inquotes == 0)
-						*cp1 = ' ';
-				}
-			}
-
-			/*
-			 * Tokens within the line are separated by blanks
-			 *  and tabs.  For each token in the line which
-			 * contains a '=' we strip out any quotes and then
-			 * stick the token in the environment array.
-			 */
-			if ((tokp = strtok(line, " \t")) == NULL)
-				continue;
-			do {
-				if (strchr(tokp, '=') == NULL)
-					continue;
-				length = strlen(tokp);
-				while ((cp1 = strpbrk(tokp, "\"\'")) != NULL) {
-					for (cp2 = cp1;
-					    cp2 < &tokp[length]; cp2++)
-						*cp2 = *(cp2 + 1);
-					length--;
-				}
-
-				if (strncmp(tokp, "CMASK=",
-				    sizeof ("CMASK=") - 1) == 0) {
-					long t;
-
-					/* We know there's an = */
-					t = strtol(strchr(tokp, '=') + 1, NULL,
-					    8);
-
-					/* Sanity */
-					if (t <= 077 && t >= 0)
-						cmask = (int)t;
-					(void) umask(cmask);
-					continue;
-				}
-				glob_envp[glob_envn] =
-				    malloc((unsigned)(length + 1));
-				(void) strcpy(glob_envp[glob_envn], tokp);
-				if (++glob_envn >= MAXENVENT - 1)
-					break;
-			} while ((tokp = strtok(NULL, " \t")) != NULL);
-		}
-
-		/*
-		 * Append a null pointer to the environment array
-		 * to mark its end.
-		 */
-		glob_envp[glob_envn] = NULL;
-		(void) fclose(fp);
+		return;
 	}
+
+	while ((tokp = definit_token(dstate)) != NULL &&
+	    glob_envn < MAXENVENT - 2) {
+
+		if (strncmp(tokp, "CMASK=", sizeof ("CMASK=") - 1) == 0) {
+			long t;
+
+			/* We know there's an = */
+			t = strtol(strchr(tokp, '=') + 1, NULL, 8);
+
+			/* Sanity */
+			if (t >= DEFINIT_MIN_UMASK && t <= DEFINIT_MAX_UMASK)
+				cmask = (int)t;
+			(void) umask(cmask);
+			continue;
+		}
+		glob_envp[glob_envn] = strdup(tokp);
+		if (glob_envp[glob_envn] == NULL) {
+			console(B_TRUE, "Out of memory building environment, "
+			    "truncated.\n");
+			break;
+		}
+		if (++glob_envn >= MAXENVENT - 1) {
+			console(B_TRUE, "Too many variables in %s; "
+			    "environment not fully initialized.\n", ENVFILE);
+			break;
+		}
+	}
+
+	/*
+	 * Append a null pointer to the environment array to mark its end.
+	 */
+	glob_envp[glob_envn] = NULL;
+
+	definit_close(dstate);
 }
 
 /*
