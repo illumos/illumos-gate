@@ -41,7 +41,7 @@ extern "C" {
 extern dladm_handle_t dld_handle;
 
 extern void warn(const char *, ...);
-extern void die(char *, ...);
+extern void die(char *, ...) __NORETURN;
 extern char *setpname(char *);
 extern const char *ac_type_name(int);
 extern int open_exacct_file(const char *, int);
