@@ -1749,8 +1749,56 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_slotsts2[] = {
 	{ -1, -1, NULL }
 };
 
+static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_dev[] = {
+	{ PCIE_PCIECAP, 2, "cap", "Capability Register",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_cap },
+	{ PCIE_DEVCAP, 4, "devcap", "Device Capabilities",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_devcap },
+	{ PCIE_DEVSTS, 2, "devsts", "Device Status",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_devsts },
+	{ -1, -1, NULL }
+};
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1[] = {
+static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_link[] = {
+	{ PCIE_PCIECAP, 2, "cap", "Capability Register",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_cap },
+	{ PCIE_DEVCAP, 4, "devcap", "Device Capabilities",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_devcap },
+	{ PCIE_DEVSTS, 2, "devsts", "Device Status",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_devsts },
+	{ PCIE_LINKCAP, 4, "linkcap", "Link Capabilities",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_linkcap },
+	{ PCIE_LINKCTL, 2, "linkctl", "Link Control",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_linkctl },
+	{ PCIE_LINKSTS, 2, "linksts", "Link Status",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_linksts },
+	{ -1, -1, NULL }
+};
+
+static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_slot[] = {
+	{ PCIE_PCIECAP, 2, "cap", "Capability Register",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_cap },
+	{ PCIE_DEVCAP, 4, "devcap", "Device Capabilities",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_devcap },
+	{ PCIE_DEVSTS, 2, "devsts", "Device Status",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_devsts },
+	{ PCIE_LINKCAP, 4, "linkcap", "Link Capabilities",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_linkcap },
+	{ PCIE_LINKCTL, 2, "linkctl", "Link Control",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_linkctl },
+	{ PCIE_LINKSTS, 2, "linksts", "Link Status",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_linksts },
+	{ PCIE_SLOTCAP, 4, "slotcap", "Slot Capabilities",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_slotcap },
+	{ PCIE_SLOTCTL, 2, "slotctl", "Slot Control",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_slotctl },
+	{ PCIE_SLOTSTS, 2, "slotsts", "Slot Status",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_slotsts },
+	{ -1, -1, NULL }
+};
+
+
+static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_all[] = {
 	{ PCIE_PCIECAP, 2, "cap", "Capability Register",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_cap },
 	{ PCIE_DEVCAP, 4, "devcap", "Device Capabilities",
@@ -3908,6 +3956,90 @@ pcieadm_cap_info_pcipm(pcieadm_cfgspace_walk_t *walkp,
 }
 
 /*
+ * The PCIe capability underwent a few changes. In version 1 of the capability,
+ * devices were not required to implement the entire capability. In particular,
+ * endpoints did not need to implement anything more than the link status
+ * register. In the v2 capability, this was changed such that all devices had to
+ * implement the entire capbility, but otherwise hardcode registers to zero. As
+ * such we get to play guess the length based on the device type.
+ */
+static pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_dev = {
+	1, 0x0c, pcieadm_cap_pcie_v1_dev
+};
+
+static pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_link = {
+	1, 0x14, pcieadm_cap_pcie_v1_link
+};
+
+static pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_slot = {
+	1, 0x1c, pcieadm_cap_pcie_v1_slot
+};
+
+static pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_all = {
+	1, 0x24, pcieadm_cap_pcie_v1_all
+};
+
+static pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v2 = {
+	2, 0x4c, pcieadm_cap_pcie_v2
+};
+
+static void
+pcieadm_cap_info_pcie(pcieadm_cfgspace_walk_t *walkp,
+    const pcieadm_pci_cap_t *cap, uint32_t off,
+    const pcieadm_cap_vers_t **versp, uint32_t *lenp,
+    const pcieadm_subcap_t **subcap)
+{
+	uint8_t vers = walkp->pcw_data->pcb_u8[off + 2] & 0xf;
+	uint16_t pcie = walkp->pcw_data->pcb_u8[off + 2] |
+	    (walkp->pcw_data->pcb_u8[off + 3] << 8);
+
+	/*
+	 * Version 2 is simple. There's only one thing to do, so we do it. For
+	 * version 1 we need to look at the device type.
+	 */
+	*subcap = NULL;
+	if (vers == 2) {
+		*versp = &pcieadm_cap_vers_pcie_v2;
+		*lenp = (*versp)->ppr_len;
+		return;
+	} else if (vers != 1) {
+		*versp = NULL;
+		*lenp = 0;
+		return;
+	}
+
+	switch (pcie & PCIE_PCIECAP_DEV_TYPE_MASK) {
+	case PCIE_PCIECAP_DEV_TYPE_PCIE_DEV:
+	case PCIE_PCIECAP_DEV_TYPE_PCI_DEV:
+		*versp = &pcieadm_cap_vers_pcie_v1_link;
+		break;
+	case PCIE_PCIECAP_DEV_TYPE_RC_IEP:
+		*versp = &pcieadm_cap_vers_pcie_v1_dev;
+		break;
+	case PCIE_PCIECAP_DEV_TYPE_UP:
+	case PCIE_PCIECAP_DEV_TYPE_DOWN:
+	case PCIE_PCIECAP_DEV_TYPE_PCIE2PCI:
+	case PCIE_PCIECAP_DEV_TYPE_PCI2PCIE:
+		if ((pcie & PCIE_PCIECAP_SLOT_IMPL) != 0) {
+			*versp = &pcieadm_cap_vers_pcie_v1_slot;
+		} else {
+			*versp = &pcieadm_cap_vers_pcie_v1_link;
+		}
+		break;
+	case PCIE_PCIECAP_DEV_TYPE_ROOT:
+	case PCIE_PCIECAP_DEV_TYPE_RC_EC:
+		*versp = &pcieadm_cap_vers_pcie_v1_all;
+		break;
+	default:
+		*versp = NULL;
+		*lenp = 0;
+		return;
+	}
+
+	*lenp = (*versp)->ppr_len;
+}
+
+/*
  * The length of the MSI capability depends on bits in its control field. As
  * such we use a custom function to extract the length and treat each of these
  * variants as thought it were a different version.
@@ -3998,7 +4130,7 @@ pcieadm_cap_info_aer(pcieadm_cfgspace_walk_t *walkp,
     const pcieadm_cap_vers_t **versp, uint32_t *lenp,
     const pcieadm_subcap_t **subcap)
 {
-	if (walkp->pcw_dtype == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) {
+	if (walkp->pcw_pcietype == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) {
 		uint8_t vers;
 
 		*subcap = NULL;
@@ -4156,9 +4288,7 @@ pcieadm_pci_cap_t pcieadm_pci_caps[] = {
 	    pcieadm_cap_info_fixed, { 0, 8, pcieadm_cap_bridge_subsys } },
 	{ PCI_CAP_ID_AGP_8X, "agp8x", "AGP 8x" },
 	{ PCI_CAP_ID_SECURE_DEV, "secdev", "Secure Device" },
-	{ PCI_CAP_ID_PCI_E, "pcie", "PCI Express", pcieadm_cap_info_vers,
-	    { { 1, 0x24, pcieadm_cap_pcie_v1 },
-	    { 2, 0x3c, pcieadm_cap_pcie_v2 } } },
+	{ PCI_CAP_ID_PCI_E, "pcie", "PCI Express", pcieadm_cap_info_pcie },
 	{ PCI_CAP_ID_MSI_X, "msix", "MSI-X", pcieadm_cap_info_fixed,
 	    { { 0, 12, pcieadm_cap_msix } } },
 	{ PCI_CAP_ID_SATA, "sata", "Serial ATA Configuration",
@@ -4252,7 +4382,11 @@ pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	{ PCIE_EXT_CAP_ID_NPEM, "npem", "Native PCIe Enclosure Management" },
 	{ PCIE_EXT_CAP_ID_PL32GT, "pl32g", "Physical Layer 32.0 GT/s" },
 	{ PCIE_EXT_CAP_ID_AP, "ap", "Alternative Protocol" },
-	{ PCIE_EXT_CAP_ID_SFI, "sfi", "System Firmware Intermediary" }
+	{ PCIE_EXT_CAP_ID_SFI, "sfi", "System Firmware Intermediary" },
+	{ PCIE_EXT_CAP_ID_SHDW_FUNC, "sfunc", "Shadow Functions" },
+	{ PCIE_EXT_CAP_ID_DOE, "doe", "Data Object Exchange" },
+	{ PCIE_EXT_CAP_ID_DEV3, "dev3", "Device 3" },
+	{ PCIE_EXT_CAP_ID_IDE, "ide", "Integrity and Data Encryption" }
 };
 
 static const pcieadm_pci_cap_t *
