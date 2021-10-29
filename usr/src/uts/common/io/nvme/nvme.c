@@ -4662,7 +4662,7 @@ nvme_ioctl_get_features(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 				return (EINVAL);
 			}
 		} else if (res != 0) {
-			return (EINVAL);
+			return (ENOTSUP);
 		}
 		break;
 
@@ -4777,7 +4777,7 @@ nvme_ioctl_format(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	 * Check whether the FORMAT NVM command is supported.
 	 */
 	if (nvme->n_idctl->id_oacs.oa_format == 0)
-		return (EINVAL);
+		return (ENOTSUP);
 
 	/*
 	 * Don't allow format or secure erase of individual namespace if that
@@ -4908,6 +4908,9 @@ nvme_ioctl_firmware_download(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	if ((mode & FWRITE) == 0 || secpolicy_sys_config(cred_p, B_FALSE) != 0)
 		return (EPERM);
 
+	if (nvme->n_idctl->id_oacs.oa_firmware == 0)
+		return (ENOTSUP);
+
 	if (nsid != 0)
 		return (EINVAL);
 
@@ -4988,6 +4991,9 @@ nvme_ioctl_firmware_commit(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 
 	if ((mode & FWRITE) == 0 || secpolicy_sys_config(cred_p, B_FALSE) != 0)
 		return (EPERM);
+
+	if (nvme->n_idctl->id_oacs.oa_firmware == 0)
+		return (ENOTSUP);
 
 	if (nsid != 0)
 		return (EINVAL);
