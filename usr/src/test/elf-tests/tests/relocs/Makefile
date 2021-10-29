@@ -14,12 +14,6 @@
 # Copyright 2018 Joyent, Inc.
 #
 
-SUBDIRS =		\
-	assert-deflib	\
-	linker-sets	\
-	mapfiles	\
-	relocs		\
-	string-merge	\
-	tls
+SUBDIRS = amd64 i386
 
 include $(SRC)/test/Makefile.com

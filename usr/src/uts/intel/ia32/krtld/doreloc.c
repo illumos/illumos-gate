@@ -112,7 +112,7 @@ const Rel_entry	reloc_table[R_386_NUM] = {
 	[R_386_TLS_DESC_CALL]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
 	[R_386_TLS_DESC]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
 	[R_386_IRELATIVE]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
-	[R_386_GOT32X]		= {0, FLG_RE_NOTSUP, 0, 0, 0}
+	[R_386_GOT32X]		= {0, FLG_RE_GOTADD, 4, 0, 0},
 };
 #if	(R_386_NUM != (R_386_GOT32X + 1))
 #error	"R_386_NUM has grown"

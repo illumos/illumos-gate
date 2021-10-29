@@ -107,8 +107,8 @@ const Rel_entry	reloc_table[R_AMD64_NUM] = {
 	[R_AMD64_RELATIVE64]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
 	[R_AMD64_UNKNOWN39]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
 	[R_AMD64_UNKNOWN40]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
-	[R_AMD64_GOTPCRELX]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
-	[R_AMD64_REX_GOTPCRELX]	= {0, FLG_RE_NOTSUP, 0, 0, 0},
+	[R_AMD64_GOTPCRELX]	= {0, FLG_RE_GOTPC | FLG_RE_GOTADD, 4, 0, 0},
+	[R_AMD64_REX_GOTPCRELX]	= {0, FLG_RE_GOTPC | FLG_RE_GOTADD, 4, 0, 0},
 };
 #if	(R_AMD64_NUM != (R_AMD64_REX_GOTPCRELX + 1))
 #error	"R_AMD64_NUM has grown"
@@ -264,7 +264,8 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		 * references.  Validate that the value being written will fit
 		 * in the field provided.
 		 *
-		 *    R_AMD64_PC32, R_AMD64_GOTPC32, R_AMD64_GOTPCREL
+		 *    R_AMD64_PC32, R_AMD64_GOTPC32, R_AMD64_GOTPCREL,
+		 *    R_AMD64_GOTPCRELX, R_AMD64_REX_GOTPCRELX.
 		 */
 		if (rtype == R_AMD64_32) {
 			/*
@@ -281,7 +282,9 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 				return (0);
 			}
 		} else if ((rtype == R_AMD64_32S) || (rtype == R_AMD64_PC32) ||
-		    (rtype == R_AMD64_GOTPCREL) || (rtype == R_AMD64_GOTPC32)) {
+		    (rtype == R_AMD64_GOTPCREL) || (rtype == R_AMD64_GOTPC32) ||
+		    (rtype == R_AMD64_GOTPCRELX) ||
+		    (rtype == R_AMD64_REX_GOTPCRELX)) {
 			/*
 			 * Verify that this value will act as a sign-extended
 			 * signed 32 bit value, that is that the upper 33 bits

@@ -9,17 +9,8 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-#
-# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
-# Copyright 2018 Joyent, Inc.
-#
+# Copyright 2021, Richard Lowe.
 
-SUBDIRS =		\
-	assert-deflib	\
-	linker-sets	\
-	mapfiles	\
-	relocs		\
-	string-merge	\
-	tls
+SUBDIRS = got32x
 
 include $(SRC)/test/Makefile.com
