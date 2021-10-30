@@ -22,7 +22,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -2732,14 +2732,15 @@ done:
 
 /*
  * Return the length of the IPv6 related headers (including extension headers)
- * Returns a length even if the packet is malformed.
+ * If the packet is malformed, this returns the simple IPv6 header length.
  */
 uint16_t
 ip_hdr_length_v6(mblk_t *mp, ip6_t *ip6h)
 {
 	uint16_t hdr_len;
 
-	(void) ip_hdr_length_nexthdr_v6(mp, ip6h, &hdr_len, NULL);
+	if (!ip_hdr_length_nexthdr_v6(mp, ip6h, &hdr_len, NULL))
+		hdr_len = sizeof (*ip6h);
 	return (hdr_len);
 }
 
