@@ -9918,7 +9918,7 @@ do_create_overlay(int argc, char *argv[], const char *use)
 	char			name[MAXLINKNAMELEN];
 	dladm_status_t		status;
 	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
-	uint64_t		vid;
+	uint64_t		vid = 0;
 	boolean_t		havevid = B_FALSE;
 	char			propstr[DLADM_STRSIZE];
 	dladm_arg_list_t	*proplist = NULL;
@@ -10529,7 +10529,7 @@ do_modify_overlay(int argc, char *argv[], const char *use)
 	int			opt, ocnt = 0;
 	boolean_t		flush, set, delete;
 	struct ether_addr	e;
-	char			*dest;
+	char			*dest = NULL;
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	dladm_status_t		status;
 
