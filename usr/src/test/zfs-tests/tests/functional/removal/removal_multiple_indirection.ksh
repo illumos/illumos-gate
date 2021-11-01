@@ -44,7 +44,7 @@
 #    that the files contents remain the same across transfers.
 #
 
-TMPDIR=${TMPDIR:-/tmp}
+TMPDIR=${TMPDIR:-$TEST_BASE_DIR}
 log_must mkfile $(($MINVDEVSIZE * 2)) $TMPDIR/dsk1
 log_must mkfile $(($MINVDEVSIZE * 2)) $TMPDIR/dsk2
 DISKS="$TMPDIR/dsk1 $TMPDIR/dsk2"

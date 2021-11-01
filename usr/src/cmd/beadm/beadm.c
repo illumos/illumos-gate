@@ -169,12 +169,10 @@ main(int argc, char **argv)
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	if (argc < 2) {
-		usage();
-		return (1);
-	}
-
-	cmdname = argv[1];
+	if (argc < 2)
+		cmdname = "list";
+	else
+		cmdname = argv[1];
 
 	/* Turn error printing off */
 	libbe_print_errors(B_FALSE);

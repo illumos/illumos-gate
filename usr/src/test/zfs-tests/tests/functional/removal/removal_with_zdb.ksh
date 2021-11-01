@@ -21,7 +21,7 @@
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/removal/removal.kshlib
 
-zdbout=${TMPDIR:-/tmp}/zdbout.$$
+zdbout=${TMPDIR:-$TEST_BASE_DIR}/zdbout.$$
 
 function cleanup
 {
