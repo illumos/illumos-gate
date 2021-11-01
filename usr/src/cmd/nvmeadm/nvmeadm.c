@@ -293,6 +293,7 @@ main(int argc, char **argv)
 	}
 
 	npa.npa_cmd = cmd;
+	npa.npa_interactive = B_TRUE;
 
 	optind++;
 
@@ -533,8 +534,12 @@ nvme_process(di_node_t node, di_minor_t minor, void *arg)
 	if (npa->npa_idns == NULL)
 		goto out;
 
-	if (npa->npa_isns)
-		npa->npa_dsk = nvme_dskname(npa);
+	if (npa->npa_isns) {
+		npa->npa_ignored = nvme_is_ignored_ns(fd);
+		if (!npa->npa_ignored)
+			npa->npa_dsk = nvme_dskname(npa);
+	}
+
 
 	exitcode += npa->npa_cmd->c_func(fd, npa);
 
@@ -1247,12 +1252,21 @@ do_attach_detach(int fd, const nvme_process_arg_t *npa)
 		nvme_walk(&ns_npa, npa->npa_node);
 
 		return (exitcode);
-	} else {
-		if ((c_name[0] == 'd' ? nvme_detach : nvme_attach)(fd)
-		    == B_FALSE) {
-			warn("%s failed", c_name);
-			return (-1);
-		}
+	}
+
+	/*
+	 * Unless the user interactively requested a particular namespace to be
+	 * attached or detached, don't even try to attach or detach namespaces
+	 * that are ignored by the driver, thereby avoiding printing pointless
+	 * error messages.
+	 */
+	if (!npa->npa_interactive && npa->npa_ignored)
+		return (0);
+
+	if ((c_name[0] == 'd' ? nvme_detach : nvme_attach)(fd)
+	    == B_FALSE) {
+		warn("%s failed", c_name);
+		return (-1);
 	}
 
 	return (0);

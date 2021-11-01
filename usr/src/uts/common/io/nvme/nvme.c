@@ -5272,6 +5272,26 @@ out:
 }
 
 static int
+nvme_ioctl_is_ignored_ns(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
+    cred_t *cred_p)
+{
+	_NOTE(ARGUNUSED(cred_p));
+
+	if ((mode & FREAD) == 0)
+		return (EPERM);
+
+	if (nsid == 0)
+		return (EINVAL);
+
+	if (nvme->n_ns[nsid - 1].ns_ignore)
+		nioc->n_arg = 1;
+	else
+		nioc->n_arg = 0;
+
+	return (0);
+}
+
+static int
 nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
     int *rval_p)
 {
@@ -5298,7 +5318,8 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		nvme_ioctl_attach,
 		nvme_ioctl_firmware_download,
 		nvme_ioctl_firmware_commit,
-		nvme_ioctl_passthru
+		nvme_ioctl_passthru,
+		nvme_ioctl_is_ignored_ns
 	};
 
 	if (nvme == NULL)
