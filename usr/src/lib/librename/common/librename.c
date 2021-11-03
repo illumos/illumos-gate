@@ -13,10 +13,6 @@
  * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
  */
 
-/*
- * Implementation of librename(3RENAME) interfaces.
- */
-
 #include <librename.h>
 
 #include <errno.h>

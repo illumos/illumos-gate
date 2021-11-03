@@ -16,10 +16,6 @@
 #ifndef _LIBRENAME_H
 #define	_LIBRENAME_H
 
-/*
- * librename(3RENAME) public interfaces
- */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
