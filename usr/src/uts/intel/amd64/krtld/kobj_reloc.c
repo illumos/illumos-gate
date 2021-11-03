@@ -213,8 +213,7 @@ do_relocate(struct module *mp, char *reltbl, int nreloc, int relocsize,
 			    rtype);
 			_kobj_printf(ops, " at 0x%lx:", off);
 			_kobj_printf(ops, " file=%s\n", mp->filename);
-			err = 1;
-			continue;
+			return (-1);
 		}
 
 
