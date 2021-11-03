@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/debug.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -89,12 +90,10 @@ librename_atomic_fdinit(int fd, const char *file, const char *prefix,
 		return (ret);
 	}
 
-
 	lrap->lra_fname = strdup(file);
 	if (lrap->lra_fname == NULL) {
 		ret = errno;
-		if (close(lrap->lra_dirfd) != 0)
-			abort();
+		VERIFY0(close(lrap->lra_dirfd));
 		free(lrap);
 		return (ret);
 	}
@@ -108,8 +107,7 @@ librename_atomic_fdinit(int fd, const char *file, const char *prefix,
 	if (ret == -1) {
 		ret = errno;
 		free(lrap->lra_fname);
-		if (close(lrap->lra_dirfd) != 0)
-			abort();
+		VERIFY0(close(lrap->lra_dirfd));
 		free(lrap);
 		return (errno);
 	}
@@ -127,14 +125,12 @@ librename_atomic_fdinit(int fd, const char *file, const char *prefix,
 		ret = errno;
 		free(lrap->lra_altname);
 		free(lrap->lra_fname);
-		if (close(lrap->lra_dirfd) != 0)
-			abort();
+		VERIFY0(close(lrap->lra_dirfd));
 		free(lrap);
 		return (ret);
 	}
 
-	if (mutex_init(&lrap->lra_lock, USYNC_THREAD, NULL) != 0)
-		abort();
+	VERIFY0(mutex_init(&lrap->lra_lock, USYNC_THREAD, NULL));
 
 	lrap->lra_state = LIBRENAME_ATOMIC_INITIAL;
 	*outp = lrap;
@@ -151,8 +147,7 @@ librename_atomic_init(const char *dir, const char *file, const char *prefix,
 		return (errno);
 
 	ret = librename_atomic_fdinit(fd, file, prefix, mode, flags, outp);
-	if (close(fd) != 0)
-		abort();
+	VERIFY0(close(fd));
 
 	return (ret);
 }
@@ -175,8 +170,7 @@ librename_atomic_commit(librename_atomic_t *lrap)
 {
 	int ret = 0;
 
-	if (mutex_lock(&lrap->lra_lock) != 0)
-		abort();
+	VERIFY0(mutex_lock(&lrap->lra_lock));
 	if (lrap->lra_state == LIBRENAME_ATOMIC_COMPLETED) {
 		ret = EINVAL;
 		goto out;
@@ -208,8 +202,7 @@ librename_atomic_commit(librename_atomic_t *lrap)
 	lrap->lra_state = LIBRENAME_ATOMIC_COMPLETED;
 
 out:
-	if (mutex_unlock(&lrap->lra_lock) != 0)
-		abort();
+	VERIFY0(mutex_unlock(&lrap->lra_lock));
 	return (ret);
 }
 
@@ -219,11 +212,8 @@ librename_atomic_fini(librename_atomic_t *lrap)
 
 	free(lrap->lra_altname);
 	free(lrap->lra_fname);
-	if (close(lrap->lra_tmpfd) != 0)
-		abort();
-	if (close(lrap->lra_dirfd) != 0)
-		abort();
-	if (mutex_destroy(&lrap->lra_lock) != 0)
-		abort();
+	VERIFY0(close(lrap->lra_tmpfd));
+	VERIFY0(close(lrap->lra_dirfd));
+	VERIFY0(mutex_destroy(&lrap->lra_lock));
 	free(lrap);
 }

@@ -385,6 +385,12 @@ usr/lib/libcmdutils.so
 usr/lib/amd64/libcmdutils.so		i386
 usr/lib/sparcv9/libcmdutils.so		sparc
 #
+# Private librename
+#
+usr/lib/librename.so
+usr/lib/amd64/librename.so		i386
+usr/include/librename.h
+#
 # Private interfaces in libsec
 #
 usr/include/aclutils.h
