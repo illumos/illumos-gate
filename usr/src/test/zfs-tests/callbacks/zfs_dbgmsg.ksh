@@ -22,7 +22,13 @@ echo "================================================================="
 echo " Tailing last $lines lines of zfs_dbgmsg log"
 echo "================================================================="
 
-sudo mdb -ke "::zfs_dbgmsg ! tail -n $lines"
+id=$(id -u)
+
+if (( id == 0 )); then
+	mdb -ke "::zfs_dbgmsg ! tail -n $lines"
+else
+	sudo mdb -ke "::zfs_dbgmsg ! tail -n $lines"
+fi
 
 echo "================================================================="
 echo " End of zfs_dbgmsg log"
