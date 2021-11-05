@@ -31,18 +31,21 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/ahci@$(PKGVERS)
-set name=pkg.description \
-    value="Advanced Host Controller Interface (AHCI) SATA HBA Driver"
 set name=pkg.summary \
+    value="Advanced Host Controller Interface (AHCI) SATA HBA Driver"
+set name=pkg.description \
     value="Advanced Host Controller Interface (AHCI) SATA HBA Driver"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Ports
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/lib/ahci
-dir path=usr/share/man
-dir path=usr/share/man/man7d
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/ahci group=sys
+dir  path=usr/lib/ahci
+file path=usr/lib/ahci/ahciem mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/ahci.7d
 #
 # In general, we expect ahci devices to use the ahci class code.
 # However, there are a handful of Intel controller hubs which will
@@ -50,13 +53,10 @@ dir path=usr/share/man/man7d
 # experimentally (and based on reading between the lines in their
 # datasheets) proven to still support AHCI.
 #
-driver name=ahci class=scsi-self-identifying perms="* 0644 root sys" \
+driver name=ahci perms="* 0644 root sys" class=scsi-self-identifying \
     alias=pci8086,2822,p \
     alias=pci8086,282a,p \
     alias=pciclass,010601
-file path=kernel/drv/$(ARCH64)/ahci group=sys
-file path=usr/lib/ahci/ahciem mode=0555
-file path=usr/share/man/man7d/ahci.7d
 legacy pkg=SUNWahci \
     desc="Advanced Host Controller Interface (AHCI) SATA HBA Driver" \
     name="Advanced Host Controller Interface (AHCI) SATA HBA Driver"

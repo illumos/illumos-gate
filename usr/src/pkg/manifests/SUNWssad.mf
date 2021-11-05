@@ -26,4 +26,4 @@
 set name=pkg.fmri value=pkg:/SUNWssad@0.5.11,5.11-0.133
 set name=pkg.renamed value=true
 set name=variant.arch value=sparc
-depend fmri=pkg:/driver/storage/ssd@0.5.11,5.11-0.133 type=require
+depend type=require fmri=pkg:/driver/storage/ssd@0.5.11,5.11-0.133

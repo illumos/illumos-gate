@@ -24,15 +24,15 @@
 #
 
 set name=pkg.fmri value=pkg:/system/header/header-firewire@$(PKGVERS)
-set name=pkg.description value="Sun IEEE1394 Header Files"
 set name=pkg.summary value="Sun IEEE1394 Framework Header Files"
+set name=pkg.description value="Sun IEEE1394 Header Files"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/include
-dir path=usr/include/sys
-dir path=usr/include/sys/1394
+dir  path=usr group=sys
+dir  path=usr/include
+dir  path=usr/include/sys
+dir  path=usr/include/sys/1394
 file path=usr/include/sys/1394/cmd1394.h
 file path=usr/include/sys/1394/id1394.h
 file path=usr/include/sys/1394/ieee1212.h

@@ -30,38 +30,37 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/kernel/suspend-resume@$(PKGVERS)
-set name=pkg.description value="Suspend, Resume package"
 set name=pkg.summary value="Suspend, Resume package"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.description value="Suspend, Resume package"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
 $(i386_ONLY)dir path=kernel group=sys
 $(i386_ONLY)dir path=kernel/drv group=sys
 $(i386_ONLY)dir path=kernel/drv/$(ARCH64) group=sys
-dir path=platform group=sys
+$(i386_ONLY)file path=kernel/drv/$(ARCH64)/srn group=sys
+$(i386_ONLY)file path=kernel/drv/srn.conf group=sys
+dir  path=platform group=sys
 $(i386_ONLY)dir path=platform/i86pc group=sys
 $(i386_ONLY)dir path=platform/i86pc/kernel group=sys
 $(i386_ONLY)dir path=platform/i86pc/kernel/misc group=sys
 $(i386_ONLY)dir path=platform/i86pc/kernel/misc/$(ARCH64) group=sys
+$(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/cpr group=sys \
+    mode=0755
 $(sparc_ONLY)dir path=platform/sun4u group=sys
+$(sparc_ONLY)file path=platform/sun4u/cprboot group=sys reboot-needed=true
 $(sparc_ONLY)dir path=platform/sun4u/kernel group=sys
 $(sparc_ONLY)dir path=platform/sun4u/kernel/drv group=sys
 $(sparc_ONLY)dir path=platform/sun4u/kernel/drv/$(ARCH64) group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel/misc group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel/misc/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7
-$(i386_ONLY)driver name=srn
-$(i386_ONLY)file path=kernel/drv/$(ARCH64)/srn group=sys
-$(i386_ONLY)file path=kernel/drv/srn.conf group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/cpr group=sys \
-    mode=0755
-$(sparc_ONLY)file path=platform/sun4u/cprboot group=sys reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/tod group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/tod.conf group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/misc group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/misc/$(ARCH64) group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/cpr group=sys \
     mode=0755
+dir  path=usr/share/man
+dir  path=usr/share/man/man7
 file path=usr/share/man/man7/cpr.7
+$(i386_ONLY)driver name=srn
 $(i386_ONLY)legacy pkg=SUNWcpr.i arch=$(ARCH).i86pc \
     desc="Suspend, Resume package" name="Suspend, Resume package"
 $(sparc_ONLY)legacy pkg=SUNWcpr.u arch=$(ARCH).sun4u \

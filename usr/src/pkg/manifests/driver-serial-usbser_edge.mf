@@ -30,16 +30,28 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/serial/usbser_edge@$(PKGVERS)
-set name=pkg.description value="USB Digi Edgeport serial driver"
 set name=pkg.summary value="USB Digi Edgeport serial driver"
+set name=pkg.description value="USB Digi Edgeport serial driver"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Ports
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/usbser_edge group=sys
+file path=kernel/drv/usbser_edge.conf group=sys \
+    original_name=SUNWuedg:kernel/drv/usbser_edge.conf preserve=true
 driver name=usbser_edge perms="* 0666 root sys" \
     alias=usbif1608,1.100.config1.0 \
     alias=usbif1608,1.config1.0 \
+    alias=usbif1608,3.config1.0 \
+    alias=usbif1608,4.config1.0 \
+    alias=usbif1608,5.config1.0 \
+    alias=usbif1608,6.config1.0 \
+    alias=usbif1608,7.config1.0 \
+    alias=usbif1608,c.config1.0 \
+    alias=usbif1608,d.config1.0 \
+    alias=usbif1608,e.config1.0 \
+    alias=usbif1608,f.config1.0 \
     alias=usbif1608,10.config1.0 \
     alias=usbif1608,11.config1.0 \
     alias=usbif1608,12.config1.0 \
@@ -59,19 +71,7 @@ driver name=usbser_edge perms="* 0666 root sys" \
     alias=usbif1608,242.config1.0 \
     alias=usbif1608,243.config1.0 \
     alias=usbif1608,244.config1.0 \
-    alias=usbif1608,247.config1.0 \
-    alias=usbif1608,3.config1.0 \
-    alias=usbif1608,4.config1.0 \
-    alias=usbif1608,5.config1.0 \
-    alias=usbif1608,6.config1.0 \
-    alias=usbif1608,7.config1.0 \
-    alias=usbif1608,c.config1.0 \
-    alias=usbif1608,d.config1.0 \
-    alias=usbif1608,e.config1.0 \
-    alias=usbif1608,f.config1.0
-file path=kernel/drv/$(ARCH64)/usbser_edge group=sys
-file path=kernel/drv/usbser_edge.conf group=sys \
-    original_name=SUNWuedg:kernel/drv/usbser_edge.conf preserve=true
+    alias=usbif1608,247.config1.0
 legacy pkg=SUNWuedg desc="USB Digi Edgeport serial driver" \
     name="USB Digi Edgeport serial driver"
 license cr_Sun license=cr_Sun

@@ -30,27 +30,26 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/ofk@$(PKGVERS)
+set name=pkg.summary value="Solaris Open Fabrics kernel components"
 set name=pkg.description \
     value="The Solaris Open Fabrics kernel components package provides support of the OFED defined kernel RDMA KPI, as well as providing kernel modules to facilitate OFED userland libraries."
-set name=pkg.summary value="Solaris Open Fabrics kernel components"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=kernel/misc group=sys
-dir path=kernel/misc/$(ARCH64) group=sys
-driver name=sol_ucma perms="* 0666 root sys"
-driver name=sol_umad perms="* 0666 root sys"
-driver name=sol_uverbs perms="* 0666 root sys"
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/sol_ucma group=sys
 file path=kernel/drv/$(ARCH64)/sol_umad group=sys
 file path=kernel/drv/$(ARCH64)/sol_uverbs group=sys
 file path=kernel/drv/sol_ucma.conf group=sys
 file path=kernel/drv/sol_umad.conf group=sys
 file path=kernel/drv/sol_uverbs.conf group=sys
+dir  path=kernel/misc group=sys
+dir  path=kernel/misc/$(ARCH64) group=sys
 file path=kernel/misc/$(ARCH64)/sol_ofs group=sys mode=0755
+driver name=sol_ucma perms="* 0666 root sys"
+driver name=sol_umad perms="* 0666 root sys"
+driver name=sol_uverbs perms="* 0666 root sys"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/io/ib/clients/of/THIRDPARTYLICENSE \

@@ -24,63 +24,61 @@
 #
 
 set name=pkg.fmri value=pkg:/network/ipfilter@$(PKGVERS)
-set name=pkg.description value="IP Filter Utilities"
 set name=pkg.summary value="IP Filter utilities"
+set name=pkg.description value="IP Filter Utilities"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys
-dir path=etc/ipf group=sys
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/network group=sys
-dir path=lib/svc/method
-dir path=usr group=sys
-dir path=usr/kernel group=sys
-dir path=usr/kernel/drv group=sys
-dir path=usr/kernel/drv/$(ARCH64) group=sys
-dir path=usr/lib
-dir path=usr/lib/ipf
-$(i386_ONLY)dir path=usr/lib/ipf/$(ARCH32) group=sys
-dir path=usr/lib/ipf/$(ARCH64) group=sys
-dir path=usr/sbin
-$(i386_ONLY)dir path=usr/sbin/$(ARCH32)
-dir path=usr/sbin/$(ARCH64)
-dir path=usr/share
-dir path=usr/share/ipfilter
-dir path=usr/share/ipfilter/examples
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man5
-dir path=usr/share/man/man7i
-dir path=var group=sys
-dir path=var/db group=sys
-dir path=var/db/ipf group=sys
-driver name=ipf perms="* 0666 root sys" \
-    policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
+dir  path=etc group=sys
+dir  path=etc/ipf group=sys
 file path=etc/ipf/ipf.conf group=sys original_name=SUNWipf:etc/ipf/ipf.conf \
     preserve=true
+dir  path=lib
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/network group=sys
 file path=lib/svc/manifest/network/ipfilter.xml group=sys mode=0444
+dir  path=lib/svc/method
 file path=lib/svc/method/ipfilter mode=0555
+dir  path=usr group=sys
+dir  path=usr/kernel group=sys
+dir  path=usr/kernel/drv group=sys
+dir  path=usr/kernel/drv/$(ARCH64) group=sys
 file path=usr/kernel/drv/$(ARCH64)/ipf group=sys
 file path=usr/kernel/drv/ipf.conf group=sys
+dir  path=usr/lib
+dir  path=usr/lib/ipf
+$(i386_ONLY)dir path=usr/lib/ipf/$(ARCH32) group=sys
 $(i386_ONLY)file path=usr/lib/ipf/$(ARCH32)/ipftest mode=0555
+dir  path=usr/lib/ipf/$(ARCH64) group=sys
 file path=usr/lib/ipf/$(ARCH64)/ipftest mode=0555
 file path=usr/lib/ipf/IPFILTER.LICENCE
+hardlink path=usr/lib/ipf/ipftest target=../../../usr/lib/isaexec
 file path=usr/lib/servinfo mode=0555
+dir  path=usr/sbin
+$(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 $(i386_ONLY)file path=usr/sbin/$(ARCH32)/ipf mode=0555
 $(i386_ONLY)file path=usr/sbin/$(ARCH32)/ipfs mode=0555
 $(i386_ONLY)file path=usr/sbin/$(ARCH32)/ipfstat mode=0555
 $(i386_ONLY)file path=usr/sbin/$(ARCH32)/ipmon mode=0555
 $(i386_ONLY)file path=usr/sbin/$(ARCH32)/ipnat mode=0555
 $(i386_ONLY)file path=usr/sbin/$(ARCH32)/ippool mode=0555
+dir  path=usr/sbin/$(ARCH64)
 file path=usr/sbin/$(ARCH64)/ipf mode=0555
 file path=usr/sbin/$(ARCH64)/ipfs mode=0555
 file path=usr/sbin/$(ARCH64)/ipfstat mode=0555
 file path=usr/sbin/$(ARCH64)/ipmon mode=0555
 file path=usr/sbin/$(ARCH64)/ipnat mode=0555
 file path=usr/sbin/$(ARCH64)/ippool mode=0555
+hardlink path=usr/sbin/ipf target=../../usr/lib/isaexec
+hardlink path=usr/sbin/ipfs target=../../usr/lib/isaexec
+hardlink path=usr/sbin/ipfstat target=../../usr/lib/isaexec
+hardlink path=usr/sbin/ipmon target=../../usr/lib/isaexec
+hardlink path=usr/sbin/ipnat target=../../usr/lib/isaexec
+hardlink path=usr/sbin/ippool target=../../usr/lib/isaexec
+dir  path=usr/share
+dir  path=usr/share/ipfilter
+dir  path=usr/share/ipfilter/examples
 file path=usr/share/ipfilter/examples/BASIC.NAT
 file path=usr/share/ipfilter/examples/BASIC_1.FW
 file path=usr/share/ipfilter/examples/BASIC_2.FW
@@ -108,6 +106,8 @@ file path=usr/share/ipfilter/examples/nat.eg
 file path=usr/share/ipfilter/examples/pool.conf
 file path=usr/share/ipfilter/examples/server
 file path=usr/share/ipfilter/examples/tcpstate
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/ipf.1m
 file path=usr/share/man/man1m/ipfs.1m
 file path=usr/share/man/man1m/ipfstat.1m
@@ -115,27 +115,26 @@ file path=usr/share/man/man1m/ipmon.1m
 file path=usr/share/man/man1m/ipnat.1m
 file path=usr/share/man/man1m/ippool.1m
 file path=usr/share/man/man4/ipf.4
+link path=usr/share/man/man4/ipf.conf.4 target=./ipf.4
+link path=usr/share/man/man4/ipf6.conf.4 target=./ipf.4
 file path=usr/share/man/man4/ipmon.4
+link path=usr/share/man/man4/ipmon.conf.4 target=./ipmon.4
 file path=usr/share/man/man4/ipnat.4
+link path=usr/share/man/man4/ipnat.conf.4 target=./ipnat.4
 file path=usr/share/man/man4/ippool.4
+link path=usr/share/man/man4/ippool.conf.4 target=./ippool.4
+dir  path=usr/share/man/man5
 file path=usr/share/man/man5/ipfilter.5
+dir  path=usr/share/man/man7i
 file path=usr/share/man/man7i/ipnat.7i
-hardlink path=usr/lib/ipf/ipftest target=../../../usr/lib/isaexec
-hardlink path=usr/sbin/ipf target=../../usr/lib/isaexec
-hardlink path=usr/sbin/ipfs target=../../usr/lib/isaexec
-hardlink path=usr/sbin/ipfstat target=../../usr/lib/isaexec
-hardlink path=usr/sbin/ipmon target=../../usr/lib/isaexec
-hardlink path=usr/sbin/ipnat target=../../usr/lib/isaexec
-hardlink path=usr/sbin/ippool target=../../usr/lib/isaexec
+dir  path=var group=sys
+dir  path=var/db group=sys
+dir  path=var/db/ipf group=sys
+driver name=ipf perms="* 0666 root sys" \
+    policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
 legacy pkg=SUNWipfr desc="IP Filter Utilities" \
     name="IP Filter utilities, (Root)"
-legacy pkg=SUNWipfu desc="IP Filter Utilities" \
-    name="IP Filter utilities, (Usr)"
+legacy pkg=SUNWipfu desc="IP Filter Utilities" name="IP Filter utilities, (Usr)"
 license cr_Sun license=cr_Sun
 license usr/src/cmd/ipf/tools/IPFILTER.LICENCE \
     license=usr/src/cmd/ipf/tools/IPFILTER.LICENCE
-link path=usr/share/man/man4/ipf.conf.4 target=./ipf.4
-link path=usr/share/man/man4/ipf6.conf.4 target=./ipf.4
-link path=usr/share/man/man4/ipmon.conf.4 target=./ipmon.4
-link path=usr/share/man/man4/ipnat.conf.4 target=./ipnat.4
-link path=usr/share/man/man4/ippool.conf.4 target=./ippool.4

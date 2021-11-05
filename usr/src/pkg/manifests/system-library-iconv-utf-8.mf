@@ -24,16 +24,14 @@
 #
 
 set name=pkg.fmri value=pkg:/system/library/iconv/utf-8@$(PKGVERS)
-set name=pkg.description value="Iconv modules for UTF-8 Locale"
 set name=pkg.summary value="Iconv modules for UTF-8 Locale"
+set name=pkg.description value="Iconv modules for UTF-8 Locale"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Internationalization
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/iconv
-dir path=usr/lib/iconv/$(ARCH64)
-dir path=usr/lib/iconv/geniconvtbl
-dir path=usr/lib/iconv/geniconvtbl/binarytables
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/iconv
+dir  path=usr/lib/iconv/$(ARCH64)
 file path=usr/lib/iconv/$(ARCH64)/646%UCS-2.so
 file path=usr/lib/iconv/$(ARCH64)/646%UCS-2BE.so
 file path=usr/lib/iconv/$(ARCH64)/646%UCS-2LE.so
@@ -231,6 +229,7 @@ file path=usr/lib/iconv/$(ARCH64)/8859-9%UTF-32LE.so
 file path=usr/lib/iconv/$(ARCH64)/8859-9%UTF-8.so
 file path=usr/lib/iconv/$(ARCH64)/ACE%UTF-8.so
 file path=usr/lib/iconv/$(ARCH64)/ACE-ALLOW-UNASSIGNED%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/BIG5%UTF-8.so target=./zh_TW-big5%UTF-8.so
 file path=usr/lib/iconv/$(ARCH64)/CP1250%UCS-2.so
 file path=usr/lib/iconv/$(ARCH64)/CP1250%UCS-2BE.so
 file path=usr/lib/iconv/$(ARCH64)/CP1250%UCS-2LE.so
@@ -569,6 +568,8 @@ file path=usr/lib/iconv/$(ARCH64)/CP874%UTF-32.so
 file path=usr/lib/iconv/$(ARCH64)/CP874%UTF-32BE.so
 file path=usr/lib/iconv/$(ARCH64)/CP874%UTF-32LE.so
 file path=usr/lib/iconv/$(ARCH64)/CP874%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/GB18030%UTF-8.so target=./zh_CN.gbk%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/GBK%UTF-8.so target=./zh_CN.gbk%UTF-8.so
 file path=usr/lib/iconv/$(ARCH64)/KOI8-R%UCS-2.so
 file path=usr/lib/iconv/$(ARCH64)/KOI8-R%UCS-2BE.so
 file path=usr/lib/iconv/$(ARCH64)/KOI8-R%UCS-2LE.so
@@ -820,6 +821,7 @@ file path=usr/lib/iconv/$(ARCH64)/UCS-4%UTF-32BE.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4%UTF-32LE.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4%UTF-7.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4%eucJP.so target=./UTF-32%eucJP.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4BE%646.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4BE%8859-1.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4BE%8859-10.so
@@ -874,6 +876,7 @@ file path=usr/lib/iconv/$(ARCH64)/UCS-4BE%UTF-32.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4BE%UTF-32BE.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4BE%UTF-32LE.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4BE%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4BE%eucJP.so target=./UTF-32BE%eucJP.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4LE%646.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4LE%8859-1.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4LE%8859-10.so
@@ -928,6 +931,7 @@ file path=usr/lib/iconv/$(ARCH64)/UCS-4LE%UTF-32.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4LE%UTF-32BE.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4LE%UTF-32LE.so
 file path=usr/lib/iconv/$(ARCH64)/UCS-4LE%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4LE%eucJP.so target=./UTF-32LE%eucJP.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-16%646.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-16%8859-1.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-16%8859-10.so
@@ -1269,6 +1273,7 @@ file path=usr/lib/iconv/$(ARCH64)/UTF-8%8859-8.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%8859-9.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%ACE-ALLOW-UNASSIGNED.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%ACE.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%BIG5.so target=./UTF-8%zh_TW-big5.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%CP1250.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%CP1251.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%CP1252.so
@@ -1295,6 +1300,8 @@ file path=usr/lib/iconv/$(ARCH64)/UTF-8%CP865.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%CP866.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%CP869.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%CP874.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%GB18030.so target=./UTF-8%zh_CN.gbk.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%GBK.so target=./UTF-8%zh_CN.gbk.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%KOI8-R.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%KOI8-U.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%PTCP154.so
@@ -1315,12 +1322,19 @@ file path=usr/lib/iconv/$(ARCH64)/UTF-8%UTF-8.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%UTF-EBCDIC.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%eucJP.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%eucTH.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_CN.gb18030.so \
+    target=./UTF-8%zh_CN.gbk.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_CN.gbk.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_TW-big5.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_TW.big5.so \
+    target=./UTF-8%zh_TW-big5.so
 file path=usr/lib/iconv/$(ARCH64)/UTF-EBCDIC%UTF-8.so
 file path=usr/lib/iconv/$(ARCH64)/eucJP%UCS-2.so
 file path=usr/lib/iconv/$(ARCH64)/eucJP%UCS-2BE.so
 file path=usr/lib/iconv/$(ARCH64)/eucJP%UCS-2LE.so
+link path=usr/lib/iconv/$(ARCH64)/eucJP%UCS-4.so target=./eucJP%UTF-32.so
+link path=usr/lib/iconv/$(ARCH64)/eucJP%UCS-4BE.so target=./eucJP%UTF-32BE.so
+link path=usr/lib/iconv/$(ARCH64)/eucJP%UCS-4LE.so target=./eucJP%UTF-32LE.so
 file path=usr/lib/iconv/$(ARCH64)/eucJP%UTF-16.so
 file path=usr/lib/iconv/$(ARCH64)/eucJP%UTF-16BE.so
 file path=usr/lib/iconv/$(ARCH64)/eucJP%UTF-16LE.so
@@ -1329,8 +1343,12 @@ file path=usr/lib/iconv/$(ARCH64)/eucJP%UTF-32BE.so
 file path=usr/lib/iconv/$(ARCH64)/eucJP%UTF-32LE.so
 file path=usr/lib/iconv/$(ARCH64)/eucJP%UTF-8.so
 file path=usr/lib/iconv/$(ARCH64)/eucTH%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/zh_CN.gb18030%UTF-8.so \
+    target=./zh_CN.gbk%UTF-8.so
 file path=usr/lib/iconv/$(ARCH64)/zh_CN.gbk%UTF-8.so
 file path=usr/lib/iconv/$(ARCH64)/zh_TW-big5%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/zh_TW.big5%UTF-8.so \
+    target=./zh_TW-big5%UTF-8.so
 file path=usr/lib/iconv/646%UCS-2.so
 file path=usr/lib/iconv/646%UCS-2BE.so
 file path=usr/lib/iconv/646%UCS-2LE.so
@@ -1528,6 +1546,7 @@ file path=usr/lib/iconv/8859-9%UTF-32LE.so
 file path=usr/lib/iconv/8859-9%UTF-8.so
 file path=usr/lib/iconv/ACE%UTF-8.so
 file path=usr/lib/iconv/ACE-ALLOW-UNASSIGNED%UTF-8.so
+link path=usr/lib/iconv/BIG5%UTF-8.so target=./zh_TW-big5%UTF-8.so
 file path=usr/lib/iconv/CP1250%UCS-2.so
 file path=usr/lib/iconv/CP1250%UCS-2BE.so
 file path=usr/lib/iconv/CP1250%UCS-2LE.so
@@ -1866,6 +1885,8 @@ file path=usr/lib/iconv/CP874%UTF-32.so
 file path=usr/lib/iconv/CP874%UTF-32BE.so
 file path=usr/lib/iconv/CP874%UTF-32LE.so
 file path=usr/lib/iconv/CP874%UTF-8.so
+link path=usr/lib/iconv/GB18030%UTF-8.so target=./zh_CN.gbk%UTF-8.so
+link path=usr/lib/iconv/GBK%UTF-8.so target=./zh_CN.gbk%UTF-8.so
 file path=usr/lib/iconv/KOI8-R%UCS-2.so
 file path=usr/lib/iconv/KOI8-R%UCS-2BE.so
 file path=usr/lib/iconv/KOI8-R%UCS-2LE.so
@@ -2117,6 +2138,7 @@ file path=usr/lib/iconv/UCS-4%UTF-32BE.so
 file path=usr/lib/iconv/UCS-4%UTF-32LE.so
 file path=usr/lib/iconv/UCS-4%UTF-7.so
 file path=usr/lib/iconv/UCS-4%UTF-8.so
+link path=usr/lib/iconv/UCS-4%eucJP.so target=./UTF-32%eucJP.so
 file path=usr/lib/iconv/UCS-4BE%646.so
 file path=usr/lib/iconv/UCS-4BE%8859-1.so
 file path=usr/lib/iconv/UCS-4BE%8859-10.so
@@ -2171,6 +2193,7 @@ file path=usr/lib/iconv/UCS-4BE%UTF-32.so
 file path=usr/lib/iconv/UCS-4BE%UTF-32BE.so
 file path=usr/lib/iconv/UCS-4BE%UTF-32LE.so
 file path=usr/lib/iconv/UCS-4BE%UTF-8.so
+link path=usr/lib/iconv/UCS-4BE%eucJP.so target=./UTF-32BE%eucJP.so
 file path=usr/lib/iconv/UCS-4LE%646.so
 file path=usr/lib/iconv/UCS-4LE%8859-1.so
 file path=usr/lib/iconv/UCS-4LE%8859-10.so
@@ -2225,6 +2248,7 @@ file path=usr/lib/iconv/UCS-4LE%UTF-32.so
 file path=usr/lib/iconv/UCS-4LE%UTF-32BE.so
 file path=usr/lib/iconv/UCS-4LE%UTF-32LE.so
 file path=usr/lib/iconv/UCS-4LE%UTF-8.so
+link path=usr/lib/iconv/UCS-4LE%eucJP.so target=./UTF-32LE%eucJP.so
 file path=usr/lib/iconv/UTF-16%646.so
 file path=usr/lib/iconv/UTF-16%8859-1.so
 file path=usr/lib/iconv/UTF-16%8859-10.so
@@ -2566,6 +2590,7 @@ file path=usr/lib/iconv/UTF-8%8859-8.so
 file path=usr/lib/iconv/UTF-8%8859-9.so
 file path=usr/lib/iconv/UTF-8%ACE-ALLOW-UNASSIGNED.so
 file path=usr/lib/iconv/UTF-8%ACE.so
+link path=usr/lib/iconv/UTF-8%BIG5.so target=./UTF-8%zh_TW-big5.so
 file path=usr/lib/iconv/UTF-8%CP1250.so
 file path=usr/lib/iconv/UTF-8%CP1251.so
 file path=usr/lib/iconv/UTF-8%CP1252.so
@@ -2592,6 +2617,8 @@ file path=usr/lib/iconv/UTF-8%CP865.so
 file path=usr/lib/iconv/UTF-8%CP866.so
 file path=usr/lib/iconv/UTF-8%CP869.so
 file path=usr/lib/iconv/UTF-8%CP874.so
+link path=usr/lib/iconv/UTF-8%GB18030.so target=./UTF-8%zh_CN.gbk.so
+link path=usr/lib/iconv/UTF-8%GBK.so target=./UTF-8%zh_CN.gbk.so
 file path=usr/lib/iconv/UTF-8%KOI8-R.so
 file path=usr/lib/iconv/UTF-8%KOI8-U.so
 file path=usr/lib/iconv/UTF-8%PTCP154.so
@@ -2612,13 +2639,18 @@ file path=usr/lib/iconv/UTF-8%UTF-8.so
 file path=usr/lib/iconv/UTF-8%UTF-EBCDIC.so
 file path=usr/lib/iconv/UTF-8%eucJP.so
 file path=usr/lib/iconv/UTF-8%eucTH.so
+link path=usr/lib/iconv/UTF-8%zh_CN.gb18030.so target=./UTF-8%zh_CN.gbk.so
 file path=usr/lib/iconv/UTF-8%zh_CN.gbk.so
 file path=usr/lib/iconv/UTF-8%zh_TW-big5.so
+link path=usr/lib/iconv/UTF-8%zh_TW.big5.so target=./UTF-8%zh_TW-big5.so
 file path=usr/lib/iconv/UTF-EBCDIC%UTF-8.so
 file path=usr/lib/iconv/alias mode=0444
 file path=usr/lib/iconv/eucJP%UCS-2.so
 file path=usr/lib/iconv/eucJP%UCS-2BE.so
 file path=usr/lib/iconv/eucJP%UCS-2LE.so
+link path=usr/lib/iconv/eucJP%UCS-4.so target=./eucJP%UTF-32.so
+link path=usr/lib/iconv/eucJP%UCS-4BE.so target=./eucJP%UTF-32BE.so
+link path=usr/lib/iconv/eucJP%UCS-4LE.so target=./eucJP%UTF-32LE.so
 file path=usr/lib/iconv/eucJP%UTF-16.so
 file path=usr/lib/iconv/eucJP%UTF-16BE.so
 file path=usr/lib/iconv/eucJP%UTF-16LE.so
@@ -2627,6 +2659,8 @@ file path=usr/lib/iconv/eucJP%UTF-32BE.so
 file path=usr/lib/iconv/eucJP%UTF-32LE.so
 file path=usr/lib/iconv/eucJP%UTF-8.so
 file path=usr/lib/iconv/eucTH%UTF-8.so
+dir  path=usr/lib/iconv/geniconvtbl
+dir  path=usr/lib/iconv/geniconvtbl/binarytables
 file path=usr/lib/iconv/geniconvtbl/binarytables/IBM-037%UTF-8.bt mode=0444
 file path=usr/lib/iconv/geniconvtbl/binarytables/IBM-1025%UTF-8.bt mode=0444
 file path=usr/lib/iconv/geniconvtbl/binarytables/IBM-1026%UTF-8.bt mode=0444
@@ -2705,8 +2739,10 @@ file path=usr/lib/iconv/geniconvtbl/binarytables/UTF-8%IBM-871.bt mode=0444
 file path=usr/lib/iconv/geniconvtbl/binarytables/UTF-8%IBM-875.bt mode=0444
 file path=usr/lib/iconv/geniconvtbl/binarytables/UTF-8%IBM-921.bt mode=0444
 file path=usr/lib/iconv/geniconvtbl/binarytables/UTF-8%IBM-922.bt mode=0444
+link path=usr/lib/iconv/zh_CN.gb18030%UTF-8.so target=./zh_CN.gbk%UTF-8.so
 file path=usr/lib/iconv/zh_CN.gbk%UTF-8.so
 file path=usr/lib/iconv/zh_TW-big5%UTF-8.so
+link path=usr/lib/iconv/zh_TW.big5%UTF-8.so target=./zh_TW-big5%UTF-8.so
 legacy pkg=SUNWuiu8 category=system desc="Iconv modules for UTF-8 Locale" \
     name="Iconv modules for UTF-8 Locale"
 license cr_Sun license=cr_Sun
@@ -2715,39 +2751,3 @@ license usr/src/lib/iconv_modules/THIRDPARTYLICENSE.icu \
     license=usr/src/lib/iconv_modules/THIRDPARTYLICENSE.icu
 license usr/src/lib/iconv_modules/THIRDPARTYLICENSE.unicode \
     license=usr/src/lib/iconv_modules/THIRDPARTYLICENSE.unicode
-link path=usr/lib/iconv/$(ARCH64)/BIG5%UTF-8.so target=./zh_TW-big5%UTF-8.so
-link path=usr/lib/iconv/$(ARCH64)/GB18030%UTF-8.so target=./zh_CN.gbk%UTF-8.so
-link path=usr/lib/iconv/$(ARCH64)/GBK%UTF-8.so target=./zh_CN.gbk%UTF-8.so
-link path=usr/lib/iconv/$(ARCH64)/UCS-4%eucJP.so target=./UTF-32%eucJP.so
-link path=usr/lib/iconv/$(ARCH64)/UCS-4BE%eucJP.so target=./UTF-32BE%eucJP.so
-link path=usr/lib/iconv/$(ARCH64)/UCS-4LE%eucJP.so target=./UTF-32LE%eucJP.so
-link path=usr/lib/iconv/$(ARCH64)/UTF-8%BIG5.so target=./UTF-8%zh_TW-big5.so
-link path=usr/lib/iconv/$(ARCH64)/UTF-8%GB18030.so target=./UTF-8%zh_CN.gbk.so
-link path=usr/lib/iconv/$(ARCH64)/UTF-8%GBK.so target=./UTF-8%zh_CN.gbk.so
-link path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_CN.gb18030.so \
-    target=./UTF-8%zh_CN.gbk.so
-link path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_TW.big5.so \
-    target=./UTF-8%zh_TW-big5.so
-link path=usr/lib/iconv/$(ARCH64)/eucJP%UCS-4.so target=./eucJP%UTF-32.so
-link path=usr/lib/iconv/$(ARCH64)/eucJP%UCS-4BE.so target=./eucJP%UTF-32BE.so
-link path=usr/lib/iconv/$(ARCH64)/eucJP%UCS-4LE.so target=./eucJP%UTF-32LE.so
-link path=usr/lib/iconv/$(ARCH64)/zh_CN.gb18030%UTF-8.so \
-    target=./zh_CN.gbk%UTF-8.so
-link path=usr/lib/iconv/$(ARCH64)/zh_TW.big5%UTF-8.so \
-    target=./zh_TW-big5%UTF-8.so
-link path=usr/lib/iconv/BIG5%UTF-8.so target=./zh_TW-big5%UTF-8.so
-link path=usr/lib/iconv/GB18030%UTF-8.so target=./zh_CN.gbk%UTF-8.so
-link path=usr/lib/iconv/GBK%UTF-8.so target=./zh_CN.gbk%UTF-8.so
-link path=usr/lib/iconv/UCS-4%eucJP.so target=./UTF-32%eucJP.so
-link path=usr/lib/iconv/UCS-4BE%eucJP.so target=./UTF-32BE%eucJP.so
-link path=usr/lib/iconv/UCS-4LE%eucJP.so target=./UTF-32LE%eucJP.so
-link path=usr/lib/iconv/UTF-8%BIG5.so target=./UTF-8%zh_TW-big5.so
-link path=usr/lib/iconv/UTF-8%GB18030.so target=./UTF-8%zh_CN.gbk.so
-link path=usr/lib/iconv/UTF-8%GBK.so target=./UTF-8%zh_CN.gbk.so
-link path=usr/lib/iconv/UTF-8%zh_CN.gb18030.so target=./UTF-8%zh_CN.gbk.so
-link path=usr/lib/iconv/UTF-8%zh_TW.big5.so target=./UTF-8%zh_TW-big5.so
-link path=usr/lib/iconv/eucJP%UCS-4.so target=./eucJP%UTF-32.so
-link path=usr/lib/iconv/eucJP%UCS-4BE.so target=./eucJP%UTF-32BE.so
-link path=usr/lib/iconv/eucJP%UCS-4LE.so target=./eucJP%UTF-32LE.so
-link path=usr/lib/iconv/zh_CN.gb18030%UTF-8.so target=./zh_CN.gbk%UTF-8.so
-link path=usr/lib/iconv/zh_TW.big5%UTF-8.so target=./zh_TW-big5%UTF-8.so

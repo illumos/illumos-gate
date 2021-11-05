@@ -25,40 +25,44 @@
 #
 
 set name=pkg.fmri value=pkg:/service/network/network-clients@$(PKGVERS)
+set name=pkg.summary value="Remote Network Client Commands"
 set name=pkg.description \
     value="Remote Network Client Commands (rsh, rlogin, rcp, rsh, ...)"
-set name=pkg.summary value="Remote Network Client Commands"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/bin
-dir path=usr/lib
-dir path=usr/sbin
-dir path=usr/share/man/man1
-dir path=usr/share/man/man1m
+dir  path=usr group=sys
+dir  path=usr/bin
 file path=usr/bin/filesync mode=0555
 file path=usr/bin/rcp mode=4555
 file path=usr/bin/rdate mode=0555
 file path=usr/bin/rdist mode=4555
+link path=usr/bin/remsh target=./rsh
 file path=usr/bin/rlogin mode=4555
 file path=usr/bin/rsh mode=4555
 file path=usr/bin/rup mode=0555
 file path=usr/bin/ruptime mode=0555
 file path=usr/bin/rusers mode=0555
 file path=usr/bin/whois mode=0555
+dir  path=usr/lib
+link path=usr/lib/sunw,rcp target=../bin/rcp
+dir  path=usr/sbin
 file path=usr/sbin/rmt mode=0555
 file path=usr/sbin/rwall mode=0555
 file path=usr/sbin/snoop mode=0555
 file path=usr/sbin/spray mode=0555
+dir  path=usr/share/man/man1
 file path=usr/share/man/man1/filesync.1
 file path=usr/share/man/man1/rcp.1
 file path=usr/share/man/man1/rdist.1
+link path=usr/share/man/man1/remote_shell.1 target=rsh.1
+link path=usr/share/man/man1/remsh.1 target=rsh.1
 file path=usr/share/man/man1/rlogin.1
 file path=usr/share/man/man1/rsh.1
 file path=usr/share/man/man1/rup.1
 file path=usr/share/man/man1/ruptime.1
 file path=usr/share/man/man1/rusers.1
 file path=usr/share/man/man1/whois.1
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/rdate.1m
 file path=usr/share/man/man1m/rmt.1m
 file path=usr/share/man/man1m/rwall.1m
@@ -79,7 +83,3 @@ license usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.whois \
     license=usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.whois
 license usr/src/cmd/cmd-inet/usr.bin/rdist/THIRDPARTYLICENSE \
     license=usr/src/cmd/cmd-inet/usr.bin/rdist/THIRDPARTYLICENSE
-link path=usr/bin/remsh target=./rsh
-link path=usr/lib/sunw,rcp target=../bin/rcp
-link path=usr/share/man/man1/remote_shell.1 target=rsh.1
-link path=usr/share/man/man1/remsh.1 target=rsh.1

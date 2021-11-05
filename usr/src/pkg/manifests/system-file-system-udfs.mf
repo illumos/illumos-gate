@@ -24,34 +24,34 @@
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/udfs@$(PKGVERS)
-set name=pkg.description value="Universal Disk Format 1.50 File System"
 set name=pkg.summary value="Universal Disk Format 1.50"
+set name=pkg.description value="Universal Disk Format 1.50 File System"
 set name=info.classification value=org.opensolaris.category.2008:System/Media
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/fs group=sys
-dir path=kernel/fs/$(ARCH64) group=sys
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/fs group=sys
-dir path=usr/lib/fs/udfs group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man7fs
+dir  path=kernel group=sys
+dir  path=kernel/fs group=sys
+dir  path=kernel/fs/$(ARCH64) group=sys
 file path=kernel/fs/$(ARCH64)/udfs group=sys mode=0755
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/fs group=sys
+dir  path=usr/lib/fs/udfs group=sys
 file path=usr/lib/fs/udfs/fsck mode=0555
 file path=usr/lib/fs/udfs/fsdb mode=0555
+hardlink path=usr/lib/fs/udfs/fstyp target=../../../sbin/fstyp
 file path=usr/lib/fs/udfs/fstyp.so.1 mode=0555
 file path=usr/lib/fs/udfs/labelit mode=0555
 file path=usr/lib/fs/udfs/mkfs mode=0555
 file path=usr/lib/fs/udfs/mount mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/fsck_udfs.1m
 file path=usr/share/man/man1m/fsdb_udfs.1m
 file path=usr/share/man/man1m/labelit_udfs.1m
 file path=usr/share/man/man1m/mkfs_udfs.1m
 file path=usr/share/man/man1m/mount_udfs.1m
+dir  path=usr/share/man/man7fs
 file path=usr/share/man/man7fs/udfs.7fs
-hardlink path=usr/lib/fs/udfs/fstyp target=../../../sbin/fstyp
 legacy pkg=SUNWudf desc="Universal Disk Format 1.50 File System, (Usr)" \
     name="Universal Disk Format 1.50, (Usr)"
 legacy pkg=SUNWudfr desc="Universal Disk Format 1.50 File System" \

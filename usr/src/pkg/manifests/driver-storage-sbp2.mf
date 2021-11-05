@@ -30,14 +30,13 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/sbp2@$(PKGVERS)
-set name=pkg.description value="Serial Bus Protocol 2 module"
 set name=pkg.summary value="Serial Bus Protocol 2 module"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.description value="Serial Bus Protocol 2 module"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/misc group=sys
-dir path=kernel/misc/$(ARCH64) group=sys
+dir  path=kernel group=sys
+dir  path=kernel/misc group=sys
+dir  path=kernel/misc/$(ARCH64) group=sys
 file path=kernel/misc/$(ARCH64)/sbp2 group=sys mode=0755
 legacy pkg=SUNWsbp2 desc="Serial Bus Protocol 2 module" \
     name="Serial Bus Protocol 2 module"

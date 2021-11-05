@@ -31,22 +31,32 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/qlc@$(PKGVERS)
-set name=pkg.description \
-    value="Qlogic ISP Fibre Channel Device Driver and GLDv3 NIC driver"
 set name=pkg.summary \
     value="Qlogic ISP Fibre Channel Device Driver and GLDv3 NIC driver"
-set name=info.classification \
-    value=org.opensolaris.category.2008:Drivers/Storage
+set name=pkg.description \
+    value="Qlogic ISP Fibre Channel Device Driver and GLDv3 NIC driver"
+set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=kernel/misc group=sys
-dir path=kernel/misc/qlc group=sys
-dir path=kernel/misc/qlc/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=qlc class=fibre-channel perms="* 0666 root sys" \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/qlc group=sys
+file path=kernel/drv/$(ARCH64)/qlge group=sys
+file path=kernel/drv/qlc.conf group=sys \
+    original_name=SUNWqlc:kernel/drv/qlc.conf preserve=true
+dir  path=kernel/misc group=sys
+dir  path=kernel/misc/qlc group=sys
+dir  path=kernel/misc/qlc/$(ARCH64) group=sys
+file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2200 group=sys mode=0755
+file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2300 group=sys mode=0755
+file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2400 group=sys mode=0755
+file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2500 group=sys mode=0755
+file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_6322 group=sys mode=0755
+file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_8100 group=sys mode=0755
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/qlc.7d
+driver name=qlc perms="* 0666 root sys" class=fibre-channel \
     alias=pci1077,2200 \
     alias=pci1077,2300 \
     alias=pci1077,2312 \
@@ -57,18 +67,7 @@ driver name=qlc class=fibre-channel perms="* 0666 root sys" \
     alias=pciex1077,5432 \
     alias=pciex1077,8001 \
     alias=pciex1077,8021
-driver name=qlge alias=pciex1077,8000 perms="* 0666 root sys"
-file path=kernel/drv/$(ARCH64)/qlc group=sys
-file path=kernel/drv/$(ARCH64)/qlge group=sys
-file path=kernel/drv/qlc.conf group=sys \
-    original_name=SUNWqlc:kernel/drv/qlc.conf preserve=true
-file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2200 group=sys mode=0755
-file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2300 group=sys mode=0755
-file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2400 group=sys mode=0755
-file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2500 group=sys mode=0755
-file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_6322 group=sys mode=0755
-file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_8100 group=sys mode=0755
-file path=usr/share/man/man7d/qlc.7d
+driver name=qlge perms="* 0666 root sys" alias=pciex1077,8000
 legacy pkg=SUNWqlc \
     desc="Qlogic ISP Fibre Channel Device Driver and GLDv3 NIC driver" \
     name="Qlogic ISP Fibre Channel Device Driver and GLDv3 NIC driver"

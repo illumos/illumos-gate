@@ -26,52 +26,19 @@
 #
 
 set name=pkg.fmri value=pkg:/service/hal@$(PKGVERS)
+set name=pkg.summary value="Hardware Abstraction Layer"
 set name=pkg.description \
     value="Hardware Abstraction Layer, HAL (freedesktop.org)"
-set name=pkg.summary value="Hardware Abstraction Layer"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys variant.opensolaris.zone=global
-dir path=etc/dbus-1 variant.opensolaris.zone=global
-dir path=etc/dbus-1/system.d variant.opensolaris.zone=global
-dir path=etc/hal variant.opensolaris.zone=global
-dir path=etc/hal/fdi variant.opensolaris.zone=global
-dir path=etc/hal/fdi/information variant.opensolaris.zone=global
-dir path=etc/hal/fdi/information/10freedesktop variant.opensolaris.zone=global
-dir path=etc/hal/fdi/information/20thirdparty variant.opensolaris.zone=global
-dir path=etc/hal/fdi/information/30user variant.opensolaris.zone=global
-dir path=etc/hal/fdi/policy variant.opensolaris.zone=global
-dir path=etc/hal/fdi/policy/10osvendor variant.opensolaris.zone=global
-dir path=etc/hal/fdi/policy/20thirdparty variant.opensolaris.zone=global
-dir path=etc/hal/fdi/policy/30user variant.opensolaris.zone=global
-dir path=etc/hal/fdi/preprobe variant.opensolaris.zone=global
-dir path=etc/hal/fdi/preprobe/10osvendor variant.opensolaris.zone=global
-dir path=etc/hal/fdi/preprobe/20thirdparty variant.opensolaris.zone=global
-dir path=etc/hal/fdi/preprobe/30user variant.opensolaris.zone=global
-dir path=lib variant.opensolaris.zone=global
-dir path=lib/svc variant.opensolaris.zone=global
-dir path=lib/svc/manifest group=sys variant.opensolaris.zone=global
-dir path=lib/svc/manifest/network group=sys variant.opensolaris.zone=global
-dir path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
-dir path=lib/svc/method variant.opensolaris.zone=global
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/lib/$(ARCH64)/pkgconfig group=other
-dir path=usr/lib/hal
-dir path=usr/lib/hal/sunos
-dir path=usr/lib/pkgconfig group=other
-dir path=usr/sbin
-dir path=usr/share
-dir path=usr/share/lib
-dir path=usr/share/lib/xml group=sys
-dir path=usr/share/lib/xml/dtd group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man4
-dir path=usr/share/man/man5
+dir  path=etc group=sys variant.opensolaris.zone=global
+dir  path=etc/dbus-1 variant.opensolaris.zone=global
+dir  path=etc/dbus-1/system.d variant.opensolaris.zone=global
 file path=etc/dbus-1/system.d/hal.conf variant.opensolaris.zone=global
+dir  path=etc/hal variant.opensolaris.zone=global
+dir  path=etc/hal/fdi variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/information variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/information/10freedesktop variant.opensolaris.zone=global
 file path=etc/hal/fdi/information/10freedesktop/10-camera-ptp.fdi mode=0444 \
     variant.opensolaris.zone=global
 file path=etc/hal/fdi/information/10freedesktop/10-cd-dvd-burner.fdi mode=0444 \
@@ -86,6 +53,10 @@ file path=etc/hal/fdi/information/10freedesktop/10-usb-zip-drives.fdi \
     mode=0444 variant.opensolaris.zone=global
 file path=etc/hal/fdi/information/10freedesktop/10-wireless-mice.fdi mode=0444 \
     variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/information/20thirdparty variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/information/30user variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/policy variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/policy/10osvendor variant.opensolaris.zone=global
 file path=etc/hal/fdi/policy/10osvendor/10-cpufreq.fdi mode=0444 \
     variant.opensolaris.zone=global
 file path=etc/hal/fdi/policy/10osvendor/10-laptop-panel-mgmt-policy.fdi \
@@ -100,6 +71,10 @@ file path=etc/hal/fdi/policy/10osvendor/20-storage-methods.fdi mode=0444 \
     variant.opensolaris.zone=global
 file path=etc/hal/fdi/policy/10osvendor/20-zfs-methods.fdi mode=0444 \
     variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/policy/20thirdparty variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/policy/30user variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/preprobe variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/preprobe/10osvendor variant.opensolaris.zone=global
 file path=etc/hal/fdi/preprobe/10osvendor/10-ide-drives.fdi mode=0444 \
     variant.opensolaris.zone=global
 file path=etc/hal/fdi/preprobe/10osvendor/20-ignore-fixed-storage.fdi \
@@ -108,17 +83,34 @@ file path=etc/hal/fdi/preprobe/10osvendor/20-ignore-lofi.fdi mode=0444 \
     variant.opensolaris.zone=global
 file path=etc/hal/fdi/preprobe/10osvendor/20-printers.fdi mode=0444 \
     variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/preprobe/20thirdparty variant.opensolaris.zone=global
+dir  path=etc/hal/fdi/preprobe/30user variant.opensolaris.zone=global
+dir  path=lib variant.opensolaris.zone=global
+dir  path=lib/svc variant.opensolaris.zone=global
+dir  path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir  path=lib/svc/manifest/network group=sys variant.opensolaris.zone=global
 file path=lib/svc/manifest/network/network-discovery.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
+dir  path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
 file path=lib/svc/manifest/system/hal.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
+dir  path=lib/svc/method variant.opensolaris.zone=global
 file path=lib/svc/method/svc-hal mode=0555 variant.opensolaris.zone=global
 file path=lib/svc/method/svc-network-discovery mode=0555 \
     variant.opensolaris.zone=global
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libhal-storage.so target=./libhal-storage.so.1.0.0
+link path=usr/lib/$(ARCH64)/libhal-storage.so.1 target=./libhal-storage.so.1.0.0
 file path=usr/lib/$(ARCH64)/libhal-storage.so.1.0.0
+link path=usr/lib/$(ARCH64)/libhal.so target=./libhal.so.1.0.0
+link path=usr/lib/$(ARCH64)/libhal.so.1 target=./libhal.so.1.0.0
 file path=usr/lib/$(ARCH64)/libhal.so.1.0.0
+dir  path=usr/lib/$(ARCH64)/pkgconfig group=other
 file path=usr/lib/$(ARCH64)/pkgconfig/hal-storage.pc
 file path=usr/lib/$(ARCH64)/pkgconfig/hal.pc
+dir  path=usr/lib/hal
 file path=usr/lib/hal/hal-functions mode=0555
 file path=usr/lib/hal/hal-is-caller-privileged mode=0555
 file path=usr/lib/hal/hal-storage-cleanup-all-mountpoints mode=0555
@@ -147,16 +139,23 @@ file path=usr/lib/hal/hald-probe-storage mode=0555
 file path=usr/lib/hal/hald-probe-volume mode=0555
 file path=usr/lib/hal/hald-probe-xkb mode=0555
 file path=usr/lib/hal/hald-runner mode=0555
+dir  path=usr/lib/hal/sunos
 file path=usr/lib/hal/sunos/hal-system-lcd-get-brightness-sunos mode=0555
 file path=usr/lib/hal/sunos/hal-system-lcd-set-brightness-sunos mode=0555
 file path=usr/lib/hal/sunos/hal-system-power-hibernate-sunos mode=0555
 file path=usr/lib/hal/sunos/hal-system-power-reboot-sunos mode=0555
 file path=usr/lib/hal/sunos/hal-system-power-shutdown-sunos mode=0555
 file path=usr/lib/hal/sunos/hal-system-power-suspend-sunos mode=0555
+link path=usr/lib/libhal-storage.so target=./libhal-storage.so.1.0.0
+link path=usr/lib/libhal-storage.so.1 target=./libhal-storage.so.1.0.0
 file path=usr/lib/libhal-storage.so.1.0.0
+link path=usr/lib/libhal.so target=./libhal.so.1.0.0
+link path=usr/lib/libhal.so.1 target=./libhal.so.1.0.0
 file path=usr/lib/libhal.so.1.0.0
+dir  path=usr/lib/pkgconfig group=other
 file path=usr/lib/pkgconfig/hal-storage.pc
 file path=usr/lib/pkgconfig/hal.pc
+dir  path=usr/sbin
 file path=usr/sbin/hal-device mode=0555
 file path=usr/sbin/hal-fdi-validate mode=0555
 file path=usr/sbin/hal-find-by-capability mode=0555
@@ -164,13 +163,24 @@ file path=usr/sbin/hal-find-by-property mode=0555
 file path=usr/sbin/hal-get-property mode=0555
 file path=usr/sbin/hal-set-property mode=0555
 file path=usr/sbin/lshal mode=0555
+dir  path=usr/share
+dir  path=usr/share/lib
+dir  path=usr/share/lib/xml group=sys
+dir  path=usr/share/lib/xml/dtd group=sys
 file path=usr/share/lib/xml/dtd/fdi.dtd.1
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/hal-device.1m
 file path=usr/share/man/man1m/hal-fdi-validate.1m
+link path=usr/share/man/man1m/hal-find-by-capability.1m target=hal-find.1m
+link path=usr/share/man/man1m/hal-find-by-property.1m target=hal-find.1m
 file path=usr/share/man/man1m/hal-find.1m
 file path=usr/share/man/man1m/hal-get-property.1m
+link path=usr/share/man/man1m/hal-set-property.1m target=hal-get-property.1m
 file path=usr/share/man/man1m/hald.1m
+dir  path=usr/share/man/man4
 file path=usr/share/man/man4/fdi.4
+dir  path=usr/share/man/man5
 file path=usr/share/man/man5/hal.5
 legacy pkg=SUNWhal desc="Hardware Abstraction Layer, HAL (freedesktop.org)" \
     name="Hardware Abstraction Layer"
@@ -180,15 +190,3 @@ legacy pkg=SUNWhalr \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/cmd/hal/LICENSE license=usr/src/cmd/hal/LICENSE
-link path=usr/lib/$(ARCH64)/libhal-storage.so target=./libhal-storage.so.1.0.0
-link path=usr/lib/$(ARCH64)/libhal-storage.so.1 \
-    target=./libhal-storage.so.1.0.0
-link path=usr/lib/$(ARCH64)/libhal.so target=./libhal.so.1.0.0
-link path=usr/lib/$(ARCH64)/libhal.so.1 target=./libhal.so.1.0.0
-link path=usr/lib/libhal-storage.so target=./libhal-storage.so.1.0.0
-link path=usr/lib/libhal-storage.so.1 target=./libhal-storage.so.1.0.0
-link path=usr/lib/libhal.so target=./libhal.so.1.0.0
-link path=usr/lib/libhal.so.1 target=./libhal.so.1.0.0
-link path=usr/share/man/man1m/hal-find-by-capability.1m target=hal-find.1m
-link path=usr/share/man/man1m/hal-find-by-property.1m target=hal-find.1m
-link path=usr/share/man/man1m/hal-set-property.1m target=hal-get-property.1m

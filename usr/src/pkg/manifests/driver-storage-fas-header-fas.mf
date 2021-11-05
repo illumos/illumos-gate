@@ -24,16 +24,16 @@
 #
 
 set name=pkg.fmri value=pkg:/driver/storage/fas/header-fas@$(PKGVERS)
-set name=pkg.description value="SunSwift Adapter Headers"
 set name=pkg.summary value="SunSwift Adapter Headers"
+set name=pkg.description value="SunSwift Adapter Headers"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=sparc
-dir path=usr group=sys
-dir path=usr/include
-dir path=usr/include/sys
-dir path=usr/include/sys/scsi
-dir path=usr/include/sys/scsi/adapters
+dir  path=usr group=sys
+dir  path=usr/include
+dir  path=usr/include/sys
+dir  path=usr/include/sys/scsi
+dir  path=usr/include/sys/scsi/adapters
 file path=usr/include/sys/scsi/adapters/fascmd.h
 file path=usr/include/sys/scsi/adapters/fasdma.h
 file path=usr/include/sys/scsi/adapters/fasreg.h

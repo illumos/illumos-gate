@@ -25,8 +25,8 @@
 #
 
 set name=pkg.fmri value=pkg:/system/boot/real-mode@$(PKGVERS)
-set name=pkg.description value="Realmode Modules"
 set name=pkg.summary value="Realmode Modules"
+set name=pkg.description value="Realmode Modules"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 # SUNWrmod doesn't deliver anything for sparc, but SUNWrmodu was
 # renamed for i386, and we can't obsolete one variant and rename
@@ -35,17 +35,17 @@ set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 $(i386_ONLY)dir path=boot group=sys
 $(i386_ONLY)dir path=boot/solaris group=sys
+$(i386_ONLY)hardlink path=boot/solaris.xpm target=splashimage.xpm
+$(i386_ONLY)file path=boot/solaris/bootenv.rc group=sys \
+    original_name=SUNWrmodr:boot/solaris/bootenv.rc preserve=renamenew
 $(i386_ONLY)dir path=boot/solaris/devicedb group=sys
+$(i386_ONLY)file path=boot/solaris/devicedb/master group=sys \
+    original_name=SUNWrmod:boot/solaris/devicedb/master preserve=true
+$(i386_ONLY)file path=boot/splashimage.xpm group=sys
 $(i386_ONLY)dir path=usr group=sys
 $(i386_ONLY)dir path=usr/lib
 $(i386_ONLY)dir path=usr/lib/fs group=sys
 $(i386_ONLY)dir path=usr/lib/fs/ufs group=sys
-$(i386_ONLY)file path=boot/solaris/bootenv.rc group=sys \
-    original_name=SUNWrmodr:boot/solaris/bootenv.rc preserve=renamenew
-$(i386_ONLY)file path=boot/solaris/devicedb/master group=sys \
-    original_name=SUNWrmod:boot/solaris/devicedb/master preserve=true
-$(i386_ONLY)file path=boot/splashimage.xpm group=sys
-$(i386_ONLY)hardlink path=boot/solaris.xpm target=splashimage.xpm
 $(i386_ONLY)legacy pkg=SUNWrmodr desc="Realmode Modules, (Root)" \
     name="Realmode Modules, (Root)"
 $(i386_ONLY)legacy pkg=SUNWrmodu desc="Realmode Modules, (Usr)" \

@@ -30,22 +30,22 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/chxge@$(PKGVERS)
+set name=pkg.summary value="Chelsio N110 10GE NIC Driver"
 set name=pkg.description \
     value="Chelsio N110 10 Gigabit Ethernet Network Adapter Driver"
-set name=pkg.summary value="Chelsio N110 10GE NIC Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=chxge clone_perms="chxge 0666 root sys" perms="* 0666 root sys" \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/chxge group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/chxge.7d
+driver name=chxge perms="* 0666 root sys" clone_perms="chxge 0666 root sys" \
     alias=pci1425,7 \
     alias=pci1425,a
-file path=kernel/drv/$(ARCH64)/chxge group=sys
-file path=usr/share/man/man7d/chxge.7d
 legacy pkg=SUNWchxge \
     desc="Chelsio N110 10 Gigabit Ethernet Network Adapter Driver" \
     name="Chelsio N110 10GE NIC Driver"

@@ -24,12 +24,12 @@
 #
 
 set name=pkg.fmri value=pkg:/system/header/header-picl@$(PKGVERS)
-set name=pkg.description value="PICL Header Files"
 set name=pkg.summary value="PICL Header Files"
+set name=pkg.description value="PICL Header Files"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/include
+dir  path=usr group=sys
+dir  path=usr/include
 file path=usr/include/picl.h
 file path=usr/include/picltree.h
 legacy pkg=SUNWpiclh desc="PICL Header Files" name="PICL Header Files (Usr)"

@@ -14,32 +14,32 @@
 #
 
 set name=pkg.fmri value=pkg:/system/network/mailwrapper@$(PKGVERS)
+set name=pkg.summary value=mailwrapper
 set name=pkg.description \
     value="utility to invoke appropriate MTA software based on configuration file"
-set name=pkg.summary value=mailwrapper
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys
-dir path=etc/mail group=mail
-dir path=usr/bin
-dir path=usr/lib
-dir path=usr/sbin
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man4
+dir  path=etc group=sys
+dir  path=etc/mail group=mail
 file path=etc/mailer.conf group=sys preserve=true
+dir  path=usr/bin
+link path=usr/bin/mailq target=../lib/mailwrapper mediator=mta \
+    mediator-implementation=mailwrapper
+dir  path=usr/lib
 file path=usr/lib/mailwrapper mode=0555
+link path=usr/lib/sendmail target=mailwrapper mediator=mta \
+    mediator-implementation=mailwrapper
+dir  path=usr/sbin
+link path=usr/sbin/newaliases target=../lib/mailwrapper mediator=mta \
+    mediator-implementation=mailwrapper
+link path=usr/sbin/sendmail target=../lib/mailwrapper mediator=mta \
+    mediator-implementation=mailwrapper
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/mailwrapper.1m
+dir  path=usr/share/man/man4
 file path=usr/share/man/man4/mailer.conf.4
 license usr/src/cmd/mailwrapper/THIRDPARTYLICENSE \
     license=usr/src/cmd/mailwrapper/THIRDPARTYLICENSE
-link path=usr/bin/mailq mediator=mta mediator-implementation=mailwrapper \
-    target=../lib/mailwrapper
-link path=usr/lib/sendmail mediator=mta mediator-implementation=mailwrapper \
-    target=mailwrapper
-link path=usr/sbin/newaliases mediator=mta mediator-implementation=mailwrapper \
-    target=../lib/mailwrapper
-link path=usr/sbin/sendmail mediator=mta mediator-implementation=mailwrapper \
-    target=../lib/mailwrapper
-depend fmri=service/network/smtp/sendmail type=require
+depend type=require fmri=service/network/smtp/sendmail

@@ -25,47 +25,44 @@
 #
 
 set name=pkg.fmri value=pkg:/service/network/network-servers@$(PKGVERS)
+set name=pkg.summary value="Remote Network Server Commands"
 set name=pkg.description \
     value="Remote Network Server Commands (includes finger, talk, rwho commands)"
-set name=pkg.summary value="Remote Network Server Commands"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/network group=sys
-dir path=lib/svc/manifest/network/rpc group=sys
-dir path=usr group=sys
-dir path=usr/bin
-dir path=usr/lib
-dir path=usr/lib/netsvc group=sys
-dir path=usr/lib/netsvc/rstat group=sys
-dir path=usr/lib/netsvc/rusers group=sys
-dir path=usr/lib/netsvc/rwall group=sys
-dir path=usr/lib/netsvc/spray group=sys
-dir path=usr/sbin
-dir path=usr/share/man
-dir path=usr/share/man/man1
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man4
+dir  path=etc group=sys
+link path=etc/rmt target=../usr/sbin/rmt
+dir  path=lib
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/network group=sys
 file path=lib/svc/manifest/network/comsat.xml group=sys mode=0444
 file path=lib/svc/manifest/network/finger.xml group=sys mode=0444
 file path=lib/svc/manifest/network/login.xml group=sys mode=0444
 file path=lib/svc/manifest/network/rexec.xml group=sys mode=0444
+dir  path=lib/svc/manifest/network/rpc group=sys
 file path=lib/svc/manifest/network/rpc/rstat.xml group=sys mode=0444
 file path=lib/svc/manifest/network/rpc/rusers.xml group=sys mode=0444
 file path=lib/svc/manifest/network/rpc/spray.xml group=sys mode=0444
 file path=lib/svc/manifest/network/rpc/wall.xml group=sys mode=0444
 file path=lib/svc/manifest/network/shell.xml group=sys mode=0444
 file path=lib/svc/manifest/network/talk.xml group=sys mode=0444
+dir  path=usr group=sys
+dir  path=usr/bin
 file path=usr/bin/finger mode=0555
 file path=usr/bin/rwho mode=0555
 file path=usr/bin/talk mode=0555
+dir  path=usr/lib
+dir  path=usr/lib/netsvc group=sys
+dir  path=usr/lib/netsvc/rstat group=sys
 file path=usr/lib/netsvc/rstat/rpc.rstatd mode=0555
+dir  path=usr/lib/netsvc/rusers group=sys
 file path=usr/lib/netsvc/rusers/rpc.rusersd mode=0555
+dir  path=usr/lib/netsvc/rwall group=sys
 file path=usr/lib/netsvc/rwall/rpc.rwalld mode=0555
+dir  path=usr/lib/netsvc/spray group=sys
 file path=usr/lib/netsvc/spray/rpc.sprayd mode=0555
+dir  path=usr/sbin
 file path=usr/sbin/in.comsat mode=0555
 file path=usr/sbin/in.fingerd mode=0555
 file path=usr/sbin/in.rexecd mode=0555
@@ -73,9 +70,14 @@ file path=usr/sbin/in.rlogind mode=0555
 file path=usr/sbin/in.rshd mode=0555
 file path=usr/sbin/in.rwhod mode=0555
 file path=usr/sbin/in.talkd mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man1
 file path=usr/share/man/man1/finger.1
 file path=usr/share/man/man1/rwho.1
 file path=usr/share/man/man1/talk.1
+dir  path=usr/share/man/man1m
+link path=usr/share/man/man1m/comsat.1m target=in.comsat.1m
+link path=usr/share/man/man1m/fingerd.1m target=in.fingerd.1m
 file path=usr/share/man/man1m/in.comsat.1m
 file path=usr/share/man/man1m/in.fingerd.1m
 file path=usr/share/man/man1m/in.rexecd.1m
@@ -83,11 +85,22 @@ file path=usr/share/man/man1m/in.rlogind.1m
 file path=usr/share/man/man1m/in.rshd.1m
 file path=usr/share/man/man1m/in.rwhod.1m
 file path=usr/share/man/man1m/in.talkd.1m
+link path=usr/share/man/man1m/rexecd.1m target=in.rexecd.1m
+link path=usr/share/man/man1m/rlogind.1m target=in.rlogind.1m
 file path=usr/share/man/man1m/rpc.rstatd.1m
 file path=usr/share/man/man1m/rpc.rusersd.1m
 file path=usr/share/man/man1m/rpc.rwalld.1m
 file path=usr/share/man/man1m/rpc.sprayd.1m
+link path=usr/share/man/man1m/rshd.1m target=in.rshd.1m
+link path=usr/share/man/man1m/rstatd.1m target=rpc.rstatd.1m
+link path=usr/share/man/man1m/rusersd.1m target=rpc.rusersd.1m
+link path=usr/share/man/man1m/rwalld.1m target=rpc.rwalld.1m
+link path=usr/share/man/man1m/rwhod.1m target=in.rwhod.1m
+link path=usr/share/man/man1m/sprayd.1m target=rpc.sprayd.1m
+link path=usr/share/man/man1m/talkd.1m target=in.talkd.1m
+dir  path=usr/share/man/man4
 file path=usr/share/man/man4/hosts.equiv.4
+link path=usr/share/man/man4/rhosts.4 target=hosts.equiv.4
 legacy pkg=SUNWrcmdr desc="Remote Network Server Commands (Root)" \
     name="Remote Network Server Commands (Root)"
 legacy pkg=SUNWrcmds \
@@ -99,16 +112,3 @@ license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.comsat \
     license=usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.comsat
 license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.rlogind \
     license=usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.rlogind
-link path=etc/rmt target=../usr/sbin/rmt
-link path=usr/share/man/man1m/comsat.1m target=in.comsat.1m
-link path=usr/share/man/man1m/fingerd.1m target=in.fingerd.1m
-link path=usr/share/man/man1m/rexecd.1m target=in.rexecd.1m
-link path=usr/share/man/man1m/rlogind.1m target=in.rlogind.1m
-link path=usr/share/man/man1m/rshd.1m target=in.rshd.1m
-link path=usr/share/man/man1m/rstatd.1m target=rpc.rstatd.1m
-link path=usr/share/man/man1m/rusersd.1m target=rpc.rusersd.1m
-link path=usr/share/man/man1m/rwalld.1m target=rpc.rwalld.1m
-link path=usr/share/man/man1m/rwhod.1m target=in.rwhod.1m
-link path=usr/share/man/man1m/sprayd.1m target=rpc.sprayd.1m
-link path=usr/share/man/man1m/talkd.1m target=in.talkd.1m
-link path=usr/share/man/man4/rhosts.4 target=hosts.equiv.4

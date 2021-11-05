@@ -20,71 +20,26 @@
 #
 
 set name=pkg.fmri value=pkg:/system/test/utiltest@$(PKGVERS)
-set name=pkg.description value="Miscellaneous Utility Unit Tests"
 set name=pkg.summary value="Utility Unit Test Suite"
+set name=pkg.description value="Miscellaneous Utility Unit Tests"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-dir path=opt/util-tests
-dir path=opt/util-tests/bin
-dir path=opt/util-tests/runfiles
-dir path=opt/util-tests/tests
-dir path=opt/util-tests/tests/ar
-dir path=opt/util-tests/tests/awk
-dir path=opt/util-tests/tests/awk/bugs-fixed
-dir path=opt/util-tests/tests/awk/data
-dir path=opt/util-tests/tests/awk/examples
-dir path=opt/util-tests/tests/awk/examples/awk
-dir path=opt/util-tests/tests/awk/examples/out
-dir path=opt/util-tests/tests/awk/gnu
-dir path=opt/util-tests/tests/awk/syn
-dir path=opt/util-tests/tests/awk/tests
-dir path=opt/util-tests/tests/ctf
-dir path=opt/util-tests/tests/ctf/test-merge-dedup
-dir path=opt/util-tests/tests/ctf/test-merge-forward
-dir path=opt/util-tests/tests/ctf/test-merge-reduction
-dir path=opt/util-tests/tests/ctf/test-merge-static
-dir path=opt/util-tests/tests/ctf/test-merge-weak
-dir path=opt/util-tests/tests/demangle
-dir path=opt/util-tests/tests/dis
-dir path=opt/util-tests/tests/dis/i386
-dir path=opt/util-tests/tests/dis/risc-v
-dir path=opt/util-tests/tests/dis/risc-v-c
-dir path=opt/util-tests/tests/dis/sparc
-dir path=opt/util-tests/tests/files
-dir path=opt/util-tests/tests/files/grep
-dir path=opt/util-tests/tests/files/make_a
-dir path=opt/util-tests/tests/files/make_a/a
-dir path=opt/util-tests/tests/files/make_a/b
-dir path=opt/util-tests/tests/files/make_a/c
-dir path=opt/util-tests/tests/files/make_l
-dir path=opt/util-tests/tests/files/svr4pkg
-dir path=opt/util-tests/tests/files/svr4pkg/data
-dir path=opt/util-tests/tests/files/svr4pkg/data/a
-dir path=opt/util-tests/tests/files/svr4pkg/data/b
-dir path=opt/util-tests/tests/find
-dir path=opt/util-tests/tests/head
-dir path=opt/util-tests/tests/libcustr
-dir path=opt/util-tests/tests/libnvpair_json
-dir path=opt/util-tests/tests/libsff
-dir path=opt/util-tests/tests/mdb
-dir path=opt/util-tests/tests/mdb/exit-e
-dir path=opt/util-tests/tests/mdb/format
-dir path=opt/util-tests/tests/mdb/options
-dir path=opt/util-tests/tests/mdb/typedef
-dir path=opt/util-tests/tests/mergeq
-dir path=opt/util-tests/tests/pci
-dir path=opt/util-tests/tests/sed
-dir path=opt/util-tests/tests/sed/regress.multitest.out
-dir path=opt/util-tests/tests/sleep
+dir  path=opt/util-tests
 file path=opt/util-tests/README mode=0444
+dir  path=opt/util-tests/bin
 file path=opt/util-tests/bin/print_json mode=0555
 file path=opt/util-tests/bin/utiltest mode=0555
+dir  path=opt/util-tests/runfiles
 file path=opt/util-tests/runfiles/default.run mode=0444
+dir  path=opt/util-tests/tests
 file path=opt/util-tests/tests/allowed-ips mode=0555
+dir  path=opt/util-tests/tests/ar
 file path=opt/util-tests/tests/ar/ar_test0.o mode=0444
 file path=opt/util-tests/tests/ar/ar_test1.o mode=0444
 file path=opt/util-tests/tests/ar/artest mode=0555
+dir  path=opt/util-tests/tests/awk
+dir  path=opt/util-tests/tests/awk/bugs-fixed
 file path=opt/util-tests/tests/awk/bugs-fixed/a-format.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/a-format.ok mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/concat-assign-same.awk mode=0444
@@ -99,8 +54,7 @@ file path=opt/util-tests/tests/awk/bugs-fixed/nf-self-assign.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/nf-self-assign.ok mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/numeric-fs.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/numeric-fs.ok mode=0444
-file path=opt/util-tests/tests/awk/bugs-fixed/numeric-output-seps.awk \
-    mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/numeric-output-seps.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/numeric-output-seps.ok mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/numeric-rs.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/numeric-rs.ok mode=0444
@@ -110,8 +64,7 @@ file path=opt/util-tests/tests/awk/bugs-fixed/ofs-rebuild.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/ofs-rebuild.ok mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/space.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/space.ok mode=0444
-file path=opt/util-tests/tests/awk/bugs-fixed/split-fs-from-array.awk \
-    mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/split-fs-from-array.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/split-fs-from-array.ok mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/string-conv.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/string-conv.ok mode=0444
@@ -121,8 +74,11 @@ file path=opt/util-tests/tests/awk/bugs-fixed/system-status.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/system-status.ok mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/unary-plus.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/unary-plus.ok mode=0444
+dir  path=opt/util-tests/tests/awk/data
 file path=opt/util-tests/tests/awk/data/test.countries mode=0444
 file path=opt/util-tests/tests/awk/data/test.data mode=0444
+dir  path=opt/util-tests/tests/awk/examples
+dir  path=opt/util-tests/tests/awk/examples/awk
 file path=opt/util-tests/tests/awk/examples/awk/p.1 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/p.10 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/p.11 mode=0444
@@ -347,6 +303,7 @@ file path=opt/util-tests/tests/awk/examples/awk/t.vf1 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.vf2 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.vf3 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.x mode=0444
+dir  path=opt/util-tests/tests/awk/examples/out
 file path=opt/util-tests/tests/awk/examples/out/p.1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/p.10 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/p.11 mode=0444
@@ -571,6 +528,7 @@ file path=opt/util-tests/tests/awk/examples/out/t.vf1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.vf2 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.vf3 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.x mode=0444
+dir  path=opt/util-tests/tests/awk/gnu
 file path=opt/util-tests/tests/awk/gnu/anchgsub.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/anchgsub.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/anchgsub.ok mode=0444
@@ -1001,6 +959,7 @@ file path=opt/util-tests/tests/awk/gnu/zeroe0.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/zeroflag.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/zeroflag.ok mode=0444
 file path=opt/util-tests/tests/awk/runtests.sh mode=0555
+dir  path=opt/util-tests/tests/awk/syn
 file path=opt/util-tests/tests/awk/syn/arrayparm.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/arrayparm.ok mode=0444
 file path=opt/util-tests/tests/awk/syn/arryref3.awk mode=0444
@@ -1067,6 +1026,7 @@ file path=opt/util-tests/tests/awk/syn/tradanch1.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/tradanch1.ok mode=0444
 file path=opt/util-tests/tests/awk/syn/unterm.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/unterm.ok mode=0444
+dir  path=opt/util-tests/tests/awk/tests
 file path=opt/util-tests/tests/awk/tests/T.-f-f mode=0555
 file path=opt/util-tests/tests/awk/tests/T.argv mode=0555
 file path=opt/util-tests/tests/awk/tests/T.builtin mode=0555
@@ -1105,6 +1065,7 @@ file path=opt/util-tests/tests/awk/tests/penicil.p mode=0444
 file path=opt/util-tests/tests/awk/tests/res.ok mode=0444
 file path=opt/util-tests/tests/awk/tests/res.p mode=0444
 file path=opt/util-tests/tests/chown_test mode=0555
+dir  path=opt/util-tests/tests/ctf
 file path=opt/util-tests/tests/ctf/Makefile.ctftest.com mode=0555
 file path=opt/util-tests/tests/ctf/check-array mode=0555
 file path=opt/util-tests/tests/ctf/check-enum mode=0555
@@ -1137,30 +1098,30 @@ file path=opt/util-tests/tests/ctf/test-float.c mode=0555
 file path=opt/util-tests/tests/ctf/test-forward.c mode=0555
 file path=opt/util-tests/tests/ctf/test-function.c mode=0555
 file path=opt/util-tests/tests/ctf/test-int.c mode=0555
+dir  path=opt/util-tests/tests/ctf/test-merge-dedup
 file path=opt/util-tests/tests/ctf/test-merge-dedup/Makefile.ctftest mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-dedup/test-merge-1.c mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-dedup/test-merge-2.c mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-dedup/test-merge-3.c mode=0555
-file path=opt/util-tests/tests/ctf/test-merge-dedup/test-merge-dedup.c \
-    mode=0555
-file path=opt/util-tests/tests/ctf/test-merge-forward/Makefile.ctftest \
-    mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-dedup/test-merge-dedup.c mode=0555
+dir  path=opt/util-tests/tests/ctf/test-merge-forward
+file path=opt/util-tests/tests/ctf/test-merge-forward/Makefile.ctftest mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-forward/test-impl.c mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-forward/test-merge.c mode=0555
+dir  path=opt/util-tests/tests/ctf/test-merge-reduction
 file path=opt/util-tests/tests/ctf/test-merge-reduction/Makefile.ctftest \
     mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-reduction/mapfile-vers mode=0555
-file path=opt/util-tests/tests/ctf/test-merge-reduction/test-global.c \
-    mode=0555
-file path=opt/util-tests/tests/ctf/test-merge-reduction/test-scoped.c \
-    mode=0555
-file path=opt/util-tests/tests/ctf/test-merge-static/Makefile.ctftest \
-    mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-reduction/test-global.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-reduction/test-scoped.c mode=0555
+dir  path=opt/util-tests/tests/ctf/test-merge-static
+file path=opt/util-tests/tests/ctf/test-merge-static/Makefile.ctftest mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-static/test-a.c mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-static/test-b.c mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-static/test-c.c mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-static/test-d.c mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-static/test-main.c mode=0555
+dir  path=opt/util-tests/tests/ctf/test-merge-weak
 file path=opt/util-tests/tests/ctf/test-merge-weak/Makefile.ctftest mode=0555
 file path=opt/util-tests/tests/ctf/test-merge-weak/test-merge-weak.c mode=0555
 file path=opt/util-tests/tests/ctf/test-qualifiers.c mode=0555
@@ -1168,11 +1129,14 @@ file path=opt/util-tests/tests/ctf/test-reference.c mode=0555
 file path=opt/util-tests/tests/ctf/test-sou.c mode=0555
 file path=opt/util-tests/tests/ctf/test-weak.c mode=0555
 file path=opt/util-tests/tests/date_test mode=0555
+dir  path=opt/util-tests/tests/demangle
 file path=opt/util-tests/tests/demangle/afl-fast mode=0555
 file path=opt/util-tests/tests/demangle/gcc-libstdc++ mode=0555
 file path=opt/util-tests/tests/demangle/llvm-stdcxxabi mode=0555
 file path=opt/util-tests/tests/demangle/rust mode=0555
+dir  path=opt/util-tests/tests/dis
 file path=opt/util-tests/tests/dis/distest mode=0555
+dir  path=opt/util-tests/tests/dis/i386
 file path=opt/util-tests/tests/dis/i386/32.adx.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.adx.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.aes.out mode=0444
@@ -1317,6 +1281,8 @@ file path=opt/util-tests/tests/dis/i386/tst.vmx.out mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.vmx.s mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.wbnovind.out mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.wbnovind.s mode=0444
+dir  path=opt/util-tests/tests/dis/risc-v
+dir  path=opt/util-tests/tests/dis/risc-v-c
 file path=opt/util-tests/tests/dis/risc-v-c/32.ldsr.out mode=0444
 file path=opt/util-tests/tests/dis/risc-v-c/32.ldsr.s mode=0444
 file path=opt/util-tests/tests/dis/risc-v-c/64.int.out mode=0444
@@ -1357,8 +1323,10 @@ file path=opt/util-tests/tests/dis/risc-v/tst.rv32m.out mode=0444
 file path=opt/util-tests/tests/dis/risc-v/tst.rv32m.s mode=0444
 file path=opt/util-tests/tests/dis/risc-v/tst.supervisor.out mode=0444
 file path=opt/util-tests/tests/dis/risc-v/tst.supervisor.s mode=0444
+dir  path=opt/util-tests/tests/dis/sparc
 file path=opt/util-tests/tests/dis/sparc/tst.regs.out mode=0444
 file path=opt/util-tests/tests/dis/sparc/tst.regs.s mode=0444
+dir  path=opt/util-tests/tests/files
 file path=opt/util-tests/tests/files/cout0 mode=0444
 file path=opt/util-tests/tests/files/cout1 mode=0444
 file path=opt/util-tests/tests/files/cout10 mode=0444
@@ -1371,6 +1339,7 @@ file path=opt/util-tests/tests/files/cout6 mode=0444
 file path=opt/util-tests/tests/files/cout7 mode=0444
 file path=opt/util-tests/tests/files/cout8 mode=0444
 file path=opt/util-tests/tests/files/cout9 mode=0444
+dir  path=opt/util-tests/tests/files/grep
 file path=opt/util-tests/tests/files/grep/gout.t1.0 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t1.1 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t1.10 mode=0444
@@ -1519,18 +1488,29 @@ file path=opt/util-tests/tests/files/grep/test5 mode=0444
 file path=opt/util-tests/tests/files/grep/test6 mode=0444
 file path=opt/util-tests/tests/files/grep/test7 mode=0444
 file path=opt/util-tests/tests/files/grep/testnl mode=0444
+dir  path=opt/util-tests/tests/files/make_a
 file path=opt/util-tests/tests/files/make_a/Makefile mode=0444
+dir  path=opt/util-tests/tests/files/make_a/a
 file path=opt/util-tests/tests/files/make_a/a/Makefile mode=0444
 file path=opt/util-tests/tests/files/make_a/a/make.rules mode=0444
+dir  path=opt/util-tests/tests/files/make_a/b
 file path=opt/util-tests/tests/files/make_a/b/Makefile mode=0444
 file path=opt/util-tests/tests/files/make_a/b/make.rules mode=0444
+dir  path=opt/util-tests/tests/files/make_a/c
 file path=opt/util-tests/tests/files/make_a/c/Makefile mode=0444
 file path=opt/util-tests/tests/files/make_a/c/make.rules mode=0444
 file path=opt/util-tests/tests/files/make_a/make.rules mode=0444
+dir  path=opt/util-tests/tests/files/make_l
+dir  path=opt/util-tests/tests/files/svr4pkg
+dir  path=opt/util-tests/tests/files/svr4pkg/data
+dir  path=opt/util-tests/tests/files/svr4pkg/data/a
 file path=opt/util-tests/tests/files/svr4pkg/data/a/file1.txt mode=0444
+dir  path=opt/util-tests/tests/files/svr4pkg/data/b
 file path=opt/util-tests/tests/files/svr4pkg/data/b/file2.txt mode=0444
+dir  path=opt/util-tests/tests/find
 file path=opt/util-tests/tests/find/findtest mode=0555
 file path=opt/util-tests/tests/grep_test mode=0555
+dir  path=opt/util-tests/tests/head
 file path=opt/util-tests/tests/head/5221.in mode=0444
 file path=opt/util-tests/tests/head/5221.out mode=0444
 file path=opt/util-tests/tests/head/head_test mode=0555
@@ -1552,9 +1532,11 @@ file path=opt/util-tests/tests/head/stdin.5.out mode=0444
 file path=opt/util-tests/tests/head/stdin.multi.out mode=0444
 file path=opt/util-tests/tests/head/stdin.nonewline.out mode=0444
 file path=opt/util-tests/tests/iconv_test mode=0555
+dir  path=opt/util-tests/tests/libcustr
 file path=opt/util-tests/tests/libcustr/custr_remove mode=0555
 file path=opt/util-tests/tests/libcustr/custr_trunc mode=0555
 file path=opt/util-tests/tests/libjedec_test mode=0555
+dir  path=opt/util-tests/tests/libnvpair_json
 file path=opt/util-tests/tests/libnvpair_json/json_00_blank mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_01_boolean mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_02_numbers mode=0555
@@ -1564,6 +1546,7 @@ file path=opt/util-tests/tests/libnvpair_json/json_05_strings mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_06_nested mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_07_nested_arrays mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_common mode=0555
+dir  path=opt/util-tests/tests/libsff
 file path=opt/util-tests/tests/libsff/libsff mode=0555
 file path=opt/util-tests/tests/libsff/libsff_8472 mode=0555
 file path=opt/util-tests/tests/libsff/libsff_8472.out mode=0444
@@ -1595,6 +1578,8 @@ file path=opt/util-tests/tests/libsff/libsff_strings mode=0555
 file path=opt/util-tests/tests/libsff/libsff_wave mode=0555
 file path=opt/util-tests/tests/libsff/libsff_wave.out mode=0444
 file path=opt/util-tests/tests/make_test mode=0555
+dir  path=opt/util-tests/tests/mdb
+dir  path=opt/util-tests/tests/mdb/exit-e
 file path=opt/util-tests/tests/mdb/exit-e/err.cmdbadopt.ksh mode=0444
 file path=opt/util-tests/tests/mdb/exit-e/err.enocmd.ksh mode=0444
 file path=opt/util-tests/tests/mdb/exit-e/err.nowrite.ksh mode=0444
@@ -1602,6 +1587,7 @@ file path=opt/util-tests/tests/mdb/exit-e/err.unmapped.ksh mode=0444
 file path=opt/util-tests/tests/mdb/exit-e/tst.output.ksh mode=0444
 file path=opt/util-tests/tests/mdb/exit-e/tst.output.ksh.out mode=0444
 file path=opt/util-tests/tests/mdb/exit-e/tst.simple.ksh mode=0444
+dir  path=opt/util-tests/tests/mdb/format
 file path=opt/util-tests/tests/mdb/format/tst.format-cap-E.mdb mode=0444
 file path=opt/util-tests/tests/mdb/format/tst.format-cap-E.mdb.out mode=0444
 file path=opt/util-tests/tests/mdb/format/tst.format-cap-G.mdb mode=0444
@@ -1621,35 +1607,31 @@ file path=opt/util-tests/tests/mdb/format/tst.format-j.mdb.out mode=0444
 file path=opt/util-tests/tests/mdb/format/tst.format-p.mdb mode=0444
 file path=opt/util-tests/tests/mdb/format/tst.format-p.mdb.out mode=0444
 file path=opt/util-tests/tests/mdb/mdbtest mode=0555
+dir  path=opt/util-tests/tests/mdb/options
 file path=opt/util-tests/tests/mdb/options/tst.autowrap.mdb mode=0444
 file path=opt/util-tests/tests/mdb/options/tst.autowrap.mdb.out mode=0444
+dir  path=opt/util-tests/tests/mdb/typedef
 file path=opt/util-tests/tests/mdb/typedef/err.badid-leadnum.ksh mode=0444
 file path=opt/util-tests/tests/mdb/typedef/err.badid-leadschar.ksh mode=0444
 file path=opt/util-tests/tests/mdb/typedef/err.badmodel.ksh mode=0444
 file path=opt/util-tests/tests/mdb/typedef/err.badstruct-extrabraces.ksh \
     mode=0444
-file path=opt/util-tests/tests/mdb/typedef/err.badstruct-neglenarr.ksh \
-    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-neglenarr.ksh mode=0444
 file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noarrayclose.ksh \
     mode=0444
 file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noarraylen.ksh \
     mode=0444
 file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noarrayopen.ksh \
     mode=0444
-file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nobraces.ksh \
-    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nobraces.ksh mode=0444
 file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noclosebrace.ksh \
     mode=0444
-file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nomembers.ksh \
-    mode=0444
-file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nomemname.ksh \
-    mode=0444
-file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nomemsemi.ksh \
-    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nomembers.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nomemname.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nomemsemi.ksh mode=0444
 file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noopenbrace.ksh \
     mode=0444
-file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noquotes.ksh \
-    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noquotes.ksh mode=0444
 file path=opt/util-tests/tests/mdb/typedef/err.badstruct-repmemname.ksh \
     mode=0444
 file path=opt/util-tests/tests/mdb/typedef/err.badstruct-vlaonly.ksh mode=0444
@@ -1684,8 +1666,10 @@ file path=opt/util-tests/tests/mdb/typedef/tst.structvla.mdb mode=0444
 file path=opt/util-tests/tests/mdb/typedef/tst.structvla.mdb.out mode=0444
 file path=opt/util-tests/tests/mdb/typedef/tst.union.mdb mode=0444
 file path=opt/util-tests/tests/mdb/typedef/tst.union.mdb.out mode=0444
+dir  path=opt/util-tests/tests/mergeq
 file path=opt/util-tests/tests/mergeq/mqt mode=0555
 file path=opt/util-tests/tests/mergeq/wqt mode=0555
+dir  path=opt/util-tests/tests/pci
 file path=opt/util-tests/tests/pci/bridge-efilt-p.out mode=0444
 file path=opt/util-tests/tests/pci/bridge-efilt.out mode=0444
 file path=opt/util-tests/tests/pci/bridge-ht-p.out mode=0444
@@ -1705,7 +1689,9 @@ file path=opt/util-tests/tests/pcidbtest mode=0555
 file path=opt/util-tests/tests/pcieadm-priv mode=0555
 file path=opt/util-tests/tests/pcieadmtest mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555
+dir  path=opt/util-tests/tests/sed
 file path=opt/util-tests/tests/sed/multi_test mode=0555
+dir  path=opt/util-tests/tests/sed/regress.multitest.out
 file path=opt/util-tests/tests/sed/regress.multitest.out/1.1 mode=0444
 file path=opt/util-tests/tests/sed/regress.multitest.out/1.10 mode=0444
 file path=opt/util-tests/tests/sed/regress.multitest.out/1.11 mode=0444
@@ -1838,6 +1824,7 @@ file path=opt/util-tests/tests/sed/regress.multitest.out/9.8 mode=0444
 file path=opt/util-tests/tests/sed/regress.multitest.out/9.9 mode=0444
 file path=opt/util-tests/tests/sed/sed_addr mode=0555
 file path=opt/util-tests/tests/set-linkprop mode=0555
+dir  path=opt/util-tests/tests/sleep
 file path=opt/util-tests/tests/sleep/sleep.awk mode=0444
 file path=opt/util-tests/tests/sleep/sleep.d mode=0444
 file path=opt/util-tests/tests/sleep/sleeptest mode=0555
@@ -1853,9 +1840,9 @@ license usr/src/test/util-tests/tests/demangle/THIRDPARTYLICENSE.rust \
     license=usr/src/test/util-tests/tests/demangle/THIRDPARTYLICENSE.rust
 license usr/src/test/util-tests/tests/sed/bsd/THIRDPARTYLICENSE \
     license=usr/src/test/util-tests/tests/sed/bsd/THIRDPARTYLICENSE
-depend fmri=developer/dtrace type=require
-depend fmri=diagnostic/pci type=require
-depend fmri=locale/de type=require
-depend fmri=system/kernel/dtrace/providers type=require
-depend fmri=system/library/iconv/utf-8 type=require
-depend fmri=system/test/testrunner type=require
+depend type=require fmri=developer/dtrace
+depend type=require fmri=diagnostic/pci
+depend type=require fmri=locale/de
+depend type=require fmri=system/kernel/dtrace/providers
+depend type=require fmri=system/library/iconv/utf-8
+depend type=require fmri=system/test/testrunner

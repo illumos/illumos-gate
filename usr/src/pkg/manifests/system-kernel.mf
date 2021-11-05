@@ -52,267 +52,47 @@
 <include system-kernel.man9p.inc>
 <include system-kernel.man9s.inc>
 set name=pkg.fmri value=pkg:/system/kernel@$(PKGVERS)
+set name=pkg.summary value="Core Solaris Kernel"
 set name=pkg.description \
     value="core kernel software for a specific instruction-set architecture"
-set name=pkg.summary value="Core Solaris Kernel"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-dir path=boot group=sys
+dir  path=boot group=sys
 $(i386_ONLY)dir path=boot/acpi group=sys
 $(i386_ONLY)dir path=boot/acpi/tables group=sys
-dir path=boot/solaris group=sys
-dir path=boot/solaris/bin group=sys
-dir path=etc group=sys
-dir path=etc/crypto group=sys
-dir path=etc/sock2path.d group=sys
-dir path=kernel group=sys
-$(i386_ONLY)dir path=kernel/$(ARCH64) group=sys
-dir path=kernel/cc group=sys
-dir path=kernel/cc/$(ARCH64) group=sys
-dir path=kernel/crypto group=sys
-dir path=kernel/crypto/$(ARCH64) group=sys
-dir path=kernel/dacf group=sys
-dir path=kernel/dacf/$(ARCH64) group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=kernel/exec group=sys
-dir path=kernel/exec/$(ARCH64) group=sys
-dir path=kernel/firmware group=sys
-dir path=kernel/fs group=sys
-dir path=kernel/fs/$(ARCH64) group=sys
-dir path=kernel/ipp group=sys
-dir path=kernel/ipp/$(ARCH64) group=sys
-dir path=kernel/kiconv group=sys
-dir path=kernel/kiconv/$(ARCH64) group=sys
-dir path=kernel/mac group=sys
-dir path=kernel/mac/$(ARCH64) group=sys
-dir path=kernel/misc group=sys
-dir path=kernel/misc/$(ARCH64) group=sys
-dir path=kernel/misc/scsi_vhci group=sys
-dir path=kernel/misc/scsi_vhci/$(ARCH64) group=sys
-dir path=kernel/sched group=sys
-dir path=kernel/sched/$(ARCH64) group=sys
-dir path=kernel/socketmod group=sys
-dir path=kernel/socketmod/$(ARCH64) group=sys
-dir path=kernel/strmod group=sys
-dir path=kernel/strmod/$(ARCH64) group=sys
-dir path=kernel/sys group=sys
-dir path=kernel/sys/$(ARCH64) group=sys
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/system group=sys
-dir path=lib/svc/method
-dir path=usr/kernel group=sys
-dir path=usr/kernel/drv group=sys
-dir path=usr/kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man2
-dir path=usr/share/man/man3
-dir path=usr/share/man/man4
-dir path=usr/share/man/man5
-dir path=usr/share/man/man7d
-dir path=usr/share/man/man7fs
-dir path=usr/share/man/man7m
-dir path=usr/share/man/man7p
-dir path=usr/share/man/man9
-dir path=usr/share/man/man9e
-dir path=usr/share/man/man9f
-dir path=usr/share/man/man9p
-dir path=usr/share/man/man9s
-$(i386_ONLY)driver name=acpi_drv perms="* 0666 root sys"
-driver name=aggr perms="* 0666 root sys"
-driver name=arp perms="arp 0666 root sys"
-driver name=bl perms="* 0666 root sys"
-driver name=bridge clone_perms="bridge 0666 root sys" \
-    policy="read_priv_set=net_rawaccess write_priv_set=net_rawaccess"
-driver name=clone
-driver name=cn perms="* 0620 root tty"
-driver name=conskbd perms="kbd 0666 root sys"
-driver name=consms perms="mouse 0666 root sys"
-driver name=cpuid perms="self 0644 root sys"
-$(i386_ONLY)driver name=cpunex alias=cpus
-driver name=crypto perms="crypto 0666 root sys"
-driver name=cryptoadm perms="cryptoadm 0644 root sys"
-$(sparc_ONLY)driver name=dad alias=ide-disk perms="* 0640 root sys"
-driver name=devinfo perms="devinfo 0640 root sys" \
-    perms="devinfo,ro 0444 root sys"
-driver name=dld perms="* 0666 root sys"
-driver name=dlpistub perms="* 0666 root sys"
-$(sparc_ONLY)driver name=i8042 alias=8042
-$(i386_ONLY)driver name=i8042
-driver name=icmp perms="icmp 0666 root sys" \
-    policy="read_priv_set=net_icmpaccess write_priv_set=net_icmpaccess"
-driver name=icmp6 perms="icmp6 0666 root sys" \
-    policy="read_priv_set=net_icmpaccess write_priv_set=net_icmpaccess"
-$(i386_ONLY)driver name=intel_nb5000 \
-    alias=pci8086,25c0 \
-    alias=pci8086,25d0 \
-    alias=pci8086,25d4 \
-    alias=pci8086,25d8 \
-    alias=pci8086,3600 \
-    alias=pci8086,4000 \
-    alias=pci8086,4001 \
-    alias=pci8086,4003 \
-    alias=pci8086,65c0
-$(i386_ONLY)driver name=intel_nhm \
-    alias=pci8086,3423 \
-    alias=pci8086,372a
-$(i386_ONLY)driver name=intel_nhmex alias=pci8086,3438
-driver name=ip perms="ip 0666 root sys" \
-    policy="read_priv_set=net_rawaccess write_priv_set=net_rawaccess"
-driver name=ip6 perms="ip6 0666 root sys" \
-    policy="read_priv_set=net_rawaccess write_priv_set=net_rawaccess"
-driver name=ipnet perms="lo0 0666 root sys" \
-    policy="read_priv_set=net_observability write_priv_set=net_observability"
-driver name=ippctl
-driver name=ipsecah perms="ipsecah 0666 root sys" \
-    policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
-driver name=ipsecesp perms="ipsecesp 0666 root sys" \
-    policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
-driver name=iptun
-driver name=iwscn
-driver name=kb8042 alias=pnpPNP,303
-driver name=keysock perms="keysock 0666 root sys" \
-    policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
-driver name=kmdb
-driver name=kssl perms="* 0666 root sys"
-driver name=llc1 clone_perms="llc1 0666 root sys"
-driver name=lofi perms="* 0600 root sys" perms="ctl 0644 root sys"
-driver name=log perms="conslog 0666 root sys" perms="log 0640 root sys"
-$(i386_ONLY)driver name=mc-amd \
-    alias=pci1022,1100 \
-    alias=pci1022,1101 \
-    alias=pci1022,1102
-driver name=mm perms="allkmem 0600 root sys" perms="full 0666 root sys" \
-    perms="kmem 0640 root sys" perms="mem 0640 root sys" \
-    perms="null 0666 root sys" perms="zero 0666 root sys" \
-    policy="allkmem read_priv_set=all write_priv_set=all" \
-    policy="kmem read_priv_set=none write_priv_set=all" \
-    policy="mem read_priv_set=none write_priv_set=all"
-driver name=mouse8042 alias=pnpPNP,f03
-$(i386_ONLY)driver name=mpt class=scsi \
-    alias=pci1000,30 \
-    alias=pci1000,50 \
-    alias=pci1000,54 \
-    alias=pci1000,56 \
-    alias=pci1000,58 \
-    alias=pci1000,62 \
-    alias=pciex1000,56 \
-    alias=pciex1000,58 \
-    alias=pciex1000,62
-driver name=nulldriver \
-    alias=scsa,nodev \
-    alias=scsa,probe
-driver name=openeepr perms="openprom 0640 root sys" policy=write_priv_set=all
-driver name=options
-$(sparc_ONLY)driver name=pci_pci class=pci \
-    alias=pci1011,1 \
-    alias=pci1011,21 \
-    alias=pci1011,24 \
-    alias=pci1011,25 \
-    alias=pci1011,26 \
-    alias=pci1014,22 \
-    alias=pciclass,060400
-$(i386_ONLY)driver name=pci_pci class=pci \
-    alias=pci1011,1 \
-    alias=pci1011,21 \
-    alias=pci1014,22 \
-    alias=pciclass,060400 \
-    alias=pciclass,060401
-$(sparc_ONLY)driver name=pcieb \
-    alias=pciex108e,9010 \
-    alias=pciex108e,9020 \
-    alias=pciex10b5,8114 \
-    alias=pciex10b5,8516 \
-    alias=pciex10b5,8517 \
-    alias=pciex10b5,8518 \
-    alias=pciex10b5,8532 \
-    alias=pciex10b5,8533 \
-    alias=pciex10b5,8548 \
-    alias=pciexclass,060400
-$(i386_ONLY)driver name=pcieb \
-    alias=pciexclass,060400 \
-    alias=pciexclass,060401
-$(sparc_ONLY)driver name=pcieb_bcm alias=pciex1166,103
-driver name=physmem perms="* 0600 root sys"
-driver name=poll perms="* 0666 root sys"
-$(sparc_ONLY)driver name=power alias=ali1535d+-power
-$(i386_ONLY)driver name=power
-driver name=pseudo alias=zconsnex
-driver name=ptc perms="* 0666 root sys"
-driver name=ptsl perms="* 0666 root sys"
-$(sparc_ONLY)driver name=ramdisk alias=SUNW,ramdisk perms="* 0600 root sys" \
-    perms="ctl 0644 root sys"
-$(i386_ONLY)driver name=ramdisk perms="* 0600 root sys" \
-    perms="ctl 0644 root sys"
-driver name=random perms="* 0644 root sys" policy=write_priv_set=sys_devices
-driver name=rts perms="rts 0666 root sys"
-driver name=sad perms="admin 0666 root sys" perms="user 0666 root sys"
-driver name=scsi_vhci class=scsi-self-identifying perms="* 0666 root sys" \
-    policy="devctl write_priv_set=sys_devices"
-$(sparc_ONLY)driver name=sd perms="* 0640 root sys" \
-    alias=ide-cdrom \
-    alias=scsiclass,00 \
-    alias=scsiclass,05
-$(i386_ONLY)driver name=sd perms="* 0640 root sys" \
-    alias=scsiclass,00 \
-    alias=scsiclass,05
-driver name=sgen perms="* 0600 root sys" \
-    alias=scsa,08.bfcp \
-    alias=scsa,08.bvhci
-driver name=signalfd perms="* 0666 root sys"
-driver name=simnet clone_perms="simnet 0666 root sys" perms="* 0666 root sys"
-$(i386_ONLY)driver name=smbios perms="smbios 0444 root sys"
-driver name=softmac
-driver name=spdsock perms="spdsock 0666 root sys" \
-    policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
-driver name=st alias=scsiclass,01 perms="* 0666 root sys"
-driver name=sy perms="tty 0666 root tty"
-driver name=sysevent perms="* 0600 root sys"
-driver name=sysmsg perms="msglog 0600 root sys" perms="sysmsg 0600 root sys"
-driver name=tcp perms="tcp 0666 root sys"
-driver name=tcp6 perms="tcp6 0666 root sys"
-driver name=tl perms="* 0666 root sys" clone_perms="ticlts 0666 root sys" \
-    clone_perms="ticots 0666 root sys" clone_perms="ticotsord 0666 root sys"
-$(i386_ONLY)driver name=tzmon
-$(sparc_ONLY)driver name=uata \
-    alias=pci1095,646 \
-    alias=pci1095,649 \
-    alias=pci1095,680 \
-    alias=pci10b9,5229 \
-    alias=pci10b9,5288 class=dada class=scsi
-$(i386_ONLY)driver name=ucode perms="* 0644 root sys"
-driver name=udp perms="udp 0666 root sys"
-driver name=udp6 perms="udp6 0666 root sys"
-driver name=ufm perms="ufm 0666 root sys"
-$(i386_ONLY)driver name=vgatext \
-    alias=pciclass,000100 \
-    alias=pciclass,030000 \
-    alias=pciclass,030001 \
-    alias=pnpPNP,900
-driver name=vnic clone_perms="vnic 0666 root sys" perms="* 0666 root sys"
-driver name=wc perms="* 0600 root sys"
+dir  path=boot/solaris group=sys
+dir  path=boot/solaris/bin group=sys
 $(i386_ONLY)file path=boot/solaris/bin/create_diskmap group=sys mode=0555
 file path=boot/solaris/bin/create_ramdisk group=sys mode=0555
 file path=boot/solaris/bin/extract_boot_filelist group=sys mode=0555
+$(i386_ONLY)link path=boot/solaris/bin/root_archive \
+    target=../../../usr/sbin/root_archive
 $(i386_ONLY)file path=boot/solaris/bin/symdef group=sys mode=0555
 $(i386_ONLY)file path=boot/solaris/bin/update_grub group=sys mode=0555
 file path=boot/solaris/filelist.ramdisk group=sys
 file path=boot/solaris/filelist.safe group=sys
+link path=dev/dld target=../devices/pseudo/dld@0:ctl
+dir  path=etc group=sys
+dir  path=etc/crypto group=sys
 file path=etc/crypto/kcf.conf group=sys \
     original_name=SUNWckr:etc/crypto/kcf.conf preserve=true
 $(i386_ONLY)file path=etc/mach group=sys original_name=SUNWos86r:etc/mach \
     preserve=true
 file path=etc/name_to_sysnum group=sys \
     original_name=SUNWckr:etc/name_to_sysnum preserve=renameold
+dir  path=etc/sock2path.d group=sys
 file path=etc/sock2path.d/system%2Fkernel group=sys
 file path=etc/system group=sys original_name=SUNWckr:etc/system preserve=true
+dir  path=kernel group=sys
+$(i386_ONLY)dir path=kernel/$(ARCH64) group=sys
 $(i386_ONLY)file path=kernel/$(ARCH64)/genunix group=sys mode=0755
+dir  path=kernel/cc group=sys
+dir  path=kernel/cc/$(ARCH64) group=sys
 file path=kernel/cc/$(ARCH64)/cc_cubic group=sys mode=0755
 file path=kernel/cc/$(ARCH64)/cc_newreno group=sys mode=0755
 file path=kernel/cc/$(ARCH64)/cc_sunreno group=sys mode=0755
+dir  path=kernel/crypto group=sys
+dir  path=kernel/crypto/$(ARCH64) group=sys
 file path=kernel/crypto/$(ARCH64)/aes group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/arcfour group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/blowfish group=sys mode=0755
@@ -326,9 +106,12 @@ file path=kernel/crypto/$(ARCH64)/sha1 group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/sha2 group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/skein group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/swrand group=sys mode=0755
-$(sparc_ONLY)file path=kernel/dacf/$(ARCH64)/consconfig_dacf group=sys \
-    mode=0755
+dir  path=kernel/dacf group=sys
+dir  path=kernel/dacf/$(ARCH64) group=sys
+$(sparc_ONLY)file path=kernel/dacf/$(ARCH64)/consconfig_dacf group=sys mode=0755
 file path=kernel/dacf/$(ARCH64)/net_dacf group=sys mode=0755
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/acpi_drv group=sys
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/acpi_toshiba group=sys
 file path=kernel/drv/$(ARCH64)/aggr group=sys
@@ -493,9 +276,14 @@ file path=kernel/drv/udp6.conf group=sys
 file path=kernel/drv/ufm.conf group=sys
 file path=kernel/drv/vnic.conf group=sys
 file path=kernel/drv/wc.conf group=sys
+dir  path=kernel/exec group=sys
+dir  path=kernel/exec/$(ARCH64) group=sys
 $(sparc_ONLY)file path=kernel/exec/$(ARCH64)/aoutexec group=sys mode=0755
 file path=kernel/exec/$(ARCH64)/elfexec group=sys mode=0755
 file path=kernel/exec/$(ARCH64)/intpexec group=sys mode=0755
+dir  path=kernel/firmware group=sys
+dir  path=kernel/fs group=sys
+dir  path=kernel/fs/$(ARCH64) group=sys
 file path=kernel/fs/$(ARCH64)/autofs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/bootfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/ctfs group=sys mode=0755
@@ -514,18 +302,26 @@ file path=kernel/fs/$(ARCH64)/sockfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/specfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/tmpfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/ufs group=sys mode=0755
+dir  path=kernel/ipp group=sys
+dir  path=kernel/ipp/$(ARCH64) group=sys
 file path=kernel/ipp/$(ARCH64)/ipgpc group=sys mode=0755
+dir  path=kernel/kiconv group=sys
+dir  path=kernel/kiconv/$(ARCH64) group=sys
 file path=kernel/kiconv/$(ARCH64)/kiconv_emea group=sys mode=0755
 file path=kernel/kiconv/$(ARCH64)/kiconv_ja group=sys mode=0755
 file path=kernel/kiconv/$(ARCH64)/kiconv_ko group=sys mode=0755
 file path=kernel/kiconv/$(ARCH64)/kiconv_sc group=sys mode=0755
 file path=kernel/kiconv/$(ARCH64)/kiconv_tc group=sys mode=0755
+dir  path=kernel/mac group=sys
+dir  path=kernel/mac/$(ARCH64) group=sys
 file path=kernel/mac/$(ARCH64)/mac_6to4 group=sys mode=0755
 file path=kernel/mac/$(ARCH64)/mac_ether group=sys mode=0755
 file path=kernel/mac/$(ARCH64)/mac_ib group=sys mode=0755
 file path=kernel/mac/$(ARCH64)/mac_ipv4 group=sys mode=0755
 file path=kernel/mac/$(ARCH64)/mac_ipv6 group=sys mode=0755
 file path=kernel/mac/$(ARCH64)/mac_wifi group=sys mode=0755
+dir  path=kernel/misc group=sys
+dir  path=kernel/misc/$(ARCH64) group=sys
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/acpica group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/bignum group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/bootdev group=sys mode=0755
@@ -536,7 +332,12 @@ file path=kernel/misc/$(ARCH64)/cmlb group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/consconfig group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/ctf group=sys mode=0755
 $(sparc_ONLY)file path=kernel/misc/$(ARCH64)/dada group=sys mode=0755
+link path=kernel/misc/$(ARCH64)/des target=../../../kernel/crypto/$(ARCH64)/des
 file path=kernel/misc/$(ARCH64)/dls group=sys mode=0755
+# Sadly vuid mouse support is in different packages on different platforms
+# While kstat(7D) is in SUNWcs, the structures are general
+hardlink path=kernel/misc/$(ARCH64)/edonr \
+    target=../../../kernel/crypto/$(ARCH64)/edonr
 file path=kernel/misc/$(ARCH64)/fssnap_if group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/gld group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/hook group=sys mode=0755
@@ -549,6 +350,8 @@ file path=kernel/misc/$(ARCH64)/kcf group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/kmdbmod group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/ksocket group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/mac group=sys mode=0755
+hardlink path=kernel/misc/$(ARCH64)/md5 \
+    target=../../../kernel/crypto/$(ARCH64)/md5
 file path=kernel/misc/$(ARCH64)/mii group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/net80211 group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/neti group=sys mode=0755
@@ -560,10 +363,18 @@ file path=kernel/misc/$(ARCH64)/pcmcia group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/rpcsec group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/sata group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/scsi group=sys mode=0755
+hardlink path=kernel/misc/$(ARCH64)/sha1 \
+    target=../../../kernel/crypto/$(ARCH64)/sha1
+hardlink path=kernel/misc/$(ARCH64)/sha2 \
+    target=../../../kernel/crypto/$(ARCH64)/sha2
+hardlink path=kernel/misc/$(ARCH64)/skein \
+    target=../../../kernel/crypto/$(ARCH64)/skein
 file path=kernel/misc/$(ARCH64)/strplumb group=sys mode=0755
 $(sparc_ONLY)file path=kernel/misc/$(ARCH64)/swapgeneric group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/tem group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/tlimod group=sys mode=0755
+dir  path=kernel/misc/scsi_vhci group=sys
+dir  path=kernel/misc/scsi_vhci/$(ARCH64) group=sys
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_asym_emc group=sys \
     mode=0755
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_asym_lsi group=sys \
@@ -577,16 +388,41 @@ file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_tape group=sys mode=0755
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_tpgs group=sys mode=0755
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_tpgs_tape group=sys \
     mode=0755
+dir  path=kernel/sched group=sys
+dir  path=kernel/sched/$(ARCH64) group=sys
 file path=kernel/sched/$(ARCH64)/SDC group=sys mode=0755
 file path=kernel/sched/$(ARCH64)/TS group=sys mode=0755
 file path=kernel/sched/$(ARCH64)/TS_DPTBL group=sys mode=0755
+dir  path=kernel/socketmod group=sys
+dir  path=kernel/socketmod/$(ARCH64) group=sys
+hardlink path=kernel/socketmod/$(ARCH64)/icmp \
+    target=../../../kernel/drv/$(ARCH64)/icmp
 file path=kernel/socketmod/$(ARCH64)/ksslf group=sys mode=0755
+hardlink path=kernel/socketmod/$(ARCH64)/rts \
+    target=../../../kernel/drv/$(ARCH64)/rts
 file path=kernel/socketmod/$(ARCH64)/socksctp group=sys mode=0755
+hardlink path=kernel/socketmod/$(ARCH64)/tcp \
+    target=../../../kernel/drv/$(ARCH64)/tcp
 file path=kernel/socketmod/$(ARCH64)/trill group=sys mode=0755
+hardlink path=kernel/socketmod/$(ARCH64)/udp \
+    target=../../../kernel/drv/$(ARCH64)/udp
+dir  path=kernel/strmod group=sys
+dir  path=kernel/strmod/$(ARCH64) group=sys
+hardlink path=kernel/strmod/$(ARCH64)/arp \
+    target=../../../kernel/drv/$(ARCH64)/arp
 file path=kernel/strmod/$(ARCH64)/bufmod group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/connld group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/dedump group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/drcompat group=sys mode=0755
+hardlink path=kernel/strmod/$(ARCH64)/icmp \
+    target=../../../kernel/drv/$(ARCH64)/icmp
+hardlink path=kernel/strmod/$(ARCH64)/ip target=../../../kernel/drv/$(ARCH64)/ip
+hardlink path=kernel/strmod/$(ARCH64)/ipsecah \
+    target=../../../kernel/drv/$(ARCH64)/ipsecah
+hardlink path=kernel/strmod/$(ARCH64)/ipsecesp \
+    target=../../../kernel/drv/$(ARCH64)/ipsecesp
+hardlink path=kernel/strmod/$(ARCH64)/keysock \
+    target=../../../kernel/drv/$(ARCH64)/keysock
 file path=kernel/strmod/$(ARCH64)/ldterm group=sys mode=0755
 $(sparc_ONLY)file path=kernel/strmod/$(ARCH64)/ms group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/pckt group=sys mode=0755
@@ -595,10 +431,18 @@ file path=kernel/strmod/$(ARCH64)/pipemod group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/ptem group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/redirmod group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/rpcmod group=sys mode=0755
+hardlink path=kernel/strmod/$(ARCH64)/tcp \
+    target=../../../kernel/drv/$(ARCH64)/tcp
 file path=kernel/strmod/$(ARCH64)/timod group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/tirdwr group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/ttcompat group=sys mode=0755
+hardlink path=kernel/strmod/$(ARCH64)/udp \
+    target=../../../kernel/drv/$(ARCH64)/udp
 $(sparc_ONLY)file path=kernel/strmod/$(ARCH64)/vuid3ps2 group=sys mode=0755
+dir  path=kernel/sys group=sys
+dir  path=kernel/sys/$(ARCH64) group=sys
+hardlink path=kernel/sys/$(ARCH64)/autofs \
+    target=../../../kernel/fs/$(ARCH64)/autofs
 file path=kernel/sys/$(ARCH64)/c2audit group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/doorfs group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/inst_sync group=sys mode=0755
@@ -607,60 +451,218 @@ file path=kernel/sys/$(ARCH64)/msgsys group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/pipe group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/portfs group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/pset group=sys mode=0755
+hardlink path=kernel/sys/$(ARCH64)/rpcmod \
+    target=../../../kernel/strmod/$(ARCH64)/rpcmod
 file path=kernel/sys/$(ARCH64)/semsys group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/shmsys group=sys mode=0755
+dir  path=lib
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/system group=sys
 file path=lib/svc/manifest/system/dumpadm.xml group=sys mode=0444
 file path=lib/svc/manifest/system/intrd.xml group=sys mode=0444
 file path=lib/svc/manifest/system/scheduler.xml group=sys mode=0444
+dir  path=lib/svc/method
 file path=lib/svc/method/svc-dumpadm mode=0555
 file path=lib/svc/method/svc-intrd mode=0555
 file path=lib/svc/method/svc-scheduler mode=0555
+dir  path=usr/kernel group=sys
+dir  path=usr/kernel/drv group=sys
+dir  path=usr/kernel/drv/$(ARCH64) group=sys
 file path=usr/kernel/drv/$(ARCH64)/signalfd group=sys
 file path=usr/kernel/drv/signalfd.conf group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 $(sparc_ONLY)file path=usr/share/man/man1m/monitor.1m
 $(sparc_ONLY)file path=usr/share/man/man1m/obpsym.1m
+dir  path=usr/share/man/man2
+dir  path=usr/share/man/man3
+dir  path=usr/share/man/man4
+dir  path=usr/share/man/man5
+dir  path=usr/share/man/man7d
 $(sparc_ONLY)file path=usr/share/man/man7d/dad.7d
 $(i386_ONLY)file path=usr/share/man/man7d/smbios.7d
-# Sadly vuid mouse support is in different packages on different platforms
-# While kstat(7D) is in SUNWcs, the structures are general
-hardlink path=kernel/misc/$(ARCH64)/edonr \
-    target=../../../kernel/crypto/$(ARCH64)/edonr
-hardlink path=kernel/misc/$(ARCH64)/md5 \
-    target=../../../kernel/crypto/$(ARCH64)/md5
-hardlink path=kernel/misc/$(ARCH64)/sha1 \
-    target=../../../kernel/crypto/$(ARCH64)/sha1
-hardlink path=kernel/misc/$(ARCH64)/sha2 \
-    target=../../../kernel/crypto/$(ARCH64)/sha2
-hardlink path=kernel/misc/$(ARCH64)/skein \
-    target=../../../kernel/crypto/$(ARCH64)/skein
-hardlink path=kernel/socketmod/$(ARCH64)/icmp \
-    target=../../../kernel/drv/$(ARCH64)/icmp
-hardlink path=kernel/socketmod/$(ARCH64)/rts \
-    target=../../../kernel/drv/$(ARCH64)/rts
-hardlink path=kernel/socketmod/$(ARCH64)/tcp \
-    target=../../../kernel/drv/$(ARCH64)/tcp
-hardlink path=kernel/socketmod/$(ARCH64)/udp \
-    target=../../../kernel/drv/$(ARCH64)/udp
-hardlink path=kernel/strmod/$(ARCH64)/arp \
-    target=../../../kernel/drv/$(ARCH64)/arp
-hardlink path=kernel/strmod/$(ARCH64)/icmp \
-    target=../../../kernel/drv/$(ARCH64)/icmp
-hardlink path=kernel/strmod/$(ARCH64)/ip \
-    target=../../../kernel/drv/$(ARCH64)/ip
-hardlink path=kernel/strmod/$(ARCH64)/ipsecah \
-    target=../../../kernel/drv/$(ARCH64)/ipsecah
-hardlink path=kernel/strmod/$(ARCH64)/ipsecesp \
-    target=../../../kernel/drv/$(ARCH64)/ipsecesp
-hardlink path=kernel/strmod/$(ARCH64)/keysock \
-    target=../../../kernel/drv/$(ARCH64)/keysock
-hardlink path=kernel/strmod/$(ARCH64)/tcp \
-    target=../../../kernel/drv/$(ARCH64)/tcp
-hardlink path=kernel/strmod/$(ARCH64)/udp \
-    target=../../../kernel/drv/$(ARCH64)/udp
-hardlink path=kernel/sys/$(ARCH64)/autofs \
-    target=../../../kernel/fs/$(ARCH64)/autofs
-hardlink path=kernel/sys/$(ARCH64)/rpcmod \
-    target=../../../kernel/strmod/$(ARCH64)/rpcmod
+dir  path=usr/share/man/man7fs
+dir  path=usr/share/man/man7m
+dir  path=usr/share/man/man7p
+dir  path=usr/share/man/man9
+dir  path=usr/share/man/man9e
+dir  path=usr/share/man/man9f
+dir  path=usr/share/man/man9p
+dir  path=usr/share/man/man9s
+$(i386_ONLY)driver name=acpi_drv perms="* 0666 root sys"
+driver name=aggr perms="* 0666 root sys"
+driver name=arp perms="arp 0666 root sys"
+driver name=bl perms="* 0666 root sys"
+driver name=bridge clone_perms="bridge 0666 root sys" \
+    policy="read_priv_set=net_rawaccess write_priv_set=net_rawaccess"
+driver name=clone
+driver name=cn perms="* 0620 root tty"
+driver name=conskbd perms="kbd 0666 root sys"
+driver name=consms perms="mouse 0666 root sys"
+driver name=cpuid perms="self 0644 root sys"
+$(i386_ONLY)driver name=cpunex alias=cpus
+driver name=crypto perms="crypto 0666 root sys"
+driver name=cryptoadm perms="cryptoadm 0644 root sys"
+$(sparc_ONLY)driver name=dad perms="* 0640 root sys" alias=ide-disk
+driver name=devinfo perms="devinfo 0640 root sys" \
+    perms="devinfo,ro 0444 root sys"
+driver name=dld perms="* 0666 root sys"
+driver name=dlpistub perms="* 0666 root sys"
+$(sparc_ONLY)driver name=i8042 alias=8042
+$(i386_ONLY)driver name=i8042
+driver name=icmp perms="icmp 0666 root sys" \
+    policy="read_priv_set=net_icmpaccess write_priv_set=net_icmpaccess"
+driver name=icmp6 perms="icmp6 0666 root sys" \
+    policy="read_priv_set=net_icmpaccess write_priv_set=net_icmpaccess"
+$(i386_ONLY)driver name=intel_nb5000 \
+    alias=pci8086,25c0 \
+    alias=pci8086,25d0 \
+    alias=pci8086,25d4 \
+    alias=pci8086,25d8 \
+    alias=pci8086,3600 \
+    alias=pci8086,4000 \
+    alias=pci8086,4001 \
+    alias=pci8086,4003 \
+    alias=pci8086,65c0
+$(i386_ONLY)driver name=intel_nhm \
+    alias=pci8086,3423 \
+    alias=pci8086,372a
+$(i386_ONLY)driver name=intel_nhmex alias=pci8086,3438
+driver name=ip perms="ip 0666 root sys" \
+    policy="read_priv_set=net_rawaccess write_priv_set=net_rawaccess"
+driver name=ip6 perms="ip6 0666 root sys" \
+    policy="read_priv_set=net_rawaccess write_priv_set=net_rawaccess"
+driver name=ipnet perms="lo0 0666 root sys" \
+    policy="read_priv_set=net_observability write_priv_set=net_observability"
+driver name=ippctl
+driver name=ipsecah perms="ipsecah 0666 root sys" \
+    policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
+driver name=ipsecesp perms="ipsecesp 0666 root sys" \
+    policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
+driver name=iptun
+driver name=iwscn
+driver name=kb8042 alias=pnpPNP,303
+driver name=keysock perms="keysock 0666 root sys" \
+    policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
+driver name=kmdb
+driver name=kssl perms="* 0666 root sys"
+driver name=llc1 clone_perms="llc1 0666 root sys"
+driver name=lofi perms="* 0600 root sys" perms="ctl 0644 root sys"
+driver name=log perms="conslog 0666 root sys" perms="log 0640 root sys"
+$(i386_ONLY)driver name=mc-amd \
+    alias=pci1022,1100 \
+    alias=pci1022,1101 \
+    alias=pci1022,1102
+driver name=mm perms="allkmem 0600 root sys" perms="full 0666 root sys" \
+    perms="kmem 0640 root sys" perms="mem 0640 root sys" \
+    perms="null 0666 root sys" perms="zero 0666 root sys" \
+    policy="allkmem read_priv_set=all write_priv_set=all" \
+    policy="kmem read_priv_set=none write_priv_set=all" \
+    policy="mem read_priv_set=none write_priv_set=all"
+driver name=mouse8042 alias=pnpPNP,f03
+$(i386_ONLY)driver name=mpt class=scsi \
+    alias=pci1000,30 \
+    alias=pci1000,50 \
+    alias=pci1000,54 \
+    alias=pci1000,56 \
+    alias=pci1000,58 \
+    alias=pci1000,62 \
+    alias=pciex1000,56 \
+    alias=pciex1000,58 \
+    alias=pciex1000,62
+driver name=nulldriver \
+    alias=scsa,nodev \
+    alias=scsa,probe
+driver name=openeepr perms="openprom 0640 root sys" policy=write_priv_set=all
+driver name=options
+$(sparc_ONLY)driver name=pci_pci class=pci \
+    alias=pci1011,1 \
+    alias=pci1011,21 \
+    alias=pci1011,24 \
+    alias=pci1011,25 \
+    alias=pci1011,26 \
+    alias=pci1014,22 \
+    alias=pciclass,060400
+$(i386_ONLY)driver name=pci_pci class=pci \
+    alias=pci1011,1 \
+    alias=pci1011,21 \
+    alias=pci1014,22 \
+    alias=pciclass,060400 \
+    alias=pciclass,060401
+$(sparc_ONLY)driver name=pcieb \
+    alias=pciex108e,9010 \
+    alias=pciex108e,9020 \
+    alias=pciex10b5,8114 \
+    alias=pciex10b5,8516 \
+    alias=pciex10b5,8517 \
+    alias=pciex10b5,8518 \
+    alias=pciex10b5,8532 \
+    alias=pciex10b5,8533 \
+    alias=pciex10b5,8548 \
+    alias=pciexclass,060400
+$(i386_ONLY)driver name=pcieb \
+    alias=pciexclass,060400 \
+    alias=pciexclass,060401
+$(sparc_ONLY)driver name=pcieb_bcm alias=pciex1166,103
+driver name=physmem perms="* 0600 root sys"
+driver name=poll perms="* 0666 root sys"
+$(sparc_ONLY)driver name=power alias=ali1535d+-power
+$(i386_ONLY)driver name=power
+driver name=pseudo alias=zconsnex
+driver name=ptc perms="* 0666 root sys"
+driver name=ptsl perms="* 0666 root sys"
+$(sparc_ONLY)driver name=ramdisk perms="* 0600 root sys" \
+    perms="ctl 0644 root sys" alias=SUNW,ramdisk
+$(i386_ONLY)driver name=ramdisk perms="* 0600 root sys" \
+    perms="ctl 0644 root sys"
+driver name=random perms="* 0644 root sys" policy=write_priv_set=sys_devices
+driver name=rts perms="rts 0666 root sys"
+driver name=sad perms="admin 0666 root sys" perms="user 0666 root sys"
+driver name=scsi_vhci perms="* 0666 root sys" class=scsi-self-identifying \
+    policy="devctl write_priv_set=sys_devices"
+$(sparc_ONLY)driver name=sd perms="* 0640 root sys" \
+    alias=ide-cdrom \
+    alias=scsiclass,00 \
+    alias=scsiclass,05
+$(i386_ONLY)driver name=sd perms="* 0640 root sys" \
+    alias=scsiclass,00 \
+    alias=scsiclass,05
+driver name=sgen perms="* 0600 root sys" \
+    alias=scsa,08.bfcp \
+    alias=scsa,08.bvhci
+driver name=signalfd perms="* 0666 root sys"
+driver name=simnet perms="* 0666 root sys" clone_perms="simnet 0666 root sys"
+$(i386_ONLY)driver name=smbios perms="smbios 0444 root sys"
+driver name=softmac
+driver name=spdsock perms="spdsock 0666 root sys" \
+    policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
+driver name=st perms="* 0666 root sys" alias=scsiclass,01
+driver name=sy perms="tty 0666 root tty"
+driver name=sysevent perms="* 0600 root sys"
+driver name=sysmsg perms="msglog 0600 root sys" perms="sysmsg 0600 root sys"
+driver name=tcp perms="tcp 0666 root sys"
+driver name=tcp6 perms="tcp6 0666 root sys"
+driver name=tl perms="* 0666 root sys" clone_perms="ticlts 0666 root sys" \
+    clone_perms="ticots 0666 root sys" clone_perms="ticotsord 0666 root sys"
+$(i386_ONLY)driver name=tzmon
+$(sparc_ONLY)driver name=uata \
+    alias=pci1095,646 \
+    alias=pci1095,649 \
+    alias=pci1095,680 \
+    alias=pci10b9,5229 \
+    alias=pci10b9,5288 class=dada class=scsi
+$(i386_ONLY)driver name=ucode perms="* 0644 root sys"
+driver name=udp perms="udp 0666 root sys"
+driver name=udp6 perms="udp6 0666 root sys"
+driver name=ufm perms="ufm 0666 root sys"
+$(i386_ONLY)driver name=vgatext \
+    alias=pciclass,000100 \
+    alias=pciclass,030000 \
+    alias=pciclass,030001 \
+    alias=pnpPNP,900
+driver name=vnic perms="* 0666 root sys" clone_perms="vnic 0666 root sys"
+driver name=wc perms="* 0600 root sys"
 legacy pkg=SUNWckr \
     desc="core kernel software for a specific instruction-set architecture" \
     name="Core Solaris Kernel (Root)"
@@ -699,8 +701,3 @@ license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
 $(i386_ONLY)license usr/src/uts/intel/io/acpica/THIRDPARTYLICENSE \
     license=usr/src/uts/intel/io/acpica/THIRDPARTYLICENSE
-$(i386_ONLY)link path=boot/solaris/bin/root_archive \
-    target=../../../usr/sbin/root_archive
-link path=dev/dld target=../devices/pseudo/dld@0:ctl
-link path=kernel/misc/$(ARCH64)/des \
-    target=../../../kernel/crypto/$(ARCH64)/des

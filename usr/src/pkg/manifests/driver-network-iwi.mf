@@ -30,19 +30,21 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/iwi@$(PKGVERS)
-set name=pkg.description \
-    value="Intel Pro. Wirless 802.11a/b/g IPW2200B/G IPW2915A/B/G Driver"
 set name=pkg.summary \
     value="Intel Pro. Wireless 802.11a/b/g IPW2200B/G IPW2915A/B/G Driver"
+set name=pkg.description \
+    value="Intel Pro. Wirless 802.11a/b/g IPW2200B/G IPW2915A/B/G Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=iwi clone_perms="iwi 0666 root sys" perms="* 0666 root sys" \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/iwi group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/iwi.7d
+driver name=iwi perms="* 0666 root sys" clone_perms="iwi 0666 root sys" \
     alias=pci8086,4220 \
     alias=pci8086,4223 \
     alias=pci8086,4223.8086.1000 \
@@ -50,8 +52,6 @@ driver name=iwi clone_perms="iwi 0666 root sys" perms="* 0666 root sys" \
     alias=pci8086,4224 \
     alias=pci8086,4224.8086.1010 \
     alias=pci8086,4224.8086.1011
-file path=kernel/drv/$(ARCH64)/iwi group=sys
-file path=usr/share/man/man7d/iwi.7d
 legacy pkg=SUNWiwi \
     desc="Intel Pro. Wirless 802.11a/b/g IPW2200B/G IPW2915A/B/G Driver" \
     name="Intel Pro. Wireless 802.11a/b/g IPW2200B/G IPW2915A/B/G Driver"

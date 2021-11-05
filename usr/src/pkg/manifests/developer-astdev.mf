@@ -24,26 +24,26 @@
 #
 
 set name=pkg.fmri value=pkg:/developer/astdev@$(PKGVERS)
-set name=pkg.description value="AT&T AST development utilities"
 set name=pkg.summary value="AT&T AST development utilities"
+set name=pkg.description value="AT&T AST development utilities"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Software Management"
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/ast group=sys
-dir path=usr/ast/bin
-dir path=usr/include
-dir path=usr/include/ast
-dir path=usr/lib
-dir path=usr/share/man/man1
+dir  path=usr group=sys
+dir  path=usr/ast group=sys
+dir  path=usr/ast/bin
 file path=usr/ast/bin/msgcc mode=0555
 file path=usr/ast/bin/msgcpp mode=0555
 file path=usr/ast/bin/msgcvt mode=0555
 file path=usr/ast/bin/msggen mode=0555
 file path=usr/ast/bin/msgget mode=0555
+dir  path=usr/include
+dir  path=usr/include/ast
 file path=usr/include/ast/pp.h
 file path=usr/include/ast/ppkey.h
+dir  path=usr/lib
 file path=usr/lib/libpp.so.1
+dir  path=usr/share/man/man1
 file path=usr/share/man/man1/msgcc.1
 file path=usr/share/man/man1/msgcpp.1
 file path=usr/share/man/man1/msgcvt.1

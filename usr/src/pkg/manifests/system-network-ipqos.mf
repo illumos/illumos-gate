@@ -30,32 +30,32 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/network/ipqos@$(PKGVERS)
-set name=pkg.description value="Solaris IP Quality of Service"
 set name=pkg.summary value="IP QoS"
+set name=pkg.description value="Solaris IP Quality of Service"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/include
-dir path=usr/include/ipp
-dir path=usr/include/ipp/dlcosmk
-dir path=usr/include/ipp/dscpmk
-dir path=usr/include/ipp/flowacct
-dir path=usr/include/ipp/meters
-dir path=usr/lib
-dir path=usr/lib/ipqosconf
-dir path=usr/sbin
-dir path=usr/share/man/man1m
+dir  path=usr group=sys
+dir  path=usr/include
+dir  path=usr/include/ipp
+dir  path=usr/include/ipp/dlcosmk
 file path=usr/include/ipp/dlcosmk/dlcosmk.h
+dir  path=usr/include/ipp/dscpmk
 file path=usr/include/ipp/dscpmk/dscpmk.h
+dir  path=usr/include/ipp/flowacct
 file path=usr/include/ipp/flowacct/flowacct.h
+dir  path=usr/include/ipp/meters
 file path=usr/include/ipp/meters/meter.h
+dir  path=usr/lib
+dir  path=usr/lib/ipqosconf
 file path=usr/lib/ipqosconf/dlcosmk.types mode=0444
 file path=usr/lib/ipqosconf/dscpmk.types mode=0444
 file path=usr/lib/ipqosconf/flowacct.types mode=0444
 file path=usr/lib/ipqosconf/ipgpc.types mode=0444
 file path=usr/lib/ipqosconf/tokenmt.types mode=0444
 file path=usr/lib/ipqosconf/tswtclmt.types mode=0444
+dir  path=usr/sbin
 file path=usr/sbin/ipqosconf mode=0755
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/ipqosconf.1m
 legacy pkg=SUNWqosu desc="Solaris IP Quality of Service (Usr)" \
     name="IP QoS, (Usr)"

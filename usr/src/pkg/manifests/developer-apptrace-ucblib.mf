@@ -24,14 +24,14 @@
 #
 
 set name=pkg.fmri value=pkg:/developer/apptrace/ucblib@$(PKGVERS)
+set name=pkg.summary value="Apptrace support objects for ucblib"
 set name=pkg.description \
     value="Apptrace shared objects for UCB compatibility libraries"
-set name=pkg.summary value="Apptrace support objects for ucblib"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/ucblib
+dir  path=usr group=sys
+dir  path=usr/ucblib
 legacy pkg=SUNWucbt \
     desc="Apptrace shared objects for UCB compatibility libraries" \
     name="Apptrace support objects for ucblib"

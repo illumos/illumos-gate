@@ -30,21 +30,20 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/fcoe@$(PKGVERS)
+set name=pkg.summary value="Sun FCoE Transport Driver"
 set name=pkg.description \
     value="Sun FCoE (Fibre Channel over Ethernet) Transport Driver"
-set name=pkg.summary value="Sun FCoE Transport Driver"
-set name=info.classification \
-    value=org.opensolaris.category.2008:Drivers/Storage
+set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=fcoe perms="* 0600 root sys"
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/fcoe group=sys
 file path=kernel/drv/fcoe.conf group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
 file path=usr/share/man/man7d/fcoe.7d
+driver name=fcoe perms="* 0600 root sys"
 legacy pkg=SUNWfcoe \
     desc="Sun FCoE (Fibre Channel over Ethernet) Transport Driver" \
     name="Sun FCoE Transport Driver"

@@ -24,15 +24,15 @@
 #
 
 set name=pkg.fmri value=pkg:/network/netcat@$(PKGVERS)
-set name=pkg.description value="Netcat Command"
 set name=pkg.summary value="Netcat Command"
+set name=pkg.description value="Netcat Command"
 set name=info.classification \
     value=org.opensolaris.category.2008:Applications/Internet
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/bin
-dir path=usr/share/man/man1
+dir  path=usr group=sys
+dir  path=usr/bin
 file path=usr/bin/nc mode=0555
+dir  path=usr/share/man/man1
 file path=usr/share/man/man1/nc.1
 legacy pkg=SUNWnetcat desc="Netcat Command" name="Netcat Command"
 license usr/src/cmd/cmd-inet/usr.bin/nc/THIRDPARTYLICENSE \

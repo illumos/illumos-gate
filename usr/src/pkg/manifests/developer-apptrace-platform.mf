@@ -25,59 +25,59 @@
 #
 
 set name=pkg.fmri value=pkg:/developer/apptrace/platform@$(PKGVERS)
-set name=pkg.description value="Apptrace processor specific shared objects"
 set name=pkg.summary value="Platform specific apptrace support"
+set name=pkg.description value="Apptrace processor specific shared objects"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=sparc
-dir path=usr group=sys
-dir path=usr/platform group=sys
-dir path=usr/platform/SUNW,A70 group=sys
-dir path=usr/platform/SUNW,A70/lib
-dir path=usr/platform/SUNW,Netra-CP3010 group=sys
-dir path=usr/platform/SUNW,Netra-CP3010/lib
-dir path=usr/platform/SUNW,Netra-T12 group=sys
-dir path=usr/platform/SUNW,Netra-T12/lib
-dir path=usr/platform/SUNW,Netra-T4 group=sys
-dir path=usr/platform/SUNW,Netra-T4/lib
-dir path=usr/platform/SUNW,Sun-Blade-100 group=sys
-dir path=usr/platform/SUNW,Sun-Blade-100/lib
-dir path=usr/platform/SUNW,Sun-Blade-1000 group=sys
-dir path=usr/platform/SUNW,Sun-Blade-1000/lib
-dir path=usr/platform/SUNW,Sun-Blade-1500 group=sys
-dir path=usr/platform/SUNW,Sun-Blade-1500/lib
-dir path=usr/platform/SUNW,Sun-Blade-2500 group=sys
-dir path=usr/platform/SUNW,Sun-Blade-2500/lib
-dir path=usr/platform/SUNW,Sun-Fire group=sys
-dir path=usr/platform/SUNW,Sun-Fire-280R group=sys
-dir path=usr/platform/SUNW,Sun-Fire-280R/lib
-dir path=usr/platform/SUNW,Sun-Fire-480R group=sys
-dir path=usr/platform/SUNW,Sun-Fire-480R/lib
-dir path=usr/platform/SUNW,Sun-Fire-880 group=sys
-dir path=usr/platform/SUNW,Sun-Fire-880/lib
-dir path=usr/platform/SUNW,Sun-Fire-V215 group=sys
-dir path=usr/platform/SUNW,Sun-Fire-V215/lib
-dir path=usr/platform/SUNW,Sun-Fire-V240 group=sys
-dir path=usr/platform/SUNW,Sun-Fire-V240/lib
-dir path=usr/platform/SUNW,Sun-Fire-V250 group=sys
-dir path=usr/platform/SUNW,Sun-Fire-V250/lib
-dir path=usr/platform/SUNW,Sun-Fire-V440 group=sys
-dir path=usr/platform/SUNW,Sun-Fire-V440/lib
-dir path=usr/platform/SUNW,Sun-Fire-V445 group=sys
-dir path=usr/platform/SUNW,Sun-Fire-V445/lib
-dir path=usr/platform/SUNW,Sun-Fire-V490 group=sys
-dir path=usr/platform/SUNW,Sun-Fire-V490/lib
-dir path=usr/platform/SUNW,Sun-Fire-V890 group=sys
-dir path=usr/platform/SUNW,Sun-Fire-V890/lib
-dir path=usr/platform/SUNW,Sun-Fire/lib
-dir path=usr/platform/SUNW,Ultra-2 group=sys
-dir path=usr/platform/SUNW,Ultra-2/lib
-dir path=usr/platform/SUNW,Ultra-250 group=sys
-dir path=usr/platform/SUNW,Ultra-250/lib
-dir path=usr/platform/SUNW,Ultra-4 group=sys
-dir path=usr/platform/SUNW,Ultra-4/lib
-dir path=usr/platform/SUNW,Ultra-Enterprise group=sys
-dir path=usr/platform/SUNW,Ultra-Enterprise/lib
+dir  path=usr group=sys
+dir  path=usr/platform group=sys
+dir  path=usr/platform/SUNW,A70 group=sys
+dir  path=usr/platform/SUNW,A70/lib
+dir  path=usr/platform/SUNW,Netra-CP3010 group=sys
+dir  path=usr/platform/SUNW,Netra-CP3010/lib
+dir  path=usr/platform/SUNW,Netra-T12 group=sys
+dir  path=usr/platform/SUNW,Netra-T12/lib
+dir  path=usr/platform/SUNW,Netra-T4 group=sys
+dir  path=usr/platform/SUNW,Netra-T4/lib
+dir  path=usr/platform/SUNW,Sun-Blade-100 group=sys
+dir  path=usr/platform/SUNW,Sun-Blade-100/lib
+dir  path=usr/platform/SUNW,Sun-Blade-1000 group=sys
+dir  path=usr/platform/SUNW,Sun-Blade-1000/lib
+dir  path=usr/platform/SUNW,Sun-Blade-1500 group=sys
+dir  path=usr/platform/SUNW,Sun-Blade-1500/lib
+dir  path=usr/platform/SUNW,Sun-Blade-2500 group=sys
+dir  path=usr/platform/SUNW,Sun-Blade-2500/lib
+dir  path=usr/platform/SUNW,Sun-Fire group=sys
+dir  path=usr/platform/SUNW,Sun-Fire-280R group=sys
+dir  path=usr/platform/SUNW,Sun-Fire-280R/lib
+dir  path=usr/platform/SUNW,Sun-Fire-480R group=sys
+dir  path=usr/platform/SUNW,Sun-Fire-480R/lib
+dir  path=usr/platform/SUNW,Sun-Fire-880 group=sys
+dir  path=usr/platform/SUNW,Sun-Fire-880/lib
+dir  path=usr/platform/SUNW,Sun-Fire-V215 group=sys
+dir  path=usr/platform/SUNW,Sun-Fire-V215/lib
+dir  path=usr/platform/SUNW,Sun-Fire-V240 group=sys
+dir  path=usr/platform/SUNW,Sun-Fire-V240/lib
+dir  path=usr/platform/SUNW,Sun-Fire-V250 group=sys
+dir  path=usr/platform/SUNW,Sun-Fire-V250/lib
+dir  path=usr/platform/SUNW,Sun-Fire-V440 group=sys
+dir  path=usr/platform/SUNW,Sun-Fire-V440/lib
+dir  path=usr/platform/SUNW,Sun-Fire-V445 group=sys
+dir  path=usr/platform/SUNW,Sun-Fire-V445/lib
+dir  path=usr/platform/SUNW,Sun-Fire-V490 group=sys
+dir  path=usr/platform/SUNW,Sun-Fire-V490/lib
+dir  path=usr/platform/SUNW,Sun-Fire-V890 group=sys
+dir  path=usr/platform/SUNW,Sun-Fire-V890/lib
+dir  path=usr/platform/SUNW,Sun-Fire/lib
+dir  path=usr/platform/SUNW,Ultra-2 group=sys
+dir  path=usr/platform/SUNW,Ultra-2/lib
+dir  path=usr/platform/SUNW,Ultra-250 group=sys
+dir  path=usr/platform/SUNW,Ultra-250/lib
+dir  path=usr/platform/SUNW,Ultra-4 group=sys
+dir  path=usr/platform/SUNW,Ultra-4/lib
+dir  path=usr/platform/SUNW,Ultra-Enterprise group=sys
+dir  path=usr/platform/SUNW,Ultra-Enterprise/lib
 legacy pkg=SUNWpstl.u arch=$(ARCH).sun4u \
     desc="Apptrace processor specific shared objects" \
     name="Platform specific apptrace support"

@@ -20,53 +20,19 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/iwn@$(PKGVERS)
-set name=pkg.description \
-    value="Intel(R) WiFi Link 4965 and 100/1000/2000/5000/6000 series driver"
 set name=pkg.summary \
+    value="Intel(R) WiFi Link 4965 and 100/1000/2000/5000/6000 series driver"
+set name=pkg.description \
     value="Intel(R) WiFi Link 4965 and 100/1000/2000/5000/6000 series driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=kernel/firmware group=sys
-dir path=kernel/firmware/iwn group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=iwn clone_perms="iwn 0666 root sys" perms="* 0666 root sys" \
-    alias=pciex8086,422b \
-    alias=pciex8086,422c \
-    alias=pciex8086,4236 \
-    alias=pciex8086,4238 \
-    alias=pciex8086,4239 \
-    alias=pciex8086,82 \
-    alias=pciex8086,83 \
-    alias=pciex8086,84 \
-    alias=pciex8086,85 \
-    alias=pciex8086,87 \
-    alias=pciex8086,887 \
-    alias=pciex8086,888 \
-    alias=pciex8086,88e \
-    alias=pciex8086,88f \
-    alias=pciex8086,89 \
-    alias=pciex8086,890 \
-    alias=pciex8086,891 \
-    alias=pciex8086,892 \
-    alias=pciex8086,893 \
-    alias=pciex8086,894 \
-    alias=pciex8086,895 \
-    alias=pciex8086,896 \
-    alias=pciex8086,897 \
-    alias=pciex8086,8a \
-    alias=pciex8086,8ae \
-    alias=pciex8086,8af \
-    alias=pciex8086,8b \
-    alias=pciex8086,8d \
-    alias=pciex8086,8e \
-    alias=pciex8086,90 \
-    alias=pciex8086,91
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/iwn group=sys
+dir  path=kernel/firmware group=sys
+dir  path=kernel/firmware/iwn group=sys
 file path=kernel/firmware/iwn/iwlwifi-100-5.ucode
 file path=kernel/firmware/iwn/iwlwifi-1000-3.ucode
 file path=kernel/firmware/iwn/iwlwifi-105-6.ucode
@@ -80,7 +46,41 @@ file path=kernel/firmware/iwn/iwlwifi-6000-4.ucode
 file path=kernel/firmware/iwn/iwlwifi-6000g2a-6.ucode
 file path=kernel/firmware/iwn/iwlwifi-6000g2b-6.ucode
 file path=kernel/firmware/iwn/iwlwifi-6050-5.ucode
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
 file path=usr/share/man/man7d/iwn.7d
+driver name=iwn perms="* 0666 root sys" clone_perms="iwn 0666 root sys" \
+    alias=pciex8086,82 \
+    alias=pciex8086,83 \
+    alias=pciex8086,84 \
+    alias=pciex8086,85 \
+    alias=pciex8086,87 \
+    alias=pciex8086,89 \
+    alias=pciex8086,8a \
+    alias=pciex8086,8b \
+    alias=pciex8086,8d \
+    alias=pciex8086,8e \
+    alias=pciex8086,90 \
+    alias=pciex8086,91 \
+    alias=pciex8086,887 \
+    alias=pciex8086,888 \
+    alias=pciex8086,88e \
+    alias=pciex8086,88f \
+    alias=pciex8086,890 \
+    alias=pciex8086,891 \
+    alias=pciex8086,892 \
+    alias=pciex8086,893 \
+    alias=pciex8086,894 \
+    alias=pciex8086,895 \
+    alias=pciex8086,896 \
+    alias=pciex8086,897 \
+    alias=pciex8086,8ae \
+    alias=pciex8086,8af \
+    alias=pciex8086,422b \
+    alias=pciex8086,422c \
+    alias=pciex8086,4236 \
+    alias=pciex8086,4238 \
+    alias=pciex8086,4239
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/io/iwn/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/iwn/THIRDPARTYLICENSE

@@ -274,7 +274,7 @@ export PKGARCHIVE="${CODEMGR_WS}/packages/${MACH}/nightly"
 # export PKGPUBLISHER_REDIST='on-redist'
 
 # Package manifest format version.
-export PKGFMT_OUTPUT='v1'
+export PKGFMT_OUTPUT='v2'
 
 # we want make to do as much as it can, just in case there's more than
 # one problem.
@@ -300,7 +300,7 @@ export SPRO_VROOT="$SPRO_ROOT"
 # if the 'N' option is not specified, is to run this test.
 #CHECK_PATHS='y'
 
-if [[ "$ENABLE_SMATCH" = "1" ]]; then
+if [[ "$ENABLE_SMATCH" == "1" ]]; then
 	SMATCHBIN=$CODEMGR_WS/usr/src/tools/proto/root_$MACH-nd/opt/onbld/bin/$MACH/smatch
 	export SHADOW_CCS="$SHADOW_CCS smatch,$SMATCHBIN,smatch"
 fi

@@ -24,7 +24,6 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-set name=pkg.fmri \
-    value=pkg:/service/network/dhcp/datastore/binfiles@$(PKGVERS)
+set name=pkg.fmri value=pkg:/service/network/dhcp/datastore/binfiles@$(PKGVERS)
 set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)

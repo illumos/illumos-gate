@@ -30,15 +30,14 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/kernel/rsmops@$(PKGVERS)
+set name=pkg.summary value="RSMPI Operations Registration Module"
 set name=pkg.description \
     value="Support for network specific implementations of RSMPI"
-set name=pkg.summary value="RSMPI Operations Registration Module"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/misc group=sys
-dir path=kernel/misc/$(ARCH64) group=sys
+dir  path=kernel group=sys
+dir  path=kernel/misc group=sys
+dir  path=kernel/misc/$(ARCH64) group=sys
 file path=kernel/misc/$(ARCH64)/rsmops group=sys mode=0755
 legacy pkg=SUNWrsmo \
     desc="Support for network specific implementations of RSMPI" \

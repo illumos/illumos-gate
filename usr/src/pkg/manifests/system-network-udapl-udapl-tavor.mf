@@ -30,32 +30,31 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/network/udapl/udapl-tavor@$(PKGVERS)
-set name=pkg.description value="Sun uDAPL provider for Tavor"
 set name=pkg.summary value="Sun uDAPL for Tavor (User)"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.description value="Sun uDAPL provider for Tavor"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys
-dir path=etc/init.d group=sys
-dir path=etc/rc2.d group=sys
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/share
-dir path=usr/share/dat group=sys
-driver name=daplt perms="* 0644 root sys"
+dir  path=etc group=sys
+dir  path=etc/init.d group=sys
 file path=etc/init.d/dodatadm.udaplt group=sys mode=0744 \
     original_name=SUNWudaplt:etc/init.d/dodatadm.udaplt preserve=true
-file path=kernel/drv/$(ARCH64)/daplt group=sys
-file path=kernel/drv/daplt.conf group=sys
-file path=usr/lib/$(ARCH64)/udapl_tavor.so.1
-file path=usr/lib/udapl_tavor.so.1
-file path=usr/share/dat/SUNWudaplt.conf group=sys mode=0644
+dir  path=etc/rc2.d group=sys
 hardlink path=etc/rc2.d/S81dodatadm.udaplt \
     target=../../etc/init.d/dodatadm.udaplt
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/daplt group=sys
+file path=kernel/drv/daplt.conf group=sys
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+file path=usr/lib/$(ARCH64)/udapl_tavor.so.1
+file path=usr/lib/udapl_tavor.so.1
+dir  path=usr/share
+dir  path=usr/share/dat group=sys
+file path=usr/share/dat/SUNWudaplt.conf group=sys mode=0644
+driver name=daplt perms="* 0644 root sys"
 legacy pkg=SUNWudapltr \
     desc="Sun uDAPL provider for Tavor driver and registration script" \
     name="Sun uDAPL for Tavor (Root)"

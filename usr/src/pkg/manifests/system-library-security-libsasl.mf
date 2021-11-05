@@ -25,24 +25,22 @@
 #
 
 set name=pkg.fmri value=pkg:/system/library/security/libsasl@$(PKGVERS)
-set name=pkg.description \
-    value="Simple Authentication and Security Layer (SASL) v2 shared library and plugins"
 set name=pkg.summary \
+    value="Simple Authentication and Security Layer (SASL) v2 shared library and plugins"
+set name=pkg.description \
     value="Simple Authentication and Security Layer (SASL) v2 shared library and plugins"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/lib/sasl
-dir path=usr/lib/sasl/$(ARCH64)
-dir path=usr/share/man
-dir path=usr/share/man/man3lib
-dir path=usr/share/man/man3sasl
-dir path=usr/share/man/man4
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libsasl.so target=libsasl.so.1
 file path=usr/lib/$(ARCH64)/libsasl.so.1
+link path=usr/lib/libsasl.so target=libsasl.so.1
 file path=usr/lib/libsasl.so.1
+dir  path=usr/lib/sasl
+dir  path=usr/lib/sasl/$(ARCH64)
 file path=usr/lib/sasl/$(ARCH64)/crammd5.so.1
 file path=usr/lib/sasl/$(ARCH64)/digestmd5.so.1
 file path=usr/lib/sasl/$(ARCH64)/login.so.1
@@ -51,7 +49,21 @@ file path=usr/lib/sasl/crammd5.so.1
 file path=usr/lib/sasl/digestmd5.so.1
 file path=usr/lib/sasl/login.so.1
 file path=usr/lib/sasl/plain.so.1
+dir  path=usr/share/man
+dir  path=usr/share/man/man3lib
 file path=usr/share/man/man3lib/libsasl.3lib
+dir  path=usr/share/man/man3sasl
+link path=usr/share/man/man3sasl/prop_clear.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_dispose.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_dup.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_erase.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_format.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_get.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_getnames.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_new.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_request.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_set.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_setvals.3sasl target=sasl_auxprop.3sasl
 file path=usr/share/man/man3sasl/sasl_authorize_t.3sasl
 file path=usr/share/man/man3sasl/sasl_auxprop.3sasl
 file path=usr/share/man/man3sasl/sasl_auxprop_add_plugin.3sasl
@@ -74,6 +86,7 @@ file path=usr/share/man/man3sasl/sasl_dispose.3sasl
 file path=usr/share/man/man3sasl/sasl_done.3sasl
 file path=usr/share/man/man3sasl/sasl_encode.3sasl
 file path=usr/share/man/man3sasl/sasl_encode64.3sasl
+link path=usr/share/man/man3sasl/sasl_encodev.3sasl target=sasl_encode.3sasl
 file path=usr/share/man/man3sasl/sasl_erasebuffer.3sasl
 file path=usr/share/man/man3sasl/sasl_errdetail.3sasl
 file path=usr/share/man/man3sasl/sasl_errors.3sasl
@@ -105,6 +118,7 @@ file path=usr/share/man/man3sasl/sasl_setprop.3sasl
 file path=usr/share/man/man3sasl/sasl_utf8verify.3sasl
 file path=usr/share/man/man3sasl/sasl_verifyfile_t.3sasl
 file path=usr/share/man/man3sasl/sasl_version.3sasl
+dir  path=usr/share/man/man4
 file path=usr/share/man/man4/sasl_appname.conf.4
 legacy pkg=SUNWlibsasl \
     desc="Simple Authentication and Security Layer (SASL) v2 shared library and plugins" \
@@ -112,17 +126,3 @@ legacy pkg=SUNWlibsasl \
 license cr_Sun license=cr_Sun
 license usr/src/lib/libsasl/THIRDPARTYLICENSE \
     license=usr/src/lib/libsasl/THIRDPARTYLICENSE
-link path=usr/lib/$(ARCH64)/libsasl.so target=libsasl.so.1
-link path=usr/lib/libsasl.so target=libsasl.so.1
-link path=usr/share/man/man3sasl/prop_clear.3sasl target=sasl_auxprop.3sasl
-link path=usr/share/man/man3sasl/prop_dispose.3sasl target=sasl_auxprop.3sasl
-link path=usr/share/man/man3sasl/prop_dup.3sasl target=sasl_auxprop.3sasl
-link path=usr/share/man/man3sasl/prop_erase.3sasl target=sasl_auxprop.3sasl
-link path=usr/share/man/man3sasl/prop_format.3sasl target=sasl_auxprop.3sasl
-link path=usr/share/man/man3sasl/prop_get.3sasl target=sasl_auxprop.3sasl
-link path=usr/share/man/man3sasl/prop_getnames.3sasl target=sasl_auxprop.3sasl
-link path=usr/share/man/man3sasl/prop_new.3sasl target=sasl_auxprop.3sasl
-link path=usr/share/man/man3sasl/prop_request.3sasl target=sasl_auxprop.3sasl
-link path=usr/share/man/man3sasl/prop_set.3sasl target=sasl_auxprop.3sasl
-link path=usr/share/man/man3sasl/prop_setvals.3sasl target=sasl_auxprop.3sasl
-link path=usr/share/man/man3sasl/sasl_encodev.3sasl target=sasl_encode.3sasl

@@ -24,15 +24,25 @@
 #
 
 set name=pkg.fmri value=pkg:/system/library/iconv/xsh4/latin@$(PKGVERS)
-set name=pkg.description value="XSH4 conversion for ISO Latin character sets"
 set name=pkg.summary value="XSH4 conversion for ISO Latin character sets"
+set name=pkg.description value="XSH4 conversion for ISO Latin character sets"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Text Tools"
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/iconv
-dir path=usr/lib/iconv/$(ARCH64)
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/iconv
+dir  path=usr/lib/iconv/$(ARCH64)
 file path=usr/lib/iconv/$(ARCH64)/646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-15.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-2.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-4.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-5.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-6.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-7.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-8.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-9.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%CP1251.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%KOI8-R.so target=646%8859-1.so
 file path=usr/lib/iconv/$(ARCH64)/646da%8859-1.so
 file path=usr/lib/iconv/$(ARCH64)/646de%8859-1.so
 file path=usr/lib/iconv/$(ARCH64)/646en%8859-1.so
@@ -101,6 +111,16 @@ file path=usr/lib/iconv/$(ARCH64)/maz%CP1250.so
 file path=usr/lib/iconv/$(ARCH64)/maz%CP852.so
 file path=usr/lib/iconv/$(ARCH64)/maz%dhn.so
 file path=usr/lib/iconv/646%8859-1.so
+link path=usr/lib/iconv/646%8859-15.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-2.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-4.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-5.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-6.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-7.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-8.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-9.so target=646%8859-1.so
+link path=usr/lib/iconv/646%CP1251.so target=646%8859-1.so
+link path=usr/lib/iconv/646%KOI8-R.so target=646%8859-1.so
 file path=usr/lib/iconv/646da%8859-1.so
 file path=usr/lib/iconv/646de%8859-1.so
 file path=usr/lib/iconv/646en%8859-1.so
@@ -173,23 +193,3 @@ legacy pkg=SUNWisolc category=system \
     name="XSH4 conversion for ISO Latin character sets" version=1.0,REV=
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/iconv/$(ARCH64)/646%8859-15.so target=646%8859-1.so
-link path=usr/lib/iconv/$(ARCH64)/646%8859-2.so target=646%8859-1.so
-link path=usr/lib/iconv/$(ARCH64)/646%8859-4.so target=646%8859-1.so
-link path=usr/lib/iconv/$(ARCH64)/646%8859-5.so target=646%8859-1.so
-link path=usr/lib/iconv/$(ARCH64)/646%8859-6.so target=646%8859-1.so
-link path=usr/lib/iconv/$(ARCH64)/646%8859-7.so target=646%8859-1.so
-link path=usr/lib/iconv/$(ARCH64)/646%8859-8.so target=646%8859-1.so
-link path=usr/lib/iconv/$(ARCH64)/646%8859-9.so target=646%8859-1.so
-link path=usr/lib/iconv/$(ARCH64)/646%CP1251.so target=646%8859-1.so
-link path=usr/lib/iconv/$(ARCH64)/646%KOI8-R.so target=646%8859-1.so
-link path=usr/lib/iconv/646%8859-15.so target=646%8859-1.so
-link path=usr/lib/iconv/646%8859-2.so target=646%8859-1.so
-link path=usr/lib/iconv/646%8859-4.so target=646%8859-1.so
-link path=usr/lib/iconv/646%8859-5.so target=646%8859-1.so
-link path=usr/lib/iconv/646%8859-6.so target=646%8859-1.so
-link path=usr/lib/iconv/646%8859-7.so target=646%8859-1.so
-link path=usr/lib/iconv/646%8859-8.so target=646%8859-1.so
-link path=usr/lib/iconv/646%8859-9.so target=646%8859-1.so
-link path=usr/lib/iconv/646%CP1251.so target=646%8859-1.so
-link path=usr/lib/iconv/646%KOI8-R.so target=646%8859-1.so

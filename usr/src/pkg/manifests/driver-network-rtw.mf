@@ -30,20 +30,20 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/rtw@$(PKGVERS)
-set name=pkg.description value="realtek 8180L 802.11b driver"
 set name=pkg.summary value="realtek 8180L 802.11b driver"
+set name=pkg.description value="realtek 8180L 802.11b driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=rtw alias=pci10ec,8180 clone_perms="rtw 0666 root sys" \
-    perms="* 0666 root sys"
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/rtw group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
 file path=usr/share/man/man7d/rtw.7d
+driver name=rtw perms="* 0666 root sys" clone_perms="rtw 0666 root sys" \
+    alias=pci10ec,8180
 legacy pkg=SUNWrtw desc="realtek 8180L 802.11b driver" \
     name="realtek 8180L 802.11b driver"
 license usr/src/uts/common/io/rtw/THIRDPARTYLICENSE \

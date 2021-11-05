@@ -31,37 +31,38 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/service/storage/ndmp@$(PKGVERS)
+set name=pkg.summary value="Network Data Management Protocol Service (User)"
 set name=pkg.description \
     value="Network Data Management Protocol Service (user components)"
-set name=pkg.summary value="Network Data Management Protocol Service (User)"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Services
+set name=info.classification value=org.opensolaris.category.2008:System/Services
 set name=variant.arch value=$(ARCH)
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/system group=sys
-dir path=lib/svc/method
-dir path=usr group=sys
-dir path=usr/include
-dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/lib/ndmp
-dir path=usr/sbin
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man4
+dir  path=lib
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/system group=sys
 file path=lib/svc/manifest/system/ndmp.xml group=sys mode=0444
+dir  path=lib/svc/method
 file path=lib/svc/method/svc-ndmp mode=0555
+dir  path=usr group=sys
+dir  path=usr/include
 file path=usr/include/libndmp.h
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libndmp.so target=libndmp.so.1
 file path=usr/lib/$(ARCH64)/libndmp.so.1
+link path=usr/lib/libndmp.so target=libndmp.so.1
 file path=usr/lib/libndmp.so.1
+dir  path=usr/lib/ndmp
 file path=usr/lib/ndmp/ndmpd mode=0555
+dir  path=usr/sbin
 file path=usr/sbin/ndmpadm mode=0555
 file path=usr/sbin/ndmpstat mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/ndmpadm.1m
 file path=usr/share/man/man1m/ndmpd.1m
 file path=usr/share/man/man1m/ndmpstat.1m
+dir  path=usr/share/man/man4
 file path=usr/share/man/man4/ndmp.4
 legacy pkg=SUNWndmpr \
     desc="Network Data Management Protocol Service (root components)" \
@@ -73,5 +74,3 @@ license cr_Sun license=cr_Sun
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble
 license usr/src/cmd/ndmpd/LICENSE license=usr/src/cmd/ndmpd/LICENSE
-link path=usr/lib/$(ARCH64)/libndmp.so target=libndmp.so.1
-link path=usr/lib/libndmp.so target=libndmp.so.1

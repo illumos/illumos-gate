@@ -31,29 +31,29 @@
 <include global_zone_only_component>
 set name=pkg.fmri \
     value=pkg:/system/domain-configuration/sparc-enterprise@$(PKGVERS)
-set name=pkg.description value="Domain Configuration Server"
 set name=pkg.summary value="Domain Configuration Server"
+set name=pkg.description value="Domain Configuration Server"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=sparc
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/platform group=sys
-dir path=lib/svc/manifest/platform/sun4u group=sys
-dir path=lib/svc/method
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/platform group=sys
-dir path=usr/platform/SUNW,SPARC-Enterprise group=sys
-dir path=usr/platform/SUNW,SPARC-Enterprise/lib
-dir path=usr/platform/SUNW,SPARC-Enterprise/lib/$(ARCH64)
-dir path=usr/share/man/man1m
+dir  path=lib
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/platform group=sys
+dir  path=lib/svc/manifest/platform/sun4u group=sys
 file path=lib/svc/manifest/platform/sun4u/dcs.xml group=sys mode=0444
 file path=lib/svc/manifest/platform/sun4u/oplhpd.xml group=sys mode=0444
+dir  path=lib/svc/method
 file path=lib/svc/method/svc-dcs mode=0555
 file path=lib/svc/method/svc-oplhpd mode=0555
+dir  path=usr group=sys
+dir  path=usr/lib
 file path=usr/lib/dcs mode=0755
+dir  path=usr/platform group=sys
+dir  path=usr/platform/SUNW,SPARC-Enterprise group=sys
+dir  path=usr/platform/SUNW,SPARC-Enterprise/lib
+dir  path=usr/platform/SUNW,SPARC-Enterprise/lib/$(ARCH64)
 file path=usr/platform/SUNW,SPARC-Enterprise/lib/$(ARCH64)/oplhpd mode=0755
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/dcs.1m
 file path=usr/share/man/man1m/oplhpd.1m
 legacy pkg=SUNWdcsr desc="Domain Configuration Server, (Root)" \

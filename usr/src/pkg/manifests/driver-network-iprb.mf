@@ -32,18 +32,20 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/iprb@$(PKGVERS)
-set name=pkg.description value="Intel 8255x Fast Ethernet Driver"
 set name=pkg.summary value="Intel 8255x Fast Ethernet Driver"
+set name=pkg.description value="Intel 8255x Fast Ethernet Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-dir path=etc group=sys
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=iprb clone_perms="iprb 0666 root sys" perms="* 0666 root sys" \
+dir  path=etc group=sys
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/iprb group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/iprb.7d
+driver name=iprb perms="* 0666 root sys" clone_perms="iprb 0666 root sys" \
     alias=pci8086,1029 \
     alias=pci8086,1030 \
     alias=pci8086,1031 \
@@ -61,8 +63,6 @@ driver name=iprb clone_perms="iprb 0666 root sys" perms="* 0666 root sys" \
     alias=pci8086,1229 \
     alias=pci8086,2449 \
     alias=pci8086,27dc
-file path=kernel/drv/$(ARCH64)/iprb group=sys
-file path=usr/share/man/man7d/iprb.7d
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/io/iprb/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/iprb/THIRDPARTYLICENSE

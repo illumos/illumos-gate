@@ -30,17 +30,16 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/ibdma@$(PKGVERS)
-set name=pkg.description value="Sun InfiniBand Device Management Agent"
 set name=pkg.summary value="Sun InfiniBand Device Management Agent"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.description value="Sun InfiniBand Device Management Agent"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/misc group=sys
-dir path=kernel/misc/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
+dir  path=kernel group=sys
+dir  path=kernel/misc group=sys
+dir  path=kernel/misc/$(ARCH64) group=sys
 file path=kernel/misc/$(ARCH64)/ibdma group=sys mode=0755
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
 file path=usr/share/man/man7d/ibdma.7d
 legacy pkg=SUNWibdmar desc="Sun InfiniBand Device Management Agent (Root)" \
     name="Sun InfiniBand Device Management Agent (Root)"

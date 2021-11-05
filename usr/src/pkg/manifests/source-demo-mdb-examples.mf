@@ -24,20 +24,15 @@
 #
 
 set name=pkg.fmri value=pkg:/source/demo/mdb-examples@$(PKGVERS)
+set name=pkg.summary value="Modular Debugger Demo Source"
 set name=pkg.description \
     value="Modular Debugger (MDB) demonstration modules and source code"
-set name=pkg.summary value="Modular Debugger Demo Source"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/demo
-dir path=usr/demo/mdb
-dir path=usr/demo/mdb/amd64
-dir path=usr/demo/mdb/common
-dir path=usr/demo/mdb/i386
-dir path=usr/demo/mdb/sparc
-dir path=usr/demo/mdb/sparcv9
+dir  path=usr group=sys
+dir  path=usr/demo
+dir  path=usr/demo/mdb
 file path=usr/demo/mdb/Makefile
 file path=usr/demo/mdb/Makefile.amd64
 file path=usr/demo/mdb/Makefile.common
@@ -45,8 +40,13 @@ file path=usr/demo/mdb/Makefile.i386
 file path=usr/demo/mdb/Makefile.sparc
 file path=usr/demo/mdb/Makefile.sparcv9
 file path=usr/demo/mdb/README
+dir  path=usr/demo/mdb/amd64
+dir  path=usr/demo/mdb/common
 file path=usr/demo/mdb/common/example1.c
 file path=usr/demo/mdb/common/example2.c
+dir  path=usr/demo/mdb/i386
+dir  path=usr/demo/mdb/sparc
+dir  path=usr/demo/mdb/sparcv9
 legacy pkg=SUNWmdbdm \
     desc="Modular Debugger (MDB) demonstration modules and source code" \
     name="Modular Debugger Demo Source"

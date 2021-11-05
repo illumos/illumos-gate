@@ -30,21 +30,20 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/sdpib@$(PKGVERS)
-set name=pkg.description value="Sun InfiniBand Sockets Direct Protocol"
 set name=pkg.summary value="Sun InfiniBand Sockets Direct Protocol"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.description value="Sun InfiniBand Sockets Direct Protocol"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=kernel/strmod group=sys
-dir path=kernel/strmod/$(ARCH64) group=sys
-driver name=sdpib perms="* 0644 root sys"
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/sdpib group=sys
 file path=kernel/drv/sdpib.conf group=sys
+dir  path=kernel/strmod group=sys
+dir  path=kernel/strmod/$(ARCH64) group=sys
 hardlink path=kernel/strmod/$(ARCH64)/sdpib \
     target=../../../kernel/drv/$(ARCH64)/sdpib
+driver name=sdpib perms="* 0644 root sys"
 legacy pkg=SUNWibsdpib desc="Sun InfiniBand Sockets Direct Protocol" \
     name="Sun InfiniBand Sockets Direct Protocol"
 license cr_Sun license=cr_Sun

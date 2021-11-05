@@ -14,14 +14,14 @@
 #
 
 set name=pkg.fmri value=pkg:/system/test/ksh93@$(PKGVERS)
-set name=pkg.description value="ksh93 unit tests"
 set name=pkg.summary value="AT&T ksh93 test suite"
+set name=pkg.description value="ksh93 unit tests"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
-dir path=opt/ksh93-tests
-dir path=opt/ksh93-tests/tests
+dir  path=opt/ksh93-tests
 file path=opt/ksh93-tests/README.tests
 file path=opt/ksh93-tests/shtests mode=0755
+dir  path=opt/ksh93-tests/tests
 file path=opt/ksh93-tests/tests/alias.sh
 file path=opt/ksh93-tests/tests/append.sh
 file path=opt/ksh93-tests/tests/arith.sh
@@ -75,51 +75,32 @@ file path=opt/ksh93-tests/tests/sun_solaris_command_substitution.sh
 file path=opt/ksh93-tests/tests/sun_solaris_compound_misc.sh
 file path=opt/ksh93-tests/tests/sun_solaris_compound_nameref.sh
 file path=opt/ksh93-tests/tests/sun_solaris_compoundvario.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6687139_command_substitution_exec_redirection_allocation_loop.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6713682_compound_var_bleeds_through_subshell.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6687139_command_substitution_exec_redirection_allocation_loop.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6713682_compound_var_bleeds_through_subshell.sh
 file path=opt/ksh93-tests/tests/sun_solaris_cr_6722134_background_CHLD_trap.sh
 file path=opt/ksh93-tests/tests/sun_solaris_cr_6753538_subshell_leaks_umask.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6754020_weird_square_bracket_expansion.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6763594_command_failure_execs_twice.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6754020_weird_square_bracket_expansion.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6763594_command_failure_execs_twice.sh
 file path=opt/ksh93-tests/tests/sun_solaris_cr_6766246_pattern_matching_bug.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6769332_substitutions_terminate_shell_after_257_iterations.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6777491_lacks_arithmetric_function_iszero.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6769332_substitutions_terminate_shell_after_257_iterations.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6777491_lacks_arithmetric_function_iszero.sh
 file path=opt/ksh93-tests/tests/sun_solaris_cr_6778077_sigthaw_trap.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6789247_printf_hexfloat_rounding.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6800929_large_command_substitution_hang.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6789247_printf_hexfloat_rounding.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6800929_large_command_substitution_hang.sh
 file path=opt/ksh93-tests/tests/sun_solaris_cr_6805792_varmovetest1.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6805794_character_to_wchar_not_working.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6805794_character_to_wchar_not_working.sh
 file path=opt/ksh93-tests/tests/sun_solaris_cr_6805795_negative_zero.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6807179_shellpattern_uses_getpwnam.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6807179_shellpattern_uses_getpwnam.sh
 file path=opt/ksh93-tests/tests/sun_solaris_cr_6835835_builtin_cat_n_broken.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6848486_echo_test_with_test_undefined_executes_test_builtin.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6855875_typeset_hexfloat_has_too_few_digits.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6862121_shbinexec_kernel_module_defunct.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6881017_background_process_in_subshell_hangs_caller.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6887363_shell_sometimes_mishandles_return_value_of_its_child_process.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6904557_wc_no_longer_counts_number_of_bytes_correctly.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6904575_cut_-d_with_multibyte_character_no_longer_works.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6904878_join_-t_no_longer_works_with_multibyte_char_separator.sh
-file \
-    path=opt/ksh93-tests/tests/sun_solaris_cr_6907460_EXIT_trap_handlers_are_sometimes_executed_twice.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6848486_echo_test_with_test_undefined_executes_test_builtin.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6855875_typeset_hexfloat_has_too_few_digits.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6862121_shbinexec_kernel_module_defunct.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6881017_background_process_in_subshell_hangs_caller.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6887363_shell_sometimes_mishandles_return_value_of_its_child_process.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6904557_wc_no_longer_counts_number_of_bytes_correctly.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6904575_cut_-d_with_multibyte_character_no_longer_works.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6904878_join_-t_no_longer_works_with_multibyte_char_separator.sh
+file path=opt/ksh93-tests/tests/sun_solaris_cr_6907460_EXIT_trap_handlers_are_sometimes_executed_twice.sh
 file path=opt/ksh93-tests/tests/sun_solaris_cr_xxxxxxxx_template.sh
 file path=opt/ksh93-tests/tests/sun_solaris_getconf.sh
 file path=opt/ksh93-tests/tests/sun_solaris_local_compound_nameref001.sh

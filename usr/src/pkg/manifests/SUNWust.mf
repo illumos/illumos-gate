@@ -26,4 +26,4 @@
 set name=pkg.fmri value=pkg:/SUNWust@0.5.11,5.11-0.133
 set name=pkg.renamed value=true
 set name=variant.arch value=sparc
-depend fmri=pkg:/system/kernel/cpu/sun4v@0.5.11,5.11-0.133 type=require
+depend type=require fmri=pkg:/system/kernel/cpu/sun4v@0.5.11,5.11-0.133

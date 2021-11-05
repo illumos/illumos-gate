@@ -12,36 +12,28 @@
 # Copyright 2021, Richard Lowe.
 
 set name=pkg.fmri value=pkg:/system/test/elftest@$(PKGVERS)
-set name=pkg.description value="ELF Unit Tests"
 set name=pkg.summary value="ELF Test Suite"
+set name=pkg.description value="ELF Unit Tests"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-dir path=opt/elf-tests
-dir path=opt/elf-tests/bin
-dir path=opt/elf-tests/runfiles
-dir path=opt/elf-tests/tests
-dir path=opt/elf-tests/tests/assert-deflib
-dir path=opt/elf-tests/tests/linker-sets
-dir path=opt/elf-tests/tests/mapfiles
-dir path=opt/elf-tests/tests/mapfiles/assert
-dir path=opt/elf-tests/tests/mapfiles/parser
-dir path=opt/elf-tests/tests/string-merge
-dir path=opt/elf-tests/tests/tls
-dir path=opt/elf-tests/tests/tls/amd64
-dir path=opt/elf-tests/tests/tls/amd64/ie
-dir path=opt/elf-tests/tests/tls/amd64/ld
-dir path=opt/elf-tests/tests/tls/i386
-dir path=opt/elf-tests/tests/tls/i386/ld
+dir  path=opt/elf-tests
 file path=opt/elf-tests/README mode=0444
+dir  path=opt/elf-tests/bin
 file path=opt/elf-tests/bin/elftest mode=0555
+dir  path=opt/elf-tests/runfiles
 file path=opt/elf-tests/runfiles/default.run mode=0444
+dir  path=opt/elf-tests/tests
+dir  path=opt/elf-tests/tests/assert-deflib
 file path=opt/elf-tests/tests/assert-deflib/link.c mode=0444
 file path=opt/elf-tests/tests/assert-deflib/test-deflib mode=0555
+dir  path=opt/elf-tests/tests/linker-sets
 file path=opt/elf-tests/tests/linker-sets/in-use-check mode=0555
 file path=opt/elf-tests/tests/linker-sets/simple mode=0555
 file path=opt/elf-tests/tests/linker-sets/simple-src.c mode=0444
 file path=opt/elf-tests/tests/linker-sets/simple.out mode=0444
+dir  path=opt/elf-tests/tests/mapfiles
+dir  path=opt/elf-tests/tests/mapfiles/assert
 file path=opt/elf-tests/tests/mapfiles/assert/mapfile.alias-with-others \
     mode=0444
 file path=opt/elf-tests/tests/mapfiles/assert/mapfile.circalias mode=0444
@@ -61,11 +53,11 @@ file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongbits2 mode=0444
 file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongscope mode=0444
 file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongsize mode=0444
 file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongtype mode=0444
-file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongtype-alias \
-    mode=0444
+file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongtype-alias mode=0444
 file path=opt/elf-tests/tests/mapfiles/assert/mapfile.wrongtype2 mode=0444
 file path=opt/elf-tests/tests/mapfiles/assert/object.c mode=0444
 file path=opt/elf-tests/tests/mapfiles/assert/test-assert mode=0555
+dir  path=opt/elf-tests/tests/mapfiles/parser
 file path=opt/elf-tests/tests/mapfiles/parser/mapfile.addrsize.good mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/mapfile.addrsize.mult mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/mapfile.addrsize.substring \
@@ -74,8 +66,7 @@ file path=opt/elf-tests/tests/mapfiles/parser/mapfile.addrsize.superstring \
     mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/mapfile.addrsize.wrong mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.good mode=0444
-file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.noterm \
-    mode=0444
+file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.noterm mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.overflow \
     mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.twobegin \
@@ -83,9 +74,13 @@ file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.twobegin \
 file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.wrong mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/object.c mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/test-parser mode=0555
+dir  path=opt/elf-tests/tests/string-merge
 file path=opt/elf-tests/tests/string-merge/simple mode=0555
 file path=opt/elf-tests/tests/string-merge/str1.s mode=0444
 file path=opt/elf-tests/tests/string-merge/str2.s mode=0444
+dir  path=opt/elf-tests/tests/tls
+dir  path=opt/elf-tests/tests/tls/amd64
+dir  path=opt/elf-tests/tests/tls/amd64/ie
 file path=opt/elf-tests/tests/tls/amd64/ie/Makefile.test mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/amd64-ie-test mode=0555
 file path=opt/elf-tests/tests/tls/amd64/ie/style1-func-with-r12.s mode=0444
@@ -96,15 +91,18 @@ file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-badness.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-r12.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-r13.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style2.s mode=0444
+dir  path=opt/elf-tests/tests/tls/amd64/ld
 file path=opt/elf-tests/tests/tls/amd64/ld/Makefile.test mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ld/amd64-ld-test mode=0555
 file path=opt/elf-tests/tests/tls/amd64/ld/ld-with-addend.s mode=0444
+dir  path=opt/elf-tests/tests/tls/i386
+dir  path=opt/elf-tests/tests/tls/i386/ld
 file path=opt/elf-tests/tests/tls/i386/ld/Makefile.test mode=0444
 file path=opt/elf-tests/tests/tls/i386/ld/half-ldm.s mode=0444
 file path=opt/elf-tests/tests/tls/i386/ld/i386-ld-test mode=0555
 license lic_CDDL license=lic_CDDL
 license usr/src/test/elf-tests/THIRDPARTYLICENSE \
     license=usr/src/test/elf-tests/THIRDPARTYLICENSE
-depend fmri=developer/linker type=require
-depend fmri=developer/object-file type=require
-depend fmri=system/test/testrunner type=require
+depend type=require fmri=developer/linker
+depend type=require fmri=developer/object-file
+depend type=require fmri=system/test/testrunner

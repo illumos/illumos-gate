@@ -30,16 +30,19 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/aac@$(PKGVERS)
-set name=pkg.description \
-    value="Adaptec AdvanceRaid Controller SCSI HBA Driver"
 set name=pkg.summary value="Adaptec AdvanceRaid Controller SCSI HBA Driver"
+set name=pkg.description value="Adaptec AdvanceRaid Controller SCSI HBA Driver"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Ports
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/aac group=sys
+file path=kernel/drv/aac.conf group=sys \
+    original_name=SUNWaac:kernel/drv/aac.conf preserve=true
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/aac.7d
 driver name=aac class=scsi \
     alias=pci1028,3 \
     alias=pci1028,a \
@@ -47,10 +50,6 @@ driver name=aac class=scsi \
     alias=pci9005,286 \
     alias=pciex9005,285 \
     alias=pciex9005,286
-file path=kernel/drv/$(ARCH64)/aac group=sys
-file path=kernel/drv/aac.conf group=sys \
-    original_name=SUNWaac:kernel/drv/aac.conf preserve=true
-file path=usr/share/man/man7d/aac.7d
 legacy pkg=SUNWaac desc="Adaptec AdvanceRaid Controller SCSI HBA Driver" \
     name="Adaptec AdvanceRaid Controller SCSI HBA Driver"
 license cr_Sun license=cr_Sun

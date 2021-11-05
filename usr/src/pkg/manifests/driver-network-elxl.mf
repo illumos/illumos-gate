@@ -31,17 +31,19 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/elxl@$(PKGVERS)
-set name=pkg.description value="3Com Etherlink XL Ethernet Driver"
 set name=pkg.summary value="3Com Etherlink XL Ethernet Driver"
+set name=pkg.description value="3Com Etherlink XL Ethernet Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=elxl clone_perms="elxl 0666 root sys" perms="* 0666 root sys" \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/elxl group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/elxl.7d
+driver name=elxl perms="* 0666 root sys" clone_perms="elxl 0666 root sys" \
     alias=pci10b7,9000 \
     alias=pci10b7,9001 \
     alias=pci10b7,9004 \
@@ -57,8 +59,6 @@ driver name=elxl clone_perms="elxl 0666 root sys" perms="* 0666 root sys" \
     alias=pci10b7,9202 \
     alias=pci10b7,9800 \
     alias=pci10b7,9805
-file path=kernel/drv/$(ARCH64)/elxl group=sys
-file path=usr/share/man/man7d/elxl.7d
 legacy pkg=SUNWelxl desc="3Com Etherlink XL Ethernet Driver" \
     name="3Com Etherlink XL Ethernet Driver"
 license usr/src/uts/common/io/elxl/THIRDPARTYLICENSE \

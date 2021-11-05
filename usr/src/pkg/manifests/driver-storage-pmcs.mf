@@ -30,32 +30,31 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/pmcs@$(PKGVERS)
-set name=pkg.description value="PMC-Sierra SAS-2 HBA Driver"
 set name=pkg.summary value="PMC-Sierra SAS-2 HBA driver"
-set name=info.classification \
-    value=org.opensolaris.category.2008:Drivers/Storage
+set name=pkg.description value="PMC-Sierra SAS-2 HBA Driver"
+set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=kernel/kmdb group=sys
-dir path=kernel/kmdb/$(ARCH64) group=sys
-dir path=kernel/misc group=sys
-dir path=kernel/misc/pmcs group=sys
-dir path=kernel/misc/pmcs/$(ARCH64) group=sys
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/mdb group=sys
-dir path=usr/lib/mdb/kvm group=sys
-dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
-driver name=pmcs alias=pciex11f8,8001 class=scsi-self-identifying \
-    perms="* 0600 root sys"
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/pmcs group=sys
 file path=kernel/drv/pmcs.conf group=sys \
     original_name=SUNWpmcs:kernel/drv/pmcs.conf preserve=true
+dir  path=kernel/kmdb group=sys
+dir  path=kernel/kmdb/$(ARCH64) group=sys
 file path=kernel/kmdb/$(ARCH64)/pmcs group=sys mode=0555
+dir  path=kernel/misc group=sys
+dir  path=kernel/misc/pmcs group=sys
+dir  path=kernel/misc/pmcs/$(ARCH64) group=sys
 file path=kernel/misc/pmcs/$(ARCH64)/pmcs8001fw group=sys mode=0755
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/mdb group=sys
+dir  path=usr/lib/mdb/kvm group=sys
+dir  path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 file path=usr/lib/mdb/kvm/$(ARCH64)/pmcs.so group=sys mode=0555
+driver name=pmcs perms="* 0600 root sys" class=scsi-self-identifying \
+    alias=pciex11f8,8001
 legacy pkg=SUNWpmcsr desc="PMC-Sierra SAS-2 HBA Driver (root)" \
     name="PMC-Sierra SAS-2 HBA driver (root)"
 legacy pkg=SUNWpmcsu desc="PMC-Sierra SAS-2 HBA driver (usr)" \

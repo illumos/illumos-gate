@@ -30,20 +30,18 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/network/spdadm@$(PKGVERS)
+set name=pkg.summary value="Sun InfiniBand pseudo Sockets Direct Protocol Admin"
 set name=pkg.description value="Sun InfiniBand Sockets Direct Protocol Admin"
-set name=pkg.summary \
-    value="Sun InfiniBand pseudo Sockets Direct Protocol Admin"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/rcm
-dir path=usr/lib/rcm/scripts
-dir path=usr/sbin
-dir path=usr/share/man/man1m
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/rcm
+dir  path=usr/lib/rcm/scripts
 file path=usr/lib/rcm/scripts/SUNW,ibsdpu.sh mode=0555
+dir  path=usr/sbin
 file path=usr/sbin/sdpadm mode=0555
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/sdpadm.1m
 legacy pkg=SUNWibsdpu desc="Sun InfiniBand Sockets Direct Protocol Admin" \
     name="Sun InfiniBand pseudo Sockets Direct Protocol Admin"

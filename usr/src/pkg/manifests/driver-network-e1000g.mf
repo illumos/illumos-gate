@@ -30,17 +30,27 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/e1000g@$(PKGVERS)
-set name=pkg.description value="Intel(R) PRO/1000 Server Adapter Driver"
 set name=pkg.summary value="Intel(R) PRO/1000 Server Adapter Driver"
+set name=pkg.description value="Intel(R) PRO/1000 Server Adapter Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=e1000g clone_perms="e1000g 0666 root sys" perms="* 0666 root sys" \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/e1000g group=sys
+file path=kernel/drv/e1000g.conf group=sys \
+    original_name=SUNWintgige:kernel/drv/e1000g.conf preserve=renamenew
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/e1000g.7d
+driver name=e1000g perms="* 0666 root sys" clone_perms="e1000g 0666 root sys" \
+    alias=pci8086,d4c,p \
+    alias=pci8086,d4d,p \
+    alias=pci8086,d4e,p \
+    alias=pci8086,d4f,p \
+    alias=pci8086,d53,p \
+    alias=pci8086,d55,p \
     alias=pci8086,1000 \
     alias=pci8086,1001 \
     alias=pci8086,1004.0e11.49 \
@@ -167,13 +177,13 @@ driver name=e1000g clone_perms="e1000g 0666 root sys" perms="* 0666 root sys" \
     alias=pci8086,15fb,p \
     alias=pci8086,15fc,p \
     alias=pci8086,294c \
-    alias=pci8086,d4c,p \
-    alias=pci8086,d4d,p \
-    alias=pci8086,d4e,p \
-    alias=pci8086,d4f,p \
-    alias=pci8086,d53,p \
-    alias=pci8086,d55,p \
     alias=pci8086,f0fe \
+    alias=pciex8086,d4c \
+    alias=pciex8086,d4d \
+    alias=pciex8086,d4e \
+    alias=pciex8086,d4f \
+    alias=pciex8086,d53 \
+    alias=pciex8086,d55 \
     alias=pciex8086,1049 \
     alias=pciex8086,104a \
     alias=pciex8086,104b \
@@ -254,17 +264,7 @@ driver name=e1000g clone_perms="e1000g 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,15fb \
     alias=pciex8086,15fc \
     alias=pciex8086,294c \
-    alias=pciex8086,d4c \
-    alias=pciex8086,d4d \
-    alias=pciex8086,d4e \
-    alias=pciex8086,d4f \
-    alias=pciex8086,d53 \
-    alias=pciex8086,d55 \
     alias=pciex8086,f0fe
-file path=kernel/drv/$(ARCH64)/e1000g group=sys
-file path=kernel/drv/e1000g.conf group=sys \
-    original_name=SUNWintgige:kernel/drv/e1000g.conf preserve=renamenew
-file path=usr/share/man/man7d/e1000g.7d
 legacy pkg=SUNWintgige desc="Intel(R) PRO/1000 Server Adapter Driver" \
     name="Intel(R) PRO/1000 Server Adapter Driver"
 license usr/src/uts/common/io/e1000g/THIRDPARTYLICENSE \

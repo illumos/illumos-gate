@@ -30,19 +30,18 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/smp@$(PKGVERS)
-set name=pkg.description \
-    value="Target Driver for Serial SCSI Management Protocol (SMP) Compliant Devices"
 set name=pkg.summary \
     value="Target Driver for Serial SCSI Management Protocol (SMP) Compliant Devices"
-set name=info.classification \
-    value=org.opensolaris.category.2008:Drivers/Storage
+set name=pkg.description \
+    value="Target Driver for Serial SCSI Management Protocol (SMP) Compliant Devices"
+set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-driver name=smp perms="* 0644 root sys"
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/smp group=sys
 file path=kernel/drv/smp.conf group=sys
+driver name=smp perms="* 0644 root sys"
 legacy pkg=SUNWsmpd \
     desc="Target Driver for Serial SCSI Management Protocol (SMP) Compliant Devices" \
     name="Target Driver for Serial SCSI Management Protocol (SMP) Compliant Devices"

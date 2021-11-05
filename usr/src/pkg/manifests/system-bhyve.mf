@@ -25,23 +25,15 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/bhyve@$(PKGVERS)
-set name=pkg.description value="BSD hypervisor"
 set name=pkg.summary value="BSD hypervisor"
+set name=pkg.description value="BSD hypervisor"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Virtualization
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=usr group=sys
-dir path=usr/kernel/drv group=sys
-dir path=usr/kernel/drv/$(ARCH64) group=sys
-dir path=usr/sbin
-dir path=usr/share
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man4
-driver name=ppt
-driver name=viona
-driver name=vmm
+dir  path=kernel group=sys
+dir  path=usr group=sys
+dir  path=usr/kernel/drv group=sys
+dir  path=usr/kernel/drv/$(ARCH64) group=sys
 file path=usr/kernel/drv/$(ARCH64)/ppt
 file path=usr/kernel/drv/$(ARCH64)/viona
 file path=usr/kernel/drv/$(ARCH64)/vmm
@@ -49,16 +41,24 @@ file path=usr/kernel/drv/ppt.conf
 file path=usr/kernel/drv/viona.conf
 file path=usr/kernel/drv/vmm.conf
 file path=usr/lib/rsrvrctl mode=0555
+dir  path=usr/sbin
 file path=usr/sbin/bhyve mode=0555
 file path=usr/sbin/bhyvectl mode=0555
 file path=usr/sbin/pptadm mode=0555
+dir  path=usr/share
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/bhyve.1m
 file path=usr/share/man/man1m/bhyvectl.1m
 file path=usr/share/man/man1m/pptadm.1m
+dir  path=usr/share/man/man4
 file path=usr/share/man/man4/bhyve_config.4
+driver name=ppt
+driver name=viona
+driver name=vmm
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/i86pc/io/vmm/THIRDPARTYLICENSE \
     license=usr/src/uts/i86pc/io/vmm/THIRDPARTYLICENSE
-depend fmri=developer/acpi type=require
-depend fmri=system/bhyve/firmware type=require
-depend fmri=system/library/bhyve type=require
+depend type=require fmri=developer/acpi
+depend type=require fmri=system/bhyve/firmware
+depend type=require fmri=system/library/bhyve

@@ -24,18 +24,18 @@
 #
 
 set name=pkg.fmri value=pkg:/security/bart@$(PKGVERS)
-set name=pkg.description value="Basic Audit Reporting Tool (BART)"
 set name=pkg.summary value="Basic Audit Reporting Tool"
+set name=pkg.description value="Basic Audit Reporting Tool (BART)"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/bin
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man4
+dir  path=usr group=sys
+dir  path=usr/bin
 file path=usr/bin/bart mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/bart.1m
+dir  path=usr/share/man/man4
 file path=usr/share/man/man4/bart_manifest.4
 file path=usr/share/man/man4/bart_rules.4
 legacy pkg=SUNWbart desc="Basic Audit Reporting Tool (BART)" \

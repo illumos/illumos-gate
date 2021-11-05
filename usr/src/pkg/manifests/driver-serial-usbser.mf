@@ -30,14 +30,13 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/serial/usbser@$(PKGVERS)
-set name=pkg.description value="USB generic serial module"
 set name=pkg.summary value="USB generic serial module"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.description value="USB generic serial module"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/misc group=sys
-dir path=kernel/misc/$(ARCH64) group=sys
+dir  path=kernel group=sys
+dir  path=kernel/misc group=sys
+dir  path=kernel/misc/$(ARCH64) group=sys
 file path=kernel/misc/$(ARCH64)/usbser group=sys mode=0755
 legacy pkg=SUNWusbs desc="USB generic serial module" \
     name="USB generic serial module"

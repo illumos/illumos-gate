@@ -32,20 +32,16 @@
 <include global_zone_only_component>
 set name=pkg.fmri \
     value=pkg:/system/boot/loader@1.1,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
-set name=pkg.description value="Boot Loader"
 set name=pkg.summary value="BootForth Boot Loader"
+set name=pkg.description value="Boot Loader"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 $(i386_ONLY)dir path=boot group=sys
+$(i386_ONLY)file path=boot/cdboot group=sys mode=0444
 $(i386_ONLY)dir path=boot/conf.d group=sys
 $(i386_ONLY)dir path=boot/defaults group=sys
-$(i386_ONLY)dir path=boot/forth group=sys
-$(i386_ONLY)dir path=usr/share/man
-$(i386_ONLY)dir path=usr/share/man/man3
-$(i386_ONLY)dir path=usr/share/man/man4
-$(i386_ONLY)dir path=usr/share/man/man5
-$(i386_ONLY)file path=boot/cdboot group=sys mode=0444
 $(i386_ONLY)file path=boot/defaults/loader.conf group=sys mode=0444
+$(i386_ONLY)dir path=boot/forth group=sys
 $(i386_ONLY)file path=boot/forth/beadm.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/beastie.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/brand-illumos.4th group=sys mode=0444
@@ -82,7 +78,11 @@ $(i386_ONLY)file path=boot/loader32.efi group=sys mode=0555
 $(i386_ONLY)file path=boot/loader64.efi group=sys mode=0555
 $(i386_ONLY)file path=boot/pmbr group=sys mode=0444
 $(i386_ONLY)file path=boot/pxeboot group=sys mode=0444
+$(i386_ONLY)dir path=usr/share/man
+$(i386_ONLY)dir path=usr/share/man/man3
+$(i386_ONLY)dir path=usr/share/man/man4
 $(i386_ONLY)file path=usr/share/man/man4/loader.conf.4
+$(i386_ONLY)dir path=usr/share/man/man5
 $(i386_ONLY)file path=usr/share/man/man5/beastie.4th.5
 $(i386_ONLY)file path=usr/share/man/man5/brand.4th.5
 $(i386_ONLY)file path=usr/share/man/man5/check-password.4th.5

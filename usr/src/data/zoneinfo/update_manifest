@@ -92,7 +92,7 @@ echo "+++ Adding new entries to manifest"
 } >> $tmpf1
 
 echo "+++ Formatting manifest"
-pkgfmt -f v1 $tmpf1
+pkgfmt -fv2 $tmpf1
 
 mv $tmpf1 $MANIFEST
 

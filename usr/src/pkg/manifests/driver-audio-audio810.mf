@@ -30,29 +30,33 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/audio/audio810@$(PKGVERS)
+set name=pkg.summary value="SUNW W1100z & W2100z Audio Drivers"
 set name=pkg.description \
     value="SunOS audio device driver for W1100z & W2100z workstations"
-set name=pkg.summary value="SUNW W1100z & W2100z Audio Drivers"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Media
 set name=info.keyword value=audioi810
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/audio810 group=sys
+file path=kernel/drv/audio810.conf group=sys \
+    original_name=SUNWad810:kernel/drv/audio810.conf preserve=true
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/audio810.7d
 driver name=audio810 \
     alias=pci1022,7445 \
     alias=pci1022,746d \
     alias=pci1039,7012 \
-    alias=pci10de,1b1 \
-    alias=pci10de,26b \
     alias=pci10de,3a \
     alias=pci10de,59 \
     alias=pci10de,6a \
     alias=pci10de,8a \
     alias=pci10de,da \
     alias=pci10de,ea \
+    alias=pci10de,1b1 \
+    alias=pci10de,26b \
     alias=pci8086,2415 \
     alias=pci8086,2425 \
     alias=pci8086,2445 \
@@ -64,10 +68,6 @@ driver name=audio810 \
     alias=pci8086,2698 \
     alias=pci8086,27de \
     alias=pci8086,7195
-file path=kernel/drv/$(ARCH64)/audio810 group=sys
-file path=kernel/drv/audio810.conf group=sys \
-    original_name=SUNWad810:kernel/drv/audio810.conf preserve=true
-file path=usr/share/man/man7d/audio810.7d
 legacy pkg=SUNWad810 \
     desc="SunOS audio device driver for W1100z & W2100z workstations" \
     name="SUNW W1100z & W2100z Audio Drivers"

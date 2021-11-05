@@ -30,16 +30,19 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/bnx@$(PKGVERS)
-set name=pkg.description \
-    value="Broadcom NetXtreme II Gigabit Ethernet PCI-X/PCIE Adapter Driver"
 set name=pkg.summary \
     value="Broadcom NetXtreme II Gigabit Ethernet Adapter Driver"
+set name=pkg.description \
+    value="Broadcom NetXtreme II Gigabit Ethernet PCI-X/PCIE Adapter Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/bnx group=sys
+file path=kernel/drv/bnx.conf group=sys \
+    original_name=BRCMbnx:kernel/drv/bnx.conf preserve=renamenew
 driver name=bnx perms="* 0644 root sys" \
     alias=pci14e4,1639 \
     alias=pci14e4,163a \
@@ -49,9 +52,6 @@ driver name=bnx perms="* 0644 root sys" \
     alias=pci14e4,164c \
     alias=pci14e4,16aa \
     alias=pci14e4,16ac
-file path=kernel/drv/$(ARCH64)/bnx group=sys
-file path=kernel/drv/bnx.conf group=sys \
-    original_name=BRCMbnx:kernel/drv/bnx.conf preserve=renamenew
 legacy pkg=BRCMbnx \
     desc="Broadcom NetXtreme II Gigabit Ethernet PCI-X/PCIE Adapter Driver" \
     name="Broadcom NetXtreme II Gigabit Ethernet Adapter Driver" \

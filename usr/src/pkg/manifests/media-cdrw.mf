@@ -24,22 +24,22 @@
 #
 
 set name=pkg.fmri value=pkg:/media/cdrw@$(PKGVERS)
-set name=pkg.description \
-    value="utility for writing to CD-R/RW and DVD{+-}R/RW disks"
 set name=pkg.summary \
+    value="utility for writing to CD-R/RW and DVD{+-}R/RW disks"
+set name=pkg.description \
     value="utility for writing to CD-R/RW and DVD{+-}R/RW disks"
 set name=info.classification value=org.opensolaris.category.2008:System/Media
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/bin
-dir path=usr/lib
-dir path=usr/lib/help
-dir path=usr/lib/help/auths
-dir path=usr/lib/help/auths/locale
-dir path=usr/lib/help/auths/locale/C
-dir path=usr/share/man/man1
+dir  path=usr group=sys
+dir  path=usr/bin
 file path=usr/bin/cdrw mode=4755
+dir  path=usr/lib
+dir  path=usr/lib/help
+dir  path=usr/lib/help/auths
+dir  path=usr/lib/help/auths/locale
+dir  path=usr/lib/help/auths/locale/C
 file path=usr/lib/help/auths/locale/C/DevCDRW.html
+dir  path=usr/share/man/man1
 file path=usr/share/man/man1/cdrw.1
 legacy pkg=SUNWcdrw \
     desc="utility for writing to CD-R/RW and DVD{+-}R/RW disks" \

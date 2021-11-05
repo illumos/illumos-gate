@@ -30,21 +30,21 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/pcn@$(PKGVERS)
-set name=pkg.description value="PCnet Fast Ethernet Network Adapter Driver"
 set name=pkg.summary value="PCnet Ethernet Driver"
+set name=pkg.description value="PCnet Fast Ethernet Network Adapter Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=pcn clone_perms="pcn 0666 root sys" perms="* 0666 root sys" \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/pcn group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/pcn.7d
+driver name=pcn perms="* 0666 root sys" clone_perms="pcn 0666 root sys" \
     alias=pci1022,2000 \
     alias=pci103c,104c
-file path=kernel/drv/$(ARCH64)/pcn group=sys
-file path=usr/share/man/man7d/pcn.7d
 license license_in_headers license=license_in_headers
 license usr/src/uts/common/io/pcn/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/pcn/THIRDPARTYLICENSE

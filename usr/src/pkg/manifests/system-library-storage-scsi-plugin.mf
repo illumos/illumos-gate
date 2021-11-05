@@ -27,5 +27,5 @@ set name=pkg.fmri \
     value=pkg:/system/library/storage/scsi-plugin@0.5.11,5.11-0.134
 set name=pkg.renamed value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=pkg:/system/library/storage/scsi-plugins@0.5.11,5.11-0.134 \
-    type=require
+depend type=require \
+    fmri=pkg:/system/library/storage/scsi-plugins@0.5.11,5.11-0.134

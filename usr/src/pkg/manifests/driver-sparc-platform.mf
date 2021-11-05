@@ -30,24 +30,30 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/sparc/platform@$(PKGVERS)
-set name=pkg.description value="Drivers for the PCI bus"
 set name=pkg.summary value="PCI Drivers"
+set name=pkg.description value="Drivers for the PCI bus"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Ports \
     value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=sparc
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/ecpp group=sys
+file path=kernel/drv/$(ARCH64)/glm group=sys
+file path=kernel/drv/$(ARCH64)/mpt group=sys
+file path=kernel/drv/$(ARCH64)/se group=sys
+file path=kernel/drv/ecpp.conf group=sys
+file path=kernel/drv/mpt.conf group=sys preserve=true
 driver name=ecpp perms="* 0666 root sys" \
     alias=ns87317-ecpp \
     alias=pnpALI,1533,3
 driver name=glm class=scsi \
     alias=pci1000,1 \
-    alias=pci1000,20 \
-    alias=pci1000,21 \
     alias=pci1000,b \
     alias=pci1000,c \
-    alias=pci1000,f
+    alias=pci1000,f \
+    alias=pci1000,20 \
+    alias=pci1000,21
 driver name=mpt class=scsi \
     alias=pci1000,30 \
     alias=pci1000,50 \
@@ -61,12 +67,6 @@ driver name=mpt class=scsi \
 driver name=se perms="[0-7],hdlc 0666 root sys" perms="[a-h] 0666 root sys" \
     perms="[a-h],cu 0600 uucp uucp" perms="ssp 0600 root sys" \
     perms="sspctl 0600 root sys"
-file path=kernel/drv/$(ARCH64)/ecpp group=sys
-file path=kernel/drv/$(ARCH64)/glm group=sys
-file path=kernel/drv/$(ARCH64)/mpt group=sys
-file path=kernel/drv/$(ARCH64)/se group=sys
-file path=kernel/drv/ecpp.conf group=sys
-file path=kernel/drv/mpt.conf group=sys preserve=true
 legacy pkg=SUNWpd desc="Drivers for the PCI bus" name="PCI Drivers"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

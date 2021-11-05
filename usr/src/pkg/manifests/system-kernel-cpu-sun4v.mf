@@ -30,17 +30,15 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/kernel/cpu/sun4v@$(PKGVERS)
-set name=pkg.description value="UltraSPARC-T1 core kernel software"
 set name=pkg.summary value=UltraSPARC-T1
+set name=pkg.description value="UltraSPARC-T1 core kernel software"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=sparc
-dir path=platform group=sys
-dir path=platform/sun4v group=sys
-dir path=platform/sun4v/kernel group=sys
-dir path=platform/sun4v/kernel/cpu group=sys
-dir path=platform/sun4v/kernel/cpu/$(ARCH64) group=sys
-dir path=platform/sun4v/kernel/pcbe group=sys
-dir path=platform/sun4v/kernel/pcbe/$(ARCH64) group=sys
+dir  path=platform group=sys
+dir  path=platform/sun4v group=sys
+dir  path=platform/sun4v/kernel group=sys
+dir  path=platform/sun4v/kernel/cpu group=sys
+dir  path=platform/sun4v/kernel/cpu/$(ARCH64) group=sys
 file path=platform/sun4v/kernel/cpu/$(ARCH64)/SPARC-T3 group=sys mode=0755
 file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T1 group=sys \
     mode=0755
@@ -48,6 +46,8 @@ file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T2 group=sys \
     mode=0755
 file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T2+ group=sys \
     mode=0755
+dir  path=platform/sun4v/kernel/pcbe group=sys
+dir  path=platform/sun4v/kernel/pcbe/$(ARCH64) group=sys
 file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T1 \
     group=sys mode=0755
 file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T2 \

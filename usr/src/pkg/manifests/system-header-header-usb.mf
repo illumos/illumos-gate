@@ -25,34 +25,33 @@
 #
 
 set name=pkg.fmri value=pkg:/system/header/header-usb@$(PKGVERS)
-set name=pkg.description value="USB Headers"
 set name=pkg.summary value="USB Headers"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.description value="USB Headers"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/include
-dir path=usr/include/sys
-dir path=usr/include/sys/usb
-dir path=usr/include/sys/usb/clients
-dir path=usr/include/sys/usb/clients/audio
-dir path=usr/include/sys/usb/clients/hid
-dir path=usr/include/sys/usb/clients/mass_storage
-dir path=usr/include/sys/usb/clients/printer
-dir path=usr/include/sys/usb/clients/usbcdc
-dir path=usr/include/sys/usb/clients/usbinput
-dir path=usr/include/sys/usb/clients/usbinput/usbwcm
-dir path=usr/include/sys/usb/clients/video
-dir path=usr/include/sys/usb/clients/video/usbvc
-dir path=usr/include/sys/usb/hubd
+dir  path=usr group=sys
+dir  path=usr/include
+dir  path=usr/include/sys
+dir  path=usr/include/sys/usb
+dir  path=usr/include/sys/usb/clients
+dir  path=usr/include/sys/usb/clients/audio
 file path=usr/include/sys/usb/clients/audio/usb_audio.h
+dir  path=usr/include/sys/usb/clients/hid
 file path=usr/include/sys/usb/clients/hid/hid.h
+dir  path=usr/include/sys/usb/clients/mass_storage
 file path=usr/include/sys/usb/clients/mass_storage/usb_bulkonly.h
 file path=usr/include/sys/usb/clients/mass_storage/usb_cbi.h
+dir  path=usr/include/sys/usb/clients/printer
 file path=usr/include/sys/usb/clients/printer/usb_printer.h
+dir  path=usr/include/sys/usb/clients/usbcdc
 file path=usr/include/sys/usb/clients/usbcdc/usb_cdc.h
+dir  path=usr/include/sys/usb/clients/usbinput
+dir  path=usr/include/sys/usb/clients/usbinput/usbwcm
 file path=usr/include/sys/usb/clients/usbinput/usbwcm/usbwcm.h
+dir  path=usr/include/sys/usb/clients/video
+dir  path=usr/include/sys/usb/clients/video/usbvc
 file path=usr/include/sys/usb/clients/video/usbvc/usbvc.h
+dir  path=usr/include/sys/usb/hubd
 file path=usr/include/sys/usb/hubd/hub.h
 file path=usr/include/sys/usb/usba.h
 file path=usr/include/sys/usb/usbai.h

@@ -26,16 +26,15 @@
 
 set name=pkg.fmri \
     value=pkg:/system/data/hardware-registry@2021.9.23,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.summary value="Hardware data files"
 set name=pkg.description \
     value="ASCII databases describing various PCI, USB and other hardware"
-set name=pkg.summary value="Hardware data files"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=org.opensolaris.incorp-facet value=true
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/share
-dir path=usr/share/hwdata group=sys
+dir  path=usr group=sys
+dir  path=usr/share
+dir  path=usr/share/hwdata group=sys
 file path=usr/share/hwdata/efi.fixes preserve=renamenew
 file path=usr/share/hwdata/pci.ids
 file path=usr/share/hwdata/usb.ids

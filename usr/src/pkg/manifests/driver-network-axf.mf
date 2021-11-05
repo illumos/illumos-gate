@@ -15,25 +15,19 @@
 
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/axf@$(PKGVERS)
-set name=pkg.description value="ASIX AX88172/772 USB to Fast Ethernet Driver"
 set name=pkg.summary value="ASIX AX88172/772 USB to Fast Ethernet Driver"
+set name=pkg.description value="ASIX AX88172/772 USB to Fast Ethernet Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-driver name=axf clone_perms="axf 0666 root sys" perms="* 0666 root sys" \
-    alias=usb1189,893 \
-    alias=usb13b1,18 \
-    alias=usb1557,7720 \
-    alias=usb1631,6200 \
-    alias=usb2001,1a00 \
-    alias=usb2001,3c05 \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/axf group=sys
+driver name=axf perms="* 0666 root sys" clone_perms="axf 0666 root sys" \
     alias=usb411,3d \
     alias=usb557,2009 \
     alias=usb5ac,1402 \
-    alias=usb6189,182d \
     alias=usb77b,2226 \
     alias=usb7aa,17 \
     alias=usb7b8,420a \
@@ -42,8 +36,14 @@ driver name=axf clone_perms="axf 0666 root sys" perms="* 0666 root sys" \
     alias=usb8dd,90ff \
     alias=usbb95,1720 \
     alias=usbb95,7720 \
-    alias=usbb95,772a
-file path=kernel/drv/$(ARCH64)/axf group=sys
+    alias=usbb95,772a \
+    alias=usb1189,893 \
+    alias=usb13b1,18 \
+    alias=usb1557,7720 \
+    alias=usb1631,6200 \
+    alias=usb2001,1a00 \
+    alias=usb2001,3c05 \
+    alias=usb6189,182d
 license usr/src/uts/common/io/axf/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/axf/THIRDPARTYLICENSE
-depend fmri=driver/usb/usbgem type=require
+depend type=require fmri=driver/usb/usbgem

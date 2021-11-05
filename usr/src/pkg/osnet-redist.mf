@@ -26,9 +26,11 @@
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
-set name=pkg.fmri value=pkg:/consolidation/osnet/osnet-redistributable@$(PKGVERS)
-set name=variant.arch value=$(ARCH)
-set name=pkg.description value="This group package installs all packages from the OS/Net consolidation."
-set name=pkg.linted.opensolaris.manifest001.1 value=True
+set name=pkg.fmri \
+    value=pkg:/consolidation/osnet/osnet-redistributable@$(PKGVERS)
 set name=pkg.summary value="OS/Net consolidation group package"
+set name=pkg.description \
+    value="This group package installs all packages from the OS/Net consolidation."
+set name=pkg.linted.opensolaris.manifest001.1 value=True
+set name=variant.arch value=$(ARCH)
 <include packages.redist.current>

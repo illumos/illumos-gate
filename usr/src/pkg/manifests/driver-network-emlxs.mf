@@ -25,28 +25,35 @@
 #
 
 set name=pkg.fmri value=pkg:/driver/network/emlxs@$(PKGVERS)
-set name=pkg.description \
-    value="Device driver kit for Emulex-Sun FC, FCoE, and NIC adapters"
 set name=pkg.summary \
     value="Emulex-Sun driver kit for Fibre Channel and Converged Network Adapters"
+set name=pkg.description \
+    value="Device driver kit for Emulex-Sun FC, FCoE, and NIC adapters"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking \
     value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=kernel/kmdb group=sys
-dir path=kernel/kmdb/$(ARCH64) group=sys
-dir path=kernel/misc group=sys
-dir path=kernel/misc/emlxs group=sys
-dir path=kernel/misc/emlxs/$(ARCH64) group=sys
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/mdb group=sys
-dir path=usr/lib/mdb/kvm group=sys
-dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
-driver name=emlxs class=fibre-channel perms="* 0666 root sys" \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/emlxs group=sys
+file path=kernel/drv/$(ARCH64)/oce group=sys
+file path=kernel/drv/emlxs.conf group=sys \
+    original_name=SUNWemlxs:kernel/drv/emlxs.conf preserve=true
+dir  path=kernel/kmdb group=sys
+dir  path=kernel/kmdb/$(ARCH64) group=sys
+file path=kernel/kmdb/$(ARCH64)/emlxs group=sys mode=0555
+dir  path=kernel/misc group=sys
+dir  path=kernel/misc/emlxs group=sys
+dir  path=kernel/misc/emlxs/$(ARCH64) group=sys
+file path=kernel/misc/emlxs/$(ARCH64)/emlxs_fw group=sys mode=0755
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/mdb group=sys
+dir  path=usr/lib/mdb/kvm group=sys
+dir  path=usr/lib/mdb/kvm/$(ARCH64) group=sys
+file path=usr/lib/mdb/kvm/$(ARCH64)/emlxs.so group=sys mode=0555
+driver name=emlxs perms="* 0666 root sys" class=fibre-channel \
     alias=lpfs \
     alias=pci10df,f0a5 \
     alias=pci10df,f800 \
@@ -76,13 +83,6 @@ driver name=emlxs class=fibre-channel perms="* 0666 root sys" \
 driver name=oce perms="* 0666 root sys" \
     alias=pciex19a2,700 \
     alias=pciex19a2,710
-file path=kernel/drv/$(ARCH64)/emlxs group=sys
-file path=kernel/drv/$(ARCH64)/oce group=sys
-file path=kernel/drv/emlxs.conf group=sys \
-    original_name=SUNWemlxs:kernel/drv/emlxs.conf preserve=true
-file path=kernel/kmdb/$(ARCH64)/emlxs group=sys mode=0555
-file path=kernel/misc/emlxs/$(ARCH64)/emlxs_fw group=sys mode=0755
-file path=usr/lib/mdb/kvm/$(ARCH64)/emlxs.so group=sys mode=0555
 legacy pkg=SUNWemlxs \
     desc="Device driver kit for Emulex-Sun FC, FCoE, and NIC adapters" \
     name="Emulex-Sun driver kit for Fibre Channel and Converged Network Adapters (root)" \

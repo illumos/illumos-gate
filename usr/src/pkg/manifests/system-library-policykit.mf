@@ -25,25 +25,24 @@
 #
 
 set name=pkg.fmri value=pkg:/system/library/policykit@$(PKGVERS)
+set name=pkg.summary value=PolicyKit
 set name=pkg.description \
     value="Toolkit for controlling privileges (freedesktop.org)"
-set name=pkg.summary value=PolicyKit
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/pkgconfig group=other
-dir path=usr/sbin
-dir path=usr/share/man/man1m
-file path=usr/lib/libpolkit.so.0.0.0
-file path=usr/lib/pkgconfig/polkit.pc
-file path=usr/sbin/polkit-is-privileged mode=0555
-file path=usr/share/man/man1m/polkit-is-privileged.1m
-legacy pkg=SUNWpolkit \
-    desc="Toolkit for controlling privileges (freedesktop.org)" \
-    name=PolicyKit
-license cr_Sun license=cr_Sun
-license usr/src/cmd/hal/LICENSE license=usr/src/cmd/hal/LICENSE
+dir  path=usr group=sys
+dir  path=usr/lib
 link path=usr/lib/libpolkit.so target=./libpolkit.so.0.0.0
 link path=usr/lib/libpolkit.so.0 target=./libpolkit.so.0.0.0
+file path=usr/lib/libpolkit.so.0.0.0
+dir  path=usr/lib/pkgconfig group=other
+file path=usr/lib/pkgconfig/polkit.pc
+dir  path=usr/sbin
+file path=usr/sbin/polkit-is-privileged mode=0555
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/polkit-is-privileged.1m
+legacy pkg=SUNWpolkit \
+    desc="Toolkit for controlling privileges (freedesktop.org)" name=PolicyKit
+license cr_Sun license=cr_Sun
+license usr/src/cmd/hal/LICENSE license=usr/src/cmd/hal/LICENSE

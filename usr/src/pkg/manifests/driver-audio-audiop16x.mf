@@ -30,19 +30,19 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/audio/audiop16x@$(PKGVERS)
+set name=pkg.summary value="Creative P16X Audio Driver"
 set name=pkg.description \
     value="SunOS audio device driver for Creative P16X (EMU10K1X)"
-set name=pkg.summary value="Creative P16X Audio Driver"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Media
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=audiop16x alias=pci1102,6
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/audiop16x group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
 file path=usr/share/man/man7d/audiop16x.7d
+driver name=audiop16x alias=pci1102,6
 legacy pkg=SUNWaudiop16x \
     desc="SunOS audio device driver for Creative P16X (EMU10K1X)" \
     name="Creative P16X Audio Driver"

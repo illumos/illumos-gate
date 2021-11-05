@@ -18,28 +18,18 @@
 #
 
 set name=pkg.fmri value=pkg:/system/test/cryptotest@$(PKGVERS)
-set name=pkg.description value="Miscellaneous KCF/PKCS Unit Tests"
 set name=pkg.summary value="KCF/PKCS Unit Test Suite"
+set name=pkg.description value="Miscellaneous KCF/PKCS Unit Tests"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-dir path=opt/crypto-tests
-dir path=opt/crypto-tests/bin
-dir path=opt/crypto-tests/runfiles
-dir path=opt/crypto-tests/share
-dir path=opt/crypto-tests/tests
-dir path=opt/crypto-tests/tests/aes group=root mode=0755 owner=root
-dir path=opt/crypto-tests/tests/aes/kcf group=root mode=0755 owner=root
-dir path=opt/crypto-tests/tests/aes/pkcs group=root mode=0755 owner=root
-dir path=opt/crypto-tests/tests/digest
-dir path=opt/crypto-tests/tests/digest/kcf
-dir path=opt/crypto-tests/tests/digest/pkcs
-dir path=opt/crypto-tests/tests/hmac
-dir path=opt/crypto-tests/tests/hmac/kcf
-dir path=opt/crypto-tests/tests/hmac/pkcs
+dir  path=opt/crypto-tests
 file path=opt/crypto-tests/README mode=0444
+dir  path=opt/crypto-tests/bin
 file path=opt/crypto-tests/bin/cryptotest mode=0555
+dir  path=opt/crypto-tests/runfiles
 file path=opt/crypto-tests/runfiles/default.run mode=0444
+dir  path=opt/crypto-tests/share
 file path=opt/crypto-tests/share/MD5Msg.rsp mode=0444
 file path=opt/crypto-tests/share/README mode=0444
 file path=opt/crypto-tests/share/SHA1LongMsg.rsp mode=0444
@@ -56,186 +46,195 @@ file path=opt/crypto-tests/share/SHA512_224LongMsg.rsp mode=0444
 file path=opt/crypto-tests/share/SHA512_224ShortMsg.rsp mode=0444
 file path=opt/crypto-tests/share/SHA512_256LongMsg.rsp mode=0444
 file path=opt/crypto-tests/share/SHA512_256ShortMsg.rsp mode=0444
+dir  path=opt/crypto-tests/tests
+dir  path=opt/crypto-tests/tests/aes owner=root group=root mode=0755
+dir  path=opt/crypto-tests/tests/aes/kcf owner=root group=root mode=0755
 file opt/crypto-tests/tests/aes/kcf/aes_cbc_32 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_cbc_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_cbc_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/aes_cbc_64 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_cbc_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_cbc_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/aes_ccm_32 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_ccm_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_ccm_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/aes_ccm_64 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_ccm_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_ccm_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/aes_cmac_32 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_cmac_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_cmac_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/aes_cmac_64 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_cmac_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_cmac_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/aes_ctr_32 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_ctr_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_ctr_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/aes_ctr_64 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_ctr_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_ctr_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/aes_ecb_32 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_ecb_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_ecb_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/aes_ecb_64 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_ecb_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_ecb_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/aes_gcm_32 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_gcm_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_gcm_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/aes_gcm_64 \
-    path=opt/crypto-tests/tests/aes/kcf/aes_gcm_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/aes_gcm_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/kcf/cleanup \
-    path=opt/crypto-tests/tests/aes/kcf/cleanup group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/kcf/cleanup owner=root group=root mode=0555
 file opt/crypto-tests/tests/aes/kcf/setup \
-    path=opt/crypto-tests/tests/aes/kcf/setup group=root mode=0555 owner=root
+    path=opt/crypto-tests/tests/aes/kcf/setup owner=root group=root mode=0555
+dir  path=opt/crypto-tests/tests/aes/pkcs owner=root group=root mode=0755
 file opt/crypto-tests/tests/aes/pkcs/aes_cbc_32 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_cbc_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_cbc_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_cbc_64 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_cbc_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_cbc_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_cbc_pad_32 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_cbc_pad_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_cbc_pad_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_cbc_pad_64 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_cbc_pad_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_cbc_pad_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_ccm_32 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_ccm_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_ccm_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_ccm_64 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_ccm_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_ccm_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_cmac_32 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_cmac_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_cmac_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_cmac_64 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_cmac_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_cmac_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_ctr_32 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_ctr_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_ctr_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_ctr_64 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_ctr_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_ctr_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_ecb_32 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_ecb_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_ecb_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_ecb_64 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_ecb_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_ecb_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_gcm_32 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_gcm_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_gcm_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/aes/pkcs/aes_gcm_64 \
-    path=opt/crypto-tests/tests/aes/pkcs/aes_gcm_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/aes/pkcs/aes_gcm_64 owner=root group=root \
+    mode=0555
+dir  path=opt/crypto-tests/tests/digest
+dir  path=opt/crypto-tests/tests/digest/kcf
 file opt/crypto-tests/tests/digest/kcf/cleanup \
-    path=opt/crypto-tests/tests/digest/kcf/cleanup group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/cleanup owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/kcf/md5_32 \
-    path=opt/crypto-tests/tests/digest/kcf/md5_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/md5_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/kcf/md5_64 \
-    path=opt/crypto-tests/tests/digest/kcf/md5_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/md5_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/kcf/setup \
-    path=opt/crypto-tests/tests/digest/kcf/setup group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/setup owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha1_32 \
-    path=opt/crypto-tests/tests/digest/kcf/sha1_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha1_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha1_64 \
-    path=opt/crypto-tests/tests/digest/kcf/sha1_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha1_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha256_32 \
-    path=opt/crypto-tests/tests/digest/kcf/sha256_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha256_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha256_64 \
-    path=opt/crypto-tests/tests/digest/kcf/sha256_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha256_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha384_32 \
-    path=opt/crypto-tests/tests/digest/kcf/sha384_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha384_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha384_64 \
-    path=opt/crypto-tests/tests/digest/kcf/sha384_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha384_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha512_224_32 \
-    path=opt/crypto-tests/tests/digest/kcf/sha512_224_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha512_224_32 owner=root \
+    group=root mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha512_224_64 \
-    path=opt/crypto-tests/tests/digest/kcf/sha512_224_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha512_224_64 owner=root \
+    group=root mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha512_256_32 \
-    path=opt/crypto-tests/tests/digest/kcf/sha512_256_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha512_256_32 owner=root \
+    group=root mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha512_256_64 \
-    path=opt/crypto-tests/tests/digest/kcf/sha512_256_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha512_256_64 owner=root \
+    group=root mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha512_32 \
-    path=opt/crypto-tests/tests/digest/kcf/sha512_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha512_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/kcf/sha512_64 \
-    path=opt/crypto-tests/tests/digest/kcf/sha512_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/kcf/sha512_64 owner=root group=root \
+    mode=0555
+dir  path=opt/crypto-tests/tests/digest/pkcs
 file opt/crypto-tests/tests/digest/pkcs/md5_32 \
-    path=opt/crypto-tests/tests/digest/pkcs/md5_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/md5_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/pkcs/md5_64 \
-    path=opt/crypto-tests/tests/digest/pkcs/md5_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/md5_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha1_32 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha1_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha1_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha1_64 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha1_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha1_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha256_32 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha256_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha256_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha256_64 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha256_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha256_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha384_32 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha384_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha384_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha384_64 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha384_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha384_64 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha512_224_32 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha512_224_32 group=root \
-    mode=0555 owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha512_224_32 owner=root \
+    group=root mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha512_224_64 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha512_224_64 group=root \
-    mode=0555 owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha512_224_64 owner=root \
+    group=root mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha512_256_32 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha512_256_32 group=root \
-    mode=0555 owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha512_256_32 owner=root \
+    group=root mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha512_256_64 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha512_256_64 group=root \
-    mode=0555 owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha512_256_64 owner=root \
+    group=root mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha512_32 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha512_32 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha512_32 owner=root group=root \
+    mode=0555
 file opt/crypto-tests/tests/digest/pkcs/sha512_64 \
-    path=opt/crypto-tests/tests/digest/pkcs/sha512_64 group=root mode=0555 \
-    owner=root
+    path=opt/crypto-tests/tests/digest/pkcs/sha512_64 owner=root group=root \
+    mode=0555
+dir  path=opt/crypto-tests/tests/hmac
+dir  path=opt/crypto-tests/tests/hmac/kcf
 file path=opt/crypto-tests/tests/hmac/kcf/cleanup mode=0555
 file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha1_32 mode=0555
 file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha1_64 mode=0555
 file path=opt/crypto-tests/tests/hmac/kcf/setup mode=0555
+dir  path=opt/crypto-tests/tests/hmac/pkcs
 file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha1_32 mode=0555
 file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha1_64 mode=0555
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-depend fmri=driver/crypto/dprov type=require
-depend fmri=system/test/testrunner type=require
+depend type=require fmri=driver/crypto/dprov
+depend type=require fmri=system/test/testrunner

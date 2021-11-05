@@ -17,11 +17,11 @@ set name=pkg.summary \
 set name=info.classification \
     value="org.opensolaris.category.2008:Applications/System Utilities"
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/bin
-dir path=usr/share
-dir path=usr/share/man
-dir path=usr/share/man/man1m
+dir  path=usr group=sys
+dir  path=usr/bin
 file path=usr/bin/arcstat mode=0555
+dir  path=usr/share
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/arcstat.1m
 license lic_CDDL license=lic_CDDL

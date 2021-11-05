@@ -30,17 +30,21 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/bnxe@$(PKGVERS)
+set name=pkg.summary value="Broadcom NetXtreme II 10GbE NIC Driver"
 set name=pkg.description \
     value="Broadcom NetXtreme II 10 Gigabit Ethernet PCI-X/PCIE Adapter Driver"
-set name=pkg.summary value="Broadcom NetXtreme II 10GbE NIC Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/bnxe group=sys
+file path=kernel/drv/bnxe.conf group=sys \
+    original_name=BRCMbnxe:kernel/drv/bnxe.conf preserve=renameold
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/bnxe.7d
 driver name=bnxe perms="* 0666 root sys" \
     alias=pci14e4,164e \
     alias=pci14e4,164f \
@@ -58,10 +62,6 @@ driver name=bnxe perms="* 0666 root sys" \
     alias=pciex14e4,16a5 \
     alias=pciex14e4,16ab \
     alias=pciex14e4,16ae
-file path=kernel/drv/$(ARCH64)/bnxe group=sys
-file path=kernel/drv/bnxe.conf group=sys \
-    original_name=BRCMbnxe:kernel/drv/bnxe.conf preserve=renameold
-file path=usr/share/man/man7d/bnxe.7d
 legacy pkg=BRCMbnxe \
     desc="Broadcom NetXtreme II 10 Gigabit Ethernet PCI-X/PCIE Adapter Driver" \
     name="Broadcom NetXtreme II 10GbE NIC Driver" \

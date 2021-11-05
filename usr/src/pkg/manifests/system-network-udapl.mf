@@ -31,28 +31,28 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/network/udapl@$(PKGVERS)
-set name=pkg.description value="Sun DAT registry library and datadm"
 set name=pkg.summary value="Sun User Direct Access Programming Library (User)"
+set name=pkg.description value="Sun DAT registry library and datadm"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys
-dir path=etc/dat group=sys
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/sbin
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man3dat
-dir path=usr/share/man/man3lib
-dir path=usr/share/man/man4
+dir  path=etc group=sys
+dir  path=etc/dat group=sys
 file path=etc/dat/dat.conf group=sys original_name=SUNWudapl:etc/dat/dat.conf \
     preserve=true
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libdat.so target=libdat.so.1
 file path=usr/lib/$(ARCH64)/libdat.so.1
+link path=usr/lib/libdat.so target=libdat.so.1
 file path=usr/lib/libdat.so.1
+dir  path=usr/sbin
 file path=usr/sbin/datadm mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/datadm.1m
+dir  path=usr/share/man/man3dat
 file path=usr/share/man/man3dat/dat_cno_create.3dat
 file path=usr/share/man/man3dat/dat_cno_free.3dat
 file path=usr/share/man/man3dat/dat_cno_modify_agent.3dat
@@ -126,7 +126,9 @@ file path=usr/share/man/man3dat/dat_srq_query.3dat
 file path=usr/share/man/man3dat/dat_srq_resize.3dat
 file path=usr/share/man/man3dat/dat_srq_set_lw.3dat
 file path=usr/share/man/man3dat/dat_strerror.3dat
+dir  path=usr/share/man/man3lib
 file path=usr/share/man/man3lib/libdat.3lib
+dir  path=usr/share/man/man4
 file path=usr/share/man/man4/dat.conf.4
 legacy pkg=SUNWudaplr desc="DAT static registry file" \
     name="Sun User Direct Access Programming Library (Root)"
@@ -134,5 +136,3 @@ legacy pkg=SUNWudaplu desc="Sun DAT registry library and datadm" \
     name="Sun User Direct Access Programming Library (User)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/$(ARCH64)/libdat.so target=libdat.so.1
-link path=usr/lib/libdat.so target=libdat.so.1

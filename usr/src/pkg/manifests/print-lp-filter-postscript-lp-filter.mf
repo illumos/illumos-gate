@@ -24,17 +24,15 @@
 #
 
 set name=pkg.fmri value=pkg:/print/lp/filter/postscript-lp-filter@$(PKGVERS)
+set name=pkg.summary value="PostScript filters -"
 set name=pkg.description \
     value="client configuration files and utilities for the print service"
-set name=pkg.summary value="PostScript filters -"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Printing
+set name=info.classification value=org.opensolaris.category.2008:System/Printing
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/lp group=lp
-dir path=usr/lib/lp/postscript group=lp
-dir path=usr/share/man/man1
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/lp group=lp
+dir  path=usr/lib/lp/postscript group=lp
 file path=usr/lib/lp/postscript/aps.ps group=lp mode=0555
 file path=usr/lib/lp/postscript/banner.ps group=lp mode=0555
 file path=usr/lib/lp/postscript/baseline.ps group=lp mode=0555
@@ -51,6 +49,7 @@ file path=usr/lib/lp/postscript/postprint group=lp mode=0555
 file path=usr/lib/lp/postscript/postprint.ps group=lp mode=0555
 file path=usr/lib/lp/postscript/postreverse group=lp mode=0555
 file path=usr/lib/lp/postscript/ps.requests group=lp mode=0555
+dir  path=usr/share/man/man1
 file path=usr/share/man/man1/download.1
 file path=usr/share/man/man1/dpost.1
 file path=usr/share/man/man1/postio.1

@@ -30,27 +30,27 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/ath@$(PKGVERS)
-set name=pkg.description value="Atheros AR52xx 802.11b/g Wireless NIC Driver"
 set name=pkg.summary value="Atheros 802.11b/g Wireless NIC Driver"
+set name=pkg.description value="Atheros AR52xx 802.11b/g Wireless NIC Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=ath clone_perms="ath 0666 root sys" perms="* 0666 root sys" \
-    alias=pci168c,1014 \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/ath group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/ath.7d
+driver name=ath perms="* 0666 root sys" clone_perms="ath 0666 root sys" \
     alias=pci168c,12 \
     alias=pci168c,13 \
     alias=pci168c,1a \
     alias=pci168c,1b \
     alias=pci168c,23 \
+    alias=pci168c,1014 \
     alias=pciex168c,1c \
     alias=pciex168c,24
-file path=kernel/drv/$(ARCH64)/ath group=sys
-file path=usr/share/man/man7d/ath.7d
 legacy pkg=SUNWatheros desc="Atheros AR52xx 802.11b/g Wireless NIC Driver" \
     name="Atheros 802.11b/g Wireless NIC Driver"
 license cr_Sun license=cr_Sun

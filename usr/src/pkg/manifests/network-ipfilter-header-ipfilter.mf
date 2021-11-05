@@ -30,14 +30,14 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/network/ipfilter/header-ipfilter@$(PKGVERS)
-set name=pkg.description value="C header files for IP Filter"
 set name=pkg.summary value="IP Filter header files"
+set name=pkg.description value="C header files for IP Filter"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/include
-dir path=usr/include/netinet
+dir  path=usr group=sys
+dir  path=usr/include
+dir  path=usr/include/netinet
 file path=usr/include/netinet/ip_auth.h
 file path=usr/include/netinet/ip_compat.h
 file path=usr/include/netinet/ip_fil.h

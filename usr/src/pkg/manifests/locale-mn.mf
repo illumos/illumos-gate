@@ -13,39 +13,39 @@
 #
 
 set name=pkg.fmri value=pkg:/locale/mn@$(PKGVERS)
-set name=pkg.description value="Mongolian language support"
 set name=pkg.summary value="Mongolian language support"
+set name=pkg.description value="Mongolian language support"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Localizations
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/locale
-dir path=usr/lib/locale/mn_CN.UTF-8
-dir path=usr/lib/locale/mn_CN.UTF-8/LC_COLLATE
-dir path=usr/lib/locale/mn_CN.UTF-8/LC_CTYPE
-dir path=usr/lib/locale/mn_CN.UTF-8/LC_MESSAGES
-dir path=usr/lib/locale/mn_CN.UTF-8/LC_MONETARY
-dir path=usr/lib/locale/mn_CN.UTF-8/LC_NUMERIC
-dir path=usr/lib/locale/mn_CN.UTF-8/LC_TIME
-dir path=usr/lib/locale/mn_MN.UTF-8
-dir path=usr/lib/locale/mn_MN.UTF-8/LC_COLLATE
-dir path=usr/lib/locale/mn_MN.UTF-8/LC_CTYPE
-dir path=usr/lib/locale/mn_MN.UTF-8/LC_MESSAGES
-dir path=usr/lib/locale/mn_MN.UTF-8/LC_MONETARY
-dir path=usr/lib/locale/mn_MN.UTF-8/LC_NUMERIC
-dir path=usr/lib/locale/mn_MN.UTF-8/LC_TIME
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/locale
+dir  path=usr/lib/locale/mn_CN.UTF-8
+dir  path=usr/lib/locale/mn_CN.UTF-8/LC_COLLATE
 file path=usr/lib/locale/mn_CN.UTF-8/LC_COLLATE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/mn_CN.UTF-8/LC_CTYPE
 file path=usr/lib/locale/mn_CN.UTF-8/LC_CTYPE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/mn_CN.UTF-8/LC_MESSAGES
 file path=usr/lib/locale/mn_CN.UTF-8/LC_MESSAGES/LCL_DATA mode=0444
+dir  path=usr/lib/locale/mn_CN.UTF-8/LC_MONETARY
 file path=usr/lib/locale/mn_CN.UTF-8/LC_MONETARY/LCL_DATA mode=0444
+dir  path=usr/lib/locale/mn_CN.UTF-8/LC_NUMERIC
 file path=usr/lib/locale/mn_CN.UTF-8/LC_NUMERIC/LCL_DATA mode=0444
+dir  path=usr/lib/locale/mn_CN.UTF-8/LC_TIME
 file path=usr/lib/locale/mn_CN.UTF-8/LC_TIME/LCL_DATA mode=0444
+dir  path=usr/lib/locale/mn_MN.UTF-8
+dir  path=usr/lib/locale/mn_MN.UTF-8/LC_COLLATE
 file path=usr/lib/locale/mn_MN.UTF-8/LC_COLLATE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/mn_MN.UTF-8/LC_CTYPE
 file path=usr/lib/locale/mn_MN.UTF-8/LC_CTYPE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/mn_MN.UTF-8/LC_MESSAGES
 file path=usr/lib/locale/mn_MN.UTF-8/LC_MESSAGES/LCL_DATA mode=0444
+dir  path=usr/lib/locale/mn_MN.UTF-8/LC_MONETARY
 file path=usr/lib/locale/mn_MN.UTF-8/LC_MONETARY/LCL_DATA mode=0444
+dir  path=usr/lib/locale/mn_MN.UTF-8/LC_NUMERIC
 file path=usr/lib/locale/mn_MN.UTF-8/LC_NUMERIC/LCL_DATA mode=0444
+dir  path=usr/lib/locale/mn_MN.UTF-8/LC_TIME
 file path=usr/lib/locale/mn_MN.UTF-8/LC_TIME/LCL_DATA mode=0444
 license lic_CDDL license=lic_CDDL
 license usr/src/data/locale/data/THIRDPARTYLICENSE \

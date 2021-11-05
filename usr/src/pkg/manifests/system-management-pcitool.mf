@@ -30,19 +30,18 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/management/pcitool@$(PKGVERS)
+set name=pkg.summary value="Administrative tools to modify the pci/pcie fabric"
 set name=pkg.description \
-    value="Administrative tools to modify the pci/pcie fabric"
-set name=pkg.summary \
     value="Administrative tools to modify the pci/pcie fabric"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/sbin
-dir path=usr/share
-dir path=usr/share/man
-dir path=usr/share/man/man1m
+dir  path=usr group=sys
+dir  path=usr/sbin
 file path=usr/sbin/pcitool mode=0555
+dir  path=usr/share
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/pcitool.1m
 legacy pkg=SUNWio-tools \
     desc="Administrative tools to modify the pci/pcie fabric" \

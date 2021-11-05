@@ -25,25 +25,14 @@
 #
 
 set name=pkg.fmri value=pkg:/source/demo/system@$(PKGVERS)
+set name=pkg.summary value="OS demo source"
 set name=pkg.description \
     value="Source code to demonstrate the use of OS interfaces: ELF"
-set name=pkg.summary value="OS demo source"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/demo
-dir path=usr/demo/ELF
-dir path=usr/demo/libexacct
-dir path=usr/demo/librtld_db
-dir path=usr/demo/librtld_db/amd64
-dir path=usr/demo/librtld_db/common
-dir path=usr/demo/librtld_db/i386
-dir path=usr/demo/librtld_db/sparc
-dir path=usr/demo/librtld_db/sparcv9
-dir path=usr/demo/librtld_db/tests
-dir path=usr/demo/link_audit
-dir path=usr/demo/link_audit/man
-dir path=usr/demo/link_audit/src
+dir  path=usr group=sys
+dir  path=usr/demo
+dir  path=usr/demo/ELF
 file path=usr/demo/ELF/00README
 file path=usr/demo/ELF/Makefile
 file path=usr/demo/ELF/acom.c
@@ -51,15 +40,19 @@ file path=usr/demo/ELF/dcom.c
 file path=usr/demo/ELF/dispsyms.c
 file path=usr/demo/ELF/pcom.c
 file path=usr/demo/ELF/tpcom.c
+dir  path=usr/demo/libexacct
 file path=usr/demo/libexacct/Makefile
 file path=usr/demo/libexacct/README
 file path=usr/demo/libexacct/exdump.c
+dir  path=usr/demo/librtld_db
 file path=usr/demo/librtld_db/00README
 file path=usr/demo/librtld_db/Makefile.com
 file path=usr/demo/librtld_db/Makefile.targ
+dir  path=usr/demo/librtld_db/amd64
 file path=usr/demo/librtld_db/amd64/Makefile
 file path=usr/demo/librtld_db/amd64/rdb_mach.h
 file path=usr/demo/librtld_db/amd64/regs.c
+dir  path=usr/demo/librtld_db/common
 file path=usr/demo/librtld_db/common/bpt.c
 file path=usr/demo/librtld_db/common/callstack.c
 file path=usr/demo/librtld_db/common/dis.c
@@ -76,18 +69,22 @@ file path=usr/demo/librtld_db/common/rdb.h
 file path=usr/demo/librtld_db/common/rdb.man
 file path=usr/demo/librtld_db/common/syms.c
 file path=usr/demo/librtld_db/common/utils.c
+dir  path=usr/demo/librtld_db/i386
 file path=usr/demo/librtld_db/i386/Makefile
 file path=usr/demo/librtld_db/i386/m_utils.c
 file path=usr/demo/librtld_db/i386/rdb_mach.h
 file path=usr/demo/librtld_db/i386/regs.c
+dir  path=usr/demo/librtld_db/sparc
 file path=usr/demo/librtld_db/sparc/Makefile
 file path=usr/demo/librtld_db/sparc/m_utils.c
 file path=usr/demo/librtld_db/sparc/rdb_mach.h
 file path=usr/demo/librtld_db/sparc/regs.c
+dir  path=usr/demo/librtld_db/sparcv9
 file path=usr/demo/librtld_db/sparcv9/Makefile
 file path=usr/demo/librtld_db/sparcv9/m_utils.c
 file path=usr/demo/librtld_db/sparcv9/rdb_mach.h
 file path=usr/demo/librtld_db/sparcv9/regs.c
+dir  path=usr/demo/librtld_db/tests
 file path=usr/demo/librtld_db/tests/breaks
 file path=usr/demo/librtld_db/tests/loadmaps
 file path=usr/demo/librtld_db/tests/object_padding_maps
@@ -96,11 +93,14 @@ file path=usr/demo/librtld_db/tests/simp.c
 file path=usr/demo/librtld_db/tests/steps
 file path=usr/demo/librtld_db/tests/sub.c
 file path=usr/demo/librtld_db/tests/test-sparc-regs
+dir  path=usr/demo/link_audit
 file path=usr/demo/link_audit/00README
 file path=usr/demo/link_audit/Makefile
+dir  path=usr/demo/link_audit/man
 file path=usr/demo/link_audit/man/dumpbind.man
 file path=usr/demo/link_audit/man/perfcnt.man
 file path=usr/demo/link_audit/man/symbindrep.man
+dir  path=usr/demo/link_audit/src
 file path=usr/demo/link_audit/src/bindings.c
 file path=usr/demo/link_audit/src/bindings.h
 file path=usr/demo/link_audit/src/dumpbind.c

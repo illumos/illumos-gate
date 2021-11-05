@@ -47,6 +47,7 @@ PYSRCS = \
 	ManLint.py	\
 	Mapfile.py	\
 	ProcessCheck.py	\
+	PkgFmt.py	\
 	ShellLint.py	\
 	SpellCheck.py	\
 	WsCheck.py	\

@@ -24,22 +24,21 @@
 #
 
 set name=pkg.fmri value=pkg:/system/network/ppp/pppdump@$(PKGVERS)
-set name=pkg.description value="Optional GNU utilities for use with PPP"
 set name=pkg.summary value="GNU utilities for PPP"
-set name=info.classification \
-    value=org.opensolaris.category.2008:Development/GNU
+set name=pkg.description value="Optional GNU utilities for use with PPP"
+set name=info.classification value=org.opensolaris.category.2008:Development/GNU
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/bin
-dir path=usr/lib
-dir path=usr/lib/inet
-dir path=usr/lib/inet/ppp
-dir path=usr/share
-dir path=usr/share/man
-dir path=usr/share/man/man1m
+dir  path=usr group=sys
+dir  path=usr/bin
 file path=usr/bin/pppdump mode=0555
+dir  path=usr/lib
+dir  path=usr/lib/inet
+dir  path=usr/lib/inet/ppp
 file path=usr/lib/inet/ppp/minconn.so mode=0544
 file path=usr/lib/inet/ppp/passprompt.so mode=0544
+dir  path=usr/share
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/pppdump.1m
 legacy pkg=SUNWpppg desc="Optional GNU utilities for use with PPP" \
     name="GNU utilities for PPP"

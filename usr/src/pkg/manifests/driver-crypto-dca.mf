@@ -24,24 +24,33 @@
 #
 
 set name=pkg.fmri value=pkg:/driver/crypto/dca@$(PKGVERS)
-set name=pkg.description value="DCA Crypto Accelerator Supplemental Files"
 set name=pkg.summary value="DCA Crypto Accelerator"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.description value="DCA Crypto Accelerator Supplemental Files"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/fm
-dir path=usr/lib/fm/dict
-dir path=usr/lib/fm/eft
-dir path=usr/lib/locale
-dir path=usr/lib/locale/C
-dir path=usr/lib/locale/C/LC_MESSAGES
-dir path=usr/share/man
-dir path=usr/share/man/man7d
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/dca group=sys
+file path=kernel/drv/dca.conf group=sys \
+    original_name=SUNWdcaf:kernel/drv/dca.conf preserve=true
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/fm
+dir  path=usr/lib/fm/dict
+file path=usr/lib/fm/dict/SCA1000.dict mode=0444
+file path=usr/lib/fm/dict/SCA500.dict mode=0444
+dir  path=usr/lib/fm/eft
+file path=usr/lib/fm/eft/sca1000.eft mode=0444
+file path=usr/lib/fm/eft/sca500.eft mode=0444
+dir  path=usr/lib/locale
+dir  path=usr/lib/locale/C
+dir  path=usr/lib/locale/C/LC_MESSAGES
+file path=usr/lib/locale/C/LC_MESSAGES/SCA1000.mo mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/SCA500.mo mode=0444
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/dca.7d
 driver name=dca \
     alias=pci108e,5454 \
     alias=pci108e,5455 \
@@ -51,16 +60,6 @@ driver name=dca \
     alias=pci14e4,5821 \
     alias=pci14e4,5822 \
     alias=pci14e4,5825
-file path=kernel/drv/$(ARCH64)/dca group=sys
-file path=kernel/drv/dca.conf group=sys \
-    original_name=SUNWdcaf:kernel/drv/dca.conf preserve=true
-file path=usr/lib/fm/dict/SCA1000.dict mode=0444
-file path=usr/lib/fm/dict/SCA500.dict mode=0444
-file path=usr/lib/fm/eft/sca1000.eft mode=0444
-file path=usr/lib/fm/eft/sca500.eft mode=0444
-file path=usr/lib/locale/C/LC_MESSAGES/SCA1000.mo mode=0444
-file path=usr/lib/locale/C/LC_MESSAGES/SCA500.mo mode=0444
-file path=usr/share/man/man7d/dca.7d
 legacy pkg=SUNWdcaf desc="DCA Crypto Accelerator Supplemental Files (usr)" \
     name="DCA Crypto Accelerator (usr)"
 legacy pkg=SUNWdcar desc="DCA Crypto Accelerator driver" \

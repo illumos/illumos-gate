@@ -25,13 +25,13 @@
 
 set name=pkg.fmri \
     value=pkg:/system/library/libdiskmgt/header-libdiskmgt@$(PKGVERS)
-set name=pkg.description value="libdiskmgt private header file pkg"
 set name=pkg.summary value="libdiskmgt private header file pkg"
+set name=pkg.description value="libdiskmgt private header file pkg"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/include
+dir  path=usr group=sys
+dir  path=usr/include
 file path=usr/include/libdiskmgt.h
 legacy pkg=SUNWldskint desc="libdiskmgt private header file pkg" \
     name="libdiskmgt private header file pkg"

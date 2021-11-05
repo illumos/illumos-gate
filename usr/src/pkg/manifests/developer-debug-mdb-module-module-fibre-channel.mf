@@ -25,16 +25,15 @@
 
 set name=pkg.fmri \
     value=pkg:/developer/debug/mdb/module/module-fibre-channel@$(PKGVERS)
-set name=pkg.description value="Fibre Channel adb macros and mdb modules"
 set name=pkg.summary value="Fibre Channel adb macros and mdb modules"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.description value="Fibre Channel adb macros and mdb modules"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/mdb group=sys
-dir path=usr/lib/mdb/kvm group=sys
-dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/mdb group=sys
+dir  path=usr/lib/mdb/kvm group=sys
+dir  path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 file path=usr/lib/mdb/kvm/$(ARCH64)/fcip.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/fcp.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/fctl.so group=sys mode=0555

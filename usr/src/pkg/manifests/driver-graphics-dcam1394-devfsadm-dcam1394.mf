@@ -31,21 +31,21 @@
 <include global_zone_only_component>
 set name=pkg.fmri \
     value=pkg:/driver/graphics/dcam1394/devfsadm-dcam1394@$(PKGVERS)
-set name=pkg.description value="Sun IEEE1394 Video Conferencing support"
 set name=pkg.summary value="Sun IEEE1394 Video Conferencing Support"
+set name=pkg.description value="Sun IEEE1394 Video Conferencing support"
 set name=info.classification value=org.opensolaris.category.2008:System/Media
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/include
-dir path=usr/include/sys
-dir path=usr/include/sys/dcam
-dir path=usr/lib
-dir path=usr/lib/devfsadm group=sys
-dir path=usr/lib/devfsadm/linkmod group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
+dir  path=usr group=sys
+dir  path=usr/include
+dir  path=usr/include/sys
+dir  path=usr/include/sys/dcam
 file path=usr/include/sys/dcam/dcam1394_io.h
+dir  path=usr/lib
+dir  path=usr/lib/devfsadm group=sys
+dir  path=usr/lib/devfsadm/linkmod group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_dcam1394_link.so group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
 file path=usr/share/man/man7d/dcam1394.7d
 legacy pkg=SUNWfwdcu desc="Sun IEEE1394 Video Conferencing support" \
     name="Sun IEEE1394 Video Conferencing Support (Usr)"

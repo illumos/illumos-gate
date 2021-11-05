@@ -15,21 +15,44 @@
 
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/cpu/mc@$(PKGVERS)
-set name=pkg.description value="CPU Memory Controller Drivers"
 set name=pkg.summary value="CPU Memory Controller Drivers"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.description value="CPU Memory Controller Drivers"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=i386
-dir path=platform group=sys
-dir path=platform/i86pc group=sys
-dir path=platform/i86pc/$(ARCH64) group=sys
-dir path=platform/i86pc/kernel group=sys
-dir path=platform/i86pc/kernel/drv group=sys
-dir path=platform/i86pc/kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
+dir  path=platform group=sys
+dir  path=platform/i86pc group=sys
+dir  path=platform/i86pc/$(ARCH64) group=sys
+dir  path=platform/i86pc/kernel group=sys
+dir  path=platform/i86pc/kernel/drv group=sys
+dir  path=platform/i86pc/kernel/drv/$(ARCH64) group=sys
+file path=platform/i86pc/kernel/drv/$(ARCH64)/imc group=sys
+file path=platform/i86pc/kernel/drv/$(ARCH64)/imcstub group=sys
+file path=platform/i86pc/kernel/drv/imc.conf group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/imc.7d
+file path=usr/share/man/man7d/imcstub.7d
 driver name=imc
 driver name=imcstub \
+    alias=pci8086,e1e,p \
+    alias=pci8086,e1f,p \
+    alias=pci8086,e60,p \
+    alias=pci8086,e68,p \
+    alias=pci8086,e6a,p \
+    alias=pci8086,e6b,p \
+    alias=pci8086,e6c,p \
+    alias=pci8086,e6d,p \
+    alias=pci8086,e71,p \
+    alias=pci8086,e79,p \
+    alias=pci8086,ea0,p \
+    alias=pci8086,ea8,p \
+    alias=pci8086,eaa,p \
+    alias=pci8086,eab,p \
+    alias=pci8086,eac,p \
+    alias=pci8086,ead,p \
+    alias=pci8086,ec8,p \
+    alias=pci8086,ec9,p \
+    alias=pci8086,eca,p \
     alias=pci8086,2014,p \
     alias=pci8086,2016,p \
     alias=pci8086,2024,p \
@@ -90,25 +113,25 @@ driver name=imcstub \
     alias=pci8086,6fad,p \
     alias=pci8086,6ffc,p \
     alias=pci8086,6ffd,p \
-    alias=pci8086,e1e,p \
-    alias=pci8086,e1f,p \
-    alias=pci8086,e60,p \
-    alias=pci8086,e68,p \
-    alias=pci8086,e6a,p \
-    alias=pci8086,e6b,p \
-    alias=pci8086,e6c,p \
-    alias=pci8086,e6d,p \
-    alias=pci8086,e71,p \
-    alias=pci8086,e79,p \
-    alias=pci8086,ea0,p \
-    alias=pci8086,ea8,p \
-    alias=pci8086,eaa,p \
-    alias=pci8086,eab,p \
-    alias=pci8086,eac,p \
-    alias=pci8086,ead,p \
-    alias=pci8086,ec8,p \
-    alias=pci8086,ec9,p \
-    alias=pci8086,eca,p \
+    alias=pciex8086,e1e \
+    alias=pciex8086,e1f \
+    alias=pciex8086,e60 \
+    alias=pciex8086,e68 \
+    alias=pciex8086,e6a \
+    alias=pciex8086,e6b \
+    alias=pciex8086,e6c \
+    alias=pciex8086,e6d \
+    alias=pciex8086,e71 \
+    alias=pciex8086,e79 \
+    alias=pciex8086,ea0 \
+    alias=pciex8086,ea8 \
+    alias=pciex8086,eaa \
+    alias=pciex8086,eab \
+    alias=pciex8086,eac \
+    alias=pciex8086,ead \
+    alias=pciex8086,ec8 \
+    alias=pciex8086,ec9 \
+    alias=pciex8086,eca \
     alias=pciex8086,2014 \
     alias=pciex8086,2016 \
     alias=pciex8086,2024 \
@@ -168,29 +191,5 @@ driver name=imcstub \
     alias=pciex8086,6fac \
     alias=pciex8086,6fad \
     alias=pciex8086,6ffc \
-    alias=pciex8086,6ffd \
-    alias=pciex8086,e1e \
-    alias=pciex8086,e1f \
-    alias=pciex8086,e60 \
-    alias=pciex8086,e68 \
-    alias=pciex8086,e6a \
-    alias=pciex8086,e6b \
-    alias=pciex8086,e6c \
-    alias=pciex8086,e6d \
-    alias=pciex8086,e71 \
-    alias=pciex8086,e79 \
-    alias=pciex8086,ea0 \
-    alias=pciex8086,ea8 \
-    alias=pciex8086,eaa \
-    alias=pciex8086,eab \
-    alias=pciex8086,eac \
-    alias=pciex8086,ead \
-    alias=pciex8086,ec8 \
-    alias=pciex8086,ec9 \
-    alias=pciex8086,eca
-file path=platform/i86pc/kernel/drv/$(ARCH64)/imc group=sys
-file path=platform/i86pc/kernel/drv/$(ARCH64)/imcstub group=sys
-file path=platform/i86pc/kernel/drv/imc.conf group=sys
-file path=usr/share/man/man7d/imc.7d
-file path=usr/share/man/man7d/imcstub.7d
+    alias=pciex8086,6ffd
 license lic_CDDL license=lic_CDDL

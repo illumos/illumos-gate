@@ -30,32 +30,31 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/nge@$(PKGVERS)
-set name=pkg.description value="Nvidia CK8-04 GE driver"
 set name=pkg.summary value="Nvidia CK8-04 GE driver"
+set name=pkg.description value="Nvidia CK8-04 GE driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-driver name=nge clone_perms="nge 0666 root sys" perms="* 0666 root sys" \
-    alias=pci10de,268 \
-    alias=pci10de,269 \
-    alias=pci10de,37 \
-    alias=pci10de,372 \
-    alias=pci10de,373 \
-    alias=pci10de,38 \
-    alias=pci10de,3ee \
-    alias=pci10de,3ef \
-    alias=pci10de,56 \
-    alias=pci10de,57 \
-    alias=pci10de,760 \
-    alias=pci10de,ab0 \
-    alias=pci10de,df \
-    alias=pci10de,e6
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/nge group=sys
 file path=kernel/drv/nge.conf group=sys
-legacy pkg=SUNWnge desc="Nvidia CK8-04 GE driver" \
-    name="Nvidia CK8-04 GE driver"
+driver name=nge perms="* 0666 root sys" clone_perms="nge 0666 root sys" \
+    alias=pci10de,37 \
+    alias=pci10de,38 \
+    alias=pci10de,56 \
+    alias=pci10de,57 \
+    alias=pci10de,df \
+    alias=pci10de,e6 \
+    alias=pci10de,268 \
+    alias=pci10de,269 \
+    alias=pci10de,372 \
+    alias=pci10de,373 \
+    alias=pci10de,3ee \
+    alias=pci10de,3ef \
+    alias=pci10de,760 \
+    alias=pci10de,ab0
+legacy pkg=SUNWnge desc="Nvidia CK8-04 GE driver" name="Nvidia CK8-04 GE driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

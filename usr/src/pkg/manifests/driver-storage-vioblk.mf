@@ -30,18 +30,17 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/vioblk@$(PKGVERS)
-set name=pkg.description value="Virtio block driver"
 set name=pkg.summary value="Virtio block"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.description value="Virtio block driver"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=vioblk alias=pci1af4,1001 clone_perms="vioblk 0666 root sys" \
-    perms="* 0666 root sys"
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/vioblk group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
 file path=usr/share/man/man7d/vioblk.7d
+driver name=vioblk perms="* 0666 root sys" clone_perms="vioblk 0666 root sys" \
+    alias=pci1af4,1001
 license lic_CDDL license=lic_CDDL

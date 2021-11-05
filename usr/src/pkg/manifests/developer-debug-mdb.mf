@@ -25,73 +25,14 @@
 #
 
 set name=pkg.fmri value=pkg:/developer/debug/mdb@$(PKGVERS)
-set name=pkg.description value="Modular Debugger (MDB)"
 set name=pkg.summary value="Modular Debugger"
+set name=pkg.description value="Modular Debugger (MDB)"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/kmdb group=sys
-dir path=kernel/kmdb/$(ARCH64) group=sys
-dir path=platform group=sys variant.opensolaris.zone=global
-$(i386_ONLY)dir path=platform/i86pc group=sys variant.opensolaris.zone=global
-$(i386_ONLY)dir path=platform/i86pc/kernel group=sys \
-    variant.opensolaris.zone=global
-$(i386_ONLY)dir path=platform/i86pc/kernel/kmdb group=sys
-$(i386_ONLY)dir path=platform/i86pc/kernel/kmdb/$(ARCH64) group=sys
-$(i386_ONLY)dir path=platform/i86xpv group=sys variant.opensolaris.zone=global
-$(i386_ONLY)dir path=platform/i86xpv/kernel group=sys \
-    variant.opensolaris.zone=global
-$(i386_ONLY)dir path=platform/i86xpv/kernel/kmdb group=sys
-$(i386_ONLY)dir path=platform/i86xpv/kernel/kmdb/$(ARCH64) group=sys
-$(sparc_ONLY)dir path=platform/sun4u group=sys variant.opensolaris.zone=global
-$(sparc_ONLY)dir path=platform/sun4u/kernel group=sys \
-    variant.opensolaris.zone=global
-$(sparc_ONLY)dir path=platform/sun4u/kernel/kmdb group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel/kmdb/$(ARCH64) group=sys
-$(sparc_ONLY)dir path=platform/sun4v group=sys variant.opensolaris.zone=global
-$(sparc_ONLY)dir path=platform/sun4v/kernel group=sys \
-    variant.opensolaris.zone=global
-$(sparc_ONLY)dir path=platform/sun4v/kernel/kmdb group=sys
-$(sparc_ONLY)dir path=platform/sun4v/kernel/kmdb/$(ARCH64) group=sys
-dir path=usr group=sys
-dir path=usr/bin
-dir path=usr/bin/$(ARCH32)
-dir path=usr/bin/$(ARCH64)
-dir path=usr/include
-dir path=usr/include/sys
-dir path=usr/lib
-dir path=usr/lib/mdb group=sys
-dir path=usr/lib/mdb/kvm group=sys
-dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
-dir path=usr/lib/mdb/proc group=sys
-$(sparc_ONLY)dir path=usr/lib/mdb/proc/$(ARCH64) group=sys
-$(i386_ONLY)dir path=usr/lib/mdb/proc/$(ARCH64)
-$(i386_ONLY)dir path=usr/lib/mdb/raw group=sys
-$(i386_ONLY)dir path=usr/lib/mdb/raw/$(ARCH64) group=sys
-dir path=usr/platform group=sys
-$(i386_ONLY)dir path=usr/platform/i86pc group=sys
-$(i386_ONLY)dir path=usr/platform/i86pc/lib
-$(i386_ONLY)dir path=usr/platform/i86pc/lib/mdb group=sys
-$(i386_ONLY)dir path=usr/platform/i86pc/lib/mdb/kvm group=sys
-$(i386_ONLY)dir path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64) group=sys
-$(i386_ONLY)dir path=usr/platform/i86xpv group=sys
-$(i386_ONLY)dir path=usr/platform/i86xpv/lib
-$(i386_ONLY)dir path=usr/platform/i86xpv/lib/mdb group=sys
-$(i386_ONLY)dir path=usr/platform/i86xpv/lib/mdb/kvm group=sys
-$(i386_ONLY)dir path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64) group=sys
-$(sparc_ONLY)dir path=usr/platform/sun4u group=sys
-$(sparc_ONLY)dir path=usr/platform/sun4u/lib
-$(sparc_ONLY)dir path=usr/platform/sun4u/lib/mdb group=sys
-$(sparc_ONLY)dir path=usr/platform/sun4u/lib/mdb/kvm group=sys
-$(sparc_ONLY)dir path=usr/platform/sun4u/lib/mdb/kvm/$(ARCH64) group=sys
-$(sparc_ONLY)dir path=usr/platform/sun4v group=sys
-$(sparc_ONLY)dir path=usr/platform/sun4v/lib
-$(sparc_ONLY)dir path=usr/platform/sun4v/lib/mdb group=sys
-$(sparc_ONLY)dir path=usr/platform/sun4v/lib/mdb/kvm group=sys
-$(sparc_ONLY)dir path=usr/platform/sun4v/lib/mdb/kvm/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man1
+dir  path=kernel group=sys
+dir  path=kernel/kmdb group=sys
+dir  path=kernel/kmdb/$(ARCH64) group=sys
 file path=kernel/kmdb/$(ARCH64)/arp group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/cpc group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/$(ARCH64)/cpu.generic group=sys mode=0555
@@ -117,7 +58,11 @@ file path=kernel/kmdb/$(ARCH64)/mr_sas group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/nca group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/neti group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/nfs group=sys mode=0555
+$(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/niumx target=intr
+$(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/pcipsy target=intr
+$(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/pcisch target=intr
 file path=kernel/kmdb/$(ARCH64)/ptm group=sys mode=0555
+$(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/px target=intr
 file path=kernel/kmdb/$(ARCH64)/random group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/s1394 group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/$(ARCH64)/sata group=sys mode=0555
@@ -131,6 +76,12 @@ $(sparc_ONLY)file path=kernel/kmdb/$(ARCH64)/ssd group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/ufs group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/$(ARCH64)/uhci group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/usba group=sys mode=0555
+dir  path=platform group=sys variant.opensolaris.zone=global
+$(i386_ONLY)dir path=platform/i86pc group=sys variant.opensolaris.zone=global
+$(i386_ONLY)dir path=platform/i86pc/kernel group=sys \
+    variant.opensolaris.zone=global
+$(i386_ONLY)dir path=platform/i86pc/kernel/kmdb group=sys
+$(i386_ONLY)dir path=platform/i86pc/kernel/kmdb/$(ARCH64) group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/apix group=sys \
     mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/pcplusmp group=sys \
@@ -139,12 +90,22 @@ $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/unix group=sys \
     mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/uppc group=sys \
     mode=0555
+$(i386_ONLY)dir path=platform/i86xpv group=sys variant.opensolaris.zone=global
+$(i386_ONLY)dir path=platform/i86xpv/kernel group=sys \
+    variant.opensolaris.zone=global
+$(i386_ONLY)dir path=platform/i86xpv/kernel/kmdb group=sys
+$(i386_ONLY)dir path=platform/i86xpv/kernel/kmdb/$(ARCH64) group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/kmdb/$(ARCH64)/unix group=sys \
     mode=0555
 $(i386_ONLY)file path=platform/i86xpv/kernel/kmdb/$(ARCH64)/xpv_psm group=sys \
     mode=0555
 $(i386_ONLY)file path=platform/i86xpv/kernel/kmdb/$(ARCH64)/xpv_uppc group=sys \
     mode=0555
+$(sparc_ONLY)dir path=platform/sun4u group=sys variant.opensolaris.zone=global
+$(sparc_ONLY)dir path=platform/sun4u/kernel group=sys \
+    variant.opensolaris.zone=global
+$(sparc_ONLY)dir path=platform/sun4u/kernel/kmdb group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/kmdb/$(ARCH64) group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/kmdb/$(ARCH64)/oplhwd group=sys \
     mode=0555
 $(sparc_ONLY)file path=platform/sun4u/kernel/kmdb/$(ARCH64)/sgenv group=sys \
@@ -153,6 +114,11 @@ $(sparc_ONLY)file path=platform/sun4u/kernel/kmdb/$(ARCH64)/sgsbbc group=sys \
     mode=0555
 $(sparc_ONLY)file path=platform/sun4u/kernel/kmdb/$(ARCH64)/unix group=sys \
     mode=0555
+$(sparc_ONLY)dir path=platform/sun4v group=sys variant.opensolaris.zone=global
+$(sparc_ONLY)dir path=platform/sun4v/kernel group=sys \
+    variant.opensolaris.zone=global
+$(sparc_ONLY)dir path=platform/sun4v/kernel/kmdb group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/kmdb/$(ARCH64) group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/kmdb/$(ARCH64)/errh group=sys \
     mode=0555
 $(sparc_ONLY)file path=platform/sun4v/kernel/kmdb/$(ARCH64)/ldc group=sys \
@@ -163,9 +129,23 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/kmdb/$(ARCH64)/unix group=sys \
     mode=0555
 $(sparc_ONLY)file path=platform/sun4v/kernel/kmdb/$(ARCH64)/vdsk group=sys \
     mode=0555
+dir  path=usr group=sys
+dir  path=usr/bin
+dir  path=usr/bin/$(ARCH32)
+hardlink path=usr/bin/$(ARCH32)/adb target=../../../usr/bin/$(ARCH32)/mdb
 file path=usr/bin/$(ARCH32)/mdb mode=0555
+dir  path=usr/bin/$(ARCH64)
+hardlink path=usr/bin/$(ARCH64)/adb target=../../../usr/bin/$(ARCH64)/mdb
 file path=usr/bin/$(ARCH64)/mdb mode=0555
+hardlink path=usr/bin/adb target=../../usr/lib/isaexec
+hardlink path=usr/bin/mdb target=../../usr/lib/isaexec
+dir  path=usr/include
+dir  path=usr/include/sys
 file path=usr/include/sys/mdb_modapi.h
+dir  path=usr/lib
+dir  path=usr/lib/mdb group=sys
+dir  path=usr/lib/mdb/kvm group=sys
+dir  path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 file path=usr/lib/mdb/kvm/$(ARCH64)/arp.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/cpc.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/cpu.generic.so group=sys \
@@ -193,7 +173,11 @@ file path=usr/lib/mdb/kvm/$(ARCH64)/mr_sas.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/nca.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/neti.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/nfs.so group=sys mode=0555
+$(sparc_ONLY)link path=usr/lib/mdb/kvm/$(ARCH64)/niumx.so target=intr.so
+$(sparc_ONLY)link path=usr/lib/mdb/kvm/$(ARCH64)/pcipsy.so target=intr.so
+$(sparc_ONLY)link path=usr/lib/mdb/kvm/$(ARCH64)/pcisch.so target=intr.so
 file path=usr/lib/mdb/kvm/$(ARCH64)/ptm.so group=sys mode=0555
+$(sparc_ONLY)link path=usr/lib/mdb/kvm/$(ARCH64)/px.so target=intr.so
 file path=usr/lib/mdb/kvm/$(ARCH64)/random.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/s1394.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/sata.so group=sys mode=0555
@@ -208,6 +192,9 @@ $(sparc_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/ssd.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/ufs.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/uhci.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/usba.so group=sys mode=0555
+dir  path=usr/lib/mdb/proc group=sys
+$(sparc_ONLY)dir path=usr/lib/mdb/proc/$(ARCH64) group=sys
+$(i386_ONLY)dir path=usr/lib/mdb/proc/$(ARCH64)
 file path=usr/lib/mdb/proc/$(ARCH64)/ld.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libavl.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libc.so group=sys mode=0555
@@ -223,8 +210,7 @@ file path=usr/lib/mdb/proc/$(ARCH64)/libumem.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libuutil.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/list.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/mdb_ds.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/proc/$(ARCH64)/mdb_test.so group=sys \
-    mode=0555
+$(i386_ONLY)file path=usr/lib/mdb/proc/$(ARCH64)/mdb_test.so group=sys mode=0555
 file path=usr/lib/mdb/proc/ld.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libavl.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libc.so group=sys mode=0555
@@ -240,9 +226,17 @@ file path=usr/lib/mdb/proc/list.so group=sys mode=0555
 file path=usr/lib/mdb/proc/mdb_ds.so group=sys mode=0555
 file path=usr/lib/mdb/proc/svc.configd.so group=sys mode=0555
 file path=usr/lib/mdb/proc/svc.startd.so group=sys mode=0555
+$(i386_ONLY)dir path=usr/lib/mdb/raw group=sys
+$(i386_ONLY)dir path=usr/lib/mdb/raw/$(ARCH64) group=sys
 $(i386_ONLY)file path=usr/lib/mdb/raw/$(ARCH64)/disk_label.so group=sys \
     mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/raw/disk_label.so group=sys mode=0555
+dir  path=usr/platform group=sys
+$(i386_ONLY)dir path=usr/platform/i86pc group=sys
+$(i386_ONLY)dir path=usr/platform/i86pc/lib
+$(i386_ONLY)dir path=usr/platform/i86pc/lib/mdb group=sys
+$(i386_ONLY)dir path=usr/platform/i86pc/lib/mdb/kvm group=sys
+$(i386_ONLY)dir path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64) group=sys
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/apix.so \
     group=sys mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/pcplusmp.so \
@@ -251,6 +245,11 @@ $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/unix.so \
     group=sys mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/uppc.so \
     group=sys mode=0555
+$(i386_ONLY)dir path=usr/platform/i86xpv group=sys
+$(i386_ONLY)dir path=usr/platform/i86xpv/lib
+$(i386_ONLY)dir path=usr/platform/i86xpv/lib/mdb group=sys
+$(i386_ONLY)dir path=usr/platform/i86xpv/lib/mdb/kvm group=sys
+$(i386_ONLY)dir path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64) group=sys
 $(i386_ONLY)file path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64)/unix.so \
     group=sys mode=0555
 $(i386_ONLY)file path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64)/xpv.so \
@@ -259,6 +258,11 @@ $(i386_ONLY)file path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64)/xpv_psm.so \
     group=sys mode=0555
 $(i386_ONLY)file path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64)/xpv_uppc.so \
     group=sys mode=0555
+$(sparc_ONLY)dir path=usr/platform/sun4u group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/mdb group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/mdb/kvm group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/mdb/kvm/$(ARCH64) group=sys
 $(sparc_ONLY)file path=usr/platform/sun4u/lib/mdb/kvm/$(ARCH64)/oplhwd.so \
     group=sys mode=0555
 $(sparc_ONLY)file path=usr/platform/sun4u/lib/mdb/kvm/$(ARCH64)/sgenv.so \
@@ -267,6 +271,11 @@ $(sparc_ONLY)file path=usr/platform/sun4u/lib/mdb/kvm/$(ARCH64)/sgsbbc.so \
     group=sys mode=0555
 $(sparc_ONLY)file path=usr/platform/sun4u/lib/mdb/kvm/$(ARCH64)/unix.so \
     group=sys mode=0555
+$(sparc_ONLY)dir path=usr/platform/sun4v group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/mdb group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/mdb/kvm group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/mdb/kvm/$(ARCH64) group=sys
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/mdb/kvm/$(ARCH64)/errh.so \
     group=sys mode=0555
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/mdb/kvm/$(ARCH64)/ldc.so \
@@ -277,13 +286,11 @@ $(sparc_ONLY)file path=usr/platform/sun4v/lib/mdb/kvm/$(ARCH64)/unix.so \
     group=sys mode=0555
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/mdb/kvm/$(ARCH64)/vdsk.so \
     group=sys mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man1
 file path=usr/share/man/man1/adb.1
 file path=usr/share/man/man1/kmdb.1
 file path=usr/share/man/man1/mdb.1
-hardlink path=usr/bin/$(ARCH32)/adb target=../../../usr/bin/$(ARCH32)/mdb
-hardlink path=usr/bin/$(ARCH64)/adb target=../../../usr/bin/$(ARCH64)/mdb
-hardlink path=usr/bin/adb target=../../usr/lib/isaexec
-hardlink path=usr/bin/mdb target=../../usr/lib/isaexec
 legacy pkg=SUNWmdb desc="Modular Debugger (MDB)" name="Modular Debugger"
 legacy pkg=SUNWmdbr desc="Modular Debugger (MDB) (Root)" \
     name="Modular Debugger (Root)"
@@ -294,11 +301,3 @@ license usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE
 license usr/src/uts/common/zmod/THIRDPARTYLICENSE \
     license=usr/src/uts/common/zmod/THIRDPARTYLICENSE
-$(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/niumx target=intr
-$(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/pcipsy target=intr
-$(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/pcisch target=intr
-$(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/px target=intr
-$(sparc_ONLY)link path=usr/lib/mdb/kvm/$(ARCH64)/niumx.so target=intr.so
-$(sparc_ONLY)link path=usr/lib/mdb/kvm/$(ARCH64)/pcipsy.so target=intr.so
-$(sparc_ONLY)link path=usr/lib/mdb/kvm/$(ARCH64)/pcisch.so target=intr.so
-$(sparc_ONLY)link path=usr/lib/mdb/kvm/$(ARCH64)/px.so target=intr.so

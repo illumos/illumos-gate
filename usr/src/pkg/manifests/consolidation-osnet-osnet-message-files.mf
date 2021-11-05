@@ -22,11 +22,10 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 
-set name=pkg.fmri \
-    value=pkg:/consolidation/osnet/osnet-message-files@$(PKGVERS)
+set name=pkg.fmri value=pkg:/consolidation/osnet/osnet-message-files@$(PKGVERS)
+set name=pkg.summary value="Localizable ON message files"
 set name=pkg.description \
     value="localizable message files for the OS-Networking consolidation"
-set name=pkg.summary value="Localizable ON message files"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 
@@ -36,26 +35,11 @@ set name=info.classification \
 #
 set name=org.opensolaris.nodepend value=true
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/help
-dir path=usr/lib/help/auths
-dir path=usr/lib/help/auths/locale
-dir path=usr/lib/help/profiles
-dir path=usr/lib/help/profiles/locale
-dir path=usr/lib/locale
-dir path=usr/lib/locale/C
-dir path=usr/lib/locale/C/LC_MESSAGES
-dir path=usr/lib/locale/C/LC_TIME
-dir path=usr/share
-dir path=usr/share/lib
-dir path=usr/share/lib/locale
-dir path=usr/share/lib/locale/com
-dir path=usr/share/lib/locale/com/sun
-dir path=usr/share/lib/locale/com/sun/admin
-dir path=usr/share/lib/locale/com/sun/admin/pm
-dir path=usr/share/lib/locale/com/sun/admin/pm/client
-dir path=usr/share/lib/locale/com/sun/slp
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/help
+dir  path=usr/lib/help/auths
+dir  path=usr/lib/help/auths/locale
 file path=usr/lib/help/auths/locale/AllSolAuthsHeader.html
 file path=usr/lib/help/auths/locale/AuditHeader.html
 file path=usr/lib/help/auths/locale/AuthJobsAdmin.html
@@ -199,6 +183,8 @@ file path=usr/lib/help/auths/locale/ZoneCloneFrom.html
 file path=usr/lib/help/auths/locale/ZoneHeader.html
 file path=usr/lib/help/auths/locale/ZoneLogin.html
 file path=usr/lib/help/auths/locale/ZoneManage.html
+dir  path=usr/lib/help/profiles
+dir  path=usr/lib/help/profiles/locale
 file path=usr/lib/help/profiles/locale/RtAcctadm.html
 file path=usr/lib/help/profiles/locale/RtAll.html
 file path=usr/lib/help/profiles/locale/RtAuditCfg.html
@@ -276,6 +262,9 @@ file path=usr/lib/help/profiles/locale/RtZFSFileSysMngmnt.html
 file path=usr/lib/help/profiles/locale/RtZFSStorageMngmnt.html
 file path=usr/lib/help/profiles/locale/RtZoneMngmnt.html
 file path=usr/lib/help/profiles/locale/RtZoneSecurity.html
+dir  path=usr/lib/locale
+dir  path=usr/lib/locale/C
+dir  path=usr/lib/locale/C/LC_MESSAGES
 file path=usr/lib/locale/C/LC_MESSAGES/AMD.po
 file path=usr/lib/locale/C/LC_MESSAGES/DISK.po
 file path=usr/lib/locale/C/LC_MESSAGES/FMD.po
@@ -316,11 +305,20 @@ file path=usr/lib/locale/C/LC_MESSAGES/mailx.help group=sys
 file path=usr/lib/locale/C/LC_MESSAGES/more.help group=sys
 file path=usr/lib/locale/C/LC_MESSAGES/priv_names group=sys
 file path=usr/lib/locale/C/LC_MESSAGES/uxlibc.src group=sys
+dir  path=usr/lib/locale/C/LC_TIME
 file path=usr/lib/locale/C/LC_TIME/SUNW_OST_OSCMD.po group=sys
+dir  path=usr/share
+dir  path=usr/share/lib
+dir  path=usr/share/lib/locale
+dir  path=usr/share/lib/locale/com
+dir  path=usr/share/lib/locale/com/sun
+dir  path=usr/share/lib/locale/com/sun/admin
+dir  path=usr/share/lib/locale/com/sun/admin/pm
+dir  path=usr/share/lib/locale/com/sun/admin/pm/client
 file path=usr/share/lib/locale/com/sun/admin/pm/client/pmHelpResources.java \
     group=lp
-file path=usr/share/lib/locale/com/sun/admin/pm/client/pmResources.java \
-    group=lp
+file path=usr/share/lib/locale/com/sun/admin/pm/client/pmResources.java group=lp
+dir  path=usr/share/lib/locale/com/sun/slp
 file path=usr/share/lib/locale/com/sun/slp/ClientLib_en.properties group=sys
 file path=usr/share/lib/locale/com/sun/slp/Server_en.properties group=sys
 legacy pkg=SUNW0on arch=all \

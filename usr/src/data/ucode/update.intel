@@ -100,6 +100,6 @@ for i in "${!links[@]}"; do
 EOM
 done
 
-pkgfmt $mf
+pkgfmt -fv2 $mf
 
 rm -rf $tmp

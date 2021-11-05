@@ -30,19 +30,22 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/bge@$(PKGVERS)
+set name=pkg.summary value="Broadcom 57xx GE NIC Driver"
 set name=pkg.description \
     value="Broadcom 57xx Gigabit Ethernet Network Adapter Driver"
-set name=pkg.summary value="Broadcom 57xx GE NIC Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-$(i386_ONLY)driver name=bge clone_perms="bge 0666 root sys" \
-    perms="* 0666 root sys" \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/bge group=sys
+file path=kernel/drv/bge.conf group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/bge.7d
+$(i386_ONLY)driver name=bge perms="* 0666 root sys" \
+    clone_perms="bge 0666 root sys" \
     alias=SUNW,bge \
     alias=pci108e,1647 \
     alias=pci108e,1648 \
@@ -119,8 +122,8 @@ $(i386_ONLY)driver name=bge clone_perms="bge 0666 root sys" \
     alias=pciex14e4,16f3 \
     alias=pciex14e4,16fd \
     alias=pciex14e4,1713
-$(sparc_ONLY)driver name=bge clone_perms="bge 0666 root sys" \
-    perms="* 0666 root sys" \
+$(sparc_ONLY)driver name=bge perms="* 0666 root sys" \
+    clone_perms="bge 0666 root sys" \
     alias=SUNW,bge \
     alias=pci108e,1647 \
     alias=pci108e,1648 \
@@ -148,6 +151,15 @@ $(sparc_ONLY)driver name=bge clone_perms="bge 0666 root sys" \
     alias=pci14e4,16b6 \
     alias=pci14e4,16b7 \
     alias=pci14e4,16c7 \
+    alias=pciex14e4,1655 \
+    alias=pciex14e4,1656 \
+    alias=pciex14e4,1659 \
+    alias=pciex14e4,165a \
+    alias=pciex14e4,165b \
+    alias=pciex14e4,165c \
+    alias=pciex14e4,1677 \
+    alias=pciex14e4,167a \
+    alias=pciex14e4,167b \
     alias=pciex14e4,0x1682 \
     alias=pciex14e4,0x1686 \
     alias=pciex14e4,0x16b0 \
@@ -157,19 +169,7 @@ $(sparc_ONLY)driver name=bge clone_perms="bge 0666 root sys" \
     alias=pciex14e4,0x16b4 \
     alias=pciex14e4,0x16b5 \
     alias=pciex14e4,0x16b6 \
-    alias=pciex14e4,0x16b7 \
-    alias=pciex14e4,1655 \
-    alias=pciex14e4,1656 \
-    alias=pciex14e4,1659 \
-    alias=pciex14e4,165a \
-    alias=pciex14e4,165b \
-    alias=pciex14e4,165c \
-    alias=pciex14e4,1677 \
-    alias=pciex14e4,167a \
-    alias=pciex14e4,167b
-file path=kernel/drv/$(ARCH64)/bge group=sys
-file path=kernel/drv/bge.conf group=sys
-file path=usr/share/man/man7d/bge.7d
+    alias=pciex14e4,0x16b7
 legacy pkg=SUNWbge \
     desc="Broadcom 57xx Gigabit Ethernet Network Adapter Driver" \
     name="Broadcom 57xx GE NIC Driver"

@@ -26,12 +26,12 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/developer/build/onbld@$(PKGVERS)
-set name=pkg.description value="tools used to build the OS-Net consolidation"
 set name=pkg.summary value="OS-Net Build Tools"
+set name=pkg.description value="tools used to build the OS-Net consolidation"
 set name=info.classification \
     value="org.opensolaris.category.2008:Development/Distribution Tools"
 
@@ -41,36 +41,10 @@ set name=info.classification \
 #
 set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
-dir path=opt group=sys
-dir path=opt/onbld
-dir path=opt/onbld/bin
-dir path=opt/onbld/bin/$(ARCH)
-dir path=opt/onbld/env
-dir path=opt/onbld/etc
-dir path=opt/onbld/etc/exception_lists
-dir path=opt/onbld/lib
-dir path=opt/onbld/lib/$(ARCH)
-dir path=opt/onbld/lib/$(ARCH)/64
-dir path=opt/onbld/lib/perl
-$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)
-$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld
-$(python3tools_ONLY)dir \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks
-$(python3tools_ONLY)dir \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__
-$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm
-$(python3tools_ONLY)dir \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/__pycache__
-$(python3tools_ONLY)dir \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/__pycache__
-$(python2tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON_VERSION)
-$(python2tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld
-$(python2tools_ONLY)dir \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks
-$(python2tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm
-dir path=opt/onbld/man
-dir path=opt/onbld/man/man1onbld
-dir path=opt/onbld/share
+dir  path=opt group=sys
+dir  path=opt/onbld
+dir  path=opt/onbld/bin
+dir  path=opt/onbld/bin/$(ARCH)
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/aw mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/btxld mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/chk4ubin mode=0555
@@ -83,11 +57,13 @@ file path=opt/onbld/bin/$(ARCH)/ctfmerge mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfstabs mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfstrip mode=0555
 file path=opt/onbld/bin/$(ARCH)/cw mode=0555
+link path=opt/onbld/bin/$(ARCH)/dmake target=make
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/elfextract mode=0555
 file path=opt/onbld/bin/$(ARCH)/findunref mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth_preload.so.1 mode=0555
 file path=opt/onbld/bin/$(ARCH)/install mode=0555
+hardlink path=opt/onbld/bin/$(ARCH)/install.bin target=./install
 file path=opt/onbld/bin/$(ARCH)/lintdump mode=0555
 file path=opt/onbld/bin/$(ARCH)/localedef mode=0555
 file path=opt/onbld/bin/$(ARCH)/make mode=0555
@@ -117,6 +93,7 @@ file path=opt/onbld/bin/find_elf mode=0555
 file path=opt/onbld/bin/findcrypto mode=0555
 file path=opt/onbld/bin/flg.flp mode=0555
 file path=opt/onbld/bin/genoffsets mode=0555
+link path=opt/onbld/bin/git-nits target=git-pbchk
 file path=opt/onbld/bin/git-pbchk mode=0555 \
     pkg.depend.bypass-generate=.*(?:Checks|onbld|cStringIO).*
 file path=opt/onbld/bin/hdrchk mode=0555 \
@@ -143,28 +120,39 @@ file path=opt/onbld/bin/wscheck mode=0555 \
     pkg.depend.bypass-generate=.*(?:Checks|onbld|WsCheck).*
 # wsdiff does not import the commands module when run under python3 but
 # pkgdepend still tries to resolve it, and fails.
-file path=opt/onbld/bin/wsdiff mode=0555 \
-    pkg.depend.bypass-generate=.*commands.*
+file path=opt/onbld/bin/wsdiff mode=0555 pkg.depend.bypass-generate=.*commands.*
 file path=opt/onbld/bin/xref mode=0555
 file path=opt/onbld/bin/xref.mk
+dir  path=opt/onbld/env
 file path=opt/onbld/env/illumos
+dir  path=opt/onbld/etc
+dir  path=opt/onbld/etc/exception_lists
 file path=opt/onbld/etc/exception_lists/check_rtime
 file path=opt/onbld/etc/exception_lists/interface_check
 file path=opt/onbld/etc/exception_lists/interface_cmp
 file path=opt/onbld/etc/its.conf
 file path=opt/onbld/etc/its.reg
+dir  path=opt/onbld/lib
+dir  path=opt/onbld/lib/$(ARCH)
+dir  path=opt/onbld/lib/$(ARCH)/64
 file path=opt/onbld/lib/$(ARCH)/64/libmakestate.so.1
+link path=opt/onbld/lib/$(ARCH)/libctf.so target=libctf.so.1
 file path=opt/onbld/lib/$(ARCH)/libctf.so.1 mode=0555
 file path=opt/onbld/lib/$(ARCH)/libdwarf.so.1
 file path=opt/onbld/lib/$(ARCH)/libmakestate.so.1
+dir  path=opt/onbld/lib/perl
 file path=opt/onbld/lib/perl/onbld_elfmod.pm
 file path=opt/onbld/lib/perl/onbld_elfmod_vertype.pm
+$(python2tools_ONLY)link path=opt/onbld/lib/python \
+    target=python$(PYTHON_VERSION)
+$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)
+$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld
+$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks
 $(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/CStyle.py \
     mode=0444
 $(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Cddl.py \
-    mode=0444
+    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Cddl.py mode=0444
 $(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/CmtBlk.py \
     mode=0444
@@ -193,6 +181,9 @@ $(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Mapfile.py \
     mode=0444
 $(python3tools_ONLY)file \
+    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/PkgFmt.py \
+    mode=0444
+$(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/ProcessCheck.py \
     mode=0444
 $(python3tools_ONLY)file \
@@ -207,6 +198,7 @@ $(python3tools_ONLY)file \
 $(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__init__.py \
     mode=0444
+$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__
 $(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/CStyle.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
@@ -241,6 +233,9 @@ $(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/Mapfile.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
 $(python3tools_ONLY)file \
+    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/PkgFmt.cpython$(PYTHON3_PKGVERS).pyc \
+    mode=0444
+$(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/ProcessCheck.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
 $(python3tools_ONLY)file \
@@ -255,11 +250,12 @@ $(python3tools_ONLY)file \
 $(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/__init__.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
+$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm
 $(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/Ignore.py mode=0444
 $(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/__init__.py \
-    mode=0444
+    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/__init__.py mode=0444
+$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/__pycache__
 $(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/__pycache__/Ignore.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
@@ -268,23 +264,24 @@ $(python3tools_ONLY)file \
     mode=0444
 $(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/__init__.py mode=0444
+$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/__pycache__
 $(python3tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/__pycache__/__init__.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
+$(python2tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON_VERSION)
+$(python2tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld
+$(python2tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks
 $(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/CStyle.py \
-    mode=0444
+    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/CStyle.py mode=0444
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/CStyle.pyc \
     mode=0444
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Cddl.py mode=0444
 $(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Cddl.pyc \
-    mode=0444
+    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Cddl.pyc mode=0444
 $(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/CmtBlk.py \
-    mode=0444
+    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/CmtBlk.py mode=0444
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/CmtBlk.pyc \
     mode=0444
@@ -307,14 +304,12 @@ $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/DbLookups.pyc \
     mode=0444
 $(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/HdrChk.py \
-    mode=0444
+    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/HdrChk.py mode=0444
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/HdrChk.pyc \
     mode=0444
 $(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/JStyle.py \
-    mode=0444
+    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/JStyle.py mode=0444
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/JStyle.pyc \
     mode=0444
@@ -335,6 +330,11 @@ $(python2tools_ONLY)file \
     mode=0444
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Mapfile.pyc \
+    mode=0444
+$(python2tools_ONLY)file \
+    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/PkgFmt.py mode=0444
+$(python2tools_ONLY)file \
+    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/PkgFmt.pyc \
     mode=0444
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/ProcessCheck.py \
@@ -366,20 +366,21 @@ $(python2tools_ONLY)file \
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/__init__.pyc \
     mode=0444
+$(python2tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/Ignore.py mode=0444
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/Ignore.pyc mode=0444
 $(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/__init__.py \
-    mode=0444
+    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/__init__.py mode=0444
 $(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/__init__.pyc \
-    mode=0444
+    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/__init__.pyc mode=0444
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/__init__.py mode=0444
 $(python2tools_ONLY)file \
     path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/__init__.pyc mode=0444
+dir  path=opt/onbld/man
+dir  path=opt/onbld/man/man1onbld
 file path=opt/onbld/man/man1onbld/Install.1onbld
 file path=opt/onbld/man/man1onbld/bldenv.1onbld
 file path=opt/onbld/man/man1onbld/bringovercheck.1onbld
@@ -393,6 +394,7 @@ file path=opt/onbld/man/man1onbld/cw.1onbld
 file path=opt/onbld/man/man1onbld/find_elf.1onbld
 file path=opt/onbld/man/man1onbld/findunref.1onbld
 file path=opt/onbld/man/man1onbld/flg.flp.1onbld
+link path=opt/onbld/man/man1onbld/git-nits.1onbld target=git-pbchk.1onbld
 file path=opt/onbld/man/man1onbld/git-pbchk.1onbld
 file path=opt/onbld/man/man1onbld/hdrchk.1onbld
 file path=opt/onbld/man/man1onbld/interface_check.1onbld
@@ -411,19 +413,13 @@ file path=opt/onbld/man/man1onbld/which_scm.1onbld
 file path=opt/onbld/man/man1onbld/ws.1onbld
 file path=opt/onbld/man/man1onbld/wsdiff.1onbld
 file path=opt/onbld/man/man1onbld/xref.1onbld
+dir  path=opt/onbld/share
 file path=opt/onbld/share/make.rules mode=0444
-hardlink path=opt/onbld/bin/$(ARCH)/install.bin target=./install
 legacy pkg=SUNWonbld desc="tools used to build the OS-Net consolidation" \
     name="OS-Net Build Tools" version=11.11,REV=2009.10.22
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/libdwarf/THIRDPARTYLICENSE \
     license=usr/src/lib/libdwarf/THIRDPARTYLICENSE
-link path=opt/onbld/bin/$(ARCH)/dmake target=make
-link path=opt/onbld/bin/git-nits target=git-pbchk
-link path=opt/onbld/lib/$(ARCH)/libctf.so target=libctf.so.1
-$(python2tools_ONLY)link path=opt/onbld/lib/python \
-    target=python$(PYTHON_VERSION)
-link path=opt/onbld/man/man1onbld/git-nits.1onbld target=git-pbchk.1onbld
 # nightly(1) uses wget
-depend fmri=web/wget type=require
+depend type=require fmri=web/wget

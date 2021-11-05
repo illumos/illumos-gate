@@ -30,39 +30,19 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/mega_sas@$(PKGVERS)
-set name=pkg.description value="LSI MegaSAS RAID Controller HBA Driver"
 set name=pkg.summary value="LSI MegaSAS RAID Controller HBA Driver"
-set name=info.classification \
-    value=org.opensolaris.category.2008:Drivers/Storage
+set name=pkg.description value="LSI MegaSAS RAID Controller HBA Driver"
+set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/mega_sas group=sys
+file path=kernel/drv/mega_sas.conf group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/mega_sas.7d
 driver name=mega_sas class=scsi \
-    alias=pci1000,411.1000.1001 \
-    alias=pci1000,411.1000.1002 \
-    alias=pci1000,411.1000.1003 \
-    alias=pci1000,411.1000.1004 \
-    alias=pci1000,411.1000.1008 \
-    alias=pci1000,411.1000.100c \
-    alias=pci1000,411.1000.100d \
-    alias=pci1000,411.1000.2004 \
-    alias=pci1000,411.1000.2005 \
-    alias=pci1000,411.1033.8287 \
-    alias=pci1000,411.1054.3016 \
-    alias=pci1000,411.1734.1081 \
-    alias=pci1000,411.1734.10a3 \
-    alias=pci1000,411.8086.1001 \
-    alias=pci1000,411.8086.1003 \
-    alias=pci1000,411.8086.1008 \
-    alias=pci1000,411.8086.3490 \
-    alias=pci1000,411.8086.3500 \
-    alias=pci1000,411.8086.3501 \
-    alias=pci1000,411.8086.3504 \
-    alias=pci1000,411.8086.3507 \
-    alias=pci1000,413.1000.1005 \
     alias=pci1000,57.8086.3002 \
     alias=pci1000,60.1000.1006 \
     alias=pci1000,60.1000.100a \
@@ -141,12 +121,31 @@ driver name=mega_sas class=scsi \
     alias=pci1000,7c.1000.101c \
     alias=pci1000,7c.1000.101d \
     alias=pci1000,7c.1014.395 \
+    alias=pci1000,411.1000.1001 \
+    alias=pci1000,411.1000.1002 \
+    alias=pci1000,411.1000.1003 \
+    alias=pci1000,411.1000.1004 \
+    alias=pci1000,411.1000.1008 \
+    alias=pci1000,411.1000.100c \
+    alias=pci1000,411.1000.100d \
+    alias=pci1000,411.1000.2004 \
+    alias=pci1000,411.1000.2005 \
+    alias=pci1000,411.1033.8287 \
+    alias=pci1000,411.1054.3016 \
+    alias=pci1000,411.1734.1081 \
+    alias=pci1000,411.1734.10a3 \
+    alias=pci1000,411.8086.1001 \
+    alias=pci1000,411.8086.1003 \
+    alias=pci1000,411.8086.1008 \
+    alias=pci1000,411.8086.3490 \
+    alias=pci1000,411.8086.3500 \
+    alias=pci1000,411.8086.3501 \
+    alias=pci1000,411.8086.3504 \
+    alias=pci1000,411.8086.3507 \
+    alias=pci1000,413.1000.1005 \
     alias=pci1028,15.1028.1f01 \
     alias=pci1028,15.1028.1f02 \
     alias=pci1028,15.1028.1f03
-file path=kernel/drv/$(ARCH64)/mega_sas group=sys
-file path=kernel/drv/mega_sas.conf group=sys
-file path=usr/share/man/man7d/mega_sas.7d
 legacy pkg=SUNWmegasas desc="LSI MegaSAS RAID Controller HBA Driver" \
     name="LSI MegaSAS RAID Controller HBA Driver"
 license usr/src/uts/common/io/mega_sas/THIRDPARTYLICENSE \

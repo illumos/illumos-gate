@@ -24,20 +24,19 @@
 #
 
 set name=pkg.fmri value=pkg:/system/library/security/gss/spnego@$(PKGVERS)
-set name=pkg.description value="SPNEGO GSS-API Mechanism"
 set name=pkg.summary value="SPNEGO GSS-API Mechanism"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Security
+set name=pkg.description value="SPNEGO GSS-API Mechanism"
+set name=info.classification value=org.opensolaris.category.2008:System/Security
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/lib/$(ARCH64)/gss
-dir path=usr/lib/gss
-dir path=usr/share/man
-dir path=usr/share/man/man5
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+dir  path=usr/lib/$(ARCH64)/gss
 file path=usr/lib/$(ARCH64)/gss/mech_spnego.so.1
+dir  path=usr/lib/gss
 file path=usr/lib/gss/mech_spnego.so.1
+dir  path=usr/share/man
+dir  path=usr/share/man/man5
 file path=usr/share/man/man5/mech_spnego.5
 legacy pkg=SUNWspnego desc="SPNEGO GSS-API Mechanism" \
     name="SPNEGO GSS-API Mechanism"

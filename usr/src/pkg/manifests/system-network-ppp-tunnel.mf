@@ -24,21 +24,20 @@
 #
 
 set name=pkg.fmri value=pkg:/system/network/ppp/tunnel@$(PKGVERS)
-set name=pkg.description \
-    value="Extensions implementing PPP tunneling protocols"
 set name=pkg.summary value="Solaris PPP Tunneling"
+set name=pkg.description value="Extensions implementing PPP tunneling protocols"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/inet
-dir path=usr/lib/inet/ppp
-dir path=usr/sbin
-dir path=usr/share/man/man1m
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/inet
+dir  path=usr/lib/inet/ppp
 file path=usr/lib/inet/ppp/pppoe.so mode=0544
 file path=usr/lib/inet/pppoec mode=0555
 file path=usr/lib/inet/pppoed mode=0555
+dir  path=usr/sbin
 file path=usr/sbin/sppptun mode=0555
+dir  path=usr/share/man/man1m
 file path=usr/share/man/man1m/pppoec.1m
 file path=usr/share/man/man1m/pppoed.1m
 file path=usr/share/man/man1m/sppptun.1m
