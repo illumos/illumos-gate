@@ -15,6 +15,7 @@
 # Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2020 Joyent, Inc.
 # Copyright (c) 2018 Datto Inc.
+# Copyright 2021 Jason King
 #
 
 set name=pkg.fmri value=pkg:/system/test/zfstest@$(PKGVERS)
@@ -411,9 +412,15 @@ file \
     path=opt/zfs-tests/tests/functional/channel_program/lua_core/tst.timeout.zcp \
     mode=0444
 dir  path=opt/zfs-tests/tests/functional/channel_program/synctask_core
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/synctask_core/change_key.exe \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/channel_program/synctask_core/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/channel_program/synctask_core/setup \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.change_key \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.destroy_fs \

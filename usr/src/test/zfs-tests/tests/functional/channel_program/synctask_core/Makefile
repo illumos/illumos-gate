@@ -11,15 +11,27 @@
 
 #
 # Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
+include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.ctf
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
 TESTDIR = $(ROOTOPTPKG)/tests/functional/channel_program/synctask_core
 
 KSHFILES :sh= ls *.ksh
-PROGS = $(KSHFILES:.ksh=)
+KSHPROGS = $(KSHFILES:.ksh=)
+
+SRCS :sh= ls *.c
+CPROGS = $(SRCS:%.c=%.exe)
+LDLIBS = $(LDLIBS.cmd)
+LDLIBS += -lzfs_core -lnvpair
+CSTD = $(CSTD_GNU99)
+OBJS = $(SRCS:%.c=%.o)
+
+PROGS = $(KSHPROGS) $(CPROGS)
 FILES :sh= ls *.zcp *.out *.err 2>/dev/null; true
 
 INSTPROGS = $(PROGS:%=$(TESTDIR)/%)
@@ -28,7 +40,9 @@ INSTFILES = $(FILES:%=$(TESTDIR)/%)
 $(INSTPROGS) := FILEMODE = 0555
 $(INSTFILES) := FILEMODE = 0444
 
-all lint clean clobber:
+all: $(CPROGS)
+
+clean clobber:
 
 install: $(INSTPROGS) $(INSTFILES)
 
@@ -43,3 +57,16 @@ $(TESTDIR)/%: %.ksh
 
 $(TESTDIR)/%: %
 	$(INS.file)
+
+%.o: ../%.c
+	$(COMPILE.c) $<
+
+%.exe: %.o
+	$(LINK.c) $< -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+clobber: clean
+	-$(RM) $(PROGS)
+
+clean:
+	-$(RM) $(OBJS)

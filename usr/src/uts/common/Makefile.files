@@ -1431,6 +1431,7 @@ ZFS_COMMON_OBJS +=		\
 	zap_leaf.o		\
 	zap_micro.o		\
 	zcp.o			\
+	zcp_change_key.o	\
 	zcp_get.o		\
 	zcp_set.o		\
 	zcp_global.o		\

@@ -164,6 +164,11 @@ typedef struct spa_keystore {
 	avl_tree_t sk_wkeys;
 } spa_keystore_t;
 
+typedef struct spa_keystore_change_key_args {
+	const char *skcka_dsname;
+	dsl_crypto_params_t *skcka_cp;
+} spa_keystore_change_key_args_t;
+
 int dsl_crypto_params_create_nvlist(dcp_cmd_t cmd, nvlist_t *props,
     nvlist_t *crypto_args, dsl_crypto_params_t **dcp_out);
 void dsl_crypto_params_free(dsl_crypto_params_t *dcp, boolean_t unload);
@@ -199,6 +204,8 @@ int dsl_crypto_recv_raw(const char *poolname, uint64_t dsobj, uint64_t fromobj,
     dmu_objset_type_t ostype, nvlist_t *nvl, boolean_t do_key);
 
 int spa_keystore_change_key(const char *dsname, dsl_crypto_params_t *dcp);
+int spa_keystore_change_key_check(void *arg, dmu_tx_t *tx);
+void spa_keystore_change_key_sync(void *arg, dmu_tx_t *tx);
 int dsl_dir_rename_crypt_check(dsl_dir_t *dd, dsl_dir_t *newparent);
 int dsl_dataset_promote_crypt_check(dsl_dir_t *target, dsl_dir_t *origin);
 void dsl_dataset_promote_crypt_sync(dsl_dir_t *target, dsl_dir_t *origin,

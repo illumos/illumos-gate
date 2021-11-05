@@ -37,6 +37,7 @@
  * Copyright (c) 2017, loli10K <ezomori.nozomu@gmail.com>. All rights reserved.
  * Copyright 2017 RackTop Systems.
  * Copyright (c) 2017, Datto, Inc. All rights reserved.
+ * Copyright 2021 The University of Queensland
  */
 
 /*
@@ -3837,6 +3838,7 @@ zfs_ioc_destroy_bookmarks(const char *poolname, nvlist_t *innvl,
 static const zfs_ioc_key_t zfs_keys_channel_program[] = {
 	{"program",	DATA_TYPE_STRING,		0},
 	{"arg",		DATA_TYPE_ANY,			0},
+	{"hidden_args",	DATA_TYPE_ANY,			ZK_OPTIONAL},
 	{"sync",	DATA_TYPE_BOOLEAN_VALUE,	ZK_OPTIONAL},
 	{"instrlimit",	DATA_TYPE_UINT64,		ZK_OPTIONAL},
 	{"memlimit",	DATA_TYPE_UINT64,		ZK_OPTIONAL},
@@ -3850,6 +3852,7 @@ zfs_ioc_channel_program(const char *poolname, nvlist_t *innvl,
 	uint64_t instrlimit, memlimit;
 	boolean_t sync_flag;
 	nvpair_t *nvarg = NULL;
+	nvlist_t *hidden_args = NULL;
 
 	program = fnvlist_lookup_string(innvl, ZCP_ARG_PROGRAM);
 	if (0 != nvlist_lookup_boolean_value(innvl, ZCP_ARG_SYNC, &sync_flag)) {
@@ -3862,6 +3865,16 @@ zfs_ioc_channel_program(const char *poolname, nvlist_t *innvl,
 		memlimit = ZCP_DEFAULT_MEMLIMIT;
 	}
 	nvarg = fnvlist_lookup_nvpair(innvl, ZCP_ARG_ARGLIST);
+
+	/* hidden args are optional */
+	if (nvlist_lookup_nvlist(innvl, ZPOOL_HIDDEN_ARGS, &hidden_args) == 0) {
+		nvlist_t *argnvl = fnvpair_value_nvlist(nvarg);
+		int ret;
+
+		ret = nvlist_add_nvlist(argnvl, ZPOOL_HIDDEN_ARGS, hidden_args);
+		if (ret != 0)
+			return (ret);
+	}
 
 	if (instrlimit == 0 || instrlimit > zfs_lua_max_instrlimit)
 		return (EINVAL);
