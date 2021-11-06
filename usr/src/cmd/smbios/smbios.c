@@ -480,7 +480,8 @@ static void
 print_chassis(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
 	smbios_chassis_t c;
-	int elem_cnt;
+	smbios_chassis_entry_t *elts;
+	uint_t nelts, i;
 
 	(void) smbios_info_chassis(shp, id, &c);
 
@@ -504,35 +505,38 @@ print_chassis(smbios_hdl_t *shp, id_t id, FILE *fp)
 	oprintf(fp, "  Chassis Height: %uu\n", c.smbc_uheight);
 	oprintf(fp, "  Power Cords: %u\n", c.smbc_cords);
 
-	elem_cnt = c.smbc_elems;
-	oprintf(fp, "  Element Records: %u\n", elem_cnt);
+	oprintf(fp, "  Element Records: %u\n", c.smbc_elems);
 
-	if (elem_cnt > 0) {
-		id_t *elems;
-		uint8_t type;
-		int i, n, cnt;
+	if (c.smbc_elems == 0) {
+		return;
+	}
 
-		elems = alloca(c.smbc_elems * sizeof (id_t));
-		cnt = smbios_info_contains(shp, id, elem_cnt, elems);
-		if (cnt > SMB_CONT_MAX)
-			return;
-		n = MIN(elem_cnt, cnt);
+	if (smbios_info_chassis_elts(shp, id, &nelts, &elts) != 0) {
+		smbios_warn(shp, "failed to read chassis elements");
+		return;
+	}
 
-		oprintf(fp, "\n");
-		for (i = 0; i < n; i++) {
-			type = (uint8_t)elems[i];
-			if (type & 0x80) {
-				/* SMBIOS structrure Type */
-				desc_printf(smbios_type_name(type & 0x7f), fp,
-				    "  Contained SMBIOS structure Type: %u",
-				    type & 0x80);
-			} else {
-				/* SMBIOS Base Board Type */
-				desc_printf(smbios_bboard_type_desc(type), fp,
-				    "  Contained SMBIOS Base Board Type: 0x%x",
-				    type);
-			}
+	oprintf(fp, "\n");
+
+	for (i = 0; i < nelts; i++) {
+		switch (elts[i].smbce_type) {
+		case SMB_CELT_BBOARD:
+			desc_printf(smbios_bboard_type_desc(elts[i].smbce_elt),
+			    fp, "  Contained SMBIOS Base Board Type: 0x%x",
+			    elts[i].smbce_elt);
+			break;
+		case SMB_CELT_SMBIOS:
+			desc_printf(smbios_type_name(elts[i].smbce_elt), fp,
+			    "  Contained SMBIOS structure Type: %u",
+			    elts[i].smbce_elt);
+			break;
+		default:
+			oprintf(fp, "  Unknown contained Type: %u/%u\n",
+			    elts[i].smbce_type, elts[i].smbce_elt);
+			break;
 		}
+		oprintf(fp, "    Minimum number: %u\n", elts[i].smbce_min);
+		oprintf(fp, "    Maximum number: %u\n", elts[i].smbce_max);
 	}
 }
 
@@ -782,6 +786,19 @@ print_slot(smbios_hdl_t *shp, id_t id, FILE *fp)
 		oprintf(fp, "  Slot Pitch: %u.%u mm\n", s.smbl_pitch / 100,
 		    s.smbl_pitch % 100);
 	}
+
+	/*
+	 * The slot height was introduced in SMBIOS 3.5. However, a value of
+	 * zero here does not mean that it is unknown, but rather that the
+	 * concept is not applicable. Therefore we cannot use a standard check
+	 * against zero for this and instead use the version.
+	 */
+	if (smbios_vergteq(&v, 3, 5)) {
+		desc_printf(smbios_slot_height_desc(s.smbl_height), fp,
+		    "  Height: 0x%x", s.smbl_height);
+	} else {
+		oprintf(fp, "  Height:  unknown\n");
+	}
 }
 
 static void
@@ -798,7 +815,7 @@ print_obdevs_ext(smbios_hdl_t *shp, id_t id, FILE *fp)
 	 * are the actual device type.
 	 */
 	enabled = oe.smboe_dtype >> 7;
-	type = smbios_onboard_type_desc(oe.smboe_dtype & 0x7f);
+	type = smbios_onboard_ext_type_desc(oe.smboe_dtype & 0x7f);
 
 	str_print(fp, "  Reference Designator", oe.smboe_name);
 	oprintf(fp, "  Device Enabled: %s\n", enabled == B_TRUE ? "true" :
@@ -1685,6 +1702,74 @@ print_extmemdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 	}
 }
 
+static void
+print_strprop_info(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	smbios_strprop_t prop;
+
+	if (smbios_info_strprop(shp, id, &prop) != 0) {
+		smbios_warn(shp, "failed to read string property information");
+		return;
+	}
+
+	desc_printf(smbios_strprop_id_desc(prop.smbsp_prop_id), fp,
+	    "  Property ID: %u", prop.smbsp_prop_id);
+	if (prop.smbsp_prop_val != NULL) {
+		str_print(fp, "  Property Value", prop.smbsp_prop_val);
+	}
+	id_printf(fp, "  Parent Handle: ", prop.smbsp_parent);
+}
+
+static void
+print_fwinfo(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	smbios_fwinfo_t fw;
+	smbios_fwinfo_comp_t *comps;
+	uint_t ncomps, i;
+
+	if (smbios_info_fwinfo(shp, id, &fw) != 0) {
+		smbios_warn(shp, "failed to read firmware inventory");
+		return;
+	}
+
+	str_print(fp, "  Component Name", fw.smbfw_name);
+	str_print(fp, "  ID", fw.smbfw_id);
+	str_print(fp, "  Release Date", fw.smbfw_reldate);
+	str_print(fp, "  Lowest Supported Version", fw.smbfw_lsv);
+	desc_printf(smbios_fwinfo_vers_desc(fw.smbfw_vers_fmt), fp,
+	    "  Version Format: %u", fw.smbfw_vers_fmt);
+	desc_printf(smbios_fwinfo_id_desc(fw.smbfw_id_fmt), fp,
+	    "  ID Format: %u", fw.smbfw_id_fmt);
+	if (fw.smbfw_imgsz != UINT64_MAX) {
+		oprintf(fp, "  Image Size: %" PRIu64 "\n", fw.smbfw_imgsz);
+	} else {
+		oprintf(fp, "  Image Size: unknown\n");
+	}
+
+	flag_printf(fp, "Characteristics", fw.smbfw_chars,
+	    sizeof (fw.smbfw_chars) * NBBY, smbios_fwinfo_ch_name,
+	    smbios_fwinfo_ch_desc);
+
+	desc_printf(smbios_fwinfo_state_desc(fw.smbfw_state), fp, "  State: %u",
+	    fw.smbfw_state);
+	oprintf(fp, "  Number of Associated Components: %u\n",
+	    fw.smbfw_ncomps);
+
+	if (fw.smbfw_ncomps == 0)
+		return;
+
+	if (smbios_info_fwinfo_comps(shp, id, &ncomps, &comps) == -1) {
+		smbios_warn(shp, "failed to read firmware inventory "
+		    "components");
+		return;
+	}
+
+	oprintf(fp, "\n  Component Handles:\n");
+	for (i = 0; i < ncomps; i++) {
+		oprintf(fp, "    %ld\n", comps[i]);
+	}
+}
+
 static int
 print_struct(smbios_hdl_t *shp, const smbios_struct_t *sp, void *fp)
 {
@@ -1840,6 +1925,14 @@ print_struct(smbios_hdl_t *shp, const smbios_struct_t *sp, void *fp)
 	case SMB_TYPE_PROCESSOR_INFO:
 		oprintf(fp, "\n");
 		print_processor_info(shp, sp->smbstr_id, fp);
+		break;
+	case SMB_TYPE_STRPROP:
+		oprintf(fp, "\n");
+		print_strprop_info(shp, sp->smbstr_id, fp);
+		break;
+	case SMB_TYPE_FWINFO:
+		oprintf(fp, "\n");
+		print_fwinfo(shp, sp->smbstr_id, fp);
 		break;
 	case SUN_OEM_EXT_PROCESSOR:
 		oprintf(fp, "\n");

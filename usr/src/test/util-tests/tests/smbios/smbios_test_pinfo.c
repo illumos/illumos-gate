@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Robert Mustacchi
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -330,13 +331,13 @@ smbios_test_pinfo_verify_riscv(smbios_hdl_t *hdl)
 	}
 
 	if (strcmp(smbios_riscv_isa_desc(SMB_RV_ISA_C), "Compressed") != 0) {
-		warnx("SMB_RV_ISA_Q string desc mismatch, found %s",
+		warnx("SMB_RV_ISA_C string desc mismatch, found %s",
 		    smbios_riscv_isa_desc(SMB_RV_ISA_C));
 		ret = B_FALSE;
 	}
 
 	if (strcmp(smbios_riscv_isa_desc(SMB_RV_ISA_Q),
-	    "Quad-precision floating-poit") != 0) {
+	    "Quad-precision floating-point") != 0) {
 		warnx("SMB_RV_ISA_Q string desc mismatch, found %s",
 		    smbios_riscv_isa_desc(SMB_RV_ISA_Q));
 		ret = B_FALSE;
