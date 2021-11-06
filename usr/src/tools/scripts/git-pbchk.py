@@ -319,7 +319,7 @@ def pkgfmt(root, parent, flist, output):
     ret = 0
     output.write("Package manifests:\n")
 
-    for f in flist(lambda x: x.endswith('.mf')):
+    for f in flist(lambda x: x.endswith('.p5m')):
         with io.open(f, mode='rb') as fh:
             ret |= PkgFmt.check(fh, output=output)
 

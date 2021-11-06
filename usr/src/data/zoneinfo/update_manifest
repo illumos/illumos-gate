@@ -22,7 +22,7 @@ This script should be run within a bldenv by issuing 'make update' in
 	exit 1
 fi
 
-MANIFEST=$CODEMGR_WS/usr/src/pkg/manifests/system-data-zoneinfo.mf
+MANIFEST=$CODEMGR_WS/usr/src/pkg/manifests/system-data-zoneinfo.p5m
 PREFIX=usr/share/lib/zoneinfo
 
 if [[ ! -f "$MANIFEST" ]]; then

@@ -249,21 +249,21 @@ CLOBBERFILES= $(PDIR) proto_list_$(PKGMACH) install-$(PKGMACH).out \
 # SUNW.* as one useful example.
 #
 SPECIAL_MANIFESTS = system-library-python-.*
-LIST_MANIFESTS_CMD = (cd manifests ; /usr/bin/ls -1 *.mf |\
+LIST_MANIFESTS_CMD = (cd manifests ; /usr/bin/ls -1 *.p5m |\
 	$(SED) $(SPECIAL_MANIFESTS:%=-e '/^%$$/d') )
 MANIFESTS = $(LIST_MANIFESTS_CMD:sh)
 
 # Conditionally add back python modules
 $(BUILDPY2) MANIFESTS += \
-	system-library-python-libbe-2.mf \
-	system-library-python-solaris-2.mf \
-	system-library-python-zfs-2.mf
+	system-library-python-libbe-2.p5m \
+	system-library-python-solaris-2.p5m \
+	system-library-python-zfs-2.p5m
 $(BUILDPY3) MANIFESTS += \
-	system-library-python-libbe-3.mf \
-	system-library-python-solaris-3.mf \
-	system-library-python-zfs-3.mf
+	system-library-python-libbe-3.p5m \
+	system-library-python-solaris-3.p5m \
+	system-library-python-zfs-3.p5m
 
-PKGS= $(MANIFESTS:%.mf=%)
+PKGS= $(MANIFESTS:%.p5m=%)
 DEP_PKGS= $(PKGS:%=$(PDIR)/%.dep)
 PROC_PKGS= $(PKGS:%=$(PDIR)/%.mog)
 FIN_PKGS= $(PKGS:%=$(PDIR)/%.fin)
@@ -326,7 +326,7 @@ PKGLISTS= \
 #
 # For a single manifest, the dependency chain looks like this:
 #
-#	raw manifest (mypkg.mf)
+#	raw manifest (mypkg.p5m)
 #		|
 #		| use pkgmogrify to process raw manifest
 #		|
@@ -532,9 +532,9 @@ $(REPOS:%=$(PKGDEST)/repo.%):
 #   pkgmogrify encounters an abort in the publish transforms.
 #
 
-.SUFFIXES: .mf .mog .dep .res .fin .pub
+.SUFFIXES: .p5m .mog .dep .res .fin .pub
 
-$(PDIR)/%.mog: manifests/%.mf
+$(PDIR)/%.mog: manifests/%.p5m
 	@print "Processing manifest $(<F)"
 	@pkgfmt -fv2 -c $<
 	$(PKGDEBUG)$(RM) $(@) $(@:%.mog=%) $(@:%.mog=%.nodepend) \
@@ -611,12 +611,12 @@ $(PDIR)/%.pub: $(PDIR)/%.fin
 # The implementation notes from the previous rule are applicable
 # here, too.
 #
-$(PROC_SYNTH_PKGS): $(PKGLISTS) $$(@F:%.mog=%.mf)
-	@print "Processing synthetic manifest $(@F:%.mog=%.mf)"
+$(PROC_SYNTH_PKGS): $(PKGLISTS) $$(@F:%.mog=%.p5m)
+	@print "Processing synthetic manifest $(@F:%.mog=%.p5m)"
 	$(PKGDEBUG)$(RM) $(@) $(PDIR)/$(@F:%.mog=%).metadata.* $(@).vars
 	$(PKGDEBUG)$(PKGMOGRIFY) $(PKGMOG_VERBOSE) -I transforms -I $(PDIR) \
 		$(PKGMOG_DEFINES:%=-D %) -D PKGDEP_TYPE=$(PKGDEP_TYPE) \
-		-P $(@).vars -O $(@) $(@F:%.mog=%.mf) \
+		-P $(@).vars -O $(@) $(@F:%.mog=%.p5m) \
 		$(PM_TRANSFORMS) synthetic
 	$(PKGDEBUG)eval REPO=redist PKGSTAT=current `$(CAT) -s $(@).vars`; \
 	if [ -f $(@) ]; then \

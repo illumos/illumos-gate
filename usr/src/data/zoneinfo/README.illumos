@@ -75,7 +75,7 @@ hardlink path=usr/share/lib/zoneinfo/Arda/Gondolin target=Beleriand
 The 'update' make target can help with this by automatically re-generating all
 of the hardlinks in the package manifest based on the Link lines found in the
 data files. Run 'make update' and then check the manifest file at
-$CODEMGR_WS/usr/src/pkg/manifests/system-data-zoneinfo.mf to ensure it has
+$CODEMGR_WS/usr/src/pkg/manifests/system-data-zoneinfo.p5m to ensure it has
 done the right thing.
 
 Other differences in files describe the addition and removal of various

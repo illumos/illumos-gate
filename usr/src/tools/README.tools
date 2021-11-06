@@ -255,6 +255,6 @@ Files you have to update to add a tool
 
 1.  Add the tool in its appropriate place.
 2.  Update the Makefile as required.
-3.  Update usr/src/pkg/manifests/developer-build-onbld.mf
+3.  Update usr/src/pkg/manifests/developer-build-onbld.p5m
 4.  Update usr/src/tools/README.tools (this file).
 5.  Repeat 1-4 for any man pages.
