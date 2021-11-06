@@ -96,7 +96,6 @@ bfastpathrec fastpath_builtins[] =
 	{ "id",		b_id		},
 	{ "join",	b_join		},
 	{ "ln",		b_ln		},
-	{ "logname",	b_logname	},
 	{ "md5sum",	b_md5sum	},
 	{ "mkdir",	b_mkdir		},
 	{ "mkfifo",	b_mkfifo	},
