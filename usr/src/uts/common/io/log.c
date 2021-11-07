@@ -271,23 +271,14 @@ log_rsrv(queue_t *q)
 	size_t idlen;
 
 	while (canputnext(q) && (mp = getq(q)) != NULL) {
-		if (log_msgid == 0) {
-			/*
-			 * Strip out the message ID.  If it's a kernel
-			 * SL_CONSOLE message, replace msgid with "unix: ".
-			 */
-			msg = (char *)mp->b_cont->b_rptr;
-			if ((msgid_start = strstr(msg, "[ID ")) != NULL &&
-			    (msgid_end = strstr(msgid_start, "] ")) != NULL) {
-				log_ctl_t *lc = (log_ctl_t *)mp->b_rptr;
-				if ((lc->flags & SL_CONSOLE) &&
-				    (lc->pri & LOG_FACMASK) == LOG_KERN)
-					msgid_start = msg + snprintf(msg,
-					    7, "unix: ");
-				idlen = msgid_end + 2 - msgid_start;
-				ovbcopy(msg, msg + idlen, msgid_start - msg);
-				mp->b_cont->b_rptr += idlen;
-			}
+		msg = (char *)mp->b_cont->b_rptr;
+		if (log_msgid == 0 &&
+		    (msgid_start = strstr(msg, "[ID ")) != NULL &&
+		    (msgid_end = strstr(msgid_start, "] ")) != NULL) {
+			/* Strip out the message ID */
+			idlen = msgid_end + 2 - msgid_start;
+			ovbcopy(msg, msg + idlen, msgid_start - msg);
+			mp->b_cont->b_rptr += idlen;
 		}
 		mp->b_band = 0;
 		putnext(q, mp);
