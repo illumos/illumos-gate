@@ -26,8 +26,6 @@
 #ifndef	_STRING_TABLE_DOT_H
 #define	_STRING_TABLE_DOT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef __cplusplus
@@ -50,6 +48,8 @@ extern int		st_insert(Str_tbl *, const char *);
 extern Str_tbl		*st_new(uint_t);
 extern int		st_setstrbuf(Str_tbl *, char *, size_t);
 extern int		st_setstring(Str_tbl *, const char *, size_t *);
+extern void		st_setallstrings(Str_tbl *);
+extern off_t		st_findstring(Str_tbl *, const char *);
 
 /*
  * Exported flags values for st_new().

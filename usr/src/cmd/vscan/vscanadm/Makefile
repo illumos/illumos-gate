@@ -34,7 +34,6 @@ LDFLAGS += -R/usr/lib/vscan
 CFLAGS += $(CCVERBOSE)
 
 CSTD =       $(CSTD_GNU99)
-C99LMODE =      -Xc99=%all
 
 .KEEP_STATE:
 
@@ -42,8 +41,6 @@ all: $(PROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

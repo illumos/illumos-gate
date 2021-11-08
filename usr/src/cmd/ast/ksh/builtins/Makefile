@@ -44,7 +44,6 @@ ALIASPROG= \
 	jobs \
 	join \
 	kill \
-	logname \
 	paste \
 	print \
 	read \

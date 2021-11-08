@@ -60,8 +60,6 @@ INC_PATH	+= -I$(UTSBASE)/common/fs/zut
 INC_PATH	+= -I$(SRC)/common
 INC_PATH	+= -I$(COMMONBASE)/zut
 
-C99LMODE=	-Xc99=%all
-
 #
 # For now, disable these warnings; maintainers should endeavor
 # to investigate and remove these for maximum coverage.

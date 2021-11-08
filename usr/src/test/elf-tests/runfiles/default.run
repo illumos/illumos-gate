@@ -10,7 +10,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-# Copyright 2018, Richard Lowe.
+# Copyright 2021, Richard Lowe.
 
 [DEFAULT]
 pre =
@@ -31,6 +31,9 @@ tests = ['test-parser']
 
 [/opt/elf-tests/tests/mapfiles/assert]
 tests = ['test-assert']
+
+[/opt/elf-tests/tests/string-merge/]
+tests = ['simple']
 
 [/opt/elf-tests/tests/tls/amd64/ie]
 arch = i86pc

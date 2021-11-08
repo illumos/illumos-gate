@@ -57,8 +57,6 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 LDFLAGS		+= -dy -Ndrv/fct -Ndrv/stmf
 CFLAGS		+= -DUNIQUE_FW_NAME
 
-C99LMODE=	-Xc99=%all
-
 #
 # For now, disable these warnings; maintainers should endeavor
 # to investigate and remove these for maximum coverage.

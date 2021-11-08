@@ -32,6 +32,8 @@
 
 #define	ELF_TARGET_AMD64
 
+#include	<sys/debug.h>
+
 #include	<string.h>
 #include	<strings.h>
 #include	<stdio.h>
@@ -2742,46 +2744,47 @@ strmerge_get_reloc_str(Ofl_desc *ofl, Rel_desc *rsp)
 /*
  * First pass over the relocation records for string table merging.
  * Build lists of relocations and symbols that will need modification,
- * and insert the strings they reference into the mstrtab string table.
+ * and insert the strings they reference into the output string table.
  *
  * entry:
- *	ofl, osp - As passed to ld_make_strmerge().
- *	mstrtab - String table to receive input strings. This table
- *		must be in its first (initialization) pass and not
- *		yet cooked (st_getstrtab_sz() not yet called).
- *	rel_alpp - APlist to receive pointer to any relocation
- *		descriptors with STT_SECTION symbols that reference
- *		one of the input sections being merged.
- *	sym_alpp - APlist to receive pointer to any symbols that reference
- *		one of the input sections being merged.
- *	rcp - Pointer to cache of relocation descriptors to examine.
- *		Either &ofl->ofl_actrels (active relocations)
- *		or &ofl->ofl_outrels (output relocations).
+ *	ofl - Output file descriptor
  *
- * exit:
- *	On success, rel_alpp and sym_alpp are updated, and
- *	any strings in the mergeable input sections referenced by
- *	a relocation has been entered into mstrtab. True (1) is returned.
+ * exit: On success, the string merging specific members of each output
+ *	section descriptor in ofl are updated based on information from the
+ *	relocation entries, and 0 is returned.
  *
- *	On failure, False (0) is returned.
+ *	On error, S_ERROR is returned.
  */
-static int
-strmerge_pass1(Ofl_desc *ofl, Os_desc *osp, Str_tbl *mstrtab,
-    APlist **rel_alpp, APlist **sym_alpp, Rel_cache *rcp)
+static uintptr_t
+ld_gather_strmerge(Ofl_desc *ofl, Rel_cache *cache)
 {
-	Aliste		idx;
-	Rel_cachebuf	*rcbp;
-	Sym_desc	*sdp;
-	Sym_desc	*last_sdp = NULL;
-	Rel_desc	*rsp;
-	const char	*name;
+	Rel_cachebuf *rbcp;
+	Rel_desc *rsp;
+	Sym_desc *last_sdp = NULL;
+	Aliste idx1;
 
-	REL_CACHE_TRAVERSE(rcp, idx, rcbp, rsp) {
-		sdp = rsp->rel_sym;
+	/*
+	 * Pass 1:
+	 *
+	 * Build lists of relocations and symbols that will need
+	 * modification, and insert the strings they reference into
+	 * the output string table.
+	 */
+	REL_CACHE_TRAVERSE(cache, idx1, rbcp, rsp) {
+		Sym_desc *sdp = rsp->rel_sym;
+		Os_desc *osp;
+		const char *name;
+
+		/*
+		 * If there's no input section, or the input section is
+		 * discarded or does not contain mergable strings, we have
+		 * nothing to do.
+		 */
 		if ((sdp->sd_isc == NULL) || ((sdp->sd_isc->is_flags &
-		    (FLG_IS_DISCARD | FLG_IS_INSTRMRG)) != FLG_IS_INSTRMRG) ||
-		    (sdp->sd_isc->is_osdesc != osp))
+		    (FLG_IS_DISCARD | FLG_IS_INSTRMRG)) != FLG_IS_INSTRMRG))
 			continue;
+
+		osp = sdp->sd_isc->is_osdesc;
 
 		/*
 		 * Remember symbol for use in the third pass. There is no
@@ -2791,78 +2794,108 @@ strmerge_pass1(Ofl_desc *ofl, Os_desc *osp, Str_tbl *mstrtab,
 		 * we saved last time, don't bother.
 		 */
 		if (last_sdp != sdp) {
-			if (aplist_append(sym_alpp, sdp, AL_CNT_STRMRGSYM) ==
-			    NULL)
-				return (0);
+			if (aplist_append(&osp->os_mstrsyms, sdp,
+			    AL_CNT_STRMRGSYM) == NULL)
+				return (S_ERROR);
 			last_sdp = sdp;
 		}
 
+		if ((osp->os_mstrtab == NULL) &&
+		    (osp->os_mstrtab = st_new(FLG_STNEW_COMPRESS)) == NULL)
+			return (S_ERROR);
+
 		/* Enter the string into our new string table */
 		name = strmerge_get_reloc_str(ofl, rsp);
-		if (st_insert(mstrtab, name) == -1)
-			return (0);
+		if (st_insert(osp->os_mstrtab, name) == -1)
+			return (S_ERROR);
 
 		/*
 		 * If this is an STT_SECTION symbol, then the second pass
 		 * will need to modify this relocation, so hang on to it.
 		 */
 		if ((ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) &&
-		    (aplist_append(rel_alpp, rsp, AL_CNT_STRMRGREL) == NULL))
-			return (0);
+		    (aplist_append(&osp->os_mstrrels, rsp,
+		    AL_CNT_STRMRGREL) == NULL)) {
+			return (S_ERROR);
+		}
 	}
 
-	return (1);
+	return (0);
 }
 
 /*
- * If the output section has any SHF_MERGE|SHF_STRINGS input sections,
- * replace them with a single merged/compressed input section.
+ * If any an output section has more than one SHF_MERGE|SHF_STRINGS input
+ * section, replace them with a single merged/compressed input section.
+ *
+ * This is done by making a Str_tbl (as we use for managing SHT_STRTAB
+ * sections) per output section with compression enabled to manage all strings
+ * in the mergeable input sections.  We then discard all inputs which
+ * contributed to this table and replace them with an input section we create
+ * taking data from this Str_tbl.  References to the now discarded sections
+ * are then updated to refer to our new merged input section, and the string
+ * table and other metadata are freed.
+ *
+ * This process is done in 3 passes.  For efficiency reasons half of pass 1 is
+ * done by ld_strmerge_gather() so relocations only need to be processed once.
+ * Steps 1.5 onward are performed here.  The steps are:
+ *
+ *	1) In ld_strmerge_gather() examine all relocations, insert strings
+ *		from relocations to the mergeable input sections into the string
+ *		table.
+ *	1.5) Gather every string from the mergeable input sections, regardless
+ *		of whether it is referenced from a relocation.	 All strings
+ *		must be processed, and relocations may point into the middle
+ *		of an actual NUL-terminated string, so we must enter both the
+ *		precise strings referenced by relocations and full strings
+ *		within the section.
+ *	2) Modify the relocation values to be correct for the
+ *		new merged section.
+ *	3) Modify the symbols used by the relocations to reference
+ *		the new section.
+ *
+ * These passes cannot be combined:
+ *	- The string table code works in two passes, and all
+ *		strings have to be loaded in pass one before the
+ *		offset of any strings can be determined.
+ *	- Multiple relocations reference a single symbol, so the
+ *		symbol cannot be modified until all relocations are
+ *		fixed.
  *
  * entry:
  *	ofl - Output file descriptor
- *	osp - Output section descriptor
- *	rel_alpp, sym_alpp, - Address of 2 APlists, to be used
- *		for internal processing. On the initial call to
- *		ld_make_strmerge, these list pointers must be NULL.
- *		The caller is encouraged to pass the same lists back for
- *		successive calls to this function without freeing
- *		them in between calls. This causes a single pair of
- *		memory allocations to be reused multiple times.
+ *	osp - Outputs section descriptor
  *
  * exit:
- *	If section merging is possible, it is done. If no errors are
- *	encountered, True (1) is returned. On error, S_ERROR.
+ *	If section merging is possible for this output section, it is done.
+ *	If no errors are encountered, 0 is returned. On error, S_ERROR is
+ *	returned.
  *
- *	The contents of rel_alpp and sym_alpp on exit are
- *	undefined. The caller can free them, or pass them back to a subsequent
- *	call to this routine, but should not examine their contents.
+ *	The contents of the string-merging specific members of this output
+ *	section descriptor are undefined after this function returns.
  */
 static uintptr_t
-ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
-    APlist **sym_alpp)
+ld_strmerge_sec(Ofl_desc *ofl, Os_desc *osp)
 {
-	Str_tbl		*mstrtab;	/* string table for string merge secs */
-	Is_desc		*mstrsec;	/* Generated string merge section */
-	Is_desc		*isp;
-	Shdr		*mstr_shdr;
-	Elf_Data	*mstr_data;
+	Is_desc		*isp = NULL;
 	Sym_desc	*sdp;
 	Rel_desc	*rsp;
-	Aliste		idx;
+	Is_desc		*mstrsec = NULL; /* Generated string merge section */
+	Shdr		*mstr_shdr = NULL;
+	Elf_Data	*mstr_data = NULL;
 	size_t		data_size;
-	int		st_setstring_status;
-	size_t		stoff;
-
-	/* If string table compression is disabled, there's nothing to do */
-	if ((ofl->ofl_flags1 & FLG_OF1_NCSTTAB) != 0)
-		return (1);
+	Aliste		idx;
+	uintptr_t	ret = 0;
+	Boolean		placed = FALSE;
 
 	/*
-	 * Pass over the mergeable input sections, and if they haven't
-	 * all been discarded, create a string table.
+	 * Pass 1.5: Add all strings from all mergeable input sections.
+	 *
+	 * The last section we find also serves as the template for our
+	 * replacement merged section, providing the section attributes, etc.
 	 */
-	mstrtab = NULL;
 	for (APLIST_TRAVERSE(osp->os_mstrisdescs, idx, isp)) {
+		const char *str, *end;
+
 		if (isdesc_discarded(isp))
 			continue;
 
@@ -2873,93 +2906,66 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
 		if (isp->is_shdr->sh_size == 0)
 			continue;
 
-		/*
-		 * We have at least one non-discarded section.
-		 * Create a string table descriptor.
-		 */
-		if ((mstrtab = st_new(FLG_STNEW_COMPRESS)) == NULL)
-			return (S_ERROR);
-		break;
+		if ((osp->os_mstrtab == NULL) &&
+		    (osp->os_mstrtab = st_new(FLG_STNEW_COMPRESS)) == NULL) {
+			ret = S_ERROR;
+			goto out;
+		}
+
+		end = isp->is_indata->d_buf + isp->is_indata->d_size;
+		for (str = isp->is_indata->d_buf; str < end;
+		    str += strlen(str) + 1) {
+			if (st_insert(osp->os_mstrtab, str) != 0) {
+				ret = S_ERROR;
+				goto out;
+			}
+		}
 	}
 
-	/* If no string table was created, we have no mergeable sections */
-	if (mstrtab == NULL)
-		return (1);
+	IMPLY(osp->os_mstrtab != NULL, isp != NULL);
+	if (osp->os_mstrtab == NULL) {
+		ret = 0;
+		goto out;
+	}
 
 	/*
-	 * This routine has to make 3 passes:
-	 *
-	 *	1) Examine all relocations, insert strings from relocations
-	 *		to the mergeable input sections into the string table.
-	 *	2) Modify the relocation values to be correct for the
-	 *		new merged section.
-	 *	3) Modify the symbols used by the relocations to reference
-	 *		the new section.
-	 *
-	 * These passes cannot be combined:
-	 *	- The string table code works in two passes, and all
-	 *		strings have to be loaded in pass one before the
-	 *		offset of any strings can be determined.
-	 *	- Multiple relocations reference a single symbol, so the
-	 *		symbol cannot be modified until all relocations are
-	 *		fixed.
-	 *
-	 * The number of relocations related to section merging is usually
-	 * a mere fraction of the overall active and output relocation lists,
-	 * and the number of symbols is usually a fraction of the number
-	 * of related relocations. We therefore build APlists for the
-	 * relocations and symbols in the first pass, and then use those
-	 * lists to accelerate the operation of pass 2 and 3.
-	 *
-	 * Reinitialize the lists to a completely empty state.
+	 * Get the size of the new input section. Requesting the string
+	 * table size "cooks" the table, and finalizes its contents.
 	 */
-	aplist_reset(*rel_alpp);
-	aplist_reset(*sym_alpp);
-
-	/*
-	 * Pass 1:
-	 *
-	 * Every relocation related to this output section (and the input
-	 * sections that make it up) is found in either the active, or the
-	 * output relocation list, depending on whether the relocation is to
-	 * be processed by this invocation of the linker, or inserted into the
-	 * output object.
-	 *
-	 * Build lists of relocations and symbols that will need modification,
-	 * and insert the strings they reference into the mstrtab string table.
-	 */
-	if (strmerge_pass1(ofl, osp, mstrtab, rel_alpp, sym_alpp,
-	    &ofl->ofl_actrels) == 0)
-		goto return_s_error;
-	if (strmerge_pass1(ofl, osp, mstrtab, rel_alpp, sym_alpp,
-	    &ofl->ofl_outrels) == 0)
-		goto return_s_error;
-
-	/*
-	 * Get the size of the new input section. Requesting the
-	 * string table size "cooks" the table, and finalizes its contents.
-	 */
-	data_size = st_getstrtab_sz(mstrtab);
+	data_size = st_getstrtab_sz(osp->os_mstrtab);
 
 	/* Create a new input section to hold the merged strings */
 	if (new_section_from_template(ofl, isp, data_size,
-	    &mstrsec, &mstr_shdr, &mstr_data) == S_ERROR)
-		goto return_s_error;
+	    &mstrsec, &mstr_shdr, &mstr_data) == S_ERROR) {
+		ret = S_ERROR;
+		goto out;
+	}
 	mstrsec->is_flags |= FLG_IS_GNSTRMRG;
 
 	/*
-	 * Allocate a data buffer for the new input section.
-	 * Then, associate the buffer with the string table descriptor.
+	 * Allocate a data buffer for the new input section, associate the
+	 * buffer with the string table descriptor, and fill it from the
+	 * string table.
 	 */
-	if ((mstr_data->d_buf = libld_malloc(data_size)) == NULL)
-		goto return_s_error;
-	if (st_setstrbuf(mstrtab, mstr_data->d_buf, data_size) == -1)
-		goto return_s_error;
+	if ((mstr_data->d_buf = libld_malloc(data_size)) == NULL) {
+		ret = S_ERROR;
+		goto out;
+	}
+	if ((st_setstrbuf(osp->os_mstrtab, mstr_data->d_buf,
+	    data_size) == -1)) {
+		ret = S_ERROR;
+		goto out;
+	}
+
+	st_setallstrings(osp->os_mstrtab);
 
 	/* Add the new section to the output image */
 	if (ld_place_section(ofl, mstrsec, NULL, osp->os_identndx, NULL) ==
-	    (Os_desc *)S_ERROR)
-		goto return_s_error;
+	    (Os_desc *)S_ERROR) {
+		ret = S_ERROR;
+		goto out;
+	}
+	placed = TRUE;
 
 	/*
 	 * Pass 2:
@@ -2969,20 +2975,17 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
 	 * record so that the offset it contains is for the new section
 	 * instead of the original.
 	 */
-	for (APLIST_TRAVERSE(*rel_alpp, idx, rsp)) {
+	for (APLIST_TRAVERSE(osp->os_mstrrels, idx, rsp)) {
 		const char	*name;
+		size_t		stoff;
 
-		/* Put the string into the merged string table */
+		/*
+		 * Find the string to the merged table's buffer and get its
+		 * offset.
+		 */
 		name = strmerge_get_reloc_str(ofl, rsp);
-		st_setstring_status = st_setstring(mstrtab, name, &stoff);
-		if (st_setstring_status == -1) {
-			/*
-			 * A failure to insert at this point means that
-			 * something is corrupt. This isn't a resource issue.
-			 */
-			assert(st_setstring_status != -1);
-			goto return_s_error;
-		}
+		stoff = st_findstring(osp->os_mstrtab, name);
+		VERIFY3S(stoff, !=, -1);
 
 		/*
 		 * Alter the relocation to access the string at the
@@ -3002,18 +3005,23 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
 		 * ld_do_activerelocs(). The FLG_REL_NADDEND flag
 		 * tells them that this is the case.
 		 */
-		if ((rsp->rel_flags & FLG_REL_RELA) == 0)   /* REL */
+		if ((rsp->rel_flags & FLG_REL_RELA) == 0) {
+			/* REL */
 			rsp->rel_flags |= FLG_REL_NADDEND;
+		}
 		rsp->rel_raddend = (Sxword)stoff;
 
 		/*
 		 * Generate a symbol name string for STT_SECTION symbols
 		 * that might reference our merged section. This shows up
 		 * in debug output and helps show how the relocation has
-		 * changed from its original input section to our merged one.
+		 * changed from its original input section to our merged
+		 * one.
 		 */
-		if (ld_stt_section_sym_name(mstrsec) == NULL)
-			goto return_s_error;
+		if (ld_stt_section_sym_name(mstrsec) == NULL) {
+			ret = S_ERROR;
+			goto out;
+		}
 	}
 
 	/*
@@ -3023,13 +3031,13 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
 	 * so that they reference the new input section containing the
 	 * merged strings instead of the original input sections.
 	 */
-	for (APLIST_TRAVERSE(*sym_alpp, idx, sdp)) {
+	for (APLIST_TRAVERSE(osp->os_mstrsyms, idx, sdp)) {
 		/*
-		 * If we've already processed this symbol, don't do it
-		 * twice. strmerge_pass1() uses a heuristic (relocations to
-		 * the same symbol clump together) to avoid inserting a
-		 * given symbol more than once, but repeat symbols in
-		 * the list can occur.
+		 * If we've already redirected this symbol to the merged data,
+		 * don't do it again.  ld_gather_strmerge() uses a heuristic
+		 * (relocations to the same symbol clump together) to avoid
+		 * inserting a given symbol more than once, but repeat symbols
+		 * in the list can occur.
 		 */
 		if ((sdp->sd_isc->is_flags & FLG_IS_INSTRMRG) == 0)
 			continue;
@@ -3041,23 +3049,22 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
 			 * input section. Update the address to reflect
 			 * the address in our new merged section.
 			 */
-			const char *name = sdp->sd_sym->st_value +
+			const char	*name;
+			size_t		stoff;
+
+			/*
+			 * Find the string in the merged table's buffer and get
+			 * its offset.
+			 */
+			name = sdp->sd_sym->st_value +
 			    (char *)sdp->sd_isc->is_indata->d_buf;
+			stoff = st_findstring(osp->os_mstrtab, name);
+			VERIFY3S(stoff, !=, -1);
 
-			st_setstring_status =
-			    st_setstring(mstrtab, name, &stoff);
-			if (st_setstring_status == -1) {
-				/*
-				 * A failure to insert at this point means
-				 * something is corrupt. This isn't a
-				 * resource issue.
-				 */
-				assert(st_setstring_status != -1);
-				goto return_s_error;
+			if (ld_sym_copy(sdp) == S_ERROR) {
+				ret = S_ERROR;
+				goto out;
 			}
-
-			if (ld_sym_copy(sdp) == S_ERROR)
-				goto return_s_error;
 			sdp->sd_sym->st_value = (Word)stoff;
 		}
 
@@ -3085,12 +3092,64 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
 	DBG_CALL(Dbg_sec_genstr_compress(ofl->ofl_lml, osp->os_name, data_size,
 	    mstr_data->d_size));
 
-	st_destroy(mstrtab);
-	return (1);
+out:
+	if ((ret == S_ERROR) && !placed) {
+		libld_free(mstrsec);
+		if (mstr_data != NULL)
+			libld_free(mstr_data->d_buf);
+		libld_free(mstr_data);
+		libld_free(mstr_shdr);
+	}
 
-return_s_error:
-	st_destroy(mstrtab);
-	return (S_ERROR);
+	libld_free(osp->os_mstrsyms);
+	osp->os_mstrsyms = NULL;
+	libld_free(osp->os_mstrrels);
+	osp->os_mstrrels = NULL;
+
+	if (osp->os_mstrtab != NULL) {
+		st_destroy(osp->os_mstrtab);
+		osp->os_mstrtab = NULL;
+	}
+
+	return (ret);
+}
+
+/*
+ * If any output section has SHF_MERGE|SHF_STRINGS input sections,
+ * replace them with a single merged/compressed input section.
+ *
+ * entry:
+ *	ofl - Output file descriptor
+ *
+ * exit:
+ *	If section merging is possible, it is done. If no errors are
+ *	encountered, 0 is returned. On error, S_ERROR is returned.
+ *
+ *	The contents of the string-merging specific members of any output
+ *	section descriptor are undefined after this function returns.
+ */
+static uintptr_t
+ld_make_strmerge(Ofl_desc *ofl)
+{
+	Sg_desc *sgp;
+	Aliste idx1;
+
+	if (ld_gather_strmerge(ofl, &ofl->ofl_actrels) == S_ERROR)
+		return (S_ERROR);
+	if (ld_gather_strmerge(ofl, &ofl->ofl_outrels) == S_ERROR)
+		return (S_ERROR);
+
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
+		Os_desc	*osp;
+		Aliste	idx2;
+
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
+			if (ld_strmerge_sec(ofl, osp) == S_ERROR)
+				return (S_ERROR);
+		}
+	}
+
+	return (0);
 }
 
 /*
@@ -3197,29 +3256,7 @@ ld_make_sections(Ofl_desc *ofl)
 	 * for this processing, for all the output sections.
 	 */
 	if ((ofl->ofl_flags1 & FLG_OF1_NCSTTAB) == 0) {
-		int	error_seen = 0;
-		APlist	*rel_alpp = NULL;
-		APlist	*sym_alpp = NULL;
-		Aliste	idx1;
-
-		for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
-			Os_desc	*osp;
-			Aliste	idx2;
-
-			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp))
-				if ((osp->os_mstrisdescs != NULL) &&
-				    (ld_make_strmerge(ofl, osp,
-				    &rel_alpp, &sym_alpp) ==
-				    S_ERROR)) {
-					error_seen = 1;
-					break;
-				}
-		}
-		if (rel_alpp != NULL)
-			libld_free(rel_alpp);
-		if (sym_alpp != NULL)
-			libld_free(sym_alpp);
-		if (error_seen != 0)
+		if (ld_make_strmerge(ofl) == S_ERROR)
 			return (S_ERROR);
 	}
 

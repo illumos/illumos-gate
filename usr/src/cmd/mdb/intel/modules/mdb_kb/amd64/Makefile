@@ -35,7 +35,6 @@ include ../../../../intel/Makefile.amd64
 include ../../../../Makefile.module
 
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
 
 CPPFLAGS += -DMP -D_MACHDEP -D_MDB -D__xpv
 CPPFLAGS += -U_KERNEL -D_KMEMUSER

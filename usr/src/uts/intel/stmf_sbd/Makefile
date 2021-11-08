@@ -59,8 +59,6 @@ LDFLAGS		+= -dy -Ndrv/stmf -Nfs/zfs
 
 INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 
-C99LMODE=	-Xc99=%all
-
 #
 # For now, disable these warnings; maintainers should endeavor
 # to investigate and remove these for maximum coverage.

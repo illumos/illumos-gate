@@ -18,6 +18,7 @@ SUBDIRS =		\
 	assert-deflib	\
 	linker-sets	\
 	mapfiles	\
+	string-merge	\
 	tls
 
 include $(SRC)/test/Makefile.com

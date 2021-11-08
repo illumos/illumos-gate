@@ -52,7 +52,6 @@ INCS +=	-I../../../uts/common/smbsrv
 INCS +=	-I../../../common/smbsrv
 
 CSTD=		$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
 
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
@@ -71,11 +70,6 @@ LDFLAGS += $(ZNOLAZYLOAD)
 LDFLAGS += '-R$$ORIGIN/..'
 LDLIBS += -lfakekernel -lcmdutils
 
-LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
-LINTFLAGS += -xerroff=E_NAME_USED_NOT_DEF2
-LINTFLAGS += -xerroff=E_INCONS_ARG_DECL2
-LINTFLAGS += -xerroff=E_INCONS_VAL_TYPE_DECL2
-
 ROOTSMBDDIR = $(ROOTLIB)/smbsrv
 ROOTSMBDFILE = $(PROG:%=$(ROOTSMBDDIR)/%)
 
@@ -89,8 +83,6 @@ $(PROG): $(OBJS)
 
 clean:
 	-$(RM) $(OBJS)
-
-lint:	# lint_SRCS
 
 include ../../Makefile.targ
 

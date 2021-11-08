@@ -58,8 +58,6 @@ CERRWARN	+= -erroff=E_STATEMENT_NOT_REACHED
 # needs work
 SMATCH=off
 
-C99LMODE=	-Xc99=%all
-
 #
 # For now, disable these warnings; maintainers should endeavor
 # to investigate and remove these for maximum coverage.

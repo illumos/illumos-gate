@@ -99,7 +99,6 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -D_MDB -I. -I../.. -I../../../common
 
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
 
 LDLIBS += -lcurses -lkvm -lproc -lrtld_db -lctf -lumem -ldisasm -lscf
 LDLIBS += -ldemangle-sys
@@ -111,14 +110,6 @@ CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-variable
 
-#
-# -erroff=E_INCONS_ARG_DECL2 works around a problem where lint gets confused
-# about how struct mdb_tgt_gregset is used in mdb_tgt_stack_f() and
-# mdb_tgt_stack_iter_f(). Will be resolved as part of fix for CR 6749868.
-#
-LINTFLAGS += -n -errtags=yes -erroff=E_INCONS_ARG_DECL2
-LINTFILES = $(SRCS:%.c=%.ln)
-
 PROG = mdb
 OBJS = $(SRCS:%.c=%.o) mdb_lex.o mdb_grammar.o
 
@@ -128,7 +119,7 @@ ROOTLINK32 = $(LINK:%=$(ROOTBIN32)/%)
 ROOTLINK64 = $(LINK:%=$(ROOTBIN64)/%)
 
 .NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
+.PARALLEL: $(OBJS)
 
 all: $(PROG)
 
@@ -181,32 +172,11 @@ ffs.o ffs.ln := CPPFLAGS += -Dffs=mdb_ffs
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
-clean.lint:
-	$(RM) $(LINTFILES)
-
 clean:
 	$(RM) $(OBJS)
 	$(RM) mdb_lex.c mdb_grammar.c mdb_grammar.h y.tab.h y.tab.c y.output
 
-clobber: clean clean.lint
+clobber: clean
 	$(RM) $(PROG)
-
-%.ln: ../../../common/mdb/%.c
-	$(LINT.c) -c $<
-
-%.ln: ../../mdb/%.c
-	$(LINT.c) -c $<
-
-%.ln: %.c
-	$(LINT.c) -c $<
-
-%.ln: $(SRC)/common/net/util/%.c
-	$(LINT.c) -c $<
-
-%.ln: $(SRC)/common/util/%.c
-	$(LINT.c) -c $<
-
-lint: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES)
 
 dmods:

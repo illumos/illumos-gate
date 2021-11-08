@@ -47,9 +47,6 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(CONFMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
-
 #
 #	Driver-specific flags
 #

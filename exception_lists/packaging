@@ -391,6 +391,12 @@ usr/lib/librename.so
 usr/lib/amd64/librename.so		i386
 usr/include/librename.h
 #
+# Private libidspace
+#
+usr/lib/libidspace.so
+usr/lib/amd64/libidspace.so		i386
+usr/include/libidspace.h
+#
 # Private interfaces in libsec
 #
 usr/include/aclutils.h

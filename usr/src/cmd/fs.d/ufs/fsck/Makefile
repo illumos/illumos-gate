@@ -62,29 +62,7 @@ $(LIBPROG):	$(OBJS)
 %.o:	$(UFSDIR)/%.c
 	$(COMPILE.c) $< $(CTFCONVERT_HOOK)
 
-# Use DEVLINTFLAGS and the definition of LINT.c below for development
-# checking.  Prior to putback, increase Nlevel to 4 for extra sanity.
-# Nlevel=2 is the default applied by lint.
-#
-# Remember to comment LINT.c out before doing the putback, as we shouldn't
-# be overriding the top-level settings under normal circumstances.
-#
-# Note that you have to have a proto area with populated usr/include and
-# usr/include/sys (or the parent workspace needs it).  Otherwise lint gets
-# very confused.  Unfortunately, we also have to tell it where its own
-# include directory is, or it gets the wrong version of note.h.
-
-SECLEVEL=core
-DEVLINTFLAGS =	-errtags=yes -U__PRAGMA_REDEFINE_EXTNAME \
-		$(C99LMODE) -errsecurity=$(SECLEVEL) \
-		-x -Nlevel=2 \
-		-I/net/tools-sparc/export/tools.sparc/on10-tools/SUNWspro/SOS8/prod/include/lint
-
-#LINT.c=		$(LINT) $(DEVLINTFLAGS) $(CPPFLAGS)
-
-lint:	lint_SRCS
-
-clean:     
+clean:
 	$(RM) $(FSCKOBJS) $(UFSOBJS)
 
 cscope.out tags: FRC

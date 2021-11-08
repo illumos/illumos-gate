@@ -36,7 +36,8 @@
 /*
  * Simple TFTP implementation for libsa.
  * Assumes:
- *  - socket descriptor (int) at open_file->f_devdata
+ *  - socket descriptor (int) at dev->d_opendata, dev stored at
+ *	open_file->f_devdata
  *  - server host IP in global rootip
  * Restrictions:
  *  - read only
@@ -429,6 +430,7 @@ tftp_getnextblock(struct tftp_handle *h)
 static int
 tftp_open(const char *path, struct open_file *f)
 {
+	struct devdesc *dev;
 	struct tftp_handle *tftpfile;
 	struct iodesc	*io;
 	int		res;
@@ -449,7 +451,8 @@ tftp_open(const char *path, struct open_file *f)
 		return (ENOMEM);
 
 	tftpfile->tftp_blksize = TFTP_REQUESTED_BLKSIZE;
-	tftpfile->iodesc = io = socktodesc(*(int *)(f->f_devdata));
+	dev = f->f_devdata;
+	tftpfile->iodesc = io = socktodesc(*(int *)(dev->d_opendata));
 	if (io == NULL) {
 		free(tftpfile);
 		return (EINVAL);

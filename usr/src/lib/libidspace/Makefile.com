@@ -25,7 +25,7 @@ SRCDIR =	../common
 SRCS =		../../../common/idspace/id_space.c
 LIBS =		$(DYNLIB)
 
-LDLIBS += 	-lumem
+LDLIBS +=	-lumem
 
 .KEEP_STATE:
 

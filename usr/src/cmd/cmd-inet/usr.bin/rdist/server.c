@@ -1523,9 +1523,9 @@ error(char *fmt, ...)
 	static FILE *fp;
 
 	nerrs++;
-	if (!fp && !(fp = fdopen(rem, "w")))
-		return;
 	if (iamremote) {
+		if (!fp && !(fp = fdopen(rem, "w")))
+			return;
 		va_start(ap, fmt);
 		(void) fprintf(fp, "%crdist: ", 0x01);
 		(void) vfprintf(fp, fmt, ap);
@@ -1555,9 +1555,9 @@ fatal(char *fmt, ...)
 	static FILE *fp;
 
 	nerrs++;
-	if (!fp && !(fp = fdopen(rem, "w")))
-		return;
 	if (iamremote) {
+		if (!fp && !(fp = fdopen(rem, "w")))
+			return;
 		va_start(ap, fmt);
 		(void) fprintf(fp, "%crdist: ", 0x02);
 		(void) vfprintf(fp, fmt, ap);

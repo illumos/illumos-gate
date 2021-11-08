@@ -45,8 +45,9 @@
 .\" Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright (c) 2014, Joyent, Inc.  All rights Reserved.
 .\" Copyright (c) 2014 by Delphix. All rights reserved.
+.\" Copyright 2021 Oxide Computer Company
 .\"
-.Dd May 4, 2019
+.Dd October 24, 2021
 .Dt DD 1M
 .Os
 .Sh NAME
@@ -531,6 +532,35 @@ For more information on
 .Cm O_SYNC
 see
 .Xr fcntl.h 3HEAD .
+.El
+.It Cm status Ns = Ns Ar type
+Changes the way that
+.Nm
+outputs information about transfers.
+Only one
+.Ar type may be specified.
+The following are valid values for
+.Ar type :
+.Bl -hang
+.It Cm none
+The program will not output any information and statistics about the transfer.
+This includes when
+.Nm
+receives a signal such as
+.Dv SIGINFO
+and
+.Dv SIGUSR1 .
+Only errors will be emitted.
+.It Cm noxfer
+When printing statistical information such as when the program terminates or in
+response to a signal, only print information about the number of records and
+none of the statistics about the transfer
+.Pq total bytes, total time, and throughput .
+.It Cm progress
+Once a second, output the normal
+.Nm
+transfer statistics that include the total number of bytes transferred, time
+elapsed, and average throughput.
 .El
 .El
 .Pp

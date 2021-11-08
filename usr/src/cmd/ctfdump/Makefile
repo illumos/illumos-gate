@@ -21,7 +21,6 @@ CFLAGS += $(CCVERBOSE)
 LDLIBS += -lctf
 
 CSTD = $(CSTD_GNU99)
-C99LMODE = -Xc99=%all
 
 .KEEP_STATE:
 
@@ -30,7 +29,5 @@ all: $(PROG)
 install: all $(ROOTPROG)
 
 clean:
-
-lint:	lint_PROG
 
 include ../Makefile.targ

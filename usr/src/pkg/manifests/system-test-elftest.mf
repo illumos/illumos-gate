@@ -9,9 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-#
-# Copyright 2018, Richard Lowe.
-#
+# Copyright 2021, Richard Lowe.
 
 set name=pkg.fmri value=pkg:/system/test/elftest@$(PKGVERS)
 set name=pkg.description value="ELF Unit Tests"
@@ -28,6 +26,7 @@ dir path=opt/elf-tests/tests/linker-sets
 dir path=opt/elf-tests/tests/mapfiles
 dir path=opt/elf-tests/tests/mapfiles/assert
 dir path=opt/elf-tests/tests/mapfiles/parser
+dir path=opt/elf-tests/tests/string-merge
 dir path=opt/elf-tests/tests/tls
 dir path=opt/elf-tests/tests/tls/amd64
 dir path=opt/elf-tests/tests/tls/amd64/ie
@@ -84,6 +83,9 @@ file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.twobegin \
 file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.wrong mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/object.c mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/test-parser mode=0555
+file path=opt/elf-tests/tests/string-merge/simple mode=0555
+file path=opt/elf-tests/tests/string-merge/str1.s mode=0444
+file path=opt/elf-tests/tests/string-merge/str2.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/Makefile.test mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/amd64-ie-test mode=0555
 file path=opt/elf-tests/tests/tls/amd64/ie/style1-func-with-r12.s mode=0444

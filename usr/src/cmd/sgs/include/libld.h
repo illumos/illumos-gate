@@ -999,6 +999,9 @@ struct os_desc {			/* Output section descriptor */
 	Xword		os_szoutrels;	/* size of output relocation section */
 	uint_t		os_namehash;	/* hash on section name */
 	uchar_t		os_flags;	/* various flags */
+	APlist		*os_mstrsyms;	/* symbols affected by string merge */
+	APlist		*os_mstrrels;	/* section relocs affected by... */
+	Str_tbl		*os_mstrtab;	/* merged string table */
 };
 
 #define	FLG_OS_KEY		0x01	/* section requires sort keys */
