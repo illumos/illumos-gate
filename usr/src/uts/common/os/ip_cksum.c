@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -40,8 +40,7 @@
 #include <sys/multidata.h>
 #include <sys/multidata_impl.h>
 
-extern unsigned int 	ip_ocsum(ushort_t *address, int halfword_count,
-    unsigned int sum);
+extern unsigned int ip_ocsum(ushort_t *, int, unsigned int);
 
 /*
  * Checksum routine for Internet Protocol family headers.
@@ -587,7 +586,8 @@ ip_hdr_length_nexthdr_v6(mblk_t *mp, ip6_t *ip6h, uint16_t *hdr_length_ptr,
 	ip6_rthdr_t *rthdr;
 	ip6_frag_t *fraghdr;
 
-	ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
+	if (IPH_HDR_VERSION(ip6h) != IPV6_VERSION)
+		return (B_FALSE);
 	length = IPV6_HDR_LEN;
 	whereptr = ((uint8_t *)&ip6h[1]); /* point to next hdr */
 	endptr = mp->b_wptr;
