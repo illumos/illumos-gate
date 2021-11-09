@@ -239,7 +239,7 @@ add_mapping(struct glyph *gl, unsigned int c, unsigned int map_idx)
 	return (0);
 }
 
-static int
+static void
 dedup_mapping(unsigned int map_idx)
 {
 	struct mapping *tmp, *mp_bold, *mp_normal;
@@ -261,7 +261,6 @@ dedup_mapping(unsigned int map_idx)
 		free(mp_bold);
 		mapping_dupe++;
 	}
-	return (0);
 }
 
 static struct glyph *
@@ -399,7 +398,8 @@ parse_bdf(FILE *fp, unsigned int map_idx)
 			for (i = 0; i < height; i++) {
 				if (fgets(ln, sizeof (ln), fp) == NULL)
 					errx(1, "Unexpected EOF!");
-				sscanf(ln, "%x", &line);
+				if (sscanf(ln, "%x", &line) <= 0)
+					err(1, "sscanf failed at %s", ln);
 				if (parse_bitmap_line(bytes + i * wbytes,
 				    bytes_r + i * wbytes, line, dwidth) != 0)
 					return (1);
@@ -459,11 +459,11 @@ parse_hex(FILE *fp, unsigned int map_idx)
 			dwidth = width;
 			if (chars_per_row / 2 > (width + 7) / 8)
 				dwidth *= 2; /* Double-width character. */
-			snprintf(fmt_str, sizeof (fmt_str), "%%%ux",
+			(void) snprintf(fmt_str, sizeof (fmt_str), "%%%ux",
 			    chars_per_row);
 
 			for (i = 0; i < height; i++) {
-				sscanf(p, fmt_str, &line);
+				(void) sscanf(p, fmt_str, &line);
 				p += chars_per_row;
 				if (parse_bitmap_line(bytes + i * wbytes,
 				    bytes_r + i * wbytes, line, dwidth) != 0) {
@@ -549,7 +549,7 @@ parse_file(const char *filename, unsigned int map_idx)
 		if ((rv = parse_bdf_header(fp)) == 0)
 			rv = parse_bdf(fp, map_idx);
 	}
-	fclose(fp);
+	(void) fclose(fp);
 	return (rv);
 }
 
@@ -588,7 +588,8 @@ write_glyph_source(const void *ptr, size_t size, size_t nitems, FILE *stream)
 
 /* Write to buffer */
 static size_t
-write_glyph_buf(const void *ptr, size_t size, size_t nitems, FILE *stream)
+write_glyph_buf(const void *ptr, size_t size, size_t nitems,
+    FILE *stream __unused)
 {
 	static size_t index = 0;
 
@@ -713,7 +714,7 @@ write_fnt(const char *filename)
 	fh.map_count[3] = htobe32(map_folded_count[3]);
 	if (fwrite(&fh, sizeof (fh), 1, fp) != 1) {
 		perror(filename);
-		fclose(fp);
+		(void) fclose(fp);
 		return (1);
 	}
 
@@ -723,11 +724,11 @@ write_fnt(const char *filename)
 	    write_mappings(fp, VFNT_MAP_BOLD) != 0 ||
 	    write_mappings(fp, 3) != 0) {
 		perror(filename);
-		fclose(fp);
+		(void) fclose(fp);
 		return (1);
 	}
 
-	fclose(fp);
+	(void) fclose(fp);
 	return (0);
 }
 
@@ -919,7 +920,7 @@ write_fnt_source(bool lz4, const char *filename)
 done:
 	if (rv != 0)
 		perror(filename);
-	fclose(fp);
+	(void) fclose(fp);
 	return (0);
 }
 

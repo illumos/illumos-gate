@@ -24,9 +24,6 @@ OBJS	+=	$(LZ4_OBJS)
 
 LDLIBS += -lumem
 
-# not linted
-SMATCH=off
-
 %.o:	$(LZ4)/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
