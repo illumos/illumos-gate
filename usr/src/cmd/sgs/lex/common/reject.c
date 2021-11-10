@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 
@@ -84,7 +82,6 @@ extern int yyleng;
 #endif
 
 #pragma weak yyback
-#if defined(__cplusplus) || defined(__STDC__)
 extern int	yyback(int *, int);
 extern int	YYINPUT(void);
 extern void	YYUNPUT(int);
@@ -95,7 +92,6 @@ extern void	YYUNPUT(int);
 #endif
 #ifdef EOPTION
 	extern size_t	wcstombs(char *, const wchar_t *, size_t);
-#endif
 #endif
 
 #pragma weak yyout
@@ -115,12 +111,9 @@ extern CHR YYTEXT[];
 #pragma weak yylstate
 #pragma weak yyolsp
 extern struct {int *yyaa, *yybb; int *yystops; } *yylstate[], **yylsp, **yyolsp;
-#if defined(__cplusplus) || defined(__STDC__)
+
 int
 YYREJECT(void)
-#else
-YYREJECT()
-#endif
 {
 	for (; yylsp < yyolsp; yylsp++)
 		YYTEXT[YYLENG++] = YYINPUT();
@@ -144,12 +137,8 @@ YYREJECT()
 	return (-1);
 }
 
-#if defined(__cplusplus) || defined(__STDC__)
 int
 yyracc(int m)
-#else
-yyracc(m)
-#endif
 {
 	yyolsp = yylsp;
 	if (yyextra[m]) {

@@ -26,8 +26,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ldefs.h"
 
 static void add(int **array, int n);
@@ -487,12 +485,14 @@ nextstate(int s, int c)
 	count = j;
 }
 
+/* see if tmpstat occurs previously */
 static int
 notin(int n)
-{	/* see if tmpstat occurs previously */
+{
 	int *j, k;
 	CHR *temp;
 	int i;
+
 	if (count == 0)
 		return (-2);
 	temp = tmpstat;
@@ -1038,37 +1038,37 @@ layout(void)
 			k = i+j;
 			if (verify[k])
 				(void) fprintf(fout,
-				"%d,%d,\t", verify[k], advance[k]);
+				"{ %d,%d },\t", verify[k], advance[k]);
 			else
-				(void) fprintf(fout, "0,0,\t");
+				(void) fprintf(fout, "{ 0,0 },\t");
 		}
 		(void) putc('\n', fout);
 	}
-	(void) fprintf(fout, "0,0};\n");
+	(void) fprintf(fout, "{ 0,0 } };\n");
 
 	/* put out yysvec */
 
 	(void) fprintf(fout, "struct yysvf yysvec[] = {\n");
-	(void) fprintf(fout, "0,\t0,\t0,\n");
+	(void) fprintf(fout, "{ 0,\t0,\t0 },\n");
 	for (i = 0; i <= stnum; i++) {	/* for each state */
 		if (cpackflg[i])
 			stoff[i] = -stoff[i];
-		(void) fprintf(fout, "yycrank+%d,\t", stoff[i]);
+		(void) fprintf(fout, "{ yycrank+%d,\t", stoff[i]);
 		if (sfall[i] != -1)
 			(void) fprintf(fout,
 			"yysvec+%d,\t", sfall[i]+1); /* state + 1 */
 		else
 			(void) fprintf(fout, "0,\t\t");
 		if (atable[i] != -1)
-			(void) fprintf(fout, "yyvstop+%d,", atable[i]);
+			(void) fprintf(fout, "yyvstop+%d },", atable[i]);
 		else
-			(void) fprintf(fout, "0,\t");
+			(void) fprintf(fout, "0 },\t");
 #ifdef DEBUG
 		(void) fprintf(fout, "\t\t/* state %d */", i);
 #endif
 		(void) putc('\n', fout);
 	}
-	(void) fprintf(fout, "0,\t0,\t0};\n");
+	(void) fprintf(fout, "{ 0,\t0,\t0 } };\n");
 
 	/* put out yymatch */
 

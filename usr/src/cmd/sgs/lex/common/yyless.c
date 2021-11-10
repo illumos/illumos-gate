@@ -20,15 +20,13 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/euc.h>
 #include <stdlib.h>
@@ -93,20 +91,13 @@ extern CHR yywtext[];
 #endif
 
 extern int YYLENG;
-#if defined(__STDC__)
-    extern void YYUNPUT(int);
-#endif
+extern void YYUNPUT(int);
 
-#if defined(__cplusplus) || defined(__STDC__)
 /* XCU4: type of yyless() changes to int */
 int
 yyless(int x)
-#else
-yyless(x)
-int x;
-#endif
 {
-	register CHR *lastch, *ptr;
+	CHR *lastch, *ptr;
 
 	lastch = YYTEXT+YYLENG;
 	if (x >= 0 && x <= YYLENG)
@@ -117,8 +108,7 @@ int x;
 
 		if (!seen) {
 			(void) write(2,
-				    "warning: yyless pointer arg truncated\n",
-				    39);
+			    "warning: yyless pointer arg truncated\n", 39);
 			seen = 1;
 		}
 #endif	/* _LP64 */

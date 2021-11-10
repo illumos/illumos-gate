@@ -21,9 +21,7 @@
  */
 
 /*	Copyright (c) 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 int yylineno =1;
 # define YYU(x) x
@@ -34,14 +32,12 @@ char *yysptr = yysbuf;
 int *yyfnd;
 extern struct yysvf *yyestate;
 int yyprevious = YYNEWLINE;
-#if defined(__cplusplus) || defined(__STDC__)
-int yylook(void)
-#else
-yylook()
-#endif
+
+int
+yylook(void)
 {
-	register struct yysvf *yystate, **lsp;
-	register struct yywork *yyt;
+	struct yysvf *yystate, **lsp;
+	struct yywork *yyt;
 	struct yysvf *yyz;
 	int yych, yyfirst;
 	struct yywork *yyr;
@@ -232,13 +228,9 @@ yylook()
 		if(debug)putchar('\n');
 # endif
 		}
-	}
-#if defined(__cplusplus) || defined(__STDC__)
+}
+
 int yyback(int *p, int m)
-#else
-yyback(p, m)
-	int *p;
-#endif
 {
 	if (p==0) return(0);
 	while (*p) {
@@ -247,38 +239,30 @@ yyback(p, m)
 	}
 	return(0);
 }
-	/* the following are only used in the lex library */
-#if defined(__cplusplus) || defined(__STDC__)
-int yyinput(void)
-#else
-yyinput()
-#endif
+
+/* the following are only used in the lex library */
+int
+yyinput(void)
 {
 #ifndef __cplusplus
 	return(input());
 #else
 	return(lex_input());
 #endif
-	}
-#if defined(__cplusplus) || defined(__STDC__)
-void yyoutput(int c)
-#else
-yyoutput(c)
-  int c; 
-#endif
+}
+
+void
+yyoutput(int c)
 {
 #ifndef __cplusplus
 	output(c);
 #else
 	lex_output(c);
 #endif
-	}
-#if defined(__cplusplus) || defined(__STDC__)
-void yyunput(int c)
-#else
-yyunput(c)
-   int c; 
-#endif
+}
+
+void
+yyunput(int c)
 {
 	unput(c);
-	}
+}

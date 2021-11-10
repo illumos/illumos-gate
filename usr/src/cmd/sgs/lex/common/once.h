@@ -29,8 +29,6 @@
 #ifndef	_ONCE_H
 #define	_ONCE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ldefs.h"
 
 /* once.c */
