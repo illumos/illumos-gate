@@ -1131,8 +1131,8 @@ interpret_fddi(int flags, caddr_t e, int elen, int origlen)
 	if (is_snap)
 		ethertype = ntohs(f->type);
 	else {
-		src_name = 	print_etherinfo(&f->shost);
-		dst_name =  print_etherinfo(&f->dhost);
+		src_name = print_etherinfo(&f->shost);
+		dst_name = print_etherinfo(&f->dhost);
 	}
 
 	/*

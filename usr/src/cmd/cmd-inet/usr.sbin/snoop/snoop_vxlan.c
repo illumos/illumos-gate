@@ -20,6 +20,8 @@
 #include <sys/vxlan.h>
 #include "snoop.h"
 
+extern interpreter_fn_t interpret_ether;
+
 int
 interpret_vxlan(int flags, char *data, int fraglen)
 {
