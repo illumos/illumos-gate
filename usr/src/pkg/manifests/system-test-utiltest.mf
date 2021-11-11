@@ -16,7 +16,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2017 Jason King.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2020 Oxide Computer Company
+# Copyright 2021 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/utiltest@$(PKGVERS)
@@ -29,6 +29,7 @@ dir path=opt/util-tests
 dir path=opt/util-tests/bin
 dir path=opt/util-tests/runfiles
 dir path=opt/util-tests/tests
+dir path=opt/util-tests/tests/ar
 dir path=opt/util-tests/tests/awk
 dir path=opt/util-tests/tests/awk/bugs-fixed
 dir path=opt/util-tests/tests/awk/data
@@ -91,6 +92,9 @@ file path=opt/util-tests/bin/print_json mode=0555
 file path=opt/util-tests/bin/utiltest mode=0555
 file path=opt/util-tests/runfiles/default.run mode=0444
 file path=opt/util-tests/tests/allowed-ips mode=0555
+file path=opt/util-tests/tests/ar/ar_test0.o mode=0444
+file path=opt/util-tests/tests/ar/ar_test1.o mode=0444
+file path=opt/util-tests/tests/ar/artest mode=0555
 file path=opt/util-tests/tests/awk/bugs-fixed/a-format.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/a-format.ok mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/concat-assign-same.awk mode=0444
