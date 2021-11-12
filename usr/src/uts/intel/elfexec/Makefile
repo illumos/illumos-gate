@@ -59,7 +59,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-INC_PATH	+= -I$(UTSBASE)/intel/ia32
+INC_PATH	+= -I$(UTSBASE)/intel/ia32 -I$(SRC)/common/core
 
 #
 # For now, disable these warnings; maintainers should endeavor

@@ -69,6 +69,8 @@
 #include <sys/siginfo.h>
 #include <sys/random.h>
 
+#include <core_shstrtab.h>
+
 #if defined(__x86)
 #include <sys/comm_page_util.h>
 #include <sys/fp.h>
@@ -107,71 +109,6 @@ uint_t elf_nphdr_max = 1000;
 uint_t elf_nshdr_max = 10000;
 size_t elf_shstrtab_max = 100 * 1024;
 #endif
-
-
-
-typedef enum {
-	STR_CTF,
-	STR_SYMTAB,
-	STR_DYNSYM,
-	STR_STRTAB,
-	STR_DYNSTR,
-	STR_SHSTRTAB,
-	STR_NUM
-} shstrtype_t;
-
-static const char *shstrtab_data[] = {
-	".SUNW_ctf",
-	".symtab",
-	".dynsym",
-	".strtab",
-	".dynstr",
-	".shstrtab"
-};
-
-typedef struct shstrtab {
-	uint_t	sst_ndx[STR_NUM];
-	uint_t	sst_cur;
-} shstrtab_t;
-
-static void
-shstrtab_init(shstrtab_t *s)
-{
-	bzero(&s->sst_ndx, sizeof (s->sst_ndx));
-	s->sst_cur = 1;
-}
-
-static uint_t
-shstrtab_ndx(shstrtab_t *s, shstrtype_t type)
-{
-	uint_t ret;
-
-	if ((ret = s->sst_ndx[type]) != 0)
-		return (ret);
-
-	ret = s->sst_ndx[type] = s->sst_cur;
-	s->sst_cur += strlen(shstrtab_data[type]) + 1;
-
-	return (ret);
-}
-
-static size_t
-shstrtab_size(const shstrtab_t *s)
-{
-	return (s->sst_cur);
-}
-
-static void
-shstrtab_dump(const shstrtab_t *s, char *buf)
-{
-	uint_t i, ndx;
-
-	*buf = '\0';
-	for (i = 0; i < STR_NUM; i++) {
-		if ((ndx = s->sst_ndx[i]) != 0)
-			(void) strcpy(buf + ndx, shstrtab_data[i]);
-	}
-}
 
 static int
 dtrace_safe_phdr(Phdr *phdrp, struct uarg *args, uintptr_t base)
@@ -1974,7 +1911,9 @@ elf_copy_scn(elf_core_ctx_t *ctx, const Shdr *src, vnode_t *src_vp, Shdr *dst)
 
 /*
  * Walk sections for a given ELF object, counting (or copying) those of
- * interest (CTF, symtab, strtab).
+ * interest (CTF, symtab, strtab, DWARF debug).
+ *
+ * Returns UINT_MAX upon low-memory.
  */
 static uint_t
 elf_process_obj_scns(elf_core_ctx_t *ctx, vnode_t *mvp, caddr_t saddr,
@@ -1992,7 +1931,8 @@ elf_process_obj_scns(elf_core_ctx_t *ctx, vnode_t *mvp, caddr_t saddr,
 	size_t shsize, shstrsize;
 	char *shstrbase;
 
-	if ((content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB)) == 0) {
+	if ((content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB | CC_CONTENT_DEBUG))
+	    == 0) {
 		return (0);
 	}
 
@@ -2030,6 +1970,50 @@ elf_process_obj_scns(elf_core_ctx_t *ctx, vnode_t *mvp, caddr_t saddr,
 		    (content & CC_CONTENT_SYMTAB) != 0 &&
 		    strcmp(name, shstrtab_data[STR_SYMTAB]) == 0) {
 			symchk = shdr;
+		} else if ((content & CC_CONTENT_DEBUG) != 0 &&
+		    strncmp(name, ".debug_", strlen(".debug_")) == 0) {
+			/*
+			 * The design of the above check is intentional.  In
+			 * particular, we want to capture any sections that
+			 * begin with '.debug_' for a few reasons:
+			 *
+			 * 1) Various revisions to the DWARF spec end up
+			 * changing the set of section headers that
+			 * exist. This ensures that we don't need to change
+			 * the kernel to get a new version.
+			 *
+			 * 2) Other software uses .debug_ sections for things
+			 * which aren't DWARF. This allows them to be captured
+			 * as well.
+			 *
+			 * Because of this, we emit straight here, unlike the
+			 * other two sections where we wait until we're done
+			 * scanning.
+			 */
+
+			/* We're only counting, don't emit! */
+			if (v == NULL)
+				continue;
+
+			elf_ctx_resize_scratch(ctx, shdr->sh_size);
+			if (!shstrtab_ndx(shstr, name, &v[idx].sh_name)) {
+				count = UINT_MAX;
+				goto done;
+			}
+			v[idx].sh_addr = (Addr)(uintptr_t)saddr;
+			v[idx].sh_type = shdr->sh_type;
+			v[idx].sh_addralign = shdr->sh_addralign;
+			*doffp = roundup(*doffp, v[idx].sh_addralign);
+			v[idx].sh_offset = *doffp;
+			v[idx].sh_size = shdr->sh_size;
+			v[idx].sh_link = 0;
+			v[idx].sh_entsize = shdr->sh_entsize;
+			v[idx].sh_info = shdr->sh_info;
+
+			elf_copy_scn(ctx, shdr, mvp, &v[idx]);
+			count++;
+			idx++;
+			continue;
 		} else {
 			continue;
 		}
@@ -2049,7 +2033,8 @@ elf_process_obj_scns(elf_core_ctx_t *ctx, vnode_t *mvp, caddr_t saddr,
 		symtab = symchk;
 		strtab = strchk;
 
-		if (symtab != NULL && ctf != NULL) {
+		if (symtab != NULL && ctf != NULL &&
+		    (content & CC_CONTENT_DEBUG) == 0) {
 			/* No other shdrs are of interest at this point */
 			break;
 		}
@@ -2059,6 +2044,7 @@ elf_process_obj_scns(elf_core_ctx_t *ctx, vnode_t *mvp, caddr_t saddr,
 		count += 1;
 	if (symtab != NULL)
 		count += 2;
+
 	if (v == NULL || count == 0 || count > remain) {
 		count = MIN(count, remain);
 		goto done;
@@ -2068,7 +2054,11 @@ elf_process_obj_scns(elf_core_ctx_t *ctx, vnode_t *mvp, caddr_t saddr,
 	if (ctf != NULL) {
 		elf_ctx_resize_scratch(ctx, ctf->sh_size);
 
-		v[idx].sh_name = shstrtab_ndx(shstrtab, STR_CTF);
+		if (!shstrtab_ndx(shstr, STR_CTF, &v[idx].sh_name)) {
+			count = UINT_MAX;
+			goto done;
+		}
+
 		v[idx].sh_addr = (Addr)(uintptr_t)saddr;
 		v[idx].sh_type = SHT_PROGBITS;
 		v[idx].sh_addralign = 4;
@@ -2164,7 +2154,8 @@ elf_process_scns(elf_core_ctx_t *ctx, Shdr *v, uint_t nv, uint_t *nshdrsp)
 	if (v != NULL) {
 		ASSERT(nv != 0);
 
-		shstrtab_init(&shstrtab);
+		if (!shstrtab_init(&shstrtab))
+			return (ENOMEM);
 		remain = nv;
 	} else {
 		ASSERT(nv == 0);
@@ -2212,6 +2203,10 @@ elf_process_scns(elf_core_ctx_t *ctx, Shdr *v, uint_t nv, uint_t *nshdrsp)
 
 		count = elf_process_obj_scns(ctx, mvp, saddr, v, idx, remain,
 		    &shstrtab);
+		if (count == UINT_MAX) {
+			error = ENOMEM;
+			goto done;
+		}
 
 		ASSERT(count <= remain);
 		ASSERT(v == NULL || (idx + count) < nv);
@@ -2228,6 +2223,7 @@ elf_process_scns(elf_core_ctx_t *ctx, Shdr *v, uint_t nv, uint_t *nshdrsp)
 			/* Include room for the shrstrtab at the end */
 			*nshdrsp = idx + 1;
 		}
+		/* No need to free up shstrtab so we can just return. */
 		return (0);
 	}
 
@@ -2235,10 +2231,15 @@ elf_process_scns(elf_core_ctx_t *ctx, Shdr *v, uint_t nv, uint_t *nshdrsp)
 		cmn_err(CE_WARN, "elfcore: core dump failed for "
 		    "process %d; address space is changing",
 		    ctx->ecc_p->p_pid);
-		return (EIO);
+		error = EIO;
+		goto done;
 	}
 
-	v[idx].sh_name = shstrtab_ndx(&shstrtab, STR_SHSTRTAB);
+	if (!shstrtab_ndx(&shstrtab, shstrtab_data[STR_SHSTRTAB],
+	    &v[idx].sh_name)) {
+		error = ENOMEM;
+		goto done;
+	}
 	v[idx].sh_size = shstrtab_size(&shstrtab);
 	v[idx].sh_addralign = 1;
 	v[idx].sh_offset = ctx->ecc_doffset;
@@ -2255,6 +2256,9 @@ elf_process_scns(elf_core_ctx_t *ctx, Shdr *v, uint_t nv, uint_t *nshdrsp)
 		ctx->ecc_doffset += v[idx].sh_size;
 	}
 
+done:
+	if (v != NULL)
+		shstrtab_fini(&shstrtab);
 	return (error);
 }
 
@@ -2302,9 +2306,8 @@ top:
 	 * Count the number of section headers we're going to need.
 	 */
 	nshdrs = 0;
-	if (content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB)) {
+	if (content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB | CC_CONTENT_DEBUG))
 		VERIFY0(elf_process_scns(&ctx, NULL, 0, &nshdrs));
-	}
 	AS_LOCK_EXIT(as);
 
 	/*
@@ -2317,10 +2320,11 @@ top:
 	}
 
 	/*
-	 * Allocate a buffer which is sized adequately to hold the ehdr, phdrs
-	 * or shdrs needed to produce the core file.  It is used for the three
-	 * tasks sequentially, not simultaneously, so it does not need space
-	 * for all three data at once, only the largest one.
+	 * Allocate a buffer which is sized adequately to hold the ehdr,
+	 * phdrs, DWARF debug, or shdrs needed to produce the core file.  It
+	 * is used for the four tasks sequentially, not simultaneously, so it
+	 * does not need space for all four data at once, only the largest
+	 * one.
 	 */
 	VERIFY(nphdrs >= 2);
 	phdrsz = nphdrs * sizeof (Phdr);

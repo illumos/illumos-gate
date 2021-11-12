@@ -30,6 +30,7 @@ LIBRARY = libproc.a
 VERS = .1
 
 CMNOBJS =	\
+	core_shstrtab.o	\
 	list.o		\
 	P32ton.o	\
 	Pcontrol.o	\
@@ -90,7 +91,7 @@ SRCS =		$(CMNOBJS:%.o=../common/%.c) $(ISAOBJS:%.o=%.c)
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lrtld_db -lelf -lctf -lc
 CSTD =	$(CSTD_GNU99)
-CPPFLAGS +=	$($(MACH64)_CPPFLAGS)
+CPPFLAGS +=	$($(MACH64)_CPPFLAGS) -I$(SRC)/common/core
 
 SRCDIR =	../common
 
@@ -124,5 +125,9 @@ objs/%.o pics/%.o: %.c
 	$(POST_PROCESS_O)
 
 objs/%.o pics/%.o: $(SRC)/common/list/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+objs/%.o pics/%.o: $(SRC)/common/core/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)

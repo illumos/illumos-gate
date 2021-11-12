@@ -87,8 +87,9 @@ extern "C" {
 
 #define	CC_CONTENT_CTF		0x0800ULL /* CTF data */
 #define	CC_CONTENT_SYMTAB	0x1000ULL /* symbol table */
+#define	CC_CONTENT_DEBUG	0x2000ULL /* debug information */
 
-#define	CC_CONTENT_ALL		0x1fffULL
+#define	CC_CONTENT_ALL		0x3fffULL
 #define	CC_CONTENT_NONE		0ULL
 #define	CC_CONTENT_DEFAULT	(CC_CONTENT_STACK | CC_CONTENT_HEAP | \
 	CC_CONTENT_ISM | CC_CONTENT_DISM | CC_CONTENT_SHM | \

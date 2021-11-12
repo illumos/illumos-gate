@@ -25,8 +25,8 @@
 #
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 # Copyright (c) 2018 Joyent, Inc.
-# Copyright 2020 Oxide Computer Company
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 Oxide Computer Company
 #
 
 @ MSG_NT_PRSTATUS		"[ NT_PRSTATUS ]"
@@ -128,6 +128,7 @@
 @ MSG_CC_CONTENT_DISM		"DISM"
 @ MSG_CC_CONTENT_CTF		"CTF"
 @ MSG_CC_CONTENT_SYMTAB		"SYMTAB"
+@ MSG_CC_CONTENT_DEBUG		"DEBUG"
 
 
 @ MSG_ERRNO_EPERM		"[ EPERM ]"			# 1

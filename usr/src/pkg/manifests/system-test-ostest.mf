@@ -29,6 +29,8 @@ dir path=opt/os-tests
 dir path=opt/os-tests/bin
 dir path=opt/os-tests/runfiles
 dir path=opt/os-tests/tests
+dir path=opt/os-tests/tests/cores
+$(i386_ONLY)dir path=opt/os-tests/tests/cores/amd64
 dir path=opt/os-tests/tests/ddi_ufm
 dir path=opt/os-tests/tests/file-locking
 $(i386_ONLY)dir path=opt/os-tests/tests/i386
@@ -54,6 +56,13 @@ file path=opt/os-tests/tests/OS-6097.32 mode=0555
 file path=opt/os-tests/tests/OS-6097.64 mode=0555
 file path=opt/os-tests/tests/clock_gettime.32 mode=0555
 file path=opt/os-tests/tests/clock_gettime.64 mode=0555
+$(i386_ONLY)file path=opt/os-tests/tests/cores/amd64/libdumper.so.1 mode=0755
+file path=opt/os-tests/tests/cores/core_prereqs mode=0555
+file path=opt/os-tests/tests/cores/coretests mode=0555
+file path=opt/os-tests/tests/cores/dumper.32 mode=0555
+file path=opt/os-tests/tests/cores/dumper.64 mode=0555
+file path=opt/os-tests/tests/cores/libdumper.so.1 mode=0755
+file path=opt/os-tests/tests/cores/secmapper mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-cleanup mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-setup mode=0555

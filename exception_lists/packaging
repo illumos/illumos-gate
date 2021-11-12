@@ -923,3 +923,10 @@ opt/onbld/man/man1onbld/sgsmsg.1onbld
 # The built link-editor demos are not delivered
 #
 opt/SUNWonld/
+
+#
+# Libraries that are built for tests whose compilation symlinks are only
+# needed at build time.
+#
+opt/os-tests/tests/cores/libdumper.so
+opt/os-tests/tests/cores/amd64/libdumper.so	i386
