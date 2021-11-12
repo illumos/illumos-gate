@@ -26,8 +26,6 @@
 /* Copyright (c) 1988 AT&T */
 /* All Rights Reserved */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dextern.h"
 #define	NOMORE -1000
 
@@ -52,7 +50,7 @@ static int nxdb = 0;
 static int adb = 0;
 
 void
-callopt()
+callopt(void)
 {
 	int i, *p, j, k, *q;
 
@@ -368,7 +366,7 @@ stin(int i)
 }
 
 static int
-nxti()
+nxti(void)
 {
 	/* finds the next i */
 	int i, max, maxi;
@@ -394,7 +392,7 @@ nxti()
 }
 
 static void
-osummary()
+osummary(void)
 {
 	/* write summary */
 	int i, *p;
@@ -419,7 +417,7 @@ osummary()
 }
 
 static void
-aoutput()
+aoutput(void)
 {
 	/* this version is for C */
 	/* write out the optimized parser */
@@ -431,9 +429,7 @@ aoutput()
 }
 
 static void
-arout(s, v, n)
-wchar_t *s;
-int *v, n;
+arout(wchar_t *s, int *v, int n)
 {
 	int i;
 
@@ -450,7 +446,7 @@ int *v, n;
 }
 
 static int
-gtnm()
+gtnm(void)
 {
 	int s, val, c;
 
@@ -476,8 +472,7 @@ gtnm()
 }
 
 void
-exp_act(ptr)
-int **ptr;
+exp_act(int **ptr)
 {
 	static int *actbase;
 	int i;

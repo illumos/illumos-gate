@@ -26,8 +26,6 @@
 /* Copyright (c) 1988 AT&T */
 /* All Rights Reserved */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dextern.h"
 
 static void go2gen(int);
@@ -44,10 +42,10 @@ extern int cwp;
 
 /* print the output for the states */
 void
-output()
+output(void)
 {
 	int i, k, c;
-	register WSET *u, *v;
+	WSET *u, *v;
 
 	(void) fprintf(ftable, "static YYCONST yytabelem yyexca[] ={\n");
 
@@ -122,9 +120,7 @@ output()
 
 static int pkdebug = 0;
 int
-apack(p, n)
-int *p;
-int n;
+apack(int *p, int n)
 {
 	/* pack state i from temp1 into amem */
 	int off;
@@ -169,7 +165,7 @@ int n;
 
 		if (pkdebug && foutput != NULL)
 			(void) fprintf(foutput,
-				"off = %d, k = %" PRIdPTR "\n", off, rr-amem);
+			    "off = %d, k = %" PRIdPTR "\n", off, rr-amem);
 
 		qq = rr;
 		for (pp = p; pp <= q; ++pp, ++qq) {
@@ -200,7 +196,7 @@ int n;
 }
 
 void
-go2out()
+go2out(void)
 {
 	/* output the gotos for the nontermninals */
 	int i, j, k, best, count, cbest, times;
@@ -247,7 +243,8 @@ go2out()
 }
 
 static int g2debug = 0;
-static void go2gen(int c)
+static void
+go2gen(int c)
 {
 	/* output the gotos for nonterminal c */
 	int i, work, cc;
@@ -488,9 +485,7 @@ wdef(wchar_t *s, int n)
 }
 
 void
-warray(s, v, n)
-wchar_t *s;
-int *v, n;
+warray(wchar_t *s, int *v, int n)
 {
 	int i;
 	(void) fprintf(ftable, WSFMT("static YYCONST yytabelem %ws[]={\n"), s);
@@ -506,7 +501,7 @@ int *v, n;
 }
 
 void
-hideprod()
+hideprod(void)
 {
 	/*
 	 * in order to free up the mem and amem arrays for the optimizer,
@@ -542,15 +537,14 @@ hideprod()
 
 
 static int
-cmpmbchars(p, q)
-MBCLIT *p, *q;
+cmpmbchars(MBCLIT *p, MBCLIT *q)
 {
 	/* Compare two MBLITs. */
 	return ((p->character) - (q->character));
 }
 
 static void
-wrmbchars()
+wrmbchars(void)
 {
 	int i;
 	wdef(L"YYNMBCHARS", nmbchars);

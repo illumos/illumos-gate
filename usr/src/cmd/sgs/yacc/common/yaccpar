@@ -27,8 +27,6 @@
 /* Copyright (c) 1988 AT&T */
 /* All Rights Reserved */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** Skeleton parser driver for yacc output
 */
@@ -90,14 +88,10 @@ int yychar;			/* current input token number */
 #define YYLEX()		yycvtok(yylex())
 /*
 ** yycvtok - return a token if i is a wchar_t value that exceeds 255.
-**	If i<255, i itself is the token.  If i>255 but the neither 
+**	If i<255, i itself is the token.  If i>255 but the neither
 **	of the 30th or 31st bit is on, i is already a token.
 */
-#if defined(__STDC__) || defined(__cplusplus)
 int yycvtok(int i)
-#else
-int yycvtok(i) int i;
-#endif
 {
 	int first = 0;
 	int last = YYNMBCHARS - 1;
@@ -111,7 +105,7 @@ int yycvtok(i) int i;
 		while ((last>=first)&&(first>=0)) {/*Binary search loop*/
 			mid = (first+last)/2;
 			j = yymbchars[mid].character;
-			if( j==i ){/*Found*/ 
+			if( j==i ){/*Found*/
 				return yymbchars[mid].tvalue;
 			}else if( j<i ){
 				first = mid + 1;
@@ -132,13 +126,9 @@ int yycvtok(i) int i;
 /*
 ** yyparse - return 0 if worked, 1 if syntax error not recovered from
 */
-#if defined(__STDC__) || defined(__cplusplus)
 int yyparse(void)
-#else
-int yyparse()
-#endif
 {
-	register YYSTYPE *yypvt = 0;	/* top of value stack for $vars */
+	YYSTYPE *yypvt = 0;	/* top of value stack for $vars */
 
 #if defined(__cplusplus) || defined(lint)
 /*
@@ -176,10 +166,10 @@ int yyparse()
 #endif
 
 	{
-		register YYSTYPE *yy_pv;	/* top of value stack */
-		register int *yy_ps;		/* top of state stack */
-		register int yy_state;		/* current state */
-		register int  yy_n;		/* internal state number info */
+		YYSTYPE *yy_pv;	/* top of value stack */
+		int *yy_ps;		/* top of state stack */
+		int yy_state;		/* current state */
+		int  yy_n;		/* internal state number info */
 	goto yystack;	/* moved from 6 lines above to here to please C++ */
 
 		/*
@@ -217,7 +207,7 @@ int yyparse()
 		*/
 		if ( yydebug )
 		{
-			register int yy_i;
+			int yy_i;
 
 			printf( "State %d, token ", yy_state );
 			if ( yychar == 0 )
@@ -301,7 +291,7 @@ int yyparse()
 #if YYDEBUG
 		if ( yydebug && yytmp )
 		{
-			register int yy_i;
+			int yy_i;
 
 			printf( "Received token " );
 			if ( yychar == 0 )
@@ -343,7 +333,7 @@ int yyparse()
 #if YYDEBUG
 			if ( yydebug && yytmp )
 			{
-				register int yy_i;
+				int yy_i;
 
 				printf( "Received token " );
 				if ( yychar == 0 )
@@ -370,7 +360,7 @@ int yyparse()
 			** look through exception table
 			*/
 			{
-				register YYCONST int *yyxi = yyexca;
+				YYCONST int *yyxi = yyexca;
 
 				while ( ( *yyxi != -1 ) ||
 					( yyxi[1] != yy_state ) )
@@ -456,7 +446,7 @@ int yyparse()
 				*/
 				if ( yydebug )
 				{
-					register int yy_i;
+					int yy_i;
 
 					printf( "Error recovery discards " );
 					if ( yychar == 0 )
@@ -516,7 +506,7 @@ int yyparse()
 		*/
 		{
 			/* length of production doubled with extra bit */
-			register int yy_len = yyr2[ yy_n ];
+			int yy_len = yyr2[ yy_n ];
 
 			if ( !( yy_len & 01 ) )
 			{
@@ -556,4 +546,3 @@ int yyparse()
 	}
 	goto yystack;		/* reset registers in driver code */
 }
-
