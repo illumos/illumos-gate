@@ -1051,6 +1051,10 @@ is_vga(struct memlist *elem, enum io_mem io)
 static boolean_t
 list_is_vga_only(struct memlist *l, enum io_mem io)
 {
+	if (l == NULL) {
+		return (B_FALSE);
+	}
+
 	do {
 		if (!is_vga(l, io))
 			return (B_FALSE);
