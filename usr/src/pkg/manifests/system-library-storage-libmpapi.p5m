@@ -1,0 +1,108 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
+
+set name=pkg.fmri value=pkg:/system/library/storage/libmpapi@$(PKGVERS)
+set name=pkg.summary value="SNIA Multipath Management API Common Library"
+set name=pkg.description \
+    value="Common Library based on SNIA MP API specification"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Libraries
+set name=variant.arch value=$(ARCH)
+dir  path=etc group=sys
+file path=etc/mpapi.conf original_name=SUNWmpapi:etc/mpapi.conf preserve=true
+dir  path=lib
+dir  path=lib/$(ARCH64)
+link path=lib/$(ARCH64)/libMPAPI.so target=libMPAPI.so.1
+file path=lib/$(ARCH64)/libMPAPI.so.1
+link path=lib/libMPAPI.so target=libMPAPI.so.1
+file path=lib/libMPAPI.so.1
+dir  path=usr group=sys
+dir  path=usr/include
+file path=usr/include/mpapi-sun.h
+file path=usr/include/mpapi.h
+dir  path=usr/share/man
+dir  path=usr/share/man/man3lib
+file path=usr/share/man/man3lib/libMPAPI.3lib
+link path=usr/share/man/man3lib/libmpapi.3lib target=libMPAPI.3lib
+dir  path=usr/share/man/man3mpapi
+file path=usr/share/man/man3mpapi/MP_AssignLogicalUnitToTPG.3mpapi
+file path=usr/share/man/man3mpapi/MP_CancelOverridePath.3mpapi
+file path=usr/share/man/man3mpapi/MP_CompareOIDs.3mpapi
+file path=usr/share/man/man3mpapi/MP_DeregisterForObjectPropertyChanges.3mpapi
+file path=usr/share/man/man3mpapi/MP_DeregisterForObjectVisibilityChanges.3mpapi
+file path=usr/share/man/man3mpapi/MP_DeregisterPlugin.3mpapi
+file path=usr/share/man/man3mpapi/MP_DisableAutoFailback.3mpapi
+file path=usr/share/man/man3mpapi/MP_DisableAutoProbing.3mpapi
+file path=usr/share/man/man3mpapi/MP_DisablePath.3mpapi
+file path=usr/share/man/man3mpapi/MP_EnableAutoFailback.3mpapi
+file path=usr/share/man/man3mpapi/MP_EnableAutoProbing.3mpapi
+file path=usr/share/man/man3mpapi/MP_EnablePath.3mpapi
+file path=usr/share/man/man3mpapi/MP_FreeOidList.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetAssociatedPathOidList.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetAssociatedPluginOid.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetAssociatedTPGOidList.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetDeviceProductOidList.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetDeviceProductProperties.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetInitiatorPortOidList.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetInitiatorPortProperties.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetLibraryProperties.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetMPLogicalUnitProperties.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetMPLuOidListFromTPG.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetMultipathLus.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetObjectType.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetPathLogicalUnitProperties.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetPluginOidList.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetPluginProperties.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetProprietaryLoadBalanceOidList.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetProprietaryLoadBalanceProperties.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetTargetPortGroupProperties.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetTargetPortOidList.3mpapi
+file path=usr/share/man/man3mpapi/MP_GetTargetPortProperties.3mpapi
+file path=usr/share/man/man3mpapi/MP_RegisterForObjectPropertyChanges.3mpapi
+file path=usr/share/man/man3mpapi/MP_RegisterForObjectVisibilityChanges.3mpapi
+file path=usr/share/man/man3mpapi/MP_RegisterPlugin.3mpapi
+file path=usr/share/man/man3mpapi/MP_SetFailbackPollingRate.3mpapi
+file path=usr/share/man/man3mpapi/MP_SetLogicalUnitLoadBalanceType.3mpapi
+file path=usr/share/man/man3mpapi/MP_SetOverridePath.3mpapi
+file path=usr/share/man/man3mpapi/MP_SetPathWeight.3mpapi
+file path=usr/share/man/man3mpapi/MP_SetPluginLoadBalanceType.3mpapi
+file path=usr/share/man/man3mpapi/MP_SetProbingPollingRate.3mpapi
+file path=usr/share/man/man3mpapi/MP_SetProprietaryProperties.3mpapi
+file path=usr/share/man/man3mpapi/MP_SetTPGAccess.3mpapi
+file path=usr/share/man/man3mpapi/Sun_MP_SendScsiCmd.3mpapi
+dir  path=usr/share/man/man4
+file path=usr/share/man/man4/mpapi.conf.4
+legacy pkg=SUNWmpapi desc="Common Library based on SNIA MP API specification" \
+    name="SNIA Multipath Management API Common Library"
+legacy pkg=SUNWmpapir \
+    desc="Common Library based on SNIA MP API specification (Root)" \
+    name="SNIA Multipath Management API Common Library (Root)"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license usr/src/lib/mpapi/libmpapi/THIRDPARTYLICENSE \
+    license=usr/src/lib/mpapi/libmpapi/THIRDPARTYLICENSE
+depend type=require fmri=system/library/storage/libmpscsi_vhci

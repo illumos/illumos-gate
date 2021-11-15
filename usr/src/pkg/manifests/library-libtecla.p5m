@@ -1,0 +1,202 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
+
+set name=pkg.fmri \
+    value=pkg:/library/libtecla@1.6.0,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.summary value="Tecla command-line editing library"
+set name=pkg.description value="Tecla command-line editing library"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Libraries
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/bin
+file path=usr/bin/enhance mode=0555
+dir  path=usr/include
+file path=usr/include/libtecla.h
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libtecla.so target=libtecla.so.1
+file path=usr/lib/$(ARCH64)/libtecla.so.1
+link path=usr/lib/libtecla.so target=libtecla.so.1
+file path=usr/lib/libtecla.so.1
+dir  path=usr/share/man
+dir  path=usr/share/man/man1
+file path=usr/share/man/man1/enhance.1
+dir  path=usr/share/man/man3lib
+file path=usr/share/man/man3lib/libtecla.3lib
+dir  path=usr/share/man/man3tecla
+link path=usr/share/man/man3tecla/cfc_file_start.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/cfc_literal_escapes.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/cfc_set_check_fn.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/cpl_add_completion.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/cpl_check_exe.3tecla \
+    target=cpl_complete_word.3tecla
+file path=usr/share/man/man3tecla/cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/cpl_file_completions.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/cpl_last_error.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/cpl_list_completions.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/cpl_recall_matches.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/cpl_record_error.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/del_CplFileConf.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/del_ExpandFile.3tecla \
+    target=ef_expand_file.3tecla
+link path=usr/share/man/man3tecla/del_GetLine.3tecla target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/del_PathCache.3tecla \
+    target=pca_lookup_file.3tecla
+link path=usr/share/man/man3tecla/del_PcaPathConf.3tecla \
+    target=pca_lookup_file.3tecla
+link path=usr/share/man/man3tecla/del_WordCompletion.3tecla \
+    target=cpl_complete_word.3tecla
+file path=usr/share/man/man3tecla/ef_expand_file.3tecla
+link path=usr/share/man/man3tecla/ef_last_error.3tecla \
+    target=ef_expand_file.3tecla
+link path=usr/share/man/man3tecla/ef_list_expansions.3tecla \
+    target=ef_expand_file.3tecla
+link path=usr/share/man/man3tecla/gl_abandon_line.3tecla \
+    target=gl_io_mode.3tecla
+link path=usr/share/man/man3tecla/gl_append_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_automatic_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_bind_keyseq.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_catch_blocked.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_change_terminal.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_clear_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_completion_action.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_configure_getline.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_customize_completion.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_display_text.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_echo_mode.3tecla target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_erase_terminal.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_error_message.3tecla \
+    target=gl_get_line.3tecla
+file path=usr/share/man/man3tecla/gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_group_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_handle_signal.3tecla \
+    target=gl_io_mode.3tecla
+link path=usr/share/man/man3tecla/gl_ignore_signal.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_inactivity_timeout.3tecla \
+    target=gl_get_line.3tecla
+file path=usr/share/man/man3tecla/gl_io_mode.3tecla
+link path=usr/share/man/man3tecla/gl_last_signal.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_limit_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_list_signals.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_load_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_lookup_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_normal_io.3tecla target=gl_io_mode.3tecla
+link path=usr/share/man/man3tecla/gl_pending_io.3tecla target=gl_io_mode.3tecla
+link path=usr/share/man/man3tecla/gl_prompt_style.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_query_char.3tecla target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_range_of_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_raw_io.3tecla target=gl_io_mode.3tecla
+link path=usr/share/man/man3tecla/gl_read_char.3tecla target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_register_action.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_replace_prompt.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_resize_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_return_status.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_save_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_set_term_size.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_show_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_size_of_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_state_of_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_terminal_size.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_toggle_history.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_trap_signal.3tecla \
+    target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/gl_tty_signals.3tecla target=gl_io_mode.3tecla
+link path=usr/share/man/man3tecla/gl_watch_fd.3tecla target=gl_get_line.3tecla
+file path=usr/share/man/man3tecla/libtecla_version.3tecla
+link path=usr/share/man/man3tecla/new_CplFileConf.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/new_ExpandFile.3tecla \
+    target=ef_expand_file.3tecla
+link path=usr/share/man/man3tecla/new_GetLine.3tecla target=gl_get_line.3tecla
+link path=usr/share/man/man3tecla/new_PathCache.3tecla \
+    target=pca_lookup_file.3tecla
+link path=usr/share/man/man3tecla/new_PcaPathConf.3tecla \
+    target=pca_lookup_file.3tecla
+link path=usr/share/man/man3tecla/new_WordCompletion.3tecla \
+    target=cpl_complete_word.3tecla
+link path=usr/share/man/man3tecla/pca_last_error.3tecla \
+    target=pca_lookup_file.3tecla
+file path=usr/share/man/man3tecla/pca_lookup_file.3tecla
+link path=usr/share/man/man3tecla/pca_path_completions.3tecla \
+    target=pca_lookup_file.3tecla
+link path=usr/share/man/man3tecla/pca_scan_path.3tecla \
+    target=pca_lookup_file.3tecla
+link path=usr/share/man/man3tecla/pca_set_check_fn.3tecla \
+    target=pca_lookup_file.3tecla
+link path=usr/share/man/man3tecla/ppc_file_start.3tecla \
+    target=pca_lookup_file.3tecla
+link path=usr/share/man/man3tecla/ppc_literal_escapes.3tecla \
+    target=pca_lookup_file.3tecla
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/tecla.5
+link path=usr/share/man/man5/teclarc.5 target=tecla.5
+legacy pkg=SUNWtecla desc="Tecla command-line editing library" \
+    name="Tecla command-line editing library"
+license usr/src/lib/libtecla/THIRDPARTYLICENSE \
+    license=usr/src/lib/libtecla/THIRDPARTYLICENSE

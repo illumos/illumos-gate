@@ -1,0 +1,55 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/crypto/tpm@$(PKGVERS)
+set name=pkg.summary value="Trusted Platform Module driver"
+set name=pkg.description value="Trusted Platform Module driver"
+set name=info.classification \
+    value="org.opensolaris.category.2008:Drivers/Other Peripherals"
+set name=variant.arch value=$(ARCH)
+$(i386_ONLY)dir path=kernel group=sys
+$(i386_ONLY)dir path=kernel/drv group=sys
+$(i386_ONLY)dir path=kernel/drv/$(ARCH64) group=sys
+$(i386_ONLY)file path=kernel/drv/$(ARCH64)/tpm group=sys
+$(sparc_ONLY)dir path=platform group=sys
+$(sparc_ONLY)dir path=platform/sun4v group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/drv group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/tpm group=sys
+$(sparc_ONLY)driver name=tpm perms="* 0600 root sys" \
+    devlink=type=ddi_pseudo;name=tpm\t\D alias=SUNW,sun4v-ptpm
+$(i386_ONLY)driver name=tpm perms="* 0600 root sys" \
+    devlink=type=ddi_pseudo;name=tpm\t\D
+legacy pkg=SUNWtpm desc="Trusted Platform Module driver" \
+    name="Trusted Platform Module driver" version=11.11.0,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

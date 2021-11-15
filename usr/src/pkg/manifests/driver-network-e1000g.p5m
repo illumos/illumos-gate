@@ -1,0 +1,271 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/network/e1000g@$(PKGVERS)
+set name=pkg.summary value="Intel(R) PRO/1000 Server Adapter Driver"
+set name=pkg.description value="Intel(R) PRO/1000 Server Adapter Driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=$(ARCH)
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/e1000g group=sys
+file path=kernel/drv/e1000g.conf group=sys \
+    original_name=SUNWintgige:kernel/drv/e1000g.conf preserve=renamenew
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/e1000g.7d
+driver name=e1000g perms="* 0666 root sys" clone_perms="e1000g 0666 root sys" \
+    alias=pci8086,d4c,p \
+    alias=pci8086,d4d,p \
+    alias=pci8086,d4e,p \
+    alias=pci8086,d4f,p \
+    alias=pci8086,d53,p \
+    alias=pci8086,d55,p \
+    alias=pci8086,1000 \
+    alias=pci8086,1001 \
+    alias=pci8086,1004.0e11.49 \
+    alias=pci8086,1004.0e11.b1a4 \
+    alias=pci8086,1004.1014.10f2 \
+    alias=pci8086,1004.8086.1004 \
+    alias=pci8086,1004.8086.2004 \
+    alias=pci8086,1008 \
+    alias=pci8086,1009 \
+    alias=pci8086,100c \
+    alias=pci8086,100d \
+    alias=pci8086,100e \
+    alias=pci8086,100f \
+    alias=pci8086,1010 \
+    alias=pci8086,1011 \
+    alias=pci8086,1012 \
+    alias=pci8086,1013 \
+    alias=pci8086,1014 \
+    alias=pci8086,1015 \
+    alias=pci8086,1016 \
+    alias=pci8086,1017 \
+    alias=pci8086,1018 \
+    alias=pci8086,1019 \
+    alias=pci8086,101a \
+    alias=pci8086,101d \
+    alias=pci8086,101e \
+    alias=pci8086,1026 \
+    alias=pci8086,1027 \
+    alias=pci8086,1028 \
+    alias=pci8086,1049 \
+    alias=pci8086,104a \
+    alias=pci8086,104b \
+    alias=pci8086,104c \
+    alias=pci8086,104d \
+    alias=pci8086,105a \
+    alias=pci8086,105b \
+    alias=pci8086,105c \
+    alias=pci8086,105e \
+    alias=pci8086,105f \
+    alias=pci8086,1060 \
+    alias=pci8086,1061 \
+    alias=pci8086,1062 \
+    alias=pci8086,1063 \
+    alias=pci8086,1075 \
+    alias=pci8086,1076 \
+    alias=pci8086,1077 \
+    alias=pci8086,1078 \
+    alias=pci8086,1079 \
+    alias=pci8086,107a \
+    alias=pci8086,107b \
+    alias=pci8086,107c \
+    alias=pci8086,107d \
+    alias=pci8086,107e \
+    alias=pci8086,107f \
+    alias=pci8086,108a \
+    alias=pci8086,108b \
+    alias=pci8086,108c \
+    alias=pci8086,1096 \
+    alias=pci8086,1098 \
+    alias=pci8086,1099 \
+    alias=pci8086,109a \
+    alias=pci8086,10a4 \
+    alias=pci8086,10a5 \
+    alias=pci8086,10b5 \
+    alias=pci8086,10b9 \
+    alias=pci8086,10ba \
+    alias=pci8086,10bb \
+    alias=pci8086,10bc \
+    alias=pci8086,10bd \
+    alias=pci8086,10bf \
+    alias=pci8086,10c0 \
+    alias=pci8086,10c2 \
+    alias=pci8086,10c3 \
+    alias=pci8086,10c4 \
+    alias=pci8086,10c5 \
+    alias=pci8086,10cb \
+    alias=pci8086,10cc \
+    alias=pci8086,10cd \
+    alias=pci8086,10ce \
+    alias=pci8086,10d3 \
+    alias=pci8086,10d5 \
+    alias=pci8086,10d9 \
+    alias=pci8086,10da \
+    alias=pci8086,10de \
+    alias=pci8086,10df \
+    alias=pci8086,10e5 \
+    alias=pci8086,10ea \
+    alias=pci8086,10eb \
+    alias=pci8086,10ef \
+    alias=pci8086,10f0 \
+    alias=pci8086,10f5 \
+    alias=pci8086,10f6 \
+    alias=pci8086,1502 \
+    alias=pci8086,1503 \
+    alias=pci8086,150c \
+    alias=pci8086,153a \
+    alias=pci8086,153b \
+    alias=pci8086,1559 \
+    alias=pci8086,155a \
+    alias=pci8086,156f \
+    alias=pci8086,1570 \
+    alias=pci8086,15a0 \
+    alias=pci8086,15a1 \
+    alias=pci8086,15a2 \
+    alias=pci8086,15a3 \
+    alias=pci8086,15b7 \
+    alias=pci8086,15b8 \
+    alias=pci8086,15b9 \
+    alias=pci8086,15bb \
+    alias=pci8086,15bc \
+    alias=pci8086,15bd \
+    alias=pci8086,15be \
+    alias=pci8086,15d6 \
+    alias=pci8086,15d7 \
+    alias=pci8086,15d8 \
+    alias=pci8086,15df \
+    alias=pci8086,15e0 \
+    alias=pci8086,15e1 \
+    alias=pci8086,15e2 \
+    alias=pci8086,15e3 \
+    alias=pci8086,15f4,p \
+    alias=pci8086,15f9,p \
+    alias=pci8086,15fa,p \
+    alias=pci8086,15fb,p \
+    alias=pci8086,15fc,p \
+    alias=pci8086,294c \
+    alias=pci8086,f0fe \
+    alias=pciex8086,d4c \
+    alias=pciex8086,d4d \
+    alias=pciex8086,d4e \
+    alias=pciex8086,d4f \
+    alias=pciex8086,d53 \
+    alias=pciex8086,d55 \
+    alias=pciex8086,1049 \
+    alias=pciex8086,104a \
+    alias=pciex8086,104b \
+    alias=pciex8086,104c \
+    alias=pciex8086,104d \
+    alias=pciex8086,105e \
+    alias=pciex8086,105f \
+    alias=pciex8086,1060 \
+    alias=pciex8086,107d \
+    alias=pciex8086,107e \
+    alias=pciex8086,107f \
+    alias=pciex8086,108b \
+    alias=pciex8086,108c \
+    alias=pciex8086,1096 \
+    alias=pciex8086,1098 \
+    alias=pciex8086,109a \
+    alias=pciex8086,10a4 \
+    alias=pciex8086,10a5 \
+    alias=pciex8086,10b9 \
+    alias=pciex8086,10ba \
+    alias=pciex8086,10bb \
+    alias=pciex8086,10bc \
+    alias=pciex8086,10bd \
+    alias=pciex8086,10bf \
+    alias=pciex8086,10c0 \
+    alias=pciex8086,10c2 \
+    alias=pciex8086,10c3 \
+    alias=pciex8086,10c4 \
+    alias=pciex8086,10c5 \
+    alias=pciex8086,10cb \
+    alias=pciex8086,10cc \
+    alias=pciex8086,10cd \
+    alias=pciex8086,10ce \
+    alias=pciex8086,10d3 \
+    alias=pciex8086,10d5 \
+    alias=pciex8086,10d9 \
+    alias=pciex8086,10da \
+    alias=pciex8086,10de \
+    alias=pciex8086,10df \
+    alias=pciex8086,10e5 \
+    alias=pciex8086,10ea \
+    alias=pciex8086,10eb \
+    alias=pciex8086,10ef \
+    alias=pciex8086,10f0 \
+    alias=pciex8086,10f5 \
+    alias=pciex8086,10f6 \
+    alias=pciex8086,1502 \
+    alias=pciex8086,1503 \
+    alias=pciex8086,150c \
+    alias=pciex8086,153a \
+    alias=pciex8086,153b \
+    alias=pciex8086,1559 \
+    alias=pciex8086,155a \
+    alias=pciex8086,156f \
+    alias=pciex8086,1570 \
+    alias=pciex8086,15a0 \
+    alias=pciex8086,15a1 \
+    alias=pciex8086,15a2 \
+    alias=pciex8086,15a3 \
+    alias=pciex8086,15b7 \
+    alias=pciex8086,15b8 \
+    alias=pciex8086,15b9 \
+    alias=pciex8086,15bb \
+    alias=pciex8086,15bc \
+    alias=pciex8086,15bd \
+    alias=pciex8086,15be \
+    alias=pciex8086,15d6 \
+    alias=pciex8086,15d7 \
+    alias=pciex8086,15d8 \
+    alias=pciex8086,15df \
+    alias=pciex8086,15e0 \
+    alias=pciex8086,15e1 \
+    alias=pciex8086,15e2 \
+    alias=pciex8086,15e3 \
+    alias=pciex8086,15f4 \
+    alias=pciex8086,15f9 \
+    alias=pciex8086,15fa \
+    alias=pciex8086,15fb \
+    alias=pciex8086,15fc \
+    alias=pciex8086,294c \
+    alias=pciex8086,f0fe
+legacy pkg=SUNWintgige desc="Intel(R) PRO/1000 Server Adapter Driver" \
+    name="Intel(R) PRO/1000 Server Adapter Driver"
+license usr/src/uts/common/io/e1000g/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/e1000g/THIRDPARTYLICENSE

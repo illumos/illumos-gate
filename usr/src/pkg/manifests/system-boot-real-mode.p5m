@@ -1,0 +1,54 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/boot/real-mode@$(PKGVERS)
+set name=pkg.summary value="Realmode Modules"
+set name=pkg.description value="Realmode Modules"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+# SUNWrmod doesn't deliver anything for sparc, but SUNWrmodu was
+# renamed for i386, and we can't obsolete one variant and rename
+# another, so SUNWrmod continues to be delivered as sparc, but
+# empty to satisfy the rename.
+set name=variant.arch value=$(ARCH)
+$(i386_ONLY)dir path=boot group=sys
+$(i386_ONLY)dir path=boot/solaris group=sys
+$(i386_ONLY)hardlink path=boot/solaris.xpm target=splashimage.xpm
+$(i386_ONLY)file path=boot/solaris/bootenv.rc group=sys \
+    original_name=SUNWrmodr:boot/solaris/bootenv.rc preserve=renamenew
+$(i386_ONLY)dir path=boot/solaris/devicedb group=sys
+$(i386_ONLY)file path=boot/solaris/devicedb/master group=sys \
+    original_name=SUNWrmod:boot/solaris/devicedb/master preserve=true
+$(i386_ONLY)file path=boot/splashimage.xpm group=sys
+$(i386_ONLY)dir path=usr group=sys
+$(i386_ONLY)dir path=usr/lib
+$(i386_ONLY)dir path=usr/lib/fs group=sys
+$(i386_ONLY)dir path=usr/lib/fs/ufs group=sys
+$(i386_ONLY)legacy pkg=SUNWrmodr desc="Realmode Modules, (Root)" \
+    name="Realmode Modules, (Root)"
+$(i386_ONLY)legacy pkg=SUNWrmodu desc="Realmode Modules, (Usr)" \
+    name="Realmode Modules, (Usr)"
+$(i386_ONLY)license cr_Sun license=cr_Sun
+$(i386_ONLY)license lic_CDDL license=lic_CDDL

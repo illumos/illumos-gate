@@ -1,0 +1,224 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 Peter Tribble
+#
+
+#
+# Copyright (c) 2012 by Delphix. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/developer/dtrace@$(PKGVERS)
+set name=pkg.summary value="DTrace Clients"
+set name=pkg.description value="Dynamic Tracing (DTrace) Clients"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/demo
+dir  path=usr/demo/dtrace
+file path=usr/demo/dtrace/applicat.d
+file path=usr/demo/dtrace/badopen.d
+file path=usr/demo/dtrace/begin.d
+file path=usr/demo/dtrace/callout.d
+file path=usr/demo/dtrace/clause.d
+file path=usr/demo/dtrace/clear.d
+file path=usr/demo/dtrace/countdown.d
+file path=usr/demo/dtrace/counter.d
+file path=usr/demo/dtrace/dateprof.d
+file path=usr/demo/dtrace/delay.d
+file path=usr/demo/dtrace/denorm.d
+file path=usr/demo/dtrace/end.d
+file path=usr/demo/dtrace/error.d
+file path=usr/demo/dtrace/errorpath.d
+file path=usr/demo/dtrace/find.d
+file path=usr/demo/dtrace/firebird.d
+file path=usr/demo/dtrace/hello.d
+file path=usr/demo/dtrace/howlong.d
+file path=usr/demo/dtrace/index.html
+file path=usr/demo/dtrace/interp.d
+file path=usr/demo/dtrace/interval.d
+file path=usr/demo/dtrace/intr.d
+file path=usr/demo/dtrace/iocpu.d
+file path=usr/demo/dtrace/iosnoop.d
+file path=usr/demo/dtrace/iothrough.d
+file path=usr/demo/dtrace/iotime.d
+file path=usr/demo/dtrace/ipio.d
+file path=usr/demo/dtrace/ipproto.d
+$(i386_ONLY)file path=usr/demo/dtrace/iprb.d
+file path=usr/demo/dtrace/kstat.d
+file path=usr/demo/dtrace/ksyms.d
+file path=usr/demo/dtrace/libc.d
+file path=usr/demo/dtrace/lquantize.d
+file path=usr/demo/dtrace/lwptime.d
+file path=usr/demo/dtrace/normalize.d
+file path=usr/demo/dtrace/nscd.d
+file path=usr/demo/dtrace/pri.d
+file path=usr/demo/dtrace/printa.d
+file path=usr/demo/dtrace/pritime.d
+file path=usr/demo/dtrace/prof.d
+file path=usr/demo/dtrace/profpri.d
+file path=usr/demo/dtrace/progtime.d
+file path=usr/demo/dtrace/putnext.d
+file path=usr/demo/dtrace/qlen.d
+file path=usr/demo/dtrace/qtime.d
+file path=usr/demo/dtrace/renormalize.d
+file path=usr/demo/dtrace/restest.d
+file path=usr/demo/dtrace/ring.d
+file path=usr/demo/dtrace/rtime.d
+file path=usr/demo/dtrace/rwinfo.d
+file path=usr/demo/dtrace/rwtime.d
+file path=usr/demo/dtrace/sig.d
+file path=usr/demo/dtrace/soffice.d
+file path=usr/demo/dtrace/spec.d
+file path=usr/demo/dtrace/specopen.d
+file path=usr/demo/dtrace/ssd.d
+file path=usr/demo/dtrace/syscall.d
+file path=usr/demo/dtrace/tcp1stbyte.d
+file path=usr/demo/dtrace/tcpbytes.d
+file path=usr/demo/dtrace/tcpbytesstat.d
+file path=usr/demo/dtrace/tcpconnlat.d
+file path=usr/demo/dtrace/tcpio.d
+file path=usr/demo/dtrace/tcpioflags.d
+file path=usr/demo/dtrace/tcprst.d
+file path=usr/demo/dtrace/tcpsnoop.d
+file path=usr/demo/dtrace/tcpstate.d
+file path=usr/demo/dtrace/tcptop.d
+file path=usr/demo/dtrace/tick.d
+file path=usr/demo/dtrace/ticktime.d
+file path=usr/demo/dtrace/time.d
+file path=usr/demo/dtrace/tracewrite.d
+file path=usr/demo/dtrace/trunc.d
+file path=usr/demo/dtrace/trussrw.d
+file path=usr/demo/dtrace/udpbytes.d
+file path=usr/demo/dtrace/udpbytesstat.d
+file path=usr/demo/dtrace/udpio.d
+file path=usr/demo/dtrace/udpsnoop.d
+file path=usr/demo/dtrace/udptop.d
+file path=usr/demo/dtrace/userfunc.d
+file path=usr/demo/dtrace/whatfor.d
+file path=usr/demo/dtrace/whatlock.d
+file path=usr/demo/dtrace/where.d
+file path=usr/demo/dtrace/whererun.d
+file path=usr/demo/dtrace/whoexec.d
+file path=usr/demo/dtrace/whofor.d
+file path=usr/demo/dtrace/whoio.d
+file path=usr/demo/dtrace/whopreempt.d
+file path=usr/demo/dtrace/whoqueue.d
+file path=usr/demo/dtrace/whosteal.d
+file path=usr/demo/dtrace/whowrite.d
+file path=usr/demo/dtrace/writes.d
+file path=usr/demo/dtrace/writesbycmd.d
+file path=usr/demo/dtrace/writesbycmdfd.d
+file path=usr/demo/dtrace/writetime.d
+file path=usr/demo/dtrace/writetimeq.d
+file path=usr/demo/dtrace/xioctl.d
+file path=usr/demo/dtrace/xterm.d
+file path=usr/demo/dtrace/xwork.d
+dir  path=usr/include
+file path=usr/include/dtrace.h
+dir  path=usr/include/sys
+file path=usr/include/sys/dtrace.h
+file path=usr/include/sys/dtrace_impl.h
+file path=usr/include/sys/fasttrap.h
+file path=usr/include/sys/fasttrap_impl.h
+file path=usr/include/sys/fasttrap_isa.h
+file path=usr/include/sys/lockstat.h
+file path=usr/include/sys/sdt.h
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libdtrace.so target=libdtrace.so.1
+file path=usr/lib/$(ARCH64)/libdtrace.so.1
+link path=usr/lib/$(ARCH64)/libdtrace_jni.so target=libdtrace_jni.so.1
+file path=usr/lib/$(ARCH64)/libdtrace_jni.so.1
+dir  path=usr/lib/devfsadm group=sys
+dir  path=usr/lib/devfsadm/linkmod group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_dtrace_link.so group=sys
+dir  path=usr/lib/dtrace
+dir  path=usr/lib/dtrace/64
+file path=usr/lib/dtrace/64/drti.o mode=0444
+file path=usr/lib/dtrace/64/libdtrace_forceload.so mode=0555
+file path=usr/lib/dtrace/drti.o mode=0444
+file path=usr/lib/dtrace/errno.d mode=0444
+file path=usr/lib/dtrace/fc.d mode=0444
+file path=usr/lib/dtrace/io.d mode=0444
+file path=usr/lib/dtrace/ip.d mode=0444
+file path=usr/lib/dtrace/iscsit.d mode=0444
+file path=usr/lib/dtrace/libdtrace_forceload.so mode=0555
+file path=usr/lib/dtrace/net.d mode=0444
+file path=usr/lib/dtrace/nfs.d mode=0444
+file path=usr/lib/dtrace/nfssrv.d mode=0444
+file path=usr/lib/dtrace/procfs.d mode=0444
+file path=usr/lib/dtrace/regs.d mode=0444
+file path=usr/lib/dtrace/sched.d mode=0444
+file path=usr/lib/dtrace/scsi.d mode=0444
+file path=usr/lib/dtrace/signal.d mode=0444
+file path=usr/lib/dtrace/smb.d mode=0444
+file path=usr/lib/dtrace/srp.d mode=0444
+file path=usr/lib/dtrace/sysevent.d mode=0444
+file path=usr/lib/dtrace/tcp.d mode=0444
+file path=usr/lib/dtrace/udp.d mode=0444
+file path=usr/lib/dtrace/unistd.d mode=0444
+link path=usr/lib/libdtrace.so target=libdtrace.so.1
+file path=usr/lib/libdtrace.so.1
+link path=usr/lib/libdtrace_jni.so target=libdtrace_jni.so.1
+file path=usr/lib/libdtrace_jni.so.1
+dir  path=usr/lib/mdb group=sys
+dir  path=usr/lib/mdb/kvm group=sys
+dir  path=usr/lib/mdb/kvm/$(ARCH64) group=sys
+file path=usr/lib/mdb/kvm/$(ARCH64)/dtrace.so group=sys mode=0555
+dir  path=usr/lib/mdb/raw group=sys
+dir  path=usr/lib/mdb/raw/$(ARCH64) group=sys
+file path=usr/lib/mdb/raw/$(ARCH64)/dof.so group=sys mode=0555
+file path=usr/lib/mdb/raw/dof.so group=sys mode=0555
+dir  path=usr/sbin
+dir  path=usr/sbin/$(ARCH32)
+file path=usr/sbin/$(ARCH32)/dtrace mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/intrstat mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/lockstat mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/plockstat mode=0555
+dir  path=usr/sbin/$(ARCH64)
+file path=usr/sbin/$(ARCH64)/dtrace mode=0555
+file path=usr/sbin/$(ARCH64)/intrstat mode=0555
+file path=usr/sbin/$(ARCH64)/lockstat mode=0555
+file path=usr/sbin/$(ARCH64)/plockstat mode=0555
+hardlink path=usr/sbin/dtrace target=../../usr/lib/isaexec
+hardlink path=usr/sbin/intrstat target=../../usr/lib/isaexec
+hardlink path=usr/sbin/lockstat target=../../usr/lib/isaexec
+hardlink path=usr/sbin/plockstat target=../../usr/lib/isaexec
+dir  path=usr/share
+dir  path=usr/share/lib
+dir  path=usr/share/lib/java group=sys
+file path=usr/share/lib/java/dtrace.jar group=sys
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/dtrace.1m
+file path=usr/share/man/man1m/intrstat.1m
+file path=usr/share/man/man1m/lockstat.1m
+file path=usr/share/man/man1m/plockstat.1m
+dir  path=usr/share/man/man3lib
+file path=usr/share/man/man3lib/libdtrace.3lib
+legacy pkg=SUNWdtrc desc="Dynamic Tracing (DTrace) Clients" \
+    name="DTrace Clients"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

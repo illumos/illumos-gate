@@ -1,0 +1,54 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/header/header-audio@$(PKGVERS)
+set name=pkg.summary value="Audio Header Files"
+set name=pkg.description \
+    value="SunOS C/C++ header files for audio drivers and applications"
+set name=info.classification value=org.opensolaris.category.2008:System/Media
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/include
+dir  path=usr/include/audio
+file path=usr/include/audio/au.h
+dir  path=usr/include/sys
+dir  path=usr/include/sys/audio
+file path=usr/include/sys/audio.h
+file path=usr/include/sys/audio/ac97.h
+file path=usr/include/sys/audio/audio_common.h
+file path=usr/include/sys/audio/audio_driver.h
+file path=usr/include/sys/audio/audio_oss.h
+file path=usr/include/sys/audio/g711.h
+file path=usr/include/sys/audioio.h
+file path=usr/include/sys/mixer.h
+file path=usr/include/sys/soundcard.h
+dir  path=usr/share/man
+dir  path=usr/share/man/man4
+file path=usr/share/man/man4/au.4
+legacy pkg=SUNWaudh \
+    desc="SunOS C/C++ header files for audio drivers and applications" \
+    name="Audio Header Files"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

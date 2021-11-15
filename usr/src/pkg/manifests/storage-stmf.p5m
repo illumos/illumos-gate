@@ -1,0 +1,158 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
+
+set name=pkg.fmri value=pkg:/storage/stmf@$(PKGVERS)
+set name=pkg.summary value="Sun Common Multiprotocol SCSI Target"
+set name=pkg.description \
+    value="Sun Common Multiprotocol SCSI Target device drivers"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=$(ARCH)
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/fct group=sys
+file path=kernel/drv/$(ARCH64)/pppt group=sys
+file path=kernel/drv/$(ARCH64)/qlt group=sys
+file path=kernel/drv/$(ARCH64)/stmf group=sys
+file path=kernel/drv/$(ARCH64)/stmf_sbd group=sys
+file path=kernel/drv/fct.conf group=sys
+file path=kernel/drv/pppt.conf group=sys
+file path=kernel/drv/qlt.conf group=sys
+file path=kernel/drv/stmf.conf group=sys
+file path=kernel/drv/stmf_sbd.conf group=sys
+dir  path=kernel/kmdb group=sys
+dir  path=kernel/kmdb/$(ARCH64) group=sys
+file path=kernel/kmdb/$(ARCH64)/stmf group=sys mode=0555
+file path=kernel/kmdb/$(ARCH64)/stmf_sbd group=sys mode=0555
+dir  path=lib variant.opensolaris.zone=global
+dir  path=lib/svc variant.opensolaris.zone=global
+dir  path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir  path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
+file path=lib/svc/manifest/system/stmf.xml group=sys mode=0444 \
+    variant.opensolaris.zone=global
+dir  path=lib/svc/method variant.opensolaris.zone=global
+file path=lib/svc/method/svc-stmf mode=0555 variant.opensolaris.zone=global
+dir  path=usr group=sys
+dir  path=usr/demo
+dir  path=usr/demo/comstar
+dir  path=usr/demo/comstar/bin
+file path=usr/demo/comstar/bin/aluaadm mode=0555
+file path=usr/demo/comstar/bin/svc-stmfproxy mode=0555
+file path=usr/demo/comstar/stmfproxy.xml mode=0444
+dir  path=usr/include
+file path=usr/include/libstmf.h
+file path=usr/include/libstmfproxy.h
+dir  path=usr/include/sys
+file path=usr/include/sys/fct.h
+file path=usr/include/sys/fct_defines.h
+file path=usr/include/sys/fctio.h
+file path=usr/include/sys/lpif.h
+file path=usr/include/sys/portif.h
+file path=usr/include/sys/stmf.h
+file path=usr/include/sys/stmf_defines.h
+file path=usr/include/sys/stmf_ioctl.h
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libstmf.so target=libstmf.so.1
+file path=usr/lib/$(ARCH64)/libstmf.so.1
+link path=usr/lib/$(ARCH64)/libstmfproxy.so target=libstmfproxy.so.1
+file path=usr/lib/$(ARCH64)/libstmfproxy.so.1
+link path=usr/lib/libstmf.so target=libstmf.so.1
+file path=usr/lib/libstmf.so.1
+link path=usr/lib/libstmfproxy.so target=libstmfproxy.so.1
+file path=usr/lib/libstmfproxy.so.1
+dir  path=usr/lib/mdb group=sys
+dir  path=usr/lib/mdb/kvm group=sys
+dir  path=usr/lib/mdb/kvm/$(ARCH64) group=sys
+file path=usr/lib/mdb/kvm/$(ARCH64)/stmf.so group=sys mode=0555
+file path=usr/lib/mdb/kvm/$(ARCH64)/stmf_sbd.so group=sys mode=0555
+dir  path=usr/sbin
+file path=usr/sbin/sbdadm mode=0555
+file path=usr/sbin/stmfadm mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/sbdadm.1m
+file path=usr/share/man/man1m/stmfadm.1m
+dir  path=usr/share/man/man3lib
+file path=usr/share/man/man3lib/libstmf.3lib
+dir  path=usr/share/man/man3stmf
+file path=usr/share/man/man3stmf/stmfAddToHostGroup.3stmf
+file path=usr/share/man/man3stmf/stmfAddToTargetGroup.3stmf
+file path=usr/share/man/man3stmf/stmfAddViewEntry.3stmf
+file path=usr/share/man/man3stmf/stmfClearProviderData.3stmf
+file path=usr/share/man/man3stmf/stmfCreateHostGroup.3stmf
+file path=usr/share/man/man3stmf/stmfCreateLu.3stmf
+file path=usr/share/man/man3stmf/stmfCreateLuResource.3stmf
+file path=usr/share/man/man3stmf/stmfCreateTargetGroup.3stmf
+file path=usr/share/man/man3stmf/stmfDeleteHostGroup.3stmf
+file path=usr/share/man/man3stmf/stmfDeleteLu.3stmf
+file path=usr/share/man/man3stmf/stmfDeleteTargetGroup.3stmf
+file path=usr/share/man/man3stmf/stmfDevidFromIscsiName.3stmf
+file path=usr/share/man/man3stmf/stmfDevidFromWwn.3stmf
+file path=usr/share/man/man3stmf/stmfFreeLuResource.3stmf
+file path=usr/share/man/man3stmf/stmfFreeMemory.3stmf
+file path=usr/share/man/man3stmf/stmfGetHostGroupList.3stmf
+file path=usr/share/man/man3stmf/stmfGetHostGroupMembers.3stmf
+file path=usr/share/man/man3stmf/stmfGetLogicalUnitList.3stmf
+file path=usr/share/man/man3stmf/stmfGetLogicalUnitProperties.3stmf
+link path=usr/share/man/man3stmf/stmfGetLuProp.3stmf target=stmfSetLuProp.3stmf
+file path=usr/share/man/man3stmf/stmfGetLuResource.3stmf
+file path=usr/share/man/man3stmf/stmfGetPersistMethod.3stmf
+file path=usr/share/man/man3stmf/stmfGetProviderData.3stmf
+file path=usr/share/man/man3stmf/stmfGetProviderDataProt.3stmf
+file path=usr/share/man/man3stmf/stmfGetState.3stmf
+file path=usr/share/man/man3stmf/stmfGetTargetGroupList.3stmf
+file path=usr/share/man/man3stmf/stmfGetTargetGroupMembers.3stmf
+file path=usr/share/man/man3stmf/stmfGetTargetList.3stmf
+file path=usr/share/man/man3stmf/stmfGetTargetProperties.3stmf
+file path=usr/share/man/man3stmf/stmfGetViewEntryList.3stmf
+file path=usr/share/man/man3stmf/stmfModifyLu.3stmf
+link path=usr/share/man/man3stmf/stmfModifyLuByFname.3stmf \
+    target=stmfModifyLu.3stmf
+file path=usr/share/man/man3stmf/stmfOfflineLogicalUnit.3stmf
+file path=usr/share/man/man3stmf/stmfOfflineTarget.3stmf
+file path=usr/share/man/man3stmf/stmfOnlineLogicalUnit.3stmf
+file path=usr/share/man/man3stmf/stmfOnlineTarget.3stmf
+file path=usr/share/man/man3stmf/stmfRemoveFromHostGroup.3stmf
+file path=usr/share/man/man3stmf/stmfRemoveFromTargetGroup.3stmf
+file path=usr/share/man/man3stmf/stmfRemoveViewEntry.3stmf
+file path=usr/share/man/man3stmf/stmfSetLuProp.3stmf
+file path=usr/share/man/man3stmf/stmfSetPersistMethod.3stmf
+file path=usr/share/man/man3stmf/stmfSetProviderData.3stmf
+file path=usr/share/man/man3stmf/stmfSetProviderDataProt.3stmf
+driver name=fct perms="* 0666 root sys"
+driver name=pppt perms="* 0666 root sys"
+driver name=qlt perms="* 0666 root sys"
+driver name=stmf perms="* 0666 root sys"
+driver name=stmf_sbd perms="* 0666 root sys"
+legacy pkg=SUNWstmf desc="Sun Common Multiprotocol SCSI Target device drivers" \
+    name="Sun Common Multiprotocol SCSI Target"
+legacy pkg=SUNWstmfu \
+    desc="Sun Common Multiprotocol SCSI Target Libraries and Tools" \
+    name="Sun Common Multiprotocol SCSI Target Libraries and Tools"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

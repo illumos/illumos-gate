@@ -1,0 +1,282 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 Oxide Computer Company
+#
+
+set name=pkg.fmri value=pkg:/diagnostic/cpu-counters@$(PKGVERS)
+set name=pkg.summary value="CPU Performance Counter libraries and utilities"
+set name=pkg.description value="CPU Performance Counter libraries and utilities"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/bin
+$(i386_ONLY)dir path=usr/bin/$(ARCH32)
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/cputrack mode=0555
+dir  path=usr/bin/$(ARCH64)
+file path=usr/bin/$(ARCH64)/cputrack mode=0555
+hardlink path=usr/bin/cputrack target=../lib/isaexec
+dir  path=usr/include
+file path=usr/include/libcpc.h
+file path=usr/include/libpctx.h
+dir  path=usr/include/sys
+dir  path=usr/kernel group=sys
+dir  path=usr/kernel/pcbe group=sys
+dir  path=usr/kernel/pcbe/$(ARCH64) group=sys
+$(sparc_ONLY)hardlink path=usr/kernel/pcbe/$(ARCH64)/pcbe.23 target=pcbe.62
+$(sparc_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.4.6 group=sys mode=0755
+$(sparc_ONLY)hardlink path=usr/kernel/pcbe/$(ARCH64)/pcbe.4.7 target=pcbe.4.6
+$(sparc_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.62 group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.AuthenticAMD group=sys \
+    mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.15 group=sys \
+    mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.15 \
+    group=sys mode=0755
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.23 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.26 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.28 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.29 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.30 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.31 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.37 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.44 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.46 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.47 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.122 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.126 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.134 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.140 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.141 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.142 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.158 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.165 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.166 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.38 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.39 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.42 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.45 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.53 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.54 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.55 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.58 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.60 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.61 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.62 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.63 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.69 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.70 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.71 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.76 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.77 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.78 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.79 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.85 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.86 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.92 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.94 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.95 \
+    target=pcbe.GenuineIntel.6.15
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libcpc.so target=./libcpc.so.1
+file path=usr/lib/$(ARCH64)/libcpc.so.1
+link path=usr/lib/$(ARCH64)/libpctx.so target=./libpctx.so.1
+file path=usr/lib/$(ARCH64)/libpctx.so.1
+link path=usr/lib/libcpc.so target=./libcpc.so.1
+file path=usr/lib/libcpc.so.1
+link path=usr/lib/libpctx.so target=./libpctx.so.1
+file path=usr/lib/libpctx.so.1
+dir  path=usr/sbin
+file path=usr/sbin/cpustat mode=0555
+dir  path=usr/share/man/man1
+file path=usr/share/man/man1/cputrack.1
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/cpustat.1m
+dir  path=usr/share/man/man3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/amd_f17h_zen1_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/amd_f17h_zen2_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/amd_f19h_zen3_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/bdw_de_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/bdw_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/bdx_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/bnl_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/clx_events.3cpc
+file path=usr/share/man/man3cpc/cpc.3cpc
+file path=usr/share/man/man3cpc/cpc_access.3cpc
+link path=usr/share/man/man3cpc/cpc_bind_cpu.3cpc target=cpc_bind_curlwp.3cpc
+file path=usr/share/man/man3cpc/cpc_bind_curlwp.3cpc
+file path=usr/share/man/man3cpc/cpc_bind_event.3cpc
+link path=usr/share/man/man3cpc/cpc_bind_pctx.3cpc target=cpc_bind_curlwp.3cpc
+link path=usr/share/man/man3cpc/cpc_buf_add.3cpc target=cpc_buf_create.3cpc
+link path=usr/share/man/man3cpc/cpc_buf_copy.3cpc target=cpc_buf_create.3cpc
+file path=usr/share/man/man3cpc/cpc_buf_create.3cpc
+link path=usr/share/man/man3cpc/cpc_buf_destroy.3cpc target=cpc_buf_create.3cpc
+link path=usr/share/man/man3cpc/cpc_buf_get.3cpc target=cpc_buf_create.3cpc
+link path=usr/share/man/man3cpc/cpc_buf_hrtime.3cpc target=cpc_buf_create.3cpc
+link path=usr/share/man/man3cpc/cpc_buf_set.3cpc target=cpc_buf_create.3cpc
+link path=usr/share/man/man3cpc/cpc_buf_sub.3cpc target=cpc_buf_create.3cpc
+link path=usr/share/man/man3cpc/cpc_buf_tick.3cpc target=cpc_buf_create.3cpc
+link path=usr/share/man/man3cpc/cpc_buf_zero.3cpc target=cpc_buf_create.3cpc
+link path=usr/share/man/man3cpc/cpc_caps.3cpc target=cpc_npic.3cpc
+link path=usr/share/man/man3cpc/cpc_cciname.3cpc target=cpc_npic.3cpc
+link path=usr/share/man/man3cpc/cpc_close.3cpc target=cpc_open.3cpc
+link path=usr/share/man/man3cpc/cpc_count_sys_events.3cpc \
+    target=cpc_count_usr_events.3cpc
+file path=usr/share/man/man3cpc/cpc_count_usr_events.3cpc
+link path=usr/share/man/man3cpc/cpc_cpuref.3cpc target=cpc_npic.3cpc
+link path=usr/share/man/man3cpc/cpc_disable.3cpc target=cpc_enable.3cpc
+file path=usr/share/man/man3cpc/cpc_enable.3cpc
+file path=usr/share/man/man3cpc/cpc_event.3cpc
+link path=usr/share/man/man3cpc/cpc_event_accum.3cpc target=cpc_event_diff.3cpc
+file path=usr/share/man/man3cpc/cpc_event_diff.3cpc
+link path=usr/share/man/man3cpc/cpc_eventtostr.3cpc target=cpc_strtoevent.3cpc
+link path=usr/share/man/man3cpc/cpc_getcciname.3cpc target=cpc_getcpuver.3cpc
+link path=usr/share/man/man3cpc/cpc_getcpuref.3cpc target=cpc_getcpuver.3cpc
+file path=usr/share/man/man3cpc/cpc_getcpuver.3cpc
+link path=usr/share/man/man3cpc/cpc_getnpic.3cpc target=cpc_getcpuver.3cpc
+link path=usr/share/man/man3cpc/cpc_getusage.3cpc target=cpc_getcpuver.3cpc
+file path=usr/share/man/man3cpc/cpc_npic.3cpc
+file path=usr/share/man/man3cpc/cpc_open.3cpc
+file path=usr/share/man/man3cpc/cpc_pctx_bind_event.3cpc
+link path=usr/share/man/man3cpc/cpc_pctx_invalidate.3cpc \
+    target=cpc_pctx_bind_event.3cpc
+link path=usr/share/man/man3cpc/cpc_pctx_rele.3cpc \
+    target=cpc_pctx_bind_event.3cpc
+link path=usr/share/man/man3cpc/cpc_pctx_take_sample.3cpc \
+    target=cpc_pctx_bind_event.3cpc
+link path=usr/share/man/man3cpc/cpc_rele.3cpc target=cpc_bind_event.3cpc
+link path=usr/share/man/man3cpc/cpc_request_preset.3cpc \
+    target=cpc_bind_curlwp.3cpc
+link path=usr/share/man/man3cpc/cpc_set_add_request.3cpc \
+    target=cpc_set_create.3cpc
+file path=usr/share/man/man3cpc/cpc_set_create.3cpc
+link path=usr/share/man/man3cpc/cpc_set_destroy.3cpc target=cpc_set_create.3cpc
+link path=usr/share/man/man3cpc/cpc_set_restart.3cpc target=cpc_bind_curlwp.3cpc
+link path=usr/share/man/man3cpc/cpc_set_sample.3cpc target=cpc_buf_create.3cpc
+file path=usr/share/man/man3cpc/cpc_seterrfn.3cpc
+file path=usr/share/man/man3cpc/cpc_seterrhndlr.3cpc
+link path=usr/share/man/man3cpc/cpc_shared_bind_event.3cpc \
+    target=cpc_shared_open.3cpc
+link path=usr/share/man/man3cpc/cpc_shared_close.3cpc \
+    target=cpc_shared_open.3cpc
+file path=usr/share/man/man3cpc/cpc_shared_open.3cpc
+link path=usr/share/man/man3cpc/cpc_shared_rele.3cpc target=cpc_shared_open.3cpc
+link path=usr/share/man/man3cpc/cpc_shared_take_sample.3cpc \
+    target=cpc_shared_open.3cpc
+file path=usr/share/man/man3cpc/cpc_strtoevent.3cpc
+link path=usr/share/man/man3cpc/cpc_take_sample.3cpc target=cpc_bind_event.3cpc
+link path=usr/share/man/man3cpc/cpc_unbind.3cpc target=cpc_bind_curlwp.3cpc
+file path=usr/share/man/man3cpc/cpc_version.3cpc
+link path=usr/share/man/man3cpc/cpc_walk_attrs.3cpc target=cpc_npic.3cpc
+link path=usr/share/man/man3cpc/cpc_walk_events_all.3cpc target=cpc_npic.3cpc
+link path=usr/share/man/man3cpc/cpc_walk_events_pic.3cpc target=cpc_npic.3cpc
+link path=usr/share/man/man3cpc/cpc_walk_generic_events_all.3cpc \
+    target=cpc_npic.3cpc
+link path=usr/share/man/man3cpc/cpc_walk_generic_events_pic.3cpc \
+    target=cpc_npic.3cpc
+link path=usr/share/man/man3cpc/cpc_walk_names.3cpc target=cpc_getcpuver.3cpc
+link path=usr/share/man/man3cpc/cpc_walk_requests.3cpc \
+    target=cpc_set_create.3cpc
+file path=usr/share/man/man3cpc/generic_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/glm_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/glp_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/hsw_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/hsx_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/icl_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/ivb_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/ivt_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/jkt_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/nhm_ep_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/nhm_ex_events.3cpc
+file path=usr/share/man/man3cpc/pctx_capture.3cpc
+link path=usr/share/man/man3cpc/pctx_create.3cpc target=pctx_capture.3cpc
+link path=usr/share/man/man3cpc/pctx_release.3cpc target=pctx_capture.3cpc
+link path=usr/share/man/man3cpc/pctx_run.3cpc target=pctx_capture.3cpc
+file path=usr/share/man/man3cpc/pctx_set_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/skl_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/skx_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/slm_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/snb_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/snr_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/tgl_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/wsm_ep_dp_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/wsm_ep_sp_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/wsm_ex_events.3cpc
+dir  path=usr/share/man/man3lib
+file path=usr/share/man/man3lib/libcpc.3lib
+file path=usr/share/man/man3lib/libpctx.3lib
+legacy pkg=SUNWcpcu desc="CPU Performance Counter libraries and utilities" \
+    name="CPU Performance Counter libraries and utilities"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+$(i386_ONLY)license usr/src/data/perfmon/THIRDPARTYLICENSE \
+    license=usr/src/data/perfmon/THIRDPARTYLICENSE
+$(i386_ONLY)license usr/src/uts/intel/pcbe/THIRDPARTYLICENSE \
+    license=usr/src/uts/intel/pcbe/THIRDPARTYLICENSE
+$(sparc_ONLY)license usr/src/uts/sun4u/pcbe/THIRDPARTYLICENSE \
+    license=usr/src/uts/sun4u/pcbe/THIRDPARTYLICENSE

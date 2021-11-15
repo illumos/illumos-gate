@@ -26,7 +26,7 @@ set -o pipefail
 
 ucodetar="$1"
 
-mf=../../pkg/manifests/system-microcode-intel.mf
+mf=../../pkg/manifests/system-microcode-intel.p5m
 [[ -f $mf ]] || {
 	echo "Run from usr/src/data/ucode" 2>&1
 	exit 1
@@ -100,6 +100,6 @@ for i in "${!links[@]}"; do
 EOM
 done
 
-pkgfmt $mf
+pkgfmt -fv2 $mf
 
 rm -rf $tmp

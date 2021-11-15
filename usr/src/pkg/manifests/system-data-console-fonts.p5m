@@ -1,0 +1,58 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2017, Toomas Soome <tsoome@me.com>
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/data/console/fonts@$(PKGVERS)
+set name=pkg.summary value="System Console Unicode fonts"
+set name=pkg.description \
+    value="System Console Unicode bitmap fonts, including Gallant and Terminus"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+dir  path=boot group=sys
+dir  path=boot/fonts group=sys
+file path=boot/fonts/10x18.fnt owner=root group=bin mode=0444
+file path=boot/fonts/10x18b.fnt owner=root group=bin mode=0444
+file path=boot/fonts/10x20.fnt owner=root group=bin mode=0444
+file path=boot/fonts/10x20b.fnt owner=root group=bin mode=0444
+file path=boot/fonts/11x22.fnt owner=root group=bin mode=0444
+file path=boot/fonts/11x22b.fnt owner=root group=bin mode=0444
+file path=boot/fonts/12x24.fnt owner=root group=bin mode=0444
+file path=boot/fonts/12x24b.fnt owner=root group=bin mode=0444
+file path=boot/fonts/14x28.fnt owner=root group=bin mode=0444
+file path=boot/fonts/14x28b.fnt owner=root group=bin mode=0444
+file path=boot/fonts/16x32.fnt owner=root group=bin mode=0444
+file path=boot/fonts/16x32b.fnt owner=root group=bin mode=0444
+file path=boot/fonts/6x12.fnt owner=root group=bin mode=0444
+file path=boot/fonts/6x12b.fnt owner=root group=bin mode=0444
+file path=boot/fonts/8x14.fnt owner=root group=bin mode=0444
+file path=boot/fonts/8x14b.fnt owner=root group=bin mode=0444
+file path=boot/fonts/8x14v.fnt owner=root group=bin mode=0444
+file path=boot/fonts/8x16.fnt owner=root group=bin mode=0444
+file path=boot/fonts/8x16b.fnt owner=root group=bin mode=0444
+file path=boot/fonts/8x16v.fnt owner=root group=bin mode=0444
+file path=boot/fonts/Gallant19.fnt owner=root group=bin mode=0444
+file path=boot/fonts/fonts.dir owner=root group=bin mode=0444
+dir  path=usr group=sys
+dir  path=usr/share
+dir  path=usr/share/lib
+link path=usr/share/lib/fonts target=../../../boot/fonts
+license lic_CDDL license=lic_CDDL
+license usr/src/data/consfonts/THIRDPARTYLICENSE \
+    license=usr/src/data/consfonts/THIRDPARTYLICENSE

@@ -1,0 +1,45 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet
+# at http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2014, Alexander Pyhalov
+#
+
+set name=pkg.fmri value=pkg:/system/network/mailwrapper@$(PKGVERS)
+set name=pkg.summary value=mailwrapper
+set name=pkg.description \
+    value="utility to invoke appropriate MTA software based on configuration file"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Administration and Configuration"
+set name=variant.arch value=$(ARCH)
+dir  path=etc group=sys
+dir  path=etc/mail group=mail
+file path=etc/mailer.conf group=sys preserve=true
+dir  path=usr/bin
+link path=usr/bin/mailq target=../lib/mailwrapper mediator=mta \
+    mediator-implementation=mailwrapper
+dir  path=usr/lib
+file path=usr/lib/mailwrapper mode=0555
+link path=usr/lib/sendmail target=mailwrapper mediator=mta \
+    mediator-implementation=mailwrapper
+dir  path=usr/sbin
+link path=usr/sbin/newaliases target=../lib/mailwrapper mediator=mta \
+    mediator-implementation=mailwrapper
+link path=usr/sbin/sendmail target=../lib/mailwrapper mediator=mta \
+    mediator-implementation=mailwrapper
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/mailwrapper.1m
+dir  path=usr/share/man/man4
+file path=usr/share/man/man4/mailer.conf.4
+license usr/src/cmd/mailwrapper/THIRDPARTYLICENSE \
+    license=usr/src/cmd/mailwrapper/THIRDPARTYLICENSE
+depend type=require fmri=service/network/smtp/sendmail

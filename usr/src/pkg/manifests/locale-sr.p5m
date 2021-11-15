@@ -1,0 +1,82 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL)".  You may
+# only use this file in accordance with the terms of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+#
+
+#
+# A word about these languages.  In English we refer to these as
+# Serbo-Croatian (and would include Croatian in the list), but the
+# naming of the local dialects is an area of locale dispute in these
+# regions.  We have followed the precedent set by the Unicode CLDR
+# distribution, and used "sr" for Serbian (which includes Serbian,
+# Montenegrin, and Bosnian).  "hr" is used for Croatian.  Constructive
+# feedback from persons more familiar with these languages is welcome.
+#
+# Additionally, Serbian can be represented with both Cyrillic and
+# Latin alphabets.  Cyrillic is mandated by law within Serbia, but
+# Latin is used elsewhere.  Accordingly, sr_RS is based on the
+# Cyrillic Unicode data, while sr_BA and sr_ME use the Latin versions.
+# The complementary versions can be provided if there is deemed to be
+# cause.
+#
+
+set name=pkg.fmri value=pkg:/locale/sr@$(PKGVERS)
+set name=pkg.summary value="Serbian language support"
+set name=pkg.description value="Serbian language support"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Localizations
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/locale
+dir  path=usr/lib/locale/sr_BA.UTF-8
+dir  path=usr/lib/locale/sr_BA.UTF-8/LC_COLLATE
+file path=usr/lib/locale/sr_BA.UTF-8/LC_COLLATE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_BA.UTF-8/LC_CTYPE
+file path=usr/lib/locale/sr_BA.UTF-8/LC_CTYPE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_BA.UTF-8/LC_MESSAGES
+file path=usr/lib/locale/sr_BA.UTF-8/LC_MESSAGES/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_BA.UTF-8/LC_MONETARY
+file path=usr/lib/locale/sr_BA.UTF-8/LC_MONETARY/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_BA.UTF-8/LC_NUMERIC
+file path=usr/lib/locale/sr_BA.UTF-8/LC_NUMERIC/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_BA.UTF-8/LC_TIME
+file path=usr/lib/locale/sr_BA.UTF-8/LC_TIME/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_ME.UTF-8
+dir  path=usr/lib/locale/sr_ME.UTF-8/LC_COLLATE
+file path=usr/lib/locale/sr_ME.UTF-8/LC_COLLATE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_ME.UTF-8/LC_CTYPE
+file path=usr/lib/locale/sr_ME.UTF-8/LC_CTYPE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_ME.UTF-8/LC_MESSAGES
+file path=usr/lib/locale/sr_ME.UTF-8/LC_MESSAGES/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_ME.UTF-8/LC_MONETARY
+file path=usr/lib/locale/sr_ME.UTF-8/LC_MONETARY/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_ME.UTF-8/LC_NUMERIC
+file path=usr/lib/locale/sr_ME.UTF-8/LC_NUMERIC/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_ME.UTF-8/LC_TIME
+file path=usr/lib/locale/sr_ME.UTF-8/LC_TIME/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_RS.UTF-8
+dir  path=usr/lib/locale/sr_RS.UTF-8/LC_COLLATE
+file path=usr/lib/locale/sr_RS.UTF-8/LC_COLLATE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_RS.UTF-8/LC_CTYPE
+file path=usr/lib/locale/sr_RS.UTF-8/LC_CTYPE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_RS.UTF-8/LC_MESSAGES
+file path=usr/lib/locale/sr_RS.UTF-8/LC_MESSAGES/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_RS.UTF-8/LC_MONETARY
+file path=usr/lib/locale/sr_RS.UTF-8/LC_MONETARY/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_RS.UTF-8/LC_NUMERIC
+file path=usr/lib/locale/sr_RS.UTF-8/LC_NUMERIC/LCL_DATA mode=0444
+dir  path=usr/lib/locale/sr_RS.UTF-8/LC_TIME
+file path=usr/lib/locale/sr_RS.UTF-8/LC_TIME/LCL_DATA mode=0444
+license lic_CDDL license=lic_CDDL
+license usr/src/data/locale/data/THIRDPARTYLICENSE \
+    license=usr/src/data/locale/data/THIRDPARTYLICENSE

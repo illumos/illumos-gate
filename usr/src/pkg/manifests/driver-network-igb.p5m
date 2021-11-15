@@ -1,0 +1,87 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012, Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Pluribus Networks Inc.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/network/igb@$(PKGVERS)
+set name=pkg.summary value="Intel 82575 1Gb PCI Express NIC Driver"
+set name=pkg.description value="Intel 82575 1Gb PCI Express NIC Driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=$(ARCH)
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/igb group=sys
+file path=kernel/drv/igb.conf group=sys \
+    original_name=SUNWigb:kernel/drv/igb.conf preserve=renamenew
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/igb.7d
+driver name=igb perms="* 0666 root sys" clone_perms="igb 0666 root sys" \
+    alias=pciex8086,438 \
+    alias=pciex8086,10a7 \
+    alias=pciex8086,10a9 \
+    alias=pciex8086,10c9 \
+    alias=pciex8086,10d6 \
+    alias=pciex8086,10e6 \
+    alias=pciex8086,10e7 \
+    alias=pciex8086,10e8 \
+    alias=pciex8086,150a \
+    alias=pciex8086,150d \
+    alias=pciex8086,150e \
+    alias=pciex8086,150f \
+    alias=pciex8086,1510 \
+    alias=pciex8086,1511 \
+    alias=pciex8086,1516 \
+    alias=pciex8086,1518 \
+    alias=pciex8086,1521 \
+    alias=pciex8086,1522 \
+    alias=pciex8086,1523 \
+    alias=pciex8086,1524 \
+    alias=pciex8086,1526 \
+    alias=pciex8086,1533 \
+    alias=pciex8086,1534 \
+    alias=pciex8086,1535 \
+    alias=pciex8086,1536 \
+    alias=pciex8086,1537 \
+    alias=pciex8086,1538 \
+    alias=pciex8086,1539 \
+    alias=pciex8086,1546 \
+    alias=pciex8086,157b \
+    alias=pciex8086,157c \
+    alias=pciex8086,1f40 \
+    alias=pciex8086,1f41 \
+    alias=pciex8086,1f45
+legacy pkg=SUNWigb desc="Intel 82575 1Gb PCI Express NIC Driver" \
+    name="Intel 82575 1Gb PCI Express NIC Driver"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

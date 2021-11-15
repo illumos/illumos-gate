@@ -1,0 +1,65 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/service/security/gss@$(PKGVERS)
+set name=pkg.summary value="GSSAPI CONFIG V2"
+set name=pkg.description \
+    value="Generic Security Service Application Program Interface, Version 2 - config"
+set name=info.classification value=org.opensolaris.category.2008:System/Security
+set name=variant.arch value=$(ARCH)
+dir  path=etc group=sys
+dir  path=etc/gss group=sys
+file path=etc/gss/gsscred.conf group=sys \
+    original_name=SUNWgssc:etc/gss/gsscred.conf preserve=true
+file path=etc/gss/mech group=sys original_name=SUNWgssc:etc/gss/mech \
+    preserve=true
+file path=etc/gss/qop group=sys original_name=SUNWgssc:etc/gss/qop preserve=true
+dir  path=lib
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/network group=sys
+dir  path=lib/svc/manifest/network/rpc group=sys
+file path=lib/svc/manifest/network/rpc/gss.xml group=sys mode=0444
+dir  path=usr/share/man
+dir  path=usr/share/man/man4
+file path=usr/share/man/man4/gsscred.conf.4
+file path=usr/share/man/man4/mech.4
+link path=usr/share/man/man4/qop.4 target=mech.4
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/gss_auth_rules.5
+legacy pkg=SUNWgssc \
+    desc="Generic Security Service Application Program Interface, Version 2 - config" \
+    name="GSSAPI CONFIG V2"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+#
+# These dependencies can be removed once there is a mechanism in place
+# to configure gss plugins, rather than delivering a fully populated
+# etc/gss/mech file.
+#
+depend type=require fmri=service/security/kerberos-5
+depend type=require fmri=system/library/security/gss/diffie-hellman
+depend type=require fmri=system/library/security/gss/spnego

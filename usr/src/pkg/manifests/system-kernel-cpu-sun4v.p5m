@@ -1,0 +1,66 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/kernel/cpu/sun4v@$(PKGVERS)
+set name=pkg.summary value=UltraSPARC-T1
+set name=pkg.description value="UltraSPARC-T1 core kernel software"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=sparc
+dir  path=platform group=sys
+dir  path=platform/sun4v group=sys
+dir  path=platform/sun4v/kernel group=sys
+dir  path=platform/sun4v/kernel/cpu group=sys
+dir  path=platform/sun4v/kernel/cpu/$(ARCH64) group=sys
+file path=platform/sun4v/kernel/cpu/$(ARCH64)/SPARC-T3 group=sys mode=0755
+file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T1 group=sys \
+    mode=0755
+file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T2 group=sys \
+    mode=0755
+file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T2+ group=sys \
+    mode=0755
+dir  path=platform/sun4v/kernel/pcbe group=sys
+dir  path=platform/sun4v/kernel/pcbe/$(ARCH64) group=sys
+file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T1 \
+    group=sys mode=0755
+file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T2 \
+    group=sys mode=0755
+file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T2+ \
+    group=sys mode=0755
+file path=platform/sun4v/kernel/pcbe/sparcv9/pcbe.SPARC-T3 group=sys mode=0755
+legacy pkg=SUNWust1.v arch=$(ARCH).sun4v \
+    desc="UltraSPARC-T1 core kernel software" name="UltraSPARC-T1 (Root)"
+legacy pkg=SUNWust2.v arch=$(ARCH).sun4v \
+    desc="UltraSPARC-T2 family core kernel software" \
+    name="UltraSPARC-T2 family (Root)"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license usr/src/uts/sun4v/pcbe/THIRDPARTYLICENSE \
+    license=usr/src/uts/sun4v/pcbe/THIRDPARTYLICENSE

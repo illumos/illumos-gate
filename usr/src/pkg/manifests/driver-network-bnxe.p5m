@@ -1,0 +1,69 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/network/bnxe@$(PKGVERS)
+set name=pkg.summary value="Broadcom NetXtreme II 10GbE NIC Driver"
+set name=pkg.description \
+    value="Broadcom NetXtreme II 10 Gigabit Ethernet PCI-X/PCIE Adapter Driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=$(ARCH)
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/bnxe group=sys
+file path=kernel/drv/bnxe.conf group=sys \
+    original_name=BRCMbnxe:kernel/drv/bnxe.conf preserve=renameold
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/bnxe.7d
+driver name=bnxe perms="* 0666 root sys" \
+    alias=pci14e4,164e \
+    alias=pci14e4,164f \
+    alias=pci14e4,1650 \
+    alias=pciex14e4,164e \
+    alias=pciex14e4,164f \
+    alias=pciex14e4,1650 \
+    alias=pciex14e4,1662 \
+    alias=pciex14e4,1663 \
+    alias=pciex14e4,168a \
+    alias=pciex14e4,168d \
+    alias=pciex14e4,168e \
+    alias=pciex14e4,16a1 \
+    alias=pciex14e4,16a4 \
+    alias=pciex14e4,16a5 \
+    alias=pciex14e4,16ab \
+    alias=pciex14e4,16ae
+legacy pkg=BRCMbnxe \
+    desc="Broadcom NetXtreme II 10 Gigabit Ethernet PCI-X/PCIE Adapter Driver" \
+    name="Broadcom NetXtreme II 10GbE NIC Driver" \
+    vendor="Broadcom Corporation, Inc."
+license cr_Sun license=cr_Sun

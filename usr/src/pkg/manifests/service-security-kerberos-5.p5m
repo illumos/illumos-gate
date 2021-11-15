@@ -1,0 +1,116 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/service/security/kerberos-5@$(PKGVERS)
+set name=pkg.summary value="Kerberos version 5 support"
+set name=pkg.description value="Kerberos version 5 support"
+set name=info.classification value=org.opensolaris.category.2008:System/Security
+set name=variant.arch value=$(ARCH)
+dir  path=etc group=sys
+dir  path=etc/krb5 group=sys
+file path=etc/krb5/krb5.conf group=sys \
+    original_name=SUNWkrb:etc/krb5/krb5.conf preserve=true
+file path=etc/krb5/warn.conf group=sys \
+    original_name=SUNWkrb:etc/krb5/warn.conf preserve=true
+dir  path=lib
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/network group=sys
+dir  path=lib/svc/manifest/network/security group=sys
+file path=lib/svc/manifest/network/security/kadmin.xml group=sys mode=0444
+file path=lib/svc/manifest/network/security/krb5kdc.xml group=sys mode=0444
+file path=lib/svc/manifest/network/security/ktkt_warn.xml group=sys mode=0444
+dir  path=usr group=sys
+dir  path=usr/bin
+file path=usr/bin/kdestroy mode=0555
+file path=usr/bin/kinit mode=0555
+file path=usr/bin/klist mode=0555
+file path=usr/bin/kpasswd mode=0555
+file path=usr/bin/krb5-config mode=0555
+file path=usr/bin/ktutil mode=0555
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+dir  path=usr/lib/$(ARCH64)/gss
+link path=usr/lib/$(ARCH64)/gss/mech_krb5.so target=./mech_krb5.so.1
+file path=usr/lib/$(ARCH64)/gss/mech_krb5.so.1
+link path=usr/lib/$(ARCH64)/libkrb5.so target=./libkrb5.so.1
+file path=usr/lib/$(ARCH64)/libkrb5.so.1
+dir  path=usr/lib/gss
+link path=usr/lib/gss/mech_krb5.so target=./mech_krb5.so.1
+file path=usr/lib/gss/mech_krb5.so.1
+dir  path=usr/lib/krb5
+dir  path=usr/lib/krb5/$(ARCH64)
+link path=usr/lib/krb5/$(ARCH64)/libkadm5clnt.so target=./libkadm5clnt.so.1
+file path=usr/lib/krb5/$(ARCH64)/libkadm5clnt.so.1
+file path=usr/lib/krb5/ktkt_warnd mode=0555
+link path=usr/lib/krb5/libkadm5clnt.so target=./libkadm5clnt.so.1
+file path=usr/lib/krb5/libkadm5clnt.so.1
+link path=usr/lib/krb5/libss.so target=libss.so.1
+file path=usr/lib/krb5/libss.so.1
+dir  path=usr/lib/krb5/plugins
+dir  path=usr/lib/krb5/plugins/preauth
+link path=usr/lib/krb5/plugins/preauth/pkinit.so target=pkinit.so.1
+file path=usr/lib/krb5/plugins/preauth/pkinit.so.1
+link path=usr/lib/libkrb5.so target=./libkrb5.so.1
+file path=usr/lib/libkrb5.so.1
+dir  path=usr/lib/security
+dir  path=usr/lib/security/$(ARCH64)
+link path=usr/lib/security/$(ARCH64)/pam_krb5.so target=./pam_krb5.so.1
+file path=usr/lib/security/$(ARCH64)/pam_krb5.so.1
+link path=usr/lib/security/$(ARCH64)/pam_krb5_migrate.so \
+    target=./pam_krb5_migrate.so.1
+file path=usr/lib/security/$(ARCH64)/pam_krb5_migrate.so.1
+link path=usr/lib/security/pam_krb5.so target=./pam_krb5.so.1
+file path=usr/lib/security/pam_krb5.so.1
+link path=usr/lib/security/pam_krb5_migrate.so target=./pam_krb5_migrate.so.1
+file path=usr/lib/security/pam_krb5_migrate.so.1
+dir  path=usr/share/man
+dir  path=usr/share/man/man1
+file path=usr/share/man/man1/kdestroy.1
+file path=usr/share/man/man1/kinit.1
+file path=usr/share/man/man1/klist.1
+file path=usr/share/man/man1/kpasswd.1
+file path=usr/share/man/man1/krb5-config.1
+file path=usr/share/man/man1/ktutil.1
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/ktkt_warnd.1m
+dir  path=usr/share/man/man3lib
+file path=usr/share/man/man3lib/libkrb5.3lib
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/pam_krb5.5
+file path=usr/share/man/man5/pam_krb5_migrate.5
+dir  path=var group=sys
+dir  path=var/krb5 group=sys
+dir  path=var/krb5/rcache group=sys mode=1777
+dir  path=var/krb5/rcache/root group=sys mode=0700
+legacy pkg=SUNWkrbr desc="Kerberos version 5 support (Root)" \
+    name="Kerberos version 5 support (Root)"
+legacy pkg=SUNWkrbu desc="Kerberos version 5 support (Usr)" \
+    name="Kerberos version 5 support (Usr)"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license usr/src/lib/gss_mechs/mech_krb5/THIRDPARTYLICENSE \
+    license=usr/src/lib/gss_mechs/mech_krb5/THIRDPARTYLICENSE
+depend type=require fmri=service/security/gss

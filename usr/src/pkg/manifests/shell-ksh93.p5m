@@ -1,0 +1,122 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+#
+
+# sh (AT&T Research) 93u+ 2012-08-01
+set name=pkg.fmri \
+    value=pkg:/shell/ksh93@93.21.1.20120801,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.summary \
+    value="ksh - Shell, the standard command language interpreter"
+set name=pkg.description value="ksh93 - the AT&T Korn Shell"
+set name=info.classification value=org.opensolaris.category.2008:System/Shells
+set name=org.opensolaris.incorp-facet value=true
+file path=etc/ksh.kshrc group=sys original_name=SUNWcs:etc/ksh.kshrc \
+    preserve=renameold
+file path=etc/skel/.kshrc group=other original_name=SUNWcs:etc/skel/.kshrc \
+    preserve=true
+dir  path=sbin group=sys
+link path=sbin/jsh target=../usr/bin/ksh93
+link path=sbin/sh target=../usr/bin/$(ARCH32)/ksh93
+dir  path=usr/bin
+dir  path=usr/bin/$(ARCH32)
+hardlink path=usr/bin/$(ARCH32)/ksh target=ksh93
+file path=usr/bin/$(ARCH32)/ksh93 mode=0555
+hardlink path=usr/bin/$(ARCH32)/rksh target=ksh93
+hardlink path=usr/bin/$(ARCH32)/rksh93 target=ksh93
+dir  path=usr/bin/$(ARCH64)
+hardlink path=usr/bin/$(ARCH64)/ksh target=ksh93
+file path=usr/bin/$(ARCH64)/ksh93 mode=0555
+hardlink path=usr/bin/$(ARCH64)/rksh target=ksh93
+hardlink path=usr/bin/$(ARCH64)/rksh93 target=ksh93
+file path=usr/bin/alias mode=0555
+hardlink path=usr/bin/bg target=alias
+hardlink path=usr/bin/cd target=alias
+hardlink path=usr/bin/cksum target=alias
+hardlink path=usr/bin/cmp target=alias
+hardlink path=usr/bin/comm target=alias
+hardlink path=usr/bin/command target=alias
+hardlink path=usr/bin/cut target=alias
+hardlink path=usr/bin/fc target=alias
+hardlink path=usr/bin/fg target=alias
+hardlink path=usr/bin/getopts target=alias
+hardlink path=usr/bin/hash target=alias
+hardlink path=usr/bin/jobs target=alias
+hardlink path=usr/bin/join target=alias
+link path=usr/bin/jsh target=ksh93
+hardlink path=usr/bin/kill target=alias
+hardlink path=usr/bin/ksh target=../lib/isaexec
+hardlink path=usr/bin/ksh93 target=../lib/isaexec
+hardlink path=usr/bin/paste target=alias
+hardlink path=usr/bin/pfksh target=pfexec
+hardlink path=usr/bin/pfksh93 target=pfexec
+hardlink path=usr/bin/pfrksh target=pfexec
+hardlink path=usr/bin/pfrksh93 target=pfexec
+hardlink path=usr/bin/pfsh target=pfexec
+hardlink path=usr/bin/print target=alias
+hardlink path=usr/bin/read target=alias
+hardlink path=usr/bin/rev target=alias
+hardlink path=usr/bin/rksh target=../lib/isaexec
+hardlink path=usr/bin/rksh93 target=../lib/isaexec
+link path=usr/bin/sh target=$(ARCH32)/ksh93
+file path=usr/bin/shcomp mode=0555
+hardlink path=usr/bin/sum target=alias
+hardlink path=usr/bin/tee target=alias
+hardlink path=usr/bin/test target=alias
+hardlink path=usr/bin/type target=alias
+hardlink path=usr/bin/ulimit target=alias
+hardlink path=usr/bin/umask target=alias
+hardlink path=usr/bin/unalias target=alias
+hardlink path=usr/bin/uniq target=alias
+hardlink path=usr/bin/wait target=alias
+hardlink path=usr/bin/wc target=alias
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+file path=usr/lib/$(ARCH64)/libast.so.1
+file path=usr/lib/$(ARCH64)/libcmd.so.1
+file path=usr/lib/$(ARCH64)/libdll.so.1
+file path=usr/lib/$(ARCH64)/libshell.so.1
+file path=usr/lib/$(ARCH64)/libsum.so.1
+file path=usr/lib/libast.so.1
+file path=usr/lib/libcmd.so.1
+file path=usr/lib/libdll.so.1
+file path=usr/lib/libshell.so.1
+file path=usr/lib/libsum.so.1
+link path=usr/lib/rsh target=../bin/ksh93
+file path=usr/share/man/man1/cksum.1
+file path=usr/share/man/man1/cmp.1
+file path=usr/share/man/man1/comm.1
+file path=usr/share/man/man1/command.1
+file path=usr/share/man/man1/cut.1
+file path=usr/share/man/man1/getopts.1
+file path=usr/share/man/man1/join.1
+link path=usr/share/man/man1/jsh.1 target=ksh93.1
+file path=usr/share/man/man1/kill.1
+link path=usr/share/man/man1/ksh.1 target=ksh93.1
+file path=usr/share/man/man1/ksh93.1
+file path=usr/share/man/man1/paste.1
+file path=usr/share/man/man1/print.1
+file path=usr/share/man/man1/rev.1
+link path=usr/share/man/man1/rksh.1 target=ksh93.1
+link path=usr/share/man/man1/rksh93.1 target=ksh93.1
+link path=usr/share/man/man1/sh.1 target=ksh93.1
+file path=usr/share/man/man1/shcomp.1
+file path=usr/share/man/man1/sum.1
+file path=usr/share/man/man1/tee.1
+file path=usr/share/man/man1/test.1
+file path=usr/share/man/man1/type.1
+file path=usr/share/man/man1/umask.1
+file path=usr/share/man/man1/uniq.1
+file path=usr/share/man/man1/wait.1
+file path=usr/share/man/man1/wc.1
+license usr/src/contrib/ast/LICENSE license=usr/src/contrib/ast/LICENSE

@@ -1,0 +1,44 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL)".  You may
+# only use this file in accordance with the terms of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+#
+
+#
+# These are extra locales (ISO8859 codesets), primarily of historical
+# interest.
+#
+
+set name=pkg.fmri value=pkg:/locale/pl-extra@$(PKGVERS)
+set name=pkg.summary value="Polish language support extra files"
+set name=pkg.description value="Polish language support extra files"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Localizations
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/locale
+dir  path=usr/lib/locale/pl_PL.ISO8859-2
+dir  path=usr/lib/locale/pl_PL.ISO8859-2/LC_COLLATE
+file path=usr/lib/locale/pl_PL.ISO8859-2/LC_COLLATE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/pl_PL.ISO8859-2/LC_CTYPE
+file path=usr/lib/locale/pl_PL.ISO8859-2/LC_CTYPE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/pl_PL.ISO8859-2/LC_MESSAGES
+file path=usr/lib/locale/pl_PL.ISO8859-2/LC_MESSAGES/LCL_DATA mode=0444
+dir  path=usr/lib/locale/pl_PL.ISO8859-2/LC_MONETARY
+file path=usr/lib/locale/pl_PL.ISO8859-2/LC_MONETARY/LCL_DATA mode=0444
+dir  path=usr/lib/locale/pl_PL.ISO8859-2/LC_NUMERIC
+file path=usr/lib/locale/pl_PL.ISO8859-2/LC_NUMERIC/LCL_DATA mode=0444
+dir  path=usr/lib/locale/pl_PL.ISO8859-2/LC_TIME
+file path=usr/lib/locale/pl_PL.ISO8859-2/LC_TIME/LCL_DATA mode=0444
+license lic_CDDL license=lic_CDDL
+license usr/src/data/locale/data/THIRDPARTYLICENSE \
+    license=usr/src/data/locale/data/THIRDPARTYLICENSE

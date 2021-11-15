@@ -1,0 +1,54 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+set name=pkg.fmri \
+    value=pkg:/system/library/security/gss/diffie-hellman@$(PKGVERS)
+set name=pkg.summary value="GSS Diffie-Hellman"
+set name=pkg.description \
+    value="GSS-API mechanism libraries for NIS+ extended Diffie-Hellman"
+set name=info.classification value=org.opensolaris.category.2008:System/Security
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+dir  path=usr/lib/$(ARCH64)/gss
+link path=usr/lib/$(ARCH64)/gss/dh1024-0.so target=dh1024-0.so.1
+file path=usr/lib/$(ARCH64)/gss/dh1024-0.so.1
+link path=usr/lib/$(ARCH64)/gss/dh640-0.so target=dh640-0.so.1
+file path=usr/lib/$(ARCH64)/gss/dh640-0.so.1
+link path=usr/lib/$(ARCH64)/gss/mech_dh.so target=mech_dh.so.1
+file path=usr/lib/$(ARCH64)/gss/mech_dh.so.1
+dir  path=usr/lib/gss
+link path=usr/lib/gss/dh1024-0.so target=dh1024-0.so.1
+file path=usr/lib/gss/dh1024-0.so.1
+link path=usr/lib/gss/dh640-0.so target=dh640-0.so.1
+file path=usr/lib/gss/dh640-0.so.1
+link path=usr/lib/gss/mech_dh.so target=mech_dh.so.1
+file path=usr/lib/gss/mech_dh.so.1
+legacy pkg=SUNWgssdh \
+    desc="GSS-API mechanism libraries for NIS+ extended Diffie-Hellman" \
+    name="GSS Diffie-Hellman"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

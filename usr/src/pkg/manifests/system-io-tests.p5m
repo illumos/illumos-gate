@@ -1,0 +1,64 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 Joyent, Inc.
+#
+
+set name=pkg.fmri value=pkg:/system/io/tests@$(PKGVERS)
+set name=pkg.summary value="I/O test utilities and drivers"
+set name=pkg.description value="I/O test utilities and drivers"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/include
+dir  path=usr/include/sys
+file path=usr/include/sys/emul64.h
+file path=usr/include/sys/emul64cmd.h
+file path=usr/include/sys/emul64var.h
+file path=usr/include/sys/pshot.h
+dir  path=usr/kernel group=sys
+dir  path=usr/kernel/drv group=sys
+dir  path=usr/kernel/drv/$(ARCH64) group=sys
+file path=usr/kernel/drv/$(ARCH64)/emul64 group=sys
+file path=usr/kernel/drv/$(ARCH64)/gen_drv group=sys
+file path=usr/kernel/drv/$(ARCH64)/pshot group=sys
+file path=usr/kernel/drv/$(ARCH64)/tclient group=sys
+file path=usr/kernel/drv/$(ARCH64)/tphci group=sys
+file path=usr/kernel/drv/$(ARCH64)/tvhci group=sys
+file path=usr/kernel/drv/$(ARCH64)/ufmtest group=sys
+file path=usr/kernel/drv/emul64.conf group=sys
+file path=usr/kernel/drv/pshot.conf group=sys
+file path=usr/kernel/drv/ufmtest.conf group=sys
+dir  path=usr/lib
+dir  path=usr/lib/scsi
+file path=usr/lib/scsi/sestopo mode=0555
+file path=usr/lib/scsi/smp mode=0555
+dir  path=usr/sbin
+file path=usr/sbin/devctl mode=0555
+file path=usr/sbin/emul64ioctl mode=0555
+legacy pkg=SUNWioth desc="I/O Test Header Files" name="I/O Test Header Files"
+legacy pkg=SUNWiotu desc="I/O test utilities and drivers" \
+    name="I/O test utilities and drivers, (Usr)"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

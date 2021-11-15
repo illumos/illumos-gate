@@ -1,0 +1,680 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2018 Nexenta Systems, Inc.
+# Copyright (c) 2014 Joyent, Inc. All rights reserved.
+# Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+#
+
+set name=pkg.fmri \
+    value=pkg:/system/data/zoneinfo@2021.5,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.summary value="Timezone Information"
+set name=pkg.description value="timezone information"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=org.opensolaris.incorp-facet value=true
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/share
+dir  path=usr/share/lib
+dir  path=usr/share/lib/zoneinfo
+dir  path=usr/share/lib/zoneinfo/Africa
+file path=usr/share/lib/zoneinfo/Africa/Abidjan
+hardlink path=usr/share/lib/zoneinfo/Africa/Accra target=Abidjan
+hardlink path=usr/share/lib/zoneinfo/Africa/Addis_Ababa target=Nairobi
+file path=usr/share/lib/zoneinfo/Africa/Algiers
+hardlink path=usr/share/lib/zoneinfo/Africa/Asmara target=Nairobi
+hardlink path=usr/share/lib/zoneinfo/Africa/Asmera target=Nairobi
+hardlink path=usr/share/lib/zoneinfo/Africa/Bamako target=Abidjan
+hardlink path=usr/share/lib/zoneinfo/Africa/Bangui target=Lagos
+hardlink path=usr/share/lib/zoneinfo/Africa/Banjul target=Abidjan
+file path=usr/share/lib/zoneinfo/Africa/Bissau
+hardlink path=usr/share/lib/zoneinfo/Africa/Blantyre target=Maputo
+hardlink path=usr/share/lib/zoneinfo/Africa/Brazzaville target=Lagos
+hardlink path=usr/share/lib/zoneinfo/Africa/Bujumbura target=Maputo
+file path=usr/share/lib/zoneinfo/Africa/Cairo
+file path=usr/share/lib/zoneinfo/Africa/Casablanca
+file path=usr/share/lib/zoneinfo/Africa/Ceuta
+hardlink path=usr/share/lib/zoneinfo/Africa/Conakry target=Abidjan
+hardlink path=usr/share/lib/zoneinfo/Africa/Dakar target=Abidjan
+hardlink path=usr/share/lib/zoneinfo/Africa/Dar_es_Salaam target=Nairobi
+hardlink path=usr/share/lib/zoneinfo/Africa/Djibouti target=Nairobi
+hardlink path=usr/share/lib/zoneinfo/Africa/Douala target=Lagos
+file path=usr/share/lib/zoneinfo/Africa/El_Aaiun
+hardlink path=usr/share/lib/zoneinfo/Africa/Freetown target=Abidjan
+hardlink path=usr/share/lib/zoneinfo/Africa/Gaborone target=Maputo
+hardlink path=usr/share/lib/zoneinfo/Africa/Harare target=Maputo
+file path=usr/share/lib/zoneinfo/Africa/Johannesburg
+file path=usr/share/lib/zoneinfo/Africa/Juba
+hardlink path=usr/share/lib/zoneinfo/Africa/Kampala target=Nairobi
+file path=usr/share/lib/zoneinfo/Africa/Khartoum
+hardlink path=usr/share/lib/zoneinfo/Africa/Kigali target=Maputo
+hardlink path=usr/share/lib/zoneinfo/Africa/Kinshasa target=Lagos
+file path=usr/share/lib/zoneinfo/Africa/Lagos
+hardlink path=usr/share/lib/zoneinfo/Africa/Libreville target=Lagos
+hardlink path=usr/share/lib/zoneinfo/Africa/Lome target=Abidjan
+hardlink path=usr/share/lib/zoneinfo/Africa/Luanda target=Lagos
+hardlink path=usr/share/lib/zoneinfo/Africa/Lubumbashi target=Maputo
+hardlink path=usr/share/lib/zoneinfo/Africa/Lusaka target=Maputo
+hardlink path=usr/share/lib/zoneinfo/Africa/Malabo target=Lagos
+file path=usr/share/lib/zoneinfo/Africa/Maputo
+hardlink path=usr/share/lib/zoneinfo/Africa/Maseru target=Johannesburg
+hardlink path=usr/share/lib/zoneinfo/Africa/Mbabane target=Johannesburg
+hardlink path=usr/share/lib/zoneinfo/Africa/Mogadishu target=Nairobi
+file path=usr/share/lib/zoneinfo/Africa/Monrovia
+file path=usr/share/lib/zoneinfo/Africa/Nairobi
+file path=usr/share/lib/zoneinfo/Africa/Ndjamena
+hardlink path=usr/share/lib/zoneinfo/Africa/Niamey target=Lagos
+hardlink path=usr/share/lib/zoneinfo/Africa/Nouakchott target=Abidjan
+hardlink path=usr/share/lib/zoneinfo/Africa/Ouagadougou target=Abidjan
+hardlink path=usr/share/lib/zoneinfo/Africa/Porto-Novo target=Lagos
+file path=usr/share/lib/zoneinfo/Africa/Sao_Tome
+hardlink path=usr/share/lib/zoneinfo/Africa/Timbuktu target=Abidjan
+file path=usr/share/lib/zoneinfo/Africa/Tripoli
+file path=usr/share/lib/zoneinfo/Africa/Tunis
+file path=usr/share/lib/zoneinfo/Africa/Windhoek
+dir  path=usr/share/lib/zoneinfo/America
+file path=usr/share/lib/zoneinfo/America/Adak
+file path=usr/share/lib/zoneinfo/America/Anchorage
+hardlink path=usr/share/lib/zoneinfo/America/Anguilla target=Puerto_Rico
+hardlink path=usr/share/lib/zoneinfo/America/Antigua target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Araguaina
+dir  path=usr/share/lib/zoneinfo/America/Argentina
+file path=usr/share/lib/zoneinfo/America/Argentina/Buenos_Aires
+file path=usr/share/lib/zoneinfo/America/Argentina/Catamarca
+hardlink path=usr/share/lib/zoneinfo/America/Argentina/ComodRivadavia \
+    target=Catamarca
+file path=usr/share/lib/zoneinfo/America/Argentina/Cordoba
+file path=usr/share/lib/zoneinfo/America/Argentina/Jujuy
+file path=usr/share/lib/zoneinfo/America/Argentina/La_Rioja
+file path=usr/share/lib/zoneinfo/America/Argentina/Mendoza
+file path=usr/share/lib/zoneinfo/America/Argentina/Rio_Gallegos
+file path=usr/share/lib/zoneinfo/America/Argentina/Salta
+file path=usr/share/lib/zoneinfo/America/Argentina/San_Juan
+file path=usr/share/lib/zoneinfo/America/Argentina/San_Luis
+file path=usr/share/lib/zoneinfo/America/Argentina/Tucuman
+file path=usr/share/lib/zoneinfo/America/Argentina/Ushuaia
+hardlink path=usr/share/lib/zoneinfo/America/Aruba target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Asuncion
+hardlink path=usr/share/lib/zoneinfo/America/Atikokan target=Panama
+hardlink path=usr/share/lib/zoneinfo/America/Atka target=Adak
+file path=usr/share/lib/zoneinfo/America/Bahia
+file path=usr/share/lib/zoneinfo/America/Bahia_Banderas
+file path=usr/share/lib/zoneinfo/America/Barbados
+file path=usr/share/lib/zoneinfo/America/Belem
+file path=usr/share/lib/zoneinfo/America/Belize
+hardlink path=usr/share/lib/zoneinfo/America/Blanc-Sablon target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Boa_Vista
+file path=usr/share/lib/zoneinfo/America/Bogota
+file path=usr/share/lib/zoneinfo/America/Boise
+hardlink path=usr/share/lib/zoneinfo/America/Buenos_Aires \
+    target=Argentina/Buenos_Aires
+file path=usr/share/lib/zoneinfo/America/Cambridge_Bay
+file path=usr/share/lib/zoneinfo/America/Campo_Grande
+file path=usr/share/lib/zoneinfo/America/Cancun
+file path=usr/share/lib/zoneinfo/America/Caracas
+hardlink path=usr/share/lib/zoneinfo/America/Catamarca \
+    target=Argentina/Catamarca
+file path=usr/share/lib/zoneinfo/America/Cayenne
+hardlink path=usr/share/lib/zoneinfo/America/Cayman target=Panama
+file path=usr/share/lib/zoneinfo/America/Chicago
+file path=usr/share/lib/zoneinfo/America/Chihuahua
+hardlink path=usr/share/lib/zoneinfo/America/Coral_Harbour target=Panama
+hardlink path=usr/share/lib/zoneinfo/America/Cordoba target=Argentina/Cordoba
+file path=usr/share/lib/zoneinfo/America/Costa_Rica
+hardlink path=usr/share/lib/zoneinfo/America/Creston target=Phoenix
+file path=usr/share/lib/zoneinfo/America/Cuiaba
+hardlink path=usr/share/lib/zoneinfo/America/Curacao target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Danmarkshavn
+file path=usr/share/lib/zoneinfo/America/Dawson
+file path=usr/share/lib/zoneinfo/America/Dawson_Creek
+file path=usr/share/lib/zoneinfo/America/Denver
+file path=usr/share/lib/zoneinfo/America/Detroit
+hardlink path=usr/share/lib/zoneinfo/America/Dominica target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Edmonton
+file path=usr/share/lib/zoneinfo/America/Eirunepe
+file path=usr/share/lib/zoneinfo/America/El_Salvador
+hardlink path=usr/share/lib/zoneinfo/America/Ensenada target=Tijuana
+file path=usr/share/lib/zoneinfo/America/Fort_Nelson
+hardlink path=usr/share/lib/zoneinfo/America/Fort_Wayne \
+    target=Indiana/Indianapolis
+file path=usr/share/lib/zoneinfo/America/Fortaleza
+file path=usr/share/lib/zoneinfo/America/Glace_Bay
+hardlink path=usr/share/lib/zoneinfo/America/Godthab target=Nuuk
+file path=usr/share/lib/zoneinfo/America/Goose_Bay
+file path=usr/share/lib/zoneinfo/America/Grand_Turk
+hardlink path=usr/share/lib/zoneinfo/America/Grenada target=Puerto_Rico
+hardlink path=usr/share/lib/zoneinfo/America/Guadeloupe target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Guatemala
+file path=usr/share/lib/zoneinfo/America/Guayaquil
+file path=usr/share/lib/zoneinfo/America/Guyana
+file path=usr/share/lib/zoneinfo/America/Halifax
+file path=usr/share/lib/zoneinfo/America/Havana
+file path=usr/share/lib/zoneinfo/America/Hermosillo
+dir  path=usr/share/lib/zoneinfo/America/Indiana
+file path=usr/share/lib/zoneinfo/America/Indiana/Indianapolis
+file path=usr/share/lib/zoneinfo/America/Indiana/Knox
+file path=usr/share/lib/zoneinfo/America/Indiana/Marengo
+file path=usr/share/lib/zoneinfo/America/Indiana/Petersburg
+file path=usr/share/lib/zoneinfo/America/Indiana/Tell_City
+file path=usr/share/lib/zoneinfo/America/Indiana/Vevay
+file path=usr/share/lib/zoneinfo/America/Indiana/Vincennes
+file path=usr/share/lib/zoneinfo/America/Indiana/Winamac
+hardlink path=usr/share/lib/zoneinfo/America/Indianapolis \
+    target=Indiana/Indianapolis
+file path=usr/share/lib/zoneinfo/America/Inuvik
+file path=usr/share/lib/zoneinfo/America/Iqaluit
+file path=usr/share/lib/zoneinfo/America/Jamaica
+hardlink path=usr/share/lib/zoneinfo/America/Jujuy target=Argentina/Jujuy
+file path=usr/share/lib/zoneinfo/America/Juneau
+dir  path=usr/share/lib/zoneinfo/America/Kentucky
+file path=usr/share/lib/zoneinfo/America/Kentucky/Louisville
+file path=usr/share/lib/zoneinfo/America/Kentucky/Monticello
+hardlink path=usr/share/lib/zoneinfo/America/Knox_IN target=Indiana/Knox
+hardlink path=usr/share/lib/zoneinfo/America/Kralendijk target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/La_Paz
+file path=usr/share/lib/zoneinfo/America/Lima
+file path=usr/share/lib/zoneinfo/America/Los_Angeles
+hardlink path=usr/share/lib/zoneinfo/America/Louisville \
+    target=Kentucky/Louisville
+hardlink path=usr/share/lib/zoneinfo/America/Lower_Princes target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Maceio
+file path=usr/share/lib/zoneinfo/America/Managua
+file path=usr/share/lib/zoneinfo/America/Manaus
+hardlink path=usr/share/lib/zoneinfo/America/Marigot target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Martinique
+file path=usr/share/lib/zoneinfo/America/Matamoros
+file path=usr/share/lib/zoneinfo/America/Mazatlan
+hardlink path=usr/share/lib/zoneinfo/America/Mendoza target=Argentina/Mendoza
+file path=usr/share/lib/zoneinfo/America/Menominee
+file path=usr/share/lib/zoneinfo/America/Merida
+file path=usr/share/lib/zoneinfo/America/Metlakatla
+file path=usr/share/lib/zoneinfo/America/Mexico_City
+file path=usr/share/lib/zoneinfo/America/Miquelon
+file path=usr/share/lib/zoneinfo/America/Moncton
+file path=usr/share/lib/zoneinfo/America/Monterrey
+file path=usr/share/lib/zoneinfo/America/Montevideo
+hardlink path=usr/share/lib/zoneinfo/America/Montreal target=Toronto
+hardlink path=usr/share/lib/zoneinfo/America/Montserrat target=Puerto_Rico
+hardlink path=usr/share/lib/zoneinfo/America/Nassau target=Toronto
+file path=usr/share/lib/zoneinfo/America/New_York
+file path=usr/share/lib/zoneinfo/America/Nipigon
+file path=usr/share/lib/zoneinfo/America/Nome
+file path=usr/share/lib/zoneinfo/America/Noronha
+dir  path=usr/share/lib/zoneinfo/America/North_Dakota
+file path=usr/share/lib/zoneinfo/America/North_Dakota/Beulah
+file path=usr/share/lib/zoneinfo/America/North_Dakota/Center
+file path=usr/share/lib/zoneinfo/America/North_Dakota/New_Salem
+file path=usr/share/lib/zoneinfo/America/Nuuk
+file path=usr/share/lib/zoneinfo/America/Ojinaga
+file path=usr/share/lib/zoneinfo/America/Panama
+file path=usr/share/lib/zoneinfo/America/Pangnirtung
+file path=usr/share/lib/zoneinfo/America/Paramaribo
+file path=usr/share/lib/zoneinfo/America/Phoenix
+file path=usr/share/lib/zoneinfo/America/Port-au-Prince
+hardlink path=usr/share/lib/zoneinfo/America/Port_of_Spain target=Puerto_Rico
+hardlink path=usr/share/lib/zoneinfo/America/Porto_Acre target=Rio_Branco
+file path=usr/share/lib/zoneinfo/America/Porto_Velho
+file path=usr/share/lib/zoneinfo/America/Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Punta_Arenas
+file path=usr/share/lib/zoneinfo/America/Rainy_River
+file path=usr/share/lib/zoneinfo/America/Rankin_Inlet
+file path=usr/share/lib/zoneinfo/America/Recife
+file path=usr/share/lib/zoneinfo/America/Regina
+file path=usr/share/lib/zoneinfo/America/Resolute
+file path=usr/share/lib/zoneinfo/America/Rio_Branco
+hardlink path=usr/share/lib/zoneinfo/America/Rosario target=Argentina/Cordoba
+hardlink path=usr/share/lib/zoneinfo/America/Santa_Isabel target=Tijuana
+file path=usr/share/lib/zoneinfo/America/Santarem
+file path=usr/share/lib/zoneinfo/America/Santiago
+file path=usr/share/lib/zoneinfo/America/Santo_Domingo
+file path=usr/share/lib/zoneinfo/America/Sao_Paulo
+file path=usr/share/lib/zoneinfo/America/Scoresbysund
+hardlink path=usr/share/lib/zoneinfo/America/Shiprock target=Denver
+file path=usr/share/lib/zoneinfo/America/Sitka
+hardlink path=usr/share/lib/zoneinfo/America/St_Barthelemy target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/St_Johns
+hardlink path=usr/share/lib/zoneinfo/America/St_Kitts target=Puerto_Rico
+hardlink path=usr/share/lib/zoneinfo/America/St_Lucia target=Puerto_Rico
+hardlink path=usr/share/lib/zoneinfo/America/St_Thomas target=Puerto_Rico
+hardlink path=usr/share/lib/zoneinfo/America/St_Vincent target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Swift_Current
+file path=usr/share/lib/zoneinfo/America/Tegucigalpa
+file path=usr/share/lib/zoneinfo/America/Thule
+file path=usr/share/lib/zoneinfo/America/Thunder_Bay
+file path=usr/share/lib/zoneinfo/America/Tijuana
+file path=usr/share/lib/zoneinfo/America/Toronto
+hardlink path=usr/share/lib/zoneinfo/America/Tortola target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Vancouver
+hardlink path=usr/share/lib/zoneinfo/America/Virgin target=Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Whitehorse
+file path=usr/share/lib/zoneinfo/America/Winnipeg
+file path=usr/share/lib/zoneinfo/America/Yakutat
+file path=usr/share/lib/zoneinfo/America/Yellowknife
+dir  path=usr/share/lib/zoneinfo/Antarctica
+file path=usr/share/lib/zoneinfo/Antarctica/Casey
+file path=usr/share/lib/zoneinfo/Antarctica/Davis
+hardlink path=usr/share/lib/zoneinfo/Antarctica/DumontDUrville \
+    target=../Pacific/Port_Moresby
+file path=usr/share/lib/zoneinfo/Antarctica/Macquarie
+file path=usr/share/lib/zoneinfo/Antarctica/Mawson
+hardlink path=usr/share/lib/zoneinfo/Antarctica/McMurdo \
+    target=../Pacific/Auckland
+file path=usr/share/lib/zoneinfo/Antarctica/Palmer
+file path=usr/share/lib/zoneinfo/Antarctica/Rothera
+hardlink path=usr/share/lib/zoneinfo/Antarctica/South_Pole \
+    target=../Pacific/Auckland
+hardlink path=usr/share/lib/zoneinfo/Antarctica/Syowa target=../Asia/Riyadh
+file path=usr/share/lib/zoneinfo/Antarctica/Troll
+file path=usr/share/lib/zoneinfo/Antarctica/Vostok
+dir  path=usr/share/lib/zoneinfo/Arctic
+hardlink path=usr/share/lib/zoneinfo/Arctic/Longyearbyen target=../Europe/Oslo
+dir  path=usr/share/lib/zoneinfo/Asia
+hardlink path=usr/share/lib/zoneinfo/Asia/Aden target=Riyadh
+file path=usr/share/lib/zoneinfo/Asia/Almaty
+file path=usr/share/lib/zoneinfo/Asia/Amman
+file path=usr/share/lib/zoneinfo/Asia/Anadyr
+file path=usr/share/lib/zoneinfo/Asia/Aqtau
+file path=usr/share/lib/zoneinfo/Asia/Aqtobe
+file path=usr/share/lib/zoneinfo/Asia/Ashgabat
+hardlink path=usr/share/lib/zoneinfo/Asia/Ashkhabad target=Ashgabat
+file path=usr/share/lib/zoneinfo/Asia/Atyrau
+file path=usr/share/lib/zoneinfo/Asia/Baghdad
+hardlink path=usr/share/lib/zoneinfo/Asia/Bahrain target=Qatar
+file path=usr/share/lib/zoneinfo/Asia/Baku
+file path=usr/share/lib/zoneinfo/Asia/Bangkok
+file path=usr/share/lib/zoneinfo/Asia/Barnaul
+file path=usr/share/lib/zoneinfo/Asia/Beirut
+file path=usr/share/lib/zoneinfo/Asia/Bishkek
+file path=usr/share/lib/zoneinfo/Asia/Brunei
+hardlink path=usr/share/lib/zoneinfo/Asia/Calcutta target=Kolkata
+file path=usr/share/lib/zoneinfo/Asia/Chita
+file path=usr/share/lib/zoneinfo/Asia/Choibalsan
+hardlink path=usr/share/lib/zoneinfo/Asia/Chongqing target=Shanghai
+hardlink path=usr/share/lib/zoneinfo/Asia/Chungking target=Shanghai
+file path=usr/share/lib/zoneinfo/Asia/Colombo
+hardlink path=usr/share/lib/zoneinfo/Asia/Dacca target=Dhaka
+file path=usr/share/lib/zoneinfo/Asia/Damascus
+file path=usr/share/lib/zoneinfo/Asia/Dhaka
+file path=usr/share/lib/zoneinfo/Asia/Dili
+file path=usr/share/lib/zoneinfo/Asia/Dubai
+file path=usr/share/lib/zoneinfo/Asia/Dushanbe
+file path=usr/share/lib/zoneinfo/Asia/Famagusta
+file path=usr/share/lib/zoneinfo/Asia/Gaza
+hardlink path=usr/share/lib/zoneinfo/Asia/Harbin target=Shanghai
+file path=usr/share/lib/zoneinfo/Asia/Hebron
+file path=usr/share/lib/zoneinfo/Asia/Ho_Chi_Minh
+file path=usr/share/lib/zoneinfo/Asia/Hong_Kong
+file path=usr/share/lib/zoneinfo/Asia/Hovd
+file path=usr/share/lib/zoneinfo/Asia/Irkutsk
+hardlink path=usr/share/lib/zoneinfo/Asia/Istanbul target=../Europe/Istanbul
+file path=usr/share/lib/zoneinfo/Asia/Jakarta
+file path=usr/share/lib/zoneinfo/Asia/Jayapura
+file path=usr/share/lib/zoneinfo/Asia/Jerusalem
+file path=usr/share/lib/zoneinfo/Asia/Kabul
+file path=usr/share/lib/zoneinfo/Asia/Kamchatka
+file path=usr/share/lib/zoneinfo/Asia/Karachi
+hardlink path=usr/share/lib/zoneinfo/Asia/Kashgar target=Urumqi
+file path=usr/share/lib/zoneinfo/Asia/Kathmandu
+hardlink path=usr/share/lib/zoneinfo/Asia/Katmandu target=Kathmandu
+file path=usr/share/lib/zoneinfo/Asia/Khandyga
+file path=usr/share/lib/zoneinfo/Asia/Kolkata
+file path=usr/share/lib/zoneinfo/Asia/Krasnoyarsk
+file path=usr/share/lib/zoneinfo/Asia/Kuala_Lumpur
+file path=usr/share/lib/zoneinfo/Asia/Kuching
+hardlink path=usr/share/lib/zoneinfo/Asia/Kuwait target=Riyadh
+hardlink path=usr/share/lib/zoneinfo/Asia/Macao target=Macau
+file path=usr/share/lib/zoneinfo/Asia/Macau
+file path=usr/share/lib/zoneinfo/Asia/Magadan
+file path=usr/share/lib/zoneinfo/Asia/Makassar
+file path=usr/share/lib/zoneinfo/Asia/Manila
+hardlink path=usr/share/lib/zoneinfo/Asia/Muscat target=Dubai
+file path=usr/share/lib/zoneinfo/Asia/Nicosia
+file path=usr/share/lib/zoneinfo/Asia/Novokuznetsk
+file path=usr/share/lib/zoneinfo/Asia/Novosibirsk
+file path=usr/share/lib/zoneinfo/Asia/Omsk
+file path=usr/share/lib/zoneinfo/Asia/Oral
+hardlink path=usr/share/lib/zoneinfo/Asia/Phnom_Penh target=Bangkok
+file path=usr/share/lib/zoneinfo/Asia/Pontianak
+file path=usr/share/lib/zoneinfo/Asia/Pyongyang
+file path=usr/share/lib/zoneinfo/Asia/Qatar
+file path=usr/share/lib/zoneinfo/Asia/Qostanay
+file path=usr/share/lib/zoneinfo/Asia/Qyzylorda
+hardlink path=usr/share/lib/zoneinfo/Asia/Rangoon target=Yangon
+file path=usr/share/lib/zoneinfo/Asia/Riyadh
+hardlink path=usr/share/lib/zoneinfo/Asia/Saigon target=Ho_Chi_Minh
+file path=usr/share/lib/zoneinfo/Asia/Sakhalin
+file path=usr/share/lib/zoneinfo/Asia/Samarkand
+file path=usr/share/lib/zoneinfo/Asia/Seoul
+file path=usr/share/lib/zoneinfo/Asia/Shanghai
+file path=usr/share/lib/zoneinfo/Asia/Singapore
+file path=usr/share/lib/zoneinfo/Asia/Srednekolymsk
+file path=usr/share/lib/zoneinfo/Asia/Taipei
+file path=usr/share/lib/zoneinfo/Asia/Tashkent
+file path=usr/share/lib/zoneinfo/Asia/Tbilisi
+file path=usr/share/lib/zoneinfo/Asia/Tehran
+hardlink path=usr/share/lib/zoneinfo/Asia/Tel_Aviv target=Jerusalem
+hardlink path=usr/share/lib/zoneinfo/Asia/Thimbu target=Thimphu
+file path=usr/share/lib/zoneinfo/Asia/Thimphu
+file path=usr/share/lib/zoneinfo/Asia/Tokyo
+file path=usr/share/lib/zoneinfo/Asia/Tomsk
+hardlink path=usr/share/lib/zoneinfo/Asia/Ujung_Pandang target=Makassar
+file path=usr/share/lib/zoneinfo/Asia/Ulaanbaatar
+hardlink path=usr/share/lib/zoneinfo/Asia/Ulan_Bator target=Ulaanbaatar
+file path=usr/share/lib/zoneinfo/Asia/Urumqi
+file path=usr/share/lib/zoneinfo/Asia/Ust-Nera
+hardlink path=usr/share/lib/zoneinfo/Asia/Vientiane target=Bangkok
+file path=usr/share/lib/zoneinfo/Asia/Vladivostok
+file path=usr/share/lib/zoneinfo/Asia/Yakutsk
+file path=usr/share/lib/zoneinfo/Asia/Yangon
+file path=usr/share/lib/zoneinfo/Asia/Yekaterinburg
+file path=usr/share/lib/zoneinfo/Asia/Yerevan
+dir  path=usr/share/lib/zoneinfo/Atlantic
+file path=usr/share/lib/zoneinfo/Atlantic/Azores
+file path=usr/share/lib/zoneinfo/Atlantic/Bermuda
+file path=usr/share/lib/zoneinfo/Atlantic/Canary
+file path=usr/share/lib/zoneinfo/Atlantic/Cape_Verde
+hardlink path=usr/share/lib/zoneinfo/Atlantic/Faeroe target=Faroe
+file path=usr/share/lib/zoneinfo/Atlantic/Faroe
+hardlink path=usr/share/lib/zoneinfo/Atlantic/Jan_Mayen target=../Europe/Oslo
+file path=usr/share/lib/zoneinfo/Atlantic/Madeira
+file path=usr/share/lib/zoneinfo/Atlantic/Reykjavik
+file path=usr/share/lib/zoneinfo/Atlantic/South_Georgia
+hardlink path=usr/share/lib/zoneinfo/Atlantic/St_Helena target=../Africa/Abidjan
+file path=usr/share/lib/zoneinfo/Atlantic/Stanley
+dir  path=usr/share/lib/zoneinfo/Australia
+hardlink path=usr/share/lib/zoneinfo/Australia/ACT target=Sydney
+file path=usr/share/lib/zoneinfo/Australia/Adelaide
+file path=usr/share/lib/zoneinfo/Australia/Brisbane
+file path=usr/share/lib/zoneinfo/Australia/Broken_Hill
+hardlink path=usr/share/lib/zoneinfo/Australia/Canberra target=Sydney
+hardlink path=usr/share/lib/zoneinfo/Australia/Currie target=Hobart
+file path=usr/share/lib/zoneinfo/Australia/Darwin
+file path=usr/share/lib/zoneinfo/Australia/Eucla
+file path=usr/share/lib/zoneinfo/Australia/Hobart
+hardlink path=usr/share/lib/zoneinfo/Australia/LHI target=Lord_Howe
+file path=usr/share/lib/zoneinfo/Australia/Lindeman
+file path=usr/share/lib/zoneinfo/Australia/Lord_Howe
+file path=usr/share/lib/zoneinfo/Australia/Melbourne
+hardlink path=usr/share/lib/zoneinfo/Australia/NSW target=Sydney
+hardlink path=usr/share/lib/zoneinfo/Australia/North target=Darwin
+file path=usr/share/lib/zoneinfo/Australia/Perth
+hardlink path=usr/share/lib/zoneinfo/Australia/Queensland target=Brisbane
+hardlink path=usr/share/lib/zoneinfo/Australia/South target=Adelaide
+file path=usr/share/lib/zoneinfo/Australia/Sydney
+hardlink path=usr/share/lib/zoneinfo/Australia/Tasmania target=Hobart
+hardlink path=usr/share/lib/zoneinfo/Australia/Victoria target=Melbourne
+hardlink path=usr/share/lib/zoneinfo/Australia/West target=Perth
+hardlink path=usr/share/lib/zoneinfo/Australia/Yancowinna target=Broken_Hill
+dir  path=usr/share/lib/zoneinfo/Brazil
+hardlink path=usr/share/lib/zoneinfo/Brazil/Acre target=../America/Rio_Branco
+hardlink path=usr/share/lib/zoneinfo/Brazil/DeNoronha target=../America/Noronha
+hardlink path=usr/share/lib/zoneinfo/Brazil/East target=../America/Sao_Paulo
+hardlink path=usr/share/lib/zoneinfo/Brazil/West target=../America/Manaus
+file path=usr/share/lib/zoneinfo/CET
+file path=usr/share/lib/zoneinfo/CST6CDT
+dir  path=usr/share/lib/zoneinfo/Canada
+hardlink path=usr/share/lib/zoneinfo/Canada/Atlantic target=../America/Halifax
+hardlink path=usr/share/lib/zoneinfo/Canada/Central target=../America/Winnipeg
+hardlink path=usr/share/lib/zoneinfo/Canada/Eastern target=../America/Toronto
+hardlink path=usr/share/lib/zoneinfo/Canada/Mountain target=../America/Edmonton
+hardlink path=usr/share/lib/zoneinfo/Canada/Newfoundland \
+    target=../America/St_Johns
+hardlink path=usr/share/lib/zoneinfo/Canada/Pacific target=../America/Vancouver
+hardlink path=usr/share/lib/zoneinfo/Canada/Saskatchewan \
+    target=../America/Regina
+hardlink path=usr/share/lib/zoneinfo/Canada/Yukon target=../America/Whitehorse
+dir  path=usr/share/lib/zoneinfo/Chile
+hardlink path=usr/share/lib/zoneinfo/Chile/Continental \
+    target=../America/Santiago
+hardlink path=usr/share/lib/zoneinfo/Chile/EasterIsland target=../Pacific/Easter
+hardlink path=usr/share/lib/zoneinfo/Cuba target=America/Havana
+file path=usr/share/lib/zoneinfo/EET
+file path=usr/share/lib/zoneinfo/EST
+file path=usr/share/lib/zoneinfo/EST5EDT
+hardlink path=usr/share/lib/zoneinfo/Egypt target=Africa/Cairo
+hardlink path=usr/share/lib/zoneinfo/Eire target=Europe/Dublin
+dir  path=usr/share/lib/zoneinfo/Etc
+file path=usr/share/lib/zoneinfo/Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/Etc/GMT+0 target=GMT
+file path=usr/share/lib/zoneinfo/Etc/GMT+1
+file path=usr/share/lib/zoneinfo/Etc/GMT+10
+file path=usr/share/lib/zoneinfo/Etc/GMT+11
+file path=usr/share/lib/zoneinfo/Etc/GMT+12
+file path=usr/share/lib/zoneinfo/Etc/GMT+2
+file path=usr/share/lib/zoneinfo/Etc/GMT+3
+file path=usr/share/lib/zoneinfo/Etc/GMT+4
+file path=usr/share/lib/zoneinfo/Etc/GMT+5
+file path=usr/share/lib/zoneinfo/Etc/GMT+6
+file path=usr/share/lib/zoneinfo/Etc/GMT+7
+file path=usr/share/lib/zoneinfo/Etc/GMT+8
+file path=usr/share/lib/zoneinfo/Etc/GMT+9
+hardlink path=usr/share/lib/zoneinfo/Etc/GMT-0 target=GMT
+file path=usr/share/lib/zoneinfo/Etc/GMT-1
+file path=usr/share/lib/zoneinfo/Etc/GMT-10
+file path=usr/share/lib/zoneinfo/Etc/GMT-11
+file path=usr/share/lib/zoneinfo/Etc/GMT-12
+file path=usr/share/lib/zoneinfo/Etc/GMT-13
+file path=usr/share/lib/zoneinfo/Etc/GMT-14
+file path=usr/share/lib/zoneinfo/Etc/GMT-2
+file path=usr/share/lib/zoneinfo/Etc/GMT-3
+file path=usr/share/lib/zoneinfo/Etc/GMT-4
+file path=usr/share/lib/zoneinfo/Etc/GMT-5
+file path=usr/share/lib/zoneinfo/Etc/GMT-6
+file path=usr/share/lib/zoneinfo/Etc/GMT-7
+file path=usr/share/lib/zoneinfo/Etc/GMT-8
+file path=usr/share/lib/zoneinfo/Etc/GMT-9
+hardlink path=usr/share/lib/zoneinfo/Etc/GMT0 target=GMT
+hardlink path=usr/share/lib/zoneinfo/Etc/Greenwich target=GMT
+hardlink path=usr/share/lib/zoneinfo/Etc/UCT target=UTC
+file path=usr/share/lib/zoneinfo/Etc/UTC
+hardlink path=usr/share/lib/zoneinfo/Etc/Universal target=UTC
+hardlink path=usr/share/lib/zoneinfo/Etc/Zulu target=UTC
+dir  path=usr/share/lib/zoneinfo/Europe
+file path=usr/share/lib/zoneinfo/Europe/Amsterdam
+file path=usr/share/lib/zoneinfo/Europe/Andorra
+file path=usr/share/lib/zoneinfo/Europe/Astrakhan
+file path=usr/share/lib/zoneinfo/Europe/Athens
+hardlink path=usr/share/lib/zoneinfo/Europe/Belfast target=London
+file path=usr/share/lib/zoneinfo/Europe/Belgrade
+file path=usr/share/lib/zoneinfo/Europe/Berlin
+hardlink path=usr/share/lib/zoneinfo/Europe/Bratislava target=Prague
+file path=usr/share/lib/zoneinfo/Europe/Brussels
+file path=usr/share/lib/zoneinfo/Europe/Bucharest
+file path=usr/share/lib/zoneinfo/Europe/Budapest
+hardlink path=usr/share/lib/zoneinfo/Europe/Busingen target=Zurich
+file path=usr/share/lib/zoneinfo/Europe/Chisinau
+file path=usr/share/lib/zoneinfo/Europe/Copenhagen
+file path=usr/share/lib/zoneinfo/Europe/Dublin
+file path=usr/share/lib/zoneinfo/Europe/Gibraltar
+hardlink path=usr/share/lib/zoneinfo/Europe/Guernsey target=London
+file path=usr/share/lib/zoneinfo/Europe/Helsinki
+hardlink path=usr/share/lib/zoneinfo/Europe/Isle_of_Man target=London
+file path=usr/share/lib/zoneinfo/Europe/Istanbul
+hardlink path=usr/share/lib/zoneinfo/Europe/Jersey target=London
+file path=usr/share/lib/zoneinfo/Europe/Kaliningrad
+file path=usr/share/lib/zoneinfo/Europe/Kiev
+file path=usr/share/lib/zoneinfo/Europe/Kirov
+file path=usr/share/lib/zoneinfo/Europe/Lisbon
+hardlink path=usr/share/lib/zoneinfo/Europe/Ljubljana target=Belgrade
+file path=usr/share/lib/zoneinfo/Europe/London
+file path=usr/share/lib/zoneinfo/Europe/Luxembourg
+file path=usr/share/lib/zoneinfo/Europe/Madrid
+file path=usr/share/lib/zoneinfo/Europe/Malta
+hardlink path=usr/share/lib/zoneinfo/Europe/Mariehamn target=Helsinki
+file path=usr/share/lib/zoneinfo/Europe/Minsk
+file path=usr/share/lib/zoneinfo/Europe/Monaco
+file path=usr/share/lib/zoneinfo/Europe/Moscow
+hardlink path=usr/share/lib/zoneinfo/Europe/Nicosia target=../Asia/Nicosia
+file path=usr/share/lib/zoneinfo/Europe/Oslo
+file path=usr/share/lib/zoneinfo/Europe/Paris
+hardlink path=usr/share/lib/zoneinfo/Europe/Podgorica target=Belgrade
+file path=usr/share/lib/zoneinfo/Europe/Prague
+file path=usr/share/lib/zoneinfo/Europe/Riga
+file path=usr/share/lib/zoneinfo/Europe/Rome
+file path=usr/share/lib/zoneinfo/Europe/Samara
+hardlink path=usr/share/lib/zoneinfo/Europe/San_Marino target=Rome
+hardlink path=usr/share/lib/zoneinfo/Europe/Sarajevo target=Belgrade
+file path=usr/share/lib/zoneinfo/Europe/Saratov
+file path=usr/share/lib/zoneinfo/Europe/Simferopol
+hardlink path=usr/share/lib/zoneinfo/Europe/Skopje target=Belgrade
+file path=usr/share/lib/zoneinfo/Europe/Sofia
+file path=usr/share/lib/zoneinfo/Europe/Stockholm
+file path=usr/share/lib/zoneinfo/Europe/Tallinn
+file path=usr/share/lib/zoneinfo/Europe/Tirane
+hardlink path=usr/share/lib/zoneinfo/Europe/Tiraspol target=Chisinau
+file path=usr/share/lib/zoneinfo/Europe/Ulyanovsk
+file path=usr/share/lib/zoneinfo/Europe/Uzhgorod
+hardlink path=usr/share/lib/zoneinfo/Europe/Vaduz target=Zurich
+hardlink path=usr/share/lib/zoneinfo/Europe/Vatican target=Rome
+file path=usr/share/lib/zoneinfo/Europe/Vienna
+file path=usr/share/lib/zoneinfo/Europe/Vilnius
+file path=usr/share/lib/zoneinfo/Europe/Volgograd
+file path=usr/share/lib/zoneinfo/Europe/Warsaw
+hardlink path=usr/share/lib/zoneinfo/Europe/Zagreb target=Belgrade
+file path=usr/share/lib/zoneinfo/Europe/Zaporozhye
+file path=usr/share/lib/zoneinfo/Europe/Zurich
+file path=usr/share/lib/zoneinfo/Factory
+hardlink path=usr/share/lib/zoneinfo/GB target=Europe/London
+hardlink path=usr/share/lib/zoneinfo/GB-Eire target=Europe/London
+hardlink path=usr/share/lib/zoneinfo/GMT target=Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/GMT+0 target=Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/GMT-0 target=Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/GMT0 target=Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/Greenwich target=Etc/GMT
+file path=usr/share/lib/zoneinfo/HST
+hardlink path=usr/share/lib/zoneinfo/Hongkong target=Asia/Hong_Kong
+hardlink path=usr/share/lib/zoneinfo/Iceland target=Atlantic/Reykjavik
+dir  path=usr/share/lib/zoneinfo/Indian
+hardlink path=usr/share/lib/zoneinfo/Indian/Antananarivo \
+    target=../Africa/Nairobi
+file path=usr/share/lib/zoneinfo/Indian/Chagos
+file path=usr/share/lib/zoneinfo/Indian/Christmas
+file path=usr/share/lib/zoneinfo/Indian/Cocos
+hardlink path=usr/share/lib/zoneinfo/Indian/Comoro target=../Africa/Nairobi
+file path=usr/share/lib/zoneinfo/Indian/Kerguelen
+file path=usr/share/lib/zoneinfo/Indian/Mahe
+file path=usr/share/lib/zoneinfo/Indian/Maldives
+file path=usr/share/lib/zoneinfo/Indian/Mauritius
+hardlink path=usr/share/lib/zoneinfo/Indian/Mayotte target=../Africa/Nairobi
+file path=usr/share/lib/zoneinfo/Indian/Reunion
+hardlink path=usr/share/lib/zoneinfo/Iran target=Asia/Tehran
+hardlink path=usr/share/lib/zoneinfo/Israel target=Asia/Jerusalem
+hardlink path=usr/share/lib/zoneinfo/Jamaica target=America/Jamaica
+hardlink path=usr/share/lib/zoneinfo/Japan target=Asia/Tokyo
+hardlink path=usr/share/lib/zoneinfo/Kwajalein target=Pacific/Kwajalein
+hardlink path=usr/share/lib/zoneinfo/Libya target=Africa/Tripoli
+file path=usr/share/lib/zoneinfo/MET
+file path=usr/share/lib/zoneinfo/MST
+file path=usr/share/lib/zoneinfo/MST7MDT
+dir  path=usr/share/lib/zoneinfo/Mexico
+hardlink path=usr/share/lib/zoneinfo/Mexico/BajaNorte target=../America/Tijuana
+hardlink path=usr/share/lib/zoneinfo/Mexico/BajaSur target=../America/Mazatlan
+hardlink path=usr/share/lib/zoneinfo/Mexico/General \
+    target=../America/Mexico_City
+hardlink path=usr/share/lib/zoneinfo/NZ target=Pacific/Auckland
+hardlink path=usr/share/lib/zoneinfo/NZ-CHAT target=Pacific/Chatham
+hardlink path=usr/share/lib/zoneinfo/Navajo target=America/Denver
+hardlink path=usr/share/lib/zoneinfo/PRC target=Asia/Shanghai
+file path=usr/share/lib/zoneinfo/PST8PDT
+dir  path=usr/share/lib/zoneinfo/Pacific
+file path=usr/share/lib/zoneinfo/Pacific/Apia
+file path=usr/share/lib/zoneinfo/Pacific/Auckland
+file path=usr/share/lib/zoneinfo/Pacific/Bougainville
+file path=usr/share/lib/zoneinfo/Pacific/Chatham
+file path=usr/share/lib/zoneinfo/Pacific/Chuuk
+file path=usr/share/lib/zoneinfo/Pacific/Easter
+file path=usr/share/lib/zoneinfo/Pacific/Efate
+hardlink path=usr/share/lib/zoneinfo/Pacific/Enderbury target=Kanton
+file path=usr/share/lib/zoneinfo/Pacific/Fakaofo
+file path=usr/share/lib/zoneinfo/Pacific/Fiji
+file path=usr/share/lib/zoneinfo/Pacific/Funafuti
+file path=usr/share/lib/zoneinfo/Pacific/Galapagos
+file path=usr/share/lib/zoneinfo/Pacific/Gambier
+file path=usr/share/lib/zoneinfo/Pacific/Guadalcanal
+file path=usr/share/lib/zoneinfo/Pacific/Guam
+file path=usr/share/lib/zoneinfo/Pacific/Honolulu
+hardlink path=usr/share/lib/zoneinfo/Pacific/Johnston target=Honolulu
+file path=usr/share/lib/zoneinfo/Pacific/Kanton
+file path=usr/share/lib/zoneinfo/Pacific/Kiritimati
+file path=usr/share/lib/zoneinfo/Pacific/Kosrae
+file path=usr/share/lib/zoneinfo/Pacific/Kwajalein
+file path=usr/share/lib/zoneinfo/Pacific/Majuro
+file path=usr/share/lib/zoneinfo/Pacific/Marquesas
+hardlink path=usr/share/lib/zoneinfo/Pacific/Midway target=Pago_Pago
+file path=usr/share/lib/zoneinfo/Pacific/Nauru
+file path=usr/share/lib/zoneinfo/Pacific/Niue
+file path=usr/share/lib/zoneinfo/Pacific/Norfolk
+file path=usr/share/lib/zoneinfo/Pacific/Noumea
+file path=usr/share/lib/zoneinfo/Pacific/Pago_Pago
+file path=usr/share/lib/zoneinfo/Pacific/Palau
+file path=usr/share/lib/zoneinfo/Pacific/Pitcairn
+file path=usr/share/lib/zoneinfo/Pacific/Pohnpei
+hardlink path=usr/share/lib/zoneinfo/Pacific/Ponape target=Pohnpei
+file path=usr/share/lib/zoneinfo/Pacific/Port_Moresby
+file path=usr/share/lib/zoneinfo/Pacific/Rarotonga
+hardlink path=usr/share/lib/zoneinfo/Pacific/Saipan target=Guam
+hardlink path=usr/share/lib/zoneinfo/Pacific/Samoa target=Pago_Pago
+file path=usr/share/lib/zoneinfo/Pacific/Tahiti
+file path=usr/share/lib/zoneinfo/Pacific/Tarawa
+file path=usr/share/lib/zoneinfo/Pacific/Tongatapu
+hardlink path=usr/share/lib/zoneinfo/Pacific/Truk target=Chuuk
+file path=usr/share/lib/zoneinfo/Pacific/Wake
+file path=usr/share/lib/zoneinfo/Pacific/Wallis
+hardlink path=usr/share/lib/zoneinfo/Pacific/Yap target=Chuuk
+hardlink path=usr/share/lib/zoneinfo/Poland target=Europe/Warsaw
+hardlink path=usr/share/lib/zoneinfo/Portugal target=Europe/Lisbon
+hardlink path=usr/share/lib/zoneinfo/ROC target=Asia/Taipei
+hardlink path=usr/share/lib/zoneinfo/ROK target=Asia/Seoul
+hardlink path=usr/share/lib/zoneinfo/Singapore target=Asia/Singapore
+hardlink path=usr/share/lib/zoneinfo/Turkey target=Europe/Istanbul
+hardlink path=usr/share/lib/zoneinfo/UCT target=Etc/UTC
+dir  path=usr/share/lib/zoneinfo/US
+hardlink path=usr/share/lib/zoneinfo/US/Alaska target=../America/Anchorage
+hardlink path=usr/share/lib/zoneinfo/US/Aleutian target=../America/Adak
+hardlink path=usr/share/lib/zoneinfo/US/Arizona target=../America/Phoenix
+hardlink path=usr/share/lib/zoneinfo/US/Central target=../America/Chicago
+hardlink path=usr/share/lib/zoneinfo/US/East-Indiana \
+    target=../America/Indiana/Indianapolis
+hardlink path=usr/share/lib/zoneinfo/US/Eastern target=../America/New_York
+hardlink path=usr/share/lib/zoneinfo/US/Hawaii target=../Pacific/Honolulu
+hardlink path=usr/share/lib/zoneinfo/US/Indiana-Starke \
+    target=../America/Indiana/Knox
+hardlink path=usr/share/lib/zoneinfo/US/Michigan target=../America/Detroit
+hardlink path=usr/share/lib/zoneinfo/US/Mountain target=../America/Denver
+hardlink path=usr/share/lib/zoneinfo/US/Pacific target=../America/Los_Angeles
+hardlink path=usr/share/lib/zoneinfo/US/Samoa target=../Pacific/Pago_Pago
+hardlink path=usr/share/lib/zoneinfo/UTC target=Etc/UTC
+hardlink path=usr/share/lib/zoneinfo/Universal target=Etc/UTC
+hardlink path=usr/share/lib/zoneinfo/W-SU target=Europe/Moscow
+file path=usr/share/lib/zoneinfo/WET
+hardlink path=usr/share/lib/zoneinfo/Zulu target=Etc/UTC
+link path=usr/share/lib/zoneinfo/posixrules target=./US/Eastern
+dir  path=usr/share/lib/zoneinfo/src
+file path=usr/share/lib/zoneinfo/src/README
+file path=usr/share/lib/zoneinfo/src/africa
+file path=usr/share/lib/zoneinfo/src/antarctica
+file path=usr/share/lib/zoneinfo/src/asia
+file path=usr/share/lib/zoneinfo/src/australasia
+file path=usr/share/lib/zoneinfo/src/backward
+file path=usr/share/lib/zoneinfo/src/etcetera
+file path=usr/share/lib/zoneinfo/src/europe
+file path=usr/share/lib/zoneinfo/src/factory
+file path=usr/share/lib/zoneinfo/src/northamerica
+file path=usr/share/lib/zoneinfo/src/southamerica
+file path=usr/share/lib/zoneinfo/src/systemv
+dir  path=usr/share/lib/zoneinfo/tab
+file path=usr/share/lib/zoneinfo/tab/continent.tab
+file path=usr/share/lib/zoneinfo/tab/country.tab
+file path=usr/share/lib/zoneinfo/tab/zone_sun.tab
+license lic_CDDL license=lic_CDDL

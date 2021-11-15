@@ -1,0 +1,209 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
+
+set name=pkg.fmri value=pkg:/service/resource-pools@$(PKGVERS)
+set name=pkg.summary value="Resource Pools"
+set name=pkg.description value="core software for resource pools"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+dir  path=lib variant.opensolaris.zone=global
+dir  path=lib/svc variant.opensolaris.zone=global
+dir  path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir  path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
+file path=lib/svc/manifest/system/pools.xml group=sys mode=0444 \
+    variant.opensolaris.zone=global
+dir  path=lib/svc/method variant.opensolaris.zone=global
+file path=lib/svc/method/svc-pools mode=0555 variant.opensolaris.zone=global
+dir  path=usr group=sys
+dir  path=usr/bin
+file path=usr/bin/poolstat mode=0555
+dir  path=usr/include
+file path=usr/include/pool.h
+dir  path=usr/kernel group=sys
+dir  path=usr/kernel/drv group=sys
+dir  path=usr/kernel/drv/$(ARCH64) group=sys
+file path=usr/kernel/drv/$(ARCH64)/pool group=sys
+file path=usr/kernel/drv/pool.conf group=sys
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libpool.so target=libpool.so.1
+file path=usr/lib/$(ARCH64)/libpool.so.1
+link path=usr/lib/libpool.so target=./libpool.so.1
+file path=usr/lib/libpool.so.1
+dir  path=usr/lib/rcm
+dir  path=usr/lib/rcm/modules
+file path=usr/lib/rcm/modules/SUNW_pool_rcm.so mode=0555
+dir  path=usr/sbin
+file path=usr/sbin/pooladm mode=0555
+file path=usr/sbin/poolbind mode=0555
+file path=usr/sbin/poolcfg mode=0555
+dir  path=usr/share
+dir  path=usr/share/lib
+dir  path=usr/share/lib/xml group=sys
+dir  path=usr/share/lib/xml/dtd group=sys
+file path=usr/share/lib/xml/dtd/rm_pool.dtd.1
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/pooladm.1m
+file path=usr/share/man/man1m/poolbind.1m
+file path=usr/share/man/man1m/poolcfg.1m
+file path=usr/share/man/man1m/poolstat.1m
+dir  path=usr/share/man/man3lib
+file path=usr/share/man/man3lib/libpool.3lib
+dir  path=usr/share/man/man3pool
+file path=usr/share/man/man3pool/pool_associate.3pool
+file path=usr/share/man/man3pool/pool_component_info.3pool
+file path=usr/share/man/man3pool/pool_component_to_elem.3pool
+file path=usr/share/man/man3pool/pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_close.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_commit.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_export.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_free.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_info.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_location.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_open.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_remove.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_rollback.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_status.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_to_elem.3pool \
+    target=pool_component_to_elem.3pool
+link path=usr/share/man/man3pool/pool_conf_update.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_conf_validate.3pool \
+    target=pool_conf_alloc.3pool
+link path=usr/share/man/man3pool/pool_create.3pool target=pool_associate.3pool
+link path=usr/share/man/man3pool/pool_destroy.3pool target=pool_associate.3pool
+link path=usr/share/man/man3pool/pool_dissociate.3pool \
+    target=pool_associate.3pool
+file path=usr/share/man/man3pool/pool_dynamic_location.3pool
+file path=usr/share/man/man3pool/pool_error.3pool
+file path=usr/share/man/man3pool/pool_get_binding.3pool
+link path=usr/share/man/man3pool/pool_get_owning_resource.3pool \
+    target=pool_component_info.3pool
+file path=usr/share/man/man3pool/pool_get_pool.3pool
+file path=usr/share/man/man3pool/pool_get_property.3pool
+link path=usr/share/man/man3pool/pool_get_resource.3pool \
+    target=pool_get_pool.3pool
+link path=usr/share/man/man3pool/pool_get_resource_binding.3pool \
+    target=pool_get_binding.3pool
+link path=usr/share/man/man3pool/pool_get_status.3pool \
+    target=pool_dynamic_location.3pool
+link path=usr/share/man/man3pool/pool_info.3pool target=pool_associate.3pool
+link path=usr/share/man/man3pool/pool_put_property.3pool \
+    target=pool_get_property.3pool
+link path=usr/share/man/man3pool/pool_query_components.3pool \
+    target=pool_get_pool.3pool
+link path=usr/share/man/man3pool/pool_query_pool_resources.3pool \
+    target=pool_associate.3pool
+link path=usr/share/man/man3pool/pool_query_pools.3pool \
+    target=pool_get_pool.3pool
+link path=usr/share/man/man3pool/pool_query_resource_components.3pool \
+    target=pool_resource_create.3pool
+link path=usr/share/man/man3pool/pool_query_resources.3pool \
+    target=pool_get_pool.3pool
+file path=usr/share/man/man3pool/pool_resource_create.3pool
+link path=usr/share/man/man3pool/pool_resource_destroy.3pool \
+    target=pool_resource_create.3pool
+link path=usr/share/man/man3pool/pool_resource_info.3pool \
+    target=pool_resource_create.3pool
+link path=usr/share/man/man3pool/pool_resource_to_elem.3pool \
+    target=pool_component_to_elem.3pool
+link path=usr/share/man/man3pool/pool_resource_transfer.3pool \
+    target=pool_resource_create.3pool
+link path=usr/share/man/man3pool/pool_resource_type_list.3pool \
+    target=pool_dynamic_location.3pool
+link path=usr/share/man/man3pool/pool_resource_xtransfer.3pool \
+    target=pool_resource_create.3pool
+link path=usr/share/man/man3pool/pool_rm_property.3pool \
+    target=pool_get_property.3pool
+link path=usr/share/man/man3pool/pool_set_binding.3pool \
+    target=pool_get_binding.3pool
+link path=usr/share/man/man3pool/pool_set_status.3pool \
+    target=pool_dynamic_location.3pool
+link path=usr/share/man/man3pool/pool_static_location.3pool \
+    target=pool_dynamic_location.3pool
+link path=usr/share/man/man3pool/pool_strerror.3pool target=pool_error.3pool
+link path=usr/share/man/man3pool/pool_to_elem.3pool \
+    target=pool_component_to_elem.3pool
+file path=usr/share/man/man3pool/pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_free.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_get_bool.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_get_double.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_get_int64.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_get_name.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_get_string.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_get_type.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_get_uint64.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_set_bool.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_set_double.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_set_int64.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_set_name.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_set_string.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_value_set_uint64.3pool \
+    target=pool_value_alloc.3pool
+link path=usr/share/man/man3pool/pool_version.3pool \
+    target=pool_dynamic_location.3pool
+file path=usr/share/man/man3pool/pool_walk_components.3pool
+link path=usr/share/man/man3pool/pool_walk_pools.3pool \
+    target=pool_walk_components.3pool
+link path=usr/share/man/man3pool/pool_walk_properties.3pool \
+    target=pool_get_property.3pool
+link path=usr/share/man/man3pool/pool_walk_resources.3pool \
+    target=pool_walk_components.3pool
+dir  path=var group=sys variant.opensolaris.zone=global
+dir  path=var/adm/pool group=sys variant.opensolaris.zone=global
+dir  path=var/log/pool group=sys variant.opensolaris.zone=global
+driver name=pool perms="pool 0666 root sys" perms="poolctl 0666 root sys"
+legacy pkg=SUNWpool desc="core software for resource pools" \
+    name="Resource Pools"
+legacy pkg=SUNWpoolr desc="core software for resource pools (Root)" \
+    name="Resource Pools (Root)"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

@@ -1,0 +1,2059 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2018 Joyent, Inc.
+#
+
+set name=pkg.fmri value=pkg:/system/dtrace/tests@$(PKGVERS)
+set name=pkg.summary value="DTrace Test Suite"
+set name=pkg.description value="DTrace Test Suite Internal Distribution"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir  path=opt/SUNWdtrt group=sys
+file path=opt/SUNWdtrt/README mode=0444
+dir  path=opt/SUNWdtrt/bin
+dir  path=opt/SUNWdtrt/bin/$(ARCH32)
+file path=opt/SUNWdtrt/bin/$(ARCH32)/chkargs mode=0555
+dir  path=opt/SUNWdtrt/bin/$(ARCH64)
+file path=opt/SUNWdtrt/bin/$(ARCH64)/chkargs mode=0555
+file path=opt/SUNWdtrt/bin/baddof mode=0555
+file path=opt/SUNWdtrt/bin/badioctl mode=0555
+file path=opt/SUNWdtrt/bin/chkargs mode=0555
+file path=opt/SUNWdtrt/bin/dstyle mode=0555
+file path=opt/SUNWdtrt/bin/dtest mode=0555
+file path=opt/SUNWdtrt/bin/dtfailures mode=0555
+file path=opt/SUNWdtrt/bin/exception.lst mode=0444
+file path=opt/SUNWdtrt/bin/jdtrace mode=0555
+dir  path=opt/SUNWdtrt/lib
+dir  path=opt/SUNWdtrt/lib/java
+file path=opt/SUNWdtrt/lib/java/jdtrace.jar
+dir  path=opt/SUNWdtrt/tst
+dir  path=opt/SUNWdtrt/tst/$(ARCH)
+dir  path=opt/SUNWdtrt/tst/$(ARCH)/arrays
+file path=opt/SUNWdtrt/tst/$(ARCH)/arrays/tst.uregsarray.d mode=0444
+$(i386_ONLY)dir path=opt/SUNWdtrt/tst/$(ARCH)/error
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/error/tst.DTRACEFLT_DIVZERO.d \
+    mode=0444
+$(i386_ONLY)dir path=opt/SUNWdtrt/tst/$(ARCH)/funcs
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/funcs/tst.badcopyin.d mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/funcs/tst.badcopyinstr.d \
+    mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/funcs/tst.badcopyout.d mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/funcs/tst.badcopyoutstr.d \
+    mode=0444
+dir  path=opt/SUNWdtrt/tst/$(ARCH)/pid
+$(sparc_ONLY)file \
+    path=opt/SUNWdtrt/tst/$(ARCH)/pid/err.D_PROC_ALIGN.misaligned.d mode=0444
+$(sparc_ONLY)file \
+    path=opt/SUNWdtrt/tst/$(ARCH)/pid/err.D_PROC_ALIGN.misaligned.exe mode=0555
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/err.uregswrite1.d mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/err.uregswrite1.exe mode=0555
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/err.uregswrite2.d mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/err.uregswrite2.exe mode=0555
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.badinstr.d mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.badinstr.exe mode=0555
+$(sparc_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.br.d mode=0444
+$(sparc_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.br.d.out mode=0444
+$(sparc_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.br.exe mode=0555
+file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.branch.d mode=0444
+file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.branch.exe mode=0555
+file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.embedded.d mode=0444
+file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.embedded.exe mode=0555
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.ret.d mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.ret.exe mode=0555
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.retlist.exe mode=0555
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.retlist.ksh mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.uregswrite.d mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/pid/tst.uregswrite.exe mode=0555
+$(sparc_ONLY)dir path=opt/SUNWdtrt/tst/$(ARCH)/usdt
+$(sparc_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/usdt/tst.tailcall.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/$(ARCH)/ustack
+file path=opt/SUNWdtrt/tst/$(ARCH)/ustack/tst.annotated.d mode=0444
+file path=opt/SUNWdtrt/tst/$(ARCH)/ustack/tst.annotated.d.out mode=0444
+file path=opt/SUNWdtrt/tst/$(ARCH)/ustack/tst.annotated.exe mode=0555
+file path=opt/SUNWdtrt/tst/$(ARCH)/ustack/tst.circstack.d mode=0444
+file path=opt/SUNWdtrt/tst/$(ARCH)/ustack/tst.circstack.exe mode=0555
+file path=opt/SUNWdtrt/tst/$(ARCH)/ustack/tst.helper.d mode=0444
+file path=opt/SUNWdtrt/tst/$(ARCH)/ustack/tst.helper.d.out mode=0444
+file path=opt/SUNWdtrt/tst/$(ARCH)/ustack/tst.helper.exe mode=0555
+$(sparc_ONLY)file path=opt/SUNWdtrt/tst/$(ARCH)/ustack/tst.trapstat.ksh \
+    mode=0444
+dir  path=opt/SUNWdtrt/tst/common
+dir  path=opt/SUNWdtrt/tst/common/aggs
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_AGG_FUNC.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_AGG_MDIM.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_AGG_NULL.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_AGG_REDEF.redef.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.avgtoofew.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.maxnoarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.mintoofew.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.quantizetoofew.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.stddevtoofew.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.sumtoofew.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_CLEAR_AGGARG.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_CLEAR_PROTO.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_FUNC_IDENT.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_FUNC_UNDEF.badaggfunc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_IDENT_UNDEF.badexpr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_IDENT_UNDEF.badkey3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_IDENT_UNDEF.noeffect.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_KEY_TYPE.badkey1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_KEY_TYPE.badkey2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_KEY_TYPE.badkey4.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_BASETYPE.lqbad1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_BASETYPE.lqshort.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_BASEVAL.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_LIMTYPE.lqbad1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_LIMVAL.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_MATCHBASE.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_MATCHBASE.order.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_MATCHLIM.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_MATCHLIM.order.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_MATCHSTEP.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_MISMATCH.lqbadarg.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_STEPLARGE.lqtoofew.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_STEPSMALL.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_STEPTYPE.lqbadinc.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_LQUANT_STEPVAL.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_NORMALIZE_AGGARG.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_NORMALIZE_PROTO.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_NORMALIZE_SCALAR.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_ARG.lquantizetoofew.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.avgnoarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.avgtoomany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.counttoomany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.lquantizenoarg.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.lquantizetoomany.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.maxnoarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.maxtoomany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.minnoarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.mintoomany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.quantizenoarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.quantizetoomany.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.stddevnoarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.stddevtoomany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.sumnoarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.sumtoomany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_TRUNC_AGGARG.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_TRUNC_PROTO.badmany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_TRUNC_PROTO.badnone.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/err.D_TRUNC_SCALAR.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.aggencoding.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.aggencoding.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.agghist.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.agghist.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.aggpack.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.aggpack.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.aggpackbanner.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.aggpackbanner.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.aggpackzoom.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.aggpackzoom.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.aggzoom.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.aggzoom.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.allquant.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.allquant.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.avg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.avg.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.avg_neg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.avg_neg.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clear.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clear.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clearavg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clearavg.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clearavg2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clearavg2.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.cleardenormalize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.cleardenormalize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clearlquantize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clearlquantize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clearnormalize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clearnormalize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clearstddev.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.clearstddev.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.count.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.count.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.count2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.count2.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.count3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.denormalize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.denormalize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.denormalizeonly.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.denormalizeonly.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.fmtnormalize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.fmtnormalize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.forms.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.forms.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.goodkey.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.keysort.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.keysort.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.lquantize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.lquantize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.lquantnormal.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.lquantnormal.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.lquantrange.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.lquantrange.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.lquantround.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.lquantround.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.lquantzero.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.lquantzero.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.max.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.max.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.max_neg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.max_neg.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.min.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.min.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.min_neg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.min_neg.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.multiaggs1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.multiaggs2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.multiaggs2.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.multiaggs3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.multiaggs3.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.multinormalize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.multinormalize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.neglquant.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.neglquant.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.negorder.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.negorder.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.negquant.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.negquant.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.negtrunc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.negtrunc.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.negtruncquant.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.negtruncquant.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.normalize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.normalize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.order.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.order.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.quantize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.quantize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.quantmany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.quantmany.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.quantround.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.quantround.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.quantzero.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.quantzero.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.signature.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.signedkeys.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.signedkeys.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.signedkeyspos.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.signedkeyspos.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.sizedkeys.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.sizedkeys.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.stddev.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.stddev.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.stddev.normalize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.stddev.normalize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.subr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.sum.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.sum.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.trunc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.trunc.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.trunc0.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.trunc0.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.truncquant.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.truncquant.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.valsortkeypos.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.valsortkeypos.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/arithmetic
+file path=opt/SUNWdtrt/tst/common/arithmetic/err.D_DIV_ZERO.divby0.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/err.D_DIV_ZERO.divby0_1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/err.D_DIV_ZERO.divby0_2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/err.D_DIV_ZERO.modby0.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/err.D_SYNTAX.addmin.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/err.D_SYNTAX.divmin.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/err.D_SYNTAX.muladd.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/err.D_SYNTAX.muldiv.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.basics.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.basics.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.compcast.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.compcast.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.compnarrowassign.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.compnarrowassign.d.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.execcast.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.execcast.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/arithmetic/tst.nonarrow.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/arrays
+file path=opt/SUNWdtrt/tst/common/arrays/err.D_ARR_BADREF.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/err.D_DECL_ARRBIG.toobig.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/err.D_DECL_ARRNULL.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/err.D_DECL_ARRSUB.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/err.D_DECL_PROTO_TYPE.badtuple.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/err.D_IDENT_UNDEF.badureg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/tst.basic1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/tst.basic2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/tst.basic3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/tst.basic4.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/tst.basic5.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/tst.basic6.d mode=0444
+file path=opt/SUNWdtrt/tst/common/arrays/tst.uregsarray.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/assocs
+file path=opt/SUNWdtrt/tst/common/assocs/err.D_OP_INCOMPAT.dupgtype.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/err.D_OP_INCOMPAT.dupttype.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/err.D_OP_INCOMPAT.this.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/err.D_PROTO_ARG.badsig.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/err.D_PROTO_LEN.toofew.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/err.D_PROTO_LEN.toomany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/err.D_SYNTAX.errassign.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/err.tupoflow.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/tst.cpyarray.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/tst.diffprofile.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/tst.initialize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/tst.invalidref.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/tst.misc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/tst.orthogonality.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/tst.this.d mode=0444
+file path=opt/SUNWdtrt/tst/common/assocs/tst.valassign.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/begin
+file path=opt/SUNWdtrt/tst/common/begin/err.D_PDESC_ZERO.begin.d mode=0444
+file path=opt/SUNWdtrt/tst/common/begin/err.D_PDESC_ZERO.tick.d mode=0444
+file path=opt/SUNWdtrt/tst/common/begin/tst.begin.d mode=0444
+file path=opt/SUNWdtrt/tst/common/begin/tst.begin.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/begin/tst.multibegin.d mode=0444
+file path=opt/SUNWdtrt/tst/common/begin/tst.multibegin.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/bitfields
+file \
+    path=opt/SUNWdtrt/tst/common/bitfields/err.D_ADDROF_BITFIELD.BitfieldAddress.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/bitfields/err.D_DECL_BFCONST.NegBitField.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/bitfields/err.D_DECL_BFCONST.ZeroBitField.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/bitfields/err.D_DECL_BFSIZE.ExceedBaseType.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/bitfields/err.D_DECL_BFSIZE.GreaterThan64.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/bitfields/err.D_DECL_BFTYPE.badtype.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/bitfields/err.D_OFFSETOF_BITFIELD.d mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/bitfields/err.D_SIZEOF_BITFIELD.SizeofBitfield.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/bitfields/tst.BitFieldPromotion.d mode=0444
+file path=opt/SUNWdtrt/tst/common/bitfields/tst.SizeofBitField.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/buffering
+file path=opt/SUNWdtrt/tst/common/buffering/err.end.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/err.resize1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/err.resize2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/err.resize3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/err.zerobuf.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.alignring.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.cputime.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.dynvarsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.fill1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.fill1.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.resize1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.resize2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.resize3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.ring1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.ring2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.ring2.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.ring3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.ring3.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.smallring.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.switch1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/buffering/tst.switch1.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/builtinvar
+file path=opt/SUNWdtrt/tst/common/builtinvar/err.D_XLATE_NOCONV.cpuusage.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/err.D_XLATE_NOCONV.nice.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/err.D_XLATE_NOCONV.priority.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/err.D_XLATE_NOCONV.prsize.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/err.D_XLATE_NOCONV.rssize.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.arg0.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.arg0clause.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.arg1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.arg1to8.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.arg1to8clause.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.caller.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.caller1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.epid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.epid1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.errno.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.errno1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.execname.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.hpriority.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.id.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.id1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.ipl.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.ipl1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.lwpsinfo.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.lwpsinfo1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.pid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.pid1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.psinfo.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.psinfo1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.tid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.tid1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.timestamp.d mode=0444
+file path=opt/SUNWdtrt/tst/common/builtinvar/tst.vtimestamp.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/cg
+file path=opt/SUNWdtrt/tst/common/cg/err.D_NOREG.noreg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/cg/err.baddif.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/clauses
+file path=opt/SUNWdtrt/tst/common/clauses/err.D_IDENT_UNDEF.aggfun.d mode=0444
+file path=opt/SUNWdtrt/tst/common/clauses/err.D_IDENT_UNDEF.aggtup.d mode=0444
+file path=opt/SUNWdtrt/tst/common/clauses/err.D_IDENT_UNDEF.arrtup.d mode=0444
+file path=opt/SUNWdtrt/tst/common/clauses/err.D_IDENT_UNDEF.body.d mode=0444
+file path=opt/SUNWdtrt/tst/common/clauses/err.D_IDENT_UNDEF.both.d mode=0444
+file path=opt/SUNWdtrt/tst/common/clauses/err.D_IDENT_UNDEF.pred.d mode=0444
+file path=opt/SUNWdtrt/tst/common/clauses/tst.nopred.d mode=0444
+file path=opt/SUNWdtrt/tst/common/clauses/tst.pred.d mode=0444
+file path=opt/SUNWdtrt/tst/common/clauses/tst.predfirst.d mode=0444
+file path=opt/SUNWdtrt/tst/common/clauses/tst.predlast.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/cpc
+file path=opt/SUNWdtrt/tst/common/cpc/err.D_PDESC_ZERO.lowfrequency.d mode=0444
+file path=opt/SUNWdtrt/tst/common/cpc/err.D_PDESC_ZERO.malformedoverflow.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/cpc/err.D_PDESC_ZERO.nonexistentevent.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/cpc/err.cpcvscpustatpart1.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/cpc/err.cpcvscpustatpart2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/cpc/err.cputrackfailtostart.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/cpc/err.cputrackterminates.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/cpc/err.toomanyenablings.d mode=0444
+file path=opt/SUNWdtrt/tst/common/cpc/tst.allcpus.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/cpc/tst.genericevent.d mode=0444
+file path=opt/SUNWdtrt/tst/common/cpc/tst.platformevent.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/decls
+file path=opt/SUNWdtrt/tst/common/decls/err.D_DECL_LOCASSC.NonLocalAssoc.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/err.D_DECL_LONGINT.LongStruct.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/err.D_DECL_PARMCLASS.BadStorageClass.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/err.D_DECL_PROTO_NAME.VoidName.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/err.D_DECL_PROTO_TYPE.Dyn.d mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/err.D_DECL_PROTO_VARARGS.VarLenArgs.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/err.D_DECL_PROTO_VOID.NonSoleVoid.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/err.D_DECL_SIGNINT.UnsignedStruct.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/err.D_DECL_VOIDATTR.ShortVoidDecl.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/tst.arrays.d mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/tst.basics.d mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/tst.funcs.d mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/tst.pointers.d mode=0444
+file path=opt/SUNWdtrt/tst/common/decls/tst.varargsfuncs.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/drops
+file path=opt/SUNWdtrt/tst/common/drops/drp.DTRACEDROP_AGGREGATION.d mode=0444
+file path=opt/SUNWdtrt/tst/common/drops/drp.DTRACEDROP_DBLERROR.d mode=0444
+file path=opt/SUNWdtrt/tst/common/drops/drp.DTRACEDROP_DYNAMIC.d mode=0444
+file path=opt/SUNWdtrt/tst/common/drops/drp.DTRACEDROP_PRINCIPAL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/drops/drp.DTRACEDROP_PRINCIPAL.end.d mode=0444
+file path=opt/SUNWdtrt/tst/common/drops/drp.DTRACEDROP_SPEC.d mode=0444
+file path=opt/SUNWdtrt/tst/common/drops/drp.DTRACEDROP_SPECUNAVAIL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/drops/drp.DTRACEDROP_STKSTROVERFLOW.d \
+    mode=0444
+dir  path=opt/SUNWdtrt/tst/common/dtraceUtil
+file \
+    path=opt/SUNWdtrt/tst/common/dtraceUtil/err.D_PDESC_ZERO.InvalidDescription1.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.AddSearchPath.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.BufsizeGiga.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.BufsizeKilo.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.BufsizeMega.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.BufsizeTera.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DataModel32.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DataModel64.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DefineNameWithCPP.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DefineNameWithCPP.d.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DestructWithFunction.d.ksh \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DestructWithFunction.d.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DestructWithID.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DestructWithID.d.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DestructWithModule.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DestructWithModule.d.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DestructWithName.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DestructWithName.d.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DestructWithProvider.d.ksh \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DestructWithProvider.d.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.DestructWithoutW.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ELFGenerationOut.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ELFGenerationWithO.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ExitStatus1.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ExitStatus2.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ExtraneousProbeIds.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidFuncName1.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidFuncName2.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidId1.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidId2.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidId3.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidModule1.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidModule2.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidModule3.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidModule4.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidProbeIdentifier.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidProvider1.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidProvider2.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidProvider3.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidProvider4.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceFunc1.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceFunc2.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceFunc3.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceFunc4.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceFunc5.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceFunc6.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceFunc7.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceFunc8.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceFunc9.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceID1.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceID2.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceID3.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceID4.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceID5.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceID6.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceID7.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceModule1.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceModule2.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceModule3.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceModule4.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceModule5.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceModule6.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceModule7.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceModule8.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceName1.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceName2.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceName3.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceName4.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceName5.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceName6.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceName7.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceName8.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceName9.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceProvider1.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceProvider2.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceProvider3.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceProvider4.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.InvalidTraceProvider5.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.MultipleInvalidProbeId.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.PreprocessorStatement.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.QuietMode.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.QuietMode.d.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.TestCompile.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.TestCompile.d.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.UnDefineNameWithCPP.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ZeroFunctionProbes.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ZeroFunctionProbes.d.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ZeroModuleProbes.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ZeroModuleProbes.d.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ZeroNameProbes.d.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ZeroNameProbes.d.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ZeroProbeIdentfier.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ZeroProbesWithoutZ.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ZeroProviderProbes.d.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/dtraceUtil/tst.ZeroProviderProbes.d.ksh.out \
+    mode=0444
+dir  path=opt/SUNWdtrt/tst/common/end
+file path=opt/SUNWdtrt/tst/common/end/err.D_IDENT_UNDEF.timespent.d mode=0444
+file path=opt/SUNWdtrt/tst/common/end/tst.end.d mode=0444
+file path=opt/SUNWdtrt/tst/common/end/tst.endwithoutbegin.d mode=0444
+file path=opt/SUNWdtrt/tst/common/end/tst.multibeginend.d mode=0444
+file path=opt/SUNWdtrt/tst/common/end/tst.multiend.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/enum
+file path=opt/SUNWdtrt/tst/common/enum/err.D_DECL_IDRED.EnumSameName.d mode=0444
+file path=opt/SUNWdtrt/tst/common/enum/err.D_UNKNOWN.RepeatIdentifiers.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/enum/tst.EnumEquality.d mode=0444
+file path=opt/SUNWdtrt/tst/common/enum/tst.EnumSameValue.d mode=0444
+file path=opt/SUNWdtrt/tst/common/enum/tst.EnumValAssign.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/env
+file path=opt/SUNWdtrt/tst/common/env/err.D_PRAGMA_OPTSET.setfromscript.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/env/err.D_PRAGMA_OPTSET.unsetfromscript.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.ld_nolazyload.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.ld_nolazyload.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.setenv1.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.setenv1.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.setenv2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.setenv2.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.unsetenv1.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.unsetenv1.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.unsetenv2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/env/tst.unsetenv2.ksh.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/error
+file path=opt/SUNWdtrt/tst/common/error/tst.DTRACEFLT_BADADDR.d mode=0444
+file path=opt/SUNWdtrt/tst/common/error/tst.DTRACEFLT_DIVZERO.d mode=0444
+file path=opt/SUNWdtrt/tst/common/error/tst.DTRACEFLT_UNKNOWN.d mode=0444
+file path=opt/SUNWdtrt/tst/common/error/tst.error.d mode=0444
+file path=opt/SUNWdtrt/tst/common/error/tst.errorend.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/exit
+file path=opt/SUNWdtrt/tst/common/exit/err.D_PROTO_LEN.noarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/exit/err.exitarg1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/exit/tst.basic1.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/fbtprovider
+file path=opt/SUNWdtrt/tst/common/fbtprovider/err.D_PDESC_ZERO.notreturn.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/fbtprovider/tst.basic.d mode=0444
+file path=opt/SUNWdtrt/tst/common/fbtprovider/tst.functionentry.d mode=0444
+file path=opt/SUNWdtrt/tst/common/fbtprovider/tst.functionreturnvalue.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/fbtprovider/tst.ioctlargs.d mode=0444
+file path=opt/SUNWdtrt/tst/common/fbtprovider/tst.offset.d mode=0444
+file path=opt/SUNWdtrt/tst/common/fbtprovider/tst.offsetzero.d mode=0444
+file path=opt/SUNWdtrt/tst/common/fbtprovider/tst.return.d mode=0444
+file path=opt/SUNWdtrt/tst/common/fbtprovider/tst.return0.d mode=0444
+file path=opt/SUNWdtrt/tst/common/fbtprovider/tst.tailcall.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/funcs
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_FUNC_UNDEF.progenyofbad1.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_OP_VFPTR.badop.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.chillbadarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.copyoutbadarg.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.mobadarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.raisebadarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.tolower.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.toupper.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.allocanoarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.badbreakpoint.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.chilltoofew.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.chilltoomany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.copyoutstrbadarg.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.copyoutstrtoofew.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.copyouttoofew.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.copyouttoomany.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.motoofew.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.motoomany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.mtabadarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.mtatoofew.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.mtatoomany.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.panicbadarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.progenyofbad2.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.stopbadarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.tolower.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.tolowertoomany.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.toupper.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.touppertoomany.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_STRINGOF_TYPE.badstringof.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_VAR_UNDEF.badvar.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.badalloca.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.badalloca2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.badbcopy.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.badbcopy1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.badbcopy2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.badbcopy3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.badbcopy4.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.badbcopy5.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.badbcopy6.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.badchill.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.chillbadarg.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.copyout.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.copyoutbadaddr.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.copyoutstrbadaddr.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.inet_ntoa6badaddr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.inet_ntoabadaddr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.inet_ntopbadaddr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.inet_ntopbadarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.badfreopen.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.basename.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.basename.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.bcopy.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.chill.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.cleanpath.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.cleanpath.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.copyin.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.copyinto.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.ddi_pathname.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.default.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.freopen.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.ftruncate.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.ftruncate.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.hton.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.index.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.index.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.inet_ntoa.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.inet_ntoa.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.inet_ntoa6.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.inet_ntoa6.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.inet_ntop.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.inet_ntop.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.lltostr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.lltostr.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.lltostrbase.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.lltostrbase.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.mutex_owned.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.mutex_owner.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.mutex_type_adaptive.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.progenyof.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.rand.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.strchr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.strchr.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.strjoin.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.strjoin.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.strstr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.strstr.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.strtok.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.strtok.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.strtok_null.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.substr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.substr.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.substrminate.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.substrminate.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.system.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.system.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.tolower.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.toupper.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/grammar
+file path=opt/SUNWdtrt/tst/common/grammar/err.D_ADDROF_LVAL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/grammar/err.D_EMPTY.empty.d mode=0444
+file path=opt/SUNWdtrt/tst/common/grammar/tst.clauses.d mode=0444
+file path=opt/SUNWdtrt/tst/common/grammar/tst.stmts.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/include
+file path=opt/SUNWdtrt/tst/common/include/tst.includefirst.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/inline
+file path=opt/SUNWdtrt/tst/common/inline/err.D_DECL_IDRED.redef1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/inline/err.D_DECL_IDRED.redef2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/inline/err.D_IDENT_UNDEF.recur.d mode=0444
+file path=opt/SUNWdtrt/tst/common/inline/err.D_OP_INCOMPAT.baddef1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/inline/err.D_OP_INCOMPAT.baddef2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/inline/err.D_OP_INCOMPAT.badxlate.d mode=0444
+file path=opt/SUNWdtrt/tst/common/inline/tst.InlineDataAssign.d mode=0444
+file path=opt/SUNWdtrt/tst/common/inline/tst.InlineExpression.d mode=0444
+file path=opt/SUNWdtrt/tst/common/inline/tst.InlineKinds.d mode=0444
+file path=opt/SUNWdtrt/tst/common/inline/tst.InlineKinds.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/inline/tst.InlineTypedef.d mode=0444
+file path=opt/SUNWdtrt/tst/common/inline/tst.InlineWritableAssign.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/io
+file path=opt/SUNWdtrt/tst/common/io/tst.fds.d mode=0444
+file path=opt/SUNWdtrt/tst/common/io/tst.fds.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/io/tst.fds.exe mode=0555
+dir  path=opt/SUNWdtrt/tst/common/ip
+file path=opt/SUNWdtrt/tst/common/ip/get.ipv4remote.pl mode=0555
+file path=opt/SUNWdtrt/tst/common/ip/get.ipv6remote.pl mode=0555
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4localicmp.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4localicmp.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4localtcp.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4localtcp.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4localudp.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4localudp.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4remoteicmp.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4remoteicmp.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4remotetcp.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4remotetcp.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4remoteudp.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv4remoteudp.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv6localicmp.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv6localicmp.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv6remoteicmp.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.ipv6remoteicmp.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.localtcpstate.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.localtcpstate.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.remotetcpstate.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.remotetcpstate.ksh.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/java_api
+file path=opt/SUNWdtrt/tst/common/java_api/test.jar
+file path=opt/SUNWdtrt/tst/common/java_api/tst.Abort.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.Abort.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.Bean.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.Bean.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.Close.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.Close.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.Drop.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.Drop.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.Enable.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.Enable.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.FunctionLookup.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/java_api/tst.FunctionLookup.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.FunctionLookup.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.GetAggregate.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.MaxConsumers.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.MaxConsumers.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.MultiAggPrinta.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.MultiAggPrinta.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.ProbeData.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/java_api/tst.ProbeData.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.ProbeData.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.ProbeDescription.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.ProbeDescription.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.StateMachine.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.StateMachine.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.StopLock.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.StopLock.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.printa.d mode=0444
+file path=opt/SUNWdtrt/tst/common/java_api/tst.printa.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/json
+file path=opt/SUNWdtrt/tst/common/json/tst.general.d mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.general.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.strsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.strsize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.usdt.d mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.usdt.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/json/tst.usdt.exe mode=0555
+dir  path=opt/SUNWdtrt/tst/common/lexer
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_CHR_NL.char.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_CHR_NULL.char.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_INT_DIGIT.InvalidDigit.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_INT_OFLOW.BigInt.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_STR_NL.string.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.brace1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.brace2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.brack1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.brack2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.brack3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.paren1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.paren2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.paren3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/lexer/tst.D_MACRO_OFLOW.ParIntOvflow.d.ksh \
+    mode=0444
+dir  path=opt/SUNWdtrt/tst/common/llquantize
+file \
+    path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTOREVEN.nodivide.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTOREVEN.notfactor.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORMATCH.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORNSTEPS.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORSMALL.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORTYPE.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORVAL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_HIGHMATCH.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_HIGHTYPE.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_HIGHVAL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_LOWMATCH.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_LOWTYPE.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_LOWVAL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_MAGRANGE.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_MAGTOOBIG.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_NSTEPMATCH.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_NSTEPTYPE.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_NSTEPVAL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.bases.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.bases.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.basic.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.basic.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.clear.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.clear.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.multiaggs.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.multiaggs.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negorder.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negorder.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negvalue.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negvalue.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.normal.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.normal.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.range.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.range.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.steps.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.steps.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.trunc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.trunc.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/mdb
+file path=opt/SUNWdtrt/tst/common/mdb/tst.dtracedcmd.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/mib
+file path=opt/SUNWdtrt/tst/common/mib/tst.icmp.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/mib/tst.tcp.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/mib/tst.udp.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/misc
+file path=opt/SUNWdtrt/tst/common/misc/err.D_PRAGMA_OPTSET.d mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.badopt.d mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.boolopt.d mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.boolopt.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.dofmax.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.dynopt.d mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.dynopt.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.enablerace.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.haslam.d mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.include.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.macroglob.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.macroglob.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.roch.d mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.schrock.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/multiaggs
+file path=opt/SUNWdtrt/tst/common/multiaggs/err.D_PRINTA_AGGKEY.d mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/err.D_PRINTA_AGGPROTO.d mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.many.d mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.many.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.same.d mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.same.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.sort.d mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.sort.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.sortpos.d mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.sortpos.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.tuplecompat.d mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.tuplecompat.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.zero.d mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.zero.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.zero2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.zero2.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.zero3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/multiaggs/tst.zero3.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/nfs
+file path=opt/SUNWdtrt/tst/common/nfs/tst.call.d mode=0444
+file path=opt/SUNWdtrt/tst/common/nfs/tst.call.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/nfs/tst.call3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/nfs/tst.call3.exe mode=0555
+dir  path=opt/SUNWdtrt/tst/common/offsetof
+file path=opt/SUNWdtrt/tst/common/offsetof/err.D_OFFSETOF_BITFIELD.bitfield.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/err.D_OFFSETOF_TYPE.badtype.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/err.D_OFFSETOF_TYPE.notsou.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/err.D_UNKNOWN.OffsetofNULL.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/err.D_UNKNOWN.badmemb.d mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/tst.OffsetofAlias.d mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/tst.OffsetofArith.d mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/tst.OffsetofUnion.d mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/tst.struct.d mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/tst.struct.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/tst.union.d mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/tst.union.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/operators
+file path=opt/SUNWdtrt/tst/common/operators/tst.ternary.d mode=0444
+file path=opt/SUNWdtrt/tst/common/operators/tst.ternary.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/pid
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PDESC_ZERO.badlib.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PDESC_ZERO.badlib.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PDESC_ZERO.badproc1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_BADPID.badproc2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_CREATEFAIL.many.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_CREATEFAIL.many.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_FUNC.badfunc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_FUNC.badfunc.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_LIB.libdash.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_LIB.libdash.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_NAME.alldash.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_NAME.alldash.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_NAME.badname.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_NAME.badname.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_NAME.globdash.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_NAME.globdash.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_OFF.toobig.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/err.D_PROC_OFF.toobig.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/tst.addprobes.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.args1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.args1.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/tst.coverage.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.coverage.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/tst.emptystack.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.emptystack.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.emptystack.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/tst.float.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.float.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/tst.fork.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.fork.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/tst.killonerror.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.main.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.manypids.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.newprobes.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.newprobes.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.probemod.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.provregex1.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.provregex2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.provregex2.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.provregex3.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.provregex3.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.provregex4.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.provregex4.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.ret1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.ret1.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/tst.ret2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.ret2.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/tst.utf8probefunc.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.utf8probefunc.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.utf8probemod.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.utf8probemod.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.vfork.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.vfork.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/tst.weak1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.weak1.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/tst.weak2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.weak2.exe mode=0555
+dir  path=opt/SUNWdtrt/tst/common/plockstat
+file path=opt/SUNWdtrt/tst/common/plockstat/tst.available.d mode=0444
+file path=opt/SUNWdtrt/tst/common/plockstat/tst.available.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/plockstat/tst.libmap.d mode=0444
+file path=opt/SUNWdtrt/tst/common/plockstat/tst.libmap.exe mode=0555
+dir  path=opt/SUNWdtrt/tst/common/pointers
+file path=opt/SUNWdtrt/tst/common/pointers/err.BadAlign.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.D_ADDROF_VAR.ArrayVar.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.D_ADDROF_VAR.DynamicVar.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.D_ADDROF_VAR.agg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.D_DEREF_NONPTR.noptr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.D_DEREF_VOID.VoidPointerDeref.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.D_OP_ARRFUN.ArrayAssignment.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/pointers/err.D_OP_INCOMPAT.VoidPointerArith.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.D_OP_LVAL.AddressChange.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.D_OP_PTR.NonPointerAccess.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.D_OP_PTR.badpointer.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.D_OP_SOU.BadPointerAccess.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.D_OP_SOU.badpointer.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.InvalidAddress1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.InvalidAddress2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.InvalidAddress3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.InvalidAddress4.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/err.InvalidAddress5.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.ArrayPointer1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.ArrayPointer2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.ArrayPointer3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.GlobalVar.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.IntegerArithmetic1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.PointerArithmetic1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.PointerArithmetic2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.PointerArithmetic3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.PointerAssignment.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.ValidPointer1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.ValidPointer2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.VoidCast.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.assigncast1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.assigncast2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.basic1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pointers/tst.basic2.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/pragma
+file path=opt/SUNWdtrt/tst/common/pragma/err.D_PRAGERR.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/err.D_PRAGMA_DEPEND.main.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/err.D_PRAGMA_INVAL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/err.D_PRAGMA_MALFORM.d mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/err.D_PRAGMA_UNUSED.UnusedPragma.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/err.circlibdep.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/err.invalidlibdep.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/tst.libchain.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/tst.libdep.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/tst.libdepfullyconnected.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/tst.libdepsepdir.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/tst.temporal.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/tst.temporal2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/tst.temporal3.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/predicates
+file path=opt/SUNWdtrt/tst/common/predicates/err.D_PRED_SCALAR.NonScalarPred.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/predicates/err.D_SYNTAX.invalid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/predicates/err.D_SYNTAX.operr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/predicates/tst.argsnotcached.d mode=0444
+file path=opt/SUNWdtrt/tst/common/predicates/tst.basics.d mode=0444
+file path=opt/SUNWdtrt/tst/common/predicates/tst.basics.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/predicates/tst.complex.d mode=0444
+file path=opt/SUNWdtrt/tst/common/predicates/tst.complex.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/preprocessor
+file path=opt/SUNWdtrt/tst/common/preprocessor/err.D_IDENT_UNDEF.afterprobe.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/err.D_PRAGCTL_INVAL.tabdefine.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/err.D_SYNTAX.withoutpound.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/err.defincomp.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/err.ifdefelsenotendif.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/err.ifdefincomp.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/err.ifdefnotendif.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/err.incompelse.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/err.mulelse.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.ifdef.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.ifdef.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.ifndef.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.ifndef.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.ifnotdef.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.ifnotdef.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.logicaland.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.logicaland.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.logicalandor.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.logicalandor.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.logicalor.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.logicalor.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.muland.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.muland.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.mulor.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.mulor.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.precondi.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.precondi.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.predicatedeclare.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.preexp.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.preexp.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.preexpelse.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.preexpelse.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.preexpif.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.preexpif.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.preexpifelse.d mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.preexpifelse.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/preprocessor/tst.withinprobe.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/print
+file path=opt/SUNWdtrt/tst/common/print/err.D_PRINT_AGG.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/err.D_PRINT_VOID.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/err.D_PROTO_LEN.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.array.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.array.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.bitfield.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.bitfield.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.dyn.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.enum.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.enum.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.primitive.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.primitive.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.struct.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.struct.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.xlate.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.xlate.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/printa
+file path=opt/SUNWdtrt/tst/common/printa/err.D_PRINTA_AGGARG.badagg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/err.D_PRINTA_AGGARG.badfmt.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/err.D_PRINTA_AGGARG.badval.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/err.D_PRINTA_PROTO.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/err.D_PRINTF_ARG_TYPE.jstack.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/err.D_PRINTF_ARG_TYPE.stack.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/err.D_PRINTF_ARG_TYPE.ustack.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.basics.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.basics.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.def.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.def.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.dynwidth.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.dynwidth.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.fmt.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.fmt.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.largeusersym.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.many.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.manyval.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.manyval.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.stack.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.tuple.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.tuple.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.walltimestamp.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/printa/tst.walltimestamp.ksh.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/printf
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PRINTF_AGG_CONV.aggfmt.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PRINTF_ARG_EXTRA.toomany.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PRINTF_ARG_EXTRA.widths.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PRINTF_ARG_FMT.badfmt.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PRINTF_ARG_PROTO.novalue.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PRINTF_ARG_TYPE.aggarg.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PRINTF_ARG_TYPE.recursive.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PRINTF_DYN_PROTO.noprec.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PRINTF_DYN_PROTO.nowidth.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PRINTF_DYN_TYPE.badprec.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PRINTF_DYN_TYPE.badwidth.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_PROTO_LEN.toofew.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_SYNTAX.badconv1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_SYNTAX.badconv2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/err.D_SYNTAX.badconv3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.basics.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.basics.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.flags.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.flags.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.hello.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.hello.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.ints.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.ints.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.precs.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.precs.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.print-f.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.print-f.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.printT.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.printT.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.printY.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.printY.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.printcont.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.printcont.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.printeE.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.printeE.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.printgG.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.printgG.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.rawfmt.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.rawfmt.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.signs.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.signs.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.str.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.str.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.sym.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.sym.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.uints.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.uints.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.widths.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.widths.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.widths1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.wp.d mode=0444
+file path=opt/SUNWdtrt/tst/common/printf/tst.wp.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/privs
+file path=opt/SUNWdtrt/tst/common/privs/tst.fds.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.func_access.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.getf.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.kpriv.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.noprivdrop.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.noprivrestrict.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.op_access.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.procpriv.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.providers.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.tick.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.unpriv_funcs.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/probes
+file path=opt/SUNWdtrt/tst/common/probes/err.D_PDESC_ZERO.probeqtn.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/err.D_PDESC_ZERO.probestar.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/err.D_PDESC_ZERO.tickstar.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/err.D_SYNTAX.assign.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/err.D_SYNTAX.declare.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/err.D_SYNTAX.declarein.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/err.D_SYNTAX.lbraces.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/err.D_SYNTAX.probespec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/err.D_SYNTAX.rbraces.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/err.D_SYNTAX.recdec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/tst.basic1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/tst.check.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/tst.declare.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/tst.declareafter.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/tst.emptyprobe.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/tst.pragma.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/tst.pragmaaftertab.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/tst.pragmainside.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/tst.pragmaoutside.d mode=0444
+file path=opt/SUNWdtrt/tst/common/probes/tst.probestar.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/proc
+file path=opt/SUNWdtrt/tst/common/proc/tst.create.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/proc/tst.discard.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/proc/tst.exec.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/proc/tst.execfail.ENOENT.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/proc/tst.execfail.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/proc/tst.exitcore.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/proc/tst.exitexit.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/proc/tst.exitkilled.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/proc/tst.signal.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/proc/tst.sigwait.d mode=0444
+file path=opt/SUNWdtrt/tst/common/proc/tst.sigwait.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/proc/tst.startexit.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/profile-n
+file path=opt/SUNWdtrt/tst/common/profile-n/err.D_PDESC_ZERO.profile.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/err.D_PDESC_ZEROonens.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/err.D_PDESC_ZEROonensec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/err.D_PDESC_ZEROoneus.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/err.D_PDESC_ZEROoneusec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.argtest.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.argtest.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.basic.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.basic.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.func.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.mod.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilehz.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilehz.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilems.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilems.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilemsec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilemsec.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilenhz.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilenhz.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilens.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilens.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilensec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilensec.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profiles.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profiles.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilesec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profilesec.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profileus.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profileus.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profileusec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.profileusec.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.sym.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.ufunc.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.ufuncsort.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.ufuncsort.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.ufuncsort.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.umod.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/profile-n/tst.usym.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/providers
+file path=opt/SUNWdtrt/tst/common/providers/err.D_PDESC_INVAL.wrongdec4.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/err.D_PDESC_ZERO.nonprofile.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/err.D_PDESC_ZERO.wrongdec1.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/err.D_PDESC_ZERO.wrongdec2.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/err.D_PDESC_ZERO.wrongdec3.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.basics.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.basics.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.beginexit.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.beginprof.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.beginprof.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.probattrs.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.probattrs.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.probefunc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.probefunc.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.probemod.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.probemod.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.probename.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.probename.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.probprov.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.probprov.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.profend.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.profend.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.profexit.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.profexit.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.trace.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.trace.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.twoprof.d mode=0444
+file path=opt/SUNWdtrt/tst/common/providers/tst.twoprof.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/raise
+file path=opt/SUNWdtrt/tst/common/raise/tst.raise1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/raise/tst.raise1.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/raise/tst.raise2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/raise/tst.raise2.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/raise/tst.raise3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/raise/tst.raise3.exe mode=0555
+dir  path=opt/SUNWdtrt/tst/common/rates
+file path=opt/SUNWdtrt/tst/common/rates/tst.aggrate.d mode=0444
+file path=opt/SUNWdtrt/tst/common/rates/tst.aggrate.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/rates/tst.statusrate.d mode=0444
+file path=opt/SUNWdtrt/tst/common/rates/tst.switchrate.d mode=0444
+file path=opt/SUNWdtrt/tst/common/rates/tst.switchrate.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/safety
+file path=opt/SUNWdtrt/tst/common/safety/tst.basename.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.caller.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.cleanpath.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.copyin.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.copyin2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.ddi_pathname.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.dirname.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.errno.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.execname.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.gid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.hton.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.index.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.msgdsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.msgsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.null.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.pid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.ppid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.progenyof.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.random.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.rw.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.shortstr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.stack.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.stackdepth.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.stddev.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.strchr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.strjoin.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.strstr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.strtok.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.substr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.ucaller.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.uid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.unalign.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.uregs.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.ustack.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.ustackdepth.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.vahole.d mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.violentdeath.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/safety/tst.zonename.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/scalars
+file path=opt/SUNWdtrt/tst/common/scalars/err.D_ARR_LOCAL.thisarray.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/err.D_DECL_CLASS.selfthis.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/err.D_DECL_CLASS.thisself.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/err.D_DECL_IDRED.errval.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/err.D_OP_INCOMPAT.dec.err.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/err.D_OP_INCOMPAT.dupgtype.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/err.D_OP_INCOMPAT.dupltype.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/err.D_OP_INCOMPAT.dupttype.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/err.D_SYNTAX.declare.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/err.bigglobal.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/err.biglocal.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.16kglobal.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.16klocal.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.basicvar.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.basicvar.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.localvar.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.misc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.self.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.selfarray.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.selfarray2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.selfthis.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.this.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scalars/tst.thisself.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/sched
+file path=opt/SUNWdtrt/tst/common/sched/tst.enqueue.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sched/tst.oncpu.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sched/tst.stackdepth.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/scripting
+file path=opt/SUNWdtrt/tst/common/scripting/err.D_MACRO_UNDEF.invalidargs.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/err.D_OP_LVAL.rdonly.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/err.D_OP_WRITE.usepidmacro.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/err.D_SYNTAX.concat.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/err.D_SYNTAX.desc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/err.D_SYNTAX.inval.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/err.D_SYNTAX.pid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.D_MACRO_UNUSED.overflow.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.arg0.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.arguments.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.assign.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.basic.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.egid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.egid.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.euid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.euid.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.gid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.gid.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.pgid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.pid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.ppid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.ppid.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.projid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.projid.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.quite.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.sid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.sid.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.stringmacro.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.taskid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.taskid.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.trace.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.uid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/scripting/tst.uid.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/sdt
+file path=opt/SUNWdtrt/tst/common/sdt/tst.sdtargs.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sdt/tst.sdtargs.exe mode=0555
+dir  path=opt/SUNWdtrt/tst/common/sizeof
+file path=opt/SUNWdtrt/tst/common/sizeof/err.D_IDENT_BADREF.SizeofAssoc.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/err.D_IDENT_UNDEF.UnknownSymbol.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/err.D_SIZEOF_TYPE.badstruct.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/err.D_SIZEOF_TYPE.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/err.D_SYNTAX.SizeofBadType.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/tst.SizeofArray.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/tst.SizeofDataTypes.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/tst.SizeofExpression.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/tst.SizeofNULL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/tst.SizeofStrConst.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/tst.SizeofStrConst.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/tst.SizeofString1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/tst.SizeofString1.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/tst.SizeofString2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/tst.SizeofString2.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/speculation
+file path=opt/SUNWdtrt/tst/common/speculation/err.BufSizeVariations1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.BufSizeVariations2.d mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_ACT_SPEC.SpeculateWithBreakPoint.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_ACT_SPEC.SpeculateWithChill.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_ACT_SPEC.SpeculateWithCopyOut.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_ACT_SPEC.SpeculateWithCopyOutStr.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_ACT_SPEC.SpeculateWithPanic.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_ACT_SPEC.SpeculateWithRaise.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_ACT_SPEC.SpeculateWithStop.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.D_AGG_COMM.AggAftCommit.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithAvg.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithCount.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithLquant.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithMax.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithMin.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithQuant.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithStddev.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithSum.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_COMM_COMM.CommitAftCommit.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.D_COMM_COMM.DisjointCommit.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_COMM_DREC.CommitAftDataRec.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_DREC_COMM.DataRecAftCommit.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_DREC_COMM.ExitAfterCommit.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.D_EXIT_SPEC.ExitAftSpec.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.D_PRAGMA_MALFORM.NspecExpr.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_PRAGMA_OPTSET.HugeNspecValue.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_PRAGMA_OPTSET.InvalidSpecSize.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/speculation/err.D_PRAGMA_OPTSET.NegSpecSize.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.D_PROTO_LEN.SpecNoId.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.D_SPEC_COMM.SpecAftCommit.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.D_SPEC_DREC.SpecAftDataRec.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.D_SPEC_SPEC.SpecAftSpec.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.NegativeBufSize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.NegativeNspec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.NegativeSpecSize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.SpecSizeVariations1.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/err.SpecSizeVariations2.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.CommitAfterDiscard.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.CommitWithZero.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.DataRecAftDiscard.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.DiscardAftCommit.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.DiscardAftDataRec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.DiscardAftDiscard.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.DiscardWithZero.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.ExitAftDiscard.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.NoSpecBuffer.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.SpecSizeVariations1.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.SpecSizeVariations2.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.SpecSizeVariations3.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.SpeculateWithRandom.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.SpeculationCommit.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.SpeculationDiscard.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.SpeculationID.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.SpeculationWithZero.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.TwoSpecBuffers.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.negcommit.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.negspec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/speculation/tst.zerosize.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/stability
+file path=opt/SUNWdtrt/tst/common/stability/err.D_ATTR_MIN.MinAttributes.d \
+    mode=0444
+dir  path=opt/SUNWdtrt/tst/common/stack
+file path=opt/SUNWdtrt/tst/common/stack/err.D_STACK_PROTO.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/stack/err.D_STACK_SIZE.d mode=0444
+file path=opt/SUNWdtrt/tst/common/stack/err.D_USTACK_FRAMES.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/stack/err.D_USTACK_PROTO.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/stack/err.D_USTACK_STRSIZE.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/stack/tst.default.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/stackdepth
+file path=opt/SUNWdtrt/tst/common/stackdepth/tst.default.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/stop
+file path=opt/SUNWdtrt/tst/common/stop/tst.stop1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/stop/tst.stop1.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/stop/tst.stop2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/stop/tst.stop2.exe mode=0555
+dir  path=opt/SUNWdtrt/tst/common/strlen
+file path=opt/SUNWdtrt/tst/common/strlen/tst.strlen1.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/strtoll
+file path=opt/SUNWdtrt/tst/common/strtoll/err.BaseTooLarge.d mode=0444
+file path=opt/SUNWdtrt/tst/common/strtoll/err.BaseTooSmall.d mode=0444
+file path=opt/SUNWdtrt/tst/common/strtoll/tst.strtoll.d mode=0444
+file path=opt/SUNWdtrt/tst/common/strtoll/tst.strtoll.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/struct
+file path=opt/SUNWdtrt/tst/common/struct/err.D_ADDROF_VAR.StructPointer.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/err.D_DECL_COMBO.StructWithoutColon.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/struct/err.D_DECL_COMBO.StructWithoutColon1.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/err.D_DECL_INCOMPLETE.circular.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/err.D_DECL_INCOMPLETE.order.d mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/err.D_DECL_INCOMPLETE.order2.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/err.D_DECL_INCOMPLETE.recursive.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/err.D_DECL_INCOMPLETE.simple.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/err.D_DECL_VOIDOBJ.baddec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/err.D_PROTO_ARG.DupStructAssoc.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/tst.StructAssoc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/tst.StructDataTypes.d mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/tst.StructInside.d mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/tst.clauselocal.d mode=0444
+file path=opt/SUNWdtrt/tst/common/struct/tst.clauselocal.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/sugar
+file path=opt/SUNWdtrt/tst/common/sugar/tst.else.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if_before_after.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if_nested.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if_trailing_semicolon.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sugar/tst.if_trailing_semicolon2.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/syscall
+file path=opt/SUNWdtrt/tst/common/syscall/tst.args.d mode=0444
+file path=opt/SUNWdtrt/tst/common/syscall/tst.args.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/syscall/tst.openret.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/sysevent
+file path=opt/SUNWdtrt/tst/common/sysevent/tst.post.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sysevent/tst.post.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/sysevent/tst.post_chan.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sysevent/tst.post_chan.exe mode=0555
+dir  path=opt/SUNWdtrt/tst/common/threadname
+file path=opt/SUNWdtrt/tst/common/threadname/tst.threadname.d mode=0444
+file path=opt/SUNWdtrt/tst/common/threadname/tst.threadname.exe mode=0555
+dir  path=opt/SUNWdtrt/tst/common/tick-n
+file path=opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZERO.tick.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZEROonens.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZEROonensec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZEROoneus.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZEROoneusec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickarg0.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickms.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickms.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickmsec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickmsec.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickns.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickns.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.ticknsec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.ticknsec.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.ticks.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.ticks.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.ticksec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.ticksec.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickus.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickus.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickusec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tick-n/tst.tickusec.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/trace
+file path=opt/SUNWdtrt/tst/common/trace/err.D_PROTO_LEN.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/trace/err.D_TRACE_AGG.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/trace/err.D_TRACE_VOID.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/trace/tst.dyn.d mode=0444
+file path=opt/SUNWdtrt/tst/common/trace/tst.misc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/trace/tst.qstring.d mode=0444
+file path=opt/SUNWdtrt/tst/common/trace/tst.qstring.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/trace/tst.string.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/tracemem
+file path=opt/SUNWdtrt/tst/common/tracemem/err.D_PROTO_ARG.badsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/err.D_PROTO_LEN.toofew.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_ADDR.badaddr.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_ARGS.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_DYNSIZE.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_SIZE.negsize.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_SIZE.zerosize.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.dynsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.dynsize.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.rootvp.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.smallsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.smallsize.d.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/translators
+file \
+    path=opt/SUNWdtrt/tst/common/translators/err.D_DECL_TYPERED.BadTransDecl.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/translators/err.D_OP_INCOMPLETE.NonExistentInput1.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/err.D_SYNTAX.BadTransDecl1.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/err.D_SYNTAX.BadTransDecl3.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/err.D_SYNTAX.BadTransDecl4.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/translators/err.D_TYPE_MEMBER.NonExistentInput2.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/translators/err.D_XLATE_INCOMPAT.BadInputType1.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/translators/err.D_XLATE_MEMB.NonExistentOutput2.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/err.D_XLATE_NONE.BadTransDecl6.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/translators/err.D_XLATE_REDECL.RepeatTransDecl.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/err.D_XLATE_SOU.BadTransDecl8.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/err.D_XLATE_SOU.BadTransInt.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/translators/err.D_XLATE_SOU.NonExistentOutput1.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.CircularTransDecl.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.EmptyTransDecl.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.ForwardTag.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.InputAliasTrans.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.InputIntTrans.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.OutputAliasTrans.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.PartialDereferencing.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.PartialOutputTransDefn.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.ProcModelTrans.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.RepeatDeclaration.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.SimultaneousTranslators.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.StructureAssignment.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TestTransStability1.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TestTransStability1.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TestTransStability2.ksh \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TestTransStability2.ksh.out \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TransNonPointer.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TransOutputPointer.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TransPointer.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.TranslateSelf.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.UnionInputTrans.d mode=0444
+file path=opt/SUNWdtrt/tst/common/translators/tst.UnionOutputTrans.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/typedef
+file path=opt/SUNWdtrt/tst/common/typedef/err.D_DECL_IDRED.DupTypeDef.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/typedef/err.D_SYNTAX.BadExistingTypedef.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/typedef/err.D_SYNTAX.TypedefInClause.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/typedef/tst.ChainTypedef.d mode=0444
+file path=opt/SUNWdtrt/tst/common/typedef/tst.TypedefDataAssign.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/types
+file path=opt/SUNWdtrt/tst/common/types/err.D_CAST_INVAL.badcast.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_CG_DYN.ResultDynType.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_CHR_OFLOW.charconst.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_BADCLASS.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_CHARATTR.badtype3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_COMBO.badtype4.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_COMBO.badtype5.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_COMBO.rptdattr1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_COMBO.rptdattr2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_COMBO.rptdattr3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_COMBO.rptdattr4.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_COMBO.rptdattr5.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_ENCONST.badeval.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_ENOFLOW.enoflow.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_ENOFLOW.enuflow.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_SCOPE.scopeop.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_DECL_USELESS.baddec.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_OP_ACT.badcond.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_OP_ARITH.badoperand.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_OP_INCOMPAT.badassign.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_OP_INT.badbitop.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_OP_INT.badshift.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_OP_SCALAR.badcond.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_OP_SCALAR.badincop.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_OP_SCALAR.badlogop.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_PROTO_LEN.badcond1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_SYNTAX.badenum.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_SYNTAX.badid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_SYNTAX.badstruct.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_UNKNOWN.badtype1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_UNKNOWN.badtype2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_UNKNOWN.dupenum.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_UNKNOWN.dupstruct.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.D_XLATE_REDECL.ResultDynType.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.EDT_NOTYPE.cmbdatt1.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/err.EDT_NOTYPE.cmbdatt2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.assignops.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.badshiftops.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.basics.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.basics.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.bitops.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.charconstants.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.complex.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.condexpr.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.const.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.constants.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.conv.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.enum.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.intincop.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.intops.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.inttypes.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.ptrincop.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.ptrops.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.relenum.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.relstring.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.shiftops.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.stringconstants.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.struct.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.typedef.d mode=0444
+file path=opt/SUNWdtrt/tst/common/types/tst.unaryop.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/uctf
+file path=opt/SUNWdtrt/tst/common/uctf/err.invalidpid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/err.invalidpid2.d mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/err.invalidpid3.d mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/err.invalidtype.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/err.invalidtype2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/err.user64mode.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.aouttype.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/uctf/tst.aouttype.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.chasestrings.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/uctf/tst.chasestrings.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.chasestrings.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.libtype.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/uctf/tst.libtype.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.linkmap.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.pidprint.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.pidprinttarg.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.printtype.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/uctf/tst.printtype.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.printtype.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.printtypetarg.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.userlandkey.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.userlandkey.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.userstrings.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/uctf/tst.userstrings.ksh.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/union
+file path=opt/SUNWdtrt/tst/common/union/err.D_ADDROF_VAR.UnionPointer.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/union/err.D_DECL_COMBO.UnionWithoutColon.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/union/err.D_DECL_COMBO.UnionWithoutColon1.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/union/err.D_DECL_INCOMPLETE.circular.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/union/err.D_DECL_INCOMPLETE.order.d mode=0444
+file path=opt/SUNWdtrt/tst/common/union/err.D_DECL_INCOMPLETE.recursive.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/union/err.D_DECL_INCOMPLETE.simple.d mode=0444
+file path=opt/SUNWdtrt/tst/common/union/err.D_PROTO_ARG.DupUnionAssoc.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/union/tst.UnionAssoc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/union/tst.UnionDataTypes.d mode=0444
+file path=opt/SUNWdtrt/tst/common/union/tst.UnionInside.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/usdt
+file path=opt/SUNWdtrt/tst/common/usdt/tst.andpid.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.argmap.d mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.argmap.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/usdt/tst.args.d mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.args.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/usdt/tst.badguess.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.corruptenv.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.deadstub.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.dlclose1.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.dlclose1.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.dlclose2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.dlclose2.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.dlclose3.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.eliminate.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.enabled.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.enabled.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.enabled2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.enabled2.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.entryreturn.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.entryreturn.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.fork.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.fork.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.forker.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/usdt/tst.forker.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.guess32.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.guess64.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.header.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.include.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.lazyprobe.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/usdt/tst.lazyprobe1.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.lazyprobe2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.linkpriv.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.linkunpriv.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.multiple.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.multiple.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.multiprov.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.multiprov.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.nodtrace.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.noprobes.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.noreap.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.noreapring.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.onlyenabled.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.reap.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.reeval.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.sameprovmulti.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.sameprovmulti.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.static.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.static.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.static2.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.static2.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.user.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.user.ksh.out mode=0444
+dir  path=opt/SUNWdtrt/tst/common/ustack
+file path=opt/SUNWdtrt/tst/common/ustack/tst.bigstack.d mode=0444
+file path=opt/SUNWdtrt/tst/common/ustack/tst.bigstack.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/ustack/tst.depth.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ustack/tst.spin.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/ustack/tst.spin.ksh mode=0444
+dir  path=opt/SUNWdtrt/tst/common/vars
+file path=opt/SUNWdtrt/tst/common/vars/tst.gid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/vars/tst.nullassign.d mode=0444
+file path=opt/SUNWdtrt/tst/common/vars/tst.ppid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/vars/tst.ucaller.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/vars/tst.ucaller.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/vars/tst.uid.d mode=0444
+file path=opt/SUNWdtrt/tst/common/vars/tst.walltimestamp.d mode=0444
+dir  path=opt/SUNWdtrt/tst/common/version
+file path=opt/SUNWdtrt/tst/common/version/tst.1.0.d mode=0444
+$(i386_ONLY)dir path=opt/SUNWdtrt/tst/i86xpv
+$(i386_ONLY)dir path=opt/SUNWdtrt/tst/i86xpv/xdt
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/i86xpv/xdt/tst.basic.ksh mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/i86xpv/xdt/tst.hvmenable.ksh mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/i86xpv/xdt/tst.memenable.ksh mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/i86xpv/xdt/tst.schedargs.ksh mode=0444
+$(i386_ONLY)file path=opt/SUNWdtrt/tst/i86xpv/xdt/tst.schedenable.ksh mode=0444
+legacy pkg=SUNWdtrt category=internal \
+    desc="DTrace Test Suite Internal Distribution" \
+    hotline="Contact the DTrace discussion forum" name="DTrace Test Suite"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+depend type=require fmri=runtime/java
+depend type=require fmri=runtime/java/runtime64

@@ -1,0 +1,138 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/network/udapl@$(PKGVERS)
+set name=pkg.summary value="Sun User Direct Access Programming Library (User)"
+set name=pkg.description value="Sun DAT registry library and datadm"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Libraries
+set name=variant.arch value=$(ARCH)
+dir  path=etc group=sys
+dir  path=etc/dat group=sys
+file path=etc/dat/dat.conf group=sys original_name=SUNWudapl:etc/dat/dat.conf \
+    preserve=true
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libdat.so target=libdat.so.1
+file path=usr/lib/$(ARCH64)/libdat.so.1
+link path=usr/lib/libdat.so target=libdat.so.1
+file path=usr/lib/libdat.so.1
+dir  path=usr/sbin
+file path=usr/sbin/datadm mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/datadm.1m
+dir  path=usr/share/man/man3dat
+file path=usr/share/man/man3dat/dat_cno_create.3dat
+file path=usr/share/man/man3dat/dat_cno_free.3dat
+file path=usr/share/man/man3dat/dat_cno_modify_agent.3dat
+file path=usr/share/man/man3dat/dat_cno_query.3dat
+file path=usr/share/man/man3dat/dat_cno_wait.3dat
+file path=usr/share/man/man3dat/dat_cr_accept.3dat
+file path=usr/share/man/man3dat/dat_cr_handoff.3dat
+file path=usr/share/man/man3dat/dat_cr_query.3dat
+file path=usr/share/man/man3dat/dat_cr_reject.3dat
+file path=usr/share/man/man3dat/dat_ep_connect.3dat
+file path=usr/share/man/man3dat/dat_ep_create.3dat
+file path=usr/share/man/man3dat/dat_ep_create_with_srq.3dat
+file path=usr/share/man/man3dat/dat_ep_disconnect.3dat
+file path=usr/share/man/man3dat/dat_ep_dup_connect.3dat
+file path=usr/share/man/man3dat/dat_ep_free.3dat
+file path=usr/share/man/man3dat/dat_ep_get_status.3dat
+file path=usr/share/man/man3dat/dat_ep_modify.3dat
+file path=usr/share/man/man3dat/dat_ep_post_rdma_read.3dat
+file path=usr/share/man/man3dat/dat_ep_post_rdma_write.3dat
+file path=usr/share/man/man3dat/dat_ep_post_recv.3dat
+file path=usr/share/man/man3dat/dat_ep_post_send.3dat
+file path=usr/share/man/man3dat/dat_ep_query.3dat
+file path=usr/share/man/man3dat/dat_ep_recv_query.3dat
+file path=usr/share/man/man3dat/dat_ep_reset.3dat
+file path=usr/share/man/man3dat/dat_ep_set_watermark.3dat
+file path=usr/share/man/man3dat/dat_evd_clear_unwaitable.3dat
+file path=usr/share/man/man3dat/dat_evd_dequeue.3dat
+file path=usr/share/man/man3dat/dat_evd_disable.3dat
+file path=usr/share/man/man3dat/dat_evd_enable.3dat
+file path=usr/share/man/man3dat/dat_evd_free.3dat
+file path=usr/share/man/man3dat/dat_evd_modify_cno.3dat
+file path=usr/share/man/man3dat/dat_evd_post_se.3dat
+file path=usr/share/man/man3dat/dat_evd_query.3dat
+file path=usr/share/man/man3dat/dat_evd_resize.3dat
+file path=usr/share/man/man3dat/dat_evd_set_unwaitable.3dat
+file path=usr/share/man/man3dat/dat_evd_wait.3dat
+file path=usr/share/man/man3dat/dat_get_consumer_context.3dat
+file path=usr/share/man/man3dat/dat_get_handle_type.3dat
+file path=usr/share/man/man3dat/dat_ia_close.3dat
+file path=usr/share/man/man3dat/dat_ia_open.3dat
+file path=usr/share/man/man3dat/dat_ia_query.3dat
+file path=usr/share/man/man3dat/dat_lmr_create.3dat
+file path=usr/share/man/man3dat/dat_lmr_free.3dat
+file path=usr/share/man/man3dat/dat_lmr_query.3dat
+file path=usr/share/man/man3dat/dat_lmr_sync_rdma_read.3dat
+file path=usr/share/man/man3dat/dat_lmr_sync_rdma_write.3dat
+file path=usr/share/man/man3dat/dat_provider_fini.3dat
+file path=usr/share/man/man3dat/dat_provider_init.3dat
+file path=usr/share/man/man3dat/dat_psp_create.3dat
+file path=usr/share/man/man3dat/dat_psp_create_any.3dat
+file path=usr/share/man/man3dat/dat_psp_free.3dat
+file path=usr/share/man/man3dat/dat_psp_query.3dat
+file path=usr/share/man/man3dat/dat_pz_create.3dat
+file path=usr/share/man/man3dat/dat_pz_free.3dat
+file path=usr/share/man/man3dat/dat_pz_query.3dat
+file path=usr/share/man/man3dat/dat_registry_add_provider.3dat
+file path=usr/share/man/man3dat/dat_registry_list_providers.3dat
+file path=usr/share/man/man3dat/dat_registry_remove_provider.3dat
+file path=usr/share/man/man3dat/dat_rmr_bind.3dat
+file path=usr/share/man/man3dat/dat_rmr_create.3dat
+file path=usr/share/man/man3dat/dat_rmr_free.3dat
+file path=usr/share/man/man3dat/dat_rmr_query.3dat
+file path=usr/share/man/man3dat/dat_rsp_create.3dat
+file path=usr/share/man/man3dat/dat_rsp_free.3dat
+file path=usr/share/man/man3dat/dat_rsp_query.3dat
+file path=usr/share/man/man3dat/dat_set_consumer_context.3dat
+file path=usr/share/man/man3dat/dat_srq_create.3dat
+file path=usr/share/man/man3dat/dat_srq_free.3dat
+file path=usr/share/man/man3dat/dat_srq_post_recv.3dat
+file path=usr/share/man/man3dat/dat_srq_query.3dat
+file path=usr/share/man/man3dat/dat_srq_resize.3dat
+file path=usr/share/man/man3dat/dat_srq_set_lw.3dat
+file path=usr/share/man/man3dat/dat_strerror.3dat
+dir  path=usr/share/man/man3lib
+file path=usr/share/man/man3lib/libdat.3lib
+dir  path=usr/share/man/man4
+file path=usr/share/man/man4/dat.conf.4
+legacy pkg=SUNWudaplr desc="DAT static registry file" \
+    name="Sun User Direct Access Programming Library (Root)"
+legacy pkg=SUNWudaplu desc="Sun DAT registry library and datadm" \
+    name="Sun User Direct Access Programming Library (User)"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

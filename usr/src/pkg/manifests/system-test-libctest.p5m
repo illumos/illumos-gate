@@ -1,0 +1,257 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2015 Garrett D'Amore <garrett@damore.org>
+# Copyright 2018 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+#
+
+set name=pkg.fmri value=pkg:/system/test/libctest@$(PKGVERS)
+set name=pkg.summary value="C Library Unit Test Suite"
+set name=pkg.description value="C library Unit Tests"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir  path=opt/libc-tests
+file path=opt/libc-tests/README mode=0444
+dir  path=opt/libc-tests/bin
+file path=opt/libc-tests/bin/libctest mode=0555
+dir  path=opt/libc-tests/cfg
+file path=opt/libc-tests/cfg/README mode=0444
+file path=opt/libc-tests/cfg/compilation.cfg mode=0444
+dir  path=opt/libc-tests/cfg/symbols
+file path=opt/libc-tests/cfg/symbols/README mode=0444
+file path=opt/libc-tests/cfg/symbols/assert_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/ctype_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/dirent_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/fcntl_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/locale_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/math_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/netdb_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/pthread_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/signal_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/stdalign_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/stddef_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/stdio_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/stdlib_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/stdnoreturn_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/string_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/strings_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/sys_stat_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/sys_time_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/sys_timeb_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/threads_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/time_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/ucontext_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/unistd_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/wchar_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/wctype_h.cfg mode=0444
+dir  path=opt/libc-tests/runfiles
+file path=opt/libc-tests/runfiles/default.run mode=0444
+dir  path=opt/libc-tests/tests
+file path=opt/libc-tests/tests/aligned_alloc.32 mode=0555
+file path=opt/libc-tests/tests/aligned_alloc.64 mode=0555
+file path=opt/libc-tests/tests/c11_threads.32 mode=0555
+file path=opt/libc-tests/tests/c11_threads.64 mode=0555
+file path=opt/libc-tests/tests/c11_tss.32 mode=0555
+file path=opt/libc-tests/tests/c11_tss.64 mode=0555
+file path=opt/libc-tests/tests/call_once.32 mode=0555
+file path=opt/libc-tests/tests/call_once.64 mode=0555
+file path=opt/libc-tests/tests/catopen mode=0555
+file path=opt/libc-tests/tests/endian.32 mode=0555
+file path=opt/libc-tests/tests/endian.64 mode=0555
+file path=opt/libc-tests/tests/env-7076.32 mode=0555
+file path=opt/libc-tests/tests/env-7076.64 mode=0555
+file path=opt/libc-tests/tests/fnmatch.32 mode=0555
+file path=opt/libc-tests/tests/fnmatch.64 mode=0555
+file path=opt/libc-tests/tests/fpround_test mode=0555
+file path=opt/libc-tests/tests/fpround_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/fpround_test.$(ARCH64) mode=0555
+dir  path=opt/libc-tests/tests/i18n
+file path=opt/libc-tests/tests/i18n/bindtextdomain_test mode=0555
+file path=opt/libc-tests/tests/i18n/bindtextdomain_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/i18n/bindtextdomain_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/memchr.32 mode=0555
+file path=opt/libc-tests/tests/memchr.64 mode=0555
+file path=opt/libc-tests/tests/memset_s.32 mode=0555
+file path=opt/libc-tests/tests/memset_s.64 mode=0555
+file path=opt/libc-tests/tests/newlocale_test mode=0555
+file path=opt/libc-tests/tests/newlocale_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/newlocale_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/nl_langinfo_test mode=0555
+file path=opt/libc-tests/tests/nl_langinfo_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/nl_langinfo_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/posix_memalign.32 mode=0555
+file path=opt/libc-tests/tests/posix_memalign.64 mode=0555
+file path=opt/libc-tests/tests/printf-6961.64 mode=0555
+file path=opt/libc-tests/tests/printf-9511.32 mode=0555
+file path=opt/libc-tests/tests/printf-9511.64 mode=0555
+file path=opt/libc-tests/tests/priv_gettext mode=0555
+file path=opt/libc-tests/tests/psignal mode=0555
+file path=opt/libc-tests/tests/psignal-5097.32 mode=0555
+file path=opt/libc-tests/tests/psignal-5097.64 mode=0555
+file path=opt/libc-tests/tests/pthread_attr_get_np mode=0555
+dir  path=opt/libc-tests/tests/qsort
+file path=opt/libc-tests/tests/qsort/qsort_test mode=0555
+file path=opt/libc-tests/tests/qsort/qsort_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/qsort/qsort_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/quick_exit mode=0555
+file path=opt/libc-tests/tests/quick_exit_order.32 mode=0555
+file path=opt/libc-tests/tests/quick_exit_order.64 mode=0555
+file path=opt/libc-tests/tests/quick_exit_status.32 mode=0555
+file path=opt/libc-tests/tests/quick_exit_status.64 mode=0555
+dir  path=opt/libc-tests/tests/random
+file path=opt/libc-tests/tests/random/arc4key.ksh mode=0555
+file path=opt/libc-tests/tests/random/arc4random mode=0555
+file path=opt/libc-tests/tests/random/arc4random_fork mode=0555
+file path=opt/libc-tests/tests/random/arc4random_forkall mode=0555
+file path=opt/libc-tests/tests/random/arc4random_forksig mode=0555
+file path=opt/libc-tests/tests/random/arc4random_prefork mode=0555
+file path=opt/libc-tests/tests/random/arc4random_preforkall mode=0555
+file path=opt/libc-tests/tests/random/arc4random_preforksig mode=0555
+file path=opt/libc-tests/tests/random/arc4random_rekey mode=0555
+file path=opt/libc-tests/tests/random/chacha mode=0555
+file path=opt/libc-tests/tests/random/getentropy mode=0555
+file path=opt/libc-tests/tests/random/getrandom mode=0555
+file path=opt/libc-tests/tests/random/getrandred mode=0555
+file path=opt/libc-tests/tests/random/inz_child mode=0555
+file path=opt/libc-tests/tests/random/inz_inval mode=0555
+file path=opt/libc-tests/tests/random/inz_mlock mode=0555
+file path=opt/libc-tests/tests/random/inz_region mode=0555
+file path=opt/libc-tests/tests/random/inz_split mode=0555
+file path=opt/libc-tests/tests/random/inz_split_vpp mode=0555
+file path=opt/libc-tests/tests/random/inz_vpp mode=0555
+dir  path=opt/libc-tests/tests/regex
+dir  path=opt/libc-tests/tests/regex/data
+file path=opt/libc-tests/tests/regex/data/basic.dat mode=0444
+file path=opt/libc-tests/tests/regex/data/basic.out mode=0444
+file path=opt/libc-tests/tests/regex/data/categorize.dat mode=0444
+file path=opt/libc-tests/tests/regex/data/categorize.out mode=0444
+file path=opt/libc-tests/tests/regex/data/forcedassoc.dat mode=0444
+file path=opt/libc-tests/tests/regex/data/forcedassoc.out mode=0444
+file path=opt/libc-tests/tests/regex/data/leftassoc.dat mode=0444
+file path=opt/libc-tests/tests/regex/data/leftassoc.out mode=0444
+file path=opt/libc-tests/tests/regex/data/nullsubexpr.dat mode=0444
+file path=opt/libc-tests/tests/regex/data/nullsubexpr.out mode=0444
+file path=opt/libc-tests/tests/regex/data/repetition.dat mode=0444
+file path=opt/libc-tests/tests/regex/data/repetition.out mode=0444
+file path=opt/libc-tests/tests/regex/data/rightassoc.dat mode=0444
+file path=opt/libc-tests/tests/regex/data/rightassoc.out mode=0444
+file path=opt/libc-tests/tests/regex/regex_test mode=0555
+file path=opt/libc-tests/tests/regex/testregex mode=0555
+dir  path=opt/libc-tests/tests/select
+file path=opt/libc-tests/tests/select/select.sh mode=0555
+file path=opt/libc-tests/tests/select/select_test mode=0555
+file path=opt/libc-tests/tests/set_constraint_handler_s.32 mode=0555
+file path=opt/libc-tests/tests/set_constraint_handler_s.64 mode=0555
+dir  path=opt/libc-tests/tests/stdio
+file path=opt/libc-tests/tests/stdio/fileno.32 mode=0555
+file path=opt/libc-tests/tests/stdio/fileno.64 mode=0555
+file path=opt/libc-tests/tests/stdio/fmemopentest.32 mode=0555
+file path=opt/libc-tests/tests/stdio/fmemopentest.64 mode=0555
+file path=opt/libc-tests/tests/stdio/ftell_ungetc.32 mode=0555
+file path=opt/libc-tests/tests/stdio/ftell_ungetc.64 mode=0555
+file path=opt/libc-tests/tests/stdio/ftello_12768.64 mode=0555
+file path=opt/libc-tests/tests/stdio/ftello_12768.lfs mode=0555
+file path=opt/libc-tests/tests/stdio/memstream.32 mode=0555
+file path=opt/libc-tests/tests/stdio/memstream.64 mode=0555
+file path=opt/libc-tests/tests/stdio/memstream_reopen.32 mode=0555
+file path=opt/libc-tests/tests/stdio/memstream_reopen.64 mode=0555
+file path=opt/libc-tests/tests/stdio/open_memstreamtest.32 mode=0555
+file path=opt/libc-tests/tests/stdio/open_memstreamtest.64 mode=0555
+file path=opt/libc-tests/tests/stdio/orientation_test.32 mode=0555
+file path=opt/libc-tests/tests/stdio/orientation_test.64 mode=0555
+file path=opt/libc-tests/tests/stdio/test_mbrtowc.32 mode=0555
+file path=opt/libc-tests/tests/stdio/test_mbrtowc.64 mode=0555
+file path=opt/libc-tests/tests/strcoll-strxfrm-6907.32 mode=0555
+file path=opt/libc-tests/tests/strcoll-strxfrm-6907.64 mode=0555
+file path=opt/libc-tests/tests/strerror mode=0555
+dir  path=opt/libc-tests/tests/symbols
+hardlink path=opt/libc-tests/tests/symbols/assert_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/ctype_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/dirent_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/fcntl_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/locale_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/math_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/netdb_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/pthread_h target=setup
+file path=opt/libc-tests/tests/symbols/setup mode=0555
+hardlink path=opt/libc-tests/tests/symbols/signal_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/stdalign_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/stddef_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/stdio_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/stdlib_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/stdnoreturn_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/string_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/strings_h target=setup
+file path=opt/libc-tests/tests/symbols/symbols_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/symbols/symbols_test.$(ARCH64) mode=0555
+hardlink path=opt/libc-tests/tests/symbols/sys_stat_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/sys_time_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/sys_timeb_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/threads_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/time_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/ucontext_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/unistd_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/wchar_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/wctype_h target=setup
+file path=opt/libc-tests/tests/thread_name mode=0555
+file path=opt/libc-tests/tests/timespec_get.32 mode=0555
+file path=opt/libc-tests/tests/timespec_get.64 mode=0555
+file path=opt/libc-tests/tests/uchar.32 mode=0555
+file path=opt/libc-tests/tests/uchar.64 mode=0555
+file path=opt/libc-tests/tests/utimes.32 mode=0555
+file path=opt/libc-tests/tests/utimes.64 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp-7344.32 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp-7344.64 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp-7350.32 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp-7350.64 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp.32 mode=0555
+file path=opt/libc-tests/tests/wcsncasecmp.64 mode=0555
+file path=opt/libc-tests/tests/wcsrtombs_test mode=0555
+file path=opt/libc-tests/tests/wcsrtombs_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/wcsrtombs_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/wctype_test mode=0555
+file path=opt/libc-tests/tests/wctype_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/wctype_test.$(ARCH64) mode=0555
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/locale
+dir  path=usr/lib/locale/zz_AA.UTF-8
+dir  path=usr/lib/locale/zz_AA.UTF-8/LC_COLLATE
+file path=usr/lib/locale/zz_AA.UTF-8/LC_COLLATE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/zz_AA.UTF-8/LC_CTYPE
+file path=usr/lib/locale/zz_AA.UTF-8/LC_CTYPE/LCL_DATA mode=0444
+dir  path=usr/lib/locale/zz_AA.UTF-8/LC_MESSAGES
+file path=usr/lib/locale/zz_AA.UTF-8/LC_MESSAGES/LCL_DATA mode=0444
+file path=usr/lib/locale/zz_AA.UTF-8/LC_MESSAGES/SUNW_OST_OSLIB.mo mode=0444
+file path=usr/lib/locale/zz_AA.UTF-8/LC_MESSAGES/priv_names mode=0444
+dir  path=usr/lib/locale/zz_AA.UTF-8/LC_MONETARY
+file path=usr/lib/locale/zz_AA.UTF-8/LC_MONETARY/LCL_DATA mode=0444
+dir  path=usr/lib/locale/zz_AA.UTF-8/LC_NUMERIC
+file path=usr/lib/locale/zz_AA.UTF-8/LC_NUMERIC/LCL_DATA mode=0444
+dir  path=usr/lib/locale/zz_AA.UTF-8/LC_TIME
+file path=usr/lib/locale/zz_AA.UTF-8/LC_TIME/LCL_DATA mode=0444
+license lic_CDDL license=lic_CDDL
+license usr/src/test/libc-tests/tests/regex/THIRDPARTYLICENSE \
+    license=usr/src/test/libc-tests/tests/regex/THIRDPARTYLICENSE
+depend type=require fmri=developer/dtrace
+depend type=require fmri=locale/ar
+depend type=require fmri=locale/de
+depend type=require fmri=locale/en
+depend type=require fmri=locale/en-extra
+depend type=require fmri=locale/ja
+depend type=require fmri=locale/ru
+depend type=require fmri=system/kernel/dtrace/providers
+depend type=require fmri=system/test/testrunner

@@ -1,0 +1,1312 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright (c) 2013 Gary Mills
+# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2017 RackTop Systems.
+# Copyright 2018, Joyent, Inc.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+#
+
+<include system-library.man3.inc>
+<include system-library.man3avl.inc>
+<include system-library.man3bsm.inc>
+<include system-library.man3c.inc>
+<include system-library.man3c_db.inc>
+<include system-library.man3cfgadm.inc>
+<include system-library.man3commputil.inc>
+<include system-library.man3contract.inc>
+<include system-library.man3curses.inc>
+<include system-library.man3devid.inc>
+<include system-library.man3devinfo.inc>
+<include system-library.man3dlpi.inc>
+<include system-library.man3elf.inc>
+<include system-library.man3exacct.inc>
+<include system-library.man3ext.inc>
+<include system-library.man3fstyp.inc>
+<include system-library.man3gen.inc>
+<include system-library.man3kstat.inc>
+<include system-library.man3kvm.inc>
+<include system-library.man3ldap.inc>
+<include system-library.man3lgrp.inc>
+<include system-library.man3lib.inc>
+<include system-library.man3mail.inc>
+<include system-library.man3malloc.inc>
+<include system-library.man3mp.inc>
+<include system-library.man3nsl.inc>
+<include system-library.man3nvpair.inc>
+<include system-library.man3ofmt.inc>
+<include system-library.man3pam.inc>
+<include system-library.man3proc.inc>
+<include system-library.man3project.inc>
+<include system-library.man3resolv.inc>
+<include system-library.man3rpc.inc>
+<include system-library.man3scf.inc>
+<include system-library.man3sec.inc>
+<include system-library.man3secdb.inc>
+<include system-library.man3sip.inc>
+<include system-library.man3socket.inc>
+<include system-library.man3sysevent.inc>
+<include system-library.man3tsol.inc>
+<include system-library.man3uuid.inc>
+<include system-library.man3volmgt.inc>
+<include system-library.man3xcurses.inc>
+<include system-library.man3xnet.inc>
+<include system-library.man4.inc>
+<include system-library.man5.inc>
+<include system-library.man7p.inc>
+set name=pkg.fmri value=pkg:/system/library@$(PKGVERS)
+set name=pkg.summary value="Core Solaris, (Shared Libs)"
+set name=pkg.description \
+    value="core shared libraries for a specific instruction-set architecture"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+$(i386_ONLY)dir path=etc group=sys
+$(i386_ONLY)dir path=etc/flash group=sys
+$(i386_ONLY)dir path=etc/flash/postcreation group=sys mode=0700
+$(i386_ONLY)dir path=etc/flash/precreation group=sys mode=0700
+$(i386_ONLY)file path=etc/flash/precreation/caplib group=sys mode=0500
+$(i386_ONLY)dir path=etc/flash/preexit group=sys mode=0700
+dir  path=lib
+dir  path=lib/$(ARCH64)
+file path=lib/$(ARCH64)/c_synonyms.so.1
+file path=lib/$(ARCH64)/ld.so.1
+link path=lib/$(ARCH64)/libadm.so target=libadm.so.1
+file path=lib/$(ARCH64)/libadm.so.1
+link path=lib/$(ARCH64)/libaio.so target=libaio.so.1
+file path=lib/$(ARCH64)/libaio.so.1
+link path=lib/$(ARCH64)/libavl.so target=libavl.so.1
+file path=lib/$(ARCH64)/libavl.so.1
+link path=lib/$(ARCH64)/libbsm.so target=libbsm.so.1
+file path=lib/$(ARCH64)/libbsm.so.1
+link path=lib/$(ARCH64)/libc.so target=libc.so.1 reboot-needed=true
+file path=lib/$(ARCH64)/libc.so.1
+link path=lib/$(ARCH64)/libc_db.so target=libc_db.so.1
+file path=lib/$(ARCH64)/libc_db.so.1
+file path=lib/$(ARCH64)/libcmdutils.so.1
+link path=lib/$(ARCH64)/libcontract.so target=libcontract.so.1
+file path=lib/$(ARCH64)/libcontract.so.1
+link path=lib/$(ARCH64)/libcryptoutil.so target=libcryptoutil.so.1
+file path=lib/$(ARCH64)/libcryptoutil.so.1
+link path=lib/$(ARCH64)/libctf.so target=libctf.so.1
+file path=lib/$(ARCH64)/libctf.so.1
+link path=lib/$(ARCH64)/libcurses.so target=libcurses.so.1
+file path=lib/$(ARCH64)/libcurses.so.1
+file path=lib/$(ARCH64)/libcustr.so.1
+link path=lib/$(ARCH64)/libdevice.so target=libdevice.so.1
+file path=lib/$(ARCH64)/libdevice.so.1
+link path=lib/$(ARCH64)/libdevid.so target=libdevid.so.1
+file path=lib/$(ARCH64)/libdevid.so.1
+link path=lib/$(ARCH64)/libdevinfo.so target=libdevinfo.so.1
+file path=lib/$(ARCH64)/libdevinfo.so.1
+file path=lib/$(ARCH64)/libdhcpagent.so.1
+file path=lib/$(ARCH64)/libdhcputil.so.1
+link path=lib/$(ARCH64)/libdl.so target=libdl.so.1
+file path=lib/$(ARCH64)/libdl.so.1
+link path=lib/$(ARCH64)/libdladm.so target=libdladm.so.1
+file path=lib/$(ARCH64)/libdladm.so.1
+link path=lib/$(ARCH64)/libdlpi.so target=libdlpi.so.1
+file path=lib/$(ARCH64)/libdlpi.so.1
+link path=lib/$(ARCH64)/libdoor.so target=libdoor.so.1
+file path=lib/$(ARCH64)/libdoor.so.1
+file path=lib/$(ARCH64)/libdwarf.so.1
+link path=lib/$(ARCH64)/libefi.so target=libefi.so.1
+file path=lib/$(ARCH64)/libefi.so.1
+link path=lib/$(ARCH64)/libelf.so target=libelf.so.1
+file path=lib/$(ARCH64)/libelf.so.1
+file path=lib/$(ARCH64)/libfakekernel.so.1
+$(i386_ONLY)link path=lib/$(ARCH64)/libfdisk.so target=libfdisk.so.1
+$(i386_ONLY)file path=lib/$(ARCH64)/libfdisk.so.1
+link path=lib/$(ARCH64)/libgen.so target=libgen.so.1
+file path=lib/$(ARCH64)/libgen.so.1
+file path=lib/$(ARCH64)/libinetutil.so.1
+link path=lib/$(ARCH64)/libintl.so target=libintl.so.1
+file path=lib/$(ARCH64)/libintl.so.1
+file path=lib/$(ARCH64)/libipadm.so.1
+link path=lib/$(ARCH64)/libipmp.so target=libipmp.so.1
+file path=lib/$(ARCH64)/libipmp.so.1
+link path=lib/$(ARCH64)/libkmf.so target=libkmf.so.1
+file path=lib/$(ARCH64)/libkmf.so.1
+link path=lib/$(ARCH64)/libkmfberder.so target=libkmfberder.so.1
+file path=lib/$(ARCH64)/libkmfberder.so.1
+link path=lib/$(ARCH64)/libkstat.so target=libkstat.so.1
+file path=lib/$(ARCH64)/libkstat.so.1
+file path=lib/$(ARCH64)/libld.so.4
+file path=lib/$(ARCH64)/liblddbg.so.4
+link path=lib/$(ARCH64)/libmd.so target=libmd.so.1
+file path=lib/$(ARCH64)/libmd.so.1
+link path=lib/$(ARCH64)/libmd5.so target=libmd5.so.1
+file path=lib/$(ARCH64)/libmd5.so.1
+link path=lib/$(ARCH64)/libmp.so target=libmp.so.2
+file path=lib/$(ARCH64)/libmp.so.2
+link path=lib/$(ARCH64)/libnsl.so target=libnsl.so.1
+file path=lib/$(ARCH64)/libnsl.so.1
+link path=lib/$(ARCH64)/libnvpair.so target=libnvpair.so.1
+file path=lib/$(ARCH64)/libnvpair.so.1
+link path=lib/$(ARCH64)/libofmt.so target=libofmt.so.1
+file path=lib/$(ARCH64)/libofmt.so.1
+link path=lib/$(ARCH64)/libpam.so target=libpam.so.1
+file path=lib/$(ARCH64)/libpam.so.1
+link path=lib/$(ARCH64)/libposix4.so target=libposix4.so.1
+link path=lib/$(ARCH64)/libposix4.so.1 target=librt.so.1
+link path=lib/$(ARCH64)/libproc.so target=libproc.so.1
+file path=lib/$(ARCH64)/libproc.so.1
+link path=lib/$(ARCH64)/libpthread.so target=libpthread.so.1
+file path=lib/$(ARCH64)/libpthread.so.1
+link path=lib/$(ARCH64)/librcm.so target=librcm.so.1
+file path=lib/$(ARCH64)/librcm.so.1
+link path=lib/$(ARCH64)/libresolv.so target=libresolv.so.2
+file path=lib/$(ARCH64)/libresolv.so.2
+link path=lib/$(ARCH64)/librestart.so target=librestart.so.1
+file path=lib/$(ARCH64)/librestart.so.1
+link path=lib/$(ARCH64)/librpcsvc.so target=librpcsvc.so.1
+file path=lib/$(ARCH64)/librpcsvc.so.1
+link path=lib/$(ARCH64)/librt.so target=librt.so.1
+file path=lib/$(ARCH64)/librt.so.1
+file path=lib/$(ARCH64)/librtld.so.1
+link path=lib/$(ARCH64)/librtld_db.so target=librtld_db.so.1
+file path=lib/$(ARCH64)/librtld_db.so.1
+link path=lib/$(ARCH64)/libscf.so target=libscf.so.1
+file path=lib/$(ARCH64)/libscf.so.1
+link path=lib/$(ARCH64)/libsec.so target=libsec.so.1
+file path=lib/$(ARCH64)/libsec.so.1
+link path=lib/$(ARCH64)/libsecdb.so target=libsecdb.so.1
+file path=lib/$(ARCH64)/libsecdb.so.1
+link path=lib/$(ARCH64)/libsendfile.so target=libsendfile.so.1
+file path=lib/$(ARCH64)/libsendfile.so.1
+link path=lib/$(ARCH64)/libsocket.so target=libsocket.so.1
+file path=lib/$(ARCH64)/libsocket.so.1
+link path=lib/$(ARCH64)/libsysevent.so target=libsysevent.so.1
+file path=lib/$(ARCH64)/libsysevent.so.1
+link path=lib/$(ARCH64)/libtermcap.so target=libtermcap.so.1
+file path=lib/$(ARCH64)/libtermcap.so.1
+link path=lib/$(ARCH64)/libtermlib.so target=libtermlib.so.1
+link path=lib/$(ARCH64)/libtermlib.so.1 target=libcurses.so.1
+link path=lib/$(ARCH64)/libthread.so target=libthread.so.1
+file path=lib/$(ARCH64)/libthread.so.1
+link path=lib/$(ARCH64)/libthread_db.so target=libc_db.so.1
+link path=lib/$(ARCH64)/libthread_db.so.1 target=libc_db.so.1
+link path=lib/$(ARCH64)/libtsnet.so target=libtsnet.so.1
+file path=lib/$(ARCH64)/libtsnet.so.1
+link path=lib/$(ARCH64)/libtsol.so target=libtsol.so.2
+file path=lib/$(ARCH64)/libtsol.so.2
+link path=lib/$(ARCH64)/libumem.so target=libumem.so.1
+file path=lib/$(ARCH64)/libumem.so.1
+link path=lib/$(ARCH64)/libuuid.so target=libuuid.so.1
+file path=lib/$(ARCH64)/libuuid.so.1
+link path=lib/$(ARCH64)/libuutil.so target=libuutil.so.1
+file path=lib/$(ARCH64)/libuutil.so.1
+link path=lib/$(ARCH64)/libw.so target=libw.so.1
+file path=lib/$(ARCH64)/libw.so.1
+link path=lib/$(ARCH64)/libxnet.so target=libxnet.so.1
+file path=lib/$(ARCH64)/libxnet.so.1
+file path=lib/$(ARCH64)/nss_compat.so.1
+file path=lib/$(ARCH64)/nss_dns.so.1
+file path=lib/$(ARCH64)/nss_files.so.1
+file path=lib/$(ARCH64)/nss_nis.so.1
+file path=lib/$(ARCH64)/nss_user.so.1
+link path=lib/32 target=.
+link path=lib/64 target=$(ARCH64)
+file path=lib/c_synonyms.so.1
+dir  path=lib/crypto
+dir  path=lib/crypto/$(ARCH64)
+file path=lib/crypto/$(ARCH64)/kmf_mapper_cn.so.1
+file path=lib/crypto/$(ARCH64)/kmf_nss.so.1
+file path=lib/crypto/$(ARCH64)/kmf_openssl.so.1
+file path=lib/crypto/$(ARCH64)/kmf_pkcs11.so.1
+link path=lib/crypto/32 target=.
+link path=lib/crypto/64 target=$(ARCH64)
+file path=lib/crypto/kmf_mapper_cn.so.1
+file path=lib/crypto/kmf_nss.so.1
+file path=lib/crypto/kmf_openssl.so.1
+file path=lib/crypto/kmf_pkcs11.so.1
+file path=lib/ld.so.1
+link path=lib/libadm.so target=libadm.so.1
+file path=lib/libadm.so.1
+link path=lib/libaio.so target=libaio.so.1
+file path=lib/libaio.so.1
+link path=lib/libavl.so target=libavl.so.1
+file path=lib/libavl.so.1
+link path=lib/libbsm.so target=libbsm.so.1
+file path=lib/libbsm.so.1
+link path=lib/libc.so target=libc.so.1
+file path=lib/libc.so.1 mountpoint=true reboot-needed=true
+link path=lib/libc_db.so target=libc_db.so.1
+file path=lib/libc_db.so.1
+file path=lib/libcmdutils.so.1
+link path=lib/libcontract.so target=libcontract.so.1
+file path=lib/libcontract.so.1
+link path=lib/libcryptoutil.so target=./libcryptoutil.so.1
+file path=lib/libcryptoutil.so.1
+link path=lib/libctf.so target=libctf.so.1
+file path=lib/libctf.so.1
+link path=lib/libcurses.so target=libcurses.so.1
+file path=lib/libcurses.so.1
+file path=lib/libcustr.so.1
+link path=lib/libdevice.so target=libdevice.so.1
+file path=lib/libdevice.so.1
+link path=lib/libdevid.so target=libdevid.so.1
+file path=lib/libdevid.so.1
+link path=lib/libdevinfo.so target=libdevinfo.so.1
+file path=lib/libdevinfo.so.1
+file path=lib/libdhcpagent.so.1
+file path=lib/libdhcputil.so.1
+link path=lib/libdl.so target=libdl.so.1
+file path=lib/libdl.so.1
+link path=lib/libdladm.so target=libdladm.so.1
+file path=lib/libdladm.so.1
+link path=lib/libdlpi.so target=libdlpi.so.1
+file path=lib/libdlpi.so.1
+link path=lib/libdoor.so target=libdoor.so.1
+file path=lib/libdoor.so.1
+file path=lib/libdwarf.so.1
+link path=lib/libefi.so target=libefi.so.1
+file path=lib/libefi.so.1
+link path=lib/libelf.so target=libelf.so.1
+file path=lib/libelf.so.1
+link path=lib/libelfsign.so target=libelfsign.so.1
+file path=lib/libelfsign.so.1
+file path=lib/libfakekernel.so.1
+$(i386_ONLY)link path=lib/libfdisk.so target=libfdisk.so.1
+$(i386_ONLY)file path=lib/libfdisk.so.1
+link path=lib/libgen.so target=libgen.so.1
+file path=lib/libgen.so.1
+file path=lib/libinetutil.so.1
+link path=lib/libintl.so target=libintl.so.1
+file path=lib/libintl.so.1
+file path=lib/libipadm.so.1
+link path=lib/libipmp.so target=./libipmp.so.1
+file path=lib/libipmp.so.1
+file path=lib/libkcfd.so.1
+link path=lib/libkmf.so target=libkmf.so.1
+file path=lib/libkmf.so.1
+link path=lib/libkmfberder.so target=libkmfberder.so.1
+file path=lib/libkmfberder.so.1
+link path=lib/libkstat.so target=libkstat.so.1
+file path=lib/libkstat.so.1
+file path=lib/libld.so.4
+file path=lib/liblddbg.so.4
+link path=lib/libmd.so target=libmd.so.1
+file path=lib/libmd.so.1
+link path=lib/libmd5.so target=libmd5.so.1
+file path=lib/libmd5.so.1
+link path=lib/libmp.so target=libmp.so.2
+file path=lib/libmp.so.1
+file path=lib/libmp.so.2
+link path=lib/libnsl.so target=libnsl.so.1
+file path=lib/libnsl.so.1
+link path=lib/libnvpair.so target=libnvpair.so.1
+file path=lib/libnvpair.so.1
+link path=lib/libnwam.so target=libnwam.so.1
+file path=lib/libnwam.so.1
+link path=lib/libofmt.so target=libofmt.so.1
+file path=lib/libofmt.so.1
+link path=lib/libpam.so target=libpam.so.1
+file path=lib/libpam.so.1
+link path=lib/libposix4.so target=libposix4.so.1
+link path=lib/libposix4.so.1 target=librt.so.1
+link path=lib/libproc.so target=libproc.so.1
+file path=lib/libproc.so.1
+link path=lib/libpthread.so target=libpthread.so.1
+file path=lib/libpthread.so.1
+link path=lib/librcm.so target=./librcm.so.1
+file path=lib/librcm.so.1
+link path=lib/libresolv.so target=libresolv.so.2
+file path=lib/libresolv.so.1
+file path=lib/libresolv.so.2
+file path=lib/librestart.so.1
+link path=lib/librpcsvc.so target=librpcsvc.so.1
+file path=lib/librpcsvc.so.1
+link path=lib/librt.so target=librt.so.1
+file path=lib/librt.so.1
+file path=lib/librtld.so.1
+link path=lib/librtld_db.so target=librtld_db.so.1
+file path=lib/librtld_db.so.1
+link path=lib/libscf.so target=libscf.so.1
+file path=lib/libscf.so.1
+link path=lib/libsec.so target=libsec.so.1
+file path=lib/libsec.so.1
+link path=lib/libsecdb.so target=libsecdb.so.1
+file path=lib/libsecdb.so.1
+link path=lib/libsendfile.so target=libsendfile.so.1
+file path=lib/libsendfile.so.1
+link path=lib/libsocket.so target=libsocket.so.1
+file path=lib/libsocket.so.1
+file path=lib/libsqlite-sys.so.2.8.15
+link path=lib/libsysevent.so target=./libsysevent.so.1
+file path=lib/libsysevent.so.1
+link path=lib/libtermcap.so target=libtermcap.so.1
+file path=lib/libtermcap.so.1
+link path=lib/libtermlib.so target=libtermlib.so.1
+link path=lib/libtermlib.so.1 target=libcurses.so.1
+link path=lib/libthread.so target=libthread.so.1
+file path=lib/libthread.so.1
+link path=lib/libthread_db.so target=libc_db.so.1
+link path=lib/libthread_db.so.1 target=libc_db.so.1
+file path=lib/libtsnet.so.1
+link path=lib/libtsol.so target=libtsol.so.2
+file path=lib/libtsol.so.2
+link path=lib/libumem.so target=libumem.so.1
+file path=lib/libumem.so.1
+link path=lib/libuuid.so target=libuuid.so.1
+file path=lib/libuuid.so.1
+file path=lib/libuutil.so.1
+link path=lib/libw.so target=libw.so.1
+file path=lib/libw.so.1
+link path=lib/libxnet.so target=libxnet.so.1
+file path=lib/libxnet.so.1
+dir  path=lib/mpxio
+file path=lib/mpxio/stmsboot_util mode=0555
+file path=lib/nss_compat.so.1
+file path=lib/nss_dns.so.1
+file path=lib/nss_files.so.1
+file path=lib/nss_nis.so.1
+file path=lib/nss_user.so.1
+dir  path=lib/secure
+dir  path=lib/secure/$(ARCH64)
+link path=lib/secure/32 target=.
+link path=lib/secure/64 target=$(ARCH64)
+dir  path=usr group=sys
+dir  path=usr/bin
+dir  path=usr/ccs
+dir  path=usr/ccs/lib
+dir  path=usr/ccs/lib/$(ARCH64)
+link path=usr/ccs/lib/$(ARCH64)/libcurses.so \
+    target=../../../../lib/$(ARCH64)/libcurses.so.1
+link path=usr/ccs/lib/$(ARCH64)/libform.so \
+    target=../../../lib/$(ARCH64)/libform.so.1
+link path=usr/ccs/lib/$(ARCH64)/libgen.so \
+    target=../../../../lib/$(ARCH64)/libgen.so.1
+link path=usr/ccs/lib/$(ARCH64)/libl.so target=../../../lib/$(ARCH64)/libl.so.1
+link path=usr/ccs/lib/$(ARCH64)/libmalloc.so \
+    target=../../../lib/$(ARCH64)/libmalloc.so.1
+link path=usr/ccs/lib/$(ARCH64)/libmenu.so \
+    target=../../../lib/$(ARCH64)/libmenu.so.1
+link path=usr/ccs/lib/$(ARCH64)/libpanel.so \
+    target=../../../lib/$(ARCH64)/libpanel.so.1
+link path=usr/ccs/lib/$(ARCH64)/libtermcap.so \
+    target=../../../../lib/$(ARCH64)/libtermcap.so.1
+link path=usr/ccs/lib/$(ARCH64)/libtermlib.so \
+    target=../../../../lib/$(ARCH64)/libcurses.so.1
+link path=usr/ccs/lib/$(ARCH64)/liby.so target=../../../lib/$(ARCH64)/liby.so.1
+link path=usr/ccs/lib/libcurses.so target=../../../lib/libcurses.so.1
+link path=usr/ccs/lib/libform.so target=../../lib/libform.so.1
+link path=usr/ccs/lib/libgen.so target=../../../lib/libgen.so.1
+link path=usr/ccs/lib/libl.so target=../../lib/libl.so.1
+link path=usr/ccs/lib/libmalloc.so target=../../lib/libmalloc.so.1
+link path=usr/ccs/lib/libmenu.so target=../../lib/libmenu.so.1
+link path=usr/ccs/lib/libpanel.so target=../../lib/libpanel.so.1
+link path=usr/ccs/lib/libtermcap.so target=../../../lib/libtermcap.so.1
+link path=usr/ccs/lib/libtermlib.so target=../../../lib/libcurses.so.1
+link path=usr/ccs/lib/liby.so target=../../lib/liby.so.1
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+file path=usr/lib/$(ARCH64)/0@0.so.1
+file path=usr/lib/$(ARCH64)/getloginx.so.1
+link path=usr/lib/$(ARCH64)/libadm.so target=../../../lib/$(ARCH64)/libadm.so.1
+link path=usr/lib/$(ARCH64)/libadm.so.1 \
+    target=../../../lib/$(ARCH64)/libadm.so.1
+link path=usr/lib/$(ARCH64)/libads.so target=./libads.so.1
+file path=usr/lib/$(ARCH64)/libads.so.1
+link path=usr/lib/$(ARCH64)/libadutils.so target=./libadutils.so.1
+file path=usr/lib/$(ARCH64)/libadutils.so.1
+link path=usr/lib/$(ARCH64)/libaio.so target=../../../lib/$(ARCH64)/libaio.so.1
+link path=usr/lib/$(ARCH64)/libaio.so.1 \
+    target=../../../lib/$(ARCH64)/libaio.so.1
+link path=usr/lib/$(ARCH64)/libavl.so target=../../../lib/$(ARCH64)/libavl.so.1
+link path=usr/lib/$(ARCH64)/libavl.so.1 \
+    target=../../../lib/$(ARCH64)/libavl.so.1
+link path=usr/lib/$(ARCH64)/libbsdmalloc.so target=libbsdmalloc.so.1
+file path=usr/lib/$(ARCH64)/libbsdmalloc.so.1
+link path=usr/lib/$(ARCH64)/libbsm.so target=../../../lib/$(ARCH64)/libbsm.so.1
+link path=usr/lib/$(ARCH64)/libbsm.so.1 \
+    target=../../../lib/$(ARCH64)/libbsm.so.1
+link path=usr/lib/$(ARCH64)/libc.so target=../../../lib/$(ARCH64)/libc.so.1
+link path=usr/lib/$(ARCH64)/libc.so.1 target=../../../lib/$(ARCH64)/libc.so.1
+link path=usr/lib/$(ARCH64)/libc_db.so \
+    target=../../../lib/$(ARCH64)/libc_db.so.1
+link path=usr/lib/$(ARCH64)/libc_db.so.1 \
+    target=../../../lib/$(ARCH64)/libc_db.so.1
+link path=usr/lib/$(ARCH64)/libcfgadm.so target=libcfgadm.so.1
+file path=usr/lib/$(ARCH64)/libcfgadm.so.1
+link path=usr/lib/$(ARCH64)/libcmdutils.so.1 \
+    target=../../../lib/$(ARCH64)/libcmdutils.so.1
+link path=usr/lib/$(ARCH64)/libcommputil.so target=libcommputil.so.1
+file path=usr/lib/$(ARCH64)/libcommputil.so.1
+link path=usr/lib/$(ARCH64)/libcontract.so \
+    target=../../../lib/$(ARCH64)/libcontract.so.1
+link path=usr/lib/$(ARCH64)/libcontract.so.1 \
+    target=../../../lib/$(ARCH64)/libcontract.so.1
+file path=usr/lib/$(ARCH64)/libcrle.so.1
+link path=usr/lib/$(ARCH64)/libcrypt.so target=./libcrypt.so.1
+file path=usr/lib/$(ARCH64)/libcrypt.so.1
+link path=usr/lib/$(ARCH64)/libcrypt_d.so target=./libcrypt.so
+link path=usr/lib/$(ARCH64)/libcrypt_d.so.1 target=./libcrypt.so.1
+link path=usr/lib/$(ARCH64)/libcrypt_i.so target=./libcrypt.so
+link path=usr/lib/$(ARCH64)/libcrypt_i.so.1 target=./libcrypt.so.1
+link path=usr/lib/$(ARCH64)/libctf.so target=../../../lib/$(ARCH64)/libctf.so.1
+link path=usr/lib/$(ARCH64)/libctf.so.1 \
+    target=../../../lib/$(ARCH64)/libctf.so.1
+link path=usr/lib/$(ARCH64)/libcurses.so \
+    target=../../../lib/$(ARCH64)/libcurses.so.1
+link path=usr/lib/$(ARCH64)/libcurses.so.1 \
+    target=../../../lib/$(ARCH64)/libcurses.so.1
+link path=usr/lib/$(ARCH64)/libdevice.so \
+    target=../../../lib/$(ARCH64)/libdevice.so.1
+link path=usr/lib/$(ARCH64)/libdevice.so.1 \
+    target=../../../lib/$(ARCH64)/libdevice.so.1
+link path=usr/lib/$(ARCH64)/libdevid.so \
+    target=../../../lib/$(ARCH64)/libdevid.so.1
+link path=usr/lib/$(ARCH64)/libdevid.so.1 \
+    target=../../../lib/$(ARCH64)/libdevid.so.1
+link path=usr/lib/$(ARCH64)/libdevinfo.so \
+    target=../../../lib/$(ARCH64)/libdevinfo.so.1
+link path=usr/lib/$(ARCH64)/libdevinfo.so.1 \
+    target=../../../lib/$(ARCH64)/libdevinfo.so.1
+link path=usr/lib/$(ARCH64)/libdhcpagent.so.1 \
+    target=../../../lib/$(ARCH64)/libdhcpagent.so.1
+link path=usr/lib/$(ARCH64)/libdhcputil.so.1 \
+    target=../../../lib/$(ARCH64)/libdhcputil.so.1
+link path=usr/lib/$(ARCH64)/libdisasm.so target=libdisasm.so.1
+file path=usr/lib/$(ARCH64)/libdisasm.so.1
+link path=usr/lib/$(ARCH64)/libdl.so target=../../../lib/$(ARCH64)/libdl.so.1
+link path=usr/lib/$(ARCH64)/libdl.so.1 target=../../../lib/$(ARCH64)/libdl.so.1
+link path=usr/lib/$(ARCH64)/libdlpi.so \
+    target=../../../lib/$(ARCH64)/libdlpi.so.1
+link path=usr/lib/$(ARCH64)/libdlpi.so.1 \
+    target=../../../lib/$(ARCH64)/libdlpi.so.1
+link path=usr/lib/$(ARCH64)/libdoor.so \
+    target=../../../lib/$(ARCH64)/libdoor.so.1
+link path=usr/lib/$(ARCH64)/libdoor.so.1 \
+    target=../../../lib/$(ARCH64)/libdoor.so.1
+link path=usr/lib/$(ARCH64)/libdwarf.so.1 \
+    target=../../../lib/$(ARCH64)/libdwarf.so.1
+link path=usr/lib/$(ARCH64)/libefi.so target=../../../lib/$(ARCH64)/libefi.so.1
+link path=usr/lib/$(ARCH64)/libefi.so.1 \
+    target=../../../lib/$(ARCH64)/libefi.so.1
+link path=usr/lib/$(ARCH64)/libelf.so target=../../../lib/$(ARCH64)/libelf.so.1
+link path=usr/lib/$(ARCH64)/libelf.so.1 \
+    target=../../../lib/$(ARCH64)/libelf.so.1
+link path=usr/lib/$(ARCH64)/libexacct.so target=libexacct.so.1
+file path=usr/lib/$(ARCH64)/libexacct.so.1
+link path=usr/lib/$(ARCH64)/libfakekernel.so.1 \
+    target=../../../lib/$(ARCH64)/libfakekernel.so.1
+$(i386_ONLY)link path=usr/lib/$(ARCH64)/libfdisk.so \
+    target=../../../lib/$(ARCH64)/libfdisk.so.1
+$(i386_ONLY)link path=usr/lib/$(ARCH64)/libfdisk.so.1 \
+    target=../../../lib/$(ARCH64)/libfdisk.so.1
+link path=usr/lib/$(ARCH64)/libform.so target=libform.so.1
+file path=usr/lib/$(ARCH64)/libform.so.1
+link path=usr/lib/$(ARCH64)/libfstyp.so target=./libfstyp.so.1
+file path=usr/lib/$(ARCH64)/libfstyp.so.1
+link path=usr/lib/$(ARCH64)/libgen.so target=../../../lib/$(ARCH64)/libgen.so.1
+link path=usr/lib/$(ARCH64)/libgen.so.1 \
+    target=../../../lib/$(ARCH64)/libgen.so.1
+link path=usr/lib/$(ARCH64)/libhotplug.so target=libhotplug.so.1
+file path=usr/lib/$(ARCH64)/libhotplug.so.1
+link path=usr/lib/$(ARCH64)/libidmap.so target=./libidmap.so.1
+file path=usr/lib/$(ARCH64)/libidmap.so.1
+file path=usr/lib/$(ARCH64)/libidspace.so.1
+file path=usr/lib/$(ARCH64)/libike.so.1
+link path=usr/lib/$(ARCH64)/libinetutil.so.1 \
+    target=../../../lib/$(ARCH64)/libinetutil.so.1
+link path=usr/lib/$(ARCH64)/libintl.so \
+    target=../../../lib/$(ARCH64)/libintl.so.1
+link path=usr/lib/$(ARCH64)/libintl.so.1 \
+    target=../../../lib/$(ARCH64)/libintl.so.1
+link path=usr/lib/$(ARCH64)/libipmi.so target=./libipmi.so.1
+file path=usr/lib/$(ARCH64)/libipmi.so.1
+link path=usr/lib/$(ARCH64)/libipp.so target=libipp.so.1
+file path=usr/lib/$(ARCH64)/libipp.so.1
+file path=usr/lib/$(ARCH64)/libipsecutil.so.1
+file path=usr/lib/$(ARCH64)/libjedec.so.1
+link path=usr/lib/$(ARCH64)/libkstat.so \
+    target=../../../lib/$(ARCH64)/libkstat.so.1
+link path=usr/lib/$(ARCH64)/libkstat.so.1 \
+    target=../../../lib/$(ARCH64)/libkstat.so.1
+link path=usr/lib/$(ARCH64)/libkvm.so target=libkvm.so.1
+file path=usr/lib/$(ARCH64)/libkvm.so.1
+link path=usr/lib/$(ARCH64)/libl.so target=libl.so.1
+file path=usr/lib/$(ARCH64)/libl.so.1
+link path=usr/lib/$(ARCH64)/libldap.so target=libldap.so.5
+file path=usr/lib/$(ARCH64)/libldap.so.5
+link path=usr/lib/$(ARCH64)/liblddbg.so.4 \
+    target=../../../lib/$(ARCH64)/liblddbg.so.4
+link path=usr/lib/$(ARCH64)/liblgrp.so target=liblgrp.so.1
+file path=usr/lib/$(ARCH64)/liblgrp.so.1
+link path=usr/lib/$(ARCH64)/liblm.so target=liblm.so.1
+file path=usr/lib/$(ARCH64)/liblm.so.1
+link path=usr/lib/$(ARCH64)/libmail.so target=libmail.so.1
+file path=usr/lib/$(ARCH64)/libmail.so.1
+link path=usr/lib/$(ARCH64)/libmalloc.so target=libmalloc.so.1
+file path=usr/lib/$(ARCH64)/libmalloc.so.1
+link path=usr/lib/$(ARCH64)/libmapmalloc.so target=libmapmalloc.so.1
+file path=usr/lib/$(ARCH64)/libmapmalloc.so.1
+link path=usr/lib/$(ARCH64)/libmd.so target=../../../lib/$(ARCH64)/libmd.so.1
+link path=usr/lib/$(ARCH64)/libmd.so.1 target=../../../lib/$(ARCH64)/libmd.so.1
+link path=usr/lib/$(ARCH64)/libmd5.so target=../../../lib/$(ARCH64)/libmd5.so.1
+link path=usr/lib/$(ARCH64)/libmd5.so.1 \
+    target=../../../lib/$(ARCH64)/libmd5.so.1
+link path=usr/lib/$(ARCH64)/libmenu.so target=libmenu.so.1
+file path=usr/lib/$(ARCH64)/libmenu.so.1
+link path=usr/lib/$(ARCH64)/libmp.so target=../../../lib/$(ARCH64)/libmp.so.2
+link path=usr/lib/$(ARCH64)/libmp.so.2 target=../../../lib/$(ARCH64)/libmp.so.2
+link path=usr/lib/$(ARCH64)/libmtmalloc.so target=libmtmalloc.so.1
+file path=usr/lib/$(ARCH64)/libmtmalloc.so.1
+link path=usr/lib/$(ARCH64)/libnls.so target=libnls.so.1
+file path=usr/lib/$(ARCH64)/libnls.so.1
+link path=usr/lib/$(ARCH64)/libnsl.so target=../../../lib/$(ARCH64)/libnsl.so.1
+link path=usr/lib/$(ARCH64)/libnsl.so.1 \
+    target=../../../lib/$(ARCH64)/libnsl.so.1
+link path=usr/lib/$(ARCH64)/libnvpair.so \
+    target=../../../lib/$(ARCH64)/libnvpair.so.1
+link path=usr/lib/$(ARCH64)/libnvpair.so.1 \
+    target=../../../lib/$(ARCH64)/libnvpair.so.1
+link path=usr/lib/$(ARCH64)/libpam.so target=../../../lib/$(ARCH64)/libpam.so.1
+link path=usr/lib/$(ARCH64)/libpam.so.1 \
+    target=../../../lib/$(ARCH64)/libpam.so.1
+link path=usr/lib/$(ARCH64)/libpanel.so target=libpanel.so.1
+file path=usr/lib/$(ARCH64)/libpanel.so.1
+file path=usr/lib/$(ARCH64)/libpcidb.so.1
+link path=usr/lib/$(ARCH64)/libpkcs11.so target=libpkcs11.so.1
+file path=usr/lib/$(ARCH64)/libpkcs11.so.1
+link path=usr/lib/$(ARCH64)/libposix4.so \
+    target=../../../lib/$(ARCH64)/librt.so.1
+link path=usr/lib/$(ARCH64)/libposix4.so.1 \
+    target=../../../lib/$(ARCH64)/librt.so.1
+link path=usr/lib/$(ARCH64)/libproc.so \
+    target=../../../lib/$(ARCH64)/libproc.so.1
+link path=usr/lib/$(ARCH64)/libproc.so.1 \
+    target=../../../lib/$(ARCH64)/libproc.so.1
+link path=usr/lib/$(ARCH64)/libproject.so target=libproject.so.1
+file path=usr/lib/$(ARCH64)/libproject.so.1
+link path=usr/lib/$(ARCH64)/libpthread.so \
+    target=../../../lib/$(ARCH64)/libpthread.so.1
+link path=usr/lib/$(ARCH64)/libpthread.so.1 \
+    target=../../../lib/$(ARCH64)/libpthread.so.1
+file path=usr/lib/$(ARCH64)/libraidcfg.so.1
+link path=usr/lib/$(ARCH64)/librcm.so target=../../../lib/$(ARCH64)/librcm.so.1
+link path=usr/lib/$(ARCH64)/librcm.so.1 \
+    target=../../../lib/$(ARCH64)/librcm.so.1
+file path=usr/lib/$(ARCH64)/librename.so.1
+link path=usr/lib/$(ARCH64)/libreparse.so target=libreparse.so.1
+file path=usr/lib/$(ARCH64)/libreparse.so.1
+link path=usr/lib/$(ARCH64)/libresolv.so \
+    target=../../../lib/$(ARCH64)/libresolv.so.2
+link path=usr/lib/$(ARCH64)/libresolv.so.2 \
+    target=../../../lib/$(ARCH64)/libresolv.so.2
+$(i386_ONLY)link path=usr/lib/$(ARCH64)/librestart.so \
+    target=../../../lib/$(ARCH64)/librestart.so.1
+link path=usr/lib/$(ARCH64)/librestart.so.1 \
+    target=../../../lib/$(ARCH64)/librestart.so.1
+link path=usr/lib/$(ARCH64)/librpcsvc.so \
+    target=../../../lib/$(ARCH64)/librpcsvc.so.1
+link path=usr/lib/$(ARCH64)/librpcsvc.so.1 \
+    target=../../../lib/$(ARCH64)/librpcsvc.so.1
+link path=usr/lib/$(ARCH64)/librt.so target=../../../lib/$(ARCH64)/librt.so.1
+link path=usr/lib/$(ARCH64)/librt.so.1 target=../../../lib/$(ARCH64)/librt.so.1
+link path=usr/lib/$(ARCH64)/librtld.so.1 \
+    target=../../../lib/$(ARCH64)/librtld.so.1
+link path=usr/lib/$(ARCH64)/librtld_db.so \
+    target=../../../lib/$(ARCH64)/librtld_db.so.1
+link path=usr/lib/$(ARCH64)/librtld_db.so.1 \
+    target=../../../lib/$(ARCH64)/librtld_db.so.1
+$(i386_ONLY)file path=usr/lib/$(ARCH64)/libsaveargs.so.1
+link path=usr/lib/$(ARCH64)/libscf.so target=../../../lib/$(ARCH64)/libscf.so.1
+link path=usr/lib/$(ARCH64)/libscf.so.1 \
+    target=../../../lib/$(ARCH64)/libscf.so.1
+link path=usr/lib/$(ARCH64)/libsched.so target=libsched.so.1
+file path=usr/lib/$(ARCH64)/libsched.so.1
+link path=usr/lib/$(ARCH64)/libsctp.so target=./libsctp.so.1
+file path=usr/lib/$(ARCH64)/libsctp.so.1
+link path=usr/lib/$(ARCH64)/libsec.so target=../../../lib/$(ARCH64)/libsec.so.1
+link path=usr/lib/$(ARCH64)/libsec.so.1 \
+    target=../../../lib/$(ARCH64)/libsec.so.1
+link path=usr/lib/$(ARCH64)/libsecdb.so \
+    target=../../../lib/$(ARCH64)/libsecdb.so.1
+link path=usr/lib/$(ARCH64)/libsecdb.so.1 \
+    target=../../../lib/$(ARCH64)/libsecdb.so.1
+link path=usr/lib/$(ARCH64)/libsendfile.so \
+    target=../../../lib/$(ARCH64)/libsendfile.so.1
+link path=usr/lib/$(ARCH64)/libsendfile.so.1 \
+    target=../../../lib/$(ARCH64)/libsendfile.so.1
+file path=usr/lib/$(ARCH64)/libsff.so.1
+link path=usr/lib/$(ARCH64)/libsip.so target=./libsip.so.1
+file path=usr/lib/$(ARCH64)/libsip.so.1
+link path=usr/lib/$(ARCH64)/libsldap.so target=libsldap.so.1
+file path=usr/lib/$(ARCH64)/libsldap.so.1
+link path=usr/lib/$(ARCH64)/libsmbios.so target=libsmbios.so.1
+file path=usr/lib/$(ARCH64)/libsmbios.so.1
+link path=usr/lib/$(ARCH64)/libsocket.so \
+    target=../../../lib/$(ARCH64)/libsocket.so.1
+link path=usr/lib/$(ARCH64)/libsocket.so.1 \
+    target=../../../lib/$(ARCH64)/libsocket.so.1
+link path=usr/lib/$(ARCH64)/libsoftcrypto.so target=./libsoftcrypto.so.1
+file path=usr/lib/$(ARCH64)/libsoftcrypto.so.1
+link path=usr/lib/$(ARCH64)/libsysevent.so \
+    target=../../../lib/$(ARCH64)/libsysevent.so.1
+link path=usr/lib/$(ARCH64)/libsysevent.so.1 \
+    target=../../../lib/$(ARCH64)/libsysevent.so.1
+link path=usr/lib/$(ARCH64)/libtermcap.so \
+    target=../../../lib/$(ARCH64)/libtermcap.so.1
+link path=usr/lib/$(ARCH64)/libtermcap.so.1 \
+    target=../../../lib/$(ARCH64)/libtermcap.so.1
+link path=usr/lib/$(ARCH64)/libtermlib.so \
+    target=../../../lib/$(ARCH64)/libcurses.so.1
+link path=usr/lib/$(ARCH64)/libtermlib.so.1 \
+    target=../../../lib/$(ARCH64)/libcurses.so.1
+link path=usr/lib/$(ARCH64)/libthread.so \
+    target=../../../lib/$(ARCH64)/libthread.so.1
+link path=usr/lib/$(ARCH64)/libthread.so.1 \
+    target=../../../lib/$(ARCH64)/libthread.so.1
+link path=usr/lib/$(ARCH64)/libthread_db.so \
+    target=../../../lib/$(ARCH64)/libc_db.so.1
+link path=usr/lib/$(ARCH64)/libthread_db.so.1 \
+    target=../../../lib/$(ARCH64)/libc_db.so.1
+link path=usr/lib/$(ARCH64)/libtsnet.so \
+    target=../../../lib/$(ARCH64)/libtsnet.so.1
+link path=usr/lib/$(ARCH64)/libtsnet.so.1 \
+    target=../../../lib/$(ARCH64)/libtsnet.so.1
+link path=usr/lib/$(ARCH64)/libtsol.so \
+    target=../../../lib/$(ARCH64)/libtsol.so.2
+link path=usr/lib/$(ARCH64)/libtsol.so.2 \
+    target=../../../lib/$(ARCH64)/libtsol.so.2
+link path=usr/lib/$(ARCH64)/libumem.so \
+    target=../../../lib/$(ARCH64)/libumem.so.1
+link path=usr/lib/$(ARCH64)/libumem.so.1 \
+    target=../../../lib/$(ARCH64)/libumem.so.1
+link path=usr/lib/$(ARCH64)/libuuid.so \
+    target=../../../lib/$(ARCH64)/libuuid.so.1
+link path=usr/lib/$(ARCH64)/libuuid.so.1 \
+    target=../../../lib/$(ARCH64)/libuuid.so.1
+$(i386_ONLY)link path=usr/lib/$(ARCH64)/libuutil.so \
+    target=../../../lib/$(ARCH64)/libuutil.so.1
+link path=usr/lib/$(ARCH64)/libuutil.so.1 \
+    target=../../../lib/$(ARCH64)/libuutil.so.1
+$(sparc_ONLY)link path=usr/lib/$(ARCH64)/libv12n.so target=./libv12n.so.1
+$(sparc_ONLY)file path=usr/lib/$(ARCH64)/libv12n.so.1
+link path=usr/lib/$(ARCH64)/libvolmgt.so target=libvolmgt.so.1
+file path=usr/lib/$(ARCH64)/libvolmgt.so.1
+link path=usr/lib/$(ARCH64)/libw.so target=../../../lib/$(ARCH64)/libw.so.1
+link path=usr/lib/$(ARCH64)/libw.so.1 target=../../../lib/$(ARCH64)/libw.so.1
+link path=usr/lib/$(ARCH64)/libwrap.so target=libwrap.so.1.0
+link path=usr/lib/$(ARCH64)/libwrap.so.1 target=libwrap.so.1.0
+file path=usr/lib/$(ARCH64)/libwrap.so.1.0
+link path=usr/lib/$(ARCH64)/libxnet.so \
+    target=../../../lib/$(ARCH64)/libxnet.so.1
+link path=usr/lib/$(ARCH64)/libxnet.so.1 \
+    target=../../../lib/$(ARCH64)/libxnet.so.1
+link path=usr/lib/$(ARCH64)/liby.so target=liby.so.1
+file path=usr/lib/$(ARCH64)/liby.so.1
+link path=usr/lib/$(ARCH64)/libzoneinfo.so target=./libzoneinfo.so.1
+file path=usr/lib/$(ARCH64)/libzoneinfo.so.1
+file path=usr/lib/$(ARCH64)/nss_ad.so.1
+link path=usr/lib/$(ARCH64)/nss_compat.so.1 \
+    target=../../../lib/$(ARCH64)/nss_compat.so.1
+link path=usr/lib/$(ARCH64)/nss_dns.so.1 \
+    target=../../../lib/$(ARCH64)/nss_dns.so.1
+link path=usr/lib/$(ARCH64)/nss_files.so.1 \
+    target=../../../lib/$(ARCH64)/nss_files.so.1
+file path=usr/lib/$(ARCH64)/nss_ldap.so.1
+link path=usr/lib/$(ARCH64)/nss_nis.so.1 \
+    target=../../../lib/$(ARCH64)/nss_nis.so.1
+link path=usr/lib/$(ARCH64)/nss_user.so.1 \
+    target=../../../lib/$(ARCH64)/nss_user.so.1
+file path=usr/lib/$(ARCH64)/passwdutil.so.1
+link path=usr/lib/$(ARCH64)/straddr.so target=straddr.so.2
+file path=usr/lib/$(ARCH64)/straddr.so.2
+file path=usr/lib/$(ARCH64)/watchmalloc.so.1
+file path=usr/lib/0@0.so.1
+link path=usr/lib/32 target=.
+link path=usr/lib/64 target=$(ARCH64)
+dir  path=usr/lib/cfgadm
+dir  path=usr/lib/cfgadm/$(ARCH64)
+link path=usr/lib/cfgadm/$(ARCH64)/ib.so target=./ib.so.1
+file path=usr/lib/cfgadm/$(ARCH64)/ib.so.1
+link path=usr/lib/cfgadm/$(ARCH64)/pci.so target=./pci.so.1
+file path=usr/lib/cfgadm/$(ARCH64)/pci.so.1
+$(i386_ONLY)link path=usr/lib/cfgadm/$(ARCH64)/sata.so target=./sata.so.1
+$(i386_ONLY)file path=usr/lib/cfgadm/$(ARCH64)/sata.so.1
+link path=usr/lib/cfgadm/$(ARCH64)/scsi.so target=./scsi.so.1
+file path=usr/lib/cfgadm/$(ARCH64)/scsi.so.1
+link path=usr/lib/cfgadm/$(ARCH64)/shp.so target=./shp.so.1
+file path=usr/lib/cfgadm/$(ARCH64)/shp.so.1
+link path=usr/lib/cfgadm/$(ARCH64)/usb.so target=./usb.so.1
+file path=usr/lib/cfgadm/$(ARCH64)/usb.so.1
+link path=usr/lib/cfgadm/ib.so target=./ib.so.1
+file path=usr/lib/cfgadm/ib.so.1
+link path=usr/lib/cfgadm/pci.so target=./pci.so.1
+file path=usr/lib/cfgadm/pci.so.1
+$(i386_ONLY)link path=usr/lib/cfgadm/sata.so target=./sata.so.1
+$(i386_ONLY)file path=usr/lib/cfgadm/sata.so.1
+link path=usr/lib/cfgadm/scsi.so target=./scsi.so.1
+file path=usr/lib/cfgadm/scsi.so.1
+link path=usr/lib/cfgadm/shp.so target=./shp.so.1
+file path=usr/lib/cfgadm/shp.so.1
+link path=usr/lib/cfgadm/usb.so target=./usb.so.1
+file path=usr/lib/cfgadm/usb.so.1
+file path=usr/lib/extendedFILE.so.1
+file path=usr/lib/getloginx.so.1
+dir  path=usr/lib/iconv/$(ARCH64)
+file path=usr/lib/lib.b mode=0444
+link path=usr/lib/libadm.so target=../../lib/libadm.so.1
+link path=usr/lib/libadm.so.1 target=../../lib/libadm.so.1
+link path=usr/lib/libads.so target=./libads.so.1
+file path=usr/lib/libads.so.1
+link path=usr/lib/libadutils.so target=./libadutils.so.1
+file path=usr/lib/libadutils.so.1
+link path=usr/lib/libaio.so target=../../lib/libaio.so.1
+link path=usr/lib/libaio.so.1 target=../../lib/libaio.so.1
+link path=usr/lib/libavl.so target=../../lib/libavl.so.1
+link path=usr/lib/libavl.so.1 target=../../lib/libavl.so.1
+link path=usr/lib/libbsdmalloc.so target=./libbsdmalloc.so.1
+file path=usr/lib/libbsdmalloc.so.1
+link path=usr/lib/libbsm.so target=../../lib/libbsm.so.1
+link path=usr/lib/libbsm.so.1 target=../../lib/libbsm.so.1
+$(i386_ONLY)dir path=usr/lib/libc
+link path=usr/lib/libc.so target=../../lib/libc.so.1
+link path=usr/lib/libc.so.1 target=../../lib/libc.so.1
+$(i386_ONLY)file path=usr/lib/libc/libc_hwcap1.so.1 reboot-needed=true
+$(i386_ONLY)file path=usr/lib/libc/libc_hwcap2.so.1 reboot-needed=true
+$(i386_ONLY)file path=usr/lib/libc/libc_hwcap3.so.1 reboot-needed=true
+link path=usr/lib/libc_db.so target=../../lib/libc_db.so.1
+link path=usr/lib/libc_db.so.1 target=../../lib/libc_db.so.1
+link path=usr/lib/libcfgadm.so target=./libcfgadm.so.1
+file path=usr/lib/libcfgadm.so.1
+link path=usr/lib/libcmdutils.so.1 target=../../lib/libcmdutils.so.1
+link path=usr/lib/libcommputil.so target=./libcommputil.so.1
+file path=usr/lib/libcommputil.so.1
+link path=usr/lib/libcontract.so target=../../lib/libcontract.so.1
+link path=usr/lib/libcontract.so.1 target=../../lib/libcontract.so.1
+file path=usr/lib/libcrle.so.1
+link path=usr/lib/libcrypt.so target=./libcrypt.so.1
+file path=usr/lib/libcrypt.so.1
+link path=usr/lib/libcrypt_d.so target=./libcrypt.so
+link path=usr/lib/libcrypt_d.so.1 target=./libcrypt.so.1
+link path=usr/lib/libcrypt_i.so target=./libcrypt.so
+link path=usr/lib/libcrypt_i.so.1 target=./libcrypt.so.1
+link path=usr/lib/libctf.so target=../../lib/libctf.so.1
+link path=usr/lib/libctf.so.1 target=../../lib/libctf.so.1
+link path=usr/lib/libcurses.so target=../../lib/libcurses.so.1
+link path=usr/lib/libcurses.so.1 target=../../lib/libcurses.so.1
+link path=usr/lib/libdevice.so target=../../lib/libdevice.so.1
+link path=usr/lib/libdevice.so.1 target=../../lib/libdevice.so.1
+link path=usr/lib/libdevid.so target=../../lib/libdevid.so.1
+link path=usr/lib/libdevid.so.1 target=../../lib/libdevid.so.1
+link path=usr/lib/libdevinfo.so target=../../lib/libdevinfo.so.1
+link path=usr/lib/libdevinfo.so.1 target=../../lib/libdevinfo.so.1
+link path=usr/lib/libdhcpagent.so.1 target=../../lib/libdhcpagent.so.1
+link path=usr/lib/libdhcputil.so.1 target=../../lib/libdhcputil.so.1
+link path=usr/lib/libdisasm.so target=./libdisasm.so.1
+file path=usr/lib/libdisasm.so.1
+link path=usr/lib/libdl.so target=../../lib/libdl.so.1
+link path=usr/lib/libdl.so.1 target=../../lib/libdl.so.1
+link path=usr/lib/libdlpi.so target=../../lib/libdlpi.so.1
+link path=usr/lib/libdlpi.so.1 target=../../lib/libdlpi.so.1
+link path=usr/lib/libdoor.so target=../../lib/libdoor.so.1
+link path=usr/lib/libdoor.so.1 target=../../lib/libdoor.so.1
+link path=usr/lib/libdwarf.so.1 target=../../lib/libdwarf.so.1
+link path=usr/lib/libefi.so target=../../lib/libefi.so.1
+link path=usr/lib/libefi.so.1 target=../../lib/libefi.so.1
+link path=usr/lib/libelf.so target=../../lib/libelf.so.1
+link path=usr/lib/libelf.so.1 target=../../lib/libelf.so.1
+link path=usr/lib/libexacct.so target=./libexacct.so.1
+file path=usr/lib/libexacct.so.1
+link path=usr/lib/libfakekernel.so.1 target=../../lib/libfakekernel.so.1
+$(i386_ONLY)link path=usr/lib/libfdisk.so target=../../lib/libfdisk.so.1
+$(i386_ONLY)link path=usr/lib/libfdisk.so.1 target=../../lib/libfdisk.so.1
+link path=usr/lib/libform.so target=./libform.so.1
+file path=usr/lib/libform.so.1
+link path=usr/lib/libfstyp.so target=./libfstyp.so.1
+file path=usr/lib/libfstyp.so.1
+link path=usr/lib/libgen.so target=../../lib/libgen.so.1
+link path=usr/lib/libgen.so.1 target=../../lib/libgen.so.1
+link path=usr/lib/libhotplug.so target=./libhotplug.so.1
+file path=usr/lib/libhotplug.so.1
+link path=usr/lib/libidmap.so target=./libidmap.so.1
+file path=usr/lib/libidmap.so.1
+file path=usr/lib/libidspace.so.1
+file path=usr/lib/libike.so.1
+file path=usr/lib/libinetsvc.so.1
+link path=usr/lib/libinetutil.so.1 target=../../lib/libinetutil.so.1
+link path=usr/lib/libintl.so target=../../lib/libintl.so.1
+link path=usr/lib/libintl.so.1 target=../../lib/libintl.so.1
+link path=usr/lib/libipmi.so target=./libipmi.so.1
+file path=usr/lib/libipmi.so.1
+link path=usr/lib/libipp.so target=./libipp.so.1
+file path=usr/lib/libipp.so.1
+file path=usr/lib/libipsecutil.so.1
+file path=usr/lib/libjedec.so.1
+link path=usr/lib/libkstat.so target=../../lib/libkstat.so.1
+link path=usr/lib/libkstat.so.1 target=../../lib/libkstat.so.1
+link path=usr/lib/libkvm.so target=./libkvm.so.1
+file path=usr/lib/libkvm.so.1
+link path=usr/lib/libl.so target=./libl.so.1
+file path=usr/lib/libl.so.1
+link path=usr/lib/libldap.so target=libldap.so.5
+file path=usr/lib/libldap.so.5
+link path=usr/lib/liblddbg.so.4 target=../../lib/liblddbg.so.4
+link path=usr/lib/liblgrp.so target=./liblgrp.so.1
+file path=usr/lib/liblgrp.so.1
+link path=usr/lib/liblm.so target=./liblm.so.1
+file path=usr/lib/liblm.so.1
+link path=usr/lib/libmail.so target=./libmail.so.1
+file path=usr/lib/libmail.so.1
+link path=usr/lib/libmalloc.so target=./libmalloc.so.1
+file path=usr/lib/libmalloc.so.1
+link path=usr/lib/libmapmalloc.so target=./libmapmalloc.so.1
+file path=usr/lib/libmapmalloc.so.1
+link path=usr/lib/libmd.so target=../../lib/libmd.so.1
+link path=usr/lib/libmd.so.1 target=../../lib/libmd.so.1
+link path=usr/lib/libmd5.so target=../../lib/libmd5.so.1
+link path=usr/lib/libmd5.so.1 target=../../lib/libmd5.so.1
+link path=usr/lib/libmenu.so target=./libmenu.so.1
+file path=usr/lib/libmenu.so.1
+link path=usr/lib/libmp.so target=../../lib/libmp.so.2
+link path=usr/lib/libmp.so.1 target=../../lib/libmp.so.1
+link path=usr/lib/libmp.so.2 target=../../lib/libmp.so.2
+link path=usr/lib/libmtmalloc.so target=./libmtmalloc.so.1
+file path=usr/lib/libmtmalloc.so.1
+link path=usr/lib/libnls.so target=./libnls.so.1
+file path=usr/lib/libnls.so.1
+link path=usr/lib/libnsl.so target=../../lib/libnsl.so.1
+link path=usr/lib/libnsl.so.1 target=../../lib/libnsl.so.1
+link path=usr/lib/libnvpair.so target=../../lib/libnvpair.so.1
+link path=usr/lib/libnvpair.so.1 target=../../lib/libnvpair.so.1
+link path=usr/lib/libpam.so target=../../lib/libpam.so.1
+link path=usr/lib/libpam.so.1 target=../../lib/libpam.so.1
+link path=usr/lib/libpanel.so target=./libpanel.so.1
+file path=usr/lib/libpanel.so.1
+file path=usr/lib/libpcidb.so.1
+link path=usr/lib/libpkcs11.so target=./libpkcs11.so.1
+file path=usr/lib/libpkcs11.so.1
+link path=usr/lib/libposix4.so target=../../lib/librt.so.1
+link path=usr/lib/libposix4.so.1 target=../../lib/librt.so.1
+link path=usr/lib/libproc.so target=../../lib/libproc.so.1
+link path=usr/lib/libproc.so.1 target=../../lib/libproc.so.1
+link path=usr/lib/libproject.so target=./libproject.so.1
+file path=usr/lib/libproject.so.1
+link path=usr/lib/libpthread.so target=../../lib/libpthread.so.1
+link path=usr/lib/libpthread.so.1 target=../../lib/libpthread.so.1
+file path=usr/lib/libraidcfg.so.1
+link path=usr/lib/librcm.so target=../../lib/librcm.so.1
+link path=usr/lib/librcm.so.1 target=../../lib/librcm.so.1
+file path=usr/lib/librename.so.1
+link path=usr/lib/libreparse.so target=./libreparse.so.1
+file path=usr/lib/libreparse.so.1
+link path=usr/lib/libresolv.so target=../../lib/libresolv.so.2
+link path=usr/lib/libresolv.so.1 target=../../lib/libresolv.so.1
+link path=usr/lib/libresolv.so.2 target=../../lib/libresolv.so.2
+link path=usr/lib/librestart.so.1 target=../../lib/librestart.so.1
+link path=usr/lib/librpcsvc.so target=../../lib/librpcsvc.so.1
+link path=usr/lib/librpcsvc.so.1 target=../../lib/librpcsvc.so.1
+link path=usr/lib/librt.so target=../../lib/librt.so.1
+link path=usr/lib/librt.so.1 target=../../lib/librt.so.1
+link path=usr/lib/librtld.so.1 target=../../lib/librtld.so.1
+link path=usr/lib/librtld_db.so target=../../lib/librtld_db.so.1
+link path=usr/lib/librtld_db.so.1 target=../../lib/librtld_db.so.1
+link path=usr/lib/libscf.so target=../../lib/libscf.so.1
+link path=usr/lib/libscf.so.1 target=../../lib/libscf.so.1
+link path=usr/lib/libsched.so target=./libsched.so.1
+file path=usr/lib/libsched.so.1
+link path=usr/lib/libsctp.so target=./libsctp.so.1
+file path=usr/lib/libsctp.so.1
+link path=usr/lib/libsec.so target=../../lib/libsec.so.1
+link path=usr/lib/libsec.so.1 target=../../lib/libsec.so.1
+link path=usr/lib/libsecdb.so target=../../lib/libsecdb.so.1
+link path=usr/lib/libsecdb.so.1 target=../../lib/libsecdb.so.1
+link path=usr/lib/libsendfile.so target=../../lib/libsendfile.so.1
+link path=usr/lib/libsendfile.so.1 target=../../lib/libsendfile.so.1
+file path=usr/lib/libsff.so.1
+link path=usr/lib/libsip.so target=./libsip.so.1
+file path=usr/lib/libsip.so.1
+link path=usr/lib/libsldap.so target=libsldap.so.1
+file path=usr/lib/libsldap.so.1
+link path=usr/lib/libsmbios.so target=libsmbios.so.1
+file path=usr/lib/libsmbios.so.1
+link path=usr/lib/libsocket.so target=../../lib/libsocket.so.1
+link path=usr/lib/libsocket.so.1 target=../../lib/libsocket.so.1
+link path=usr/lib/libsoftcrypto.so target=./libsoftcrypto.so.1
+file path=usr/lib/libsoftcrypto.so.1
+link path=usr/lib/libsysevent.so target=../../lib/libsysevent.so.1
+link path=usr/lib/libsysevent.so.1 target=../../lib/libsysevent.so.1
+link path=usr/lib/libtermcap.so target=../../lib/libtermcap.so.1
+link path=usr/lib/libtermcap.so.1 target=../../lib/libtermcap.so.1
+link path=usr/lib/libtermlib.so target=../../lib/libcurses.so.1
+link path=usr/lib/libtermlib.so.1 target=../../lib/libcurses.so.1
+link path=usr/lib/libthread.so target=../../lib/libthread.so.1
+link path=usr/lib/libthread.so.1 target=../../lib/libthread.so.1
+link path=usr/lib/libthread_db.so target=../../lib/libc_db.so.1
+link path=usr/lib/libthread_db.so.1 target=../../lib/libc_db.so.1
+link path=usr/lib/libtsnet.so target=../../lib/libtsnet.so.1
+link path=usr/lib/libtsnet.so.1 target=../../lib/libtsnet.so.1
+link path=usr/lib/libtsol.so target=../../lib/libtsol.so.2
+link path=usr/lib/libtsol.so.2 target=../../lib/libtsol.so.2
+link path=usr/lib/libumem.so target=../../lib/libumem.so.1
+link path=usr/lib/libumem.so.1 target=../../lib/libumem.so.1
+link path=usr/lib/libuuid.so target=../../lib/libuuid.so.1
+link path=usr/lib/libuuid.so.1 target=../../lib/libuuid.so.1
+link path=usr/lib/libuutil.so.1 target=../../lib/libuutil.so.1
+$(sparc_ONLY)link path=usr/lib/libv12n.so target=./libv12n.so.1
+$(sparc_ONLY)file path=usr/lib/libv12n.so.1
+link path=usr/lib/libvolmgt.so target=./libvolmgt.so.1
+file path=usr/lib/libvolmgt.so.1
+link path=usr/lib/libw.so target=../../lib/libw.so.1
+link path=usr/lib/libw.so.1 target=../../lib/libw.so.1
+link path=usr/lib/libwrap.so target=libwrap.so.1.0
+link path=usr/lib/libwrap.so.1 target=libwrap.so.1.0
+file path=usr/lib/libwrap.so.1.0
+link path=usr/lib/libxnet.so target=../../lib/libxnet.so.1
+link path=usr/lib/libxnet.so.1 target=../../lib/libxnet.so.1
+link path=usr/lib/liby.so target=./liby.so.1
+file path=usr/lib/liby.so.1
+link path=usr/lib/libzoneinfo.so target=./libzoneinfo.so.1
+file path=usr/lib/libzoneinfo.so.1
+dir  path=usr/lib/lwp
+dir  path=usr/lib/lwp/$(ARCH64)
+link path=usr/lib/lwp/$(ARCH64)/libthread.so.1 \
+    target=../../$(ARCH64)/libthread.so.1
+link path=usr/lib/lwp/$(ARCH64)/libthread_db.so.1 \
+    target=../../$(ARCH64)/libthread_db.so.1
+link path=usr/lib/lwp/32 target=.
+link path=usr/lib/lwp/64 target=$(ARCH64)
+link path=usr/lib/lwp/libthread.so.1 target=../libthread.so.1
+link path=usr/lib/lwp/libthread_db.so.1 target=../libthread_db.so.1
+file path=usr/lib/nss_ad.so.1
+link path=usr/lib/nss_compat.so.1 target=../../lib/nss_compat.so.1
+link path=usr/lib/nss_dns.so.1 target=../../lib/nss_dns.so.1
+link path=usr/lib/nss_files.so.1 target=../../lib/nss_files.so.1
+file path=usr/lib/nss_ldap.so.1
+link path=usr/lib/nss_nis.so.1 target=../../lib/nss_nis.so.1
+link path=usr/lib/nss_user.so.1 target=../../lib/nss_user.so.1
+file path=usr/lib/passwdutil.so.1
+dir  path=usr/lib/raidcfg
+dir  path=usr/lib/raidcfg/$(ARCH64)
+file path=usr/lib/raidcfg/$(ARCH64)/mpt.so.1
+file path=usr/lib/raidcfg/mpt.so.1
+dir  path=usr/lib/scsi
+dir  path=usr/lib/scsi/$(ARCH64)
+link path=usr/lib/scsi/$(ARCH64)/libscsi.so target=./libscsi.so.1
+file path=usr/lib/scsi/$(ARCH64)/libscsi.so.1
+link path=usr/lib/scsi/$(ARCH64)/libses.so target=./libses.so.1
+file path=usr/lib/scsi/$(ARCH64)/libses.so.1
+link path=usr/lib/scsi/$(ARCH64)/libsmp.so target=./libsmp.so.1
+file path=usr/lib/scsi/$(ARCH64)/libsmp.so.1
+link path=usr/lib/scsi/libscsi.so target=./libscsi.so.1
+file path=usr/lib/scsi/libscsi.so.1
+link path=usr/lib/scsi/libses.so target=./libses.so.1
+file path=usr/lib/scsi/libses.so.1
+link path=usr/lib/scsi/libsmp.so target=./libsmp.so.1
+file path=usr/lib/scsi/libsmp.so.1
+dir  path=usr/lib/scsi/plugins
+dir  path=usr/lib/scsi/plugins/scsi
+dir  path=usr/lib/scsi/plugins/scsi/engines
+dir  path=usr/lib/scsi/plugins/scsi/engines/$(ARCH64)
+file path=usr/lib/scsi/plugins/scsi/engines/$(ARCH64)/uscsi.so
+file path=usr/lib/scsi/plugins/scsi/engines/uscsi.so
+dir  path=usr/lib/scsi/plugins/ses
+dir  path=usr/lib/scsi/plugins/ses/framework
+dir  path=usr/lib/scsi/plugins/ses/framework/$(ARCH64)
+file path=usr/lib/scsi/plugins/ses/framework/$(ARCH64)/libses.so
+file path=usr/lib/scsi/plugins/ses/framework/$(ARCH64)/ses2.so
+file path=usr/lib/scsi/plugins/ses/framework/libses.so
+file path=usr/lib/scsi/plugins/ses/framework/ses2.so
+dir  path=usr/lib/scsi/plugins/ses/vendor
+$(sparc_ONLY)dir path=usr/lib/scsi/plugins/ses/vendor/$(ARCH64)
+dir  path=usr/lib/scsi/plugins/smp
+dir  path=usr/lib/scsi/plugins/smp/engine
+dir  path=usr/lib/scsi/plugins/smp/engine/$(ARCH64)
+file path=usr/lib/scsi/plugins/smp/engine/$(ARCH64)/usmp.so
+file path=usr/lib/scsi/plugins/smp/engine/usmp.so
+dir  path=usr/lib/scsi/plugins/smp/framework
+dir  path=usr/lib/scsi/plugins/smp/framework/$(ARCH64)
+file path=usr/lib/scsi/plugins/smp/framework/$(ARCH64)/sas2.so
+file path=usr/lib/scsi/plugins/smp/framework/sas2.so
+dir  path=usr/lib/security
+dir  path=usr/lib/security/$(ARCH64)
+link path=usr/lib/security/$(ARCH64)/crypt_bsdbf.so target=./crypt_bsdbf.so.1
+file path=usr/lib/security/$(ARCH64)/crypt_bsdbf.so.1
+link path=usr/lib/security/$(ARCH64)/crypt_bsdmd5.so target=./crypt_bsdmd5.so.1
+file path=usr/lib/security/$(ARCH64)/crypt_bsdmd5.so.1
+link path=usr/lib/security/$(ARCH64)/crypt_sha256.so target=./crypt_sha256.so.1
+file path=usr/lib/security/$(ARCH64)/crypt_sha256.so.1
+link path=usr/lib/security/$(ARCH64)/crypt_sha512.so target=./crypt_sha512.so.1
+file path=usr/lib/security/$(ARCH64)/crypt_sha512.so.1
+link path=usr/lib/security/$(ARCH64)/crypt_sunmd5.so target=./crypt_sunmd5.so.1
+file path=usr/lib/security/$(ARCH64)/crypt_sunmd5.so.1
+link path=usr/lib/security/$(ARCH64)/pam_allow.so target=./pam_allow.so.1
+file path=usr/lib/security/$(ARCH64)/pam_allow.so.1
+link path=usr/lib/security/$(ARCH64)/pam_authtok_check.so \
+    target=./pam_authtok_check.so.1
+file path=usr/lib/security/$(ARCH64)/pam_authtok_check.so.1
+link path=usr/lib/security/$(ARCH64)/pam_authtok_get.so \
+    target=./pam_authtok_get.so.1
+file path=usr/lib/security/$(ARCH64)/pam_authtok_get.so.1
+link path=usr/lib/security/$(ARCH64)/pam_authtok_store.so \
+    target=./pam_authtok_store.so.1
+file path=usr/lib/security/$(ARCH64)/pam_authtok_store.so.1
+link path=usr/lib/security/$(ARCH64)/pam_deny.so target=./pam_deny.so.1
+file path=usr/lib/security/$(ARCH64)/pam_deny.so.1
+link path=usr/lib/security/$(ARCH64)/pam_dhkeys.so target=./pam_dhkeys.so.1
+file path=usr/lib/security/$(ARCH64)/pam_dhkeys.so.1
+link path=usr/lib/security/$(ARCH64)/pam_dial_auth.so \
+    target=./pam_dial_auth.so.1
+file path=usr/lib/security/$(ARCH64)/pam_dial_auth.so.1
+link path=usr/lib/security/$(ARCH64)/pam_ldap.so target=./pam_ldap.so.1
+file path=usr/lib/security/$(ARCH64)/pam_ldap.so.1
+link path=usr/lib/security/$(ARCH64)/pam_list.so target=./pam_list.so.1
+file path=usr/lib/security/$(ARCH64)/pam_list.so.1
+link path=usr/lib/security/$(ARCH64)/pam_passwd_auth.so \
+    target=./pam_passwd_auth.so.1
+file path=usr/lib/security/$(ARCH64)/pam_passwd_auth.so.1
+link path=usr/lib/security/$(ARCH64)/pam_rhosts_auth.so \
+    target=./pam_rhosts_auth.so.1
+file path=usr/lib/security/$(ARCH64)/pam_rhosts_auth.so.1
+link path=usr/lib/security/$(ARCH64)/pam_roles.so target=./pam_roles.so.1
+file path=usr/lib/security/$(ARCH64)/pam_roles.so.1
+link path=usr/lib/security/$(ARCH64)/pam_sample.so target=./pam_sample.so.1
+file path=usr/lib/security/$(ARCH64)/pam_sample.so.1
+link path=usr/lib/security/$(ARCH64)/pam_timestamp.so \
+    target=./pam_timestamp.so.1
+file path=usr/lib/security/$(ARCH64)/pam_timestamp.so.1
+link path=usr/lib/security/$(ARCH64)/pam_tsol_account.so \
+    target=./pam_tsol_account.so.1
+file path=usr/lib/security/$(ARCH64)/pam_tsol_account.so.1
+link path=usr/lib/security/$(ARCH64)/pam_unix_account.so \
+    target=./pam_unix_account.so.1
+file path=usr/lib/security/$(ARCH64)/pam_unix_account.so.1
+link path=usr/lib/security/$(ARCH64)/pam_unix_auth.so \
+    target=./pam_unix_auth.so.1
+file path=usr/lib/security/$(ARCH64)/pam_unix_auth.so.1
+link path=usr/lib/security/$(ARCH64)/pam_unix_cred.so \
+    target=./pam_unix_cred.so.1
+file path=usr/lib/security/$(ARCH64)/pam_unix_cred.so.1
+link path=usr/lib/security/$(ARCH64)/pam_unix_session.so \
+    target=./pam_unix_session.so.1
+file path=usr/lib/security/$(ARCH64)/pam_unix_session.so.1
+link path=usr/lib/security/$(ARCH64)/pkcs11_kernel.so \
+    target=./pkcs11_kernel.so.1
+file path=usr/lib/security/$(ARCH64)/pkcs11_kernel.so.1
+link path=usr/lib/security/$(ARCH64)/pkcs11_softtoken.so \
+    target=./pkcs11_softtoken.so.1
+file path=usr/lib/security/$(ARCH64)/pkcs11_softtoken.so.1
+link path=usr/lib/security/$(ARCH64)/pkcs11_tpm.so target=./pkcs11_tpm.so.1
+file path=usr/lib/security/$(ARCH64)/pkcs11_tpm.so.1
+link path=usr/lib/security/64 target=$(ARCH64)
+link path=usr/lib/security/audit_binfile.so target=./audit_binfile.so.1
+file path=usr/lib/security/audit_binfile.so.1
+link path=usr/lib/security/audit_remote.so target=./audit_remote.so.1
+file path=usr/lib/security/audit_remote.so.1
+link path=usr/lib/security/audit_syslog.so target=./audit_syslog.so.1
+file path=usr/lib/security/audit_syslog.so.1
+link path=usr/lib/security/crypt_bsdbf.so target=./crypt_bsdbf.so.1
+file path=usr/lib/security/crypt_bsdbf.so.1
+link path=usr/lib/security/crypt_bsdmd5.so target=./crypt_bsdmd5.so.1
+file path=usr/lib/security/crypt_bsdmd5.so.1
+link path=usr/lib/security/crypt_sha256.so target=./crypt_sha256.so.1
+file path=usr/lib/security/crypt_sha256.so.1
+link path=usr/lib/security/crypt_sha512.so target=./crypt_sha512.so.1
+file path=usr/lib/security/crypt_sha512.so.1
+link path=usr/lib/security/crypt_sunmd5.so target=./crypt_sunmd5.so.1
+file path=usr/lib/security/crypt_sunmd5.so.1
+link path=usr/lib/security/pam_allow.so target=./pam_allow.so.1
+file path=usr/lib/security/pam_allow.so.1
+link path=usr/lib/security/pam_authtok_check.so target=./pam_authtok_check.so.1
+file path=usr/lib/security/pam_authtok_check.so.1
+link path=usr/lib/security/pam_authtok_get.so target=./pam_authtok_get.so.1
+file path=usr/lib/security/pam_authtok_get.so.1
+link path=usr/lib/security/pam_authtok_store.so target=./pam_authtok_store.so.1
+file path=usr/lib/security/pam_authtok_store.so.1
+link path=usr/lib/security/pam_deny.so target=./pam_deny.so.1
+file path=usr/lib/security/pam_deny.so.1
+link path=usr/lib/security/pam_dhkeys.so target=./pam_dhkeys.so.1
+file path=usr/lib/security/pam_dhkeys.so.1
+link path=usr/lib/security/pam_dial_auth.so target=./pam_dial_auth.so.1
+file path=usr/lib/security/pam_dial_auth.so.1
+link path=usr/lib/security/pam_ldap.so target=./pam_ldap.so.1
+file path=usr/lib/security/pam_ldap.so.1
+link path=usr/lib/security/pam_list.so target=./pam_list.so.1
+file path=usr/lib/security/pam_list.so.1
+link path=usr/lib/security/pam_passwd_auth.so target=./pam_passwd_auth.so.1
+file path=usr/lib/security/pam_passwd_auth.so.1
+link path=usr/lib/security/pam_rhosts_auth.so target=./pam_rhosts_auth.so.1
+file path=usr/lib/security/pam_rhosts_auth.so.1
+link path=usr/lib/security/pam_roles.so target=./pam_roles.so.1
+file path=usr/lib/security/pam_roles.so.1
+link path=usr/lib/security/pam_sample.so target=./pam_sample.so.1
+file path=usr/lib/security/pam_sample.so.1
+link path=usr/lib/security/pam_timestamp.so target=./pam_timestamp.so.1
+file path=usr/lib/security/pam_timestamp.so.1
+link path=usr/lib/security/pam_tsol_account.so target=./pam_tsol_account.so.1
+file path=usr/lib/security/pam_tsol_account.so.1
+link path=usr/lib/security/pam_unix_account.so target=./pam_unix_account.so.1
+file path=usr/lib/security/pam_unix_account.so.1
+link path=usr/lib/security/pam_unix_auth.so target=./pam_unix_auth.so.1
+file path=usr/lib/security/pam_unix_auth.so.1
+link path=usr/lib/security/pam_unix_cred.so target=./pam_unix_cred.so.1
+file path=usr/lib/security/pam_unix_cred.so.1
+link path=usr/lib/security/pam_unix_session.so target=./pam_unix_session.so.1
+file path=usr/lib/security/pam_unix_session.so.1
+link path=usr/lib/security/pkcs11_kernel.so target=./pkcs11_kernel.so.1
+file path=usr/lib/security/pkcs11_kernel.so.1
+link path=usr/lib/security/pkcs11_softtoken.so target=./pkcs11_softtoken.so.1
+file path=usr/lib/security/pkcs11_softtoken.so.1
+link path=usr/lib/security/pkcs11_tpm.so target=./pkcs11_tpm.so.1
+file path=usr/lib/security/pkcs11_tpm.so.1
+link path=usr/lib/straddr.so target=./straddr.so.2
+file path=usr/lib/straddr.so.2
+file path=usr/lib/watchmalloc.so.1
+dir  path=usr/share/man
+dir  path=usr/share/man/man3
+dir  path=usr/share/man/man3avl
+dir  path=usr/share/man/man3bsm
+dir  path=usr/share/man/man3c
+dir  path=usr/share/man/man3c_db
+dir  path=usr/share/man/man3cfgadm
+dir  path=usr/share/man/man3commputil
+dir  path=usr/share/man/man3contract
+dir  path=usr/share/man/man3curses
+dir  path=usr/share/man/man3devid
+dir  path=usr/share/man/man3devinfo
+dir  path=usr/share/man/man3dlpi
+dir  path=usr/share/man/man3elf
+dir  path=usr/share/man/man3exacct
+dir  path=usr/share/man/man3ext
+dir  path=usr/share/man/man3fstyp
+dir  path=usr/share/man/man3gen
+dir  path=usr/share/man/man3kstat
+dir  path=usr/share/man/man3kvm
+dir  path=usr/share/man/man3ldap
+dir  path=usr/share/man/man3lgrp
+dir  path=usr/share/man/man3lib
+dir  path=usr/share/man/man3mail
+dir  path=usr/share/man/man3malloc
+dir  path=usr/share/man/man3mp
+dir  path=usr/share/man/man3nsl
+dir  path=usr/share/man/man3nvpair
+dir  path=usr/share/man/man3ofmt
+dir  path=usr/share/man/man3pam
+dir  path=usr/share/man/man3pool
+dir  path=usr/share/man/man3proc
+dir  path=usr/share/man/man3project
+dir  path=usr/share/man/man3resolv
+dir  path=usr/share/man/man3rpc
+dir  path=usr/share/man/man3scf
+dir  path=usr/share/man/man3sec
+dir  path=usr/share/man/man3secdb
+dir  path=usr/share/man/man3sip
+dir  path=usr/share/man/man3socket
+dir  path=usr/share/man/man3sysevent
+dir  path=usr/share/man/man3tsol
+dir  path=usr/share/man/man3uuid
+dir  path=usr/share/man/man3volmgt
+dir  path=usr/share/man/man3xcurses
+dir  path=usr/share/man/man3xnet
+dir  path=usr/share/man/man5
+dir  path=usr/share/man/man7p
+dir  path=usr/xpg4
+dir  path=usr/xpg4/lib
+dir  path=usr/xpg4/lib/$(ARCH64)
+link path=usr/xpg4/lib/$(ARCH64)/libcurses.so target=libcurses.so.2
+# XXX: Obsoleted by open i18n?
+file path=usr/xpg4/lib/$(ARCH64)/libcurses.so.1
+file path=usr/xpg4/lib/$(ARCH64)/libcurses.so.2
+link path=usr/xpg4/lib/64 target=$(ARCH64)
+link path=usr/xpg4/lib/libcurses.so target=./libcurses.so.2
+file path=usr/xpg4/lib/libcurses.so.1
+file path=usr/xpg4/lib/libcurses.so.2
+legacy pkg=SUNWcsl \
+    desc="core shared libraries for a specific instruction-set architecture" \
+    name="Core Solaris, (Shared Libs)"
+legacy pkg=SUNWcslr \
+    desc="core software for a specific instruction-set architecture" \
+    name="Core Solaris Libraries (Root)"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license lic_OSBL license=lic_OSBL
+license lic_OSBL_preamble license=lic_OSBL_preamble
+# libwrap is part of tcp wrappers along with tcpd
+license usr/src/cmd/tcpd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/tcpd/THIRDPARTYLICENSE
+license usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams \
+    license=usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams
+license usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman \
+    license=usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman
+license usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl \
+    license=usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl
+license usr/src/common/crypto/ecc/THIRDPARTYLICENSE \
+    license=usr/src/common/crypto/ecc/THIRDPARTYLICENSE
+license usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE \
+    license=usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE
+license usr/src/common/crypto/sha1/amd64/THIRDPARTYLICENSE.sha1-ni \
+    license=usr/src/common/crypto/sha1/amd64/THIRDPARTYLICENSE.sha1-ni
+license usr/src/common/crypto/sha2/amd64/THIRDPARTYLICENSE.sha256-ni \
+    license=usr/src/common/crypto/sha2/amd64/THIRDPARTYLICENSE.sha256-ni
+license usr/src/common/crypto/skein/THIRDPARTYLICENSE \
+    license=usr/src/common/crypto/skein/THIRDPARTYLICENSE
+license usr/src/common/mpi/THIRDPARTYLICENSE \
+    license=usr/src/common/mpi/THIRDPARTYLICENSE
+license usr/src/common/util/THIRDPARTYLICENSE.multi3 \
+    license=usr/src/common/util/THIRDPARTYLICENSE.multi3
+license usr/src/lib/libbsdmalloc/THIRDPARTYLICENSE \
+    license=usr/src/lib/libbsdmalloc/THIRDPARTYLICENSE
+license usr/src/lib/libc/THIRDPARTYLICENSE \
+    license=usr/src/lib/libc/THIRDPARTYLICENSE
+license usr/src/lib/libdwarf/THIRDPARTYLICENSE \
+    license=usr/src/lib/libdwarf/THIRDPARTYLICENSE
+license usr/src/lib/libinetutil/common/THIRDPARTYLICENSE \
+    license=usr/src/lib/libinetutil/common/THIRDPARTYLICENSE
+license usr/src/lib/libkmf/THIRDPARTYLICENSE \
+    license=usr/src/lib/libkmf/THIRDPARTYLICENSE
+license usr/src/lib/libldap5/THIRDPARTYLICENSE \
+    license=usr/src/lib/libldap5/THIRDPARTYLICENSE
+license usr/src/lib/libmp/common/THIRDPARTYLICENSE \
+    license=usr/src/lib/libmp/common/THIRDPARTYLICENSE
+license usr/src/lib/libresolv/THIRDPARTYLICENSE \
+    license=usr/src/lib/libresolv/THIRDPARTYLICENSE
+license usr/src/lib/libresolv2/THIRDPARTYLICENSE \
+    license=usr/src/lib/libresolv2/THIRDPARTYLICENSE
+license usr/src/lib/pam_modules/authtok_check/THIRDPARTYLICENSE \
+    license=usr/src/lib/pam_modules/authtok_check/THIRDPARTYLICENSE
+license usr/src/lib/passwdutil/THIRDPARTYLICENSE \
+    license=usr/src/lib/passwdutil/THIRDPARTYLICENSE
+license usr/src/lib/pkcs11/pkcs11_tpm/THIRDPARTYLICENSE \
+    license=usr/src/lib/pkcs11/pkcs11_tpm/THIRDPARTYLICENSE
+license usr/src/man/man3c/THIRDPARTYLICENSE.arc4random \
+    license=usr/src/man/man3c/THIRDPARTYLICENSE.arc4random
+license usr/src/man/man3c/THIRDPARTYLICENSE.getentropy \
+    license=usr/src/man/man3c/THIRDPARTYLICENSE.getentropy
+license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
+    license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
+$(python3_ONLY)depend type=conditional \
+    fmri=system/library/python/solaris$(PYTHON3_PKGVERS) \
+    predicate=runtime/python$(PYTHON3_PKGVERS)
+$(python2_ONLY)depend type=conditional \
+    fmri=system/library/python/solaris$(PYTHON_PKGVERS) \
+    predicate=runtime/python$(PYTHON_PKGVERS)
+#
+# libses.so needs to dlopen(3C) plugins from usr/lib/scsi/plugins/ses/vendor/,
+# a dependency which cannot be automatically derived
+#
+depend type=require fmri=system/library/storage/scsi-plugins

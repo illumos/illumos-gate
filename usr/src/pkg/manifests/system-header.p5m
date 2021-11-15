@@ -1,0 +1,2233 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2013 Saso Kiselkov. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+# Copyright 2020 Joyent, Inc.
+# Copyright 2019 Peter Tribble.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+#
+
+set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
+set name=pkg.summary value="SunOS Header Files"
+set name=pkg.description \
+    value="SunOS C/C++ header files for general development of software"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/include
+$(i386_ONLY)dir path=usr/include/$(ARCH64)
+$(i386_ONLY)dir path=usr/include/$(ARCH64)/sys
+$(i386_ONLY)file path=usr/include/$(ARCH64)/sys/kdi_regs.h
+$(i386_ONLY)file path=usr/include/$(ARCH64)/sys/privmregs.h
+$(i386_ONLY)file path=usr/include/$(ARCH64)/sys/privregs.h
+dir  path=usr/include/ads
+file path=usr/include/ads/dsgetdc.h
+file path=usr/include/aio.h
+file path=usr/include/alloca.h
+file path=usr/include/apptrace.h
+file path=usr/include/apptrace_impl.h
+file path=usr/include/ar.h
+file path=usr/include/archives.h
+dir  path=usr/include/arpa
+file path=usr/include/arpa/ftp.h
+file path=usr/include/arpa/inet.h
+file path=usr/include/arpa/nameser.h
+file path=usr/include/arpa/nameser_compat.h
+file path=usr/include/arpa/telnet.h
+file path=usr/include/arpa/tftp.h
+dir  path=usr/include/asm
+$(i386_ONLY)file path=usr/include/asm/atomic.h
+$(i386_ONLY)file path=usr/include/asm/bitmap.h
+$(i386_ONLY)file path=usr/include/asm/byteorder.h
+$(i386_ONLY)file path=usr/include/asm/clock.h
+$(i386_ONLY)file path=usr/include/asm/cpu.h
+$(i386_ONLY)file path=usr/include/asm/cpuvar.h
+$(sparc_ONLY)file path=usr/include/asm/flush.h
+$(i386_ONLY)file path=usr/include/asm/htable.h
+$(i386_ONLY)file path=usr/include/asm/mmu.h
+file path=usr/include/asm/sunddi.h
+file path=usr/include/asm/thread.h
+file path=usr/include/assert.h
+dir  path=usr/include/ast
+file path=usr/include/ast/align.h
+file path=usr/include/ast/aso.h
+file path=usr/include/ast/ast.h
+file path=usr/include/ast/ast_api.h
+file path=usr/include/ast/ast_botch.h
+file path=usr/include/ast/ast_ccode.h
+file path=usr/include/ast/ast_common.h
+file path=usr/include/ast/ast_dir.h
+file path=usr/include/ast/ast_dirent.h
+file path=usr/include/ast/ast_fcntl.h
+file path=usr/include/ast/ast_float.h
+file path=usr/include/ast/ast_fs.h
+file path=usr/include/ast/ast_getopt.h
+file path=usr/include/ast/ast_iconv.h
+file path=usr/include/ast/ast_lib.h
+file path=usr/include/ast/ast_limits.h
+file path=usr/include/ast/ast_map.h
+file path=usr/include/ast/ast_mmap.h
+file path=usr/include/ast/ast_mode.h
+file path=usr/include/ast/ast_namval.h
+file path=usr/include/ast/ast_ndbm.h
+file path=usr/include/ast/ast_nl_types.h
+file path=usr/include/ast/ast_param.h
+file path=usr/include/ast/ast_sizeof.h
+file path=usr/include/ast/ast_standards.h
+file path=usr/include/ast/ast_std.h
+file path=usr/include/ast/ast_stdio.h
+file path=usr/include/ast/ast_sys.h
+file path=usr/include/ast/ast_time.h
+file path=usr/include/ast/ast_tty.h
+file path=usr/include/ast/ast_vfork.h
+file path=usr/include/ast/ast_wait.h
+file path=usr/include/ast/ast_wchar.h
+file path=usr/include/ast/ast_wctype.h
+file path=usr/include/ast/ast_windows.h
+file path=usr/include/ast/bytesex.h
+file path=usr/include/ast/ccode.h
+file path=usr/include/ast/cdt.h
+file path=usr/include/ast/cdtlib.h
+file path=usr/include/ast/cmd.h
+file path=usr/include/ast/cmdarg.h
+file path=usr/include/ast/cmdext.h
+file path=usr/include/ast/debug.h
+file path=usr/include/ast/dirent.h
+file path=usr/include/ast/dlldefs.h
+file path=usr/include/ast/dt.h
+file path=usr/include/ast/endian.h
+file path=usr/include/ast/error.h
+file path=usr/include/ast/find.h
+file path=usr/include/ast/fnmatch.h
+file path=usr/include/ast/fnv.h
+file path=usr/include/ast/fs3d.h
+file path=usr/include/ast/fts.h
+file path=usr/include/ast/ftw.h
+file path=usr/include/ast/ftwalk.h
+file path=usr/include/ast/getopt.h
+file path=usr/include/ast/glob.h
+file path=usr/include/ast/hash.h
+file path=usr/include/ast/hashkey.h
+file path=usr/include/ast/hashpart.h
+file path=usr/include/ast/history.h
+file path=usr/include/ast/iconv.h
+file path=usr/include/ast/ip6.h
+file path=usr/include/ast/lc.h
+file path=usr/include/ast/ls.h
+file path=usr/include/ast/magic.h
+file path=usr/include/ast/magicid.h
+file path=usr/include/ast/mc.h
+file path=usr/include/ast/mime.h
+file path=usr/include/ast/mnt.h
+file path=usr/include/ast/modecanon.h
+file path=usr/include/ast/modex.h
+file path=usr/include/ast/namval.h
+file path=usr/include/ast/nl_types.h
+file path=usr/include/ast/nval.h
+file path=usr/include/ast/option.h
+file path=usr/include/ast/preroot.h
+file path=usr/include/ast/proc.h
+file path=usr/include/ast/prototyped.h
+file path=usr/include/ast/re_comp.h
+file path=usr/include/ast/recfmt.h
+file path=usr/include/ast/regex.h
+file path=usr/include/ast/regexp.h
+file path=usr/include/ast/sfdisc.h
+file path=usr/include/ast/sfio.h
+file path=usr/include/ast/sfio_s.h
+file path=usr/include/ast/sfio_t.h
+file path=usr/include/ast/shcmd.h
+file path=usr/include/ast/shell.h
+file path=usr/include/ast/sig.h
+file path=usr/include/ast/stack.h
+file path=usr/include/ast/stak.h
+file path=usr/include/ast/stdio.h
+file path=usr/include/ast/stk.h
+file path=usr/include/ast/sum.h
+file path=usr/include/ast/swap.h
+file path=usr/include/ast/tar.h
+file path=usr/include/ast/times.h
+file path=usr/include/ast/tm.h
+file path=usr/include/ast/tmx.h
+file path=usr/include/ast/tok.h
+file path=usr/include/ast/tv.h
+file path=usr/include/ast/usage.h
+file path=usr/include/ast/vdb.h
+file path=usr/include/ast/vecargs.h
+file path=usr/include/ast/vmalloc.h
+file path=usr/include/ast/wait.h
+file path=usr/include/ast/wchar.h
+file path=usr/include/ast/wctype.h
+file path=usr/include/ast/wordexp.h
+file path=usr/include/atomic.h
+file path=usr/include/attr.h
+file path=usr/include/auth_attr.h
+dir  path=usr/include/bsm
+file path=usr/include/bsm/adt.h
+file path=usr/include/bsm/adt_event.h
+file path=usr/include/bsm/audit.h
+file path=usr/include/bsm/audit_kernel.h
+file path=usr/include/bsm/audit_kevents.h
+file path=usr/include/bsm/audit_record.h
+file path=usr/include/bsm/audit_uevents.h
+file path=usr/include/bsm/devices.h
+file path=usr/include/bsm/libbsm.h
+file path=usr/include/config_admin.h
+file path=usr/include/cpio.h
+file path=usr/include/crypt.h
+file path=usr/include/cryptoutil.h
+file path=usr/include/ctype.h
+file path=usr/include/curses.h
+dir  path=usr/include/dat
+file path=usr/include/dat/dat.h
+file path=usr/include/dat/dat_error.h
+file path=usr/include/dat/dat_platform_specific.h
+file path=usr/include/dat/dat_redirection.h
+file path=usr/include/dat/dat_registry.h
+file path=usr/include/dat/dat_vendor_specific.h
+file path=usr/include/dat/udat.h
+file path=usr/include/dat/udat_config.h
+file path=usr/include/dat/udat_redirection.h
+file path=usr/include/dat/udat_vendor_specific.h
+file path=usr/include/deflt.h
+dir  path=usr/include/des
+file path=usr/include/des/des.h
+file path=usr/include/des/desdata.h
+file path=usr/include/des/softdes.h
+file path=usr/include/devfsadm.h
+file path=usr/include/device_info.h
+file path=usr/include/devid.h
+file path=usr/include/devmgmt.h
+file path=usr/include/devpoll.h
+file path=usr/include/dial.h
+file path=usr/include/dirent.h
+file path=usr/include/dlfcn.h
+file path=usr/include/door.h
+file path=usr/include/elf.h
+file path=usr/include/endian.h
+file path=usr/include/err.h
+file path=usr/include/errno.h
+file path=usr/include/eti.h
+file path=usr/include/euc.h
+file path=usr/include/exacct.h
+file path=usr/include/exacct_impl.h
+file path=usr/include/exec_attr.h
+file path=usr/include/execinfo.h
+file path=usr/include/fatal.h
+file path=usr/include/fcntl.h
+file path=usr/include/float.h
+file path=usr/include/fmtmsg.h
+file path=usr/include/fnmatch.h
+file path=usr/include/form.h
+file path=usr/include/fts.h
+file path=usr/include/ftw.h
+file path=usr/include/gelf.h
+file path=usr/include/getopt.h
+file path=usr/include/getwidth.h
+file path=usr/include/glob.h
+file path=usr/include/grp.h
+dir  path=usr/include/gssapi
+file path=usr/include/gssapi/gssapi.h
+file path=usr/include/gssapi/gssapi_ext.h
+dir  path=usr/include/hal
+file path=usr/include/hal/libhal-storage.h
+file path=usr/include/hal/libhal.h
+$(i386_ONLY)dir path=usr/include/ia32
+$(i386_ONLY)dir path=usr/include/ia32/sys
+$(i386_ONLY)link path=usr/include/ia32/sys/asm_linkage.h \
+    target=../../sys/asm_linkage.h
+$(i386_ONLY)file path=usr/include/ia32/sys/kdi_regs.h
+$(i386_ONLY)link path=usr/include/ia32/sys/machtypes.h \
+    target=../../sys/machtypes.h
+$(i386_ONLY)file path=usr/include/ia32/sys/privmregs.h
+$(i386_ONLY)file path=usr/include/ia32/sys/privregs.h
+$(i386_ONLY)link path=usr/include/ia32/sys/psw.h target=../../sys/psw.h
+$(i386_ONLY)link path=usr/include/ia32/sys/pte.h target=../../sys/pte.h
+$(i386_ONLY)link path=usr/include/ia32/sys/reg.h target=../../sys/reg.h
+$(i386_ONLY)link path=usr/include/ia32/sys/stack.h target=../../sys/stack.h
+$(i386_ONLY)link path=usr/include/ia32/sys/trap.h target=../../sys/trap.h
+$(i386_ONLY)link path=usr/include/ia32/sys/traptrace.h \
+    target=../../sys/traptrace.h
+file path=usr/include/iconv.h
+file path=usr/include/idmap.h
+file path=usr/include/ieeefp.h
+file path=usr/include/ifaddrs.h
+dir  path=usr/include/inet
+file path=usr/include/inet/arp.h
+file path=usr/include/inet/cc.h
+file path=usr/include/inet/common.h
+file path=usr/include/inet/ip.h
+file path=usr/include/inet/ip6.h
+file path=usr/include/inet/ip6_asp.h
+file path=usr/include/inet/ip_arp.h
+file path=usr/include/inet/ip_ftable.h
+file path=usr/include/inet/ip_if.h
+file path=usr/include/inet/ip_ire.h
+file path=usr/include/inet/ip_multi.h
+file path=usr/include/inet/ip_netinfo.h
+file path=usr/include/inet/ip_rts.h
+file path=usr/include/inet/ip_stack.h
+file path=usr/include/inet/ipclassifier.h
+file path=usr/include/inet/ipdrop.h
+file path=usr/include/inet/ipnet.h
+file path=usr/include/inet/ipp_common.h
+dir  path=usr/include/inet/kssl
+file path=usr/include/inet/kssl/ksslapi.h
+file path=usr/include/inet/led.h
+file path=usr/include/inet/mi.h
+file path=usr/include/inet/mib2.h
+file path=usr/include/inet/nd.h
+file path=usr/include/inet/optcom.h
+file path=usr/include/inet/sctp_itf.h
+file path=usr/include/inet/snmpcom.h
+file path=usr/include/inet/tcp.h
+file path=usr/include/inet/tcp_sack.h
+file path=usr/include/inet/tcp_stack.h
+file path=usr/include/inet/tcp_stats.h
+file path=usr/include/inet/tunables.h
+file path=usr/include/inet/wifi_ioctl.h
+file path=usr/include/inttypes.h
+file path=usr/include/ipmp.h
+file path=usr/include/ipmp_admin.h
+file path=usr/include/ipmp_mpathd.h
+file path=usr/include/ipmp_query.h
+dir  path=usr/include/ipp
+dir  path=usr/include/ipp/ipgpc
+file path=usr/include/ipp/ipgpc/ipgpc.h
+file path=usr/include/ipp/ipp.h
+file path=usr/include/ipp/ipp_config.h
+file path=usr/include/ipp/ipp_impl.h
+file path=usr/include/ipp/ippctl.h
+dir  path=usr/include/iso
+link path=usr/include/iso/assert_iso.h target=../assert.h
+file path=usr/include/iso/ctype_iso.h
+link path=usr/include/iso/errno_iso.h target=../errno.h
+link path=usr/include/iso/float_iso.h target=../float.h
+link path=usr/include/iso/iso646_iso.h target=../iso646.h
+file path=usr/include/iso/limits_iso.h
+file path=usr/include/iso/locale_iso.h
+file path=usr/include/iso/setjmp_iso.h
+file path=usr/include/iso/signal_iso.h
+file path=usr/include/iso/stdarg_c99.h
+file path=usr/include/iso/stdarg_iso.h
+file path=usr/include/iso/stddef_iso.h
+file path=usr/include/iso/stdio_c99.h
+file path=usr/include/iso/stdio_iso.h
+file path=usr/include/iso/stdlib_c11.h
+file path=usr/include/iso/stdlib_c99.h
+file path=usr/include/iso/stdlib_iso.h
+file path=usr/include/iso/string_iso.h
+file path=usr/include/iso/time_iso.h
+file path=usr/include/iso/wchar_c99.h
+file path=usr/include/iso/wchar_iso.h
+file path=usr/include/iso/wctype_iso.h
+file path=usr/include/iso646.h
+dir  path=usr/include/kerberosv5
+file path=usr/include/kerberosv5/com_err.h
+file path=usr/include/kerberosv5/krb5.h
+file path=usr/include/kerberosv5/locate_plugin.h
+file path=usr/include/kerberosv5/mit-sipb-copyright.h
+file path=usr/include/kerberosv5/mit_copyright.h
+file path=usr/include/klpd.h
+file path=usr/include/kmfapi.h
+file path=usr/include/kmftypes.h
+file path=usr/include/kstat.h
+file path=usr/include/kvm.h
+file path=usr/include/langinfo.h
+file path=usr/include/lastlog.h
+file path=usr/include/lber.h
+file path=usr/include/ldap.h
+file path=usr/include/libcontract.h
+file path=usr/include/libctf.h
+file path=usr/include/libdevice.h
+file path=usr/include/libdevinfo.h
+file path=usr/include/libdladm.h
+file path=usr/include/libdlbridge.h
+file path=usr/include/libdlib.h
+file path=usr/include/libdllink.h
+file path=usr/include/libdlpi.h
+file path=usr/include/libdlvlan.h
+file path=usr/include/libelf.h
+$(i386_ONLY)file path=usr/include/libfdisk.h
+file path=usr/include/libfstyp.h
+file path=usr/include/libfstyp_module.h
+file path=usr/include/libgen.h
+file path=usr/include/libgrubmgmt.h
+file path=usr/include/libintl.h
+file path=usr/include/libipmi.h
+file path=usr/include/libipp.h
+file path=usr/include/libnvpair.h
+file path=usr/include/libnwam.h
+dir  path=usr/include/libpolkit
+file path=usr/include/libpolkit/libpolkit.h
+file path=usr/include/libproc.h
+file path=usr/include/librcm.h
+file path=usr/include/libscf.h
+file path=usr/include/libscf_priv.h
+file path=usr/include/libshare.h
+file path=usr/include/libsysevent.h
+file path=usr/include/libsysevent_impl.h
+file path=usr/include/libtsnet.h
+$(sparc_ONLY)file path=usr/include/libv12n.h
+file path=usr/include/libw.h
+file path=usr/include/libzfs.h
+file path=usr/include/libzfs_core.h
+file path=usr/include/libzfsbootenv.h
+file path=usr/include/libzoneinfo.h
+file path=usr/include/limits.h
+file path=usr/include/linenum.h
+file path=usr/include/link.h
+file path=usr/include/listen.h
+file path=usr/include/locale.h
+file path=usr/include/macros.h
+file path=usr/include/maillock.h
+file path=usr/include/malloc.h
+file path=usr/include/md4.h
+file path=usr/include/md5.h
+file path=usr/include/memory.h
+file path=usr/include/menu.h
+file path=usr/include/mon.h
+file path=usr/include/monetary.h
+file path=usr/include/mp.h
+file path=usr/include/mqueue.h
+file path=usr/include/mtmalloc.h
+file path=usr/include/nan.h
+file path=usr/include/ndbm.h
+file path=usr/include/ndpd.h
+dir  path=usr/include/net
+file path=usr/include/net/af.h
+file path=usr/include/net/bridge.h
+file path=usr/include/net/if.h
+file path=usr/include/net/if_arp.h
+file path=usr/include/net/if_dl.h
+file path=usr/include/net/if_types.h
+file path=usr/include/net/pfkeyv2.h
+file path=usr/include/net/pfpolicy.h
+file path=usr/include/net/ppp-comp.h
+file path=usr/include/net/ppp_defs.h
+file path=usr/include/net/pppio.h
+file path=usr/include/net/radix.h
+file path=usr/include/net/route.h
+file path=usr/include/net/trill.h
+file path=usr/include/net/vjcompress.h
+file path=usr/include/netconfig.h
+file path=usr/include/netdb.h
+file path=usr/include/netdir.h
+dir  path=usr/include/netinet
+file path=usr/include/netinet/arp.h
+file path=usr/include/netinet/dhcp.h
+file path=usr/include/netinet/dhcp6.h
+file path=usr/include/netinet/icmp6.h
+file path=usr/include/netinet/icmp_var.h
+file path=usr/include/netinet/if_ether.h
+file path=usr/include/netinet/igmp.h
+file path=usr/include/netinet/igmp_var.h
+file path=usr/include/netinet/in.h
+file path=usr/include/netinet/in_pcb.h
+file path=usr/include/netinet/in_systm.h
+file path=usr/include/netinet/in_var.h
+file path=usr/include/netinet/ip.h
+file path=usr/include/netinet/ip6.h
+file path=usr/include/netinet/ip_icmp.h
+file path=usr/include/netinet/ip_mroute.h
+file path=usr/include/netinet/ip_var.h
+file path=usr/include/netinet/pim.h
+file path=usr/include/netinet/sctp.h
+file path=usr/include/netinet/tcp.h
+file path=usr/include/netinet/tcp_debug.h
+file path=usr/include/netinet/tcp_fsm.h
+file path=usr/include/netinet/tcp_seq.h
+file path=usr/include/netinet/tcp_timer.h
+file path=usr/include/netinet/tcp_var.h
+file path=usr/include/netinet/tcpip.h
+file path=usr/include/netinet/udp.h
+file path=usr/include/netinet/udp_var.h
+file path=usr/include/netinet/vrrp.h
+dir  path=usr/include/nfs
+file path=usr/include/nfs/auth.h
+file path=usr/include/nfs/export.h
+file path=usr/include/nfs/lm.h
+file path=usr/include/nfs/mapid.h
+file path=usr/include/nfs/mount.h
+file path=usr/include/nfs/nfs.h
+file path=usr/include/nfs/nfs4.h
+file path=usr/include/nfs/nfs4_attr.h
+file path=usr/include/nfs/nfs4_clnt.h
+file path=usr/include/nfs/nfs4_db_impl.h
+file path=usr/include/nfs/nfs4_idmap_impl.h
+file path=usr/include/nfs/nfs4_kprot.h
+file path=usr/include/nfs/nfs_acl.h
+file path=usr/include/nfs/nfs_clnt.h
+file path=usr/include/nfs/nfs_cmd.h
+file path=usr/include/nfs/nfs_log.h
+file path=usr/include/nfs/nfs_sec.h
+file path=usr/include/nfs/nfsid_map.h
+file path=usr/include/nfs/nfssys.h
+file path=usr/include/nfs/rnode.h
+file path=usr/include/nfs/rnode4.h
+file path=usr/include/nl_types.h
+file path=usr/include/nlist.h
+file path=usr/include/note.h
+file path=usr/include/nss_common.h
+file path=usr/include/nss_dbdefs.h
+file path=usr/include/nss_netdir.h
+file path=usr/include/nsswitch.h
+file path=usr/include/panel.h
+file path=usr/include/paths.h
+file path=usr/include/pcsample.h
+file path=usr/include/pfmt.h
+file path=usr/include/pkgdev.h
+file path=usr/include/pkginfo.h
+file path=usr/include/pkglocs.h
+file path=usr/include/pkgstrct.h
+file path=usr/include/pkgtrans.h
+file path=usr/include/poll.h
+file path=usr/include/port.h
+file path=usr/include/priv.h
+file path=usr/include/proc_service.h
+file path=usr/include/procfs.h
+file path=usr/include/prof.h
+file path=usr/include/prof_attr.h
+file path=usr/include/project.h
+dir  path=usr/include/protocols
+file path=usr/include/protocols/dumprestore.h
+file path=usr/include/protocols/routed.h
+file path=usr/include/protocols/rwhod.h
+file path=usr/include/protocols/timed.h
+file path=usr/include/pthread.h
+file path=usr/include/pw.h
+file path=usr/include/pwd.h
+file path=usr/include/rcm_module.h
+file path=usr/include/rctl.h
+file path=usr/include/re_comp.h
+file path=usr/include/regex.h
+file path=usr/include/regexp.h
+file path=usr/include/regexpr.h
+file path=usr/include/resolv.h
+file path=usr/include/rje.h
+file path=usr/include/rp_plugin.h
+dir  path=usr/include/rpc
+file path=usr/include/rpc/auth.h
+file path=usr/include/rpc/auth_des.h
+file path=usr/include/rpc/auth_sys.h
+file path=usr/include/rpc/auth_unix.h
+file path=usr/include/rpc/bootparam.h
+file path=usr/include/rpc/clnt.h
+file path=usr/include/rpc/clnt_soc.h
+file path=usr/include/rpc/clnt_stat.h
+file path=usr/include/rpc/des_crypt.h
+$(sparc_ONLY)file path=usr/include/rpc/ib.h
+file path=usr/include/rpc/key_prot.h
+file path=usr/include/rpc/nettype.h
+file path=usr/include/rpc/pmap_clnt.h
+file path=usr/include/rpc/pmap_prot.h
+file path=usr/include/rpc/pmap_prot.x
+file path=usr/include/rpc/pmap_rmt.h
+file path=usr/include/rpc/rpc.h
+file path=usr/include/rpc/rpc_com.h
+file path=usr/include/rpc/rpc_msg.h
+file path=usr/include/rpc/rpc_rdma.h
+file path=usr/include/rpc/rpc_sztypes.h
+file path=usr/include/rpc/rpcb_clnt.h
+file path=usr/include/rpc/rpcb_prot.h
+file path=usr/include/rpc/rpcb_prot.x
+file path=usr/include/rpc/rpcent.h
+file path=usr/include/rpc/rpcsec_gss.h
+file path=usr/include/rpc/rpcsys.h
+file path=usr/include/rpc/svc.h
+file path=usr/include/rpc/svc_auth.h
+file path=usr/include/rpc/svc_mt.h
+file path=usr/include/rpc/svc_soc.h
+file path=usr/include/rpc/types.h
+file path=usr/include/rpc/xdr.h
+dir  path=usr/include/rpcsvc
+file path=usr/include/rpcsvc/autofs_prot.h
+file path=usr/include/rpcsvc/autofs_prot.x
+file path=usr/include/rpcsvc/bootparam.h
+file path=usr/include/rpcsvc/bootparam_prot.h
+file path=usr/include/rpcsvc/bootparam_prot.x
+file path=usr/include/rpcsvc/dbm.h
+file path=usr/include/rpcsvc/key_prot.x
+file path=usr/include/rpcsvc/mount.h
+file path=usr/include/rpcsvc/mount.x
+file path=usr/include/rpcsvc/nfs4_prot.h
+file path=usr/include/rpcsvc/nfs4_prot.x
+file path=usr/include/rpcsvc/nfs_acl.h
+file path=usr/include/rpcsvc/nfs_acl.x
+file path=usr/include/rpcsvc/nfs_prot.h
+file path=usr/include/rpcsvc/nfs_prot.x
+file path=usr/include/rpcsvc/nis.h
+file path=usr/include/rpcsvc/nis.x
+file path=usr/include/rpcsvc/nis_db.h
+file path=usr/include/rpcsvc/nis_object.x
+file path=usr/include/rpcsvc/nislib.h
+file path=usr/include/rpcsvc/nlm_prot.h
+file path=usr/include/rpcsvc/nlm_prot.x
+file path=usr/include/rpcsvc/nsm_addr.h
+file path=usr/include/rpcsvc/nsm_addr.x
+file path=usr/include/rpcsvc/rpc_sztypes.h
+file path=usr/include/rpcsvc/rpc_sztypes.x
+file path=usr/include/rpcsvc/rquota.h
+file path=usr/include/rpcsvc/rquota.x
+file path=usr/include/rpcsvc/rstat.h
+file path=usr/include/rpcsvc/rstat.x
+file path=usr/include/rpcsvc/rusers.h
+file path=usr/include/rpcsvc/rusers.x
+file path=usr/include/rpcsvc/rwall.h
+file path=usr/include/rpcsvc/rwall.x
+file path=usr/include/rpcsvc/sm_inter.h
+file path=usr/include/rpcsvc/sm_inter.x
+file path=usr/include/rpcsvc/spray.h
+file path=usr/include/rpcsvc/spray.x
+file path=usr/include/rpcsvc/ufs_prot.h
+file path=usr/include/rpcsvc/ufs_prot.x
+file path=usr/include/rpcsvc/yp.x
+file path=usr/include/rpcsvc/yp_prot.h
+file path=usr/include/rpcsvc/ypclnt.h
+file path=usr/include/rpcsvc/yppasswd.h
+file path=usr/include/rpcsvc/ypupd.h
+file path=usr/include/rsmapi.h
+file path=usr/include/rtld_db.h
+file path=usr/include/sac.h
+dir  path=usr/include/sasl
+file path=usr/include/sasl/prop.h
+file path=usr/include/sasl/sasl.h
+file path=usr/include/sasl/saslplug.h
+file path=usr/include/sasl/saslutil.h
+file path=usr/include/sched.h
+file path=usr/include/schedctl.h
+dir  path=usr/include/scsi
+file path=usr/include/scsi/libscsi.h
+file path=usr/include/scsi/libses.h
+file path=usr/include/scsi/libses_plugin.h
+file path=usr/include/scsi/libsmp.h
+file path=usr/include/scsi/libsmp_plugin.h
+dir  path=usr/include/scsi/plugins
+dir  path=usr/include/scsi/plugins/ses
+dir  path=usr/include/scsi/plugins/ses/framework
+file path=usr/include/scsi/plugins/ses/framework/libses.h
+file path=usr/include/scsi/plugins/ses/framework/ses2.h
+file path=usr/include/scsi/plugins/ses/framework/ses2_impl.h
+dir  path=usr/include/scsi/plugins/ses/vendor
+file path=usr/include/scsi/plugins/ses/vendor/sun.h
+dir  path=usr/include/scsi/plugins/smp
+dir  path=usr/include/scsi/plugins/smp/engine
+dir  path=usr/include/scsi/plugins/smp/framework
+file path=usr/include/sdp.h
+file path=usr/include/search.h
+file path=usr/include/secdb.h
+dir  path=usr/include/security
+file path=usr/include/security/auditd.h
+file path=usr/include/security/cryptoki.h
+file path=usr/include/security/pam_appl.h
+file path=usr/include/security/pam_modules.h
+file path=usr/include/security/pkcs11.h
+file path=usr/include/security/pkcs11f.h
+file path=usr/include/security/pkcs11t.h
+file path=usr/include/semaphore.h
+file path=usr/include/setjmp.h
+file path=usr/include/sgtty.h
+file path=usr/include/sha1.h
+file path=usr/include/sha2.h
+file path=usr/include/shadow.h
+dir  path=usr/include/sharefs
+file path=usr/include/sharefs/share.h
+file path=usr/include/sharefs/sharefs.h
+file path=usr/include/sharefs/sharetab.h
+file path=usr/include/siginfo.h
+file path=usr/include/signal.h
+file path=usr/include/sip.h
+file path=usr/include/skein.h
+file path=usr/include/smbios.h
+file path=usr/include/spawn.h
+$(i386_ONLY)file path=usr/include/stack_unwind.h
+file path=usr/include/stdalign.h
+file path=usr/include/stdarg.h
+file path=usr/include/stdbool.h
+file path=usr/include/stddef.h
+file path=usr/include/stdint.h
+file path=usr/include/stdio.h
+file path=usr/include/stdio_ext.h
+file path=usr/include/stdio_impl.h
+file path=usr/include/stdio_tag.h
+file path=usr/include/stdlib.h
+file path=usr/include/stdnoreturn.h
+file path=usr/include/storclass.h
+file path=usr/include/string.h
+file path=usr/include/strings.h
+file path=usr/include/stropts.h
+file path=usr/include/syms.h
+file path=usr/include/synch.h
+dir  path=usr/include/sys
+file path=usr/include/sys/acct.h
+file path=usr/include/sys/acctctl.h
+file path=usr/include/sys/acl.h
+file path=usr/include/sys/acl_impl.h
+file path=usr/include/sys/acpi_drv.h
+file path=usr/include/sys/aio.h
+file path=usr/include/sys/aio_impl.h
+file path=usr/include/sys/aio_req.h
+file path=usr/include/sys/aiocb.h
+file path=usr/include/sys/archsystm.h
+file path=usr/include/sys/ascii.h
+file path=usr/include/sys/asm_linkage.h
+file path=usr/include/sys/asynch.h
+file path=usr/include/sys/atomic.h
+file path=usr/include/sys/attr.h
+file path=usr/include/sys/autoconf.h
+file path=usr/include/sys/auxv.h
+file path=usr/include/sys/auxv_386.h
+file path=usr/include/sys/auxv_SPARC.h
+dir  path=usr/include/sys/av
+file path=usr/include/sys/av/iec61883.h
+file path=usr/include/sys/avintr.h
+file path=usr/include/sys/avl.h
+file path=usr/include/sys/avl_impl.h
+file path=usr/include/sys/bitmap.h
+file path=usr/include/sys/bitset.h
+file path=usr/include/sys/bl.h
+file path=usr/include/sys/blkdev.h
+file path=usr/include/sys/bofi.h
+file path=usr/include/sys/bofi_impl.h
+file path=usr/include/sys/bootconf.h
+$(i386_ONLY)file path=usr/include/sys/bootregs.h
+file path=usr/include/sys/bootstat.h
+$(i386_ONLY)file path=usr/include/sys/bootsvcs.h
+file path=usr/include/sys/bpp_io.h
+file path=usr/include/sys/brand.h
+file path=usr/include/sys/buf.h
+file path=usr/include/sys/bufmod.h
+file path=usr/include/sys/bustypes.h
+file path=usr/include/sys/byteorder.h
+file path=usr/include/sys/callb.h
+file path=usr/include/sys/callo.h
+file path=usr/include/sys/cap_util.h
+file path=usr/include/sys/ccompile.h
+file path=usr/include/sys/cdio.h
+file path=usr/include/sys/cis.h
+file path=usr/include/sys/cis_handlers.h
+file path=usr/include/sys/cis_protos.h
+file path=usr/include/sys/cladm.h
+file path=usr/include/sys/class.h
+file path=usr/include/sys/clconf.h
+file path=usr/include/sys/cmlb.h
+file path=usr/include/sys/cmn_err.h
+$(sparc_ONLY)file path=usr/include/sys/cmpregs.h
+file path=usr/include/sys/compress.h
+file path=usr/include/sys/condvar.h
+file path=usr/include/sys/condvar_impl.h
+file path=usr/include/sys/conf.h
+file path=usr/include/sys/consdev.h
+file path=usr/include/sys/console.h
+file path=usr/include/sys/consplat.h
+file path=usr/include/sys/containerof.h
+dir  path=usr/include/sys/contract
+file path=usr/include/sys/contract.h
+file path=usr/include/sys/contract/device.h
+file path=usr/include/sys/contract/device_impl.h
+file path=usr/include/sys/contract/process.h
+file path=usr/include/sys/contract/process_impl.h
+file path=usr/include/sys/contract_impl.h
+$(i386_ONLY)file path=usr/include/sys/controlregs.h
+file path=usr/include/sys/copyops.h
+file path=usr/include/sys/core.h
+file path=usr/include/sys/corectl.h
+file path=usr/include/sys/cpc_impl.h
+file path=usr/include/sys/cpc_pcbe.h
+file path=usr/include/sys/cpr.h
+file path=usr/include/sys/cpu.h
+file path=usr/include/sys/cpu_uarray.h
+file path=usr/include/sys/cpucaps.h
+file path=usr/include/sys/cpucaps_impl.h
+file path=usr/include/sys/cpupart.h
+file path=usr/include/sys/cpuvar.h
+file path=usr/include/sys/crc32.h
+file path=usr/include/sys/cred.h
+file path=usr/include/sys/cred_impl.h
+file path=usr/include/sys/crtctl.h
+dir  path=usr/include/sys/crypto
+file path=usr/include/sys/crypto/api.h
+file path=usr/include/sys/crypto/common.h
+file path=usr/include/sys/crypto/ioctl.h
+file path=usr/include/sys/crypto/ioctladmin.h
+file path=usr/include/sys/crypto/spi.h
+file path=usr/include/sys/cs.h
+file path=usr/include/sys/cs_priv.h
+file path=usr/include/sys/cs_strings.h
+file path=usr/include/sys/cs_stubs.h
+file path=usr/include/sys/cs_types.h
+file path=usr/include/sys/csiioctl.h
+file path=usr/include/sys/ctf.h
+file path=usr/include/sys/ctf_api.h
+file path=usr/include/sys/ctfs.h
+file path=usr/include/sys/ctfs_impl.h
+file path=usr/include/sys/ctype.h
+file path=usr/include/sys/cyclic.h
+file path=usr/include/sys/cyclic_impl.h
+file path=usr/include/sys/dacf.h
+file path=usr/include/sys/dacf_impl.h
+file path=usr/include/sys/damap.h
+file path=usr/include/sys/damap_impl.h
+file path=usr/include/sys/dc_ki.h
+file path=usr/include/sys/ddi.h
+file path=usr/include/sys/ddi_hp.h
+file path=usr/include/sys/ddi_hp_impl.h
+file path=usr/include/sys/ddi_impldefs.h
+file path=usr/include/sys/ddi_implfuncs.h
+file path=usr/include/sys/ddi_intr.h
+file path=usr/include/sys/ddi_intr_impl.h
+file path=usr/include/sys/ddi_isa.h
+file path=usr/include/sys/ddi_obsolete.h
+file path=usr/include/sys/ddi_periodic.h
+file path=usr/include/sys/ddi_ufm.h
+file path=usr/include/sys/ddi_ufm_impl.h
+file path=usr/include/sys/ddidevmap.h
+file path=usr/include/sys/ddidmareq.h
+file path=usr/include/sys/ddifm.h
+file path=usr/include/sys/ddifm_impl.h
+file path=usr/include/sys/ddimapreq.h
+file path=usr/include/sys/ddipropdefs.h
+file path=usr/include/sys/dditypes.h
+file path=usr/include/sys/debug.h
+$(i386_ONLY)file path=usr/include/sys/debugreg.h
+file path=usr/include/sys/des.h
+file path=usr/include/sys/devcache.h
+file path=usr/include/sys/devcache_impl.h
+file path=usr/include/sys/devctl.h
+file path=usr/include/sys/devfm.h
+file path=usr/include/sys/devid_cache.h
+file path=usr/include/sys/devinfo_impl.h
+file path=usr/include/sys/devops.h
+file path=usr/include/sys/devpolicy.h
+file path=usr/include/sys/devpoll.h
+file path=usr/include/sys/dirent.h
+file path=usr/include/sys/disp.h
+file path=usr/include/sys/dkbad.h
+file path=usr/include/sys/dkio.h
+file path=usr/include/sys/dkioc_free_util.h
+file path=usr/include/sys/dklabel.h
+$(sparc_ONLY)file path=usr/include/sys/dkmpio.h
+dir  path=usr/include/sys/dktp
+$(i386_ONLY)file path=usr/include/sys/dktp/altsctr.h
+$(i386_ONLY)file path=usr/include/sys/dktp/cmpkt.h
+file path=usr/include/sys/dktp/dadkio.h
+file path=usr/include/sys/dktp/fdisk.h
+file path=usr/include/sys/dl.h
+file path=usr/include/sys/dld.h
+file path=usr/include/sys/dlpi.h
+file path=usr/include/sys/dls_mgmt.h
+$(i386_ONLY)file path=usr/include/sys/dma_engine.h
+file path=usr/include/sys/dma_i8237A.h
+file path=usr/include/sys/dnlc.h
+file path=usr/include/sys/door.h
+file path=usr/include/sys/door_data.h
+file path=usr/include/sys/door_impl.h
+file path=usr/include/sys/dumphdr.h
+file path=usr/include/sys/ecppio.h
+file path=usr/include/sys/ecppreg.h
+file path=usr/include/sys/ecppsys.h
+file path=usr/include/sys/ecppvar.h
+file path=usr/include/sys/edonr.h
+file path=usr/include/sys/efi_partition.h
+file path=usr/include/sys/elf.h
+file path=usr/include/sys/elf_386.h
+file path=usr/include/sys/elf_SPARC.h
+file path=usr/include/sys/elf_amd64.h
+file path=usr/include/sys/elf_notes.h
+file path=usr/include/sys/elftypes.h
+file path=usr/include/sys/epm.h
+file path=usr/include/sys/epoll.h
+file path=usr/include/sys/errno.h
+file path=usr/include/sys/errorq.h
+file path=usr/include/sys/errorq_impl.h
+file path=usr/include/sys/esunddi.h
+file path=usr/include/sys/ethernet.h
+file path=usr/include/sys/euc.h
+file path=usr/include/sys/eucioctl.h
+file path=usr/include/sys/eventfd.h
+file path=usr/include/sys/exacct.h
+file path=usr/include/sys/exacct_catalog.h
+file path=usr/include/sys/exacct_impl.h
+file path=usr/include/sys/exec.h
+file path=usr/include/sys/exechdr.h
+file path=usr/include/sys/fault.h
+file path=usr/include/sys/fbio.h
+file path=usr/include/sys/fbuf.h
+dir  path=usr/include/sys/fc4
+file path=usr/include/sys/fc4/fc.h
+file path=usr/include/sys/fc4/fc_transport.h
+file path=usr/include/sys/fc4/fcal.h
+file path=usr/include/sys/fc4/fcal_linkapp.h
+file path=usr/include/sys/fc4/fcal_transport.h
+file path=usr/include/sys/fc4/fcio.h
+file path=usr/include/sys/fc4/fcp.h
+file path=usr/include/sys/fc4/linkapp.h
+file path=usr/include/sys/fcntl.h
+file path=usr/include/sys/fdbuffer.h
+file path=usr/include/sys/fdio.h
+$(sparc_ONLY)file path=usr/include/sys/fdreg.h
+$(sparc_ONLY)file path=usr/include/sys/fdvar.h
+file path=usr/include/sys/feature_tests.h
+file path=usr/include/sys/fem.h
+file path=usr/include/sys/file.h
+file path=usr/include/sys/filio.h
+$(i386_ONLY)file path=usr/include/sys/firmload.h
+file path=usr/include/sys/flock.h
+file path=usr/include/sys/flock_impl.h
+dir  path=usr/include/sys/fm
+dir  path=usr/include/sys/fm/cpu
+$(sparc_ONLY)file path=usr/include/sys/fm/cpu/SPARC64-VI.h
+$(sparc_ONLY)file path=usr/include/sys/fm/cpu/UltraSPARC-II.h
+$(sparc_ONLY)file path=usr/include/sys/fm/cpu/UltraSPARC-III.h
+$(sparc_ONLY)file path=usr/include/sys/fm/cpu/UltraSPARC-T1.h
+dir  path=usr/include/sys/fm/fs
+file path=usr/include/sys/fm/fs/zfs.h
+dir  path=usr/include/sys/fm/io
+file path=usr/include/sys/fm/io/ddi.h
+file path=usr/include/sys/fm/io/disk.h
+file path=usr/include/sys/fm/io/opl_mc_fm.h
+file path=usr/include/sys/fm/io/pci.h
+file path=usr/include/sys/fm/io/scsi.h
+file path=usr/include/sys/fm/io/sun4upci.h
+file path=usr/include/sys/fm/protocol.h
+file path=usr/include/sys/fm/util.h
+file path=usr/include/sys/fork.h
+$(i386_ONLY)file path=usr/include/sys/fp.h
+$(sparc_ONLY)dir path=usr/include/sys/fpu
+$(sparc_ONLY)file path=usr/include/sys/fpu/fpu_simulator.h
+$(sparc_ONLY)file path=usr/include/sys/fpu/fpusystm.h
+$(sparc_ONLY)file path=usr/include/sys/fpu/globals.h
+$(sparc_ONLY)file path=usr/include/sys/fpu/ieee.h
+file path=usr/include/sys/frame.h
+dir  path=usr/include/sys/fs
+file path=usr/include/sys/fs/autofs.h
+file path=usr/include/sys/fs/decomp.h
+file path=usr/include/sys/fs/dv_node.h
+file path=usr/include/sys/fs/fifonode.h
+file path=usr/include/sys/fs/hsfs_isospec.h
+file path=usr/include/sys/fs/hsfs_node.h
+file path=usr/include/sys/fs/hsfs_rrip.h
+file path=usr/include/sys/fs/hsfs_spec.h
+file path=usr/include/sys/fs/hsfs_susp.h
+file path=usr/include/sys/fs/lofs_info.h
+file path=usr/include/sys/fs/lofs_node.h
+file path=usr/include/sys/fs/mntdata.h
+file path=usr/include/sys/fs/namenode.h
+file path=usr/include/sys/fs/pc_dir.h
+file path=usr/include/sys/fs/pc_fs.h
+file path=usr/include/sys/fs/pc_label.h
+file path=usr/include/sys/fs/pc_node.h
+file path=usr/include/sys/fs/pxfs_ki.h
+file path=usr/include/sys/fs/sdev_impl.h
+file path=usr/include/sys/fs/sdev_plugin.h
+file path=usr/include/sys/fs/snode.h
+file path=usr/include/sys/fs/swapnode.h
+file path=usr/include/sys/fs/tmp.h
+file path=usr/include/sys/fs/tmpnode.h
+file path=usr/include/sys/fs/udf_inode.h
+file path=usr/include/sys/fs/udf_volume.h
+file path=usr/include/sys/fs/ufs_acl.h
+file path=usr/include/sys/fs/ufs_bio.h
+file path=usr/include/sys/fs/ufs_filio.h
+file path=usr/include/sys/fs/ufs_fs.h
+file path=usr/include/sys/fs/ufs_fsdir.h
+file path=usr/include/sys/fs/ufs_inode.h
+file path=usr/include/sys/fs/ufs_lockfs.h
+file path=usr/include/sys/fs/ufs_log.h
+file path=usr/include/sys/fs/ufs_mount.h
+file path=usr/include/sys/fs/ufs_panic.h
+file path=usr/include/sys/fs/ufs_prot.h
+file path=usr/include/sys/fs/ufs_quota.h
+file path=usr/include/sys/fs/ufs_snap.h
+file path=usr/include/sys/fs/ufs_trans.h
+file path=usr/include/sys/fs/zfs.h
+file path=usr/include/sys/fs_reparse.h
+file path=usr/include/sys/fs_subr.h
+file path=usr/include/sys/fsid.h
+$(sparc_ONLY)file path=usr/include/sys/fsr.h
+file path=usr/include/sys/fss.h
+file path=usr/include/sys/fssnap.h
+file path=usr/include/sys/fssnap_if.h
+file path=usr/include/sys/fsspriocntl.h
+file path=usr/include/sys/fstyp.h
+file path=usr/include/sys/ftrace.h
+file path=usr/include/sys/fx.h
+file path=usr/include/sys/fxpriocntl.h
+file path=usr/include/sys/gfs.h
+$(i386_ONLY)file path=usr/include/sys/gfx_private.h
+file path=usr/include/sys/gld.h
+file path=usr/include/sys/gldpriv.h
+file path=usr/include/sys/group.h
+file path=usr/include/sys/hdio.h
+file path=usr/include/sys/hook.h
+file path=usr/include/sys/hook_event.h
+file path=usr/include/sys/hook_impl.h
+dir  path=usr/include/sys/hotplug
+file path=usr/include/sys/hotplug/hpcsvc.h
+file path=usr/include/sys/hotplug/hpctrl.h
+dir  path=usr/include/sys/hotplug/pci
+file path=usr/include/sys/hotplug/pci/pcicfg.h
+file path=usr/include/sys/hotplug/pci/pcihp.h
+file path=usr/include/sys/hwconf.h
+$(i386_ONLY)file path=usr/include/sys/hypervisor.h
+$(i386_ONLY)file path=usr/include/sys/i8272A.h
+file path=usr/include/sys/ia.h
+file path=usr/include/sys/iapriocntl.h
+dir  path=usr/include/sys/ib
+dir  path=usr/include/sys/ib/adapters
+dir  path=usr/include/sys/ib/adapters/hermon
+file path=usr/include/sys/ib/adapters/hermon/hermon_ioctl.h
+file path=usr/include/sys/ib/adapters/mlnx_umap.h
+dir  path=usr/include/sys/ib/adapters/tavor
+file path=usr/include/sys/ib/adapters/tavor/tavor_ioctl.h
+dir  path=usr/include/sys/ib/clients
+dir  path=usr/include/sys/ib/clients/ibd
+file path=usr/include/sys/ib/clients/ibd/ibd.h
+dir  path=usr/include/sys/ib/clients/of
+file path=usr/include/sys/ib/clients/of/ofa_solaris.h
+file path=usr/include/sys/ib/clients/of/ofed_kernel.h
+dir  path=usr/include/sys/ib/clients/of/rdma
+file path=usr/include/sys/ib/clients/of/rdma/ib_addr.h
+file path=usr/include/sys/ib/clients/of/rdma/ib_user_mad.h
+file path=usr/include/sys/ib/clients/of/rdma/ib_user_sa.h
+file path=usr/include/sys/ib/clients/of/rdma/ib_user_verbs.h
+file path=usr/include/sys/ib/clients/of/rdma/ib_verbs.h
+file path=usr/include/sys/ib/clients/of/rdma/rdma_cm.h
+file path=usr/include/sys/ib/clients/of/rdma/rdma_user_cm.h
+dir  path=usr/include/sys/ib/clients/of/sol_ofs
+file path=usr/include/sys/ib/clients/of/sol_ofs/sol_cma.h
+file path=usr/include/sys/ib/clients/of/sol_ofs/sol_ib_cma.h
+file path=usr/include/sys/ib/clients/of/sol_ofs/sol_kverb_impl.h
+file path=usr/include/sys/ib/clients/of/sol_ofs/sol_ofs_common.h
+dir  path=usr/include/sys/ib/clients/of/sol_ucma
+file path=usr/include/sys/ib/clients/of/sol_ucma/sol_rdma_user_cm.h
+file path=usr/include/sys/ib/clients/of/sol_ucma/sol_ucma.h
+dir  path=usr/include/sys/ib/clients/of/sol_umad
+file path=usr/include/sys/ib/clients/of/sol_umad/sol_umad.h
+dir  path=usr/include/sys/ib/clients/of/sol_uverbs
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs.h
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs2ucma.h
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs_comp.h
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs_event.h
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs_hca.h
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs_qp.h
+file path=usr/include/sys/ib/ib_pkt_hdrs.h
+file path=usr/include/sys/ib/ib_types.h
+dir  path=usr/include/sys/ib/ibnex
+file path=usr/include/sys/ib/ibnex/ibnex_devctl.h
+dir  path=usr/include/sys/ib/ibtl
+file path=usr/include/sys/ib/ibtl/ibci.h
+file path=usr/include/sys/ib/ibtl/ibti.h
+file path=usr/include/sys/ib/ibtl/ibti_cm.h
+file path=usr/include/sys/ib/ibtl/ibti_common.h
+file path=usr/include/sys/ib/ibtl/ibtl_ci_types.h
+file path=usr/include/sys/ib/ibtl/ibtl_status.h
+file path=usr/include/sys/ib/ibtl/ibtl_types.h
+file path=usr/include/sys/ib/ibtl/ibvti.h
+dir  path=usr/include/sys/ib/ibtl/impl
+file path=usr/include/sys/ib/ibtl/impl/ibtl_util.h
+dir  path=usr/include/sys/ib/mgt
+file path=usr/include/sys/ib/mgt/ib_dm_attr.h
+file path=usr/include/sys/ib/mgt/ib_mad.h
+dir  path=usr/include/sys/ib/mgt/ibmf
+file path=usr/include/sys/ib/mgt/ibmf/ibmf.h
+file path=usr/include/sys/ib/mgt/ibmf/ibmf_msg.h
+file path=usr/include/sys/ib/mgt/ibmf/ibmf_saa.h
+file path=usr/include/sys/ib/mgt/ibmf/ibmf_utils.h
+file path=usr/include/sys/ib/mgt/sa_recs.h
+file path=usr/include/sys/ib/mgt/sm_attr.h
+file path=usr/include/sys/ibpart.h
+file path=usr/include/sys/id32.h
+file path=usr/include/sys/id_space.h
+file path=usr/include/sys/idmap.h
+file path=usr/include/sys/inline.h
+file path=usr/include/sys/instance.h
+file path=usr/include/sys/int_const.h
+file path=usr/include/sys/int_fmtio.h
+file path=usr/include/sys/int_limits.h
+file path=usr/include/sys/int_types.h
+file path=usr/include/sys/inttypes.h
+file path=usr/include/sys/ioccom.h
+file path=usr/include/sys/ioctl.h
+$(i386_ONLY)file path=usr/include/sys/iommulib.h
+file path=usr/include/sys/ipc.h
+file path=usr/include/sys/ipc_impl.h
+file path=usr/include/sys/ipc_rctl.h
+file path=usr/include/sys/isa_defs.h
+dir  path=usr/include/sys/iso
+file path=usr/include/sys/iso/signal_iso.h
+file path=usr/include/sys/jioctl.h
+file path=usr/include/sys/kbd.h
+file path=usr/include/sys/kbdreg.h
+file path=usr/include/sys/kbio.h
+file path=usr/include/sys/kcpc.h
+file path=usr/include/sys/kd.h
+file path=usr/include/sys/kdi.h
+file path=usr/include/sys/kdi_impl.h
+file path=usr/include/sys/kdi_machimpl.h
+$(i386_ONLY)file path=usr/include/sys/kdi_regs.h
+file path=usr/include/sys/kiconv.h
+file path=usr/include/sys/kidmap.h
+file path=usr/include/sys/klpd.h
+file path=usr/include/sys/klwp.h
+file path=usr/include/sys/kmem.h
+file path=usr/include/sys/kmem_impl.h
+file path=usr/include/sys/kobj.h
+file path=usr/include/sys/kobj_impl.h
+file path=usr/include/sys/ksocket.h
+file path=usr/include/sys/kstat.h
+file path=usr/include/sys/kstr.h
+file path=usr/include/sys/ksyms.h
+file path=usr/include/sys/ksynch.h
+file path=usr/include/sys/ldterm.h
+file path=usr/include/sys/lgrp.h
+file path=usr/include/sys/lgrp_user.h
+file path=usr/include/sys/limits.h
+file path=usr/include/sys/link.h
+file path=usr/include/sys/linker_set.h
+file path=usr/include/sys/list.h
+file path=usr/include/sys/list_impl.h
+file path=usr/include/sys/llc1.h
+file path=usr/include/sys/loadavg.h
+file path=usr/include/sys/lock.h
+file path=usr/include/sys/lockfs.h
+file path=usr/include/sys/lofi.h
+file path=usr/include/sys/log.h
+file path=usr/include/sys/logindmux.h
+file path=usr/include/sys/lwp.h
+file path=usr/include/sys/lwp_timer_impl.h
+file path=usr/include/sys/lwp_upimutex_impl.h
+file path=usr/include/sys/mac.h
+file path=usr/include/sys/mac_ether.h
+file path=usr/include/sys/mac_flow.h
+file path=usr/include/sys/mac_provider.h
+file path=usr/include/sys/machelf.h
+file path=usr/include/sys/machlock.h
+file path=usr/include/sys/machsig.h
+file path=usr/include/sys/machtypes.h
+file path=usr/include/sys/map.h
+$(i386_ONLY)file path=usr/include/sys/mc.h
+$(i386_ONLY)file path=usr/include/sys/mc_amd.h
+$(i386_ONLY)file path=usr/include/sys/mc_intel.h
+$(i386_ONLY)file path=usr/include/sys/mca_amd.h
+$(i386_ONLY)file path=usr/include/sys/mca_x86.h
+file path=usr/include/sys/mcontext.h
+file path=usr/include/sys/md4.h
+file path=usr/include/sys/md5.h
+file path=usr/include/sys/md5_consts.h
+file path=usr/include/sys/mdi_impldefs.h
+file path=usr/include/sys/mem.h
+file path=usr/include/sys/mem_config.h
+file path=usr/include/sys/memlist.h
+file path=usr/include/sys/mhd.h
+file path=usr/include/sys/mii.h
+file path=usr/include/sys/miiregs.h
+file path=usr/include/sys/mkdev.h
+file path=usr/include/sys/mman.h
+file path=usr/include/sys/mmapobj.h
+file path=usr/include/sys/mntent.h
+file path=usr/include/sys/mntio.h
+file path=usr/include/sys/mnttab.h
+file path=usr/include/sys/modctl.h
+file path=usr/include/sys/mode.h
+file path=usr/include/sys/model.h
+file path=usr/include/sys/modhash.h
+file path=usr/include/sys/modhash_impl.h
+file path=usr/include/sys/mount.h
+file path=usr/include/sys/mouse.h
+file path=usr/include/sys/msacct.h
+file path=usr/include/sys/msg.h
+file path=usr/include/sys/msg_impl.h
+file path=usr/include/sys/msio.h
+file path=usr/include/sys/msreg.h
+file path=usr/include/sys/mtio.h
+file path=usr/include/sys/multidata.h
+file path=usr/include/sys/mutex.h
+$(i386_ONLY)file path=usr/include/sys/mutex_impl.h
+file path=usr/include/sys/nbmlock.h
+file path=usr/include/sys/ndi_impldefs.h
+file path=usr/include/sys/ndifm.h
+file path=usr/include/sys/netconfig.h
+file path=usr/include/sys/neti.h
+file path=usr/include/sys/netstack.h
+file path=usr/include/sys/nexusdefs.h
+file path=usr/include/sys/note.h
+file path=usr/include/sys/null.h
+file path=usr/include/sys/nvpair.h
+file path=usr/include/sys/nvpair_impl.h
+file path=usr/include/sys/objfs.h
+file path=usr/include/sys/objfs_impl.h
+file path=usr/include/sys/obpdefs.h
+file path=usr/include/sys/old_procfs.h
+file path=usr/include/sys/open.h
+file path=usr/include/sys/openpromio.h
+file path=usr/include/sys/panic.h
+file path=usr/include/sys/param.h
+file path=usr/include/sys/pathconf.h
+file path=usr/include/sys/pathname.h
+file path=usr/include/sys/pattr.h
+file path=usr/include/sys/pbio.h
+file path=usr/include/sys/pcb.h
+file path=usr/include/sys/pccard.h
+file path=usr/include/sys/pci.h
+$(i386_ONLY)file path=usr/include/sys/pcic_reg.h
+$(i386_ONLY)file path=usr/include/sys/pcic_var.h
+file path=usr/include/sys/pcie.h
+file path=usr/include/sys/pcmcia.h
+file path=usr/include/sys/pctypes.h
+file path=usr/include/sys/pfmod.h
+file path=usr/include/sys/pg.h
+file path=usr/include/sys/pghw.h
+file path=usr/include/sys/physmem.h
+$(i386_ONLY)file path=usr/include/sys/pic.h
+$(i386_ONLY)file path=usr/include/sys/pit.h
+file path=usr/include/sys/pkp_hash.h
+file path=usr/include/sys/pm.h
+$(i386_ONLY)file path=usr/include/sys/pmem.h
+file path=usr/include/sys/policy.h
+file path=usr/include/sys/poll.h
+file path=usr/include/sys/poll_impl.h
+file path=usr/include/sys/pool.h
+file path=usr/include/sys/pool_impl.h
+file path=usr/include/sys/pool_pset.h
+file path=usr/include/sys/port.h
+file path=usr/include/sys/port_impl.h
+file path=usr/include/sys/port_kernel.h
+file path=usr/include/sys/ppmio.h
+file path=usr/include/sys/priocntl.h
+file path=usr/include/sys/priv.h
+file path=usr/include/sys/priv_const.h
+file path=usr/include/sys/priv_impl.h
+file path=usr/include/sys/priv_names.h
+$(i386_ONLY)file path=usr/include/sys/privmregs.h
+$(i386_ONLY)file path=usr/include/sys/privregs.h
+file path=usr/include/sys/prnio.h
+dir  path=usr/include/sys/proc
+file path=usr/include/sys/proc.h
+file path=usr/include/sys/proc/prdata.h
+file path=usr/include/sys/processor.h
+file path=usr/include/sys/procfs.h
+file path=usr/include/sys/procfs_isa.h
+file path=usr/include/sys/procset.h
+file path=usr/include/sys/project.h
+$(i386_ONLY)file path=usr/include/sys/prom_emul.h
+$(i386_ONLY)file path=usr/include/sys/prom_isa.h
+$(i386_ONLY)file path=usr/include/sys/prom_plat.h
+file path=usr/include/sys/promif.h
+file path=usr/include/sys/promimpl.h
+file path=usr/include/sys/protosw.h
+file path=usr/include/sys/prsystm.h
+file path=usr/include/sys/pset.h
+file path=usr/include/sys/psw.h
+$(i386_ONLY)file path=usr/include/sys/pte.h
+file path=usr/include/sys/ptem.h
+file path=usr/include/sys/ptms.h
+file path=usr/include/sys/ptyvar.h
+file path=usr/include/sys/queue.h
+file path=usr/include/sys/raidioctl.h
+file path=usr/include/sys/ramdisk.h
+file path=usr/include/sys/random.h
+file path=usr/include/sys/rctl.h
+file path=usr/include/sys/rctl_impl.h
+file path=usr/include/sys/rds.h
+file path=usr/include/sys/reboot.h
+file path=usr/include/sys/refstr.h
+file path=usr/include/sys/refstr_impl.h
+file path=usr/include/sys/reg.h
+file path=usr/include/sys/regset.h
+file path=usr/include/sys/resource.h
+file path=usr/include/sys/rlioctl.h
+dir  path=usr/include/sys/rsm
+file path=usr/include/sys/rsm/rsm.h
+file path=usr/include/sys/rsm/rsm_common.h
+file path=usr/include/sys/rsm/rsmapi_common.h
+file path=usr/include/sys/rsm/rsmka_path_int.h
+file path=usr/include/sys/rsm/rsmndi.h
+file path=usr/include/sys/rsm/rsmpi.h
+file path=usr/include/sys/rsm/rsmpi_driver.h
+file path=usr/include/sys/rt.h
+$(i386_ONLY)file path=usr/include/sys/rtc.h
+file path=usr/include/sys/rtpriocntl.h
+file path=usr/include/sys/rwlock.h
+file path=usr/include/sys/rwlock_impl.h
+file path=usr/include/sys/rwstlock.h
+file path=usr/include/sys/sad.h
+$(i386_ONLY)dir path=usr/include/sys/sata group=sys
+$(i386_ONLY)file path=usr/include/sys/sata/sata_defs.h
+$(i386_ONLY)file path=usr/include/sys/sata/sata_hba.h
+file path=usr/include/sys/schedctl.h
+dir  path=usr/include/sys/scsi
+dir  path=usr/include/sys/scsi/adapters
+$(sparc_ONLY)file path=usr/include/sys/scsi/adapters/ifpio.h
+file path=usr/include/sys/scsi/adapters/scsi_vhci.h
+$(sparc_ONLY)file path=usr/include/sys/scsi/adapters/sfvar.h
+dir  path=usr/include/sys/scsi/conf
+file path=usr/include/sys/scsi/conf/autoconf.h
+file path=usr/include/sys/scsi/conf/device.h
+dir  path=usr/include/sys/scsi/generic
+file path=usr/include/sys/scsi/generic/commands.h
+file path=usr/include/sys/scsi/generic/dad_mode.h
+file path=usr/include/sys/scsi/generic/inquiry.h
+file path=usr/include/sys/scsi/generic/message.h
+file path=usr/include/sys/scsi/generic/mode.h
+file path=usr/include/sys/scsi/generic/persist.h
+file path=usr/include/sys/scsi/generic/sense.h
+file path=usr/include/sys/scsi/generic/sff_frames.h
+file path=usr/include/sys/scsi/generic/smp_frames.h
+file path=usr/include/sys/scsi/generic/status.h
+dir  path=usr/include/sys/scsi/impl
+file path=usr/include/sys/scsi/impl/commands.h
+file path=usr/include/sys/scsi/impl/inquiry.h
+file path=usr/include/sys/scsi/impl/mode.h
+file path=usr/include/sys/scsi/impl/scsi_reset_notify.h
+file path=usr/include/sys/scsi/impl/scsi_sas.h
+file path=usr/include/sys/scsi/impl/sense.h
+file path=usr/include/sys/scsi/impl/services.h
+file path=usr/include/sys/scsi/impl/smp_transport.h
+file path=usr/include/sys/scsi/impl/spc3_types.h
+file path=usr/include/sys/scsi/impl/status.h
+file path=usr/include/sys/scsi/impl/transport.h
+file path=usr/include/sys/scsi/impl/types.h
+file path=usr/include/sys/scsi/impl/uscsi.h
+file path=usr/include/sys/scsi/impl/usmp.h
+file path=usr/include/sys/scsi/scsi.h
+file path=usr/include/sys/scsi/scsi_address.h
+file path=usr/include/sys/scsi/scsi_ctl.h
+file path=usr/include/sys/scsi/scsi_fm.h
+file path=usr/include/sys/scsi/scsi_names.h
+file path=usr/include/sys/scsi/scsi_params.h
+file path=usr/include/sys/scsi/scsi_pkt.h
+file path=usr/include/sys/scsi/scsi_resource.h
+file path=usr/include/sys/scsi/scsi_types.h
+file path=usr/include/sys/scsi/scsi_watch.h
+dir  path=usr/include/sys/scsi/targets
+file path=usr/include/sys/scsi/targets/sddef.h
+file path=usr/include/sys/scsi/targets/ses.h
+file path=usr/include/sys/scsi/targets/sesio.h
+file path=usr/include/sys/scsi/targets/sgendef.h
+file path=usr/include/sys/scsi/targets/smp.h
+$(sparc_ONLY)file path=usr/include/sys/scsi/targets/ssddef.h
+file path=usr/include/sys/scsi/targets/stdef.h
+file path=usr/include/sys/secflags.h
+$(i386_ONLY)file path=usr/include/sys/segment.h
+$(i386_ONLY)file path=usr/include/sys/segments.h
+file path=usr/include/sys/select.h
+file path=usr/include/sys/sem.h
+file path=usr/include/sys/sem_impl.h
+file path=usr/include/sys/sema_impl.h
+file path=usr/include/sys/semaphore.h
+file path=usr/include/sys/sendfile.h
+$(sparc_ONLY)file path=usr/include/sys/ser_async.h
+file path=usr/include/sys/ser_sync.h
+$(sparc_ONLY)file path=usr/include/sys/ser_zscc.h
+file path=usr/include/sys/serializer.h
+file path=usr/include/sys/session.h
+file path=usr/include/sys/sha1.h
+file path=usr/include/sys/sha2.h
+file path=usr/include/sys/share.h
+file path=usr/include/sys/shm.h
+file path=usr/include/sys/shm_impl.h
+file path=usr/include/sys/sid.h
+file path=usr/include/sys/siginfo.h
+file path=usr/include/sys/signal.h
+file path=usr/include/sys/signalfd.h
+file path=usr/include/sys/skein.h
+file path=usr/include/sys/sleepq.h
+file path=usr/include/sys/smbios.h
+file path=usr/include/sys/smbios_impl.h
+file path=usr/include/sys/smedia.h
+file path=usr/include/sys/sobject.h
+$(sparc_ONLY)file path=usr/include/sys/socal_cq_defs.h
+$(sparc_ONLY)file path=usr/include/sys/socalio.h
+$(sparc_ONLY)file path=usr/include/sys/socalmap.h
+$(sparc_ONLY)file path=usr/include/sys/socalreg.h
+$(sparc_ONLY)file path=usr/include/sys/socalvar.h
+file path=usr/include/sys/socket.h
+file path=usr/include/sys/socket_impl.h
+file path=usr/include/sys/socket_proto.h
+file path=usr/include/sys/socketvar.h
+file path=usr/include/sys/sockio.h
+file path=usr/include/sys/spl.h
+file path=usr/include/sys/squeue.h
+file path=usr/include/sys/squeue_impl.h
+file path=usr/include/sys/sservice.h
+file path=usr/include/sys/stack.h
+file path=usr/include/sys/stat.h
+file path=usr/include/sys/stat_impl.h
+file path=usr/include/sys/statfs.h
+file path=usr/include/sys/statvfs.h
+file path=usr/include/sys/stdbool.h
+file path=usr/include/sys/stddef.h
+file path=usr/include/sys/stdint.h
+file path=usr/include/sys/stermio.h
+file path=usr/include/sys/stream.h
+file path=usr/include/sys/strft.h
+file path=usr/include/sys/strlog.h
+file path=usr/include/sys/strmdep.h
+file path=usr/include/sys/stropts.h
+file path=usr/include/sys/strredir.h
+file path=usr/include/sys/strstat.h
+file path=usr/include/sys/strsubr.h
+file path=usr/include/sys/strsun.h
+file path=usr/include/sys/strtty.h
+file path=usr/include/sys/sunddi.h
+file path=usr/include/sys/sunldi.h
+file path=usr/include/sys/sunldi_impl.h
+file path=usr/include/sys/sunmdi.h
+file path=usr/include/sys/sunndi.h
+file path=usr/include/sys/sunpm.h
+file path=usr/include/sys/suntpi.h
+file path=usr/include/sys/suntty.h
+file path=usr/include/sys/swap.h
+file path=usr/include/sys/synch.h
+file path=usr/include/sys/syscall.h
+file path=usr/include/sys/sysconf.h
+file path=usr/include/sys/sysconfig.h
+file path=usr/include/sys/sysconfig_impl.h
+file path=usr/include/sys/sysdc.h
+file path=usr/include/sys/sysdc_impl.h
+dir  path=usr/include/sys/sysevent
+file path=usr/include/sys/sysevent.h
+file path=usr/include/sys/sysevent/ap_driver.h
+file path=usr/include/sys/sysevent/datalink.h
+file path=usr/include/sys/sysevent/dev.h
+file path=usr/include/sys/sysevent/domain.h
+file path=usr/include/sys/sysevent/dr.h
+file path=usr/include/sys/sysevent/env.h
+file path=usr/include/sys/sysevent/eventdefs.h
+file path=usr/include/sys/sysevent/ipmp.h
+file path=usr/include/sys/sysevent/pwrctl.h
+file path=usr/include/sys/sysevent/vrrp.h
+file path=usr/include/sys/sysevent_impl.h
+$(i386_ONLY)file path=usr/include/sys/sysi86.h
+file path=usr/include/sys/sysinfo.h
+file path=usr/include/sys/syslog.h
+file path=usr/include/sys/sysmacros.h
+file path=usr/include/sys/systeminfo.h
+file path=usr/include/sys/systm.h
+file path=usr/include/sys/t_kuser.h
+file path=usr/include/sys/t_lock.h
+file path=usr/include/sys/task.h
+file path=usr/include/sys/taskq.h
+file path=usr/include/sys/taskq_impl.h
+file path=usr/include/sys/telioctl.h
+file path=usr/include/sys/termio.h
+file path=usr/include/sys/termios.h
+file path=usr/include/sys/termiox.h
+file path=usr/include/sys/thread.h
+file path=usr/include/sys/ticlts.h
+file path=usr/include/sys/ticots.h
+file path=usr/include/sys/ticotsord.h
+file path=usr/include/sys/tihdr.h
+file path=usr/include/sys/time.h
+file path=usr/include/sys/time_impl.h
+file path=usr/include/sys/time_std_impl.h
+file path=usr/include/sys/timeb.h
+file path=usr/include/sys/timer.h
+file path=usr/include/sys/timerfd.h
+file path=usr/include/sys/times.h
+file path=usr/include/sys/timex.h
+file path=usr/include/sys/timod.h
+file path=usr/include/sys/tirdwr.h
+file path=usr/include/sys/tiuser.h
+file path=usr/include/sys/tl.h
+file path=usr/include/sys/tnf.h
+file path=usr/include/sys/tnf_com.h
+file path=usr/include/sys/tnf_probe.h
+file path=usr/include/sys/tnf_writer.h
+file path=usr/include/sys/todio.h
+file path=usr/include/sys/tpicommon.h
+file path=usr/include/sys/trap.h
+$(i386_ONLY)file path=usr/include/sys/traptrace.h
+file path=usr/include/sys/ts.h
+dir  path=usr/include/sys/tsol
+file path=usr/include/sys/tsol/label.h
+file path=usr/include/sys/tsol/label_macro.h
+file path=usr/include/sys/tsol/priv.h
+file path=usr/include/sys/tsol/tndb.h
+file path=usr/include/sys/tsol/tsyscall.h
+file path=usr/include/sys/tspriocntl.h
+$(i386_ONLY)file path=usr/include/sys/tss.h
+file path=usr/include/sys/ttcompat.h
+file path=usr/include/sys/ttold.h
+file path=usr/include/sys/tty.h
+file path=usr/include/sys/ttychars.h
+file path=usr/include/sys/ttydev.h
+file path=usr/include/sys/tuneable.h
+file path=usr/include/sys/turnstile.h
+file path=usr/include/sys/types.h
+file path=usr/include/sys/types32.h
+file path=usr/include/sys/tzfile.h
+file path=usr/include/sys/u8_textprep.h
+file path=usr/include/sys/uadmin.h
+$(i386_ONLY)file path=usr/include/sys/ucode.h
+file path=usr/include/sys/ucontext.h
+file path=usr/include/sys/uio.h
+file path=usr/include/sys/ulimit.h
+file path=usr/include/sys/un.h
+file path=usr/include/sys/unistd.h
+file path=usr/include/sys/user.h
+file path=usr/include/sys/ustat.h
+file path=usr/include/sys/utime.h
+file path=usr/include/sys/utrap.h
+file path=usr/include/sys/utsname.h
+file path=usr/include/sys/utssys.h
+file path=usr/include/sys/uuid.h
+file path=usr/include/sys/va_impl.h
+file path=usr/include/sys/va_list.h
+file path=usr/include/sys/var.h
+file path=usr/include/sys/varargs.h
+file path=usr/include/sys/vfs.h
+file path=usr/include/sys/vfs_opreg.h
+file path=usr/include/sys/vfstab.h
+file path=usr/include/sys/videodev2.h
+file path=usr/include/sys/visual_io.h
+file path=usr/include/sys/vm.h
+file path=usr/include/sys/vm_usage.h
+file path=usr/include/sys/vmem.h
+file path=usr/include/sys/vmem_impl.h
+file path=usr/include/sys/vmem_impl_user.h
+file path=usr/include/sys/vmparam.h
+file path=usr/include/sys/vmsystm.h
+file path=usr/include/sys/vnode.h
+file path=usr/include/sys/vt.h
+file path=usr/include/sys/vtdaemon.h
+file path=usr/include/sys/vtoc.h
+file path=usr/include/sys/vtrace.h
+file path=usr/include/sys/vuid_event.h
+file path=usr/include/sys/vuid_queue.h
+file path=usr/include/sys/vuid_state.h
+file path=usr/include/sys/vuid_store.h
+file path=usr/include/sys/vuid_wheel.h
+file path=usr/include/sys/wait.h
+file path=usr/include/sys/waitq.h
+file path=usr/include/sys/watchpoint.h
+$(i386_ONLY)file path=usr/include/sys/x86_archext.h
+$(i386_ONLY)file path=usr/include/sys/xen_errno.h
+file path=usr/include/sys/xti_inet.h
+file path=usr/include/sys/xti_osi.h
+file path=usr/include/sys/xti_xtiopt.h
+file path=usr/include/sys/zcons.h
+file path=usr/include/sys/zmod.h
+file path=usr/include/sys/zone.h
+$(sparc_ONLY)file path=usr/include/sys/zsdev.h
+file path=usr/include/sysexits.h
+file path=usr/include/syslog.h
+file path=usr/include/tar.h
+file path=usr/include/tcpd.h
+file path=usr/include/term.h
+file path=usr/include/termcap.h
+file path=usr/include/termio.h
+file path=usr/include/termios.h
+file path=usr/include/thread.h
+file path=usr/include/thread_db.h
+file path=usr/include/threads.h
+file path=usr/include/time.h
+file path=usr/include/tiuser.h
+dir  path=usr/include/tsol
+file path=usr/include/tsol/label.h
+file path=usr/include/tzfile.h
+file path=usr/include/uchar.h
+file path=usr/include/ucontext.h
+file path=usr/include/ucred.h
+file path=usr/include/uid_stp.h
+file path=usr/include/ulimit.h
+file path=usr/include/umem.h
+file path=usr/include/umem_impl.h
+file path=usr/include/unctrl.h
+file path=usr/include/unistd.h
+file path=usr/include/upanic.h
+file path=usr/include/user_attr.h
+file path=usr/include/userdefs.h
+file path=usr/include/ustat.h
+file path=usr/include/utility.h
+file path=usr/include/utime.h
+file path=usr/include/utmp.h
+file path=usr/include/utmpx.h
+dir  path=usr/include/uuid
+file path=usr/include/uuid/uuid.h
+$(sparc_ONLY)dir path=usr/include/v7
+$(sparc_ONLY)dir path=usr/include/v7/sys
+$(sparc_ONLY)file path=usr/include/v7/sys/machpcb.h
+$(sparc_ONLY)file path=usr/include/v7/sys/machtrap.h
+$(sparc_ONLY)file path=usr/include/v7/sys/mutex_impl.h
+$(sparc_ONLY)file path=usr/include/v7/sys/privregs.h
+$(sparc_ONLY)file path=usr/include/v7/sys/prom_isa.h
+$(sparc_ONLY)file path=usr/include/v7/sys/psr.h
+$(sparc_ONLY)file path=usr/include/v7/sys/traptrace.h
+$(sparc_ONLY)dir path=usr/include/v9
+$(sparc_ONLY)dir path=usr/include/v9/sys
+$(sparc_ONLY)file path=usr/include/v9/sys/asi.h
+$(sparc_ONLY)file path=usr/include/v9/sys/machpcb.h
+$(sparc_ONLY)file path=usr/include/v9/sys/machtrap.h
+$(sparc_ONLY)file path=usr/include/v9/sys/membar.h
+$(sparc_ONLY)file path=usr/include/v9/sys/mutex_impl.h
+$(sparc_ONLY)file path=usr/include/v9/sys/privregs.h
+$(sparc_ONLY)file path=usr/include/v9/sys/prom_isa.h
+$(sparc_ONLY)file path=usr/include/v9/sys/psr_compat.h
+$(sparc_ONLY)file path=usr/include/v9/sys/vis_simulator.h
+file path=usr/include/valtools.h
+file path=usr/include/values.h
+file path=usr/include/varargs.h
+dir  path=usr/include/vm
+file path=usr/include/vm/anon.h
+file path=usr/include/vm/as.h
+file path=usr/include/vm/faultcode.h
+file path=usr/include/vm/hat.h
+file path=usr/include/vm/kpm.h
+file path=usr/include/vm/page.h
+file path=usr/include/vm/pvn.h
+file path=usr/include/vm/rm.h
+file path=usr/include/vm/seg.h
+file path=usr/include/vm/seg_dev.h
+file path=usr/include/vm/seg_enum.h
+file path=usr/include/vm/seg_kmem.h
+file path=usr/include/vm/seg_kp.h
+file path=usr/include/vm/seg_kpm.h
+file path=usr/include/vm/seg_map.h
+file path=usr/include/vm/seg_spt.h
+file path=usr/include/vm/seg_vn.h
+file path=usr/include/vm/vpage.h
+file path=usr/include/vm/vpm.h
+file path=usr/include/volmgt.h
+file path=usr/include/wait.h
+file path=usr/include/wchar.h
+file path=usr/include/wchar_impl.h
+file path=usr/include/wctype.h
+file path=usr/include/widec.h
+file path=usr/include/wordexp.h
+file path=usr/include/xlocale.h
+file path=usr/include/xti.h
+file path=usr/include/xti_inet.h
+file path=usr/include/zone.h
+file path=usr/include/zonestat.h
+dir  path=usr/platform group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,A70 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,A70/include target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T12 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Netra-T12/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Netra-T4/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,SPARC-Enterprise/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-100 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-100/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-1000/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1500 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-1500/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-2500 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-2500/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-280R/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-480R/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-880 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-880/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V215 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V215/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V240 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V240/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V250 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V250/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V440 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V440/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V445 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V445/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V490 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V490/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V890 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V890/include \
+    target=../sun4u/include
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-2 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-2/include target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-250 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-250/include \
+    target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-4 group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-4/include target=../sun4u/include
+$(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise/include \
+    target=../sun4u/include
+$(i386_ONLY)dir path=usr/platform/i86pc group=sys
+$(i386_ONLY)dir path=usr/platform/i86pc/include
+$(i386_ONLY)dir path=usr/platform/i86pc/include/sys
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/acpidev.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/amd_iommu.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/asm_misc.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/clock.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/cram.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/ddi_subrdefs.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/debug_info.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/fastboot.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/hma.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/mach_mmu.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/machclock.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/machcpuvar.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/machparam.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/machprivregs.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/machsystm.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/machthread.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/memnode.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/pc_mmu.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/psm.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/psm_defs.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/psm_modctl.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/psm_types.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/rm_platter.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/sbd_ioctl.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/smp_impldefs.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/smt.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/vm_machparam.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/x_call.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/xc_levels.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/xsvc.h
+$(i386_ONLY)dir path=usr/platform/i86pc/include/vm
+$(i386_ONLY)file path=usr/platform/i86pc/include/vm/hat_i86.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/vm/hat_pte.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/vm/hment.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/vm/htable.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/vm/kboot_mmu.h
+$(i386_ONLY)dir path=usr/platform/i86xpv group=sys
+$(i386_ONLY)dir path=usr/platform/i86xpv/include
+$(i386_ONLY)dir path=usr/platform/i86xpv/include/sys
+$(i386_ONLY)file path=usr/platform/i86xpv/include/sys/balloon.h
+$(i386_ONLY)file path=usr/platform/i86xpv/include/sys/machprivregs.h
+$(i386_ONLY)file path=usr/platform/i86xpv/include/sys/xen_mmu.h
+$(i386_ONLY)file path=usr/platform/i86xpv/include/sys/xpv_impl.h
+$(i386_ONLY)dir path=usr/platform/i86xpv/include/vm
+$(i386_ONLY)file path=usr/platform/i86xpv/include/vm/seg_mf.h
+$(sparc_ONLY)dir path=usr/platform/sun4u group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4u/include
+$(sparc_ONLY)dir path=usr/platform/sun4u/include/sys
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/ac.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/async.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cheetahregs.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cherrystone.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/clock.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cmp.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cpc_ultra.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cpr_impl.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cpu_impl.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cpu_sgnblk_defs.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/daktari.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/ddi_subrdefs.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/dvma.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/ecc_kstat.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/eeprom.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/envctrl.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/envctrl_gen.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/envctrl_ue250.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/envctrl_ue450.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/environ.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/errclassify.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/fhc.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/gpio_87317.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/hpc3130_events.h
+$(sparc_ONLY)dir path=usr/platform/sun4u/include/sys/i2c
+$(sparc_ONLY)dir path=usr/platform/sun4u/include/sys/i2c/clients
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/i2c/clients/hpc3130.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/i2c/clients/i2c_client.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/i2c/clients/lm75.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/i2c/clients/max1617.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/i2c/clients/pcf8591.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/i2c/clients/ssc050.h
+$(sparc_ONLY)dir path=usr/platform/sun4u/include/sys/i2c/misc
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/i2c/misc/i2c_svc.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/idprom.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/intr.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/intreg.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/iocache.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/iommu.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/ivintr.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/lom_io.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/machasi.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/machclock.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/machcpuvar.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/machparam.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/machsystm.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/machthread.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/mem_cache.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memlist_plat.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memnode.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/mmu.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/nexusdebug.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/opl_hwdesc.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/opl_module.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/prom_debug.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/prom_plat.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/pte.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sbd_ioctl.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/scb.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/simmstat.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/smt.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/spitregs.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sram.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sun4asi.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sysctrl.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sysioerr.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sysiosbus.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/tod.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/todmostek.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/trapstat.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/traptrace.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/vis.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/vm_machparam.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/x_call.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/xc_impl.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/zsmach.h
+$(sparc_ONLY)dir path=usr/platform/sun4u/include/vm
+$(sparc_ONLY)file path=usr/platform/sun4u/include/vm/hat_sfmmu.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/vm/mach_sfmmu.h
+$(sparc_ONLY)dir path=usr/platform/sun4v group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4v/include
+$(sparc_ONLY)dir path=usr/platform/sun4v/include/sys
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/clock.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/cmp.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/cpc_ultra.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/cpu_sgnblk_defs.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/ddi_subrdefs.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/ds_pri.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/ds_snmp.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/dvma.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/eeprom.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/fcode.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/hsvc.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/hypervisor_api.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/idprom.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/intr.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/intreg.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/ivintr.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/machasi.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/machclock.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/machcpuvar.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/machintreg.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/machparam.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/machsystm.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/machthread.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/memlist_plat.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/memnode.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/mmu.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/nexusdebug.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/niagaraasi.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/niagararegs.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/ntwdt.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/pri.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/prom_debug.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/prom_plat.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/pte.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/qcn.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/scb.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/smt.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/soft_state.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/sun4asi.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/tod.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/trapstat.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/traptrace.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/vis.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/vm_machparam.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/x_call.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/xc_impl.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/zsmach.h
+$(sparc_ONLY)dir path=usr/platform/sun4v/include/vm
+$(sparc_ONLY)file path=usr/platform/sun4v/include/vm/hat_sfmmu.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/vm/mach_sfmmu.h
+dir  path=usr/share
+dir  path=usr/share/man
+dir  path=usr/share/man/man3
+dir  path=usr/share/man/man3head
+link path=usr/share/man/man3head/CMSG_DATA.3head target=socket.h.3head
+link path=usr/share/man/man3head/CMSG_FIRSTHDR.3head target=socket.h.3head
+link path=usr/share/man/man3head/CMSG_LEN.3head target=socket.h.3head
+link path=usr/share/man/man3head/CMSG_NXTHDR.3head target=socket.h.3head
+link path=usr/share/man/man3head/CMSG_SPACE.3head target=socket.h.3head
+link path=usr/share/man/man3head/LIST_CLASS_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_CLASS_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_CONCAT.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_EMPTY.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_FIRST.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_FOREACH.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_FOREACH_FROM.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_FOREACH_FROM_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/LIST_FOREACH_SAFE.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_HEAD_INITIALIZER.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/LIST_INIT.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_INSERT_AFTER.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_INSERT_BEFORE.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_INSERT_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_NEXT.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_PREV.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_REMOVE.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_SWAP.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_CLASS_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_CLASS_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_CONCAT.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_EMPTY.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_FIRST.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_FOREACH.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_FOREACH_FROM.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_FOREACH_FROM_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_FOREACH_SAFE.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_HEAD_INITIALIZER.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_INIT.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_INSERT_AFTER.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_INSERT_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_NEXT.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_REMOVE.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_REMOVE_AFTER.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_REMOVE_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_SWAP.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_CLASS_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_CLASS_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_CONCAT.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_EMPTY.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_FIRST.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_FOREACH.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_FOREACH_FROM.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_FOREACH_FROM_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_FOREACH_SAFE.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_HEAD_INITIALIZER.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_INIT.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_INSERT_AFTER.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_INSERT_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_INSERT_TAIL.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_LAST.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_NEXT.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_REMOVE.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_REMOVE_AFTER.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_REMOVE_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_SWAP.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_CLASS_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_CLASS_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_CONCAT.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_EMPTY.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FIRST.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_FROM.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_FROM_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_REVERSE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_REVERSE_FROM.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_REVERSE_FROM_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_REVERSE_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_SAFE.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_HEAD_INITIALIZER.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_INIT.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_INSERT_AFTER.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_INSERT_BEFORE.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_INSERT_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_INSERT_TAIL.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_LAST.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_NEXT.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_PREV.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_REMOVE.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_SWAP.3head target=queue.h.3head
+link path=usr/share/man/man3head/TIMESPEC_TO_TIMEVAL.3head target=timespec.3head
+link path=usr/share/man/man3head/TIMEVAL_TO_TIMESPEC.3head target=timespec.3head
+link path=usr/share/man/man3head/acct.3head target=acct.h.3head
+file path=usr/share/man/man3head/acct.h.3head
+link path=usr/share/man/man3head/aio.3head target=aio.h.3head
+file path=usr/share/man/man3head/aio.h.3head
+link path=usr/share/man/man3head/ar.3head target=ar.h.3head
+file path=usr/share/man/man3head/ar.h.3head
+link path=usr/share/man/man3head/archives.3head target=archives.h.3head
+file path=usr/share/man/man3head/archives.h.3head
+link path=usr/share/man/man3head/assert.3head target=assert.h.3head
+file path=usr/share/man/man3head/assert.h.3head
+link path=usr/share/man/man3head/complex.3head target=complex.h.3head
+file path=usr/share/man/man3head/complex.h.3head
+link path=usr/share/man/man3head/cpio.3head target=cpio.h.3head
+file path=usr/share/man/man3head/cpio.h.3head
+link path=usr/share/man/man3head/dirent.3head target=dirent.h.3head
+file path=usr/share/man/man3head/dirent.h.3head
+file path=usr/share/man/man3head/endian.h.3head
+link path=usr/share/man/man3head/errno.3head target=errno.h.3head
+file path=usr/share/man/man3head/errno.h.3head
+link path=usr/share/man/man3head/fcntl.3head target=fcntl.h.3head
+file path=usr/share/man/man3head/fcntl.h.3head
+link path=usr/share/man/man3head/fenv.3head target=fenv.h.3head
+file path=usr/share/man/man3head/fenv.h.3head
+link path=usr/share/man/man3head/float.3head target=float.h.3head
+file path=usr/share/man/man3head/float.h.3head
+link path=usr/share/man/man3head/floatingpoint.3head \
+    target=floatingpoint.h.3head
+file path=usr/share/man/man3head/floatingpoint.h.3head
+link path=usr/share/man/man3head/fmtmsg.3head target=fmtmsg.h.3head
+file path=usr/share/man/man3head/fmtmsg.h.3head
+link path=usr/share/man/man3head/fnmatch.3head target=fnmatch.h.3head
+file path=usr/share/man/man3head/fnmatch.h.3head
+link path=usr/share/man/man3head/ftw.3head target=ftw.h.3head
+file path=usr/share/man/man3head/ftw.h.3head
+link path=usr/share/man/man3head/glob.3head target=glob.h.3head
+file path=usr/share/man/man3head/glob.h.3head
+link path=usr/share/man/man3head/grp.3head target=grp.h.3head
+file path=usr/share/man/man3head/grp.h.3head
+link path=usr/share/man/man3head/iconv.3head target=iconv.h.3head
+file path=usr/share/man/man3head/iconv.h.3head
+link path=usr/share/man/man3head/if.3head target=if.h.3head
+file path=usr/share/man/man3head/if.h.3head
+link path=usr/share/man/man3head/in.3head target=in.h.3head
+file path=usr/share/man/man3head/in.h.3head
+link path=usr/share/man/man3head/inet.3head target=inet.h.3head
+file path=usr/share/man/man3head/inet.h.3head
+link path=usr/share/man/man3head/inttypes.3head target=inttypes.h.3head
+file path=usr/share/man/man3head/inttypes.h.3head
+link path=usr/share/man/man3head/ipc.3head target=ipc.h.3head
+file path=usr/share/man/man3head/ipc.h.3head
+link path=usr/share/man/man3head/iso646.3head target=iso646.h.3head
+file path=usr/share/man/man3head/iso646.h.3head
+link path=usr/share/man/man3head/langinfo.3head target=langinfo.h.3head
+file path=usr/share/man/man3head/langinfo.h.3head
+link path=usr/share/man/man3head/libgen.3head target=libgen.h.3head
+file path=usr/share/man/man3head/libgen.h.3head
+link path=usr/share/man/man3head/libintl.3head target=libintl.h.3head
+file path=usr/share/man/man3head/libintl.h.3head
+link path=usr/share/man/man3head/limits.3head target=limits.h.3head
+file path=usr/share/man/man3head/limits.h.3head
+link path=usr/share/man/man3head/locale.3head target=locale.h.3head
+file path=usr/share/man/man3head/locale.h.3head
+link path=usr/share/man/man3head/math.3head target=math.h.3head
+file path=usr/share/man/man3head/math.h.3head
+link path=usr/share/man/man3head/mman.3head target=mman.h.3head
+file path=usr/share/man/man3head/mman.h.3head
+link path=usr/share/man/man3head/monetary.3head target=monetary.h.3head
+file path=usr/share/man/man3head/monetary.h.3head
+link path=usr/share/man/man3head/mqueue.3head target=mqueue.h.3head
+file path=usr/share/man/man3head/mqueue.h.3head
+link path=usr/share/man/man3head/msg.3head target=msg.h.3head
+file path=usr/share/man/man3head/msg.h.3head
+link path=usr/share/man/man3head/ndbm.3head target=ndbm.h.3head
+file path=usr/share/man/man3head/ndbm.h.3head
+link path=usr/share/man/man3head/netdb.3head target=netdb.h.3head
+file path=usr/share/man/man3head/netdb.h.3head
+link path=usr/share/man/man3head/nl_types.3head target=nl_types.h.3head
+file path=usr/share/man/man3head/nl_types.h.3head
+link path=usr/share/man/man3head/poll.3head target=poll.h.3head
+file path=usr/share/man/man3head/poll.h.3head
+link path=usr/share/man/man3head/pthread.3head target=pthread.h.3head
+file path=usr/share/man/man3head/pthread.h.3head
+link path=usr/share/man/man3head/pwd.3head target=pwd.h.3head
+file path=usr/share/man/man3head/pwd.h.3head
+file path=usr/share/man/man3head/queue.h.3head
+link path=usr/share/man/man3head/regex.3head target=regex.h.3head
+file path=usr/share/man/man3head/regex.h.3head
+link path=usr/share/man/man3head/resource.3head target=resource.h.3head
+file path=usr/share/man/man3head/resource.h.3head
+link path=usr/share/man/man3head/sched.3head target=sched.h.3head
+file path=usr/share/man/man3head/sched.h.3head
+link path=usr/share/man/man3head/search.3head target=search.h.3head
+file path=usr/share/man/man3head/search.h.3head
+link path=usr/share/man/man3head/select.3head target=select.h.3head
+file path=usr/share/man/man3head/select.h.3head
+link path=usr/share/man/man3head/sem.3head target=sem.h.3head
+file path=usr/share/man/man3head/sem.h.3head
+link path=usr/share/man/man3head/semaphore.3head target=semaphore.h.3head
+file path=usr/share/man/man3head/semaphore.h.3head
+link path=usr/share/man/man3head/setjmp.3head target=setjmp.h.3head
+file path=usr/share/man/man3head/setjmp.h.3head
+link path=usr/share/man/man3head/shm.3head target=shm.h.3head
+file path=usr/share/man/man3head/shm.h.3head
+link path=usr/share/man/man3head/siginfo.3head target=siginfo.h.3head
+file path=usr/share/man/man3head/siginfo.h.3head
+link path=usr/share/man/man3head/signal.3head target=signal.h.3head
+file path=usr/share/man/man3head/signal.h.3head
+link path=usr/share/man/man3head/socket.3head target=socket.h.3head
+file path=usr/share/man/man3head/socket.h.3head
+link path=usr/share/man/man3head/spawn.3head target=spawn.h.3head
+file path=usr/share/man/man3head/spawn.h.3head
+link path=usr/share/man/man3head/stat.3head target=stat.h.3head
+file path=usr/share/man/man3head/stat.h.3head
+link path=usr/share/man/man3head/statvfs.3head target=statvfs.h.3head
+file path=usr/share/man/man3head/statvfs.h.3head
+link path=usr/share/man/man3head/stdbool.3head target=stdbool.h.3head
+file path=usr/share/man/man3head/stdbool.h.3head
+link path=usr/share/man/man3head/stddef.3head target=stddef.h.3head
+file path=usr/share/man/man3head/stddef.h.3head
+link path=usr/share/man/man3head/stdint.3head target=stdint.h.3head
+file path=usr/share/man/man3head/stdint.h.3head
+link path=usr/share/man/man3head/stdio.3head target=stdio.h.3head
+file path=usr/share/man/man3head/stdio.h.3head
+link path=usr/share/man/man3head/stdlib.3head target=stdlib.h.3head
+file path=usr/share/man/man3head/stdlib.h.3head
+link path=usr/share/man/man3head/string.3head target=string.h.3head
+file path=usr/share/man/man3head/string.h.3head
+link path=usr/share/man/man3head/strings.3head target=strings.h.3head
+file path=usr/share/man/man3head/strings.h.3head
+link path=usr/share/man/man3head/stropts.3head target=stropts.h.3head
+file path=usr/share/man/man3head/stropts.h.3head
+link path=usr/share/man/man3head/syslog.3head target=syslog.h.3head
+file path=usr/share/man/man3head/syslog.h.3head
+link path=usr/share/man/man3head/tar.3head target=tar.h.3head
+file path=usr/share/man/man3head/tar.h.3head
+link path=usr/share/man/man3head/tcp.3head target=tcp.h.3head
+file path=usr/share/man/man3head/tcp.h.3head
+link path=usr/share/man/man3head/termios.3head target=termios.h.3head
+file path=usr/share/man/man3head/termios.h.3head
+link path=usr/share/man/man3head/tgmath.3head target=tgmath.h.3head
+file path=usr/share/man/man3head/tgmath.h.3head
+link path=usr/share/man/man3head/time.3head target=time.h.3head
+file path=usr/share/man/man3head/time.h.3head
+link path=usr/share/man/man3head/timeb.3head target=timeb.h.3head
+file path=usr/share/man/man3head/timeb.h.3head
+link path=usr/share/man/man3head/times.3head target=times.h.3head
+file path=usr/share/man/man3head/times.h.3head
+file path=usr/share/man/man3head/timespec.3head
+link path=usr/share/man/man3head/timeval.3head target=timespec.3head
+link path=usr/share/man/man3head/types.3head target=types.h.3head
+file path=usr/share/man/man3head/types.h.3head
+link path=usr/share/man/man3head/types32.3head target=types32.h.3head
+file path=usr/share/man/man3head/types32.h.3head
+file path=usr/share/man/man3head/uchar.h.3head
+link path=usr/share/man/man3head/ucontext.3head target=ucontext.h.3head
+file path=usr/share/man/man3head/ucontext.h.3head
+link path=usr/share/man/man3head/uio.3head target=uio.h.3head
+file path=usr/share/man/man3head/uio.h.3head
+link path=usr/share/man/man3head/ulimit.3head target=ulimit.h.3head
+file path=usr/share/man/man3head/ulimit.h.3head
+link path=usr/share/man/man3head/un.3head target=un.h.3head
+file path=usr/share/man/man3head/un.h.3head
+link path=usr/share/man/man3head/unistd.3head target=unistd.h.3head
+file path=usr/share/man/man3head/unistd.h.3head
+file path=usr/share/man/man3head/upanic.h.3head
+link path=usr/share/man/man3head/utime.3head target=utime.h.3head
+file path=usr/share/man/man3head/utime.h.3head
+link path=usr/share/man/man3head/utmpx.3head target=utmpx.h.3head
+file path=usr/share/man/man3head/utmpx.h.3head
+link path=usr/share/man/man3head/utsname.3head target=utsname.h.3head
+file path=usr/share/man/man3head/utsname.h.3head
+link path=usr/share/man/man3head/values.3head target=values.h.3head
+file path=usr/share/man/man3head/values.h.3head
+link path=usr/share/man/man3head/wait.3head target=wait.h.3head
+file path=usr/share/man/man3head/wait.h.3head
+link path=usr/share/man/man3head/wchar.3head target=wchar.h.3head
+file path=usr/share/man/man3head/wchar.h.3head
+link path=usr/share/man/man3head/wctype.3head target=wctype.h.3head
+file path=usr/share/man/man3head/wctype.h.3head
+link path=usr/share/man/man3head/wordexp.3head target=wordexp.h.3head
+file path=usr/share/man/man3head/wordexp.h.3head
+link path=usr/share/man/man3head/xlocale.3head target=xlocale.h.3head
+file path=usr/share/man/man3head/xlocale.h.3head
+dir  path=usr/share/man/man4
+file path=usr/share/man/man4/note.4
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/prof.5
+dir  path=usr/share/man/man7i
+file path=usr/share/man/man7i/cdio.7i
+file path=usr/share/man/man7i/dkio.7i
+file path=usr/share/man/man7i/fbio.7i
+file path=usr/share/man/man7i/fdio.7i
+file path=usr/share/man/man7i/hdio.7i
+file path=usr/share/man/man7i/iec61883.7i
+file path=usr/share/man/man7i/mhd.7i
+file path=usr/share/man/man7i/mtio.7i
+file path=usr/share/man/man7i/prnio.7i
+file path=usr/share/man/man7i/quotactl.7i
+file path=usr/share/man/man7i/sesio.7i
+file path=usr/share/man/man7i/sockio.7i
+file path=usr/share/man/man7i/streamio.7i
+file path=usr/share/man/man7i/termio.7i
+file path=usr/share/man/man7i/termiox.7i
+file path=usr/share/man/man7i/uscsi.7i
+file path=usr/share/man/man7i/visual_io.7i
+file path=usr/share/man/man7i/vt.7i
+dir  path=usr/share/src group=sys
+dir  path=usr/share/src/uts
+$(i386_ONLY)dir path=usr/share/src/uts/i86pc
+$(i386_ONLY)link path=usr/share/src/uts/i86pc/sys \
+    target=../../../../platform/i86pc/include/sys
+$(i386_ONLY)link path=usr/share/src/uts/i86pc/vm \
+    target=../../../../platform/i86pc/include/vm
+$(i386_ONLY)dir path=usr/share/src/uts/i86xpv
+$(i386_ONLY)link path=usr/share/src/uts/i86xpv/sys \
+    target=../../../../platform/i86xpv/include/sys
+$(i386_ONLY)link path=usr/share/src/uts/i86xpv/vm \
+    target=../../../../platform/i86xpv/include/vm
+$(sparc_ONLY)dir path=usr/share/src/uts/sun4u
+$(sparc_ONLY)link path=usr/share/src/uts/sun4u/sys \
+    target=../../../../platform/sun4u/include/sys
+$(sparc_ONLY)link path=usr/share/src/uts/sun4u/vm \
+    target=../../../../platform/sun4u/include/vm
+$(sparc_ONLY)dir path=usr/share/src/uts/sun4v
+$(sparc_ONLY)link path=usr/share/src/uts/sun4v/sys \
+    target=../../../../platform/sun4v/include/sys
+$(sparc_ONLY)link path=usr/share/src/uts/sun4v/vm \
+    target=../../../../platform/sun4v/include/vm
+dir  path=usr/xpg4
+dir  path=usr/xpg4/include
+file path=usr/xpg4/include/curses.h
+file path=usr/xpg4/include/term.h
+file path=usr/xpg4/include/unctrl.h
+legacy pkg=SUNWhea \
+    desc="SunOS C/C++ header files for general development of software" \
+    name="SunOS Header Files"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license license_in_headers license=license_in_headers
+license usr/src/lib/pkcs11/include/THIRDPARTYLICENSE \
+    license=usr/src/lib/pkcs11/include/THIRDPARTYLICENSE
+license usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload \
+    license=usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload

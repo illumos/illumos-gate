@@ -1,0 +1,62 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/file-system/udfs@$(PKGVERS)
+set name=pkg.summary value="Universal Disk Format 1.50"
+set name=pkg.description value="Universal Disk Format 1.50 File System"
+set name=info.classification value=org.opensolaris.category.2008:System/Media
+set name=variant.arch value=$(ARCH)
+dir  path=kernel group=sys
+dir  path=kernel/fs group=sys
+dir  path=kernel/fs/$(ARCH64) group=sys
+file path=kernel/fs/$(ARCH64)/udfs group=sys mode=0755
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/fs group=sys
+dir  path=usr/lib/fs/udfs group=sys
+file path=usr/lib/fs/udfs/fsck mode=0555
+file path=usr/lib/fs/udfs/fsdb mode=0555
+hardlink path=usr/lib/fs/udfs/fstyp target=../../../sbin/fstyp
+file path=usr/lib/fs/udfs/fstyp.so.1 mode=0555
+file path=usr/lib/fs/udfs/labelit mode=0555
+file path=usr/lib/fs/udfs/mkfs mode=0555
+file path=usr/lib/fs/udfs/mount mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/fsck_udfs.1m
+file path=usr/share/man/man1m/fsdb_udfs.1m
+file path=usr/share/man/man1m/labelit_udfs.1m
+file path=usr/share/man/man1m/mkfs_udfs.1m
+file path=usr/share/man/man1m/mount_udfs.1m
+dir  path=usr/share/man/man7fs
+file path=usr/share/man/man7fs/udfs.7fs
+legacy pkg=SUNWudf desc="Universal Disk Format 1.50 File System, (Usr)" \
+    name="Universal Disk Format 1.50, (Usr)"
+legacy pkg=SUNWudfr desc="Universal Disk Format 1.50 File System" \
+    name="Universal Disk Format 1.50"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license usr/src/cmd/fs.d/udfs/fsck/THIRDPARTYLICENSE \
+    license=usr/src/cmd/fs.d/udfs/fsck/THIRDPARTYLICENSE

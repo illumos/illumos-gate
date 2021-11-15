@@ -1,0 +1,65 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/network/udapl/udapl-tavor@$(PKGVERS)
+set name=pkg.summary value="Sun uDAPL for Tavor (User)"
+set name=pkg.description value="Sun uDAPL provider for Tavor"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=$(ARCH)
+dir  path=etc group=sys
+dir  path=etc/init.d group=sys
+file path=etc/init.d/dodatadm.udaplt group=sys mode=0744 \
+    original_name=SUNWudaplt:etc/init.d/dodatadm.udaplt preserve=true
+dir  path=etc/rc2.d group=sys
+hardlink path=etc/rc2.d/S81dodatadm.udaplt \
+    target=../../etc/init.d/dodatadm.udaplt
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/daplt group=sys
+file path=kernel/drv/daplt.conf group=sys
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+file path=usr/lib/$(ARCH64)/udapl_tavor.so.1
+file path=usr/lib/udapl_tavor.so.1
+dir  path=usr/share
+dir  path=usr/share/dat group=sys
+file path=usr/share/dat/SUNWudaplt.conf group=sys mode=0644
+driver name=daplt perms="* 0644 root sys"
+legacy pkg=SUNWudapltr \
+    desc="Sun uDAPL provider for Tavor driver and registration script" \
+    name="Sun uDAPL for Tavor (Root)"
+legacy pkg=SUNWudapltu desc="Sun uDAPL provider for Tavor" \
+    name="Sun uDAPL for Tavor (User)"
+license cr_Sun license=cr_Sun
+license lic_OSBL license=lic_OSBL
+license lic_OSBL_preamble license=lic_OSBL_preamble

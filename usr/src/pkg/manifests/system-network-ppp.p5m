@@ -1,0 +1,99 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/network/ppp@$(PKGVERS)
+set name=pkg.summary value="Solaris PPP Device Drivers"
+set name=pkg.description \
+    value="Device drivers implementing point-to-point protocol (PPP)"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=$(ARCH)
+dir  path=etc group=sys
+dir  path=etc/init.d group=sys
+file path=etc/init.d/pppd group=sys mode=0744 \
+    original_name=SUNWpppd:etc/init.d/pppd preserve=true
+dir  path=etc/ppp group=sys
+file path=etc/ppp/chap-secrets group=sys mode=0600 \
+    original_name=SUNWpppd:etc/ppp/chap-secrets preserve=true
+file path=etc/ppp/myisp-chat.tmpl group=sys
+file path=etc/ppp/options.tmpl group=sys
+file path=etc/ppp/options.ttya.tmpl group=sys
+file path=etc/ppp/pap-secrets group=sys mode=0600 \
+    original_name=SUNWpppd:etc/ppp/pap-secrets preserve=true
+dir  path=etc/ppp/peers group=sys
+file path=etc/ppp/peers/myisp.tmpl group=sys
+dir  path=etc/ppp/plugins group=sys
+dir  path=etc/rc0.d group=sys
+hardlink path=etc/rc0.d/K50pppd target=../../etc/init.d/pppd
+dir  path=etc/rc1.d group=sys
+hardlink path=etc/rc1.d/K50pppd target=../../etc/init.d/pppd
+dir  path=etc/rc2.d group=sys
+hardlink path=etc/rc2.d/S47pppd target=../../etc/init.d/pppd
+dir  path=etc/rcS.d group=sys
+hardlink path=etc/rcS.d/K50pppd target=../../etc/init.d/pppd
+dir  path=usr group=sys
+dir  path=usr/bin
+file path=usr/bin/chat mode=0555
+file path=usr/bin/pppd mode=4555
+file path=usr/bin/pppstats mode=0555
+dir  path=usr/kernel group=sys
+dir  path=usr/kernel/drv group=sys
+dir  path=usr/kernel/drv/$(ARCH64) group=sys
+file path=usr/kernel/drv/$(ARCH64)/sppp group=sys
+file path=usr/kernel/drv/$(ARCH64)/sppptun group=sys
+file path=usr/kernel/drv/sppp.conf group=sys
+file path=usr/kernel/drv/sppptun.conf group=sys
+dir  path=usr/kernel/strmod group=sys
+dir  path=usr/kernel/strmod/$(ARCH64) group=sys
+file path=usr/kernel/strmod/$(ARCH64)/spppasyn group=sys mode=0755
+file path=usr/kernel/strmod/$(ARCH64)/spppcomp group=sys mode=0755
+hardlink path=usr/kernel/strmod/$(ARCH64)/sppptun \
+    target=../../drv/$(ARCH64)/sppptun
+dir  path=usr/sbin
+file path=usr/sbin/asppp2pppd mode=0550
+dir  path=usr/share/man
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/chat.1m
+file path=usr/share/man/man1m/pppd.1m
+file path=usr/share/man/man1m/pppstats.1m
+dir  path=usr/share/man/man7m
+file path=usr/share/man/man7m/sppptun.7m
+driver name=sppp
+driver name=sppptun
+legacy pkg=SUNWpppd \
+    desc="Device drivers implementing point-to-point protocol (PPP)" \
+    name="Solaris PPP Device Drivers"
+legacy pkg=SUNWpppdr \
+    desc="Configuration files for Solaris Point-to-Point Protocol (PPP)" \
+    name="Solaris PPP configuration files"
+legacy pkg=SUNWpppdu \
+    desc="Daemon and utilities for Point-to-Point Protocol (PPP)" \
+    name="Solaris PPP daemon and utilities"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license usr/src/cmd/cmd-inet/usr.bin/pppd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.bin/pppd/THIRDPARTYLICENSE
+license usr/src/uts/common/io/ppp/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/ppp/THIRDPARTYLICENSE

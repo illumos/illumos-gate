@@ -1,0 +1,84 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/kernel/io-performance-counters@$(PKGVERS)
+set name=pkg.summary value="sun4u IO chip performance counter modules"
+set name=pkg.description value="Kernel support for IO chip performance counters"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=sparc
+dir  path=platform group=sys
+dir  path=platform/SUNW,A70 group=sys
+dir  path=platform/SUNW,A70/kernel group=sys
+dir  path=platform/SUNW,A70/kernel/drv group=sys
+dir  path=platform/SUNW,A70/kernel/drv/$(ARCH64) group=sys
+file path=platform/SUNW,A70/kernel/drv/$(ARCH64)/fpc group=sys
+file path=platform/SUNW,A70/kernel/drv/fpc.conf group=sys
+dir  path=platform/SUNW,Sun-Fire-V215 group=sys
+dir  path=platform/SUNW,Sun-Fire-V215/kernel group=sys
+dir  path=platform/SUNW,Sun-Fire-V215/kernel/drv group=sys
+dir  path=platform/SUNW,Sun-Fire-V215/kernel/drv/$(ARCH64) group=sys
+link path=platform/SUNW,Sun-Fire-V215/kernel/drv/$(ARCH64)/fpc \
+    target=../../../../SUNW,A70/kernel/drv/$(ARCH64)/fpc
+link path=platform/SUNW,Sun-Fire-V215/kernel/drv/fpc.conf \
+    target=../../../SUNW,A70/kernel/drv/fpc.conf
+dir  path=platform/SUNW,Sun-Fire-V445 group=sys
+dir  path=platform/SUNW,Sun-Fire-V445/kernel group=sys
+dir  path=platform/SUNW,Sun-Fire-V445/kernel/drv group=sys
+dir  path=platform/SUNW,Sun-Fire-V445/kernel/drv/$(ARCH64) group=sys
+link path=platform/SUNW,Sun-Fire-V445/kernel/drv/$(ARCH64)/fpc \
+    target=../../../../SUNW,A70/kernel/drv/$(ARCH64)/fpc
+link path=platform/SUNW,Sun-Fire-V445/kernel/drv/fpc.conf \
+    target=../../../SUNW,A70/kernel/drv/fpc.conf
+dir  path=platform/sun4v group=sys
+dir  path=platform/sun4v/kernel group=sys
+dir  path=platform/sun4v/kernel/drv group=sys
+dir  path=platform/sun4v/kernel/drv/$(ARCH64) group=sys
+file path=platform/sun4v/kernel/drv/$(ARCH64)/fpc group=sys
+file path=platform/sun4v/kernel/drv/$(ARCH64)/iospc group=sys
+file path=platform/sun4v/kernel/drv/$(ARCH64)/n2piupc group=sys
+file path=platform/sun4v/kernel/drv/fpc.conf group=sys
+file path=platform/sun4v/kernel/drv/iospc.conf group=sys
+file path=platform/sun4v/kernel/drv/n2piupc.conf group=sys
+driver name=fpc perms="* 0666 root sys"
+driver name=iospc perms="* 0666 root sys" \
+    alias=SUNW,ktios-pr \
+    alias=SUNW,rfios-pr
+driver name=n2piupc perms="* 0666 root sys" \
+    alias=SUNW,n2piu-pr \
+    alias=SUNW,vfpiu-pr
+legacy pkg=SUNWiopc.u arch=$(ARCH).sun4u \
+    desc="Kernel support for IO chip performance counters" \
+    name="sun4u IO chip performance counter modules"
+legacy pkg=SUNWiopc.v arch=$(ARCH).sun4v \
+    desc="Kernel support for IO chip performance counters" \
+    name="sun4v IO chip performance counter modules"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

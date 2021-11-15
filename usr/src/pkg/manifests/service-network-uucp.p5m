@@ -1,0 +1,149 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/service/network/uucp@$(PKGVERS)
+set name=pkg.summary value="Networking UUCP Utilities"
+set name=pkg.description value="UUCP utilities and daemon"
+set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=variant.arch value=$(ARCH)
+dir  path=etc group=sys
+dir  path=etc/init.d group=sys
+file path=etc/init.d/uucp group=sys mode=0744 \
+    original_name=SUNWbnu:etc/init.d/uucp preserve=true
+dir  path=etc/rc2.d group=sys
+hardlink path=etc/rc2.d/S70uucp target=../../etc/init.d/uucp
+dir  path=etc/uucp owner=uucp group=uucp
+file path=etc/uucp/Config owner=uucp group=uucp \
+    original_name=SUNWbnu:etc/uucp/Config preserve=true
+file path=etc/uucp/Devconfig owner=uucp group=uucp \
+    original_name=SUNWbnu:etc/uucp/Devconfig preserve=true
+file path=etc/uucp/Devices owner=uucp group=uucp \
+    original_name=SUNWbnu:etc/uucp/Devices preserve=true
+file path=etc/uucp/Dialcodes owner=uucp group=uucp \
+    original_name=SUNWbnu:etc/uucp/Dialcodes preserve=true
+file path=etc/uucp/Dialers owner=uucp group=uucp \
+    original_name=SUNWbnu:etc/uucp/Dialers preserve=true
+file path=etc/uucp/Grades owner=uucp group=uucp \
+    original_name=SUNWbnu:etc/uucp/Grades preserve=true
+file path=etc/uucp/Limits owner=uucp group=uucp \
+    original_name=SUNWbnu:etc/uucp/Limits preserve=true
+file path=etc/uucp/Permissions owner=uucp group=uucp mode=0600 \
+    original_name=SUNWbnu:etc/uucp/Permissions preserve=true
+file path=etc/uucp/Poll owner=uucp group=uucp \
+    original_name=SUNWbnu:etc/uucp/Poll preserve=true
+file path=etc/uucp/Sysfiles owner=uucp group=uucp \
+    original_name=SUNWbnu:etc/uucp/Sysfiles preserve=true
+file path=etc/uucp/Systems owner=uucp group=uucp mode=0600 \
+    original_name=SUNWbnu:etc/uucp/Systems preserve=true
+link path=etc/uucp/remote.unknown target=../../usr/lib/uucp/remote.unknown
+dir  path=lib
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/network group=sys
+file path=lib/svc/manifest/network/uucp.xml group=sys mode=0444
+dir  path=usr group=sys
+dir  path=usr/bin
+file path=usr/bin/ct group=uucp mode=4511
+file path=usr/bin/cu owner=uucp group=uucp mode=4511
+file path=usr/bin/uucp owner=uucp group=uucp mode=4511
+file path=usr/bin/uuglist owner=uucp group=uucp mode=4511
+file path=usr/bin/uulog group=uucp mode=0555
+file path=usr/bin/uuname owner=uucp group=uucp mode=4511
+file path=usr/bin/uupick group=uucp mode=0555
+file path=usr/bin/uustat owner=uucp group=uucp mode=4511
+file path=usr/bin/uuto group=uucp mode=0555
+file path=usr/bin/uux owner=uucp group=uucp mode=4511
+dir  path=usr/lib
+dir  path=usr/lib/uucp owner=uucp group=uucp
+file path=usr/lib/uucp/Uutry group=uucp mode=0555
+file path=usr/lib/uucp/bnuconvert owner=uucp group=uucp mode=0510
+file path=usr/lib/uucp/remote.unknown owner=uucp group=uucp mode=4511
+file path=usr/lib/uucp/uucheck owner=uucp group=uucp mode=0510
+file path=usr/lib/uucp/uucico owner=uucp group=uucp mode=4511
+file path=usr/lib/uucp/uucleanup owner=uucp group=uucp mode=0510
+file path=usr/lib/uucp/uudemon.admin group=uucp mode=0555
+file path=usr/lib/uucp/uudemon.cleanup group=uucp mode=0555
+file path=usr/lib/uucp/uudemon.crontab group=uucp mode=0444
+file path=usr/lib/uucp/uudemon.hour group=uucp mode=0555
+file path=usr/lib/uucp/uudemon.poll group=uucp mode=0555
+file path=usr/lib/uucp/uusched owner=uucp group=uucp mode=4511
+file path=usr/lib/uucp/uuxqt owner=uucp group=uucp mode=4511
+dir  path=usr/sbin
+file path=usr/sbin/in.uucpd group=uucp mode=0555
+dir  path=usr/share/man/man1c
+file path=usr/share/man/man1c/ct.1c
+file path=usr/share/man/man1c/cu.1c
+file path=usr/share/man/man1c/rup.1c
+file path=usr/share/man/man1c/uucp.1c
+link path=usr/share/man/man1c/uudecode.1c target=uuencode.1c
+file path=usr/share/man/man1c/uuencode.1c
+file path=usr/share/man/man1c/uuglist.1c
+link path=usr/share/man/man1c/uulog.1c target=uucp.1c
+link path=usr/share/man/man1c/uuname.1c target=uucp.1c
+link path=usr/share/man/man1c/uupick.1c target=uuto.1c
+file path=usr/share/man/man1c/uustat.1c
+file path=usr/share/man/man1c/uuto.1c
+file path=usr/share/man/man1c/uux.1c
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/Uutry.1m
+file path=usr/share/man/man1m/in.uucpd.1m
+file path=usr/share/man/man1m/uucheck.1m
+file path=usr/share/man/man1m/uucico.1m
+file path=usr/share/man/man1m/uucleanup.1m
+link path=usr/share/man/man1m/uucpd.1m target=in.uucpd.1m
+file path=usr/share/man/man1m/uusched.1m
+link path=usr/share/man/man1m/uutry.1m target=Uutry.1m
+file path=usr/share/man/man1m/uuxqt.1m
+dir  path=var group=sys
+dir  path=var/spool
+dir  path=var/spool/uucp owner=uucp group=uucp
+link path=var/spool/uucp/.Admin target=../../uucp/.Admin
+dir  path=var/spool/uucp/.Corrupt owner=uucp group=uucp
+link path=var/spool/uucp/.Log target=../../uucp/.Log
+link path=var/spool/uucp/.Old target=../../uucp/.Old
+link path=var/spool/uucp/.Sequence target=../../uucp/.Sequence
+link path=var/spool/uucp/.Status target=../../uucp/.Status
+dir  path=var/spool/uucp/.Workspace owner=uucp group=uucp
+dir  path=var/spool/uucp/.Xqtdir owner=uucp group=uucp
+dir  path=var/spool/uucppublic owner=uucp group=uucp mode=1777
+dir  path=var/uucp owner=uucp group=uucp
+dir  path=var/uucp/.Admin owner=uucp group=uucp
+dir  path=var/uucp/.Log owner=uucp group=uucp
+dir  path=var/uucp/.Log/uucico owner=uucp group=uucp
+dir  path=var/uucp/.Log/uucp owner=uucp group=uucp
+dir  path=var/uucp/.Log/uux owner=uucp group=uucp
+dir  path=var/uucp/.Log/uuxqt owner=uucp group=uucp
+dir  path=var/uucp/.Old owner=uucp group=uucp
+dir  path=var/uucp/.Sequence owner=uucp group=uucp
+dir  path=var/uucp/.Status owner=uucp group=uucp
+legacy pkg=SUNWbnur desc="configuration and start-up files for UUCP utilities" \
+    name="Networking UUCP Utilities, (Root)"
+legacy pkg=SUNWbnuu desc="UUCP utilities and daemon" \
+    name="Networking UUCP Utilities, (Usr)"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license usr/src/cmd/bnu/THIRDPARTYLICENSE \
+    license=usr/src/cmd/bnu/THIRDPARTYLICENSE

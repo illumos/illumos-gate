@@ -1,0 +1,158 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2020 Joyent, Inc.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/test/ostest@$(PKGVERS)
+set name=pkg.summary value="OS Unit Test Suite"
+set name=pkg.description value="Miscellaneous OS Unit Tests"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/ksensor_test group=sys
+file path=kernel/drv/ksensor_test.conf group=sys
+dir  path=opt/os-tests
+file path=opt/os-tests/README mode=0444
+dir  path=opt/os-tests/bin
+file path=opt/os-tests/bin/ostest mode=0555
+dir  path=opt/os-tests/runfiles
+file path=opt/os-tests/runfiles/default.run mode=0444
+dir  path=opt/os-tests/tests
+file path=opt/os-tests/tests/clock_gettime.32 mode=0555
+file path=opt/os-tests/tests/clock_gettime.64 mode=0555
+dir  path=opt/os-tests/tests/cores
+$(i386_ONLY)dir path=opt/os-tests/tests/cores/amd64
+$(i386_ONLY)file path=opt/os-tests/tests/cores/amd64/libdumper.so.1 mode=0755
+file path=opt/os-tests/tests/cores/core_prereqs mode=0555
+file path=opt/os-tests/tests/cores/coretests mode=0555
+file path=opt/os-tests/tests/cores/dumper.32 mode=0555
+file path=opt/os-tests/tests/cores/dumper.64 mode=0555
+file path=opt/os-tests/tests/cores/libdumper.so.1 mode=0755
+file path=opt/os-tests/tests/cores/secmapper mode=0555
+dir  path=opt/os-tests/tests/ddi_ufm
+file path=opt/os-tests/tests/ddi_ufm/ufm-test mode=0555
+file path=opt/os-tests/tests/ddi_ufm/ufm-test-cleanup mode=0555
+file path=opt/os-tests/tests/ddi_ufm/ufm-test-setup mode=0555
+file path=opt/os-tests/tests/epoll_test mode=0555
+file path=opt/os-tests/tests/eventfd.32 mode=0555
+file path=opt/os-tests/tests/eventfd.64 mode=0555
+dir  path=opt/os-tests/tests/file-locking
+file path=opt/os-tests/tests/file-locking/acquire-lock.32 mode=0555
+file path=opt/os-tests/tests/file-locking/acquire-lock.64 mode=0555
+file path=opt/os-tests/tests/file-locking/runtests.32 mode=0555
+file path=opt/os-tests/tests/file-locking/runtests.64 mode=0555
+$(i386_ONLY)dir path=opt/os-tests/tests/i386
+$(i386_ONLY)file path=opt/os-tests/tests/i386/badseg mode=0555
+$(i386_ONLY)file path=opt/os-tests/tests/i386/badseg_exec mode=0555
+$(i386_ONLY)file path=opt/os-tests/tests/i386/ldt mode=0555
+$(i386_ONLY)file path=opt/os-tests/tests/imc_test mode=0555
+dir  path=opt/os-tests/tests/ksensor
+file path=opt/os-tests/tests/ksensor/ksensor_basic.32 mode=0555
+file path=opt/os-tests/tests/ksensor/ksensor_basic.64 mode=0555
+file path=opt/os-tests/tests/ksensor/ksensor_err.32 mode=0555
+file path=opt/os-tests/tests/ksensor/ksensor_err.64 mode=0555
+file path=opt/os-tests/tests/ksensor/ksensor_fini mode=0555
+file path=opt/os-tests/tests/ksensor/ksensor_init mode=0555
+file path=opt/os-tests/tests/ksensor/ksensor_sread.32 mode=0555
+file path=opt/os-tests/tests/ksensor/ksensor_sread.64 mode=0555
+file path=opt/os-tests/tests/ksensor/ksensor_stress mode=0555
+file path=opt/os-tests/tests/ksensor/ksensor_unload mode=0555
+dir  path=opt/os-tests/tests/libtopo
+file path=opt/os-tests/tests/libtopo/digraph-test mode=0555
+file path=opt/os-tests/tests/libtopo/digraph-test-in-badedge.xml mode=0444
+file path=opt/os-tests/tests/libtopo/digraph-test-in-badelement.xml mode=0444
+file path=opt/os-tests/tests/libtopo/digraph-test-in-badnum.xml mode=0444
+file path=opt/os-tests/tests/libtopo/digraph-test-in-badscheme.xml mode=0444
+file path=opt/os-tests/tests/libtopo/digraph-test-in.xml mode=0444
+file path=opt/os-tests/tests/odirectory.32 mode=0555
+file path=opt/os-tests/tests/odirectory.64 mode=0555
+dir  path=opt/os-tests/tests/pf_key
+file path=opt/os-tests/tests/pf_key/acquire-compare mode=0555
+file path=opt/os-tests/tests/pf_key/acquire-spray mode=0555
+file path=opt/os-tests/tests/pf_key/eacq-enabler mode=0555
+file path=opt/os-tests/tests/pf_key/kmc-update mode=0555
+file path=opt/os-tests/tests/pf_key/kmc-updater mode=0555
+file path=opt/os-tests/tests/poll_test mode=0555
+dir  path=opt/os-tests/tests/sdevfs
+file path=opt/os-tests/tests/sdevfs/sdevfs_eisdir mode=0555
+dir  path=opt/os-tests/tests/secflags
+file path=opt/os-tests/tests/secflags/addrs-32 mode=0555
+file path=opt/os-tests/tests/secflags/addrs-64 mode=0555
+file path=opt/os-tests/tests/secflags/secflags_aslr mode=0555
+file path=opt/os-tests/tests/secflags/secflags_core mode=0555
+file path=opt/os-tests/tests/secflags/secflags_dts mode=0555
+file path=opt/os-tests/tests/secflags/secflags_elfdump mode=0555
+file path=opt/os-tests/tests/secflags/secflags_forbidnullmap mode=0555
+file path=opt/os-tests/tests/secflags/secflags_limits mode=0555
+file path=opt/os-tests/tests/secflags/secflags_noexecstack mode=0555
+file path=opt/os-tests/tests/secflags/secflags_proc mode=0555
+file path=opt/os-tests/tests/secflags/secflags_psecflags mode=0555
+file path=opt/os-tests/tests/secflags/secflags_syscall mode=0555
+file path=opt/os-tests/tests/secflags/secflags_truss mode=0555
+file path=opt/os-tests/tests/secflags/secflags_zonecfg mode=0555
+file path=opt/os-tests/tests/secflags/stacky mode=0555
+dir  path=opt/os-tests/tests/sigqueue
+file path=opt/os-tests/tests/sigqueue/sigqueue_queue_size mode=0555
+dir  path=opt/os-tests/tests/sockfs
+file path=opt/os-tests/tests/sockfs/conn mode=0555
+file path=opt/os-tests/tests/sockfs/dgram mode=0555
+file path=opt/os-tests/tests/sockfs/drop_priv mode=0555
+file path=opt/os-tests/tests/sockfs/nosignal mode=0555
+file path=opt/os-tests/tests/sockfs/recvmsg.32 mode=0555
+file path=opt/os-tests/tests/sockfs/recvmsg.64 mode=0555
+file path=opt/os-tests/tests/sockfs/rights.32 mode=0555
+file path=opt/os-tests/tests/sockfs/rights.64 mode=0555
+file path=opt/os-tests/tests/sockfs/sockpair mode=0555
+file path=opt/os-tests/tests/spoof-ras mode=0555
+dir  path=opt/os-tests/tests/stackalign
+file path=opt/os-tests/tests/stackalign/stackalign.32 mode=0555
+file path=opt/os-tests/tests/stackalign/stackalign.64 mode=0555
+dir  path=opt/os-tests/tests/stress
+file path=opt/os-tests/tests/stress/dladm-kstat mode=0555
+dir  path=opt/os-tests/tests/syscall
+file path=opt/os-tests/tests/syscall/open.32 mode=0555
+file path=opt/os-tests/tests/syscall/open.64 mode=0555
+dir  path=opt/os-tests/tests/timer
+file path=opt/os-tests/tests/timer/timer_limit mode=0555
+dir  path=opt/os-tests/tests/uccid
+file path=opt/os-tests/tests/uccid/atrparse mode=0555
+file path=opt/os-tests/tests/uccid/excl-badread mode=0555
+file path=opt/os-tests/tests/uccid/excl-basic mode=0555
+file path=opt/os-tests/tests/uccid/excl-close mode=0555
+file path=opt/os-tests/tests/uccid/excl-loop mode=0555
+file path=opt/os-tests/tests/uccid/excl-nonblock mode=0555
+file path=opt/os-tests/tests/uccid/excl-reset mode=0555
+file path=opt/os-tests/tests/uccid/modify mode=0555
+file path=opt/os-tests/tests/uccid/notxn-poll mode=0555
+file path=opt/os-tests/tests/uccid/pollin mode=0555
+file path=opt/os-tests/tests/uccid/pollout mode=0555
+file path=opt/os-tests/tests/uccid/status mode=0555
+file path=opt/os-tests/tests/uccid/txn-pollerr mode=0555
+file path=opt/os-tests/tests/uccid/yk mode=0555
+file path=opt/os-tests/tests/uccid/yk-poll mode=0555
+file path=opt/os-tests/tests/uccid/yk-readonly mode=0555
+file path=opt/os-tests/tests/writev.32 mode=0555
+file path=opt/os-tests/tests/writev.64 mode=0555
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+depend type=require fmri=developer/dtrace
+depend type=require fmri=system/io/tests
+depend type=require fmri=system/kernel/dtrace/providers
+depend type=require fmri=system/ksensor
+depend type=require fmri=system/test/testrunner

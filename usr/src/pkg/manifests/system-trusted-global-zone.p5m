@@ -1,0 +1,89 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/trusted/global-zone@$(PKGVERS)
+set name=pkg.summary value="Trusted Extensions global"
+set name=pkg.description \
+    value="Solaris Trusted Extensions, globalzone-only files"
+set name=info.classification value=org.opensolaris.category.2008:System/Trusted
+set name=variant.arch value=$(ARCH)
+dir  path=etc group=sys
+dir  path=etc/security group=sys
+dir  path=etc/security/audio group=sys
+dir  path=etc/security/lib group=sys
+link path=etc/security/lib/audio_clean.windowing target=./audio_clean
+file path=etc/security/lib/disk_clean group=sys mode=0555
+link path=etc/security/lib/disk_clean.windowing target=./disk_clean
+link path=etc/security/lib/st_clean.windowing target=./st_clean
+file path=etc/security/lib/wdwmsg group=sys mode=0555
+file path=etc/security/lib/wdwwrapper group=sys mode=0555
+dir  path=etc/security/tsol group=sys
+file path=etc/security/tsol/devalloc_defaults group=sys \
+    original_name=SUNWtsg:etc/security/tsol/devalloc_defaults preserve=true
+file path=etc/security/tsol/label_encodings group=sys mode=0400 \
+    original_name=SUNWtsg:etc/security/tsol/label_encodings preserve=renamenew
+file path=etc/security/tsol/label_encodings.example group=sys mode=0444
+file path=etc/security/tsol/label_encodings.gfi.multi group=sys mode=0444
+file path=etc/security/tsol/label_encodings.gfi.single group=sys mode=0444
+file path=etc/security/tsol/label_encodings.multi group=sys mode=0444
+file path=etc/security/tsol/label_encodings.single group=sys mode=0444
+file path=etc/security/tsol/relabel group=sys mode=0755 \
+    original_name=SUNWtsg:etc/security/tsol/relabel preserve=renamenew
+file path=etc/security/tsol/tnrhdb group=sys \
+    original_name=SUNWtsg:etc/security/tsol/tnrhdb preserve=renamenew
+file path=etc/security/tsol/tnrhtp group=sys \
+    original_name=SUNWtsg:etc/security/tsol/tnrhtp preserve=renamenew
+file path=etc/security/tsol/tnzonecfg group=sys \
+    original_name=SUNWtsg:etc/security/tsol/tnzonecfg preserve=renamenew
+dir  path=etc/zones group=sys
+file path=etc/zones/SUNWtsoldef.xml mode=0444
+dir  path=lib
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/network group=sys
+file path=lib/svc/manifest/network/tnctl.xml group=sys mode=0444
+file path=lib/svc/manifest/network/tnd.xml group=sys mode=0444
+dir  path=lib/svc/manifest/system group=sys
+file path=lib/svc/manifest/system/labeld.xml group=sys mode=0444
+dir  path=lib/svc/method
+file path=lib/svc/method/svc-labeld mode=0555
+file path=lib/svc/method/svc-tnctl mode=0555
+file path=lib/svc/method/svc-tnd mode=0555
+dir  path=usr/share/man/man1m
+dir  path=var group=sys
+dir  path=var/tsol group=sys
+dir  path=var/tsol/doors group=sys
+legacy pkg=SUNWtsg desc="Solaris Trusted Extensions, globalzone-only files" \
+    name="Trusted Extensions global"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+# etc/security/lib/wdwmsg runs usr/bin/zenity
+depend type=require fmri=gnome/zenity

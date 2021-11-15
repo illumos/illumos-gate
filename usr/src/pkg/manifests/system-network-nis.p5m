@@ -1,0 +1,115 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+#
+
+set name=pkg.fmri value=pkg:/system/network/nis@$(PKGVERS)
+set name=pkg.summary value="Network Information System"
+set name=pkg.description \
+    value="utilities for the Network Information System (NIS)"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Administration and Configuration"
+set name=variant.arch value=$(ARCH)
+dir  path=etc group=sys
+file path=etc/nsswitch.nis group=sys
+file path=etc/publickey original_name=SUNWnis:etc/publickey preserve=true
+dir  path=lib
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/network group=sys
+dir  path=lib/svc/manifest/network/nis group=sys
+file path=lib/svc/manifest/network/nis/client.xml group=sys mode=0444
+dir  path=lib/svc/manifest/network/rpc group=sys
+dir  path=usr group=sys
+dir  path=usr/bin
+file path=usr/bin/chkey group=sys mode=4555
+file path=usr/bin/ldaplist mode=0555
+file path=usr/bin/ypcat group=other mode=0555
+file path=usr/bin/ypmatch group=other mode=0555
+file path=usr/bin/yppasswd mode=0555
+file path=usr/bin/ypwhich group=other mode=0555
+dir  path=usr/lib
+dir  path=usr/lib/ldap
+file path=usr/lib/ldap/idsconfig mode=0555
+file path=usr/lib/ldap/ldap_cachemgr mode=0555
+link path=usr/lib/libnisdb.so target=./libnisdb.so.2
+file path=usr/lib/libnisdb.so.2
+dir  path=usr/lib/netsvc group=sys
+dir  path=usr/lib/netsvc/nis group=sys
+dir  path=usr/lib/netsvc/yp
+file path=usr/lib/netsvc/yp/ypbind mode=0555
+file path=usr/lib/netsvc/yp/ypstart mode=0555
+file path=usr/lib/netsvc/yp/ypstop mode=0555
+file path=usr/lib/netsvc/yp/ypxfr mode=0555
+dir  path=usr/sbin
+file path=usr/sbin/ldapaddent mode=0555
+file path=usr/sbin/ldapclient mode=0555
+file path=usr/sbin/newkey group=sys mode=0555
+file path=usr/sbin/ypalias mode=0555
+file path=usr/sbin/ypinit mode=0555
+file path=usr/sbin/yppoll mode=0555
+file path=usr/sbin/ypset mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man1
+file path=usr/share/man/man1/chkey.1
+file path=usr/share/man/man1/ldaplist.1
+file path=usr/share/man/man1/ypcat.1
+file path=usr/share/man/man1/ypmatch.1
+file path=usr/share/man/man1/yppasswd.1
+file path=usr/share/man/man1/ypwhich.1
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/idsconfig.1m
+file path=usr/share/man/man1m/ldap_cachemgr.1m
+file path=usr/share/man/man1m/ldapaddent.1m
+file path=usr/share/man/man1m/ldapclient.1m
+file path=usr/share/man/man1m/newkey.1m
+file path=usr/share/man/man1m/ypbind.1m
+file path=usr/share/man/man1m/ypinit.1m
+file path=usr/share/man/man1m/yppoll.1m
+file path=usr/share/man/man1m/ypset.1m
+file path=usr/share/man/man1m/ypstart.1m
+link path=usr/share/man/man1m/ypstop.1m target=ypstart.1m
+file path=usr/share/man/man1m/ypxfr.1m
+link path=usr/share/man/man1m/ypxfr_1perday.1m target=ypxfr.1m
+link path=usr/share/man/man1m/ypxfr_1perhour.1m target=ypxfr.1m
+link path=usr/share/man/man1m/ypxfr_2perday.1m target=ypxfr.1m
+dir  path=usr/share/man/man4
+file path=usr/share/man/man4/defaultdomain.4
+file path=usr/share/man/man4/publickey.4
+dir  path=var group=sys
+dir  path=var/ldap group=sys
+dir  path=var/yp
+file path=var/yp/aliases mode=0555 original_name=SUNWnis:var/yp/aliases \
+    preserve=true
+dir  path=var/yp/binding
+file path=var/yp/nicknames original_name=SUNWnis:var/yp/nicknames preserve=true
+legacy pkg=SUNWnisr \
+    desc="configuration files and directories for the Network Information System (NIS)" \
+    name="Network Information System, (Root)"
+legacy pkg=SUNWnisu desc="utilities for the Network Information System (NIS)" \
+    name="Network Information System, (Usr)"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+depend type=require fmri=pkg:/developer/build/make

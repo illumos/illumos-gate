@@ -1,0 +1,64 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Joyent, Inc.
+# Copyright 2021 Oxide Computer Company
+#
+
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/cpu/sensor@$(PKGVERS)
+set name=pkg.summary value="CPU Sensor Drivers"
+set name=pkg.description value="CPU Sensor Drivers"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=i386
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/amdnbtemp group=sys
+file path=kernel/drv/$(ARCH64)/coretemp group=sys
+file path=kernel/drv/$(ARCH64)/pchtemp group=sys
+file path=kernel/drv/$(ARCH64)/smntemp group=sys
+file path=kernel/drv/coretemp.conf group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man7d
+file path=usr/share/man/man7d/amdnbtemp.7d
+file path=usr/share/man/man7d/coretemp.7d
+file path=usr/share/man/man7d/pchtemp.7d
+file path=usr/share/man/man7d/smntemp.7d
+driver name=amdnbtemp \
+    alias=pci1022,1203,p \
+    alias=pci1022,1303,p \
+    alias=pci1022,1403,p \
+    alias=pci1022,141d,p \
+    alias=pci1022,1533,p \
+    alias=pci1022,1583,p \
+    alias=pci1022,1603,p \
+    alias=pci1022,1703,p
+driver name=coretemp
+driver name=pchtemp \
+    alias=pci8086,2f9,p \
+    alias=pci8086,6f9,p \
+    alias=pci8086,8c24,p \
+    alias=pci8086,8ca4,p \
+    alias=pci8086,8d24,p \
+    alias=pci8086,9ca4,p \
+    alias=pci8086,9d31,p \
+    alias=pci8086,9df9,p \
+    alias=pci8086,a131,p \
+    alias=pci8086,a1b1,p \
+    alias=pci8086,a231,p \
+    alias=pci8086,a2b1,p \
+    alias=pci8086,a379,p
+driver name=smntemp
+license lic_CDDL license=lic_CDDL
+depend type=require fmri=driver/cpu/amd/zen
+depend type=require fmri=system/ksensor

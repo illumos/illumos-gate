@@ -1,0 +1,301 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+#
+
+set name=pkg.fmri \
+    value=pkg:/source/system/grub@0.97,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.summary value="Source for GNU GRUB - GNU GRand Unified Bootloader"
+set name=pkg.description value="Source for GNU GRUB"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=i386
+dir  path=usr group=sys
+dir  path=usr/share
+dir  path=usr/share/src group=sys
+dir  path=usr/share/src/grub
+file path=usr/share/src/grub/AUTHORS
+file path=usr/share/src/grub/BUGS
+file path=usr/share/src/grub/COPYING
+file path=usr/share/src/grub/ChangeLog
+file path=usr/share/src/grub/INSTALL
+file path=usr/share/src/grub/MAINTENANCE
+file path=usr/share/src/grub/Makefile.am
+file path=usr/share/src/grub/Makefile.in
+file path=usr/share/src/grub/NEWS
+file path=usr/share/src/grub/README
+file path=usr/share/src/grub/THANKS
+file path=usr/share/src/grub/TODO
+file path=usr/share/src/grub/acinclude.m4
+file path=usr/share/src/grub/aclocal.m4
+file path=usr/share/src/grub/compile mode=0755
+file path=usr/share/src/grub/config.guess mode=0755
+file path=usr/share/src/grub/config.h.in
+file path=usr/share/src/grub/config.sub mode=0755
+file path=usr/share/src/grub/configure mode=0755
+file path=usr/share/src/grub/configure.ac
+file path=usr/share/src/grub/depcomp mode=0755
+dir  path=usr/share/src/grub/docs
+file path=usr/share/src/grub/docs/Makefile.am
+file path=usr/share/src/grub/docs/Makefile.in
+file path=usr/share/src/grub/docs/boot.S
+file path=usr/share/src/grub/docs/boot.S.texi
+file path=usr/share/src/grub/docs/grub-install.8
+file path=usr/share/src/grub/docs/grub-md5-crypt.8
+file path=usr/share/src/grub/docs/grub-terminfo.8
+file path=usr/share/src/grub/docs/grub.8
+file path=usr/share/src/grub/docs/grub.info
+file path=usr/share/src/grub/docs/grub.info-1
+file path=usr/share/src/grub/docs/grub.info-2
+file path=usr/share/src/grub/docs/grub.info-3
+file path=usr/share/src/grub/docs/grub.info-4
+file path=usr/share/src/grub/docs/grub.texi
+file path=usr/share/src/grub/docs/help2man
+file path=usr/share/src/grub/docs/internals.texi
+file path=usr/share/src/grub/docs/kernel.c
+file path=usr/share/src/grub/docs/kernel.c.texi
+file path=usr/share/src/grub/docs/mbchk.1
+file path=usr/share/src/grub/docs/mdate-sh
+file path=usr/share/src/grub/docs/menu.lst
+file path=usr/share/src/grub/docs/multiboot.h
+file path=usr/share/src/grub/docs/multiboot.h.texi
+file path=usr/share/src/grub/docs/multiboot.info
+file path=usr/share/src/grub/docs/multiboot.texi
+file path=usr/share/src/grub/docs/src2texi
+file path=usr/share/src/grub/docs/stamp-vti
+file path=usr/share/src/grub/docs/texinfo.tex
+file path=usr/share/src/grub/docs/version.texi
+dir  path=usr/share/src/grub/grub
+file path=usr/share/src/grub/grub/Makefile.am
+file path=usr/share/src/grub/grub/Makefile.in
+file path=usr/share/src/grub/grub/asmstub.c
+file path=usr/share/src/grub/grub/main.c
+file path=usr/share/src/grub/install-sh mode=0755
+dir  path=usr/share/src/grub/lib
+file path=usr/share/src/grub/lib/Makefile.am
+file path=usr/share/src/grub/lib/Makefile.in
+file path=usr/share/src/grub/lib/device.c
+file path=usr/share/src/grub/lib/device.h
+file path=usr/share/src/grub/lib/getopt.c
+file path=usr/share/src/grub/lib/getopt.h
+file path=usr/share/src/grub/lib/getopt1.c
+file path=usr/share/src/grub/missing mode=0755
+file path=usr/share/src/grub/mkinstalldirs mode=0755
+dir  path=usr/share/src/grub/netboot
+file path=usr/share/src/grub/netboot/$(ARCH)_byteswap.h
+file path=usr/share/src/grub/netboot/$(ARCH)_elf.h
+file path=usr/share/src/grub/netboot/$(ARCH)_endian.h
+file path=usr/share/src/grub/netboot/$(ARCH)_timer.c
+file path=usr/share/src/grub/netboot/3c595.c
+file path=usr/share/src/grub/netboot/3c595.h
+file path=usr/share/src/grub/netboot/3c90x.c
+file path=usr/share/src/grub/netboot/Makefile.am
+file path=usr/share/src/grub/netboot/Makefile.in
+file path=usr/share/src/grub/netboot/README.netboot
+file path=usr/share/src/grub/netboot/basemem.c
+file path=usr/share/src/grub/netboot/big_bswap.h
+file path=usr/share/src/grub/netboot/bootp.h
+file path=usr/share/src/grub/netboot/byteswap.h
+file path=usr/share/src/grub/netboot/config.c
+file path=usr/share/src/grub/netboot/cpu.h
+file path=usr/share/src/grub/netboot/davicom.c
+file path=usr/share/src/grub/netboot/dev.h
+file path=usr/share/src/grub/netboot/e1000.c
+file path=usr/share/src/grub/netboot/e1000_hw.h
+file path=usr/share/src/grub/netboot/eepro100.c
+file path=usr/share/src/grub/netboot/elf.h
+file path=usr/share/src/grub/netboot/endian.h
+file path=usr/share/src/grub/netboot/epic100.c
+file path=usr/share/src/grub/netboot/epic100.h
+file path=usr/share/src/grub/netboot/etherboot.h
+file path=usr/share/src/grub/netboot/forcedeth.c
+file path=usr/share/src/grub/netboot/fsys_tftp.c
+file path=usr/share/src/grub/netboot/grub.h
+file path=usr/share/src/grub/netboot/if_arp.h
+file path=usr/share/src/grub/netboot/if_ether.h
+file path=usr/share/src/grub/netboot/igmp.h
+file path=usr/share/src/grub/netboot/in.h
+file path=usr/share/src/grub/netboot/io.h
+file path=usr/share/src/grub/netboot/ip.h
+file path=usr/share/src/grub/netboot/isa.h
+file path=usr/share/src/grub/netboot/latch.h
+file path=usr/share/src/grub/netboot/little_bswap.h
+file path=usr/share/src/grub/netboot/mii.h
+file path=usr/share/src/grub/netboot/misc.c
+file path=usr/share/src/grub/netboot/natsemi.c
+file path=usr/share/src/grub/netboot/nfs.h
+file path=usr/share/src/grub/netboot/nic.c
+file path=usr/share/src/grub/netboot/nic.h
+file path=usr/share/src/grub/netboot/ns83820.c
+file path=usr/share/src/grub/netboot/ns8390.c
+file path=usr/share/src/grub/netboot/ns8390.h
+file path=usr/share/src/grub/netboot/osdep.h
+file path=usr/share/src/grub/netboot/pci.c
+file path=usr/share/src/grub/netboot/pci.h
+file path=usr/share/src/grub/netboot/pci_ids.h
+file path=usr/share/src/grub/netboot/pci_io.c
+file path=usr/share/src/grub/netboot/pcnet32.c
+file path=usr/share/src/grub/netboot/pic8259.c
+file path=usr/share/src/grub/netboot/pic8259.h
+file path=usr/share/src/grub/netboot/pnic.c
+file path=usr/share/src/grub/netboot/pnic_api.h
+file path=usr/share/src/grub/netboot/pxe.h
+file path=usr/share/src/grub/netboot/r8169.c
+file path=usr/share/src/grub/netboot/rtl8139.c
+file path=usr/share/src/grub/netboot/segoff.h
+file path=usr/share/src/grub/netboot/sis900.c
+file path=usr/share/src/grub/netboot/sis900.h
+file path=usr/share/src/grub/netboot/stdint.h
+file path=usr/share/src/grub/netboot/sundance.c
+file path=usr/share/src/grub/netboot/tftp.h
+file path=usr/share/src/grub/netboot/tg3.c
+file path=usr/share/src/grub/netboot/tg3.h
+file path=usr/share/src/grub/netboot/timer.c
+file path=usr/share/src/grub/netboot/timer.h
+file path=usr/share/src/grub/netboot/tlan.c
+file path=usr/share/src/grub/netboot/tlan.h
+file path=usr/share/src/grub/netboot/tulip.c
+file path=usr/share/src/grub/netboot/types.h
+file path=usr/share/src/grub/netboot/udp.h
+file path=usr/share/src/grub/netboot/undi.c
+file path=usr/share/src/grub/netboot/undi.h
+file path=usr/share/src/grub/netboot/via-rhine.c
+file path=usr/share/src/grub/netboot/w89c840.c
+dir  path=usr/share/src/grub/stage1
+file path=usr/share/src/grub/stage1/Makefile.am
+file path=usr/share/src/grub/stage1/Makefile.in
+file path=usr/share/src/grub/stage1/stage1.S
+file path=usr/share/src/grub/stage1/stage1.h
+dir  path=usr/share/src/grub/stage2
+file path=usr/share/src/grub/stage2/$(ARCH)-elf.h
+file path=usr/share/src/grub/stage2/Makefile.am
+file path=usr/share/src/grub/stage2/Makefile.in
+file path=usr/share/src/grub/stage2/apic.h
+file path=usr/share/src/grub/stage2/apm.S
+file path=usr/share/src/grub/stage2/asm.S
+file path=usr/share/src/grub/stage2/bios.c
+file path=usr/share/src/grub/stage2/boot.c
+file path=usr/share/src/grub/stage2/builtins.c
+file path=usr/share/src/grub/stage2/char_io.c
+file path=usr/share/src/grub/stage2/cmdline.c
+file path=usr/share/src/grub/stage2/common.c
+file path=usr/share/src/grub/stage2/console.c
+file path=usr/share/src/grub/stage2/defs.h
+file path=usr/share/src/grub/stage2/dir.h
+file path=usr/share/src/grub/stage2/disk_inode.h
+file path=usr/share/src/grub/stage2/disk_inode_ffs.h
+file path=usr/share/src/grub/stage2/disk_io.c
+file path=usr/share/src/grub/stage2/expand.c
+file path=usr/share/src/grub/stage2/expand.h
+file path=usr/share/src/grub/stage2/fat.h
+file path=usr/share/src/grub/stage2/filesys.h
+file path=usr/share/src/grub/stage2/freebsd.h
+file path=usr/share/src/grub/stage2/fs.h
+file path=usr/share/src/grub/stage2/fsys_ext2fs.c
+file path=usr/share/src/grub/stage2/fsys_fat.c
+file path=usr/share/src/grub/stage2/fsys_ffs.c
+file path=usr/share/src/grub/stage2/fsys_iso9660.c
+file path=usr/share/src/grub/stage2/fsys_jfs.c
+file path=usr/share/src/grub/stage2/fsys_minix.c
+file path=usr/share/src/grub/stage2/fsys_reiserfs.c
+file path=usr/share/src/grub/stage2/fsys_ufs.c
+file path=usr/share/src/grub/stage2/fsys_ufs2.c
+file path=usr/share/src/grub/stage2/fsys_vstafs.c
+file path=usr/share/src/grub/stage2/fsys_xfs.c
+file path=usr/share/src/grub/stage2/fsys_zfs.c
+file path=usr/share/src/grub/stage2/fsys_zfs.h
+file path=usr/share/src/grub/stage2/graphics.c
+file path=usr/share/src/grub/stage2/graphics.h
+file path=usr/share/src/grub/stage2/gunzip.c
+file path=usr/share/src/grub/stage2/hercules.c
+file path=usr/share/src/grub/stage2/hercules.h
+file path=usr/share/src/grub/stage2/imgact_aout.h
+file path=usr/share/src/grub/stage2/iso9660.h
+file path=usr/share/src/grub/stage2/jfs.h
+file path=usr/share/src/grub/stage2/mb_header.h
+file path=usr/share/src/grub/stage2/mb_info.h
+file path=usr/share/src/grub/stage2/md5.c
+file path=usr/share/src/grub/stage2/md5.h
+file path=usr/share/src/grub/stage2/moddiv.c
+file path=usr/share/src/grub/stage2/nbi.h
+file path=usr/share/src/grub/stage2/nbloader.S
+file path=usr/share/src/grub/stage2/pc_slice.h
+file path=usr/share/src/grub/stage2/pxeloader.S
+file path=usr/share/src/grub/stage2/serial.c
+file path=usr/share/src/grub/stage2/serial.h
+file path=usr/share/src/grub/stage2/setjmp.S
+file path=usr/share/src/grub/stage2/shared.h
+file path=usr/share/src/grub/stage2/size_test
+file path=usr/share/src/grub/stage2/smp-imps.c
+file path=usr/share/src/grub/stage2/smp-imps.h
+file path=usr/share/src/grub/stage2/stage1_5.c
+file path=usr/share/src/grub/stage2/stage2.c
+file path=usr/share/src/grub/stage2/start.S
+file path=usr/share/src/grub/stage2/start_eltorito.S
+file path=usr/share/src/grub/stage2/term.h
+file path=usr/share/src/grub/stage2/terminfo.c
+file path=usr/share/src/grub/stage2/terminfo.h
+file path=usr/share/src/grub/stage2/tparm.c
+file path=usr/share/src/grub/stage2/tparm.h
+file path=usr/share/src/grub/stage2/ufs.h
+file path=usr/share/src/grub/stage2/ufs2.h
+file path=usr/share/src/grub/stage2/vstafs.h
+file path=usr/share/src/grub/stage2/xfs.h
+dir  path=usr/share/src/grub/stage2/zfs-include
+file path=usr/share/src/grub/stage2/zfs-include/dmu.h
+file path=usr/share/src/grub/stage2/zfs-include/dmu_objset.h
+file path=usr/share/src/grub/stage2/zfs-include/dnode.h
+file path=usr/share/src/grub/stage2/zfs-include/dsl_dataset.h
+file path=usr/share/src/grub/stage2/zfs-include/dsl_dir.h
+file path=usr/share/src/grub/stage2/zfs-include/spa.h
+file path=usr/share/src/grub/stage2/zfs-include/uberblock_impl.h
+file path=usr/share/src/grub/stage2/zfs-include/vdev_impl.h
+file path=usr/share/src/grub/stage2/zfs-include/zap_impl.h
+file path=usr/share/src/grub/stage2/zfs-include/zap_leaf.h
+file path=usr/share/src/grub/stage2/zfs-include/zfs.h
+file path=usr/share/src/grub/stage2/zfs-include/zfs_acl.h
+file path=usr/share/src/grub/stage2/zfs-include/zfs_znode.h
+file path=usr/share/src/grub/stage2/zfs-include/zil.h
+file path=usr/share/src/grub/stage2/zfs-include/zio.h
+file path=usr/share/src/grub/stage2/zfs-include/zio_checksum.h
+file path=usr/share/src/grub/stage2/zfs_fletcher.c
+file path=usr/share/src/grub/stage2/zfs_lz4.c
+file path=usr/share/src/grub/stage2/zfs_lzjb.c
+file path=usr/share/src/grub/stage2/zfs_sha256.c
+file path=usr/share/src/grub/stamp-h.in
+dir  path=usr/share/src/grub/util
+file path=usr/share/src/grub/util/Makefile.am
+file path=usr/share/src/grub/util/Makefile.in
+file path=usr/share/src/grub/util/grub-image.in
+file path=usr/share/src/grub/util/grub-install.in
+file path=usr/share/src/grub/util/grub-md5-crypt.in
+file path=usr/share/src/grub/util/grub-set-default.in
+file path=usr/share/src/grub/util/grub-terminfo.in
+file path=usr/share/src/grub/util/mbchk.c
+file path=usr/share/src/grub/util/mkbimage
+legacy pkg=SUNWgrubS desc="Source for GNU GRUB" \
+    name="Source for GNU GRUB - GNU GRand Unified Bootloader"
+license cr_Sun license=cr_Sun
+license usr/src/grub/grub-0.97/AUTHORS license=usr/src/grub/grub-0.97/AUTHORS
+license usr/src/grub/grub-0.97/COPYING license=usr/src/grub/grub-0.97/COPYING

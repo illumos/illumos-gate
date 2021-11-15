@@ -1,0 +1,2734 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/data/terminfo@$(PKGVERS)
+set name=pkg.summary value="Terminal Information"
+set name=pkg.description \
+    value="extensive terminfo database entries describing capabilities of terminals and pseudoterminals"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/lib
+link path=usr/lib/tabset target=../share/lib/tabset
+dir  path=usr/share
+dir  path=usr/share/lib
+dir  path=usr/share/lib/terminfo
+dir  path=usr/share/lib/terminfo/1
+hardlink path=usr/share/lib/terminfo/1/1178 target=../a/adm1178
+hardlink path=usr/share/lib/terminfo/1/1730-lm target=../d/diablo1740-lm
+dir  path=usr/share/lib/terminfo/2
+hardlink path=usr/share/lib/terminfo/2/2621 target=../h/hp2621
+hardlink path=usr/share/lib/terminfo/2/2621-wl target=../h/hp2621
+hardlink path=usr/share/lib/terminfo/2/2621A target=../h/hp2621
+hardlink path=usr/share/lib/terminfo/2/2621a target=../h/hp2621
+dir  path=usr/share/lib/terminfo/3
+hardlink path=usr/share/lib/terminfo/3/386at target=../a/att6386
+hardlink path=usr/share/lib/terminfo/3/3b1 target=../a/att7300
+dir  path=usr/share/lib/terminfo/4
+hardlink path=usr/share/lib/terminfo/4/4025ex target=../t/tek4025ex
+hardlink path=usr/share/lib/terminfo/4/4027ex target=../t/tek4025ex
+hardlink path=usr/share/lib/terminfo/4/4410-w target=../a/att5410-w
+dir  path=usr/share/lib/terminfo/5
+hardlink path=usr/share/lib/terminfo/5/5051 target=../i/ibm-pc
+hardlink path=usr/share/lib/terminfo/5/5410-w target=../a/att5410-w
+hardlink path=usr/share/lib/terminfo/5/5620 target=../a/att5620
+hardlink path=usr/share/lib/terminfo/5/5630-24 target=../a/att630-24
+hardlink path=usr/share/lib/terminfo/5/5630DMD-24 target=../a/att630-24
+dir  path=usr/share/lib/terminfo/6
+hardlink path=usr/share/lib/terminfo/6/6053 target=../d/dg6053
+hardlink path=usr/share/lib/terminfo/6/6053-dg target=../d/dg6053
+hardlink path=usr/share/lib/terminfo/6/605x target=../d/dg6053
+hardlink path=usr/share/lib/terminfo/6/605x-dg target=../d/dg6053
+hardlink path=usr/share/lib/terminfo/6/630-lm target=../d/diablo1740-lm
+hardlink path=usr/share/lib/terminfo/6/630MTG-24 target=../a/att630-24
+dir  path=usr/share/lib/terminfo/7
+hardlink path=usr/share/lib/terminfo/7/730MTG-24 target=../a/att730-24
+hardlink path=usr/share/lib/terminfo/7/730MTG-41 target=../a/att730-41
+hardlink path=usr/share/lib/terminfo/7/730MTG-41r target=../a/att730r-41
+hardlink path=usr/share/lib/terminfo/7/730MTGr target=../a/att730r
+hardlink path=usr/share/lib/terminfo/7/730MTGr-24 target=../a/att730r-24
+dir  path=usr/share/lib/terminfo/8
+hardlink path=usr/share/lib/terminfo/8/8510 target=../c/citoh
+dir  path=usr/share/lib/terminfo/9
+hardlink path=usr/share/lib/terminfo/9/955-hb target=../t/tvi955-hb
+hardlink path=usr/share/lib/terminfo/9/955-w target=../t/tvi955-w
+file path=usr/share/lib/terminfo/9/9term
+dir  path=usr/share/lib/terminfo/A
+hardlink path=usr/share/lib/terminfo/A/Apple_Terminal target=../n/nsterm
+dir  path=usr/share/lib/terminfo/E
+file path=usr/share/lib/terminfo/E/Eterm
+file path=usr/share/lib/terminfo/E/Eterm-256color
+file path=usr/share/lib/terminfo/E/Eterm-88color
+hardlink path=usr/share/lib/terminfo/E/Eterm-color target=../E/Eterm
+dir  path=usr/share/lib/terminfo/L
+hardlink path=usr/share/lib/terminfo/L/LFT-PC850 target=../l/lft
+dir  path=usr/share/lib/terminfo/M
+file path=usr/share/lib/terminfo/M/MtxOrb
+file path=usr/share/lib/terminfo/M/MtxOrb162
+file path=usr/share/lib/terminfo/M/MtxOrb204
+dir  path=usr/share/lib/terminfo/N
+file path=usr/share/lib/terminfo/N/NCR260VT300WPP
+hardlink path=usr/share/lib/terminfo/N/NCRVT100WPP target=../n/ncrvt100wan
+dir  path=usr/share/lib/terminfo/P
+hardlink path=usr/share/lib/terminfo/P/P12 target=../p/prism12
+hardlink path=usr/share/lib/terminfo/P/P12-M target=../p/prism12-m
+hardlink path=usr/share/lib/terminfo/P/P12-M-W target=../p/prism12-m-w
+hardlink path=usr/share/lib/terminfo/P/P12-W target=../p/prism12-w
+hardlink path=usr/share/lib/terminfo/P/P14 target=../p/prism14
+hardlink path=usr/share/lib/terminfo/P/P14-M target=../p/prism14-m
+hardlink path=usr/share/lib/terminfo/P/P14-M-W target=../p/prism14-m-w
+hardlink path=usr/share/lib/terminfo/P/P14-W target=../p/prism14-w
+hardlink path=usr/share/lib/terminfo/P/P4 target=../p/prism4
+hardlink path=usr/share/lib/terminfo/P/P5 target=../p/prism5
+hardlink path=usr/share/lib/terminfo/P/P7 target=../p/prism7
+hardlink path=usr/share/lib/terminfo/P/P8 target=../p/prism8
+hardlink path=usr/share/lib/terminfo/P/P8-W target=../p/prism8-w
+hardlink path=usr/share/lib/terminfo/P/P9 target=../p/prism9
+hardlink path=usr/share/lib/terminfo/P/P9-8 target=../p/prism9-8
+hardlink path=usr/share/lib/terminfo/P/P9-8-W target=../p/prism9-8-w
+hardlink path=usr/share/lib/terminfo/P/P9-W target=../p/prism9-w
+dir  path=usr/share/lib/terminfo/Q
+hardlink path=usr/share/lib/terminfo/Q/Q306-8-pc target=../b/bq300-8-pc
+hardlink path=usr/share/lib/terminfo/Q/Q310-vip-H target=../v/vip-H
+hardlink path=usr/share/lib/terminfo/Q/Q310-vip-H-am target=../v/vip-H
+hardlink path=usr/share/lib/terminfo/Q/Q310-vip-Hw target=../v/vip-Hw
+hardlink path=usr/share/lib/terminfo/Q/Q310-vip-w target=../v/vip-w
+hardlink path=usr/share/lib/terminfo/Q/Q310-vip-w-am target=../v/vip-w
+dir  path=usr/share/lib/terminfo/X
+hardlink path=usr/share/lib/terminfo/X/X-hpterm target=../h/hpterm
+dir  path=usr/share/lib/terminfo/a
+hardlink path=usr/share/lib/terminfo/a/a210 target=../a/ampex210
+hardlink path=usr/share/lib/terminfo/a/a80 target=../a/ampex80
+hardlink path=usr/share/lib/terminfo/a/a980 target=../a/adds980
+hardlink path=usr/share/lib/terminfo/a/aa4080 target=../a/annarbor4080
+file path=usr/share/lib/terminfo/a/aaa
+file path=usr/share/lib/terminfo/a/aaa+dec
+file path=usr/share/lib/terminfo/a/aaa+rv
+file path=usr/share/lib/terminfo/a/aaa+unk
+file path=usr/share/lib/terminfo/a/aaa-18
+file path=usr/share/lib/terminfo/a/aaa-18-rv
+file path=usr/share/lib/terminfo/a/aaa-20
+file path=usr/share/lib/terminfo/a/aaa-22
+file path=usr/share/lib/terminfo/a/aaa-24
+file path=usr/share/lib/terminfo/a/aaa-24-rv
+file path=usr/share/lib/terminfo/a/aaa-26
+file path=usr/share/lib/terminfo/a/aaa-28
+hardlink path=usr/share/lib/terminfo/a/aaa-30 target=../a/aaa
+file path=usr/share/lib/terminfo/a/aaa-30-ctxt
+file path=usr/share/lib/terminfo/a/aaa-30-rv
+file path=usr/share/lib/terminfo/a/aaa-30-rv-ctxt
+file path=usr/share/lib/terminfo/a/aaa-30-s
+hardlink path=usr/share/lib/terminfo/a/aaa-30-s-ctxt target=../a/aaa-s-ctxt
+file path=usr/share/lib/terminfo/a/aaa-30-s-rv
+hardlink path=usr/share/lib/terminfo/a/aaa-30-s-rv-ct target=../a/aaa-s-rv-ctxt
+file path=usr/share/lib/terminfo/a/aaa-36
+file path=usr/share/lib/terminfo/a/aaa-36-rv
+file path=usr/share/lib/terminfo/a/aaa-40
+file path=usr/share/lib/terminfo/a/aaa-40-rv
+file path=usr/share/lib/terminfo/a/aaa-48
+file path=usr/share/lib/terminfo/a/aaa-48-rv
+file path=usr/share/lib/terminfo/a/aaa-60
+file path=usr/share/lib/terminfo/a/aaa-60-dec-rv
+file path=usr/share/lib/terminfo/a/aaa-60-rv
+file path=usr/share/lib/terminfo/a/aaa-60-s
+file path=usr/share/lib/terminfo/a/aaa-60-s-rv
+hardlink path=usr/share/lib/terminfo/a/aaa-ctxt target=../a/aaa-30-ctxt
+file path=usr/share/lib/terminfo/a/aaa-db
+hardlink path=usr/share/lib/terminfo/a/aaa-rv target=../a/aaa-30-rv
+hardlink path=usr/share/lib/terminfo/a/aaa-rv-ctxt target=../a/aaa-30-rv-ctxt
+file path=usr/share/lib/terminfo/a/aaa-rv-unk
+hardlink path=usr/share/lib/terminfo/a/aaa-s target=../a/aaa-30-s
+file path=usr/share/lib/terminfo/a/aaa-s-ctxt
+hardlink path=usr/share/lib/terminfo/a/aaa-s-rv target=../a/aaa-30-s-rv
+file path=usr/share/lib/terminfo/a/aaa-s-rv-ctxt
+hardlink path=usr/share/lib/terminfo/a/aaa-unk target=../a/aaa+unk
+file path=usr/share/lib/terminfo/a/aas1901
+file path=usr/share/lib/terminfo/a/abm80
+file path=usr/share/lib/terminfo/a/abm85
+file path=usr/share/lib/terminfo/a/abm85e
+file path=usr/share/lib/terminfo/a/abm85h
+file path=usr/share/lib/terminfo/a/abm85h-old
+file path=usr/share/lib/terminfo/a/act4
+file path=usr/share/lib/terminfo/a/act5
+file path=usr/share/lib/terminfo/a/addrinfo
+file path=usr/share/lib/terminfo/a/adds980
+hardlink path=usr/share/lib/terminfo/a/addsviewpoint target=../v/viewpoint
+hardlink path=usr/share/lib/terminfo/a/addsvp60 target=../v/vp60
+file path=usr/share/lib/terminfo/a/adm+sgr
+hardlink path=usr/share/lib/terminfo/a/adm1 target=../a/adm1a
+file path=usr/share/lib/terminfo/a/adm11
+file path=usr/share/lib/terminfo/a/adm1178
+file path=usr/share/lib/terminfo/a/adm12
+file path=usr/share/lib/terminfo/a/adm1a
+file path=usr/share/lib/terminfo/a/adm2
+file path=usr/share/lib/terminfo/a/adm20
+file path=usr/share/lib/terminfo/a/adm21
+file path=usr/share/lib/terminfo/a/adm22
+file path=usr/share/lib/terminfo/a/adm3
+file path=usr/share/lib/terminfo/a/adm31
+file path=usr/share/lib/terminfo/a/adm31-old
+file path=usr/share/lib/terminfo/a/adm36
+file path=usr/share/lib/terminfo/a/adm3a
+file path=usr/share/lib/terminfo/a/adm3a+
+file path=usr/share/lib/terminfo/a/adm42
+file path=usr/share/lib/terminfo/a/adm42-ns
+file path=usr/share/lib/terminfo/a/adm5
+file path=usr/share/lib/terminfo/a/aepro
+file path=usr/share/lib/terminfo/a/aixterm
+file path=usr/share/lib/terminfo/a/aixterm-16color
+file path=usr/share/lib/terminfo/a/aixterm-m
+file path=usr/share/lib/terminfo/a/aixterm-m-old
+hardlink path=usr/share/lib/terminfo/a/aj target=../a/aj830
+file path=usr/share/lib/terminfo/a/aj510
+file path=usr/share/lib/terminfo/a/aj830
+hardlink path=usr/share/lib/terminfo/a/aj832 target=../a/aj830
+hardlink path=usr/share/lib/terminfo/a/alt2 target=../a/altos2
+hardlink path=usr/share/lib/terminfo/a/alt3 target=../a/altos3
+hardlink path=usr/share/lib/terminfo/a/alt4 target=../a/altos4
+hardlink path=usr/share/lib/terminfo/a/alt5 target=../a/altos3
+hardlink path=usr/share/lib/terminfo/a/alt7 target=../a/altos7
+hardlink path=usr/share/lib/terminfo/a/alt7pc target=../a/altos7pc
+file path=usr/share/lib/terminfo/a/alto-h19
+hardlink path=usr/share/lib/terminfo/a/alto-heath target=../a/alto-h19
+hardlink path=usr/share/lib/terminfo/a/altoh19 target=../a/alto-h19
+hardlink path=usr/share/lib/terminfo/a/altoheath target=../a/alto-h19
+hardlink path=usr/share/lib/terminfo/a/altos-2 target=../a/altos2
+hardlink path=usr/share/lib/terminfo/a/altos-3 target=../a/altos3
+hardlink path=usr/share/lib/terminfo/a/altos-4 target=../a/altos4
+hardlink path=usr/share/lib/terminfo/a/altos-5 target=../a/altos3
+file path=usr/share/lib/terminfo/a/altos2
+file path=usr/share/lib/terminfo/a/altos3
+file path=usr/share/lib/terminfo/a/altos4
+hardlink path=usr/share/lib/terminfo/a/altos5 target=../a/altos3
+file path=usr/share/lib/terminfo/a/altos7
+file path=usr/share/lib/terminfo/a/altos7pc
+hardlink path=usr/share/lib/terminfo/a/ambas target=../a/aaa
+hardlink path=usr/share/lib/terminfo/a/ambassador target=../a/aaa
+file path=usr/share/lib/terminfo/a/amiga
+file path=usr/share/lib/terminfo/a/amiga-8bit
+file path=usr/share/lib/terminfo/a/amiga-h
+file path=usr/share/lib/terminfo/a/amiga-vnc
+hardlink path=usr/share/lib/terminfo/a/amp219 target=../a/ampex219
+hardlink path=usr/share/lib/terminfo/a/amp219w target=../a/ampex219w
+hardlink path=usr/share/lib/terminfo/a/ampex-219 target=../a/ampex219
+hardlink path=usr/share/lib/terminfo/a/ampex-219w target=../a/ampex219w
+hardlink path=usr/share/lib/terminfo/a/ampex-232 target=../a/ampex232
+file path=usr/share/lib/terminfo/a/ampex175
+file path=usr/share/lib/terminfo/a/ampex175-b
+file path=usr/share/lib/terminfo/a/ampex210
+file path=usr/share/lib/terminfo/a/ampex219
+file path=usr/share/lib/terminfo/a/ampex219w
+file path=usr/share/lib/terminfo/a/ampex232
+file path=usr/share/lib/terminfo/a/ampex232w
+file path=usr/share/lib/terminfo/a/ampex80
+file path=usr/share/lib/terminfo/a/annarbor4080
+file path=usr/share/lib/terminfo/a/ansi
+file path=usr/share/lib/terminfo/a/ansi+arrows
+file path=usr/share/lib/terminfo/a/ansi+csr
+file path=usr/share/lib/terminfo/a/ansi+cup
+file path=usr/share/lib/terminfo/a/ansi+enq
+file path=usr/share/lib/terminfo/a/ansi+erase
+file path=usr/share/lib/terminfo/a/ansi+idc
+file path=usr/share/lib/terminfo/a/ansi+idl
+file path=usr/share/lib/terminfo/a/ansi+idl1
+file path=usr/share/lib/terminfo/a/ansi+inittabs
+file path=usr/share/lib/terminfo/a/ansi+local
+file path=usr/share/lib/terminfo/a/ansi+local1
+file path=usr/share/lib/terminfo/a/ansi+pp
+file path=usr/share/lib/terminfo/a/ansi+rca
+file path=usr/share/lib/terminfo/a/ansi+rep
+file path=usr/share/lib/terminfo/a/ansi+sgr
+file path=usr/share/lib/terminfo/a/ansi+sgrbold
+file path=usr/share/lib/terminfo/a/ansi+sgrdim
+file path=usr/share/lib/terminfo/a/ansi+sgrso
+file path=usr/share/lib/terminfo/a/ansi+sgrul
+file path=usr/share/lib/terminfo/a/ansi+tabs
+file path=usr/share/lib/terminfo/a/ansi-color-2-emx
+file path=usr/share/lib/terminfo/a/ansi-color-3-emx
+file path=usr/share/lib/terminfo/a/ansi-emx
+file path=usr/share/lib/terminfo/a/ansi-generic
+file path=usr/share/lib/terminfo/a/ansi-m
+file path=usr/share/lib/terminfo/a/ansi-mini
+hardlink path=usr/share/lib/terminfo/a/ansi-mono target=../a/ansi-m
+file path=usr/share/lib/terminfo/a/ansi-mr
+file path=usr/share/lib/terminfo/a/ansi-mtabs
+file path=usr/share/lib/terminfo/a/ansi-nt
+file path=usr/share/lib/terminfo/a/ansi.sys
+file path=usr/share/lib/terminfo/a/ansi.sys-old
+file path=usr/share/lib/terminfo/a/ansi.sysk
+hardlink path=usr/share/lib/terminfo/a/ansi43m target=../p/pcansi-43-m
+file path=usr/share/lib/terminfo/a/ansi77
+hardlink path=usr/share/lib/terminfo/a/ansi80x25 target=../c/cons25
+hardlink path=usr/share/lib/terminfo/a/ansi80x25-mono target=../c/cons25-m
+hardlink path=usr/share/lib/terminfo/a/ansi80x25-raw target=../c/cons25w
+hardlink path=usr/share/lib/terminfo/a/ansi80x30 target=../c/cons30
+hardlink path=usr/share/lib/terminfo/a/ansi80x30-mono target=../c/cons30-m
+hardlink path=usr/share/lib/terminfo/a/ansi80x43 target=../c/cons43
+hardlink path=usr/share/lib/terminfo/a/ansi80x43-mono target=../c/cons43-m
+hardlink path=usr/share/lib/terminfo/a/ansi80x50 target=../c/cons50
+hardlink path=usr/share/lib/terminfo/a/ansi80x50-mono target=../c/cons50-m
+hardlink path=usr/share/lib/terminfo/a/ansi80x60 target=../c/cons60
+hardlink path=usr/share/lib/terminfo/a/ansi80x60-mono target=../c/cons60-m
+hardlink path=usr/share/lib/terminfo/a/ansil target=../c/cons50
+hardlink path=usr/share/lib/terminfo/a/ansil-mono target=../c/cons50-m
+hardlink path=usr/share/lib/terminfo/a/ansis target=../c/cons25
+hardlink path=usr/share/lib/terminfo/a/ansis-mono target=../c/cons25-m
+hardlink path=usr/share/lib/terminfo/a/ansisysk target=../a/ansi.sysk
+hardlink path=usr/share/lib/terminfo/a/ansiw target=../c/cons25w
+hardlink path=usr/share/lib/terminfo/a/ap-vm80 target=../a/apple-vm80
+hardlink path=usr/share/lib/terminfo/a/apl target=../i/ibm-apl
+file path=usr/share/lib/terminfo/a/apollo
+file path=usr/share/lib/terminfo/a/apollo_15P
+file path=usr/share/lib/terminfo/a/apollo_19L
+file path=usr/share/lib/terminfo/a/apollo_color
+file path=usr/share/lib/terminfo/a/apple-80
+file path=usr/share/lib/terminfo/a/apple-ae
+file path=usr/share/lib/terminfo/a/apple-soroc
+file path=usr/share/lib/terminfo/a/apple-uterm
+file path=usr/share/lib/terminfo/a/apple-uterm-vb
+file path=usr/share/lib/terminfo/a/apple-videx
+file path=usr/share/lib/terminfo/a/apple-videx2
+file path=usr/share/lib/terminfo/a/apple-videx3
+file path=usr/share/lib/terminfo/a/apple-vm80
+file path=usr/share/lib/terminfo/a/apple2e
+file path=usr/share/lib/terminfo/a/apple2e-p
+file path=usr/share/lib/terminfo/a/apple80p
+file path=usr/share/lib/terminfo/a/appleII
+hardlink path=usr/share/lib/terminfo/a/appleIIc target=../a/appleIIgs
+hardlink path=usr/share/lib/terminfo/a/appleIIe target=../a/appleIIgs
+file path=usr/share/lib/terminfo/a/appleIIgs
+file path=usr/share/lib/terminfo/a/arm100
+hardlink path=usr/share/lib/terminfo/a/arm100-am target=../a/arm100
+file path=usr/share/lib/terminfo/a/arm100-w
+hardlink path=usr/share/lib/terminfo/a/arm100-wam target=../a/arm100-w
+hardlink path=usr/share/lib/terminfo/a/at target=../s/st52
+hardlink path=usr/share/lib/terminfo/a/at-color target=../s/st52-color
+hardlink path=usr/share/lib/terminfo/a/at-m target=../s/st52
+hardlink path=usr/share/lib/terminfo/a/at386 target=../a/att6386
+hardlink path=usr/share/lib/terminfo/a/atari target=../s/st52
+hardlink path=usr/share/lib/terminfo/a/atari-color target=../s/st52-color
+hardlink path=usr/share/lib/terminfo/a/atari-m target=../s/st52
+file path=usr/share/lib/terminfo/a/atari-old
+hardlink path=usr/share/lib/terminfo/a/atari_st target=../s/st52
+hardlink path=usr/share/lib/terminfo/a/atari_st-color target=../s/st52-color
+hardlink path=usr/share/lib/terminfo/a/atarist-m target=../s/st52
+file path=usr/share/lib/terminfo/a/aterm
+file path=usr/share/lib/terminfo/a/att2300
+file path=usr/share/lib/terminfo/a/att2350
+file path=usr/share/lib/terminfo/a/att4410
+hardlink path=usr/share/lib/terminfo/a/att4410-w target=../a/att5410-w
+hardlink path=usr/share/lib/terminfo/a/att4410v1 target=../a/att5410v1
+file path=usr/share/lib/terminfo/a/att4410v1-w
+file path=usr/share/lib/terminfo/a/att4415
+file path=usr/share/lib/terminfo/a/att4415+nl
+file path=usr/share/lib/terminfo/a/att4415-nl
+file path=usr/share/lib/terminfo/a/att4415-rv
+file path=usr/share/lib/terminfo/a/att4415-rv-nl
+file path=usr/share/lib/terminfo/a/att4415-w
+file path=usr/share/lib/terminfo/a/att4415-w-nl
+file path=usr/share/lib/terminfo/a/att4415-w-rv
+file path=usr/share/lib/terminfo/a/att4415-w-rv-n
+file path=usr/share/lib/terminfo/a/att4418
+file path=usr/share/lib/terminfo/a/att4418-w
+file path=usr/share/lib/terminfo/a/att4420
+file path=usr/share/lib/terminfo/a/att4424
+file path=usr/share/lib/terminfo/a/att4424-1
+file path=usr/share/lib/terminfo/a/att4424m
+hardlink path=usr/share/lib/terminfo/a/att4425 target=../a/att5425
+hardlink path=usr/share/lib/terminfo/a/att4425-nl target=../a/att5425-nl
+hardlink path=usr/share/lib/terminfo/a/att4425-w target=../a/att5425-w
+file path=usr/share/lib/terminfo/a/att4426
+file path=usr/share/lib/terminfo/a/att500
+file path=usr/share/lib/terminfo/a/att505
+file path=usr/share/lib/terminfo/a/att505-24
+file path=usr/share/lib/terminfo/a/att510a
+file path=usr/share/lib/terminfo/a/att510d
+hardlink path=usr/share/lib/terminfo/a/att513 target=../a/att500
+file path=usr/share/lib/terminfo/a/att5310
+hardlink path=usr/share/lib/terminfo/a/att5320 target=../a/att5310
+hardlink path=usr/share/lib/terminfo/a/att5410 target=../a/att4410
+file path=usr/share/lib/terminfo/a/att5410-w
+file path=usr/share/lib/terminfo/a/att5410v1
+hardlink path=usr/share/lib/terminfo/a/att5410v1-w target=../a/att4410v1-w
+hardlink path=usr/share/lib/terminfo/a/att5418 target=../a/att4418
+hardlink path=usr/share/lib/terminfo/a/att5418-w target=../a/att4418-w
+hardlink path=usr/share/lib/terminfo/a/att5420 target=../a/att4415
+hardlink path=usr/share/lib/terminfo/a/att5420+nl target=../a/att4415+nl
+hardlink path=usr/share/lib/terminfo/a/att5420-nl target=../a/att4415-nl
+hardlink path=usr/share/lib/terminfo/a/att5420-rv target=../a/att4415-rv
+hardlink path=usr/share/lib/terminfo/a/att5420-rv-nl target=../a/att4415-rv-nl
+hardlink path=usr/share/lib/terminfo/a/att5420-w target=../a/att4415-w
+hardlink path=usr/share/lib/terminfo/a/att5420-w-nl target=../a/att4415-w-nl
+hardlink path=usr/share/lib/terminfo/a/att5420-w-rv target=../a/att4415-w-rv
+hardlink path=usr/share/lib/terminfo/a/att5420-w-rv-n target=../a/att4415-w-rv-n
+file path=usr/share/lib/terminfo/a/att5420_2
+file path=usr/share/lib/terminfo/a/att5420_2-w
+file path=usr/share/lib/terminfo/a/att5425
+file path=usr/share/lib/terminfo/a/att5425-nl
+file path=usr/share/lib/terminfo/a/att5425-w
+hardlink path=usr/share/lib/terminfo/a/att5430 target=../a/att505
+file path=usr/share/lib/terminfo/a/att5620
+file path=usr/share/lib/terminfo/a/att5620-1
+file path=usr/share/lib/terminfo/a/att5620-24
+file path=usr/share/lib/terminfo/a/att5620-34
+file path=usr/share/lib/terminfo/a/att5620-s
+file path=usr/share/lib/terminfo/a/att605
+file path=usr/share/lib/terminfo/a/att605-pc
+file path=usr/share/lib/terminfo/a/att605-w
+file path=usr/share/lib/terminfo/a/att610
+file path=usr/share/lib/terminfo/a/att610-103k
+file path=usr/share/lib/terminfo/a/att610-103k-w
+file path=usr/share/lib/terminfo/a/att610-w
+file path=usr/share/lib/terminfo/a/att615
+file path=usr/share/lib/terminfo/a/att615-103k
+file path=usr/share/lib/terminfo/a/att615-103k-w
+file path=usr/share/lib/terminfo/a/att615-w
+file path=usr/share/lib/terminfo/a/att620
+file path=usr/share/lib/terminfo/a/att620-103k
+file path=usr/share/lib/terminfo/a/att620-103k-w
+file path=usr/share/lib/terminfo/a/att620-w
+file path=usr/share/lib/terminfo/a/att630
+file path=usr/share/lib/terminfo/a/att630-24
+file path=usr/share/lib/terminfo/a/att6386
+file path=usr/share/lib/terminfo/a/att700
+file path=usr/share/lib/terminfo/a/att730
+file path=usr/share/lib/terminfo/a/att730-24
+file path=usr/share/lib/terminfo/a/att730-41
+file path=usr/share/lib/terminfo/a/att7300
+file path=usr/share/lib/terminfo/a/att730r
+file path=usr/share/lib/terminfo/a/att730r-24
+file path=usr/share/lib/terminfo/a/att730r-41
+file path=usr/share/lib/terminfo/a/avatar
+file path=usr/share/lib/terminfo/a/avatar0
+file path=usr/share/lib/terminfo/a/avatar0+
+hardlink path=usr/share/lib/terminfo/a/avatar1 target=../a/avatar
+file path=usr/share/lib/terminfo/a/avt
+file path=usr/share/lib/terminfo/a/avt+s
+file path=usr/share/lib/terminfo/a/avt-ns
+file path=usr/share/lib/terminfo/a/avt-rv
+file path=usr/share/lib/terminfo/a/avt-rv-ns
+hardlink path=usr/share/lib/terminfo/a/avt-rv-s target=../a/avt-rv
+hardlink path=usr/share/lib/terminfo/a/avt-s target=../a/avt
+file path=usr/share/lib/terminfo/a/avt-w
+file path=usr/share/lib/terminfo/a/avt-w-ns
+file path=usr/share/lib/terminfo/a/avt-w-rv
+file path=usr/share/lib/terminfo/a/avt-w-rv-ns
+hardlink path=usr/share/lib/terminfo/a/avt-w-rv-s target=../a/avt-w-rv
+hardlink path=usr/share/lib/terminfo/a/avt-w-s target=../a/avt-w
+file path=usr/share/lib/terminfo/a/aws
+file path=usr/share/lib/terminfo/a/awsc
+dir  path=usr/share/lib/terminfo/b
+hardlink path=usr/share/lib/terminfo/b/b-128 target=../c/commodore
+file path=usr/share/lib/terminfo/b/bantam
+hardlink path=usr/share/lib/terminfo/b/basic4 target=../m/mai
+file path=usr/share/lib/terminfo/b/basis
+hardlink path=usr/share/lib/terminfo/b/bct510a target=../a/att510a
+hardlink path=usr/share/lib/terminfo/b/bct510d target=../a/att510d
+file path=usr/share/lib/terminfo/b/beacon
+hardlink path=usr/share/lib/terminfo/b/bee target=../b/beehive
+file path=usr/share/lib/terminfo/b/beehive
+file path=usr/share/lib/terminfo/b/beehive3
+file path=usr/share/lib/terminfo/b/beehive4
+hardlink path=usr/share/lib/terminfo/b/beehiveIIIm target=../b/beehive3
+file path=usr/share/lib/terminfo/b/beterm
+file path=usr/share/lib/terminfo/b/bg1.25
+file path=usr/share/lib/terminfo/b/bg1.25nv
+file path=usr/share/lib/terminfo/b/bg1.25rv
+file path=usr/share/lib/terminfo/b/bg2.0
+hardlink path=usr/share/lib/terminfo/b/bg2.0nv target=../b/bitgraph
+file path=usr/share/lib/terminfo/b/bg2.0rv
+hardlink path=usr/share/lib/terminfo/b/bg3.10 target=../b/bg2.0
+hardlink path=usr/share/lib/terminfo/b/bg3.10nv target=../b/bitgraph
+hardlink path=usr/share/lib/terminfo/b/bg3.10rv target=../b/bg2.0rv
+hardlink path=usr/share/lib/terminfo/b/bh3m target=../b/beehive3
+hardlink path=usr/share/lib/terminfo/b/bh4 target=../b/beehive4
+file path=usr/share/lib/terminfo/b/bitgraph
+file path=usr/share/lib/terminfo/b/blit
+file path=usr/share/lib/terminfo/b/bobcat
+file path=usr/share/lib/terminfo/b/bq300
+file path=usr/share/lib/terminfo/b/bq300-8
+file path=usr/share/lib/terminfo/b/bq300-8-pc
+file path=usr/share/lib/terminfo/b/bq300-8-pc-rv
+file path=usr/share/lib/terminfo/b/bq300-8-pc-w
+file path=usr/share/lib/terminfo/b/bq300-8-pc-w-rv
+file path=usr/share/lib/terminfo/b/bq300-8rv
+file path=usr/share/lib/terminfo/b/bq300-8w
+file path=usr/share/lib/terminfo/b/bq300-pc
+file path=usr/share/lib/terminfo/b/bq300-pc-rv
+file path=usr/share/lib/terminfo/b/bq300-pc-w
+file path=usr/share/lib/terminfo/b/bq300-pc-w-rv
+file path=usr/share/lib/terminfo/b/bq300-rv
+file path=usr/share/lib/terminfo/b/bq300-w
+file path=usr/share/lib/terminfo/b/bq300-w-8rv
+file path=usr/share/lib/terminfo/b/bq300-w-rv
+file path=usr/share/lib/terminfo/b/bsdos-pc
+file path=usr/share/lib/terminfo/b/bsdos-pc-m
+hardlink path=usr/share/lib/terminfo/b/bsdos-pc-mono target=../b/bsdos-pc-m
+file path=usr/share/lib/terminfo/b/bsdos-pc-nobold
+file path=usr/share/lib/terminfo/b/bsdos-ppc
+file path=usr/share/lib/terminfo/b/bsdos-sparc
+file path=usr/share/lib/terminfo/b/bterm
+dir  path=usr/share/lib/terminfo/c
+file path=usr/share/lib/terminfo/c/c100
+hardlink path=usr/share/lib/terminfo/c/c100-1p target=../o/oc100
+hardlink path=usr/share/lib/terminfo/c/c100-4p target=../c/c100
+file path=usr/share/lib/terminfo/c/c100-rv
+hardlink path=usr/share/lib/terminfo/c/c100-rv-4p target=../c/c100-rv
+hardlink path=usr/share/lib/terminfo/c/c104 target=../c/c100
+file path=usr/share/lib/terminfo/c/c108
+file path=usr/share/lib/terminfo/c/c108-4p
+hardlink path=usr/share/lib/terminfo/c/c108-8p target=../c/c108
+file path=usr/share/lib/terminfo/c/c108-rv
+file path=usr/share/lib/terminfo/c/c108-rv-4p
+hardlink path=usr/share/lib/terminfo/c/c108-rv-8p target=../c/c108-rv
+file path=usr/share/lib/terminfo/c/c108-w
+hardlink path=usr/share/lib/terminfo/c/c108-w-8p target=../c/c108-w
+hardlink path=usr/share/lib/terminfo/c/c300 target=../c/contel300
+hardlink path=usr/share/lib/terminfo/c/c301 target=../c/contel301
+hardlink path=usr/share/lib/terminfo/c/c321 target=../c/contel301
+file path=usr/share/lib/terminfo/c/ca22851
+file path=usr/share/lib/terminfo/c/cad68-2
+file path=usr/share/lib/terminfo/c/cad68-3
+file path=usr/share/lib/terminfo/c/cbblit
+file path=usr/share/lib/terminfo/c/cbunix
+file path=usr/share/lib/terminfo/c/cci
+hardlink path=usr/share/lib/terminfo/c/cci1 target=../c/cci
+file path=usr/share/lib/terminfo/c/cdc456
+file path=usr/share/lib/terminfo/c/cdc721
+file path=usr/share/lib/terminfo/c/cdc721-esc
+file path=usr/share/lib/terminfo/c/cdc721ll
+file path=usr/share/lib/terminfo/c/cdc752
+file path=usr/share/lib/terminfo/c/cdc756
+file path=usr/share/lib/terminfo/c/cg7900
+hardlink path=usr/share/lib/terminfo/c/cgc2 target=../c/cad68-2
+hardlink path=usr/share/lib/terminfo/c/cgc3 target=../c/cad68-3
+hardlink path=usr/share/lib/terminfo/c/chromatics target=../c/cg7900
+hardlink path=usr/share/lib/terminfo/c/ci8510 target=../c/citoh
+hardlink path=usr/share/lib/terminfo/c/cit-80 target=../c/cit80
+file path=usr/share/lib/terminfo/c/cit101
+file path=usr/share/lib/terminfo/c/cit101e
+file path=usr/share/lib/terminfo/c/cit101e-132
+file path=usr/share/lib/terminfo/c/cit101e-n
+file path=usr/share/lib/terminfo/c/cit101e-n132
+file path=usr/share/lib/terminfo/c/cit101e-rv
+file path=usr/share/lib/terminfo/c/cit500
+file path=usr/share/lib/terminfo/c/cit80
+hardlink path=usr/share/lib/terminfo/c/citc target=../c/cit101
+file path=usr/share/lib/terminfo/c/citoh
+file path=usr/share/lib/terminfo/c/citoh-6lpi
+file path=usr/share/lib/terminfo/c/citoh-8lpi
+file path=usr/share/lib/terminfo/c/citoh-comp
+file path=usr/share/lib/terminfo/c/citoh-elite
+file path=usr/share/lib/terminfo/c/citoh-pica
+file path=usr/share/lib/terminfo/c/citoh-prop
+hardlink path=usr/share/lib/terminfo/c/citoh-ps target=../c/citoh-prop
+file path=usr/share/lib/terminfo/c/coco3
+hardlink path=usr/share/lib/terminfo/c/coherent target=../p/pc-coherent
+file path=usr/share/lib/terminfo/c/color_xterm
+hardlink path=usr/share/lib/terminfo/c/colorscan target=../c/cs10
+file path=usr/share/lib/terminfo/c/commodore
+hardlink path=usr/share/lib/terminfo/c/concept target=../c/c100
+hardlink path=usr/share/lib/terminfo/c/concept-avt target=../a/avt
+hardlink path=usr/share/lib/terminfo/c/concept100 target=../c/c100
+hardlink path=usr/share/lib/terminfo/c/concept100-rv target=../c/c100-rv
+hardlink path=usr/share/lib/terminfo/c/concept108 target=../c/c108
+hardlink path=usr/share/lib/terminfo/c/concept108-4p target=../c/c108-4p
+hardlink path=usr/share/lib/terminfo/c/concept108-8p target=../c/c108
+hardlink path=usr/share/lib/terminfo/c/concept108-w-8 target=../c/c108-w
+hardlink path=usr/share/lib/terminfo/c/concept108-w8p target=../c/c108-w
+hardlink path=usr/share/lib/terminfo/c/concept108rv4p target=../c/c108-rv-4p
+file path=usr/share/lib/terminfo/c/cons25
+file path=usr/share/lib/terminfo/c/cons25-debian
+hardlink path=usr/share/lib/terminfo/c/cons25-iso-m target=../c/cons25l1-m
+hardlink path=usr/share/lib/terminfo/c/cons25-iso8859 target=../c/cons25l1
+hardlink path=usr/share/lib/terminfo/c/cons25-koi8-r target=../c/cons25r
+hardlink path=usr/share/lib/terminfo/c/cons25-koi8r-m target=../c/cons25r-m
+file path=usr/share/lib/terminfo/c/cons25-m
+file path=usr/share/lib/terminfo/c/cons25l1
+file path=usr/share/lib/terminfo/c/cons25l1-m
+file path=usr/share/lib/terminfo/c/cons25r
+file path=usr/share/lib/terminfo/c/cons25r-m
+file path=usr/share/lib/terminfo/c/cons25w
+file path=usr/share/lib/terminfo/c/cons30
+file path=usr/share/lib/terminfo/c/cons30-m
+file path=usr/share/lib/terminfo/c/cons43
+file path=usr/share/lib/terminfo/c/cons43-m
+file path=usr/share/lib/terminfo/c/cons50
+hardlink path=usr/share/lib/terminfo/c/cons50-iso-m target=../c/cons50l1-m
+hardlink path=usr/share/lib/terminfo/c/cons50-iso8859 target=../c/cons50l1
+hardlink path=usr/share/lib/terminfo/c/cons50-koi8r target=../c/cons50r
+hardlink path=usr/share/lib/terminfo/c/cons50-koi8r-m target=../c/cons50r-m
+file path=usr/share/lib/terminfo/c/cons50-m
+file path=usr/share/lib/terminfo/c/cons50l1
+file path=usr/share/lib/terminfo/c/cons50l1-m
+file path=usr/share/lib/terminfo/c/cons50r
+file path=usr/share/lib/terminfo/c/cons50r-m
+file path=usr/share/lib/terminfo/c/cons60
+hardlink path=usr/share/lib/terminfo/c/cons60-iso target=../c/cons60l1
+hardlink path=usr/share/lib/terminfo/c/cons60-iso-m target=../c/cons60l1-m
+hardlink path=usr/share/lib/terminfo/c/cons60-koi8r target=../c/cons60r
+hardlink path=usr/share/lib/terminfo/c/cons60-koi8r-m target=../c/cons60r-m
+file path=usr/share/lib/terminfo/c/cons60-m
+file path=usr/share/lib/terminfo/c/cons60l1
+file path=usr/share/lib/terminfo/c/cons60l1-m
+file path=usr/share/lib/terminfo/c/cons60r
+file path=usr/share/lib/terminfo/c/cons60r-m
+file path=usr/share/lib/terminfo/c/contel300
+file path=usr/share/lib/terminfo/c/contel301
+hardlink path=usr/share/lib/terminfo/c/contel320 target=../c/contel300
+hardlink path=usr/share/lib/terminfo/c/contel321 target=../c/contel301
+hardlink path=usr/share/lib/terminfo/c/cops target=../c/cops10
+hardlink path=usr/share/lib/terminfo/c/cops-10 target=../c/cops10
+file path=usr/share/lib/terminfo/c/cops10
+file path=usr/share/lib/terminfo/c/crt
+hardlink path=usr/share/lib/terminfo/c/crt-vt220 target=../c/crt
+file path=usr/share/lib/terminfo/c/cs10
+file path=usr/share/lib/terminfo/c/cs10-w
+hardlink path=usr/share/lib/terminfo/c/ct82 target=../s/swtp
+file path=usr/share/lib/terminfo/c/ct8500
+file path=usr/share/lib/terminfo/c/ctrm
+hardlink path=usr/share/lib/terminfo/c/cx target=../c/color_xterm
+hardlink path=usr/share/lib/terminfo/c/cx100 target=../c/color_xterm
+file path=usr/share/lib/terminfo/c/cyb110
+file path=usr/share/lib/terminfo/c/cyb83
+file path=usr/share/lib/terminfo/c/cygwin
+file path=usr/share/lib/terminfo/c/cygwinB19
+file path=usr/share/lib/terminfo/c/cygwinDBG
+dir  path=usr/share/lib/terminfo/d
+file path=usr/share/lib/terminfo/d/d132
+hardlink path=usr/share/lib/terminfo/d/d2 target=../d/dg6053
+hardlink path=usr/share/lib/terminfo/d/d2-dg target=../d/dg6053
+file path=usr/share/lib/terminfo/d/d200
+hardlink path=usr/share/lib/terminfo/d/d200-dg target=../d/d200
+file path=usr/share/lib/terminfo/d/d210
+file path=usr/share/lib/terminfo/d/d210-dg
+file path=usr/share/lib/terminfo/d/d211
+file path=usr/share/lib/terminfo/d/d211-7b
+file path=usr/share/lib/terminfo/d/d211-dg
+hardlink path=usr/share/lib/terminfo/d/d214 target=../d/d210
+hardlink path=usr/share/lib/terminfo/d/d214-dg target=../d/d210-dg
+hardlink path=usr/share/lib/terminfo/d/d215 target=../d/d211
+hardlink path=usr/share/lib/terminfo/d/d215-7b target=../d/d211-7b
+hardlink path=usr/share/lib/terminfo/d/d215-dg target=../d/d211-dg
+hardlink path=usr/share/lib/terminfo/d/d216+ target=../d/d216-unix
+hardlink path=usr/share/lib/terminfo/d/d216+25 target=../d/d216-unix-25
+hardlink path=usr/share/lib/terminfo/d/d216+dg target=../d/d216-dg
+file path=usr/share/lib/terminfo/d/d216-dg
+file path=usr/share/lib/terminfo/d/d216-unix
+file path=usr/share/lib/terminfo/d/d216-unix-25
+hardlink path=usr/share/lib/terminfo/d/d216e+ target=../d/d216-unix
+hardlink path=usr/share/lib/terminfo/d/d216e+dg target=../d/d216-dg
+hardlink path=usr/share/lib/terminfo/d/d216e-dg target=../d/d216-dg
+hardlink path=usr/share/lib/terminfo/d/d216e-unix target=../d/d216-unix
+hardlink path=usr/share/lib/terminfo/d/d217-dg target=../d/d216-dg
+file path=usr/share/lib/terminfo/d/d217-unix
+file path=usr/share/lib/terminfo/d/d217-unix-25
+file path=usr/share/lib/terminfo/d/d220
+file path=usr/share/lib/terminfo/d/d220-7b
+file path=usr/share/lib/terminfo/d/d220-dg
+hardlink path=usr/share/lib/terminfo/d/d230 target=../d/d230c
+hardlink path=usr/share/lib/terminfo/d/d230-dg target=../d/d230c-dg
+file path=usr/share/lib/terminfo/d/d230c
+file path=usr/share/lib/terminfo/d/d230c-dg
+file path=usr/share/lib/terminfo/d/d400
+hardlink path=usr/share/lib/terminfo/d/d400-dg target=../d/d400
+file path=usr/share/lib/terminfo/d/d410
+file path=usr/share/lib/terminfo/d/d410-7b
+file path=usr/share/lib/terminfo/d/d410-7b-w
+file path=usr/share/lib/terminfo/d/d410-dg
+file path=usr/share/lib/terminfo/d/d410-w
+hardlink path=usr/share/lib/terminfo/d/d411 target=../d/d410
+hardlink path=usr/share/lib/terminfo/d/d411-7b target=../d/d410-7b
+hardlink path=usr/share/lib/terminfo/d/d411-7b-w target=../d/d410-7b-w
+hardlink path=usr/share/lib/terminfo/d/d411-dg target=../d/d410-dg
+hardlink path=usr/share/lib/terminfo/d/d411-w target=../d/d410-w
+hardlink path=usr/share/lib/terminfo/d/d412+ target=../d/d412-unix
+hardlink path=usr/share/lib/terminfo/d/d412+25 target=../d/d412-unix-25
+hardlink path=usr/share/lib/terminfo/d/d412+dg target=../d/d412-dg
+hardlink path=usr/share/lib/terminfo/d/d412+s target=../d/d412-unix-s
+hardlink path=usr/share/lib/terminfo/d/d412+sr target=../d/d412-unix-sr
+hardlink path=usr/share/lib/terminfo/d/d412+w target=../d/d412-unix-w
+file path=usr/share/lib/terminfo/d/d412-dg
+file path=usr/share/lib/terminfo/d/d412-unix
+file path=usr/share/lib/terminfo/d/d412-unix-25
+file path=usr/share/lib/terminfo/d/d412-unix-s
+file path=usr/share/lib/terminfo/d/d412-unix-sr
+file path=usr/share/lib/terminfo/d/d412-unix-w
+hardlink path=usr/share/lib/terminfo/d/d413-dg target=../d/d412-dg
+file path=usr/share/lib/terminfo/d/d413-unix
+file path=usr/share/lib/terminfo/d/d413-unix-25
+file path=usr/share/lib/terminfo/d/d413-unix-s
+file path=usr/share/lib/terminfo/d/d413-unix-sr
+file path=usr/share/lib/terminfo/d/d413-unix-w
+file path=usr/share/lib/terminfo/d/d414-unix
+file path=usr/share/lib/terminfo/d/d414-unix-25
+file path=usr/share/lib/terminfo/d/d414-unix-s
+file path=usr/share/lib/terminfo/d/d414-unix-sr
+file path=usr/share/lib/terminfo/d/d414-unix-w
+hardlink path=usr/share/lib/terminfo/d/d430-dg target=../d/d430c-dg
+hardlink path=usr/share/lib/terminfo/d/d430-dg-ccc target=../d/d430c-dg-ccc
+hardlink path=usr/share/lib/terminfo/d/d430-unix target=../d/d430c-unix
+hardlink path=usr/share/lib/terminfo/d/d430-unix-25 target=../d/d430c-unix-25
+hardlink path=usr/share/lib/terminfo/d/d430-unix-25-ccc \
+    target=../d/d430c-unix-25-ccc
+hardlink path=usr/share/lib/terminfo/d/d430-unix-ccc target=../d/d430c-unix-ccc
+hardlink path=usr/share/lib/terminfo/d/d430-unix-s target=../d/d430c-unix-s
+hardlink path=usr/share/lib/terminfo/d/d430-unix-s-ccc \
+    target=../d/d430c-unix-s-ccc
+hardlink path=usr/share/lib/terminfo/d/d430-unix-sr target=../d/d430c-unix-sr
+hardlink path=usr/share/lib/terminfo/d/d430-unix-sr-ccc \
+    target=../d/d430c-unix-sr-ccc
+hardlink path=usr/share/lib/terminfo/d/d430-unix-w target=../d/d430c-unix-w
+hardlink path=usr/share/lib/terminfo/d/d430-unix-w-ccc \
+    target=../d/d430c-unix-w-ccc
+file path=usr/share/lib/terminfo/d/d430c-dg
+file path=usr/share/lib/terminfo/d/d430c-dg-ccc
+file path=usr/share/lib/terminfo/d/d430c-unix
+file path=usr/share/lib/terminfo/d/d430c-unix-25
+file path=usr/share/lib/terminfo/d/d430c-unix-25-ccc
+file path=usr/share/lib/terminfo/d/d430c-unix-ccc
+file path=usr/share/lib/terminfo/d/d430c-unix-s
+file path=usr/share/lib/terminfo/d/d430c-unix-s-ccc
+file path=usr/share/lib/terminfo/d/d430c-unix-sr
+file path=usr/share/lib/terminfo/d/d430c-unix-sr-ccc
+file path=usr/share/lib/terminfo/d/d430c-unix-w
+file path=usr/share/lib/terminfo/d/d430c-unix-w-ccc
+hardlink path=usr/share/lib/terminfo/d/d450 target=../d/d400
+hardlink path=usr/share/lib/terminfo/d/d450-dg target=../d/d400
+hardlink path=usr/share/lib/terminfo/d/d460 target=../d/d410
+hardlink path=usr/share/lib/terminfo/d/d460-7b target=../d/d410-7b
+hardlink path=usr/share/lib/terminfo/d/d460-7b-w target=../d/d410-7b-w
+hardlink path=usr/share/lib/terminfo/d/d460-dg target=../d/d410-dg
+hardlink path=usr/share/lib/terminfo/d/d460-w target=../d/d410-w
+hardlink path=usr/share/lib/terminfo/d/d461 target=../d/d410
+hardlink path=usr/share/lib/terminfo/d/d461-7b target=../d/d410-7b
+hardlink path=usr/share/lib/terminfo/d/d461-7b-w target=../d/d410-7b-w
+hardlink path=usr/share/lib/terminfo/d/d461-dg target=../d/d410-dg
+hardlink path=usr/share/lib/terminfo/d/d461-w target=../d/d410-w
+hardlink path=usr/share/lib/terminfo/d/d462+ target=../d/d412-unix
+hardlink path=usr/share/lib/terminfo/d/d462+25 target=../d/d412-unix-25
+hardlink path=usr/share/lib/terminfo/d/d462+dg target=../d/d412-dg
+hardlink path=usr/share/lib/terminfo/d/d462+s target=../d/d412-unix-s
+hardlink path=usr/share/lib/terminfo/d/d462+sr target=../d/d412-unix-sr
+hardlink path=usr/share/lib/terminfo/d/d462+w target=../d/d412-unix-w
+hardlink path=usr/share/lib/terminfo/d/d462-dg target=../d/d412-dg
+hardlink path=usr/share/lib/terminfo/d/d462-unix target=../d/d412-unix
+hardlink path=usr/share/lib/terminfo/d/d462-unix-25 target=../d/d412-unix-25
+hardlink path=usr/share/lib/terminfo/d/d462-unix-s target=../d/d412-unix-s
+hardlink path=usr/share/lib/terminfo/d/d462-unix-sr target=../d/d412-unix-sr
+hardlink path=usr/share/lib/terminfo/d/d462-unix-w target=../d/d412-unix-w
+hardlink path=usr/share/lib/terminfo/d/d462e-dg target=../d/d412-dg
+hardlink path=usr/share/lib/terminfo/d/d463-dg target=../d/d412-dg
+hardlink path=usr/share/lib/terminfo/d/d463-unix target=../d/d413-unix
+hardlink path=usr/share/lib/terminfo/d/d463-unix-25 target=../d/d413-unix-25
+hardlink path=usr/share/lib/terminfo/d/d463-unix-s target=../d/d413-unix-s
+hardlink path=usr/share/lib/terminfo/d/d463-unix-sr target=../d/d413-unix-sr
+hardlink path=usr/share/lib/terminfo/d/d463-unix-w target=../d/d413-unix-w
+hardlink path=usr/share/lib/terminfo/d/d464-unix target=../d/d414-unix
+hardlink path=usr/share/lib/terminfo/d/d464-unix-25 target=../d/d414-unix-25
+hardlink path=usr/share/lib/terminfo/d/d464-unix-s target=../d/d414-unix-s
+hardlink path=usr/share/lib/terminfo/d/d464-unix-sr target=../d/d414-unix-sr
+hardlink path=usr/share/lib/terminfo/d/d464-unix-w target=../d/d414-unix-w
+hardlink path=usr/share/lib/terminfo/d/d470 target=../d/d470c
+hardlink path=usr/share/lib/terminfo/d/d470-7b target=../d/d470c-7b
+hardlink path=usr/share/lib/terminfo/d/d470-dg target=../d/d470c-dg
+file path=usr/share/lib/terminfo/d/d470c
+file path=usr/share/lib/terminfo/d/d470c-7b
+file path=usr/share/lib/terminfo/d/d470c-dg
+file path=usr/share/lib/terminfo/d/d555
+file path=usr/share/lib/terminfo/d/d555-7b
+file path=usr/share/lib/terminfo/d/d555-7b-w
+file path=usr/share/lib/terminfo/d/d555-dg
+file path=usr/share/lib/terminfo/d/d555-w
+file path=usr/share/lib/terminfo/d/d577
+file path=usr/share/lib/terminfo/d/d577-7b
+file path=usr/share/lib/terminfo/d/d577-7b-w
+file path=usr/share/lib/terminfo/d/d577-dg
+file path=usr/share/lib/terminfo/d/d577-w
+file path=usr/share/lib/terminfo/d/d578
+file path=usr/share/lib/terminfo/d/d578-7b
+hardlink path=usr/share/lib/terminfo/d/d578-dg target=../d/d577-dg
+hardlink path=usr/share/lib/terminfo/d/d80 target=../a/ampex80
+file path=usr/share/lib/terminfo/d/d800
+hardlink path=usr/share/lib/terminfo/d/darwin target=../x/xnuppc
+hardlink path=usr/share/lib/terminfo/d/darwin-100x37 target=../x/xnuppc-100x37
+hardlink path=usr/share/lib/terminfo/d/darwin-100x37-m \
+    target=../x/xnuppc-100x37-m
+hardlink path=usr/share/lib/terminfo/d/darwin-112x37 target=../x/xnuppc-112x37
+hardlink path=usr/share/lib/terminfo/d/darwin-112x37-m \
+    target=../x/xnuppc-112x37-m
+hardlink path=usr/share/lib/terminfo/d/darwin-128x40 target=../x/xnuppc-128x40
+hardlink path=usr/share/lib/terminfo/d/darwin-128x40-m \
+    target=../x/xnuppc-128x40-m
+hardlink path=usr/share/lib/terminfo/d/darwin-128x48 target=../x/xnuppc-128x48
+hardlink path=usr/share/lib/terminfo/d/darwin-128x48-m \
+    target=../x/xnuppc-128x48-m
+hardlink path=usr/share/lib/terminfo/d/darwin-144x48 target=../x/xnuppc-144x48
+hardlink path=usr/share/lib/terminfo/d/darwin-144x48-m \
+    target=../x/xnuppc-144x48-m
+hardlink path=usr/share/lib/terminfo/d/darwin-160x64 target=../x/xnuppc-160x64
+hardlink path=usr/share/lib/terminfo/d/darwin-160x64-m \
+    target=../x/xnuppc-160x64-m
+hardlink path=usr/share/lib/terminfo/d/darwin-200x64 target=../x/xnuppc-200x64
+hardlink path=usr/share/lib/terminfo/d/darwin-200x64-m \
+    target=../x/xnuppc-200x64-m
+hardlink path=usr/share/lib/terminfo/d/darwin-200x75 target=../x/xnuppc-200x75
+hardlink path=usr/share/lib/terminfo/d/darwin-200x75-m \
+    target=../x/xnuppc-200x75-m
+hardlink path=usr/share/lib/terminfo/d/darwin-256x96 target=../x/xnuppc-256x96
+hardlink path=usr/share/lib/terminfo/d/darwin-256x96-m \
+    target=../x/xnuppc-256x96-m
+hardlink path=usr/share/lib/terminfo/d/darwin-80x25 target=../x/xnuppc-80x25
+hardlink path=usr/share/lib/terminfo/d/darwin-80x25-m target=../x/xnuppc-80x25-m
+hardlink path=usr/share/lib/terminfo/d/darwin-80x30 target=../x/xnuppc-80x30
+hardlink path=usr/share/lib/terminfo/d/darwin-80x30-m target=../x/xnuppc-80x30-m
+hardlink path=usr/share/lib/terminfo/d/darwin-90x30 target=../x/xnuppc-90x30
+hardlink path=usr/share/lib/terminfo/d/darwin-90x30-m target=../x/xnuppc-90x30-m
+hardlink path=usr/share/lib/terminfo/d/darwin-b target=../x/xnuppc-b
+hardlink path=usr/share/lib/terminfo/d/darwin-f target=../x/xnuppc-f
+hardlink path=usr/share/lib/terminfo/d/darwin-f2 target=../x/xnuppc-f2
+hardlink path=usr/share/lib/terminfo/d/darwin-m target=../x/xnuppc-m
+hardlink path=usr/share/lib/terminfo/d/darwin-m-b target=../x/xnuppc-m-b
+hardlink path=usr/share/lib/terminfo/d/darwin-m-f target=../x/xnuppc-m-f
+hardlink path=usr/share/lib/terminfo/d/darwin-m-f2 target=../x/xnuppc-m-f2
+hardlink path=usr/share/lib/terminfo/d/datagraphix target=../d/d132
+hardlink path=usr/share/lib/terminfo/d/datamedia2500 target=../d/dm2500
+hardlink path=usr/share/lib/terminfo/d/datapoint target=../d/dp3360
+hardlink path=usr/share/lib/terminfo/d/dataspeed40 target=../t/tty40
+hardlink path=usr/share/lib/terminfo/d/dd5000 target=../d/delta
+file path=usr/share/lib/terminfo/d/ddr
+hardlink path=usr/share/lib/terminfo/d/ddr3180 target=../d/ddr
+file path=usr/share/lib/terminfo/d/dec-vt100
+file path=usr/share/lib/terminfo/d/dec-vt220
+hardlink path=usr/share/lib/terminfo/d/dec-vt330 target=../v/vt340
+hardlink path=usr/share/lib/terminfo/d/dec-vt340 target=../v/vt340
+hardlink path=usr/share/lib/terminfo/d/dec-vt400 target=../v/vt400
+file path=usr/share/lib/terminfo/d/decansi
+hardlink path=usr/share/lib/terminfo/d/decpro target=../p/pro350
+hardlink path=usr/share/lib/terminfo/d/decwriter target=../d/dw2
+file path=usr/share/lib/terminfo/d/delta
+file path=usr/share/lib/terminfo/d/dg+ccc
+file path=usr/share/lib/terminfo/d/dg+color
+file path=usr/share/lib/terminfo/d/dg+color8
+file path=usr/share/lib/terminfo/d/dg+fixed
+hardlink path=usr/share/lib/terminfo/d/dg-ansi target=../d/dg210
+file path=usr/share/lib/terminfo/d/dg-generic
+hardlink path=usr/share/lib/terminfo/d/dg100 target=../d/dg6053-old
+file path=usr/share/lib/terminfo/d/dg200
+file path=usr/share/lib/terminfo/d/dg210
+file path=usr/share/lib/terminfo/d/dg211
+file path=usr/share/lib/terminfo/d/dg450
+file path=usr/share/lib/terminfo/d/dg460-ansi
+file path=usr/share/lib/terminfo/d/dg6053
+file path=usr/share/lib/terminfo/d/dg6053-old
+hardlink path=usr/share/lib/terminfo/d/dg605x target=../d/dg6053
+hardlink path=usr/share/lib/terminfo/d/dg6134 target=../d/dg450
+file path=usr/share/lib/terminfo/d/dgkeys+11
+file path=usr/share/lib/terminfo/d/dgkeys+15
+file path=usr/share/lib/terminfo/d/dgkeys+7b
+file path=usr/share/lib/terminfo/d/dgkeys+8b
+file path=usr/share/lib/terminfo/d/dgmode+color
+file path=usr/share/lib/terminfo/d/dgmode+color8
+file path=usr/share/lib/terminfo/d/dgunix+ccc
+file path=usr/share/lib/terminfo/d/dgunix+fixed
+hardlink path=usr/share/lib/terminfo/d/diablo target=../d/diablo1640
+hardlink path=usr/share/lib/terminfo/d/diablo-lm target=../d/diablo1640-lm
+file path=usr/share/lib/terminfo/d/diablo1620
+file path=usr/share/lib/terminfo/d/diablo1620-m8
+file path=usr/share/lib/terminfo/d/diablo1640
+file path=usr/share/lib/terminfo/d/diablo1640-lm
+hardlink path=usr/share/lib/terminfo/d/diablo1640-m8 target=../d/diablo1620-m8
+hardlink path=usr/share/lib/terminfo/d/diablo1720 target=../d/diablo1620
+hardlink path=usr/share/lib/terminfo/d/diablo1730 target=../d/diablo1640
+hardlink path=usr/share/lib/terminfo/d/diablo1740 target=../d/diablo1640
+file path=usr/share/lib/terminfo/d/diablo1740-lm
+hardlink path=usr/share/lib/terminfo/d/diablo450 target=../d/diablo1620
+hardlink path=usr/share/lib/terminfo/d/diablo630 target=../d/diablo1640
+hardlink path=usr/share/lib/terminfo/d/dialogue target=../a/ampex80
+hardlink path=usr/share/lib/terminfo/d/dialogue80 target=../a/ampex80
+file path=usr/share/lib/terminfo/d/digilog
+file path=usr/share/lib/terminfo/d/djgpp
+file path=usr/share/lib/terminfo/d/djgpp203
+file path=usr/share/lib/terminfo/d/djgpp204
+file path=usr/share/lib/terminfo/d/dku7003
+file path=usr/share/lib/terminfo/d/dku7003-dumb
+hardlink path=usr/share/lib/terminfo/d/dku7102 target=../t/tws-generic
+file path=usr/share/lib/terminfo/d/dku7102-old
+hardlink path=usr/share/lib/terminfo/d/dku7102-sna target=../t/tws2102-sna
+hardlink path=usr/share/lib/terminfo/d/dku7103-sna target=../t/tws2103-sna
+file path=usr/share/lib/terminfo/d/dku7202
+file path=usr/share/lib/terminfo/d/dm1520
+hardlink path=usr/share/lib/terminfo/d/dm1521 target=../d/dm1520
+file path=usr/share/lib/terminfo/d/dm2500
+file path=usr/share/lib/terminfo/d/dm3025
+file path=usr/share/lib/terminfo/d/dm3045
+file path=usr/share/lib/terminfo/d/dm80
+file path=usr/share/lib/terminfo/d/dm80w
+file path=usr/share/lib/terminfo/d/dmchat
+hardlink path=usr/share/lib/terminfo/d/dmd target=../a/att5620
+hardlink path=usr/share/lib/terminfo/d/dmd-24 target=../a/att5620-24
+hardlink path=usr/share/lib/terminfo/d/dmd-34 target=../a/att5620-34
+hardlink path=usr/share/lib/terminfo/d/dmd1 target=../a/att5620-1
+hardlink path=usr/share/lib/terminfo/d/dmdt80 target=../d/dm80
+hardlink path=usr/share/lib/terminfo/d/dmdt80w target=../d/dm80w
+file path=usr/share/lib/terminfo/d/dmterm
+file path=usr/share/lib/terminfo/d/dp3360
+file path=usr/share/lib/terminfo/d/dp8242
+hardlink path=usr/share/lib/terminfo/d/ds40 target=../t/tty40
+hardlink path=usr/share/lib/terminfo/d/ds40-2 target=../t/tty40
+hardlink path=usr/share/lib/terminfo/d/dt-100 target=../d/dt100
+hardlink path=usr/share/lib/terminfo/d/dt-100w target=../d/dt100w
+file path=usr/share/lib/terminfo/d/dt100
+file path=usr/share/lib/terminfo/d/dt100w
+file path=usr/share/lib/terminfo/d/dt110
+hardlink path=usr/share/lib/terminfo/d/dt80 target=../d/dm80
+file path=usr/share/lib/terminfo/d/dt80-sas
+hardlink path=usr/share/lib/terminfo/d/dt80w target=../d/dm80w
+file path=usr/share/lib/terminfo/d/dtc300s
+file path=usr/share/lib/terminfo/d/dtc382
+file path=usr/share/lib/terminfo/d/dtterm
+file path=usr/share/lib/terminfo/d/dumb
+hardlink path=usr/share/lib/terminfo/d/dw target=../d/dw2
+file path=usr/share/lib/terminfo/d/dw1
+file path=usr/share/lib/terminfo/d/dw2
+file path=usr/share/lib/terminfo/d/dw3
+file path=usr/share/lib/terminfo/d/dw4
+file path=usr/share/lib/terminfo/d/dwk
+hardlink path=usr/share/lib/terminfo/d/dwk-vt target=../d/dwk
+dir  path=usr/share/lib/terminfo/e
+file path=usr/share/lib/terminfo/e/ecma+color
+file path=usr/share/lib/terminfo/e/ecma+sgr
+file path=usr/share/lib/terminfo/e/elks
+file path=usr/share/lib/terminfo/e/elks-ansi
+file path=usr/share/lib/terminfo/e/elks-glasstty
+file path=usr/share/lib/terminfo/e/elks-vt52
+hardlink path=usr/share/lib/terminfo/e/emots target=../g/gs6300
+file path=usr/share/lib/terminfo/e/emu
+file path=usr/share/lib/terminfo/e/emu-220
+file path=usr/share/lib/terminfo/e/emx-base
+file path=usr/share/lib/terminfo/e/env230
+hardlink path=usr/share/lib/terminfo/e/envision230 target=../e/env230
+file path=usr/share/lib/terminfo/e/ep40
+hardlink path=usr/share/lib/terminfo/e/ep4000 target=../e/ep40
+hardlink path=usr/share/lib/terminfo/e/ep4080 target=../e/ep48
+file path=usr/share/lib/terminfo/e/ep48
+file path=usr/share/lib/terminfo/e/ergo4000
+file path=usr/share/lib/terminfo/e/esprit
+file path=usr/share/lib/terminfo/e/esprit-am
+file path=usr/share/lib/terminfo/e/eterm
+file path=usr/share/lib/terminfo/e/eterm-color
+file path=usr/share/lib/terminfo/e/ex155
+file path=usr/share/lib/terminfo/e/excel62
+file path=usr/share/lib/terminfo/e/excel62-rv
+file path=usr/share/lib/terminfo/e/excel62-w
+hardlink path=usr/share/lib/terminfo/e/excel64 target=../e/excel62
+hardlink path=usr/share/lib/terminfo/e/excel64-rv target=../e/excel62-rv
+hardlink path=usr/share/lib/terminfo/e/excel64-w target=../e/excel62-w
+hardlink path=usr/share/lib/terminfo/e/exec80 target=../h/hazel
+dir  path=usr/share/lib/terminfo/f
+file path=usr/share/lib/terminfo/f/f100
+file path=usr/share/lib/terminfo/f/f100-rv
+file path=usr/share/lib/terminfo/f/f110
+file path=usr/share/lib/terminfo/f/f110-14
+file path=usr/share/lib/terminfo/f/f110-14w
+file path=usr/share/lib/terminfo/f/f110-w
+file path=usr/share/lib/terminfo/f/f1720
+hardlink path=usr/share/lib/terminfo/f/f1720a target=../f/f1720
+file path=usr/share/lib/terminfo/f/f200
+file path=usr/share/lib/terminfo/f/f200-w
+file path=usr/share/lib/terminfo/f/f200vi
+file path=usr/share/lib/terminfo/f/f200vi-w
+file path=usr/share/lib/terminfo/f/falco
+file path=usr/share/lib/terminfo/f/falco-p
+hardlink path=usr/share/lib/terminfo/f/fenix target=../p/pt100
+hardlink path=usr/share/lib/terminfo/f/fenixw target=../p/pt100w
+hardlink path=usr/share/lib/terminfo/f/fixterm target=../c/cbblit
+hardlink path=usr/share/lib/terminfo/f/fortune target=../f/fos
+file path=usr/share/lib/terminfo/f/fos
+file path=usr/share/lib/terminfo/f/fox
+hardlink path=usr/share/lib/terminfo/f/freedom target=../f/f100
+hardlink path=usr/share/lib/terminfo/f/freedom-rv target=../f/f100-rv
+hardlink path=usr/share/lib/terminfo/f/freedom100 target=../f/f100
+hardlink path=usr/share/lib/terminfo/f/freedom110 target=../f/f110
+hardlink path=usr/share/lib/terminfo/f/freedom200 target=../f/f200
+dir  path=usr/share/lib/terminfo/g
+file path=usr/share/lib/terminfo/g/gator
+file path=usr/share/lib/terminfo/g/gator-52
+file path=usr/share/lib/terminfo/g/gator-52t
+file path=usr/share/lib/terminfo/g/gator-t
+file path=usr/share/lib/terminfo/g/gigi
+file path=usr/share/lib/terminfo/g/glasstty
+file path=usr/share/lib/terminfo/g/gnome
+file path=usr/share/lib/terminfo/g/gnome+pcfkeys
+file path=usr/share/lib/terminfo/g/gnome-2007
+file path=usr/share/lib/terminfo/g/gnome-2008
+file path=usr/share/lib/terminfo/g/gnome-256color
+file path=usr/share/lib/terminfo/g/gnome-fc5
+file path=usr/share/lib/terminfo/g/gnome-rh62
+file path=usr/share/lib/terminfo/g/gnome-rh72
+file path=usr/share/lib/terminfo/g/gnome-rh80
+file path=usr/share/lib/terminfo/g/gnome-rh90
+hardlink path=usr/share/lib/terminfo/g/go-225 target=../g/go225
+file path=usr/share/lib/terminfo/g/go140
+file path=usr/share/lib/terminfo/g/go140w
+file path=usr/share/lib/terminfo/g/go225
+file path=usr/share/lib/terminfo/g/graphos
+file path=usr/share/lib/terminfo/g/graphos-30
+hardlink path=usr/share/lib/terminfo/g/gs5430 target=../a/att505
+hardlink path=usr/share/lib/terminfo/g/gs5430-22 target=../t/tt505-22
+hardlink path=usr/share/lib/terminfo/g/gs5430-24 target=../a/att505-24
+file path=usr/share/lib/terminfo/g/gs6300
+file path=usr/share/lib/terminfo/g/gsi
+hardlink path=usr/share/lib/terminfo/g/gt100 target=../i/i100
+hardlink path=usr/share/lib/terminfo/g/gt100a target=../i/i100
+file path=usr/share/lib/terminfo/g/gt40
+file path=usr/share/lib/terminfo/g/gt42
+file path=usr/share/lib/terminfo/g/guru
+file path=usr/share/lib/terminfo/g/guru+rv
+file path=usr/share/lib/terminfo/g/guru+s
+hardlink path=usr/share/lib/terminfo/g/guru+unk target=../g/guru
+file path=usr/share/lib/terminfo/g/guru-24
+hardlink path=usr/share/lib/terminfo/g/guru-33 target=../g/guru
+hardlink path=usr/share/lib/terminfo/g/guru-33-rv target=../g/guru-rv
+hardlink path=usr/share/lib/terminfo/g/guru-33-s target=../g/guru-s
+file path=usr/share/lib/terminfo/g/guru-44
+file path=usr/share/lib/terminfo/g/guru-44-s
+file path=usr/share/lib/terminfo/g/guru-76
+file path=usr/share/lib/terminfo/g/guru-76-lp
+file path=usr/share/lib/terminfo/g/guru-76-s
+file path=usr/share/lib/terminfo/g/guru-76-w
+file path=usr/share/lib/terminfo/g/guru-76-w-s
+file path=usr/share/lib/terminfo/g/guru-76-wm
+hardlink path=usr/share/lib/terminfo/g/guru-lp target=../g/guru-76-lp
+file path=usr/share/lib/terminfo/g/guru-nctxt
+file path=usr/share/lib/terminfo/g/guru-rv
+file path=usr/share/lib/terminfo/g/guru-s
+dir  path=usr/share/lib/terminfo/h
+hardlink path=usr/share/lib/terminfo/h/h-100 target=../z/z100
+hardlink path=usr/share/lib/terminfo/h/h-100bw target=../z/z100bw
+hardlink path=usr/share/lib/terminfo/h/h100 target=../z/z100
+hardlink path=usr/share/lib/terminfo/h/h100bw target=../z/z100bw
+file path=usr/share/lib/terminfo/h/h19
+file path=usr/share/lib/terminfo/h/h19-a
+hardlink path=usr/share/lib/terminfo/h/h19-b target=../h/h19
+file path=usr/share/lib/terminfo/h/h19-bs
+file path=usr/share/lib/terminfo/h/h19-g
+hardlink path=usr/share/lib/terminfo/h/h19-smul target=../h/h19-us
+file path=usr/share/lib/terminfo/h/h19-u
+file path=usr/share/lib/terminfo/h/h19-us
+hardlink path=usr/share/lib/terminfo/h/h19a target=../h/h19-a
+hardlink path=usr/share/lib/terminfo/h/h19g target=../h/h19-g
+file path=usr/share/lib/terminfo/h/h19k
+hardlink path=usr/share/lib/terminfo/h/h19kermit target=../h/h19k
+hardlink path=usr/share/lib/terminfo/h/h19us target=../h/h19-us
+hardlink path=usr/share/lib/terminfo/h/h29a-kc-bc target=../z/z29a
+hardlink path=usr/share/lib/terminfo/h/h29a-kc-uc target=../z/z29a-kc-uc
+hardlink path=usr/share/lib/terminfo/h/h29a-nkc-bc target=../z/z29a-nkc-bc
+hardlink path=usr/share/lib/terminfo/h/h29a-nkc-uc target=../z/z29a-nkc-uc
+hardlink path=usr/share/lib/terminfo/h/h80 target=../h/hazel
+file path=usr/share/lib/terminfo/h/ha8675
+file path=usr/share/lib/terminfo/h/ha8686
+file path=usr/share/lib/terminfo/h/hazel
+file path=usr/share/lib/terminfo/h/hds200
+hardlink path=usr/share/lib/terminfo/h/he80 target=../h/hazel
+hardlink path=usr/share/lib/terminfo/h/heath target=../h/h19
+hardlink path=usr/share/lib/terminfo/h/heath-19 target=../h/h19
+hardlink path=usr/share/lib/terminfo/h/heath-ansi target=../h/h19-a
+hardlink path=usr/share/lib/terminfo/h/heathkit target=../h/h19
+hardlink path=usr/share/lib/terminfo/h/heathkit-a target=../h/h19-a
+hardlink path=usr/share/lib/terminfo/h/hft target=../i/ibm5081
+file path=usr/share/lib/terminfo/h/hft-c
+file path=usr/share/lib/terminfo/h/hft-c-old
+file path=usr/share/lib/terminfo/h/hft-old
+file path=usr/share/lib/terminfo/h/hirez100
+file path=usr/share/lib/terminfo/h/hirez100-w
+file path=usr/share/lib/terminfo/h/hmod1
+hardlink path=usr/share/lib/terminfo/h/hp target=../h/hpgeneric
+file path=usr/share/lib/terminfo/h/hp+arrows
+file path=usr/share/lib/terminfo/h/hp+color
+file path=usr/share/lib/terminfo/h/hp+labels
+file path=usr/share/lib/terminfo/h/hp+pfk+arrows
+file path=usr/share/lib/terminfo/h/hp+pfk+cr
+file path=usr/share/lib/terminfo/h/hp+pfk-cr
+file path=usr/share/lib/terminfo/h/hp+printer
+file path=usr/share/lib/terminfo/h/hp110
+file path=usr/share/lib/terminfo/h/hp150
+file path=usr/share/lib/terminfo/h/hp2
+file path=usr/share/lib/terminfo/h/hp236
+hardlink path=usr/share/lib/terminfo/h/hp2382 target=../h/hp2382a
+file path=usr/share/lib/terminfo/h/hp2382a
+file path=usr/share/lib/terminfo/h/hp2392
+hardlink path=usr/share/lib/terminfo/h/hp2397 target=../h/hp2397a
+file path=usr/share/lib/terminfo/h/hp2397a
+file path=usr/share/lib/terminfo/h/hp2621
+file path=usr/share/lib/terminfo/h/hp2621-48
+file path=usr/share/lib/terminfo/h/hp2621-a
+file path=usr/share/lib/terminfo/h/hp2621-ba
+file path=usr/share/lib/terminfo/h/hp2621-fl
+file path=usr/share/lib/terminfo/h/hp2621-k45
+file path=usr/share/lib/terminfo/h/hp2621-nl
+file path=usr/share/lib/terminfo/h/hp2621-nt
+hardlink path=usr/share/lib/terminfo/h/hp2621-wl target=../h/hp2621
+hardlink path=usr/share/lib/terminfo/h/hp2621A target=../h/hp2621
+hardlink path=usr/share/lib/terminfo/h/hp2621a target=../h/hp2621
+hardlink path=usr/share/lib/terminfo/h/hp2621a-a target=../h/hp2621-a
+file path=usr/share/lib/terminfo/h/hp2621b
+file path=usr/share/lib/terminfo/h/hp2621b-kx
+file path=usr/share/lib/terminfo/h/hp2621b-kx-p
+file path=usr/share/lib/terminfo/h/hp2621b-p
+hardlink path=usr/share/lib/terminfo/h/hp2621k45 target=../h/hp2621-k45
+file path=usr/share/lib/terminfo/h/hp2621p
+file path=usr/share/lib/terminfo/h/hp2621p-a
+file path=usr/share/lib/terminfo/h/hp2622
+hardlink path=usr/share/lib/terminfo/h/hp2622a target=../h/hp2622
+file path=usr/share/lib/terminfo/h/hp2623
+hardlink path=usr/share/lib/terminfo/h/hp2623a target=../h/hp2623
+file path=usr/share/lib/terminfo/h/hp2624
+file path=usr/share/lib/terminfo/h/hp2624-10p
+hardlink path=usr/share/lib/terminfo/h/hp2624a target=../h/hp2624
+hardlink path=usr/share/lib/terminfo/h/hp2624a-10p target=../h/hp2624-10p
+hardlink path=usr/share/lib/terminfo/h/hp2624b target=../h/hp2624
+hardlink path=usr/share/lib/terminfo/h/hp2624b-10p target=../h/hp2624-10p
+file path=usr/share/lib/terminfo/h/hp2624b-10p-p
+hardlink path=usr/share/lib/terminfo/h/hp2624b-4p target=../h/hp2624
+hardlink path=usr/share/lib/terminfo/h/hp2624b-4p-p target=../h/hp2624b-p
+file path=usr/share/lib/terminfo/h/hp2624b-p
+file path=usr/share/lib/terminfo/h/hp2626
+file path=usr/share/lib/terminfo/h/hp2626-12
+file path=usr/share/lib/terminfo/h/hp2626-12-s
+file path=usr/share/lib/terminfo/h/hp2626-12x40
+file path=usr/share/lib/terminfo/h/hp2626-ns
+file path=usr/share/lib/terminfo/h/hp2626-s
+file path=usr/share/lib/terminfo/h/hp2626-x40
+hardlink path=usr/share/lib/terminfo/h/hp2626a target=../h/hp2626
+hardlink path=usr/share/lib/terminfo/h/hp2626p target=../h/hp2626
+file path=usr/share/lib/terminfo/h/hp2627a
+file path=usr/share/lib/terminfo/h/hp2627a-rev
+file path=usr/share/lib/terminfo/h/hp2627c
+file path=usr/share/lib/terminfo/h/hp262x
+file path=usr/share/lib/terminfo/h/hp2640a
+file path=usr/share/lib/terminfo/h/hp2640b
+file path=usr/share/lib/terminfo/h/hp2641a
+hardlink path=usr/share/lib/terminfo/h/hp2644a target=../h/hp2640b
+file path=usr/share/lib/terminfo/h/hp2645
+hardlink path=usr/share/lib/terminfo/h/hp2645a target=../h/hp2641a
+hardlink path=usr/share/lib/terminfo/h/hp2647a target=../h/hp2641a
+file path=usr/share/lib/terminfo/h/hp2648
+hardlink path=usr/share/lib/terminfo/h/hp2648a target=../h/hp2648
+file path=usr/share/lib/terminfo/h/hp300h
+hardlink path=usr/share/lib/terminfo/h/hp45 target=../h/hp2645
+hardlink path=usr/share/lib/terminfo/h/hp700 target=../h/hpansi
+file path=usr/share/lib/terminfo/h/hp700-wy
+file path=usr/share/lib/terminfo/h/hp70092
+hardlink path=usr/share/lib/terminfo/h/hp70092A target=../h/hp70092
+hardlink path=usr/share/lib/terminfo/h/hp70092a target=../h/hp70092
+file path=usr/share/lib/terminfo/h/hp9837
+file path=usr/share/lib/terminfo/h/hp9845
+file path=usr/share/lib/terminfo/h/hp98550
+hardlink path=usr/share/lib/terminfo/h/hp98550a target=../h/hp98550
+hardlink path=usr/share/lib/terminfo/h/hp98720 target=../h/hp9837
+hardlink path=usr/share/lib/terminfo/h/hp98721 target=../h/hp9837
+file path=usr/share/lib/terminfo/h/hpansi
+file path=usr/share/lib/terminfo/h/hpex
+hardlink path=usr/share/lib/terminfo/h/hpex2 target=../h/hp2
+file path=usr/share/lib/terminfo/h/hpgeneric
+file path=usr/share/lib/terminfo/h/hpsub
+file path=usr/share/lib/terminfo/h/hpterm
+file path=usr/share/lib/terminfo/h/hpterm-color
+hardlink path=usr/share/lib/terminfo/h/htx11 target=../z/ztx
+file path=usr/share/lib/terminfo/h/hurd
+file path=usr/share/lib/terminfo/h/hz1000
+file path=usr/share/lib/terminfo/h/hz1420
+file path=usr/share/lib/terminfo/h/hz1500
+file path=usr/share/lib/terminfo/h/hz1510
+file path=usr/share/lib/terminfo/h/hz1520
+file path=usr/share/lib/terminfo/h/hz1520-noesc
+file path=usr/share/lib/terminfo/h/hz1552
+file path=usr/share/lib/terminfo/h/hz1552-rv
+file path=usr/share/lib/terminfo/h/hz2000
+dir  path=usr/share/lib/terminfo/i
+file path=usr/share/lib/terminfo/i/i100
+hardlink path=usr/share/lib/terminfo/i/i3101 target=../i/ibm3101
+hardlink path=usr/share/lib/terminfo/i/i3164 target=../i/ibm3164
+file path=usr/share/lib/terminfo/i/i400
+file path=usr/share/lib/terminfo/i/iTerm.app
+file path=usr/share/lib/terminfo/i/ibcs2
+file path=usr/share/lib/terminfo/i/ibm+16color
+file path=usr/share/lib/terminfo/i/ibm+color
+file path=usr/share/lib/terminfo/i/ibm-apl
+file path=usr/share/lib/terminfo/i/ibm-pc
+file path=usr/share/lib/terminfo/i/ibm-system1
+file path=usr/share/lib/terminfo/i/ibm3101
+file path=usr/share/lib/terminfo/i/ibm3151
+file path=usr/share/lib/terminfo/i/ibm3161
+file path=usr/share/lib/terminfo/i/ibm3161-C
+file path=usr/share/lib/terminfo/i/ibm3162
+hardlink path=usr/share/lib/terminfo/i/ibm3163 target=../i/ibm3161
+file path=usr/share/lib/terminfo/i/ibm3164
+file path=usr/share/lib/terminfo/i/ibm327x
+hardlink path=usr/share/lib/terminfo/i/ibm5051 target=../i/ibm-pc
+file path=usr/share/lib/terminfo/i/ibm5081
+file path=usr/share/lib/terminfo/i/ibm5081-c
+file path=usr/share/lib/terminfo/i/ibm5151
+file path=usr/share/lib/terminfo/i/ibm5154
+hardlink path=usr/share/lib/terminfo/i/ibm5154-c target=../i/ibmega-c
+file path=usr/share/lib/terminfo/i/ibm6153
+file path=usr/share/lib/terminfo/i/ibm6153-40
+file path=usr/share/lib/terminfo/i/ibm6153-90
+file path=usr/share/lib/terminfo/i/ibm6154
+hardlink path=usr/share/lib/terminfo/i/ibm6154-c target=../i/ibmapa8c-c
+file path=usr/share/lib/terminfo/i/ibm6155
+file path=usr/share/lib/terminfo/i/ibm8503
+hardlink path=usr/share/lib/terminfo/i/ibm8507 target=../i/ibm8503
+file path=usr/share/lib/terminfo/i/ibm8512
+hardlink path=usr/share/lib/terminfo/i/ibm8513 target=../i/ibm8512
+file path=usr/share/lib/terminfo/i/ibm8514
+file path=usr/share/lib/terminfo/i/ibm8514-c
+hardlink path=usr/share/lib/terminfo/i/ibm8604 target=../i/ibm8503
+file path=usr/share/lib/terminfo/i/ibmaed
+hardlink path=usr/share/lib/terminfo/i/ibmapa16 target=../r/rtpc
+hardlink path=usr/share/lib/terminfo/i/ibmapa8 target=../i/ibmapa8c
+file path=usr/share/lib/terminfo/i/ibmapa8c
+file path=usr/share/lib/terminfo/i/ibmapa8c-c
+file path=usr/share/lib/terminfo/i/ibmega
+file path=usr/share/lib/terminfo/i/ibmega-c
+file path=usr/share/lib/terminfo/i/ibmmono
+hardlink path=usr/share/lib/terminfo/i/ibmmpel-c target=../i/ibm5081-c
+file path=usr/share/lib/terminfo/i/ibmpc
+file path=usr/share/lib/terminfo/i/ibmpc3
+hardlink path=usr/share/lib/terminfo/i/ibmpc3r target=../c/cons25r
+hardlink path=usr/share/lib/terminfo/i/ibmpc3r-mono target=../c/cons25r-m
+file path=usr/share/lib/terminfo/i/ibmpcx
+file path=usr/share/lib/terminfo/i/ibmvga
+file path=usr/share/lib/terminfo/i/ibmvga-c
+hardlink path=usr/share/lib/terminfo/i/ibmx target=../i/ibmpcx
+hardlink path=usr/share/lib/terminfo/i/icl6402 target=../i/icl6404
+file path=usr/share/lib/terminfo/i/icl6404
+file path=usr/share/lib/terminfo/i/icl6404-w
+file path=usr/share/lib/terminfo/i/ifmr
+file path=usr/share/lib/terminfo/i/ims-ansi
+file path=usr/share/lib/terminfo/i/ims950
+file path=usr/share/lib/terminfo/i/ims950-b
+file path=usr/share/lib/terminfo/i/ims950-rv
+file path=usr/share/lib/terminfo/i/infoton
+file path=usr/share/lib/terminfo/i/interix
+file path=usr/share/lib/terminfo/i/interix-nti
+hardlink path=usr/share/lib/terminfo/i/intertec target=../i/intertube
+file path=usr/share/lib/terminfo/i/intertube
+file path=usr/share/lib/terminfo/i/intertube2
+file path=usr/share/lib/terminfo/i/intext
+file path=usr/share/lib/terminfo/i/intext2
+hardlink path=usr/share/lib/terminfo/i/intextii target=../i/intext2
+hardlink path=usr/share/lib/terminfo/i/ips target=../c/citoh-prop
+hardlink path=usr/share/lib/terminfo/i/ipsi target=../d/diablo1620
+hardlink path=usr/share/lib/terminfo/i/iq120 target=../s/soroc120
+hardlink path=usr/share/lib/terminfo/i/iq140 target=../s/soroc140
+file path=usr/share/lib/terminfo/i/iris-ansi
+file path=usr/share/lib/terminfo/i/iris-ansi-ap
+hardlink path=usr/share/lib/terminfo/i/iris-ansi-net target=../i/iris-ansi
+file path=usr/share/lib/terminfo/i/iris-color
+hardlink path=usr/share/lib/terminfo/i/iris40 target=../w/wsiris
+dir  path=usr/share/lib/terminfo/j
+file path=usr/share/lib/terminfo/j/jaixterm
+file path=usr/share/lib/terminfo/j/jaixterm-m
+hardlink path=usr/share/lib/terminfo/j/jerq target=../b/blit
+hardlink path=usr/share/lib/terminfo/j/jfbterm target=../k/kon
+dir  path=usr/share/lib/terminfo/k
+hardlink path=usr/share/lib/terminfo/k/k45 target=../h/hp2621-k45
+file path=usr/share/lib/terminfo/k/kaypro
+hardlink path=usr/share/lib/terminfo/k/kaypro2 target=../k/kaypro
+hardlink path=usr/share/lib/terminfo/k/kds6402 target=../i/icl6404
+hardlink path=usr/share/lib/terminfo/k/kds7372 target=../i/icl6404
+hardlink path=usr/share/lib/terminfo/k/kds7372-w target=../i/icl6404-w
+file path=usr/share/lib/terminfo/k/kermit
+file path=usr/share/lib/terminfo/k/kermit-am
+file path=usr/share/lib/terminfo/k/klone+acs
+file path=usr/share/lib/terminfo/k/klone+color
+file path=usr/share/lib/terminfo/k/klone+koi8acs
+file path=usr/share/lib/terminfo/k/klone+sgr
+file path=usr/share/lib/terminfo/k/klone+sgr-dumb
+file path=usr/share/lib/terminfo/k/klone+sgr8
+file path=usr/share/lib/terminfo/k/kon
+hardlink path=usr/share/lib/terminfo/k/kon2 target=../k/kon
+file path=usr/share/lib/terminfo/k/konsole
+file path=usr/share/lib/terminfo/k/konsole+pcfkeys
+file path=usr/share/lib/terminfo/k/konsole-16color
+file path=usr/share/lib/terminfo/k/konsole-256color
+file path=usr/share/lib/terminfo/k/konsole-base
+file path=usr/share/lib/terminfo/k/konsole-linux
+file path=usr/share/lib/terminfo/k/konsole-solaris
+file path=usr/share/lib/terminfo/k/konsole-vt100
+file path=usr/share/lib/terminfo/k/konsole-vt420pc
+file path=usr/share/lib/terminfo/k/konsole-xf3x
+file path=usr/share/lib/terminfo/k/konsole-xf4x
+file path=usr/share/lib/terminfo/k/kt7
+file path=usr/share/lib/terminfo/k/kt7ix
+file path=usr/share/lib/terminfo/k/kterm
+hardlink path=usr/share/lib/terminfo/k/kterm-co target=../k/kterm-color
+file path=usr/share/lib/terminfo/k/kterm-color
+hardlink path=usr/share/lib/terminfo/k/ktm target=../s/synertek
+file path=usr/share/lib/terminfo/k/kvt
+dir  path=usr/share/lib/terminfo/l
+hardlink path=usr/share/lib/terminfo/l/la120 target=../d/dw3
+hardlink path=usr/share/lib/terminfo/l/layer target=../a/att5620-s
+file path=usr/share/lib/terminfo/l/lft
+hardlink path=usr/share/lib/terminfo/l/lft-pc850 target=../l/lft
+file path=usr/share/lib/terminfo/l/linux
+file path=usr/share/lib/terminfo/l/linux-16color
+file path=usr/share/lib/terminfo/l/linux-basic
+file path=usr/share/lib/terminfo/l/linux-c
+file path=usr/share/lib/terminfo/l/linux-c-nc
+file path=usr/share/lib/terminfo/l/linux-koi8
+file path=usr/share/lib/terminfo/l/linux-koi8r
+file path=usr/share/lib/terminfo/l/linux-lat
+file path=usr/share/lib/terminfo/l/linux-m
+file path=usr/share/lib/terminfo/l/linux-nic
+file path=usr/share/lib/terminfo/l/linux-vt
+file path=usr/share/lib/terminfo/l/linux2.2
+file path=usr/share/lib/terminfo/l/linux2.6
+file path=usr/share/lib/terminfo/l/linux2.6.26
+file path=usr/share/lib/terminfo/l/linux3.0
+file path=usr/share/lib/terminfo/l/lisa
+file path=usr/share/lib/terminfo/l/lisaterm
+file path=usr/share/lib/terminfo/l/lisaterm-w
+file path=usr/share/lib/terminfo/l/liswb
+file path=usr/share/lib/terminfo/l/ln03
+file path=usr/share/lib/terminfo/l/ln03-w
+file path=usr/share/lib/terminfo/l/lpr
+file path=usr/share/lib/terminfo/l/luna
+hardlink path=usr/share/lib/terminfo/l/luna68k target=../l/luna
+dir  path=usr/share/lib/terminfo/m
+file path=usr/share/lib/terminfo/m/m2-nam
+file path=usr/share/lib/terminfo/m/mac
+file path=usr/share/lib/terminfo/m/mac-w
+file path=usr/share/lib/terminfo/m/mach
+file path=usr/share/lib/terminfo/m/mach-bold
+file path=usr/share/lib/terminfo/m/mach-color
+hardlink path=usr/share/lib/terminfo/m/macintosh target=../m/mac
+hardlink path=usr/share/lib/terminfo/m/macterminal-w target=../m/mac-w
+file path=usr/share/lib/terminfo/m/mai
+file path=usr/share/lib/terminfo/m/masscomp
+file path=usr/share/lib/terminfo/m/masscomp1
+file path=usr/share/lib/terminfo/m/masscomp2
+hardlink path=usr/share/lib/terminfo/m/mdl110 target=../c/cyb110
+file path=usr/share/lib/terminfo/m/megatek
+file path=usr/share/lib/terminfo/m/memhp
+file path=usr/share/lib/terminfo/m/mgr
+file path=usr/share/lib/terminfo/m/mgr-linux
+file path=usr/share/lib/terminfo/m/mgr-sun
+file path=usr/share/lib/terminfo/m/mgt
+file path=usr/share/lib/terminfo/m/mgterm
+file path=usr/share/lib/terminfo/m/microb
+hardlink path=usr/share/lib/terminfo/m/microbee target=../m/microb
+hardlink path=usr/share/lib/terminfo/m/microterm target=../a/act4
+hardlink path=usr/share/lib/terminfo/m/microterm5 target=../a/act5
+file path=usr/share/lib/terminfo/m/mime
+hardlink path=usr/share/lib/terminfo/m/mime-3ax target=../m/mime3ax
+file path=usr/share/lib/terminfo/m/mime-fb
+file path=usr/share/lib/terminfo/m/mime-hb
+hardlink path=usr/share/lib/terminfo/m/mime1 target=../m/mime
+hardlink path=usr/share/lib/terminfo/m/mime2 target=../m/mime
+file path=usr/share/lib/terminfo/m/mime2a
+file path=usr/share/lib/terminfo/m/mime2a-s
+hardlink path=usr/share/lib/terminfo/m/mime2a-v target=../m/mime2a
+file path=usr/share/lib/terminfo/m/mime314
+hardlink path=usr/share/lib/terminfo/m/mime340 target=../m/mm340
+file path=usr/share/lib/terminfo/m/mime3a
+file path=usr/share/lib/terminfo/m/mime3ax
+hardlink path=usr/share/lib/terminfo/m/mimei target=../m/mime
+hardlink path=usr/share/lib/terminfo/m/mimeii target=../m/mime
+hardlink path=usr/share/lib/terminfo/m/minitel target=../m/m2-nam
+hardlink path=usr/share/lib/terminfo/m/minitel-2 target=../m/m2-nam
+hardlink path=usr/share/lib/terminfo/m/minitel-2-nam target=../m/m2-nam
+file path=usr/share/lib/terminfo/m/minitel1
+file path=usr/share/lib/terminfo/m/minitel1b
+file path=usr/share/lib/terminfo/m/minitel1b-80
+file path=usr/share/lib/terminfo/m/minix
+hardlink path=usr/share/lib/terminfo/m/minix-1.5 target=../m/minix-old
+file path=usr/share/lib/terminfo/m/minix-1.7
+file path=usr/share/lib/terminfo/m/minix-3.0
+file path=usr/share/lib/terminfo/m/minix-old
+file path=usr/share/lib/terminfo/m/minix-old-am
+file path=usr/share/lib/terminfo/m/mlterm
+file path=usr/share/lib/terminfo/m/mlterm+pcfkeys
+file path=usr/share/lib/terminfo/m/mlterm-256color
+hardlink path=usr/share/lib/terminfo/m/mm314 target=../m/mime314
+file path=usr/share/lib/terminfo/m/mm340
+hardlink path=usr/share/lib/terminfo/m/mod target=../m/modgraph48
+hardlink path=usr/share/lib/terminfo/m/mod24 target=../m/modgraph
+file path=usr/share/lib/terminfo/m/modgraph
+file path=usr/share/lib/terminfo/m/modgraph2
+file path=usr/share/lib/terminfo/m/modgraph48
+file path=usr/share/lib/terminfo/m/mono-emx
+file path=usr/share/lib/terminfo/m/morphos
+hardlink path=usr/share/lib/terminfo/m/mouse-sun target=../m/mterm
+file path=usr/share/lib/terminfo/m/mrxvt
+file path=usr/share/lib/terminfo/m/mrxvt-256color
+file path=usr/share/lib/terminfo/m/ms-vt-utf8
+file path=usr/share/lib/terminfo/m/ms-vt100
+file path=usr/share/lib/terminfo/m/ms-vt100+
+file path=usr/share/lib/terminfo/m/ms-vt100-color
+file path=usr/share/lib/terminfo/m/msk227
+file path=usr/share/lib/terminfo/m/msk22714
+file path=usr/share/lib/terminfo/m/msk227am
+hardlink path=usr/share/lib/terminfo/m/mskermit227 target=../m/msk227
+hardlink path=usr/share/lib/terminfo/m/mskermit22714 target=../m/msk22714
+hardlink path=usr/share/lib/terminfo/m/mskermit227am target=../m/msk227am
+hardlink path=usr/share/lib/terminfo/m/mt-70 target=../m/mt70
+file path=usr/share/lib/terminfo/m/mt4520-rv
+file path=usr/share/lib/terminfo/m/mt70
+file path=usr/share/lib/terminfo/m/mterm
+file path=usr/share/lib/terminfo/m/mterm-ansi
+file path=usr/share/lib/terminfo/m/mvterm
+dir  path=usr/share/lib/terminfo/n
+file path=usr/share/lib/terminfo/n/nansi.sys
+file path=usr/share/lib/terminfo/n/nansi.sysk
+hardlink path=usr/share/lib/terminfo/n/nansisys target=../n/nansi.sys
+hardlink path=usr/share/lib/terminfo/n/nansisysk target=../n/nansi.sysk
+file path=usr/share/lib/terminfo/n/ncr160vppp
+file path=usr/share/lib/terminfo/n/ncr160vpwpp
+file path=usr/share/lib/terminfo/n/ncr160vt100an
+file path=usr/share/lib/terminfo/n/ncr160vt100pp
+file path=usr/share/lib/terminfo/n/ncr160vt100wan
+file path=usr/share/lib/terminfo/n/ncr160vt100wpp
+file path=usr/share/lib/terminfo/n/ncr160vt200an
+file path=usr/share/lib/terminfo/n/ncr160vt200pp
+file path=usr/share/lib/terminfo/n/ncr160vt200wan
+file path=usr/share/lib/terminfo/n/ncr160vt200wpp
+file path=usr/share/lib/terminfo/n/ncr160vt300an
+file path=usr/share/lib/terminfo/n/ncr160vt300pp
+file path=usr/share/lib/terminfo/n/ncr160vt300wan
+file path=usr/share/lib/terminfo/n/ncr160vt300wpp
+file path=usr/share/lib/terminfo/n/ncr160wy50+pp
+file path=usr/share/lib/terminfo/n/ncr160wy50+wpp
+file path=usr/share/lib/terminfo/n/ncr160wy60pp
+file path=usr/share/lib/terminfo/n/ncr160wy60wpp
+file path=usr/share/lib/terminfo/n/ncr260intan
+file path=usr/share/lib/terminfo/n/ncr260intpp
+file path=usr/share/lib/terminfo/n/ncr260intwan
+file path=usr/share/lib/terminfo/n/ncr260intwpp
+file path=usr/share/lib/terminfo/n/ncr260vppp
+file path=usr/share/lib/terminfo/n/ncr260vpwpp
+file path=usr/share/lib/terminfo/n/ncr260vt100an
+file path=usr/share/lib/terminfo/n/ncr260vt100pp
+file path=usr/share/lib/terminfo/n/ncr260vt100wan
+file path=usr/share/lib/terminfo/n/ncr260vt100wpp
+file path=usr/share/lib/terminfo/n/ncr260vt200an
+file path=usr/share/lib/terminfo/n/ncr260vt200pp
+file path=usr/share/lib/terminfo/n/ncr260vt200wan
+file path=usr/share/lib/terminfo/n/ncr260vt200wpp
+file path=usr/share/lib/terminfo/n/ncr260vt300an
+file path=usr/share/lib/terminfo/n/ncr260vt300pp
+file path=usr/share/lib/terminfo/n/ncr260vt300wan
+hardlink path=usr/share/lib/terminfo/n/ncr260vt300wpp target=../N/NCR260VT300WPP
+file path=usr/share/lib/terminfo/n/ncr260wy325pp
+file path=usr/share/lib/terminfo/n/ncr260wy325wpp
+file path=usr/share/lib/terminfo/n/ncr260wy350pp
+file path=usr/share/lib/terminfo/n/ncr260wy350wpp
+file path=usr/share/lib/terminfo/n/ncr260wy50+pp
+file path=usr/share/lib/terminfo/n/ncr260wy50+wpp
+file path=usr/share/lib/terminfo/n/ncr260wy60pp
+file path=usr/share/lib/terminfo/n/ncr260wy60wpp
+hardlink path=usr/share/lib/terminfo/n/ncr7900 target=../n/ncr7900i
+file path=usr/share/lib/terminfo/n/ncr7900i
+file path=usr/share/lib/terminfo/n/ncr7900iv
+file path=usr/share/lib/terminfo/n/ncr7901
+file path=usr/share/lib/terminfo/n/ncrvt100an
+hardlink path=usr/share/lib/terminfo/n/ncrvt100pp target=../n/ncrvt100an
+file path=usr/share/lib/terminfo/n/ncrvt100wan
+hardlink path=usr/share/lib/terminfo/n/ncrvt100wpp target=../n/ncrvt100wan
+file path=usr/share/lib/terminfo/n/ncsa
+file path=usr/share/lib/terminfo/n/ncsa-m
+file path=usr/share/lib/terminfo/n/ncsa-m-ns
+file path=usr/share/lib/terminfo/n/ncsa-ns
+file path=usr/share/lib/terminfo/n/ncsa-vt220
+hardlink path=usr/share/lib/terminfo/n/ncsa-vt220-8 target=../n/ncsa-m
+hardlink path=usr/share/lib/terminfo/n/nd9500 target=../n/ndr9500
+file path=usr/share/lib/terminfo/n/ndr9500
+file path=usr/share/lib/terminfo/n/ndr9500-25
+file path=usr/share/lib/terminfo/n/ndr9500-25-mc
+file path=usr/share/lib/terminfo/n/ndr9500-25-mc-nl
+file path=usr/share/lib/terminfo/n/ndr9500-25-nl
+file path=usr/share/lib/terminfo/n/ndr9500-mc
+file path=usr/share/lib/terminfo/n/ndr9500-mc-nl
+file path=usr/share/lib/terminfo/n/ndr9500-nl
+hardlink path=usr/share/lib/terminfo/n/nec target=../n/nec5520
+file path=usr/share/lib/terminfo/n/nec5520
+file path=usr/share/lib/terminfo/n/newhp
+file path=usr/share/lib/terminfo/n/newhpkeyboard
+hardlink path=usr/share/lib/terminfo/n/news target=../n/nwp512
+file path=usr/share/lib/terminfo/n/news-29
+file path=usr/share/lib/terminfo/n/news-29-euc
+file path=usr/share/lib/terminfo/n/news-29-sjis
+file path=usr/share/lib/terminfo/n/news-33
+file path=usr/share/lib/terminfo/n/news-33-euc
+file path=usr/share/lib/terminfo/n/news-33-sjis
+file path=usr/share/lib/terminfo/n/news-42
+file path=usr/share/lib/terminfo/n/news-42-euc
+file path=usr/share/lib/terminfo/n/news-42-sjis
+hardlink path=usr/share/lib/terminfo/n/news-a target=../n/nwp512-a
+hardlink path=usr/share/lib/terminfo/n/news-o target=../n/nwp512-o
+file path=usr/share/lib/terminfo/n/news-old-unk
+file path=usr/share/lib/terminfo/n/news-unk
+file path=usr/share/lib/terminfo/n/news28
+hardlink path=usr/share/lib/terminfo/n/news28-a target=../n/news29
+file path=usr/share/lib/terminfo/n/news29
+hardlink path=usr/share/lib/terminfo/n/news31 target=../n/nwp513
+hardlink path=usr/share/lib/terminfo/n/news31-a target=../n/nwp513-a
+hardlink path=usr/share/lib/terminfo/n/news31-o target=../n/nwp513-o
+hardlink path=usr/share/lib/terminfo/n/news33 target=../n/nwp513-a
+hardlink path=usr/share/lib/terminfo/n/news40 target=../n/nwp512
+hardlink path=usr/share/lib/terminfo/n/news40-a target=../n/nwp512-a
+hardlink path=usr/share/lib/terminfo/n/news40-o target=../n/nwp512-o
+hardlink path=usr/share/lib/terminfo/n/news42 target=../n/nwp512-a
+hardlink path=usr/share/lib/terminfo/n/newscbm target=../n/nwp513
+hardlink path=usr/share/lib/terminfo/n/newscbm-a target=../n/nwp513-a
+hardlink path=usr/share/lib/terminfo/n/newscbm-o target=../n/nwp513-o
+hardlink path=usr/share/lib/terminfo/n/newscbm33 target=../n/nwp513-a
+file path=usr/share/lib/terminfo/n/next
+file path=usr/share/lib/terminfo/n/nextshell
+file path=usr/share/lib/terminfo/n/northstar
+file path=usr/share/lib/terminfo/n/nsterm
+file path=usr/share/lib/terminfo/n/nsterm+7
+file path=usr/share/lib/terminfo/n/nsterm+acs
+file path=usr/share/lib/terminfo/n/nsterm+c
+file path=usr/share/lib/terminfo/n/nsterm+c41
+file path=usr/share/lib/terminfo/n/nsterm+mac
+file path=usr/share/lib/terminfo/n/nsterm+s
+file path=usr/share/lib/terminfo/n/nsterm-16color
+file path=usr/share/lib/terminfo/n/nsterm-7
+file path=usr/share/lib/terminfo/n/nsterm-7-c
+hardlink path=usr/share/lib/terminfo/n/nsterm-7-c-s target=../n/nsterm-c-s-7
+hardlink path=usr/share/lib/terminfo/n/nsterm-7-m target=../n/nsterm-m-7
+hardlink path=usr/share/lib/terminfo/n/nsterm-7-m-s target=../n/nsterm-m-s-7
+hardlink path=usr/share/lib/terminfo/n/nsterm-7-s target=../n/nsterm-s-7
+file path=usr/share/lib/terminfo/n/nsterm-acs
+hardlink path=usr/share/lib/terminfo/n/nsterm-acs-c target=../n/nsterm-c-acs
+hardlink path=usr/share/lib/terminfo/n/nsterm-acs-c-s target=../n/nsterm-c-s-acs
+hardlink path=usr/share/lib/terminfo/n/nsterm-acs-m target=../n/nsterm-m-acs
+hardlink path=usr/share/lib/terminfo/n/nsterm-acs-m-s target=../n/nsterm-m-s-acs
+hardlink path=usr/share/lib/terminfo/n/nsterm-acs-s target=../n/nsterm-s-acs
+file path=usr/share/lib/terminfo/n/nsterm-bce
+file path=usr/share/lib/terminfo/n/nsterm-c
+hardlink path=usr/share/lib/terminfo/n/nsterm-c-7 target=../n/nsterm-7-c
+file path=usr/share/lib/terminfo/n/nsterm-c-acs
+file path=usr/share/lib/terminfo/n/nsterm-c-s
+file path=usr/share/lib/terminfo/n/nsterm-c-s-7
+file path=usr/share/lib/terminfo/n/nsterm-c-s-acs
+file path=usr/share/lib/terminfo/n/nsterm-m
+file path=usr/share/lib/terminfo/n/nsterm-m-7
+file path=usr/share/lib/terminfo/n/nsterm-m-acs
+file path=usr/share/lib/terminfo/n/nsterm-m-s
+file path=usr/share/lib/terminfo/n/nsterm-m-s-7
+file path=usr/share/lib/terminfo/n/nsterm-m-s-acs
+file path=usr/share/lib/terminfo/n/nsterm-old
+file path=usr/share/lib/terminfo/n/nsterm-s
+file path=usr/share/lib/terminfo/n/nsterm-s-7
+file path=usr/share/lib/terminfo/n/nsterm-s-acs
+hardlink path=usr/share/lib/terminfo/n/ntconsole target=../i/interix
+hardlink path=usr/share/lib/terminfo/n/ntconsole-100 target=../o/opennt-100
+hardlink path=usr/share/lib/terminfo/n/ntconsole-100-nti \
+    target=../o/opennt-100-nti
+hardlink path=usr/share/lib/terminfo/n/ntconsole-25 target=../i/interix
+hardlink path=usr/share/lib/terminfo/n/ntconsole-25-nti target=../i/interix-nti
+hardlink path=usr/share/lib/terminfo/n/ntconsole-25-w target=../o/opennt-w
+hardlink path=usr/share/lib/terminfo/n/ntconsole-25-w-vt target=../o/opennt-w-vt
+hardlink path=usr/share/lib/terminfo/n/ntconsole-35 target=../o/opennt-35
+hardlink path=usr/share/lib/terminfo/n/ntconsole-35-nti \
+    target=../o/opennt-35-nti
+hardlink path=usr/share/lib/terminfo/n/ntconsole-35-w target=../o/opennt-35-w
+hardlink path=usr/share/lib/terminfo/n/ntconsole-50 target=../o/opennt-50
+hardlink path=usr/share/lib/terminfo/n/ntconsole-50-nti \
+    target=../o/opennt-50-nti
+hardlink path=usr/share/lib/terminfo/n/ntconsole-50-w target=../o/opennt-50-w
+hardlink path=usr/share/lib/terminfo/n/ntconsole-60 target=../o/opennt-60
+hardlink path=usr/share/lib/terminfo/n/ntconsole-60-nti \
+    target=../o/opennt-60-nti
+hardlink path=usr/share/lib/terminfo/n/ntconsole-60-w target=../o/opennt-60-w
+hardlink path=usr/share/lib/terminfo/n/ntconsole-w target=../o/opennt-w
+hardlink path=usr/share/lib/terminfo/n/ntconsole-w-vt target=../o/opennt-w-vt
+hardlink path=usr/share/lib/terminfo/n/nwe501 target=../n/nwp513
+hardlink path=usr/share/lib/terminfo/n/nwe501-a target=../n/nwp513-a
+hardlink path=usr/share/lib/terminfo/n/nwe501-o target=../n/nwp513-o
+hardlink path=usr/share/lib/terminfo/n/nwp-511 target=../n/nwp511
+hardlink path=usr/share/lib/terminfo/n/nwp-517 target=../n/nwp517
+hardlink path=usr/share/lib/terminfo/n/nwp-517-w target=../n/nwp517-w
+hardlink path=usr/share/lib/terminfo/n/nwp251-a target=../n/nwp513-a
+hardlink path=usr/share/lib/terminfo/n/nwp251-o target=../n/nwp513-o
+file path=usr/share/lib/terminfo/n/nwp511
+file path=usr/share/lib/terminfo/n/nwp512
+file path=usr/share/lib/terminfo/n/nwp512-a
+file path=usr/share/lib/terminfo/n/nwp512-o
+file path=usr/share/lib/terminfo/n/nwp513
+file path=usr/share/lib/terminfo/n/nwp513-a
+file path=usr/share/lib/terminfo/n/nwp513-o
+hardlink path=usr/share/lib/terminfo/n/nwp514 target=../n/nwp512
+hardlink path=usr/share/lib/terminfo/n/nwp514-a target=../n/nwp512-a
+hardlink path=usr/share/lib/terminfo/n/nwp514-o target=../n/nwp512-o
+file path=usr/share/lib/terminfo/n/nwp517
+file path=usr/share/lib/terminfo/n/nwp517-w
+hardlink path=usr/share/lib/terminfo/n/nwp518 target=../n/nwp513
+hardlink path=usr/share/lib/terminfo/n/nwp518-a target=../n/nwp513-a
+hardlink path=usr/share/lib/terminfo/n/nwp518-o target=../n/nwp513-o
+hardlink path=usr/share/lib/terminfo/n/nxterm target=../x/xterm-color
+dir  path=usr/share/lib/terminfo/o
+hardlink path=usr/share/lib/terminfo/o/o31 target=../a/adm31-old
+hardlink path=usr/share/lib/terminfo/o/o4112-nd target=../o/otek4112
+hardlink path=usr/share/lib/terminfo/o/o85h target=../a/abm85h-old
+hardlink path=usr/share/lib/terminfo/o/oabm85h target=../a/abm85h-old
+file path=usr/share/lib/terminfo/o/oblit
+file path=usr/share/lib/terminfo/o/oc100
+hardlink path=usr/share/lib/terminfo/o/oconcept target=../o/oc100
+file path=usr/share/lib/terminfo/o/ofcons
+hardlink path=usr/share/lib/terminfo/o/ojerq target=../o/oblit
+hardlink path=usr/share/lib/terminfo/o/oldibmpc3 target=../o/oldpc3
+file path=usr/share/lib/terminfo/o/oldpc3
+file path=usr/share/lib/terminfo/o/oldsun
+file path=usr/share/lib/terminfo/o/omron
+hardlink path=usr/share/lib/terminfo/o/opennt target=../i/interix
+file path=usr/share/lib/terminfo/o/opennt-100
+file path=usr/share/lib/terminfo/o/opennt-100-nti
+hardlink path=usr/share/lib/terminfo/o/opennt-25 target=../i/interix
+hardlink path=usr/share/lib/terminfo/o/opennt-25-nti target=../i/interix-nti
+hardlink path=usr/share/lib/terminfo/o/opennt-25-w target=../o/opennt-w
+hardlink path=usr/share/lib/terminfo/o/opennt-25-w-vt target=../o/opennt-w-vt
+file path=usr/share/lib/terminfo/o/opennt-35
+file path=usr/share/lib/terminfo/o/opennt-35-nti
+file path=usr/share/lib/terminfo/o/opennt-35-w
+file path=usr/share/lib/terminfo/o/opennt-50
+file path=usr/share/lib/terminfo/o/opennt-50-nti
+file path=usr/share/lib/terminfo/o/opennt-50-w
+file path=usr/share/lib/terminfo/o/opennt-60
+file path=usr/share/lib/terminfo/o/opennt-60-nti
+file path=usr/share/lib/terminfo/o/opennt-60-w
+hardlink path=usr/share/lib/terminfo/o/opennt-nti target=../i/interix-nti
+file path=usr/share/lib/terminfo/o/opennt-w
+file path=usr/share/lib/terminfo/o/opennt-w-vt
+file path=usr/share/lib/terminfo/o/opus3n1+
+hardlink path=usr/share/lib/terminfo/o/origibmpc3 target=../o/origpc3
+file path=usr/share/lib/terminfo/o/origpc3
+hardlink path=usr/share/lib/terminfo/o/os9LII target=../c/coco3
+file path=usr/share/lib/terminfo/o/osborne
+file path=usr/share/lib/terminfo/o/osborne-w
+hardlink path=usr/share/lib/terminfo/o/osborne1 target=../o/osborne
+hardlink path=usr/share/lib/terminfo/o/osborne1-w target=../o/osborne-w
+file path=usr/share/lib/terminfo/o/osexec
+file path=usr/share/lib/terminfo/o/otek4112
+hardlink path=usr/share/lib/terminfo/o/otek4113 target=../o/otek4112
+hardlink path=usr/share/lib/terminfo/o/otek4114 target=../o/otek4112
+file path=usr/share/lib/terminfo/o/otek4115
+file path=usr/share/lib/terminfo/o/owl
+dir  path=usr/share/lib/terminfo/p
+hardlink path=usr/share/lib/terminfo/p/p12 target=../p/prism12
+hardlink path=usr/share/lib/terminfo/p/p12-m target=../p/prism12-m
+hardlink path=usr/share/lib/terminfo/p/p12-m-w target=../p/prism12-m-w
+hardlink path=usr/share/lib/terminfo/p/p12-w target=../p/prism12-w
+hardlink path=usr/share/lib/terminfo/p/p14 target=../p/prism14
+hardlink path=usr/share/lib/terminfo/p/p14-m target=../p/prism14-m
+hardlink path=usr/share/lib/terminfo/p/p14-m-w target=../p/prism14-m-w
+hardlink path=usr/share/lib/terminfo/p/p14-w target=../p/prism14-w
+file path=usr/share/lib/terminfo/p/p19
+hardlink path=usr/share/lib/terminfo/p/p4 target=../p/prism4
+hardlink path=usr/share/lib/terminfo/p/p5 target=../p/prism5
+hardlink path=usr/share/lib/terminfo/p/p7 target=../p/prism7
+hardlink path=usr/share/lib/terminfo/p/p8 target=../p/prism8
+hardlink path=usr/share/lib/terminfo/p/p8-w target=../p/prism8-w
+file path=usr/share/lib/terminfo/p/p8gl
+hardlink path=usr/share/lib/terminfo/p/p9 target=../p/prism9
+hardlink path=usr/share/lib/terminfo/p/p9-8 target=../p/prism9-8
+hardlink path=usr/share/lib/terminfo/p/p9-8-w target=../p/prism9-8-w
+hardlink path=usr/share/lib/terminfo/p/p9-w target=../p/prism9-w
+file path=usr/share/lib/terminfo/p/pc-coherent
+file path=usr/share/lib/terminfo/p/pc-minix
+file path=usr/share/lib/terminfo/p/pc-venix
+file path=usr/share/lib/terminfo/p/pc3
+hardlink path=usr/share/lib/terminfo/p/pc3-bold target=../i/ibmpc3
+hardlink path=usr/share/lib/terminfo/p/pc3r target=../c/cons25r
+hardlink path=usr/share/lib/terminfo/p/pc3r-m target=../c/cons25r-m
+file path=usr/share/lib/terminfo/p/pc6300plus
+hardlink path=usr/share/lib/terminfo/p/pc7300 target=../a/att7300
+file path=usr/share/lib/terminfo/p/pcansi
+file path=usr/share/lib/terminfo/p/pcansi-25
+file path=usr/share/lib/terminfo/p/pcansi-25-m
+file path=usr/share/lib/terminfo/p/pcansi-33
+file path=usr/share/lib/terminfo/p/pcansi-33-m
+file path=usr/share/lib/terminfo/p/pcansi-43
+file path=usr/share/lib/terminfo/p/pcansi-43-m
+file path=usr/share/lib/terminfo/p/pcansi-m
+hardlink path=usr/share/lib/terminfo/p/pcansi-mono target=../p/pcansi-m
+hardlink path=usr/share/lib/terminfo/p/pcansi25 target=../p/pcansi-25
+hardlink path=usr/share/lib/terminfo/p/pcansi25m target=../p/pcansi-25-m
+hardlink path=usr/share/lib/terminfo/p/pcansi33 target=../p/pcansi-33
+hardlink path=usr/share/lib/terminfo/p/pcansi33m target=../p/pcansi-33-m
+hardlink path=usr/share/lib/terminfo/p/pcansi43 target=../p/pcansi-43
+file path=usr/share/lib/terminfo/p/pccons
+hardlink path=usr/share/lib/terminfo/p/pcconsole target=../p/pccons
+file path=usr/share/lib/terminfo/p/pcix
+file path=usr/share/lib/terminfo/p/pckermit
+hardlink path=usr/share/lib/terminfo/p/pckermit12 target=../p/pckermit
+file path=usr/share/lib/terminfo/p/pckermit120
+file path=usr/share/lib/terminfo/p/pcmw
+file path=usr/share/lib/terminfo/p/pcplot
+file path=usr/share/lib/terminfo/p/pcvt25
+file path=usr/share/lib/terminfo/p/pcvt25-color
+file path=usr/share/lib/terminfo/p/pcvt25w
+file path=usr/share/lib/terminfo/p/pcvt28
+file path=usr/share/lib/terminfo/p/pcvt28w
+file path=usr/share/lib/terminfo/p/pcvt35
+file path=usr/share/lib/terminfo/p/pcvt35w
+file path=usr/share/lib/terminfo/p/pcvt40
+file path=usr/share/lib/terminfo/p/pcvt40w
+file path=usr/share/lib/terminfo/p/pcvt43
+file path=usr/share/lib/terminfo/p/pcvt43w
+file path=usr/share/lib/terminfo/p/pcvt50
+file path=usr/share/lib/terminfo/p/pcvt50w
+file path=usr/share/lib/terminfo/p/pcvtXX
+hardlink path=usr/share/lib/terminfo/p/pcz19 target=../p/pc-coherent
+hardlink path=usr/share/lib/terminfo/p/pe1100 target=../f/fox
+hardlink path=usr/share/lib/terminfo/p/pe1200 target=../o/owl
+file path=usr/share/lib/terminfo/p/pe1251
+hardlink path=usr/share/lib/terminfo/p/pe550 target=../b/bantam
+hardlink path=usr/share/lib/terminfo/p/pe6100 target=../b/bantam
+hardlink path=usr/share/lib/terminfo/p/pe6300 target=../p/pe1251
+hardlink path=usr/share/lib/terminfo/p/pe6312 target=../p/pe1251
+file path=usr/share/lib/terminfo/p/pe7000c
+file path=usr/share/lib/terminfo/p/pe7000m
+file path=usr/share/lib/terminfo/p/pilot
+file path=usr/share/lib/terminfo/p/pmcons
+hardlink path=usr/share/lib/terminfo/p/pmconsole target=../p/pmcons
+hardlink path=usr/share/lib/terminfo/p/printer target=../l/lpr
+file path=usr/share/lib/terminfo/p/prism12
+file path=usr/share/lib/terminfo/p/prism12-m
+file path=usr/share/lib/terminfo/p/prism12-m-w
+file path=usr/share/lib/terminfo/p/prism12-w
+file path=usr/share/lib/terminfo/p/prism14
+file path=usr/share/lib/terminfo/p/prism14-m
+file path=usr/share/lib/terminfo/p/prism14-m-w
+file path=usr/share/lib/terminfo/p/prism14-w
+file path=usr/share/lib/terminfo/p/prism2
+file path=usr/share/lib/terminfo/p/prism4
+file path=usr/share/lib/terminfo/p/prism5
+file path=usr/share/lib/terminfo/p/prism7
+file path=usr/share/lib/terminfo/p/prism8
+file path=usr/share/lib/terminfo/p/prism8-w
+hardlink path=usr/share/lib/terminfo/p/prism8gl target=../p/p8gl
+file path=usr/share/lib/terminfo/p/prism9
+file path=usr/share/lib/terminfo/p/prism9-8
+file path=usr/share/lib/terminfo/p/prism9-8-w
+file path=usr/share/lib/terminfo/p/prism9-w
+file path=usr/share/lib/terminfo/p/pro350
+file path=usr/share/lib/terminfo/p/ps300
+file path=usr/share/lib/terminfo/p/psterm
+file path=usr/share/lib/terminfo/p/psterm-80x24
+file path=usr/share/lib/terminfo/p/psterm-90x28
+file path=usr/share/lib/terminfo/p/psterm-96x48
+hardlink path=usr/share/lib/terminfo/p/psterm-basic target=../p/psterm
+file path=usr/share/lib/terminfo/p/psterm-fast
+hardlink path=usr/share/lib/terminfo/p/psx_ansi target=../a/ansi-nt
+file path=usr/share/lib/terminfo/p/pt100
+file path=usr/share/lib/terminfo/p/pt100w
+hardlink path=usr/share/lib/terminfo/p/pt200 target=../p/pt100
+hardlink path=usr/share/lib/terminfo/p/pt200w target=../p/pt100w
+file path=usr/share/lib/terminfo/p/pt210
+file path=usr/share/lib/terminfo/p/pt250
+file path=usr/share/lib/terminfo/p/pt250w
+hardlink path=usr/share/lib/terminfo/p/pt505 target=../a/att505
+hardlink path=usr/share/lib/terminfo/p/pt505-22 target=../t/tt505-22
+hardlink path=usr/share/lib/terminfo/p/pt505-24 target=../a/att505-24
+file path=usr/share/lib/terminfo/p/pty
+file path=usr/share/lib/terminfo/p/putty
+file path=usr/share/lib/terminfo/p/putty-256color
+file path=usr/share/lib/terminfo/p/putty-vt100
+dir  path=usr/share/lib/terminfo/q
+file path=usr/share/lib/terminfo/q/qansi
+file path=usr/share/lib/terminfo/q/qansi-g
+file path=usr/share/lib/terminfo/q/qansi-m
+file path=usr/share/lib/terminfo/q/qansi-t
+file path=usr/share/lib/terminfo/q/qansi-w
+hardlink path=usr/share/lib/terminfo/q/qdcons target=../q/qdss
+file path=usr/share/lib/terminfo/q/qdss
+file path=usr/share/lib/terminfo/q/qnx
+hardlink path=usr/share/lib/terminfo/q/qnx4 target=../q/qnx
+file path=usr/share/lib/terminfo/q/qnxm
+file path=usr/share/lib/terminfo/q/qnxt
+file path=usr/share/lib/terminfo/q/qnxt2
+hardlink path=usr/share/lib/terminfo/q/qnxt4 target=../q/qnxt
+file path=usr/share/lib/terminfo/q/qnxtmono
+file path=usr/share/lib/terminfo/q/qnxw
+hardlink path=usr/share/lib/terminfo/q/qume target=../q/qume5
+file path=usr/share/lib/terminfo/q/qume5
+file path=usr/share/lib/terminfo/q/qvt101
+file path=usr/share/lib/terminfo/q/qvt101+
+hardlink path=usr/share/lib/terminfo/q/qvt101p target=../q/qvt101+
+file path=usr/share/lib/terminfo/q/qvt102
+file path=usr/share/lib/terminfo/q/qvt103
+file path=usr/share/lib/terminfo/q/qvt103-w
+hardlink path=usr/share/lib/terminfo/q/qvt108 target=../q/qvt101
+hardlink path=usr/share/lib/terminfo/q/qvt119 target=../q/qvt119+
+file path=usr/share/lib/terminfo/q/qvt119+
+file path=usr/share/lib/terminfo/q/qvt119+-25
+file path=usr/share/lib/terminfo/q/qvt119+-25-w
+file path=usr/share/lib/terminfo/q/qvt119+-w
+hardlink path=usr/share/lib/terminfo/q/qvt119-25-w target=../q/qvt119+-25-w
+hardlink path=usr/share/lib/terminfo/q/qvt119-w target=../q/qvt119+-w
+hardlink path=usr/share/lib/terminfo/q/qvt119p target=../q/qvt119+
+hardlink path=usr/share/lib/terminfo/q/qvt119p-25 target=../q/qvt119+-25
+hardlink path=usr/share/lib/terminfo/q/qvt119p-25-w target=../q/qvt119+-25-w
+hardlink path=usr/share/lib/terminfo/q/qvt119p-w target=../q/qvt119+-w
+file path=usr/share/lib/terminfo/q/qvt203
+hardlink path=usr/share/lib/terminfo/q/qvt203+ target=../q/qvt203
+file path=usr/share/lib/terminfo/q/qvt203-25
+file path=usr/share/lib/terminfo/q/qvt203-25-w
+file path=usr/share/lib/terminfo/q/qvt203-w
+hardlink path=usr/share/lib/terminfo/q/qvt203-w-am target=../q/qvt203-w
+dir  path=usr/share/lib/terminfo/r
+file path=usr/share/lib/terminfo/r/rbcomm
+file path=usr/share/lib/terminfo/r/rbcomm-nam
+file path=usr/share/lib/terminfo/r/rbcomm-w
+file path=usr/share/lib/terminfo/r/rca
+file path=usr/share/lib/terminfo/r/rcons
+file path=usr/share/lib/terminfo/r/rcons-color
+hardlink path=usr/share/lib/terminfo/r/rebus3180 target=../d/ddr
+file path=usr/share/lib/terminfo/r/regent
+file path=usr/share/lib/terminfo/r/regent100
+file path=usr/share/lib/terminfo/r/regent20
+hardlink path=usr/share/lib/terminfo/r/regent200 target=../r/regent60
+file path=usr/share/lib/terminfo/r/regent25
+file path=usr/share/lib/terminfo/r/regent40
+file path=usr/share/lib/terminfo/r/regent40+
+file path=usr/share/lib/terminfo/r/regent60
+file path=usr/share/lib/terminfo/r/rt6221
+file path=usr/share/lib/terminfo/r/rt6221-w
+file path=usr/share/lib/terminfo/r/rtpc
+file path=usr/share/lib/terminfo/r/rxvt
+file path=usr/share/lib/terminfo/r/rxvt+pcfkeys
+file path=usr/share/lib/terminfo/r/rxvt-16color
+file path=usr/share/lib/terminfo/r/rxvt-256color
+file path=usr/share/lib/terminfo/r/rxvt-88color
+file path=usr/share/lib/terminfo/r/rxvt-basic
+file path=usr/share/lib/terminfo/r/rxvt-color
+file path=usr/share/lib/terminfo/r/rxvt-cygwin
+file path=usr/share/lib/terminfo/r/rxvt-cygwin-native
+file path=usr/share/lib/terminfo/r/rxvt-unicode
+file path=usr/share/lib/terminfo/r/rxvt-unicode-256color
+file path=usr/share/lib/terminfo/r/rxvt-xpm
+dir  path=usr/share/lib/terminfo/s
+hardlink path=usr/share/lib/terminfo/s/s4 target=../a/att7300
+file path=usr/share/lib/terminfo/s/sb1
+file path=usr/share/lib/terminfo/s/sb2
+hardlink path=usr/share/lib/terminfo/s/sb3 target=../s/sb2
+file path=usr/share/lib/terminfo/s/sbi
+hardlink path=usr/share/lib/terminfo/s/sbobcat target=../b/bobcat
+hardlink path=usr/share/lib/terminfo/s/sc410 target=../s/scanset
+hardlink path=usr/share/lib/terminfo/s/sc415 target=../s/scanset
+file path=usr/share/lib/terminfo/s/scanset
+file path=usr/share/lib/terminfo/s/scoansi
+file path=usr/share/lib/terminfo/s/scoansi-new
+file path=usr/share/lib/terminfo/s/scoansi-old
+file path=usr/share/lib/terminfo/s/screen
+file path=usr/share/lib/terminfo/s/screen+fkeys
+file path=usr/share/lib/terminfo/s/screen-16color
+file path=usr/share/lib/terminfo/s/screen-16color-bce
+file path=usr/share/lib/terminfo/s/screen-16color-bce-s
+file path=usr/share/lib/terminfo/s/screen-16color-s
+file path=usr/share/lib/terminfo/s/screen-256color
+file path=usr/share/lib/terminfo/s/screen-256color-bce
+file path=usr/share/lib/terminfo/s/screen-256color-bce-s
+file path=usr/share/lib/terminfo/s/screen-256color-s
+file path=usr/share/lib/terminfo/s/screen-bce
+file path=usr/share/lib/terminfo/s/screen-bce.Eterm
+file path=usr/share/lib/terminfo/s/screen-bce.gnome
+file path=usr/share/lib/terminfo/s/screen-bce.konsole
+file path=usr/share/lib/terminfo/s/screen-bce.linux
+file path=usr/share/lib/terminfo/s/screen-bce.mlterm
+file path=usr/share/lib/terminfo/s/screen-bce.mrxvt
+file path=usr/share/lib/terminfo/s/screen-bce.rxvt
+file path=usr/share/lib/terminfo/s/screen-bce.xterm-new
+file path=usr/share/lib/terminfo/s/screen-s
+file path=usr/share/lib/terminfo/s/screen-w
+file path=usr/share/lib/terminfo/s/screen.Eterm
+file path=usr/share/lib/terminfo/s/screen.gnome
+file path=usr/share/lib/terminfo/s/screen.konsole
+file path=usr/share/lib/terminfo/s/screen.linux
+file path=usr/share/lib/terminfo/s/screen.mlterm
+file path=usr/share/lib/terminfo/s/screen.mrxvt
+file path=usr/share/lib/terminfo/s/screen.rxvt
+file path=usr/share/lib/terminfo/s/screen.teraterm
+file path=usr/share/lib/terminfo/s/screen.vte
+hardlink path=usr/share/lib/terminfo/s/screen.xterm-new \
+    target=../s/screen.xterm-xfree86
+file path=usr/share/lib/terminfo/s/screen.xterm-r6
+file path=usr/share/lib/terminfo/s/screen.xterm-xfree86
+file path=usr/share/lib/terminfo/s/screen2
+file path=usr/share/lib/terminfo/s/screen3
+file path=usr/share/lib/terminfo/s/screwpoint
+file path=usr/share/lib/terminfo/s/scrhp
+file path=usr/share/lib/terminfo/s/sibo
+file path=usr/share/lib/terminfo/s/simpleterm
+file path=usr/share/lib/terminfo/s/simterm
+hardlink path=usr/share/lib/terminfo/s/soroc target=../s/soroc120
+file path=usr/share/lib/terminfo/s/soroc120
+file path=usr/share/lib/terminfo/s/soroc140
+hardlink path=usr/share/lib/terminfo/s/spinwriter target=../n/nec5520
+hardlink path=usr/share/lib/terminfo/s/st target=../s/simpleterm
+file path=usr/share/lib/terminfo/s/st-16color
+file path=usr/share/lib/terminfo/s/st-256color
+file path=usr/share/lib/terminfo/s/st52
+file path=usr/share/lib/terminfo/s/st52-color
+hardlink path=usr/share/lib/terminfo/s/st52-m target=../s/st52
+file path=usr/share/lib/terminfo/s/st52-old
+file path=usr/share/lib/terminfo/s/stv52
+file path=usr/share/lib/terminfo/s/stv52pc
+file path=usr/share/lib/terminfo/s/sun
+file path=usr/share/lib/terminfo/s/sun-1
+file path=usr/share/lib/terminfo/s/sun-12
+file path=usr/share/lib/terminfo/s/sun-17
+file path=usr/share/lib/terminfo/s/sun-24
+file path=usr/share/lib/terminfo/s/sun-34
+file path=usr/share/lib/terminfo/s/sun-48
+file path=usr/share/lib/terminfo/s/sun-c
+file path=usr/share/lib/terminfo/s/sun-cgsix
+hardlink path=usr/share/lib/terminfo/s/sun-cmd target=../s/sun-c
+file path=usr/share/lib/terminfo/s/sun-color
+file path=usr/share/lib/terminfo/s/sun-e
+file path=usr/share/lib/terminfo/s/sun-e-s
+file path=usr/share/lib/terminfo/s/sun-il
+hardlink path=usr/share/lib/terminfo/s/sun-nic target=../s/sun-e
+file path=usr/share/lib/terminfo/s/sun-s
+hardlink path=usr/share/lib/terminfo/s/sun-s-e target=../s/sun-e-s
+hardlink path=usr/share/lib/terminfo/s/sun-ss5 target=../s/sun-cgsix
+file path=usr/share/lib/terminfo/s/sun-type4
+hardlink path=usr/share/lib/terminfo/s/sun1 target=../s/sun
+hardlink path=usr/share/lib/terminfo/s/sun2 target=../s/sun
+hardlink path=usr/share/lib/terminfo/s/sune target=../s/sun-e
+hardlink path=usr/share/lib/terminfo/s/superbee target=../s/sbi
+file path=usr/share/lib/terminfo/s/superbee-xsb
+file path=usr/share/lib/terminfo/s/superbeeic
+file path=usr/share/lib/terminfo/s/superbrain
+hardlink path=usr/share/lib/terminfo/s/sv80 target=../a/att2300
+file path=usr/share/lib/terminfo/s/swtp
+file path=usr/share/lib/terminfo/s/synertek
+hardlink path=usr/share/lib/terminfo/s/synertek380 target=../s/synertek
+hardlink path=usr/share/lib/terminfo/s/system1 target=../i/ibm-system1
+dir  path=usr/share/lib/terminfo/t
+file path=usr/share/lib/terminfo/t/t10
+file path=usr/share/lib/terminfo/t/t1061
+file path=usr/share/lib/terminfo/t/t1061f
+file path=usr/share/lib/terminfo/t/t16
+file path=usr/share/lib/terminfo/t/t3700
+file path=usr/share/lib/terminfo/t/t3800
+hardlink path=usr/share/lib/terminfo/t/t653x target=../t/tandem653
+hardlink path=usr/share/lib/terminfo/t/tab target=../t/tab132
+file path=usr/share/lib/terminfo/t/tab132
+hardlink path=usr/share/lib/terminfo/t/tab132-15 target=../t/tab132
+file path=usr/share/lib/terminfo/t/tab132-rv
+file path=usr/share/lib/terminfo/t/tab132-w
+file path=usr/share/lib/terminfo/t/tab132-w-rv
+file path=usr/share/lib/terminfo/t/tandem6510
+file path=usr/share/lib/terminfo/t/tandem653
+file path=usr/share/lib/terminfo/t/tek
+hardlink path=usr/share/lib/terminfo/t/tek4012 target=../t/tek
+file path=usr/share/lib/terminfo/t/tek4013
+file path=usr/share/lib/terminfo/t/tek4014
+file path=usr/share/lib/terminfo/t/tek4014-sm
+file path=usr/share/lib/terminfo/t/tek4015
+file path=usr/share/lib/terminfo/t/tek4015-sm
+file path=usr/share/lib/terminfo/t/tek4023
+file path=usr/share/lib/terminfo/t/tek4024
+hardlink path=usr/share/lib/terminfo/t/tek4025 target=../t/tek4024
+file path=usr/share/lib/terminfo/t/tek4025-17
+file path=usr/share/lib/terminfo/t/tek4025-17-ws
+file path=usr/share/lib/terminfo/t/tek4025-cr
+file path=usr/share/lib/terminfo/t/tek4025-ex
+file path=usr/share/lib/terminfo/t/tek4025a
+file path=usr/share/lib/terminfo/t/tek4025ex
+hardlink path=usr/share/lib/terminfo/t/tek4027 target=../t/tek4024
+hardlink path=usr/share/lib/terminfo/t/tek4027-ex target=../t/tek4025-ex
+file path=usr/share/lib/terminfo/t/tek4105
+file path=usr/share/lib/terminfo/t/tek4105-30
+file path=usr/share/lib/terminfo/t/tek4105a
+file path=usr/share/lib/terminfo/t/tek4106brl
+file path=usr/share/lib/terminfo/t/tek4107
+hardlink path=usr/share/lib/terminfo/t/tek4107brl target=../t/tek4106brl
+hardlink path=usr/share/lib/terminfo/t/tek4109 target=../t/tek4107
+hardlink path=usr/share/lib/terminfo/t/tek4109brl target=../t/tek4106brl
+file path=usr/share/lib/terminfo/t/tek4112
+file path=usr/share/lib/terminfo/t/tek4112-5
+file path=usr/share/lib/terminfo/t/tek4112-nd
+file path=usr/share/lib/terminfo/t/tek4113
+file path=usr/share/lib/terminfo/t/tek4113-34
+file path=usr/share/lib/terminfo/t/tek4113-nd
+hardlink path=usr/share/lib/terminfo/t/tek4114 target=../t/tek4112
+file path=usr/share/lib/terminfo/t/tek4115
+file path=usr/share/lib/terminfo/t/tek4125
+file path=usr/share/lib/terminfo/t/tek4205
+file path=usr/share/lib/terminfo/t/tek4207
+file path=usr/share/lib/terminfo/t/tek4207-s
+file path=usr/share/lib/terminfo/t/tek4404
+hardlink path=usr/share/lib/terminfo/t/teleray target=../t/t1061
+file path=usr/share/lib/terminfo/t/teletec
+file path=usr/share/lib/terminfo/t/teraterm
+file path=usr/share/lib/terminfo/t/teraterm2.3
+file path=usr/share/lib/terminfo/t/teraterm4.59
+file path=usr/share/lib/terminfo/t/terminator
+hardlink path=usr/share/lib/terminfo/t/terminet target=../t/terminet1200
+file path=usr/share/lib/terminfo/t/terminet1200
+hardlink path=usr/share/lib/terminfo/t/terminet300 target=../t/terminet1200
+hardlink path=usr/share/lib/terminfo/t/tgtelnet target=../p/pilot
+file path=usr/share/lib/terminfo/t/ti700
+hardlink path=usr/share/lib/terminfo/t/ti733 target=../t/ti700
+hardlink path=usr/share/lib/terminfo/t/ti735 target=../t/ti700
+hardlink path=usr/share/lib/terminfo/t/ti745 target=../t/ti700
+hardlink path=usr/share/lib/terminfo/t/ti800 target=../t/ti700
+file path=usr/share/lib/terminfo/t/ti916
+file path=usr/share/lib/terminfo/t/ti916-132
+hardlink path=usr/share/lib/terminfo/t/ti916-220-7 target=../t/ti916
+hardlink path=usr/share/lib/terminfo/t/ti916-220-8 target=../t/ti916-8
+file path=usr/share/lib/terminfo/t/ti916-8
+file path=usr/share/lib/terminfo/t/ti916-8-132
+file path=usr/share/lib/terminfo/t/ti924
+file path=usr/share/lib/terminfo/t/ti924-8
+file path=usr/share/lib/terminfo/t/ti924-8w
+file path=usr/share/lib/terminfo/t/ti924w
+file path=usr/share/lib/terminfo/t/ti926
+file path=usr/share/lib/terminfo/t/ti926-8
+file path=usr/share/lib/terminfo/t/ti928
+file path=usr/share/lib/terminfo/t/ti928-8
+file path=usr/share/lib/terminfo/t/ti931
+file path=usr/share/lib/terminfo/t/ti_ansi
+hardlink path=usr/share/lib/terminfo/t/tkterm target=../t/tt
+hardlink path=usr/share/lib/terminfo/t/tn1200 target=../t/terminet1200
+hardlink path=usr/share/lib/terminfo/t/tn300 target=../t/terminet1200
+file path=usr/share/lib/terminfo/t/trs16
+file path=usr/share/lib/terminfo/t/trs2
+hardlink path=usr/share/lib/terminfo/t/trs80II target=../t/trs2
+hardlink path=usr/share/lib/terminfo/t/trsII target=../t/trs2
+hardlink path=usr/share/lib/terminfo/t/ts-1 target=../f/falco
+hardlink path=usr/share/lib/terminfo/t/ts-1p target=../f/falco-p
+hardlink path=usr/share/lib/terminfo/t/ts1 target=../f/falco
+file path=usr/share/lib/terminfo/t/ts100
+file path=usr/share/lib/terminfo/t/ts100-ctxt
+hardlink path=usr/share/lib/terminfo/t/ts100-sp target=../t/ts100
+hardlink path=usr/share/lib/terminfo/t/ts1p target=../f/falco-p
+file path=usr/share/lib/terminfo/t/tt
+file path=usr/share/lib/terminfo/t/tt505-22
+file path=usr/share/lib/terminfo/t/tt52
+file path=usr/share/lib/terminfo/t/tty33
+hardlink path=usr/share/lib/terminfo/t/tty35 target=../t/tty33
+file path=usr/share/lib/terminfo/t/tty37
+file path=usr/share/lib/terminfo/t/tty40
+file path=usr/share/lib/terminfo/t/tty43
+hardlink path=usr/share/lib/terminfo/t/tty4420 target=../a/att4420
+hardlink path=usr/share/lib/terminfo/t/tty4424 target=../a/att4424
+hardlink path=usr/share/lib/terminfo/t/tty4424-1 target=../a/att4424-1
+hardlink path=usr/share/lib/terminfo/t/tty4424m target=../a/att4424m
+hardlink path=usr/share/lib/terminfo/t/tty4426 target=../a/att4426
+hardlink path=usr/share/lib/terminfo/t/tty5410 target=../a/att4410
+hardlink path=usr/share/lib/terminfo/t/tty5410-w target=../a/att5410-w
+hardlink path=usr/share/lib/terminfo/t/tty5410v1 target=../a/att5410v1
+hardlink path=usr/share/lib/terminfo/t/tty5410v1-w target=../a/att4410v1-w
+hardlink path=usr/share/lib/terminfo/t/tty5420 target=../a/att4415
+hardlink path=usr/share/lib/terminfo/t/tty5420+nl target=../a/att4415+nl
+hardlink path=usr/share/lib/terminfo/t/tty5420-nl target=../a/att4415-nl
+hardlink path=usr/share/lib/terminfo/t/tty5420-rv target=../a/att4415-rv
+hardlink path=usr/share/lib/terminfo/t/tty5420-rv-nl target=../a/att4415-rv-nl
+hardlink path=usr/share/lib/terminfo/t/tty5420-w target=../a/att4415-w
+hardlink path=usr/share/lib/terminfo/t/tty5420-w-nl target=../a/att4415-w-nl
+hardlink path=usr/share/lib/terminfo/t/tty5420-w-rv target=../a/att4415-w-rv
+hardlink path=usr/share/lib/terminfo/t/tty5420-w-rv-n target=../a/att4415-w-rv-n
+hardlink path=usr/share/lib/terminfo/t/tty5425 target=../a/att5425
+hardlink path=usr/share/lib/terminfo/t/tty5425-nl target=../a/att5425-nl
+hardlink path=usr/share/lib/terminfo/t/tty5425-w target=../a/att5425-w
+hardlink path=usr/share/lib/terminfo/t/tty5620 target=../a/att5620
+hardlink path=usr/share/lib/terminfo/t/tty5620-1 target=../a/att5620-1
+hardlink path=usr/share/lib/terminfo/t/tty5620-24 target=../a/att5620-24
+hardlink path=usr/share/lib/terminfo/t/tty5620-34 target=../a/att5620-34
+hardlink path=usr/share/lib/terminfo/t/tty5620-s target=../a/att5620-s
+hardlink path=usr/share/lib/terminfo/t/ttydmd target=../a/att5620
+file path=usr/share/lib/terminfo/t/tvi803
+file path=usr/share/lib/terminfo/t/tvi9065
+file path=usr/share/lib/terminfo/t/tvi910
+file path=usr/share/lib/terminfo/t/tvi910+
+file path=usr/share/lib/terminfo/t/tvi912
+file path=usr/share/lib/terminfo/t/tvi912b
+file path=usr/share/lib/terminfo/t/tvi912b+2p
+file path=usr/share/lib/terminfo/t/tvi912b+dim
+file path=usr/share/lib/terminfo/t/tvi912b+mc
+file path=usr/share/lib/terminfo/t/tvi912b+printer
+file path=usr/share/lib/terminfo/t/tvi912b+vb
+file path=usr/share/lib/terminfo/t/tvi912b-2p
+file path=usr/share/lib/terminfo/t/tvi912b-2p-mc
+file path=usr/share/lib/terminfo/t/tvi912b-2p-p
+file path=usr/share/lib/terminfo/t/tvi912b-2p-unk
+file path=usr/share/lib/terminfo/t/tvi912b-mc
+hardlink path=usr/share/lib/terminfo/t/tvi912b-mc-2p target=../t/tvi912b-2p-mc
+hardlink path=usr/share/lib/terminfo/t/tvi912b-mc-vb target=../t/tvi912b-vb-mc
+file path=usr/share/lib/terminfo/t/tvi912b-p
+hardlink path=usr/share/lib/terminfo/t/tvi912b-p-2p target=../t/tvi912b-2p-p
+hardlink path=usr/share/lib/terminfo/t/tvi912b-p-vb target=../t/tvi912b-vb-p
+file path=usr/share/lib/terminfo/t/tvi912b-unk
+hardlink path=usr/share/lib/terminfo/t/tvi912b-unk-2p target=../t/tvi912b-2p-unk
+hardlink path=usr/share/lib/terminfo/t/tvi912b-unk-vb target=../t/tvi912b-vb-unk
+file path=usr/share/lib/terminfo/t/tvi912b-vb
+file path=usr/share/lib/terminfo/t/tvi912b-vb-mc
+file path=usr/share/lib/terminfo/t/tvi912b-vb-p
+file path=usr/share/lib/terminfo/t/tvi912b-vb-unk
+hardlink path=usr/share/lib/terminfo/t/tvi912c target=../t/tvi912b
+hardlink path=usr/share/lib/terminfo/t/tvi912c-2p target=../t/tvi912b-2p
+hardlink path=usr/share/lib/terminfo/t/tvi912c-2p-mc target=../t/tvi912b-2p-mc
+hardlink path=usr/share/lib/terminfo/t/tvi912c-2p-p target=../t/tvi912b-2p-p
+hardlink path=usr/share/lib/terminfo/t/tvi912c-2p-unk target=../t/tvi912b-2p-unk
+hardlink path=usr/share/lib/terminfo/t/tvi912c-mc target=../t/tvi912b-mc
+hardlink path=usr/share/lib/terminfo/t/tvi912c-mc-2p target=../t/tvi912b-2p-mc
+hardlink path=usr/share/lib/terminfo/t/tvi912c-mc-vb target=../t/tvi912b-vb-mc
+hardlink path=usr/share/lib/terminfo/t/tvi912c-p target=../t/tvi912b-p
+hardlink path=usr/share/lib/terminfo/t/tvi912c-p-2p target=../t/tvi912b-2p-p
+hardlink path=usr/share/lib/terminfo/t/tvi912c-p-vb target=../t/tvi912b-vb-p
+hardlink path=usr/share/lib/terminfo/t/tvi912c-unk target=../t/tvi912b-unk
+hardlink path=usr/share/lib/terminfo/t/tvi912c-unk-2p target=../t/tvi912b-2p-unk
+hardlink path=usr/share/lib/terminfo/t/tvi912c-unk-vb target=../t/tvi912b-vb-unk
+hardlink path=usr/share/lib/terminfo/t/tvi912c-vb target=../t/tvi912b-vb
+hardlink path=usr/share/lib/terminfo/t/tvi912c-vb-mc target=../t/tvi912b-vb-mc
+hardlink path=usr/share/lib/terminfo/t/tvi912c-vb-p target=../t/tvi912b-vb-p
+hardlink path=usr/share/lib/terminfo/t/tvi912c-vb-unk target=../t/tvi912b-vb-unk
+file path=usr/share/lib/terminfo/t/tvi912cc
+hardlink path=usr/share/lib/terminfo/t/tvi914 target=../t/tvi912
+hardlink path=usr/share/lib/terminfo/t/tvi920 target=../t/tvi912
+file path=usr/share/lib/terminfo/t/tvi920b
+file path=usr/share/lib/terminfo/t/tvi920b+fn
+file path=usr/share/lib/terminfo/t/tvi920b-2p
+file path=usr/share/lib/terminfo/t/tvi920b-2p-mc
+file path=usr/share/lib/terminfo/t/tvi920b-2p-p
+file path=usr/share/lib/terminfo/t/tvi920b-2p-unk
+file path=usr/share/lib/terminfo/t/tvi920b-mc
+hardlink path=usr/share/lib/terminfo/t/tvi920b-mc-2p target=../t/tvi920b-2p-mc
+hardlink path=usr/share/lib/terminfo/t/tvi920b-mc-vb target=../t/tvi920b-vb-mc
+file path=usr/share/lib/terminfo/t/tvi920b-p
+hardlink path=usr/share/lib/terminfo/t/tvi920b-p-2p target=../t/tvi920b-2p-p
+hardlink path=usr/share/lib/terminfo/t/tvi920b-p-vb target=../t/tvi920b-vb-p
+file path=usr/share/lib/terminfo/t/tvi920b-unk
+hardlink path=usr/share/lib/terminfo/t/tvi920b-unk-2p target=../t/tvi920b-2p-unk
+hardlink path=usr/share/lib/terminfo/t/tvi920b-unk-vb target=../t/tvi920b-vb-unk
+file path=usr/share/lib/terminfo/t/tvi920b-vb
+file path=usr/share/lib/terminfo/t/tvi920b-vb-mc
+file path=usr/share/lib/terminfo/t/tvi920b-vb-p
+file path=usr/share/lib/terminfo/t/tvi920b-vb-unk
+hardlink path=usr/share/lib/terminfo/t/tvi920c target=../t/tvi920b
+hardlink path=usr/share/lib/terminfo/t/tvi920c-2p target=../t/tvi920b-2p
+hardlink path=usr/share/lib/terminfo/t/tvi920c-2p-mc target=../t/tvi920b-2p-mc
+hardlink path=usr/share/lib/terminfo/t/tvi920c-2p-p target=../t/tvi920b-2p-p
+hardlink path=usr/share/lib/terminfo/t/tvi920c-2p-unk target=../t/tvi920b-2p-unk
+hardlink path=usr/share/lib/terminfo/t/tvi920c-mc target=../t/tvi920b-mc
+hardlink path=usr/share/lib/terminfo/t/tvi920c-mc-2p target=../t/tvi920b-2p-mc
+hardlink path=usr/share/lib/terminfo/t/tvi920c-mc-vb target=../t/tvi920b-vb-mc
+hardlink path=usr/share/lib/terminfo/t/tvi920c-p target=../t/tvi920b-p
+hardlink path=usr/share/lib/terminfo/t/tvi920c-p-2p target=../t/tvi920b-2p-p
+hardlink path=usr/share/lib/terminfo/t/tvi920c-p-vb target=../t/tvi920b-vb-p
+hardlink path=usr/share/lib/terminfo/t/tvi920c-unk target=../t/tvi920b-unk
+hardlink path=usr/share/lib/terminfo/t/tvi920c-unk-2p target=../t/tvi920b-2p-unk
+hardlink path=usr/share/lib/terminfo/t/tvi920c-unk-vb target=../t/tvi920b-vb-unk
+hardlink path=usr/share/lib/terminfo/t/tvi920c-vb target=../t/tvi920b-vb
+hardlink path=usr/share/lib/terminfo/t/tvi920c-vb-mc target=../t/tvi920b-vb-mc
+hardlink path=usr/share/lib/terminfo/t/tvi920c-vb-p target=../t/tvi920b-vb-p
+hardlink path=usr/share/lib/terminfo/t/tvi920c-vb-unk target=../t/tvi920b-vb-unk
+file path=usr/share/lib/terminfo/t/tvi921
+file path=usr/share/lib/terminfo/t/tvi924
+file path=usr/share/lib/terminfo/t/tvi925
+file path=usr/share/lib/terminfo/t/tvi925-hi
+file path=usr/share/lib/terminfo/t/tvi92B
+file path=usr/share/lib/terminfo/t/tvi92D
+file path=usr/share/lib/terminfo/t/tvi950
+file path=usr/share/lib/terminfo/t/tvi950-2p
+file path=usr/share/lib/terminfo/t/tvi950-4p
+file path=usr/share/lib/terminfo/t/tvi950-rv
+file path=usr/share/lib/terminfo/t/tvi950-rv-2p
+file path=usr/share/lib/terminfo/t/tvi950-rv-4p
+file path=usr/share/lib/terminfo/t/tvi955
+file path=usr/share/lib/terminfo/t/tvi955-hb
+file path=usr/share/lib/terminfo/t/tvi955-w
+file path=usr/share/lib/terminfo/t/tvi970
+file path=usr/share/lib/terminfo/t/tvi970-2p
+file path=usr/share/lib/terminfo/t/tvi970-vb
+file path=usr/share/lib/terminfo/t/tvipt
+file path=usr/share/lib/terminfo/t/tw100
+file path=usr/share/lib/terminfo/t/tw52
+hardlink path=usr/share/lib/terminfo/t/tw52-color target=../t/tw52
+file path=usr/share/lib/terminfo/t/tw52-m
+file path=usr/share/lib/terminfo/t/tws-generic
+file path=usr/share/lib/terminfo/t/tws2102-sna
+file path=usr/share/lib/terminfo/t/tws2103
+file path=usr/share/lib/terminfo/t/tws2103-sna
+dir  path=usr/share/lib/terminfo/u
+hardlink path=usr/share/lib/terminfo/u/ultima2 target=../i/ims-ansi
+hardlink path=usr/share/lib/terminfo/u/ultimaII target=../i/ims-ansi
+file path=usr/share/lib/terminfo/u/uniterm
+hardlink path=usr/share/lib/terminfo/u/uniterm49 target=../u/uniterm
+hardlink path=usr/share/lib/terminfo/u/unixpc target=../a/att7300
+file path=usr/share/lib/terminfo/u/unknown
+file path=usr/share/lib/terminfo/u/uts30
+file path=usr/share/lib/terminfo/u/uwin
+dir  path=usr/share/lib/terminfo/v
+hardlink path=usr/share/lib/terminfo/v/v200-nam target=../v/vt220-nam
+hardlink path=usr/share/lib/terminfo/v/v320n target=../v/vt320nam
+file path=usr/share/lib/terminfo/v/v3220
+file path=usr/share/lib/terminfo/v/v5410
+file path=usr/share/lib/terminfo/v/vanilla
+hardlink path=usr/share/lib/terminfo/v/vapple target=../a/apple-videx3
+hardlink path=usr/share/lib/terminfo/v/vc103 target=../v/vc303
+hardlink path=usr/share/lib/terminfo/v/vc203 target=../v/vc303
+file path=usr/share/lib/terminfo/v/vc303
+file path=usr/share/lib/terminfo/v/vc303a
+hardlink path=usr/share/lib/terminfo/v/vc403a target=../v/vc303a
+file path=usr/share/lib/terminfo/v/vc404
+file path=usr/share/lib/terminfo/v/vc404-s
+file path=usr/share/lib/terminfo/v/vc414
+hardlink path=usr/share/lib/terminfo/v/vc414h target=../v/vc414
+file path=usr/share/lib/terminfo/v/vc415
+hardlink path=usr/share/lib/terminfo/v/venix target=../p/pc-venix
+file path=usr/share/lib/terminfo/v/versaterm
+file path=usr/share/lib/terminfo/v/vi200
+file path=usr/share/lib/terminfo/v/vi200-f
+file path=usr/share/lib/terminfo/v/vi200-rv
+file path=usr/share/lib/terminfo/v/vi300
+file path=usr/share/lib/terminfo/v/vi300-old
+file path=usr/share/lib/terminfo/v/vi50
+file path=usr/share/lib/terminfo/v/vi500
+file path=usr/share/lib/terminfo/v/vi50adm
+file path=usr/share/lib/terminfo/v/vi55
+file path=usr/share/lib/terminfo/v/vi550
+file path=usr/share/lib/terminfo/v/vi603
+file path=usr/share/lib/terminfo/v/viewpoint
+hardlink path=usr/share/lib/terminfo/v/viewpoint3a+ target=../v/vp3a+
+hardlink path=usr/share/lib/terminfo/v/viewpoint60 target=../v/vp60
+hardlink path=usr/share/lib/terminfo/v/viewpoint90 target=../v/vp90
+file path=usr/share/lib/terminfo/v/vip
+file path=usr/share/lib/terminfo/v/vip-H
+file path=usr/share/lib/terminfo/v/vip-Hw
+file path=usr/share/lib/terminfo/v/vip-w
+hardlink path=usr/share/lib/terminfo/v/vip7800-H target=../v/vip-H
+hardlink path=usr/share/lib/terminfo/v/vip7800-Hw target=../v/vip-Hw
+hardlink path=usr/share/lib/terminfo/v/vip7800-w target=../v/vip-w
+file path=usr/share/lib/terminfo/v/visa50
+hardlink path=usr/share/lib/terminfo/v/visual603 target=../v/vi603
+hardlink path=usr/share/lib/terminfo/v/vitty target=../a/att5620-s
+hardlink path=usr/share/lib/terminfo/v/vk100 target=../g/gigi
+file path=usr/share/lib/terminfo/v/vp3a+
+file path=usr/share/lib/terminfo/v/vp60
+file path=usr/share/lib/terminfo/v/vp90
+file path=usr/share/lib/terminfo/v/vremote
+hardlink path=usr/share/lib/terminfo/v/vs100 target=../x/xterm-24
+hardlink path=usr/share/lib/terminfo/v/vs100-x10 target=../x/x10term
+file path=usr/share/lib/terminfo/v/vsc
+hardlink path=usr/share/lib/terminfo/v/vt-61 target=../v/vt61
+hardlink path=usr/share/lib/terminfo/v/vt-utf8 target=../m/ms-vt-utf8
+file path=usr/share/lib/terminfo/v/vt100
+hardlink path=usr/share/lib/terminfo/v/vt100+ target=../m/ms-vt100+
+file path=usr/share/lib/terminfo/v/vt100+enq
+file path=usr/share/lib/terminfo/v/vt100+fnkeys
+file path=usr/share/lib/terminfo/v/vt100+keypad
+file path=usr/share/lib/terminfo/v/vt100+pfkeys
+hardlink path=usr/share/lib/terminfo/v/vt100-am target=../v/vt100
+hardlink path=usr/share/lib/terminfo/v/vt100-bm target=../n/nwp512
+hardlink path=usr/share/lib/terminfo/v/vt100-bm-o target=../n/nwp512-o
+hardlink path=usr/share/lib/terminfo/v/vt100-bot-s target=../v/vt100-s-bot
+hardlink path=usr/share/lib/terminfo/v/vt100-nam target=../v/vt100nam
+hardlink path=usr/share/lib/terminfo/v/vt100-nam-w target=../v/vt100-w-nam
+file path=usr/share/lib/terminfo/v/vt100-nav
+file path=usr/share/lib/terminfo/v/vt100-nav-w
+file path=usr/share/lib/terminfo/v/vt100-putty
+file path=usr/share/lib/terminfo/v/vt100-s
+file path=usr/share/lib/terminfo/v/vt100-s-bot
+hardlink path=usr/share/lib/terminfo/v/vt100-s-top target=../v/vt100-s
+hardlink path=usr/share/lib/terminfo/v/vt100-top-s target=../v/vt100-s
+file path=usr/share/lib/terminfo/v/vt100-vb
+file path=usr/share/lib/terminfo/v/vt100-w
+hardlink path=usr/share/lib/terminfo/v/vt100-w-am target=../v/vt100-w
+file path=usr/share/lib/terminfo/v/vt100-w-nam
+hardlink path=usr/share/lib/terminfo/v/vt100-w-nav target=../v/vt100-nav-w
+file path=usr/share/lib/terminfo/v/vt100nam
+file path=usr/share/lib/terminfo/v/vt102
+file path=usr/share/lib/terminfo/v/vt102+enq
+file path=usr/share/lib/terminfo/v/vt102-nsgr
+file path=usr/share/lib/terminfo/v/vt102-w
+file path=usr/share/lib/terminfo/v/vt125
+file path=usr/share/lib/terminfo/v/vt131
+file path=usr/share/lib/terminfo/v/vt132
+hardlink path=usr/share/lib/terminfo/v/vt200 target=../v/vt220
+hardlink path=usr/share/lib/terminfo/v/vt200-8 target=../v/vt220-8bit
+hardlink path=usr/share/lib/terminfo/v/vt200-8bit target=../v/vt220-8bit
+file path=usr/share/lib/terminfo/v/vt200-js
+hardlink path=usr/share/lib/terminfo/v/vt200-old target=../v/vt220-old
+hardlink path=usr/share/lib/terminfo/v/vt200-w target=../v/vt220-w
+file path=usr/share/lib/terminfo/v/vt220
+file path=usr/share/lib/terminfo/v/vt220+keypad
+hardlink path=usr/share/lib/terminfo/v/vt220-8 target=../v/vt220-8bit
+file path=usr/share/lib/terminfo/v/vt220-8bit
+hardlink path=usr/share/lib/terminfo/v/vt220-js target=../v/vt200-js
+file path=usr/share/lib/terminfo/v/vt220-nam
+file path=usr/share/lib/terminfo/v/vt220-old
+file path=usr/share/lib/terminfo/v/vt220-w
+file path=usr/share/lib/terminfo/v/vt220d
+hardlink path=usr/share/lib/terminfo/v/vt300 target=../v/vt320
+hardlink path=usr/share/lib/terminfo/v/vt300-nam target=../v/vt320-nam
+hardlink path=usr/share/lib/terminfo/v/vt300-w target=../v/vt320-w
+hardlink path=usr/share/lib/terminfo/v/vt300-w-nam target=../v/vt320-w-nam
+file path=usr/share/lib/terminfo/v/vt320
+file path=usr/share/lib/terminfo/v/vt320-k3
+file path=usr/share/lib/terminfo/v/vt320-k311
+file path=usr/share/lib/terminfo/v/vt320-nam
+file path=usr/share/lib/terminfo/v/vt320-w
+file path=usr/share/lib/terminfo/v/vt320-w-nam
+file path=usr/share/lib/terminfo/v/vt320nam
+hardlink path=usr/share/lib/terminfo/v/vt330 target=../v/vt340
+file path=usr/share/lib/terminfo/v/vt340
+file path=usr/share/lib/terminfo/v/vt400
+hardlink path=usr/share/lib/terminfo/v/vt400-24 target=../v/vt400
+file path=usr/share/lib/terminfo/v/vt420
+file path=usr/share/lib/terminfo/v/vt420f
+file path=usr/share/lib/terminfo/v/vt420pc
+file path=usr/share/lib/terminfo/v/vt420pcdos
+file path=usr/share/lib/terminfo/v/vt50
+file path=usr/share/lib/terminfo/v/vt50h
+file path=usr/share/lib/terminfo/v/vt510
+file path=usr/share/lib/terminfo/v/vt510pc
+file path=usr/share/lib/terminfo/v/vt510pcdos
+file path=usr/share/lib/terminfo/v/vt52
+file path=usr/share/lib/terminfo/v/vt520
+file path=usr/share/lib/terminfo/v/vt525
+file path=usr/share/lib/terminfo/v/vt61
+hardlink path=usr/share/lib/terminfo/v/vt61.5 target=../v/vt61
+file path=usr/share/lib/terminfo/v/vte
+file path=usr/share/lib/terminfo/v/vte+pcfkeys
+file path=usr/share/lib/terminfo/v/vte-2007
+file path=usr/share/lib/terminfo/v/vte-2008
+file path=usr/share/lib/terminfo/v/vte-256color
+hardlink path=usr/share/lib/terminfo/v/vtnt target=../m/ms-vt100-color
+hardlink path=usr/share/lib/terminfo/v/vv100 target=../m/mvterm
+file path=usr/share/lib/terminfo/v/vwmterm
+dir  path=usr/share/lib/terminfo/w
+hardlink path=usr/share/lib/terminfo/w/wren target=../p/pt100
+hardlink path=usr/share/lib/terminfo/w/wrenw target=../p/pt100w
+file path=usr/share/lib/terminfo/w/wsiris
+file path=usr/share/lib/terminfo/w/wsvt25
+file path=usr/share/lib/terminfo/w/wsvt25m
+hardlink path=usr/share/lib/terminfo/w/wy-75ap target=../w/wy75ap
+hardlink path=usr/share/lib/terminfo/w/wy-99fgt target=../w/wy99f
+hardlink path=usr/share/lib/terminfo/w/wy-99fgta target=../w/wy99fa
+file path=usr/share/lib/terminfo/w/wy100
+file path=usr/share/lib/terminfo/w/wy100q
+file path=usr/share/lib/terminfo/w/wy120
+file path=usr/share/lib/terminfo/w/wy120-25
+file path=usr/share/lib/terminfo/w/wy120-25-w
+file path=usr/share/lib/terminfo/w/wy120-vb
+file path=usr/share/lib/terminfo/w/wy120-w
+file path=usr/share/lib/terminfo/w/wy120-w-vb
+hardlink path=usr/share/lib/terminfo/w/wy120-wvb target=../w/wy120-w-vb
+hardlink path=usr/share/lib/terminfo/w/wy150 target=../w/wy120
+hardlink path=usr/share/lib/terminfo/w/wy150-25 target=../w/wy120-25
+hardlink path=usr/share/lib/terminfo/w/wy150-25-w target=../w/wy120-25-w
+hardlink path=usr/share/lib/terminfo/w/wy150-vb target=../w/wy120-vb
+hardlink path=usr/share/lib/terminfo/w/wy150-w target=../w/wy120-w
+hardlink path=usr/share/lib/terminfo/w/wy150-w-vb target=../w/wy120-w-vb
+file path=usr/share/lib/terminfo/w/wy160
+file path=usr/share/lib/terminfo/w/wy160-25
+file path=usr/share/lib/terminfo/w/wy160-25-w
+file path=usr/share/lib/terminfo/w/wy160-42
+file path=usr/share/lib/terminfo/w/wy160-42-w
+file path=usr/share/lib/terminfo/w/wy160-43
+file path=usr/share/lib/terminfo/w/wy160-43-w
+file path=usr/share/lib/terminfo/w/wy160-tek
+file path=usr/share/lib/terminfo/w/wy160-vb
+file path=usr/share/lib/terminfo/w/wy160-w
+file path=usr/share/lib/terminfo/w/wy160-w-vb
+hardlink path=usr/share/lib/terminfo/w/wy160-wvb target=../w/wy160-w-vb
+file path=usr/share/lib/terminfo/w/wy185
+file path=usr/share/lib/terminfo/w/wy185-24
+file path=usr/share/lib/terminfo/w/wy185-vb
+file path=usr/share/lib/terminfo/w/wy185-w
+file path=usr/share/lib/terminfo/w/wy185-wvb
+file path=usr/share/lib/terminfo/w/wy30
+file path=usr/share/lib/terminfo/w/wy30-mc
+file path=usr/share/lib/terminfo/w/wy30-vb
+file path=usr/share/lib/terminfo/w/wy325
+file path=usr/share/lib/terminfo/w/wy325-25
+file path=usr/share/lib/terminfo/w/wy325-25w
+file path=usr/share/lib/terminfo/w/wy325-42
+file path=usr/share/lib/terminfo/w/wy325-42w
+file path=usr/share/lib/terminfo/w/wy325-42w-vb
+hardlink path=usr/share/lib/terminfo/w/wy325-42wvb target=../w/wy325-42w-vb
+file path=usr/share/lib/terminfo/w/wy325-43
+file path=usr/share/lib/terminfo/w/wy325-43w
+file path=usr/share/lib/terminfo/w/wy325-43w-vb
+hardlink path=usr/share/lib/terminfo/w/wy325-43wvb target=../w/wy325-43w-vb
+hardlink path=usr/share/lib/terminfo/w/wy325-80 target=../w/wy325-25
+file path=usr/share/lib/terminfo/w/wy325-vb
+file path=usr/share/lib/terminfo/w/wy325-w
+file path=usr/share/lib/terminfo/w/wy325-w-vb
+hardlink path=usr/share/lib/terminfo/w/wy325-wvb target=../w/wy325-w-vb
+hardlink path=usr/share/lib/terminfo/w/wy325w-24 target=../w/wy325-w
+file path=usr/share/lib/terminfo/w/wy350
+file path=usr/share/lib/terminfo/w/wy350-vb
+file path=usr/share/lib/terminfo/w/wy350-w
+file path=usr/share/lib/terminfo/w/wy350-wvb
+file path=usr/share/lib/terminfo/w/wy370
+hardlink path=usr/share/lib/terminfo/w/wy370-101k target=../w/wy370
+file path=usr/share/lib/terminfo/w/wy370-105k
+file path=usr/share/lib/terminfo/w/wy370-EPC
+file path=usr/share/lib/terminfo/w/wy370-nk
+file path=usr/share/lib/terminfo/w/wy370-rv
+file path=usr/share/lib/terminfo/w/wy370-tek
+file path=usr/share/lib/terminfo/w/wy370-vb
+file path=usr/share/lib/terminfo/w/wy370-w
+file path=usr/share/lib/terminfo/w/wy370-wvb
+file path=usr/share/lib/terminfo/w/wy50
+file path=usr/share/lib/terminfo/w/wy50-mc
+file path=usr/share/lib/terminfo/w/wy50-vb
+file path=usr/share/lib/terminfo/w/wy50-w
+file path=usr/share/lib/terminfo/w/wy50-wvb
+file path=usr/share/lib/terminfo/w/wy520
+file path=usr/share/lib/terminfo/w/wy520-24
+file path=usr/share/lib/terminfo/w/wy520-36
+file path=usr/share/lib/terminfo/w/wy520-36pc
+file path=usr/share/lib/terminfo/w/wy520-36w
+file path=usr/share/lib/terminfo/w/wy520-36wpc
+file path=usr/share/lib/terminfo/w/wy520-48
+file path=usr/share/lib/terminfo/w/wy520-48pc
+file path=usr/share/lib/terminfo/w/wy520-48w
+file path=usr/share/lib/terminfo/w/wy520-48wpc
+file path=usr/share/lib/terminfo/w/wy520-epc
+file path=usr/share/lib/terminfo/w/wy520-epc-24
+file path=usr/share/lib/terminfo/w/wy520-epc-vb
+file path=usr/share/lib/terminfo/w/wy520-epc-w
+file path=usr/share/lib/terminfo/w/wy520-epc-wvb
+file path=usr/share/lib/terminfo/w/wy520-vb
+file path=usr/share/lib/terminfo/w/wy520-w
+file path=usr/share/lib/terminfo/w/wy520-wvb
+file path=usr/share/lib/terminfo/w/wy60
+file path=usr/share/lib/terminfo/w/wy60-25
+file path=usr/share/lib/terminfo/w/wy60-25-w
+hardlink path=usr/share/lib/terminfo/w/wy60-316X target=../i/ibm3161
+file path=usr/share/lib/terminfo/w/wy60-42
+file path=usr/share/lib/terminfo/w/wy60-42-w
+file path=usr/share/lib/terminfo/w/wy60-43
+file path=usr/share/lib/terminfo/w/wy60-43-w
+hardlink path=usr/share/lib/terminfo/w/wy60-AT target=../i/ibm5151
+hardlink path=usr/share/lib/terminfo/w/wy60-PC target=../i/ibmpc
+file path=usr/share/lib/terminfo/w/wy60-vb
+file path=usr/share/lib/terminfo/w/wy60-w
+file path=usr/share/lib/terminfo/w/wy60-w-vb
+hardlink path=usr/share/lib/terminfo/w/wy60-wvb target=../w/wy60-w-vb
+file path=usr/share/lib/terminfo/w/wy75
+file path=usr/share/lib/terminfo/w/wy75-mc
+file path=usr/share/lib/terminfo/w/wy75-vb
+file path=usr/share/lib/terminfo/w/wy75-w
+file path=usr/share/lib/terminfo/w/wy75-wvb
+file path=usr/share/lib/terminfo/w/wy75ap
+file path=usr/share/lib/terminfo/w/wy85
+file path=usr/share/lib/terminfo/w/wy85-8bit
+file path=usr/share/lib/terminfo/w/wy85-vb
+file path=usr/share/lib/terminfo/w/wy85-w
+file path=usr/share/lib/terminfo/w/wy85-wvb
+file path=usr/share/lib/terminfo/w/wy99-ansi
+file path=usr/share/lib/terminfo/w/wy99a-ansi
+file path=usr/share/lib/terminfo/w/wy99f
+file path=usr/share/lib/terminfo/w/wy99fa
+hardlink path=usr/share/lib/terminfo/w/wy99fgt target=../w/wy99f
+hardlink path=usr/share/lib/terminfo/w/wy99fgta target=../w/wy99fa
+file path=usr/share/lib/terminfo/w/wy99gt
+file path=usr/share/lib/terminfo/w/wy99gt-25
+file path=usr/share/lib/terminfo/w/wy99gt-25-w
+file path=usr/share/lib/terminfo/w/wy99gt-tek
+file path=usr/share/lib/terminfo/w/wy99gt-vb
+file path=usr/share/lib/terminfo/w/wy99gt-w
+file path=usr/share/lib/terminfo/w/wy99gt-w-vb
+hardlink path=usr/share/lib/terminfo/w/wy99gt-wvb target=../w/wy99gt-w-vb
+hardlink path=usr/share/lib/terminfo/w/wyse-325 target=../w/wy325-25
+hardlink path=usr/share/lib/terminfo/w/wyse-75ap target=../w/wy75ap
+file path=usr/share/lib/terminfo/w/wyse-vp
+hardlink path=usr/share/lib/terminfo/w/wyse120 target=../w/wy120
+hardlink path=usr/share/lib/terminfo/w/wyse120-25 target=../w/wy120-25
+hardlink path=usr/share/lib/terminfo/w/wyse120-25-w target=../w/wy120-25-w
+hardlink path=usr/share/lib/terminfo/w/wyse120-vb target=../w/wy120-vb
+hardlink path=usr/share/lib/terminfo/w/wyse120-w target=../w/wy120-w
+hardlink path=usr/share/lib/terminfo/w/wyse120-wvb target=../w/wy120-w-vb
+hardlink path=usr/share/lib/terminfo/w/wyse150 target=../w/wy120
+hardlink path=usr/share/lib/terminfo/w/wyse150-25 target=../w/wy120-25
+hardlink path=usr/share/lib/terminfo/w/wyse150-25-w target=../w/wy120-25-w
+hardlink path=usr/share/lib/terminfo/w/wyse150-vb target=../w/wy120-vb
+hardlink path=usr/share/lib/terminfo/w/wyse150-w target=../w/wy120-w
+hardlink path=usr/share/lib/terminfo/w/wyse150-w-vb target=../w/wy120-w-vb
+hardlink path=usr/share/lib/terminfo/w/wyse160 target=../w/wy160
+hardlink path=usr/share/lib/terminfo/w/wyse160-25 target=../w/wy160-25
+hardlink path=usr/share/lib/terminfo/w/wyse160-25-w target=../w/wy160-25-w
+hardlink path=usr/share/lib/terminfo/w/wyse160-42 target=../w/wy160-42
+hardlink path=usr/share/lib/terminfo/w/wyse160-42-w target=../w/wy160-42-w
+hardlink path=usr/share/lib/terminfo/w/wyse160-43 target=../w/wy160-43
+hardlink path=usr/share/lib/terminfo/w/wyse160-43-w target=../w/wy160-43-w
+hardlink path=usr/share/lib/terminfo/w/wyse160-vb target=../w/wy160-vb
+hardlink path=usr/share/lib/terminfo/w/wyse160-w target=../w/wy160-w
+hardlink path=usr/share/lib/terminfo/w/wyse160-wvb target=../w/wy160-w-vb
+hardlink path=usr/share/lib/terminfo/w/wyse185 target=../w/wy185
+hardlink path=usr/share/lib/terminfo/w/wyse185-24 target=../w/wy185-24
+hardlink path=usr/share/lib/terminfo/w/wyse185-vb target=../w/wy185-vb
+hardlink path=usr/share/lib/terminfo/w/wyse185-w target=../w/wy185-w
+hardlink path=usr/share/lib/terminfo/w/wyse185-wvb target=../w/wy185-wvb
+hardlink path=usr/share/lib/terminfo/w/wyse30 target=../w/wy30
+hardlink path=usr/share/lib/terminfo/w/wyse30-mc target=../w/wy30-mc
+hardlink path=usr/share/lib/terminfo/w/wyse30-vb target=../w/wy30-vb
+hardlink path=usr/share/lib/terminfo/w/wyse325 target=../w/wy325
+hardlink path=usr/share/lib/terminfo/w/wyse325-25 target=../w/wy325-25
+hardlink path=usr/share/lib/terminfo/w/wyse325-25w target=../w/wy325-25w
+hardlink path=usr/share/lib/terminfo/w/wyse325-42 target=../w/wy325-42
+hardlink path=usr/share/lib/terminfo/w/wyse325-42w target=../w/wy325-42w
+hardlink path=usr/share/lib/terminfo/w/wyse325-43 target=../w/wy325-43
+hardlink path=usr/share/lib/terminfo/w/wyse325-43w target=../w/wy325-43w
+hardlink path=usr/share/lib/terminfo/w/wyse325-vb target=../w/wy325-vb
+hardlink path=usr/share/lib/terminfo/w/wyse325-w target=../w/wy325-w
+hardlink path=usr/share/lib/terminfo/w/wyse325-wvb target=../w/wy325-w-vb
+hardlink path=usr/share/lib/terminfo/w/wyse350 target=../w/wy350
+hardlink path=usr/share/lib/terminfo/w/wyse350-vb target=../w/wy350-vb
+hardlink path=usr/share/lib/terminfo/w/wyse350-w target=../w/wy350-w
+hardlink path=usr/share/lib/terminfo/w/wyse350-wvb target=../w/wy350-wvb
+hardlink path=usr/share/lib/terminfo/w/wyse370 target=../w/wy370
+hardlink path=usr/share/lib/terminfo/w/wyse50 target=../w/wy50
+hardlink path=usr/share/lib/terminfo/w/wyse50-mc target=../w/wy50-mc
+hardlink path=usr/share/lib/terminfo/w/wyse50-vb target=../w/wy50-vb
+hardlink path=usr/share/lib/terminfo/w/wyse50-w target=../w/wy50-w
+hardlink path=usr/share/lib/terminfo/w/wyse50-wvb target=../w/wy50-wvb
+hardlink path=usr/share/lib/terminfo/w/wyse520 target=../w/wy520
+hardlink path=usr/share/lib/terminfo/w/wyse520-24 target=../w/wy520-24
+hardlink path=usr/share/lib/terminfo/w/wyse520-36 target=../w/wy520-36
+hardlink path=usr/share/lib/terminfo/w/wyse520-36pc target=../w/wy520-36pc
+hardlink path=usr/share/lib/terminfo/w/wyse520-36w target=../w/wy520-36w
+hardlink path=usr/share/lib/terminfo/w/wyse520-36wpc target=../w/wy520-36wpc
+hardlink path=usr/share/lib/terminfo/w/wyse520-48 target=../w/wy520-48
+hardlink path=usr/share/lib/terminfo/w/wyse520-48pc target=../w/wy520-48pc
+hardlink path=usr/share/lib/terminfo/w/wyse520-48w target=../w/wy520-48w
+hardlink path=usr/share/lib/terminfo/w/wyse520-48wpc target=../w/wy520-48wpc
+hardlink path=usr/share/lib/terminfo/w/wyse520-epc target=../w/wy520-epc
+hardlink path=usr/share/lib/terminfo/w/wyse520-epc-w target=../w/wy520-epc-w
+hardlink path=usr/share/lib/terminfo/w/wyse520-p-wvb target=../w/wy520-epc-wvb
+hardlink path=usr/share/lib/terminfo/w/wyse520-pc-24 target=../w/wy520-epc-24
+hardlink path=usr/share/lib/terminfo/w/wyse520-pc-vb target=../w/wy520-epc-vb
+hardlink path=usr/share/lib/terminfo/w/wyse520-vb target=../w/wy520-vb
+hardlink path=usr/share/lib/terminfo/w/wyse520-w target=../w/wy520-w
+hardlink path=usr/share/lib/terminfo/w/wyse520-wvb target=../w/wy520-wvb
+hardlink path=usr/share/lib/terminfo/w/wyse60 target=../w/wy60
+hardlink path=usr/share/lib/terminfo/w/wyse60-25 target=../w/wy60-25
+hardlink path=usr/share/lib/terminfo/w/wyse60-25-w target=../w/wy60-25-w
+hardlink path=usr/share/lib/terminfo/w/wyse60-316X target=../i/ibm3161
+hardlink path=usr/share/lib/terminfo/w/wyse60-42 target=../w/wy60-42
+hardlink path=usr/share/lib/terminfo/w/wyse60-42-w target=../w/wy60-42-w
+hardlink path=usr/share/lib/terminfo/w/wyse60-43 target=../w/wy60-43
+hardlink path=usr/share/lib/terminfo/w/wyse60-43-w target=../w/wy60-43-w
+hardlink path=usr/share/lib/terminfo/w/wyse60-AT target=../i/ibm5151
+hardlink path=usr/share/lib/terminfo/w/wyse60-PC target=../i/ibmpc
+hardlink path=usr/share/lib/terminfo/w/wyse60-vb target=../w/wy60-vb
+hardlink path=usr/share/lib/terminfo/w/wyse60-w target=../w/wy60-w
+hardlink path=usr/share/lib/terminfo/w/wyse60-wvb target=../w/wy60-w-vb
+hardlink path=usr/share/lib/terminfo/w/wyse75 target=../w/wy75
+hardlink path=usr/share/lib/terminfo/w/wyse75-mc target=../w/wy75-mc
+hardlink path=usr/share/lib/terminfo/w/wyse75-vb target=../w/wy75-vb
+hardlink path=usr/share/lib/terminfo/w/wyse75-w target=../w/wy75-w
+hardlink path=usr/share/lib/terminfo/w/wyse75-wvb target=../w/wy75-wvb
+hardlink path=usr/share/lib/terminfo/w/wyse75ap target=../w/wy75ap
+hardlink path=usr/share/lib/terminfo/w/wyse85 target=../w/wy85
+hardlink path=usr/share/lib/terminfo/w/wyse85-8bit target=../w/wy85-8bit
+hardlink path=usr/share/lib/terminfo/w/wyse85-vb target=../w/wy85-vb
+hardlink path=usr/share/lib/terminfo/w/wyse85-w target=../w/wy85-w
+hardlink path=usr/share/lib/terminfo/w/wyse85-wvb target=../w/wy85-wvb
+hardlink path=usr/share/lib/terminfo/w/wyse99gt target=../w/wy99gt
+hardlink path=usr/share/lib/terminfo/w/wyse99gt-25 target=../w/wy99gt-25
+hardlink path=usr/share/lib/terminfo/w/wyse99gt-25-w target=../w/wy99gt-25-w
+hardlink path=usr/share/lib/terminfo/w/wyse99gt-vb target=../w/wy99gt-vb
+hardlink path=usr/share/lib/terminfo/w/wyse99gt-w target=../w/wy99gt-w
+hardlink path=usr/share/lib/terminfo/w/wyse99gt-wvb target=../w/wy99gt-w-vb
+dir  path=usr/share/lib/terminfo/x
+file path=usr/share/lib/terminfo/x/x10term
+hardlink path=usr/share/lib/terminfo/x/x1700 target=../d/diablo1640
+hardlink path=usr/share/lib/terminfo/x/x1700-lm target=../d/diablo1740-lm
+hardlink path=usr/share/lib/terminfo/x/x1720 target=../x/xerox1720
+hardlink path=usr/share/lib/terminfo/x/x1750 target=../x/xerox1720
+file path=usr/share/lib/terminfo/x/x68k
+hardlink path=usr/share/lib/terminfo/x/x68k-ite target=../x/x68k
+hardlink path=usr/share/lib/terminfo/x/x820 target=../x/xerox820
+hardlink path=usr/share/lib/terminfo/x/xdku target=../t/tws2103
+hardlink path=usr/share/lib/terminfo/x/xenix target=../i/ibmpcx
+hardlink path=usr/share/lib/terminfo/x/xerox target=../d/diablo1640
+hardlink path=usr/share/lib/terminfo/x/xerox-lm target=../d/diablo1640-lm
+file path=usr/share/lib/terminfo/x/xerox1720
+file path=usr/share/lib/terminfo/x/xerox820
+file path=usr/share/lib/terminfo/x/xfce
+file path=usr/share/lib/terminfo/x/xiterm
+hardlink path=usr/share/lib/terminfo/x/xl83 target=../c/cyb83
+file path=usr/share/lib/terminfo/x/xnuppc
+file path=usr/share/lib/terminfo/x/xnuppc+100x37
+file path=usr/share/lib/terminfo/x/xnuppc+112x37
+file path=usr/share/lib/terminfo/x/xnuppc+128x40
+file path=usr/share/lib/terminfo/x/xnuppc+128x48
+file path=usr/share/lib/terminfo/x/xnuppc+144x48
+file path=usr/share/lib/terminfo/x/xnuppc+160x64
+file path=usr/share/lib/terminfo/x/xnuppc+200x64
+file path=usr/share/lib/terminfo/x/xnuppc+200x75
+file path=usr/share/lib/terminfo/x/xnuppc+256x96
+file path=usr/share/lib/terminfo/x/xnuppc+80x25
+file path=usr/share/lib/terminfo/x/xnuppc+80x30
+file path=usr/share/lib/terminfo/x/xnuppc+90x30
+file path=usr/share/lib/terminfo/x/xnuppc+b
+file path=usr/share/lib/terminfo/x/xnuppc+basic
+file path=usr/share/lib/terminfo/x/xnuppc+c
+file path=usr/share/lib/terminfo/x/xnuppc+f
+file path=usr/share/lib/terminfo/x/xnuppc+f2
+file path=usr/share/lib/terminfo/x/xnuppc-100x37
+file path=usr/share/lib/terminfo/x/xnuppc-100x37-m
+file path=usr/share/lib/terminfo/x/xnuppc-112x37
+file path=usr/share/lib/terminfo/x/xnuppc-112x37-m
+file path=usr/share/lib/terminfo/x/xnuppc-128x40
+file path=usr/share/lib/terminfo/x/xnuppc-128x40-m
+file path=usr/share/lib/terminfo/x/xnuppc-128x48
+file path=usr/share/lib/terminfo/x/xnuppc-128x48-m
+file path=usr/share/lib/terminfo/x/xnuppc-144x48
+file path=usr/share/lib/terminfo/x/xnuppc-144x48-m
+file path=usr/share/lib/terminfo/x/xnuppc-160x64
+file path=usr/share/lib/terminfo/x/xnuppc-160x64-m
+file path=usr/share/lib/terminfo/x/xnuppc-200x64
+file path=usr/share/lib/terminfo/x/xnuppc-200x64-m
+file path=usr/share/lib/terminfo/x/xnuppc-200x75
+file path=usr/share/lib/terminfo/x/xnuppc-200x75-m
+file path=usr/share/lib/terminfo/x/xnuppc-256x96
+file path=usr/share/lib/terminfo/x/xnuppc-256x96-m
+file path=usr/share/lib/terminfo/x/xnuppc-80x25
+file path=usr/share/lib/terminfo/x/xnuppc-80x25-m
+file path=usr/share/lib/terminfo/x/xnuppc-80x30
+file path=usr/share/lib/terminfo/x/xnuppc-80x30-m
+file path=usr/share/lib/terminfo/x/xnuppc-90x30
+file path=usr/share/lib/terminfo/x/xnuppc-90x30-m
+file path=usr/share/lib/terminfo/x/xnuppc-b
+file path=usr/share/lib/terminfo/x/xnuppc-f
+file path=usr/share/lib/terminfo/x/xnuppc-f2
+file path=usr/share/lib/terminfo/x/xnuppc-m
+file path=usr/share/lib/terminfo/x/xnuppc-m-b
+file path=usr/share/lib/terminfo/x/xnuppc-m-f
+file path=usr/share/lib/terminfo/x/xnuppc-m-f2
+file path=usr/share/lib/terminfo/x/xtalk
+file path=usr/share/lib/terminfo/x/xterm
+file path=usr/share/lib/terminfo/x/xterm+256color
+file path=usr/share/lib/terminfo/x/xterm+88color
+file path=usr/share/lib/terminfo/x/xterm+app
+file path=usr/share/lib/terminfo/x/xterm+edit
+file path=usr/share/lib/terminfo/x/xterm+noapp
+file path=usr/share/lib/terminfo/x/xterm+pc+edit
+file path=usr/share/lib/terminfo/x/xterm+pcc0
+file path=usr/share/lib/terminfo/x/xterm+pcc1
+file path=usr/share/lib/terminfo/x/xterm+pcc2
+file path=usr/share/lib/terminfo/x/xterm+pcc3
+file path=usr/share/lib/terminfo/x/xterm+pce2
+file path=usr/share/lib/terminfo/x/xterm+pcf0
+file path=usr/share/lib/terminfo/x/xterm+pcf2
+file path=usr/share/lib/terminfo/x/xterm+pcfkeys
+file path=usr/share/lib/terminfo/x/xterm+r6f2
+file path=usr/share/lib/terminfo/x/xterm+sl
+file path=usr/share/lib/terminfo/x/xterm+sl-twm
+file path=usr/share/lib/terminfo/x/xterm+tmux
+file path=usr/share/lib/terminfo/x/xterm+vt+edit
+file path=usr/share/lib/terminfo/x/xterm-1002
+file path=usr/share/lib/terminfo/x/xterm-1003
+file path=usr/share/lib/terminfo/x/xterm-16color
+file path=usr/share/lib/terminfo/x/xterm-24
+file path=usr/share/lib/terminfo/x/xterm-256color
+file path=usr/share/lib/terminfo/x/xterm-88color
+file path=usr/share/lib/terminfo/x/xterm-8bit
+file path=usr/share/lib/terminfo/x/xterm-basic
+file path=usr/share/lib/terminfo/x/xterm-bold
+file path=usr/share/lib/terminfo/x/xterm-color
+file path=usr/share/lib/terminfo/x/xterm-hp
+file path=usr/share/lib/terminfo/x/xterm-new
+file path=usr/share/lib/terminfo/x/xterm-nic
+file path=usr/share/lib/terminfo/x/xterm-noapp
+hardlink path=usr/share/lib/terminfo/x/xterm-old target=../x/xterm-r6
+file path=usr/share/lib/terminfo/x/xterm-pcolor
+file path=usr/share/lib/terminfo/x/xterm-r5
+file path=usr/share/lib/terminfo/x/xterm-r6
+file path=usr/share/lib/terminfo/x/xterm-sco
+file path=usr/share/lib/terminfo/x/xterm-sun
+file path=usr/share/lib/terminfo/x/xterm-utf8
+file path=usr/share/lib/terminfo/x/xterm-vt220
+file path=usr/share/lib/terminfo/x/xterm-vt52
+file path=usr/share/lib/terminfo/x/xterm-xf86-v32
+file path=usr/share/lib/terminfo/x/xterm-xf86-v33
+file path=usr/share/lib/terminfo/x/xterm-xf86-v333
+file path=usr/share/lib/terminfo/x/xterm-xf86-v40
+file path=usr/share/lib/terminfo/x/xterm-xf86-v43
+file path=usr/share/lib/terminfo/x/xterm-xf86-v44
+file path=usr/share/lib/terminfo/x/xterm-xfree86
+file path=usr/share/lib/terminfo/x/xterm-xi
+file path=usr/share/lib/terminfo/x/xterm1
+file path=usr/share/lib/terminfo/x/xtermc
+file path=usr/share/lib/terminfo/x/xtermm
+hardlink path=usr/share/lib/terminfo/x/xterms target=../x/xterm-24
+file path=usr/share/lib/terminfo/x/xterms-sun
+hardlink path=usr/share/lib/terminfo/x/xwsh target=../i/iris-color
+dir  path=usr/share/lib/terminfo/z
+hardlink path=usr/share/lib/terminfo/z/z-100 target=../z/z100
+hardlink path=usr/share/lib/terminfo/z/z-100bw target=../z/z100bw
+file path=usr/share/lib/terminfo/z/z100
+file path=usr/share/lib/terminfo/z/z100bw
+hardlink path=usr/share/lib/terminfo/z/z110 target=../z/z100
+hardlink path=usr/share/lib/terminfo/z/z110bw target=../z/z100bw
+hardlink path=usr/share/lib/terminfo/z/z19 target=../h/h19
+file path=usr/share/lib/terminfo/z/z29
+file path=usr/share/lib/terminfo/z/z29a
+hardlink path=usr/share/lib/terminfo/z/z29a-kc-bc target=../z/z29a
+file path=usr/share/lib/terminfo/z/z29a-kc-uc
+file path=usr/share/lib/terminfo/z/z29a-nkc-bc
+file path=usr/share/lib/terminfo/z/z29a-nkc-uc
+hardlink path=usr/share/lib/terminfo/z/z29b target=../z/z29
+hardlink path=usr/share/lib/terminfo/z/z30 target=../z/zen30
+file path=usr/share/lib/terminfo/z/z340
+file path=usr/share/lib/terminfo/z/z340-nam
+file path=usr/share/lib/terminfo/z/z39-a
+hardlink path=usr/share/lib/terminfo/z/z39a target=../z/z39-a
+hardlink path=usr/share/lib/terminfo/z/z50 target=../z/zen50
+hardlink path=usr/share/lib/terminfo/z/z8001 target=../c/cci
+file path=usr/share/lib/terminfo/z/zen30
+file path=usr/share/lib/terminfo/z/zen50
+hardlink path=usr/share/lib/terminfo/z/zen8001 target=../c/cci
+hardlink path=usr/share/lib/terminfo/z/zenith target=../h/h19
+hardlink path=usr/share/lib/terminfo/z/zenith29 target=../z/z29
+hardlink path=usr/share/lib/terminfo/z/zenith39-a target=../z/z39-a
+hardlink path=usr/share/lib/terminfo/z/zenith39-ansi target=../z/z39-a
+hardlink path=usr/share/lib/terminfo/z/zt-1 target=../z/ztx
+file path=usr/share/lib/terminfo/z/ztx
+hardlink path=usr/share/lib/terminfo/z/ztx-1-a target=../z/ztx
+hardlink path=usr/share/lib/terminfo/z/ztx11 target=../z/ztx
+link path=usr/share/terminfo target=../share/lib/terminfo
+legacy pkg=SUNWter \
+    desc="extensive terminfo database entries describing capabilities of terminals and pseudoterminals" \
+    name="Terminal Information"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license usr/src/data/terminfo/THIRDPARTYLICENSE \
+    license=usr/src/data/terminfo/THIRDPARTYLICENSE

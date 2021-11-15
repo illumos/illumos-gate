@@ -1,0 +1,69 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/kernel/suspend-resume@$(PKGVERS)
+set name=pkg.summary value="Suspend, Resume package"
+set name=pkg.description value="Suspend, Resume package"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=$(ARCH)
+$(i386_ONLY)dir path=kernel group=sys
+$(i386_ONLY)dir path=kernel/drv group=sys
+$(i386_ONLY)dir path=kernel/drv/$(ARCH64) group=sys
+$(i386_ONLY)file path=kernel/drv/$(ARCH64)/srn group=sys
+$(i386_ONLY)file path=kernel/drv/srn.conf group=sys
+dir  path=platform group=sys
+$(i386_ONLY)dir path=platform/i86pc group=sys
+$(i386_ONLY)dir path=platform/i86pc/kernel group=sys
+$(i386_ONLY)dir path=platform/i86pc/kernel/misc group=sys
+$(i386_ONLY)dir path=platform/i86pc/kernel/misc/$(ARCH64) group=sys
+$(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/cpr group=sys \
+    mode=0755
+$(sparc_ONLY)dir path=platform/sun4u group=sys
+$(sparc_ONLY)file path=platform/sun4u/cprboot group=sys reboot-needed=true
+$(sparc_ONLY)dir path=platform/sun4u/kernel group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/drv group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/tod group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/tod.conf group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/misc group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/misc/$(ARCH64) group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/cpr group=sys \
+    mode=0755
+dir  path=usr/share/man
+dir  path=usr/share/man/man7
+file path=usr/share/man/man7/cpr.7
+$(i386_ONLY)driver name=srn
+$(i386_ONLY)legacy pkg=SUNWcpr.i arch=$(ARCH).i86pc \
+    desc="Suspend, Resume package" name="Suspend, Resume package"
+$(sparc_ONLY)legacy pkg=SUNWcpr.u arch=$(ARCH).sun4u \
+    desc="Suspend, Resume package" name="Suspend, Resume package"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

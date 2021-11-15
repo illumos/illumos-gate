@@ -1,0 +1,867 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 Peter Tribble.
+#
+
+set name=pkg.fmri value=pkg:/service/picl@$(PKGVERS)
+set name=pkg.summary value="PICL Libraries, and Plugin Modules"
+set name=pkg.description \
+    value="PICL Daemon, Libraries, prtpicl client and plug-in modules"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+dir  path=lib variant.opensolaris.zone=global
+dir  path=lib/svc variant.opensolaris.zone=global
+dir  path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+file path=lib/svc/manifest/system/picl.xml group=sys mode=0444 \
+    variant.opensolaris.zone=global
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libpicl.so target=./libpicl.so.1
+file path=usr/lib/$(ARCH64)/libpicl.so.1
+link path=usr/lib/libpicl.so target=./libpicl.so.1
+file path=usr/lib/libpicl.so.1
+link path=usr/lib/libpicld_pluginutil.so target=./libpicld_pluginutil.so.1
+file path=usr/lib/libpicld_pluginutil.so.1
+link path=usr/lib/libpicltree.so target=./libpicltree.so.1
+file path=usr/lib/libpicltree.so.1
+dir  path=usr/lib/picl group=sys
+file path=usr/lib/picl/picld mode=0555
+dir  path=usr/lib/picl/plugins group=sys
+link path=usr/lib/picl/plugins/libpicldevtree.so target=./libpicldevtree.so.1
+file path=usr/lib/picl/plugins/libpicldevtree.so.1 group=sys
+link path=usr/lib/picl/plugins/libpiclevent.so target=./libpiclevent.so.1
+file path=usr/lib/picl/plugins/libpiclevent.so.1 group=sys
+link path=usr/lib/picl/plugins/libpiclfrutree.so target=./libpiclfrutree.so.1
+file path=usr/lib/picl/plugins/libpiclfrutree.so.1 group=sys
+link path=usr/lib/picl/plugins/libpiclmemcfg.so target=./libpiclmemcfg.so.1
+file path=usr/lib/picl/plugins/libpiclmemcfg.so.1 group=sys
+dir  path=usr/lib/sysevent
+dir  path=usr/lib/sysevent/modules
+file path=usr/lib/sysevent/modules/picl_slm.so
+$(sparc_ONLY)dir path=usr/platform group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,A70 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,A70/lib
+$(sparc_ONLY)link path=usr/platform/SUNW,A70/lib/libprtdiag_psr.so.1 \
+    target=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,A70/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,A70/lib/picl/plugins group=sys
+$(sparc_ONLY)file path=usr/platform/SUNW,A70/lib/picl/plugins/envmodel.conf \
+    group=sys
+$(sparc_ONLY)link path=usr/platform/SUNW,A70/lib/picl/plugins/libpiclenvd.so \
+    target=./libpiclenvd.so.1
+$(sparc_ONLY)file path=usr/platform/SUNW,A70/lib/picl/plugins/libpiclenvd.so.1 \
+    group=sys
+$(sparc_ONLY)file path=usr/platform/SUNW,A70/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/lib/picl/plugins group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-CP3010/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T12 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T12/lib
+$(sparc_ONLY)file path=usr/platform/SUNW,Netra-T12/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T12/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T12/lib/picl/plugins group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Netra-T12/lib/picl/plugins/libpiclfrutree.so \
+    target=libpiclfrutree.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-T12/lib/picl/plugins/libpiclfrutree.so.1 \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4/lib
+$(sparc_ONLY)link path=usr/platform/SUNW,Netra-T4/lib/libprtdiag_psr.so.1 \
+    target=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4/lib/picl/plugins group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-T4/lib/picl/plugins/fcal_leds.conf group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Netra-T4/lib/picl/plugins/libfcal_leds.so \
+    target=libfcal_leds.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-T4/lib/picl/plugins/libfcal_leds.so.1 \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-T4/lib/picl/plugins/picldevtree.conf group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-T4/lib/picl/plugins/piclfrutree.conf group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-100 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-100/lib
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-100/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-100/lib/picl/plugins group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-100/lib/picl/plugins/envmodel.conf \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Blade-100/lib/picl/plugins/libpiclenvd.so \
+    target=./libpiclenvd.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-100/lib/picl/plugins/libpiclenvd.so.1 \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Blade-100/lib/picl/plugins/libpiclmemcfg.so \
+    target=./libpiclmemcfg.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-100/lib/picl/plugins/libpiclmemcfg.so.1 \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-100/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000/lib
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Blade-1000/lib/libprtdiag_psr.so.1 \
+    target=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000/lib/picl/plugins \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-1000/lib/picl/plugins/envmodel.conf \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Blade-1000/lib/picl/plugins/libpiclenvd.so \
+    target=./libpiclenvd.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-1000/lib/picl/plugins/libpiclenvd.so.1 \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-1000/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1500 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1500/lib
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Blade-1500/lib/libprtdiag_psr.so.1 \
+    target=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1500/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1500/lib/picl/plugins \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-1500/lib/picl/plugins/envmodel.conf \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Blade-1500/lib/picl/plugins/libpiclenvd.so \
+    target=./libpiclenvd.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-1500/lib/picl/plugins/libpiclenvd.so.1 \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-1500/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-2500 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-2500/lib
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Blade-2500/lib/libprtdiag_psr.so.1 \
+    target=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-2500/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-2500/lib/picl/plugins \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-2500/lib/picl/plugins/envmodel.conf \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Blade-2500/lib/picl/plugins/libpiclenvd.so \
+    target=./libpiclenvd.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-2500/lib/picl/plugins/libpiclenvd.so.1 \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-2500/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R/lib
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-280R/lib/libpsvcpolicy_psr.so \
+    target=./libpsvcpolicy_psr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-280R/lib/libpsvcpolicy_psr.so.1 group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins/libpiclfrutree.so \
+    target=./libpiclfrutree.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins/libpiclfrutree.so.1 \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin.so \
+    target=./libpsvcplugin.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin.so.1 \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin_psr.so \
+    target=./libpsvcplugin_psr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin_psr.so.1 \
+    group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins/picldevtree.conf \
+    group=sys mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-280R/lib/platsvcd.conf \
+    group=sys mode=0444
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-280R/lib/psvcobj.conf \
+    group=sys mode=0444
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R/lib
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-480R/lib/libpsvcpolicy_psr.so \
+    target=./libpsvcpolicy_psr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-480R/lib/libpsvcpolicy_psr.so.1 group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins:usr/platform/sun4u/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins/libpiclfrutree.so \
+    target=./libpiclfrutree.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins/libpiclfrutree.so.1 \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins/libpsvcplugin.so \
+    target=../../../../SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin.so.1
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins/libpsvcplugin.so.1 \
+    target=../../../../SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin.so.1
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins/libpsvcplugin_psr.so \
+    target=./libpsvcplugin_psr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins/libpsvcplugin_psr.so.1 \
+    group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins/picldevtree.conf \
+    group=sys mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-480R/lib/platsvcd.conf \
+    group=sys mode=0444
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-480R/lib/psvcobj.conf \
+    group=sys mode=0444
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-880 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-880/lib
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-880/lib/libpsvcpolicy_psr.so \
+    target=./libpsvcpolicy_psr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-880/lib/libpsvcpolicy_psr.so.1 group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins:usr/platform/sun4u/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-880/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins/libpiclfrutree.so \
+    target=./libpiclfrutree.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins/libpiclfrutree.so.1 \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins/libpsvcplugin.so \
+    target=../../../../SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin.so.1
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins/libpsvcplugin.so.1 \
+    target=../../../../SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin.so.1
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins/libpsvcplugin_psr.so \
+    target=./libpsvcplugin_psr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins/libpsvcplugin_psr.so.1 \
+    group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins/picldevtree.conf \
+    group=sys mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-880/lib/platsvcd.conf \
+    group=sys mode=0444
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-880/lib/psvcobj.conf \
+    group=sys mode=0444
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V215 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V215/lib
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V215/lib/libprtdiag_psr.so.1 \
+    target=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V215/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT4.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT5.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT6.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_HDD0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_HDD1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_HDD2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_HDD3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_PS0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_PS1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_SC.conf group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-4.conf \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/libpiclfrudr.so \
+    target=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/libpiclfrudr.so.1 \
+    target=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/picl_asr.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/picldevtree.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/piclenvmon.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V240 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V240/lib
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V240/lib/libprtdiag_psr.so.1 \
+    target=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V240/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/fru_HDD0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/fru_HDD1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/fru_HDD2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/fru_HDD3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/fru_PS0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/fru_PS1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/fru_SC.conf group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/fru_usb-a-1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/fru_usb-a-2.conf \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so \
+    target=libpiclfrudr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1 \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/picl_asr.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/picldevtree.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/piclenvmon.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V250 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V250/lib
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V250/lib/libprtdiag_psr.so.1 \
+    target=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V250/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_HDD0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_HDD1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_HDD2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_HDD3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_HDD4.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_HDD5.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_HDD6.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_HDD7.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_PS0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_PS1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_SC.conf group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_usb-a-1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_usb-a-2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_usb-b-1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_usb-b-2.conf \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/libpiclfrudr.so \
+    target=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/libpiclfrudr.so.1 \
+    target=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/picl_asr.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/picldevtree.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/piclenvmon.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V440 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V440/lib
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V440/lib/libprtdiag_psr.so.1 \
+    target=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V440/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_FT0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_FT1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_FT2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_FT3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_HDD0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_HDD1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_HDD2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_HDD3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_PS0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_PS1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_PSU0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_PSU1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_PSU2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_PSU3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_SC.conf group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/libpiclfrudr.so \
+    target=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/libpiclfrudr.so.1 \
+    target=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/picldevtree.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/piclenvmon.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V445 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V445/lib
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V445/lib/libprtdiag_psr.so.1 \
+    target=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V445/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT4.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT5.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD4.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD5.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD6.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD7.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PS0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PS1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PS2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PS3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_SC.conf group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-4.conf \
+    group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/libpiclfrudr.so \
+    target=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/libpiclfrudr.so.1 \
+    target=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/picl_asr.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/picldevtree.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/piclenvmon.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/piclfrutree.conf \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V490 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V490/lib
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V490/lib/libpsvcpolicy_psr.so \
+    target=../../SUNW,Sun-Fire-480R/lib/libpsvcpolicy_psr.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V490/lib/libpsvcpolicy_psr.so.1 \
+    target=../../SUNW,Sun-Fire-480R/lib/libpsvcpolicy_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V490/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins/libpiclfrutree.so \
+    target=../../../../SUNW,Sun-Fire-480R/lib/picl/plugins/libpiclfrutree.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins/libpiclfrutree.so.1 \
+    target=../../../../SUNW,Sun-Fire-480R/lib/picl/plugins/libpiclfrutree.so.1
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins/libpsvcplugin.so \
+    target=../../../../SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin.so.1
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins/libpsvcplugin.so.1 \
+    target=../../../../SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin.so.1
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins/libpsvcplugin_psr.so \
+    target=../../../../SUNW,Sun-Fire-480R/lib/picl/plugins/libpsvcplugin_psr.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins/libpsvcplugin_psr.so.1 \
+    target=../../../../SUNW,Sun-Fire-480R/lib/picl/plugins/libpsvcplugin_psr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins/picldevtree.conf \
+    group=sys mode=0444
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins/piclfrutree.conf \
+    target=../../../../SUNW,Sun-Fire-480R/lib/picl/plugins/piclfrutree.conf
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-V490/lib/platsvcd.conf \
+    group=sys mode=0444
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-V490/lib/psvcobj.conf \
+    group=sys mode=0444
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V890 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V890/lib
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V890/lib/libpsvcpolicy_psr.so \
+    target=../../SUNW,Sun-Fire-880/lib/libpsvcpolicy_psr.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V890/lib/libpsvcpolicy_psr.so.1 \
+    target=../../SUNW,Sun-Fire-880/lib/libpsvcpolicy_psr.so.1
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V890/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins group=sys
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins/libpiclfrutree.so \
+    target=../../../../SUNW,Sun-Fire-880/lib/picl/plugins/libpiclfrutree.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins/libpiclfrutree.so.1 \
+    target=../../../../SUNW,Sun-Fire-880/lib/picl/plugins/libpiclfrutree.so.1
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins/libpsvcplugin.so \
+    target=../../../../SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin.so.1
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins/libpsvcplugin.so.1 \
+    target=../../../../SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin.so.1
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins/libpsvcplugin_psr.so \
+    target=../../../../SUNW,Sun-Fire-880/lib/picl/plugins/libpsvcplugin_psr.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins/libpsvcplugin_psr.so.1 \
+    target=../../../../SUNW,Sun-Fire-880/lib/picl/plugins/libpsvcplugin_psr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins/picldevtree.conf \
+    group=sys mode=0444
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins/piclfrutree.conf \
+    target=../../../../SUNW,Sun-Fire-880/lib/picl/plugins/piclfrutree.conf
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-V890/lib/platsvcd.conf \
+    group=sys mode=0444
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-V890/lib/psvcobj.conf \
+    group=sys mode=0444
+$(sparc_ONLY)dir path=usr/platform/sun4u group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib
+$(sparc_ONLY)link path=usr/platform/sun4u/lib/libpsvcobj.so \
+    target=./libpsvcobj.so.1
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/libpsvcobj.so.1 group=sys
+$(sparc_ONLY)link path=usr/platform/sun4u/lib/libpsvcpolicy.so \
+    target=./libpsvcpolicy.so.1
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/libpsvcpolicy.so.1 group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins:usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins:usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins:usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins:usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/picl/plugins group=sys
+$(sparc_ONLY)link path=usr/platform/sun4u/lib/picl/plugins/libpiclenvmon.so \
+    target=./libpiclenvmon.so.1
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/picl/plugins/libpiclenvmon.so.1 \
+    group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4v group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib
+$(sparc_ONLY)link path=usr/platform/sun4v/lib/libpiclsnmp.so \
+    target=./libpiclsnmp.so.1
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/libpiclsnmp.so.1 group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/picl group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/picl/plugins group=sys
+$(sparc_ONLY)link path=usr/platform/sun4v/lib/picl/plugins/libmdescplugin.so \
+    target=./libmdescplugin.so.1
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libmdescplugin.so.1 \
+    group=sys
+$(sparc_ONLY)link path=usr/platform/sun4v/lib/picl/plugins/libpiclsbl.so \
+    target=./libpiclsbl.so.1
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libpiclsbl.so.1 \
+    group=sys
+$(sparc_ONLY)link path=usr/platform/sun4v/lib/picl/plugins/libpriplugin.so \
+    target=./libpriplugin.so.1
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libpriplugin.so.1 \
+    group=sys variant.opensolaris.zone=global
+$(sparc_ONLY)link path=usr/platform/sun4v/lib/picl/plugins/libsnmpplugin.so \
+    target=./libsnmpplugin.so.1
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libsnmpplugin.so.1 \
+    group=sys
+dir  path=usr/sbin
+file path=usr/sbin/prtpicl mode=0755
+$(sparc_ONLY)dir path=usr/share/man
+dir  path=usr/share/man/man1m
+file path=usr/share/man/man1m/picld.1m
+file path=usr/share/man/man1m/prtpicl.1m
+dir  path=usr/share/man/man3lib
+file path=usr/share/man/man3lib/libpicl.3lib
+file path=usr/share/man/man3lib/libpicltree.3lib
+dir  path=usr/share/man/man3picl
+file path=usr/share/man/man3picl/libpicl.3picl
+file path=usr/share/man/man3picl/picl_find_node.3picl
+file path=usr/share/man/man3picl/picl_get_first_prop.3picl
+file path=usr/share/man/man3picl/picl_get_frutree_parent.3picl
+link path=usr/share/man/man3picl/picl_get_next_by_col.3picl \
+    target=picl_get_next_by_row.3picl
+file path=usr/share/man/man3picl/picl_get_next_by_row.3picl
+link path=usr/share/man/man3picl/picl_get_next_prop.3picl \
+    target=picl_get_first_prop.3picl
+file path=usr/share/man/man3picl/picl_get_node_by_path.3picl
+file path=usr/share/man/man3picl/picl_get_prop_by_name.3picl
+file path=usr/share/man/man3picl/picl_get_propinfo.3picl
+file path=usr/share/man/man3picl/picl_get_propinfo_by_name.3picl
+file path=usr/share/man/man3picl/picl_get_propval.3picl
+link path=usr/share/man/man3picl/picl_get_propval_by_name.3picl \
+    target=picl_get_propval.3picl
+file path=usr/share/man/man3picl/picl_get_root.3picl
+file path=usr/share/man/man3picl/picl_initialize.3picl
+file path=usr/share/man/man3picl/picl_set_propval.3picl
+link path=usr/share/man/man3picl/picl_set_propval_by_name.3picl \
+    target=picl_set_propval.3picl
+file path=usr/share/man/man3picl/picl_shutdown.3picl
+file path=usr/share/man/man3picl/picl_strerror.3picl
+file path=usr/share/man/man3picl/picl_wait.3picl
+file path=usr/share/man/man3picl/picl_walk_tree_by_class.3picl
+dir  path=usr/share/man/man3picltree
+file path=usr/share/man/man3picltree/libpicltree.3picltree
+file path=usr/share/man/man3picltree/picld_log.3picltree
+file path=usr/share/man/man3picltree/picld_plugin_register.3picltree
+file path=usr/share/man/man3picltree/ptree_add_node.3picltree
+file path=usr/share/man/man3picltree/ptree_add_prop.3picltree
+link path=usr/share/man/man3picltree/ptree_add_row_to_table.3picltree \
+    target=ptree_create_table.3picltree
+file path=usr/share/man/man3picltree/ptree_create_and_add_node.3picltree
+file path=usr/share/man/man3picltree/ptree_create_and_add_prop.3picltree
+file path=usr/share/man/man3picltree/ptree_create_node.3picltree
+file path=usr/share/man/man3picltree/ptree_create_prop.3picltree
+file path=usr/share/man/man3picltree/ptree_create_table.3picltree
+link path=usr/share/man/man3picltree/ptree_delete_node.3picltree \
+    target=ptree_add_node.3picltree
+link path=usr/share/man/man3picltree/ptree_delete_prop.3picltree \
+    target=ptree_add_prop.3picltree
+link path=usr/share/man/man3picltree/ptree_destroy_node.3picltree \
+    target=ptree_create_node.3picltree
+link path=usr/share/man/man3picltree/ptree_destroy_prop.3picltree \
+    target=ptree_create_prop.3picltree
+file path=usr/share/man/man3picltree/ptree_find_node.3picltree
+file path=usr/share/man/man3picltree/ptree_get_first_prop.3picltree
+file path=usr/share/man/man3picltree/ptree_get_frutree_parent.3picltree
+link path=usr/share/man/man3picltree/ptree_get_next_by_col.3picltree \
+    target=ptree_get_next_by_row.3picltree
+file path=usr/share/man/man3picltree/ptree_get_next_by_row.3picltree
+link path=usr/share/man/man3picltree/ptree_get_next_prop.3picltree \
+    target=ptree_get_first_prop.3picltree
+file path=usr/share/man/man3picltree/ptree_get_node_by_path.3picltree
+file path=usr/share/man/man3picltree/ptree_get_prop_by_name.3picltree
+file path=usr/share/man/man3picltree/ptree_get_propinfo.3picltree
+file path=usr/share/man/man3picltree/ptree_get_propinfo_by_name.3picltree
+file path=usr/share/man/man3picltree/ptree_get_propval.3picltree
+link path=usr/share/man/man3picltree/ptree_get_propval_by_name.3picltree \
+    target=ptree_get_propval.3picltree
+file path=usr/share/man/man3picltree/ptree_get_root.3picltree
+file path=usr/share/man/man3picltree/ptree_init_propinfo.3picltree
+file path=usr/share/man/man3picltree/ptree_post_event.3picltree
+file path=usr/share/man/man3picltree/ptree_register_handler.3picltree
+file path=usr/share/man/man3picltree/ptree_unregister_handler.3picltree
+file path=usr/share/man/man3picltree/ptree_update_propval.3picltree
+link path=usr/share/man/man3picltree/ptree_update_propval_by_name.3picltree \
+    target=ptree_update_propval.3picltree
+file path=usr/share/man/man3picltree/ptree_walk_tree_by_class.3picltree
+legacy pkg=SUNWpiclr desc="PICL Framework init scripts" \
+    name="PICL Framework (Root)"
+legacy pkg=SUNWpiclu \
+    desc="PICL Daemon, Libraries, prtpicl client and plug-in modules" \
+    name="PICL Libraries, and Plugin Modules (Usr)"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

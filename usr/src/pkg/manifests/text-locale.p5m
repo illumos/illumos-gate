@@ -1,0 +1,76 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/text/locale@$(PKGVERS)
+set name=pkg.summary value="System Localization"
+set name=pkg.description \
+    value="localization utilities and C locale (POSIX default) definitions"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Localizations
+set name=variant.arch value=$(ARCH)
+dir  path=usr group=sys
+dir  path=usr/bin
+file path=usr/bin/gencat mode=0555
+file path=usr/bin/genmsg mode=0555
+file path=usr/bin/gettxt mode=0555
+file path=usr/bin/locale mode=0555
+file path=usr/bin/localedef mode=0555
+file path=usr/bin/mkmsgs group=root mode=0555
+file path=usr/bin/msgfmt mode=0555
+file path=usr/bin/srchtxt mode=0555
+file path=usr/bin/xgettext mode=0555
+dir  path=usr/lib
+file path=usr/lib/gmsgfmt mode=0555
+dir  path=usr/lib/iconv
+dir  path=usr/lib/iconv/$(ARCH64)
+file path=usr/lib/iconv/$(ARCH64)/geniconvtbl.so mode=0555
+dir  path=usr/lib/iconv/geniconvtbl
+file path=usr/lib/iconv/geniconvtbl.so mode=0555
+dir  path=usr/lib/iconv/geniconvtbl/binarytables
+file path=usr/lib/iconv/geniconvtbl/binarytables/ISO646%ISO8859-1.bt mode=0444
+file path=usr/lib/iconv/geniconvtbl/binarytables/ISO8859-1%ISO646.bt mode=0444
+dir  path=usr/lib/iconv/geniconvtbl/srcs
+file path=usr/lib/iconv/geniconvtbl/srcs/ISO-2022-JP_to_eucJP.src mode=0444
+file path=usr/lib/iconv/geniconvtbl/srcs/ISO646_to_ISO8859-1.src mode=0444
+file path=usr/lib/iconv/geniconvtbl/srcs/ISO8859-1_to_ISO646.src mode=0444
+file path=usr/lib/iconv/geniconvtbl/srcs/ISO8859-1_to_UTF-8.src mode=0444
+file path=usr/lib/iconv/geniconvtbl/srcs/UTF-8_to_ISO8859-1.src mode=0444
+file path=usr/lib/iconv/geniconvtbl/srcs/eucJP_to_ISO-2022-JP.src mode=0444
+dir  path=usr/share/man/man1
+file path=usr/share/man/man1/gencat.1
+file path=usr/share/man/man1/genmsg.1
+file path=usr/share/man/man1/gettxt.1
+file path=usr/share/man/man1/locale.1
+file path=usr/share/man/man1/mkmsgs.1
+file path=usr/share/man/man1/msgfmt.1
+file path=usr/share/man/man1/printf.1
+file path=usr/share/man/man1/srchtxt.1
+file path=usr/share/man/man1/xgettext.1
+legacy pkg=SUNWloc \
+    desc="localization utilities and C locale (POSIX default) definitions" \
+    name="System Localization"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

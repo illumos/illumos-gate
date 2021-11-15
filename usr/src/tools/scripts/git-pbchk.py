@@ -57,7 +57,7 @@ sys.path.insert(2, os.path.join(os.path.dirname(__file__), ".."))
 from onbld.Scm import Ignore
 from onbld.Checks import Comments, Copyright, CStyle, HdrChk, WsCheck
 from onbld.Checks import JStyle, Keywords, ManLint, Mapfile, SpellCheck
-from onbld.Checks import ShellLint
+from onbld.Checks import ShellLint, PkgFmt
 
 class GitError(Exception):
     pass
@@ -315,6 +315,16 @@ def shelllint(root, parent, flist, output):
 
     return ret
 
+def pkgfmt(root, parent, flist, output):
+    ret = 0
+    output.write("Package manifests:\n")
+
+    for f in flist(lambda x: x.endswith('.p5m')):
+        with io.open(f, mode='rb') as fh:
+            ret |= PkgFmt.check(fh, output=output)
+
+    return ret
+
 def keywords(root, parent, flist, output):
     ret = 0
     output.write("SCCS Keywords:\n")
@@ -421,6 +431,7 @@ def nits(root, parent, paths):
             manlint,
             mapfilechk,
             shelllint,
+            pkgfmt,
             winnames,
             wscheck]
     scmds = [symlinks]
@@ -436,6 +447,7 @@ def pbchk(root, parent, paths):
             manlint,
             mapfilechk,
             shelllint,
+            pkgfmt,
             winnames,
             wscheck]
     scmds = [symlinks]

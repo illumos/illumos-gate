@@ -114,7 +114,7 @@ Incremental Builds
    make command line and specify the "all" target.  If you want to process
    them all, simply specify the "all" target.
 
-   	% dmake -e PKGS="BRCMbnx BRCMbnxe" all
+	% dmake -e PKGS="BRCMbnx BRCMbnxe" all
 	% dmake -e all
 
    If you want to publish a subset of packages, simply set PKGS on the
@@ -124,7 +124,7 @@ Incremental Builds
    system.  If you want to publish them all, simply specify the
    "install" target.
 
-   	% dmake -e PKGS="BRCMbnx BRCMbnxe" install
+	% dmake -e PKGS="BRCMbnx BRCMbnxe" install
 	% dmake -e install
 
    You can also use package names, or package names with ".pub"
@@ -365,13 +365,13 @@ For example, to find rename ancestors of 'system/zones', do the following:
 
     $ cd usr/src/pkg/manifests
     $ mypkgname=system/zones
-    $ grep -l "fmri=pkg:/$mypkgname@" `grep -l pkg.renamed *.mf` /dev/null
-    SUNWzone.mf
+    $ grep -l "fmri=pkg:/$mypkgname@" `grep -l pkg.renamed *.p5m` /dev/null
+    SUNWzone.p5m
 
 Make sure to check that the package has not undergone multiple renames!
 
     $ mypkgname=SUNWzone
-    $ grep -l "fmri=pkg:/$mypkgname@" `grep -l pkg.renamed *.mf` /dev/null
+    $ grep -l "fmri=pkg:/$mypkgname@" `grep -l pkg.renamed *.p5m` /dev/null
     $
 
 Once you have the renamed ancestor list, for *each* of the packages (the
@@ -402,13 +402,13 @@ to system/foobar in build 140, and then later obsoleted in build 150.
 Note that in all cases the package FMRI is updated to the obsoletion
 build, 150.
 
-    SUNWfoobar.mf:
+    SUNWfoobar.p5m:
         # Was renamed to system/foobar, both now obsolete.
         set name=pkg.fmri value=pkg:/SUNWfoobar@0.5.11,5.11-0.150
         set name=pkg.obsolete value=true
         set name=variant.arch value=$(ARCH)
 
-    system-foobar.mf:
+    system-foobar.p5m:
 	set name=pkg.fmri value=pkg:/system/foobar@0.5.11,5.11-0.150
 	set name=pkg.obsolete value=true
 	set name=variant.arch value=$(ARCH)
