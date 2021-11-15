@@ -10,6 +10,7 @@
 #
 
 # Copyright 2015, Richard Lowe.
+# Copyright 2019 Joyent, Inc.
 
 set name=pkg.fmri value=pkg:/developer/build/make@$(PKGVERS)
 set name=pkg.summary value="Parallel make(1) build tool"
@@ -19,14 +20,21 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 link path=usr/bin/dmake target=make
 file path=usr/bin/make mode=0555
+dir  path=usr/ccs
+dir  path=usr/ccs/bin
 link path=usr/ccs/bin/make target=../../bin/make
+dir  path=usr/ccs/lib
 link path=usr/ccs/lib/svr4.make target=../../bin/make
+dir  path=usr/lib/$(ARCH64)
 file path=usr/lib/$(ARCH64)/libmakestate.so.1
 file path=usr/lib/libmakestate.so.1
 link path=usr/lib/svr4.make target=../bin/make
+dir  path=usr/share
+dir  path=usr/share/lib
 dir  path=usr/share/lib/make
 file path=usr/share/lib/make/make.rules
 file path=usr/share/lib/make/svr4.make.rules
+dir  path=usr/share/man
 dir  path=usr/share/man/man1
 link path=usr/share/man/man1/dmake.1 target=make.1
 file path=usr/share/man/man1/make.1
@@ -34,4 +42,6 @@ file path=usr/share/man/man1/sysV-make.1
 dir  path=usr/share/man/man1s
 link path=usr/share/man/man1s/dmake.1s target=../man1/make.1
 link path=usr/share/man/man1s/make.1s target=../man1/make.1
+dir  path=usr/xpg4
+dir  path=usr/xpg4/bin
 link path=usr/xpg4/bin/make target=../../bin/make

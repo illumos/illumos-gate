@@ -20,8 +20,6 @@
 set name=pkg.fmri value=pkg:/system/library/bhyve@$(PKGVERS)
 set name=pkg.summary value="BSD hypervisor (libraries)"
 set name=pkg.description value="BSD hypervisor (libraries)"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Virtualization
 set name=variant.arch value=i386
 dir  path=lib group=bin
 dir  path=lib/$(ARCH64) group=bin

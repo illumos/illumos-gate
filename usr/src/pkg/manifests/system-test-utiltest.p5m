@@ -28,6 +28,7 @@ set name=variant.arch value=$(ARCH)
 dir  path=opt/util-tests
 file path=opt/util-tests/README mode=0444
 dir  path=opt/util-tests/bin
+file path=opt/util-tests/bin/btest mode=0555
 file path=opt/util-tests/bin/print_json mode=0555
 file path=opt/util-tests/bin/utiltest mode=0555
 dir  path=opt/util-tests/runfiles
@@ -38,6 +39,7 @@ dir  path=opt/util-tests/tests/ar
 file path=opt/util-tests/tests/ar/ar_test0.o mode=0444
 file path=opt/util-tests/tests/ar/ar_test1.o mode=0444
 file path=opt/util-tests/tests/ar/artest mode=0555
+dir  path=opt/util-tests/tests/awk
 dir  path=opt/util-tests/tests/awk
 dir  path=opt/util-tests/tests/awk/bugs-fixed
 file path=opt/util-tests/tests/awk/bugs-fixed/a-format.awk mode=0444
@@ -75,9 +77,12 @@ file path=opt/util-tests/tests/awk/bugs-fixed/system-status.ok mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/unary-plus.awk mode=0444
 file path=opt/util-tests/tests/awk/bugs-fixed/unary-plus.ok mode=0444
 dir  path=opt/util-tests/tests/awk/data
+dir  path=opt/util-tests/tests/awk/data
 file path=opt/util-tests/tests/awk/data/test.countries mode=0444
 file path=opt/util-tests/tests/awk/data/test.data mode=0444
 dir  path=opt/util-tests/tests/awk/examples
+dir  path=opt/util-tests/tests/awk/examples
+dir  path=opt/util-tests/tests/awk/examples/awk
 dir  path=opt/util-tests/tests/awk/examples/awk
 file path=opt/util-tests/tests/awk/examples/awk/p.1 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/p.10 mode=0444
@@ -304,6 +309,7 @@ file path=opt/util-tests/tests/awk/examples/awk/t.vf2 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.vf3 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.x mode=0444
 dir  path=opt/util-tests/tests/awk/examples/out
+dir  path=opt/util-tests/tests/awk/examples/out
 file path=opt/util-tests/tests/awk/examples/out/p.1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/p.10 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/p.11 mode=0444
@@ -528,6 +534,7 @@ file path=opt/util-tests/tests/awk/examples/out/t.vf1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.vf2 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.vf3 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.x mode=0444
+dir  path=opt/util-tests/tests/awk/gnu
 dir  path=opt/util-tests/tests/awk/gnu
 file path=opt/util-tests/tests/awk/gnu/anchgsub.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/anchgsub.in mode=0444
@@ -960,6 +967,7 @@ file path=opt/util-tests/tests/awk/gnu/zeroflag.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/zeroflag.ok mode=0444
 file path=opt/util-tests/tests/awk/runtests.sh mode=0555
 dir  path=opt/util-tests/tests/awk/syn
+dir  path=opt/util-tests/tests/awk/syn
 file path=opt/util-tests/tests/awk/syn/arrayparm.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/arrayparm.ok mode=0444
 file path=opt/util-tests/tests/awk/syn/arryref3.awk mode=0444
@@ -1027,6 +1035,7 @@ file path=opt/util-tests/tests/awk/syn/tradanch1.ok mode=0444
 file path=opt/util-tests/tests/awk/syn/unterm.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/unterm.ok mode=0444
 dir  path=opt/util-tests/tests/awk/tests
+dir  path=opt/util-tests/tests/awk/tests
 file path=opt/util-tests/tests/awk/tests/T.-f-f mode=0555
 file path=opt/util-tests/tests/awk/tests/T.argv mode=0555
 file path=opt/util-tests/tests/awk/tests/T.builtin mode=0555
@@ -1064,6 +1073,8 @@ file path=opt/util-tests/tests/awk/tests/penicil.ok mode=0444
 file path=opt/util-tests/tests/awk/tests/penicil.p mode=0444
 file path=opt/util-tests/tests/awk/tests/res.ok mode=0444
 file path=opt/util-tests/tests/awk/tests/res.p mode=0444
+dir  path=opt/util-tests/tests/bunyan
+file path=opt/util-tests/tests/bunyan/bunyan mode=0555
 file path=opt/util-tests/tests/chown_test mode=0555
 dir  path=opt/util-tests/tests/ctf
 file path=opt/util-tests/tests/ctf/Makefile.ctftest.com mode=0555
@@ -1824,12 +1835,14 @@ file path=opt/util-tests/tests/sed/regress.multitest.out/9.8 mode=0444
 file path=opt/util-tests/tests/sed/regress.multitest.out/9.9 mode=0444
 file path=opt/util-tests/tests/sed/sed_addr mode=0555
 file path=opt/util-tests/tests/set-linkprop mode=0555
+file path=opt/util-tests/tests/show-overlay-exit mode=0555
 dir  path=opt/util-tests/tests/sleep
 file path=opt/util-tests/tests/sleep/sleep.awk mode=0444
 file path=opt/util-tests/tests/sleep/sleep.d mode=0444
 file path=opt/util-tests/tests/sleep/sleeptest mode=0555
 file path=opt/util-tests/tests/smbios mode=0555
 file path=opt/util-tests/tests/svr4pkg_test mode=0555
+file path=opt/util-tests/tests/vnic-mtu mode=0555
 file path=opt/util-tests/tests/xargs_test mode=0555
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/libdemangle/THIRDPARTYLICENSE \

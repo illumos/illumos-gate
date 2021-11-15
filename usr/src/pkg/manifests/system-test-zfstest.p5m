@@ -48,6 +48,7 @@ file path=opt/zfs-tests/bin/randwritecomp mode=0555
 file path=opt/zfs-tests/bin/readmmap mode=0555
 file path=opt/zfs-tests/bin/rename_dir mode=0555
 file path=opt/zfs-tests/bin/rm_lnkcnt_zero_file mode=0555
+file path=opt/zfs-tests/bin/watch_dir mode=0555
 file path=opt/zfs-tests/bin/zfstest mode=0555
 dir  path=opt/zfs-tests/callbacks
 file path=opt/zfs-tests/callbacks/zfs_dbgmsg mode=0555
@@ -723,6 +724,8 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_crypt_combos \
     mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_dryrun \
+    mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_encrypted \
     mode=0555
@@ -904,6 +907,12 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount_encrypted \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount_watched_inotify \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount_watched_portfs \
     mode=0555
 dir  path=opt/zfs-tests/tests/functional/cli_root/zfs_program
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_program/cleanup mode=0555

@@ -14,19 +14,16 @@
 #
 
 set name=pkg.fmri value=pkg:/system/test/vndtest@$(PKGVERS)
-set name=pkg.description value="vndtest"
 set name=pkg.summary value="vndtest execution"
+set name=pkg.description value=vndtest
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-dir path=opt/vndtest
-dir path=opt/vndtest/bin
-dir path=opt/vndtest/tst
-dir path=opt/vndtest/tst/cmd
-dir path=opt/vndtest/tst/dld
-dir path=opt/vndtest/tst/ioctl
-dir path=opt/vndtest/tst/lib
+dir  path=opt/vndtest
+dir  path=opt/vndtest/bin
 file path=opt/vndtest/bin/vndtest mode=0555
+dir  path=opt/vndtest/tst
+dir  path=opt/vndtest/tst/cmd
 file path=opt/vndtest/tst/cmd/cmd.common.ksh mode=0555
 file path=opt/vndtest/tst/cmd/create.list.ksh mode=0555
 file path=opt/vndtest/tst/cmd/create.list.ksh.out mode=0555
@@ -37,10 +34,12 @@ file path=opt/vndtest/tst/cmd/ecreate.setbadprop.ksh mode=0555
 file path=opt/vndtest/tst/cmd/ecreate.setbadvalue.ksh mode=0555
 file path=opt/vndtest/tst/cmd/ecreate.setbuftoobig.ksh mode=0555
 file path=opt/vndtest/tst/cmd/ecreate.setrdonlyprop.ksh mode=0555
+dir  path=opt/vndtest/tst/dld
 file path=opt/vndtest/tst/dld/create.reuse.ksh mode=0555
 file path=opt/vndtest/tst/dld/dld.common.ksh mode=0555
 file path=opt/vndtest/tst/dld/ecreate.ipfirst.ksh mode=0555
 file path=opt/vndtest/tst/dld/ecreate.vndfirst.ksh mode=0555
+dir  path=opt/vndtest/tst/ioctl
 file path=opt/vndtest/tst/ioctl/create.attach.exe mode=0555
 file path=opt/vndtest/tst/ioctl/create.attachnolink.exe mode=0555
 file path=opt/vndtest/tst/ioctl/create.badlinkname.exe mode=0555
@@ -63,6 +62,7 @@ file path=opt/vndtest/tst/ioctl/tst.gioctlfault.exe mode=0555
 file path=opt/vndtest/tst/ioctl/tst.gioctlnattach.exe mode=0555
 file path=opt/vndtest/tst/ioctl/tst.iocsize.ksh mode=0555
 file path=opt/vndtest/tst/ioctl/tst.openctlbadflags.exe mode=0555
+dir  path=opt/vndtest/tst/lib
 file path=opt/vndtest/tst/lib/create.badlink.exe mode=0555
 file path=opt/vndtest/tst/lib/create.badpropid.exe mode=0555
 file path=opt/vndtest/tst/lib/create.badpropsize.exe mode=0555

@@ -707,9 +707,9 @@ $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/eft/gcpu_amd.eft mode=0444
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/eft/intel.eft mode=0444
 $(i386_ONLY)dir path=usr/platform/i86pc/lib/fm/topo
 $(i386_ONLY)dir path=usr/platform/i86pc/lib/fm/topo/maps
-$(i386_ONLY)file \
-    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-1101-disk-hc-topology.xml \
-    mode=0444
+$(i386_ONLY)link \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3101-hc-topology.xml \
+    target=./SSG-2028R-ACR24L-hc-topology.xml
 $(i386_ONLY)link \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3101-hc-topology.xml \
     target=SSG-2028R-ACR24L-hc-topology.xml
@@ -722,6 +722,9 @@ $(i386_ONLY)link \
     target=SSG-2028R-ACR24L-usb.usbtopo
 $(i386_ONLY)link \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3102-hc-topology.xml \
+    target=./SSG-2028R-ACR24L-hc-topology.xml
+$(i386_ONLY)link \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3102-hc-topology.xml \
     target=SSG-2028R-ACR24L-hc-topology.xml
 $(i386_ONLY)link \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3102-usb.usbtopo \
@@ -729,11 +732,23 @@ $(i386_ONLY)link \
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3301-hc-topology.xml \
     mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3301-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)link \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3302-hc-topology.xml \
+    target=./Joyent-Compute-Platform-3301-hc-topology.xml
 $(i386_ONLY)link \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3302-hc-topology.xml \
     target=Joyent-Compute-Platform-3301-hc-topology.xml
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-330x-chassis-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-330x-chassis-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-330x-fan-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-330x-fan-hc-topology.xml \
@@ -754,7 +769,16 @@ $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Storage-Platform-7001-chassis-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Storage-Platform-7001-chassis-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Storage-Platform-7001-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Storage-Platform-7001-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Storage-Platform-7001-slot-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Storage-Platform-7001-slot-hc-topology.xml \
@@ -766,10 +790,22 @@ $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-chassis-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-chassis-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-disk-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-disk-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-slot-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-slot-hc-topology.xml \
@@ -781,10 +817,22 @@ $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-chassis-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-chassis-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-disk-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-disk-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-slot-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-slot-hc-topology.xml \

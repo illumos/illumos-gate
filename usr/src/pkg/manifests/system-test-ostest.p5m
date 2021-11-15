@@ -34,6 +34,8 @@ file path=opt/os-tests/bin/ostest mode=0555
 dir  path=opt/os-tests/runfiles
 file path=opt/os-tests/runfiles/default.run mode=0444
 dir  path=opt/os-tests/tests
+file path=opt/os-tests/tests/OS-6097.32 mode=0555
+file path=opt/os-tests/tests/OS-6097.64 mode=0555
 file path=opt/os-tests/tests/clock_gettime.32 mode=0555
 file path=opt/os-tests/tests/clock_gettime.64 mode=0555
 dir  path=opt/os-tests/tests/cores
@@ -49,7 +51,6 @@ dir  path=opt/os-tests/tests/ddi_ufm
 file path=opt/os-tests/tests/ddi_ufm/ufm-test mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-cleanup mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-setup mode=0555
-file path=opt/os-tests/tests/epoll_test mode=0555
 file path=opt/os-tests/tests/eventfd.32 mode=0555
 file path=opt/os-tests/tests/eventfd.64 mode=0555
 dir  path=opt/os-tests/tests/file-locking
@@ -61,6 +62,7 @@ $(i386_ONLY)dir path=opt/os-tests/tests/i386
 $(i386_ONLY)file path=opt/os-tests/tests/i386/badseg mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/i386/badseg_exec mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/i386/ldt mode=0555
+file path=opt/os-tests/tests/imc_test mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/imc_test mode=0555
 dir  path=opt/os-tests/tests/ksensor
 file path=opt/os-tests/tests/ksensor/ksensor_basic.32 mode=0555
@@ -88,7 +90,9 @@ file path=opt/os-tests/tests/pf_key/acquire-spray mode=0555
 file path=opt/os-tests/tests/pf_key/eacq-enabler mode=0555
 file path=opt/os-tests/tests/pf_key/kmc-update mode=0555
 file path=opt/os-tests/tests/pf_key/kmc-updater mode=0555
-file path=opt/os-tests/tests/poll_test mode=0555
+dir  path=opt/os-tests/tests/poll
+file path=opt/os-tests/tests/poll/epoll_test mode=0555
+file path=opt/os-tests/tests/poll/poll_test mode=0555
 dir  path=opt/os-tests/tests/sdevfs
 file path=opt/os-tests/tests/sdevfs/sdevfs_eisdir mode=0555
 dir  path=opt/os-tests/tests/secflags
