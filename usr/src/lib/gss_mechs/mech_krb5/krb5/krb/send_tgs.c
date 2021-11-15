@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 Racktop Systems, Inc.
  */
 
 /*
@@ -67,7 +68,6 @@ krb5_send_tgs_basic(krb5_context context, krb5_data *in_data, krb5_creds *in_cre
 				       &in_cred->keyblock,
 				       KRB5_KEYUSAGE_TGS_REQ_AUTH_CKSUM,
 				       in_data, &checksum))) {
-	free(checksum.contents);
 	return(retval);
     }
 

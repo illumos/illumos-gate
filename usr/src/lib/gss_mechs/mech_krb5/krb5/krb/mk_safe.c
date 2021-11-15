@@ -1,6 +1,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2021 Racktop Systems, Inc.
  */
 
 
@@ -113,7 +114,13 @@ krb5_mk_safe_basic(krb5_context context, const krb5_data *userdata,
 				       KRB5_KEYUSAGE_KRB_SAFE_CKSUM,
 				       scratch1, &safe_checksum)) != 0){
 	KRB5_LOG(KRB5_ERR, "krb5_mk_safe_basic() error retval=%d", retval);
-	goto cleanup_checksum;
+	/*
+	 * If krb5_c_make_checksum() fails, the value of safe_checksum.contents
+	 * is either still &zero_octet (i.e. a stack allocated value) or NULL.
+	 * Not calling krb5_xfree() when krb5_c_make_checksum() fails safely
+	 * handles either case.
+	 */
+	goto cleanup;
     }
 
     safemsg.checksum = &safe_checksum;
@@ -130,6 +137,7 @@ krb5_mk_safe_basic(krb5_context context, const krb5_data *userdata,
 cleanup_checksum:
     krb5_xfree(safe_checksum.contents);
 
+cleanup:
     memset((char *)scratch1->data, 0, scratch1->length);
     krb5_free_data(context, scratch1);
     /* Solaris Kerberos */

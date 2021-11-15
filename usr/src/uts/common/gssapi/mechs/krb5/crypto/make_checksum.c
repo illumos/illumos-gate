@@ -1,6 +1,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 /*
@@ -64,8 +66,10 @@ krb5_c_make_checksum(krb5_context context, krb5_cksumtype cksumtype,
 #endif
     cksum->length = cksumlen;
 
-    if ((cksum->contents = (krb5_octet *) MALLOC(cksum->length)) == NULL)
+    if ((cksum->contents = (krb5_octet *) MALLOC(cksum->length)) == NULL) {
+	cksum->length = 0;
 	return(ENOMEM);
+    }
 
     data.length = cksum->length;
     data.data = (char *) cksum->contents;
@@ -102,7 +106,7 @@ krb5_c_make_checksum(krb5_context context, krb5_cksumtype cksumtype,
 	}
 #else
 	if ((ret = init_key_uef(krb_ctx_hSession(context), (krb5_keyblock *)key)))
-		return (ret);
+		goto cleanup;
 #endif /* _KERNEL */
 
 	ret = (*(krb5_cksumtypes_list[i].keyhash->hash))(context, key,
@@ -123,7 +127,7 @@ krb5_c_make_checksum(krb5_context context, krb5_cksumtype cksumtype,
 #else
 	ret = init_key_uef(krb_ctx_hSession(context), (krb5_keyblock *)key);
 	if (ret)
-		return (ret);
+		goto cleanup;
 #endif /* _KERNEL */
 	ret = krb5_dk_make_checksum(context,
 				krb5_cksumtypes_list[i].hash,
