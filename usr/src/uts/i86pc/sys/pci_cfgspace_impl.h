@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef _SYS_PCI_CFGSPACE_IMPL_H
@@ -118,6 +119,13 @@ extern uint8_t mcfg_bus_end;
  */
 extern kmutex_t pcicfg_mutex;
 extern kmutex_t pcicfg_mmio_mutex;
+
+/*
+ * The maximum offset that these I/O space mechanisms can read. Generally either
+ * 0xff to indicate that PCIe extended configuration space is not available or
+ * 0xfff to indicate that it is.
+ */
+extern uint_t pci_iocfg_max_offset;
 
 /*
  * Orion/Neptune cfg access wraps mech1 cfg access, so needs a separate mutex
