@@ -31,9 +31,6 @@
 #include <sys/conf.h>
 #include <sys/pci.h>
 #include <sys/sunndi.h>
-#include <sys/acpi/acpi.h>
-#include <sys/acpi/acpi_pci.h>
-#include <sys/acpica.h>
 #include <sys/pci_cap.h>
 #include <sys/pcie_impl.h>
 #include <sys/x86_archext.h>
@@ -45,7 +42,6 @@
 /*
  * Prototype declaration
  */
-void	npe_query_acpi_mcfg(dev_info_t *dip);
 void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 void	npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl);
@@ -57,54 +53,6 @@ void	npe_enable_htmsi_children(dev_info_t *dip);
 int	npe_enable_htmsi_flag = 1;
 
 extern uint32_t npe_aer_uce_mask;
-
-/*
- * Query the MCFG table using ACPI.  If MCFG is found, setup the 'ecfg'
- * property accordingly.  If no table is found, the property remains unset; the
- * system will not make use of memory-mapped access to PCI Express
- * configuration space.
- */
-void
-npe_query_acpi_mcfg(dev_info_t *dip)
-{
-	MCFG_TABLE *mcfgp;
-	CFG_BASE_ADDR_ALLOC *cfg_baap;
-	char *cfg_baa_endp;
-	int64_t ecfginfo[4];
-
-	/* Query the MCFG table using ACPI */
-	if (AcpiGetTable(ACPI_SIG_MCFG, 1,
-	    (ACPI_TABLE_HEADER **)&mcfgp) == AE_OK) {
-
-		cfg_baap = (CFG_BASE_ADDR_ALLOC *)mcfgp->CfgBaseAddrAllocList;
-		cfg_baa_endp = ((char *)mcfgp) + mcfgp->Length;
-
-		while ((char *)cfg_baap < cfg_baa_endp) {
-			if (cfg_baap->base_addr != (uint64_t)0 &&
-			    cfg_baap->segment == 0) {
-				/*
-				 * Set up the 'ecfg' property to hold
-				 * base_addr, segment, and first/last bus.
-				 * We only do the first entry that maps
-				 * segment 0; nonzero segments are not yet
-				 * known, or handled.  If they appear,
-				 * we'll need to figure out which bus node
-				 * should have which entry by examining the
-				 * ACPI _SEG method on each bus node.
-				 */
-				ecfginfo[0] = cfg_baap->base_addr;
-				ecfginfo[1] = cfg_baap->segment;
-				ecfginfo[2] = cfg_baap->start_bno;
-				ecfginfo[3] = cfg_baap->end_bno;
-				(void) ndi_prop_update_int64_array(
-				    DDI_DEV_T_NONE, dip, "ecfg",
-				    ecfginfo, 4);
-				break;
-			}
-			cfg_baap++;
-		}
-	}
-}
 
 /*
  * Enable reporting of AER capability next pointer.
@@ -150,7 +98,8 @@ npe_disable_empty_bridges_workaround(dev_info_t *child)
 }
 
 void
-npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl) {
+npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl)
+{
 	uint32_t regs;
 	uint16_t vendor_id = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
 	uint16_t dev_id = pci_config_get16(cfg_hdl, PCI_CONF_DEVID);
@@ -170,7 +119,8 @@ npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl) {
 }
 
 void
-npe_intel_error_workaround(ddi_acc_handle_t cfg_hdl) {
+npe_intel_error_workaround(ddi_acc_handle_t cfg_hdl)
+{
 	uint32_t regs;
 	uint16_t vendor_id = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
 	uint16_t dev_id = pci_config_get16(cfg_hdl, PCI_CONF_DEVID);
@@ -220,7 +170,8 @@ npe_intel_error_workaround(ddi_acc_handle_t cfg_hdl) {
  * RP is beneath.
  */
 boolean_t
-npe_child_is_pci(dev_info_t *dip) {
+npe_child_is_pci(dev_info_t *dip)
+{
 	char *dev_type;
 	boolean_t parent_is_pci, child_is_pciex;
 

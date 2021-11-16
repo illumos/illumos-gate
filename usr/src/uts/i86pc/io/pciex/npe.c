@@ -208,7 +208,6 @@ static int npe_initchild(dev_info_t *child);
 /*
  * External support routine
  */
-extern void	npe_query_acpi_mcfg(dev_info_t *dip);
 extern void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 extern int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 extern void	npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl);
@@ -395,7 +394,6 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	PCIE_DIP2PFD(devi) = kmem_zalloc(sizeof (pf_data_t), KM_SLEEP);
 	pcie_rc_init_pfd(devi, PCIE_DIP2PFD(devi));
 
-	npe_query_acpi_mcfg(devi);
 	ddi_report_dev(devi);
 	pcie_fab_init_bus(devi, PCIE_BUS_FINAL);
 

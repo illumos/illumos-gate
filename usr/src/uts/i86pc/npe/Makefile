@@ -56,13 +56,11 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# depends on misc/acpica and misc/pcie
-#
-# acpica supplies ACPI access routines
+# depends on misc/pcie
 #
 # pcie supplies PCI Express fabric error support
 #
-LDFLAGS	+= -Nmisc/acpica -Nmisc/pcie
+LDFLAGS	+= -Nmisc/pcie
 
 #
 # Name of the module is needed by the source, to distinguish from other
