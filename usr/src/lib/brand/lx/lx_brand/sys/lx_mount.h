@@ -129,12 +129,12 @@ extern int lx_nfs_mount(char *, char *, char *, int, char *);
  */
 struct lx_nfs_fh2 {
 	unsigned char	lx_fh_data[NFS_FHSIZE];
-} lx_nfs_fh2;
+};
 
 struct lx_nfs_fh3 {
 	unsigned short	lx_fh3_length;
 	unsigned char	lx_fh3_data[NFS3_FHSIZE];
-} lx_nfs_fh3;
+};
 
 typedef struct lx_nfs_mount_data {
 	int			nmd_version;
