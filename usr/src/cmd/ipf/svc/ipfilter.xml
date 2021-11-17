@@ -152,7 +152,7 @@
 		</common_name>
 		<description>
 			<loctext xml:lang='C'>
-			Solaris IP Filter - host-based firewall
+			IP Filter - host-based firewall
 			</loctext>
 		</description>
 		<documentation>
@@ -177,7 +177,7 @@ The default system-wide firewall policy.
 			    required='true'>
 				<common_name>
 					<loctext xml:lang='C'>
-Global Default policy 
+Global Default policy
 					</loctext>
 				</common_name>
 				<description>
@@ -191,7 +191,7 @@ Firewall policy.
 					<value name='none'>
 						<description>
 							<loctext xml:lang='C'>
-No firewall (allow all), this is the default value. 
+No firewall (allow all), this is the default value.
 							</loctext>
 
 						</description>
@@ -390,7 +390,7 @@ The system-wide firewall policy that overrides default system-wide and all servi
 			    required='true'>
 				<common_name>
 					<loctext xml:lang='C'>
-Global Override policy 
+Global Override policy
 					</loctext>
 				</common_name>
 				<description>
@@ -404,7 +404,7 @@ Firewall policy.
 					<value name='none'>
 						<description>
 							<loctext xml:lang='C'>
-No firewall (allow all), this is the default value. 
+No firewall (allow all), this is the default value.
 							</loctext>
 						</description>
 					</value>

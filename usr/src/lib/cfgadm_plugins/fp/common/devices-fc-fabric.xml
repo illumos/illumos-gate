@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
-	
+
 CDDL HEADER START
 
 The contents of this file are subject to the terms of the
@@ -75,7 +75,7 @@ Use is subject to license terms.
 	<template>
 		<common_name>
 			<loctext xml:lang='C'>
-				Solaris FC fabric device configuration.
+				FC fabric device configuration.
 			</loctext>
 		</common_name>
                 <documentation>

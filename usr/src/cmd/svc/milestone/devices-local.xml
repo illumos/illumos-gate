@@ -24,8 +24,6 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -77,7 +75,7 @@
 	<template>
 		<common_name>
 			<loctext xml:lang='C'>
-				Standard Solaris device configuration.
+				standard device configuration.
 			</loctext>
 		</common_name>
 	</template>

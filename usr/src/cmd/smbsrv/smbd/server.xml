@@ -259,7 +259,7 @@ file.
 	<!-- 6. Identify faults to be ignored. -->
 	<!-- 7. Identify service model. Default service model is 'contract' -->
 	<!-- 8. Identify dependents.
-		For Solaris NAS, we may want to have the smbd service start,
+		For a NAS, we may want to have the smbd service start,
 		before it reaches the svc:/milestone/multi-user-server
 		milestone.
 		<dependent
