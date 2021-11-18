@@ -39,8 +39,7 @@ $(__GNUC)sparc_CC=	$(GNUC_ROOT)/bin/gcc
 CFLAGS += $(CCVERBOSE)
 
 # Override CFLAGS.  This is needed only for bootstrap of cw.
-$(__GNUC)CFLAGS=	-O -D__sun -Wall -Wno-unknown-pragmas -Werror \
-			-std=gnu99 -nodefaultlibs
+$(__GNUC)CFLAGS=	-O -D__sun -Wall -Werror -std=gnu99 -nodefaultlibs
 $(__SUNC)CFLAGS=	-xspace -Xa -xildoff -errtags=yes -errwarn=%all \
 			-xc99=%all -W0,-xglobalstatic -v
 
@@ -62,8 +61,6 @@ INS.file=	$(RM) $@; $(CP) $< $(@D); $(CHMOD) $(FILEMODE) $@
 all: $(PROG) $(MAN1ONBLDFILES)
 
 install: all .WAIT $(ROOTONBLDMACHPROG) $(ROOTONBLDMAN1ONBLDFILES)
-
-lint: lint_PROG
 
 clean:
 

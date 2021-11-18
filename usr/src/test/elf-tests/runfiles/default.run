@@ -32,6 +32,14 @@ tests = ['test-parser']
 [/opt/elf-tests/tests/mapfiles/assert]
 tests = ['test-assert']
 
+[/opt/elf-tests/tests/relocs/i386/got32x]
+arch = i86pc
+tests = ['got32x']
+
+[/opt/elf-tests/tests/relocs/amd64/gotpcrelx]
+arch = i86pc
+tests = ['gotpcrelx', 'rex_gotpcrelx']
+
 [/opt/elf-tests/tests/string-merge/]
 tests = ['simple']
 

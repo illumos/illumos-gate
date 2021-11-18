@@ -44,7 +44,9 @@ depends on it.
 2. Running the ZFS Test Suite
 
 The pre-requisites for running the ZFS Test Suite are:
-	- Three scratch disks
+	- root pool about 100GB (some test data is using /var/tmp)
+	- about 8GB RAM
+	- Three scratch disks (15GB, tests with ufs need 512B native or 512e)
 	  - Specify the disks you wish to use in the $DISKS variable, as a
 	    space delimited list like this: DISKS='c3t1d0 c3t2d0 c3t3d0'
 	  - Use the '-a' option to the zfstest script and all unused disks on
