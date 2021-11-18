@@ -45,6 +45,13 @@ SRCDIR=$(dirname $0)
 
 SED=${SED:=/usr/bin/sed}
 
+#
+# Sanitize the environment so we're able to operate with known good
+# defaults. Note, tests such as 7.1 require that we're in the C locale.
+#
+unalias -a
+export LANG=C
+
 typeset -i err=0
 typeset -i pass=0
 typeset -i fail=0
