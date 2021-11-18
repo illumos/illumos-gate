@@ -74,20 +74,18 @@ file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.twobegin \
 file path=opt/elf-tests/tests/mapfiles/parser/mapfile.sizemult.wrong mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/object.c mode=0444
 file path=opt/elf-tests/tests/mapfiles/parser/test-parser mode=0555
-dir  path=opt/elf-tests/tests/relocs owner=owner group=group mode=0755
-dir  path=opt/elf-tests/tests/relocs/amd64 owner=owner group=group mode=0755
-dir  path=opt/elf-tests/tests/relocs/amd64/gotpcrelx owner=owner group=group \
-    mode=0755
+dir  path=opt/elf-tests/tests/relocs
+dir  path=opt/elf-tests/tests/relocs/amd64
+dir  path=opt/elf-tests/tests/relocs/amd64/gotpcrelx
 file path=opt/elf-tests/tests/relocs/amd64/gotpcrelx/gotpcrel.s mode=0444
 file path=opt/elf-tests/tests/relocs/amd64/gotpcrelx/gotpcrelx mode=0555
 file path=opt/elf-tests/tests/relocs/amd64/gotpcrelx/rex_gotpcrel.s mode=0444
 file path=opt/elf-tests/tests/relocs/amd64/gotpcrelx/rex_gotpcrelx mode=0555
-dir  path=opt/elf-tests/tests/relocs/i386 owner=owner group=group mode=0755
-dir  path=opt/elf-tests/tests/relocs/i386/got32x owner=owner group=group \
-    mode=0755
+dir  path=opt/elf-tests/tests/relocs/i386
+dir  path=opt/elf-tests/tests/relocs/i386/got32x
 file path=opt/elf-tests/tests/relocs/i386/got32x/got32x mode=0555
 file path=opt/elf-tests/tests/relocs/i386/got32x/got32x.s mode=0444
-dir  path=opt/elf-tests/tests/string-merge owner=owner group=group mode=0755
+dir  path=opt/elf-tests/tests/string-merge
 file path=opt/elf-tests/tests/string-merge/simple mode=0555
 file path=opt/elf-tests/tests/string-merge/str1.s mode=0444
 file path=opt/elf-tests/tests/string-merge/str2.s mode=0444
