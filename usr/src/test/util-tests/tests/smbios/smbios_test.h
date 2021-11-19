@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Robert Mustacchi
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef _SMBIOS_TEST_H
@@ -58,6 +58,7 @@ extern void smbios_test_table_append_raw(smbios_test_table_t *, const void *,
     size_t);
 extern void smbios_test_table_append_string(smbios_test_table_t *,
     const char *);
+extern void smbios_test_table_str_fini(smbios_test_table_t *);
 extern uint16_t smbios_test_table_append(smbios_test_table_t *, const void *,
     size_t);
 extern void smbios_test_table_append_eot(smbios_test_table_t *);
@@ -81,10 +82,15 @@ typedef struct smbios_test {
 extern boolean_t smbios_test_slot_mktable(smbios_test_table_t *);
 extern boolean_t smbios_test_slot_mktable_34_nopeers(smbios_test_table_t *);
 extern boolean_t smbios_test_slot_mktable_34_peers(smbios_test_table_t *);
+extern boolean_t smbios_test_slot_mktable_35(smbios_test_table_t *);
 extern boolean_t smbios_test_slot_verify(smbios_hdl_t *);
 extern boolean_t smbios_test_slot_verify_34_nopeers(smbios_hdl_t *);
 extern boolean_t smbios_test_slot_verify_34_peers(smbios_hdl_t *);
+extern boolean_t smbios_test_slot_verify_34_overrun(smbios_hdl_t *);
+extern boolean_t smbios_test_slot_verify_35(smbios_hdl_t *);
+
 extern boolean_t smbios_test_badvers_mktable(smbios_test_table_t *);
+extern boolean_t smbios_test_verify_badids(smbios_hdl_t *);
 
 extern boolean_t smbios_test_memdevice_mktable_32(smbios_test_table_t *);
 extern boolean_t smbios_test_memdevice_mktable_33(smbios_test_table_t *);
@@ -107,6 +113,39 @@ extern boolean_t smbios_test_pinfo_verify_invlen2(smbios_hdl_t *);
 extern boolean_t smbios_test_pinfo_verify_invlen3(smbios_hdl_t *);
 extern boolean_t smbios_test_pinfo_verify_invlen4(smbios_hdl_t *);
 extern boolean_t smbios_test_pinfo_verify_badtype(smbios_hdl_t *);
+
+extern boolean_t smbios_test_strprop_mktable_invlen1(smbios_test_table_t *);
+extern boolean_t smbios_test_strprop_mktable_invlen2(smbios_test_table_t *);
+extern boolean_t smbios_test_strprop_mktable_badstr(smbios_test_table_t *);
+extern boolean_t smbios_test_strprop_mktable_basic(smbios_test_table_t *);
+extern boolean_t smbios_test_strprop_verify_invlen1(smbios_hdl_t *);
+extern boolean_t smbios_test_strprop_verify_invlen2(smbios_hdl_t *);
+extern boolean_t smbios_test_strprop_verify_badstr(smbios_hdl_t *);
+extern boolean_t smbios_test_strprop_verify_badtype(smbios_hdl_t *);
+extern boolean_t smbios_test_strprop_verify_basic(smbios_hdl_t *);
+
+extern boolean_t smbios_test_fwinfo_mktable_invlen_base(smbios_test_table_t *);
+extern boolean_t smbios_test_fwinfo_mktable_invlen_comps(smbios_test_table_t *);
+extern boolean_t smbios_test_fwinfo_mktable_nocomps(smbios_test_table_t *);
+extern boolean_t smbios_test_fwinfo_mktable_comps(smbios_test_table_t *);
+extern boolean_t smbios_test_fwinfo_verify_invlen_base(smbios_hdl_t *);
+extern boolean_t smbios_test_fwinfo_verify_invlen_comps(smbios_hdl_t *);
+extern boolean_t smbios_test_fwinfo_verify_badtype(smbios_hdl_t *);
+extern boolean_t smbios_test_fwinfo_verify_nocomps(smbios_hdl_t *);
+extern boolean_t smbios_test_fwinfo_verify_comps(smbios_hdl_t *);
+
+extern boolean_t smbios_test_verify_strings(smbios_hdl_t *);
+
+extern boolean_t smbios_test_chassis_mktable_invlen_base(smbios_test_table_t *);
+extern boolean_t smbios_test_chassis_mktable_base(smbios_test_table_t *);
+extern boolean_t smbios_test_chassis_mktable_comps(smbios_test_table_t *);
+extern boolean_t smbios_test_chassis_mktable_sku(smbios_test_table_t *);
+extern boolean_t smbios_test_chassis_mktable_sku_nocomps(smbios_test_table_t *);
+extern boolean_t smbios_test_chassis_verify_invlen(smbios_hdl_t *);
+extern boolean_t smbios_test_chassis_verify_base(smbios_hdl_t *);
+extern boolean_t smbios_test_chassis_verify_comps(smbios_hdl_t *);
+extern boolean_t smbios_test_chassis_verify_sku_nocomps(smbios_hdl_t *);
+extern boolean_t smbios_test_chassis_verify_sku(smbios_hdl_t *);
 
 #ifdef __cplusplus
 }

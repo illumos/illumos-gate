@@ -10,6 +10,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2021 Oxide Computer Company
 #
 
 #
@@ -32,13 +33,23 @@ sleep 3
 
 $(dirname $0)/badseg_exec || true
 
-coreadm -g "$old_pattern"
+#
+# If this property is set to the empty string (e.g. unset, but the property is
+# present), svcprop will return that as "". If we don't special case this, we
+# will then pass that literal string back to coreadm as an actual path, which is
+# invalid.
+#
+if [[ "$old_pattern" == '""' ]]; then
+	coreadm -g ''
+else
+	coreadm -g "$old_pattern"
+fi
 
-if [[ "$old_enabled" = "true" ]]; then
+if [[ "$old_enabled" == "true" ]]; then
        coreadm -e global
 fi
 
-if [[ "$old_log" = "true" ]]; then
+if [[ "$old_log" == "true" ]]; then
        coreadm -e log
 fi
 

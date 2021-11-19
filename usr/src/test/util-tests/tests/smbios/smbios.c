@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
@@ -21,7 +21,14 @@
  */
 
 #include <umem.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <unistd.h>
 #include "smbios_test.h"
+
+static int test_dirfd = -1;
 
 const char *
 _umem_debug_init(void)
@@ -110,6 +117,14 @@ smbios_test_table_append_string(smbios_test_table_t *table, const char *str)
 {
 	size_t len = strlen(str) + 1;
 	(void) smbios_test_table_append_common(table, str, len);
+}
+
+void
+smbios_test_table_str_fini(smbios_test_table_t *table)
+{
+	const uint8_t endstring = 0;
+
+	smbios_test_table_append_raw(table, &endstring, sizeof (endstring));
 }
 
 uint16_t
@@ -215,6 +230,34 @@ smbios_test_table_fini(smbios_test_table_t *table)
 static const smbios_test_t smbios_tests[] = {
 	{
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = 0xffff,
+	    .st_mktable = smbios_test_badvers_mktable,
+	    .st_desc = "bad library version"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = 0,
+	    .st_mktable = smbios_test_badvers_mktable,
+	    .st_desc = "bad library version (zeros)"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_slot_mktable,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_verify_badids,
+	    .st_desc = "smbios_info_* with bad id"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_slot_mktable,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_verify_strings,
+	    .st_desc = "smbios string functions"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION_32,
 	    .st_libvers = SMB_VERSION,
 	    .st_mktable = smbios_test_slot_mktable,
@@ -239,10 +282,20 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_desc = "slot 3.4 with peers"
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
-	    .st_tvers = SMB_VERSION,
-	    .st_libvers = 0xffff,
-	    .st_mktable = smbios_test_badvers_mktable,
-	    .st_desc = "bad library version"
+	    .st_tvers = SMB_VERSION_35,
+	    .st_libvers = SMB_VERSION_34,
+	    .st_mktable = smbios_test_slot_mktable_35,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_slot_verify_34_overrun,
+	    .st_desc = "slot 3.5 against 3.4 lib"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_35,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_slot_mktable_35,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_slot_verify_35,
+	    .st_desc = "slot 3.5"
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION_32,
@@ -250,7 +303,7 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_mktable = smbios_test_memdevice_mktable_32,
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_memdevice_verify_32,
-	    .st_desc = "memory device 3.2 / 3.2"
+	    .st_desc = "memory device 3.2 % 3.2"
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION_32,
@@ -258,7 +311,7 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_mktable = smbios_test_memdevice_mktable_32,
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_memdevice_verify_32_33,
-	    .st_desc = "memory device 3.2 / 3.3"
+	    .st_desc = "memory device 3.2 % 3.3"
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION_33,
@@ -331,8 +384,143 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_pinfo_verify_badtype,
 	    .st_desc = "processor additional information - bad type"
-	},
-
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_strprop_mktable_invlen1,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_strprop_verify_invlen1,
+	    .st_desc = "string property - bad table length 1"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_strprop_mktable_invlen2,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_strprop_verify_invlen2,
+	    .st_desc = "string property - bad table length 2"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_memdevice_mktable_32,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_strprop_verify_badtype,
+	    .st_desc = "string property - bad type"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_strprop_mktable_basic,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_strprop_verify_basic,
+	    .st_desc = "string property - basic"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_strprop_mktable_badstr,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_strprop_verify_badstr,
+	    .st_desc = "string property - bad string"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_fwinfo_mktable_invlen_base,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_fwinfo_verify_invlen_base,
+	    .st_desc = "firmware inventory - bad base length"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_fwinfo_mktable_invlen_comps,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_fwinfo_verify_invlen_comps,
+	    .st_desc = "firmware inventory - bad comp length"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_memdevice_mktable_32,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_fwinfo_verify_badtype,
+	    .st_desc = "firmware inventory - bad type"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_fwinfo_mktable_nocomps,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_fwinfo_verify_nocomps,
+	    .st_desc = "firmware inventory - no components"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_fwinfo_mktable_comps,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_fwinfo_verify_comps,
+	    .st_desc = "firmware inventory - components"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_24,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_chassis_mktable_invlen_base,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_invlen,
+	    .st_desc = "chassis - bad length (2.4 table)"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_chassis_mktable_invlen_base,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_invlen,
+	    .st_desc = "chassis - bad length (latest version)"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_chassis_mktable_base,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_invlen,
+	    .st_desc = "chassis - bad length, expect sku"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_24,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_chassis_mktable_base,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_base,
+	    .st_desc = "chassis - basic 2.4 version"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_chassis_mktable_sku_nocomps,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_sku_nocomps,
+	    .st_desc = "chassis - sku, but no components"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_24,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_chassis_mktable_comps,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_comps,
+	    .st_desc = "chassis - 2.4 version with comps"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_chassis_mktable_sku_nocomps,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_sku_nocomps,
+	    .st_desc = "chassis - sku + comps"
+	}
 };
 
 static boolean_t
@@ -374,6 +562,26 @@ smbios_test_run_one(const smbios_test_t *test)
 		ret = B_TRUE;
 	}
 
+	if (hdl != NULL && test_dirfd > -1) {
+		int fd;
+		char fname[PATH_MAX];
+
+		(void) snprintf(fname, sizeof (fname), "%s.smbios",
+		    test->st_desc);
+		fd = openat(test_dirfd, fname, O_RDWR | O_CREAT, 0644);
+		if (fd < 0) {
+			warn("failed to dump test %s, failed to open output "
+			    "file", test->st_desc);
+		} else {
+			if (smbios_write(hdl, fd) != 0) {
+				warnx("failed to dump test %s: %s",
+				    test->st_desc,
+				    smbios_errmsg(smbios_errno(hdl)));
+			} else {
+				(void) close(fd);
+			}
+		}
+	}
 out:
 	if (hdl != NULL) {
 		smbios_close(hdl);
@@ -393,16 +601,39 @@ out:
 }
 
 int
-main(void)
+main(int argc, char *argv[])
 {
-	int err = 0;
+	int ret = 0, c;
 	size_t i;
+	const char *outdir = NULL;
 
-	for (i = 0; i < ARRAY_SIZE(smbios_tests); i++) {
-		if (!smbios_test_run_one(&smbios_tests[i])) {
-			err = 1;
+	while ((c = getopt(argc, argv, ":d:")) != -1) {
+		switch (c) {
+		case 'd':
+			outdir = optarg;
+			break;
+		case '?':
+			errx(EXIT_FAILURE, "unknown option: -%c", optopt);
+		case ':':
+			errx(EXIT_FAILURE, "-%c requires an operand", optopt);
 		}
 	}
 
-	return (err);
+	if (outdir != NULL) {
+		if ((test_dirfd = open(outdir, O_RDONLY)) < 0) {
+			err(EXIT_FAILURE, "failed to open %s", outdir);
+		}
+	}
+
+	for (i = 0; i < ARRAY_SIZE(smbios_tests); i++) {
+		if (!smbios_test_run_one(&smbios_tests[i])) {
+			ret = 1;
+		}
+	}
+
+	if (ret == 0) {
+		(void) printf("All tests passed successfully\n");
+	}
+
+	return (ret);
 }

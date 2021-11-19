@@ -22,6 +22,7 @@
 # Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2021 Oxide Computer Company
 #
 
 #
@@ -80,6 +81,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_evlog_format_desc;
 	smbios_evlog_method_desc;
 	smbios_fdopen;
+	smbios_fwinfo_ch_name;
+	smbios_fwinfo_ch_desc;
+	smbios_fwinfo_id_desc;
+	smbios_fwinfo_state_desc;
+	smbios_fwinfo_vers_desc;
 	smbios_hwsec_desc;
 	smbios_info_battery;
 	smbios_info_bboard;
@@ -87,10 +93,15 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_info_boot;
 	smbios_info_cache;
 	smbios_info_chassis;
+	smbios_info_chassis_elts;
+	smbios_info_chassis_elts_free;
 	smbios_info_cooldev;
 	smbios_info_common;
 	smbios_info_contains;
 	smbios_info_eventlog;
+	smbios_info_fwinfo;
+	smbios_info_fwinfo_comps;
+	smbios_info_fwinfo_comps_free;
 	smbios_info_hwsec;
 	smbios_info_ipmi;
 	smbios_info_iprobe;
@@ -116,6 +127,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_info_slot_peers_free;
 	smbios_info_smbios;
 	smbios_info_smbios_version;
+	smbios_info_strprop;
 	smbios_info_strtab;
 	smbios_info_system;
 	smbios_info_pciexrc;
@@ -140,8 +152,9 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_memdevice_memtech_desc;
 	smbios_memdevice_type_desc;
 	smbios_memdevice_rank_desc;
-	smbios_open;
+	smbios_onboard_ext_type_desc;
 	smbios_onboard_type_desc;
+	smbios_open;
 	smbios_pointdev_iface_desc;
 	smbios_pointdev_type_desc;
 	smbios_port_conn_desc;
@@ -168,10 +181,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_slot_ch1_name;
 	smbios_slot_ch2_desc;
 	smbios_slot_ch2_name;
+	smbios_slot_height_desc;
 	smbios_slot_length_desc;
 	smbios_slot_type_desc;
 	smbios_slot_usage_desc;
 	smbios_slot_width_desc;
+	smbios_strprop_id_desc;
 	smbios_system_wakeup_desc;
 	smbios_tprobe_loc_desc;
 	smbios_tprobe_status_desc;
