@@ -564,7 +564,8 @@ CGLOBALSTATIC= -W0,-xglobalstatic
 
 # Sometimes we want all symbols and types in debugging information even
 # if they aren't used.
-CALLSYMS=	-W0,-xdbggen=no%usedonly
+CALLSYMS=	-_gcc=-fno-eliminate-unused-debug-symbols \
+		-_gcc=-fno-eliminate-unused-debug-types
 
 #
 # We force the compilers to generate the debugging information best understood
