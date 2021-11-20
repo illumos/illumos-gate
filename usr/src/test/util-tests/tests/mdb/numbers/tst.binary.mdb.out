@@ -1,0 +1,11 @@
+                47              
+                11101
+                ||| |
+                ||| +-- bit 0 mask 0x01
+                ||+---- bit 2 mask 0x04
+                |+----- bit 3 mask 0x08
+                +------ bit 4 mask 0x10
+                6               
+radix = 2 base ten
+                411             
+                2               

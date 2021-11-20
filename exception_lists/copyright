@@ -573,3 +573,10 @@ usr/src/lib/libvmmapi/README.license
 usr/src/uts/i86pc/io/vmm/README.license
 usr/src/uts/i86pc/io/viona/THIRDPARTYLICENSE
 usr/src/uts/i86pc/io/viona/THIRDPARTYLICENSE.descrip
+
+#
+# Various bits from the mdb test suite that represent literal input to
+# mdb.
+#
+usr/src/test/util-tests/tests/mdb/*/*.mdb
+usr/src/test/util-tests/tests/mdb/*/*.mdb.out
