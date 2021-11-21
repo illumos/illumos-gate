@@ -14,13 +14,13 @@
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
-file path=usr/share/man/man3devid/devid_get.3devid
 link path=usr/share/man/man3devid/devid_compare.3devid target=devid_get.3devid
 link path=usr/share/man/man3devid/devid_deviceid_to_nmlist.3devid \
     target=devid_get.3devid
 link path=usr/share/man/man3devid/devid_free.3devid target=devid_get.3devid
 link path=usr/share/man/man3devid/devid_free_nmlist.3devid \
     target=devid_get.3devid
+file path=usr/share/man/man3devid/devid_get.3devid
 link path=usr/share/man/man3devid/devid_get_minor_name.3devid \
     target=devid_get.3devid
 link path=usr/share/man/man3devid/devid_sizeof.3devid target=devid_get.3devid
@@ -28,8 +28,7 @@ link path=usr/share/man/man3devid/devid_str_decode.3devid \
     target=devid_get.3devid
 link path=usr/share/man/man3devid/devid_str_encode.3devid \
     target=devid_get.3devid
-link path=usr/share/man/man3devid/devid_str_free.3devid \
-    target=devid_get.3devid
+link path=usr/share/man/man3devid/devid_str_free.3devid target=devid_get.3devid
 link path=usr/share/man/man3devid/devid_str_from_path.3devid \
     target=devid_get.3devid
 link path=usr/share/man/man3devid/devid_valid.3devid target=devid_get.3devid

@@ -14,10 +14,6 @@
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
-file path=usr/share/man/man3exacct/ea_error.3exacct
-file path=usr/share/man/man3exacct/ea_open.3exacct
-file path=usr/share/man/man3exacct/ea_pack_object.3exacct
-file path=usr/share/man/man3exacct/ea_set_item.3exacct
 link path=usr/share/man/man3exacct/ea_alloc.3exacct target=ea_set_item.3exacct
 link path=usr/share/man/man3exacct/ea_attach_to_group.3exacct \
     target=ea_set_item.3exacct
@@ -28,6 +24,7 @@ link path=usr/share/man/man3exacct/ea_copy_object.3exacct \
     target=ea_pack_object.3exacct
 link path=usr/share/man/man3exacct/ea_copy_object_tree.3exacct \
     target=ea_pack_object.3exacct
+file path=usr/share/man/man3exacct/ea_error.3exacct
 link path=usr/share/man/man3exacct/ea_free.3exacct target=ea_set_item.3exacct
 link path=usr/share/man/man3exacct/ea_free_item.3exacct \
     target=ea_set_item.3exacct
@@ -45,14 +42,15 @@ link path=usr/share/man/man3exacct/ea_match_object_catalog.3exacct \
     target=ea_set_item.3exacct
 link path=usr/share/man/man3exacct/ea_next_object.3exacct \
     target=ea_pack_object.3exacct
+file path=usr/share/man/man3exacct/ea_open.3exacct
+file path=usr/share/man/man3exacct/ea_pack_object.3exacct
 link path=usr/share/man/man3exacct/ea_previous_object.3exacct \
     target=ea_pack_object.3exacct
 link path=usr/share/man/man3exacct/ea_set_group.3exacct \
     target=ea_set_item.3exacct
-link path=usr/share/man/man3exacct/ea_strdup.3exacct \
-    target=ea_set_item.3exacct
-link path=usr/share/man/man3exacct/ea_strfree.3exacct \
-    target=ea_set_item.3exacct
+file path=usr/share/man/man3exacct/ea_set_item.3exacct
+link path=usr/share/man/man3exacct/ea_strdup.3exacct target=ea_set_item.3exacct
+link path=usr/share/man/man3exacct/ea_strfree.3exacct target=ea_set_item.3exacct
 link path=usr/share/man/man3exacct/ea_unpack_object.3exacct \
     target=ea_pack_object.3exacct
 link path=usr/share/man/man3exacct/ea_write_object.3exacct \

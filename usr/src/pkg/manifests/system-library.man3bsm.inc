@@ -14,15 +14,10 @@
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
+link path=usr/share/man/man3bsm/au_close.3bsm target=au_open.3bsm
 file path=usr/share/man/man3bsm/au_open.3bsm
 file path=usr/share/man/man3bsm/au_preselect.3bsm
 file path=usr/share/man/man3bsm/au_to.3bsm
-file path=usr/share/man/man3bsm/au_user_mask.3bsm
-file path=usr/share/man/man3bsm/getauclassent.3bsm
-file path=usr/share/man/man3bsm/getauditflags.3bsm
-file path=usr/share/man/man3bsm/getauevent.3bsm
-file path=usr/share/man/man3bsm/getfauditflags.3bsm
-link path=usr/share/man/man3bsm/au_close.3bsm target=au_open.3bsm
 link path=usr/share/man/man3bsm/au_to_arg.3bsm target=au_to.3bsm
 link path=usr/share/man/man3bsm/au_to_arg32.3bsm target=au_to.3bsm
 link path=usr/share/man/man3bsm/au_to_arg64.3bsm target=au_to.3bsm
@@ -46,21 +41,24 @@ link path=usr/share/man/man3bsm/au_to_socket.3bsm target=au_to.3bsm
 link path=usr/share/man/man3bsm/au_to_subject.3bsm target=au_to.3bsm
 link path=usr/share/man/man3bsm/au_to_subject_ex.3bsm target=au_to.3bsm
 link path=usr/share/man/man3bsm/au_to_text.3bsm target=au_to.3bsm
+file path=usr/share/man/man3bsm/au_user_mask.3bsm
 link path=usr/share/man/man3bsm/au_write.3bsm target=au_open.3bsm
 link path=usr/share/man/man3bsm/endauclass.3bsm target=getauclassent.3bsm
 link path=usr/share/man/man3bsm/endauevent.3bsm target=getauevent.3bsm
+file path=usr/share/man/man3bsm/getauclassent.3bsm
 link path=usr/share/man/man3bsm/getauclassent_r.3bsm target=getauclassent.3bsm
 link path=usr/share/man/man3bsm/getauclassnam.3bsm target=getauclassent.3bsm
 link path=usr/share/man/man3bsm/getauclassnam_r.3bsm target=getauclassent.3bsm
-link path=usr/share/man/man3bsm/getauditflagsbin.3bsm \
-    target=getauditflags.3bsm
-link path=usr/share/man/man3bsm/getauditflagschar.3bsm \
-    target=getauditflags.3bsm
+file path=usr/share/man/man3bsm/getauditflags.3bsm
+link path=usr/share/man/man3bsm/getauditflagsbin.3bsm target=getauditflags.3bsm
+link path=usr/share/man/man3bsm/getauditflagschar.3bsm target=getauditflags.3bsm
+file path=usr/share/man/man3bsm/getauevent.3bsm
 link path=usr/share/man/man3bsm/getauevent_r.3bsm target=getauevent.3bsm
 link path=usr/share/man/man3bsm/getauevnam.3bsm target=getauevent.3bsm
 link path=usr/share/man/man3bsm/getauevnam_r.3bsm target=getauevent.3bsm
 link path=usr/share/man/man3bsm/getauevnonam.3bsm target=getauevent.3bsm
 link path=usr/share/man/man3bsm/getauevnum.3bsm target=getauevent.3bsm
 link path=usr/share/man/man3bsm/getauevnum_r.3bsm target=getauevent.3bsm
+file path=usr/share/man/man3bsm/getfauditflags.3bsm
 link path=usr/share/man/man3bsm/setauclass.3bsm target=getauclassent.3bsm
 link path=usr/share/man/man3bsm/setauevent.3bsm target=getauevent.3bsm

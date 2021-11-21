@@ -13,6 +13,8 @@
 # Copyright 2015, Joyent, Inc.
 #
 
+link path=usr/share/man/man3avl/AVL_NEXT.3avl target=avl_first.3avl
+link path=usr/share/man/man3avl/AVL_PREV.3avl target=avl_first.3avl
 file path=usr/share/man/man3avl/avl_add.3avl
 file path=usr/share/man/man3avl/avl_create.3avl
 file path=usr/share/man/man3avl/avl_destroy.3avl
@@ -20,13 +22,11 @@ file path=usr/share/man/man3avl/avl_destroy_nodes.3avl
 file path=usr/share/man/man3avl/avl_find.3avl
 file path=usr/share/man/man3avl/avl_first.3avl
 file path=usr/share/man/man3avl/avl_insert.3avl
+link path=usr/share/man/man3avl/avl_insert_here.3avl target=avl_insert.3avl
 file path=usr/share/man/man3avl/avl_is_empty.3avl
+link path=usr/share/man/man3avl/avl_last.3avl target=avl_first.3avl
 file path=usr/share/man/man3avl/avl_nearest.3avl
 file path=usr/share/man/man3avl/avl_numnodes.3avl
-file path=usr/share/man/man3avl/avl_swap.3avl
-link path=usr/share/man/man3avl/AVL_NEXT.3avl target=avl_first.3avl
-link path=usr/share/man/man3avl/AVL_PREV.3avl target=avl_first.3avl
-link path=usr/share/man/man3avl/avl_insert_here.3avl target=avl_insert.3avl
-link path=usr/share/man/man3avl/avl_last.3avl target=avl_first.3avl
 link path=usr/share/man/man3avl/avl_remove.3avl target=avl_add.3avl
+file path=usr/share/man/man3avl/avl_swap.3avl
 

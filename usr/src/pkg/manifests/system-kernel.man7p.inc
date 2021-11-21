@@ -14,10 +14,20 @@
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
+link path=usr/share/man/man7p/AH.7p target=ipsecah.7p
+link path=usr/share/man/man7p/ARP.7p target=arp.7p
+link path=usr/share/man/man7p/ESP.7p target=ipsecesp.7p
+link path=usr/share/man/man7p/ICMP.7p target=icmp.7p
+link path=usr/share/man/man7p/IP.7p target=ip.7p
+link path=usr/share/man/man7p/NDP.7p target=ndp.7p
+link path=usr/share/man/man7p/SCTP.7p target=sctp.7p
+link path=usr/share/man/man7p/TCP.7p target=tcp.7p
+link path=usr/share/man/man7p/UDP.7p target=udp.7p
 file path=usr/share/man/man7p/arp.7p
 file path=usr/share/man/man7p/dlpi.7p
 file path=usr/share/man/man7p/icmp.7p
 file path=usr/share/man/man7p/icmp6.7p
+link path=usr/share/man/man7p/if.7p target=if_tcp.7p
 file path=usr/share/man/man7p/if_tcp.7p
 file path=usr/share/man/man7p/inet.7p
 file path=usr/share/man/man7p/inet6.7p
@@ -33,13 +43,3 @@ file path=usr/share/man/man7p/routing.7p
 file path=usr/share/man/man7p/sctp.7p
 file path=usr/share/man/man7p/tcp.7p
 file path=usr/share/man/man7p/udp.7p
-link path=usr/share/man/man7p/AH.7p target=ipsecah.7p
-link path=usr/share/man/man7p/ARP.7p target=arp.7p
-link path=usr/share/man/man7p/ESP.7p target=ipsecesp.7p
-link path=usr/share/man/man7p/ICMP.7p target=icmp.7p
-link path=usr/share/man/man7p/IP.7p target=ip.7p
-link path=usr/share/man/man7p/NDP.7p target=ndp.7p
-link path=usr/share/man/man7p/SCTP.7p target=sctp.7p
-link path=usr/share/man/man7p/TCP.7p target=tcp.7p
-link path=usr/share/man/man7p/UDP.7p target=udp.7p
-link path=usr/share/man/man7p/if.7p target=if_tcp.7p
