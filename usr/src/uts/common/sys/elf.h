@@ -615,6 +615,21 @@ typedef struct {
 #define	SHT_GNU_LIBLIST		0x6ffffff7	/* Prelink library list */
 #define	SHT_CHECKSUM		0x6ffffff8	/* Checksum for DSO content */
 
+/*
+ * LLVM-specific section types, actually independent of any (ELF) OS.
+ * See: https://llvm.org/docs/Extensions.html
+ */
+#define	SHT_LLVM_ODRTAB		0x6fff4c00 /* ODR Table */
+#define	SHT_LLVM_LINKER_OPTIONS	0x6fff4c01 /* Linker options */
+#define	SHT_LLVM_UNKNOWN1	0x6fff4c02 /* previously call graph profile */
+#define	SHT_LLVM_ADDRSIG	0x6fff4c03 /* significant address table */
+#define	SHT_LLVM_DEPENDENT_LIBRARIES	0x6fff4c04 /* dependent libraries. */
+#define	SHT_LLVM_SYMPART	0x6fff4c05 /* symbol partition specs. */
+#define	SHT_LLVM_PART_EHDR	0x6fff4c06 /* ehdr for loadable part. */
+#define	SHT_LLVM_PART_PHDR	0x6fff4c07 /* phdrs for loadable part. */
+#define	SHT_LLVM_BB_ADDR_MAP	0x6fff4c08 /* basic block addr map */
+#define	SHT_LLVM_CALL_GRAPH_PROFILE	0x6fff4c09 /* call graph profile */
+
 #define	SHT_LOPROC	0x70000000	/* processor specific range */
 #define	SHT_HIPROC	0x7fffffff
 

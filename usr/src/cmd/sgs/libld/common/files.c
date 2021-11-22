@@ -1396,7 +1396,8 @@ invalid_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_FIL_INVALSEC),
 	    ifl->ifl_name, EC_WORD(ndx), name,
 	    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
-	    ifl->ifl_ehdr->e_machine, shdr->sh_type, 0, &inv_buf));
+	    ifl->ifl_ehdr->e_machine, shdr->sh_type, CONV_FMT_ALT_CF,
+	    &inv_buf));
 	return (1);
 }
 
@@ -2385,7 +2386,8 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_FIL_INVALSEC),
 		    ifl->ifl_name, EC_WORD(isc->is_scnndx), isc->is_name,
 		    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
-		    ifl->ifl_ehdr->e_machine, shdr->sh_type, 0, &inv_buf));
+		    ifl->ifl_ehdr->e_machine, shdr->sh_type, CONV_FMT_ALT_CF,
+		    &inv_buf));
 		return (0);
 	}
 
@@ -2692,7 +2694,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				    EC_WORD(ndx), name, conv_sec_type(
 				    ifl->ifl_ehdr->e_ident[EI_OSABI],
 				    ifl->ifl_ehdr->e_machine,
-				    shdr->sh_type, 0, &inv_buf));
+				    shdr->sh_type, CONV_FMT_ALT_CF, &inv_buf));
 			}
 
 			/*
