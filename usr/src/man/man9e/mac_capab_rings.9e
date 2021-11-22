@@ -1,0 +1,475 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd July 2, 2022
+.Dt MAC_CAPAB_RINGS 9E
+.Os
+.Sh NAME
+.Nm mac_capab_rings
+.Nd MAC ring capability
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Vt typedef struct mac_capab_rings_s mac_capab_rings_t;
+.Sh INTERFACE LEVEL
+.Sy Uncommitted -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh DESCRIPTION
+The
+.Sy MAC_CAPAB_RINGS
+capability provides a means for device drivers to take advantage of
+the additional resources offered by hardware beyond the basic operations
+to transmit and receive.
+There are two primary concepts that this MAC capability relies on: rings
+and groups.
+.Pp
+The
+.Em ring
+is a abstract concept which must be mapped to some hardware construct by
+the driver.
+It typically takes the form of a DMA memory region which is divided
+into many smaller units, called descriptors or entries.
+Each entry in the ring describes a location in memory of a packet, which the
+hardware is to read from
+.Pq to transmit it
+or write to
+.Pq upon reception .
+Entries also typically contain metadata and attributes about the packet.
+These entries are typically arranged in a fixed-size circular buffer
+.Po hence the
+.Dq ring
+name
+.Pc
+which is shared between the operating system and the
+hardware via the DMA-backed memory.
+Most NICs, regardless of their support for this capability, use something
+resembling a descriptor ring under the hood.
+Some vendors may also refer to rings as
+.Em queues .
+The ring concept is intentionally general, so that more unusual underlying
+hardware constructs can also be used to implement it.
+.Pp
+A collection of one or more rings is called a
+.Em group .
+Each group usually has a collection of filters that can be associated
+with them.
+These filters are usually defined in terms of matching something like a
+MAC address, VLAN, or Ethertype, though more complex filters may exist
+in hardware.
+When a packet matches a filter, it will then be directed to the group
+and eventually delivered to one of the rings in the group.
+.Pp
+In the MAC framework, rings and groups are separated into categories
+based on their purpose: transmitting and receiving.
+While the MAC framework thinks of transmit and receive rings as
+different physical constructs, they may map to the same underlying
+resources in the hardware.
+The device driver may implement the
+.Dv MAC_CAPAB_RINGS
+capability for one of transmitting, receiving, or both.
+.Ss Mapping Hardware to Rings and Groups
+There are many different ways that hardware resources may map to this
+capability.
+Consider the following examples:
+.Bl -enum
+.It
+Hardware may support a feature commonly known as receive side scaling
+.Pq RSS .
+With RSS, the hardware has multiple rings and uses a hash function
+calculated over packet headers to choose which ring receives a
+particular packet.
+Rings are associated with different interrupts, allowing multiple rings
+to be processed in parallel.
+Supporting RSS in isolation would result in a device which has a single
+group, and multiple rings within that group.
+.It
+Some hardware may have a single ring, but still support multiple receive
+filters.
+This is commonly seen with some 1 GbE devices.
+While the hardware only has one ring, it has support for multiple
+independent MAC address filters, each of which can be programmed to
+receive traffic for a single MAC address.
+The driver should map this situation to a single group with a single
+ring.
+However, it would implement the ability to program several filters.
+While this may not seem useful at first, when virtual NICs are created
+on top of a physical NIC, the additional hardware filters will be used
+to avoid putting the device in promiscuous mode.
+.It
+Finally, some hardware has many rings, which can be placed in many
+different groups.
+Each group has its own filtering capabilities.
+For such hardware, the device driver would declare support for multiple
+groups, each of which has its own independent set of rings.
+.El
+.Pp
+When choosing hardware constructs to implement rings and groups, it is
+also important to consider interrupts.
+In order to support polling, each receive ring must be able to
+independently toggle whether that ring will generate an interrupt on
+packet reception, even when many rings share the same hardware level
+interrupt
+.Pq e.g. the same MSI or MSI-X interrupt number and handler .
+.Ss Filters
+The
+.Xr mac_group_info 9S
+structure is used to define several different kinds of filters that the
+group might implement.
+There are three different classes of filters that exist:
+.Bl -tag -width Ds
+.It Sy MAC Address
+A given frame matches a MAC Address filter if the receive address in
+the Ethernet Header matches the specified MAC address.
+.It Sy VLAN
+A given frame matches a VLAN filter if it both has an 802.1Q VLAN tag
+and that tag matches the VALN number specified in the filter.
+If the frame's outer ethertype is not 0x8100, then the filter will not
+match.
+.It Sy MAC Address and VLAN
+A given frame matches a MAC Address and VLAN filter if it matches both
+the specified MAC address and the specified VLAN.
+This is constructed as a logical AND of the previous two filters.
+If only one of the two matches, then the frame does not match this
+filter.
+.Pp
+Note: this filter type is still under development and has not been
+plumbed through our APIs yet.
+.El
+.Pp
+Devices may support many different filter types.
+If the hardware resources required for a combined filter type
+.Pq e.g. MAC Address and VLAN
+are similar to the resources required for each in isolation, drivers
+should prefer to implement just the combined type and should not
+implement the individual types.
+.Pp
+The MAC framework assumes that the following rules hold regarding
+filters:
+.Bl -enum
+.It
+When there are multiple filters of the same kind with different
+addresses, then the hardware will accept a frame if it matches
+.Em ANY
+of the specified filters.
+In other words, if there are two VLAN filters defined, one for VLAN 23
+and one for VLAN 42, then if a frame has either VLAN 23 or VLAN 42,
+it will be accepted for the group.
+.It
+If multiple different classes of filters are defined, then the hardware
+should only accept a frame if it passes
+.Em ALL
+of the filter classes.
+For example, if there is a MAC address filter and a separate VLAN
+filter, the hardware will only accept the frame if it passes both sets
+of filters.
+.It
+If there are multiple different classes of filters and there are
+multiple filters present in each class, then the driver will accept a
+packet as long as it matches
+.Em ALL
+filter classes.
+However, within a given filter class, it may match
+.Em ANY
+of the filters.
+See the following boolean logic as an alternative way to phrase this
+case:
+.Bd -literal -offset indent
+match = MAC && VLAN
+MAC = 00:11:22:33:44:55 OR 00:66:77:88:99:aa OR ...
+VLAN = 11 OR 12 OR ...
+.Ed
+.El
+.Pp
+The following psuedocode summarizes the behavior for a device that
+supports independent MAC and VLAN filters.
+If the hardware only supports a single family of filters, then simply
+treat that in the psuedocode as though it is always true:
+.Bd -literal -offset indent
+for each packet p:
+    for each MAC filter m:
+        if m matches p's mac:
+            for each VLAN filter v:
+                if v matches p's vlan:
+                    accept p for group
+	            proceed to next packet
+    reject packet p
+    proceed to next packet
+.Ed
+.Pp
+The following psuedocode summarizes the behavior for a device that
+supports a combined MAC address and VLAN filter:
+.Bd -literal -offset indent
+for each packet p:
+    for each filter f:
+        if f.mac matches p's mac and f.vlan matches p's vlan:
+            accept p for group
+	    proceed to next packet
+    reject packet p
+    proceed to next packet
+.Ed
+.Ss MAC Capability Structure
+When the device driver's
+.Xr mc_getcapab 9E
+function entry point is called with the capability requested set to
+.Dv MAC_CAPAB_RINGS ,
+then the value of the capability structure is a pointer to a
+.Vt mac_capab_rings_t
+structure with the following members:
+.Bd -literal -offset indent
+mac_ring_type_t         mr_type;
+mac_groupt_type_t       mr_group_type;
+uint_t                  mr_rnum;
+uint_t                  mr_gnum;
+mac_get_ring_t          mr_rget;
+mac_get_group_t         mr_gget;
+.Ed
+.Pp
+If the driver supports the
+.Dv MAC_CAPAB_RINGS
+capability, then it should first check the
+.Fa mr_type
+member of the structure.
+This member has the following possible values:
+.Bl -tag -width Dv
+.It Dv MAC_RING_TYPE_RX
+Indicates that this group is for receive rings.
+.It Dv MAC_RING_TYPE_TX
+Indicates that this group is for transmit rings.
+.El
+.Pp
+The driver will be asked to fill in this capability structure separately
+for receive and transmit groups and rings.
+This allows a driver to have different entry points for each type.
+If neither of these values is specified, then the device driver must
+return
+.Dv B_FALSE
+from its
+.Xr mc_getcapab 9E
+entry point.
+Once it has identified the type, it should fill in the capability
+structure based on the following rules:
+.Bl -tag -width Fa
+.It Fa mr_type
+The
+.Fa mr_type
+member is used to indicate whether this group is for transmit or receive
+rings.
+The
+.Fa mr_type
+member should not be modified by the device driver.
+It is set by the MAC framework when the driver's
+.Xr mc_getcapab 9E
+entry point is called.
+As indicated above, the driver must check the value to determine which
+group this
+.Xr mc_getcapab 9E
+call is referring to.
+.It Fa mr_group_type
+This member is used to indicate the group type.
+This should be set to
+.Dv MAC_GROUP_TYPE_STATIC ,
+which indicates that the assignment of rings to groups is fixed, and
+each ring can only ever belong to one specific group.
+The number of rings per group may vary on the group and can be set by
+the driver.
+.It Fa mr_rnum
+This indicates the total number of rings that are available.
+The number exposed may be less than the number supported in hardware.
+This is often due to receiving fewer resources such as interrupts.
+.It Fa mr_gnum
+This indicates the total number of groups that are available from
+hardware.
+The number exposed may be less than the number supported in hardware.
+This is often due to receiving fewer resources such as interrupts.
+.Pp
+When working with transmit rings, this value may be zero.
+In this case, each ring is treated independently and separate groups for
+each transmit ring are not required.
+.It Fa mr_rget
+This member is a function pointer that will be called to provide
+information about a ring inside of a specific group.
+See
+.Xr mr_rget 9E
+for information on the function, its signature, and responsibilities.
+.It Fa mr_gget
+This member is a function pointer that will be called to provide
+information about a group.
+See
+.Xr mr_gget 9E
+for information on the function, its signature, and responsibilities.
+.El
+.Sh DRIVER IMPLICATIONS
+.Ss MAC Callback Entry Points
+When a driver implements the
+.Dv MAC_CAPAB_RINGS
+capability, then it must not implement some of the traditional MAC
+callbacks.
+If the driver supports
+.Dv MAC_CAPAB_RINGS
+for receiving, then it must not implement the
+.Xr mc_unicst 9E
+entry point.
+This is instead handled through the filters that were described earlier.
+The filter entry points are defined as part of the
+.Xr mac_group_info 9S
+structure.
+.Pp
+If the driver supports
+.Dv MAC_CAPAB_RINGS
+for transmitting, then it should not implement the
+.Xr mc_tx 9E
+entry point, it will not be used.
+The MAC framework will instead use the
+.Xr mri_tx 9E
+entry point that is provided by the driver in the
+.Xr mac_ring_info 9S
+structure.
+.Ss Locking and Concurrency
+One of the main points of the
+.Dv MAC_CAPAB_RINGS
+capability is to increase the parallelism and concurrency that is
+actively going on in the driver.
+This means that a driver may be asked to transmit, poll, or receiver
+interrupts on all of its rings in parallel.
+This usually calls for fine-grained locking in a driver's own data
+structures to ensure that the various rings can be populated and used
+without having to block on one another.
+In general, most drivers have their own independent set of locks for
+each transmit and receive ring.
+They also usually have separate locks for each group.
+.Pp
+Just because one driver performs locking in one way, does not mean that
+one has to mimic it.
+The design of a driver and its locking is often tightly coupled to how
+the underlying hardware works and its complexity.
+.Ss Polling on rings
+When the
+.Dv MAC_CAPAB_RINGS
+capability is implemented, then additional functionality for receiving
+becomes available.
+A receive ring has the ability to be polled.
+When the operating system desires to begin polling the ring, it will
+make a function call into the driver, asking it to receive packets from
+this ring.
+When receiving packets while polling, the process is generally identical
+to that described in the
+.Sy Receiving Data
+section of
+.Xr mac 9E .
+For more details, see
+.Xr mri_poll 9E .
+.Pp
+When the MAC framework wants to enable polling, it will first turn off
+interrupts through the
+.Xr mi_disable 9E
+entry point on the driver.
+The driver must ensure that there is proper serialization between the
+interrupt enablement, interrupt disablement, the interrupt handler for
+that ring, and the
+.Xr mri_poll 9E
+entry point.
+For more information on the locking requirements related to polling, see
+the discussions in
+.Xr mri_poll 9E
+and
+.Xr mi_disable 9E .
+.Ss Updated callback functions
+When using rings, two of the primary functions that were used change.
+First, the
+.Xr mac_rx 9F
+function should be replaced with the
+.Xr mac_ring_rx 9F
+function.
+Secondly,
+the
+.Xr mac_tx_update 9F
+function should be replaced with the
+.Xr mac_tx_ring_update 9F
+function.
+.Ss Interrupt and Ring Mapping
+Drivers often vary the number of rings that they expose based on the
+number of interrupts that exist.
+When a driver only supports a single group, there is often no reason to
+have more rings than interrupts.
+However, most hardware supports a means of having multiple rings tie to
+the same interrupt.
+Drivers then tie the rings in different groups to the same interrupts
+and therefore when an interrupt is triggered, iterate over all of the
+rings.
+.Pp
+Tying multiple rings together into a single interrupt should only be done
+if hardware has the ability to control whether or not each ring
+contributes to the interrupt.
+For the
+.Xr mi_disable 9E
+entry point to work, each ring must be able to independently control
+whether or not receipt of a packet generates the shared interrupt.
+.Ss Filter Management
+As part of general operation, the device driver will be asked to add
+various filters to groups.
+The MAC framework does not keep track of the assigned filters in such a
+way that after a device reset that they'll be given to the driver again.
+Therefore, it is recommended that the driver keep track of all filters
+it has assigned such that they can be reinstated after a driver or
+system initiated device reset of some kind.
+There is no need to persist anything across a call to
+.Xr detach 9E
+or similar.
+.Pp
+For more information, see the
+.Sy TX STALL DETECTION, DEVICE RESETS, AND FAULT MANAGEMENT
+section of
+.Xr mac 9E .
+.Ss Broadcast, Multicast, and Promiscuous Mode
+Rings and groups are currently designed to emphasize and enhance the
+receipt of filtered, unicast frames.
+This means that special handling is required when working with broadcast
+traffic, multicast traffic, and enabling promiscuous mode.
+This only applies to receive groups and rings.
+.Pp
+By default, only the first group with index zero, sometimes called the
+default group, should ever be
+programmed to receive broadcast traffic.
+This group should always be programmed to receive broadcast traffic, the
+same way that the broader device is programmed to always receive
+broadcast traffic when the
+.Dv MAC_CAPAB_RINGS
+capability has not been negotiated.
+.Pp
+When multicast addresses are assigned to the device through the
+.Xr mc_multicst 9E
+entry point, those should also be assigned to the first group.
+.Pp
+Similarly, when enabling promiscuous mode, the driver should only enable
+promiscuous traffic to be received by the first group.
+.Pp
+No other groups or rings should ever receive broadcast, multicast, or
+promiscuous mode traffic.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mc_getcapab 9E ,
+.Xr mc_multicst 9E ,
+.Xr mc_tx 9E ,
+.Xr mc_unicst 9E ,
+.Xr mi_disable 9E ,
+.Xr mr_gaddring 9E ,
+.Xr mr_gget 9E ,
+.Xr mr_gremring 9E ,
+.Xr mr_rget 9E ,
+.Xr mri_poll 9E ,
+.Xr mac_ring_rx 9F ,
+.Xr mac_rx 9F ,
+.Xr mac_tx_ring_update 9F ,
+.Xr mac_tx_update 9F ,
+.Xr mac_group_info 9S

@@ -1,0 +1,165 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd July 2, 2022
+.Dt MRI_STAT 9E
+.Os
+.Sh NAME
+.Nm mri_stat
+.Nd xtatistics collection entry point for rings
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft int
+.Fo prefix_ring_stat
+.Fa "mac_ring_driver_t rh"
+.Fa "uint_t stat"
+.Fa "uint64_t *val"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Uncommitted -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa rh
+A pointer to the ring's private data that was passed in via the
+.Vt mri_driver
+member of the
+.Xr mac_ring_info 9S
+structure as part of the
+.Xr mr_rget 9E
+entry point.
+.It Fa stat
+The numeric identifier of a statistic.
+.It Fa val
+A pointer to a 64-bit unsigned value into which the device driver should
+place statistic.
+.El
+.Sh DESCRIPTION
+The
+.Fn mri_stat
+entry point is called by the MAC framework to get statistics that have
+been scoped to the ring, indicated by
+.Fa rh .
+.Pp
+The set of statistics that the driver should check depends on the kind
+of ring that is in use.
+If the driver encounters an unknown statistic it should return
+.Er ENOTSUP .
+All the statistics should be values that are scoped to the ring itself.
+This is in contrast to the normal
+.Xr mc_getstat 9E
+entry point, which has statistics for the entire device.
+Other than the scoping, the statistics listed below have the same
+meaning as they do in the
+.Sx STATISTICS
+section of
+.Xr mac 9E .
+See
+.Xr mac 9E
+for more details of those statistics.
+.Pp
+Receive rings should support the following statistics:
+.Bl -bullet
+.It
+.Dv MAC_STAT_IPACKETS
+.It
+.Dv MAC_STAT_RBYTES
+.El
+.Pp
+Transmit rings should support the following statitics:
+.Bl -bullet
+.It
+.Dv MAC_STAT_OBYTES
+.It
+.Dv MAC_STAT_OPACKETS
+.El
+.Sh EXAMPLES
+The following example shows how a driver might structure its
+.Fn mri_stat
+entry point.
+.Bd -literal
+#include <sys/mac_provider.h>
+
+/*
+ * Note, this example merely shows the structure of the function. For
+ * the purpose of this example, we assume that we have a per-ring
+ * structure which has members that indicate its stats and that it has a
+ * lock which is used to serialize access to this data.
+ */
+
+static int
+example_tx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
+{
+	example_tx_ring_t *etrp = arg;
+
+	mutex_enter(&etrp->etrp_lock);
+	switch (stat) {
+	case MAC_STAT_OBYTES:
+		*val = etrp->etrp_stats.eps_obytes;
+		break;
+	case MAC_STAT_OPACKETS:
+		*val = etrp->etrp_stats.eps_opackets;
+		break;
+	default:
+		mutex_exit(&etrp->etrp_lock);
+		return (ENOTSUP);
+	}
+	mutex_exit(&etrp->etrp_lock);
+
+	return (0);
+}
+
+static int
+example_rx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
+{
+	example_rx_ring_t *errp = arg;
+
+	mutex_enter(&errp->errp_lock);
+	switch (stat) {
+	case MAC_STAT_RBYTES:
+		*val = errp->errp_stats.eps_ibytes;
+		break;
+	case MAC_STAT_IPACKETS:
+		*val = errp->errp_stats.eps_ipackets;
+		break;
+	default:
+		mutex_exit(&errp->errp_lock);
+		return (ENOTSUP);
+	}
+	mutex_exit(&errp->errp_lock);
+
+	return (0);
+}
+.Ed
+.Sh ERRORS
+The device driver may return one of the following errors.
+While this list is not intended to be exhaustive, it is recommend to use
+one of these if possible.
+.Bl -tag -width Er
+.It Er ENOTSUP
+The specified statistic is unknown, unsupported, or unimplemented.
+.It Er EIO
+A transport or DMA FM related error occurred while trying to sync data
+from the device.
+.It Er ECANCELLED
+The device is not currently in a state where it can currently service
+the request.
+.El
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mc_getstat 9E ,
+.Xr mr_rget 9E ,
+.Xr mac_ring_info 9S

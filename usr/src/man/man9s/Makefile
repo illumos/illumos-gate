@@ -50,7 +50,10 @@ MANFILES=	Intro.9s			\
 		kstat_named.9s			\
 		linkblk.9s			\
 		mac_callbacks.9s		\
+		mac_group_info.9s		\
+		mac_intr.9s			\
 		mac_register.9s			\
+		mac_ring_info.9s		\
 		modldrv.9s			\
 		modlinkage.9s			\
 		modlmisc.9s			\
@@ -102,7 +105,10 @@ MANFILES=	Intro.9s			\
 MANLINKS=	dblk.9s				\
 		intro.9s			\
 		mac_callbacks_t.9s		\
+		mac_group_info_t.9s		\
+		mac_intr_t.9s			\
 		mac_register_t.9s		\
+		mac_ring_info_t.9s		\
 		mblk.9s				\
 		usb_ep_ss_comp_descr_t.9s	\
 		usb_ep_xdescr_t.9s		\
@@ -125,7 +131,10 @@ intro.9s		:= LINKSRC = Intro.9s
 dblk.9s			:= LINKSRC = datab.9s
 
 mac_callbacks_t.9s	:= LINKSRC = mac_callbacks.9s
+mac_group_info_t.9s	:= LINKSRC = mac_group_info.9s
+mac_intr_t.9s		:= LINKSRC = mac_intr.9s
 mac_register_t.9s	:= LINKSRC = mac_register.9s
+mac_ring_info_t.9s	:= LINKSRC = mac_ring_info.9s
 
 mblk.9s			:= LINKSRC = msgb.9s
 

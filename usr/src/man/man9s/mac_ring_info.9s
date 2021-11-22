@@ -1,0 +1,154 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd July 2, 2022
+.Dt MAC_RING_INFO 9S
+.Os
+.Sh NAME
+.Nm mac_ring_info ,
+.Nm mac_ring_info_t
+.Nd MAC ring information structure
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Sh INTERFACE STABILITY
+.Sy Uncommitted -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh DESCRIPTION
+The
+.Vt mac_ring_info_t
+structure is used by the MAC framework as part of the
+.Dv MAC_CAPAB_RINGS
+capability.
+For more background on the MAC framework, please see
+.Xr mac 9E
+and for an introduction to the
+.Dv MAC_CAPAB_RINGS
+capability,
+.Xr mac_capab_rings 9E .
+.Pp
+When a device driver declares that it supports the
+.Dv MAC_CAPAB_RINGS
+capability and fills out the structure as described in
+.Xr mac_capab_rings 9E ,
+it indicates that it supports a number of rings for transmitting and
+receiving.
+For each ring that it supports, the driver's
+.Xr mr_rget 9E
+entry point will be called, during which it will have to fill out the
+.Vt mac_ring_info_t
+structure defined here.
+.Sh TYPES
+The following types define the function pointers in use in the
+.Vt mac_ring_info_t
+structure.
+.Bd -literal -offset indent
+typedef int (*mac_ring_start_t)(mac_ring_driver_t, uint64_t);
+typedef void (*mac_ring_stop_t)(mac_ring_driver_t);
+
+typedef mblk_t *(*mac_ring_send_t)(mac_ring_driver_t, mblk_t *);
+typedef mblk_t *(*mac_ring_poll_t)(mac_ring_driver_t, int);
+
+typedef int (*mac_ring_stat_t)(mac_ring_driver_t, uint_t, uint64_t *);
+.Ed
+.Sh STRUCTURE MEMBERS
+.Bd -literal -offset indent
+mac_ring_driver_t	mri_driver;
+mac_ring_start_t        mri_start;
+mac_ring_stop_t         mri_stop;
+mac_intr_t              mri_intr;
+mac_ring_send_t		mri_tx;
+mac_ring_poll_t		mri_poll;
+mac_ring_stat_t         mri_stat;
+.Ed
+.Pp
+The
+.Fa mri_driver
+member should be set to a driver-specific value that represents the data
+structure that corresponds to the ring.
+The driver will receive this value in all of the callback functions that
+are defined in this structure and discussed below.
+.Pp
+The
+.Fa mri_start
+member is a required entry point that is used to start the ring.
+While the device driver may not need to do any work with hardware to
+start the use of the ring, it must record the ring's generation number.
+For more information, see
+.Xr mri_start 9E .
+.Pp
+The
+.Fa mri_stop
+member is an optional entry point that will be called when the ring is
+being stopped.
+For more information, see
+.Xr mri_stop 9E .
+.Pp
+The
+.Fa mri_intr
+member contains information about the interrupt associated with the
+ring.
+For more information on filling it out, see
+.Xr mac_intr 9S .
+.Pp
+The
+.Fa mri_tx
+member should only be set on transmit rings.
+It must not be set on receive rings.
+The
+.Fa mri_tx
+member should be set to a function that will transmit a given frame on
+the specified ring.
+For more information, see
+.Xr mri_tx 9E .
+.Pp
+The
+.Fa mri_poll
+member should only be set on receive rings.
+It must not be set on transmit rings.
+The
+.Fa mri_poll
+member should be set to a function which will poll the specified ring.
+For more information, see
+.Xr mri_poll 9E .
+.Pp
+The
+.Fa mri_stat
+member should be set to a function which will retrieve statistics about
+the specified ring.
+For more information, see
+.Xr mri_stat 9E .
+.Ss Required Members
+All non-function members are required.
+The
+.Fa mri_intr
+member must be a properly filled out as per
+.Xr mac_intr 9S .
+.Pp
+For transmit rings, the
+.Fa mri_tx
+member is required.
+.Pp
+For receive rings, the
+.Fa mri_poll
+member is required.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mri_poll 9E ,
+.Xr mri_start 9E ,
+.Xr mri_stat 9E ,
+.Xr mri_stop 9E ,
+.Xr mri_tx 9E ,
+.Xr mac_intr 9S

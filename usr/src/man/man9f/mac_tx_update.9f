@@ -9,13 +9,15 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
 .\"
-.Dd June 02, 2016
+.Dd July 2, 2022
 .Dt MAC_TX_UPDATE 9F
 .Os
 .Sh NAME
-.Nm mac_tx_update
+.Nm mac_tx_update ,
+.Nm mac_tx_ring_update
 .Nd indicate that a device can transmit again
 .Sh SYNOPSIS
 .In sys/mac_provider.h
@@ -23,13 +25,28 @@
 .Fo mac_tx_update
 .Fa "mac_handle_t mh"
 .Fc
+.Ft void
+.Fo mac_tx_ring_update
+.Fa "mac_handle_t mh"
+.Fa "mac_ring_handle_t mrh"
+.Fc
 .Sh INTERFACE LEVEL
 illumos DDI specific
+.Pp
+The
+.Fn mac_tx_ring_update
+function point is
+.Sy Uncommitted -
+API and ABI stability is not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa mh
 The MAC handle obtained from a call to
 .Xr mac_register 9F .
+.It Fa mrh
+The MAC ring handle obtained when the driver's ring entry point
+.Xr mr_rget 9E
+was called.
 .El
 .Sh DESCRIPTION
 The
@@ -55,6 +72,28 @@ See the
 section of
 .Xr mac 9E
 for more information.
+.Pp
+When a driver has negotiated the
+.Dv MAC_CAPAB_RINGS
+capability and indicated that it supports transmit groups, it must not
+use the
+.Fn mac_tx_update
+function and should instead call the
+.Fn mac_tx_ring_update
+function targeting a specific ring instead.
+The ring that is being updated is specified by the ring handle passed in
+the
+.Fa mrh
+argument.
+The ring should have previously returned frames from its
+.Xr mri_tx 9E
+entry point to indicate that it was blocked.
+.Pp
+In all other respects, the
+.Fn mac_tx_ring_update
+function is similar to the
+.Fn mac_tx_update
+function.
 .Sh CONTEXT
 The
 .Fn mac_tx_update
@@ -66,5 +105,8 @@ or
 context.
 .Sh SEE ALSO
 .Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
 .Xr mc_tx 9E ,
+.Xr mr_rget 9E ,
+.Xr mri_tx 9E ,
 .Xr mac_register 9F

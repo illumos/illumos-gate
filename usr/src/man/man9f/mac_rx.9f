@@ -9,13 +9,15 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Compuer Company
 .\"
-.Dd June 02, 2016
+.Dd July 2, 2022
 .Dt MAC_RX 9F
 .Os
 .Sh NAME
-.Nm mac_rx
+.Nm mac_rx ,
+.Nm mac_ring_rx
 .Nd deliver frames from a driver to the system
 .Sh SYNOPSIS
 .In sys/mac_provider.h
@@ -25,8 +27,21 @@
 .Fa "mac_resource_handle_t mrh"
 .Fa "mblk_t *mp_chain"
 .Fc
+.Ft void
+.Fo mac_rx_ring
+.Fa "mac_handle_t mh"
+.Fa "mac_ring_handle_t mring"
+.Fa "mblk_t *mp_chain"
+.Fa "uint64_t mr_gen"
+.Fc
 .Sh INTERFACE LEVEL
 illumos DDI specific
+.Pp
+The
+.Fn mac_rx_ring
+function point is
+.Sy Uncommitted -
+API and ABI stability is not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa mh
@@ -35,12 +50,21 @@ The MAC handle obtained from a call to
 .It Fa mrh
 A reserved parameter that should be passed as
 .Dv NULL .
+.It Fa mring
+A pointer to the ring handle that was passed to the driver in the
+.Xr mr_rget 9E
+entry point.
 .It Fa mp_chain
 A series of one or more
 .Xr mblk 9S
 structures chained together by their
 .Sy b_next
 member.
+.It Fa mr_gen
+The generation number for the current ring.
+The generation comes from the
+.Xr mri_start 9E
+entry point.
 .El
 .Sh DESCRIPTION
 The
@@ -66,7 +90,48 @@ Device drivers should not call the
 .Fn mac_rx
 function after each individual mblk_t is assembled.
 Rather, the device driver should batch up as many frames as it is willing to
-process in a given interrupt or otherwise.
+process in a given interrupt or are available.
+.Pp
+The
+.Fn mac_rx_ring
+function is similar to the
+.Fa mac_rx
+function; however, it should be called by device drivers that have
+negotiated the
+.Dv MAC_CAPAB_RINGS
+capability and indicated that it supports receive groups.
+Device drivers that have negotiated this capability must not call the
+.Fn mac_rx
+function, but use the
+.Fn mac_rx_ring
+function instead.
+The driver should pass the ring handle in
+.Fa mring
+for the ring in question that it processed.
+If more than one ring was processed during an interrupt, then the driver
+must call
+.Fn mac_ring_rx
+once for each ring and ensure that the
+.Fa mr_gen
+argument matches what was passed to the driver during the
+.Xr mri_start 9E
+entry point for each ring.
+If the value of
+.Fa mr_gen
+does not match what the operating system expects, all of the packets
+will be dropped.
+This is used to make sure that the system is receiving what it considers
+valid data from the device driver.
+.Pp
+When a driver supporting the
+.Dv MAC_CAPAB_RINGS
+capability is asked to poll via their
+.Xr mri_poll 9E
+entry point, then the driver should not call the
+.Fn mac_ring_rx
+function to deliver packets and instead returns them during the
+.Xr mri_poll 9E
+call.
 .Sh CONTEXT
 The
 .Fn mac_rx
@@ -78,5 +143,9 @@ or
 context.
 .Sh SEE ALSO
 .Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mr_rget 9E ,
+.Xr mri_poll 9E ,
+.Xr mri_start 9E ,
 .Xr mac_register 9F ,
 .Xr mblk 9S

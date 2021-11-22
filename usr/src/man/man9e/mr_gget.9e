@@ -1,0 +1,132 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd July 2, 2022
+.Dt MR_GGET 9E
+.Os
+.Sh NAME
+.Nm mr_gget
+.Nd fill MAC group information
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft void
+.Fo prefix_fill_group_info
+.Fa "void *driver"
+.Fa "mac_ring_type_t rtype"
+.Fa "const int group_index"
+.Fa "mac_group_info_t *infop"
+.Fa "mac_group_handle_t gh"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Uncommitted -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Fa m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa rtype
+A value indicating the type of ring that makes up the groups.
+Valid values include:
+.Bl -tag -width Dv
+.It Dv MAC_RING_TYPE_RX
+The group is intended for use with receive rings.
+.It Dv MAC_RING_TYPE_TX
+The group is intended for use with transmit rings.
+.El
+.It Fa group_index
+An integer value that uniquely identifying the group.
+Groups are numbered starting from zero.
+.It Fa infop
+A pointer to an instance of a
+.Xr mac_group_info 9S
+structure.
+.It Fa gh
+An opaque pointer to a group handle that can be used to identify this
+group.
+.El
+.Sh DESCRIPTION
+The
+.Fn mr_gget
+entry point provides a means for the device driver to fill in
+information about a group.
+The driver returns information about the group to the MAC framework via
+the
+.Fa infop
+argument.
+For the list of fields and an explanation of how to fill them in, please
+see
+.Xr mac_group_info 9S .
+.Pp
+The
+.Fa rtype
+argument describes whether this is a group of receive rings or a group
+of transmit rings.
+This is identified by the value in
+.Fa rtype
+which will be
+.Dv MAC_RING_TYPE_RX
+for a receive group
+and
+.Dv MAC_RING_TYPE_TX
+for a transmit group.
+It is recommended that a driver doule check that the
+.Fa rtype
+matches what it expects if it uses separate entry points for receive and
+transmit groups.
+The group information that is filled in varies between transmit and
+receive groups.
+If separate entry points were not specified in the
+.Xr mac_capab_rings 9E
+structure, then the driver must ensure that it checks this value and
+acts appropriately.
+.Pp
+The
+.Fa group_index
+argument is used to uniquely identify a group.
+Groups are numbered starting at zero and end at one less then the number
+of groups specified in
+.Fa mr_gnum
+member of the
+.Vt mac_capbab_rings_t
+structure which is described in
+.Xr mac_capab_rings 9E .
+Group IDs can be represented as the mathematical range [0, mr_gnum).
+.Pp
+After filling in the group information in
+.Fa infop ,
+the driver should make sure to store the group handle
+.Fa gh
+for future use, mapping it to the index
+.Fa group_index .
+.Sh CONTEXT
+The
+.Fn mr_gget
+entry point will be called in response to a driver calling the
+.Xr mac_register 9F
+function and the driver has acknowledged that it supports the
+.Dv MAC_CAPAB_RINGS
+capability.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mac_register 9F ,
+.Xr mac_group_info 9S ,
+.Xr mac_register 9S

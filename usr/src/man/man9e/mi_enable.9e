@@ -1,0 +1,107 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd July 2, 2022
+.Dt MI_ENABLE 9E
+.Os
+.Sh NAME
+.Nm mi_enable ,
+.Nm mi_disable
+.Nd MAC interrupt enable and disable entry points
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft int
+.Fo prefix_intr_enable
+.Fa "mac_intr_handle_t driver"
+.Fc
+.Ft int
+.Fo prefix_intr_disable
+.Fa "mac_intr_handle_t driver"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Uncommitted -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the mac interrupt's private data that was passed in via the
+.Vt mi_handle
+member of the
+.Xr mac_intr 9S
+structure.
+.El
+.Sh DESCRIPTION
+The
+.Fn mi_enable
+and
+.Fn mi_disable
+entry points are used by the MAC framework when it wishes to disable the
+generation of interrupts for the ring and poll on the it through the
+.Xr mri_poll 9E
+entry point.
+.Pp
+These entry points should enable and disable the generation of the
+interrupt for the ring that is represented by
+.Fa driver .
+The
+.Fa driver
+argument corresponds to what the driver set in the
+.Fa mri_intr
+member while filling out the
+.Xr mac_ring_info 9S
+structure and generally is used to point to a specific ring.
+.Pp
+Importantly, this entry point is not asking to enable and disable the
+underlying device-level interrupt such as a PCIe MSI or MSI-X, which may
+be being used by multiple rings.
+Drivers must not implement this in terms of the DDI interrupt functions
+such as
+.Xr ddi_intr_enable 9F
+and
+.Xr ddi_intr_disable 9F .
+.Pp
+Instead this should be implemented through device specific means such as
+writing to registers or sending control messages to enable or disable
+the generation of interrupts for the specified ring.
+.Pp
+When manipulating the device's control of interrupts, the driver should
+be careful to serialize these changes with the ongoing processing of
+interrupts through the interrupt handler and the
+.Xr mri_poll 9E
+entry point.
+These should all be protected by the same mutex which is scoped to the
+ring itself when the ability to turn on and off interrupt generation may
+be manipulated on a per-ring basis.
+Failure to properly synchronize this may lead to the driver mistakenly
+delivering the same packet twice through both its interrupt handler and
+its
+.Xr mri_poll 9E
+entry point.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn mi_enable
+and
+.Fn mi_disable
+entry points should return
+.Sy 0 .
+Otherwise the appropriate error number should be returned.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mri_poll 9E ,
+.Xr ddi_intr_disable 9F ,
+.Xr ddi_intr_enable 9F ,
+.Xr mac_intr 9S ,
+.Xr mac_ring_info 9S

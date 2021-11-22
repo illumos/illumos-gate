@@ -1,0 +1,117 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd July 2, 2022
+.Dt MRI_POLL 9E
+.Os
+.Sh NAME
+.Nm mri_poll
+.Nd Poll a ring for received network data
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft mblk_t *
+.Fo prefix_ring_poll
+.Fa "void *driver"
+.Fa "int poll_bytes"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Uncommitted -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the ring's private data that was passed in via the
+.Fa mri_driver
+member of the
+.Xr mac_ring_info 9S
+structure as part of the
+.Xr mr_rget 9E
+entry point.
+.It Fa poll_bytes
+The maximum number of bytes that the driver should poll in a given call.
+.El
+.Sh DESCRIPTION
+The
+.Fn mri_poll
+entry point is called by the MAC framework when it wishes to have the
+driver check the ring specified by
+.Fa driver
+for available data.
+.Pp
+The device driver should perform the same logic that it would when it's
+procesing an interrupt and as described in the
+.Sx Receiving Data
+section of
+.Xr mac 9E .
+The main difference is that instead of calling
+.Xr mac_ring_rx 9E ,
+it should instead return that data as a
+.Vt mblk_t
+chain.
+Also, while an interrupt may map to more than one ring in some drivers,
+the driver should only process the ring indicated by
+.Fa driver .
+The MAC framework can be polling some rings that are receiving a lot of
+traffic while still relying on interrupts for others.
+.Pp
+Drivers should exercise caution with the locking between the polling,
+interrupt disabling routines, and the interrupt handler.
+This mutex is generally scoped to a receive ring and is used to
+synchronize the act of transitioning between polling and handling
+interrupts.
+That means that in addition to the
+.Fn mri_poll
+entry point, the
+.Xr mi_enable 9E
+and
+.Xr mi_disable 9E
+entry points should synchronize on the same mutex when transitioning the
+device.
+This is the same mutex that would be used when processing this ring
+during an interrupt handler, though that mutex should only be used while
+processing a specific ring and not held for the duration of the entire
+interrupt handler.
+.Pp
+The driver should limit the number of frames it collects based on the
+size value present in the
+.Fa poll_bytes
+argument.
+The driver should sum up the total size of each processed frame and
+compare that running total to
+.Fa poll_bytes .
+If there are fewer frames than,
+.Fa poll_bytes ,
+the driver should not wait and can instead return right away.
+Similarly, if the driver has iterated around its entire descriptor ring
+and still does not have enough enough, it is OK to return early.
+Importantly, the framework is
+.Em not
+asking the driver to block until it has
+.Fa poll_bytes
+available .
+.Sh RETURN VALUES
+Upon successful completion, the device driver should return a message
+block chain of collected frames.
+If no frames are available or it encountered an error while procesing
+data, then it should return
+.Dv NULL .
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mac_ring_rx 9E ,
+.Xr mi_disable 9E ,
+.Xr mi_enable 9E ,
+.Xr mr_rget 9E ,
+.Xr mac_ring_info 9S
