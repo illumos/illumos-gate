@@ -19,20 +19,6 @@
 
 #include <sys/types.h>
 
-typedef struct vmm_pt_ops vmm_pt_ops_t;
-struct vmm_pt_ops {
-	void *		(*vpo_init)(uint64_t *);
-	void		(*vpo_free)(void *);
-	uint64_t	(*vpo_wired_cnt)(void *);
-	int		(*vpo_is_wired)(void *, uint64_t, uint_t *);
-	int		(*vpo_map)(void *, uint64_t, pfn_t, uint_t, uint_t,
-			    uint8_t);
-	uint64_t	(*vpo_unmap)(void *, uint64_t, uint64_t);
-};
-
-extern struct vmm_pt_ops ept_ops;
-extern struct vmm_pt_ops rvi_ops;
-
 /*
  * Constants for the nodes in the GPT radix tree.  Note
  * that, in accordance with hardware page table descriptions,
@@ -64,6 +50,8 @@ enum vmm_gpt_node_level {
  * vpeo_reset_accessed: Resets the accessed bit on the given PTE.  If the
  *   second argument is `true`, the bit will be set, otherwise it will be
  *   cleared.  Returns non-zero if the previous value of the bit was set.
+ * vpeo_get_pmtp: Generate a properly formatted PML4 (EPTP/nCR3), given the root
+ *   PFN for the GPT.
  */
 typedef struct vmm_pte_ops vmm_pte_ops_t;
 struct vmm_pte_ops {
@@ -74,30 +62,29 @@ struct vmm_pte_ops {
 	uint_t		(*vpeo_pte_prot)(uint64_t);
 	uint_t		(*vpeo_reset_dirty)(uint64_t *, bool);
 	uint_t		(*vpeo_reset_accessed)(uint64_t *, bool);
+	uint64_t	(*vpeo_get_pmtp)(pfn_t);
 };
+
+extern vmm_pte_ops_t ept_pte_ops;
+extern vmm_pte_ops_t rvi_pte_ops;
 
 struct vmm_gpt;
 typedef struct vmm_gpt vmm_gpt_t;
 
-vmm_gpt_t *ept_create(void);
-vmm_gpt_t *rvi_create(void);
-
 vmm_gpt_t *vmm_gpt_alloc(vmm_pte_ops_t *);
 void vmm_gpt_free(vmm_gpt_t *);
 
-void *vmm_gpt_root_kaddr(vmm_gpt_t *);
-pfn_t vmm_gpt_root_pfn(vmm_gpt_t *);
 uint64_t *vmm_gpt_lookup(vmm_gpt_t *, uint64_t);
 void vmm_gpt_walk(vmm_gpt_t *, uint64_t, uint64_t **, enum vmm_gpt_node_level);
-void vmm_gpt_populate_entry(vmm_gpt_t *, uint64_t);
 void vmm_gpt_populate_region(vmm_gpt_t *, uint64_t, uint64_t);
+bool vmm_gpt_map_at(vmm_gpt_t *, uint64_t *, pfn_t, uint_t, uint8_t);
 void vmm_gpt_vacate_region(vmm_gpt_t *, uint64_t, uint64_t);
 bool vmm_gpt_map(vmm_gpt_t *, uint64_t, pfn_t, uint_t, uint8_t);
 bool vmm_gpt_unmap(vmm_gpt_t *, uint64_t);
 size_t vmm_gpt_unmap_region(vmm_gpt_t *, uint64_t, uint64_t);
+uint64_t vmm_gpt_get_pmtp(vmm_gpt_t *);
 
-bool vmm_gpt_is_mapped(vmm_gpt_t *, uint64_t, uint_t *);
-size_t vmm_gpt_mapped_count(vmm_gpt_t *);
+bool vmm_gpt_is_mapped(vmm_gpt_t *, uint64_t *, pfn_t *, uint_t *);
 uint_t vmm_gpt_reset_accessed(vmm_gpt_t *, uint64_t *, bool);
 uint_t vmm_gpt_reset_dirty(vmm_gpt_t *, uint64_t *, bool);
 

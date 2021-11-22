@@ -52,13 +52,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/systm.h>
-#include <sys/smp.h>
+#include <sys/cpuset.h>
 
 #include <x86/specialreg.h>
 #include <x86/apicreg.h>
 
 #include <machine/clock.h>
-#include <machine/smp.h>
 
 #include <machine/vmm.h>
 
@@ -1602,7 +1601,7 @@ vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
 }
 
 void
-vlapic_post_intr(struct vlapic *vlapic, int hostcpu, int ipinum)
+vlapic_post_intr(struct vlapic *vlapic, int hostcpu)
 {
 	/*
 	 * Post an interrupt to the vcpu currently running on 'hostcpu'.
@@ -1616,7 +1615,7 @@ vlapic_post_intr(struct vlapic *vlapic, int hostcpu, int ipinum)
 	if (vlapic->ops.post_intr)
 		(*vlapic->ops.post_intr)(vlapic, hostcpu);
 	else
-		ipi_cpu(hostcpu, ipinum);
+		poke_cpu(hostcpu);
 }
 
 bool

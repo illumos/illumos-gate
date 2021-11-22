@@ -594,25 +594,18 @@ nd_get_event_info(nd_hdl_t *nhdl, const char *class, fmev_t ev,
 	return (0);
 }
 
-static void
-condfree(void *buf)
-{
-	if (buf != NULL)
-		free(buf);
-}
-
 void
 nd_free_event_info(nd_ev_info_t *ev_info)
 {
-	condfree(ev_info->ei_severity);
-	condfree(ev_info->ei_descr);
-	condfree(ev_info->ei_diagcode);
-	condfree(ev_info->ei_url);
-	condfree(ev_info->ei_uuid);
-	condfree(ev_info->ei_fmri);
-	condfree(ev_info->ei_from_state);
-	condfree(ev_info->ei_to_state);
-	condfree(ev_info->ei_reason);
+	free(ev_info->ei_severity);
+	free(ev_info->ei_descr);
+	free(ev_info->ei_diagcode);
+	free(ev_info->ei_url);
+	free(ev_info->ei_uuid);
+	free(ev_info->ei_fmri);
+	free(ev_info->ei_from_state);
+	free(ev_info->ei_to_state);
+	free(ev_info->ei_reason);
 	fmev_rele(ev_info->ei_ev);
 	free(ev_info);
 }

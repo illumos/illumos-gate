@@ -60,7 +60,6 @@
 #include <machine/cpufunc.h>
 #include <machine/fpu.h>
 #include <machine/md_var.h>
-#include <machine/pmap.h>
 #include <machine/specialreg.h>
 #include <machine/vmm.h>
 #include <machine/vmparam.h>
@@ -95,7 +94,7 @@ uint8_t const bin2bcd_data[] = {
 };
 
 void
-pmap_invalidate_cache(void)
+invalidate_cache_all(void)
 {
 	cpuset_t cpuset;
 
@@ -108,7 +107,7 @@ pmap_invalidate_cache(void)
 }
 
 vm_paddr_t
-pmap_kextract(vm_offset_t va)
+vtophys(void *va)
 {
 	pfn_t	pfn;
 
@@ -409,18 +408,6 @@ vmm_glue_callout_localize(struct callout *c)
 	mutex_enter(&cpu_lock);
 	cyclic_move_here(c->c_cyc_id);
 	mutex_exit(&cpu_lock);
-}
-
-void
-ipi_cpu(int cpu, uint_t ipi)
-{
-	/*
-	 * This was previously implemented as an invocation of asynchronous
-	 * no-op crosscalls to interrupt the target CPU.  Since even nowait
-	 * crosscalls can block in certain circumstances, a direct poke_cpu()
-	 * is safer when called from delicate contexts.
-	 */
-	poke_cpu(cpu);
 }
 
 uint_t	cpu_high;		/* Highest arg to CPUID */

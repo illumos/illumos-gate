@@ -22,8 +22,8 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2019 Peter Tribble
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
 include ../Makefile.master
@@ -86,6 +86,7 @@ MANIFEST_SUBDIRS=			\
 	cmd-inet/usr.lib/in.daytimed	\
 	cmd-inet/usr.lib/in.discardd	\
 	cmd-inet/usr.lib/in.echod	\
+	cmd-inet/usr.lib/in.mpathd	\
 	cmd-inet/usr.lib/in.ndpd	\
 	cmd-inet/usr.lib/in.ripngd	\
 	cmd-inet/usr.lib/in.timed	\

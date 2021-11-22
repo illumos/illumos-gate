@@ -23,6 +23,4 @@ extern	char	cpu_vendor[];		/* CPU Origin code */
 
 #include <sys/systm.h>
 
-#define	Maxmem	(physmax + 1)
-
 #endif	/* _COMPAT_FREEBSD_AMD64_MACHINE_MD_VAR_H_ */

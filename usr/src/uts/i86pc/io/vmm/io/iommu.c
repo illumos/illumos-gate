@@ -48,7 +48,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/pci.h>
 
 #include "vmm_util.h"
-#include "vmm_mem.h"
 #include "iommu.h"
 
 static int iommu_avail;
@@ -190,6 +189,12 @@ iommu_find_device(dev_info_t *dip, void *arg)
 	}
 
 	return (DDI_WALK_CONTINUE);
+}
+
+static vm_paddr_t
+vmm_mem_maxaddr(void)
+{
+	return (ptoa(physmax + 1));
 }
 #endif
 

@@ -57,6 +57,7 @@
 #define	SUCCESS	0
 
 extern uint64_t mcfg_mem_base;
+extern uint_t pci_iocfg_max_offset;
 int pcitool_debug = 0;
 
 /*
@@ -600,7 +601,7 @@ pcitool_cfg_access(pcitool_reg_t *prg, boolean_t write_flag,
 	 */
 
 	if (io_access)
-		max_offset = 0xFF;
+		max_offset = pci_iocfg_max_offset;
 	else
 		max_offset = 0xFFF;
 	if (prg->offset + size - 1 > max_offset) {
@@ -651,10 +652,10 @@ pcitool_cfg_access(pcitool_reg_t *prg, boolean_t write_flag,
 		}
 	}
 	/*
-	 * Check if legacy IO config access is used, in which case
-	 * only first 256 bytes are valid.
+	 * Check if legacy I/O config access is used, in which case the valid
+	 * range varies with the I/O space mechanism used.
 	 */
-	if (req.ioacc && (prg->offset + size - 1 > 0xFF)) {
+	if (req.ioacc && (prg->offset + size - 1 > pci_iocfg_max_offset)) {
 		prg->status = PCITOOL_INVALID_ADDRESS;
 		return (ENOTSUP);
 	}

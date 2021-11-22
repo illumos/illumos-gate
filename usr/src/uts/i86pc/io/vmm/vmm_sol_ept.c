@@ -21,16 +21,11 @@
 #include <sys/kmem.h>
 #include <sys/machsystm.h>
 #include <sys/mman.h>
+#include <sys/x86_archext.h>
+#include <vm/hat_pte.h>
 
 #include <sys/vmm_gpt.h>
 #include <sys/vmm_vm.h>
-
-
-typedef struct ept_map ept_map_t;
-struct ept_map {
-	vmm_gpt_t	*em_gpt;
-	kmutex_t	em_lock;
-};
 
 #define	EPT_R		(1 << 0)
 #define	EPT_W		(1 << 1)
@@ -41,6 +36,9 @@ struct ept_map {
 #define	EPT_DIRTY	(1 << 9)
 
 #define	EPT_PA_MASK	(0x000ffffffffff000ull)
+
+#define	EPT_MAX_LEVELS	4
+CTASSERT(EPT_MAX_LEVELS <= MAX_GPT_LEVEL);
 
 CTASSERT(EPT_R == PROT_READ);
 CTASSERT(EPT_W == PROT_WRITE);
@@ -121,7 +119,15 @@ ept_reset_accessed(uint64_t *entry, bool on)
 	    on ? EPT_ACCESSED : 0));
 }
 
-static vmm_pte_ops_t ept_pte_ops = {
+static uint64_t
+ept_get_pmtp(pfn_t root_pfn)
+{
+	/* TODO: enable AD tracking when required */
+	return ((root_pfn << PAGESHIFT |
+	    (EPT_MAX_LEVELS - 1) << 3 | MTRR_TYPE_WB));
+}
+
+vmm_pte_ops_t ept_pte_ops = {
 	.vpeo_map_table		= ept_map_table,
 	.vpeo_map_page		= ept_map_page,
 	.vpeo_pte_pfn		= ept_pte_pfn,
@@ -129,100 +135,5 @@ static vmm_pte_ops_t ept_pte_ops = {
 	.vpeo_pte_prot		= ept_pte_prot,
 	.vpeo_reset_dirty	= ept_reset_dirty,
 	.vpeo_reset_accessed	= ept_reset_accessed,
-};
-
-vmm_gpt_t *
-ept_create(void)
-{
-	return (vmm_gpt_alloc(&ept_pte_ops));
-}
-
-static void *
-ept_ops_create(uintptr_t *root_kaddr)
-{
-	ept_map_t *map;
-
-	map = kmem_zalloc(sizeof (*map), KM_SLEEP);
-	mutex_init(&map->em_lock, NULL, MUTEX_DEFAULT, NULL);
-	map->em_gpt = ept_create();
-	*root_kaddr = (uintptr_t)vmm_gpt_root_kaddr(map->em_gpt);
-
-	return (map);
-}
-
-static void
-ept_ops_destroy(void *arg)
-{
-	ept_map_t *map = arg;
-
-	if (map != NULL) {
-		vmm_gpt_free(map->em_gpt);
-		mutex_destroy(&map->em_lock);
-		kmem_free(map, sizeof (*map));
-	}
-}
-
-static uint64_t
-ept_ops_wired_count(void *arg)
-{
-	ept_map_t *map = arg;
-	uint64_t res;
-
-	mutex_enter(&map->em_lock);
-	res = vmm_gpt_mapped_count(map->em_gpt);
-	mutex_exit(&map->em_lock);
-
-	return (res);
-}
-
-static int
-ept_ops_is_wired(void *arg, uint64_t gpa, uint_t *protp)
-{
-	ept_map_t *map = arg;
-	bool mapped;
-
-	mutex_enter(&map->em_lock);
-	mapped = vmm_gpt_is_mapped(map->em_gpt, gpa, protp);
-	mutex_exit(&map->em_lock);
-
-	return (mapped ? 0 : -1);
-}
-
-static int
-ept_ops_map(void *arg, uint64_t gpa, pfn_t pfn, uint_t _lvl, uint_t prot,
-    uint8_t attr)
-{
-	ept_map_t *map = arg;
-
-	ASSERT((prot & EPT_RWX) != 0 && (prot & ~EPT_RWX) == 0);
-
-	mutex_enter(&map->em_lock);
-	vmm_gpt_populate_entry(map->em_gpt, gpa);
-	(void) vmm_gpt_map(map->em_gpt, gpa, pfn, prot, attr);
-	mutex_exit(&map->em_lock);
-
-	return (0);
-}
-
-static uint64_t
-ept_ops_unmap(void *arg, uint64_t start, uint64_t end)
-{
-	ept_map_t *map = arg;
-	size_t unmapped = 0;
-
-	mutex_enter(&map->em_lock);
-	unmapped = vmm_gpt_unmap_region(map->em_gpt, start, end);
-	vmm_gpt_vacate_region(map->em_gpt, start, end);
-	mutex_exit(&map->em_lock);
-
-	return ((uint64_t)unmapped);
-}
-
-struct vmm_pt_ops ept_ops = {
-	.vpo_init		= ept_ops_create,
-	.vpo_free		= ept_ops_destroy,
-	.vpo_wired_cnt		= ept_ops_wired_count,
-	.vpo_is_wired		= ept_ops_is_wired,
-	.vpo_map		= ept_ops_map,
-	.vpo_unmap		= ept_ops_unmap,
+	.vpeo_get_pmtp		= ept_get_pmtp,
 };

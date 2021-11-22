@@ -19,12 +19,20 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Milan Jurik. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Milan Jurik. All rights reserved.
+# Copyright 2019 Joyent, Inc.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+#
+
+#
+# NOTE: Upstream illumos has IPMP configuration and upgrading of ipadm.conf in
+# here.  SmartOS does not.  Recent improvements to IPMP specifically for
+# upgrading ipadm.conf do not appear here, therefore.
 #
 
 . /lib/svc/share/smf_include.sh

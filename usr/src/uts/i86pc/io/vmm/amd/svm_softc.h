@@ -50,7 +50,7 @@ struct svm_vcpu {
 	uint64_t	nextrip; /* next instruction to be executed by guest */
 	int		lastcpu; /* host cpu that the vcpu last ran on */
 	uint32_t	dirty;	 /* state cache bits that must be cleared */
-	long		eptgen;	 /* pmap->pm_eptgen when the vcpu last ran */
+	uint64_t	nptgen;	 /* page table gen when the vcpu last ran */
 	hma_svm_asid_t	hma_asid;
 	boolean_t	loaded;
 } __aligned(PAGE_SIZE);
@@ -61,7 +61,7 @@ struct svm_vcpu {
 struct svm_softc {
 	uint8_t apic_page[VM_MAXCPU][PAGE_SIZE];
 	struct svm_vcpu vcpu[VM_MAXCPU];
-	vm_offset_t	nptp;		/* nested page table */
+	uint64_t	nptp;		/* nested page table (host PA) */
 	uint8_t		*iopm_bitmap;	/* shared by all vcpus */
 	uint8_t		*msr_bitmap;	/* shared by all vcpus */
 	struct vm	*vm;

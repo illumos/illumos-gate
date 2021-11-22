@@ -247,7 +247,6 @@ VMM_OBJS += vmm.o \
 	vmm_instruction_emul.o \
 	vmm_ioport.o \
 	vmm_lapic.o \
-	vmm_mem.o \
 	vmm_stat.o \
 	vmm_util.o \
 	x86.o \
@@ -259,7 +258,6 @@ VMM_OBJS += vmm.o \
 	vlapic.o \
 	vrtc.o \
 	vpmtmr.o \
-	ept.o \
 	vmcs.o \
 	vmx_msr.o \
 	vmx.o \
@@ -268,18 +266,17 @@ VMM_OBJS += vmm.o \
 	vtd_sol.o \
 	svm.o \
 	svm_msr.o \
-	npt.o \
 	vmcb.o \
 	svm_support.o \
 	amdv.o \
 	vmm_gpt.o \
 	seg_vmm.o \
 	vmm_reservoir.o \
-	vmm_sol_vm.o \
 	vmm_sol_glue.o \
 	vmm_sol_ept.o \
 	vmm_sol_rvi.o \
 	vmm_support.o \
+	vmm_vm.o \
 	vmm_zsd.o
 
 VIONA_OBJS += viona_main.o \

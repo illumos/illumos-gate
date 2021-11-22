@@ -18,8 +18,11 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 Joyent, Inc.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
 # Needed for ROOTFS_LIBDIR definition
@@ -39,9 +42,6 @@ include		../../../Makefile.cmd
 ROOTCFGDIR=		$(ROOTETC)/ipadm
 ROOTCFGFILES=		$(CFGFILES:%=$(ROOTCFGDIR)/%)
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
-
-CERRWARN += -_gcc=-Wno-switch
-CERRWARN += $(CNOWARN_UNINIT)
 
 $(ROOTCFGFILES)	:= OWNER= ipadm
 $(ROOTCFGFILES)	:= GROUP= sys
@@ -87,4 +87,4 @@ $(ROOTCFGDIR):
 $(ROOTCFGDIR)/%: $(ROOTCFGDIR) %
 	$(INS.file)
 
-include 	../../../Makefile.targ
+include	../../../Makefile.targ

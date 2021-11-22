@@ -21,8 +21,9 @@
 
 typedef struct segvmm_crargs {
 	uchar_t		prot;		/* protection */
-	vm_object_t	obj;
 	uintptr_t	offset;
+	vm_object_t	*vmo;
+	vm_client_t	*vmc;
 } segvmm_crargs_t;
 
 int segvmm_create(struct seg **, void *);

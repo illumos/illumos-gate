@@ -254,7 +254,7 @@ vtd_wbflush(struct vtdmap *vtdmap)
 {
 
 	if (VTD_ECAP_COHERENCY(vtdmap->ext_cap) == 0)
-		pmap_invalidate_cache();
+		invalidate_cache_all();
 
 	if (VTD_CAP_RWBF(vtdmap->cap)) {
 		vtdmap->gcr = VTD_GCR_WBF;

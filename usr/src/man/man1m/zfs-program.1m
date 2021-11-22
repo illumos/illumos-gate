@@ -11,8 +11,9 @@
 .\" Copyright (c) 2016, 2017 by Delphix. All rights reserved.
 .\" Copyright (c) 2018 Datto Inc.
 .\" Copyright 2020 Joyent, Inc.
+.\" Copyright 2021 Jason King
 .\"
-.Dd February 3, 2020
+.Dd November 8, 2021
 .Dt ZFS-PROGRAM 1M
 .Os
 .Sh NAME
@@ -350,6 +351,12 @@ They are executed in "syncing context".
 .Pp
 The available sync submodule functions are as follows:
 .Bl -tag -width "xx"
+.It Em zfs.sync.change_key(dataset, key)
+Change the dataset encryption key.
+.Fa key
+must be in the format (raw or hex) specified by the dataset
+.Sy keyformat
+property.
 .It Em zfs.sync.destroy(dataset, [defer=true|false])
 Destroy the given dataset.
 Returns 0 on successful destroy, or a nonzero error code if the dataset could
@@ -458,6 +465,7 @@ would successfully destroy the dataset.
 .Pp
 The available zfs.check functions are:
 .Bl -tag -width "xx"
+.It Em zfs.check.change_key(dataset, key)
 .It Em zfs.check.destroy(dataset, [defer=true|false])
 .It Em zfs.check.promote(dataset)
 .It Em zfs.check.rollback(filesystem)

@@ -24,7 +24,7 @@
  * Copyright 2018 Joyent, Inc.
  * Copyright 2016 Argo Technologie SA.
  * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
- * Copyright 2021, Tintri by DDN. All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -80,6 +80,161 @@ extern pthread_rwlock_t ipmgmt_dbconf_lock;
 
 /* signifies whether volatile copy of data store is in use */
 static boolean_t ipmgmt_rdonly_root = B_FALSE;
+
+typedef int ipmgmt_if_updater_func_t(nvlist_t *, nvpair_t *, uint_t);
+
+static ipmgmt_if_updater_func_t ipmgmt_if_family_updater;
+static ipmgmt_if_updater_func_t ipmgmt_if_groupmembers_updater;
+
+static int ipmgmt_get_ifinfo_nvl(const char *ifname, nvlist_t **if_info_nvl);
+
+typedef struct {
+	const char	*name;
+	ipmgmt_if_updater_func_t	*func;
+} ipmgmt_if_updater_ent_t;
+
+static ipmgmt_if_updater_ent_t ipmgmt_if_updater_ent[] = {
+	{IPADM_NVP_FAMILIES, ipmgmt_if_family_updater},
+	{IPADM_NVP_MIFNAMES, ipmgmt_if_groupmembers_updater},
+	{NULL, NULL}
+};
+
+static ipmgmt_if_updater_ent_t *
+ipmgmt_find_if_field_updater(const char *field_name)
+{
+	int i;
+
+	for (i = 0; ipmgmt_if_updater_ent[i].name != NULL; i++) {
+		if (strcmp(field_name, ipmgmt_if_updater_ent[i].name) == 0) {
+			break;
+		}
+	}
+
+	return (&ipmgmt_if_updater_ent[i]);
+}
+
+static int
+ipmgmt_if_groupmembers_updater(nvlist_t *db_nvl, nvpair_t *member_nvp,
+    uint_t flags)
+{
+	char	**members;
+	char	*member;
+	char	**out_members;
+	uint_t  nelem = 0, cnt = 0;
+	int	err;
+
+	if ((err = nvpair_value_string(member_nvp, &member)) != 0)
+		return (err);
+
+	err = nvlist_lookup_string_array(db_nvl, IPADM_NVP_MIFNAMES,
+	    &members, &nelem);
+
+	if (err != 0 && (flags & IPMGMT_REMOVE))
+		return (ENOENT);
+
+	/*
+	 * Reserve one extra slot for IPMGMT_APPEND.
+	 * Probably not worth conditionalizing.
+	 */
+	out_members = calloc(nelem + 1, sizeof (char *));
+	if (out_members == NULL)
+		return (ENOMEM);
+
+	while (nelem-- > 0) {
+		if ((flags & IPMGMT_REMOVE) &&
+		    (strcmp(member, members[nelem]) == 0))
+			continue;
+
+		if ((out_members[cnt] = strdup(members[nelem])) == NULL) {
+			err = ENOMEM;
+			goto fail;
+		}
+
+		cnt++;
+	}
+
+	if (flags & IPMGMT_APPEND) {
+		if ((out_members[cnt] = strdup(member)) == NULL) {
+			err = ENOMEM;
+			goto fail;
+		}
+		cnt++;
+	}
+
+	if (cnt == 0) {
+		err = nvlist_remove(db_nvl, IPADM_NVP_MIFNAMES,
+		    DATA_TYPE_STRING_ARRAY);
+	} else {
+		err = nvlist_add_string_array(db_nvl, IPADM_NVP_MIFNAMES,
+		    out_members, cnt);
+	}
+
+fail:
+	while (cnt--)
+		free(out_members[cnt]);
+
+	free(out_members);
+
+	return (err);
+}
+
+static int
+ipmgmt_if_family_updater(nvlist_t *db_nvl, nvpair_t *families_nvp, uint_t flags)
+{
+	uint16_t *families;
+	uint_t  nelem = 0;
+	int	err;
+
+	if ((err = nvpair_value_uint16_array(families_nvp, &families,
+	    &nelem)) != 0)
+		return (err);
+
+	return (ipmgmt_update_family_nvp(db_nvl, families[0], flags));
+}
+
+int
+ipmgmt_update_family_nvp(nvlist_t *nvl, sa_family_t af, uint_t flags)
+{
+	uint16_t	*families = NULL;
+	uint16_t	out_families[2];
+	uint_t	nelem = 0, cnt;
+	int	err;
+
+	err = nvlist_lookup_uint16_array(nvl, IPADM_NVP_FAMILIES,
+	    &families, &nelem);
+	if (err != 0 && (flags & IPMGMT_REMOVE)) {
+		return (ENOENT);
+	}
+
+	if (flags & IPMGMT_APPEND) {
+		if (families != NULL) {
+			if (nelem == 2 || families[0] == af) {
+				return (EEXIST);
+			}
+			out_families[0] = families[0];
+			out_families[1] = af;
+			cnt = 2;
+		} else {
+			out_families[0] = af;
+			cnt = 1;
+		}
+	} else {
+		assert(nelem == 1 || nelem == 2);
+		cnt = 0;
+		while (nelem-- > 0) {
+			if (families[nelem] != af) {
+				out_families[cnt] = families[nelem];
+				cnt++;
+			}
+		}
+	}
+
+	if (cnt != 0) {
+		return (nvlist_add_uint16_array(nvl, IPADM_NVP_FAMILIES,
+		    out_families, cnt));
+	}
+	return (nvlist_remove(nvl, IPADM_NVP_FAMILIES, DATA_TYPE_UINT16_ARRAY));
+}
 
 /*
  * Checks if the database nvl, `db_nvl' contains and matches ALL of the passed
@@ -329,7 +484,7 @@ boolean_t
 ipmgmt_db_getaddr(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
     int *errp)
 {
-	ipmgmt_getaddr_cbarg_t	*cbarg = arg;
+	ipmgmt_get_cbarg_t	*cbarg = arg;
 	char		*db_aobjname = NULL;
 	char		*db_ifname = NULL;
 	nvlist_t	*db_addr = NULL;
@@ -565,57 +720,130 @@ ipmgmt_db_update(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 }
 
 /*
- * For the given `cbarg->cb_ifname' interface, retrieves any persistent
- * interface information (used in 'ipadm show-if')
+ * This function is used to update a DB line that describes
+ * an interface, its family and group interface
+ *
+ */
+boolean_t
+ipmgmt_db_update_if(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
+    int *errp)
+{
+	ipadm_dbwrite_cbarg_t *cb = arg;
+	ipmgmt_if_updater_ent_t *updater;
+	nvlist_t	*in_nvl = cb->dbw_nvl;
+	uint_t		flags = cb->dbw_flags;
+	nvpair_t	*nvp;
+	char		*name;
+	char		*db_ifname;
+	char		*gifname = NULL;
+	char		*mifname = NULL;
+
+	*errp = 0;
+
+	/* Only one flag */
+	if ((flags & (IPMGMT_APPEND | IPMGMT_REMOVE)) == 0 ||
+	    ((flags & IPMGMT_APPEND) && (flags & IPMGMT_REMOVE))) {
+		*errp = EINVAL;
+		return (B_FALSE);
+	}
+
+	if (!nvlist_exists(db_nvl, IPADM_NVP_FAMILIES))
+		return (B_TRUE);
+
+	if (nvlist_exists(db_nvl, IPADM_NVP_IFCLASS) &&
+	    nvlist_lookup_string(db_nvl, IPADM_NVP_IFNAME, &db_ifname) == 0 &&
+	    nvlist_lookup_string(in_nvl, IPADM_NVP_GIFNAME, &gifname) == 0 &&
+	    nvlist_lookup_string(in_nvl, IPADM_NVP_MIFNAMES, &mifname) == 0 &&
+	    strcmp(db_ifname, mifname) == 0) {
+		if (flags & IPMGMT_APPEND) {
+			if ((*errp = nvlist_add_string(db_nvl,
+			    IPADM_NVP_GIFNAME, gifname)) != 0)
+				return (B_FALSE);
+		} else {
+			if ((*errp = nvlist_remove(db_nvl, IPADM_NVP_GIFNAME,
+			    DATA_TYPE_STRING)) != 0)
+				return (B_FALSE);
+		}
+		cb->dbw_flags &= ~IPMGMT_UPDATE_IPMP;
+		goto done;
+	}
+
+	if (!ipmgmt_nvlist_intersects(db_nvl, in_nvl))
+		return (B_TRUE);
+
+	for (nvp = nvlist_next_nvpair(in_nvl, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(in_nvl, nvp)) {
+		name = nvpair_name(nvp);
+		if (strcmp(name, IPADM_NVP_FAMILIES) != 0 &&
+		    strcmp(name, IPADM_NVP_MIFNAMES) != 0)
+			continue;
+
+		updater = ipmgmt_find_if_field_updater(name);
+		assert(updater != NULL);
+		*errp = (*updater->func)(db_nvl, nvp, flags);
+		if (*errp != 0)
+			return (B_FALSE);
+	}
+
+	cb->dbw_flags &= ~IPMGMT_UPDATE_IF;
+
+done:
+	(void) memset(buf, 0, buflen);
+	if (ipadm_nvlist2str(db_nvl, buf, buflen) == 0) {
+		*errp = EOVERFLOW;
+		return (B_FALSE);
+	}
+
+	/* we finished all operations, so do not continue */
+	if ((cb->dbw_flags & (IPMGMT_UPDATE_IF | IPMGMT_UPDATE_IPMP)) == 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * For the given `cbarg->cb_ifname' interface, retrieve the nvlist that
+ * represents the persistent interface information.
+ * The nvlist contains:
+ *      IPADM_NVP_IFNAME
+ *      IPADM_NVP_FAMILIES
+ *      IPADM_NVP_IF_CLASS
+ *
+ * (used in 'ipadm show-if')
  */
 /* ARGSUSED */
 boolean_t
 ipmgmt_db_getif(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
     int *errp)
 {
-	ipmgmt_getif_cbarg_t	*cbarg = arg;
-	char			*ifname = cbarg->cb_ifname;
-	char			*intf = NULL;
-	ipadm_if_info_list_t	*ifl = NULL;
-	ipadm_if_info_t		*ifp;
-	sa_family_t		af;
-	char			*afstr;
+	ipmgmt_get_cbarg_t *cbarg = arg;
+	char		*ifname = cbarg->cb_ifname;
+	nvpair_t	*nvp;
+	char		*db_ifname = NULL;
+	boolean_t	families = B_FALSE;
 
-	*errp = 0;
-	if (nvlist_lookup_string(db_nvl, IPADM_NVP_FAMILY, &afstr) != 0 ||
-	    nvlist_lookup_string(db_nvl, IPADM_NVP_IFNAME, &intf) != 0 ||
-	    (ifname[0] != '\0' && strcmp(ifname, intf) != 0)) {
-		return (B_TRUE);
-	}
-	af = atoi(afstr);
-	for (ifl = cbarg->cb_ifinfo; ifl != NULL; ifl = ifl->ifil_next) {
-		ifp = &ifl->ifil_ifi;
-		if (strcmp(ifp->ifi_name, intf) == 0)
-			break;
-	}
-	if (ifl == NULL) {
-		ipadm_if_info_list_t *new;
-
-		if ((new = calloc(1, sizeof (*new))) == NULL) {
-			*errp = ENOMEM;
-			return (B_FALSE); /* don't continue the walk */
+	/* Parse db nvlist */
+	for (nvp = nvlist_next_nvpair(db_nvl, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(db_nvl, nvp)) {
+		if (strcmp(nvpair_name(nvp), IPADM_NVP_IFNAME) == 0) {
+			(void) nvpair_value_string(nvp, &db_ifname);
+		} else if (strcmp(nvpair_name(nvp), IPADM_NVP_FAMILIES) == 0) {
+			families = B_TRUE;
 		}
-		new->ifil_next = cbarg->cb_ifinfo;
-		cbarg->cb_ifinfo = new;
-		ifp = &new->ifil_ifi;
-		(void) strlcpy(ifp->ifi_name, intf, sizeof (ifp->ifi_name));
 	}
 
-	if (af == AF_INET) {
-		ifp->ifi_pflags |= IFIF_IPV4;
-	} else {
-		assert(af == AF_INET6);
-		ifp->ifi_pflags |= IFIF_IPV6;
-	}
+	if (db_ifname == NULL || !families)
+		return (B_TRUE);
 
-	/* Terminate the walk if we found both v4 and v6 interfaces. */
-	if (ifname[0] != '\0' && (ifp->ifi_pflags & IFIF_IPV4) &&
-	    (ifp->ifi_pflags & IFIF_IPV6))
+	if (ifname != NULL && ifname[0] != '\0' &&
+	    strcmp(ifname, db_ifname) != 0)
+		return (B_TRUE);
+
+	*errp = nvlist_add_nvlist(cbarg->cb_onvl, db_ifname, db_nvl);
+	if (*errp == 0)
+		cbarg->cb_ocnt++;
+
+	if (ifname != NULL && ifname[0] != '\0')
 		return (B_FALSE);
 
 	return (B_TRUE);
@@ -634,7 +862,6 @@ ipmgmt_db_resetif(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 	boolean_t	isv6 = (cbarg->cb_family == AF_INET6);
 	char		*ifname = cbarg->cb_ifname;
 	char		*modstr = NULL;
-	char		*afstr;
 	char		*aobjname;
 	uint_t		proto;
 	ipmgmt_aobjmap_t *head;
@@ -645,9 +872,31 @@ ipmgmt_db_resetif(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 	if (!ipmgmt_nvlist_contains(db_nvl, NULL, ifname, NULL))
 		return (B_TRUE);
 
-	if (nvlist_lookup_string(db_nvl, IPADM_NVP_FAMILY, &afstr) == 0) {
-		if (atoi(afstr) == cbarg->cb_family)
+	if (nvlist_exists(db_nvl, IPADM_NVP_FAMILIES)) {
+
+		if ((*errp = ipmgmt_update_family_nvp(db_nvl, cbarg->cb_family,
+		    IPMGMT_REMOVE)) != 0) {
+			return (B_FALSE);
+		}
+
+		if (cbarg->cb_family == AF_INET) {
+			cbarg->cb_ipv4exists = B_FALSE;
+		} else {
+			assert(cbarg->cb_family == AF_INET6);
+			cbarg->cb_ipv6exists = B_FALSE;
+		}
+		if (!nvlist_exists(db_nvl, IPADM_NVP_FAMILIES)) {
+			cbarg->cb_ipv4exists = B_FALSE;
+			cbarg->cb_ipv6exists = B_FALSE;
 			goto delete;
+		}
+		/* Otherwise need to reconstruct this string */
+		(void) memset(buf, 0, buflen);
+		if (ipadm_nvlist2str(db_nvl, buf, buflen) == 0) {
+			/* buffer overflow */
+			*errp = EOVERFLOW;
+			return (B_FALSE);
+		}
 		return (B_TRUE);
 	}
 
@@ -703,8 +952,8 @@ ipmgmt_db_resetif(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 				goto delete;
 			break;
 		case MOD_PROTO_IP:
-			/* this should never be the case, today */
-			assert(0);
+			if (!cbarg->cb_ipv4exists && !cbarg->cb_ipv6exists)
+				goto delete;
 			break;
 		}
 	}
@@ -904,7 +1153,7 @@ ipmgmt_aobjmap_op(ipmgmt_aobjmap_t *nodep, uint32_t op)
 	ipmgmt_aobjmap_t	*head, *prev, *matched = NULL;
 	boolean_t		update = B_TRUE;
 	int			err = 0;
-	ipadm_db_op_t		db_op;
+	ipadm_db_op_t		db_op = IPADM_DB_READ;
 
 	(void) pthread_rwlock_wrlock(&aobjmap.aobjmap_rwlock);
 
@@ -1383,7 +1632,7 @@ ipmgmt_db_init(void *cbarg, nvlist_t *db_nvl, char *buf, size_t buflen,
     int *errp)
 {
 	ipadm_handle_t	iph = cbarg;
-	nvpair_t	*nvp, *pnvp;
+	nvpair_t	*nvp, *pnvp = NULL;
 	char		*strval = NULL, *name, *mod = NULL, *pname;
 	char		tmpstr[IPMGMT_STRSIZE];
 	uint_t		proto;
@@ -1410,7 +1659,7 @@ ipmgmt_db_init(void *cbarg, nvlist_t *db_nvl, char *buf, size_t buflen,
 		}
 	}
 
-	/* if we are here than we found a global property */
+	/* If we are here then we have found a global property */
 	assert(mod != NULL);
 	assert(nvpair_type(pnvp) == DATA_TYPE_STRING);
 
@@ -1599,6 +1848,8 @@ ipmgmt_get_scfprop(scf_resources_t *res, const char *pgname, const char *pname,
 	case SCF_TYPE_ASTRING:
 		*(char **)pval = scf_simple_prop_next_astring(prop);
 		break;
+	default:
+		break;
 	}
 ret:
 	scf_simple_prop_free(prop);
@@ -1721,4 +1972,110 @@ ipmgmt_update_dbver(scf_resources_t *res)
 
 	(void) ipmgmt_set_scfprop(res, IPMGMTD_APP_PG,
 	    IPMGMTD_PROP_DBVER, &version, SCF_TYPE_INTEGER);
+}
+
+/*
+ * Return TRUE if `ifname' has persistent configuration for the `af' address
+ * family in the datastore.
+ * It is possible to call the function with af == AF_UNSPEC, so in this case
+ * the function returns TRUE if either AF_INET or AF_INET6 interface exists
+ */
+boolean_t
+ipmgmt_persist_if_exists(const char *ifname, sa_family_t af)
+{
+	boolean_t exists = B_FALSE;
+	nvlist_t    *if_info_nvl;
+	uint16_t    *families = NULL;
+	sa_family_t af_db;
+	uint_t	nelem = 0;
+
+	if (ipmgmt_get_ifinfo_nvl(ifname, &if_info_nvl) != 0)
+		goto done;
+
+	if (nvlist_lookup_uint16_array(if_info_nvl, IPADM_NVP_FAMILIES,
+	    &families, &nelem) != 0)
+		goto done;
+
+	while (nelem-- > 0) {
+		af_db = families[nelem];
+		if (af_db == af || (af == AF_UNSPEC &&
+		    (af_db == AF_INET || af_db == AF_INET6))) {
+			exists = B_TRUE;
+			break;
+		}
+	}
+
+done:
+	if (if_info_nvl != NULL)
+		nvlist_free(if_info_nvl);
+
+	return (exists);
+}
+
+/*
+ * Retrieves the membership information for the requested mif_name
+ * if mif_name is a member of a IPMP group, then gif_name will contain
+ * the name of IPMP group interface, otherwise the variable will be empty
+ */
+void
+ipmgmt_get_group_interface(const char *mif_name, char *gif_name, size_t size)
+{
+	char	*gif_name_from_nvl;
+	nvlist_t	*if_info_nvl;
+
+	gif_name[0] = '\0';
+
+	if (ipmgmt_get_ifinfo_nvl(mif_name, &if_info_nvl) != 0)
+		goto done;
+
+	if (nvlist_lookup_string(if_info_nvl, IPADM_NVP_GIFNAME,
+	    &gif_name_from_nvl) != 0)
+		goto done;
+
+	(void) strlcpy(gif_name, gif_name_from_nvl, size);
+
+done:
+	if (if_info_nvl != NULL)
+		nvlist_free(if_info_nvl);
+}
+
+static int
+ipmgmt_get_ifinfo_nvl(const char *ifname, nvlist_t **if_info_nvl)
+{
+	ipmgmt_get_cbarg_t cbarg;
+	nvpair_t    *nvp;
+	nvlist_t    *nvl;
+	int	err;
+
+	cbarg.cb_ifname = NULL;
+	cbarg.cb_aobjname = NULL;
+	cbarg.cb_ocnt = 0;
+
+	if ((err = nvlist_alloc(&cbarg.cb_onvl, NV_UNIQUE_NAME, 0)) != 0)
+		goto done;
+
+	err = ipmgmt_db_walk(ipmgmt_db_getif, &cbarg, IPADM_DB_READ);
+	if (err == ENOENT && cbarg.cb_ocnt > 0)
+		err = 0;
+
+	if (err != 0)
+		goto done;
+
+	for (nvp = nvlist_next_nvpair(cbarg.cb_onvl, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(cbarg.cb_onvl, nvp)) {
+
+		if (strcmp(nvpair_name(nvp), ifname) != 0)
+			continue;
+
+		if ((err = nvpair_value_nvlist(nvp, &nvl)) != 0 ||
+		    (err = nvlist_dup(nvl, if_info_nvl, NV_UNIQUE_NAME)) != 0)
+			*if_info_nvl = NULL;
+
+		break;
+	}
+
+done:
+	nvlist_free(cbarg.cb_onvl);
+
+	return (err);
 }

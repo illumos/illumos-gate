@@ -11,16 +11,16 @@
 .\"
 .\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
 .\" Copyright (c) 2013, 2017 by Delphix. All rights reserved.
-.\" Copyright 2018 Nexenta Systems, Inc.
 .\" Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
 .\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd October 20, 2021
+.Dd November 15, 2021
 .Dt IPADM 1M
 .Os
 .Sh NAME
 .Nm ipadm
-.Nd configure IP interfaces, addresses and protocols
+.Nd configure IP and IPMP interfaces, addresses and protocols
 .Sh SYNOPSIS
 .Nm
 .Ic help
@@ -28,6 +28,36 @@
 .Ic create-if
 .Op Fl t
 .Ar interface
+.Nm
+.Ic create-ip
+.Op Fl t
+.Ar interface
+.Nm
+.Ic delete-if
+.Ar interface
+.Nm
+.Ic delete-ip
+.Ar interface
+.Pp
+.Nm
+.Ic create-ipmp
+.Op Fl t
+.Op Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
+.Ar ipmp-interface
+.Nm
+.Ic delete-ipmp
+.Ar ipmp-interface
+.Nm
+.Ic add-ipmp
+.Op Fl t
+.Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
+.Ar ipmp-interface
+.Nm
+.Ic remove-ipmp
+.Op Fl t
+.Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
+.Ar ipmp-interface
+.Pp
 .Nm
 .Ic disable-if
 .Fl t
@@ -37,12 +67,10 @@
 .Fl t
 .Ar interface
 .Nm
-.Ic delete-if
-.Ar interface
-.Nm
 .Ic show-if
 .Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Ar interface
+.Pp
 .Nm
 .Ic set-ifprop
 .Op Fl t
@@ -61,6 +89,7 @@
 .Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
 .Op Fl m Ar protocol
 .Op Ar interface
+.Pp
 .Nm
 .Ic create-addr
 .Op Fl t
@@ -86,6 +115,18 @@
 .Bro Cm yes Ns | Ns Cm no Brc Oc Ns ...
 .Ar addrobj
 .Nm
+.Ic delete-addr
+.Op Fl r
+.Ar addrobj
+.Nm
+.Ic show-addr
+.Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
+.Op Ar addrobj
+.Nm
+.Ic refresh-addr
+.Op Fl i
+.Ar addrobj
+.Nm
 .Ic down-addr
 .Op Fl t
 .Ar addrobj
@@ -101,18 +142,7 @@
 .Ic enable-addr
 .Op Fl t
 .Ar addrobj
-.Nm
-.Ic refresh-addr
-.Op Fl i
-.Ar addrobj
-.Nm
-.Ic delete-addr
-.Op Fl r
-.Ar addrobj
-.Nm
-.Ic show-addr
-.Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
-.Op Ar addrobj
+.Pp
 .Nm
 .Ic set-addrprop
 .Op Fl t
@@ -128,6 +158,7 @@
 .Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
 .Op Ar addrobj
+.Pp
 .Nm
 .Ic set-prop
 .Op Fl t
@@ -191,12 +222,23 @@ shows the current address properties, in the same way as
 .Ic show-addr .
 .Pp
 The following subcommands are supported:
-.Bl -tag -width Ds
-.It Nm Ic help
+.Pp
+.Bl -tag -compact -width Ds
+.It Xo
+.Nm
+.Ic help
+.Xc
 Display brief command usage.
+.Pp
 .It Xo
 .Nm
 .Ic create-if
+.Op Fl t
+.Ar interface
+.Xc
+.It Xo
+.Nm
+.Ic create-ip
 .Op Fl t
 .Ar interface
 .Xc
@@ -204,10 +246,88 @@ Create an IP interface that will handle both IPv4 and IPv6 packets.
 The interface will be enabled as part of the creation process.
 The IPv4 interface will have the address 0.0.0.0.
 The IPv6 interface will have the address ::.
+The subcommands
+.Ic create-if
+and
+.Ic create-ip
+are functionally equivalent aliases of each other.
 .Bl -tag -width Ds
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
+.Pp
+.It Xo
+.Nm
+.Ic delete-if
+.Ar interface
+.Xc
+.It Xo
+.Nm
+.Ic delete-ip
+.Ar interface
+.Xc
+Permanently delete the specified IP interface.
+The subcommands
+.Ic delete-if
+and
+.Ic delete-ip
+are functionally equivalent aliases of each other.
+.Pp
+.It Xo
+.Nm
+.Ic create-ipmp
+.Op Fl t
+.Op Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
+.Ar ipmp-interface
+.Xc
+Create an IPMP interface that will handle both IPv4 and IPv6 packets.
+The interface will be enabled as part of the creation process.
+The IPv4 interface will have the address 0.0.0.0.
+The IPv6 interface will have the address ::.
+.Bl -tag -width Ds
+.It Fl i Ns \&, Ns Fl -interface
+Interface(s) to be added to the new IPMP interface.
+.It Fl t Ns \&, Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.Pp
+.It Xo
+.Nm
+.Ic delete-ipmp
+.Ar ipmp-interface
+.Xc
+Permanently delete the IPMP interface.
+.Pp
+.It Xo
+.Nm
+.Ic add-ipmp
+.Op Fl t
+.Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
+.Ar ipmp-interface
+.Xc
+Add the IP interface(s) to the IPMP interface.
+.Bl -tag -width ""
+.It Fl i Ns \&, Ns Fl -interface
+Interface(s) to be added to the IPMP interface.
+.It Fl t Ns \&, Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.Pp
+.It Xo
+.Nm
+.Ic remove-ipmp
+.Op Fl t
+.Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
+.Ar ipmp-interface
+.Xc
+Remove the IP interface(s) from the IPMP interface.
+.Bl -tag -width ""
+.It Fl i Ns \&, Ns Fl -interface
+Interface(s) to be removed from the IPMP interface.
+.It Fl t Ns \&, Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.Pp
 .It Xo
 .Nm
 .Ic disable-if
@@ -219,6 +339,7 @@ Disable the specified IP interface.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic enable-if
@@ -230,12 +351,7 @@ Enable the specified IP interface.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
-.It Xo
-.Nm
-.Ic delete-if
-.Ar interface
-.Xc
-Permanently delete the specified IP interface.
+.Pp
 .It Xo
 .Nm
 .Ic show-if
@@ -309,6 +425,7 @@ IPv6
 .It Fl p Ns \&, Ns Fl -parsable
 Print the output in a parsable format.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic set-ifprop
@@ -351,6 +468,7 @@ may also be used.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic reset-ifprop
@@ -371,6 +489,7 @@ subcommand for the list of property names.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic show-ifprop
@@ -417,6 +536,7 @@ See the
 .Nm ipadm Ic set-ifprop
 subcommand for the list of property names.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic create-addr
@@ -433,7 +553,7 @@ The address will be enabled but can disabled using the
 subcommand.
 Note that
 .Cm addrconf
-address configured on an interface is required to configure
+address configured on the interface is required to configure
 .Cm static
 IPv6 address on the same interface.
 This takes the following options:
@@ -455,6 +575,7 @@ The address is down.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic create-addr
@@ -498,6 +619,7 @@ address; or specify
 to wait without interruption.
 The default value is 120.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic create-addr
@@ -518,68 +640,7 @@ Specify which method of auto-configuration should be used.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
-.It Xo
-.Nm
-.Ic down-addr
-.Op Fl t
-.Ar addrobj
-.Xc
-Down the address.
-This will stop packets from being sent or received.
-.Bl -tag -width Ds
-.It Fl t Ns \&, Ns Fl -temporary
-Temporary, not persistent across reboots.
-.El
-.It Xo
-.Nm
-.Ic up-addr
-.Op Fl t
-.Ar addrobj
-.Xc
-Up the address.
-This will enable packets to be sent and received.
-.Bl -tag -width Ds
-.It Fl t Ns \&, Ns Fl -temporary
-Temporary, not persistent across reboots.
-.El
-.It Xo
-.Nm
-.Ic disable-addr
-.Op Fl t
-.Ar addrobj
-.Xc
-Disable the address.
-.Bl -tag -width Ds
-.It Fl t Ns \&, Ns Fl -temporary
-Temporary, not persistent across reboots.
-.El
-.It Xo
-.Nm
-.Ic enable-addr
-.Op Fl t
-.Ar addrobj
-.Xc
-Enable the address.
-.Bl -tag -width Ds
-.It Fl t Ns \&, Ns Fl -temporary
-Temporary, not persistent across reboots.
-.El
-.It Xo
-.Nm
-.Ic refresh-addr
-.Op Fl i
-.Ar addrobj
-.Xc
-Extend the lease for
-.Sy DHCP
-addresses.
-It also restarts duplicate address detection for
-.Cm static
-addresses.
-.Bl -tag -width Ds
-.It Fl i Ns \&, Ns Fl -inform
-Obtain network configuration from DHCP without taking a lease on the address.
-.El
+.Pp
 .It Xo
 .Nm
 .Ic delete-addr
@@ -591,6 +652,7 @@ Delete the given address.
 .It Fl r Ns \&, Ns Fl -release
 Indicate that the DHCP-assigned address should be released.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic show-addr
@@ -623,7 +685,7 @@ see the
 .Nm ipadm Ic down-addr
 subcommand
 .It Sy duplicate
-the address is a duplicate
+the address is duplicate
 .It Sy inaccessible
 the interface for this address has failed
 .It Sy ok
@@ -665,6 +727,74 @@ The address.
 .It Fl p Ns \&, Ns Fl -parsable
 Print the output in a parsable format.
 .El
+.Pp
+.It Xo
+.Nm
+.Ic refresh-addr
+.Op Fl i
+.Ar addrobj
+.Xc
+Extend the lease for
+.Sy DHCP
+addresses.
+It also restarts duplicate address detection for
+.Cm static
+addresses.
+.Bl -tag -width ""
+.It Fl i Ns \&, Ns Fl -inform
+Obtain network configuration from DHCP without taking a lease on the address.
+.El
+.Pp
+.It Xo
+.Nm
+.Ic down-addr
+.Op Fl t
+.Ar addrobj
+.Xc
+Down the address.
+This will stop packets from being sent or received.
+.Bl -tag -width Ds
+.It Fl t Ns \&, Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.Pp
+.It Xo
+.Nm
+.Ic up-addr
+.Op Fl t
+.Ar addrobj
+.Xc
+Up the address.
+This will enable packets to be sent and received.
+.Bl -tag -width Ds
+.It Fl t Ns \&, Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.Pp
+.It Xo
+.Nm
+.Ic disable-addr
+.Op Fl t
+.Ar addrobj
+.Xc
+Disable the address.
+.Bl -tag -width Ds
+.It Fl t Ns \&, Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.Pp
+.It Xo
+.Nm
+.Ic enable-addr
+.Op Fl t
+.Ar addrobj
+.Xc
+Enable the address.
+.Bl -tag -width Ds
+.It Fl t Ns \&, Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.Pp
 .It Xo
 .Nm
 .Ic set-addrprop
@@ -712,6 +842,7 @@ to make persistent).
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic reset-addrprop
@@ -729,6 +860,7 @@ subcommand for the list of property names.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic show-addrprop
@@ -770,7 +902,9 @@ See the
 .Nm ipadm Ic set-addrprop
 subcommand for the list of property names.
 .El
+.Pp
 .It Xo
+.Nm
 .Ic set-prop
 .Op Fl t
 .Fl p Ar prop Ns Oo Cm + Ns | Ns Cm - Oc Ns = Ns
@@ -852,6 +986,7 @@ The IPv4 time-to-live.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic reset-prop
@@ -869,6 +1004,7 @@ subcommand for the list of property names.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
+.Pp
 .It Xo
 .Nm
 .Ic show-prop
