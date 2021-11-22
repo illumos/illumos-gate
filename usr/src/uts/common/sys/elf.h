@@ -701,6 +701,9 @@ typedef struct {
 #define	STB_WEAK	2
 #define	STB_NUM		3
 
+#define	STB_LOOS	10		/* operating system specific range */
+#define	STB_HIOS	12
+
 #define	STB_LOPROC	13		/* processor specific range */
 #define	STB_HIPROC	15
 
