@@ -981,7 +981,6 @@ $(sparc_ONLY)driver name=pcipsy class=pci \
     alias=pci108e,8000 \
     alias=pci108e,a000 \
     alias=pci108e,a001 \
-    alias=pci \
     alias=pciclass,060000
 $(sparc_ONLY)driver name=pcisch class=pci \
     alias=pci108e,8001 \
