@@ -244,7 +244,7 @@ pci_viona_poll_thread(void *param)
 			}
 			if (assert_lintr) {
 				pthread_mutex_lock(&sc->vsc_mtx);
-				sc->vsc_isr |= VTCFG_ISR_QUEUES;
+				sc->vsc_isr |= VIRTIO_PCI_ISR_INTR;
 				pci_lintr_assert(sc->vsc_pi);
 				pthread_mutex_unlock(&sc->vsc_mtx);
 			}

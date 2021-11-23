@@ -32,6 +32,7 @@ file path=usr/share/man/man1m/auditd.1m
 file path=usr/share/man/man1m/auditrecord.1m
 file path=usr/share/man/man1m/auditreduce.1m
 file path=usr/share/man/man1m/auditstat.1m
+link path=usr/share/man/man1m/audlinks.1m target=devfsadm.1m
 file path=usr/share/man/man1m/autopush.1m
 file path=usr/share/man/man1m/bootadm.1m
 file path=usr/share/man/man1m/busstat.1m
@@ -54,10 +55,12 @@ file path=usr/share/man/man1m/consadm.1m
 file path=usr/share/man/man1m/coreadm.1m
 file path=usr/share/man/man1m/cron.1m
 file path=usr/share/man/man1m/cryptoadm.1m
+link path=usr/share/man/man1m/dcopy.1m target=clri.1m
 file path=usr/share/man/man1m/dd.1m
 file path=usr/share/man/man1m/devattr.1m
 file path=usr/share/man/man1m/devfree.1m
 file path=usr/share/man/man1m/devfsadm.1m
+link path=usr/share/man/man1m/devfsadmd.1m target=devfsadm.1m
 file path=usr/share/man/man1m/devinfo.1m
 file path=usr/share/man/man1m/devlinks.1m
 file path=usr/share/man/man1m/devnm.1m
@@ -108,6 +111,7 @@ file path=usr/share/man/man1m/groupadd.1m
 file path=usr/share/man/man1m/groupdel.1m
 file path=usr/share/man/man1m/groupmod.1m
 file path=usr/share/man/man1m/growfs.1m
+link path=usr/share/man/man1m/grpck.1m target=pwck.1m
 file path=usr/share/man/man1m/halt.1m
 file path=usr/share/man/man1m/hostconfig.1m
 file path=usr/share/man/man1m/hotplug.1m
@@ -130,6 +134,7 @@ file path=usr/share/man/man1m/install.1m
 file path=usr/share/man/man1m/installboot.1m
 file path=usr/share/man/man1m/installgrub.1m
 file path=usr/share/man/man1m/intrd.1m
+link path=usr/share/man/man1m/intro.1m target=Intro.1m
 file path=usr/share/man/man1m/iostat.1m
 file path=usr/share/man/man1m/ipaddrsel.1m
 file path=usr/share/man/man1m/ipmpstat.1m
@@ -185,6 +190,7 @@ file path=usr/share/man/man1m/pbind.1m
 file path=usr/share/man/man1m/ping.1m
 file path=usr/share/man/man1m/pmadm.1m
 file path=usr/share/man/man1m/ports.1m
+link path=usr/share/man/man1m/poweroff.1m target=halt.1m
 file path=usr/share/man/man1m/praudit.1m
 file path=usr/share/man/man1m/prstat.1m
 file path=usr/share/man/man1m/prtconf.1m
@@ -200,6 +206,7 @@ file path=usr/share/man/man1m/pwconv.1m
 file path=usr/share/man/man1m/quot.1m
 file path=usr/share/man/man1m/quota.1m
 file path=usr/share/man/man1m/quotacheck.1m
+link path=usr/share/man/man1m/quotaoff.1m target=quotaon.1m
 file path=usr/share/man/man1m/quotaon.1m
 file path=usr/share/man/man1m/raidctl.1m
 file path=usr/share/man/man1m/ramdiskadm.1m
@@ -207,6 +214,7 @@ file path=usr/share/man/man1m/rctladm.1m
 file path=usr/share/man/man1m/reboot.1m
 file path=usr/share/man/man1m/rem_drv.1m
 file path=usr/share/man/man1m/repquota.1m
+link path=usr/share/man/man1m/restricted_shell.1m target=rsh.1m
 file path=usr/share/man/man1m/roleadd.1m
 file path=usr/share/man/man1m/roledel.1m
 file path=usr/share/man/man1m/rolemod.1m
@@ -253,6 +261,7 @@ file path=usr/share/man/man1m/syseventconfd.1m
 file path=usr/share/man/man1m/syseventd.1m
 file path=usr/share/man/man1m/syslogd.1m
 file path=usr/share/man/man1m/tapes.1m
+link path=usr/share/man/man1m/telinit.1m target=init.1m
 file path=usr/share/man/man1m/tic.1m
 file path=usr/share/man/man1m/tpmadm.1m
 file path=usr/share/man/man1m/traceroute.1m
@@ -266,8 +275,12 @@ file path=usr/share/man/man1m/uadmin.1m
 file path=usr/share/man/man1m/ucodeadm.1m
 file path=usr/share/man/man1m/ufsdump.1m
 file path=usr/share/man/man1m/ufsrestore.1m
+link path=usr/share/man/man1m/umount.1m target=mount.1m
+link path=usr/share/man/man1m/umountall.1m target=mountall.1m
+link path=usr/share/man/man1m/unlink.1m target=link.1m
 file path=usr/share/man/man1m/unshare.1m
 file path=usr/share/man/man1m/unshare_nfs.1m
+link path=usr/share/man/man1m/unshareall.1m target=shareall.1m
 file path=usr/share/man/man1m/update_drv.1m
 file path=usr/share/man/man1m/useradd.1m
 file path=usr/share/man/man1m/userdel.1m
@@ -281,16 +294,3 @@ file path=usr/share/man/man1m/whodo.1m
 file path=usr/share/man/man1m/wracct.1m
 file path=usr/share/man/man1m/zdump.1m
 file path=usr/share/man/man1m/zic.1m
-link path=usr/share/man/man1m/audlinks.1m target=devfsadm.1m
-link path=usr/share/man/man1m/dcopy.1m target=clri.1m
-link path=usr/share/man/man1m/devfsadmd.1m target=devfsadm.1m
-link path=usr/share/man/man1m/grpck.1m target=pwck.1m
-link path=usr/share/man/man1m/intro.1m target=Intro.1m
-link path=usr/share/man/man1m/poweroff.1m target=halt.1m
-link path=usr/share/man/man1m/quotaoff.1m target=quotaon.1m
-link path=usr/share/man/man1m/restricted_shell.1m target=rsh.1m
-link path=usr/share/man/man1m/telinit.1m target=init.1m
-link path=usr/share/man/man1m/umount.1m target=mount.1m
-link path=usr/share/man/man1m/umountall.1m target=mountall.1m
-link path=usr/share/man/man1m/unlink.1m target=link.1m
-link path=usr/share/man/man1m/unshareall.1m target=shareall.1m

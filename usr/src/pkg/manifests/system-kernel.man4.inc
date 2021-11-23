@@ -15,9 +15,11 @@
 #
 
 file path=usr/share/man/man4/cardbus.4
+link path=usr/share/man/man4/dir.4 target=dir_ufs.4
 file path=usr/share/man/man4/dir_ufs.4
 file path=usr/share/man/man4/driver.conf.4
 file path=usr/share/man/man4/pci.4
+link path=usr/share/man/man4/pcie.4 target=pci.4
 file path=usr/share/man/man4/priv_names.4
 file path=usr/share/man/man4/proc.4
 file path=usr/share/man/man4/process.4
@@ -27,5 +29,3 @@ file path=usr/share/man/man4/sock2path.d.4
 file path=usr/share/man/man4/system.4
 file path=usr/share/man/man4/tnf_kernel_probes.4
 file path=usr/share/man/man4/ts_dptbl.4
-link path=usr/share/man/man4/dir.4 target=dir_ufs.4
-link path=usr/share/man/man4/pcie.4 target=pci.4

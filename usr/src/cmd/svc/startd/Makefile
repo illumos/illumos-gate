@@ -23,6 +23,7 @@
 # Copyright 2012 Milan Jurik. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG = svc.startd
@@ -49,10 +50,12 @@ OBJS = \
 
 ALLOBJS = $(OBJS) \
 	proc.o \
+	definit.o \
 	manifest_hash.o
 
 SRCS = $(OBJS:%.o=%.c) \
 	proc.c \
+	$(SRC)/common/definit/definit.c \
 	../common/manifest_hash.c
 
 POFILES = $(OBJS:%.o=%.po) \
@@ -64,7 +67,7 @@ include ../../Makefile.ctf
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CFLAGS += $(CCVERBOSE)
-CPPFLAGS += -I. -I../common
+CPPFLAGS += -I. -I../common -I$(SRC)/common/definit
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-label
@@ -82,8 +85,9 @@ proc.o := CPPFLAGS += -D_REENTRANT
 	$(COMPILE.c) $(OUTPUT_OPTION) $<
 	$(POST_PROCESS_O)
 
-%.ln:	../common/%.c
-	$(LINT.c) $(OUTPUT_OPTION) -c $<
+%.o:	$(SRC)/common/definit/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)
 
 LDLIBS += \
 	-lcontract \
@@ -110,12 +114,6 @@ LDFLAGS +=	-R/lib/fm
 
 FILEMODE = 0555
 
-# lint doesn't like the unused _umem_*_init()
-# And lint thinks uadmin() is undefined.
-lint_SRCS := LINTFLAGS += -U_FILE_OFFSET_BITS -xerroff=E_NAME_DEF_NOT_USED2 -u
-lint_SRCS := CPPFLAGS += \
-	-I. -I../common -D_REENTRANT -D_FILE_OFFSET_BITS=64
-
 .KEEP_STATE:
 
 .PARALLEL: $(ALLOBJS)
@@ -133,7 +131,5 @@ install: all $(ROOTLIBSVCBINPROG)
 
 clean:
 	$(RM) $(ALLOBJS)
-
-lint:   lint_SRCS
 
 include ../../Makefile.targ

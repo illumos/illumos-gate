@@ -111,11 +111,11 @@ struct vring_used {
 
 /*
  * Bits in VTCFG_R_ISR.  These apply only if not using MSI-X.
- *
- * (We don't [yet?] ever use CONF_CHANGED.)
  */
-#define	VTCFG_ISR_QUEUES	0x01	/* re-scan queues */
-#define	VTCFG_ISR_CONF_CHANGED	0x80	/* configuration changed */
+/* The bit of the ISR which indicates a device has an interrupt. */
+#define VIRTIO_PCI_ISR_INTR     0x01
+/* The bit of the ISR which indicates a device configuration change. */
+#define VIRTIO_PCI_ISR_CONFIG   0x02
 
 #define	VIRTIO_MSI_NO_VECTOR	0xFFFF
 

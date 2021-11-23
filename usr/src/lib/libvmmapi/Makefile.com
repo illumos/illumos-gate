@@ -32,8 +32,7 @@ LIBS		= $(DYNLIB)
 CPPFLAGS	= -I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 	$(CPPFLAGS.master) -I$(SRC)/uts/i86pc
 
-# not linted
-SMATCH=off
+SMOFF += all_func_returns
 
 LDLIBS		+= -lc
 

@@ -16,6 +16,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2020 Peter Tribble
+# Copyright 2021 Oxide Computer Company
 #
 
 include		$(SRC)/Makefile.master
@@ -46,6 +47,7 @@ _MANFILES=	aac.7d		\
 		dtrace.7d	\
 		e1000g.7d	\
 		ehci.7d		\
+		ena.7d		\
 		fasttrap.7d	\
 		fbt.7d		\
 		fcip.7d		\

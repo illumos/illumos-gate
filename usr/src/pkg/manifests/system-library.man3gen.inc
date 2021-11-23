@@ -14,25 +14,25 @@
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
+link path=usr/share/man/man3gen/advance.3gen target=regexpr.3gen
 file path=usr/share/man/man3gen/bgets.3gen
 file path=usr/share/man/man3gen/bufsplit.3gen
+link path=usr/share/man/man3gen/compile.3gen target=regexpr.3gen
 file path=usr/share/man/man3gen/copylist.3gen
 file path=usr/share/man/man3gen/gmatch.3gen
 file path=usr/share/man/man3gen/isencrypt.3gen
 file path=usr/share/man/man3gen/mkdirp.3gen
+link path=usr/share/man/man3gen/p2close.3gen target=p2open.3gen
 file path=usr/share/man/man3gen/p2open.3gen
 file path=usr/share/man/man3gen/pathfind.3gen
 file path=usr/share/man/man3gen/regexpr.3gen
-file path=usr/share/man/man3gen/strccpy.3gen
-file path=usr/share/man/man3gen/strfind.3gen
-link path=usr/share/man/man3gen/advance.3gen target=regexpr.3gen
-link path=usr/share/man/man3gen/compile.3gen target=regexpr.3gen
-link path=usr/share/man/man3gen/p2close.3gen target=p2open.3gen
 link path=usr/share/man/man3gen/rmdirp.3gen target=mkdirp.3gen
 link path=usr/share/man/man3gen/step.3gen target=regexpr.3gen
 link path=usr/share/man/man3gen/str.3gen target=strfind.3gen
 link path=usr/share/man/man3gen/strcadd.3gen target=strccpy.3gen
+file path=usr/share/man/man3gen/strccpy.3gen
 link path=usr/share/man/man3gen/streadd.3gen target=strccpy.3gen
 link path=usr/share/man/man3gen/strecpy.3gen target=strccpy.3gen
+file path=usr/share/man/man3gen/strfind.3gen
 link path=usr/share/man/man3gen/strrspn.3gen target=strfind.3gen
 link path=usr/share/man/man3gen/strtrns.3gen target=strfind.3gen

@@ -674,6 +674,7 @@ f kernel/drv/amd64/dtrace 0755 root sys
 f kernel/drv/amd64/e1000g 0755 root sys
 f kernel/drv/amd64/ehci 0755 root sys
 f kernel/drv/amd64/eibnx 0755 root sys
+f kernel/drv/amd64/ena 0755 root sys
 f kernel/drv/amd64/fasttrap 0755 root sys
 f kernel/drv/amd64/fbt 0755 root sys
 f kernel/drv/amd64/fcp 0755 root sys
@@ -852,6 +853,7 @@ f kernel/drv/dtrace.conf 0644 root sys
 f kernel/drv/e1000g.conf 0644 root sys
 f kernel/drv/ehci.conf 0644 root sys
 f kernel/drv/eibnx.conf 0644 root sys
+f kernel/drv/ena.conf 0644 root sys
 f kernel/drv/fasttrap.conf 0644 root sys
 f kernel/drv/fbt.conf 0644 root sys
 f kernel/drv/fcp.conf 0644 root sys
@@ -19655,6 +19657,7 @@ f usr/share/man/man7d/dnet.7d 0444 root bin
 f usr/share/man/man7d/dtrace.7d 0444 root bin
 f usr/share/man/man7d/e1000g.7d 0444 root bin
 f usr/share/man/man7d/ehci.7d 0444 root bin
+f usr/share/man/man7d/ena.7d 0444 root bin
 f usr/share/man/man7d/fasttrap.7d 0444 root bin
 f usr/share/man/man7d/fbt.7d 0444 root bin
 f usr/share/man/man7d/fcp.7d 0444 root bin

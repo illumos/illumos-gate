@@ -89,7 +89,7 @@ SRCS =	acpi.c			\
 # trouble of fixing the header tangle for this is not worth the complexity.
 	#kernemu_dev.c		\
 
-# The virtio-scsi driver appears to include  a slew of materials from FreeBSD's
+# The virtio-scsi driver appears to include a slew of materials from FreeBSD's
 # native SCSI implementation.  We will omit that complexity for now.
 	#ctl_util.c		\
 	#ctl_scsi_all.c		\
@@ -99,6 +99,9 @@ SRCS =	acpi.c			\
 	#audio.c		\
 	#hda_codec.c		\
 	#pci_hda.c		\
+
+# The virtio input device expects to link to a FreeBSD /dev/input/eventX device
+	#pci_virtio_input.c	\
 
 OBJS = $(SRCS:.c=.o)
 
@@ -153,13 +156,14 @@ $(PROG) := LDLIBS += \
 	-ldladm \
 	-lmd \
 	-lnvpair \
+	-lproc \
 	-lsunw_crypto \
 	-luuid \
 	-lvmmapi \
 	-lz
 NATIVE_LIBS += libz.so libsunw_crypto.so
 $(ZHYVE_PROG) := LDLIBS += -lnvpair
-$(MEVENT_TEST_PROG) := LDLIBS += -lsocket
+$(MEVENT_TEST_PROG) := LDLIBS += -lsocket -lproc
 $(PROG) := LDFLAGS += $(ZASLR)
 
 .KEEP_STATE:

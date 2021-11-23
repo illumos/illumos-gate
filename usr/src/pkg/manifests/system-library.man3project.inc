@@ -11,9 +11,6 @@
 
 # Copyright 2017, Richard Lowe
 
-file path=usr/share/man/man3project/getprojent.3project
-file path=usr/share/man/man3project/project_walk.3project
-file path=usr/share/man/man3project/setproject.3project
 link path=usr/share/man/man3project/endprojent.3project \
     target=getprojent.3project
 link path=usr/share/man/man3project/fgetprojent.3project \
@@ -24,8 +21,11 @@ link path=usr/share/man/man3project/getprojbyid.3project \
     target=getprojent.3project
 link path=usr/share/man/man3project/getprojbyname.3project \
     target=getprojent.3project
+file path=usr/share/man/man3project/getprojent.3project
 link path=usr/share/man/man3project/getprojidbyname.3project \
     target=getprojent.3project
 link path=usr/share/man/man3project/inproj.3project target=getprojent.3project
+file path=usr/share/man/man3project/project_walk.3project
+file path=usr/share/man/man3project/setproject.3project
 link path=usr/share/man/man3project/setprojent.3project \
     target=getprojent.3project

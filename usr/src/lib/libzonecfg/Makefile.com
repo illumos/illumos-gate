@@ -21,11 +21,12 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 Joyent, Inc.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 LIBRARY=	libzonecfg.a
 VERS=		.1
-LIB_OBJS=	libzonecfg.o getzoneent.o scratchops.o
+LIB_OBJS=	libzonecfg.o getzoneent.o scratchops.o definit.o
 XML_OBJS=	os_dtd.o
 OBJECTS=	$(LIB_OBJS) $(XML_OBJS)
 
@@ -46,6 +47,7 @@ SRCS = \
 		$(XML_OBJS:%.o=$(XMLDIR)/%.c) \
 
 CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
+CPPFLAGS +=	-I$(SRC)/common/definit
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 
@@ -58,5 +60,9 @@ all:	$(LIBS)
 pics/%.o: $(XMLDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
+
+pics/%.o:	$(SRC)/common/definit/%.c
+		$(COMPILE.c) -o $@ $<
+		$(POST_PROCESS_O)
 
 include ../../Makefile.targ

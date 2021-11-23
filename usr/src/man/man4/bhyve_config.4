@@ -25,7 +25,7 @@
 .\"
 .\" Portions Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd May 7, 2021
+.Dd September 10, 2021
 .Dt BHYVE_CONFIG 4
 .Os
 .Sh NAME
@@ -145,11 +145,12 @@ the host's hostname and the VM name.
 Use MSI-X interrupts for PCI VirtIO devices.
 If set to false, MSI interrupts are used instead.
 .It Va config.dump Ta bool Ta false Ta
-If this value is set to true, then
+If this value is set to true then, after parsing command line options,
 .Xr bhyve 1M
 will write all of its configuration variables to
 .Dv stdout
-and exit after it has finished parsing command line options.
+and exit.
+No VM will be started.
 .It Va privileges.debug Ta bool Ta false Ta
 Enable debug messages relating to privilege management.
 These messages are sent to
@@ -184,7 +185,7 @@ Device settings are stored under a device node.
 The device node's name is set by the parent bus of the device.
 .Ss PCI Device Settings
 PCI devices are described by a device node named
-.Dq pci Ns Ar bus . Ns Ar slot . Ns Ar function
+.Dq pci . Ns Ar bus . Ns Ar slot . Ns Ar function
 where each of
 .Ar bus ,
 .Ar slot ,
@@ -486,6 +487,16 @@ The share name exposed to the guest.
 The path of a directory on the host to export to the guest.
 .It Va ro Ta bool Ta false Ta
 If true, the guest filesystem is read-only.
+.El
+.Ss VirtIO Block Device Settings
+In addition to the block device settings described above, each
+VirtIO block device supports the following settings:
+.Bl -column "model" "integer" "generated"
+.It Sy Name Ta Sy Format Ta Sy Default Ta Sy Description
+.It Va ser Ta string Ta generated Ta
+Serial number of up to twenty characters.
+A default serial number is generated using a hash of the backing
+store's pathname.
 .El
 .Ss VirtIO Console Device Settings
 Each VirtIO Console device contains one or more console ports.

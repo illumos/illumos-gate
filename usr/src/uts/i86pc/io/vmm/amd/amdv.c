@@ -97,7 +97,7 @@ amd_iommu_destroy_domain(void *domain)
 
 static uint64_t
 amd_iommu_create_mapping(void *domain, vm_paddr_t gpa, vm_paddr_t hpa,
-			 uint64_t len)
+    uint64_t len)
 {
 
 	printf("amd_iommu_create_mapping: not implemented\n");
@@ -133,7 +133,7 @@ amd_iommu_invalidate_tlb(void *domain)
 	printf("amd_iommu_invalidate_tlb: not implemented\n");
 }
 
-struct iommu_ops iommu_ops_amd = {
+const struct iommu_ops iommu_ops_amd = {
 	amd_iommu_init,
 	amd_iommu_cleanup,
 	amd_iommu_enable,
