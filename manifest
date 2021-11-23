@@ -19254,6 +19254,7 @@ f usr/share/man/man3xnet/socketpair.3xnet 0444 root bin
 d usr/share/man/man4 0755 root bin
 f usr/share/man/man4/Intro.4 0444 root bin
 f usr/share/man/man4/NISLDAPmapping.4 0444 root bin
+s usr/share/man/man4/TIMEZONE.4=init.4
 f usr/share/man/man4/a.out.4 0444 root bin
 s usr/share/man/man4/addresses.4=aliases.4
 f usr/share/man/man4/admin.4 0444 root bin
