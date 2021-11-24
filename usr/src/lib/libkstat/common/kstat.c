@@ -71,7 +71,7 @@ kstat_open(void)
 	kstat_ctl_t *kc;
 	int kd;
 
-	kd = open("/dev/kstat", O_RDONLY);
+	kd = open("/dev/kstat", O_RDONLY | O_CLOEXEC);
 	if (kd == -1)
 		return (NULL);
 	kstat_zalloc((void **)&kc, sizeof (kstat_ctl_t), 0);
