@@ -1,26 +1,43 @@
-'\" te
+.\"
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KSTAT 3KSTAT "Jan 29, 2007"
-.SH NAME
-kstat \- kernel statistics facility
-.SH DESCRIPTION
-.sp
-.LP
-The \fBkstat\fR facility is a general-purpose mechanism for providing kernel
-statistics to users.
-.SS "The kstat model"
-.sp
-.LP
-The kernel maintains a linked list of statistics structures, or kstats. Each
-kstat has a common header section and a type-specific data section. The header
-section is defined by the \fBkstat_t\fR structure:
-.SS "kstat header"
-.sp
-.in +2
-.nf
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 29, 2021
+.Dt KSTAT 3KSTAT
+.Os
+.Sh NAME
+.Nm kstat
+.Nd kernel statistics facility
+.Sh LIBRARY
+.Lb libkstat
+.Sh DESCRIPTION
+The
+.Nm
+facility is a general-purpose mechanism for providing kernel statistics to
+users.
+.Ss The kstat model
+The kernel maintains a linked list of statistics structures, or kstats.
+Each kstat has a common header section and a type-specific data section.
+The header section is defined by the
+.Vt kstat_t
+structure:
+.Ss "kstat header"
+.Bd -literal -offset indent
 typedef   int kid_t;    /* unique kstat id */
 
 typedef struct kstat {
@@ -53,180 +70,136 @@ typedef struct kstat {
    int(*ks_snapshot)(struct kstat *, void *, int);
    void  *ks_lock;
 } kstat_t;
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
 The fields that are of significance to the user are:
-.sp
-.ne 2
-.na
-\fB\fBks_crtime\fR\fR
-.ad
-.RS 16n
-The time the kstat was created. This allows you to compute the rates of various
-counters since the kstat was created; "rate since boot" is replaced by the more
-general concept of "rate since kstat creation". All times associated with
-kstats (such as creation time, last snapshot time, \fBkstat_timer_t\fR and
-\fBkstat_io_t\fR timestamps, and the like) are 64-bit nanosecond values. The
-accuracy of kstat timestamps is machine dependent, but the precision (units) is
-the same across all platforms. See \fBgethrtime\fR(3C) for general information
-about high-resolution timestamps.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBks_next\fR\fR
-.ad
-.RS 16n
-kstats are stored as a linked list, or chain. \fBks_next\fR points to the next
-kstat in the chain.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBks_kid\fR\fR
-.ad
-.RS 16n
+.Bl -tag -width Ds
+.It Fa ks_crtime
+The time the kstat was created.
+This allows you to compute the rates of various counters since the kstat was
+created;
+.Dq rate since boot
+is replaced by the more general concept of
+.Dq rate since kstat creation .
+All times associated with kstats
+.Po
+such as creation time, last snapshot time,
+.Vt kstat_timer_t
+and
+.Vt kstat_io_t
+timestamps, and the like
+.Pc
+are 64-bit nanosecond values.
+The accuracy of kstat timestamps is machine dependent, but the precision
+.Pq units
+is the same across all platforms.
+See
+.Xr gethrtime 3C
+for general information about high-resolution timestamps.
+.It Fa ks_next
+kstats are stored as a linked list, or chain.
+.Fa ks_next
+points to the next kstat in the chain.
+.It Fa ks_kid
 A unique identifier for the kstat.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBks_module\fR,\fR
-.ad
-.br
-.na
-\fB\fBks_instance\fR\fR
-.ad
-.RS 16n
-contain the name and instance of the module that created the kstat. In cases
-where there can only be one instance, \fBks_instance\fR is 0.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBks_name\fR\fR
-.ad
-.RS 16n
-gives a meaningful name to a kstat. The full kstat namespace is
-<\fBks_module\fR,\fBks_instance\fR,\fBks_name\fR>, so the name only need be
-unique within a module.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBks_type\fR\fR
-.ad
-.RS 16n
-The type of data in this kstat. kstat data types are discussed below.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBks_class\fR\fR
-.ad
-.RS 16n
+.It Fa ks_module , Fa ks_instance
+contain the name and instance of the module that created the kstat.
+In cases where there can only be one instance,
+.Fa ks_instance
+is 0.
+.It Fa ks_name
+gives a meaningful name to a kstat.
+The full kstat namespace is
+.Ao
+.Fa ks_module ,
+.Fa ks_instance ,
+.Fa ks_name
+.Ac ,
+so the name only need be unique within a module.
+.It Fa ks_type
+The type of data in this kstat.
+kstat data types are discussed below.
+.It Fa ks_class
 Each kstat can be characterized as belonging to some broad class of statistics,
-such as disk, tape, net, vm, and streams. This field can be used as a filter to
-extract related kstats. The following values are currently in use: \fBdisk\fR,
-\fBtape\fR, \fBcontroller\fR, \fBnet\fR, \fBrpc\fR, \fBvm\fR, \fBkvm\fR,
-\fBhat\fR, \fBstreams\fR, \fBkmem\fR, \fBkmem_cache\fR, \fBkstat\fR, and
-\fBmisc\fR. (The kstat class encompasses things like \fIkstat_types\fR.)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBks_data\fR,\fR
-.ad
-.br
-.na
-\fB\fBks_ndata\fR,\fR
-.ad
-.br
-.na
-\fB\fBks_data_size\fR\fR
-.ad
-.RS 16n
-\fBks_data\fR is a pointer to the kstat's data section. The type of data stored
-there depends on \fBks_type\fR. \fBks_ndata\fR indicates the number of data
-records. Only some kstat types support multiple data records. Currently,
-\fBKSTAT_TYPE_RAW\fR, \fBKSTAT_TYPE_NAMED\fR and \fBKSTAT_TYPE_TIMER\fR kstats
-support multiple data records. \fBKSTAT_TYPE_INTR\fR and \fBKSTAT_TYPE_IO\fR
-kstats support only one data record. \fBks_data_size\fR is the total size of
-the data section, in bytes.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBks_snaptime\fR\fR
-.ad
-.RS 16n
-The timestamp for the last data snapshot. This allows you to compute activity
-rates:
-.sp
-\fBrate = (new_count - old_count) / (new_snaptime - old_snaptime);\fR
-.RE
-
-.SS "kstat data types"
-.sp
-.LP
+such as disk, tape, net, vm, and streams.
+This field can be used as a filter to extract related kstats.
+The following values are currently in use: disk, tape, controller, net, rpc, vm,
+kvm, hat, streams, kmem, kmem_cache, kstat, and misc.
+.Po
+The kstat class encompasses things like
+.Fa kstat_types .
+.Pc
+.It Fa ks_data , Fa ks_ndata , Fa ks_data_size
+.Fa ks_data
+is a pointer to the kstat's data section.
+The type of data stored there depends on
+.Fa ks_type .
+.Fa ks_ndata
+indicates the number of data records.
+Only some kstat types support multiple data records.
+Currently,
+.Dv KSTAT_TYPE_RAW ,
+.Dv KSTAT_TYPE_NAMED ,
+and
+.Dv KSTAT_TYPE_TIMER
+kstats support multiple data records.
+.Dv KSTAT_TYPE_INTR
+and
+.Dv KSTAT_TYPE_IO
+kstats support only one data record.
+.Fa ks_data_size
+is the total size of the data section, in bytes.
+.It Fa ks_snaptime
+The timestamp for the last data snapshot.
+This allows you to compute activity rates:
+.Bd -literal
+rate = (new_count - old_count) / (new_snaptime - old_snaptime);
+.Ed
+.El
+.Ss kstat data types
 The following types of kstats are currently available:
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
 #define KSTAT_TYPE_RAW    0   /* can be anything */
 #define KSTAT_TYPE_NAMED  1   /* name/value pairs */
 #define KSTAT_TYPE_INTR   2   /* interrupt statistics */
 #define KSTAT_TYPE_IO     3   /* I/O statistics */
 #define KSTAT_TYPE_TIMER  4   /* event timers */
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
 To get a list of all kstat types currently supported in the system, tools can
-read out the standard system kstat \fIkstat_types\fR (full name spec is
-\fI<``unix'', 0, ``kstat_types''>\fR). This is a \fBKSTAT_TYPE_NAMED\fR kstat
-in which the \fIname\fR field describes the type of kstat, and the \fIvalue\fR
-field is the kstat type number (for example, \fBKSTAT_TYPE_IO\fR is type 3 --
-see above).
-.SS "Raw kstat"
-.sp
-.ne 2
-.na
-\fB\fBKSTAT_TYPE_RAW\fR\fR
-.ad
-.RS 18n
-raw data
-.RE
-
-.sp
-.LP
-The "raw" kstat type is just treated as an array of bytes. This is generally
-used to export well-known structures, like \fIsysinfo\fR.
-.SS "Name=value kstat"
-.sp
-.ne 2
-.na
-\fB\fBKSTAT_TYPE_NAMED\fR\fR
-.ad
-.RS 20n
-A list of arbitrary \fIname=value\fR statistics.
-.RE
-
-.sp
-.in +2
-.nf
+read out the standard system kstat
+.Fa kstat_types
+.Po
+full name spec is
+.Aq unix, 0, kstat_types
+.Pc .
+This is a
+.Dv KSTAT_TYPE_NAMED
+kstat in which the
+.Fa name
+field describes the type of kstat, and the
+.Fa value
+field is the kstat type number
+.Po
+for example,
+.Dv KSTAT_TYPE_IO
+is type 3 \(em see above
+.Pc .
+.Ss "Raw kstat"
+.Dv KSTAT_TYPE_RAW
+\(em raw data
+.Pp
+The
+.Dq raw
+kstat type is just treated as an array of bytes.
+This is generally used to export well-known structures, like
+.Vt sysinfo .
+.Ss "Name=value kstat"
+.Dv KSTAT_TYPE_NAMED
+\(em A list of arbitrary
+.Fa name=value
+statistics.
+.Bd -literal -offset indent
 typedef struct kstat_named {
    char    name[KSTAT_STRLEN];    /* name of counter */
    uchar_t data_type;             /* data type */
@@ -272,50 +245,46 @@ KSTAT_DATA_LONGLONG
 KSTAT_DATA_ULONGLONG
 KSTAT_DATA_FLOAT
 KSTAT_DATA_DOUBLE
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
 Some devices need to publish strings that exceed the maximum value for
-\fBKSTAT_DATA_CHAR\fR in length; \fBKSTAT_DATA_STRING\fR is a data type that
-allows arbitrary-length strings to be associated with a named kstat. The macros
-below are the supported means to read the pointer to the string and its length.
-.sp
-.in +2
-.nf
+.Dv KSTAT_DATA_CHAR
+in length;
+.Dv KSTAT_DATA_STRING
+is a data type that allows arbitrary-length strings to be associated with a
+named kstat.
+The macros below are the supported means to read the pointer to the string and
+its length.
+.Bd -literal -offset indent
 #define KSTAT_NAMED_STR_PTR(knptr) ((knptr)->value.str.addr.ptr)
 #define KSTAT_NAMED_STR_BUFLEN(knptr) ((knptr)->value.str.len)
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-\fBKSTAT_NAMED_STR_BUFLEN()\fR returns the number of bytes required to store
-the string pointed to by \fBKSTAT_NAMED_STR_PTR()\fR; that is,
-\fBstrlen(KSTAT_NAMED_STR_PTR()) + 1\fR.
-.SS "Interrupt kstat"
-.sp
-.ne 2
-.na
-\fB\fBKSTAT_TYPE_INTR\fR\fR
-.ad
-.RS 19n
-Interrupt statistics.
-.RE
-
-.sp
-.LP
-An interrupt is a hard interrupt (sourced from the hardware device itself), a
-soft interrupt (induced by the system via the use of some system interrupt
-source), a watchdog interrupt (induced by a periodic timer call), spurious (an
-interrupt entry point was entered but there was no interrupt to service), or
-multiple service (an interrupt was detected and serviced just prior to
-returning from any of the other types).
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+.Fn KSTAT_NAMED_STR_BUFLEN
+returns the number of bytes required to store the string pointed to by
+.Fn KSTAT_NAMED_STR_PTR ;
+that is,
+.Fo strlen
+.Fa "KSTAT_NAMED_STR_PTR() + 1"
+.Fc .
+.Ss "Interrupt kstat"
+.Dv KSTAT_TYPE_INTR
+\(em Interrupt statistics.
+.Pp
+An interrupt is a hard interrupt
+.Pq sourced from the hardware device itself ,
+a soft interrupt
+.Pq induced by the system via the use of some system interrupt source ,
+a watchdog interrupt
+.Pq induced by a periodic timer call ,
+spurious
+.Pq an interrupt entry point was entered but there was no interrupt to service ,
+or multiple service
+.Po
+an interrupt was detected and serviced just prior to returning from any of the
+other types
+.Pc .
+.Bd -literal -offset indent
 #define KSTAT_INTR_HARD      0
 #define KSTAT_INTR_SOFT      1
 #define KSTAT_INTR_WATCHDOG  2
@@ -326,25 +295,13 @@ returning from any of the other types).
 typedef struct kstat_intr {
    uint_t intrs[KSTAT_NUM_INTRS]; /* interrupt counters */
 } kstat_intr_t;
-.fi
-.in -2
-
-.SS "Event timer kstat"
-.sp
-.ne 2
-.na
-\fB\fBKSTAT_TYPE_TIMER\fR\fR
-.ad
-.RS 20n
-Event timer statistics.
-.RE
-
-.sp
-.LP
+.Ed
+.Ss Event timer kstat
+.Dv KSTAT_TYPE_TIMER
+\(em Event timer statistics.
+.Pp
 These provide basic counting and timing information for any type of event.
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
 typedef struct kstat_timer {
    char         name[KSTAT_STRLEN]; /* event name */
    uchar_t      resv;               /* reserved */
@@ -355,123 +312,120 @@ typedef struct kstat_timer {
    hrtime_t     start_time;         /* previous event start time */
    hrtime_t     stop_time;          /* previous event stop time */
 } kstat_timer_t;
-.fi
-.in -2
-
-.SS "I/O kstat"
-.sp
-.ne 2
-.na
-\fB\fBKSTAT_TYPE_IO\fR\fR
-.ad
-.RS 17n
-I/O statistics.
-.RE
-
-.sp
-.in +2
-.nf
+.Ed
+.Ss I/O kstat
+.Dv KSTAT_TYPE_IO
+\(em I/O statistics.
+.Bd -literal -offset indent
 typedef struct kstat_io {
 /*
  * Basic counters.
  */
-u_longlong_t     nread;      /* number of bytes read */
-u_longlong_t     nwritten;   /* number of bytes written */
-uint_t           reads;      /* number of read operations */
-uint_t           writes;     /* number of write operations */
+   u_longlong_t     nread;      /* number of bytes read */
+   u_longlong_t     nwritten;   /* number of bytes written */
+   uint_t           reads;      /* number of read operations */
+   uint_t           writes;     /* number of write operations */
 /*
-* Accumulated time and queue length statistics.
-*
-* Time statistics are kept as a running sum of "active" time.
-* Queue length statistics are kept as a running sum of the
-* product of queue length and elapsed time at that length --
-* that is, a Riemann sum for queue length integrated against time.
-*
-*               ^
-*               |                       _________
-*               8                       | i4    |
-*               |                       |       |
-*       Queue   6                       |       |
-*       Length  |       _________       |       |
-*               4       | i2    |_______|       |
-*               |       |       i3              |
-*               2_______|                       |
-*               |    i1                         |
-*               |_______________________________|
-*               Time->  t1      t2      t3      t4
-*
-* At each change of state (entry or exit from the queue),
-* we add the elapsed time (since the previous state change)
-* to the active time if the queue length was non-zero during
-* that interval; and we add the product of the elapsed time
-* times the queue length to the running length*time sum.
-*
-* This method is generalizable to measuring residency
-* in any defined system: instead of queue lengths, think
-* of "outstanding RPC calls to server X".
-*
-* A large number of I/O subsystems have at least two basic
-* "lists" of transactions they manage: one for transactions
-* that have been accepted for processing but for which processing
-* has yet to begin, and one for transactions which are actively
-* being processed (but not done). For this reason, two cumulative
-* time statistics are defined here: pre-service (wait) time,
-* and service (run) time.
-*
-* The units of cumulative busy time are accumulated nanoseconds.
-* The units of cumulative length*time products are elapsed time
-* times queue length.
-*/
-hrtime_t   wtime;            /* cumulative wait (pre-service) time */
-hrtime_t   wlentime;         /* cumulative wait length*time product*/
-hrtime_t   wlastupdate;      /* last time wait queue changed */
-hrtime_t   rtime;            /* cumulative run (service) time */
-hrtime_t   rlentime;         /* cumulative run length*time product */
-hrtime_t   rlastupdate;      /* last time run queue changed */
-uint_t     wcnt;             /* count of elements in wait state */
-uint_t     rcnt;             /* count of elements in run state */
+ * Accumulated time and queue length statistics.
+ *
+ * Time statistics are kept as a running sum of "active" time.
+ * Queue length statistics are kept as a running sum of the
+ * product of queue length and elapsed time at that length --
+ * that is, a Riemann sum for queue length integrated against time.
+ *
+ *               ^
+ *               |                       _________
+ *               8                       | i4    |
+ *               |                       |       |
+ *       Queue   6                       |       |
+ *       Length  |       _________       |       |
+ *               4       | i2    |_______|       |
+ *               |       |       i3              |
+ *               2_______|                       |
+ *               |    i1                         |
+ *               |_______________________________|
+ *               Time->  t1      t2      t3      t4
+ *
+ * At each change of state (entry or exit from the queue),
+ * we add the elapsed time (since the previous state change)
+ * to the active time if the queue length was non-zero during
+ * that interval; and we add the product of the elapsed time
+ * times the queue length to the running length*time sum.
+ *
+ * This method is generalizable to measuring residency
+ * in any defined system: instead of queue lengths, think
+ * of "outstanding RPC calls to server X".
+ *
+ * A large number of I/O subsystems have at least two basic
+ * "lists" of transactions they manage: one for transactions
+ * that have been accepted for processing but for which processing
+ * has yet to begin, and one for transactions which are actively
+ * being processed (but not done). For this reason, two cumulative
+ * time statistics are defined here: pre-service (wait) time,
+ * and service (run) time.
+ *
+ * The units of cumulative busy time are accumulated nanoseconds.
+ * The units of cumulative length*time products are elapsed time
+ * times queue length.
+ */
+   hrtime_t   wtime;            /* cumulative wait (pre-service) time */
+   hrtime_t   wlentime;         /* cumulative wait length*time product*/
+   hrtime_t   wlastupdate;      /* last time wait queue changed */
+   hrtime_t   rtime;            /* cumulative run (service) time */
+   hrtime_t   rlentime;         /* cumulative run length*time product */
+   hrtime_t   rlastupdate;      /* last time run queue changed */
+   uint_t     wcnt;             /* count of elements in wait state */
+   uint_t     rcnt;             /* count of elements in run state */
 } kstat_io_t;
-.fi
-.in -2
-.sp
-
-.SS "Using libkstat"
-.sp
-.LP
-The kstat library, \fBlibkstat\fR, defines the user interface (API) to the
-system's kstat facility.
-.sp
-.LP
-You begin by opening libkstat with \fBkstat_open\fR(3KSTAT), which returns a
-pointer to a fully initialized kstat control structure. This is your ticket to
-subsequent libkstat operations:
-.sp
-.in +2
-.nf
+.Ed
+.Ss Using libkstat
+The kstat library,
+.Sy libkstat ,
+defines the user interface
+.Pq API
+to the system's kstat facility.
+.Pp
+You begin by opening libkstat with
+.Xr kstat_open 3KSTAT ,
+which returns a pointer to a fully initialized kstat control structure.
+This is your ticket to subsequent libkstat operations:
+.Bd -literal -offset indent
 typedef struct kstat_ctl {
    kid_t     kc_chain_id;    /* current kstat chain ID */
    kstat_t   *kc_chain;      /* pointer to kstat chain */
    int       kc_kd;          /* /dev/kstat descriptor */
 } kstat_ctl_t;
-.fi
-.in -2
-
-.sp
-.LP
-Only the first two fields, \fBkc_chain_id\fR and \fBkc_chain\fR, are of
-interest to \fBlibkstat\fR clients. (\fIkc_kd\fR is the descriptor for
-\fB/dev/kstat\fR, the kernel statistics driver. libkstat functions are built on
-top of \fB/dev/kstat\fR \fBioctl\fR(2) primitives. Direct interaction with
-\fB/dev/kstat\fR is strongly discouraged, since it is \fInot\fR a public
-interface.)
-.sp
-.LP
-\fBkc_chain\fR points to your copy of the kstat chain. You typically walk the
-chain to find and process a certain kind of kstat. For example, to display all
-\fBI/O\fR kstats:
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+Only the first two fields,
+.Fa kc_chain_id
+and
+.Fa kc_chain ,
+are of
+interest to
+libkstat clients.
+.Po
+.Fa kc_kd
+is the descriptor for
+.Pa /dev/kstat ,
+the kernel statistics driver.
+libkstat functions are built on top of
+.Pa /dev/kstat
+.Xr ioctl 2
+primitives.
+Direct interaction with
+.Pa /dev/kstat
+is strongly discouraged, since it is
+.Em not
+a public interface.
+.Pc
+.Pp
+.Fa kc_chain
+points to your copy of the kstat chain.
+You typically walk the chain to find and process a certain kind of kstat.
+For example, to display all
+I/O kstats:
+.Bd -literal -offset indent
 kstat_ctl_t    *kc;
 kstat_t        *ksp;
 kstat_io_t     kio;
@@ -483,47 +437,32 @@ for (ksp = kc->kc_chain; ksp != NULL; ksp = ksp->ks_next) {
                 my_io_display(kio);
         }
 }
-.fi
-.in -2
-
-.sp
-.LP
-\fBkc_chain_id\fR is the kstat chain \fBID\fR, or \fBKCID\fR, of your copy of
-the kstat chain. See \fBkstat_chain_update\fR(3KSTAT) for an explanation of
-\fBKCID\fRs.
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/kstat\fR\fR
-.ad
-.RS 28n
-kernel statistics driver
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/include/kstat.h\fR\fR
-.ad
-.RS 28n
-header
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/include/sys/kstat.h\fR\fR
-.ad
-.RS 28n
-header
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBioctl\fR(2), \fBgethrtime\fR(3C), \fBgetloadavg\fR(3C),
-\fBkstat_chain_update\fR(3KSTAT), \fBkstat_close\fR(3KSTAT),
-\fBkstat_data_lookup\fR(3KSTAT), \fBkstat_lookup\fR(3KSTAT),
-\fBkstat_open\fR(3KSTAT), \fBkstat_read\fR(3KSTAT), \fBkstat_write\fR(3KSTAT),
-\fBattributes\fR(5)
+.Ed
+.Pp
+.Fa kc_chain_id
+is the kstat chain ID, or
+.Sy KCID ,
+of your copy of the kstat chain.
+See
+.Xr kstat_chain_update 3KSTAT
+for an explanation of KCIDs.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/kstat
+kernel statistics driver character device
+.It Pa /usr/include/kstat.h
+kstat library header file
+.It Pa /usr/include/sys/kstat.h
+system kstat header
+.El
+.Sh SEE ALSO
+.Xr ioctl 2 ,
+.Xr gethrtime 3C ,
+.Xr kstat_chain_update 3KSTAT ,
+.Xr kstat_close 3KSTAT ,
+.Xr kstat_data_lookup 3KSTAT ,
+.Xr kstat_lookup 3KSTAT ,
+.Xr kstat_open 3KSTAT ,
+.Xr kstat_read 3KSTAT ,
+.Xr kstat_write 3KSTAT ,
+.Xr attributes 5

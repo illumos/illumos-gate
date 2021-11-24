@@ -1,125 +1,119 @@
-'\" te
+.\"
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KSTAT_OPEN 3KSTAT "Aug 3, 2004"
-.SH NAME
-kstat_open, kstat_close \- initialize kernel statistics facility
-.SH SYNOPSIS
-.LP
-.nf
-\fBcc\fR[ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lkstat\fR [ \fIlibrary\fR\&.\|.\|.]
-#include <kstat.h>
-
-\fBkstat_ctl_t *\fR\fBkstat_open\fR(\fB\fR\fIvoid\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBkstat_close\fR(\fBkstat_ctl_t *\fR\fIkc\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBkstat_open()\fR function initializes a kstat control structure that
-provides access to the kernel statistics library.  It returns a pointer to this
-structure, which must be supplied as the \fIkc\fR argument in subsequent
-\fBlibkstat\fR function calls.
-.sp
-.LP
-The \fBkstat_close()\fR function frees all resources that were associated with
-\fIkc\fR. This is performed automatically on \fBexit\fR(2) and \fBexecve\fR(2).
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBkstat_open()\fR returns a pointer to a kstat
-control structure.  Otherwise, it returns \fINULL\fR, no resources are
-allocated, and \fBerrno\fR is set to indicate the error.
-.sp
-.LP
-Upon successful completion, \fBkstat_close()\fR returns 0. Otherwise, \(mi1 is
-returned and \fBerrno\fR is set to indicate the error.
-.SH ERRORS
-.sp
-.LP
-The \fBkstat_open()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 13n
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 29, 2021
+.Dt KSTAT_OPEN 3KSTAT
+.Os
+.Sh NAME
+.Nm kstat_open ,
+.Nm kstat_close
+.Nd initialize kernel statistics facility
+.Sh LIBRARY
+.Lb libkstat
+.Sh SYNOPSIS
+.In kstat.h
+.Ft "kstat_ctl_t *"
+.Fo kstat_open
+.Fa "void"
+.Fc
+.Ft int
+.Fo kstat_close
+.Fa "kstat_ctl_t *kc"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn kstat_open
+function initializes a kstat control structure that provides access to the
+kernel statistics library.
+It returns a pointer to this structure, which must be supplied as the
+.Fa kc
+argument in subsequent
+.Sy libkstat
+function calls.
+.Pp
+The
+.Fn kstat_close
+function frees all resources that were associated with
+.Fa kc .
+This is performed automatically on
+.Xr exit 2
+and
+.Xr execve 2 .
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn kstat_open
+returns a pointer to a kstat control structure.
+Otherwise, it returns
+.Dv NULL ,
+no resources are allocated, and
+.Va errno
+is set to indicate the error.
+.Pp
+Upon successful completion,
+.Fn kstat_close
+returns
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned and
+.Va errno
+is set to indicate the error.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/kstat
+kernel statistics driver character device
+.El
+.Sh ERRORS
+The
+.Fn kstat_open
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOMEM
 Insufficient storage space is available.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 13n
+.It Er EAGAIN
 The kstat was temporarily unavailable for reading or writing.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 13n
+.It Er ENXIO
 The given kstat could not be located for reading.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEOVERFLOW\fR\fR
-.ad
-.RS 13n
+.It Er EOVERFLOW
 The data for the given kstat was too large to be stored in the structure.
-.RE
-
-.sp
-.LP
-The \fBkstat_open()\fR function can also return the error values for
-\fBopen\fR(2).
-.sp
-.LP
-The \fBkstat_close()\fR function can also return the error values for
-\fBclose\fR(2).
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/kstat\fR\fR
-.ad
-.RS 14n
-kernel statistics driver
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Stable
-_
-MT-Level	Unsafe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBclose\fR(2), \fBexecve\fR(2), \fBopen\fR(2), \fBexit\fR(2),
-\fBkstat\fR(3KSTAT), \fBkstat_chain_update\fR(3KSTAT),
-\fBkstat_lookup\fR(3KSTAT), \fBkstat_read\fR(3KSTAT), \fBattributes\fR(5)
+.El
+.Pp
+The
+.Fn kstat_open
+function can also return the error values for
+.Xr open 2 .
+.Pp
+The
+.Fn kstat_close
+function can also return the error values for
+.Xr close 2 .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Unsafe
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr execve 2 ,
+.Xr exit 2 ,
+.Xr open 2 ,
+.Xr kstat 3KSTAT ,
+.Xr kstat_chain_update 3KSTAT ,
+.Xr kstat_lookup 3KSTAT ,
+.Xr kstat_read 3KSTAT ,
+.Xr attributes 5

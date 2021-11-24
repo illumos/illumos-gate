@@ -1,147 +1,130 @@
-'\" te
+.\"
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KSTAT_READ 3KSTAT "Aug 3, 2004"
-.SH NAME
-kstat_read, kstat_write \- read or write kstat data
-.SH SYNOPSIS
-.LP
-.nf
-\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lkstat\fR [ \fIlibrary\fR\&.\|.\|. ]
-#include <kstat.h>
-
-\fBkid_t\fR \fBkstat_read\fR(\fBkstat_ctl_t *\fR\fIkc\fR, \fBkstat_t *\fR\fIksp\fR, \fBvoid *\fR\fIbuf\fR);
-.fi
-
-.LP
-.nf
-\fBkid_t\fR \fBkstat_write\fR(\fBkstat_ctl_t *\fR\fIkc\fR, \fBkstat_t *\fR\fIksp\fR, \fBvoid *\fR\fIbuf\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBkstat_read()\fR function gets data from the kernel for the kstat pointed
-to by \fIksp\fR. The \fIksp\fR->\fBks_data\fR field is automatically allocated
-(or reallocated) to be large enough to hold all of the data. The
-\fIksp\fR->\fBks_ndata\fR field is set to the number of data fields,
-\fIksp\fR->\fBks_data_size\fR is set to the total size of the data, and
-\fIksp\fR->\fBks_snaptime\fR is set to the high-resolution time at which the
-data snapshot was taken. If \fIbuf\fR is  non-null, the data is copied from
-\fIksp\fR->\fBks_data\fR to \fIbuf\fR.
-.sp
-.LP
-The \fBkstat_write()\fR function writes data from \fIbuf\fR, or from
-\fIksp\fR->\fBks_data\fR if \fIbuf\fR is \fINULL\fR, to the corresponding kstat
-in the kernel.  Only the superuser can use \fBkstat_write()\fR.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBkstat_read()\fR and \fBkstat_write()\fR return
-the current kstat chain ID (KCID). Otherwise, they return \(mi1 and set
-\fBerrno\fR to indicate the error.
-.SH ERRORS
-.sp
-.LP
-The \fBkstat_read()\fR and \fBkstat_write()\fR functions will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEACCES\fR\fR
-.ad
-.RS 13n
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 29, 2021
+.Dt KSTAT_READ 3KSTAT
+.Os
+.Sh NAME
+.Nm kstat_read ,
+.Nm kstat_write
+.Nd read or write kstat data
+.Sh LIBRARY
+.Lb libkstat
+.Sh SYNOPSIS
+.In kstat.h
+.Ft kid_t
+.Fo kstat_read
+.Fa "kstat_ctl_t *kc"
+.Fa "kstat_t *ksp"
+.Fa "void *buf"
+.Fc
+.Ft kid_t
+.Fo kstat_write
+.Fa "kstat_ctl_t *kc"
+.Fa "kstat_t *ksp"
+.Fa "void *buf"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn kstat_read
+function gets data from the kernel for the kstat pointed to by
+.Fa ksp .
+The
+.Ql ksp->ks_data
+field is automatically allocated
+.Pq or reallocated
+to be large enough to hold all of the data.
+The
+.Ql ksp->ks_ndata
+field is set to the number of data fields,
+.Ql ksp->ks_data_size
+is set to the total size of the data, and
+.Ql ksp->ks_snaptime
+is set to the high-resolution time at which the data snapshot was taken.
+If
+.Fa buf
+is non-null, the data is copied from
+.Ql ksp->ks_data
+to
+.Fa buf .
+.Pp
+The
+.Fn kstat_write
+function writes data from
+.Fa buf ,
+or from
+.Ql ksp->ks_data
+if
+.Fa buf
+is
+.Dv NULL
+to the corresponding kstat in the kernel.
+Only a privileged user can use
+.Fn kstat_write .
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn kstat_read
+and
+.Fn kstat_write
+return the current kstat chain ID (KCID).
+Otherwise, they return
+.Sy -1
+and set
+.Va errno
+to indicate the error.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/kstat
+kernel statistics driver character device
+.El
+.Sh ERRORS
+The
+.Fn kstat_read
+and
+.Fn kstat_write
+functions will fail if:
+.Bl -tag -width Er
+.It Er EACCES
 An attempt was made to write to a non-writable kstat.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 13n
+.It Er EAGAIN
 The kstat was temporarily unavailable for reading or writing.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 13n
+.It Er EINVAL
 An attempt was made to write data to a kstat, but the number of elements or the
 data size does not match.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 13n
+.It Er ENOMEM
 Insufficient storage space is available.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 13n
+.It Er ENXIO
 The given kstat could not be located for reading or writing.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEOVERFLOW\fR\fR
-.ad
-.RS 13n
-The data for the given kstat was too large to be stored in the structure.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEPERM\fR\fR
-.ad
-.RS 13n
-An attempt was made to write to a kstat, but {\fBPRIV_SYS_CONFIG\fR} was not
-asserted in the effective privilege set.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/kstat\fR\fR
-.ad
-.RS 14n
-kernel statistics driver
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Stable
-_
-MT-Level	Unsafe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBkstat\fR(3KSTAT), \fBkstat_chain_update\fR(3KSTAT),
-\fBkstat_lookup\fR(3KSTAT), \fBkstat_open\fR(3KSTAT), \fBattributes\fR(5),
-\fBprivileges\fR(5)
+.It Er EOVERFLOW
+.It Er EPERM
+An attempt was made to write to a kstat, but
+.Brq Dv PRIV_SYS_CONFIG
+was not asserted in the effective privilege set.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Unsafe
+.Sh SEE ALSO
+.Xr kstat 3KSTAT ,
+.Xr kstat_chain_update 3KSTAT ,
+.Xr kstat_lookup 3KSTAT ,
+.Xr kstat_open 3KSTAT ,
+.Xr attributes 5 ,
+.Xr privileges 5
