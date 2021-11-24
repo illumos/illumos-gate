@@ -31,14 +31,14 @@
 .Ft "kstat_t *"
 .Fo kstat_lookup
 .Fa "kstat_ctl_t *kc"
-.Fa "char *ks_module"
+.Fa "const char *ks_module"
 .Fa "int ks_instance"
-.Fa "char *ks_name"
+.Fa "const char *ks_name"
 .Fc
 .Ft "void *"
 .Fo kstat_data_lookup
 .Fa "kstat_t *ksp"
-.Fa "char *name"
+.Fa "const char *name"
 .Fc
 .Sh DESCRIPTION
 The

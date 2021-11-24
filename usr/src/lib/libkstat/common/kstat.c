@@ -23,6 +23,7 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -298,7 +299,8 @@ kstat_chain_update(kstat_ctl_t *kc)
 }
 
 kstat_t *
-kstat_lookup(kstat_ctl_t *kc, char *ks_module, int ks_instance, char *ks_name)
+kstat_lookup(kstat_ctl_t *kc, const char *ks_module, int ks_instance,
+    const char *ks_name)
 {
 	kstat_t *ksp;
 
@@ -315,7 +317,7 @@ kstat_lookup(kstat_ctl_t *kc, char *ks_module, int ks_instance, char *ks_name)
 }
 
 void *
-kstat_data_lookup(kstat_t *ksp, char *name)
+kstat_data_lookup(kstat_t *ksp, const char *name)
 {
 	int i, size;
 	char *namep, *datap;
