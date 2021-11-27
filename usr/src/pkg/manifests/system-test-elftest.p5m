@@ -97,6 +97,15 @@ file \
     path=opt/elf-tests/tests/resolution/mixed-hidden-comdat/mixed-hidden-comdat \
     mode=0555
 file path=opt/elf-tests/tests/resolution/mixed-hidden-comdat/visible.s mode=0444
+dir  path=opt/elf-tests/tests/sections
+dir  path=opt/elf-tests/tests/sections/shf-exclude
+file path=opt/elf-tests/tests/sections/shf-exclude/Makefile.test mode=0444
+file path=opt/elf-tests/tests/sections/shf-exclude/exclude-exec mode=0555
+file path=opt/elf-tests/tests/sections/shf-exclude/exclude-kmod mode=0555
+file path=opt/elf-tests/tests/sections/shf-exclude/exclude-so mode=0555
+file path=opt/elf-tests/tests/sections/shf-exclude/exclude.s mode=0444
+file path=opt/elf-tests/tests/sections/shf-exclude/include-reloc mode=0555
+file path=opt/elf-tests/tests/sections/shf-exclude/stub.c mode=0444
 dir  path=opt/elf-tests/tests/string-merge
 file path=opt/elf-tests/tests/string-merge/simple mode=0555
 file path=opt/elf-tests/tests/string-merge/str1.s mode=0444

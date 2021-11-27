@@ -156,6 +156,24 @@ ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Word flags, Ofl_desc *ofl,
 }
 
 /*
+ * Return TRUE if shdr is to be excluded via SHF_EXCLUDE.
+ *
+ * If SHF_EXCLUDE is set, a section should be excluded from dynamic output.
+ * Additionally, it will be excluded from kernel modules (-ztype=kmod).
+ */
+static inline Boolean
+section_is_exclude(Ofl_desc *ofl, Shdr *shdr)
+{
+	if (shdr->sh_flags & SHF_EXCLUDE) {
+		if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)
+			return (TRUE);
+		if (ofl->ofl_flags & FLG_OF_KMOD)
+			return (TRUE);
+	}
+	return (FALSE);
+}
+
+/*
  * Process a generic section.  The appropriate section information is added
  * to the files input descriptor list.
  */
@@ -185,10 +203,8 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 		return (0);
 	}
 
-	if ((shdr->sh_flags & SHF_EXCLUDE) &&
-	    ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)) {
+	if (section_is_exclude(ofl, shdr))
 		isp->is_flags |= FLG_IS_DISCARD;
-	}
 
 	/*
 	 * Add the new input section to the files input section list and
@@ -2639,12 +2655,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 
 		row = shdr->sh_type;
 
-		/*
-		 * If the section has the SHF_EXCLUDE flag on, and we're not
-		 * generating a relocatable object, exclude the section.
-		 */
-		if (((shdr->sh_flags & SHF_EXCLUDE) != 0) &&
-		    ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)) {
+		if (section_is_exclude(ofl, shdr)) {
 			if ((error = process_exclude(name, ifl, shdr, scn,
 			    ndx, ofl)) == S_ERROR)
 				return (S_ERROR);

@@ -1683,3 +1683,4 @@ Bugid   Risk Synopsis
 14209	partial support for new relaxable relocations
 14250	ld should resolve discarded COMDAT symbols against their mates
 14283	ldd should not complain about non-executable shared objects
+14308	discard SHF_EXCLUDE sections when linking kernel modules

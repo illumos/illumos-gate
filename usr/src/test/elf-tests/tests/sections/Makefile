@@ -14,14 +14,6 @@
 # Copyright 2018 Joyent, Inc.
 #
 
-SUBDIRS =		\
-	assert-deflib	\
-	linker-sets	\
-	mapfiles	\
-	relocs		\
-	resolution	\
-	sections	\
-	string-merge	\
-	tls
+SUBDIRS = shf-exclude
 
 include $(SRC)/test/Makefile.com
