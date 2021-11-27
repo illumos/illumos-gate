@@ -53,8 +53,6 @@ include $(CONF_SRCDIR)/pmcs8001fw.version
 ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS		+= -dy
-
 #
 #	Extra flags
 #

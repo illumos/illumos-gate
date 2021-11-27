@@ -67,7 +67,7 @@ DEBUG_DEFS	+= $(DEBUG_FLGS)
 #
 # dependency on scsi module
 #
-LDFLAGS += -dy -Nmisc/scsi
+LDFLAGS += -Nmisc/scsi
 
 #
 # For now, disable these warnings; maintainers should endeavor

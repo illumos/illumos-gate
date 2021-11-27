@@ -63,7 +63,7 @@ $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 CPPFLAGS	+= -DSUNDDI
 CERRWARN	+= -_gcc=-Wno-unused-function
 
-LDFLAGS		+= -dy -N misc/acpica
+LDFLAGS		+= -N misc/acpica
 
 #
 # For now, disable these checks; maintainers should endeavor

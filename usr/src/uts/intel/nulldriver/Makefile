@@ -58,11 +58,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 INC_PATH	+= -I$(ROOT)/usr/include
 
 #
-#	Overrides
-#
-LDFLAGS		+= -dy
-
-#
 #	Default build targets.
 #
 .KEEP_STATE:

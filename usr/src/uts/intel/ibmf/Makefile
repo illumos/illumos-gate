@@ -35,7 +35,7 @@ UTSBASE	= ../..
 MODULE		= ibmf
 OBJECTS		= $(IBMF_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-LDFLAGS		+= -dy -Nmisc/ibtl
+LDFLAGS		+= -Nmisc/ibtl
 
 #
 #	Include common rules.

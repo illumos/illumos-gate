@@ -45,7 +45,7 @@ INC_PATH +=		-I$(UTSBASE)/common/io/virtio
 #
 # Driver depends on virtio and mac
 #
-LDFLAGS +=		-dy -N misc/virtio -N misc/mac
+LDFLAGS +=		-N misc/virtio -N misc/mac
 
 #
 # Default build targets.

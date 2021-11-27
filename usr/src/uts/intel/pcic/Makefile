@@ -60,7 +60,7 @@ CPPFLAGS	+=	-DCARDBUS -DHOTPLUG
 #
 #	Dependency
 #
-LDFLAGS		+= -dy -Nmisc/busra -Nmisc/pcmcia -Nmisc/cardbus
+LDFLAGS		+= -Nmisc/busra -Nmisc/pcmcia -Nmisc/cardbus
 
 #
 # For now, disable these warnings; maintainers should endeavor

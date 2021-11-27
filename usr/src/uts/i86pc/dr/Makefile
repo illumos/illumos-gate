@@ -71,7 +71,7 @@ SMOFF += index_overflow
 #
 # module dependencies
 #
-LDFLAGS += -dy -Nmisc/drmach_acpi
+LDFLAGS += -Nmisc/drmach_acpi
 
 CLEANFILES +=	$(DR_GENERR)
 CLEANFILES +=	$(DR_IO)/dr_err.c

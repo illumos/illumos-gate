@@ -56,7 +56,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS += -dy -Ndrv/ip
+LDFLAGS += -Ndrv/ip
 
 CFLAGS += $(CCVERBOSE)
 

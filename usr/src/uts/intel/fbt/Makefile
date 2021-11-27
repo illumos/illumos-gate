@@ -36,7 +36,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
-LDFLAGS		+= -dy -Ndrv/dtrace -Nmisc/ctf
+LDFLAGS		+= -Ndrv/dtrace -Nmisc/ctf
 
 .KEEP_STATE:
 

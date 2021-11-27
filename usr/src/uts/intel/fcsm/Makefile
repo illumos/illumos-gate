@@ -61,7 +61,7 @@ INC_PATH	+= -I$(ROOT)/usr/include
 #
 #	Overrides
 #
-LDFLAGS		+= -dy -Nmisc/fctl
+LDFLAGS		+= -Nmisc/fctl
 
 #
 # For now, disable these warnings; maintainers should endeavor

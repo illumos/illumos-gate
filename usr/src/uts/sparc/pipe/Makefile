@@ -67,7 +67,7 @@ CFLAGS		+= $(CCVERBOSE)
 #
 # Define dependency on fifofs
 #
-LDFLAGS         += -dy -N fs/fifofs
+LDFLAGS         += -N fs/fifofs
 
 #
 #	Default build targets.

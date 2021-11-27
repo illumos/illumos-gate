@@ -71,7 +71,7 @@ INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/emlxs
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/impl
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/ulp
 
-LDFLAGS		+= -dy -Nmisc/md5 -Nmisc/sha1
+LDFLAGS		+= -Nmisc/md5 -Nmisc/sha1
 LDFLAGS		+= -Nmisc/bignum -Nmisc/fctl
 
 #

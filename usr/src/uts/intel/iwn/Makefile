@@ -54,7 +54,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTFIRMWARE)
 
-LDFLAGS         += -dy -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip
+LDFLAGS         += -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip
 
 # needs work
 SMOFF += all_func_returns

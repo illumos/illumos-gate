@@ -40,7 +40,7 @@ MODULE		= tavor
 OBJECTS		= $(TAVOR_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/adapters/tavor
-LDFLAGS		+= -dy -Ndrv/ib -Nmisc/ibtl -Nmisc/ibmf
+LDFLAGS		+= -Ndrv/ib -Nmisc/ibtl -Nmisc/ibmf
 
 #
 #	Include common rules.

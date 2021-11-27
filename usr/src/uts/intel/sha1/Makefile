@@ -54,7 +54,7 @@ CLEANFILES += sha1-x86_64.s
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Nmisc/kcf
+LDFLAGS += -Nmisc/kcf
 
 CFLAGS += -I$(COMDIR)
 

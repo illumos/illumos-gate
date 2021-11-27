@@ -57,7 +57,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Ncrypto/md5 -Ncrypto/sha2 -Nmisc/bignum -Nmisc/kcf
+LDFLAGS += -Ncrypto/md5 -Ncrypto/sha2 -Nmisc/bignum -Nmisc/kcf
 
 CPPFLAGS	+= -I$(COM1_DIR) -I$(COM2_DIR)
 

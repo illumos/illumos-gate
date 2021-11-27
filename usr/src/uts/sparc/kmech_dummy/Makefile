@@ -58,7 +58,7 @@ CFLAGS		+= $(CCVERBOSE)
 #
 # Define dependency on kgssapi
 #
-LDFLAGS         += -dy -N misc/kgssapi
+LDFLAGS         += -N misc/kgssapi
 
 #
 #	Default build targets.

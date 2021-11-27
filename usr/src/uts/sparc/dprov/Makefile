@@ -65,7 +65,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 # Note that regular providers do not need to have an explicit dependency
 # on KCF. This is a special case since the test pseudo driver dprov
 # uses private KCF functions.
-LDFLAGS += -dy -Nmisc/kcf
+LDFLAGS += -Nmisc/kcf
 
 CFLAGS		+= -I$(COM_DIR)
 

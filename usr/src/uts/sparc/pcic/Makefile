@@ -68,7 +68,7 @@ ALL_BUILDS	= $(ALL_BUILDS64)
 CPPFLAGS        +=      -DCARDBUS -DHOTPLUG
 
 #	dependency
-LDFLAGS	+=	-dy -Nmisc/busra -Nmisc/pcmcia -Nmisc/cardbus
+LDFLAGS	+=	-Nmisc/busra -Nmisc/pcmcia -Nmisc/cardbus
 
 
 #

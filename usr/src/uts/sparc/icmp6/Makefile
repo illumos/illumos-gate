@@ -57,7 +57,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #	depends on ip ip6 and icmp
 #
-LDFLAGS		+= -dy -Ndrv/ip -Ndrv/ip6 -Ndrv/icmp
+LDFLAGS		+= -Ndrv/ip -Ndrv/ip6 -Ndrv/icmp
 
 #
 #	Default build targets.

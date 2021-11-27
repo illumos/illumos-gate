@@ -59,7 +59,7 @@ CPPFLAGS	+= -DSGPIO_SUPPORT
 #
 # dependency on sata module
 #
-LDFLAGS += -dy -N misc/sata
+LDFLAGS += -N misc/sata
 
 #
 # For now, disable these warnings; maintainers should endeavor

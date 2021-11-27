@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 CFLAGS +=	$(CCVERBOSE)
 
-LDFLAGS +=	-dy -Ndacf/consconfig_dacf
+LDFLAGS +=	-Ndacf/consconfig_dacf
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)

@@ -67,7 +67,7 @@ CFLAGS += -DVGEN_HANDLE_LOST_PKTS
 #
 # Driver depends on MAC & IP
 #
-LDFLAGS         += -dy -N misc/mac -N drv/ip -N misc/ldc -N misc/platsvc
+LDFLAGS         += -N misc/mac -N drv/ip -N misc/ldc -N misc/platsvc
 
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-clobbered

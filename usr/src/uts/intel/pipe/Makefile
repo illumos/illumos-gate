@@ -59,7 +59,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Define dependency on fifofs
 #
-LDFLAGS += -dy -N fs/fifofs
+LDFLAGS += -N fs/fifofs
 
 #
 #	Default build targets.

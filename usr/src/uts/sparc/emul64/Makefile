@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Define dependency on scsi
 #
-LDFLAGS         += -dy -N misc/scsi
+LDFLAGS         += -N misc/scsi
 
 #
 # For now, disable these warnings; maintainers should endeavor

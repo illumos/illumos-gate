@@ -45,7 +45,7 @@ INC_PATH +=		-I$(UTSBASE)/common/io/virtio
 #
 # Driver depends on virtio and blkdev
 #
-LDFLAGS +=		-dy -N misc/virtio -N drv/blkdev
+LDFLAGS +=		-N misc/virtio -N drv/blkdev
 
 #
 # Default build targets.

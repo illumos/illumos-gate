@@ -62,7 +62,7 @@ ALL_BUILDS	= $(ALL_BUILDS64)
 #
 # Driver depends on xnb and mac.
 #
-LDFLAGS		+= -dy -N misc/xnb -N misc/mac
+LDFLAGS		+= -N misc/xnb -N misc/mac
 
 #
 # use Solaris specific code in xen public header files

@@ -53,7 +53,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #	Overrides and depends_on
 #
-LDFLAGS		+= -dy -Nmisc/fctl -Ndrv/fcoe
+LDFLAGS		+= -Nmisc/fctl -Ndrv/fcoe
 INC_PATH	+= -I$(UTSBASE)/common/io/fibre-channel/fca/fcoei
 
 #

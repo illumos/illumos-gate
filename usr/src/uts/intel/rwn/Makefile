@@ -55,7 +55,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Driver depends on GLDv3 & wifi kernel support module.
 #
-LDFLAGS		+= -dy -Nmisc/mac -Nmisc/net80211
+LDFLAGS		+= -Nmisc/mac -Nmisc/net80211
 
 #
 #	Overrides

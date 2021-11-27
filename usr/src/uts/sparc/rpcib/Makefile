@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # depends on misc/ibtl and misc/ibcm
 #
-LDFLAGS	+= -dy -Nmisc/ibtl -Nmisc/ibcm
+LDFLAGS	+= -Nmisc/ibtl -Nmisc/ibcm
 
 #
 # For now, disable these warnings; maintainers should endeavor

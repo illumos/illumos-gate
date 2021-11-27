@@ -44,7 +44,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/mac
+LDFLAGS         += -Nmisc/usba -Nmisc/mac
 
 CFLAGS += $(CCVERBOSE)
 

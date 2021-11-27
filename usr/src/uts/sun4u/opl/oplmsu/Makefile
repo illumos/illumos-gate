@@ -54,7 +54,7 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CFLAGS += -I../sys
-LDFLAGS += -dy -Ndrv/su
+LDFLAGS += -Ndrv/su
 
 #
 # For now, disable these warnings; maintainers should endeavor

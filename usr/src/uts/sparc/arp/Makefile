@@ -63,7 +63,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 #
 #	depends on ip
 #
-LDFLAGS		+= -dy -Ndrv/ip
+LDFLAGS		+= -Ndrv/ip
 
 #
 #	Default build targets.

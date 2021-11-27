@@ -35,7 +35,7 @@ MODULE		= sol_umad
 OBJECTS		= $(SOL_UMAD_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/of/sol_umad
-LDFLAGS		+= -dy -Nmisc/sol_ofs -Nmisc/ibmf -Nmisc/ibtl
+LDFLAGS		+= -Nmisc/sol_ofs -Nmisc/ibmf -Nmisc/ibtl
 #
 #	Include common rules.
 #

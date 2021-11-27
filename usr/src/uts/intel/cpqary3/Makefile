@@ -42,7 +42,7 @@ CPPFLAGS	+= -I$(UTSBASE)/common/io/cpqary3
 #
 #	Kernel Module Dependencies
 #
-LDFLAGS		+= -dy -Nmisc/scsi
+LDFLAGS		+= -Nmisc/scsi
 
 SMATCH=off
 

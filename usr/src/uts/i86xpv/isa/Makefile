@@ -69,7 +69,7 @@ CERRWARN	+= -_gcc=-Wno-unused-variable
 
 #
 #       Dependency
-LDFLAGS         += -dy -Nmisc/acpica -Nmisc/busra -Nmisc/pci_autoconfig
+LDFLAGS         += -Nmisc/acpica -Nmisc/busra -Nmisc/pci_autoconfig
 
 #
 # Define our version of dma_engine and i8237A interfaces

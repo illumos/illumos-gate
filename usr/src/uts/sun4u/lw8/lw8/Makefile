@@ -61,7 +61,7 @@ ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
 
 CFLAGS	+= $(CCVERBOSE)
-LDFLAGS	+= -dy -Ndrv/sgsbbc
+LDFLAGS	+= -Ndrv/sgsbbc
 
 #
 #	Default build targets.

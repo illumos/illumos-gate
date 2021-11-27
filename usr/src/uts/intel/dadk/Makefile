@@ -54,7 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
-LDFLAGS		+= -dy -Nmisc/gda
+LDFLAGS		+= -Nmisc/gda
 
 # Larger than 1TB VTOC support
 

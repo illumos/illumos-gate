@@ -59,7 +59,7 @@ CFLAGS += $(CCVERBOSE)
 #
 # Define dependencies on scsi and cmlb
 #
-LDFLAGS += -dy -N misc/scsi -N misc/cmlb
+LDFLAGS += -N misc/scsi -N misc/cmlb
 
 #
 #	Default build targets.

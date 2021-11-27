@@ -74,7 +74,7 @@ CERRWARN	+= -_gcc=-Wno-unused-value
 #
 #	Dependency
 #
-LDFLAGS += -dy -Nmisc/pcie -Nmisc/pcihp
+LDFLAGS += -Nmisc/pcie -Nmisc/pcihp
 
 #
 #	Default build targets.

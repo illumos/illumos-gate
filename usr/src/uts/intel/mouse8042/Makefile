@@ -52,7 +52,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) # $(SRC_CONFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS += -dy -Ndacf/consconfig_dacf
+LDFLAGS += -Ndacf/consconfig_dacf
 
 #
 # For now, disable these warnings; maintainers should endeavor

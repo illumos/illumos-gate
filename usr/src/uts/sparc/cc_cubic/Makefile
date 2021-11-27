@@ -42,7 +42,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -N misc/cc -N cc/cc_newreno
+LDFLAGS		+= -N misc/cc -N cc/cc_newreno
 
 #
 #	Default build targets.

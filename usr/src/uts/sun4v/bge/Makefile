@@ -60,7 +60,7 @@ CFLAGS		+= -dalign
 #
 # Driver depends on MAC & IP
 #
-LDFLAGS		+= -dy -N misc/mac -N drv/ip
+LDFLAGS		+= -N misc/mac -N drv/ip
 
 #
 # For now, disable these warnings; maintainers should endeavor

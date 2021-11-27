@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Define dependency on ptc
 #
-LDFLAGS         += -dy -N drv/ptc
+LDFLAGS         += -N drv/ptc
 
 #
 # For now, disable these warnings; maintainers should endeavor

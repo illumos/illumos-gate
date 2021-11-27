@@ -57,7 +57,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #	Kernel Module Dependencies
 #
-LDFLAGS		+= -dy -Nmisc/scsi
+LDFLAGS		+= -Nmisc/scsi
 
 #
 # For now, disable these warnings; maintainers should endeavor

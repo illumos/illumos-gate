@@ -53,7 +53,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Nfs/sockfs
+LDFLAGS		+= -Nfs/sockfs
 
 #
 #	Default build targets.

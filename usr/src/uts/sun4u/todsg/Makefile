@@ -56,7 +56,7 @@ CFLAGS += $(CCVERBOSE)
 #
 #	Dependency
 #
-LDFLAGS	+= -dy -Ndrv/sgsbbc
+LDFLAGS	+= -Ndrv/sgsbbc
 
 #
 # serengeti speciific header files

@@ -67,7 +67,7 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)
 
-LDFLAGS		+= -dy -Nfs/namefs
+LDFLAGS		+= -Nfs/namefs
 
 #
 #	Default build targets.

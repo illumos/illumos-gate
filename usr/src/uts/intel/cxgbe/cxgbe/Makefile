@@ -47,7 +47,7 @@ CFLAGS += -I$(UTSBASE)/common/io/cxgbe -I$(UTSBASE)/common/io/cxgbe/common \
 #
 # Driver depends
 #
-LDFLAGS += -dy -N misc/mac -N drv/ip
+LDFLAGS += -N misc/mac -N drv/ip
 
 #
 # Default build targets.

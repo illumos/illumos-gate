@@ -50,7 +50,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 # depends on usba, hidparser and audio related misc modules
 #
-LDFLAGS	+= -dy -Nmisc/usba -Nmisc/hidparser -Ndrv/usb_ac
+LDFLAGS	+= -Nmisc/usba -Nmisc/hidparser -Ndrv/usb_ac
 
 #
 #	Define targets

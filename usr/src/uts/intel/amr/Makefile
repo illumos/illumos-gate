@@ -46,7 +46,7 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 #
 # Depends on scsi
 #
-LDFLAGS         += -dy -N misc/scsi
+LDFLAGS         += -N misc/scsi
 
 #
 #	Default build targets.

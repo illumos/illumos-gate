@@ -67,7 +67,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 # on KCF. This is a special case since the test pseudo driver dprov
 # uses private KCF functions.
 #
-LDFLAGS += -dy -Nmisc/kcf
+LDFLAGS += -Nmisc/kcf
 
 CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
 

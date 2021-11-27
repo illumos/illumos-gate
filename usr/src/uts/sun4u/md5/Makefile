@@ -58,7 +58,7 @@ CFLAGS += $(CCVERBOSE)
 #
 # md5 depends on the kcf framework
 #
-LDFLAGS		+= -dy -Nmisc/kcf
+LDFLAGS		+= -Nmisc/kcf
 
 #
 # need extra inline file for here.

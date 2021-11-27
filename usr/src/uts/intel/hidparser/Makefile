@@ -62,7 +62,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 # depends on misc/usba
 #
-LDFLAGS         += -dy -Nmisc/usba
+LDFLAGS         += -Nmisc/usba
 
 #
 #	Default build targets.

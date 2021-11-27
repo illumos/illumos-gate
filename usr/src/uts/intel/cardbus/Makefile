@@ -61,7 +61,7 @@ INC_PATH        += -I$(UTSBASE)/sun4u -I$(UTSBASE)/sun4 -I$(UTSBASE)/i86pc
 CPPFLAGS        +=      -DHOTPLUG
 
 #	dependency
-LDFLAGS	+=	-dy -Nmisc/busra -Nmisc/pcmcia -Nmisc/hpcsvc
+LDFLAGS	+=	-Nmisc/busra -Nmisc/pcmcia -Nmisc/hpcsvc
 
 #
 # For now, disable these warnings; maintainers should endeavor

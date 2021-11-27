@@ -59,7 +59,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 # depends on misc/usba
 #
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/kbtrans -Nmisc/hidparser
+LDFLAGS         += -Nmisc/usba -Nmisc/kbtrans -Nmisc/hidparser
 
 #
 #	Default build targets.

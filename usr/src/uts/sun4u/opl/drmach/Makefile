@@ -70,7 +70,7 @@ CERRWARN += $(CNOWARN_UNINIT)
 #
 # module dependencies
 #
-LDFLAGS += -dy -Nmisc/opl_cfg
+LDFLAGS += -Nmisc/opl_cfg
 
 #
 #	Default build targets.

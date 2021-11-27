@@ -79,7 +79,7 @@ $(OBJS_DIR)/npi_txc.o := SMOFF += shift_to_zero
 #
 #	Driver depends on mac & IP
 #
-LDFLAGS		+= -dy -N misc/mac -N drv/ip
+LDFLAGS		+= -N misc/mac -N drv/ip
 
 #
 #	Default build targets.

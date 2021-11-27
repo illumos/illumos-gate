@@ -59,7 +59,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
-LDFLAGS		+= -dy -Nmisc/dadk -Nmisc/strategy -Nmisc/cmlb
+LDFLAGS		+= -Nmisc/dadk -Nmisc/strategy -Nmisc/cmlb
 
 # Larger than 1TB VTOC support
 CPPFLAGS	+= -D_EXTVTOC

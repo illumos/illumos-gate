@@ -61,7 +61,7 @@ CPPFLAGS += -DENX_DEBUG
 #
 # Depends on misc/ibtl
 #
-LDFLAGS	+= -dy -Nmisc/ibcm -Nmisc/ibtl
+LDFLAGS	+= -Nmisc/ibcm -Nmisc/ibtl
 
 #
 # For now, disable these warnings; maintainers should endeavor

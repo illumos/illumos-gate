@@ -34,7 +34,6 @@ UTSBASE	= ../..
 MODULE		= sdp
 OBJECTS		= $(SDP_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-LDFLAGS		+= -dy
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/sdp
 #
 #	Include common rules.

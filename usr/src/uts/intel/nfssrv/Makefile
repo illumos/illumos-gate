@@ -59,7 +59,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Overrides.
 #
-LDFLAGS         += -dy -Nstrmod/rpcmod -Nfs/nfs -Nmisc/rpcsec
+LDFLAGS         += -Nstrmod/rpcmod -Nfs/nfs -Nmisc/rpcsec
 LDFLAGS		+= -Nmisc/klmmod
 
 #

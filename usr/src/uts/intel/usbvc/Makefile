@@ -63,7 +63,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 # depends on misc/usba
 #
-LDFLAGS		+= -dy -Nmisc/usba
+LDFLAGS		+= -Nmisc/usba
 
 #
 # Disable this because it is necessary for this driver

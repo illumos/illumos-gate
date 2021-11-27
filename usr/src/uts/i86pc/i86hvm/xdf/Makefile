@@ -54,7 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 # Overrides
 CPPFLAGS	+= -DHVMPV_XDF_VERS=2
-LDFLAGS		+= -dy -Nmisc/cmlb -Ndrv/xpvd -Ndrv/xpv
+LDFLAGS		+= -Nmisc/cmlb -Ndrv/xpvd -Ndrv/xpv
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-label

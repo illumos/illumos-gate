@@ -68,7 +68,7 @@ CFLAGS		+= $(CCVERBOSE)
 #
 # Define dependency on sppp
 #
-LDFLAGS += -dy -N drv/sppp
+LDFLAGS += -N drv/sppp
 
 #
 #	Default build targets.

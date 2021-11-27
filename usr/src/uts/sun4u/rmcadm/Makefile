@@ -51,7 +51,7 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-LDFLAGS += -dy -Ndrv/rmc_comm -Ndrv/pmugpio
+LDFLAGS += -Ndrv/rmc_comm -Ndrv/pmugpio
 
 #
 # Turn on doubleword alignment for 64 bit registers

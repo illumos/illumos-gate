@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 INC_PATH	+= -I$(ROOT)/usr/include
 
-LDFLAGS		+= -dy -Nmisc/fctl
+LDFLAGS		+= -Nmisc/fctl
 
 #
 # For now, disable these warnings; maintainers should endeavor

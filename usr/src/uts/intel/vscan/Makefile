@@ -51,7 +51,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Module dependencies
 #
-LDFLAGS += -dy -N"fs/sockfs" -N"sys/doorfs"
+LDFLAGS += -Nfs/sockfs -Nsys/doorfs
 
 #
 #	Define targets

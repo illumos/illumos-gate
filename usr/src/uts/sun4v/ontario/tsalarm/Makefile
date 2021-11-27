@@ -60,7 +60,6 @@ CFLAGS += -I$(UTSBASE)/sun4u/mpxu
 CFLAGS += -dalign
 
 #Need to verify to add glvc driver required
-LDFLAGS	+= -dy
 #LDFLAGS	+= -dy  -Ndrv/rmclomv
 
 #

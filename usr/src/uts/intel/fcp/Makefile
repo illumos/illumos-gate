@@ -53,7 +53,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #	Overrides
 #
-LDFLAGS		+= -dy -Nmisc/fctl -Nmisc/scsi
+LDFLAGS		+= -Nmisc/fctl -Nmisc/scsi
 
 #
 # For now, disable these warnings; maintainers should endeavor

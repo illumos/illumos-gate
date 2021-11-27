@@ -55,7 +55,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #	Overrides and depends_on
 #
 MODSTUBS_DIR	 = $(OBJS_DIR)
-LDFLAGS		+= -dy -Ndrv/stmf -Nfs/zfs
+LDFLAGS		+= -Ndrv/stmf -Nfs/zfs
 
 INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 

@@ -59,7 +59,7 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 #
 # Driver depends on Mac
 #
-LDFLAGS		+= -dy -N misc/mac -N misc/mii
+LDFLAGS		+= -N misc/mac -N misc/mii
 
 #
 #	Default build targets.

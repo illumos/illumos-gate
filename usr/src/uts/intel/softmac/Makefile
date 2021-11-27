@@ -50,7 +50,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Overrides
 #
-LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/strplumb -Nmisc/dls
+LDFLAGS		+= -Ndrv/dld -Nmisc/mac -Nmisc/strplumb -Nmisc/dls
 
 #
 # For now, disable these warnings as it is a generic STREAMS problem;

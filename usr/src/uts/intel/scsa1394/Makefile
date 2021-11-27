@@ -51,7 +51,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # depends on
 #
-LDFLAGS		+= -dy -Nmisc/scsi -Nmisc/s1394 -Nmisc/sbp2
+LDFLAGS		+= -Nmisc/scsi -Nmisc/s1394 -Nmisc/sbp2
 
 #
 # For now, disable these warnings; maintainers should endeavor

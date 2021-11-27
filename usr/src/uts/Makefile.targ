@@ -47,7 +47,7 @@ $(OBJECTS): $(INLINES)
 #	on modstubs simplifies things...
 #
 $(BINARY):		$(OBJECTS) $(DTRACE_MAPFILE) $(MAPFILE)
-	$(LD) -r $(LDFLAGS) -o $@ $(OBJECTS)
+	$(LD) -ztype=kmod $(LDFLAGS) -o $@ $(OBJECTS)
 	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
 	$(POST_PROCESS)
 

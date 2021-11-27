@@ -49,7 +49,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Module dependencies
 #
-LDFLAGS += -dy -N"sys/doorfs" -N"strmod/rpcmod"
+LDFLAGS += -Nsys/doorfs -Nstrmod/rpcmod
 
 # Function variables unused for rpcgen-generated code
 # Constant conditions for do { } while (0) macros

@@ -66,7 +66,7 @@ DEBUG_DEFS	+= $(DEBUG_FLGS)
 #
 # Depends on ACPI CA interpreter
 #
-LDFLAGS		+= -dy -N misc/acpica
+LDFLAGS		+= -N misc/acpica
 
 
 CERRWARN	+= -_gcc=-Wno-type-limits

@@ -57,7 +57,7 @@ CFLAGS		+= -dalign
 #
 # Module Dependencies
 #
-LDFLAGS		+= -dy -Nmisc/ds -Nmisc/platsvc -Ndrv/drctl
+LDFLAGS		+= -Nmisc/ds -Nmisc/platsvc -Ndrv/drctl
 
 #
 # Default build targets.

@@ -63,7 +63,7 @@ CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)
 
-LDFLAGS += -dy -Ndrv/rds -Nmisc/ibtl -Nmisc/ibcm -Ndrv/ip
+LDFLAGS += -Ndrv/rds -Nmisc/ibtl -Nmisc/ibcm -Ndrv/ip
 
 #
 #	Default build targets.

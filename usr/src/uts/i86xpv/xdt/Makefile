@@ -36,7 +36,7 @@ include $(UTSBASE)/i86xpv/Makefile.i86xpv
 ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-LDFLAGS		+= -dy -Ndrv/dtrace
+LDFLAGS		+= -Ndrv/dtrace
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 

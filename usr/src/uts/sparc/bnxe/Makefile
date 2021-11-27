@@ -80,7 +80,7 @@ CPPFLAGS	+= -DLM_RXPKT_NON_CONTIGUOUS \
 		   -I$(SRCDIR)/577xx/hsi/mcp \
 		   -I$(SRCDIR)
 
-LDFLAGS		+= -dy -r -Ndrv/ip -Nmisc/mac
+LDFLAGS		+= -Ndrv/ip -Nmisc/mac
 #CERRWARN	+= -_gcc=-Wno-old-style-declaration
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)

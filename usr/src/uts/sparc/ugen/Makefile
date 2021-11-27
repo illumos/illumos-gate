@@ -59,7 +59,7 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 #
 # depends on misc/usba
 #
-LDFLAGS         += -dy -Nmisc/usba
+LDFLAGS         += -Nmisc/usba
 
 #
 #	Define targets

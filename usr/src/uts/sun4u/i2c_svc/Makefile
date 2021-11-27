@@ -22,8 +22,6 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 
 CFLAGS += $(CCVERBOSE)
 
-LDFLAGS += -dy
-
 #
 #	Define targets
 #

@@ -69,7 +69,7 @@ CFLAGS += $(CCVERBOSE)
 # dependency on blkdev module, scope limiting mapfile
 #
 MAPFILE		= $(UTSBASE)/common/io/sdcard/impl/mapfile
-LDFLAGS		+= -dy -Ndrv/blkdev $(BREDUCE) -M $(MAPFILE)
+LDFLAGS		+= -Ndrv/blkdev $(BREDUCE) -M $(MAPFILE)
 
 # needs work
 SMOFF += all_func_returns

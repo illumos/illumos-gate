@@ -34,7 +34,7 @@ UTSBASE	= ../..
 MODULE		= sol_ucma
 OBJECTS		= $(SOL_UCMA_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-LDFLAGS		+= -dy -Nmisc/sol_ofs
+LDFLAGS		+= -Nmisc/sol_ofs
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/of/sol_ucma
 
 #

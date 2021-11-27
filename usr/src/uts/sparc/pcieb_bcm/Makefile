@@ -66,7 +66,7 @@ CPPFLAGS += -DPCIEB_BCM -DPX_MOD_NAME=pcieb_bcm
 #
 #	Dependency
 #
-LDFLAGS += -dy -Nmisc/pcie
+LDFLAGS += -Nmisc/pcie
 
 #
 # For now, disable these warnings; maintainers should endeavor

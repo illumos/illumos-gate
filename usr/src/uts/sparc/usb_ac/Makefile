@@ -50,7 +50,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 
 
 #
-LDFLAGS	+= -dy -Nmisc/usba -Ndrv/audio
+LDFLAGS	+= -Nmisc/usba -Ndrv/audio
 
 #
 #	Define targets

@@ -60,7 +60,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # Driver depends on MAC & IP
 #
 CPPFLAGS	+= -DHVMPV_XNF_VERS=1
-LDFLAGS		+= -dy -Nmisc/mac -Ndrv/ip -Ndrv/xpvd -Ndrv/xpv
+LDFLAGS		+= -Nmisc/mac -Ndrv/ip -Ndrv/xpvd -Ndrv/xpv
 
 #
 #	Default build targets.

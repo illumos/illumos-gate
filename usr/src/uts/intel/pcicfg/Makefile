@@ -58,7 +58,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 #	Dependency
 #
-LDFLAGS		+= -dy -Nmisc/busra -Nmisc/pcie
+LDFLAGS		+= -Nmisc/busra -Nmisc/pcie
 
 #
 # For now, disable these warnings; maintainers should endeavor

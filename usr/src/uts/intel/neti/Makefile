@@ -52,7 +52,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
-LDFLAGS		+= -dy -Nmisc/hook
+LDFLAGS		+= -Nmisc/hook
 
 #
 #	Default build targets.

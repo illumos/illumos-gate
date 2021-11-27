@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Defined dependency on zs
 #
-LDFLAGS += -dy -N drv/zs
+LDFLAGS += -N drv/zs
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 

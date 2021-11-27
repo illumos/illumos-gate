@@ -70,7 +70,7 @@ CPPFLAGS += \
 	-I$(SRCDIR)/570x/driver/common/lmdev
 
 
-LDFLAGS		+= -dy -r -Ndrv/ip -Nmisc/mac
+LDFLAGS		+= -Ndrv/ip -Nmisc/mac
 
 #
 #	Default build targets.

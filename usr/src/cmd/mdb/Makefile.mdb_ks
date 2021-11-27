@@ -56,3 +56,6 @@ MAPFILE =
 kmod/mdb_ks.o := CPPFLAGS += -D_mdb_init=mdb_ks_init -D_mdb_fini=mdb_ks_fini
 
 CERRWARN += -_gcc=-Wno-type-limits
+
+# mdb_ks is not a real module, and should not be linked with -ztype=kmod
+KMODFLAG = -r -dy

@@ -36,7 +36,7 @@ UTSBASE	= ../..
 MODULE		= iser
 OBJECTS		= $(ISER_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-LDFLAGS		+= -dy -Nmisc/ibtl -Nmisc/ibcm -Nmisc/idm
+LDFLAGS		+= -Nmisc/ibtl -Nmisc/ibcm -Nmisc/idm
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/iser
 
 #

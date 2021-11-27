@@ -42,7 +42,7 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/scsi/adapters/mpt_sas
 #
 #	Kernel Module Dependencies
 #
-LDFLAGS += -dy -Nmisc/scsi -Ndrv/scsi_vhci -Nmisc/sata
+LDFLAGS += -Nmisc/scsi -Ndrv/scsi_vhci -Nmisc/sata
 
 #
 #	Define targets

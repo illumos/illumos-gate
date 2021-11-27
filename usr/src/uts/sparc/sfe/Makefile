@@ -79,7 +79,7 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 #
 # Driver depends on MAC & IP
 #
-LDFLAGS		+= -dy -N misc/mac -N drv/ip
+LDFLAGS		+= -N misc/mac -N drv/ip
 
 #
 #	Default build targets.

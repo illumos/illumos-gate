@@ -49,7 +49,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Depends on drv/audio and misc/ac97
 #
-LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
+LDFLAGS		+= -Ndrv/audio -Nmisc/ac97
 
 CERRWARN	+= -_gcc=-Wno-switch
 

@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Note dependancy on misc/scsi.
 #
-LDFLAGS += -dy -N"misc/scsi"
+LDFLAGS += -Nmisc/scsi
 
 #
 # Overrides.

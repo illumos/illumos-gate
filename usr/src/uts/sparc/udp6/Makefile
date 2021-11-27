@@ -59,7 +59,7 @@ CFLAGS		+= $(CCVERBOSE)
 #
 #	depends on udp ip and ip6
 #
-LDFLAGS		+= -dy -Ndrv/udp -Ndrv/ip -Ndrv/ip6
+LDFLAGS		+= -Ndrv/udp -Ndrv/ip -Ndrv/ip6
 
 #
 #	Default build targets.

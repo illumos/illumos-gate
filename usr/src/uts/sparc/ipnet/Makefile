@@ -62,7 +62,7 @@ CFLAGS          += $(CCVERBOSE)
 #
 # Depends on ip, neti, and hook.
 #
-LDFLAGS		+= -dy -Ndrv/ip -Nmisc/neti -Nmisc/hook
+LDFLAGS		+= -Ndrv/ip -Nmisc/neti -Nmisc/hook
 
 #
 # To get the BPF header files

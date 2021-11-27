@@ -52,7 +52,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 # depends on misc/usba
 #
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/hidparser
+LDFLAGS         += -Nmisc/usba -Nmisc/hidparser
 
 #
 #	Define targets

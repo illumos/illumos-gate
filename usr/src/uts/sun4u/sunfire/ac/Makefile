@@ -68,7 +68,7 @@ CFLAGS += -dalign
 #
 # Define dependency on fhc
 #
-LDFLAGS += -dy -N drv/fhc
+LDFLAGS += -N drv/fhc
 
 #
 #	Default build targets.

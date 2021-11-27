@@ -60,7 +60,7 @@ CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= $(CNOWARN_UNINIT)
 
-LDFLAGS += -dy -Nfs/sockfs -Ndrv/ip -Ndrv/sdpib
+LDFLAGS += -Nfs/sockfs -Ndrv/ip -Ndrv/sdpib
 
 #
 #	Default build targets.

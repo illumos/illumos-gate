@@ -50,7 +50,7 @@ ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
 
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/dls -Ndrv/vmm -Nmisc/neti
+LDFLAGS		+= -Ndrv/dld -Nmisc/mac -Nmisc/dls -Ndrv/vmm -Nmisc/neti
 LDFLAGS		+= -Nmisc/hook
 LDFLAGS		+= -M $(MAPFILE)
 

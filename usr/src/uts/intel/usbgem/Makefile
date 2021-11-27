@@ -52,7 +52,7 @@ CERRWARN	+= -_gcc=-Wno-unused-function
 SMOFF += all_func_returns
 
 
-LDFLAGS		+= -dy -N misc/mac -N drv/ip -N misc/usba
+LDFLAGS		+= -N misc/mac -N drv/ip -N misc/usba
 
 #
 #	Define targets

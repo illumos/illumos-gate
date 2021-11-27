@@ -42,7 +42,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser
+LDFLAGS         += -Nmisc/usba -Nmisc/usbser
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 

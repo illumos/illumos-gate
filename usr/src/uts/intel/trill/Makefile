@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Ndrv/bridge -Nmisc/mac -Nmisc/dls -Nfs/sockfs
+LDFLAGS		+= -Ndrv/bridge -Nmisc/mac -Nmisc/dls -Nfs/sockfs
 
 #
 #	Default build targets.

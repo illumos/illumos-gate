@@ -43,7 +43,7 @@ MODULE		= hci1394
 OBJECTS		= $(HCI1394_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/1394/adapters
-LDFLAGS		+= -dy -Nmisc/s1394
+LDFLAGS		+= -Nmisc/s1394
 
 #
 #	Include common rules.

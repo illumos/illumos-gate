@@ -56,7 +56,7 @@ CERRWARN	+= -_gcc=-Wno-unused-label
 #
 #	Depends on misc/audiosup
 #
-LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
+LDFLAGS		+= -Ndrv/audio -Nmisc/ac97
 
 #
 #	Define targets

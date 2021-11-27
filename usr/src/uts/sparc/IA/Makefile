@@ -59,7 +59,7 @@ CFLAGS		+= $(CCVERBOSE)
 #
 # Define dependency on TS
 #
-LDFLAGS         += -dy -N sched/TS
+LDFLAGS         += -N sched/TS
 
 #
 #	Default build targets.

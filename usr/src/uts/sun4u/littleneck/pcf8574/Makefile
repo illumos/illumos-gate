@@ -62,7 +62,7 @@ CFLAGS += $(CCVERBOSE)
 #
 CFLAGS += -dalign
 
-LDFLAGS += -dy -N misc/i2c_svc
+LDFLAGS += -N misc/i2c_svc
 #
 #	Default build targets.
 #

@@ -42,7 +42,7 @@ include $(UTSBASE)/intel/Makefile.intel
 
 CFLAGS += $(CCVERBOSE)
 
-LDFLAGS += -dy -Ndrv/softmac
+LDFLAGS += -Ndrv/softmac
 
 #
 #	Define targets

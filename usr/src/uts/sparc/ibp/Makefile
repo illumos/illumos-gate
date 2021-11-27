@@ -35,7 +35,7 @@ MODULE		= ibp
 OBJECTS		= $(IBD_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/ibd
-LDFLAGS		+= -dy -Nmisc/mac -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf -Ndrv/ip \
+LDFLAGS		+= -Nmisc/mac -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf -Ndrv/ip \
 		-Nmisc/dls -Ndrv/dld
 
 #

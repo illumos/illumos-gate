@@ -48,7 +48,7 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #
 #	Dependency
 #
-LDFLAGS		+= -dy -Nmisc/acpica -Nmisc/busra
+LDFLAGS		+= -Nmisc/acpica -Nmisc/busra
 
 #
 #	Define targets

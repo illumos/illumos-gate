@@ -59,7 +59,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
 
-LDFLAGS	+= -dy -Ndrv/sgsbbc
+LDFLAGS	+= -Ndrv/sgsbbc
 
 #
 # For now, disable these warnings; maintainers should endeavor

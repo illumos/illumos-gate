@@ -60,7 +60,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 INCS		+= -I$(SRC)/uts/common/
 
-LDFLAGS		+= -dy -Nmisc/fctl -Ndrv/fcp -Nmisc/scsi
+LDFLAGS		+= -Nmisc/fctl -Ndrv/fcp -Nmisc/scsi
 
 #
 # For now, disable these warnings; maintainers should endeavor

@@ -42,7 +42,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -N misc/cc
+LDFLAGS		+= -N misc/cc
 
 #
 #	Default build targets.

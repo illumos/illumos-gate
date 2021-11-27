@@ -123,7 +123,7 @@ $(LIBGEN):	$(OBJECTS) $(LIBSTUBS)
 
 $(GENUNIX): $(IPCTF_TARGET) $(OBJECTS)
 	@pwd
-	$(LD) -r $(LDFLAGS) -o $@ $(OBJECTS)
+	$(LD) -ztype=kmod $(LDFLAGS) -o $@ $(OBJECTS)
 	$(CTFMERGE_GENUNIX_MERGE)
 	$(POST_PROCESS)
 

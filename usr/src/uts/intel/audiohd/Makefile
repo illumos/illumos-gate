@@ -54,7 +54,7 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)
 
-LDFLAGS		+= -dy -Ndrv/audio
+LDFLAGS		+= -Ndrv/audio
 
 #
 #	Define targets

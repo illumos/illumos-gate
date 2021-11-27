@@ -46,7 +46,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-LDFLAGS		+= -dy -Nmisc/kbtrans
+LDFLAGS		+= -Nmisc/kbtrans
 
 #
 #	Define targets

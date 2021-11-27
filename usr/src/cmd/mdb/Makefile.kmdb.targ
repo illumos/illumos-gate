@@ -32,7 +32,7 @@ $(PROG).core: $(OBJS) $(KMDBLIBS) $(MAPFILE)
 	    $(KMDBLIBS)
 
 $(PROG): $(PROG).core $(KCTLOBJS)
-	$(LD) -dy -r -o $@ $@.core -Nmisc/ctf $(KCTLOBJS)
+	$(LD) -ztype=kmod -o $@ $@.core -Nmisc/ctf $(KCTLOBJS)
 	$(CTFMERGE) -l "$(UTS_LABEL)" -o $@ $(OBJS) $(KCTLOBJS)
 	$(KMDB_FPTEST)
 	$(POST_PROCESS)

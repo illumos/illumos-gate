@@ -47,7 +47,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
-LDFLAGS		+= -dy -Nmisc/kbtrans
+LDFLAGS		+= -Nmisc/kbtrans
 
 #
 #	Define targets

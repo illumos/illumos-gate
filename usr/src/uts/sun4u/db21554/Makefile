@@ -70,7 +70,7 @@ CFLAGS += -DPCI_HOTPLUG
 #
 # Driver depends on pci hotplug.
 #
-LDFLAGS += -dy -Nmisc/pcihp
+LDFLAGS += -Nmisc/pcihp
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)

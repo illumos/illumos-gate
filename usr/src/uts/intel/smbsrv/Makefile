@@ -53,7 +53,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Module dependencies
 #
 #
-LDFLAGS += -dy -Nfs/sockfs -Nmisc/ksocket -Ndrv/ip -Nstrmod/rpcmod -Nsys/doorfs
+LDFLAGS += -Nfs/sockfs -Nmisc/ksocket -Ndrv/ip -Nstrmod/rpcmod -Nsys/doorfs
 LDFLAGS += -Nmisc/kcf
 
 #

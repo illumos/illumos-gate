@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 INC_PATH	+= -I$(SRC)/uts/common
 
-LDFLAGS		+= -dy -Nmisc/fctl -Ndrv/ip
+LDFLAGS		+= -Nmisc/fctl -Ndrv/ip
 
 #
 # For now, disable these warnings; maintainers should endeavor

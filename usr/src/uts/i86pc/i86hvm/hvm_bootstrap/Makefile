@@ -51,9 +51,6 @@ include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-# Overrides
-LDFLAGS		+= -dy
-
 #
 #	Default build targets.
 #

@@ -87,7 +87,7 @@ $(OBJS_DIR)/nxge_hw.o := SMOFF += deref_check
 #
 #	Driver depends on mac & IP
 #
-LDFLAGS		+= -dy -N misc/mac -N drv/ip
+LDFLAGS		+= -N misc/mac -N drv/ip
 
 #
 #	Default build targets.

@@ -78,7 +78,7 @@ CFLAGS += -dalign
 #
 #	Dependency
 #
-LDFLAGS	+= -dy -Ndrv/sgsbbc -Nmisc/hpcsvc
+LDFLAGS	+= -Ndrv/sgsbbc -Nmisc/hpcsvc
 
 #
 #	Default build targets.

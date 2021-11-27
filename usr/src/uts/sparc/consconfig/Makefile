@@ -61,7 +61,7 @@ MODSTUBS_DIR	= $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DCONSCONFIG_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Ndacf/consconfig_dacf
+LDFLAGS		+= -Ndacf/consconfig_dacf
 
 #
 #	Def aultbuild targets.

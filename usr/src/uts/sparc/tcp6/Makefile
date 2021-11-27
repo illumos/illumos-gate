@@ -55,7 +55,7 @@ ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Ndrv/tcp -Ndrv/ip -Ndrv/ip6
+LDFLAGS		+= -Ndrv/tcp -Ndrv/ip -Ndrv/ip6
 
 #
 #	Default build targets.

@@ -62,7 +62,7 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DSOCK_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS         += -dy -Ndrv/ip
+LDFLAGS         += -Ndrv/ip
 
 #
 #	Derived file "nl7ctokgen.h" defines.

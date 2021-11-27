@@ -48,7 +48,7 @@ CFLAGS += $(CCVERBOSE)
 #
 # Driver depends on GLDv3 (mac)
 #
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -N misc/mac
 
 # needs work
 $(OBJS_DIR)/sfxge_ev.o := SMOFF += index_overflow

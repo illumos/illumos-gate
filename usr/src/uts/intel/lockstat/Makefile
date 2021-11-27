@@ -38,7 +38,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
 include $(UTSBASE)/intel/Makefile.intel
 
-LDFLAGS		+= -dy -Ndrv/dtrace
+LDFLAGS		+= -Ndrv/dtrace
 
 .KEEP_STATE:
 

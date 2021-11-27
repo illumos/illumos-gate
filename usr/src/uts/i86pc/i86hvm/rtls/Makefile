@@ -37,8 +37,6 @@ include		$(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 ALL_TARGET=	$(BINARY)
 INSTALL_TARGET=	$(BINARY) $(ROOTMODULE)
 
-LDFLAGS +=	-dy
-
 .KEEP_STATE:
 
 def:		$(DEF_DEPS)

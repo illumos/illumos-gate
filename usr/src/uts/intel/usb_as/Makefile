@@ -60,7 +60,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 MODSTUBS_DIR	 = $(OBJS_DIR)
 CLEANFILES	+= $(MODSTUBS_O)
 
-LDFLAGS		+= -dy -Nmisc/usba -Ndrv/usb_ac
+LDFLAGS		+= -Nmisc/usba -Ndrv/usb_ac
 
 #
 # For now, disable these warnings; maintainers should endeavor

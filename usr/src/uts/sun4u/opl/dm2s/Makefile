@@ -70,7 +70,7 @@ CFLAGS += -dalign
 
 #
 #	Dependency
-LDFLAGS	+= -dy -Ndrv/scfd
+LDFLAGS	+= -Ndrv/scfd
 
 #
 #	Default build targets.

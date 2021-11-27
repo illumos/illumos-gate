@@ -49,7 +49,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS		+= -dy -Nmisc/fctl
+LDFLAGS		+= -Nmisc/fctl
 
 #
 #	Default build targets.

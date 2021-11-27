@@ -62,7 +62,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DUFS_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
-LDFLAGS		+= -dy -Nfs/specfs -Nmisc/fssnap_if
+LDFLAGS		+= -Nfs/specfs -Nmisc/fssnap_if
 
 #
 # For now, disable these warnings; maintainers should endeavor

@@ -68,7 +68,7 @@ CERRWARN	+= -_gcc=-Wno-unused-variable
 #
 # Declare dependency on misc/acpica
 #
-LDFLAGS += -dy -N misc/acpica
+LDFLAGS += -N misc/acpica
 
 #
 #	Default build targets.

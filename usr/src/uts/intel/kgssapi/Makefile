@@ -53,7 +53,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_KGSS_DIR)
 #
 # Define dependencies on rpcmod, rpcsec, and tlimod
 #
-LDFLAGS += -dy -N strmod/rpcmod -N misc/rpcsec -N misc/tlimod
+LDFLAGS += -N strmod/rpcmod -N misc/rpcsec -N misc/tlimod
 
 #
 # For now, disable these warnings; maintainers should endeavor

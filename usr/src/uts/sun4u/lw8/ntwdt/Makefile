@@ -67,7 +67,7 @@ DEF_BUILDS	= $(DEF_BUILDSONLY64)
 CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= $(CNOWARN_UNINIT)
 
-LDFLAGS		+= -dy -Ndrv/sgsbbc
+LDFLAGS		+= -Ndrv/sgsbbc
 
 #
 #	Default build targets.

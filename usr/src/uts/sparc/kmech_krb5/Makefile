@@ -55,7 +55,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Define dependencies on kgssapi and md5
 #
-LDFLAGS         += -dy -N misc/kgssapi -N crypto/md5
+LDFLAGS         += -N misc/kgssapi -N crypto/md5
 
 
 #

@@ -54,7 +54,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
-LDFLAGS		+= -dy -Nmisc/kcf
+LDFLAGS		+= -Nmisc/kcf
 
 #
 # For now, disable these warnings; maintainers should endeavor

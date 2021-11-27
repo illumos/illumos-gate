@@ -44,7 +44,7 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 
 CERRWARN	+= -_gcc=-Wno-unused-label
 
-LDFLAGS += -dy -N misc/i2c_svc
+LDFLAGS += -N misc/i2c_svc
 
 #
 #	Define targets

@@ -72,7 +72,7 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 #
 #	depends on misc/ibtl
 #
-LDFLAGS	+= -dy -Nmisc/ibdm -Nmisc/ibtl
+LDFLAGS	+= -Nmisc/ibdm -Nmisc/ibtl
 
 #
 #	Default build targets.

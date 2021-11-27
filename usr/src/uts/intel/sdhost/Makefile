@@ -66,7 +66,7 @@ CFLAGS += $(CCVERBOSE)
 #
 # dependency on sda module
 #
-LDFLAGS += -dy -Nmisc/sda
+LDFLAGS += -Nmisc/sda
 
 #
 #	Default build targets.

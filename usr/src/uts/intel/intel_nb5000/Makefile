@@ -57,7 +57,7 @@ INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Depends on smbios
 #
-LDFLAGS         += -dy -N drv/smbios
+LDFLAGS         += -N drv/smbios
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)

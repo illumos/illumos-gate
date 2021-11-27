@@ -60,7 +60,7 @@ ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
 MACHINE_DEFS	+= -DCHEETAH_PLUS
 
-LDFLAGS	+= -dy -Ndrv/sgsbbc
+LDFLAGS	+= -Ndrv/sgsbbc
 
 #
 # For now, disable these warnings; maintainers should endeavor

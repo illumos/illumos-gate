@@ -178,7 +178,7 @@ $(MODFILE): dmod .WAIT $(MODOBJS) $$(MAPFILE-EXT)
 LINKTESTOBJ = $(KMDBDIR)/kmdb_modlinktest.o
 
 KMDB_LINKTEST = \
-	$(LD) $(ZDEFS) -dy -r -o $@.linktest $(KMODOBJS) \
+	$(LD) $(ZDEFS) -ztype=kmod -o $@.linktest $(KMODOBJS) \
 	$(STANDOBJS) $(LINKTESTOBJ) && \
 	$(RM) $@.linktest
 
@@ -190,8 +190,12 @@ $(KMDB_LINKTEST_ENABLE)KMDB_LINKTEST_CMD = $(KMDB_LINKTEST)
 #
 KMDB_FPTEST_CMD = $(KMDB_FPTEST)
 
+# Allow overriding this because mdb_ks is special case fake module,
+# see Makefile.mdb_ks
+KMODFLAG = -ztype=kmod
+
 $(KMODFILE): kmod .WAIT $(KMODOBJS) $(MAPFILE)
-	$(LD) -dy -r $(MAPFILE:%=-Wl,-M%) -Nmisc/kmdbmod -o $@ $(KMODOBJS) \
+	$(LD) $(KMODFLAG) $(MAPFILE:%=-Wl,-M%) -Nmisc/kmdbmod -o $@ $(KMODOBJS) \
 	$(STANDOBJS)
 	$(KMDB_LINKTEST_CMD)
 	$(KMDB_FPTEST_CMD)

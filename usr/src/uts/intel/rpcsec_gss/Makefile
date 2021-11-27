@@ -55,7 +55,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Define dependency on rpcmod and kgssapi
 #
-LDFLAGS += -dy -N strmod/rpcmod -N misc/kgssapi
+LDFLAGS += -N strmod/rpcmod -N misc/kgssapi
 
 #
 # For now, disable these warnings; maintainers should endeavor

@@ -51,7 +51,7 @@ CFLAGS += -I$(UTSBASE)/common/io/cxgbe -I$(UTSBASE)/common/io/cxgbe/common \
 #
 # Driver depends
 #
-LDFLAGS += -dy -N misc/mac -N drv/ip
+LDFLAGS += -N misc/mac -N drv/ip
 
 # needs work
 SMOFF += all_func_returns,snprintf_overflow

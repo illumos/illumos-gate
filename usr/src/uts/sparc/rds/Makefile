@@ -62,7 +62,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 CFLAGS += $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
 
-LDFLAGS += -dy -Nfs/sockfs -Ndrv/ip
+LDFLAGS += -Nfs/sockfs -Ndrv/ip
 
 #
 #	Default build targets.

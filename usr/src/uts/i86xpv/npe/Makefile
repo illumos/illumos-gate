@@ -60,7 +60,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # pcie supplies PCI Express fabric error support
 #
-LDFLAGS	+= -dy -Nmisc/acpica -Nmisc/pcie
+LDFLAGS	+= -Nmisc/acpica -Nmisc/pcie
 
 #
 # Name of the module is needed by the source, to distinguish from other

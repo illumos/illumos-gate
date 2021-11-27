@@ -44,7 +44,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser
+LDFLAGS         += -Nmisc/usba -Nmisc/usbser
 
 #
 # For now, disable these warnings; maintainers should endeavor

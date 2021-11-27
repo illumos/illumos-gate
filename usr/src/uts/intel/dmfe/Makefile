@@ -60,7 +60,7 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 #
 # extra link arguments
 #
-LDFLAGS += -dy -N misc/mac -N misc/mii
+LDFLAGS += -N misc/mac -N misc/mii
 
 #
 #	Default build targets.

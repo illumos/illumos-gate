@@ -54,7 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 CFLAGS += $(CCVERBOSE)
 
-LDFLAGS		+= -dy -Nmisc/hook
+LDFLAGS		+= -Nmisc/hook
 
 #
 #	Default build targets.

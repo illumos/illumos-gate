@@ -54,7 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 #
 #	Overrides
 #
-LDFLAGS += -dy -Nfs/sockfs -Ndrv/ip
+LDFLAGS += -Nfs/sockfs -Ndrv/ip
 
 # needs work
 $(OBJS_DIR)/ncaddi.o := SMOFF += index_overflow

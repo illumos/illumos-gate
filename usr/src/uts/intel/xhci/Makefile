@@ -25,7 +25,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(CONFMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-LDFLAGS		+= -dy -Nmisc/usba
+LDFLAGS		+= -Nmisc/usba
 
 .KEEP_STATE:
 

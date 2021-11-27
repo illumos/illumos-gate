@@ -51,7 +51,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 
 
 #
-LDFLAGS		+= -dy -Nmisc/usba -Ndrv/usb_ac
+LDFLAGS		+= -Nmisc/usba -Ndrv/usb_ac
 
 #
 #	Define targets

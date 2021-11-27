@@ -47,7 +47,7 @@ ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 #
 #	dependency
 #
-LDFLAGS	+=      -dy -Nmisc/pci_autoconfig
+LDFLAGS	+=      -Nmisc/pci_autoconfig
 
 #
 #	Include common rules.

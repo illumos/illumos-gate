@@ -52,7 +52,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Overrides.
 #
-LDFLAGS		+= -dy -Nstrmod/rpcmod -Nfs/nfs -Nmisc/klmmod
+LDFLAGS		+= -Nstrmod/rpcmod -Nfs/nfs -Nmisc/klmmod
 LDFLAGS		+= -M $(UTSBASE)/common/klm/mapfile-ops
 
 #

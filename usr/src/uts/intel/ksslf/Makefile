@@ -50,7 +50,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS += -dy -Nmisc/md5 -Nmisc/kcf -Ndrv/kssl -Nfs/sockfs
+LDFLAGS += -Nmisc/md5 -Nmisc/kcf -Ndrv/kssl -Nfs/sockfs
 
 #
 # For now, disable these warnings; maintainers should endeavor

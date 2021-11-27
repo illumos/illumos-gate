@@ -50,7 +50,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Driver depends on blkdev
 #
-LDFLAGS		+= -dy -N drv/blkdev
+LDFLAGS		+= -N drv/blkdev
 
 #
 # Overrides

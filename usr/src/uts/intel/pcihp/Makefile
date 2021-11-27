@@ -51,7 +51,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Dependency
 #
-LDFLAGS		+= -dy -Nmisc/busra -Nmisc/hpcsvc
+LDFLAGS		+= -Nmisc/busra -Nmisc/hpcsvc
 
 # needs work
 SMOFF += indenting

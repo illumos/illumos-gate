@@ -37,7 +37,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
 include $(UTSBASE)/sparc/Makefile.sparc
 
-LDFLAGS		+= -dy -Ndrv/dtrace -Ndrv/cpc
+LDFLAGS		+= -Ndrv/dtrace -Ndrv/cpc
 
 .KEEP_STATE:
 

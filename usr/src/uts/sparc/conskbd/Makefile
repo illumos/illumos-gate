@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 CFLAGS		+= $(CCVERBOSE)
 
-LDFLAGS = -dy -Nmisc/kbtrans
+LDFLAGS += -Nmisc/kbtrans
 
 #
 #	Default build targets.

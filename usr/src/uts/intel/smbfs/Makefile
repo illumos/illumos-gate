@@ -57,7 +57,7 @@ $(MODSTUBS_O)	:= AS_CPPFLAGS += -DSMBFS_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 INC_PATH	+= -I$(UTSBASE)/common/fs/smbclnt
 INC_PATH	+= -I$(COMMONBASE)/smbclnt
-LDFLAGS         += -dy -Ndrv/nsmb
+LDFLAGS         += -Ndrv/nsmb
 
 #
 # For now, disable these warnings; maintainers should endeavor

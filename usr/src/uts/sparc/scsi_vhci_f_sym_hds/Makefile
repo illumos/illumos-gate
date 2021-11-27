@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Note dependancy on misc/scsi.
 #
-LDFLAGS += -dy -N"misc/scsi" -N"drv/scsi_vhci"
+LDFLAGS += -Nmisc/scsi -Ndrv/scsi_vhci
 
 #
 # Default build targets.

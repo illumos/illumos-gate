@@ -62,7 +62,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DSPEC_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
-LDFLAGS		+= -dy -Nfs/fifofs
+LDFLAGS		+= -Nfs/fifofs
 
 #
 # For now, disable these warnings; maintainers should endeavor

@@ -53,7 +53,7 @@ INSTALL_TARGET =	$(BINARY) $(ROOTMODULE)
 #	Update compiler variables.
 #
 INC_PATH +=	-I$(SN1_BASE) -I$(OBJS_DIR)
-LDFLAGS +=	-dy -Nexec/elfexec
+LDFLAGS +=	-Nexec/elfexec
 
 #
 #	Default build targets.

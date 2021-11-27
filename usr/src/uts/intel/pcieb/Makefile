@@ -53,7 +53,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # depends on misc/pcie
 #
-LDFLAGS		+= -dy -Nmisc/pcie
+LDFLAGS		+= -Nmisc/pcie
 
 #
 #	Override defaults to build a unique, local modstubs.o.

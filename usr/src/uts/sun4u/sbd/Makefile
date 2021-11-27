@@ -41,7 +41,7 @@ UTSBASE	= ../..
 MODULE		= sbd
 OBJECTS		= $(SBD_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
-LDFLAGS		+= -dy -Nmisc/sbdp
+LDFLAGS		+= -Nmisc/sbdp
 
 #
 #	Include common rules.

@@ -60,11 +60,6 @@ CFLAGS += $(CCVERBOSE)
 CFLAGS += -dalign
 
 #
-# dependency
-#
-LDFLAGS += -dy
-
-#
 #	Default build targets.
 #
 .KEEP_STATE:

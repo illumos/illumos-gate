@@ -71,7 +71,7 @@ SMATCH=off
 #
 #	depends on misc/ibtl and misc/ibmf
 #
-LDFLAGS	+= -dy -Nmisc/ibtl -Nmisc/ibmf -Ndrv/ip
+LDFLAGS	+= -Nmisc/ibtl -Nmisc/ibmf -Ndrv/ip
 
 #
 #	Default build targets.

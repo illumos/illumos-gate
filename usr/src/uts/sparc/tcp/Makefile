@@ -71,7 +71,7 @@ CFLAGS		+= -xinline=tcp_set_ws_value,tcp_fill_header
 #
 #	depends on ip, md5 and sockfs
 #
-LDFLAGS		+= -dy -Ndrv/ip -Ncrypto/md5 -Nfs/sockfs
+LDFLAGS		+= -Ndrv/ip -Ncrypto/md5 -Nfs/sockfs
 
 #
 #	Default build targets.

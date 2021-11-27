@@ -69,7 +69,7 @@ CFLAGS += $(CCVERBOSE)
 #
 # module dependencies
 #
-LDFLAGS += -dy -Nmisc/acpica -Nmisc/acpidev
+LDFLAGS += -Nmisc/acpica -Nmisc/acpidev
 
 CLEANFILES +=	$(DRMACH_GENERR)
 CLEANFILES +=	$(DRMACH_IO)/drmach_err.c

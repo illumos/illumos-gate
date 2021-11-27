@@ -34,7 +34,7 @@ UTSBASE	= ../..
 MODULE		= rds
 OBJECTS		= $(RDS_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-LDFLAGS		+= -dy -Nfs/sockfs -Ndrv/ip
+LDFLAGS		+= -Nfs/sockfs -Ndrv/ip
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/rds
 #
 #	Include common rules.

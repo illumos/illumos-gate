@@ -71,7 +71,7 @@ CFLAGS		+= -DSUN_KSTATS -DHOST_PAUSE -DTX_CKSUM_FIX -DTX_THREAD_RECLAIM
 #
 #	Driver depends on GLD, IP, and MAC
 #
-LDFLAGS		+= -dy -N misc/gld -N drv/ip -N misc/mac
+LDFLAGS		+= -N misc/gld -N drv/ip -N misc/mac
 
 
 #

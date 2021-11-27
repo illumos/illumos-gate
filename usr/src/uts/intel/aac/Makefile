@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #	Kernel Module Dependencies
 #
-LDFLAGS		+= -dy -Nmisc/scsi
+LDFLAGS		+= -Nmisc/scsi
 
 #
 #	Overrides
