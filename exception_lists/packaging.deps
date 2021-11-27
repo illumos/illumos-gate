@@ -32,6 +32,10 @@ pkg:/package/pkg
 pkg:/print/cups
 pkg:/print/filter/ghostscript
 pkg:/release/name
+pkg:/runtime/python-27
+pkg:/runtime/python-35
+pkg:/runtime/python-39
+pkg:/runtime/python-310
 pkg:/runtime/java
 pkg:/runtime/java/openjdk11
 pkg:/runtime/java/openjdk8

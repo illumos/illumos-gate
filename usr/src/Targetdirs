@@ -28,7 +28,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2017 RackTop Systems.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Joyent, Inc.
 #
 
@@ -86,6 +86,14 @@ $(BUILDPY3)PYTHON3_DIRS += \
 	/usr/lib/python$(PYTHON3_VERSION)/vendor-packages/solaris/__pycache__ \
 	/usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs \
 	/usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__
+
+$(BUILDPY3b)PYTHON3_DIRS += \
+	/usr/lib/python$(PYTHON3b_VERSION) \
+	/usr/lib/python$(PYTHON3b_VERSION)/vendor-packages \
+	/usr/lib/python$(PYTHON3b_VERSION)/vendor-packages/solaris \
+	/usr/lib/python$(PYTHON3b_VERSION)/vendor-packages/solaris/__pycache__ \
+	/usr/lib/python$(PYTHON3b_VERSION)/vendor-packages/zfs \
+	/usr/lib/python$(PYTHON3b_VERSION)/vendor-packages/zfs/__pycache__
 
 DIRS= \
 	/boot \

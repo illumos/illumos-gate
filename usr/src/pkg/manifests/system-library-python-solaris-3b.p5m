@@ -14,21 +14,21 @@
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/library/python/solaris$(PYTHON3_PKGVERS)@$(PKGVERS)
-set name=pkg.summary value="solaris module, python $(PYTHON3_VERSION)"
+    value=pkg:/system/library/python/solaris$(PYTHON3b_PKGVERS)@$(PKGVERS)
+set name=pkg.summary value="solaris module, python $(PYTHON3b_VERSION)"
 set name=pkg.description value="Solaris Python3 Module"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
 dir  path=usr group=sys
 dir  path=usr/lib
-dir  path=usr/lib/python$(PYTHON3_VERSION)
-dir  path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages
-dir  path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/solaris
-file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/solaris/__init__.py
-dir  path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/solaris/__pycache__
-file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/solaris/__pycache__/__init__.cpython$(PYTHON3_PKGVERS).pyc
-file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/solaris/misc.so
+dir  path=usr/lib/python$(PYTHON3b_VERSION)
+dir  path=usr/lib/python$(PYTHON3b_VERSION)/vendor-packages
+dir  path=usr/lib/python$(PYTHON3b_VERSION)/vendor-packages/solaris
+file path=usr/lib/python$(PYTHON3b_VERSION)/vendor-packages/solaris/__init__.py
+dir  path=usr/lib/python$(PYTHON3b_VERSION)/vendor-packages/solaris/__pycache__
+file path=usr/lib/python$(PYTHON3b_VERSION)/vendor-packages/solaris/__pycache__/__init__.cpython$(PYTHON3b_PKGVERS).pyc
+file path=usr/lib/python$(PYTHON3b_VERSION)/vendor-packages/solaris/misc.so
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-depend type=require fmri=runtime/python$(PYTHON3_PKGVERS)
+depend type=require fmri=runtime/python$(PYTHON3b_PKGVERS)

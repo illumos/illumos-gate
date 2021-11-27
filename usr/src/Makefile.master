@@ -27,7 +27,7 @@
 # Copyright 2015 Gary Mills
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Joyent, Inc.
 # Copyright 2019 RackTop Systems.
 # Copyright 2020 Oxide Computer Company
@@ -215,7 +215,15 @@ PYTHON=		/usr/bin/python$(PYTHON_VERSION)
 PYTHON3_VERSION=	3.5
 PYTHON3_PKGVERS=	-35
 PYTHON3_SUFFIX=		m
+# BUILDPY3b should be overridden in the .env file in order to build the libbe
+# python module with a secondary python to aid migration between versions.
+BUILDPY3b=		$(POUND_SIGN)
+PYTHON3b_VERSION=	3.9
+PYTHON3b_PKGVERS=	-39
+PYTHON3b_SUFFIX=
+#
 PYTHON3=		/usr/bin/python$(PYTHON3_VERSION)
+$(BUILDPY3b)PYTHON3b=	/usr/bin/python$(PYTHON3b_VERSION)
 $(BUILDPY3TOOLS)TOOLS_PYTHON=		$(PYTHON3)
 $(BUILDPY2TOOLS)TOOLS_PYTHON=		$(PYTHON)
 SORT=		/usr/bin/sort

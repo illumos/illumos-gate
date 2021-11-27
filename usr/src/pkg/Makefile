@@ -24,7 +24,7 @@
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 RackTop Systems.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Peter Tribble
 #
 
@@ -195,10 +195,13 @@ PKGMOG_DEFINES= \
 	BUILDPERL64=$(BUILDPERL64) \
 	PYTHON_VERSION=$(PYTHON_VERSION) \
 	PYTHON3_VERSION=$(PYTHON3_VERSION) \
+	PYTHON3b_VERSION=$(PYTHON3b_VERSION) \
 	PYTHON_PKGVERS=$(PYTHON_PKGVERS) \
 	PYTHON3_PKGVERS=$(PYTHON3_PKGVERS) \
+	PYTHON3b_PKGVERS=$(PYTHON3b_PKGVERS) \
 	python2_ONLY=$(BUILDPY2) \
 	python3_ONLY=$(BUILDPY3) \
+	python3b_ONLY=$(BUILDPY3b) \
 	python2tools_ONLY=$(BUILDPY2TOOLS) \
 	python3tools_ONLY=$(BUILDPY3TOOLS) \
 	JAVA_11_ONLY=$(JAVA_11_ONLY) \
@@ -262,6 +265,10 @@ $(BUILDPY3) MANIFESTS += \
 	system-library-python-libbe-3.p5m \
 	system-library-python-solaris-3.p5m \
 	system-library-python-zfs-3.p5m
+$(BUILDPY3b) MANIFESTS += \
+	system-library-python-libbe-3b.p5m \
+	system-library-python-solaris-3b.p5m \
+	system-library-python-zfs-3b.p5m
 
 PKGS= $(MANIFESTS:%.p5m=%)
 DEP_PKGS= $(PKGS:%=$(PDIR)/%.dep)
