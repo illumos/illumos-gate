@@ -11,7 +11,7 @@
 
 # Copyright 2021, Richard Lowe.
 
-OBJS= exclude.o stub.o
+OBJS= exclude.o unknown-os-exclude.o stub.o
 
 # Allow building out of the test harness easily too
 SRCDIR=$(PWD)
@@ -19,6 +19,10 @@ SRCDIR=$(PWD)
 .KEEP_STATE:
 
 all: $(OBJS)
+
+unknown-os-exclude.o: exclude.o
+	cp exclude.o $@;
+	elfedit -e 'shdr:sh_type .test 0x60000000' $@ # SHT_LOOS
 
 %.o: $(SRCDIR)/%.c
 	gcc -m64 -c $< -o $@
@@ -40,3 +44,6 @@ test.exec: exclude.o stub.o
 
 test.o: exclude.o stub.o
 	ld -zfatal-warnings -r exclude.o stub.o -o test.o
+
+test.unknown-os: unknown-os-exclude.o stub.o
+	ld -zfatal-warnings -r unknown-os-exclude.o stub.o -o test.unknown-os
