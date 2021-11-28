@@ -143,7 +143,13 @@ struct vmx {
 	uint64_t	eptp;
 	enum vmx_caps	vmx_caps;
 	struct vm	*vm;
-	uint64_t	eptgen[MAXCPU];		/* cached vmspace generation */
+	/*
+	 * Track the latest vmspace generation as it is run on a given host CPU.
+	 * This allows us to react to modifications to the vmspace (such as
+	 * unmap or changed protection) which necessitate flushing any
+	 * guest-physical TLB entries tagged for this guest via 'invept'.
+	 */
+	uint64_t	eptgen[MAXCPU];
 };
 CTASSERT((offsetof(struct vmx, vmcs) & PAGE_MASK) == 0);
 CTASSERT((offsetof(struct vmx, msr_bitmap) & PAGE_MASK) == 0);

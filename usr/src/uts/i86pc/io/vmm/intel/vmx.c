@@ -704,7 +704,7 @@ vmx_vminit(struct vm *vm)
 	vmx->eptp = vmspace_table_root(vm_get_vmspace(vm));
 
 	/*
-	 * Clean up EPTP-tagged guest physical and combined mappings
+	 * Clean up EP4TA-tagged guest-physical and combined mappings
 	 *
 	 * VMX transitions are not required to invalidate any guest physical
 	 * mappings. So, it may be possible for stale guest physical mappings
@@ -942,7 +942,11 @@ invvpid(uint64_t type, struct invvpid_desc desc)
 }
 
 /*
- * Invalidate guest mappings identified by its vpid from the TLB.
+ * Invalidate guest mappings identified by its VPID from the TLB.
+ *
+ * This is effectively a flush of the guest TLB, removing only "combined
+ * mappings" (to use the VMX parlance).  Actions which modify the EPT structures
+ * for the instance (such as unmapping GPAs) would require an 'invept' flush.
  */
 static __inline void
 vmx_invvpid(struct vmx *vmx, int vcpu, int running)
@@ -970,17 +974,9 @@ vmx_invvpid(struct vmx *vmx, int vcpu, int running)
 	/*
 	 * Invalidate all mappings tagged with 'vpid'
 	 *
-	 * We do this because this vcpu was executing on a different host
-	 * cpu when it last ran. We do not track whether it invalidated
-	 * mappings associated with its 'vpid' during that run. So we must
-	 * assume that the mappings associated with 'vpid' on 'curcpu' are
-	 * stale and invalidate them.
-	 *
-	 * Note that we incur this penalty only when the scheduler chooses to
-	 * move the thread associated with this vcpu between host cpus.
-	 *
-	 * Note also that this will invalidate mappings tagged with 'vpid'
-	 * for "all" EP4TAs.
+	 * This is done when a vCPU moves between host CPUs, where there may be
+	 * stale TLB entries for this VPID on the target, or if emulated actions
+	 * in the guest CPU have incurred an explicit TLB flush.
 	 */
 	if (vmspace_table_gen(vms) == vmx->eptgen[curcpu]) {
 		invvpid_desc._res1 = 0;
@@ -991,10 +987,10 @@ vmx_invvpid(struct vmx *vmx, int vcpu, int running)
 		vmm_stat_incr(vmx->vm, vcpu, VCPU_INVVPID_DONE, 1);
 	} else {
 		/*
-		 * The invvpid can be skipped if an invept is going to
-		 * be performed before entering the guest. The invept
-		 * will invalidate combined mappings tagged with
-		 * 'vmx->eptp' for all vpids.
+		 * The INVVPID can be skipped if an INVEPT is going to be
+		 * performed before entering the guest.  The INVEPT will
+		 * invalidate combined mappings for the EP4TA associated with
+		 * this guest, in all VPIDs.
 		 */
 		vmm_stat_incr(vmx->vm, vcpu, VCPU_INVVPID_SAVED, 1);
 	}
@@ -2841,14 +2837,14 @@ vmx_run(void *arg, int vcpu, uint64_t rip)
 		 * entry, checking for the necessity of an invept invalidation.
 		 */
 		eptgen = vmc_table_enter(vmc);
-		if (vmx->eptgen[vcpu] != eptgen) {
+		if (vmx->eptgen[curcpu] != eptgen) {
 			/*
-			 * VMspace generate does not match what was previously
-			 * used for this CPU so all mappings associated with
-			 * this EPTP must be invalidated.
+			 * VMspace generation does not match what was previously
+			 * used on this host CPU, so all mappings associated
+			 * with this EP4TA must be invalidated.
 			 */
 			invept(1, vmx->eptp);
-			vmx->eptgen[vcpu] = eptgen;
+			vmx->eptgen[curcpu] = eptgen;
 		}
 
 		vmx_run_trace(vmx, vcpu);
