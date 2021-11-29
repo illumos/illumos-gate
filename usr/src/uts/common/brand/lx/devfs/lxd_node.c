@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -767,14 +767,23 @@ lxd_dirdelete(lxd_node_t *dir, lxd_node_t *ldn, char *nm, enum dr_op op,
 			error = lxd_dirdelete(ldn, dn, dirp->lddir_name,
 			    DR_REMOVE, cred);
 			ldnode_rele(dn);
+			if (error != 0)
+				return (error);
 
 			dirp = nextp;
 		}
 	}
 
 	dirp = lxd_find_dirent(nm, dir, NOHOLD, &fndnp);
-	VERIFY(dirp != NULL);
-	VERIFY(ldn == fndnp);
+	/* These used to be VERIFY(), but in racy conditions they can fail. */
+	if (dirp == NULL) {
+		/* Can't find the directory entry at all now! */
+		return (ENOENT);
+	}
+	if (ldn != fndnp) {
+		/* Returned fndnp isn't our original, so it's also not-there. */
+		return (ENOENT);
+	}
 
 	lxd_rm_dirent(dirp);
 

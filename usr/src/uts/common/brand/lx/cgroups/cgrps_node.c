@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -589,6 +589,8 @@ cgrp_dirdelete(cgrp_node_t *dir, cgrp_node_t *cn, char *nm, enum dr_op op,
 			    cdp->cgd_name, DR_REMOVE, cred);
 			mutex_exit(&cgm->cg_contents);
 			cgnode_rele(pseudo_node);
+			if (error != 0)
+				return (error);
 			mutex_enter(&cgm->cg_contents);
 
 			cdp = nextp;
@@ -598,8 +600,15 @@ cgrp_dirdelete(cgrp_node_t *dir, cgrp_node_t *cn, char *nm, enum dr_op op,
 	}
 
 	cndp = cgrp_hash_lookup(nm, dir, NOHOLD, &cnnp);
-	VERIFY(cndp != NULL);
-	VERIFY(cn == cnnp);
+	/* These used to be VERIFY(), but in racy conditions they can fail. */
+	if (cndp == NULL) {
+		/* Can't find the directory entry at all now! */
+		return (ENOENT);
+	}
+	if (cn != cnnp) {
+		/* Returned cnnp isn't our original, so it's also not-there. */
+		return (ENOENT);
+	}
 
 	cgrp_hash_out(cndp);
 
