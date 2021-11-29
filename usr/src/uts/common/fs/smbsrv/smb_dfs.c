@@ -83,6 +83,7 @@ static uint32_t smb_dfs_referrals_get(smb_request_t *, char *, dfs_reftype_t,
     dfs_referral_response_t *);
 static void smb_dfs_referrals_free(dfs_referral_response_t *);
 static uint16_t smb_dfs_referrals_unclen(dfs_info_t *, uint16_t);
+static uint32_t smb_dfs_get_referrals_ex(smb_request_t *, smb_fsctl_t *);
 
 /*
  * Handle device type FILE_DEVICE_DFS
@@ -108,7 +109,9 @@ smb_dfs_fsctl(smb_request_t *sr, smb_fsctl_t *fsctl)
 	case FSCTL_DFS_GET_REFERRALS:
 		status = smb_dfs_get_referrals(sr, fsctl);
 		break;
-	case FSCTL_DFS_GET_REFERRALS_EX: /* XXX - todo */
+	case FSCTL_DFS_GET_REFERRALS_EX:
+		status = smb_dfs_get_referrals_ex(sr, fsctl);
+		break;
 	default:
 		/*
 		 * MS-SMB2 suggests INVALID_DEVICE_REQUEST
@@ -117,6 +120,119 @@ smb_dfs_fsctl(smb_request_t *sr, smb_fsctl_t *fsctl)
 		 */
 		status = NT_STATUS_FS_DRIVER_REQUIRED;
 	}
+
+	return (status);
+}
+
+/*
+ * XXX Instead of decoding the referral request and encoding
+ * the response here (in-kernel) we could pass the given
+ * request buffer in our door call, and let that return the
+ * response buffer ready to stuff into out_mbc.  That would
+ * allow all this decoding/encoding to happen at user-level.
+ * (and most of this file would go away. :-)
+ */
+
+/*
+ * See [MS-DFSC] for details about this command
+ * Handles FSCTL_DFS_GET_REFERRALS_EX (only)
+ */
+uint32_t
+smb_dfs_get_referrals_ex(smb_request_t *sr, smb_fsctl_t *fsctl)
+{
+	dfs_info_t *referrals;
+	dfs_referral_response_t refrsp;
+	dfs_reftype_t reftype;
+	char *path;
+	uint16_t maxver;
+	uint16_t flags;
+	uint16_t fnlen;
+	uint32_t datalen;
+	uint32_t status;
+	int rc;
+
+	/*
+	 * The caller checks this, because the error reporting method
+	 * varies across SMB versions.
+	 */
+	ASSERT(STYPE_ISIPC(sr->tid_tree->t_res_type));
+
+	/*
+	 * Decode fixed part.
+	 * Input data is (w) MaxReferralLevel, (w) Flags,
+	 * (l) RequestDataLength, ... variable data ...
+	 */
+	rc = smb_mbc_decodef(fsctl->in_mbc, "wwl",
+	    &maxver, &flags, &datalen);
+	if (rc != 0)
+		return (NT_STATUS_INVALID_PARAMETER);
+
+	/*
+	 * Decode variable part:
+	 * (w) file name length, (u) filename,
+	 * ( if flags & 1 )
+	 *	(w) site name len, (u) site name
+	 * We don't decode or use the site name
+	 */
+	if (MBC_ROOM_FOR(fsctl->in_mbc, datalen) == 0)
+		return (NT_STATUS_INVALID_PARAMETER);
+	rc = smb_mbc_decodef(fsctl->in_mbc, "%wu",
+	    sr, &fnlen, &path);
+	if (rc != 0)
+		return (NT_STATUS_INVALID_PARAMETER);
+
+	reftype = smb_dfs_get_reftype((const char *)path);
+	switch (reftype) {
+	case DFS_REFERRAL_INVALID:
+		/* Need to check the error for this case */
+		return (NT_STATUS_INVALID_PARAMETER);
+
+	case DFS_REFERRAL_DOMAIN:
+	case DFS_REFERRAL_DC:
+		/* MS-DFSC: this error is returned by non-DC root */
+		return (NT_STATUS_INVALID_PARAMETER);
+
+	case DFS_REFERRAL_SYSVOL:
+		/* MS-DFSC: this error is returned by non-DC root */
+		return (NT_STATUS_NO_SUCH_DEVICE);
+
+	default:
+		break;
+	}
+
+	status = smb_dfs_referrals_get(sr, path, reftype, &refrsp);
+	if (status != NT_STATUS_SUCCESS)
+		return (status);
+
+	referrals = &refrsp.rp_referrals;
+	smb_dfs_encode_hdr(fsctl->out_mbc, referrals);
+
+	/*
+	 * Server may respond with any referral version at or below
+	 * the maximum specified in the request.
+	 */
+	switch (maxver) {
+	case DFS_REFERRAL_V1:
+		status = smb_dfs_encode_refv1(sr, fsctl->out_mbc, referrals);
+		break;
+
+	case DFS_REFERRAL_V2:
+		status = smb_dfs_encode_refv2(sr, fsctl->out_mbc, referrals);
+		break;
+
+	case DFS_REFERRAL_V3:
+		status = smb_dfs_encode_refv3x(sr, fsctl->out_mbc, referrals,
+		    DFS_REFERRAL_V3);
+		break;
+
+	case DFS_REFERRAL_V4:
+	default:
+		status = smb_dfs_encode_refv3x(sr, fsctl->out_mbc, referrals,
+		    DFS_REFERRAL_V4);
+		break;
+	}
+
+	smb_dfs_referrals_free(&refrsp);
 
 	return (status);
 }
@@ -147,15 +263,6 @@ smb_dfs_get_referrals(smb_request_t *sr, smb_fsctl_t *fsctl)
 	 * varies across SMB versions.
 	 */
 	ASSERT(STYPE_ISIPC(sr->tid_tree->t_res_type));
-
-	/*
-	 * XXX Instead of decoding the referral request and encoding
-	 * the response here (in-kernel) we could pass the given
-	 * request buffer in our door call, and let that return the
-	 * response buffer ready to stuff into out_mbc.  That would
-	 * allow all this decoding/encoding to happen at user-level.
-	 * (and most of this file would go away. :-)
-	 */
 
 	/*
 	 * Input data is (w) MaxReferralLevel, (U) path
