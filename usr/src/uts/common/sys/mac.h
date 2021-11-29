@@ -113,7 +113,7 @@ typedef struct mac_propval_uint32_range_s {
  */
 typedef struct mac_propval_str_range_s {
 	uint32_t mpur_nextbyte;
-	char mpur_data[1];
+	char mpur_data[];
 } mac_propval_str_range_t;
 
 /*
