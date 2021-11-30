@@ -30,20 +30,10 @@
 #include <sys/cpuvar.h>
 #include <sys/stack.h>
 #include <vm/seg_kp.h>
+#include <sys/machparam.h>
 #include <sys/proc.h>
 #include <sys/pset.h>
 #include <sys/sysmacros.h>
-
-/*
- * Use a slightly larger thread stack size for interrupt threads rather than the
- * default. This is useful for cases where the networking stack may do an rx and
- * a tx in the context of a single interrupt and when combined with various
- * promisc hooks that need memory, can cause us to get dangerously close to the
- * edge of the traditional stack sizes. This is only a few pages more than a
- * traditional stack and given that we don't have that many interrupt threads,
- * the memory costs end up being more than worthwhile.
- */
-#define	LL_INTR_STKSZ	(32 * 1024)
 
 /*
  * Create and initialize an interrupt thread.
@@ -100,7 +90,7 @@ thread_create_intr(cpu_t *cp)
 
 /*
  * Allocate a given number of interrupt threads for a given CPU.  These threads
- * will get freed by cpu_destroy_bound_threads() when CPU gets unconfigured.
+ * will get freed by cpu_destroy_bound_threads() when the CPU gets unconfigured.
  *
  * Note, high level interrupts are always serviced using cpu_intr_stack and are
  * not allowed to block. Low level interrupts or soft-interrupts use the

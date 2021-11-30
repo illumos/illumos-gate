@@ -69,7 +69,7 @@ extern "C" {
  * The value defined below could grow to 16. hat structure and
  * page_t have room for 16 nodes.
  */
-#define	MAXNODES 	4
+#define	MAXNODES	4
 #define	NUMA_NODEMASK	0x0f
 
 /*
@@ -119,6 +119,18 @@ extern "C" {
 #else	/* !_ASM */
 #define	DEFAULTSTKSZ	_MUL(DEFAULTSTKSZ_NPGS, PAGESIZE) /* as(1) lameness */
 #endif	/* !_ASM */
+
+/*
+ * Use a slightly larger thread stack size for interrupt threads rather than
+ * the default. This is useful for cases where the networking stack may do an
+ * rx and a tx in the context of a single interrupt and when combined with
+ * various promisc hooks that need memory, can cause us to get dangerously
+ * close to the edge of the traditional stack sizes. This is only a few pages
+ * more than a traditional stack and given that we don't have that many
+ * interrupt threads, the memory costs end up being more than worthwhile.
+ */
+#define	LL_INTR_STKSZ_NPGS	8
+#define	LL_INTR_STKSZ		(LL_INTR_STKSZ_NPGS * PAGESIZE)
 
 /*
  * During intial boot we limit heap to the top 4Gig.
