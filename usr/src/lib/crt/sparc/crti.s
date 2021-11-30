@@ -1,4 +1,4 @@
-/*
+y/*
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
@@ -34,7 +34,8 @@
  * For further details - see bug#4433015
  */
 
-	.file		"crti.s"
+	.file	"crti.s"
+	.ident	""
 
 #include <sys/asm_linkage.h>
 

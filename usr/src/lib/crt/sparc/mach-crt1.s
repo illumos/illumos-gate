@@ -13,13 +13,14 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-	
+
 /* Copyright 2016, Richard Lowe. */
 
 #include <sys/asm_linkage.h>
 #include <sys/stack.h>
 
 	.file	"mach-crt1.s"
+	.ident	""
 
 	.global	_start_crt
 
@@ -61,7 +62,7 @@ ENTRY_NP(_start)
 	 *
 	 * and an exit handler from the linker is in %g1
 	 */
-	clr	%fp		! don't trace the stack past this point 
+	clr	%fp		! don't trace the stack past this point
 
 	add	%sp, WINDOWSIZE + STACK_BIAS, %l0	! address of argc
 

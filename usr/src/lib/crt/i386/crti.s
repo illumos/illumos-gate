@@ -38,6 +38,7 @@
  */
 
 	.file	"crti.s"
+	.ident	""
 
 /*
  * Note that when _init and _fini are called the stack needs to be 16-byte

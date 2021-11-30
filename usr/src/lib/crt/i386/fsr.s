@@ -27,6 +27,7 @@
 #include <sys/asm_linkage.h>
 
 	.file	"fsr.s"
+	.ident	""
 
 	.section	.data
 	.align 4

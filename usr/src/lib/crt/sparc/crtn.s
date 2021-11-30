@@ -33,7 +33,8 @@
  * For further details - see bug#4433015
  */
 
-	.file		"crtn.s"
+	.file	"crtn.s"
+	.ident	""
 
 /*
  * _init function epilogue
