@@ -1,46 +1,49 @@
-'\" te
+.\"
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DCFS 7FS "Nov 28, 2007"
-.SH NAME
-dcfs \- Compression file system
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/filio.h>
-#include <sys/fs/decomp.h>
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBdcfs\fR filesystem is a layered filesystem that you use to compress data
-when writing to a file and decompress upon read.  The primary function of the
-\fBdcfs\fR filesystem is to compress individual files when constructing a boot
-archive and when reading or booting from the archive.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-l l
-l l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-Interface Stability	Uncommitted
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBboot\fR(1M), \fBbootadm\fR(1M), \fBfiocompress\fR(1M), \fBattributes\fR(5),
-\fBufs\fR(7FS)
-.SH NOTES
-.sp
-.LP
-The \fBdcfs\fR compression/decompression file system works only with UFS.
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 28, 2007
+.Dt DCFS 7FS
+.Os
+.Sh NAME
+.Nm dcfs
+.Nd Compression file system
+.Sh SYNOPSIS
+.In sys/filio.h
+.In sys/fs/decomp.h
+.Sh DESCRIPTION
+The
+.Nm
+filesystem is a layered filesystem that you use to compress data when writing to
+a file and decompress upon read.
+The primary function of the
+.Nm
+filesystem is to compress individual files when constructing a boot archive and
+when reading or booting from the archive.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh SEE ALSO
+.Xr boot 1M ,
+.Xr bootadm 1M ,
+.Xr fiocompress 1M ,
+.Xr attributes 5 ,
+.Xr ufs 7FS
+.Sh NOTES
+The
+.Nm
+compression/decompression file system works only with UFS.

@@ -10,59 +10,55 @@
 .\"
 .\"
 .\" Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+.\" Copyright 2021 Oxide Computer Company
 .\"
-
-.TH BOOTFS 7FS "May 8, 2014"
-.SH NAME
-bootfs \- boot-time module file system
-
-.SH DESCRIPTION
-
+.Dd May 8, 2014
+.Dt BOOTFS 7FS
+.Os
+.Sh NAME
+.Nm bootfs
+.Nd boot-time module file system
+.Sh DESCRIPTION
 The
-.B bootfs
+.Nm
 file system is a read-only file system that provides access to any
 boot-time modules that were passed in to the system loader which were
 tagged with the type
-.IR file .
-.B bootfs
+.Em file .
+.Nm
 does not display any boot-time modules that were tagged as type
-.I hash
+.Em hash
 or type
-.IR rootfs .
-
+.Em rootfs .
 If modules with duplicate names and paths are specified, only the first
 such entry will be present in the file system and a counter will be
 incremented to indicate that a duplicate entry was found, but is not
-present into the file system. If a module's name only consists of
-invalid characters, such as '.', '..', or '/', then the module will not
-be present in the file system and a counter will be incremented to
-indicate that this has occurred. In both cases, diagnostic information
-is available through the kstats facility.
-
-.SH FILES
-.ne 2
-.na
-.B /system/boot
-.ad
-.RS 8n
+present into the file system.
+If a module's name only consists of invalid characters, such as
+.Sq . ,
+.Sq .. ,
+or
+.Sq / ,
+then the module will not be present in the file system and a counter
+will be incremented to indicate that this has occurred.
+In both cases, diagnostic information is available through the kstats
+facility.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /system/boot
 The mount point for the
-.B bootfs
+.Nm
 file system in the global zone.
-
-.SH EXAMPLES
-
-.LP
-Example 1 Determining if collisions or invalid names are present
-.sp
-.LP
+.El
+.Sh EXAMPLES
+.Sy Example 1
+Determining if collisions or invalid names are present
+.Pp
 To determine if any boot-time modules were not created due to collisions
 or invalid names, enter the following command:
-
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
 # kstat -m bootfs
-module: bootfs                          instance: 1     
+module: bootfs                          instance: 1
 name:   bootfs                          class:    fs
         crtime                          236063.651324041
         nbytes                          8749355
@@ -71,19 +67,18 @@ name:   bootfs                          class:    fs
         ndup                            0
         nfiles                          2
         snaptime                        236063.651324041
-.fi
-.in -2
-.sp
-.LP
+.Ed
 The field
-.B ndiscard
-lists the number of boot-time modules that were discarded due to naming conflicts. The field
-.B ndup
-lists the number of duplicate entries that were found and therefore not displayed in the file system.
-.sp
-.LP
-This information is provided for informational purposes only, it is not to be construed as a stable interface.
-
-.SH SEE ALSO
-.BR kstat (1M),
-.BR grub (5)
+.Fa ndiscard
+lists the number of boot-time modules that were discarded due to naming
+conflicts.
+The field
+.Fa ndup
+lists the number of duplicate entries that were found and therefore not
+displayed in the file system.
+.Pp
+This information is provided for informational purposes only, it is not
+to be construed as a stable interface.
+.Sh SEE ALSO
+.Xr kstat 1M ,
+.Xr loader 5

@@ -1,123 +1,150 @@
-'\" te
+.\"
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
-.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMBFS 7FS "Sep 9, 2009"
-.SH NAME
-smbfs \- CIFS/SMB file system
-.SH DESCRIPTION
-.sp
-.LP
-The \fBsmbfs\fR file system allows you to mount CIFS shares that are exported
-from Windows or compatible systems. SMB is the historical name for the CIFS
-protocol, which stands for Server Message Block and is more commonly used in
-technical contexts.
-.sp
-.LP
-The \fBsmbfs\fR file system permits ordinary UNIX applications to change
-directory into an \fBsmbfs\fR mount and perform simple file and directory
-operations. Supported operations include \fBopen\fR, \fBclose\fR, \fBread\fR,
-\fBwrite\fR, \fBrename\fR, \fBdelete\fR, \fBmkdir\fR, \fBrmdir\fR and \fBls\fR.
-.SS "Limitations"
-.sp
-.LP
-Some local UNIX file systems (for example UFS) have features that are not
-supported by \fBsmbfs\fR. These include:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-No mapped-file access because \fBmmap\fR(2) returns \fBENOSYS\fR.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Locking is \fBlocal only\fR and is not sent to the server.
-.RE
-.sp
-.LP
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd September 9, 2009
+.Dt SMBFS 7FS
+.Os
+.Sh NAME
+.Nm smbfs
+.Nd CIFS/SMB file system
+.Sh DESCRIPTION
+The
+.Nm
+file system allows you to mount CIFS shares that are exported from Windows or
+compatible systems.
+SMB is the historical name for the CIFS protocol, which stands for Server
+Message Block and is more commonly used in technical contexts.
+.Pp
+The
+.Nm
+file system permits ordinary UNIX applications to change directory into an
+.Nm
+mount and perform simple file and directory operations.
+Supported operations include
+.Xr open 2 ,
+.Xr close 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr rename 2 ,
+.Xr rm 1 ,
+.Xr mkdir 1 ,
+.Xr rmdir 1 ,
+and
+.Xr ls 1 .
+.Ss Limitations
+Some local UNIX file systems
+.Pq for example UFS
+have features that are not supported by
+.Nm .
+These include:
+.Bl -bullet -offset indent
+.It
+No mapped-file access because
+.Xr mmap (2)
+returns
+.Er ENOSYS .
+.It
+Locking is
+.Sy local only
+and is not sent to the server.
+.El
+.Pp
 The following are limitations in the CIFS protocol:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBunlink()\fR or \fBrename()\fR of open files returns \fBEBUSY\fR.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBrename()\fR of extended attribute files returns \fBEINVAL\fR.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.Bl -bullet -offset indent
+.It
+.Xr unlink 2
+or
+.Xr rename 2
+of open files returns
+Er EBUSY .
+.It
+.Xr rename 2
+of extended attribute files returns
+.Er EINVAL .
+.It
 Creation of files with any of the following illegal characters returns
-\fBEINVAL\fR: colon (\fB:\fR), backslash (\fB\\\fR), slash (\fB/\fR), asterisk
-(\fB*\fR), question mark (\fB?\fR), double quote (\fB"\fR), less than
-(\fB<\fR), greater than (\fB>\fR), and vertical bar (\fB|\fR).
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBchmod\fR and \fBchown\fR settings are silently discarded.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.Er EINVAL :
+colon
+.Pq \&: ,
+backslash
+.Pq \e ,
+slash
+.Pq / ,
+asterisk
+.Pq * ,
+question mark
+.Pq \&? ,
+double quote
+.Pq \(dq ,
+less than
+.Pq \(la ,
+greater than
+.Pq \(ra ,
+and vertical bar
+.Pq | .
+.It
+.Xr chmod 2
+and
+.Xr chown 2
+settings are silently discarded.
+.It
 Links are not supported.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 Symbolic links are not supported.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBmknod\fR is not supported. (Only file and directory objects are supported.)
-.RE
-.sp
-.LP
-The current \fBsmbfs\fR implementation does not support multi-user mounts.
+.It
+.Xr mknod 2
+is not supported.
+.Pq Only file and directory objects are supported.
+.El
+.Pp
+The current
+.Nm
+implementation does not support multi-user mounts.
 Instead, each Unix user needs to make their own private mount points.
-.sp
-.LP
-Currently, all access through an \fBsmbfs\fR mount point uses the Windows
-credentials established by the user that ran the \fBmount\fR command. Normally,
-permissions on \fBsmbfs\fR mount points should be \fB0700\fR to prevent Unix
-users from using each others' Windows credentials. See the \fBdirperms\fR
-option to \fBmount_smbfs\fR(1M) for details regarding how to control
-\fBsmbfs\fR mount point permissions.
-.sp
-.LP
+.Pp
+Currently, all access through an
+.Nm
+mount point uses the Windows credentials established by the user that ran the
+.Xr mount 1
+command.
+Normally, permissions on
+.Nm
+mount points should be
+.Sy 0700
+to prevent Unix users from using each others' Windows credentials.
+See the
+.Ar dirperms
+option to
+.Xr mount_smbfs 1M
+for details regarding how to control
+.Nm
+mount point permissions.
+.Pp
 An important implication of this limitation is that system-wide mounts, such as
-those made using \fB/etc/vfstab\fR or automount maps are only useful in cases
-where access control is not a concern, such as for public read-only resources.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Uncommitted
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBsmbutil\fR(1), \fBmount_smbfs\fR(1M), \fBnsmbrc\fR(4), \fBattributes\fR(5)
+those made using
+.Pa /etc/vfstab
+or automount maps are only useful in cases where access control is not a
+concern, such as for public read-only resources.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh SEE ALSO
+.Xr smbutil 1 ,
+.Xr mount_smbfs 1M ,
+.Xr nsmbrc 4 ,
+.Xr attributes 5

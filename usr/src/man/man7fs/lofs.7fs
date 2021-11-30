@@ -1,87 +1,137 @@
-'\" te
+.\"
 .\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
 .\"  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
-.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOFS 7FS "Nov 24, 2014"
-.SH NAME
-lofs \- loopback virtual file system
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/param.h>
-#include <sys/mount.h>
-
-\fBint\fR \fBmount\fR (\fBconst char *\fR\fIdir\fR, \fBconst char *\fR\fIvirtual\fR, \fBint\fR \fImflag\fR, \fB"lofs"\fR, \fBNULL\fR, \fB0\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 24, 2014
+.Dt LOFS 7FS
+.Os
+.Sh NAME
+.Nm lofs
+.Nd loopback virtual file system
+.Sh SYNOPSIS
+.In sys/param.h
+.In sys/mount.h
+.Ft int
+.Fo mount
+.Fa "const char *dir"
+.Fa "const char *virtual"
+.Fa "int mflag"
+.Fa \(dqlofs\(dq ,
+.Fa NULL ,
+.Fa 0
+.Fc
+.Sh DESCRIPTION
 The loopback file system device allows new, virtual file systems to be created,
-which provide access to existing files using alternate pathnames. Once the
-virtual file system is created, other file systems can be mounted within it,
-without affecting the original file system. However, file systems which are
-subsequently mounted onto the original file system \fIare\fR visible to the
-virtual file system, unless or until the corresponding mount point in the
-virtual file system is covered by a file system mounted there.
-.sp
-.LP
-\fIvirtual\fR is the mount point for the virtual file system. \fIdir\fR is the
-pathname of the existing file system. \fImflag\fR specifies the mount options;
-the  \fBMS_DATA\fR bit in  \fImflag\fR must be set. If the \fBMS_RDONLY\fR bit
-in  \fImflag\fR is not set, accesses to the loop back file system are the same
-as for the underlying file system. Otherwise, all accesses in the loopback file
-system will be read-only. All other \fBmount\fR(2) options are inherited from
-the underlying file systems.
-.sp
-.LP
-A loopback mount of '\fB/\fR' onto \fB/tmp/newroot\fR allows the entire file
-system hierarchy to appear as if it were duplicated under \fB/tmp/newroot\fR,
-including any file systems mounted from remote \fBNFS\fR servers. All files
-would then be accessible either from a pathname relative to '\fB/\fR' or from a
-pathname relative to \fB/tmp/newroot\fR until such time as a file system is
-mounted in \fB/tmp/newroot\fR, or any of its subdirectories.
-.sp
-.LP
-Loopback mounts of '\fB/\fR' can be performed in conjunction with the
-\fBchroot\fR(2) system call, to provide a complete virtual file system to a
-process or family of processes.
-.sp
-.LP
-Recursive traversal of loopback mount points is not allowed. After the loopback
-mount of \fB/tmp/newroot\fR, the file \fB/tmp/newroot/tmp/newroot\fR does not
-contain yet another file system hierarchy; rather, it appears just as
-\fB/tmp/newroot\fR did before the loopback mount was performed (for example, as
-an empty directory).
-.SS "Examples"
-.LP
-\fBlofs\fR file systems are mounted using:
-.sp
-.in +2
-.nf
-\fBmount\fR \fB-F\fR lofs /tmp /mnt
-.fi
-.in -2
-.sp
-
-.SH SEE ALSO
-.LP
-\fBlofiadm\fR(1M), \fBmount\fR(1M), \fBchroot\fR(2), \fBmount\fR(2),
-\fBsysfs\fR(2), \fBvfstab\fR(4), \fBlofi\fR(7D)
-.SH NOTES
-.LP
-All access to entries in \fBlofs\fR mounted file systems map to their
-underlying file system. If a mount point is made available in multiple
-locations via \fBlofs\fR and is busy in any of those locations, an attempt to
-mount a file system at that mount point fails unless the overlay flag is
-specified. See \fBmount\fR(1M). Examples of a mount point being busy within a
-\fBlofs\fR mount include having a file system mounted on it or it being a
-processes' current working directory.
-.SH WARNINGS
-.LP
+which provide access to existing files using alternate pathnames.
+Once the virtual file system is created, other file systems can be mounted
+within it, without affecting the original file system.
+However, file systems which are subsequently mounted onto the original file
+system
+.Em are
+visible to the virtual file system, unless or until the corresponding mount
+point in the virtual file system is covered by a file system mounted there.
+.Pp
+.Fa virtual
+is the mount point for the virtual file system.
+.Fa dir
+is the pathname of the existing file system.
+.Fa mflag
+specifies the mount options; the
+.Dv MS_DATA
+bit in
+.Fa mflag
+must be set.
+If the
+.Dv MS_RDONLY
+bit in
+.Fa mflag
+is not set, accesses to the loop back file system are the same as for the
+underlying file system.
+Otherwise, all accesses in the loopback file system will be read-only.
+All other
+.Xr mount 2
+options are inherited from the underlying file systems.
+.Pp
+A loopback mount of
+.Pa /
+onto
+.Pa /tmp/newroot
+allows the entire file system hierarchy to appear as if it were duplicated under
+.Pa /tmp/newroot ,
+including any file systems mounted from remote NFS servers.
+All files would then be accessible either from a pathname relative to
+.Pa /
+or from a pathname relative to
+.Pa /tmp/newroot
+until such time as a file system is mounted in
+.Pa /tmp/newroot
+or any of its subdirectories.
+.Pp
+Loopback mounts of
+.Pa /
+can be performed in conjunction with the
+.Xr chroot 2
+system call, to provide a complete virtual file system to a process or family of
+processes.
+.Pp
+Recursive traversal of loopback mount points is not allowed.
+After the loopback mount of
+.Pa /tmp/newroot ,
+the file
+.Pa /tmp/newroot/tmp/newroot
+does not contain yet another file system hierarchy; rather, it appears just as
+.Pa /tmp/newroot
+did before the loopback mount was performed
+.Pq for example, as an empty directory .
+.Sh EXAMPLES
+.Nm
+file systems are mounted using:
+.Bd -literal -offset indent
+mount -F lofs /tmp /mnt
+.Ed
+.Sh SEE ALSO
+.Xr lofiadm 1M ,
+.Xr mount 1M ,
+.Xr chroot 2 ,
+.Xr mount 2 ,
+.Xr sysfs 2 ,
+.Xr vfstab 4 ,
+.Xr lofi 7D
+.Sh NOTES
+All access to entries in
+.Nm
+mounted file systems map to their underlying file system.
+If a mount point is made available in multiple locations via
+.Nm
+and is busy in any of those locations, an attempt to mount a file system at that
+mount point fails unless the overlay flag is specified.
+See
+.Xr mount 1M .
+Examples of a mount point being busy within a
+.Nm
+mount include having a file system mounted on it or it being a processes'
+current working directory.
+.Sh WARNINGS
 Because of the potential for confusing users and applications, you should use
-loopback mounts with care. A loopback mount entry in \fB/etc/vfstab\fR must be
-placed after the mount points of both directories it depends on.  This is most
-easily accomplished by  making the loopback mount entry the last in
-\fB/etc/vfstab\fR.
+loopback mounts with care.
+A loopback mount entry in
+.Pa /etc/vfstab
+must be placed after the mount points of both directories it depends on.
+This is most easily accomplished by making the loopback mount entry the last in
+.Pa /etc/vfstab .
