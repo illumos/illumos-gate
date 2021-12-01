@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -95,13 +96,26 @@ smb_dfs_fsctl(smb_request_t *sr, smb_fsctl_t *fsctl)
 	if (!STYPE_ISIPC(sr->tid_tree->t_res_type))
 		return (NT_STATUS_INVALID_DEVICE_REQUEST);
 
+	/*
+	 * If the connection is not DFS capable, we should return
+	 * NT_STATUS_FS_DRIVER_REQUIRED for both of these DFS ioctls.
+	 * See [MS-SMB2] 3.3.5.15.2.
+	 */
+	if ((sr->session->srv_cap & SMB2_CAP_DFS) == 0)
+		return (NT_STATUS_FS_DRIVER_REQUIRED);
+
 	switch (fsctl->CtlCode) {
 	case FSCTL_DFS_GET_REFERRALS:
 		status = smb_dfs_get_referrals(sr, fsctl);
 		break;
 	case FSCTL_DFS_GET_REFERRALS_EX: /* XXX - todo */
 	default:
-		status = NT_STATUS_NOT_SUPPORTED;
+		/*
+		 * MS-SMB2 suggests INVALID_DEVICE_REQUEST
+		 * for unknown control codes, but using that
+		 * here makes Windows unhappy.
+		 */
+		status = NT_STATUS_FS_DRIVER_REQUIRED;
 	}
 
 	return (status);
@@ -520,8 +534,25 @@ smb_dfs_referrals_get(smb_request_t *sr, char *dfs_path, dfs_reftype_t reftype,
 	rc = smb_kdoor_upcall(sr->sr_server, SMB_DR_DFS_GET_REFERRALS,
 	    &req, dfs_referral_query_xdr, refrsp, dfs_referral_response_xdr);
 
-	if (rc != 0 || refrsp->rp_status != ERROR_SUCCESS) {
+	if (rc != 0)
 		return (NT_STATUS_FS_DRIVER_REQUIRED);
+
+	/*
+	 * Map the Win error to one of the NT status codes
+	 * documented in MS-DFSC. The most common, when we
+	 * have no DFS root configured, is NOT_FOUND.
+	 */
+	switch (refrsp->rp_status) {
+	case ERROR_SUCCESS:
+		break;
+	case ERROR_INVALID_PARAMETER:
+		return (NT_STATUS_INVALID_PARAMETER);
+	case ERROR_NOT_ENOUGH_MEMORY:
+		return (NT_STATUS_INSUFFICIENT_RESOURCES);
+	case ERROR_NOT_FOUND:
+		return (NT_STATUS_NOT_FOUND);
+	default:
+		return (NT_STATUS_UNEXPECTED_NETWORK_ERROR);
 	}
 
 	(void) strsubst(refrsp->rp_referrals.i_uncpath, '/', '\\');
