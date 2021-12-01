@@ -2625,7 +2625,7 @@ int sh_exec(register const Shnode_t *t, int flags)
 #endif	/* timeofday */
 				job.waitall = 1;
 				sh_onstate(SH_TIMING);
-				sh_exec(t->par.partre,OPTIMIZE);
+				sh_exec(t->par.partre,sh_isstate(SH_ERREXIT)|OPTIMIZE);
 				if(!timer_on)
 					sh_offstate(SH_TIMING);
 				job.waitall = 0;
