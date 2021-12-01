@@ -45,6 +45,11 @@ static const char gdb_tmpl[] = "gdb -ex \"set pagination 0\" -p %d";
 
 #define	boot_ncpus	(sysconf(_SC_NPROCESSORS_ONLN))
 
+static size_t ilog2(size_t a)
+{
+	return (a > 1 ? 1 + ilog2(a >> 1) : 0);
+}
+
 static void print_opts(raidz_test_opts_t *opts, boolean_t force)
 {
 	char *verbose;

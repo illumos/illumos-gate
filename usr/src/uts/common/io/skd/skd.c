@@ -179,8 +179,7 @@ static struct modlinkage modlinkage = {
 /*
  * sTec-required wrapper for debug printing.
  */
-/*PRINTFLIKE2*/
-static inline void
+static void
 Dcmn_err(int lvl, const char *fmt, ...)
 {
 	va_list ap;

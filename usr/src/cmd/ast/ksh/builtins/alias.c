@@ -175,7 +175,7 @@ static const char *script = "\n"
 "fi\n"
 "exitval=$?";
 
-static inline int
+static int
 script_builtin_main(int argc, char **argv)
 {
 	int i;
