@@ -111,8 +111,10 @@ static int gfx_inverse_screen = 0;
 static uint8_t gfx_fg = DEFAULT_ANSI_FOREGROUND;
 static uint8_t gfx_bg = DEFAULT_ANSI_BACKGROUND;
 #if defined(EFI)
+EFI_GRAPHICS_OUTPUT_BLT_PIXEL *shadow_fb;
 static EFI_GRAPHICS_OUTPUT_BLT_PIXEL *GlyphBuffer;
 #else
+struct paletteentry *shadow_fb;
 static struct paletteentry *GlyphBuffer;
 #endif
 static size_t GlyphBufferSize;
@@ -827,6 +829,38 @@ gfxfb_blt_video_to_video(uint32_t SourceX, uint32_t SourceY,
 	return (0);
 }
 
+static void
+gfxfb_shadow_fill(uint32_t *BltBuffer,
+    uint32_t DestinationX, uint32_t DestinationY,
+    uint32_t Width, uint32_t Height)
+{
+	uint32_t fbX, fbY;
+
+	if (shadow_fb == NULL)
+		return;
+
+	fbX = gfx_fb.framebuffer_common.framebuffer_width;
+	fbY = gfx_fb.framebuffer_common.framebuffer_height;
+
+	if (BltBuffer == NULL)
+		return;
+
+	if (DestinationX + Width > fbX)
+		Width = fbX - DestinationX;
+
+	if (DestinationY + Height > fbY)
+		Height = fbY - DestinationY;
+
+	uint32_t y2 = Height + DestinationY;
+	for (uint32_t y1 = DestinationY; y1 < y2; y1++) {
+		uint32_t off = y1 * fbX + DestinationX;
+
+		for (uint32_t x = 0; x < Width; x++) {
+			*(uint32_t *)&shadow_fb[off + x] = *BltBuffer;
+		}
+	}
+}
+
 int
 gfxfb_blt(void *BltBuffer, GFXFB_BLT_OPERATION BltOperation,
     uint32_t SourceX, uint32_t SourceY,
@@ -848,6 +882,8 @@ gfxfb_blt(void *BltBuffer, GFXFB_BLT_OPERATION BltOperation,
 		tpl = BS->RaiseTPL(TPL_NOTIFY);
 		switch (BltOperation) {
 		case GfxFbBltVideoFill:
+			gfxfb_shadow_fill(BltBuffer, DestinationX,
+			    DestinationY, Width, Height);
 			status = gop->Blt(gop, BltBuffer, EfiBltVideoFill,
 			    SourceX, SourceY, DestinationX, DestinationY,
 			    Width, Height, Delta);
@@ -899,6 +935,8 @@ gfxfb_blt(void *BltBuffer, GFXFB_BLT_OPERATION BltOperation,
 
 	switch (BltOperation) {
 	case GfxFbBltVideoFill:
+		gfxfb_shadow_fill(BltBuffer, DestinationX, DestinationY,
+		    Width, Height);
 		rv = gfxfb_blt_fill(BltBuffer, DestinationX, DestinationY,
 		    Width, Height);
 		break;
@@ -946,13 +984,77 @@ gfx_fb_cons_clear(struct vis_consclear *ca)
 void
 gfx_fb_cons_copy(struct vis_conscopy *ma)
 {
-	uint32_t width, height;
+#if defined(EFI)
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *source, *destination;
+#else
+	struct paletteentry *source, *destination;
+#endif
+	uint32_t width, height, bytes;
+	uint32_t sx, sy, dx, dy;
+	uint32_t pitch;
+	int step;
 
 	width = ma->e_col - ma->s_col + 1;
 	height = ma->e_row - ma->s_row + 1;
 
-	(void) gfxfb_blt(NULL, GfxFbBltVideoToVideo, ma->s_col, ma->s_row,
-	    ma->t_col, ma->t_row, width, height, 0);
+	sx = ma->s_col;
+	sy = ma->s_row;
+	dx = ma->t_col;
+	dy = ma->t_row;
+
+	if (sx + width > gfx_fb.framebuffer_common.framebuffer_width)
+		width = gfx_fb.framebuffer_common.framebuffer_width - sx;
+
+	if (sy + height > gfx_fb.framebuffer_common.framebuffer_height)
+		height = gfx_fb.framebuffer_common.framebuffer_height - sy;
+
+	if (dx + width > gfx_fb.framebuffer_common.framebuffer_width)
+		width = gfx_fb.framebuffer_common.framebuffer_width - dx;
+
+	if (dy + height > gfx_fb.framebuffer_common.framebuffer_height)
+		height = gfx_fb.framebuffer_common.framebuffer_height - dy;
+
+	if (width == 0 || height == 0)
+		return;
+
+	/*
+	 * With no shadow fb, use video to video copy.
+	 */
+	if (shadow_fb == NULL) {
+		(void) gfxfb_blt(NULL, GfxFbBltVideoToVideo,
+		    sx, sy, dx, dy, width, height, 0);
+		return;
+	}
+
+	/*
+	 * With shadow fb, we need to copy data on both shadow and video,
+	 * to preserve the consistency. We only read data from shadow fb.
+	 */
+
+	step = 1;
+	pitch = gfx_fb.framebuffer_common.framebuffer_width;
+	bytes = width * sizeof (*shadow_fb);
+
+	/*
+	 * To handle overlapping areas, set up reverse copy here.
+	 */
+	if (dy * pitch + dx > sy * pitch + sx) {
+		sy += height;
+		dy += height;
+		step = -step;
+	}
+
+	while (height-- > 0) {
+		source = &shadow_fb[sy * pitch + sx];
+		destination = &shadow_fb[dy * pitch + dx];
+
+		bcopy(source, destination, bytes);
+		(void) gfxfb_blt(destination, GfxFbBltBufferToVideo,
+		    0, 0, dx, dy, width, 1, 0);
+
+		sy += step;
+		dy += step;
+	}
 }
 
 /*
@@ -1030,9 +1132,9 @@ void
 gfx_fb_cons_display(struct vis_consdisplay *da)
 {
 #if defined(EFI)
-	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *BltBuffer;
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *BltBuffer, *data;
 #else
-	struct paletteentry *BltBuffer;
+	struct paletteentry *BltBuffer, *data;
 #endif
 	uint32_t size;
 
@@ -1045,7 +1147,30 @@ gfx_fb_cons_display(struct vis_consdisplay *da)
 	    gfx_fb.framebuffer_common.framebuffer_height)
 		return;
 
-	size = sizeof (*BltBuffer) * da->width * da->height;
+	/*
+	 * If we do have shadow fb, we will use shadow to render data,
+	 * and copy shadow to video.
+	 */
+	if (shadow_fb != NULL) {
+		uint32_t pitch = gfx_fb.framebuffer_common.framebuffer_width;
+		uint32_t dx, dy, width, height;
+
+		dx = da->col;
+		dy = da->row;
+		height = da->height;
+		width = da->width;
+
+		data = (void *)da->data;
+		/* Copy rectangle line by line. */
+		for (uint32_t y = 0; y < height; y++) {
+			BltBuffer = shadow_fb + dy * pitch + dx;
+			bitmap_cpy(BltBuffer, &data[y * width], width);
+			(void) gfxfb_blt(BltBuffer, GfxFbBltBufferToVideo,
+			    0, 0, dx, dy, width, 1, 0);
+			dy++;
+		}
+		return;
+	}
 
 	/*
 	 * Common data to display is glyph, use preallocated
@@ -1054,6 +1179,7 @@ gfx_fb_cons_display(struct vis_consdisplay *da)
 	if (tems.ts_pix_data_size != GlyphBufferSize)
 		(void) allocate_glyphbuffer(da->width, da->height);
 
+	size = sizeof (*BltBuffer) * da->width * da->height;
 	if (size == GlyphBufferSize) {
 		BltBuffer = GlyphBuffer;
 	} else {
@@ -1074,8 +1200,14 @@ gfx_fb_cons_display(struct vis_consdisplay *da)
 }
 
 static void
-gfx_fb_cursor_impl(uint32_t fg, uint32_t bg, struct vis_conscursor *ca)
+gfx_fb_cursor_impl(void *buf, uint32_t stride, uint32_t fg, uint32_t bg,
+    struct vis_conscursor *ca)
 {
+#if defined(EFI)
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *p;
+#else
+	struct paletteentry *p;
+#endif
 	union pixel {
 #if defined(EFI)
 		EFI_GRAPHICS_OUTPUT_BLT_PIXEL p;
@@ -1085,13 +1217,15 @@ gfx_fb_cursor_impl(uint32_t fg, uint32_t bg, struct vis_conscursor *ca)
 		uint32_t p32;
 	} *row;
 
+	p = buf;
+
 	/*
 	 * Build inverse image of the glyph.
 	 * Since xor has self-inverse property, drawing cursor
 	 * second time on the same spot, will restore the original content.
 	 */
 	for (screen_size_t i = 0; i < ca->height; i++) {
-		row = (union pixel *)(GlyphBuffer + i * ca->width);
+		row = (union pixel *)(p + i * stride);
 		for (screen_size_t j = 0; j < ca->width; j++) {
 			row[j].p32 = (row[j].p32 ^ fg) ^ bg;
 		}
@@ -1113,13 +1247,33 @@ gfx_fb_display_cursor(struct vis_conscursor *ca)
 	bcopy(&ca->fg_color, &fg.p32, sizeof (fg.p32));
 	bcopy(&ca->bg_color, &bg.p32, sizeof (bg.p32));
 
-	if (allocate_glyphbuffer(ca->width, ca->height) != NULL) {
+	if (shadow_fb == NULL &&
+	    allocate_glyphbuffer(ca->width, ca->height) != NULL) {
 		if (gfxfb_blt(GlyphBuffer, GfxFbBltVideoToBltBuffer,
 		    ca->col, ca->row, 0, 0, ca->width, ca->height, 0) == 0)
-			gfx_fb_cursor_impl(fg.p32, bg.p32, ca);
+			gfx_fb_cursor_impl(GlyphBuffer, ca->width,
+			    fg.p32, bg.p32, ca);
 
 		(void) gfxfb_blt(GlyphBuffer, GfxFbBltBufferToVideo, 0, 0,
 		    ca->col, ca->row, ca->width, ca->height, 0);
+		return;
+	}
+
+	uint32_t pitch = gfx_fb.framebuffer_common.framebuffer_width;
+	uint32_t dx, dy, width, height;
+
+	dx = ca->col;
+	dy = ca->row;
+	width = ca->width;
+	height = ca->height;
+
+	gfx_fb_cursor_impl(shadow_fb + dy * pitch + dx, pitch,
+	    fg.p32, bg.p32, ca);
+	/* Copy rectangle line by line. */
+	for (uint32_t y = 0; y < height; y++) {
+		(void) gfxfb_blt(shadow_fb + dy * pitch + dx,
+		    GfxFbBltBufferToVideo, 0, 0, dx, dy, width, 1, 0);
+		dy++;
 	}
 }
 

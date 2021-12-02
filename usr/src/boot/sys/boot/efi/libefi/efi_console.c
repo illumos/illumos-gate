@@ -424,9 +424,15 @@ static void
 efi_framebuffer_setup(void)
 {
 	int bpp, pos;
+	extern EFI_GRAPHICS_OUTPUT_BLT_PIXEL *shadow_fb;
 
 	bpp = fls(efifb.fb_mask_red | efifb.fb_mask_green |
 	    efifb.fb_mask_blue | efifb.fb_mask_reserved);
+
+	if (shadow_fb != NULL)
+		free(shadow_fb);
+	shadow_fb = malloc(efifb.fb_width * efifb.fb_height *
+	    sizeof (*shadow_fb));
 
 	gfx_fb.framebuffer_common.mb_type = MULTIBOOT_TAG_TYPE_FRAMEBUFFER;
 	gfx_fb.framebuffer_common.mb_size = sizeof (gfx_fb);
