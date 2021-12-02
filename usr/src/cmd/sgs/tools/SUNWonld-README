@@ -1682,3 +1682,4 @@ Bugid   Risk Synopsis
 14207	want updated ELF relocation definitions from the psABI
 14209	partial support for new relaxable relocations
 14250	ld should resolve discarded COMDAT symbols against their mates
+14283	ldd should not complain about non-executable shared objects

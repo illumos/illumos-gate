@@ -47,8 +47,7 @@
 @ MSG_USP_UNKNOWN	"%s: %s: unsupported or unknown file type\n"
 @ MSG_USP_ELFINS	"%s: %s: file has insecure interpreter %s\n"
 @ MSG_USP_AOUTINS	"%s: %s: insecure a.out file\n"
-@ MSG_USP_NOTEXEC_1	"%s: %s: is not executable\n"
-@ MSG_USP_NOTEXEC_2	"warning: %s: %s: is not executable\n"
+@ MSG_USP_NOTEXEC	"%s: %s: is not executable\n"
 
 
 # ELF messages

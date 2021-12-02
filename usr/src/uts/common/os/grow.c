@@ -30,7 +30,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/types.h>
 #include <sys/inttypes.h>
@@ -758,20 +758,11 @@ smmap_common(caddr_t *addrp, size_t len,
 	}
 
 	/*
-	 * XXX - Do we also adjust maxprot based on protections
-	 * of the vnode?  E.g. if no execute permission is given
-	 * on the vnode for the current user, maxprot probably
-	 * should disallow PROT_EXEC also?  This is different
-	 * from the write access as this would be a per vnode
-	 * test as opposed to a per fd test for writability.
-	 */
-
-	/*
-	 * Verify that the specified protections are not greater than
-	 * the maximum allowable protections.  Also test to make sure
-	 * that the file descriptor does allows for read access since
-	 * "write only" mappings are hard to do since normally we do
-	 * the read from the file before the page can be written.
+	 * Verify that the specified protections are not greater than the
+	 * maximum allowable protections.  Also test to make sure that the
+	 * file descriptor allows for read access since "write only" mappings
+	 * are hard to do since normally we do the read from the file before
+	 * the page can be written.
 	 */
 	if (((maxprot & uprot) != uprot) || (fp->f_flag & FREAD) == 0)
 		return (EACCES);
