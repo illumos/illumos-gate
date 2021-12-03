@@ -285,3 +285,56 @@ NO_COMMENT	^usr/lib/raidcfg/sparcv9/mpt\.so\.1
 NO_COMMENT	^usr/lib/sparcv9/libike\.so\.1
 NO_COMMENT	^usr/sbin/chk_encodings
 NO_COMMENT	^usr/xpg4/bin/more
+NO_COMMENT	^kernel/drv/amd64/acpi_toshiba
+NO_COMMENT	^kernel/drv/amd64/adpu320
+NO_COMMENT	^kernel/drv/amd64/atiatom
+NO_COMMENT	^kernel/drv/amd64/bcm_sata
+NO_COMMENT	^kernel/drv/amd64/glm
+NO_COMMENT	^kernel/drv/amd64/intel_nhmex
+NO_COMMENT	^kernel/drv/amd64/ixgb
+NO_COMMENT	^kernel/drv/amd64/lsimega
+NO_COMMENT	^kernel/drv/amd64/marvell88sx
+NO_COMMENT	^kernel/drv/amd64/mpt
+NO_COMMENT	^kernel/drv/amd64/sdpib
+NO_COMMENT	^kernel/drv/amd64/usbser_edge
+NO_COMMENT	^kernel/kmdb/amd64/mpt
+NO_COMMENT	^kernel/kmdb/amd64/nfs
+NO_COMMENT	^kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_emc
+NO_COMMENT	^kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_lsi
+NO_COMMENT	^kernel/misc/scsi_vhci/amd64/scsi_vhci_f_sym_emc
+NO_COMMENT	^kernel/strmod/amd64/sdpib
+NO_COMMENT	^platform/i86pc/kernel/cpu/amd64/cpu_ms\.GenuineIntel\.6\.46
+NO_COMMENT	^platform/i86pc/kernel/cpu/amd64/cpu_ms\.GenuineIntel\.6\.47
+
+# ath contains a binary HAL component which contains an incorrect .comment
+# section and has a license which forbids modification.
+NO_COMMENT	^kernel/drv/amd64/ath
+
+# mdb standalone library versions which are neither delivered nor are real
+# shared objects
+NO_COMMENT	^usr/lib/amd64/libstanddisasm\.so
+NO_COMMENT	^usr/lib/amd64/libstandsaveargs\.so
+NO_COMMENT	^usr/lib/amd64/libstanddisasm\.so
+NO_COMMENT	^usr/lib/libstanddisasm\.so
+
+# closed binaries predate -ztype=kmod
+NOT_KMOD	^kernel/drv/amd64/acpi_toshiba
+NOT_KMOD	^kernel/drv/amd64/adpu320
+NOT_KMOD	^kernel/drv/amd64/atiatom
+NOT_KMOD	^kernel/drv/amd64/bcm_sata
+NOT_KMOD	^kernel/drv/amd64/glm
+NOT_KMOD	^kernel/drv/amd64/intel_nhmex
+NOT_KMOD	^kernel/drv/amd64/ixgb
+NOT_KMOD	^kernel/drv/amd64/lsimega
+NOT_KMOD	^kernel/drv/amd64/marvell88sx
+NOT_KMOD	^kernel/drv/amd64/mpt
+NOT_KMOD	^kernel/drv/amd64/sdpib
+NOT_KMOD	^kernel/drv/amd64/usbser_edge
+NOT_KMOD	^kernel/kmdb/amd64/mpt
+NOT_KMOD	^kernel/kmdb/amd64/nfs
+NOT_KMOD	^kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_emc
+NOT_KMOD	^kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_lsi
+NOT_KMOD	^kernel/misc/scsi_vhci/amd64/scsi_vhci_f_sym_emc
+NOT_KMOD	^kernel/strmod/amd64/sdpib
+NOT_KMOD	^platform/i86pc/kernel/cpu/amd64/cpu_ms\.GenuineIntel\.6\.46
+NOT_KMOD	^platform/i86pc/kernel/cpu/amd64/cpu_ms\.GenuineIntel\.6\.47

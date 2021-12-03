@@ -228,11 +228,13 @@ sub ProcFile {
 	# Obtain the ELF information for this object.
 	@Elf = GetObjectInfo($FullPath);
 
-        # Return quietly if:
-	#	- Not an executable or sharable object
-	#	- An executable, but the -s option was used.
-	if ((($Elf[1] ne 'EXEC') && ($Elf[1] ne 'DYN')) ||
-	    (($Elf[1] eq 'EXEC') && $opt{s})) {
+	if ($Elf[1] eq 'NONE') {
+		return;
+	}
+
+        # Return quietly if object is executable or relocatable but the -s
+        # option was used.
+	if ((($Elf[1] eq 'EXEC') || ($Elf[1] eq 'REL')) && $opt{s}) {
 		return;
 	}
 
