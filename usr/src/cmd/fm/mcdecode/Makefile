@@ -26,7 +26,7 @@ ROOTLIBFMD = $(ROOT)/usr/lib/fm/fmd
 ROOTPROG = $(ROOTLIBFMD)/$(PROG)
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
-CPPFLAGS += -I$(SRC)/uts/i86pc/io/imc
+CPPFLAGS += -I$(SRC)/uts/intel/io/imc
 LDLIBS += -lnvpair
 
 CSTD = $(CSTD_GNU99)

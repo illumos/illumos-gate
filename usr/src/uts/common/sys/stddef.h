@@ -25,7 +25,7 @@ extern "C" {
 #endif
 
 #if !defined(offsetof)
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 1)
 #define	offsetof(s, m)	__builtin_offsetof(s, m)
 #else
 #if __cplusplus >= 199711L

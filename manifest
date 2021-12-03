@@ -689,6 +689,8 @@ f kernel/drv/amd64/i8042 0755 root sys
 f kernel/drv/amd64/icmp 0755 root sys
 f kernel/drv/amd64/icmp6 0755 root sys
 f kernel/drv/amd64/igb 0755 root sys
+f kernel/drv/amd64/imc 0755 root sys
+f kernel/drv/amd64/imcstub 0755 root sys
 f kernel/drv/amd64/intel_nb5000 0755 root sys
 f kernel/drv/amd64/intel_nhm 0755 root sys
 f kernel/drv/amd64/intel_nhmex 0755 root sys
@@ -865,6 +867,7 @@ f kernel/drv/i40e.conf 0644 root sys
 f kernel/drv/icmp.conf 0644 root sys
 f kernel/drv/icmp6.conf 0644 root sys
 f kernel/drv/igb.conf 0644 root sys
+f kernel/drv/imc.conf 0644 root sys
 f kernel/drv/intel_nb5000.conf 0644 root sys
 f kernel/drv/intel_nhm.conf 0644 root sys
 f kernel/drv/intel_nhmex.conf 0644 root sys
@@ -1928,8 +1931,6 @@ f platform/i86pc/kernel/drv/amd64/cpc 0755 root sys
 f platform/i86pc/kernel/drv/amd64/cpudrv 0755 root sys
 f platform/i86pc/kernel/drv/amd64/dr 0755 root sys
 f platform/i86pc/kernel/drv/amd64/fipe 0755 root sys
-f platform/i86pc/kernel/drv/amd64/imc 0755 root sys
-f platform/i86pc/kernel/drv/amd64/imcstub 0755 root sys
 f platform/i86pc/kernel/drv/amd64/ioat 0755 root sys
 f platform/i86pc/kernel/drv/amd64/isa 0755 root sys
 f platform/i86pc/kernel/drv/amd64/npe 0755 root sys
@@ -1943,7 +1944,6 @@ f platform/i86pc/kernel/drv/amd_iommu.conf 0644 root sys
 f platform/i86pc/kernel/drv/cpc.conf 0644 root sys
 f platform/i86pc/kernel/drv/dr.conf 0644 root sys
 f platform/i86pc/kernel/drv/fipe.conf 0644 root sys
-f platform/i86pc/kernel/drv/imc.conf 0644 root sys
 f platform/i86pc/kernel/drv/ioat.conf 0644 root sys
 f platform/i86pc/kernel/drv/pci-ide.conf 0644 root sys
 f platform/i86pc/kernel/drv/pit_beep.conf 0644 root sys
