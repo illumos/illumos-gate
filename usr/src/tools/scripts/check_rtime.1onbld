@@ -229,7 +229,7 @@ rules from
 is the typical reason for having non-pic code in shared objects.
 Text relocations are displayed as:
 .Pp
-.Dl foo: TEXTREL .dynamic tag  <no -Kpic?>
+.Dl foo: TEXTREL .dynamic tag  <no -fpic?>
 .It
 Debugging information is unnecessary in released objects.
 Although extensive when compiled

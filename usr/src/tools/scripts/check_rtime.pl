@@ -560,7 +560,7 @@ ELF:	foreach my $Line (@Elf) {
 				next ELF;
 			}
 			onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath,
-			    "TEXTREL .dynamic tag\t\t\t<no -Kpic?>");
+			    "TEXTREL .dynamic tag\t\t\t<no -fpic?>");
 			$Tex = 0;
 			next;
 		}
