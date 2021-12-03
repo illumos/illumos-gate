@@ -26,6 +26,7 @@
 #include <sys/asm_linkage.h>
 
 	.file	"mach-crt1.s"
+	.ident	""
 
 /* global entities defined elsewhere but used here */
 	.globl	_start_crt

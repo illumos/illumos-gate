@@ -27,6 +27,7 @@
 #include <sys/asm_linkage.h>
 
 	.file	"mach-crt1.s"
+	.ident	""
 
 	.global	_start_crt
 

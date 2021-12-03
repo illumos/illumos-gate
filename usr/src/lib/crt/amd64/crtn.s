@@ -24,6 +24,7 @@
  */
 
 	.file	"crtn.s"
+	.ident	""
 
 /*
  * These crt*.o modules are provided as the bare minimum required
