@@ -1278,7 +1278,7 @@ ehci_init_ctlr(ehci_state_t *ehcip, int init_type)
 	/*
 	 * Currently EHCI driver doesn't support 64 bit addressing.
 	 *
-	 * If we are using 64 bit addressing capability, then, program
+	 * If the controller is 64-bit address capable, then program
 	 * ehci_ctrl_segment register with 4 Gigabyte segment where all
 	 * of the interface data structures are allocated.
 	 */
@@ -1287,10 +1287,10 @@ ehci_init_ctlr(ehci_state_t *ehcip, int init_type)
 		USB_DPRINTF_L3(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 		    "ehci_init_ctlr: EHCI driver doesn't support "
 		    "64 bit addressing");
-	}
 
-	/* 64 bit addressing is not support */
-	Set_OpReg(ehci_ctrl_segment, 0x00000000);
+		/* 64 bit addressing is not supported */
+		Set_OpReg(ehci_ctrl_segment, 0x00000000);
+	}
 
 	/* Turn on/off the schedulers */
 	ehci_toggle_scheduler(ehcip);
@@ -1317,9 +1317,16 @@ ehci_init_ctlr(ehci_state_t *ehcip, int init_type)
 	/*
 	 * Set the desired interrupt threshold and turn on EHCI host controller.
 	 */
-	Set_OpReg(ehci_command,
-	    ((Get_OpReg(ehci_command) & ~EHCI_CMD_INTR_THRESHOLD) |
-	    (EHCI_CMD_01_INTR | EHCI_CMD_HOST_CTRL_RUN)));
+	uint32_t cmd_reg = Get_OpReg(ehci_command);
+
+	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+	    "%s: cmd_reg: %x\n", __func__, cmd_reg);
+
+	cmd_reg &= ~EHCI_CMD_INTR_THRESHOLD;
+	cmd_reg |= EHCI_CMD_01_INTR;
+	cmd_reg |= EHCI_CMD_PERIODIC_SCHED_ENABLE;
+
+	Set_OpReg(ehci_command, cmd_reg | EHCI_CMD_HOST_CTRL_RUN);
 
 	ASSERT(Get_OpReg(ehci_command) & EHCI_CMD_HOST_CTRL_RUN);
 
