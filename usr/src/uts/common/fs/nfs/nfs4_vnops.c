@@ -39,6 +39,7 @@
 
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -10849,8 +10850,20 @@ nfs4_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 		return (EIO);
 
 	/* check for valid cmd parameter */
-	if (cmd != F_GETLK && cmd != F_SETLK && cmd != F_SETLKW)
+	switch (cmd) {
+	case F_FLOCK:
+	case F_FLOCKW:
+	case F_OFD_GETLK:
+	case F_OFD_SETLK:
+	case F_OFD_SETLKW:
+		return (EOPNOTSUPP);
+	case F_GETLK:
+	case F_SETLK:
+	case F_SETLKW:
+		break;
+	default:
 		return (EINVAL);
+	}
 
 	/* Verify l_type. */
 	switch (bfp->l_type) {
