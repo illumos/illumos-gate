@@ -17,7 +17,9 @@
  * purpose.  It is provided "as is" without express or implied warranty.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 /*
  * Modification history kern_ntptime.c
@@ -116,7 +118,7 @@ ntp_gettime(struct ntptimeval *tp)
 	 * synchronization requested
 	 */
 	    (time_status & (STA_PPSFREQ | STA_PPSTIME) &&
-		!(time_status & STA_PPSSIGNAL)) ||
+	    !(time_status & STA_PPSSIGNAL)) ||
 
 	/*
 	 * PPS jitter exceeded when time synchronization
@@ -128,9 +130,10 @@ ntp_gettime(struct ntptimeval *tp)
 	 * PPS wander exceeded or calibration error when
 	 * frequency synchronization requested
 	 */
-	    (time_status & STA_PPSFREQ && time_status &
-		(STA_PPSWANDER | STA_PPSERROR)))
+	    (time_status & STA_PPSFREQ &&
+	    time_status & (STA_PPSWANDER | STA_PPSERROR))) {
 		return (TIME_ERROR);
+	}
 
 	return (time_state);
 }
@@ -157,7 +160,11 @@ ntp_adjtime(struct timex *tp)
 	if (modes != 0 && secpolicy_settime(CRED()) != 0)
 		return (set_errno(EPERM));
 
-	if (ntv.constant < 0 || ntv.constant > 30)
+	/*
+	 * If the time constant is being set, validate it first so that
+	 * no changes are made if it is out of range.
+	 */
+	if ((modes & MOD_TIMECONST) && (ntv.constant < 0 || ntv.constant > 30))
 		return (set_errno(EINVAL));
 
 	mutex_enter(&tod_lock);
@@ -173,6 +180,10 @@ ntp_adjtime(struct timex *tp)
 		time_constant = ntv.constant;
 	if (modes & MOD_OFFSET)
 		clock_update(ntv.offset);
+	/*
+	 * clock_update() updates time_freq so keep MOD_FREQUENCY after
+	 * MOD_OFFSET.
+	 */
 	if (modes & MOD_FREQUENCY)
 		time_freq = ntv.freq - pps_freq;
 	/*

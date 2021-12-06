@@ -514,4 +514,18 @@ $SHELL -xc '$(LD_LIBRARY_PATH=$LD_LIBRARY_PATH exec $SHELL -c :)' > /dev/null 2>
 
 $SHELL 2> /dev/null -c $'for i;\ndo :;done' || err_exit 'for i ; <newline> not vaid'
 
+# The time keyword should obey the errexit option
+# https://www.illumos.org/issues/7694
+time_errexit="$tmp/time_errexit.sh"
+cat > "$time_errexit" << 'EOF'
+time false
+echo FAILURE
+true
+EOF
+got=$($SHELL -e "$time_errexit" 2>&1)
+(( $? == 0 )) && err_exit "The time keyword ignores the errexit option" \
+	"(got $(printf %q "$got"))"
+[[ -z $got ]] || err_exit "The time keyword produces output when a timed command fails and the errexit option is on" \
+	"(got $(printf %q "$got"))"
+
 exit $((Errors<125?Errors:125))

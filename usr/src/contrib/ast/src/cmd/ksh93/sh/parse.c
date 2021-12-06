@@ -251,7 +251,7 @@ static Shnode_t	*makeparent(Lex_t *lp, int flag, Shnode_t *child)
 	return(par);
 }
 
-static int paramsub(const char *str)
+static const char *paramsub(const char *str)
 {
 	register int c,sub=0,lit=0;
 	while(c= *str++)
@@ -259,16 +259,16 @@ static int paramsub(const char *str)
 		if(c=='$' && !lit)
 		{
 			if(*str=='(')
-				return(0);
+				return(NULL);
 			if(sub)
 				continue;
 			if(*str=='{')
 				str++;
 			if(!isdigit(*str) && strchr("?#@*!$ ",*str)==0)
-				return(1);
+				return(str);
 		}
 		else if(c=='`')
-			return(0);
+			return(NULL);
 		else if(c=='[' && !lit)
 			sub++;
 		else if(c==']' && !lit)
@@ -276,7 +276,7 @@ static int paramsub(const char *str)
 		else if(c=='\'')
 			lit = !lit;
 	}
-	return(0);
+	return(NULL);
 }
 
 static Shnode_t *getanode(Lex_t *lp, struct argnod *ap)
@@ -289,8 +289,15 @@ static Shnode_t *getanode(Lex_t *lp, struct argnod *ap)
 		t->ar.arcomp = sh_arithcomp(lp->sh,ap->argval);
 	else
 	{
-		if(sh_isoption(SH_NOEXEC) && (ap->argflag&ARG_MAC) && paramsub(ap->argval))
-			errormsg(SH_DICT,ERROR_warn(0),e_lexwarnvar,lp->sh->inlineno, ap->argval);
+		const char *p, *q;
+
+		if (sh_isoption(SH_NOEXEC) && (ap->argflag&ARG_MAC) &&
+		    (p = paramsub(ap->argval)) != NULL) {
+			for (q = p; !isspace(*q) && *q != '\0'; q++)
+				;
+			errormsg(SH_DICT, ERROR_warn(0), e_lexwarnvar,
+			    lp->sh->inlineno, ap->argval, q - p, p);
+		}
 		t->ar.arcomp = 0;
 	}
 	return(t);
