@@ -110,6 +110,7 @@ enum {
 	FEC_RS		= 1 << 0,	/* Reed-Solomon */
 	FEC_BASER_RS	= 1 << 1,	/* Base-R, aka Firecode */
 	FEC_NONE	= 1 << 2,	/* no FEC */
+	FEC_FORCE	= 1 << 3,       /* Force specified FEC */
 
 	/*
 	 * Pseudo FECs that translate to real FECs.  The firmware knows nothing
@@ -507,20 +508,11 @@ enum fw_caps {
 
 struct link_config {
 	fw_port_cap32_t pcaps;		/* link capabilities */
-	fw_port_cap32_t def_acaps;	/* default advertised capabilities */
 	fw_port_cap32_t	acaps;		/* advertised capabilities */
 	fw_port_cap32_t	lpacaps;	/* peer advertised capabilities */
 
-	fw_port_cap32_t speed_caps;	/* speed(s) user has requested */
-	u32		speed;		/* actual link speed (Mb/s) */
-
-	cc_pause_t	requested_fc;	/* flow control user has requested */
-	cc_pause_t	fc;		/* actual link flow control */
-
-	cc_fec_t	requested_fec;	/* Forward Error Correction: */
-	cc_fec_t	fec;		/*   requested and actual in use */
-
-	unsigned char	autoneg;	/* autonegotiating? */
+	fw_port_cap32_t link_caps;      /* current link capabilities */
+	fw_port_cap32_t admin_caps;     /* admin configured link capabilities */
 
 	unsigned char	link_ok;	/* link up? */
 	unsigned char	link_down_rc;	/* link down reason */
@@ -595,21 +587,30 @@ int t4_slow_intr_handler(struct adapter *adapter);
 
 int t4_hash_mac_addr(const u8 *addr);
 
-fw_port_cap32_t t4_link_acaps(struct adapter *adapter, unsigned int port,
-			      struct link_config *lc);
+unsigned int t4_link_fwcap_to_speed(fw_port_cap32_t caps);
+int t4_link_set_autoneg(struct port_info *pi, u8 autoneg,
+			fw_port_cap32_t *new_caps);
+int t4_link_set_pause(struct port_info *pi, cc_pause_t pause,
+		      fw_port_cap32_t *new_caps);
+int t4_link_set_fec(struct port_info *pi, cc_fec_t fec,
+		    fw_port_cap32_t *new_caps);
+int t4_link_set_speed(struct port_info *pi, fw_port_cap32_t speed, u8 en,
+		      fw_port_cap32_t *new_caps);
 int t4_link_l1cfg_core(struct adapter *adapter, unsigned int mbox,
 		       unsigned int port, struct link_config *lc,
-		       bool sleep_ok, int timeout);
+		       fw_port_cap32_t rcap, bool sleep_ok, int timeout);
 static inline int t4_link_l1cfg(struct adapter *adapter, unsigned int mbox,
-				unsigned int port, struct link_config *lc)
+				unsigned int port, struct link_config *lc,
+				fw_port_cap32_t rcap)
 {
-	return t4_link_l1cfg_core(adapter, mbox, port, lc,
+	return t4_link_l1cfg_core(adapter, mbox, port, lc, rcap,
 				  true, FW_CMD_MAX_TIMEOUT);
 }
 static inline int t4_link_l1cfg_ns(struct adapter *adapter, unsigned int mbox,
-				   unsigned int port, struct link_config *lc)
+				   unsigned int port, struct link_config *lc,
+				   fw_port_cap32_t rcap)
 {
-	return t4_link_l1cfg_core(adapter, mbox, port, lc,
+	return t4_link_l1cfg_core(adapter, mbox, port, lc, rcap,
 				  false, FW_CMD_MAX_TIMEOUT);
 }
 

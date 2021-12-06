@@ -342,6 +342,8 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	cv_init(&sc->cv, NULL, CV_DRIVER, NULL);
 	mutex_init(&sc->sfl_lock, NULL, MUTEX_DRIVER, NULL);
 	TAILQ_INIT(&sc->sfl);
+	mutex_init(&sc->mbox_lock, NULL, MUTEX_DRIVER, NULL);
+	STAILQ_INIT(&sc->mbox_list);
 
 	mutex_enter(&t4_adapter_list_lock);
 	SLIST_INSERT_HEAD(&t4_adapter_list, sc, link);
@@ -974,9 +976,10 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		pci_config_teardown(&sc->pci_regh);
 
 	mutex_enter(&t4_adapter_list_lock);
-	SLIST_REMOVE_HEAD(&t4_adapter_list, link);
+	SLIST_REMOVE(&t4_adapter_list, sc, adapter, link);
 	mutex_exit(&t4_adapter_list_lock);
 
+	mutex_destroy(&sc->mbox_lock);
 	mutex_destroy(&sc->lock);
 	cv_destroy(&sc->cv);
 	mutex_destroy(&sc->sfl_lock);
@@ -2334,6 +2337,26 @@ done:
 	return (rc);
 }
 
+static char *
+print_port_speed(const struct port_info *pi)
+{
+	if (!pi)
+		return "-";
+
+	if (is_100G_port(pi))
+		return "100G";
+	else if (is_50G_port(pi))
+		return "50G";
+	else if (is_40G_port(pi))
+		return "40G";
+	else if (is_25G_port(pi))
+		return "25G";
+	else if (is_10G_port(pi))
+		return "10G";
+	else
+		return "1G";
+}
+
 #define	KS_UINIT(x)	kstat_named_init(&kstatp->x, #x, KSTAT_DATA_ULONG)
 #define	KS_CINIT(x)	kstat_named_init(&kstatp->x, #x, KSTAT_DATA_CHAR)
 #define	KS_U_SET(x, y)	kstatp->x.value.ul = (y)
@@ -2735,12 +2758,12 @@ t4_os_find_pci_capability(struct adapter *sc, int cap)
 }
 
 void
-t4_os_portmod_changed(const struct adapter *sc, int idx)
+t4_os_portmod_changed(struct adapter *sc, int idx)
 {
 	static const char *mod_str[] = {
 		NULL, "LR", "SR", "ER", "TWINAX", "active TWINAX", "LRM"
 	};
-	const struct port_info *pi = sc->port[idx];
+	struct port_info *pi = sc->port[idx];
 
 	if (pi->mod_type == FW_PORT_MOD_TYPE_NONE)
 		cxgb_printf(pi->dip, CE_NOTE, "transceiver unplugged.");
@@ -2756,6 +2779,10 @@ t4_os_portmod_changed(const struct adapter *sc, int idx)
 	else
 		cxgb_printf(pi->dip, CE_NOTE, "transceiver (type %d) inserted.",
 		    pi->mod_type);
+
+	if ((isset(&sc->open_device_map, pi->port_id) != 0) &&
+	    pi->link_cfg.new_module)
+		pi->link_cfg.redo_l1cfg = true;
 }
 
 /* ARGSUSED */
