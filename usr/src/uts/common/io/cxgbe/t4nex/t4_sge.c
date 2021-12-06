@@ -1425,9 +1425,9 @@ alloc_iq_fl(struct port_info *pi, struct sge_iq *iq, struct sge_fl *fl,
 	iq->polling = 0;
 
 	cntxt_id = iq->cntxt_id - sc->sge.iq_start;
-	if (cntxt_id >= sc->sge.niq) {
+	if (cntxt_id >= sc->sge.iqmap_sz) {
 		panic("%s: iq->cntxt_id (%d) more than the max (%d)", __func__,
-		    cntxt_id, sc->sge.niq - 1);
+		      cntxt_id, sc->sge.iqmap_sz - 1);
 	}
 	sc->sge.iqmap[cntxt_id] = iq;
 
@@ -1437,9 +1437,9 @@ alloc_iq_fl(struct port_info *pi, struct sge_iq *iq, struct sge_fl *fl,
 		fl->copy_threshold = rx_copy_threshold;
 
 		cntxt_id = fl->cntxt_id - sc->sge.eq_start;
-		if (cntxt_id >= sc->sge.neq) {
+		if (cntxt_id >= sc->sge.eqmap_sz) {
 			panic("%s: fl->cntxt_id (%d) more than the max (%d)",
-			    __func__, cntxt_id, sc->sge.neq - 1);
+			      __func__, cntxt_id, sc->sge.eqmap_sz - 1);
 		}
 		sc->sge.eqmap[cntxt_id] = (void *)fl;
 
@@ -1685,9 +1685,9 @@ ctrl_eq_alloc(struct adapter *sc, struct sge_eq *eq)
 
 	eq->cntxt_id = G_FW_EQ_CTRL_CMD_EQID(BE_32(c.cmpliqid_eqid));
 	cntxt_id = eq->cntxt_id - sc->sge.eq_start;
-	if (cntxt_id >= sc->sge.neq)
+	if (cntxt_id >= sc->sge.eqmap_sz)
 		panic("%s: eq->cntxt_id (%d) more than the max (%d)", __func__,
-		    cntxt_id, sc->sge.neq - 1);
+		      cntxt_id, sc->sge.eqmap_sz - 1);
 	sc->sge.eqmap[cntxt_id] = eq;
 
 	return (rc);
@@ -1728,9 +1728,9 @@ eth_eq_alloc(struct adapter *sc, struct port_info *pi, struct sge_eq *eq)
 
 	eq->cntxt_id = G_FW_EQ_ETH_CMD_EQID(BE_32(c.eqid_pkd));
 	cntxt_id = eq->cntxt_id - sc->sge.eq_start;
-	if (cntxt_id >= sc->sge.neq)
+	if (cntxt_id >= sc->sge.eqmap_sz)
 		panic("%s: eq->cntxt_id (%d) more than the max (%d)", __func__,
-		    cntxt_id, sc->sge.neq - 1);
+		      cntxt_id, sc->sge.eqmap_sz - 1);
 	sc->sge.eqmap[cntxt_id] = eq;
 
 	return (rc);
@@ -1771,9 +1771,9 @@ ofld_eq_alloc(struct adapter *sc, struct port_info *pi, struct sge_eq *eq)
 
 	eq->cntxt_id = G_FW_EQ_OFLD_CMD_EQID(BE_32(c.eqid_pkd));
 	cntxt_id = eq->cntxt_id - sc->sge.eq_start;
-	if (cntxt_id >= sc->sge.neq)
+	if (cntxt_id >= sc->sge.eqmap_sz)
 		panic("%s: eq->cntxt_id (%d) more than the max (%d)", __func__,
-		    cntxt_id, sc->sge.neq - 1);
+		      cntxt_id, sc->sge.eqmap_sz - 1);
 	sc->sge.eqmap[cntxt_id] = eq;
 
 	return (rc);

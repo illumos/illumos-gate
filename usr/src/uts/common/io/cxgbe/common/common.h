@@ -333,7 +333,6 @@ struct pf_resources {
 	unsigned int neq;		/* N egress Qs */
 	unsigned int nethctrl;		/* N egress ETH or CTRL Qs */
 	unsigned int niqflint;		/* N ingress Qs/w free list(s) & intr */
-	unsigned int niq;		/* N ingress Qs */
 	unsigned int tc;		/* PCI-E traffic class */
 	unsigned int pmask;		/* port access rights mask */
 	unsigned int nexactf;		/* N exact MPS filters */

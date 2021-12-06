@@ -303,7 +303,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	struct adapter *sc = NULL;
 	struct sge *s;
 	int i, instance, rc = DDI_SUCCESS, rqidx, tqidx, q;
-	int irq = 0, nxg, n100g, n40g, n25g, n10g, n1g;
+	int irq = 0, nxg = 0, n1g = 0;
 #ifdef TCP_OFFLOAD_ENABLE
 	int ofld_rqidx, ofld_tqidx;
 #endif
@@ -525,7 +525,6 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * out whether a port is 10G or 1G and use that information when
 	 * calculating how many interrupts to attempt to allocate.
 	 */
-	n100g = n40g = n25g = n10g = n1g = 0;
 	for_each_port(sc, i) {
 		struct port_info *pi;
 
@@ -552,20 +551,8 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_init(&pi->lock, NULL, MUTEX_DRIVER, NULL);
 		pi->mtu = ETHERMTU;
 
-		if (is_100G_port(pi)) {
-			n100g++;
-			pi->tmr_idx = prp->tmr_idx_10g;
-			pi->pktc_idx = prp->pktc_idx_10g;
-		} else if (is_40G_port(pi)) {
-			n40g++;
-			pi->tmr_idx = prp->tmr_idx_10g;
-			pi->pktc_idx = prp->pktc_idx_10g;
-		} else if (is_25G_port(pi)) {
-			n25g++;
-			pi->tmr_idx = prp->tmr_idx_10g;
-			pi->pktc_idx = prp->pktc_idx_10g;
-		} else if (is_10G_port(pi)) {
-			n10g++;
+		if (is_10XG_port(pi)) {
+			nxg++;
 			pi->tmr_idx = prp->tmr_idx_10g;
 			pi->pktc_idx = prp->pktc_idx_10g;
 		} else {
@@ -580,7 +567,6 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		setbit(&sc->registered_device_map, i);
 	}
 
-	nxg = n10g + n25g + n40g + n100g;
 	(void) remove_extra_props(sc, nxg, n1g);
 
 	if (sc->registered_device_map == 0) {
@@ -642,8 +628,8 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #endif
 	s->rxq = kmem_zalloc(s->nrxq * sizeof (struct sge_rxq), KM_SLEEP);
 	s->txq = kmem_zalloc(s->ntxq * sizeof (struct sge_txq), KM_SLEEP);
-	s->iqmap = kmem_zalloc(s->niq * sizeof (struct sge_iq *), KM_SLEEP);
-	s->eqmap = kmem_zalloc(s->neq * sizeof (struct sge_eq *), KM_SLEEP);
+	s->iqmap = kmem_zalloc(s->iqmap_sz * sizeof (struct sge_iq *), KM_SLEEP);
+	s->eqmap = kmem_zalloc(s->eqmap_sz * sizeof (struct sge_eq *), KM_SLEEP);
 
 	sc->intr_handle = kmem_zalloc(sc->intr_count *
 	    sizeof (ddi_intr_handle_t), KM_SLEEP);
@@ -815,46 +801,12 @@ ofld_queues:
 	 */
 	t4_dump_version_info(sc);
 
-	if (n100g) {
-		cxgb_printf(dip, CE_NOTE,
-		    "%dx100G (%d rxq, %d txq total) %d %s.",
-		    n100g, rqidx, tqidx, sc->intr_count,
+	cxgb_printf(dip, CE_NOTE,
+		    "(%d rxq, %d txq total) %d %s.",
+		    rqidx, tqidx, sc->intr_count,
 		    sc->intr_type == DDI_INTR_TYPE_MSIX ? "MSI-X interrupts" :
 		    sc->intr_type == DDI_INTR_TYPE_MSI ? "MSI interrupts" :
 		    "fixed interrupt");
-	} else if (n40g) {
-		cxgb_printf(dip, CE_NOTE,
-		    "%dx40G (%d rxq, %d txq total) %d %s.",
-		    n40g, rqidx, tqidx, sc->intr_count,
-		    sc->intr_type == DDI_INTR_TYPE_MSIX ? "MSI-X interrupts" :
-		    sc->intr_type == DDI_INTR_TYPE_MSI ? "MSI interrupts" :
-		    "fixed interrupt");
-	} else if (n25g) {
-		cxgb_printf(dip, CE_NOTE,
-		    "%dx25G (%d rxq, %d txq total) %d %s.",
-		    n25g, rqidx, tqidx, sc->intr_count,
-		    sc->intr_type == DDI_INTR_TYPE_MSIX ? "MSI-X interrupts" :
-		    sc->intr_type == DDI_INTR_TYPE_MSI ? "MSI interrupts" :
-		    "fixed interrupt");
-	} else if (n10g && n1g) {
-		cxgb_printf(dip, CE_NOTE,
-		    "%dx10G %dx1G (%d rxq, %d txq total) %d %s.",
-		    n10g, n1g, rqidx, tqidx, sc->intr_count,
-		    sc->intr_type == DDI_INTR_TYPE_MSIX ? "MSI-X interrupts" :
-		    sc->intr_type == DDI_INTR_TYPE_MSI ? "MSI interrupts" :
-		    "fixed interrupt");
-	} else {
-		cxgb_printf(dip, CE_NOTE,
-		    "%dx%sG (%d rxq, %d txq per port) %d %s.",
-		    n10g ? n10g : n1g,
-		    n10g ? "10" : "1",
-		    n10g ? iaq.nrxq10g : iaq.nrxq1g,
-		    n10g ? iaq.ntxq10g : iaq.ntxq1g,
-		    sc->intr_count,
-		    sc->intr_type == DDI_INTR_TYPE_MSIX ? "MSI-X interrupts" :
-		    sc->intr_type == DDI_INTR_TYPE_MSI ? "MSI interrupts" :
-		    "fixed interrupt");
-	}
 
 	sc->ksp = setup_kstats(sc);
 	sc->ksp_stat = setup_wc_kstats(sc);
@@ -934,9 +886,9 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (s->txq != NULL)
 		kmem_free(s->txq, s->ntxq * sizeof (struct sge_txq));
 	if (s->iqmap != NULL)
-		kmem_free(s->iqmap, s->niq * sizeof (struct sge_iq *));
+		kmem_free(s->iqmap, s->iqmap_sz * sizeof (struct sge_iq *));
 	if (s->eqmap != NULL)
-		kmem_free(s->eqmap, s->neq * sizeof (struct sge_eq *));
+		kmem_free(s->eqmap, s->eqmap_sz * sizeof (struct sge_eq *));
 
 	if (s->rxbuf_cache != NULL)
 		rxbuf_cache_destroy(s->rxbuf_cache);
@@ -1708,6 +1660,19 @@ get_params__post_init(struct adapter *sc)
 	sc->vres.l2t.start = val[4];
 	sc->vres.l2t.size = val[5] - val[4] + 1;
 
+	param[0] = FW_PARAM_PFVF(IQFLINT_END);
+	param[1] = FW_PARAM_PFVF(EQ_END);
+	rc = -t4_query_params(sc, sc->mbox, sc->pf, 0, 2, param, val);
+	if (rc != 0) {
+		cxgb_printf(sc->dip, CE_WARN,
+			    "failed to query eq/iq map size parameters (post_init): %d.\n",
+			    rc);
+		return (rc);
+	}
+
+	sc->sge.iqmap_sz = val[0] - sc->sge.iq_start + 1;
+	sc->sge.eqmap_sz = val[1] - sc->sge.eq_start + 1;
+
 	/* get capabilites */
 	bzero(&caps, sizeof (caps));
 	caps.op_to_write = htonl(V_FW_CMD_OP(FW_CAPS_CONFIG_CMD) |
@@ -1742,6 +1707,13 @@ get_params__post_init(struct adapter *sc)
 		sc->vres.ddp.size = val[4] - val[3] + 1;
 		sc->params.ofldq_wr_cred = val[5];
 		sc->params.offload = 1;
+	}
+
+	rc = -t4_get_pfres(sc);
+	if (rc != 0) {
+		cxgb_printf(sc->dip, CE_WARN,
+			    "failed to query PF resource params: %d.\n", rc);
+		return (rc);
 	}
 
 	/* These are finalized by FW initialization, load their values now */
@@ -2127,21 +2099,112 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
     struct intrs_and_queues *iaq)
 {
 	struct driver_properties *p = &sc->props;
-	int rc, itype, itypes, navail, nc, nrxq10g, nrxq1g, n;
-	int nofldrxq10g = 0, nofldrxq1g = 0;
+	int rc, itype, itypes, navail, nc, n;
+	int pfres_rxq, pfres_txq, pfresq;
 
 	bzero(iaq, sizeof (*iaq));
 	nc = ncpus;	/* our snapshot of the number of CPUs */
 	iaq->ntxq10g = min(nc, p->max_ntxq_10g);
 	iaq->ntxq1g = min(nc, p->max_ntxq_1g);
-	iaq->nrxq10g = nrxq10g = min(nc, p->max_nrxq_10g);
-	iaq->nrxq1g = nrxq1g = min(nc, p->max_nrxq_1g);
+	iaq->nrxq10g = min(nc, p->max_nrxq_10g);
+	iaq->nrxq1g = min(nc, p->max_nrxq_1g);
 #ifdef TCP_OFFLOAD_ENABLE
 	iaq->nofldtxq10g = min(nc, p->max_nofldtxq_10g);
 	iaq->nofldtxq1g = min(nc, p->max_nofldtxq_1g);
-	iaq->nofldrxq10g = nofldrxq10g = min(nc, p->max_nofldrxq_10g);
-	iaq->nofldrxq1g = nofldrxq1g = min(nc, p->max_nofldrxq_1g);
+	iaq->nofldrxq10g = min(nc, p->max_nofldrxq_10g);
+	iaq->nofldrxq1g = min(nc, p->max_nofldrxq_1g);
 #endif
+
+	pfres_rxq = iaq->nrxq10g * n10g + iaq->nrxq1g * n1g;
+	pfres_txq = iaq->ntxq10g * n10g + iaq->ntxq1g * n1g;
+#ifdef TCP_OFFLOAD_ENABLE
+	pfres_rxq += iaq->nofldrxq10g * n10g + iaq->nofldrxq1g * n1g;
+	pfres_txq += iaq->nofldtxq10g * n10g + iaq->nofldtxq1g * n1g;
+#endif
+
+	/* If current configuration of max number of Rxqs and Txqs exceed
+	 * the max available for all the ports under this PF, then shrink
+	 * the queues to max available. Reduce them in a way that each
+	 * port under this PF has equally distributed number of queues.
+	 * Must guarantee at least 1 queue for each port for both NIC
+	 * and Offload queues.
+	 *
+	 * neq - fixed max number of Egress queues on Tx path and Free List
+	 * queues that hold Rx payload data on Rx path. Half are reserved
+	 * for Egress queues and the other half for Free List queues.
+	 * Hence, the division by 2.
+	 *
+	 * niqflint - max number of Ingress queues with interrupts on Rx
+	 * path to receive completions that indicate Rx payload has been
+	 * posted in its associated Free List queue. Also handles Tx
+	 * completions for packets successfully transmitted on Tx path.
+	 *
+	 * nethctrl - max number of Egress queues only for Tx path. This
+	 * number is usually half of neq. However, if it became less than
+	 * neq due to lack of resources based on firmware configuration,
+	 * then take the lower value.
+	 */
+	while (pfres_rxq >
+	       min(sc->params.pfres.neq / 2, sc->params.pfres.niqflint)) {
+		pfresq = pfres_rxq;
+
+		if (iaq->nrxq10g > 1) {
+			iaq->nrxq10g--;
+			pfres_rxq -= n10g;
+		}
+
+		if (iaq->nrxq1g > 1) {
+			iaq->nrxq1g--;
+			pfres_rxq -= n1g;
+		}
+
+#ifdef TCP_OFFLOAD_ENABLE
+		if (iaq->nofldrxq10g > 1) {
+			iaq->nofldrxq10g--;
+			pfres_rxq -= n10g;
+		}
+
+		if (iaq->nofldrxq1g > 1) {
+			iaq->nofldrxq1g--;
+			pfres_rxq -= n1g;
+		}
+#endif
+
+		/* Break if nothing changed */
+		if (pfresq == pfres_rxq)
+			break;
+	}
+
+	while (pfres_txq >
+	       min(sc->params.pfres.neq / 2, sc->params.pfres.nethctrl)) {
+		pfresq = pfres_txq;
+
+		if (iaq->ntxq10g > 1) {
+			iaq->ntxq10g--;
+			pfres_txq -= n10g;
+		}
+
+		if (iaq->ntxq1g > 1) {
+			iaq->ntxq1g--;
+			pfres_txq -= n1g;
+		}
+
+#ifdef TCP_OFFLOAD_ENABLE
+		if (iaq->nofldtxq10g > 1) {
+			iaq->nofldtxq10g--;
+			pfres_txq -= n10g;
+		}
+
+		if (iaq->nofldtxq1g > 1) {
+			iaq->nofldtxq1g--;
+			pfres_txq -= n1g;
+		}
+#endif
+
+		/* Break if nothing changed */
+		if (pfresq == pfres_txq)
+			break;
+	}
 
 	rc = ddi_intr_get_supported_types(sc->dip, &itypes);
 	if (rc != DDI_SUCCESS) {
@@ -2177,8 +2240,12 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 		 * as offload).
 		 */
 		iaq->nirq = T4_EXTRA_INTR;
-		iaq->nirq += n10g * (nrxq10g + nofldrxq10g);
-		iaq->nirq += n1g * (nrxq1g + nofldrxq1g);
+		iaq->nirq += n10g * iaq->nrxq10g;
+		iaq->nirq += n1g * iaq->nrxq1g;
+#ifdef TCP_OFFLOAD_ENABLE
+		iaq->nirq += n10g * iaq->nofldrxq10g;
+		iaq->nirq += n1g * iaq->nofldrxq1g;
+#endif
 
 		if (iaq->nirq <= navail &&
 		    (itype != DDI_INTR_TYPE_MSI || ISP2(iaq->nirq))) {
@@ -2192,8 +2259,13 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 		 * offload rxq's.
 		 */
 		iaq->nirq = T4_EXTRA_INTR;
-		iaq->nirq += n10g * max(nrxq10g, nofldrxq10g);
-		iaq->nirq += n1g * max(nrxq1g, nofldrxq1g);
+#ifdef TCP_OFFLOAD_ENABLE
+		iaq->nirq += n10g * max(iaq->nrxq10g, iaq->nofldrxq10g);
+		iaq->nirq += n1g * max(iaq->nrxq1g, iaq->nofldrxq1g);
+#else
+		iaq->nirq += n10g * iaq->nrxq10g;
+		iaq->nirq += n1g * iaq->nrxq1g;
+#endif
 		if (iaq->nirq <= navail &&
 		    (itype != DDI_INTR_TYPE_MSI || ISP2(iaq->nirq))) {
 			iaq->intr_fwd = 1;
@@ -2212,32 +2284,38 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 			int leftover = navail - iaq->nirq;
 
 			if (n10g > 0) {
-				int target = max(nrxq10g, nofldrxq10g);
+				int target = iaq->nrxq10g;
 
+#ifdef TCP_OFFLOAD_ENABLE
+				target = max(target, iaq->nofldrxq10g);
+#endif
 				n = 1;
 				while (n < target && leftover >= n10g) {
 					leftover -= n10g;
 					iaq->nirq += n10g;
 					n++;
 				}
-				iaq->nrxq10g = min(n, nrxq10g);
+				iaq->nrxq10g = min(n, iaq->nrxq10g);
 #ifdef TCP_OFFLOAD_ENABLE
-				iaq->nofldrxq10g = min(n, nofldrxq10g);
+				iaq->nofldrxq10g = min(n, iaq->nofldrxq10g);
 #endif
 			}
 
 			if (n1g > 0) {
-				int target = max(nrxq1g, nofldrxq1g);
+				int target = iaq->nrxq1g;
 
+#ifdef TCP_OFFLOAD_ENABLE
+				target = max(target, iaq->nofldrxq1g);
+#endif
 				n = 1;
 				while (n < target && leftover >= n1g) {
 					leftover -= n1g;
 					iaq->nirq += n1g;
 					n++;
 				}
-				iaq->nrxq1g = min(n, nrxq1g);
+				iaq->nrxq1g = min(n, iaq->nrxq1g);
 #ifdef TCP_OFFLOAD_ENABLE
-				iaq->nofldrxq1g = min(n, nofldrxq1g);
+				iaq->nofldrxq1g = min(n, iaq->nofldrxq1g);
 #endif
 			}
 
