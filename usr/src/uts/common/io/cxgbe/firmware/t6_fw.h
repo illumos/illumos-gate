@@ -2,13 +2,8 @@
  * Automatically generated file.
  */
 
-#ifndef __T6FW_H
-#define __T6FW_H
-
-#define T6FW_VERSION_MAJOR 1
-#define T6FW_VERSION_MINOR 24
-#define T6FW_VERSION_MICRO 3
-#define T6FW_VERSION_BUILD 0
+#ifndef	__T6FW_H
+#define	__T6FW_H
 
 extern unsigned char t6fw_data[];
 extern int t6fw_size;
