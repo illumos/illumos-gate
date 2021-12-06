@@ -53,7 +53,7 @@ if (( $? != 0 )); then
 	exit 1;
 fi
 
-gcc got32x.o -o got32x
+gcc -m32 got32x.o -o got32x
 if (( $? != 0 )); then
 	print -u2 "Couldn't link ${TESTDIR}/got32x.s"
 	exit 1;
