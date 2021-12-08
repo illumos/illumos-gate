@@ -14,13 +14,6 @@
 # Copyright 2018 Joyent, Inc.
 #
 
-SUBDIRS =		\
-	assert-deflib	\
-	linker-sets	\
-	mapfiles	\
-	relocs		\
-	resolution	\
-	string-merge	\
-	tls
+SUBDIRS = mixed-hidden-comdat
 
 include $(SRC)/test/Makefile.com

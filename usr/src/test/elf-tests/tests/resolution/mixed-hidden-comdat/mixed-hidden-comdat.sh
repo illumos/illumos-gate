@@ -30,39 +30,42 @@ if [[ $PWD != $tmpdir ]]; then
 	exit 1;
 fi
 
-if [[ -n $PROTO ]]; then
-	export LD_ALTEXEC=$PROTO/bin/ld
-fi
-
-gas -32 --mrelax-relocations=yes -c ${TESTDIR}/got32x.s -o got32x.o
+make -f ${TESTDIR}/Makefile.test SRCDIR=${TESTDIR}
 if (( $? != 0 )); then
-	print -u2 "Couldn't assemble ${TESTDIR}/got32x.s with relocation relaxation"
+	print -u2 "FAIL: Failed to link"
 	exit 1;
 fi
 
-$PROTO/bin/elfdump -rN.rel.text got32x.o | \
-	awk '$4 == "foo" {
-		if ($1 == "R_386_GOT32X") {
-			exit(0)
-		} else {
-			exit(1)
-		}
-	     }'
+elfdump -sN.symtab libtest.so | awk '$9 ~ /(bss|data)_symbol/ {
+	if ($5 != "LOCL") {
+		exit 1;
+	}
+}'
+
 if (( $? != 0 )); then
-	print -u2 "Assembled ${TESTDIR}/got32x.s did not result in relaxed relocation"
+	print -u2 "FAIL: libtest.so COMDAT symbols not reduced to local"
 	exit 1;
 fi
 
-gcc -m32 got32x.o -o got32x
+elfdump -sN.symtab libothertest.so | awk '$9 ~ /(bss|data)_symbol/ {
+	if ($5 != "LOCL") {
+		exit 1;
+	}
+}'
+
 if (( $? != 0 )); then
-	print -u2 "Couldn't link ${TESTDIR}/got32x.s"
+	print -u2 "FAIL: libothertest.so COMDAT symbols not reduced to local"
 	exit 1;
 fi
 
-./got32x | grep -q '^string$'
-if (( $? != 0 )); then
-	print -u2 "${TESTDIR}/got32x.s ran incorrectly"
+elfdump -s libnoref.so | grep -q _symbol
+if (( $? == 0 )); then
+	print -u2 "FAIL: unreferenced symbols survive into output object"
 	exit 1;
 fi
 
-exit 0
+./test
+if (( $? != 0 )); then
+	print -u2 "FAIL: Failed to execute ./test"
+	exit 1;
+fi

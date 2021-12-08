@@ -1,0 +1,42 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2021, Richard Lowe.
+
+OBJS=visible.o hidden.o access.o
+
+SRCDIR=$(PWD)
+
+.KEEP_STATE:
+
+all: libnoref.so libothertest.so test
+
+%.o: $(SRCDIR)/%.s
+	gcc -D_ASM -m64 -c $< -o $@
+%.o: $(SRCDIR)/%.S
+	gcc -D_ASM -m64 -c $< -o $@
+
+libtest.so: $(OBJS)
+	gcc -m64 -shared $(OBJS) -o $@
+
+# libtest.so, but with the important objects in the other order so that we
+# choose the other COMDAT section to keep.
+libothertest.so: $(OBJS)
+	gcc -m64 -shared hidden.o visible.o access.o -o $@
+
+libnoref.so: $(OBJS:access.o=)	#Remove any references
+	gcc -m64 -Wl,-zignore -shared $(OBJS:access.o=) -o $@
+
+test: $(SRCDIR)/main.c libtest.so
+	gcc -m64 $(SRCDIR)/main.c -o $@ -L$(PWD) -R$(PWD) -ltest
+
+clean:
+	rm -rf $(OBJS) test libtest.so
