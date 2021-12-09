@@ -98,10 +98,12 @@ function run_single
 	echo "Executing test $name ... \c"
 	mkdir -p "$odir" >/dev/null || fatal "can't make output directory"
 	if [[ -z "$input" ]]; then
-		MDB=$mt_mdb $command > "$odir/stdout" 2>"$odir/stderr"
+		MDB=$mt_mdb ODIR=$odir $command > "$odir/stdout" \
+		    2>"$odir/stderr"
 		res=$?
 	else
-		MDB=$mt_mdb $command < $input > "$odir/stdout" 2>"$odir/stderr"
+		MDB=$mt_mdb ODIR=$odir $command < $input > "$odir/stdout" \
+		    2>"$odir/stderr"
 		res=$?
 	fi
 

@@ -1,0 +1,23 @@
+broken_t {
+    unsigned int:3 brk_a :3 = 0x3
+    unsigned int:2 brk_b :2 = 0x3
+    unsigned int:1 brk_c :1 = 0
+    unsigned int:1 brk_d :1 = 0x1
+    unsigned int:1 brk_e :1 = 0x1
+    unsigned int:1 brk_f :1 = 0x1
+    unsigned int:3 brk_g :3 = 0x3
+    unsigned int:3 brk_h :3 = 0x5
+    unsigned int:5 brk_i :5 = 0x3
+    unsigned int:4 brk_j :4 = 0x9
+    unsigned int:6 brk_k :6 = 0x13
+    unsigned int:1 brk_l :1 = 0
+    unsigned int:1 brk_m :1 = 0x1
+}
+broken6491_t {
+    unsigned short:1 a :1 = 0x1
+    unsigned short:8 b :8 = 0x2
+    unsigned short:3 c :3 = 0
+    unsigned short:2 d :2 = 0
+    unsigned short:1 e :1 = 0x1
+    unsigned short:1 f :1 = 0
+}

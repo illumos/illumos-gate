@@ -1613,6 +1613,8 @@ file path=opt/util-tests/tests/mdb/numbers/tst.base10.mdb mode=0444
 file path=opt/util-tests/tests/mdb/numbers/tst.base10.mdb.out mode=0444
 file path=opt/util-tests/tests/mdb/numbers/tst.binary.mdb mode=0444
 file path=opt/util-tests/tests/mdb/numbers/tst.binary.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/numbers/tst.bitfields.ksh mode=0444
+file path=opt/util-tests/tests/mdb/numbers/tst.bitfields.ksh.out mode=0444
 file path=opt/util-tests/tests/mdb/numbers/tst.hex.mdb mode=0444
 file path=opt/util-tests/tests/mdb/numbers/tst.hex.mdb.out mode=0444
 file path=opt/util-tests/tests/mdb/numbers/tst.octal.mdb mode=0444
@@ -1622,6 +1624,7 @@ dir  path=opt/util-tests/tests/mdb/options
 file path=opt/util-tests/tests/mdb/options/tst.autowrap.mdb mode=0444
 file path=opt/util-tests/tests/mdb/options/tst.autowrap.mdb.out mode=0444
 dir  path=opt/util-tests/tests/mdb/progs
+file path=opt/util-tests/tests/mdb/progs/bitfields mode=0555
 file path=opt/util-tests/tests/mdb/progs/number_symbol mode=0555
 dir  path=opt/util-tests/tests/mdb/typedef
 file path=opt/util-tests/tests/mdb/typedef/err.badid-leadnum.ksh mode=0444

@@ -579,4 +579,4 @@ usr/src/uts/i86pc/io/viona/THIRDPARTYLICENSE.descrip
 # mdb.
 #
 usr/src/test/util-tests/tests/mdb/*/*.mdb
-usr/src/test/util-tests/tests/mdb/*/*.mdb.out
+usr/src/test/util-tests/tests/mdb/*/*.out

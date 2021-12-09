@@ -61,6 +61,8 @@ FILES = \
 	numbers/tst.badnums.ksh \
 	numbers/tst.base10.mdb \
 	numbers/tst.base10.mdb.out \
+	numbers/tst.bitfields.ksh \
+	numbers/tst.bitfields.ksh.out \
 	numbers/tst.binary.mdb \
 	numbers/tst.binary.mdb.out \
 	numbers/tst.hex.mdb \
