@@ -237,8 +237,6 @@
  * -xtime			error
  * -xtransition			-Wtransition
  * -xunroll=n			error
- * -W0,-xdbggen=no%usedonly	-fno-eliminate-unused-debug-symbols
- *				-fno-eliminate-unused-debug-types
  * -Y<c>,<dir>			error
  * -YA,<dir>			error
  * -YI,<dir>			-nostdinc -I<dir>
@@ -947,13 +945,6 @@ do_gcc(cw_ictx_t *ctx)
 				 * Generate tests at the top of loops.
 				 * There is no direct gcc equivalent, ignore.
 				 */
-				break;
-			}
-			if (strcmp(arg, "-W0,-xdbggen=no%usedonly") == 0) {
-				newae(ctx->i_ae,
-				    "-fno-eliminate-unused-debug-symbols");
-				newae(ctx->i_ae,
-				    "-fno-eliminate-unused-debug-types");
 				break;
 			}
 			if (strcmp(arg, "-W2,-xwrap_int") == 0) {

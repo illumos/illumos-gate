@@ -2218,8 +2218,8 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 	 * Create the srs_worker with twice the stack of a normal kernel thread
 	 * to reduce the likelihood of stack overflows in receive-side
 	 * processing.  (The larger stacks are not the only precaution taken
-	 * against stack overflows; see the use of the MAC_RX_SRS_TOODEEP
-	 * macro for details.)
+	 * against stack overflows; see the use of mac_rx_srs_stack_needed
+	 * in mac_sched.c).
 	 */
 	mac_srs->srs_worker = thread_create(NULL, default_stksize << 1,
 	    mac_srs_worker, mac_srs, 0, &p0, TS_RUN, mac_srs->srs_pri);
