@@ -2039,6 +2039,8 @@ ipmgmt_get_ifinfo_nvl(const char *ifname, nvlist_t **if_info_nvl)
 	cbarg.cb_aobjname = NULL;
 	cbarg.cb_ocnt = 0;
 
+	*if_info_nvl = NULL;
+
 	if ((err = nvlist_alloc(&cbarg.cb_onvl, NV_UNIQUE_NAME, 0)) != 0)
 		goto done;
 
