@@ -470,18 +470,12 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 
 	/*
 	 * Check that the file is executable.  Dynamic executables must be
-	 * executable to be exec'ed.  Shared objects need not be executable to
-	 * be mapped with a dynamic executable, however, by convention they're
-	 * supposed to be executable.
+	 * executable to be exec'ed for ldd(1) to function.
 	 */
-	if (access(fname, X_OK) != 0) {
-		if (ehdr.e_type == ET_EXEC) {
-			(void) fprintf(stderr, MSG_INTL(MSG_USP_NOTEXEC_1),
-			    cname, fname);
-			return (1);
-		}
-		(void) fprintf(stderr, MSG_INTL(MSG_USP_NOTEXEC_2), cname,
-		    fname);
+	if ((access(fname, X_OK) != 0) && (ehdr.e_type == ET_EXEC)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_USP_NOTEXEC),
+		    cname, fname);
+		return (1);
 	}
 
 	/*
