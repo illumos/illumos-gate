@@ -373,7 +373,13 @@ typedef enum __ns_type {
 	ns_t_dhcid = 49,	/* Dynamic host configuratin identifier */
 	ns_t_nsec3 = 50,	/* Negative security type 3 */
 	ns_t_nsec3param = 51,	/* Negative security type 3 parameters */
+	ns_t_tlsa = 52,		/* TLSA (RFC 6698) */
+	ns_t_smimea = 53,	/* S/MIME cert association (RFC 8162) */
 	ns_t_hip = 55,		/* Host Identity Protocol */
+	ns_t_cds = 59,		/* Child DS (RFC 7344) */
+	ns_t_cdnskey = 60,	/* DNSKEY(s) the Child wants reflected in DS */
+	ns_t_openpgpkey = 61,	/* OpenPGP Key (RFC 7929) */
+	ns_t_csync = 62,	/* Child-To-Parent Synchronization (RFC 7477) */
 	ns_t_spf = 99,		/* Sender Policy Framework */
 	ns_t_tkey = 249,	/* Transaction key */
 	ns_t_tsig = 250,	/* Transaction signature. */
@@ -383,6 +389,7 @@ typedef enum __ns_type {
 	ns_t_maila = 254,	/* Transfer mail agent records. */
 	ns_t_any = 255,		/* Wildcard match. */
 	ns_t_zxfr = 256,	/* BIND-specific, nonstandard. */
+	ns_t_caa = 257,		/* Certification Authority Restriction */
 	ns_t_dlv = 32769,	/* DNSSEC look-aside validatation. */
 	ns_t_max = 65536
 } ns_type;

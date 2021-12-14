@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
@@ -273,7 +271,7 @@ dns_type_string(uint_t type, int detail)
 {
 	static char buffer[64];
 	switch (type) {
-	case ns_t_a:	return (detail ? "Address" : "Addr");
+	case ns_t_a:	return (detail ? "Address" : "A");
 	case ns_t_ns:	return (detail ? "Authoritative Name Server" : "NS");
 	case ns_t_cname:	return (detail ? "Canonical Name" : "CNAME");
 	case ns_t_soa:	return (detail ? "Start Of a zone Authority" : "SOA");
@@ -289,7 +287,41 @@ dns_type_string(uint_t type, int detail)
 	case ns_t_mx:	return (detail ? "Mail Exchange" : "MX");
 	case ns_t_txt:	return (detail ? "Text strings" : "TXT");
 	case ns_t_aaaa:	return (detail ? "IPv6 Address" : "AAAA");
+	case ns_t_loc:	return (detail ? "Location Information" : "LOC");
+	case ns_t_srv:	return (detail ? "Server Selection" : "SRV");
+	case ns_t_naptr:
+		return (detail ? "Naming Authority Pointer" : "NAPTR");
 	case ns_t_opt:	return (detail ? "EDNS0 option" : "OPT");
+	case ns_t_cert:	return (detail ? "Certificate record" : "CERT");
+	case ns_t_sshfp:
+		return (detail ? "SSH Fingerprint" : "SSHFP");
+	case ns_t_ipseckey:
+		return (detail ? "IPsec Key" : "IPSECKEY");
+	case ns_t_rrsig:
+		return (detail ? "DNSSEC signature" : "RRSIG");
+	case ns_t_nsec:	return (detail ? "Next Secure record" : "NSEC");
+	case ns_t_dnskey:
+		return (detail ? "DNS Key record" : "DNSKEY");
+	case ns_t_dhcid:
+		return (detail ? "DHCP identifier" : "DHCID");
+	case ns_t_nsec3:
+		return (detail ? "NSEC3 record" : "NSEC3");
+	case ns_t_nsec3param:
+		return (detail ? "NSEC3 parameter" : "NSEC3PARAM");
+	case ns_t_tlsa:
+		return (detail ? "TLSA certificate association" : "TLSA");
+	case ns_t_smimea:
+		return (detail ? "S/MIME cert association" : "SMIMEA");
+	case ns_t_hip:	return (detail ? "Host Identity record" : "HIP");
+	case ns_t_cds:	return (detail ? "Child DS" : "CDS");
+	case ns_t_cdnskey:
+		return (detail ? "Child copy of DNSKEY record" : "CDNSKEY");
+	case ns_t_openpgpkey:
+		return (detail ? "OpenPGP public key record" : "OPENPGPKEY");
+	case ns_t_csync:
+		return (detail ? "Child-to-Parent Synchronization" : "CSYNC");
+	case ns_t_caa:
+		return (detail ? "Certification Authority Restriction" : "CAA");
 	case ns_t_axfr:	return (detail ? "Transfer of entire zone" : "AXFR");
 	case ns_t_mailb:
 		return (detail ? "Mailbox related records" : "MAILB");
@@ -306,8 +338,8 @@ dns_class_string(uint_t cls, int detail)
 {
 	static char buffer[64];
 	switch (cls) {
-	case ns_c_in:		return (detail ? "Internet" : "Internet");
-	case ns_c_chaos: 	return (detail ? "CHAOS" : "CH");
+	case ns_c_in:		return (detail ? "Internet" : "IN");
+	case ns_c_chaos:	return (detail ? "CHAOS" : "CH");
 	case ns_c_hs:		return (detail ? "Hesiod" : "HS");
 	case ns_c_any:		return (detail ? "* (Any class)" : "*");
 	default:
@@ -395,8 +427,8 @@ print_question(char *line, const uchar_t *header, const uchar_t *data,
  *	*line: snoops output buffer.
  *	*header: start of the DNS packet, required for names and rcode.
  *	*data: location within header from where the RR starts.
- * 	*data_end: where DNS data ends.
- * 	detail: simple or verbose output.
+ *	*data_end: where DNS data ends.
+ *	detail: simple or verbose output.
  *
  * Returns:
  *	Pointer to next RR or data_end.
