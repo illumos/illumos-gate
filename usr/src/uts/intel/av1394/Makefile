@@ -69,7 +69,7 @@ $(OBJS_DIR)/av1394_isoch.o := SMOFF += signed
 
 #
 # depends on misc/s1394
-LDFLAGS		+= -dy -Nmisc/s1394
+LDFLAGS		+= -Nmisc/s1394
 
 #	Default build targets.
 #

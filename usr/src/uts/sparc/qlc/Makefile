@@ -57,7 +57,7 @@ INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/ulp
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/qlc
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/impl
 
-LDFLAGS		+= -dy -Nmisc/fctl
+LDFLAGS		+= -Nmisc/fctl
 
 FWIMAGES         = 2200
 FWIMAGES        += 2300

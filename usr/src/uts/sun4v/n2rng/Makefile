@@ -67,7 +67,7 @@ CERRWARN += $(CNOWARN_UNINIT)
 #
 # module dependencies
 #
-LDFLAGS += -dy -Nmisc/kcf
+LDFLAGS += -Nmisc/kcf
 
 #
 #	Default build targets.

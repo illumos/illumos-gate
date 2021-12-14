@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Define dependency on sockfs
 #
-LDFLAGS += -dy -N fs/sockfs
+LDFLAGS += -N fs/sockfs
 
 #
 # For now, disable these warnings; maintainers should endeavor

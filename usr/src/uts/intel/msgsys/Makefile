@@ -55,7 +55,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Overrides.
 #
-LDFLAGS		+= -dy -Nmisc/ipc
+LDFLAGS		+= -Nmisc/ipc
 
 #
 # For now, disable these warnings; maintainers should endeavor

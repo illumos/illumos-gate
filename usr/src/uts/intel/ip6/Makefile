@@ -52,7 +52,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #	depends on ip
 #
-LDFLAGS		+= -dy -Ndrv/ip
+LDFLAGS		+= -Ndrv/ip
 
 # needs work
 $(OBJS_DIR)/ip6ddi.o := SMOFF += index_overflow

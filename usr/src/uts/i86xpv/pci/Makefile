@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # depends on misc/pci_autoconfig misc/pcihp
 #
-LDFLAGS		+= -dy -Nmisc/pcihp
+LDFLAGS		+= -Nmisc/pcihp
 
 #
 # Name of the module is needed by the source, to distinguish from other

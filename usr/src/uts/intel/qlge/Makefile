@@ -58,7 +58,7 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/qlge
 
-LDFLAGS		+= -dy -Nmisc/mac -Ndrv/ip
+LDFLAGS		+= -Nmisc/mac -Ndrv/ip
 
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)

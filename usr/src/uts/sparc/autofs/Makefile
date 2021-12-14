@@ -62,7 +62,7 @@ CFLAGS		+= $(CCVERBOSE)
 #
 # Define dependencies on rpmod, rpcsec, and mntfs
 #
-LDFLAGS         += -dy -N strmod/rpcmod -N misc/rpcsec -N fs/mntfs
+LDFLAGS         += -N strmod/rpcmod -N misc/rpcsec -N fs/mntfs
 
 #
 # For now, disable these warnings; maintainers should endeavor

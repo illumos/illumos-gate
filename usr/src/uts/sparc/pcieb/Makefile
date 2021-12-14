@@ -66,7 +66,7 @@ CPPFLAGS += -DPX_PLX
 #
 #	Dependency
 #
-LDFLAGS += -dy -Nmisc/pcie
+LDFLAGS += -Nmisc/pcie
 
 #
 # For now, disable these warnings; maintainers should endeavor

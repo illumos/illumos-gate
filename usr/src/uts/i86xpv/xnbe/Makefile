@@ -62,7 +62,7 @@ ALL_BUILDS	= $(ALL_BUILDS64)
 #
 # Driver depends on MAC and IP.
 #
-#LDFLAGS		+= -dy -N misc/mac -N drv/ip
+#LDFLAGS		+= -N misc/mac -N drv/ip
 
 #
 # use Solaris specific code in xen public header files

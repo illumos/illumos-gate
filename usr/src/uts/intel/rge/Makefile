@@ -54,7 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Driver depends on GLD & IP
 #
-LDFLAGS		+= -dy -N misc/mac -N drv/ip
+LDFLAGS		+= -N misc/mac -N drv/ip
 
 #
 # For now, disable these warnings; maintainers should endeavor

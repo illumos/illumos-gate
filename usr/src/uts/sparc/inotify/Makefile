@@ -32,7 +32,7 @@ CONF_SRCDIR	= $(UTSBASE)/common/io
 include $(UTSBASE)/sparc/Makefile.sparc
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-LDFLAGS		+= -dy -Nfs/specfs
+LDFLAGS		+= -Nfs/specfs
 
 #
 #	Define targets

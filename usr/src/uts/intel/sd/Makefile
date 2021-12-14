@@ -64,7 +64,7 @@ SMOFF += index_overflow,shift_to_zero,signed
 #
 # Depends on scsi and cmlb
 #
-LDFLAGS         += -dy -N misc/scsi -N misc/cmlb
+LDFLAGS         += -N misc/scsi -N misc/cmlb
 
 #
 #	Default build targets.

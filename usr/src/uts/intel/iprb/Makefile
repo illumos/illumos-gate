@@ -57,7 +57,7 @@ CERRWARN	+= -_gcc=-Wno-switch
 #
 # Driver depends on GLD
 #
-LDFLAGS		+= -dy -N misc/mac -Nmisc/mii
+LDFLAGS		+= -N misc/mac -Nmisc/mii
 
 #
 #	Default build targets.

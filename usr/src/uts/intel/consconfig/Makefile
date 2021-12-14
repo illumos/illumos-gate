@@ -60,7 +60,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DCONSCONFIG_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
-LDFLAGS		+= -dy -Ndacf/consconfig_dacf
+LDFLAGS		+= -Ndacf/consconfig_dacf
 
 #
 #	Default build targets.

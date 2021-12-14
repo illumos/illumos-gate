@@ -69,7 +69,7 @@ CFLAGS += -dalign
 #
 # Define dependency on fcodem
 #
-LDFLAGS += -dy -N misc/fcodem
+LDFLAGS += -N misc/fcodem
 
 #
 #	Default build targets.

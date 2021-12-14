@@ -65,7 +65,7 @@ CERRWARN	+= -_gcc=-Wno-type-limits
 #
 #	Dependency
 #
-LDFLAGS		+= -dy -Nmisc/dcopy
+LDFLAGS		+= -Nmisc/dcopy
 
 #
 #	Default build targets.

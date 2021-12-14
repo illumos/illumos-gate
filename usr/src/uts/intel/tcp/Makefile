@@ -69,7 +69,7 @@ CFLAGS		+= $(CINLINES)
 #
 #	depends on ip, md5 and sockfs
 #
-LDFLAGS		+= -dy -Ndrv/ip -Ncrypto/md5 -Nfs/sockfs
+LDFLAGS		+= -Ndrv/ip -Ncrypto/md5 -Nfs/sockfs
 
 # needs work
 $(OBJS_DIR)/tcpddi.o := SMOFF += index_overflow

@@ -67,7 +67,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 #	depends_on
 #
-LDFLAGS		+= -dy -Nmisc/tlimod
+LDFLAGS		+= -Nmisc/tlimod
 
 #
 # For now, disable these warnings; maintainers should endeavor

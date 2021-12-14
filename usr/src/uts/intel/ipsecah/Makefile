@@ -60,7 +60,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Ndrv/ip -Ndrv/tcp -Nmisc/kcf
+LDFLAGS += -Ndrv/ip -Ndrv/tcp -Nmisc/kcf
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)

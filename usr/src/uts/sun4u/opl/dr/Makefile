@@ -65,7 +65,7 @@ CERRWARN += -_gcc=-Wno-parentheses
 #
 # module dependencies
 #
-LDFLAGS += -dy -Nmisc/drmach
+LDFLAGS += -Nmisc/drmach
 
 #
 #	Default build targets.

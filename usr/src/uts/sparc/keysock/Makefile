@@ -59,7 +59,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Ndrv/ip
+LDFLAGS += -Ndrv/ip
 
 #
 # For now, disable these warnings; maintainers should endeavor

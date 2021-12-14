@@ -52,7 +52,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #	depends on udp ip and ip6
 #
-LDFLAGS		+= -dy -Ndrv/udp -Ndrv/ip -Ndrv/ip6
+LDFLAGS		+= -Ndrv/udp -Ndrv/ip -Ndrv/ip6
 
 # needs work
 SMOFF += index_overflow

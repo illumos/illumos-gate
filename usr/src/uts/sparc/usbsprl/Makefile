@@ -53,7 +53,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= $(CNOWARN_UNINIT)
 
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser
+LDFLAGS         += -Nmisc/usba -Nmisc/usbser
 
 #
 #	Define targets

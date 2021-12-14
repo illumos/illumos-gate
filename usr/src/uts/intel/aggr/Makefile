@@ -51,7 +51,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # Overrides
 #
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/dls
+LDFLAGS		+= -Ndrv/dld -Nmisc/mac -Nmisc/dls
 
 #
 # For now, disable these warnings; maintainers should endeavor

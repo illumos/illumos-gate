@@ -61,7 +61,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # which happens to live in "ip" kernel module only.  Needed to do
 # AF_UNIX socket options.
 #
-LDFLAGS += -dy -Ndrv/ip
+LDFLAGS += -Ndrv/ip
 
 #
 # For now, disable these warnings; maintainers should endeavor

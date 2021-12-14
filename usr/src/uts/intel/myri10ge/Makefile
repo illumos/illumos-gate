@@ -63,7 +63,7 @@ CFLAGS    += -DSOLARIS_S11
 #
 # Driver depends on MAC
 #
-LDFLAGS	  += -dy -N misc/mac -N drv/ip
+LDFLAGS	  += -N misc/mac -N drv/ip
 
 #
 #	Default build targets.

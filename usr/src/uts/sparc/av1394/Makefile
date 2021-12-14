@@ -67,7 +67,7 @@ CERRWARN	+= -_gcc=-Wno-type-limits
 
 #
 # depends on misc/s1394
-LDFLAGS		+= -dy -Nmisc/s1394
+LDFLAGS		+= -Nmisc/s1394
 
 #	Default build targets.
 #

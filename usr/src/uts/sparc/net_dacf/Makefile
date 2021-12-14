@@ -41,7 +41,7 @@ ROOTMODULE	= $(ROOT_DACF_DIR)/$(MODULE)
 include $(UTSBASE)/sparc/Makefile.sparc
 
 CFLAGS += $(CCVERBOSE)
-LDFLAGS += -dy -Ndrv/softmac
+LDFLAGS += -Ndrv/softmac
 
 #
 #	Define targets

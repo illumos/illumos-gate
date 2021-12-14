@@ -64,7 +64,7 @@ CFLAGS += $(CCVERBOSE)
 #
 # Module dependencies
 #
-LDFLAGS	+= -dy -Nmisc/ldc
+LDFLAGS	+= -Nmisc/ldc
 
 #
 #	Default build targets.

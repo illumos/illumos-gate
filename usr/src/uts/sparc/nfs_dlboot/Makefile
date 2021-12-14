@@ -60,7 +60,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
-LDFLAGS		+= -dy -Nmisc/strplumb -Nstrmod/rpcmod
+LDFLAGS		+= -Nmisc/strplumb -Nstrmod/rpcmod
 
 #
 # For now, disable these warnings; maintainers should endeavor

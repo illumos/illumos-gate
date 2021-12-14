@@ -71,7 +71,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Nmisc/kcf
+LDFLAGS += -Nmisc/kcf
 
 #
 # For now, disable these warnings; maintainers should endeavor

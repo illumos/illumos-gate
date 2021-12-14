@@ -37,7 +37,7 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CPPFLAGS	+= -I$(UTSBASE)/common/brand/lx
-LDFLAGS		+= -dy -Ndrv/ip -Nfs/sockfs -Nbrand/lx_brand
+LDFLAGS		+= -Ndrv/ip -Nfs/sockfs -Nbrand/lx_brand
 
 # needs work
 SMOFF += all_func_returns

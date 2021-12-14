@@ -62,7 +62,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DSOCK_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
-LDFLAGS         += -dy -Ndrv/ip
+LDFLAGS         += -Ndrv/ip
 
 #
 #	Derived file "nl7ctokgen.h" defines.

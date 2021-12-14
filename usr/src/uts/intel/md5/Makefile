@@ -63,7 +63,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 #
 # md5 depends on the kcf framework
 #
-LDFLAGS		+= -dy -Nmisc/kcf
+LDFLAGS		+= -Nmisc/kcf
 
 #
 #	Default build targets.

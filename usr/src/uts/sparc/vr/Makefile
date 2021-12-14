@@ -61,7 +61,7 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 #
 # Driver depends on GLD
 #
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -N misc/mac
 
 #
 #	Default build targets.

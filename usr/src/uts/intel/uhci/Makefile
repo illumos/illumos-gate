@@ -60,7 +60,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 # depends on misc/usba
 #
-LDFLAGS		+= -dy -Nmisc/usba
+LDFLAGS		+= -Nmisc/usba
 
 #
 # For now, disable these warnings; maintainers should endeavor

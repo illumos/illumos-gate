@@ -27,7 +27,7 @@ CPPFLAGS	+= -I$(UTSBASE)/common/io/ena
 ALL_TARGET	= $(BINARY) $(CONFMOD)
 INSTALL_TARGET	= $(BINBAR) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -N misc/mac
 
 MAPFILES	+= ddi mac kernel
 

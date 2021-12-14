@@ -60,7 +60,7 @@ CFLAGS += $(CCVERBOSE)
 #
 #	depends on ip
 #
-LDFLAGS		+= -dy -Ndrv/ip
+LDFLAGS		+= -Ndrv/ip
 
 #
 #	Default build targets.

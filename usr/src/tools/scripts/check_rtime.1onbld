@@ -19,7 +19,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.Dd February 3, 2020
+.Dd December 3, 2021
 .Dt CHECK_RTIME 1ONBLD
 .Os
 .Sh NAME
@@ -55,13 +55,13 @@ is typically called from
 when the
 .Fl r
 option is in effect.
-In this case the dynamic objects under
+In this case the objects under
 the associated
 .Em proto area
 .Pq Ev $ROOT
 are checked.
 .Nm check_rtime
-can also be run standalone against any set of dynamic objects.
+can also be run standalone against any set of objects.
 .Pp
 .Nm check_rtime
 uses
@@ -229,7 +229,7 @@ rules from
 is the typical reason for having non-pic code in shared objects.
 Text relocations are displayed as:
 .Pp
-.Dl foo: TEXTREL .dynamic tag  <no -Kpic?>
+.Dl foo: TEXTREL .dynamic tag  <no -fpic?>
 .It
 Debugging information is unnecessary in released objects.
 Although extensive when compiled
@@ -427,6 +427,14 @@ Changes to the symbols defined by an object, or the versions they belong to,
 do not necessarily indicate an error condition, but
 provides information that is often useful for gatekeepers to track
 changes in a release.
+.Pp
+.Nm check_rtime
+uses
+.Xr elfedit 1
+to verify that relocatable objects which seem likely to be kernel modules were
+linked with the
+.Fl z Ar type=kmod
+flag.
 .Sh OPTIONS
 The following options are supported:
 .Bl -tag -width indent
@@ -572,6 +580,10 @@ Executables that are not required to have non-executable writable
 data segments
 .It EXEC_STACK
 Executables that are not required to have a non-executable stack
+.It KMOD
+Objects that looks like kernel modules but don't have to be linked with the
+.Fl z Ar type=kmod
+flag.
 .It NOCRLEALT
 Objects that should be skipped when building the alternative dependency
 mapping via the

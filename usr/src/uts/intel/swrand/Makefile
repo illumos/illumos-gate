@@ -58,7 +58,7 @@ CFLAGS		+= -I$(COM_DIR)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Nmisc/kcf -Nmisc/sha1
+LDFLAGS += -Nmisc/kcf -Nmisc/sha1
 
 #
 # For now, disable these warnings; maintainers should endeavor

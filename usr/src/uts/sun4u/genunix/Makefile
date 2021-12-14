@@ -132,7 +132,7 @@ $(IPCTF_TARGET) ipctf_target: FRC
 	@pwd
 
 $(GENUNIX): $(IPCTF_TARGET) $(OBJECTS)
-	$(LD) -r $(LDFLAGS) -o $@ $(OBJECTS)
+	$(LD) -ztype=kmod $(LDFLAGS) -o $@ $(OBJECTS)
 	$(CTFMERGE_GENUNIX_MERGE)
 	$(POST_PROCESS)
 

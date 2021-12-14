@@ -54,7 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Note dependancy on misc/scsi.
 #
-LDFLAGS += -dy -Nmisc/cmlb
+LDFLAGS += -Nmisc/cmlb
 
 #
 # Default build targets.

@@ -53,7 +53,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Depends on procfs
 #
-LDFLAGS		+= -dy -Nfs/procfs
+LDFLAGS		+= -Nfs/procfs
 
 # false positive
 # needs work

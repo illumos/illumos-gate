@@ -55,7 +55,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 
 
-LDFLAGS = -dy -Nmisc/kbtrans
+LDFLAGS += -Nmisc/kbtrans
 
 #
 #	Default build targets.

@@ -62,7 +62,7 @@ CFLAGS += $(CCVERBOSE)
 #
 # depends on misc/usba
 #
-LDFLAGS         += -dy -Nmisc/usba
+LDFLAGS         += -Nmisc/usba
 
 #
 #	Define targets

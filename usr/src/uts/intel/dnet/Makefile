@@ -62,7 +62,7 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 $(OBJS_DIR)/dnet.o := SMOFF += index_overflow
 $(OBJS_DIR)/dnet_mii.o := SMOFF += all_func_returns
 
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -N misc/mac
 
 #
 #	Default build targets.

@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Overrides
 #
-LDFLAGS		+= -dy -Nmisc/mac -Nmac/mac_wifi -Ndrv/ip
+LDFLAGS		+= -Nmisc/mac -Nmac/mac_wifi -Ndrv/ip
 
 #
 # For now, disable these warnings; maintainers should endeavor

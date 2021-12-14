@@ -66,7 +66,7 @@ CERRWARN += $(CNOWARN_UNINIT)
 #
 CFLAGS += -dalign
 
-LDFLAGS         += -dy -Ndrv/pcipsy
+LDFLAGS         += -Ndrv/pcipsy
 
 #
 #	Default build targets.

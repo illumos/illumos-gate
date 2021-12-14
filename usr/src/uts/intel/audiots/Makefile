@@ -55,7 +55,7 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 #
 #	Depends on misc/ac97 and drv/audio
 #
-LDFLAGS		+= -dy -N misc/ac97 -N drv/audio
+LDFLAGS		+= -N misc/ac97 -N drv/audio
 
 #
 #	Define targets

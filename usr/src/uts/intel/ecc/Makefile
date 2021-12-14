@@ -54,7 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Nmisc/kcf
+LDFLAGS += -Nmisc/kcf
 
 CPPFLAGS	+= -I$(COM1_DIR) -I$(COM2_DIR)
 

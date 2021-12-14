@@ -58,7 +58,7 @@ INC_PATH	+= -I$(CONF_SRCDIR)
 #
 # Driver depends on GLD
 #
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -N misc/mac
 
 #
 # For now, disable these warnings; maintainers should endeavor

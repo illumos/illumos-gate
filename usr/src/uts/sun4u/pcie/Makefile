@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #     Dependency
 #
-LDFLAGS += -dy -Nmisc/busra
+LDFLAGS += -Nmisc/busra
 
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-value

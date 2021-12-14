@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Depends on scsi
 #
-LDFLAGS         += -dy -N misc/scsi
+LDFLAGS         += -N misc/scsi
 
 #
 #	Default build targets.

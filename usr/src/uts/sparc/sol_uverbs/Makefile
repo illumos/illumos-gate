@@ -34,7 +34,7 @@ UTSBASE	= ../..
 MODULE		= sol_uverbs
 OBJECTS		= $(SOL_UVERBS_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-LDFLAGS		+= -dy -Nmisc/ibtl -Nmisc/sol_ofs
+LDFLAGS		+= -Nmisc/ibtl -Nmisc/sol_ofs
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/of/sol_uverbs
 
 #

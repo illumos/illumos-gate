@@ -48,7 +48,7 @@ ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CPPFLAGS	+= -I. -D_KERNEL
-LDFLAGS         += -dy -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip
+LDFLAGS         += -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip
 
 # needs work
 $(OBJS_DIR)/ipw2200.o := SMOFF += deref_check

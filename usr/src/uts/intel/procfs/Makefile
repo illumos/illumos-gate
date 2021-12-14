@@ -79,7 +79,7 @@ $(OBJS_DIR)/prsubr.o := SMOFF += all_func_returns
 $(OBJS_DIR)/prcontrol.o := SMOFF += all_func_returns
 $(OBJS_DIR)/prioctl.o := SMOFF += signed
 
-LDFLAGS         += -dy -Nfs/namefs
+LDFLAGS         += -Nfs/namefs
 
 #
 #	Default build targets.

@@ -62,7 +62,7 @@ DEF_BUILDS	= $(DEF_BUILDSONLY64)
 #
 #	depends on misc/ibtl, and misc/ibmf
 #
-LDFLAGS	+= -dy -Nmisc/ibtl -Nmisc/ibmf
+LDFLAGS	+= -Nmisc/ibtl -Nmisc/ibmf
 
 #
 # For now, disable these warnings; maintainers should endeavor

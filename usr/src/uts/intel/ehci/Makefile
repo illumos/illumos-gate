@@ -51,7 +51,7 @@ SMOFF += deref_check,shift_to_zero
 #
 # depends on misc/usba
 #
-LDFLAGS		+= -dy -Nmisc/usba
+LDFLAGS		+= -Nmisc/usba
 
 #
 #	Define targets

@@ -66,7 +66,7 @@ INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 # swrand as it needs random numbers early on during boot before
 # kCF subsystem can load swrand.
 #
-LDFLAGS		+= -dy -Nmisc/md5 -Ncrypto/swrand -Nmisc/hook -Nmisc/neti
+LDFLAGS		+= -Nmisc/md5 -Ncrypto/swrand -Nmisc/hook -Nmisc/neti
 
 #
 # Depends on the congestion control framework for TCP connections.

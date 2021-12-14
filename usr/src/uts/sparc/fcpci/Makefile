@@ -65,7 +65,7 @@ CFLAGS += -dalign
 #
 # Define dependency on fcodem and busra
 #
-LDFLAGS += -dy -N misc/fcodem -N misc/busra
+LDFLAGS += -N misc/fcodem -N misc/busra
 
 #
 # For now, disable these warnings; maintainers should endeavor

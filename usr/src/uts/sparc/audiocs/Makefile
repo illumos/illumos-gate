@@ -60,7 +60,7 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 #
 #	Depends on misc/audiosup
 #
-LDFLAGS		+= -dy -Ndrv/audio
+LDFLAGS		+= -Ndrv/audio
 
 #
 #	Default build targets.

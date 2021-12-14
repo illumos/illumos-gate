@@ -53,7 +53,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 
 # depends on misc/usba misc/scsi
 #
-LDFLAGS		+= -dy -Nmisc/usba -Nmisc/scsi
+LDFLAGS		+= -Nmisc/usba -Nmisc/scsi
 
 #
 #	Define targets

@@ -48,7 +48,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Override defaults
 #
-LDFLAGS += -dy -Ndrv/ip
+LDFLAGS += -Ndrv/ip
 
 
 #

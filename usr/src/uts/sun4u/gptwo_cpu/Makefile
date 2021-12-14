@@ -67,7 +67,7 @@ CFLAGS += -DCHEETAH_PLUS
 #
 # module dependencies
 #
-LDFLAGS += -dy -Nmisc/gptwocfg
+LDFLAGS += -Nmisc/gptwocfg
 
 #
 # For now, disable these warnings; maintainers should endeavor

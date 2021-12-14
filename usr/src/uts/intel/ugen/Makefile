@@ -57,7 +57,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # depends on misc/usba misc/scsi
 #
-LDFLAGS		+= -dy -Nmisc/usba
+LDFLAGS		+= -Nmisc/usba
 
 #
 #	Default build targets.

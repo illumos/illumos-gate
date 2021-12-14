@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DSHMSYS_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
-LDFLAGS		+= -dy -Nmisc/ipc
+LDFLAGS		+= -Nmisc/ipc
 
 #
 # For now, disable these warnings; maintainers should endeavor

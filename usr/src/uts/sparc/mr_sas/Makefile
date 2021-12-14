@@ -70,7 +70,7 @@ CFLAGS		+= -dalign
 #
 #	Kernel Module Dependencies
 #
-LDFLAGS		+= -dy -Nmisc/scsi
+LDFLAGS		+= -Nmisc/scsi
 
 #
 #	Overrides

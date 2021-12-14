@@ -19,18 +19,17 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH FIND_ELF 1ONBLD "Mar 25, 2010"
+.TH FIND_ELF 1ONBLD "December 3, 2021"
 .SH NAME
-find_elf \- Locate ELF shared objects and executables
+find_elf \- Locate ELF objects
 .SH SYNOPSIS
 \fBfind_elf [-afrs] path\fP
 .SH DESCRIPTION
 The
 .I find_elf
 command descends a directory hierarchy and produces one line
-of output on stdout for each ELF executable or shared object found.
+of output on stdout for each ELF object found.
 .SH OPTIONS
-.LP
 The following options are supported:
 .TP 4
 .B \-a
@@ -54,7 +53,6 @@ instead of fully qualified.
 .B \-s
 Only report shared objects.
 .SH OUTPUT
-.LP
 .I find_elf
 produces a series of PREFIX, OBJECT, and ALIAS lines, which collectively
 describe the ELF objects located. Whitespace is used within each
@@ -76,14 +74,14 @@ For each object found, an OBJECT line is produced to describe it:
 .sp
 .in +4
 .nf
-OBJECT [32 | 64] [DYN | EXEC] [VERDEF | NOVERDEF] object-path
+OBJECT [32 | 64] [DYN | EXEC | REL] [VERDEF | NOVERDEF] object-path
 .fi
 .in -4
 .sp
 The first field provides the ELF class of the object, and will be
 either 32 or 64.
 The second field provides the type of object, either
-a shared object (DYN) or executable (EXEC).
+a shared object (DYN), an executable (EXEC), or a relocatable object (REL).
 The third field will be VERDEF if the object contains ELF
 version definitions, and NOVERDEF if the object is not versioned.
 The final field gives the path to the object.

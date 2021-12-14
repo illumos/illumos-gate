@@ -76,7 +76,7 @@ INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/ulp
 #	misc/fctl required because #ifdef MODSYM_LOAD code
 #	triggered by -DS11; uses DDI calls to load FCA symbols
 #
-LDFLAGS		+= -dy -Nmisc/md5 -Nmisc/sha1
+LDFLAGS		+= -Nmisc/md5 -Nmisc/sha1
 LDFLAGS		+= -Nmisc/bignum -Nmisc/fctl
 
 CERRWARN	+= -_gcc=-Wno-parentheses

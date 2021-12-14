@@ -39,7 +39,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CFLAGS += $(CCVERBOSE)
 
-LDFLAGS += -dy -Nfs/sockfs -Ndrv/ip
+LDFLAGS += -Nfs/sockfs -Ndrv/ip
 
 #
 #	Default build targets.

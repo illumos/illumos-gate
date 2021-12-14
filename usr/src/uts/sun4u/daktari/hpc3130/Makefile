@@ -74,7 +74,7 @@ CERRWARN += -_gcc=-Wno-char-subscripts
 CFLAGS += -dalign
 
 #	Dependency
-LDFLAGS += -dy -N misc/i2c_svc -Nmisc/hpcsvc
+LDFLAGS += -N misc/i2c_svc -Nmisc/hpcsvc
 
 #
 #	Default build targets.

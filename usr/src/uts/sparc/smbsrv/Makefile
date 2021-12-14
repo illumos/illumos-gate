@@ -51,7 +51,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 #	Module dependencies
 #
-LDFLAGS += -dy -Nfs/sockfs -Nmisc/ksocket -Ndrv/ip -Nstrmod/rpcmod -Nsys/doorfs
+LDFLAGS += -Nfs/sockfs -Nmisc/ksocket -Ndrv/ip -Nstrmod/rpcmod -Nsys/doorfs
 LDFLAGS += -Nmisc/kcf
 
 #

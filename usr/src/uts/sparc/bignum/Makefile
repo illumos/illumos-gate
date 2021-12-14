@@ -55,7 +55,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Nmisc/kcf
+LDFLAGS += -Nmisc/kcf
 
 CFLAGS		+= $(CCVERBOSE) -I$(CRYPTODIR) -I$(COM1_DIR)
 CFLAGS		+= -DUMUL64

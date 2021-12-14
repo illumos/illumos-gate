@@ -68,7 +68,7 @@ $(OBJS_DIR)/usb_ac.o := SMOFF += deref_check,indenting,testing_index_after_use
 #
 # depends on misc/usba
 #
-LDFLAGS += -dy -Nmisc/usba -Ndrv/audio
+LDFLAGS += -Nmisc/usba -Ndrv/audio
 
 #
 #	Default build targets.

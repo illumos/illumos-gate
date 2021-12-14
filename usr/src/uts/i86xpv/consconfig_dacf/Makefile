@@ -52,7 +52,7 @@ INSTALL_TARGET  = $(BINARY) $(ROOTMODULE)
 #
 #	Overrides
 #
-LDFLAGS		+= -dy -Nmisc/usbser
+LDFLAGS		+= -Nmisc/usbser
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 

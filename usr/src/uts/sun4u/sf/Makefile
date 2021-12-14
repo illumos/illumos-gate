@@ -63,7 +63,7 @@ CFLAGS		+= $(CCVERBOSE)
 #
 # Define dependency on scsi
 #
-LDFLAGS += -dy -N misc/scsi
+LDFLAGS += -N misc/scsi
 
 #
 # For now, disable these warnings; maintainers should endeavor

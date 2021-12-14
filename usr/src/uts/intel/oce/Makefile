@@ -52,7 +52,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/oce
 
-LDFLAGS		+= -dy -Nmisc/mac
+LDFLAGS		+= -Nmisc/mac
 
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-label

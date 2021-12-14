@@ -57,7 +57,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 # depends on misc/usba
 #
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/hidparser
+LDFLAGS         += -Nmisc/usba -Nmisc/hidparser
 
 #
 # For now, disable these warnings; maintainers should endeavor

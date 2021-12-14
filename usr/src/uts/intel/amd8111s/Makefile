@@ -54,7 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Driver depends on GLDv3
 #
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -N misc/mac
 
 # seems wrong
 $(OBJS_DIR)/amd8111s_hw.o := SMOFF += precedence

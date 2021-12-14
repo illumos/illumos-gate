@@ -39,7 +39,7 @@ INC_PATH	+= -I$(UTSBASE)/i86pc
 
 include $(UTSBASE)/intel/Makefile.intel
 
-LDFLAGS		+= -dy -Ndrv/dtrace -Ndrv/cpc
+LDFLAGS		+= -Ndrv/dtrace -Ndrv/cpc
 
 .KEEP_STATE:
 

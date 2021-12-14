@@ -55,7 +55,7 @@ CERRWARN	+= -_gcc=-Wno-switch
 #
 #	Depends on drv/audio and misc/ac97
 #
-LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
+LDFLAGS		+= -Ndrv/audio -Nmisc/ac97
 
 #
 #	Define targets

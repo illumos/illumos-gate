@@ -65,7 +65,7 @@ CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses
 
-LDFLAGS += -dy -Nfs/sockfs -Nmisc/ksocket -Ndrv/ip -Nmisc/ibtl -Nmisc/ibcm -Nmisc/sol_ofs
+LDFLAGS += -Nfs/sockfs -Nmisc/ksocket -Ndrv/ip -Nmisc/ibtl -Nmisc/ibcm -Nmisc/sol_ofs
 
 #
 #	Default build targets.

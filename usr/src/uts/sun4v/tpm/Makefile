@@ -68,7 +68,7 @@ CPPFLAGS	+= -I$(ROOT)/usr/include
 # This is for /usr/include/tss/, which is not built in the ON consolidation
 CPPFLAGS        += -I$(ADJUNCT_PROTO)/usr/include
 
-LDFLAGS += -dy -Nmisc/kcf
+LDFLAGS += -Nmisc/kcf
 
 #
 #	Default build targets.

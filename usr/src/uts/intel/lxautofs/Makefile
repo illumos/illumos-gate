@@ -67,7 +67,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 #	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Nfs/nfs
+LDFLAGS		+= -Nfs/nfs
 
 # needs work
 SMOFF += all_func_returns

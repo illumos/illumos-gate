@@ -59,7 +59,7 @@ CFLAGS	                += $(EMLXS_CFLAGS) -DEMLXS_ARCH=\"$(CLASS)\"
 
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/emlxs
 
-LDFLAGS		+= -dy -Nmisc/fctl
+LDFLAGS		+= -Nmisc/fctl
 
 #
 #	Default build targets.

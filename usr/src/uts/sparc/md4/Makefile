@@ -59,8 +59,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CFLAGS += $(CCVERBOSE)
 
-LDFLAGS		+= -dy
-
 #
 #	Default build targets.
 #

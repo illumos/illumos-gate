@@ -49,7 +49,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Driver-specific flags
 #
 CPPFLAGS	+= -DCH_KERNELVER=270
-LDFLAGS		+= -dy
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-function
 

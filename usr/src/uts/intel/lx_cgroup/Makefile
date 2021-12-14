@@ -30,7 +30,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CFLAGS		+= $(CCVERBOSE)
 
-LDFLAGS		+= -dy -Nbrand/lx_brand
+LDFLAGS		+= -Nbrand/lx_brand
 
 # needs work
 $(OBJS_DIR)/cgrps_vnops.o := SMOFF += signed

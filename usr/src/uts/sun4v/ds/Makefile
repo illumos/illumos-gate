@@ -61,7 +61,7 @@ CFLAGS		+= -dalign
 #
 # Module Dependencies
 #
-LDFLAGS		+= -dy -Nmisc/ldc
+LDFLAGS		+= -Nmisc/ldc
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 

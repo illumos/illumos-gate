@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 CPPFLAGS += -DIPFILTER_LKM -DIPFILTER_LOG -DIPFILTER_LOOKUP
 CPPFLAGS += -DSUNDDI -DSOLARIS2=$(RELEASE_MINOR) -DIRE_ILL_CN -DUSE_INET6
-LDFLAGS += -dy -Ndrv/ip -Nmisc/md5 -Nmisc/neti -Nmisc/hook -Nmisc/kcf
+LDFLAGS += -Ndrv/ip -Nmisc/md5 -Nmisc/neti -Nmisc/hook -Nmisc/kcf
 LDFLAGS += -Nmisc/mac
 
 INC_PATH += -I$(UTSBASE)/common/inet/ipf

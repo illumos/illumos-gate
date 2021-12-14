@@ -52,7 +52,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #	Overrides.
 #
-LDFLAGS		+= -dy -Nmisc/tem -Ndacf/consconfig_dacf
+LDFLAGS		+= -Nmisc/tem -Ndacf/consconfig_dacf
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 

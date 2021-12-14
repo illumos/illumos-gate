@@ -57,7 +57,7 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #	i_devname_to_promname(), which may only be necessary on SPARC. Removing
 #	this symbol may be sufficient to remove depedency.
 #
-LDFLAGS		+= -dy -N misc/acpica -N misc/bootdev
+LDFLAGS		+= -N misc/acpica -N misc/bootdev
 
 #
 #	Define targets

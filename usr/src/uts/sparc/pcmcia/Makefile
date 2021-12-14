@@ -65,7 +65,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 INC_PATH	+= -I$(UTSBASE)/sun4
 
 # dependency
-LDFLAGS	+=	-dy -Nmisc/busra
+LDFLAGS	+=	-Nmisc/busra
 
 #
 # For now, disable these warnings; maintainers should endeavor

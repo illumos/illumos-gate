@@ -28,10 +28,10 @@
 #
 # Check ELF information.
 #
-# This script descends a directory hierarchy inspecting ELF dynamic executables
-# and shared objects.  The general theme is to verify that common Makefile rules
-# have been used to build these objects.  Typical failures occur when Makefile
-# rules are re-invented rather than being inherited from "cmd/lib" Makefiles.
+# This script descends a directory hierarchy inspecting ELF objects.  The
+# general theme is to verify that common Makefile rules have been used to
+# build these objects.  Typical failures occur when Makefile rules are
+# re-invented rather than being inherited from "cmd/lib" Makefiles.
 #
 # As always, a number of components don't follow the rules, and these are
 # excluded to reduce this scripts output.
@@ -103,6 +103,10 @@ use vars  qw($ErrFH $ErrTtl $InfoFH $InfoTtl $OutCnt1 $OutCnt2);
 #   FORBIDDEN
 #	Objects to which nobody not excepted with FORBIDDEN_DEP may link
 #
+#   NOT_KMOD
+#	Objects that we think should be linked with -ztype=kmod but are
+#	allowed to not be.
+#
 #   NOCRLEALT
 #	Objects that should be skipped by AltObjectConfig() when building
 #	the crle script that maps objects to the proto area.
@@ -148,7 +152,7 @@ use vars  qw($EXRE_exec_data $EXRE_exec_stack $EXRE_nocrlealt);
 use vars  qw($EXRE_nodirect $EXRE_nosymsort $EXRE_forbidden_dep $EXRE_forbidden);
 use vars  qw($EXRE_olddep $EXRE_skip $EXRE_stab $EXRE_textrel $EXRE_undef_ref);
 use vars  qw($EXRE_unref_obj $EXRE_unused_deps $EXRE_unused_obj);
-use vars  qw($EXRE_unused_rpath $EXRE_no_comment);
+use vars  qw($EXRE_unused_rpath $EXRE_no_comment $EXRE_not_kmod);
 
 use strict;
 use Getopt::Std;
@@ -184,10 +188,7 @@ sub ProcFile {
 	my(@Elf, @Ldd, $Dyn, $Sym, $Stack);
 	my($Sun, $Relsz, $Pltsz, $Tex, $Stab, $Strip, $Lddopt, $SymSort);
 	my($Val, $Header, $IsX86, $RWX, $UnDep);
-	my($HasDirectBinding);
-
-	# Only look at executables and sharable objects
-	return if ($Type ne 'EXEC') && ($Type ne 'DYN');
+	my($HasDirectBinding, $HasKMOD);
 
 	# Ignore symbolic links
 	return if -l $FullPath;
@@ -215,7 +216,8 @@ sub ProcFile {
 	# shared object.
 	@Elf = split(/\n/, `elfdump -epdcy $FullPath 2>&1`);
 
-	$Dyn = $Stack = $IsX86 = $RWX = 0;
+	$Dyn = $Stack = $IsX86 = $RWX = $HasKMOD = 0;
+
 	$Header = 'None';
 	foreach my $Line (@Elf) {
 		# If we have an invalid file type (which we can tell from the
@@ -240,7 +242,7 @@ sub ProcFile {
 
 		if ($Line =~ /^Dynamic Section/) {
 			# A dynamic section indicates we're a dynamic object
-			# (this makes sure we don't check static executables).
+			$Header = 'Dyn';
 			$Dyn = 1;
 			next;
 		}
@@ -275,15 +277,20 @@ sub ProcFile {
 			$Stack = 1;
 			next;
 		}
+
+		if (($Header eq 'Dyn') && ($Line =~ /SUNW_KMOD/)) {
+			$HasKMOD = 1;
+			next;
+		}
 	}
 
-	# Determine whether this ELF executable or shared object has a
-	# conforming mcs(1) comment section.  If the correct $(POST_PROCESS)
-	# macros are used, only a 3 or 4 line .comment section should exist
-	# containing one or two "@(#)illumos" identifying comments (one comment
-	# for a non-debug build, and two for a debug build). The results of
-	# the following split should be three or four lines, the last empty
-	# line being discarded by the split.
+	# Determine whether this ELF object has a conforming mcs(1) comment
+	# section.  If the correct $(POST_PROCESS) macros are used, only a 3
+	# or 4 line .comment section should exist containing one or two
+	# "@(#)illumos" identifying comments (one comment for a non-debug
+	# build, and two for a debug build). The results of the following
+	# split should be three or four lines, the last empty line being
+	# discarded by the split.
 	if ($opt{m} &&
 	    (!defined($EXRE_no_comment) || ($RelPath !~ $EXRE_no_comment))) {
 		my(@Mcs, $Con, $Dev);
@@ -324,15 +331,9 @@ sub ProcFile {
 		    "non-executable stack required\t<no -Mmapfile_noexstk?>");
 	}
 
-	# Having caught any static executables in the mcs(1) check and non-
-	# executable stack definition check, continue with dynamic objects
-	# from now on.
-	if ($Dyn eq 0) {
-		return;
-	}
-
-	# Use ldd unless its a 64-bit object and we lack the hardware.
-	if (($Class == 32) || $Ena64) {
+	# Use ldd on dynamic objects unless it's a 64-bit object and we lack
+	# the hardware.
+	if (($Type ne 'REL') && (($Class == 32) || $Ena64)) {
 		my $LDDFullPath = $FullPath;
 
 		if ($Secure) {
@@ -343,7 +344,7 @@ sub ProcFile {
 			# being investigated to a safe place first.  In addition
 			# remove its secure permission so that it can be
 			# influenced by any alternative dependency mappings.
-	
+
 			my $File = $RelPath;
 			$File =~ s!^.*/!!;      # basename
 
@@ -401,7 +402,8 @@ sub ProcFile {
 
 			# Historically, ldd(1) likes executable objects to have
 			# their execute bit set.
-			if ($Line =~ /not executable/) {
+			if (($Type eq 'EXEC' || $Type eq 'DYN' ||
+			     $HasKMOD == 1) && (!(-x $FullPath))) {
 				onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath,
 				    "is not executable");
 				next;
@@ -411,7 +413,7 @@ sub ProcFile {
 		# Look for "file" or "versions" that aren't found.  Note that
 		# these lines will occur before we find any symbol referencing
 		# errors.
-		if (($Sym == 5) && ($Line =~ /not found\)/)) {
+		if (($Type ne 'REL') && ($Sym == 5) && ($Line =~ /not found\)/)) {
 			if ($Line =~ /file not found\)/) {
 				$Line =~ s/$/\t<no -zdefs?>/;
 			}
@@ -421,7 +423,7 @@ sub ProcFile {
 		# Look for relocations whose symbols can't be found.  Note, we
 		# only print out the first 5 relocations for any file as this
 		# output can be excessive.
-		if ($Sym && ($Line =~ /symbol not found/)) {
+		if (($Type ne 'REL') && $Sym && ($Line =~ /symbol not found/)) {
 			# Determine if this file is allowed undefined
 			# references.
 			if (($Sym == 5) && defined($EXRE_undef_ref) &&
@@ -451,7 +453,7 @@ sub ProcFile {
 			onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath, $Line);
 			next;
 		}
-                
+
 		# Look for unreferenced dependencies.  Note, if any unreferenced
 		# objects are ignored, then set $UnDep so as to suppress any
 		# associated unused-object messages.
@@ -491,6 +493,7 @@ sub ProcFile {
 	$Sun = $Relsz = $Pltsz = $Dyn = $Stab = $SymSort = 0;
 	$Tex = $Strip = 1;
 	$HasDirectBinding = 0;
+	$HasKMOD = 0;
 
 	$Header = 'None';
 ELF:	foreach my $Line (@Elf) {
@@ -549,7 +552,7 @@ ELF:	foreach my $Line (@Elf) {
 		}
 
 		# Does this object contain text relocations.
-		if ($Tex && ($Line =~ /TEXTREL/)) {
+		if ($Tex && ($Type ne 'REL') && ($Line =~ /TEXTREL/)) {
 			# Determine if this file is allowed text relocations.
 			if (defined($EXRE_textrel) &&
 			    ($RelPath =~ $EXRE_textrel)) {
@@ -557,7 +560,7 @@ ELF:	foreach my $Line (@Elf) {
 				next ELF;
 			}
 			onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath,
-			    "TEXTREL .dynamic tag\t\t\t<no -Kpic?>");
+			    "TEXTREL .dynamic tag\t\t\t<no -fpic?>");
 			$Tex = 0;
 			next;
 		}
@@ -588,11 +591,11 @@ ELF:	foreach my $Line (@Elf) {
 				onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath,
 				    "NEEDED=$Need\t<dependency no " .
 				    "longer necessary>");
-			} elsif ((defined($EXRE_forbidden) && 
+			} elsif ((defined($EXRE_forbidden) &&
                                   ($Need =~ $EXRE_forbidden)) &&
-                                 (!defined($EXRE_forbidden_dep) || 
+                                 (!defined($EXRE_forbidden_dep) ||
                                   ($FullPath !~ $EXRE_forbidden_dep))) {
-				onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath, 
+				onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath,
 				    "NEEDED=$Need\t<forbidden dependency, " .
 				    "missing -nodefaultlibs?>");
 			} elsif ($opt{i}) {
@@ -600,13 +603,17 @@ ELF:	foreach my $Line (@Elf) {
 				# any useful dynamic entries.
 				onbld_elfmod::OutMsg($InfoFH, $InfoTtl, $RelPath,
 				    "NEEDED=$Need");
-                	}
+			}
 			next;
 		}
 
 		# Is this object built with -B direct flag on?
 		if ($Line =~ / DIRECT /) {
 			$HasDirectBinding = 1;
+		}
+
+		if (($Header eq 'Dyn') && ($Line =~ /SUNW_KMOD/)) {
+			$HasKMOD = 1;
 		}
 
 		# Does this object specify a runpath.
@@ -623,6 +630,15 @@ ELF:	foreach my $Line (@Elf) {
 	if (($Type eq 'DYN') && $Relsz && ($Relsz != $Pltsz) && ($Sun == 0)) {
 		onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath,
 		    ".SUNW_reloc section missing\t\t<no -zcombreloc?>");
+	}
+
+	# A probable kernel module should be tagged
+	if (($Type eq 'REL') && ($RelPath =~ qr{(^|/)kernel/}) &&
+	    ($HasKMOD == 0)) {
+		if (!defined($EXRE_not_kmod) || ($RelPath !~ $EXRE_not_kmod)) {
+			onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath,
+			    "kernel object should be linked -ztype=kmod");
+		}
 	}
 
 	# No objects released to a customer should have any .stabs sections
@@ -703,7 +719,7 @@ sub ProcSymSort {
 	my $secname;
 	while ($line = <SORT>) {
 		chomp $line;
-		
+
 		next if ($line eq '');
 
 		# If this is a header line, pick up the section name
@@ -726,9 +742,9 @@ sub ProcSymSort {
 
 		# Process symbol line
 		my @fields = split /\s+/, $line;
-		my $new_addr = $fields[2]; 
+		my $new_addr = $fields[2];
 		my $new_type = $fields[8];
-		my $new_name = $fields[9]; 
+		my $new_name = $fields[9];
 
 		if ($new_type eq 'UNDEF') {
 			onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath,
@@ -743,13 +759,13 @@ sub ProcSymSort {
 			ProcSymSortOutMsg($RelPath, $secname,
 			    $last_addr, @dups) if (scalar(@dups) > 1);
 			@dups = ( $new_name );
-			$last_addr = $new_addr; 
+			$last_addr = $new_addr;
 		}
 	}
 
 	ProcSymSortOutMsg($RelPath, $secname, $last_addr, @dups)
 		if (scalar(@dups) > 1);
-	
+
 	close SORT;
 }
 
@@ -814,13 +830,13 @@ sub ProcVerdef {
 			    onbld_elfmod::OutMsg($InfoFH, $InfoTtl,
 			        $RelPath, "VERSION=$ver");
 			    $cur_ver = $ver;
-			}			    
+			}
 			onbld_elfmod::OutMsg($InfoFH, $InfoTtl,
 			    $RelPath, "SYMBOL=$sym");
 		    }
 		}
 	}
-	
+
 	close PVS;
 }
 
@@ -1031,7 +1047,7 @@ LINE:
 
 # -----------------------------------------------------------------------------
 
-# This script relies on ldd returning output reflecting only the binary 
+# This script relies on ldd returning output reflecting only the binary
 # contents.  But if LD_PRELOAD* environment variables are present, libraries
 # named by them will also appear in the output, disrupting our analysis.
 # So, before we get too far, scrub the environment.

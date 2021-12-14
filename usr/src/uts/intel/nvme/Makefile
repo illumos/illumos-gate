@@ -42,7 +42,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Driver depends on blkdev
 #
-LDFLAGS		+= -dy -N drv/blkdev -N misc/sata
+LDFLAGS		+= -N drv/blkdev -N misc/sata
 
 #
 #	Default build targets.

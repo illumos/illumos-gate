@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Linkage dependencies
 #
-LDFLAGS += -dy -Nmisc/kcf
+LDFLAGS += -Nmisc/kcf
 
 CPPFLAGS	+= -I$(COM_DIR) -I$(COM_DIR)/..
 CPPFLAGS	+= -DCRYPTO_PROVIDER_NAME=\"$(MODULE)\"

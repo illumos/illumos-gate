@@ -58,8 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Nmisc/mac -Nmisc/dls -Ndrv/ipnet -Nmisc/neti -Ndrv/ip
-INC_PATH	+= -I$(UTSBASE)/common/io/bpf
+LDFLAGS		+= -Nmisc/mac -Nmisc/dls -Ndrv/ipnet -Nmisc/neti -Ndrv/ip
 
 #
 # For now, disable these warnings; maintainers should endeavor

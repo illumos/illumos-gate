@@ -80,7 +80,7 @@ CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
 #
 # module dependencies
 #
-LDFLAGS += -dy -Nmisc/ldc -Nmisc/platsvc
+LDFLAGS += -Nmisc/ldc -Nmisc/platsvc
 
 #
 # For now, disable these warnings; maintainers should endeavor

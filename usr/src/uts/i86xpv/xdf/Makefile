@@ -53,7 +53,7 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 # Overrides
-LDFLAGS		+= -dy -Nmisc/cmlb
+LDFLAGS		+= -Nmisc/cmlb
 
 
 CERRWARN	+= -_gcc=-Wno-parentheses

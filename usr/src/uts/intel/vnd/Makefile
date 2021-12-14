@@ -26,7 +26,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/vnd
 
 CPPFLAGS	+= -I$(UTSBASE)/i86pc
-LDFLAGS		+= -dy -Nmisc/neti -Nmisch/hook -Nfs/dev -Nmisc/gsqueue
+LDFLAGS		+= -Nmisc/neti -Nmisch/hook -Nfs/dev -Nmisc/gsqueue
 
 #
 # We use <sys/ctype.h> which causes gcc to think that all of its inline

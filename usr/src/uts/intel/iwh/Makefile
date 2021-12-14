@@ -61,7 +61,7 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 
 CPPFLAGS	+= -I. -D_KERNEL
 
-LDFLAGS         += -dy -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip
+LDFLAGS         += -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip
 
 #
 #	Default build targets.

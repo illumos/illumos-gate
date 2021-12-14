@@ -67,7 +67,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Depends on bootdev
 #
-LDFLAGS += -dy -N misc/bootdev
+LDFLAGS += -N misc/bootdev
 
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-label

@@ -70,7 +70,7 @@ SMOFF += indenting,index_overflow
 #
 # Depends on sppp
 #
-LDFLAGS         += -dy -N drv/sppp
+LDFLAGS         += -N drv/sppp
 
 #
 #	Default build targets.

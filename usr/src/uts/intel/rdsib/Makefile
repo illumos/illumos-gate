@@ -34,7 +34,7 @@ UTSBASE	= ../..
 MODULE		= rdsib
 OBJECTS		= $(RDSIB_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-LDFLAGS		+= -dy -Ndrv/rds -Nmisc/ibtl -Nmisc/ibcm -Ndrv/ip
+LDFLAGS		+= -Ndrv/rds -Nmisc/ibtl -Nmisc/ibcm -Ndrv/ip
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/rds
 #
 #	Include common rules.

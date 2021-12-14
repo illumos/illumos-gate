@@ -68,7 +68,7 @@ $(OBJS_DIR)/psm_common.o := SMOFF += deref_check
 #
 # Depends on ACPI CA interpreter
 #
-LDFLAGS		+= -dy -N misc/acpica
+LDFLAGS		+= -N misc/acpica
 
 #
 #	Default build targets.

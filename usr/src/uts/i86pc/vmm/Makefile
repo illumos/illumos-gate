@@ -61,7 +61,7 @@ AS_INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(OBJS_DIR)
 CFLAGS		+= -DVMM_KEEP_STATS
 
 LDFLAGS         += -N misc/acpica -N misc/pcie -N fs/dev
-LDFLAGS         += -z type=kmod -M $(MAPFILE)
+LDFLAGS         += -M $(MAPFILE)
 
 OFFSETS_VMX	= $(CONF_SRCDIR)/intel/offsets.in
 OFFSETS_SVM	= $(CONF_SRCDIR)/amd/offsets.in

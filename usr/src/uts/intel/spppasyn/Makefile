@@ -67,7 +67,7 @@ INC_PATH	+= -I$(UTSBASE)/common/io/ppp/common
 #
 # Depends on sppp
 #
-LDFLAGS         += -dy -N drv/sppp
+LDFLAGS         += -N drv/sppp
 
 #
 #	Default build targets.

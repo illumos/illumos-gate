@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # module dependencies
 #
-LDFLAGS += -dy -Nmisc/fcodem -Nmisc/busra
+LDFLAGS += -Nmisc/fcodem -Nmisc/busra
 
 #
 # OPL specific header files

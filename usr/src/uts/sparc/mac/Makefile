@@ -57,7 +57,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS				+= $(CCVERBOSE)
 $(RELEASE_BUILD)CFLAGS		+= -xinline=auto -xcrossfile
 $(RELEASE_BUILD)COPTIMIZE	= -xO5
-LDFLAGS				+= -dy
+INC_PATH			+= -I$(UTSBASE)/common/io/bpf
 
 
 CERRWARN			+= -_gcc=-Wno-unused-label

@@ -67,7 +67,7 @@ INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 #
 #	depends on ip and sockfs
 #
-LDFLAGS		+= -dy -Ndrv/ip -Nfs/sockfs
+LDFLAGS		+= -Ndrv/ip -Nfs/sockfs
 
 # needs work
 $(OBJS_DIR)/icmpddi.o := SMOFF += index_overflow

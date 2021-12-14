@@ -69,7 +69,7 @@ INC_PATH        += -I$(UTSBASE)/i86pc
 #
 #	dependency
 #
-LDFLAGS	+=	-dy -Nmisc/busra -Nmisc/pci_autoconfig
+LDFLAGS	+=	-Nmisc/busra -Nmisc/pci_autoconfig
 
 #
 # For now, disable these warnings; maintainers should endeavor

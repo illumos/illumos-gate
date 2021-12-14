@@ -45,7 +45,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 GFX_DIR		= $(UTSBASE)/i86pc/io/gfx_private
 INC_PATH	+= -I$(GFX_DIR)
 
-LDFLAGS +=	-dy -Nmisc/gfx_private
+LDFLAGS +=	-Nmisc/gfx_private
 
 #
 #	Include common rules.

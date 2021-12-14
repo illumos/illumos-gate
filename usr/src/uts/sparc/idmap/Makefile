@@ -49,7 +49,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 #	Module dependencies
 #
-LDFLAGS += -dy -N"sys/doorfs" -N"strmod/rpcmod"
+LDFLAGS += -Nsys/doorfs -Nstrmod/rpcmod
 
 #
 # warnings turned off

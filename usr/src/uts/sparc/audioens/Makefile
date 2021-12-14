@@ -50,7 +50,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
+LDFLAGS		+= -Ndrv/audio -Nmisc/ac97
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 

@@ -34,7 +34,7 @@ UTSBASE	= ../..
 MODULE		= sol_ofs
 OBJECTS		= $(SOL_OFS_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-LDFLAGS		+= -dy -Nmisc/ibtl -Nmisc/ibcm
+LDFLAGS		+= -Nmisc/ibtl -Nmisc/ibcm
 
 #
 #	Include common rules.

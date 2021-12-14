@@ -84,7 +84,7 @@ SMOFF += all_func_returns
 #
 # Driver depends on MAC & IP
 #
-LDFLAGS		+= -dy -N misc/mac -N drv/ip
+LDFLAGS		+= -N misc/mac -N drv/ip
 
 #
 #	Default build targets.

@@ -69,7 +69,7 @@ CERRWARN += -_gcc=-Wno-type-limits
 #
 CFLAGS += -dalign
 
-LDFLAGS	+= -dy -Ndrv/pcipsy
+LDFLAGS	+= -Ndrv/pcipsy
 
 #
 #	Default build targets.

@@ -72,7 +72,7 @@ $(OBJS_DIR)/eib_ibt.o := SMOFF += deref_check
 #
 # Depends on misc/ibtl
 #
-LDFLAGS	+= -dy -Nmisc/mac -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf
+LDFLAGS	+= -Nmisc/mac -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf
 
 #
 # Default build targets

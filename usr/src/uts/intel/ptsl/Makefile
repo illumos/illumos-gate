@@ -65,7 +65,7 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 #
 # Depends on ptc
 #
-LDFLAGS += -dy -N drv/ptc
+LDFLAGS += -N drv/ptc
 
 #
 #	Default build targets.

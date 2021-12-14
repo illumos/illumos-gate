@@ -73,7 +73,7 @@ CFLAGS += -dalign -DMC_EMULATION
 
 #
 #	Dependency
-LDFLAGS	+= -dy -Ndrv/scfd
+LDFLAGS	+= -Ndrv/scfd
 
 #
 #	Default build targets.

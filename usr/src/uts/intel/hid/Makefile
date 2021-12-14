@@ -60,7 +60,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 # depends on misc/usba
 #
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/hidparser -Ndacf/consconfig_dacf
+LDFLAGS         += -Nmisc/usba -Nmisc/hidparser -Ndacf/consconfig_dacf
 
 #
 # For now, disable these warnings; maintainers should endeavor

@@ -52,7 +52,7 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 #
 # Define dependency on kgssapi
 #
-LDFLAGS += -dy -N misc/kgssapi
+LDFLAGS += -N misc/kgssapi
 
 #
 #	Define targets

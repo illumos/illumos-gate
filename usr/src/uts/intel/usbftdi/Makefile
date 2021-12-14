@@ -47,7 +47,7 @@ include $(UTSBASE)/intel/Makefile.intel
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser
+LDFLAGS         += -Nmisc/usba -Nmisc/usbser
 
 #
 #	Define targets

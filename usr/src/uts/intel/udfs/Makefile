@@ -58,7 +58,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 # Define dependency on specfs
 #
-LDFLAGS += -dy -N fs/specfs
+LDFLAGS += -N fs/specfs
 
 #
 # For now, disable these warnings; maintainers should endeavor

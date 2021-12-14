@@ -59,7 +59,7 @@ INCS		+= -I$(SRC)/uts/common/
 #
 #	Overrides
 #
-LDFLAGS		+= -dy -Ndrv/fcp -Nmisc/fctl -Nmisc/scsi
+LDFLAGS		+= -Ndrv/fcp -Nmisc/fctl -Nmisc/scsi
 
 #
 # For now, disable these warnings; maintainers should endeavor

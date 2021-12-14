@@ -64,7 +64,7 @@ CFLAGS += -dalign -DPCICFG_INTERPRET_FCODE
 
 #
 #	Dependency
-LDFLAGS += -dy -Nmisc/busra -Nmisc/fcpci -Nmisc/fcodem -Nmisc/pcie
+LDFLAGS += -Nmisc/busra -Nmisc/fcpci -Nmisc/fcodem -Nmisc/pcie
 
 #
 # For now, disable these warnings; maintainers should endeavor

@@ -53,7 +53,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS += -dy -Ndacf/consconfig_dacf
+LDFLAGS += -Ndacf/consconfig_dacf
 
 #
 #	Default build targets.

@@ -47,7 +47,7 @@ GFXP_VGATEXT_SRC	= $(UTSBASE)/i86pc/io/gfx_private
 #
 #	dependency
 #
-LDFLAGS	+=      -dy -Nmisc/pci_autoconfig
+LDFLAGS	+=      -Nmisc/pci_autoconfig
 
 #
 #	Include common rules.

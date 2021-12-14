@@ -55,7 +55,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # depends on misc/iommulib and misc/acpica
 #
-LDFLAGS         += -dy -Nmisc/iommulib -Nmisc/acpica
+LDFLAGS         += -Nmisc/iommulib -Nmisc/acpica
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses

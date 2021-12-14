@@ -61,7 +61,7 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DSPEC_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Nfs/fifofs
+LDFLAGS		+= -Nfs/fifofs
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)

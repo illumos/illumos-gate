@@ -71,7 +71,7 @@ CERRWARN += $(CNOWARN_UNINIT)
 
 #
 # Module Dependencies
-LDFLAGS		+= -dy -Nmisc/ds
+LDFLAGS		+= -Nmisc/ds
 
 #
 #	Default build targets.

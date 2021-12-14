@@ -25,7 +25,7 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CPPFLAGS	+= -I$(SRC)/common/ccid
 
-LDFLAGS		+= -dy -N misc/usba
+LDFLAGS		+= -N misc/usba
 
 .KEEP_STATE:
 

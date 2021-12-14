@@ -82,7 +82,7 @@ CFLAGS		+= -dalign
 #
 # Driver depends on MAC
 #
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -N misc/mac
 
 #
 #	Default build targets.

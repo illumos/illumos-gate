@@ -52,7 +52,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #	Overrides and depends_on
 #
-LDFLAGS		+= -dy -Nmisc/fssnap_if -Nfs/ufs
+LDFLAGS		+= -Nmisc/fssnap_if -Nfs/ufs
 
 #
 # For now, disable these warnings; maintainers should endeavor

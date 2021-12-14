@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Nmisc/kcf
+LDFLAGS += -Nmisc/kcf
 
 CFLAGS += -I$(COM_DIR)
 CFLAGS += -DVIS_SHA1

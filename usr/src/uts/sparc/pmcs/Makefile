@@ -42,7 +42,7 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/scsi/adapters/pmcs
 #
 #	Kernel Module Dependencies
 #
-LDFLAGS += -dy -Nmisc/scsi
+LDFLAGS += -Nmisc/scsi
 
 #
 #	Define targets

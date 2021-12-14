@@ -48,7 +48,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 # depends on misc/s1394
-LDFLAGS		+= -dy -Nmisc/s1394
+LDFLAGS		+= -Nmisc/s1394
 
 #
 # For now, disable these warnings; maintainers should endeavor

@@ -36,7 +36,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Driver flags.
 #
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -N misc/mac -N misc/mii
+LDFLAGS		+= -N misc/mac -N misc/mii
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 

@@ -63,7 +63,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 
 #
 #	Dependency
-LDFLAGS		+= -dy -Nmisc/busra -Nmisc/hpcsvc -Nmisc/pcicfg
+LDFLAGS		+= -Nmisc/busra -Nmisc/hpcsvc -Nmisc/pcicfg
 
 #
 #	Default build targets.

@@ -61,7 +61,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 CFLAGS += -DACPI_POWER_BUTTON
 
-LDFLAGS += -dy -N misc/acpica
+LDFLAGS += -N misc/acpica
 
 #
 # For now, disable these warnings; maintainers should endeavor

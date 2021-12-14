@@ -61,7 +61,7 @@ CFLAGS += -dalign -DMODULE_NAME=\"$(MODULE)\"
 #
 # Module Dependencies
 #
-LDFLAGS		+= -dy -Nmisc/ds
+LDFLAGS		+= -Nmisc/ds
 
 INC_PATH        += -I$(UTSBASE)/sun4v/io/iospc
 

@@ -68,7 +68,7 @@ CERRWARN += -_gcc=-Wno-unused-variable
 #
 # Link to acpica for ACPI services
 #
-LDFLAGS	+= -dy -N misc/acpica
+LDFLAGS	+= -N misc/acpica
 
 #
 #	Default build targets.

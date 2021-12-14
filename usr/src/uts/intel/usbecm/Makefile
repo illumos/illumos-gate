@@ -44,7 +44,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/mac
+LDFLAGS         += -Nmisc/usba -Nmisc/mac
 
 #
 #	Define targets

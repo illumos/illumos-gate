@@ -66,7 +66,7 @@ CFLAGS += -D_EXTVTOC
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
 
-LDFLAGS += -dy -Nmisc/ldc -Nmisc/platsvc -Nmisc/scsi
+LDFLAGS += -Nmisc/ldc -Nmisc/platsvc -Nmisc/scsi
 
 #
 #	Default build targets.

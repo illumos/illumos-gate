@@ -54,7 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Define dependencies on iommulib and acpica
 #
-LDFLAGS		+= -dy -N misc/iommulib -N misc/acpica
+LDFLAGS		+= -N misc/iommulib -N misc/acpica
 
 #
 # For now, disable these checks; maintainers should endeavor

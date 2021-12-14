@@ -51,7 +51,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 # depends on misc/usba
 #
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/hidparser -Ndacf/consconfig_dacf
+LDFLAGS         += -Nmisc/usba -Nmisc/hidparser -Ndacf/consconfig_dacf
 
 #
 #	Define targets

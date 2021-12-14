@@ -74,7 +74,7 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 #
 #
 # we depend on the sata module
-LDFLAGS += -dy -N misc/sata
+LDFLAGS += -N misc/sata
 
 #
 #	Default build targets.

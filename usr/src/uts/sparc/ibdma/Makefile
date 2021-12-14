@@ -62,7 +62,7 @@ CFLAGS += $(CCVERBOSE)
 #
 #	depends on misc/ibtl, and misc/ibmf
 #
-LDFLAGS	+= -dy -Nmisc/ibtl -Nmisc/ibmf
+LDFLAGS	+= -Nmisc/ibtl -Nmisc/ibmf
 
 #
 #	Default build targets.

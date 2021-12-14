@@ -61,7 +61,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 # Define dependencies on specfs, rpcmod, and rpcsec
 #
-LDFLAGS += -dy -N fs/specfs -N strmod/rpcmod -N misc/rpcsec
+LDFLAGS += -N fs/specfs -N strmod/rpcmod -N misc/rpcsec
 
 #
 # For now, disable these warnings; maintainers should endeavor

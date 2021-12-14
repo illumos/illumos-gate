@@ -61,8 +61,8 @@ INC_PATH	+= -I$(SRC)/common/hdcrc
 #
 # Note dependancy on misc/scsi.
 #
-LDFLAGS += -dy -N"misc/scsi" -N"fs/sockfs" -N"sys/doorfs" -Nmisc/md5 -Nmisc/ksocket
-LDFLAGS += -N"misc/idm"
+LDFLAGS += -Nmisc/scsi -Nfs/sockfs -Nsys/doorfs -Nmisc/md5 -Nmisc/ksocket
+LDFLAGS += -Nmisc/idm
 
 
 CERRWARN	+= -_gcc=-Wno-switch

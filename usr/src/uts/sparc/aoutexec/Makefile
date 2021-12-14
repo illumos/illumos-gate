@@ -65,7 +65,7 @@ CERRWARN += -_gcc=-Wno-parentheses
 #
 # Define dependency on elfexec
 #
-LDFLAGS += -dy -N exec/elfexec
+LDFLAGS += -N exec/elfexec
 
 #
 #	Default build targets.

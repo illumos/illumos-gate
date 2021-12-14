@@ -66,7 +66,7 @@ CFLAGS		+= $(CCVERBOSE)
 #
 #	depends on ip and sockfs
 #
-LDFLAGS		+= -dy -Ndrv/ip -Nfs/sockfs
+LDFLAGS		+= -Ndrv/ip -Nfs/sockfs
 
 #
 #	Default build targets.

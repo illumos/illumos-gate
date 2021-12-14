@@ -54,7 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 
 
-LDFLAGS += -dy -Nfs/sockfs -Ndrv/ip
+LDFLAGS += -Nfs/sockfs -Ndrv/ip
 
 #
 # For now, disable these warnings; maintainers should endeavor

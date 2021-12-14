@@ -37,7 +37,7 @@ ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Ndrv/dtrace -Nmisc/ctf
+LDFLAGS		+= -Ndrv/dtrace -Nmisc/ctf
 
 #
 # For now, disable these warnings; maintainers should endeavor

@@ -59,7 +59,7 @@ ALL_TARGET      = $(BINARY) $(SRC_CONFFILE)
 INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 CPPFLAGS +=  -I$(UTSBASE)/i86pc
-LDFLAGS += -dy -N misc/gld
+LDFLAGS += -N misc/gld
 
 # needs work
 SMOFF += all_func_returns

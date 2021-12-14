@@ -75,7 +75,7 @@ CERRWARN	+= -_gcc=-Wno-type-limits
 # Depends on scsi and cmlb
 # fcp included for fibre support
 #
-LDFLAGS         += -dy -N misc/scsi -N misc/cmlb -N drv/fcp
+LDFLAGS         += -N misc/scsi -N misc/cmlb -N drv/fcp
 
 #
 #	Default build targets.

@@ -72,7 +72,7 @@ SMATCH=off
 #
 # Depends on scsi
 #
-LDFLAGS         += -dy -N misc/scsi
+LDFLAGS         += -N misc/scsi
 
 #
 #	Default build targets.

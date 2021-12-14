@@ -57,7 +57,7 @@ ALL_BUILDS	= $(ALL_BUILDS64)
 #
 # Module depends on mac.
 #
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -N misc/mac
 
 #
 # use Solaris specific code in xen public header files

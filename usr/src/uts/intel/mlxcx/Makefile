@@ -27,7 +27,7 @@ CPPFLAGS	+= -I$(UTSBASE)/common/io/mlxcx
 ALL_TARGET	= $(BINARY) $(CONFMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -N misc/mac
 
 .KEEP_STATE:
 

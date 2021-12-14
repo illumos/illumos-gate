@@ -77,7 +77,7 @@ CFLAGS += -dalign
 #
 # dependency
 #
-LDFLAGS += -dy -Ndrv/schppm
+LDFLAGS += -Ndrv/schppm
 
 #
 #	Default build targets.

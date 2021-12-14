@@ -67,7 +67,7 @@ INC_PATH	+= -I$(UTSBASE)/common/io/ppp/common
 #
 # Define dependency on sppp
 #
-LDFLAGS += -dy -N drv/sppp
+LDFLAGS += -N drv/sppp
 
 #
 # For now, disable these warnings; maintainers should endeavor

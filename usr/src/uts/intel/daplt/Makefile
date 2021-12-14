@@ -37,7 +37,7 @@ MODULE		= daplt
 OBJECTS		= $(DAPLT_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/daplt
-LDFLAGS		+= -dy -Nmisc/ibtl -Nmisc/ibcm
+LDFLAGS		+= -Nmisc/ibtl -Nmisc/ibcm
 
 #
 #	Include common rules.

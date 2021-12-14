@@ -50,7 +50,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS		+= -dy -Ndrv/audio
+LDFLAGS		+= -Ndrv/audio
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 

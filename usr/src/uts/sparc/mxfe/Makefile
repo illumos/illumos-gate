@@ -60,7 +60,7 @@ CERRWARN	+= -_gcc=-Wno-switch
 #
 # Driver depends on GLDv3
 #
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -N misc/mac
 
 #
 #	Default build targets.

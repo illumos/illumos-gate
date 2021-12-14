@@ -60,7 +60,7 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 # $(MODSTUBS_O)	:= AS_CPPFLAGS += -DDEVFS_MODULE
 # CLEANFILES	+= $(MODSTUBS_O)
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Nfs/devfs -Nmisc/dls
+LDFLAGS		+= -Nfs/devfs -Nmisc/dls
 INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 

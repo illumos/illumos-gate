@@ -38,7 +38,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
 CPPFLAGS += -I$(UTSBASE)/common/brand/lx
 
-LDFLAGS         += -dy -Ndrv/dtrace -Nbrand/lx_brand
+LDFLAGS         += -Ndrv/dtrace -Nbrand/lx_brand
 
 .KEEP_STATE:
 

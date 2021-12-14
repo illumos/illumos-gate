@@ -46,7 +46,6 @@ OBJECTS		+= $(FWOBJ)
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-LDFLAGS	=
 #
 #	Define targets
 #

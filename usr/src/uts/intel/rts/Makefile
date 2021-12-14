@@ -61,7 +61,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 #
 #	depends on ip and sockfs
 #
-LDFLAGS		+= -dy -Ndrv/ip -Nfs/sockfs
+LDFLAGS		+= -Ndrv/ip -Nfs/sockfs
 
 # needs work
 $(OBJS_DIR)/rtsddi.o := SMOFF += index_overflow

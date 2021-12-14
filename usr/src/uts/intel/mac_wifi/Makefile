@@ -55,7 +55,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Nmisc/mac
+LDFLAGS		+= -Nmisc/mac
 
 #
 #	Default build targets.

@@ -66,7 +66,7 @@ CERRWARN += -_gcc=-Wno-parentheses
 #
 CFLAGS += -dalign
 
-LDFLAGS	+= -dy  -Ndrv/rmclomv
+LDFLAGS	+=  -Ndrv/rmclomv
 
 #
 #	Default build targets.

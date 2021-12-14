@@ -56,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Defined kgssapi and md5 as depdencies
 #
-LDFLAGS += -dy -N misc/kgssapi -N misc/md5
+LDFLAGS += -N misc/kgssapi -N misc/md5
 
 #
 # For now, disable these warnings; maintainers should endeavor

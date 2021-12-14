@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 #
 # Define dependency on rpcmod, rpcsec, and mntfs
 #
-LDFLAGS += -dy -N strmod/rpcmod -N misc/rpcsec -N fs/mntfs
+LDFLAGS += -N strmod/rpcmod -N misc/rpcsec -N fs/mntfs
 
 #
 # For now, disable these warnings; maintainers should endeavor

@@ -87,7 +87,7 @@ MODSTUBS_DIR	= $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DNSMB_MODULE
 CLEANFILES	+= $(MODSTUBS_O) $(IOC_CHECK_H)
 INC_PATH	+= -I$(UTSBASE)/common/fs/smbclnt
-LDFLAGS         += -dy -Ncrypto/md4 -Ncrypto/md5 -Nmisc/tlimod
+LDFLAGS         += -Ncrypto/md4 -Ncrypto/md5 -Nmisc/tlimod
 
 #
 # For now, disable these warnings; maintainers should endeavor

@@ -53,7 +53,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Define dependencies on rpcmod and tlimod
 #
-LDFLAGS += -dy -N strmod/rpcmod -N misc/tlimod
+LDFLAGS += -N strmod/rpcmod -N misc/tlimod
 
 #
 # For now, disable these warnings; maintainers should endeavor

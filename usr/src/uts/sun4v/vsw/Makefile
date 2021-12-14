@@ -65,7 +65,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Module dependencies
 #
-LDFLAGS += -dy -Nmisc/ldc -Nmisc/mac -Nmisc/platsvc
+LDFLAGS += -Nmisc/ldc -Nmisc/mac -Nmisc/platsvc
 
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-clobbered

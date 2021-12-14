@@ -63,7 +63,7 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 #
 # Driver depends on MAC, DLS, and DLD
 #
-LDFLAGS		+= -dy -Nmisc/mac -Nmisc/dls -Ndrv/dld -Nfs/dev
+LDFLAGS		+= -Nmisc/mac -Nmisc/dls -Ndrv/dld -Nfs/dev
 
 #
 #	Default build targets.

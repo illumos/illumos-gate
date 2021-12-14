@@ -67,7 +67,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= $(CNOWARN_UNINIT)
 
-LDFLAGS += -dy -Nmisc/tem -Ndacf/consconfig_dacf
+LDFLAGS += -Nmisc/tem -Ndacf/consconfig_dacf
 
 #
 #	Default build targets.

@@ -30,7 +30,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CFLAGS		+= $(CCVERBOSE)
 
-LDFLAGS		+= -dy -Nbrand/lx_brand -Ndrv/ip
+LDFLAGS		+= -Nbrand/lx_brand -Ndrv/ip
 
 .KEEP_STATE:
 

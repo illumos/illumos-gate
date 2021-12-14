@@ -55,7 +55,7 @@ INSTALL_TARGET =	$(BINARY) $(ROOTMODULE)
 #
 INC_PATH +=	-I$(SN1_BASE) -I$(OBJS_DIR)
 AS_INC_PATH	+= -I$(UTSBASE)/i86pc/genassym/$(OBJS_DIR)
-LDFLAGS +=	-dy -Nexec/elfexec
+LDFLAGS +=	-Nexec/elfexec
 
 #
 # Ugh, this is a gross hack.  Sn1_brand_asm.s uses lots of defines

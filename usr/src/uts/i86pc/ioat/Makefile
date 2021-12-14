@@ -62,7 +62,7 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 #
 #	Dependency
 #
-LDFLAGS		+= -dy -Nmisc/dcopy
+LDFLAGS		+= -Nmisc/dcopy
 
 #
 #	Override defaults to build a unique, local modstubs.o.

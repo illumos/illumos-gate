@@ -37,7 +37,7 @@ CERRWARN   += -_cc=-erroff=E_ENUM_VAL_OVERFLOWS_INT_MAX
 # 3rd party code
 SMOFF += all_func_returns
 
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -N misc/mac
 
 MAPFILES	+= ddi mac random
 

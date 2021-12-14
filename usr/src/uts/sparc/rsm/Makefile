@@ -59,7 +59,7 @@ INC_PATH += -I $(UTSBASE)/common/sys/rsm
 #
 #	depends on rsmops
 #
-LDFLAGS		+= -dy -Nmisc/rsmops
+LDFLAGS		+= -Nmisc/rsmops
 
 #
 # Flag to enable for DR testing via drtest driver

@@ -63,7 +63,7 @@ sparc_SPACEFLAG	= -W0,-Lt
 #
 # md5 depends on the kcf framework
 #
-LDFLAGS		+= -dy -Nmisc/kcf
+LDFLAGS		+= -Nmisc/kcf
 
 #
 # need extra inline file for here.
