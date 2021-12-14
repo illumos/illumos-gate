@@ -25,6 +25,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
+ * Copyright 2021 Oxide Computer Company
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -76,10 +88,16 @@ struct atpic {
 	uint8_t		mask;		/* Interrupt Mask Register (IMR) */
 	uint8_t		smm;		/* special mask mode */
 
-	int		acnt[8];	/* sum of pin asserts and deasserts */
+	uint_t		acnt[8];	/* sum of pin asserts and deasserts */
 	int		lowprio;	/* lowest priority irq */
 
 	bool		intr_raised;
+};
+
+struct atpic_stats {
+	uint64_t	as_interrupts;
+	uint64_t	as_saturate_low;
+	uint64_t	as_saturate_high;
 };
 
 struct vatpic {
@@ -87,6 +105,7 @@ struct vatpic {
 	struct mtx	mtx;
 	struct atpic	atpic[2];
 	uint8_t		elc[2];
+	struct atpic_stats stats;
 };
 
 #define	VATPIC_CTR0(vatpic, fmt)					\
@@ -112,7 +131,7 @@ struct vatpic {
 	    tmpvar < 8;							\
 	    tmpvar++, pinvar = (pinvar + 1) & 0x7)
 
-static void vatpic_set_pinstate(struct vatpic *vatpic, int pin, bool newstate);
+static int vatpic_set_pinstate(struct vatpic *vatpic, int pin, bool newstate);
 
 static __inline bool
 master_atpic(struct vatpic *vatpic, struct atpic *atpic)
@@ -215,8 +234,9 @@ vatpic_notify_intr(struct vatpic *vatpic)
 		 * Cascade the request from the slave to the master.
 		 */
 		atpic->intr_raised = true;
-		vatpic_set_pinstate(vatpic, 2, true);
-		vatpic_set_pinstate(vatpic, 2, false);
+		if (vatpic_set_pinstate(vatpic, 2, true) == 0) {
+			(void) vatpic_set_pinstate(vatpic, 2, false);
+		}
 	} else {
 		VATPIC_CTR3(vatpic, "atpic slave no eligible interrupts "
 		    "(imr 0x%x irr 0x%x isr 0x%x)",
@@ -261,6 +281,7 @@ vatpic_notify_intr(struct vatpic *vatpic)
 		atpic->intr_raised = true;
 		lapic_set_local_intr(vatpic->vm, -1, APIC_LVT_LINT0);
 		vioapic_pulse_irq(vatpic->vm, 0);
+		vatpic->stats.as_interrupts++;
 	} else {
 		VATPIC_CTR3(vatpic, "atpic master no eligible interrupts "
 		    "(imr 0x%x irr 0x%x isr 0x%x)",
@@ -413,48 +434,59 @@ vatpic_ocw3(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 	return (0);
 }
 
-static void
+static int
 vatpic_set_pinstate(struct vatpic *vatpic, int pin, bool newstate)
 {
 	struct atpic *atpic;
-	int oldcnt, newcnt;
-	bool level;
+	uint_t oldcnt, newcnt;
+	int err = 0;
 
-	KASSERT(pin >= 0 && pin < 16,
-	    ("vatpic_set_pinstate: invalid pin number %d", pin));
-	KASSERT(VATPIC_LOCKED(vatpic),
-	    ("vatpic_set_pinstate: vatpic is not locked"));
+	VERIFY(pin >= 0 && pin < 16);
+	ASSERT(VATPIC_LOCKED(vatpic));
 
-	atpic = &vatpic->atpic[pin >> 3];
+	const int chip = pin >> 3;
+	const int lpin = pin & 0x7;
+	atpic = &vatpic->atpic[chip];
 
-	oldcnt = atpic->acnt[pin & 0x7];
-	if (newstate)
-		atpic->acnt[pin & 0x7]++;
-	else
-		atpic->acnt[pin & 0x7]--;
-	newcnt = atpic->acnt[pin & 0x7];
-
-	if (newcnt < 0) {
-		VATPIC_CTR2(vatpic, "atpic pin%d: bad acnt %d", pin, newcnt);
+	oldcnt = newcnt = atpic->acnt[lpin];
+	if (newstate) {
+		if (newcnt != UINT_MAX) {
+			newcnt++;
+		} else {
+			err = E2BIG;
+			DTRACE_PROBE2(vatpic__sat_high, struct vatpic *, vatpic,
+			    int, pin);
+			vatpic->stats.as_saturate_high++;
+		}
+	} else {
+		if (newcnt != 0) {
+			newcnt--;
+		} else {
+			err = ERANGE;
+			DTRACE_PROBE2(vatpic__sat_low, struct vatpic *, vatpic,
+			    int, pin);
+			vatpic->stats.as_saturate_low++;
+		}
 	}
+	atpic->acnt[lpin] = newcnt;
 
-	level = ((vatpic->elc[pin >> 3] & (1 << (pin & 0x7))) != 0);
-
+	const bool level = ((vatpic->elc[chip] & (1 << (lpin))) != 0);
 	if ((oldcnt == 0 && newcnt == 1) || (newcnt > 0 && level == true)) {
 		/* rising edge or level */
-		VATPIC_CTR1(vatpic, "atpic pin%d: asserted", pin);
-		atpic->request |= (1 << (pin & 0x7));
+		DTRACE_PROBE2(vatpic__assert, struct vatpic *, vatpic,
+		    int, pin);
+		atpic->request |= (1 << lpin);
 	} else if (oldcnt == 1 && newcnt == 0) {
 		/* falling edge */
-		VATPIC_CTR1(vatpic, "atpic pin%d: deasserted", pin);
-		if (level)
-			atpic->request &= ~(1 << (pin & 0x7));
-	} else {
-		VATPIC_CTR3(vatpic, "atpic pin%d: %s, ignored, acnt %d",
-		    pin, newstate ? "asserted" : "deasserted", newcnt);
+		DTRACE_PROBE2(vatpic__deassert, struct vatpic *, vatpic,
+		    int, pin);
+		if (level) {
+			atpic->request &= ~(1 << lpin);
+		}
 	}
 
 	vatpic_notify_intr(vatpic);
+	return (err);
 }
 
 static int
@@ -462,6 +494,7 @@ vatpic_set_irqstate(struct vm *vm, int irq, enum irqstate irqstate)
 {
 	struct vatpic *vatpic;
 	struct atpic *atpic;
+	int err = 0;
 
 	if (irq < 0 || irq > 15)
 		return (EINVAL);
@@ -475,21 +508,23 @@ vatpic_set_irqstate(struct vm *vm, int irq, enum irqstate irqstate)
 	VATPIC_LOCK(vatpic);
 	switch (irqstate) {
 	case IRQSTATE_ASSERT:
-		vatpic_set_pinstate(vatpic, irq, true);
+		err = vatpic_set_pinstate(vatpic, irq, true);
 		break;
 	case IRQSTATE_DEASSERT:
-		vatpic_set_pinstate(vatpic, irq, false);
+		err = vatpic_set_pinstate(vatpic, irq, false);
 		break;
 	case IRQSTATE_PULSE:
-		vatpic_set_pinstate(vatpic, irq, true);
-		vatpic_set_pinstate(vatpic, irq, false);
+		err = vatpic_set_pinstate(vatpic, irq, true);
+		if (err == 0) {
+			err = vatpic_set_pinstate(vatpic, irq, false);
+		}
 		break;
 	default:
 		panic("vatpic_set_irqstate: invalid irqstate %d", irqstate);
 	}
 	VATPIC_UNLOCK(vatpic);
 
-	return (0);
+	return (err);
 }
 
 int
@@ -582,6 +617,8 @@ vatpic_pending_intr(struct vm *vm, int *vecptr)
 static void
 vatpic_pin_accepted(struct atpic *atpic, int pin)
 {
+	ASSERT(pin >= 0 && pin < 8);
+
 	atpic->intr_raised = false;
 
 	if (atpic->acnt[pin] == 0)
