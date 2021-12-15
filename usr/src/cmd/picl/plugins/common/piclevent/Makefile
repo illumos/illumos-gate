@@ -102,7 +102,7 @@ include $(SRC)/cmd/picl/plugins/Makefile.targ
 include $(SRC)/lib/Makefile.targ
 
 %.so: %.o
-	$(LINK.c) -o $@ $(GSHARED) -h $@ $< $(MOD_LDLIBS)
+	$(LINK.c) -o $@ $(GSHARED) -Wl,-h$@ $< $(MOD_LDLIBS)
 
 %.o: %.c
 	$(COMPILE.c) -o $@ $<
