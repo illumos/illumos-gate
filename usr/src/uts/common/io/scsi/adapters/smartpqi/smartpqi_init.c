@@ -132,7 +132,8 @@ static boolean_t identify_controller(pqi_state_t *s,
     bmic_identify_controller_t *ident);
 static boolean_t write_host_wellness(pqi_state_t *s, void *buf, size_t len);
 static boolean_t get_device_list(pqi_state_t *s,
-    report_phys_lun_extended_t **pl, report_log_lun_extended_t **ll);
+    report_phys_lun_extended_t **pl, size_t *plen,
+    report_log_lun_extended_t **ll, size_t *llen);
 static boolean_t build_raid_path_request(pqi_raid_path_request_t *rqst, int cmd,
     caddr_t lun, uint32_t len, int vpd_page);
 static boolean_t identify_physical_device(pqi_state_t *s, pqi_device_t *devp,
@@ -970,13 +971,16 @@ pqi_scan_scsi_devices(pqi_state_t *s)
 {
 	report_phys_lun_extended_t	*phys_list	= NULL;
 	report_log_lun_extended_t	*logical_list	= NULL;
+	size_t plen;
+	size_t llen;
 	boolean_t			rval		= B_FALSE;
 	int				num_phys	= 0;
 	int				num_logical	= 0;
 	int				i;
 	pqi_device_t			*dev;
 
-	if (get_device_list(s, &phys_list, &logical_list) == B_FALSE)
+	if (get_device_list(s, &phys_list, &plen,
+	    &logical_list, &llen) == B_FALSE)
 		goto error_out;
 
 	if (phys_list) {
@@ -1047,14 +1051,10 @@ pqi_scan_scsi_devices(pqi_state_t *s)
 	rval = B_TRUE;
 
 error_out:
-
 	if (phys_list != NULL)
-		kmem_free(phys_list, ntohl(phys_list->header.list_length) +
-		    sizeof (report_lun_header_t));
+		kmem_free(phys_list, plen);
 	if (logical_list != NULL)
-		kmem_free(logical_list,
-		    ntohl(logical_list->header.list_length) +
-		    sizeof (report_lun_header_t));
+		kmem_free(logical_list, llen);
 	return (rval);
 }
 
@@ -1644,7 +1644,7 @@ error_out:
 }
 
 static boolean_t
-report_luns_by_cmd(pqi_state_t *s, int cmd, void **buf)
+report_luns_by_cmd(pqi_state_t *s, int cmd, void **buf, size_t *buflen)
 {
 	void		*data		= NULL;
 	size_t		data_len	= 0;
@@ -1674,26 +1674,28 @@ error_out:
 	if (rval == B_FALSE) {
 		kmem_free(data, data_len);
 		data = NULL;
+		data_len = 0;
 	}
 	*buf = data;
+	*buflen = data_len;
 	return (rval);
 }
 
 static inline boolean_t
-report_phys_luns(pqi_state_t *s, void **v)
+report_phys_luns(pqi_state_t *s, void **v, size_t *vlen)
 {
-	return (report_luns_by_cmd(s, CISS_REPORT_PHYS, v));
+	return (report_luns_by_cmd(s, CISS_REPORT_PHYS, v, vlen));
 }
 
 static inline boolean_t
-report_logical_luns(pqi_state_t *s, void **v)
+report_logical_luns(pqi_state_t *s, void **v, size_t *vlen)
 {
-	return (report_luns_by_cmd(s, CISS_REPORT_LOG, v));
+	return (report_luns_by_cmd(s, CISS_REPORT_LOG, v, vlen));
 }
 
 static boolean_t
-get_device_list(pqi_state_t *s, report_phys_lun_extended_t **pl,
-    report_log_lun_extended_t **ll)
+get_device_list(pqi_state_t *s, report_phys_lun_extended_t **pl, size_t *plen,
+    report_log_lun_extended_t **ll, size_t *llen)
 {
 	report_log_lun_extended_t	*log_data;
 	report_log_lun_extended_t	*internal_log;
@@ -1701,14 +1703,14 @@ get_device_list(pqi_state_t *s, report_phys_lun_extended_t **pl,
 	size_t				data_len;
 	report_lun_header_t		header;
 
-	if (report_phys_luns(s, (void **)pl) == B_FALSE)
+	if (report_phys_luns(s, (void **)pl, plen) == B_FALSE)
 		return (B_FALSE);
 
-	if (report_logical_luns(s, (void **)ll) == B_FALSE)
+	if (report_logical_luns(s, (void **)ll, llen) == B_FALSE)
 		return (B_FALSE);
 
 	log_data = *ll;
-	if (log_data) {
+	if (log_data != NULL) {
 		list_len = ntohl(log_data->header.list_length);
 	} else {
 		(void) memset(&header, 0, sizeof (header));
@@ -1727,9 +1729,9 @@ get_device_list(pqi_state_t *s, report_phys_lun_extended_t **pl,
 	    sizeof (report_log_lun_extended_entry_t));
 
 	if (*ll != NULL)
-		kmem_free(*ll, sizeof (report_lun_header_t) +
-		    ntohl((*ll)->header.list_length));
+		kmem_free(*ll, *llen);
 	*ll = internal_log;
+	*llen = data_len + sizeof (report_log_lun_extended_entry_t);
 	return (B_TRUE);
 }
 
