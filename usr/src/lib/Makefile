@@ -632,7 +632,7 @@ libinetsvc:	libscf
 libinetutil:	libsocket
 libinstzones:	libzonecfg libcontract
 libipadm:	libinetutil libdlpi libdhcpagent libdladm libsecdb libdhcputil \
-		libcmdutils
+		libcmdutils libipmp
 libipmi:	libm libnvpair libsocket libnsl
 libipmp:	libinetutil
 libipsecutil:	libtecla libtsol libkmf
