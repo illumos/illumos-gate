@@ -1195,6 +1195,12 @@ vm_set_run_state(struct vm *vm, int vcpuid, uint32_t state, uint8_t sipi_vec)
 	return (0);
 }
 
+void
+vm_track_dirty_pages(struct vm *vm, uint64_t gpa, size_t len, uint8_t *bitmap)
+{
+	vmspace_t *vms = vm_get_vmspace(vm);
+	vmspace_track_dirty(vms, gpa, len, bitmap);
+}
 
 static void
 restore_guest_fpustate(struct vcpu *vcpu)

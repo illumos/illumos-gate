@@ -461,6 +461,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_RTC_GETTIME:
 	case VM_PPTDEV_DISABLE_MSIX:
 	case VM_DEVMEM_GETOFFSET:
+	case VM_TRACK_DIRTY_PAGES:
 		vmm_read_lock(sc);
 		lock_type = LOCK_READ_HOLD;
 		break;
@@ -1344,7 +1345,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		}
 		break;
 	}
-
 	case VM_DEVMEM_GETOFFSET: {
 		struct vm_devmem_offset vdo;
 		list_t *dl = &sc->vmm_devmem_list;
@@ -1368,6 +1368,42 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		} else {
 			error = ENOENT;
 		}
+		break;
+	}
+	case VM_TRACK_DIRTY_PAGES: {
+		const size_t max_track_region_len = 8 * PAGESIZE * 8 * PAGESIZE;
+		struct vmm_dirty_tracker tracker;
+		uint8_t *bitmap;
+		size_t len;
+
+		if (ddi_copyin(datap, &tracker, sizeof (tracker), md) != 0) {
+			error = EFAULT;
+			break;
+		}
+		if ((tracker.vdt_start_gpa & PAGEOFFSET) != 0) {
+			error = EINVAL;
+			break;
+		}
+		if (tracker.vdt_len == 0) {
+			break;
+		}
+		if ((tracker.vdt_len & PAGEOFFSET) != 0) {
+			error = EINVAL;
+			break;
+		}
+		if (tracker.vdt_len > max_track_region_len) {
+			error = EINVAL;
+			break;
+		}
+		len = roundup(tracker.vdt_len / PAGESIZE, 8) / 8;
+		bitmap = kmem_zalloc(len, KM_SLEEP);
+		vm_track_dirty_pages(sc->vmm_vm, tracker.vdt_start_gpa,
+		    tracker.vdt_len, bitmap);
+		if (ddi_copyout(bitmap, tracker.vdt_pfns, len, md) != 0) {
+			error = EFAULT;
+		}
+		kmem_free(bitmap, len);
+
 		break;
 	}
 	case VM_WRLOCK_CYCLE: {

@@ -309,6 +309,28 @@ struct vmm_resv_query {
 	size_t	vrq_limit;
 };
 
+/*
+ * struct vmm_dirty_tracker is used for tracking dirty guest pages during
+ * e.g. live migration.
+ *
+ * - The `vdt_start_gpa` field specifies the offset from the beginning of
+ *   guest physical memory to track;
+ * - `vdt_pfns` points to a bit vector indexed by guest PFN relative to the
+ *   given start address.  Each bit indicates whether the given guest page
+ *   is dirty or not.
+ * - `vdt_pfns_len` specifies the length of the of the guest physical memory
+ *   region in bytes.  It also de facto bounds the range of guest addresses
+ *   we will examine on any one `VM_TRACK_DIRTY_PAGES` ioctl().  If the
+ *   range of the bit vector spans an unallocated region (or extends beyond
+ *   the end of the guest physical address space) the corresponding bits in
+ *   `vdt_pfns` will be zeroed.
+ */
+struct vmm_dirty_tracker {
+	uint64_t	vdt_start_gpa;
+	size_t		vdt_len;	/* length of region */
+	void		*vdt_pfns;	/* bit vector of dirty bits */
+};
+
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
 #define	VMM_IOC_BASE		(('v' << 16) | ('m' << 8))
 #define	VMM_LOCK_IOC_BASE	(('v' << 16) | ('l' << 8))
@@ -403,6 +425,9 @@ struct vmm_resv_query {
 #define	VM_RESUME_CPU			(VMM_IOC_BASE | 0x1e)
 
 #define	VM_PPTDEV_DISABLE_MSIX		(VMM_IOC_BASE | 0x1f)
+
+/* Note: forces a barrier on a flush operation before returning. */
+#define	VM_TRACK_DIRTY_PAGES		(VMM_IOC_BASE | 0x20)
 
 #define	VM_DEVMEM_GETOFFSET		(VMM_IOC_BASE | 0xff)
 

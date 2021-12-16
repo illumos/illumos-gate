@@ -122,6 +122,11 @@ int vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
     uint16_t threads, uint16_t maxcpus);
 
 /*
+ * APIs that race against hardware.
+ */
+void vm_track_dirty_pages(struct vm *, uint64_t, size_t, uint8_t *);
+
+/*
  * APIs that modify the guest memory map require all vcpus to be frozen.
  */
 int vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t off,

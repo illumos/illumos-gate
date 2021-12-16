@@ -406,6 +406,7 @@ vbe_get_mode(void)
 int
 vbe_set_mode(int modenum)
 {
+	extern struct paletteentry *shadow_fb;
 	struct modeinfoblock mi;
 	int ret;
 
@@ -445,6 +446,11 @@ vbe_set_mode(int modenum)
 	/* make sure we have current MI in vbestate */
 	memcpy(vbe_mode, &mi, sizeof (*vbe_mode));
 	vbestate.vbe_mode = modenum;
+
+	if (shadow_fb != NULL)
+		free(shadow_fb);
+	shadow_fb = malloc(mi.XResolution * mi.YResolution *
+	    sizeof (*shadow_fb));
 
 	gfx_fb.framebuffer_common.framebuffer_addr =
 	    (uint64_t)mi.PhysBasePtr & 0xffffffff;
