@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_GSS_SECCREATE 3NSL "Jun 29, 2001"
+.TH RPC_GSS_SECCREATE 3NSL "November 21, 2021"
 .SH NAME
 rpc_gss_seccreate \- create a security context using the RPCSEC_GSS protocol
 .SH SYNOPSIS
-.LP
 .nf
 #include <rpc/rpcsec_gss.h>
 
@@ -18,17 +17,13 @@ rpc_gss_seccreate \- create a security context using the RPCSEC_GSS protocol
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-\fBrpc_gss_seccreate()\fR is used by an appliction to create a security context
+\fBrpc_gss_seccreate()\fR is used by an application to create a security context
 using the \fBRPCSEC_GSS\fR protocol, making use of the underlying \fBGSS-API\fR
 network layer.   \fBrpc_gss_seccreate()\fR allows an application to specify the
 type of security mechanism (for example, Kerberos v5), the type of service (for
 example, integrity checking), and the Quality of Protection (\fBQOP\fR) desired
 for transferring data.
 .SH PARAMETERS
-.sp
-.LP
 Information on  \fBRPCSEC_GSS\fR data types for parameters may be found on the
 \fBrpcsec_gss\fR(3NSL) man page.
 .sp
@@ -50,7 +45,7 @@ This is the RPC client handle. \fIclnt\fR may be obtained, for example, from
 This is the identity of the server principal, specified in the form
 \fIservice\fR@\fIhost\fR, where \fIservice\fR is the name of the service the
 client wishes to access and \fIhost\fR is the fully qualified name of the host
-where the service resides \(em for example, nfs@mymachine.eng.company.com.
+where the service resides \(em for example, nfs@mymachine.eng.example.com.
 .RE
 
 .sp
@@ -110,14 +105,11 @@ need to see these options, then it may specify \fINULL\fR for this parameter.
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 \fBrpc_gss_seccreate()\fR returns a security context handle (an RPC
 authentication handle) of type \fBAUTH\fR. If \fBrpc_gss_seccreate()\fR cannot
 return successfully, the application can get an error number by calling
 \fBrpc_gss_get_error()\fR.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/gss/mech\fR\fR
@@ -136,8 +128,6 @@ File containing valid QOP values.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -152,8 +142,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBauth_destroy\fR(3NSL), \fBrpc\fR(3NSL), \fBrpc_gss_get_error\fR(3NSL), \fBrpc_gss_get_mechanisms\fR(3NSL), \fBrpcsec_gss\fR(3NSL), \fBmech\fR(4), \fBqop\fR(4), \fBattributes\fR(5)
 .sp
 .LP
@@ -161,5 +149,3 @@ MT-Level	MT-Safe
 .sp
 .LP
 Linn, J. \fIRFC 2743, Generic Security Service Application Program Interface Version 2, Update 1\fR. Network Working Group. January 2000.
-.SH NOTES
-.sp

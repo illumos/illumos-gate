@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KADMIN 1M "Oct 29, 2015"
+.TH KADMIN 1M "November 22, 2021"
 .SH NAME
 kadmin, kadmin.local \- Kerberos database administration program
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/kadmin\fR [\fB-r\fR \fIrealm\fR] [\fB-p\fR \fIprincipal\fR] [\fB-q\fR \fIquery\fR]
  [\fB-s\fR \fIadmin_server\fR [\fI:port\fR]] [ [\fB-c\fR \fIcredential_cache\fR]
@@ -21,8 +20,6 @@ kadmin, kadmin.local \- Kerberos database administration program
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBkadmin\fR and \fBkadmin.local\fR are interactive command-line interfaces to
 the Kerberos V5 administration system. They provide for the maintenance of
 Kerberos principals, policies, and service key tables (keytabs). \fBkadmin\fR
@@ -62,8 +59,6 @@ file (see \fBkdb5_util\fR(1M)) to decrypt information from the database rather
 than prompting for a password. The \fB-m\fR option will bypass the
 \fB\&.k5.\fR\fIrealm\fR stash file and prompt for the master password.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -254,7 +249,6 @@ Directory server connection port.
 .RE
 
 .SH COMMANDS
-.sp
 .ne 2
 .na
 \fB\fBlist_requests\fR\fR
@@ -573,11 +567,11 @@ des-cbc-crc:normal.
 .in +2
 .nf
 kadmin: \fBaddprinc tlyu/admin\fR
-WARNING: no policy specified for "tlyu/admin@ACME.COM";
+WARNING: no policy specified for "tlyu/admin@EXAMPLE.COM";
 defaulting to no policy.
-Enter password for principal tlyu/admin@ACME.COM:
-Re-enter password for principal tlyu/admin@ACME.COM:
-Principal "tlyu/admin@ACME.COM" created.
+Enter password for principal tlyu/admin@EXAMPLE.COM:
+Re-enter password for principal tlyu/admin@EXAMPLE.COM:
+Principal "tlyu/admin@EXAMPLE.COM" created.
 kadmin:
 .fi
 .in -2
@@ -627,8 +621,8 @@ deletion, unless the \fB-force\fR option is given. This command requires the
 .nf
 kadmin: \fBdelprinc mwm_user\fR
 Are you sure you want to delete the principal
-"mwm_user@ACME.COM"? (yes/no): \fByes\fR
-Principal "mwm_user@ACME.COM" deleted.
+"mwm_user@EXAMPLE.COM"? (yes/no): \fByes\fR
+Principal "mwm_user@EXAMPLE.COM" deleted.
 Make sure that you have removed this principal from
 all kadmind ACLs before reusing.
 kadmin:
@@ -749,9 +743,9 @@ will allow existing valid TGTs to continue to work.
 .in +2
 .nf
 kadmin: \fBcpw systest\fR
-Enter password for principal systest@ACME.COM:
-Re-enter password for principal systest@ACME.COM:
-Password for systest@ACME.COM changed.
+Enter password for principal systest@EXAMPLE.COM:
+Re-enter password for principal systest@EXAMPLE.COM:
+Password for systest@EXAMPLE.COM changed.
 kadmin:
 .fi
 .in -2
@@ -801,13 +795,13 @@ tab-separated strings. Aliased by \fBgetprinc\fR.
 .in +2
 .nf
 kadmin: \fBgetprinc tlyu/admin\fR
-Principal: tlyu/admin@ACME.COM
+Principal: tlyu/admin@EXAMPLE.COM
 Expiration date: [never]
 Last password change: Thu Jan 03 12:17:46 CET 2008
 Password expiration date: [none]
 Maximum ticket life: 24855 days 03:14:07
 Maximum renewable life: 24855 days 03:14:07
-Last modified: Thu Jan 03 12:17:46 CET 2008 (root/admin@ACME.COM)
+Last modified: Thu Jan 03 12:17:46 CET 2008 (root/admin@EXAMPLE.COM)
 Last successful authentication: [never]
 Last failed authentication: [never]
 Failed password attempts: 0
@@ -820,8 +814,8 @@ Key: vno 2, DES cbc mode with RSA-MD5, no salt
 Attributes: REQUIRES_PRE_AUTH
 Policy: [none]
 kadmin: \fBgetprinc -terse tlyu/admin\fR
-"tlyu/admin@ACME.COM"   0       1199359066      0       2147483647
-"root/admin@ACME.COM"   1199359066      128     2       0       "[none]"       21474836
+"tlyu/admin@EXAMPLE.COM"   0       1199359066      0       2147483647
+"root/admin@EXAMPLE.COM"   1199359066      128     2       0       "[none]"       21474836
 47      0       0       0       5       1       2       18      0       1      2
 17      0       1       2       16      0       1       2       23      0      12
        3       0
@@ -871,10 +865,10 @@ the expression. Requires the \fBlist\fR privilege. Aliased by \fBlistprincs\fR,
 .in +2
 .nf
 kadmin: \fBlistprincs test*\fR
-test3@ACME.COM
-test2@ACME.COM
-test1@ACME.COM
-testuser@ACME.COM
+test3@EXAMPLE.COM
+test2@EXAMPLE.COM
+test1@EXAMPLE.COM
+testuser@EXAMPLE.COM
 kadmin:
 .fi
 .in -2
@@ -1266,8 +1260,6 @@ Quits \fBkadmin\fR. Aliased by \fBexit\fR and \fBq\fR.
 .RE
 
 .SS "Time Formats"
-.sp
-.LP
 Various commands in \fBkadmin\fR can take a variety of time formats, specifying
 time durations or absolute times. The \fBkadmin\fR option variables
 \fImaxrenewlife\fR, \fImaxlife\fR, and \fIminlife\fR are time durations,
@@ -1350,7 +1342,7 @@ l l .
 .TS
 l l
 l l .
-\fBVariable Description\fR	
+\fBVariable\fR	\fBDescription\fR
 \fBdd\fR	day
 \fImm\fR	month
 \fIyy\fR	T{
@@ -1370,29 +1362,29 @@ l l .
 \fBTime Units\fR	\fBExamples\fR
 [+|- \fI#\fR] year	"-2 year"
 [+|- \fI#\fR] month	"2 months"
-[+|- \fI#\fR] fortnight	
-[+|- \fI#\fR] week	
-[+|- \fI#\fR] day	
-[+|- \fI#\fR] hour	
-[+|- \fI#\fR] minute	
-[+|- \fI#\fR] min	
-[+|- \fI#\fR] second	
-[+|- \fI#\fR] sec	
-tomorrow	
-yesterday	
-today 	
-now 	
+[+|- \fI#\fR] fortnight
+[+|- \fI#\fR] week
+[+|- \fI#\fR] day
+[+|- \fI#\fR] hour
+[+|- \fI#\fR] minute
+[+|- \fI#\fR] min
+[+|- \fI#\fR] second
+[+|- \fI#\fR] sec
+tomorrow
+yesterday
+today
+now
 this	"this year"
 last	"last saturday"
 next	"next month"
-sunday	
-monday	
-tuesday	
-wednesday	
-thursday	
-friday	
-saturday	
-never	
+sunday
+monday
+tuesday
+wednesday
+thursday
+friday
+saturday
+never
 .TE
 
 .sp
@@ -1402,8 +1394,6 @@ You can also use the following time modifiers: \fBfirst\fR, \fBsecond\fR,
 \fBeighth\fR, \fBninth\fR, \fBtenth\fR, \fBeleventh\fR, \fBtwelfth\fR, and
 \fBago\fR.
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBkadmin\fR:
 .sp
@@ -1418,7 +1408,6 @@ specify options. The default is \fBmore\fR(1).
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/krb5/principal\fR\fR
@@ -1492,8 +1481,6 @@ Keytab for \fBkadmind\fR principals: \fBkadmin\fR/\fIfqdn\fR,
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1508,20 +1495,14 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBkpasswd\fR(1), \fBmore\fR(1), \fBkadmind\fR(1M),
 \fBkdb5_util\fR(1M), \fBkdb5_ldap_util\fR(1M), \fBkproplog\fR(1M),
 \fBkadm5.acl\fR(4), \fBkdc.conf\fR(4), \fBkrb5.conf\fR(4), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBkerberos\fR(5), \fBkrb5envvar\fR(5)
 .SH HISTORY
-.sp
-.LP
 The \fBkadmin\fR program was originally written by Tom Yu at MIT, as an
 interface to the OpenVision Kerberos administration program.
 .SH DIAGNOSTICS
-.sp
-.LP
 The \fBkadmin\fR command is currently incompatible with the MIT \fBkadmind\fR
 daemon interface, so you cannot use this command to administer an MIT-based
 Kerberos database. However, clients running the Solaris implementation of

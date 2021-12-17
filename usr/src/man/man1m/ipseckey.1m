@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IPSECKEY 1M "Sep 25, 2008"
+.TH IPSECKEY 1M "November 22, 2021"
 .SH NAME
 ipseckey \- manually manipulate an IPsec Security Association Database (SADB)
 .SH SYNOPSIS
-.LP
 .nf
 \fBipseckey\fR  [\fB-nvp\fR]
 .fi
@@ -53,8 +52,6 @@ ipseckey \- manually manipulate an IPsec Security Association Database (SADB)
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBipseckey\fR command is used to manually manipulate the security
 association databases of the network security services, \fBipsecah\fR(7P) and
 \fBipsecesp\fR(7P). You can use the \fBipseckey\fR command to set up security
@@ -81,7 +78,6 @@ types.
 \fBipseckey\fR handles sensitive cryptographic keying information. Please read
 the \fBSecurity\fR section for details on how to use this command securely.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-c\fR [\fIfilename\fR]\fR
@@ -158,7 +154,6 @@ raw seconds values for lifetimes.
 .RE
 
 .SH COMMANDS
-.sp
 .ne 2
 .na
 \fB\fBadd\fR\fR
@@ -313,7 +308,6 @@ Prints a brief summary of commands.
 .RE
 
 .SS "\fBSA_TYPE\fR"
-.sp
 .ne 2
 .na
 \fB\fBall\fR\fR
@@ -346,8 +340,6 @@ Specifies the IPsec Encapsulating Security Payload ("\fBESP\fR") \fBSA\fR.
 .RE
 
 .SH EXTENSION VALUE TYPES
-.sp
-.LP
 Commands like \fBadd\fR, \fBdelete\fR, \fBget\fR, and \fBupdate\fR require that
 certain extensions and associated values be specified. The extensions will be
 listed here, followed by the commands that use them, and the commands that
@@ -1015,14 +1007,10 @@ is used by the \fBadd\fR and \fBupdate\fR commands
 .RE
 
 .SS "Tunnel Mode versus Transport Mode SAs"
-.sp
-.LP
 An IPsec SA is a Tunnel Mode SA if the "proto" value is either 4 (\fBipip\fR)
 or 41 (\fBipv6\fR) \fBand\fR there is an inner-address or inner-port value
 specified. Otherwise, the SA is a Transport Mode SA.
 .SH SECURITY
-.sp
-.LP
 Keying material is very sensitive and should be generated as randomly as
 possible. Some algorithms have known weak keys. IPsec algorithms have built-in
 weak key checks, so that if a weak key is in a newly added \fBSA\fR, the
@@ -1103,8 +1091,6 @@ For further thoughts on this subject, see the afterward by Matt Blaze in Bruce
 Schneier's \fIApplied Cryptography: Protocols, Algorithms, and Source Code in
 C\fR.
 .SS "Service Management Facility"
-.sp
-.LP
 IPsec manual keys are managed by the service management facility, \fBsmf\fR(5).
 The services listed below manage the components of IPsec. These services are
 delivered as follows:
@@ -1244,7 +1230,6 @@ discouraged. If the \fBipseckey\fR command is to be run from the command line,
 the \fBmanual-key\fR \fBsmf\fR(5) service should be disabled first. See
 \fBsvcadm\fR(1M).
 .SH EXAMPLES
-.LP
 \fBExample 1 \fREmptying Out All \fBSA\fRs
 .sp
 .LP
@@ -1352,9 +1337,9 @@ Adding or updating \fBSA\fRs requires entering interactive mode:
 .in +2
 .nf
 example# \fBipseckey\fR
-ipseckey> \fBadd ah spi 0x90125 src me.domain.com dst you.domain.com \e
+ipseckey> \fBadd ah spi 0x90125 src me.example.com dst you.example.com \e
           authalg md5 authkey 1234567890abcdef1234567890abcdef\fR
-ipseckey> \fBupdate ah spi 0x90125 dst you.domain.com hard_bytes \e
+ipseckey> \fBupdate ah spi 0x90125 dst you.example.com hard_bytes \e
           16000000\fR
 ipseckey> \fBexit\fR
 .fi
@@ -1369,10 +1354,10 @@ Adding two SAs that are linked together as a pair:
 .in +2
 .nf
 example# \fBipseckey\fR
-ipseckey> \fBadd esp spi 0x2345 src me.domain.com dst you.domain.com \e
+ipseckey> \fBadd esp spi 0x2345 src me.example.com dst you.example.com \e
    authalg md5 authkey bde359723576fdea08e56cbe876e24ad \e
    encralg des encrkey be02938e7def2839\fR
-ipseckey> \fBadd esp spi 0x5432 src me.domain.com dst you.domain.com \e
+ipseckey> \fBadd esp spi 0x5432 src me.example.com dst you.example.com \e
    authalg md5 authkey bde359723576fdea08e56cbe876e24ad \e
    encralg des encrkey be02938e7def2839 pair-spi 0x2345\fR
 ipseckey> \fBexit\fR
@@ -1392,7 +1377,7 @@ also needs to add both \fBSA\fRs.
 .in +2
 .nf
 example# \fBipseckey\fR
-ipseckey> \fBadd ah spi 0x2112 src you.domain.com dst me.domain.com \e
+ipseckey> \fBadd ah spi 0x2112 src you.example.com dst me.example.com \e
           authalg md5 authkey bde359723576fdea08e56cbe876e24ad \e
           hard_bytes 16000000\fR
 ipseckey> \fBexit\fR
@@ -1434,10 +1419,10 @@ flush esp
 ### SECURITY section in this manual page for why this can be
 ### dangerous .
 
-add esp spi 0x2112 src me.domain.com dst you.domain.com \e
+add esp spi 0x2112 src me.example.com dst you.example.com \e
     authalg md5 authkey bde359723576fdea08e56cbe876e24ad \e
     encralg des encrkey be02938e7def2839 hard_usetime 28800
-add esp spi 0x5150 src you.domain.com dst me.domain.com \e
+add esp spi 0x5150 src you.example.com dst me.example.com \e
     authalg md5 authkey 930987dbe09743ade09d92b4097d9e93 \e
     encralg des encrkey 8bd4a52e10127deb hard_usetime 28800
 
@@ -1480,7 +1465,6 @@ pair-spi 0x654321\fR
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/inet/secret/ipseckeys\fR\fR
@@ -1492,8 +1476,6 @@ and \fBSECURITY\fR for more information.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1507,8 +1489,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBps\fR(1), \fBsvcprop\fR(1), \fBsvcs\fR(1), \fBipsecconf\fR(1M),
 \fBipsecalgs\fR(1M), \fBroute\fR(1M), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
 \fBike.config\fR(4), \fBattributes\fR(5), \fBsmf\fR(5), \fBipsec\fR(7P),
@@ -1518,8 +1498,6 @@ Interface Stability	Committed
 Schneier, B., \fIApplied Cryptography: Protocols, Algorithms, and Source Code
 in C\fR. Second ed. New York, New York: John Wiley & Sons, 1996.
 .SH DIAGNOSTICS
-.sp
-.LP
 The \fBipseckey\fR command parses the configuration file and reports any
 errors. In the case of multiple errors, \fBipseckey\fR reports as many of these
 as possible.
@@ -1629,8 +1607,6 @@ provides more detail about what precise value was incorrect and why.
 .RE
 
 .SH NOTES
-.sp
-.LP
 In spite of its IPsec-specific name, \fBipseckey\fR is analogous to
 \fBroute\fR(1M), in that it is a command-line interface to a socket-based
 administration engine, in this case, \fBPF_KEY\fR. \fBPF_KEY\fR was originally

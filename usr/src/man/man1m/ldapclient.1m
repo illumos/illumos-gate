@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAPCLIENT 1M "Feb 25, 2017"
+.TH LDAPCLIENT 1M "November 22, 2021"
 .SH NAME
 ldapclient \- initialize LDAP client machine or output an LDAP client profile
 in LDIF format
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/ldapclient\fR [\fB-v\fR | \fB-q\fR] init [\fB-a\fR profileName=\fIprofileName\fR]
      [\fB-a\fR domainName=\fIdomain\fR] [\fB-a\fR proxyDN=\fIproxyDN\fR]
@@ -49,7 +48,6 @@ in LDIF format
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBldapclient\fR utility can be used to:
 .RS +4
 .TP
@@ -108,7 +106,7 @@ self \fBcredentialLevel\fR is configured, \fBauthenticationMethod\fR must be
 \fBsasl/GSSAPI\fR.
 .sp
 .LP
-Similarily, if a client is to be configured to enable shadow information update
+Similarly, if a client is to be configured to enable shadow information update
 and use a proxy credentialLevel, administrator credentials must be provided
 using \fB-a\fR \fBadminDN=\fR\fIadminDN\fR and \fB-a\fR
 \fBadminPassword=\fR\fIadminPassword\fR. However, the shadow information update
@@ -252,7 +250,6 @@ appropriate certificate databases to use TLS. Note that the \fBtls:none\fR
 authentication method requires a \fBcredentialLevel\fR of \fBproxy\fR to
 take effect.
 .SS "Commands"
-.LP
 The following commands are supported:
 .sp
 .ne 2
@@ -319,7 +316,6 @@ directory for clients to use, with the \fBinit\fR form of this command.
 .RE
 
 .SS "Attributes"
-.LP
 The following attributes are supported:
 .sp
 .ne 2
@@ -765,18 +761,17 @@ This is a multivalued attribute. In the example,
 .sp
 .in +2
 .nf
-serviceSearchDescriptor=passwd:ou=people,dc=a1,dc=acme,dc=com?one
+serviceSearchDescriptor=passwd:ou=people,dc=a1,dc=example,dc=com?one
 .fi
 .in -2
 .sp
 
 the LDAP client would do a one level search in
-\fBou=people,dc=a1,dc=acme,dc=com\fR rather than
+\fBou=people,dc=a1,dc=example,dc=com\fR rather than
 \fBou=people,\fIdefaultSearchBase\fR\fR for the \fBpasswd\fR service.
 .RE
 
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -876,7 +871,6 @@ This option is mutually exclusive of the \fB-a\fR \fIadminPassword\fR option.
 .RE
 
 .SH OPERANDS
-.LP
 The following operand is supported:
 .sp
 .ne 2
@@ -892,7 +886,6 @@ Once the profile is loaded, the \fBpreferredServerList\fR and
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSetting Up a Client By Using the Default Profile Stored on a
 Specified LDAP Server
 .sp
@@ -917,14 +910,14 @@ a Specified LDAP Server
 .LP
 The following example shows how to set up a client using the \fBsimple\fR
 profile stored on the specified LDAP server. The domainname is set to
-\fBxyz.mycompany.com\fR and the proxyPassword is \fBsecret\fR.
+\fBxyz.example.com\fR and the proxyPassword is \fBsecret\fR.
 
 .sp
 .in +2
 .nf
 example# \fBldapclient init -a profileName=simple \e
--a domainName=xyz.mycompany.com \e
--a proxyDN=cn=proxyagent,ou=profile,dc=xyz,dc=mycompany,dc=com \e
+-a domainName=xyz.example.com \e
+-a proxyDN=cn=proxyagent,ou=profile,dc=xyz,dc=example,dc=com \e
 -a proxyPassword=secret '['fe80::a00:20ff:fea3:388']':386\fR
 .fi
 .in -2
@@ -936,13 +929,13 @@ example# \fBldapclient init -a profileName=simple \e
 .LP
 The following example shows how to set up a client using only one server. The
 authentication method is set to \fBnone\fR, and the search base is
-\fBdc=mycompany,dc=com\fR.
+\fBdc=example,dc=com\fR.
 
 .sp
 .in +2
 .nf
 example# \fBldapclient manual -a authenticationMethod=none \e
--a defaultSearchBase=dc=mycompany,dc=com \e
+-a defaultSearchBase=dc=example,dc=com \e
 -a defaultServerList=172.16.100.1\fR
 .fi
 .in -2
@@ -956,7 +949,7 @@ Referrals
 The following example shows how to set up a client using only one server. The
 credential level is set to \fBproxy\fR. The authentication method of is
 \fBsasl/CRAM-MD5\fR, with the option not to follow referrals. The domain name
-is \fBxyz.mycompany.com\fR, and the LDAP server is running on port number 386
+is \fBxyz.example.com\fR, and the LDAP server is running on port number 386
 at IP address \fB172.16.100.1\fR.
 
 .sp
@@ -966,9 +959,9 @@ example# \fBldapclient manual \e
 -a credentialLevel=proxy \e
 -a authenticationMethod=sasl/CRAM-MD5 \e
 -a proxyPassword=secret \e
--a proxyDN=cn=proxyagent,ou=profile,dc=xyz,dc=mycompany,dc=com \e
--a defaultSearchBase=dc=xyz,dc=mycompany,dc=com \e
--a domainName=xyz.mycompany.com \e
+-a proxyDN=cn=proxyagent,ou=profile,dc=xyz,dc=example,dc=com \e
+-a defaultSearchBase=dc=xyz,dc=example,dc=com \e
+-a domainName=xyz.example.com \e
 -a followReferrals=false \e
 -a defaultServerList=172.16.100.1:386\fR
 .fi
@@ -1006,8 +999,8 @@ The following example creates a profile on IPv6 servers
 example# \fBldapclient genprofile -a profileName=eng \e
 -a credentialLevel=proxy \e
 -a authenticationMethod=sasl/DIGEST-MD5 \e
--a defaultSearchBase=dc=eng,dc=acme,dc=com \e
--a "serviceSearchDescriptor=passwd:ou=people,dc=a1,dc=acme,dc=com?one"\e
+-a defaultSearchBase=dc=eng,dc=example,dc=com \e
+-a "serviceSearchDescriptor=passwd:ou=people,dc=a1,dc=example,dc=com?one"\e
 -a preferredServerList= '['fe80::a00:20ff:fea3:388']' \e
 -a "defaultServerList='['fec0::111:a00:20ff:fea3:edcf']' \e
     '['fec0::111:a00:20ff:feb5:e41']'" > eng.ldif\fR
@@ -1027,8 +1020,8 @@ The following example shows a profile that overrides every default value.
 example# \fBldapclient genprofile -a profileName=eng \e
 -a credentialLevel=proxy -a authenticationMethod=sasl/DIGEST-MD5 \e
 -a bindTimeLimit=20 \e
--a defaultSearchBase=dc=eng,dc=acme,dc=com \e
--a "serviceSearchDescriptor=passwd:ou=people,dc=a1,dc=acme,dc=com?one"\e
+-a defaultSearchBase=dc=eng,dc=example,dc=com \e
+-a "serviceSearchDescriptor=passwd:ou=people,dc=a1,dc=example,dc=com?one"\e
 -a serviceAuthenticationMethod=pam_ldap:tls:simple \e
 -a defaultSearchScope=sub \e
 -a attributeMap=passwd:uid=employeeNumber \e
@@ -1041,7 +1034,6 @@ example# \fBldapclient genprofile -a profileName=eng \e
 .sp
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -1120,7 +1112,6 @@ files.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1135,14 +1126,12 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.LP
 \fBchkey\fR(1), \fBldap\fR(1), \fBldapadd\fR(1), \fBldapdelete\fR(1),
 \fBldaplist\fR(1), \fBldapmodify\fR(1), \fBldapmodrdn\fR(1),
 \fBldapsearch\fR(1), \fBidsconfig\fR(1M), \fBldapaddent\fR(1M),
 \fBldap_cachemgr\fR(1M), \fBdefaultdomain\fR(4),
 \fBnsswitch.conf\fR(4), \fBresolv.conf\fR(4), \fBattributes\fR(5)
 .SH CAUTION
-.LP
 Currently \fBStartTLS\fR is not supported by \fBlibldap.so.5\fR, therefore the
 port number provided refers to the port used during a TLS open, rather than the
 port used as part of a \fBStartTLS\fR sequence. To avoid timeout delays, mixed

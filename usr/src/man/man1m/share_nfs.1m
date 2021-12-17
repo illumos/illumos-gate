@@ -23,7 +23,7 @@
 .\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 2016 Jason King.
 .\"
-.Dd March 23, 2017
+.Dd November 22, 2021
 .Dt SHARE_NFS 1M
 .Os
 .Sh NAME
@@ -440,14 +440,14 @@ NIS   172.16.45.9 --> "myhost"
 .Pp
 and
 .Bd -literal -offset indent
-DNS or LDAP   172.16.45.9 --> "myhost.mydomain.mycompany.com"
+DNS or LDAP   172.16.45.9 --> "myhost.mydomain.example.com"
 .Ed
 .Pp
 The domain name suffix is distinguished from hostnames and netgroups by a
 prefixed dot.
 For example,
 .Bd -literal -offset indent
-rw=.mydomain.mycompany.com
+rw=.mydomain.example.com
 .Ed
 .Pp
 A single dot can be used to match a hostname with no suffix.
@@ -459,7 +459,7 @@ rw=.
 matches
 .Qq mydomain
 but not
-.Qq mydomain.mycompany.com .
+.Qq mydomain.example.com .
 This feature can be used to match hosts resolved through NIS rather
 than DNS and LDAP.
 .It Sy network

@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SDP_PARSE 3COMMPUTIL "Oct 12, 2007"
+.TH SDP_PARSE 3COMMPUTIL "November 22, 2021"
 .SH NAME
 sdp_parse \- parse the SDP description
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR...] \fIfile\fR... -\fBlcommputil\fR [ \fIlibrary\fR...]
 #include <sdp.h>
@@ -18,8 +17,6 @@ sdp_parse \- parse the SDP description
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsdp_parse()\fR function parses the SDP description present in
 \fIsdp_info\fR and populates the \fBsdp_session_t\fR structure. The \fIlen\fR
 argument specifies the length of the character buffer \fIsdp_info\fR. The
@@ -85,7 +82,7 @@ and contains the following members:
 .in +2
 .nf
 typedef    struct sdp_session {
-    int              sdp_session_version;  /* SDP session verstion */
+    int              sdp_session_version;  /* SDP session version */
     int              s_version;            /* SDP version field */
     sdp_origin_t     *s_origin;            /* SDP origin field */
     char             *s_name;              /* SDP name field */
@@ -303,14 +300,10 @@ typedef struct sdp_media {
 .in -2
 
 .SH RETURN VALUES
-.sp
-.LP
 The \fBsdp_parse()\fR function returns 0 on success and the appropriate error
 value on failure. The value of \fBerrno\fR is not changed by these calls in the
 event of an error.
 .SH ERRORS
-.sp
-.LP
 The \fBsdp_parse()\fR function will fail if:
 .sp
 .ne 2
@@ -331,7 +324,6 @@ Memory allocation failed while parsing \fIsdp_info\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR\fBsdp_parse()\fR example
 .sp
 .LP
@@ -344,7 +336,7 @@ v=0\er\en
 o=jdoe 23423423 234234234 IN IP4 192.168.1.1\er\en
 s=SDP seminar\er\en
 i=A seminar on the session description protocol\er\en
-e=test@host.com
+e=test@example.com
 c=IN IP4 156.78.90.1\er\en
 t=2873397496 2873404696\er\en
 .fi
@@ -373,7 +365,7 @@ session {
         s_info = "A seminar on the session description protocol"
         s_uri =  (nil)
         s_email {
-                value = "test@host.com"
+                value = "test@example.com"
                 next = (nil)
         }
         s_phone = (nil)
@@ -401,8 +393,6 @@ session {
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -419,7 +409,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibcommputil\fR(3LIB), \fBsdp_new_session\fR(3COMMPUTIL),
 \fBattributes\fR(5)
