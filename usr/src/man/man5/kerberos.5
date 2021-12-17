@@ -4,12 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KERBEROS 5 "Oct 22, 2014"
+.TH KERBEROS 5 "November 22, 2021"
 .SH NAME
 kerberos \- overview of Solaris Kerberos implementation
 .SH DESCRIPTION
-.sp
-.LP
 The Solaris Kerberos implementation, hereafter sometimes shortened to
 "Kerberos," authenticates clients in a network environment, allowing for secure
 transactions. (A client may be a user or a network service.) Kerberos validates
@@ -104,7 +102,6 @@ and \fIprivacy\fR, which encrypts transmitted data. Developers can take
 advantage of the \fBGSS-API\fR through the use of the RPCSEC_GSS \fBAPI\fR
 interface (see \fBrpcsec_gss\fR(3NSL)).
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRExamples of valid principal names
 .sp
 .LP
@@ -115,10 +112,10 @@ The following are examples of valid principal names:
 .nf
 	joe
 	joe/admin
-	joe@ENG.ACME.COM
-	joe/admin@ENG.ACME.COM
-	rlogin/bigmachine.eng.acme.com@ENG.ACME.COM
-	host/bigmachine.eng.acme.com@ENG.ACME.COM
+	joe@ENG.EXAMPLE.COM
+	joe/admin@ENG.EXAMPLE.COM
+	rlogin/bigmachine.eng.example.com@ENG.EXAMPLE.COM
+	host/bigmachine.eng.example.com@ENG.EXAMPLE.COM
 .fi
 .in -2
 .sp
@@ -135,16 +132,12 @@ With host principals, the instance is the fully qualified hostname. Note that
 the words \fBadmin\fR and \fBhost\fR are reserved keywords.
 
 .SH SEE ALSO
-.sp
-.LP
 \fBkdestroy\fR(1), \fBkinit\fR(1), \fBklist\fR(1), \fBkpasswd\fR(1),
 \fBkrb5.conf\fR(4), \fBkrb5envvar\fR(5)
 .sp
 .LP
 \fISystem Administration Guide: Security Services\fR
 .SH NOTES
-.sp
-.LP
 In previous releases of the Solaris operating system, the Solaris Kerberos
 implementation was referred to as the "Sun Enterprise Authentication Mechanism"
 (SEAM).

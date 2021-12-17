@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAPMODIFY 1 "Jan 15, 2004"
+.TH LDAPMODIFY 1 "November 22, 2021"
 .SH NAME
 ldapmodify, ldapadd \- ldap entry addition and modification tools
 .SH SYNOPSIS
-.LP
 .nf
 \fBldapmodify\fR [\fB-a\fR] [\fB-c\fR] [\fB-r\fR] [\fB-n\fR] [\fB-v\fR] [\fB-F\fR] [\fB-b\fR] [\fB-A\fR] [\fB-q\fR]
      [\fB-H\fR] [\fB-?\fR] [\fB-E\fR] [\fB-J\fR] [\fB-Z\fR] [\fB-M\fR] [\fB-d\fR \fIdebuglevel\fR]
@@ -32,8 +31,6 @@ ldapmodify, ldapadd \- ldap entry addition and modification tools
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBldapmodify\fR utility opens a connection to an \fBLDAP\fR server, binds
 and modifies or adds entries. The entry information is read from standard input
 or from \fIfile\fR, specified using the \fB-f\fR option. The \fBldapadd\fR
@@ -45,8 +42,6 @@ automatically.
 Both \fBldapadd\fR and \fBldapmodify\fR reject duplicate attribute-name/value
 pairs for the same entry.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -548,8 +543,6 @@ options needed to identify the certificate and the key database.
 .RE
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -570,8 +563,6 @@ An error occurred. A diagnostic message is written to standard error.
 .RE
 
 .SH EXAMPLES
-.sp
-.LP
 The format of the content of \fIfile\fR (or standard input if no \fB-f\fR
 option is specified) is illustrated in the following examples.
 .LP
@@ -586,7 +577,7 @@ The file \fB/tmp/entrymods\fR contains the following modification instructions:
      dn: cn=Modify Me, o=XYZ, c=US
     changetype: modify
     replace: mail
-    mail: modme@atlanta.xyz.com
+    mail: modme@atlanta.example.com
     -
     add: title
     title: System Manager
@@ -619,7 +610,7 @@ modifies the \fBModify Me\fR entry as follows:
 .TP
 1.
 The current value of the \fBmail\fR attribute is replaced with the value,
-\fBmodme@atlanta.xyz.com\fR.
+\fBmodme@atlanta.example.com\fR.
 .RE
 .RS +4
 .TP
@@ -653,7 +644,7 @@ a new entry:
     cn: Annie Jones
     sn: Jones
     title: Director of Research and Development
-    mail: ajones@londonrd.xyz.us.com
+    mail: ajones@londonrd.example.com
     uid: ajones
 .fi
 .in -2
@@ -690,7 +681,7 @@ a new entry: on an IPv6 server.
     cn: Annie Jones
     sn: Jones
     title: Director of Research and Development
-    mail: ajones@londonrd.xyz.us.com
+    mail: ajones@londonrd.example.com
     uid: ajones
 .fi
 .in -2
@@ -746,8 +737,6 @@ example% \fBldapmodify -f /tmp/badentry\fR
 removes Ann Jones' entry.
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -761,8 +750,6 @@ Stability Level	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBldap\fR(1), \fBldapdelete\fR(1), \fBldaplist\fR(1), \fBldapmodrdn\fR(1),
 \fBldapsearch\fR(1), \fBldapaddent\fR(1M), \fBldap_cachemgr\fR(1M),
 \fBldap_get_option\fR(3LDAP), \fBldap_set_option\fR(3LDAP), \fBattributes\fR(5)

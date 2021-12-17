@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KMFCFG 1 "June 13, 2021"
+.TH KMFCFG 1 "November 22, 2021"
 .SH NAME
 kmfcfg \- Key Management Policy and Plugin Configuration Utility
 .SH SYNOPSIS
@@ -155,7 +155,7 @@ Sets the proxy server name and port for dynamically retrieving a CRL file when
 .sp
 The port number is optional. If the port number is not specified, the default
 value is \fB8080\fR. An example \fBcrl-proxy\fR setting might be:
-\fBcrl-proxy=webcache.sfbay:8080\fR.
+\fBcrl-proxy=webcache.example.org:8080\fR.
 .RE
 
 .sp
@@ -273,7 +273,7 @@ not verified. This attribute value is default to \fBfalse\fR.
 .RS 4n
 Set the proxy server name and port for OCSP. The port number is optional. If
 the port number is not specified, the default value is 8080. An example
-\fBocsp-proxy\fR setting might be: \fBocsp-proxy="webcache.sfbay:8080"\fR
+\fBocsp-proxy\fR setting might be: \fBocsp-proxy="webcache.example.org:8080"\fR
 .RE
 
 .sp

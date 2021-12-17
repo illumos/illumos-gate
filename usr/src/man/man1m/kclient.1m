@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KCLIENT 1M "May 27, 2009"
+.TH KCLIENT 1M "November 22, 2021"
 .SH NAME
 kclient \- set up a machine as a Kerberos client
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/kclient\fR [\fB-n\fR] [\fB-R\fR \fIrealm\fR] [\fB-k\fR \fIkdc\fR] [\fB-a\fR \fIadminuser\fR]
      [\fB-c\fR \fIfilepath\fR] [\fB-d\fR \fIdnsarg\fR] [\fB-f\fR \fIfqdn_list\fR] [\fB-h\fR \fIlogical_host_name\fR]
@@ -16,8 +15,6 @@ kclient \- set up a machine as a Kerberos client
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 By specifying the various command options, you can use the \fBkclient\fR
 utility to:
 .RS +4
@@ -137,8 +134,6 @@ the KDC. It is advised that both systems run some form of time synchronization
 protocol, such as the Network Time Protocol (NTP). See the \fBntpd\fR man page,
 delivered  in  the  \fBSUNWntpu\fR package (not a SunOS man page).
 .SH OPTIONS
-.sp
-.LP
 The non-interactive mode supports the following options:
 .sp
 .ne 2
@@ -417,18 +412,17 @@ example of a possible \fIpam_service\fR value is: \fBdtlogin,sshd-kbdint\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSetting Up a Kerberos Client Using Command-Line Options
 .sp
 .LP
 To setup a Kerberos client using the \fBclntconfig/admin\fR administrative
-principal for realm \fB\&'ABC.COM', kdc `example1.com'\fR and that also does
-kerberized NFS, enter:
+principal for realm \fB\&'EXAMPLE.COM', kdc `example1.example.com'\fR and
+that also does kerberized NFS, enter:
 
 .sp
 .in +2
 .nf
-# /usr/sbin/kclient -n -R ABC.COM -k example1.com -a clntconfig
+# /usr/sbin/kclient -n -R EXAMPLE.COM -k example1.example.com -a clntconfig
 .fi
 .in -2
 .sp
@@ -436,15 +430,15 @@ kerberized NFS, enter:
 .sp
 .LP
 Alternatively, to set up a Kerberos client using the \fBclntconfig/admin\fR
-administrative principal for the realm \fB`EAST.ABC.COM', kdc
-`example2.east.abc.com'\fR and that also needs service principal(s) created
+administrative principal for the realm \fB`EAST.EXAMPLE.COM', kdc
+`example2.east.example.com'\fR and that also needs service principal(s) created
 and/or added to the local \fBkeytab\fR for multiple DNS domains, enter:
 
 .sp
 .in +2
 .nf
-# /usr/sbin/kclient -n -R EAST.ABC.COM -k example2.east.abc.com \e
--f west.abc.com,central.abc.com -a clntconfig
+# /usr/sbin/kclient -n -R EAST.EXAMPLE.COM -k example2.east.example.com \e
+-f west.example.com,central.example.com -a clntconfig
 .fi
 .in -2
 
@@ -458,7 +452,7 @@ privileges (for the principals in the KDC database) in order for the
 .sp
 .in +2
 .nf
-clntconfig/admin@ABC.COM acmi
+clntconfig/admin@EXAMPLE.COM acmi
 .fi
 .in -2
 .sp
@@ -468,13 +462,13 @@ clntconfig/admin@ABC.COM acmi
 .sp
 .LP
 To setup a Kerberos client using the \fBclntconfig/admin\fR administrative
-principal for realm \fB`ABC.COM', kdc `example1.com'\fR and that also copies
-over the master \fBkrb5.conf\fR from a specified location, enter:
+principal for realm \fB`EXAMPLE.COM', kdc `example1.example.com'\fR and that
+also copies over the master \fBkrb5.conf\fR from a specified location, enter:
 
 .sp
 .in +2
 .nf
-# /usr/sbin/kclient -p /net/example1.com/export/profile.krb5
+# /usr/sbin/kclient -p /net/example1.example.com/export/profile.krb5
 .fi
 .in -2
 .sp
@@ -486,10 +480,10 @@ The contents of \fBprofile.krb5\fR:
 .sp
 .in +2
 .nf
-REALM ABC.COM
-KDC example1
+REALM EXAMPLE.COM
+KDC example1.example.com
 ADMIN clntconfig
-FILEPATH /net/example1.com/export/krb5.conf
+FILEPATH /net/example1.example.com/export/krb5.conf
 NFS 0
 DNSLOOKUP none
 .fi
@@ -507,8 +501,8 @@ therefore does not require a \fBkeytab\fR (\fB/etc/krb5/krb5.keytab\fR) file.
 .sp
 .LP
 For this type of client the administrator would issue the following command to
-configure this machine to be a Kerberos client of the \fBABC.COM\fR realm with
-the KDC server \fBkdc1.example.com\fR:
+configure this machine to be a Kerberos client of the \fBEXAMPLE.COM\fR realm
+with the KDC server \fBkdc1.example.com\fR:
 
 .sp
 .in +2
@@ -519,7 +513,6 @@ the KDC server \fBkdc1.example.com\fR:
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/krb5/kadm5.acl\fR\fR
@@ -570,8 +563,6 @@ DNS resolver configuration file.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -586,15 +577,11 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBencrypt\fR(1), \fBksh93\fR(1), \fBldapdelete\fR(1), \fBldapmodify\fR(1),
 \fBldapsearch\fR(1), \fBdd\fR(1M), \fBsmbadm\fR(1M), \fBkadm5.acl\fR(4),
 \fBkrb5.conf\fR(4), \fBnfssec.conf\fR(4), \fBpam.conf\fR(4),
 \fBresolv.conf\fR(4), \fBattributes\fR(5), \fBpam_krb5\fR(5)
 .SH NOTES
-.sp
-.LP
 \fBfqdn\fR stands for the Fully Qualified Domain Name of the local host. The
 \fBkclient\fR utility saves copies of both the \fBkrb5.conf\fR(4) and
 \fBnfssec.conf\fR(4) files to files with corresponding names and \fB\&.sav\fR

@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ETRN 1M "Aug 10, 2004"
+.TH ETRN 1M "November 22, 2021"
 .SH NAME
 etrn \- start mail queue run
 .SH SYNOPSIS
-.LP
 .nf
 \fBetrn\fR [\fB-b\fR] [\fB-v\fR] \fIserver-host\fR [\fIclient-hosts\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 SMTP's \fBETRN\fR command allows an SMTP client and server to interact, giving
 the server an opportunity to start the processing of its queues for messages to
 go to a given host. This is meant to be used in start-up conditions, as well as
@@ -29,8 +26,6 @@ command with that name as the argument. If any \fIclient-hosts\fR are
 specified, \fBetrn\fR uses each of these as arguments for successive \fBETRN\fR
 commands.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -59,8 +54,6 @@ conversations with the remote SMTP server.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 No environment variables are used. However, at system start-up,
 \fBsvc:/network/smtp:sendmail\fR reads \fB/etc/default/sendmail\fR. In this
 file, if the variable \fBETRN_HOSTS\fR is set, \fBsvc:/network/smtp:sendmail\fR
@@ -92,7 +85,6 @@ for each \fIclient\fR name. This is comparable to running:
 .LP
 on the host \fIserver\fR.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBetrn\fR
 .sp
 .LP
@@ -101,7 +93,7 @@ Inserting the line:
 .sp
 .in +2
 .nf
-ETRN_HOSTS="s1.domain.com:clnt.domain.com s2.domain.com:clnt.domain.com"
+ETRN_HOSTS="s1.example.com:clnt.example.com s2.example.com:clnt.example.com"
 .fi
 .in -2
 .sp
@@ -110,8 +102,8 @@ ETRN_HOSTS="s1.domain.com:clnt.domain.com s2.domain.com:clnt.domain.com"
 .LP
 in \fB/etc/default/sendmail\fR results in \fBsvc:/network/smtp:sendmail\fR
 invoking \fBetrn\fR such that \fBETRN\fR commands are sent to both
-\fBs1.domain.com\fR and \fBs2.domain.com\fR, with both having
-\fBclnt.domain.com\fR as the \fBETRN\fR argument.
+\fBs1.example.com\fR and \fBs2.example.com\fR, with both having
+\fBclnt.example.com\fR as the \fBETRN\fR argument.
 
 .sp
 .LP
@@ -120,16 +112,16 @@ The line:
 .sp
 .in +2
 .nf
-ETRN_HOSTS="server.domain.com:client1.domain.com,client2.domain.com"
+ETRN_HOSTS="server.example.com:client1.example.com,client2.example.com"
 .fi
 .in -2
 .sp
 
 .sp
 .LP
-results in two \fBETRN\fR commands being sent to \fBserver.domain.com\fR, one
-with the argument \fBclient1.domain.com\fR, the other with the argument
-\fBclient2.domain.com\fR.
+results in two \fBETRN\fR commands being sent to \fBserver.example.com\fR, one
+with the argument \fBclient1.example.com\fR, the other with the argument
+\fBclient2.example.com\fR.
 
 .sp
 .LP
@@ -138,7 +130,7 @@ The line:
 .sp
 .in +2
 .nf
-ETRN_HOSTS="server1.domain.com server2.domain.com"
+ETRN_HOSTS="server1.example.com server2.example.com"
 .fi
 .in -2
 .sp
@@ -146,12 +138,11 @@ ETRN_HOSTS="server1.domain.com server2.domain.com"
 .sp
 .LP
 results in set of a \fBETRN\fR commands being sent to both
-\fBserver1.domain.com\fR and \fBserver2.domain.com\fR; each set contains one
+\fBserver1.example.com\fR and \fBserver2.example.com\fR; each set contains one
 \fBETRN\fR command for each host name for which \fBsendmail\fR(1M) accepts
 email, with that host name as the argument.
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/mail/sendmail.cf\fR\fR
@@ -170,8 +161,6 @@ Variables used by \fBsvc:/network/smtp:sendmail\fR
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -186,13 +175,9 @@ Interface Stability	Stable
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBsendmail\fR(1M), \fBattributes\fR(5)
 .sp
 .LP
 RFC 1985
 .SH NOTES
-.sp
-.LP
 Not all SMTP servers support \fBETRN\fR.

@@ -4,17 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IKE.CONFIG 4 "Apr 27, 2009"
+.TH IKE.CONFIG 4 "November 22, 2021"
 .SH NAME
 ike.config \- configuration file for IKE policy
 .SH SYNOPSIS
-.LP
 .nf
 \fB/etc/inet/ike/config\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fB/etc/inet/ike/config\fR file contains rules for matching inbound IKE
 requests. It also contains rules for preparing outbound \fBIKE\fR requests.
 .sp
@@ -24,7 +22,6 @@ using the \fB-c\fR or \fB-f\fR options of \fBin.iked\fR(1M). You must use the
 \fB-c\fR option to test a \fBconfig\fR file. You might need to use the \fB-f\fR
 option if it is not in \fB/etc/inet/ike/config\fR.
 .SS "Lexical Components"
-.LP
 On any line, an unquoted \fB#\fR character introduces a comment. The remainder
 of that line is ignored. Additionally, on any line, an unquoted \fB//\fR
 sequence introduces a comment. The remainder of that line is ignored.
@@ -164,12 +161,12 @@ alternative names, the filename or \fBslot\fR of a certificate in
 .in +2
 .nf
 "SLOT=0"
-"EMAIL=postmaster@domain.org"
-"webmaster@domain.org" # Some just work w/o TYPE=
+"EMAIL=postmaster@example.org"
+"webmaster@example.org" # Some just work w/o TYPE=
 "IP=10.0.0.1"
 "10.21.11.11"          # Some just work w/o TYPE=
-"DNS=www.domain.org"
-"mailhost.domain.org"  # Some just work w/o TYPE=
+"DNS=www.example.org"
+"mailhost.example.org"  # Some just work w/o TYPE=
 "ISSUER=C=US, O=Sun Microsystems\\, Inc., CN=Sun CA"
 .fi
 .in -2
@@ -206,7 +203,6 @@ A list of parameters.
 .RE
 
 .SS "File Body Entries"
-.LP
 There are four main types of entries:
 .RS +4
 .TP
@@ -527,13 +523,13 @@ an IP address (for example, \fB10.1.1.2\fR)
 .TP
 .ie t \(bu
 .el o
-DNS name (for example, \fBtest.domain.com\fR)
+DNS name (for example, \fBtest.example.com\fR)
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-MBOX RFC 822 name (for example, \fBroot@domain.com\fR)
+MBOX RFC 822 name (for example, \fBroot@example.com\fR)
 .RE
 .RS +4
 .TP
@@ -897,7 +893,7 @@ An initiator offers up lists of phase 1 transforms, and a receiver is expected
 to only accept such an entry if it matches one in a phase 1 rule. There can be
 several of these, and they are additive. There must be either at least one
 phase 1 transform in a rule or a global default phase 1 transform list. A
-\fBike.config\fR file without a global default phase 1transform list \fBand\fR
+\fBike.config\fR file without a global default phase 1 transform list \fBand\fR
 a rule without a phase 1 transform list is an invalid file. Elements within the
 parameter-list; unless specified as optional, must occur exactly once within a
 given transform's parameter-list:
@@ -984,7 +980,6 @@ Optional. The lifetime for a phase 1 SA.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRA Sample \fBike.config\fR File
 .sp
 .LP
@@ -1007,10 +1002,10 @@ cert_root    "C=US, O=Sun Microsystems\\, Inc., CN=Sun CA"
 # Explicitly trusted certs that need no signatures, or perhaps
 # self-signed ones. Like root certificates, use full DNs for them
 # for now.
-cert_trust    "EMAIL=root@domain.org"
+cert_trust    "EMAIL=root@example.org"
 
 # Where do I send LDAP requests?
-ldap_server        "ldap1.domain.org,ldap2.domain.org:389"
+ldap_server        "ldap1.example.org,ldap2.example.org:389"
 
 ## phase 1 transform defaults...
 
@@ -1118,7 +1113,7 @@ p2_pfs 2
 
     label "punchin-point"
     local_id_type mbox
-    local_id "ipsec-wizard@domain.org"
+    local_id "ipsec-wizard@example.org"
 
     remote_id "10.5.5.128"
 
@@ -1133,7 +1128,7 @@ p2_pfs 2
 {
    label "receiver side"
 
-   remote_id "ipsec-wizard@domain.org"
+   remote_id "ipsec-wizard@example.org"
 
    local_id_type ip
    local_id "10.5.5.128"
@@ -1154,7 +1149,6 @@ p2_pfs 2
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1169,7 +1163,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBcryptoadm\fR(1M), \fBikeadm\fR(1M), \fBin.iked\fR(1M), \fBikecert\fR(1M),
 \fBipseckey\fR(1M), \fBipsecalgs\fR(1M), \fBipsecconf\fR(1M), \fBsvccfg\fR(1M),
 \fBdlopen\fR(3C), \fBattributes\fR(5), \fBrandom\fR(7D)

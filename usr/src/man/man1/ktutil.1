@@ -4,18 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KTUTIL 1 "Nov 16, 2006"
+.TH KTUTIL 1 "November 22, 2021"
 .SH NAME
 ktutil \- Kerberos keytab maintenance utility
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/ktutil\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBktutil\fR command is an interactive command-line interface utility for
 managing  the keylist in keytab files. You must read in a keytab's keylist
 before you can manage it. Also, the user running the \fBktutil\fR command must
@@ -23,7 +20,6 @@ have read/write permissions on the keytab. For example, if a keytab is owned by
 root, which it typically is, \fBktutil\fR must be run as root to have the
 appropriate permissions.
 .SH COMMANDS
-.sp
 .ne 2
 .na
 \fB\fBclear_list\fR\fR
@@ -137,11 +133,10 @@ Exits utility.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDeleting a principal from a file
 .sp
 .LP
-The following example deletes the \fBhost/denver@ACME.com\fR principal from the
+The following example deletes the \fBhost/denver@EXAMPLE.com\fR principal from the
 \fB/etc/krb5/krb5.keytab\fR file. Notice that if you want to delete an entry
 from an existing keytab, you must first write the keylist to a temporary keytab
 and then overwrite the existing keytab with the temporary keytab. This is
@@ -156,13 +151,13 @@ example# \fB/usr/krb5/bin/ktutil\fR
     ktutil: list
 slot KVNO Principal
 ---- ---- ---------------------------------------
-   1    8 host/vail@ACME.COM
-   2    5 host/denver@ACME.COM
+   1    8 host/vail@EXAMPLE.COM
+   2    5 host/denver@EXAMPLE.COM
     ktutil:delent 2
     ktutil:l
 slot KVNO Principal
 ---- ---- --------------------------------------
-   1    8 host/vail@ACME.COM
+   1    8 host/vail@EXAMPLE.COM
     ktutil:wkt /tmp/krb5.keytab
     ktutil:q
 example# \fBmv /tmp/krb5.keytab /etc/krb5/krb5.keytab\fR
@@ -171,7 +166,6 @@ example# \fBmv /tmp/krb5.keytab /etc/krb5/krb5.keytab\fR
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/krb5/krb5.keytab\fR\fR
@@ -181,8 +175,6 @@ keytab file for Kerberos clients
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -200,6 +192,4 @@ Interface Stability	See below.
 .LP
 The command arguments are Evolving. The command output is Unstable.
 .SH SEE ALSO
-.sp
-.LP
 \fBkadmin\fR(1M), \fBk5srvutil\fR(1M), \fBattributes\fR(5), \fBkerberos\fR(5)

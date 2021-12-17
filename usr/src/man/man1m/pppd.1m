@@ -3,18 +3,15 @@
 .\" Redistribution and use in source and binary forms are permitted provided that the above copyright notice and this paragraph are duplicated in all such forms and that any documentation, advertising materials, and other materials related to such distribution and use acknowledge that the software was developed by Carnegie Mellon University.  The name of the University may not be used to endorse or promote products derived from this software without specific prior written permission.  THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
 .\" WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Right Reserved.
-.TH PPPD 1M "Nov 21, 2001"
+.TH PPPD 1M "November 22, 2021"
 .SH NAME
 pppd \- point to point protocol daemon
 .SH SYNOPSIS
-.LP
 .nf
 \fBpppd\fR [\fItty_name\fR] [\fIspeed\fR] [\fIoptions\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The point-to-point protocol (PPP) provides a method for transmitting datagrams
 over serial point-to-point links. PPP is composed of three components: a
 facility for encapsulating datagrams over serial links, an extensible link
@@ -27,12 +24,8 @@ provides the basic LCP authentication support and several NCPs for establishing
 and configuring the Internet Protocol (referred to as the IP Control Protocol
 or "IPCP") and IPv6 (IPV6CP).
 .SH OPTIONS
-.sp
-.LP
 The following sections discuss the \fBpppd\fR options:
 .SS "Options Files"
-.sp
-.LP
 Options are taken from files and the command line. \fBpppd\fR reads options
 from the files \fB/etc/ppp/options\fR, \fB$HOME/.ppprc\fR and
 \fB/etc/ppp/options.\fR\fIttyname\fR (in that order) before processing the
@@ -51,7 +44,6 @@ starts a comment, which continues until the end of the line. There is no
 restriction on using the \fBfile\fR or \fBcall\fR options within an options
 file.
 .SS "Frequently Used Options"
-.sp
 .ne 2
 .na
 \fB\fB<tty_name>\fR \fR
@@ -269,7 +261,6 @@ this option.
 .RE
 
 .SS "Options"
-.sp
 .ne 2
 .na
 \fB\fB<local_IP_address>:<remote_IP_address>\fR \fR
@@ -507,9 +498,9 @@ in conjunction with the \fBdemand\fR option.
 .RS 4n
 Append the domain name \fId\fR to the local host name for authentication
 purposes. For example, if \fBgethostname()\fR returns the name \fBporsche\fR,
-but the fully qualified domain name is \fBporsche.Quotron.COM\fR, you could
-specify \fBdomain Quotron.COM\fR. With this configuration, \fBpppd\fR uses the
-name \fBporsche.Quotron.COM\fR for accessing secrets in the secrets file and as
+but the fully qualified domain name is \fBporsche.Example.COM\fR, you could
+specify \fBdomain Example.COM\fR. With this configuration, \fBpppd\fR uses the
+name \fBporsche.Example.COM\fR for accessing secrets in the secrets file and as
 the default name when authenticating to the peer. This option is privileged.
 .RE
 
@@ -1813,8 +1804,6 @@ the serial port.
 .RE
 
 .SS "Obsolete Options"
-.sp
-.LP
 The following options are obsolete:
 .sp
 .ne 2
@@ -1855,12 +1844,8 @@ Show brief help message and exit.
 .RE
 
 .SH EXTENDED DESCRIPTION
-.sp
-.LP
 The following sections discuss miscellaneous features of \fBpppd\fR:
 .SS "Security"
-.sp
-.LP
 \fBpppd\fR allows system administrators to provide legitimate users with PPP
 access to a server machine without fear of compromising the security of the
 server or the network it runs on. Access control is provided by restricting IP
@@ -1902,8 +1887,6 @@ administrator can allow users to establish a PPP connection via a device that
 they would not normally have access to. Otherwise \fBpppd\fR uses the invoking
 user's real UID when opening the device.
 .SS "Authentication"
-.sp
-.LP
 During the authentication process, one peer convinces the other of its identity
 by sending its name and some secret information to the other. During
 authentication, the first peer becomes the "client" and the second becomes the
@@ -2027,8 +2010,6 @@ peername servername secret ip-address -- novj
 .in -2
 
 .SS "Routing"
-.sp
-.LP
 When IPCP negotiation is complete, \fBpppd\fR informs the kernel of the local
 and remote IP addresses for the PPP interface and creates a host route to the
 remote end of the link that enables peers to exchange IP packets. Communication
@@ -2060,8 +2041,6 @@ addresses to the negotiated addresses. This may disrupt existing connections.
 Using demand dialing with peers that perform dynamic IP address assignment is
 not recommended.
 .SS "Scripts"
-.sp
-.LP
 \fBpppd\fR invokes scripts at various stages during processing that are used to
 perform site-specific ancillary processing. These scripts may be shell scripts
 or executable programs. \fBpppd\fR does not wait for the scripts to finish. The
@@ -2262,7 +2241,6 @@ script.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing the \fBauth\fR Option
 .sp
 .LP
@@ -2336,13 +2314,13 @@ To provide a user with access to the PPP facilities, allocate an IP address for
 the user's machine, create an entry in \fB/etc/ppp/pap-secrets\fR or
 \fB/etc/ppp/chap-secrets\fR. This enables the user's machine to authenticate
 itself. For example, to enable user "Joe" using machine "joespc" to dial in to
-machine "server" and use the IP address "joespc.my.net," add the following
+machine "server" and use the IP address "joespc.example.net," add the following
 entry to the \fB/etc/ppp/pap-secrets\fR or \fB/etc/ppp/chap-secrets\fR files:
 
 .sp
 .in +2
 .nf
-\fBjoespc	server	"joe's secret"	joespc.my.net\fR
+\fBjoespc	server	"joe's secret"	joespc.example.net\fR
 .fi
 .in -2
 .sp
@@ -2363,8 +2341,6 @@ includes a telnet, escape ^] (\fBasyncmap 200a0000\fR). If the path includes a
 followed by any 8 bytes] from the stream.
 
 .SH EXIT STATUS
-.sp
-.LP
 The \fBpppd\fR exit status indicates errors or specifies why a link was
 terminated. Exit status values are:
 .sp
@@ -2554,7 +2530,6 @@ Authentication to the peer failed.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/run/sppp\fIn\fR\fR\fB\&.pid\fR \fR
@@ -2641,8 +2616,6 @@ but only to certain trusted peers.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -2657,8 +2630,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBchat\fR(1M), \fBifconfig\fR(1M), \fBcrypt\fR(3C), \fBpam\fR(3PAM),
 \fBattributes\fR(5)
 .sp
@@ -2690,8 +2661,6 @@ Group. July 1994.
 Simpson, W. \fIRFC 1662, HDLC-like Framing \fR. Network Working Group. July
 1994.
 .SH NOTES
-.sp
-.LP
 These signals affect \fBpppd\fR behavior:
 .sp
 .ne 2
@@ -2738,8 +2707,6 @@ implementation.)
 .RE
 
 .SH DIAGNOSTICS
-.sp
-.LP
 Messages are sent to the syslog daemon using facility \fBLOG_DAEMON\fR. To see
 error and debug messages, edit the \fB/etc/syslog.conf\fR file to direct the
 messages to the desired output device or file, or use the \fBupdetach\fR or

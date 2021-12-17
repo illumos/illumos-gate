@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KSSLCFG 1M "May 27, 2008"
+.TH KSSLCFG 1M "November 22, 2021"
 .SH NAME
 ksslcfg \- enable and configure SMF instance of Kernel SSL
 .SH SYNOPSIS
-.LP
 .nf
 \fBksslcfg\fR create \fB-f\fR pkcs11 \fB-T\fR \fItoken_label\fR \fB-C\fR \fIcertificate_label\fR
      [\fB-d\fR \fIsofttoken_directory\fR]
@@ -49,8 +48,6 @@ ksslcfg \- enable and configure SMF instance of Kernel SSL
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBksslcfg\fR manages \fBsmf\fR(5) instances for the Kernel SSL proxy module.
 An SSL-enabled web server can use the services of its Kernel SSL proxy to
 improve the performance of the HTTPS packets processing. It does so by creating
@@ -85,8 +82,6 @@ service unique to the combination of host and SSL port. Instance FMRIs for
 particular proxy entries can be found with \fBsvcs\fR(1) and used for
 dependencies of other services.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -281,7 +276,6 @@ Displays the usage of the command.
 .RE
 
 .SH OPERANDS
-.sp
 .ne 2
 .na
 \fB\fB[\fIhost\fR] [\fIssl_port\fR]\fR\fR
@@ -295,7 +289,6 @@ is required. Typically, this has a value of 443.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCreate and Enable a Kernel SSL Instance
 .sp
 .LP
@@ -307,11 +300,11 @@ certificate and a key in PKCS#11 format.
 .nf
 # \fBksslcfg create -f pkcs11 -T "Sun Software PKCS#11 softtoken"  \e
 -C "Server-Cert" -p /some/directory/password -u webservd \e
--x 8080 www.mysite.com 443\fR
+-x 8080 www.example.com 443\fR
 
 % \fBsvcs svc:/network/ssl/proxy\fR
 STATE          STIME    FMRI
-online         Sep_27   svc:/network/ssl/proxy:kssl-www-mysite-com-443
+online         Sep_27   svc:/network/ssl/proxy:kssl-www-example-com-443
 .fi
 .in -2
 .sp
@@ -321,7 +314,7 @@ online         Sep_27   svc:/network/ssl/proxy:kssl-www-mysite-com-443
 .sp
 .LP
 The following command creates and enables a default instance for all addresses
-from a certicate and key in a \fBpkcs#12\fR file.
+from a certificate and key in a \fBpkcs#12\fR file.
 
 .sp
 .in +2
@@ -359,13 +352,12 @@ The following command disables and deletes an instance.
 .sp
 .in +2
 .nf
-# \fBksslcfg delete www.mysite.com 443\fR
+# \fBksslcfg delete www.example.com 443\fR
 .fi
 .in -2
 .sp
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -384,8 +376,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -405,14 +395,10 @@ Command line options are Evolving; command output is Unstable. The FMRI service
 name (\fBsvc://network/ssl/proxy\fR) is Unstable, as is the FMRI instance's
 name format. The utility name is Stable.
 .SH SEE ALSO
-.sp
-.LP
 \fBnca\fR(1), \fBsvcprop\fR(1), \fBsvcs\fR(1), \fBcryptoadm\fR(1M),
 \fBsvcadm\fR(1M), \fBsvccfg\fR(1M), \fBuser_attr\fR(4), \fBattributes\fR(5),
 \fBpkcs11_softtoken\fR(5), \fBrbac\fR(5), \fBsmf\fR(5)
 .SH NOTES
-.sp
-.LP
 \fBksslcfg\fR \fBcreate\fR without an host argument creates an \fBINADDR_ANY\fR
 \fBsmf\fR instance. \fBksslcfg\fR \fBdelete\fR without an host argument deletes
 only the \fBINADDR_ANY\fR instance. \fBksslcfg\fR \fBdelete\fR needs a host

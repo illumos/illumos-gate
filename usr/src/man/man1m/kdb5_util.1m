@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KDB5_UTIL 1M "April 9, 2016"
+.TH KDB5_UTIL 1M "November 22, 2021"
 .SH NAME
 kdb5_util \- Kerberos Database maintenance utility
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/kdb5_util\fR  [\fB-d\fR \fIdbname\fR] [\fB-f\fR \fIstashfile_name\fR]
      [\fB-k\fR \fImkeytype\fR] [\fB-m\fR ] [\fB-M\fR \fImkeyname\fR] [\fB-P\fR \fIpassword\fR] [\fB-r\fR \fIrealm\fR]
@@ -15,12 +14,10 @@ kdb5_util \- Kerberos Database maintenance utility
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBkdb5_util\fR utility enables you to create, dump, load, and destroy the
 Kerberos V5 database. You can also use \fBkdb5_util\fR to create a stash file
 containing the Kerberos database master key.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -160,7 +157,6 @@ Directory server connection port.
 .RE
 
 .SH OPERANDS
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -446,18 +442,17 @@ Optional argument that is derived from \fIdbname\fR if not specified.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCreating File that Contains Information about Two Principals
 .sp
 .LP
 The following example creates a file named \fBslavedata\fR that contains the
-information about two principals, \fBjdb@ACME.COM\fR and \fBpak@ACME.COM\fR.
+information about two principals, \fBjdb@EXAMPLE.COM\fR and \fBpak@EXAMPLE.COM\fR.
 
 .sp
 .in +2
 .nf
 # /usr/krb5/bin/kdb5_util dump -verbose slavedata
-jdb@ACME.COM pak@ACME.COM
+jdb@EXAMPLE.COM pak@EXAMPLE.COM
 .fi
 .in -2
 .sp
@@ -505,7 +500,6 @@ The update log file for incremental propagation.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -520,7 +514,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.LP
 \fBkpasswd\fR(1), \fBkadmin\fR(1M), \fBkadmind\fR(1M),
 \fBkadmin.local\fR(1M), \fBkdb5_ldap_util\fR(1M), \fBkproplog\fR(1M),
 \fBkadm5.acl\fR(4), \fBkdc.conf\fR(4), \fBattributes\fR(5), \fBkerberos\fR(5)

@@ -3,27 +3,22 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_KRB5_MIGRATE 5 "Jul 29, 2004"
+.TH PAM_KRB5_MIGRATE 5 "November 22, 2021"
 .SH NAME
 pam_krb5_migrate \- authentication PAM module for the KerberosV5 auto-migration
 of users feature
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/lib/security/pam_krb5_migrate.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The KerberosV5 auto-migrate service module for PAM provides functionality for
 the PAM authentication component. The service module helps in the automatic
 migration of \fBPAM_USER\fR to the client's local Kerberos realm, using
 \fBPAM_AUTHTOK\fR (the PAM authentication token associated with \fBPAM_USER\fR)
 as the new Kerberos principal's password.
 .SS "KerberosV5 Auto-migrate Authentication Module"
-.sp
-.LP
 The KerberosV5 auto-migrate authentication component provides the
 \fBpam_sm_authenticate\fR(3PAM) function to migrate a user who does not have a
 corresponding \fBkrb5\fR principal account to the default Kerberos realm of the
@@ -54,8 +49,6 @@ is used in the authentication stack of a particular service, it is mandatory
 that \fBpam_krb5\fR(5) be listed in the PAM account stack of that service for
 proper operation (see EXAMPLES).
 .SH OPTIONS
-.sp
-.LP
 The following options can be passed to the KerberosV5 auto-migrate
 authentication module:
 .sp
@@ -111,7 +104,6 @@ to \fBnow\fR (current time).
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSample Entries from \fBpam.conf\fR
 .sp
 .LP
@@ -153,15 +145,15 @@ host client service principal:
 .sp
 .in +2
 .nf
-host/*@ACME.COM U root
-host/*@ACME.COM ui *
+host/*@EXAMPLE.COM U root
+host/*@EXAMPLE.COM ui *
 .fi
 .in -2
 
 .sp
 .LP
 The preceding entries permit the \fBpam_krb5_migrate\fR \fBadd\fR privilege to
-the host client service principal of any machine in the \fBACME.COM\fR
+the host client service principal of any machine in the \fBEXAMPLE.COM\fR
 KerberosV5 realm, but denies the \fBadd\fR privilege to all host service
 principals for addition of the root user account.
 
@@ -182,8 +174,6 @@ k5migrate        account required        pam_unix_account.so.1
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attribute:
 .sp
 
@@ -198,8 +188,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBkadmind\fR(1M), \fBsyslog\fR(3C), \fBpam_authenticate\fR(3PAM),
 \fBpam_acct_mgmt\fR(3PAM), \fBpam_sm_authenticate\fR(3PAM), \fBkadm5.acl\fR(4),
 \fBpam.conf\fR(4), \fBattributes\fR(5), \fBpam_authtok_get\fR(5),

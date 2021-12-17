@@ -18,7 +18,7 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\"
-.Dd December 16, 2016
+.Dd November 22, 2021
 .Dt SHARECTL 1M
 .Os
 .Sh NAME
@@ -148,7 +148,7 @@ lockd_listen_backlog=32
 lockd_servers=256
 lockd_retransmit_timeout=5
 grace_period=90
-nfsmapid_domain=sun.com
+nfsmapid_domain=example.com
 servers=1024
 server_versmin=2
 server_versmax=4
@@ -172,24 +172,24 @@ nfs      enabled
 The following command shows how an authorized user can use
 .Nm
 commands to configure global settings for the
-.Pa ex.com
+.Pa example.com
 environment in the service management facility
 .Pq SMF .
 See
 .Xr nsmbrc 4
 for a description of the example environment,
-.Pa ex.com .
+.Pa example.com .
 See
 .Xr smf 5
 for a description of the SMF.
 .Bd -literal
 # sharectl set -p section=default -p workgroup=SALES \e
   -p timeout=5 smbfs
-# sharectl set -p section=FSERVER -p addr=fserv.ex.com smbfs
+# sharectl set -p section=FSERVER -p addr=fserv.example.com smbfs
 # sharectl set -p section=RSERVER -p workgroup=REMGROUP \e
-  -p addr=rserv.ex.com smbfs
+  -p addr=rserv.example.com smbfs
 # sharectl set -p section=RSERVER:george -p timeout=30 smbfs
-# sharectl set -p section="SSERV:*:POKY" -p addr=sserv.ex.com \e
+# sharectl set -p section="SSERV:*:POKY" -p addr=sserv.example.com \e
   -p timeout=25 smbfs
 .Ed
 .It Sy Example 5 No Displaying Current Settings
@@ -205,14 +205,14 @@ The values shown are those set by the previous example.
 workgroup=SALES
 timeout=5
 [FSERVER]
-addr=fserv.ex.com
+addr=fserv.example.com
 [RSERVER]
 workgroup=REMGROUP
-addr=rserv.ex.com
+addr=rserv.example.com
 [RSERVER:george]
 timeout=30
 [SSERV:*:POKY]
-addr=sserv.ex.com
+addr=sserv.example.com
 timeout=25
 .Ed
 .El

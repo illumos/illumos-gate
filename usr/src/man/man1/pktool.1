@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PKTOOL 1 "December 28, 2020"
+.TH PKTOOL 1 "November 22, 2021"
 .SH NAME
 pktool \- manage certificates and keys
 .SH SYNOPSIS
@@ -70,10 +70,10 @@ An example of using the \fB-i\fR option follows:
 Country Name (2 letter code) [US]:US
 State or Province Name (full name) [Some-State]:CA
 Locality Name (eg, city) []:Menlo Park
-Organization Name (eg, company):Sun Microsystems Inc.
+Organization Name (eg, company):Example Microsystems Inc.
 Organizational Unit Name (eg, section):OPG
 Common Name (eg, YOUR name):John Smith
- Email Address []: john.smith@sun.com
+ Email Address []: john.smith@example.com
 .fi
 .in -2
 .sp
@@ -82,8 +82,8 @@ The resulting \fBsubject-DN\fR is:
 .sp
 .in +2
 .nf
-"C=US, ST=CA, L=Menlo Park, O=Sun Microsystems Inc.,\e
-   OU=OPG, emailAddress=john.smith@sun.com, \e
+"C=US, ST=CA, L=Menlo Park, O=Example Microsystems Inc.,\e
+   OU=OPG, emailAddress=john.smith@example.com, \e
    CN=John Smith"
 .fi
 .in -2
@@ -723,12 +723,12 @@ The \fBpktool\fR subcommands support the following options:
 Subject Alternative Names the certificate. The argument that follows the -A
 option should be in the form of tag=value. Valid tags are IP, DNS, EMAIL, URI,
 DN, KRB, UPN, and RID. The SubjectAltName extension is marked as \fBcritical\fR
-if the altname string is pre-peneded with the
+if the altname string is prepended with the word \fBcritical\fR.
 .sp
 Example 1: Add an IP address to the \fIsubjectAltName\fR extension.
 \fBaltname="IP=1.2.3.4"\fR Example 2: Add an email address to the
 \fIsubjectAltName\fR extension, and mark it as being critical.
-\fBaltname="critical:EMAIL=first.last@company.com"\fR
+\fBaltname="critical:EMAIL=first.last@example.com"\fR
 .RE
 
 .sp
@@ -1151,7 +1151,7 @@ request. An example \fBsubject=\fR setting might be:
 .sp
 .in +2
 .nf
-subject=O=Sun Microsystems Inc., \e
+subject=O=Example Microsystems Inc., \e
 OU=Solaris Security Technologies Group, \e
 L=Ashburn, ST=VA, C=US, CN=John Smith
 .fi
@@ -1250,7 +1250,7 @@ indicated in the command:
 .in +2
 .nf
  $ pktool gencert keystore=nss nickname=WebServerCert \e
-       subject="O=Sun Microsystems Inc., OU=Solaris Security Technologies Group, \e
+       subject="O=Example Microsystems Inc., OU=Solaris Security Technologies Group, \e
        L=Ashburn, ST=VA, C=US, CN=John Smith" dir=/etc/certs \e
        keytype=rsa keylen=2048
 .fi
@@ -1267,7 +1267,7 @@ in the command:
 .sp
 .in +2
 .nf
- $ pktool gencsr keystore=nss subject="O=Sun Microsystems Inc., \e
+ $ pktool gencsr keystore=nss subject="O=Example Microsystems Inc., \e
        OU=Solaris Security Technologies Group, L=Ashburn, ST=VA, C=US, \e
        CN=John Smith" keytype=rsa keylen=2048 outcsr=csr.dat
 .fi

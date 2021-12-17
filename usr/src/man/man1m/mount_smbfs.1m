@@ -7,12 +7,11 @@
 .\" SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 .\" OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\" Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
-.TH MOUNT_SMBFS 1M "Jan 2, 2012"
+.TH MOUNT_SMBFS 1M "November 22, 2021"
 .SH NAME
 mount_smbfs, umount_smbfs \- mount and unmount a shared resource from a CIFS
 file server
 .SH SYNOPSIS
-.LP
 .nf
 \fB/sbin/mount\fR [\fB-F smbfs\fR] [\fIgeneric-options\fR] [\fB-o\fR \fIname\fR\fB=\fR\fIvalue\fR] [\fB-O\fR] \fIresource\fR
 .fi
@@ -34,8 +33,6 @@ file server
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmount\fR utility attaches a named resource, \fIresource\fR, to the file
 system hierarchy at the path name location, \fImount-point\fR, which must
 already exist.
@@ -78,8 +75,6 @@ To enable the service, enter the following \fBsvcadm\fR(1M) command:
 .sp
 
 .SS "Operands"
-.sp
-.LP
 The \fBmount\fR command supports the following operands:
 .sp
 .ne 2
@@ -148,8 +143,6 @@ The \fBmount\fR command maintains a table of mounted file systems in the
 .RE
 
 .SH OPTIONS
-.sp
-.LP
 See the \fBmount\fR(1M) man page for the list of supported
 \fIgeneric-options\fR.
 .sp
@@ -323,7 +316,6 @@ producing the error "device busy."
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRMounting an SMBFS Share
 .sp
 .LP
@@ -335,7 +327,7 @@ perform the mount operation.
 .sp
 .in +2
 .nf
-# \fBmount -F smbfs "//SALES;root@nano.sfbay/tmp" /mnt\fR
+# \fBmount -F smbfs "//SALES;root@nano.example.org/tmp" /mnt\fR
 Password:
 .fi
 .in -2
@@ -352,7 +344,7 @@ password for the \fBroot\fR user to successfully perform the mount operation.
 .sp
 .in +2
 .nf
-# \fBmount -F smbfs //root@nano.sfbay/tmp /mnt\fR
+# \fBmount -F smbfs //root@nano.example.org/tmp /mnt\fR
 Password:
 .fi
 .in -2
@@ -370,7 +362,7 @@ View the file system entry in the \fB/etc/mnttab\fR file.
 .in +2
 .nf
 # \fBgrep root /etc/mnttab\fR
-//root@nano.sfbay/tmp   /mnt    smbfs   dev=4900000     1177097833
+//root@nano.example.org/tmp   /mnt    smbfs   dev=4900000     1177097833
 .fi
 .in -2
 .sp
@@ -385,7 +377,7 @@ View the output of the \fBmount\fR command.
 .in +2
 .nf
 # \fBmount | grep root\fR
-/mnt on //root@nano.sfbay/tmp read/write/setuid/devices/dev=4900000 on
+/mnt on //root@nano.example.org/tmp read/write/setuid/devices/dev=4900000 on
 Fri Apr 20 13:37:13 2007
 .fi
 .in -2
@@ -401,7 +393,7 @@ View the output of the \fBdf /mnt\fR command.
 .in +2
 .nf
 # \fBdf /mnt\fR
-/mnt               (//root@nano.sfbay/tmp): 3635872 blocks       -1 files
+/mnt               (//root@nano.example.org/tmp): 3635872 blocks       -1 files
 .fi
 .in -2
 .sp
@@ -417,7 +409,7 @@ Obtain information about the mounted share by viewing the output of the \fBdf
 .nf
 # \fBdf -k /mnt\fR
 Filesystem            kbytes    used   avail capacity  Mounted on
-//root@nano.sfbay/tmp
+//root@nano.example.org/tmp
                       1882384   64448 1817936     4%    /mnt
 .fi
 .in -2
@@ -439,7 +431,6 @@ point. The following command line unmounts the share from the mount point.
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/mnttab\fR\fR
@@ -481,8 +472,6 @@ connection.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See the \fBattributes\fR(5) man page for descriptions of the following
 attributes:
 .sp
@@ -498,21 +487,15 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBldap\fR(1), \fBsmbutil\fR(1),
 \fBmount\fR(1M), \fBmountall\fR(1M), \fBsvcadm\fR(1M),
 \fBacl\fR(2), \fBfcntl\fR(2), \fBlink\fR(2), \fBmknod\fR(2), \fBmount\fR(2),
 \fBsymlink\fR(2), \fBumount\fR(2), \fBmnttab\fR(4), \fBnsmbrc\fR(4),
 \fBvfstab\fR(4), \fBattributes\fR(5), \fBpcfs\fR(7FS), \fBsmbfs\fR(7FS)
 .SH AUTHORS
-.sp
-.LP
 This manual page contains material originally authored by Boris Popov,
 \fBbpATbutya.kz\fR, \fBbpATFreeBSD.org\fR.
 .SH NOTES
-.sp
-.LP
 The Solaris CIFS client always attempts to use \fBgethostbyname()\fR to resolve
 host names. If the host name cannot be resolved, the CIFS client uses NetBIOS
 name resolution (NBNS). By default, the Solaris CIFS client permits the use of

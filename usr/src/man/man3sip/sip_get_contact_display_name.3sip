@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SIP_GET_CONTACT_DISPLAY_NAME 3SIP "Feb 10, 2007"
+.TH SIP_GET_CONTACT_DISPLAY_NAME 3SIP "November 22, 2021"
 .SH NAME
 sip_get_contact_display_name, sip_get_from_display_name,
 sip_get_to_display_name, sip_get_from_tag, sip_get_to_tag, sip_get_callid,
@@ -33,7 +33,6 @@ sip_get_event, sip_get_substate, sip_get_content_lang, sip_get_tstamp_value,
 sip_get_route_uri_str, sip_get_route_display_name, sip_get_contact_uri_str,
 sip_get_from_uri_str, sip_get_to_uri_str \- obtain header specific attributes
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
 #include <sip.h>
@@ -515,8 +514,6 @@ sip_method_t\fB\fR \fIsip_get_rack_method\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBi
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 For functions that return a pointer of type \fBsip_str_t\fR, \fBsip_str_t\fR is
 supplied by:
 .sp
@@ -540,7 +537,7 @@ For example, given the following request line in a \fBSIP\fR message
 .sp
 .in +2
 .nf
-FROM : <Alice sip:alice@atlanta.com>;tag=1928301774
+FROM : <Alice sip:alice@example.com>;tag=1928301774
 .fi
 .in -2
 
@@ -1032,8 +1029,6 @@ provided \fBCONTENT-LANGUAGE\fR value.
 The \fBsip_get_tstamp_value()\fR function will return the timestamp value from
 the \fBTIMESTAMP\fR header in the \fBSIP\fR message \fIsip_msg\fR.
 .SH RETURN VALUES
-.sp
-.LP
 For functions that return a pointer to \fIsip_str_t\fR, the return value is the
 specified value on success or \fBNULL\fR in case of error. For functions that
 return an integer, the return value is the specified value on success and
@@ -1043,8 +1038,6 @@ return an integer, the return value is the specified value on success and
 The value of \fBerrno\fR is not changed by these calls in the event of an
 error.
 .SH ERRORS
-.sp
-.LP
 These functions take a pointer to an integer \fIerror\fR as an argument. If the
 error is non-null, one of the following values is set:
 .sp
@@ -1081,8 +1074,6 @@ There is an error allocating memory for the return value.
 On success, the value of the location pointed to by \fIerror\fR is set to
 \fB0\fR.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1099,6 +1090,4 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibsip\fR(3LIB)

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KRB5.CONF 4 "May 16, 2020"
+.TH KRB5.CONF 4 "November 22, 2021"
 .SH NAME
 krb5.conf \- Kerberos configuration file
 .SH SYNOPSIS
@@ -394,7 +394,7 @@ option has no effect.
 .RS 4n
 If \fBtrue\fR, the local keytab file (\fB/etc/krb5/krb5.keytab\fR) must contain
 an entry for the local \fBhost\fR principal, for example,
-\fBhost/foo.bar.com@FOO.COM\fR. This entry is needed to verify that the
+\fBhost/foo.example.net@EXAMPLE.COM\fR. This entry is needed to verify that the
 \fBTGT\fR requested was issued by the same \fBKDC\fR that issued the key for
 the host principal. If undefined, the behavior is as if this option were set to
 \fBtrue\fR. Setting this value to \fBfalse\fR leaves the system vulnerable to
@@ -735,10 +735,10 @@ Regular expressions are defined in \fBregex\fR(5).
 .sp
 For example:
 .sp
-auth_to_local = RULE:[1:$1@$0](.*@.*ACME\.COM)s/@.*//
+auth_to_local = RULE:[1:$1@$0](.*@.*EXAMPLE\.COM)s/@.*//
 .sp
-The preceding maps \fB\fIusername\fR@ACME.COM\fR and all sub-realms of
-\fBACME.COM\fR to \fIusername\fR.
+The preceding maps \fB\fIusername\fR@EXAMPLE.COM\fR and all sub-realms of
+\fBEXAMPLE.COM\fR to \fIusername\fR.
 .RE
 
 .sp
@@ -843,7 +843,7 @@ Regardless of the size, both protocols are tried if the first attempt fails.
 .RS 4n
 If \fBtrue\fR, the local keytab file (\fB/etc/krb5/krb5.keytab\fR) must contain
 an entry for the local \fBhost\fR principal, for example,
-\fBhost/foo.bar.com@FOO.COM\fR. This entry is needed to verify that the
+\fBhost/foo.example.net@EXAMPLE.COM\fR. This entry is needed to verify that the
 \fBTGT\fR requested was issued by the same \fBKDC\fR that issued the key for
 the host principal. If undefined, the behavior is as if this option were set to
 \fBtrue\fR. Setting this value to \fBfalse\fR leaves the system vulnerable to
@@ -882,8 +882,8 @@ hostname's domain portion converted to upper case. For example, the following
    .mit.edu = ATHENA.MIT.EDU
    mit.edu = ATHENA.MIT.EDU
    crash.mit.edu = TEST.ATHENA.MIT.EDU
-   .fubar.org = FUBAR.ORG
-   fubar.org = FUBAR.ORG
+   .example.org = EXAMPLE.ORG
+   example.org = EXAMPLE.ORG
 .fi
 .in -2
 .sp
@@ -891,9 +891,9 @@ hostname's domain portion converted to upper case. For example, the following
 .sp
 .LP
 All other hosts in the \fBmit.edu\fR domain maps by default to the
-\fBATHENA.MIT.EDU\fR realm, and all hosts in the \fBfubar.org\fR domain maps by
-default into the \fBFUBAR.ORG\fR realm. The entries for the hosts \fBmit.edu\fR
-and \fBfubar.org\fR. Without these entries, these hosts would be mapped into
+\fBATHENA.MIT.EDU\fR realm, and all hosts in the \fBexample.org\fR domain maps by
+default into the \fBEXAMPLE.ORG\fR realm. The entries for the hosts \fBmit.edu\fR
+and \fBexample.org\fR. Without these entries, these hosts would be mapped into
 the Kerberos realms \fBEDU\fR and \fBORG\fR, respectively.
 .SS "The \fB[logging]\fR Section"
 This section indicates how Kerberos programs are to perform logging. There are
@@ -1773,10 +1773,10 @@ The following is an example of a generic \fBkrb5.conf\fR file:
       auth_to_local_realm = KRBDEV.ATHENA.MIT.EDU
    }
 
-   FUBAR.ORG = {
-      kdc = kerberos.fubar.org
-      kdc = kerberos-1.fubar.org
-      admin_server = kerberos.fubar.org
+   EXAMPLE.ORG = {
+      kdc = kerberos.example.org
+      kdc = kerberos-1.example.org
+      admin_server = kerberos.example.org
   }
 
 [domain_realm]
@@ -1798,7 +1798,7 @@ a Kerberos configuration file when the KDC is using the LDAP KDB plug-in.
 .in +2
 .nf
 [realms]
-    SUN.COM = {
+    EXAMPLE.COM = {
         kdc = kc-umpk-01.athena.mit.edu
         kdc = kc-umpk-02.athena.mit.edu
         admin_server = kc-umpk-01.athena.mit.edu

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SIP_IS_SIP_URI 3SIP "Feb 10, 2007"
+.TH SIP_IS_SIP_URI 3SIP "November 22, 2021"
 .SH NAME
 sip_is_sip_uri, sip_get_uri_scheme, sip_get_uri_host, sip_get_uri_user,
 sip_get_uri_password, sip_get_uri_port, sip_get_uri_params,
@@ -11,7 +11,6 @@ sip_get_uri_headers, sip_get_uri_opaque, sip_get_uri_query, sip_get_uri_path,
 sip_get_uri_regname, sip_is_uri_teluser, sip_get_uri_errflags,
 sip_uri_errflags_to_str \- get URI related attributes
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
 #include <sip.h>
@@ -102,8 +101,6 @@ sip_uri_errflags_to_str \- get URI related attributes
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 For functions that return a pointer of type \fIsip_str_t\fR, \fIsip_str_t\fR is
 supplied by:
 .sp
@@ -127,15 +124,15 @@ For example, given the following request line in a \fBSIP\fR message input to
 .sp
 .in +2
 .nf
-INVITE sip:marconi@radio.org SIP/2.0
+INVITE sip:marconi@example.org SIP/2.0
 .fi
 .in -2
 
 .sp
 .LP
 the return is a pointer to \fIsip_str_t\fR with the \fIsip_str_ptr\fR member
-pointing to "\fBs\fR" of \fBsip:marconi@radio.org\fR and \fIsip_str_len\fR
-being set to \fB21\fR, the length of \fBsip:marconi@radio.org\fR.
+pointing to "\fBs\fR" of \fBsip:marconi@example.org\fR and \fIsip_str_len\fR
+being set to \fB23\fR, the length of \fBsip:marconi@example.org\fR.
 .sp
 .LP
 The \fBsip_is_sip_uri()\fR function takes a parsed \fBURI\fR \fIsip_uri\fR and
@@ -227,8 +224,6 @@ function returns a string such as:
 .LP
 The caller is responsible for freeing the returned string.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBsip_get_uri_scheme()\fR, \fBsip_get_uri_user()\fR,
 \fBsip_get_uri_password()\fR, \fBsip_get_uri_host()\fR,
 \fBsip_get_uri_params()\fR, \fBsip_get_uri_headers()\fR,
@@ -245,8 +240,6 @@ The \fBsip_get_uri_port()\fR function returns \fIport\fR from the \fBURI\fR or
 The value of \fBerrno\fR is not changed by these calls in the event of an
 error.
 .SH ERRORS
-.sp
-.LP
 If the error is non-null, the following value is set:
 .sp
 .ne 2
@@ -270,8 +263,6 @@ components are requested from a \fBSIP[S]\fR \fBURI\fR.
 On success, the value of the location pointed to by \fIerror\fR is set to
 \fB0\fR.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -288,6 +279,4 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibsip\fR(3LIB)

@@ -3,12 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KRB5_AUTH_RULES 5 "Oct 29, 2015"
+.TH KRB5_AUTH_RULES 5 "November 22, 2021"
 .SH NAME
 krb5_auth_rules \- overview of Kerberos V5 authorization
 .SH DESCRIPTION
-.sp
-.LP
 When kerberized versions of the \fBftp\fR, \fBrdist\fR, \fBrcp\fR,
 \fBrlogin\fR, \fBrsh\fR, \fBtelnet\fR, or \fBssh\fR clients are used to connect
 to a server, the identity of the originating user must be authenticated to the
@@ -23,7 +21,7 @@ remote user on the server the client is attempting to access. The file should
 contain a private authorization list comprised of Kerberos principal names of
 the form \fIprincipal/instance\fR@\fIrealm\fR. The \fI/instance\fR variable is
 optional in Kerberos principal names. For example, different principal names
-such as \fBjdb@ENG.ACME.COM\fR and \fBjdb/happy.eng.acme.com@ENG.ACME.COM\fR
+such as \fBjdb@ENG.EXAMPLE.COM\fR and \fBjdb/happy.eng.example.com@ENG.EXAMPLE.COM\fR
 would each be legal, though not equivalent, Kerberos principals. The client is
 granted access if the \fB~/.k5login\fR file is located in the login directory
 of the remote user account and if the originating user can be authenticated to
@@ -41,7 +39,7 @@ access. If the Unix user ID does not match, access is denied. See
 .sp
 .LP
 For example, an originating user listed in the \fBgsscred\fR table with the
-principal name \fBjdb@ENG.ACME.COM\fR and the \fBuid\fR \fB23154\fR is granted
+principal name \fBjdb@ENG.EXAMPLE.COM\fR and the \fBuid\fR \fB23154\fR is granted
 access to the \fBjdb-user\fR account if \fB23154\fR is also the \fBuid\fR of
 \fBjdb-user\fR listed in the user account database. See \fBpasswd\fR(4).
 .sp
@@ -74,9 +72,9 @@ The Unix account name exists on the server.
 .sp
 .LP
 For example, if the originating user has the principal name
-\fBjdb@ENG.ACME.COM\fR and if the server is in realm \fBSALES.ACME.COM\fR, the
+\fBjdb@ENG.EXAMPLE.COM\fR and if the server is in realm \fBSALES.EXAMPLE.COM\fR, the
 client would be denied access even if \fBjdb\fR is a valid account name on the
-server. This is because the realms \fBSALES.ACME.COM\fR and \fBENG.ACME.COM\fR
+server. This is because the realms \fBSALES.EXAMPLE.COM\fR and \fBENG.EXAMPLE.COM\fR
 differ.
 .sp
 .LP
@@ -84,7 +82,6 @@ The \fBkrb5.conf\fR(4) \fIauth_to_local_realm\fR parameter also affects
 authorization. Non-default realms can be equated with the default realm for
 authenticated \fBname-to-local name\fR mapping.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB~/.k5login\fR\fR
@@ -104,8 +101,6 @@ System account file. This information may also be in a directory service. See
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -120,8 +115,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBftp\fR(1), \fBrcp\fR(1), \fBrdist\fR(1), \fBrlogin\fR(1), \fBrsh\fR(1),
 \fBtelnet\fR(1), \fBgsscred\fR(1M), \fBkadm5.acl\fR(4),
 \fBkrb5.conf\fR(4), \fBpasswd\fR(4), \fBattributes\fR(5),

@@ -1,26 +1,23 @@
 '\" te
-.\" Copyright (c) 2017 Peter Tribble
+.\" Copyright (c) 2021 Peter Tribble
 .\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIT_REMOTE 5 "Mar 6, 2017"
+.TH AUDIT_REMOTE 5 "November 22, 2021"
 .SH NAME
 audit_remote \- send audit logs to a remote server
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/lib/security/audit_remote.so\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBaudit_remote\fR plugin module for audit,
 \fB/usr/lib/security/audit_remote.so\fR, sends binary audit records
 (\fBaudit.log\fR(4)) to audit servers specified in the plugin's attributes
 configured by \fBauditconfig\fR(1M).
 .SS "Object Attributes"
-.LP
 The following attributes specify the configuration of the \fBaudit_remote\fR
 plugin:
 .sp
@@ -95,7 +92,6 @@ The default is the value of the kernel queue control high water mark. See
 .RE
 
 .SS "GSS SESSION"
-.LP
 The \fBaudit_remote plugin\fR is a TCP client that authenticates configured
 audit servers using the GSS-API (\fBlibgss\fR(3LIB)). Binary Audit
 records are sent with integrity and confidentiality protection as per-message
@@ -148,7 +144,6 @@ retry <count> <error>.<error>\fR is connection \fB<host:port> <the network
 error>\fR\&. An \fBEPROTO\fR network error indicates that the client plugin did
 not get a successful protocol version handshake.
 .SS "PROTOCOL DESCRIPTION"
-.LP
 All protocol messages are preceded by the 4 octets of the size of the data to
 follow. This size is in network byte order.
 .sp
@@ -258,7 +253,6 @@ Secure remote audit client/server communication flow:
 .in -2
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRActivating \fBaudit_remote.so\fR and Specifying attributes
 .sp
 .LP
@@ -288,8 +282,8 @@ with the servers.
 .in +2
 .nf
 # auditconfig -setplugin audit_remote active \e
-p_hosts=eggplant.eng.sun.com::kerberos_v5,\e
-purple.ebay.sun.com:4592:kerberos_v5
+p_hosts=eggplant.eng.example.com::kerberos_v5,\e
+purple.ebay.example.com:4592:kerberos_v5
 .fi
 .in -2
 
@@ -304,14 +298,13 @@ mechanism. It also shows use of default port on one of the configured servers:
 .in +2
 .nf
 # auditconfig -setplugin audit_remote active \e
-p_hosts=jedger.eng.sun.com,\e
-jbadams.ebay.sun.com:4592
+p_hosts=jedger.eng.example.com,\e
+jbadams.ebay.example.com:4592
 .fi
 .in -2
 .sp
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -333,7 +326,6 @@ The plugin configuration parameters are Committed. The client/server protocol
 (version \fB"01"\fR) is Contracted Project Private. See \fBaudit.log\fR(4) for
 the audit record format and content stability.
 .SH SEE ALSO
-.LP
 \fBauditd\fR(1M), \fBauditconfig\fR(1M), \fBaudit_warn\fR(1M),
 \fBgetipnodebyname\fR(3SOCKET), \fBgetservbyname\fR(3XNET),
 \fBgss_accept_sec_context\fR(3GSS), \fBgss_get_mic\fR(3GSS),
@@ -342,7 +334,6 @@ the audit record format and content stability.
 \fBaudit.log\fR(4), \fBkrb5.conf\fR(4), \fBmech\fR(4), \fBattributes\fR(5),
 \fBkerberos\fR(5), \fBtcp\fR(7P)
 .SH NOTES
-.LP
 \fBaudit_remote\fR authenticates itself to the remote audit service by way of
 GSS-API (\fBlibgss\fR(3LIB)). Default gss credentials are used as provided by
 the \fBgss\fR implementation mechanism, such as Kerberos.

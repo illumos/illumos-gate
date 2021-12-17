@@ -83,6 +83,8 @@ driver name=upf perms="* 0666 root sys" clone_perms="upf 0666 root sys" \
     alias=usb8dd,988 \
     alias=usb8dd,8511 \
     alias=usb951,a \
+    alias=usbb39,109 \
+    alias=usbb39,901 \
     alias=usbdb7,2 \
     alias=usbe66,400c \
     alias=usb1044,8002 \
@@ -95,9 +97,7 @@ driver name=upf perms="* 0666 root sys" clone_perms="upf 0666 root sys" \
     alias=usb2001,4003 \
     alias=usb2001,400b \
     alias=usb2001,4102 \
-    alias=usb2001,abc1 \
-    alias=usbb3p,109 \
-    alias=usbb3p,901
+    alias=usb2001,abc1
 license usr/src/uts/common/io/upf/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/upf/THIRDPARTYLICENSE
 depend type=require fmri=driver/usb/usbgem

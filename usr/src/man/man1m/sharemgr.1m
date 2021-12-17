@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SHAREMGR 1M "Feb 25, 2017"
+.TH SHAREMGR 1M "November 22, 2021"
 .SH NAME
 sharemgr \- configure and manage file sharing
 .SH SYNOPSIS
-.LP
 .nf
 \fBsharemgr\fR \fIsubcommand\fR [\fIoptions\fR]
 .fi
@@ -89,7 +88,6 @@ sharemgr \- configure and manage file sharing
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBsharemgr\fR command configures share groups and the shares contained
 within them.
 .sp
@@ -123,7 +121,6 @@ The options shown in the SYNOPSIS section are described in the context of each
 subcommand. All subcommands except \fBlist\fR and \fBshow\fR require root
 privileges or that you assume the Primary Administrator role.
 .SS "Subcommands"
-.LP
 With no subcommand entered, a \fBsharemgr\fR command with the \fB-h\fR option
 displays a usage message for all subcommands.
 .sp
@@ -629,7 +626,6 @@ across reboots.
 .RE
 
 .SS "Supported Properties"
-.LP
 Properties are protocol-specific. Currently, only the NFS and SMB protocols are
 supported. Properties have the following characteristics:
 .RS +4
@@ -1130,7 +1126,6 @@ is when the access list is an asterisk (\fB*\fR), in which case \fBro\fR or
 .RE
 
 .SS "Access List Argument"
-.LP
 The \fIaccess-list\fR argument is either the string \fB"*"\fR to represent all
 hosts or a colon-separated list whose components can be any number of the
 following:
@@ -1191,7 +1186,7 @@ Returns: \fBmyhost\fR
 .ad
 .sp .6
 .RS 4n
-Returns: \fBmyhost.mydomain.mycompany.com\fR
+Returns: \fBmyhost.mydomain.example.com\fR
 .RE
 
 The domain name suffix is distinguished from hostnames and netgroups by a
@@ -1199,7 +1194,7 @@ prefixed dot. For example:
 .sp
 .in +2
 .nf
-rw=.mydomain.mycompany.com
+rw=.mydomain.example.com
 .fi
 .in -2
 
@@ -1212,7 +1207,7 @@ rw=.
 .fi
 .in -2
 
-\&...matches \fBmydomain\fR but not \fBmydomain.mycompany.com\fR. This feature
+\&...matches \fBmydomain\fR but not \fBmydomain.example.com\fR. This feature
 can be used to match hosts resolved through NIS rather than DNS and
 LDAP.
 .RE
@@ -1321,7 +1316,6 @@ Error codes used for exit status.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1336,6 +1330,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBidmap\fR(1M), \fBsharectl\fR(1M), \fBzfs\fR(1M), \fBattributes\fR(5),
 \fBnfssec\fR(5), \fBsmf\fR(5), \fBstandards\fR(5)
