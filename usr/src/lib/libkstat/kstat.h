@@ -21,12 +21,11 @@
  */
 /*
  * Copyright (c) 1992 by Sun Microsystems, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef	_KSTAT_H
 #define	_KSTAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -45,23 +44,14 @@ typedef struct kstat_ctl {
 	int	kc_kd;		/* /dev/kstat descriptor	*/
 } kstat_ctl_t;
 
-#ifdef	__STDC__
 extern	kstat_ctl_t	*kstat_open(void);
 extern	int		kstat_close(kstat_ctl_t *);
 extern	kid_t		kstat_read(kstat_ctl_t *, kstat_t *, void *);
 extern	kid_t		kstat_write(kstat_ctl_t *, kstat_t *, void *);
 extern	kid_t		kstat_chain_update(kstat_ctl_t *);
-extern	kstat_t		*kstat_lookup(kstat_ctl_t *, char *, int, char *);
-extern	void		*kstat_data_lookup(kstat_t *, char *);
-#else
-extern	kstat_ctl_t	*kstat_open();
-extern	int		kstat_close();
-extern	kid_t		kstat_read();
-extern	kid_t		kstat_write();
-extern	kid_t		kstat_chain_update();
-extern	kstat_t		*kstat_lookup();
-extern	void		*kstat_data_lookup();
-#endif
+extern	kstat_t		*kstat_lookup(kstat_ctl_t *, const char *, int,
+    const char *);
+extern	void		*kstat_data_lookup(kstat_t *, const char *);
 
 #ifdef	__cplusplus
 }

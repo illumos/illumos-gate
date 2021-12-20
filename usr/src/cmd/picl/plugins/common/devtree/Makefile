@@ -88,7 +88,7 @@ include $(SRC)/cmd/picl/plugins/Makefile.targ
 include $(SRC)/lib/Makefile.targ
 
 %.so: %.o
-	$(LINK.c) -o $@ $(GSHARED) -h $@ $< $(LDLIBS)
+	$(LINK.c) -o $@ $(GSHARED) -Wl,-h$@ $< $(LDLIBS)
 
 %.o: %.c
 	$(COMPILE.c) -o $@ $<

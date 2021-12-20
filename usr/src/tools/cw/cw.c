@@ -39,7 +39,7 @@
  */
 
 /* If you modify this file, you must increment CW_VERSION */
-#define	CW_VERSION	"5.1"
+#define	CW_VERSION	"6.1"
 
 /*
  * -#		Verbose mode
@@ -172,7 +172,6 @@
  * -fstore			error
  * -g				pass-thru
  * -H				pass-thru
- * -h <name>			pass-thru
  * -I<dir>			pass-thru
  * -i				pass-thru
  * -keeptmp			-save-temps
@@ -783,7 +782,6 @@ do_gcc(cw_ictx_t *ctx)
 			break;
 		case 'A':
 		case 'g':
-		case 'h':
 		case 'I':
 		case 'i':
 		case 'L':

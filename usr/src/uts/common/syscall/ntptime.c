@@ -184,8 +184,17 @@ ntp_adjtime(struct timex *tp)
 	 * clock_update() updates time_freq so keep MOD_FREQUENCY after
 	 * MOD_OFFSET.
 	 */
-	if (modes & MOD_FREQUENCY)
+	if (modes & MOD_FREQUENCY) {
 		time_freq = ntv.freq - pps_freq;
+
+		/*
+		 * If the frequency offset was adjusted, then set tod_needsync
+		 * since it implies someone is watching over the system clock.
+		 */
+		int s = hr_clock_lock();
+		tod_needsync = 1;
+		hr_clock_unlock(s);
+	}
 	/*
 	 * Retrieve all clock variables
 	 */

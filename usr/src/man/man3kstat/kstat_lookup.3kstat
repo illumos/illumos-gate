@@ -1,102 +1,147 @@
-'\" te
+.\"
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KSTAT_LOOKUP 3KSTAT "March 24, 2020"
-.SH NAME
-kstat_lookup, kstat_data_lookup \- find a kstat by name
-.SH SYNOPSIS
-.nf
-\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lkstat\fR [ \fIlibrary\fR\&.\|.\|.]
-#include <kstat.h>
-
-\fBkstat_t *\fR\fBkstat_lookup\fR(\fBkstat_ctl_t *\fR\fIkc\fR, \fBchar *\fR\fIks_module\fR, \fBint\fR \fIks_instance\fR,
-     \fBchar *\fR\fIks_name\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBkstat_data_lookup\fR(\fBkstat_t *\fR\fIksp\fR, \fBchar *\fR\fIname\fR);
-.fi
-
-.SH DESCRIPTION
-The \fBkstat_lookup()\fR function traverses the kstat chain,
-\fIkc\fR->\fBkc_chain\fR, searching for a kstat with the same \fIks_module\fR,
-\fIks_instance\fR, and \fIks_name\fR fields; this triplet uniquely identifies a
-kstat.  If \fIks_module\fR is \fINULL\fR, \fIks_instance\fR is  -1, or
-\fIks_name\fR is \fINULL\fR, those fields will be ignored in the search.  For
-example, \fBkstat_lookup(kc, NULL, -1, "foo")\fR  will find the first kstat
-with name "foo".
-.sp
-.LP
-The \fBkstat_data_lookup()\fR function searches the kstat's data section for
-the record with the specified \fIname\fR. This operation is valid only for
-those kstat types that have named data records: \fBKSTAT_TYPE_NAMED\fR and
-\fBKSTAT_TYPE_TIMER\fR.
-.SS Lifetime
-The \fBkstat_t\fR structures and any associated data are owned by the library
-and the corresponding handle, \fIkc\fR. That is, two callers with same library
-handle will generally have the same memory returned to them, though this is not
-a guaranteed part of the interface. Callers should not modify or attempt to free
-the data associated with either. Calling the \fBkstat_chain_update\fR(3KSTAT) or
-\fBkstat_close\fR(3KSTAT) functions on the handle \fIkc\fR will cause the
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 29, 2021
+.Dt KSTAT_LOOKUP 3KSTAT
+.Os
+.Sh NAME
+.Nm kstat_lookup ,
+.Nm kstat_data_lookup
+.Nd find a kstat by name
+.Sh LIBRARY
+.Lb libkstat
+.Sh SYNOPSIS
+.In kstat.h
+.Ft "kstat_t *"
+.Fo kstat_lookup
+.Fa "kstat_ctl_t *kc"
+.Fa "const char *ks_module"
+.Fa "int ks_instance"
+.Fa "const char *ks_name"
+.Fc
+.Ft "void *"
+.Fo kstat_data_lookup
+.Fa "kstat_t *ksp"
+.Fa "const char *name"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn kstat_lookup
+function traverses the kstat chain,
+.Ql kc->kc_chain ,
+searching for a kstat with the same
+.Fa ks_module ,
+.Fa ks_instance ,
+and
+.Fa ks_name
+fields; this triplet uniquely identifies a kstat.
+If
+.Fa ks_module ,
+is
+.Dv NULL ,
+.Fa ks_instance
+is -1, or
+.Fa ks_name
+is
+.Dv NULL ,
+those fields will be ignored in the search.
+For
+example,
+.Fo kstat_lookup
+.Fa kc ,
+.Fa NULL ,
+.Fa -1 ,
+.Fa "foo"
+.Fc
+will find the first kstat with name
+.Dq foo .
+.Pp
+The
+.Fn kstat_data_lookup
+function searches the kstat's data section for the record with the specified
+.Fa name .
+This operation is valid only for those kstat types that have named data records:
+.Dv KSTAT_TYPE_NAMED
+and
+.Dv KSTAT_TYPE_TIMER .
+.Ss Lifetime
+The
+.Vt kstat_t
+structures and any associated data are owned by the library and the
+corresponding handle,
+.Fa kc .
+That is, two callers with same library handle will generally have the same
+memory returned to them, though this is not a guaranteed part of the interface.
+Callers should not modify or attempt to free the data associated with either.
+Calling the
+.Xr kstat_chain_update 3KSTAT
+or
+.Xr kstat_close 3KSTAT
+functions on the handle
+.Fa kc
+will cause the
 pointers returned from these functions with the same handle to be invalid.
-.SH RETURN VALUES
-The \fBkstat_lookup()\fR function returns a pointer to the requested kstat if
-it is found. Otherwise it returns \fINULL\fR and sets \fBerrno\fR to indicate
-the error.
-.sp
-.LP
-The \fBkstat_data_lookup()\fR function returns a pointer to the requested data
-record if it is found. Otherwise it returns \fINULL\fR and sets \fBerrno\fR to
-indicate the error .
-.SH ERRORS
-The \fBkstat_lookup()\fR and \fBkstat_data_lookup()\fR functions will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+.Sh RETURN VALUES
+The
+.Fn kstat_lookup
+function returns a pointer to the requested kstat if it is found.
+Otherwise it returns
+.Dv NULL
+and sets
+.Va errno
+to indicate the error.
+.Pp
+The
+.Fn kstat_data_lookup
+function returns a pointer to the requested data record if it is found.
+Otherwise it returns
+.Dv NULL
+and sets
+.Va errno
+to indicate the error.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/kstat
+kernel statistics driver character device
+.El
+.Sh ERRORS
+The
+.Fn kstat_lookup
+and
+.Fn kstat_data_lookup
+functions will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
 An attempt was made to look up data for a kstat that was not of type
-\fBKSTAT_TYPE_NAMED\fR or \fBKSTAT_TYPE_TIMER\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOENT\fR\fR
-.ad
-.RS 10n
+.Dv KSTAT_TYPE_NAMED
+or
+.Dv KSTAT_TYPE_TIMER .
+.It Er ENOENT
 The requested kstat could not be found.
-.RE
-
-.SH FILES
-.ne 2
-.na
-\fB\fB/dev/kstat\fR\fR
-.ad
-.RS 14n
-kernel statistics driver
-.RE
-
-.SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Stable
-_
-MT-Level	Unsafe
-.TE
-
-.SH SEE ALSO
-\fBkstat\fR(3KSTAT), \fBkstat_chain_update\fR(3KSTAT),
-\fBkstat_open\fR(3KSTAT), \fBkstat_read\fR(3KSTAT), \fBattributes\fR(5)
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Unsafe
+.Sh SEE ALSO
+.Xr kstat 3KSTAT ,
+.Xr kstat_chain_update 3KSTAT ,
+.Xr kstat_open 3KSTAT ,
+.Xr kstat_read 3KSTAT ,
+.Xr attributes 5

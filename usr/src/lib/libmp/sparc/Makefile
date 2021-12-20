@@ -44,7 +44,7 @@ $(ROOTLIBDIR)/$(OLIBRARY) :=	FILEMODE= 755
 # search path, but not the actual additional libraries.
 #
 $(OLIBRARY):	pics/pics_mp.o libmp.so.2 $(OMAPFILE)
-	$(CC) $(CFLAGS) -o $@ $(GSHARED) -h $(OLIBRARY) $(ZTEXT) $(ZDEFS) \
+	$(CC) $(CFLAGS) -o $@ $(GSHARED) -Wl,-h$(OLIBRARY) $(ZTEXT) $(ZDEFS) \
 	    $(BDIRECT) $(ZCOMBRELOC) pics/pics_mp.o libmp.so.2 -Wl,-M$(OMAPFILE) \
 	    $(MAPFILE.PGA:%=-Wl,-M%) $(MAPFILE.NED:%=-Wl,-M%) $(LDLIBS.lib)
 	$(POST_PROCESS_SO)
