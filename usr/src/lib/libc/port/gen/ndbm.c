@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -37,8 +37,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <sys/types.h>
@@ -841,7 +839,7 @@ setbit(DBM *db)
 }
 
 static datum
-makdatum(char buf[PBLKSIZ], int n)
+makdatum(char *buf, int n)
 {
 	short *sp;
 	int t;
@@ -886,7 +884,7 @@ cmpdatum(datum d1, datum d2)
 }
 
 static int
-finddatum(char buf[PBLKSIZ], datum item)
+finddatum(char *buf, datum item)
 {
 	short *sp;
 	int i, n, j;
@@ -962,7 +960,7 @@ dcalchash(datum item)
  * Delete pairs of items (n & n+1).
  */
 static int
-delitem(char buf[PBLKSIZ], int n)
+delitem(char *buf, int n)
 {
 	short *sp, *sp1;
 	int i1, i2;
@@ -993,7 +991,7 @@ delitem(char buf[PBLKSIZ], int n)
  * Add pairs of items (item & item1).
  */
 static int
-additem(char buf[PBLKSIZ], datum item, datum item1)
+additem(char *buf, datum item, datum item1)
 {
 	short *sp;
 	int i1, i2;

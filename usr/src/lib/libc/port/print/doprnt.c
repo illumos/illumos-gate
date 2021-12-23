@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  *	_doprnt: common code for printf, fprintf, sprintf
@@ -166,9 +166,9 @@ static const wchar_t widenullstr[] = L"(null)";
 	}
 
 #define	PAD(s, n)    { ssize_t nn; \
-		    for (nn = n; nn > PAD_LEN; nn -= PAD_LEN) \
-			if (!_dowrite(s, PAD_LEN, iop, &bufptr)) \
-				return (EOF); \
+			for (nn = n; nn > PAD_LEN; nn -= PAD_LEN) \
+					if (!_dowrite(s, PAD_LEN, iop, &bufptr)) \
+						return (EOF); \
 			PUT(s, nn); \
 		}
 
@@ -522,7 +522,7 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 	ssize_t	prefixlength, suffixlength;
 
 	/* Combined length of leading zeroes, trailing zeroes, and suffix */
-	ssize_t 	otherlength;
+	ssize_t	otherlength;
 
 	/* The value being converted, if integer */
 	ssize_t	val;
