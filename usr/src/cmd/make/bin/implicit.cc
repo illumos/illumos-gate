@@ -56,10 +56,10 @@ static	wchar_t		WIDE_NULL[1] = {(wchar_t) nul_char};
  * File table of contents
  */
 extern	Doname		find_suffix_rule(Name target, Name target_body, Name target_suffix, Property *command, Boolean rechecking);
-extern	Doname		find_ar_suffix_rule(register Name target, Name true_target, Property *command, Boolean rechecking);
-extern	Doname		find_double_suffix_rule(register Name target, Property *command, Boolean rechecking);
-extern	void		build_suffix_list(register Name target_suffix);
-extern	Doname		find_percent_rule(register Name target, Property *command, Boolean rechecking);
+extern	Doname		find_ar_suffix_rule(Name target, Name true_target, Property *command, Boolean rechecking);
+extern	Doname		find_double_suffix_rule(Name target, Property *command, Boolean rechecking);
+extern	void		build_suffix_list(Name target_suffix);
+extern	Doname		find_percent_rule(Name target, Property *command, Boolean rechecking);
 static	void		create_target_group_and_dependencies_list(Name target, Percent pat_rule, String percent);
 static	Boolean		match_found_with_pattern(Name target, Percent pat_rule, String percent, wchar_t *percent_buf);
 static	void		construct_string_from_pattern(Percent pat_rule, String percent, String result);
@@ -113,11 +113,11 @@ find_suffix_rule(Name target, Name target_body, Name target_suffix, Property *co
 	static wchar_t		static_string_buf_3M [ 3 * MAXPATHLEN ];
 	Name			true_target = target;
 	wchar_t			*sourcename = (wchar_t*)static_string_buf_3M;
-	register wchar_t	*put_suffix;
-	register Property	source_suffix;
-	register Name		source;
+	wchar_t	*put_suffix;
+	Property	source_suffix;
+	Name		source;
 	Doname			result;
-	register Property	line;
+	Property	line;
 	extern Boolean		tilde_rule;
 	Boolean			name_found = true;
 	Boolean			posix_tilde_attempt = true;
@@ -495,11 +495,11 @@ posix_attempts:
  *		suffixes	List of suffixes used for scan (from .SUFFIXES)
  */
 Doname
-find_ar_suffix_rule(register Name target, Name true_target, Property *command, Boolean rechecking)
+find_ar_suffix_rule(Name target, Name true_target, Property *command, Boolean rechecking)
 {
 	wchar_t			*target_end;
-	register Dependency	suffix;
-	register int		suffix_length;
+	Dependency	suffix;
+	int		suffix_length;
 	Property		line;
 	Name			body;
 	static Name		dot_a;
@@ -590,13 +590,13 @@ find_ar_suffix_rule(register Name target, Name true_target, Property *command, B
  *		suffixes	List of suffixes used for scan (from .SUFFIXES)
  */
 Doname
-find_double_suffix_rule(register Name target, Property *command, Boolean rechecking)
+find_double_suffix_rule(Name target, Property *command, Boolean rechecking)
 {
 	Name			true_target = target;
 	Name			target_body;
-	register wchar_t	*target_end;
-	register Dependency	suffix;
-	register int		suffix_length;
+	wchar_t	*target_end;
+	Dependency	suffix;
+	int		suffix_length;
 	Boolean			scanned_once = false;
 	Boolean			name_found = true;
 
@@ -697,12 +697,12 @@ find_double_suffix_rule(register Name target, Property *command, Boolean recheck
  *		working_on_targets Indicates that this is a real target
  */
 void
-build_suffix_list(register Name target_suffix)
+build_suffix_list(Name target_suffix)
 {
-	register Dependency	source_suffix;
+	Dependency	source_suffix;
 	wchar_t			rule_name[MAXPATHLEN];
-	register Property	line;
-	register Property	suffix;
+	Property	line;
+	Property	suffix;
 	Name			rule;
 
 	/* If this is before default.mk has been read we just return to try */
@@ -795,12 +795,12 @@ build_suffix_list(register Name target_suffix)
  *		empty_name
  */
 Doname
-find_percent_rule(register Name target, Property *command, Boolean rechecking)
+find_percent_rule(Name target, Property *command, Boolean rechecking)
 {
-	register Percent	pat_rule, pat_depe;
-	register Name		depe_to_check;
-	register Dependency	depe;
-	register Property	line;
+	Percent	pat_rule, pat_depe;
+	Name		depe_to_check;
+	Dependency	depe;
+	Property	line;
 	String_rec		string;
 	wchar_t			string_buf[STRING_BUFFER_LENGTH];
 	String_rec		percent;

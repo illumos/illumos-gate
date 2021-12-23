@@ -1,5 +1,3 @@
-#ifndef _MKSH_MACRO_H
-#define _MKSH_MACRO_H
 /*
  * CDDL HEADER START
  *
@@ -25,12 +23,15 @@
  * Use is subject to license terms.
  */
 
+#ifndef _MKSH_MACRO_H
+#define	_MKSH_MACRO_H
+
 #include <mksh/defs.h>
 
-extern void	expand_macro(register Source source, register String destination, wchar_t *current_string, Boolean cmd);
-extern void	expand_value(Name value, register String destination, Boolean cmd);
-extern Name	getvar(register Name name);
+extern void	expand_macro(Source, String, wchar_t *, Boolean);
+extern void	expand_value(Name, String, Boolean);
+extern Name	getvar(Name);
 
-extern Property	setvar_daemon(register Name name, register Name value, Boolean append, Daemon daemon, Boolean strip_trailing_spaces, short debug_level);
+extern Property	setvar_daemon(Name, Name, Boolean, Daemon, Boolean, short);
 
-#endif
+#endif /* _MKSH_MACRO_H */

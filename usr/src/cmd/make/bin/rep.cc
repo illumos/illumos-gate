@@ -323,7 +323,7 @@ gather_recursive_deps(void)
 	Name_set::iterator	np, e;
 	String_rec		rec;
 	wchar_t			rec_buf[STRING_BUFFER_LENGTH];
-	register Property	lines;
+	Property	lines;
 	Boolean			has_recursive;
 	Dependency		dp;
 

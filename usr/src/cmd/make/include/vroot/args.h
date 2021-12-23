@@ -25,7 +25,7 @@
 
 
 #ifndef _ARGS_H_
-#define _ARGS_H_
+#define	_ARGS_H_
 
 #include <sys/syscall.h>
 #include <errno.h>
@@ -39,25 +39,52 @@
 
 typedef enum { rw_read, rw_write} rwt, *rwpt;
 
-extern	void	translate_with_thunk(register char *filename, int (*thunk) (char *), pathpt path_vector, pathpt vroot_vector, rwt rw);
+extern	void	translate_with_thunk(char *, int (*) (char *), pathpt, pathpt,
+	rwt);
 
 union Args {
-	struct { int mode;} access;
-	struct { int mode;} chmod;
-	struct { int user; int group;} chown;
-	struct { int mode;} creat;
-	struct { char **argv; char **environ;} execve;
-	struct { struct stat *buffer;} lstat;
-	struct { int mode;} mkdir;
-	struct { char *name; int mode;} mount;
-	struct { int flags; int mode;} open;
-	struct { char *buffer; int buffer_size;} readlink;
-	struct { struct stat *buffer;} stat;
-	struct { int length;} truncate;
-	struct { struct timeval *time;} utimes;
+	struct {
+		int mode;
+	} access;
+	struct {
+		int mode;
+	} chmod;
+	struct {
+		int user; int group;
+	} chown;
+	struct {
+		int mode;
+	} creat;
+	struct {
+		char **argv; char **environ;
+	} execve;
+	struct {
+		struct stat *buffer;
+	} lstat;
+	struct {
+		int mode;
+	} mkdir;
+	struct {
+		char *name; int mode;
+	} mount;
+	struct {
+		int flags; int mode;
+	} open;
+	struct {
+		char *buffer; int buffer_size;
+	} readlink;
+	struct {
+		struct stat *buffer;
+	} stat;
+	struct {
+		int length;
+	} truncate;
+	struct {
+		struct timeval *time;
+	} utimes;
 };
 
 extern	union Args	vroot_args;
 extern	int		vroot_result;
 
-#endif
+#endif /* _ARGS_H_ */

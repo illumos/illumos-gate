@@ -154,11 +154,11 @@ typedef struct {
 /*
  * File table of contents
  */
-extern	timestruc_t&	read_archive(register Name target);
-static	Boolean		open_archive(char *filename, register Ar *arp);
-static	void		close_archive(register Ar *arp);
-static	Boolean		read_archive_dir(register Ar *arp, Name library, char **long_names_table);
-static	void		translate_entry(register Ar *arp, Name target, register Property member, char **long_names_table);
+extern	timestruc_t&	read_archive(Name target);
+static	Boolean		open_archive(char *filename, Ar *arp);
+static	void		close_archive(Ar *arp);
+static	Boolean		read_archive_dir(Ar *arp, Name library, char **long_names_table);
+static	void		translate_entry(Ar *arp, Name target, Property member, char **long_names_table);
 static	long		sgetl(char *);
 
 /*
@@ -177,16 +177,16 @@ static	long		sgetl(char *);
  */
 
 int read_member_header (Ar_port *header, FILE *fd, char* filename);
-int process_long_names_member (register Ar *arp, char **long_names_table, char *filename);
+int process_long_names_member (Ar *arp, char **long_names_table, char *filename);
 
 timestruc_t&
-read_archive(register Name target)
+read_archive(Name target)
 {
-	register Property       member;
+	Property       member;
 	wchar_t			*slash;
 	String_rec		true_member_name;
 	wchar_t			buffer[STRING_BUFFER_LENGTH];
-	register Name		true_member = NULL;
+	Name		true_member = NULL;
 	Ar                      ar;
 	char			*long_names_table = NULL; /* Table of long
 							     member names */
@@ -267,7 +267,7 @@ read_archive(register Name target)
  *	Global variables used:
  */
 static Boolean
-open_archive(char *filename, register Ar *arp)
+open_archive(char *filename, Ar *arp)
 {
 	int			fd;
 	char			mag_5[AR_5_MAGIC_LENGTH];
@@ -350,7 +350,7 @@ open_archive(char *filename, register Ar *arp)
  *	Global variables used:
  */
 static void
-close_archive(register Ar *arp)
+close_archive(Ar *arp)
 {
 	if (arp->fd != NULL) {
 		(void) fclose(arp->fd);
@@ -374,14 +374,14 @@ close_archive(register Ar *arp)
  *	Global variables used:
  */
 static Boolean
-read_archive_dir(register Ar *arp, Name library, char **long_names_table)
+read_archive_dir(Ar *arp, Name library, char **long_names_table)
 {
 	wchar_t			*name_string;
 	wchar_t			*member_string;
-	register long		len;
-	register wchar_t	*p;
-	register char		*q;
-	register Name		name;
+	long		len;
+	wchar_t	*p;
+	char		*q;
+	Name		name;
 	Property		member;
 	long			ptr;
 	long			date;
@@ -562,7 +562,7 @@ read_error:
  *	Global variables used:
  */
 int
-process_long_names_member(register Ar *arp, char **long_names_table, char *filename)
+process_long_names_member(Ar *arp, char **long_names_table, char *filename)
 {
 	Ar_port			*ar_member_header;
 	int			table_size;
@@ -614,10 +614,10 @@ process_long_names_member(register Ar *arp, char **long_names_table, char *filen
  *	Global variables used:
  */
 static void
-translate_entry(register Ar *arp, Name target, register Property member, char **long_names_table)
+translate_entry(Ar *arp, Name target, Property member, char **long_names_table)
 {
-	register int		len;
-	register int		i;
+	int		len;
+	int		i;
 	wchar_t			*member_string;
 	ar_port_word		*offs;
 	int			strtablen;
@@ -625,8 +625,8 @@ translate_entry(register Ar *arp, Name target, register Property member, char **
 	char			*csym;		 /* string table */
 	ar_port_word		*offend;	 /* end of offsets table */
 	int			date;
-	register wchar_t	*ap;
-	register char		*hp;
+	wchar_t	*ap;
+	char		*hp;
 	int			maxs;
 	int			offset;
 	char		buffer[4];
@@ -794,10 +794,10 @@ read_error:
  *	Global variables used:
  */
 static long
-sgetl(register char *buffer)
+sgetl(char *buffer)
 {
-	register long		w = 0;
-	register int		i = BITSPERBYTE * AR_PORT_WORD;
+	long		w = 0;
+	int		i = BITSPERBYTE * AR_PORT_WORD;
 
 	while ((i -= BITSPERBYTE) >= 0) {
 		w |= (long) ((unsigned char) *buffer++) << i;

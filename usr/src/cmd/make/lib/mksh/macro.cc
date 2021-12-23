@@ -45,7 +45,7 @@
  * File table of contents
  */
 static void	add_macro_to_global_list(Name macro_to_add);
-static void	expand_value_with_daemon(Name, register Property macro, register String destination, Boolean cmd);
+static void	expand_value_with_daemon(Name, Property macro, String destination, Boolean cmd);
 
 static void	init_arch_macros(void);
 static void	init_mach_macros(void);
@@ -70,11 +70,11 @@ long env_alloc_bytes = 0;
  *	Global variables used:
  */
 Name
-getvar(register Name name)
+getvar(Name name)
 {
 	String_rec		destination;
 	wchar_t			buffer[STRING_BUFFER_LENGTH];
-	register Name		result;
+	Name		result;
 
 	if ((name == host_arch) || (name == target_arch)) {
 		if (!init_arch_done) {
@@ -115,12 +115,12 @@ getvar(register Name name)
  *	Global variables used:
  */
 void
-expand_value(Name value, register String destination, Boolean cmd)
+expand_value(Name value, String destination, Boolean cmd)
 {
 	Source_rec		sourceb;
-	register Source		source = &sourceb;
-	register wchar_t	*source_p = NULL;
-	register wchar_t	*source_end = NULL;
+	Source		source = &sourceb;
+	wchar_t	*source_p = NULL;
+	wchar_t	*source_end = NULL;
 	wchar_t			*block_start = NULL;
 	int			quote_seen = 0;
 
@@ -235,9 +235,9 @@ expand_value(Name value, register String destination, Boolean cmd)
  *	and get the value. The value is then expanded.
  *	destination is a String that is filled in with the expanded macro.
  *	It may be passed in referencing a buffer to expand the macro into.
- * 	Note that most expansions are done on demand, e.g. right 
+ *	Note that most expansions are done on demand, e.g. right
  *	before the command is executed and not while the file is
- * 	being parsed.
+ *	being parsed.
  *
  *	Parameters:
  *		source		The source block that references the string
@@ -256,19 +256,19 @@ expand_value(Name value, register String destination, Boolean cmd)
  *		query_mentioned	Set if the word "?" is mentioned
  */
 void
-expand_macro(register Source source, register String destination, wchar_t *current_string, Boolean cmd)
+expand_macro(Source source, String destination, wchar_t *current_string, Boolean cmd)
 {
 	static Name		make = (Name)NULL;
 	static wchar_t		colon_sh[4];
 	static wchar_t		colon_shell[7];
 	String_rec		string;
 	wchar_t			buffer[STRING_BUFFER_LENGTH];
-	register wchar_t	*source_p = source->string.text.p;
-	register wchar_t	*source_end = source->string.text.end;
-	register int		closer = 0;
+	wchar_t	*source_p = source->string.text.p;
+	wchar_t	*source_end = source->string.text.end;
+	int		closer = 0;
 	wchar_t			*block_start = (wchar_t *)NULL;
 	int			quote_seen = 0;
-	register int		closer_level = 1;
+	int		closer_level = 1;
 	Name			name = (Name)NULL;
 	wchar_t			*colon = (wchar_t *)NULL;
 	wchar_t			*percent = (wchar_t *)NULL;
@@ -857,7 +857,7 @@ add_macro_to_global_list(Name macro_to_add)
 		value_to_add = "";
 	}
 
-	/* 
+	/*
 	 * Check if this macro is already on list, if so, do nothing
 	 */
 	for (macro_on_list = cond_macro_list;
@@ -885,11 +885,11 @@ add_macro_to_global_list(Name macro_to_add)
  *
  *	Set the magic macros TARGET_ARCH, HOST_ARCH,
  *
- *	Parameters: 
+ *	Parameters:
  *
  *	Global variables used:
- * 	                        host_arch   Property for magic macro HOST_ARCH
- * 	                        target_arch Property for magic macro TARGET_ARCH
+ *	                        host_arch   Property for magic macro HOST_ARCH
+ *	                        target_arch Property for magic macro TARGET_ARCH
  *
  *	Return value:
  *				The function does not return a value, but can
@@ -940,11 +940,11 @@ init_arch_macros(void)
  *
  *	Set the magic macros TARGET_MACH, HOST_MACH,
  *
- *	Parameters: 
+ *	Parameters:
  *
  *	Global variables used:
- * 	                        host_mach   Property for magic macro HOST_MACH
- * 	                        target_mach Property for magic macro TARGET_MACH
+ *	                        host_mach   Property for magic macro HOST_MACH
+ *	                        target_mach Property for magic macro TARGET_MACH
  *
  *	Return value:
  *				The function does not return a value, but can
@@ -1005,9 +1005,9 @@ init_mach_macros(void)
  *	Global variables used:
  */
 static void
-expand_value_with_daemon(Name, register Property macro, register String destination, Boolean cmd)
+expand_value_with_daemon(Name, Property macro, String destination, Boolean cmd)
 {
-	register Chain		chain;
+	Chain		chain;
 
 
 	switch (macro->body.macro.daemon) {
@@ -1074,14 +1074,14 @@ int	sunpro_dependencies_buf_size = 0;
  *		envvar		A list of environment vars with $ in value
  */
 Property
-setvar_daemon(register Name name, register Name value, Boolean append, Daemon daemon, Boolean strip_trailing_spaces, short debug_level)
+setvar_daemon(Name name, Name value, Boolean append, Daemon daemon, Boolean strip_trailing_spaces, short debug_level)
 {
-	register Property	macro = maybe_append_prop(name, macro_prop);
-	register Property	macro_apx = get_prop(name->prop, macro_append_prop);
+	Property	macro = maybe_append_prop(name, macro_prop);
+	Property	macro_apx = get_prop(name->prop, macro_append_prop);
 	int			length = 0;
 	String_rec		destination;
 	wchar_t			buffer[STRING_BUFFER_LENGTH];
-	register Chain		chain;
+	Chain		chain;
 	Name			val;
 	wchar_t			*val_string = (wchar_t*)NULL;
 	Wstring			wcb;
@@ -1111,7 +1111,7 @@ setvar_daemon(register Name name, register Name value, Boolean append, Daemon da
 			value = GETNAME(destination.buffer.start, FIND_LENGTH);
 		}
 	}
-		
+
 	if(macro_apx != NULL) {
 		val = macro_apx->body.macro_appendix.value;
 	} else {
@@ -1313,7 +1313,7 @@ found_it:;
 			new_value = ALLOC_WC(length);
 			new_value_allocated = true;
 			WCSTOMBS(mbs_buffer, old_vr);
-			(void) swprintf(new_value, length * SIZEOFWCHAR_T, 
+			(void) swprintf(new_value, length * SIZEOFWCHAR_T,
 				        L"/usr/arch/%s/%s:%s",
 				        ha->string_mb + 1,
 				        ta->string_mb + 1,

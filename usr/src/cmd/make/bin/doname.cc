@@ -78,30 +78,30 @@ static int	second_pass = 0;
 /*
  * File table of contents
  */
-extern	Doname		doname_check(register Name target, register Boolean do_get, register Boolean implicit, register Boolean automatic);
-extern	Doname		doname(register Name target, register Boolean do_get, register Boolean implicit, register Boolean automatic);
+extern	Doname		doname_check(Name target, Boolean do_get, Boolean implicit, Boolean automatic);
+extern	Doname		doname(Name target, Boolean do_get, Boolean implicit, Boolean automatic);
 static	Boolean		check_dependencies(Doname *result, Property line, Boolean do_get, Name target, Name true_target, Boolean doing_subtree, Chain *out_of_date_tail, Property old_locals, Boolean implicit, Property *command, Name less, Boolean rechecking_target, Boolean recheck_conditionals);
 void		dynamic_dependencies(Name target);
-static	Doname		run_command(register Property line, Boolean print_machine);
+static	Doname		run_command(Property line, Boolean print_machine);
 extern	Doname		execute_serial(Property line);
-extern	Name		vpath_translation(register Name cmd);
+extern	Name		vpath_translation(Name cmd);
 extern	void		check_state(Name temp_file_name);
-static	void		read_dependency_file(register Name filename);
+static	void		read_dependency_file(Name filename);
 static	void		check_read_state_file(void);
-static	void		do_assign(register Name line, register Name target);
-static	void		build_command_strings(Name target, register Property line);
-static	Doname		touch_command(register Property line, register Name target, Doname result);
+static	void		do_assign(Name line, Name target);
+static	void		build_command_strings(Name target, Property line);
+static	Doname		touch_command(Property line, Name target, Doname result);
 extern	void		update_target(Property line, Doname result);
-static	Doname		sccs_get(register Name target, register Property *command);
-extern	void		read_directory_of_file(register Name file);
-static	void		add_pattern_conditionals(register Name target);
-extern	void		set_locals(register Name target, register Property old_locals);
-extern	void		reset_locals(register Name target, register Property old_locals, register Property conditional, register int index);
+static	Doname		sccs_get(Name target, Property *command);
+extern	void		read_directory_of_file(Name file);
+static	void		add_pattern_conditionals(Name target);
+extern	void		set_locals(Name target, Property old_locals);
+extern	void		reset_locals(Name target, Property old_locals, Property conditional, int index);
 extern	Boolean		check_auto_dependencies(Name target, int auto_count, Name *automatics);
 static	void		delete_query_chain(Chain ch);
 
 // From read2.cc
-extern	Name		normalize_name(register wchar_t *name_string, register int length);
+extern	Name		normalize_name(wchar_t *name_string, int length);
 
 
 
@@ -127,7 +127,7 @@ extern	Name		normalize_name(register wchar_t *name_string, register int length);
  *		report_dependencies	No error msg if -P is on
  */
 Doname
-doname_check(register Name target, register Boolean do_get, register Boolean implicit, register Boolean automatic)
+doname_check(Name target, Boolean do_get, Boolean implicit, Boolean automatic)
 {
 	int first_time = 1;
 	Doname rv = build_failed;
@@ -288,19 +288,19 @@ find_dyntarget(Name target)
  *		report_dependencies make -P is on
  */
 Doname
-doname(register Name target, register Boolean do_get, register Boolean implicit, register Boolean automatic)
+doname(Name target, Boolean do_get, Boolean implicit, Boolean automatic)
 {
 	Doname			result = build_dont_know;
 	Chain			out_of_date_list = NULL;
 	Chain			target_group;
 	Property		old_locals = NULL;
-	register Property	line;
+	Property	line;
 	Property		command = NULL;
-	register Dependency	dependency;
+	Dependency	dependency;
 	Name			less = NULL;
 	Name			true_target = target;
 	Name			*automatics = NULL;
-	register int		auto_count;
+	int		auto_count;
 	Boolean			rechecking_target = false;
 	Boolean			saved_commands_done;
 	Boolean			restart = false;
@@ -936,7 +936,7 @@ static Boolean
 check_dependencies(Doname *result, Property line, Boolean do_get, Name target, Name true_target, Boolean doing_subtree, Chain *out_of_date_tail, Property old_locals, Boolean implicit, Property *command, Name less, Boolean rechecking_target, Boolean recheck_conditionals)
 {
 	Boolean			dependencies_running;
-	register Dependency	dependency;
+	Dependency	dependency;
 	Doname			dep_result;
 	Boolean			dependency_changed = false;
 
@@ -1240,9 +1240,9 @@ check_dependencies(Doname *result, Property line, Boolean do_get, Name target, N
 			Name			target_body;
 			Name			tt = true_target;
 			Property		member;
-			register wchar_t	*target_end;
-			register Dependency	suffix;
-			register int		suffix_length;
+			wchar_t	*target_end;
+			Dependency	suffix;
+			int		suffix_length;
 			Wstring			targ_string;
 			Wstring			suf_string;
 
@@ -1318,16 +1318,16 @@ void
 dynamic_dependencies(Name target)
 {
 	wchar_t			pattern[MAXPATHLEN];
-	register wchar_t	*p;
+	wchar_t	*p;
 	Property		line;
-	register Dependency	dependency;
-	register Dependency	*remove;
+	Dependency	dependency;
+	Dependency	*remove;
 	String_rec		string;
 	wchar_t			buffer[MAXPATHLEN];
-	register Boolean	set_at = false;
-	register wchar_t	*start;
+	Boolean	set_at = false;
+	wchar_t	*start;
 	Dependency		new_depe;
-	register Boolean	reuse_cell;
+	Boolean	reuse_cell;
 	Dependency		first_member;
 	Name			directory;
 	Name			lib;
@@ -1574,11 +1574,11 @@ dynamic_dependencies(Name target)
  *		touch		Indicates that make -t is on
  */
 static Doname
-run_command(register Property line, Boolean)
+run_command(Property line, Boolean)
 {
-	register Doname		result = build_ok;
-	register Boolean	remember_only = false;
-	register Name		target = line->body.line.target;
+	Doname		result = build_ok;
+	Boolean	remember_only = false;
+	Name		target = line->body.line.target;
 	wchar_t			*string;
 	char			tmp_file_path[MAXPATHLEN];
 
@@ -1902,7 +1902,7 @@ execute_serial(Property line)
  *	Global variables used:
  */
 Name
-vpath_translation(register Name cmd)
+vpath_translation(Name cmd)
 {
 	wchar_t			buffer[STRING_BUFFER_LENGTH];
 	String_rec		new_cmd;
@@ -1991,9 +1991,9 @@ check_state(Name temp_file_name)
  *		trace_reader	Debug flag
  */
 static void
-read_dependency_file(register Name filename)
+read_dependency_file(Name filename)
 {
-	register Makefile_type	save_makefile_type;
+	Makefile_type	save_makefile_type;
 
 	if (filename == NULL) {
 		return;
@@ -2036,8 +2036,8 @@ static void
 check_read_state_file(void)
 {
 	timestruc_t		previous = make_state->stat.time;
-	register Makefile_type	save_makefile_type;
-	register Property	makefile;
+	Makefile_type	save_makefile_type;
+	Property	makefile;
 
 	make_state->stat.time = file_no_time;
 	if ((exists(make_state) == file_doesnt_exist) ||
@@ -2080,13 +2080,13 @@ check_read_state_file(void)
  *		assign_done	Set to indicate doname needs to reprocess
  */
 static void
-do_assign(register Name line, register Name target)
+do_assign(Name line, Name target)
 {
 	Wstring wcb(line);
-	register wchar_t	*string = wcb.get_string();
-	register wchar_t	*equal;
-	register Name		name;
-	register Boolean	append = false;
+	wchar_t	*string = wcb.get_string();
+	wchar_t	*equal;
+	Name		name;
+	Boolean	append = false;
 
 	/*
 	 * If any runtime assignments are done, doname() must reprocess all
@@ -2163,17 +2163,17 @@ do_assign(register Name line, register Name target)
  *		silent		Used to init field for line
  */
 static void
-build_command_strings(Name target, register Property line)
+build_command_strings(Name target, Property line)
 {
 	String_rec		command_line;
-	register Cmd_line	command_template = line->body.line.command_template;
-	register Cmd_line	*insert = &line->body.line.command_used;
-	register Cmd_line	used = *insert;
+	Cmd_line	command_template = line->body.line.command_template;
+	Cmd_line	*insert = &line->body.line.command_used;
+	Cmd_line	used = *insert;
 	wchar_t			buffer[STRING_BUFFER_LENGTH];
 	wchar_t			*start;
 	Name			new_command_line;
-	register Boolean	new_command_longer = false;
-	register Boolean	ignore_all_command_dependency = true;
+	Boolean	new_command_longer = false;
+	Boolean	ignore_all_command_dependency = true;
 	Property		member;
 	static Name		less_name;
 	static Name		percent_name;
@@ -2508,10 +2508,10 @@ build_command_strings(Name target, register Property line)
  *		silent		Do not echo commands
  */
 static Doname
-touch_command(register Property line, register Name target, Doname result)
+touch_command(Property line, Name target, Doname result)
 {
 	Name			name;
-	register Chain		target_group;
+	Chain		target_group;
 	String_rec		touch_string;
 	wchar_t			buffer[MAXPATHLEN];
 	Name			touch_cmd;
@@ -2677,15 +2677,15 @@ update_target(Property line, Doname result)
  *		sccs_get_rule	The rule to used for sccs getting
  */
 static Doname
-sccs_get(register Name target, register Property *command)
+sccs_get(Name target, Property *command)
 {
-	register int		result;
+	int		result;
 	char			link[MAXPATHLEN];
 	String_rec		string;
 	wchar_t			name[MAXPATHLEN];
-	register wchar_t	*p;
+	wchar_t	*p;
 	timestruc_t		sccs_time;
-	register Property	line;
+	Property	line;
 	int			sym_link_depth = 0;
 
 	/* For sccs, we need to chase symlinks. */
@@ -2820,7 +2820,7 @@ sccs_get(register Name target, register Property *command)
  *		dot		The Name ".", used as the default dir
  */
 void
-read_directory_of_file(register Name file)
+read_directory_of_file(Name file)
 {
 
 	Wstring file_string(file);
@@ -2828,10 +2828,10 @@ read_directory_of_file(register Name file)
 	wchar_t usr_include_buf[MAXPATHLEN];
 	wchar_t usr_include_sys_buf[MAXPATHLEN];
 
-	register Name		directory = dot;
-	register wchar_t	*p = (wchar_t *) wcsrchr(wcb,
+	Name		directory = dot;
+	wchar_t	*p = (wchar_t *) wcsrchr(wcb,
 							(int) slash_char);
-	register int		length = p - wcb;
+	int		length = p - wcb;
 	static Name		usr_include;
 	static Name		usr_include_sys;
 
@@ -2884,9 +2884,9 @@ read_directory_of_file(register Name file)
  *		conditionals	The list of pattern conditionals
  */
 static void
-add_pattern_conditionals(register Name target)
+add_pattern_conditionals(Name target)
 {
-	register Property	conditional;
+	Property	conditional;
 	Property		new_prop;
 	Property		*previous;
 	Name_rec		dummy;
@@ -2951,11 +2951,11 @@ add_pattern_conditionals(register Name target)
  *		recursion_level	Used for tracing
  */
 void
-set_locals(register Name target, register Property old_locals)
+set_locals(Name target, Property old_locals)
 {
-	register Property	conditional;
-	register int		i;
-	register Boolean	saved_conditional_macro_used;
+	Property	conditional;
+	int		i;
+	Boolean	saved_conditional_macro_used;
 	Chain			cond_name;
 	Chain			cond_chain;
 
@@ -3013,9 +3013,9 @@ set_locals(register Name target, register Property old_locals)
  *		recursion_level	Used for tracing
  */
 void
-reset_locals(register Name target, register Property old_locals, register Property conditional, register int index)
+reset_locals(Name target, Property old_locals, Property conditional, int index)
 {
-	register Property	this_conditional;
+	Property	this_conditional;
 	Chain			cond_chain;
 
 	if (target->dont_activate_cond_values) {
@@ -3136,7 +3136,7 @@ delete_query_chain(Chain ch)
 }
 
 Doname
-target_can_be_built(register Name target) {
+target_can_be_built(Name target) {
 	Doname		result = build_dont_know;
 	Name		true_target = target;
 	Property	line;

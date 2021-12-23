@@ -1,5 +1,3 @@
-#ifndef _MKSH_READ_H
-#define _MKSH_READ_H
 /*
  * CDDL HEADER START
  *
@@ -25,9 +23,11 @@
  * Use is subject to license terms.
  */
 
+#ifndef _MKSH_READ_H
+#define	_MKSH_READ_H
 
 #include <mksh/defs.h>
 
-extern Source	get_next_block_fn(register Source source);
+extern Source	get_next_block_fn(Source source);
 
-#endif
+#endif /* _MKSH_READ_H */

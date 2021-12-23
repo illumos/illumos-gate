@@ -59,18 +59,18 @@
  */
 Boolean		make_state_locked;
 Source
-get_next_block_fn(register Source source)
+get_next_block_fn(Source source)
 {
-	register off_t		to_read;
-	register int		length;
-	register size_t		num_wc_chars;
+	off_t		to_read;
+	int		length;
+	size_t		num_wc_chars;
 	char			ch_save;
 	char			*ptr;
 
 	if (source == NULL) {
 		return NULL;
 	}
-	if ((source->fd < 0) || 
+	if ((source->fd < 0) ||
 		((source->bytes_left_in_file <= 0) &&
 			(source->inp_buf_ptr >= source->inp_buf_end))) {
 		/* We can't read from the makefile, so pop the source block */
@@ -104,7 +104,7 @@ get_next_block_fn(register Source source)
 	 * Hopefully the kernel managed to prefetch the stuff.
 	 */
 		to_read = source->bytes_left_in_file;
-	 	source->inp_buf_ptr = source->inp_buf = getmem(to_read + 1);
+		source->inp_buf_ptr = source->inp_buf = getmem(to_read + 1);
 		source->inp_buf_end = source->inp_buf + to_read;
 		length = read(source->fd, source->inp_buf, (unsigned int) to_read);
 		if (length != to_read) {
@@ -139,7 +139,7 @@ get_next_block_fn(register Source source)
 			break;
 		}
 	}
-		
+
 	if ((int) num_wc_chars == (size_t)-1) {
 		source->error_converting = true;
 		return source;

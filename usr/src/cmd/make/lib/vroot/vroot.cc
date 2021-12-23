@@ -57,12 +57,12 @@ static vroot_datat	vroot_data= {
 	"", NULL, NULL, NULL, 0, 1};
 
 void
-add_dir_to_path(const char *path, register pathpt *pointer, register int position)
+add_dir_to_path(const char *path, pathpt *pointer, int position)
 {
-	register int		size= 0;
-	register int		length;
-	register char		*name;
-	register pathcellpt	p;
+	int		size= 0;
+	int		length;
+	char		*name;
+	pathcellpt	p;
 	pathpt			new_path;
 
 	if (*pointer != NULL) {
@@ -88,9 +88,9 @@ add_dir_to_path(const char *path, register pathpt *pointer, register int positio
 }
 
 pathpt
-parse_path_string(register char *string, register int remove_slash)
+parse_path_string(char *string, int remove_slash)
 {
-	register char		*p;
+	char		*p;
 	pathpt			result= NULL;
 
 	if (string != NULL)
@@ -148,7 +148,7 @@ set_path_style(int style)
 }
 
 char *
-get_vroot_path(register char **vroot, register char **path, register char **filename)
+get_vroot_path(char **vroot, char **path, char **filename)
 {
 	if (vroot != NULL) {
 		if ((*vroot= vroot_data.vroot_start) == NULL)
@@ -163,13 +163,13 @@ get_vroot_path(register char **vroot, register char **path, register char **file
 }
 
 void
-translate_with_thunk(register char *filename, int (*thunk) (char *), pathpt path_vector, pathpt vroot_vector, rwt rw)
+translate_with_thunk(char *filename, int (*thunk) (char *), pathpt path_vector, pathpt vroot_vector, rwt rw)
 {
-	register pathcellt	*vp;
-	pathcellt		*pp;
-	register pathcellt	*pp1;
-	register char		*p;
-	int			flags[256];
+	pathcellt	*vp;
+	pathcellt	*pp;
+	pathcellt	*pp1;
+	char		*p;
+	int		flags[256];
 
 /* Setup path to use */
 	if (rw == rw_write)
