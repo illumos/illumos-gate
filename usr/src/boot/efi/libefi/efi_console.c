@@ -56,6 +56,9 @@ EFI_GUID gEfiSimpleTextInProtocolGuid = EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
 EFI_GUID gEfiSimpleTextInputExProtocolGuid =
     EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID;
 EFI_GUID gEfiSimpleTextOutProtocolGuid = EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID;
+
+extern EFI_GRAPHICS_OUTPUT_BLT_PIXEL *shadow_fb;
+static size_t shadow_sz;	/* units of pages */
 static EFI_CONSOLE_CONTROL_PROTOCOL	*console_control;
 static EFI_CONSOLE_CONTROL_SCREEN_MODE	console_mode;
 static SIMPLE_TEXT_OUTPUT_INTERFACE	*conout;
@@ -439,15 +442,25 @@ static void
 efi_framebuffer_setup(void)
 {
 	int bpp, pos;
-	extern EFI_GRAPHICS_OUTPUT_BLT_PIXEL *shadow_fb;
+	EFI_STATUS status;
 
 	bpp = fls(efifb.fb_mask_red | efifb.fb_mask_green |
 	    efifb.fb_mask_blue | efifb.fb_mask_reserved);
 
-	if (shadow_fb != NULL)
-		free(shadow_fb);
-	shadow_fb = malloc(efifb.fb_width * efifb.fb_height *
+	/*
+	 * To save heap space, allocate shadow fb with AllocatePages().
+	 * FB memory can be rather large and its size depends on resolution.
+	 */
+	if (shadow_fb != NULL) {
+		BS->FreePages((EFI_PHYSICAL_ADDRESS)(uintptr_t)shadow_fb,
+		    shadow_sz);
+	}
+	shadow_sz = EFI_SIZE_TO_PAGES(efifb.fb_width * efifb.fb_height *
 	    sizeof (*shadow_fb));
+	status = BS->AllocatePages(AllocateMaxAddress, EfiLoaderData,
+	    shadow_sz, (EFI_PHYSICAL_ADDRESS *)&shadow_fb);
+	if (status != EFI_SUCCESS)
+		shadow_fb = NULL;
 
 	gfx_fb.framebuffer_common.mb_type = MULTIBOOT_TAG_TYPE_FRAMEBUFFER;
 	gfx_fb.framebuffer_common.mb_size = sizeof (gfx_fb);
