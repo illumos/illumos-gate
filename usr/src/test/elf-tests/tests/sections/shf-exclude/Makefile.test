@@ -1,0 +1,42 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2021, Richard Lowe.
+
+OBJS= exclude.o stub.o
+
+# Allow building out of the test harness easily too
+SRCDIR=$(PWD)
+
+.KEEP_STATE:
+
+all: $(OBJS)
+
+%.o: $(SRCDIR)/%.c
+	gcc -m64 -c $< -o $@
+
+%.o: $(SRCDIR)/%.s
+	gcc -D_ASM -m64 -c $< -o $@
+
+clean:
+	rm -rf $(OBJS)
+
+test.kmod: exclude.o stub.o
+	gcc -m64 -Wl,-ztype=kmod exclude.o stub.o -o test.kmod
+
+test.so: exclude.o stub.o
+	gcc -m64 -shared exclude.o stub.o -o test.so
+
+test.exec: exclude.o stub.o
+	gcc -m64 exclude.o stub.o -o test.exec
+
+test.o: exclude.o stub.o
+	ld -zfatal-warnings -r exclude.o stub.o -o test.o

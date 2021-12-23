@@ -1,4 +1,3 @@
-
 #
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
@@ -43,6 +42,10 @@ tests = ['gotpcrelx', 'rex_gotpcrelx']
 [/opt/elf-tests/tests/resolution/mixed-hidden-comdat]
 arch = i86pc
 tests = ['mixed-hidden-comdat']
+
+[/opt/elf-tests/tests/sections/shf-exclude]
+arch = i86pc
+tests = ['exclude-kmod', 'exclude-exec', 'exclude-so', 'include-reloc']
 
 [/opt/elf-tests/tests/string-merge/]
 tests = ['simple']
