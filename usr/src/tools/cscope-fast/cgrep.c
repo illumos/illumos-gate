@@ -20,15 +20,12 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1990 AT&T	*/
-/*	  All Rights Reserved  	*/
-
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	cscope - interactive C symbol or text cross-reference
@@ -209,7 +206,7 @@ typedef struct {
 #define	ADD(N)	if (qtail) qtail = qtail->next = NEW(N); \
 			else qtail = qhead = NEW(N)
 #define	DEL()	{ Link *_l = qhead; if ((qhead = qhead->next) == NULL) \
-			qtail = NULL; _l->next = froot; froot = _l; }
+			{ qtail = NULL; } _l->next = froot; froot = _l; }
 
 static uchar_t	*buffer;
 static uchar_t	*bufend;
@@ -718,10 +715,8 @@ followstate(re_re *r, State *s, int a, Positionset *fpos)
 			for (q = e->follow, eq = q + e->flen; q < eq; q++) {
 				SET(fpos, *q, r->posbase[j].fcount + 1)
 #ifdef	DEBUG
-				printf("CHAR %c FC %c COUNT %d\n",
-					a,
-					r->ptr[*q]->lit,
-					r->posbase[j].fcount+1);
+				printf("CHAR %c FC %c COUNT %d\n", a,
+				    r->ptr[*q]->lit, r->posbase[j].fcount+1);
 #endif
 			}
 		}
@@ -889,8 +884,8 @@ stateof(re_re *r, Positionset *ps)
 		if (s->npos == ps->count) {
 			for (p = s->pos+r->posbase, e = p+s->npos; p < e; p++)
 				if (ps->base[p->id].id == 0 ||
-					ps->base[p->id].fcount != p->fcount)
-						goto next;
+				    ps->base[p->id].fcount != p->fcount)
+					goto next;
 			return (s);
 		}
 	next:;
@@ -962,8 +957,9 @@ lex(re_re *r, PATTERN *pat)
 			if (pat->loc1 == pat->loc2) {
 				err("syntax error - missing character "
 				    "after \\");
-			} else
-			    toklit = r->cmap[*pat->loc1++];
+			} else {
+				toklit = r->cmap[*pat->loc1++];
+			}
 			break;
 	case '^': case '$':	toktype = Literal; toklit = NL; break;
 	default:	toktype = Literal; toklit = r->cmap[toklit]; break;
@@ -990,8 +986,7 @@ ccl(PATTERN *pat, uchar_t *tab)
 		lastc = *pat->loc1++;
 	}
 	/* scan for chars */
-	for (; (pat->loc1 < pat->loc2) && (*pat->loc1 != ']');
-							pat->loc1++) {
+	for (; (pat->loc1 < pat->loc2) && (*pat->loc1 != ']'); pat->loc1++) {
 		if (*pat->loc1 == '-') {
 			if (lastc < 0) CCL_SET(tab, pat->cmap['-']);
 			else range = 1;
@@ -1109,7 +1104,7 @@ d1(re_re *r, PATTERN *pat)
 
 	e = d2(r, pat);
 	while ((toktype == Literal) || (toktype == Dot) || (toktype == Lpar) ||
-		(toktype == Backslash) || (toktype == Charclass)) {
+	    (toktype == Backslash) || (toktype == Charclass)) {
 		f = d2(r, pat);
 		e = newexpr(Cat, 0, e, f);
 	}
@@ -1784,7 +1779,7 @@ fgetfile(LINE *cur_ptr)
 	 */
 	int	bytes;	  /* bytes read in current buffer */
 	int	bufsize = MAXBUFSIZE; /* free space in data buffer */
-	int 	save_current;
+	int	save_current;
 	uchar_t	*begin = cur_ptr->prntbuf;
 
 	/*
