@@ -2530,10 +2530,9 @@ push_pending_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 			    cmd->frame_dma_obj.acc_handle, &hdr->timeout);
 			if (cmd->drv_pkt_time < debug_timeout_g)
 				cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
-				con_log(CL_ANN1, (CE_CONT,
-				    "push_pending_pkt(): "
-				    "Called IO Timeout Value %x\n",
-				    cmd->drv_pkt_time));
+			con_log(CL_ANN1, (CE_CONT,
+			    "push_pending_pkt(): Called IO Timeout Value %x\n",
+			    cmd->drv_pkt_time));
 		}
 		if (hdr && instance->timeout_id == (timeout_id_t)-1) {
 			instance->timeout_id = timeout(io_timeout_checker,
