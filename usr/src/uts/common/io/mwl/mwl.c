@@ -268,12 +268,14 @@ static int	mwl_hal_sethwdma(struct mwl_softc *,
 		    const struct mwl_hal_txrxdma *);
 static int	mwl_hal_getchannelinfo(struct mwl_softc *, int, int,
 		    const MWL_HAL_CHANNELINFO **);
-static int	mwl_hal_setmac_locked(struct mwl_softc *, const uint8_t *);
+static int	mwl_hal_setmac_locked(struct mwl_softc *,
+		    const uint8_t [IEEE80211_ADDR_LEN]);
 static int	mwl_hal_keyreset(struct mwl_softc *, const MWL_HAL_KEYVAL *,
 		    const uint8_t mac[IEEE80211_ADDR_LEN]);
 static int	mwl_hal_keyset(struct mwl_softc *, const MWL_HAL_KEYVAL *,
 		    const uint8_t mac[IEEE80211_ADDR_LEN]);
-static int	mwl_hal_newstation(struct mwl_softc *, const uint8_t *,
+static int	mwl_hal_newstation(struct mwl_softc *,
+		    const uint8_t [IEEE80211_ADDR_LEN],
 		    uint16_t, uint16_t, const MWL_HAL_PEERINFO *, int, int);
 static int	mwl_hal_setantenna(struct mwl_softc *, MWL_HAL_ANTENNA, int);
 static int	mwl_hal_setradio(struct mwl_softc *, int, MWL_HAL_PREAMBLE);
@@ -288,8 +290,8 @@ static int	mwl_hal_settxrate_auto(struct mwl_softc *,
 static int	mwl_hal_setrateadaptmode(struct mwl_softc *, uint16_t);
 static int	mwl_hal_setoptimizationlevel(struct mwl_softc *, int);
 static int	mwl_hal_setregioncode(struct mwl_softc *, int);
-static int	mwl_hal_setassocid(struct mwl_softc *, const uint8_t *,
-		    uint16_t);
+static int	mwl_hal_setassocid(struct mwl_softc *,
+		    const uint8_t [IEEE80211_ADDR_LEN], uint16_t);
 static int	mwl_setrates(struct ieee80211com *);
 static int	mwl_hal_setrtsthreshold(struct mwl_softc *, int);
 static int	mwl_hal_setcsmode(struct mwl_softc *, MWL_HAL_CSMODE);
@@ -307,7 +309,8 @@ static int	mwl_key_delete(struct ieee80211com *,
 		    const struct ieee80211_key *);
 static int	mwl_key_set(struct ieee80211com *, const struct ieee80211_key *,
 		    const uint8_t mac[IEEE80211_ADDR_LEN]);
-static void	mwl_setanywepkey(struct ieee80211com *, const uint8_t *);
+static void	mwl_setanywepkey(struct ieee80211com *,
+		    const uint8_t [IEEE80211_ADDR_LEN]);
 static void	mwl_setglobalkeys(struct ieee80211com *c);
 static int	addgroupflags(MWL_HAL_KEYVAL *, const struct ieee80211_key *);
 static void	mwl_hal_txstart(struct mwl_softc *, int);
@@ -346,8 +349,8 @@ mwl_debug(uint32_t dbg_flags, const int8_t *fmt, ...)
  */
 static int
 mwl_alloc_dma_mem(dev_info_t *devinfo, ddi_dma_attr_t *dma_attr,
-	size_t memsize, ddi_device_acc_attr_t *attr_p, uint_t alloc_flags,
-	uint_t bind_flags, struct dma_area *dma_p)
+    size_t memsize, ddi_device_acc_attr_t *attr_p, uint_t alloc_flags,
+    uint_t bind_flags, struct dma_area *dma_p)
 {
 	int err;
 
@@ -1466,7 +1469,7 @@ addchan(struct mwl_channel *c, int freq, int flags, int ieee, int txpow)
 
 static const struct mwl_channel *
 findchannel(const struct mwl_channel chans[], int nchans,
-	int freq, int flags)
+    int freq, int flags)
 {
 	const struct mwl_channel *c;
 	int i;
@@ -1481,7 +1484,7 @@ findchannel(const struct mwl_channel chans[], int nchans,
 
 static void
 addht40channels(struct mwl_channel chans[], int maxchans, int *nchans,
-	const MWL_HAL_CHANNELINFO *ci, int flags)
+    const MWL_HAL_CHANNELINFO *ci, int flags)
 {
 	struct mwl_channel *c;
 	const struct mwl_channel *extc;
@@ -1518,7 +1521,7 @@ addht40channels(struct mwl_channel chans[], int maxchans, int *nchans,
 
 static void
 addchannels(struct mwl_channel chans[], int maxchans, int *nchans,
-	const MWL_HAL_CHANNELINFO *ci, int flags)
+    const MWL_HAL_CHANNELINFO *ci, int flags)
 {
 	struct mwl_channel *c;
 	int i;
@@ -1567,7 +1570,7 @@ addchannels(struct mwl_channel chans[], int maxchans, int *nchans,
 
 static int
 mwl_hal_getchannelinfo(struct mwl_softc *sc, int band, int chw,
-	const MWL_HAL_CHANNELINFO **ci)
+    const MWL_HAL_CHANNELINFO **ci)
 {
 	switch (band) {
 	case MWL_FREQ_BAND_2DOT4GHZ:
@@ -1585,7 +1588,7 @@ mwl_hal_getchannelinfo(struct mwl_softc *sc, int band, int chw,
 
 static void
 getchannels(struct mwl_softc *sc, int maxchans, int *nchans,
-	struct mwl_channel chans[])
+    struct mwl_channel chans[])
 {
 	const MWL_HAL_CHANNELINFO *ci;
 
@@ -1679,7 +1682,7 @@ mwl_gethwspecs(struct mwl_softc *sc)
 
 static int
 mwl_hal_setmac_locked(struct mwl_softc *sc,
-	const uint8_t addr[IEEE80211_ADDR_LEN])
+    const uint8_t addr[IEEE80211_ADDR_LEN])
 {
 	HostCmd_DS_SET_MAC *pCmd;
 
@@ -1709,8 +1712,8 @@ cvtPeerInfo(PeerInfo_t *to, const MWL_HAL_PEERINFO *from)
 /* XXX station id must be in [0..63] */
 static int
 mwl_hal_newstation(struct mwl_softc *sc,
-	const uint8_t addr[IEEE80211_ADDR_LEN], uint16_t aid, uint16_t sid,
-	const MWL_HAL_PEERINFO *peer, int isQosSta, int wmeInfo)
+    const uint8_t addr[IEEE80211_ADDR_LEN], uint16_t aid, uint16_t sid,
+    const MWL_HAL_PEERINFO *peer, int isQosSta, int wmeInfo)
 {
 	HostCmd_FW_SET_NEW_STN *pCmd;
 	int retval;
@@ -1895,7 +1898,7 @@ mwl_hal_settxpower(struct mwl_softc *sc,
 
 static int
 mwl_hal_settxrate(struct mwl_softc *sc, MWL_HAL_TXRATE_HANDLING handling,
-	const MWL_HAL_TXRATE *rate)
+    const MWL_HAL_TXRATE *rate)
 {
 	HostCmd_FW_USE_FIXED_RATE *pCmd;
 	FIXED_RATE_ENTRY *fp;
@@ -2024,7 +2027,7 @@ mwl_hal_setregioncode(struct mwl_softc *sc, int regionCode)
 
 static int
 mwl_hal_setassocid(struct mwl_softc *sc,
-	const uint8_t bssId[IEEE80211_ADDR_LEN], uint16_t assocId)
+    const uint8_t bssId[IEEE80211_ADDR_LEN], uint16_t assocId)
 {
 	HostCmd_FW_SET_AID *pCmd = (HostCmd_FW_SET_AID *) &sc->sc_cmd_mem[0];
 	int retval;
@@ -2154,7 +2157,7 @@ mwl_hal_stop(struct mwl_softc *sc)
 
 static int
 mwl_hal_keyset(struct mwl_softc *sc, const MWL_HAL_KEYVAL *kv,
-	const uint8_t mac[IEEE80211_ADDR_LEN])
+    const uint8_t mac[IEEE80211_ADDR_LEN])
 {
 	HostCmd_FW_UPDATE_ENCRYPTION_SET_KEY *pCmd;
 	int retval;
@@ -2261,7 +2264,7 @@ mwl_node_free(struct ieee80211_node *ni)
  */
 static int
 mwl_key_alloc(struct ieee80211com *ic, const struct ieee80211_key *k,
-	ieee80211_keyix *keyix, ieee80211_keyix *rxkeyix)
+    ieee80211_keyix *keyix, ieee80211_keyix *rxkeyix)
 {
 	if (k->wk_keyix != IEEE80211_KEYIX_NONE ||
 	    (k->wk_flags & IEEE80211_KEY_GROUP)) {
@@ -2328,7 +2331,7 @@ mwl_key_delete(struct ieee80211com *ic, const struct ieee80211_key *k)
 /* ARGSUSED */
 static int
 mwl_key_set(struct ieee80211com *ic, const struct ieee80211_key *k,
-	const uint8_t mac[IEEE80211_ADDR_LEN])
+    const uint8_t mac[IEEE80211_ADDR_LEN])
 {
 #define	GRPXMIT	(IEEE80211_KEY_XMIT | IEEE80211_KEY_GROUP)
 /* NB: static wep keys are marked GROUP+tx/rx; GTK will be tx or rx */
