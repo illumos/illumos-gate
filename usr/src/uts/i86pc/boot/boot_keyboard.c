@@ -80,8 +80,9 @@ extern unsigned short *kb_status;
 #else /* __xpv && _BOOT */
 
 /* Device memory addresses */
-#define	kb_flag		((unsigned char *)BIOS_KB_FLAG)
-#define	kb_flag_1	((unsigned char *)BIOS_KB_FLAG_1)
+static unsigned char *kb_status = ((unsigned char *)BIOS_KB_FLAG);
+#define	kb_flag		(&kb_status[0])
+#define	kb_flag_1	(&kb_status[1])
 
 #endif /* __xpv && _BOOT */
 
