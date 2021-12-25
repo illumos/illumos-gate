@@ -499,9 +499,12 @@ des_crypt_impl(uint64_t *ks, uint64_t block, int one_or_three)
 }
 #endif /* !sun4u */
 
+/*
+ * block and out_block are assumed to be uint8_t [DES_BLOCK_LEN].
+ */
 int
-des3_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
-    uint8_t out_block[DES_BLOCK_LEN], boolean_t decrypt)
+des3_crunch_block(const void *cookie, const uint8_t *block,
+    uint8_t *out_block, boolean_t decrypt)
 {
 	keysched3_t *ksch = (keysched3_t *)cookie;
 
@@ -558,9 +561,12 @@ des3_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
 	return (CRYPTO_SUCCESS);
 }
 
+/*
+ * block and out_block are assumed to be uint8_t [DES_BLOCK_LEN].
+ */
 int
-des_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
-    uint8_t out_block[DES_BLOCK_LEN], boolean_t decrypt)
+des_crunch_block(const void *cookie, const uint8_t *block,
+    uint8_t *out_block, boolean_t decrypt)
 {
 	keysched_t *ksch = (keysched_t *)cookie;
 
