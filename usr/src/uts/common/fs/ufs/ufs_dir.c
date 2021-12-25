@@ -2870,9 +2870,6 @@ ufs_dirpurgedotdot(
  * Scan the directoy. If clr_dotdot is true clear the ..
  * directory else check to see if the directory is empty.
  *
- * Using a struct dirtemplate here is not precisely
- * what we want, but better than using a struct direct.
- *
  * clr_dotdot is used as a flag to tell us if we need
  * to clear the dotdot entry
  *
@@ -2886,20 +2883,19 @@ ufs_dirscan(
 	int clr_dotdot)
 {
 	offset_t off;
-	struct dirtemplate dbuf;
-	struct direct *dp = (struct direct *)&dbuf;
+	struct tmp_dir dbuf, *dp;
 	int err, count;
 	int empty = 1;	/* Assume it's empty */
-#define	MINDIRSIZ (sizeof (struct dirtemplate) / 2)
 
+	dp = &dbuf;
 	ASSERT(RW_LOCK_HELD(&ip->i_contents));
 
 	ASSERT(ip->i_size <= (offset_t)MAXOFF_T);
 	for (off = 0; off < ip->i_size; off += dp->d_reclen) {
 		err = ufs_rdwri(UIO_READ, FREAD, ip, (caddr_t)dp,
-		    (ssize_t)MINDIRSIZ, off, UIO_SYSSPACE, &count, cr);
+		    sizeof (struct tmp_dir), off, UIO_SYSSPACE, &count, cr);
 		/*
-		 * Since we read MINDIRSIZ, residual must
+		 * Since we read sizeof (struct tmp_dir), residual must
 		 * be 0 unless we're at end of file.
 		 */
 		if (err || count != 0 || dp->d_reclen == 0) {
@@ -3108,20 +3104,19 @@ int
 ufs_xattrdirempty(struct inode *ip, ino_t parentino, struct cred *cr)
 {
 	offset_t off;
-	struct dirtemplate dbuf;
-	struct direct *dp = (struct direct *)&dbuf;
+	struct tmp_dir dbuf, *dp;
 	int err, count;
 	int empty = 1;	/* Assume it's empty */
-#define	MINDIRSIZ (sizeof (struct dirtemplate) / 2)
 
+	dp = &dbuf;
 	ASSERT(RW_LOCK_HELD(&ip->i_contents));
 
 	ASSERT(ip->i_size <= (offset_t)MAXOFF_T);
 	for (off = 0; off < ip->i_size; off += dp->d_reclen) {
 		err = ufs_rdwri(UIO_READ, FREAD, ip, (caddr_t)dp,
-		    (ssize_t)MINDIRSIZ, off, UIO_SYSSPACE, &count, cr);
+		    sizeof (struct tmp_dir), off, UIO_SYSSPACE, &count, cr);
 		/*
-		 * Since we read MINDIRSIZ, residual must
+		 * Since we read sizeof (struct tmp_dir), residual must
 		 * be 0 unless we're at end of file.
 		 */
 
