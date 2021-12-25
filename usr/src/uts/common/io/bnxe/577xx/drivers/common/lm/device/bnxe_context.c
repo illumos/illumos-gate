@@ -699,7 +699,7 @@ lm_status_t lm_allocate_cid(struct _lm_device_t *pdev, u32_t type, void * cookie
 
 void lm_cfc_delete(struct _lm_device_t *pdev, void *param)
 {
-    u32_t cid             = *((u32_t *)&param);
+    u32_t cid             = (u32_t)(uintptr_t)param;
     u8_t  flr_in_progress = lm_fl_reset_is_inprogress(pdev);
 
     if ( CHK_NULL(pdev) ||
@@ -815,12 +815,13 @@ void lm_free_cid(struct _lm_device_t *pdev, u32_t type, u32_t cid, u8_t notify_f
         if (type == TOE_CONNECTION_TYPE)
         {
             DbgMessage(pdev, WARN, "lm_free_cid: CFC delete: cid=0x%x\n",cid);
-            lm_cfc_delete(pdev,*((void **)&cid));
+            lm_cfc_delete(pdev,(void *)(uintptr_t)cid);
         }
         else
         {
             DbgMessage(pdev, WARN, "lm_free_cid: schedule CFC delete: cid=0x%x\n",cid);
-            mm_schedule_task(pdev,delay_time,lm_cfc_delete,*((void **)&cid));
+            mm_schedule_task(pdev,delay_time,lm_cfc_delete,
+		(void *)(uintptr_t)cid);
         }
     }
 
@@ -1249,7 +1250,7 @@ lm_status_t lm_set_con_state(struct _lm_device_t *pdev, u32_t cid, u32_t state)
     }
 
     cid_resc->con_state = state;
-    
+
     return LM_STATUS_SUCCESS;
 }
 
