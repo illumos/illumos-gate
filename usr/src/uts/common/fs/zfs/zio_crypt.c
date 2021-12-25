@@ -1061,14 +1061,17 @@ zio_crypt_do_dnode_hmac_updates(crypto_context_t ctx, uint64_t version,
 	dnode_phys_t *adnp;
 	boolean_t le_bswap = (should_bswap == ZFS_HOST_BYTEORDER);
 	crypto_data_t cd;
-	uint8_t tmp_dncore[offsetof(dnode_phys_t, dn_blkptr)];
+	uint8_t tmp_dncore[sizeof (dnode_phys_t)];
 
+	adnp = (dnode_phys_t *)tmp_dncore;
 	cd.cd_format = CRYPTO_DATA_RAW;
 	cd.cd_offset = 0;
+	cd.cd_length = offsetof(dnode_phys_t, dn_blkptr);
+	cd.cd_raw.iov_base = (char *)adnp;
+	cd.cd_raw.iov_len = cd.cd_length;
 
 	/* authenticate the core dnode (masking out non-portable bits) */
-	bcopy(dnp, tmp_dncore, sizeof (tmp_dncore));
-	adnp = (dnode_phys_t *)tmp_dncore;
+	bcopy(dnp, tmp_dncore, cd.cd_length);
 	if (le_bswap) {
 		adnp->dn_datablkszsec = BSWAP_16(adnp->dn_datablkszsec);
 		adnp->dn_bonuslen = BSWAP_16(adnp->dn_bonuslen);
@@ -1077,10 +1080,6 @@ zio_crypt_do_dnode_hmac_updates(crypto_context_t ctx, uint64_t version,
 	}
 	adnp->dn_flags &= DNODE_CRYPT_PORTABLE_FLAGS_MASK;
 	adnp->dn_used = 0;
-
-	cd.cd_length = sizeof (tmp_dncore);
-	cd.cd_raw.iov_base = (char *)adnp;
-	cd.cd_raw.iov_len = cd.cd_length;
 
 	ret = crypto_mac_update(ctx, &cd, NULL);
 	if (ret != CRYPTO_SUCCESS) {
