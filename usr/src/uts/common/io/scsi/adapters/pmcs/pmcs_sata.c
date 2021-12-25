@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * SATA midlayer interface for PMC drier.
+ * SATA midlayer interface for PMC driver.
  */
 
 #include <sys/scsi/adapters/pmcs/pmcs.h>
@@ -52,7 +52,8 @@ SATAcopy(pmcs_cmd_t *sp, void *kbuf, uint32_t amt)
  *
  * Called with PHY lock and xp statlock held.
  */
-#define	SRESPSZ	128
+#define	SRESPSZ	132
+CTASSERT(SRESPSZ == sizeof (struct scsi_inquiry));
 
 static int
 pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
