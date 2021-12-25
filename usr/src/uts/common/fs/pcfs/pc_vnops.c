@@ -1849,8 +1849,8 @@ out:
 		*offp = io_off;
 	if (lenp)
 		*lenp = io_len;
-		PC_DPRINTF4(4, "pcfs_putapage: vp=%p pp=%p off=%lld len=%lu\n",
-		    (void *)vp, (void *)pp, io_off, io_len);
+	PC_DPRINTF4(4, "pcfs_putapage: vp=%p pp=%p off=%lld len=%lu\n",
+	    (void *)vp, (void *)pp, io_off, io_len);
 	if (err) {
 		PC_DPRINTF1(1, "pcfs_putapage err=%d", err);
 	}
@@ -2090,7 +2090,7 @@ set_long_fn_chunk(struct pcdir_lfn *ep, char *buf, int len)
 static int
 get_long_fn_chunk(struct pcdir_lfn *ep, char *buf)
 {
-	char 	*tmp = buf;
+	char	*tmp = buf;
 	int	i;
 
 	/* Copy all the names, no filtering now */
