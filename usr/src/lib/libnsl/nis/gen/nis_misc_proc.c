@@ -200,7 +200,7 @@ Done:
 	(memcmp((o1)->elements, (o2)->elements, (o1)->length) == 0))
 
 int
-__nis_gssprin2netname(rpc_gss_principal_t prin, char netname[MAXNETNAMELEN+1])
+__nis_gssprin2netname(rpc_gss_principal_t prin, char netname[])
 {
 	gss_buffer_desc display_name;
 	gss_name_t name;
