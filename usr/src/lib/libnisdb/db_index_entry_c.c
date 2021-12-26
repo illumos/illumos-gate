@@ -40,20 +40,18 @@
 #include "xdr_nullptr.h"
 
 bool_t
-xdr_db_index_entry(xdrs, objp)
-	register XDR *xdrs;
-	db_index_entry *objp;
+xdr_db_index_entry(XDR *xdrs, db_index_entry *objp)
 {
 	bool_t	more_data;
-	register db_index_entry *ep = objp;
-	register db_index_entry *loc;
-	register db_index_entry *freeptr = NULL;
+	db_index_entry *ep = objp;
+	db_index_entry *loc;
+	db_index_entry *freeptr = NULL;
 
 	for (;;) {
 		if (!xdr_u_long(xdrs, &ep->hashval))
 			return (FALSE);
 		if (!xdr_pointer(xdrs, (char **)&ep->key, sizeof (item),
-			(xdrproc_t) xdr_item))
+		    (xdrproc_t)xdr_item))
 			return (FALSE);
 		if (!xdr_entryp(xdrs, &ep->location))
 			return (FALSE);
@@ -93,7 +91,7 @@ xdr_db_index_entry(xdrs, objp)
 		case XDR_DECODE:
 			if (loc == NULL) {
 				ep->next = loc = (db_index_entry *)
-					mem_alloc(sizeof (db_index_entry));
+				    mem_alloc(sizeof (db_index_entry));
 				if (loc == NULL) {
 					syslog(LOG_ERR,
 				"xdr_db_index_entry: mem_alloc failed");
@@ -125,13 +123,11 @@ xdr_db_index_entry(xdrs, objp)
 
 
 bool_t
-xdr_db_index_entry_p(xdrs, objp)
-	register XDR *xdrs;
-	db_index_entry_p *objp;
+xdr_db_index_entry_p(XDR *xdrs, db_index_entry_p *objp)
 {
 
 	if (!xdr_pointer(xdrs, (char **)objp, sizeof (db_index_entry),
-		(xdrproc_t) xdr_db_index_entry))
+	    (xdrproc_t)xdr_db_index_entry))
 		return (FALSE);
 	return (TRUE);
 }
@@ -139,14 +135,12 @@ xdr_db_index_entry_p(xdrs, objp)
 
 
 bool_t
-xdr_db_free_entry(xdrs, objp)
-	register XDR *xdrs;
-	db_free_entry *objp;
+xdr_db_free_entry(XDR *xdrs, db_free_entry *objp)
 {
 	bool_t	more_data;
-	register db_free_entry *ep = objp;
-	register db_free_entry *loc;
-	register db_free_entry *freeptr = NULL;
+	db_free_entry *ep = objp;
+	db_free_entry *loc;
+	db_free_entry *freeptr = NULL;
 
 	for (;;) {
 		if (!xdr_entryp(xdrs, &ep->where))
@@ -185,7 +179,7 @@ xdr_db_free_entry(xdrs, objp)
 		case XDR_DECODE:
 			if (loc == NULL) {
 				ep->next = loc = (db_free_entry *)
-					mem_alloc(sizeof (db_free_entry));
+				    mem_alloc(sizeof (db_free_entry));
 				if (loc == NULL) {
 					syslog(LOG_ERR,
 				"db_free_entry: mem_alloc failed");
