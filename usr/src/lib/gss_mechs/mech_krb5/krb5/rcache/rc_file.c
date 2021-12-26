@@ -49,7 +49,7 @@ rc_store(krb5_context context, krb5_rcache id, krb5_donot_replay *rep)
     krb5_timeofday(context, &time);
 
     /* Solaris: calling alive() on rep since it doesn't make sense to store an
-     * expired replay. 
+     * expired replay.
      */
     if (alive(context, rep, t->lifespan, time) == CMP_EXPIRED){
 	return CMP_EXPIRED;
@@ -163,8 +163,8 @@ krb5_rc_file_close_no_free(krb5_context context, krb5_rcache id)
 	FREE_RC(q->rep.server);
 	FREE_RC(q);
     }
- if (t->d.fd >= 0)
-    (void) krb5_rc_io_close(context, &t->d);
+    if (t->d.fd >= 0)
+        (void) krb5_rc_io_close(context, &t->d);
     FREE_RC(t);
     id->data = NULL;
     return 0;
@@ -283,7 +283,7 @@ krb5_rc_io_fetch(krb5_context context, struct file_data *t,
     if (retval)
 	goto errout;
 
-    retval = krb5_rc_io_read(context, &t->d, (krb5_pointer) &len, 
+    retval = krb5_rc_io_read(context, &t->d, (krb5_pointer) &len,
 			     sizeof(len));
     if (retval)
 	goto errout;
@@ -365,7 +365,7 @@ krb5_rc_file_recover_locked(krb5_context context, krb5_rcache id)
 	    retval = KRB5_RC_IO;
 	    goto io_fail;
 	}
-	
+
 	retval = krb5_rc_io_fetch (context, t, rep, (int) max_size);
 
 	if (retval == KRB5_RC_IO_EOF)
