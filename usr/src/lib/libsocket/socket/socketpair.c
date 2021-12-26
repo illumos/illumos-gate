@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stropts.h>
@@ -49,9 +47,9 @@
 #include <stdlib.h>
 
 extern int _socket_create(int, int, int, int);
-extern int _so_socketpair(int*);
+extern int _so_socketpair(int *);
 
-int _socketpair_create(int, int, int, int*, int);
+int _socketpair_create(int, int, int, int [2], int);
 
 #pragma weak socketpair = _socketpair
 
@@ -73,15 +71,13 @@ _socketpair_bsd(int family, int type, int protocol, int sv[2])
 int
 _socketpair_svr4(int family, int type, int protocol, int sv[2])
 {
-	return (_socketpair_create(family, type, protocol, sv,
-				SOV_SOCKSTREAM));
+	return (_socketpair_create(family, type, protocol, sv, SOV_SOCKSTREAM));
 }
 
 int
 __xnet_socketpair(int family, int type, int protocol, int sv[2])
 {
-	return (_socketpair_create(family, type, protocol, sv,
-				SOV_XPG4_2));
+	return (_socketpair_create(family, type, protocol, sv, SOV_XPG4_2));
 }
 
 int
