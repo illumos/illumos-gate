@@ -343,9 +343,8 @@ cfga_help(struct cfga_msg *msgp, const char *options, cfga_flags_t flags)
 
 }
 
-/*ARGSUSED*/
 int
-cfga_ap_id_cmp(const char *ap_id1, const char *ap_id2)
+cfga_ap_id_cmp(const cfga_ap_log_id_t ap_id1, const cfga_ap_log_id_t ap_id2)
 {
 	int i = 0;
 	long long ret;
