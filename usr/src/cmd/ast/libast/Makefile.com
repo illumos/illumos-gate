@@ -98,8 +98,15 @@ CERRWARN += -_gcc=-Wno-address
 # Since this is third party source, silencing this warning seems to be
 # reasonable path to take.
 pics/path/pathpath.o := CERRWARN += -_gcc10=-Wno-return-local-addr
+pics/path/pathpath.o := CERRWARN += -_gcc11=-Wno-return-local-addr
 pics/path/pathkey.o := CERRWARN += -_gcc10=-Wno-return-local-addr
+pics/path/pathkey.o := CERRWARN += -_gcc11=-Wno-return-local-addr
 pics/path/pathprobe.o := CERRWARN += -_gcc10=-Wno-return-local-addr
+pics/path/pathprobe.o := CERRWARN += -_gcc11=-Wno-return-local-addr
+
+# The code layout after macro expansion is upsetting gcc 11, silence it.
+pics/sfio/sfdisc.o := CERRWARN += -_gcc11=-Wno-misleading-indentation
+pics/sfio/sfstack.o := CERRWARN += -_gcc11=-Wno-misleading-indentation
 
 SMATCH= off
 
