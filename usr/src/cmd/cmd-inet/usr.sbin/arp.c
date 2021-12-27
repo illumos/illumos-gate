@@ -78,9 +78,10 @@ main(int argc, char *argv[])
 			if (nflags > 0) {	\
 				usage();	\
 				exit(1);	\
-			} else			\
+			} else {		\
 				y##_flag = 1;	\
-				nflags++;	\
+			}			\
+			nflags++;		\
 			break
 
 	while ((c = getopt(argc, argv, "nadfs")) != EOF) {

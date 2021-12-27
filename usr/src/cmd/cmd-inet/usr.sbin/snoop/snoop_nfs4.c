@@ -46,6 +46,7 @@
 
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <sys/sysmacros.h>
 #include <rpcsvc/nfs_prot.h>
 /* use the same nfs4_prot.h as the xdr code */
 #include "rpcsvc/nfs4_prot.h"
@@ -248,7 +249,7 @@ static op_info_t cb_opcode_info[] = {
 		sumarg_cb_recall,	sum_nfsstat4,
 		dtlarg_cb_recall,	dtl_nfsstat4},
 };
-static uint_t cb_num_opcodes = sizeof (cb_opcode_info) / sizeof (op_info_t *);
+static uint_t cb_num_opcodes = ARRAY_SIZE(cb_opcode_info);
 
 static op_info_t opcode_info[] = {
 	{"OP_ZERO",	NULL,	NULL,	NULL,	NULL},	/* 0 */
@@ -339,7 +340,7 @@ static op_info_t opcode_info[] = {
 	sumarg_release_lkown, sum_nfsstat4,
 	dtlarg_release_lkown, dtl_nfsstat4},
 };
-static uint_t num_opcodes = sizeof (opcode_info) / sizeof (op_info_t *);
+static uint_t num_opcodes = ARRAY_SIZE(opcode_info);
 
 /*
  * File types.
