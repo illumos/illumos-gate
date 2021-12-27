@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved 	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -404,7 +404,7 @@ setbit(void)
 }
 
 datum
-makdatum(char buf[PBLKSIZ], int n)
+makdatum(char *buf, int n)
 {
 	short *sp;
 	int t;
