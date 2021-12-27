@@ -2351,14 +2351,13 @@ _nscd_cfg_str_to_data(
 		else if (strcasecmp(str, "no") == 0)
 			*(nscd_bool_t *)data = nscd_false;
 		else {
+			(void) snprintf(msg, sizeof (msg),
+			    gettext("data (%s) must be 'yes' or 'no' for %s"),
+			    str, desc->id.name);
 
-		(void) snprintf(msg, sizeof (msg),
-		gettext("data (%s) must be 'yes' or 'no' for %s"),
-		    str, desc->id.name);
-
-		if (errorp != NULL)
-			*errorp = _nscd_cfg_make_error(NSCD_INVALID_ARGUMENT,
-			    msg);
+			if (errorp != NULL)
+				*errorp = _nscd_cfg_make_error(
+				    NSCD_INVALID_ARGUMENT, msg);
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "ERROR: %s\n", msg);
