@@ -129,13 +129,16 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 
 pci_nvme.o := CERRWARN += -_gcc=-Wno-pointer-sign
 pci_nvme.o := CERRWARN += -_gcc10=-Wno-address-of-packed-member
+pci_nvme.o := CERRWARN += -_gcc11=-Wno-address-of-packed-member
 pci_nvme.o := SMOFF += kmalloc_wrong_size
 
 pci_passthru.o := CERRWARN += -_gcc10=-Wno-address-of-packed-member
+pci_passthru.o := CERRWARN += -_gcc11=-Wno-address-of-packed-member
 
 pci_virtio_9p.o := SMOFF += kmalloc_wrong_size
 
 pci_xhci.o := CERRWARN += -_gcc10=-Wno-address-of-packed-member
+pci_xhci.o := CERRWARN += -_gcc11=-Wno-address-of-packed-member
 
 SMOFF += all_func_returns,leaks,no_if_block
 
