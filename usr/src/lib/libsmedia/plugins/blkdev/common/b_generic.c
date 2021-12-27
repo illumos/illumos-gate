@@ -25,7 +25,7 @@
 /*
  * b_generic.c :
  *      This file contains the functions for generic block devices
- * 	for libsmedia.
+ *	for libsmedia.
  */
 
 #include <stdio.h>
@@ -150,8 +150,8 @@ _m_get_device_info(rmedia_handle_t *handle, void *ip)
 	}
 	vendor_name = (char *)malloc(1);
 	if (vendor_name == NULL) {
-	if (!errno)
-		errno = ENOMEM;
+		if (!errno)
+			errno = ENOMEM;
 		return (-1);
 	}
 	product_name = (char *)malloc(1);
