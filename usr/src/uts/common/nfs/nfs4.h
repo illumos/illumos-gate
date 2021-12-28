@@ -193,6 +193,8 @@ extern bool_t		rfs4_dbe_islocked(rfs4_dbe_t *);
 #endif
 extern void		rfs4_dbe_walk(rfs4_table_t *,
 			void (*callout)(rfs4_entry_t, void *), void *);
+extern void		rfs4_dbsearch_cb(rfs4_index_t *idx, void *key,
+    int maxcount, void (*callout)(rfs4_entry_t));
 
 /*
  * Minimal server stable storage.
@@ -971,6 +973,10 @@ extern	void		rfs4_file_rele(rfs4_file_t *);
 /* General collection of "get state" functions */
 extern	nfsstat4	rfs4_get_state(stateid4 *, rfs4_state_t **,
 					rfs4_dbsearch_type_t);
+extern nfsstat4		rfs4_get_state_nolock(stateid4 *, rfs4_state_t **,
+					rfs4_dbsearch_type_t);
+extern void rfs4_state_rele_nounlock(rfs4_state_t *);
+
 extern	nfsstat4	rfs4_get_deleg_state(stateid4 *,
 					rfs4_deleg_state_t **);
 extern	nfsstat4	rfs4_get_lo_state(stateid4 *, rfs4_lo_state_t **,
@@ -1236,9 +1242,13 @@ struct compound_state {
 	uint16_t	op_pos;
 	uint16_t	op_len;		/* number operations in compound req */
 #define	RFS4_DISPATCH_DONE	(1 << 0)
+#define	RFS4_CURRENT_STATEID	(1 << 1)
+#define	RFS4_SAVED_STATEID	(1 << 2)
 	uint8_t		cs_flags;
 	bool_t		cachethis;
 	COMPOUND4res	*cmpresp;
+	stateid4	current_stateid;
+	stateid4	save_stateid;
 };
 
 typedef struct compound_state compound_state_t;
@@ -1248,6 +1258,10 @@ rfs4_has_session(const compound_state_t *cs)
 {
 	return (cs->slot != NULL);
 }
+
+extern stateid4 invalid_stateid;
+
+#define	INVALID_STATEID(x) (!memcmp((x), &invalid_stateid, sizeof (stateid4))
 
 /*
  * Conversion commands for nfsv4 server attr checking
@@ -1537,7 +1551,7 @@ extern void rfs4_fini_compound_state(struct compound_state *);
 struct rpcdisp;
 extern int rfs4_dispatch(struct rpcdisp *, struct svc_req *, SVCXPRT *, char *);
 extern void	rfs4_compound_free(COMPOUND4res *);
-extern void	rfs4_compound_flagproc(COMPOUND4args *, int *);
+extern bool_t	rfs4_idempotent_req(const COMPOUND4args *);
 
 extern void	rfs4_srvrinit(void);
 extern void	rfs4_srvrfini(void);
@@ -1548,6 +1562,9 @@ extern void	rfs4_state_zone_init(nfs4_srv_t *);
 extern void	rfs4_state_g_fini(void);
 extern void	rfs4_state_zone_fini(void);
 extern nfs4_srv_t *nfs4_get_srv(void);
+
+void put_stateid4(struct compound_state *, stateid4 *);
+void get_stateid4(struct compound_state *, stateid4 *);
 
 #endif
 #ifdef	__cplusplus
