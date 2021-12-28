@@ -831,6 +831,9 @@ rfs4x_sequence_prep(COMPOUND4args *args, COMPOUND4res *resp,
 	if (status != NFS4_OK)
 		return (status);
 
+	if (args->array_len > cs->sp->sn_fore->cn_attrs.ca_maxoperations)
+		return (NFS4ERR_TOO_MANY_OPS);
+
 	/*  have reference to session */
 	slot = &cs->sp->sn_slots[sargs->sa_slotid];
 
