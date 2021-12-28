@@ -35,6 +35,7 @@ CFGS = README \
 	symbols/stdnoreturn_h.cfg \
 	symbols/string_h.cfg \
 	symbols/strings_h.cfg \
+	symbols/sys_atomic_h.cfg \
 	symbols/sys_stat_h.cfg \
 	symbols/sys_time_h.cfg \
 	symbols/sys_timeb_h.cfg \
