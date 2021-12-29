@@ -1,16 +1,16 @@
 '\" te
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2021 Peter Tribble.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CT_PR_EVENT_GET_PID 3CONTRACT "Jul 19, 2004"
+.TH CT_PR_EVENT_GET_PID 3CONTRACT "November 21, 2021"
 .SH NAME
 ct_pr_event_get_pid, ct_pr_event_get_ppid, ct_pr_event_get_signal,
 ct_pr_event_get_sender, ct_pr_event_get_senderct, ct_pr_event_get_exitstatus,
 ct_pr_event_get_pcorefile, ct_pr_event_get_gcorefile, ct_pr_event_get_zcorefile
 \- process contract event functions
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -lcontract \fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libcontract.h>
@@ -36,7 +36,7 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -
 
 .LP
 .nf
-\fBint\fR \fBct_pr_event_get_senderct\fR(\fBct_evthdl_t\fR \fIevthdl\fR, \fBctid_t *\fR\fIpidp\fR);
+\fBint\fR \fBct_pr_event_get_senderct\fR(\fBct_evthdl_t\fR \fIevthdl\fR, \fBctid_t *\fR\fIctidp\fR);
 .fi
 
 .LP
@@ -60,8 +60,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions read process contract event information from an event object
 returned by \fBct_event_read\fR(3CONTRACT) or
 \fBct_event_read_critical\fR(3CONTRACT).
@@ -85,10 +83,10 @@ signal's sender was not in the same zone as the signal's recipient, this
 information is available only to event consumers in the global zone.
 .sp
 .LP
-The ct_pr_event_get_senderct function reads the contract ID of the process that
-sent the signal that caused the CT_PR_EV_SIGNAL event. If the signal's sender
-was not in the same zone as the signal's recipient, this information is
-available only
+The \fBct_pr_event_get_senderct()\fR function reads the contract ID of the
+process that sent the signal that caused the \fBCT_PR_EV_SIGNAL\fR event. If
+the signal's sender was not in the same zone as the signal's recipient, this
+information is available only to event consumers in the global zone.
 .sp
 .LP
 The \fBct_pr_event_get_exitstatus()\fR function reads the exit status of the
@@ -114,8 +112,6 @@ event consumers in the global zone. A pointer to a character array is stored in
 *\fInamep\fR and is freed when \fBct_event_free()\fR is called on the event
 handle.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBct_pr_event_get_pid()\fR,
 \fBct_pr_event_get_ppid()\fR, \fBct_pr_event_get_signal()\fR,
 \fBct_pr_event_get_sender()\fR, \fBct_pr_event_get_senderct()\fR,
@@ -123,8 +119,6 @@ Upon successful completion, \fBct_pr_event_get_pid()\fR,
 \fBct_pr_event_get_gcorefile()\fR, and \fBct_pr_event_get_zcorefile()\fR return
 0. Otherwise, they return a non-zero error value.
 .SH ERRORS
-.sp
-.LP
 The \fBct_pr_event_get_pid()\fR, \fBct_pr_event_get_ppid()\fR,
 \fBct_pr_event_get_signal()\fR, \fBct_pr_event_get_sender()\fR,
 \fBct_pr_event_get_senderct()\fR, \fBct_pr_event_get_exitstatus()\fR,
@@ -157,15 +151,17 @@ The requested data do not match the event type.
 
 .sp
 .LP
-The \fBct_pr_event_get_sender()\fRa functions will fail if:
+The \fBct_pr_event_get_sender()\fR and \fBct_pr_event_get_senderct()\fR
+functions will fail if:
 .sp
 .ne 2
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-The process ID of the sender was not available, or the event object was read by
-a process running in a non-global zone and the sender was in a different zone.
+The process or contract ID of the sender was not available, or the event object
+was read by a process running in a non-global zone and the sender was in a
+different zone.
 .RE
 
 .sp
@@ -194,7 +190,6 @@ The event object was read by a process running in a non-global zone.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRPrint the instigator of all \fBCT_PR_EV_SIGNAL\fR events.
 .sp
 .LP
@@ -236,8 +231,6 @@ for (;;) {
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -254,8 +247,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBct_event_free\fR(3CONTRACT), \fBct_event_read\fR(3CONTRACT),
 \fBct_event_read_critical\fR(3CONTRACT), \fBlibcontract\fR(3LIB),
 \fBcontract\fR(4), \fBprocess\fR(4), \fBattributes\fR(5), \fBlfcompile\fR(5)
