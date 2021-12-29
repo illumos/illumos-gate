@@ -686,7 +686,7 @@ crypto_create_ctx_template(crypto_mechanism_t *mech,
 }
 
 crypto_mech_type_t
-crypto_mech2id(crypto_mech_name_t name)
+crypto_mech2id(const char *name)
 {
 	return (CRYPTO_MECH_INVALID);
 }
