@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved  */
 
 
 
@@ -125,12 +125,9 @@ struct index {	struct key *key;
 /* index pts to the front of the index list */
 static struct index *index = NULL;
 
-/* ******************* */
+
 void
-el_init(du, lb, dt, nlim)
-/* ******************* */
-int du, nlim;
-time_t lb, dt;
+el_init(int du, time_t lb, time_t dt, int nlim)
 {
 	int	i;
 	time_t	t;
@@ -217,13 +214,8 @@ time_t lb, dt;
 }
 
 
-/* ********************** */
 int
-el_add(event, time, id)
-/* ********************** */
-void	*event;
-int	id;
-time_t	time;
+el_add(void *event, time_t time, int id)
 {
 	/*
 	 * add works slightly differently than in the reference.  if the
@@ -303,11 +295,8 @@ time_t	time;
 }
 
 
-/* ******************** */
 void
-el_remove(id, flag)
-/* ******************** */
-int	id, flag;
+el_remove(int id, int flag)
 {
 	/*
 	 * remove finds notices n that need to be removed by traversing thru
@@ -334,11 +323,13 @@ int	id, flag;
 				(k->left)->right = k->right;
 				(k->right)->left = k->left;
 				free(k);
-			} else { if (n->key != NULL) {
+			} else {
+				if (n->key != NULL) {
 					/* n has a key pointing to it */
 					(n->left)->key = n->key;
 					(n->key)->time = (n->left)->time;
-					(n->key)->notice = n->left; }
+					(n->key)->notice = n->left;
+				}
 				/* find the key that points to this sublist */
 				n2 = n;
 				while (n2->key == NULL) n2 = n2->right;
@@ -359,8 +350,7 @@ int	id, flag;
 					k->left = kl->left;
 					free(kl);
 				} else if ((!(k->notice)->isdummy) &&
-					    ((kr->numnote+k->numnote)
-					    <= NLIM)) {
+				    ((kr->numnote+k->numnote) <= NLIM)) {
 					/* delete this key */
 					(k->notice)->key = NULL;
 					kr->numnote += k->numnote;
@@ -386,10 +376,8 @@ int	id, flag;
 }
 
 
-/* ********************* */
 int
 el_empty(void)
-/* ********************* */
 {
 	if (current == NULL)
 		return (1);
@@ -398,10 +386,8 @@ el_empty(void)
 }
 
 
-/* ********************* */
 void *
 el_first(void)
-/* ********************* */
 {
 	struct notice *n, *fn;
 	struct key *k, *fk;
@@ -496,10 +482,8 @@ el_first(void)
 }
 
 
-/* ************** */
 void
 el_delete(void)
-/* ************** */
 {
 	/* el_delete frees up all the space associated with the event list */
 

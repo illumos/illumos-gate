@@ -41,8 +41,7 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-unused-value
 
-# not linted
-SMATCH=off
+SMOFF +=	signed_integer_overflow_check,all_func_returns
 
 ROOTVAR =	$(ROOT)/var
 

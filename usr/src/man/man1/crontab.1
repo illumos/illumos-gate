@@ -44,8 +44,10 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2022 Sebastian Wiedenroth
+
 .\"
-.TH CRONTAB 1 "Aug 20, 2020"
+.TH CRONTAB 1 "Jan 9, 2022"
 .SH NAME
 crontab \- user crontab file
 .SH SYNOPSIS
@@ -312,6 +314,29 @@ TZ=Iceland
 .sp
 
 .RE
+
+.sp
+.ne 2
+.na
+\fBRANDOM_DELAY\fR
+.ad
+.sp .6
+.RS 4n
+Allows the user to specify an upper bound in minutes for which execution
+may be delayed. The default is 0 which means no delay. A value that is
+larger than the scheduled interval may result in the command running less
+often. For example, to have the command run at some random time within
+two minutes after the schedule use:
+.sp
+.in +2
+.nf
+RANDOM_DELAY=2
+.fi
+.in -2
+.sp
+
+.RE
+
 
 .sp
 .LP

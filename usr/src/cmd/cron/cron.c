@@ -27,6 +27,7 @@
  * Copyright (c) 2014 Gary Mills
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Sebastian Wiedenroth
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -194,6 +195,7 @@ struct event {
 			struct shared *tz;	/* timezone of this event */
 			struct shared *home;	/* directory for this event */
 			struct shared *shell;	/* shell for this event */
+			uint32_t max_random_delay;	/* max. random delay */
 		} ct;
 		struct { /* for at events */
 			short exists;	/* for revising at events	*/
@@ -1130,7 +1132,9 @@ readcron(struct usr *u, time_t reftime)
 	struct shared *tz = NULL;
 	struct shared *home = NULL;
 	struct shared *shell = NULL;
+	uint32_t max_random_delay = 0;
 	int lineno = 0;
+	const char *errstr;
 
 	/* read the crontab file */
 	cte_init();		/* Init error handling */
@@ -1204,6 +1208,23 @@ readcron(struct usr *u, time_t reftime)
 			continue;
 		}
 
+		if (strncmp(&line[cursor], ENV_RANDOM_DELAY,
+		    strlen(ENV_RANDOM_DELAY)) == 0) {
+			if ((tmp = strchr(&line[cursor], '\n')) != NULL) {
+				*tmp = '\0';
+			}
+
+			max_random_delay = strtonum(
+			    &line[cursor + strlen(ENV_RANDOM_DELAY)], 0,
+			    UINT32_MAX / 60, &errstr);
+			if (errstr != NULL) {
+				cte_add(lineno, line);
+				break;
+			}
+
+			continue;
+		}
+
 		e = xmalloc(sizeof (struct event));
 		e->etype = CRONEVENT;
 
@@ -1258,6 +1279,8 @@ again:
 		e->of.ct.shell = dup_shared(shell);
 		/* set the home of this entry */
 		e->of.ct.home = dup_shared(home);
+		/* set the maximum random delay */
+		e->of.ct.max_random_delay = max_random_delay;
 		/* have the event point to it's owner	*/
 		e->u = u;
 		/* insert this event at the front of this user's event list */
@@ -1848,18 +1871,22 @@ recalc:
 static time_t
 next_time(struct event *e, time_t tflag)
 {
-	if (e->of.ct.tz != NULL) {
-		time_t ret;
+	time_t ret;
 
+	if (e->of.ct.tz != NULL) {
 		(void) putenv((char *)get_obj(e->of.ct.tz));
 		tzset();
 		ret = tz_next_time(e, tflag);
 		(void) putenv(tzone);
 		tzset();
-		return (ret);
 	} else {
-		return (tz_next_time(e, tflag));
+		ret = tz_next_time(e, tflag);
 	}
+
+	if (e->of.ct.max_random_delay > 0) {
+		ret += arc4random_uniform(e->of.ct.max_random_delay * 60 - 1);
+	}
+	return (ret);
 }
 
 /*
