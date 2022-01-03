@@ -16,4 +16,4 @@
 include ../Makefile.com
 include ../../Makefile.cmd.64
 
-install: all $(ROOTPROG64)
+install: all $(ROOTPROG)

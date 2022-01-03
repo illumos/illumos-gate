@@ -22,9 +22,7 @@ include ../../Makefile.cmd
 include ../../Makefile.ctf
 
 LDLIBS += -lficl-sys -ltecla -lumem
-CPPFLAGS += -D_FILE_OFFSET_BITS=64 -I$(SRC)/common/ficl
-
-SMOFF += all_func_returns
+CPPFLAGS += -I$(SRC)/common/ficl
 
 .KEEP_STATE:
 

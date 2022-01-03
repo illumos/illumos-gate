@@ -15,4 +15,6 @@
 
 include ../Makefile.com
 
+CPPFLAGS += -D_FILE_OFFSET_BITS=64
+
 install: all $(ROOTPROG32)

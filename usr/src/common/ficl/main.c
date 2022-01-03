@@ -42,6 +42,7 @@
 #include <unistd.h>
 #include <termios.h>
 #include <sys/errno.h>
+#include <err.h>
 
 #include <ficl.h>
 #include <ficlplatform/emu.h>
@@ -100,36 +101,39 @@ main(int argc, char **argv)
 			rows = ws.ws_row;
 	}
 
-	clearenv();
-	asprintf(&buffer, "%d", cols);
-	setenv("screen-#cols", buffer, 1);
+	(void) clearenv();
+	if (asprintf(&buffer, "%d", cols) < 0)
+		err(EXIT_FAILURE, NULL);
+	(void) setenv("screen-#cols", buffer, 1);
 	free(buffer);
-	asprintf(&buffer, "%d", rows);
-	setenv("screen-#rows", buffer, 1);
+	if (asprintf(&buffer, "%d", rows) < 0)
+		err(EXIT_FAILURE, NULL);
+	(void) setenv("screen-#rows", buffer, 1);
 	free(buffer);
 
 	if (getenv("prompt") == NULL)
-		setenv("prompt", "${interpret}", 1);
+		(void) setenv("prompt", "${interpret}", 1);
 	if (getenv("interpret") == NULL)
-		setenv("interpret", "ok", 1);
+		(void) setenv("interpret", "ok", 1);
 
 	if ((vm = bf_init("", NULL)) == NULL)
-		return (ENOMEM);
+		err(EXIT_FAILURE, NULL);
 	returnValue = ficlVmEvaluate(vm, ".ver cr quit");
 
 	/*
 	 * load files specified on command-line
 	 */
 	if (argc  > 1) {
-		asprintf(&buffer, ".( loading %s ) cr include %s\n cr",
-		    argv[1], argv[1]);
+		if (asprintf(&buffer, ".( loading %s ) cr include %s\n cr",
+		    argv[1], argv[1]) < 0)
+			err(EXIT_FAILURE, NULL);
 		returnValue = ficlVmEvaluate(vm, buffer);
 		free(buffer);
 	}
 
 	if ((gl = new_GetLine(LINELEN, HISTORY)) == NULL) {
 		bf_fini();
-		return (ENOMEM);
+		err(EXIT_FAILURE, NULL);
 	}
 
 	while (returnValue != FICL_VM_STATUS_USER_EXIT) {
@@ -140,5 +144,7 @@ main(int argc, char **argv)
 
 	gl = del_GetLine(gl);
 	bf_fini();
-	return (returnValue);
+	if (returnValue != FICL_VM_STATUS_USER_EXIT)
+		return (EXIT_FAILURE);
+	return (EXIT_SUCCESS);
 }

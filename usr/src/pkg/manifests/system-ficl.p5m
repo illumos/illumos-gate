@@ -18,6 +18,10 @@
 # global zone only.  See the include file for greater detail, as well as
 # information about overriding the defaults.
 #
+$(i386_ONLY) dir  path=usr/bin group=bin
+$(i386_ONLY) dir  path=usr/bin/$(ARCH32) group=bin
+$(i386_ONLY) file path=usr/bin/$(ARCH32)/ficl-sys group=sys mode=0555
+$(i386_ONLY) file path=usr/bin/ficl-sys group=sys mode=0555
 set name=pkg.fmri \
     value=pkg:/system/ficl@4.1.0,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="FICL Forth Implementation"
@@ -25,12 +29,6 @@ set name=pkg.description value="Forth Inspired Command Language"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 dir  path=usr group=sys
-dir  path=usr/bin group=bin
-dir  path=usr/bin/$(ARCH32) group=bin
-file path=usr/bin/$(ARCH32)/ficl-sys group=sys mode=0555
-dir  path=usr/bin/$(ARCH64) group=bin
-file path=usr/bin/$(ARCH64)/ficl-sys group=sys mode=0555
-hardlink path=usr/bin/ficl-sys target=../../usr/lib/isaexec
 dir  path=usr/lib group=bin
 dir  path=usr/lib/$(ARCH64) group=bin
 file path=usr/lib/$(ARCH64)/libficl-sys.so.4.1.0 group=sys mode=0755
