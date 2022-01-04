@@ -4,12 +4,11 @@ public Git repository at https://git.freebsd.org/src.git
 The bhyve kernel module and its associated userland consumers have been updated
 to the latest upstream FreeBSD sources as of:
 
-	commit 5ac4ac85ca20ce1f00c84502a65a3291bf416c18
-	Author: John Baldwin <jhb@FreeBSD.org>
-	Date:   Wed Sep 15 09:03:17 2021 -0700
+    commit 4558c11f1b4dfd7fd505d70b79467eb7f1193f07
+    Author: Mark Johnston <markj@FreeBSD.org>
+    Date:   Wed Jan 5 10:08:13 2022 -0500
 
-	    Remove an always-true check.
-	    This fixes a -Wtype-limits error from GCC 9.
+        bhyve: Correct unmapping of the MSI-X table BAR
 
 Divergence Notes:
 

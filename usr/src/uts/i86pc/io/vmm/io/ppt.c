@@ -322,21 +322,21 @@ ppt_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 }
 
 static int
-ppt_find_pba_bar(struct pptdev *ppt)
+ppt_find_msix_table_bar(struct pptdev *ppt)
 {
 	uint16_t base;
-	uint32_t pba_off;
+	uint32_t off;
 
 	if (PCI_CAP_LOCATE(ppt->pptd_cfg, PCI_CAP_ID_MSI_X, &base) !=
 	    DDI_SUCCESS)
 		return (-1);
 
-	pba_off = pci_config_get32(ppt->pptd_cfg, base + PCI_MSIX_PBA_OFFSET);
+	off = pci_config_get32(ppt->pptd_cfg, base + PCI_MSIX_TBL_OFFSET);
 
-	if (pba_off == PCI_EINVAL32)
+	if (off == PCI_EINVAL32)
 		return (-1);
 
-	return (pba_off & PCI_MSIX_PBA_BIR_MASK);
+	return (off & PCI_MSIX_TBL_BIR_MASK);
 }
 
 static int
@@ -361,7 +361,7 @@ ppt_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 	if (off < 0 || off != P2ALIGN(off, PAGESIZE))
 		return (EINVAL);
 
-	if ((bar = ppt_find_pba_bar(ppt)) == -1)
+	if ((bar = ppt_find_msix_table_bar(ppt)) == -1)
 		return (EINVAL);
 
 	ddireg = ppt->pptd_bars[bar].ddireg;
@@ -377,7 +377,6 @@ ppt_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 
 	return (err);
 }
-
 
 static void
 ppt_bar_wipe(struct pptdev *ppt)

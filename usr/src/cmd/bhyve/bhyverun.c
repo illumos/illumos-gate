@@ -240,11 +240,11 @@ usage(int code)
 #endif
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
 #ifdef	__FreeBSD__
-		"       %*s [-G port] [-k file] [-l lpc] [-m mem] [-o var=value]\n"
+		"       %*s [-G port] [-k config_file] [-l lpc] [-m mem] [-o var=value]\n"
 		"       %*s [-p vcpu:hostcpu] [-r file] [-s pci] [-U uuid] vmname\n"
 
 #else
-		"       %*s [-k <file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
+		"       %*s [-k <config_file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
 		"       %*s [-s <pci>] [-U uuid] vmname\n"
 #endif
 		"       -A: create ACPI tables\n"
@@ -1247,7 +1247,7 @@ do_open(const char *vmname)
 	bool reinit, romboot;
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_t rights;
-	const cap_ioctl_t *cmds;	
+	const cap_ioctl_t *cmds;
 	size_t ncmds;
 #endif
 
@@ -1297,7 +1297,7 @@ do_open(const char *vmname)
 
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_init(&rights, CAP_IOCTL, CAP_MMAP_RW);
-	if (caph_rights_limit(vm_get_device_fd(ctx), &rights) == -1) 
+	if (caph_rights_limit(vm_get_device_fd(ctx), &rights) == -1)
 		errx(EX_OSERR, "Unable to apply rights for sandbox");
 	vm_get_ioctls(&ncmds);
 	cmds = vm_get_ioctls(NULL);
@@ -1307,7 +1307,7 @@ do_open(const char *vmname)
 		errx(EX_OSERR, "Unable to apply rights for sandbox");
 	free((cap_ioctl_t *)cmds);
 #endif
- 
+
 	if (reinit) {
 #ifndef __FreeBSD__
 		error = vm_reinit(ctx, 0);
@@ -1532,7 +1532,7 @@ main(int argc, char *argv[])
 			set_config_bool("x86.mptable", false);
 			break;
 		case 'h':
-			usage(0);			
+			usage(0);
 		default:
 			usage(1);
 		}

@@ -143,7 +143,7 @@ struct blockif_ctxt {
 	struct mevent		*bc_resize_event;
 
 	/* Request elements and free/pending/busy queues */
-	TAILQ_HEAD(, blockif_elem) bc_freeq;       
+	TAILQ_HEAD(, blockif_elem) bc_freeq;
 	TAILQ_HEAD(, blockif_elem) bc_pendq;
 	TAILQ_HEAD(, blockif_elem) bc_busyq;
 	struct blockif_elem	bc_reqs[BLOCKIF_MAXREQ];
@@ -614,7 +614,7 @@ blockif_open(nvlist_t *nvl, const char *ident)
 
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_init(&rights, CAP_FSYNC, CAP_IOCTL, CAP_READ, CAP_SEEK,
-	    CAP_WRITE, CAP_FSTAT, CAP_EVENT);
+	    CAP_WRITE, CAP_FSTAT, CAP_EVENT, CAP_FPATHCONF);
 	if (ro)
 		cap_rights_clear(&rights, CAP_FSYNC, CAP_WRITE);
 
