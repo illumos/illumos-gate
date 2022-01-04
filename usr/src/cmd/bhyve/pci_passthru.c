@@ -662,6 +662,7 @@ passthru_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	struct passthru_softc *sc;
 	const char *path;
 
+	pptfd = -1;
 	sc = NULL;
 	error = 1;
 
@@ -700,7 +701,8 @@ passthru_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 done:
 	if (error) {
 		free(sc);
-		vm_unassign_pptdev(ctx, pptfd);
+		if (pptfd != -1)
+			vm_unassign_pptdev(ctx, pptfd);
 	}
 	return (error);
 }
@@ -733,10 +735,10 @@ msicap_access(struct passthru_softc *sc, int coff)
 static int
 msixcap_access(struct passthru_softc *sc, int coff)
 {
-	if (sc->psc_msix.capoff == 0) 
+	if (sc->psc_msix.capoff == 0)
 		return (0);
 
-	return (coff >= sc->psc_msix.capoff && 
+	return (coff >= sc->psc_msix.capoff &&
 	        coff < sc->psc_msix.capoff + MSIX_CAPLEN);
 }
 

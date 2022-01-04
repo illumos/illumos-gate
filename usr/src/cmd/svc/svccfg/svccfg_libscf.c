@@ -16254,7 +16254,7 @@ create_instance_list(scf_service_t *svc, int wohandcrafted)
 	scf_instance_t  *inst;
 	scf_iter_t	*inst_iter;
 	uu_list_t	*instances;
-	char		*instname;
+	char		*instname = NULL;
 	int		r;
 
 	inst_iter = scf_iter_create(g_hndl);

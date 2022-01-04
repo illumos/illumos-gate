@@ -4,15 +4,13 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved.  The Berkeley Software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <locale.h>
@@ -39,7 +37,7 @@ struct prefix
 {
 	double	factor;
 	char	*pname;
-} prefix[] = 
+} prefix[] =
 {
 	1e-21,	"zepto",
 	1e-24,	"yocto",
@@ -93,7 +91,7 @@ main(int argc, char *argv[])
 	char *file;
 	struct unit u1, u2;
 	double f;
-	
+
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
 #define TEXT_DOMAIN "SYS_TEST"
@@ -177,11 +175,12 @@ pu(int u, int i, int f)
 		if(f&2)
 			putchar('-');
 		if(unames[i])
-			printf("%s", unames[i]); else
+			printf("%s", unames[i]);
+		else
 			printf(gettext("*%c*"), i+'a');
 		if(u > 1)
 			putchar(u+'0');
-			return(2);
+		return(2);
 	}
 	if(u < 0)
 		return(1);
