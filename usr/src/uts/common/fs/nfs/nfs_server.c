@@ -24,6 +24,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2017 Joyent Inc
  * Copyright 2019 Nexenta by DDN, Inc.
+ * Copyright 2021 Racktop Systems, Inc.
  */
 
 /*
@@ -1363,11 +1364,6 @@ static struct rpc_disptable rfs_disptable[] = {
 static int nfs_portmon = 0;
 
 #ifdef DEBUG
-static int cred_hits = 0;
-static int cred_misses = 0;
-#endif
-
-#ifdef DEBUG
 /*
  * Debug code to allow disabling of rfs_dispatch() use of
  * fastxdrargs() and fastxdrres() calls for testing purposes.
@@ -1635,25 +1631,7 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 		else
 			anon_ok = 0;
 
-		cr = xprt->xp_cred;
-		ASSERT(cr != NULL);
-#ifdef DEBUG
-		{
-			if (crgetref(cr) != 1) {
-				crfree(cr);
-				cr = crget();
-				xprt->xp_cred = cr;
-				cred_misses++;
-			} else
-				cred_hits++;
-		}
-#else
-		if (crgetref(cr) != 1) {
-			crfree(cr);
-			cr = crget();
-			xprt->xp_cred = cr;
-		}
-#endif
+		cr = svc_xprt_cred(xprt);
 
 		exi = checkexport(fsid, xfid);
 

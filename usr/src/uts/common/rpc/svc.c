@@ -23,6 +23,7 @@
  * Copyright 2012 Marcel Telka <marcel@telka.sk>
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 Racktop Systems, Inc.
  */
 
 /*
@@ -2867,4 +2868,23 @@ rpc_msg_free(struct rpc_msg **msg, int cb_verf_oa_length)
 
 	kmem_free(m, sizeof (*m));
 	m = NULL;
+}
+
+/*
+ * Generally 'cr_ref' should be 1, otherwise reference is kept
+ * in underlying calls, so reset it.
+ */
+cred_t *
+svc_xprt_cred(SVCXPRT *xprt)
+{
+	cred_t *cr = xprt->xp_cred;
+
+	ASSERT(cr != NULL);
+
+	if (crgetref(cr) != 1) {
+		crfree(cr);
+		cr = crget();
+		xprt->xp_cred = cr;
+	}
+	return (cr);
 }

@@ -1,60 +1,50 @@
 #
-# CDDL HEADER START
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
 #
-# The contents of this file are subject to the terms of the
-# Common Development and Distribution License (the "License").
-# You may not use this file except in compliance with the License.
-#
-# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or http://www.opensolaris.org/os/licensing.
-# See the License for the specific language governing permissions
-# and limitations under the License.
-#
-# When distributing Covered Code, include this CDDL HEADER in each
-# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-# If applicable, add the following below this CDDL HEADER, with the
-# fields enclosed by brackets "[]" replaced with your own identifying
-# information: Portions Copyright [yyyy] [name of copyright owner]
-#
-# CDDL HEADER END
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
 #
 
 #
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri \
     value=pkg:/system/library/python/zfs$(PYTHON3_PKGVERS)@$(PKGVERS)
-set name=pkg.summary value="zfs module, python3"
+set name=pkg.summary value="zfs module, python $(PYTHON3_VERSION)"
 set name=pkg.description value="ZFS Python3 Module"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
 dir  path=usr group=sys
 dir  path=usr/lib
-$(python3_ONLY)dir path=usr/lib/python$(PYTHON3_VERSION)
-$(python3_ONLY)dir path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages
-$(python3_ONLY)dir path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__init__.py
-$(python3_ONLY)dir path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/__init__.cpython$(PYTHON3_PKGVERS).pyc
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/allow.cpython$(PYTHON3_PKGVERS).pyc
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/dataset.cpython$(PYTHON3_PKGVERS).pyc
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/groupspace.cpython$(PYTHON3_PKGVERS).pyc
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/holds.cpython$(PYTHON3_PKGVERS).pyc
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/table.cpython$(PYTHON3_PKGVERS).pyc
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/unallow.cpython$(PYTHON3_PKGVERS).pyc
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/userspace.cpython$(PYTHON3_PKGVERS).pyc
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/util.cpython$(PYTHON3_PKGVERS).pyc
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/allow.py
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/dataset.py
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/groupspace.py
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/holds.py
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/ioctl.so
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/table.py
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/unallow.py
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/userspace.py
-$(python3_ONLY)file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/util.py
+dir  path=usr/lib/python$(PYTHON3_VERSION)
+dir  path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages
+dir  path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__init__.py
+dir  path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/__init__.cpython$(PYTHON3_PKGVERS).pyc
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/allow.cpython$(PYTHON3_PKGVERS).pyc
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/dataset.cpython$(PYTHON3_PKGVERS).pyc
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/groupspace.cpython$(PYTHON3_PKGVERS).pyc
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/holds.cpython$(PYTHON3_PKGVERS).pyc
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/table.cpython$(PYTHON3_PKGVERS).pyc
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/unallow.cpython$(PYTHON3_PKGVERS).pyc
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/userspace.cpython$(PYTHON3_PKGVERS).pyc
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__/util.cpython$(PYTHON3_PKGVERS).pyc
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/allow.py
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/dataset.py
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/groupspace.py
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/holds.py
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/ioctl.so
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/table.py
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/unallow.py
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/userspace.py
+file path=usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/util.py
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-$(python3_ONLY)depend type=require fmri=runtime/python$(PYTHON3_PKGVERS)
+depend type=require fmri=runtime/python$(PYTHON3_PKGVERS)

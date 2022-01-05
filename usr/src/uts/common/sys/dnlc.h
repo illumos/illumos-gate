@@ -82,8 +82,13 @@ typedef struct ncache {
 	struct vnode *dp;		/* vnode of parent of name */
 	int hash;			/* hash signature */
 	uchar_t namlen;			/* length of name */
-	char name[1];			/* segment name - null terminated */
+	char name[];			/* segment name */
 } ncache_t;
+
+/*
+ * Produce size of struct ncache with space allocated in name string.
+ */
+#define	NCACHE_SIZE(namelen)	offsetof(ncache_t, name) + (namelen)
 
 /*
  * Hash table bucket structure of name cache entries for fast lookup.
@@ -214,8 +219,13 @@ typedef struct dcentry {
 	struct dcentry *de_next;	/* link to next name entry in bucket */
 	int de_hash;			/* hash signature */
 	uchar_t de_namelen;		/* length of name excluding null */
-	char de_name[1];		/* null terminated name */
+	char de_name[];			/* name */
 } dcentry_t;
+
+/*
+ * Produce size of struct dcentry with space allocated in name string.
+ */
+#define	DCENTTRY_SIZE(namelen)	offsetof(dcentry_t, de_name) + (namelen)
 
 typedef struct dircache {
 	struct dircache *dc_next;	/* chain - for purge purposes */
