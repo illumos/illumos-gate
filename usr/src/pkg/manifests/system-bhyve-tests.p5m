@@ -15,6 +15,7 @@
 
 #
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/bhyve/tests@$(PKGVERS)
@@ -23,6 +24,13 @@ set name=pkg.description value="BSD hypervisor tests"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Virtualization
 set name=variant.arch value=i386
+dir  path=opt/bhyve-tests
+dir  path=opt/bhyve-tests/bin
+file path=opt/bhyve-tests/bin/bhyvetest mode=0555
+dir  path=opt/bhyve-tests/runfiles
+file path=opt/bhyve-tests/runfiles/default.run mode=0444
+dir  path=opt/bhyve-tests/tests
+file path=opt/bhyve-tests/tests/memmap mode=0555
 dir  path=opt/bhyvetest
 dir  path=opt/bhyvetest/bin
 file path=opt/bhyvetest/bin/bhyvetest mode=0555
@@ -33,3 +41,5 @@ file path=opt/bhyvetest/tst/mevent/read.disable.exe mode=0555
 file path=opt/bhyvetest/tst/mevent/read.pause.exe mode=0555
 file path=opt/bhyvetest/tst/mevent/read.requeue.exe mode=0555
 license lic_CDDL license=lic_CDDL
+depend type=require fmri=system/bhyve
+depend type=require fmri=system/test/testrunner
