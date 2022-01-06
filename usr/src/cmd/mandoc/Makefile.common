@@ -74,12 +74,14 @@ OBJS=		arch.o		\
 		term_ascii.o	\
 		term_ps.o	\
 		term_tab.o	\
+		term_tag.o	\
 		tree.o
 
-OBJS +=		compat_ohash.o
+OBJS +=		compat_ohash.o compat_stringlist.o
 
-# XXX gcc 4.4.4 false positive
+# gcc 4.4.4 false positive
 roff.o :=	CERRWARN += $(CNOWARN_UNINIT)
+main.o :=	CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

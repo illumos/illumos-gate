@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #ifndef	_SYS_PCIE_H
@@ -588,6 +589,10 @@ extern "C" {
 #define	PCIE_EXT_CAP_ID_DOE		0x2E	/* Data Object Exchange */
 #define	PCIE_EXT_CAP_ID_DEV3		0x2F	/* Device 3 */
 #define	PCIE_EXT_CAP_ID_IDE		0x30	/* Integrity and Data Encr. */
+#define	PCIE_EXT_CAP_ID_PL64GT		0x31	/* Physical Layer 64.0 GT/s */
+#define	PCIE_EXT_CAP_ID_FLIT_LOG	0x32	/* Flit Logging */
+#define	PCIE_EXT_CAP_ID_FLIT_PERF	0x33	/* Flit Perf. Measurement */
+#define	PCIE_EXT_CAP_ID_FLIT_ERR	0x34	/* Flit Error Injection */
 
 /*
  * PCI-Express Advanced Error Reporting Extended Capability Offsets

@@ -1,301 +1,253 @@
-'\" te
+.\"
 .\" Copyright (c) 2006, Sun Microsystems, Inc.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HSFS 7FS "Nov 1, 2006"
-.SH NAME
-hsfs \- High Sierra & ISO 9660 CD-ROM file system
-.SH DESCRIPTION
-.sp
-.LP
-\fBHSFS\fR is a file system type that allows users to access files on High
-Sierra or  \fBISO\fR 9660 format \fBCD-ROM\fR disks from within the SunOS
-operating system. Once mounted, a \fBHSFS\fR file system provides standard
-SunOS read-only file system operations and semantics, meaning that you can read
-and list files in a directory on a High Sierra or \fBISO\fR 9660 \fBCD-ROM\fR
-and applications can use standard UNIX system calls on these files and
-directories.
-.sp
-.LP
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 1, 2006
+.Dt HSFS 7FS
+.Os
+.Sh NAME
+.Nm hsfs
+.Nd High Sierra & ISO 9660 CD-ROM file system
+.Sh DESCRIPTION
+.Nm
+is a file system type that allows users to access files on High Sierra or ISO
+9660 format CD-ROM disks from within the SunOS operating system.
+Once mounted, a
+.Nm
+file system provides standard read-only file system operations and semantics,
+meaning that you can read and list files in a directory on a High Sierra or ISO
+9660 CD-ROM and applications can use standard UNIX system calls on these files
+and directories.
+.Pp
 This file system contains support for Rock Ridge, ISO 9660 Version 2 and Joliet
-extensions. These extensions provide support for file names with a  length of
-at least 207 bytes, but only Rock Ridge extensions (with the exception of
-writability and hard links) can provide file system semantics and file types as
-they are found in UFS. The presence of Rock Ridge, ISO 9660 Version 2  and
-Joliet is autodetected and the best-suitable available extension is  used by
-the HSFS driver for file name and attribute lookup.
-.sp
-.LP
-If  your \fB/etc/vfstab\fR file contains a line similar to the following:
-.sp
-.in +2
-.nf
-/dev/dsk/c0t6d0s0 \(mi/hsfs hsfs \fB-no\fR ro
-.fi
-.in -2
-
-.sp
-.LP
-and \fB/hsfs\fR exists, you can mount an \fBHSFS\fR file system with either of
-the following commands:
-.sp
-.in +2
-.nf
-mount \fB-F\fR hsfs \fB-o\fR ro \fIdevice-special\fR \fIdirectory-name\fR
-.fi
-.in -2
-
-.sp
-.LP
+extensions.
+These extensions provide support for file names with a length of at least 207
+bytes, but only Rock Ridge extensions
+.Pq with the exception of writability and hard links
+can provide file system semantics and file types as they are found in UFS.
+The presence of Rock Ridge, ISO 9660 Version 2, and Joliet is autodetected and
+the best-suitable available extension is used by the HSFS driver for file name
+and attribute lookup.
+.Pp
+If your
+.Pa /etc/vfstab
+file contains a line similar to the following:
+.Bd -literal
+/dev/dsk/c0t6d0s0 - /hsfs hsfs - no ro
+.Ed
+.Pp
+and
+.Pa /hsfs
+exists, you can mount an
+.Nm
+file system with either of the following commands:
+.Bd -literal -offset indent
+mount -F hsfs -o ro device-special directory-name
+.Ed
 or
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
 mount /hsfs
-.fi
-.in -2
-
-.sp
-.LP
-By default, Rock Ridge extensions are used if available, otherwise  ISO 9660
-Version 2, then Joliet are used. If neither extension is present HSFS defaults
-to the standard capabilities of ISO  9660. Since so-called hybrid CD-ROMs that
-contain multiple extensions are possible,  you can use the following mount
-options to deliberately disable the  search for a specific extension or to
-force the use of a specific extension even if a preferable type is present:
-.sp
-.in +2
-.nf
-mount \fB-F\fR hsfs \fB-o\fR ro,nrr \fIdevice-special\fR \fIdirectory-name\fR
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
+By default, Rock Ridge extensions are used if available, otherwise ISO 9660
+Version 2, then Joliet are used.
+If neither extension is present HSFS defaults to the standard capabilities of
+ISO 9660.
+Since so-called hybrid CD-ROMs that contain multiple extensions are possible,
+you can use the following mount options to deliberately disable the search for a
+specific extension or to force the use of a specific extension even if a
+preferable type is present:
+.Bd -literal
+mount -F hsfs -o ro,nrr device-special directory-name
+.Ed
+.Pp
 Mount options are:
-.sp
-.LP
-rr\(emrequest HSFS to use Rock Ridge extensions, if present. This is the
-default  behavior and does not need to be explicitly specified.
-.sp
-.LP
-nrr\(emdisable detection and use of Rock Ridge extensions, even if present.
-.sp
-.LP
-vers2\(emrequest HSFS to use \fIISO 9660\fR Version 2 extensions, even if Rock
-Ridge is available.
-.sp
-.LP
-novers2\(emdisable detection and use of \fIISO 9660\fR Version 2 extensions.
-.sp
-.LP
-joliet\(emrequest HSFS to use Joliet extensions, even if Rock Ridge or \fIISO
-9660\fR Version 2 extensions are available.
-.sp
-.LP
-nojoliet\(emdisable detection and use of Joliet extensions.
-.sp
-.LP
-Files on a High Sierra or \fBISO\fR 9660 \fBCD-ROM\fR disk have names of the
-form \fIfilename.ext;version\fR, where  \fIfilename\fR and the optional
-\fIext\fR consist of a sequence of uppercase alphanumeric characters (including
-``_''), while the \fIversion\fR consists of a sequence of digits, representing
-the version number of  the file. \fBHSFS\fR converts all the uppercase
-characters in a file name to lowercase, and truncates the ``;'' and version
-information. If more than one version of a file is present on the
-\fBCD-ROM\fR, only the file with the highest version number is accessible.
-.sp
-.LP
+.Bl -tag -width Ds
+.It rr
+Request HSFS to use Rock Ridge extensions, if present.
+This is the default behavior and does not need to be explicitly specified.
+.It nrr
+Disable detection and use of Rock Ridge extensions, even if present.
+.It vers2
+Request HSFS to use ISO 9660 Version 2 extensions, even if Rock Ridge is
+available.
+.It novers2
+Disable detection and use of ISO 9660 Version 2 extensions.
+.It joliet
+Request HSFS to use Joliet extensions, even if Rock Ridge or ISO 9660 Version 2
+extensions are available.
+.It nojoliet
+Disable detection and use of Joliet extensions.
+.El
+.Pp
+Files on a High Sierra or ISO 9660 CD-ROM disk have names of the form
+.Pa filename.ext;versio ,
+where
+.Fa filename
+and the optional
+.Fa ext
+consist of a sequence of uppercase alphanumeric characters
+.Po
+including
+.Sq _
+.Pc ,
+while the
+.Fa version
+consists of a sequence of digits, representing the version number of the file.
+.Nm
+converts all the uppercase characters in a file name to lowercase, and truncates
+the
+.Sq ;
+and version information.
+If more than one version of a file is present on the CD-ROM, only the file with
+the highest version number is accessible.
+.Pp
 Conversion of uppercase to lowercase characters may be disabled by using the
-\fB-o\fR \fBnomaplcase\fR option to \fBmount\fR(1M). (See
-\fBmount_hsfs\fR(1M)).
-.sp
-.LP
-If the  \fBCD-ROM\fR contains Rock Ridge, ISO  9660 version 2 or Joliet
-extensions, the file names and directory names may contain any character
-supported under  \fBUFS.\fR The names may also be upper and/or lower case and
-are case sensitive. File name lengths can be as long as those of  \fBUFS\fR.
-.sp
-.LP
-Files accessed through \fBHSFS\fR have mode 555 (owner, group and world
-readable and executable),  uid 0 and gid 3. If a directory on the \fBCD-ROM\fR
-has read permission, \fBHSFS\fR grants execute permission to the directory,
-allowing it to be searched.
-.sp
-.LP
+.Fl o
+.Ar nomaplcase
+option to
+.Xr mount 1M .
+See
+.Xr mount_hsfs 1M .
+.Pp
+If the CD-ROM contains Rock Ridge, ISO 9660 version 2 or Joliet extensions, the
+file names and directory names may contain any character supported under
+.Xr UFS 7FS .
+The names may also be upper and/or lower case and are case sensitive.
+File name lengths can be as long as those of
+.Xr UFS 7FS .
+.Pp
+Files accessed through
+.Nm
+have mode 555
+.Pq owner, group and world readable and executable ,
+uid 0 and gid 3. If a directory on the CD-ROM has read permission,
+.Nm
+grants execute permission to the directory, allowing it to be searched.
+.Pp
 With Rock Ridge extensions, files and directories can have any permissions that
-are supported on a  \fBUFS\fR file system. However, under all write
-permissions, the file system is read-only, with \fBEROFS\fR returned to any
-write operations.
-.sp
-.LP
-Like High Sierra and \fBISO\fR 9660 \fBCD-ROMs\fR, HSFS supports only regular
-files and directories. A Rock Ridge \fBCD-ROM\fR can support regular files,
-directories, and symbolic links, as well as device nodes, such as block,
-character, and FIFO.
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRSample Display of File System Files
-.sp
-.LP
-If there is a file \fBBIG.BAR\fR on a High Sierra or \fBISO\fR 9660 format
-\fBCD-ROM\fR it will show up as \fBbig.bar\fR when listed on a \fBHSFS\fR file
-system.
-
-.sp
-.LP
+are supported on a
+.Xr UFS 7FS
+file system.
+However, under all write permissions, the file system is read-only, with
+.Er EROFS
+returned to any write operations.
+.Pp
+Like High Sierra and ISO 9660 CD-ROMs, HSFS supports only regular files and
+directories.
+A Rock Ridge CD-ROM can support regular files, directories, and symbolic links,
+as well as device nodes, such as block, character, and FIFO.
+.Sh EXAMPLES
+.Sy Example 1
+Sample Display of File System Files
+.Pp
+If there is a file
+.Pa BIG.BAR
+on a High Sierra or ISO 9660 format CD-ROM it will show up as
+.Pa big.bar
+when listed on a
+.Nm
+file system.
+.Pp
 If there are three files
-
-.sp
-.in +2
-.nf
-\fBBAR.BAZ;1\fR
-.fi
-.in -2
-
-.sp
-.in +2
-.nf
-\fBBAR.BAZ;2\fR
-.fi
-.in -2
-
-.sp
-.LP
+Pa BAR.BAZ;1 ,
+Pa BBAR.BAZ;2 ,
 and
-
-.sp
-.in +2
-.nf
-\fBBAR.BAZ;3\fR
-.fi
-.in -2
-
-.sp
-.LP
-on a High Sierra or \fBISO\fR 9660 format \fBCD-ROM,\fR only the file
-\fBBAR.BAZ;3\fR will be accessible. It will be listed as \fBbar.baz\fR.
-
-.SH SEE ALSO
-.sp
-.LP
-\fBmount\fR(1M), \fBmount_hsfs\fR(1M), \fBvfstab\fR(4)
-.sp
-.LP
-N. V. Phillips and Sony Corporation, \fISystem Description Compact Disc Digital
-Audio\fR, ("Red Book").
-.sp
-.LP
-N. V. Phillips and Sony Corporation, \fISystem Description of Compact Disc Read
-Only Memory\fR, ("Yellow Book").
-.sp
-.LP
-IR "Volume and File Structure of CD-ROM for Information Interchange", ISO
-9660:1988(E).
-.SH DIAGNOSTICS
-.sp
-.ne 2
-.na
-\fBhsfs: Warning: the file system... \fR
-.ad
-.br
-.na
-\fBdoes not conform to the ISO-9660 spec\fR
-.ad
-.sp .6
-.RS 4n
-The specific reason appears on the following line. You might be attempting to
-mount a \fBCD-ROM\fR containing a different file system, such as \fBUFS\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fBhsfs: Warning: the file system... \fR
-.ad
-.br
-.na
-\fBcontains a file [with an] unsupported type\fR
-.ad
-.sp .6
-.RS 4n
-The \fBhsfs\fR file system does not support the format of some file or
-directory on the \fBCD-ROM,\fR for example a record structured file.
-.RE
-
-.sp
-.ne 2
-.na
-\fBhsfs: hsnode table full, %d nodes allocated\fR
-.ad
-.sp .6
-.RS 4n
-There are not enough \fBHSFS\fR internal data structure elements to handle all
-the files currently open.  This problem may be overcome by adding a line of the
-form \fBset hsfs:nhsnode=\fR\fInumber\fR to the \fB/etc/system\fR system
-configuration file and rebooting.  See \fBsystem\fR(4).
-.RE
-
-.SH WARNINGS
-.sp
-.LP
-Do not physically eject a \fBCD-ROM\fR while the device is still mounted as a
-\fBHSFS\fR file system.
-.sp
-.LP
-Under \fBMS-DOS\fR (for which \fBCD-ROMs\fR are frequently targeted), files
-with no extension may be represented either as:
-.sp
-.in +2
-.nf
-\fIfilename.\fR
-.fi
-.in -2
-
-.sp
-.LP
+.Pa BAR.BAZ;3
+on a High Sierra or ISO 9660 format CD-ROM, only the file
+.Pa BAR.BAZ;3
+will be accessible.
+It will be listed as
+.Pa bar.baz .
+.Sh DIAGNOSTICS
+.Bl -tag -width Ds
+.It "hsfs: Warning: the file system...  does not conform to the ISO-9660 spec"
+The specific reason appears on the following line.
+You might be attempting to mount a CD-ROM containing a different file system,
+such as
+.Xr UFS 7FS
+.It "hsfs: Warning: the file system... contains a file [with an] unsupported"
+type"
+The
+.Nm
+file system does not support the format of some file or directory on the CD-ROM,
+for example a record structured file.
+.It "hsfs: hsnode table full, %d nodes allocated"
+There are not enough
+.Nm
+internal data structure elements to handle all the files currently open.
+This problem may be overcome by adding a line of the form
+.Ql set hsfs:nhsnode=number
+to the
+.Pa /etc/system
+system configuration file and rebooting.
+See
+.Xr system 4 .
+.El
+.Sh SEE ALSO
+.Xr mount 1M ,
+.Xr mount_hsfs 1M ,
+.Xr vfstab 4
+.Pp
+.Rs
+.%A N. V. Phillips
+.%A Sony Corporation
+.%T System Description Compact Disc Digital Audio, ("Red Book")
+.Re
+.Rs
+.%A N. V. Phillips
+.%A Sony Corporation
+.%T System Description of Compact Disc Read Only Memory, ("Yellow Book")
+.Re
+.Rs
+.%T Volume and File Structure of CD-ROM for Information Interchange
+.%N ISO 9660:1988(E)
+.Re
+.Sh WARNINGS
+Do not physically eject a CD-ROM while the device is still mounted as a
+.Nm
+file system.
+.Pp
+Under MS-DOS
+.Pq for which CD-ROMs are frequently targeted ,
+files with no extension may be represented either as:
+.Pa filename\&.
 or
-.sp
-.in +2
-.nf
-\fIfilename\fR
-.fi
-.in -2
-
-.sp
-.LP
-that is, with or without a trailing period. These names are not equivalent
-under UNIX systems. For example, the names:
-.sp
-.in +2
-.nf
-\fBBAR.\fR
-.fi
-.in -2
-
-.sp
-.LP
+.Pa filename
+that is, with or without a trailing period.
+These names are not equivalent under UNIX systems.
+For example, the names:
+.Pa BAR\&.
 and
-.sp
-.in +2
-.nf
-\fBBAR\fR
-.fi
-.in -2
-
-.sp
-.LP
-are not names for the same file under the UNIX system. This may cause confusion
-if you are consulting documentation for \fBCD-ROMs\fR originally intended for
-\fBMS-DOS\fR systems.
-.sp
-.LP
-Use of the \fB-o\fR \fBnotraildot\fR option to \fBmount\fR(1M) makes it
-optional to specify the trailing dot. (See \fBmount_hsfs\fR(1M)).
-.SH NOTES
-.sp
-.LP
-No translation of any sort is done on the contents of High Sierra or \fBISO\fR
-9660 format \fBCD-ROMs\fR; only directory and file names are subject to
-interpretation by \fBHSFS.\fR
+.Pa BAR
+are not names for the same file under the UNIX system.
+This may cause confusion if you are consulting documentation for CD-ROMs
+originally intended for MS-DOS systems.
+.Pp
+Use of the
+.Fl o
+.Ar notraildot
+option to
+.Xr mount 1M
+makes it optional to specify the trailing dot.
+See
+.Xr mount_hsfs 1M .
+.Sh NOTES
+No translation of any sort is done on the contents of High Sierra or ISO 9660
+format CD-ROMs; only directory and file names are subject to interpretation by
+.Nm .

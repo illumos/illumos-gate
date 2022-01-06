@@ -21,14 +21,8 @@ include		$(SRC)/tools/Makefile.tools
 include		$(CMDDIR)/Makefile.common
 
 CPPFLAGS +=	-_gcc=-nostdinc -I/usr/include -I$(ADJUNCT_PROTO)/usr/include
-CPPFLAGS +=	-I. -include fts.h
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 LDFLAGS +=	-L$(ADJUNCT_PROTO)/lib -R$(ADJUNCT_PROTO)/lib
-
-OBJS +=		fts.o \
-		reallocarray.o \
-		recallocarray.o \
-		strtonum.o
 
 # 3rd party code
 SMATCH=off

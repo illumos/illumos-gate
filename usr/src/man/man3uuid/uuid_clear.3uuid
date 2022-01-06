@@ -1,170 +1,246 @@
-'\" te
+.\"
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2014 Andrew Stormont.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UUID_CLEAR 3UUID "Apr 9, 2014"
-.SH NAME
-uuid_clear, uuid_compare, uuid_copy, uuid_generate, uuid_generate_random,
-uuid_generate_time, uuid_is_null, uuid_parse, uuid_time, uuid_unparse,
-uuid_unparse_lower, uuid_unparse_upper \- universally unique identifier (UUID)
-operations
-.SH SYNOPSIS
-.LP
-.nf
-cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-luuid\fR [ \fIlibrary \&.\|.\|.\fR ]
-#include <uuid/uuid.h>
-
-\fBvoid\fR \fBuuid_clear\fR(\fBuuid_t\fR \fIuu\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBuuid_compare\fR(\fBuuid_t\fR \fIuu1\fR, \fBuuid_t\fR \fIuu2\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBuuid_copy\fR(\fBuuid_t\fR \fIdst\fR, \fBuuid_t\fR \fIsrc\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBuuid_generate\fR(\fBuuid_t\fR \fIout\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBuuid_generate_random\fR(\fBuuid_t\fR \fIout\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBuuid_generate_time\fR(\fBuuid_t\fR \fIout\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBuuid_is_null\fR(\fBuuid_t\fR \fIuu\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBuuid_parse\fR(\fBchar *\fR\fIin\fR, \fBuuid_t\fR \fIuu\fR);
-.fi
-
-.LP
-.nf
-\fBtime_t\fR \fBuuid_time\fR(\fBuuid_t\fR \fIuu\fR, \fBstruct timeval *\fR\fIret_tv\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBuuid_unparse\fR(\fBuuid_t\fR \fIuu\fR, \fBchar *\fR\fIout\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBuuid_unparse_lower\fR(\fBuuid_t\fR \fIuu\fR, \fBchar *\fR\fIout\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBuuid_unparse_upper\fR(\fBuuid_t\fR \fIuu\fR, \fBchar *\fR\fIout\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBuuid_clear()\fR function sets the value of the specified universally
-unique identifier (UUID) variable \fIuu\fR to the \fINULL\fR value.
-.sp
-.LP
-The \fBuuid_compare()\fR function compares the two specified UUID variables
-\fIuu1\fR and \fIuu2\fR to each other. It returns an integer less than, equal
-to, or greater than zero if \fIuu1\fR is found to be, respectively,
-lexicographically less than, equal, or greater than \fIuu2\fR.
-.sp
-.LP
-The \fBuuid_copy()\fR function copies the UUID variable \fIsrc\fR to \fIdst\fR.
-.sp
-.LP
-The \fBuuid_generate()\fR function creates a new UUID that is generated based
-on high-quality randomness from \fB/dev/urandom\fR, if available. If
-\fB/dev/urandom\fR is not available, \fBuuid_generate()\fR calls
-\fBuuid_generate_time()\fR. Because the use of this algorithm provides
-information about when and where the UUID was generated, it could cause privacy
-problems for some applications.
-.sp
-.LP
-The \fBuuid_generate_random()\fR function produces a UUID with a random or
-pseudo-randomly generated time and Ethernet MAC address that corresponds to a
-DCE version 4 UUID.
-.sp
-.LP
-The \fBuuid_generate_time()\fR function uses the current time and the local
-Ethernet MAC address (if available, otherwise a MAC address is fabricated) that
-corresponds to a DCE version 1 UUID. If the UUID is not guaranteed to be
-unique, the multicast bit is set (the high-order bit of octet number 10).
-.sp
-.LP
-The \fBuuid_is_null()\fR function compares the value of the specified UUID
-variable \fIuu\fR to the \fINULL\fR value. If the value is equal to the
-\fINULL\fR UUID, 1 is returned. Otherwise 0 is returned.
-.sp
-.LP
-The \fBuuid_parse()\fR function converts the UUID string specified by \fIin\fR
-to the internal \fBuuid_t\fR format. The input UUID is a string of the form
-\fBcefa7a9c-1dd2-11b2-8350-880020adbeef\fR. In \fBprintf\fR(3C) format, the
-string is "\fB%08x-%04x-%04x-%04x-%012x\fR", 36 bytes plus the trailing null
-character. If the input string is parsed successfully, \fB0\fR is returned and
-the UUID is stored in the location pointed to by \fIuu\fR. Otherwise \fB-1\fR
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 30, 2021
+.Dt UUID_CLEAR 3UUID
+.Os
+.Sh NAME
+.Nm uuid_clear ,
+.Nm uuid_compare ,
+.Nm uuid_copy ,
+.Nm uuid_generate ,
+.Nm uuid_generate_random ,
+.Nm uuid_generate_time ,
+.Nm uuid_is_null ,
+.Nm uuid_parse ,
+.Nm uuid_time ,
+.Nm uuid_unparse ,
+.Nm uuid_unparse_lower ,
+.Nm uuid_unparse_upper
+.Nd universally unique identifier (UUID) operations
+.Sh LIBRARY
+.Lb libuuid
+.Sh SYNOPSIS
+.In uuid/uuid.h
+.Ft void
+.Fo uuid_clear
+.Fa "uuid_t uu"
+.Fc
+.Ft int
+.Fo uuid_compare
+.Fa "uuid_t uu1"
+.Fa "uuid_t uu2"
+.Fc
+.Ft void
+.Fo uuid_copy
+.Fa "uuid_t dst"
+.Fa "uuid_t src"
+.Fc
+.Ft void
+.Fo uuid_generate
+.Fa "uuid_t out"
+.Fc
+.Ft void
+.Fo uuid_generate_random
+.Fa "uuid_t out"
+.Fc
+.Ft void
+.Fo uuid_generate_time
+.Fa "uuid_t out"
+.Fc
+.Ft int
+.Fo uuid_is_null
+.Fa "uuid_t uu"
+.Fc
+.Ft int
+.Fo uuid_parse
+.Fa "char *int"
+.Fa "uuid_t uu"
+.Fc
+.Ft time_t
+.Fo uuid_time
+.Fa "uuid_t uu"
+.Fa "struct timeval *ret_tv"
+.Fc
+.Ft void
+.Fo uuid_unparse
+.Fa "uuid_t uu"
+.Fa "char *out"
+.Fc
+.Ft void
+.Fo uuid_unparse_lower
+.Fa "uuid_t uu"
+.Fa "char *out"
+.Fc
+.Ft void
+.Fo uuid_unparse_upper
+.Fa "uuid_t uu"
+.Fa "char *out"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn uuid_clear
+function sets the value of the specified universally unique identifier
+.Pq UUID
+variable
+.Fa uu
+to the NULL value.
+.Pp
+The
+.Fn uuid_compare
+function compares the two specified UUID variables
+.Fa uu1
+and
+.Fa uu2
+to each other.
+It returns an integer less than, equal to, or greater than zero if
+.Fa uu1
+is found to be, respectively, lexicographically less than, equal, or greater
+than
+.Fa uu2 .
+.Pp
+The
+.Fn uuid_copy
+function copies the UUID variable
+.Fa src
+to
+.Fa dst .
+.Pp
+The
+.Fn uuid_generate
+and
+.Fn uuid_generate_random
+functions create a new UUID that is generated based on high-quality randomness
+utilizing the
+.Xr arc4random 3C
+function.
+These correspond to a DCE version 4 UUID.
+On some implementations it is possible that the
+.Fn uuid_generate
+function will fall back to generating a version 1 UUID.
+While in our current implementation this is not possible, applications should
+not assume a guaranteed format when calling the
+.Fn uuid_generate
+function.
+.Pp
+The
+.Fn uuid_generate_time
+function uses the current time and the local Ethernet MAC address
+.Pq if available, otherwise a MAC address is fabricated
+that corresponds to a DCE version 1 UUID.
+If the UUID is not guaranteed to be unique, the multicast bit is set
+.Pq the high-order bit of octet number 10 .
+.Pp
+The
+.Fn uuid_is_null
+function compares the value of the specified UUID variable
+.Fa uu
+to the NULL value.
+If the value is equal to the NULL UUID,
+.Sy 1
 is returned.
-.sp
-.LP
-The \fBuuid_time()\fR function extracts the time at which the specified UUID
-\fIuu\fR was created. Since the UUID creation time is encoded within the UUID,
-this function can reasonably be expected to extract the creation time only for
-UUIDs created with the \fBuuid_generate_time()\fR function. The time at which
-the UUID was created, in seconds since January 1, 1970 GMT (the epoch), is
-returned (see \fBtime\fR(2)). The time at which the UUID was created, in
-seconds and microseconds since the epoch is also stored in the location pointed
-to by \fBret_tv\fR (see \fBgettimeofday\fR(3C)).
-.sp
-.LP
-The \fBuuid_unparse()\fR and \fBuuid_unparse_lower()\fR functions convert the
-specified UUID \fIuu\fR from the internal binary format to a lower case string
-of the length defined in the \fBuuid.h\fR macro,
-\fBUUID_PRINTABLE_STRING_LENGTH\fR, which includes the trailing null character.
-The resulting value is stored in the character string pointed to by \fIout\fR.
-.sp
-.LP
-The \fBuuid_unparse_upper()\fR function converts the specified UUID \fIuu\fR
+Otherwise
+.Sy 0
+is returned.
+.Pp
+The
+.Fn uuid_parse
+function converts the UUID string specified by
+.Fa in
+to the internal
+.Vt uuid_t
+format.
+The input UUID is a string of the form
+.Sy cefa7a9c-1dd2-11b2-8350-880020adbeef .
+In
+.Xr printf 3C
+format, the string is
+.Dq Sy %08x-%04x-%04x-%04x-%012x ,
+36 bytes plus the trailing null character.
+If the input string is parsed successfully,
+.Sy 0
+is returned and the UUID is stored in the location pointed to by
+.Fa uu .
+Otherwise
+.Sy -1
+is returned.
+.Pp
+The
+.Fn uuid_time
+function extracts the time at which the specified UUID
+.Fa uu
+was created.
+Since the UUID creation time is encoded within the UUID, this function can
+reasonably be expected to extract the creation time only for UUIDs created with
+the
+.Fn uuid_generate_time
+function.
+The time at which the UUID was created, in seconds since January 1, 1970 GMT
+.Pq the epoch ,
+is returned
+.Po
+see
+.Xr time 2
+.Pc .
+The time at which the UUID was created, in seconds and microseconds since the
+epoch is also stored in the location pointed to by
+.Fa ret_tv
+.Po
+see
+.Xr gettimeofday 3C
+.Pc .
+.Pp
+The
+.Fn uuid_unparse
+and
+.Fn uuid_unparse_lower
+functions convert the specified UUID
+.Fa uu
+from the internal binary format to a lower case string of the length defined in
+the
+.In uuid/uuid.h
+macro,
+.Dv UUID_PRINTABLE_STRING_LENGTH ,
+which includes the trailing null character.
+The resulting value is stored in the character string pointed to by
+.Fa out .
+.Pp
+The uuid_unparse_upper
+function converts the specified UUID
+.Fa uu
 from the internal binary format to a upper case string of the length defined in
-the \fBuuid.h\fR macro, \fBUUID_PRINTABLE_STRING_LENGTH\fR, which includes the
-trailing null character. The resulting value is stored in the character string
-pointed to by \fIout\fR.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Evolving
-_
-MT-Level	Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBinetd\fR(1M), \fBtime\fR(2), \fBgettimeofday\fR(3C), \fBlibuuid\fR(3LIB),
-\fBprintf\fR(3C), \fBattributes\fR(5)
+the
+.In uuid/uuid.h
+macro,
+.Dv UUID_PRINTABLE_STRING_LENGTH ,
+which includes the trailing null character.
+The resulting value is stored in the character string pointed to by
+.Fa out .
+.Sh INTERFACE STABILITY
+.Sy Evolving
+.Sh MT-LEVEL
+.Sy Safe
+.Sh SEE ALSO
+.Xr time 2 ,
+.Xr arc4random 3C ,
+.Xr gettimeofday 3C ,
+.Xr printf 3C ,
+.Xr libuuid 3LIB ,
+.Xr attributes 5

@@ -1,145 +1,190 @@
-'\" te
+.\"
 .\" Copyright (c) 1990, Sun Microsystems, Inc.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TMPFS 7FS "Oct 9, 1990"
-.SH NAME
-tmpfs \- memory based file system
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/mount.h>
-
-\fB\fR\fBmount\fR (\fB\fR\fIspecial\fR, \fB\fR\fIdirectory\fR, \fB\fR\fIMS_DATA\fR, \fB\fR\fI"tmpfs"\fR, \fB\fR\fINULL\fR, \fB\fR\fI0\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-\fBtmpfs\fR is a memory based file system which uses kernel resources relating
-to the \fBVM\fR system and page cache as a file system. Once mounted, a
-\fBtmpfs\fR file system provides standard file operations and semantics.
-\fBtmpfs\fR is so named because files and directories are not preserved across
-reboot or unmounts, all files residing on a  \fBtmpfs\fR file system that is
-unmounted will be lost.
-.sp
-.LP
-\fBtmpfs\fR file systems can be mounted with the command:
-.sp
-.in +2
-.nf
-\fBmount \fR\fB-F\fR\fB tmpfs swap \fR\fIdirectory\fR
-.fi
-.in -2
-
-.sp
-.LP
-Alternatively, to mount a  \fBtmpfs\fR file system on \fB/tmp\fR at multi-user
-startup time (maximizing possible performance improvements), add the following
-line to \fB/etc/vfstab\fR:
-.sp
-.in +2
-.nf
-\fBswap \(mi/tmp tmpfs \(mi yes \(mi\fR
-.fi
-.in -2
-
-.sp
-.LP
-\fBtmpfs\fR is designed as a performance enhancement which is achieved by
-caching the writes to files residing on a  \fBtmpfs\fR file system. Performance
-improvements are most noticeable when a large number of short lived files are
-written and accessed on a \fBtmpfs\fR file system. Large compilations with
-\fBtmpfs\fR mounted on \fB/tmp\fR are a good example of this.
-.sp
-.LP
-Users of \fBtmpfs\fR should be aware of some constraints involved in mounting a
-\fBtmpfs\fR file system. The resources used by \fBtmpfs\fR are the same as
-those used when commands are executed (for example, swap space allocation).
-This means that  large sized  \fBtmpfs\fR files can affect the amount of space
-left over for programs to execute. Likewise, programs requiring large amounts
-of memory use up the space available to \fBtmpfs\fR. Users running into this
-constraint (for example, running out of space on \fBtmpfs\fR) can allocate more
-swap space by using the \fBswap\fR(1M) command.
-.sp
-.LP
-Another constraint is that the number of files available in a  \fBtmpfs\fR file
-system is calculated based on the physical memory of the machine  and not the
-size of the swap device/partition. If you have too many files, \fBtmpfs\fR will
-print a warning message and you will be unable to create new files. You cannot
-increase this limit by adding swap space.
-.sp
-.LP
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd October 9, 1990
+.Dt TMPFS 7FS
+.Os
+.Sh NAME
+.Nm tmpfs
+.Nd memory based file system
+.Sh SYNOPSIS
+.In sys/mount.h
+.Fo mount
+.Fa "const char *special"
+.Fa "const char *directory"
+.Fa IMS_DATA
+.Fa \(dqtmpfs\(dq
+.Fa NULL
+.Fa 0
+.Fc
+.Sh DESCRIPTION
+.Nm
+is a memory based file system which uses kernel resources relating to the VM
+system and page cache as a file system.
+Once mounted, a
+.Nm
+file system provides standard file operations and semantics.
+.Nm
+is so named because files and directories are not preserved across
+reboot or unmounts, all files residing on a
+.Nm
+file system that is unmounted will be lost.
+.Pp
+.Nm
+file systems can be mounted with the command:
+.Bd -literal -offset indent
+mount -F tmpfs swap directory
+.Ed
+.Pp
+Alternatively, to mount a
+.Nm
+file system on
+.Pa /tmp
+at multi-user startup time
+.Pq maximizing possible performance improvements  ,
+add the following line to
+.Pa /etc/vfstab :
+.Bd -literal -offset indent
+swap \(mi/tmp tmpfs \(mi yes \(mi
+.Ed
+.Pp
+.Nm
+is designed as a performance enhancement which is achieved by caching the writes
+to files residing on a
+.Nm
+file system.
+Performance improvements are most noticeable when a large number of short lived
+files are written and accessed on a
+.Nm
+file system.
+Large compilations with
+.Nm
+mounted on
+.Pa /tmp
+are a good example of this.
+.Pp
+Users of
+.Nm
+should be aware of some constraints involved in mounting a
+.Nm
+file system.
+The resources used by
+.Nm
+are the same as those used when commands are executed
+.Pq for example, swap space allocation .
+This means that large sized
+.Nm
+files can affect the amount of space left over for programs to execute.
+Likewise, programs requiring large amounts of memory use up the space available
+to
+.Nm
+Users running into this constraint
+.Po
+for example, running out of space on
+.Nm
+.Pc
+can allocate more swap space by using the
+.Xr swap 1M
+command.
+.Pp
+Another constraint is that the number of files available in a
+.Nm
+file system is calculated based on the physical memory of the machine and not
+the size of the swap device/partition.
+If you have too many files,
+.Nm
+will print a warning message and you will be unable to create new files.
+You cannot increase this limit by adding swap space.
+.Pp
 Normal file system writes are scheduled to be written to a permanent storage
-medium along with all control information associated with the file (for
-example, modification time, file permissions). \fBtmpfs\fR control information
-resides only in memory and never needs to be written to permanent storage. File
-data remains in core until memory demands are sufficient to cause pages
-associated with \fBtmpfs\fR to be reused at which time they are copied out to
-swap.
-.sp
-.LP
-An additional mount option can be specified to control the size of an
-individual \fBtmpfs\fR file system.
-.SH SEE ALSO
-.sp
-.LP
-\fBdf\fR(1M), \fBmount\fR(1M), \fBmount_tmpfs\fR(1M), \fBswap\fR(1M),
-\fBmmap\fR(2), \fBmount\fR(2), \fBumount\fR(2), \fBvfstab\fR(4)
-.sp
-.LP
-\fISystem Administration Guide: Basic Administration\fR
-.SH DIAGNOSTICS
-.sp
-.LP
-If \fBtmpfs\fR runs out of space, one of the following messages will display in
-the console.
-.sp
-.ne 2
-.na
-\fB\fB\fIdirectory\fR: File system full, swap space limit exceeded\fR\fR
-.ad
-.sp .6
-.RS 4n
+medium along with all control information associated with the file
+.Pq for example, modification time, file permissions .
+.Nm
+control information resides only in memory and never needs to be written to
+permanent storage.
+File data remains in core until memory demands are sufficient to cause pages
+associated with
+.Nm
+to be reused at which time they are copied out to swap.
+.Pp
+An additional mount option can be specified to control the size of an individual
+.Nm
+file system.
+See
+.Xr mount_tmpfs 1M
+for more details.
+.Sh DIAGNOSTICS
+If
+.Nm
+runs out of space, one of the following messages will display in the console.
+.Bl -tag -width Ds
+.It "directory: File system full, swap space limit exceeded"
 This message appears because a page could not be allocated while writing to a
-file. This can occur if \fBtmpfs\fR is attempting to write more than it is
-allowed, or if currently executing programs are using a lot of memory. To make
-more space available, remove unnecessary files, exit from some programs, or
-allocate more swap space using \fBswap\fR(1M).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB\fIdirectory\fR: File system full, memory allocation failed\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBtmpfs\fR ran out of physical memory while attempting to create a new file or
-directory. Remove unnecessary files or directories or install more physical
-memory.
-.RE
-
-.SH WARNINGS
-.sp
-.LP
-Files and directories on a \fBtmpfs\fR file system are not preserved across
-reboots or unmounts. Command scripts or programs which count on this will not
-work as expected.
-.SH NOTES
-.sp
-.LP
-Compilers do not necessarily use \fB/tmp\fR to write intermediate files
-therefore missing some significant performance benefits. This can be remedied
-by setting the environment variable \fBTMPDIR\fR to \fB/tmp\fR. Compilers use
+file.
+This can occur if
+.Nm
+is attempting to write more than it is allowed, or if currently executing
+programs are using a lot of memory.
+To make more space available, remove unnecessary files, exit from some programs,
+or allocate more swap space using
+.Xr swap 1M .
+.It "directory: File system full, memory allocation failed"
+.Nm
+ran out of physical memory while attempting to create a new file or
+directory.
+Remove unnecessary files or directories or install more physical memory.
+.El
+.Sh SEE ALSO
+.Xr df 1M ,
+.Xr mount 1M ,
+.Xr mount_tmpfs 1M ,
+.Xr swap 1M ,
+.Xr mmap 2 ,
+.Xr mount 2 ,
+.Xr umount 2 ,
+.Xr vfstab 4
+.Sh WARNINGS
+Files and directories on a
+.Nm
+file system are not preserved across reboots or unmounts.
+Command scripts or programs which count on this will not work as expected.
+.Sh NOTES
+Compilers do not necessarily use
+/tmp
+to write intermediate files therefore missing some significant performance
+benefits.
+This can be remedied by setting the environment variable
+.Ev TMPDIR to
+.Pa /tmp .
+Compilers use
 the value in this environment variable as the name of the directory to store
 intermediate files.
-.sp
-.LP
-\fBswap\fR to a \fBtmpfs\fR file is not supported.
-.sp
-.LP
-\fBdf\fR(1M) output is of limited accuracy since a \fBtmpfs\fR file system size
-is not static and the space available to \fBtmpfs\fR is dependent on the swap
-space demands of the entire system.
+.Pp
+.Sy swap
+to a
+.Nm
+file is not supported.
+.Pp
+.Xr df 1M
+output is of limited accuracy since a
+.Nm
+file system size
+is not static and the space available to
+.Nm
+is dependent on the swap space demands of the entire system.

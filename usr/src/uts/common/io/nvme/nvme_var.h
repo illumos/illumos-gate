@@ -14,6 +14,7 @@
  * Copyright 2016 The MathWorks, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation.
+ * Copyright 2021 Oxide Computer Company.
  */
 
 #ifndef _NVME_VAR_H
@@ -87,6 +88,7 @@ struct nvme_cmd {
 	uint16_t nc_sqid;
 
 	nvme_dma_t *nc_dma;
+	nvme_dma_t *nc_prp; /* DMA for PRP lists */
 
 	kmutex_t nc_mutex;
 	kcondvar_t nc_cv;

@@ -1,7 +1,7 @@
-/*	$Id: mandoc_msg.c,v 1.6 2019/03/06 15:55:38 schwarze Exp $ */
+/* $OpenBSD: mandoc_msg.c,v 1.8 2020/01/19 17:59:01 schwarze Exp $ */
 /*
+ * Copyright (c) 2014-2021 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2010, 2011 Kristaps Dzonsons <kristaps@bsd.lv>
- * Copyright (c) 2014,2015,2016,2017,2018 Ingo Schwarze <schwarze@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,6 +14,8 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * Implementation of warning and error messages for mandoc(1).
  */
 #include "config.h"
 
@@ -29,8 +31,8 @@ static	const enum mandocerr lowest_type[MANDOCLEVEL_MAX] = {
 	MANDOCERR_WARNING,
 	MANDOCERR_ERROR,
 	MANDOCERR_UNSUPP,
-	MANDOCERR_MAX,
-	MANDOCERR_MAX
+	MANDOCERR_BADARG,
+	MANDOCERR_SYSERR
 };
 
 static	const char *const level_name[MANDOCLEVEL_MAX] = {
@@ -53,11 +55,10 @@ static	const char *const type_message[MANDOCERR_MAX] = {
 	"unknown architecture",
 	"operating system explicitly specified",
 	"RCS id missing",
-	"referenced manual not found",
 
 	"generic style suggestion",
 
-	"legacy man(7) date format",
+	"legacy man(5) date format",
 	"normalizing date format to",
 	"lower case character in document title",
 	"duplicate RCS id",
@@ -67,10 +68,12 @@ static	const char *const type_message[MANDOCERR_MAX] = {
 	"consider using OS macro",
 	"errnos out of order",
 	"duplicate errno",
+	"referenced manual not found",
 	"trailing delimiter",
 	"no blank before trailing delimiter",
 	"fill mode already enabled, skipping",
 	"fill mode already disabled, skipping",
+	"input text line longer than 80 bytes",
 	"verbatim \"--\", maybe consider using \\(em",
 	"function name without markup",
 	"whitespace at end of input line",
@@ -83,7 +86,8 @@ static	const char *const type_message[MANDOCERR_MAX] = {
 	"missing manual title, using \"\"",
 	"missing manual section, using \"\"",
 	"unknown manual section",
-	"missing date, using today's date",
+	"filename/section mismatch",
+	"missing date, using \"\"",
 	"cannot parse date, using it verbatim",
 	"date in the future, using it anyway",
 	"missing Os macro, using \"\"",
@@ -187,13 +191,13 @@ static	const char *const type_message[MANDOCERR_MAX] = {
 	"empty tbl layout",
 	"invalid character in tbl layout",
 	"unmatched parenthesis in tbl layout",
+	"ignoring excessive spacing in tbl layout",
 	"tbl without any data cells",
 	"ignoring data in spanned tbl cell",
 	"ignoring extra tbl data cells",
 	"data block open at end of tbl",
 
 	/* related to document structure and macros */
-	NULL,
 	"duplicate prologue macro",
 	"skipping late title macro",
 	"input stack limit exceeded, infinite loop?",
@@ -224,6 +228,7 @@ static	const char *const type_message[MANDOCERR_MAX] = {
 	"excessive shift",
 	"NOT IMPLEMENTED: .so with absolute path or \"..\"",
 	".so request failed",
+	"skipping tag containing whitespace",
 	"skipping all arguments",
 	"skipping excess arguments",
 	"divide by zero",
@@ -240,11 +245,43 @@ static	const char *const type_message[MANDOCERR_MAX] = {
 	"eqn delim option in tbl",
 	"unsupported tbl layout modifier",
 	"ignoring macro in table",
+	"skipping tbl in -Tman mode",
+	"skipping eqn in -Tman mode",
+
+	/* bad command line arguments */
+	NULL,
+	"bad command line argument",
+	"duplicate command line argument",
+	"option has a superfluous value",
+	"missing option value",
+	"bad option value",
+	"duplicate option value",
+	"no such tag",
+	"-Tmarkdown unsupported for man(5) input",
+
+	/* system errors */
+	NULL,
+	"dup",
+	"exec",
+	"fdopen",
+	"fflush",
+	"fork",
+	"fstat",
+	"getline",
+	"glob",
+	"gzclose",
+	"gzdopen",
+	"mkstemp",
+	"open",
+	"pledge",
+	"read",
+	"wait",
+	"write",
 };
 
 static	FILE		*fileptr = NULL;
 static	const char	*filename = NULL;
-static	enum mandocerr	 min_type = MANDOCERR_MAX;
+static	enum mandocerr	 min_type = MANDOCERR_BADARG;
 static	enum mandoclevel rc = MANDOCLEVEL_OK;
 
 
@@ -297,10 +334,10 @@ mandoc_msg(enum mandocerr t, int line, int col, const char *fmt, ...)
 	va_list			 ap;
 	enum mandoclevel	 level;
 
-	if (t < min_type && t != MANDOCERR_FILE)
+	if (t < min_type)
 		return;
 
-	level = MANDOCLEVEL_UNSUPP;
+	level = MANDOCLEVEL_SYSERR;
 	while (t < lowest_type[level])
 		level--;
 	mandoc_msg_setrc(level);
@@ -326,4 +363,13 @@ mandoc_msg(enum mandocerr t, int line, int col, const char *fmt, ...)
 		va_end(ap);
 	}
 	fputc('\n', fileptr);
+}
+
+void
+mandoc_msg_summary(void)
+{
+	if (fileptr != NULL && rc != MANDOCLEVEL_OK)
+		fprintf(fileptr,
+		    "%s: see above the output for %s messages\n",
+		    getprogname(), level_name[rc]);
 }

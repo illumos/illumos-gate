@@ -106,7 +106,7 @@ patch64(Elf64_Ehdr *eh)
 {
 	Elf64_Phdr		*phdr;
 	caddr_t			phdrs = NULL;
-	int			ndx, mem, mem2;
+	unsigned		ndx, mem, mem2;
 	multiboot_header_t	*mbh;
 	multiboot2_header_t	*mbh2;
 

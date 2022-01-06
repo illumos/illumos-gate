@@ -1,7 +1,7 @@
-/*	$Id: man_term.c,v 1.228 2019/01/05 21:18:26 schwarze Exp $ */
+/* $Id: man_term.c,v 1.236 2021/06/28 19:50:15 schwarze Exp $ */
 /*
+ * Copyright (c) 2010-2015, 2017-2020 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2008-2012 Kristaps Dzonsons <kristaps@bsd.lv>
- * Copyright (c) 2010-2015, 2017-2019 Ingo Schwarze <schwarze@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,6 +14,9 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * Plain text formatter for man(7), used by mandoc(1)
+ * for ASCII, UTF-8, PostScript, and PDF output.
  */
 #include "config.h"
 
@@ -27,10 +30,12 @@
 #include <string.h>
 
 #include "mandoc_aux.h"
+#include "mandoc.h"
 #include "roff.h"
 #include "man.h"
 #include "out.h"
 #include "term.h"
+#include "term_tag.h"
 #include "main.h"
 
 #define	MAXMARGINS	  64 /* maximum number of indented scopes */
@@ -62,7 +67,7 @@ static	void		  print_man_head(struct termp *,
 static	void		  print_man_foot(struct termp *,
 				const struct roff_meta *);
 static	void		  print_bvspace(struct termp *,
-				const struct roff_node *, int);
+				struct roff_node *, int);
 
 static	int		  pre_B(DECL_ARGS);
 static	int		  pre_DT(DECL_ARGS);
@@ -146,7 +151,7 @@ terminal_man(void *arg, const struct roff_meta *man)
 {
 	struct mtermp		 mt;
 	struct termp		*p;
-	struct roff_node	*n;
+	struct roff_node	*n, *nc, *nn;
 	size_t			 save_defindent;
 
 	p = (struct termp *)arg;
@@ -165,18 +170,23 @@ terminal_man(void *arg, const struct roff_meta *man)
 
 	n = man->first->child;
 	if (p->synopsisonly) {
-		while (n != NULL) {
-			if (n->tok == MAN_SH &&
-			    n->child->child->type == ROFFT_TEXT &&
-			    !strcmp(n->child->child->string, "SYNOPSIS")) {
-				if (n->child->next->child != NULL)
-					print_man_nodelist(p, &mt,
-					    n->child->next->child, man);
-				term_newln(p);
+		for (nn = NULL; n != NULL; n = n->next) {
+			if (n->tok != MAN_SH)
+				continue;
+			nc = n->child->child;
+			if (nc->type != ROFFT_TEXT)
+				continue;
+			if (strcmp(nc->string, "SYNOPSIS") == 0)
 				break;
-			}
-			n = n->next;
+			if (nn == NULL && strcmp(nc->string, "NAME") == 0)
+				nn = n;
 		}
+		if (n == NULL)
+			n = nn;
+		p->flags |= TERMP_NOSPACE;
+		if (n != NULL && (n = n->child->next->child) != NULL)
+			print_man_nodelist(p, &mt, n, man);
+		term_newln(p);
 	} else {
 		term_begin(p, print_man_head, print_man_foot, man);
 		p->flags |= TERMP_NOSPACE;
@@ -196,19 +206,20 @@ terminal_man(void *arg, const struct roff_meta *man)
  * first, print it.
  */
 static void
-print_bvspace(struct termp *p, const struct roff_node *n, int pardist)
+print_bvspace(struct termp *p, struct roff_node *n, int pardist)
 {
-	int	 i;
+	struct roff_node	*nch;
+	int			 i;
 
 	term_newln(p);
 
-	if (n->body != NULL && n->body->child != NULL)
-		if (n->body->child->type == ROFFT_TBL)
-			return;
+	if (n->body != NULL &&
+	    (nch = roff_node_child(n->body)) != NULL &&
+	    nch->type == ROFFT_TBL)
+		return;
 
-	if (n->parent->type == ROFFT_ROOT || n->parent->tok != MAN_RS)
-		if (n->prev == NULL)
-			return;
+	if (n->parent->tok != MAN_RS && roff_node_prev(n) == NULL)
+		return;
 
 	for (i = 0; i < pardist; i++)
 		term_vspace(p);
@@ -660,12 +671,8 @@ pre_SS(DECL_ARGS)
 		 * and after an empty subsection.
 		 */
 
-		do {
-			n = n->prev;
-		} while (n != NULL && n->tok >= MAN_TH &&
-		    man_term_act(n->tok)->flags & MAN_NOTEXT);
-		if (n == NULL || n->type == ROFFT_COMMENT ||
-		    (n->tok == MAN_SS && n->body->child == NULL))
+		if ((n = roff_node_prev(n)) == NULL ||
+		    (n->tok == MAN_SS && roff_node_child(n->body) == NULL))
 			break;
 
 		for (i = 0; i < mt->pardist; i++)
@@ -705,12 +712,8 @@ pre_SH(DECL_ARGS)
 		 * and after an empty section.
 		 */
 
-		do {
-			n = n->prev;
-		} while (n != NULL && n->tok >= MAN_TH &&
-		    man_term_act(n->tok)->flags & MAN_NOTEXT);
-		if (n == NULL || n->type == ROFFT_COMMENT ||
-		    (n->tok == MAN_SH && n->body->child == NULL))
+		if ((n = roff_node_prev(n)) == NULL ||
+		    (n->tok == MAN_SH && roff_node_child(n->body) == NULL))
 			break;
 
 		for (i = 0; i < mt->pardist; i++)
@@ -816,7 +819,7 @@ pre_SY(DECL_ARGS)
 
 	switch (n->type) {
 	case ROFFT_BLOCK:
-		if (n->prev == NULL || n->prev->tok != MAN_SY)
+		if ((nn = roff_node_prev(n)) == NULL || nn->tok != MAN_SY)
 			print_bvspace(p, n, mt->pardist);
 		return 1;
 	case ROFFT_HEAD:
@@ -896,6 +899,9 @@ print_man_node(DECL_ARGS)
 {
 	const struct man_term_act *act;
 	int c;
+
+	if (n->flags & NODE_ID)
+		term_tag_write(n, p->line);
 
 	switch (n->type) {
 	case ROFFT_TEXT:
@@ -1015,10 +1021,6 @@ print_man_foot(struct termp *p, const struct roff_meta *meta)
 	 */
 
 	if ( ! p->mdocstyle) {
-		if (meta->hasbody) {
-			term_vspace(p);
-			term_vspace(p);
-		}
 		mandoc_asprintf(&title, "%s(%s)",
 		    meta->title, meta->msec);
 	} else if (meta->os != NULL) {
@@ -1137,9 +1139,5 @@ print_man_head(struct termp *p, const struct roff_meta *meta)
 	 */
 
 	term_vspace(p);
-	if ( ! p->mdocstyle) {
-		term_vspace(p);
-		term_vspace(p);
-	}
 	free(title);
 }

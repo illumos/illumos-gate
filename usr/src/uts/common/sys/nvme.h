@@ -52,7 +52,8 @@ extern "C" {
 #define	NVME_IOC_ATTACH			(NVME_IOC | 10)
 #define	NVME_IOC_FIRMWARE_DOWNLOAD	(NVME_IOC | 11)
 #define	NVME_IOC_FIRMWARE_COMMIT	(NVME_IOC | 12)
-#define	NVME_IOC_MAX			NVME_IOC_FIRMWARE_COMMIT
+#define	NVME_IOC_PASSTHRU		(NVME_IOC | 13)
+#define	NVME_IOC_MAX			NVME_IOC_PASSTHRU
 
 #define	IS_NVME_IOC(x)			((x) > NVME_IOC && (x) <= NVME_IOC_MAX)
 #define	NVME_IOC_CMD(x)			((x) & 0xff)
@@ -945,6 +946,65 @@ typedef union {
 #define	NVME_CQE_SC_INT_NVM_REF_TAG	0x84	/* Reference Tag Check Err */
 #define	NVME_CQE_SC_INT_NVM_COMPARE	0x85	/* Compare Failure */
 #define	NVME_CQE_SC_INT_NVM_ACCESS	0x86	/* Access Denied */
+
+/* Flags for NVMe passthru commands. */
+#define	NVME_PASSTHRU_READ	0x1 /* Read from device */
+#define	NVME_PASSTHRU_WRITE	0x2 /* Write to device */
+
+/* Error codes for NVMe passthru command validation. */
+/* Must be sizeof(nvme_passthru_cmd_t) */
+#define	NVME_PASSTHRU_ERR_CMD_SIZE	0x01
+#define	NVME_PASSTHRU_ERR_NOT_SUPPORTED	0x02	/* Not supported on device */
+#define	NVME_PASSTHRU_ERR_INVALID_OPCODE	0x03
+#define	NVME_PASSTHRU_ERR_READ_AND_WRITE	0x04	/* Must read ^ write */
+#define	NVME_PASSTHRU_ERR_INVALID_TIMEOUT	0x05
+
+/*
+ * Must be
+ * - multiple of 4 bytes in length
+ * - non-null iff length is non-zero
+ * - null if neither reading nor writing
+ * - non-null if either reading or writing
+ * - <= `nvme_vendor_specific_admin_cmd_size` in length, 16 MiB
+ * - <= UINT32_MAX in length
+ */
+#define	NVME_PASSTHRU_ERR_INVALID_BUFFER	0x06
+
+
+/* Generic struct for passing through vendor-unique commands to a device. */
+typedef struct {
+	uint8_t npc_opcode;	/* Command opcode. */
+	uint8_t npc_status;	/* Command completion status code. */
+	uint8_t npc_err;	/* Error-code if validation fails. */
+	uint8_t npc_rsvd0;	/* Align to 4 bytes */
+	uint32_t npc_timeout;	/* Command timeout, in seconds. */
+	uint32_t npc_flags;	/* Flags for the command. */
+	uint32_t npc_cdw0;	/* Command-specific result DWord 0 */
+	uint32_t npc_cdw12;	/* Command-specific DWord 12 */
+	uint32_t npc_cdw13;	/* Command-specific DWord 13 */
+	uint32_t npc_cdw14;	/* Command-specific DWord 14 */
+	uint32_t npc_cdw15;	/* Command-specific DWord 15 */
+	size_t npc_buflen;	/* Size of npc_buf. */
+	uintptr_t npc_buf;	/* I/O source or destination */
+} nvme_passthru_cmd_t;
+
+#ifdef _KERNEL
+typedef struct {
+	uint8_t npc_opcode;	/* Command opcode. */
+	uint8_t npc_status;	/* Command completion status code. */
+	uint8_t npc_err;	/* Error-code if validation fails. */
+	uint8_t npc_rsvd0;	/* Align to 4 bytes */
+	uint32_t npc_timeout;	/* Command timeout, in seconds. */
+	uint32_t npc_flags;	/* Flags for the command. */
+	uint32_t npc_cdw0;	/* Command-specific result DWord 0 */
+	uint32_t npc_cdw12;	/* Command-specific DWord 12 */
+	uint32_t npc_cdw13;	/* Command-specific DWord 13 */
+	uint32_t npc_cdw14;	/* Command-specific DWord 14 */
+	uint32_t npc_cdw15;	/* Command-specific DWord 15 */
+	size32_t npc_buflen;	/* Size of npc_buf. */
+	uintptr32_t npc_buf;	/* I/O source or destination */
+} nvme_passthru_cmd32_t;
+#endif
 
 #ifdef __cplusplus
 }

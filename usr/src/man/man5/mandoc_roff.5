@@ -1,4 +1,4 @@
-.\"	$Id: roff.7,v 1.111 2019/01/01 03:45:29 schwarze Exp $
+.\"	$Id: roff.7,v 1.116 2021/09/18 12:23:06 schwarze Exp $
 .\"
 .\" Copyright (c) 2010, 2011, 2012 Kristaps Dzonsons <kristaps@bsd.lv>
 .\" Copyright (c) 2010-2019 Ingo Schwarze <schwarze@openbsd.org>
@@ -15,7 +15,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: January 1 2019 $
+.Dd $Mdocdate: September 18 2021 $
 .Dt ROFF 5
 .Os
 .Sh NAME
@@ -315,12 +315,18 @@ delimiters
 The proper spacing is also intelligently preserved if a sentence ends at
 the boundary of a macro line.
 .Pp
+If an input line happens to end with a period, exclamation or question
+mark that isn't the end of a sentence, append a zero-width space
+.Pq Sq \e& .
+.Pp
 Examples:
 .Bd -literal -offset indent -compact
 Do not end sentences mid-line like this.  Instead,
 end a sentence like this.
 A macro would end like this:
 \&.Xr mandoc 1 \&.
+An abbreviation at the end of an input line needs escaping, e.g.\e&
+like this.
 .Ed
 .Sh REQUEST SYNTAX
 A request or macro line consists of:
@@ -503,10 +509,9 @@ This is a Heirloom extension and currently unsupported.
 .It Ic \&br
 Break the output line.
 .It Ic \&break
-Break out of a
+Break out of the innermost
 .Ic \&while
 loop.
-Currently unsupported.
 .It Ic \&breakchar Ar char ...
 Optional line break characters.
 This is a Heirloom extension and currently ignored.
@@ -619,7 +624,7 @@ Its syntax can be either
 .Pp
 or
 .Bd -literal -offset indent
-.Pf . Ic \&de Ar macroname Ar endmacro
+.Pf . Ic \&de Ar macroname endmacro
 .Ar definition
 .Pf . Ar endmacro
 .Ed
@@ -1306,7 +1311,7 @@ Change the output line length.
 If the
 .Ar width
 argument is omitted, the line length is reset to its previous value.
-The default setting for terminal output is 58n.
+The default setting for terminal output is 78n.
 If a sign is given, the line length is added to or subtracted from;
 otherwise, it is set to the provided value.
 Using this request in new manuals is discouraged for several reasons,
@@ -1815,7 +1820,7 @@ Each number may be followed by one optional scaling unit described below
 .Sx Scaling Widths .
 The following equations hold:
 .Bd -literal -offset indent
-1i = 6v = 6P = 10m = 10n = 52p = 1000M = 240u = 240
+1i = 6v = 6P = 10m = 10n = 72p = 1000M = 240u = 240
 254c = 100i = 24000u = 24000
 1f = 65536u = 65536
 .Ed
@@ -2326,7 +2331,7 @@ for
 .At v2 ,
 then ported nroff to C as troff, which Brian W. Kernighan released with
 .At v7 .
-In 1989, James Clarke re-implemented troff in C++, naming it groff.
+In 1989, James Clark re-implemented troff in C++, naming it groff.
 .Sh AUTHORS
 .An -nosplit
 This
