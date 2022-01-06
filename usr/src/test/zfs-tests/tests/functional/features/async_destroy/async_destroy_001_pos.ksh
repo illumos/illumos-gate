@@ -71,6 +71,7 @@ log_must dd bs=1024k count=128 if=/dev/zero of=/$TEST_FS/file
 #
 log_must set_max_blocks 0t100
 
+sync_all_pools
 log_must zfs destroy $TEST_FS
 
 #

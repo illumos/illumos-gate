@@ -62,7 +62,7 @@ log_must user_run $PUSER mkdir $PRJDIR
 # log_must chattr +P -p $PRJID1 $PRJDIR
 log_must zfs project -s -p $PRJID1 $PRJDIR
 log_must user_run $PUSER mkfile 100m $PRJDIR/qf
-sync
+sync_all_pools
 
 log_note "set projectquota at a smaller size than its current usage"
 log_must zfs set projectquota@$PRJID1=90m $QFS

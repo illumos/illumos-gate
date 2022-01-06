@@ -40,6 +40,7 @@ ret=$?
 
 (( $ret != $ENOSPC )) && \
     log_fail "$TESTFILE0 returned: $ret rather than ENOSPC."
+sync_all_pools true
 
 log_mustnot_expect space zfs create $TESTPOOL/$TESTFS/subfs
 log_mustnot_expect space zfs clone $TESTPOOL/$TESTFS@snap $TESTPOOL/clone

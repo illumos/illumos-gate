@@ -70,7 +70,7 @@ log_must zpool create $TESTPOOL "$LARGEFILE"
 fsize=$(( floor(LARGESIZE * 0.80) ))
 cnt=$((fsize / 1048576))
 log_must dd if=/dev/urandom of=/$TESTPOOL/file bs=1048576 count=$cnt
-log_must zpool sync
+sync_all_pools
 
 new_size=$(du "$LARGEFILE" | cut -f1)
 new_size=$((new_size * 512))
@@ -95,7 +95,7 @@ log_must set_tunable32 zfs_trim_metaslab_skip 1
 log_must zpool trim $TESTPOOL
 log_must set_tunable32 zfs_trim_metaslab_skip 0
 
-log_must zpool sync
+sync_all_pools
 while [[ "$(trim_progress $TESTPOOL $LARGEFILE)" -lt "100" ]]; do
 	sleep 0.5
 done
@@ -109,7 +109,7 @@ log_must test $new_size -gt $LARGESIZE
 # space usage of the new metaslabs.
 log_must zpool trim $TESTPOOL
 
-log_must zpool sync
+sync_all_pools
 while [[ "$(trim_progress $TESTPOOL $LARGEFILE)" -lt "100" ]]; do
 	sleep 0.5
 done

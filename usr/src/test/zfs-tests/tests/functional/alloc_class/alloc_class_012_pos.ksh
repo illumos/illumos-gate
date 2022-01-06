@@ -84,7 +84,7 @@ for i in 1 2 3 4; do
 	    count=$blocks
 	((blocks = blocks + 25))
 done
-log_must sync_pool $TESTPOOL
+sync_pool $TESTPOOL
 log_must zpool list -v $TESTPOOL
 
 # Verify the files were written in the special class vdevs
@@ -101,7 +101,7 @@ log_must zpool remove $TESTPOOL $CLASS_DISK0
 log_must zfs remap $TESTPOOL/$TESTFS
 
 sleep 5
-log_must sync_pool $TESTPOOL
+sync_pool $TESTPOOL
 sleep 1
 
 log_must zdb -bbcc $TESTPOOL
