@@ -2067,7 +2067,7 @@ be_has_menu_entry(char *be_dataset, char *be_root_pool, int *entry)
 {
 	zfs_handle_t *zhp = NULL;
 	char		menu_file[MAXPATHLEN];
-	FILE		*menu_fp;
+	FILE		*menu_fp = NULL;
 	char		line[BUFSIZ];
 	char		*last;
 	char		*rpool_mntpnt = NULL;
@@ -2139,7 +2139,6 @@ be_has_menu_entry(char *be_dataset, char *be_root_pool, int *entry)
 				tok = strtok_r(last, BE_WHITE_SPACE, &last);
 				if (tok != NULL && strcmp(tok,
 				    be_dataset) == 0) {
-					(void) fclose(menu_fp);
 					/*
 					 * The entry number needs to be
 					 * decremented here because the title

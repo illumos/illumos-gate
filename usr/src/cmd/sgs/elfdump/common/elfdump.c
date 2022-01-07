@@ -133,7 +133,7 @@ typedef struct {
 		uint_t	n;		/* # items in shxndx.data */
 	} shxndx;
 	VERSYM_STATE	*versym;	/* NULL, or associated VERSYM section */
-	Sym 		*sym;		/* Array of symbols */
+	Sym		*sym;		/* Array of symbols */
 	Word		symn;		/* # of symbols */
 } SYMTBL_STATE;
 
@@ -1575,7 +1575,7 @@ cap_section(const char *file, Cache *cache, Word shnum, Cache *ccache,
 	    ((ehdr->e_type == ET_EXEC) || (ehdr->e_type == ET_DYN))) {
 		Capinfo		*cip;
 		Capchain	*chain;
-		Cache   	*chcache;
+		Cache		*chcache;
 		Shdr		*chshdr;
 		Word		chainnum, inum;
 
@@ -1965,7 +1965,7 @@ syminfo(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 	Elf_syminfo_title(0);
 
 	for (ndx = 1, info++; ndx < infonum; ndx++, info++) {
-		Sym 		*sym;
+		Sym		*sym;
 		const char	*needed, *name;
 		Word		expect_dt;
 		Word		boundto = info->si_boundto;
@@ -2135,7 +2135,7 @@ version_def(Verdef *vdf, Word vdf_num, Cache *vcache, Cache *scache,
  *	contain the largest version index seen.
  *
  * note:
- * 	The versym section of an object that follows the original
+ *	The versym section of an object that follows the original
  *	Solaris versioning rules only contains indexes into the verdef
  *	section. Symbols defined in other objects (UNDEF) are given
  *	a version of 0, indicating that they are not defined by
@@ -3028,7 +3028,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 		case _sec_type: \
 			if (sec._sec_field == NULL) \
 				sec._sec_field = _cache; \
-				break
+			break
 		GRAB(SHT_SYMTAB,	symtab);
 		GRAB(SHT_DYNSYM,	dynsym);
 		GRAB(SHT_FINI_ARRAY,	fini_array);

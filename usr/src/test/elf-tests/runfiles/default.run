@@ -45,7 +45,7 @@ tests = ['mixed-hidden-comdat']
 
 [/opt/elf-tests/tests/sections/shf-exclude]
 arch = i86pc
-tests = ['exclude-kmod', 'exclude-exec', 'exclude-so', 'include-reloc']
+tests = ['exclude-kmod', 'exclude-exec', 'exclude-so', 'include-reloc', 'unknown-os']
 
 [/opt/elf-tests/tests/string-merge/]
 tests = ['simple']

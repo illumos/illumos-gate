@@ -17,7 +17,8 @@ include $(SRC)/test/Makefile.com
 PROG =	exclude-kmod	\
 	exclude-so	\
 	exclude-exec	\
-	include-reloc
+	include-reloc	\
+	unknown-os
 
 DATAFILES =	Makefile.test exclude.s stub.c
 

@@ -1402,7 +1402,7 @@ attrVal(char *msg, char *attrName, char *def, char *attrs) {
 	return (val);
 }
 
-extern bool_t	xdr_nis_object(register XDR *xdrs, nis_object *objp);
+extern bool_t	xdr_nis_object(XDR *xdrs, nis_object *objp);
 
 /*
  * Copy an XDR:ed version of the NIS+ object 'o' (or the one indicated

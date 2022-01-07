@@ -3075,10 +3075,11 @@ static char stdtabs[] = {
 
 
 static int
-stdtab(char option[], char tabvect[NTABS])
+stdtab(char *option, char *tabvect)
 {
 	char *scan;
-	tabvect[0] = 0;
+
+	tabvect[0] = '\0';
 	scan = stdtabs;
 	while (*scan) {
 		if (strequal(&scan, option)) {
