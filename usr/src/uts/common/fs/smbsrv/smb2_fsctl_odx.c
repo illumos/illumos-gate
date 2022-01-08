@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018-2021 Tintri by DDN, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -197,7 +198,7 @@ smb2_fsctl_odx_read(smb_request_t *sr, smb_fsctl_t *fsctl)
 	int rc;
 
 	if (smb2_odx_enable == 0)
-		return (NT_STATUS_NOT_SUPPORTED);
+		return (NT_STATUS_INVALID_DEVICE_REQUEST);
 
 	/*
 	 * Make sure the (src) ofile granted access allows read.
@@ -391,7 +392,7 @@ smb2_fsctl_odx_write(smb_request_t *sr, smb_fsctl_t *fsctl)
 	args.out_struct_size = 16;
 
 	if (smb2_odx_enable == 0)
-		return (NT_STATUS_NOT_SUPPORTED);
+		return (NT_STATUS_INVALID_DEVICE_REQUEST);
 
 	/*
 	 * Make sure the (dst) ofile granted_access allows write.

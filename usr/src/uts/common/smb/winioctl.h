@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 #ifndef _SMB_WINIOCTL_H
 #define	_SMB_WINIOCTL_H
@@ -482,6 +483,9 @@ extern "C" {
 		FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 #define	FSCTL_QUERY_FILE_REGIONS \
 	CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 161, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+#define	FSCTL_REFS_STREAM_SNAPSHOT_MANAGEMENT \
+	CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 272, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 /* FILE_DEVICE_NETWORK_FILE_SYSTEM */
 /* Read the snapshot info for Volume Shadow Copy Services */

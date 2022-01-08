@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -32,6 +33,15 @@
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/ntifs.h>
 
+/*
+ * MS-FSA 2.1.5.20 Server Requests Querying Quota Information
+ *
+ * Support for this operation is optional. If the object store does not
+ * implement this functionality, the operation MUST be failed with
+ * STATUS_INVALID_DEVICE_REQUEST
+ *
+ * Similar to smb_nt_transact_query_quota()
+ */
 uint32_t
 smb2_qinfo_quota(smb_request_t *sr, smb_queryinfo_t *qi)
 {
@@ -49,11 +59,11 @@ smb2_qinfo_quota(smb_request_t *sr, smb_queryinfo_t *qi)
 	bzero(&reply, sizeof (smb_quota_response_t));
 
 	if (!smb_tree_has_feature(sr->tid_tree, SMB_TREE_QUOTA))
-		return (NT_STATUS_NOT_SUPPORTED);
+		return (NT_STATUS_INVALID_DEVICE_REQUEST);
 
 	if ((ofile->f_node == NULL) ||
 	    (ofile->f_ftype != SMB_FTYPE_DISK))
-		return (NT_STATUS_NOT_SUPPORTED);
+		return (NT_STATUS_INVALID_DEVICE_REQUEST);
 
 	rc = smb_mbc_decodef(
 	    &sr->smb_data, "bb..lll",

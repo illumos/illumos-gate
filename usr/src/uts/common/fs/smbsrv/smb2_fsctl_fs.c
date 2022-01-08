@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -23,10 +24,6 @@
 #include <smbsrv/smb_fsops.h>
 #include <smb/winioctl.h>
 
-/*
- * XXX: Should use smb2_fsctl_invalid in place of smb2_fsctl_notsup
- * but that will require some re-testing.
- */
 static uint32_t
 smb2_fsctl_invalid(smb_request_t *sr, smb_fsctl_t *fsctl)
 {
@@ -40,7 +37,7 @@ smb2_fsctl_notsup(smb_request_t *sr, smb_fsctl_t *fsctl)
 }
 
 /*
- * Same as smb2_fsctl_notsup, but make some noise (if DEBUG)
+ * Same as smb2_fsctl_invalid, but make some noise (if DEBUG)
  * so we'll learn about new fsctl codes clients start using.
  */
 /* ARGSUSED */
@@ -50,7 +47,7 @@ smb2_fsctl_unknown(smb_request_t *sr, smb_fsctl_t *fsctl)
 #ifdef	DEBUG
 	cmn_err(CE_NOTE, "smb2_fsctl_unknown: code 0x%x", fsctl->CtlCode);
 #endif
-	return (NT_STATUS_NOT_SUPPORTED);
+	return (NT_STATUS_INVALID_DEVICE_REQUEST);
 }
 
 /*
@@ -145,7 +142,7 @@ smb2_fsctl_fs(smb_request_t *sr, smb_fsctl_t *fsctl)
 		break;
 	case FSCTL_SET_REPARSE_POINT:		/* 41 */
 	case FSCTL_GET_REPARSE_POINT:		/* 42 */
-		func = smb2_fsctl_notsup;
+		func = smb2_fsctl_invalid;
 		break;
 	case FSCTL_CREATE_OR_GET_OBJECT_ID:	/* 48 */
 		func = smb2_fsctl_invalid;
@@ -160,7 +157,7 @@ smb2_fsctl_fs(smb_request_t *sr, smb_fsctl_t *fsctl)
 		func = smb2_fsctl_query_alloc_ranges;
 		break;
 	case FSCTL_FILE_LEVEL_TRIM:		/* 130 */
-		func = smb2_fsctl_notsup;
+		func = smb2_fsctl_invalid;
 		break;
 	case FSCTL_OFFLOAD_READ:		/* 153 */
 		func = smb2_fsctl_odx_read;
@@ -168,11 +165,17 @@ smb2_fsctl_fs(smb_request_t *sr, smb_fsctl_t *fsctl)
 	case FSCTL_OFFLOAD_WRITE:		/* 154 */
 		func = smb2_fsctl_odx_write;
 		break;
+	case FSCTL_GET_INTEGRITY_INFORMATION:	/* 159 */
 	case FSCTL_SET_INTEGRITY_INFORMATION:	/* 160 */
-		func = smb2_fsctl_notsup;
+		func = smb2_fsctl_invalid;
 		break;
 	case FSCTL_QUERY_FILE_REGIONS:		/* 161 */
 		func = smb2_fsctl_query_file_regions;
+		break;
+
+	case FSCTL_REFS_STREAM_SNAPSHOT_MANAGEMENT:
+		/* WPTS wants NOT_SUPPORTED here. */
+		func = smb2_fsctl_notsup;
 		break;
 
 	default:
@@ -213,14 +216,14 @@ smb2_fsctl_netfs(smb_request_t *sr, smb_fsctl_t *fsctl)
 		func = smb2_fsctl_copychunk;
 		break;
 	case FSCTL_SRV_READ_HASH:		/* 0x6e */
-		func = smb2_fsctl_notsup;
+		func = smb2_fsctl_invalid;
 		break;
 	case FSCTL_LMR_REQUEST_RESILIENCY:	/* 0x75 */
 		func = smb2_fsctl_set_resilient;
 		break;
 	case FSCTL_QUERY_NETWORK_INTERFACE_INFO: /* 0x7f */
 		need_disk_file = B_FALSE;
-		func = smb2_fsctl_notsup;
+		func = smb2_fsctl_invalid;
 		break;
 	case FSCTL_VALIDATE_NEGOTIATE_INFO:	/* 0x81 */
 		need_disk_file = B_FALSE;
