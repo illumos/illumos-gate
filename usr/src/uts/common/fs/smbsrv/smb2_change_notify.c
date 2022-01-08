@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -80,8 +81,10 @@ smb2_change_notify(smb_request_t *sr)
 	if (iFlags & SMB2_WATCH_TREE)
 		CompletionFilter |= FILE_NOTIFY_CHANGE_EV_SUBDIR;
 
-	if (oBufLength > smb2_max_trans)
-		oBufLength = smb2_max_trans;
+	if (oBufLength > smb2_max_trans) {
+		status = NT_STATUS_INVALID_PARAMETER;
+		goto errout;
+	}
 
 	/*
 	 * Check for events and consume, non-blocking.
