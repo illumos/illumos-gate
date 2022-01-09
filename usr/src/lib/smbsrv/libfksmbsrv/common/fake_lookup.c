@@ -22,10 +22,11 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -56,6 +57,91 @@
 #include <sys/zone.h>
 #include <sys/dnlc.h>
 #include <sys/fs/snode.h>
+
+int
+lookupname(
+	char *fnamep,
+	enum uio_seg seg,
+	int followlink,
+	vnode_t **dirvpp,
+	vnode_t **compvpp)
+{
+	return (lookupnameatcred(fnamep, seg, followlink, dirvpp, compvpp, NULL,
+	    CRED()));
+}
+
+/*
+ * Lookup the user file name,
+ * Handle allocation and freeing of pathname buffer, return error.
+ */
+int
+lookupnameatcred(
+	char *fnamep,			/* user pathname */
+	enum uio_seg seg,		/* addr space that name is in */
+	int followlink,			/* follow sym links */
+	vnode_t **dirvpp,		/* ret for ptr to parent dir vnode */
+	vnode_t **compvpp,		/* ret for ptr to component vnode */
+	vnode_t *startvp,		/* start path search from vp */
+	cred_t *cr)			/* credential */
+{
+	char namebuf[TYPICALMAXPATHLEN];
+	struct pathname lookpn;
+	int error;
+
+	error = pn_get_buf(fnamep, seg, &lookpn, namebuf, sizeof (namebuf));
+	if (error == 0) {
+		error = lookuppnatcred(&lookpn, NULL, followlink,
+		    dirvpp, compvpp, startvp, cr);
+	}
+	if (error == ENAMETOOLONG) {
+		/*
+		 * This thread used a pathname > TYPICALMAXPATHLEN bytes long.
+		 */
+		if ((error = pn_get(fnamep, seg, &lookpn)) != 0)
+			return (error);
+		error = lookuppnatcred(&lookpn, NULL, followlink,
+		    dirvpp, compvpp, startvp, cr);
+		pn_free(&lookpn);
+	}
+
+	return (error);
+}
+
+/*
+ * Lookup the user file name from a given vp, using a specific credential.
+ */
+int
+lookuppnatcred(
+	struct pathname *pnp,		/* pathname to lookup */
+	struct pathname *rpnp,		/* if non-NULL, return resolved path */
+	int followlink,			/* (don't) follow sym links */
+	vnode_t **dirvpp,		/* ptr for parent vnode */
+	vnode_t **compvpp,		/* ptr for entry vnode */
+	vnode_t *startvp,		/* start search from this vp */
+	cred_t *cr)			/* user credential */
+{
+	vnode_t *vp;	/* current directory vp */
+	vnode_t *rootvp;
+
+	if (pnp->pn_pathlen == 0)
+		return (ENOENT);
+
+	/* Simplified for fake_... */
+	vp = rootvp = rootdir;
+
+	/*
+	 * Skip over leading slashes
+	 */
+	if (pnp->pn_path[0] == '/') {
+		do {
+			pnp->pn_path++;
+			pnp->pn_pathlen--;
+		} while (pnp->pn_path[0] == '/');
+	}
+
+	return (lookuppnvp(pnp, rpnp, followlink, dirvpp,
+	    compvpp, rootvp, vp, cr));
+}
 
 /*
  * Starting at current directory, translate pathname pnp to end.
