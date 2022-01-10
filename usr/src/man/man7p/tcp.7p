@@ -12,6 +12,7 @@
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright 2019 Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
 .\" Copyright 1989 AT&T
 .\"
 .Dd "Jan 07, 2019"
@@ -222,6 +223,14 @@ When
 is set to zero after it has been enabled, all currently buffered data is sent
 out (as permitted by the peer's receive window and the current congestion
 window).
+.Pp
+Still other latency-sensitive applications rely on receiving a quick
+notification that their packets have been successfully received.
+To satisfy the requirements of those applications, setting the
+.Dv TCP_QUICKACK
+option to a non-zero value will instruct the TCP stack to send an acknowlegment
+immediately upon receipt of a packet, rather than waiting to acknowledge
+multiple packets at once.
 .Pp
 TCP provides an urgent data mechanism, which may be invoked using the
 out-of-band provisions of

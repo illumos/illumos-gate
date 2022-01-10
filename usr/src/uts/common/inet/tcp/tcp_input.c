@@ -25,6 +25,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /* This file contains all TCP input processing functions. */
@@ -4754,6 +4755,9 @@ update_ack:
 				tcp->tcp_rack_cur_max = tcp->tcp_rack_abs_max;
 			else
 				tcp->tcp_rack_cur_max = cur_max;
+		} else if (tcp->tcp_quickack) {
+			/* The executable asked that we ack each packet */
+			flags |= TH_ACK_NEEDED;
 		} else if (TCP_IS_DETACHED(tcp)) {
 			/* We don't have an ACK timer for detached TCP. */
 			flags |= TH_ACK_NEEDED;
