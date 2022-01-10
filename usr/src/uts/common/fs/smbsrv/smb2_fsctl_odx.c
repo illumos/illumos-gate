@@ -16,8 +16,8 @@
 
 /*
  * Support functions for smb2_ioctl/fsctl codes:
- * FSCTL_SRV_OFFLOAD_READ
- * FSCTL_SRV_OFFLOAD_WRITE
+ * FSCTL_OFFLOAD_READ
+ * FSCTL_OFFLOAD_WRITE
  * (and related)
  */
 
@@ -254,8 +254,9 @@ smb2_fsctl_odx_read(smb_request_t *sr, smb_fsctl_t *fsctl)
 
 	/*
 	 * [MS-FSA] If Open.Stream.IsDeleted ...
-	 * We don't really have this.
 	 */
+	if (ofile->f_node->flags & NODE_FLAGS_DELETE_COMMITTED)
+		return (NT_STATUS_FILE_DELETED);
 
 	/*
 	 * If CopyLength == 0, "return immediately success".
@@ -313,8 +314,6 @@ smb2_fsctl_odx_read(smb_request_t *sr, smb_fsctl_t *fsctl)
 	 */
 	data = in_file_off;
 	tok_type = STORAGE_OFFLOAD_TOKEN_TYPE_NATIVE1;
-	if (sr->sr_state != SMB_REQ_STATE_ACTIVE)
-		return (NT_STATUS_SUCCESS);
 	rc = smb_fsop_next_alloc_range(ofile->f_cr, ofile->f_node,
 	    &data, &hole);
 	switch (rc) {
@@ -324,8 +323,13 @@ smb2_fsctl_odx_read(smb_request_t *sr, smb_fsctl_t *fsctl)
 			tok_type = STORAGE_OFFLOAD_TOKEN_TYPE_ZERO_DATA;
 		break;
 	case ENXIO:
-		/* No data here or following. */
-		tok_type = STORAGE_OFFLOAD_TOKEN_TYPE_ZERO_DATA;
+		/*
+		 * No data here to EOF.  Use TOKEN_TYPE_ZERO_DATA,
+		 * but only if we're not crossing src_size, because
+		 * type zero cannot preserve unaligned src_size.
+		 */
+		if ((in_file_off + out_xlen) <= src_size)
+			tok_type = STORAGE_OFFLOAD_TOKEN_TYPE_ZERO_DATA;
 		out_flags |= OFFLOAD_READ_FLAG_ALL_ZERO_BEYOND;
 		break;
 	case ENOSYS:	/* FS does not support VOP_IOCTL... */
@@ -368,7 +372,7 @@ done:
 }
 
 /*
- * FSCTL_SRV_OFFLOAD_WRITE
+ * FSCTL_OFFLOAD_WRITE
  * [MS-FSCC] 2.3.80
  *
  * Similar (in concept) to FSCTL_COPYCHUNK_WRITE
@@ -384,7 +388,6 @@ smb2_fsctl_odx_write(smb_request_t *sr, smb_fsctl_t *fsctl)
 	odx_write_args_t args;
 	smb_odx_token_t *tok = NULL;
 	smb_ofile_t *ofile = sr->fid_ofile;
-	uint64_t dst_rnd_size;
 	uint32_t status = NT_STATUS_INVALID_PARAMETER;
 	int rc;
 
@@ -460,9 +463,9 @@ smb2_fsctl_odx_write(smb_request_t *sr, smb_fsctl_t *fsctl)
 
 	/*
 	 * [MS-FSA] If Open.Stream.IsDeleted ...
-	 * We don't really have such a thing.
-	 * Also skip Volume.MaxFileSize check.
 	 */
+	if (ofile->f_node->flags & NODE_FLAGS_DELETE_COMMITTED)
+		return (NT_STATUS_FILE_DELETED);
 
 	/*
 	 * Check for lock conflicting with the write.
@@ -481,25 +484,12 @@ smb2_fsctl_odx_write(smb_request_t *sr, smb_fsctl_t *fsctl)
 	if (status != NT_STATUS_SUCCESS)
 		return (status);
 	args.wa_eof = dst_attr.sa_vattr.va_size;
-	dst_rnd_size = (args.wa_eof + OFFMASK) & ~OFFMASK;
 
 	/*
 	 * Destination offset vs. EOF
 	 */
-	if (args.in_dstoff >= args.wa_eof)
+	if (args.in_dstoff > args.wa_eof)
 		return (NT_STATUS_END_OF_FILE);
-
-	/*
-	 * Destination offset+len vs. EOF
-	 *
-	 * The spec. is silent about copying when the file length is
-	 * not block aligned, but clients appear to ask us to copy a
-	 * range that's rounded up to a block size.  We'll limit the
-	 * transfer size to the rounded up file size, but the actual
-	 * copy will stop at EOF (args.wa_eof).
-	 */
-	if ((args.in_dstoff + args.in_xlen) > dst_rnd_size)
-		args.in_xlen = dst_rnd_size - args.in_dstoff;
 
 	/*
 	 * Finally, run the I/O
@@ -536,64 +526,126 @@ done:
  * Handle FSCTL_OFFLOAD_WRITE with token type
  * STORAGE_OFFLOAD_TOKEN_TYPE_ZERO_DATA
  *
- * In this handler, the "token" represents a source of zeros.
+ * In this handler, the "token" represents a source of zeros,
+ * limited to the range: in_dstoff to (in_dstoff + in_xlen)
+ *
+ * ODX write handlers are allowed to return any transfer amount
+ * less than or equal to the requested size.  We want to limit
+ * the amount of I/O "work" we do per ODX write call.  Here,
+ * we're only doing meta-data operations, so we'll allow up to
+ * up to smb2_odx_read_max (256M) per call.
+ *
+ * The I/O "work" done by this function is to make zeros appear
+ * in the file in the range: in_dstoff, (in_dstoff + in_xlen).
+ * Rather than actually write zeros, we'll use VOP_SPACE to
+ * make "holes" in the file.  If any of the range we're asked
+ * to zero out is beyond the destination EOF, we can simply
+ * extend the file length (zeros will appear).
+ *
+ * The caller has verified block alignement of:
+ * args->in_dstoff, args->in_xoff, args->in_xlen
  */
 static uint32_t
 smb2_fsctl_odx_write_zeros(smb_request_t *sr, odx_write_args_t *args)
 {
 	smb_ofile_t *dst_ofile = sr->fid_ofile;
-	uint64_t xlen = args->in_xlen;
-	uint32_t status = 0;
+	uint64_t xlen;
 	int rc;
 
 	ASSERT(args->in_xlen > 0);
+	args->out_xlen = 0;
 
 	/*
-	 * Limit the I/O size.  In here we're just doing freesp,
-	 * which is assumed to require only meta-data I/O, so
-	 * we'll allow up to smb2_odx_read_max (256M) per call.
-	 * This is essentially just a double-check of the range
-	 * we gave the client at the offload_read call, making
-	 * sure they can't use a zero token for longer ranges
-	 * than offload_read would allow.
+	 * Limit the I/O size. (per above)
 	 */
-	if (xlen > smb2_odx_read_max)
-		xlen = smb2_odx_read_max;
+	if (args->in_xlen > smb2_odx_read_max)
+		args->in_xlen = smb2_odx_read_max;
 
 	/*
-	 * Also limit to the actual file size, which may be
-	 * smaller than the (block-aligned) transfer size.
-	 * Report the rounded up size to the caller at EOF.
+	 * Handle the part below destination EOF.
+	 * (in_dstoff to wa_eof).
 	 */
-	args->out_xlen = xlen;
-	if ((args->in_dstoff + xlen) > args->wa_eof)
-		xlen = args->wa_eof - args->in_dstoff;
-
-	/*
-	 * Arrange for zeros to appear in the range:
-	 * in_dstoff, (in_dstoff + in_xlen)
-	 *
-	 * Just "free" the range and let it allocate as needed
-	 * when someone later writes in this range.
-	 */
-	rc = smb_fsop_freesp(sr, dst_ofile->f_cr, dst_ofile,
-	    args->in_dstoff, xlen);
-	if (rc != 0) {
-		status = smb_errno2status(rc);
-		if (status == NT_STATUS_INVALID_PARAMETER ||
-		    status == NT_STATUS_NOT_SUPPORTED)
-			status = NT_STATUS_INVALID_DEVICE_REQUEST;
-		args->out_xlen = 0;
-	} else {
-		status = 0;
+	if (args->in_dstoff < args->wa_eof) {
+		xlen = args->in_xlen;
+		if ((args->in_dstoff + xlen) > args->wa_eof) {
+			xlen = args->wa_eof - args->in_dstoff;
+			ASSERT(xlen < args->in_xlen);
+		}
+		rc = smb_fsop_freesp(sr, dst_ofile->f_cr, dst_ofile,
+		    args->in_dstoff, xlen);
+		if (rc != 0) {
+			/* Let client fall-back to normal copy. */
+			return (NT_STATUS_OFFLOAD_WRITE_FILE_NOT_SUPPORTED);
+		}
 	}
 
-	return (status);
+	/*
+	 * Now the part after destination EOF, if any.
+	 * Just set the file size.
+	 */
+	if ((args->in_dstoff + args->in_xlen) > args->wa_eof) {
+		smb_attr_t attr;
+
+		bzero(&attr, sizeof (smb_attr_t));
+		attr.sa_mask = SMB_AT_SIZE;
+		attr.sa_vattr.va_size = args->in_dstoff + args->in_xlen;
+
+		rc = smb_node_setattr(sr, dst_ofile->f_node,
+		    dst_ofile->f_cr, dst_ofile, &attr);
+		if (rc != 0) {
+			return (smb_errno2status(rc));
+		}
+	}
+
+	args->out_xlen = args->in_xlen;
+
+	return (0);
 }
 
 /*
  * Handle FSCTL_OFFLOAD_WRITE with token type
  * STORAGE_OFFLOAD_TOKEN_TYPE_NATIVE1
+ *
+ * For this handler, the token represents a valid range in the
+ * source file (tn1_off to tn1_eof).  The token contains enough
+ * information for us to find the tree and file handle that the
+ * client has open on the source file for this copy.
+ *
+ * ODX write handlers are allowed to return any transfer amount
+ * less than or equal to the requested size.  We want to limit
+ * the amount of I/O "work" we do per ODX write call.  Here,
+ * we're actually copying from another file, so limit transfers
+ * to smb2_odx_write_max (16M) per call.
+ *
+ * Copying past un-aligned end of source file:
+ *
+ * The MS-FSA spec. is silent about copying when the file length is
+ * not block aligned. Clients normally request copying a range that's
+ * the file size rounded up to a block boundary, and expect that copy
+ * to extend the destination as long as the copy has not crossed the
+ * EOF in the source file.  This means that the last block we copy
+ * will generally be a partial copy, where the first part comes from
+ * the source file, and the remainider is either zeros or truncated.
+ *
+ * Extending the destination file:
+ *
+ * With a whole file copy, we want the destination file length to
+ * match the source file length, even if it's not block aligned.
+ * We could just never extend the destination file, but there are
+ * WPTS tests that prove that ODX write IS supposed to extend the
+ * destination file when appropriate.  This is solved by having
+ * this write handler extend the destination file as long as the
+ * copy has not yet crossed EOF in the source file.  After we've
+ * past the source EOF with copying, we'll zero out the remainder
+ * of the block in which the copy stopped, stopping at either the
+ * end of the block or the end of the destination file, whichever
+ * comes first.  This guarantees that a future read anywhere in
+ * that range will see either data from the source file or zeros.
+ *
+ * Note that no matter which way we stopped copying, we MUST
+ * return a block-aligned transfer size in our response.
+ * The caller has verified block alignement of:
+ * args->in_dstoff, args->in_xoff, args->in_xlen
  */
 static uint32_t
 smb2_fsctl_odx_write_native1(smb_request_t *sr,
@@ -609,11 +661,17 @@ smb2_fsctl_odx_write_native1(smb_request_t *sr,
 	uint32_t xlen;
 	uint32_t status;
 
+	ASSERT(args->in_xlen > 0);
+	args->out_xlen = 0;
+
 	/*
-	 * Lookup the source ofile using the resume key,
-	 * which smb2_fsctl_offload_read encoded as an
-	 * smb2fid_t.  Similar to smb2sr_lookup_fid(),
-	 * but different error code.
+	 * Limit the I/O size. (per above)
+	 */
+	if (args->in_xlen > smb2_odx_write_max)
+		args->in_xlen = smb2_odx_write_max;
+
+	/*
+	 * Lookup the source ofile using the "token".
 	 */
 	tn1 = &tok->tok_u.u_tok_native1;
 
@@ -655,7 +713,9 @@ smb2_fsctl_odx_write_native1(smb_request_t *sr,
 
 	/*
 	 * Make sure src_ofile is open on a regular file, and
-	 * granted access includes READ_DATA
+	 * granted access includes READ_DATA.  These were all
+	 * validated in ODX READ, so if these checks fail it
+	 * means somebody messed with the token or something.
 	 */
 	if (!smb_node_is_file(src_ofile->f_node)) {
 		status = NT_STATUS_ACCESS_DENIED;
@@ -666,23 +726,17 @@ smb2_fsctl_odx_write_native1(smb_request_t *sr,
 		goto out;
 
 	/*
-	 * Limit the I/O size.  In here we're actually copying,
-	 * so limit to smb2_odx_write_max (16M) per call.
-	 * Note that xlen is a 32-bit value here.
+	 * Get a buffer used for copying, always smb2_odx_buf_size
+	 *
+	 * Rather than sleep for this relatively large allocation,
+	 * allow the allocation to fail and return an error.
+	 * The client should then fall back to normal copy.
 	 */
-	if (args->in_xlen > smb2_odx_write_max)
-		xlen = smb2_odx_write_max;
-	else
-		xlen = (uint32_t)args->in_xlen;
-
-	/*
-	 * Also limit to the actual file size, which may be
-	 * smaller than the (block-aligned) transfer size.
-	 * Report the rounded up size to the caller at EOF.
-	 */
-	args->out_xlen = xlen;
-	if ((args->in_dstoff + xlen) > args->wa_eof)
-		xlen = (uint32_t)(args->wa_eof - args->in_dstoff);
+	buffer = kmem_alloc(bufsize, KM_NOSLEEP_LAZY);
+	if (buffer == NULL) {
+		status = NT_STATUS_INSUFF_SERVER_RESOURCES;
+		goto out;
+	}
 
 	/*
 	 * Note: in_xoff is relative to the beginning of the "token"
@@ -697,42 +751,92 @@ smb2_fsctl_odx_write_native1(smb_request_t *sr,
 	}
 
 	/*
-	 * Get a buffer used for copying, always
-	 * smb2_odx_buf_size (1M)
-	 *
-	 * Rather than sleep for this relatively large allocation,
-	 * allow the allocation to fail and return an error.
-	 * The client should then fall back to normal copy.
+	 * Source offset+len vs. source EOF (see top comment)
 	 */
-	buffer = kmem_alloc(bufsize, KM_NOSLEEP_LAZY);
-	if (buffer == NULL) {
-		status = NT_STATUS_INSUFF_SERVER_RESOURCES;
-		goto out;
+	xlen = (uint32_t)args->in_xlen;
+	if ((src_offset + xlen) > tn1->tn1_eof) {
+		/*
+		 * Copying would pass tn1_eof.  Reduce xlen.
+		 */
+		DTRACE_PROBE3(crossed__eof, smb_request_t *, sr,
+		    odx_write_args_t *, args, smb_odx_token_t *, tok);
+		xlen = (uint32_t)(tn1->tn1_eof - src_offset);
 	}
 
 	/*
-	 * Copy src to dst for xlen
+	 * Copy src to dst for xlen.  This MAY extend the dest file.
+	 * Note: xlen may be not block-aligned now.  Handled below.
 	 */
 	resid = xlen;
 	status = smb2_sparse_copy(sr, src_ofile, dst_ofile,
 	    src_offset, args->in_dstoff, &resid, buffer, bufsize);
 
 	/*
-	 * If the result was a partial copy, round down the
-	 * reported transfer size to a block boundary.
+	 * If the result was a partial copy, round down the reported
+	 * transfer size to a block boundary. If we moved any data,
+	 * suppress errors on this call.  If an error was suppressed,
+	 * it will happen again and be returned on the next call.
 	 */
-	if (resid != 0) {
+	if (status != 0 || resid != 0) {
 		xlen -= resid;
 		xlen &= ~OFFMASK;
 		args->out_xlen = xlen;
+		/* If we moved any data, suppress errors. */
+		if (xlen > 0)
+			status = 0;
+		goto out;
 	}
 
 	/*
-	 * If we did any I/O, ignore the error that stopped us.
-	 * We'll report this error during the next call.
+	 * If the copying covered the whole in_xlen, we're done.
+	 * The test is >= here just so we can guarantee < below.
 	 */
-	if (args->out_xlen > 0)
-		status = 0;
+	if (xlen >= args->in_xlen) {
+		args->out_xlen = args->in_xlen;
+		goto out;
+	}
+
+	/*
+	 * Have: xlen < args->in_xlen
+	 *
+	 * Here we know xlen was reduced because the copy
+	 * crossed the source EOF.  See top comment.
+	 * Set the rounded-up transfer size now, and
+	 * deal with the remainder of the last block.
+	 */
+	args->out_xlen = (xlen + OFFMASK) & ~OFFMASK;
+
+	/*
+	 * If smb2_sparse_copy passed wa_eof, that means we've
+	 * extended the file, so the remainder of the last block
+	 * written is beyond the destination EOF was, so there's
+	 * no need to zero out the remainder. "We're done".
+	 */
+	args->in_dstoff += xlen;
+	if (args->in_dstoff >= args->wa_eof)
+		goto out;
+
+	/*
+	 * Have: in_dstoff < wa_eof
+	 *
+	 * Zero out the unwritten part of the last block that
+	 * falls before the destination EOF. (Not extending.)
+	 * Here, resid is the length of the part we'll zero.
+	 */
+	resid = args->out_xlen - xlen;
+	if ((args->in_dstoff + resid) > args->wa_eof)
+		resid = args->wa_eof - args->in_dstoff;
+	if (resid > 0) {
+		int rc;
+		/*
+		 * Zero out in_dstoff to wa_eof.
+		 */
+		rc = smb_fsop_freesp(sr, dst_ofile->f_cr, dst_ofile,
+		    args->in_dstoff, resid);
+		if (rc != 0) {
+			status = smb_errno2status(rc);
+		}
+	}
 
 out:
 	if (src_ofile != NULL)
