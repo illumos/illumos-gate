@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * sub3.c ... ALE enhancement.
  * Since a typical Asian language has a huge character set, it is not
@@ -62,9 +60,9 @@
  */
 
 lchar	yycgidtbl[MAXNCG] = {
-	0, 		/* For ease of computation of the id. */
-	'\n', 		/* Newline is always special because '.' exclude it. */
-	0x000000ff, 	/* The upper limit of codeset 0. */
+	0,		/* For ease of computation of the id. */
+	'\n',		/* Newline is always special because '.' exclude it. */
+	0x000000ff,	/* The upper limit of codeset 0. */
 	0x20ffffff,	/* The upper limit of codeset 2. */
 	0x40ffffff	/* The upper limit of codeset 3. */
 /*	0x60ffffff	   The upper limit of codeset 1. */
@@ -79,7 +77,7 @@ static void setsymbol(int i);
 /*
  * For given 16-bit wchar_t (See NOTE), lchar is computed as illustrated below:
  *
- * 	wc: axxxxxxbyyyyyyy
+ *	wc: axxxxxxbyyyyyyy
  *
  * returns: 0ab0000000000000axxxxxxxbyyyyyyy
  *

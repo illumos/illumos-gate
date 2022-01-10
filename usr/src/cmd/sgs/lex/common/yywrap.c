@@ -20,16 +20,11 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if defined(__cplusplus) || defined(__STDC__)
-int yywrap(void)
-#else
-yywrap()
-#endif
+int
+yywrap(void)
 {
-	return(1);
+	return (1);
 }

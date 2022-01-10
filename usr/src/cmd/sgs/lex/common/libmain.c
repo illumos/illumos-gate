@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -38,9 +38,8 @@ extern void exit();
 #pragma weak yylex
 extern int  yylex();
 
-/* ARGSUSED */
 int
-main(int argc, char **argv)
+main(int argc __unused, char **argv __unused)
 {
 	(void) yylex();
 	exit(0);

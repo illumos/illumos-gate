@@ -26,10 +26,7 @@
  */
 
 /*	Copyright (c) 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 int yylineno =1;
 int yygid;
@@ -42,11 +39,8 @@ struct yysvf *yylstate [YYLMAX], **yylsp, **yyolsp;
 int *yyfnd;
 extern struct yysvf *yyestate;
 int yyprevious = YYNEWLINE;
-#if defined(__cplusplus) || defined(__STDC__)
+
 int yylook(void)
-#else
-yylook()
-#endif
 {
 	struct yysvf *yystate, **lsp;
 	struct yywork *yyt;
@@ -264,13 +258,7 @@ yylook()
 		}
 	}
 int
-#if defined(__cplusplus) || defined(__STDC__)
 yyback(int *p, int m)
-#else
-yyback(p, m)
-	int *p;
-	int m;
-#endif
 {
 	if (p==0) return(0);
 	while (*p) {
@@ -282,11 +270,8 @@ yyback(p, m)
 
 #ifdef YYLEX_E /* -e */
 wchar_t
-#if defined(__cplusplus) || defined(__STDC__)
-yywinput(void){
-#else
-yywinput(){
-#endif
+yywinput(void)
+{
 	unsigned char eucbuf[MB_LEN_MAX];
 	wchar_t wc;
 	unsigned char *p=eucbuf;
@@ -307,13 +292,8 @@ yywinput(){
 	return wc;
 }
 
-#if defined(__cplusplus) || defined(__STDC__)
 void
 yywoutput(wchar_t wc)
-#else
-yywoutput(wc)
-	wchar_t wc;
-#endif
 {
 	unsigned char eucbuf[MB_LEN_MAX];
 	int n;
@@ -327,13 +307,8 @@ yywoutput(wc)
 #endif
 }
 
-#if defined(__cplusplus) || defined(__STDC__)
 void
 yywunput(wchar_t wc)
-#else
-yywunput(wc)
-	wchar_t wc;
-#endif
 {
 	unsigned char eucbuf[MB_LEN_MAX];
 	int n;
@@ -363,8 +338,7 @@ yylinearize(wc)
 }
 #endif/*!LONG_WCHAR_T*/
 int
-yycgid(c)
-     wchar_t	c;
+yycgid(wchar_t c)
 {
 	int first = 0;
 	int last = YYNCGIDTBL - 1;
@@ -377,11 +351,11 @@ yycgid(c)
 		if (lc == yycgidtbl[i])
 		    return (2*i);
 		else if ( yycgidtbl[i]<lc) {
-			if (lc<yycgidtbl[i+1]) 
+			if (lc<yycgidtbl[i+1])
 			    return (2*i+1);
-			else	
+			else
 			    first = i + 1;
-		}else		
+		}else
 		    last = i - 1;
 	}
 	return 0; /*Error*/
@@ -393,39 +367,27 @@ yycgid(c)
 
 	/* the following are only used in the lex library */
 int
-#if defined(__cplusplus) || defined(__STDC__)
 yyinput(void)
-#else
-yyinput()
-#endif
 {
 #ifndef __cplusplus
 	return(input());
 #else
 	return(lex_input());
 #endif
-	}
-#if defined(__cplusplus) || defined(__STDC__)
+}
+
 void
 yyoutput(int c)
-#else
-yyoutput(c)
-  int c; 
-#endif
 {
 #ifndef __cplusplus
 	output(c);
 #else
 	lex_output(c);
 #endif
-	}
-#if defined(__cplusplus) || defined(__STDC__)
+}
+
 void
 yyunput(int c)
-#else
-yyunput(c)
-   int c; 
-#endif
 {
 	unput(c);
-	}
+}

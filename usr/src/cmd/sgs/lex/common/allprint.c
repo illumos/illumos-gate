@@ -24,9 +24,7 @@
  */
 
 /*	Copyright (c) 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -77,8 +75,7 @@ allprint(CHR c)
 }
 
 void
-sprint(s)
-CHR *s;
+sprint(CHR *s)
 {
 	while (*s)
 		allprint(*s++);

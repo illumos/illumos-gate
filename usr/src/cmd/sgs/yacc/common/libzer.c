@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -27,18 +27,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 
-#ifdef __cplusplus
 void
 yyerror(const char *s)
-#else
-void
-yyerror(s)
-char *s;
-#endif
 {
 	(void) fprintf(stderr, "%s\n", s);
 }

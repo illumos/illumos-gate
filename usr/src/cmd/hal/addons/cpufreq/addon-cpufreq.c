@@ -1234,11 +1234,9 @@ get_cpufreq_avail_gov(DBusConnection *con, DBusMessage *msg, void *udata)
 	}
 
 	for (ngov = 0; gov_list[ngov] != NULL; ngov++) {
-		if (gov_list[ngov])
-			HAL_DEBUG (("\n%d Gov Name: %s", ngov, gov_list[ngov]));
-			dbus_message_iter_append_basic (&array_iter,
-			    DBUS_TYPE_STRING,
-			    &gov_list[ngov]);
+		HAL_DEBUG (("\n%d Gov Name: %s", ngov, gov_list[ngov]));
+		dbus_message_iter_append_basic (&array_iter, DBUS_TYPE_STRING,
+		    &gov_list[ngov]);
 	}
 	dbus_message_iter_close_container (&rep_iter, &array_iter);
 

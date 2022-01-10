@@ -61,8 +61,8 @@ static int tbitset;	/* size of lookahead sets */
 LOOKSETS *lkst;
 static int lsetsize;
 
-static int nlset = 0; 	/* next lookahead set index */
-int nolook = 0; 	/* flag to suppress lookahead computations */
+static int nlset = 0;	/* next lookahead set index */
+int nolook = 0;		/* flag to suppress lookahead computations */
 static LOOKSETS clset;  /* temporary storage for lookahead computations */
 
 static ITEM *psmem, *zzmemsz;
@@ -97,7 +97,7 @@ int new_actsize = ACTSIZE;
 int *temp1;		/* temp storate, indexed by terms+ntokens or states */
 int lineno = 0;		/* current input line number */
 int size;
-static int fatfl = 1;  	/* if on, error is fatal */
+static int fatfl = 1;	/* if on, error is fatal */
 static int nerrors = 0;	/* number of errors */
 
 	/* storage for information about the nonterminals */
@@ -119,17 +119,17 @@ main(int argc, char *argv[])
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	setup(argc, argv); 		/* initialize and read productions */
+	setup(argc, argv);		/* initialize and read productions */
 	TBITSET = NWORDS(ntoksz*LKFACTOR);
 	tbitset = NWORDS(ntokens*LKFACTOR);
 	mktbls();
-	cpres(); 	/* make table of which productions yield a */
+	cpres();	/* make table of which productions yield a */
 			/* given nonterminal */
-	cempty(); 	/* make a table of which nonterminals can match	*/
+	cempty();	/* make a table of which nonterminals can match	*/
 			/* the empty string */
-	cpfir(); 	/* make a table of firsts of nonterminals */
-	stagen();	/* generate the states 	*/
-	output();  	/* write the states and the tables */
+	cpfir();	/* make a table of firsts of nonterminals */
+	stagen();	/* generate the states	*/
+	output();	/* write the states and the tables */
 	go2out();
 	hideprod();
 	summary();
@@ -140,7 +140,7 @@ main(int argc, char *argv[])
 
 
 static void
-mktbls()
+mktbls(void)
 {
 	int i;
 
@@ -170,7 +170,8 @@ mktbls()
 	/*
 	 * For lkst
 	 */
-#define	INIT_LSIZE	nnontersz*LKFACTOR
+#define	INIT_LSIZE	nnontersz * LKFACTOR
+
 	tmp_lset = (int *)
 	    calloc((size_t)(TBITSET * (INIT_LSIZE+1)), sizeof (int));
 	if (tmp_lset == NULL)
@@ -260,7 +261,7 @@ yacc_assemble_path(char *buf, size_t size, const char *file, int type)
 
 /* put out other arrays, copy the parsers */
 static void
-others()
+others(void)
 {
 	extern int gen_lines;
 	int c, i, j;
@@ -358,10 +359,9 @@ others()
 
 /* copies string q into p, returning next free char ptr */
 static wchar_t *
-chcopy(p, q)
-wchar_t *p, *q;
+chcopy(wchar_t *p, wchar_t *q)
 {
-	while (*p = *q++)
+	while ((*p = *q++) != L'\0')
 		++p;
 	return (p);
 }
@@ -369,8 +369,7 @@ wchar_t *p, *q;
 #define	ISIZE 400
 /* creates output string for item pointed to by pp */
 wchar_t *
-writem(pp)
-int *pp;
+writem(int *pp)
 {
 	int i, *p;
 	static int isize = ISIZE;
@@ -394,7 +393,8 @@ int *pp;
 		for (i = 0; i < isize; ++i)
 			sarr[i] = L' ';
 	}
-	for (p = pp; *p > 0; ++p) /* NULL */;
+	for (p = pp; *p > 0; ++p) /* NULL */
+		;
 	p = prdptr[-*p];
 	q = chcopy(sarr, nontrst[*p-NTBASE].name);
 	q = chcopy(q, L" : ");
@@ -411,7 +411,7 @@ int *pp;
 			sarrbase = sarr;
 			isize += ISIZE;
 			sarr = (wchar_t *)
-				realloc((char *)sarr, sizeof (*sarr) * isize);
+			    realloc((char *)sarr, sizeof (*sarr) * isize);
 			if (sarr == NULL)
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
@@ -423,7 +423,7 @@ int *pp;
  *	'Could not allocate internally used memory.'
  */
 				error(gettext(
-				"cannot expand sarr arrays"));
+				    "cannot expand sarr arrays"));
 			q = q - sarrbase + sarr;
 		}
 	}
@@ -459,7 +459,7 @@ int zzrrconf = 0;
 
 /* output the summary on the tty */
 static void
-summary()
+summary(void)
 {
 	if (foutput != NULL) {
 		(void) fprintf(foutput,
@@ -592,8 +592,7 @@ warning(int flag, char *s, ...)
 
 /* set elements 0 through n-1 to c */
 void
-aryfil(v, n, c)
-int *v, n, c;
+aryfil(int *v, int n, int c)
 {
 	int i;
 	for (i = 0; i < n; ++i)
@@ -603,8 +602,7 @@ int *v, n, c;
 /* set a to the union of a and b */
 /* return 1 if b is not a subset of a, 0 otherwise */
 static int
-setunion(a, b)
-int *a, *b;
+setunion(int *a, int *b)
 {
 	int i, x, sub;
 
@@ -618,8 +616,7 @@ int *a, *b;
 }
 
 static void
-prlook(p)
-LOOKSETS *p;
+prlook(LOOKSETS *p)
 {
 	int j, *pp;
 	pp = p->lset;
@@ -643,7 +640,7 @@ LOOKSETS *p;
  * the array pyield has the lists: the total size is only NPROD+1
  */
 static void
-cpres()
+cpres(void)
 {
 	int **ptrpy;
 	int **pyield;
@@ -679,10 +676,10 @@ cpres()
 		pres[i] = ptrpy;
 		fatfl = 0;  /* make undefined  symbols  nonfatal */
 		PLOOP(0, j) {
-			if (*prdptr[j] == c)  	/* linear search for all c's */
+			if (*prdptr[j] == c)	/* linear search for all c's */
 				*ptrpy++ =  prdptr[j] + 1;
 		}
-		if (pres[i] == ptrpy) { 		/* c not found */
+		if (pres[i] == ptrpy) {		/* c not found */
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
  *	This message is passed to error() function.
@@ -718,7 +715,7 @@ cpres()
 static int indebug = 0;
 /* compute an array with the first of nonterminals */
 static void
-cpfir()
+cpfir(void)
 {
 	int *p, **s, i, **t, ch, changes;
 
@@ -730,7 +727,7 @@ cpfir()
 		for (s = pres[i]; s < t; ++s) {
 			/* check if ch is non-terminal */
 			for (p = *s; (ch = *p) > 0; ++p) {
-				if (ch < NTBASE) { 	/* should be token */
+				if (ch < NTBASE) {	/* should be token */
 					SETBIT(wsets[i].ws.lset, ch);
 					break;
 				} else if (!pempty[ch-NTBASE])
@@ -858,15 +855,13 @@ state(int c)
 static int pidebug = 0;
 
 void
-putitem(ptr, lptr)
-int *ptr;
-LOOKSETS *lptr;
+putitem(int *ptr, LOOKSETS *lptr)
 {
 	register ITEM *j;
 
 	if (pidebug && (foutput != NULL))
 		(void) fprintf(foutput,
-			WSFMT("putitem(%ws), state %d\n"), writem(ptr), nstate);
+		    WSFMT("putitem(%ws), state %d\n"), writem(ptr), nstate);
 	j = pstate[nstate+1];
 	j->pitem = ptr;
 	if (!nolook)
@@ -885,7 +880,7 @@ LOOKSETS *lptr;
  * also, look for nonterminals which don't derive any token strings
  */
 static void
-cempty()
+cempty(void)
 {
 #define	EMPTY 1
 #define	WHOKNOWS 0
@@ -976,7 +971,7 @@ again:
 /* generate the states */
 static int gsdebug = 0;
 static void
-stagen()
+stagen(void)
 {
 	int i, j;
 	int c;
@@ -1175,8 +1170,7 @@ closure(int i)
 }
 
 static LOOKSETS *
-flset(p)
-LOOKSETS *p;
+flset(LOOKSETS *p)
 {
 	/* decide if the lookahead set pointed to by p is known */
 	/* return pointer to a perminent location for the set */
@@ -1207,7 +1201,7 @@ LOOKSETS *p;
 }
 
 static void
-exp_lkst()
+exp_lkst(void)
 {
 	int i, j;
 	static LOOKSETS *lookbase;
@@ -1253,7 +1247,7 @@ exp_lkst()
 }
 
 static void
-exp_wsets()
+exp_wsets(void)
 {
 	int i, j;
 
@@ -1290,7 +1284,7 @@ exp_wsets()
 }
 
 static void
-exp_states()
+exp_states(void)
 {
 	nstatesz += NSTATES;
 
@@ -1316,7 +1310,7 @@ exp_states()
 }
 
 static void
-exp_psmem()
+exp_psmem(void)
 {
 	int i;
 

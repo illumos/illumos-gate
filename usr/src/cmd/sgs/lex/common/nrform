@@ -23,8 +23,6 @@
  * Copyright (c) 1993 by Sun Microsystems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 block data
 integer cshift, csize, yynlin
 common /yyllib/ cshift, csize, yynlin
@@ -178,5 +176,5 @@ while (vstop(isub) .ne. 0){
 	isub = isub + 1
 	}
 yyback = 0
-return 
+return
 end
