@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Syneto S.R.L.  All rights reserved.
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2011-2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -698,7 +698,8 @@ uint32_t smb_odir_openpath(smb_request_t *, char *, uint16_t, uint32_t,
     smb_odir_t **);
 uint32_t smb_odir_openfh(smb_request_t *, const char *, uint16_t,
     smb_odir_t **);
-uint32_t smb_odir_openat(smb_request_t *, smb_node_t *, smb_odir_t **);
+uint32_t smb_odir_openat(smb_request_t *, smb_node_t *, smb_odir_t **,
+    boolean_t);
 void smb_odir_reopen(smb_odir_t *, const char *, uint16_t);
 void smb_odir_close(smb_odir_t *);
 boolean_t smb_odir_hold(smb_odir_t *);

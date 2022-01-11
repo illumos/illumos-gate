@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011-2020 Tintri by DDN, Inc.  All rights reserved.
+ * Copyright 2011-2022 Tintri by DDN, Inc.  All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
  */
 
@@ -1227,6 +1227,7 @@ typedef struct smb_tree {
 #define	SMB_ODIR_FLAG_CATIA		0x0010
 #define	SMB_ODIR_FLAG_ABE		0x0020
 #define	SMB_ODIR_FLAG_SHORTNAMES	0x0040
+#define	SMB_ODIR_FLAG_RESTRICTED	0x0080
 
 typedef enum {
 	SMB_ODIR_STATE_OPEN = 0,
