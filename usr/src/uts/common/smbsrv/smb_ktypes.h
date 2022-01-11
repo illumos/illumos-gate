@@ -1417,6 +1417,7 @@ typedef struct smb_ofile {
 	cred_t			*f_cr;
 	pid_t			f_pid;
 	smb_attr_t		f_pending_attr;
+	boolean_t		f_written;
 	smb_oplock_grant_t	f_oplock;
 	boolean_t		f_oplock_closing;
 	uint8_t			TargetOplockKey[SMB_LEASE_KEY_SZ];

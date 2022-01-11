@@ -23,7 +23,7 @@
  * Copyright 2011-2020 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2016 Syneto S.R.L. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -580,6 +580,16 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 			 */
 			(void) smb_node_setattr(NULL, of->f_node,
 			    of->f_cr, NULL, pa);
+		}
+		/*
+		 * Don't want the performance cost of generating
+		 * change notify events on every write.  Instead:
+		 * Keep track of the fact that we have written
+		 * data via this handle, and do change notify
+		 * work on the first write, and during close.
+		 */
+		if (of->f_written) {
+			smb_node_notify_modified(of->f_node);
 		}
 
 		smb_server_dec_files(of->f_server);
