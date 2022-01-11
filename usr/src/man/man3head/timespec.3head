@@ -11,8 +11,8 @@
 .\"
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd Sep 06, 2020
-.Dt timespec 3HEAD
+.Dd December 29, 2021
+.Dt TIMESPEC 3HEAD
 .Os
 .Sh NAME
 .Nm timespec ,
