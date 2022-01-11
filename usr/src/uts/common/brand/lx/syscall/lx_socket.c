@@ -22,8 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2020 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -2826,7 +2826,7 @@ static const lx_sockopt_map_t ltos_tcp_sockopts[LX_TCP_NOTSENT_LOWAT + 1] = {
 	{ OPTNOTSUP, 0 },			/* TCP_DEFER_ACCEPT - in code */
 	{ OPTNOTSUP, 0 },			/* TCP_WINDOW_CLAMP - in code */
 	{ OPTNOTSUP, 0 },			/* TCP_INFO		*/
-	{ OPTNOTSUP, 0 },			/* TCP_QUICKACK - in code */
+	{ TCP_QUICKACK, sizeof (int) },		/* TCP_QUICKACK		*/
 	{ TCP_CONGESTION, CC_ALGO_NAME_MAX },	/* TCP_CONGESTION	*/
 	{ OPTNOTSUP, 0 },			/* TCP_MD5SIG		*/
 	{ OPTNOTSUP, 0 },
@@ -3409,8 +3409,8 @@ lx_setsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t optlen)
 	uint32_t rto_max, abrt_thresh;
 	boolean_t abrt_changed = B_FALSE, rto_max_changed = B_FALSE;
 
-	if (optname == LX_TCP_WINDOW_CLAMP || optname == LX_TCP_QUICKACK) {
-		/* It appears safe to lie and say we did these. */
+	if (optname == LX_TCP_WINDOW_CLAMP) {
+		/* It appears safe to lie and say we did this. */
 		return (0);
 	}
 
@@ -3860,7 +3860,6 @@ lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 
 	switch (optname) {
 	case LX_TCP_WINDOW_CLAMP:
-	case LX_TCP_QUICKACK:
 		/*
 		 * We do not support these options but some apps rely on them.
 		 * Rather than return an error we just return 0.  This isn't
