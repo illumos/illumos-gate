@@ -162,8 +162,12 @@ dmu_zfetch_fini(zfetch_t *zf)
 	ASSERT(!RW_LOCK_HELD(&zf->zf_rwlock));
 
 	rw_enter(&zf->zf_rwlock, RW_WRITER);
-	while ((zs = list_head(&zf->zf_stream)) != NULL)
-		dmu_zfetch_stream_orphan(zf, zs);
+	while ((zs = list_head(&zf->zf_stream)) != NULL) {
+		if (zfs_refcount_count(&zs->zs_blocks) != 0)
+			dmu_zfetch_stream_orphan(zf, zs);
+		else
+			dmu_zfetch_stream_remove(zf, zs);
+	}
 	rw_exit(&zf->zf_rwlock);
 	list_destroy(&zf->zf_stream);
 	rw_destroy(&zf->zf_rwlock);

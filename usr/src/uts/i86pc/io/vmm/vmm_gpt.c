@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -79,6 +79,12 @@
  * each node contains its level and index in its parent's table.  Finally,
  * each node contains the host PFN of the page that it links into the page
  * table, as well as a kernel pointer to table.
+ *
+ * On leaf nodes, the reference count tracks how many entries in the table are
+ * covered by mapping from the containing vmspace.  This is maintained during
+ * calls to vmm_populate_region() and vmm_gpt_vacate_region() as part of vmspace
+ * map/unmap operations, rather than in the data path of faults populating the
+ * PTEs themselves.
  *
  * Note, this is carefully sized to fit exactly into a 64-byte cache line.
  */
@@ -346,6 +352,14 @@ vmm_gpt_populate_entry(vmm_gpt_t *gpt, uint64_t gpa)
 		}
 		node = child;
 	}
+
+	/*
+	 * Bump the reference count for this leaf for the PTE that is now usable
+	 * by the mapping covering its GPA.
+	 */
+	ASSERT3U(node->vgn_level, ==, LEVEL1);
+	ASSERT3U(node->vgn_ref_cnt, <, 512);
+	node->vgn_ref_cnt++;
 }
 
 /*
@@ -437,15 +451,26 @@ vmm_gpt_vacate_entry(vmm_gpt_t *gpt, uint64_t gpa)
 		nodes[i] = node;
 		node = vmm_gpt_node_find_child(node, gpa);
 	}
-	if (nodes[LEVEL1] != NULL) {
-		uint64_t *ptes = nodes[LEVEL1]->vgn_entries;
-		for (uint_t i = 0; i < (PAGESIZE / sizeof (uint64_t)); i++)
-			ASSERT3U(ptes[i], ==, 0);
-	}
 	for (uint_t i = LEVEL1; i > 0; i--) {
-		if (nodes[i] == NULL)
+		node = nodes[i];
+
+		if (node == NULL)
 			continue;
-		if (nodes[i]->vgn_ref_cnt != 0)
+
+		if (i == LEVEL1) {
+			ASSERT0(node->vgn_entries[vmm_gpt_node_index(gpa, i)]);
+			ASSERT3U(node->vgn_ref_cnt, !=, 0);
+
+			/*
+			 * Just as vmm_gpt_populate_entry() increments the
+			 * reference count for leaf PTEs which become usable,
+			 * here we decrement it as they become unusable as the
+			 * mapping covering its GPA is removed.
+			 */
+			node->vgn_ref_cnt--;
+		}
+
+		if (node->vgn_ref_cnt != 0)
 			break;
 		vmm_gpt_node_remove_child(nodes[i - 1], nodes[i]);
 	}

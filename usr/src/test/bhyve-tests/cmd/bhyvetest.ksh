@@ -1,3 +1,5 @@
+#!/usr/bin/ksh
+
 #
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
@@ -10,27 +12,27 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2019 Joyent, Inc.
-# Copyright 2020 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2022 Oxide Computer Company
 #
 
-.PARALLEL: $(SUBDIRS)
+TEST_DIR="/opt/bhyve-tests"
+RUNNER="/opt/test-runner/bin/run"
 
-SUBDIRS = \
-	bhyve-tests \
-	crypto-tests \
-	elf-tests \
-	libc-tests \
-	libmlrpc-tests \
-	net-tests \
-	os-tests \
-	smartos-test \
-	smbclient-tests \
-	test-runner \
-	util-tests \
-	zfs-tests
+while getopts c: c; do
+	case $c in
+	'c')
+		RUN_FILE=$OPTARG
+		if [[ ! -f $RUN_FILE ]]; then
+			echo "Cannot read file: $RUN_FILE"
+			exit 1
+		fi
+		;;
+	esac
+done
+shift $((OPTIND - 1))
 
-include Makefile.com
+if [[ -z $RUN_FILE ]]; then
+	RUN_FILE="$TEST_DIR/runfiles/default.run"
+fi
+
+exec $RUNNER -c $RUN_FILE

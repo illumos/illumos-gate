@@ -589,7 +589,7 @@ av1394_ioctl_isoch_handle2ic(av1394_inst_t *avp, void *arg)
 	int		num = (int)(intptr_t)arg;
 	av1394_isoch_t	*ip = &avp->av_i;
 
-	if (num >= (sizeof (ip->i_ic) / sizeof (av1394_ic_t))) {
+	if (num >= NELEM(ip->i_ic)) {
 		TNF_PROBE_0(av1394_ioctl_isoch_handle2ic_error_range,
 		    AV1394_TNF_ISOCH_ERROR, "");
 		return (NULL);
@@ -665,7 +665,7 @@ av1394_ioctl_recv(av1394_inst_t *avp, void *arg, int mode)
 		return (EFAULT);
 	}
 	num = recv.rx_handle;
-	if (num >= (sizeof (ip->i_ic) / sizeof (av1394_ic_t))) {
+	if (num >= NELEM(ip->i_ic)) {
 		TNF_PROBE_0(av1394_ioctl_recv_error_range,
 		    AV1394_TNF_ISOCH_ERROR, "");
 		return (EINVAL);
@@ -707,7 +707,7 @@ av1394_ioctl_xmit(av1394_inst_t *avp, void *arg, int mode)
 		return (EFAULT);
 	}
 	num = xmit.tx_handle;
-	if (num >= (sizeof (ip->i_ic) / sizeof (av1394_ic_t))) {
+	if (num >= NELEM(ip->i_ic)) {
 		TNF_PROBE_0(av1394_ioctl_xmit_error_range,
 		    AV1394_TNF_ISOCH_ERROR, "");
 		return (EINVAL);

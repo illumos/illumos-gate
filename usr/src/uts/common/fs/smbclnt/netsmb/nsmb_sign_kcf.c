@@ -32,7 +32,7 @@
  * Common function to see if a mech is available.
  */
 static int
-find_mech(smb_sign_mech_t *mech, crypto_mech_name_t name)
+find_mech(smb_sign_mech_t *mech, const char *name)
 {
 	crypto_mech_type_t t;
 

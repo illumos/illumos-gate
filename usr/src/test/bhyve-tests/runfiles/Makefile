@@ -10,27 +10,29 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2019 Joyent, Inc.
-# Copyright 2020 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2022 Oxide Computer Company
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = \
-	bhyve-tests \
-	crypto-tests \
-	elf-tests \
-	libc-tests \
-	libmlrpc-tests \
-	net-tests \
-	os-tests \
-	smartos-test \
-	smbclient-tests \
-	test-runner \
-	util-tests \
-	zfs-tests
+SRCS = default.run
 
-include Makefile.com
+ROOTOPTPKG = $(ROOT)/opt/bhyve-tests
+RUNFILES = $(ROOTOPTPKG)/runfiles
+
+OUTPUTS = $(SRCS:%=$(RUNFILES)/%)
+$(OUTPUTS) := FILEMODE = 0444
+
+all: $(SRCS)
+
+install: $(OUTPUTS)
+
+clean lint clobber:
+
+$(OUTPUTS): $(RUNFILES) $(SRCS)
+
+$(RUNFILES):
+	$(INS.dir)
+
+$(RUNFILES)/%: %
+	$(INS.file)

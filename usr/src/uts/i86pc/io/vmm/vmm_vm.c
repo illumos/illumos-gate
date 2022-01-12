@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -741,12 +741,10 @@ vmspace_lookup_map(vmspace_t *vms, uintptr_t gpa, int req_prot, pfn_t *pfnp,
 		vmspace_mapping_t *vmsm;
 		vm_object_t *vmo;
 
-		/*
-		 * Because of the prior leaf check, we should be confident that
-		 * _some_ mapping covers this GPA
-		 */
 		vmsm = vm_mapping_find(vms, gpa, PAGESIZE);
-		VERIFY(vmsm != NULL);
+		if (vmsm == NULL) {
+			return (FC_NOMAP);
+		}
 
 		if ((req_prot & vmsm->vmsm_prot) != req_prot) {
 			return (FC_PROT);
