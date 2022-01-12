@@ -11,6 +11,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2022 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
@@ -22,38 +23,24 @@ include $(SRC)/cmd/Makefile.cmd.64
 #
 CSTD=		$(CSTD_GNU99)
 
-CFLAGS +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration \
-		-_gcc=-Wno-parentheses
-CFLAGS64 +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration \
-		-_gcc=-Wno-parentheses
-CPPFLAGS =	-I$(SRC)/cmd/bhyve \
-		-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
-		-I$(CONTRIB)/bhyve/dev/usb/controller \
-		-I$(CONTRIB)/bhyve/dev/mii \
+CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
+		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
 		$(CPPFLAGS.master) \
-		-I$(SRC)/uts/i86pc/io/vmm \
-		-I$(SRC)/uts/common \
-		-I$(SRC)/uts/i86pc \
-		-I$(SRC)/lib/libdladm/common \
+		-I$(SRC)/cmd/bhyve \
 		-DWITHOUT_CAPSICUM
-CPPFLAGS +=	-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64
+
 LDFLAGS +=	-lproc
 
 SMOFF += all_func_returns
 
-CLEANFILES +=	$(EXETESTS)
-CLOBBERFILES +=	$(ROOTTESTS)
+CLEANFILES +=	$(PROG)
 
 #
 # Install related definitions
 #
-ROOTOPTPKG =	$(ROOT)/opt/bhyvetest
-ROOTBIN =	$(ROOTOPTPKG)/bin
-ROOTTST =	$(ROOTOPTPKG)/tst
-ROOTTSTDIR =	$(ROOTTST)/$(TSTDIR)
-ROOTTSTEXES =	$(EXETESTS:%=$(ROOTTSTDIR)/%)
-ROOTTSTSH =	$(SHTESTS:%=$(ROOTTSTDIR)/%)
-ROOTOUT =	$(OUTFILES:%=$(ROOTTSTDIR)/%)
-ROOTTESTS =	$(ROOTTSTEXES) $(ROOTTSTSH) $(ROOTOUT)
+ROOTOPTPKG =	$(ROOT)/opt/bhyve-tests
+ROOTTESTS =	$(ROOTOPTPKG)/tests
+TESTDIR =	$(ROOTTESTS)/$(TESTSUBDIR)
+
 FILEMODE =	0555
 LDLIBS =	$(LDLIBS.cmd)

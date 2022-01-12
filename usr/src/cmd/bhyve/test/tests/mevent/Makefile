@@ -11,20 +11,31 @@
 
 #
 # Copyright 2018 Joyent, Inc.
+# Copyright 2022 Oxide Computer Company
 #
 
-TSTDIR =	mevent
-EXETESTS = \
-		lists.delete.exe \
-		read.disable.exe \
-		read.pause.exe \
-		read.requeue.exe \
+TESTSUBDIR =	mevent
+PROG = \
+		lists_delete \
+		read_disable \
+		read_pause \
+		read_requeue
 
-SHTESTS =
 SUPOBJS =	mevent.o testlib.o
 
 include ../../Makefile.com
 
-install: $(ROOTTESTS)
+CMDS =		$(PROG:%=$(TESTDIR)/%)
+$(CMDS) :=	FILEMODE = 0555
+
+all: $(PROG)
+
+install: $(TESTDIR) $(CMDS)
+
+$(CMDS): $(PROG)
 
 include ../../Makefile.targ
+
+%: %.o $(SUPOBJS)
+	$(LINK.c) -o $@ $< $(SUPOBJS) $(LDLIBS)
+	$(POST_PROCESS)
