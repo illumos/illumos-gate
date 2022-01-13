@@ -83,6 +83,7 @@ CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-parentheses
+CCWARNINLINE	=
 
 SMOFF += indenting,all_func_returns,no_if_block
 

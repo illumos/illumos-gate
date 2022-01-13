@@ -40,6 +40,7 @@
  *
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -68,6 +69,12 @@ __FBSDID("$FreeBSD$");
 #define	REDIR_ENTRIES	32
 #define	RTBL_RO_BITS	((uint64_t)(IOART_REM_IRR | IOART_DELIVS))
 
+struct ioapic_stats {
+	uint64_t	is_interrupts;
+	uint64_t	is_saturate_low;
+	uint64_t	is_saturate_high;
+};
+
 struct vioapic {
 	struct vm	*vm;
 	struct mtx	mtx;
@@ -75,8 +82,15 @@ struct vioapic {
 	uint32_t	ioregsel;
 	struct {
 		uint64_t reg;
-		int	 acnt;	/* sum of pin asserts (+1) and deasserts (-1) */
+		/*
+		 * The sum of pin asserts (+1) and deasserts (-1) are tracked in
+		 * 'acnt'.  It is clamped to prevent overflow or underflow
+		 * should emulation consumers feed it an invalid set of
+		 * transitions.
+		 */
+		uint_t acnt;
 	} rtbl[REDIR_ENTRIES];
+	struct ioapic_stats stats;
 };
 
 #define	VIOAPIC_LOCK(vioapic)		mtx_lock_spin(&((vioapic)->mtx))
@@ -97,18 +111,6 @@ static MALLOC_DEFINE(M_VIOAPIC, "vioapic", "bhyve virtual ioapic");
 #define	VIOAPIC_CTR4(vioapic, fmt, a1, a2, a3, a4)			\
 	VM_CTR4((vioapic)->vm, fmt, a1, a2, a3, a4)
 
-#ifdef KTR
-static const char *
-pinstate_str(bool asserted)
-{
-
-	if (asserted)
-		return ("asserted");
-	else
-		return ("deasserted");
-}
-#endif
-
 static void
 vioapic_send_intr(struct vioapic *vioapic, int pin)
 {
@@ -116,11 +118,8 @@ vioapic_send_intr(struct vioapic *vioapic, int pin)
 	uint32_t low, high, dest;
 	bool level, phys;
 
-	KASSERT(pin >= 0 && pin < REDIR_ENTRIES,
-	    ("vioapic_set_pinstate: invalid pin number %d", pin));
-
-	KASSERT(VIOAPIC_LOCKED(vioapic),
-	    ("vioapic_set_pinstate: vioapic is not locked"));
+	VERIFY(pin >= 0 && pin < REDIR_ENTRIES);
+	ASSERT(VIOAPIC_LOCKED(vioapic));
 
 	low = vioapic->rtbl[pin].reg;
 	high = vioapic->rtbl[pin].reg >> 32;
@@ -145,45 +144,54 @@ vioapic_send_intr(struct vioapic *vioapic, int pin)
 	vector = low & IOART_INTVEC;
 	dest = high >> APIC_ID_SHIFT;
 	vlapic_deliver_intr(vioapic->vm, level, dest, phys, delmode, vector);
+	vioapic->stats.is_interrupts++;
 }
 
-static void
+static int
 vioapic_set_pinstate(struct vioapic *vioapic, int pin, bool newstate)
 {
-	int oldcnt, newcnt;
-	bool needintr;
+	uint_t oldcnt, newcnt;
+	bool needintr = false;
+	int err = 0;
 
-	KASSERT(pin >= 0 && pin < REDIR_ENTRIES,
-	    ("vioapic_set_pinstate: invalid pin number %d", pin));
+	VERIFY(pin >= 0 && pin < REDIR_ENTRIES);
+	ASSERT(VIOAPIC_LOCKED(vioapic));
 
-	KASSERT(VIOAPIC_LOCKED(vioapic),
-	    ("vioapic_set_pinstate: vioapic is not locked"));
-
-	oldcnt = vioapic->rtbl[pin].acnt;
-	if (newstate)
-		vioapic->rtbl[pin].acnt++;
-	else
-		vioapic->rtbl[pin].acnt--;
-	newcnt = vioapic->rtbl[pin].acnt;
-
-	if (newcnt < 0) {
-		VIOAPIC_CTR2(vioapic, "ioapic pin%d: bad acnt %d",
-		    pin, newcnt);
+	oldcnt = newcnt = vioapic->rtbl[pin].acnt;
+	if (newstate) {
+		if (newcnt != UINT_MAX) {
+			newcnt++;
+		} else {
+			err = E2BIG;
+			DTRACE_PROBE2(vioapic__sat_high,
+			    struct vioapic *, vioapic, int, pin);
+			vioapic->stats.is_saturate_high++;
+		}
+	} else {
+		if (newcnt != 0) {
+			newcnt--;
+		} else {
+			err = ERANGE;
+			DTRACE_PROBE2(vioapic__sat_low,
+			    struct vioapic *, vioapic, int, pin);
+			vioapic->stats.is_saturate_low++;
+		}
 	}
+	vioapic->rtbl[pin].acnt = newcnt;
 
-	needintr = false;
 	if (oldcnt == 0 && newcnt == 1) {
 		needintr = true;
-		VIOAPIC_CTR1(vioapic, "ioapic pin%d: asserted", pin);
+		DTRACE_PROBE2(vioapic__assert, struct vioapic *, vioapic,
+		    int, pin);
 	} else if (oldcnt == 1 && newcnt == 0) {
-		VIOAPIC_CTR1(vioapic, "ioapic pin%d: deasserted", pin);
-	} else {
-		VIOAPIC_CTR3(vioapic, "ioapic pin%d: %s, ignored, acnt %d",
-		    pin, pinstate_str(newstate), newcnt);
+		DTRACE_PROBE2(vioapic__deassert, struct vioapic *, vioapic,
+		    int, pin);
 	}
 
-	if (needintr)
+	if (needintr) {
 		vioapic_send_intr(vioapic, pin);
+	}
+	return (err);
 }
 
 enum irqstate {
@@ -196,6 +204,7 @@ static int
 vioapic_set_irqstate(struct vm *vm, int irq, enum irqstate irqstate)
 {
 	struct vioapic *vioapic;
+	int err = 0;
 
 	if (irq < 0 || irq >= REDIR_ENTRIES)
 		return (EINVAL);
@@ -205,21 +214,23 @@ vioapic_set_irqstate(struct vm *vm, int irq, enum irqstate irqstate)
 	VIOAPIC_LOCK(vioapic);
 	switch (irqstate) {
 	case IRQSTATE_ASSERT:
-		vioapic_set_pinstate(vioapic, irq, true);
+		err = vioapic_set_pinstate(vioapic, irq, true);
 		break;
 	case IRQSTATE_DEASSERT:
-		vioapic_set_pinstate(vioapic, irq, false);
+		err = vioapic_set_pinstate(vioapic, irq, false);
 		break;
 	case IRQSTATE_PULSE:
-		vioapic_set_pinstate(vioapic, irq, true);
-		vioapic_set_pinstate(vioapic, irq, false);
+		err = vioapic_set_pinstate(vioapic, irq, true);
+		if (err == 0) {
+			err = vioapic_set_pinstate(vioapic, irq, false);
+		}
 		break;
 	default:
 		panic("vioapic_set_irqstate: invalid irqstate %d", irqstate);
 	}
 	VIOAPIC_UNLOCK(vioapic);
 
-	return (0);
+	return (err);
 }
 
 int

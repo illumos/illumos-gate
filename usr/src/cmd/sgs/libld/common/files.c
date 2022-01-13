@@ -1414,7 +1414,7 @@ invalid_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
  * exit:
  *	Returns True (1) if the names match, and False (0) otherwise.
  */
-inline static int
+static int
 is_name_cmp(const char *is_name, const char *match_name, size_t match_len)
 {
 	/*
