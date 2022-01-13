@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -804,47 +804,99 @@ smb_pathname_init(smb_request_t *sr, smb_pathname_t *pn, char *path)
 
 	/* parse pn->pn_path into its constituent parts */
 	pname = pn->pn_path;
-	fname = strrchr(pn->pn_path, '\\');
 
-	if (fname) {
+	/*
+	 * Split the string between the directory and filename.
+	 * Either part may be empty.
+	 *
+	 * Fill in pn->pn_pname (the path name)
+	 */
+	fname = strrchr(pname, '\\');
+	if (fname != NULL) {
 		if (fname == pname) {
+			/*
+			 * Last '/' is at start of string.
+			 * No directory part (dir is root)
+			 */
 			pn->pn_pname = NULL;
 		} else {
+			/*
+			 * Directory part ends at the last '/'
+			 * Temporarily truncate and copy
+			 */
 			*fname = '\0';
 			pn->pn_pname =
 			    smb_pathname_strdup(sr, pname);
 			*fname = '\\';
 		}
 		++fname;
+		/* fname is just after the '/' */
 	} else {
+		/*
+		 * No '/' at all in the string.
+		 * It's all filename
+		 */
 		fname = pname;
 		pn->pn_pname = NULL;
 	}
 
-	if (fname[0] == '\0') {
-		pn->pn_fname = NULL;
-		return;
-	}
-
-	if (!smb_is_stream_name(fname)) {
+	/*
+	 * Find end of the filename part of the string,
+	 * which may be the null terminator, or may be
+	 * the start of the optional :sname suffix.
+	 */
+	sname = strchr(fname, ':');
+	if (sname == NULL) {
+		/*
+		 * No :sname suffix.  We're done.
+		 */
 		pn->pn_fname = smb_pathname_strdup(sr, fname);
 		return;
 	}
 
 	/*
-	 * find sname and stype in fname.
-	 * sname can't be NULL smb_is_stream_name checks this
+	 * We have a stream name, and maybe a stream type.
+	 * Can't use smb_is_stream_name(fname) here because
+	 * we need to allow sname="::$DATA"
 	 */
-	sname = strchr(fname, ':');
-	if (sname == fname)
-		fname = NULL;
-	else {
+	if (sname == fname) {
+		/*
+		 * The ":sname" part is at the start of
+		 * the file name, which means that the
+		 * file name is "" and this pathname
+		 * refers to a stream on the directory.
+		 */
+		pn->pn_fname = NULL;
+	} else {
+		/*
+		 * The filename part ends at the ':'
+		 * Temporarily truncate and copy
+		 */
 		*sname = '\0';
-		pn->pn_fname =
-		    smb_pathname_strdup(sr, fname);
+		pn->pn_fname = smb_pathname_strdup(sr, fname);
 		*sname = ':';
 	}
 
+	/*
+	 * Special case "::$DATA" which "points to"
+	 * the "unnamed" stream (the file itself).
+	 * Basically ignore the "::$DATA"
+	 */
+	if (strcasecmp(sname, "::$DATA") == 0) {
+		ASSERT(sname >= pname &&
+		    sname < (pname + strlen(pname)));
+		*sname = '\0';
+		return;
+	}
+
+	/*
+	 * sname points to ":sname:stype" in pn_path
+	 * If ":stype" is missing, add it, then set
+	 * pn_stype to point after the 2nd ':'
+	 *
+	 * Caller knows pn_stype is NOT allocated.
+	 * Allocations here are free'd via smb_srm_fini
+	 */
 	pn->pn_sname = smb_pathname_strdup(sr, sname);
 	pn->pn_stype = strchr(pn->pn_sname + 1, ':');
 	if (pn->pn_stype) {
@@ -1065,6 +1117,9 @@ smb_validate_dirname(smb_request_t *sr, smb_pathname_t *pn)
 		}
 	}
 
+	if (pn->pn_sname)
+		return (smb_validate_stream_name(sr, pn));
+
 	return (B_TRUE);
 }
 
@@ -1229,14 +1284,6 @@ smb_validate_stream_name(smb_request_t *sr, smb_pathname_t *pn)
 
 	ASSERT(pn);
 	ASSERT(pn->pn_sname);
-
-	if ((!(pn->pn_sname)) ||
-	    ((pn->pn_pname) && !(pn->pn_fname))) {
-		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
-		    ERRDOS, ERROR_INVALID_NAME);
-		return (B_FALSE);
-	}
-
 
 	if (pn->pn_stype != NULL) {
 		for (i = 0; i < sizeof (strmtype) / sizeof (strmtype[0]); ++i) {
