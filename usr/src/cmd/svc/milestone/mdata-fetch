@@ -21,7 +21,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 2017, Joyent, Inc. All rights reserved.
+# Copyright 2022 Joyent, Inc.
 #
 
 export PS4='[\D{%FT%TZ}] ${BASH_SOURCE}:${LINENO}: ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
@@ -56,12 +56,12 @@ function isIPv4AndCIDR() {
 
 # Test if an address looks like an IPv6 address.
 function isIPv6() {
-  [[ "$1" =~ ^[0-9a-f]*:[0-9a-f]*:[:0-9a-f]*$ ]]
+  [[ "${1,,}" =~ ^[0-9a-f]*:[0-9a-f]*:[:0-9a-f]*$ ]]
 }
 
 # Test if an address looks like an IPv6 address + CIDR.
 function isIPv6AndCIDR() {
-  [[ "$1" =~ ^[0-9a-f]*:[0-9a-f]*:[:0-9a-f]*/[0-9]{1,3}$ ]]
+  [[ "${1,,}" =~ ^[0-9a-f]*:[0-9a-f]*:[:0-9a-f]*/[0-9]{1,3}$ ]]
 }
 
 # For old zones that were created prior to OS-2253 and bumping the mdata:fetch
