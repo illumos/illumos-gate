@@ -19,8 +19,8 @@ timeout = 60
 post =
 outputdir = /var/tmp/test_results
 
-[/opt/bhyve-tests/tests]
-tests = ['memmap']
+[/opt/bhyve-tests/tests/vmm]
+tests = ['mem_partial', 'mem_seg_map']
 
 # Tests of userspace mevent system, built from cmd/bhyve
 [/opt/bhyve-tests/tests/mevent]

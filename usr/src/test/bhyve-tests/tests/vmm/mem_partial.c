@@ -20,11 +20,14 @@
 #include <strings.h>
 #include <signal.h>
 #include <setjmp.h>
+#include <libgen.h>
 
 #include <sys/vmm.h>
 #include <sys/vmm_dev.h>
 #include <sys/mman.h>
 #include <vmmapi.h>
+
+#include "common.h"
 
 /* Half of a leaf page table is 256 pages */
 #define	LOWER_SZ	(256 * 4096)
@@ -34,42 +37,10 @@
 #define	LOWER_OFF	0
 #define	UPPER_OFF	LOWER_SZ
 
-#define	PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
-
 enum test_memsegs {
 	MSEG_LOW = 0,
 	MSEG_HIGH = 1,
 };
-
-struct vmctx *
-create_test_vm()
-{
-	char name[VM_MAX_NAMELEN];
-	int res;
-
-	(void) snprintf(name, sizeof (name), "bhyve-test-memmap-%d", getpid());
-
-	res = vm_create(name, 0);
-	if (res != 0) {
-		return (NULL);
-	}
-
-	return (vm_open(name));
-}
-
-int
-alloc_memseg(struct vmctx *ctx, int segid, size_t len, const char *name)
-{
-	struct vm_memseg memseg = {
-		.segid = segid,
-		.len = len,
-	};
-	(void) strlcpy(memseg.name, name, sizeof (memseg.name));
-
-	int fd = vm_get_device_fd(ctx);
-
-	return (ioctl(fd, VM_ALLOC_MEMSEG, &memseg));
-}
 
 static sigjmp_buf segv_env;
 
@@ -88,6 +59,10 @@ main(int argc, char *argv[])
 	void *guest_mem;
 
 	ctx = create_test_vm();
+	if (ctx == NULL) {
+		perror("could open test VM");
+		return (1);
+	}
 	fd = vm_get_device_fd(ctx);
 
 	res = alloc_memseg(ctx, MSEG_LOW, LOWER_SZ, "mseg_low");
@@ -217,6 +192,7 @@ main(int argc, char *argv[])
 	}
 
 	/* mission accomplished */
+	(void) printf("%s\tPASS\n", basename(argv[0]));
 	vm_destroy(ctx);
 	return (0);
 

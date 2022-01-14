@@ -9,40 +9,12 @@
 # http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2022 Oxide Computer Company
+#
 
-include $(SRC)/cmd/Makefile.cmd
-include $(SRC)/cmd/Makefile.cmd.64
+.PARALLEL: $(SUBDIRS)
+
+SUBDIRS = vmm
+
 include $(SRC)/test/Makefile.com
-
-PROG =	memmap
-
-ROOTOPTPKG = $(ROOT)/opt/bhyve-tests
-TESTDIR = $(ROOTOPTPKG)/tests
-
-CMDS = $(PROG:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-CSTD=		$(CSTD_GNU99)
-CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
-		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
-		$(CPPFLAGS.master) \
-		-I$(SRC)/uts/i86pc/io/vmm \
-		-I$(SRC)/uts/i86pc
-$(PROG) := LDLIBS += \
-	-lvmmapi
-
-all: $(PROG)
-
-install: all $(CMDS)
-
-clobber: clean
-	-$(RM) $(PROG)
-
-$(CMDS): $(TESTDIR) $(PROG)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
