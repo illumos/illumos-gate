@@ -45,6 +45,7 @@ static uint32_t smb2_qif_pipe_rem(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_compr(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_opens(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_tags(smb_request_t *, smb_queryinfo_t *);
+static uint32_t smb2_qif_id_info(smb_request_t *, smb_queryinfo_t *);
 
 
 uint32_t
@@ -99,6 +100,11 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 
 	case FileNetworkOpenInformation:
 		mask = SMB_AT_BASIC | SMB_AT_STANDARD;
+		break;
+
+	case FileIdInformation:
+		mask = SMB_AT_NODEID;
+		break;
 
 	default:
 		break;
@@ -179,6 +185,9 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 		break;
 	case FileAttributeTagInformation:
 		status = smb2_qif_tags(sr, qi);
+		break;
+	case FileIdInformation:
+		status = smb2_qif_id_info(sr, qi);
 		break;
 	default:
 		status = NT_STATUS_INVALID_INFO_CLASS;
@@ -642,6 +651,49 @@ smb2_qif_tags(smb_request_t *sr, smb_queryinfo_t *qi)
 	    &sr->raw_data, "ll", 0, 0);
 	if (rc != 0)
 		return (NT_STATUS_BUFFER_OVERFLOW);
+
+	return (0);
+}
+
+/*
+ * FileIdInformation
+ *
+ * Returns a A FILE_ID_INFORMATION
+ *	VolumeSerialNumber (8 bytes)
+ *	FileId (16 bytes)
+ *
+ * Take the volume serial from the share root,
+ * and compose the FileId from the nodeid and fsid
+ * of the file (in case we crossed mounts)
+ */
+static uint32_t
+smb2_qif_id_info(smb_request_t *sr, smb_queryinfo_t *qi)
+{
+	smb_attr_t *sa = &qi->qi_attr;
+	smb_ofile_t *of = sr->fid_ofile;
+	smb_tree_t *tree = sr->tid_tree;
+	vfs_t	*f_vfs;	// file
+	vfs_t	*s_vfs;	// share
+	uint64_t nodeid;
+	int rc;
+
+	ASSERT((sa->sa_mask & SMB_AT_NODEID) != 0);
+	if (of->f_ftype != SMB_FTYPE_DISK)
+		return (NT_STATUS_INVALID_INFO_CLASS);
+
+	s_vfs = SMB_NODE_VFS(tree->t_snode);
+	f_vfs = SMB_NODE_VFS(of->f_node);
+	nodeid = (uint64_t)sa->sa_vattr.va_nodeid;
+
+	rc = smb_mbc_encodef(
+	    &sr->raw_data, "llqll",
+	    s_vfs->vfs_fsid.val[0],	/* l */
+	    s_vfs->vfs_fsid.val[1],	/* l */
+	    nodeid,			/* q */
+	    f_vfs->vfs_fsid.val[0],	/* l */
+	    f_vfs->vfs_fsid.val[1]);	/* l */
+	if (rc != 0)
+		return (NT_STATUS_INFO_LENGTH_MISMATCH);
 
 	return (0);
 }
