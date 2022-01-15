@@ -32,6 +32,7 @@ static uint32_t smb2_qif_internal(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_ea_size(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_access(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_name(smb_request_t *, smb_queryinfo_t *);
+static uint32_t smb2_qif_normalized_name(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_position(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_full_ea(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_mode(smb_request_t *, smb_queryinfo_t *);
@@ -81,6 +82,7 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 		break;
 
 	case FileNameInformation:
+	case FileNormalizedNameInformation:
 		getname = B_TRUE;
 		break;
 
@@ -146,6 +148,9 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 		break;
 	case FileNameInformation:
 		status = smb2_qif_name(sr, qi);
+		break;
+	case FileNormalizedNameInformation:
+		status = smb2_qif_normalized_name(sr, qi);
 		break;
 	case FilePositionInformation:
 		status = smb2_qif_position(sr, qi);
@@ -401,15 +406,51 @@ smb2_qif_access(smb_request_t *sr, smb_queryinfo_t *qi)
 static uint32_t
 smb2_qif_name(smb_request_t *sr, smb_queryinfo_t *qi)
 {
+	char *name;
+	uint32_t nlen;
 	int rc;
 
-	ASSERT(qi->qi_namelen > 0);
+	/* SMB2 leaves off the leading / */
+	nlen = qi->qi_namelen;
+	name = qi->qi_name;
+	if (qi->qi_name[0] == '\\') {
+		name++;
+		nlen -= 2;
+	}
 
 	rc = smb_mbc_encodef(
 	    &sr->raw_data, "llU",
 	    0, /* FileIndex	 (l) */
-	    qi->qi_namelen,	/* l */
-	    qi->qi_name);	/* U */
+	    nlen,	/* l */
+	    name);	/* U */
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
+
+	return (0);
+}
+
+/*
+ * FileNormalizedNameInformation
+ */
+static uint32_t
+smb2_qif_normalized_name(smb_request_t *sr, smb_queryinfo_t *qi)
+{
+	char *name;
+	uint32_t nlen;
+	int rc;
+
+	/* SMB2 leaves off the leading / */
+	nlen = qi->qi_namelen;
+	name = qi->qi_name;
+	if (qi->qi_name[0] == '\\') {
+		name++;
+		nlen -= 2;
+	}
+
+	rc = smb_mbc_encodef(
+	    &sr->raw_data, "lU",
+	    nlen,	/* l */
+	    name);	/* U */
 	if (rc != 0)
 		return (NT_STATUS_BUFFER_OVERFLOW);
 
