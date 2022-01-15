@@ -471,7 +471,7 @@ sub ProcFile {
 			next;
 		}
 		# Look for any unused dependencies.
-		if ($UnDep && ($Line =~ /unused/)) {
+		if ($UnDep && ($Line =~ /unused .+=/)) {
 			# Skip if object is allowed to have unused dependencies
 			next if defined($EXRE_unused_deps) &&
 			    ($RelPath =~ $EXRE_unused_deps);
