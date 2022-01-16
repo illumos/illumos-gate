@@ -223,33 +223,34 @@ next_fmt:
 		if (base == 0)
 			continue;
 
-		if (h_count == 0 && l_count == 0)
+		if (h_count == 0 && l_count == 0) {
 			if (sign)
 				ul = (int64_t)va_arg(args, int);
 			else
 				ul = (int64_t)va_arg(args, unsigned int);
-		else if (l_count > 1)
+		} else if (l_count > 1) {
 			if (sign)
 				ul = (int64_t)va_arg(args, int64_t);
 			else
 				ul = (int64_t)va_arg(args, uint64_t);
-		else if (l_count > 0)
+		} else if (l_count > 0) {
 			if (sign)
 				ul = (int64_t)va_arg(args, long);
 			else
 				ul = (int64_t)va_arg(args, unsigned long);
-		else if (h_count > 1)
+		} else if (h_count > 1) {
 			if (sign)
 				ul = (int64_t)((char)va_arg(args, int));
 			else
 				ul = (int64_t)((unsigned char)va_arg(args,
 				    int));
-		else if (h_count > 0)
+		} else if (h_count > 0) {
 			if (sign)
 				ul = (int64_t)((short)va_arg(args, int));
 			else
 				ul = (int64_t)((unsigned short)va_arg(args,
 				    int));
+		}
 
 		if (sign && (int64_t)ul < 0)
 			ul = -ul;

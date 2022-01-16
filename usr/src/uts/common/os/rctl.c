@@ -1567,8 +1567,6 @@ rctl_local_op(rctl_hndl_t hndl, rctl_val_t *oval, rctl_val_t *nval,
 	int ret = 0;
 	rctl_dict_entry_t *rde = rctl_dict_lookup_hndl(hndl);
 
-local_op_retry:
-
 	ASSERT(MUTEX_HELD(&p->p_lock));
 
 	rset = rctl_entity_obtain_rset(rde, p);

@@ -635,7 +635,7 @@ typedef	page_t	devpage_t;
 extern pad_mutex_t ph_mutex[];
 
 #define	PAGE_HASH_MUTEX(x) \
-	&(ph_mutex[((x) ^ ((x) >> PH_SHIFT_SIZE) + ((x) << 3)) & \
+	&(ph_mutex[((x) ^ (((x) >> PH_SHIFT_SIZE) + ((x) << 3))) & \
 		(PH_TABLE_SIZE - 1)].pad_mutex)
 
 /*

@@ -1277,7 +1277,7 @@ get_registration(sysevent_channel_descriptor_t *chan, char *databuf,
 	class_lst_t *clist;
 	subclass_lst_t *sc_list;
 
-	if (class_index < 0 || class_index > CLASS_HASH_SZ)
+	if (class_index > CLASS_HASH_SZ)
 		return (EINVAL);
 
 	if ((clist = chan->scd_class_list_tbl[class_index]) == NULL) {
@@ -1395,10 +1395,15 @@ log_sysevent_register(char *channel_name, char *udatabuf, se_pubsub_t *udata)
 	case SE_CLOSE_REGISTRATION:
 		close_channel(kchannel);
 		break;
-	case SE_BIND_REGISTRATION:
-		if ((kdata.ps_id = bind_common(chan, kdata.ps_type)) <= 0)
+	case SE_BIND_REGISTRATION: {
+		id_t id;
+
+		id = bind_common(chan, kdata.ps_type);
+		kdata.ps_id = (uint32_t)id;
+		if (id <= 0)
 			error = EBUSY;
 		break;
+	}
 	case SE_UNBIND_REGISTRATION:
 		(void) unbind_common(chan, kdata.ps_type, (id_t)kdata.ps_id);
 		break;

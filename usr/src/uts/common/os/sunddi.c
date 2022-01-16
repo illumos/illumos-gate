@@ -2813,7 +2813,7 @@ ddi_prop_int64_op(prop_handle_t *ph, uint_t cmd, int64_t *data)
 		 */
 		ph->ph_cur_pos = (uchar_t *)ph->ph_cur_pos +
 		    sizeof (int64_t);
-			return (DDI_PROP_RESULT_OK);
+		return (DDI_PROP_RESULT_OK);
 
 	case DDI_PROP_CMD_ENCODE:
 		/*
@@ -2861,7 +2861,7 @@ ddi_prop_int64_op(prop_handle_t *ph, uint_t cmd, int64_t *data)
 		 */
 		ph->ph_cur_pos = (uchar_t *)ph->ph_cur_pos +
 		    sizeof (int64_t);
-			return (DDI_PROP_RESULT_OK);
+		return (DDI_PROP_RESULT_OK);
 
 	case DDI_PROP_CMD_GET_ESIZE:
 		/*
@@ -9827,7 +9827,7 @@ e_ddi_branch_unconfigure(
 		/* The dip still exists, so do a hold */
 		e_ddi_branch_hold(rdip);
 	}
-out:
+
 	kmem_free(devnm, MAXNAMELEN + 1);
 	ndi_devi_exit(pdip, circ);
 	return (ndi2errno(rv));

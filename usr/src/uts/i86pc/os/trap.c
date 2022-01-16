@@ -966,7 +966,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	case T_EXTERRFLT + USER: /* x87 floating point exception pending */
 		if (tudebug && tudebugfpe)
 			showregs(type, rp, addr);
-		if (sicode = fpexterrflt(rp)) {
+		if ((sicode = fpexterrflt(rp)) != 0) {
 			siginfo.si_signo = SIGFPE;
 			siginfo.si_code  = sicode;
 			siginfo.si_addr  = (caddr_t)rp->r_pc;
@@ -1917,7 +1917,7 @@ dump_ttrace(void)
 	trap_trace_ctl_t *ttc;
 	trap_trace_rec_t *rec;
 	uintptr_t current;
-	int i, j, k;
+	int i, j;
 	int n = NCPU;
 	const char banner[] =
 	    "CPU          ADDRESS    TIMESTAMP TYPE  VC HANDLER          PC\n";
@@ -1993,6 +1993,7 @@ dump_ttrace(void)
 					stype = "syse";	/* sysenter */
 					break;
 				default:
+					stype = "";
 					break;
 				}
 				(void) snprintf(data2, sizeof (data2), fmt2,

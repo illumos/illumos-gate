@@ -821,7 +821,6 @@ watch_xcopyin(const void *uaddr, void *kaddr, size_t count)
 			count -= part;
 		}
 
-error:
 		/* if we hit a watched address, do the watchpoint logic */
 		if (watchcode &&
 		    (!sys_watchpoint(vaddr, watchcode, ta) ||

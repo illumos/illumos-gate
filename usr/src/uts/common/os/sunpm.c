@@ -1616,7 +1616,7 @@ power_dev(dev_info_t *dip, int comp, int level, int old_level,
 				    (PM_CP(dip, comp)->pmc_flags &
 				    PM_PHC_WHILE_SET_POWER));
 
-					resume_needed = suspended;
+				resume_needed = suspended;
 			}
 		} else {
 			if (POWERING_OFF(old_level, level)) {
@@ -1629,7 +1629,7 @@ power_dev(dev_info_t *dip, int comp, int level, int old_level,
 				    (PM_CP(dip, comp)->pmc_flags &
 				    PM_PHC_WHILE_SET_POWER));
 
-					resume_needed = suspended;
+				resume_needed = suspended;
 			}
 		}
 	}
@@ -2076,13 +2076,12 @@ e_pm_hold_rele_power(dev_info_t *dip, int cnt)
 		return;
 
 	PM_LOCK_POWER(dip, &circ);
-	ASSERT(cnt >= 0 && PM_KUC(dip) >= 0 || cnt < 0 && PM_KUC(dip) > 0);
+	ASSERT(cnt >= 0 || (cnt < 0 && PM_KUC(dip) > 0));
 	PMD(PMD_KIDSUP, ("%s: kidsupcnt for %s@%s(%s#%d) %d->%d\n", pmf,
 	    PM_DEVICE(dip), PM_KUC(dip), (PM_KUC(dip) + cnt)))
 
 	PM_KUC(dip) += cnt;
 
-	ASSERT(PM_KUC(dip) >= 0);
 	PM_UNLOCK_POWER(dip, circ);
 
 	if (cnt < 0 && PM_KUC(dip) == 0)

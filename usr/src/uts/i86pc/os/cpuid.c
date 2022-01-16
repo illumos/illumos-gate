@@ -2832,7 +2832,6 @@ cpuid_patch_retpolines(x86_spectrev2_mitigation_t mit)
 		uintptr_t source, dest;
 		int ssize, dsize;
 		char sourcebuf[64], destbuf[64];
-		size_t len;
 
 		(void) snprintf(destbuf, sizeof (destbuf),
 		    "__x86_indirect_thunk%s", thunks[i]);
@@ -4295,7 +4294,7 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		if (cpi->cpi_family == 0xf || cpi->cpi_family == 0x11) {
 			add_x86_feature(featureset, X86FSET_LFENCE_SER);
 		} else if (cpi->cpi_family >= 0x10) {
-			uint64_t val = 0;
+			uint64_t val;
 
 #if !defined(__xpv)
 			/*
@@ -4310,6 +4309,8 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 				val |= AMD_DE_CFG_LFENCE_DISPATCH;
 				wrmsr(MSR_AMD_DE_CFG, val);
 				val = rdmsr(MSR_AMD_DE_CFG);
+			} else {
+				val = 0;
 			}
 			no_trap();
 #endif
@@ -4769,8 +4770,8 @@ cpuid_pass2(cpu_t *cpu)
 				 * Before then, don't trust the data.
 				 */
 				if (cpi->cpi_family < 6 ||
-				    cpi->cpi_family == 6 &&
-				    cpi->cpi_model < 1)
+				    (cpi->cpi_family == 6 &&
+				    cpi->cpi_model < 1))
 					cp->cp_eax = cp->cp_ebx = 0;
 				/*
 				 * AMD Duron rev A0 reports L2

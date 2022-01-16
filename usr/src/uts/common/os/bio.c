@@ -1488,7 +1488,6 @@ bio_getfreeblk(long bsize)
 	 */
 	bio_mem_get(bsize);	/* Account for our memory request */
 
-again:
 	bp = bio_bhdr_alloc();	/* Get a buf hdr */
 	sema_p(&bp->b_sem);	/* Should never fail */
 

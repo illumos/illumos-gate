@@ -3597,6 +3597,16 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		MDI_PI_LOCK(pip);
 		MDI_PI_SET_OFFLINING(pip);
 		break;
+
+	case MDI_PATHINFO_STATE_INIT:
+		/*
+		 * Callers are not allowed to ask us to change the state to the
+		 * initial state.
+		 */
+		rv = MDI_FAILURE;
+		MDI_PI_UNLOCK(pip);
+		goto state_change_exit;
+
 	}
 	MDI_PI_UNLOCK(pip);
 	MDI_CLIENT_UNSTABLE(ct);
@@ -5722,6 +5732,7 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
 			break;
 
 		case DDI_RESUME:
+		case DDI_PM_RESUME:
 			MDI_DEBUG(2, (MDI_NOTE, dip,
 			    "pHCI post_resume: called %p", (void *)ph));
 			if (error == DDI_SUCCESS) {
@@ -5769,6 +5780,7 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
 			break;
 
 		case DDI_RESUME:
+		case DDI_PM_RESUME:
 			MDI_DEBUG(2, (MDI_NOTE, dip,
 			    "client post_attach: called %p", (void *)ct));
 			if (error == DDI_SUCCESS) {
@@ -6011,11 +6023,14 @@ i_mdi_phci_post_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, int error)
 		break;
 
 	case DDI_SUSPEND:
+	case DDI_PM_SUSPEND:
 		MDI_DEBUG(2, (MDI_NOTE, dip,
 		    "pHCI post_suspend: called %p",
 		    (void *)ph));
 		if (error != DDI_SUCCESS)
 			MDI_PHCI_SET_RESUME(ph);
+		break;
+	case DDI_HOTPLUG_DETACH:
 		break;
 	}
 	MDI_PHCI_UNLOCK(ph);
@@ -6054,10 +6069,13 @@ i_mdi_client_post_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, int error)
 		break;
 
 	case DDI_SUSPEND:
+	case DDI_PM_SUSPEND:
 		MDI_DEBUG(2, (MDI_NOTE, dip,
 		    "called %p", (void *)ct));
 		if (error != DDI_SUCCESS)
 			MDI_CLIENT_SET_RESUME(ct);
+		break;
+	case DDI_HOTPLUG_DETACH:
 		break;
 	}
 	MDI_CLIENT_UNLOCK(ct);
@@ -6819,6 +6837,10 @@ mdi_bus_power(dev_info_t *parent, void *impl_arg, pm_bus_power_op_t op,
 			    "i_mdi_pm_rele_client\n"));
 			i_mdi_pm_rele_client(ct, ct->ct_path_count);
 		}
+		break;
+	default:
+		dev_err(parent, CE_WARN, "!unhandled bus power operation: 0x%x",
+		    op);
 		break;
 	}
 

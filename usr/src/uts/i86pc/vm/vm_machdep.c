@@ -1399,12 +1399,12 @@ void
 mnode_range_setup(mnoderange_t *mnoderanges)
 {
 	mnoderange_t *mp;
-	size_t nr_ranges;
+	ssize_t nr_ranges;
 	size_t mnode;
 
 	for (mnode = 0, nr_ranges = 0, mp = mnoderanges;
 	    mnode < max_mem_nodes; mnode++) {
-		size_t mri = nranges - 1;
+		ssize_t mri = nranges - 1;
 
 		if (mem_node_config[mnode].exists == 0)
 			continue;
@@ -3794,9 +3794,8 @@ ppcopy(page_t *frompp, page_t *topp)
 	caddr_t		pp_addr2;
 	hat_mempte_t	pte1;
 	hat_mempte_t	pte2;
-	kmutex_t	*ppaddr_mutex;
 	label_t		ljb;
-	int		ret = 1;
+	int		ret;
 
 	ASSERT_STACK_ALIGNED();
 	ASSERT(PAGE_LOCKED(frompp));
@@ -3817,8 +3816,7 @@ ppcopy(page_t *frompp, page_t *topp)
 		pte1 = CPU->cpu_caddr1pte;
 		pte2 = CPU->cpu_caddr2pte;
 
-		ppaddr_mutex = &CPU->cpu_ppaddr_mutex;
-		mutex_enter(ppaddr_mutex);
+		mutex_enter(&CPU->cpu_ppaddr_mutex);
 
 		hat_mempte_remap(page_pptonum(frompp), pp_addr1, pte1,
 		    PROT_READ | HAT_STORECACHING_OK, HAT_LOAD_NOCONSIST);
@@ -3830,6 +3828,8 @@ ppcopy(page_t *frompp, page_t *topp)
 	if (on_fault(&ljb)) {
 		ret = 0;
 		goto faulted;
+	} else {
+		ret = 1;
 	}
 	if (use_sse_pagecopy)
 #ifdef __xpv
@@ -3855,7 +3855,7 @@ faulted:
 		    UVMF_INVLPG | UVMF_LOCAL) < 0)
 			panic("HYPERVISOR_update_va_mapping() failed");
 #endif
-		mutex_exit(ppaddr_mutex);
+		mutex_exit(&CPU->cpu_ppaddr_mutex);
 	}
 	kpreempt_enable();
 	return (ret);

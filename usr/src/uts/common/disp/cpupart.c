@@ -885,7 +885,7 @@ cpupart_unbind_threads(cpupart_t *pp, boolean_t unbind_all)
 	kthread_t *t;
 	proc_t	*p;
 	int	err = 0;
-	psetid_t psid = pp->cp_id;
+	psetid_t psid;
 
 	ASSERT(pool_lock_held());
 	ASSERT(MUTEX_HELD(&cpu_lock));
@@ -893,6 +893,7 @@ cpupart_unbind_threads(cpupart_t *pp, boolean_t unbind_all)
 	if (pp == NULL || pp == &cp_default) {
 		return (EINVAL);
 	}
+	psid = pp->cp_id;
 
 	/*
 	 * Pre-allocate enough buffers for FSS for all active projects and
@@ -974,7 +975,7 @@ cpupart_destroy(psetid_t psid)
 
 	newpp = &cp_default;
 	while ((cp = pp->cp_cpulist) != NULL) {
-		if (err = cpupart_move_cpu(cp, newpp, 0)) {
+		if ((err = cpupart_move_cpu(cp, newpp, 0)) != 0) {
 			mutex_exit(&cpu_lock);
 			return (err);
 		}

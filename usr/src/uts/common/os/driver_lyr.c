@@ -1131,7 +1131,7 @@ ldi_usage_walker_helper(struct ldi_ident *lip, vnode_t *vp,
 	else
 		major = lip->li_major;
 
-	ASSERT((major >= 0) && (major < devcnt));
+	ASSERT3U(major, <, devcnt);
 
 	dnp = &devnamesp[major];
 	LOCK_DEV_OPS(&dnp->dn_lock);

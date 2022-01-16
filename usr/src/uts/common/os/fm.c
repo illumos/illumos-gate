@@ -336,6 +336,7 @@ fm_nvprintr(nvlist_t *nvl, int d, int c, int cols)
 			c = fm_printf(d + 1, c, cols, "[...]");
 			break;
 		case DATA_TYPE_UNKNOWN:
+		case DATA_TYPE_DONTCARE:
 			c = fm_printf(d + 1, c, cols, "<unknown>");
 			break;
 		}

@@ -511,10 +511,10 @@ update_sregs(struct regs *rp,  klwp_t *lwp)
 	pcb_t *pcb = &lwp->lwp_pcb;
 	ulong_t	kgsbase;
 	on_trap_data_t	otd;
-	int rc = 0;
+	int rc;
 
 	if (!on_trap(&otd, OT_SEGMENT_ACCESS)) {
-
+		rc = 0;
 #if defined(__xpv)
 		/*
 		 * On the hyervisor this is easy. The hypercall below will
@@ -728,8 +728,6 @@ static void
 lwp_segregs_restore32(void *arg)
 {
 	klwp_t *lwp = arg;
-	/*LINTED*/
-	cpu_t *cpu = CPU;
 	pcb_t *pcb = &lwp->lwp_pcb;
 
 	ASSERT(VALID_LWP_DESC(&lwp->lwp_pcb.pcb_fsdesc));

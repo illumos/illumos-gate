@@ -1122,8 +1122,8 @@ flk_process_request(lock_descriptor_t *request)
 	}
 
 	if (!request_blocked_by_active) {
-			lock_descriptor_t *lk[1];
-			lock_descriptor_t *first_glock = NULL;
+		lock_descriptor_t *lk[1];
+		lock_descriptor_t *first_glock = NULL;
 		/*
 		 * Shall we grant this?! NO!!
 		 * What about those locks that were just granted and still
@@ -2093,12 +2093,12 @@ flk_graph_uncolor(graph_t *gp)
 
 	if (gp->mark == UINT_MAX) {
 		gp->mark = 1;
-	for (lock = ACTIVE_HEAD(gp)->l_next; lock != ACTIVE_HEAD(gp);
-	    lock = lock->l_next)
+		for (lock = ACTIVE_HEAD(gp)->l_next; lock != ACTIVE_HEAD(gp);
+		    lock = lock->l_next)
 			lock->l_color  = 0;
 
-	for (lock = SLEEPING_HEAD(gp)->l_next; lock != SLEEPING_HEAD(gp);
-	    lock = lock->l_next)
+		for (lock = SLEEPING_HEAD(gp)->l_next;
+		    lock != SLEEPING_HEAD(gp); lock = lock->l_next)
 			lock->l_color  = 0;
 	} else {
 		gp->mark++;
@@ -4469,34 +4469,34 @@ check_sleeping_locks(graph_t *gp)
 	edge_t *ep;
 	for (lock1 = SLEEPING_HEAD(gp)->l_next; lock1 != SLEEPING_HEAD(gp);
 	    lock1 = lock1->l_next) {
-				ASSERT(!IS_BARRIER(lock1));
-	for (lock2 = lock1->l_next; lock2 != SLEEPING_HEAD(gp);
-	    lock2 = lock2->l_next) {
-		if (lock1->l_vnode == lock2->l_vnode) {
-			if (BLOCKS(lock2, lock1)) {
-				ASSERT(!IS_GRANTED(lock1));
-				ASSERT(!NOT_BLOCKED(lock1));
-				path(lock1, lock2);
+		ASSERT(!IS_BARRIER(lock1));
+		for (lock2 = lock1->l_next; lock2 != SLEEPING_HEAD(gp);
+		    lock2 = lock2->l_next) {
+			if (lock1->l_vnode == lock2->l_vnode) {
+				if (BLOCKS(lock2, lock1)) {
+					ASSERT(!IS_GRANTED(lock1));
+					ASSERT(!NOT_BLOCKED(lock1));
+					path(lock1, lock2);
+				}
 			}
 		}
-	}
 
-	for (lock2 = ACTIVE_HEAD(gp)->l_next; lock2 != ACTIVE_HEAD(gp);
-	    lock2 = lock2->l_next) {
-				ASSERT(!IS_BARRIER(lock1));
-		if (lock1->l_vnode == lock2->l_vnode) {
-			if (BLOCKS(lock2, lock1)) {
-				ASSERT(!IS_GRANTED(lock1));
-				ASSERT(!NOT_BLOCKED(lock1));
-				path(lock1, lock2);
+		for (lock2 = ACTIVE_HEAD(gp)->l_next; lock2 != ACTIVE_HEAD(gp);
+		    lock2 = lock2->l_next) {
+			ASSERT(!IS_BARRIER(lock1));
+			if (lock1->l_vnode == lock2->l_vnode) {
+				if (BLOCKS(lock2, lock1)) {
+					ASSERT(!IS_GRANTED(lock1));
+					ASSERT(!NOT_BLOCKED(lock1));
+					path(lock1, lock2);
+				}
 			}
 		}
-	}
-	ep = FIRST_ADJ(lock1);
-	while (ep != HEAD(lock1)) {
-		ASSERT(BLOCKS(ep->to_vertex, lock1));
-		ep = NEXT_ADJ(ep);
-	}
+		ep = FIRST_ADJ(lock1);
+		while (ep != HEAD(lock1)) {
+			ASSERT(BLOCKS(ep->to_vertex, lock1));
+			ep = NEXT_ADJ(ep);
+		}
 	}
 }
 

@@ -2814,9 +2814,12 @@ checkpolldat(pollstate_t *ps)
 					refp = &pdp->pd_ref[j];
 					if (refp->xf_refcnt > 0) {
 						pcsp = &ps->ps_pcacheset[j];
-				ASSERT(refp->xf_position < pcsp->pcs_nfds);
+						ASSERT(refp->xf_position <
+						    pcsp->pcs_nfds);
 						pollfd = pcsp->pcs_pollfd;
-			ASSERT(pdp->pd_fd == pollfd[refp->xf_position].fd);
+						ASSERT(pdp->pd_fd ==
+						    pollfd[refp->xf_position].
+						    fd);
 					}
 				}
 			}

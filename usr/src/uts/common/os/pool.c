@@ -1441,9 +1441,13 @@ pool_do_bind(pool_t *pool, idtype_t idtype, id_t id, int flags)
 			switch (idtype) {
 			case P_PID:
 			case P_TASKID:
+			default:
+
 				/*
-				 * Can't bind processes or tasks
-				 * in local zones to pools.
+				 * Can't bind processes or tasks in local zones
+				 * to pools. Also catch all remaining types of
+				 * idtype_t that should already have been
+				 * filtered out.
 				 */
 				mutex_exit(&p->p_lock);
 				mutex_exit(&pidlock);
@@ -1714,6 +1718,8 @@ out:	switch (idtype) {
 		}
 		zone->zone_pool_mod = gethrtime();
 		zone_rele(zone);
+		break;
+	default:
 		break;
 	}
 

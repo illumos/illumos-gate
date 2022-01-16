@@ -2397,8 +2397,8 @@ release_bootstrap(void)
 			continue;
 		}
 
-		if (root_is_ramdisk && pp_in_range(pp, ramdisk_start,
-		    ramdisk_end) || pp_in_module(pp, modranges)) {
+		if ((root_is_ramdisk && pp_in_range(pp, ramdisk_start,
+		    ramdisk_end)) || pp_in_module(pp, modranges)) {
 			pp->p_next = rd_pages;
 			rd_pages = pp;
 			continue;
@@ -2818,7 +2818,6 @@ set_soft_hostid(void)
 	int i;
 	int32_t hostid = (int32_t)HW_INVALID_HOSTID;
 	unsigned char *c;
-	hrtime_t tsc;
 	smbios_system_t smsys;
 
 	/*

@@ -803,7 +803,7 @@ do_erratum_298(struct cpu *cpu)
 uint_t
 workaround_errata(struct cpu *cpu)
 {
-	uint_t missing = 0;
+	volatile uint_t missing = 0;
 
 	ASSERT(cpu == CPU);
 

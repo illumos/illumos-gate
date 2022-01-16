@@ -4206,8 +4206,8 @@ try_again:
 		/*
 		 * can stop short if we found a ref'd or mod'd page
 		 */
-		if ((flags & HAT_SYNC_STOPON_MOD) && PP_ISMOD(save_pp) ||
-		    (flags & HAT_SYNC_STOPON_REF) && PP_ISREF(save_pp)) {
+		if (((flags & HAT_SYNC_STOPON_MOD) && PP_ISMOD(save_pp)) ||
+		    ((flags & HAT_SYNC_STOPON_REF) && PP_ISREF(save_pp))) {
 			x86_hm_exit(pp);
 			goto done;
 		}

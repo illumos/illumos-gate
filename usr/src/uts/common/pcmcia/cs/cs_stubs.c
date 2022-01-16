@@ -131,9 +131,9 @@ csx_register_cardservices(cs_register_cardservices_t *rcs)
 {
 #ifdef	CS_STUBS_DEBUG
 	if (cs_stubs_debug > 2)
-	    cmn_err(CE_CONT, "csx_register_cardservices: "
-		"magic: 0x%x function: 0x%x cardservices: 0x%p\n",
-		rcs->magic, rcs->function, (void *)rcs->cardservices);
+		cmn_err(CE_CONT, "csx_register_cardservices: "
+		    "magic: 0x%x function: 0x%x cardservices: 0x%p\n",
+		    rcs->magic, rcs->function, (void *)rcs->cardservices);
 #endif
 
 	if (rcs->magic != CS_STUBS_MAGIC)
@@ -144,8 +144,9 @@ csx_register_cardservices(cs_register_cardservices_t *rcs)
 		cardservices = rcs->cardservices;
 		do_cs_call = 1;
 #ifdef	CS_STUBS_DEBUG
-	if (cs_stubs_debug > 2)
-	    cmn_err(CE_CONT, "csx_register_cardservices: CS_ENTRY_REGISTER\n");
+		if (cs_stubs_debug > 2)
+			cmn_err(CE_CONT, "csx_register_cardservices: "
+			    "CS_ENTRY_REGISTER\n");
 #endif
 
 		return (CS_SUCCESS);
@@ -154,17 +155,18 @@ csx_register_cardservices(cs_register_cardservices_t *rcs)
 		do_cs_call = 0;
 		cardservices = cs_no_carservices;
 #ifdef	CS_STUBS_DEBUG
-	if (cs_stubs_debug > 2)
-	    cmn_err(CE_CONT,
-		"csx_register_cardservices: CS_ENTRY_DEREGISTER\n");
+		if (cs_stubs_debug > 2)
+			cmn_err(CE_CONT, "csx_register_cardservices: "
+			    "CS_ENTRY_DEREGISTER\n");
 #endif
 		return (CS_UNSUPPORTED_FUNCTION);
 
 	    case CS_ENTRY_INQUIRE:
 		rcs->cardservices = cardservices;
 #ifdef	CS_STUBS_DEBUG
-	if (cs_stubs_debug > 2)
-	    cmn_err(CE_CONT, "csx_register_cardservices: CS_ENTRY_INQUIRE\n");
+		if (cs_stubs_debug > 2)
+			cmn_err(CE_CONT, "csx_register_cardservices: "
+			    "CS_ENTRY_INQUIRE\n");
 #endif
 
 		if (do_cs_call)
@@ -174,8 +176,9 @@ csx_register_cardservices(cs_register_cardservices_t *rcs)
 
 	    default:
 #ifdef	CS_STUBS_DEBUG
-	if (cs_stubs_debug > 2)
-	    cmn_err(CE_CONT, "csx_register_cardservices: (unknown function)\n");
+		if (cs_stubs_debug > 2)
+			cmn_err(CE_CONT, "csx_register_cardservices: "
+			    "(unknown function)\n");
 #endif
 		return (CS_UNSUPPORTED_FUNCTION);
 	}

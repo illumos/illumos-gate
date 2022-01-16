@@ -1150,7 +1150,7 @@ check_user_privs(const cred_t *cr, const priv_set_t *set)
 out:
 	if (da.rbuf != (char *)&res)
 		kmem_free(da.rbuf, da.rsize);
-out1:
+
 	kmem_free(pap, pasize);
 	klpd_rele(pfd);
 	return (err);

@@ -1070,7 +1070,7 @@ lgrp_plat_latency(lgrp_handle_t from, lgrp_handle_t to)
 	/*
 	 * Return 0 for nodes (lgroup platform handles) out of range
 	 */
-	if (src < 0 || src >= MAX_NODES || dest < 0 || dest >= MAX_NODES)
+	if (src >= MAX_NODES || dest >= MAX_NODES)
 		return (0);
 
 	/*

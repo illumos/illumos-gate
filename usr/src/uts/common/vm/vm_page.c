@@ -3654,7 +3654,7 @@ page_add_common(page_t **ppp, page_t *pp)
 void
 page_sub(page_t **ppp, page_t *pp)
 {
-	ASSERT((PP_ISFREE(pp)) ? 1 :
+	ASSERT(pp != NULL && (PP_ISFREE(pp)) ? 1 :
 	    (PAGE_EXCL(pp)) || (PAGE_SHARED(pp) && page_iolock_assert(pp)));
 
 	if (*ppp == NULL || pp == NULL) {

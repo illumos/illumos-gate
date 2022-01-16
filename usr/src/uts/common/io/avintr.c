@@ -741,7 +741,7 @@ av_dispatch_softvect(uint_t pil)
 	caddr_t arg2;
 
 	ASSERT_STACK_ALIGNED();
-	ASSERT(pil >= 0 && pil <= PIL_MAX);
+	ASSERT3U(pil, <=, PIL_MAX);
 
 	for (av = softvect[pil].avh_link; av; av = av->av_link) {
 		/*

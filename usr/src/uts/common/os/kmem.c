@@ -5362,7 +5362,7 @@ kmem_cache_scan(kmem_cache_t *cp)
 	}
 
 	if (kmem_cache_is_fragmented(cp, &reap)) {
-		size_t slabs_found;
+		int slabs_found;
 
 		/*
 		 * Consolidate reclaimable slabs from the end of the partial

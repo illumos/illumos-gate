@@ -163,14 +163,14 @@ static	segkmem_lpcb_t segkmem_lpcb;
  * we allow for large page heap.
  */
 size_t  segkmem_kmemlp_max;
-static  uint_t  segkmem_kmemlp_pcnt;
+uint_t  segkmem_kmemlp_pcnt;
 
 /*
  * Getting large pages for kernel heap could be problematic due to
  * physical memory fragmentation. That's why we allow to preallocate
  * "segkmem_kmemlp_min" bytes at boot time.
  */
-static  size_t	segkmem_kmemlp_min;
+size_t	segkmem_kmemlp_min;
 
 /*
  * Throttling is used to avoid expensive tries to allocate large pages

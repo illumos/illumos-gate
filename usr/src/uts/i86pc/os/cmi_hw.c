@@ -302,7 +302,7 @@ cmi_inj_tainted(void)
 
 #define	CMI_MSRI_HASHSZ		16
 #define	CMI_MSRI_HASHIDX(hdl, msr) \
-	(((uintptr_t)(hdl) >> 3 + (msr)) % (CMI_MSRI_HASHSZ - 1))
+	((((uintptr_t)(hdl) >> 3) + (msr)) % (CMI_MSRI_HASHSZ - 1))
 
 struct cmi_msri_bkt {
 	kmutex_t msrib_lock;

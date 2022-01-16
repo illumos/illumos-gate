@@ -721,7 +721,6 @@ dboot_loader_mmap_get_type(int index)
 {
 #if !defined(__xpv)
 	mb_memory_map_t *mp, *mpend;
-	caddr32_t mmap_addr;
 	int i;
 
 	switch (multiboot_version) {
@@ -1375,13 +1374,13 @@ fixup_modules(void)
 		return;
 
 	if (modules[0].bm_type != BMT_FILE ||
-	    modules_used > 1 && modules[1].bm_type != BMT_FILE) {
+	    (modules_used > 1 && modules[1].bm_type != BMT_FILE)) {
 		return;
 	}
 
 	if (modules[0].bm_hash != (native_ptr_t)(uintptr_t)NULL ||
-	    modules_used > 1 &&
-	    modules[1].bm_hash != (native_ptr_t)(uintptr_t)NULL) {
+	    (modules_used > 1 &&
+	    modules[1].bm_hash != (native_ptr_t)(uintptr_t)NULL)) {
 		return;
 	}
 
