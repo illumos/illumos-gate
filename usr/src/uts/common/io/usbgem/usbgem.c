@@ -57,38 +57,25 @@
 #include <sys/errno.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#ifndef USBGEM_CONFIG_GLDv3
-#include <sys/dlpi.h>
-#include <sys/strsubr.h>
-#endif
 #include <sys/stream.h>		/* required for MBLK* */
 #include <sys/strsun.h>		/* required for mionack() */
 #include <sys/byteorder.h>
 
 #include <sys/usb/usba.h>
-#ifdef USBGEM_CONFIG_GLDv3
 #include <inet/common.h>
 #include <inet/led.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
-#endif
 
 /* supplement definitions */
 extern const char *usb_str_cr(usb_cr_t);
 
-#ifndef USBGEM_CONFIG_GLDv3
-#pragma weak	gld_linkstate
-#endif
 #include <sys/note.h>
 
 #include "usbgem_mii.h"
 #include "usbgem.h"
 
-#ifdef MODULE
 char	ident[] = "usb general ethernet mac driver v" VERSION;
-#else
-extern char	ident[];
-#endif
 
 /* Debugging support */
 #ifdef USBGEM_DEBUG_LEVEL
@@ -156,7 +143,6 @@ static uint8_t usbgem_bcastaddr[] = {
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
 
-#ifdef MODULE
 extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
@@ -200,7 +186,6 @@ _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
 }
-#endif /* MODULE */
 
 /* ============================================================== */
 /*
@@ -427,50 +412,6 @@ x:
 #endif /* USBGEM_DEBUG_VLAN */
 #endif /* USBGEM_DEBUG_LEVEL */
 
-#ifdef GEM_GCC_RUNTIME
-/*
- * gcc3 runtime routines
- */
-#pragma weak memcmp
-int
-memcmp(const void *s1, const void *s2, size_t n)
-{
-	int	i;
-	int	ret;
-
-	ret = 0;
-	for (i = 0; i < n; i++) {
-		ret = (int)((uint8_t *)s1)[i] - (int)((uint8_t *)s2)[i];
-		if (ret) {
-			return (ret);
-		}
-	}
-	return (0);
-}
-
-#pragma weak memset
-void *
-memset(void *s, int c, size_t n)
-{
-	if ((c & 0xff) == 0) {
-		bzero(s, n);
-	} else {
-		while (n--) {
-			((uint8_t *)s)[n] = c;
-		}
-	}
-	return (s);
-}
-
-#pragma weak _memcpy = memcpy
-#pragma weak memcpy
-void *
-memcpy(void *s1, const void *s2, size_t n)
-{
-	bcopy(s2, s1, n);
-	return (s1);
-}
-#endif /* GEM_GCC_RUNTIME */
 /* ============================================================== */
 /*
  * hardware operations
@@ -1071,16 +1012,7 @@ usbgem_bulkin_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 		}
 
 		/* send up if it is a valid packet */
-#ifdef USBGEM_CONFIG_GLDv3
 		mac_rx(dp->mh, NULL, newmp);
-#else
-		while (newmp) {
-			tp = newmp;
-			newmp = newmp->b_next;
-			tp->b_next = NULL;
-			gld_recv(dp->macinfo, tp);
-		}
-#endif
 	} else {
 		freemsg(mp);
 		len = 0;
@@ -1189,11 +1121,7 @@ usbgem_bulkout_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	mutex_exit(&dp->txlock);
 
 	if (tx_sched) {
-#ifdef USBGEM_CONFIG_GLDv3
 		mac_tx_update(dp->mh);
-#else
-		gld_sched(dp->macinfo);
-#endif
 	}
 }
 
@@ -1405,19 +1333,8 @@ static char *usbgem_fc_type[] = {
 	"with rx",
 };
 
-#ifdef USBGEM_CONFIG_GLDv3
 #define	USBGEM_LINKUP(dp)	mac_link_update((dp)->mh, LINK_STATE_UP)
 #define	USBGEM_LINKDOWN(dp)	mac_link_update((dp)->mh, LINK_STATE_DOWN)
-#else
-#define	USBGEM_LINKUP(dp)	\
-	if (gld_linkstate) {	\
-		gld_linkstate((dp)->macinfo, GLD_LINKSTATE_UP);	\
-	}
-#define	USBGEM_LINKDOWN(dp)	\
-	if (gld_linkstate) {	\
-		gld_linkstate((dp)->macinfo, GLD_LINKSTATE_DOWN);	\
-	}
-#endif
 
 static uint8_t usbgem_fc_result[4 /* my cap */][4 /* lp cap */] = {
 /*	 none	symm	tx	rx/symm */
@@ -2145,11 +2062,7 @@ usbgem_mii_link_watcher(struct usbgem_dev *dp)
 		 */
 		if (tx_sched) {
 			/* kick potentially stopped downstream */
-#ifdef USBGEM_CONFIG_GLDv3
 			mac_tx_update(dp->mh);
-#else
-			gld_sched(dp->macinfo);
-#endif
 		}
 
 		if (old_mii_state != new_mii_state) {
@@ -2771,7 +2684,6 @@ usbgem_get_def_val(struct usbgem_dev *dp, mac_prop_id_t pr_num,
 	return (err);
 }
 
-#ifdef MAC_VERSION_V1
 static void
 usbgem_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
     mac_prop_info_handle_t prh)
@@ -2900,7 +2812,6 @@ usbgem_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		break;
 	}
 }
-#endif
 
 static int
 usbgem_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
@@ -3070,13 +2981,8 @@ usbgem_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 }
 
 static int
-#ifdef MAC_VERSION_V1
 usbgem_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, void *pr_val)
-#else
-usbgem_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
-#endif
 {
 	struct usbgem_dev *dp = arg;
 	int err = 0;
@@ -3086,21 +2992,11 @@ usbgem_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	if (pr_valsize == 0) {
 		return (EINVAL);
 	}
-#ifndef MAC_VERSION_V1
-	*perm = MAC_PROP_PERM_RW;
-#endif
+
 	bzero(pr_val, pr_valsize);
-#ifndef MAC_VERSION_V1
-	if ((pr_flags & MAC_PROP_DEFAULT) && (pr_num != MAC_PROP_PRIVATE)) {
-		return (usbgem_get_def_val(dp, pr_num, pr_valsize, pr_val));
-	}
-#endif
 	rw_enter(&dp->dev_state_lock, RW_READER);
 	switch (pr_num) {
 	case MAC_PROP_DUPLEX:
-#ifndef MAC_VERSION_V1
-		*perm = MAC_PROP_PERM_READ;
-#endif
 		if (pr_valsize >= sizeof (link_duplex_t)) {
 			if (dp->mii_state != MII_STATE_LINKUP) {
 				*(link_duplex_t *)pr_val = LINK_DUPLEX_UNKNOWN;
@@ -3114,9 +3010,6 @@ usbgem_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		}
 		break;
 	case MAC_PROP_SPEED:
-#ifndef MAC_VERSION_V1
-		*perm = MAC_PROP_PERM_READ;
-#endif
 		if (pr_valsize >= sizeof (uint64_t)) {
 			switch (dp->speed) {
 			case USBGEM_SPD_1000:
@@ -3138,11 +3031,6 @@ usbgem_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		break;
 
 	case MAC_PROP_AUTONEG:
-#ifndef MAC_VERSION_V1
-		if (dp->mii_status_ro & MII_STATUS_CANAUTONEG) {
-			*perm = MAC_PROP_PERM_READ;
-		}
-#endif
 		*(uint8_t *)pr_val = dp->anadv_autoneg;
 		break;
 
@@ -3179,67 +3067,30 @@ usbgem_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		break;
 
 	case MAC_PROP_EN_1000FDX_CAP:
-#ifndef MAC_VERSION_V1
-		if ((dp->mii_xstatus_ro & MII_XSTATUS_1000BASET_FD) &&
-		    (dp->mii_xstatus_ro & MII_XSTATUS_1000BASEX_FD)) {
-			*perm = MAC_PROP_PERM_READ;
-		}
-#endif
 		*(uint8_t *)pr_val = dp->anadv_1000fdx;
 		break;
 
 	case MAC_PROP_EN_1000HDX_CAP:
-#ifndef MAC_VERSION_V1
-		if ((dp->mii_xstatus_ro & MII_XSTATUS_1000BASET) &&
-		    (dp->mii_xstatus_ro & MII_XSTATUS_1000BASEX)) {
-			*perm = MAC_PROP_PERM_READ;
-		}
-#endif
 		*(uint8_t *)pr_val = dp->anadv_1000hdx;
 		break;
 
 	case MAC_PROP_EN_100FDX_CAP:
-#ifndef MAC_VERSION_V1
-		if (dp->mii_status_ro & MII_STATUS_100_BASEX_FD) {
-			*perm = MAC_PROP_PERM_READ;
-		}
-#endif
 		*(uint8_t *)pr_val = dp->anadv_100fdx;
 		break;
 
 	case MAC_PROP_EN_100HDX_CAP:
-#ifndef MAC_VERSION_V1
-		if (dp->mii_status_ro & MII_STATUS_100_BASEX) {
-			*perm = MAC_PROP_PERM_READ;
-		}
-#endif
 		*(uint8_t *)pr_val = dp->anadv_100hdx;
 		break;
 
 	case MAC_PROP_EN_10FDX_CAP:
-#ifndef MAC_VERSION_V1
-		if (dp->mii_status_ro & MII_STATUS_10_FD) {
-			*perm = MAC_PROP_PERM_READ;
-		}
-#endif
 		*(uint8_t *)pr_val = dp->anadv_10fdx;
 		break;
 
 	case MAC_PROP_EN_10HDX_CAP:
-#ifndef MAC_VERSION_V1
-		if (dp->mii_status_ro & MII_STATUS_10) {
-			*perm = MAC_PROP_PERM_READ;
-		}
-#endif
 		*(uint8_t *)pr_val = dp->anadv_10hdx;
 		break;
 
 	case MAC_PROP_EN_100T4_CAP:
-#ifndef MAC_VERSION_V1
-		if (dp->mii_status_ro & MII_STATUS_100_BASE_T4) {
-			*perm = MAC_PROP_PERM_READ;
-		}
-#endif
 		*(uint8_t *)pr_val = dp->anadv_100t4;
 		break;
 
@@ -3247,25 +3098,6 @@ usbgem_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		err = ENOTSUP;
 		break;
 
-#ifndef MAC_VERSION_V1
-	case MAC_PROP_MTU: {
-		mac_propval_range_t range;
-		if (!(pr_flags & MAC_PROP_POSSIBLE)) {
-			err = ENOTSUP;
-			break;
-		}
-		if (pr_valsize < sizeof (mac_propval_range_t)) {
-			err = EINVAL;
-			break;
-		}
-		range.mpr_count = 1;
-		range.mpr_type = MAC_PROPVAL_UINT32;
-		range.range_uint32[0].mpur_min = ETHERMTU;
-		range.range_uint32[0].mpur_max = dp->mtu;
-		bcopy(&range, pr_val, sizeof (range));
-		break;
-	}
-#endif
 	default:
 		err = ENOTSUP;
 		break;
@@ -3275,600 +3107,6 @@ usbgem_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	return (err);
 }
 #endif /* USBGEM_CONFIG_MAC_PROP */
-
-#ifdef USBGEM_CONFIG_ND
-/* ============================================================== */
-/*
- * ND interface
- */
-/* ============================================================== */
-enum {
-	PARAM_AUTONEG_CAP,
-	PARAM_PAUSE_CAP,
-	PARAM_ASYM_PAUSE_CAP,
-	PARAM_1000FDX_CAP,
-	PARAM_1000HDX_CAP,
-	PARAM_100T4_CAP,
-	PARAM_100FDX_CAP,
-	PARAM_100HDX_CAP,
-	PARAM_10FDX_CAP,
-	PARAM_10HDX_CAP,
-
-	PARAM_ADV_AUTONEG_CAP,
-	PARAM_ADV_PAUSE_CAP,
-	PARAM_ADV_ASYM_PAUSE_CAP,
-	PARAM_ADV_1000FDX_CAP,
-	PARAM_ADV_1000HDX_CAP,
-	PARAM_ADV_100T4_CAP,
-	PARAM_ADV_100FDX_CAP,
-	PARAM_ADV_100HDX_CAP,
-	PARAM_ADV_10FDX_CAP,
-	PARAM_ADV_10HDX_CAP,
-	PARAM_ADV_1000T_MS,
-
-	PARAM_LP_AUTONEG_CAP,
-	PARAM_LP_PAUSE_CAP,
-	PARAM_LP_ASYM_PAUSE_CAP,
-	PARAM_LP_1000FDX_CAP,
-	PARAM_LP_1000HDX_CAP,
-	PARAM_LP_100T4_CAP,
-	PARAM_LP_100FDX_CAP,
-	PARAM_LP_100HDX_CAP,
-	PARAM_LP_10FDX_CAP,
-	PARAM_LP_10HDX_CAP,
-
-	PARAM_LINK_STATUS,
-	PARAM_LINK_SPEED,
-	PARAM_LINK_DUPLEX,
-
-	PARAM_LINK_AUTONEG,
-	PARAM_LINK_RX_PAUSE,
-	PARAM_LINK_TX_PAUSE,
-
-	PARAM_LOOP_MODE,
-	PARAM_MSI_CNT,
-#ifdef DEBUG_RESUME
-	PARAM_RESUME_TEST,
-#endif
-
-	PARAM_COUNT
-};
-
-struct usbgem_nd_arg {
-	struct usbgem_dev	*dp;
-	int		item;
-};
-
-static int
-usbgem_param_get(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *credp)
-{
-	struct usbgem_dev	*dp = ((struct usbgem_nd_arg *)(void *)arg)->dp;
-	int		item = ((struct usbgem_nd_arg *)(void *)arg)->item;
-	long		val;
-
-	DPRINTF(1, (CE_CONT, "!%s: %s: called, item:%d",
-	    dp->name, __func__, item));
-
-	switch (item) {
-	case PARAM_AUTONEG_CAP:
-		val = BOOLEAN(dp->mii_status & MII_STATUS_CANAUTONEG);
-		DPRINTF(1, (CE_CONT, "autoneg_cap:%d", val));
-		break;
-
-	case PARAM_PAUSE_CAP:
-		val = dp->ugc.usbgc_flow_control != FLOW_CONTROL_NONE;
-		break;
-
-	case PARAM_ASYM_PAUSE_CAP:
-		val = dp->ugc.usbgc_flow_control > FLOW_CONTROL_SYMMETRIC;
-		break;
-
-	case PARAM_1000FDX_CAP:
-		val = (dp->mii_xstatus & MII_XSTATUS_1000BASET_FD) ||
-		    (dp->mii_xstatus & MII_XSTATUS_1000BASEX_FD);
-		break;
-
-	case PARAM_1000HDX_CAP:
-		val = (dp->mii_xstatus & MII_XSTATUS_1000BASET) ||
-		    (dp->mii_xstatus & MII_XSTATUS_1000BASEX);
-		break;
-
-	case PARAM_100T4_CAP:
-		val = BOOLEAN(dp->mii_status & MII_STATUS_100_BASE_T4);
-		break;
-
-	case PARAM_100FDX_CAP:
-		val = BOOLEAN(dp->mii_status & MII_STATUS_100_BASEX_FD);
-		break;
-
-	case PARAM_100HDX_CAP:
-		val = BOOLEAN(dp->mii_status & MII_STATUS_100_BASEX);
-		break;
-
-	case PARAM_10FDX_CAP:
-		val = BOOLEAN(dp->mii_status & MII_STATUS_10_FD);
-		break;
-
-	case PARAM_10HDX_CAP:
-		val = BOOLEAN(dp->mii_status & MII_STATUS_10);
-		break;
-
-	case PARAM_ADV_AUTONEG_CAP:
-		val = dp->anadv_autoneg;
-		break;
-
-	case PARAM_ADV_PAUSE_CAP:
-		val = dp->anadv_pause;
-		break;
-
-	case PARAM_ADV_ASYM_PAUSE_CAP:
-		val = dp->anadv_asmpause;
-		break;
-
-	case PARAM_ADV_1000FDX_CAP:
-		val = dp->anadv_1000fdx;
-		break;
-
-	case PARAM_ADV_1000HDX_CAP:
-		val = dp->anadv_1000hdx;
-		break;
-
-	case PARAM_ADV_100T4_CAP:
-		val = dp->anadv_100t4;
-		break;
-
-	case PARAM_ADV_100FDX_CAP:
-		val = dp->anadv_100fdx;
-		break;
-
-	case PARAM_ADV_100HDX_CAP:
-		val = dp->anadv_100hdx;
-		break;
-
-	case PARAM_ADV_10FDX_CAP:
-		val = dp->anadv_10fdx;
-		break;
-
-	case PARAM_ADV_10HDX_CAP:
-		val = dp->anadv_10hdx;
-		break;
-
-	case PARAM_ADV_1000T_MS:
-		val = dp->anadv_1000t_ms;
-		break;
-
-	case PARAM_LP_AUTONEG_CAP:
-		val = BOOLEAN(dp->mii_exp & MII_AN_EXP_LPCANAN);
-		break;
-
-	case PARAM_LP_PAUSE_CAP:
-		val = BOOLEAN(dp->mii_lpable & MII_ABILITY_PAUSE);
-		break;
-
-	case PARAM_LP_ASYM_PAUSE_CAP:
-		val = BOOLEAN(dp->mii_lpable & MII_ABILITY_ASM_DIR);
-		break;
-
-	case PARAM_LP_1000FDX_CAP:
-		val = BOOLEAN(dp->mii_stat1000 & MII_1000TS_LP_FULL);
-		break;
-
-	case PARAM_LP_1000HDX_CAP:
-		val = BOOLEAN(dp->mii_stat1000 & MII_1000TS_LP_HALF);
-		break;
-
-	case PARAM_LP_100T4_CAP:
-		val = BOOLEAN(dp->mii_lpable & MII_ABILITY_100BASE_T4);
-		break;
-
-	case PARAM_LP_100FDX_CAP:
-		val = BOOLEAN(dp->mii_lpable & MII_ABILITY_100BASE_TX_FD);
-		break;
-
-	case PARAM_LP_100HDX_CAP:
-		val = BOOLEAN(dp->mii_lpable & MII_ABILITY_100BASE_TX);
-		break;
-
-	case PARAM_LP_10FDX_CAP:
-		val = BOOLEAN(dp->mii_lpable & MII_ABILITY_10BASE_T_FD);
-		break;
-
-	case PARAM_LP_10HDX_CAP:
-		val = BOOLEAN(dp->mii_lpable & MII_ABILITY_10BASE_T);
-		break;
-
-	case PARAM_LINK_STATUS:
-		val = (dp->mii_state == MII_STATE_LINKUP);
-		break;
-
-	case PARAM_LINK_SPEED:
-		val = usbgem_speed_value[dp->speed];
-		break;
-
-	case PARAM_LINK_DUPLEX:
-		val = 0;
-		if (dp->mii_state == MII_STATE_LINKUP) {
-			val = dp->full_duplex ? 2 : 1;
-		}
-		break;
-
-	case PARAM_LINK_AUTONEG:
-		val = BOOLEAN(dp->mii_exp & MII_AN_EXP_LPCANAN);
-		break;
-
-	case PARAM_LINK_RX_PAUSE:
-		val = (dp->flow_control == FLOW_CONTROL_SYMMETRIC) ||
-		    (dp->flow_control == FLOW_CONTROL_RX_PAUSE);
-		break;
-
-	case PARAM_LINK_TX_PAUSE:
-		val = (dp->flow_control == FLOW_CONTROL_SYMMETRIC) ||
-		    (dp->flow_control == FLOW_CONTROL_TX_PAUSE);
-		break;
-
-#ifdef DEBUG_RESUME
-	case PARAM_RESUME_TEST:
-		val = 0;
-		break;
-#endif
-	default:
-		cmn_err(CE_WARN, "%s: unimplemented ndd control (%d)",
-		    dp->name, item);
-		break;
-	}
-
-	(void) mi_mpprintf(mp, "%ld", val);
-
-	return (0);
-}
-
-static int
-usbgem_param_set(queue_t *q,
-    mblk_t *mp, char *value, caddr_t arg, cred_t *credp)
-{
-	struct usbgem_dev	*dp = ((struct usbgem_nd_arg *)(void *)arg)->dp;
-	int		item = ((struct usbgem_nd_arg *)(void *)arg)->item;
-	long		val;
-	char		*end;
-
-	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
-	if (ddi_strtol(value, &end, 10, &val)) {
-		return (EINVAL);
-	}
-	if (end == value) {
-		return (EINVAL);
-	}
-
-	switch (item) {
-	case PARAM_ADV_AUTONEG_CAP:
-		if (val != 0 && val != 1) {
-			goto err;
-		}
-		if (val && (dp->mii_status & MII_STATUS_CANAUTONEG) == 0) {
-			goto err;
-		}
-		dp->anadv_autoneg = (int)val;
-		break;
-
-	case PARAM_ADV_PAUSE_CAP:
-		if (val != 0 && val != 1) {
-			goto err;
-		}
-		if (val && dp->ugc.usbgc_flow_control == FLOW_CONTROL_NONE) {
-			goto err;
-		}
-		dp->anadv_pause = (int)val;
-		break;
-
-	case PARAM_ADV_ASYM_PAUSE_CAP:
-		if (val != 0 && val != 1) {
-			goto err;
-		}
-		if (val &&
-		    dp->ugc.usbgc_flow_control <= FLOW_CONTROL_SYMMETRIC) {
-			goto err;
-		}
-		dp->anadv_asmpause = (int)val;
-		break;
-
-	case PARAM_ADV_1000FDX_CAP:
-		if (val != 0 && val != 1) {
-			goto err;
-		}
-		if (val && (dp->mii_xstatus &
-		    (MII_XSTATUS_1000BASET_FD |
-		    MII_XSTATUS_1000BASEX_FD)) == 0) {
-			goto err;
-		}
-		dp->anadv_1000fdx = (int)val;
-		break;
-
-	case PARAM_ADV_1000HDX_CAP:
-		if (val != 0 && val != 1) {
-			goto err;
-		}
-		if (val && (dp->mii_xstatus &
-		    (MII_XSTATUS_1000BASET | MII_XSTATUS_1000BASEX)) == 0) {
-			goto err;
-		}
-		dp->anadv_1000hdx = (int)val;
-		break;
-
-	case PARAM_ADV_100T4_CAP:
-		if (val != 0 && val != 1) {
-			goto err;
-		}
-		if (val && (dp->mii_status & MII_STATUS_100_BASE_T4) == 0) {
-			goto err;
-		}
-		dp->anadv_100t4 = (int)val;
-		break;
-
-	case PARAM_ADV_100FDX_CAP:
-		if (val != 0 && val != 1) {
-			goto err;
-		}
-		if (val && (dp->mii_status & MII_STATUS_100_BASEX_FD) == 0) {
-			goto err;
-		}
-		dp->anadv_100fdx = (int)val;
-		break;
-
-	case PARAM_ADV_100HDX_CAP:
-		if (val != 0 && val != 1) {
-			goto err;
-		}
-		if (val && (dp->mii_status & MII_STATUS_100_BASEX) == 0) {
-			goto err;
-		}
-		dp->anadv_100hdx = (int)val;
-		break;
-
-	case PARAM_ADV_10FDX_CAP:
-		if (val != 0 && val != 1) {
-			goto err;
-		}
-		if (val && (dp->mii_status & MII_STATUS_10_FD) == 0) {
-			goto err;
-		}
-		dp->anadv_10fdx = (int)val;
-		break;
-
-	case PARAM_ADV_10HDX_CAP:
-		if (val != 0 && val != 1) {
-			goto err;
-		}
-		if (val && (dp->mii_status & MII_STATUS_10) == 0) {
-			goto err;
-		}
-		dp->anadv_10hdx = (int)val;
-		break;
-
-	case PARAM_ADV_1000T_MS:
-		if (val != 0 && val != 1 && val != 2) {
-			goto err;
-		}
-		if (val && (dp->mii_xstatus &
-		    (MII_XSTATUS_1000BASET | MII_XSTATUS_1000BASET_FD)) == 0) {
-			goto err;
-		}
-		dp->anadv_1000t_ms = (int)val;
-		break;
-
-#ifdef DEBUG_RESUME
-	case PARAM_RESUME_TEST:
-		mutex_exit(&dp->xmitlock);
-		mutex_exit(&dp->intrlock);
-		gem_suspend(dp->dip);
-		gem_resume(dp->dip);
-		mutex_enter(&dp->intrlock);
-		mutex_enter(&dp->xmitlock);
-		break;
-#endif
-	}
-
-	/* sync with PHY */
-	usbgem_choose_forcedmode(dp);
-
-	dp->mii_state = MII_STATE_UNKNOWN;
-	if (dp->ugc.usbgc_mii_hw_link_detection) {
-		/* wake up link watcher possiblely sleeps */
-		cv_signal(&dp->link_watcher_wait_cv);
-	}
-
-	return (0);
-err:
-	return (EINVAL);
-}
-
-static void
-usbgem_nd_load(struct usbgem_dev *dp,
-    char *name, ndgetf_t gf, ndsetf_t sf, int item)
-{
-	struct usbgem_nd_arg	*arg;
-
-	ASSERT(item >= 0);
-	ASSERT(item < PARAM_COUNT);
-
-	arg = &((struct usbgem_nd_arg *)(void *)dp->nd_arg_p)[item];
-	arg->dp = dp;
-	arg->item = item;
-
-	DPRINTF(2, (CE_CONT, "!%s: %s: name:%s, item:%d",
-	    dp->name, __func__, name, item));
-	(void) nd_load(&dp->nd_data_p, name, gf, sf, (caddr_t)arg);
-}
-
-static void
-usbgem_nd_setup(struct usbgem_dev *dp)
-{
-	DPRINTF(1, (CE_CONT, "!%s: %s: called, mii_status:0x%b",
-	    dp->name, __func__, dp->mii_status, MII_STATUS_BITS));
-
-	ASSERT(dp->nd_arg_p == NULL);
-
-	dp->nd_arg_p =
-	    kmem_zalloc(sizeof (struct usbgem_nd_arg) * PARAM_COUNT, KM_SLEEP);
-
-#define	SETFUNC(x)	((x) ? usbgem_param_set : NULL)
-
-	usbgem_nd_load(dp, "autoneg_cap",
-	    usbgem_param_get, NULL, PARAM_AUTONEG_CAP);
-	usbgem_nd_load(dp, "pause_cap",
-	    usbgem_param_get, NULL, PARAM_PAUSE_CAP);
-	usbgem_nd_load(dp, "asym_pause_cap",
-	    usbgem_param_get, NULL, PARAM_ASYM_PAUSE_CAP);
-	usbgem_nd_load(dp, "1000fdx_cap",
-	    usbgem_param_get, NULL, PARAM_1000FDX_CAP);
-	usbgem_nd_load(dp, "1000hdx_cap",
-	    usbgem_param_get, NULL, PARAM_1000HDX_CAP);
-	usbgem_nd_load(dp, "100T4_cap",
-	    usbgem_param_get, NULL, PARAM_100T4_CAP);
-	usbgem_nd_load(dp, "100fdx_cap",
-	    usbgem_param_get, NULL, PARAM_100FDX_CAP);
-	usbgem_nd_load(dp, "100hdx_cap",
-	    usbgem_param_get, NULL, PARAM_100HDX_CAP);
-	usbgem_nd_load(dp, "10fdx_cap",
-	    usbgem_param_get, NULL, PARAM_10FDX_CAP);
-	usbgem_nd_load(dp, "10hdx_cap",
-	    usbgem_param_get, NULL, PARAM_10HDX_CAP);
-
-	/* Our advertised capabilities */
-	usbgem_nd_load(dp, "adv_autoneg_cap", usbgem_param_get,
-	    SETFUNC(dp->mii_status & MII_STATUS_CANAUTONEG),
-	    PARAM_ADV_AUTONEG_CAP);
-	usbgem_nd_load(dp, "adv_pause_cap", usbgem_param_get,
-	    SETFUNC(dp->ugc.usbgc_flow_control & 1),
-	    PARAM_ADV_PAUSE_CAP);
-	usbgem_nd_load(dp, "adv_asym_pause_cap", usbgem_param_get,
-	    SETFUNC(dp->ugc.usbgc_flow_control & 2),
-	    PARAM_ADV_ASYM_PAUSE_CAP);
-	usbgem_nd_load(dp, "adv_1000fdx_cap", usbgem_param_get,
-	    SETFUNC(dp->mii_xstatus &
-	    (MII_XSTATUS_1000BASEX_FD | MII_XSTATUS_1000BASET_FD)),
-	    PARAM_ADV_1000FDX_CAP);
-	usbgem_nd_load(dp, "adv_1000hdx_cap", usbgem_param_get,
-	    SETFUNC(dp->mii_xstatus &
-	    (MII_XSTATUS_1000BASEX | MII_XSTATUS_1000BASET)),
-	    PARAM_ADV_1000HDX_CAP);
-	usbgem_nd_load(dp, "adv_100T4_cap", usbgem_param_get,
-	    SETFUNC((dp->mii_status & MII_STATUS_100_BASE_T4) &&
-	    !dp->mii_advert_ro),
-	    PARAM_ADV_100T4_CAP);
-	usbgem_nd_load(dp, "adv_100fdx_cap", usbgem_param_get,
-	    SETFUNC((dp->mii_status & MII_STATUS_100_BASEX_FD) &&
-	    !dp->mii_advert_ro),
-	    PARAM_ADV_100FDX_CAP);
-	usbgem_nd_load(dp, "adv_100hdx_cap", usbgem_param_get,
-	    SETFUNC((dp->mii_status & MII_STATUS_100_BASEX) &&
-	    !dp->mii_advert_ro),
-	    PARAM_ADV_100HDX_CAP);
-	usbgem_nd_load(dp, "adv_10fdx_cap", usbgem_param_get,
-	    SETFUNC((dp->mii_status & MII_STATUS_10_FD) &&
-	    !dp->mii_advert_ro),
-	    PARAM_ADV_10FDX_CAP);
-	usbgem_nd_load(dp, "adv_10hdx_cap", usbgem_param_get,
-	    SETFUNC((dp->mii_status & MII_STATUS_10) &&
-	    !dp->mii_advert_ro),
-	    PARAM_ADV_10HDX_CAP);
-	usbgem_nd_load(dp, "adv_1000t_ms", usbgem_param_get,
-	    SETFUNC(dp->mii_xstatus &
-	    (MII_XSTATUS_1000BASET_FD | MII_XSTATUS_1000BASET)),
-	    PARAM_ADV_1000T_MS);
-
-
-	/* Partner's advertised capabilities */
-	usbgem_nd_load(dp, "lp_autoneg_cap",
-	    usbgem_param_get, NULL, PARAM_LP_AUTONEG_CAP);
-	usbgem_nd_load(dp, "lp_pause_cap",
-	    usbgem_param_get, NULL, PARAM_LP_PAUSE_CAP);
-	usbgem_nd_load(dp, "lp_asym_pause_cap",
-	    usbgem_param_get, NULL, PARAM_LP_ASYM_PAUSE_CAP);
-	usbgem_nd_load(dp, "lp_1000fdx_cap",
-	    usbgem_param_get, NULL, PARAM_LP_1000FDX_CAP);
-	usbgem_nd_load(dp, "lp_1000hdx_cap",
-	    usbgem_param_get, NULL, PARAM_LP_1000HDX_CAP);
-	usbgem_nd_load(dp, "lp_100T4_cap",
-	    usbgem_param_get, NULL, PARAM_LP_100T4_CAP);
-	usbgem_nd_load(dp, "lp_100fdx_cap",
-	    usbgem_param_get, NULL, PARAM_LP_100FDX_CAP);
-	usbgem_nd_load(dp, "lp_100hdx_cap",
-	    usbgem_param_get, NULL, PARAM_LP_100HDX_CAP);
-	usbgem_nd_load(dp, "lp_10fdx_cap",
-	    usbgem_param_get, NULL, PARAM_LP_10FDX_CAP);
-	usbgem_nd_load(dp, "lp_10hdx_cap",
-	    usbgem_param_get, NULL, PARAM_LP_10HDX_CAP);
-
-	/* Current operating modes */
-	usbgem_nd_load(dp, "link_status",
-	    usbgem_param_get, NULL, PARAM_LINK_STATUS);
-	usbgem_nd_load(dp, "link_speed",
-	    usbgem_param_get, NULL, PARAM_LINK_SPEED);
-	usbgem_nd_load(dp, "link_duplex",
-	    usbgem_param_get, NULL, PARAM_LINK_DUPLEX);
-	usbgem_nd_load(dp, "link_autoneg",
-	    usbgem_param_get, NULL, PARAM_LINK_AUTONEG);
-	usbgem_nd_load(dp, "link_rx_pause",
-	    usbgem_param_get, NULL, PARAM_LINK_RX_PAUSE);
-	usbgem_nd_load(dp, "link_tx_pause",
-	    usbgem_param_get, NULL, PARAM_LINK_TX_PAUSE);
-#ifdef DEBUG_RESUME
-	usbgem_nd_load(dp, "resume_test",
-	    usbgem_param_get, usbgem_param_set, PARAM_RESUME_TEST);
-#endif
-#undef	SETFUNC
-}
-
-static
-enum ioc_reply
-usbgem_nd_ioctl(struct usbgem_dev *dp,
-    queue_t *wq, mblk_t *mp, struct iocblk *iocp)
-{
-	boolean_t	ok;
-
-	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
-
-	switch (iocp->ioc_cmd) {
-	case ND_GET:
-		ok = nd_getset(wq, dp->nd_data_p, mp);
-		DPRINTF(1, (CE_CONT,
-		    "%s: get %s", dp->name, ok ? "OK" : "FAIL"));
-		return (ok ? IOC_REPLY : IOC_INVAL);
-
-	case ND_SET:
-		ok = nd_getset(wq, dp->nd_data_p, mp);
-
-		DPRINTF(1, (CE_CONT, "%s: set %s err %d",
-		    dp->name, ok ? "OK" : "FAIL", iocp->ioc_error));
-
-		if (!ok) {
-			return (IOC_INVAL);
-		}
-
-		if (iocp->ioc_error) {
-			return (IOC_REPLY);
-		}
-
-		return (IOC_RESTART_REPLY);
-	}
-
-	cmn_err(CE_WARN, "%s: invalid cmd 0x%x", dp->name, iocp->ioc_cmd);
-
-	return (IOC_INVAL);
-}
-
-static void
-usbgem_nd_cleanup(struct usbgem_dev *dp)
-{
-	ASSERT(dp->nd_data_p != NULL);
-	ASSERT(dp->nd_arg_p != NULL);
-
-	nd_free(&dp->nd_data_p);
-
-	kmem_free(dp->nd_arg_p, sizeof (struct usbgem_nd_arg) * PARAM_COUNT);
-	dp->nd_arg_p = NULL;
-}
-#endif /* USBGEM_CONFIG_ND */
 
 static void
 usbgem_mac_ioctl(struct usbgem_dev *dp, queue_t *wq, mblk_t *mp)
@@ -3887,60 +3125,7 @@ usbgem_mac_ioctl(struct usbgem_dev *dp, queue_t *wq, mblk_t *mp)
 	DPRINTF(1, (CE_CONT, "%s: %s cmd:0x%x", dp->name, __func__,
 	    iocp->ioc_cmd));
 
-#ifdef USBGEM_CONFIG_ND
-	switch (iocp->ioc_cmd) {
-	default:
-		_NOTE(NOTREACHED)
-		status = IOC_INVAL;
-		break;
-
-	case ND_GET:
-	case ND_SET:
-		status = usbgem_nd_ioctl(dp, wq, mp, iocp);
-		break;
-	}
-
-	/*
-	 * Finally, decide how to reply
-	 */
-	switch (status) {
-	default:
-	case IOC_INVAL:
-		/*
-		 * Error, reply with a NAK and EINVAL or the specified error
-		 */
-		miocnak(wq, mp, 0, iocp->ioc_error == 0 ?
-		    EINVAL : iocp->ioc_error);
-		break;
-
-	case IOC_DONE:
-		/*
-		 * OK, reply already sent
-		 */
-		break;
-
-	case IOC_RESTART_ACK:
-	case IOC_ACK:
-		/*
-		 * OK, reply with an ACK
-		 */
-		miocack(wq, mp, 0, 0);
-		break;
-
-	case IOC_RESTART_REPLY:
-	case IOC_REPLY:
-		/*
-		 * OK, send prepared reply as ACK or NAK
-		 */
-		mp->b_datap->db_type =
-		    iocp->ioc_error == 0 ? M_IOCACK : M_IOCNAK;
-		qreply(wq, mp);
-		break;
-	}
-#else
 	miocnak(wq, mp, 0, EINVAL);
-	return;
-#endif /* USBGEM_CONFIG_GLDv3 */
 }
 
 #ifndef SYS_MAC_H
@@ -3984,7 +3169,6 @@ usbgem_mac_xcvr_inuse(struct usbgem_dev *dp)
 	return (val);
 }
 
-#ifdef USBGEM_CONFIG_GLDv3
 /* ============================================================== */
 /*
  * GLDv3 interface
@@ -3998,34 +3182,13 @@ static int	usbgem_m_multicst(void *, boolean_t, const uint8_t *);
 static int	usbgem_m_unicst(void *, const uint8_t *);
 static mblk_t	*usbgem_m_tx(void *, mblk_t *);
 static void	usbgem_m_ioctl(void *, queue_t *, mblk_t *);
-#ifdef GEM_CONFIG_MAC_PROP
 static int	usbgem_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
-#ifdef MAC_VERSION_V1
 static int	usbgem_m_getprop(void *, const char *, mac_prop_id_t,
     uint_t, void *);
-#else
-static int	usbgem_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
-#endif
-#endif
-
-#ifdef _SYS_MAC_PROVIDER_H
-#define	GEM_M_CALLBACK_FLAGS	(MC_IOCTL)
-#else
-#define	GEM_M_CALLBACK_FLAGS	(MC_IOCTL)
-#endif
 
 static mac_callbacks_t gem_m_callbacks = {
-#ifdef USBGEM_CONFIG_MAC_PROP
-#ifdef MAC_VERSION_V1
-	GEM_M_CALLBACK_FLAGS | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
-#else
-	GEM_M_CALLBACK_FLAGS | MC_SETPROP | MC_GETPROP,
-#endif
-#else
-	GEM_M_CALLBACK_FLAGS,
-#endif
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	usbgem_m_getstat,
 	usbgem_m_start,
 	usbgem_m_stop,
@@ -4033,24 +3196,14 @@ static mac_callbacks_t gem_m_callbacks = {
 	usbgem_m_multicst,
 	usbgem_m_unicst,
 	usbgem_m_tx,
-#ifdef _SYS_MAC_PROVIDER_H
-#ifdef MAC_VERSION_V1
 	NULL,
-#endif
-#else
-	NULL,	/* m_resources */
-#endif
 	usbgem_m_ioctl,
 	NULL, /* m_getcapab */
-#ifdef USBGEM_CONFIG_MAC_PROP
 	NULL,
 	NULL,
 	usbgem_m_setprop,
 	usbgem_m_getprop,
-#endif
-#ifdef MAC_VERSION_V1
 	usbgem_m_propinfo,
-#endif
 };
 
 static int
@@ -4637,368 +3790,6 @@ usbgem_gld3_init(struct usbgem_dev *dp, mac_register_t *macp)
 		macp->m_margin = VTAG_SIZE;
 	}
 }
-#else
-/* ============================================================== */
-/*
- * GLDv2 interface
- */
-/* ============================================================== */
-static int usbgem_gld_reset(gld_mac_info_t *);
-static int usbgem_gld_start(gld_mac_info_t *);
-static int usbgem_gld_stop(gld_mac_info_t *);
-static int usbgem_gld_set_mac_address(gld_mac_info_t *, uint8_t *);
-static int usbgem_gld_set_multicast(gld_mac_info_t *, uint8_t *, int);
-static int usbgem_gld_set_promiscuous(gld_mac_info_t *, int);
-static int usbgem_gld_get_stats(gld_mac_info_t *, struct gld_stats *);
-static int usbgem_gld_send(gld_mac_info_t *, mblk_t *);
-static int usbgem_gld_send_tagged(gld_mac_info_t *, mblk_t *, uint32_t);
-
-static int
-usbgem_gld_reset(gld_mac_info_t *macinfo)
-{
-	int	err;
-	struct usbgem_dev	*dp;
-
-	err = GLD_SUCCESS;
-	dp = (struct usbgem_dev *)macinfo->gldm_private;
-
-	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
-
-	rw_enter(&dp->dev_state_lock, RW_WRITER);
-	if (usbgem_mac_init(dp) != USB_SUCCESS) {
-		err = GLD_FAILURE;
-		goto x;
-	}
-
-	dp->nic_state = NIC_STATE_INITIALIZED;
-
-	/* setup media mode if the link have been up */
-	if (dp->mii_state == MII_STATE_LINKUP) {
-		if (dp->mac_state != MAC_STATE_DISCONNECTED) {
-			(void) usbgem_hal_set_media(dp);
-		}
-	}
-x:
-	rw_exit(&dp->dev_state_lock);
-	return (err);
-}
-
-static int
-usbgem_gld_start(gld_mac_info_t *macinfo)
-{
-	int	err;
-	struct usbgem_dev *dp;
-
-	dp = (struct usbgem_dev *)macinfo->gldm_private;
-
-	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
-
-	rw_enter(&dp->dev_state_lock, RW_WRITER);
-
-	dp->nic_state = NIC_STATE_ONLINE;
-
-	if (dp->mii_state == MII_STATE_LINKUP) {
-		if (usbgem_mac_start(dp) != USB_SUCCESS) {
-			/* sema_v(&dp->mii_lock); */
-			err = GLD_FAILURE;
-			goto x;
-		}
-	}
-
-	/*
-	 * XXX - don't call gld_linkstate() here,
-	 * otherwise it cause recursive mutex call.
-	 */
-	err = GLD_SUCCESS;
-x:
-	rw_exit(&dp->dev_state_lock);
-
-	return (err);
-}
-
-static int
-usbgem_gld_stop(gld_mac_info_t *macinfo)
-{
-	int	err = GLD_SUCCESS;
-	struct usbgem_dev	*dp;
-
-	dp = (struct usbgem_dev *)macinfo->gldm_private;
-
-	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
-
-	/* try to stop rx gracefully */
-	rw_enter(&dp->dev_state_lock, RW_READER);
-	sema_p(&dp->rxfilter_lock);
-	dp->rxmode &= ~RXMODE_ENABLE;
-
-	if (dp->mac_state != MAC_STATE_DISCONNECTED) {
-		(void) usbgem_hal_set_rx_filter(dp);
-	}
-	sema_v(&dp->rxfilter_lock);
-	rw_exit(&dp->dev_state_lock);
-
-	/* make the nic state inactive */
-	rw_enter(&dp->dev_state_lock, RW_WRITER);
-	dp->nic_state = NIC_STATE_STOPPED;
-
-	if (dp->mac_state != MAC_STATE_DISCONNECTED) {
-		if (usbgem_mac_stop(dp, MAC_STATE_STOPPED, STOP_GRACEFUL)
-		    != USB_SUCCESS) {
-			err = GLD_FAILURE;
-		}
-	}
-	rw_exit(&dp->dev_state_lock);
-
-	return (err);
-}
-
-static int
-usbgem_gld_set_multicast(gld_mac_info_t *macinfo, uint8_t *ep, int flag)
-{
-	int		err;
-	int		ret;
-	struct usbgem_dev	*dp;
-
-	dp = (struct usbgem_dev *)macinfo->gldm_private;
-
-	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
-
-	rw_enter(&dp->dev_state_lock, RW_READER);
-	if (flag == GLD_MULTI_ENABLE) {
-		ret = usbgem_add_multicast(dp, ep);
-	} else {
-		ret = usbgem_remove_multicast(dp, ep);
-	}
-	rw_exit(&dp->dev_state_lock);
-
-	err = GLD_SUCCESS;
-	if (ret != USB_SUCCESS) {
-#ifdef GEM_CONFIG_FMA
-		ddi_fm_service_impact(dp->dip, DDI_SERVICE_DEGRADED);
-#endif
-		err = GLD_FAILURE;
-	}
-	return (err);
-}
-
-static int
-usbgem_gld_set_promiscuous(gld_mac_info_t *macinfo, int flag)
-{
-	boolean_t	need_to_change = B_TRUE;
-	struct usbgem_dev	*dp;
-
-	dp = (struct usbgem_dev *)macinfo->gldm_private;
-
-	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
-
-	sema_p(&dp->rxfilter_lock);
-	if (flag == GLD_MAC_PROMISC_NONE) {
-		dp->rxmode &= ~(RXMODE_PROMISC | RXMODE_ALLMULTI_REQ);
-	} else if (flag == GLD_MAC_PROMISC_MULTI) {
-		dp->rxmode |= RXMODE_ALLMULTI_REQ;
-	} else if (flag == GLD_MAC_PROMISC_PHYS) {
-		dp->rxmode |= RXMODE_PROMISC;
-	} else {
-		/* mode unchanged */
-		need_to_change = B_FALSE;
-	}
-
-	if (need_to_change) {
-		if (dp->mac_state != MAC_STATE_DISCONNECTED) {
-			(void) usbgem_hal_set_rx_filter(dp);
-		}
-	}
-	sema_v(&dp->rxfilter_lock);
-
-	return (GLD_SUCCESS);
-}
-
-static int
-usbgem_gld_set_mac_address(gld_mac_info_t *macinfo, uint8_t *mac)
-{
-	struct usbgem_dev	*dp;
-	dp = (struct usbgem_dev *)macinfo->gldm_private;
-
-	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
-
-	sema_p(&dp->rxfilter_lock);
-	bcopy(mac, dp->cur_addr.ether_addr_octet, ETHERADDRL);
-	dp->rxmode |= RXMODE_ENABLE;
-
-	if (dp->mac_state != MAC_STATE_DISCONNECTED) {
-		(void) usbgem_hal_set_rx_filter(dp);
-	}
-	sema_v(&dp->rxfilter_lock);
-
-	return (GLD_SUCCESS);
-}
-
-static	int
-usbgem_gld_get_stats(gld_mac_info_t *macinfo, struct gld_stats *gs)
-{
-	struct usbgem_dev	*dp;
-	struct usbgem_stats	*vs;
-
-	dp = (struct usbgem_dev *)macinfo->gldm_private;
-
-	if ((*dp->ugc.usbgc_get_stats)(dp) != USB_SUCCESS) {
-#ifdef GEM_CONFIG_FMA
-		ddi_fm_service_impact(dp->dip, DDI_SERVICE_DEGRADED);
-#endif
-		return (USB_FAILURE);
-	}
-
-	vs = &dp->stats;
-
-	gs->glds_errxmt = vs->errxmt;
-	gs->glds_errrcv = vs->errrcv;
-	gs->glds_collisions = vs->collisions;
-
-	gs->glds_excoll = vs->excoll;
-	gs->glds_defer = vs->defer;
-	gs->glds_frame = vs->frame;
-	gs->glds_crc = vs->crc;
-
-	gs->glds_overflow = vs->overflow; /* fifo err,underrun,rbufovf */
-	gs->glds_underflow = vs->underflow;
-	gs->glds_short = vs->runt;
-	gs->glds_missed = vs->missed; /* missed pkts while rbuf ovf */
-	gs->glds_xmtlatecoll = vs->xmtlatecoll;
-	gs->glds_nocarrier = vs->nocarrier;
-	gs->glds_norcvbuf = vs->norcvbuf;	/* OS resource exaust */
-	gs->glds_intr = vs->intr;
-
-	/* all before here must be kept in place for v0 compatibility */
-	gs->glds_speed = usbgem_speed_value[dp->speed] * 1000000;
-	gs->glds_media = GLDM_PHYMII;
-	gs->glds_duplex = dp->full_duplex ? GLD_DUPLEX_FULL : GLD_DUPLEX_HALF;
-
-	/* gs->glds_media_specific */
-	gs->glds_dot3_first_coll = vs->first_coll;
-	gs->glds_dot3_multi_coll = vs->multi_coll;
-	gs->glds_dot3_sqe_error = 0;
-	gs->glds_dot3_mac_xmt_error = 0;
-	gs->glds_dot3_mac_rcv_error = 0;
-	gs->glds_dot3_frame_too_long = vs->frame_too_long;
-
-	return (GLD_SUCCESS);
-}
-
-static int
-usbgem_gld_ioctl(gld_mac_info_t *macinfo, queue_t *wq, mblk_t *mp)
-{
-	struct usbgem_dev	*dp;
-
-	dp = (struct usbgem_dev *)macinfo->gldm_private;
-	usbgem_mac_ioctl(dp, wq, mp);
-
-	return (GLD_SUCCESS);
-}
-
-/*
- * gem_gld_send is used only for sending data packets into ethernet wire.
- */
-static int
-usbgem_gld_send(gld_mac_info_t *macinfo, mblk_t *mp)
-{
-	int		ret;
-	uint32_t	flags = 0;
-	struct usbgem_dev	*dp;
-
-	dp = (struct usbgem_dev *)macinfo->gldm_private;
-
-	/* nic state must be online of suspended */
-	rw_enter(&dp->dev_state_lock, RW_READER);
-
-	ASSERT(dp->nic_state == NIC_STATE_ONLINE);
-	ASSERT(mp->b_next == NULL);
-
-	if (dp->mii_state != MII_STATE_LINKUP) {
-		/* Some nics hate to send packets while the link is down. */
-		/* we discard the untransmitted packets silently */
-		rw_exit(&dp->dev_state_lock);
-
-		freemsg(mp);
-#ifdef GEM_CONFIG_FMA
-		/* FIXME - should we ignore the error? */
-		ddi_fm_service_impact(dp->dip, DDI_SERVICE_DEGRADED);
-#endif
-		return (GLD_SUCCESS);
-	}
-
-	ret = (usbgem_send_common(dp, mp, flags) == NULL)
-	    ? GLD_SUCCESS : GLD_NORESOURCES;
-	rw_exit(&dp->dev_state_lock);
-
-	return (ret);
-}
-
-/*
- * usbgem_gld_send is used only for sending data packets into ethernet wire.
- */
-static int
-usbgem_gld_send_tagged(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag)
-{
-	uint32_t	flags;
-	struct usbgem_dev	*dp;
-
-	dp = (struct usbgem_dev *)macinfo->gldm_private;
-
-	/*
-	 * Some nics hate to send packets while the link is down.
-	 */
-	if (dp->mii_state != MII_STATE_LINKUP) {
-		/* we dicard the untransmitted packets silently */
-		freemsg(mp);
-#ifdef GEM_CONFIG_FMA
-		/* FIXME - should we ignore the error? */
-		ddi_fm_service_impact(dp->dip, DDI_SERVICE_UNAFFECTED);
-#endif
-		return (GLD_SUCCESS);
-	}
-#ifdef notyet
-	flags = GLD_VTAG_TCI(vtag) << GEM_SEND_VTAG_SHIFT;
-#endif
-	return ((usbgem_send_common(dp, mp, 0) == NULL) ?
-	    GLD_SUCCESS : GLD_NORESOURCES);
-}
-
-static void
-usbgem_gld_init(struct usbgem_dev *dp, gld_mac_info_t *macinfo, char *ident)
-{
-	/*
-	 * configure GLD
-	 */
-	macinfo->gldm_devinfo = dp->dip;
-	macinfo->gldm_private = (caddr_t)dp;
-
-	macinfo->gldm_reset = usbgem_gld_reset;
-	macinfo->gldm_start = usbgem_gld_start;
-	macinfo->gldm_stop = usbgem_gld_stop;
-	macinfo->gldm_set_mac_addr = usbgem_gld_set_mac_address;
-	macinfo->gldm_send = usbgem_gld_send;
-	macinfo->gldm_set_promiscuous = usbgem_gld_set_promiscuous;
-	macinfo->gldm_get_stats = usbgem_gld_get_stats;
-	macinfo->gldm_ioctl = usbgem_gld_ioctl;
-	macinfo->gldm_set_multicast = usbgem_gld_set_multicast;
-	macinfo->gldm_intr = NULL;
-	macinfo->gldm_mctl = NULL;
-
-	macinfo->gldm_ident = ident;
-	macinfo->gldm_type = DL_ETHER;
-	macinfo->gldm_minpkt = 0;
-	macinfo->gldm_maxpkt = dp->mtu;
-	macinfo->gldm_addrlen = ETHERADDRL;
-	macinfo->gldm_saplen = -2;
-	macinfo->gldm_ppa = ddi_get_instance(dp->dip);
-#ifdef GLD_CAP_LINKSTATE
-	macinfo->gldm_capabilities = GLD_CAP_LINKSTATE;
-#endif
-	macinfo->gldm_vendor_addr = dp->dev_addr.ether_addr_octet;
-	macinfo->gldm_broadcast_addr = usbgem_bcastaddr;
-}
-#endif /* USBGEM_CONFIG_GLDv3 */
-
 
 /* ======================================================================== */
 /*
@@ -5963,12 +4754,7 @@ usbgem_do_attach(dev_info_t *dip,
 {
 	struct usbgem_dev	*dp;
 	int			i;
-#ifdef USBGEM_CONFIG_GLDv3
 	mac_register_t		*macp = NULL;
-#else
-	gld_mac_info_t		*macinfo;
-	void			*tmp;
-#endif
 	int			ret;
 	int			unit;
 	int			err;
@@ -5982,21 +4768,14 @@ usbgem_do_attach(dev_info_t *dip,
 	 */
 	dp = kmem_zalloc(USBGEM_LOCAL_DATA_SIZE(gc), KM_SLEEP);
 	if (dp == NULL) {
-#ifndef USBGEM_CONFIG_GLDv3
-		gld_mac_free(macinfo);
-#endif
 		return (NULL);
 	}
-#ifdef USBGEM_CONFIG_GLDv3
+
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
 		cmn_err(CE_WARN, "!gem%d: %s: mac_alloc failed",
 		    unit, __func__);
 		return (NULL);
 	}
-#else
-	macinfo = gld_mac_alloc(dip);
-	dp->macinfo = macinfo;
-#endif
 
 	/* link to private area */
 	dp->private = lp;
@@ -6116,11 +4895,7 @@ usbgem_do_attach(dev_info_t *dip,
 	dp->bulkout_timeout =
 	    dp->ugc.usbgc_tx_timeout / drv_usectohz(1000*1000);
 
-#ifdef USBGEM_CONFIG_GLDv3
 	usbgem_gld3_init(dp, macp);
-#else
-	usbgem_gld_init(dp, macinfo, ident);
-#endif
 
 	/* Probe MII phy (scan phy) */
 	dp->mii_lpable = 0;
@@ -6159,22 +4934,8 @@ usbgem_do_attach(dev_info_t *dip,
 	}
 
 	/*
-	 * initialize kstats including mii statistics
-	 */
-#ifdef USBGEM_CONFIG_GLDv3
-#ifdef USBGEM_CONFIG_ND
-	usbgem_nd_setup(dp);
-#endif
-#else
-	if (usbgem_kstat_init(dp) != USB_SUCCESS) {
-		goto err_free_memory;
-	}
-#endif
-
-	/*
 	 * Add interrupt to system.
 	 */
-#ifdef USBGEM_CONFIG_GLDv3
 	if (ret = mac_register(macp, &dp->mh)) {
 		cmn_err(CE_WARN, "!%s: mac_register failed, error:%d",
 		    dp->name, ret);
@@ -6182,19 +4943,7 @@ usbgem_do_attach(dev_info_t *dip,
 	}
 	mac_free(macp);
 	macp = NULL;
-#else
-	/* gld_register will corrupts driver_private */
-	tmp = ddi_get_driver_private(dip);
-	if (gld_register(dip,
-	    (char *)ddi_driver_name(dip), macinfo) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "!%s: %s: gld_register failed",
-		    dp->name, __func__);
-		ddi_set_driver_private(dip, tmp);
-		goto err_release_stats;
-	}
-	/* restore driver private */
-	ddi_set_driver_private(dip, tmp);
-#endif /* USBGEM_CONFIG_GLDv3 */
+
 	if (usb_register_hotplug_cbs(dip,
 	    usbgem_suspend, usbgem_resume) != USB_SUCCESS) {
 		cmn_err(CE_WARN,
@@ -6226,22 +4975,9 @@ err_unregister_hotplug:
 	usb_unregister_hotplug_cbs(dip);
 
 err_unregister_gld:
-#ifdef USBGEM_CONFIG_GLDv3
 	mac_unregister(dp->mh);
-#else
-	gld_unregister(macinfo);
-#endif
 
 err_release_stats:
-#ifdef USBGEM_CONFIG_GLDv3
-#ifdef USBGEM_CONFIG_ND
-	/* release NDD resources */
-	usbgem_nd_cleanup(dp);
-#endif
-#else
-	kstat_delete(dp->ksp);
-#endif
-
 err_free_memory:
 	usbgem_free_memory(dp);
 
@@ -6263,13 +4999,10 @@ err_unregister_client:
 	usb_client_detach(dp->dip, dp->reg_data);
 
 err_free_private:
-#ifdef USBGEM_CONFIG_GLDv3
 	if (macp) {
 		mac_free(macp);
 	}
-#else
-	gld_mac_free(macinfo);
-#endif
+
 	kmem_free((caddr_t)dp, USBGEM_LOCAL_DATA_SIZE(gc));
 
 	return (NULL);
@@ -6282,17 +5015,11 @@ usbgem_do_detach(dev_info_t *dip)
 
 	dp = USBGEM_GET_DEV(dip);
 
-#ifdef USBGEM_CONFIG_GLDv3
 	/* unregister with gld v3 */
 	if (mac_unregister(dp->mh) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
-#else
-	/* unregister with gld v2 */
-	if (gld_unregister(dp->macinfo) != DDI_SUCCESS) {
-		return (DDI_FAILURE);
-	}
-#endif
+
 	/* unregister with hotplug service */
 	usb_unregister_hotplug_cbs(dip);
 
@@ -6308,17 +5035,6 @@ usbgem_do_detach(dev_info_t *dip)
 	usb_client_detach(dp->dip, dp->reg_data);
 	dp->reg_data = NULL;
 
-	/* unregister with kernel statistics */
-#ifdef USBGEM_CONFIG_GLDv3
-#ifdef USBGEM_CONFIG_ND
-	/* release ndd resources */
-	usbgem_nd_cleanup(dp);
-#endif
-#else
-	/* destroy kstat objects */
-	kstat_delete(dp->ksp);
-#endif
-
 	/* release locks and condition variables */
 	mutex_destroy(&dp->txlock);
 	mutex_destroy(&dp->rxlock);
@@ -6331,9 +5047,6 @@ usbgem_do_detach(dev_info_t *dip)
 	sema_destroy(&dp->rxfilter_lock);
 
 	/* release basic memory resources */
-#ifndef USBGEM_CONFIG_GLDv3
-	gld_mac_free(dp->macinfo);
-#endif
 	kmem_free((caddr_t)(dp->private), dp->priv_size);
 	kmem_free((caddr_t)dp, USBGEM_LOCAL_DATA_SIZE(&dp->ugc));
 
@@ -6346,23 +5059,20 @@ usbgem_do_detach(dev_info_t *dip)
 int
 usbgem_mod_init(struct dev_ops *dop, char *name)
 {
-#ifdef USBGEM_CONFIG_GLDv3
 	major_t	major;
 	major = ddi_name_to_major(name);
 	if (major == DDI_MAJOR_T_NONE) {
 		return (DDI_FAILURE);
 	}
 	mac_init_ops(dop, name);
-#endif
+
 	return (DDI_SUCCESS);
 }
 
 void
 usbgem_mod_fini(struct dev_ops *dop)
 {
-#ifdef USBGEM_CONFIG_GLDv3
 	mac_fini_ops(dop);
-#endif
 }
 
 int
