@@ -21,3 +21,7 @@ outputdir = /var/tmp/test_results
 
 [/opt/bhyve-tests/tests]
 tests = ['memmap']
+
+# Tests of userspace mevent system, built from cmd/bhyve
+[/opt/bhyve-tests/tests/mevent]
+tests = ['lists_delete', 'read_disable', 'read_pause', 'read_requeue']

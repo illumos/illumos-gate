@@ -13,6 +13,6 @@
 # Copyright 2018 Joyent, Inc.
 #
 
-SUBDIRS = scripts tst
+SUBDIRS = tests
 
 include Makefile.subdirs

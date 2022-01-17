@@ -27,6 +27,7 @@
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <mdb/mdb_modapi.h>
@@ -878,6 +879,19 @@ print_bitfield(ulong_t off, printarg_t *pap, ctf_encoding_t *ep)
 	}
 
 	/*
+	 * Our bitfield may stradle a byte boundary, if so, the calculation of
+	 * size may not correctly capture that. However, off is relative to the
+	 * entire bitfield, so we first have to make that relative to the byte.
+	 */
+	if ((off % 8) + ep->cte_bits > NBBY * size) {
+		size++;
+	}
+
+	if (size > sizeof (value)) {
+		mdb_printf("??? (total bitfield too large after alignment");
+	}
+
+	/*
 	 * On big-endian machines, we need to adjust the buf pointer to refer
 	 * to the lowest 'size' bytes in 'value', and we need shift based on
 	 * the offset from the end of the data, not the offset of the start.
@@ -886,6 +900,7 @@ print_bitfield(ulong_t off, printarg_t *pap, ctf_encoding_t *ep)
 	buf += sizeof (value) - size;
 	off += ep->cte_bits;
 #endif
+
 	if (mdb_tgt_aread(pap->pa_tgt, pap->pa_as, buf, size, addr) != size) {
 		mdb_warn("failed to read %lu bytes at %llx",
 		    (ulong_t)size, addr);
@@ -988,12 +1003,15 @@ print_int_val(const char *type, ctf_encoding_t *ep, ulong_t off,
 	}
 
 	/*
-	 * If the size is not a power-of-two number of bytes in the range 1-8
-	 * then we assume it is a bitfield and print it as such.
+	 * If the size is not a power-of-two number of bytes in the range 1-8 or
+	 * power-of-two number starts in the middle of a byte then we assume it
+	 * is a bitfield and print it as such.
 	 */
 	size = ep->cte_bits / NBBY;
-	if (size > 8 || (ep->cte_bits % NBBY) != 0 || (size & (size - 1)) != 0)
+	if (size > 8 || (ep->cte_bits % NBBY) != 0 || (size & (size - 1) ||
+	    (off % NBBY) != 0) != 0) {
 		return (print_bitfield(off, pap, ep));
+	}
 
 	if (IS_CHAR(*ep))
 		return (print_char_val(addr, pap));

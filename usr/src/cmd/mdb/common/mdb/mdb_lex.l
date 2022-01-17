@@ -29,6 +29,7 @@
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -122,7 +123,7 @@ RGX_COMMENT	"//".*\n
 		 * Comments are legal in these three states -- if we see one
 		 * eat the line and return the newline character.
 		 */
-		BEGIN(S_INITIAL);	
+		BEGIN(S_INITIAL);
 		return ('\n');
 	}
 
@@ -247,7 +248,7 @@ RGX_COMMENT	"//".*\n
 <S_INITIAL>'{RGX_CHR_SEQ}$	|
 <S_EXPR>'{RGX_CHR_SEQ}$		yyerror("syntax error: ' unmatched");
 
-<S_INITIAL>'{RGX_CHR_SEQ}' 	|
+<S_INITIAL>'{RGX_CHR_SEQ}'	|
 <S_EXPR>'{RGX_CHR_SEQ}'		{
 		char *s, *p, *q;
 		size_t nbytes;
@@ -415,8 +416,8 @@ RGX_COMMENT	"//".*\n
 		yyerror("invalid cast -- %s\n", yytext);
 	}
 
-<S_INITIAL>0[iI][0-1]+	|
-<S_EXPR>0[iI][0-1]+	{
+<S_INITIAL>0[iI][0-1][0-1_]*	|
+<S_EXPR>0[iI][0-1][0-1_]*	{
 		/*
 		 * Binary immediate value.
 		 */
@@ -424,8 +425,8 @@ RGX_COMMENT	"//".*\n
 		return (MDB_TOK_IMMEDIATE);
 	}
 
-<S_INITIAL>0[oO][0-7]+	|
-<S_EXPR>0[oO][0-7]+	{
+<S_INITIAL>0[oO][0-7][0-7_]*	|
+<S_EXPR>0[oO][0-7][0-7_]*	{
 		/*
 		 * Octal immediate value.
 		 */
@@ -433,8 +434,8 @@ RGX_COMMENT	"//".*\n
 		return (MDB_TOK_IMMEDIATE);
 	}
 
-<S_INITIAL>0[tT][0-9]+"."[0-9]+	|
-<S_EXPR>0[tT][0-9]+"."[0-9]+	{
+<S_INITIAL>0[tT][0-9][0-9_]*"."[0-9][0-9_]*	|
+<S_EXPR>0[tT][0-9][0-9_]*"."[0-9][0-9_]*	{
 #ifdef _KMDB
 		yyerror("floating point not supported\n");
 #else
@@ -450,8 +451,14 @@ RGX_COMMENT	"//".*\n
 
 		d = (double)mdb_strtonum(yytext + 2, 10);
 
-		for (i = 0; (c = *p++) != '\0'; i++)
+		i = 0;
+		while (*p != '\0') {
+			c = *p++;
+			if (c == '_')
+				continue;
 			d = d * 10 + c - '0';
+			i++;
+		}
 
 		while (i-- != 0)
 			d /= 10;
@@ -461,8 +468,8 @@ RGX_COMMENT	"//".*\n
 #endif
 	}
 
-<S_INITIAL>0[tT][0-9]+	|
-<S_EXPR>0[tT][0-9]+	{
+<S_INITIAL>0[tT][0-9][0-9_]*	|
+<S_EXPR>0[tT][0-9][0-9_]*	{
 		/*
 		 * Decimal immediate value.
 		 */
@@ -470,8 +477,8 @@ RGX_COMMENT	"//".*\n
 		return (MDB_TOK_IMMEDIATE);
 	}
 
-<S_INITIAL>0[xX][0-9a-fA-F]+	|
-<S_EXPR>0[xX][0-9a-fA-F]+	{
+<S_INITIAL>0[xX][0-9a-fA-F][0-9a-fA-F_]*	|
+<S_EXPR>0[xX][0-9a-fA-F][0-9a-fA-F_]*	{
 		/*
 		 * Hexadecimal value.
 		 */
@@ -479,8 +486,8 @@ RGX_COMMENT	"//".*\n
 		return (MDB_TOK_IMMEDIATE);
 	}
 
-<S_INITIAL>[0-9a-fA-F]+	|
-<S_EXPR>[0-9a-fA-F]+	{
+<S_INITIAL>[0-9a-fA-F][0-9a-fA-F_]*	|
+<S_EXPR>[0-9a-fA-F][0-9a-fA-F_]*	{
 		GElf_Sym sym;
 		/*
 		 * Immediate values without an explicit base are converted
@@ -538,7 +545,7 @@ yydiscard(void)
 	int c;
 
 	/*
-	 * If stdin is a string, pipeline, or tty, throw away all our buffered 
+	 * If stdin is a string, pipeline, or tty, throw away all our buffered
 	 * data. Otherwise discard characters up to the next likely delimiter.
 	 */
 	if (mdb_iob_isastr(mdb.m_in) || mdb_iob_isatty(mdb.m_in) ||
@@ -762,7 +769,7 @@ typedef struct mdb_lex_state {
 	int	yyprevious;
 	void	*yybgin;
 	/* Variables needed by yyparse */
-	void 	*yypv;
+	void	*yypv;
 	int	*yyps;
 	int	yytmp;
 	int	yystate;
@@ -775,7 +782,7 @@ typedef struct mdb_lex_state {
 	YYSTYPE	yyv[YYMAXDEPTH];
 } mdb_lex_state_t;
 
-void 
+void
 mdb_lex_state_save(mdb_lex_state_t *s)
 {
 	ASSERT(s != NULL);
@@ -802,7 +809,7 @@ mdb_lex_state_save(mdb_lex_state_t *s)
 	s->yyval = yyval;
 }
 
-void 
+void
 mdb_lex_state_restore(mdb_lex_state_t *s)
 {
 	ASSERT(s != NULL);

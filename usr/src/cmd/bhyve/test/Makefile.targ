@@ -11,37 +11,20 @@
 
 #
 # Copyright 2018 Joyent, Inc.
+# Copyright 2022 Oxide Computer Company
 #
 
 $(ROOTOPTPKG):
 	$(INS.dir)
 
-$(ROOTBIN): $(ROOTOPTPKG)
+$(ROOTTESTS): $(ROOTOPTPKG)
 	$(INS.dir)
 
-$(ROOTBIN)/%: %.ksh $(ROOTBIN)
-	$(INS.rename)
-
-$(ROOTTST): $(ROOTOPTPKG)
+$(TESTDIR): $(ROOTTESTS)
 	$(INS.dir)
 
-$(ROOTTSTDIR): $(ROOTTST)
-	$(INS.dir)
-
-$(ROOTTSTDIR)/%.ksh: %.ksh $(ROOTTSTDIR)
+$(TESTDIR)/%: % $(TESTDIR)
 	$(INS.file)
-
-$(ROOTTSTDIR)/%.out: %.out $(ROOTTSTDIR)
-	$(INS.file)
-
-%.exe: %.o $(SUPOBJS)
-	$(LINK.c) -o $@ $< $(SUPOBJS) $(LDLIBS)
-	$(POST_PROCESS)
-
-$(ROOTTSTDIR)/%.exe: %.exe $(ROOTTSTDIR)
-	$(INS.file)
-
-all: install
 
 clean:
 	-$(RM) *.o $(CLEANFILES)

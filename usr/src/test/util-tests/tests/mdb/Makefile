@@ -11,6 +11,7 @@
 
 #
 # Copyright 2020 Joyent, Inc.
+# Copyright 2021 Oxide Computer Company
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -19,6 +20,7 @@ include $(SRC)/test/Makefile.com
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/mdb
 
+SUBDIRS = progs
 PROG = mdbtest
 
 ROOTPROG = $(PROG:%=$(TESTDIR)/%)
@@ -27,6 +29,7 @@ MAKEDIRS = \
 	exit-e \
 	format \
 	options \
+	numbers \
 	typedef
 
 FILES = \
@@ -55,6 +58,18 @@ FILES = \
 	format/tst.format-j.mdb.out \
 	format/tst.format-p.mdb \
 	format/tst.format-p.mdb.out \
+	numbers/tst.badnums.ksh \
+	numbers/tst.base10.mdb \
+	numbers/tst.base10.mdb.out \
+	numbers/tst.bitfields.ksh \
+	numbers/tst.bitfields.ksh.out \
+	numbers/tst.binary.mdb \
+	numbers/tst.binary.mdb.out \
+	numbers/tst.hex.mdb \
+	numbers/tst.hex.mdb.out \
+	numbers/tst.octal.mdb \
+	numbers/tst.octal.mdb.out \
+	numbers/tst.prefsym.ksh \
 	options/tst.autowrap.mdb \
 	options/tst.autowrap.mdb.out \
 	typedef/err.badid-leadnum.ksh \
@@ -112,11 +127,17 @@ FILEMODE = 0444
 
 $(TESTDIR)/mdbtest := FILEMODE = 0555
 
-all:
 
-install: all $(ROOTFILES) $(ROOTPROG)
+all     :=      TARGET = all
+install :=      TARGET = install
+clean   :=      TARGET = clean
+clobber :=      TARGET = clobber
 
-clean clobber:
+all: $(SUBDIRS)
+
+install: all $(ROOTFILES) $(ROOTPROG) $(SUBDIRS)
+
+clean clobber: $(SUBDIRS)
 
 $(ROOTFILES): $(TESTDIR) $(ROOTMAKEDIRS) $(FILES)
 
@@ -125,3 +146,6 @@ $(TESTDIR) $(ROOTMAKEDIRS):
 
 $(TESTDIR)/%: %
 	$(INS.file)
+
+$(SUBDIRS): FRC
+	cd $@; pwd; $(MAKE) $(TARGET)

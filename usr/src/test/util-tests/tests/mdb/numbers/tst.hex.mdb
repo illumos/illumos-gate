@@ -1,0 +1,7 @@
+0x123456789abcdef=K
+0x123____456_789___abcd__ef=K
+0x1_2_3_4_5_6_7_8_9_a_b_c_d_e_f____=K
+0t16$d
+badcafe=K
+bad___cafe=K
+bad___ca_fe=E

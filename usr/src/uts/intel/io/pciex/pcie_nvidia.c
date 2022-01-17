@@ -177,8 +177,6 @@ look_for_any_pciex_device(uchar_t bus)
 boolean_t
 create_pcie_root_bus(uchar_t bus, dev_info_t *dip)
 {
-	pcie_bus_t *bus_p;
-
 	/*
 	 * Currently this is being hard-coded.
 	 * We need to figure out if the root bus does indeed
@@ -198,10 +196,6 @@ create_pcie_root_bus(uchar_t bus, dev_info_t *dip)
 	    "compatible", "pciex_root_complex");
 
 	pcie_rc_init_bus(dip);
-
-	/* save base addr in bus_t for pci_cfgacc_xxx() */
-	bus_p = PCIE_DIP2BUS(dip);
-	bus_p->bus_cfgacc_base = mcfg_mem_base;
 
 	return (B_TRUE);
 }

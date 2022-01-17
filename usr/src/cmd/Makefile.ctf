@@ -21,10 +21,25 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2021 Oxide Computer Company
 #
 
-POST_PROCESS += ; $(CTFMERGE) $(CTFMRGFLAGS) -L VERSION -o $@ $(OBJS)
-POST_PROCESS_O += ; $(CTFCONVERT_O)
+#
+# The default mode at the moment is to use ctfconvert on object files
+# and merge them together. If you set this to 'link' after including
+# Makefile.ctf, it will switch that so instead we just do a single
+# ctfconvert on the resulting linked binary.
+#
+CTF_MODE = objs
+
+POST_objs = ; $(CTFMERGE) $(CTFMRGFLAGS) -L VERSION -o $@ $(OBJS)
+POST_O_objs = ; $(CTFCONVERT_O)
+
+POST_link = $(CTFCONVERT) -L VERSION $@
+POST_O_link =
+
+PROCESS_CTF = $(POST_$(CTF_MODE))
+POST_PROCESS_O += $(POST_O_$(CTF_MODE))
 
 CFLAGS += $(CTF_FLAGS)
 CFLAGS64 += $(CTF_FLAGS)

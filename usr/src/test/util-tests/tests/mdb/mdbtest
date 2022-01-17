@@ -12,6 +12,7 @@
 
 #
 # Copyright 2020 Joyent, Inc.
+# Copyright 2021 Oxide Computer Company
 #
 
 #
@@ -22,6 +23,7 @@ shopt -s xpg_echo
 #set -o xtrace
 
 mt_arg0=$(basename $0)
+mt_root=$(dirname $0)
 mt_ksh="/usr/bin/ksh"
 mt_mdb="/usr/bin/mdb"
 mt_outdir=
@@ -37,11 +39,11 @@ function usage
 	local msg="$*"
 	[[ -z "$msg" ]] || echo "$msg" 2>&1
 	cat <<USAGE >&2
-Usage: $mt_arg0  [ -o dir ] [ -k ] [ -m executable ] [ -a | test ... ]
+Usage: $mt_arg0  [ -o dir ] [ -k ] [ -m executable ] [ test ... ]
 
 	-o dir		Sets 'dir' as the output directory
 	-k		Keep output from all tests, not just failures
-	-m 		mdb binary to test
+	-m		mdb binary to test
 USAGE
 	exit 2
 }
@@ -96,10 +98,12 @@ function run_single
 	echo "Executing test $name ... \c"
 	mkdir -p "$odir" >/dev/null || fatal "can't make output directory"
 	if [[ -z "$input" ]]; then
-		MDB=$mt_mdb $command > "$odir/stdout" 2>"$odir/stderr"
+		MDB=$mt_mdb ODIR=$odir $command > "$odir/stdout" \
+		    2>"$odir/stderr"
 		res=$?
 	else
-		MDB=$mt_mdb $command < $input > "$odir/stdout" 2>"$odir/stderr"
+		MDB=$mt_mdb ODIR=$odir $command < $input > "$odir/stdout" \
+		    2>"$odir/stderr"
 		res=$?
 	fi
 
@@ -123,7 +127,7 @@ function run_single
 		echo "passed"
 		((mt_tsuc++))
 		mv "$odir" "$mt_outdir/success.$mt_tsuc" || fatal \
-		    "failed to move test directory"	
+		    "failed to move test directory"
 	fi
 
 	((mt_tnum++))
@@ -132,7 +136,7 @@ function run_single
 function run_all
 {
 	local tests t
-	
+
 	tests=$(find . -type f -name '[tst,err]*.*.[ksh,mdb]*')
 	for t in $tests; do
 		run_single $t
@@ -143,7 +147,7 @@ function welcome
 {
 	cat <<WELCOME
 Starting tests...
-mtest target: $mt_mdb
+mdbtest target: $mt_mdb
 output directory: $mt_outdir
 WELCOME
 }
@@ -161,6 +165,10 @@ function cleanup
 
 function goodbye
 {
+	if [[ $mt_tnum -eq 0 ]]; then
+		fatal "no tests were run, are you in the right directory?"
+	fi
+
 	cat <<EOF
 
 -------------
@@ -214,11 +222,14 @@ setup_outdir
 welcome
 
 if [[ ! -z "$mt_all" ]]; then
+	if ! cd "$mt_root"; then
+		fatal "failed to change to test root: $mt_root"
+	fi
 	run_all
 else
 	for t in $@; do
 		[[ -f $t ]] || fatal "cannot find test $t"
-		run_single $t		
+		run_single $t
 	done
 fi
 
@@ -228,4 +239,4 @@ cleanup
 #
 # Exit 1 if we have tests that return non-zero
 #
-[[ $mt_tfai -eq 0 ]]
+[[ $mt_tfail -eq 0 ]]

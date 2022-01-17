@@ -22,6 +22,7 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2021 Oxide Computer Company
  */
 
 #include <netinet/in.h>
@@ -131,6 +132,9 @@ mdb_strtonum(const char *s, int base)
 	for (c = *++s; c != '\0'; c = *++s) {
 		if (val > multmax)
 			goto oflow;
+
+		if (c == '_')
+			continue;
 
 		if ((i = CTOI(c)) >= base)
 			yyerror("digit '%c' is invalid in current base\n", c);
