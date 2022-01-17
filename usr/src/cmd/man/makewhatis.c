@@ -29,6 +29,7 @@
 /*
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -651,19 +652,23 @@ process_page(struct page_info *page, char *section_dir)
 				state = STATE_MDOCNAME;
 			continue;
 		/* Inside an old-style .SH NAME section */
-		case STATE_MANSTYLE:
+		case STATE_MANSTYLE: {
+			char *altline;
+
 			if (strncmp(line, ".SH", 3) == 0 ||
 			    strncmp(line, ".SS", 3) == 0)
 				break;
 			(void) trim_rhs(line);
 			if (strcmp(line, ".") == 0)
 				continue;
-			if (strncmp(line, ".IX", 3) == 0) {
-				line += 3;
-				line = skip_spaces(line);
+			altline = line;
+			if (strncmp(altline, ".IX", 3) == 0) {
+				altline += 3;
+				altline = skip_spaces(altline);
 			}
-			process_man_line(line);
+			process_man_line(altline);
 			continue;
+		}
 		/* Inside a new-style .Sh NAME section (the .Nm part) */
 		case STATE_MDOCNAME:
 			(void) trim_rhs(line);
