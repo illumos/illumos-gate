@@ -234,6 +234,26 @@ and
 .Fn list_prev
 functions return the next or previous item in the list, relative to the named
 reference item which must be linked on the list.
+If the referenced item is either the last entry in the list for
+.Fn list_next
+or the first entry in the list for
+.Fn list_prev ,
+then the functions will return
+.Dv NULL .
+This is useful for iterating over a list with the following pattern:
+.Bd -literal -offset indent
+list_t list_t;
+\&...
+for (foo_t *foo = list_head(&list_t); foo != NULL;
+    foo = list_next(&list_t, foo)) {
+	/* Process each entry of the list */
+}
+
+for (foo_t *foo = list_tail(&list_t); foo != NULL;
+    foo = list_prev(&list_t, foo)) {
+	/* Same thing, but in reverse */
+}
+.Ed
 .Pp
 The
 .Fn list_is_empty
