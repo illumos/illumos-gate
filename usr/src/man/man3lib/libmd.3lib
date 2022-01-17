@@ -30,6 +30,8 @@
 .In md5.h
 .In sha1.h
 .In sha2.h
+.In sys/edonr.h
+.In sys/skein.h
 .Sh DESCRIPTION
 This library provides hashing routines for the following suites of hash
 functions:
@@ -52,6 +54,20 @@ SHA384
 .It
 SHA512
 .Pq FIPS 180-2
+.It
+Edon-R
+.Po
+.Rs
+.%T Cryptographic hash function Edon-R
+.Re
+.Pc
+.It
+Skein 256, 512, and 1024
+.Po
+.Rs
+.%T The Skein Hash Function Family
+.Re
+.Pc
 .El
 .Sh INTERFACES
 The shared object
@@ -60,14 +76,25 @@ provides the public interfaces defined below.
 See
 .Xr Intro 3
 for additional information on shared object interfaces.
-.Bl -column -offset indent ".Sy SHA2Update" ".Sy SHA2Update"
+.Bl -column -offset indent ".Sy Skein1024_Final_Pad" ".Sy Skein1024_Final_Pad"
+.It Sy EdonRFinal Ta Sy EdonRHash
+.It Sy EdonRInit Ta Sy EdonRUpdate
 .It Sy MD4Final Ta Sy MD4Init
 .It Sy MD4Update Ta Sy md5_calc
 .It Sy MD5Final Ta Sy MD5Init
 .It Sy MD5Update Ta Sy SHA1Final
 .It Sy SHA1Init Ta Sy SHA1Update
 .It Sy SHA2Final Ta Sy SHA2Init
-.It Sy SHA2Update Ta ""
+.It Sy SHA2Update Ta Sy Skein_256_Final
+.It Sy Skein_256_Final_Pad Ta Sy Skein_256_Init
+.It Sy Skein_256_InitExt Ta Sy Skein_256_Output
+.It Sy Skein_256_Update Ta Sy Skein_512_Final
+.It Sy Skein_512_Final_Pad Ta Sy Skein_512_Init
+.It Sy Skein_512_InitExt Ta Sy Skein_512_Output
+.It Sy Skein_512_Update Ta Sy Skein1024_Final
+.It Sy Skein1024_Final_Pad Ta Sy Skein1024_Init
+.It Sy Skein1024_InitExt Ta Sy Skein1024_Output
+.It Sy Skein1024_Update Ta ""
 .El
 .Sh SECURITY
 The MD4 and MD5 algorithms are currently considered weak for cryptographic use.
