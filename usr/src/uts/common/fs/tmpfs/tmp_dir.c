@@ -54,6 +54,11 @@ static int tdiraddentry(struct tmpnode *, struct tmpnode *, char *,
 #define	T_HASH_SIZE	8192		/* must be power of 2 */
 #define	T_MUTEX_SIZE	64
 
+/* Non-static so compilers won't constant-fold these away. */
+clock_t tmpfs_rename_backoff_delay = 1;
+unsigned int tmpfs_rename_backoff_tries = 0;
+unsigned long tmpfs_rename_loops = 0;
+
 static struct tdirent	*t_hashtable[T_HASH_SIZE];
 static kmutex_t		 t_hashmutex[T_MUTEX_SIZE];
 
@@ -266,8 +271,65 @@ tdirenter(
 	 * to see if it has been removed while it was unlocked.
 	 */
 	if (op == DE_LINK || op == DE_RENAME) {
-		if (tp != dir)
-			rw_enter(&tp->tn_rwlock, RW_WRITER);
+		if (tp != dir) {
+			unsigned int tries = 0;
+
+			/*
+			 * If we are acquiring tp->tn_rwlock (for SOURCE)
+			 * inside here, we must consider the following:
+			 *
+			 * - dir->tn_rwlock (TARGET) is already HELD (see
+			 * above ASSERT()).
+			 *
+			 * - It is possible our SOURCE is a parent of our
+			 * TARGET. Yes it's unusual, but it will return an
+			 * error below via tdircheckpath().
+			 *
+			 * - It is also possible that another thread,
+			 * concurrent to this one, is performing
+			 * rmdir(TARGET), which means it will first acquire
+			 * SOURCE's lock, THEN acquire TARGET's lock, which
+			 * could result in this thread holding TARGET and
+			 * trying for SOURCE, but the other thread holding
+			 * SOURCE and trying for TARGET.  This is deadlock,
+			 * and it's inducible.
+			 *
+			 * To prevent this, we borrow some techniques from UFS
+			 * and rw_tryenter(), delaying if we fail, and
+			 * if someone tweaks the number of backoff tries to be
+			 * nonzero, return EBUSY after that number of tries.
+			 */
+			while (!rw_tryenter(&tp->tn_rwlock, RW_WRITER)) {
+				/*
+				 * Sloppy, but this is a diagnostic so atomic
+				 * increment would be overkill.
+				 */
+				tmpfs_rename_loops++;
+
+				if (tmpfs_rename_backoff_tries != 0) {
+					if (tries > tmpfs_rename_backoff_tries)
+						return (EBUSY);
+					tries++;
+				}
+				/*
+				 * NOTE: We're still holding dir->tn_rwlock,
+				 * so drop it over the delay, so any other
+				 * thread can get its business done.
+				 *
+				 * No state change or state inspection happens
+				 * prior to here, so it is not wholly dangerous
+				 * to release-and-reacquire dir->tn_rwlock.
+				 *
+				 * Hold the vnode of dir in case it gets
+				 * released by another thread, though.
+				 */
+				VN_HOLD(TNTOV(dir));
+				rw_exit(&dir->tn_rwlock);
+				delay(tmpfs_rename_backoff_delay);
+				rw_enter(&dir->tn_rwlock, RW_WRITER);
+				VN_RELE(TNTOV(dir));
+			}
+		}
 		mutex_enter(&tp->tn_tlock);
 		if (tp->tn_nlink == 0) {
 			mutex_exit(&tp->tn_tlock);

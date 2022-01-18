@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #pragma weak _run_setkey = run_setkey
 #pragma weak _run_crypt = run_crypt
@@ -48,7 +46,7 @@
 
 #define	READER	0
 #define	WRITER	1
-#define	KSIZE 	8
+#define	KSIZE	8
 
 /*  Global Variables  */
 static char key[KSIZE+1];
@@ -65,7 +63,7 @@ static int writekey();
 void	_exit();
 
 int
-run_setkey(int p[2], const char *keyparam)
+run_setkey(int *p, const char *keyparam)
 {
 	(void) mutex_lock(&lock);
 	if (cryptopen(p) == -1) {
@@ -119,7 +117,7 @@ writekey(int p[2], char *keyarg)
 
 
 int
-run_crypt(long offset, char *buffer, unsigned int count, int p[2])
+run_crypt(long offset, char *buffer, unsigned int count, int *p)
 {
 	struct header header;
 	void (*pstat) ();
@@ -193,7 +191,7 @@ crypt_close_nolock(int p[2])
 }
 
 int
-crypt_close(int p[2])
+crypt_close(int *p)
 {
 	(void) mutex_lock(&lock);
 	(void) crypt_close_nolock(p);
