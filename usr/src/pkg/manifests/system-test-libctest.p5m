@@ -49,6 +49,7 @@ file path=opt/libc-tests/cfg/symbols/stdnoreturn_h.cfg mode=0444
 file path=opt/libc-tests/cfg/symbols/string_h.cfg mode=0444
 file path=opt/libc-tests/cfg/symbols/strings_h.cfg mode=0444
 file path=opt/libc-tests/cfg/symbols/sys_atomic_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/sys_mman_h.cfg mode=0444
 file path=opt/libc-tests/cfg/symbols/sys_stat_h.cfg mode=0444
 file path=opt/libc-tests/cfg/symbols/sys_time_h.cfg mode=0444
 file path=opt/libc-tests/cfg/symbols/sys_timeb_h.cfg mode=0444
@@ -199,6 +200,7 @@ hardlink path=opt/libc-tests/tests/symbols/strings_h target=setup
 file path=opt/libc-tests/tests/symbols/symbols_test.$(ARCH) mode=0555
 file path=opt/libc-tests/tests/symbols/symbols_test.$(ARCH64) mode=0555
 hardlink path=opt/libc-tests/tests/symbols/sys_atomic_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/sys_mman_h target=setup
 hardlink path=opt/libc-tests/tests/symbols/sys_stat_h target=setup
 hardlink path=opt/libc-tests/tests/symbols/sys_time_h target=setup
 hardlink path=opt/libc-tests/tests/symbols/sys_timeb_h target=setup

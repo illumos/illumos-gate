@@ -721,8 +721,8 @@ shmat(int shmid, const void *shmaddr, int shmflag)
 /*
  * mmap interpose
  */
-caddr_t
-mmap(caddr_t addr, size_t len, int prot, int flags, int fd, off_t pos)
+void *
+mmap(void *addr, size_t len, int prot, int flags, int fd, off_t pos)
 {
 	static caddr_t (*mmapfunc)() = NULL;
 	caddr_t result;
@@ -774,8 +774,8 @@ mmap(caddr_t addr, size_t len, int prot, int flags, int fd, off_t pos)
 /*
  * mmap64 interpose
  */
-caddr_t
-mmap64(caddr_t addr, size_t len, int prot, int flags, int fd, off64_t pos)
+void *
+mmap64(void *addr, size_t len, int prot, int flags, int fd, off64_t pos)
 {
 	static caddr_t (*mmap64func)();
 	caddr_t result;

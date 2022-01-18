@@ -527,7 +527,7 @@ write(int fd, const void *buf, size_t size)
 
 int
 getmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
-	int *flagsp)
+    int *flagsp)
 {
 	extern int __getmsg(int, struct strbuf *, struct strbuf *, int *);
 	int rv;
@@ -537,7 +537,7 @@ getmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
 
 int
 getpmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
-	int *bandp, int *flagsp)
+    int *bandp, int *flagsp)
 {
 	extern int __getpmsg(int, struct strbuf *, struct strbuf *,
 	    int *, int *);
@@ -548,7 +548,7 @@ getpmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
 
 int
 putmsg(int fd, const struct strbuf *ctlptr,
-	const struct strbuf *dataptr, int flags)
+    const struct strbuf *dataptr, int flags)
 {
 	extern int __putmsg(int, const struct strbuf *,
 	    const struct strbuf *, int);
@@ -559,7 +559,7 @@ putmsg(int fd, const struct strbuf *ctlptr,
 
 int
 __xpg4_putmsg(int fd, const struct strbuf *ctlptr,
-	const struct strbuf *dataptr, int flags)
+    const struct strbuf *dataptr, int flags)
 {
 	extern int __putmsg(int, const struct strbuf *,
 	    const struct strbuf *, int);
@@ -570,7 +570,7 @@ __xpg4_putmsg(int fd, const struct strbuf *ctlptr,
 
 int
 putpmsg(int fd, const struct strbuf *ctlptr,
-	const struct strbuf *dataptr, int band, int flags)
+    const struct strbuf *dataptr, int band, int flags)
 {
 	extern int __putpmsg(int, const struct strbuf *,
 	    const struct strbuf *, int, int);
@@ -581,7 +581,7 @@ putpmsg(int fd, const struct strbuf *ctlptr,
 
 int
 __xpg4_putpmsg(int fd, const struct strbuf *ctlptr,
-	const struct strbuf *dataptr, int band, int flags)
+    const struct strbuf *dataptr, int band, int flags)
 {
 	extern int __putpmsg(int, const struct strbuf *,
 	    const struct strbuf *, int, int);
@@ -607,7 +607,7 @@ nanosleep(const timespec_t *rqtp, timespec_t *rmtp)
 
 int
 clock_nanosleep(clockid_t clock_id, int flags,
-	const timespec_t *rqtp, timespec_t *rmtp)
+    const timespec_t *rqtp, timespec_t *rmtp)
 {
 	timespec_t reltime;
 	hrtime_t start;
@@ -810,7 +810,7 @@ msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg)
 }
 
 int
-msync(caddr_t addr, size_t len, int flags)
+msync(void *addr, size_t len, int flags)
 {
 	extern int __msync(caddr_t, size_t, int);
 	int rv;
@@ -1007,7 +1007,7 @@ sigsuspend(const sigset_t *set)
 
 int
 _pollsys(struct pollfd *fds, nfds_t nfd, const timespec_t *timeout,
-	const sigset_t *sigmask)
+    const sigset_t *sigmask)
 {
 	extern int __pollsys(struct pollfd *, nfds_t, const timespec_t *,
 	    const sigset_t *);

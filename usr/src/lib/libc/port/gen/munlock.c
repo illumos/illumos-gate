@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #pragma weak _munlock = munlock
 
@@ -40,7 +38,7 @@
  */
 
 int
-munlock(caddr_t addr, size_t len)
+munlock(const void *addr, size_t len)
 {
-	return (memcntl(addr, len, MC_UNLOCK, 0, 0, 0));
+	return (memcntl((void *)addr, len, MC_UNLOCK, 0, 0, 0));
 }

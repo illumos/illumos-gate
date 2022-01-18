@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #pragma weak _mlock = mlock
 
@@ -39,7 +37,7 @@
  * Function to lock address range in memory.
  */
 int
-mlock(caddr_t addr, size_t len)
+mlock(const void *addr, size_t len)
 {
-	return (memcntl(addr, len, MC_LOCK, 0, 0, 0));
+	return (memcntl((void *)addr, len, MC_LOCK, 0, 0, 0));
 }

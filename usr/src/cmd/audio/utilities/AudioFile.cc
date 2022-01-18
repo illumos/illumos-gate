@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -42,9 +40,6 @@
 #include <AudioDebug.h>
 #include <libaudio.h>
 #include <audio_hdr.h>
-
-// XX64  This should go away when <sys/mman.h> gets fixed.
-extern "C" int madvise(caddr_t, size_t, int);
 
 // class AudioFile methods
 
