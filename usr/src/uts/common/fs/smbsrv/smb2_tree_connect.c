@@ -127,6 +127,7 @@ errout:
 
 	/*
 	 * XXX These need work..
+	 * See SMB1 flags in tcon->optional_support
 	 */
 	if (tree->t_encrypt != SMB_CONFIG_DISABLED)
 		ShareFlags = SMB2_SHAREFLAG_ENCRYPT_DATA;

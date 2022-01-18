@@ -22,6 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -67,7 +68,6 @@ int	smb_maxbufsize = SMB_NT_MAXBUF;
 int	smb_flush_required = 1;
 int	smb_dirsymlink_enable = 1;
 int	smb_sign_debug = 0;
-int	smb_shortnames = 1;
 uint_t	smb_audit_flags =
 #ifdef	DEBUG
     SMB_AUDIT_NODE;
