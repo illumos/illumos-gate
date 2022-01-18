@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 Joyent, Inc.
 .\"
-.Dd August 28, 2021
+.Dd January 17, 2022
 .Dt GETGROUPLIST 3C
 .Os
 .Sh NAME
@@ -112,7 +112,7 @@ upon return to determine the number of entries in
 .Pp
 On Linux, both glibc and musl return the number of groups
 .Fa user
-belongs to on success and returns -1 on failure.
+belongs to on success and return -1 on failure.
 .Pp
 None of these other implementations document any
 .Va errno
@@ -145,7 +145,7 @@ printgroups(const char *user)
         err(EXIT_FAILURE, "calloc");
 
     if ((pw = getpwnam(user)) == NULL)
-        err(EXIT_FAILURE, "getpwname");
+        err(EXIT_FAILURE, "getpwnam");
 
     ngroups = NGROUPS_MAX;
     ret = getgrouplist(user, pw->pw_gid, groups, &ngroups);
@@ -165,7 +165,7 @@ printgroups(const char *user)
 .Sh ERRORS
 On failure,
 .Fn getgrouplist
-returns -1, and will set errno to one one of the following values:
+returns -1, and will set errno to one of the following values:
 .Bl -tag -width Dv
 .It Er ENOMEM
 Not enough memory to complete the request.
