@@ -147,7 +147,7 @@ static void upf_interrupt(struct usbgem_dev *, mblk_t *);
 #define	UPF_REQ_GET_REGISTER	0xf0
 #define	UPF_REQ_SET_REGISTER	0xf1
 #define	OUTB(dp, p, v, errp, label)	\
-	if ((*(errp) = usbgem_ctrl_out((dp), 	\
+	if ((*(errp) = usbgem_ctrl_out((dp),	\
 	/* bmRequestType */ USB_DEV_REQ_HOST_TO_DEV	\
 		| USB_DEV_REQ_TYPE_VENDOR | USB_DEV_REQ_RCPT_DEV,	\
 	/* bRequest */	UPF_REQ_SET_REGISTER,	\
@@ -158,7 +158,7 @@ static void upf_interrupt(struct usbgem_dev *, mblk_t *);
 	/* size */	0)) != USB_SUCCESS) goto label;
 
 #define	OUTW(dp, p, v, errp, label)	\
-	if ((*(errp) = usbgem_ctrl_out_val((dp), 	\
+	if ((*(errp) = usbgem_ctrl_out_val((dp),	\
 	/* bmRequestType */ USB_DEV_REQ_HOST_TO_DEV	\
 		| USB_DEV_REQ_TYPE_VENDOR | USB_DEV_REQ_RCPT_DEV,	\
 	/* bRequest */	UPF_REQ_SET_REGISTER,	\
@@ -168,7 +168,7 @@ static void upf_interrupt(struct usbgem_dev *, mblk_t *);
 	/* value */	(v))) != USB_SUCCESS) goto label
 
 #define	OUTS(dp, p, buf, len, errp, label)	\
-	if ((*(errp) = usbgem_ctrl_out((dp), 	\
+	if ((*(errp) = usbgem_ctrl_out((dp),	\
 	/* bmRequestType */ USB_DEV_REQ_HOST_TO_DEV	\
 		| USB_DEV_REQ_TYPE_VENDOR | USB_DEV_REQ_RCPT_DEV,	\
 	/* bRequest */	UPF_REQ_SET_REGISTER,	\
@@ -179,7 +179,7 @@ static void upf_interrupt(struct usbgem_dev *, mblk_t *);
 	/* size */	(len))) != USB_SUCCESS) goto label
 
 #define	INB(dp, p, vp, errp, label)	\
-	if ((*(errp) = usbgem_ctrl_in_val((dp), 	\
+	if ((*(errp) = usbgem_ctrl_in_val((dp),		\
 	/* bmRequestType */ USB_DEV_REQ_DEV_TO_HOST	\
 		| USB_DEV_REQ_TYPE_VENDOR | USB_DEV_REQ_RCPT_DEV,	\
 	/* bRequest */ UPF_REQ_GET_REGISTER,	\
@@ -189,7 +189,7 @@ static void upf_interrupt(struct usbgem_dev *, mblk_t *);
 	/* valuep */	(vp))) != USB_SUCCESS) goto label
 
 #define	INW(dp, p, vp, errp, label)	\
-	if ((*(errp) = usbgem_ctrl_in_val((dp), 	\
+	if ((*(errp) = usbgem_ctrl_in_val((dp),		\
 	/* bmRequestType */ USB_DEV_REQ_DEV_TO_HOST	\
 		| USB_DEV_REQ_TYPE_VENDOR | USB_DEV_REQ_RCPT_DEV,	\
 	/* bRequest */ UPF_REQ_GET_REGISTER,	\
@@ -199,7 +199,7 @@ static void upf_interrupt(struct usbgem_dev *, mblk_t *);
 	/* valuep */	(vp))) != USB_SUCCESS) goto label
 
 #define	INS(dp, p, buf, len, errp, label)	\
-	if ((*(errp) = usbgem_ctrl_in((dp), 	\
+	if ((*(errp) = usbgem_ctrl_in((dp),	\
 	/* bmRequestType */ USB_DEV_REQ_DEV_TO_HOST	\
 		    | USB_DEV_REQ_TYPE_VENDOR | USB_DEV_REQ_RCPT_DEV,	\
 	/* bRequest */ UPF_REQ_GET_REGISTER,	\
@@ -1080,81 +1080,9 @@ upfdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  * OS depend (loadable streams driver) routine
  */
 /* ======================================================== */
-#ifdef USBGEM_CONFIG_GLDv3
+
 USBGEM_STREAM_OPS(upf_ops, upfattach, upfdetach);
-#else
-static	struct module_info upfminfo = {
-	0,			/* mi_idnum */
-	"upf",			/* mi_idname */
-	0,			/* mi_minpsz */
-	ETHERMTU,		/* mi_maxpsz */
-	32*1024,		/* mi_hiwat */
-	1,			/* mi_lowat */
-};
 
-static	struct qinit upfrinit = {
-	(int (*)()) NULL,	/* qi_putp */
-	usbgem_rsrv,		/* qi_srvp */
-	usbgem_open,		/* qi_qopen */
-	usbgem_close,		/* qi_qclose */
-	(int (*)()) NULL,	/* qi_qadmin */
-	&upfminfo,		/* qi_minfo */
-	NULL			/* qi_mstat */
-};
-
-static	struct qinit upfwinit = {
-	usbgem_wput,		/* qi_putp */
-	usbgem_wsrv,		/* qi_srvp */
-	(int (*)()) NULL,	/* qi_qopen */
-	(int (*)()) NULL,	/* qi_qclose */
-	(int (*)()) NULL,	/* qi_qadmin */
-	&upfminfo,		/* qi_minfo */
-	NULL			/* qi_mstat */
-};
-
-static struct streamtab	upf_info = {
-	&upfrinit,	/* st_rdinit */
-	&upfwinit,	/* st_wrinit */
-	NULL,		/* st_muxrinit */
-	NULL		/* st_muxwrinit */
-};
-
-static	struct cb_ops cb_upf_ops = {
-	nulldev,	/* cb_open */
-	nulldev,	/* cb_close */
-	nodev,		/* cb_strategy */
-	nodev,		/* cb_print */
-	nodev,		/* cb_dump */
-	nodev,		/* cb_read */
-	nodev,		/* cb_write */
-	nodev,		/* cb_ioctl */
-	nodev,		/* cb_devmap */
-	nodev,		/* cb_mmap */
-	nodev,		/* cb_segmap */
-	nochpoll,	/* cb_chpoll */
-	ddi_prop_op,	/* cb_prop_op */
-	&upf_info,	/* cb_stream */
-	D_MP		/* cb_flag */
-};
-
-static	struct dev_ops upf_ops = {
-	DEVO_REV,	/* devo_rev */
-	0,		/* devo_refcnt */
-	usbgem_getinfo,	/* devo_getinfo */
-	nulldev,	/* devo_identify */
-	nulldev,	/* devo_probe */
-	upfattach,	/* devo_attach */
-	upfdetach,	/* devo_detach */
-	nodev,		/* devo_reset */
-	&cb_upf_ops,	/* devo_cb_ops */
-	NULL,		/* devo_bus_ops */
-	usbgem_power,	/* devo_power */
-#if DEVO_REV >= 4
-	usbgem_quiesce,	/* devo_quiesce */
-#endif
-
-};
-#endif
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module.  This one is a driver */
 	ident,
@@ -1173,7 +1101,7 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	int 	status;
+	int	status;
 
 	DPRINTF(2, (CE_CONT, "!upf: _init: called"));
 

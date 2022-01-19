@@ -9,15 +9,11 @@
 
 #pragma	ident	"@(#)usbgem.h	1.4 12/02/09"
 
-#ifdef USBGEM_CONFIG_GLDv3
 #include <sys/mac.h>
 #ifndef MAC_VERSION
 #include <sys/mac_provider.h>
 #endif
 #include <sys/mac_ether.h>
-#else
-#include <sys/gld.h>
-#endif /* GLDv3 */
 
 /*
  * Useful macros and typedefs
@@ -88,11 +84,7 @@ struct mcast_addr {
  */
 struct usbgem_dev {
 	dev_info_t	*dip;
-#ifdef USBGEM_CONFIG_GLDv3
 	mac_handle_t	mh;
-#else
-	void		*macinfo;	/* opaque handle for upper layer */
-#endif
 	char		name[USBGEM_NAME_LEN];
 
 	/* pointer to usb private data */
@@ -404,25 +396,10 @@ int usbgem_resume(dev_info_t *);
 int usbgem_suspend(dev_info_t *);
 int usbgem_quiesce(dev_info_t *);
 
-#ifdef USBGEM_CONFIG_GLDv3
-#if DEVO_REV < 4
-#define	USBGEM_STREAM_OPS(dev_ops, attach, detach) \
-    DDI_DEFINE_STREAM_OPS(dev_ops, nulldev, nulldev, attach, detach, \
-    nodev, NULL, D_MP, NULL)
-#else
 #define	USBGEM_STREAM_OPS(dev_ops, attach, detach) \
     DDI_DEFINE_STREAM_OPS(dev_ops, nulldev, nulldev, attach, detach, \
     nodev, NULL, D_MP, NULL, usbgem_quiesce)
-#endif
-#else
-#define	usbgem_getinfo	gld_getinfo
-#define	usbgem_open	gld_open
-#define	usbgem_close	gld_close
-#define	usbgem_wput	gld_wput
-#define	usbgem_wsrv	gld_wsrv
-#define	usbgem_rsrv	gld_rsrv
-#define	usbgem_power	NULL
-#endif
+
 int usbgem_mod_init(struct dev_ops *, char *);
 void usbgem_mod_fini(struct dev_ops *);
 
