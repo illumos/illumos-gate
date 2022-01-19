@@ -208,8 +208,6 @@ struct vm_page {
 	int		vmp_prot;
 };
 
-#define	VMC_IS_ACTIVE(vmc)	(((vmc)->vmc_state & VCS_ACTIVE) != 0)
-
 static vmspace_mapping_t *vm_mapping_find(vmspace_t *, uintptr_t, size_t);
 static void vmspace_hold_enter(vmspace_t *);
 static void vmspace_hold_exit(vmspace_t *, bool);
@@ -300,8 +298,12 @@ vmspace_track_dirty(vmspace_t *vms, uint64_t gpa, size_t len, uint8_t *bitmap)
 {
 	/*
 	 * Accumulate dirty bits into the given bit vector.  Note that this
-	 * races both against hardware writes from running VCPUs and
+	 * races both against hardware writes from running vCPUs and
 	 * reflections from userspace.
+	 *
+	 * Called from a userspace-visible ioctl, this depends on the VM
+	 * instance being read-locked to prevent vmspace_map/vmspace_unmap
+	 * operations from changing the page tables during the walk.
 	 */
 	for (size_t offset = 0; offset < len; offset += PAGESIZE) {
 		bool bit = false;
@@ -861,6 +863,7 @@ vmc_activate(vm_client_t *vmc)
 	mutex_enter(&vmc->vmc_lock);
 	VERIFY0(vmc->vmc_state & VCS_ACTIVE);
 	if ((vmc->vmc_state & VCS_ORPHANED) != 0) {
+		mutex_exit(&vmc->vmc_lock);
 		return (ENXIO);
 	}
 	while ((vmc->vmc_state & VCS_HOLD) != 0) {
@@ -974,6 +977,7 @@ vmc_space_release(vm_client_t *vmc, bool kick_on_cpu)
 	 * VMC_HOLD must be done atomically here.
 	 */
 	atomic_and_uint(&vmc->vmc_state, ~VCS_HOLD);
+	cv_broadcast(&vmc->vmc_cv);
 	mutex_exit(&vmc->vmc_lock);
 }
 
