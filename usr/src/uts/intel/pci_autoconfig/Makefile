@@ -57,9 +57,9 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# Depends on acpica ACPI CA interpreter and PCI-E framework
+# Depends on the platform's resource discovery and PCI-E framework
 #
-LDFLAGS		+= -Nmisc/acpica -Nmisc/pcie
+LDFLAGS		+= -Nmisc/pcie -Nmisc/pci_prd
 
 #
 #	Default build targets.

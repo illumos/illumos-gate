@@ -293,7 +293,7 @@ SYS_KMODS	+=
 #
 #	'Misc' Modules (/kernel/misc):
 #
-MISC_KMODS	+= gfx_private pcie
+MISC_KMODS	+= gfx_private pcie pci_prd
 MISC_KMODS	+= acpidev
 MISC_KMODS	+= drmach_acpi
 

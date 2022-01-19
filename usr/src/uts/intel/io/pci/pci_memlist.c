@@ -40,8 +40,8 @@
 #include <sys/pci_impl.h>
 #include <sys/debug.h>
 
-extern int pci_boot_debug;
-#define	dprintf if (pci_boot_debug) printf
+int pci_memlist_debug;
+#define	dprintf if (pci_memlist_debug) printf
 
 void
 memlist_dump(struct memlist *listp)

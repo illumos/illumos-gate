@@ -31,16 +31,14 @@
 #ifndef	_PCIHRT_H
 #define	_PCIHRT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 struct hrt_hdr { /* PCI Hot-Plug Configuration Resource Table header */
-	uint32_t hrt_sig;	/* $HRT 				*/
+	uint32_t hrt_sig;	/* $HRT					*/
 	uint16_t hrt_avail_imap; /* Bitmap of unused IRQs		*/
-	uint16_t hrt_used_imap;	/* Bitmap of IRQs used by PCI 		*/
+	uint16_t hrt_used_imap;	/* Bitmap of IRQs used by PCI		*/
 	uchar_t	hrt_entry_cnt;	/* no. of PCI hot-plug slot entries	*/
 	uchar_t	hrt_ver;	/* version no. = 1			*/
 	uchar_t	hrt_resv0;	/* reserved				*/
@@ -58,7 +56,7 @@ struct php_entry {	/* PCI hot-plug slot entry */
 	uchar_t	php_subord_bus;	/* Max Subordinate bus of this slot	*/
 	uint16_t php_io_start;	/* allocated I/O space starting addr	*/
 	uint16_t php_io_size;	/* allocated I/O space size in bytes	*/
-	uint16_t php_mem_start;	/* allocated Memory space start addr 	*/
+	uint16_t php_mem_start;	/* allocated Memory space start addr	*/
 	uint16_t php_mem_size;	/* allocated Memory space size in 64k	*/
 	uint16_t php_pfmem_start; /* allocated Prefetchable Memory start */
 	uint16_t php_pfmem_size; /* allocated Prefetchable size in 64k	*/

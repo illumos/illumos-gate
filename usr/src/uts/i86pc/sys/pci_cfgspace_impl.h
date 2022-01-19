@@ -21,15 +21,17 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _SYS_PCI_CFGSPACE_IMPL_H
 #define	_SYS_PCI_CFGSPACE_IMPL_H
 
 /*
- * Routines to support particular PCI chipsets
+ * Routines to support particular PCI chipsets and the PCI BIOS.
  */
+
+#include <sys/plat/pci_prd.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -182,6 +184,11 @@ typedef struct pci_irq_route_hdr {
 	uint32_t	pir_addr;
 } pci_irq_route_hdr_t;
 #pragma pack()
+
+extern int pci_irq_nroutes;
+
+extern int pci_slot_names_prop(int, char *, int);
+extern void pci_bios_bus_iter(pci_prd_root_complex_f, void *);
 
 #ifdef __cplusplus
 }
