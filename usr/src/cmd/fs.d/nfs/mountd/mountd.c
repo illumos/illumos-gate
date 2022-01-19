@@ -443,7 +443,7 @@ main(int argc, char *argv[])
 	bool_t	can_do_mlp;
 	long	thr_flags = (THR_NEW_LWP|THR_DAEMON);
 	char defval[5];
-	int defvers, ret, bufsz;
+	int ret, bufsz;
 	struct rlimit rl;
 	int listen_backlog = 0;
 	int max_threads = 0;
@@ -539,35 +539,12 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Read in the NFS version values from config file.
+	 * One might be tempted to use the NFS configuration values
+	 * server_versmin, server_versmax to constrain the range of
+	 * mountd versions supported here.  However, older clients
+	 * use mountd V1 for showmount, so just leave all mountd
+	 * versions enabled here. (mount_vers_min, mount_vers_max)
 	 */
-	bufsz = sizeof (defval);
-	ret = nfs_smf_get_prop("server_versmin", defval, DEFAULT_INSTANCE,
-	    SCF_TYPE_INTEGER, NFSD, &bufsz);
-	if (ret == SA_OK) {
-		errno = 0;
-		defvers = strtol(defval, (char **)NULL, 10);
-		if (errno == 0) {
-			mount_vers_min = defvers;
-			/*
-			 * special because NFSv2 is
-			 * supported by mount v1 & v2
-			 */
-			if (defvers == NFS_VERSION)
-				mount_vers_min = MOUNTVERS;
-		}
-	}
-
-	bufsz = sizeof (defval);
-	ret = nfs_smf_get_prop("server_versmax", defval, DEFAULT_INSTANCE,
-	    SCF_TYPE_INTEGER, NFSD, &bufsz);
-	if (ret == SA_OK) {
-		errno = 0;
-		defvers = strtol(defval, (char **)NULL, 10);
-		if (errno == 0) {
-			mount_vers_max = defvers;
-		}
-	}
 
 	ret = nfs_smf_get_iprop("mountd_listen_backlog", &listen_backlog,
 	    DEFAULT_INSTANCE, SCF_TYPE_INTEGER, NFSD);
