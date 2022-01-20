@@ -81,7 +81,7 @@ static void Encode(uint8_t *, const uint32_t *, size_t);
 		(ctx)->state[3], (ctx)->state[4], (ctx), (in))
 
 static void SHA1Transform(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
-    SHA1_CTX *, const uint8_t *);
+    SHA1_CTX *, const uint8_t [64]);
 
 #elif	defined(__amd64)
 
@@ -95,7 +95,7 @@ void sha1_block_data_order(SHA1_CTX *ctx, const void *inpp, size_t num_blocks);
 
 #define	SHA1_TRANSFORM(ctx, in) SHA1Transform((ctx), (in))
 
-static void SHA1Transform(SHA1_CTX *, const uint8_t *);
+static void SHA1Transform(SHA1_CTX *, const uint8_t [64]);
 
 #endif
 

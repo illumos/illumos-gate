@@ -53,6 +53,7 @@ extern void atomic_inc_uint(volatile uint_t *);
 extern void atomic_inc_ulong(volatile ulong_t *);
 #if defined(_KERNEL) || defined(_INT64_TYPE)
 extern void atomic_inc_64(volatile uint64_t *);
+#endif
 
 /*
  * Decrement target
@@ -262,7 +263,6 @@ extern void membar_producer(void);
  * after the available flag has been seen, i.e. it imposes load ordering.
  */
 extern void membar_consumer(void);
-#endif
 
 #if defined(_KERNEL)
 
@@ -270,10 +270,6 @@ extern void membar_consumer(void);
 #define	atomic_add_ip		atomic_add_long
 #define	atomic_add_ip_nv	atomic_add_long_nv
 #define	casip			atomic_cas_ulong
-#endif
-
-#if defined(__sparc)
-extern uint8_t ldstub(uint8_t *);
 #endif
 
 #endif	/* _KERNEL */
