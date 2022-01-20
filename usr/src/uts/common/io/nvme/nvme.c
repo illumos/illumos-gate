@@ -343,7 +343,7 @@ int nvme_commit_save_cmd_timeout = 15;
 
 /*
  * tunable for the size of arbitrary vendor specific admin commands,
- * default is 16MiB
+ * default is 16MiB.
  */
 uint32_t nvme_vendor_specific_admin_cmd_size = 1 << 24;
 
@@ -456,7 +456,35 @@ static ddi_ufm_ops_t nvme_ufm_ops = {
 #define	NVME_MINOR_INST(minor)	((minor) >> NVME_MINOR_INST_SHIFT)
 #define	NVME_MINOR_NSID(minor)	((minor) & ((1 << NVME_MINOR_INST_SHIFT) - 1))
 #define	NVME_MINOR_MAX		(NVME_MINOR(1, 0) - 2)
-#define	NVME_IS_VENDOR_UNIQUE_CMD(x)	(((x) >= 0xC0) && ((x) <= 0xFF))
+#define	NVME_IS_VENDOR_SPECIFIC_CMD(x)	(((x) >= 0xC0) && ((x) <= 0xFF))
+#define	NVME_VENDOR_SPECIFIC_LOGPAGE_MIN	0xC0
+#define	NVME_VENDOR_SPECIFIC_LOGPAGE_MAX	0xFF
+#define	NVME_IS_VENDOR_SPECIFIC_LOGPAGE(x)	\
+		(((x) >= NVME_VENDOR_SPECIFIC_LOGPAGE_MIN) && \
+		((x) <= NVME_VENDOR_SPECIFIC_LOGPAGE_MAX))
+
+/*
+ * NVMe versions 1.3 and later actually support log pages up to UINT32_MAX
+ * DWords in size. However, revision 1.3 also modified the layout of the Get Log
+ * Page command significantly relative to version 1.2, including changing
+ * reserved bits, adding new bitfields, and requiring the use of command DWord
+ * 11 to fully specify the size of the log page (the lower and upper 16 bits of
+ * the number of DWords in the page are split between DWord 10 and DWord 11,
+ * respectively).
+ *
+ * All of these impose significantly different layout requirements on the
+ * `nvme_getlogpage_t` type. This could be solved with two different types, or a
+ * complicated/nested union with the two versions as the overlying members. Both
+ * of these are reasonable, if a bit convoluted. However, these is no current
+ * need for such large pages, or a way to test them, as most log pages actually
+ * fit within the current size limit. So for simplicity, we retain the size cap
+ * from version 1.2.
+ *
+ * Note that the number of DWords is zero-based, so we add 1. It is subtracted
+ * to form a zero-based value in `nvme_get_logpage`.
+ */
+#define	NVME_VENDOR_SPECIFIC_LOGPAGE_MAX_SIZE	\
+		(((1 << 12) + 1) * sizeof (uint32_t))
 
 static void *nvme_state;
 static kmem_cache_t *nvme_cmd_cache;
@@ -1988,6 +2016,12 @@ nvme_format_nvm(nvme_t *nvme, boolean_t user, uint32_t nsid, uint8_t lbaf,
 	return (ret);
 }
 
+/*
+ * The `bufsize` parameter is usually an output parameter, set by this routine
+ * when filling in the supported types of logpages from the device. However, for
+ * vendor-specific pages, it is an input parameter, and must be set
+ * appropriately by callers.
+ */
 static int
 nvme_get_logpage(nvme_t *nvme, boolean_t user, void **buf, size_t *bufsize,
     uint8_t logpage, ...)
@@ -2011,11 +2045,7 @@ nvme_get_logpage(nvme_t *nvme, boolean_t user, void **buf, size_t *bufsize,
 	switch (logpage) {
 	case NVME_LOGPAGE_ERROR:
 		cmd->nc_sqe.sqe_nsid = (uint32_t)-1;
-		/*
-		 * The GET LOG PAGE command can use at most 2 pages to return
-		 * data, PRP lists are not supported.
-		 */
-		*bufsize = MIN(2 * nvme->n_pagesize,
+		*bufsize = MIN(NVME_VENDOR_SPECIFIC_LOGPAGE_MAX_SIZE,
 		    nvme->n_error_log_len * sizeof (nvme_error_log_entry_t));
 		break;
 
@@ -2030,11 +2060,20 @@ nvme_get_logpage(nvme_t *nvme, boolean_t user, void **buf, size_t *bufsize,
 		break;
 
 	default:
-		dev_err(nvme->n_dip, CE_WARN, "!unknown log page requested: %d",
-		    logpage);
-		atomic_inc_32(&nvme->n_unknown_logpage);
-		ret = EINVAL;
-		goto fail;
+		/*
+		 * This intentionally only checks against the minimum valid
+		 * log page ID. `logpage` is a uint8_t, and `0xFF` is a valid
+		 * page ID, so this one-sided check avoids a compiler error
+		 * about a check that's always true.
+		 */
+		if (logpage < NVME_VENDOR_SPECIFIC_LOGPAGE_MIN) {
+			dev_err(nvme->n_dip, CE_WARN,
+			    "!unknown log page requested: %d", logpage);
+			atomic_inc_32(&nvme->n_unknown_logpage);
+			ret = EINVAL;
+			goto fail;
+		}
+		cmd->nc_sqe.sqe_nsid = va_arg(ap, uint32_t);
 	}
 
 	va_end(ap);
@@ -2051,22 +2090,8 @@ nvme_get_logpage(nvme_t *nvme, boolean_t user, void **buf, size_t *bufsize,
 		goto fail;
 	}
 
-	if (cmd->nc_dma->nd_ncookie > 2) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!too many DMA cookies for GET LOG PAGE");
-		atomic_inc_32(&nvme->n_too_many_cookies);
-		ret = ENOMEM;
+	if ((ret = nvme_fill_prp(cmd, cmd->nc_dma->nd_dmah)) != 0)
 		goto fail;
-	}
-
-	cmd->nc_sqe.sqe_dptr.d_prp[0] = cmd->nc_dma->nd_cookie.dmac_laddress;
-	if (cmd->nc_dma->nd_ncookie > 1) {
-		ddi_dma_nextcookie(cmd->nc_dma->nd_dmah,
-		    &cmd->nc_dma->nd_cookie);
-		cmd->nc_sqe.sqe_dptr.d_prp[1] =
-		    cmd->nc_dma->nd_cookie.dmac_laddress;
-	}
-
 	nvme_admin_cmd(cmd, nvme_admin_cmd_timeout);
 
 	if ((ret = nvme_check_cmd_status(cmd)) != 0) {
@@ -4426,7 +4451,19 @@ nvme_ioctl_get_logpage(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 			return (EINVAL);
 		break;
 	default:
-		return (EINVAL);
+		if (!NVME_IS_VENDOR_SPECIFIC_LOGPAGE(nioc->n_arg))
+			return (EINVAL);
+		if (nioc->n_len > NVME_VENDOR_SPECIFIC_LOGPAGE_MAX_SIZE) {
+			dev_err(nvme->n_dip, CE_NOTE, "!Vendor-specific log "
+			    "page size exceeds device maximum supported size: "
+			    "%lu", NVME_VENDOR_SPECIFIC_LOGPAGE_MAX_SIZE);
+			return (EINVAL);
+		}
+		if (nioc->n_len == 0)
+			return (EINVAL);
+		bufsize = nioc->n_len;
+		if (nsid == 0)
+			nsid = (uint32_t)-1;
 	}
 
 	if (nvme_get_logpage(nvme, B_TRUE, &log, &bufsize, nioc->n_arg, nsid)
@@ -4977,7 +5014,7 @@ nvme_ioctl_passthru(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	if (nvme_passthru_copy_cmd_in((const void*)nioc->n_buf, &cmd, mode))
 		return (EFAULT);
 
-	if (!NVME_IS_VENDOR_UNIQUE_CMD(cmd.npc_opcode)) {
+	if (!NVME_IS_VENDOR_SPECIFIC_CMD(cmd.npc_opcode)) {
 		cmd.npc_err = NVME_PASSTHRU_ERR_INVALID_OPCODE;
 		rv = EINVAL;
 		goto out;
