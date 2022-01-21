@@ -335,7 +335,7 @@ static void	iwk_m_stop(void *arg);
 static int	iwk_m_unicst(void *arg, const uint8_t *macaddr);
 static int	iwk_m_multicst(void *arg, boolean_t add, const uint8_t *m);
 static int	iwk_m_promisc(void *arg, boolean_t on);
-static mblk_t 	*iwk_m_tx(void *arg, mblk_t *mp);
+static mblk_t	*iwk_m_tx(void *arg, mblk_t *mp);
 static void	iwk_m_ioctl(void *arg, queue_t *wq, mblk_t *mp);
 static int	iwk_m_setprop(void *arg, const char *pr_name,
 	mac_prop_id_t wldp_pr_name, uint_t wldp_length, const void *wldp_buf);
@@ -5919,6 +5919,7 @@ static void iwk_recv_mgmt(struct ieee80211com *ic, mblk_t *mp,
 	mutex_exit(&sc->sc_glock);
 }
 
+#ifdef DEBUG
 /*
  * 1)  log_event_table_ptr indicates base of the event log.  This traces
  *     a 256-entry history of uCode execution within a circular buffer.
@@ -6103,6 +6104,7 @@ static void iwk_write_error_log(iwk_sc_t *sc)
 
 	iwk_mac_access_exit(sc);
 }
+#endif /* DEBUG */
 
 static int
 iwk_run_state_config_ibss(ieee80211com_t *ic)

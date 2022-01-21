@@ -283,6 +283,7 @@ instr_is_other_syscall(caddr_t pc, int which)
 	return (0);
 }
 
+#ifdef DEBUG
 static const char *
 syscall_insn_string(int syscall_insn)
 {
@@ -297,6 +298,7 @@ syscall_insn_string(int syscall_insn)
 		return ("Unknown");
 	}
 }
+#endif /* DEBUG */
 
 static int
 ldt_rewrite_syscall(struct regs *rp, proc_t *p, int syscall_insn)

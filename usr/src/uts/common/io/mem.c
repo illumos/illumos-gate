@@ -99,8 +99,6 @@ static int mm_kmem_io_access;
 static int mm_kstat_update(kstat_t *ksp, int rw);
 static int mm_kstat_snapshot(kstat_t *ksp, void *buf, int rw);
 
-static int mm_read_mem_name(intptr_t data, mem_name_t *mem_name);
-
 #define	MM_KMEMLOG_NENTRIES	64
 
 static int mm_kmemlogent;
@@ -335,6 +333,8 @@ mmio(struct uio *uio, enum uio_rw rw, pfn_t pfn, off_t pageoff, int allowio,
 	return (error);
 }
 
+#ifdef	__sparc
+
 static int
 mmpagelock(struct as *as, caddr_t va)
 {
@@ -348,8 +348,6 @@ mmpagelock(struct as *as, caddr_t va)
 
 	return (i);
 }
-
-#ifdef	__sparc
 
 #define	NEED_LOCK_KVADDR(kva)	mmpagelock(&kas, kva)
 
@@ -641,6 +639,37 @@ mmioctl_page_retire(int cmd, intptr_t data)
 }
 
 #ifdef __sparc
+/*
+ * Read a mem_name_t from user-space and store it in the mem_name_t
+ * pointed to by the mem_name argument.
+ */
+static int
+mm_read_mem_name(intptr_t data, mem_name_t *mem_name)
+{
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		if (copyin((void *)data, mem_name, sizeof (mem_name_t)))
+			return (EFAULT);
+	}
+#ifdef	_SYSCALL32
+	else {
+		mem_name32_t mem_name32;
+
+		if (copyin((void *)data, &mem_name32, sizeof (mem_name32_t)))
+			return (EFAULT);
+		mem_name->m_addr = mem_name32.m_addr;
+		mem_name->m_synd = mem_name32.m_synd;
+		mem_name->m_type[0] = mem_name32.m_type[0];
+		mem_name->m_type[1] = mem_name32.m_type[1];
+		mem_name->m_name = (caddr_t)(uintptr_t)mem_name32.m_name;
+		mem_name->m_namelen = (size_t)mem_name32.m_namelen;
+		mem_name->m_sid = (caddr_t)(uintptr_t)mem_name32.m_sid;
+		mem_name->m_sidlen = (size_t)mem_name32.m_sidlen;
+	}
+#endif	/* _SYSCALL32 */
+
+	return (0);
+}
+
 /*
  * Given a syndrome, syndrome type, and address return the
  * associated memory name in the provided data buffer.
@@ -1083,37 +1112,6 @@ mm_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 		kspmem->size = pmem->ml_size;
 	}
 	memlist_read_unlock();
-
-	return (0);
-}
-
-/*
- * Read a mem_name_t from user-space and store it in the mem_name_t
- * pointed to by the mem_name argument.
- */
-static int
-mm_read_mem_name(intptr_t data, mem_name_t *mem_name)
-{
-	if (get_udatamodel() == DATAMODEL_NATIVE) {
-		if (copyin((void *)data, mem_name, sizeof (mem_name_t)))
-			return (EFAULT);
-	}
-#ifdef	_SYSCALL32
-	else {
-		mem_name32_t mem_name32;
-
-		if (copyin((void *)data, &mem_name32, sizeof (mem_name32_t)))
-			return (EFAULT);
-		mem_name->m_addr = mem_name32.m_addr;
-		mem_name->m_synd = mem_name32.m_synd;
-		mem_name->m_type[0] = mem_name32.m_type[0];
-		mem_name->m_type[1] = mem_name32.m_type[1];
-		mem_name->m_name = (caddr_t)(uintptr_t)mem_name32.m_name;
-		mem_name->m_namelen = (size_t)mem_name32.m_namelen;
-		mem_name->m_sid = (caddr_t)(uintptr_t)mem_name32.m_sid;
-		mem_name->m_sidlen = (size_t)mem_name32.m_sidlen;
-	}
-#endif	/* _SYSCALL32 */
 
 	return (0);
 }

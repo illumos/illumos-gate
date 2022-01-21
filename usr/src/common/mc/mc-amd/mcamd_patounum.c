@@ -22,8 +22,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Given a physical address and an optional syndrome, determine the
  * name of the memory module that contains it.
@@ -435,6 +433,7 @@ mc_whichdimm(struct mcamd_hdl *hdl, mcamd_node_t *cs, uint64_t pa,
 	}
 }
 
+#ifdef DEBUG
 /*
  * Brute-force BKDG pa to cs translation, coded to look as much like the
  * BKDG code as possible.
@@ -599,6 +598,7 @@ mc_bkdg_patounum(struct mcamd_hdl *hdl, mcamd_node_t *mc, uint64_t pa,
 
 	return (mcamd_set_errno(hdl, EMCAMD_NOADDR));
 }
+#endif /* DEBUG */
 
 /*
  * Called for each memory controller to see if the given address is

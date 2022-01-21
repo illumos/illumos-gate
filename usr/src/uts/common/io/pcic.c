@@ -6333,6 +6333,7 @@ pcic_cb_disable_intr(dev_info_t *dip)
 	mutex_exit(&pcic->pc_lock);
 }
 
+#if defined(__sparc)
 static int
 log_pci_cfg_err(ushort_t e, int bridge_secondary)
 {
@@ -6363,7 +6364,6 @@ log_pci_cfg_err(ushort_t e, int bridge_secondary)
 	return (nerr);
 }
 
-#if defined(__sparc)
 static int
 pcic_fault(enum pci_fault_ops op, void *arg)
 {
@@ -6786,6 +6786,7 @@ pcic_cbus_powerctl(pcicdev_t *pcic, int socket)
 
 static int	pcic_do_pprintf = 0;
 
+#ifdef PCIC_DEBUG
 static void
 pcic_dump_debqueue(char *msg)
 {
@@ -6802,6 +6803,7 @@ pcic_dump_debqueue(char *msg)
 		debp = debp->next;
 	}
 }
+#endif /* PCIC_DEBUG */
 
 
 /* PRINTFLIKE3 */
