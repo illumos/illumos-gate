@@ -22,11 +22,13 @@ extern "C" {
 
 #define	FICL_WANT_PLATFORM (1)
 
-#define	FICL_PLATFORM_OS		"Illumos"
-#ifdef __sparc
-#define	FICL_PLATFORM_ARCHITECTURE	"sparc"
-#else
+#define	FICL_PLATFORM_OS		"illumos"
+#if defined(__i386__) || defined(__amd64__)
 #define	FICL_PLATFORM_ARCHITECTURE	"i386"
+#elif defined(__aarch64__)
+#define	FICL_PLATFORM_ARCHITECTURE	"aarch64"
+#else
+#error "unsupported plarform"
 #endif
 
 #define	FICL_PLATFORM_BASIC_TYPES	(1)

@@ -27,18 +27,6 @@
 
 only forth definitions
 
-s" arch-i386" environment? [if] [if]
-	s" loader_version" environment?  [if]
-		11 < [if]
-			.( Loader version 1.1+ required) cr
-			abort
-		[then]
-	[else]
-		.( Could not get loader version!) cr
-		abort
-	[then]
-[then] [then]
-
 include /boot/forth/support.4th
 include /boot/forth/color.4th
 include /boot/forth/delay.4th
