@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021, The University of Queensland
+ * Copyright 2023 The University of Queensland
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2023 RackTop Systems, Inc.
  * Copyright 2023 MNX Cloud, Inc.
@@ -184,6 +184,12 @@ extern "C" {
 #define	MLXCX_RX_PER_CQ_DEFAULT			256
 #define	MLXCX_RX_PER_CQ_MIN			16
 #define	MLXCX_RX_PER_CQ_MAX			4096
+
+/*
+ * Minimum size for packets loaned when >50% of a ring's buffers are already
+ * on loan to MAC.
+ */
+#define	MLXCX_P50_LOAN_MIN_SIZE_DFLT		256
 
 #define	MLXCX_DOORBELL_TRIES_DFLT		3
 extern uint_t mlxcx_doorbell_tries;
@@ -536,6 +542,10 @@ typedef struct mlxcx_buf_shard {
 	mlxcx_shard_state_t	mlbs_state;
 	list_node_t		mlbs_entry;
 	kmutex_t		mlbs_mtx;
+	uint64_t		mlbs_ntotal;
+	uint64_t		mlbs_nloaned;
+	uint64_t		mlbs_hiwat1;
+	uint64_t		mlbs_hiwat2;
 	list_t			mlbs_busy;
 	list_t			mlbs_free;
 	list_t			mlbs_loaned;
@@ -1035,6 +1045,7 @@ typedef struct {
 	uint64_t		mldp_eq_check_interval_sec;
 	uint64_t		mldp_cq_check_interval_sec;
 	uint64_t		mldp_wq_check_interval_sec;
+	uint_t			mldp_rx_p50_loan_min_size;
 } mlxcx_drv_props_t;
 
 typedef struct {
