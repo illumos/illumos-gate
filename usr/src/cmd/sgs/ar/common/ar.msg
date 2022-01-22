@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2022 Oxide Computer Company
 #
 
 @ _START_
@@ -33,7 +33,7 @@
 @ MSG_USAGE		"usage: ar -d[-SvV] archive file ...\n       \
 			 ar -m[-abiSvV] [posname] archive file ...\n       \
 			 ar -p[-vV][-sS] archive [file ...]\n       \
-			 ar -q[-cuvSV] [file ...]\n       \
+			 ar -q[-csuvSV] [file ...]\n       \
 			 ar -r[-cuvSV] [-abi] [posname] [file ...]\n       \
 			 ar -s[-vV] archive\n       \
 			 ar -t[-vV][-sS] archive [file ...]\n       \
@@ -55,6 +55,8 @@
 @ MSG_INTERNAL_01	"ar: internal error: cannot tell whether file is \
 			 included in archive or not\n"
 @ MSG_INTERNAL_02	"ar: internal header generation error\n"
+
+@ MSG_BAD_CREATE	"ar: failed to create %s: %s, is the path correct?\n"
 
 @ MSG_SYS_OPEN		"ar: cannot open %s: %s\n"
 @ MSG_SYS_CLOSE		"ar: cannot close %s: %s\n"

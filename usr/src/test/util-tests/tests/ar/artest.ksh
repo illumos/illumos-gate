@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2021 Oxide Computer Company
+# Copyright 2022 Oxide Computer Company
 #
 
 #
@@ -437,6 +437,46 @@ function test_t
 	fi
 }
 
+function test_q
+{
+	typeset alt="$ar_tmpdir/q.a"
+
+	if ! $ar_prog q $alt $ar_data1 $ar_data0; then
+		warn "ar -q: did not create an archive"
+	fi
+
+	if ! compare_files $ar_f10 $alt; then
+		warn "ar -q: did not create expected file"
+	else
+		print "TEST PASSED: ar -q creates archives"
+	fi
+
+	rm -f $alt
+
+	if ! $ar_prog cq $alt $ar_data1 $ar_data0; then
+		warn "ar -rs: did not create an archive"
+	fi
+
+	if ! compare_files $ar_f10 $alt; then
+		warn "ar -cq: did not create expected file"
+	else
+		print "TEST PASSED: ar -cq creates archives"
+	fi
+
+	rm -f $alt
+
+	if ! $ar_prog cqs $alt $ar_data1 $ar_data0; then
+		warn "ar -cqs: did not create an archive"
+	fi
+
+	if ! compare_files $ar_f10 $alt; then
+		warn "ar -cqs: did not create expected file"
+	else
+		print "TEST PASSED: ar -cqs creates archives"
+	fi
+
+}
+
 function test_err
 {
 	if $ar_prog $@ 2>/dev/null 1>/dev/null; then
@@ -483,6 +523,7 @@ test_x
 test_xs
 test_m
 test_t
+test_q
 
 #
 # Note, there are many cases here which probably should be failures and

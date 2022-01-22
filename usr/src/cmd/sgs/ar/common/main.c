@@ -27,7 +27,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include "inc.h"
@@ -141,7 +141,7 @@ main(int argc, char **argv, char *envp[])
 		boolean_t req_r = (cmd_info->opt_flgs & r_FLAG) &&
 		    (cmd_info->opt_flgs & (a_FLAG | b_FLAG));
 		boolean_t req_s = (cmd_info->opt_flgs & s_FLAG) &&
-		    (cmd_info->opt_flgs & r_FLAG) == 0;
+		    (cmd_info->opt_flgs & (r_FLAG | q_FLAG)) == 0;
 
 		if (req_arg || req_r || req_s) {
 			(void) fprintf(stderr, MSG_INTL(MSG_NOT_FOUND_AR),
