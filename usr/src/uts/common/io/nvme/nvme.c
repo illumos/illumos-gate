@@ -16,15 +16,18 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation.
  * Copyright 2020 Racktop Systems.
- * Copyright 2021 Oxide Computer Company.
+ * Copyright 2022 Oxide Computer Company.
  */
 
 /*
  * blkdev driver for NVMe compliant storage devices
  *
- * This driver was written to conform to version 1.2.1 of the NVMe
- * specification.  It may work with newer versions, but that is completely
- * untested and disabled by default.
+ * This driver targets and is designed to support all NVMe 1.x devices.
+ * Features are added to the driver as we encounter devices that require them
+ * and our needs, so some commands or log pages may not take advantage of newer
+ * features that devices support at this time. When you encounter such a case,
+ * it is generally fine to add that support to the driver as long as you take
+ * care to ensure that the requisite device version is met before using it.
  *
  * The driver has only been tested on x86 systems and will not work on big-
  * endian systems without changes to the code accessing registers and data

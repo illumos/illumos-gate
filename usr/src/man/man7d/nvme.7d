@@ -13,7 +13,7 @@
 .\" Copyright (c) 2018, Joyent, Inc.
 .\" Copyright 2019, Western Digital Corporation
 .\"
-.Dd July 31, 2018
+.Dd January 22, 2022
 .Dt NVME 7D
 .Os
 .Sh NAME
@@ -25,8 +25,8 @@ The
 driver uses the
 .Xr blkdev 7D
 framework to provide access to
-Intel
 NVMe compliant solid-state storage devices.
+All NVMe version 1.x devices are supported.
 .Lp
 NVMe devices supporting multiple namespaces will present each
 namespace as its own
