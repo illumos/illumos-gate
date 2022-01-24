@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #ifndef _SMB_SMB2_H
@@ -420,6 +420,8 @@ typedef enum {
 /* SMB3.x encryption ciphers */
 #define	SMB3_CIPHER_AES128_CCM	1	/* 3.0 */
 #define	SMB3_CIPHER_AES128_GCM	2	/* 3.1.1 */
+#define	SMB3_CIPHER_AES256_CCM	3	/* 3.1.1 */
+#define	SMB3_CIPHER_AES256_GCM	4	/* 3.1.1 */
 
 #ifdef __cplusplus
 }

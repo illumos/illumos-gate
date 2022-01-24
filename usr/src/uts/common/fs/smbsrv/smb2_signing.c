@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 /*
  * These routines provide the SMB MAC signing for the SMB2 server.
@@ -185,24 +185,26 @@ smb2_sign_begin(smb_request_t *sr, smb_token_t *token)
 	if (s->dialect >= SMB_VERS_3_0) {
 		/*
 		 * For SMB3, the signing key is a "KDF" hash of the
-		 * session key.
+		 * session key.   Limit the SessionKey input to its
+		 * maximum size (16 bytes)
 		 */
+		uint32_t ssnkey_len = MIN(token->tkn_ssnkey.len, SMB2_KEYLEN);
 		if (s->dialect >= SMB_VERS_3_11) {
-			if (smb3_kdf(sign_key->key,
-			    token->tkn_ssnkey.val, token->tkn_ssnkey.len,
+			if (smb3_kdf(sign_key->key, SMB2_KEYLEN,
+			    token->tkn_ssnkey.val, ssnkey_len,
 			    (uint8_t *)"SMBSigningKey", 14,
 			    u->u_preauth_hashval, SHA512_DIGEST_LENGTH)
 			    != 0)
 				return;
 		} else {
-			if (smb3_kdf(sign_key->key,
-			    token->tkn_ssnkey.val, token->tkn_ssnkey.len,
+			if (smb3_kdf(sign_key->key, SMB2_KEYLEN,
+			    token->tkn_ssnkey.val, ssnkey_len,
 			    (uint8_t *)"SMB2AESCMAC", 12,
 			    (uint8_t *)"SmbSign", 8)
 			    != 0)
 				return;
 		}
-		sign_key->len = SMB3_KEYLEN;
+		sign_key->len = SMB2_KEYLEN;
 	} else {
 		/*
 		 * For SMB2, the signing key is just the first 16 bytes

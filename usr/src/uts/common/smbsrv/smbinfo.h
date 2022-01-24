@@ -242,7 +242,7 @@ const char *smbnative_lm_str(smb_version_t *);
 /*
  * Maxiumum currently supported encryption cipher.
  */
-#define	SMB3_CIPHER_MAX		SMB3_CIPHER_AES128_GCM
+#define	SMB3_CIPHER_MAX		SMB3_CIPHER_AES256_GCM
 
 /*
  * SMB 3.x encryption ciphers bits.
@@ -252,6 +252,8 @@ const char *smbnative_lm_str(smb_version_t *);
 
 #define	SMB3_CIPHER_FLAG_AES128_CCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES128_CCM)
 #define	SMB3_CIPHER_FLAG_AES128_GCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES128_GCM)
+#define	SMB3_CIPHER_FLAG_AES256_CCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES256_CCM)
+#define	SMB3_CIPHER_FLAG_AES256_GCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES256_GCM)
 
 #ifdef __cplusplus
 }

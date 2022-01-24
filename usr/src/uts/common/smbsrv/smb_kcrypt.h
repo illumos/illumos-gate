@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #ifndef _SMB_KCRYPT_H_
@@ -35,12 +35,14 @@
 extern "C" {
 #endif
 
+#define	AES128_KEY_LENGTH	16	/* AES128 key length in bytes */
+#define	AES256_KEY_LENGTH	32	/* AES256 key length in bytes */
 #define	MD5_DIGEST_LENGTH	16	/* MD5 digest length in bytes */
 #define	SHA256_DIGEST_LENGTH	32	/* SHA256 digest length in bytes */
 #define	SHA512_DIGEST_LENGTH	64	/* SHA512 digest length in bytes */
 #define	SMB2_SIG_SIZE		16
-#define	SMB2_KEYLEN		16
-#define	SMB3_KEYLEN		16	/* AES-128 keys */
+#define	SMB2_KEYLEN		16	/* SMB2/3 Signing Key length */
+#define	SMB2_SSN_KEYLEN		16	/* Max size of the SMB2 Session Key */
 
 #ifdef	_KERNEL
 /* KCF variant */
@@ -95,12 +97,16 @@ int smb2_hmac_init(smb_sign_ctx_t *, smb_crypto_mech_t *, uint8_t *, size_t);
 int smb2_hmac_update(smb_sign_ctx_t, uint8_t *, size_t);
 int smb2_hmac_final(smb_sign_ctx_t, uint8_t *);
 
+int smb2_hmac_one(smb_crypto_mech_t *mech, uint8_t *key, size_t key_len,
+    uint8_t *data, size_t data_len, uint8_t *mac, size_t mac_len);
+
 int smb3_cmac_getmech(smb_crypto_mech_t *);
 int smb3_cmac_init(smb_sign_ctx_t *, smb_crypto_mech_t *, uint8_t *, size_t);
 int smb3_cmac_update(smb_sign_ctx_t, uint8_t *, size_t);
 int smb3_cmac_final(smb_sign_ctx_t, uint8_t *);
 
-int smb3_kdf(uint8_t *outbuf, uint8_t *key, size_t key_len,
+int smb3_kdf(uint8_t *outbuf, uint32_t outbuf_len,
+    uint8_t *key, size_t key_len,
     uint8_t *label, size_t label_len,
     uint8_t *context, size_t context_len);
 
