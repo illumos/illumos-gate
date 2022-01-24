@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2017, Nexenta Systems, Inc. All Rights Reserved.
-.\" Copyright 2020, RackTop Systems, Inc. All Rights Reserved.
+.\" Copyright 2021, RackTop Systems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the
 .\" Common Development and Distribution License (the "License").
 .\" You may not use this file except in compliance with the License.
@@ -156,24 +156,25 @@ message that CAN be encrypted MUST be encrypted.
 .ad
 .sp .6
 .RS 4n
-Specifies the maximum SMB 3.1.1 encryption cipher. This property is only used
-when encryption is On (see \fBencrypt\fR property) and negotiated SMB dialect is
-3.1.1 or higher (see \fBmax_protocol\fR property). Otherwise it is ignored.
+Specifies a list of enabled SMB 3.1.1 encryption ciphers. This property is only
+used when encryption is On (see \fBencrypt\fR property) and negotiated SMB
+dialect is 3.1.1 or higher (see \fBmax_protocol\fR property). Otherwise it is
+ignored.
 .sp
-When the property is set the valid values are aes-128-ccm and aes-128-gcm.
-If aes-128-gcm is selected both CCM and GCM are allowed, but GCM is preferred.
-If aes-128-ccm is selected it is the only allowed cipher. If the property is not
-set explicitly the default value is used - aes-128-gcm.
+When the property is set, a list of comma separated ciphers should be specified,
+or the value \fBall\fR should be used instead to enable all supported ciphers.
+By default, when the property is empty, it is equivalent to value \fBall\fR -
+all available ciphers will be enabled.
 .sp
-The property can be set to one of these values:
+The list of ciphers should contain these values:
 .sp
 .ne 2
 .na
 \fBaes128-ccm\fR
 .ad
 .RS 13n
-The only allowed cipher is AES-128-CCM. It is the only cipher used for SMB 3.0.2
-dialect. In SMB 3.1.1 it is deprecated.
+AES-128-CCM cipher is enabled. It is the only cipher used for SMB 3.0.2
+dialect.
 .RE
 
 .sp
@@ -182,8 +183,17 @@ dialect. In SMB 3.1.1 it is deprecated.
 \fBaes128-gcm\fR
 .ad
 .RS 13n
-Both AES-128-CCM and AES-128-GCM ciphers are allowed, but AES-128-GCM is
+AES-128-GCM cipher is enabled.
 preferred.
+.RE
+
+.sp
+.ne 2
+.na
+\fBall\fR
+.ad
+.RS 13n
+All ciphers are enabled.
 .RE
 
 .RE
@@ -400,8 +410,8 @@ The UID of the Unix user.
 .sp .6
 .RS 4n
 Specifies the maximum SMB protocol level that the SMB service
-should allow clients to negotiate.  The default value is \fB2.1\fR.
-Valid settings include: \fB1\fR, \fB2.1\fR, \fB3.0\fR
+should allow clients to negotiate.  The default value is \fB3.11\fR.
+Valid settings include: \fB1\fR, \fB2.1\fR, \fB3.0\fR, \fB3.02\fR, \fB3.11\fR
 .RE
 
 .sp

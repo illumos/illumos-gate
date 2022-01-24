@@ -395,7 +395,8 @@ CCNOAUTOINLINE= \
 #
 # Since at present we don't benefit from this even in userland, we disable it globally,
 # but the application of this may move into usr/src/uts/ in future.
-CCNOREORDER=	-_gcc=-fno-reorder-functions
+CCNOREORDER=	-_gcc=-fno-reorder-functions \
+		-_gcc=-fno-reorder-blocks-and-partition
 
 #
 # gcc has a rather aggressive optimization on by default that infers loop

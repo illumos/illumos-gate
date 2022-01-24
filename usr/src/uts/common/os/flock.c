@@ -28,7 +28,7 @@
 /*	All Rights Reserved */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2015 Joyent, Inc.
  */
 
@@ -4318,6 +4318,8 @@ nbl_lock_conflict(vnode_t *vp, nbl_op_t op, u_offset_t offset,
 		    lock->l_flock.l_pid != pid) &&
 		    lock_blocks_io(op, offset, length,
 		    lock->l_type, lock->l_start, lock->l_end)) {
+			DTRACE_PROBE1(conflict_lock,
+			    lock_descriptor_t *, lock);
 			conflict = 1;
 			break;
 		}

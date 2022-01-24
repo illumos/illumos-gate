@@ -754,7 +754,7 @@ ppt_max_completion_tmo_us(dev_info_t *dip)
 	    PCIE_PCIECAP_VER_MASK) < PCIE_PCIECAP_VER_2_0)
 		goto out;
 
-	if ((PCI_CAP_GET16(hdl, 0, cap_ptr, PCIE_DEVCAP2) &
+	if ((PCI_CAP_GET32(hdl, 0, cap_ptr, PCIE_DEVCAP2) &
 	    PCIE_DEVCTL2_COM_TO_RANGE_MASK) == 0)
 		goto out;
 
@@ -782,7 +782,7 @@ ppt_flr(dev_info_t *dip, boolean_t force)
 	if (PCI_CAP_LOCATE(hdl, PCI_CAP_ID_PCI_E, &cap_ptr) != DDI_SUCCESS)
 		goto fail;
 
-	if ((PCI_CAP_GET16(hdl, 0, cap_ptr, PCIE_DEVCAP) & PCIE_DEVCAP_FLR)
+	if ((PCI_CAP_GET32(hdl, 0, cap_ptr, PCIE_DEVCAP) & PCIE_DEVCAP_FLR)
 	    == 0)
 		goto fail;
 

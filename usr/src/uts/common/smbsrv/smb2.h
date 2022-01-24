@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 #ifndef _SMB_SMB2_H
@@ -412,6 +413,13 @@ typedef enum {
 
 /* SMB2 Oplock Break: lease break notification flags */
 #define	SMB2_NOTIFY_BREAK_LEASE_FLAG_ACK_REQUIRED  0x01
+
+/* SMB3.1.1 the only pre-authentication hash */
+#define	SMB3_HASH_SHA512	1
+
+/* SMB3.x encryption ciphers */
+#define	SMB3_CIPHER_AES128_CCM	1	/* 3.0 */
+#define	SMB3_CIPHER_AES128_GCM	2	/* 3.1.1 */
 
 #ifdef __cplusplus
 }

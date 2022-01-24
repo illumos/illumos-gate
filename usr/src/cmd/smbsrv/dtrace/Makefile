@@ -26,7 +26,8 @@
 #
 
 SRCS=	smbd-all.d smbd-authsvc.d smbd-doorsvc.d smbd-pipesvc.d \
-	smbnode.d smbsrv.d smbvfs.d smb-trace.d smb2-trace.d
+	smbnode.d smbsrv.d smbvfs.d smb-trace.d smb2-trace.d \
+	nbl-conflict.d
 
 include ../../Makefile.cmd
 

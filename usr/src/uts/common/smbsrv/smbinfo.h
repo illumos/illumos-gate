@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 #ifndef	_SMBSRV_SMBINFO_H
@@ -32,6 +32,7 @@
 #include <smbsrv/netbios.h>
 #include <netinet/in.h>
 #include <smbsrv/smb_inet.h>
+#include <smbsrv/smb2.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -237,11 +238,19 @@ const char *smbnative_lm_str(smb_version_t *);
 #define	SMB_VERS_3_02		0x302	/* "3.02" */
 #define	SMB_VERS_3_11		0x311	/* "3.11" */
 
-#define	SMB3_HASH_SHA512	1
+/*
+ * Maxiumum currently supported encryption cipher.
+ */
+#define	SMB3_CIPHER_MAX		SMB3_CIPHER_AES128_GCM
 
-#define	SMB3_CIPHER_NONE	0
-#define	SMB3_CIPHER_AES128_CCM	1
-#define	SMB3_CIPHER_AES128_GCM	2
+/*
+ * SMB 3.x encryption ciphers bits.
+ */
+#define	SMB3_ALL_CIPHERS	((1 << (SMB3_CIPHER_MAX)) - 1)
+#define	SMB3_CIPHER_BIT(c)	(1 << ((c) - 1))
+
+#define	SMB3_CIPHER_FLAG_AES128_CCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES128_CCM)
+#define	SMB3_CIPHER_FLAG_AES128_GCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES128_GCM)
 
 #ifdef __cplusplus
 }

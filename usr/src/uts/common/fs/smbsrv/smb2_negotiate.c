@@ -269,6 +269,9 @@ typedef struct smb2_neg_ctxs {
 #define	STATUS_PREAUTH_HASH_OVERLAP \
     STATUS_SMB_NO_PREAUTH_INEGRITY_HASH_OVERLAP
 
+#define	SMB3_CIPHER_ENABLED(c, f)	((c) <= SMB3_CIPHER_MAX && \
+    SMB3_CIPHER_BIT(c) & (f))
+
 /*
  * This function should be called only for dialect >= 0x311
  * Negotiate context list should contain exactly one
@@ -283,10 +286,9 @@ smb31_decode_neg_ctxs(smb_request_t *sr, smb2_neg_ctxs_t *neg_ctxs)
 	smb_session_t *s = sr->session;
 	smb2_preauth_caps_t *picap = &neg_ctxs->preauth_ctx.preauth_caps;
 	smb2_encrypt_caps_t *encap = &neg_ctxs->encrypt_ctx.encrypt_caps;
-	boolean_t preauth_sha512_enabled = B_FALSE;
-	boolean_t encrypt_ccm_enabled = B_FALSE;
-	boolean_t encrypt_gcm_enabled = B_FALSE;
-	uint16_t cipher = sr->sr_server->sv_cfg.skc_encrypt_cipher;
+	boolean_t found_sha512 = B_FALSE;
+	boolean_t found_cipher = B_FALSE;
+	uint16_t ciphers = sr->sr_server->sv_cfg.skc_encrypt_cipher;
 	uint32_t status = 0;
 	int32_t skip;
 	int found_preauth_ctx = 0;
@@ -420,7 +422,7 @@ smb31_decode_neg_ctxs(smb_request_t *sr, smb2_neg_ctxs_t *neg_ctxs)
 			}
 
 			if (picap->picap_hash_id == SMB3_HASH_SHA512)
-				preauth_sha512_enabled = B_TRUE;
+				found_sha512 = B_TRUE;
 			break;
 		case SMB2_ENCRYPTION_CAPS:
 			memcpy(&neg_ctxs->preauth_ctx.neg_ctx, &neg_ctx,
@@ -452,16 +454,17 @@ smb31_decode_neg_ctxs(smb_request_t *sr, smb2_neg_ctxs_t *neg_ctxs)
 				goto errout;
 			}
 
+			/*
+			 * Select the first enabled cipher.
+			 * Client should list more prioritized ciphers first.
+			 */
 			for (int k = 0; k < encap->encap_cipher_count; k++) {
-				switch (encap->encap_cipher_ids[k]) {
-				case SMB3_CIPHER_AES128_CCM:
-					encrypt_ccm_enabled = B_TRUE;
+				uint16_t c = encap->encap_cipher_ids[k];
+
+				if (SMB3_CIPHER_ENABLED(c, ciphers)) {
+					s->smb31_enc_cipherid = c;
+					found_cipher = B_TRUE;
 					break;
-				case SMB3_CIPHER_AES128_GCM:
-					encrypt_gcm_enabled = B_TRUE;
-					break;
-				default:
-					;
 				}
 			}
 			break;
@@ -479,29 +482,15 @@ smb31_decode_neg_ctxs(smb_request_t *sr, smb2_neg_ctxs_t *neg_ctxs)
 		goto errout;
 	}
 
-	if (!preauth_sha512_enabled) {
+	if (!found_sha512) {
 		status = STATUS_PREAUTH_HASH_OVERLAP;
 		goto errout;
 	}
 
 	s->smb31_preauth_hashid = SMB3_HASH_SHA512;
 
-	switch (cipher) {
-	case SMB3_CIPHER_AES128_GCM:
-		if (encrypt_gcm_enabled) {
-			s->smb31_enc_cipherid = SMB3_CIPHER_AES128_GCM;
-			break;
-		}
-		/* FALLTHROUGH */
-	case SMB3_CIPHER_AES128_CCM:
-		if (encrypt_ccm_enabled) {
-			s->smb31_enc_cipherid = SMB3_CIPHER_AES128_CCM;
-			break;
-		}
-		/* FALLTHROUGH */
-	default:
+	if (!found_cipher)
 		s->smb31_enc_cipherid = 0;
-	}
 
 errout:
 	return (status);

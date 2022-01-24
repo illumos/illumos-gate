@@ -10537,6 +10537,7 @@ f usr/lib/smbfs/smbiod 0555 root bin
 f usr/lib/smbfs/smbiod-svc 0555 root bin
 d usr/lib/smbsrv 0755 root bin
 d usr/lib/smbsrv/dtrace 0755 root bin
+f usr/lib/smbsrv/dtrace/nbl-conflict.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smb-trace.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smb2-trace.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smbd-all.d 0555 root bin
