@@ -12,6 +12,7 @@
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -1672,6 +1673,13 @@ iprb_periodic(void *arg)
 	/* update the statistics */
 	mutex_enter(&ip->culock);
 
+	/*
+	 * The watchdog timer is updated when we send frames or when we reclaim
+	 * completed commands.  When the link is idle for long periods it is
+	 * possible we will have done neither of these things, so reclaim
+	 * explicitly before checking for a transmit stall:
+	 */
+	iprb_cmd_reclaim(ip);
 	if (ip->tx_wdog && ((gethrtime() - ip->tx_wdog) > ip->tx_timeout)) {
 		/* transmit/CU hang? */
 		cmn_err(CE_CONT, "?CU stalled, resetting.\n");
