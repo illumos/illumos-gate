@@ -68,9 +68,9 @@
 	</dependency>
 
 	<!--
-		The fmd service exists in all Solaris zones, but only
-		in the global zone (which dumpadm is defined in) should
-		it be dependent on dumpadm configuration.
+		The fmd service may exist in a zone, but only in the
+		global zone (which dumpadm is defined in) should it be
+		dependent on dumpadm configuration.
 	-->
 	<dependent
 		name='dumpadm-fmd'

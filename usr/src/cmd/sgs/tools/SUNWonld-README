@@ -1685,3 +1685,4 @@ Bugid   Risk Synopsis
 14283	ldd should not complain about non-executable shared objects
 14308	discard SHF_EXCLUDE sections when linking kernel modules
 14319	ld shouldn't warn about SHF_EXCLUDE unknown sections
+14401	elfdump should understand LLVM section types

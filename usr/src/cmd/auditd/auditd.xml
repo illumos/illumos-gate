@@ -153,7 +153,7 @@
 
 	<!--
 	  Audit Queue Control Properties - see auditconfig(1M)
-	    
+
 	    Note, that the default value for all the queue control
 	    configuration parameters is 0, which makes auditd(1M) to
 	    use current active system parameters.
@@ -218,7 +218,7 @@
 	<!--
 	  Plugins to configure where to send the audit trail - see
 	  auditconfig(1M), audit_binfile(5), audit_remote(5),
-	  audit_syslog(5) 
+	  audit_syslog(5)
 
 	  Each plugin type property group has properties:
 
@@ -310,7 +310,7 @@
 	<template>
 		<common_name>
 			<loctext xml:lang='C'>
-				Solaris audit daemon
+				audit daemon
 			</loctext>
 		</common_name>
 		<documentation>

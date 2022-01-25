@@ -82,7 +82,7 @@
 	<template>
 		<common_name>
 			<loctext xml:lang='C'>
-			  Solaris audio device configuration.
+			  audio device configuration.
 			</loctext>
 		</common_name>
 	</template>

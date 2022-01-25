@@ -40,9 +40,9 @@ sec_type_strings(conv_iter_osabi_t osabi, Half mach, Conv_fmt_flags_t fmt_flags)
 {
 	/*
 	 * This routine can return an array with 1 generic array, up to
-	 * three osabi arrays, two machine arrays, plus the NULL termination.
+	 * four osabi arrays, two machine arrays, plus the NULL termination.
 	 */
-#define	MAX_RET	7
+#define	MAX_RET	8
 
 	static const Msg secs_def[SHT_NUM] = {
 		MSG_SHT_NULL,			MSG_SHT_PROGBITS,
@@ -243,6 +243,48 @@ sec_type_strings(conv_iter_osabi_t osabi, Half mach, Conv_fmt_flags_t fmt_flags)
 	static const conv_ds_msg_t ds_amd64_nf = {
 	    CONV_DS_MSG_INIT(SHT_AMD64_UNWIND, amd64_nf) };
 
+	/* LLVM "OS-specific" range */
+	static const Msg llvm_def[] = {
+		MSG_SHT_LLVM_ODRTAB,	MSG_SHT_LLVM_LINKER_OPTIONS,
+		MSG_SHT_LLVM_UNKNOWN1,
+		MSG_SHT_LLVM_ADDRSIG,	MSG_SHT_LLVM_DEPENDENT_LIBRARIES,
+		MSG_SHT_LLVM_SYMPART,	MSG_SHT_LLVM_PART_EHDR,
+		MSG_SHT_LLVM_PART_PHDR,	MSG_SHT_LLVM_BB_ADDR_MAP,
+		MSG_SHT_LLVM_CALL_GRAPH_PROFILE
+	};
+	static const Msg llvm_dmp[] = {
+		MSG_SHT_LLVM_ODRTAB_DMP,	MSG_SHT_LLVM_LINKER_OPTIONS_DMP,
+		MSG_SHT_LLVM_UNKNOWN1_DMP,	MSG_SHT_LLVM_ADDRSIG_DMP,
+		MSG_SHT_LLVM_DEPENDENT_LIBRARIES_DMP,
+		MSG_SHT_LLVM_SYMPART_DMP,	MSG_SHT_LLVM_PART_EHDR_DMP,
+		MSG_SHT_LLVM_PART_PHDR_DMP,	MSG_SHT_LLVM_BB_ADDR_MAP_DMP,
+		MSG_SHT_LLVM_CALL_GRAPH_PROFILE_DMP
+	};
+	static const Msg llvm_cf[] = {
+		MSG_SHT_LLVM_ODRTAB_CF,		MSG_SHT_LLVM_LINKER_OPTIONS_CF,
+		MSG_SHT_LLVM_UNKNOWN1_CF,	MSG_SHT_LLVM_ADDRSIG_CF,
+		MSG_SHT_LLVM_DEPENDENT_LIBRARIES_CF,
+		MSG_SHT_LLVM_SYMPART_CF,	MSG_SHT_LLVM_PART_EHDR_CF,
+		MSG_SHT_LLVM_PART_PHDR_CF,	MSG_SHT_LLVM_BB_ADDR_MAP_CF,
+		MSG_SHT_LLVM_CALL_GRAPH_PROFILE_CF
+	};
+	static const Msg llvm_nf[] = {
+		MSG_SHT_LLVM_ODRTAB_NF,		MSG_SHT_LLVM_LINKER_OPTIONS_NF,
+		MSG_SHT_LLVM_UNKNOWN1_NF,	MSG_SHT_LLVM_ADDRSIG_NF,
+		MSG_SHT_LLVM_DEPENDENT_LIBRARIES_NF,
+		MSG_SHT_LLVM_SYMPART_NF,	MSG_SHT_LLVM_PART_EHDR_NF,
+		MSG_SHT_LLVM_PART_PHDR_NF,	MSG_SHT_LLVM_BB_ADDR_MAP_NF,
+		MSG_SHT_LLVM_CALL_GRAPH_PROFILE_NF
+	};
+
+	static const conv_ds_msg_t ds_llvm_def = {
+		CONV_DS_MSG_INIT(SHT_LLVM_ODRTAB, llvm_def) };
+	static const conv_ds_msg_t ds_llvm_dmp = {
+		CONV_DS_MSG_INIT(SHT_LLVM_ODRTAB, llvm_dmp) };
+	static const conv_ds_msg_t ds_llvm_cf = {
+		CONV_DS_MSG_INIT(SHT_LLVM_ODRTAB, llvm_cf) };
+	static const conv_ds_msg_t ds_llvm_nf = {
+		CONV_DS_MSG_INIT(SHT_LLVM_ODRTAB, llvm_nf) };
 
 	static const conv_ds_t	*retarr[MAX_RET];
 	int			retndx = 0;
@@ -277,6 +319,24 @@ sec_type_strings(conv_iter_osabi_t osabi, Half mach, Conv_fmt_flags_t fmt_flags)
 			break;
 		default:
 			retarr[retndx++] = CONV_DS_ADDR(ds_usecs_def);
+			break;
+		}
+	}
+
+	if ((osabi == ELFOSABI_NONE) || (osabi == ELFOSABI_LINUX) ||
+	    (osabi == ELFOSABI_SOLARIS) || (osabi == CONV_OSABI_ALL)) {
+		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+		case CONV_FMT_ALT_DUMP:
+			retarr[retndx++] = CONV_DS_ADDR(ds_llvm_dmp);
+			break;
+		case CONV_FMT_ALT_CF:
+			retarr[retndx++] = CONV_DS_ADDR(ds_llvm_cf);
+			break;
+		case CONV_FMT_ALT_NF:
+			retarr[retndx++] = CONV_DS_ADDR(ds_llvm_nf);
+			break;
+		default:
+			retarr[retndx++] = CONV_DS_ADDR(ds_llvm_def);
 			break;
 		}
 	}
