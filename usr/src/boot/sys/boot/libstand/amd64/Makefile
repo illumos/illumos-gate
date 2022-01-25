@@ -33,10 +33,16 @@ OBJECTS += _setjmp.o
 SRCS += sha1-x86_64.s
 OBJECTS += sha1-x86_64.o
 
+SRCS += $(SASRC)/x86/hypervisor.c
+OBJECTS += hypervisor.o
+
 CLEANFILES += sha1-x86_64.s
 
 pics/%.o: $(SASRC)/amd64/%.S
 	$(COMPILE.S) -o $@ $<
+
+pics/%.o: $(SASRC)/x86/%.c
+	$(COMPILE.c) -o $@ $<
 
 include $(SRC)/boot/sys/boot/Makefile.lib
 

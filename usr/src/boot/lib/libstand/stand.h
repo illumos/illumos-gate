@@ -273,6 +273,8 @@ extern char	*sbrk(int incr);
 
 extern void	mallocstats(void);
 
+const char *x86_hypervisor(void);
+
 extern int	printf(const char *fmt, ...) __printflike(1, 2);
 extern void	vprintf(const char *fmt, __va_list);
 extern int	asprintf(char **buf, const char *cfmt, ...) __printflike(2, 3);

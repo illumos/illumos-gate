@@ -367,6 +367,9 @@ struct arch_switch
 
 	/* Probe ZFS pool(s), if needed. */
 	void	(*arch_zfs_probe)(void);
+
+	/* Return the hypervisor name/type or NULL if not virtualized. */
+	const char *(*arch_hypervisor)(void);
 };
 extern struct arch_switch archsw;
 
