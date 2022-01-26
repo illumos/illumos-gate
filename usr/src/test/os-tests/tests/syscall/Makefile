@@ -16,7 +16,7 @@
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-PROGS = open
+PROGS = fchmodat open
 
 CSTD = $(CSTD_GNU99)
 

@@ -1585,7 +1585,9 @@ fsetattrat(int fd, char *path, int flags, struct vattr *vap)
 		VN_HOLD(vp);
 	}
 
-	if (vn_is_readonly(vp)) {
+	if (vp->v_type == VLNK && (vap->va_mask & AT_MODE) != 0) {
+		error = EOPNOTSUPP;
+	} else if (vn_is_readonly(vp)) {
 		error = EROFS;
 	} else {
 		error = VOP_SETATTR(vp, vap, 0, CRED(), NULL);

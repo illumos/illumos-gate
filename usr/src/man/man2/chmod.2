@@ -45,11 +45,10 @@
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2014, Joyent, Inc.
 .\"
-.TH CHMOD 2 "Dec 22, 2014"
+.TH CHMOD 2 "Jan 26, 2022"
 .SH NAME
 chmod, fchmod, fchmodat \- change access permission mode of file
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -68,7 +67,6 @@ chmod, fchmod, fchmodat \- change access permission mode of file
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBchmod()\fR, \fBfchmod()\fR, and \fBfchmodat()\fR functions set the access
 permission portion of the mode of the file whose name is given by \fIpath\fR or
 referenced by the open file descriptor \fIfildes\fR to the bit pattern contained
@@ -196,12 +194,10 @@ will result in an error.
 Upon successful completion, \fBchmod()\fR, \fBfchmod()\fR, \fBfchmodat()\fR mark
 for update the \fBst_ctime\fR field of the file.
 .SH RETURN VALUES
-.LP
 Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
 returned, the file mode is unchanged, and \fBerrno\fR is set to indicate the
 error.
 .SH ERRORS
-.LP
 The \fBchmod()\fR, \fBfchmod()\fR, and \fBfchmodat()\fR functions will fail if:
 .sp
 .ne 2
@@ -404,7 +400,8 @@ descriptor which does not refer to a file.
 .B EOPNOTSUPP
 .ad
 .RS 16n
-The \fBAT_SYMLINK_NOFOLLOW\fR bit is set in the \fIflags\fR argument.
+The \fBAT_SYMLINK_NOFOLLOW\fR bit is set in the \fIflags\fR argument and
+\fIpath\fR refers to a symbolic link.
 .RE
 
 .sp
@@ -445,7 +442,6 @@ of this function on a pipe.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSet Read Permissions for User, Group, and Others
 .sp
 .LP
@@ -517,7 +513,6 @@ status = stat("home/cnd/mod1", &buffer;);
 .in -2
 
 .SH USAGE
-.LP
 If \fBchmod()\fR or \fBfchmod()\fR is used to change the file group owner
 permissions on a file with non-trivial ACL entries, only the ACL mask is set to
 the new permissions and the group owner permission bits in the file's mode
@@ -526,7 +521,6 @@ one whose meaning cannot be represented in the file's mode field alone. The new
 ACL mask permissions  might change the effective permissions for additional
 users and groups that have ACL entries on the file.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -543,7 +537,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBchmod\fR(1), \fBchown\fR(2), \fBcreat\fR(2), \fBfcntl\fR(2), \fBmknod\fR(2),
 \fBopen\fR(2), \fBread\fR(2), \fBrename\fR(2), \fBstat\fR(2), \fBwrite\fR(2),
 \fBfattach\fR(3C), \fBmkfifo\fR(3C), \fBstat.h\fR(3HEAD), \fBattributes\fR(5),

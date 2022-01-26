@@ -76,7 +76,7 @@ tests = ['conn', 'dgram', 'drop_priv', 'nosignal', 'rights.32', 'rights.64',
          'sockpair', 'recvmsg.32', 'recvmsg.64']
 
 [/opt/os-tests/tests/syscall]
-tests = ['open.32', 'open.64']
+tests = ['fchmodat.32', 'fchmodat.64', 'open.32', 'open.64']
 
 [/opt/os-tests/tests/pf_key]
 user = root
