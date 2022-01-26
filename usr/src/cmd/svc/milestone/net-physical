@@ -25,7 +25,7 @@
 # All rights reserved.
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Milan Jurik. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2021 Joyent, Inc.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
@@ -395,6 +395,26 @@ function setup_mtu
     done
 }
 
+#
+# Set up resolvers, if we can
+#
+function configure_resolv_conf
+{
+    if [[ ${RESOLV_CONF_DONE} == true ]]; then
+        return
+    elif [[ -n ${CONFIG_dns_domain} ]] && [[ -n ${CONFIG_dns_resolvers} ]]; then
+        echo "search ${CONFIG_dns_domain}" > /etc/resolv.conf
+        if [[ -n ${CONFIG_binder_admin_ips} ]]; then
+            for serv in $(echo "${CONFIG_binder_admin_ips}" | sed -e "s/,/ /g"); do
+                echo "nameserver ${serv}" >> /etc/resolv.conf
+            done
+        fi
+        for serv in $(echo "${CONFIG_dns_resolvers}" | sed -e "s/,/ /g"); do
+            echo "nameserver ${serv}" >> /etc/resolv.conf
+        done
+        RESOLV_CONF_DONE=true
+    fi
+}
 
 # Helper function for plumbing an interface for an address family once
 typeset -A plumbedifs
@@ -547,17 +567,7 @@ if smf_is_globalzone; then
         ADMIN_NIC_UP=true
 
         # also setup resolv.conf if we can
-        if [[ -n ${CONFIG_dns_domain} ]] && [[ -n ${CONFIG_dns_resolvers} ]]; then
-            echo "search ${CONFIG_dns_domain}" > /etc/resolv.conf
-            if [[ -n ${CONFIG_binder_admin_ips} ]]; then
-               for serv in $(echo "${CONFIG_binder_admin_ips}" | sed -e "s/,/ /g"); do
-                   echo "nameserver ${serv}" >> /etc/resolv.conf
-               done
-            fi
-            for serv in $(echo "${CONFIG_dns_resolvers}" | sed -e "s/,/ /g"); do
-                echo "nameserver ${serv}" >> /etc/resolv.conf
-            done
-        fi
+        configure_resolv_conf
     else
         if [[ ${headnode} == "true" ]]; then
             echo "ERROR: headnode but no admin_{ip,netmask} in config, not bringing up admin network."
@@ -719,6 +729,10 @@ if smf_is_globalzone; then
             done
 
         done
+
+        # All vnics are done. If the config has admin_ip=none, then we won't
+        # have resolvers set up yet, so try again here.
+        configure_resolv_conf
     fi
 else
     # Non-global zones
