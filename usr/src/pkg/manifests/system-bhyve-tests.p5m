@@ -30,12 +30,14 @@ file path=opt/bhyve-tests/bin/bhyvetest mode=0555
 dir  path=opt/bhyve-tests/runfiles
 file path=opt/bhyve-tests/runfiles/default.run mode=0444
 dir  path=opt/bhyve-tests/tests
-file path=opt/bhyve-tests/tests/memmap mode=0555
 dir  path=opt/bhyve-tests/tests/mevent
 file path=opt/bhyve-tests/tests/mevent/lists_delete mode=0555
 file path=opt/bhyve-tests/tests/mevent/read_disable mode=0555
 file path=opt/bhyve-tests/tests/mevent/read_pause mode=0555
 file path=opt/bhyve-tests/tests/mevent/read_requeue mode=0555
+dir  path=opt/bhyve-tests/tests/vmm
+file path=opt/bhyve-tests/tests/vmm/mem_partial mode=0555
+file path=opt/bhyve-tests/tests/vmm/mem_seg_map mode=0555
 license lic_CDDL license=lic_CDDL
 depend type=require fmri=system/bhyve
 depend type=require fmri=system/test/testrunner

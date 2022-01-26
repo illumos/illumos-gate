@@ -94,20 +94,20 @@ utimes_impl(const char *path, const struct timeval times[2], int flag)
 }
 
 int
-utimes(const char *path, const struct timeval times[2])
+utimes(const char *path, const struct timeval *times)
 {
 	return (utimes_impl(path, times, 0));
 }
 
 int
-lutimes(const char *path, const struct timeval times[2])
+lutimes(const char *path, const struct timeval *times)
 {
 	return (utimes_impl(path, times, AT_SYMLINK_NOFOLLOW));
 }
 
 #pragma weak _futimesat = futimesat
 int
-futimesat(int fd, const char *path, const struct timeval times[2])
+futimesat(int fd, const char *path, const struct timeval *times)
 {
 	struct timeval ltimes[2];
 	timespec_t ts[2];
@@ -133,7 +133,7 @@ futimesat(int fd, const char *path, const struct timeval times[2])
 }
 
 int
-futimes(int fd, const struct timeval times[2])
+futimes(int fd, const struct timeval *times)
 {
 	return (futimesat(fd, NULL, times));
 }

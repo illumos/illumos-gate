@@ -931,14 +931,18 @@ invvpid(uint64_t type, struct invvpid_desc desc)
 {
 	int error;
 
+	DTRACE_PROBE3(vmx__invvpid, uint64_t, type, uint16_t, desc.vpid,
+	    uint64_t, desc.linear_addr);
+
 	__asm __volatile("invvpid %[desc], %[type];"
 	    VMX_SET_ERROR_CODE_ASM
 	    : [error] "=r" (error)
 	    : [desc] "m" (desc), [type] "r" (type)
 	    : "memory");
 
-	if (error)
+	if (error) {
 		panic("invvpid error %d", error);
+	}
 }
 
 /*
@@ -948,17 +952,16 @@ invvpid(uint64_t type, struct invvpid_desc desc)
  * mappings" (to use the VMX parlance).  Actions which modify the EPT structures
  * for the instance (such as unmapping GPAs) would require an 'invept' flush.
  */
-static __inline void
+static void
 vmx_invvpid(struct vmx *vmx, int vcpu, int running)
 {
 	struct vmxstate *vmxstate;
-	struct invvpid_desc invvpid_desc;
 	struct vmspace *vms;
 
 	vmxstate = &vmx->state[vcpu];
-	if (vmxstate->vpid == 0)
+	if (vmxstate->vpid == 0) {
 		return;
-	vms = vm_get_vmspace(vmx->vm);
+	}
 
 	if (!running) {
 		/*
@@ -978,11 +981,15 @@ vmx_invvpid(struct vmx *vmx, int vcpu, int running)
 	 * stale TLB entries for this VPID on the target, or if emulated actions
 	 * in the guest CPU have incurred an explicit TLB flush.
 	 */
+	vms = vm_get_vmspace(vmx->vm);
 	if (vmspace_table_gen(vms) == vmx->eptgen[curcpu]) {
-		invvpid_desc._res1 = 0;
-		invvpid_desc._res2 = 0;
-		invvpid_desc.vpid = vmxstate->vpid;
-		invvpid_desc.linear_addr = 0;
+		struct invvpid_desc invvpid_desc = {
+			.vpid = vmxstate->vpid,
+			.linear_addr = 0,
+			._res1 = 0,
+			._res2 = 0,
+		};
+
 		invvpid(INVVPID_TYPE_SINGLE_CONTEXT, invvpid_desc);
 		vmm_stat_incr(vmx->vm, vcpu, VCPU_INVVPID_DONE, 1);
 	} else {
@@ -1004,6 +1011,8 @@ invept(uint64_t type, uint64_t eptp)
 		uint64_t eptp;
 		uint64_t _resv;
 	} desc = { eptp, 0 };
+
+	DTRACE_PROBE2(vmx__invept, uint64_t, type, uint64_t, eptp);
 
 	__asm __volatile("invept %[desc], %[type];"
 	    VMX_SET_ERROR_CODE_ASM

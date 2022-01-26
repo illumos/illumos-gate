@@ -651,7 +651,7 @@ michael_mic_hdr(const struct ieee80211_frame *wh0, uint8_t hdr[16])
 static void
 michael_mic(struct tkip_ctx *ctx, const uint8_t *key,
     mblk_t *mp, uint_t off, size_t data_len,
-    uint8_t mic[IEEE80211_WEP_MICLEN])
+    uint8_t mic[])
 {
 	uint8_t hdr[16];
 	uint32_t l, r;
