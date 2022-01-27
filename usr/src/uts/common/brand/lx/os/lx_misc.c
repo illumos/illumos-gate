@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -57,8 +57,16 @@
 #include <sys/sysmacros.h>
 
 /* Linux specific functions and definitions */
-static void lx_save(klwp_t *);
-static void lx_restore(klwp_t *);
+static void lx_save(void *);
+static void lx_restore(void *);
+
+/* Context op template. */
+static const struct ctxop_template lx_ctxop_template = {
+	.ct_rev		= CTXOP_TPL_REV,
+	.ct_save	= lx_save,
+	.ct_restore	= lx_restore,
+	.ct_exit	= lx_save,
+};
 
 /*
  * Set the return code for the forked child, always zero
@@ -120,8 +128,7 @@ lx_exec()
 	lwpd->br_ntv_stack = 0;
 	lwpd->br_ntv_stack_current = 0;
 
-	installctx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL, lx_save,
-	    NULL, NULL);
+	ctxop_install(lwptot(lwp), &lx_ctxop_template, lwp);
 
 	/*
 	 * clear out the tls array
@@ -346,8 +353,12 @@ lx_freelwp(klwp_t *lwp)
 	 */
 	lwp->lwp_brand_syscall = NULL;
 
-	(void) removectx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL,
-	    lx_save, NULL);
+	/*
+	 * If this process is being de-branded during an exec(),
+	 * the LX ctxops may have already been removed, so the result
+	 * from ctxop_remove is irrelevant.
+	 */
+	(void) ctxop_remove(lwptot(lwp), &lx_ctxop_template, lwp);
 	if (lwpd->br_pid != 0) {
 		lx_pid_rele(lwptoproc(lwp)->p_pid, lwptot(lwp)->t_tid);
 	}
@@ -498,8 +509,7 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 	 */
 	lwpd->br_lpid = NULL;
 
-	installctx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL,
-	    lx_save, NULL, NULL);
+	ctxop_install(lwptot(lwp), &lx_ctxop_template, lwp);
 
 	/*
 	 * Install branded system call hooks for this LWP:
@@ -613,7 +623,7 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
  */
 /* ARGSUSED */
 static void
-lx_save(klwp_t *t)
+lx_save(void *arg)
 {
 	int i;
 
@@ -633,8 +643,9 @@ lx_save(klwp_t *t)
  * is the case then pcb_rupdate should be set.
  */
 static void
-lx_restore(klwp_t *t)
+lx_restore(void *arg)
 {
+	klwp_t *t = (klwp_t *)arg;
 	struct lx_lwp_data *lwpd = lwptolxlwp(t);
 	user_desc_t *tls;
 	int i;
