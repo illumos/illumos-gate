@@ -93,9 +93,6 @@ sysi86(short cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
 	 */
 	case SI86V86:
 		if (arg1 == V86SC_IOPL) {
-#if defined(__xpv)
-			struct ctxop *ctx;
-#endif
 			struct regs *rp = lwptoregs(ttolwp(curthread));
 			greg_t oldpl = rp->r_ps & PS_IOPL;
 			greg_t newpl = arg2 & PS_IOPL;
@@ -108,12 +105,18 @@ sysi86(short cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
 			    secpolicy_sys_config(CRED(), B_FALSE)) != 0)
 				return (set_errno(error));
 #if defined(__xpv)
-			ctx = installctx_preallocate();
+			const struct ctxop_template xen_tpl = {
+				.ct_rev		= CTXOP_TPL_REV,
+				.ct_save	= xen_disable_user_iopl,
+				.ct_restore	= xen_enable_user_iopl,
+				.ct_exit	= xen_disable_user_iopl,
+			};
+			struct ctxop *ctx;
+
+			ctx = ctxop_allocate(&xen_tpl, NULL);
 			kpreempt_disable();
-			installctx(curthread, NULL, xen_disable_user_iopl,
-			    xen_enable_user_iopl, NULL, NULL,
-			    xen_disable_user_iopl, NULL, ctx);
-			xen_enable_user_iopl();
+			ctxop_attach(curthread, ctx);
+			xen_enable_user_iopl(NULL);
 			kpreempt_enable();
 #else
 			rp->r_ps ^= oldpl ^ newpl;

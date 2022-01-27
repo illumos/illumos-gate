@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Joyent, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -28,6 +29,7 @@
 /*	All Rights Reserved   */
 
 #include <sys/types.h>
+#include <sys/stdbool.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
 #include <sys/signal.h>
@@ -457,8 +459,9 @@ lwp_pcb_exit(void)
 
 /*ARGSUSED*/
 void
-lwp_segregs_save(klwp_t *lwp)
+lwp_segregs_save(void *arg)
 {
+	klwp_t *lwp = arg;
 	pcb_t *pcb = &lwp->lwp_pcb;
 	struct regs *rp;
 
@@ -702,8 +705,9 @@ gdt_ucode_model(model_t model)
  * on current cpu's GDT.
  */
 static void
-lwp_segregs_restore(klwp_t *lwp)
+lwp_segregs_restore(void *arg)
 {
+	klwp_t *lwp = arg;
 	pcb_t *pcb = &lwp->lwp_pcb;
 
 	ASSERT(VALID_LWP_DESC(&pcb->pcb_fsdesc));
@@ -721,8 +725,9 @@ lwp_segregs_restore(klwp_t *lwp)
 #ifdef _SYSCALL32_IMPL
 
 static void
-lwp_segregs_restore32(klwp_t *lwp)
+lwp_segregs_restore32(void *arg)
 {
+	klwp_t *lwp = arg;
 	/*LINTED*/
 	cpu_t *cpu = CPU;
 	pcb_t *pcb = &lwp->lwp_pcb;
@@ -736,6 +741,13 @@ lwp_segregs_restore32(klwp_t *lwp)
 }
 
 #endif	/* _SYSCALL32_IMPL */
+
+static const struct ctxop_template brand_interpose_ctxop_tpl = {
+	.ct_rev		= CTXOP_TPL_REV,
+	.ct_save	= brand_interpositioning_disable,
+	.ct_restore	= brand_interpositioning_enable,
+	.ct_exit	= brand_interpositioning_disable,
+};
 
 /*
  * If this is a process in a branded zone, then we want it to use the brand
@@ -751,16 +763,14 @@ lwp_attach_brand_hdlrs(klwp_t *lwp)
 
 	ASSERT(PROC_IS_BRANDED(lwptoproc(lwp)));
 
-	ASSERT(removectx(t, NULL, brand_interpositioning_disable,
-	    brand_interpositioning_enable, NULL, NULL,
-	    brand_interpositioning_disable, NULL) == 0);
-	installctx(t, NULL, brand_interpositioning_disable,
-	    brand_interpositioning_enable, NULL, NULL,
-	    brand_interpositioning_disable, NULL, NULL);
+	/* Confirm that brand interposition ctxop is not already present */
+	ASSERT0(ctxop_remove(t, &brand_interpose_ctxop_tpl, NULL));
+
+	ctxop_install(t, &brand_interpose_ctxop_tpl, NULL);
 
 	if (t == curthread) {
 		kpreempt_disable();
-		brand_interpositioning_enable();
+		brand_interpositioning_enable(NULL);
 		kpreempt_enable();
 	}
 }
@@ -780,16 +790,20 @@ lwp_detach_brand_hdlrs(klwp_t *lwp)
 		kpreempt_disable();
 
 	/* Remove the original context handlers */
-	VERIFY(removectx(t, NULL, brand_interpositioning_disable,
-	    brand_interpositioning_enable, NULL, NULL,
-	    brand_interpositioning_disable, NULL) != 0);
+	ctxop_remove(t, &brand_interpose_ctxop_tpl, NULL);
 
 	if (t == curthread) {
 		/* Cleanup our MSR and IDT entries. */
-		brand_interpositioning_disable();
+		brand_interpositioning_disable(NULL);
 		kpreempt_enable();
 	}
 }
+
+static const struct ctxop_template sep_tpl = {
+	.ct_rev		= CTXOP_TPL_REV,
+	.ct_save	= sep_save,
+	.ct_restore	= sep_restore,
+};
 
 /*
  * Add any lwp-associated context handlers to the lwp at the beginning
@@ -815,14 +829,19 @@ void
 lwp_installctx(klwp_t *lwp)
 {
 	kthread_t *t = lwptot(lwp);
-	int thisthread = t == curthread;
-#ifdef _SYSCALL32_IMPL
-	void (*restop)(klwp_t *) = lwp_getdatamodel(lwp) == DATAMODEL_NATIVE ?
-	    lwp_segregs_restore : lwp_segregs_restore32;
-#else
-	void (*restop)(klwp_t *) = lwp_segregs_restore;
-#endif
+	bool thisthread = (t == curthread);
 	struct ctxop *ctx;
+
+	const struct ctxop_template segreg_tpl = {
+		.ct_rev		= CTXOP_TPL_REV,
+		.ct_save	= lwp_segregs_save,
+#ifdef _SYSCALL32_IMPL
+		.ct_restore	= lwp_getdatamodel(lwp) == DATAMODEL_NATIVE ?
+	    lwp_segregs_restore : lwp_segregs_restore32
+#else
+		.ct_restore	= lwp_segregs_restore;
+#endif
+	};
 
 	/*
 	 * Install the basic lwp context handlers on each lwp.
@@ -836,21 +855,18 @@ lwp_installctx(klwp_t *lwp)
 	 * On the i386 kernel, the context handlers are responsible for
 	 * virtualizing %gs/%fs to the lwp by updating the per-cpu GDTs
 	 */
-	ASSERT(removectx(t, lwp, lwp_segregs_save, restop,
-	    NULL, NULL, NULL, NULL) == 0);
+	ASSERT0(ctxop_remove(t, &segreg_tpl, lwp));
+
+	ctx = ctxop_allocate(&segreg_tpl, lwp);
 	if (thisthread) {
-		ctx = installctx_preallocate();
 		kpreempt_disable();
-	} else {
-		ctx = NULL;
 	}
-	installctx(t, lwp, lwp_segregs_save, restop,
-	    NULL, NULL, NULL, NULL, ctx);
+	ctxop_attach(t, ctx);
 	if (thisthread) {
 		/*
 		 * Since we're the right thread, set the values in the GDT
 		 */
-		restop(lwp);
+		segreg_tpl.ct_restore(lwp);
 		kpreempt_enable();
 	}
 
@@ -864,17 +880,14 @@ lwp_installctx(klwp_t *lwp)
 	 */
 	if (is_x86_feature(x86_featureset, X86FSET_SEP)) {
 		caddr_t kstktop = (caddr_t)lwp->lwp_regs;
-		ASSERT(removectx(t, kstktop,
-		    sep_save, sep_restore, NULL, NULL, NULL, NULL) == 0);
 
+		ASSERT0(ctxop_remove(t, &sep_tpl, kstktop));
+
+		ctx = ctxop_allocate(&sep_tpl, kstktop);
 		if (thisthread) {
-			ctx = installctx_preallocate();
 			kpreempt_disable();
-		} else {
-			ctx = NULL;
 		}
-		installctx(t, kstktop,
-		    sep_save, sep_restore, NULL, NULL, NULL, NULL, ctx);
+		ctxop_attach(t, ctx);
 		if (thisthread) {
 			/*
 			 * We're the right thread, so set the stack pointer

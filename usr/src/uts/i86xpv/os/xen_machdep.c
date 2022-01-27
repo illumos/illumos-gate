@@ -1086,7 +1086,7 @@ xen_xlate_errcode(int error)
  * Caller responsible for preventing kernel preemption.
  */
 void
-xen_enable_user_iopl(void)
+xen_enable_user_iopl(void *arg __unused)
 {
 	physdev_set_iopl_t set_iopl;
 	set_iopl.iopl = 3;		/* user ring 3 */
@@ -1097,7 +1097,7 @@ xen_enable_user_iopl(void)
  * Drop PS_IOPL on current vcpu to kernel level
  */
 void
-xen_disable_user_iopl(void)
+xen_disable_user_iopl(void *arg __unused)
 {
 	physdev_set_iopl_t set_iopl;
 	set_iopl.iopl = 1;		/* kernel pseudo ring 1 */

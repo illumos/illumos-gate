@@ -1258,7 +1258,7 @@ cu_cpu_fini(cpu_t *cp)
 			ctx = cpu_ctx->ctx_ptr_array[i];
 			if (ctx == NULL)
 				continue;
-			kcpc_free(ctx, 0);
+			kcpc_free_cpu(ctx);
 		}
 
 		/*

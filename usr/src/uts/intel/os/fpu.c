@@ -22,6 +22,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Joyent, Inc.
  * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -579,6 +580,22 @@ void (*xsavep)(struct xsave_state *, uint64_t) = xsave;
 
 static int fpe_sicode(uint_t);
 static int fpe_simd_sicode(uint_t);
+static void fp_new_lwp(void *, void *);
+static void fp_free_ctx(void *, int);
+
+static struct ctxop *
+fp_ctxop_allocate(struct fpu_ctx *fp)
+{
+	const struct ctxop_template tpl = {
+		.ct_rev		= CTXOP_TPL_REV,
+		.ct_save	= fpsave_ctxt,
+		.ct_restore	= fprestore_ctxt,
+		.ct_fork	= fp_new_lwp,
+		.ct_lwp_create	= fp_new_lwp,
+		.ct_free	= fp_free_ctx,
+	};
+	return (ctxop_allocate(&tpl, fp));
+}
 
 /*
  * Copy the state of parent lwp's floating point context into the new lwp.
@@ -589,8 +606,9 @@ static int fpe_simd_sicode(uint_t);
  * reset to their initial state.
  */
 static void
-fp_new_lwp(kthread_id_t t, kthread_id_t ct)
+fp_new_lwp(void *parent, void *child)
 {
+	kthread_id_t t = parent, ct = child;
 	struct fpu_ctx *fp;		/* parent fpu context */
 	struct fpu_ctx *cfp;		/* new fpu context */
 	struct fxsave_state *fx, *cfx;
@@ -651,8 +669,7 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 	 * before returning to user land.
 	 */
 
-	installctx(ct, cfp, fpsave_ctxt, fprestore_ctxt, fp_new_lwp,
-	    fp_new_lwp, NULL, fp_free, NULL);
+	ctxop_attach(ct, fp_ctxop_allocate(cfp));
 }
 
 /*
@@ -672,9 +689,8 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
  *	disable fpu and release the fp context for the CPU
  *
  */
-/*ARGSUSED*/
 void
-fp_free(struct fpu_ctx *fp, int isexec)
+fp_free(struct fpu_ctx *fp)
 {
 	ASSERT(fp_kind != FP_NO);
 
@@ -696,6 +712,15 @@ fp_free(struct fpu_ctx *fp, int isexec)
 		fpdisable();
 	}
 	kpreempt_enable();
+}
+
+/*
+ * Wrapper for freectx to make the types line up for fp_free()
+ */
+static void
+fp_free_ctx(void *arg, int isexec __unused)
+{
+	fp_free((struct fpu_ctx *)arg);
 }
 
 /*
@@ -778,19 +803,18 @@ void
 fp_exec(void)
 {
 	struct fpu_ctx *fp = &ttolwp(curthread)->lwp_pcb.pcb_fpu;
-	struct ctxop *ctx = installctx_preallocate();
 
 	if (fp_save_mech == FP_XSAVE) {
 		fp->fpu_xsave_mask = XFEATURE_FP_ALL;
 	}
 
+	struct ctxop *ctx = fp_ctxop_allocate(fp);
 	/*
 	 * Make sure that we're not preempted in the middle of initializing the
 	 * FPU on CPU.
 	 */
 	kpreempt_disable();
-	installctx(curthread, fp, fpsave_ctxt, fprestore_ctxt, fp_new_lwp,
-	    fp_new_lwp, NULL, fp_free, ctx);
+	ctxop_attach(curthread, ctx);
 	fpinit();
 	fp->fpu_flags = FPU_EN;
 	kpreempt_enable();
@@ -818,8 +842,7 @@ fp_seed(void)
 		fp->fpu_xsave_mask = XFEATURE_FP_ALL;
 	}
 
-	installctx(curthread, fp, fpsave_ctxt, fprestore_ctxt, fp_new_lwp,
-	    fp_new_lwp, NULL, fp_free, NULL);
+	ctxop_attach(curthread, fp_ctxop_allocate(fp));
 	fpinit();
 
 	/*
@@ -1297,6 +1320,12 @@ kernel_fpu_no_swtch(void)
 	}
 }
 
+static const struct ctxop_template kfpu_ctxop_tpl = {
+	.ct_rev		= CTXOP_TPL_REV,
+	.ct_save	= kernel_fpu_ctx_save,
+	.ct_restore	= kernel_fpu_ctx_restore,
+};
+
 void
 kernel_fpu_begin(kfpu_state_t *kfpu, uint_t flags)
 {
@@ -1364,7 +1393,7 @@ kernel_fpu_begin(kfpu_state_t *kfpu, uint_t flags)
 	 * FPU or another code path) so FPU_VALID could be set. This is handled
 	 * by fp_save, as is the FPU_EN check.
 	 */
-	ctx = installctx_preallocate();
+	ctx = ctxop_allocate(&kfpu_ctxop_tpl, kfpu);
 	kpreempt_disable();
 	if (pl != NULL) {
 		if ((flags & KFPU_USE_LWP) == 0)
@@ -1373,17 +1402,14 @@ kernel_fpu_begin(kfpu_state_t *kfpu, uint_t flags)
 	}
 
 	/*
-	 * Set the context operations for kernel FPU usage. Note that this is
-	 * done with a preallocated buffer and under kpreempt_disable because
-	 * without a preallocated buffer, installctx does a sleeping
-	 * allocation. We haven't finished initializing our kernel FPU state
-	 * yet, and in the rare case that we happen to save/restore just as
-	 * installctx() exits its own kpreempt_enable() internal call, we
-	 * guard against restoring an uninitialized buffer (0xbaddcafe).
+	 * Set the context operations for kernel FPU usage.  Because kernel FPU
+	 * setup and ctxop attachment needs to happen under the protection of
+	 * kpreempt_disable(), we allocate the ctxop outside the guard so its
+	 * sleeping allocation will not cause a voluntary swtch().  This allows
+	 * the rest of the initialization to proceed, ensuring valid state for
+	 * the ctxop handlers.
 	 */
-	installctx(curthread, kfpu, kernel_fpu_ctx_save, kernel_fpu_ctx_restore,
-	    NULL, NULL, NULL, NULL, ctx);
-
+	ctxop_attach(curthread, ctx);
 	curthread->t_flag |= T_KFPU;
 
 	if ((flags & KFPU_USE_LWP) == KFPU_USE_LWP) {
@@ -1433,9 +1459,9 @@ kernel_fpu_end(kfpu_state_t *kfpu, uint_t flags)
 	 *
 	 * Calling fpdisable only effects the current CPU's %cr0 register.
 	 *
-	 * During removectx and kpreempt_enable, we can voluntarily context
+	 * During ctxop_remove and kpreempt_enable, we can voluntarily context
 	 * switch, so the CPU we were on when we entered this function might
-	 * not be the same one we're on when we return from removectx or end
+	 * not be the same one we're on when we return from ctxop_remove or end
 	 * the function. Note there can be user-level context switch handlers
 	 * still installed if this is a user-level thread.
 	 *
@@ -1477,8 +1503,7 @@ kernel_fpu_end(kfpu_state_t *kfpu, uint_t flags)
 	}
 
 	if ((flags & KFPU_NO_STATE) == 0) {
-		removectx(curthread, kfpu, kernel_fpu_ctx_save,
-		    kernel_fpu_ctx_restore, NULL, NULL, NULL, NULL);
+		ctxop_remove(curthread, &kfpu_ctxop_tpl, kfpu);
 
 		if (kfpu != NULL) {
 			if (kfpu->kfpu_curthread != curthread) {

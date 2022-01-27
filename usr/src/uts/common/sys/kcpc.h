@@ -199,13 +199,12 @@ extern int kcpc_overflow_ast(void);
 extern uint_t kcpc_hw_overflow_intr(caddr_t, caddr_t);
 extern int kcpc_hw_cpu_hook(int cpuid, ulong_t *kcpc_cpumap);
 extern int kcpc_hw_lwp_hook(void);
-extern void kcpc_idle_save(struct cpu *cp);
-extern void kcpc_idle_restore(struct cpu *cp);
+extern void kcpc_idle_ctxop_install(struct _kthread *, struct cpu *);
 
 extern krwlock_t	kcpc_cpuctx_lock;  /* lock for 'kcpc_cpuctx' below */
 extern int		kcpc_cpuctx;	   /* number of cpu-specific contexts */
 
-extern void kcpc_free(kcpc_ctx_t *ctx, int isexec);
+extern void kcpc_free_cpu(kcpc_ctx_t *);
 
 /*
  * 'dtrace_cpc_in_use' contains the number of currently active cpc provider
