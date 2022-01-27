@@ -942,5 +942,5 @@ ksocket_krecv_set(ksocket_t ks, ksocket_krecv_f cb, void *arg)
 void
 ksocket_krecv_unblock(ksocket_t ks)
 {
-	so_krecv_unblock(KSTOSO(ks));
+	return (so_krecv_unblock(KSTOSO(ks)));
 }

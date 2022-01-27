@@ -51,7 +51,7 @@
 #define	__KSOCKET_EV_cantrecvmore	KSOCKET_EV_CANTRECVMORE
 #define	__KSOCKET_EV_error		KSOCKET_EV_ERROR
 
-#define	KSOCKET_CALLBACK(so, cbfn, arg) 				\
+#define	KSOCKET_CALLBACK(so, cbfn, arg)					\
 	if ((so)->so_ksock_callbacks.ksock_cb_##cbfn != NULL) {		\
 		(*(so)->so_ksock_callbacks.ksock_cb_##cbfn)(SOTOKS(so),	\
 		    __KSOCKET_EV_##cbfn, (so)->so_ksock_cb_arg, (arg));	\

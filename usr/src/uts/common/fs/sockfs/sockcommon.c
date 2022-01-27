@@ -458,16 +458,16 @@ sonode_constructor(void *buf, void *cdrarg, int kmflags)
 	vp->v_data = so;
 	vn_setops(vp, socket_vnodeops);
 
-	so->so_priv 		= NULL;
+	so->so_priv		= NULL;
 	so->so_oobmsg		= NULL;
 
 	so->so_proto_handle	= NULL;
 
-	so->so_peercred 	= NULL;
+	so->so_peercred		= NULL;
 
 	so->so_rcv_queued	= 0;
-	so->so_rcv_q_head 	= NULL;
-	so->so_rcv_q_last_head 	= NULL;
+	so->so_rcv_q_head	= NULL;
+	so->so_rcv_q_last_head	= NULL;
 	so->so_rcv_head		= NULL;
 	so->so_rcv_last_head	= NULL;
 	so->so_rcv_wanted	= 0;
