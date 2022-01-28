@@ -20,7 +20,7 @@ post =
 outputdir = /var/tmp/test_results
 
 [/opt/bhyve-tests/tests/vmm]
-tests = ['mem_partial', 'mem_seg_map']
+tests = ['mem_partial', 'mem_seg_map', 'fpu_getset']
 
 # Tests of userspace mevent system, built from cmd/bhyve
 [/opt/bhyve-tests/tests/mevent]

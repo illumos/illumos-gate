@@ -23,12 +23,13 @@
 #include <vmmapi.h>
 
 struct vmctx *
-create_test_vm(void)
+create_test_vm(const char *test_suite_name)
 {
 	char name[VM_MAX_NAMELEN];
 	int res;
 
-	(void) snprintf(name, sizeof (name), "bhyve-test-memmap-%d", getpid());
+	(void) snprintf(name, sizeof (name), "bhyve-test-%s-%d",
+	    test_suite_name, getpid());
 
 	res = vm_create(name, 0);
 	if (res != 0) {

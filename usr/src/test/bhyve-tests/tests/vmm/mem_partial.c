@@ -57,8 +57,9 @@ main(int argc, char *argv[])
 	struct vmctx *ctx;
 	int res, fd;
 	void *guest_mem;
+	const char *suite_name = basename(argv[0]);
 
-	ctx = create_test_vm();
+	ctx = create_test_vm(suite_name);
 	if (ctx == NULL) {
 		perror("could open test VM");
 		return (1);
@@ -192,7 +193,7 @@ main(int argc, char *argv[])
 	}
 
 	/* mission accomplished */
-	(void) printf("%s\tPASS\n", basename(argv[0]));
+	(void) printf("%s\tPASS\n", suite_name);
 	vm_destroy(ctx);
 	return (0);
 

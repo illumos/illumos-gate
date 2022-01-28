@@ -269,7 +269,7 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 		    &fpu->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave);
 		fpu->fpu_regs.kfpu_xstatus =
 		    fp->fp_reg_set.fpchip_state.xstatus;
-		fpu->fpu_regs.kfpu_u.kfpu_xs->xs_xstate_bv |=
+		fpu->fpu_regs.kfpu_u.kfpu_xs->xs_header.xsh_xstate_bv |=
 		    (XFEATURE_LEGACY_FP | XFEATURE_SSE);
 		break;
 	default:

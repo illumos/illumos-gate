@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -51,6 +51,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/errno.h>
 #include <sys/mman.h>
 #include <sys/cpuset.h>
+#ifndef __FreeBSD__
+#include <sys/fp.h>
+#endif /* __FreeBSD__ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -312,6 +315,7 @@ static int get_cpu_topology;
 #ifndef __FreeBSD__
 static int pmtmr_port;
 static int wrlock_cycle;
+static int get_fpu;
 #endif
 
 /*
@@ -1534,6 +1538,7 @@ setup_options(bool cpu_intel)
 #ifndef __FreeBSD__
 		{ "pmtmr-port",		REQ_ARG,	0,	PMTMR_PORT },
 		{ "wrlock-cycle",	NO_ARG,	&wrlock_cycle,	1 },
+		{ "get-fpu",	NO_ARG,		&get_fpu,	1 },
 #endif
 	};
 
@@ -1751,6 +1756,93 @@ show_memseg(struct vmctx *ctx)
 		segid++;
 	}
 }
+
+#ifndef __FreeBSD__
+static int
+show_fpu(struct vmctx *ctx, int vcpu)
+{
+	int res, fd;
+
+	struct vm_fpu_desc_entry entries[64];
+	struct vm_fpu_desc desc = {
+		.vfd_entry_data = entries,
+		.vfd_num_entries = 64,
+	};
+	fd = vm_get_device_fd(ctx);
+	res = ioctl(fd, VM_DESC_FPU_AREA, &desc);
+	if (res != 0) {
+		return (errno);
+	}
+	for (uint_t i = 0; i < desc.vfd_num_entries; i++) {
+		const struct vm_fpu_desc_entry *entry = &entries[i];
+
+		/* confirm that AVX fields are where we expect */
+		if (entry->vfde_feature == XFEATURE_AVX) {
+			if (entry->vfde_size != 0x100 ||
+			    entry->vfde_off != 0x240) {
+				(void) fprintf(stderr,
+				    "show_fpu: unexpected AVX size/placement "
+				    "- size:%x off:%x\n",
+				    entry->vfde_size, entry->vfde_off);
+				return (EINVAL);
+			}
+		}
+	}
+	void *buf = malloc(desc.vfd_req_size);
+	if (buf == NULL) {
+		return (ENOMEM);
+	}
+	struct vm_fpu_state req = {
+		.vcpuid = vcpu,
+		.buf = buf,
+		.len = desc.vfd_req_size,
+	};
+	res = ioctl(fd, VM_GET_FPU, &req);
+	if (res != 0) {
+		res = errno;
+		free(buf);
+		return (res);
+	}
+
+	const struct xsave_state *state = buf;
+	const struct fxsave_state *fx = &state->xs_fxsave;
+	(void) printf("fpu_fcw[%d]\t\t0x%04x\n", vcpu, fx->fx_fcw);
+	(void) printf("fpu_fsw[%d]\t\t0x%04x\n", vcpu, fx->fx_fsw);
+	(void) printf("fpu_ftw[%d]\t\t0x%04x\n", vcpu, fx->fx_fctw);
+	(void) printf("fpu_fop[%d]\t\t0x%04x\n", vcpu, fx->fx_fop);
+	(void) printf("fpu_rip[%d]\t\t0x%016lx\n", vcpu, fx->fx_rip);
+	(void) printf("fpu_rdp[%d]\t\t0x%016lx\n", vcpu, fx->fx_rdp);
+	(void) printf("fpu_mxcsr[%d]\t\t0x%08x\n", vcpu, fx->fx_mxcsr);
+	(void) printf("fpu_mxcsr_mask[%d]\t0x%08x\n", vcpu,
+	    fx->fx_mxcsr_mask);
+	/* ST/MMX regs */
+	for (uint_t i = 0; i < 8; i++) {
+		(void) printf("fpu_st%u[%d]\t\t0x%08x%08x%08x%08x\n", vcpu, i,
+		    fx->fx_st[i].__fpr_pad[0], fx->fx_st[i].__fpr_pad[1],
+		    fx->fx_st[i].__fpr_pad[2], fx->fx_st[i].__fpr_pad[3]);
+	}
+	/* SSE regs */
+	for (uint_t i = 0; i < 16; i++) {
+		(void) printf("fpu_xmm%u[%d]\t\t0x%08x%08x%08x%08x\n",
+		    i, vcpu,
+		    fx->fx_xmm[i]._l[0], fx->fx_xmm[i]._l[1],
+		    fx->fx_xmm[i]._l[2], fx->fx_xmm[i]._l[3]);
+	}
+
+	if (state->xs_header.xsh_xstate_bv & XFEATURE_AVX) {
+		/* AVX regs */
+		for (uint_t i = 0; i < 16; i++) {
+			(void) printf("fpu_ymm%u[%d]\t\t0x%08x%08x%08x%08x\n",
+			    i, vcpu,
+			    state->xs_ymm[i]._l[0], state->xs_ymm[i]._l[1],
+			    state->xs_ymm[i]._l[2], state->xs_ymm[i]._l[3]);
+		}
+	}
+
+	free(buf);
+	return (0);
+}
+#endif /*__FreeBSD__ */
 
 int
 main(int argc, char *argv[])
@@ -2149,6 +2241,12 @@ main(int argc, char *argv[])
 
 	if (!error)
 		error = get_all_segments(ctx, vcpu);
+
+#ifndef __FreeBSD__
+	if (!error && (get_fpu || get_all)) {
+		error = show_fpu(ctx, vcpu);
+	}
+#endif /* __FreeBSD__ */
 
 	if (!error) {
 		if (cpu_intel)
