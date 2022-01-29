@@ -1,9 +1,10 @@
 .\"  Copyright (c) 2000, Sun Microsystems, Inc.,  All Rights Reserved
 .\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd Apr 23, 2017
+.Dd January 29, 2022
 .Dt SCSI_ADDRESS 9S
 .Os
 .Sh NAME
@@ -16,47 +17,56 @@ illumos architecture specific (illumos DDI)
 .Sh DESCRIPTION
 A
 .Vt scsi_address
-structure defines the addressing components for a
-.Sy SCSI
-target device.
+structure defines the addressing components for a SCSI target device.
 The address of the target device is separated into two components:
 target number and logical unit number.
 The two addressing components are used to uniquely identify any type of
-.Sy SCSI
-device; however, most devices can be addressed with the target component of the
-address.
+SCSI device; however, most devices can be addressed with the target
+component of the address.
 .Pp
 In the case where only the target component is used to address the device, the
 logical unit should be set to
-.Sy 0 . If the
-.Sy SCSI
-target device supports logical units, then the HBA must interpret the
-logical units field of the data structure.
+.Sy 0 .
+If the SCSI target device supports logical units, then the HBA must
+interpret the logical units field of the data structure.
 .Pp
 The
-.Sy pkt_address
+.Fa pkt_address
 member of a
 .Xr scsi_pkt 9S
 is initialized by
 .Xr scsi_init_pkt 9F .
 .Ss Complex Addressing
-Drivers may set the flag
+HBA drivers may set the flag
 .Dv SCSI_HBA_ADDR_COMPLEX
 in the
 .Fa hba_flags
 argument to
 .Xr scsi_hba_attach_setup 9F .
-When the flag is set, this structure must be treated as opaque.
-Instead of storing a traditional target and LUN, the address is treated
-as the string form of a unit address.
-In addition, rather than storing a pointer to the
+When the flag is set, the way this structure is used changes.
+While the
+.Fa a_hba_tran
+member is still accessible for accessing the
 .Xr scsi_hba_tran 9S
-structure, the address structure can store any arbitrary pointer through
-the
+structure, the nature of addressing changes.
+.Pp
+When using complex addressing, a particular device is addressed through a unit
+address which takes the shape of a string.
+When using complex addressing, the target and lun fields are inaccessible and
+instead a device driver can obtain the
+.Xr scsi_device 9S
+structure that this address corresponds to.
+In the complex addressing world, this is generally a direct mapping.
+To obtain this structure, a driver would call the
+.Xr scsi_address_device 9F
+function.
+.Pp
+With the
+.Xr scsi_device 9S
+structure, the device driver can then get to the device-specific private data
+through the
 .Xr scsi_device_hba_private_get 9F
-and
-.Xr scsi_device_hba_private_set 9F
-functions.
+function.
 .Sh STRUCTURE MEMBERS
 .Bd -literal
 scsi_hba_tran_t   *a_hba_tran;  /* Transport vectors for the SCSI bus */
@@ -65,44 +75,27 @@ uchar_t           a_lun;        /* SCSI logical unit */
 .Ed
 .Pp
 .Fa a_hba_tran
-is a pointer to the controlling
-.Sy HBA 's
-transport vector
-structure.
-The
-.Sy SCSA
-interface uses this field to pass any transport
-requests from the
-.Sy SCSI
-target device drivers to the
-.Sy HBA
-driver.
+is a pointer to the controlling HBA's transport vector structure.
+The SCSA interface uses this field to pass any transport requests from the SCSI
+target device drivers to the HBA driver.
+This member is accessible regardless of whether the device driver uses complex
+addressing or not.
 .Pp
 .Fa a_target
-is the target component of the
-.Sy SCSI
-address
+is the target component of the SCSI address.
+This member is not accessible when the device driver uses complex addressing.
 .Pp
 .Fa a_lun
-is the logical unit component of the
-.Sy SCSI
-address.
-The logical unit is used to further distinguish a
-.Sy SCSI
-target device that
+is the logical unit component of the SCSI address.
+The logical unit is used to further distinguish a SCSI target device that
 supports multiple logical units from one that does not.
-.Pp
-If the flag,
-.Dv SCSI_HBA_ADDR_COMPLEX
-was set, then the driver
-.Em must not
-dereference any of these fields, the structure contents will have
-changed and should be considered opaque.
+This member is not accessible when the device driver uses complex addressing.
 .Sh SEE ALSO
+.Xr scsi_address_device 9F ,
 .Xr scsi_device_hba_private_get 9F ,
-.Xr scsi_device_hba_private_set 9F ,
 .Xr scsi_hba_attach_setup 9F ,
 .Xr scsi_init_pkt 9F ,
+.Xr scsi_device 9S ,
 .Xr scsi_hba_tran 9S ,
 .Xr scsi_pkt 9S
 .Pp
