@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -499,6 +499,7 @@ pcieadm_cfgspace_print_regdef(pcieadm_cfgspace_walk_t *walkp,
 			if (strval == NULL) {
 				strval = "reserved";
 			}
+
 			pcieadm_field_printf(walkp, regdef->prd_short,
 			    regdef->prd_human, regval, "%s (0x%" PRIx64 ")\n",
 			    strval, regval << regdef->prd_lowbit);
@@ -1171,9 +1172,9 @@ static pcieadm_regdef_t pcieadm_regdef_msictrl[] = {
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 8, 8, "pvm", "Per-Vector Masking Capable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
-	{ 9, 9, "extmdcap", "Extended Message Data Capable",
+	{ 9, 9, "extmdcap", "Extended Message Data Capable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
-	{ 10, 10, "extmden", "extended Message Data Enable",
+	{ 10, 10, "extmden", "extended Message Data Enable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ -1, -1, NULL }
 };
@@ -1438,17 +1439,19 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_linkctl[] = {
 	{ 5, 5, "retrain", "Retrain Link", PRDV_HEX },
 	{ 6, 6, "ccc", "Common Clock Configuration", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "asynchronous", "common" } } },
-	{ 7, 7, "extsync", "Extended Sync", PRDV_HEX,
+	{ 7, 7, "extsync", "Extended Sync", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
-	{ 8, 8, "clkpm", "Clock Power Management", PRDV_HEX,
+	{ 8, 8, "clkpm", "Clock Power Management", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
-	{ 9, 9, "hwawd", "Hardware Autonomous Width", PRDV_HEX,
+	{ 9, 9, "hwawd", "Hardware Autonomous Width", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "enabled", "disabled" } } },
-	{ 10, 10, "linkbwint", "Link Bandwidth Management Interrupt", PRDV_HEX,
-	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
-	{ 11, 11, "linkabwint", "Link Autonomous Bandwidth Interrupt", PRDV_HEX,
-	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
-	{ 14, 15, "drs", "DRS Signaling Control", PRDV_HEX,
+	{ 10, 10, "linkbwint", "Link Bandwidth Management Interrupt",
+	    PRDV_STRVAL, .prd_val = { .prdv_strval = { "disabled",
+	    "enabled" } } },
+	{ 11, 11, "linkabwint", "Link Autonomous Bandwidth Interrupt",
+	    PRDV_STRVAL, .prd_val = { .prdv_strval = { "disabled",
+	    "enabled" } } },
+	{ 14, 15, "drs", "DRS Signaling Control", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "not reported", "Interrupt enabled",
 	    "DRS->FRS enabled" } } },
 	{ -1, -1, NULL }
@@ -1489,9 +1492,9 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_slotcap[] = {
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 7, 14, "slotplv", "Slot Power Limit Value", PRDV_HEX },
 	{ 15, 16, "slotpls", "Slot Power Limit Scale", PRDV_HEX },
-	{ 17, 17, "emi", "Electromechanical Interlock Present",
+	{ 17, 17, "emi", "Electromechanical Interlock Present", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "no", "yes" } } },
-	{ 18, 18, "ncc", "No Command Completed", PRDV_HEX,
+	{ 18, 18, "ncc", "No Command Completed", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 19, 31, "slotno", "Physical Slot Number", PRDV_HEX },
 	{ -1, -1, NULL }

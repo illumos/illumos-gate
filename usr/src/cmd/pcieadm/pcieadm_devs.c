@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <err.h>
@@ -28,6 +28,7 @@ typedef struct pcieadm_show_devs {
 	boolean_t psd_funcs;
 	int psd_nfilts;
 	char **psd_filts;
+	boolean_t *psd_used;
 	uint_t psd_nprint;
 } pcieadm_show_devs_t;
 
@@ -291,20 +292,24 @@ pcieadm_show_devs_match(pcieadm_show_devs_t *psd,
 		const char *filt = psd->psd_filts[i];
 
 		if (strcmp(filt, psdo->psdo_path) == 0) {
+			psd->psd_used[i] = B_TRUE;
 			return (B_TRUE);
 		}
 
 		if (strcmp(filt, bdf) == 0) {
+			psd->psd_used[i] = B_TRUE;
 			return (B_TRUE);
 		}
 
 		if (psdo->psdo_driver != NULL &&
 		    strcmp(filt, psdo->psdo_driver) == 0) {
+			psd->psd_used[i] = B_TRUE;
 			return (B_TRUE);
 		}
 
 		if (psdo->psdo_driver != NULL && psdo->psdo_instance != -1 &&
 		    strcmp(filt, dinst) == 0) {
+			psd->psd_used[i] = B_TRUE;
 			return (B_TRUE);
 		}
 
@@ -313,6 +318,7 @@ pcieadm_show_devs_match(pcieadm_show_devs_t *psd,
 		}
 
 		if (strcmp(filt, psdo->psdo_path) == 0) {
+			psd->psd_used[i] = B_TRUE;
 			return (B_TRUE);
 		}
 	}
@@ -488,7 +494,7 @@ pcieadm_show_devs_help(const char *fmt, ...)
 int
 pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 {
-	int c;
+	int c, ret;
 	uint_t flags = 0;
 	const char *fields = NULL;
 	pcieadm_show_devs_t psd;
@@ -557,6 +563,11 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 	if (argc > 0) {
 		psd.psd_nfilts = argc;
 		psd.psd_filts = argv;
+		psd.psd_used = calloc(argc, sizeof (boolean_t));
+		if (psd.psd_used == NULL) {
+			err(EXIT_FAILURE, "failed to allocate filter tracking "
+			    "memory");
+		}
 	}
 
 	oferr = ofmt_open(fields, pcieadm_show_dev_ofmt, flags, 0,
@@ -568,9 +579,18 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 
 	pcieadm_di_walk(pcip, &walk);
 
-	if (psd.psd_nprint > 0) {
-		return (EXIT_SUCCESS);
-	} else {
-		return (EXIT_FAILURE);
+	ret = EXIT_SUCCESS;
+	for (int i = 0; i < psd.psd_nfilts; i++) {
+		if (!psd.psd_used[i]) {
+			warnx("filter '%s' did not match any devices",
+			    psd.psd_filts[i]);
+			ret = EXIT_FAILURE;
+		}
 	}
+
+	if (psd.psd_nprint == 0) {
+		ret = EXIT_FAILURE;
+	}
+
+	return (ret);
 }
