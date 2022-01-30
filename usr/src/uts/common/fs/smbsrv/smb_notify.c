@@ -409,7 +409,7 @@ smb_notify_get_events(smb_request_t *sr)
 	nc = &of->f_notify;
 
 	DTRACE_PROBE2(notify__get__events,
-	    smb_request_t, sr,
+	    smb_request_t *, sr,
 	    uint32_t, nc->nc_events);
 
 	/*

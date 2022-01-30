@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -542,7 +542,7 @@ smb_oplock_send_brk(smb_request_t *sr)
 
 		cmn_err(CE_NOTE, "clnt %s oplock break timeout",
 		    sr->session->ip_addr_str);
-		DTRACE_PROBE1(break_timeout, smb_ofile_t, ofile);
+		DTRACE_PROBE1(break_timeout, smb_ofile_t *, ofile);
 
 		/*
 		 * Will do local ack below.  Note, after timeout,

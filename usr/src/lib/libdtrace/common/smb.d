@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #pragma	D depends_on library ip.d
@@ -137,6 +138,7 @@ typedef struct smb2opinfo {
 	uint64_t soi_asyncid;		/* Message ID (when async) */
 	uint64_t soi_uid;		/* user ID (SMB2 Session ID) */
 	uint32_t soi_tid;		/* tree ID */
+	uint32_t soi_fid;		/* file ID */
 	uint32_t soi_status;
 	uint32_t soi_flags;
 	zoneid_t soi_zoneid;		/* zone identifier */
@@ -150,6 +152,7 @@ translator smb2opinfo_t < struct smb_request *P > {
 	soi_asyncid	= P->smb2_async_id;
 	soi_uid		= P->smb2_ssnid;
 	soi_tid		= P->smb_tid;
+	soi_fid		= P->smb_fid;
 	soi_status	= P->smb2_status;
 	soi_flags	= P->smb2_hdr_flags;
 	soi_zoneid	= P->sr_server->sv_zid;

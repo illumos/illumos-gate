@@ -835,7 +835,7 @@ smb_common_open(smb_request_t *sr)
 			 * This code path is exercised by smbtorture
 			 * smb2.durable-open.delete_on_close1
 			 */
-			DTRACE_PROBE1(node_deleted, smb_node_t, fnode);
+			DTRACE_PROBE1(node_deleted, smb_node_t *, fnode);
 			tree_fid = of->f_fid;
 			of->f_fid = 0;
 			smb_ofile_free(of);

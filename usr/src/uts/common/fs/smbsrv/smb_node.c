@@ -782,7 +782,7 @@ smb_node_open_check(smb_node_t *node, uint32_t desired_access,
 		default:
 			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
 			DTRACE_PROBE3(conflict3,
-			    smb_ofile_t, of,
+			    smb_ofile_t *, of,
 			    uint32_t, desired_access,
 			    uint32_t, share_access);
 			smb_llist_exit(&node->n_ofile_list);
@@ -817,7 +817,7 @@ smb_node_rename_check(smb_node_t *node)
 			break;
 		default:
 			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
-			DTRACE_PROBE1(conflict1, smb_ofile_t, of);
+			DTRACE_PROBE1(conflict1, smb_ofile_t *, of);
 			smb_llist_exit(&node->n_ofile_list);
 			return (status);
 		}
@@ -855,7 +855,7 @@ smb_node_delete_check(smb_node_t *node)
 			break;
 		default:
 			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
-			DTRACE_PROBE1(conflict1, smb_ofile_t, of);
+			DTRACE_PROBE1(conflict1, smb_ofile_t *, of);
 			smb_llist_exit(&node->n_ofile_list);
 			return (status);
 		}
