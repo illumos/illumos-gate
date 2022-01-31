@@ -25,6 +25,7 @@
  * Copyright 2014 Toomas Soome <tsoome@me.com>
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Jason King
  */
 
 #include <stdio.h>
@@ -35,6 +36,7 @@
 #include <smbios.h>
 #include <uuid/uuid.h>
 #include <libintl.h>
+#include <sys/debug.h>
 #include <sys/types.h>
 #include <sys/dkio.h>
 #include <sys/vtoc.h>
@@ -217,7 +219,7 @@ efi_alloc_and_init(int fd, uint32_t nparts, struct dk_gpt **vtoc)
 	 */
 	vptr->efi_first_u_lba = nblocks + 1;
 	vptr->efi_last_lba = capacity - 1;
-	vptr->efi_altern_lba = capacity -1;
+	vptr->efi_altern_lba = capacity - 1;
 	vptr->efi_last_u_lba = vptr->efi_last_lba - nblocks;
 
 	(void) uuid_generate((uchar_t *)&uuid);
@@ -904,68 +906,182 @@ check_input(struct dk_gpt *vtoc)
 }
 
 /*
+ * Set *lastp_p to the last non-reserved partition with the last (highest)
+ * LBA (and set *last_lbap to the last used LBA). We also will fail if the
+ * partition layout isn't as expected (reserved partiton last, no overlap
+ * with the last partiton).
+ */
+static int
+efi_use_whole_disk_get_last(struct dk_gpt *l, struct dk_part **lastp_p,
+    diskaddr_t *last_lbap)
+{
+	struct dk_part *last_p = NULL;
+	struct dk_part *resv_p = NULL;
+	diskaddr_t last_ulba = 0;
+	uint_t i;
+
+	if (l->efi_nparts < 2) {
+		if (efi_debug) {
+			(void) fprintf(stderr, "%s: too few (%u) partitions",
+			    __func__, l->efi_nparts);
+		}
+		return (-1);
+	}
+
+	/*
+	 * Look for the last (highest) used LBA. We ignore the last
+	 * (efi_nparts - 1) partition since that should be the reserved
+	 * partition (which is checked later).
+	 */
+	for (i = 0; i < l->efi_nparts - 1; i++) {
+		struct dk_part *p = &l->efi_parts[i];
+		diskaddr_t end;
+
+		if (p->p_tag == V_RESERVED) {
+			if (efi_debug) {
+				/*
+				 * Output the error message now so we can
+				 * indicate which partition is the problem.
+				 * We'll return failure later.
+				 */
+				(void) fprintf(stderr, "%s: reserved partition "
+				    "found at unexpected position (%u)\n",
+				    __func__, i);
+			}
+			return (-1);
+		}
+
+		/* Ignore empty partitions */
+		if (p->p_size == 0)
+			continue;
+
+		end = p->p_start + p->p_size - 1;
+		if (last_ulba < end) {
+			last_p = p;
+			last_ulba = end;
+		}
+	}
+
+	if (l->efi_parts[l->efi_nparts - 1].p_tag != V_RESERVED) {
+		if (efi_debug) {
+			(void) fprintf(stderr, "%s: no reserved partition\n",
+			    __func__);
+		}
+		return (-1);
+	}
+
+	resv_p = &l->efi_parts[l->efi_nparts - 1];
+
+	/*
+	 * The reserved partition should start after the last (highest)
+	 * LBA used by any other partition.
+	 */
+	if (resv_p->p_start <= last_ulba) {
+		if (efi_debug) {
+			(void) fprintf(stderr, "%s: reserved partition not "
+			    "after other partitions\n", __func__);
+		}
+		return (-1);
+	}
+
+	*lastp_p = last_p;
+	*last_lbap = last_ulba;
+	return (0);
+}
+
+/*
  * add all the unallocated space to the current label
  */
 int
 efi_use_whole_disk(int fd)
 {
 	struct dk_gpt		*efi_label;
+	struct dk_part		*resv_p = NULL;
+	struct dk_part		*last_p = NULL;
+	diskaddr_t		last_lba = 0;
 	int			rval;
-	int			i;
-	uint_t			phy_last_slice = 0;
-	diskaddr_t		pl_start = 0;
-	diskaddr_t		pl_size;
+	uint_t			nblocks;
+	boolean_t		save = B_FALSE;
 
 	rval = efi_alloc_and_read(fd, &efi_label);
 	if (rval < 0) {
 		return (rval);
 	}
 
-	/* find the last physically non-zero partition */
-	for (i = 0; i < efi_label->efi_nparts - 2; i ++) {
-		if (pl_start < efi_label->efi_parts[i].p_start) {
-			pl_start = efi_label->efi_parts[i].p_start;
-			phy_last_slice = i;
-		}
-	}
-	pl_size = efi_label->efi_parts[phy_last_slice].p_size;
-
-	/*
-	 * If alter_lba is 1, we are using the backup label.
-	 * Since we can locate the backup label by disk capacity,
-	 * there must be no unallocated space.
-	 */
-	if ((efi_label->efi_altern_lba == 1) || (efi_label->efi_altern_lba
-	    >= efi_label->efi_last_lba)) {
-		if (efi_debug) {
-			(void) fprintf(stderr,
-			    "efi_use_whole_disk: requested space not found\n");
-		}
+	rval = efi_use_whole_disk_get_last(efi_label, &last_p, &last_lba);
+	if (rval < 0) {
 		efi_free(efi_label);
-		return (VT_ENOSPC);
+		return (VT_EINVAL);
+	}
+	resv_p = &efi_label->efi_parts[efi_label->efi_nparts - 1];
+	ASSERT3U(resv_p->p_tag, ==, V_RESERVED);
+
+	/*
+	 * If we aren't using the backup label (efi_altern_lba == 1)
+	 * and the backup label isn't at the end of the disk, move the backup
+	 * label to the end of the disk. efi_read() sets efi_last_lba based
+	 * on the capacity of the disk, so we don't need to re-read the
+	 * capacity again to get the last LBA.
+	 */
+	if (efi_label->efi_altern_lba != 1 &&
+	    efi_label->efi_altern_lba != efi_label->efi_last_lba) {
+		efi_label->efi_altern_lba = efi_label->efi_last_lba;
+		save = B_TRUE;
 	}
 
 	/*
-	 * If there is space between the last physically non-zero partition
-	 * and the reserved partition, just add the unallocated space to this
-	 * area. Otherwise, the unallocated space is added to the last
-	 * physically non-zero partition.
+	 * This is similar to the logic used in efi_alloc_and_init(). Based
+	 * on the number of partitions (and the minimum number of entries
+	 * required for an EFI label), determine the size of the backup label.
 	 */
-	if (pl_start + pl_size - 1 == efi_label->efi_last_u_lba -
-	    efi_reserved_sectors(efi_label)) {
-		efi_label->efi_parts[phy_last_slice].p_size +=
-		    efi_label->efi_last_lba - efi_label->efi_altern_lba;
+	nblocks = NBLOCKS(efi_label->efi_nparts, efi_label->efi_lbasize);
+	if ((nblocks * efi_label->efi_lbasize) < EFI_MIN_ARRAY_SIZE +
+	    efi_label->efi_lbasize) {
+		nblocks = EFI_MIN_ARRAY_SIZE / efi_label->efi_lbasize + 1;
+	}
+
+	/* efi_last_u_lba should be the last LBA before the backup label */
+	if (efi_label->efi_last_u_lba < efi_label->efi_last_lba - nblocks) {
+		efi_label->efi_last_u_lba = efi_label->efi_last_lba - nblocks;
+		save = B_TRUE;
 	}
 
 	/*
-	 * Move the reserved partition. There is currently no data in
-	 * here except fabricated devids (which get generated via
-	 * efi_write()). So there is no need to copy data.
+	 * If there is unused space after the reserved partition, move it to
+	 * the end of the disk. There is currently no data in here except
+	 * fabricated devids (which are generated via efi_write()). Therefore,
+	 * there is no need to copy the contents.
 	 */
-	efi_label->efi_parts[efi_label->efi_nparts - 1].p_start +=
-	    efi_label->efi_last_lba - efi_label->efi_altern_lba;
-	efi_label->efi_last_u_lba += efi_label->efi_last_lba
-	    - efi_label->efi_altern_lba;
+	if (resv_p->p_start + resv_p->p_size - 1 < efi_label->efi_last_u_lba) {
+		diskaddr_t new_start =
+		    efi_label->efi_last_u_lba - resv_p->p_size + 1;
+
+		if (resv_p->p_start > new_start) {
+			if (efi_debug) {
+				(void) fprintf(stderr, "%s: reserved partition "
+				    "size mismatch\n", __func__);
+			}
+			efi_free(efi_label);
+			return (VT_EINVAL);
+		}
+
+		resv_p->p_start = new_start;
+		save = B_TRUE;
+	}
+
+	/*
+	 * If there is space between the last (non-reserved) partition and
+	 * the reserved partition, grow the last partition.
+	 */
+	if (last_lba < resv_p->p_start) {
+		last_p->p_size += resv_p->p_start - last_lba - 1;
+		save = B_TRUE;
+	}
+
+	if (!save) {
+		efi_free(efi_label);
+		return (0);
+	}
 
 	rval = efi_write(fd, efi_label);
 	if (rval < 0) {
