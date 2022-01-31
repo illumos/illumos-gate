@@ -1,94 +1,118 @@
-'\" te
+.\"
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBMD 3LIB "Jun 16, 2008"
-.SH NAME
-libmd \- Message Digest library
-.SH SYNOPSIS
-.LP
-.nf
-cc [ \fIflag\fR... ] \fIfile\fR... \fB-lmd\fR [ \fIlibrary\fR... ]
-#include <\fBmd4.h\fR>
-#include <\fBmd5.h\fR>
-#include <\fBsha1.h\fR>
-#include <\fBsha2.h\fR>
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-Functions in this library provide hashing routines for \fBMD4 (RFC1320)\fR,
-\fBMD5 (RFC1321)\fR, \fBSHA1 (RFC3174)\fR, \fBSHA256 (FIPS 180-2)\fR, \fBSHA384
-(FIPS 180-2)\fR, \fBSHA512 (FIPS 180-2)\fR.
-.SH INTERFACES
-.sp
-.LP
-The shared object \fBlibmd.so.1\fR provides the public interfaces defined
-below. See \fBIntro\fR(3) for additional information on shared object
-interfaces.
-.sp
-
-.sp
-.TS
-l l
-l l .
-\fBMD4Final\fR	\fBMD4Init\fR
-\fBMD4Update\fR	\fBmd5_calc\fR
-\fBMD5Final\fR	\fBMD5Init\fR
-\fBMD5Update\fR	\fBSHA1Final\fR
-\fBSHA1Init\fR	\fBSHA1Update\fR
-\fBSHA2Final\fR	\fBSHA2Init\fR
-\fBSHA2Update\fR	
-.TE
-
-.SH SECURITY
-.sp
-.LP
-The \fBMD4\fR and \fBMD5\fR algorithms are currently considered weak for
-cryptographic use. The algorithms should be used only for compatibility with
-legacy systems or protocols.
-.sp
-.LP
-The \fBSHA1\fR algorithm is also believed to have some weaknesses. Migration to
-one of the \fBSHA2\fR algorithms-including \fBSHA256\fR, \fBSHA386\fR or
-\fBSHA512\fR-is highly recommended when compatibility with data formats and on
-wire protocols is permitted.
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/lib/libmd.so.1\fR\fR
-.ad
-.RS 22n
-shared object
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/lib/64/libmd.so.1\fR\fR
-.ad
-.RS 22n
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd January 16, 2022
+.Dt LIBMD 3LIB
+.Os
+.Sh NAME
+.Nm libmd
+.Nd Message Digest library
+.Sh LIBRARY
+.Lb libmd
+.Sh SYNOPSIS
+.In md4.h
+.In md5.h
+.In sha1.h
+.In sha2.h
+.In sys/edonr.h
+.In sys/skein.h
+.Sh DESCRIPTION
+This library provides hashing routines for the following suites of hash
+functions:
+.Bl -bullet -offset indent -compact
+.It
+MD4
+.Pq RFC1320
+.It
+MD5
+.Pq RFC1321
+.It
+SHA1
+.Pq RFC3174
+.It
+SHA256
+.Pq FIPS 180-2
+.It
+SHA384
+.Pq FIPS 180-2
+.It
+SHA512
+.Pq FIPS 180-2
+.It
+Edon-R
+.Po
+.Rs
+.%T Cryptographic hash function Edon-R
+.Re
+.Pc
+.It
+Skein 256, 512, and 1024
+.Po
+.Rs
+.%T The Skein Hash Function Family
+.Re
+.Pc
+.El
+.Sh INTERFACES
+The shared object
+.Sy libmd.so.1
+provides the public interfaces defined below.
+See
+.Xr Intro 3
+for additional information on shared object interfaces.
+.Bl -column -offset indent ".Sy Skein1024_Final_Pad" ".Sy Skein1024_Final_Pad"
+.It Sy EdonRFinal Ta Sy EdonRHash
+.It Sy EdonRInit Ta Sy EdonRUpdate
+.It Sy MD4Final Ta Sy MD4Init
+.It Sy MD4Update Ta Sy md5_calc
+.It Sy MD5Final Ta Sy MD5Init
+.It Sy MD5Update Ta Sy SHA1Final
+.It Sy SHA1Init Ta Sy SHA1Update
+.It Sy SHA2Final Ta Sy SHA2Init
+.It Sy SHA2Update Ta Sy Skein_256_Final
+.It Sy Skein_256_Final_Pad Ta Sy Skein_256_Init
+.It Sy Skein_256_InitExt Ta Sy Skein_256_Output
+.It Sy Skein_256_Update Ta Sy Skein_512_Final
+.It Sy Skein_512_Final_Pad Ta Sy Skein_512_Init
+.It Sy Skein_512_InitExt Ta Sy Skein_512_Output
+.It Sy Skein_512_Update Ta Sy Skein1024_Final
+.It Sy Skein1024_Final_Pad Ta Sy Skein1024_Init
+.It Sy Skein1024_InitExt Ta Sy Skein1024_Output
+.It Sy Skein1024_Update Ta ""
+.El
+.Sh SECURITY
+The MD4 and MD5 algorithms are currently considered weak for cryptographic use.
+The algorithms should be used only for compatibility with legacy systems or
+protocols.
+.Pp
+The SHA1 algorithm is also believed to have some weaknesses.
+Migration to one of the SHA2 algorithms \(em including SHA256, SHA386 or SHA512
+\(em is highly recommended when data formats and on wire protocols support the
+use of SHA2.
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /lib/libmd.so.1
+32-bit shared object
+.It Pa /lib/64/libmd.so.1
 64-bit shared object
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-_
-MT-Level	MT-Safe
-.TE
-
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe

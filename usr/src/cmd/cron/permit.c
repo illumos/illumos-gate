@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved  */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -46,8 +46,7 @@ static int within(char *, char *);
 
 
 char *
-getuser(uid)
-uid_t uid;
+getuser(uid_t uid)
 {
 	struct passwd *nptr;
 
@@ -69,8 +68,7 @@ uid_t uid;
 }
 
 int
-allowed(user, allow, deny)
-char *user, *allow, *deny;
+allowed(char *user, char *allow, char *deny)
 {
 	if (exists(allow)) {
 		if (within(user, allow)) {
@@ -92,8 +90,7 @@ char *user, *allow, *deny;
 }
 
 static int
-within(username, filename)
-char *username, *filename;
+within(char *username, char *filename)
 {
 	char line[UNAMESIZE];
 	FILE *cap;

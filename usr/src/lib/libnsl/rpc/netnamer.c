@@ -159,7 +159,7 @@ parse_gidlist(char *p, struct netid_userdata *argp)
  * Parse uid and group information from the passed string.
  *
  * The format of the string passed is
- * 	uid:gid,grp,grp, ...
+ *	uid:gid,grp,grp, ...
  *
  */
 static int
@@ -194,10 +194,10 @@ parse_netid_str(char *s, struct netid_userdata *argp)
 static int
 netname2user_files(int *err, char *netname, struct netid_userdata *argp)
 {
-	char 	buf[512];	/* one line from the file */
+	char	buf[512];	/* one line from the file */
 	char	*name;
 	char	*value;
-	char 	*res;
+	char	*res;
 	FILE	*fd;
 
 	fd = fopen(NETIDFILE, "rF");
@@ -372,8 +372,8 @@ netname2user_ldap(int *err, char *netname, struct netid_userdata *argp)
  * Convert network-name into unix credential
  */
 int
-netname2user(const char netname[MAXNETNAMELEN + 1], uid_t *uidp, gid_t *gidp,
-						int *gidlenp, gid_t *gidlist)
+netname2user(const char *netname, uid_t *uidp, gid_t *gidp, int *gidlenp,
+    gid_t *gidlist)
 {
 	struct __nsw_switchconfig *conf;
 	struct __nsw_lookup *look;
@@ -464,8 +464,7 @@ netname2user(const char netname[MAXNETNAMELEN + 1], uid_t *uidp, gid_t *gidp,
  * We just construct the hostname using information from the domainname.
  */
 int
-netname2host(const char netname[MAXNETNAMELEN + 1], char *hostname,
-							const int hostlen)
+netname2host(const char *netname, char *hostname, const int hostlen)
 {
 	char *p, *domainname;
 	int len, dlen;

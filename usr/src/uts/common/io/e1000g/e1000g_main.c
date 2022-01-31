@@ -26,6 +26,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -51,7 +52,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 /* LINTED E_STATIC_UNUSED */
-static char e1000g_version[] = "Driver Ver. 5.3.24";
+static char e1000g_version[] = "Driver Ver. 5.4.00";
 
 /*
  * Proto types for DDI entry points
@@ -713,6 +714,10 @@ e1000g_regs_map(struct e1000g *Adapter)
 	case e1000_pch_spt:
 	case e1000_pch_cnp:
 	case e1000_pch_tgp:
+	case e1000_pch_adp:
+	case e1000_pch_mtp:
+	case e1000_pch_lnp:
+	case e1000_pch_rpl:
 		/*
 		 * On the SPT, the device flash is actually in BAR0, not a
 		 * separate BAR. Therefore we end up setting the
@@ -913,6 +918,10 @@ e1000g_setup_max_mtu(struct e1000g *Adapter)
 	case e1000_pch_spt:
 	case e1000_pch_cnp:
 	case e1000_pch_tgp:
+	case e1000_pch_adp:
+	case e1000_pch_mtp:
+	case e1000_pch_lnp:
+	case e1000_pch_rpl:
 		Adapter->max_mtu = MAXIMUM_MTU_9K;
 		break;
 	/* types with a special limit */
@@ -1493,6 +1502,14 @@ e1000g_init(struct e1000g *Adapter)
 	} else if (hw->mac.type == e1000_pch_cnp) {
 		pba = E1000_PBA_26K;
 	} else if (hw->mac.type == e1000_pch_tgp) {
+		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch_adp) {
+		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch_mtp) {
+		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch_lnp) {
+		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch_rpl) {
 		pba = E1000_PBA_26K;
 	} else {
 		/*

@@ -512,6 +512,9 @@ main(int argc, CHAR16 *argv[])
 	archsw.arch_readin = efi_readin;
 	archsw.arch_loadaddr = efi_loadaddr;
 	archsw.arch_free_loadaddr = efi_free_loadaddr;
+#if defined(__amd64) || defined(__i386)
+	archsw.arch_hypervisor = x86_hypervisor;
+#endif
 	/* Note this needs to be set before ZFS init. */
 	archsw.arch_zfs_probe = efi_zfs_probe;
 

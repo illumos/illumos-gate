@@ -1,215 +1,303 @@
-'\" te
+.\"
+.\"
 .\" Copyright (c) 2009, Sun Microsystems Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
-.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIST_CREATE 9F "May 3, 2018"
-.SH NAME
-list_create, list_destroy, list_insert_after, list_insert_before,
-list_insert_head, list_insert_tail, list_remove, list_remove_head,
-list_remove_tail, list_head, list_tail, list_next, list_prev, list_is_empty,
-list_link_init, list_link_active, list_move_tail, list_link_replace \- list
-functions
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/list.h>
-
-\fBvoid\fR \fBlist_create\fR(\fBlist_t *\fR \fIlist\fR, \fBsize_t\fR \fIsize\fR, \fBsize_t\fR \fIoffset\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBlist_destroy\fR(\fBlist_t *\fR \fIlist\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBlist_insert_after\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fR\fIreference_item\fR,
-     \fBvoid *\fR\fInew_item\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBlist_insert_before\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fR\fIreference_item\fR,
-     \fBvoid *\fR\fInew_item\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBlist_insert_head\fR(\fBlist_t *\fR \fIlist\fR*, \fBvoid *\fR\fInew_item\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBlist_insert_tail\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fR\fInew_item\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBlist_remove\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fRitem);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBlist_remove_head\fR(\fBlist_t *\fR \fIlist\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBlist_remove_tail\fR(\fBlist_t *\fR \fIlist\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBlist_head\fR(\fBlist_t *\fR \fIlist\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBlist_tail\fR(\fBlist_t *\fR \fIlist\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBlist_next\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fR\fIreference_item\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBlist_prev\fR(\fBlist_t *\fR \fIlist\fR, \fBvoid *\fR\fIreference_item\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBlist_is_empty\fR(\fBlist_t *\fR \fIlist\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBlist_link_init\fR(\fBlist_node_t *\fR\fInode\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBlist_link_active\fR(\fBlist_node_t *\fR\fInode\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBlist_move_tail\fR(\fBlist_t *\fR\fIdst\fR, \fBlist_t *\fR\fIsrc\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBlist_link_replace\fR(\fBlist_node_t *\fR\fIlold\fR, \fBlist_node_t *\fR\fIlnew\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
-These functions provide a generic doubly-linked list implementation. To
-utilize it, simply embed a \fBlist_node_t\fR field in the structures
-that will constitute the linked list elements and pass the
-\fBlist_node_t\fR field offset to \fBlist_create()\fR in the appropriate
-parameter (see below). A single \fBlist_node_t\fR field can only be used
-in a single list simultaneously, so to add a structure to multiple
-lists, embed multiple \fBlist_node_t\fR fields in your user structure.
-.sp
-.LP
-Please note that a \fBlist_node_t\fR contains pointers back to its
-parent \fBlist_t\fR so you cannot copy the \fBlist_t\fR around once it
-has been initialized. In particular, this kind of construct won't work:
-.sp
-.in +2
-.nf
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd January 16, 2022
+.Dt LIST_CREATE 9F
+.Os
+.Sh NAME
+.Nm list_create ,
+.Nm list_destroy ,
+.Nm list_insert_after ,
+.Nm list_insert_before ,
+.Nm list_insert_head ,
+.Nm list_insert_tail ,
+.Nm list_remove ,
+.Nm list_remove_head ,
+.Nm list_remove_tail ,
+.Nm list_head ,
+.Nm list_tail ,
+.Nm list_next ,
+.Nm list_prev ,
+.Nm list_is_empty, ,
+.Nm list_link_init ,
+.Nm list_link_active ,
+.Nm list_move_tail ,
+.Nm list_link_replace
+.Nd list functions
+.Sh SYNOPSIS
+.In sys/list.h
+.Ft void
+.Fo list_create
+.Fa "list_t *list"
+.Fa "size_t size"
+.Fa "size_t offset"
+.Fc
+.Ft void
+.Fo list_destroy
+.Fa "list_t *list"
+.Fc
+.Ft void
+.Fo list_insert_after
+.Fa "list_t *list"
+.Fa "void *reference_item"
+.Fa "void *new_item"
+.Fc
+.Ft void
+.Fo list_insert_before
+.Fa "list_t *list"
+.Fa "void *reference_item"
+.Fa "void *new_item"
+.Fc
+.Ft void
+.Fo list_insert_head
+.Fa "list_t *list*"
+.Fa "void *new_item"
+.Fc
+.Ft void
+.Fo list_insert_tail
+.Fa "list_t *list"
+.Fa "void *new_item"
+.Fc
+.Ft void
+.Fo list_remove
+.Fa "list_t *list"
+.Fa "void *item"
+.Fc
+.Ft "void *"
+.Fo list_remove_head
+.Fa "list_t *list"
+.Fc
+.Ft "void *"
+.Fo list_remove_tail
+.Fa "list_t *list"
+.Fc
+.Ft "void *"
+.Fo list_head
+.Fa "list_t *list"
+.Fc
+.Ft "void *"
+.Fo list_tail
+.Fa "list_t *list"
+.Fc
+.Ft "void *"
+.Fo list_next
+.Fa "list_t *list"
+.Fa "void *reference_item"
+.Fc
+.Ft "void *"
+.Fo list_prev
+.Fa "list_t *list"
+.Fa "void *reference_item"
+.Fc
+.Ft int
+.Fo list_is_empty
+.Fa "list_t *list"
+.Fc
+.Ft void
+.Fo list_link_init
+.Fa "list_node_t *node"
+.Fc
+.Ft int
+.Fo list_link_active
+.Fa "list_node_t *node"
+.Fc
+.Ft void
+.Fo list_move_tail
+.Fa "list_t *dst"
+.Fa "list_t *src"
+.Fc
+.Ft void
+.Fo list_link_replace
+.Fa "list_node_t *lold"
+.Fa "list_node_t *lnew"
+.Fc
+.Sh DESCRIPTION
+These functions provide a generic doubly-linked list implementation.
+To utilize it, simply embed a
+.Vt list_node_t
+field in the structures that will constitute the linked list elements and pass
+the
+.Vt list_node_t
+field offset to
+.Fn list_create
+in the appropriate
+parameter
+.Pq see below .
+A single
+.Vt list_node_t
+field can only be used in a single list simultaneously, so to add a structure to
+multiple lists, embed multiple
+.Vt list_node_t
+fields in your user structure.
+.Pp
+Please note that a
+.Vt list_node_t
+contains pointers back to its parent
+.Vt list_t
+so you cannot copy the
+.Vt list_t
+around once it has been initialized.
+In particular, this kind of construct will not work:
+.Bd -literal -offset indent
 struct { list_t l; } a, b;
 list_create(&a.l, ...);
 b = a;    <= This will break the list in `b', as the `l' element
              in `a' got copied to a different memory address.
-.fi
-.in -2
-.sp
+.Ed
+.Pp
 To do this you must move the list items to the new list using functions
-such as \fBlist_move_tail()\fR.
-.sp
-.LP
-The \fBlist_create()\fR function initializes a new list. The driver supplies
-the storage for the list handle, the size of an individual element, and the
-offset of a \fBlist_node_t\fR within the element to use for the links of the
+such as
+.Fn list_move_tail .
+.Pp
+The
+.Fn list_create
+function initializes a new list.
+The driver supplies the storage for the list handle, the size of an individual
+element, and the offset of a
+.Vt list_node_t
+within the element to use for the links of the list.
+.Pp
+The
+.Fn list_destroy
+function destroys the list handle, including freeing any resources that may have
+been internally allocated for the list.
+The list must be empty when this function is called.
+.Pp
+The
+.Fn list_insert_after
+and
+.Fn list_insert_before
+functions insert
+.Fa new_item
+into the linked list at a location after or before the reference item, which
+must already be on the list.
+.Pp
+The
+.Fn list_insert_head
+and
+.Fn list_insert_tail
+functions insert the
+.Fa new_item
+on the list at either the head or tail of the list.
+The head is the first item, the tail is the last item.
+.Pp
+The
+.Fn list_remove
+function removes the item from the list.
+.Pp
+The
+.Fn list_remove_head
+and
+.Fn list_remove_tail
+functions remove the head
+.Pq first
+or tail
+.Pq last
+item from the list.
+The item removed is returned to the caller.
+If the list is empty when these functions are called, then no change is made and
+.Dv NULL
+is returned to the caller.
+.Pp
+The
+.Fn list_head
+and
+.Fn list_tail
+functions simply return the head
+.Pq first
+or tail
+.Pq last
+item on the list.
+.Dv NULL
+is returned if the list is empty.
+.Pp
+The
+.Fn list_next
+and
+.Fn list_prev
+functions return the next or previous item in the list, relative to the named
+reference item which must be linked on the list.
+If the referenced item is either the last entry in the list for
+.Fn list_next
+or the first entry in the list for
+.Fn list_prev ,
+then the functions will return
+.Dv NULL .
+This is useful for iterating over a list with the following pattern:
+.Bd -literal -offset indent
+list_t list_t;
+\&...
+for (foo_t *foo = list_head(&list_t); foo != NULL;
+    foo = list_next(&list_t, foo)) {
+	/* Process each entry of the list */
+}
+
+for (foo_t *foo = list_tail(&list_t); foo != NULL;
+    foo = list_prev(&list_t, foo)) {
+	/* Same thing, but in reverse */
+}
+.Ed
+.Pp
+The
+.Fn list_is_empty
+function returns 0 if the list has items in it, or non-zero otherwise.
+.Pp
+The
+.Fn list_link_init
+function initializes the
+.Vt list_node_t .
+It is functionally equivalent to
+.Fo bzero
+.Fa "node"
+.Fa "sizeof (*node)"
+.Fc ; .
+.Pp
+The
+.Fn list_link_active
+function returns non-zero if the node is on an active list.
+.Pp
+The
+.Fn list_move_tail
+function is used to append the items on the
+.Fa src
+list to the end of the
+.Fa dst
 list.
-.sp
-.LP
-The \fBlist_destroy()\fR function destroys the list handle, including freeing
-any resources that may have been internally allocated for the list. The list
-must be empty when this function is called.
-.sp
-.LP
-The \fBlist_insert_after()\fR and \fBlist_insert_before()\fR functions insert
-\fInew_item\fR into the linked list at a location after or before the reference
-item, which must already be on the list.
-.sp
-.LP
-The \fBlist_insert_head()\fR and \fBlist_insert_tail()\fR functions insert the
-\fInew_item\fR on the list at either the head or tail of the list.  (The head
-is the first item, the tail is the last item).
-.sp
-.LP
-The \fBlist_remove()\fR function removes the item from the list.
-.sp
-.LP
-The \fBlist_remove_head()\fR and \fBlist_remove_tail()\fR functions remove the
-head (first) or tail (last) item from the list. The item removed is returned to
-the caller. If the list is empty when these functions are called, then no
-change is made and \fINULL\fR is returned to the caller.
-.sp
-.LP
-The \fBlist_head()\fR and \fBlist_tail()\fR functions simply return the head
-(first) or tail (last) item on the list.  \fINULL\fR is returned if the list is
-empty.
-.sp
-.LP
-The \fBlist_next()\fR and \fBlist_prev()\fR functions return the next or
-previous item in the list, relative to the named reference item which must be
-linked on the list.
-.sp
-.LP
-The \fBlist_is_empty()\fR function returns 0 if the list has items in it, or
-non-zero otherwise.
-.sp
-.LP
-The \fBlist_link_init()\fR function initializes the \fBlist_node_t\fR. It is
-functionally equivalent to \fBbzero\fR(\fInode\fR, \fBsizeof\fR(*\fInode\fR));
-.sp
-.LP
-The \fBlist_link_active()\fR function returns non-zero if the node is on an
-active list.
-.sp
-.LP
-The \fBlist_move_tail()\fR function is used to append the items on the
-\fIsrc\fR list to the end of the \fIdst\fR list. It is mandatory that the two
-lists were initialized using identical size and offset parameters. Upon
-completion, the \fIsrc\fR list will be empty.
-.sp
-.LP
-The \fBlist_link_replace()\fR function replaces \fIlold\fR node on an active
-list with the \fIlnew\fR node.  When the function is called the \fIlnew\fR node
-must not be linked on any list.  Upon completion the \fIlold\fR node will be
-left unlinked from any list.
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-.TE
-
-.SH SEE ALSO
-.LP
-\fBattributes\fR(5)
+It is mandatory that the two lists were initialized using identical size and
+offset parameters.
+Upon completion, the
+.Fa src
+list will be empty.
+.Pp
+The
+.Fn list_link_replace
+function replaces
+.Fa lold
+node on an active list with the
+.Fa lnew
+node.
+When the function is called the
+.Fa lnew
+node must not be linked on any list.
+Upon completion the
+.Fa lold
+node will be left unlinked from any list.
+.Sh INTERFACE STABILITY
+.Sy Committed

@@ -139,7 +139,7 @@ user2netname_nis(int *err, char netname[MAXNETNAMELEN + 1], uid_t uid,
  * Figure out my fully qualified network name
  */
 int
-getnetname(char name[MAXNETNAMELEN + 1])
+getnetname(char *name)
 {
 	uid_t uid;
 
@@ -174,8 +174,7 @@ __getnetnamebyuid(char name[MAXNETNAMELEN + 1], uid_t uid)
  * so only the first entry would be relevant for those cases.
  */
 int
-user2netname(char netname[MAXNETNAMELEN + 1], const uid_t uid,
-    const char *domain)
+user2netname(char *netname, const uid_t uid, const char *domain)
 {
 	struct __nsw_switchconfig *conf;
 	struct __nsw_lookup *look;
@@ -265,8 +264,7 @@ user2netname(char netname[MAXNETNAMELEN + 1], const uid_t uid,
  *	h.w.x	a.b		unix.h@a.b
  */
 int
-host2netname(char netname[MAXNETNAMELEN + 1], const char *host,
-    const char *domain)
+host2netname(char *netname, const char *host, const char *domain)
 {
 	char *p;
 	char hostname[MAXHOSTNAMELEN + 1];

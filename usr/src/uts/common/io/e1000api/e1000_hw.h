@@ -165,6 +165,23 @@ struct e1000_hw;
 #define E1000_DEV_ID_PCH_TGP_I219_LM14		0x15F9
 #define E1000_DEV_ID_PCH_TGP_I219_V14		0x15FA
 #define E1000_DEV_ID_PCH_TGP_I219_LM15		0x15F4
+#define E1000_DEV_ID_PCH_TGP_I219_V15		0x15F5
+#define E1000_DEV_ID_PCH_ADP_I219_LM16		0x1A1E
+#define E1000_DEV_ID_PCH_ADP_I219_V16		0x1A1F
+#define E1000_DEV_ID_PCH_ADP_I219_LM17		0x1A1C
+#define E1000_DEV_ID_PCH_ADP_I219_V17		0x1A1D
+#define E1000_DEV_ID_PCH_MTP_I219_LM18		0x550A
+#define E1000_DEV_ID_PCH_MTP_I219_V18		0x550B
+#define E1000_DEV_ID_PCH_MTP_I219_LM19		0x550C
+#define E1000_DEV_ID_PCH_MTP_I219_V19		0x550D
+#define E1000_DEV_ID_PCH_LNP_I219_LM20		0x550E
+#define E1000_DEV_ID_PCH_LNP_I219_V20		0x550F
+#define E1000_DEV_ID_PCH_LNP_I219_LM21		0x5510
+#define E1000_DEV_ID_PCH_LNP_I219_V21		0x5511
+#define E1000_DEV_ID_PCH_RPL_I219_LM22		0x0DC7
+#define E1000_DEV_ID_PCH_RPL_I219_V22		0x0DC8
+#define E1000_DEV_ID_PCH_RPL_I219_LM23		0x0DC5
+#define E1000_DEV_ID_PCH_RPL_I219_V23		0x0DC6
 #define E1000_DEV_ID_82576			0x10C9
 #define E1000_DEV_ID_82576_FIBER		0x10E6
 #define E1000_DEV_ID_82576_SERDES		0x10E7
@@ -254,9 +271,10 @@ enum e1000_mac_type {
 	/*
 	 * The following MACs all share the ich8 style of hardware and are
 	 * implemented in ich8, though some are a little more different than
-	 * others. The pch_lpt, pch_spt, pch_cnp, and pch_tgp families are a bit
-	 * more different than the others and just have slight variants in
-	 * behavior between them. They are ordered based on release.
+	 * others. The pch_lpt, pch_spt, pch_cnp, pch_tgp, pch_adp, pch_mtp,
+	 * pch_lnp, and pch_rpl families are a bit more different than the
+	 * others and just have slight variants in behavior between them. They
+	 * are ordered based on release.
 	 */
 	e1000_ich8lan,
 	e1000_ich9lan,
@@ -267,6 +285,10 @@ enum e1000_mac_type {
 	e1000_pch_spt,
 	e1000_pch_cnp,
 	e1000_pch_tgp,
+	e1000_pch_adp,
+	e1000_pch_mtp,
+	e1000_pch_lnp,
+	e1000_pch_rpl,
 	/*
 	 * After this point all MACs are used by the igb(7D) driver as opposed
 	 * to e1000g(7D). If a new MAC is specific to e1000g series of devices,

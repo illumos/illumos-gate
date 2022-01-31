@@ -31,8 +31,14 @@ CCASFLAGS +=	-m32
 SRCS += $(SASRC)/i386/_setjmp.S
 OBJECTS += _setjmp.o
 
+SRCS += $(SASRC)/x86/hypervisor.c
+OBJECTS += hypervisor.o
+
 pics/%.o objs/%.o: $(SASRC)/i386/%.S
 	$(COMPILE.S) -o $@ $<
+
+pics/%.o objs/%.o: $(SASRC)/x86/%.c
+	$(COMPILE.c) -o $@ $<
 
 include $(SRC)/boot/sys/boot/Makefile.lib
 

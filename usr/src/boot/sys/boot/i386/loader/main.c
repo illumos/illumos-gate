@@ -159,6 +159,7 @@ main(void)
 	archsw.arch_isainb = isa_inb;
 	archsw.arch_isaoutb = isa_outb;
 	archsw.arch_loadaddr = i386_loadaddr;
+	archsw.arch_hypervisor = x86_hypervisor;
 	archsw.arch_zfs_probe = i386_zfs_probe;
 
 	/*

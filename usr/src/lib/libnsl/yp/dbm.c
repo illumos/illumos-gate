@@ -34,8 +34,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include <rpcsvc/dbm.h>
 #include <sys/types.h>
@@ -391,7 +389,7 @@ setbit(void)
 }
 
 datum
-makdatum(char buf[PBLKSIZ], int n)
+makdatum(char *buf, int n)
 {
 	short *sp;
 	int t;
@@ -427,10 +425,10 @@ cmpdatum(datum d1, datum d2)
 		return (0);
 	p1 = d1.dptr;
 	p2 = d2.dptr;
-	do
+	do {
 		if (*p1++ != *p2++)
 			return (*--p1 - *--p2);
-	while (--n);
+	} while (--n);
 	return (0);
 }
 
@@ -503,7 +501,7 @@ calchash(datum item)
 }
 
 void
-delitem(char buf[PBLKSIZ], int n)
+delitem(char *buf, int n)
 {
 	short *sp;
 	int i1, i2, i3;
@@ -537,12 +535,11 @@ bad:
 }
 
 int
-additem(char buf[PBLKSIZ], datum item)
+additem(char *buf, datum item)
 {
 	short *sp;
 	int i1, i2;
 
-	/* LINTED pointer cast */
 	sp = (short *)buf;
 	i1 = PBLKSIZ;
 	if (sp[0] > 0)
@@ -561,7 +558,7 @@ additem(char buf[PBLKSIZ], datum item)
 }
 
 void
-chkblk(char buf[PBLKSIZ])
+chkblk(char *buf)
 {
 	short *sp;
 	int t, i;

@@ -6,7 +6,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved  */
 
 
 /*
@@ -93,13 +93,13 @@ main(int argc, char **argv)
 
 	(void) setlocale(LC_ALL, "");
 	pp = getpwuid(getuid());
-	pr.pw_uid = pp->pw_uid;
-	pr.pw_name = pp->pw_name;
-
 	if (pp == NULL)
 		atabort(INVALIDUSER);
 	if (!allowed(pp->pw_name, ATALLOW, ATDENY))
 		atabort(NOTALLOWED);
+
+	pr.pw_uid = pp->pw_uid;
+	pr.pw_name = pp->pw_name;
 
 	/*
 	 * Interpret command line flags if they exist.
