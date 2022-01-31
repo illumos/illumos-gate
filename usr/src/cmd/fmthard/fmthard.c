@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -121,7 +121,7 @@ static diskaddr_t	lastlba = 0;	/* last LBA on 64-bit VTOC */
 static char	*uboot = "boot";
 
 #elif defined(i386)
-/* use installgrub(1M) to install boot blocks */
+/* use installboot(1M) to install boot blocks */
 static char *uboot = "";
 #else
 #error No platform defined.
@@ -168,7 +168,7 @@ main(int argc, char **argv)
 		case 'b':
 			(void) fprintf(stderr,
 			    "fmthard: -p and -b no longer supported."
-			    " Use installgrub(1M) to install boot blocks\n");
+			    " Use installboot(1M) to install boot blocks\n");
 			break;
 #endif	/* defined(i386) */
 
