@@ -58,7 +58,9 @@ static void pmcs_flush_observations(pmcs_hw_t *);
 static boolean_t pmcs_report_observations(pmcs_hw_t *);
 static boolean_t pmcs_report_iport_observations(pmcs_hw_t *, pmcs_iport_t *,
     pmcs_phy_t *);
+#ifdef DEBUG
 static pmcs_phy_t *pmcs_find_phy_needing_work(pmcs_hw_t *, pmcs_phy_t *);
+#endif
 static int pmcs_kill_devices(pmcs_hw_t *, pmcs_phy_t *);
 static void pmcs_lock_phy_impl(pmcs_phy_t *, int);
 static void pmcs_unlock_phy_impl(pmcs_phy_t *, int);
@@ -958,7 +960,7 @@ pmcs_stop_phys(pmcs_hw_t *pwp)
 
 /*
  * Run SAS_DIAG_EXECUTE with cmd and cmd_desc passed.
- * 	ERR_CNT_RESET: return status of cmd
+ *	ERR_CNT_RESET: return status of cmd
  *	DIAG_REPORT_GET: return value of the counter
  */
 int
@@ -2631,6 +2633,7 @@ restart:
 	mutex_exit(&pwp->config_lock);
 }
 
+#ifdef DEBUG
 /*
  * Return any PHY that needs to have scheduled work done.  The PHY is returned
  * locked.
@@ -2665,6 +2668,7 @@ pmcs_find_phy_needing_work(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 
 	return (NULL);
 }
+#endif
 
 /*
  * We may (or may not) report observations to SCSA.  This is prefaced by
@@ -6726,7 +6730,7 @@ pmcs_wr_oqpi(pmcs_hw_t *pwp, uint32_t qnum, uint32_t val)
 void
 pmcs_check_iomb_status(pmcs_hw_t *pwp, uint32_t *iomb)
 {
-	uint16_t 	opcode;
+	uint16_t	opcode;
 	int		offset;
 
 	if (iomb == NULL) {

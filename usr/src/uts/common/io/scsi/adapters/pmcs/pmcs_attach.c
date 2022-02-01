@@ -3100,12 +3100,10 @@ pmcs_create_one_phy_stats(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 static void
 pmcs_create_all_phy_stats(pmcs_iport_t *iport)
 {
-	pmcs_hw_t		*pwp;
 	pmcs_phy_t		*phyp;
 
 	ASSERT(iport != NULL);
-	pwp = iport->pwp;
-	ASSERT(pwp != NULL);
+	ASSERT(iport->pwp != NULL);
 
 	mutex_enter(&iport->lock);
 

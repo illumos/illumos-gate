@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -1187,7 +1188,8 @@ writefile(Cmd_info *cmd_info)
 	ar_outfile.fd = open(ar_outfile.path, O_RDWR|O_CREAT|O_LARGEFILE, 0666);
 	if (ar_outfile.fd == -1) {
 		int err = errno;
-		(void) fprintf(stderr, MSG_INTL(MSG_SYS_OPEN),
+		(void) fprintf(stderr, new_archive ?
+		    MSG_INTL(MSG_BAD_CREATE) : MSG_INTL(MSG_SYS_OPEN),
 		    ar_outfile.path, strerror(err));
 		exit(1);
 	}

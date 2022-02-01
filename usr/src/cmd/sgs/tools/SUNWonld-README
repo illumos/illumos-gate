@@ -1625,7 +1625,7 @@ Bugid   Risk Synopsis
 --------------------------------------------------------------------------------
 
 --------------
-Illumos
+illumos
 --------------
 Bugid   Risk Synopsis
 ================================================================================
@@ -1686,3 +1686,4 @@ Bugid   Risk Synopsis
 14308	discard SHF_EXCLUDE sections when linking kernel modules
 14319	ld shouldn't warn about SHF_EXCLUDE unknown sections
 14401	elfdump should understand LLVM section types
+4795	/usr/bin/ld manpage and help should indicate '-soname' not '--soname'

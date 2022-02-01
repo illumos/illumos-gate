@@ -88,7 +88,7 @@
 			 \t\t\tspecify library for which this file is a filter\n"
 @ MSG_ARG_DETAIL_CG	"\t[-G], [-shared]\n\
 			 \t\t\tcreate a shared object\n"
-@ MSG_ARG_DETAIL_H	"\t[-h name], [--soname name]\n\
+@ MSG_ARG_DETAIL_H	"\t[-h name], [-soname name]\n\
 			 \t\t\tuse 'name' as internal shared object identifier\n"
 @ MSG_ARG_DETAIL_I	"\t[-i]\t\tignore LD_LIBRARY_PATH setting\n"
 @ MSG_ARG_DETAIL_CI	"\t[-I name]\tuse 'name' as path of interpreter\n"
@@ -976,7 +976,7 @@
 			-z type=reloc)"
 @ MSG_MARG_RPATH	"runpath option (-R, -rpath)"
 @ MSG_MARG_SO		"shared object option (-G, -shared, -z type=shared)"
-@ MSG_MARG_SONAME	"soname option (-h, --soname)"
+@ MSG_MARG_SONAME	"soname option (-h, -soname)"
 @ MSG_MARG_STRIP	"strip option (-s, --strip-all)"
 @ MSG_MARG_TYPE_KMOD	"-z type=kmod"
 

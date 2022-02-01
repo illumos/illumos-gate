@@ -631,7 +631,8 @@ opt_pcbe_init(void)
 		amd_events = opteron_pcbe_f17h_zen2_events;
 		amd_generic_events = family_17h_zen2_papi_events;
 	} else if (amd_family == 0x19 && (amd_model <= 0xf ||
-	    (amd_model >= 0x20 && amd_model <= 0x2f))) {
+	    (amd_model >= 0x20 && amd_model <= 0x2f) ||
+	    (amd_model >= 0x50 && amd_model <= 0x5f))) {
 		amd_pcbe_cpuref = amd_fam_19h_zen3_reg;
 		amd_events = opteron_pcbe_f19h_zen3_events;
 		amd_generic_events = family_19h_zen3_papi_events;
