@@ -2389,7 +2389,7 @@ sbd_write_same_data(struct scsi_task *task, sbd_cmd_t *scmd)
 	 * Don't sleep for the allocation, and don't make the system
 	 * reclaim memory.  Trade higher I/Os if in a low-memory situation.
 	 */
-	big_buf = kmem_alloc(big_buf_size, KM_NOSLEEP | KM_NORMALPRI);
+	big_buf = kmem_alloc(big_buf_size, KM_NOSLEEP_LAZY);
 
 	if (big_buf == NULL) {
 		/*

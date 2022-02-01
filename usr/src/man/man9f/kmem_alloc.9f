@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2022 Joyent, Inc.
 .\"  Copyright 1989 AT&T
 .\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
@@ -46,8 +47,14 @@ Number of bytes to allocate.
 .ad
 .RS 8n
 Determines whether caller can sleep for memory. Possible flags are
-\fBKM_SLEEP\fR to allow sleeping until memory is available, or \fBKM_NOSLEEP\fR
-to return \fINULL\fR immediately if memory is not available.
+\fBKM_SLEEP\fR to allow sleeping until memory is available, \fBKM_NOSLEEP\fR
+to return \fINULL\fR if memory is not available even after some reclamation
+attempts, and \fBKM_NOSLEEP_LAZY\fR to return \fINULL\fR without reclamation
+attempts.  \fBKM_NOSLEEP_LAZY\fR is actually two flags combined:
+(\fBKM_NOSLEEP\fR | \fBKM_NORMALPRI\fR), the latter flag indicating not to
+attempt reclamation before giving up and returning NULL.  If any mention of
+\fBKM_NOSLEEP\fR appears in this man page by itself, it applies equally to
+\fBKM_NOSLEEP_LAZY\fR as well.
 .RE
 
 .sp
@@ -65,9 +72,12 @@ returns a pointer to the allocated memory. The allocated memory is at least
 double-word aligned, so it can hold any C data structure. No greater alignment
 can be assumed. \fIflag\fR determines whether the caller can sleep for memory.
 \fBKM_SLEEP\fR allocations may sleep but are guaranteed to succeed.
-\fBKM_NOSLEEP\fR allocations are guaranteed not to sleep but may fail (return
-\fINULL\fR) if no memory is currently available. The initial contents of memory
-allocated using \fBkmem_alloc()\fR are random garbage.
+\fBKM_NOSLEEP\fR and \fBKM_NOSLEEP_LAZY\fR allocations are guaranteed not to
+sleep but may fail (return \fINULL\fR) if no memory is currently
+available. \fBKM_NOSLEEP\fR will first attempt to aggressively reclaim memory
+from otherwise unused blocks, while \fBKM_NOSLEEP_LAZY\fR will not attempt any
+reclamation. The initial contents of memory allocated using
+\fBkmem_alloc()\fR are random garbage.
 .sp
 .LP
 The \fBkmem_zalloc()\fR function is like \fBkmem_alloc()\fR but returns
@@ -79,13 +89,14 @@ buffer address and size must exactly match the original allocation. Memory
 cannot be returned piecemeal.
 .SH RETURN VALUES
 If successful, \fBkmem_alloc()\fR and \fBkmem_zalloc()\fR return a pointer to
-the allocated memory. If \fBKM_NOSLEEP\fR is set and memory cannot be allocated
-without sleeping, \fBkmem_alloc()\fR and \fBkmem_zalloc()\fR return \fINULL\fR.
+the allocated memory. If \fBKM_NOSLEEP\fR is set and memory cannot be
+allocated without sleeping, \fBkmem_alloc()\fR and \fBkmem_zalloc()\fR return
+\fINULL\fR.
 .SH CONTEXT
 The \fBkmem_alloc()\fR and \fBkmem_zalloc()\fR functions can be called from
-interrupt context only if the \fBKM_NOSLEEP\fR flag is set. They can be called
-from user context with any valid \fIflag\fR. The \fBkmem_free()\fR function can
-be called from from user, interrupt, or kernel context.
+interrupt context only if the \fBKM_NOSLEEP\fR flag is set. They can be
+called from user context with any valid \fIflag\fR. The \fBkmem_free()\fR
+function can be called from from user, interrupt, or kernel context.
 .SH SEE ALSO
 \fBcopyout\fR(9F), \fBfreerbuf\fR(9F), \fBgetrbuf\fR(9F)
 .sp

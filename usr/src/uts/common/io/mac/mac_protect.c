@@ -1469,8 +1469,8 @@ insert_slaac_prefix(mac_client_impl_t *mcip, nd_opt_prefix_info_t *po)
 		return;
 	}
 
-	if ((addr = kmem_zalloc(sizeof (slaac_addr_t),
-	    KM_NOSLEEP | KM_NORMALPRI)) == NULL)
+	if ((addr = kmem_zalloc(sizeof (slaac_addr_t), KM_NOSLEEP_LAZY)) ==
+	    NULL)
 		return;
 
 	bcopy(&po->nd_opt_pi_prefix, &addr->sla_prefix,

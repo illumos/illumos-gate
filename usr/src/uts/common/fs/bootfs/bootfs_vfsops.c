@@ -93,7 +93,7 @@ bootfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 * there's nothing to be done about that.
 	 */
 	vfs_setresource(vfsp, bootfs_name, 0);
-	bfs = kmem_zalloc(sizeof (bootfs_t), KM_NOSLEEP | KM_NORMALPRI);
+	bfs = kmem_zalloc(sizeof (bootfs_t), KM_NOSLEEP_LAZY);
 	if (bfs == NULL)
 		return (ENOMEM);
 

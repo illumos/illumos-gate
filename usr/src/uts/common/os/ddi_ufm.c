@@ -181,7 +181,7 @@ ufm_cache_fill(ddi_ufm_handle_t *ufmh)
 	 */
 	ufmh->ufmh_images =
 	    kmem_zalloc((sizeof (ddi_ufm_image_t) * ufmh->ufmh_nimages),
-	    KM_NOSLEEP | KM_NORMALPRI);
+	    KM_NOSLEEP_LAZY);
 	if (ufmh->ufmh_images == NULL)
 		return (ENOMEM);
 
@@ -201,7 +201,7 @@ ufm_cache_fill(ddi_ufm_handle_t *ufmh)
 
 		img->ufmi_slots =
 		    kmem_zalloc((sizeof (ddi_ufm_slot_t) * img->ufmi_nslots),
-		    KM_NOSLEEP | KM_NORMALPRI);
+		    KM_NOSLEEP_LAZY);
 		if (img->ufmi_slots == NULL) {
 			ret = ENOMEM;
 			goto cache_fail;

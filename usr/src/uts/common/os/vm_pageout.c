@@ -133,7 +133,7 @@
  *   v allocations (e.g., KM_SLEEP) are held here while we wait for
  *   | more memory.  Non-sleeping allocations are generally allowed to
  *   | proceed, unless their priority is explicitly lowered with
- *   | KM_NORMALPRI.
+ *   | KM_NORMALPRI (Note: KM_NOSLEEP_LAZY == (KM_NOSLEEP | KM_NORMALPRI).).
  *   |
  *   +------- pageout_reserve (3/4 of throttlefree, 0.44% of physmem, min. 4MB)
  *   |

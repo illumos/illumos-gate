@@ -354,8 +354,7 @@ overlay_target_lookup(overlay_dev_t *odd, mblk_t *mp, struct sockaddr *sock,
 	entry = refhash_lookup(ott->ott_u.ott_dyn.ott_dhash,
 	    mhi.mhi_daddr);
 	if (entry == NULL) {
-		entry = kmem_cache_alloc(overlay_entry_cache,
-		    KM_NOSLEEP | KM_NORMALPRI);
+		entry = kmem_cache_alloc(overlay_entry_cache, KM_NOSLEEP_LAZY);
 		if (entry == NULL) {
 			mutex_exit(&ott->ott_lock);
 			return (OVERLAY_TARGET_DROP);

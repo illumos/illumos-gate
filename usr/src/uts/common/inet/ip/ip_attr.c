@@ -862,7 +862,7 @@ conn_get_ixa_exclusive(conn_t *connp)
 	ip_xmit_attr_t *oldixa;
 	ip_xmit_attr_t *ixa;
 
-	ixa = kmem_alloc(sizeof (*ixa), KM_NOSLEEP | KM_NORMALPRI);
+	ixa = kmem_alloc(sizeof (*ixa), KM_NOSLEEP_LAZY);
 	if (ixa == NULL)
 		return (NULL);
 
