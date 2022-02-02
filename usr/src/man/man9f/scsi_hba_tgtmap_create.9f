@@ -10,8 +10,9 @@
 .\"
 .\"
 .\" Copyright 2019, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
 .\"
-.Dd June 03, 2019
+.Dd January 29, 2022
 .Dt SCSI_HBA_TGTMAP_CREATE 9F
 .Os
 .Sh NAME
@@ -173,8 +174,9 @@ argument.
 .Pp
 The
 .Fa dip
-argument should correspond to the HBA driver's device node or one of its
-iports.
+argument should correspond to one of the HBA driver's iports.
+The overall driver instance cannot be used here.
+Target maps are only supported on iports.
 .Pp
 The
 .Fa mode
@@ -198,7 +200,7 @@ argument to
 and use the
 .Fn scsi_hba_tgtmap_tgt_add
 and
-.Fn scsi_hba_tgtmap_tgt_destroy
+.Fn scsi_hba_tgtmap_tgt_remove
 functions.
 See the section
 .Sx Per-Address Reporting

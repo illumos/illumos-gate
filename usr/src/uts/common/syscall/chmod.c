@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/param.h>
 #include <sys/isa_defs.h>
@@ -54,9 +54,6 @@ fchmodat(int fd, char *path, int mode, int flag)
 
 	if (flag & ~AT_SYMLINK_NOFOLLOW)
 		return (set_errno(EINVAL));
-
-	if (flag & AT_SYMLINK_NOFOLLOW)
-		return (set_errno(EOPNOTSUPP));
 
 	vattr.va_mode = mode & MODEMASK;
 	vattr.va_mask = AT_MODE;
