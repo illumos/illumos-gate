@@ -445,6 +445,8 @@ static int nvme_open(dev_t *, int, int, cred_t *);
 static int nvme_close(dev_t, int, int, cred_t *);
 static int nvme_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
+static void nvme_changed_ns(nvme_t *, int);
+
 static ddi_ufm_ops_t nvme_ufm_ops = {
 	NULL,
 	nvme_ufm_fill_image,
@@ -1955,11 +1957,7 @@ nvme_async_event_task(void *arg)
 
 				if (nsid == 0)	/* end of list */
 					break;
-
-				dev_err(nvme->n_dip, CE_CONT,
-				    "namespace %u (%s) has changed.\n",
-				    nsid, nvme->n_ns[nsid - 1].ns_name);
-				/* TODO: handle namespace resize. */
+				nvme_changed_ns(nvme, nsid);
 			}
 
 			break;
@@ -2691,6 +2689,41 @@ nvme_prepare_devid(nvme_t *nvme, uint32_t nsid)
 
 	nvme->n_ns[nsid - 1].ns_devid = kmem_asprintf("%4X-%s-%s-%X",
 	    nvme->n_idctl->id_vid, model, serial, nsid);
+}
+
+static void
+nvme_changed_ns(nvme_t *nvme, int nsid)
+{
+	nvme_namespace_t *ns = &nvme->n_ns[nsid - 1];
+	nvme_identify_nsid_t *idns, *oidns;
+
+	dev_err(nvme->n_dip, CE_NOTE, "!namespace %u (%s) has changed.",
+	    nsid, ns->ns_name);
+
+	if (ns->ns_ignore)
+		return;
+
+	/*
+	 * The namespace has changed in some way. At present, we only update
+	 * the device capacity and trigger blkdev to check the device state.
+	 */
+
+	if (nvme_identify(nvme, B_FALSE, nsid, (void **)&idns) != 0) {
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!failed to identify namespace %d", nsid);
+		return;
+	}
+
+	oidns = ns->ns_idns;
+	ns->ns_idns = idns;
+	kmem_free(oidns, sizeof (nvme_identify_nsid_t));
+
+	ns->ns_block_count = idns->id_nsize;
+	ns->ns_block_size =
+	    1 << idns->id_lbaf[idns->id_flbas.lba_format].lbaf_lbads;
+	ns->ns_best_block_size = ns->ns_block_size;
+
+	bd_state_change(ns->ns_bd_hdl);
 }
 
 static int

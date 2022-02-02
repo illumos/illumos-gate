@@ -22,6 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -32,15 +33,15 @@
  *
  * When a device is added to the system:
  *
- * 	1. Search for any vdevs whose devid matches that of the newly added
+ *	1. Search for any vdevs whose devid matches that of the newly added
  *	   device.
  *
- * 	2. If no vdevs are found, then search for any vdevs whose devfs path
+ *	2. If no vdevs are found, then search for any vdevs whose devfs path
  *	   matches that of the new device.
  *
  *	3. If no vdevs match by either method, then ignore the event.
  *
- * 	4. Attempt to online the device with a flag to indicate that it should
+ *	4. Attempt to online the device with a flag to indicate that it should
  *	   be unspared when resilvering completes.  If this succeeds, then the
  *	   same device was inserted and we should continue normally.
  *
@@ -319,11 +320,11 @@ zfs_iter_vdev(zpool_handle_t *zhp, nvlist_t *nvl, void *data)
 		 * string.  However, we allow substring matches in the following
 		 * cases:
 		 *
-		 * 	<path>:		This is a devpath, and the target is one
-		 * 			of its children.
+		 *	<path>:		This is a devpath, and the target is one
+		 *			of its children.
 		 *
-		 * 	<path/>		This is a devid for a whole disk, and
-		 * 			the target is one of its children.
+		 *	<path/>		This is a devid for a whole disk, and
+		 *			the target is one of its children.
 		 */
 		if (path[len] != '\0' && path[len] != ':' &&
 		    path[len - 1] != '/')
@@ -555,7 +556,7 @@ zfsdle_vdev_online(zpool_handle_t *zhp, void *data)
 	vdev_state_t newstate;
 	nvlist_t *tgt;
 
-	syseventd_print(9, "zfsdle_vdev_online: searching for %s in pool %s\n",
+	syseventd_print(9, "%s: searching for %s in pool %s\n", __func__,
 	    devname, zpool_get_name(zhp));
 
 	if ((tgt = zpool_find_vdev_by_physpath(zhp, devname,
@@ -567,6 +568,11 @@ zfsdle_vdev_online(zpool_handle_t *zhp, void *data)
 		    &path) == 0);
 		verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_WHOLE_DISK,
 		    &wholedisk) == 0);
+
+		syseventd_print(9, "%s: "
+		    "found %s in pool %s (wholedisk: %s)\n", __func__,
+		    path, zpool_get_name(zhp),
+		    wholedisk != 0 ? "true" : "false");
 
 		(void) strlcpy(fullpath, path, sizeof (fullpath));
 		if (wholedisk) {
@@ -581,12 +587,13 @@ zfsdle_vdev_online(zpool_handle_t *zhp, void *data)
 		}
 
 		if (zpool_get_prop_int(zhp, ZPOOL_PROP_AUTOEXPAND, NULL)) {
-			syseventd_print(9, "zfsdle_vdev_online: setting device"
-			    " device %s to ONLINE state in pool %s.\n",
-			    fullpath, zpool_get_name(zhp));
-			if (zpool_get_state(zhp) != POOL_STATE_UNAVAIL)
+			syseventd_print(9, "%s: "
+			    "setting device %s to ONLINE state in pool %s.\n",
+			    __func__, fullpath, zpool_get_name(zhp));
+			if (zpool_get_state(zhp) != POOL_STATE_UNAVAIL) {
 				(void) zpool_vdev_online(zhp, fullpath, 0,
 				    &newstate);
+			}
 		}
 		zpool_close(zhp);
 		return (1);
