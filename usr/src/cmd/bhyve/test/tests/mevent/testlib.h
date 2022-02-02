@@ -71,6 +71,7 @@
 #define	ASSERT_INT_EQ(msg, got, exp)	ASSERT_CMP(msg, got, ==, exp, "%d")
 #define	ASSERT_INT_NEQ(msg, got, exp)	ASSERT_CMP(msg, got, !=, exp, "%d")
 #define	ASSERT_INT64_EQ(msg, got, exp)	ASSERT_CMP(msg, got, ==, exp, "%ld")
+#define	ASSERT_INT64_NEQ(msg, got, exp)	ASSERT_CMP(msg, got, !=, exp, "%ld")
 #define	ASSERT_PTR_EQ(msg, got, exp)	ASSERT_CMP(msg, got, ==, exp, "%p")
 #define	ASSERT_PTR_NEQ(msg, got, exp)	ASSERT_CMP(msg, got, !=, exp, "%p")
 
@@ -89,5 +90,6 @@ extern boolean_t	testlib_verbose;
 extern void start_test(const char *, uint32_t);
 extern void start_event_thread(void);
 extern void test_mevent_count_lists(int *, int *, int *);
+extern void set_mevent_file_poll_interval_ms(int);
 
 #endif /* _TESTLIB_H_ */

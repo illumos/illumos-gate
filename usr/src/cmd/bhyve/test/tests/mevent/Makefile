@@ -12,6 +12,7 @@
 #
 # Copyright 2018 Joyent, Inc.
 # Copyright 2022 Oxide Computer Company
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 TESTSUBDIR =	mevent
@@ -19,7 +20,9 @@ PROG = \
 		lists_delete \
 		read_disable \
 		read_pause \
-		read_requeue
+		read_requeue \
+		vnode_file \
+		vnode_zvol
 
 SUPOBJS =	mevent.o testlib.o
 
@@ -34,8 +37,12 @@ install: $(TESTDIR) $(CMDS)
 
 $(CMDS): $(PROG)
 
+vnode_zvol :=	LDLIBS += -lzfs -lnvpair
+
 include ../../Makefile.targ
 
 %: %.o $(SUPOBJS)
 	$(LINK.c) -o $@ $< $(SUPOBJS) $(LDLIBS)
 	$(POST_PROCESS)
+
+mevent.o: ../../../mevent.c

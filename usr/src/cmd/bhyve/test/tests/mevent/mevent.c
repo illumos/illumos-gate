@@ -55,3 +55,9 @@ test_mevent_count_lists(int *ret_global, int *ret_change, int *ret_del_pending)
 	*ret_change = change;
 	*ret_del_pending = del_pending;
 }
+
+void
+set_mevent_file_poll_interval_ms(int ms)
+{
+	mevent_file_poll_interval_ms = ms;
+}

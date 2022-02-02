@@ -24,4 +24,9 @@ tests = ['mem_partial', 'mem_seg_map']
 
 # Tests of userspace mevent system, built from cmd/bhyve
 [/opt/bhyve-tests/tests/mevent]
-tests = ['lists_delete', 'read_disable', 'read_pause', 'read_requeue']
+tests = ['lists_delete', 'read_disable', 'read_pause', 'read_requeue',
+	'vnode_file']
+
+[/opt/bhyve-tests/tests/mevent/vnode_zvol]
+user = root
+
