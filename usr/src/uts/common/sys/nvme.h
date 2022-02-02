@@ -14,6 +14,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _SYS_NVME_H
@@ -557,6 +558,7 @@ typedef struct {
 #define	NVME_LOGPAGE_ERROR	0x1	/* Error Information */
 #define	NVME_LOGPAGE_HEALTH	0x2	/* SMART/Health Information */
 #define	NVME_LOGPAGE_FWSLOT	0x3	/* Firmware Slot Information */
+#define	NVME_LOGPAGE_NSCHANGE	0x4	/* Changed namespace (1.2) */
 
 typedef struct {
 	uint64_t el_count;		/* Error Count */
@@ -634,6 +636,18 @@ typedef struct {
 	uint8_t fw_rsvd4[512 - 64];
 } nvme_fwslot_log_t;
 
+/*
+ * The NVMe spec specifies that the changed namespace list contains up to
+ * 1024 entries.
+ */
+#define	NVME_NSCHANGE_LIST_SIZE	1024
+
+typedef struct {
+	uint32_t	nscl_ns[NVME_NSCHANGE_LIST_SIZE];
+} __packed nvme_nschange_list_t;
+
+/* CSTYLED */
+_Static_assert(sizeof (nvme_nschange_list_t) == 4096, "bad size for nvme_nschange_list_t");
 
 /*
  * NVMe Format NVM
@@ -798,13 +812,21 @@ typedef union {
 /* Asynchronous Event Configuration Feature */
 typedef union {
 	struct {
-		uint8_t aec_avail:1;	/* available space too low */
-		uint8_t aec_temp:1;	/* temperature too high */
-		uint8_t aec_reliab:1;	/* degraded reliability */
-		uint8_t aec_readonly:1;	/* media is read-only */
-		uint8_t aec_volatile:1;	/* volatile memory backup failed */
+		uint8_t aec_avail:1;	/* Available space too low */
+		uint8_t aec_temp:1;	/* Temperature too high */
+		uint8_t aec_reliab:1;	/* Degraded reliability */
+		uint8_t aec_readonly:1;	/* Media is read-only */
+		uint8_t aec_volatile:1;	/* Volatile memory backup failed */
 		uint8_t aec_rsvd1:3;
-		uint8_t aec_rsvd2[3];
+		uint8_t aec_nsan:1;	/* Namespace attribute notices (1.2) */
+		uint8_t aec_fwact:1;	/* Firmware activation notices (1.2) */
+		uint8_t aec_telln:1;	/* Telemetry log notices (1.3) */
+		uint8_t aec_ansacn:1;	/* Asymm. NS access change (1.4) */
+		uint8_t aec_plat:1;	/* Predictable latency ev. agg. (1.4) */
+		uint8_t aec_lbasi:1;	/* LBA status information (1.4) */
+		uint8_t aec_egeal:1;	/* Endurance group ev. agg. (1.4) */
+		uint8_t aec_rsvd2:1;
+		uint8_t aec_rsvd3[2];
 	} b;
 	uint32_t r;
 } nvme_async_event_conf_t;

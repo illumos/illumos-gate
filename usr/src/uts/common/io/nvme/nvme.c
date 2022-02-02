@@ -17,6 +17,7 @@
  * Copyright 2019 Western Digital Corporation.
  * Copyright 2020 Racktop Systems.
  * Copyright 2022 Oxide Computer Company.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -216,7 +217,7 @@
  *
  * While the callback registration relies on the NDI event framework, the
  * removal event itself is kicked off in the PCIe hotplug framework, when the
- * PCIe bridge driver ("pcieb") gets a hotplug interrupt indicatating that a
+ * PCIe bridge driver ("pcieb") gets a hotplug interrupt indicating that a
  * device was removed from the slot.
  *
  * The NVMe driver instance itself will remain until the final close of the
@@ -1790,6 +1791,7 @@ nvme_async_event_task(void *arg)
 	nvme_t *nvme = cmd->nc_nvme;
 	nvme_error_log_entry_t *error_log = NULL;
 	nvme_health_log_t *health_log = NULL;
+	nvme_nschange_list_t *nslist = NULL;
 	size_t logsize = 0;
 	nvme_async_event_t event;
 
@@ -1831,7 +1833,6 @@ nvme_async_event_task(void *arg)
 		nvme_free_cmd(cmd);
 		return;
 	}
-
 
 	event.r = cmd->nc_cqe.cqe_dw0;
 
@@ -1926,6 +1927,95 @@ nvme_async_event_task(void *arg)
 		}
 		break;
 
+	case NVME_ASYNC_TYPE_NOTICE:
+		switch (event.b.ae_info) {
+		case NVME_ASYNC_NOTICE_NS_CHANGE:
+			dev_err(nvme->n_dip, CE_NOTE,
+			    "namespace attribute change event, "
+			    "logpage = %x", event.b.ae_logpage);
+			atomic_inc_32(&nvme->n_notice_event);
+
+			if (event.b.ae_logpage != NVME_LOGPAGE_NSCHANGE)
+				break;
+
+			if (nvme_get_logpage(nvme, B_FALSE, (void **)&nslist,
+			    &logsize, event.b.ae_logpage, -1) != 0) {
+				break;
+			}
+
+			if (nslist->nscl_ns[0] == UINT32_MAX) {
+				dev_err(nvme->n_dip, CE_CONT,
+				    "more than %u namespaces have changed.\n",
+				    NVME_NSCHANGE_LIST_SIZE);
+				break;
+			}
+
+			for (uint_t i = 0; i < NVME_NSCHANGE_LIST_SIZE; i++) {
+				uint32_t nsid = nslist->nscl_ns[i];
+
+				if (nsid == 0)	/* end of list */
+					break;
+
+				dev_err(nvme->n_dip, CE_CONT,
+				    "namespace %u (%s) has changed.\n",
+				    nsid, nvme->n_ns[nsid - 1].ns_name);
+				/* TODO: handle namespace resize. */
+			}
+
+			break;
+
+		case NVME_ASYNC_NOTICE_FW_ACTIVATE:
+			dev_err(nvme->n_dip, CE_NOTE,
+			    "firmware activation starting, "
+			    "logpage = %x", event.b.ae_logpage);
+			atomic_inc_32(&nvme->n_notice_event);
+			break;
+
+		case NVME_ASYNC_NOTICE_TELEMETRY:
+			dev_err(nvme->n_dip, CE_NOTE,
+			    "telemetry log changed, "
+			    "logpage = %x", event.b.ae_logpage);
+			atomic_inc_32(&nvme->n_notice_event);
+			break;
+
+		case NVME_ASYNC_NOTICE_NS_ASYMM:
+			dev_err(nvme->n_dip, CE_NOTE,
+			    "asymmetric namespace access change, "
+			    "logpage = %x", event.b.ae_logpage);
+			atomic_inc_32(&nvme->n_notice_event);
+			break;
+
+		case NVME_ASYNC_NOTICE_LATENCYLOG:
+			dev_err(nvme->n_dip, CE_NOTE,
+			    "predictable latency event aggregate log change, "
+			    "logpage = %x", event.b.ae_logpage);
+			atomic_inc_32(&nvme->n_notice_event);
+			break;
+
+		case NVME_ASYNC_NOTICE_LBASTATUS:
+			dev_err(nvme->n_dip, CE_NOTE,
+			    "LBA status information alert, "
+			    "logpage = %x", event.b.ae_logpage);
+			atomic_inc_32(&nvme->n_notice_event);
+			break;
+
+		case NVME_ASYNC_NOTICE_ENDURANCELOG:
+			dev_err(nvme->n_dip, CE_NOTE,
+			    "endurance group event aggregate log page change, "
+			    "logpage = %x", event.b.ae_logpage);
+			atomic_inc_32(&nvme->n_notice_event);
+			break;
+
+		default:
+			dev_err(nvme->n_dip, CE_WARN,
+			    "!unknown notice async event received, "
+			    "info = %x, logpage = %x", event.b.ae_info,
+			    event.b.ae_logpage);
+			atomic_inc_32(&nvme->n_unknown_event);
+			break;
+		}
+		break;
+
 	case NVME_ASYNC_TYPE_VENDOR:
 		dev_err(nvme->n_dip, CE_WARN, "!vendor specific async event "
 		    "received, info = %x, logpage = %x", event.b.ae_info,
@@ -1941,11 +2031,14 @@ nvme_async_event_task(void *arg)
 		break;
 	}
 
-	if (error_log)
+	if (error_log != NULL)
 		kmem_free(error_log, logsize);
 
-	if (health_log)
+	if (health_log != NULL)
 		kmem_free(health_log, logsize);
+
+	if (nslist != NULL)
+		kmem_free(nslist, logsize);
 }
 
 static void
@@ -2057,6 +2150,11 @@ nvme_get_logpage(nvme_t *nvme, boolean_t user, void **buf, size_t *bufsize,
 	case NVME_LOGPAGE_FWSLOT:
 		cmd->nc_sqe.sqe_nsid = (uint32_t)-1;
 		*bufsize = sizeof (nvme_fwslot_log_t);
+		break;
+
+	case NVME_LOGPAGE_NSCHANGE:
+		cmd->nc_sqe.sqe_nsid = (uint32_t)-1;
+		*bufsize = sizeof (nvme_nschange_list_t);
 		break;
 
 	default:
@@ -2392,7 +2490,7 @@ nvme_set_nqueues(nvme_t *nvme)
 		nvme->n_completion_queues = nvme->n_intr_cnt;
 
 	/*
-	 * There is no point in having more compeletion queues than
+	 * There is no point in having more completion queues than
 	 * interrupt vectors.
 	 */
 	nvme->n_completion_queues = MIN(nvme->n_completion_queues,
@@ -2867,7 +2965,7 @@ nvme_init(nvme_t *nvme)
 	sema_init(&nvme->n_abort_sema, 1, NULL, SEMA_DRIVER, NULL);
 
 	/*
-	 * Setup initial interrupt for admin queue.
+	 * Set up initial interrupt for admin queue.
 	 */
 	if ((nvme_setup_interrupts(nvme, DDI_INTR_TYPE_MSIX, 1)
 	    != DDI_SUCCESS) &&
@@ -3499,7 +3597,7 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nvme->n_sgl_dma_attr = nvme_sgl_dma_attr;
 
 	/*
-	 * Setup FMA support.
+	 * Set up FMA support.
 	 */
 	nvme->n_fm_cap = ddi_getprop(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "fm-capable",
@@ -4310,7 +4408,7 @@ nvme_ioc_cmd(nvme_t *nvme, nvme_sqe_t *sqe, boolean_t is_admin, void *data_addr,
 	}
 
 	/*
-	 * This function is used to faciliate requests from
+	 * This function is used to facilitate requests from
 	 * userspace, so don't panic if the command fails. This
 	 * is especially true for admin passthru commands, where
 	 * the actual command data structure is entirely defined

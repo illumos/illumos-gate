@@ -13,6 +13,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2019 Western Digital Corporation
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -2166,6 +2167,34 @@ nvme_print_feat_async_event(uint64_t res, void *b, size_t s,
 		    nvme_version_check(version, 1, 0),
 		    aec.b.aec_volatile, "enabled", "disabled");
 	}
+
+	/* NVMe 1.2 */
+	nvme_print_bit(4, "Namespace attribute notices",
+	    nvme_version_check(version, 1, 2),
+	    aec.b.aec_nsan, "enabled", "disabled");
+	nvme_print_bit(4, "Firmware activation notices",
+	    nvme_version_check(version, 1, 2),
+	    aec.b.aec_fwact, "enabled", "disabled");
+
+	/* NVMe 1.3 */
+	nvme_print_bit(4, "Telemetry log notices",
+	    nvme_version_check(version, 1, 3),
+	    aec.b.aec_telln, "enabled", "disabled");
+
+	/* NVMe 1.4 */
+	nvme_print_bit(4, "ANA change notices",
+	    nvme_version_check(version, 1, 4),
+	    aec.b.aec_ansacn, "enabled", "disabled");
+	nvme_print_bit(4,
+	    "Predictable latency event aggr. LCNs",
+	    nvme_version_check(version, 1, 4),
+	    aec.b.aec_plat, "enabled", "disabled");
+	nvme_print_bit(4, "LBA status information notices",
+	    nvme_version_check(version, 1, 4),
+	    aec.b.aec_lbasi, "enabled", "disabled");
+	nvme_print_bit(4, "Endurance group event aggregate LCNs",
+	    nvme_version_check(version, 1, 4),
+	    aec.b.aec_egeal, "enabled", "disabled");
 }
 
 void
