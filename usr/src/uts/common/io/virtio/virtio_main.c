@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -322,6 +323,26 @@ virtio_init(dev_info_t *dip, uint64_t driver_features, boolean_t allow_indirect)
 }
 
 /*
+ * Some virtio devices can change their device configuration state at any
+ * time. This function may be called by the driver during the initialisation
+ * phase - before calling virtio_init_complete() - in order to register a
+ * handler function which will be called when the device configuration space
+ * is updated.
+ */
+void
+virtio_register_cfgchange_handler(virtio_t *vio, ddi_intr_handler_t *func,
+    void *funcarg)
+{
+	VERIFY(!(vio->vio_initlevel & VIRTIO_INITLEVEL_INT_ADDED));
+	VERIFY(!vio->vio_cfgchange_handler_added);
+
+	mutex_enter(&vio->vio_mutex);
+	vio->vio_cfgchange_handler = func;
+	vio->vio_cfgchange_handlerarg = funcarg;
+	mutex_exit(&vio->vio_mutex);
+}
+
+/*
  * This function must be called by the driver once it has completed early setup
  * calls.  The value of "allowed_interrupt_types" is a mask of interrupt types
  * (DDI_INTR_TYPE_MSIX, etc) that we'll try to use when installing handlers, or
@@ -333,7 +354,8 @@ virtio_init_complete(virtio_t *vio, int allowed_interrupt_types)
 	VERIFY(!(vio->vio_initlevel & VIRTIO_INITLEVEL_PROVIDER));
 	vio->vio_initlevel |= VIRTIO_INITLEVEL_PROVIDER;
 
-	if (!list_is_empty(&vio->vio_queues)) {
+	if (!list_is_empty(&vio->vio_queues) ||
+	    vio->vio_cfgchange_handler != NULL) {
 		/*
 		 * Set up interrupts for the queues that have been registered.
 		 */
@@ -1343,32 +1365,45 @@ virtio_shared_isr(caddr_t arg0, caddr_t arg1)
 	 * this field resets it to zero.
 	 */
 	isr = virtio_get8(vio, VIRTIO_LEGACY_ISR_STATUS);
-	if ((isr & VIRTIO_ISR_CHECK_QUEUES) == 0) {
-		goto done;
-	}
 
-	for (virtio_queue_t *viq = list_head(&vio->vio_queues); viq != NULL;
-	    viq = list_next(&vio->vio_queues, viq)) {
-		if (viq->viq_func != NULL) {
-			mutex_exit(&vio->vio_mutex);
-			if (viq->viq_func(viq->viq_funcarg, arg0) ==
-			    DDI_INTR_CLAIMED) {
-				r = DDI_INTR_CLAIMED;
-			}
-			mutex_enter(&vio->vio_mutex);
+	if ((isr & VIRTIO_ISR_CHECK_QUEUES) != 0) {
+		r = DDI_INTR_CLAIMED;
 
-			if (vio->vio_initlevel & VIRTIO_INITLEVEL_SHUTDOWN) {
-				/*
-				 * The device was shut down while in a queue
-				 * handler routine.
-				 */
-				goto done;
+		for (virtio_queue_t *viq = list_head(&vio->vio_queues);
+		    viq != NULL; viq = list_next(&vio->vio_queues, viq)) {
+			if (viq->viq_func != NULL) {
+				mutex_exit(&vio->vio_mutex);
+				(void) viq->viq_func(viq->viq_funcarg, arg0);
+				mutex_enter(&vio->vio_mutex);
+
+				if (vio->vio_initlevel &
+				    VIRTIO_INITLEVEL_SHUTDOWN) {
+					/*
+					 * The device was shut down while in a
+					 * queue handler routine.
+					 */
+					break;
+				}
 			}
 		}
 	}
 
-done:
 	mutex_exit(&vio->vio_mutex);
+
+	/*
+	 * vio_cfgchange_{handler,handlerarg} cannot change while interrupts
+	 * are configured so it is safe to access them outside of the lock.
+	 */
+
+	if ((isr & VIRTIO_ISR_CHECK_CONFIG) != 0) {
+		r = DDI_INTR_CLAIMED;
+		if (vio->vio_cfgchange_handler != NULL) {
+			(void) vio->vio_cfgchange_handler(
+			    (caddr_t)vio->vio_cfgchange_handlerarg,
+			    (caddr_t)vio);
+		}
+	}
+
 	return (r);
 }
 
@@ -1391,6 +1426,13 @@ virtio_interrupts_setup(virtio_t *vio, int allow_types)
 			count++;
 		}
 	}
+
+	/*
+	 * If there is a configuration change handler, one extra interrupt
+	 * is needed for that.
+	 */
+	if (vio->vio_cfgchange_handler != NULL)
+		count++;
 
 	if (ddi_intr_get_supported_types(dip, &types) != DDI_SUCCESS) {
 		dev_err(dip, CE_WARN, "could not get supported interrupts");
@@ -1493,6 +1535,22 @@ add_handlers:
 	VERIFY3S(vio->vio_ninterrupts, ==, count);
 
 	uint_t n = 0;
+
+	/* Bind the configuration vector interrupt */
+	if (vio->vio_cfgchange_handler != NULL) {
+		if (ddi_intr_add_handler(vio->vio_interrupts[n],
+		    vio->vio_cfgchange_handler,
+		    (caddr_t)vio->vio_cfgchange_handlerarg,
+		    (caddr_t)vio) != DDI_SUCCESS) {
+			dev_err(dip, CE_WARN,
+			    "adding configuration change interrupt failed");
+			goto fail;
+		}
+		vio->vio_cfgchange_handler_added = B_TRUE;
+		vio->vio_cfgchange_handler_index = n;
+		n++;
+	}
+
 	for (virtio_queue_t *viq = list_head(&vio->vio_queues); viq != NULL;
 	    viq = list_next(&vio->vio_queues, viq)) {
 		if (viq->viq_func == NULL) {
@@ -1546,6 +1604,21 @@ virtio_interrupts_teardown(virtio_t *vio)
 			}
 		}
 	} else {
+		/*
+		 * Remove the configuration vector interrupt handler.
+		 */
+		if (vio->vio_cfgchange_handler_added) {
+			int r;
+
+			if ((r = ddi_intr_remove_handler(
+			    vio->vio_interrupts[0])) != DDI_SUCCESS) {
+				dev_err(vio->vio_dip, CE_WARN,
+				    "removing configuration change interrupt "
+				    "handler failed (%d)", r);
+			}
+			vio->vio_cfgchange_handler_added = B_FALSE;
+		}
+
 		for (virtio_queue_t *viq = list_head(&vio->vio_queues);
 		    viq != NULL; viq = list_next(&vio->vio_queues, viq)) {
 			int r;
@@ -1604,6 +1677,11 @@ virtio_interrupts_unwind(virtio_t *vio)
 			virtio_put16(vio, VIRTIO_LEGACY_QUEUE_SELECT,
 			    viq->viq_index);
 			virtio_put16(vio, VIRTIO_LEGACY_MSIX_QUEUE,
+			    VIRTIO_LEGACY_MSI_NO_VECTOR);
+		}
+
+		if (vio->vio_cfgchange_handler_added) {
+			virtio_put16(vio, VIRTIO_LEGACY_MSIX_CONFIG,
 			    VIRTIO_LEGACY_MSI_NO_VECTOR);
 		}
 	}
@@ -1697,6 +1775,23 @@ virtio_interrupts_enable(virtio_t *vio)
 				    "failed to configure MSI-X vector %u for "
 				    "queue \"%s\" (#%u)", (uint_t)msi,
 				    viq->viq_name, (uint_t)qi);
+
+				virtio_interrupts_unwind(vio);
+				mutex_exit(&vio->vio_mutex);
+				return (DDI_FAILURE);
+			}
+		}
+
+		if (vio->vio_cfgchange_handler_added) {
+			virtio_put16(vio, VIRTIO_LEGACY_MSIX_CONFIG,
+			    vio->vio_cfgchange_handler_index);
+
+			/* Verify the value was accepted. */
+			if (virtio_get16(vio, VIRTIO_LEGACY_MSIX_CONFIG) !=
+			    vio->vio_cfgchange_handler_index) {
+				dev_err(vio->vio_dip, CE_WARN,
+				    "failed to configure MSI-X vector for "
+				    "configuration");
 
 				virtio_interrupts_unwind(vio);
 				mutex_exit(&vio->vio_mutex);
