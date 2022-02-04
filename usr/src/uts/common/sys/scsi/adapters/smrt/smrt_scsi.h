@@ -26,10 +26,10 @@ extern "C" {
 #endif
 
 /* CISS LUN Addressing MODEs */
-#define	PERIPHERIAL_DEV_ADDR 			0x0
-#define	LOGICAL_VOL_ADDR 			0x1
-#define	MASK_PERIPHERIAL_DEV_ADDR 		0x3
-#define	CISS_PHYS_MODE 				0x0
+#define	PERIPHERIAL_DEV_ADDR			0x0
+#define	LOGICAL_VOL_ADDR			0x1
+#define	MASK_PERIPHERIAL_DEV_ADDR		0x3
+#define	CISS_PHYS_MODE				0x0
 
 /*
  * Vendor-specific SCSI Commands

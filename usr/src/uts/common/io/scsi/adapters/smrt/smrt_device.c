@@ -58,7 +58,7 @@ smrt_locate_cfgtbl(smrt_t *smrt, pci_regspec_t *regs, unsigned nregs,
 	/*
 	 * Locate the Configuration Table.  Three different values read
 	 * from two I2O registers allow us to determine the location:
-	 * 	- the correct PCI BAR offset is in the low 16 bits of
+	 *	- the correct PCI BAR offset is in the low 16 bits of
 	 *	  CISS_I2O_CFGTBL_CFG_OFFSET
 	 *	- bit 16 is 0 for a 32-bit space, and 1 for 64-bit
 	 *	- the memory offset from the base of this BAR is

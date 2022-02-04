@@ -606,7 +606,6 @@ smrt_phys_teardown(smrt_t *smrt)
 {
 	smrt_physical_t *smpt;
 
-	VERIFY(MUTEX_HELD(&smrt->smrt_mutex));
 	while ((smpt = list_remove_head(&smrt->smrt_physicals)) != NULL) {
 		smrt_physical_free(smpt);
 	}

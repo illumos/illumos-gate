@@ -123,15 +123,15 @@
  * The CISS specification allows for three different kinds of attributes that
  * describe how requests are queued to the controller.  These are:
  *
- * 	HEAD OF QUEUE		The request should go to the head of the
- * 				controller queue.  This is used for resets and
- * 				aborts to ensure that they're not blocked behind
- * 				additional I/O.
+ *	HEAD OF QUEUE		The request should go to the head of the
+ *				controller queue.  This is used for resets and
+ *				aborts to ensure that they're not blocked behind
+ *				additional I/O.
  *
- * 	SIMPLE			This queues the request for normal processing.
- * 				Commands queued this way are not special with
- * 				respect to one another.  We use this for all I/O
- * 				and discovery commands.
+ *	SIMPLE			This queues the request for normal processing.
+ *				Commands queued this way are not special with
+ *				respect to one another.  We use this for all I/O
+ *				and discovery commands.
  *
  *	ORDERED			This attribute is used to indicate that commands
  *				should be submitted and processed in some order.
