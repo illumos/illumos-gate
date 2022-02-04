@@ -27,6 +27,7 @@
  * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
  * Copyright (c) 2017 Datto Inc.
  * Copyright (c) 2017, Intel Corporation.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <ctype.h>
@@ -39,6 +40,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <libgen.h>
+#include <sys/dkio.h>
 #include <sys/efi_partition.h>
 #include <sys/vtoc.h>
 #include <sys/zfs_ioctl.h>
@@ -2797,6 +2799,7 @@ static int
 zpool_relabel_disk(libzfs_handle_t *hdl, const char *name, const char *msg)
 {
 	char path[MAXPATHLEN];
+	enum dkio_state st;
 	int fd, error;
 	int (*_efi_use_whole_disk)(int);
 
@@ -2818,12 +2821,25 @@ zpool_relabel_disk(libzfs_handle_t *hdl, const char *name, const char *msg)
 	 * ignore that error and continue on.
 	 */
 	error = _efi_use_whole_disk(fd);
-	(void) close(fd);
 	if (error && error != VT_ENOSPC) {
+		(void) close(fd);
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "cannot "
 		    "relabel '%s': unable to read disk capacity"), name);
 		return (zfs_error(hdl, EZFS_NOCAP, msg));
 	}
+
+	/*
+	 * Writing a new EFI partition table to the disk will have marked
+	 * the geometry as needing re-validation. Before returning, force
+	 * it to be checked by querying the device state, otherwise the
+	 * subsequent vdev_reopen() will very likely fail to read the device
+	 * size, faulting the pool.
+	 */
+	st = DKIO_NONE;
+	(void) ioctl(fd, DKIOCSTATE, (caddr_t)&st);
+
+	(void) close(fd);
+
 	return (0);
 }
 
