@@ -24,6 +24,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2021 Racktop Systems, Inc.
  */
 
 /*
@@ -37,7 +39,19 @@
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
 #include <util/sscanf.h>
+#include <util/qsort.h>
 
+/*
+ * Used to track the interrupts used by a resource, as well as the set of
+ * interrupts used overall. The IRQ values are ints for historical purposes
+ * (the "interrupts" property has traditionally been an array of ints) even
+ * though negative IRQ values do not make much sense.
+ */
+typedef struct intrs {
+	int	*i_intrs;
+	uint_t	i_num;
+	uint_t	i_alloc;
+} intrs_t;
 
 static char keyboard_alias[] = "keyboard";
 static char mouse_alias[] = "mouse";
@@ -56,7 +70,7 @@ static unsigned long acpi_enum_debug = 0x00;
 
 static char USED_RESOURCES[] = "used-resources";
 static dev_info_t *usedrdip = NULL;
-static unsigned short used_interrupts = 0;
+static intrs_t used_interrupts;
 static unsigned short used_dmas = 0;
 typedef struct used_io_mem {
 	unsigned int start_addr;
@@ -70,9 +84,47 @@ static int used_mem_count = 0;
 
 #define	MAX_PARSED_ACPI_RESOURCES	255
 #define	ACPI_ISA_LIMIT	16
-static int interrupt[ACPI_ISA_LIMIT], dma[ACPI_ISA_LIMIT];
+static int dma[ACPI_ISA_LIMIT];
 #define	ACPI_ELEMENT_PACKAGE_LIMIT	32
 #define	EISA_ID_SIZE	7
+
+static void
+add_interrupt(intrs_t *intrs, int irq)
+{
+	/* We only want to add the value once */
+	for (uint_t i = 0; i < intrs->i_num; i++) {
+		if (intrs->i_intrs[i] == irq)
+			return;
+	}
+
+	/*
+	 * Initially, i_num and i_alloc will be 0, and we allocate
+	 * i_intrs to hold ACPI_ISA_LIMIT values on the initial add attempt.
+	 * Since ISA buses could only use at most ACPI_ISA_LIMIT (16)
+	 * interrupts, this seems like a reasonable size. The extended IRQ
+	 * resource however exists explicitly to support IRQ values beyond
+	 * 16. That suggests it may be possible on some hardware to exceed
+	 * the initial allocation. If we do exceed the initial allocation, we
+	 * grow i_intrs in chunks of ACPI_ISA_LIMIT since that's as good an
+	 * amount as any.
+	 */
+	if (intrs->i_num == intrs->i_alloc) {
+		uint_t newlen = intrs->i_alloc + ACPI_ISA_LIMIT;
+		size_t newsz = newlen * sizeof (int);
+		size_t oldsz = intrs->i_alloc * sizeof (int);
+		int *newar = kmem_alloc(newsz, KM_SLEEP);
+
+		if (intrs->i_num > 0) {
+			bcopy(intrs->i_intrs, newar, oldsz);
+			kmem_free(intrs->i_intrs, oldsz);
+		}
+
+		intrs->i_intrs = newar;
+		intrs->i_alloc = newlen;
+	}
+
+	intrs->i_intrs[intrs->i_num++] = irq;
+}
 
 /*
  * insert used io/mem in increasing order
@@ -127,18 +179,52 @@ add_used_io_mem(struct regspec *io, int io_count)
 }
 
 static void
-parse_resources_irq(ACPI_RESOURCE *resource_ptr, int *interrupt_count)
+parse_resources_irq(ACPI_RESOURCE *resource_ptr, intrs_t *intrs)
 {
-	int i;
+	uint_t i;
 
 	for (i = 0; i < resource_ptr->Data.Irq.InterruptCount; i++) {
-		interrupt[(*interrupt_count)++] =
-		    resource_ptr->Data.Irq.Interrupts[i];
-		used_interrupts |= 1 << resource_ptr->Data.Irq.Interrupts[i];
+		uint8_t irq = resource_ptr->Data.Irq.Interrupts[i];
+
+		add_interrupt(intrs, irq);
+		add_interrupt(&used_interrupts, irq);
+
 		if (acpi_enum_debug & PARSE_RES_IRQ) {
-			cmn_err(CE_NOTE, "!parse_resources() "\
-			    "IRQ num %u, intr # = %u",
-			    i, resource_ptr->Data.Irq.Interrupts[i]);
+			cmn_err(CE_NOTE, "!%s() IRQ num %u, intr # = %u",
+			    __func__, i, irq);
+		}
+	}
+}
+
+static void
+parse_resources_extended_irq(ACPI_RESOURCE *resource_ptr, intrs_t *intrs)
+{
+	uint_t i;
+
+	for (i = 0; i < resource_ptr->Data.ExtendedIrq.InterruptCount; i++) {
+		uint32_t irq = resource_ptr->Data.ExtendedIrq.Interrupts[i];
+
+		/*
+		 * As noted in the definition of intrs_t above, traditionally
+		 * the "interrupts" property is an array of ints. This is
+		 * more precautionary than anything since it seems unlikely
+		 * that anything will have an irq value > 2^31 anytime soon.
+		 */
+		if (irq > INT32_MAX) {
+			if (acpi_enum_debug & PARSE_RES_IRQ) {
+				cmn_err(CE_NOTE,
+				    "!%s() intr # = %u out of range",
+				    __func__, irq);
+			}
+			continue;
+		}
+
+		add_interrupt(intrs, irq);
+		add_interrupt(&used_interrupts, irq);
+
+		if (acpi_enum_debug & PARSE_RES_IRQ) {
+			cmn_err(CE_NOTE, "!%s() IRQ num %u, intr # = %u",
+			    __func__, i, irq);
 		}
 	}
 }
@@ -446,7 +532,8 @@ parse_resources(ACPI_HANDLE handle, dev_info_t *xdip, char *path)
 	ACPI_STATUS	status;
 	char		*current_ptr, *last_ptr;
 	struct		regspec *io;
-	int		io_count = 0, interrupt_count = 0, dma_count = 0;
+	intrs_t		intrs = { 0 };
+	int		io_count = 0, dma_count = 0;
 	int		i;
 
 	buf.Length = ACPI_ALLOCATE_BUFFER;
@@ -509,7 +596,7 @@ parse_resources(ACPI_HANDLE handle, dev_info_t *xdip, char *path)
 			parse_resources_addr64(resource_ptr, io, &io_count);
 			break;
 		case ACPI_RESOURCE_TYPE_IRQ:
-			parse_resources_irq(resource_ptr, &interrupt_count);
+			parse_resources_irq(resource_ptr, &intrs);
 			break;
 		case ACPI_RESOURCE_TYPE_DMA:
 			parse_resources_dma(resource_ptr, &dma_count);
@@ -539,10 +626,7 @@ parse_resources(ACPI_HANDLE handle, dev_info_t *xdip, char *path)
 			    " not supported");
 			break;
 		case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
-			cmn_err(CE_NOTE,
-			    "!ACPI source type"
-			    " ACPI_RESOURCE_TYPE_EXT_IRQ"
-			    " not supported");
+			parse_resources_extended_irq(resource_ptr, &intrs);
 			break;
 		default:
 		/* Some types are not yet implemented (See CA 6.4) */
@@ -563,13 +647,11 @@ parse_resources(ACPI_HANDLE handle, dev_info_t *xdip, char *path)
 			    io[1].regspec_addr == 0x64) ||
 			    (io[0].regspec_addr == 0x64 &&
 			    io[1].regspec_addr == 0x60)) {
-				interrupt[0] = 0x1;
-				interrupt[1] = 0xc;
-				interrupt_count = 2;
-				used_interrupts |=
-				    1 << interrupt[0];
-				used_interrupts |=
-				    1 << interrupt[1];
+				intrs.i_num = 0;
+				add_interrupt(&intrs, 0x1);
+				add_interrupt(&intrs, 0xc);
+				add_interrupt(&used_interrupts, 0x1);
+				add_interrupt(&used_interrupts, 0xc);
 			}
 		}
 		add_used_io_mem(io, io_count);
@@ -578,9 +660,12 @@ parse_resources(ACPI_HANDLE handle, dev_info_t *xdip, char *path)
 			    "reg", (int *)io, 3*io_count);
 		}
 	}
-	if (interrupt_count && (xdip != NULL)) {
-		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
-		    "interrupts", (int *)interrupt, interrupt_count);
+	if (intrs.i_num > 0) {
+		if (xdip != NULL) {
+			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
+			    "interrupts", intrs.i_intrs, intrs.i_num);
+		}
+		kmem_free(intrs.i_intrs, intrs.i_alloc * sizeof (int));
 	}
 	if (dma_count && (xdip != NULL)) {
 		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
@@ -984,20 +1069,42 @@ done:
 	return (AE_OK);
 }
 
+static int
+irq_cmp(const void *a, const void *b)
+{
+	const int *l = a;
+	const int *r = b;
+
+	if (*l < *r)
+		return (-1);
+	if (*l > *r)
+		return (1);
+	return (0);
+}
+
 static void
 used_res_interrupts(void)
 {
-	int intr[ACPI_ISA_LIMIT];
-	int count = 0;
-	int i;
+	if (used_interrupts.i_num == 0)
+		return;
 
-	for (i = 0; i < ACPI_ISA_LIMIT; i++) {
-		if ((used_interrupts >> i) & 1) {
-			intr[count++] = i;
-		}
-	}
+	/*
+	 * add_known_used_resources() in usr/src/uts/i86pc.io/isa.c (used
+	 * when ACPI enumeration is disabled) states that the interrupt values
+	 * in the interrupts property of usedrdip should be in increasing order.
+	 * It does not state the reason for the requirement, however out of
+	 * an abundance of caution, we ensure the interrupt values are also
+	 * stored in the interrupts property in increasing order.
+	 */
+	qsort(used_interrupts.i_intrs, used_interrupts.i_num, sizeof (int),
+	    irq_cmp);
+
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, usedrdip,
-	    "interrupts", (int *)intr, count);
+	    "interrupts", used_interrupts.i_intrs, used_interrupts.i_num);
+
+	kmem_free(used_interrupts.i_intrs,
+	    used_interrupts.i_alloc * sizeof (int));
+	bzero(&used_interrupts, sizeof (used_interrupts));
 }
 
 static void
