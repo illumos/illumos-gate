@@ -12,6 +12,7 @@
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -190,10 +191,18 @@ do_close(int fid)
 		printf(" close fid %d already closed\n");
 		return;
 	}
+
+	smb_llist_enter(&node->n_ofile_list, RW_READER);
+	mutex_enter(&node->n_oplock.ol_mutex);
+
 	smb_oplock_break_CLOSE(ofile->f_node, ofile);
 
 	smb_llist_remove(&node->n_ofile_list, ofile);
 	node->n_open_count--;
+
+	mutex_exit(&node->n_oplock.ol_mutex);
+	smb_llist_exit(&node->n_ofile_list);
+
 	ofile->f_refcnt--;
 
 	bzero(ofile->TargetOplockKey, SMB_LEASE_KEY_SZ);
@@ -331,6 +340,7 @@ do_brk_setinfo(int fid, char *arg2)
 static void
 do_move(int fid, char *arg2)
 {
+	smb_node_t *node = &test_node;
 	smb_ofile_t *ofile = &ofile_array[fid];
 	smb_ofile_t *of2;
 	int fid2;
@@ -346,7 +356,12 @@ do_move(int fid, char *arg2)
 	}
 	of2 = &ofile_array[fid2];
 
+	mutex_enter(&node->n_oplock.ol_mutex);
+
 	smb_oplock_move(&test_node, ofile, of2);
+
+	mutex_exit(&node->n_oplock.ol_mutex);
+
 	printf(" move %d %d\n", fid, fid2);
 }
 
@@ -383,6 +398,8 @@ main(int argc, char *argv[])
 
 	if (isatty(0))
 		prompt = "> ";
+
+	mutex_init(&node->n_mutex, NULL, MUTEX_DEFAULT, NULL);
 
 	smb_llist_constructor(&node->n_ofile_list, sizeof (smb_ofile_t),
 	    offsetof(smb_ofile_t, f_node_lnd));
