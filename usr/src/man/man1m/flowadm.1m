@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FLOWADM 1M "February 26, 2020"
+.TH FLOWADM 1M "February 5, 2022"
 .SH NAME
 flowadm \- administer bandwidth resource control and priority for protocols,
 services, containers, and virtual machines
@@ -501,12 +501,12 @@ A comma-separated list of properties to show.
 .RE
 
 .SS "Flow Attributes"
-The flow operand that identify a flow in a \fBflowadm\fR command is a
+The flow operand that identifies a flow in a \fBflowadm\fR command is a
 comma-separated list of one or more keyword, value pairs from the list below.
 .sp
 .ne 2
 .na
-\fB\fBlocal_ip\fR[\fB/\fR\fIprefix_len\fR]\fR
+\fB\fBlocal_ip\fR=\fIvalue\fR[\fB/\fR\fIprefix_len\fR]\fR
 .ad
 .sp .6
 .RS 4n
@@ -524,7 +524,7 @@ address is \fB/32\fR and for IPv6 is \fB/128\fR.
 .sp
 .ne 2
 .na
-\fB\fBremote_ip\fR[\fB/\fR\fIprefix_len\fR]\fR
+\fB\fBremote_ip\fR=\fIvalue\fR[\fB/\fR\fIprefix_len\fR]\fR
 .ad
 .sp .6
 .RS 4n
@@ -546,7 +546,7 @@ with local_port to identify the service that needs special attention.
 .sp
 .ne 2
 .na
-\fB\fBlocal_port\fR\fR
+\fB\fBlocal_port\fR=\fIport\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -556,7 +556,7 @@ Identifies a service specified by the local port.
 .sp
 .ne 2
 .na
-\fB\fBremote_port\fR\fR
+\fB\fBremote_port\fR=\fIport\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -566,7 +566,7 @@ Identifies a service specified by the remote port.
 .sp
 .ne 2
 .na
-\fB\fBdsfield\fR[\fB:\fR\fIdsfield_mask\fR]\fR
+\fB\fBdsfield\fR=\fIvalue\fR[\fB:\fR\fIdsfield_mask\fR]\fR
 .ad
 .sp .6
 .RS 4n
@@ -586,8 +586,8 @@ The following six types of combinations of attributes are supported:
 .sp
 .in +2
 .nf
-local_ip[/\fIprefixlen\fR]=\fIaddress\fR
-remote_ip[/\fIprefixlen\fR]=\fIaddress\fR
+local_ip=\fIaddress\fR[/\fIprefixlen\fR]
+remote_ip=\fIaddress\fR[/\fIprefixlen\fR]
 transport={tcp|udp|sctp|icmp|icmpv6}
 transport={tcp|udp|sctp},local_port=\fIport\fR
 transport={tcp|udp|sctp},remote_port=\fIport\fR
