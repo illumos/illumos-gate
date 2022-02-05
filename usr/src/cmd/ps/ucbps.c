@@ -167,7 +167,6 @@ ucbmain(int argc, char **argv)
 	struct dirent *dentp;
 	char	psname[100];
 	char	asname[100];
-	int	pdlen;
 	size_t  len;
 
 	(void) setlocale(LC_ALL, "");
@@ -391,21 +390,24 @@ ucbmain(int argc, char **argv)
 		exit(1);
 	}
 
-	(void) strcpy(psname, procdir);
-	pdlen = strlen(psname);
-	psname[pdlen++] = '/';
-
 	/* for each active process --- */
 	while ((dentp = readdir(dirp)) != NULL) {
 		int	psfd;	/* file descriptor for /proc/nnnnn/psinfo */
 		int	asfd;	/* file descriptor for /proc/nnnnn/as */
+		int	n;
 
 		if (dentp->d_name[0] == '.')		/* skip . and .. */
 			continue;
-		(void) strcpy(psname + pdlen, dentp->d_name);
-		(void) strcpy(asname, psname);
-		(void) strcat(psname, "/psinfo");
-		(void) strcat(asname, "/as");
+		n = snprintf(psname, sizeof (psname), "%s/%s/psinfo",
+		    procdir, dentp->d_name);
+		if (n < 0 || n >= sizeof (psname))
+			exit(1);
+
+		n = snprintf(asname, sizeof (asname), "%s/%s/as",
+		    procdir, dentp->d_name);
+		if (n < 0 || n >= sizeof (psname))
+			exit(1);
+
 retry:
 		if ((psfd = open(psname, O_RDONLY)) == -1)
 			continue;
@@ -544,7 +546,7 @@ closeit:
 }
 
 static void
-usage()		/* print usage message and quit */
+usage(void)		/* print usage message and quit */
 {
 	static char usage1[] = "ps [ -aceglnrSuUvwx ] [ -t term ] [ num ]";
 
