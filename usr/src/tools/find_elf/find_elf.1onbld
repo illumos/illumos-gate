@@ -21,124 +21,159 @@
 .\"
 .\" Copyright 2022 Jason King
 .\"
-.TH FIND_ELF 1ONBLD "May 29, 2022"
-.SH NAME
-find_elf \- Locate ELF objects
-.SH SYNOPSIS
-\fBfind_elf [-afhnrs] path\fP
-.SH DESCRIPTION
+.Dd September  6, 2022
+.Dt FIND_ELF 1ONBLD
+.Os
+.Sh NAME
+.Nm find_elf
+.Nd Locate ELF objects
+.Sh SYNOPSIS
+.Nm
+.Op Fl afhnrs
+.Ar path
+.Sh DESCRIPTION
 The
-.I find_elf
+.Nm
 command descends a directory hierarchy and produces one line
 of output on stdout for each ELF object found.
-.SH OPTIONS
+.Sh OPTIONS
 The following options are supported:
-.TP 4
-.B \-a
-Disable alias processing. Symbolic links are treated as independent
-files, each such link results in a separate OBJECT output line,
-and ALIAS lines are not issued.
-.TP 4
-.B \-f
-Fast Mode. When reading directories, the file name and modes are
+.Bl -tag -width Fl
+.It Fl a
+Disable alias processing.
+Symbolic links are treated as independent
+files, each such link results in a separate
+.Sy OBJECT
+output line, and
+.Sy ALIAS
+lines are not issued.
+.It Fl f
+Fast Mode.
+When reading directories, the file name and modes are
 used to eliminate files from consideration and speed up the search:
-Directories with names that start with a '.' character are skipped.
+Directories with names that start with a
+.Ql \&.
+character are skipped.
 Executables must have the execute bit set, and
-shared objects must end with a .so extension. Files that do not
-meet these requirements are silently eliminated from consideration without
-further analysis.
-.TP 4
-.B \-h
+shared objects must end with a
+.Ql .so
+extension.
+Files that do not meet these requirements are silently eliminated from
+consideration without further analysis.
+.It Fl h
 Show usage message.
-.TP 4
-.B \-n
-Do not treat well known hard-linked binaries as special. Certain well known
-binaries (currently \fBalias\fP and \fBisaexec\fP) are hard linked to many
-other names in a proto directory tree.
-.P
+.It Fl n
+Do not treat well known hard-linked binaries as special.
+Certain well known binaries
+.Po
+currently
+.Pa alias
+and
+.Pa isaexec
+.Pc
+are hard linked to many other names in a proto directory tree.
+.Pp
 By default,
-.I find_elf
+.Nm
 will use these well known names as the initial name and all other hard links
-to those binaries are treated as aliases. Disabling this behavior with the
-\fB-n\fR option will choose the first name encountered during directory
-traversal as the name, and all other hard links to the binary as aliases.
-.TP 4
-.B \-r
+to those binaries are treated as aliases.
+Disabling this behavior with the
+.Fl n
+option will choose the first name encountered during directory traversal as
+the name, and all other hard links to the binary as aliases.
+.It Fl r
 Report file names as relative paths, relative to the given file or directory,
 instead of fully qualified.
-.TP 4
-.B \-s
+.It Fl s
 Only report shared objects.
-.SH OUTPUT
-.I find_elf
-produces a series of PREFIX, OBJECT, and ALIAS lines, which collectively
-describe the ELF objects located. Whitespace is used within each
+.El
+.Sh OUTPUT
+.Nm
+produces a series of
+.Sy PREFIX ,
+.Sy OBJECT ,
+and
+.Sy ALIAS
+lines, which collectively describe the ELF objects located.
+Whitespace is used within each
 line to delimit the various fields of information provided.
-.P
-If the \fB-r\fP option is used to specify that file names be reported
-as relative paths, a PREFIX line is output to provide the base path from
+.Pp
+If the
+.Fl r
+option is used to specify that file names be reported
+as relative paths, a
+.Sy PREFIX
+line is output to provide the base path from
 which the relative names should be interpreted.
-There can only be one PREFIX line, and it is output first, before any
-OBJECT or ALIAS lines.
-.sp
-.in +4
-.nf
+There can only be one
+.Sy PREFIX
+line, and it is output first, before any
+.Sy OBJECT
+or
+.Sy ALIAS
+lines.
+.Bd -literal -offset indent
 PREFIX path
-.fi
-.in -4
-.sp
-For each object found, an OBJECT line is produced to describe it:
-.sp
-.in +4
-.nf
+.Ed
+.Pp
+For each object found, an
+.Sy OBJECT
+line is produced to describe it:
+.Bd -literal -offset indent
 OBJECT [32 | 64] [DYN | EXEC | REL] [VERDEF | NOVERDEF] object-path
-.fi
-.in -4
-.sp
+.Ed
+.Pp
 The first field provides the ELF class of the object, and will be
 either 32 or 64.
 The second field provides the type of object, either
-a shared object (DYN), an executable (EXEC), or a relocatable object (REL).
-The third field will be VERDEF if the object contains ELF
-version definitions, and NOVERDEF if the object is not versioned.
+a shared object
+.Ql DYN ,
+an executable
+.Ql EXEC ,
+or a relocatable object
+.Ql REL .
+The third field will be
+.Ql VERDEF
+if the object contains ELF version definitions, and
+.Ql NOVERDEF
+if the object is not versioned.
 The final field gives the path to the object.
-.P
-Under Unix, a file can have multiple names. In the context of ELF
-objects, this often happens for one of two reasons:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.Pp
+Under Unix, a file can have multiple names.
+In the context of ELF objects, this often happens for one of two reasons:
+.Bl -bullet -offset indent
+.It
 Compilation symlinks, used to provide a non-versioned name for a shared object.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Symlinks such as '32' and '64' used to provide alternative
-non-machine specific paths to objects.
-.RE
-.sp
+.It
+Symlinks such as
+.Ql 32
+and
+.Ql 64
+used to provide alternative non-machine specific paths to objects.
+.El
+.Pp
 When
-.I find_elf
-identifies an object via such an aliased name, it issues an ALIAS line
-mapping it to the main name for the object:
-.sp
-.in +4
-.nf
+.Nm
+identifies an object via such an aliased name, it issues an
+.Sy ALIAS
+line mapping it to the main name for the object:
+.Bd -literal -offset indent
 ALIAS object-path alias-path
-.fi
-.in -4
-.sp
-The \fB-a\fP option alters the handling of aliased names. When \fB-a\fP is
-specified, each file results in a separate OBJECT line, as if they were
+.Ed
+.Pp
+The
+.Fl a
+option alters the handling of aliased names.
+When
+.Fl a
+is specified, each file results in a separate
+.Sy OBJECT
+line, as if they were
 independent files rather than the same file with different names.
-.sp
-.SH EXAMPLES
-Assume the following hierarchy of files exist under /usr/lib/foo:
-.sp
-.in +4
-.nf
+.Sh EXAMPLES
+Assume the following hierarchy of files exist under
+.Pa /usr/lib/foo :
+.Bd -literal -offset indent
 % /bin/ls -alRF /usr/lib/foo
 /usr/lib/foo:
 total 111
@@ -156,17 +191,22 @@ drwxr-xr-x  2 root root   4 Jul 16 17:35 ./
 drwxr-xr-x  3 root root   7 Jul 16 17:35 ../
 lrwxrwxrwx  1 root bin    11 Jul 16 17:35 libfoo.so -> libfoo.so.1*
 -rwxr-xr-x  1 root bin 72536 Jul 16 17:35 libfoo.so.1*
-.fi
-.in -4
-.sp
-This hierarchy contains compilation symlinks (libfoo.so) and
-path alias symlinks (32, 64), as discussed in OUTPUT.
-.P
-.I find_elf
+.Ed
+.Pp
+This hierarchy contains compilation symlinks
+.Po
+.Pa libfoo.so
+.Pc
+and path alias symlinks
+.Po
+32, 64
+.Pc ,
+as discussed in
+.Sx OUTPUT .
+.Pp
+.Nm
 produces the following output for the above hierarchy:
-.sp
-.in +4
-.nf
+.Bd -literal -offset indent
 % find_elf -r /usr/lib/foo
 PREFIX /usr/lib/foo
 OBJECT 64 DYN  VERDEF  amd64/libfoo.so.1
@@ -177,14 +217,12 @@ OBJECT 32 DYN  VERDEF  libfoo.so.1
 ALIAS                  libfoo.so.1        32/libfoo.so
 ALIAS                  libfoo.so.1        32/libfoo.so.1
 ALIAS                  libfoo.so.1        libfoo.so
-.fi
-.in -4
-.sp
-Contrast this with the output when \fB-a\fP is used to treat
-each name as an independent file:
-.sp
-.in +4
-.nf
+.Ed
+.Pp
+Contrast this with the output when
+.Fl a
+is used to treat each name as an independent file:
+.Bd -literal -offset indent
 % find_elf -ar /usr/lib/foo
 PREFIX /usr/lib/foo
 OBJECT 32 DYN  VERDEF  32/libfoo.so
@@ -195,40 +233,32 @@ OBJECT 64 DYN  VERDEF  amd64/libfoo.so.1
 OBJECT 64 DYN  VERDEF  amd64/libfoo.so
 OBJECT 32 DYN  VERDEF  libfoo.so.1
 OBJECT 32 DYN  VERDEF  libfoo.so
-.fi
-.in -4
-.sp
+.Ed
+.Pp
 When
-.I find_elf
+.Nm
 is used to process an alias for which no target object is given,
-there will be no output. For example, using /lib/libc.so, which
-is a compilation symlink for /lib/libc.so.1:
-.sp
-.in +4
-.nf
+there will be no output.
+For example, using
+.Pa /lib/libc.so ,
+which is a compilation symlink for
+.Pa /lib/libc.so.1 :
+.Bd -literal -offset indent
 % find_elf /lib/libc.so
-.fi
-.in -4
-.sp
-In such situations, the \fB-a\fP option can be used to produce
-the desired output:
-.sp
-.in +4
-.nf
+.Ed
+.Pp
+In such situations, the
+.Fl a
+option can be used to produce the desired output:
+.Bd -literal -offset indent
 % find_elf -a /lib/libc.so
 OBJECT 32 DYN  VERDEF   /lib/libc.so
-.fi
-.in -4
-.sp
-.PP
-.RS
-.nf
-.SH SEE ALSO
-.BR check_rtime (1ONBLD),
-.BR interface_check (1ONBLD),
-.BR interface_cmp (1ONBLD),
-.BR ld (1),
-.BR ldd (1),
-.BR elfdump (1),
-.BR pvs (1).
-
+.Ed
+.Sh SEE ALSO
+.Xr elfdump 1 ,
+.Xr ld 1 ,
+.Xr ldd 1 ,
+.Xr pvs 1 ,
+.Xr check_rtime 1ONBLD ,
+.Xr interface_check 1ONBLD ,
+.Xr interface_cmp 1ONBLD
