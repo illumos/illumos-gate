@@ -1439,7 +1439,7 @@ h lib/fs/dev/mount=etc/fs/dev/mount
 d lib/fs/hsfs 0755 root sys
 h lib/fs/hsfs/mount=etc/fs/hsfs/mount
 d lib/fs/nfs 0755 root sys
-h lib/fs/nfs/mount=etc/fs/nfs/mount
+s lib/fs/nfs/mount=../../../usr/lib/fs/nfs/mount
 d lib/fs/ufs 0755 root sys
 h lib/fs/ufs/mount=etc/fs/ufs/mount
 d lib/fs/zfs 0755 root sys
