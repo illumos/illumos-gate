@@ -738,6 +738,57 @@ out:
 	return (error);
 }
 
+static void
+zfs_write_clear_setid_bits_if_necessary(zfsvfs_t *zfsvfs, znode_t *zp,
+    cred_t *cr, boolean_t *did_check, dmu_tx_t *tx)
+{
+	ASSERT(did_check != NULL);
+	ASSERT(tx != NULL);
+
+	if (*did_check)
+		return;
+
+	zilog_t *zilog = zfsvfs->z_log;
+
+	/*
+	 * Clear Set-UID/Set-GID bits on successful write if not
+	 * privileged and at least one of the execute bits is set.
+	 *
+	 * It would be nice to do this after all writes have
+	 * been done, but that would still expose the ISUID/ISGID
+	 * to another app after the partial write is committed.
+	 *
+	 * Note: we don't call zfs_fuid_map_id() here because
+	 * user 0 is not an ephemeral uid.
+	 */
+	mutex_enter(&zp->z_acl_lock);
+	if ((zp->z_mode & (S_IXUSR | (S_IXUSR >> 3) | (S_IXUSR >> 6))) != 0 &&
+	    (zp->z_mode & (S_ISUID | S_ISGID)) != 0 &&
+	    secpolicy_vnode_setid_retain(cr,
+	    ((zp->z_mode & S_ISUID) != 0 && zp->z_uid == 0)) != 0) {
+		uint64_t newmode;
+		vattr_t va;
+
+		zp->z_mode &= ~(S_ISUID | S_ISGID);
+		newmode = zp->z_mode;
+		(void) sa_update(zp->z_sa_hdl, SA_ZPL_MODE(zfsvfs),
+		    (void *)&newmode, sizeof (uint64_t), tx);
+
+		/*
+		 * Make sure SUID/SGID bits will be removed when we replay the
+		 * log.
+		 */
+		bzero(&va, sizeof (va));
+		va.va_mask = AT_MODE;
+		va.va_nodeid = zp->z_id;
+		va.va_mode = newmode;
+		zfs_log_setattr(zilog, tx, TX_SETATTR, zp, &va, AT_MODE, NULL);
+	}
+	mutex_exit(&zp->z_acl_lock);
+
+	*did_check = B_TRUE;
+}
+
 /*
  * Write the bytes to a file.
  *
@@ -784,6 +835,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	int		count = 0;
 	sa_bulk_attr_t	bulk[4];
 	uint64_t	mtime[2], ctime[2];
+	boolean_t	did_clear_setid_bits = B_FALSE;
 
 	/*
 	 * Fasttrack empty write
@@ -973,6 +1025,11 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		}
 
 		/*
+		 * NB: We must call zfs_write_clear_setid_bits_if_necessary
+		 * before committing the transaction!
+		 */
+
+		/*
 		 * If rangelock_enter() over-locked we grow the blocksize
 		 * and then reduce the lock range.  This will only happen
 		 * on the first iteration since rangelock_reduce() will
@@ -1049,30 +1106,8 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			break;
 		}
 
-		/*
-		 * Clear Set-UID/Set-GID bits on successful write if not
-		 * privileged and at least one of the excute bits is set.
-		 *
-		 * It would be nice to to this after all writes have
-		 * been done, but that would still expose the ISUID/ISGID
-		 * to another app after the partial write is committed.
-		 *
-		 * Note: we don't call zfs_fuid_map_id() here because
-		 * user 0 is not an ephemeral uid.
-		 */
-		mutex_enter(&zp->z_acl_lock);
-		if ((zp->z_mode & (S_IXUSR | (S_IXUSR >> 3) |
-		    (S_IXUSR >> 6))) != 0 &&
-		    (zp->z_mode & (S_ISUID | S_ISGID)) != 0 &&
-		    secpolicy_vnode_setid_retain(cr,
-		    (zp->z_mode & S_ISUID) != 0 && zp->z_uid == 0) != 0) {
-			uint64_t newmode;
-			zp->z_mode &= ~(S_ISUID | S_ISGID);
-			newmode = zp->z_mode;
-			(void) sa_update(zp->z_sa_hdl, SA_ZPL_MODE(zfsvfs),
-			    (void *)&newmode, sizeof (uint64_t), tx);
-		}
-		mutex_exit(&zp->z_acl_lock);
+		zfs_write_clear_setid_bits_if_necessary(zfsvfs, zp, cr,
+		    &did_clear_setid_bits, tx);
 
 		zfs_tstamp_update_setup(zp, CONTENT_MODIFIED, mtime, ctime,
 		    B_TRUE);
@@ -1100,6 +1135,11 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		prev_error = error;
 		error = sa_bulk_update(zp->z_sa_hdl, bulk, count, tx);
 
+		/*
+		 * NB: During replay, the TX_SETATTR record logged by
+		 * zfs_write_clear_setid_bits_if_necessary must precede
+		 * any of the TX_WRITE records logged here.
+		 */
 		zfs_log_write(zilog, tx, TX_WRITE, zp, woff, tx_bytes, ioflag);
 		dmu_tx_commit(tx);
 
