@@ -41,6 +41,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/cdefs.h>
@@ -347,6 +348,12 @@ static const struct vie_op one_byte_opcodes[256] = {
 		/* XXX Group 1A extended opcode - not just POP */
 		.op_byte = 0x8F,
 		.op_type = VIE_OP_TYPE_POP,
+	},
+	[0xF6] = {
+		/* XXX Group 3 extended opcode - not just TEST */
+		.op_byte = 0xF6,
+		.op_type = VIE_OP_TYPE_TEST,
+		.op_flags = VIE_OP_F_IMM8,
 	},
 	[0xF7] = {
 		/* XXX Group 3 extended opcode - not just TEST */
@@ -1591,6 +1598,26 @@ vie_emulate_test(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 	error = EINVAL;
 
 	switch (vie->op.op_byte) {
+	case 0xF6:
+		/*
+		 * F6 /0		test r/m8, imm8
+		 *
+		 * Test mem (ModRM:r/m) with immediate and set status
+		 * flags according to the results.  The comparison is
+		 * performed by anding the immediate from the first
+		 * operand and then setting the status flags.
+		 */
+		if ((vie->reg & 7) != 0)
+			return (EINVAL);
+
+		size = 1;	/* override for byte operation */
+
+		error = vie_mmio_read(vie, vm, vcpuid, gpa, &op1, size);
+		if (error)
+			return (error);
+
+		rflags2 = getandflags(size, op1, vie->immediate);
+		break;
 	case 0xF7:
 		/*
 		 * F7 /0		test r/m16, imm16
