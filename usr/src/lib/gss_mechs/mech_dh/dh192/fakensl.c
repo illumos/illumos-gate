@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/rpc.h>
 #include <rpc/key_prot.h>
 
@@ -40,7 +38,7 @@ extern int key_decryptsession_pk(const char *, netobj *, des_block *);
 
 /*ARGSUSED*/
 int
-__getpublickey_cached_g(const char remotename[MAXNETNAMELEN], int keylen,
+__getpublickey_cached_g(const char remotename[], int keylen,
     int algtype, char *pkey, size_t pkeylen, int *cached)
 {
 	return (getpublickey(remotename, pkey));
@@ -49,7 +47,7 @@ __getpublickey_cached_g(const char remotename[MAXNETNAMELEN], int keylen,
 #pragma weak getpublickey_g
 /*ARGSUSED*/
 int
-getpublickey_g(const char remotename[MAXNETNAMELEN], int keylen,
+getpublickey_g(const char remotename[], int keylen,
     int algtype, char *pkey, size_t pkeylen)
 {
 	return (getpublickey(remotename, pkey));

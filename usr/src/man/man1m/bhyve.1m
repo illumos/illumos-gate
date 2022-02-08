@@ -24,7 +24,7 @@
 .\"
 .\" Portions Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd September 10, 2021
+.Dd November 18, 2021
 .Dt BHYVE 1M
 .Os
 .Sh NAME
@@ -60,14 +60,14 @@
 .Oo \&, Ns Ar key Ns = Ns Ar value Ns Oc \&...
 .Oc
 .Sm on
-.Op Fl k Ar file
+.Op Fl k Ar config_file
 .Oo Fl l
 .Sm off
 .Ar lpcdev Op Cm \&, Ar conf
 .Sm on
 .Oc
-.Oo Fl m
 .Sm off
+.Oo Fl m\~
 .Ar memsize
 .Oo
 .Cm K | k | M | m | G | g | T | t
@@ -191,7 +191,7 @@ Yield the virtual CPU thread when a HLT instruction is detected.
 If this option is not specified, virtual CPUs will use 100% of a host CPU.
 .It Fl h
 Print help message and exit.
-.It Fl k Ar file
+.It Fl k Ar config_file
 Set configuration variables from a simple, key-value config file.
 Each line of the config file is expected to consist of a config variable
 name, an equals sign
@@ -202,6 +202,9 @@ value.
 Blank lines and lines starting with
 .Sq #
 are ignored.
+See
+.Xr bhyve_config 4
+for more details.
 .It Fl l Cm help
 Print a list of supported LPC devices.
 .It Fl l Ar lpcdev Ns Op \&, Ns Ar conf
@@ -474,10 +477,15 @@ Use the host TTY device for serial port I/O.
 .Pp
 .Sy Boot ROM device backends :
 .Bl -tag -width 10n
-.It Pa romfile
+.It Pa romfile Ns Op Cm \&, Ns Ar varfile
 Map
 .Ar romfile
 in the guest address space reserved for boot firmware.
+If
+.Ar varfile
+is provided, that file is also mapped in the boot firmware guest
+address space, and any modifications the guest makes will be saved
+to that file.
 .El
 .Pp
 .Sy Pass-through device backends :
@@ -802,6 +810,20 @@ bhyve -c 2 -m 4G -w -H \e
   -s 30,xhci,tablet \e
   -s 31,lpc -l com1,stdio \e
   -l bootrom,/usr/share/bhyve/firmware/BHYVE_UEFI.fd \e
+   uefivm
+.Ed
+.Pp
+Run a UEFI virtual machine with a VARS file to save EFI variables.
+Note that
+.Nm
+will write guest modifications to the given VARS file.
+Be sure to create a per-guest copy of the template VARS file from
+.Pa /usr/share/bhyve/firmware .
+.Bd -literal -offset indent
+bhyve -c 2 -m 4g -w -H \e
+  -s 0,hostbridge \e
+  -s 31,lpc -p com1,stdio \e
+  -l bootrom,/usr/share/bhyve/firmware/BHYVE_UEFI.fd,BHYVE_UEFI_VARS.fd \e
    uefivm
 .Ed
 .Sh SEE ALSO

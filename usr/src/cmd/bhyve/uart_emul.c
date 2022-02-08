@@ -221,7 +221,7 @@ rxfifo_reset(struct uart_softc *sc, int size)
 	struct fifo *fifo;
 	ssize_t nread;
 	int error;
- 
+
 	fifo = &sc->rxfifo;
 	bzero(fifo, sizeof(struct fifo));
 	fifo->size = size;

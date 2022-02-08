@@ -5,7 +5,7 @@
  * Copyright (c) 2018 Leon Dang
  * Copyright (c) 2020 Chuck Tuffli
  *
- * Function crc16 Copyright (c) 2017, Fedor Uporov 
+ * Function crc16 Copyright (c) 2017, Fedor Uporov
  *     Obtained from function ext2_crc16() in sys/fs/ext2fs/ext2_csum.c
  *
  * Redistribution and use in source and binary forms, with or without
@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD$");
 
 #include <assert.h>
 #include <pthread.h>
+#include <pthread_np.h>
 #include <semaphore.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -253,9 +254,37 @@ struct nvme_feature_obj {
 
 #define NVME_FID_MAX		(NVME_FEAT_ENDURANCE_GROUP_EVENT_CONFIGURATION + 1)
 
+typedef enum {
+	PCI_NVME_AE_TYPE_ERROR = 0,
+	PCI_NVME_AE_TYPE_SMART,
+	PCI_NVME_AE_TYPE_NOTICE,
+	PCI_NVME_AE_TYPE_IO_CMD = 6,
+	PCI_NVME_AE_TYPE_VENDOR = 7,
+	PCI_NVME_AE_TYPE_MAX		/* Must be last */
+} pci_nvme_async_type;
+
+/* Asynchronous Event Requests */
 struct pci_nvme_aer {
 	STAILQ_ENTRY(pci_nvme_aer) link;
 	uint16_t	cid;	/* Command ID of the submitted AER */
+};
+
+typedef enum {
+	PCI_NVME_AE_INFO_NS_ATTR_CHANGED = 0,
+	PCI_NVME_AE_INFO_FW_ACTIVATION,
+	PCI_NVME_AE_INFO_TELEMETRY_CHANGE,
+	PCI_NVME_AE_INFO_ANA_CHANGE,
+	PCI_NVME_AE_INFO_PREDICT_LATENCY_CHANGE,
+	PCI_NVME_AE_INFO_LBA_STATUS_ALERT,
+	PCI_NVME_AE_INFO_ENDURANCE_GROUP_CHANGE,
+	PCI_NVME_AE_INFO_MAX,
+} pci_nvme_async_info;
+
+/* Asynchronous Event Notifications */
+struct pci_nvme_aen {
+	pci_nvme_async_type atype;
+	uint32_t	event_data;
+	bool		posted;
 };
 
 struct pci_nvme_softc {
@@ -270,6 +299,7 @@ struct pci_nvme_softc {
 	struct nvme_error_information_entry err_log;
 	struct nvme_health_information_page health_log;
 	struct nvme_firmware_page fw_log;
+	struct nvme_ns_list ns_log;
 
 	struct pci_nvme_blockstore nvstore;
 
@@ -305,10 +335,21 @@ struct pci_nvme_softc {
 	uint32_t	write_dunits_remainder;
 
 	STAILQ_HEAD(, pci_nvme_aer) aer_list;
+	pthread_mutex_t	aer_mtx;
 	uint32_t	aer_count;
+	struct pci_nvme_aen aen[PCI_NVME_AE_TYPE_MAX];
+	pthread_t	aen_tid;
+	pthread_mutex_t	aen_mtx;
+	pthread_cond_t	aen_cond;
 };
 
 
+static void pci_nvme_cq_update(struct pci_nvme_softc *sc,
+    struct nvme_completion_queue *cq,
+    uint32_t cdw0,
+    uint16_t cid,
+    uint16_t sqid,
+    uint16_t status);
 static struct pci_nvme_ioreq *pci_nvme_get_ioreq(struct pci_nvme_softc *);
 static void pci_nvme_release_ioreq(struct pci_nvme_softc *, struct pci_nvme_ioreq *);
 static void pci_nvme_io_done(struct blockif_req *, int);
@@ -362,6 +403,8 @@ static void nvme_feature_iv_config(struct pci_nvme_softc *,
     struct nvme_feature_obj *,
     struct nvme_command *,
     struct nvme_completion *);
+
+static void *aen_thr(void *arg);
 
 static __inline void
 cpywithpad(char *dst, size_t dst_size, const char *src, char pad)
@@ -471,6 +514,18 @@ pci_nvme_init_ctrldata(struct pci_nvme_softc *sc)
 	cd->ver = 0x00010300;
 
 	cd->oacs = 1 << NVME_CTRLR_DATA_OACS_FORMAT_SHIFT;
+#ifndef __FreeBSD__
+	/*
+	 * Reported upstream against https://reviews.freebsd.org/D32953
+	 * which introduced support for the namespace attribute changed AEN
+	 * and the corresponding changed namespace log page, without setting
+	 * the bit in oaes. A future sync will likely include this
+	 * definition in usr/src/contrib/bhyve/dev/nvme/nvme.h once it's
+	 * fixed there.
+	 */
+#define	NVME_CTRLR_DATA_OAES_NSCHANGE_SHIFT	(8)
+	cd->oaes = 1 << NVME_CTRLR_DATA_OAES_NSCHANGE_SHIFT;
+#endif
 	cd->acl = 2;
 	cd->aerl = 4;
 
@@ -559,15 +614,23 @@ crc16(uint16_t crc, const void *buffer, unsigned int len)
 }
 
 static void
-pci_nvme_init_nsdata(struct pci_nvme_softc *sc,
-    struct nvme_namespace_data *nd, uint32_t nsid,
-    struct pci_nvme_blockstore *nvstore)
+pci_nvme_init_nsdata_size(struct pci_nvme_blockstore *nvstore,
+    struct nvme_namespace_data *nd)
 {
 
 	/* Get capacity and block size information from backing store */
 	nd->nsze = nvstore->size / nvstore->sectsz;
 	nd->ncap = nd->nsze;
 	nd->nuse = nd->nsze;
+}
+
+static void
+pci_nvme_init_nsdata(struct pci_nvme_softc *sc,
+    struct nvme_namespace_data *nd, uint32_t nsid,
+    struct pci_nvme_blockstore *nvstore)
+{
+
+	pci_nvme_init_nsdata_size(nvstore, nd);
 
 	if (nvstore->type == NVME_STOR_BLOCKIF)
 		nvstore->deallocate = blockif_candelete(nvstore->ctx);
@@ -603,6 +666,7 @@ pci_nvme_init_logpages(struct pci_nvme_softc *sc)
 	memset(&sc->err_log, 0, sizeof(sc->err_log));
 	memset(&sc->health_log, 0, sizeof(sc->health_log));
 	memset(&sc->fw_log, 0, sizeof(sc->fw_log));
+	memset(&sc->ns_log, 0, sizeof(sc->ns_log));
 
 	/* Set read/write remainder to round up according to spec */
 	sc->read_dunits_remainder = 999;
@@ -626,6 +690,8 @@ pci_nvme_init_features(struct pci_nvme_softc *sc)
 	sc->feat[NVME_FEAT_NUMBER_OF_QUEUES].set = nvme_feature_num_queues;
 	sc->feat[NVME_FEAT_INTERRUPT_VECTOR_CONFIGURATION].set =
 	    nvme_feature_iv_config;
+	/* Enable all AENs by default */
+	sc->feat[NVME_FEAT_ASYNC_EVENT_CONFIGURATION].cdw11 = 0x31f;
 	sc->feat[NVME_FEAT_PREDICTABLE_LATENCY_MODE_CONFIG].get =
 	    nvme_feature_invalid_cb;
 	sc->feat[NVME_FEAT_PREDICTABLE_LATENCY_MODE_WINDOW].get =
@@ -633,7 +699,7 @@ pci_nvme_init_features(struct pci_nvme_softc *sc)
 }
 
 static void
-pci_nvme_aer_init(struct pci_nvme_softc *sc)
+pci_nvme_aer_reset(struct pci_nvme_softc *sc)
 {
 
 	STAILQ_INIT(&sc->aer_list);
@@ -641,29 +707,35 @@ pci_nvme_aer_init(struct pci_nvme_softc *sc)
 }
 
 static void
+pci_nvme_aer_init(struct pci_nvme_softc *sc)
+{
+
+	pthread_mutex_init(&sc->aer_mtx, NULL);
+	pci_nvme_aer_reset(sc);
+}
+
+static void
 pci_nvme_aer_destroy(struct pci_nvme_softc *sc)
 {
 	struct pci_nvme_aer *aer = NULL;
 
+	pthread_mutex_lock(&sc->aer_mtx);
 	while (!STAILQ_EMPTY(&sc->aer_list)) {
 		aer = STAILQ_FIRST(&sc->aer_list);
 		STAILQ_REMOVE_HEAD(&sc->aer_list, link);
 		free(aer);
 	}
+	pthread_mutex_unlock(&sc->aer_mtx);
 
-	pci_nvme_aer_init(sc);
+	pci_nvme_aer_reset(sc);
 }
 
-#ifdef __FreeBSD__
 static bool
 pci_nvme_aer_available(struct pci_nvme_softc *sc)
 {
 
-	return (!STAILQ_EMPTY(&sc->aer_list));
+	return (sc->aer_count != 0);
 }
-#else
-/* This is kept behind an ifdef while it's unused to appease the compiler. */
-#endif
 
 static bool
 pci_nvme_aer_limit_reached(struct pci_nvme_softc *sc)
@@ -694,11 +766,13 @@ pci_nvme_aer_add(struct pci_nvme_softc *sc, uint16_t cid)
 	if (aer == NULL)
 		return (-1);
 
-	sc->aer_count++;
-
 	/* Save the Command ID for use in the completion message */
 	aer->cid = cid;
+
+	pthread_mutex_lock(&sc->aer_mtx);
+	sc->aer_count++;
 	STAILQ_INSERT_TAIL(&sc->aer_list, aer, link);
+	pthread_mutex_unlock(&sc->aer_mtx);
 
 	return (0);
 }
@@ -709,23 +783,218 @@ pci_nvme_aer_add(struct pci_nvme_softc *sc, uint16_t cid)
  * Returns a pointer to an AER previously submitted by the host or NULL if
  * no AER's exist. Caller is responsible for freeing the returned struct.
  */
-#ifdef __FreeBSD__
 static struct pci_nvme_aer *
 pci_nvme_aer_get(struct pci_nvme_softc *sc)
 {
 	struct pci_nvme_aer *aer = NULL;
 
+	pthread_mutex_lock(&sc->aer_mtx);
 	aer = STAILQ_FIRST(&sc->aer_list);
 	if (aer != NULL) {
 		STAILQ_REMOVE_HEAD(&sc->aer_list, link);
 		sc->aer_count--;
 	}
-	
+	pthread_mutex_unlock(&sc->aer_mtx);
+
 	return (aer);
 }
-#else
-/* This is kept behind an ifdef while it's unused to appease the compiler. */
+
+static void
+pci_nvme_aen_reset(struct pci_nvme_softc *sc)
+{
+	uint32_t	atype;
+
+	memset(sc->aen, 0, PCI_NVME_AE_TYPE_MAX * sizeof(struct pci_nvme_aen));
+
+	for (atype = 0; atype < PCI_NVME_AE_TYPE_MAX; atype++) {
+		sc->aen[atype].atype = atype;
+	}
+}
+
+static void
+pci_nvme_aen_init(struct pci_nvme_softc *sc)
+{
+	char nstr[80];
+
+	pci_nvme_aen_reset(sc);
+
+	pthread_mutex_init(&sc->aen_mtx, NULL);
+	pthread_create(&sc->aen_tid, NULL, aen_thr, sc);
+	snprintf(nstr, sizeof(nstr), "nvme-aen-%d:%d", sc->nsc_pi->pi_slot,
+	    sc->nsc_pi->pi_func);
+	pthread_set_name_np(sc->aen_tid, nstr);
+}
+
+static void
+pci_nvme_aen_destroy(struct pci_nvme_softc *sc)
+{
+
+	pci_nvme_aen_reset(sc);
+}
+
+/* Notify the AEN thread of pending work */
+static void
+pci_nvme_aen_notify(struct pci_nvme_softc *sc)
+{
+
+	pthread_cond_signal(&sc->aen_cond);
+}
+
+/*
+ * Post an Asynchronous Event Notification
+ */
+static int32_t
+pci_nvme_aen_post(struct pci_nvme_softc *sc, pci_nvme_async_type atype,
+		uint32_t event_data)
+{
+	struct pci_nvme_aen *aen;
+
+	if (atype >= PCI_NVME_AE_TYPE_MAX) {
+		return(EINVAL);
+	}
+
+	pthread_mutex_lock(&sc->aen_mtx);
+	aen = &sc->aen[atype];
+
+	/* Has the controller already posted an event of this type? */
+	if (aen->posted) {
+		pthread_mutex_unlock(&sc->aen_mtx);
+		return(EALREADY);
+	}
+
+	aen->event_data = event_data;
+	aen->posted = true;
+	pthread_mutex_unlock(&sc->aen_mtx);
+
+	pci_nvme_aen_notify(sc);
+
+	return(0);
+}
+
+static void
+pci_nvme_aen_process(struct pci_nvme_softc *sc)
+{
+	struct pci_nvme_aer *aer;
+	struct pci_nvme_aen *aen;
+	pci_nvme_async_type atype;
+	uint32_t mask;
+	uint16_t status;
+	uint8_t lid;
+
+#ifndef __FreeBSD__
+	lid = 0;
 #endif
+
+	assert(pthread_mutex_isowned_np(&sc->aen_mtx));
+	for (atype = 0; atype < PCI_NVME_AE_TYPE_MAX; atype++) {
+		aen = &sc->aen[atype];
+		/* Previous iterations may have depleted the available AER's */
+		if (!pci_nvme_aer_available(sc)) {
+			DPRINTF("%s: no AER", __func__);
+			break;
+		}
+
+		if (!aen->posted) {
+			DPRINTF("%s: no AEN posted for atype=%#x", __func__, atype);
+			continue;
+		}
+
+		status = NVME_SC_SUCCESS;
+
+		/* Is the event masked? */
+		mask =
+		    sc->feat[NVME_FEAT_ASYNC_EVENT_CONFIGURATION].cdw11;
+
+		DPRINTF("%s: atype=%#x mask=%#x event_data=%#x", __func__, atype, mask, aen->event_data);
+		switch (atype) {
+		case PCI_NVME_AE_TYPE_ERROR:
+			lid = NVME_LOG_ERROR;
+			break;
+		case PCI_NVME_AE_TYPE_SMART:
+			mask &= 0xff;
+			if ((mask & aen->event_data) == 0)
+				continue;
+			lid = NVME_LOG_HEALTH_INFORMATION;
+			break;
+		case PCI_NVME_AE_TYPE_NOTICE:
+			if (aen->event_data >= PCI_NVME_AE_INFO_MAX) {
+				EPRINTLN("%s unknown AEN notice type %u",
+				    __func__, aen->event_data);
+				status = NVME_SC_INTERNAL_DEVICE_ERROR;
+				break;
+			}
+			mask >>= 8;
+			if (((1 << aen->event_data) & mask) == 0)
+				continue;
+			switch (aen->event_data) {
+			case PCI_NVME_AE_INFO_NS_ATTR_CHANGED:
+				lid = NVME_LOG_CHANGED_NAMESPACE;
+				break;
+			case PCI_NVME_AE_INFO_FW_ACTIVATION:
+				lid = NVME_LOG_FIRMWARE_SLOT;
+				break;
+			case PCI_NVME_AE_INFO_TELEMETRY_CHANGE:
+				lid = NVME_LOG_TELEMETRY_CONTROLLER_INITIATED;
+				break;
+			case PCI_NVME_AE_INFO_ANA_CHANGE:
+				lid = NVME_LOG_ASYMMETRIC_NAMESPAVE_ACCESS; //TODO spelling
+				break;
+			case PCI_NVME_AE_INFO_PREDICT_LATENCY_CHANGE:
+				lid = NVME_LOG_PREDICTABLE_LATENCY_EVENT_AGGREGATE;
+				break;
+			case PCI_NVME_AE_INFO_LBA_STATUS_ALERT:
+				lid = NVME_LOG_LBA_STATUS_INFORMATION;
+				break;
+			case PCI_NVME_AE_INFO_ENDURANCE_GROUP_CHANGE:
+				lid = NVME_LOG_ENDURANCE_GROUP_EVENT_AGGREGATE;
+				break;
+			default:
+				lid = 0;
+			}
+			break;
+		default:
+			/* bad type?!? */
+			EPRINTLN("%s unknown AEN type %u", __func__, atype);
+			status = NVME_SC_INTERNAL_DEVICE_ERROR;
+			break;
+		}
+
+		aer = pci_nvme_aer_get(sc);
+		assert(aer != NULL);
+
+		DPRINTF("%s: CID=%#x CDW0=%#x", __func__, aer->cid, (lid << 16) | (aen->event_data << 8) | atype);
+		pci_nvme_cq_update(sc, &sc->compl_queues[0],
+		    (lid << 16) | (aen->event_data << 8) | atype, /* cdw0 */
+		    aer->cid,
+		    0,		/* SQID */
+		    status);
+
+		aen->event_data = 0;
+		aen->posted = false;
+
+		pci_generate_msix(sc->nsc_pi, 0);
+	}
+}
+
+static void *
+aen_thr(void *arg)
+{
+	struct pci_nvme_softc *sc;
+
+	sc = arg;
+
+	pthread_mutex_lock(&sc->aen_mtx);
+	for (;;) {
+		pci_nvme_aen_process(sc);
+		pthread_cond_wait(&sc->aen_cond, &sc->aen_mtx);
+	}
+#ifdef __FreeBSD__
+	pthread_mutex_unlock(&sc->aen_mtx);
+
+	pthread_exit(NULL);
+#endif
+	return (NULL);
+}
 
 static void
 pci_nvme_reset_locked(struct pci_nvme_softc *sc)
@@ -767,6 +1036,7 @@ pci_nvme_reset_locked(struct pci_nvme_softc *sc)
 	sc->num_q_is_set = false;
 
 	pci_nvme_aer_destroy(sc);
+	pci_nvme_aen_destroy(sc);
 }
 
 static void
@@ -792,7 +1062,7 @@ pci_nvme_init_controller(struct vmctx *ctx, struct pci_nvme_softc *sc)
 	DPRINTF("%s mapping Admin-SQ guest 0x%lx, host: %p",
 	        __func__, sc->regs.asq, sc->submit_queues[0].qbase);
 
-	acqs = ((sc->regs.aqa >> NVME_AQA_REG_ACQS_SHIFT) & 
+	acqs = ((sc->regs.aqa >> NVME_AQA_REG_ACQS_SHIFT) &
 	    NVME_AQA_REG_ACQS_MASK) + 1;
 	sc->compl_queues[0].size = acqs;
 	sc->compl_queues[0].qbase = vm_map_gpa(ctx, sc->regs.acq,
@@ -973,7 +1243,7 @@ nvme_opc_create_io_sq(struct pci_nvme_softc* sc, struct nvme_command* command,
 		DPRINTF("%s completed creating IOSQ qid %u",
 		         __func__, qid);
 	} else {
-		/* 
+		/*
 		 * Guest sent non-cont submission queue request.
 		 * This setting is unsupported by this emulation.
 		 */
@@ -1127,6 +1397,13 @@ nvme_opc_get_log_page(struct pci_nvme_softc* sc, struct nvme_command* command,
 		    command->prp2, (uint8_t *)&sc->fw_log,
 		    MIN(logsize, sizeof(sc->fw_log)),
 		    NVME_COPY_TO_PRP);
+		break;
+	case NVME_LOG_CHANGED_NAMESPACE:
+		nvme_prp_memcpy(sc->nsc_pi->pi_vmctx, command->prp1,
+		    command->prp2, (uint8_t *)&sc->ns_log,
+		    MIN(logsize, sizeof(sc->ns_log)),
+		    NVME_COPY_TO_PRP);
+		memset(&sc->ns_log, 0, sizeof(sc->ns_log));
 		break;
 	default:
 		DPRINTF("%s get log page %x command not supported",
@@ -1425,8 +1702,13 @@ nvme_opc_set_features(struct pci_nvme_softc *sc, struct nvme_command *command,
 	if (feat->set)
 		feat->set(sc, feat, command, compl);
 
-	if (compl->status == NVME_SC_SUCCESS)
+	DPRINTF("%s: status=%#x cdw11=%#x", __func__, compl->status, command->cdw11);
+	if (compl->status == NVME_SC_SUCCESS) {
 		feat->cdw11 = command->cdw11;
+		if ((fid == NVME_FEAT_ASYNC_EVENT_CONFIGURATION) &&
+		    (command->cdw11 != 0))
+			pci_nvme_aen_notify(sc);
+	}
 
 	return (0);
 }
@@ -1544,7 +1826,8 @@ static int
 nvme_opc_async_event_req(struct pci_nvme_softc* sc,
 	struct nvme_command* command, struct nvme_completion* compl)
 {
-	DPRINTF("%s async event request 0x%x", __func__, command->cdw11);
+	DPRINTF("%s async event request count=%u aerl=%u cid=%#x", __func__,
+	    sc->aer_count, sc->ctrldata.aerl, command->cid);
 
 	/* Don't exceed the Async Event Request Limit (AERL). */
 	if (pci_nvme_aer_limit_reached(sc)) {
@@ -1565,6 +1848,7 @@ nvme_opc_async_event_req(struct pci_nvme_softc* sc,
 	 * there is an event reflective of the request to get event.
 	 */
 	compl->status = NVME_NO_STATUS;
+	pci_nvme_aen_notify(sc);
 
 	return (0);
 }
@@ -1587,7 +1871,7 @@ pci_nvme_handle_admin_cmd(struct pci_nvme_softc* sc, uint64_t value)
 
 	sqhead = sq->head;
 	DPRINTF("sqhead %u, tail %u", sqhead, sq->tail);
-	
+
 	while (sqhead != atomic_load_acq_short(&sq->tail)) {
 		cmd = &(sq->qbase)[sqhead];
 		compl.cdw0 = 0;
@@ -2056,6 +2340,7 @@ nvme_opc_write_read(struct pci_nvme_softc *sc,
 
 	lba = ((uint64_t)cmd->cdw11 << 32) | cmd->cdw10;
 	nblocks = (cmd->cdw12 & 0xFFFF) + 1;
+
 	if (pci_nvme_out_of_range(nvstore, lba, nblocks)) {
 		WPRINTF("%s command would exceed LBA range", __func__);
 		pci_nvme_status_genc(status, NVME_SC_LBA_OUT_OF_RANGE);
@@ -2755,6 +3040,28 @@ pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
 	return (0);
 }
 
+static void
+pci_nvme_resized(struct blockif_ctxt *bctxt, void *arg, size_t new_size)
+{
+	struct pci_nvme_softc *sc;
+	struct pci_nvme_blockstore *nvstore;
+	struct nvme_namespace_data *nd;
+
+	sc = arg;
+	nvstore = &sc->nvstore;
+	nd = &sc->nsdata;
+
+	nvstore->size = new_size;
+	pci_nvme_init_nsdata_size(nvstore, nd);
+
+	/* Add changed NSID to list */
+	sc->ns_log.ns[0] = 1;
+	sc->ns_log.ns[1] = 0;
+
+	pci_nvme_aen_post(sc, PCI_NVME_AE_TYPE_NOTICE,
+	    PCI_NVME_AE_INFO_NS_ATTR_CHANGED);
+}
+
 static int
 pci_nvme_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 {
@@ -2820,6 +3127,7 @@ pci_nvme_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 
 	pthread_mutex_init(&sc->mtx, NULL);
 	sem_init(&sc->iosemlock, 0, sc->ioslots);
+	blockif_register_resize_callback(sc->nvstore.ctx, pci_nvme_resized, sc);
 
 	pci_nvme_init_queues(sc, sc->max_queues, sc->max_queues);
 	/*
@@ -2832,6 +3140,7 @@ pci_nvme_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	pci_nvme_init_features(sc);
 
 	pci_nvme_aer_init(sc);
+	pci_nvme_aen_init(sc);
 
 	pci_nvme_reset(sc);
 
