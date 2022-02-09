@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2022 Spencer Evans-Cole.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  */
@@ -837,13 +838,13 @@ done:
 void
 vn_rele(vnode_t *vp)
 {
-	VERIFY(vp->v_count > 0);
 	mutex_enter(&vp->v_lock);
 	if (vp->v_count == 1) {
 		mutex_exit(&vp->v_lock);
 		VOP_INACTIVE(vp, CRED(), NULL);
 		return;
 	}
+	VERIFY(vp->v_count > 0);
 	VN_RELE_LOCKED(vp);
 	mutex_exit(&vp->v_lock);
 }
@@ -857,8 +858,8 @@ vn_rele(vnode_t *vp)
 void
 vn_rele_dnlc(vnode_t *vp)
 {
-	VERIFY((vp->v_count > 0) && (vp->v_count_dnlc > 0));
 	mutex_enter(&vp->v_lock);
+	VERIFY((vp->v_count > 0) && (vp->v_count_dnlc > 0));
 	if (--vp->v_count_dnlc == 0) {
 		if (vp->v_count == 1) {
 			mutex_exit(&vp->v_lock);
@@ -880,7 +881,6 @@ vn_rele_dnlc(vnode_t *vp)
 void
 vn_rele_stream(vnode_t *vp)
 {
-	VERIFY(vp->v_count > 0);
 	mutex_enter(&vp->v_lock);
 	vp->v_stream = NULL;
 	if (vp->v_count == 1) {
@@ -888,6 +888,7 @@ vn_rele_stream(vnode_t *vp)
 		VOP_INACTIVE(vp, CRED(), NULL);
 		return;
 	}
+	VERIFY(vp->v_count > 0);
 	VN_RELE_LOCKED(vp);
 	mutex_exit(&vp->v_lock);
 }
@@ -911,7 +912,6 @@ vn_rele_inactive(vnode_t *vp)
 void
 vn_rele_async(vnode_t *vp, taskq_t *taskq)
 {
-	VERIFY(vp->v_count > 0);
 	mutex_enter(&vp->v_lock);
 	if (vp->v_count == 1) {
 		mutex_exit(&vp->v_lock);
@@ -919,6 +919,7 @@ vn_rele_async(vnode_t *vp, taskq_t *taskq)
 		    vp, TQ_SLEEP) != TASKQID_INVALID);
 		return;
 	}
+	VERIFY(vp->v_count > 0);
 	VN_RELE_LOCKED(vp);
 	mutex_exit(&vp->v_lock);
 }
