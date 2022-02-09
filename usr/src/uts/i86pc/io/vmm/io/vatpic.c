@@ -66,32 +66,41 @@ static MALLOC_DEFINE(M_VATPIC, "atpic", "bhyve virtual atpic (8259)");
 #define	VATPIC_UNLOCK(vatpic)		mtx_unlock_spin(&((vatpic)->mtx))
 #define	VATPIC_LOCKED(vatpic)		mtx_owned(&((vatpic)->mtx))
 
+#define	IRQ_BASE_MASK	0xf8
+
 enum irqstate {
 	IRQSTATE_ASSERT,
 	IRQSTATE_DEASSERT,
 	IRQSTATE_PULSE
 };
 
-struct atpic {
-	bool		ready;
-	int		icw_num;
-	int		rd_cmd_reg;
+enum icw_state {
+	IS_ICW1 = 0,
+	IS_ICW2,
+	IS_ICW3,
+	IS_ICW4,
+};
 
-	bool		aeoi;
+struct atpic {
+	enum icw_state	icw_state;
+
+	bool		ready;
+	bool		auto_eoi;
 	bool		poll;
 	bool		rotate;
-	bool		sfn;		/* special fully-nested mode */
+	bool		special_full_nested;
+	bool		read_isr_next;
+	bool		intr_raised;
+	bool		special_mask_mode;
 
-	int		irq_base;
-	uint8_t		request;	/* Interrupt Request Register (IIR) */
-	uint8_t		service;	/* Interrupt Service (ISR) */
-	uint8_t		mask;		/* Interrupt Mask Register (IMR) */
-	uint8_t		smm;		/* special mask mode */
+	uint8_t		reg_irr;	/* Interrupt Request Register (IIR) */
+	uint8_t		reg_isr;	/* Interrupt Service (ISR) */
+	uint8_t		reg_imr;	/* Interrupt Mask Register (IMR) */
+	uint8_t		irq_base;	/* base interrupt vector */
+	uint8_t		lowprio;	/* lowest priority irq */
+	uint8_t		elc;		/* level-triggered mode bits */
 
 	uint_t		acnt[8];	/* sum of pin asserts and deasserts */
-	int		lowprio;	/* lowest priority irq */
-
-	bool		intr_raised;
 };
 
 struct atpic_stats {
@@ -104,7 +113,6 @@ struct vatpic {
 	struct vm	*vm;
 	struct mtx	mtx;
 	struct atpic	atpic[2];
-	uint8_t		elc[2];
 	struct atpic_stats stats;
 };
 
@@ -152,15 +160,17 @@ vatpic_get_highest_isrpin(struct atpic *atpic)
 	ATPIC_PIN_FOREACH(pin, atpic, i) {
 		bit = (1 << pin);
 
-		if (atpic->service & bit) {
+		if (atpic->reg_isr & bit) {
 			/*
 			 * An IS bit that is masked by an IMR bit will not be
 			 * cleared by a non-specific EOI in Special Mask Mode.
 			 */
-			if (atpic->smm && (atpic->mask & bit) != 0)
+			if (atpic->special_mask_mode &&
+			    (atpic->reg_imr & bit) != 0) {
 				continue;
-			else
+			} else {
 				return (pin);
+			}
 		}
 	}
 
@@ -178,8 +188,8 @@ vatpic_get_highest_irrpin(struct atpic *atpic)
 	 * a slave is in service, the slave is not locked out from the
 	 * master's priority logic.
 	 */
-	serviced = atpic->service;
-	if (atpic->sfn)
+	serviced = atpic->reg_isr;
+	if (atpic->special_full_nested)
 		serviced &= ~(1 << 2);
 
 	/*
@@ -188,7 +198,7 @@ vatpic_get_highest_irrpin(struct atpic *atpic)
 	 * other levels that are not masked. In other words the ISR has no
 	 * bearing on the levels that can generate interrupts.
 	 */
-	if (atpic->smm)
+	if (atpic->special_mask_mode)
 		serviced = 0;
 
 	ATPIC_PIN_FOREACH(pin, atpic, tmp) {
@@ -205,7 +215,7 @@ vatpic_get_highest_irrpin(struct atpic *atpic)
 		 * If an interrupt is asserted and not masked then return
 		 * the corresponding 'pin' to the caller.
 		 */
-		if ((atpic->request & bit) != 0 && (atpic->mask & bit) == 0)
+		if ((atpic->reg_irr & bit) != 0 && (atpic->reg_imr & bit) == 0)
 			return (pin);
 	}
 
@@ -228,7 +238,7 @@ vatpic_notify_intr(struct vatpic *vatpic)
 	    (pin = vatpic_get_highest_irrpin(atpic)) != -1) {
 		VATPIC_CTR4(vatpic, "atpic slave notify pin = %d "
 		    "(imr 0x%x irr 0x%x isr 0x%x)", pin,
-		    atpic->mask, atpic->request, atpic->service);
+		    atpic->reg_imr, atpic->reg_irr, atpic->reg_isr);
 
 		/*
 		 * Cascade the request from the slave to the master.
@@ -240,7 +250,7 @@ vatpic_notify_intr(struct vatpic *vatpic)
 	} else {
 		VATPIC_CTR3(vatpic, "atpic slave no eligible interrupts "
 		    "(imr 0x%x irr 0x%x isr 0x%x)",
-		    atpic->mask, atpic->request, atpic->service);
+		    atpic->reg_imr, atpic->reg_irr, atpic->reg_isr);
 	}
 
 	/*
@@ -251,7 +261,7 @@ vatpic_notify_intr(struct vatpic *vatpic)
 	    (pin = vatpic_get_highest_irrpin(atpic)) != -1) {
 		VATPIC_CTR4(vatpic, "atpic master notify pin = %d "
 		    "(imr 0x%x irr 0x%x isr 0x%x)", pin,
-		    atpic->mask, atpic->request, atpic->service);
+		    atpic->reg_imr, atpic->reg_irr, atpic->reg_isr);
 
 		/*
 		 * From Section 3.6.2, "Interrupt Modes", in the
@@ -285,24 +295,22 @@ vatpic_notify_intr(struct vatpic *vatpic)
 	} else {
 		VATPIC_CTR3(vatpic, "atpic master no eligible interrupts "
 		    "(imr 0x%x irr 0x%x isr 0x%x)",
-		    atpic->mask, atpic->request, atpic->service);
+		    atpic->reg_imr, atpic->reg_irr, atpic->reg_isr);
 	}
 }
 
 static int
 vatpic_icw1(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 {
-	VATPIC_CTR1(vatpic, "atpic icw1 0x%x", val);
-
 	atpic->ready = false;
 
-	atpic->icw_num = 1;
-	atpic->request = 0;
-	atpic->mask = 0;
+	atpic->icw_state = IS_ICW1;
+	atpic->reg_irr = 0;
+	atpic->reg_imr = 0;
 	atpic->lowprio = 7;
-	atpic->rd_cmd_reg = 0;
-	atpic->poll = 0;
-	atpic->smm = 0;
+	atpic->read_isr_next = false;
+	atpic->poll = false;
+	atpic->special_mask_mode = false;
 
 	if ((val & ICW1_SNGL) != 0) {
 		VATPIC_CTR0(vatpic, "vatpic cascade mode required");
@@ -314,7 +322,7 @@ vatpic_icw1(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 		return (-1);
 	}
 
-	atpic->icw_num++;
+	atpic->icw_state = IS_ICW2;
 
 	return (0);
 }
@@ -322,11 +330,8 @@ vatpic_icw1(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 static int
 vatpic_icw2(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 {
-	VATPIC_CTR1(vatpic, "atpic icw2 0x%x", val);
-
-	atpic->irq_base = val & 0xf8;
-
-	atpic->icw_num++;
+	atpic->irq_base = val & IRQ_BASE_MASK;
+	atpic->icw_state = IS_ICW3;
 
 	return (0);
 }
@@ -334,9 +339,7 @@ vatpic_icw2(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 static int
 vatpic_icw3(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 {
-	VATPIC_CTR1(vatpic, "atpic icw3 0x%x", val);
-
-	atpic->icw_num++;
+	atpic->icw_state = IS_ICW4;
 
 	return (0);
 }
@@ -344,26 +347,17 @@ vatpic_icw3(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 static int
 vatpic_icw4(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 {
-	VATPIC_CTR1(vatpic, "atpic icw4 0x%x", val);
-
 	if ((val & ICW4_8086) == 0) {
 		VATPIC_CTR0(vatpic, "vatpic microprocessor mode required");
 		return (-1);
 	}
 
-	if ((val & ICW4_AEOI) != 0)
-		atpic->aeoi = true;
-
-	if ((val & ICW4_SFNM) != 0) {
-		if (master_atpic(vatpic, atpic)) {
-			atpic->sfn = true;
-		} else {
-			VATPIC_CTR1(vatpic, "Ignoring special fully nested "
-			    "mode on slave atpic: %#x", val);
-		}
+	atpic->auto_eoi = (val & ICW4_AEOI) != 0;
+	if (master_atpic(vatpic, atpic)) {
+		atpic->special_full_nested = (val & ICW4_SFNM) != 0;
 	}
 
-	atpic->icw_num = 0;
+	atpic->icw_state = IS_ICW1;
 	atpic->ready = true;
 
 	return (0);
@@ -372,9 +366,7 @@ vatpic_icw4(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 static int
 vatpic_ocw1(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 {
-	VATPIC_CTR1(vatpic, "atpic ocw1 0x%x", val);
-
-	atpic->mask = val & 0xff;
+	atpic->reg_imr = val;
 
 	return (0);
 }
@@ -382,9 +374,7 @@ vatpic_ocw1(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 static int
 vatpic_ocw2(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 {
-	VATPIC_CTR1(vatpic, "atpic ocw2 0x%x", val);
-
-	atpic->rotate = ((val & OCW2_R) != 0);
+	atpic->rotate = (val & OCW2_R) != 0;
 
 	if ((val & OCW2_EOI) != 0) {
 		int isr_bit;
@@ -398,12 +388,12 @@ vatpic_ocw2(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 		}
 
 		if (isr_bit != -1) {
-			atpic->service &= ~(1 << isr_bit);
+			atpic->reg_isr &= ~(1 << isr_bit);
 
 			if (atpic->rotate)
 				atpic->lowprio = isr_bit;
 		}
-	} else if ((val & OCW2_SL) != 0 && atpic->rotate == true) {
+	} else if ((val & OCW2_SL) != 0 && atpic->rotate) {
 		/* specific priority */
 		atpic->lowprio = val & 0x7;
 	}
@@ -414,21 +404,14 @@ vatpic_ocw2(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 static int
 vatpic_ocw3(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 {
-	VATPIC_CTR1(vatpic, "atpic ocw3 0x%x", val);
-
-	if (val & OCW3_ESMM) {
-		atpic->smm = val & OCW3_SMM ? 1 : 0;
-		VATPIC_CTR2(vatpic, "%s atpic special mask mode %s",
-		    master_atpic(vatpic, atpic) ? "master" : "slave",
-		    atpic->smm ?  "enabled" : "disabled");
+	if ((val & OCW3_ESMM) != 0) {
+		atpic->special_mask_mode = (val & OCW3_SMM) != 0;
 	}
-
-	if (val & OCW3_RR) {
-		/* read register command */
-		atpic->rd_cmd_reg = val & OCW3_RIS;
-
-		/* Polling mode */
-		atpic->poll = ((val & OCW3_P) != 0);
+	if ((val & OCW3_RR) != 0) {
+		atpic->read_isr_next = (val & OCW3_RIS) != 0;
+	}
+	if ((val & OCW3_P) != 0) {
+		atpic->poll = true;
 	}
 
 	return (0);
@@ -444,9 +427,8 @@ vatpic_set_pinstate(struct vatpic *vatpic, int pin, bool newstate)
 	VERIFY(pin >= 0 && pin < 16);
 	ASSERT(VATPIC_LOCKED(vatpic));
 
-	const int chip = pin >> 3;
 	const int lpin = pin & 0x7;
-	atpic = &vatpic->atpic[chip];
+	atpic = &vatpic->atpic[pin >> 3];
 
 	oldcnt = newcnt = atpic->acnt[lpin];
 	if (newstate) {
@@ -470,18 +452,18 @@ vatpic_set_pinstate(struct vatpic *vatpic, int pin, bool newstate)
 	}
 	atpic->acnt[lpin] = newcnt;
 
-	const bool level = ((vatpic->elc[chip] & (1 << (lpin))) != 0);
+	const bool level = ((atpic->elc & (1 << (lpin))) != 0);
 	if ((oldcnt == 0 && newcnt == 1) || (newcnt > 0 && level == true)) {
 		/* rising edge or level */
 		DTRACE_PROBE2(vatpic__assert, struct vatpic *, vatpic,
 		    int, pin);
-		atpic->request |= (1 << lpin);
+		atpic->reg_irr |= (1 << lpin);
 	} else if (oldcnt == 1 && newcnt == 0) {
 		/* falling edge */
 		DTRACE_PROBE2(vatpic__deassert, struct vatpic *, vatpic,
 		    int, pin);
 		if (level) {
-			atpic->request &= ~(1 << lpin);
+			atpic->reg_irr &= ~(1 << lpin);
 		}
 	}
 
@@ -502,7 +484,7 @@ vatpic_set_irqstate(struct vm *vm, int irq, enum irqstate irqstate)
 	vatpic = vm_atpic(vm);
 	atpic = &vatpic->atpic[irq >> 3];
 
-	if (atpic->ready == false)
+	if (!atpic->ready)
 		return (0);
 
 	VATPIC_LOCK(vatpic);
@@ -548,14 +530,12 @@ vatpic_pulse_irq(struct vm *vm, int irq)
 int
 vatpic_set_irq_trigger(struct vm *vm, int irq, enum vm_intr_trigger trigger)
 {
-	struct vatpic *vatpic;
-
 	if (irq < 0 || irq > 15)
 		return (EINVAL);
 
 	/*
-	 * See comment in vatpic_elc_handler.  These IRQs must be
-	 * edge triggered.
+	 * See comments in vatpic_elc_handler.
+	 * These IRQs must be edge triggered.
 	 */
 	if (trigger == LEVEL_TRIGGER) {
 		switch (irq) {
@@ -568,15 +548,16 @@ vatpic_set_irq_trigger(struct vm *vm, int irq, enum vm_intr_trigger trigger)
 		}
 	}
 
-	vatpic = vm_atpic(vm);
+	struct vatpic *vatpic = vm_atpic(vm);
+	struct atpic *atpic = &vatpic->atpic[irq >> 3];
+	const int pin = irq & 0x7;
 
 	VATPIC_LOCK(vatpic);
-
-	if (trigger == LEVEL_TRIGGER)
-		vatpic->elc[irq >> 3] |=  1 << (irq & 0x7);
-	else
-		vatpic->elc[irq >> 3] &=  ~(1 << (irq & 0x7));
-
+	if (trigger == LEVEL_TRIGGER) {
+		atpic->elc |= (1 << pin);
+	} else {
+		atpic->elc &= ~(1 << pin);
+	}
 	VATPIC_UNLOCK(vatpic);
 
 	return (0);
@@ -622,13 +603,13 @@ vatpic_pin_accepted(struct atpic *atpic, int pin)
 	atpic->intr_raised = false;
 
 	if (atpic->acnt[pin] == 0)
-		atpic->request &= ~(1 << pin);
+		atpic->reg_irr &= ~(1 << pin);
 
-	if (atpic->aeoi == true) {
-		if (atpic->rotate == true)
+	if (atpic->auto_eoi) {
+		if (atpic->rotate)
 			atpic->lowprio = pin;
 	} else {
-		atpic->service |= (1 << pin);
+		atpic->reg_isr |= (1 << pin);
 	}
 }
 
@@ -644,7 +625,7 @@ vatpic_intr_accepted(struct vm *vm, int vector)
 
 	pin = vector & 0x7;
 
-	if ((vector & ~0x7) == vatpic->atpic[1].irq_base) {
+	if ((vector & IRQ_BASE_MASK) == vatpic->atpic[1].irq_base) {
 		vatpic_pin_accepted(&vatpic->atpic[1], pin);
 		/*
 		 * If this vector originated from the slave,
@@ -669,7 +650,7 @@ vatpic_read(struct vatpic *vatpic, struct atpic *atpic, bool in, int port,
 	VATPIC_LOCK(vatpic);
 
 	if (atpic->poll) {
-		atpic->poll = 0;
+		atpic->poll = false;
 		pin = vatpic_get_highest_irrpin(atpic);
 		if (pin >= 0) {
 			vatpic_pin_accepted(atpic, pin);
@@ -680,14 +661,14 @@ vatpic_read(struct vatpic *vatpic, struct atpic *atpic, bool in, int port,
 	} else {
 		if (port & ICU_IMR_OFFSET) {
 			/* read interrrupt mask register */
-			*eax = atpic->mask;
+			*eax = atpic->reg_imr;
 		} else {
-			if (atpic->rd_cmd_reg == OCW3_RIS) {
+			if (atpic->read_isr_next) {
 				/* read interrupt service register */
-				*eax = atpic->service;
+				*eax = atpic->reg_isr;
 			} else {
 				/* read interrupt request register */
-				*eax = atpic->request;
+				*eax = atpic->reg_irr;
 			}
 		}
 	}
@@ -711,14 +692,14 @@ vatpic_write(struct vatpic *vatpic, struct atpic *atpic, bool in, int port,
 	VATPIC_LOCK(vatpic);
 
 	if (port & ICU_IMR_OFFSET) {
-		switch (atpic->icw_num) {
-		case 2:
+		switch (atpic->icw_state) {
+		case IS_ICW2:
 			error = vatpic_icw2(vatpic, atpic, val);
 			break;
-		case 3:
+		case IS_ICW3:
 			error = vatpic_icw3(vatpic, atpic, val);
 			break;
-		case 4:
+		case IS_ICW4:
 			error = vatpic_icw4(vatpic, atpic, val);
 			break;
 		default:
@@ -784,37 +765,41 @@ vatpic_elc_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
     uint32_t *eax)
 {
 	struct vatpic *vatpic = arg;
-	bool is_master;
+	struct atpic *atpic = NULL;
+	uint8_t elc_mask = 0;
 
-	is_master = (port == IO_ELCR1);
+	switch (port) {
+	case IO_ELCR1:
+		atpic = &vatpic->atpic[0];
+		/*
+		 * For the master PIC the cascade channel (IRQ2), the heart beat
+		 * timer (IRQ0), and the keyboard controller (IRQ1) cannot be
+		 * programmed for level mode.
+		 */
+		elc_mask = 0xf8;
+		break;
+	case IO_ELCR2:
+		atpic = &vatpic->atpic[1];
+		/*
+		 * For the slave PIC the real time clock (IRQ8) and the floating
+		 * point error interrupt (IRQ13) cannot be programmed for level
+		 * mode.
+		 */
+		elc_mask = 0xde;
+		break;
+	default:
+		return (-1);
+	}
 
 	if (bytes != 1)
 		return (-1);
 
 	VATPIC_LOCK(vatpic);
-
 	if (in) {
-		if (is_master)
-			*eax = vatpic->elc[0];
-		else
-			*eax = vatpic->elc[1];
+		*eax = atpic->elc;
 	} else {
-		/*
-		 * For the master PIC the cascade channel (IRQ2), the
-		 * heart beat timer (IRQ0), and the keyboard
-		 * controller (IRQ1) cannot be programmed for level
-		 * mode.
-		 *
-		 * For the slave PIC the real time clock (IRQ8) and
-		 * the floating point error interrupt (IRQ13) cannot
-		 * be programmed for level mode.
-		 */
-		if (is_master)
-			vatpic->elc[0] = (*eax & 0xf8);
-		else
-			vatpic->elc[1] = (*eax & 0xde);
+		atpic->elc = *eax & elc_mask;
 	}
-
 	VATPIC_UNLOCK(vatpic);
 
 	return (0);

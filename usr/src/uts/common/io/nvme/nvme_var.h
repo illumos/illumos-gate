@@ -15,6 +15,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation.
  * Copyright 2021 Oxide Computer Company.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _NVME_VAR_H
@@ -252,6 +253,7 @@ struct nvme {
 	uint32_t n_temperature_event;
 	uint32_t n_spare_event;
 	uint32_t n_vendor_event;
+	uint32_t n_notice_event;
 	uint32_t n_unknown_event;
 
 	/* hot removal NDI event handling */

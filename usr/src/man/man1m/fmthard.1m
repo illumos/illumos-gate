@@ -1,193 +1,227 @@
-'\" te
-.\"  Copyright 1989 AT&T Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FMTHARD 1M "Sep 25, 2008"
-.SH NAME
-fmthard \- populate label on hard disks
-.SH SYNOPSIS
-.SS "SPARC"
-.LP
-.nf
-\fBfmthard\fR \fB-d\fR \fIdata\fR | \fB-n\fR \fIvolume_name\fR | \fB-s\fR \fIdatafile\fR [\fB-i\fR] /dev/rdsk/c?
-     [t?] d?s2
-.fi
-
-.SS "x86"
-.LP
-.nf
-\fBfmthard\fR \fB-d\fR \fIdata\fR | \fB-n\fR \fIvolume_name\fR | \fB-s\fR \fIdatafile\fR [\fB-i\fR] /dev/rdsk/c?
-     [t?] d?s2
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBfmthard\fR command updates the \fBVTOC\fR (Volume Table of Contents) on
-hard disks and, on x86 systems, adds boot information to the Solaris
-\fBfdisk\fR partition. One or more of the options \fB-s\fR \fIdatafile\fR,
-\fB-d\fR \fIdata\fR, or \fB-n\fR \fIvolume_name\fR must be used to request
-modifications to the disk label. To print disk label contents, see
-\fBprtvtoc\fR(1M). The
-\fB/dev/rdsk/c\fR\fI?\fR[\fBt\fR\fI?\fR]\fBd\fR\fI?\fR\fBs2\fR file must be the
-character special file of the device where the new label is to be installed. On
-x86 systems, \fBfdisk\fR(1M) must be run on the drive before \fBfmthard\fR.
-.sp
-.LP
-If you are using an x86 system, note that the term ``partition'' in this page
-refers to \fIslices\fR within the x86 \fBfdisk\fR partition on x86 machines. Do
-not confuse the partitions created by \fBfmthard\fR with the partitions created
-by \fBfdisk\fR.
-.SH OPTIONS
-.sp
-.LP
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2022 Toomas Soome <tsoome@me.com>
+.\"
+.Dd January 31, 2022
+.Dt FMTHARD 1M
+.Os
+.Sh NAME
+.Nm fmthard
+.Nd populate label on hard disks
+.Sh SYNOPSIS
+.Nm
+.Fl d Ar data | Fl n Ar volume_name | Fl s Ar datafile Op Fl i
+.Sm off
+.Ar /dev/rdsk/c? Oo t? Oc d?s2
+.Sm on
+.Sh DESCRIPTION
+The
+.Nm
+command updates the
+.Sy VTOC
+.Pq Volume Table of Contents
+on hard disks.
+One or more of the options
+.Fl s Ar datafile ,
+.Fl d Ar data ,
+or
+.Fl n Ar volume_name
+must be used to request modifications to the disk label.
+To print disk label contents, see
+.Xr prtvtoc 1M .
+The
+.Sm off
+.Ar /dev/rdsk/c? Oo t? Oc d?s2
+.Sm on
+file must be the character special file of the device where the new label
+is to be installed.
+On x86 systems,
+.Xr fdisk 1M
+must be run on the drive before
+.Nm .
+.Pp
+If you are using an x86 system, note that the term
+.Sq  partition
+in this page refers to
+.Em slices
+within the x86
+.Sy fdisk
+partition on x86 machines.
+Do not confuse the partitions created by
+.Nm
+with the partitions created by
+.Xr fdisk 1M .
+.Sh OPTIONS
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-d\fR \fIdata\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fIdata\fR argument of this option is a string representing the information
-for a particular partition in the current VTOC. The string must be of the
-format \fIpart:tag:flag:start:size\fR where \fIpart\fR is the partition number,
-\fItag\fR is the \fBID\fR TAG of the partition, \fIflag\fR is the set of
-permission flags, \fIstart\fR is the starting sector number of the partition,
-and \fIsize\fR is the number of sectors in the partition. See the description
-of the \fIdatafile\fR below for more information on these fields.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-i\fR\fR
-.ad
-.sp .6
-.RS 4n
-This option allows the command to create the desired \fBVTOC\fR table, but
-prints the information to standard output instead of modifying the \fBVTOC\fR
+.Bl -tag -width Ds
+.It Fl d Ar data
+The
+.Ar data
+argument of this option is a string representing the information
+for a particular partition in the current
+.Sy VTOC .
+The string must be of the format
+.Em part:tag:flag:start:size
+where
+.Em part
+is the partition number,
+.Em tag
+is the
+.Sy ID
+TAG of the partition,
+.Em flag
+is the set of permission flags,
+.Em start
+is the starting sector number of the partition, and
+.Em size
+is the number of sectors in the partition.
+See the description of the
+.Ar datafile
+below for more information on these fields.
+.It Fl i
+This option allows the command to create the desired
+.Sy VTOC
+table, but prints the information to standard output instead of modifying the
+.Sy VTOC
 on the disk.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-n\fR \fIvolume_name\fR\fR
-.ad
-.sp .6
-.RS 4n
-This option is used to give the disk a \fIvolume_name\fR up to 8 characters
-long.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR \fIdatafile\fR\fR
-.ad
-.sp .6
-.RS 4n
-This option is used to populate the \fBVTOC\fR according to a \fIdatafile\fR
-created by the user. If the \fIdatafile\fR is \fB\(mi\fR (a hyphen),
-\fBfmthard\fR reads from standard input. The \fIdatafile\fR format is described
-below. This option causes all of the disk partition timestamp fields to be set
+.It Fl n Ar volume_name
+This option is used to give the disk a
+.Ar volume_name
+up to 8 characters long.
+.It Fl s Ar datafile
+This option is used to populate the
+.Sy VTOC
+according to a
+.Ar datafile
+created by the user.
+If the
+.Ar datafile
+is
+.Sy \(mi Pq a hyphen ,
+.Nm
+reads from standard input.
+The
+.Ar datafile
+format is described below.
+This option causes all of the disk partition timestamp fields to be set
 to zero.
 .sp
-Every \fBVTOC\fR generated by \fBfmthard\fR will also have partition 2, by
-convention, that corresponds to the whole disk. If the input in \fIdatafile\fR
+Every
+.Sy VTOC
+generated by
+.Nm
+will also have partition 2, by convention, that corresponds to the whole disk.
+If the input in
+.Ar datafile
 does not specify an entry for partition 2, a default partition 2 entry will be
-created automatically in \fBVTOC\fR with the tag \fBV_BACKUP\fR and size equal
-to the full size of the disk.
+created automatically in
+.Sy VTOC
+with the tag
+.Sy V_BACKUP
+and size equal to the full size of the disk.
 .sp
-The \fIdatafile\fR contains one specification line for each partition, starting
-with partition 0. Each line is delimited by a new-line character (\fB\en\fR).
-If the first character of a line is an asterisk (*), the line is treated as a
-comment. Each line is composed of entries that are position-dependent,
+The
+.Ar datafile
+contains one specification line for each partition, starting with partition 0.
+Each line is delimited by a new-line character
+.Pq Sy \en .
+If the first character of a line is an asterisk
+.Pq \&* ,
+the line is treated as a comment.
+Each line is composed of entries that are position-dependent,
 separated by white space and having the following format:
 .sp
-\fIpartition tag flag starting_sector size_in_sectors\fR
+.Em partition tag flag starting_sector size_in_sectors
 .sp
 where the entries have the following values:
-.sp
-.ne 2
-.na
-\fB\fIpartition\fR\fR
-.ad
-.sp .6
-.RS 4n
-The partition number. Currently, for Solaris SPARC, a disk can have up to 8
-partitions, \fB0\fR\(mi\fB7\fR. Even though the \fIpartition\fR field has 4
-bits, only 3 bits are currently used. For x86, all 4 bits are used to allow
-slices \fB0\fR\(mi\fB15\fR. Each Solaris \fBfdisk\fR partition can have up to
-16 slices.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fItag\fR\fR
-.ad
-.sp .6
-.RS 4n
-The partition tag: a decimal number. The following are reserved codes: \fB0\fR
-(\fBV_UNASSIGNED\fR), \fB1\fR (\fBV_BOOT\fR), \fB2\fR (\fBV_ROOT\fR), \fB3\fR
-(\fBV_SWAP\fR), \fB4\fR (\fBV_USR\fR), \fB5\fR (\fBV_BACKUP\fR), \fB6\fR
-(\fBV_STAND\fR), \fB7\fR (\fBV_VAR\fR), and \fB8\fR (\fBV_HOME\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIflag\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Bl -tag -width Ds
+.It Em partition
+The partition number.
+Currently, for Solaris SPARC, a disk can have up to 8 partitions,
+.Sy 0\(mi7 .
+Even though the
+.Em partition
+field has 4 bits, only 3 bits are currently used.
+For x86, all 4 bits are used to allow slices
+.Sy 0\(mi15 .
+Each Solaris
+.Sy fdisk
+partition can have up to 16 slices.
+.It Em tag
+The partition tag: a decimal number.
+The following are reserved codes:
+.Sy 0 Pq Sy V_UNASSIGNED ,
+.Sy 1 Pq Sy V_BOOT ,
+.Sy 2 Pq Sy V_ROOT ,
+.Sy 3 Pq Sy V_SWAP ,
+.Sy 4 Pq Sy V_USR ,
+.Sy 5 Pq Sy V_BACKUP ,
+.Sy 6 Pq Sy V_STAND ,
+.Sy 7 Pq Sy V_VAR ,
+and
+.Sy 8 Pq Sy V_HOME .
+.It Em flag
 The flag allows a partition to be flagged as unmountable or read only, the
-masks being: \fBV_UNMNT 0x01\fR, and \fBV_RONLY 0x10\fR. For mountable
-partitions use \fB0x00\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIstarting_sector\fR\fR
-.ad
-.sp .6
-.RS 4n
+masks being:
+.Sy V_UNMNT 0x01 ,
+and
+.Sy V_RONLY 0x10 .
+For mountable partitions use
+.Sy 0x00 .
+.It Em starting_sector
 The sector number (decimal) on which the partition starts.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIsize_in_sectors\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Em size_in_sectors
 The number (decimal) of sectors occupied by the partition.
-.RE
-
-You can save the output of a \fBprtvtoc\fR command to a file, edit the file,
-and use it as the \fIdatafile\fR argument to the \fB-s\fR option.
-.RE
-
-.SH SEE ALSO
+.El
 .sp
-.LP
-\fBuname\fR(1), \fBformat\fR(1M), \fBprtvtoc\fR(1M), \fBattributes\fR(5)
-.SS "x86 Only"
+You can save the output of a
+.Xr prtvtoc 1M
+command to a file, edit the file, and use it as the
+.Ar datafile
+argument to the
+.Fl s
+option.
+.El
+.Sh SEE ALSO
+.Xr uname 1 ,
+.Xr format 1M ,
+.Xr installboot 1M ,
+.Xr prtvtoc 1M ,
+.Xr attributes 5
+.Ss "x86 Only"
+.Xr fdisk 1M
+.Sh NOTES
+Special care should be exercised when overwriting an existing
+.Sy VTOC ,
+as incorrect entries could result in current data being inaccessible.
+As a precaution, save the old
+.Sy VTOC .
 .sp
-.LP
-\fBfdisk\fR(1M), \fBinstallgrub\fR(1M)
-.SH NOTES
-.sp
-.LP
-Special care should be exercised when overwriting an existing \fBVTOC\fR, as
-incorrect entries could result in current data being inaccessible. As a
-precaution, save the old \fBVTOC\fR.
-.sp
-.LP
-For disks under two terabytes, \fBfmthard\fR cannot write a \fBVTOC\fR on an
-unlabeled disk. Use \fBformat\fR(1M) for this purpose.
+For disks under two terabytes,
+.Nm
+cannot write a
+.Sy VTOC
+on an unlabeled disk.
+Use
+.Xr format 1M
+for this purpose.

@@ -25,12 +25,12 @@
 
 
 #ifndef _VROOT_H_
-#define _VROOT_H_
+#define	_VROOT_H_
 
 #include <stdio.h>
 #include <nl_types.h>
 
-#define VROOT_DEFAULT ((pathpt)-1)
+#define	VROOT_DEFAULT ((pathpt)-1)
 
 typedef struct {
 	char		*path;
@@ -38,24 +38,24 @@ typedef struct {
 } pathcellt, *pathcellpt, patht;
 typedef patht		*pathpt;
 
-extern	void		add_dir_to_path(const char *path, register pathpt *pointer, register int position);
+extern	void		add_dir_to_path(const char *, pathpt *, int);
 extern	void		flush_path_cache(void);
 extern	void		flush_vroot_cache(void);
 extern	const char	*get_path_name(void);
-extern	char		*get_vroot_path(register char **vroot, register char **path, register char **filename);
+extern	char		*get_vroot_path(char **, char **, char **);
 extern	const char	*get_vroot_name(void);
-extern	int		open_vroot(char *path, int flags, int mode, pathpt vroot_path, pathpt vroot_vroot);
-extern	pathpt		parse_path_string(register char *string, register int remove_slash);
+extern	int		open_vroot(char *, int, int, pathpt, pathpt);
+extern	pathpt		parse_path_string(char *, int);
 extern	void		scan_path_first(void);
 extern	void		scan_vroot_first(void);
-extern	void		set_path_style(int style);
+extern	void		set_path_style(int);
 
-extern	int		access_vroot(char *path, int mode, pathpt vroot_path, pathpt vroot_vroot);
+extern	int		access_vroot(char *, int, pathpt, pathpt);
 
-extern	int		execve_vroot(char *path, char **argv, char **environ, pathpt vroot_path, pathpt vroot_vroot);
+extern	int		execve_vroot(char *, char **, char **, pathpt, pathpt);
 
-extern	int		lstat_vroot(char *path, struct stat *buffer, pathpt vroot_path, pathpt vroot_vroot);
-extern	int		stat_vroot(char *path, struct stat *buffer, pathpt vroot_path, pathpt vroot_vroot);
-extern	int		readlink_vroot(char *path, char *buffer, int buffer_size, pathpt vroot_path, pathpt vroot_vroot);
+extern	int		lstat_vroot(char *, struct stat *, pathpt, pathpt);
+extern	int		stat_vroot(char *, struct stat *, pathpt, pathpt);
+extern	int		readlink_vroot(char *, char *, int, pathpt, pathpt);
 
-#endif
+#endif /* _VROOT_H_ */

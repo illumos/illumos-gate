@@ -122,7 +122,7 @@ close_file(void)
 	/* If .nse_depinfo file doesn't exist */
 	if ((nse_depinfo_fp = fopen(nse_depinfo_file, "r+")) == NULL) {
 		if (is_path) {
-			if ((nse_depinfo_fp = 
+			if ((nse_depinfo_fp =
 			     fopen(nse_depinfo_file, "w")) == NULL) {
 				fprintf(stderr, gettext("Cannot open `%s' for writing\n"),
 				    nse_depinfo_file);
@@ -131,7 +131,7 @@ close_file(void)
 				unlink(lock_file);
 				return;
 			}
-			while (fgets(line, MAXPATHLEN+2, command_output_fp) 
+			while (fgets(line, MAXPATHLEN+2, command_output_fp)
 			       != NULL) {
 				fprintf(nse_depinfo_fp, "%s", line);
 			}
@@ -155,7 +155,7 @@ close_file(void)
 	len = strlen(sfile);
 	while (fgets(line, MAXPATHLEN+2, nse_depinfo_fp) != NULL) {
 		if (strncmp(line, sfile, len) == 0 && line[len] == ':') {
-			while (fgets(buf, MAXPATHLEN+2, command_output_fp) 
+			while (fgets(buf, MAXPATHLEN+2, command_output_fp)
 			       != NULL) {
 				if (is_path) {
 					fprintf(merge_fp, "%s", buf);
@@ -173,10 +173,10 @@ close_file(void)
 				       != NULL) {
 					fputs(line, merge_fp);
 				}
-				clean_up(nse_depinfo_fp, merge_fp, 
+				clean_up(nse_depinfo_fp, merge_fp,
 					 nse_depinfo_file, merge_file, 0);
 			} else {
-				clean_up(nse_depinfo_fp, merge_fp, 
+				clean_up(nse_depinfo_fp, merge_fp,
 					 nse_depinfo_file, merge_file, 1);
 			}
 			if (file_locked) {
@@ -186,7 +186,7 @@ close_file(void)
 			return;
 		} /* entry found */
 		fputs(line, merge_fp);
-	} 
+	}
 	/* Entry never found.  Add it if there is a search path */
 	if (is_path) {
 		while (fgets(line, MAXPATHLEN+2, command_output_fp) != NULL) {
@@ -206,7 +206,7 @@ report_dep(char *iflag, char *filename)
 {
 
 	if (command_output_fp == NULL) {
-		sprintf(command_output_tmpfile, 
+		sprintf(command_output_tmpfile,
 			"%s/%s.%d.XXXXXX", tmpdir, NSE_DEPINFO, getpid());
 		int fd = mkstemp(command_output_tmpfile);
 		if ((fd < 0) || (command_output_fp = fdopen(fd, "w")) == NULL) {
@@ -268,7 +268,7 @@ report_search_path(char *iflag)
 	}
 	sprintf(filename, "%s-CPP", ptr+1);
 	getcwd(curdir, sizeof(curdir));
-	if (strcmp(curdir, sdir) != 0 && strlen(iflag) > 2 && 
+	if (strcmp(curdir, sdir) != 0 && strlen(iflag) > 2 &&
 	    iflag[2] != '/') {
 		/* Makefile must have had an "cd xx; cc ..." */
 		/* Modify the -I path to be relative to the cd */
@@ -283,10 +283,10 @@ report_search_path(char *iflag)
 void
 report_dependency(const char *name)
 {
-	register char	*filename;
+	char	*filename;
 	char		buffer[MAXPATHLEN+1];
-	register char	*p;
-	register char	*p2;
+	char	*p;
+	char	*p2;
 	char		nse_depinfo_file[MAXPATHLEN];
 
 	if (report_file == NULL) {

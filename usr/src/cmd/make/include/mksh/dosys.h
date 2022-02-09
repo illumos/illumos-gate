@@ -1,5 +1,3 @@
-#ifndef _MKSH_DOSYS_H
-#define _MKSH_DOSYS_H
 /*
  * CDDL HEADER START
  *
@@ -25,13 +23,16 @@
  * Use is subject to license terms.
  */
 
+#ifndef _MKSH_DOSYS_H
+#define	_MKSH_DOSYS_H
+
 #include <mksh/defs.h>
 #include <vroot/vroot.h>
 
-extern Boolean	await(register Boolean ignore_error, register Boolean silent_error, Name target, wchar_t *command, pid_t running_pid, void *xdrs, int job_msg_id);
-extern int	doexec(register wchar_t *command, register Boolean ignore_error, char *stdout_file, char *stderr_file, pathpt vroot_path, int nice_prio);
-extern int	doshell(wchar_t *command, register Boolean ignore_error, char *stdout_file, char *stderr_file, int nice_prio);
-extern void	redirect_io(char *stdout_file, char *stderr_file);
-extern void	sh_command2string(register String command, register String destination);
+extern Boolean	await(Boolean, Boolean, Name, wchar_t *, pid_t, void *, int);
+extern int	doexec(wchar_t *, Boolean, char *, char *, pathpt, int);
+extern int	doshell(wchar_t *, Boolean, char *, char *, int);
+extern void	redirect_io(char *, char *);
+extern void	sh_command2string(String, String);
 
-#endif
+#endif /* _MKSH_DOSYS_H */

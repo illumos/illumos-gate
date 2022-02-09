@@ -1,5 +1,3 @@
-#ifndef _MKSH_MISC_H
-#define _MKSH_MISC_H
 /*
  * CDDL HEADER START
  *
@@ -27,31 +25,35 @@
  * Copyright 2019 RackTop Systems.
  */
 
+#ifndef _MKSH_MISC_H
+#define	_MKSH_MISC_H
+
 #include <mksh/defs.h>
 
-extern void	append_char(wchar_t from, register String to);
-extern Property	append_prop(register Name target, register Property_id type);
-extern void	append_string(register wchar_t *from, register String to, register int length);
-extern void	enable_interrupt(register void (*handler) (int));
-extern char	*errmsg(int errnum);
-extern void	fatal_mksh(const char *message, ...) __NORETURN;
-extern void	fatal_reader_mksh(const char *pattern, ...) __NORETURN;
+extern void	append_char(wchar_t, String);
+extern Property	append_prop(Name, Property_id);
+extern void	append_string(wchar_t *, String, int);
+extern void	enable_interrupt(void (*) (int));
+extern char	*errmsg(int);
+extern void	fatal_mksh(const char *, ...) __NORETURN;
+extern void	fatal_reader_mksh(const char *, ...) __NORETURN;
 extern char	*get_current_path_mksh(void);
-extern Property	get_prop(register Property start, register Property_id type);
-extern char	*getmem(size_t size);
-extern Name	getname_fn(wchar_t *name, register int len, register Boolean dont_enter, register Boolean * foundp = NULL);
-extern void	store_name(Name name);
-extern void	free_name(Name name);
+extern Property	get_prop(Property, Property_id);
+extern char	*getmem(size_t);
+extern Name	getname_fn(wchar_t *name, int len, Boolean dont_enter,
+		    Boolean *foundp = NULL);
+extern void	store_name(Name);
+extern void	free_name(Name);
 extern void	handle_interrupt_mksh(int);
-extern Property	maybe_append_prop(register Name target, register Property_id type);
-extern void	retmem(wchar_t *p);
-extern void	retmem_mb(caddr_t p);
+extern Property	maybe_append_prop(Name, Property_id);
+extern void	retmem(wchar_t *);
+extern void	retmem_mb(caddr_t);
 extern void	setup_char_semantics(void);
-extern void	setup_interrupt(register void (*handler) (int));
-extern void	warning_mksh(char * message, ...);
+extern void	setup_interrupt(void (*) (int));
+extern void	warning_mksh(char *, ...);
 
-extern void	append_string(register char *from, register String to, register int length);
-extern wchar_t	*get_wstring(char * from);
+extern void	append_string(char *, String, int);
+extern wchar_t	*get_wstring(char *);
 
 
-#endif
+#endif /* _MKSH_MISC_H */
