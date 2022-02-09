@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Joyent, Inc.
  */
 
 #ifndef	_SYS_UCODE_H
@@ -199,7 +200,7 @@ typedef union ucode_file {
 #define	UCODE_DEFAULT_BODY_SIZE		(UCODE_KB(2) - UCODE_HEADER_SIZE_INTEL)
 
 /*
- * For a single microcode file, the minimum size is 1K, maximum size is 280K.
+ * For a single microcode file, the minimum size is 1K, maximum size is 384K.
  * Such limitations, while somewhat artificial, are not only to provide better
  * sanity checks, but also avoid wasting precious memory at startup time as the
  * microcode buffer for the first processor has to be statically allocated.
@@ -208,7 +209,7 @@ typedef union ucode_file {
  * is 16M.
  */
 #define	UCODE_MIN_SIZE			UCODE_KB(1)
-#define	UCODE_MAX_SIZE			UCODE_KB(280)
+#define	UCODE_MAX_SIZE			UCODE_KB(384)
 #define	UCODE_MAX_COMBINED_SIZE		UCODE_MB(16)
 
 #define	UCODE_SIZE_CONVERT(size, default_size) \

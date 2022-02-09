@@ -355,7 +355,7 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	usb_alt_if_data_t	*altif_data;
 	char			minor_name[HID_MINOR_NAME_LEN];
 	usb_ep_data_t		*ep_data;
-	usb_ugen_info_t 	usb_ugen_info;
+	usb_ugen_info_t		usb_ugen_info;
 
 	switch (cmd) {
 		case DDI_ATTACH:

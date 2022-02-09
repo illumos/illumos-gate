@@ -84,10 +84,10 @@ extern "C" {
  * If the hid descriptor is not valid, the following values are
  * used.
  */
-#define	USBKPSZ 		8	/* keyboard packet size */
-#define	USBMSSZ 		3	/* mouse packet size */
-#define	USB_KB_HID_DESCR_LENGTH 0x3f 	/* keyboard Report descr length */
-#define	USB_MS_HID_DESCR_LENGTH 0x32 	/* mouse Report descr length */
+#define	USBKPSZ			8	/* keyboard packet size */
+#define	USBMSSZ			3	/* mouse packet size */
+#define	USB_KB_HID_DESCR_LENGTH 0x3f	/* keyboard Report descr length */
+#define	USB_MS_HID_DESCR_LENGTH 0x32	/* mouse Report descr length */
 
 /*
  * Flags for the default pipe.
@@ -119,12 +119,12 @@ extern "C" {
 
 /* Attach/detach states */
 #define	HID_LOCK_INIT		0x01	/* Initial attach state */
-#define	HID_MINOR_NODES		0x02 	/* Set after minor node is created */
+#define	HID_MINOR_NODES		0x02	/* Set after minor node is created */
 
 /* HID Protocol Requests */
-#define	SET_IDLE 		0x0a 	/* bRequest value to set idle request */
-#define	DURATION 		(0<<8) 	/* no. of repeat reports (HID 7.2.4) */
-#define	SET_PROTOCOL 		0x0b 	/* bRequest value for boot protocol */
+#define	SET_IDLE		0x0a	/* bRequest value to set idle request */
+#define	DURATION		(0<<8)	/* no. of repeat reports (HID 7.2.4) */
+#define	SET_PROTOCOL		0x0b	/* bRequest value for boot protocol */
 
 /* Hid PM scheme */
 typedef enum {
@@ -249,7 +249,7 @@ _NOTE(SCHEME_PROTECTS_DATA("stable data", usb_ep_descr))
  * handle is used when the kernel is in the single thread mode
  * so the field is tagged with this note.
  */
-_NOTE(SCHEME_PROTECTS_DATA("unique per call", 
+_NOTE(SCHEME_PROTECTS_DATA("unique per call",
 				hid_state_t::hid_polled_console_info))
 
 /*
@@ -316,7 +316,7 @@ _NOTE(SCHEME_PROTECTS_DATA("unique per call", hid_default_pipe_arg_t))
  * Debug message Masks
  */
 #define	PRINT_MASK_ATTA		0x00000001
-#define	PRINT_MASK_OPEN 	0x00000002
+#define	PRINT_MASK_OPEN		0x00000002
 #define	PRINT_MASK_CLOSE	0x00000004
 #define	PRINT_MASK_EVENTS	0x00000008
 #define	PRINT_MASK_PM		0x00000010
