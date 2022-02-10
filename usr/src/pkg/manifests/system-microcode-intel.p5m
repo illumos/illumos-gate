@@ -24,8 +24,8 @@
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2014 Gary Mills
 # Copyright 2019 Peter Tribble.
-# Copyright 2020 Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 Joyent, Inc.
 #
 
 #
@@ -35,7 +35,7 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri \
-    value=pkg:/system/microcode/intel@20210608,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/microcode/intel@20220207,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Microcode for Intel CPUs"
 set name=pkg.description value="Microcode for Intel CPUs"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -550,9 +550,6 @@ file path=platform/i86pc/ucode/GenuineIntel/000706A8-01 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000706E5-80 group=sys mode=0444 \
     reboot-needed=true
-file path=platform/i86pc/ucode/GenuineIntel/00080664-01 group=sys mode=0444 \
-    reboot-needed=true
-hardlink path=platform/i86pc/ucode/GenuineIntel/00080665-01 target=00080664-01
 file path=platform/i86pc/ucode/GenuineIntel/000806A1-10 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000806C1-80 group=sys mode=0444 \
