@@ -1438,8 +1438,6 @@ kernel_fpu_begin(kfpu_state_t *kfpu, uint_t flags)
 void
 kernel_fpu_end(kfpu_state_t *kfpu, uint_t flags)
 {
-	ulong_t iflags;
-
 	if ((curthread->t_flag & T_KFPU) == 0) {
 		panic("curthread attempting to clear kernel FPU state "
 		    "without using it");

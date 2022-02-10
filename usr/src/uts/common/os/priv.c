@@ -182,8 +182,7 @@ priv_pr_spriv(proc_t *p, prpriv_t *prpriv, const cred_t *cr)
 	if (prpriv->pr_nsets != PRIV_NSET ||
 	    prpriv->pr_setsize != PRIV_SETSIZE ||
 	    (prpriv->pr_infosize & (sizeof (uint32_t) - 1)) != 0 ||
-	    prpriv->pr_infosize > priv_info->priv_infosize ||
-	    prpriv->pr_infosize < 0)
+	    prpriv->pr_infosize > priv_info->priv_infosize)
 		return (EINVAL);
 
 	mutex_exit(&p->p_lock);

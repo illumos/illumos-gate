@@ -2694,7 +2694,7 @@ modrload(const char *subdir, const char *filename, struct modctl **rmodp)
 		CPU_STATS_ADDQ(CPU, sys, modload, 1);
 	}
 
-done:	if (subdir != NULL)
+	if (subdir != NULL)
 		kmem_free(fullname, size);
 	return (rmodp ? retval : id);
 }

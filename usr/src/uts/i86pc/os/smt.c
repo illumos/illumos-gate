@@ -744,8 +744,6 @@ smt_init(void)
 void
 smt_late_init(void)
 {
-	int err;
-
 	if (smt_boot_disable) {
 		int err;
 

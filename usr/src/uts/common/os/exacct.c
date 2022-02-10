@@ -1508,10 +1508,8 @@ exacct_attach_flow_item(flow_usage_t *fu, ea_object_t *record, int res)
 		}
 		break;
 	case AC_FLOW_UID:
-		if (fu->fu_userid >= 0) {
-			(void) ea_attach_item(record, &fu->fu_userid,
-			    sizeof (uint32_t), EXT_UINT32 | EXD_FLOW_UID);
-		}
+		(void) ea_attach_item(record, &fu->fu_userid,
+		    sizeof (uint32_t), EXT_UINT32 | EXD_FLOW_UID);
 		break;
 	case AC_FLOW_ANAME:
 		(void) ea_attach_item(record, fu->fu_aname,

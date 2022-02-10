@@ -213,7 +213,7 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 	cpu_t *cp = CPU;
 
 	caddr_t intr_stack = NULL;
-	uint_t intr_actv;
+	volatile uint_t intr_actv;
 
 	ushort_t schedflag = t->t_schedflag;
 	cpu_t *bound_cpu = t->t_bound_cpu;

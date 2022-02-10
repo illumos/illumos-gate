@@ -510,8 +510,11 @@ bufs_read(int fd, caddr_t buf, size_t count)
 	n = buf;
 	while (i > 0) {
 		if (filep->fi_flags & FI_COMPRESSED) {
-			if ((j = cf_read(filep, buf, count)) < 0)
+			int rval;
+
+			if ((rval = cf_read(filep, buf, count)) < 0)
 				return (0); /* encountered an error */
+			j = (size_t)rval;
 			if (j < i)
 				i = j; /* short read, must have hit EOF */
 		} else {

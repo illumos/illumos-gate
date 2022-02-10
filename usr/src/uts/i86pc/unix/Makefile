@@ -125,25 +125,15 @@ CFLAGS += -DDIS_MEM
 # to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-char-subscripts
-CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-function
-CERRWARN	+= -_gcc=-Wno-unused-label
-CERRWARN	+= -_gcc=-Wno-type-limits
-CERRWARN	+= -_gcc=-Wno-clobbered
-CERRWARN	+= -_gcc=-Wno-empty-body
-CERRWARN	+= -_gcc=-Wno-unused-value
 
 # false positives
 SMOFF += index_overflow
 
 # needs work
-SMOFF += all_func_returns,deref_check,signed
+SMOFF += all_func_returns
 
-$(OBJS_DIR)/fmsmb.o := SMOFF += indenting
-$(OBJS_DIR)/zutil.o := SMOFF += indenting
 $(OBJS_DIR)/bootrd_cpio.o := SMOFF += allocating_enough_data
 
 # too hairy

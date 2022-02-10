@@ -28,8 +28,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -181,7 +179,7 @@ hrtalarm(uap, rvp)
 			struct itimerval itv;
 			u_int which;
 
-			if (error = hrt_checkclock(cp->hrtc_clk))
+			if ((error = hrt_checkclock(cp->hrtc_clk)) != 0)
 				break;
 			switch (cp->hrtc_clk) {
 			case CLK_STD:
@@ -265,7 +263,7 @@ hrtalarm(uap, rvp)
 			break;
 
 		case HRT_BSD_CANCEL:
-			if (error = hrt_checkclock(cp->hrtc_clk))
+			if ((error = hrt_checkclock(cp->hrtc_clk)) != 0)
 				break;
 
 			error = hrt_bsd_cancel(cp->hrtc_clk);

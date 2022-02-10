@@ -63,7 +63,7 @@ extern uint_t prom_debug;
 
 extern void dboot_halt(void) __NORETURN;
 
-#define	RNDUP(x, y)	((x) + ((y) - 1ul) & ~((y) - 1ul))
+#define	RNDUP(x, y)	(((x) + ((y) - 1ul)) & ~((y) - 1ul))
 
 #endif /* _ASM */
 

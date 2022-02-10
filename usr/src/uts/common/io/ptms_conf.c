@@ -422,10 +422,7 @@ ptms_set_owner(minor_t dminor, uid_t ruid, gid_t rgid)
 {
 	struct pt_ttys *pt;
 
-	ASSERT(ruid >= 0);
-	ASSERT(rgid >= 0);
-
-	if (ruid < 0 || rgid < 0)
+	if (ruid > MAXUID || rgid > MAXUID)
 		return;
 
 	/*
@@ -478,8 +475,8 @@ ptms_minor_valid(minor_t dminor, uid_t *ruid, gid_t *rgid)
 	mutex_enter(&ptms_lock);
 	pt = ptms_minor2ptty(dminor);
 	if (pt != NULL) {
-		ASSERT(pt->pt_ruid >= 0);
-		ASSERT(pt->pt_rgid >= 0);
+		ASSERT(pt->pt_ruid <= MAXUID);
+		ASSERT(pt->pt_rgid <= MAXUID);
 		if (pt->pt_zoneid == getzoneid()) {
 			ret = 1;
 			*ruid = pt->pt_ruid;

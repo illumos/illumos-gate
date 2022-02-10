@@ -333,7 +333,7 @@ segmap_create(struct seg *seg, void *argsp)
 	nfreelist = a->nfreelist;
 	if (nfreelist == 0)
 		nfreelist = max_ncpus;
-	else if (nfreelist < 0 || nfreelist > 4 * max_ncpus) {
+	else if (nfreelist > 4 * max_ncpus) {
 		cmn_err(CE_WARN, "segmap_create: nfreelist out of range "
 		"%d, using %d", nfreelist, max_ncpus);
 		nfreelist = max_ncpus;

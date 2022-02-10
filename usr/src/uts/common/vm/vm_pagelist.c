@@ -1866,7 +1866,7 @@ mach_page_add(page_t **ppp, page_t *pp)
 void
 mach_page_sub(page_t **ppp, page_t *pp)
 {
-	ASSERT(PP_ISFREE(pp));
+	ASSERT(pp != NULL && PP_ISFREE(pp));
 
 	if (*ppp == NULL || pp == NULL)
 		panic("mach_page_sub");
@@ -2278,9 +2278,6 @@ page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
 	pgcnt_t	cands = 0, szcpgcnt = page_get_pagecnt(szc);
 	page_t	*ret_pp;
 	MEM_NODE_ITERATOR_DECL(it);
-#if defined(__sparc)
-	pfn_t pfnum0, nlo, nhi;
-#endif
 
 	if (mpss_coalesce_disable) {
 		ASSERT(szc < MMU_PAGE_SIZES);
@@ -2380,39 +2377,7 @@ page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
 	idx0 = PNUM_TO_IDX(mnode, r, pfnum);
 	ASSERT(idx0 < len);
 
-#if defined(__sparc)
-	pfnum0 = pfnum;		/* page corresponding to idx0 */
-	nhi = 0;		/* search kcage ranges */
-#endif
-
 	for (idx = idx0; wrap == 0 || (idx < idx0 && wrap < 2); ) {
-
-#if defined(__sparc)
-		/*
-		 * Find lowest intersection of kcage ranges and mnode.
-		 * MTYPE_NORELOC means look in the cage, otherwise outside.
-		 */
-		if (nhi <= pfnum) {
-			if (kcage_next_range(mtype == MTYPE_NORELOC, pfnum,
-			    (wrap == 0 ? hi : pfnum0), &nlo, &nhi))
-				goto wrapit;
-
-			/* jump to the next page in the range */
-			if (pfnum < nlo) {
-				pfnum = P2ROUNDUP(nlo, szcpgcnt);
-				MEM_NODE_ITERATOR_INIT(pfnum, mnode, szc, &it);
-				idx = PNUM_TO_IDX(mnode, r, pfnum);
-				if (idx >= len || pfnum >= hi)
-					goto wrapit;
-				if ((PFN_2_COLOR(pfnum, szc, &it) ^ color) &
-				    ceq_mask)
-					goto next;
-				if (interleaved_mnodes &&
-				    PFN_2_MEM_NODE(pfnum) != mnode)
-					goto next;
-			}
-		}
-#endif
 
 		if (PAGE_COUNTERS(mnode, r, idx) != full)
 			goto next;
@@ -2432,14 +2397,7 @@ page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
 				    PFN_2_COLOR(pfnum, szc, &it), mrange) = idx;
 				page_freelist_unlock(mnode);
 				rw_exit(&page_ctrs_rwlock[mnode]);
-#if defined(__sparc)
-				if (PP_ISNORELOC(ret_pp)) {
-					pgcnt_t npgs;
 
-					npgs = page_get_pagecnt(ret_pp->p_szc);
-					kcage_freemem_sub(npgs);
-				}
-#endif
 				return (ret_pp);
 			}
 		} else {
@@ -2467,14 +2425,10 @@ next:
 		    color_mask, &it);
 		idx = PNUM_TO_IDX(mnode, r, pfnum);
 		if (idx >= len || pfnum >= hi) {
-wrapit:
 			pfnum = lo;
 			MEM_NODE_ITERATOR_INIT(pfnum, mnode, szc, &it);
 			idx = PNUM_TO_IDX(mnode, r, pfnum);
 			wrap++;
-#if defined(__sparc)
-			nhi = 0;	/* search kcage ranges */
-#endif
 		}
 	}
 

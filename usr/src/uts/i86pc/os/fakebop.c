@@ -2922,7 +2922,8 @@ build_firmware_properties(struct xboot_info *xbp)
 	    find_fw_table(rsdp, ACPI_SIG_SRAT)) != NULL)
 		process_srat(srat_ptr);
 
-	if (slit_ptr = (ACPI_TABLE_SLIT *)find_fw_table(rsdp, ACPI_SIG_SLIT))
+	if ((slit_ptr = (ACPI_TABLE_SLIT *)find_fw_table(rsdp,
+	    ACPI_SIG_SLIT)) != NULL)
 		process_slit(slit_ptr);
 
 	tp = find_fw_table(rsdp, ACPI_SIG_MCFG);

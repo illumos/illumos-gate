@@ -614,7 +614,7 @@ again:
 	 * requests will continue to be satisfied in the same way,
 	 * even if weak bindings have recommenced.
 	 */
-	if (t->t_nomigrate < 0 || weakbindingbarrier && t->t_nomigrate == 0) {
+	if (t->t_nomigrate < 0 || (weakbindingbarrier && t->t_nomigrate == 0)) {
 		--t->t_nomigrate;
 		thread_unlock(curthread);
 		return;		/* with kpreempt_disable still active */

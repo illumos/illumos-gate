@@ -1030,12 +1030,10 @@ kobj_notify_remove(kobj_notify_list_t *knp)
 
 	mutex_enter(&kobj_lock);
 
-	/* LINTED */
-	if (tknp = knp->kn_next)
+	if ((tknp = knp->kn_next) != NULL)
 		tknp->kn_prev = knp->kn_prev;
 
-	/* LINTED */
-	if (tknp = knp->kn_prev)
+	if ((tknp = knp->kn_prev) != NULL)
 		tknp->kn_next = knp->kn_next;
 	else
 		*knl = knp->kn_next;
@@ -2240,7 +2238,7 @@ free_module_data(struct module *mp)
 				break;
 			}
 		}
-err_free_done:
+
 		if (!(mp->flags & KOBJ_PRIM)) {
 			kobj_free(mp->shdrs,
 			    mp->hdr.e_shentsize * mp->hdr.e_shnum);

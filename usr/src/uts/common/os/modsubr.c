@@ -74,8 +74,7 @@ static void hwc_unhash(struct hwc_spec *);
 int
 major_valid(major_t major)
 {
-	return (major != DDI_MAJOR_T_NONE &&
-	    (major >= 0 && major < devcnt));
+	return (major != DDI_MAJOR_T_NONE && major < devcnt);
 }
 
 int

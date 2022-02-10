@@ -1203,7 +1203,6 @@ bcons_post_bootenvrc(char *inputdev, char *outputdev, char *consoledev)
 	int cons = CONS_INVALID;
 	int ttyn;
 	char *devnames[] = { consoledev, outputdev, inputdev, NULL };
-	console_value_t *consolep;
 	int i;
 	extern int post_fastreboot;
 

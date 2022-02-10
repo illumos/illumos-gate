@@ -79,13 +79,10 @@ CPPFLAGS	+= -I$(SRC)/uts/common/fs/zfs
 
 CPPFLAGS	+= -I$(UTSBASE)/i86pc
 
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-value
 CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-clobbered
 CERRWARN	+= -_gcc=-Wno-empty-body
@@ -106,7 +103,7 @@ $(OBJS_DIR)/seg_vn.o := SMOFF += deref_check
 $(OBJS_DIR)/ddi_intr_irm.o := SMOFF += deref_check
 
 # need work still
-SMOFF += signed,indenting,all_func_returns
+SMOFF += signed,all_func_returns
 $(OBJS_DIR)/clock_highres.o := SMOFF += signed_integer_overflow_check
 $(OBJS_DIR)/evchannels.o := SMOFF += allocating_enough_data
 $(OBJS_DIR)/klpd.o := SMOFF += cast_assign
@@ -115,8 +112,8 @@ $(OBJS_DIR)/process.o := SMOFF += or_vs_and
 $(OBJS_DIR)/sunpci.o := SMOFF += deref_check
 $(OBJS_DIR)/timers.o := SMOFF += signed_integer_overflow_check
 
-# definitely wrong
-$(OBJS_DIR)/acl_common.o := SMOFF += or_vs_and
+# 3rd party code
+$(OBJS_DIR)/bz2bzlib.o := SMOFF += indenting
 
 #
 #	Default build targets.
