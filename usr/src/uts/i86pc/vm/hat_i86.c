@@ -3865,7 +3865,7 @@ hat_page_inval(struct page *pp, uint_t pg_szcd, struct hat *curhat)
 	htable_t	*ht;
 	uint_t		entry;
 	level_t		level;
-	ulong_t		cnt;
+	ulong_t		cnt = 0;
 
 	XPV_DISALLOW_MIGRATE();
 
