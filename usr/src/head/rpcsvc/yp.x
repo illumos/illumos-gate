@@ -26,8 +26,6 @@
  *	All Rights Reserved.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Protocol description file for the Network Information Services
  */
@@ -81,7 +79,7 @@ typedef opaque valdat<YPMAXRECORD>;
 
 
 struct ypmap_parms {
-	domainname domain;	
+	domainname domain;
 	mapname map;
 	unsigned int ordernum;
 	peername peer;
@@ -94,10 +92,10 @@ struct ypreq_key {
 };
 
 struct ypreq_nokey {
-	domainname domain;	
+	domainname domain;
 	mapname map;
 };
-	
+
 struct ypreq_xfr {
 	ypmap_parms map_parms;
 	unsigned int transid;
@@ -119,7 +117,7 @@ struct ypresp_key_val {
 
 
 struct ypresp_master {
-	ypstat stat;	
+	ypstat stat;
 	peername peer;
 };
 
@@ -178,31 +176,31 @@ struct yppushresp_xfr {
  * Response structure and overall result status codes.  Success and failure
  * represent two separate response message types.
  */
- 
+
 enum ypbind_resptype {
-	YPBIND_SUCC_VAL = 1, 
+	YPBIND_SUCC_VAL = 1,
 	YPBIND_FAIL_VAL = 2
 };
- 
+
 struct ypbind_binding {
     opaque ypbind_binding_addr[4]; /* In network order */
     opaque ypbind_binding_port[2]; /* In network order */
-};   
+};
 
 union ypbind_resp switch (ypbind_resptype ypbind_status) {
 case YPBIND_FAIL_VAL:
         unsigned ypbind_error;
 case YPBIND_SUCC_VAL:
         ypbind_binding ypbind_bindinfo;
-};     
+};
 
 /* Detailed failure reason codes for response field ypbind_error*/
- 
+
 const YPBIND_ERR_ERR    = 1;	/* Internal error */
 const YPBIND_ERR_NOSERV = 2;	/* No bound server for passed domain */
 const YPBIND_ERR_RESC   = 3;	/* System resource allocation failure */
- 
- 
+
+
 /*
  * Request data structure for ypbind "Set domain" procedure.
  */
@@ -218,11 +216,11 @@ struct ypbind_setdom {
  */
 program YPPROG {
 	version YPVERS {
-		void 
+		void
 		YPPROC_NULL(void) = 0;
 
-		bool 
-		YPPROC_DOMAIN(domainname) = 1;	
+		bool
+		YPPROC_DOMAIN(domainname) = 1;
 
 		bool
 		YPPROC_DOMAIN_NONACK(domainname) = 2;
@@ -230,10 +228,10 @@ program YPPROG {
 		ypresp_val
 		YPPROC_MATCH(ypreq_key) = 3;
 
-		ypresp_key_val 
+		ypresp_key_val
 		YPPROC_FIRST(ypreq_key) = 4;
 
-		ypresp_key_val 
+		ypresp_key_val
 		YPPROC_NEXT(ypreq_key) = 5;
 
 		ypresp_xfr
@@ -251,7 +249,7 @@ program YPPROG {
 		ypresp_order
 		YPPROC_ORDER(ypreq_nokey) = 10;
 
-		ypresp_maplist 
+		ypresp_maplist
 		YPPROC_MAPLIST(domainname) = 11;
 	} = 2;
 } = 100004;
@@ -265,7 +263,7 @@ program YPPUSH_XFRRESPPROG {
 		void
 		YPPUSHPROC_NULL(void) = 0;
 
-		yppushresp_xfr	
+		yppushresp_xfr
 		YPPUSHPROC_XFRRESP(void) = 1;
 	} = 1;
 } = 0x40000000;	/* transient: could be anything up to 0x5fffffff */
@@ -278,7 +276,7 @@ program YPBINDPROG {
 	version YPBINDVERS {
 		void
 		YPBINDPROC_NULL(void) = 0;
-	
+
 		ypbind_resp
 		YPBINDPROC_DOMAIN(domainname) = 1;
 

@@ -26,8 +26,6 @@
 #ifndef	_RPCSVC_BOOTPARAM_H
 #define	_RPCSVC_BOOTPARAM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpcsvc/bootparam_prot.h>
 
 #endif	/* _RPCSVC_BOOTPARAM_H */

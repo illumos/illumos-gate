@@ -27,8 +27,6 @@
 #ifndef	_APPTRACE_H
 #define	_APPTRACE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>

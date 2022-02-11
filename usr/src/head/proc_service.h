@@ -26,8 +26,6 @@
 #ifndef _PROC_SERVICE_H
 #define	_PROC_SERVICE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  Description:
  *	Types, global variables, and function definitions for provider

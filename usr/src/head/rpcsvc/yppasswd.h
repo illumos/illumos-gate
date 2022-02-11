@@ -28,8 +28,6 @@
 #ifndef _RPCSVC_YPPASSWD_H
 #define	_RPCSVC_YPPASSWD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _PWD_H
 #include <pwd.h>
 #endif

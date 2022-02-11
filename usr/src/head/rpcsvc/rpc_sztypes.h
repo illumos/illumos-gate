@@ -26,8 +26,6 @@
 #ifndef	_RPCSVC_RPC_SZTYPES_H
 #define	_RPCSVC_RPC_SZTYPES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/rpc_sztypes.h>
 
 #endif	/* _RPCSVC_RPC_SZTYPES_H */

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-/* #ident	"%Z%%M%	%I%	%E% SMI" */
-
 /*
  * Remote quota protocol
  * Requires unix authentication
@@ -51,7 +49,7 @@ struct rquota {
 	uint32_t rq_curfiles;		/* current # allocated files */
 	uint32_t rq_btimeleft;		/* time left for excessive disk use */
 	uint32_t rq_ftimeleft;		/* time left for excessive files */
-};	
+};
 
 enum gqr_status {
 	Q_OK = 1,		/* quota returned */

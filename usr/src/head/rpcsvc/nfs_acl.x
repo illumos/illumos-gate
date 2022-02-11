@@ -25,10 +25,6 @@
  *	Use is subject to license terms.
  */
 
-/*
- * ident	"%Z%%M%	%I%	%E% SMI"
- */
-
 const NFS_ACL_MAX_ENTRIES = 1024;
 
 typedef int uid;

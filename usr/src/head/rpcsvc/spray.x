@@ -25,12 +25,6 @@
 
 %/* from spray.x */
 
-#ifdef RPC_HDR
-%
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%
-#endif
-
 /*
  * Spray a server with packets
  * Useful for testing flakiness of network interfaces
@@ -63,7 +57,7 @@ program SPRAYPROG {
 	version SPRAYVERS {
 		/*
 		 * Just throw away the data and increment the counter
-		 * This call never returns, so the client should always 
+		 * This call never returns, so the client should always
 		 * time it out.
 		 */
 		void
@@ -73,7 +67,7 @@ program SPRAYPROG {
 		 * Get the value of the counter and elapsed time  since
 		 * last CLEAR.
 		 */
-		spraycumul	
+		spraycumul
 		SPRAYPROC_GET(void) = 2;
 
 		/*

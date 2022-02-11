@@ -27,8 +27,6 @@
 #ifndef	_ISO646_H
 #define	_ISO646_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

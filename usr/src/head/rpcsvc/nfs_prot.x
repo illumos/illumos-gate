@@ -24,10 +24,7 @@
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef RPC_HDR
-%
 %/*
 % * Definitions for uint64, int64, uint32, and int32
 % */
@@ -105,7 +102,7 @@ struct nfs_fh {
 	opaque data[NFS_FHSIZE];
 };
 
-/* 
+/*
  * Timeval
  */
 struct nfstime {
@@ -147,7 +144,7 @@ struct sattr {
 };
 
 
-typedef string filename<NFS_MAXNAMLEN>; 
+typedef string filename<NFS_MAXNAMLEN>;
 typedef string nfspath<NFS_MAXPATHLEN>;
 
 /*
@@ -221,7 +218,7 @@ default:
 };
 
 /*
- * Arguments to remote write 
+ * Arguments to remote write
  */
 struct writeargs {
 	nfs_fh	file;		/* handle for file */
@@ -303,28 +300,28 @@ default:
  */
 program NFS_PROGRAM {
 	version NFS_VERSION {
-		void 
+		void
 		NFSPROC_NULL(void) = 0;
 
-		attrstat 
+		attrstat
 		NFSPROC_GETATTR(nfs_fh) =	1;
 
-		attrstat 
+		attrstat
 		NFSPROC_SETATTR(sattrargs) = 2;
 
-		void 
+		void
 		NFSPROC_ROOT(void) = 3;
 
-		diropres 
+		diropres
 		NFSPROC_LOOKUP(diropargs) = 4;
 
-		readlinkres 
+		readlinkres
 		NFSPROC_READLINK(nfs_fh) = 5;
 
-		readres 
+		readres
 		NFSPROC_READ(readargs) = 6;
 
-		void 
+		void
 		NFSPROC_WRITECACHE(void) = 7;
 
 		attrstat
@@ -448,7 +445,7 @@ struct nfs_fh3 {
 	opaque data<NFS3_FHSIZE>;
 };
 
-/* 
+/*
  * Timeval
  */
 struct nfstime3 {
@@ -483,7 +480,7 @@ case TRUE:
 	fattr3 attributes;
 case FALSE:
 	void;
-};	
+};
 
 struct wcc_attr {
 	size3	 size;
@@ -559,12 +556,12 @@ default:
 };
 
 struct sattr3 {
-	set_mode3 mode; 
-	set_uid3  uid; 
-	set_gid3  gid; 
-	set_size3 size; 
-	set_atime atime; 
-	set_mtime mtime; 
+	set_mode3 mode;
+	set_uid3  uid;
+	set_gid3  gid;
+	set_size3 size;
+	set_atime atime;
+	set_mtime mtime;
 };
 
 struct diropargs3 {
@@ -691,7 +688,7 @@ struct READLINK3resok {
 struct READLINK3resfail {
 	post_op_attr	symlink_attributes;
 };
-	
+
 union READLINK3res switch (nfsstat3 status) {
 case NFS3_OK:
 	READLINK3resok	 resok;
@@ -1196,58 +1193,58 @@ default:
  */
 program NFS3_PROGRAM {
 	version NFS_V3 {
-		void 
+		void
 		NFSPROC3_NULL(void) = 0;
 
-		GETATTR3res 
+		GETATTR3res
 		NFSPROC3_GETATTR(GETATTR3args) = 1;
 
-		SETATTR3res 
+		SETATTR3res
 		NFSPROC3_SETATTR(SETATTR3args) = 2;
 
-		LOOKUP3res 
+		LOOKUP3res
 		NFSPROC3_LOOKUP(LOOKUP3args) = 3;
 
-		ACCESS3res 
+		ACCESS3res
 		NFSPROC3_ACCESS(ACCESS3args) = 4;
 
-		READLINK3res 
+		READLINK3res
 		NFSPROC3_READLINK(READLINK3args) = 5;
 
-		READ3res 
+		READ3res
 		NFSPROC3_READ(READ3args) = 6;
 
-		WRITE3res 
+		WRITE3res
 		NFSPROC3_WRITE(WRITE3args) = 7;
 
-		CREATE3res	
+		CREATE3res
 		NFSPROC3_CREATE(CREATE3args) = 8;
 
 		MKDIR3res
 		NFSPROC3_MKDIR(MKDIR3args) = 9;
 
-		SYMLINK3res	
+		SYMLINK3res
 		NFSPROC3_SYMLINK(SYMLINK3args) = 10;
 
 		MKNOD3res
 		NFSPROC3_MKNOD(MKNOD3args) = 11;
 
-		REMOVE3res	
+		REMOVE3res
 		NFSPROC3_REMOVE(REMOVE3args) = 12;
 
-		RMDIR3res	
+		RMDIR3res
 		NFSPROC3_RMDIR(RMDIR3args) = 13;
 
-		RENAME3res	
+		RENAME3res
 		NFSPROC3_RENAME(RENAME3args) = 14;
 
-		LINK3res	
+		LINK3res
 		NFSPROC3_LINK(LINK3args) = 15;
 
-		READDIR3res	
+		READDIR3res
 		NFSPROC3_READDIR(READDIR3args) = 16;
 
-		READDIRPLUS3res	
+		READDIRPLUS3res
 		NFSPROC3_READDIRPLUS(READDIRPLUS3args) = 17;
 
 		FSSTAT3res

@@ -38,8 +38,6 @@
 #ifndef	_NOTE_H
 #define	_NOTE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/note.h>
 
 #ifdef	__cplusplus

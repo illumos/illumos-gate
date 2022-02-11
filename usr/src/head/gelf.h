@@ -27,8 +27,6 @@
 #ifndef	_GELF_H
 #define	_GELF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 
 #include <libelf.h>
