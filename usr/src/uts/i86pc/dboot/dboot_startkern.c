@@ -1674,8 +1674,6 @@ dboot_multiboot1_highest_addr(void)
 static uint64_t
 dboot_multiboot_highest_addr(void)
 {
-	paddr_t addr;
-
 	switch (multiboot_version) {
 	case 1:
 		return (dboot_multiboot1_highest_addr());
