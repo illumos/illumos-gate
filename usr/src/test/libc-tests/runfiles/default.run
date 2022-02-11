@@ -167,3 +167,4 @@ tests = [
 	'wchar_h',
 	'wctype_h'
 	 ]
+timeout = 180
