@@ -269,6 +269,9 @@ int smb_event_debug = 0;
 
 static smb_llist_t	smb_servers;
 
+/* for smb_server_destroy_session() */
+static smb_llist_t smb_server_session_zombies;
+
 kmem_cache_t		*smb_cache_request;
 kmem_cache_t		*smb_cache_session;
 kmem_cache_t		*smb_cache_user;
@@ -340,6 +343,9 @@ smb_server_g_init(void)
 	smb_llist_init();
 	smb_llist_constructor(&smb_servers, sizeof (smb_server_t),
 	    offsetof(smb_server_t, sv_lnd));
+
+	smb_llist_constructor(&smb_server_session_zombies,
+	    sizeof (smb_session_t), offsetof(smb_session_t, s_lnd));
 
 	return (0);
 
@@ -1472,7 +1478,7 @@ smb_server_shutdown(smb_server_t *sv)
 	 * with shutdown in spite of any leaked sessions.
 	 * That's better than a server that won't reboot.
 	 */
-	time = SEC_TO_TICK(10) + ddi_get_lbolt();
+	time = SEC_TO_TICK(5) + ddi_get_lbolt();
 	mutex_enter(&sv->sv_mutex);
 	while (sv->sv_session_list.ll_count != 0) {
 		if (cv_timedwait(&sv->sv_cv, &sv->sv_mutex, time) < 0)
@@ -1758,7 +1764,6 @@ smb_server_receiver(void *arg)
 	/* We stay in here until socket disconnect. */
 	smb_session_receiver(session);
 
-	ASSERT(session->s_state == SMB_SESSION_STATE_SHUTDOWN);
 	smb_server_destroy_session(session);
 }
 
@@ -2612,7 +2617,25 @@ smb_server_destroy_session(smb_session_t *session)
 	count = ll->ll_count;
 	smb_llist_exit(ll);
 
-	smb_session_delete(session);
+	/*
+	 * Normally, the session should have state SHUTDOWN here.
+	 * If the session has any ofiles remaining, eg. due to
+	 * forgotten ofile references or something, the state
+	 * will be _DISCONNECTED or _TERMINATED.  Keep such
+	 * sessions in the list of zombies (for debugging).
+	 */
+	if (session->s_state == SMB_SESSION_STATE_SHUTDOWN) {
+		smb_session_delete(session);
+	} else {
+#ifdef	DEBUG
+		cmn_err(CE_NOTE, "Leaked session: 0x%p", (void *)session);
+		debug_enter("leaked session");
+#endif
+		smb_llist_enter(&smb_server_session_zombies, RW_WRITER);
+		smb_llist_insert_head(&smb_server_session_zombies, session);
+		smb_llist_exit(&smb_server_session_zombies);
+	}
+
 	if (count == 0) {
 		/* See smb_server_shutdown */
 		cv_signal(&sv->sv_cv);
