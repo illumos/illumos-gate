@@ -65,8 +65,10 @@
 #define	LX_PR_SET_THP_DISABLE		41
 #define	LX_PR_GET_THP_DISABLE		42
 
+#define	SECCOMP_MODE_FILTER	2
+
 long
-lx_prctl(int opt, uintptr_t data)
+lx_prctl(int opt, uintptr_t arg2, uintptr_t arg3)
 {
 	long err;
 	char ebuf[64];
@@ -88,13 +90,13 @@ lx_prctl(int opt, uintptr_t data)
 	case LX_PR_SET_DUMPABLE: {
 		lx_proc_data_t *lxpd;
 
-		if (data != 0 && data != 1) {
+		if (arg2 != 0 && arg2 != 1) {
 			return (set_errno(EINVAL));
 		}
 
 		mutex_enter(&curproc->p_lock);
 		VERIFY((lxpd = ptolxproc(curproc)) != NULL);
-		if (data == 0) {
+		if (arg2 == 0) {
 			lxpd->l_flags |= LX_PROC_NO_DUMP;
 		} else {
 			lxpd->l_flags &= ~LX_PROC_NO_DUMP;
@@ -120,7 +122,7 @@ lx_prctl(int opt, uintptr_t data)
 		 * flag.  There are probably some cases where it's not exactly
 		 * the same, but this will do for a first try.
 		 */
-		if (data == 0) {
+		if (arg2 == 0) {
 			err = setpflags(PRIV_AWARE_RESET, 1, NULL);
 		} else {
 			err = setpflags(PRIV_AWARE, 1, NULL);
@@ -153,7 +155,7 @@ lx_prctl(int opt, uintptr_t data)
 		 * buffer should be at least 16 (LX_PR_SET_NAME_NAMELEN) bytes
 		 * long.
 		 */
-		if (copyout(name, (void *)data, LX_PR_SET_NAME_NAMELEN) != 0) {
+		if (copyout(name, (void *)arg2, LX_PR_SET_NAME_NAMELEN) != 0) {
 			return (set_errno(EFAULT));
 		}
 		return (0);
@@ -165,7 +167,7 @@ lx_prctl(int opt, uintptr_t data)
 		proc_t *p = ttoproc(t);
 		int ret;
 
-		ret = copyinstr((const char *)data, name, sizeof (name), NULL);
+		ret = copyinstr((const char *)arg2, name, sizeof (name), NULL);
 		/*
 		 * prctl(2) explicitly states that over length strings are
 		 * silently truncated
@@ -231,11 +233,11 @@ lx_prctl(int opt, uintptr_t data)
 	}
 
 	case LX_PR_SET_PDEATHSIG: {
-		int sig = lx_ltos_signo((int)data, 0);
+		int sig = lx_ltos_signo((int)arg2, 0);
 		proc_t *pp = NULL;
 		lx_proc_data_t *lxpd;
 
-		if (sig == 0 && data != 0) {
+		if (sig == 0 && arg2 != 0) {
 			return (set_errno(EINVAL));
 		}
 
@@ -286,6 +288,57 @@ lx_prctl(int opt, uintptr_t data)
 		 * no need to map this to the illumos privileges.
 		 */
 		return (0);
+	}
+
+	case LX_PR_GET_NO_NEW_PRIVS: {
+		/*
+		 * Some Linux applications (such as Elasticsearch) use
+		 * PR_SET_NO_NEW_PRIVS to enable the NoNewPrivs flag, and then
+		 * query the flag status, and fail unless the query indicates
+		 * the flag is enabled. Since we return success in
+		 * LX_PR_SET_NO_NEW_PRIVS, we assume here that the application
+		 * has intended to enable the flag, so we return 1 indicating
+		 * that the flag is enabled.
+		 */
+		return (1);
+	}
+
+	case LX_PR_SET_SECCOMP: {
+		if (arg2 == SECCOMP_MODE_FILTER) {
+			if (arg3 == (uintptr_t)NULL) {
+				/*
+				 * prctl(2) says PR_SET_SECCOMP should indicate
+				 * EFAULT if arg3 is an invalid address.
+				 */
+				return (set_errno(EFAULT));
+			}
+
+			/*
+			 * Some Linux applications install seccomp BPF rules.
+			 * For example, Elasticsearch installs rules that
+			 * prevent fork/exec. Since Illumos doesn't have an
+			 * analogous system call rule engine, for now we just
+			 * pretend and lie that the rule installation
+			 * succeeded.
+			 */
+			/* So we can track who needs this */
+			DTRACE_PROBE(lx__SECCOMP);
+			return (0);
+		}
+		break;
+	}
+
+	case LX_PR_GET_SECCOMP: {
+		/*
+		 * Some Linux applications (such as Elasticsearch) use
+		 * PR_SET_SECCOMP to install seccomp BPF rules, and then query
+		 * the status, and fail unless the query indicates its rules
+		 * are installed. Since we return success in LX_PR_SET_SECCOMP,
+		 * we assume here that the application has intended to install
+		 * its rules, so we return SECCOMP_MODE_FILTER indicating that
+		 * its rules are installed.
+		 */
+		return (SECCOMP_MODE_FILTER);
 	}
 
 	default:
