@@ -4968,6 +4968,7 @@ f usr/include/umem.h 0644 root bin
 f usr/include/umem_impl.h 0644 root bin
 f usr/include/unctrl.h 0644 root bin
 f usr/include/unistd.h 0644 root bin
+f usr/include/upanic.h 0644 root bin
 f usr/include/user_attr.h 0644 root bin
 f usr/include/userdefs.h 0644 root bin
 f usr/include/ustat.h 0644 root bin
