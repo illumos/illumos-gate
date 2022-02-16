@@ -61,7 +61,7 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS.first += -I../common
 CPPFLAGS= $(CPPFLAGS.first)
 
-INCS += -I$(SRC)/uts/common
+INCS += -I$(SRC)/uts/common -I$(ROOT)/usr/include
 
 CPPFLAGS += $(INCS) -D_REENTRANT -D_FAKE_KERNEL
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
