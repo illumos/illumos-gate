@@ -17,6 +17,7 @@ include $(SRC)/test/Makefile.com
 
 PROG =	mem_partial \
 	mem_seg_map \
+	mem_devmem \
 	fpu_getset
 
 COMMON_OBJS =	common.o

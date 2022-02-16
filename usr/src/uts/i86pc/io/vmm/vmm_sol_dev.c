@@ -115,6 +115,33 @@ static int vmm_kstat_alloc(vmm_softc_t *, minor_t, const cred_t *);
 static void vmm_kstat_init(vmm_softc_t *);
 static void vmm_kstat_fini(vmm_softc_t *);
 
+/*
+ * The 'devmem' hack:
+ *
+ * On native FreeBSD, bhyve consumers are allowed to create 'devmem' segments
+ * in the vm which appear with their own name related to the vm under /dev.
+ * Since this would be a hassle from an sdev perspective and would require a
+ * new cdev interface (or complicate the existing one), we choose to implement
+ * this in a different manner.  Direct access to the underlying vm memory
+ * segments is exposed by placing them in a range of offsets beyond the normal
+ * guest memory space.  Userspace can query the appropriate offset to mmap()
+ * for a given segment-id with the VM_DEVMEM_GETOFFSET ioctl.
+ */
+
+static vmm_devmem_entry_t *
+vmmdev_devmem_find(vmm_softc_t *sc, int segid)
+{
+	vmm_devmem_entry_t *ent = NULL;
+	list_t *dl = &sc->vmm_devmem_list;
+
+	for (ent = list_head(dl); ent != NULL; ent = list_next(dl, ent)) {
+		if (ent->vde_segid == segid) {
+			return (ent);
+		}
+	}
+	return (NULL);
+}
+
 static int
 vmmdev_get_memseg(vmm_softc_t *sc, struct vm_memseg *mseg)
 {
@@ -128,13 +155,8 @@ vmmdev_get_memseg(vmm_softc_t *sc, struct vm_memseg *mseg)
 
 	if (!sysmem) {
 		vmm_devmem_entry_t *de;
-		list_t *dl = &sc->vmm_devmem_list;
 
-		for (de = list_head(dl); de != NULL; de = list_next(dl, de)) {
-			if (de->vde_segid == mseg->segid) {
-				break;
-			}
-		}
+		de = vmmdev_devmem_find(sc, mseg->segid);
 		if (de != NULL) {
 			(void) strlcpy(mseg->name, de->vde_name,
 			    sizeof (mseg->name));
@@ -145,19 +167,6 @@ vmmdev_get_memseg(vmm_softc_t *sc, struct vm_memseg *mseg)
 
 	return (error);
 }
-
-/*
- * The 'devmem' hack:
- *
- * On native FreeBSD, bhyve consumers are allowed to create 'devmem' segments
- * in the vm which appear with their own name related to the vm under /dev.
- * Since this would be a hassle from an sdev perspective and would require a
- * new cdev interface (or complicate the existing one), we choose to implement
- * this in a different manner.  When 'devmem' mappings are created, an
- * identifying off_t is communicated back out to userspace.  That off_t,
- * residing above the normal guest memory space, can be used to mmap the
- * 'devmem' mapping from the already-open vm device.
- */
 
 static int
 vmmdev_devmem_create(vmm_softc_t *sc, struct vm_memseg *mseg, const char *name)
@@ -239,7 +248,7 @@ vmmdev_alloc_memseg(vmm_softc_t *sc, struct vm_memseg *mseg)
 	}
 	error = vm_alloc_memseg(sc->vmm_vm, mseg->segid, mseg->len, sysmem);
 
-	if (error == 0 && VM_MEMSEG_NAME(mseg)) {
+	if (error == 0) {
 		/*
 		 * Rather than create a whole fresh device from which userspace
 		 * can mmap this segment, instead make it available at an
@@ -1442,19 +1451,14 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	}
 	case VM_DEVMEM_GETOFFSET: {
 		struct vm_devmem_offset vdo;
-		list_t *dl = &sc->vmm_devmem_list;
-		vmm_devmem_entry_t *de = NULL;
+		vmm_devmem_entry_t *de;
 
 		if (ddi_copyin(datap, &vdo, sizeof (vdo), md) != 0) {
 			error = EFAULT;
 			break;
 		}
 
-		for (de = list_head(dl); de != NULL; de = list_next(dl, de)) {
-			if (de->vde_segid == vdo.segid) {
-				break;
-			}
-		}
+		de = vmmdev_devmem_find(sc, vdo.segid);
 		if (de != NULL) {
 			vdo.offset = de->vde_off;
 			if (ddi_copyout(&vdo, datap, sizeof (vdo), md) != 0) {
