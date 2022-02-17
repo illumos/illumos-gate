@@ -69,9 +69,9 @@ $(ROOT_BOOT)/%: % $(ROOT_BOOT)
 $(ROOT_BOOT_DEFAULTS)/%: % $(ROOT_BOOT_DEFAULTS)
 	$(INS.file)
 
-$(ROOT_BOOT_FORTH)/menu.rc: ../../forth/joyent.menu.rc $(ROOT_BOOT_FORTH)
+$(ROOT_BOOT_FORTH)/menu.rc: joyent.menu.rc $(ROOT_BOOT_FORTH)
 	$(RM) $@; \
-	$(INS) -s -m $(FILEMODE) -f $(@D) ../../forth/joyent.menu.rc; \
+	$(INS) -s -m $(FILEMODE) -f $(@D) joyent.menu.rc; \
 	$(MV) $(@D)/joyent.menu.rc $@
 
 $(ROOT_BOOT_FORTH)/%: % $(ROOT_BOOT_FORTH)
