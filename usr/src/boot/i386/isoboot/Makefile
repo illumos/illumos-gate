@@ -46,7 +46,7 @@ LDSCRIPT=	../boot.ldscript
 LD_FLAGS=	-static -N --gc-sections
 LIBSTAND=	../../libsa/$(MACH)/libsa.a
 
-gptldr.out := LD_FLAGS += -m elf_i386_sol2
+gptldr.out := LD_FLAGS += $(GLDTARGET)
 
 isoboot.o := SMOFF += unreachable
 
@@ -61,7 +61,7 @@ OBJS= mb_header.o isoboot.o sio.o drv.o cons.o gptldr.o
 CLEANFILES += isoboot
 
 isoboot: gptldr.bin isoboot.bin $(BTXKERN)
-	btxld -v -E $(ORG2) -f bin -b $(BTXKERN) -V $(BOOT_VERSION) -l \
+	$(BTXLD) -v -E $(ORG2) -f bin -b $(BTXKERN) -V $(BOOT_VERSION) -l \
 		gptldr.bin -o $@ isoboot.bin
 	@set -- `ls -l $@`; x=$$(($(ISOBOOTSIZE)-$$5)); \
 	    echo "$$x bytes available"; test $$x -ge 0
@@ -72,7 +72,7 @@ gptldr.bin: gptldr.out
 	$(OBJCOPY) -S -O binary gptldr.out $@
 
 gptldr.out:	gptldr.o
-	$(LD) $(LD_FLAGS) -e start -Ttext $(ORG1) -o $@ gptldr.o
+	$(GLD) $(LD_FLAGS) -e start -Ttext $(ORG1) -o $@ gptldr.o
 
 CLEANFILES += isoboot.bin isoboot.out $(OBJS)
 
@@ -80,7 +80,7 @@ isoboot.bin: isoboot.out
 	$(OBJCOPY) -S -O binary isoboot.out $@
 
 isoboot.out: $(BTXCRT) $(OBJS)
-	$(LD) $(LD_FLAGS) -T $(LDSCRIPT) -o $@ $(BTXCRT) $(OBJS) $(LIBSTAND)
+	$(GLD) $(LD_FLAGS) -T $(LDSCRIPT) -o $@ $(BTXCRT) $(OBJS) $(LIBSTAND)
 
 machine:
 	$(RM) machine

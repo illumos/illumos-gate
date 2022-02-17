@@ -15,6 +15,7 @@
 
 # Common defines for all of /i386/
 
+GLDTARGET=	-melf_i386_sol2
 LOADER_ADDRESS=0x200000
 CFLAGS +=	-m32
 CCASFLAGS +=	-m32

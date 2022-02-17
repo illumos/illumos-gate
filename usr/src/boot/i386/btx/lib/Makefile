@@ -29,7 +29,7 @@ LDFLAGS = -r $(GLDTARGET)
 all install: $(PROG)
 
 $(PROG): $(OBJS)
-	$(LD) $(LDFLAGS) -o $@ $(OBJS)
+	$(GLD) $(LDFLAGS) -o $@ $(OBJS)
 
 clobber: clean
 

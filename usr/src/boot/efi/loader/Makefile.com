@@ -163,7 +163,7 @@ DPADD=		$(DPLIBFICL) $(DPLIBEFI) $(DPLIBSA) $(LDSCRIPT)
 LDADD=		$(LIBFICL) $(LIBEFI) $(LIBSA)
 
 loader.sym:	$(OBJS) $(DPADD)
-	$(LD) $(LDFLAGS) -o $@ $(OBJS) $(LDADD)
+	$(GLD) $(LDFLAGS) -o $@ $(OBJS) $(LDADD)
 
 machine:
 	$(RM) machine

@@ -145,7 +145,7 @@ OBJS=		$(SRCS:%.c=%.o)
 $(OBJS): machine x86
 
 $(PROG): $(OBJS) $(DPADD)
-	$(LD) $(LDFLAGS) -o $@ $(BTXCRT) $(OBJS) $(LDADD)
+	$(GLD) $(LDFLAGS) -o $@ $(BTXCRT) $(OBJS) $(LDADD)
 
 clean: clobber
 clobber:

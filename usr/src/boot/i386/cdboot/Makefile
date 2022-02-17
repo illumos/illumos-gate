@@ -22,19 +22,19 @@ CPPFLAGS +=	-I../common
 
 PROG=	cdboot
 FILEMODE=0444
-SRCS=	${PROG}.S
+SRCS=	$(PROG).S
 OBJS=	$(SRCS:%.S=%.o)
 
 ORG=	0x7c00
 
 LDFLAGS=-e start -Ttext $(ORG) -N -S --oformat binary $(GLDTARGET)
 
-all:	${PROG}
+all:	$(PROG)
 
 install: $(PROG:%=$(ROOT_BOOT)/%)
 
-${PROG}: ${OBJS}
-	${LD} ${LDFLAGS} -o $@ $^
+$(PROG): $(OBJS)
+	$(GLD) $(LDFLAGS) -o $@ $^
 
 clobber: clean
 clean:

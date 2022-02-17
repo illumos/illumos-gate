@@ -29,13 +29,13 @@ include ../Makefile.inc
 
 BTXDIR= ../btx
 
-PROG=	${LDR}
+PROG=	$(LDR)
 INTERNALPROG=
-FILES=	${BOOT}
-MAN=	${BOOT}.8
-SRCS=	${LDR}.S
-OBJS=	${LDR}.o
-CLEANFILES= ${BOOT} ${OBJS}
+FILES=	$(BOOT)
+MAN=	$(BOOT).8
+SRCS=	$(LDR).S
+OBJS=	$(LDR).o
+CLEANFILES= $(BOOT) $(OBJS)
 
 BOOT=	pxeboot
 LDR=	pxeldr
@@ -51,25 +51,25 @@ FILEMODE=0444
 
 LOADERBIN= ../loader/loader.bin
 
-CLEANFILES += ${BOOT}.tmp
+CLEANFILES += $(BOOT).tmp
 
-${BOOT}: ${LDR} ${LOADER}
-	$(CAT) ${LDR} ${LOADER} > $@.tmp
+$(BOOT): $(LDR) $(LOADER)
+	$(CAT) $(LDR) $(LOADER) > $@.tmp
 	$(DD) if=$@.tmp of=$@ obs=2k conv=sync
 	$(RM) $@.tmp
 
-LDFLAGS +=-e start -Ttext ${ORG} -N -S --oformat binary
+LDFLAGS += $(GLDTARGET) -e start -Ttext $(ORG) -N -S --oformat binary
 
-CLEANFILES += ${LOADER} ${LDR}
+CLEANFILES += $(LOADER) $(LDR)
 
-${LDR}: ${OBJS}
-	${LD} ${LDFLAGS} -o $@ $^
+$(LDR): $(OBJS)
+	$(GLD) $(LDFLAGS) -o $@ $^
 
-${LOADER}: ${LOADERBIN} ${BTXLDR} ${BTXKERN}
-	$(BTXLD) -f aout -e ${LOADER_ADDRESS} -o $@ -l ${BTXLDR} \
-	    -b ${BTXKERN} ${LOADERBIN}
+$(LOADER): $(LOADERBIN) $(BTXLDR) $(BTXKERN)
+	$(BTXLD) -f aout -e $(LOADER_ADDRESS) -o $@ -l $(BTXLDR) \
+	    -b $(BTXKERN) $(LOADERBIN)
 
-all: ${BOOT}
+all: $(BOOT)
 
 install: $(BOOT:%=$(ROOT_BOOT)/%)
 
