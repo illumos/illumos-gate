@@ -29,7 +29,7 @@
 #include "testlib.h"
 #include "mevent.h"
 
-static char *cookie = "Chocolate chip with fudge stripes";
+static char *cookie = "Shortcake";
 
 static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
@@ -67,8 +67,6 @@ test_fd(int fd, char *tag)
 	for (uint_t i = 0; cookie[i] != '\0'; i++) {
 		ssize_t written;
 
-		pthread_mutex_lock(&mtx);
-
 		if (i > 0) {
 			/*
 			 * Check that no events are emitted for writes which do
@@ -78,12 +76,21 @@ test_fd(int fd, char *tag)
 				FAIL_ERRNO("lseek");
 			if (write(fd, "X", 1) == -1)
 				FAIL_ERRNO("write");
+			/*
+			 * Allow time for the callback to fire if it is going
+			 * to.
+			 */
+			VERBOSE(("Write within"));
+			usleep(100);
 		}
+
+		pthread_mutex_lock(&mtx);
 
 		written = write(fd, cookie + i, 1);
 		if (written < 0)
 			FAIL_ERRNO("bad write");
 		ASSERT_INT64_EQ(("write byte %d of cookie", i), written, 1);
+		VERBOSE(("Write extend"));
 
 		/* Wait for the size change to be processed */
 		pthread_cond_wait(&cv, &mtx);
@@ -93,7 +100,7 @@ test_fd(int fd, char *tag)
 		 * for mevent to re-associate the port or the next write could
 		 * be missed.
 		 */
-		usleep(500);
+		usleep(100);
 	}
 
 	err = mevent_disable(evp);
@@ -105,9 +112,11 @@ test_fd(int fd, char *tag)
 int
 main(int argc, const char **argv)
 {
-	start_test(argv[0], 5);
-	start_event_thread();
 	int fd;
+
+	start_test(argv[0], 20);
+	set_mevent_file_poll_interval_ms(500);
+	start_event_thread();
 
 	/* Test with a temporary file in /tmp */
 	char *template = strdup("/tmp/mevent.vnode.XXXXXX");
