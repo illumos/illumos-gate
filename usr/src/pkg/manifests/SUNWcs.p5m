@@ -552,7 +552,6 @@ $(i386_ONLY)file path=usr/bin/$(ARCH32)/newtask group=sys mode=4555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/nohup mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/prctl mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/prstat mode=0555
-$(i386_ONLY)file path=usr/bin/$(ARCH32)/ps mode=0555
 file path=usr/bin/$(ARCH32)/savecore mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/setuname mode=0555
 dir  path=usr/bin/$(ARCH64)
@@ -568,7 +567,6 @@ file path=usr/bin/$(ARCH64)/newtask group=sys mode=4555
 file path=usr/bin/$(ARCH64)/nohup mode=0555
 file path=usr/bin/$(ARCH64)/prctl mode=0555
 file path=usr/bin/$(ARCH64)/prstat mode=0555
-file path=usr/bin/$(ARCH64)/ps mode=0555
 file path=usr/bin/$(ARCH64)/savecore mode=0555
 file path=usr/bin/$(ARCH64)/setuname mode=0555
 $(i386_ONLY)file path=usr/bin/addbadsec mode=0555
@@ -719,7 +717,7 @@ file path=usr/bin/priocntl mode=0555
 file path=usr/bin/profiles mode=0555
 file path=usr/bin/projects mode=0555
 hardlink path=usr/bin/prstat target=../../usr/lib/isaexec
-hardlink path=usr/bin/ps target=../../usr/lib/isaexec
+file path=usr/bin/ps mode=0555
 file path=usr/bin/putdev mode=0555
 file path=usr/bin/putdgrp mode=0555
 link path=usr/bin/pwconv target=../sbin/pwconv

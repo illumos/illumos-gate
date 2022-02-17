@@ -4294,9 +4294,9 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		if (cpi->cpi_family == 0xf || cpi->cpi_family == 0x11) {
 			add_x86_feature(featureset, X86FSET_LFENCE_SER);
 		} else if (cpi->cpi_family >= 0x10) {
+#if !defined(__xpv)
 			uint64_t val;
 
-#if !defined(__xpv)
 			/*
 			 * Be careful when attempting to enable the bit, and
 			 * verify that it was actually set in case we are
@@ -4313,11 +4313,11 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 				val = 0;
 			}
 			no_trap();
-#endif
 
 			if ((val & AMD_DE_CFG_LFENCE_DISPATCH) != 0) {
 				add_x86_feature(featureset, X86FSET_LFENCE_SER);
 			}
+#endif
 		}
 	} else if (cpi->cpi_vendor == X86_VENDOR_Intel &&
 	    is_x86_feature(featureset, X86FSET_SSE2)) {

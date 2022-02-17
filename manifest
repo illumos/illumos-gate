@@ -2511,7 +2511,6 @@ f usr/bin/amd64/prctl 0555 root bin
 f usr/bin/amd64/preap 0555 root bin
 f usr/bin/amd64/prstat 0555 root bin
 f usr/bin/amd64/prun 0555 root bin
-f usr/bin/amd64/ps 0555 root bin
 f usr/bin/amd64/psecflags 0555 root bin
 f usr/bin/amd64/psig 0555 root bin
 f usr/bin/amd64/pstack 0555 root bin
@@ -2824,7 +2823,7 @@ f usr/bin/profiles 0555 root bin
 f usr/bin/projects 0555 root bin
 h usr/bin/prstat=usr/lib/isaexec
 h usr/bin/prun=usr/lib/isaexec
-h usr/bin/ps=usr/lib/isaexec
+f usr/bin/ps 0555 root bin
 h usr/bin/psecflags=usr/lib/isaexec
 h usr/bin/psig=usr/lib/isaexec
 h usr/bin/pstack=usr/lib/isaexec
@@ -21439,13 +21438,12 @@ s usr/src=share/src
 s usr/tmp=../var/tmp
 d usr/ucb 0755 root bin
 d usr/ucb/amd64 0755 root bin
-f usr/ucb/amd64/ps 0555 root bin
 f usr/ucb/df 0755 root bin
 d usr/ucb/i86 0755 root bin
 f usr/ucb/ls 0755 root bin
 s usr/ucb/more=../bin/more
 s usr/ucb/page=../bin/more
-h usr/ucb/ps=usr/lib/isaexec
+h usr/ucb/ps=usr/bin/ps
 f usr/ucb/shutdown 0755 root bin
 f usr/ucb/touch 0755 root bin
 s usr/ucb/uptime=../bin/uptime

@@ -86,9 +86,7 @@ file path=usr/share/man/man1b/whereis.1b
 file path=usr/share/man/man1b/whoami.1b
 dir  path=usr/ucb
 $(i386_ONLY)dir path=usr/ucb/$(ARCH32)
-$(i386_ONLY)hardlink path=usr/ucb/$(ARCH32)/ps target=../../bin/$(ARCH32)/ps
 dir  path=usr/ucb/$(ARCH64)
-hardlink path=usr/ucb/$(ARCH64)/ps target=../../bin/$(ARCH64)/ps
 link path=usr/ucb/Mail target=../bin/mailx
 link path=usr/ucb/arch target=../bin/arch
 file path=usr/ucb/basename mode=0755
@@ -126,7 +124,7 @@ link path=usr/ucb/netstat target=../bin/netstat
 link path=usr/ucb/page target=../bin/more
 link path=usr/ucb/pagesize target=../bin/pagesize
 file path=usr/ucb/printenv mode=0755
-hardlink path=usr/ucb/ps target=../../usr/lib/isaexec
+hardlink path=usr/ucb/ps target=../bin/ps
 link path=usr/ucb/quota target=../lib/fs/ufs/quota
 link path=usr/ucb/rcp target=../bin/rcp
 link path=usr/ucb/rdate target=../bin/rdate

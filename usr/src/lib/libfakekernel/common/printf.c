@@ -22,7 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2017 RackTop Systems.
+ * Copyright 2022 RackTop Systems, Inc.
  * Copyright (c) 2018, Joyent, Inc.
  */
 
@@ -32,10 +32,10 @@
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
 #include <sys/log.h>
+#include <upanic.h>
 
 #include <fakekernel.h>
 
-void	abort(void) __NORETURN;
 void	debug_enter(char *);
 
 char *volatile panicstr;
@@ -133,12 +133,11 @@ vpanic(const char *fmt, va_list adx)
 	va_copy(tmpargs, adx);
 	fakekernel_cprintf(fmt, tmpargs, SL_FATAL, "fatal: ", "\n");
 
-	/* Call libc`assfail() so that mdb ::status works */
 	(void) vsnprintf(panicbuf, sizeof (panicbuf), fmt, adx);
 	debug_enter(panicbuf);
-	(void) assfail(panicbuf, "(panic)", 0);
 
-	abort();	/* avoid "noreturn" warnings */
+	/* Call libc`upanic() so that mdb ::status works */
+	upanic(panicbuf, sizeof (panicbuf));
 }
 
 void

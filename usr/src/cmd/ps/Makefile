@@ -29,44 +29,31 @@ OBJS=ps.o ucbps.o
 SRCS=$(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
+include ../Makefile.ctf
+
+LDLIBS += -lproject
 
 XGETFLAGS += -a -x ps.xcl
 
 DCFILE= $(PROG).dc
 
 ROOTUCBPROG = $(ROOT)/usr/ucb/$(PROG)
-ROOTUCBPROG32 = $(ROOT)/usr/ucb/$(MACH32)/$(PROG)
-ROOTUCBPROG64 = $(ROOT)/usr/ucb/$(MACH64)/$(PROG)
-
-$(64ONLY)SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
-
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS)
+all:	$(PROG)
 
-clean clobber lint:	$(SUBDIRS)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
+install:	$(PROG) $(ROOTPROG)
 	-$(RM) $(ROOTUCBPROG)
-	-$(LN) $(ISAEXEC) $(ROOTUCBPROG)
-	$(64ONLY)-$(RM) $(ROOTUCBPROG32)
-	$(64ONLY)-$(LN) $(ROOTPROG32) $(ROOTUCBPROG32)
-	$(BUILD64)-$(RM) $(ROOTUCBPROG64)
-	$(BUILD64)-$(LN) $(ROOTPROG64) $(ROOTUCBPROG64)
+	-$(LN) $(ROOTPROG) $(ROOTUCBPROG)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+clean:
+	$(RM) $(OBJS)
 
 $(DCFILE): $(PROG).c
 	$(RM) $(DCFILE)

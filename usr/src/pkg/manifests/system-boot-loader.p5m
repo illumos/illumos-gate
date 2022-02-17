@@ -98,8 +98,8 @@ $(i386_ONLY)file path=usr/share/man/man5/pxeboot.5
 $(i386_ONLY)file path=usr/share/man/man5/version.4th.5
 license lic_CDDL license=lic_CDDL
 $(i386_ONLY)license usr/src/boot/COPYRIGHT license=usr/src/boot/COPYRIGHT
-$(i386_ONLY)license usr/src/boot/sys/boot/common/linenoise/LICENSE \
-    license=usr/src/boot/sys/boot/common/linenoise/LICENSE
+$(i386_ONLY)license usr/src/boot/common/linenoise/LICENSE \
+    license=usr/src/boot/common/linenoise/LICENSE
 $(i386_ONLY)license usr/src/common/crypto/skein/THIRDPARTYLICENSE \
     license=usr/src/common/crypto/skein/THIRDPARTYLICENSE
 $(i386_ONLY)license usr/src/common/pnglite/THIRDPARTYLICENSE \
