@@ -1361,9 +1361,9 @@ rfb_init_unix(const char *path, int wait, char *password, const char *name)
 
 	if (wait) {
 		DPRINTF(("Waiting for rfb client...\n"));
-		VERIFY3S(pthread_mutex_lock(&rc->mtx), ==, 0);
+		pthread_mutex_lock(&rc->mtx);
 		VERIFY3S(pthread_cond_wait(&rc->cond, &rc->mtx), ==, 0);
-		VERIFY3S(pthread_mutex_unlock(&rc->mtx), ==, 0);
+		pthread_mutex_unlock(&rc->mtx);
 	}
 
 	return (0);

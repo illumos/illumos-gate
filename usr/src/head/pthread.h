@@ -22,6 +22,7 @@
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -109,6 +110,14 @@ extern "C" {
  */
 #define	PTHREAD_MUTEX_INITIALIZER		/* = DEFAULTMUTEX */	\
 	{{0, 0, 0, PTHREAD_PROCESS_PRIVATE, _MUTEX_MAGIC}, {{{0}}}, 0}
+
+#define	PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP /* = ERRORCHECKMUTEX */ \
+	{{0, 0, 0, PTHREAD_PROCESS_PRIVATE | PTHREAD_MUTEX_ERRORCHECK,  \
+	_MUTEX_MAGIC}, {{{0}}}, 0}
+
+#define	PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP  /* = RECURSIVEMUTEX */  \
+	{{0, 0, 0, PTHREAD_PROCESS_PRIVATE | PTHREAD_MUTEX_RECURSIVE |  \
+	PTHREAD_MUTEX_ERRORCHECK, _MUTEX_MAGIC}, {{{0}}}, 0}
 
 #define	PTHREAD_COND_INITIALIZER		/* = DEFAULTCV */	\
 	{{{0, 0, 0, 0}, PTHREAD_PROCESS_PRIVATE, _COND_MAGIC}, 0}
@@ -346,9 +355,11 @@ extern int pthread_mutexattr_getrobust_np(
  * These are non-standardized extensions that we provide. Their origins are
  * documented in their manual pages.
  */
-#if !defined(_STRICT_SYMBOLS) || defined(__EXTENSIONS__)
+#if !defined(_STRICT_SYMBOLS)
 extern int pthread_attr_get_np(pthread_t, pthread_attr_t *);
-#endif	/* !_STRICT_SYMBOLS || __EXTENSIONS__ */
+extern void pthread_mutex_enter_np(pthread_mutex_t *);
+extern void pthread_mutex_exit_np(pthread_mutex_t *);
+#endif	/* !_STRICT_SYMBOLS */
 
 #endif	/* _ASM */
 

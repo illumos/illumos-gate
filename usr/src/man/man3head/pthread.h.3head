@@ -42,133 +42,114 @@
 .\"
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH PTHREAD.H 3HEAD "Nov 11, 2008"
-.SH NAME
-pthread.h, pthread \- threads
-.SH SYNOPSIS
-.LP
-.nf
-#include <\fBpthread.h\fR>
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The <\fBpthread.h\fR> header defines the following symbols:
-.sp
-.in +2
-.nf
-PTHREAD_BARRIER_SERIAL_THREAD
-PTHREAD_CANCEL_ASYNCHRONOUS
-PTHREAD_CANCEL_ENABLE
-PTHREAD_CANCEL_DEFERRED
-PTHREAD_CANCEL_DISABLE
-PTHREAD_CANCELED
-PTHREAD_COND_INITIALIZER
-PTHREAD_CREATE_DETACHED
-PTHREAD_CREATE_JOINABLE
-PTHREAD_EXPLICIT_SCHED
-PTHREAD_INHERIT_SCHED
-PTHREAD_MUTEX_DEFAULT
-PTHREAD_MUTEX_ERRORCHECK
-PTHREAD_MUTEX_INITIALIZER
-PTHREAD_MUTEX_NORMAL
-PTHREAD_MUTEX_RECURSIVE
-PTHREAD_MUTEX_ROBUST
-PTHREAD_MUTEX_STALLED
-PTHREAD_ONCE_INIT
-PTHREAD_PRIO_INHERIT
-PTHREAD_PRIO_NONE
-PTHREAD_PRIO_PROTECT
-PTHREAD_PROCESS_SHARED
-PTHREAD_PROCESS_PRIVATE
-PTHREAD_RWLOCK_INITIALIZER
-PTHREAD_SCOPE_PROCESS
-PTHREAD_SCOPE_SYSTEM
-.fi
-.in -2
-
-.sp
-.LP
-The types listed below are defined as described in <\fBsys/types.h\fR>. See
-\fBtypes.h\fR(3HEAD).
-.sp
-.in +2
-.nf
-pthread_attr_t
-pthread_barrier_t
-pthread_barrierattr_t
-pthread_cond_t
-pthread_condattr_t
-pthread_key_t
-pthread_mutex_t
-pthread_mutexattr_t
-pthread_once_t
-pthread_rwlock_t
-pthread_rwlockattr_t
-pthread_spinlock_t
-pthread_t
-.fi
-.in -2
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-.BR pthread_attr_getguardsize (3C),
-.BR pthread_attr_init (3C),
-.BR pthread_attr_setscope (3C),
-.BR pthread_cancel (3C),
-.BR pthread_cleanup_pop (3C),
-.BR pthread_cond_init (3C),
-.BR pthread_cond_signal (3C),
-.BR pthread_cond_wait (3C),
-.BR pthread_condattr_init (3C),
-.BR pthread_create (3C),
-.BR pthread_detach (3C),
-.BR pthread_equal (3C),
-.BR pthread_exit (3C),
-.BR pthread_getconcurrency (3C),
-.BR pthread_getschedparam (3C),
-.BR pthread_join (3C),
-.BR pthread_key_create (3C),
-.BR pthread_key_delete (3C),
-.BR pthread_mutex_consistent (3C),
-.BR pthread_mutex_init (3C),
-.BR pthread_mutex_lock (3C),
-.BR pthread_mutex_setprioceiling (3C),
-.BR pthread_mutexattr_getprotocol (3C),
-.BR pthread_mutexattr_getrobust (3C),
-.BR pthread_mutexattr_gettype (3C),
-.BR pthread_mutexattr_init (3C),
-.BR pthread_once (3C),
-.BR pthread_rwlock_init (3C),
-.BR pthread_rwlock_rdlock (3C),
-.BR pthread_rwlock_unlock (3C),
-.BR pthread_rwlock_wrlock (3C),
-.BR pthread_rwlockattr_getpshared (3C),
-.BR pthread_rwlockattr_init (3C),
-.BR pthread_self (3C),
-.BR pthread_setcancelstate (3C),
-.BR pthread_setspecific (3C),
-.BR sched.h (3HEAD),
-.BR time.h (3HEAD),
-.BR types.h (3HEAD),
-.BR attributes (7),
-.BR standards (7)
+.Dd February 19, 2022
+.Dt PTHREAD.H 3HEAD
+.Os
+.Sh NAME
+.Nm pthread.h ,
+.Nm pthread
+.Nd threads
+.Sh SYNOPSIS
+.In pthread.h
+.Sh DESCRIPTION
+The
+.In pthread.h
+header defines the following symbols:
+.Pp
+.Bl -inset -offset Ds -compact
+.It Dv PTHREAD_BARRIER_SERIAL_THREAD
+.It Dv PTHREAD_CANCEL_ASYNCHRONOUS
+.It Dv PTHREAD_CANCEL_ENABLE
+.It Dv PTHREAD_CANCEL_DEFERRED
+.It Dv PTHREAD_CANCEL_DISABLE
+.It Dv PTHREAD_CANCELED
+.It Dv PTHREAD_COND_INITIALIZER
+.It Dv PTHREAD_CREATE_DETACHED
+.It Dv PTHREAD_CREATE_JOINABLE
+.It Dv PTHREAD_EXPLICIT_SCHED
+.It Dv PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP
+.It Dv PTHREAD_INHERIT_SCHED
+.It Dv PTHREAD_MUTEX_DEFAULT
+.It Dv PTHREAD_MUTEX_ERRORCHECK
+.It Dv PTHREAD_MUTEX_INITIALIZER
+.It Dv PTHREAD_MUTEX_NORMAL
+.It Dv PTHREAD_MUTEX_RECURSIVE
+.It Dv PTHREAD_MUTEX_ROBUST
+.It Dv PTHREAD_MUTEX_STALLED
+.It Dv PTHREAD_ONCE_INIT
+.It Dv PTHREAD_PRIO_INHERIT
+.It Dv PTHREAD_PRIO_NONE
+.It Dv PTHREAD_PRIO_PROTECT
+.It Dv PTHREAD_PROCESS_SHARED
+.It Dv PTHREAD_PROCESS_PRIVATE
+.It Dv PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+.It Dv PTHREAD_RWLOCK_INITIALIZER
+.It Dv PTHREAD_SCOPE_PROCESS
+.It Dv PTHREAD_SCOPE_SYSTEM
+.El
+.Pp
+The types listed below are defined as described in
+.In sys/types.h .
+See
+.Xr types.h 3HEAD .
+.Pp
+.Bl -inset -offset Ds -compact
+.It Vt pthread_attr_t
+.It Vt pthread_barrier_t
+.It Vt pthread_barrierattr_t
+.It Vt pthread_cond_t
+.It Vt pthread_condattr_t
+.It Vt pthread_key_t
+.It Vt pthread_mutex_t
+.It Vt pthread_mutexattr_t
+.It Vt pthread_once_t
+.It Vt pthread_rwlock_t
+.It Vt pthread_rwlockattr_t
+.It Vt pthread_spinlock_t
+.It Vt pthread_t
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr pthread_attr_getguardsize 3C ,
+.Xr pthread_attr_init 3C ,
+.Xr pthread_attr_setscope 3C ,
+.Xr pthread_cancel 3C ,
+.Xr pthread_cleanup_pop 3C ,
+.Xr pthread_cond_init 3C ,
+.Xr pthread_cond_signal 3C ,
+.Xr pthread_cond_wait 3C ,
+.Xr pthread_condattr_init 3C ,
+.Xr pthread_create 3C ,
+.Xr pthread_detach 3C ,
+.Xr pthread_equal 3C ,
+.Xr pthread_exit 3C ,
+.Xr pthread_getconcurrency 3C ,
+.Xr pthread_getschedparam 3C ,
+.Xr pthread_join 3C ,
+.Xr pthread_key_create 3C ,
+.Xr pthread_key_delete 3C ,
+.Xr pthread_mutex_consistent 3C ,
+.Xr pthread_mutex_init 3C ,
+.Xr pthread_mutex_lock 3C ,
+.Xr pthread_mutex_setprioceiling 3C ,
+.Xr pthread_mutexattr_getprotocol 3C ,
+.Xr pthread_mutexattr_getrobust 3C ,
+.Xr pthread_mutexattr_gettype 3C ,
+.Xr pthread_mutexattr_init 3C ,
+.Xr pthread_once 3C ,
+.Xr pthread_rwlock_init 3C ,
+.Xr pthread_rwlock_rdlock 3C ,
+.Xr pthread_rwlock_unlock 3C ,
+.Xr pthread_rwlock_wrlock 3C ,
+.Xr pthread_rwlockattr_getpshared 3C ,
+.Xr pthread_rwlockattr_init 3C ,
+.Xr pthread_self 3C ,
+.Xr pthread_setcancelstate 3C ,
+.Xr pthread_setspecific 3C ,
+.Xr sched.h 3HEAD ,
+.Xr time.h 3HEAD ,
+.Xr types.h 3HEAD ,
+.Xr attributes 7

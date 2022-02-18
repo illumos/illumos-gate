@@ -669,8 +669,6 @@ mevent_handle_pe(port_event_t *pe)
 {
 	struct mevent *mevp = pe->portev_user;
 
-	mevent_qunlock();
-
 	(*mevp->me_func)(mevp->me_fd, mevp->me_type, mevp->me_param);
 
 	mevent_qlock();

@@ -1781,7 +1781,7 @@ stall(void)
  */
 int
 mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
-	timespec_t *tsp)
+    timespec_t *tsp)
 {
 	uberdata_t *udp = curthread->ul_uberdata;
 	queue_head_t *qp;
@@ -2316,6 +2316,7 @@ mutex_lock(mutex_t *mp)
 	return (mutex_lock_impl(mp, NULL));
 }
 
+#pragma weak pthread_mutex_enter_np = mutex_enter
 void
 mutex_enter(mutex_t *mp)
 {
@@ -2341,7 +2342,7 @@ mutex_enter(mutex_t *mp)
 
 int
 pthread_mutex_timedlock(pthread_mutex_t *_RESTRICT_KYWD mp,
-	const struct timespec *_RESTRICT_KYWD abstime)
+    const struct timespec *_RESTRICT_KYWD abstime)
 {
 	timespec_t tslocal;
 	int error;
@@ -2356,7 +2357,7 @@ pthread_mutex_timedlock(pthread_mutex_t *_RESTRICT_KYWD mp,
 
 int
 pthread_mutex_reltimedlock_np(pthread_mutex_t *_RESTRICT_KYWD mp,
-	const struct timespec *_RESTRICT_KYWD reltime)
+    const struct timespec *_RESTRICT_KYWD reltime)
 {
 	timespec_t tslocal;
 	int error;
@@ -2598,6 +2599,7 @@ slow_unlock:
 	return (mutex_unlock_internal(mp, 0));
 }
 
+#pragma weak pthread_mutex_exit_np = mutex_exit
 void
 mutex_exit(mutex_t *mp)
 {
@@ -3574,7 +3576,7 @@ cond_wait(cond_t *cvp, mutex_t *mp)
  */
 int
 pthread_cond_wait(pthread_cond_t *_RESTRICT_KYWD cvp,
-	pthread_mutex_t *_RESTRICT_KYWD mp)
+    pthread_mutex_t *_RESTRICT_KYWD mp)
 {
 	int error;
 
@@ -3633,8 +3635,8 @@ cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
  */
 int
 pthread_cond_timedwait(pthread_cond_t *_RESTRICT_KYWD cvp,
-	pthread_mutex_t *_RESTRICT_KYWD mp,
-	const struct timespec *_RESTRICT_KYWD abstime)
+    pthread_mutex_t *_RESTRICT_KYWD mp,
+    const struct timespec *_RESTRICT_KYWD abstime)
 {
 	int error;
 
@@ -3677,8 +3679,8 @@ cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
 
 int
 pthread_cond_reltimedwait_np(pthread_cond_t *_RESTRICT_KYWD cvp,
-	pthread_mutex_t *_RESTRICT_KYWD mp,
-	const struct timespec *_RESTRICT_KYWD reltime)
+    pthread_mutex_t *_RESTRICT_KYWD mp,
+    const struct timespec *_RESTRICT_KYWD reltime)
 {
 	int error;
 

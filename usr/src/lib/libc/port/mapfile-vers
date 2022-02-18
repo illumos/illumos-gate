@@ -3756,6 +3756,8 @@ $endif
 	_psignal;
 	pthread_attr_getdaemonstate_np;
 	pthread_attr_setdaemonstate_np;
+	pthread_mutex_enter_np;
+	pthread_mutex_exit_np;
 	_pthread_setcleanupinit;
 	__putwchar_xpg5;
 	__putwc_xpg5;
