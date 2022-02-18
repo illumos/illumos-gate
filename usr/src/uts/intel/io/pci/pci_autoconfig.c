@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -40,8 +41,10 @@
 #include <sys/reboot.h>
 #include <sys/pci_cfgspace_impl.h>
 #include <sys/mutex.h>
+#include <sys/plat/pci_prd.h>
 
 extern int pci_boot_debug;
+extern int pci_boot_maxbus;
 
 /*
  * Interface routines
@@ -49,7 +52,7 @@ extern int pci_boot_debug;
 void pci_enumerate(int);
 void pci_setup_tree(void);
 void pci_reprogram(void);
-void bus_res_fini(void);
+dev_info_t *pci_boot_bus_to_dip(uint32_t);
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, "PCI BIOS interface"
@@ -59,13 +62,23 @@ static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modlmisc, NULL
 };
 
+static pci_prd_upcalls_t pci_upcalls = {
+	.pru_bus2dip_f = pci_boot_bus_to_dip
+};
+
 int
 _init(void)
 {
 	int	err;
 
-	if ((err = mod_install(&modlinkage)) != 0)
+	if ((err = pci_prd_init(&pci_upcalls)) != 0) {
 		return (err);
+	}
+
+	if ((err = mod_install(&modlinkage)) != 0) {
+		pci_prd_fini();
+		return (err);
+	}
 
 	impl_bus_add_probe(pci_enumerate);
 	return (0);
@@ -80,7 +93,7 @@ _fini(void)
 		return (err);
 
 	impl_bus_delete_probe(pci_enumerate);
-	bus_res_fini();
+	pci_prd_fini();
 	return (0);
 }
 
@@ -101,6 +114,14 @@ pci_enumerate(int reprogram)
 {
 	extern void add_pci_fixes(void);
 	extern void undo_pci_fixes(void);
+
+	/*
+	 * On our first pass through here actually determine what the maximum
+	 * bus that we should use is.
+	 */
+	if (reprogram == 0) {
+		pci_boot_maxbus = pci_prd_max_bus();
+	}
 
 	add_pci_fixes();
 

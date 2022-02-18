@@ -38,6 +38,7 @@ file path=opt/bhyve-tests/tests/mevent/read_requeue mode=0555
 file path=opt/bhyve-tests/tests/mevent/vnode_file mode=0555
 file path=opt/bhyve-tests/tests/mevent/vnode_zvol mode=0555
 dir  path=opt/bhyve-tests/tests/vmm
+file path=opt/bhyve-tests/tests/vmm/fpu_getset mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_partial mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_seg_map mode=0555
 license lic_CDDL license=lic_CDDL

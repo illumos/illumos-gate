@@ -4267,6 +4267,91 @@ pcieadm_cap_info_ht(pcieadm_cfgspace_walk_t *walkp,
 	}
 }
 
+/*
+ * Root Complex Link Declaration
+ */
+static pcieadm_regdef_t pcieadm_regdef_rcld_desc[] = {
+	{ 0, 3, "type", "Element Type", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "Configuration Space Element",
+	    "System Egress Port or internal sink",
+	    "Internal Root Complex Link" } } },
+	{ 8, 15, "num", "Number of Entries", PRDV_HEX },
+	{ 16, 23, "id", "Component ID", PRDV_HEX },
+	{ 24, 31, "port", "Port Number", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static pcieadm_regdef_t pcieadm_regdef_rcld_link[] = {
+	{ 0, 0, "valid", "Link Valid", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "no", "yes" } } },
+	{ 1, 1, "type", "Link Type", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "RCRB", "Configuration Space" } } },
+	{ 2, 2, "rcrb", "Assosciate RCRB", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "no", "yes" } } },
+	{ 16, 23, "tid", "Target Component ID", PRDV_HEX },
+	{ 24, 31, "tport", "Target Port Number", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+/*
+ * Print a variable number of Root Complex Links.
+ */
+static void
+pcieadm_cfgspace_print_rcld(pcieadm_cfgspace_walk_t *walkp,
+    pcieadm_cfgspace_print_t *print, void *arg)
+{
+	uint_t nlinks = walkp->pcw_data->pcb_u8[walkp->pcw_capoff + 5];
+
+	for (uint_t i = 0; i < nlinks; i++) {
+		char mshort[32], mhuman[128];
+		pcieadm_cfgspace_print_t p;
+		uint16_t off = print->pcp_off + i * 0x10;
+		uint8_t type = walkp->pcw_data->pcb_u8[walkp->pcw_capoff + off];
+
+		(void) snprintf(mshort, sizeof (mshort), "link%udesc", i);
+		(void) snprintf(mhuman, sizeof (mhuman), "Link %u Description");
+
+		p.pcp_off = off;
+		p.pcp_len = 4;
+		p.pcp_short = mshort;
+		p.pcp_human = mhuman;
+		p.pcp_print = pcieadm_cfgspace_print_regdef;
+		p.pcp_arg = pcieadm_regdef_rcld_link;
+
+		p.pcp_print(walkp, &p, p.pcp_arg);
+
+		/*
+		 * The way that we print the link depends on the actual type of
+		 * link which is in bit 2 of the link description.
+		 */
+		p.pcp_off += 8;
+
+		if ((type & (1 << 1)) == 0) {
+			(void) snprintf(mshort, sizeof (mshort),
+			    "link%uaddr", i);
+			(void) snprintf(mhuman, sizeof (mhuman),
+			    "Link %u Address");
+			p.pcp_len = 8;
+			p.pcp_print = pcieadm_cfgspace_print_hex;
+			p.pcp_arg = NULL;
+
+			p.pcp_print(walkp, &p, p.pcp_arg);
+		} else {
+			warnx("encountered unsupported RCLD Link Address");
+		}
+	}
+}
+
+static pcieadm_cfgspace_print_t pcieadm_cap_rcld[] = {
+	{ 0x0, 4, "caphdr", "Capability Header",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
+	{ 0x4, 4, "desc", "Self Description",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_rcld_desc },
+	{ 0x10, 0x10, "link", "Link Entry", pcieadm_cfgspace_print_rcld },
+	{ -1, -1, NULL }
+};
+
+
 pcieadm_pci_cap_t pcieadm_pci_caps[] = {
 	{ PCI_CAP_ID_PM, "pcipm", "PCI Power Management",
 	    pcieadm_cap_info_pcipm, { { 2, 8, pcieadm_cap_pcipm_v3 },
@@ -4319,7 +4404,8 @@ pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	{ PCIE_EXT_CAP_ID_PWR_BUDGET, "powbudg", "Power Budgeting",
 	    pcieadm_cap_info_vers, { { 1, 0x10, pcieadm_cap_powbudg } } },
 	{ PCIE_EXT_CAP_ID_RC_LINK_DECL, "rcld",
-	    "Root Complex Link Declaration" },
+	    "Root Complex Link Declaration",  pcieadm_cap_info_vers,
+	    { { 1, 0x1c, pcieadm_cap_rcld } } },
 	{ PCIE_EXT_CAP_ID_RC_INT_LINKCTRL, "rcilc",
 	    "Root Complex Internal Link Control" },
 	{ PCIE_EXT_CAP_ID_RC_EVNT_CEA, "rcecea",

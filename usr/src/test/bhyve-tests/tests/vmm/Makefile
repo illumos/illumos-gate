@@ -16,7 +16,8 @@ include $(SRC)/cmd/Makefile.cmd.64
 include $(SRC)/test/Makefile.com
 
 PROG =	mem_partial \
-	mem_seg_map
+	mem_seg_map \
+	fpu_getset
 
 COMMON_OBJS =	common.o
 CLEAN_OBJS =	$(PROG:%=%.o)

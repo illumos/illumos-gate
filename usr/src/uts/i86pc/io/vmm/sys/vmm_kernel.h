@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -161,6 +161,8 @@ int vm_get_run_state(struct vm *vm, int vcpuid, uint32_t *state,
     uint8_t *sipi_vec);
 int vm_set_run_state(struct vm *vm, int vcpuid, uint32_t state,
     uint8_t sipi_vec);
+int vm_get_fpu(struct vm *vm, int vcpuid, void *buf, size_t len);
+int vm_set_fpu(struct vm *vm, int vcpuid, void *buf, size_t len);
 int vm_run(struct vm *vm, int vcpuid, const struct vm_entry *);
 int vm_suspend(struct vm *vm, enum vm_suspend_how how);
 int vm_inject_nmi(struct vm *vm, int vcpu);

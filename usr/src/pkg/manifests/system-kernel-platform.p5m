@@ -559,6 +559,8 @@ $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/acpidev group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/gfx_private \
     group=sys mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/pci_prd group=sys \
+    mode=0755
 $(i386_ONLY)dir path=platform/i86pc/ucode group=sys
 $(i386_ONLY)dir path=platform/i86xpv group=sys
 $(i386_ONLY)dir path=platform/i86xpv/kernel group=sys

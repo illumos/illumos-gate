@@ -22,7 +22,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Joyent, Inc.
  * Copyright 2021 RackTop Systems, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -528,23 +528,18 @@ const struct xsave_state avx_initial = {
 	 * The definition below needs to be identical with sse_initial
 	 * defined above.
 	 */
-	{
-		FPU_CW_INIT,	/* fx_fcw */
-		0,		/* fx_fsw */
-		0,		/* fx_fctw */
-		0,		/* fx_fop */
-		0,		/* fx_rip */
-		0,		/* fx_rdp */
-		SSE_MXCSR_INIT	/* fx_mxcsr */
-		/* rest of structure is zero */
+	.xs_fxsave = {
+		.fx_fcw = FPU_CW_INIT,
+		.fx_mxcsr = SSE_MXCSR_INIT,
 	},
-	/*
-	 * bit0 = 1 for XSTATE_BV to indicate that legacy fields are valid,
-	 * and CPU should initialize XMM/YMM.
-	 */
-	1,
-	0	/* xs_xcomp_bv */
-	/* rest of structure is zero */
+	.xs_header = {
+		/*
+		 * bit0 = 1 for XSTATE_BV to indicate that legacy fields are
+		 * valid, and CPU should initialize XMM/YMM.
+		 */
+		.xsh_xstate_bv = 1,
+		.xsh_xcomp_bv = 0,
+	},
 };
 
 /*
@@ -656,8 +651,8 @@ fp_new_lwp(void *parent, void *child)
 		bcopy(&avx_initial, cxs, sizeof (*cxs));
 		cfx->fx_mxcsr = fx->fx_mxcsr & ~SSE_MXCSR_EFLAGS;
 		cfx->fx_fcw = fx->fx_fcw;
-		cxs->xs_xstate_bv |= (get_xcr(XFEATURE_ENABLED_MASK) &
-		    XFEATURE_FP_INITIAL);
+		cxs->xs_header.xsh_xstate_bv |=
+		    (get_xcr(XFEATURE_ENABLED_MASK) & XFEATURE_FP_INITIAL);
 		break;
 	default:
 		panic("Invalid fp_save_mech");
@@ -973,7 +968,8 @@ fpexterrflt(struct regs *rp)
 		 * Always set LEGACY_FP as it may have been cleared by XSAVE
 		 * instruction
 		 */
-		fp->fpu_regs.kfpu_u.kfpu_xs->xs_xstate_bv |= XFEATURE_LEGACY_FP;
+		fp->fpu_regs.kfpu_u.kfpu_xs->xs_header.xsh_xstate_bv |=
+		    XFEATURE_LEGACY_FP;
 		break;
 	default:
 		panic("Invalid fp_save_mech");
@@ -1154,7 +1150,8 @@ fpsetcw(uint16_t fcw, uint32_t mxcsr)
 		 * Always set LEGACY_FP as it may have been cleared by XSAVE
 		 * instruction
 		 */
-		fp->fpu_regs.kfpu_u.kfpu_xs->xs_xstate_bv |= XFEATURE_LEGACY_FP;
+		fp->fpu_regs.kfpu_u.kfpu_xs->xs_header.xsh_xstate_bv |=
+		    XFEATURE_LEGACY_FP;
 		break;
 	default:
 		panic("Invalid fp_save_mech");
@@ -1177,7 +1174,7 @@ kernel_fpu_fpstate_init(kfpu_state_t *kfpu)
 		xs = kfpu->kfpu_ctx.fpu_regs.kfpu_u.kfpu_xs;
 		bzero(xs, cpuid_get_xsave_size());
 		bcopy(&avx_initial, xs, sizeof (*xs));
-		xs->xs_xstate_bv = XFEATURE_LEGACY_FP | XFEATURE_SSE;
+		xs->xs_header.xsh_xstate_bv = XFEATURE_LEGACY_FP | XFEATURE_SSE;
 		kfpu->kfpu_ctx.fpu_xsave_mask = XFEATURE_FP_ALL;
 		break;
 	default:

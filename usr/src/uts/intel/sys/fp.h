@@ -21,6 +21,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  *
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -230,11 +231,23 @@ struct fxsave_state {
 } __aligned(16);	/* 512 bytes */
 
 /*
+ * This structure represents the header portion of the data layout used by the
+ * 'xsave' instruction variants.  It is documented in section 13.4.2 of the
+ * Intel 64 and IA-32 Architectures Software Developer’s Manual, Volume 1
+ * (IASDv1).  Although "header" is somewhat of a misnomer, considering the data
+ * begins at offset 512 of the xsave area, its contents dictate which portions
+ * of the area are present and how they may be formatted.
+ */
+struct xsave_header {
+	uint64_t	xsh_xstate_bv;
+	uint64_t	xsh_xcomp_bv;
+	uint64_t	xsh_reserved[6];
+};
+
+/*
  * This structure is written to memory by one of the 'xsave' instruction
  * variants. The first 512 bytes are compatible with the format of the 'fxsave'
- * area. The header portion of the xsave layout is documented in section
- * 13.4.2 of the Intel 64 and IA-32 Architectures Software Developer’s Manual,
- * Volume 1 (IASDv1). The extended portion is documented in section 13.4.3.
+ * area.  The extended portion is documented in section 13.4.3.
  *
  * Our size is at least AVX_XSAVE_SIZE (832 bytes), which is asserted
  * statically.  Enabling additional xsave-related CPU features requires an
@@ -245,9 +258,10 @@ struct fxsave_state {
  * determined dynamically by querying the CPU. See the xsave_info structure in
  * cpuid.c.
  *
- * xsave component usage is tracked using bits in the xs_xstate_bv field. The
- * components are documented in section 13.1 of IASDv1. For easy reference,
- * this is a summary of the currently defined component bit definitions:
+ * xsave component usage is tracked using bits in the xstate_bv field of the
+ * header. The components are documented in section 13.1 of IASDv1. For easy
+ * reference, this is a summary of the currently defined component bit
+ * definitions:
  *	x87			0x0001
  *	SSE			0x0002
  *	AVX			0x0004
@@ -259,19 +273,26 @@ struct fxsave_state {
  *	PT			0x0100
  *	PKRU			0x0200
  * When xsaveopt_ctxt is being used to save into the xsave_state area, the
- * xs_xstate_bv field is updated by the xsaveopt instruction to indicate which
+ * xstate_bv field is updated by the xsaveopt instruction to indicate which
  * elements of the xsave area are active.
  *
- * xs_xcomp_bv should always be 0, since we do not currently use the compressed
- * form of xsave (xsavec).
+ * The xcomp_bv field should always be 0, since we do not currently use the
+ * compressed form of xsave (xsavec).
  */
 struct xsave_state {
 	struct fxsave_state	xs_fxsave;	/* 0-511 legacy region */
-	uint64_t		xs_xstate_bv;	/* 512-519 start xsave header */
-	uint64_t		xs_xcomp_bv;	/* 520-527 */
-	uint64_t		xs_reserved[6];	/* 528-575 end xsave header */
+	struct xsave_header	xs_header;	/* 512-575 XSAVE header */
 	upad128_t		xs_ymm[16];	/* 576 AVX component */
 } __aligned(64);
+
+/*
+ * While AVX_XSTATE_SIZE is the smallest the kernel will allocate for FPU
+ * state-saving, other consumers may constrain themselves to the minimum
+ * possible xsave state structure, which features only the legacy area and the
+ * bare xsave header.
+ */
+#define	MIN_XSAVE_SIZE	(sizeof (struct fxsave_state) + \
+			    sizeof (struct xsave_header))
 
 /*
  * Kernel's FPU save area

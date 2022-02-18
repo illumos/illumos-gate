@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -217,4 +218,24 @@ pci_slot_names_prop(int bus, char *buf, int len)
 	for (; plen % 4; plen++)
 		*(buf + plen) = 0;
 	return (plen);
+}
+
+/*
+ * This is used to discover additional PCI buses that may exist in the system in
+ * addition to the ACPI _BBN method. Historically these were discovered by
+ * asking if there was a valid slot property, e.g. pci_slot_names_prop()
+ * returned valid data. In this case we return any entry that has a bus number
+ * and a non-zero slot value. We rely on the core PCI code to do dedup for us.
+ */
+void
+pci_bios_bus_iter(pci_prd_root_complex_f cbfunc, void *arg)
+{
+	int i;
+	for (i = 0; i < pci_irq_nroutes; i++) {
+		if (pci_irq_routes[i].pir_slot != 0) {
+			if (!cbfunc(pci_irq_routes[i].pir_bus, arg)) {
+				return;
+			}
+		}
+	}
 }

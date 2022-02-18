@@ -302,6 +302,25 @@ struct vm_run_state {
 	uint8_t		_pad[3];
 };
 
+/* Transfer data for VM_GET_FPU and VM_SET_FPU */
+struct vm_fpu_state {
+	int		vcpuid;
+	void		*buf;
+	size_t		len;
+};
+
+struct vm_fpu_desc_entry {
+	uint64_t	vfde_feature;
+	uint32_t	vfde_size;
+	uint32_t	vfde_off;
+};
+
+struct vm_fpu_desc {
+	struct vm_fpu_desc_entry	*vfd_entry_data;
+	size_t				vfd_req_size;
+	uint32_t			vfd_num_entries;
+};
+
 struct vmm_resv_query {
 	size_t	vrq_free_sz;
 	size_t	vrq_alloc_sz;
@@ -370,6 +389,8 @@ struct vmm_dirty_tracker {
 #define	VM_RESET_CPU			(VMM_CPU_IOC_BASE | 0x16)
 #define	VM_GET_RUN_STATE		(VMM_CPU_IOC_BASE | 0x17)
 #define	VM_SET_RUN_STATE		(VMM_CPU_IOC_BASE | 0x18)
+#define	VM_GET_FPU			(VMM_CPU_IOC_BASE | 0x19)
+#define	VM_SET_FPU			(VMM_CPU_IOC_BASE | 0x1a)
 
 /* Operations requiring write-locking the VM */
 #define	VM_REINIT		(VMM_LOCK_IOC_BASE | 0x01)
@@ -428,6 +449,7 @@ struct vmm_dirty_tracker {
 
 /* Note: forces a barrier on a flush operation before returning. */
 #define	VM_TRACK_DIRTY_PAGES		(VMM_IOC_BASE | 0x20)
+#define	VM_DESC_FPU_AREA		(VMM_IOC_BASE | 0x21)
 
 #define	VM_DEVMEM_GETOFFSET		(VMM_IOC_BASE | 0xff)
 

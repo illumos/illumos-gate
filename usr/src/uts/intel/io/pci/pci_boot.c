@@ -23,6 +23,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -101,18 +102,21 @@
  *   add_pci_fixes()
  *				As for first pass.
  *   pci_reprogram()
- *	pci_scan_bbn()
- *				The ACPI namespace is scanned for top-level
- *				instances of _BBN in order to enumerate the
- *				root-bridges in the system. If a root bridge is
- *				found that has not been previously discovered
- *				(existence inferred through its children) then
- *				it is added to the system.
+ *	pci_prd_root_complex_iter()
+ *				The platform is asked to tell us of all root
+ *				complexes that it knows about (e.g. using the
+ *				_BBN method via ACPI). This will include buses
+ *				that we've already discovered and those that we
+ *				potentially haven't. Anything that has not been
+ *				previously discovered (or inferred to exist) is
+ *				then added to the system.
  *	<foreach ROOT bus>
  *	    populate_bus_res()
  *				Find resources associated with this root bus
- *				from either ACPI or BIOS tables. See
- *				find_bus_res() in pci_resource.c
+ *				based on what the platform provideds through the
+ *				pci platform interfaces defined in
+ *				sys/plat/pci_prd.h. On i86pc this is driven by
+ *				ACPI and BIOS tables.
  *	<foreach bus>
  *	    fix_ppb_res()
  *				Reprogram pci(e) bridges which have not already
@@ -158,7 +162,6 @@
 #include <sys/pcie_impl.h>
 #include <sys/memlist.h>
 #include <sys/bootconf.h>
-#include <io/pci/mps_table.h>
 #include <sys/pci_cfgacc.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_cfgspace_impl.h>
@@ -172,6 +175,7 @@
 #include <sys/iommulib.h>
 #include <sys/devcache.h>
 #include <sys/pci_cfgacc_x86.h>
+#include <sys/plat/pci_prd.h>
 
 #define	pci_getb	(*pci_getb_func)
 #define	pci_getw	(*pci_getw_func)
@@ -242,16 +246,13 @@ struct pci_devfunc {
 
 extern int apic_nvidia_io_max;
 extern int pseudo_isa;
-extern int pci_bios_maxbus;
 static uchar_t max_dev_pci = 32;	/* PCI standard */
+int pci_boot_maxbus;
 int pci_boot_debug = 0;
 int pci_debug_bus_start = -1;
 int pci_debug_bus_end = -1;
-extern struct memlist *find_bus_res(int, int);
 static struct pci_fixundo *undolist = NULL;
 static int num_root_bus = 0;	/* count of root buses */
-extern volatile int acpi_resource_discovery;
-extern uint64_t mcfg_mem_base;
 extern void pci_cfgacc_add_workaround(uint16_t, uchar_t, uchar_t);
 extern dev_info_t *pcie_get_rc_dip(dev_info_t *);
 
@@ -269,12 +270,11 @@ static void add_ppb_props(dev_info_t *, uchar_t, uchar_t, uchar_t, int,
     ushort_t);
 static void add_model_prop(dev_info_t *, uint_t);
 static void add_bus_range_prop(int);
-static void add_bus_slot_names_prop(int);
 static void add_ranges_prop(int, int);
 static void add_bus_available_prop(int);
 static int get_pci_cap(uchar_t bus, uchar_t dev, uchar_t func, uint8_t cap_id);
 static void fix_ppb_res(uchar_t, boolean_t);
-static void alloc_res_array();
+static void alloc_res_array(void);
 static void create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
     ushort_t deviceid);
 static void pciex_slot_names_prop(dev_info_t *, ushort_t);
@@ -283,7 +283,6 @@ static void memlist_remove_list(struct memlist **list,
     struct memlist *remove_list);
 static void ck804_fix_aer_ptr(dev_info_t *, pcie_req_id_t);
 
-static void pci_scan_bbn(void);
 static int pci_unitaddr_cache_valid(void);
 static int pci_bus_unitaddr(int);
 static void pci_unitaddr_cache_create(void);
@@ -291,8 +290,6 @@ static void pci_unitaddr_cache_create(void);
 static int pci_cache_unpack_nvlist(nvf_handle_t, nvlist_t *, char *);
 static int pci_cache_pack_nvlist(nvf_handle_t, nvlist_t **);
 static void pci_cache_free_list(nvf_handle_t);
-
-extern int pci_slot_names_prop(int, char *, int);
 
 /* set non-zero to force PCI peer-bus renumbering */
 int pci_bus_always_renumber = 0;
@@ -326,6 +323,13 @@ typedef struct {
 nvf_handle_t	puafd_handle;
 int		pua_cache_valid = 0;
 
+dev_info_t *
+pci_boot_bus_to_dip(uint32_t busno)
+{
+	ASSERT3U(busno, <=, pci_boot_maxbus);
+	return (pci_bus_res[busno].dip);
+}
+
 static void
 dump_memlists_impl(const char *tag, int bus)
 {
@@ -356,80 +360,21 @@ dump_memlists_impl(const char *tag, int bus)
 	}
 }
 
-/*ARGSUSED*/
-static ACPI_STATUS
-pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
+static boolean_t
+pci_rc_scan_cb(uint32_t busno, void *arg)
 {
-	ACPI_DEVICE_INFO *adi;
-	int		busnum;
-
-	/*
-	 * Use AcpiGetObjectInfo() to find the device _HID
-	 * If not a PCI root-bus, ignore this device and continue
-	 * the walk
-	 */
-	if (ACPI_FAILURE(AcpiGetObjectInfo(hdl, &adi)))
-		return (AE_OK);
-
-	if (!(adi->Valid & ACPI_VALID_HID)) {
-		AcpiOsFree(adi);
-		return (AE_OK);
+	if (busno > pci_boot_maxbus) {
+		dcmn_err(CE_NOTE, "platform root complex scan returned bus "
+		    "with invalid bus id: 0x%x", busno);
+		return (B_TRUE);
 	}
 
-	if (strncmp(adi->HardwareId.String, PCI_ROOT_HID_STRING,
-	    sizeof (PCI_ROOT_HID_STRING)) &&
-	    strncmp(adi->HardwareId.String, PCI_EXPRESS_ROOT_HID_STRING,
-	    sizeof (PCI_EXPRESS_ROOT_HID_STRING))) {
-		AcpiOsFree(adi);
-		return (AE_OK);
+	if (pci_bus_res[busno].par_bus == (uchar_t)-1 &&
+	    pci_bus_res[busno].dip == NULL) {
+		create_root_bus_dip((uchar_t)busno);
 	}
 
-	AcpiOsFree(adi);
-
-	/*
-	 * acpica_get_busno() will check the presence of _BBN and
-	 * fail if not present. It will then use the _CRS method to
-	 * retrieve the actual bus number assigned, it will fall back
-	 * to _BBN should the _CRS method fail.
-	 */
-	if (ACPI_SUCCESS(acpica_get_busno(hdl, &busnum))) {
-		/*
-		 * Ignore invalid _BBN return values here (rather
-		 * than panic) and emit a warning; something else
-		 * may suffer failure as a result of the broken BIOS.
-		 */
-		if ((busnum < 0) || (busnum > pci_bios_maxbus)) {
-			dcmn_err(CE_NOTE,
-			    "pci_process_acpi_device: invalid _BBN 0x%x",
-			    busnum);
-			return (AE_CTRL_DEPTH);
-		}
-
-		/* PCI with valid _BBN */
-		if (pci_bus_res[busnum].par_bus == (uchar_t)-1 &&
-		    pci_bus_res[busnum].dip == NULL)
-			create_root_bus_dip((uchar_t)busnum);
-		return (AE_CTRL_DEPTH);
-	}
-
-	/* PCI and no _BBN, continue walk */
-	return (AE_OK);
-}
-
-/*
- * Scan the ACPI namespace for all top-level instances of _BBN
- * in order to discover childless root-bridges (which enumeration
- * may not find; root-bridges are inferred by the existence of
- * children).  This scan should find all root-bridges that have
- * been enumerated, and any childless root-bridges not enumerated.
- * Root-bridge for bus 0 may not have a _BBN object.
- */
-static void
-pci_scan_bbn()
-{
-	void *rv;
-
-	(void) AcpiGetDevices(NULL, pci_process_acpi_device, NULL, &rv);
+	return (B_TRUE);
 }
 
 static void
@@ -596,7 +541,7 @@ pci_unitaddr_cache_create(void)
 
 	index = 0;
 	listp = nvf_list(puafd_handle);
-	for (i = 0; i <= pci_bios_maxbus; i++) {
+	for (i = 0; i <= pci_boot_maxbus; i++) {
 		/* skip non-root (peer) PCI busses */
 		if ((pci_bus_res[i].par_bus != (uchar_t)-1) ||
 		    (pci_bus_res[i].dip == NULL))
@@ -622,7 +567,7 @@ pci_setup_tree(void)
 	uint_t i, root_bus_addr = 0;
 
 	alloc_res_array();
-	for (i = 0; i <= pci_bios_maxbus; i++) {
+	for (i = 0; i <= pci_boot_maxbus; i++) {
 		pci_bus_res[i].par_bus = (uchar_t)-1;
 		pci_bus_res[i].root_addr = (uchar_t)-1;
 		pci_bus_res[i].sub_bus = i;
@@ -635,7 +580,7 @@ pci_setup_tree(void)
 	/*
 	 * Now enumerate peer busses
 	 *
-	 * We loop till pci_bios_maxbus. On most systems, there is
+	 * We loop till pci_boot_maxbus. On most systems, there is
 	 * one more bus at the high end, which implements the ISA
 	 * compatibility bus. We don't care about that.
 	 *
@@ -646,144 +591,11 @@ pci_setup_tree(void)
 	 *	However, we stop enumerating phantom peers with no
 	 *	device below.
 	 */
-	for (i = 1; i <= pci_bios_maxbus; i++) {
+	for (i = 1; i <= pci_boot_maxbus; i++) {
 		if (pci_bus_res[i].dip == NULL) {
 			pci_bus_res[i].root_addr = root_bus_addr++;
 		}
 		enumerate_bus_devs(i, CONFIG_INFO);
-
-		/* add slot-names property for named pci hot-plug slots */
-		add_bus_slot_names_prop(i);
-	}
-}
-
-/*
- * >0 = present, 0 = not present, <0 = error
- */
-static int
-pci_bbn_present(int bus)
-{
-	ACPI_HANDLE	hdl;
-	int	rv;
-
-	/* no dip means no _BBN */
-	if (pci_bus_res[bus].dip == NULL)
-		return (0);
-
-	rv = -1;	/* default return value in case of error below */
-	if (ACPI_SUCCESS(acpica_get_handle(pci_bus_res[bus].dip, &hdl))) {
-		switch (AcpiEvaluateObject(hdl, "_BBN", NULL, NULL)) {
-		case AE_OK:
-			rv = 1;
-			break;
-		case AE_NOT_FOUND:
-			rv = 0;
-			break;
-		default:
-			break;
-		}
-	}
-
-	return (rv);
-}
-
-/*
- * Return non-zero if any PCI bus in the system has an associated
- * _BBN object, 0 otherwise.
- */
-static int
-pci_roots_have_bbn(void)
-{
-	int	i;
-
-	/*
-	 * Scan the PCI busses and look for at least 1 _BBN
-	 */
-	for (i = 0; i <= pci_bios_maxbus; i++) {
-		/* skip non-root (peer) PCI busses */
-		if (pci_bus_res[i].par_bus != (uchar_t)-1)
-			continue;
-
-		if (pci_bbn_present(i) > 0)
-			return (1);
-	}
-	return (0);
-
-}
-
-/*
- * return non-zero if the machine is one on which we renumber
- * the internal pci unit-addresses
- */
-static int
-pci_bus_renumber()
-{
-	ACPI_TABLE_HEADER *fadt;
-
-	if (pci_bus_always_renumber)
-		return (1);
-
-	/* get the FADT */
-	if (AcpiGetTable(ACPI_SIG_FADT, 1, (ACPI_TABLE_HEADER **)&fadt) !=
-	    AE_OK)
-		return (0);
-
-	/* compare OEM Table ID to "SUNm31" */
-	if (strncmp("SUNm31", fadt->OemId, 6))
-		return (0);
-	else
-		return (1);
-}
-
-/*
- * Initial enumeration of the physical PCI bus hierarchy can
- * leave 'gaps' in the order of peer PCI bus unit-addresses.
- * Systems with more than one peer PCI bus *must* have an ACPI
- * _BBN object associated with each peer bus; use the presence
- * of this object to remove gaps in the numbering of the peer
- * PCI bus unit-addresses - only peer busses with an associated
- * _BBN are counted.
- */
-static void
-pci_renumber_root_busses(void)
-{
-	int pci_regs[] = {0, 0, 0};
-	int	i, root_addr = 0;
-
-	/*
-	 * Currently, we only enable the re-numbering on specific
-	 * Sun machines; this is a work-around for the more complicated
-	 * issue of upgrade changing physical device paths
-	 */
-	if (!pci_bus_renumber())
-		return;
-
-	/*
-	 * If we find no _BBN objects at all, we either don't need
-	 * to do anything or can't do anything anyway
-	 */
-	if (!pci_roots_have_bbn())
-		return;
-
-	for (i = 0; i <= pci_bios_maxbus; i++) {
-		/* skip non-root (peer) PCI busses */
-		if (pci_bus_res[i].par_bus != (uchar_t)-1)
-			continue;
-
-		if (pci_bbn_present(i) < 1) {
-			pci_bus_res[i].root_addr = (uchar_t)-1;
-			continue;
-		}
-
-		ASSERT(pci_bus_res[i].dip != NULL);
-		if (pci_bus_res[i].root_addr != root_addr) {
-			/* update reg property for node */
-			pci_bus_res[i].root_addr = root_addr;
-			pci_regs[0] = pci_bus_res[i].root_addr;
-			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
-			    pci_bus_res[i].dip, "reg", (int *)pci_regs, 3);
-		}
-		root_addr++;
 	}
 }
 
@@ -810,12 +622,12 @@ remove_subtractive_res()
 	int i, j;
 	struct memlist *list;
 
-	for (i = 0; i <= pci_bios_maxbus; i++) {
+	for (i = 0; i <= pci_boot_maxbus; i++) {
 		if (pci_bus_res[i].subtractive) {
 			/* remove used io ports */
 			list = pci_bus_res[i].io_used;
 			while (list) {
-				for (j = 0; j <= pci_bios_maxbus; j++)
+				for (j = 0; j <= pci_boot_maxbus; j++)
 					(void) memlist_remove(
 					    &pci_bus_res[j].io_avail,
 					    list->ml_address, list->ml_size);
@@ -824,7 +636,7 @@ remove_subtractive_res()
 			/* remove used mem resource */
 			list = pci_bus_res[i].mem_used;
 			while (list) {
-				for (j = 0; j <= pci_bios_maxbus; j++) {
+				for (j = 0; j <= pci_boot_maxbus; j++) {
 					(void) memlist_remove(
 					    &pci_bus_res[j].mem_avail,
 					    list->ml_address, list->ml_size);
@@ -837,7 +649,7 @@ remove_subtractive_res()
 			/* remove used prefetchable mem resource */
 			list = pci_bus_res[i].pmem_used;
 			while (list) {
-				for (j = 0; j <= pci_bios_maxbus; j++) {
+				for (j = 0; j <= pci_boot_maxbus; j++) {
 					(void) memlist_remove(
 					    &pci_bus_res[j].pmem_avail,
 					    list->ml_address, list->ml_size);
@@ -905,7 +717,7 @@ get_parbus_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align,
 	 * accounted for in this case.
 	 */
 	if ((pci_bus_res[parbus].par_bus == (uchar_t)-1) &&
-	    (num_root_bus > 1) && (acpi_resource_discovery <= 0)) {
+	    (num_root_bus > 1) && !pci_prd_multi_root_ok()) {
 		return (0);
 	}
 
@@ -1593,10 +1405,16 @@ pci_reprogram(void)
 	int bus;
 
 	/*
-	 * Scan ACPI namespace for _BBN objects, make sure that
-	 * childless root-bridges appear in devinfo tree
+	 * Ask platform code for all of the root complexes it knows about in
+	 * case we have missed anything in the scan. This is to ensure that we
+	 * have them show up in the devinfo tree. This scan should find any
+	 * existing entries as well. After this, go through each bus and
+	 * ask the platform if it wants to change the name of the slot.
 	 */
-	pci_scan_bbn();
+	pci_prd_root_complex_iter(pci_rc_scan_cb, NULL);
+	for (bus = 0; bus <= pci_boot_maxbus; bus++) {
+		pci_prd_slot_name(bus, pci_bus_res[bus].dip);
+	}
 	pci_unitaddr_cache_init();
 
 	/*
@@ -1607,7 +1425,7 @@ pci_reprogram(void)
 		int	new_addr;
 		int	index = 0;
 
-		for (bus = 0; bus <= pci_bios_maxbus; bus++) {
+		for (bus = 0; bus <= pci_boot_maxbus; bus++) {
 			/* skip non-root (peer) PCI busses */
 			if ((pci_bus_res[bus].par_bus != (uchar_t)-1) ||
 			    (pci_bus_res[bus].dip == NULL))
@@ -1626,14 +1444,13 @@ pci_reprogram(void)
 		}
 	} else {
 		/* perform legacy processing */
-		pci_renumber_root_busses();
 		pci_unitaddr_cache_create();
 	}
 
 	/*
 	 * Do root-bus resource discovery
 	 */
-	for (bus = 0; bus <= pci_bios_maxbus; bus++) {
+	for (bus = 0; bus <= pci_boot_maxbus; bus++) {
 		/* skip non-root (peer) PCI busses */
 		if (pci_bus_res[bus].par_bus != (uchar_t)-1)
 			continue;
@@ -1683,7 +1500,7 @@ pci_reprogram(void)
 	memlist_free_all(&isa_res.mem_used);
 
 	/* add bus-range property for root/peer bus nodes */
-	for (i = 0; i <= pci_bios_maxbus; i++) {
+	for (i = 0; i <= pci_boot_maxbus; i++) {
 		/* create bus-range property on root/peer buses */
 		if (pci_bus_res[i].par_bus == (uchar_t)-1)
 			add_bus_range_prop(i);
@@ -1705,10 +1522,10 @@ pci_reprogram(void)
 
 	/* reprogram the non-subtractive PPB */
 	if (pci_reconfig)
-		for (i = 0; i <= pci_bios_maxbus; i++)
+		for (i = 0; i <= pci_boot_maxbus; i++)
 			fix_ppb_res(i, B_FALSE);
 
-	for (i = 0; i <= pci_bios_maxbus; i++) {
+	for (i = 0; i <= pci_boot_maxbus; i++) {
 		/* configure devices not configured by BIOS */
 		if (pci_reconfig) {
 			/*
@@ -1722,7 +1539,7 @@ pci_reprogram(void)
 	}
 
 	/* All dev programmed, so we can create available prop */
-	for (i = 0; i <= pci_bios_maxbus; i++)
+	for (i = 0; i <= pci_boot_maxbus; i++)
 		add_bus_available_prop(i);
 }
 
@@ -1734,10 +1551,11 @@ populate_bus_res(uchar_t bus)
 {
 
 	/* scan BIOS structures */
-	pci_bus_res[bus].pmem_avail = find_bus_res(bus, PREFETCH_TYPE);
-	pci_bus_res[bus].mem_avail = find_bus_res(bus, MEM_TYPE);
-	pci_bus_res[bus].io_avail = find_bus_res(bus, IO_TYPE);
-	pci_bus_res[bus].bus_avail = find_bus_res(bus, BUSRANGE_TYPE);
+	pci_bus_res[bus].pmem_avail = pci_prd_find_resource(bus,
+	    PCI_PRD_R_PREFETCH);
+	pci_bus_res[bus].mem_avail = pci_prd_find_resource(bus, PCI_PRD_R_MMIO);
+	pci_bus_res[bus].io_avail = pci_prd_find_resource(bus, PCI_PRD_R_IO);
+	pci_bus_res[bus].bus_avail = pci_prd_find_resource(bus, PCI_PRD_R_BUS);
 
 	/*
 	 * attempt to initialize sub_bus from the largest range-end
@@ -2054,7 +1872,7 @@ add_pci_fixes(void)
 {
 	int i;
 
-	for (i = 0; i <= pci_bios_maxbus; i++) {
+	for (i = 0; i <= pci_boot_maxbus; i++) {
 		/*
 		 * For each bus, apply needed fixes to the appropriate devices.
 		 * This must be done before the main enumeration loop because
@@ -3197,8 +3015,8 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	 * Some BIOSes lie about max pci busses, we allow for
 	 * such mistakes here
 	 */
-	if (subbus > pci_bios_maxbus) {
-		pci_bios_maxbus = subbus;
+	if (subbus > pci_boot_maxbus) {
+		pci_boot_maxbus = subbus;
 		alloc_res_array();
 	}
 
@@ -3436,66 +3254,6 @@ add_bus_range_prop(int bus)
 }
 
 /*
- * Add slot-names property for any named pci hot-plug slots
- */
-static void
-add_bus_slot_names_prop(int bus)
-{
-	char slotprop[256];
-	int len;
-	extern int pci_irq_nroutes;
-	char *slotcap_name;
-
-	/*
-	 * If no irq routing table, then go with the slot-names as set up
-	 * in pciex_slot_names_prop() from slot capability register (if any).
-	 */
-	if (pci_irq_nroutes == 0)
-		return;
-
-	/*
-	 * Otherise delete the slot-names we already have and use the irq
-	 * routing table values as returned by pci_slot_names_prop() instead,
-	 * but keep any property of value "pcie0" as that can't be represented
-	 * in the irq routing table.
-	 */
-	if (pci_bus_res[bus].dip != NULL) {
-		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pci_bus_res[bus].dip,
-		    DDI_PROP_DONTPASS, "slot-names", &slotcap_name) !=
-		    DDI_SUCCESS || strcmp(slotcap_name, "pcie0") != 0)
-			(void) ndi_prop_remove(DDI_DEV_T_NONE,
-			    pci_bus_res[bus].dip, "slot-names");
-	}
-
-	len = pci_slot_names_prop(bus, slotprop, sizeof (slotprop));
-	if (len > 0) {
-		/*
-		 * Only create a peer bus node if this bus may be a peer bus.
-		 * It may be a peer bus if the dip is NULL and if par_bus is
-		 * -1 (par_bus is -1 if this bus was not found to be
-		 * subordinate to any PCI-PCI bridge).
-		 * If it's not a peer bus, then the ACPI BBN-handling code
-		 * will remove it later.
-		 */
-		if (pci_bus_res[bus].par_bus == (uchar_t)-1 &&
-		    pci_bus_res[bus].dip == NULL) {
-
-			create_root_bus_dip(bus);
-		}
-		if (pci_bus_res[bus].dip != NULL) {
-			ASSERT((len % sizeof (int)) == 0);
-			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
-			    pci_bus_res[bus].dip, "slot-names",
-			    (int *)slotprop, len / sizeof (int));
-		} else {
-			cmn_err(CE_NOTE, "!BIOS BUG: Invalid bus number in PCI "
-			    "IRQ routing table; Not adding slot-names "
-			    "property for incorrect bus %d", bus);
-		}
-	}
-}
-
-/*
  * Handle both PCI root and PCI-PCI bridge range properties;
  * non-zero 'ppb' argument select PCI-PCI bridges versus root.
  */
@@ -3652,11 +3410,11 @@ add_bus_available_prop(int bus)
 static void
 alloc_res_array(void)
 {
-	static int array_size = 0;
-	int old_size;
+	static uint_t array_size = 0;
+	uint_t old_size;
 	void *old_res;
 
-	if (array_size > pci_bios_maxbus + 1)
+	if (array_size > pci_boot_maxbus + 1)
 		return;	/* array is big enough */
 
 	old_size = array_size;
@@ -3665,7 +3423,7 @@ alloc_res_array(void)
 	if (array_size == 0)
 		array_size = 16;	/* start with a reasonable number */
 
-	while (array_size <= pci_bios_maxbus + 1)
+	while (array_size <= pci_boot_maxbus + 1)
 		array_size <<= 1;
 	pci_bus_res = (struct pci_bus_resource *)kmem_zalloc(
 	    array_size * sizeof (struct pci_bus_resource), KM_SLEEP);

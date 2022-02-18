@@ -25,7 +25,7 @@
 # Copyright (c) 2010, Intel Corporation.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2022 Oxide Computer Company
 # Copyright 2021 Jason King
 #
 #	This Makefile defines file modules in the directory uts/i86pc
@@ -286,6 +286,8 @@ VIONA_OBJS += viona_main.o \
 	viona_hook.o \
 
 PPT_OBJS += ppt.o
+
+PCI_PRD_OBJS += pci_prd_i86pc.o pci_memlist.o
 
 #
 #	Build up defines and paths.

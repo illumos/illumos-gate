@@ -131,15 +131,16 @@ warning(char *s, ...)
 {
 	va_list ap;
 
-	if (!eof)
-		if (!yyline)
+	if (!eof) {
+		if (!yyline) {
 			(void) fprintf(errorf, "Command line: ");
-		else {
+		} else {
 			(void) fprintf(errorf,
 			    !no_input ? "" : "\"%s\":", sargv[optind]);
 			(void) fprintf(errorf,
 			    "line %d: ", yyline);
 		}
+	}
 	(void) fprintf(errorf, "Warning: ");
 	va_start(ap, s);
 	(void) vfprintf(errorf, s, ap);
@@ -171,8 +172,8 @@ index(int a, CHR *s)
 int
 alpha(int c)
 {
-	return ('a' <= c && c <= 'z' ||
-	    'A' <= c && c <= 'Z');
+	return (('a' <= c && c <= 'z') ||
+	    ('A' <= c && c <= 'Z'));
 }
 
 int
@@ -209,7 +210,7 @@ scopy(CHR *s, CHR *t)
 {
 	CHR *i;
 	i = t;
-	while (*i++ = *s++)
+	while ((*i++ = *s++) != 0)
 		;
 }
 
@@ -494,7 +495,7 @@ cpycom(CHR *p)
 			(void) putc(*t++, fout);
 	}
 	(void) putc('\n', fout);
-	while (c = gch()) {
+	while ((c = gch()) != 0) {
 		while (c == '*') {
 			(void) putc((char)c, fout);
 			if ((c = gch()) == '/') {
@@ -570,7 +571,7 @@ cpyact(void)
 				goto swt;
 			(void) putwc(c, fout);
 			savline = yyline;
-			while (c = gch()) {
+			while ((c = gch()) != 0) {
 				while (c == '*') {
 					(void) putwc(c, fout);
 					if ((c = gch()) == '/') {
@@ -591,7 +592,7 @@ cpyact(void)
 		case '"': /* character string */
 			mth = c;
 			(void) putwc(c, fout);
-			while (c = gch()) {
+			while ((c = gch()) != 0) {
 				if (c == '\\') {
 					(void) putwc(c, fout);
 					c = gch();

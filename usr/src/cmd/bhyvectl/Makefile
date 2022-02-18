@@ -35,6 +35,9 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(SRC)/uts/i86pc
 LDLIBS +=	-lvmmapi
 
+# Force c99 for everything
+CSTD=		$(CSTD_GNU99)
+
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
 # main() is too hairy for smatch

@@ -29,8 +29,6 @@
 #ifndef	_MPS_TABLE_H
 #define	_MPS_TABLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -42,7 +40,7 @@ struct mps_fps_hdr {		/* MP Floating Pointer Structure	*/
 	uchar_t	fps_len;	/* in paragraph (16-bytes units)	*/
 	uchar_t	fps_spec_rev;	/* MP Spec. version no.			*/
 	uchar_t	fps_cksum;	/* checksum of complete structure	*/
-	uchar_t	fps_featinfo1;	/* mp feature info byte 1 		*/
+	uchar_t	fps_featinfo1;	/* mp feature info byte 1		*/
 	uchar_t	fps_featinfo2;	/* mp feature info byte 2		*/
 	uchar_t	fps_featinfo3;	/* mp feature info byte 3		*/
 	uchar_t	fps_featinfo4;	/* mp feature info byte 4		*/
@@ -51,7 +49,7 @@ struct mps_fps_hdr {		/* MP Floating Pointer Structure	*/
 
 struct mps_ct_hdr {		/* MP Configuration Table Header	*/
 	uint32_t ct_sig;	/* "PCMP"				*/
-	uint16_t ct_len;	/* base configuration in bytes 		*/
+	uint16_t ct_len;	/* base configuration in bytes		*/
 	uchar_t	ct_spec_rev;	/* MP Spec. version no.			*/
 	uchar_t	ct_cksum;	/* base configuration table checksum	*/
 	char	ct_oem_id[8];	/* string identifies the manufacturer	*/
@@ -60,7 +58,7 @@ struct mps_ct_hdr {		/* MP Configuration Table Header	*/
 	uint16_t ct_oem_tbl_len; /* size of base OEM table in bytes	*/
 	uint16_t ct_entry_cnt;	/* no. of entries in the base table	*/
 	uint32_t ct_local_apic;	/* paddr of local APIC			*/
-	uint16_t ct_ext_tbl_len; /* extended table in bytes 		*/
+	uint16_t ct_ext_tbl_len; /* extended table in bytes		*/
 	uchar_t	ct_ext_cksum;	/* checksum for the extended table	*/
 };
 

@@ -1967,6 +1967,7 @@ f platform/i86pc/kernel/misc/amd64/acpidev 0755 root sys
 f platform/i86pc/kernel/misc/amd64/cpr 0755 root sys
 f platform/i86pc/kernel/misc/amd64/drmach_acpi 0755 root sys
 f platform/i86pc/kernel/misc/amd64/gfx_private 0755 root sys
+f platform/i86pc/kernel/misc/amd64/pci_prd 0755 root sys
 d platform/i86pc/kernel/pcbe 0755 root sys
 d platform/i86pc/kernel/pcbe/amd64 0755 root sys
 f platform/i86pc/kernel/pcbe/amd64/pcbe.AuthenticAMD 0755 root sys

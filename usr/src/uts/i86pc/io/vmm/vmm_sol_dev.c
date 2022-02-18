@@ -414,6 +414,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_RESET_CPU:
 	case VM_GET_RUN_STATE:
 	case VM_SET_RUN_STATE:
+	case VM_GET_FPU:
+	case VM_SET_FPU:
 		/*
 		 * Copy in the ID of the vCPU chosen for this operation.
 		 * Since a nefarious caller could update their struct between
@@ -469,6 +471,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_GET_GPA_PMAP:
 	case VM_IOAPIC_PINCOUNT:
 	case VM_SUSPEND:
+	case VM_DESC_FPU_AREA:
 	default:
 		break;
 	}
@@ -755,6 +758,53 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		}
 		break;
 	}
+	case VM_DESC_FPU_AREA: {
+		struct vm_fpu_desc desc;
+		void *buf = NULL;
+
+		if (ddi_copyin(datap, &desc, sizeof (desc), md)) {
+			error = EFAULT;
+			break;
+		}
+		if (desc.vfd_num_entries > 64) {
+			error = EINVAL;
+			break;
+		}
+		const size_t buf_sz = sizeof (struct vm_fpu_desc_entry) *
+		    desc.vfd_num_entries;
+		if (buf_sz != 0) {
+			buf = kmem_zalloc(buf_sz, KM_SLEEP);
+		}
+
+		/*
+		 * For now, we are depending on vm_fpu_desc_entry and
+		 * hma_xsave_state_desc_t having the same format.
+		 */
+		CTASSERT(sizeof (struct vm_fpu_desc_entry) ==
+		    sizeof (hma_xsave_state_desc_t));
+
+		size_t req_size;
+		const uint_t max_entries = hma_fpu_describe_xsave_state(
+		    (hma_xsave_state_desc_t *)buf,
+		    desc.vfd_num_entries,
+		    &req_size);
+
+		desc.vfd_req_size = req_size;
+		desc.vfd_num_entries = max_entries;
+		if (buf_sz != 0) {
+			if (ddi_copyout(buf, desc.vfd_entry_data, buf_sz, md)) {
+				error = EFAULT;
+			}
+			kmem_free(buf, buf_sz);
+		}
+
+		if (error == 0) {
+			if (ddi_copyout(&desc, datap, sizeof (desc), md)) {
+				error = EFAULT;
+			}
+		}
+		break;
+	}
 
 	case VM_ISA_ASSERT_IRQ: {
 		struct vm_isa_irq isa_irq;
@@ -1038,6 +1088,51 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		}
 		error = vm_set_run_state(sc->vmm_vm, vcpu, vrs.state,
 		    vrs.sipi_vector);
+		break;
+	}
+	case VM_GET_FPU: {
+		struct vm_fpu_state req;
+		const size_t max_len = (PAGESIZE * 2);
+		void *kbuf;
+
+		if (ddi_copyin(datap, &req, sizeof (req), md)) {
+			error = EFAULT;
+			break;
+		}
+		if (req.len > max_len || req.len == 0) {
+			error = EINVAL;
+			break;
+		}
+		kbuf = kmem_zalloc(req.len, KM_SLEEP);
+		error = vm_get_fpu(sc->vmm_vm, vcpu, kbuf, req.len);
+		if (error == 0) {
+			if (ddi_copyout(kbuf, req.buf, req.len, md)) {
+				error = EFAULT;
+			}
+		}
+		kmem_free(kbuf, req.len);
+		break;
+	}
+	case VM_SET_FPU: {
+		struct vm_fpu_state req;
+		const size_t max_len = (PAGESIZE * 2);
+		void *kbuf;
+
+		if (ddi_copyin(datap, &req, sizeof (req), md)) {
+			error = EFAULT;
+			break;
+		}
+		if (req.len > max_len || req.len == 0) {
+			error = EINVAL;
+			break;
+		}
+		kbuf = kmem_alloc(req.len, KM_SLEEP);
+		if (ddi_copyin(req.buf, kbuf, req.len, md)) {
+			error = EFAULT;
+		} else {
+			error = vm_set_fpu(sc->vmm_vm, vcpu, kbuf, req.len);
+		}
+		kmem_free(kbuf, req.len);
 		break;
 	}
 

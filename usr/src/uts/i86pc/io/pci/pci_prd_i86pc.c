@@ -19,53 +19,62 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Western Digital Corporation
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
+ */
+
+/*
+ * This file contains the x86 PCI platform resource discovery backend. This uses
+ * data from a combination of sources, preferring ACPI, if present, and if not,
+ * falling back to either the PCI hot-plug resource table or the mps tables.
  *
- * pci_resource.c -- routines to retrieve available bus resources from
- *		 the MP Spec. Table and Hotplug Resource Table
+ * Today, to get information from ACPI we need to start from a dev_info_t. This
+ * is partly why the PRD interface has a callback for getting information about
+ * a dev_info_t. It also means we cannot initialize the tables with information
+ * until all devices have been initially scanned.
  */
 
 #include <sys/types.h>
 #include <sys/memlist.h>
+#include <sys/pci.h>
 #include <sys/pci_impl.h>
+#include <sys/pci_cfgspace_impl.h>
+#include <sys/sunndi.h>
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
+#include <sys/plat/pci_prd.h>
 #include "mps_table.h"
 #include "pcihrt.h"
 
-extern int pci_boot_debug;
 extern int pci_bios_maxbus;
-#define	dprintf	if (pci_boot_debug) printf
+
+int pci_prd_debug = 0;
+#define	dprintf	if (pci_prd_debug) printf
+#define	dcmn_err	if (pci_prd_debug != 0) cmn_err
 
 static int tbl_init = 0;
 static uchar_t *mps_extp = NULL;
 static uchar_t *mps_ext_endp = NULL;
 static struct php_entry *hrt_hpep;
-static int hrt_entry_cnt = 0;
+static uint_t hrt_entry_cnt = 0;
 static int acpi_cb_cnt = 0;
+static pci_prd_upcalls_t *prd_upcalls;
 
 static void mps_probe(void);
 static void acpi_pci_probe(void);
-static int mps_find_bus_res(int, int, struct memlist **);
+static int mps_find_bus_res(uint32_t, pci_prd_rsrc_t, struct memlist **);
 static void hrt_probe(void);
-static int hrt_find_bus_res(int, int, struct memlist **);
-static int acpi_find_bus_res(int, int, struct memlist **);
+static int hrt_find_bus_res(uint32_t, pci_prd_rsrc_t, struct memlist **);
+static int acpi_find_bus_res(uint32_t, pci_prd_rsrc_t, struct memlist **);
 static uchar_t *find_sig(uchar_t *cp, int len, char *sig);
 static int checksum(unsigned char *cp, int len);
 static ACPI_STATUS acpi_wr_cb(ACPI_RESOURCE *rp, void *context);
-void bus_res_fini(void);
 static void acpi_trim_bus_ranges(void);
-
-struct memlist *acpi_io_res[256];
-struct memlist *acpi_mem_res[256];
-struct memlist *acpi_pmem_res[256];
-struct memlist *acpi_bus_res[256];
 
 /*
  * -1 = attempt ACPI resource discovery
@@ -74,53 +83,35 @@ struct memlist *acpi_bus_res[256];
  */
 volatile int acpi_resource_discovery = -1;
 
-struct memlist *
-find_bus_res(int bus, int type)
-{
-	struct memlist *res = NULL;
-	boolean_t bios = B_TRUE;
+struct memlist *acpi_io_res[PCI_MAX_BUS_NUM];
+struct memlist *acpi_mem_res[PCI_MAX_BUS_NUM];
+struct memlist *acpi_pmem_res[PCI_MAX_BUS_NUM];
+struct memlist *acpi_bus_res[PCI_MAX_BUS_NUM];
 
-	/* if efi-systab property exist, there is no BIOS */
-	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), DDI_PROP_DONTPASS,
-	    "efi-systab")) {
-		bios = B_FALSE;
-	}
+/*
+ * This indicates whether or not we have a traditional x86 BIOS present or not.
+ */
+static boolean_t pci_prd_have_bios = B_TRUE;
 
-	if (tbl_init == 0) {
-		tbl_init = 1;
-		acpi_pci_probe();
-		if (bios) {
-			hrt_probe();
-			mps_probe();
-		}
-	}
-
-	if (acpi_find_bus_res(bus, type, &res) > 0)
-		return (res);
-
-	if (bios && hrt_find_bus_res(bus, type, &res) > 0)
-		return (res);
-
-	if (bios)
-		(void) mps_find_bus_res(bus, type, &res);
-	return (res);
-}
-
+/*
+ * This value is set up as part of PCI configuration space initialization.
+ */
+extern int pci_bios_maxbus;
 
 static void
 acpi_pci_probe(void)
 {
 	ACPI_HANDLE ah;
-	dev_info_t *dip;
 	int bus;
 
 	if (acpi_resource_discovery == 0)
 		return;
 
 	for (bus = 0; bus <= pci_bios_maxbus; bus++) {
-		/* if no dip or no ACPI handle, no resources to discover */
-		dip = pci_bus_res[bus].dip;
-		if ((dip == NULL) ||
+		dev_info_t *dip;
+
+		dip = prd_upcalls->pru_bus2dip_f(bus);
+		if (dip == NULL ||
 		    (ACPI_FAILURE(acpica_get_handle(dip, &ah))))
 			continue;
 
@@ -142,7 +133,7 @@ acpi_pci_probe(void)
  * be trimmed to "0..7", in the example).
  */
 static void
-acpi_trim_bus_ranges()
+acpi_trim_bus_ranges(void)
 {
 	struct memlist *ranges, *current;
 	int bus;
@@ -154,7 +145,7 @@ acpi_trim_bus_ranges()
 	 *  - there exists at most 1 bus range entry for each bus number
 	 *  - there are no (broken) ranges that start at the same bus number
 	 */
-	for (bus = 0; bus < 256; bus++) {
+	for (bus = 0; bus < PCI_MAX_BUS_NUM; bus++) {
 		struct memlist *prev, *orig, *new;
 		/* skip buses with no range entry */
 		if ((orig = acpi_bus_res[bus]) == NULL)
@@ -211,20 +202,21 @@ acpi_trim_bus_ranges()
 }
 
 static int
-acpi_find_bus_res(int bus, int type, struct memlist **res)
+acpi_find_bus_res(uint32_t bus, pci_prd_rsrc_t type, struct memlist **res)
 {
+	ASSERT3U(bus, <, PCI_MAX_BUS_NUM);
 
 	switch (type) {
-	case IO_TYPE:
+	case PCI_PRD_R_IO:
 		*res = acpi_io_res[bus];
 		break;
-	case MEM_TYPE:
+	case PCI_PRD_R_MMIO:
 		*res = acpi_mem_res[bus];
 		break;
-	case PREFETCH_TYPE:
+	case PCI_PRD_R_PREFETCH:
 		*res = acpi_pmem_res[bus];
 		break;
-	case BUSRANGE_TYPE:
+	case PCI_PRD_R_BUS:
 		*res = acpi_bus_res[bus];
 		break;
 	default:
@@ -234,19 +226,6 @@ acpi_find_bus_res(int bus, int type, struct memlist **res)
 
 	/* memlist_count() treats NULL head as zero-length */
 	return (memlist_count(*res));
-}
-
-void
-bus_res_fini(void)
-{
-	int bus;
-
-	for (bus = 0; bus <= pci_bios_maxbus; bus++) {
-		memlist_free_all(&acpi_io_res[bus]);
-		memlist_free_all(&acpi_mem_res[bus]);
-		memlist_free_all(&acpi_pmem_res[bus]);
-		memlist_free_all(&acpi_bus_res[bus]);
-	}
 }
 
 static struct memlist **
@@ -298,7 +277,7 @@ acpi_dbg(uint_t bus, uint64_t addr, uint64_t len, uint8_t caching, uint8_t type,
 }
 
 
-ACPI_STATUS
+static ACPI_STATUS
 acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 {
 	int bus = (intptr_t)context;
@@ -332,7 +311,7 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 		acpi_cb_cnt++;
 		memlist_insert(&acpi_io_res[bus], rp->Data.Io.Minimum,
 		    rp->Data.Io.AddressLength);
-		if (pci_boot_debug != 0) {
+		if (pci_prd_debug != 0) {
 			acpi_dbg(bus, rp->Data.Io.Minimum,
 			    rp->Data.Io.AddressLength, 0, ACPI_IO_RANGE, "IO");
 		}
@@ -374,7 +353,7 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 		    rp->Data.Address.Info.Mem.Caching, bus),
 		    rp->Data.Address16.Address.Minimum,
 		    rp->Data.Address16.Address.AddressLength);
-		if (pci_boot_debug != 0) {
+		if (pci_prd_debug != 0) {
 			acpi_dbg(bus,
 			    rp->Data.Address16.Address.Minimum,
 			    rp->Data.Address16.Address.AddressLength,
@@ -391,7 +370,7 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 		    rp->Data.Address.Info.Mem.Caching, bus),
 		    rp->Data.Address32.Address.Minimum,
 		    rp->Data.Address32.Address.AddressLength);
-		if (pci_boot_debug != 0) {
+		if (pci_prd_debug != 0) {
 			acpi_dbg(bus,
 			    rp->Data.Address32.Address.Minimum,
 			    rp->Data.Address32.Address.AddressLength,
@@ -409,7 +388,7 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 		    rp->Data.Address.Info.Mem.Caching, bus),
 		    rp->Data.Address64.Address.Minimum,
 		    rp->Data.Address64.Address.AddressLength);
-		if (pci_boot_debug != 0) {
+		if (pci_prd_debug != 0) {
 			acpi_dbg(bus,
 			    rp->Data.Address64.Address.Minimum,
 			    rp->Data.Address64.Address.AddressLength,
@@ -426,7 +405,7 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 		    rp->Data.Address.Info.Mem.Caching, bus),
 		    rp->Data.ExtAddress64.Address.Minimum,
 		    rp->Data.ExtAddress64.Address.AddressLength);
-		if (pci_boot_debug != 0) {
+		if (pci_prd_debug != 0) {
 			acpi_dbg(bus,
 			    rp->Data.ExtAddress64.Address.Minimum,
 			    rp->Data.ExtAddress64.Address.AddressLength,
@@ -450,7 +429,7 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 }
 
 static void
-mps_probe()
+mps_probe(void)
 {
 	uchar_t *extp;
 	struct mps_fps_hdr *fpp = NULL;
@@ -521,22 +500,43 @@ mps_probe()
 
 
 static int
-mps_find_bus_res(int bus, int type, struct memlist **res)
+mps_find_bus_res(uint32_t bus, pci_prd_rsrc_t rsrc, struct memlist **res)
 {
 	struct sasm *sasmp;
 	uchar_t *extp;
-	int res_cnt;
+	int res_cnt, type;
+
+	ASSERT3U(bus, <, PCI_MAX_BUS_NUM);
 
 	if (mps_extp == NULL)
 		return (0);
+
+	switch (rsrc) {
+	case PCI_PRD_R_IO:
+		type = IO_TYPE;
+		break;
+	case PCI_PRD_R_MMIO:
+		type = MEM_TYPE;
+		break;
+	case PCI_PRD_R_PREFETCH:
+		type = PREFETCH_TYPE;
+		break;
+	case PCI_PRD_R_BUS:
+		type = BUSRANGE_TYPE;
+		break;
+	default:
+		*res = NULL;
+		return (0);
+	}
+
 	extp = mps_extp;
 	res_cnt = 0;
 	while (extp < mps_ext_endp) {
 		switch (*extp) {
 		case SYS_AS_MAPPING:
 			sasmp = (struct sasm *)extp;
-			if (((int)sasmp->sasm_as_type) == type &&
-			    ((int)sasmp->sasm_bus_id) == bus) {
+			if (sasmp->sasm_as_type == type &&
+			    sasmp->sasm_bus_id == bus) {
 				uint64_t base, len;
 
 				base = (uint64_t)sasmp->sasm_as_base |
@@ -558,11 +558,7 @@ mps_find_bus_res(int bus, int type, struct memlist **res)
 			cmn_err(CE_WARN, "Unknown descriptor type %d"
 			    " in BIOS Multiprocessor Spec table.",
 			    *extp);
-			while (*res) {
-				struct memlist *tmp = *res;
-				*res = tmp->ml_next;
-				memlist_free(tmp);
-			}
+			memlist_free_all(res);
 			return (0);
 		}
 	}
@@ -570,7 +566,7 @@ mps_find_bus_res(int bus, int type, struct memlist **res)
 }
 
 static void
-hrt_probe()
+hrt_probe(void)
 {
 	struct hrt_hdr *hrtp;
 
@@ -585,44 +581,46 @@ hrt_probe()
 		dprintf("PCI Hot-Plug Resource Table version no. <> 1\n");
 		return;
 	}
-	hrt_entry_cnt = (int)hrtp->hrt_entry_cnt;
+	hrt_entry_cnt = (uint_t)hrtp->hrt_entry_cnt;
 	dprintf("No. of PCI hot-plug slot entries = 0x%x\n", hrt_entry_cnt);
 	hrt_hpep = (struct php_entry *)(hrtp + 1);
 }
 
 static int
-hrt_find_bus_res(int bus, int type, struct memlist **res)
+hrt_find_bus_res(uint32_t bus, pci_prd_rsrc_t type, struct memlist **res)
 {
-	int res_cnt, i;
+	int res_cnt;
 	struct php_entry *hpep;
+
+	ASSERT3U(bus, <, PCI_MAX_BUS_NUM);
 
 	if (hrt_hpep == NULL || hrt_entry_cnt == 0)
 		return (0);
 	hpep = hrt_hpep;
 	res_cnt = 0;
-	for (i = 0; i < hrt_entry_cnt; i++, hpep++) {
+	for (uint_t i = 0; i < hrt_entry_cnt; i++, hpep++) {
 		if (hpep->php_pri_bus != bus)
 			continue;
-		if (type == IO_TYPE) {
+		if (type == PCI_PRD_R_IO) {
 			if (hpep->php_io_start == 0 || hpep->php_io_size == 0)
 				continue;
 			memlist_insert(res, (uint64_t)hpep->php_io_start,
 			    (uint64_t)hpep->php_io_size);
 			res_cnt++;
-		} else if (type == MEM_TYPE) {
+		} else if (type == PCI_PRD_R_MMIO) {
 			if (hpep->php_mem_start == 0 || hpep->php_mem_size == 0)
 				continue;
 			memlist_insert(res,
-			    (uint64_t)(((int)hpep->php_mem_start) << 16),
-			    (uint64_t)(((int)hpep->php_mem_size) << 16));
+			    ((uint64_t)hpep->php_mem_start) << 16,
+			    ((uint64_t)hpep->php_mem_size) << 16);
 			res_cnt++;
-		} else if (type == PREFETCH_TYPE) {
+		} else if (type == PCI_PRD_R_PREFETCH) {
 			if (hpep->php_pfmem_start == 0 ||
 			    hpep->php_pfmem_size == 0)
 				continue;
 			memlist_insert(res,
-			    (uint64_t)(((int)hpep->php_pfmem_start) << 16),
-			    (uint64_t)(((int)hpep->php_pfmem_size) << 16));
+			    ((uint64_t)hpep->php_pfmem_start) << 16,
+			    ((uint64_t)hpep->php_pfmem_size) << 16);
 			res_cnt++;
 		}
 	}
@@ -656,67 +654,226 @@ checksum(unsigned char *cp, int len)
 	return ((int)(cksum & 0xFF));
 }
 
-#ifdef UNUSED_BUS_HIERARY_INFO
-
-/*
- * At this point, the bus hierarchy entries do not appear to
- * provide anything we can't find out from PCI config space.
- * The only interesting bit is the ISA bus number, which we
- * don't care.
- */
-int
-mps_find_parent_bus(int bus)
+uint32_t
+pci_prd_max_bus(void)
 {
-	struct sasm *sasmp;
-	uchar_t *extp;
+	return ((uint32_t)pci_bios_maxbus);
+}
 
-	if (mps_extp == NULL)
-		return (-1);
+struct memlist *
+pci_prd_find_resource(uint32_t bus, pci_prd_rsrc_t rsrc)
+{
+	struct memlist *res = NULL;
 
-	extp = mps_extp;
-	while (extp < mps_ext_endp) {
-		bhdp = (struct bhd *)extp;
-		switch (*extp) {
-		case SYS_AS_MAPPING:
-			extp += SYS_AS_MAPPING_SIZE;
-			break;
-		case BUS_HIERARCHY_DESC:
-			if (bhdp->bhd_bus_id == bus)
-				return (bhdp->bhd_parent);
-			extp += BUS_HIERARCHY_DESC_SIZE;
-			break;
-		case COMP_BUS_AS_MODIFIER:
-			extp += COMP_BUS_AS_MODIFIER_SIZE;
-			break;
-		default:
-			cmn_err(CE_WARN, "Unknown descriptor type %d"
-			    " in BIOS Multiprocessor Spec table.",
-			    *extp);
-			return (-1);
+	if (bus > pci_bios_maxbus)
+		return (NULL);
+
+	if (tbl_init == 0) {
+		tbl_init = 1;
+		acpi_pci_probe();
+		if (pci_prd_have_bios) {
+			hrt_probe();
+			mps_probe();
 		}
 	}
-	return (-1);
+
+	if (acpi_find_bus_res(bus, rsrc, &res) > 0)
+		return (res);
+
+	if (pci_prd_have_bios && hrt_find_bus_res(bus, rsrc, &res) > 0)
+		return (res);
+
+	if (pci_prd_have_bios)
+		(void) mps_find_bus_res(bus, rsrc, &res);
+	return (res);
+}
+
+typedef struct {
+	pci_prd_root_complex_f	ppac_func;
+	void			*ppac_arg;
+} pci_prd_acpi_cb_t;
+
+static ACPI_STATUS
+pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
+{
+	ACPI_DEVICE_INFO *adi;
+	int busnum;
+	pci_prd_acpi_cb_t *cb = ctx;
+
+	/*
+	 * Use AcpiGetObjectInfo() to find the device _HID
+	 * If not a PCI root-bus, ignore this device and continue
+	 * the walk
+	 */
+	if (ACPI_FAILURE(AcpiGetObjectInfo(hdl, &adi)))
+		return (AE_OK);
+
+	if (!(adi->Valid & ACPI_VALID_HID)) {
+		AcpiOsFree(adi);
+		return (AE_OK);
+	}
+
+	if (strncmp(adi->HardwareId.String, PCI_ROOT_HID_STRING,
+	    sizeof (PCI_ROOT_HID_STRING)) &&
+	    strncmp(adi->HardwareId.String, PCI_EXPRESS_ROOT_HID_STRING,
+	    sizeof (PCI_EXPRESS_ROOT_HID_STRING))) {
+		AcpiOsFree(adi);
+		return (AE_OK);
+	}
+
+	AcpiOsFree(adi);
+
+	/*
+	 * acpica_get_busno() will check the presence of _BBN and
+	 * fail if not present. It will then use the _CRS method to
+	 * retrieve the actual bus number assigned, it will fall back
+	 * to _BBN should the _CRS method fail.
+	 */
+	if (ACPI_SUCCESS(acpica_get_busno(hdl, &busnum))) {
+		/*
+		 * Ignore invalid _BBN return values here (rather
+		 * than panic) and emit a warning; something else
+		 * may suffer failure as a result of the broken BIOS.
+		 */
+		if (busnum < 0) {
+			dcmn_err(CE_NOTE,
+			    "pci_process_acpi_device: invalid _BBN 0x%x",
+			    busnum);
+			return (AE_CTRL_DEPTH);
+		}
+
+		if (cb->ppac_func((uint32_t)busnum, cb->ppac_arg))
+			return (AE_CTRL_DEPTH);
+		return (AE_CTRL_TERMINATE);
+	}
+
+	/* PCI and no _BBN, continue walk */
+	return (AE_OK);
+}
+
+void
+pci_prd_root_complex_iter(pci_prd_root_complex_f func, void *arg)
+{
+	void *rv;
+	pci_prd_acpi_cb_t cb;
+
+	cb.ppac_func = func;
+	cb.ppac_arg = arg;
+
+	/*
+	 * First scan ACPI devices for anything that might be here. After that,
+	 * go through and check the old BIOS IRQ routing table for additional
+	 * buses. Note, slot naming from the IRQ table comes later.
+	 */
+	(void) AcpiGetDevices(NULL, pci_process_acpi_device, &cb, &rv);
+	pci_bios_bus_iter(func, arg);
+
+}
+
+
+/*
+ * If there is actually a PCI IRQ routing table present, then we want to use
+ * this to go back and update the slot name. In particular, if we have no PCI
+ * IRQ routing table, then we use the existing slot names that were already set
+ * up for us in picex_slot_names_prop() from the capability register. Otherwise,
+ * we actually delete all slot-names properties from buses and instead use
+ * something from the IRQ routing table if it exists.
+ *
+ * Note, the property is always deleted regardless of whether or not it exists
+ * in the IRQ routing table. Finally, we have traditionally kept "pcie0" names
+ * as special as apparently that can't be represented in the IRQ routing table.
+ */
+void
+pci_prd_slot_name(uint32_t bus, dev_info_t *dip)
+{
+	char slotprop[256];
+	int len;
+	char *slotcap_name;
+
+	if (pci_irq_nroutes == 0)
+		return;
+
+	if (dip != NULL) {
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pci_bus_res[bus].dip,
+		    DDI_PROP_DONTPASS, "slot-names", &slotcap_name) !=
+		    DDI_SUCCESS || strcmp(slotcap_name, "pcie0") != 0) {
+			(void) ndi_prop_remove(DDI_DEV_T_NONE,
+			    pci_bus_res[bus].dip, "slot-names");
+		}
+	}
+
+
+	len = pci_slot_names_prop(bus, slotprop, sizeof (slotprop));
+	if (len > 0) {
+		if (dip != NULL) {
+			ASSERT((len % sizeof (int)) == 0);
+			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
+			    pci_bus_res[bus].dip, "slot-names",
+			    (int *)slotprop, len / sizeof (int));
+		} else {
+			cmn_err(CE_NOTE, "!BIOS BUG: Invalid bus number in PCI "
+			    "IRQ routing table; Not adding slot-names "
+			    "property for incorrect bus %d", bus);
+		}
+	}
+}
+
+boolean_t
+pci_prd_multi_root_ok(void)
+{
+	return (acpi_resource_discovery > 0);
 }
 
 int
-hrt_find_bus_range(int bus)
+pci_prd_init(pci_prd_upcalls_t *upcalls)
 {
-	int i, max_bus, sub_bus;
-	struct php_entry *hpep;
+	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), DDI_PROP_DONTPASS,
+	    "efi-systab")) {
+		pci_prd_have_bios = B_FALSE;
+	}
 
-	if (hrt_hpep == NULL || hrt_entry_cnt == 0) {
-		return (-1);
-	}
-	hpep = hrt_hpep;
-	max_bus = -1;
-	for (i = 0; i < hrt_entry_cnt; i++, hpep++) {
-		if (hpep->php_pri_bus != bus)
-			continue;
-		sub_bus = (int)hpep->php_subord_bus;
-		if (sub_bus > max_bus)
-			max_bus = sub_bus;
-	}
-	return (max_bus);
+	prd_upcalls = upcalls;
+
+	return (0);
 }
 
-#endif /* UNUSED_BUS_HIERARY_INFO */
+void
+pci_prd_fini(void)
+{
+	int bus;
+
+	for (bus = 0; bus <= pci_bios_maxbus; bus++) {
+		memlist_free_all(&acpi_io_res[bus]);
+		memlist_free_all(&acpi_mem_res[bus]);
+		memlist_free_all(&acpi_pmem_res[bus]);
+		memlist_free_all(&acpi_bus_res[bus]);
+	}
+}
+
+static struct modlmisc pci_prd_modlmisc_i86pc = {
+	.misc_modops = &mod_miscops,
+	.misc_linkinfo = "i86pc PCI Resource Discovery"
+};
+
+static struct modlinkage pci_prd_modlinkage_i86pc = {
+	.ml_rev = MODREV_1,
+	.ml_linkage = { &pci_prd_modlmisc_i86pc, NULL }
+};
+
+int
+_init(void)
+{
+	return (mod_install(&pci_prd_modlinkage_i86pc));
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+	return (mod_info(&pci_prd_modlinkage_i86pc, modinfop));
+}
+
+int
+_fini(void)
+{
+	return (mod_remove(&pci_prd_modlinkage_i86pc));
+}

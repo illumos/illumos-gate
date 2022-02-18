@@ -16,7 +16,7 @@
 #ifndef _COMMON_H_
 #define	_COMMON_H_
 
-struct vmctx *create_test_vm(void);
+struct vmctx *create_test_vm(const char *);
 int alloc_memseg(struct vmctx *, int, size_t, const char *);
 
 #define	PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)

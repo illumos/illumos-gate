@@ -462,9 +462,9 @@ nextstate(int s, int c)
 	for (i = 0; i < num; i++) {
 		curpos = *pos++;
 		j = name[curpos];
-		if ((!ISOPERATOR(j)) && j == c ||
-		    j == RSTR && c == right[curpos] ||
-		    j == RCCL && member(c, (CHR *) left[curpos])) {
+		if ((!ISOPERATOR(j) && j == c) ||
+		    (j == RSTR && c == right[curpos]) ||
+		    (j == RCCL && member(c, (CHR *) left[curpos]))) {
 			f = foll[curpos];
 			number = *f;
 			newpos = f+1;
