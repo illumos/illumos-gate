@@ -36,11 +36,6 @@ CPPFLAGS +=	-I$(PNGLITE) -I$(LZ4)
 CFLAGS += $(C_BIGPICFLAGS)
 CFLAGS64 += $(C_BIGPICFLAGS64)
 
-# As variable "count" is marked volatile, gcc 4.4.4 will complain about
-# function argument. So we switch this warning off
-# for time being, till gcc 4.4.4 will be replaced.
-pics/vm.o := CERRWARN += -_gcc=-Wno-clobbered
-
 LDLIBS +=	-lumem -luuid -lz -lc -lm
 NATIVE_LIBS +=	libz.so
 
