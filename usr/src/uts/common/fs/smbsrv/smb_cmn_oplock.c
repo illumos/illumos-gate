@@ -315,9 +315,29 @@ uint32_t
 smb_oplock_request(smb_request_t *sr, smb_ofile_t *ofile, uint32_t *statep)
 {
 	smb_node_t *node = ofile->f_node;
+	uint32_t status;
+
+	smb_llist_enter(&node->n_ofile_list, RW_READER);
+	mutex_enter(&node->n_oplock.ol_mutex);
+
+	status = smb_oplock_request_LH(sr, ofile, statep);
+
+	mutex_exit(&node->n_oplock.ol_mutex);
+	smb_llist_exit(&node->n_ofile_list);
+
+	return (status);
+}
+
+uint32_t
+smb_oplock_request_LH(smb_request_t *sr, smb_ofile_t *ofile, uint32_t *statep)
+{
+	smb_node_t *node = ofile->f_node;
 	uint32_t type = *statep & OPLOCK_LEVEL_TYPE_MASK;
 	uint32_t level = *statep & OPLOCK_LEVEL_CACHE_MASK;
 	uint32_t status;
+
+	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
+	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
 
 	*statep = LEVEL_NONE;
 
@@ -342,9 +362,6 @@ smb_oplock_request(smb_request_t *sr, smb_ofile_t *ofile, uint32_t *statep)
 		 */
 		return (NT_STATUS_OPLOCK_NOT_GRANTED);
 	}
-
-	smb_llist_enter(&node->n_ofile_list, RW_READER);
-	mutex_enter(&node->n_oplock.ol_mutex);
 
 	/*
 	 * If Type is LEVEL_ONE or LEVEL_BATCH:
@@ -495,25 +512,15 @@ smb_oplock_request(smb_request_t *sr, smb_ofile_t *ofile, uint32_t *statep)
 		break;
 	}
 
-	/* Give caller back the "Granular" bit. */
-	if (status == NT_STATUS_SUCCESS) {
+	/*
+	 * Give caller back the "Granular" bit, eg. when
+	 * NT_STATUS_SUCCESS or NT_STATUS_OPLOCK_BREAK_IN_PROGRESS
+	 */
+	if (NT_SC_SEVERITY(status) == NT_STATUS_SEVERITY_SUCCESS) {
 		*statep |= LEVEL_GRANULAR;
-
-		/*
-		 * The oplock lease may have moved to this ofile. Update.
-		 * Minor violation of layering here (leases vs oplocks)
-		 * but we want this update coverd by the oplock mutex.
-		 */
-#ifndef	TESTJIG
-		if (ofile->f_lease != NULL)
-			ofile->f_lease->ls_oplock_ofile = ofile;
-#endif
 	}
 
 out:
-	mutex_exit(&node->n_oplock.ol_mutex);
-	smb_llist_exit(&node->n_ofile_list);
-
 	return (status);
 }
 
@@ -1481,8 +1488,8 @@ smb_oplock_ack_break(
 	boolean_t FoundMatchingRHOplock = B_FALSE;
 	int other_keys;
 
-	smb_llist_enter(&node->n_ofile_list, RW_READER);
-	mutex_enter(&node->n_oplock.ol_mutex);
+	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
+	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
 
 	/*
 	 * If Open.Stream.Oplock is empty, the operation MUST be
@@ -2069,6 +2076,7 @@ smb_oplock_ack_break(
 		 * the spec for this bit of code.  Therefore, this will
 		 * return SUCCESS instead of OPLOCK_BREAK_IN_PROGRESS.
 		 */
+		ASSERT(node->n_oplock.excl_open == ofile);
 		node->n_oplock.ol_state = level | EXCLUSIVE;
 		status = NT_STATUS_SUCCESS;
 		break;	/* case (READ_CACHING|WRITE_CACHING|...) */
@@ -2088,11 +2096,6 @@ out:
 	    type == LEVEL_GRANULAR &&
 	    *rop != LEVEL_NONE) {
 		*rop |= LEVEL_GRANULAR;
-		/* As above, leased oplock may have moved. */
-#ifndef	TESTJIG
-		if (ofile->f_lease != NULL)
-			ofile->f_lease->ls_oplock_ofile = ofile;
-#endif
 	}
 
 	/*
@@ -2111,9 +2114,14 @@ out:
 	 * The spec. describes waiting for a break here,
 	 * but we let the caller do that (when needed) if
 	 * status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS
+	 *
+	 * After some research, smb_oplock_ack_break()
+	 * never returns that status.  Paranoid check.
 	 */
-	mutex_exit(&node->n_oplock.ol_mutex);
-	smb_llist_exit(&node->n_ofile_list);
+	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+		ASSERT(!"Unexpected OPLOCK_BREAK_IN_PROGRESS");
+		status = NT_STATUS_SUCCESS;
+	}
 
 	return (status);
 }
@@ -2751,6 +2759,8 @@ smb_oplock_break_cmn(smb_node_t *node,
 					 * completes some earlier call to
 					 * 2.1.5.17.1.)
 					 */
+					o = nol->excl_open;
+					ASSERT(o != NULL);
 					smb_oplock_ind_break(o,
 					    LEVEL_TWO, B_TRUE,
 					    NT_STATUS_SUCCESS);
@@ -2829,6 +2839,8 @@ smb_oplock_break_cmn(smb_node_t *node,
 					 * completes some earlier call to
 					 * 2.1.5.17.1.)
 					 */
+					o = nol->excl_open;
+					ASSERT(o != NULL);
 					smb_oplock_ind_break(o,
 					    LEVEL_NONE, B_TRUE,
 					    NT_STATUS_SUCCESS);
@@ -2904,7 +2916,7 @@ smb_oplock_break_cmn(smb_node_t *node,
 				 *  equals Open.TargetOplockKey,
 				 *	 go to the LeaveBreakToNone label.
 				 */
-				if (o != NULL &&
+				if ((o = nol->excl_open) != NULL &&
 				    CompareOplockKeys(ofile, o, CmpFlags))
 					goto LeaveBreakToNone;
 

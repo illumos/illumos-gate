@@ -601,6 +601,7 @@ typedef struct smb_oplock_grant {
 	uint32_t		og_state;	/* latest sent to client */
 	uint32_t		og_breaking;	/* BREAK_TO... flags */
 	uint16_t		og_dialect;	/* how to send breaks */
+	kcondvar_t		og_ack_cv;	/* Wait for ACK */
 	/* File-system level state */
 	uint8_t			onlist_II;
 	uint8_t			onlist_R;
@@ -626,6 +627,7 @@ typedef struct smb_lease {
 	uint32_t		ls_breaking;	/* BREAK_TO... flags */
 	uint16_t		ls_epoch;
 	uint16_t		ls_version;
+	kcondvar_t		ls_ack_cv;	/* Wait for ACK */
 	uint8_t			ls_key[SMB_LEASE_KEY_SZ];
 	uint8_t			ls_clnt[SMB_LEASE_KEY_SZ];
 } smb_lease_t;
@@ -1657,7 +1659,9 @@ typedef struct smb_arg_lock {
 
 typedef struct smb_arg_olbrk {
 	uint32_t	NewLevel;
+	uint32_t	OldLevel;
 	boolean_t	AckRequired;
+	uint8_t		LeaseKey[SMB_LEASE_KEY_SZ];
 } smb_arg_olbrk_t;
 
 /*
