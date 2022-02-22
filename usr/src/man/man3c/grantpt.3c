@@ -43,88 +43,76 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1994, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2022 Oxide Computer Company
 .\"
-.TH GRANTPT 3C "Aug 14, 2006"
-.SH NAME
-grantpt \- grant access to the slave pseudo-terminal device
-.SH SYNOPSIS
-.LP
-.nf
-#include <stdlib.h>
-
-\fBint\fR \fBgrantpt\fR(\fBint\fR \fIfildes\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBgrantpt()\fR function changes the mode and ownership of the slave
-pseudo-terminal device associated with its master  pseudo-terminal counterpart.
-\fIfildes\fR is the file descriptor returned from a successful open of the
-master pseudo-terminal device. The user ID of the slave is set to the real UID
-of the calling process and the group ID is set to a reserved group. The
-permission mode of the slave pseudo-terminal is set to readable and writable by
-the owner and writable by the group.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBgrantpt()\fR returns \fB0\fR. Otherwise, it
-returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
-.SH ERRORS
-.sp
-.LP
-The \fBgrantpt()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEBADF\fR\fR
-.ad
-.RS 10n
-The \fIfildes\fR argument is not a valid open file descriptor.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The \fIfildes\fR argument is not associated with a master pseudo-terminal
+.Dd February 5, 2022
+.Dt GRANTPT 3C
+.Os
+.Sh NAME
+.Nm grantpt
+.Nd grant access to the subsidiary device of a pseudo-terminal
+.Sh SYNOPSIS
+.In stdlib.h
+.Ft int
+.Fo grantpt
+.Fa "int fildes"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn grantpt
+function changes the mode and ownership of the pseudo-terminal subsidiary
+device associated with its pseudo-terminal manager counterpart.
+.Pp
+The
+.Fa fildes
+argument is the file descriptor returned from a successful
+.Xr open 2
+of the pseudo-terminal manager device; e.g., by calling
+.Xr posix_openpt 3C
+or by performing an
+.Xr open 2
+of the
+.Xr ptm 7D
 device.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEACCES\fR\fR
-.ad
-.RS 10n
-The corresponding slave pseudo-terminal device could not be accessed.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBopen\fR(2), \fBptsname\fR(3C), \fBunlockpt\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
+.Pp
+The user ID owner of the subsidiary device is set to the real user ID of the
+calling process.
+The group ID owner is set to a reserved group.
+.Pp
+The permission mode of the subsidiary device is set to be readable and writable
+by the owner, and writable by the group.
+.Sh RETURN VALUES
+.Rv -std grantpt
+.Sh EXAMPLES
+See
+.Xr posix_openpt 3C
+for an example that includes a call to
+.Fn grantpt .
+.Sh ERRORS
+The
+.Fn grantpt
+function may fail if:
+.Bl -tag -width Er
+.It Er EBADF
+The
+.Fa fildes
+argument is not a valid open file descriptor.
+.It Er EINVAL
+The
+.Fa fildes
+argument is not associated with a pseudo-terminal manager device.
+.It Er EACCES
+The corresponding pseudo-terminal subsidiary device could not be accessed.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT LEVEL
+.Sy Safe
+.Sh SEE ALSO
+.Xr open 2 ,
+.Xr posix_openpt 3C ,
+.Xr ptsname 3C ,
+.Xr unlockpt 3C ,
+.Xr attributes 5 ,
+.Xr standards 5 ,
+.Xr ptm 7D

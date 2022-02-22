@@ -1502,8 +1502,8 @@ const struct ioc {
 	{ (uint_t)IPTUN_GET_6TO4RELAY, "IPTUN_GET_6TO4RELAY",	NULL},
 
 	/* zcons ioctls */
-	{ (uint_t)ZC_HOLDSLAVE,		"ZC_HOLDSLAVE",		NULL },
-	{ (uint_t)ZC_RELEASESLAVE,	"ZC_RELEASESLAVE",	NULL },
+	{ (uint_t)ZC_HOLDSUBSID,	"ZC_HOLDSUBSID",	NULL },
+	{ (uint_t)ZC_RELEASESUBSID,	"ZC_RELEASESUBSID",	NULL },
 
 	/* hid ioctls - ('h' << 8) - hid.h */
 	{ (uint_t)HIDIOCKMGDIRECT,	"HIDIOCKMGDIRECT",	NULL },

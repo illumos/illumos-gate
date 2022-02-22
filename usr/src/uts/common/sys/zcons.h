@@ -33,19 +33,19 @@ extern "C" {
 #endif
 
 /*
- * Minor node name of the global zone side (often called the "master" side)
+ * Minor node name of the global zone side (often called the "manager" side)
  * of the zcons driver.
  */
-#define	ZCONS_MASTER_NAME	"masterconsole"
+#define	ZCONS_MANAGER_NAME	"globalconsole"
 
 /*
- * Minor node name of the non-global zone side (often called the "slave"
- * side) of the zcons driver.  We name it "zoneconsole" since that nameo
+ * Minor node name of the non-global zone side (often called the "subsidiary"
+ * side) of the zcons driver.  We name it "zoneconsole" since that name
  * will show up in 'ps' output, and will make some sense to the global zone
  * user.  Inside the zone, it will simply show up as "console" due to the
  * links we create.
  */
-#define	ZCONS_SLAVE_NAME	"zoneconsole"
+#define	ZCONS_SUBSIDIARY_NAME	"zoneconsole"
 
 /*
  * ZC_IOC forms the base for all zcons ioctls.
@@ -53,18 +53,18 @@ extern "C" {
 #define	ZC_IOC		(('Z' << 24) | ('o' << 16) | ('n' << 8))
 
 /*
- * These ioctls instruct the master side of the console to hold or release
- * a reference to the slave side's vnode.  They are meant to be issued by
+ * These ioctls instruct the manager side of the console to hold or release
+ * a reference to the subsidiary side's vnode.  They are meant to be issued by
  * zoneadmd after the console device node is created and before it is destroyed
- * so that the slave's STREAMS anchor, ptem, is preserved when ttymon starts
- * popping STREAMS modules from within the associated zone.  This guarantees
- * that the zone slave console will always have terminal semantics while the
- * zone is running.
+ * so that the subsidiary's STREAMS anchor, ptem, is preserved when ttymon
+ * starts popping STREAMS modules from within the associated zone.  This
+ * guarantees that the zone subsidiary console will always have terminal
+ * semantics while the zone is running.
  *
  * A more detailed description can be found in uts/common/io/zcons.c.
  */
-#define	ZC_HOLDSLAVE	(ZC_IOC | 0)	/* get and save slave side reference */
-#define	ZC_RELEASESLAVE	(ZC_IOC | 1)	/* release slave side reference */
+#define	ZC_HOLDSUBSID		(ZC_IOC | 0)
+#define	ZC_RELEASESUBSID	(ZC_IOC | 1)
 
 #ifdef	__cplusplus
 }

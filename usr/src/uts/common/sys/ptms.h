@@ -35,18 +35,17 @@ extern "C" {
 #ifdef _KERNEL
 
 /*
- * Structures and definitions supporting the pseudo terminal
- * drivers. This structure is private and should not be used by any
- * applications.
+ * Structures and definitions supporting the pseudo-terminal drivers. This
+ * structure is private and should not be used by any applications.
  */
 struct pt_ttys {
-	queue_t *ptm_rdq; 	/* master's read queue pointer */
-	queue_t *pts_rdq; 	/* slave's read queue pointer */
+	queue_t *ptm_rdq;	/* manager's read queue pointer */
+	queue_t *pts_rdq;	/* subsidiary's read queue pointer */
 	mblk_t	*pt_nullmsg;	/* 0-bytes message block for pts close */
 	pid_t	 pt_pid;	/* process id (for debugging) */
 	minor_t	 pt_minor;	/* Minor number of this pty */
 	int	 pt_refcnt;	/* reference count for ptm_rdq/pts_rdq uses */
-	ushort_t pt_state;	/* state of master/slave pair */
+	ushort_t pt_state;	/* state of manager/subsidiary pair */
 	kcondvar_t pt_cv;	/* condition variable for exclusive access */
 	kmutex_t pt_lock;	/* Per-element lock */
 	zoneid_t pt_zoneid;	/* Zone membership for this pty */
@@ -57,10 +56,10 @@ struct pt_ttys {
 /*
  * pt_state values
  */
-#define	PTLOCK		0x01	/* master/slave pair is locked */
-#define	PTMOPEN 	0x02  	/* master side is open */
-#define	PTSOPEN 	0x04	/* slave side is open */
-#define	PTSTTY		0x08	/* slave side is tty */
+#define	PTLOCK		0x01	/* manager/subsidiary pair is locked */
+#define	PTMOPEN		0x02	/* manager side is open */
+#define	PTSOPEN		0x04	/* subsidiary side is open */
+#define	PTSTTY		0x08	/* subsidiary side is tty */
 
 /*
  * Multi-threading primitives.
@@ -104,17 +103,17 @@ struct pt_ttys {
  * ptms_lock and pt_cnt are defined in ptms_conf.c
  */
 extern kmutex_t		ptms_lock;
-extern dev_info_t 	*pts_dip;	/* private copy of devinfo ptr */
+extern dev_info_t	*pts_dip;	/* private copy of devinfo ptr */
 
 extern void ptms_init(void);
 extern struct pt_ttys *pt_ttys_alloc(void);
 extern void ptms_close(struct pt_ttys *, uint_t);
 extern struct pt_ttys *ptms_minor2ptty(minor_t);
-extern int ptms_attach_slave(void);
+extern int ptms_attach_subsidiary(void);
 extern int ptms_minor_valid(minor_t ptmin, uid_t *uid, gid_t *gid);
 extern int ptms_minor_exists(minor_t ptmin);
 extern void ptms_set_owner(minor_t ptmin, uid_t uid, gid_t gid);
-extern major_t ptms_slave_attached(void);
+extern major_t ptms_subsidiary_attached(void);
 
 #ifdef DEBUG
 extern void ptms_log(char *, uint_t);
@@ -134,28 +133,32 @@ typedef struct pt_own {
 } pt_own_t;
 
 /*
- * ioctl commands
+ * IOCTL COMMANDS
  *
- *  ISPTM: Determines whether the file descriptor is that of an open master
- *	   device. Return code of zero indicates that the file descriptor
- *	   represents master device.
+ *	ISPTM
+ *		Determines whether the file descriptor is that of an open
+ *		manager device.  Return code of zero indicates that the file
+ *		descriptor represents a manager device.
  *
- * UNLKPT: Unlocks the master and slave devices.  It returns 0 on success. On
- *	   failure, the errno is set to EINVAL indicating that the master
- *	   device is not open.
+ *	UNLKPT
+ *		Unlocks the manager and subsidiary devices.  It returns 0 on
+ *		success.  On failure, the errno is set to EINVAL indicating
+ *		that the manager device is not open.
  *
- *  ZONEPT: Sets the zoneid of the pair of master and slave devices.  It
- *	    returns 0 upon success.  Used to force a pty 'into' a zone upon
- *	    zone entry.
+ *	ZONEPT
+ *		Sets the zoneid of the pair of manager and subsidiary devices.
+ *		It returns 0 upon success.  Used to force a pty 'into' a zone
+ *		upon zone entry.
  *
- * PT_OWNER: Sets uid and gid for slave device.  It returns 0 on success.
- *
+ *	PT_OWNER
+ *		Sets uid and gid for subsidiary device.  It returns 0 on
+ *		success.
  */
-#define	ISPTM		(('P'<<8)|1)	/* query for master */
-#define	UNLKPT		(('P'<<8)|2)	/* unlock master/slave pair */
-#define	PTSSTTY		(('P'<<8)|3)	/* set tty flag */
-#define	ZONEPT		(('P'<<8)|4)	/* set zone of master/slave pair */
-#define	OWNERPT		(('P'<<8)|5)	/* set owner/group for slave device */
+#define	ISPTM		(('P'<<8)|1)  /* query for manager */
+#define	UNLKPT		(('P'<<8)|2)  /* unlock manager/subsidiary pair */
+#define	PTSSTTY		(('P'<<8)|3)  /* set tty flag */
+#define	ZONEPT		(('P'<<8)|4)  /* set zone of manager/subsidiary pair */
+#define	OWNERPT		(('P'<<8)|5)  /* set owner/group for subsidiary */
 
 #ifdef	__cplusplus
 }

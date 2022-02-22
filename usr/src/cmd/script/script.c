@@ -3,8 +3,8 @@
  * Use is subject to license terms.
  */
 
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
+/*	  All Rights Reserved */
 
 
 /*
@@ -33,8 +33,8 @@
 #include <sys/file.h>
 #include <errno.h>
 
-int 	grantpt();
-int 	unlockpt();
+int	grantpt();
+int	unlockpt();
 char	*ptsname();
 void	doinput() __NORETURN;
 void	dooutput();
@@ -42,13 +42,13 @@ void	doshell();
 void	fixtty();
 void	fail();
 void	done() __NORETURN;
-void	getmaster();
-void	getslave();
+void	getmanager();
+void	getsubsid();
 
 char	*shell;
 FILE	*fscript;
-int	master;			/* file descriptor for master pseudo-tty */
-int	slave;			/* file descriptor for slave pseudo-tty */
+int	manager;	/* file descriptor for manager pseudo-tty */
+int	subsid;		/* file descriptor for subsidiary pseudo-tty */
 int	child;
 int	subchild;
 char	*fname = "typescript";
@@ -59,7 +59,7 @@ struct	termios b;
 struct	winsize size;
 int	lb;
 int	l;
-char	*mptname = "/dev/ptmx";	/* master pseudo-tty device */
+char	*mptname = "/dev/ptmx";	/* manager pseudo-tty device */
 
 int	aflg;
 
@@ -103,7 +103,7 @@ main(int argc, char *argv[])
 	}
 	setbuf(fscript, NULL);
 	chown(fname, ruidt, gidt);
-	getmaster();
+	getmanager();
 	printf(gettext("Script started, file is %s\n"), fname);
 	fixtty();
 
@@ -146,7 +146,7 @@ doinput()
 				break;
 			}
 		}
-		(void) write(master, ibuf, cc);
+		(void) write(manager, ibuf, cc);
 	}
 	done();
 }
@@ -157,7 +157,7 @@ sigwinch()
 	struct winsize ws;
 
 	if (ioctl(0, TIOCGWINSZ, &ws) == 0)
-		(void) ioctl(master, TIOCSWINSZ, &ws);
+		(void) ioctl(manager, TIOCSWINSZ, &ws);
 }
 
 #include <sys/wait.h>
@@ -190,7 +190,7 @@ dooutput()
 	strftime(tbuf, BUFSIZ, "%c", localtime(&tvec));
 	fprintf(fscript, gettext("Script started on %s\n"), tbuf);
 	for (;;) {
-		cc = read(master, obuf, sizeof (obuf));
+		cc = read(manager, obuf, sizeof (obuf));
 		if (cc <= 0)
 			break;
 		(void) write(1, obuf, cc);
@@ -204,13 +204,13 @@ doshell()
 {
 
 	setpgrp();	/* relinquish control terminal */
-	getslave();
-	(void) close(master);
+	getsubsid();
+	(void) close(manager);
 	(void) fclose(fscript);
-	(void) dup2(slave, 0);
-	(void) dup2(slave, 1);
-	(void) dup2(slave, 2);
-	(void) close(slave);
+	(void) dup2(subsid, 0);
+	(void) dup2(subsid, 1);
+	(void) dup2(subsid, 2);
+	(void) close(subsid);
 	execl(shell, shell, "-i", (char *)0);
 	perror(shell);
 	fail();
@@ -249,7 +249,7 @@ done()
 		strftime(tbuf, BUFSIZ, "%c", localtime(&tvec));
 		fprintf(fscript, gettext("\nscript done on %s\n"), tbuf);
 		(void) fclose(fscript);
-		(void) close(master);
+		(void) close(manager);
 	} else {
 		(void) ioctl(0, TCSETSW, (char *)&b);
 		printf(gettext("Script done, file is %s\n"), fname);
@@ -258,11 +258,11 @@ done()
 }
 
 void
-getmaster()
+getmanager()
 {
 	struct stat stb;
 
-	if ((master = open(mptname, O_RDWR)) >= 0) { /* a pseudo-tty is free */
+	if ((manager = open(mptname, O_RDWR)) >= 0) { /* a pseudo-tty is free */
 		(void) ioctl(0, TCGETS, (char *)&b);
 		(void) ioctl(0, TIOCGWINSZ, (char *)&size);
 		return;
@@ -274,21 +274,21 @@ getmaster()
 }
 
 void
-getslave()
+getsubsid()
 {
-	char *slavename;	/* name of slave pseudo-tty */
+	char *subsidname;	/* name of subsidiary pseudo-tty */
 
-	grantpt(master);		/* change permissions of slave */
-	unlockpt(master);			/* unlock slave */
-	slavename = ptsname(master);		/* get name of slave */
-	slave = open(slavename, O_RDWR);	/* open slave */
-	if (slave < 0) {			/* error on opening slave */
-		perror(slavename);
+	grantpt(manager);		/* change permissions of subsidiary */
+	unlockpt(manager);			/* unlock subsidiary */
+	subsidname = ptsname(manager);		/* get name of subsidiary */
+	subsid = open(subsidname, O_RDWR);	/* open subsidiary */
+	if (subsid < 0) {			/* error opening subsidiary */
+		perror(subsidname);
 		fail();
 	}
-	ioctl(slave, I_PUSH, "ptem");	/* push pt hw emulation module */
-	ioctl(slave, I_PUSH, "ldterm");		/* push line discipline */
+	ioctl(subsid, I_PUSH, "ptem");	/* push pt hw emulation module */
+	ioctl(subsid, I_PUSH, "ldterm");	/* push line discipline */
 
-	(void) ioctl(slave, TCSETSF, (char *)&b);
-	(void) ioctl(slave, TIOCSWINSZ, (char *)&size);
+	(void) ioctl(subsid, TCSETSF, (char *)&b);
+	(void) ioctl(subsid, TIOCSWINSZ, (char *)&size);
 }

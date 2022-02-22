@@ -43,59 +43,72 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2022 Oxide Computer Company
 .\"
-.TH PTSNAME 3C "Aug 14, 2002"
-.SH NAME
-ptsname \- get name of the slave pseudo-terminal device
-.SH SYNOPSIS
-.LP
-.nf
-#include <stdlib.h>
-
-\fBchar *\fR\fBptsname\fR(\fBint\fR \fIfildes\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBptsname()\fR function returns the name of the slave pseudo-terminal
-device associated with a master pseudo-terminal device. \fIfildes\fR is a file
-descriptor returned from a successful open of the master device.
-\fBptsname()\fR returns a pointer to a string containing the null-terminated
-path name of the slave device of the form \fB/dev/pts/N\fR, where \fBN\fR is a
-non-negative integer.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, the function \fBptsname()\fR returns a pointer to a
-string which is the name of the pseudo-terminal slave device. This value points
-to a static data area that is overwritten by each call to \fBptsname()\fR. Upon
-failure, \fBptsname()\fR returns \fINULL\fR. This could occur if \fIfildes\fR
-is an invalid file descriptor or if  the slave device name does not exist in
-the file system.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBopen\fR(2), \fBgrantpt\fR(3C), \fBttyname\fR(3C), \fBunlockpt\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
+.Dd February 5, 2022
+.Dt PTSNAME 3C
+.Os
+.Sh NAME
+.Nm ptsname
+.Nd get the name of the subsidiary device of a pseudo-terminal
+.Sh SYNOPSIS
+.In stdlib.h
+.Ft char *
+.Fo ptsname
+.Fa "int fildes"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn ptsname
+function returns the name of the pseudo-terminal subsidiary device associated
+with a pseudo-terminal manager device.
+The
+.Fa fildes
+argument is a file descriptor returned from a successful open of the
+pseudo-terminal manager device; e.g., by calling
+.Xr posix_openpt 3C
+or by performing an
+.Xr open 2
+of the
+.Xr ptm 7D
+device.
+.Pp
+The
+.Fn ptsname
+function returns a pointer to a string containing the null-terminated
+path name of the subsidiary device.
+This string is of the form
+.Pa /dev/pts/N ,
+where
+.Sy N
+is a non-negative integer.
+.Sh RETURN VALUES
+If successful, the
+.Fn ptsname
+function returns a pointer to a string which is the name of the pseudo-terminal
+subsidiary device.
+This value points to a static data area that is overwritten by each call to
+.Fn ptsname .
+.Pp
+Upon failure,
+.Fn ptsname
+returns
+.Dv NULL .
+This could occur if
+.Fa fildes
+is an invalid file descriptor or if the subsidiary device name does not exist
+in the file system.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT LEVEL
+.Sy Safe
+.Sh SEE ALSO
+.Xr open 2 ,
+.Xr grantpt 3C ,
+.Xr posix_openpt 3C ,
+.Xr ttyname 3C ,
+.Xr unlockpt 3C ,
+.Xr attributes 5 ,
+.Xr standards 5 ,
+.Xr ptm 7D ,
+.Xr pts 7D

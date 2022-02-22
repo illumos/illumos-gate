@@ -11,8 +11,8 @@
  */
 
 /*
- * PTY - Stream "pseudo-tty" device.  For each "controller" side
- * it connects to a "slave" side.
+ * PTY - Stream "pseudo-terminal" device.  For each "manager" side it connects
+ * to a "subsidiary" side.
  */
 
 
@@ -29,7 +29,7 @@
 #include <sys/user.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#include <sys/vnode.h>	/* 1/0 on the vomit meter */
+#include <sys/vnode.h>
 #include <sys/proc.h>
 #include <sys/uio.h>
 #include <sys/errno.h>
@@ -116,9 +116,9 @@ extern struct dev_ops ptc_ops;
  */
 
 static struct modldrv modldrv = {
-	&mod_driverops, /* Type of module.  This one is a pseudo driver */
+	&mod_driverops,
 	"tty pseudo driver control 'ptc'",
-	&ptc_ops,	/* driver ops */
+	&ptc_ops,
 };
 
 static struct modlinkage modlinkage = {
@@ -236,12 +236,11 @@ ptc_uninit(void)
 }
 
 /*
- * Controller side.  This is not, alas, a streams device; there are too
+ * Manager side.  This is not, alas, a streams device; there are too
  * many old features that we must support and that don't work well
  * with streams.
  */
 
-/*ARGSUSED*/
 int
 ptcopen(dev_t *devp, int flag, int otyp, struct cred *cred)
 {
@@ -256,7 +255,7 @@ ptcopen(dev_t *devp, int flag, int otyp, struct cred *cred)
 	mutex_enter(&pty->ptc_lock);
 	if (pty->pt_flags & PF_CARR_ON) {
 		mutex_exit(&pty->ptc_lock);
-		return (EIO);	/* controller is exclusive use */
+		return (EIO);	/* manager is exclusive use */
 				/* XXX - should be EBUSY! */
 	}
 	if (pty->pt_flags & PF_WOPEN) {
@@ -266,7 +265,7 @@ ptcopen(dev_t *devp, int flag, int otyp, struct cred *cred)
 
 	if ((q = pty->pt_ttycommon.t_readq) != NULL) {
 		/*
-		 * Send an un-hangup to the slave, since "carrier" is
+		 * Send an un-hangup to the subsidiary, since "carrier" is
 		 * coming back up.  Make sure we're doing canonicalization.
 		 */
 		(void) putctl(q, M_UNHANGUP);
@@ -280,7 +279,6 @@ ptcopen(dev_t *devp, int flag, int otyp, struct cred *cred)
 	return (0);
 }
 
-/*ARGSUSED1*/
 int
 ptcclose(dev_t dev, int flag, int otyp, struct cred *cred)
 {
@@ -293,15 +291,15 @@ ptcclose(dev_t dev, int flag, int otyp, struct cred *cred)
 	mutex_enter(&pty->ptc_lock);
 	if ((q = pty->pt_ttycommon.t_readq) != NULL) {
 		/*
-		 * Send a hangup to the slave, since "carrier" is dropping.
+		 * Send a hangup to the subsidiary, since "carrier" is dropping.
 		 */
 		(void) putctl(q, M_HANGUP);
 	}
 
 	/*
-	 * Clear out all the controller-side state.  This also
+	 * Clear out all the manager-side state.  This also
 	 * clears PF_CARR_ON, which is correct because the
-	 * "carrier" is dropping since the controller process
+	 * "carrier" is dropping since the manager process
 	 * is going away.
 	 */
 	pty->pt_flags &= (PF_WOPEN|PF_STOPPED|PF_NOSTOP);
@@ -328,10 +326,6 @@ ptcread(dev_t dev, struct uio *uio, struct cred *cred)
 	ssize_t cc;
 	int error;
 	off_t off;
-
-#ifdef lint
-	cred = cred;
-#endif
 
 	off = uio->uio_offset;
 
@@ -475,14 +469,14 @@ ptcread(dev_t dev, struct uio *uio, struct cred *cred)
 
 		/*
 		 * There's no data available.
-		 * We want to block until the slave is open, and there's
-		 * something to read; but if we lost the slave or we're NBIO,
-		 * then return the appropriate error instead.  POSIX-style
-		 * non-block has top billing and gives -1 with errno = EAGAIN,
-		 * BSD-style comes next and gives -1 with errno = EWOULDBLOCK,
-		 * SVID-style comes last and gives 0.
+		 * We want to block until the subsidiary is open, and there's
+		 * something to read; but if we lost the subsidiary or we're
+		 * NBIO, then return the appropriate error instead.
+		 * POSIX-style non-block has top billing and gives -1 with
+		 * errno = EAGAIN, BSD-style comes next and gives -1 with
+		 * errno = EWOULDBLOCK, SVID-style comes last and gives 0.
 		 */
-		if (pty->pt_flags & PF_SLAVEGONE) {
+		if (pty->pt_flags & PF_SUBSIDGONE) {
 			error = EIO;
 			goto out;
 		}
@@ -532,11 +526,6 @@ ptcwrite(dev_t dev, struct uio *uio, struct cred *cred)
 	off_t off;
 	off = uio->uio_offset;
 
-#ifdef lint
-	cred = cred;
-#endif
-
-
 	mutex_enter(&pty->ptc_lock);
 
 again:
@@ -550,9 +539,9 @@ again:
 	if ((q = pty->pt_ttycommon.t_readq) == NULL) {
 
 		/*
-		 * Wait for slave to open.
+		 * Wait for subsidiary to open.
 		 */
-		if (pty->pt_flags & PF_SLAVEGONE) {
+		if (pty->pt_flags & PF_SUBSIDGONE) {
 			error = EIO;
 			goto out;
 		}
@@ -588,9 +577,9 @@ again:
 		do {
 			while (!canput(q)) {
 				/*
-				 * Wait for slave's read queue to unclog.
+				 * Wait for subsidiary's read queue to unclog.
 				 */
-				if (pty->pt_flags & PF_SLAVEGONE) {
+				if (pty->pt_flags & PF_SUBSIDGONE) {
 					error = EIO;
 					goto out;
 				}
@@ -763,7 +752,7 @@ ptcioctl(dev_t dev, int cmd, intptr_t data, int flag, struct cred *cred,
 
 	case TIOCSIGNAL:
 		/*
-		 * Blast a M_PCSIG message up the slave stream; the
+		 * Blast a M_PCSIG message up the subsidiary stream; the
 		 * signal number is the argument to the "ioctl".
 		 */
 		copy_in(data, d_arg);
@@ -794,7 +783,7 @@ ptcioctl(dev_t dev, int cmd, intptr_t data, int flag, struct cred *cred,
 		break;
 
 	/*
-	 * These, at least, can work on the controller-side process
+	 * These, at least, can work on the manager-side process
 	 * group.
 	 */
 	case FIOGETOWN:
@@ -813,9 +802,9 @@ ptcioctl(dev_t dev, int cmd, intptr_t data, int flag, struct cred *cred,
 
 	case FIONREAD: {
 		/*
-		 * Return the total number of bytes of data in all messages
-		 * in slave write queue, which is master read queue, unless a
-		 * special message would be read.
+		 * Return the total number of bytes of data in all messages in
+		 * subsidiary write queue, which is manager read queue, unless
+		 * a special message would be read.
 		 */
 		mblk_t *mp;
 		size_t count = 0;
@@ -916,13 +905,13 @@ ptcioctl(dev_t dev, int cmd, intptr_t data, int flag, struct cred *cred,
 
 	/*
 	 * XXX These should not be here.  The only reason why an
-	 * "ioctl" on the controller side should get the
-	 * slave side's process group is so that the process on
-	 * the controller side can send a signal to the slave
+	 * "ioctl" on the manager side should get the
+	 * subsidiary side's process group is so that the process on
+	 * the manager side can send a signal to the subsidiary
 	 * side's process group; however, this is better done
 	 * with TIOCSIGNAL, both because it doesn't require us
-	 * to know about the slave side's process group and because
-	 * the controller side process may not have permission to
+	 * to know about the subsidiary side's process group and because
+	 * the manager side process may not have permission to
 	 * send that signal to the entire process group.
 	 *
 	 * However, since vanilla 4BSD doesn't provide TIOCSIGNAL,
@@ -933,9 +922,9 @@ ptcioctl(dev_t dev, int cmd, intptr_t data, int flag, struct cred *cred,
 	/*
 	 * This is amazingly disgusting, but the stupid semantics of
 	 * 4BSD pseudo-ttys makes us do it.  If we do one of these guys
-	 * on the controller side, it really applies to the slave-side
+	 * on the manager side, it really applies to the subsidiary-side
 	 * stream.  It should NEVER have been possible to do ANY sort
-	 * of tty operations on the controller side, but it's too late
+	 * of tty operations on the manager side, but it's too late
 	 * to fix that now.  However, we won't waste our time implementing
 	 * anything that the original pseudo-tty driver didn't handle.
 	 */
@@ -983,9 +972,6 @@ ptcpoll(dev_t dev, short events, int anyyet, short *reventsp,
 	queue_t *q;
 	int pos = 0;
 
-#ifdef lint
-	anyyet = anyyet;
-#endif
 	if (polllock(php, &pty->ptc_lock) != 0) {
 		*reventsp = POLLNVAL;
 		return (0);
@@ -994,7 +980,7 @@ ptcpoll(dev_t dev, short events, int anyyet, short *reventsp,
 	ASSERT(MUTEX_HELD(&pty->ptc_lock));
 
 	*reventsp = 0;
-	if (pty->pt_flags & PF_SLAVEGONE) {
+	if (pty->pt_flags & PF_SUBSIDGONE) {
 		if (events & (POLLIN|POLLRDNORM))
 			*reventsp |= (events & (POLLIN|POLLRDNORM));
 		if (events & (POLLOUT|POLLWRNORM))

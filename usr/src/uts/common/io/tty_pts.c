@@ -12,7 +12,7 @@
 
 /*
  * PTY - Stream "pseudo-tty" device.
- * This is the "slave" side.
+ * This is the "subsidiary" side.
  */
 
 
@@ -30,7 +30,7 @@
 #include <sys/user.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#include <sys/vnode.h>	/* 1/0 on the vomit meter */
+#include <sys/vnode.h>
 #include <sys/proc.h>
 #include <sys/uio.h>
 #include <sys/errno.h>
@@ -65,7 +65,7 @@ extern struct pollhead	ptcph;	/* poll head for ptcpoll() use */
  */
 
 /*
- * Slave side.  This is a streams device.
+ * Subsidiary side.  This is a streams device.
  */
 static int ptslopen(queue_t *, dev_t *, int flag, int, cred_t *);
 static int ptslclose(queue_t *, int, cred_t *);
@@ -141,7 +141,7 @@ DDI_DEFINE_STREAM_OPS(ptsl_ops, nulldev, nulldev,
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"tty pseudo driver slave 'ptsl'",
+	"tty pseudo driver subsidiary 'ptsl'",
 	&ptsl_ops,	/* driver ops */
 };
 
@@ -226,7 +226,7 @@ ptsl_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 
 
 /*
- * Open the slave side of a pty.
+ * Open the subsidiary side of a pty.
  */
 /*ARGSUSED*/
 static int
@@ -277,13 +277,13 @@ again:
 
 	pty->pt_sdev = dev;
 	q->q_ptr = WR(q)->q_ptr = pty;
-	pty->pt_flags &= ~PF_SLAVEGONE;
+	pty->pt_flags &= ~PF_SUBSIDGONE;
 	pty->pt_ttycommon.t_readq = pty->pt_ttycommon.t_writeq = NULL;
 
 	/*
-	 * Slave is ready to accept messages but master still can't send
-	 * messages to the slave queue since it is not plumbed
-	 * yet. So do qprocson() and finish slave initialization.
+	 * Subsidiary is ready to accept messages but manager still can't send
+	 * messages to the subsidiary queue since it is not plumbed
+	 * yet. So do qprocson() and finish subsidiary initialization.
 	 */
 
 	mutex_exit(&pty->ptc_lock);
@@ -291,8 +291,8 @@ again:
 	qprocson(q);
 
 	/*
-	 * Now it is safe to send messages to q, so wakeup master possibly
-	 * waiting for slave queue to finish open.
+	 * Now it is safe to send messages to q, so wakeup manager possibly
+	 * waiting for subsidiary queue to finish open.
 	 */
 	mutex_enter(&pty->ptc_lock);
 	/*
@@ -303,7 +303,7 @@ again:
 	VN_RELE(pty->pt_vnode);
 	pty->pt_ttycommon.t_readq = q;
 	pty->pt_ttycommon.t_writeq = WR(q);
-	/* tell master device that slave is ready for writing */
+	/* tell manager device that subsidiary is ready for writing */
 	if (pty->pt_flags & PF_CARR_ON)
 		cv_broadcast(&pty->pt_cv_readq);
 	mutex_exit(&pty->ptc_lock);
@@ -326,10 +326,10 @@ ptslclose(queue_t *q, int flag, cred_t *cred)
 		return (ENODEV);	/* already been closed once */
 
 	/*
-	 * Prevent the queues from being uses by master device.
-	 * This should be done before qprocsoff or writer may attempt
-	 * to use the slave queue after qprocsoff removed it from the stream and
-	 * before entering mutex_enter().
+	 * Prevent the queues from being uses by manager device.  This should
+	 * be done before qprocsoff or writer may attempt to use the subsidiary
+	 * queue after qprocsoff removed it from the stream and before entering
+	 * mutex_enter().
 	 */
 	mutex_enter(&pty->ptc_lock);
 	pty->pt_ttycommon.t_readq = NULL;
@@ -359,11 +359,11 @@ ptslclose(queue_t *q, int flag, cred_t *cred)
 	}
 
 	/*
-	 * Clear out all the slave-side state.
+	 * Clear out all the subsidiary-side state.
 	 */
 	pty->pt_flags &= ~(PF_WOPEN|PF_STOPPED|PF_NOSTOP);
 	if (pty->pt_flags & PF_CARR_ON) {
-		pty->pt_flags |= PF_SLAVEGONE;	/* let the controller know */
+		pty->pt_flags |= PF_SUBSIDGONE;	/* let the controller know */
 		ptcpollwakeup(pty, 0);	/* wake up readers/selectors */
 		ptcpollwakeup(pty, FWRITE);	/* wake up writers/selectors */
 		cv_broadcast(&pty->pt_cv_flags);
@@ -942,10 +942,10 @@ pt_sendstop(struct pty *pty)
 	if ((pty->pt_ttycommon.t_cflag&CBAUD) == 0) {
 		if (pty->pt_flags & PF_CARR_ON) {
 			/*
-			 * Let the controller know, then wake up
+			 * Let the manager know, then wake up
 			 * readers/selectors and writers/selectors.
 			 */
-			pty->pt_flags |= PF_SLAVEGONE;
+			pty->pt_flags |= PF_SUBSIDGONE;
 			ptcpollwakeup(pty, 0);
 			ptcpollwakeup(pty, FWRITE);
 		}
@@ -977,7 +977,7 @@ pt_sendstop(struct pty *pty)
  * user control mode message has been queued up (this data is readable,
  * so we also treat it as a regular data event; should we send SIGIO,
  * though?), FREAD if regular data has been queued up, or FWRITE if
- * the slave's read queue has drained sufficiently to allow writing.
+ * the subsidiary's read queue has drained sufficiently to allow writing.
  */
 static void
 ptcpollwakeup(struct pty *pty, int flag)
@@ -997,7 +997,7 @@ ptcpollwakeup(struct pty *pty, int flag)
 	if (flag & FREAD) {
 		/*
 		 * Wake up the parent process as there is regular
-		 * data to read from slave's write queue
+		 * data to read from subsidiary's write queue
 		 */
 		pollwakeup(&ptcph, POLLIN | POLLRDNORM);
 		cv_broadcast(&pty->pt_cv_writeq);
@@ -1007,7 +1007,7 @@ ptcpollwakeup(struct pty *pty, int flag)
 	if (flag & FWRITE) {
 		/*
 		 * Wake up the parent process to write
-		 * data into slave's read queue as the
+		 * data into subsidiary's read queue as the
 		 * read queue has drained enough
 		 */
 		pollwakeup(&ptcph, POLLOUT | POLLWRNORM);

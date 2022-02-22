@@ -16,7 +16,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2020 Peter Tribble
-# Copyright 2021 Oxide Computer Company
+# Copyright 2022 Oxide Computer Company
 #
 
 include		$(SRC)/Makefile.master
@@ -105,7 +105,6 @@ _MANFILES=	aac.7d		\
 		poll.7d		\
 		profile.7d	\
 		ptm.7d		\
-		pts.7d		\
 		pty.7d		\
 		qlc.7d		\
 		ramdisk.7d	\
@@ -256,6 +255,7 @@ _MANLINKS=	1394.7d		\
 		firewire.7d	\
 		kmem.7d		\
 		lo0.7d		\
+		pts.7d		\
 		ticots.7d	\
 		ticotsord.7d	\
 		urandom.7d	\
@@ -278,6 +278,8 @@ fdc.7d		:= LINKSRC = fd.7d
 firewire.7d	:= LINKSRC = ieee1394.7d
 
 lo0.7d		:= LINKSRC = ipnet.7d
+
+pts.7d		:= LINKSRC = ptm.7d
 
 allkmem.7d	:= LINKSRC = mem.7d
 kmem.7d		:= LINKSRC = mem.7d

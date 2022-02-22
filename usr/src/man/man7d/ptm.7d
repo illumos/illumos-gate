@@ -4,89 +4,255 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PTM 7D "Feb 5, 1997"
-.SH NAME
-ptm \- STREAMS pseudo-tty master driver
-.SH DESCRIPTION
-.sp
-.LP
-The pseudo-tty subsystem simulates a terminal connection, where the master side
-represents the terminal and the slave represents the user process's special
-device end point. In order to use the pseudo-tty subsystem, a node for the
-master side driver \fB/dev/ptmx\fR and \fBN\fR number of nodes for the slave
-driver must be installed. See \fBpts\fR(7D). The master device is set up as a
-cloned device where its major device number is the major for the clone device
-and its minor device number is the major for the \fBptm\fR driver. There are no
-nodes in the file system for master devices. The master pseudo driver is opened
-using the \fBopen\fR(2) system call with \fB/dev/ptmx\fR as the device
-parameter. The clone open finds the next available minor device for the
-\fBptm\fR major device.
-.sp
-.LP
-A master device is available only if it and its corresponding slave device are
-not already open. When the master device is opened, the corresponding slave
-device is automatically locked out. Only one open is allowed on a master
-device.  Multiple opens are allowed on the slave device. After both the master
-and slave have been opened, the user has two file descriptors which are the end
-points of a full duplex connection composed of two streams which are
-automatically connected at the master and slave drivers. The user may then push
-modules onto either side of the stream pair.
-.sp
-.LP
-The master and slave drivers pass all messages to their adjacent queues. Only
-the \fBM_FLUSH\fR needs some processing. Because the read queue of one side is
-connected to the write queue of the other, the \fBFLUSHR\fR flag is changed to
-the \fBFLUSHW\fR flag and vice versa. When the master device is closed an
-\fBM_HANGUP\fR message is sent to the slave device which will render the device
-unusable. The process on the slave side gets the errno \fBEIO\fR when
-attempting to write on that stream but it will be able to read any data
-remaining on the stream head read queue. When all the data has been read,
-\fBread()\fR returns 0 indicating that the stream can no longer be used. On the
-last close of the slave device, a 0-length message is sent to the master
-device. When the application on the master side issues a \fBread()\fR or
-\fBgetmsg()\fR and 0 is returned, the user of the master device decides whether
-to issue a \fBclose()\fR that dismantles the pseudo-terminal subsystem. If the
-master device is not closed, the pseudo-tty subsystem will be available to
-another user to open the slave device.
-.sp
-.LP
-If \fBO_NONBLOCK\fR or \fBO_NDELAY\fR is set, read on the master side returns
-\(mi1 with errno set to \fBEAGAIN\fR if no data is available, and write returns
-\(mi1 with errno set to \fBEAGAIN\fR if there is internal flow control.
-.SH IOCTLS
-.sp
-.LP
-The master driver supports the \fBISPTM\fR and \fBUNLKPT\fR ioctls that are
-used by the functions \fBgrantpt\fR(3C), \fBunlockpt\fR(3C) and
-\fBptsname\fR(3C). The ioctl \fBISPTM\fR determines whether the file descriptor
-is that of an open master device. On success, it returns the 0. The ioctl
-\fBUNLKPT\fR unlocks the master and slave devices. It returns 0 on success. On
-failure, the errno is set to \fBEINVAL\fR indicating that the master device is
-not open.
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/ptmx\fR\fR
-.ad
-.RS 14n
-master clone device
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/dev/pts/M\fR\fR
-.ad
-.RS 14n
-slave devices (M = 0 -> N-1)
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBgrantpt\fR(3C), \fBptsname\fR(3C), \fBunlockpt\fR(3C), \fBpckt\fR(7M),
-\fBpts\fR(7D)
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
+.\" Copyright 2022 Oxide Computer Company
+.Dd February 5, 2022
+.Dt PTM 7D
+.Os
+.Sh NAME
+.Nm ptm ,
+.Nm pts
+.Nd STREAMS pseudo-terminal manager and subsidiary drivers
+.Sh SYNOPSIS
+.Pa /dev/ptmx
+.Pp
+.Pa /dev/pts/*
+.Sh DESCRIPTION
+The pseudo-terminal subsystem simulates a terminal connection, where the
+manager side represents the terminal and the subsidiary represents the user
+process's special device end point.
+The manager device is set up as a cloned device where its major device number
+is the major for the clone device and its minor device number is the major for
+the
+.Nm ptm
+driver; see
+.Dv CLONE_DEV
+in
+.Xr ddi_create_minor_node 9F .
+.Pp
+There are no nodes in the file system for manager devices.
+The manager pseudo driver is opened using the
+.Xr open 2
+system call with
+.Pa /dev/ptmx
+as the device parameter.
+The clone open finds the next available minor device for the
+.Nm ptm
+major device.
+.Pp
+A manager device is only available if it and its corresponding subsidiary
+device are not already open.
+Only one open is allowed on a manager device.
+Multiple opens are allowed on the subsidiary device.
+.Pp
+When the manager device is opened, the corresponding subsidiary device is
+automatically locked out.
+No user may open the subsidiary device until its permissions are adjusted and
+the device is unlocked by calling the functions
+.Xr grantpt 3C
+and
+.Xr unlockpt 3C .
+The user can then invoke the
+.Xr open 2
+system call with the device name returned by the
+.Xr ptsname 3C
+function.
+.Pp
+After both the manager and subsidiary have been opened, the user has two file
+descriptors which are the end points of a full duplex connection composed of
+two streams which are automatically connected at the manager and subsidiary
+drivers.
+The user may then push modules onto either side of the stream pair.
+Unless compiled in XPG4v2 mode
+.Po
+see
+.Sx "XPG4v2 MODE"
+.Pc ,
+the consumer needs to push the
+.Xr ptem 7M
+and
+.Xr ldterm 7M
+modules onto the subsidiary device to get terminal semantics.
+.Pp
+The manager and subsidiary drivers pass all messages to their adjacent queues.
+Only the
+.Dv M_FLUSH
+needs some processing.
+Because the read queue of one side is connected to the write queue of the
+other, the
+.Dv FLUSHR
+flag is changed to the
+.Dv FLUSHW
+flag and vice versa.
+.Pp
+When the manager device is closed, an
+.Dv M_HANGUP
+message is sent to the subsidiary device which will render the device unusable.
+The process on the subsidiary side gets an
+.Er EIO
+error when attempting to write on that stream, but it will be able to read
+any data remaining on the stream head read queue.
+When all the data has been read,
+.Xr read 2
+returns
+.Sy 0
+indicating that the stream can no longer be used.
+.Pp
+On the last close of the subsidiary device, a 0-length message is sent to the
+manager device.
+When the application on the manager side issues a
+.Xr read 2
+or
+.Xr getmsg 2
+and
+.Sy 0
+is returned, the user of the manager device decides whether to issue a
+.Xr close 2
+that dismantles the entire pseudo-terminal.
+If the manager device is not closed, the pseudo-terminal will be available to
+another user to open the subsidiary device.
+.Pp
+Since 0-length messages are used to indicate that the process on the
+subsidiary side has closed, and should be interpreted that way by the process
+on the manager side, applications on the subsidiary side should not write
+0-length messages.
+Unless the application is compiled in XPG4v2 mode
+.Po
+see
+.Sx "XPG4v2 MODE"
+.Pc ,
+then any 0-length messages written to the subsidiary device will be discarded
+by the
+.Xr ptem 7M
+module.
+.Pp
+If
+.Dv O_NONBLOCK
+or
+.Dv O_NDELAY
+is set on the manager side:
+.Bl -bullet
+.It
+Read on the manager side returns
+.Sy -1
+with
+.Va errno
+set to
+.Er EAGAIN
+if no data is available
+.It
+Write returns
+.Sy -1
+with
+.Va errno
+set to
+.Er EAGAIN
+if there is internal flow control
+.El
+.Pp
+Standard STREAMS system calls can access pseudo-terminal devices.
+The subsidiary devices support the
+.Dv O_NDELAY
+and
+.Dv O_NONBLOCK
+flags.
+.Sh XPG4v2 MODE
+.Em XPG4v2
+requires that subsidiary pseudo-terminal devices provide the process with an
+interface that is identical to the terminal interface, without needing to
+explicitly push any modules to achieve this.
+It also requires that 0-length messages written on the subsidiary device will
+be propagated to the manager device.
+.Pp
+Experience has shown that most software does not expect subsidiary
+pseudo-terminal devices to operate in this manner.
+This XPG4v2-compliant behaviour is only enabled in XPG4v2/SUS
+.Po
+see
+.Xr standards 5
+.Pc
+mode.
+.Sh IOCTLS
+The manager driver provides several ioctls to support the
+.Xr grantpt 3C ,
+.Xr unlockpt 3C ,
+and
+.Xr ptsname 3C
+functions:
+.Bl -tag -width Ds
+.It Dv ISPTM
+Determines whether the file descriptor is that of an open manager device.
+On success, it returns the value
+.Sy 0 .
+.It Dv UNLKPT
+Unlocks the manager and subsidiary devices.
+It returns
+.Sy 0
+on success.
+On failure,
+.Vt errno
+is set to
+.Vt EINVAL
+indicating that the manager device is not open.
+.El
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/ptmx
+Pseudo-terminal manager clone device.
+.It Pa /dev/pts/N
+Pseudo-terminal subsidiary devices, where
+.Sy N
+is a non-negative integer.
+Located via calls to
+.Xr ptsname 3C .
+.El
+.Sh EXAMPLES
+.Sy Example 1
+Opening the manager and subsidiary device for a pseudo-terminal.
+.Bd -literal -offset Ds
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stropts.h>
+#include <fcntl.h>
+#include <err.h>
+\&...
+int fdm, fds;
+char *subsidiaryname;
+\&...
+/*
+ * NOTE: Portable applications should use posix_openpt(3C) here:
+ */
+if ((fdm = open("/dev/ptmx", O_RDWR | O_NOCTTY)) < 0) {
+        err(1, "open manager");
+}
+if (grantpt(fdm) != 0 || unlockpt(fdm) != 0 ||
+    (subsidiaryname = ptsname(fdm)) == NULL) {
+        close(fdm);
+        err(1, "locate subsidiary");
+}
+if ((fds = open(subsidiaryname, O_RDWR | O_NOCTTY)) < 0) {
+        close(fdm);
+        err(1, "open subsidiary");
+}
+if (ioctl(fds, I_PUSH, "ptem") != 0 ||
+    ioctl(fds, I_PUSH, "ldterm") != 0) {
+        close(fds);
+        close(fdm);
+        err(1, "push modules");
+}
+.Ed
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr getmsg 2 ,
+.Xr open 2 ,
+.Xr read 2 ,
+.Xr grantpt 3C ,
+.Xr posix_openpt 3C ,
+.Xr ptsname 3C ,
+.Xr unlockpt 3C ,
+.Xr standards 5 ,
+.Xr ldterm 7M ,
+.Xr pckt 7M ,
+.Xr ptem 7M ,
+.Xr ddi_create_minor_node 9F

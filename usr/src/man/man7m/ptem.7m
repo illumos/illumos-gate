@@ -4,65 +4,127 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PTEM 7M "Jul 3, 1990"
-.SH NAME
-ptem \- STREAMS Pseudo Terminal Emulation module
-.SH SYNOPSIS
-.LP
-.nf
-\fBint ioctl(\fR\fIfd\fR, \fBI_PUSH\fR,\fB "ptem");\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-\fBptem\fR is a STREAMS module that, when used in conjunction with a line
-discipline and pseudo terminal driver, emulates a terminal.
-.sp
-.LP
-The \fBptem\fR module must be pushed (see  \fBI_PUSH\fR, \fBstreamio\fR(7I))
-onto the slave side of a pseudo terminal STREAM, before the \fBldterm\fR(7M)
+.\" Copyright 2022 Oxide Computer Company
+.Dd February 5, 2022
+.Dt PTEM 7M
+.Os
+.Sh NAME
+.Nm ptem
+.Nd STREAMS Pseudo-Terminal Emulation module
+.Sh SYNOPSIS
+.In unistd.h
+.In stropts.h
+.Ft int
+.Fo ioctl
+.Fa "int fildes" ,
+.Dv I_PUSH ,
+.Qq ptem
+.Fc
+.Sh DESCRIPTION
+.Nm ptem
+is a STREAMS module that emulates a terminal device when used in conjunction
+with the line discipline,
+.Xr ldterm 7M ,
+and the pseudo terminal driver,
+.Xr ptm 7D .
+.Pp
+The
+.Nm ptem
+module must be pushed
+.Po
+see
+.Dv I_PUSH
+in
+.Xr streamio 7I
+.Pc
+onto the subsidiary device of a pseudo-terminal STREAM, before the
+.Xr ldterm 7M
 module is pushed.
-.sp
-.LP
-On the write-side, the \fBTCSETA\fR, \fBTCSETAF\fR, \fBTCSETAW\fR,
-\fBTCGETA\fR, \fBTCSETS\fR, \fBTCSETSW\fR, \fBTCSETSF\fR, \fBTCGETS\fR,
-\fBTCSBRK\fR, \fBJWINSIZE\fR, \fBTIOCGWINSZ\fR, and \fBTIOCSWINSZ\fR
-\fBtermio\fR \fBioctl\fR(2) messages are processed and acknowledged. If remote
-mode is not in effect, \fBptem\fR handles the \fBTIOCSTI\fR ioctl by copying
-the argument bytes into an  \fBM_DATA\fR message and passing it back up the
-read side. Regardless of the remote mode setting, \fBptem\fR acknowledges the
-ioctl and passes a copy of it downstream for possible further processing. A
-hang up (that is, \fBstty 0\fR) is converted to a zero length \fBM_DATA\fR
-message and passed downstream. Termio \fBcflags\fR and window row and column
-information are stored locally one per stream. \fBM_DELAY\fR messages are
-discarded. All other messages are passed downstream unmodified.
-.sp
-.LP
-On the read-side all messages are passed upstream unmodified with the following
-exceptions. All \fBM_READ\fR and \fBM_DELAY\fR messages are freed in both
-directions. A \fBTCSBRK\fR ioctl is converted to an \fBM_BREAK\fR message and
-passed upstream and an acknowledgement is returned downstream. A
-\fBTIOCSIGNAL\fR ioctl is converted into an \fBM_PCSIG\fR message,  and passed
-upstream and an acknowledgement is returned downstream. Finally a
-\fBTIOCREMOTE\fR ioctl is converted into an \fBM_CTL\fR message, acknowledged,
-and passed upstream; the resulting mode is retained for use in subsequent
-\fBTIOCSTI\fR parsing.
-.SH FILES
-.sp
-.ne 2
-.na
-\fB<\fBsys/ptem.h\fR> \fR
-.ad
-.RS 17n
-
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBstty\fR(1), \fBioctl\fR(2), \fBldterm\fR(7M), \fBpckt\fR(7M),
-\fBstreamio\fR(7I), \fBtermio\fR(7I)
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
+.Ss Write-side Behaviour
+The
+.Dv TCSETA ,
+.Dv TCSETAF ,
+.Dv TCSETAW ,
+.Dv TCGETA ,
+.Dv TCSETS ,
+.Dv TCSETSW ,
+.Dv TCSETSF ,
+.Dv TCGETS ,
+.Dv TCSBRK ,
+.Dv JWINSIZE ,
+.Dv TIOCGWINSZ ,
+and
+.Dv TIOCSWINSZ
+.Xr termio 7I
+.Xr ioctl 2
+messages are processed and acknowledged.
+.Pp
+If
+.Em remote mode
+is not in effect,
+.Nm ptem
+handles the
+.Dv TIOCSTI
+ioctl by copying the argument bytes into an
+.Dv M_DATA
+message and passing it back up the read side.
+Regardless of the
+.Em remote mode
+setting,
+.Nm ptem
+acknowledges the ioctl and passes a copy of it downstream for possible further
+processing.
+.Pp
+A hang up
+.Po
+e.g.,
+.Ic stty 0
+.Pc
+is converted to a zero length
+.Dv M_DATA
+message and passed downstream.
+.Xr termio 7I
+.Sy cflags
+and window row and column information are stored locally, one per stream.
+.Dv M_DELAY
+messages are discarded.
+.Pp
+All other messages are passed downstream unmodified.
+.Ss Read-side Behaviour
+All messages are passed upstream unmodified with the following exceptions:
+.Bl -bullet
+.It
+All
+.Dv M_READ
+and
+.Dv M_DELAY
+messages are freed in both directions.
+.It
+A
+.Dv TCSBRK
+ioctl is converted to an
+.Dv M_BREAK
+message and passed upstream and an acknowledgement is returned downstream.
+.It
+A
+.Dv TIOCSIGNAL
+ioctl is converted into an
+.Dv M_PCSIG
+message, passed upstream, and an acknowledgement is returned downstream.
+.It
+A
+.Dv TIOCREMOTE
+ioctl is converted into an
+.Dv M_CTL
+message, acknowledged, and passed upstream; the resulting mode is retained for
+use in subsequent
+.Dv TIOCSTI
+parsing.
+.El
+.Sh SEE ALSO
+.Xr stty 1 ,
+.Xr ioctl 2 ,
+.Xr streamio 7I ,
+.Xr termio 7I ,
+.Xr ldterm 7M ,
+.Xr pckt 7M

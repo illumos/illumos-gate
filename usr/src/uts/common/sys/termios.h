@@ -478,7 +478,7 @@ struct ppsclockev32 {
 /* pseudo-tty */
 
 #define	TIOCREMOTE	(tIOC|30)	/* remote input editing */
-#define	TIOCSIGNAL	(tIOC|31)	/* pty: send signal to slave */
+#define	TIOCSIGNAL	(tIOC|31)	/* pty: send signal to subsidiary */
 
 
 /* Some more 386 xenix stuff */
