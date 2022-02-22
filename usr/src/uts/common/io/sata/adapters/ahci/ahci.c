@@ -10766,7 +10766,7 @@ ahci_em_ioctl_set(ahci_ctl_t *ahci_ctlp, intptr_t arg)
 		return (ENOTSUP);
 	}
 
-	task = kmem_alloc(sizeof (*task), KM_NOSLEEP | KM_NORMALPRI);
+	task = kmem_alloc(sizeof (*task), KM_NOSLEEP_LAZY);
 	if (task == NULL) {
 		return (ENOMEM);
 	}

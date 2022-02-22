@@ -69,7 +69,7 @@ typedef int (*overlay_target_copyin_f)(const void *, void **, size_t *, int);
 typedef int (*overlay_target_ioctl_f)(overlay_target_hdl_t *, void *);
 typedef int (*overlay_target_copyout_f)(void *, void *, size_t, int);
 
-typedef struct overaly_target_ioctl {
+typedef struct overlay_target_ioctl {
 	int		oti_cmd;	/* ioctl id */
 	boolean_t	oti_write;	/* ioctl requires FWRITE */
 	boolean_t	oti_ncopyout;	/* copyout data? */
@@ -354,8 +354,7 @@ overlay_target_lookup(overlay_dev_t *odd, mblk_t *mp, struct sockaddr *sock,
 	entry = refhash_lookup(ott->ott_u.ott_dyn.ott_dhash,
 	    mhi.mhi_daddr);
 	if (entry == NULL) {
-		entry = kmem_cache_alloc(overlay_entry_cache,
-		    KM_NOSLEEP | KM_NORMALPRI);
+		entry = kmem_cache_alloc(overlay_entry_cache, KM_NOSLEEP_LAZY);
 		if (entry == NULL) {
 			mutex_exit(&ott->ott_lock);
 			return (OVERLAY_TARGET_DROP);

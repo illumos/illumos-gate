@@ -34,7 +34,7 @@ typedef enum overlay_plugin_dest {
 	OVERLAY_PLUGIN_D_INVALID	= 0x0,
 	OVERLAY_PLUGIN_D_ETHERNET	= 0x1,
 	OVERLAY_PLUGIN_D_IP		= 0x2,
-	OVERLAY_PLUGIN_D_PORT 		= 0x4,
+	OVERLAY_PLUGIN_D_PORT		= 0x4,
 	OVERLAY_PLUGIN_D_MASK		= 0x7
 } overlay_plugin_dest_t;
 
@@ -49,7 +49,7 @@ typedef enum overlay_prop_prot {
 	OVERLAY_PROP_PERM_REQ	= 0x1,
 	OVERLAY_PROP_PERM_READ	= 0x2,
 	OVERLAY_PROP_PERM_WRITE	= 0x4,
-	OVERLAY_PROP_PERM_RW 	= 0x6,
+	OVERLAY_PROP_PERM_RW	= 0x6,
 	OVERLAY_PROP_PERM_RRW	= 0x7,
 	OVERLAY_PROP_PERM_MASK	= 0x7
 } overlay_prop_prot_t;

@@ -10,10 +10,9 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2017 Joyent, Inc.
- * Copyright 2019 Western Digital Corporation.
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -28,8 +27,7 @@
  *		secure-erase ...
  *		detach ...
  *		attach ...
- *		get-param ...
- *		set-param ...
+ *		list-firmware ...
  *		load-firmware ...
  *		commit-firmware ...
  *		activate-firmware ...
@@ -110,6 +108,7 @@ static void usage_get_features(const char *);
 static void usage_format(const char *);
 static void usage_secure_erase(const char *);
 static void usage_attach_detach(const char *);
+static void usage_firmware_list(const char *);
 static void usage_firmware_load(const char *);
 static void usage_firmware_commit(const char *);
 static void usage_firmware_activate(const char *);
@@ -167,6 +166,12 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		"attach blkdev(7d) to namespace(s) of a controller",
 		NULL,
 		do_attach_detach, usage_attach_detach, B_FALSE
+	},
+	{
+		"list-firmware",
+		"list firmware on a controller",
+		NULL,
+		do_get_logpage_fwslot, usage_firmware_list, B_FALSE
 	},
 	{
 		"load-firmware",
@@ -722,6 +727,14 @@ usage_get_logpage(const char *c_name)
 	    "are error, health, and firmware.\n", c_name);
 }
 
+static void
+usage_firmware_list(const char *c_name)
+{
+	(void) fprintf(stderr, "%s <ctl>\n\n"
+	    "  Print the log page that contains the list of firmware "
+	    "images installed on the specified NVMe controller.\n", c_name);
+}
+
 static int
 do_get_logpage_error(int fd, const nvme_process_arg_t *npa)
 {
@@ -788,7 +801,7 @@ do_get_logpage_fwslot(int fd, const nvme_process_arg_t *npa)
 		return (-1);
 
 	(void) printf("%s: ", npa->npa_name);
-	nvme_print_fwslot_log(fwlog);
+	nvme_print_fwslot_log(fwlog, npa->npa_idctl);
 
 	free(fwlog);
 
@@ -1314,6 +1327,7 @@ do_firmware_load(int fd, const nvme_process_arg_t *npa)
 	ssize_t len;
 	offset_t offset = 0;
 	size_t size;
+	uint16_t sc;
 	char buf[FIRMWARE_READ_BLKSIZE];
 
 	if (npa->npa_argc > 2)
@@ -1322,6 +1336,10 @@ do_firmware_load(int fd, const nvme_process_arg_t *npa)
 	if (npa->npa_argc == 0)
 		errx(-1, "Requires firmware file name, and an "
 		    "optional offset");
+
+	if (npa->npa_isns)
+		errx(-1, "Firmware loading not available on a per-namespace "
+		    "basis");
 
 	if (npa->npa_argc == 2)
 		offset = get_fw_offsetb(npa->npa_argv[1]);
@@ -1342,9 +1360,9 @@ do_firmware_load(int fd, const nvme_process_arg_t *npa)
 		if (len == 0)
 			break;
 
-		if (!nvme_firmware_load(fd, buf, len, offset))
+		if (!nvme_firmware_load(fd, buf, len, offset, &sc))
 			errx(-1, "Error loading \"%s\": %s", npa->npa_argv[0],
-			    strerror(errno));
+			    nvme_fw_error(errno, sc));
 
 		offset += len;
 		size += len;
@@ -1390,7 +1408,7 @@ static int
 do_firmware_commit(int fd, const nvme_process_arg_t *npa)
 {
 	uint_t slot;
-	uint16_t sct, sc;
+	uint16_t sc;
 
 	if (npa->npa_argc > 1)
 		errx(-1, "Too many arguments");
@@ -1398,11 +1416,18 @@ do_firmware_commit(int fd, const nvme_process_arg_t *npa)
 	if (npa->npa_argc == 0)
 		errx(-1, "Firmware slot number is required");
 
+	if (npa->npa_isns)
+		errx(-1, "Firmware committing not available on a per-namespace "
+		    "basis");
+
 	slot = get_slot_number(npa->npa_argv[0]);
 
-	if (!nvme_firmware_commit(fd, slot, NVME_FWC_SAVE, &sct, &sc))
+	if (slot == 1 && npa->npa_idctl->id_frmw.fw_readonly)
+		errx(-1, "Cannot commit firmware to slot 1: slot is read-only");
+
+	if (!nvme_firmware_commit(fd, slot, NVME_FWC_SAVE, &sc))
 		errx(-1, "Failed to commit firmware to slot %u: %s",
-		    slot, nvme_str_error(sct, sc));
+		    slot, nvme_fw_error(errno, sc));
 
 	if (verbose)
 		(void) printf("Firmware committed to slot %u.\n", slot);
@@ -1423,7 +1448,7 @@ static int
 do_firmware_activate(int fd, const nvme_process_arg_t *npa)
 {
 	uint_t slot;
-	uint16_t sct, sc;
+	uint16_t sc;
 
 	if (npa->npa_argc > 1)
 		errx(-1, "Too many arguments");
@@ -1431,15 +1456,19 @@ do_firmware_activate(int fd, const nvme_process_arg_t *npa)
 	if (npa->npa_argc == 0)
 		errx(-1, "Firmware slot number is required");
 
+	if (npa->npa_isns)
+		errx(-1, "Firmware activation not available on a per-namespace "
+		    "basis");
+
 	slot = get_slot_number(npa->npa_argv[0]);
 
-	if (!nvme_firmware_commit(fd, slot, NVME_FWC_ACTIVATE, &sct, &sc))
+	if (!nvme_firmware_commit(fd, slot, NVME_FWC_ACTIVATE, &sc))
 		errx(-1, "Failed to activate slot %u: %s", slot,
-		    nvme_str_error(sct, sc));
+		    nvme_fw_error(errno, sc));
 
 	if (verbose)
 		printf("Slot %u activated: %s.\n", slot,
-		    nvme_str_error(sct, sc));
+		    nvme_fw_error(errno, sc));
 
 	return (0);
 }

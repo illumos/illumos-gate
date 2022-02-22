@@ -14,7 +14,7 @@
  */
 
 /*
- * Common routines for implmeenting proxy arp
+ * Common routines for implementing proxy arp
  */
 
 #include <sys/types.h>
@@ -43,7 +43,7 @@ typedef struct varpd_arp_query {
 	varpd_query_handle_t		*vaq_query;
 	const overlay_targ_lookup_t	*vaq_otl;
 	ip6_t				*vaq_ip6;
-	nd_neighbor_solicit_t 		*vaq_ns;
+	nd_neighbor_solicit_t		*vaq_ns;
 } varpd_arp_query_t;
 
 typedef struct varpd_dhcp_query {
@@ -320,7 +320,7 @@ libvarpd_plugin_proxy_ndp(varpd_provider_handle_t *hdl,
 	}
 
 	/*
-	 * Now we know that this is an ICMPv6 request targetting the right
+	 * Now we know that this is an ICMPv6 request targeting the right
 	 * IPv6 multicast prefix. Let's go through and verify that ICMPv6
 	 * indicates that we have the real thing and ensure that per RFC 4861
 	 * the target address is not a multicast address. Further, because this
@@ -422,7 +422,6 @@ libvarpd_proxy_ndp_fini(varpd_arp_query_t *vaq)
 	na->nd_na_code = 0;
 	/*
 	 * RFC 4443 defines that we should set the checksum to zero before we
-	 * calculate the checksumat we should set the checksum to zero before we
 	 * calculate it.
 	 */
 	na->nd_na_cksum = 0;
@@ -605,7 +604,7 @@ libvarpd_plugin_dhcp_reply(varpd_dhcp_handle_t *vdh, int action)
 }
 
 /*
- * Inject a gratuitious ARP packet to the specified mac address.
+ * Inject a gratuitous ARP packet to the specified mac address.
  */
 void
 libvarpd_inject_arp(varpd_provider_handle_t *vph, const uint16_t vlan,

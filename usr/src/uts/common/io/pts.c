@@ -27,80 +27,84 @@
 
 /*
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
- * Pseudo Terminal Slave Driver.
+ * PSEUDO-TERMINAL SUBSIDIARY DRIVER (PTS)
  *
- * The pseudo-tty subsystem simulates a terminal connection, where the master
- * side represents the terminal and the slave represents the user process's
- * special device end point. The master device is set up as a cloned device
- * where its major device number is the major for the clone device and its minor
- * device number is the major for the ptm driver. There are no nodes in the file
- * system for master devices. The master pseudo driver is opened using the
- * open(2) system call with /dev/ptmx as the device parameter.  The clone open
- * finds the next available minor device for the ptm major device.
+ * The pseudo-terminal subsystem simulates a terminal connection, where the
+ * manager side represents the terminal and the subsidiary represents the user
+ * process's special device end point.  The manager device is set up as a
+ * cloned device where its major device number is the major for the clone
+ * device and its minor device number is the major for the ptm driver.  There
+ * are no nodes in the file system for manager devices.  The manager pseudo
+ * driver is opened using the open(2) system call with /dev/ptmx as the device
+ * parameter.  The clone open finds the next available minor device for the ptm
+ * major device.
  *
- * A master device is available only if it and its corresponding slave device
- * are not already open. When the master device is opened, the corresponding
- * slave device is automatically locked out. Only one open is allowed on a
- * master device.  Multiple opens are allowed on the slave device.  After both
- * the master and slave have been opened, the user has two file descriptors
- * which are the end points of a full duplex connection composed of two streams
- * which are automatically connected at the master and slave drivers. The user
- * may then push modules onto either side of the stream pair.
+ * A manager device is available only if it and its corresponding subsidiary
+ * device are not already open.  When the manager device is opened, the
+ * corresponding subsidiary device is automatically locked out.  Only one open
+ * is allowed on a manager device.  Multiple opens are allowed on the
+ * subsidiary device.  After both the manager and subsidiary have been opened,
+ * the user has two file descriptors which are the end points of a full duplex
+ * connection composed of two streams which are automatically connected at the
+ * manager and subsidiary drivers.  The user may then push modules onto either
+ * side of the stream pair.
  *
- * The master and slave drivers pass all messages to their adjacent queues.
- * Only the M_FLUSH needs some processing.  Because the read queue of one side
- * is connected to the write queue of the other, the FLUSHR flag is changed to
- * the FLUSHW flag and vice versa. When the master device is closed an M_HANGUP
- * message is sent to the slave device which will render the device
- * unusable. The process on the slave side gets the EIO when attempting to write
- * on that stream but it will be able to read any data remaining on the stream
- * head read queue.  When all the data has been read, read() returns 0
- * indicating that the stream can no longer be used.  On the last close of the
- * slave device, a 0-length message is sent to the master device. When the
- * application on the master side issues a read() or getmsg() and 0 is returned,
- * the user of the master device decides whether to issue a close() that
- * dismantles the pseudo-terminal subsystem. If the master device is not closed,
- * the pseudo-tty subsystem will be available to another user to open the slave
- * device.
+ * The manager and subsidiary drivers pass all messages to their adjacent
+ * queues.  Only the M_FLUSH needs some processing.  Because the read queue of
+ * one side is connected to the write queue of the other, the FLUSHR flag is
+ * changed to the FLUSHW flag and vice versa.  When the manager device is
+ * closed an M_HANGUP message is sent to the subsidiary device which will
+ * render the device unusable.  The process on the subsidiary side gets the EIO
+ * when attempting to write on that stream but it will be able to read any data
+ * remaining on the stream head read queue.  When all the data has been read,
+ * read() returns 0 indicating that the stream can no longer be used.  On the
+ * last close of the subsidiary device, a 0-length message is sent to the
+ * manager device.  When the application on the manager side issues a read() or
+ * getmsg() and 0 is returned, the user of the manager device decides whether
+ * to issue a close() that dismantles the pseudo-terminal subsystem.  If the
+ * manager device is not closed, the pseudo-tty subsystem will be available to
+ * another user to open the subsidiary device.
  *
- * Synchronization:
  *
- *   All global data synchronization between ptm/pts is done via global
- *   ptms_lock mutex which is initialized at system boot time from
- *   ptms_initspace (called from space.c).
+ * SYNCHRONIZATION
  *
- *   Individual fields of pt_ttys structure (except ptm_rdq, pts_rdq and
- *   pt_nullmsg) are protected by pt_ttys.pt_lock mutex.
+ * All global data synchronization between ptm/pts is done via global ptms_lock
+ * mutex which is initialized at system boot time from ptms_initspace (called
+ * from space.c).
  *
- *   PT_ENTER_READ/PT_ENTER_WRITE are reference counter based read-write locks
- *   which allow reader locks to be reacquired by the same thread (usual
- *   reader/writer locks can't be used for that purpose since it is illegal for
- *   a thread to acquire a lock it already holds, even as a reader). The sole
- *   purpose of these macros is to guarantee that the peer queue will not
- *   disappear (due to closing peer) while it is used. It is safe to use
- *   PT_ENTER_READ/PT_EXIT_READ brackets across calls like putq/putnext (since
- *   they are not real locks but reference counts).
+ * Individual fields of pt_ttys structure (except ptm_rdq, pts_rdq and
+ * pt_nullmsg) are protected by pt_ttys.pt_lock mutex.
  *
- *   PT_ENTER_WRITE/PT_EXIT_WRITE brackets are used ONLY in master/slave
- *   open/close paths to modify ptm_rdq and pts_rdq fields. These fields should
- *   be set to appropriate queues *after* qprocson() is called during open (to
- *   prevent peer from accessing the queue with incomplete plumbing) and set to
- *   NULL before qprocsoff() is called during close.
+ * PT_ENTER_READ/PT_ENTER_WRITE are reference counter based read-write locks
+ * which allow reader locks to be reacquired by the same thread (usual
+ * reader/writer locks can't be used for that purpose since it is illegal for a
+ * thread to acquire a lock it already holds, even as a reader).  The sole
+ * purpose of these macros is to guarantee that the peer queue will not
+ * disappear (due to closing peer) while it is used.  It is safe to use
+ * PT_ENTER_READ/PT_EXIT_READ brackets across calls like putq/putnext (since
+ * they are not real locks but reference counts).
  *
- *   The pt_nullmsg field is only used in open/close routines and it is also
- *   protected by PT_ENTER_WRITE/PT_EXIT_WRITE brackets to avoid extra mutex
- *   holds.
+ * PT_ENTER_WRITE/PT_EXIT_WRITE brackets are used ONLY in manager/subsidiary
+ * open/close paths to modify ptm_rdq and pts_rdq fields.  These fields should
+ * be set to appropriate queues *after* qprocson() is called during open (to
+ * prevent peer from accessing the queue with incomplete plumbing) and set to
+ * NULL before qprocsoff() is called during close.
  *
- * Lock Ordering:
+ * The pt_nullmsg field is only used in open/close routines and it is also
+ * protected by PT_ENTER_WRITE/PT_EXIT_WRITE brackets to avoid extra mutex
+ * holds.
  *
- *   If both ptms_lock and per-pty lock should be held, ptms_lock should always
- *   be entered first, followed by per-pty lock.
+ *
+ * LOCK ORDERING
+ *
+ * If both ptms_lock and per-pty lock should be held, ptms_lock should always
+ * be entered first, followed by per-pty lock.
  *
  * See ptms.h, ptm.c and ptms_conf.c fore more information.
- *
  */
 
 #include <sys/types.h>
@@ -135,9 +139,6 @@ static int ptswput(queue_t *, mblk_t *);
 static int ptsrsrv(queue_t *);
 static int ptswsrv(queue_t *);
 
-/*
- * Slave Stream Pseudo Terminal Module: stream data structure definitions
- */
 static struct module_info pts_info = {
 	0xface,
 	"pts",
@@ -192,9 +193,9 @@ DDI_DEFINE_STREAM_OPS(pts_ops, nulldev, nulldev,	\
  */
 
 static struct modldrv modldrv = {
-	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"Slave Stream Pseudo Terminal driver 'pts'",
-	&pts_ops,	/* driver ops */
+	&mod_driverops,
+	"Pseudo-Terminal Subsidiary Driver",
+	&pts_ops,
 };
 
 static struct modlinkage modlinkage = {
@@ -239,7 +240,6 @@ pts_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-/*ARGSUSED*/
 static int
 pts_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
@@ -252,7 +252,6 @@ pts_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	return (DDI_FAILURE);
 }
 
-/*ARGSUSED*/
 static int
 pts_devinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
     void **result)
@@ -280,9 +279,9 @@ pts_devinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 
 /* ARGSUSED */
 /*
- * Open the slave device. Reject a clone open and do not allow the
- * driver to be pushed. If the slave/master pair is locked or if
- * the master is not open, return EACCESS.
+ * Open the subsidiary device. Reject a clone open and do not allow the
+ * driver to be pushed. If the subsidiary/manager pair is locked or if
+ * the manager is not open, return EACCESS.
  * Upon success, store the write queue pointer in private data and
  * set the PTSOPEN bit in the pt_state field.
  */
@@ -369,10 +368,10 @@ ptsopen(
 	}
 
 	/*
-	 * Slave should send zero-length message to a master when it is
-	 * closing. If memory is low at that time, master will not detect slave
-	 * closes, this pty will not be deallocated. So, preallocate this
-	 * zero-length message block early.
+	 * Subsidiary should send zero-length message to a manager when it is
+	 * closing.  If memory is low at that time, manager will not detect
+	 * subsidiary closes, this pty will not be deallocated.  So,
+	 * preallocate this zero-length message block early.
 	 */
 	if ((mp = allocb(0, BPRI_MED)) == NULL) {
 		mutex_exit(&ptsp->pt_lock);
@@ -395,9 +394,10 @@ ptsopen(
 
 	/*
 	 * After qprocson pts driver is fully plumbed into the stream and can
-	 * send/receive messages. Setting pts_rdq will allow master side to send
-	 * messages to the slave. This setting can't occur before qprocson() is
-	 * finished because slave is not ready to process them.
+	 * send/receive messages.  Setting pts_rdq will allow manager side to
+	 * send messages to the subsidiary.  This setting can't occur before
+	 * qprocson() is finished because subsidiary is not ready to process
+	 * them.
 	 */
 	PT_ENTER_WRITE(ptsp);
 	ptsp->pts_rdq = rqp;
@@ -422,12 +422,11 @@ ptsopen(
 }
 
 /*
- * Find the address to private data identifying the slave's write
- * queue. Send a 0-length msg up the slave's read queue to designate
- * the master is closing. Uattach the master from the slave by nulling
- * out master's write queue field in private data.
+ * Find the address to private data identifying the subsidiary's write queue.
+ * Send a 0-length msg up the subsidiary's read queue to designate the manager
+ * is closing.  Uattach the manager from the subsidiary by nulling out
+ * manager's write queue field in private data.
  */
-/*ARGSUSED1*/
 static int
 ptsclose(queue_t *rqp, int flag, cred_t *credp)
 {
@@ -450,10 +449,10 @@ ptsclose(queue_t *rqp, int flag, cred_t *credp)
 	ptsp = (struct pt_ttys *)rqp->q_ptr;
 
 	/*
-	 * Slave is going to close and doesn't want any new  messages coming
-	 * from the master side, so set pts_rdq to NULL. This should be done
-	 * before call to qprocsoff() since slave can't process additional
-	 * messages from the master after qprocsoff is called.
+	 * Subsidiary is going to close and doesn't want any new messages
+	 * coming from the manager side, so set pts_rdq to NULL.  This should
+	 * be done before call to qprocsoff() since subsidiary can't process
+	 * additional messages from the manager after qprocsoff is called.
 	 */
 	PT_ENTER_WRITE(ptsp);
 	mp = ptsp->pt_nullmsg;
@@ -479,8 +478,8 @@ ptsclose(queue_t *rqp, int flag, cred_t *credp)
 		}
 	}
 	/*
-	 * qenable master side write queue so that it can flush
-	 * its messages as slaves's read queue is going away
+	 * qenable manager side write queue so that it can flush its messages
+	 * as subsidiarys's read queue is going away:
 	 */
 	if (ptsp->ptm_rdq) {
 		if (mp)
@@ -503,9 +502,9 @@ ptsclose(queue_t *rqp, int flag, cred_t *credp)
 
 
 /*
- * The wput procedure will only handle flush messages.
- * All other messages are queued and the write side
- * service procedure sends them off to the master side.
+ * The wput procedure will only handle flush messages.  All other messages are
+ * queued and the write side service procedure sends them off to the manager
+ * side.
  */
 static int
 ptswput(queue_t *qp, mblk_t *mp)
@@ -520,9 +519,9 @@ ptswput(queue_t *qp, mblk_t *mp)
 	ptsp = (struct pt_ttys *)qp->q_ptr;
 	PT_ENTER_READ(ptsp);
 	if (ptsp->ptm_rdq == NULL) {
-		DBG(("in write put proc but no master\n"));
+		DBG(("in write put proc but no manager\n"));
 		/*
-		 * NAK ioctl as slave side read queue is gone.
+		 * NAK ioctl as subsidiary side read queue is gone.
 		 * Or else free the message.
 		 */
 		if (mp->b_datap->db_type == M_IOCTL) {
@@ -540,7 +539,7 @@ ptswput(queue_t *qp, mblk_t *mp)
 		switch (type) {
 
 		/*
-		 * if write queue request, flush slave's write
+		 * if write queue request, flush subsidiary's write
 		 * queue and send FLUSHR to ptm. If read queue
 		 * request, send FLUSHR to ptm.
 		 */
@@ -585,9 +584,9 @@ ptswput(queue_t *qp, mblk_t *mp)
 			}
 		}
 		/*
-		 * Since the packet module will toss any
-		 * M_FLUSHES sent to the master's stream head
-		 * read queue, we simply turn it around here.
+		 * Since the packet module will toss any M_FLUSHES sent to the
+		 * manager's stream head read queue, we simply turn it around
+		 * here.
 		 */
 		if (*mp->b_rptr & FLUSHR) {
 			ASSERT(RD(qp)->q_first == NULL);
@@ -599,7 +598,7 @@ ptswput(queue_t *qp, mblk_t *mp)
 		break;
 
 		case M_READ:
-		/* Caused by ldterm - can not pass to master */
+		/* Caused by ldterm - can not pass to manager */
 		freemsg(mp);
 		break;
 
@@ -645,9 +644,9 @@ ptswput(queue_t *qp, mblk_t *mp)
 		/* FALLTHROUGH */
 	default:
 		/*
-		 * send other messages to the master
+		 * send other messages to the manager
 		 */
-		DBG(("put msg on slave's write queue\n"));
+		DBG(("put msg on subsidiary's write queue\n"));
 		(void) putq(qp, mp);
 		break;
 	}
@@ -659,9 +658,8 @@ ptswput(queue_t *qp, mblk_t *mp)
 
 
 /*
- * enable the write side of the master. This triggers the
- * master to send any messages queued on its write side to
- * the read side of this slave.
+ * Enable the write side of the manager.  This triggers the manager to send any
+ * messages queued on its write side to the read side of this subsidiary.
  */
 static int
 ptsrsrv(queue_t *qp)
@@ -674,7 +672,7 @@ ptsrsrv(queue_t *qp)
 	ptsp = (struct pt_ttys *)qp->q_ptr;
 	PT_ENTER_READ(ptsp);
 	if (ptsp->ptm_rdq == NULL) {
-		DBG(("in read srv proc but no master\n"));
+		DBG(("in read srv proc but no manager\n"));
 		PT_EXIT_READ(ptsp);
 		return (0);
 	}
@@ -685,10 +683,10 @@ ptsrsrv(queue_t *qp)
 }
 
 /*
- * If there are messages on this queue that can be sent to
- * master, send them via putnext(). Else, if queued messages
- * cannot be sent, leave them on this queue. If priority
- * messages on this queue, send them to master no matter what.
+ * If there are messages on this queue that can be sent to manager, send them
+ * via putnext().  Otherwise, if queued messages cannot be sent, leave them on
+ * this queue.  If priority messages on this queue, send them to manager no
+ * matter what.
  */
 static int
 ptswsrv(queue_t *qp)
@@ -703,12 +701,11 @@ ptswsrv(queue_t *qp)
 	ptsp = (struct pt_ttys *)qp->q_ptr;
 	PT_ENTER_READ(ptsp);
 	if (ptsp->ptm_rdq == NULL) {
-		DBG(("in write srv proc but no master\n"));
+		DBG(("in write srv proc but no manager\n"));
 		/*
-		 * Free messages on the write queue and send
-		 * NAK for any M_IOCTL type messages to wakeup
-		 * the user process waiting for ACK/NAK from
-		 * the ioctl invocation
+		 * Free messages on the write queue and send NAK for any
+		 * M_IOCTL type messages to wakeup the user process waiting for
+		 * ACK/NAK from the ioctl invocation
 		 */
 		while ((mp = getq(qp)) != NULL) {
 			if (mp->b_datap->db_type == M_IOCTL) {
@@ -726,13 +723,12 @@ ptswsrv(queue_t *qp)
 	}
 
 	/*
-	 * while there are messages on this write queue...
+	 * While there are messages on this write queue...
 	 */
 	while ((mp = getq(qp)) != NULL) {
 		/*
-		 * if don't have control message and cannot put
-		 * msg. on master's read queue, put it back on
-		 * this queue.
+		 * If this is not a control message and we cannot put messages
+		 * on the manager's read queue, put it back on this queue.
 		 */
 		if (mp->b_datap->db_type <= QPCTL &&
 		    !bcanputnext(ptm_rdq, mp->b_band)) {
@@ -741,9 +737,9 @@ ptswsrv(queue_t *qp)
 			break;
 		}
 		/*
-		 * else send the message up master's stream
+		 * Otherwise, send the message up manager's stream:
 		 */
-		DBG(("send message to master\n"));
+		DBG(("send message to manager\n"));
 		putnext(ptm_rdq, mp);
 	}
 	DBG(("leaving ptswsrv\n"));

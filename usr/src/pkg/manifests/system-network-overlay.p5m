@@ -1,0 +1,62 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source. A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+#
+
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/network/overlay@$(PKGVERS)
+set name=pkg.summary value="illumos overlay driver"
+set name=pkg.description value="Device driver implementing network overlays"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=$(ARCH)
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/overlay group=sys
+file path=kernel/drv/overlay.conf group=sys
+dir  path=kernel/overlay
+dir  path=kernel/overlay/$(ARCH64)
+file path=kernel/overlay/$(ARCH64)/vxlan group=sys mode=0755
+dir  path=lib
+file path=lib/$(ARCH64)/libvarpd.so.1 mode=0755 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=lib/libvarpd.so.1 mode=0755 variant.opensolaris.zone=__NODEFAULT
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/network group=sys
+file path=lib/svc/manifest/network/varpd.xml mode=0444
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+dir  path=usr/lib/varpd
+dir  path=usr/lib/varpd/$(ARCH64)
+link path=usr/lib/varpd/$(ARCH64)/libvarpd_direct.so target=libvarpd_direct.so.1
+file path=usr/lib/varpd/$(ARCH64)/libvarpd_direct.so.1
+link path=usr/lib/varpd/$(ARCH64)/libvarpd_files.so target=libvarpd_files.so.1
+file path=usr/lib/varpd/$(ARCH64)/libvarpd_files.so.1
+link path=usr/lib/varpd/64 target=$(ARCH64)
+link path=usr/lib/varpd/libvarpd_direct.so target=libvarpd_direct.so.1
+file path=usr/lib/varpd/libvarpd_direct.so.1
+link path=usr/lib/varpd/libvarpd_files.so target=libvarpd_files.so.1
+file path=usr/lib/varpd/libvarpd_files.so.1
+file path=usr/lib/varpd/varpd mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man4
+file path=usr/share/man/man4/overlay_files.4
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/overlay.5
+dir  path=usr/share/man/man7p
+link path=usr/share/man/man7p/VXLAN.7p target=vxlan.7p
+file usr/share/man/man7p/vxlan.7p path=usr/share/man/man7p/vxlan.7p mode=0444
+driver name=overlay
+license lic_CDDL license=lic_CDDL

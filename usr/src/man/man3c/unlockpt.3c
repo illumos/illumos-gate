@@ -43,78 +43,69 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1997, The Open Group. All Rights Reserved.
 .\" Portions Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2022 Oxide Computer Company
 .\"
-.TH UNLOCKPT 3C "Aug 14, 2002"
-.SH NAME
-unlockpt \- unlock a pseudo-terminal master/slave pair
-.SH SYNOPSIS
-.LP
-.nf
-#include <stdlib.h>
-
-\fBint\fR \fBunlockpt\fR(\fBint\fR \fIfildes\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBunlockpt()\fR function unlocks the slave pseudo-terminal device
-associated with the master to which \fIfildes\fR refers.
-.sp
-.LP
-Portable applications must call \fBunlockpt()\fR before opening the slave side
-of a pseudo-terminal device.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBunlockpt()\fR returns \fB0\fR. Otherwise, it
-returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
-.SH ERRORS
-.sp
-.LP
-The \fBunlockpt()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEBADF\fR\fR
-.ad
-.RS 10n
-The \fIfildes\fR argument is not a file descriptor open for writing.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The \fIfildes\fR argument is not associated with a master pseudo-terminal
-device.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBopen\fR(2), \fBgrantpt\fR(3C), \fBptsname\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
+.Dd February 5, 2022
+.Dt UNLOCKPT 3C
+.Os
+.Sh NAME
+.Nm unlockpt
+.Nd unlock a pseudo-terminal device pair
+.Sh SYNOPSIS
+.In stdlib.h
+.Ft int
+.Fo unlockpt
+.Fa "int fildes"
+.Fc
+.Sh DESCRIPTION
+When a pseudo-terminal manager device is opened, whether through
+.Xr posix_openpt 3C
+or
+.Xr open 2
+on a
+.Xr ptm 7D
+device, the subsidiary device begins operation in a locked state.
+The
+.Fn unlockpt
+function unlocks the pseudo-terminal subsidiary device associated with the
+manager device to which
+.Fa fildes
+refers.
+.Pp
+Portable applications must call
+.Fn unlockpt
+before opening the pseudo-terminal subsidiary device.
+.Sh RETURN VALUES
+.Rv -std unlockpt
+.Sh EXAMPLES
+See
+.Xr posix_openpt 3C
+for an example that includes a call to
+.Fn unlockpt .
+.Sh ERRORS
+The
+.Fn unlockpt
+function may fail if:
+.Bl -tag -width Er
+.It Er EBADF
+The
+.Fa fildes
+argument is not a file descriptor open for writing.
+.It Er EINVAL
+EINVAL
+The
+.Fa fildes
+argument is not associated with a pseudo-terminal manager device.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT LEVEL
+.Sy Safe
+.Sh SEE ALSO
+.Xr open 2 ,
+.Xr grantpt 3C ,
+.Xr posix_openpt 3C ,
+.Xr ptsname 3C ,
+.Xr attributes 5 ,
+.Xr standards 5 ,
+.Xr ptm 7D

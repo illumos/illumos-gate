@@ -3,21 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PCKT 7M "Jul 3, 1990"
+.TH PCKT 7M "Feb 5, 2022"
 .SH NAME
 pckt \- STREAMS Packet Mode module
 .SH SYNOPSIS
-.LP
 .nf
 int ioctl(\fI fd, \fRI_PUSH, "pckt");
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBpckt\fR is a STREAMS module that may be used with a pseudo terminal to
 packetize certain messages. The \fBpckt\fR module should be pushed (see
-\fBI_PUSH\fR on  \fBstreamio\fR(7I)) onto the master side of a pseudo terminal.
+\fBI_PUSH\fR on \fBstreamio\fR(7I)) onto the manager side of a pseudo terminal.
 .sp
 .LP
 Packetizing is performed by prefixing a message with an  \fBM_PROTO\fR message.
@@ -31,21 +28,19 @@ On the read-side, only the \fBM_PROTO\fR, \fBM_PCPROTO\fR, \fBM_STOP\fR,
 types are passed upstream unmodified.
 .sp
 .LP
-Since all unread state information is held in the master's stream head read
+Since all unread state information is held in the manager's stream head read
 queue, flushing of this queue is disabled.
 .sp
 .LP
 On the write-side, all messages are sent down unmodified.
 .sp
 .LP
-With this module in place, all reads from the master side of the pseudo
+With this module in place, all reads from the manager side of the pseudo
 terminal should be performed with the  \fBgetmsg\fR(2) or \fBgetpmsg\fR()
 function. The control part of the message contains the message type. The data
 part contains the actual data associated with that message type. The onus is on
 the application to separate the data into its component parts.
 .SH SEE ALSO
-.sp
-.LP
 \fBgetmsg\fR(2), \fBioctl\fR(2), \fBldterm\fR(7M), \fBptem\fR(7M),
 \fBstreamio\fR(7I), \fBtermio\fR(7I)
 .sp

@@ -21,79 +21,86 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2021 Oxide Computer Company
  */
 
 /*
- * This file contains global data and code shared between master and slave parts
- * of the pseudo-terminal driver.
+ * PSEUDO-TERMINAL COMMON DATA AND ROUTINES (PTM, PTS)
  *
- * Pseudo terminals (or pt's for short) are allocated dynamically.
- * pt's are put in the global ptms_slots array indexed by minor numbers.
+ * This file contains global data and code shared between manager and
+ * subsidiary parts of the pseudo-terminal driver.
  *
- * The slots array is initially small (of the size NPTY_MIN). When more pt's are
+ * Pseudo-terminals (or ptys for short) are allocated dynamically.
+ * ptys are put in the global ptms_slots array indexed by minor numbers.
+ *
+ * The slots array is initially small (of the size NPTY_MIN). When more ptys are
  * needed than the slot array size, the larger slot array is allocated and all
- * opened pt's move to the new one.
+ * opened ptys move to the new one.
  *
- * Resource allocation:
  *
- *	pt_ttys structures are allocated via pt_ttys_alloc, which uses
- *		kmem_cache_alloc().
- *	Minor number space is allocated via vmem_alloc() interface.
- *	ptms_slots arrays are allocated via kmem_alloc().
+ * RESOURCE ALLOCATION
  *
- *   Minors are started from 1 instead of 0 because vmem_alloc returns 0 in case
- *   of failure. Also, in anticipation of removing clone device interface to
- *   pseudo-terminal subsystem, minor 0 should not be used. (Potential future
- *   development).
+ * - pt_ttys structures are allocated via pt_ttys_alloc, which uses
+ *   kmem_cache_alloc().
+ * - Minor number space is allocated via vmem_alloc() interface.
+ * - ptms_slots arrays are allocated via kmem_alloc().
  *
- *   After the table slot size reaches pt_maxdelta, we stop 2^N extension
- *   algorithm and start extending the slot table size by pt_maxdelta.
+ * Minors start from 1 instead of 0, because vmem_alloc() returns 0 in case of
+ * failure.  Also, in anticipation of removing the clone device interface to
+ * pseudo-terminal subsystem, minor 0 should not be used. (Potential future
+ * development).
  *
- *   Device entries /dev/pts directory are created dynamically by the
- *   /dev filesystem. We no longer call ddi_create_minor_node() on
- *   behalf of the slave driver. The /dev filesystem creates /dev/pts
- *   nodes based on the pt_ttys array.
+ * After the table slot size reaches pt_maxdelta, we stop 2^N extension
+ * algorithm and start extending the slot table size by pt_maxdelta.
  *
- * Synchronization:
+ * Device entries /dev/pts directory are created dynamically by the /dev
+ * filesystem.  We no longer call ddi_create_minor_node() on behalf of the
+ * subsidiary driver.  The /dev filesystem creates /dev/pts nodes based on the
+ * pt_ttys array.
  *
- *   All global data synchronization between ptm/pts is done via global
- *   ptms_lock mutex which is implicitly initialized by declaring it global.
  *
- *   Individual fields of pt_ttys structure (except ptm_rdq, pts_rdq and
- *   pt_nullmsg) are protected by pt_ttys.pt_lock mutex.
+ * SYNCHRONIZATION
  *
- *   PT_ENTER_READ/PT_ENTER_WRITE are reference counter based read-write locks
- *   which allow reader locks to be reacquired by the same thread (usual
- *   reader/writer locks can't be used for that purpose since it is illegal for
- *   a thread to acquire a lock it already holds, even as a reader). The sole
- *   purpose of these macros is to guarantee that the peer queue will not
- *   disappear (due to closing peer) while it is used. It is safe to use
- *   PT_ENTER_READ/PT_EXIT_READ brackets across calls like putq/putnext (since
- *   they are not real locks but reference counts).
+ * All global data synchronization between ptm/pts is done via global ptms_lock
+ * mutex which is implicitly initialized by declaring it global.
  *
- *   PT_ENTER_WRITE/PT_EXIT_WRITE brackets are used ONLY in master/slave
- *   open/close paths to modify ptm_rdq and pts_rdq fields. These fields should
- *   be set to appropriate queues *after* qprocson() is called during open (to
- *   prevent peer from accessing the queue with incomplete plumbing) and set to
- *   NULL before qprocsoff() is called during close. Put and service procedures
- *   use PT_ENTER_READ/PT_EXIT_READ to prevent peer closes.
+ * Individual fields of pt_ttys structure (except ptm_rdq, pts_rdq and
+ * pt_nullmsg) are protected by pt_ttys.pt_lock mutex.
  *
- *   The pt_nullmsg field is only used in open/close routines and is also
- *   protected by PT_ENTER_WRITE/PT_EXIT_WRITE brackets to avoid extra mutex
- *   holds.
+ * PT_ENTER_READ/PT_ENTER_WRITE are reference counter based read-write locks
+ * which allow reader locks to be reacquired by the same thread (usual
+ * reader/writer locks can't be used for that purpose since it is illegal for a
+ * thread to acquire a lock it already holds, even as a reader). The sole
+ * purpose of these macros is to guarantee that the peer queue will not
+ * disappear (due to closing peer) while it is used. It is safe to use
+ * PT_ENTER_READ/PT_EXIT_READ brackets across calls like putq/putnext (since
+ * they are not real locks but reference counts).
  *
- * Lock Ordering:
+ * PT_ENTER_WRITE/PT_EXIT_WRITE brackets are used ONLY in manager/subsidiary
+ * open/close paths to modify ptm_rdq and pts_rdq fields. These fields should
+ * be set to appropriate queues *after* qprocson() is called during open (to
+ * prevent peer from accessing the queue with incomplete plumbing) and set to
+ * NULL before qprocsoff() is called during close. Put and service procedures
+ * use PT_ENTER_READ/PT_EXIT_READ to prevent peer closes.
  *
- *   If both ptms_lock and per-pty lock should be held, ptms_lock should always
- *   be entered first, followed by per-pty lock.
+ * The pt_nullmsg field is only used in open/close routines and is also
+ * protected by PT_ENTER_WRITE/PT_EXIT_WRITE brackets to avoid extra mutex
+ * holds.
  *
- * Global functions:
+ *
+ * LOCK ORDERING
+ *
+ * If both ptms_lock and per-pty lock should be held, ptms_lock should always
+ * be entered first, followed by per-pty lock.
+ *
+ *
+ * GLOBAL FUNCTIONS
  *
  * void ptms_init(void);
  *
  *	Called by pts/ptm _init entry points. It performes one-time
- * 	initialization needed for both pts and ptm. This initialization is done
- * 	here and not in ptms_initspace because all these data structures are not
+ *	initialization needed for both pts and ptm. This initialization is done
+ *	here and not in ptms_initspace because all these data structures are not
  *	needed if pseudo-terminals are not used in the system.
  *
  * struct pt_ttys *pt_ttys_alloc(void);
@@ -117,6 +124,7 @@
  *	Also returns owner of pty.
  *
  * int ptms_minor_exists(minor_t minor)
+ *
  *	Check if minor refers to an allocated pty (in any zone)
  *	Returns
  *		0 if not an allocated pty
@@ -129,32 +137,33 @@
  * void ptms_close(struct pt_ttys *pt, uint_t flags_to_clear);
  *
  *	Clear flags_to_clear in pt and if no one owns it (PTMOPEN/PTSOPEN not
- * 	set) free pt entry and corresponding slot.
+ *	set) free pt entry and corresponding slot.
  *
- * Tuneables and configuration:
+ *
+ * TUNEABLES AND CONFIGURATION
  *
  *	pt_cnt: minimum number of pseudo-terminals in the system. The system
  *		should provide at least this number of ptys (provided sufficient
- * 		memory is available). It is different from the older semantics
+ *		memory is available). It is different from the older semantics
  *		of pt_cnt meaning maximum number of ptys.
  *		Set to 0 by default.
  *
  *	pt_max_pty: Maximum number of pseudo-terminals in the system. The system
  *		should not allocate more ptys than pt_max_pty (although, it may
- * 		impose stricter maximum). Zero value means no user-defined
- * 		maximum. This is intended to be used as "denial-of-service"
+ *		impose stricter maximum). Zero value means no user-defined
+ *		maximum. This is intended to be used as "denial-of-service"
  *		protection.
  *		Set to 0 by default.
  *
- *         Both pt_cnt and pt_max_pty may be modified during system lifetime
- *         with their semantics preserved.
+ *		Both pt_cnt and pt_max_pty may be modified during system
+ *		lifetime with their semantics preserved.
  *
  *	pt_init_cnt: Initial size of ptms_slots array. Set to NPTY_INITIAL.
  *
  *	pt_ptyofmem: Approximate percentage of system memory that may be
  *		occupied by pty data structures. Initially set to NPTY_PERCENT.
  *		This variable is used once during initialization to estimate
- * 		maximum number of ptys in the system. The actual maximum is
+ *		maximum number of ptys in the system. The actual maximum is
  *		determined as minimum of pt_max_pty and calculated value.
  *
  *	pt_maxdelta: Maximum extension chunk of the slot table.
@@ -193,7 +202,7 @@
  * Tuneable variables.
  */
 uint_t	pt_cnt = 0;			/* Minimum number of ptys */
-size_t 	pt_max_pty = 0;			/* Maximum number of ptys */
+size_t	pt_max_pty = 0;			/* Maximum number of ptys */
 uint_t	pt_init_cnt = NPTY_INITIAL;	/* Initial number of ptms slots */
 uint_t	pt_pctofmem = NPTY_PERCENT;	/* Percent of memory to use for ptys */
 uint_t	pt_maxdelta = PTY_MAXDELTA;	/* Max increment for slot table size */
@@ -210,7 +219,7 @@ static size_t ptms_nslots = 0;		/* Size of slot array */
 static size_t ptms_ptymax = 0;		/* Maximum number of ptys */
 static size_t ptms_inuse = 0;		/* # of ptys currently allocated */
 
-dev_info_t 	*pts_dip = NULL;	/* set if slave is attached */
+dev_info_t *pts_dip = NULL;		/* Set if subsidiary is attached */
 
 static struct kmem_cache *ptms_cache = NULL;	/* pty cache */
 
@@ -222,9 +231,9 @@ static void ptms_destructor(void *, void *);
 static minor_t ptms_grow(void);
 
 /*
- * Total size occupied by one pty. Each pty master/slave pair consumes one
- * pointer for ptms_slots array, one pt_ttys structure and one empty message
- * preallocated for pts close.
+ * Total size occupied by one pty. Each pty manager/subsidiary pair consumes
+ * one pointer for ptms_slots array, one pt_ttys structure, and one empty
+ * message preallocated for pts close.
  */
 
 #define	PTY_SIZE (sizeof (struct pt_ttys) + \
@@ -239,7 +248,7 @@ int ptms_debug = 0;
 /*
  * Clear all bits of x except the highest bit
  */
-#define	truncate(x) 	((x) <= 2 ? (x) : (1 << (highbit(x) - 1)))
+#define	truncate(x)	((x) <= 2 ? (x) : (1 << (highbit(x) - 1)))
 
 /*
  * Roundup the number to the nearest power of 2
@@ -295,7 +304,7 @@ ptms_init(void)
  * This routine attaches the pts dip.
  */
 int
-ptms_attach_slave(void)
+ptms_attach_subsidiary(void)
 {
 	if (pts_dip == NULL && i_ddi_attach_pseudo_node("pts") == NULL)
 		return (-1);
@@ -309,7 +318,7 @@ ptms_attach_slave(void)
  * and if it is, returns its major number.
  */
 major_t
-ptms_slave_attached(void)
+ptms_subsidiary_attached(void)
 {
 	major_t maj = DDI_MAJOR_T_NONE;
 

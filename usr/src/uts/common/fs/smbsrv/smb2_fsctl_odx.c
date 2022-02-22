@@ -667,7 +667,7 @@ smb2_fsctl_odx_write_native1(smb_request_t *sr,
 	 * allow the allocation to fail and return an error.
 	 * The client should then fall back to normal copy.
 	 */
-	buffer = kmem_alloc(bufsize, KM_NOSLEEP | KM_NORMALPRI);
+	buffer = kmem_alloc(bufsize, KM_NOSLEEP_LAZY);
 	if (buffer == NULL) {
 		status = NT_STATUS_INSUFF_SERVER_RESOURCES;
 		goto out;

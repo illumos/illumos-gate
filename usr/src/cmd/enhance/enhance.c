@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,24 +67,24 @@ int unlockpt(int fd);
 #define PTY_CNTRL "pty"
 
 /*
- * Pseudo-terminal slave device file names start with the following
+ * Pseudo-terminal subsidiary device file names start with the following
  * prefix.
  */
-#define PTY_SLAVE "tty"
+#define PTY_SUBSID "tty"
 
 /*
- * Specify the maximum suffix length for the control and slave device
+ * Specify the maximum suffix length for the control and subsidiary device
  * names.
  */
 #define PTY_MAX_SUFFIX 10
 
 /*
- * Set the maximum length of the master and slave terminal device filenames,
- * including space for a terminating '\0'.
+ * Set the maximum length of the manager and subsidiary terminal device
+ * filenames, including space for a terminating '\0'.
  */
 #define PTY_MAX_NAME (sizeof(PTY_DEV_DIR)-1 + \
-		      (sizeof(PTY_SLAVE) > sizeof(PTY_CNTRL) ? \
-		       sizeof(PTY_SLAVE) : sizeof(PTY_CNTRL))-1 \
+		      (sizeof(PTY_SUBSID) > sizeof(PTY_CNTRL) ? \
+		       sizeof(PTY_SUBSID) : sizeof(PTY_CNTRL))-1 \
 		      + PTY_MAX_SUFFIX + 1)
 /*
  * Set the maximum length of an input line.
@@ -110,15 +108,15 @@ int unlockpt(int fd);
  */
 #define PTY_READ_TIMEOUT 100000    /* micro-seconds */
 
-static int pty_open_master(const char *prog, int *cntrl, char *slave_name);
-static int pty_open_slave(const char *prog, char *slave_name);
-static int pty_child(const char *prog, int slave, char *argv[]);
+static int pty_open_manager(const char *prog, int *cntrl, char *subsid_name);
+static int pty_open_subsid(const char *prog, char *subsid_name);
+static int pty_child(const char *prog, int subsid, char *argv[]);
 static int pty_parent(const char *prog, int cntrl);
 static int pty_stop_parent(int waserr, int cntrl, GetLine *gl, char *rbuff);
 static GL_FD_EVENT_FN(pty_read_from_program);
 static int pty_write_to_fd(int fd, const char *string, int n);
 static void pty_child_exited(int sig);
-static int pty_master_readable(int fd, long usec);
+static int pty_manager_readable(int fd, long usec);
 
 /*.......................................................................
  * Run a program with enhanced terminal editing facilities.
@@ -129,11 +127,11 @@ static int pty_master_readable(int fd, long usec);
 int main(int argc, char *argv[])
 {
   int cntrl = -1;  /* The fd of the pseudo-terminal controller device */
-  int slave = -1;  /* The fd of the pseudo-terminal slave device */
+  int subsid = -1;  /* The fd of the pseudo-terminal subsidiary device */
   pid_t pid;       /* The return value of fork() */
   int status;      /* The return statuses of the parent and child functions */
-  char slave_name[PTY_MAX_NAME]; /* The filename of the slave end of the */
-                                 /*  pseudo-terminal. */
+  char subsid_name[PTY_MAX_NAME]; /* The filename of the subsidiary end of */
+				 /*  the pseudo-terminal. */
   char *prog;      /* The name of the program (ie. argv[0]) */
 /*
  * Check the arguments.
@@ -165,11 +163,11 @@ int main(int argc, char *argv[])
     };
   };
 /*
- * Open the master side of a pseudo-terminal pair, and return
+ * Open the manager side of a pseudo-terminal pair, and return
  * the corresponding file descriptor and the filename of the
- * slave end of the pseudo-terminal.
+ * subsidiary end of the pseudo-terminal.
  */
-  if(pty_open_master(prog, &cntrl, slave_name))
+  if(pty_open_manager(prog, &cntrl, subsid_name))
     return 1;
 /*
  * Set up a signal handler to watch for the child process exiting.
@@ -201,11 +199,11 @@ int main(int argc, char *argv[])
     status = pty_parent(prog, cntrl);
     close(cntrl);
   } else {
-    close(cntrl); /* The child doesn't use the slave device */
+    close(cntrl); /* The child doesn't use the subsidiary device */
     signal(SIGCHLD, pty_child_exited);
-    if((slave = pty_open_slave(prog, slave_name)) >= 0) {
-      status = pty_child(prog, slave, argv + 1);
-      close(slave);
+    if((subsid = pty_open_subsid(prog, subsid_name)) >= 0) {
+      status = pty_child(prog, subsid, argv + 1);
+      close(subsid);
     } else {
       status = 1;
     };
@@ -214,24 +212,24 @@ int main(int argc, char *argv[])
 }
 
 /*.......................................................................
- * Open the master side of a pseudo-terminal pair, and return
+ * Open the manager side of a pseudo-terminal pair, and return
  * the corresponding file descriptor and the filename of the
- * slave end of the pseudo-terminal.
+ * subsidiary end of the pseudo-terminal.
  *
  * Input/Output:
  *  prog  const char *  The name of this program.
  *  cntrl        int *  The file descriptor of the pseudo-terminal
  *                      controller device will be assigned tp *cntrl.
- *  slave_name  char *  The file-name of the pseudo-terminal slave device
- *                      will be recorded in slave_name[], which must have
+ *  subsid_name  char *  The file-name of the pseudo-terminal subsidiary device
+ *                      will be recorded in subsid_name[], which must have
  *                      at least PTY_MAX_NAME elements.
  * Output:
  *  return       int    0 - OK.
  *                      1 - Error.
  */
-static int pty_open_master(const char *prog, int *cntrl, char *slave_name)
+static int pty_open_manager(const char *prog, int *cntrl, char *subsid_name)
 {
-  char master_name[PTY_MAX_NAME]; /* The filename of the master device */
+  char manager_name[PTY_MAX_NAME]; /* The filename of the manager device */
   DIR *dir;                       /* The directory iterator */
   struct dirent *file;            /* A file in "/dev" */
 /*
@@ -240,26 +238,26 @@ static int pty_open_master(const char *prog, int *cntrl, char *slave_name)
   *cntrl = -1;
 /*
  * On systems with the Sys-V pseudo-terminal interface, we don't
- * have to search for a free master terminal. We just open /dev/ptmx,
- * and if there is a free master terminal device, we are given a file
+ * have to search for a free manager terminal. We just open /dev/ptmx,
+ * and if there is a free manager terminal device, we are given a file
  * descriptor connected to it.
  */
 #if HAVE_SYSV_PTY
   *cntrl = open("/dev/ptmx", O_RDWR);
   if(*cntrl >= 0) {
 /*
- * Get the filename of the slave side of the pseudo-terminal.
+ * Get the filename of the subsidiary side of the pseudo-terminal.
  */
     char *name = ptsname(*cntrl);
     if(name) {
       if(strlen(name)+1 > PTY_MAX_NAME) {
-	fprintf(stderr, "%s: Slave pty filename too long.\n", prog);
+	fprintf(stderr, "%s: Subsidiary pty filename too long.\n", prog);
 	return 1;
       };
-      strlcpy(slave_name, name, PTY_MAX_NAME);
+      strlcpy(subsid_name, name, PTY_MAX_NAME);
 /*
- * If unable to get the slave name, discard the controller file descriptor,
- * ready to try a search instead.
+ * If unable to get the subsidiary name, discard the controller file
+ * descriptor, ready to try a search instead.
  */
     } else {
       close(*cntrl);
@@ -269,7 +267,7 @@ static int pty_open_master(const char *prog, int *cntrl, char *slave_name)
 #endif
 /*
  * On systems without /dev/ptmx, or if opening /dev/ptmx failed,
- * we open one master terminal after another, until one that isn't
+ * we open one manager terminal after another, until one that isn't
  * in use by another program is found.
  *
  * Open the devices directory.
@@ -287,7 +285,7 @@ static int pty_open_master(const char *prog, int *cntrl, char *slave_name)
     while(*cntrl < 0 && (file = readdir(dir))) {
       if(strncmp(file->d_name, PTY_CNTRL, sizeof(PTY_CNTRL)-1) == 0) {
 /*
- * Get the common extension of the control and slave filenames.
+ * Get the common extension of the control and subsidiary filenames.
  */
 	const char *ext = file->d_name + sizeof(PTY_CNTRL)-1;
 	if(strlen(ext) > PTY_MAX_SUFFIX)
@@ -295,18 +293,18 @@ static int pty_open_master(const char *prog, int *cntrl, char *slave_name)
 /*
  * Attempt to open the control file.
  */
-	strlcpy(master_name, PTY_DEV_DIR, sizeof(master_name));
-	strlcat(master_name, PTY_CNTRL, sizeof(master_name));
-	strlcat(master_name, ext, sizeof(master_name));
-	*cntrl = open(master_name, O_RDWR);
+	strlcpy(manager_name, PTY_DEV_DIR, sizeof(manager_name));
+	strlcat(manager_name, PTY_CNTRL, sizeof(manager_name));
+	strlcat(manager_name, ext, sizeof(manager_name));
+	*cntrl = open(manager_name, O_RDWR);
 	if(*cntrl < 0)
 	  continue;
 /*
- * Attempt to open the matching slave file.
+ * Attempt to open the matching subsidiary file.
  */
-	strlcpy(slave_name, PTY_DEV_DIR, PTY_MAX_NAME);
-	strlcat(slave_name, PTY_SLAVE, PTY_MAX_NAME);
-	strlcat(slave_name, ext, PTY_MAX_NAME);
+	strlcpy(subsid_name, PTY_DEV_DIR, PTY_MAX_NAME);
+	strlcat(subsid_name, PTY_SUBSID, PTY_MAX_NAME);
+	strlcat(subsid_name, ext, PTY_MAX_NAME);
       };
     };
     closedir(dir);
@@ -321,8 +319,8 @@ static int pty_open_master(const char *prog, int *cntrl, char *slave_name)
     return 1;
   };
 /*
- * System V systems require the program that opens the master to
- * grant access to the slave side of the pseudo-terminal.
+ * System V systems require the program that opens the manager to
+ * grant access to the subsidiary side of the pseudo-terminal.
  */
 #ifdef HAVE_SYSV_PTY
   if(grantpt(*cntrl) < 0 ||
@@ -339,18 +337,18 @@ static int pty_open_master(const char *prog, int *cntrl, char *slave_name)
 }
 
 /*.......................................................................
- * Open the slave end of a pseudo-terminal.
+ * Open the subsidiary end of a pseudo-terminal.
  *
  * Input:
  *  prog   const char *  The name of this program.
- *  slave_name   char *  The filename of the slave device.
+ *  subsid_name   char *  The filename of the subsidiary device.
  * Output:
  *  return        int    The file descriptor of the successfully opened
- *                       slave device, or < 0 on error.
+ *                       subsidiary device, or < 0 on error.
  */
-static int pty_open_slave(const char *prog, char *slave_name)
+static int pty_open_subsid(const char *prog, char *subsid_name)
 {
-  int fd;  /* The file descriptor of the slave device */
+  int fd;  /* The file descriptor of the subsidiary device */
 /*
  * Place the process in its own process group. In system-V based
  * OS's, this ensures that when the pseudo-terminal is opened, it
@@ -364,16 +362,16 @@ static int pty_open_slave(const char *prog, char *slave_name)
 /*
  * Attempt to open the specified device.
  */
-  fd = open(slave_name, O_RDWR);
+  fd = open(subsid_name, O_RDWR);
   if(fd < 0) {
-    fprintf(stderr, "%s: Unable to open pseudo-terminal slave device (%s).\n",
+    fprintf(stderr, "%s: Unable to open pty subsidiary device (%s).\n",
 	    prog, strerror(errno));
     return -1;
   };
 /*
  * On system-V streams based systems, we need to push the stream modules
  * that implement pseudo-terminal and termio interfaces. At least on
- * Solaris, which pushes these automatically when a slave is opened,
+ * Solaris, which pushes these automatically when a subsidiary is opened,
  * this is redundant, so ignore errors when pushing the modules.
  */
 #if HAVE_SYSV_PTY
@@ -498,11 +496,11 @@ static int pty_stop_parent(int waserr, int cntrl, GetLine *gl, char *rbuff)
 
 /*.......................................................................
  * Run the user's program, with its stdin and stdout connected to the
- * slave end of the psuedo-terminal.
+ * subsidiary end of the psuedo-terminal.
  *
  * Input:
  *  prog  const char *   The name of this program.
- *  slave        int     The file descriptor of the slave end of the
+ *  subsid        int     The file descriptor of the subsidiary end of the
  *                       pseudo terminal.
  *  argv        char *[] The argument vector to pass to the user's program,
  *                       where argv[0] is the name of the user's program,
@@ -514,33 +512,33 @@ static int pty_stop_parent(int waserr, int cntrl, GetLine *gl, char *rbuff)
  *                       with the user's program. In this case 1 is
  *                       returned.
  */
-static int pty_child(const char *prog, int slave, char *argv[])
+static int pty_child(const char *prog, int subsid, char *argv[])
 {
   struct termios attr; /* The terminal attributes */
 /*
  * We need to stop the pseudo-terminal from echoing everything that we send it.
  */
-  if(tcgetattr(slave, &attr)) {
+  if(tcgetattr(subsid, &attr)) {
     fprintf(stderr, "%s: Can't get pseudo-terminal attributes (%s).\n", prog,
 	    strerror(errno));
     return 1;
   };
   attr.c_lflag &= ~(ECHO);
-  while(tcsetattr(slave, TCSADRAIN, &attr)) {
+  while(tcsetattr(subsid, TCSADRAIN, &attr)) {
     if(errno != EINTR) {
       fprintf(stderr, "%s: tcsetattr error: %s\n", prog, strerror(errno));
       return 1;
     };
   };
 /*
- * Arrange for stdin, stdout and stderr to be connected to the slave device,
- * ignoring errors that imply that either stdin or stdout is closed.
+ * Arrange for stdin, stdout and stderr to be connected to the subsidiary
+ * device, ignoring errors that imply that either stdin or stdout is closed.
  */
-  while(dup2(slave, STDIN_FILENO) < 0 && errno==EINTR)
+  while(dup2(subsid, STDIN_FILENO) < 0 && errno==EINTR)
     ;
-  while(dup2(slave, STDOUT_FILENO) < 0 && errno==EINTR)
+  while(dup2(subsid, STDOUT_FILENO) < 0 && errno==EINTR)
     ;
-  while(dup2(slave, STDERR_FILENO) < 0 && errno==EINTR)
+  while(dup2(subsid, STDERR_FILENO) < 0 && errno==EINTR)
     ;
 /*
  * Run the user's program.
@@ -648,7 +646,7 @@ static GL_FD_EVENT_FN(pty_read_from_program)
  */
       memmove(rbuff, nextp, len - (nextp - rbuff) + 1);
     };
-  } while(pty_master_readable(fd, PTY_READ_TIMEOUT));
+  } while(pty_manager_readable(fd, PTY_READ_TIMEOUT));
 /*
  * Make the incomplete line in the output buffer the current prompt.
  */
@@ -686,7 +684,7 @@ static int pty_write_to_fd(int fd, const char *string, int n)
 /*.......................................................................
  * This is the signal handler that is called when the child process
  * that is running the user's program exits for any reason. It closes
- * the slave end of the terminal, so that gl_get_line() in the parent
+ * the subsidiary end of the terminal, so that gl_get_line() in the parent
  * process sees an end of file.
  */
 static void pty_child_exited(int sig)
@@ -707,7 +705,7 @@ static void pty_child_exited(int sig)
  *                     available).
  *                 1 - Data is waiting to be read.
  */
-static int pty_master_readable(int fd, long usec)
+static int pty_manager_readable(int fd, long usec)
 {
 #if HAVE_SELECT
   fd_set rfds;             /* The set of file descriptors to check */

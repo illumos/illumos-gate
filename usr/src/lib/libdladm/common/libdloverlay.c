@@ -59,7 +59,6 @@ dladm_overlay_prop_info(dladm_overlay_propinfo_handle_t phdl,
 		if (sizep != NULL)
 			*sizep = oinfop->oipi_defsize;
 		if (possp != NULL) {
-			/* LINTED: E_BAD_PTR_CAST_ALIGN */
 			*possp = (const mac_propval_range_t *)oinfop->oipi_poss;
 		}
 
@@ -452,7 +451,6 @@ dladm_overlay_walk_prop(dladm_handle_t handle, datalink_id_t linkid,
 			    &bufsize) != DLADM_STATUS_OK)
 				continue;
 
-			/* LINTED: E_BAD_PTR_CAST_ALIGN */
 			vp = (uint64_t *)buf;
 			varpdid = *vp;
 		}

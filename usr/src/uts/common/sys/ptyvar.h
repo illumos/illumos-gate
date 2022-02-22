@@ -25,13 +25,11 @@
  */
 
 /*
- * Pseudo-tty driver data structures.
+ * Pseudo-terminal driver data structures.
  */
 
 #ifndef	_SYS_PTYVAR_H
 #define	_SYS_PTYVAR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/tty.h>
 
@@ -49,8 +47,8 @@ struct pty {
 	struct proc *pt_selr;		/* proc selecting on controller read */
 	struct proc *pt_selw;		/* proc selecting on controller write */
 	struct proc *pt_sele;		/* proc selecting on exception */
-	dev_t	pt_sdev;		/* XXX dev no for the slave */
-	struct vnode *pt_vnode;		/* XXX vnode for the slave */
+	dev_t	pt_sdev;		/* XXX dev no for the subsidiary */
+	struct vnode *pt_vnode;		/* XXX vnode for the subsidiary */
 	short	pt_pgrp;		/* controller side process group */
 	uchar_t	pt_send;		/* pending message to controller */
 	uchar_t	pt_ucntl;		/* pending iocontrol for controller */
@@ -67,11 +65,11 @@ struct pty {
 #define	PF_ASYNC	0x00000010	/* asynchronous I/O on controller */
 #define	PF_WOPEN	0x00000020	/* waiting for open to complete */
 #define	PF_CARR_ON	0x00000040	/* "carrier" is on (cntlr. is open) */
-#define	PF_SLAVEGONE	0x00000080	/* slave was open, but is now closed */
+#define	PF_SUBSIDGONE	0x00000080	/* subsidiary was open, now closed */
 #define	PF_PKT		0x00000100	/* packet mode */
 #define	PF_STOPPED	0x00000200	/* user told stopped */
 #define	PF_REMOTE	0x00000400	/* remote and flow controlled input */
-#define	PF_NOSTOP	0x00000800	/* slave is doing XON/XOFF */
+#define	PF_NOSTOP	0x00000800	/* subsidiary is doing XON/XOFF */
 #define	PF_UCNTL	0x00001000	/* user control mode */
 #define	PF_43UCNTL	0x00002000	/* real 4.3 user control mode */
 #define	PF_IOCTL	0x00004000	/* ioctl call in progress */

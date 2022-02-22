@@ -22,7 +22,6 @@
 # Use is subject to license terms.
 # Copyright 2018 Joyent, Inc.
 #
-# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		dladm
 ROOTFS_PROG=	$(PROG)

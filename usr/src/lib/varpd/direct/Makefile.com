@@ -24,8 +24,7 @@ LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lumem -lnvpair
 CPPFLAGS +=	-I../common
 
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
+CSTD=		$(CSTD_GNU99)
 
 SRCDIR =	../common
 

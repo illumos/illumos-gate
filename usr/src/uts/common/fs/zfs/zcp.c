@@ -718,8 +718,7 @@ static void *
 zcp_lua_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
 {
 	zcp_alloc_arg_t *allocargs = ud;
-	int flags = (allocargs->aa_must_succeed) ?
-	    KM_SLEEP : (KM_NOSLEEP | KM_NORMALPRI);
+	int flags = (allocargs->aa_must_succeed) ? KM_SLEEP : KM_NOSLEEP_LAZY;
 
 	if (nsize == 0) {
 		if (ptr != NULL) {

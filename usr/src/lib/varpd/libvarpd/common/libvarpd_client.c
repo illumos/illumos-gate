@@ -76,7 +76,7 @@ libvarpd_c_door_call(varpd_client_t *client, varpd_client_arg_t *argp,
 		case ENOTSUP:
 		case EOVERFLOW:
 		case ENFILE:
-			libvarpd_panic("unhandalable errno from door_call: %d",
+			libvarpd_panic("unhandleable errno from door_call: %d",
 			    errno);
 		}
 		ret = errno;

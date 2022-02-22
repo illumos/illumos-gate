@@ -242,7 +242,7 @@ static int cryptmod_fd = -1;
 #define	TS_DONT		8	/* dont " */
 
 static int	ncc;
-static int	master;		/* master side of pty */
+static int	manager;	/* manager side of pty */
 static int	pty;		/* side of pty that gets ioctls */
 static int	net;
 static int	inter;
@@ -2754,20 +2754,20 @@ doit(int f, struct sockaddr_storage *who)
 	char username[MAXUSERNAMELEN];
 	int len;
 	uchar_t passthru;
-	char *slavename;
+	char *subsidname;
 
 	if ((p = open("/dev/ptmx", O_RDWR | O_NOCTTY)) == -1) {
 		fatalperror(f, "open /dev/ptmx", errno);
 	}
 	if (grantpt(p) == -1)
-		fatal(f, "could not grant slave pty");
+		fatal(f, "could not grant subsidiary pty");
 	if (unlockpt(p) == -1)
-		fatal(f, "could not unlock slave pty");
-	if ((slavename = ptsname(p)) == NULL)
-		fatal(f, "could not enable slave pty");
+		fatal(f, "could not unlock subsidiary pty");
+	if ((subsidname = ptsname(p)) == NULL)
+		fatal(f, "could not enable subsidiary pty");
 	(void) dup2(f, 0);
-	if ((t = open(slavename, O_RDWR | O_NOCTTY)) == -1)
-		fatal(f, "could not open slave pty");
+	if ((t = open(subsidname, O_RDWR | O_NOCTTY)) == -1)
+		fatal(f, "could not open subsidiary pty");
 	if (ioctl(t, I_PUSH, "ptem") == -1)
 		fatalperror(f, "ioctl I_PUSH ptem", errno);
 	if (ioctl(t, I_PUSH, "ldterm") == -1)
@@ -2775,7 +2775,7 @@ doit(int f, struct sockaddr_storage *who)
 	if (ioctl(t, I_PUSH, "ttcompat") == -1)
 		fatalperror(f, "ioctl I_PUSH ttcompat", errno);
 
-	line = slavename;
+	line = subsidname;
 
 	pty = t;
 
@@ -3039,7 +3039,7 @@ doit(int f, struct sockaddr_storage *who)
 		fatal(netfd, "ioctl LOGDMX_IOC_QEXCHANGE of ptmfd failed\n");
 
 	net = netfd;
-	master = ptmfd;
+	manager = ptmfd;
 	cryptmod_fd = netfd;
 
 	/*
@@ -3100,11 +3100,11 @@ doit(int f, struct sockaddr_storage *who)
 	if ((pid = fork()) < 0)
 		fatalperror(netfd, "fork", errno);
 	if (pid)
-		telnet(net, master);
+		telnet(net, manager);
 	/*
 	 * The child process needs to be the session leader
 	 * and have the pty as its controlling tty.  Thus we need
-	 * to re-open the slave side of the pty no without
+	 * to re-open the subsidiary side of the pty no without
 	 * the O_NOCTTY flag that we have been careful to
 	 * use up to this point.
 	 */
@@ -3130,10 +3130,10 @@ doit(int f, struct sockaddr_storage *who)
 	if (terminaltype)
 		(void) local_setenv("TERM", terminaltype+5, 1);
 	/*
-	 * 	-h : pass on name of host.
+	 *	-h : pass on name of host.
 	 *		WARNING:  -h is accepted by login if and only if
 	 *			getuid() == 0.
-	 * 	-p : don't clobber the environment (so terminal type stays set).
+	 *	-p : don't clobber the environment (so terminal type stays set).
 	 */
 	{
 		/* System V login expects a utmp entry to already be there */
@@ -3192,7 +3192,7 @@ doit(int f, struct sockaddr_storage *who)
 	    ((AuthenticatingUser != NULL) && strlen(AuthenticatingUser))) {
 		(void) execl(LOGIN_PROGRAM, "login",
 			    "-p",
-			    "-d", slavename,
+			    "-d", subsidname,
 			    "-h", host,
 			    "-u", krb5_name,
 			    "-s", pam_svc_name,
@@ -3208,7 +3208,7 @@ doit(int f, struct sockaddr_storage *who)
 		 */
 		(void) execl(LOGIN_PROGRAM, "login",
 		    "-p",
-		    "-d", slavename,
+		    "-d", subsidname,
 		    "-h", host,
 		    "-s", pam_svc_name, "--",
 		    (AuthenticatingUser != NULL ? AuthenticatingUser :
@@ -3216,7 +3216,7 @@ doit(int f, struct sockaddr_storage *who)
 
 	} else /* default, no auth. info available, login does it all */ {
 		(void) execl(LOGIN_PROGRAM, "login",
-		    "-p", "-h", host, "-d", slavename, "--",
+		    "-p", "-h", host, "-d", subsidname, "--",
 		    getenv("USER"), 0);
 	}
 
@@ -3254,7 +3254,7 @@ fatalperror(int f, char *msg, int errnum)
  * inkernel telnet streams module (telmod).
  */
 static void
-telnet(int net, int master)
+telnet(int net, int manager)
 {
 	int on = 1;
 	char mode;
@@ -3265,7 +3265,7 @@ telnet(int net, int master)
 
 	if (ioctl(net, FIONBIO, &on) == -1)
 		syslog(LOG_INFO, "ioctl FIONBIO net: %m\n");
-	if (ioctl(master, FIONBIO, &on) == -1)
+	if (ioctl(manager, FIONBIO, &on) == -1)
 		syslog(LOG_INFO, "ioctl FIONBIO pty p: %m\n");
 	(void) signal(SIGTSTP, SIG_IGN);
 	(void) signal(SIGCHLD, (void (*)())cleanup);
@@ -3302,7 +3302,7 @@ telnet(int net, int master)
 		 * stuff in the corresponding output buffer
 		 */
 		if (pfrontp - pbackp) {
-			FD_SET(master, &obits);
+			FD_SET(manager, &obits);
 		} else {
 			FD_SET(net, &ibits);
 		}
@@ -3390,7 +3390,7 @@ telnet(int net, int master)
 				fatal(net, "ioctl TEL_IOC_GETBLK failed\n");
 		}
 
-		if ((c = select(max(net, master) + 1, &ibits, &obits, &xbits,
+		if ((c = select(max(net, manager) + 1, &ibits, &obits, &xbits,
 		    (struct timeval *)0)) < 1) {
 			if (c == -1) {
 				if (errno == EINTR) {
@@ -3427,7 +3427,7 @@ telnet(int net, int master)
 			netflush();
 		if (ncc > 0)
 			telrcv();
-		if (FD_ISSET(master, &obits) && (pfrontp - pbackp) > 0)
+		if (FD_ISSET(manager, &obits) && (pfrontp - pbackp) > 0)
 			ptyflush();
 	}
 	cleanup(0);
@@ -4279,7 +4279,7 @@ ptyflush(void)
 	int n;
 
 	if ((n = pfrontp - pbackp) > 0)
-		n = write(master, pbackp, n);
+		n = write(manager, pbackp, n);
 	if (n < 0)
 		return;
 	pbackp += n;
@@ -4447,9 +4447,9 @@ cleanup(int signum)
 	/*
 	 * If the TEL_IOC_ENABLE ioctl hasn't completed, then we need to
 	 * handle closing differently.  We close "net" first and then
-	 * "master" in that order.  We do close(net) first because
+	 * "manager" in that order.  We do close(net) first because
 	 * we have no other way to disconnect forwarding between the network
-	 * and master.  So by issuing the close()'s we ensure that no further
+	 * and manager.  So by issuing the close()'s we ensure that no further
 	 * data rises from TCP.  A more complex fix would be adding proper
 	 * support for throwing a "stop" switch for forwarding data between
 	 * logindmux peers.  It's possible to block in the close of the tty
@@ -4460,7 +4460,7 @@ cleanup(int signum)
 
 	if (!telmod_init_done) {
 		(void) close(net);
-		(void) close(master);
+		(void) close(manager);
 	}
 	rmut();
 

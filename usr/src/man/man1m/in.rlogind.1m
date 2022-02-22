@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IN.RLOGIND 1M "June 20, 2021"
+.TH IN.RLOGIND 1M "February 5, 2022"
 .SH NAME
 in.rlogind, rlogind \- remote login server
 .SH SYNOPSIS
@@ -82,9 +82,9 @@ client is present in  \fB/etc/hosts.equiv\fR. See \fBhosts\fR(4) and
 .sp
 .LP
 Once the source port and address have been checked, \fBin.rlogind\fR allocates
-a pseudo-terminal and manipulates file descriptors so that the slave half of
-the pseudo-terminal becomes the \fBstdin\fR, \fBstdout\fR, and \fBstderr\fR for
-a login process. The login process is an instance of the \fBlogin\fR(1)
+a pseudo-terminal and manipulates file descriptors so that the subsidiary half
+of the pseudo-terminal becomes the \fBstdin\fR, \fBstdout\fR, and \fBstderr\fR
+for a login process.  The login process is an instance of the \fBlogin\fR(1)
 program, invoked with the \fB-r\fR.
 .sp
 .LP
@@ -93,7 +93,7 @@ process. See \fBSECURITY\fR below.  If automatic authentication fails, it
 reprompts the user to login.
 .sp
 .LP
-The parent of the login process manipulates the master side of the
+The parent of the login process manipulates the manager side of the
 pseudo-terminal, operating as an intermediary between the login process and the
 client instance of the \fBrlogin\fR program.  In normal operation, a packet
 protocol is invoked to provide Ctrl-S and Ctrl-Q type facilities and propagate

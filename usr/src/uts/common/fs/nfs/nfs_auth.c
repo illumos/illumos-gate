@@ -922,7 +922,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 
 		rw_exit(&exi->exi_cache_lock);
 
-		nc = kmem_alloc(sizeof (*nc), KM_NOSLEEP | KM_NORMALPRI);
+		nc = kmem_alloc(sizeof (*nc), KM_NOSLEEP_LAZY);
 		if (nc == NULL)
 			goto retrieve;
 
@@ -930,8 +930,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 		 * Initialize the new auth_cache_clnt
 		 */
 		nc->authc_addr = addr;
-		nc->authc_addr.buf = kmem_alloc(addr.maxlen,
-		    KM_NOSLEEP | KM_NORMALPRI);
+		nc->authc_addr.buf = kmem_alloc(addr.maxlen, KM_NOSLEEP_LAZY);
 		if (addr.maxlen != 0 && nc->authc_addr.buf == NULL) {
 			kmem_free(nc, sizeof (*nc));
 			goto retrieve;
@@ -972,8 +971,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 
 		rw_exit(&c->authc_lock);
 
-		np = kmem_cache_alloc(exi_cache_handle,
-		    KM_NOSLEEP | KM_NORMALPRI);
+		np = kmem_cache_alloc(exi_cache_handle, KM_NOSLEEP_LAZY);
 		if (np == NULL) {
 			rw_exit(&exi->exi_cache_lock);
 			goto retrieve;
@@ -1071,7 +1069,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 				 * auth_cache entry
 				 */
 				tmpgids = kmem_alloc(tmpngids * sizeof (gid_t),
-				    KM_NOSLEEP | KM_NORMALPRI);
+				    KM_NOSLEEP_LAZY);
 				if (tmpgids != NULL)
 					bcopy(*gids, tmpgids,
 					    tmpngids * sizeof (gid_t));

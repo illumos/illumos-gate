@@ -30,18 +30,18 @@
  * This driver, derived from the pts/ptm drivers, is the pseudo console driver
  * for system zones.  Its implementation is straightforward.  Each instance
  * of the driver represents a global-zone/local-zone pair (this maps in a
- * straightforward way to the commonly used terminal notion of "master side"
- * and "slave side", and we use that terminology throughout).
+ * straightforward way to the commonly used terminal notion of "manager side"
+ * and "subsidiary side", and we use that terminology throughout).
  *
  * Instances of zcons are onlined as children of /pseudo/zconsnex@1/
  * by zoneadmd in userland, using the devctl framework; thus the driver
  * does not need to maintain any sort of "admin" node.
  *
- * The driver shuttles I/O from master side to slave side and back.  In a break
- * from the pts/ptm semantics, if one side is not open, I/O directed towards
- * it will simply be discarded.  This is so that if zoneadmd is not holding
- * the master side console open (i.e. it has died somehow), processes in
- * the zone do not experience any errors and I/O to the console does not
+ * The driver shuttles I/O from manager side to subsidiary side and back.  In a
+ * break from the pts/ptm semantics, if one side is not open, I/O directed
+ * towards it will simply be discarded.  This is so that if zoneadmd is not
+ * holding the manager side console open (i.e. it has died somehow), processes
+ * in the zone do not experience any errors and I/O to the console does not
  * hang.
  *
  * TODO: we may want to revisit the other direction; i.e. we may want
@@ -50,64 +50,67 @@
  *
  *
  *
- * MASTER SIDE IOCTLS
+ * MANAGER SIDE IOCTLS
  *
- * The ZC_HOLDSLAVE and ZC_RELEASESLAVE ioctls instruct the master side of the
- * console to hold and release a reference to the slave side's vnode.  They are
- * meant to be issued by zoneadmd after the console device node is created and
- * before it is destroyed so that the slave's STREAMS anchor, ptem, is
- * preserved when ttymon starts popping STREAMS modules from within the
- * associated zone.  This guarantees that the zone console will always have
+ * The ZC_HOLDSUBSID and ZC_RELEASESUBSID ioctls instruct the manager side of
+ * the console to hold and release a reference to the subsidiary side's vnode.
+ * They are meant to be issued by zoneadmd after the console device node is
+ * created and before it is destroyed so that the subsidiary's STREAMS anchor,
+ * ptem, is preserved when ttymon starts popping STREAMS modules from within
+ * the associated zone.  This guarantees that the zone console will always have
  * terminal semantics while the zone is running.
  *
  * Here is the issue: the ptem module is anchored in the zone console
- * (slave side) so that processes within the associated non-global zone will
- * fail to pop it off, thus ensuring that the slave will retain terminal
- * semantics.  When a process attempts to pop the anchor off of a stream, the
- * STREAMS subsystem checks whether the calling process' zone is the same as
- * that of the process that pushed the anchor onto the stream and cancels the
- * pop if they differ.  zoneadmd used to hold an open file descriptor for the
- * slave while the associated non-global zone ran, thus ensuring that the
- * slave's STREAMS anchor would never be popped from within the non-global zone
- * (because zoneadmd runs in the global zone).  However, this file descriptor
- * was removed to make zone console management more robust.  sad(7D) is now
- * used to automatically set up the slave's STREAMS modules when the zone
- * console is freshly opened within the associated non-global zone.  However,
- * when a process within the non-global zone freshly opens the zone console, the
- * anchor is pushed from within the non-global zone, making it possible for
- * processes within the non-global zone (e.g., ttymon) to pop the anchor and
- * destroy the zone console's terminal semantics.
+ * (subsidiary side) so that processes within the associated non-global zone
+ * will fail to pop it off, thus ensuring that the subsidiary will retain
+ * terminal semantics.  When a process attempts to pop the anchor off of a
+ * stream, the STREAMS subsystem checks whether the calling process' zone is
+ * the same as that of the process that pushed the anchor onto the stream and
+ * cancels the pop if they differ.  zoneadmd used to hold an open file
+ * descriptor for the subsidiary while the associated non-global zone ran, thus
+ * ensuring that the subsidiary's STREAMS anchor would never be popped from
+ * within the non-global zone (because zoneadmd runs in the global zone).
+ * However, this file descriptor was removed to make zone console management
+ * more robust.  sad(7D) is now used to automatically set up the subsidiary's
+ * STREAMS modules when the zone console is freshly opened within the
+ * associated non-global zone.  However, when a process within the non-global
+ * zone freshly opens the zone console, the anchor is pushed from within the
+ * non-global zone, making it possible for processes within the non-global zone
+ * (e.g., ttymon) to pop the anchor and destroy the zone console's terminal
+ * semantics.
  *
- * One solution is to make the zcons device hold the slave open while the
+ * One solution is to make the zcons device hold the subsidiary open while the
  * associated non-global zone runs so that the STREAMS anchor will always be
- * associated with the global zone.  Unfortunately, the slave cannot be opened
- * from within the zcons driver because the driver is not reentrant: it has
- * an outer STREAMS perimeter.  Therefore, the next best option is for zcons to
- * provide an ioctl interface to zoneadmd to manage holding and releasing
- * the slave side of the console.  It is sufficient to hold the slave side's
- * vnode and bump the associated snode's reference count to preserve the slave's
- * STREAMS configuration while the associated zone runs, so that's what the
- * ioctls do.
+ * associated with the global zone.  Unfortunately, the subsidiary cannot be
+ * opened from within the zcons driver because the driver is not reentrant: it
+ * has an outer STREAMS perimeter.  Therefore, the next best option is for
+ * zcons to provide an ioctl interface to zoneadmd to manage holding and
+ * releasing the subsidiary side of the console.  It is sufficient to hold the
+ * subsidiary side's vnode and bump the associated snode's reference count to
+ * preserve the subsidiary's STREAMS configuration while the associated zone
+ * runs, so that's what the ioctls do.
  *
  *
- * ZC_HOLDSLAVE
+ * ZC_HOLDSUBSID
  *
  * This ioctl takes a file descriptor as an argument.  It effectively gets a
- * reference to the slave side's minor node's vnode and bumps the associated
- * snode's reference count.  The vnode reference is stored in the zcons device
- * node's soft state.  This ioctl succeeds if the given file descriptor refers
- * to the slave side's minor node or if there is already a reference to the
- * slave side's minor node's vnode in the device's soft state.
+ * reference to the subsidiary side's minor node's vnode and bumps the
+ * associated snode's reference count.  The vnode reference is stored in the
+ * zcons device node's soft state.  This ioctl succeeds if the given file
+ * descriptor refers to the subsidiary side's minor node or if there is already
+ * a reference to the subsidiary side's minor node's vnode in the device's soft
+ * state.
  *
  *
- * ZC_RELEASESLAVE
+ * ZC_RELEASESUBSID
  *
  * This ioctl takes a file descriptor as an argument.  It effectively releases
  * the vnode reference stored in the zcons device node's soft state (which was
- * previously acquired via ZC_HOLDSLAVE) and decrements the reference count of
+ * previously acquired via ZC_HOLDSUBSID) and decrements the reference count of
  * the snode associated with the vnode.  This ioctl succeeds if the given file
- * descriptor refers to the slave side's minor node or if no reference to the
- * slave side's minor node's vnode is stored in the device's soft state.
+ * descriptor refers to the subsidiary side's minor node or if no reference to
+ * the subsidiary side's minor node's vnode is stored in the device's soft
+ * state.
  *
  *
  * Note that the file descriptor arguments for both ioctls must be cast to
@@ -117,35 +120,36 @@
  *
  *     Zone boot:
  *     1.  While booting the zone, zoneadmd creates an instance of zcons.
- *     2.  zoneadmd opens the master and slave sides of the new zone console
- *         and issues the ZC_HOLDSLAVE ioctl on the master side, passing its
- *         file descriptor for the slave side as the ioctl argument.
- *     3.  zcons holds the slave side's vnode, bumps the snode's reference
+ *     2.  zoneadmd opens the manager and subsidiary sides of the new zone
+ *         console and issues the ZC_HOLDSUBSID ioctl on the manager side,
+ *         passing its file descriptor for the subsidiary side as the ioctl
+ *         argument.
+ *     3.  zcons holds the subsidiary side's vnode, bumps the snode's reference
  *         count, and stores a pointer to the vnode in the device's soft
  *         state.
- *     4.  zoneadmd closes the master and slave sides and continues to boot
- *         the zone.
+ *     4.  zoneadmd closes the manager and subsidiary sides and continues to
+ *         boot the zone.
  *
  *     Zone halt:
- *     1.  While halting the zone, zoneadmd opens the master and slave sides
- *         of the zone's console and issues the ZC_RELEASESLAVE ioctl on the
- *         master side, passing its file descriptor for the slave side as the
- *         ioctl argument.
- *     2.  zcons decrements the slave side's snode's reference count, releases
- *         the slave's vnode, and eliminates its reference to the vnode in the
- *         device's soft state.
- *     3.  zoneadmd closes the master and slave sides.
+ *     1.  While halting the zone, zoneadmd opens the manager and subsidiary
+ *         sides of the zone's console and issues the ZC_RELEASESUBSID ioctl on
+ *         the manager side, passing its file descriptor for the subsidiary
+ *         side as the ioctl argument.
+ *     2.  zcons decrements the subsidiary side's snode's reference count,
+ *         releases the subsidiary's vnode, and eliminates its reference to the
+ *         vnode in the device's soft state.
+ *     3.  zoneadmd closes the manager and subsidiary sides.
  *     4.  zoneadmd destroys the zcons device and continues to halt the zone.
  *
- * It is necessary for zoneadmd to hold the slave open while issuing
- * ZC_RELEASESLAVE because zcons might otherwise release the last reference to
- * the slave's vnode.  If it does, then specfs will panic because it will expect
- * that the STREAMS configuration for the vnode was destroyed, which VN_RELE
- * doesn't do.  Forcing zoneadmd to hold the slave open guarantees that zcons
- * won't release the vnode's last reference.  zoneadmd will properly destroy the
- * vnode and the snode when it closes the file descriptor.
+ * It is necessary for zoneadmd to hold the subsidiary open while issuing
+ * ZC_RELEASESUBSID because zcons might otherwise release the last reference to
+ * the subsidiary's vnode.  If it does, then specfs will panic because it will
+ * expect that the STREAMS configuration for the vnode was destroyed, which
+ * VN_RELE doesn't do.  Forcing zoneadmd to hold the subsidiary open guarantees
+ * that zcons won't release the vnode's last reference.  zoneadmd will properly
+ * destroy the vnode and the snode when it closes the file descriptor.
  *
- * Technically, any process that can access the master side can issue these
+ * Technically, any process that can access the manager side can issue these
  * ioctls, but they should be treated as private interfaces for zoneadmd.
  */
 
@@ -186,21 +190,22 @@ static int zc_wsrv(queue_t *);
 
 /*
  * The instance number is encoded in the dev_t in the minor number; the lowest
- * bit of the minor number is used to track the master vs. slave side of the
- * virtual console.  The rest of the bits in the minor number are the instance.
+ * bit of the minor number is used to track the manager vs. subsidiary side of
+ * the virtual console.  The rest of the bits in the minor number are the
+ * instance.
  */
-#define	ZC_MASTER_MINOR		0
-#define	ZC_SLAVE_MINOR		1
+#define	ZC_MANAGER_MINOR	0
+#define	ZC_SUBSID_MINOR		1
 
 #define	ZC_INSTANCE(x)		(getminor((x)) >> 1)
 #define	ZC_NODE(x)		(getminor((x)) & 0x01)
 
 /*
- * This macro converts a zc_state_t pointer to the associated slave minor node's
- * dev_t.
+ * This macro converts a zc_state_t pointer to the associated subsidiary minor
+ * node's dev_t.
  */
-#define	ZC_STATE_TO_SLAVEDEV(x)	(makedevice(ddi_driver_major((x)->zc_devinfo), \
-	(minor_t)(ddi_get_instance((x)->zc_devinfo) << 1 | ZC_SLAVE_MINOR)))
+#define	ZC_STATE_TO_SUBDEV(x)	(makedevice(ddi_driver_major((x)->zc_devinfo), \
+	(minor_t)(ddi_get_instance((x)->zc_devinfo) << 1 | ZC_SUBSID_MINOR)))
 
 int zcons_debug = 0;
 #define	DBG(a)   if (zcons_debug) cmn_err(CE_NOTE, a)
@@ -272,9 +277,9 @@ static struct modlinkage modlinkage = {
 
 typedef struct zc_state {
 	dev_info_t *zc_devinfo;
-	queue_t *zc_master_rdq;
-	queue_t *zc_slave_rdq;
-	vnode_t *zc_slave_vnode;
+	queue_t *zc_manager_rdq;
+	queue_t *zc_subsid_rdq;
+	vnode_t *zc_subsid_vnode;
 	int zc_state;
 } zc_state_t;
 
@@ -284,7 +289,7 @@ typedef struct zc_state {
 static void *zc_soft_state;
 
 /*
- * List of STREAMS modules that should be pushed onto every slave instance.
+ * List of STREAMS modules that should be pushed onto every subsidiary instance.
  */
 static char *zcons_mods[] = {
 	"ptem",
@@ -343,12 +348,12 @@ zc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	/*
-	 * Create the master and slave minor nodes.
+	 * Create the manager and subsidiary minor nodes.
 	 */
-	if ((ddi_create_minor_node(dip, ZCONS_SLAVE_NAME, S_IFCHR,
-	    instance << 1 | ZC_SLAVE_MINOR, DDI_PSEUDO, 0) == DDI_FAILURE) ||
-	    (ddi_create_minor_node(dip, ZCONS_MASTER_NAME, S_IFCHR,
-	    instance << 1 | ZC_MASTER_MINOR, DDI_PSEUDO, 0) == DDI_FAILURE)) {
+	if ((ddi_create_minor_node(dip, ZCONS_SUBSIDIARY_NAME, S_IFCHR,
+	    instance << 1 | ZC_SUBSID_MINOR, DDI_PSEUDO, 0) == DDI_FAILURE) ||
+	    (ddi_create_minor_node(dip, ZCONS_MANAGER_NAME, S_IFCHR,
+	    instance << 1 | ZC_MANAGER_MINOR, DDI_PSEUDO, 0) == DDI_FAILURE)) {
 		ddi_remove_minor_node(dip, NULL);
 		ddi_soft_state_free(zc_soft_state, instance);
 		return (DDI_FAILURE);
@@ -388,7 +393,6 @@ zc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  * zc_getinfo()
  *	getinfo(9e) entrypoint.
  */
-/*ARGSUSED*/
 static int
 zc_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {
@@ -410,7 +414,7 @@ zc_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 
 /*
  * Return the equivalent queue from the other side of the relationship.
- * e.g.: given the slave's write queue, return the master's write queue.
+ * e.g.: given the subsidiary's write queue, return the manager's write queue.
  */
 static queue_t *
 zc_switch(queue_t *qp)
@@ -418,16 +422,19 @@ zc_switch(queue_t *qp)
 	zc_state_t *zcs = qp->q_ptr;
 	ASSERT(zcs != NULL);
 
-	if (qp == zcs->zc_master_rdq)
-		return (zcs->zc_slave_rdq);
-	else if (OTHERQ(qp) == zcs->zc_master_rdq && zcs->zc_slave_rdq != NULL)
-		return (OTHERQ(zcs->zc_slave_rdq));
-	else if (qp == zcs->zc_slave_rdq)
-		return (zcs->zc_master_rdq);
-	else if (OTHERQ(qp) == zcs->zc_slave_rdq && zcs->zc_master_rdq != NULL)
-		return (OTHERQ(zcs->zc_master_rdq));
-	else
+	if (qp == zcs->zc_manager_rdq) {
+		return (zcs->zc_subsid_rdq);
+	} else if (OTHERQ(qp) == zcs->zc_manager_rdq &&
+	    zcs->zc_subsid_rdq != NULL) {
+		return (OTHERQ(zcs->zc_subsid_rdq));
+	} else if (qp == zcs->zc_subsid_rdq) {
+		return (zcs->zc_manager_rdq);
+	} else if (OTHERQ(qp) == zcs->zc_subsid_rdq &&
+	    zcs->zc_manager_rdq != NULL) {
+		return (OTHERQ(zcs->zc_manager_rdq));
+	} else {
 		return (NULL);
+	}
 }
 
 /*
@@ -440,17 +447,16 @@ zc_side(queue_t *qp)
 	zc_state_t *zcs = qp->q_ptr;
 	ASSERT(zcs != NULL);
 
-	if (qp == zcs->zc_master_rdq ||
-	    OTHERQ(qp) == zcs->zc_master_rdq) {
-		return ("master");
+	if (qp == zcs->zc_manager_rdq ||
+	    OTHERQ(qp) == zcs->zc_manager_rdq) {
+		return ("manager");
 	}
-	ASSERT(qp == zcs->zc_slave_rdq || OTHERQ(qp) == zcs->zc_slave_rdq);
-	return ("slave");
+	ASSERT(qp == zcs->zc_subsid_rdq || OTHERQ(qp) == zcs->zc_subsid_rdq);
+	return ("subsidiary");
 }
 
-/*ARGSUSED*/
 static int
-zc_master_open(zc_state_t *zcs,
+zc_manager_open(zc_state_t *zcs,
     queue_t	*rqp,	/* pointer to the read side queue */
     dev_t	*devp,	/* pointer to stream tail's dev */
     int		oflag,	/* the user open(2) supplied flags */
@@ -461,14 +467,14 @@ zc_master_open(zc_state_t *zcs,
 	struct stroptions *sop;
 
 	/*
-	 * Enforce exclusivity on the master side; the only consumer should
+	 * Enforce exclusivity on the manager side; the only consumer should
 	 * be the zoneadmd for the zone.
 	 */
 	if ((zcs->zc_state & ZC_STATE_MOPEN) != 0)
 		return (EBUSY);
 
 	if ((mop = allocb(sizeof (struct stroptions), BPRI_MED)) == NULL) {
-		DBG("zc_master_open(): mop allocation failed\n");
+		DBG("zc_manager_open(): mop allocation failed\n");
 		return (ENOMEM);
 	}
 
@@ -482,13 +488,13 @@ zc_master_open(zc_state_t *zcs,
 	qprocson(rqp);
 
 	/*
-	 * Following qprocson(), the master side is fully plumbed into the
-	 * STREAM and may send/receive messages.  Setting zcs->zc_master_rdq
-	 * will allow the slave to send messages to us (the master).
-	 * This cannot occur before qprocson() because the master is not
+	 * Following qprocson(), the manager side is fully plumbed into the
+	 * STREAM and may send/receive messages.  Setting zcs->zc_manager_rdq
+	 * will allow the subsidiary to send messages to us (the manager).
+	 * This cannot occur before qprocson() because the manager is not
 	 * ready to process them until that point.
 	 */
-	zcs->zc_master_rdq = rqp;
+	zcs->zc_manager_rdq = rqp;
 
 	/*
 	 * set up hi/lo water marks on stream head read queue and add
@@ -508,9 +514,8 @@ zc_master_open(zc_state_t *zcs,
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
-zc_slave_open(zc_state_t *zcs,
+zc_subsidiary_open(zc_state_t *zcs,
     queue_t	*rqp,	/* pointer to the read side queue */
     dev_t	*devp,	/* pointer to stream tail's dev */
     int		oflag,	/* the user open(2) supplied flags */
@@ -525,7 +530,7 @@ zc_slave_open(zc_state_t *zcs,
 	uint_t anchorindex;
 
 	/*
-	 * The slave side can be opened as many times as needed.
+	 * The subsidiary side can be opened as many times as needed.
 	 */
 	if ((zcs->zc_state & ZC_STATE_SOPEN) != 0) {
 		ASSERT((rqp != NULL) && (WR(rqp)->q_ptr == zcs));
@@ -538,18 +543,18 @@ zc_slave_open(zc_state_t *zcs,
 	 * in place (see streamio(7i)) because we always want the console to
 	 * have terminal semantics.
 	 */
-	minor = ddi_get_instance(zcs->zc_devinfo) << 1 | ZC_SLAVE_MINOR;
+	minor = ddi_get_instance(zcs->zc_devinfo) << 1 | ZC_SUBSID_MINOR;
 	major = ddi_driver_major(zcs->zc_devinfo);
 	lastminor = 0;
 	anchorindex = 1;
 	if (kstr_autopush(SET_AUTOPUSH, &major, &minor, &lastminor,
 	    &anchorindex, zcons_mods) != 0) {
-		DBG("zc_slave_open(): kstr_autopush() failed\n");
+		DBG("zc_subsidiary_open(): kstr_autopush() failed\n");
 		return (EIO);
 	}
 
 	if ((mop = allocb(sizeof (struct stroptions), BPRI_MED)) == NULL) {
-		DBG("zc_slave_open(): mop allocation failed\n");
+		DBG("zc_subsidiary_open(): mop allocation failed\n");
 		return (ENOMEM);
 	}
 
@@ -566,7 +571,7 @@ zc_slave_open(zc_state_t *zcs,
 	/*
 	 * Must follow qprocson(), since we aren't ready to process until then.
 	 */
-	zcs->zc_slave_rdq = rqp;
+	zcs->zc_subsid_rdq = rqp;
 
 	/*
 	 * set up hi/lo water marks on stream head read queue and add
@@ -604,11 +609,11 @@ zc_open(queue_t *rqp,	/* pointer to the read side queue */
 		return (ENXIO);
 
 	switch (ZC_NODE(*devp)) {
-	case ZC_MASTER_MINOR:
-		ret = zc_master_open(zcs, rqp, devp, oflag, sflag, credp);
+	case ZC_MANAGER_MINOR:
+		ret = zc_manager_open(zcs, rqp, devp, oflag, sflag, credp);
 		break;
-	case ZC_SLAVE_MINOR:
-		ret = zc_slave_open(zcs, rqp, devp, oflag, sflag, credp);
+	case ZC_SUBSID_MINOR:
+		ret = zc_subsidiary_open(zcs, rqp, devp, oflag, sflag, credp);
 		break;
 	default:
 		ret = ENXIO;
@@ -621,7 +626,6 @@ zc_open(queue_t *rqp,	/* pointer to the read side queue */
 /*
  * close(9e) entrypoint.
  */
-/*ARGSUSED1*/
 static int
 zc_close(queue_t *rqp, int flag, cred_t *credp)
 {
@@ -633,33 +637,33 @@ zc_close(queue_t *rqp, int flag, cred_t *credp)
 
 	zcs = (zc_state_t *)rqp->q_ptr;
 
-	if (rqp == zcs->zc_master_rdq) {
-		DBG("Closing master side");
+	if (rqp == zcs->zc_manager_rdq) {
+		DBG("Closing manager side");
 
-		zcs->zc_master_rdq = NULL;
+		zcs->zc_manager_rdq = NULL;
 		zcs->zc_state &= ~ZC_STATE_MOPEN;
 
 		/*
-		 * qenable slave side write queue so that it can flush
-		 * its messages as master's read queue is going away
+		 * qenable subsidiary side write queue so that it can flush
+		 * its messages as manager's read queue is going away
 		 */
-		if (zcs->zc_slave_rdq != NULL) {
-			qenable(WR(zcs->zc_slave_rdq));
+		if (zcs->zc_subsid_rdq != NULL) {
+			qenable(WR(zcs->zc_subsid_rdq));
 		}
 
 		qprocsoff(rqp);
 		WR(rqp)->q_ptr = rqp->q_ptr = NULL;
 
-	} else if (rqp == zcs->zc_slave_rdq) {
+	} else if (rqp == zcs->zc_subsid_rdq) {
 
-		DBG("Closing slave side");
+		DBG("Closing subsidiary side");
 		zcs->zc_state &= ~ZC_STATE_SOPEN;
-		zcs->zc_slave_rdq = NULL;
+		zcs->zc_subsid_rdq = NULL;
 
 		wqp = WR(rqp);
 		while ((bp = getq(wqp)) != NULL) {
-			if (zcs->zc_master_rdq != NULL)
-				putnext(zcs->zc_master_rdq, bp);
+			if (zcs->zc_manager_rdq != NULL)
+				putnext(zcs->zc_manager_rdq, bp);
 			else if (bp->b_datap->db_type == M_IOCTL)
 				miocnak(wqp, bp, 0, 0);
 			else
@@ -667,11 +671,11 @@ zc_close(queue_t *rqp, int flag, cred_t *credp)
 		}
 
 		/*
-		 * Qenable master side write queue so that it can flush its
-		 * messages as slaves's read queue is going away.
+		 * Qenable manager side write queue so that it can flush its
+		 * messages as subsidiarys's read queue is going away.
 		 */
-		if (zcs->zc_master_rdq != NULL)
-			qenable(WR(zcs->zc_master_rdq));
+		if (zcs->zc_manager_rdq != NULL)
+			qenable(WR(zcs->zc_manager_rdq));
 
 		qprocsoff(rqp);
 		WR(rqp)->q_ptr = rqp->q_ptr = NULL;
@@ -681,7 +685,8 @@ zc_close(queue_t *rqp, int flag, cred_t *credp)
 		 * to set up sad configuration.
 		 */
 		major = ddi_driver_major(zcs->zc_devinfo);
-		minor = ddi_get_instance(zcs->zc_devinfo) << 1 | ZC_SLAVE_MINOR;
+		minor = ddi_get_instance(zcs->zc_devinfo) << 1 |
+		    ZC_SUBSID_MINOR;
 		(void) kstr_autopush(CLR_AUTOPUSH, &major, &minor, NULL, NULL,
 		    NULL);
 	}
@@ -729,9 +734,9 @@ handle_mflush(queue_t *qp, mblk_t *mp)
 }
 
 /*
- * wput(9E) is symmetric for master and slave sides, so this handles both
+ * wput(9E) is symmetric for manager and subsidiary sides, so this handles both
  * without splitting the codepath.  (The only exception to this is the
- * processing of zcons ioctls, which is restricted to the master side.)
+ * processing of zcons ioctls, which is restricted to the manager side.)
  *
  * zc_wput() looks at the other side; if there is no process holding that
  * side open, it frees the message.  This prevents processes from hanging
@@ -746,34 +751,34 @@ zc_wput(queue_t *qp, mblk_t *mp)
 	unsigned char type = mp->b_datap->db_type;
 	zc_state_t *zcs;
 	struct iocblk *iocbp;
-	file_t *slave_filep;
-	struct snode *slave_snodep;
-	int slave_fd;
+	file_t *subsidiary_filep;
+	struct snode *subsidiary_snodep;
+	int subsidiary_fd;
 
 	ASSERT(qp->q_ptr);
 
 	DBG1("entering zc_wput, %s side", zc_side(qp));
 
 	/*
-	 * Process zcons ioctl messages if qp is the master console's write
+	 * Process zcons ioctl messages if qp is the manager console's write
 	 * queue.
 	 */
 	zcs = (zc_state_t *)qp->q_ptr;
-	if (zcs->zc_master_rdq != NULL && qp == WR(zcs->zc_master_rdq) &&
+	if (zcs->zc_manager_rdq != NULL && qp == WR(zcs->zc_manager_rdq) &&
 	    type == M_IOCTL) {
 		iocbp = (struct iocblk *)(void *)mp->b_rptr;
 		switch (iocbp->ioc_cmd) {
-		case ZC_HOLDSLAVE:
+		case ZC_HOLDSUBSID:
 			/*
-			 * Hold the slave's vnode and increment the refcount
-			 * of the snode.  If the vnode is already held, then
-			 * indicate success.
+			 * Hold the subsidiary's vnode and increment the
+			 * refcount of the snode.  If the vnode is already
+			 * held, then indicate success.
 			 */
 			if (iocbp->ioc_count != TRANSPARENT) {
 				miocack(qp, mp, 0, EINVAL);
 				return (0);
 			}
-			if (zcs->zc_slave_vnode != NULL) {
+			if (zcs->zc_subsid_vnode != NULL) {
 				miocack(qp, mp, 0, 0);
 				return (0);
 			}
@@ -789,49 +794,49 @@ zc_wput(queue_t *qp, mblk_t *mp)
 
 			/*
 			 * The calling process must pass a file descriptor for
-			 * the slave device.
+			 * the subsidiary device.
 			 */
-			slave_fd =
+			subsidiary_fd =
 			    (int)(intptr_t)*(caddr_t *)(void *)mp->b_cont->
 			    b_rptr;
-			slave_filep = getf(slave_fd);
-			if (slave_filep == NULL) {
+			subsidiary_filep = getf(subsidiary_fd);
+			if (subsidiary_filep == NULL) {
 				miocack(qp, mp, 0, EINVAL);
 				return (0);
 			}
-			if (ZC_STATE_TO_SLAVEDEV(zcs) !=
-			    slave_filep->f_vnode->v_rdev) {
-				releasef(slave_fd);
+			if (ZC_STATE_TO_SUBDEV(zcs) !=
+			    subsidiary_filep->f_vnode->v_rdev) {
+				releasef(subsidiary_fd);
 				miocack(qp, mp, 0, EINVAL);
 				return (0);
 			}
 
 			/*
-			 * Get a reference to the slave's vnode.  Also bump the
-			 * reference count on the associated snode.
+			 * Get a reference to the subsidiary's vnode.  Also
+			 * bump the reference count on the associated snode.
 			 */
-			ASSERT(vn_matchops(slave_filep->f_vnode,
+			ASSERT(vn_matchops(subsidiary_filep->f_vnode,
 			    spec_getvnodeops()));
-			zcs->zc_slave_vnode = slave_filep->f_vnode;
-			VN_HOLD(zcs->zc_slave_vnode);
-			slave_snodep = VTOCS(zcs->zc_slave_vnode);
-			mutex_enter(&slave_snodep->s_lock);
-			++slave_snodep->s_count;
-			mutex_exit(&slave_snodep->s_lock);
-			releasef(slave_fd);
+			zcs->zc_subsid_vnode = subsidiary_filep->f_vnode;
+			VN_HOLD(zcs->zc_subsid_vnode);
+			subsidiary_snodep = VTOCS(zcs->zc_subsid_vnode);
+			mutex_enter(&subsidiary_snodep->s_lock);
+			++subsidiary_snodep->s_count;
+			mutex_exit(&subsidiary_snodep->s_lock);
+			releasef(subsidiary_fd);
 			miocack(qp, mp, 0, 0);
 			return (0);
-		case ZC_RELEASESLAVE:
+		case ZC_RELEASESUBSID:
 			/*
-			 * Release the master's handle on the slave's vnode.
-			 * If there isn't a handle for the vnode, then indicate
-			 * success.
+			 * Release the manager's handle on the subsidiary's
+			 * vnode.  If there isn't a handle for the vnode, then
+			 * indicate success.
 			 */
 			if (iocbp->ioc_count != TRANSPARENT) {
 				miocack(qp, mp, 0, EINVAL);
 				return (0);
 			}
-			if (zcs->zc_slave_vnode == NULL) {
+			if (zcs->zc_subsid_vnode == NULL) {
 				miocack(qp, mp, 0, 0);
 				return (0);
 			}
@@ -847,20 +852,20 @@ zc_wput(queue_t *qp, mblk_t *mp)
 
 			/*
 			 * The process that passed the ioctl must have provided
-			 * a file descriptor for the slave device.  Make sure
-			 * this is correct.
+			 * a file descriptor for the subsidiary device.  Make
+			 * sure this is correct.
 			 */
-			slave_fd =
+			subsidiary_fd =
 			    (int)(intptr_t)*(caddr_t *)(void *)mp->b_cont->
 			    b_rptr;
-			slave_filep = getf(slave_fd);
-			if (slave_filep == NULL) {
+			subsidiary_filep = getf(subsidiary_fd);
+			if (subsidiary_filep == NULL) {
 				miocack(qp, mp, 0, EINVAL);
 				return (0);
 			}
-			if (zcs->zc_slave_vnode->v_rdev !=
-			    slave_filep->f_vnode->v_rdev) {
-				releasef(slave_fd);
+			if (zcs->zc_subsid_vnode->v_rdev !=
+			    subsidiary_filep->f_vnode->v_rdev) {
+				releasef(subsidiary_fd);
 				miocack(qp, mp, 0, EINVAL);
 				return (0);
 			}
@@ -869,15 +874,15 @@ zc_wput(queue_t *qp, mblk_t *mp)
 			 * Decrement the snode's reference count and release the
 			 * vnode.
 			 */
-			ASSERT(vn_matchops(slave_filep->f_vnode,
+			ASSERT(vn_matchops(subsidiary_filep->f_vnode,
 			    spec_getvnodeops()));
-			slave_snodep = VTOCS(zcs->zc_slave_vnode);
-			mutex_enter(&slave_snodep->s_lock);
-			--slave_snodep->s_count;
-			mutex_exit(&slave_snodep->s_lock);
-			VN_RELE(zcs->zc_slave_vnode);
-			zcs->zc_slave_vnode = NULL;
-			releasef(slave_fd);
+			subsidiary_snodep = VTOCS(zcs->zc_subsid_vnode);
+			mutex_enter(&subsidiary_snodep->s_lock);
+			--subsidiary_snodep->s_count;
+			mutex_exit(&subsidiary_snodep->s_lock);
+			VN_RELE(zcs->zc_subsid_vnode);
+			zcs->zc_subsid_vnode = NULL;
+			releasef(subsidiary_fd);
 			miocack(qp, mp, 0, 0);
 			return (0);
 		default:
@@ -939,7 +944,7 @@ zc_wput(queue_t *qp, mblk_t *mp)
 }
 
 /*
- * rsrv(9E) is symmetric for master and slave, so zc_rsrv() handles both
+ * rsrv(9E) is symmetric for manager and subsidiary, so zc_rsrv() handles both
  * without splitting up the codepath.
  *
  * Enable the write side of the partner.  This triggers the partner to send
@@ -952,10 +957,10 @@ zc_rsrv(queue_t *qp)
 	zcs = (zc_state_t *)qp->q_ptr;
 
 	/*
-	 * Care must be taken here, as either of the master or slave side
+	 * Care must be taken here, as either of the manager or subsidiary side
 	 * qptr could be NULL.
 	 */
-	ASSERT(qp == zcs->zc_master_rdq || qp == zcs->zc_slave_rdq);
+	ASSERT(qp == zcs->zc_manager_rdq || qp == zcs->zc_subsid_rdq);
 	if (zc_switch(qp) == NULL) {
 		DBG("zc_rsrv: other side isn't listening\n");
 		return (0);
@@ -965,8 +970,8 @@ zc_rsrv(queue_t *qp)
 }
 
 /*
- * This routine is symmetric for master and slave, so it handles both without
- * splitting up the codepath.
+ * This routine is symmetric for manager and subsidiary, so it handles both
+ * without splitting up the codepath.
  *
  * If there are messages on this queue that can be sent to the other, send
  * them via putnext(). Else, if queued messages cannot be sent, leave them
@@ -977,7 +982,7 @@ zc_wsrv(queue_t *qp)
 {
 	mblk_t *mp;
 
-	DBG1("zc_wsrv master (%s) side", zc_side(qp));
+	DBG1("zc_wsrv manager (%s) side", zc_side(qp));
 
 	/*
 	 * Partner has no read queue, so take the data, and throw it away.

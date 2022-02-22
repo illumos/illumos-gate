@@ -23,6 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Joyent, Inc.
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright (c) 2015 Joyent, Inc. All rights reserved.
  * Copyright 2020 Peter Tribble.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
@@ -1465,7 +1466,7 @@ static const struct option overlay_create_lopts[] = {
 	{ "encap",	required_argument,	NULL,	'e' },
 	{ "prop",	required_argument,	NULL,	'p' },
 	{ "search",	required_argument,	NULL,	's' },
-	{ "temporary", 	no_argument,		NULL,	't' },
+	{ "temporary",	no_argument,		NULL,	't' },
 	{ "vnetid",	required_argument,	NULL,	'v' },
 	{ NULL,		0,			NULL,	0 }
 };
@@ -10015,7 +10016,7 @@ do_delete_overlay(int argc, char *argv[], const char *use)
 
 typedef struct showoverlay_state {
 	ofmt_handle_t		sho_ofmt;
-	const char 		*sho_linkname;
+	const char		*sho_linkname;
 	dladm_overlay_propinfo_handle_t sho_info;
 	uint8_t			sho_value[DLADM_OVERLAY_PROP_SIZEMAX];
 	uint32_t		sho_size;
@@ -10117,10 +10118,10 @@ print_overlay_value(char *outbuf, uint_t bufsize, uint_t type, const void *pbuf,
 static boolean_t
 print_overlay_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 {
-	dladm_status_t 			status;
+	dladm_status_t			status;
 	showoverlay_state_t		*sp = ofarg->ofmt_cbarg;
 	dladm_overlay_propinfo_handle_t	infop = sp->sho_info;
-	const char 			*pname;
+	const char			*pname;
 	uint_t				type, prot;
 	const void			*def;
 	uint32_t			defsize;
@@ -10312,7 +10313,7 @@ print_overlay_targ_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 			} else if (inet_ntop(AF_INET6, &point->dop_ip, ipbuf,
 			    sizeof (ipbuf)) == NULL) {
 				/*
-				 * The only failrues we should get are
+				 * The only failures we should get are
 				 * EAFNOSUPPORT and ENOSPC because of buffer
 				 * exhaustion. In either of these cases, that
 				 * means something has gone horribly wrong.
@@ -10454,7 +10455,7 @@ do_show_overlay(int argc, char *argv[], const char *use)
 	int			i, opt;
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	dladm_status_t		status;
-	int 			(*funcp)(dladm_handle_t, datalink_id_t, void *);
+	int			(*funcp)(dladm_handle_t, datalink_id_t, void *);
 	char			*fields_str = NULL;
 	const ofmt_field_t	*fieldsp;
 	ofmt_status_t		oferr;

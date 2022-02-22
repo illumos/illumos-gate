@@ -3,8 +3,8 @@
  * Use is subject to license terms.
  */
 
-/*	Copyright(c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	Copyright(c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
+/*	  All Rights Reserved */
 
 /*
  * Copyright (c) 1983 The Regents of the University of California.
@@ -1057,13 +1057,13 @@ doit(int f,
 	if ((p = open("/dev/ptmx", O_RDWR)) == -1)
 		fatalperror(f, "cannot open /dev/ptmx");
 	if (grantpt(p) == -1)
-		fatal(f, "could not grant slave pty");
+		fatal(f, "could not grant subsidiary pty");
 	if (unlockpt(p) == -1)
-		fatal(f, "could not unlock slave pty");
+		fatal(f, "could not unlock subsidiary pty");
 	if ((line = ptsname(p)) == NULL)
-		fatal(f, "could not enable slave pty");
+		fatal(f, "could not enable subsidiary pty");
 	if ((t = open(line, O_RDWR)) == -1)
-		fatal(f, "could not open slave pty");
+		fatal(f, "could not open subsidiary pty");
 	if (ioctl(t, I_PUSH, "ptem") == -1)
 		fatalperror(f, "ioctl I_PUSH ptem");
 	if (ioctl(t, I_PUSH, "ldterm") == -1)
@@ -1128,9 +1128,9 @@ doit(int f,
 
 	/*
 	 * System V ptys allow the TIOC{SG}WINSZ ioctl to be
-	 * issued on the master side of the pty.  Luckily, that's
+	 * issued on the manager side of the pty.  Luckily, that's
 	 * the only tty ioctl we need to do do, so we can close the
-	 * slave side in the parent process after the fork.
+	 * subsidiary side in the parent process after the fork.
 	 */
 	(void) ioctl(p, TIOCSWINSZ, &win);
 
@@ -1161,12 +1161,12 @@ doit(int f,
 		if (setsid() == -1)
 			fatalperror(f, "setsid");
 		if ((tt = open(line, O_RDWR)) == -1)
-			fatalperror(f, "could not re-open slave pty");
+			fatalperror(f, "could not re-open subsidiary pty");
 
 		if (close(p) == -1)
-			fatalperror(f, "error closing pty master");
+			fatalperror(f, "error closing pty manager");
 		if (close(t) == -1)
-			fatalperror(f, "error closing pty slave"
+			fatalperror(f, "error closing pty subsidiary"
 				    " opened before session established");
 		/*
 		 * If this fails we may or may not be able to output an
@@ -1209,8 +1209,8 @@ doit(int f,
 
 	/*
 	 * Must ignore SIGTTOU, otherwise we'll stop
-	 * when we try and set slave pty's window shape
-	 * (our controlling tty is the master pty).
+	 * when we try and set subsidiary pty's window shape
+	 * (our controlling tty is the manager pty).
 	 * Likewise, we don't want any of the tty-generated
 	 * signals from chars passing through.
 	 */
@@ -1332,7 +1332,7 @@ static void
 protocol(int f, int p, int encr_flag)
 {
 	struct	stat	buf;
-	struct 	protocol_arg	rloginp;
+	struct	protocol_arg	rloginp;
 	struct	strioctl	rloginmod;
 	int	ptmfd;	/* fd of logindmux coneected to ptmx */
 	int	netfd;	/* fd of logindmux connected to netf */

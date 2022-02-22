@@ -25,8 +25,6 @@ all:
 
 install: $(ROOTPROG)
 
-lint:
-
 clobber: clean
 
 clean:

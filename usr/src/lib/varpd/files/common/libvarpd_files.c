@@ -17,7 +17,7 @@
  * Files based plug-in for varpd
  *
  * This is a dynamic varpd plug-in that has a static backing store. It's really
- * nothing more than a glorified version of /etc/ethers, though it facilitiates
+ * nothing more than a glorified version of /etc/ethers, though it facilitates
  * a bit more. The files module allows for the full set of mappings to be fixed
  * at creation time. In addition, it also provides support for proxying ARP,
  * NDP, and DHCP.
@@ -28,7 +28,7 @@
  * The plug-in only has a single property, which is the location of the JSON
  * file. The JSON file itself looks something like:
  *
- * 	{
+ *	{
  *		"aa:bb:cc:dd:ee:ff": {
  *			"arp": "10.23.69.1",
  *			"ndp": "2600:3c00::f03c:91ff:fe96:a264",

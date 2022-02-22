@@ -185,46 +185,46 @@
  *
  * The following are the supported types of properties:
  *
- * 	OVERLAY_PROP_T_INT
+ *	OVERLAY_PROP_T_INT
  *
- * 		A signed integer, its length is 8 bytes, corresponding to a
- * 		int64_t.
+ *		A signed integer, its length is 8 bytes, corresponding to a
+ *		int64_t.
  *
- * 	OVERLAY_PROP_T_UINT
+ *	OVERLAY_PROP_T_UINT
  *
- * 		An unsigned integer, its length is 8 bytes, corresponding to a
- * 		uint64_t.
+ *		An unsigned integer, its length is 8 bytes, corresponding to a
+ *		uint64_t.
  *
- * 	OVERLAY_PROP_T_IP
+ *	OVERLAY_PROP_T_IP
  *
- * 		A struct in6_addr, it has a fixed size.
+ *		A struct in6_addr, it has a fixed size.
  *
- * 	OVERLAY_PROP_T_STRING
+ *	OVERLAY_PROP_T_STRING
  *
- * 		A null-terminated character string encoded in either ASCII or
- * 		UTF-8. Note that the size of the string includes the null
- * 		terminator.
+ *		A null-terminated character string encoded in either ASCII or
+ *		UTF-8. Note that the size of the string includes the null
+ *		terminator.
  *
  * The next thing that we apply to a property is its permission. The permissions
  * are put together by the bitwise or of the following flags and values.
  *
- * 	OVERLAY_PROP_PERM_REQ
+ *	OVERLAY_PROP_PERM_REQ
  *
- * 		This indicates a required property. A property that is required
- * 		must be set by a consumer before the device can be created. If a
- * 		required property has a default property, this constraint is
- * 		loosened because the default property defines the value.
+ *		This indicates a required property. A property that is required
+ *		must be set by a consumer before the device can be created. If a
+ *		required property has a default property, this constraint is
+ *		loosened because the default property defines the value.
  *
- * 	OVERLAY_PORP_PERM_READ
+ *	OVERLAY_PORP_PERM_READ
  *
- * 		This indicates that a property can be read. All properties will
- * 		have this value set.
+ *		This indicates that a property can be read. All properties will
+ *		have this value set.
  *
- * 	OVERLAY_PROP_PERM_WRITE
+ *	OVERLAY_PROP_PERM_WRITE
  *
- * 		This indicates that a property can be written to and thus
- * 		updated by userland. Properties that are only intended to
- * 		display information, will not have OVERLAY_PROP_PERM_WRITE set.
+ *		This indicates that a property can be written to and thus
+ *		updated by userland. Properties that are only intended to
+ *		display information, will not have OVERLAY_PROP_PERM_WRITE set.
  *
  * In addition, a few additional values are defined as a convenience to
  * consumers. The first, OVERLAY_PROP_PERM_RW, is a combination of
@@ -260,19 +260,19 @@
  * summarized in the type overlay_point_t. Any combination of these is
  * supported.
  *
- * 	OVERLAY_PLUGIN_D_ETHERNET
+ *	OVERLAY_PLUGIN_D_ETHERNET
  *
- * 		An Ethernet MAC address is required.
+ *		An Ethernet MAC address is required.
  *
- * 	OVERLAY_PLUGIN_D_IP
+ *	OVERLAY_PLUGIN_D_IP
  *
- * 		An IP address is required. All IP addresses used by the overlay
- * 		system are transmitted as IPv6 addresses. IPv4 addresses can be
- * 		represented by using IPv4-mapped IPv6 addresses.
+ *		An IP address is required. All IP addresses used by the overlay
+ *		system are transmitted as IPv6 addresses. IPv4 addresses can be
+ *		represented by using IPv4-mapped IPv6 addresses.
  *
- * 	OVERLAY_PLUGIN_D_PORT
+ *	OVERLAY_PLUGIN_D_PORT
  *
- * 		A TCP/UDP port is required.
+ *		A TCP/UDP port is required.
  *
  * A kernel encapsulation plugin declares which of these that it requires, it's
  * a static set. On the other hand, a userland lookup plugin can be built to
@@ -287,20 +287,20 @@
  * determines how they interact with the broader system and how look ups are
  * performed. These types are:
  *
- * 	OVERLAY_TARGET_POINT
+ *	OVERLAY_TARGET_POINT
  *
- * 		A point to point plugin has a single static definition for where
- * 		to send all traffic. Every packet in the system always gets sent
- * 		to the exact same destination which is programmed into the
- * 		kernel when the general device is activated.
+ *		A point to point plugin has a single static definition for where
+ *		to send all traffic. Every packet in the system always gets sent
+ *		to the exact same destination which is programmed into the
+ *		kernel when the general device is activated.
  *
- * 	OVERLAY_TARGET_DYNAMIC
+ *	OVERLAY_TARGET_DYNAMIC
  *
- * 		A dynamic plugin does not have a single static definition.
- * 		Instead, for each destination, the kernel makes an asynchronous
- * 		request to varpd to determine where the packet should be routed,
- * 		and if a specific destination is found, then that destination is
- * 		cached in the overlay device's target cache.
+ *		A dynamic plugin does not have a single static definition.
+ *		Instead, for each destination, the kernel makes an asynchronous
+ *		request to varpd to determine where the packet should be routed,
+ *		and if a specific destination is found, then that destination is
+ *		cached in the overlay device's target cache.
  *
  * This distinction, while important for the general overlay device's operation,
  * is not important to the encapsulation plugins. They don't need to know about
@@ -339,7 +339,7 @@
  *           | mac_handle_t     -----+---> GLDv3 handle to MAC
  *           | datalink_id_t    -----+---> Datalink ID used by DLS
  *           | overlay_dev_flag_t ---+---> Device state
- *           | uint_t           -----+---> Curent device MTU
+ *           | uint_t           -----+---> Current device MTU
  *           | uint_t           -----+---> In-progress RX operations
  *           | uint_t           -----+---> In-progress TX operations
  *           | char[]           -----+---> FMA degraded message
@@ -442,7 +442,7 @@
  * a call to mac_rx().
  *
  * Today, we don't do too much that's special with the ksocket; however, as
- * hardware is gaining understanding for these encapuslation protocols, we'll
+ * hardware is gaining understanding for these encapsulation protocols, we'll
  * probably want to think of better ways to get those capabilities passed down
  * and potentially better ways to program receive filters so they get directly
  * to us. Though, that's all fantasy future land.
@@ -492,7 +492,7 @@
  *
  * Every kernel overlay device keeps track of its FMA state. Today in FMA we
  * cannot represent partitions between resources nor can we represent that a
- * given minor node of a psuedo device has failed -- if we degrade the overlay
+ * given minor node of a pseudo device has failed -- if we degrade the overlay
  * device, then the entire dev_info_t is degraded. However, we still want to be
  * able to indicate to administrators that things may go wrong.
  *
@@ -583,7 +583,7 @@
  *     | de:ad:be:ef:00:00 |		and only exists in the target cache.
  *     +-------------------+
  *
- * 	~~~~
+ *	~~~~
  *
  *     +---------------------+
  *     | Global list_t       |		A mblk_t comes in for an entry. We
@@ -596,7 +596,7 @@
  *             | 42:5e:1a:10:d6:2d |      | de:ad:be:ef:00:00 |
  *             +-------------------+      +-------------------+
  *
- * 	~~~~
+ *	~~~~
  *
  *     +--------------------------+
  *     | /dev/overlay minor state |	User land said that it would look up an
@@ -610,7 +610,7 @@
  *            | 90:b8:d0:79:02:dd |      | de:ad:be:ef:00:00 |
  *            +-------------------+      +-------------------+
  *
- * 	~~~~
+ *	~~~~
  *
  *     +-------------------+
  *     | Valid Entry       |		varpd returned an answer with
@@ -620,7 +620,7 @@
  *
  *
  * The lookup mechanism is performed via a series of operations on the character
- * psuedo-device /dev/overlay. The only thing that uses this device is the
+ * pseudo-device /dev/overlay. The only thing that uses this device is the
  * userland daemon varpd. /dev/overlay is a cloneable device, each open of it
  * granting a new minor number which maintains its own state. We maintain this
  * state so that way if an outstanding lookup was queued to something that
@@ -994,7 +994,7 @@ overlay_m_stop(void *arg)
 
 	/*
 	 * The MAC Perimeter is held here, so we don't have to worry about
-	 * synchornizing this with respect to metadata operations.
+	 * synchronizing this with respect to metadata operations.
 	 */
 	mutex_enter(&odd->odd_lock);
 	VERIFY(odd->odd_flags & OVERLAY_F_IN_MUX);

@@ -401,7 +401,7 @@ ptemrput(queue_t *q, mblk_t *mp)
 	case M_IOCACK:
 	case M_IOCNAK:
 		/*
-		 * We only pass write-side ioctls through to the master that
+		 * We only pass write-side ioctls through to the manager that
 		 * we've already ACKed or NAKed to the stream head.  Thus, we
 		 * discard ones arriving from below, since they're redundant
 		 * from the point of view of modules above us.
@@ -626,7 +626,7 @@ ptemwmsg(queue_t *q, mblk_t *mp)
 		 * of the M_IOCTL message is made and passed
 		 * downstream.  Eventually the PCKT module, if
 		 * it has been pushed, should pick up this message.
-		 * If the PCKT module has not been pushed the master
+		 * If the PCKT module has not been pushed the manager
 		 * side stream head will free it.
 		 */
 		iocp = (struct iocblk *)mp->b_rptr;
@@ -843,8 +843,9 @@ out:
 
 		default:
 			/*
-			 * End of the line.  The slave driver doesn't see any
-			 * ioctls that we don't explicitly pass along to it.
+			 * End of the line.  The subsidiary driver doesn't see
+			 * any ioctls that we don't explicitly pass along to
+			 * it.
 			 */
 			miocnak(q, mp, 0, EINVAL);
 			break;
@@ -983,14 +984,14 @@ ptioc(queue_t *q, mblk_t *mp, int qside)
 				(void) putnextctl1(q, M_SIG, SIGWINCH);
 			/*
 			 * Message may have come in as an M_IOCDATA; pass it
-			 * to the master side as an M_IOCTL.
+			 * to the manager side as an M_IOCTL.
 			 */
 			mp->b_datap->db_type = M_IOCTL;
 			if (qside == WRSIDE) {
 				/*
 				 * Need a copy of this message to pass on to
 				 * the PCKT module, only if the M_IOCTL
-				 * orginated from the slave side.
+				 * orginated from the subsidiary side.
 				 */
 				if ((pckt_msgp = copymsg(mp)) == NULL) {
 					miocnak(q, mp, 0, EAGAIN);
@@ -1010,7 +1011,7 @@ ptioc(queue_t *q, mblk_t *mp, int qside)
 
 	case TIOCSIGNAL: {
 		/*
-		 * This ioctl can emanate from the master side in remote
+		 * This ioctl can emanate from the manager side in remote
 		 * mode only.
 		 */
 		int	sig;
@@ -1034,8 +1035,8 @@ ptioc(queue_t *q, mblk_t *mp, int qside)
 		}
 
 		/*
-		 * Send an M_PCSIG message up the slave's read side and
-		 * respond back to the master with an ACK or NAK as
+		 * Send an M_PCSIG message up the subsidiary's read side and
+		 * respond back to the manager with an ACK or NAK as
 		 * appropriate.
 		 */
 		if (putnextctl1(q, M_PCSIG, sig) == 0) {

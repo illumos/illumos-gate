@@ -46,8 +46,7 @@ static void *
 shstrtab_alloc(void)
 {
 #ifdef	_KERNEL
-	return (kmem_zalloc(sizeof (shstrtab_ent_t),
-	    KM_NOSLEEP | KM_NORMALPRI));
+	return (kmem_zalloc(sizeof (shstrtab_ent_t), KM_NOSLEEP_LAZY));
 #else
 	return (calloc(1, sizeof (shstrtab_ent_t)));
 #endif

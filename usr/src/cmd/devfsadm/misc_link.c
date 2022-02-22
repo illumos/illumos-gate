@@ -235,8 +235,8 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 	{ "pseudo", "^daplt$",
 	    RM_PRE | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
-	{ "pseudo", "^zcons/" ZONENAME_REGEXP "/(" ZCONS_MASTER_NAME "|"
-		ZCONS_SLAVE_NAME ")$",
+	{ "pseudo", "^zcons/" ZONENAME_REGEXP "/(" ZCONS_MANAGER_NAME "|"
+		ZCONS_SUBSIDIARY_NAME ")$",
 	    RM_PRE | RM_HOT | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
 	{ "pseudo", "^zfd/" ZONENAME_REGEXP "/(master|slave)/[0-9]+$",
@@ -488,7 +488,7 @@ fc_port(di_minor_t minor, di_node_t node)
 /*
  * Handles:
  *	minor node type "ddi_printer".
- * 	rules of the form: type=ddi_printer;name=bpp  \M0
+ *	rules of the form: type=ddi_printer;name=bpp  \M0
  */
 static int
 printer_create(di_minor_t minor, di_node_t node)
@@ -719,7 +719,7 @@ zfd_create(di_minor_t minor, di_node_t node)
 }
 
 /*
- *	/dev/cpu/self/cpuid 	->	/devices/pseudo/cpuid@0:self
+ *	/dev/cpu/self/cpuid	->	/devices/pseudo/cpuid@0:self
  */
 static int
 cpuid(di_minor_t minor, di_node_t node)

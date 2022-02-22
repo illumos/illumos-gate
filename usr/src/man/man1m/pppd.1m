@@ -3,7 +3,7 @@
 .\" Redistribution and use in source and binary forms are permitted provided that the above copyright notice and this paragraph are duplicated in all such forms and that any documentation, advertising materials, and other materials related to such distribution and use acknowledge that the software was developed by Carnegie Mellon University.  The name of the University may not be used to endorse or promote products derived from this software without specific prior written permission.  THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
 .\" WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Right Reserved.
-.TH PPPD 1M "November 22, 2021"
+.TH PPPD 1M "February 5, 2022"
 .SH NAME
 pppd \- point to point protocol daemon
 .SH SYNOPSIS
@@ -1301,11 +1301,11 @@ proxy ARP entries with \fBpppd\fR, place this option in the
 .sp .6
 .RS 4n
 Normally, \fBpppd\fR requires a terminal device. With this option, \fBpppd\fR
-allocates itself a pseudo-tty master/slave pair and uses the slave as its
+allocates itself a pseudo-terminal pair and uses the subsidiary as its
 terminal device. \fBpppd\fR creates a child process to act as a character shunt
-to transfer characters between the pseudo-tty master and its standard input and
-output. Thus, \fBpppd\fR transmits characters on its standard output and
-receives characters on its standard input even if they are not terminal
+to transfer characters between the pseudo-terminal manager and its standard
+input and output. Thus, \fBpppd\fR transmits characters on its standard output
+and receives characters on its standard input even if they are not terminal
 devices. This option increases the latency and CPU overhead of transferring
 data over the ppp interface as all of the characters sent and received must
 flow through the character shunt process. An explicit device name may not be
@@ -1506,12 +1506,12 @@ Ethernet interface.
 .sp .6
 .RS 4n
 Specifies that the command \fIscript\fR, and not a specific terminal device is
-used for serial communication. \fBpppd\fR allocates itself a pseudo-tty
-master/slave pair and uses the slave as its terminal device. \fIscript\fR runs
-in a child process with the pseudo-tty master as its standard input and output.
-An explicit device name may not be given if this option is used. (Note: if the
-\fBrecord\fR option is used in conjunction with the \fBpty\fR option, the child
-process will have pipes on its standard input and output.)
+used for serial communication. \fBpppd\fR allocates itself a pseudo-terminal
+pair and uses the subsidiary as its terminal device. \fIscript\fR runs
+in a child process with the pseudo-terminal manager as its standard input and
+output.  An explicit device name may not be given if this option is used.
+(Note: if the \fBrecord\fR option is used in conjunction with the \fBpty\fR
+option, the child process will have pipes on its standard input and output.)
 .RE
 
 .sp
@@ -1537,14 +1537,14 @@ dial-back implementations.
 .RS 4n
 Directs \fBpppd\fR to record all characters sent and received to a file named
 \fIfilename\fR. \fIfilename\fR is opened in append mode, using the user's
-user-ID and permissions. Because this option uses a pseudo-tty and a process to
-transfer characters between the pseudo-tty and the real serial device, it
-increases the latency and CPU overhead of transferring data over the PPP
-interface. Characters are stored in a tagged format with timestamps that can be
-displayed in readable form using the \fBpppdump\fR(1M) program. This option is
-generally used when debugging the kernel portion of \fBpppd\fR (especially CCP
-compression algorithms) and not for debugging link configuration problems. See
-the \fBdebug\fR option.
+user-ID and permissions. Because this option uses a pseudo-terminal and a
+process to transfer characters between the pseudo-terminal and the real serial
+device, it increases the latency and CPU overhead of transferring data over the
+PPP interface. Characters are stored in a tagged format with timestamps that
+can be displayed in readable form using the \fBpppdump\fR(1M) program. This
+option is generally used when debugging the kernel portion of \fBpppd\fR
+(especially CCP compression algorithms) and not for debugging link
+configuration problems. See the \fBdebug\fR option.
 .RE
 
 .sp

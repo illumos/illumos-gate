@@ -25,11 +25,7 @@ LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lumem -lnvpair -lsocket -lcustr
 CPPFLAGS +=	-I../common
 
-LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
-LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
-
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
+CSTD=		$(CSTD_GNU99)
 
 SRCDIR =	../common
 

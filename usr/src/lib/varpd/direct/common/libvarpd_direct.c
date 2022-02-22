@@ -19,7 +19,7 @@
  * This plugin implements a simple point to point plugin for a packet. It
  * represents the traditional tunnel, just in overlay form. As such, the only
  * properties it needs are those to determine where to send everything. At this
- * time, we don't allow a mulicast address; however, there's no reason that the
+ * time, we don't allow a multicast address; however, there's no reason that the
  * direct plugin shouldn't in theory support multicast, though when implementing
  * it the best path will become clear.
  *
@@ -48,7 +48,7 @@ typedef struct varpd_direct {
 	mutex_t			vad_lock;	/* Protects the rest */
 	boolean_t		vad_hip;
 	boolean_t		vad_hport;
-	struct in6_addr 	vad_ip;
+	struct in6_addr		vad_ip;
 	uint16_t		vad_port;
 } varpd_direct_t;
 

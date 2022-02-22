@@ -54,30 +54,30 @@
  *
  *   overlay_plugin_init_t
  *
- * 	This interface is used to create a new instance of a plugin. An instance
- * 	of a plugin will be created for each overlay device that is created. For
- * 	example, if a device is created with VXLAN ID 23 and ID 42, then there
- * 	will be two different calls to this function.
+ *	This interface is used to create a new instance of a plugin. An instance
+ *	of a plugin will be created for each overlay device that is created. For
+ *	example, if a device is created with VXLAN ID 23 and ID 42, then there
+ *	will be two different calls to this function.
  *
- * 	This function gives the plugin a chance to create a private data
- * 	structure that will be returned on subsequent calls to the system.
+ *	This function gives the plugin a chance to create a private data
+ *	structure that will be returned on subsequent calls to the system.
  *
  *   overlay_plugin_fini_t
  *
- *   	This is the opposite of overlay_plugin_init_t. It will be called when it
- *   	is safe to remove any private data that is associated with this instance
- *   	of the plugin.
+ *	This is the opposite of overlay_plugin_init_t. It will be called when it
+ *	is safe to remove any private data that is associated with this instance
+ *	of the plugin.
  *
  *   overlay_plugin_propinfo_t
  *
- *   	This is called with the name of a property that is registered when the
- *   	plugin is created. This function will be called with the name of the
- *   	property that information is being requested about. The plugin is
- *   	responsible for filling out information such as setting the name, the
- *   	type of property it is, the protection of the property (can a user
- *   	update it?), whether the property is required, an optional default value
- *   	for the property, and an optional set of values or ranges that are
- *   	allowed.
+ *	This is called with the name of a property that is registered when the
+ *	plugin is created. This function will be called with the name of the
+ *	property that information is being requested about. The plugin is
+ *	responsible for filling out information such as setting the name, the
+ *	type of property it is, the protection of the property (can a user
+ *	update it?), whether the property is required, an optional default value
+ *	for the property, and an optional set of values or ranges that are
+ *	allowed.
  *
  *   overlay_plugin_getprop_t
  *
@@ -93,103 +93,103 @@
  *
  *   overlay_plugin_socket_t
  *
- *   	Every overlay device has a corresponding socket that it uses to send and
- *   	receive traffic. This routine is used to get the parameters that should
- *   	be used to define such a socket. The actual socket may be multiplexed
- *   	with other uses of it.
+ *	Every overlay device has a corresponding socket that it uses to send and
+ *	receive traffic. This routine is used to get the parameters that should
+ *	be used to define such a socket. The actual socket may be multiplexed
+ *	with other uses of it.
  *
  *   overlay_plugin_sockopt_t
  *
- *   	Allow a plugin to set any necessary socket options that it needs on the
- *   	kernel socket that is being used by a mux. This will only be called once
- *   	for a given mux, if additional devices are added to a mux, it will not
- *   	be called additional times.
+ *	Allow a plugin to set any necessary socket options that it needs on the
+ *	kernel socket that is being used by a mux. This will only be called once
+ *	for a given mux, if additional devices are added to a mux, it will not
+ *	be called additional times.
  *
  *   overlay_plugin_encap_t
  *
- *   	In this routine you're given a message block and information about the
- *   	packet, such as the identifier and are asked to fill out a message block
- *   	that represents the encapsulation header and optionally manipulate the
- *   	input message if required.
+ *	In this routine you're given a message block and information about the
+ *	packet, such as the identifier and are asked to fill out a message block
+ *	that represents the encapsulation header and optionally manipulate the
+ *	input message if required.
  *
  *   overlay_plugin_decap_t
  *
- *   	In this routine, you're given the encapsulated message block. The
- *   	requirement is to decapsulate it and determine what is the correct
- *   	overlay identifier for this network and to fill in the header size so
- *   	the broader system knows how much of this data should be considered
- *   	consumed.
+ *	In this routine, you're given the encapsulated message block. The
+ *	requirement is to decapsulate it and determine what is the correct
+ *	overlay identifier for this network and to fill in the header size so
+ *	the broader system knows how much of this data should be considered
+ *	consumed.
  *
  *   ovpo_callbacks
  *
- *   	This should be set to zero, it's reserved for future use.
+ *	This should be set to zero, it's reserved for future use.
  *
  * Once these properties are defined, the module should define the following
  * members in the overlay_plugin_register_t.
  *
  *   ovep_version
  *
- *   	Should be set to the value of the macro OVEP_VERSION.
+ *	Should be set to the value of the macro OVEP_VERSION.
  *
  *   ovep_name
  *
- *   	Should be set to a character string that has the name of the module.
- *   	Generally this should match the name of the kernel module; however, this
- *   	is the name that users will use to refer to this module when creating
- *   	devices.
+ *	Should be set to a character string that has the name of the module.
+ *	Generally this should match the name of the kernel module; however, this
+ *	is the name that users will use to refer to this module when creating
+ *	devices.
  *
  *   overlay_plugin_ops_t
  *
- *   	Should be set to the functions as described above.
+ *	Should be set to the functions as described above.
  *
  *   ovep_props
  *
- *   	This is an array of character strings that holds the names of the
- *   	properties of the encapsulation plugin.
+ *	This is an array of character strings that holds the names of the
+ *	properties of the encapsulation plugin.
  *
  *
  *   ovep_id_size
  *
- *   	This is the size in bytes of the valid range for the identifier. The
- *   	valid identifier range is considered a ovep_id_size byte unsigned
- *   	integer, [ 0, 1 << (ovep_id_size * 8) ).
+ *	This is the size in bytes of the valid range for the identifier. The
+ *	valid identifier range is considered a ovep_id_size byte unsigned
+ *	integer, [ 0, 1 << (ovep_id_size * 8) ).
  *
  *   ovep_flags
  *
- *   	A series of flags that indicate optional features that are supported.
- *   	Valid flags include:
+ *	A series of flags that indicate optional features that are supported.
+ *	Valid flags include:
  *
- *   		OVEP_F_VLAN_TAG
+ *		OVEP_F_VLAN_TAG
  *
- * 			The encapsulation format allows for the encapsulated
- * 			packet to maintain a VLAN tag.
+ *			The encapsulation format allows for the encapsulated
+ *			packet to maintain a VLAN tag.
  *
  *   ovep_dest
  *
- *   	Describes the kind of destination that the overlay plugin supports for
- *   	sending traffic. For example, vxlan uses UDP, therefore it requires both
- *   	an IP address and a port; however, nvgre uses the gre header and
- *   	therefore only requires an IP address. The following flags may be
- *   	combined:
+ *	Describes the kind of destination that the overlay plugin supports for
+ *	sending traffic. For example, vxlan uses UDP, therefore it requires both
+ *	an IP address and a port; however, nvgre uses the gre header and
+ *	therefore only requires an IP address. The following flags may be
+ *	combined:
  *
- *   		OVERLAY_PLUGIN_D_ETHERNET
+ *		OVERLAY_PLUGIN_D_ETHERNET
  *
- *   			Indicates that to send a packet to its destination, we
- *   			require a link-layer ethernet address.
+ *			Indicates that to send a packet to its destination, we
+ *			require a link-layer ethernet address.
  *
- * 		OVERLAY_PLUGIN_D_IP
+ *		OVERLAY_PLUGIN_D_IP
  *
- * 			Indicates that to send a packet to its destination, we
- * 			require an IP address. Note, all IP addresses are
- * 			transmitted as IPv6 addresses and for an IPv4
- * 			destination, using an IPv4-mapped IPv6 address is the
- * 			expected way to transmit that.
+ *			Indicates that to send a packet to its destination, we
+ *			require an IP address. Note, all IP addresses are
+ *			transmitted as IPv6 addresses and for an IPv4
+ *			destination, using an IPv4-mapped IPv6 address is the
+ *			expected way to transmit that.
  *
- * 		OVERLAY_PLUGIN_D_PORT
+ *		OVERLAY_PLUGIN_D_PORT
  *
- * 			Indicates that to send a packet to its destination, a
- * 			port is required, this usually indicates that the
- * 			protocol uses something like TCP or UDP.
+ *			Indicates that to send a packet to its destination, a
+ *			port is required, this usually indicates that the
+ *			protocol uses something like TCP or UDP.
  *
  *
  * -------------------------------------------------
@@ -209,7 +209,7 @@
  *
  * While servicing a downcall from the general overlay device framework, a
  * kernel module should not make any upcalls, excepting those functions that are
- * defined in this header file, eg. the property related callbacks. Improtantly,
+ * defined in this header file, eg. the property related callbacks. Importantly,
  * it cannot make any assumptions about what locks may or may not be held by the
  * broader system. The only thing that it is safe for it to use are its own
  * locks.
@@ -291,7 +291,7 @@ typedef struct overlay_plugin_register {
 	uint_t			ovep_version;
 	const char		*ovep_name;
 	const overlay_plugin_ops_t	*ovep_ops;
-	const char 		**ovep_props;
+	const char		**ovep_props;
 	uint_t			ovep_id_size;
 	uint_t			ovep_flags;
 	uint_t			ovep_dest;

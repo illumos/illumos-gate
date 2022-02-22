@@ -23,7 +23,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"
-.Dd May 5, 2020
+.Dd February 5, 2022
 .Dt UTEMPTER_ADD_RECORD 3UTEMPTER
 .Os
 .Sh NAME
@@ -67,7 +67,7 @@ and
 .Fn addToUtmp
 functions add a login record to the
 .Xr utmpx 4
-database for the TTY belonging to the pseudo-terminal master file descriptor
+database for the TTY belonging to the pseudo-terminal manager file descriptor
 .Fa fd ,
 using the username corresponding with the real user ID of the calling
 process and the optional hostname
@@ -83,7 +83,7 @@ The
 and
 .Fn removeLineFromUtmp
 functions mark the login session as being closed for the TTY belonging
-to the pseudo-terminal master file descriptor
+to the pseudo-terminal manager file descriptor
 .Fa fd .
 .Pp
 The

@@ -52,9 +52,10 @@ CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
 # not linted
 SMATCH=off
 
+CSTD=		$(CSTD_GNU99)
+
 .KEEP_STATE:
 
 all:		$(LIBS)
-
 
 include $(SRC)/lib/Makefile.targ

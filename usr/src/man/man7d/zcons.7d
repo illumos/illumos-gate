@@ -3,73 +3,62 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZCONS 7D "Aug 24, 2003"
-.SH NAME
-zcons \- Zone console device driver
-.SH DESCRIPTION
-.sp
-.LP
-The \fBzcons\fR character driver exports the console for system zones. The
-driver is comprised of two "sides:" a master side with which applications in
-the global zone communicate, and a slave side, which receives I/O from the
-master side. The slave side is available in the global zones.
-.sp
-.LP
-Applications must not depend on the location of \fB/dev\fR or \fB/devices\fR
-entries exported by \fBzcons\fR. Inside a zone, the \fBzcons\fR slave  side is
-fronted by \fB/dev/console\fR and other console-related  symbolic links, which
-are used by applications that expect to write to the system console.
-.sp
-.LP
-The \fBzcons\fR driver is Sun Private, and may change in future releases.
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/zcons/<\fIzonename\fR>/masterconsole\fR \fR
-.ad
-.sp .6
-.RS 4n
-Global zone master side console for zone <\fIzonename\fR>.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/dev/zcons/<\fIzonename\fR>/slaveconsole\fR \fR
-.ad
-.sp .6
-.RS 4n
-Global zone slave side console for zone <\fIzonename\fR>.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/dev/zconsole\fR \fR
-.ad
-.sp .6
-.RS 4n
-Non-global zone console (slave side).
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
- Interface Stability	Sun Private
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBzoneadm\fR(1M), \fBzonecfg\fR(1M), \fBattributes\fR(5), \fBzones\fR(5)
+.\" Copyright 2022 Oxide Computer Company
+.Dd February 5, 2022
+.Dt ZCONS 7D
+.Os
+.Sh NAME
+.Nm zcons
+.Nd Zone console device driver
+.Sh DESCRIPTION
+The
+.Nm zcons
+character driver exports the console for system zones.
+The driver is fundamentally similar to a pseudo-terminal device, and is thus
+comprised of two sides:
+.Bl -bullet
+.It
+a manager device, which applications in the global zone can open for
+communication
+.It
+a subsidiary device, which processes in the non-global zone can write to, to
+communicate with global zone management applications
+.El
+.Pp
+Applications must not depend on the location of
+.Pa /dev
+or
+.Pa /devices
+entries exposed by
+.Nm zcons
+in the global zone.
+Inside a non-global zone, the
+.Nm zcons
+subsidiary device is fronted by
+.Pa /dev/console
+and other console-related symbolic links, which are used by applications that
+expect to write to the system console.
+.Pp
+The
+.Nm
+driver is not a
+.Sy Committed
+interface, and may change at any time.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/zcons/ZONENAME/globalconsole
+Global zone console manager device for zone
+.Sy ZONENAME .
+.It Pa /dev/zcons/ZONENAME/zoneconsole
+Global zone console subsidiary device for zone
+.Sy ZONENAME .
+.It Pa /dev/zconsole
+Non-global zone console (subsidiary device).
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh SEE ALSO
+.Xr zoneadm 1M ,
+.Xr zonecfg 1M ,
+.Xr attributes 5 ,
+.Xr zones 5

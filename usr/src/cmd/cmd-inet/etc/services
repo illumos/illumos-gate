@@ -409,6 +409,7 @@ epmd		4369/udp
 ipsec-nat-t	4500/udp			# IPsec NAT-Traversal
 iax		4569/tcp			# Inter-Asterisk eXchange
 iax		4569/udp
+vxlan		4789/udp			# Virtual eXtensible Local Area Network (VXLAN)
 radmin-port	4899/tcp			# RAdmin Port
 radmin-port	4899/udp
 rfe		5002/udp			# Radio Free Ethernet

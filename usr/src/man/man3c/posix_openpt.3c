@@ -42,160 +42,142 @@
 .\"
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2022 Oxide Computer Company
 .\"
-.TH POSIX_OPENPT 3C "June 18, 2021"
-.SH NAME
-posix_openpt \- open a pseudo terminal device
-.SH SYNOPSIS
-.nf
-#include <stdlib.h>
-#include <fcntl.h>
-
-\fBint\fR \fBposix_openpt\fR(\fBint\fR \fIoflag\fR);
-.fi
-
-.SH DESCRIPTION
-The \fBposix_openpt()\fR function establishes a connection between a master
-device for a pseudo-terminal and a file descriptor. The file descriptor is used
-by other I/O functions that refer to that pseudo-terminal.
-.sp
-.LP
+.Dd February 5, 2022
+.Dt POSIX_OPENPT 3C
+.Os
+.Sh NAME
+.Nm posix_openpt
+.Nd open a pseudo-terminal manager device
+.Sh SYNOPSIS
+.In stdlib.h
+.In fcntl.h
+.Ft int
+.Fo posix_openpt
+.Fa "int oflag"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn posix_openpt
+function establishes a connection between a manager device for a
+pseudo-terminal and a file descriptor.
+The file descriptor is used by other I/O functions that refer to that
+pseudo-terminal.
+.Pp
 The file status flags and file access modes of the open file description are
-set according to the value of \fIoflag\fR.
-.sp
-.LP
-Values for \fIoflag\fR are constructed by a bitwise-inclusive OR of flags from
-the following list, defined in <\fBfcntl.h\fR>.
-.sp
-.ne 2
-.na
-\fB\fBO_RDWR\fR\fR
-.ad
-.RS 12n
+set according to the value of
+.Fa oflag .
+.Pp
+Values for
+.Fa oflag
+are constructed by a bitwise-inclusive OR of flags from
+the following list, defined in
+.Xr fcntl.h 3HEAD :
+.Bl -tag -width Ds
+.It Dv O_RDWR
 Open for reading and writing.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBO_NOCTTY\fR\fR
-.ad
-.RS 12n
-If set, \fBposix_openpt()\fR does not cause the terminal device to become the
-controlling terminal for the process.
-.RE
-
-.sp
-.LP
-The behavior of other values for the \fIoflag\fR argument is unspecified.
-.SH RETURN VALUES
-Upon successful completion, the \fBposix_openpt()\fR function opens a master
-pseudo-terminal device and returns a non-negative integer representing the
-lowest numbered unused file descriptor. Otherwise, -1 is returned and
-\fBerrno\fR is set to indicate the error.
-.SH ERRORS
-The \fBposix_openpt()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEMFILE\fR\fR
-.ad
-.RS 10n
-{\fBOPEN_MAX\fR} file descriptors are currently open in the calling process.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENFILE\fR\fR
-.ad
-.RS 10n
-The maximum allowable number of files is currently open in the system.
-.RE
-
-.sp
-.LP
-The \fBposix_openpt()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The value of \fIoflag\fR is not valid.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
-Out of pseudo-terminal resources.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOSR\fR\fR
-.ad
-.RS 10n
-Out of STREAMS resources.
-.RE
-
-.SH EXAMPLES
-\fBExample 1 \fROpen a pseudo-terminal.
-.sp
-.LP
-The following example opens a pseudo-terminal and returns the name of the slave
-device and a file descriptor.
-
-.sp
-.in +2
-.nf
+.It Dv O_NOCTTY
+If set,
+.Fn posix_openpt
+does not cause the terminal device to become the controlling terminal for the
+process.
+.El
+.Pp
+The behavior of other values for the
+.Fa oflag
+argument is unspecified.
+.Sh RETURN VALUES
+The
+.Fn posix_getopt
+function opens a manager pseudo-terminal device and, if successful, returns a
+non-negative integer representing the lowest numbered unused file descriptor ;
+otherwise, the value
+.Sy -1
+is returned and the global variable
+.Va errno
+is set to indicate the error.
+.Sh EXAMPLES
+.Sy Example 1
+Open a pseudo-terminal.
+.Pp
+The following example opens a pseudo-terminal and returns the name of the
+subsidiary device and a file descriptor.
+.Bd -literal -offset Ds
 #include <fcntl.h>
 #include <stdio.h>
+#include <err.h>
 
-int masterfd, slavefd;
-char *slavedevice;
+int managerfd, subsidiaryfd;
+char *subsidiarydevice;
 
-masterfd = posix_openpt(O_RDWR|O_NOCTTY);
+if ((managerfd = posix_openpt(O_RDWR|O_NOCTTY)) < 0) {
+        err(1, "opening pseudo-terminal manager");
+}
 
-if (masterfd == -1
-      || grantpt (masterfd) == -1
-      || unlockpt (masterfd) == -1
-      || (slavedevice = ptsname (masterfd)) == NULL)
-      return -1;
+if (grantpt(managerfd) != 0 ||
+    unlockpt(managerfd) != 0 ||
+    (subsidiarydevice = ptsname(managerfd)) == NULL) {
+        (void) close(managerfd);
+        err(1, "locating pseudo-terminal subsidiary");
+}
 
-printf("slave device is: %s\en", slavedevice);
+printf("subsidiary device is: %s\en", subsidiarydevice);
 
-slavefd = open(slave, O_RDWR|O_NOCTTY);
-if (slavefd < 0)
-      return -1;
-.fi
-.in -2
-
-.SH USAGE
-This function provides a method for portably obtaining a file descriptor of a
-master terminal device for a pseudo-terminal. The \fBgrantpt\fR(3C) and
-\fBptsname\fR(3C) functions can be used to manipulate mode and ownership
-permissions and to obtain the name of the slave device, respectively.
-.SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-\fBopen\fR(2), \fBgrantpt\fR(3C), \fBptsname\fR(3C), \fBunlockpt\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+if ((subsidiaryfd = open(subsidiary, O_RDWR|O_NOCTTY)) < 0) {
+        err(1, "opening pseudo-terminal subsidiary");
+}
+.Ed
+.Sh ERRORS
+The
+.Fn posix_openpt
+function will fail if:
+.Bl -tag -width Er
+.It Er EMFILE
+.Brq Dv OPEN_MAX
+file descriptors are currently open in the calling process.
+.It Er ENFILE
+The maximum allowable number of files is currently open in the system.
+.El
+.Pp
+The
+.Fn posix_openpt
+function may fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The value of
+.Fa oflag
+is not valid.
+.It Er EAGAIN
+The system has run out of pseudo-terminal resources.
+.It Er ENOSR
+The system has run out of STREAMS resources.
+.El
+.Sh USAGE
+This function provides a portable method for obtaining the file descriptor of a
+manager terminal device for a pseudo-terminal, as opposed to using
+.Xr open 2
+on the
+.Xr ptm 7D
+device which is system-specific.
+.Pp
+The
+.Xr grantpt 3C
+function can be used to manipulate the mode and ownership permissions
+of the subsidiary device.
+The
+.Xr ptsname 3C
+function can be used to obtain the name of the subsidiary device.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr open 2 ,
+.Xr grantpt 3C ,
+.Xr ptsname 3C ,
+.Xr unlockpt 3C ,
+.Xr attributes 5 ,
+.Xr standards 5 ,
+.Xr ptm 7D ,
+.Xr pts 7D

@@ -1636,7 +1636,7 @@ ccid_command_alloc(ccid_t *ccid, ccid_slot_t *slot, boolean_t block,
 		kmflag = KM_SLEEP;
 		usbflag = USB_FLAGS_SLEEP;
 	} else {
-		kmflag = KM_NOSLEEP | KM_NORMALPRI;
+		kmflag = KM_NOSLEEP_LAZY;
 		usbflag = 0;
 	}
 

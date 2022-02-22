@@ -15,7 +15,7 @@
 
 /*
  * No, 'tis not so deep as a well, nor so wide as a church door; but 'tis
- * enough,'twill serve. Ask for me tomorrow, and you shall find me a grave man.
+ * enough, 'twill serve. Ask for me tomorrow, and you shall find me a grave man.
  *
  * This file maintains various routines for handling when we die.
  */

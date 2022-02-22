@@ -97,7 +97,6 @@ devpts_strtol(const char *nm, minor_t *mp)
  *	  away, we use the validator to do deferred cleanup i.e. when such
  *	  nodes are encountered during subsequent lookup() and readdir().
  */
-/*ARGSUSED*/
 int
 devpts_validate(struct sdev_node *dv)
 {
@@ -124,8 +123,8 @@ devpts_validate(struct sdev_node *dv)
 	/*
 	 * Check if pts driver is attached
 	 */
-	if (ptms_slave_attached() == (major_t)-1) {
-		sdcmn_err7(("devpts_validate: slave not attached\n"));
+	if (ptms_subsidiary_attached() == (major_t)-1) {
+		sdcmn_err7(("devpts_validate: subsidiary not attached\n"));
 		return (SDEV_VTOR_INVALID);
 	}
 
@@ -159,7 +158,6 @@ devpts_validate(struct sdev_node *dv)
  * This callback is invoked from devname_lookup_func() to create
  * a pts entry when the node is not found in the cache.
  */
-/*ARGSUSED*/
 static int
 devpts_create_rvp(struct sdev_node *ddv, char *nm,
     void **arg, cred_t *cred, void *whatever, char *whichever)
@@ -177,12 +175,11 @@ devpts_create_rvp(struct sdev_node *ddv, char *nm,
 	}
 
 	/*
-	 * Check if pts driver is attached and if it is
-	 * get the major number.
+	 * Check if pts driver is attached and if it is get the major number.
 	 */
-	maj = ptms_slave_attached();
+	maj = ptms_subsidiary_attached();
 	if (maj == (major_t)-1) {
-		sdcmn_err7(("devpts_create_rvp: slave not attached\n"));
+		sdcmn_err7(("devpts_create_rvp: subsidiary not attached\n"));
 		return (-1);
 	}
 
@@ -286,7 +283,6 @@ devpts_prunedir(struct sdev_node *ddv)
  * access the realvp of the specfs node directly instead of using
  * VOP_REALVP().
  */
-/*ARGSUSED3*/
 static int
 devpts_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
     struct pathname *pnp, int flags, struct vnode *rdir, struct cred *cred,
@@ -326,7 +322,6 @@ devpts_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
  *	- creating an existing dir read-only succeeds, otherwise EISDIR
  *	- exclusive creates fail - EEXIST
  */
-/*ARGSUSED2*/
 static int
 devpts_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
     int mode, struct vnode **vpp, struct cred *cred, int flag,
@@ -359,11 +354,10 @@ devpts_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 }
 
 /*
- * Display all instantiated pts (slave) device nodes.
- * A /dev/pts entry will be created only after the first lookup of the slave
- * device succeeds.
+ * Display all instantiated pts (subsidiary) device nodes.
+ * A /dev/pts entry will be created only after the first lookup of the
+ * subsidiary device succeeds.
  */
-/*ARGSUSED4*/
 static int
 devpts_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred,
     int *eofp, caller_context_t *ct, int flags)
@@ -387,7 +381,6 @@ devpts_set_id(struct sdev_node *dv, struct vattr *vap, int protocol)
 
 }
 
-/*ARGSUSED4*/
 static int
 devpts_setattr(struct vnode *vp, struct vattr *vap, int flags,
     struct cred *cred, caller_context_t *ctp)

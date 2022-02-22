@@ -400,6 +400,18 @@ usr/include/libidspace.h
 # VXLAN
 #
 usr/include/sys/vxlan.h
+lib/libvarpd.so
+lib/amd64/libvarpd.so
+#
+# Overlay
+#
+usr/include/libdloverlay.h
+usr/include/libvarpd.h
+usr/include/libvarpd_client.h
+usr/include/libvarpd_provider.h
+usr/include/sys/overlay.h
+usr/include/sys/overlay_common.h
+usr/include/sys/overlay_target.h
 #
 # Private interfaces in libsec
 #

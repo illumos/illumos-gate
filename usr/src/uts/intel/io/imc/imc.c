@@ -1405,7 +1405,7 @@ imc_nvl_pack(imc_socket_t *sock, boolean_t sleep)
 	if (sleep) {
 		kmflag = KM_SLEEP;
 	} else {
-		kmflag = KM_NOSLEEP | KM_NORMALPRI;
+		kmflag = KM_NOSLEEP_LAZY;
 	}
 
 	if (nvlist_pack(sock->isock_nvl, &buf, &len, NV_ENCODE_XDR,
@@ -1432,7 +1432,7 @@ imc_decoder_pack(imc_t *imc)
 	}
 
 	if (nvlist_pack(imc->imc_decoder_dump, &buf, &len, NV_ENCODE_XDR,
-	    KM_NOSLEEP | KM_NORMALPRI) != 0) {
+	    KM_NOSLEEP_LAZY) != 0) {
 		return;
 	}
 

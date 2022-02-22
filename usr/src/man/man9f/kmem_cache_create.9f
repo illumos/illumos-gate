@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2022 Joyent, Inc.
 .\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
@@ -169,7 +170,21 @@ Allow sleeping (blocking) until memory is available.
 \fB\fBKM_NOSLEEP\fR\fR
 .ad
 .RS 15n
-Return NULL immediately if memory is not available.
+Return NULL immediately if memory is not available, but after an aggressive
+reclaiming attempt.  Any mention of \fBKM_NOSLEEP\fR without mentioning
+\fBKM_NOSLEEP_LAZY\fR (see below) applies to both values.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBKM_NOSLEEP_LAZY\fR\fR
+.ad
+.RS 15n
+Return NULL immediately if memory is not available, without the aggressive
+reclaiming attempt.  This is actually two flags combined:
+(\fBKM_NOSLEEP\fR | \fBKM_NORMALPRI\fR), the latter flag indicating not to
+attempt reclamation before giving up and returning NULL.
 .RE
 
 .sp
@@ -350,8 +365,8 @@ object cache.
 .LP
 \fBkmem_cache_alloc()\fR gets an object from the cache. The object will be in
 its constructed state. \fIkmflag\fR has either \fBKM_SLEEP\fR or
-\fBKM_NOSLEEP\fR set, indicating whether it is acceptable to wait for memory if
-none is currently available.
+\fBKM_NOSLEEP\fR set, indicating whether it is acceptable to wait for memory
+if none is currently available.
 .sp
 .LP
 A small pool of reserved memory is available to allow the system to progress
@@ -573,8 +588,8 @@ memory.
 .sp
 .LP
 \fBkmem_cache_alloc()\fR can be called from interrupt context only if the
-\fBKM_NOSLEEP\fR flag is set. It can be called from user or kernel context with
-any valid flag.
+\fBKM_NOSLEEP\fR flag is set. It can be called from user or kernel context
+with any valid flag.
 .sp
 .LP
 \fBkmem_cache_free()\fR can be called from user, kernel, or interrupt context.
@@ -709,9 +724,11 @@ kmem_cache_set_move(object_cache, object_move);
 .in -2
 
 .SH RETURN VALUES
-If successful, the constructor function must return \fB0\fR. If KM_NOSLEEP is
-set and memory cannot be allocated without sleeping, the constructor must
-return -\fB1\fR.
+If successful, the constructor function must return \fB0\fR. If
+\fBKM_NOSLEEP\fR or \fBKM_NOSLEEP_LAZY\fR is set and memory cannot be
+allocated without sleeping, the constructor must return -\fB1\fR.  If the
+constructor takes extraordinary steps during a \fBKM_NOSLEEP\fR construction,
+it may not take those for a \fBKM_NOSLEEP_LAZY\fR construction.
 .sp
 .LP
 \fBkmem_cache_create()\fR returns a pointer to the allocated cache.

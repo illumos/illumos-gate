@@ -25,18 +25,12 @@
 const char *
 libvarpd_isaext(void)
 {
-#if defined(__sparc)
-#if defined(__sparcv9)
-	return ("64");
-#else	/* __sparcv9 */
-	return ("");
-#endif /* __sparvc9 */
-#elif defined(__amd64)
+#if defined(__amd64)
 	return ("64");
 #elif defined(__i386)
 	return ("");
 #else
-#error	"unkonwn ISA"
+#error	"unknown ISA"
 #endif
 }
 

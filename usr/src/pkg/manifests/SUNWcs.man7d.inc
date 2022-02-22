@@ -14,4 +14,4 @@
 file path=usr/share/man/man7d/kstat.7d
 file path=usr/share/man/man7d/ksyms.7d
 file path=usr/share/man/man7d/ptm.7d
-file path=usr/share/man/man7d/pts.7d
+link path=usr/share/man/man7d/pts.7d target=ptm.7d

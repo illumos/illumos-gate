@@ -120,30 +120,30 @@ typedef struct overlay_targ_id {
  *		drop a packet.
  *
  *
- * 	OVERLAY_TARG_INJECT - overlay_targ_pkt_t
+ *	OVERLAY_TARG_INJECT - overlay_targ_pkt_t
  *
- * 		The overlay_targ_pkt_t injects a fully formed packet into the
- * 		virtual network. It may either be identified by its data link id
- * 		or by the request id. If both are specified, the
- * 		datalink id will be used. Note, that an injection is not
- * 		considered a reply and if this corresponds to a requeset, then
- * 		that individual packet must still be dropped.
- *
- *
- * 	OVERLAY_TARG_PKT - overlay_targ_pkt_t
- *
- * 		This ioctl can be used to copy data from a given request into a
- * 		user buffer. This can be used in combination with
- * 		OVERLAY_TARG_INJECT to implemnt services such as a proxy-arp.
+ *		The overlay_targ_pkt_t injects a fully formed packet into the
+ *		virtual network. It may either be identified by its data link id
+ *		or by the request id. If both are specified, the
+ *		datalink id will be used. Note, that an injection is not
+ *		considered a reply and if this corresponds to a request, then
+ *		that individual packet must still be dropped.
  *
  *
- * 	OVERLAY_TARG_RESEND - overlay_targ_pkt_t
+ *	OVERLAY_TARG_PKT - overlay_targ_pkt_t
  *
- * 		This ioctl is similar to the OVERLAY_TARG_INJECT, except instead
- * 		of receiving it on the local mac handle, it queues it for
- * 		retransmission again. This is useful if you have a packet that
- * 		was originally destined for some broadcast or multicast address
- * 		that you now want to send to a unicast address.
+ *		This ioctl can be used to copy data from a given request into a
+ *		user buffer. This can be used in combination with
+ *		OVERLAY_TARG_INJECT to implement services such as a proxy-arp.
+ *
+ *
+ *	OVERLAY_TARG_RESEND - overlay_targ_pkt_t
+ *
+ *		This ioctl is similar to the OVERLAY_TARG_INJECT, except instead
+ *		of receiving it on the local mac handle, it queues it for
+ *		retransmission again. This is useful if you have a packet that
+ *		was originally destined for some broadcast or multicast address
+ *		that you now want to send to a unicast address.
  */
 #define	OVERLAY_TARG_LOOKUP	(OVERLAY_TARG_IOCTL | 0x10)
 #define	OVERLAY_TARG_RESPOND	(OVERLAY_TARG_IOCTL | 0x11)
@@ -210,46 +210,46 @@ typedef struct overlay_targ_list {
  * The following family of ioctls all manipulate the target cache of a given
  * device.
  *
- * 	OVERLAY_TARG_CACHE_GET - overlay_targ_cache_t
+ *	OVERLAY_TARG_CACHE_GET - overlay_targ_cache_t
  *
- * 		The overlay_targ_cache_t should be have its link identifier and
- * 		the desired mac address filled in. On return, it will fill in
- * 		the otc_dest member, if the entry exists in the table.
- *
- *
- * 	OVERLAY_TARG_CACHE_SET - overlay_targ_cache_t
- *
- * 		The cache table entry of the mac address referred to by otc_mac
- * 		and otd_linkid will be filled in with the details provided by in
- * 		the otc_dest member.
- *
- * 	OVERLAY_TARG_CACHE_REMOVE - overlay_targ_cache_t
- *
- * 		Removes the cache entry identified by otc_mac from the table.
- * 		Note that this does not stop any in-flight lookups or deal with
- * 		any data that is awaiting a lookup.
+ *		The overlay_targ_cache_t should be have its link identifier and
+ *		the desired mac address filled in. On return, it will fill in
+ *		the otc_dest member, if the entry exists in the table.
  *
  *
- * 	OVERLAY_TARG_CACHE_FLUSH - overlay_targ_cache_t
+ *	OVERLAY_TARG_CACHE_SET - overlay_targ_cache_t
  *
- * 		Similar to OVERLAY_TARG_CACHE_REMOVE, but functions on the
- * 		entire table identified by otc_linkid. All other parameters are
- * 		ignored.
+ *		The cache table entry of the mac address referred to by otc_mac
+ *		and otd_linkid will be filled in with the details provided by in
+ *		the otc_dest member.
+ *
+ *	OVERLAY_TARG_CACHE_REMOVE - overlay_targ_cache_t
+ *
+ *		Removes the cache entry identified by otc_mac from the table.
+ *		Note that this does not stop any in-flight lookups or deal with
+ *		any data that is awaiting a lookup.
  *
  *
- * 	OVERLAY_TARG_CACHE_ITER - overlay_targ_cache_iter_t
+ *	OVERLAY_TARG_CACHE_FLUSH - overlay_targ_cache_t
  *
- * 		Iterates over the contents of a target cache identified by
- * 		otci_linkid. Iteration is guaranteed to be exactly once for
- * 		items which are in the hashtable at the beginning and end of
- * 		iteration. For items which are added or removed after iteration
- * 		has begun, only at most once semantics are guaranteed. Consumers
- * 		should ensure that otci_marker is zeroed before starting
- * 		iteration and should preserve its contents across calls.
+ *		Similar to OVERLAY_TARG_CACHE_REMOVE, but functions on the
+ *		entire table identified by otc_linkid. All other parameters are
+ *		ignored.
  *
- * 		Before calling in, otci_count should be set to the number of
- * 		entries that space has been allocated for in otci_ents. The
- * 		value will be updated to indicate the total number written out.
+ *
+ *	OVERLAY_TARG_CACHE_ITER - overlay_targ_cache_iter_t
+ *
+ *		Iterates over the contents of a target cache identified by
+ *		otci_linkid. Iteration is guaranteed to be exactly once for
+ *		items which are in the hashtable at the beginning and end of
+ *		iteration. For items which are added or removed after iteration
+ *		has begun, only at most once semantics are guaranteed. Consumers
+ *		should ensure that otci_marker is zeroed before starting
+ *		iteration and should preserve its contents across calls.
+ *
+ *		Before calling in, otci_count should be set to the number of
+ *		entries that space has been allocated for in otci_ents. The
+ *		value will be updated to indicate the total number written out.
  */
 
 #define	OVERLAY_TARG_CACHE_GET		(OVERLAY_TARG_IOCTL | 0x30)

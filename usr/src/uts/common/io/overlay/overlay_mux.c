@@ -37,7 +37,7 @@
 #include <sys/sdt.h>
 
 #define	OVERLAY_FREEMSG(mp, reason) \
-    DTRACE_PROBE2(overlay__fremsg, mblk_t *, mp, char *, reason)
+    DTRACE_PROBE2(overlay__freemsg, mblk_t *, mp, char *, reason)
 
 static list_t overlay_mux_list;
 static kmutex_t overlay_mux_lock;
@@ -84,7 +84,7 @@ overlay_mux_recv(ksocket_t ks, mblk_t *mpchain, size_t msgsize, int oob,
 	overlay_mux_t *mux = arg;
 
 	/*
-	 * We may have a received a chain of messages. Each messsage in the
+	 * We may have a received a chain of messages. Each message in the
 	 * chain will likely have a T_unitdata_ind attached to it as an M_PROTO.
 	 * If we aren't getting that, we should probably drop that for the
 	 * moment.

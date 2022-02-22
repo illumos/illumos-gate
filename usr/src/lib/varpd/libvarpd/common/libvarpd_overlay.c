@@ -232,11 +232,11 @@ libvarpd_overlay_lookup_reply(varpd_impl_t *vip,
 
 	/*
 	 * The only errors that should cause us to end up here are due to
-	 * programmer errors. Aruably the EINAVL case indicates that something
+	 * programmer errors. Arguably the EINVAL case indicates that something
 	 * is a bit off; however, at this time we don't opt to kill varpd.
 	 */
 	if (ret != 0 && errno != EINVAL)
-		libvarpd_panic("receieved bad errno from lookup_reply "
+		libvarpd_panic("received bad errno from lookup_reply "
 		    "(cmd %d): %d\n", cmd, errno);
 }
 
@@ -504,7 +504,7 @@ libvarpd_plugin_query_reply(varpd_query_handle_t *vqh, int action)
 	varpd_query_t *vqp = (varpd_query_t *)vqh;
 
 	if (vqp == NULL)
-		libvarpd_panic("unkonwn plugin passed invalid "
+		libvarpd_panic("unknown plugin passed invalid "
 		    "varpd_query_handle_t");
 
 	if (action == VARPD_LOOKUP_DROP)

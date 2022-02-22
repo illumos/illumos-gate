@@ -204,7 +204,7 @@ smb2_fsctl_copychunk(smb_request_t *sr, smb_fsctl_t *fsctl)
 	 * The client should then fall back to normal copy.
 	 */
 	args->bufsize = smb2_copychunk_max_seg;
-	args->buffer = kmem_alloc(args->bufsize, KM_NOSLEEP | KM_NORMALPRI);
+	args->buffer = kmem_alloc(args->bufsize, KM_NOSLEEP_LAZY);
 	if (args->buffer == NULL) {
 		status = NT_STATUS_INSUFF_SERVER_RESOURCES;
 		goto out;

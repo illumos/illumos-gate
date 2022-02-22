@@ -19,13 +19,12 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
+/*	  All Rights Reserved */
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
-
-
+#ifndef _PARMS_H
+#define _PARMS_H
 
 /* If running SVR3, #define both ATTSVR3 and ATTSV */
 #define ATTSVR3	/* System V Release 3 */
@@ -155,8 +154,8 @@
 #define DEFAULT_BAUDRATE "9600"	/* */
 
 /*define permission modes for the device */
-#define M_DEVICEMODE (mode_t) 0600	/* MASTER device mode */
-#define S_DEVICEMODE (mode_t) 0600	/* SLAVE device mode */
+#define M_DEVICEMODE (mode_t) 0600	/* manager device mode */
+#define S_DEVICEMODE (mode_t) 0600	/* subsidiary device mode */
 #define R_DEVICEMODE (mode_t) 0600	/* default mode to restore */
 
 /* NO_MODEM_CTRL - define this if you have very old hardware
@@ -232,7 +231,7 @@
 /* define USRSPOOLLOCKS if you like your lock files in /var/spool/locks
  * be sure other programs such as 'cu' and 'ct' know about this
  *
- * WARNING: if you do not define USRSPOOLLOCKS, then $LOCK in 
+ * WARNING: if you do not define USRSPOOLLOCKS, then $LOCK in
  * uudemon.cleanup must be changed.
  */
 #define USRSPOOLLOCKS  /* define to use /var/spool/locks for LCK files */
@@ -241,3 +240,5 @@
  * this entails sleeping between reads at low baud rates.
  */
 #define PKSPEEDUP	/* */
+
+#endif /* !_PARMS_H */
