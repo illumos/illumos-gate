@@ -15,7 +15,7 @@
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2017 Jason King.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Oxide Computer Company
 #
 
@@ -1840,6 +1840,7 @@ file path=opt/util-tests/tests/sed/regress.multitest.out/9.8 mode=0444
 file path=opt/util-tests/tests/sed/regress.multitest.out/9.9 mode=0444
 file path=opt/util-tests/tests/sed/sed_addr mode=0555
 file path=opt/util-tests/tests/set-linkprop mode=0555
+file path=opt/util-tests/tests/show-overlay-exit mode=0555
 dir  path=opt/util-tests/tests/sleep
 file path=opt/util-tests/tests/sleep/sleep.awk mode=0444
 file path=opt/util-tests/tests/sleep/sleep.d mode=0444

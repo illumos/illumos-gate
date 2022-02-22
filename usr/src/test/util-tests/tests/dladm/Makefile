@@ -17,7 +17,7 @@ include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests/tests
-PROG = allowed-ips set-linkprop
+PROG = allowed-ips set-linkprop show-overlay-exit
 
 ROOTPROG = $(PROG:%=$(ROOTOPTPKG)/%)
 
