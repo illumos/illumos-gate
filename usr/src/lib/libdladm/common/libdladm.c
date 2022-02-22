@@ -453,9 +453,6 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_INVALID_MTU:
 		s = "MTU check failed, MTU outside of device's supported range";
 		break;
-	case DLADM_STATUS_BAD_ENCAP:
-		s = "invalid encapsulation protocol";
-		break;
 	case DLADM_STATUS_PERSIST_ON_TEMP:
 		s = "can't create persistent object on top of temporary object";
 		break;

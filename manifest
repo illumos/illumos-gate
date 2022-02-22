@@ -1395,6 +1395,7 @@ f lib/amd64/libuuid.so.1 0755 root bin
 s lib/amd64/libuuid.so=libuuid.so.1
 f lib/amd64/libuutil.so.1 0755 root bin
 s lib/amd64/libuutil.so=libuutil.so.1
+f lib/amd64/libvarpd.so.1 0755 root bin
 f lib/amd64/libvmm.so.1 0755 root bin
 f lib/amd64/libvmmapi.so.1 0755 root bin
 f lib/amd64/libw.so.1 0755 root bin
@@ -1604,6 +1605,7 @@ f lib/libuuid.so.1 0755 root bin
 s lib/libuuid.so=libuuid.so.1
 f lib/libuutil.so.1 0755 root bin
 s lib/libuutil.so=libuutil.so.1
+f lib/libvarpd.so.1 0755 root bin
 f lib/libw.so.1 0755 root bin
 s lib/libw.so=libw.so.1
 f lib/libxnet.so.1 0755 root bin
@@ -5495,7 +5497,6 @@ s usr/lib/amd64/libuuid.so.1=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuuid.so=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuutil.so.1=../../../lib/amd64/libuutil.so.1
 s usr/lib/amd64/libuutil.so=../../../lib/amd64/libuutil.so.1
-f usr/lib/amd64/libvarpd.so.1 0755 root bin
 f usr/lib/amd64/libvnd.so.1 0755 root bin
 s usr/lib/amd64/libvnd.so=libvnd.so.1
 f usr/lib/amd64/libvolmgt.so.1 0755 root bin
@@ -7027,7 +7028,6 @@ s usr/lib/libuuid.so.1=../../lib/libuuid.so.1
 s usr/lib/libuuid.so=../../lib/libuuid.so.1
 s usr/lib/libuutil.so.1=../../lib/libuutil.so.1
 s usr/lib/libuutil.so=../../lib/libuutil.so.1
-f usr/lib/libvarpd.so.1 0755 root bin
 f usr/lib/libvnd.so.1 0755 root bin
 s usr/lib/libvnd.so=libvnd.so.1
 f usr/lib/libvolmgt.so.1 0755 root bin
@@ -19719,7 +19719,7 @@ f usr/share/man/man7d/pm.7d 0444 root bin
 f usr/share/man/man7d/poll.7d 0444 root bin
 f usr/share/man/man7d/profile.7d 0444 root bin
 f usr/share/man/man7d/ptm.7d 0444 root bin
-f usr/share/man/man7d/pts.7d 0444 root bin
+s usr/share/man/man7d/pts.7d=ptm.7d
 f usr/share/man/man7d/pty.7d 0444 root bin
 f usr/share/man/man7d/qede.7d 0444 root bin
 f usr/share/man/man7d/qlc.7d 0444 root bin
