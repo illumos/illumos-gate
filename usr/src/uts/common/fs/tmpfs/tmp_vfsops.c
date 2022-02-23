@@ -325,8 +325,8 @@ tmp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 		goto out;
 	}
 
-	if ((tm = kmem_zalloc(sizeof (struct tmount),
-	    KM_NOSLEEP | KM_NORMALPRI)) == NULL) {
+	if ((tm = kmem_zalloc(sizeof (struct tmount), KM_NOSLEEP_LAZY)) ==
+	    NULL) {
 		pn_free(&dpn);
 		error = ENOMEM;
 		goto out;

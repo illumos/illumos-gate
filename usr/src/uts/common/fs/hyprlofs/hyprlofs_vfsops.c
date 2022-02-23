@@ -271,8 +271,7 @@ hyprlofs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	    &dpn)) != 0)
 		goto out;
 
-	if ((hm = kmem_zalloc(sizeof (hlfsmount_t),
-	    KM_NORMALPRI | KM_NOSLEEP)) == NULL) {
+	if ((hm = kmem_zalloc(sizeof (hlfsmount_t), KM_NOSLEEP_LAZY)) == NULL) {
 		pn_free(&dpn);
 		error = ENOMEM;
 		goto out;

@@ -430,7 +430,7 @@ lxd_diraddentry(lxd_node_t *dir, lxd_node_t *ldn, char *name)
 	/* Allocate and initialize directory entry */
 	namelen = strlen(name) + 1;
 	alloc_size = namelen + sizeof (lxd_dirent_t);
-	dp = kmem_zalloc(alloc_size, KM_NOSLEEP | KM_NORMALPRI);
+	dp = kmem_zalloc(alloc_size, KM_NOSLEEP_LAZY);
 	if (dp == NULL)
 		return (ENOSPC);
 

@@ -4457,7 +4457,7 @@ vnd_frameio_read(vnd_dev_t *vdp, intptr_t addr, int mode)
 	vnd_data_queue_t *vqp;
 	mblk_t *mp;
 
-	fio = frameio_alloc(KM_NOSLEEP | KM_NORMALPRI);
+	fio = frameio_alloc(KM_NOSLEEP_LAZY);
 	if (fio == NULL)
 		return (EAGAIN);
 
@@ -4532,7 +4532,7 @@ vnd_frameio_write(vnd_dev_t *vdp, intptr_t addr, int mode)
 	mblk_t *mp_chain, *mp, *nmp;
 	vnd_data_queue_t *vqp;
 
-	fio = frameio_alloc(KM_NOSLEEP | KM_NORMALPRI);
+	fio = frameio_alloc(KM_NOSLEEP_LAZY);
 	if (fio == NULL)
 		return (EAGAIN);
 

@@ -908,7 +908,7 @@ cgrp_diraddentry(cgrp_node_t *dir, cgrp_node_t *cn, char *name)
 	/* Allocate and initialize directory entry */
 	namelen = strlen(name) + 1;
 	alloc_size = namelen + sizeof (cgrp_dirent_t);
-	cdp = kmem_zalloc(alloc_size, KM_NOSLEEP | KM_NORMALPRI);
+	cdp = kmem_zalloc(alloc_size, KM_NOSLEEP_LAZY);
 	if (cdp == NULL)
 		return (ENOSPC);
 

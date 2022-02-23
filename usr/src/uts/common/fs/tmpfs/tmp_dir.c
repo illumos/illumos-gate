@@ -990,7 +990,7 @@ tdiraddentry(
 	tm = TNTOTM(dir);
 	namelen = strlen(name) + 1;
 	alloc_size = namelen + sizeof (struct tdirent);
-	tdp = tmp_kmem_zalloc(tm, alloc_size, KM_NOSLEEP | KM_NORMALPRI);
+	tdp = tmp_kmem_zalloc(tm, alloc_size, KM_NOSLEEP_LAZY);
 	if (tdp == NULL)
 		return (ENOSPC);
 

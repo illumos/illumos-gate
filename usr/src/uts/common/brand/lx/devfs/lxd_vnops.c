@@ -982,7 +982,7 @@ lxd_symlink(vnode_t *dvp, char *nm, struct vattr *tva, char *tnm,
 	}
 
 	len = strlen(tnm) + 1;
-	cp = kmem_alloc(len, KM_NOSLEEP | KM_NORMALPRI);
+	cp = kmem_alloc(len, KM_NOSLEEP_LAZY);
 	if (cp == NULL) {
 		ldnode_rele(self);
 		return (ENOSPC);

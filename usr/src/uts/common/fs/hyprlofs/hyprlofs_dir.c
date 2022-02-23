@@ -504,7 +504,7 @@ hldiraddentry(
 	/* Alloc and init dir entry */
 	namelen = strlen(name) + 1;
 	alloc_size = namelen + sizeof (hldirent_t);
-	hdp = kmem_zalloc(alloc_size, KM_NORMALPRI | KM_NOSLEEP);
+	hdp = kmem_zalloc(alloc_size, KM_NOSLEEP_LAZY);
 	if (hdp == NULL)
 		return (ENOSPC);
 

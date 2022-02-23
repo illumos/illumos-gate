@@ -1645,7 +1645,7 @@ tmp_symlink(
 		return (error);
 	}
 	len = strlen(tnm) + 1;
-	cp = tmp_kmem_zalloc(tm, len, KM_NOSLEEP | KM_NORMALPRI);
+	cp = tmp_kmem_zalloc(tm, len, KM_NOSLEEP_LAZY);
 	if (cp == NULL) {
 		tmpnode_rele(self);
 		return (ENOSPC);
