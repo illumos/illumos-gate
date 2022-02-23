@@ -92,7 +92,7 @@ void smb_oplock_ind_break_in_ack(smb_request_t *, smb_ofile_t *,
     uint32_t, boolean_t);
 void smb_oplock_send_break(smb_request_t *);
 
-uint32_t smb_oplock_wait_ack(smb_request_t *);
+uint32_t smb_oplock_wait_ack(smb_request_t *, uint32_t);
 uint32_t smb_oplock_wait_break(smb_request_t *, smb_node_t *, int);
 uint32_t smb_oplock_wait_break_fem(smb_node_t *, int);
 

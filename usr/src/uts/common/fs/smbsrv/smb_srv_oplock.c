@@ -227,8 +227,17 @@ smb_oplock_ind_break_in_ack(smb_request_t *ack_sr, smb_ofile_t *ofile,
 		sr->uid_user = ofile->f_user;
 		smb_user_hold_internal(sr->uid_user);
 	}
+	if (ofile->f_lease != NULL)
+		NewLevel |= OPLOCK_LEVEL_GRANULAR;
+
 	sr->arg.olbrk.NewLevel = NewLevel;
 	sr->arg.olbrk.AckRequired = AckRequired;
+
+	/*
+	 * Could do this in _hdl_update but this way it's
+	 * visible in the dtrace fbt entry probe.
+	 */
+	sr->arg.olbrk.OldLevel = ofile->f_oplock.og_breakto;
 
 	smb_oplock_hdl_update(sr);
 
@@ -350,14 +359,23 @@ smb_oplock_ind_break(smb_ofile_t *ofile, uint32_t NewLevel,
 		sr->uid_user = ofile->f_user;
 		smb_user_hold_internal(sr->uid_user);
 	}
+	if (ofile->f_lease != NULL)
+		NewLevel |= OPLOCK_LEVEL_GRANULAR;
+
 	sr->arg.olbrk.NewLevel = NewLevel;
 	sr->arg.olbrk.AckRequired = AckRequired;
 	sr->smb2_status = CompletionStatus;
 
+	/*
+	 * Could do this in _hdl_update but this way it's
+	 * visible in the dtrace fbt entry probe.
+	 */
+	sr->arg.olbrk.OldLevel = ofile->f_oplock.og_breakto;
+
 	smb_oplock_hdl_update(sr);
 
-	(void) taskq_dispatch(
-	    sv->sv_worker_pool,
+	/* Will call smb_oplock_send_break */
+	(void) taskq_dispatch(sv->sv_worker_pool,
 	    smb_oplock_async_break, sr, TQ_SLEEP);
 }
 
@@ -462,7 +480,8 @@ smb_oplock_hdl_moved(smb_ofile_t *ofile)
 		ls->ls_oplock_ofile = (smb_ofile_t *)&invalid_ofile;
 
 	ofile->f_oplock.og_state = 0;
-	ofile->f_oplock.og_breaking = 0;
+	ofile->f_oplock.og_breakto = 0;
+	ofile->f_oplock.og_breaking = B_FALSE;
 }
 
 /*
@@ -488,7 +507,8 @@ smb_oplock_hdl_closed(smb_ofile_t *ofile)
 		}
 	}
 	ofile->f_oplock.og_state = 0;
-	ofile->f_oplock.og_breaking = 0;
+	ofile->f_oplock.og_breakto = 0;
+	ofile->f_oplock.og_breaking = B_FALSE;
 }
 
 /*
@@ -499,8 +519,16 @@ smb_oplock_hdl_closed(smb_ofile_t *ofile)
  * so we can make any state changes that should happen immediately.
  *
  * Here, keep track of what we will send to the client.
- * More importantly, if a break ack is expected, set
- * the og_breaking flags to note that fact.
+ * Saves old state in arg.olbck.OldLevel
+ *
+ * Note that because we may be in the midst of processing an
+ * smb_oplock_ack_break call here, the _breaking flag will be
+ * temporarily false, and is set true again if this ack causes
+ * another break.  This makes it tricky to know when to update
+ * the epoch, which is not supposed to increment when there's
+ * already an unacknowledged break out to the client.
+ * We can recognize that by comparing ls_state vs ls_breakto.
+ * If no unacknowledged break, ls_state == ls_breakto.
  */
 static void
 smb_oplock_hdl_update(smb_request_t *sr)
@@ -516,36 +544,28 @@ smb_oplock_hdl_update(smb_request_t *sr)
 	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
 #endif
 
+	/* Caller sets arg.olbrk.OldLevel */
+	ofile->f_oplock.og_breakto = NewLevel;
+	ofile->f_oplock.og_breaking = B_TRUE;
 	if (lease != NULL) {
-		sr->arg.olbrk.OldLevel = lease->ls_state;
-		lease->ls_epoch++;
-		NewLevel |= OPLOCK_LEVEL_GRANULAR;
+		// If no unacknowledged break, update epoch.
+		if (lease->ls_breakto == lease->ls_state)
+			lease->ls_epoch++;
+
+		lease->ls_breakto = NewLevel;
+		lease->ls_breaking = B_TRUE;
 	}
 
-	if (AckReq) {
-		uint32_t BreakTo;
-
-		if (lease != NULL) {
-			BreakTo = (NewLevel & CACHE_RWH) << BREAK_SHIFT;
-			if (BreakTo == 0)
-				BreakTo = BREAK_TO_NO_CACHING;
-			lease->ls_breaking = BreakTo;
-		} else {
-			if ((NewLevel & LEVEL_TWO_OPLOCK) != 0)
-				BreakTo = BREAK_TO_TWO;
-			else
-				BreakTo = BREAK_TO_NONE;
-		}
-		ofile->f_oplock.og_breaking = BreakTo;
-		/* Will update ls/og_state in ack. */
-	} else {
+	if (!AckReq) {
 		/*
 		 * Not expecting an Ack from the client.
 		 * Update state immediately.
 		 */
 		ofile->f_oplock.og_state = NewLevel;
+		ofile->f_oplock.og_breaking = B_FALSE;
 		if (lease != NULL) {
-			lease->ls_state = NewLevel & CACHE_RWH;
+			lease->ls_state = NewLevel;
+			lease->ls_breaking = B_FALSE;
 		}
 		if (ofile->dh_persist) {
 			smb2_dh_update_oplock(sr, ofile);
@@ -577,7 +597,8 @@ smb_oplock_close(smb_ofile_t *ofile)
 		smb_oplock_break_CLOSE(node, ofile);
 
 		ofile->f_oplock.og_state = 0;
-		ofile->f_oplock.og_breaking = 0;
+		ofile->f_oplock.og_breakto = 0;
+		ofile->f_oplock.og_breaking = B_FALSE;
 		cv_broadcast(&ofile->f_oplock.og_ack_cv);
 	}
 
@@ -605,32 +626,47 @@ smb_oplock_wait_ack_cancel(smb_request_t *sr)
  * Wait for an oplock break ACK to arrive.  This is called after
  * we've sent an oplock break or lease break to the client where
  * an "Ack break" is expected back.  If we get an Ack, that will
- * wake us up via smb2_oplock_break_ack or smb2_lease_break_ack,
- * which signal the CV on which we wait here.
+ * wake us up via smb2_oplock_break_ack or smb2_lease_break_ack.
+ *
+ * Wait until state reduced to NewLevel (or less).
+ * Note that in multi-break cases, we might wait here for just
+ * one ack when another has become pending, in which case the
+ * og_breakto might be a subset of NewLevel.  Wait until the
+ * state field is no longer a superset of NewLevel.
  */
 uint32_t
-smb_oplock_wait_ack(smb_request_t *sr)
+smb_oplock_wait_ack(smb_request_t *sr, uint32_t NewLevel)
 {
 	smb_ofile_t	*ofile = sr->fid_ofile;
 	smb_lease_t	*lease = ofile->f_lease;
 	smb_node_t	*node = ofile->f_node;
 	smb_oplock_t	*ol = &node->n_oplock;
-	uint32_t	*brp;
-	kcondvar_t	*cvp;
+	uint32_t	*state_p;
+	kcondvar_t	*cv_p;
 	clock_t		time, rv;
 	uint32_t	status = 0;
 	smb_req_state_t  srstate;
+	uint32_t	wait_mask;
 
 	time = ddi_get_lbolt() +
 	    MSEC_TO_TICK(smb_oplock_timeout_ack);
 
+	/*
+	 * Wait on either lease state or oplock state
+	 */
 	if (lease != NULL) {
-		brp = &lease->ls_breaking;
-		cvp = &lease->ls_ack_cv;
+		state_p = &lease->ls_state;
+		cv_p = &lease->ls_ack_cv;
 	} else {
-		brp = &ofile->f_oplock.og_breaking;
-		cvp = &ofile->f_oplock.og_ack_cv;
+		state_p = &ofile->f_oplock.og_state;
+		cv_p = &ofile->f_oplock.og_ack_cv;
 	}
+
+	/*
+	 * These are all the bits that we wait to be cleared.
+	 */
+	wait_mask = ~NewLevel & (CACHE_RWH |
+	    LEVEL_TWO | LEVEL_ONE | LEVEL_BATCH);
 
 	/*
 	 * Setup cancellation callback
@@ -642,15 +678,16 @@ smb_oplock_wait_ack(smb_request_t *sr)
 	}
 	sr->sr_state = SMB_REQ_STATE_WAITING_OLBRK;
 	sr->cancel_method = smb_oplock_wait_ack_cancel;
-	sr->cancel_arg2 = cvp;
+	sr->cancel_arg2 = cv_p;
 	mutex_exit(&sr->sr_mutex);
 
 	/*
 	 * Enter the wait loop
 	 */
 	mutex_enter(&ol->ol_mutex);
-	while (*brp != 0) {
-		rv = cv_timedwait(cvp, &ol->ol_mutex, time);
+
+	while ((*state_p & wait_mask) != 0) {
+		rv = cv_timedwait(cv_p, &ol->ol_mutex, time);
 		if (rv < 0) {
 			/* cv_timewait timeout */
 			status = NT_STATUS_CANNOT_BREAK_OPLOCK;

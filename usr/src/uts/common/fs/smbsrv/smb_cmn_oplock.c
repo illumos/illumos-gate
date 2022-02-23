@@ -563,6 +563,12 @@ smb_oplock_req_excl(
 	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
 	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
 
+#ifdef	DEBUG
+	FOREACH_NODE_OFILE(node, o) {
+		DTRACE_PROBE1(each_ofile, smb_ofile_t *, o);
+	}
+#endif
+
 	/*
 	 * Don't allow grants on closing ofiles.
 	 */
@@ -1062,6 +1068,12 @@ smb_oplock_req_shared(
 
 	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
 	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
+
+#ifdef	DEBUG
+	FOREACH_NODE_OFILE(node, o) {
+		DTRACE_PROBE1(each_ofile, smb_ofile_t *, o);
+	}
+#endif
 
 	/*
 	 * Don't allow grants on closing ofiles.
@@ -1601,21 +1613,10 @@ smb_oplock_ack_break(
 			 *	OplockCompletionStatus = STATUS_SUCCESS.
 			 * (Because BreakingOplockOpen is equal to the
 			 * passed-in Open, the operation ends at this point.)
-			 *
-			 * It should be OK to return the reduced oplock
-			 * (*rop = LEVEL_NONE) here and avoid the need
-			 * to send another oplock break.  This is safe
-			 * because we already have an Ack of the break
-			 * to Level_II, and the additional break to none
-			 * would use AckRequired = FALSE.
-			 *
-			 * If we followed the spec here, we'd have:
-			 * smb_oplock_ind_break(ofile,
-			 *    LEVEL_NONE, B_FALSE,
-			 *    NT_STATUS_SUCCESS);
-			 * (Or smb_oplock_ind_break_in_ack...)
 			 */
-			*rop = LEVEL_NONE;	/* Reduced from L2 */
+			smb_oplock_ind_break_in_ack(
+			    sr, ofile,
+			    LEVEL_NONE, B_FALSE);
 		}
 		status = NT_STATUS_SUCCESS;
 		goto out;
@@ -1691,8 +1692,18 @@ smb_oplock_ack_break(
 		BreakToLevel = READ_CACHING;
 		break;
 	case BREAK_TO_NO_CACHING:
-	default:
 		BreakToLevel = LEVEL_NONE;
+		break;
+	default:
+		ASSERT(0);
+		/* FALLTHROUGH */
+	case 0:
+		/*
+		 * This can happen when we have multiple RH opens,
+		 * and one of them breaks (RH to R).  Happens in
+		 * the smbtorture smb2.lease.v2rename test.
+		 */
+		BreakToLevel = CACHE_R;
 		break;
 	}
 
@@ -1703,6 +1714,21 @@ smb_oplock_ack_break(
 	case (READ_CACHING|HANDLE_CACHING):
 	case (READ_CACHING|HANDLE_CACHING|BREAK_TO_READ_CACHING):
 	case (READ_CACHING|HANDLE_CACHING|BREAK_TO_NO_CACHING):
+		/*
+		 * XXX: Missing from [MS-FSA]
+		 *
+		 * If we previously sent a break to none and the
+		 * client Ack level is R instead of none, we
+		 * need to send another break. We can then
+		 * proceed as if we got level = none.
+		 */
+		if (level == CACHE_R && BreakToLevel == LEVEL_NONE) {
+			smb_oplock_ind_break_in_ack(
+			    sr, ofile,
+			    LEVEL_NONE, B_FALSE);
+			level = LEVEL_NONE;
+		}
+
 		/*
 		 * For each RHOpContext ThisContext in
 		 * Open.Stream.Oplock.RHBreakQueue:
@@ -2001,7 +2027,11 @@ smb_oplock_ack_break(
 		 */
 
 		/*
-		 * Breaking R to none?  This is like:
+		 * Breaking R to none.
+		 *
+		 * We sent break exclusive (RWH or RW) to none and
+		 * the client Ack reduces to R instead of to none.
+		 * Need to send another break. This is like:
 		 * "If BreakCacheLevel contains READ_CACHING..."
 		 * from smb_oplock_break_cmn.
 		 */
@@ -2015,16 +2045,24 @@ smb_oplock_ack_break(
 		}
 
 		/*
-		 * Breaking RH to R or RH to none?  This is like:
+		 * Breaking RH to R or RH to none.
+		 *
+		 * We sent break from (RWH or RW) to (R or none),
+		 * and the client Ack reduces to RH instead of none.
+		 * Need to send another break. This is like:
 		 * "If BreakCacheLevel equals HANDLE_CACHING..."
 		 * from smb_oplock_break_cmn.
+		 *
+		 * Note: Windows always does break to CACHE_R here,
+		 * letting another Ack and ind_break round trip
+		 * take us the rest of the way from R to none.
 		 */
 		if (level == CACHE_RH &&
 		    (BreakToLevel == CACHE_R ||
 		    BreakToLevel == LEVEL_NONE)) {
 			smb_oplock_ind_break_in_ack(
 			    sr, ofile,
-			    BreakToLevel, B_TRUE);
+			    CACHE_R, B_TRUE);
 
 			ofile->f_oplock.BreakingToRead =
 			    (BreakToLevel & READ_CACHING) ? 1: 0;
@@ -2330,6 +2368,12 @@ smb_oplock_break_CLOSE(smb_node_t *node, smb_ofile_t *ofile)
 
 	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
 	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
+
+#ifdef	DEBUG
+	FOREACH_NODE_OFILE(node, o) {
+		DTRACE_PROBE1(each_ofile, smb_ofile_t *, o);
+	}
+#endif
 
 	/*
 	 * If Oplock.IIOplocks is not empty:
@@ -2700,6 +2744,12 @@ smb_oplock_break_cmn(smb_node_t *node,
 
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
 	mutex_enter(&node->n_oplock.ol_mutex);
+
+#ifdef	DEBUG
+	FOREACH_NODE_OFILE(node, o) {
+		DTRACE_PROBE1(each_ofile, smb_ofile_t *, o);
+	}
+#endif
 
 	if (node->n_oplock.ol_state == 0 ||
 	    node->n_oplock.ol_state == NO_OPLOCK)

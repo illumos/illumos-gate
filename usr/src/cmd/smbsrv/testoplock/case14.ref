@@ -1,0 +1,66 @@
+
+open 1 1
+ open 1 OK
+req 1 0x807
+ req oplock fid=1 ret oplock=0x807 status=0x0 (SUCCESS)
+show
+ ol_state=0x17 ( EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
+ Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=1
+  fid=1 Lease=1 State=0x807 Excl=Y onlist:
+
+brk-setinfo 1 0xa
+ brk-setinfo 1 0xa ret status=0x0 (SUCCESS)
+show
+ ol_state=0x17 ( EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
+ Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=1
+  fid=1 Lease=1 State=0x807 Excl=Y onlist:
+
+
+open 2 2
+ open 2 OK
+brk-open 2
+*smb_oplock_ind_break fid=1 NewLevel=0x3, AckReq=1, ComplStatus=0x0 (SUCCESS)
+*smb_oplock_send_break fid=1 NewLevel=0x803, OldLevel=0x807, AckReq=1)
+ brk-open 2 ret status=0x108 (OPLOCK_BREAK_IN_PROGRESS)
+show
+ ol_state=0x30017 ( BREAK_TO_HANDLE_CACHING BREAK_TO_READ_CACHING EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
+ Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease=1 State=0x807 BreakTo=0x803 Excl=Y onlist:
+  fid=2 Lease=2 State=0x0 Excl=N onlist:
+
+ack 1 0x803
+ ack: break fid=1, newstate=0x803, status=0x0 (SUCCESS)
+show
+ ol_state=0x3 ( HANDLE_CACHING READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=0 cnt_RH=1 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease=1 State=0x803 Excl=N onlist: RH
+  fid=2 Lease=2 State=0x0 Excl=N onlist:
+
+req 2 0x807
+ req oplock fid=2 ret oplock=0x0 status=0xc00000e2 (OPLOCK_NOT_GRANTED)
+req 2 0x803
+ req oplock fid=2 ret oplock=0x803 status=0x0 (SUCCESS)
+
+brk-setinfo 1 0xa
+*smb_oplock_ind_break fid=2 NewLevel=0x1, AckReq=1, ComplStatus=0x0 (SUCCESS)
+*smb_oplock_send_break fid=2 NewLevel=0x801, OldLevel=0x803, AckReq=1)
+ brk-setinfo 1 0xa ret status=0x108 (OPLOCK_BREAK_IN_PROGRESS)
+show
+ ol_state=0x3 ( HANDLE_CACHING READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=0 cnt_RH=1 cnt_RHBQ=1
+ ofile_cnt=2
+  fid=1 Lease=1 State=0x803 Excl=N onlist: RH
+  fid=2 Lease=2 State=0x803 BreakTo=0x801 Excl=N onlist: RHBQ(to read)
+
+ack 2 0x801
+ ack: break fid=2, newstate=0x801, status=0x0 (SUCCESS)
+show
+ ol_state=0x23 ( MIXED_R_AND_RH HANDLE_CACHING READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=1 cnt_RH=1 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease=1 State=0x803 Excl=N onlist: RH
+  fid=2 Lease=2 State=0x801 Excl=N onlist: R

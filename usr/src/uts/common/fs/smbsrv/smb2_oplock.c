@@ -133,7 +133,7 @@ smb2_oplock_break_ack(smb_request_t *sr)
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
 	mutex_enter(&node->n_oplock.ol_mutex);
 
-	if (og->og_breaking == 0) {
+	if (og->og_breaking == B_FALSE) {
 		/*
 		 * This is an unsolicited Ack. (There is no
 		 * outstanding oplock break in progress now.)
@@ -154,7 +154,7 @@ smb2_oplock_break_ack(smb_request_t *sr)
 	 * Clear breaking flags before we ack,
 	 * because ack might set those.
 	 */
-	ofile->f_oplock.og_breaking = 0;
+	ofile->f_oplock.og_breaking = B_FALSE;
 	cv_broadcast(&ofile->f_oplock.og_ack_cv);
 
 	status = smb_oplock_ack_break(sr, ofile, &NewLevel);
@@ -355,7 +355,7 @@ smb2_oplock_send_break(smb_request_t *sr)
 		 * We're expecting an ACK.  Wait in this thread
 		 * so we can log clients that don't respond.
 		 */
-		status = smb_oplock_wait_ack(sr);
+		status = smb_oplock_wait_ack(sr, NewLevel);
 		if (status == 0)
 			return;
 
@@ -377,7 +377,7 @@ smb2_oplock_send_break(smb_request_t *sr)
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
 	mutex_enter(&node->n_oplock.ol_mutex);
 
-	ofile->f_oplock.og_breaking = 0;
+	ofile->f_oplock.og_breaking = B_FALSE;
 	cv_broadcast(&ofile->f_oplock.og_ack_cv);
 
 	status = smb_oplock_ack_break(sr, ofile, &NewLevel);
@@ -487,8 +487,9 @@ smb2_oplock_acquire(smb_request_t *sr)
 	case NT_STATUS_SUCCESS:
 	case NT_STATUS_OPLOCK_BREAK_IN_PROGRESS:
 		ofile->f_oplock.og_dialect = SMB_VERS_2_002;
-		ofile->f_oplock.og_state = op->op_oplock_state;
-		ofile->f_oplock.og_breaking = 0;
+		ofile->f_oplock.og_state   = op->op_oplock_state;
+		ofile->f_oplock.og_breakto = op->op_oplock_state;
+		ofile->f_oplock.og_breaking = B_FALSE;
 		if (ofile->dh_persist) {
 			smb2_dh_update_oplock(sr, ofile);
 		}

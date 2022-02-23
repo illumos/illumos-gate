@@ -55,7 +55,7 @@ smb1_oplock_ack_break(smb_request_t *sr, uchar_t oplock_level)
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
 	mutex_enter(&node->n_oplock.ol_mutex);
 
-	ofile->f_oplock.og_breaking = 0;
+	ofile->f_oplock.og_breaking = B_FALSE;
 	cv_broadcast(&ofile->f_oplock.og_ack_cv);
 
 	(void) smb_oplock_ack_break(sr, ofile, &NewLevel);
@@ -189,7 +189,7 @@ smb1_oplock_send_break(smb_request_t *sr)
 	 * We're expecting an ACK.  Wait in this thread
 	 * so we can log clients that don't respond.
 	 */
-	status = smb_oplock_wait_ack(sr);
+	status = smb_oplock_wait_ack(sr, NewLevel);
 	if (status == 0)
 		return;
 
@@ -207,7 +207,7 @@ smb1_oplock_send_break(smb_request_t *sr)
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
 	mutex_enter(&node->n_oplock.ol_mutex);
 
-	ofile->f_oplock.og_breaking = 0;
+	ofile->f_oplock.og_breaking = B_FALSE;
 	cv_broadcast(&ofile->f_oplock.og_ack_cv);
 
 	status = smb_oplock_ack_break(sr, ofile, &NewLevel);
@@ -313,8 +313,9 @@ smb1_oplock_acquire(smb_request_t *sr, boolean_t level2ok)
 	case NT_STATUS_OPLOCK_BREAK_IN_PROGRESS:
 		ofile->f_oplock.og_dialect = (level2ok) ?
 		    NT_LM_0_12 : LANMAN2_1;
-		ofile->f_oplock.og_state = op->op_oplock_state;
-		ofile->f_oplock.og_breaking = 0;
+		ofile->f_oplock.og_state   = op->op_oplock_state;
+		ofile->f_oplock.og_breakto = op->op_oplock_state;
+		ofile->f_oplock.og_breaking = B_FALSE;
 		break;
 	case NT_STATUS_OPLOCK_NOT_GRANTED:
 		op->op_oplock_level = SMB_OPLOCK_NONE;

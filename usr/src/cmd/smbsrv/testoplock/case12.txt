@@ -20,9 +20,10 @@ show
 # and brk-open shoud block (break in progress)
 #
 # ack the first lease break above (RWH to RH)
-# should get a new break ind. (RH to none)
+# should get a new break ind. (RH to R) ar=1
 ack 1 0x803
 show
-# got break ind?
-ack 1 0x800
+# ack the second lease break (RH to R)
+# should get a new break ind. (R to none) ar=0
+ack 1 0x801
 show

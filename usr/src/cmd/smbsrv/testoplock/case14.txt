@@ -1,0 +1,51 @@
+# Input for testoplock, case 13
+# simulate smbtorture smb2.lease.v2_rename
+
+# Create (open_if, lease=e0dd(1), RWH, epoch=0x4711 )
+#  resp: fid=1, RWH, epoch=0x4712
+# Expect no breaks, one handle, state=RWH
+open 1 1
+req 1 0x807
+show
+
+# SetInfo fid=1, newname=...dst.dat
+#  resp OK (no breaks)
+brk-setinfo 1 0xa
+show
+
+# Create, open_if, lease=e0dd(1), RWH, epoch=0x4712
+#  resp fid=5 RWH, flags=0 (not breaking)
+# Close fid=5 / resp
+# This is handled without calling the common oplock layer,
+# by logic at the top of smb2_lease_acquire
+
+# Create, open_if, lease=feed(2), RWH, epoch=0x0044
+#  (resp pending, will break RWH to RH)
+open 2 2
+brk-open 2
+show
+
+# Lease Break Notify, lease=e0dd(1), RWH to RH, epoch=0x4713
+# Lease Break Ack, lease=e0dd, RH
+#  resp (same)
+ack 1 0x803
+show
+
+# Create-resp, fid=9 lease=feed(2), state=RH, epoch=0x0045
+# Now that open 2 breaking is done, it can request.
+# Will fail RWH, succeed RH
+req 2 0x807
+req 2 0x803
+
+# SetInfo fid=1, newname=...src.dat
+#  (resp blocked -- win10 does not go pending? we do)
+# Should get rid of handle caching (RH to R)
+brk-setinfo 1 0xa
+show
+
+# Lease Break Notify, lease=feed(2), RH to R, epoch=0x0046
+# Lease Break Ack, lease=feed(2), state=R
+#   Break Ack Resp (same)
+ack 2 0x801
+show
+# SetInfo resp, fid=1 (note: races with Break Ack resp.)

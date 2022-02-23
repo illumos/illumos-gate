@@ -6,7 +6,7 @@ show
  ol_state=0x1 ( READ_CACHING )
  Excl=n cnt_II=0 cnt_R=1 cnt_RH=0 cnt_RHBQ=0
  ofile_cnt=1
-  fid=1 Lease=1 OgState=0x801 Brk=0x0 Excl=N onlist:  R 
+  fid=1 Lease=1 State=0x801 Excl=N onlist: R
 
 open 2 1
  open 2 OK
@@ -19,23 +19,31 @@ show
  ol_state=0x17 ( EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
  Excl=Y (FID=2) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
  ofile_cnt=2
-  fid=1 Lease=1 OgState=0x0 Brk=0x0 Excl=N onlist:   
-  fid=2 Lease=1 OgState=0x807 Brk=0x0 Excl=Y onlist:   
+  fid=1 Lease=1 State=0x0 Excl=N onlist:
+  fid=2 Lease=1 State=0x807 Excl=Y onlist:
 
 move 2 1
  move 2 1
+show
+ ol_state=0x17 ( EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
+ Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease=1 State=0x807 Excl=Y onlist:
+  fid=2 Lease=1 State=0x0 Excl=N onlist:
+
 close 2
  close OK
 show
  ol_state=0x17 ( EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
  Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
  ofile_cnt=1
-  fid=1 Lease=1 OgState=0x807 Brk=0x0 Excl=Y onlist:   
+  fid=1 Lease=1 State=0x807 Excl=Y onlist:
 
 open 3 2
  open 3 OK
 brk-open 3
 *smb_oplock_ind_break fid=1 NewLevel=0x3, AckReq=1, ComplStatus=0x0 (SUCCESS)
+*smb_oplock_send_break fid=1 NewLevel=0x803, OldLevel=0x807, AckReq=1)
  brk-open 3 ret status=0x108 (OPLOCK_BREAK_IN_PROGRESS)
 ack 1
  ack: break fid=1, newstate=0x803, status=0x0 (SUCCESS)
@@ -43,8 +51,8 @@ show
  ol_state=0x3 ( HANDLE_CACHING READ_CACHING )
  Excl=n cnt_II=0 cnt_R=0 cnt_RH=1 cnt_RHBQ=0
  ofile_cnt=2
-  fid=1 Lease=1 OgState=0x803 Brk=0x0 Excl=N onlist:   RH
-  fid=3 Lease=2 OgState=0x0 Brk=0x0 Excl=N onlist:   
+  fid=1 Lease=1 State=0x803 Excl=N onlist: RH
+  fid=3 Lease=2 State=0x0 Excl=N onlist:
 
 req 3 0x801
  req oplock fid=3 ret oplock=0x801 status=0x0 (SUCCESS)
@@ -52,5 +60,5 @@ show
  ol_state=0x23 ( MIXED_R_AND_RH HANDLE_CACHING READ_CACHING )
  Excl=n cnt_II=0 cnt_R=1 cnt_RH=1 cnt_RHBQ=0
  ofile_cnt=2
-  fid=1 Lease=1 OgState=0x803 Brk=0x0 Excl=N onlist:   RH
-  fid=3 Lease=2 OgState=0x801 Brk=0x0 Excl=N onlist:  R 
+  fid=1 Lease=1 State=0x803 Excl=N onlist: RH
+  fid=3 Lease=2 State=0x801 Excl=N onlist: R
