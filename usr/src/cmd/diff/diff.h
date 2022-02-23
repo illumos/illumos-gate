@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -37,11 +37,12 @@
  * contributors.
  */
 
+/*
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef	_DIFF_H
 #define	_DIFF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #ifdef	__cplusplus
 extern "C" {
@@ -123,6 +124,7 @@ int bflag = 0;
 int tflag = 0;
 int wflag = 0;
 int iflag = 0;
+int qflag = 0;
 int rflag = 0;
 int lflag = 0;
 int sflag = 0;
