@@ -231,8 +231,9 @@ smb_set_alloc_info(smb_request_t *sr, smb_setinfo_t *si)
 uint32_t
 smb_set_disposition_info(smb_request_t *sr, smb_setinfo_t *si)
 {
-	smb_node_t *node = si->si_node;
-	smb_ofile_t *of = sr->fid_ofile;
+	smb_attr_t	*attr = &si->si_attr;
+	smb_node_t	*node = si->si_node;
+	smb_ofile_t	*of = sr->fid_ofile;
 	uint8_t		mark_delete;
 	uint32_t	status;
 	uint32_t	flags = 0;
@@ -247,6 +248,17 @@ smb_set_disposition_info(smb_request_t *sr, smb_setinfo_t *si)
 		smb_node_reset_delete_on_close(node);
 		return (NT_STATUS_SUCCESS);
 	}
+
+	/*
+	 * MS-FSA 2.1.5.14.3 FileDispositionInformation
+	 * If dosattr READONLY, STATUS_CANNOT_DELETE.
+	 */
+	attr->sa_mask = SMB_AT_DOSATTR;
+	status = smb2_ofile_getattr(sr, of, attr);
+	if (status != 0)
+		return (status);
+	if ((attr->sa_dosattr & FILE_ATTRIBUTE_READONLY) != 0)
+		return (NT_STATUS_CANNOT_DELETE);
 
 	/*
 	 * Break any oplock handle caching.

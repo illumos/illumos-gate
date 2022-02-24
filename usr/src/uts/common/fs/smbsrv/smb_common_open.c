@@ -945,6 +945,12 @@ create:
 			goto errout;
 		}
 
+		if ((op->dattr & FILE_ATTRIBUTE_READONLY) != 0 &&
+		    (op->create_options & FILE_DELETE_ON_CLOSE) != 0) {
+			status = NT_STATUS_CANNOT_DELETE;
+			goto errout;
+		}
+
 		if ((op->desired_access & ACCESS_SYSTEM_SECURITY) != 0 &&
 		    !smb_user_has_security_priv(sr->uid_user, sr->user_cr)) {
 			status = NT_STATUS_ACCESS_DENIED;
