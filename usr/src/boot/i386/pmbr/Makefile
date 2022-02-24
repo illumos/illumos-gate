@@ -36,7 +36,7 @@ all: $(PROG)
 install: $(PROG:%=$(ROOT_BOOT)/%)
 
 $(PROG): $(OBJS)
-	$(LD) $(LDFLAGS) -o $(PROG) $(OBJS)
+	$(GLD) $(LDFLAGS) -o $(PROG) $(OBJS)
 
 clobber: clean
 

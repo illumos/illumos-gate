@@ -71,7 +71,7 @@ zfs_cmd.o := CPPFLAGS += -I$(SRC)/uts/common
 part.o := CPPFLAGS += -I$(ZLIB)
 smbios.o := CPPFLAGS += -DSMBIOS_SERIAL_NUMBERS
 smbios.o := CPPFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
-gptldr.out := LD_FLAGS += -m elf_i386_sol2
+gptldr.out := LD_FLAGS += $(GLDTARGET)
 
 CLEANFILES=	gptzfsboot $(OBJS)
 
@@ -85,7 +85,7 @@ gptldr.bin: gptldr.out
 	$(OBJCOPY) -S -O binary gptldr.out $@
 
 gptldr.out: gptldr.o
-	$(LD) $(LD_FLAGS) -e start -Ttext $(ORG1) -o $@ gptldr.o
+	$(GLD) $(LD_FLAGS) -e start -Ttext $(ORG1) -o $@ gptldr.o
 
 CLEANFILES +=	gptzfsboot.bin gptzfsboot.out
 
@@ -93,7 +93,7 @@ gptzfsboot.bin: gptzfsboot.out
 	$(OBJCOPY) -S -O binary gptzfsboot.out $@
 
 gptzfsboot.out: $(BTXCRT) $(OBJS) $(DPADD)
-	$(LD) $(LD_FLAGS) -T $(LDSCRIPT) -o $@ $(BTXCRT) $(OBJS) $(LIBS)
+	$(GLD) $(LD_FLAGS) -T $(LDSCRIPT) -o $@ $(BTXCRT) $(OBJS) $(LIBS)
 
 machine:
 	$(RM) machine

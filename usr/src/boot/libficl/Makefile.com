@@ -40,9 +40,6 @@ pics/vm.o := SMOFF += check_check_deref
 MAJOR = 4
 MINOR = 1.0
 
-objs/vm.o := CFLAGS += -_gcc=-Wno-clobbered
-pics/vm.o := CFLAGS += -_gcc=-Wno-clobbered
-
 machine:
 	$(RM) machine
 	$(SYMLINK) ../../sys/$(MACHINE)/include machine

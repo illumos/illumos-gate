@@ -28,7 +28,7 @@ OBJS=	btx.o
 BOOT_BTX_FLAGS=0x0
 #.endif
 
-CPPFLAGS += -DBTX_FLAGS=${BOOT_BTX_FLAGS}
+CPPFLAGS += -DBTX_FLAGS=$(BOOT_BTX_FLAGS)
 CPPFLAGS += -I./../../common
 
 #.if defined(BTX_SERIAL)
@@ -42,12 +42,12 @@ CPPFLAGS += -I./../../common
 
 ORG=	0x9000
 
-LDFLAGS=-e start -Ttext ${ORG} -N -S --oformat binary $(GLDTARGET)
+LDFLAGS=-e start -Ttext $(ORG) -N -S --oformat binary $(GLDTARGET)
 
 all install:	$(PROG)
 
 $(PROG): $(OBJS)
-	$(LD) $(LDFLAGS) -o $@ $(OBJS)
+	$(GLD) $(LDFLAGS) -o $@ $(OBJS)
 
 clobber: clean
 

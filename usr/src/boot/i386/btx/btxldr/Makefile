@@ -22,16 +22,16 @@ PROG=	btxldr
 SRCS=	btxldr.S
 OBJS=	btxldr.o
 
-CPPFLAGS += -DLOADER_ADDRESS=${LOADER_ADDRESS}
+CPPFLAGS += -DLOADER_ADDRESS=$(LOADER_ADDRESS)
 CPPFLAGS += -DBTXLDR_VERBOSE
 CPPFLAGS += -I./../../common
 
-LDFLAGS=-e start -Ttext ${LOADER_ADDRESS} -N -S --oformat binary $(GLDTARGET)
+LDFLAGS=-e start -Ttext $(LOADER_ADDRESS) -N -S --oformat binary $(GLDTARGET)
 
 all install:	$(PROG)
 
 $(PROG): $(OBJS)
-	$(LD) $(LDFLAGS) -o $@ $(OBJS)
+	$(GLD) $(LDFLAGS) -o $@ $(OBJS)
 
 clobber: clean
 

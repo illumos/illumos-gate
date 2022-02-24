@@ -35,6 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/cdefs.h>
@@ -395,7 +396,6 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	char			tname[MAXCOMLEN + 1];
 	int error, i;
 	struct pci_viona_softc *sc;
-	uint64_t ioport;
 	const char *vnic;
 	pthread_t tid;
 
@@ -478,15 +478,6 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	error = pci_emul_alloc_bar(pi, 0, PCIBAR_IO, VIONA_REGSZ);
 	if (error != 0) {
 		WPRINTF(("could not allocate virtio BAR\n"));
-		free(sc);
-		return (1);
-	}
-
-	/* Install ioport hook for virtqueue notification */
-	ioport = pi->pi_bar[0].addr + VIRTIO_PCI_QUEUE_NOTIFY;
-	error = ioctl(sc->vsc_vnafd, VNA_IOC_SET_NOTIFY_IOP, ioport);
-	if (error != 0) {
-		WPRINTF(("could not install ioport hook at %x\n", ioport));
 		free(sc);
 		return (1);
 	}
@@ -617,6 +608,37 @@ pci_viona_qnotify(struct pci_viona_softc *sc, int ring)
 		break;
 	default:
 		break;
+	}
+}
+
+static void
+pci_viona_baraddr(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
+    int enabled, uint64_t address)
+{
+	struct pci_viona_softc *sc = pi->pi_arg;
+	uint64_t ioport;
+	int error;
+
+	if (baridx != 0)
+		return;
+
+	if (enabled == 0) {
+		error = ioctl(sc->vsc_vnafd, VNA_IOC_SET_NOTIFY_IOP, 0);
+		if (error != 0)
+			WPRINTF(("uninstall ioport hook failed %d\n", errno));
+		return;
+	}
+
+	/*
+	 * Install ioport hook for virtqueue notification.
+	 * This is part of the virtio common configuration area so the
+	 * address does not change with MSI-X status.
+	 */
+	ioport = address + VIRTIO_PCI_QUEUE_NOTIFY;
+	error = ioctl(sc->vsc_vnafd, VNA_IOC_SET_NOTIFY_IOP, ioport);
+	if (error != 0) {
+		WPRINTF(("install ioport hook at %x failed %d\n",
+		    ioport, errno));
 	}
 }
 
@@ -842,6 +864,7 @@ struct pci_devemu pci_de_viona = {
 	.pe_legacy_config = pci_viona_legacy_config,
 	.pe_barwrite =	pci_viona_write,
 	.pe_barread =	pci_viona_read,
+	.pe_baraddr =	pci_viona_baraddr,
 	.pe_lintrupdate = pci_viona_lintrupdate
 };
 PCI_EMUL_SET(pci_de_viona);
