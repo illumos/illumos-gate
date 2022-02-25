@@ -61,6 +61,7 @@
 .Oc
 .Sm on
 .Op Fl k Ar config_file
+.Op Fl K Ar layout
 .Oo Fl l
 .Sm off
 .Ar lpcdev Op Cm \&, Ar conf
@@ -205,6 +206,17 @@ are ignored.
 See
 .Xr bhyve_config 5
 for more details.
+.It Fl K Ar layout
+Specify the keyboard layout.
+The value that can be specified sets the file name in
+.Pa /usr/share/bhyve/kbdlayout .
+This specification only works when loaded with UEFI mode for VNC.
+When using a VNC client that supports QEMU Extended Key Event Message
+.Pq e.g. TigerVNC ,
+this option isn't needed.
+When using a VNC client that doesn't support QEMU Extended Key Event Message
+.Pq e.g. tightVNC ,
+the layout defaults to the US keyboard unless specified otherwise.
 .It Fl l Cm help
 Print a list of supported LPC devices.
 .It Fl l Ar lpcdev Ns Op \&, Ns Ar conf
@@ -492,6 +504,12 @@ to that file.
 .Bl -tag -width 10n
 .It Pa /dev/ppt Ns Ar N
 Connect to a PCI device on the host identified by the specified path.
+.It Cm rom= Ns Ar romfile
+Add
+.Ar romfile
+as option ROM to the PCI device.
+The ROM will be loaded by firmware and should be capable of initialising the
+device.
 .El
 .Pp
 Guest memory must be wired using the

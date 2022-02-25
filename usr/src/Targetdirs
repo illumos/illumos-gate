@@ -28,7 +28,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2017 RackTop Systems.
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Joyent, Inc.
 #
 
@@ -54,9 +54,10 @@ i386_DIRS=			\
 	/platform/i86pc		\
 	/lib/libmvec		\
 	/usr/lib/xen		\
-	/usr/lib/xen/bin
+	/usr/lib/xen/bin	\
+	/usr/share/bhyve
 
-sparc_DIRS=				\
+sparc_DIRS=			\
 	/usr/lib/ldoms
 
 sparc_64ONLY= $(POUND_SIGN)

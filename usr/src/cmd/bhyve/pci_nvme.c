@@ -119,6 +119,9 @@ static int nvme_debug = 0;
 #define NVME_NO_STATUS		0xffff
 #define NVME_COMPLETION_VALID(c)	((c).status != NVME_NO_STATUS)
 
+/* Reported temperature in Kelvin (i.e. room temperature) */
+#define NVME_TEMPERATURE 296
+
 /* helpers */
 
 /* Convert a zero-based value into a one-based value */
@@ -269,16 +272,20 @@ struct pci_nvme_aer {
 	uint16_t	cid;	/* Command ID of the submitted AER */
 };
 
+/** Asynchronous Event Information - Notice */
 typedef enum {
-	PCI_NVME_AE_INFO_NS_ATTR_CHANGED = 0,
-	PCI_NVME_AE_INFO_FW_ACTIVATION,
-	PCI_NVME_AE_INFO_TELEMETRY_CHANGE,
-	PCI_NVME_AE_INFO_ANA_CHANGE,
-	PCI_NVME_AE_INFO_PREDICT_LATENCY_CHANGE,
-	PCI_NVME_AE_INFO_LBA_STATUS_ALERT,
-	PCI_NVME_AE_INFO_ENDURANCE_GROUP_CHANGE,
-	PCI_NVME_AE_INFO_MAX,
-} pci_nvme_async_info;
+	PCI_NVME_AEI_NOTICE_NS_ATTR_CHANGED = 0,
+	PCI_NVME_AEI_NOTICE_FW_ACTIVATION,
+	PCI_NVME_AEI_NOTICE_TELEMETRY_CHANGE,
+	PCI_NVME_AEI_NOTICE_ANA_CHANGE,
+	PCI_NVME_AEI_NOTICE_PREDICT_LATENCY_CHANGE,
+	PCI_NVME_AEI_NOTICE_LBA_STATUS_ALERT,
+	PCI_NVME_AEI_NOTICE_ENDURANCE_GROUP_CHANGE,
+	PCI_NVME_AEI_NOTICE_MAX,
+} pci_nvme_async_event_info_notice;
+
+#define PCI_NVME_AEI_NOTICE_SHIFT		8
+#define PCI_NVME_AEI_NOTICE_MASK(event)	(1 << (event + PCI_NVME_AEI_NOTICE_SHIFT))
 
 /* Asynchronous Event Notifications */
 struct pci_nvme_aen {
@@ -286,6 +293,19 @@ struct pci_nvme_aen {
 	uint32_t	event_data;
 	bool		posted;
 };
+
+/*
+ * By default, enable all Asynchrnous Event Notifications:
+ *     SMART / Health Critical Warnings
+ *     Namespace Attribute Notices
+ */
+#define PCI_NVME_AEN_DEFAULT_MASK	0x11f
+
+typedef enum {
+	NVME_CNTRLTYPE_IO = 1,
+	NVME_CNTRLTYPE_DISCOVERY = 2,
+	NVME_CNTRLTYPE_ADMIN = 3,
+} pci_nvme_cntrl_type;
 
 struct pci_nvme_softc {
 	struct pci_devinst *nsc_pi;
@@ -395,11 +415,19 @@ static void nvme_feature_invalid_cb(struct pci_nvme_softc *,
     struct nvme_feature_obj *,
     struct nvme_command *,
     struct nvme_completion *);
+static void nvme_feature_temperature(struct pci_nvme_softc *,
+    struct nvme_feature_obj *,
+    struct nvme_command *,
+    struct nvme_completion *);
 static void nvme_feature_num_queues(struct pci_nvme_softc *,
     struct nvme_feature_obj *,
     struct nvme_command *,
     struct nvme_completion *);
 static void nvme_feature_iv_config(struct pci_nvme_softc *,
+    struct nvme_feature_obj *,
+    struct nvme_command *,
+    struct nvme_completion *);
+static void nvme_feature_async_event(struct pci_nvme_softc *,
     struct nvme_feature_obj *,
     struct nvme_command *,
     struct nvme_completion *);
@@ -460,13 +488,8 @@ pci_nvme_init_queues(struct pci_nvme_softc *sc, uint32_t nsq, uint32_t ncq)
 	} else {
 		struct nvme_submission_queue *sq = sc->submit_queues;
 
-#ifndef __FreeBSD__
 		for (i = 0; i < sc->num_squeues + 1; i++)
 			pthread_mutex_init(&sq[i].mtx, NULL);
-#else
-		for (i = 0; i < sc->num_squeues; i++)
-			pthread_mutex_init(&sq[i].mtx, NULL);
-#endif
 	}
 
 	/*
@@ -488,13 +511,8 @@ pci_nvme_init_queues(struct pci_nvme_softc *sc, uint32_t nsq, uint32_t ncq)
 	} else {
 		struct nvme_completion_queue *cq = sc->compl_queues;
 
-#ifndef __FreeBSD__
 		for (i = 0; i < sc->num_cqueues + 1; i++)
 			pthread_mutex_init(&cq[i].mtx, NULL);
-#else
-		for (i = 0; i < sc->num_cqueues; i++)
-			pthread_mutex_init(&cq[i].mtx, NULL);
-#endif
 	}
 }
 
@@ -521,21 +539,11 @@ pci_nvme_init_ctrldata(struct pci_nvme_softc *sc)
 
 	cd->mdts = NVME_MDTS;	/* max data transfer size (2^mdts * CAP.MPSMIN) */
 
-	cd->ver = 0x00010300;
+	cd->ver = NVME_REV(1,4);
 
+	cd->cntrltype = NVME_CNTRLTYPE_IO;
 	cd->oacs = 1 << NVME_CTRLR_DATA_OACS_FORMAT_SHIFT;
-#ifndef __FreeBSD__
-	/*
-	 * Reported upstream against https://reviews.freebsd.org/D32953
-	 * which introduced support for the namespace attribute changed AEN
-	 * and the corresponding changed namespace log page, without setting
-	 * the bit in oaes. A future sync will likely include this
-	 * definition in usr/src/contrib/bhyve/dev/nvme/nvme.h once it's
-	 * fixed there.
-	 */
-#define	NVME_CTRLR_DATA_OAES_NSCHANGE_SHIFT	(8)
-	cd->oaes = 1 << NVME_CTRLR_DATA_OAES_NSCHANGE_SHIFT;
-#endif
+	cd->oaes = NVMEB(NVME_CTRLR_DATA_OAES_NS_ATTR);
 	cd->acl = 2;
 	cd->aerl = 4;
 
@@ -548,6 +556,7 @@ pci_nvme_init_ctrldata(struct pci_nvme_softc *sc)
 
 	/* Warning Composite Temperature Threshold */
 	cd->wctemp = 0x0157;
+	cd->cctemp = 0x0157;
 
 	cd->sqes = (6 << NVME_CTRLR_DATA_SQES_MAX_SHIFT) |
 	    (6 << NVME_CTRLR_DATA_SQES_MIN_SHIFT);
@@ -568,7 +577,10 @@ pci_nvme_init_ctrldata(struct pci_nvme_softc *sc)
 		break;
 	}
 
-	cd->fna = 0x03;
+	cd->fna = NVME_CTRLR_DATA_FNA_FORMAT_ALL_MASK <<
+	    NVME_CTRLR_DATA_FNA_FORMAT_ALL_SHIFT;
+
+	cd->vwc = NVME_CTRLR_DATA_VWC_ALL_NO << NVME_CTRLR_DATA_VWC_ALL_SHIFT;
 
 	cd->power_state[0].mp = 10;
 }
@@ -683,7 +695,7 @@ pci_nvme_init_logpages(struct pci_nvme_softc *sc)
 	sc->write_dunits_remainder = 999;
 
 	/* Set nominal Health values checked by implementations */
-	sc->health_log.temperature = 310;
+	sc->health_log.temperature = NVME_TEMPERATURE;
 	sc->health_log.available_spare = 100;
 	sc->health_log.available_spare_threshold = 10;
 }
@@ -691,21 +703,41 @@ pci_nvme_init_logpages(struct pci_nvme_softc *sc)
 static void
 pci_nvme_init_features(struct pci_nvme_softc *sc)
 {
+	enum nvme_feature	fid;
 
-	sc->feat[0].set = nvme_feature_invalid_cb;
-	sc->feat[0].get = nvme_feature_invalid_cb;
-
-	sc->feat[NVME_FEAT_LBA_RANGE_TYPE].namespace_specific = true;
-	sc->feat[NVME_FEAT_ERROR_RECOVERY].namespace_specific = true;
-	sc->feat[NVME_FEAT_NUMBER_OF_QUEUES].set = nvme_feature_num_queues;
-	sc->feat[NVME_FEAT_INTERRUPT_VECTOR_CONFIGURATION].set =
-	    nvme_feature_iv_config;
-	/* Enable all AENs by default */
-	sc->feat[NVME_FEAT_ASYNC_EVENT_CONFIGURATION].cdw11 = 0x31f;
-	sc->feat[NVME_FEAT_PREDICTABLE_LATENCY_MODE_CONFIG].get =
-	    nvme_feature_invalid_cb;
-	sc->feat[NVME_FEAT_PREDICTABLE_LATENCY_MODE_WINDOW].get =
-	    nvme_feature_invalid_cb;
+	for (fid = 0; fid < NVME_FID_MAX; fid++) {
+		switch (fid) {
+		case NVME_FEAT_ARBITRATION:
+		case NVME_FEAT_POWER_MANAGEMENT:
+		case NVME_FEAT_INTERRUPT_COALESCING: //XXX
+		case NVME_FEAT_WRITE_ATOMICITY:
+			/* Mandatory but no special handling required */
+		//XXX hang - case NVME_FEAT_PREDICTABLE_LATENCY_MODE_CONFIG:
+		//XXX hang - case NVME_FEAT_HOST_BEHAVIOR_SUPPORT:
+		//		  this returns a data buffer
+			break;
+		case NVME_FEAT_TEMPERATURE_THRESHOLD:
+			sc->feat[fid].set = nvme_feature_temperature;
+			break;
+		case NVME_FEAT_ERROR_RECOVERY:
+			sc->feat[fid].namespace_specific = true;
+			break;
+		case NVME_FEAT_NUMBER_OF_QUEUES:
+			sc->feat[fid].set = nvme_feature_num_queues;
+			break;
+		case NVME_FEAT_INTERRUPT_VECTOR_CONFIGURATION:
+			sc->feat[fid].set = nvme_feature_iv_config;
+			break;
+		case NVME_FEAT_ASYNC_EVENT_CONFIGURATION:
+			sc->feat[fid].set = nvme_feature_async_event;
+			/* Enable all AENs by default */
+			sc->feat[fid].cdw11 = PCI_NVME_AEN_DEFAULT_MASK;
+			break;
+		default:
+			sc->feat[fid].set = nvme_feature_invalid_cb;
+			sc->feat[fid].get = nvme_feature_invalid_cb;
+		}
+	}
 }
 
 static void
@@ -768,9 +800,6 @@ static int
 pci_nvme_aer_add(struct pci_nvme_softc *sc, uint16_t cid)
 {
 	struct pci_nvme_aer *aer = NULL;
-
-	if (pci_nvme_aer_limit_reached(sc))
-		return (-1);
 
 	aer = calloc(1, sizeof(struct pci_nvme_aer));
 	if (aer == NULL)
@@ -927,35 +956,34 @@ pci_nvme_aen_process(struct pci_nvme_softc *sc)
 			lid = NVME_LOG_HEALTH_INFORMATION;
 			break;
 		case PCI_NVME_AE_TYPE_NOTICE:
-			if (aen->event_data >= PCI_NVME_AE_INFO_MAX) {
+			if (aen->event_data >= PCI_NVME_AEI_NOTICE_MAX) {
 				EPRINTLN("%s unknown AEN notice type %u",
 				    __func__, aen->event_data);
 				status = NVME_SC_INTERNAL_DEVICE_ERROR;
 				break;
 			}
-			mask >>= 8;
-			if (((1 << aen->event_data) & mask) == 0)
+			if ((PCI_NVME_AEI_NOTICE_MASK(aen->event_data) & mask) == 0)
 				continue;
 			switch (aen->event_data) {
-			case PCI_NVME_AE_INFO_NS_ATTR_CHANGED:
+			case PCI_NVME_AEI_NOTICE_NS_ATTR_CHANGED:
 				lid = NVME_LOG_CHANGED_NAMESPACE;
 				break;
-			case PCI_NVME_AE_INFO_FW_ACTIVATION:
+			case PCI_NVME_AEI_NOTICE_FW_ACTIVATION:
 				lid = NVME_LOG_FIRMWARE_SLOT;
 				break;
-			case PCI_NVME_AE_INFO_TELEMETRY_CHANGE:
+			case PCI_NVME_AEI_NOTICE_TELEMETRY_CHANGE:
 				lid = NVME_LOG_TELEMETRY_CONTROLLER_INITIATED;
 				break;
-			case PCI_NVME_AE_INFO_ANA_CHANGE:
-				lid = NVME_LOG_ASYMMETRIC_NAMESPAVE_ACCESS; //TODO spelling
+			case PCI_NVME_AEI_NOTICE_ANA_CHANGE:
+				lid = NVME_LOG_ASYMMETRIC_NAMESPACE_ACCESS;
 				break;
-			case PCI_NVME_AE_INFO_PREDICT_LATENCY_CHANGE:
+			case PCI_NVME_AEI_NOTICE_PREDICT_LATENCY_CHANGE:
 				lid = NVME_LOG_PREDICTABLE_LATENCY_EVENT_AGGREGATE;
 				break;
-			case PCI_NVME_AE_INFO_LBA_STATUS_ALERT:
+			case PCI_NVME_AEI_NOTICE_LBA_STATUS_ALERT:
 				lid = NVME_LOG_LBA_STATUS_INFORMATION;
 				break;
-			case PCI_NVME_AE_INFO_ENDURANCE_GROUP_CHANGE:
+			case PCI_NVME_AEI_NOTICE_ENDURANCE_GROUP_CHANGE:
 				lid = NVME_LOG_ENDURANCE_GROUP_EVENT_AGGREGATE;
 				break;
 			default:
@@ -1019,10 +1047,9 @@ pci_nvme_reset_locked(struct pci_nvme_softc *sc)
 
 	sc->regs.cap_hi = 1 << NVME_CAP_HI_REG_CSS_NVM_SHIFT;
 
-	sc->regs.vs = 0x00010300;	/* NVMe v1.3 */
+	sc->regs.vs = NVME_REV(1,4);	/* NVMe v1.4 */
 
 	sc->regs.cc = 0;
-	sc->regs.csts = 0;
 
 	assert(sc->submit_queues != NULL);
 
@@ -1047,6 +1074,12 @@ pci_nvme_reset_locked(struct pci_nvme_softc *sc)
 
 	pci_nvme_aer_destroy(sc);
 	pci_nvme_aen_destroy(sc);
+
+	/*
+	 * Clear CSTS.RDY last to prevent the host from enabling Controller
+	 * before cleanup completes
+	 */
+	sc->regs.csts = 0;
 }
 
 static void
@@ -1360,6 +1393,7 @@ static int
 nvme_opc_get_log_page(struct pci_nvme_softc* sc, struct nvme_command* command,
 	struct nvme_completion* compl)
 {
+	uint64_t logoff;
 	uint32_t logsize;
 	uint8_t logpage = command->cdw10 & 0xFF;
 
@@ -1377,15 +1411,28 @@ nvme_opc_get_log_page(struct pci_nvme_softc* sc, struct nvme_command* command,
 	 */
 	logsize = ((command->cdw11 << 16) | (command->cdw10 >> 16)) + 1;
 	logsize *= sizeof(uint32_t);
+	logoff  = ((uint64_t)(command->cdw13) << 32) | command->cdw12;
 
 	switch (logpage) {
 	case NVME_LOG_ERROR:
+		if (logoff >= sizeof(sc->err_log)) {
+			pci_nvme_status_genc(&compl->status,
+			    NVME_SC_INVALID_FIELD);
+			break;
+		}
+
 		nvme_prp_memcpy(sc->nsc_pi->pi_vmctx, command->prp1,
-		    command->prp2, (uint8_t *)&sc->err_log,
-		    MIN(logsize, sizeof(sc->err_log)),
+		    command->prp2, (uint8_t *)&sc->err_log + logoff,
+		    MIN(logsize - logoff, sizeof(sc->err_log)),
 		    NVME_COPY_TO_PRP);
 		break;
 	case NVME_LOG_HEALTH_INFORMATION:
+		if (logoff >= sizeof(sc->health_log)) {
+			pci_nvme_status_genc(&compl->status,
+			    NVME_SC_INVALID_FIELD);
+			break;
+		}
+
 		pthread_mutex_lock(&sc->mtx);
 		memcpy(&sc->health_log.data_units_read, &sc->read_data_units,
 		    sizeof(sc->health_log.data_units_read));
@@ -1398,20 +1445,32 @@ nvme_opc_get_log_page(struct pci_nvme_softc* sc, struct nvme_command* command,
 		pthread_mutex_unlock(&sc->mtx);
 
 		nvme_prp_memcpy(sc->nsc_pi->pi_vmctx, command->prp1,
-		    command->prp2, (uint8_t *)&sc->health_log,
-		    MIN(logsize, sizeof(sc->health_log)),
+		    command->prp2, (uint8_t *)&sc->health_log + logoff,
+		    MIN(logsize - logoff, sizeof(sc->health_log)),
 		    NVME_COPY_TO_PRP);
 		break;
 	case NVME_LOG_FIRMWARE_SLOT:
+		if (logoff >= sizeof(sc->fw_log)) {
+			pci_nvme_status_genc(&compl->status,
+			    NVME_SC_INVALID_FIELD);
+			break;
+		}
+
 		nvme_prp_memcpy(sc->nsc_pi->pi_vmctx, command->prp1,
-		    command->prp2, (uint8_t *)&sc->fw_log,
-		    MIN(logsize, sizeof(sc->fw_log)),
+		    command->prp2, (uint8_t *)&sc->fw_log + logoff,
+		    MIN(logsize - logoff, sizeof(sc->fw_log)),
 		    NVME_COPY_TO_PRP);
 		break;
 	case NVME_LOG_CHANGED_NAMESPACE:
+		if (logoff >= sizeof(sc->ns_log)) {
+			pci_nvme_status_genc(&compl->status,
+			    NVME_SC_INVALID_FIELD);
+			break;
+		}
+
 		nvme_prp_memcpy(sc->nsc_pi->pi_vmctx, command->prp1,
-		    command->prp2, (uint8_t *)&sc->ns_log,
-		    MIN(logsize, sizeof(sc->ns_log)),
+		    command->prp2, (uint8_t *)&sc->ns_log + logoff,
+		    MIN(logsize - logoff, sizeof(sc->ns_log)),
 		    NVME_COPY_TO_PRP);
 		memset(&sc->ns_log, 0, sizeof(sc->ns_log));
 		break;
@@ -1444,6 +1503,12 @@ nvme_opc_identify(struct pci_nvme_softc* sc, struct nvme_command* command,
 
 	switch (command->cdw10 & 0xFF) {
 	case 0x00: /* return Identify Namespace data structure */
+		/* Global NS only valid with NS Management */
+		if (command->nsid == NVME_GLOBAL_NAMESPACE_TAG) {
+			pci_nvme_status_genc(&status,
+			    NVME_SC_INVALID_NAMESPACE_OR_FORMAT);
+			break;
+		}
 		nvme_prp_memcpy(sc->nsc_pi->pi_vmctx, command->prp1,
 		    command->prp2, (uint8_t *)&sc->nsdata, sizeof(sc->nsdata),
 		    NVME_COPY_TO_PRP);
@@ -1629,7 +1694,65 @@ nvme_feature_iv_config(struct pci_nvme_softc *sc,
 			pci_nvme_status_genc(&compl->status, NVME_SC_SUCCESS);
 		}
 	}
+}
 
+#define NVME_ASYNC_EVENT_ENDURANCE_GROUP		(0x4000)
+static void
+nvme_feature_async_event(struct pci_nvme_softc *sc,
+    struct nvme_feature_obj *feat,
+    struct nvme_command *command,
+    struct nvme_completion *compl)
+{
+
+	if (command->cdw11 & NVME_ASYNC_EVENT_ENDURANCE_GROUP)
+		pci_nvme_status_genc(&compl->status, NVME_SC_INVALID_FIELD);
+}
+
+#define NVME_TEMP_THRESH_OVER	0
+#define NVME_TEMP_THRESH_UNDER	1
+static void
+nvme_feature_temperature(struct pci_nvme_softc *sc,
+    struct nvme_feature_obj *feat,
+    struct nvme_command *command,
+    struct nvme_completion *compl)
+{
+	uint16_t	tmpth;	/* Temperature Threshold */
+	uint8_t		tmpsel; /* Threshold Temperature Select */
+	uint8_t		thsel;  /* Threshold Type Select */
+	bool		set_crit = false;
+
+	tmpth  = command->cdw11 & 0xffff;
+	tmpsel = (command->cdw11 >> 16) & 0xf;
+	thsel  = (command->cdw11 >> 20) & 0x3;
+
+	DPRINTF("%s: tmpth=%#x tmpsel=%#x thsel=%#x", __func__, tmpth, tmpsel, thsel);
+
+	/* Check for unsupported values */
+	if (((tmpsel != 0) && (tmpsel != 0xf)) ||
+	    (thsel > NVME_TEMP_THRESH_UNDER)) {
+		pci_nvme_status_genc(&compl->status, NVME_SC_INVALID_FIELD);
+		return;
+	}
+
+	if (((thsel == NVME_TEMP_THRESH_OVER)  && (NVME_TEMPERATURE >= tmpth)) ||
+	    ((thsel == NVME_TEMP_THRESH_UNDER) && (NVME_TEMPERATURE <= tmpth)))
+		set_crit = true;
+
+	pthread_mutex_lock(&sc->mtx);
+	if (set_crit)
+		sc->health_log.critical_warning |=
+		    NVME_CRIT_WARN_ST_TEMPERATURE;
+	else
+		sc->health_log.critical_warning &=
+		    ~NVME_CRIT_WARN_ST_TEMPERATURE;
+	pthread_mutex_unlock(&sc->mtx);
+
+	if (set_crit)
+		pci_nvme_aen_post(sc, PCI_NVME_AE_TYPE_SMART,
+		    sc->health_log.critical_warning);
+
+
+	DPRINTF("%s: set_crit=%c critical_warning=%#x status=%#x", __func__, set_crit ? 'T':'F', sc->health_log.critical_warning, compl->status);
 }
 
 static void
@@ -1699,6 +1822,11 @@ nvme_opc_set_features(struct pci_nvme_softc *sc, struct nvme_command *command,
 	}
 	feat = &sc->feat[fid];
 
+	if (feat->namespace_specific && (nsid == NVME_GLOBAL_NAMESPACE_TAG)) {
+		pci_nvme_status_genc(&compl->status, NVME_SC_INVALID_FIELD);
+		return (1);
+	}
+
 	if (!feat->namespace_specific &&
 	    !((nsid == 0) || (nsid == NVME_GLOBAL_NAMESPACE_TAG))) {
 		pci_nvme_status_tc(&compl->status, NVME_SCT_COMMAND_SPECIFIC,
@@ -1723,12 +1851,16 @@ nvme_opc_set_features(struct pci_nvme_softc *sc, struct nvme_command *command,
 	return (0);
 }
 
+#define NVME_FEATURES_SEL_SUPPORTED	0x3
+#define NVME_FEATURES_NS_SPECIFIC	(1 << 1)
+
 static int
 nvme_opc_get_features(struct pci_nvme_softc* sc, struct nvme_command* command,
 	struct nvme_completion* compl)
 {
 	struct nvme_feature_obj *feat;
 	uint8_t fid = command->cdw10 & 0xFF;
+	uint8_t sel = (command->cdw10 >> 8) & 0x7;
 
 	DPRINTF("%s: Feature ID 0x%x (%s)", __func__, fid, nvme_fid_to_name(fid));
 
@@ -1747,7 +1879,10 @@ nvme_opc_get_features(struct pci_nvme_softc* sc, struct nvme_command* command,
 	}
 
 	if (compl->status == NVME_SC_SUCCESS) {
-		compl->cdw0 = feat->cdw11;
+		if ((sel == NVME_FEATURES_SEL_SUPPORTED) && feat->namespace_specific)
+			compl->cdw0 = NVME_FEATURES_NS_SPECIFIC;
+		else
+			compl->cdw0 = feat->cdw11;
 	}
 
 	return (0);
@@ -1812,7 +1947,8 @@ nvme_opc_format_nvm(struct pci_nvme_softc* sc, struct nvme_command* command,
 			pci_nvme_status_genc(&compl->status,
 			    NVME_SC_INTERNAL_DEVICE_ERROR);
 			pci_nvme_release_ioreq(sc, req);
-		}
+		} else
+			compl->status = NVME_NO_STATUS;
 	}
 
 	return (1);
@@ -1939,12 +2075,22 @@ pci_nvme_handle_admin_cmd(struct pci_nvme_softc* sc, uint64_t value)
 			if ((sc->ctrldata.oacs &
 			    (1 << NVME_CTRLR_DATA_OACS_FORMAT_SHIFT)) == 0) {
 				pci_nvme_status_genc(&compl.status, NVME_SC_INVALID_OPCODE);
+				break;
 			}
-			compl.status = NVME_NO_STATUS;
 			nvme_opc_format_nvm(sc, cmd, &compl);
 			break;
+		case NVME_OPC_SECURITY_SEND:
+		case NVME_OPC_SECURITY_RECEIVE:
+		case NVME_OPC_SANITIZE:
+		case NVME_OPC_GET_LBA_STATUS:
+			DPRINTF("%s command OPC=%#x (unsupported)", __func__,
+			    cmd->opc);
+			/* Valid but unsupported opcodes */
+			pci_nvme_status_genc(&compl.status, NVME_SC_INVALID_FIELD);
+			break;
 		default:
-			DPRINTF("0x%x command is not implemented",
+			DPRINTF("%s command OPC=%#X (not implemented)",
+			    __func__,
 			    cmd->opc);
 			pci_nvme_status_genc(&compl.status, NVME_SC_INVALID_OPCODE);
 		}
@@ -2010,8 +2156,8 @@ pci_nvme_stats_write_read_update(struct pci_nvme_softc *sc, uint8_t opc,
 }
 
 /*
- * Check if the combination of Starting LBA (slba) and Number of Logical
- * Blocks (nlb) exceeds the range of the underlying storage.
+ * Check if the combination of Starting LBA (slba) and number of blocks
+ * exceeds the range of the underlying storage.
  *
  * Because NVMe specifies the SLBA in blocks as a uint64_t and blockif stores
  * the capacity in bytes as a uint64_t, care must be taken to avoid integer
@@ -2019,7 +2165,7 @@ pci_nvme_stats_write_read_update(struct pci_nvme_softc *sc, uint8_t opc,
  */
 static bool
 pci_nvme_out_of_range(struct pci_nvme_blockstore *nvstore, uint64_t slba,
-    uint32_t nlb)
+    uint32_t nblocks)
 {
 	size_t	offset, bytes;
 
@@ -2028,10 +2174,10 @@ pci_nvme_out_of_range(struct pci_nvme_blockstore *nvstore, uint64_t slba,
 		return (true);
 
 	offset = slba << nvstore->sectsz_bits;
-	bytes = nlb << nvstore->sectsz_bits;
+	bytes = nblocks << nvstore->sectsz_bits;
 
 	/* Overflow check of Number of Logical Blocks */
-	if ((nvstore->size - offset) < bytes)
+	if ((nvstore->size <= offset) || ((nvstore->size - offset) < bytes))
 		return (true);
 
 	return (false);
@@ -2352,7 +2498,8 @@ nvme_opc_write_read(struct pci_nvme_softc *sc,
 	nblocks = (cmd->cdw12 & 0xFFFF) + 1;
 
 	if (pci_nvme_out_of_range(nvstore, lba, nblocks)) {
-		WPRINTF("%s command would exceed LBA range", __func__);
+		WPRINTF("%s command would exceed LBA range(slba=%#lx nblocks=%#lx)",
+		    __func__, lba, nblocks);
 		pci_nvme_status_genc(status, NVME_SC_LBA_OUT_OF_RANGE);
 		goto out;
 	}
@@ -3069,7 +3216,7 @@ pci_nvme_resized(struct blockif_ctxt *bctxt, void *arg, size_t new_size)
 	sc->ns_log.ns[1] = 0;
 
 	pci_nvme_aen_post(sc, PCI_NVME_AE_TYPE_NOTICE,
-	    PCI_NVME_AE_INFO_NS_ATTR_CHANGED);
+	    PCI_NVME_AEI_NOTICE_NS_ATTR_CHANGED);
 }
 
 static int

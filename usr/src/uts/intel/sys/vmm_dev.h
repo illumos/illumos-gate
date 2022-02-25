@@ -179,10 +179,11 @@ struct vm_nmi {
 	int		cpuid;
 };
 
-#define	MAX_VM_STATS	(64 + VM_MAXCPU)
+#define	MAX_VM_STATS	64
 
 struct vm_stats {
 	int		cpuid;				/* in */
+	int		index;				/* in */
 	int		num_entries;			/* out */
 	struct timeval	tv;
 	uint64_t	statbuf[MAX_VM_STATS];
