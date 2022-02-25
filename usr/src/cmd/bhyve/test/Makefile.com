@@ -33,7 +33,7 @@ LDFLAGS +=	-lproc
 
 SMOFF += all_func_returns
 
-CLEANFILES +=	$(PROG)
+CLOBBERFILES +=	$(PROG)
 
 #
 # Install related definitions

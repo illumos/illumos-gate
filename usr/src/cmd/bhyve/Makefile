@@ -13,7 +13,7 @@
 # Copyright 2014 Pluribus Networks Inc.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG =		bhyve
@@ -105,13 +105,12 @@ SRCS =	acpi.c			\
 
 OBJS = $(SRCS:.c=.o)
 
-CLOBBERFILES =	$(ROOTUSRSBINPROG)
-
 MEVENT_TEST_PROG = mevent_test
 MEVENT_TEST_SRCS = mevent.c mevent_test.c
 MEVENT_TEST_OBJS = $(MEVENT_TEST_SRCS:.c=.o)
 
-CLEANFILES =	$(PROG) $(MEVENT_TEST_PROG) $(MEVENT_TEST_OBJS)
+CLEANFILES =	$(OBJS) $(MEVENT_TEST_OBJS)
+CLOBBERFILES =	$(PROG) $(MEVENT_TEST_PROG)
 
 CFLAGS +=	$(CCVERBOSE)
 CFLAGS +=	-_gcc=-Wimplicit-function-declaration -_gcc=-Wno-parentheses
@@ -176,7 +175,7 @@ $(MEVENT_TEST_PROG): $(MEVENT_TEST_OBJS)
 install: all $(ROOTUSRSBINPROG) $(SUBDIRS)
 
 clean: $(SUBDIRS)
-	$(RM) $(OBJS) $(CLEANFILES)
+	$(RM) $(CLEANFILES)
 
 clobber: clean $(SUBDIRS)
 	$(RM) $(CLOBBERFILES)
