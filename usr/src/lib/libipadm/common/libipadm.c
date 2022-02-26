@@ -1006,7 +1006,7 @@ i_ipadm_call_ipmgmtd(ipadm_handle_t iph, void *garg, size_t garg_size,
 /*
  * ipadm_is_nil_hostname() : Determine if the `hostname' is nil: i.e.,
  *			NULL, empty, or a single space (e.g., as returned by
- *			domainname(1M)/sysinfo).
+ *			domainname(8)/sysinfo).
  *
  *   input: const char *: the hostname to inspect;
  *  output: boolean_t: B_TRUE if `hostname' is not NULL satisfies the

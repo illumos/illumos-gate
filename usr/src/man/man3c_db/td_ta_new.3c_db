@@ -118,7 +118,7 @@ The target process does not appear to be multithreaded.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -134,4 +134,6 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibc_db\fR(3LIB), \fBproc_service\fR(3PROC), \fBattributes\fR(5)
+.BR libc_db (3LIB),
+.BR proc_service (3PROC),
+.BR attributes (7)

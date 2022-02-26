@@ -72,5 +72,8 @@ size of this table by calling the \fBgetrlimit()\fR function.
 .SH SEE ALSO
 .sp
 .LP
-\fBclose\fR(2), \fBgetrlimit\fR(2), \fBopen\fR(2), \fBsetrlimit\fR(2),
-\fBselect\fR(3C)
+.BR close (2),
+.BR getrlimit (2),
+.BR open (2),
+.BR setrlimit (2),
+.BR select (3C)

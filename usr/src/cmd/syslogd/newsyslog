@@ -24,9 +24,9 @@
 # Copyright (c) 1997-2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
-# NOTE: This script is no longer used -- see logadm(1M)
+# NOTE: This script is no longer used -- see logadm(8)
 #
 # Running this script checks to see if /var/log/syslog or /var/adm/messages
 # need rotating, according to the policies in /etc/logadm.conf.  Since logadm

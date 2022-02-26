@@ -1,0 +1,73 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PROF 7 "Jul 3, 1990"
+.SH NAME
+prof \- profile within a function
+.SH SYNOPSIS
+.LP
+.nf
+#define MARK
+#include <prof.h>
+
+\fBvoid\fR \fBMARK\fR(\fB\fR\fIname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBMARK\fR introduces a mark called  \fIname\fR that is treated the same as a
+function entry point.  Execution of the mark adds to a counter for that mark,
+and program-counter time spent is accounted to the immediately preceding mark
+or to the function if there are no preceding marks within the active function.
+.sp
+.LP
+\fIname\fR may be any combination of letters, numbers, or  underscores. Each
+\fIname\fR in a single compilation must be unique, but may be the same as any
+ordinary program symbol.
+.sp
+.LP
+For marks to be effective, the symbol \fBMARK\fR must be defined before the
+header  \fBprof.h\fR is included, either by a  preprocessor directive as in the
+synopsis, or by a command line argument:
+.sp
+.LP
+\fBcc -p -DMARK work.c\fR
+.sp
+.LP
+If \fBMARK\fR is not defined, the  \fBMARK(\fR\fIname\fR\fB)\fR statements may
+be left in the source files  containing them and are ignored. \fBprof -g\fR
+must be used to get information on all labels.
+.SH EXAMPLES
+.sp
+.LP
+In this example, marks can be used to determine how much time is spent in each
+loop. Unless this example is compiled with  \fBMARK\fR defined on the command
+line, the marks are ignored.
+.sp
+.in +2
+.nf
+#include <prof.h>
+work( )
+{
+        int i, j;
+        ...
+        MARK(loop1);
+        for (i = 0; i < 2000; i++) {
+                ...
+        }
+        MARK(loop2);
+        for (j = 0; j < 2000; j++) {
+                ...
+        }
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+.BR profil (2),
+.BR monitor (3C)

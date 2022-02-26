@@ -151,7 +151,7 @@ process.
 .sp .6
 .RS 4n
 This function returns the next project entry from \fB$filehandle\fR, a Perl
-file handle that must refer to a previously opened file in \fBproject\fR(4)
+file handle that must refer to a previously opened file in \fBproject\fR(5)
 format.  Return values are the same as for \fBgetprojent()\fR.
 .RE
 
@@ -235,7 +235,7 @@ to selectively import constants and functions defined in this module:
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -251,6 +251,10 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBgetprojid\fR(2), \fBgetdefaultproj\fR(3PROJECT), \fBinproj\fR(3PROJECT),
-\fBlibproject\fR(3LIB), \fBsetproject\fR(3PROJECT), \fBproject\fR(4),
-\fBattributes\fR(5)
+.BR getprojid (2),
+.BR libproject (3LIB),
+.BR getdefaultproj (3PROJECT),
+.BR inproj (3PROJECT),
+.BR setproject (3PROJECT),
+.BR project (5),
+.BR attributes (7)

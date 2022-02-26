@@ -88,7 +88,7 @@ int main()
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -102,7 +102,8 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBgets\fR(3C), \fBattributes\fR(5)
+.BR gets (3C),
+.BR attributes (7)
 .SH NOTES
 When compiling multithread applications, the \fB_REENTRANT\fR flag must be
 defined on the compile line.  This flag should only be used in multithreaded

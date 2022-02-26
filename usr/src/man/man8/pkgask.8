@@ -1,0 +1,140 @@
+'\" te
+.\"  Copyright 1989 AT&T Copyright (c) 1998, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PKGASK 8 "Apr 6, 2005"
+.SH NAME
+pkgask \- stores answers to a request script
+.SH SYNOPSIS
+.LP
+.nf
+\fBpkgask\fR [\fB-d\fR \fIdevice\fR] [\fB-R\fR \fIroot_path\fR] \fB-r\fR \fIresponse\fR \fIpkginst\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpkgask\fR allows the administrator to store answers to an interactive
+package (one with a \fBrequest\fR script, that is, a user-created file that
+must be named \fBrequest\fR). Invoking this command generates a response file
+that is then used as input at installation time. The use of this response file
+prevents any interaction from occurring during installation since the file
+already contains all of the information the package needs.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported
+.sp
+.ne 2
+.na
+\fB\fB-d\fR\fI device\fR\fR
+.ad
+.RS 16n
+Run the request script for a package on \fIdevice\fR. \fIdevice\fR can be a
+directory pathname or the identifiers for tape, floppy disk or removable disk
+(for example, \fB/var/tmp\fR, \fB/dev/diskette\fR, and \fB/dev/dsk/c1d0s0\fR).
+The default device is the installation spool directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR\fI root_path\fR\fR
+.ad
+.RS 16n
+Define the full path name of a directory to use as the \fIroot_path\fR. All
+files, including package system information files, are relocated to a directory
+tree starting in the specified \fIroot_path\fR.
+.LP
+Note -
+.sp
+.RS 2
+The root file system of any non-global zones must not be referenced with the
+\fB-R\fR option. Doing so might damage the global zone's file system, might
+compromise the security of the global zone, and might damage the non-global
+zone's file system. See \fBzones\fR(7).
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR\fI response\fR\fR
+.ad
+.RS 16n
+Identify a file or directory which should be created to contain the responses
+to interaction with the package. The name must be a full pathname. The file, or
+directory of files, can later be used as input to the \fBpkgadd\fR(8) command.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fB\fIpkginst\fR\fR
+.ad
+.RS 11n
+Specify the package instance, or list of instances for which \fBrequest\fR
+scripts will be created. The token \fBall\fR may be used to refer to all
+packages available on the source medium.
+.RE
+
+.SH EXIT STATUS
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR pkginfo (1),
+.BR pkgmk (1),
+.BR pkgparam (1),
+.BR pkgproto (1),
+.BR pkgtrans (1),
+.BR admin (5),
+.BR attributes (7),
+.BR installf (8),
+.BR pkgadd (8),
+.BR pkgchk (8),
+.BR pkgrm (8),
+.BR removef (8)
+.sp
+.LP
+\fI\fR
+.SH NOTES
+.sp
+.LP
+The \fB-r\fR option can be used to indicate a directory name as well as a
+filename. The directory name is used to create numerous response files, each
+sharing the name of the package with which it should be associated. This would
+be used, for example, when you will be adding multiple interactive packages
+with one invocation of \fBpkgadd\fR(8). Each package would need a response
+file. To create multiple response files with the same name as the package
+instance, name the directory in which the files should be created and supply
+multiple instance names with the \fBpkgask\fR command. When installing the
+packages, you will be able to identify this directory to the \fBpkgadd\fR(8)
+command.
+.sp
+.LP
+If the default \fBadmin\fR file is too restrictive, the administration file may
+need to be modified to allow for total non-interaction during a package
+installation. See \fBadmin\fR(5) for details.

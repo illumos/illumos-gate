@@ -271,7 +271,7 @@ dlmgmt_init(void)
 		    DLMGMT_TMPFS_DIR, progname, ".debug.cache");
 	} else {
 		if ((fmri = getenv("SMF_FMRI")) == NULL) {
-			dlmgmt_log(LOG_ERR, "dlmgmtd is an smf(5) managed "
+			dlmgmt_log(LOG_ERR, "dlmgmtd is an smf(7) managed "
 			    "service and should not be run from the command "
 			    "line.");
 			return (EINVAL);

@@ -332,7 +332,7 @@ Cannot do probe operations until a buffer is allocated. See
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -348,7 +348,13 @@ MT Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBprex\fR(1), \fBTNF_PROBE\fR(3TNF), \fBlibtnfctl\fR(3TNF),
-\fBtnfctl_check_libs\fR(3TNF), \fBtnfctl_continue\fR(3TNF),
-\fBtnfctl_probe_apply\fR(3TNF), \fBtnfctl_probe_apply_ids\fR(3TNF),
-\fBtracing\fR(3TNF), \fBtnf_kernel_probes\fR(4), \fBattributes\fR(5)
+.BR prex (1),
+.BR TNF_PROBE (3TNF),
+.BR libtnfctl (3TNF),
+.BR tnfctl_check_libs (3TNF),
+.BR tnfctl_continue (3TNF),
+.BR tnfctl_probe_apply (3TNF),
+.BR tnfctl_probe_apply_ids (3TNF),
+.BR tracing (3TNF),
+.BR tnf_kernel_probes (5),
+.BR attributes (7)

@@ -35,7 +35,7 @@ own probes.
 .RS 17n
 The target is a separate process; a client can either \fBexec\fR(2) a program
 or attach to a running process for probe control. The \fBlibtnfctl\fR library
-uses \fBproc\fR(4) on the target process for probe and process control in this
+uses \fBproc\fR(5) on the target process for probe and process control in this
 mode, and additionally provides basic process control features.
 .RE
 
@@ -46,7 +46,7 @@ mode, and additionally provides basic process control features.
 .ad
 .RS 17n
 The target is a separate process, but the controlling process is already using
-\fBproc\fR(4) to control the target, and hence \fBlibtnfctl\fR cannot use
+\fBproc\fR(5) to control the target, and hence \fBlibtnfctl\fR cannot use
 those interfaces directly.  Use this mode to control probes from within a
 debugger. In this mode, the client must provide a set of functions that
 \fBlibtnfctl\fR can use to query and update the target process.
@@ -412,7 +412,7 @@ Error code reserved for user.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -426,22 +426,40 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-\fBprex\fR(1), \fBexec\fR(2), \fBdlclose\fR(3C), \fBdlopen\fR(3C),
-\fBTNF_PROBE\fR(3TNF), \fBtnfctl_buffer_alloc\fR(3TNF),
-\fBtnfctl_buffer_dealloc\fR(3TNF), \fBtnfctl_check_libs\fR(3TNF),
-\fBtnfctl_close\fR(3TNF), \fBtnfctl_continue\fR(3TNF),
-\fBtnfctl_internal_open\fR(3TNF), \fBtnfctl_exec_open\fR(3TNF),
-\fBtnfctl_filter_list_add\fR(3TNF), \fBtnfctl_filter_list_delete\fR(3TNF),
-\fBtnfctl_filter_list_get\fR(3TNF), \fBtnfctl_filter_state_set\fR(3TNF),
-\fBtnfctl_kernel_open\fR(3TNF), \fBtnfctl_pid_open\fR(3TNF),
-\fBtnfctl_probe_apply\fR(3TNF), \fBtnfctl_probe_apply_ids\fR(3TNF),
-\fBtnfctl_probe_connect\fR(3TNF), \fBtnfctl_probe_disable\fR(3TNF),
-\fBtnfctl_probe_enable\fR(3TNF), \fBtnfctl_probe_state_get\fR(3TNF),
-\fBtnfctl_probe_trace\fR(3TNF), \fBtnfctl_probe_untrace\fR(3TNF),
-\fBtnfctl_indirect_open\fR(3TNF), \fBtnfctl_register_funcs\fR(3TNF),
-\fBtnfctl_strerror\fR(3TNF), \fBtnfctl_trace_attrs_get\fR(3TNF),
-\fBtnfctl_trace_state_set\fR(3TNF), \fBlibtnfctl\fR(3LIB), \fBproc\fR(4),
-\fBattributes\fR(5)
+.BR prex (1),
+.BR exec (2),
+.BR dlclose (3C),
+.BR dlopen (3C),
+.BR libtnfctl (3LIB),
+.BR TNF_PROBE (3TNF),
+.BR tnfctl_buffer_alloc (3TNF),
+.BR tnfctl_buffer_dealloc (3TNF),
+.BR tnfctl_check_libs (3TNF),
+.BR tnfctl_close (3TNF),
+.BR tnfctl_continue (3TNF),
+.BR tnfctl_exec_open (3TNF),
+.BR tnfctl_filter_list_add (3TNF),
+.BR tnfctl_filter_list_delete (3TNF),
+.BR tnfctl_filter_list_get (3TNF),
+.BR tnfctl_filter_state_set (3TNF),
+.BR tnfctl_indirect_open (3TNF),
+.BR tnfctl_internal_open (3TNF),
+.BR tnfctl_kernel_open (3TNF),
+.BR tnfctl_pid_open (3TNF),
+.BR tnfctl_probe_apply (3TNF),
+.BR tnfctl_probe_apply_ids (3TNF),
+.BR tnfctl_probe_connect (3TNF),
+.BR tnfctl_probe_disable (3TNF),
+.BR tnfctl_probe_enable (3TNF),
+.BR tnfctl_probe_state_get (3TNF),
+.BR tnfctl_probe_trace (3TNF),
+.BR tnfctl_probe_untrace (3TNF),
+.BR tnfctl_register_funcs (3TNF),
+.BR tnfctl_strerror (3TNF),
+.BR tnfctl_trace_attrs_get (3TNF),
+.BR tnfctl_trace_state_set (3TNF),
+.BR proc (5),
+.BR attributes (7)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

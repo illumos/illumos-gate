@@ -95,7 +95,11 @@ The \fBput\fR(9E) routine enqueues all data messages for handling by the
 .SH SEE ALSO
 .sp
 .LP
-\fBput\fR(9E), \fBsrv\fR(9E), \fBallocb\fR(9F), \fBdatab\fR(9S), \fBmsgb\fR(9S)
+.BR put (9E),
+.BR srv (9E),
+.BR allocb (9F),
+.BR datab (9S),
+.BR msgb (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

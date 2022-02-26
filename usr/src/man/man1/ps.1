@@ -1127,7 +1127,7 @@ The starting time or date of the process, printed with no blanks.
 .ad
 .RS 11n
 The resident set size of the process, in kilobytes. The \fBrss\fR value
-reported by \fBps\fR is an estimate provided by \fBproc\fR(4) that might
+reported by \fBps\fR is an estimate provided by \fBproc\fR(5) that might
 underestimate the actual resident set size. Users who wish to get more accurate
 usage information for capacity planning should use \fBpmap\fR(1) \fB-x\fR
 instead.
@@ -1275,7 +1275,7 @@ truncation.
 
 .SH ENVIRONMENT VARIABLES
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBps\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
 .sp
@@ -1347,7 +1347,7 @@ process control files
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -1361,15 +1361,26 @@ CSI	Enabled (see USAGE)
 _
 Interface Stability	Committed
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .LP
-\fBkill\fR(1), \fBlgrpinfo\fR(1), \fBnice\fR(1), \fBpagesize\fR(1),
-\fBpmap\fR(1), \fBpriocntl\fR(1), \fBwho\fR(1), \fBgetty\fR(1M), \fBproc\fR(4),
-\fBttysrch\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBresource_controls\fR(5), \fBstandards\fR(5), \fBzones\fR(5)
+.BR kill (1),
+.BR lgrpinfo (1),
+.BR nice (1),
+.BR pagesize (1),
+.BR pmap (1),
+.BR priocntl (1),
+.BR who (1),
+.BR proc (5),
+.BR ttysrch (5),
+.BR attributes (7),
+.BR environ (7),
+.BR resource_controls (7),
+.BR standards (7),
+.BR zones (7),
+.BR getty (8)
 .SH NOTES
 .LP
 Things can change while \fBps\fR is running. The snapshot it gives is true only

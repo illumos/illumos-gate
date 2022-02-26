@@ -54,7 +54,9 @@ No \fBPCMCIA \fRhardware installed.
 .SH CONTEXT
 This function may be called from user or kernel context.
 .SH SEE ALSO
-\fBcsx_DupHandle\fR(9F), \fBcsx_RequestIO\fR(9F), \fBcsx_RequestWindow\fR(9F)
+.BR csx_DupHandle (9F),
+.BR csx_RequestIO (9F),
+.BR csx_RequestWindow (9F)
 .sp
 .LP
 \fIPC Card95 Standard, PCMCIA/JEIDA\fR

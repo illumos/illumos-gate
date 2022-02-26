@@ -33,7 +33,7 @@ NETPATH component
 The routines described on this page are part of the Network Selection
 component. They provide the application access to the system network
 configuration database, \fB/etc/netconfig\fR, as it is "filtered" by the
-\fBNETPATH\fR environment variable. See \fBenviron\fR(5). See
+\fBNETPATH\fR environment variable. See \fBenviron\fR(7). See
 \fBgetnetconfig\fR(3NSL) for other routines that also access the network
 configuration database directly. The \fBNETPATH\fR variable is a list of
 colon-separated network identifiers.
@@ -90,7 +90,7 @@ example, if \fBsetnetpath()\fR was not called previously).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -106,5 +106,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBgetnetconfig\fR(3NSL), \fBnetconfig\fR(4), \fBattributes\fR(5),
-\fBenviron\fR(5)
+.BR getnetconfig (3NSL),
+.BR netconfig (5),
+.BR attributes (7),
+.BR environ (7)

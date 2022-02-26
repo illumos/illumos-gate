@@ -101,7 +101,7 @@ and it should not perform any cloning or renumbering in its
 entry point.
 .Sh EXAMPLES
 The following example is adapated from the
-.Xr xhci 7D
+.Xr xhci 4D
 driver which shows how an HCD driver might arrange things.
 This assumes that a driver is following the recommendations in
 .Xr usba_hcdi 9E
@@ -218,7 +218,7 @@ _fini(void)
 }
 .Ed
 .Sh SEE ALSO
-.Xr xhci 7D ,
+.Xr xhci 4D ,
 .Xr attach 9E ,
 .Xr close 9E ,
 .Xr ioctl 9E ,

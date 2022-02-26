@@ -89,7 +89,7 @@
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='ipqosconf' section='1M'
+			<manpage title='ipqosconf' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

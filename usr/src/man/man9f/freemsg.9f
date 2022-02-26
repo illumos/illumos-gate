@@ -53,7 +53,9 @@ See \fBcopymsg\fR(9F).
 .SH SEE ALSO
 .sp
 .LP
-\fBcopymsg\fR(9F), \fBfreeb\fR(9F), \fBmsgb\fR(9S)
+.BR copymsg (9F),
+.BR freeb (9F),
+.BR msgb (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -318,15 +318,30 @@ the \fBservices.h\fR header file.
 .RE
 
 .SH SEE ALSO
-\fBtran_abort\fR(9E), \fBtran_bus_reset\fR(9E), \fBtran_destroy_pkt\fR(9E),
-\fBtran_dmafree\fR(9E), \fBtran_getcap\fR(9E), \fBtran_init_pkt\fR(9E),
-\fBtran_quiesce\fR(9E), \fBtran_reset\fR(9E), \fBtran_reset_notify\fR(9E),
-\fBtran_setcap\fR(9E), \fBtran_setup_pkt\fR(9E), \fBtran_start\fR(9E),
-\fBtran_sync_pkt\fR(9E), \fBtran_tgt_free\fR(9E), \fBtran_tgt_init\fR(9E),
-\fBtran_tgt_probe\fR(9E), \fBtran_unquiesce\fR(9E), \fBddi_dma_sync\fR(9F),
-\fBscsi_hba_attach\fR(9F), \fBscsi_hba_pkt_alloc\fR(9F),
-\fBscsi_hba_pkt_free\fR(9F), \fBscsi_probe\fR(9F), \fBscsi_device\fR(9S),
-\fBscsi_pkt\fR(9S)
+.BR tran_abort (9E),
+.BR tran_bus_reset (9E),
+.BR tran_destroy_pkt (9E),
+.BR tran_dmafree (9E),
+.BR tran_getcap (9E),
+.BR tran_init_pkt (9E),
+.BR tran_quiesce (9E),
+.BR tran_reset (9E),
+.BR tran_reset_notify (9E),
+.BR tran_setcap (9E),
+.BR tran_setup_pkt (9E),
+.BR tran_start (9E),
+.BR tran_sync_pkt (9E),
+.BR tran_tgt_free (9E),
+.BR tran_tgt_init (9E),
+.BR tran_tgt_probe (9E),
+.BR tran_unquiesce (9E),
+.BR ddi_dma_sync (9F),
+.BR scsi_hba_attach (9F),
+.BR scsi_hba_pkt_alloc (9F),
+.BR scsi_hba_pkt_free (9F),
+.BR scsi_probe (9F),
+.BR scsi_device (9S),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

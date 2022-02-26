@@ -1,0 +1,91 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SRPT 4D "May 21, 2009"
+.SH NAME
+srpt \- SCSI RDMA Protocol Target Driver for Infiniband (IB)
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsrpt\fR kernel pseudo device driver is an IB Architecture-compliant
+implementation of the target side of the SCSI RDMA Protocol (SRP). SRP
+accelerates the SCSI protocol by mapping SCSI data transfer phases to RDMA
+operations using InfiniBand as the underlying transport.
+.sp
+.LP
+SRP target services are enabled and disabled through \fBsmf\fR(7), using the
+FMRI \fBsvc:/system/ibsrp/target\fR.
+.sp
+.LP
+When enabled, \fBsrpt\fR enumerates each  IB Host Channel Adapter (HCA) on the
+system and registers each one as a SCSI target using the SCSI Target Mode
+Framework (STMF).
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/srpt\fR\fR
+.ad
+.RS 28n
+32-bit x86 ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/srpt\fR\fR
+.ad
+.RS 28n
+64-bit x86 ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/srpt\fR\fR
+.ad
+.RS 28n
+64-bit SPARC ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/srpt.conf\fR\fR
+.ad
+.RS 28n
+Driver configuration file
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR ib (4D),
+.BR ibdma (4D),
+.BR ibtl (4D),
+.BR attributes (7),
+.BR stmfadm (8)
+.sp
+.LP
+\fICOMSTAR Administration Guide\fR
+.sp
+.LP
+\fISCSI RDMA Protocol (SRP) T10 Project 1415-D, Revision\fR

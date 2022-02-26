@@ -1052,7 +1052,7 @@ i_ipadm_set_zone(ipadm_handle_t iph, const void *arg,
 
 	/*
 	 * To modify the zone assignment such that it persists across
-	 * reboots, zonecfg(1M) must be used.
+	 * reboots, zonecfg(8) must be used.
 	 */
 	if (flags & IPADM_OPT_PERSIST) {
 		return (IPADM_NOTSUP);

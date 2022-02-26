@@ -123,7 +123,7 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary
 .LP
 These functions are used to obtain entries describing user groups. Entries can
 come from any of the sources for \fBgroup\fR specified in the
-\fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(4)).
+\fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(5)).
 .sp
 .LP
 The \fBgetgrnam()\fR function searches the group database for an entry with the
@@ -160,7 +160,7 @@ calling \fBendgrent()\fR.
 The \fBfgetgrent()\fR function, unlike the other functions above, does not use
 \fBnsswitch.conf\fR. It reads and parses the next line from the stream \fIf\fR,
 which is assumed to have the format of the \fBgroup\fR file (see
-\fBgroup\fR(4)).
+\fBgroup\fR(5)).
 .SS "Reentrant Interfaces"
 .LP
 The  \fBgetgrnam()\fR, \fBgetgrgid()\fR, \fBgetgrent()\fR, and
@@ -352,7 +352,7 @@ the data to be referenced by the resulting \fBgroup\fR structure.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -374,8 +374,13 @@ The \fBendgrent()\fR, \fBgetgrent()\fR, \fBgetgrgid()\fR, \fBgetgrgid_r()\fR,
 Standard.
 .SH SEE ALSO
 .LP
-\fBIntro\fR(3), \fBgetpwnam\fR(3C), \fBgroup\fR(4), \fBnsswitch.conf\fR(4),
-\fBpasswd\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR Intro (3),
+.BR getpwnam (3C),
+.BR group (5),
+.BR nsswitch.conf (5),
+.BR passwd (5),
+.BR attributes (7),
+.BR standards (7)
 .SH NOTES
 .LP
 When compiling multithreaded programs, see \fBIntro\fR(3).
@@ -385,7 +390,7 @@ Use of the enumeration interfaces \fBgetgrent()\fR and \fBgetgrent_r()\fR is
 discouraged; enumeration is supported for the group file and \fBNIS\fR
 but in general is not efficient and might not be supported for all
 database sources.  The semantics of enumeration are discussed further in
-\fBnsswitch.conf\fR(4).
+\fBnsswitch.conf\fR(5).
 .sp
 .LP
 Previous releases allowed the use of ``+'' and ``-'' entries in
@@ -400,8 +405,8 @@ specifying \fBcompat\fR as the source for \fBgroup\fR.
 .LP
 If the ``+/-'' functionality is required in conjunction with \fBLDAP,\fR
 specify both \fBcompat\fR as the source for \fBgroup\fR and \fBldap\fR as
-the source for the pseudo-database \fBgroup_compat\fR. See \fBgroup\fR(4), and
-\fBnsswitch.conf\fR(4) for details.
+the source for the pseudo-database \fBgroup_compat\fR. See \fBgroup\fR(5), and
+\fBnsswitch.conf\fR(5) for details.
 .sp
 .LP
 Solaris 2.4 and earlier releases provided definitions of the \fBgetgrnam_r()\fR

@@ -38,10 +38,10 @@
 #include "ksslcfg.h"
 
 /*
- * ksslcfg(1M)
+ * ksslcfg(8)
  *
- * ksslcfg manages smf(5) instances for the Kernel SSL proxy module.
- * It makes use of kssladm(1M) which does the grunt work.
+ * ksslcfg manages smf(7) instances for the Kernel SSL proxy module.
+ * It makes use of kssladm(8) which does the grunt work.
  */
 
 /*

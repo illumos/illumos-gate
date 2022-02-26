@@ -157,7 +157,7 @@ General system failure
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -173,4 +173,6 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibpicl\fR(3PICL), \fBpicl_get_propinfo\fR(3PICL), \fBattributes\fR(5)
+.BR libpicl (3PICL),
+.BR picl_get_propinfo (3PICL),
+.BR attributes (7)

@@ -228,7 +228,9 @@ xxprop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 .in -2
 
 .SH SEE ALSO
-\fBIntro\fR(9E), \fBddi_prop_op\fR(9F), \fBddi_prop_update\fR(9F)
+.BR Intro (9E),
+.BR ddi_prop_op (9F),
+.BR ddi_prop_update (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

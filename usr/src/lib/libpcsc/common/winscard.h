@@ -26,7 +26,7 @@
  * https://docs.microsoft.com/en-us/windows/win32/api/winscard/
  *
  * New consumers should not use this library and instead should leverage
- * ccid(7D) instead.
+ * ccid(4D) instead.
  */
 
 #include <stdint.h>

@@ -34,8 +34,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Do the real work of the keyserver.
  * Store secret keys. Compute common keys,
@@ -1838,8 +1836,8 @@ hash_keys(pub, sec)
 }
 
 /*
- * problem:  keyserv loads keys from /etc/.rootkey based on nisauthconf(1M)
- *           which is too nis+-centric (see secure_rpc(3N)).
+ * problem:  keyserv loads keys from /etc/.rootkey based on nisauthconf(8)
+ *           which is too nis+-centric (see secure_rpc(3NSL)).
  *
  * So we want to make sure there is always a AUTH_DES compat entry
  * in the "list" of nis+ mechs so that the 192bit key always gets loaded so

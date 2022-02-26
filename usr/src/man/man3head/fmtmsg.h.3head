@@ -257,7 +257,7 @@ The function was unable to generate a console message, but otherwise succeeded.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -273,4 +273,6 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBfmtmsg\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR fmtmsg (3C),
+.BR attributes (7),
+.BR standards (7)

@@ -171,7 +171,7 @@ for paths naming different files on large filesystems.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -189,5 +189,9 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBmsgget\fR(2), \fBsemget\fR(2), \fBshmget\fR(2), \fBstat\fR(2),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR msgget (2),
+.BR semget (2),
+.BR shmget (2),
+.BR stat (2),
+.BR attributes (7),
+.BR standards (7)

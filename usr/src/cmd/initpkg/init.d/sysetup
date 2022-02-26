@@ -24,7 +24,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 if [ -z "$_INIT_PREV_LEVEL" ]; then
 	set -- `/usr/bin/who -r`
@@ -42,7 +41,7 @@ fi
 
 #
 # Run rctladm to configure system resource controls based on the settings
-# previously saved by rctladm.  See rctladm(1m) for instructions on how to
+# previously saved by rctladm.  See rctladm(8) for instructions on how to
 # modify resource control settings.
 #
 if [ -f /etc/rctladm.conf ] && [ -x /usr/sbin/rctladm ]; then

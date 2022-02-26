@@ -97,9 +97,14 @@ If the instance is not present now, but may be present in the future.
 .RE
 
 .SH SEE ALSO
-\fBattach\fR(9E), \fBidentify\fR(9E), \fBddi_dev_is_sid\fR(9F),
-\fBddi_map_regs\fR(9F), \fBddi_peek\fR(9F), \fBddi_poke\fR(9F),
-\fBnulldev\fR(9F), \fBdev_ops\fR(9S)
+.BR attach (9E),
+.BR identify (9E),
+.BR ddi_dev_is_sid (9F),
+.BR ddi_map_regs (9F),
+.BR ddi_peek (9F),
+.BR ddi_poke (9F),
+.BR nulldev (9F),
+.BR dev_ops (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

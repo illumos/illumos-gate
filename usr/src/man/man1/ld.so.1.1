@@ -773,17 +773,31 @@ Default configuration file for 64-bit applications.
 .RE
 
 .SH SEE ALSO
-\fBcrle\fR(1), \fBgprof\fR(1), \fBlari\fR(1), \fBld\fR(1), \fBldd\fR(1),
-\fBexec\fR(2), \fBissetugid\fR(2), \fBmmapobj\fR(2), \fBprofil\fR(2),
-\fBdladdr\fR(3C), \fBdlclose\fR(3C), \fBdldump\fR(3C), \fBdlerror\fR(3C),
-\fBdlinfo\fR(3C), \fBdlopen\fR(3C), \fBdlsym\fR(3C), \fBthr_kill\fR(3C),
-\fBproc\fR(4), \fBattributes\fR(5)
+.BR crle (1),
+.BR gprof (1),
+.BR lari (1),
+.BR ld (1),
+.BR ldd (1),
+.BR exec (2),
+.BR issetugid (2),
+.BR mmapobj (2),
+.BR profil (2),
+.BR dladdr (3C),
+.BR dlclose (3C),
+.BR dldump (3C),
+.BR dlerror (3C),
+.BR dlinfo (3C),
+.BR dlopen (3C),
+.BR dlsym (3C),
+.BR thr_kill (3C),
+.BR proc (5),
+.BR attributes (7)
 .sp
 .LP
 \fILinker and Libraries Guide\fR
 .SH NOTES
 Care should be exercised when using \fBLD_PROFILE\fR in combination with other
-process monitoring techniques, such as users of \fBproc\fR(4). Multiple process
+process monitoring techniques, such as users of \fBproc\fR(5). Multiple process
 monitoring techniques can result in deadlock conditions that leave the profile
 buffer locked. A locked buffer blocks any processes that try to record
 profiling information. To reduce this likelihood, the runtime linker's profile

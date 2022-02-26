@@ -122,7 +122,7 @@ The segment is attached for reading if (\fIshmflg\fR\fB&SHM_RDONLY\fR) is true
 .LP
 The \fBshmdt()\fR function detaches from the calling process's data segment the
 shared memory segment located at the address specified by \fIshmaddr\fR. If the
-application is standard-conforming (see \fBstandards\fR(5)), the \fIshmaddr\fR
+application is standard-conforming (see \fBstandards\fR(7)), the \fIshmaddr\fR
 argument is of type \fBconst void *\fR. Otherwise it is of type \fBchar *\fR.
 .sp
 .LP
@@ -231,7 +231,7 @@ performance on certain platforms due to D-cache aliasing.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -245,11 +245,17 @@ Interface Stability	Committed
 _
 MT-Level	Async-Signal-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(2), \fBexec\fR(2), \fBexit\fR(2), \fBfork\fR(2), \fBshmctl\fR(2),
-\fBshmget\fR(2), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR Intro (2),
+.BR exec (2),
+.BR exit (2),
+.BR fork (2),
+.BR shmctl (2),
+.BR shmget (2),
+.BR attributes (7),
+.BR standards (7)

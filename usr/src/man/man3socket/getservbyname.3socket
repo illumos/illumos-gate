@@ -56,7 +56,7 @@ getservent_r, setservent, endservent \- get service entry
 .LP
 These functions are used to obtain entries for Internet services.  An entry may
 come from any of the sources for \fBservices\fR specified in the
-\fB/etc/nsswitch.conf\fR file. See \fBnsswitch.conf\fR(4).
+\fB/etc/nsswitch.conf\fR file. See \fBnsswitch.conf\fR(5).
 .sp
 .LP
 The \fBgetservbyname()\fR and \fBgetservbyport()\fR functions sequentially
@@ -266,7 +266,7 @@ configuration file for the name-service switch
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -283,9 +283,15 @@ T}
 
 .SH SEE ALSO
 .LP
-\fBIntro\fR(2), \fBIntro\fR(3), \fBbyteorder\fR(3C), \fBnetdir\fR(3NSL),
-\fBnetconfig\fR(4), \fBnsswitch.conf\fR(4), \fBservices\fR(4),
-\fBattributes\fR(5), \fBnetdb.h\fR(3HEAD)
+.BR Intro (2),
+.BR Intro (3),
+.BR byteorder (3C),
+.BR netdb.h (3HEAD),
+.BR netdir (3NSL),
+.BR netconfig (5),
+.BR nsswitch.conf (5),
+.BR services (5),
+.BR attributes (7)
 .SH WARNINGS
 .LP
 The reentrant interfaces \fBgetservbyname_r()\fR, \fBgetservbyport_r()\fR, and
@@ -304,10 +310,10 @@ To ensure that they all return consistent results, \fBgetservbyname()\fR,
 \fBgetservbyname_r()\fR, and \fBnetdir_getbyname()\fR are implemented in terms
 of the same internal library function. This function obtains the system-wide
 source lookup policy based on the \fBinet\fR family entries in
-\fBnetconfig\fR(4) and the \fBservices:\fR entry in \fBnsswitch.conf\fR(4).
+\fBnetconfig\fR(5) and the \fBservices:\fR entry in \fBnsswitch.conf\fR(5).
 Similarly, \fBgetservbyport()\fR, \fBgetservbyport_r()\fR, and
 \fBnetdir_getbyaddr()\fR are implemented in terms of the same internal library
-function. If the \fBinet\fR family entries in \fBnetconfig\fR(4) have a ``-''
+function. If the \fBinet\fR family entries in \fBnetconfig\fR(5) have a ``-''
 in the last column for nametoaddr libraries, then the entry for \fBservices\fR
 in \fBnsswitch.conf\fR will be used; otherwise the nametoaddr libraries in that
 column will be used, and \fBnsswitch.conf\fR will not be consulted.
@@ -327,4 +333,4 @@ Multithread Applications\fR, for information about the use of the
 .LP
 Use of the enumeration interfaces \fBgetservent()\fR and \fBgetservent_r()\fR
 is discouraged; enumeration may not be supported for all database sources.  The
-semantics of enumeration are discussed further in \fBnsswitch.conf\fR(4).
+semantics of enumeration are discussed further in \fBnsswitch.conf\fR(5).

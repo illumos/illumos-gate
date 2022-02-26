@@ -1136,8 +1136,8 @@ qunbufcall(queue_t *q, bufcall_id_t id)
  * Associate the stream with an instance of the bottom driver.  This
  * function is called by APIs that establish or modify the hardware
  * association (ppa) of an open stream.  Two examples of such
- * post-open(9E) APIs are the dlpi(7p) DL_ATTACH_REQ message, and the
- * ndd(1M) "instance=" ioctl(2).  This interface may be called from a
+ * post-open(9E) APIs are the dlpi(4P) DL_ATTACH_REQ message, and the
+ * ndd(8) "instance=" ioctl(2).  This interface may be called from a
  * stream driver's wput procedure and from within syncq perimeters,
  * so it can't block.
  *

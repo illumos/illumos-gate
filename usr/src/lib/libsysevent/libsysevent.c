@@ -736,7 +736,7 @@ se_print(FILE *fp, sysevent_t *ev)
  * registration notifications and each subscriber creates a door for event
  * delivery.
  *
- * Most of these routines are used by syseventd(1M), the sysevent publisher
+ * Most of these routines are used by syseventd(8), the sysevent publisher
  * for the syseventd channel.  Processes wishing to receive sysevent
  * notifications from syseventd may use a set of public
  * APIs designed to subscribe to syseventd sysevents.  The subscription
@@ -2553,7 +2553,7 @@ sysevent_unbind_publisher(sysevent_handle_t *shp)
 }
 
 /*
- * Evolving APIs to subscribe to syseventd(1M) system events.
+ * Evolving APIs to subscribe to syseventd(8) system events.
  */
 
 static sysevent_handle_t *
@@ -2648,7 +2648,7 @@ sysevent_unbind_handle(sysevent_handle_t *shp)
 
 /*
  * sysevent_subscribe_event - Subscribe to system event notification from
- *			syseventd(1M) for the class and subclasses specified.
+ *			syseventd(8) for the class and subclasses specified.
  */
 int
 sysevent_subscribe_event(sysevent_handle_t *shp, const char *event_class,

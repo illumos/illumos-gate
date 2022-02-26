@@ -23,11 +23,9 @@
 #
 # dscp.ppp.options
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
-# These are options for running  pppd(1M) to provide a DSCP
+# These are options for running  pppd(8) to provide a DSCP
 # link between a service processor and a domain in OPL.  All
 # options are explicitly set here so that site customizations
 # of the global options files will not affect DSCP.

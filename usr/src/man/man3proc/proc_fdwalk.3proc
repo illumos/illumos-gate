@@ -84,4 +84,4 @@ functions.
 .Xr opendir 3C ,
 .Xr readdir 3C ,
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

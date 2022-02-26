@@ -29,7 +29,7 @@ The following options are supported:
 .ad
 .RS 15n
 Produces core image files with the specified content. The content description
-uses the same tokens as in \fBcoreadm\fR(1M). The \fB-c\fR option does not
+uses the same tokens as in \fBcoreadm\fR(8). The \fB-c\fR option does not
 apply to cores produced due to the \fB-p\fR or \fB-g\fR flags.
 .RE
 
@@ -49,7 +49,7 @@ Force. Grabs the target process even if another process has control.
 .ad
 .RS 15n
 Produces core image files in the global core file repository with the global
-content as configured by \fBcoreadm\fR(1M). The command fails if the user does
+content as configured by \fBcoreadm\fR(8). The command fails if the user does
 not have permissions to the global core file repository.
 .RE
 
@@ -61,7 +61,7 @@ not have permissions to the global core file repository.
 .RS 15n
 Substitutes \fIfilename\fR in place of \fBcore\fR as the first part of the name
 of the core image files. \fIfilename\fR can contain the same tokens to be
-expanded as the paths in \fBcoreadm\fR(1M).
+expanded as the paths in \fBcoreadm\fR(8).
 .RE
 
 .sp
@@ -71,7 +71,7 @@ expanded as the paths in \fBcoreadm\fR(1M).
 .ad
 .RS 15n
 Produces a core image file in the process-specific location with the
-process-specific content for each process as configured by \fBcoreadm\fR(1M).
+process-specific content for each process as configured by \fBcoreadm\fR(8).
 The command fails if the user does not have permissions to the per-process core
 file repository.
 .RE
@@ -132,7 +132,7 @@ core images
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -151,8 +151,12 @@ The command syntax is Evolving. The Output Formats are Unstable.
 .SH SEE ALSO
 .sp
 .LP
-\fBkill\fR(1), \fBcoreadm\fR(1M), \fBsetrlimit\fR(2), \fBcore\fR(4),
-\fBproc\fR(4), \fBattributes\fR(5)
+.BR kill (1),
+.BR setrlimit (2),
+.BR core (5),
+.BR proc (5),
+.BR attributes (7),
+.BR coreadm (8)
 .SH NOTES
 .sp
 .LP

@@ -1,0 +1,368 @@
+'\" te
+.\" Copyright (c) 2003 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2019 Peter Tribble
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SYSTEM 5 "Apr 20, 2019"
+.SH NAME
+system \- system configuration information file
+.SH DESCRIPTION
+.LP
+The \fBsystem\fR file is used for customizing the operation of the operating
+system kernel. The recommended procedure is to preserve the original
+\fBsystem\fR file before modifying it.
+.sp
+.LP
+It is not recommended to edit the \fB/etc/system\fR file directly but rather
+to deliver configuration fragments into files under \fB/etc/system.d\fR;
+files in this directory are combined in alphabetical order and read by the
+kernel before \fB/etc/system\fR is processed. Directives in \fB/etc/system\fR
+therefore take precedence over any settings delivered in fragment files.
+.sp
+.LP
+The recommended naming schema for the fragment files is to use the name of
+the package which is delivering the file with '\fB/\fR' characters replaced
+by '\fB:\fR'; file names that start with a dot (\fB.\fR) will be ignored.
+.sp
+.LP
+If \fB/etc/system.d/\fR exists and contains any fragment files,
+then the directory must also be writable or it will not be possible to
+create or update the system boot archive.
+.sp
+.LP
+The \fBsystem\fR file contains commands which are read by the kernel during
+initialization and used to customize the operation of your system. These
+commands are useful for modifying the system's treatment of its loadable kernel
+modules.
+.sp
+.LP
+The syntax of the \fBsystem\fR file consists of a list of keyword/value pairs
+which are recognized by the system as valid commands. Comment lines must begin
+with an asterisk (\fB*\fR) or a hash mark (\fB#\fR) and end with a newline
+character. All commands are case-insensitive except where noted.
+.sp
+.LP
+Commands that modify the system's operation with respect to loadable kernel
+modules require you to specify the module type by listing the module's
+namespace. The following namespaces are currently supported on all platforms:
+.sp
+.ne 2
+.na
+\fB\fBdrv\fR\fR
+.ad
+.RS 10n
+Modules in this namespace are device drivers.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBexec\fR\fR
+.ad
+.RS 10n
+Modules in this namespace are execution format modules. The following
+\fBexec\fR modules are currently provided:
+.sp
+.ne 2
+.na
+\fBOnly on SPARC systems:\fR
+.ad
+.RS 28n
+.sp
+.in +2
+.nf
+aoutexec
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBOn SPARC and IA systems:\fR
+.ad
+.RS 28n
+.sp
+.in +2
+.nf
+elfexec
+intpexec
+javaexec
+.fi
+.in -2
+.sp
+
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfirmware\fR\fR
+.ad
+.RS 10n
+Raw firmware images in subdirectories, one for each device driver
+module using \fBfirmload\fR(9F).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfs\fR\fR
+.ad
+.RS 10n
+These modules are filesystems.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsched\fR\fR
+.ad
+.RS 10n
+These modules implement a process scheduling algorithm.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstrmod\fR\fR
+.ad
+.RS 10n
+These modules are \fBSTREAMS\fR modules.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsys\fR\fR
+.ad
+.RS 10n
+These modules implement loadable system-call modules.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmisc\fR\fR
+.ad
+.RS 10n
+These modules do not fit into any of the above categories, so are considered
+"miscellaneous" modules.
+.RE
+
+.sp
+.LP
+SPARC only:
+.sp
+.ne 2
+.na
+\fB\fBdacf\fR\fR
+.ad
+.RS 8n
+These modules provide rules and actions for device auto-configuration.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtod\fR\fR
+.ad
+.RS 8n
+These modules provide support for the time of day hardware.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcpu\fR\fR
+.ad
+.RS 8n
+These modules provide \fBCPU\fR-specific kernel routines.
+.RE
+
+.sp
+.LP
+A description of each of the supported commands follows:
+.sp
+.ne 2
+.na
+\fB\fBexclude:\fR <\fInamespace\fR>/<\fImodulename\fR>\fR
+.ad
+.sp .6
+.RS 4n
+Do not allow the listed loadable kernel module to be loaded. \fBexclude\fR
+commands are cumulative; the list of modules to \fBexclude\fR is created by
+combining every \fBexclude\fR entry in the \fBsystem\fR file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinclude:\fR <\fInamespace\fR>/<\fImodulename\fR>\fR
+.ad
+.sp .6
+.RS 4n
+Include the listed loadable kernel module. This is the system's default, so
+using \fBinclude\fR does not modify the system's operation. \fBinclude\fR
+commands are cumulative.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBforceload:\fR <\fInamespace\fR>/<\fImodulename\fR>\fR
+.ad
+.sp .6
+.RS 4n
+Force this kernel module to be loaded during kernel initialization. The default
+action is to automatically load the kernel module when its services are first
+accessed. \fBforceload\fR commands are cumulative.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrootdev:\fR <\fIdevice name\fR>\fR
+.ad
+.sp .6
+.RS 4n
+Set the root device to the listed value instead of using the default root
+device as supplied by the boot program.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrootfs:\fR <\fIroot filesystem type\fR>\fR
+.ad
+.sp .6
+.RS 4n
+Set the root filesystem type to the listed value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmoddir:\fR <\fIfirst module path\fR>[[{:, }<\fIsecond ...\fR>]...]\fR
+.ad
+.sp .6
+.RS 4n
+Set the search path for loadable kernel modules. This command operates very
+much like the \fBPATH\fR shell variable. Multiple directories to search can be
+listed together, delimited either by blank spaces or colons.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBset\fR [\fI<module>\fR:]\fI<symbol>\fR {=, |, &} [~][-]\fI<value>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set an integer or character pointer in the kernel or in the selected kernel
+module to a new value. This command is used to change kernel and module
+parameters and thus modify the operation of your system. Assignment operations
+are not cumulative, whereas bitwise \fBAND\fR and \fBOR\fR operations are
+cumulative.
+.sp
+Operations that are supported for modifying integer variables are: simple
+assignment, inclusive bitwise \fBOR,\fR bitwise \fBAND,\fR one's complement,
+and negation. Variables in a specific loadable module can be targeted for
+modification by specifying the variable name prefixed with the kernel module
+name and a colon (:) separator. Values can be specified as hexadecimal (0x10),
+Octal (046), or Decimal (5).
+.sp
+The only operation supported for modifying character pointers is simple
+assignment. Static string data such as character arrays cannot be modified
+using the \fBset\fR command. Use care and ensure that the variable you are
+modifying is in fact a character pointer. The \fBset\fR command is very
+powerful, and will likely cause problems if used carelessly. The following
+escape sequences are supported within the quoted string:
+.sp
+.in +2
+.nf
+\en	(newline)
+\et	(tab)
+\eb	(backspace)
+.fi
+.in -2
+.sp
+
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample \fBsystem\fR file.
+.sp
+.LP
+The following is a sample \fBsystem\fR file.
+
+.sp
+.in +2
+.nf
+* Force the ELF exec kernel module to be loaded during kernel
+* initialization. Execution type modules are in the exec namespace.
+forceload: exec/elfexec
+* Change the root device to /sbus@1,f8000000/esp@0,800000/sd@3,0:a.
+* You can derive root device names from /devices.
+* Root device names must be the fully expanded Open Boot Prom
+* device name. This command is platform and configuration specific.
+* This example uses the first partition (a) of the SCSI disk at
+* SCSI target 3 on the esp host adapter in slot 0 (on board)
+* of the SBus of the machine.
+* Adapter unit-address 3,0 at sbus unit-address 0,800000.
+rootdev: /sbus@1,f8000000/esp@0,800000/sd@3,0:a
+* Set the filesystem type of the root to ufs. Note that
+* the equal sign can be used instead of the colon.
+rootfs:ufs
+* Set the search path for kernel modules to look first in
+* /usr/phil/mod_test for modules, then in /kernel/modules (the
+* default) if not found. Useful for testing new modules.
+* Note that you can delimit your module pathnames using
+* colons instead of spaces: moddir:/newmodules:/kernel/modules
+moddir:/usr/phil/mod_test /kernel/modules.
+* Set the configuration option {_POSIX_CHOWN_RESTRICTED} :
+* This configuration option is enabled by default.
+set rstchown = 1
+* Disable the configuration option {_POSIX_CHOWN_RESTRICTED} :
+set rstchown = 0
+* Turn on debugging messages in the modules mydriver. This is useful
+* during driver development.
+set mydriver:debug = 1
+* Bitwise AND the kernel variable "moddebug" with the
+* one's complement of the hex value 0x880, and set
+* "moddebug" to this new value.
+set moddebug & ~0x880
+* Demonstrate the cumulative effect of the SET
+* bitwise AND/OR operations by further modifying "moddebug"
+* by ORing it with 0x40.
+set moddebug | 0x40
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.LP
+.BR boot (8),
+.BR init (8),
+.BR kernel (8)
+.SH WARNINGS
+.LP
+Use care when modifying the \fBsystem\fR file; it modifies the operation of the
+kernel. If you preserved the original \fBsystem\fR file, you can boot using
+\fBboot -a\fR, which will ask you to specify the path to the saved file. This
+should allow the system to boot correctly. If you cannot locate a \fBsystem\fR
+file that will work, you may specify \fB/dev/null\fR. This acts as an empty
+\fBsystem\fR file, and the system will attempt to boot using its default
+settings.
+.SH NOTES
+.LP
+The \fBsystem\fR files are read only once, at boot time.

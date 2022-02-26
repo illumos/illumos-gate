@@ -2828,7 +2828,7 @@ usbecm_usb_init(usbecm_state_t *ecmp)
 	} else {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, ecmp->ecm_lh,
 		    "usbecm_usb_init: A nonstandard device is attached to "
-		    "usbecm(7D) driver. This device doesn't conform to "
+		    "usbecm(4D) driver. This device doesn't conform to "
 		    "usb cdc spec.");
 		ecmp->ecm_compatibility = B_FALSE;
 

@@ -22,7 +22,7 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #  At 03:13am on Sundays:
 #  Move a weeks worth of 'requests' to 'requests.1'.
@@ -31,5 +31,5 @@
 #
 13 3 * * 0 cd /var/lp/logs; if [ -f requests ]; then if [ -f requests.1 ]; then /bin/mv requests.1 requests.2; fi; /usr/bin/cp requests requests.1; >requests; fi
 #
-#  Rotating of the "lpsched" log files is handled by logadm(1M).
+#  Rotating of the "lpsched" log files is handled by logadm(8).
 #

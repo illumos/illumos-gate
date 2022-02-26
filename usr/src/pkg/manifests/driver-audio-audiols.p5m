@@ -40,8 +40,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/audiols group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/audiols.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/audiols.4d
 driver name=audiols alias=pci1102,7
 legacy pkg=SUNWaudiols desc="SunOS audio device driver for Creative Audigy LS" \
     name="Creative Audigy LS Audio Driver"

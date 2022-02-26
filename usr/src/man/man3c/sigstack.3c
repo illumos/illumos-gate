@@ -154,5 +154,10 @@ is recommended over this function.
 .SH SEE ALSO
 .sp
 .LP
-\fBfork\fR(2), \fB_longjmp\fR(3C), \fBlongjmp\fR(3C), \fBsetjmp\fR(3C),
-\fBsigaltstack\fR(2), \fBsiglongjmp\fR(3C), \fBsigsetjmp\fR(3C)
+.BR fork (2),
+.BR sigaltstack (2),
+.BR _longjmp (3C),
+.BR longjmp (3C),
+.BR setjmp (3C),
+.BR siglongjmp (3C),
+.BR sigsetjmp (3C)

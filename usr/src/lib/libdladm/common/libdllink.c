@@ -239,7 +239,7 @@ dladm_walk_macaddr(dladm_handle_t handle, datalink_id_t linkid, void *arg,
 }
 
 /*
- * These routines are used by administration tools such as dladm(1M) to
+ * These routines are used by administration tools such as dladm(8) to
  * iterate through the list of MAC interfaces
  */
 

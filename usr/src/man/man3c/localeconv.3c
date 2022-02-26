@@ -91,7 +91,7 @@ char n_sign_posn;           /* CHAR_MAX */
 .sp
 .LP
 The following members are also available to SUSv3-conforming applications. See
-\fBstandards\fR(5)
+.BR standards (7)
 .sp
 .in +2
 .nf
@@ -552,7 +552,7 @@ l l l l l .
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -577,4 +577,7 @@ locale.
 .SH SEE ALSO
 .sp
 .LP
-\fBsetlocale\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.BR setlocale (3C),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)

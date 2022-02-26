@@ -202,8 +202,8 @@ the \fB/devices\fR hierarchy. At-sign (\fB@\fR), slash (\fB/\fR), and space are
 not allowed. The \fIspec_type\fR specifies whether this is a block or character
 device. The \fIminor_num\fR is the minor number for the device. The
 \fInode_type\fR is used to create the names in the \fB/dev\fR hierarchy that
-refers to the names in the \fB/devices\fR hierarchy. See \fBdisks\fR(1M),
-\fBports\fR(1M), \fBtapes\fR(1M), \fBdevlinks\fR(1M). Finally \fIflag\fR
+refers to the names in the \fB/devices\fR hierarchy. See \fBdisks\fR(8),
+\fBports\fR(8), \fBtapes\fR(8), \fBdevlinks\fR(8). Finally \fIflag\fR
 determines if this is a clone device or not, and what device class the node
 belongs to.
 .SH RETURN VALUES
@@ -247,23 +247,28 @@ ddi_create_minor_node(dip, "foo", S_IFBLK, 0, DDI_NT_BLOCK, 0);
 .in -2
 
 .SH SEE ALSO
-\fBadd_drv\fR(1M), \fBdevlinks\fR(1M), \fBdisks\fR(1M), \fBdrvconfig\fR(1M),
-\fBports\fR(1M), \fBtapes\fR(1M), \fBattach\fR(9E),
-\fBddi_remove_minor_node\fR(9F)
+.BR add_drv (8),
+.BR devlinks (8),
+.BR disks (8),
+.BR drvconfig (8),
+.BR ports (8),
+.BR tapes (8),
+.BR attach (9E),
+.BR ddi_remove_minor_node (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
 If the driver is for a network device (\fInode_type\fR \fBDDI_NT_NET\fR), note
 that the driver name will undergo the driver name constraints identified in the
-NOTES section of \fBdlpi\fR(7P). Additionally, the minor name must match the
+NOTES section of \fBdlpi\fR(4P). Additionally, the minor name must match the
 driver name for a DLPI style 2 provider. If the driver is a DLPI style 1
 provider, the minor name must also match the driver name with the exception
 that the ppa is appended to the minor name.
 .sp
 .LP
-Non-\fBgld\fR(7D)-based DLPI network streams drivers are encouraged to switch
-to \fBgld\fR(7D). Failing this, a driver that creates DLPI style-2   minor
+Non-\fBgld\fR(4D)-based DLPI network streams drivers are encouraged to switch
+to \fBgld\fR(4D). Failing this, a driver that creates DLPI style-2   minor
 nodes must specify CLONE_DEV for its style-2 \fBddi_create_minor_node()\fR
 nodes and use \fBqassociate\fR(9F). A driver that supports both style-1 and
 style-2 minor nodes should return DDI_FAILURE for DDI_INFO_DEVT2INSTANCE and
@@ -271,7 +276,7 @@ DDI_INFO_DEVT2DEVINFO \fBgetinfo\fR(9E) calls to style-2 minor nodes. (The
 correct association is already established by \fBqassociate\fR(9F)). A driver
 that only supports style-2 minor nodes can use \fBddi_no_info\fR(9F) for its
 \fBgetinfo\fR(9E) implementation. For drivers that do not follow these rules,
-the results of a \fBmodunload\fR(1M) of the driver or a \fBcfgadm\fR(1M) remove
+the results of a \fBmodunload\fR(8) of the driver or a \fBcfgadm\fR(8) remove
 of hardware controlled by the driver are undefined.
 .SH WARNING
 Drivers must remove references to GLOBAL_DEV, NODEBOUND_DEV, NODESPECIFIC_DEV,

@@ -96,8 +96,8 @@ is in the process of printing, it is stopped and restarted from the beginning
 .sp
 .LP
 The print client commands locate destination information using the "printers"
-database in the name service switch. See \fBnsswitch.conf\fR(4),
-\fBprinters\fR(4), and \fBprinters.conf\fR(4) for details.
+database in the name service switch. See \fBnsswitch.conf\fR(5),
+\fBprinters\fR(5), and \fBprinters.conf\fR(5) for details.
 .SH OPTIONS
 .LP
 Printers that have a 4.\fIx\fR or \fBBSD-based print server\fR are not
@@ -128,11 +128,11 @@ printed output. \fIfile\fR is linked (as opposed to copied).
 .RS 23n
 Prints \fIfile\fR on a specific destination. The \fB-d\fR option is used to set
 the destination only when the job is first created. (\fBNote:\fR To move
-existing jobs to a different destination, see \fBlpmove\fR(1M).)
+existing jobs to a different destination, see \fBlpmove\fR(8).)
 \fIdestination\fR can be either a printer or a class of printers (see
-\fBlpadmin\fR(1M)). Specify \fIdestination\fR using atomic, URI-style
+\fBlpadmin\fR(8)). Specify \fIdestination\fR using atomic, URI-style
 (\fIscheme\fR://\fIendpoint\fR), or POSIX-style
-(\fIserver\fR\fB:\fR\fIdestination\fR) names. See \fBprinters.conf\fR(4) for
+(\fIserver\fR\fB:\fR\fIdestination\fR) names. See \fBprinters.conf\fR(5) for
 more information.
 .RE
 
@@ -146,7 +146,7 @@ Prints \fIfile\fR on \fIform-name\fR. The \fBLP\fR print service ensures that
 the form is mounted on the printer. The print request is rejected if the
 printer does not support \fIform-name\fR, if \fIform-name\fR is not defined for
 the system, or if the user is not allowed to use \fIform-name\fR (see
-\fBlpforms\fR(1M)).
+\fBlpforms\fR(8)).
 .RE
 
 .sp
@@ -360,7 +360,7 @@ an inch. Use \fBpica\fR to set character pitch to pica (\fB10\fR characters per
 inch), or \fBelite\fR to set character pitch to elite (\fB12\fR characters per
 inch) Use \fBcompressed\fR to set character pitch to as many characters as the
 printer can handle. There is no standard number of characters per inch for all
-printers; see the \fBterminfo\fR database (see \fBterminfo\fR(4)) for the
+printers; see the \fBterminfo\fR database (see \fBterminfo\fR(5)) for the
 default character pitch for your printer. This option can not be used with the
 \fB-f\fR option.
 .RE
@@ -450,7 +450,7 @@ rejected unless the print wheel is already mounted on the printer.
 Printers Using Selectable or Programmable Character Sets: If the \fB-S\fR
 option is not specified, \fBlp\fR uses the standard character set. If
 \fIcharacter-set\fR is not defined in the \fBterminfo\fR database for the
-printer (see \fBterminfo\fR(4)), or is not an alias defined by the \fBLP\fR
+printer (see \fBterminfo\fR(5)), or is not an alias defined by the \fBLP\fR
 administrator, the request is rejected.
 .RE
 
@@ -519,11 +519,11 @@ specified, \fBlp\fR uses the standard input.
 
 .SH USAGE
 .LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBlp\fR when
+See \fBlargefile\fR(7) for the description of the behavior of \fBlp\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH ENVIRONMENT VARIABLES
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBlp\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBNLSPATH\fR, and \fBPATH\fR.
 .sp
@@ -633,7 +633,7 @@ LDAP version of \fB/etc/printers.conf\fR
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -650,13 +650,33 @@ Interface Stability	Standard
 
 .SH SEE ALSO
 .LP
-\fBcancel\fR(1), \fBenable\fR(1), \fBlpq\fR(1B), \fBlpr\fR(1B), \fBlprm\fR(1B),
-\fBlpstat\fR(1), \fBmail\fR(1), \fBpostprint\fR(1), \fBpr\fR(1), \fBstty\fR(1),
-\fBaccept\fR(1M), \fBlpadmin\fR(1M), \fBlpfilter\fR(1M), \fBlpforms\fR(1M),
-\fBlpmove\fR(1M), \fBlpsched\fR(1M), \fBlpshut\fR(1M), \fBlpsystem\fR(1M),
-\fBlpusers\fR(1M), \fBnsswitch.conf\fR(4), \fBprinters\fR(4),
-\fBprinters.conf\fR(4), \fBterminfo\fR(4), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
+.BR cancel (1),
+.BR enable (1),
+.BR lpstat (1),
+.BR mail (1),
+.BR postprint (1),
+.BR pr (1),
+.BR stty (1),
+.BR lpq (1B),
+.BR lpr (1B),
+.BR lprm (1B),
+.BR nsswitch.conf (5),
+.BR printers (5),
+.BR printers.conf (5),
+.BR terminfo (5),
+.BR attributes (7),
+.BR environ (7),
+.BR largefile (7),
+.BR standards (7),
+.BR accept (8),
+.BR lpadmin (8),
+.BR lpfilter (8),
+.BR lpforms (8),
+.BR lpmove (8),
+.BR lpsched (8),
+.BR lpshut (8),
+.BR lpsystem (8),
+.BR lpusers (8)
 .SH NOTES
 .LP
 \fBCSI\fR-capability assumes that printer names are composed of \fBASCII\fR

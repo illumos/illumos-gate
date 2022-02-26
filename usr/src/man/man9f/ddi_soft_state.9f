@@ -317,8 +317,13 @@ xxopen(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 .in -2
 
 .SH SEE ALSO
-\fB_fini\fR(9E), \fB_init\fR(9E), \fBattach\fR(9E), \fBdetach\fR(9E),
-\fBddi_get_instance\fR(9F), \fBgetminor\fR(9F), \fBkmem_zalloc\fR(9F)
+.BR _fini (9E),
+.BR _init (9E),
+.BR attach (9E),
+.BR detach (9E),
+.BR ddi_get_instance (9F),
+.BR getminor (9F),
+.BR kmem_zalloc (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

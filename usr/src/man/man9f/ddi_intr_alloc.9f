@@ -206,7 +206,7 @@ On any implementation specific failure.
 The \fBddi_intr_alloc()\fR and \fBddi_intr_free()\fR functions can be called
 from kernel non-interrupt context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -220,11 +220,16 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBddi_intr_add_handler\fR(9F),
-\fBddi_intr_block_enable\fR(9F), \fBddi_intr_disable\fR(9F),
-\fBddi_intr_enable\fR(9F), \fBddi_intr_get_cap\fR(9F),
-\fBddi_intr_get_nintrs\fR(9F), \fBddi_intr_get_pri\fR(9F),
-\fBddi_intr_get_supported_types\fR(9F), \fBddi_intr_remove_handler\fR(9F)
+.BR attributes (7),
+.BR ddi_intr_add_handler (9F),
+.BR ddi_intr_block_enable (9F),
+.BR ddi_intr_disable (9F),
+.BR ddi_intr_enable (9F),
+.BR ddi_intr_get_cap (9F),
+.BR ddi_intr_get_nintrs (9F),
+.BR ddi_intr_get_pri (9F),
+.BR ddi_intr_get_supported_types (9F),
+.BR ddi_intr_remove_handler (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -32,8 +32,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * auth_des.c, client-side implementation of DES authentication
  *
@@ -185,7 +183,7 @@ authdes_pk_seccreate(const char *servername, netobj *pkey, uint_t window,
 	if (ckey == NULL) {
 		if (key_gendes(&auth->ah_key) < 0) {
 			syslog(LOG_ERR,
-	"authdes_seccreate: keyserv(1m) is unable to generate session key");
+	"authdes_seccreate: keyserv(8) is unable to generate session key");
 			goto failed;
 		}
 	} else
@@ -423,7 +421,7 @@ authdes_refresh(AUTH *auth, void *dummy)
 	pkey.n_len = (uint_t)strlen((char *)ad->ad_pkey) + 1;
 	if (key_encryptsession_pk(ad->ad_servername, &pkey, &ad->ad_xkey) < 0) {
 		syslog(LOG_INFO,
-	"authdes_refresh: keyserv(1m) is unable to encrypt session key");
+	"authdes_refresh: keyserv(8) is unable to encrypt session key");
 		return (FALSE);
 	}
 	cred->adc_fullname.key = ad->ad_xkey;

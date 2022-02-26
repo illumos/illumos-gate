@@ -1,0 +1,174 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH YGE 4D "Sep 15, 2009"
+.SH NAME
+yge \- Marvell Yukon 2 Ethernet device driver
+.SH SYNOPSIS
+.sp
+.in +2
+.nf
+/dev/net/yge
+.fi
+.in -2
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fByge\fR driver supports Marvell Yukon 2 Fast Ethernet and Gigabit
+Ethernet controllers.
+.SS "Properties"
+.sp
+.LP
+The following properties can be configured using \fBdladm\fR(8):
+.sp
+.ne 2
+.na
+\fB\fBadv_autoneg_cap\fR\fR
+.ad
+.RS 19n
+Enables (default) or disables IEEE 802.3 auto-negotiation of link speed and
+duplex settings. If enabled, the device negotiates among the supported (and
+configured, see below) link options with the link partner. If disabled, at
+least one of the link options below must be specified. The driver selects the
+first enabled link option according to the IEEE 802.3 specified preferences.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadv_1000fdx_cap\fR\fR
+.ad
+.RS 19n
+Enables the 1000 Mbps full-duplex link option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadv_1000hdx_cap\fR\fR
+.ad
+.RS 19n
+Enables the 1000 Mbps half-duplex link option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadv_100T4_cap\fR\fR
+.ad
+.RS 19n
+Enables the 100 BaseT4 link option. (Note that most hardware does not support
+this unusual link style. Also, this uses two pairs of wires for data, rather
+than one.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadv_100fdx_cap\fR\fR
+.ad
+.RS 19n
+Enables the 1000 Mbps full-duplex link option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadv_100hdx_cap\fR\fR
+.ad
+.RS 19n
+Enables the 1000 Mbps half-duplex link option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadv_10fdx_cap\fR\fR
+.ad
+.RS 19n
+Enables the 10 Base-T full-duplex link option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadv_10hdx_cap\fR\fR
+.ad
+.RS 19n
+Enables the 10 Base-T half-duplex link option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmtu\fR\fR
+.ad
+.RS 19n
+On most devices, can be set between 1500 (default) and 9000. This property can
+only be changed when the device is not in use.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/net/yge\fR\fR
+.ad
+.RS 27n
+Special network device
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/yge\fR\fR
+.ad
+.RS 27n
+32-bit driver binary (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/yge\fR\fR
+.ad
+.RS 27n
+64-bit driver binary (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/yge\fR\fR
+.ad
+.RS 27n
+64-bit driver binary (SPARC)
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86, SPARC
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR dlpi (4P),
+.BR attributes (7),
+.BR dladm (8)

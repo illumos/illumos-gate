@@ -781,9 +781,6 @@ $(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libsnmpplugin.so.1 \
 dir  path=usr/sbin
 file path=usr/sbin/prtpicl mode=0755
 $(sparc_ONLY)dir path=usr/share/man
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/picld.1m
-file path=usr/share/man/man1m/prtpicl.1m
 dir  path=usr/share/man/man3lib
 file path=usr/share/man/man3lib/libpicl.3lib
 file path=usr/share/man/man3lib/libpicltree.3lib
@@ -858,6 +855,9 @@ file path=usr/share/man/man3picltree/ptree_update_propval.3picltree
 link path=usr/share/man/man3picltree/ptree_update_propval_by_name.3picltree \
     target=ptree_update_propval.3picltree
 file path=usr/share/man/man3picltree/ptree_walk_tree_by_class.3picltree
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/picld.8
+file path=usr/share/man/man8/prtpicl.8
 legacy pkg=SUNWpiclr desc="PICL Framework init scripts" \
     name="PICL Framework (Root)"
 legacy pkg=SUNWpiclu \

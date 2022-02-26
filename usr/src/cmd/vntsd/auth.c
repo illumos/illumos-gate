@@ -45,7 +45,7 @@
  * such as 'root'); the group name in this example is "ldg1" :
  * solaris.vntsd.console-ldg1:::Access Specific LDoms Guest Console::
  *
- * Specific users are authorized with usermod(1M). To add an authorization
+ * Specific users are authorized with usermod(8). To add an authorization
  * (to /etc/user_attr) type a command similar to this (when user NOT
  * logged in):
  *

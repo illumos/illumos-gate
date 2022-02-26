@@ -446,7 +446,8 @@ No \fBPCMCIA\fR hardware installed.
 .SH CONTEXT
 These functions may be called from user or kernel context.
 .SH SEE ALSO
-\fBcsx_RegisterClient\fR(9F), \fBcsx_RequestConfiguration\fR(9F)
+.BR csx_RegisterClient (9F),
+.BR csx_RequestConfiguration (9F)
 .sp
 .LP
 \fIPC Card 95 Standard\fR, PCMCIA/JEIDA

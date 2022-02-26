@@ -1,0 +1,59 @@
+'\" te
+.\" Copyright (c) 1993, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PSEUDO 5 "Jun 15, 1993"
+.SH NAME
+pseudo \- configuration files for pseudo device drivers
+.SH DESCRIPTION
+.sp
+.LP
+Pseudo devices are devices that are implemented entirely in software. Drivers
+for pseudo devices must provide driver configuration files to inform the system
+of each pseudo device that should be created.
+.sp
+.LP
+Configuration files for pseudo device drivers must identify the parent driver
+explicitly as \fIpseudo,\fR and must create an integer property called
+\fIinstance\fR which is unique to this entry in the configuration file.
+.sp
+.LP
+Each entry in the configuration file creates a prototype devinfo node. Each
+node is assigned an instance number which is determined by the value of the
+\fIinstance\fR property. This property is only applicable to children of the
+\fIpseudo\fR parent, and is required since pseudo devices have no hardware
+address from which to determine the instance number. See \fBdriver.conf\fR(5)
+for further details of configuration file syntax.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample configuration file.
+.sp
+.LP
+Here is a configuration file called \fBramdisk.conf\fR for a pseudo device
+driver that implements a RAM disk. This file creates two nodes called
+"ramdisk". The first entry creates ramdisk node instance 0, and the second
+creates ramdisk node, instance 1, with the additional \fBdisk-size\fR property
+set to \fB512.\fR
+
+.sp
+.in +2
+.nf
+\fB#
+# Copyright (c) 1993, by Sun Microsystems, Inc.
+#
+#ident  "@(#)ramdisk.conf       1.3     93/06/04 SMI"
+name="ramdisk" parent="pseudo" instance=0;
+name="ramdisk" parent="pseudo" instance=1 disk-size=512;\fR
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+.BR driver.conf (5),
+.BR ddi_prop_op (9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

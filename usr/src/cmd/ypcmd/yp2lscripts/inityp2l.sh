@@ -293,7 +293,7 @@ HELP - The bind DN of the proxy user the ypserv to read or write
        to read and modify LDAP data. There is no default value. If
        the value ends with a comma, the value of the context for
        the current domain (as defined by a nisLDAPdomainContext
-       attribute (NISLDAPmapping(4))) is appended.
+       attribute (NISLDAPmapping(5))) is appended.
 
 EOF
     ;;
@@ -2030,8 +2030,8 @@ put_config_file_copyright_info
 
 echo "\
 #
-# Configuration file for ypserv(1M); see ypserv(4) for more information,
-# and NISLDAPmapping(4) for configuration of NIS to LDAP mapping.
+# Configuration file for ypserv(8); see ypserv(5) for more information,
+# and NISLDAPmapping(5) for configuration of NIS to LDAP mapping.
 
 # Unless otherwise noted, commented lines show default values.
 " >> $CONFIG_FILE
@@ -3746,7 +3746,7 @@ nisLDAPnameFields passwd: \
 #			
 # It is believed that 'min','max' and 'def' labels were reserved fields in 
 # SunOS 4.x and are now unused.  'always' and 'never' audit information is 
-# now contained in audit_user(4) so is now unused.
+# now contained in audit_user(5) so is now unused.
 #
 ' >> $MAP_FILE
 

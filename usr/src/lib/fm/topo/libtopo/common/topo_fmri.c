@@ -45,7 +45,7 @@
  * Topology node properties and method operations may be accessed by FMRI.
  * The FMRI used to perform property look-ups and method operations is
  * the FMRI contained in the matching topology node's protocol property
- * grouping for the resource property. The full range of fmd(1M)
+ * grouping for the resource property. The full range of fmd(8)
  * scheme plugin operations are supported as long as a backend method is
  * supplied by a scheme-specific enumerator or the enumerator module that
  * created the matching topology node.  Support for fmd scheme operations

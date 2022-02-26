@@ -1,0 +1,526 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Portions Copyright 1994-2008 The FreeBSD Project. All rights reserved.
+.\" Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 1. Redistributions of source code must retain the above copyright notice, this list of conditions and
+.\" the following disclaimer. 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.THIS SOFTWARE IS PROVIDED
+.\" BY THE AUTHOR AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+.\" SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+.\" OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.\" Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+.TH MOUNT_SMBFS 8 "November 22, 2021"
+.SH NAME
+mount_smbfs, umount_smbfs \- mount and unmount a shared resource from a CIFS
+file server
+.SH SYNOPSIS
+.nf
+\fB/sbin/mount\fR [\fB-F smbfs\fR] [\fIgeneric-options\fR] [\fB-o\fR \fIname\fR\fB=\fR\fIvalue\fR] [\fB-O\fR] \fIresource\fR
+.fi
+
+.LP
+.nf
+\fB/sbin/mount\fR [\fB-F smbfs\fR] [\fIgeneric-options\fR] [\fB-o\fR \fIname\fR\fB=\fR\fIvalue\fR] [\fB-O\fR] \fImount-point\fR
+.fi
+
+.LP
+.nf
+\fB/sbin/mount\fR [\fB-F smbfs\fR] [\fIgeneric-options\fR] [\fB-o\fR \fIname\fR\fB=\fR\fIvalue\fR]
+     [\fB-O\fR] \fIresource\fR \fImount-point\fR
+.fi
+
+.LP
+.nf
+\fB/sbin/umount\fR [\fB-F smbfs\fR] [\fIgeneric-options\fR] \fImount-point\fR
+.fi
+
+.SH DESCRIPTION
+The \fBmount\fR utility attaches a named resource, \fIresource\fR, to the file
+system hierarchy at the path name location, \fImount-point\fR, which must
+already exist.
+.sp
+.LP
+If \fImount-point\fR has any contents prior to the \fBmount\fR operation, those
+contents remain hidden until the resource is unmounted. An authorized user with
+the \fBSYS_MOUNT\fR privilege can perform a \fBmount\fR operation. Also, a user
+can perform SMBFS mount operations on a directory the user owns.
+.sp
+.LP
+If the resource is listed in the \fB/etc/vfstab\fR file, you can specify either
+\fIresource\fR or \fImount-point\fR as the \fBmount\fR command will consult the
+\fB/etc/vfstab\fR file for more information. If the \fB-F\fR option is omitted,
+\fBmount\fR takes the file system type from the entry in the \fB/etc/vfstab\fR
+file.
+.sp
+.LP
+If the resource is not listed in the \fB/etc/vfstab\fR file, the command line
+must specify both \fIresource\fR and \fImount-point\fR.
+.sp
+.LP
+The \fBumount\fR utility detaches a mounted file system from the file system
+hierarchy. An authorized user with the \fBSYS_MOUNT\fR privilege can perform a
+\fBumount\fR operation. Also, a user can perform SMBFS unmount operations on a
+directory the user owns.
+.sp
+.LP
+The \fBnetwork/smb/client\fR service must be enabled to successfully mount a
+CIFS share. This service is enabled, by default.
+.sp
+.LP
+To enable the service, enter the following \fBsvcadm\fR(8) command:
+.sp
+.in +2
+.nf
+# \fBsvcadm enable network/smb/client\fR
+.fi
+.in -2
+.sp
+
+.SS "Operands"
+The \fBmount\fR command supports the following operands:
+.sp
+.ne 2
+.na
+\fB\fIresource\fR
+//[\fIworkgroup\fR;][\fIuser\fR[:\fIpassword\fR]@]\fIserver\fR/\fIshare\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.LP
+The name of the resource to be mounted. In addition to its name, you can
+specify the following information about the resource:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIpassword\fR is the password associated with \fIuser\fR. If \fIpassword\fR is
+not specified, the mount first attempts to use the password stored by the
+\fBsmbutil login\fR command (if any). If that password fails to authenticate,
+the \fBmount_smbfs\fR prompts you for a password.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIserver\fR is the DNS or NetBIOS name of the remote computer.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIshare\fR is the resource name on the remote server.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIuser\fR is the remote user name. If \fIuser\fR is omitted, the logged in
+user ID is used.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIworkgroup\fR is the name of the workgroup or the Windows domain in which the
+user name is defined.
+.sp
+If the resource includes a workgroup, you must escape the semicolon that
+appears after the workgroup name to prevent it from being interpreted by the
+command shell. For instance, surround the entire resource name with double
+quotes: \fBmount -F smbfs "//SALES;george@RSERVER" /mnt\fR.
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fImount-point\fR\fR
+.ad
+.sp .6
+.RS 4n
+The path to the location where the file system is to be mounted or unmounted.
+The \fBmount\fR command maintains a table of mounted file systems in the
+\fB/etc/mnttab\fR file. See the \fBmnttab\fR(5) man page.
+.RE
+
+.SH OPTIONS
+See the \fBmount\fR(8) man page for the list of supported
+\fIgeneric-options\fR.
+.sp
+.ne 2
+.na
+\fB\fB-o\fR \fIname\fR\fB=\fR\fIvalue\fR or\fR
+.ad
+.br
+.na
+\fB\fB-o\fR \fIname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the file system-specific properties. You can specify more than one
+name-value pair as a list of comma-separated pairs. No spaces are permitted in
+the list. The properties are as follows:
+
+.sp
+.ne 2
+.na
+\fB\fBacl\fR|\fBnoacl\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable (or disable) presentation of Access Control Lists (ACLs)
+on files and directories under this \fBsmbfs\fR(4FS) mount.
+The default behavior is \fBnoacl\fR, which presents files and
+directories as owned by the owner of the mount point and having
+permissions based on \fBfileperms\fR or \fBdirperms\fR.
+With the \fBacl\fR mount option, files are presented with ACLs
+obtained from the SMB server.
+Setting the \fBacl\fR mount option is not advised unless the system
+is joined to an Active Directory domain and using \fBldap\fR(1)
+so it can correctly present ACL identities from the SMB server.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdirperms=\fR\fIoctaltriplet\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the permissions to be assigned to directories. The value must be
+specified as an octal triplet, such as \fB755\fR. The default value for the
+directory mode is taken from the \fBfileperms\fR setting, with execute
+permission added where \fBfileperms\fR has read permission.
+.sp
+Note that these permissions have no relation to the rights granted by the CIFS
+server.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfileperms=\fR\fIoctaltriplet\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the permissions to be assigned to files. The value must be specified
+as an octal triplet, such as \fB644\fR. The default value is \fB700\fR.
+.sp
+Note that these permissions have no relation to the rights granted by the CIFS
+server.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBgid=\fR\fIgroupid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Assigns the specified group ID to files. The default value is the group ID of
+the directory where the volume is mounted.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBintr\fR|\fBnointr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable (or disable) cancellation of \fBsmbfs\fR(4FS) I/O operations when the
+user interrupts the calling thread (for example, by hitting Ctrl-C while an
+operation is underway). The default is \fBintr\fR (interruption enabled), so
+cancellation is normally allowed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnoprompt\fR\fR
+.ad
+.sp .6
+.RS 4n
+Suppresses the prompting for a password when mounting a share. This property
+enables you to permit anonymous access to a share. Anonymous access does not
+require a password.
+.sp
+The \fBmount\fR operation fails if a password is required, the \fBnoprompt\fR
+property is set, and no password is stored by the \fBsmbutil login\fR command.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBretry_count=\fR\fInumber\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the number of SMBFS retries to attempt before the connection is
+marked as broken. By default, 4 attempts are made.
+.sp
+The \fBretry_count\fR property value set by the \fBmount\fR command overrides
+the global value set in SMF or the value set in your \fB\&.nsmbrc\fR file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtimeout=\fR\fIseconds\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the CIFS request timeout. By default, the timeout is 15 seconds.
+.sp
+The \fBtimeout\fR property value set by the \fBmount\fR command overrides the
+global value set in SMF or the value set in your \fB\&.nsmbrc\fR file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBuid=\fR\fIuserid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Assigns the specified user ID files. The default value is the owner ID of the
+directory where the volume is mounted.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBxattr\fR|\fBnoxattr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable (or disable) Solaris Extended Attributes in this mount point. This
+option defaults to \fBxattr\fR (enabled Extended Attributes), but note: if the
+CIFS server does not support CIFS "named streams", \fBsmbfs\fR(4FS) forces this
+option to \fBnoxattr\fR. When a mount has the \fBnoxattr\fR option, attempts to
+use Solaris Extended attributes fail with EINVAL.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-O\fR\fR
+.ad
+.sp .6
+.RS 4n
+Overlays mount. Allow the file system to be mounted over an existing mount
+point, making the underlying file system inaccessible. If a mount is attempted
+on a pre-existing mount point without setting this flag, the mount fails,
+producing the error "device busy."
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRMounting an SMBFS Share
+.sp
+.LP
+The following example shows how to mount the \fB/tmp\fR share from the
+\fBnano\fR server in the \fBSALES\fR workgroup on the local \fB/mnt\fR mount
+point. You must supply the password for the \fBroot\fR user to successfully
+perform the mount operation.
+
+.sp
+.in +2
+.nf
+# \fBmount -F smbfs "//SALES;root@nano.example.org/tmp" /mnt\fR
+Password:
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRVerifying That an SMBFS File System Is Mounted
+.sp
+.LP
+The following example shows how to mount the \fB/tmp\fR share from the
+\fBnano\fR server on the local \fB/mnt\fR mount point. You must supply the
+password for the \fBroot\fR user to successfully perform the mount operation.
+
+.sp
+.in +2
+.nf
+# \fBmount -F smbfs //root@nano.example.org/tmp /mnt\fR
+Password:
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+You can verify that the share is mounted in the following ways:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+View the file system entry in the \fB/etc/mnttab\fR file.
+.sp
+.in +2
+.nf
+# \fBgrep root /etc/mnttab\fR
+//root@nano.example.org/tmp   /mnt    smbfs   dev=4900000     1177097833
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+View the output of the \fBmount\fR command.
+.sp
+.in +2
+.nf
+# \fBmount | grep root\fR
+/mnt on //root@nano.example.org/tmp read/write/setuid/devices/dev=4900000 on
+Fri Apr 20 13:37:13 2007
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+View the output of the \fBdf /mnt\fR command.
+.sp
+.in +2
+.nf
+# \fBdf /mnt\fR
+/mnt               (//root@nano.example.org/tmp): 3635872 blocks       -1 files
+.fi
+.in -2
+.sp
+
+.RE
+.sp
+.LP
+Obtain information about the mounted share by viewing the output of the \fBdf
+-k /mnt\fR command.
+
+.sp
+.in +2
+.nf
+# \fBdf -k /mnt\fR
+Filesystem            kbytes    used   avail capacity  Mounted on
+//root@nano.example.org/tmp
+                      1882384   64448 1817936     4%    /mnt
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRUnmounting a CIFS Share
+.sp
+.LP
+This example assumes that a CIFS share has been mounted on the \fB/mnt\fR mount
+point. The following command line unmounts the share from the mount point.
+
+.sp
+.in +2
+.nf
+# \fBumount /mnt\fR
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/mnttab\fR\fR
+.ad
+.sp .6
+.RS 4n
+Table of mounted file systems.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/dfs/fstypes\fR\fR
+.ad
+.sp .6
+.RS 4n
+Default distributed file system type.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/vfstab\fR\fR
+.ad
+.sp .6
+.RS 4n
+Table of automatically mounted resources.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$HOME/.nsmbrc\fR\fR
+.ad
+.sp .6
+.RS 4n
+User-settable mount point configuration file to store the description for each
+connection.
+.RE
+
+.SH ATTRIBUTES
+See the \fBattributes\fR(7) man page for descriptions of the following
+attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.BR ldap (1),
+.BR smbutil (1),
+.BR acl (2),
+.BR fcntl (2),
+.BR link (2),
+.BR mknod (2),
+.BR mount (2),
+.BR symlink (2),
+.BR umount (2),
+.BR pcfs (4FS),
+.BR smbfs (4FS),
+.BR mnttab (5),
+.BR nsmbrc (5),
+.BR vfstab (5),
+.BR attributes (7),
+.BR mount (8),
+.BR mountall (8),
+.BR svcadm (8)
+.SH AUTHORS
+This manual page contains material originally authored by Boris Popov,
+\fBbpATbutya.kz\fR, \fBbpATFreeBSD.org\fR.
+.SH NOTES
+The Solaris CIFS client always attempts to use \fBgethostbyname()\fR to resolve
+host names. If the host name cannot be resolved, the CIFS client uses NetBIOS
+name resolution (NBNS). By default, the Solaris CIFS client permits the use of
+NBNS to enable Solaris CIFS clients in Windows environments to work without
+additional configuration.
+.sp
+.LP
+Since NBNS has been exploited in the past, you might want to disable it. To
+disable NBNS, set the \fBnbns-enabled\fR service management facility property
+to \fBfalse\fR. By default, \fBnbns-enabled\fR is set to \fBtrue\fR.
+.sp
+.LP
+If the directory on which a file system is to be mounted is a symbolic link,
+the file system is mounted on the directory to which the symbolic link refers,
+rather than being mounted on top of the symbolic link itself.

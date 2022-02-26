@@ -30,7 +30,7 @@ directories.
 .sp
 .LP
 The \fBsetfacl\fR utility can only manipulate POSIX-draft \fBACL\fRs.  See
-\fBacl\fR(5) for a description of the difference between the older POSIX-draft
+\fBacl\fR(7) for a description of the difference between the older POSIX-draft
 \fBACL\fRs and the newer NFSv4 \fBACL\fRs.  The \fBchmod\fR(1) utility can
 be used to manipulate \fBACL\fRs on all types of file system.
 .sp
@@ -370,6 +370,12 @@ group file
 .RE
 
 .SH SEE ALSO
-\fBchmod\fR(1), \fBgetfacl\fR(1), \fBumask\fR(1), \fBaclcheck\fR(3SEC),
-\fBaclsort\fR(3SEC), \fBgroup\fR(4), \fBpasswd\fR(4), \fBacl\fR(5),
-\fBattributes\fR(5)
+.BR chmod (1),
+.BR getfacl (1),
+.BR umask (1),
+.BR aclcheck (3SEC),
+.BR aclsort (3SEC),
+.BR group (5),
+.BR passwd (5),
+.BR acl (7),
+.BR attributes (7)

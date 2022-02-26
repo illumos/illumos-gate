@@ -302,37 +302,37 @@ reportlogerror(int ret, char *mp, char *special, char *cmd, fiolog_t *flp)
 		(void) fprintf(stderr, gettext("Solaris Volume Manager logging"
 		" is already enabled.\n"));
 		(void) fprintf(stderr, gettext("Please see the"
-		" commands metadetach(1M)"
-		" or metaclear(1M).\n"));
+		" commands metadetach(8)"
+		" or metaclear(8).\n"));
 		break;
 	case FIOLOG_EROFS :
 		(void) fprintf(stderr, gettext("File system is mounted read "
 		"only.\n"));
 		(void) fprintf(stderr, gettext("Please see the remount "
-		"option described in mount_ufs(1M).\n"));
+		"option described in mount_ufs(8).\n"));
 		break;
 	case FIOLOG_EULOCK :
 		(void) fprintf(stderr, gettext("File system is locked.\n"));
 		(void) fprintf(stderr, gettext("Please see the -u option "
-		"described in lockfs(1M).\n"));
+		"described in lockfs(8).\n"));
 		break;
 	case FIOLOG_EWLOCK :
 		(void) fprintf(stderr, gettext("The file system could not be"
 		" write locked.\n"));
 		(void) fprintf(stderr, gettext("Please see the -w option "
-		"described in lockfs(1M).\n"));
+		"described in lockfs(8).\n"));
 		break;
 	case FIOLOG_ECLEAN :
 		(void) fprintf(stderr, gettext("The file system may not be"
 		" stable.\n"));
 		(void) fprintf(stderr, gettext("Please see the -n option"
-		" for fsck(1M).\n"));
+		" for fsck(8).\n"));
 		break;
 	case FIOLOG_ENOULOCK :
 		(void) fprintf(stderr, gettext("The file system could not be"
 		" unlocked.\n"));
 		(void) fprintf(stderr, gettext("Please see the -u option "
-		"described in lockfs(1M).\n"));
+		"described in lockfs(8).\n"));
 		break;
 	default :
 		(void) fprintf(stderr, gettext("Unknown internal error"

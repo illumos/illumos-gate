@@ -94,7 +94,7 @@ startd_fork1(int *forkerr)
 
 /*
  * void fork_mount(char *, char *)
- *   Run mount(1M) with the given options and mount point.  (mount(1M) has much
+ *   Run mount(8) with the given options and mount point.  (mount(8) has much
  *   hidden knowledge; it's much less correct to reimplement that logic here to
  *   save a fork(2)/exec(2) invocation.)
  */
@@ -116,7 +116,7 @@ fork_mount(char *path, char *opts)
 		(void) waitpid(pid, &status, 0);
 
 		/*
-		 * If our mount(1M) invocation exited by peculiar means, or with
+		 * If our mount(8) invocation exited by peculiar means, or with
 		 * a non-zero status, our mount likelihood is low.
 		 */
 		if (!WIFEXITED(status) ||
@@ -183,8 +183,8 @@ fork_common(const char *name, const char *svc_fmri, int retries, ctid_t *ctidp,
 	for (pid = fork1(); pid == -1; pid = fork1()) {
 		if (++tries > retries) {
 			/*
-			 * When we exit the sulogin session, init(1M)
-			 * will restart svc.startd(1M).
+			 * When we exit the sulogin session, init(8)
+			 * will restart svc.startd(8).
 			 */
 			err = errno;
 			(void) ct_tmpl_clear(ctfd);
@@ -217,7 +217,7 @@ fork_common(const char *name, const char *svc_fmri, int retries, ctid_t *ctidp,
  *   is ended, we continue.  This is the last fallback action for system
  *   maintenance.
  *
- *   If immediate is true, fork_sulogin() executes sulogin(1M) directly, without
+ *   If immediate is true, fork_sulogin() executes sulogin(8) directly, without
  *   forking.
  *
  *   Because fork_sulogin() is needed potentially before we daemonize, we leave

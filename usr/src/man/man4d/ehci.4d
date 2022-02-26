@@ -1,0 +1,320 @@
+'\" te
+.\" Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH EHCI 4D "Jan 10, 2020"
+.SH NAME
+ehci \- Enhanced host controller driver
+.SH SYNOPSIS
+.nf
+\fBusb@unit-address\fR
+.fi
+
+.SH DESCRIPTION
+The \fBehci\fR driver is a USBA (Solaris USB Architecture) compliant nexus
+driver that supports the Enhanced Host Controller Interface Specification 2.0,
+an industry standard developed by Intel.
+.sp
+.LP
+A USB 2.0 host controller includes one high-speed host controller and zero or
+more USB 1.1 host controllers. The high-speed host controller implements an
+EHCI (Enhanced Host Controller Interface) that is used for all high-speed
+communications to high-speed-mode devices.
+.sp
+.LP
+All USB 2.0 devices connected to the root ports of the USB 2.0 host
+controller and all devices connected to a high-speed-mode hub should be routed
+to the EHCI host controller.
+.sp
+.LP
+All full- and low-speed devices connected to the root ports of the USB 2.0 host
+controller should be routed to the companion USB 1.1 host controllers. (OHCI or
+UHCI host controller).
+.sp
+.LP
+The \fBehci\fR supports bulk, interrupt, control and isochronous transfers
+(on USB1.\fIx\fR devices behind a USB2.0 hub).
+.SH FILES
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/ehci\fR\fR
+.ad
+.RS 28n
+Device driver (SPARC)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/ehci\fR\fR
+.ad
+.RS 28n
+Device driver (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/ehci.conf\fR\fR
+.ad
+.RS 28n
+Driver configuration file
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86, PCI-based systems
+.TE
+
+.SH SEE ALSO
+.BR hubd (4D),
+.BR ohci (4D),
+.BR uhci (4D),
+.BR usba (4D),
+.BR attributes (7),
+.BR add_drv (8),
+.BR prtconf (8),
+.BR rem_drv (8),
+.BR update_drv (8)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIUniversal Serial Bus Specification 2.0\fR
+.sp
+.LP
+\fIEnhanced Host Controller Interface Specification 1.0\fR
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.sp
+.LP
+\fIhttp://www.usb.org\fR
+.sp
+.LP
+\fIhttp://www.intel.com/technology/usb/ehcispec.htm\fR
+.SH DIAGNOSTICS
+In addition to being logged, the following messages may appear on the system
+console. All messages are formatted in the following manner:
+.sp
+.in +2
+.nf
+WARNING: <device path> (ehci<instance number>): Message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBUnrecoverable USB hardware error.\fR
+.ad
+.sp .6
+.RS 4n
+There was an unrecoverable USB hardware error reported by the \fBehci\fR
+controller. Reboot the system. If this problem persists, contact your system
+vendor.
+.RE
+
+.sp
+.ne 2
+.na
+\fBNo SOF interrupts.\fR
+.ad
+.br
+.na
+\fB\fR
+.ad
+.sp .6
+.RS 4n
+No SOF interrupts have been received. This USB EHCI controller is unusable.
+.RE
+
+.sp
+.ne 2
+.na
+\fBError recovery failure: Please hotplug the 2.0 hub at <device path>.\fR
+.ad
+.sp .6
+.RS 4n
+The driver failed to clear 2.0 hub's TT buffer. Remove and reinsert the
+external USB2.0 hub.
+.RE
+
+.sp
+.ne 2
+.na
+\fBRevision<xx> is not supported.\fR
+.ad
+.sp .6
+.RS 4n
+High speed USB devices prior to revision 0.95 are not supported.
+.RE
+
+.sp
+.LP
+The following messages may be entered into the system log. They are formatted
+in the following manner:
+.sp
+.in +2
+.nf
+<device path> (ehci<instance number>): Message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBUnable to take control from BIOS. Failure is ignored.\fR
+.ad
+.sp .6
+.RS 4n
+The driver was unable to take control of the EHCI hardware from the system's
+BIOS. This failure is ignored. To abort the attach on this take-over failure,
+comment out a property in ehci.conf. (x86 only).
+.RE
+
+.sp
+.ne 2
+.na
+\fBUnable to take control from BIOS.\fR
+.ad
+.sp .6
+.RS 4n
+The driver is unable to take control of the EHCI hardware from the
+system's BIOS and aborts the attach. High speed (USB 2.0) support is disabled.
+In this case, all USB devices run at full/low speed. Contact your system vendor
+or your system administrator for possible changes in BIOS settings. You can
+disable a property in \fBehci.conf\fR to ignore this failure. (x86 only.)
+.RE
+
+.sp
+.ne 2
+.na
+\fBLow speed device is not supported.\fR
+.ad
+.br
+.na
+\fBFull speed device is not supported.\fR
+.ad
+.sp .6
+.RS 4n
+The driver detected a low or full speed device on its root hub port. Per USB
+2.0 specification, the device should be routed to a companion host controller
+(OHCI or UHCI). However, no attached companion host controller appears to be
+available. Therefore, low and full speed devices are not supported.
+.RE
+
+.sp
+.ne 2
+.na
+\fBLow speed endpoint's poll interval of <n> ms is below threshold. Rounding up
+to 8 ms.\fR
+.ad
+.sp .6
+.RS 4n
+Low speed endpoints are limited to polling intervals between 8 ms and 255 ms.
+If a device reports a polling interval that is less than 8 ms, the driver uses
+8 ms instead.
+.RE
+
+.sp
+.ne 2
+.na
+\fBLow speed endpoint's poll interval is greater than 255 ms.\fR
+.ad
+.sp .6
+.RS 4n
+The low speed device's polling interval is out of range. The host controller
+does not allocate bandwidth for this device. This device is not usable.
+.RE
+
+.sp
+.ne 2
+.na
+\fBFull speed endpoint's poll interval must be between 1 and 255 ms.\fR
+.ad
+.sp .6
+.RS 4n
+The full speed device's polling interval is out of range. The host controller
+does not allocate bandwidth for this device. This device is not usable.
+.RE
+
+.sp
+.ne 2
+.na
+\fBHigh speed endpoint's poll interval must be between 1 and 16 units.\fR
+.ad
+.sp .6
+.RS 4n
+The high speed device's polling interval is out of range. The host controller
+will not allocate bandwidth for this device. This device will not be usable.
+Refer to the USB specification, revision 2.0 for the unit definition.
+.RE
+
+.sp
+.ne 2
+.na
+\fBehci_modify_qh_status_bit: Failed to halt qh=<address>.\fR
+.ad
+.sp .6
+.RS 4n
+Error recovery failed. Please disconnect and reinsert all devices or reboot.
+.RE
+
+.LP
+Note -
+.sp
+.RS 2
+Due to recently discovered incompatibilities with this USB controller,
+USB2.\fIx\fR transfer support has been disabled. However, this device continues
+to function as a USB1.\fIx\fR controller. Information on enabling USB2.x
+support is provided in this man page.
+.LP
+VIA chips may not be compatible with this driver. To bind \fBehci\fR
+specifically to the chip and eliminate the warnings, and to enable USB2.x
+support, a new, more specific driver alias (refer to \fBadd_drv\fR(8) and
+\fBupdate_drv\fR(8)) must be specified for \fBehci\fR. By default, the
+\fBehci\fR alias is 'pciclass,0c0320.' The compatible names in the
+\fBprtconf\fR(8) output provides additional aliases. For example:
+.RE
+.sp
+.in +2
+.nf
+   # prtconf -vp | grep pciclass,0c0320
+        compatible: 'pci1106,3104.1106.3104.2063' +
+\&'pci1106,3104.1106.3104' + 'pci1106,3104' +
+ pci1106,3104.2063' + 'pci1106,3104' + 'pciclass,0c0320' +
+\&'pciclass,0c03'
+         ....
+
+
+       A more specific alias is 'pci1106,3104.' Perform the follow-
+       ing step to add this alias, then reboot the system:
+
+
+       # update_drv -a -i '"pci1106,3104"' ehci
+
+       # reboot
+.fi
+.in -2
+
+.sp
+.LP
+After you apply the above workaround, the following message is displayed in
+your system log:
+.sp
+.LP
+Applying VIA workarounds.

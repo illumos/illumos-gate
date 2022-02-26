@@ -685,7 +685,7 @@ daemon_init()
 	vrrp_log(VRRP_DBG0, "daemon_init()");
 
 	if (getenv("SMF_FMRI") == NULL) {
-		vrrp_log(VRRP_ERR, "daemon_init(): vrrpd is an smf(5) managed "
+		vrrp_log(VRRP_ERR, "daemon_init(): vrrpd is an smf(7) managed "
 		    "service and should not be run from the command line.");
 		return (-1);
 	}

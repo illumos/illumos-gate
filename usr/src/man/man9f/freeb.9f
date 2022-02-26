@@ -64,8 +64,11 @@ See \fBcopyb\fR(9F) for an example of using \fBfreeb()\fR.
 .SH SEE ALSO
 .sp
 .LP
-\fBallocb\fR(9F), \fBcopyb\fR(9F), \fBdupb\fR(9F), \fBesballoc\fR(9F),
-\fBfree_rtn\fR(9S)
+.BR allocb (9F),
+.BR copyb (9F),
+.BR dupb (9F),
+.BR esballoc (9F),
+.BR free_rtn (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

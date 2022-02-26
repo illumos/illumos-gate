@@ -157,9 +157,14 @@ invoked in interrupt context at level 7.
 .in -2
 
 .SH SEE ALSO
-\fBcv_timedwait\fR(9F), \fBddi_intr_get_pri\fR(9F),
-\fBddi_periodic_delete\fR(9F), \fBddi_intr_get_softint_pri\fR(9F),
-\fBqtimeout\fR(9F), \fBquntimeout\fR(9F), \fBtimeout\fR(9F), \fBuntimeout\fR(9F)
+.BR cv_timedwait (9F),
+.BR ddi_intr_get_pri (9F),
+.BR ddi_intr_get_softint_pri (9F),
+.BR ddi_periodic_delete (9F),
+.BR qtimeout (9F),
+.BR quntimeout (9F),
+.BR timeout (9F),
+.BR untimeout (9F)
 .SH NOTES
 The caller must specify \fIinterval\fR as an even, non-zero multiple of 10ms.
 No other values are supported at this time. The interval specified is a lower

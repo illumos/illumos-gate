@@ -1,0 +1,204 @@
+'\" te
+.\" Copyright (c) 2007 by Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SFE 4D "Dec 12, 2007"
+.SH NAME
+sfe \- SiS900 series Fast Ethernet device driver
+.SH SYNOPSIS
+.LP
+.nf
+\fB/dev/sfe\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsfe\fR driver is a loadable, clonable, GLD-based  STREAMS driver
+supporting the Data Link Provider Interface \fBdlpi\fR(4P) on Silicon
+Integrated Systems 900 series Fast Ethernet controllers.
+.SH APPLICATION PROGRAMMING INTERFACE
+.sp
+.LP
+The relevant fields returned as part of a \fBDL_INFO_ACK\fR response are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum SDU is 1500.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Minimum SDU is 0.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The dlsap address length is 8.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+MAC type is \fBDL_ETHER\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+SAP length is -2. The 6-byte physical address is followed immediately by a
+2-byte SAP.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Service mode is \fBDL_CLDLS\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Broadcast address is the 6-byte Ethernet broadcast address
+(\fBff:ff:ff:ff:ff:ff\fR).
+.RE
+.sp
+.LP
+If the SAP provided is zero, then \fIIEEE 802.3\fR mode is assumed and outbound
+frames will have the frame payload length written into the type field.
+Likewise, inbound frames with a SAP between zero and 1500 are interpreted as
+\fIIEEE 802.3\fR frames and delivered to any streams that are bound to SAP zero
+(the \fI802.3\fR SAP).
+.SH PROPERTIES
+.sp
+.LP
+The following properties  may  be  configured  using  either \fBndd\fR(8) or
+the \fBsfe.conf\fR configuration file as described by \fBdriver.conf\fR(5):
+.sp
+.ne 2
+.na
+\fB\fBadv_100fdx_cap\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables the 100 Base TX full-duplex link option. (This is generally the fastest
+mode if both link partners support it. Most modern equipment supports this
+mode.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadv_100hdx_cap\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables the 100 Base TX half-duplex link option. (Typically used when the link
+partner is a 100 Mbps hub.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadv_10fdx_cap\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables the 10 Base-T full-duplex link option.  (This less-frequently used mode
+is typically used when the link partner is a 10 Mbps switch.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadv_10hdx_cap\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables the 10 Base-T half-duplex link option.  (This is the fall-back when no
+other option is available.  It is typically used when the link partner is a 10
+Mbps hub or is an older network card.)
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability 	Committed
+.TE
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/sfe\fR\fR
+.ad
+.sp .6
+.RS 4n
+Special character device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sfe\fR\fR
+.ad
+.sp .6
+.RS 4n
+32-bit driver binary (x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/sfe\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit driver binary (x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/sfe\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit driver binary (SPARC).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sfe.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+Configuration file.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR streamio (4I),
+.BR dlpi (4P),
+.BR driver.conf (5),
+.BR attributes (7),
+.BR ndd (8)
+.sp
+.LP
+\fIIEEE 802.3\fR \(em Institute of Electrical and Electronics Engineers, 2002

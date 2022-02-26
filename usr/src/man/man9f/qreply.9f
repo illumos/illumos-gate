@@ -96,8 +96,11 @@ bit is off, then the message is freed (line 15). See the example for
 .SH SEE ALSO
 .sp
 .LP
-\fBput\fR(9E), \fBsrv\fR(9E), \fBflushq\fR(9F), \fBOTHERQ\fR(9F),
-\fBputnext\fR(9F)
+.BR put (9E),
+.BR srv (9E),
+.BR OTHERQ (9F),
+.BR flushq (9F),
+.BR putnext (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

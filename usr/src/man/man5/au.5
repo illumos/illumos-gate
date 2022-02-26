@@ -1,0 +1,213 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH AU 5 "Jan 15, 2001"
+.SH NAME
+au \- AU audio file format
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <audio/au.h>\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+An AU audio file is composed of three parts: a header, an optional description
+field, and a contiguous segment of audio data. The header is 24 bytes, and the
+description field is at least 4 bytes. Therefore, the offset for most AU files
+is 28 bytes. However, some people store additional data in the AU header.
+.sp
+.LP
+The AU audio structure members and audio data are stored big endian. That is,
+it starts with the most significant byte, regardless of the native byte order
+of the machine architecture on which an application may be running. Therefore,
+multi-byte audio data may require byte reversal for proper playback on
+different processor architectures. See the macro section for properly reading
+and writing the AU audio structure members.
+.sp
+.LP
+The AU header is defined by the following structure:
+.sp
+.in +2
+.nf
+struct au_filehdr {
+   uint32_t au_magic;       /* magic number (.snd) */
+   uint32_t au_offset;      /* byte offset to start of audio data */
+   uint32_t au_data_size;   /* data length in bytes */
+   uint32_t au_encoding;    /* data encoding */
+   uint32_t au_sample_rate; /* samples per second */
+   uint32_t au_channels;    /* number of interleaved channels */
+};
+typedef struct au_filehdr au_filehdr_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBau_magic\fR field always contains the following constant for an AU audio
+file:
+.sp
+.in +2
+.nf
+AUDIO_AU_FILE_MAGIC   ( 0x2e736e64 ) /* ".snd" */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBau_offset\fR field contains the length of the audio file header plus the
+variable length info field. Consequently, it can be interpreted as the offset
+from the start of the file to the start of the audio data.
+.sp
+.LP
+The \fBau_data_size\fR field contains the length, in bytes, of the audio data
+segment. If this length is not known when the header is written, it should be
+set to \fBAUDIO_AU_UNKNOWN_SIZE\fR, defined as follows:
+.sp
+.in +2
+.nf
+AUDIO_AU_UNKNOWN_SIZE  ( ~0 )       /* (unsigned) -1 */
+.fi
+.in -2
+
+.sp
+.LP
+When the \fBau_data_size\fR field contains \fBAUDIO_AU_UNKNOWN_SIZE\fR, the
+length of the audio data can be determined by subtracting \fBau_offset\fR from
+the total length of the file.
+.sp
+.LP
+The encoding field contains one of the following enumerated keys:
+.sp
+.in +2
+.nf
+AUDIO_AU_ENCODING_ULAW         /* 8-bit u-law */
+AUDIO_AU_ENCODING_LINEAR_8     /* 8-bit linear PCM */
+AUDIO_AU_ENCODING_LINEAR_16    /* 16-bit linear PCM */
+AUDIO_AU_ENCODING_LINEAR_24    /* 24-bit linear PCM */
+AUDIO_AU_ENCODING_LINEAR_32    /* 32-bit linear PCM */
+AUDIO_AU_ENCODING_FLOAT        /* Floating point */
+AUDIO_AU_ENCODING_DOUBLE       /* Double precision float */
+AUDIO_AU_ENCODING_FRAGMENTED   /* Fragmented sample data */
+AUDIO_AU_ENCODING_DSP          /* DSP program */
+AUDIO_AU_ENCODING_FIXED_8      /* 8-bit fixed point */
+AUDIO_AU_ENCODING_FIXED_16     /* 16-bit fixed point */
+AUDIO_AU_ENCODING_FIXED_24     /* 24-bit fixed point */
+AUDIO_AU_ENCODING_FIXED_32     /* 32-bit fixed point */
+AUDIO_AU_ENCODING_EMPHASIS     /* 16-bit linear with emphasis */
+AUDIO_AU_ENCODING_COMPRESSED   /* 16-bit linear compressed */
+AUDIO_AU_ENCODING_EMP_COMP     /* 16-bit linear with emphasis
+                                              and compression */
+AUDIO_AU_ENCODING_MUSIC_KIT    /* Music kit DSP commands */
+AUDIO_AU_ENCODING_ADPCM_G721   /* CCITT G.721 ADPCM */
+AUDIO_AU_ENCODING_ADPCM_G722   /* CCITT G.722 ADPCM */
+AUDIO_AU_ENCODING_ADPCM_G723_3 /* CCITT G.723.3 ADPCM */
+AUDIO_AU_ENCODING_ADPCM_G723_5 /* CCITT G.723.5 ADPCM */
+AUDIO_AU_ENCODING_ALAW         /* 8-bit A-law G.711 */
+.fi
+.in -2
+
+.sp
+.LP
+All of the linear encoding formats are signed integers centered at zero.
+.sp
+.LP
+The \fBau_sample_rate\fR field contains the audio file's sampling rate in
+samples per second. Some common sample rates include 8000, 11025, 22050, 44100,
+and 48000 samples per second.
+.sp
+.LP
+The \fBau_channels\fR field contains the number of interleaved data channels.
+For monaural data, this value is set to one. For stereo data, this value is set
+to two. More than two data channels can be interleaved, but such formats are
+currently unsupported by the Solaris audio driver architecture. For a stereo
+sound file, the first sample is the left track and the second sample is the
+right track.
+.sp
+.LP
+The optional info field is a variable length annotation field that can be
+either text or data. If it is a text description of the sound, then it should
+be NULL terminated. However, some older files might not be terminated properly.
+The size of the info field is set when the structure is created and cannot be
+enlarged later.
+.SS "Macros"
+.sp
+.LP
+Accessing all of the AU audio structure members should be done through the
+supplied \fBAUDIO_AU_FILE2HOST\fR and \fBAUDIO_AU_HOST2FILE\fR macros. By
+always using these macros, code will be byte-order independent. See the example
+below.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDisplaying Header Information for a Sound File
+.sp
+.LP
+The following program reads and displays the header information for an AU sound
+file. The \fBAUDIO_AU_FILE2HOST\fR macro ensures that this information will
+always be in the proper byte order.
+
+.sp
+.in +2
+.nf
+void main(void)
+{
+     au_filehdr_t    hdr;
+     au_filehdr_t    local;
+     int             fd;
+     char            *name = "bark.au";
+
+     if ((fd = open(name, O_RDONLY)) < 0) {
+          printf("can't open file %s\en", name);
+     exit(1);
+     }
+
+     (void) read(fd, &hdr, sizeof (hdr));
+
+     AUDIO_AU_FILE2HOST(&hdr.au_magic, &local.au_magic);
+     AUDIO_AU_FILE2HOST(&hdr.au_offset, &local.au_offset);
+     AUDIO_AU_FILE2HOST(&hdr.au_data_size, &local.au_data_size);
+     AUDIO_AU_FILE2HOST(&hdr.au_encoding, &local.au_encoding);
+     AUDIO_AU_FILE2HOST(&hdr.au_sample_rate, &local.au_sample_rate);
+     AUDIO_AU_FILE2HOST(&hdr.au_channels, &local.au_channels);
+
+     printf("Magic = %x\en", local.au_magic);
+     printf("Offset = %d\en", local.au_offset);
+     printf("Number of data bytes = %d\en", local.au_data_size);
+     printf("Sound format = %d\en", local.au_encoding);
+     printf("Sample rate = %d\en", local.au_sample_rate);
+     printf("Number of channels = %d\en", local.au_channels);
+
+     (void) close(fd);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability Level	Evolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR attributes (7)
+.SH NOTES
+.sp
+.LP
+Some older AU audio files are incorrectly coded with info strings that are not
+properly NULL-terminated. Thus, applications should always use the \fBau_offset
+value\fR to find the end of the info data and the beginning of the audio data.

@@ -28,7 +28,9 @@ l l l .
 source	object type	association mechanism
 _
 \fBPORT_SOURCE_AIO\fR	\fBstruct aiocb\fR	T{
-\fBaio_read\fR(3C), \fBaio_write\fR(3C), \fBlio_listio\fR(3C)
+\fBaio_read\fR(3C),
+\fBaio_write\fR(3C),
+\fBlio_listio\fR(3C)
 T}
 \fBPORT_SOURCE_FD\fR	file descriptor	\fBport_associate\fR(3C)
 \fBPORT_SOURCE_MQ\fR	\fBmqd_t\fR	\fBmq_notify\fR(3C)
@@ -118,7 +120,7 @@ The \fBport_create()\fR function will fail if:
 The maximum allowable number of ports is currently open in the system. The
 maximum allowable number of ports is the minimum value of the
 \fBproject.max-port-ids\fR resource control. See \fBsetrctl\fR(2) and
-\fBrctladm\fR(1M) for information on using resource controls.
+\fBrctladm\fR(8) for information on using resource controls.
 .RE
 
 .sp
@@ -132,7 +134,7 @@ The process has too many open descriptors.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -151,7 +153,18 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBrctladm\fR(1M), \fBclose\fR(2), \fBexit\fR(2), \fBfork\fR(2), \fBpoll\fR(2),
-\fBsetrctl\fR(2), \fBaio_read\fR(3C), \fBaio_write\fR(3C), \fBaio.h\fR(3HEAD),
-\fBlio_listio\fR(3C), \fBmq_notify\fR(3C), \fBport_associate\fR(3C),
-\fBport_get\fR(3C), \fBtimer_create\fR(3C), \fBattributes\fR(5)
+.BR close (2),
+.BR exit (2),
+.BR fork (2),
+.BR poll (2),
+.BR setrctl (2),
+.BR aio_read (3C),
+.BR aio_write (3C),
+.BR lio_listio (3C),
+.BR mq_notify (3C),
+.BR port_associate (3C),
+.BR port_get (3C),
+.BR timer_create (3C),
+.BR aio.h (3HEAD),
+.BR attributes (7),
+.BR rctladm (8)

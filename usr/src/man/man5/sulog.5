@@ -1,0 +1,139 @@
+'\" te
+.\" Copyright (c) 1994, Sun Microsystems, Inc. All Rights Reserved.
+.\"  Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SULOG 5 "Jun 6, 1994"
+.SH NAME
+sulog \- su command log file
+.SH SYNOPSIS
+.LP
+.nf
+\fB/var/adm/sulog\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBsulog\fR file is a record of all attempts by users on the system  to
+execute the \fBsu\fR(8) command.  Each time  \fBsu\fR(8) is executed, an
+entry is added to the \fBsulog\fR file.
+.sp
+.LP
+Each entry in the \fBsulog\fR file is a single line of the form:
+.sp
+.in +2
+.nf
+\fBSU\fR \fBdate\fR \fBtime\fR
+\fIresult port user\fR\fB-\fR\fInewuser\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where
+.sp
+.ne 2
+.na
+\fB\fBdate\fR\fR
+.ad
+.RS 11n
+The month and date \fBsu\fR(8) was executed.  \fBdate\fR is displayed in the
+form \fImm\fR\fB/\fR\fBdd\fR where  \fImm\fR is the month number and \fBdd\fR
+is the day number in the month.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtime\fR\fR
+.ad
+.RS 11n
+The time  \fBsu\fR(8) was executed. \fBtime\fR is displayed in the form
+\fIHH\fR\fB/\fR\fIMM\fR where  \fIHH\fR is the hour number (24 hour system) and
+\fIMM\fR is the minute number.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIresult\fR\fR
+.ad
+.RS 11n
+The result of the  \fBsu\fR(8) command.  A ` + ' sign is displayed in this
+field if the su attempt was successful; otherwise  a ` - ' sign is displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIport\fR\fR
+.ad
+.RS 11n
+The name of the terminal device from which  \fBsu\fR(8) was executed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIuser\fR\fR
+.ad
+.RS 11n
+The user id of the user executing the  \fBsu\fR(8) command.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fInewuser\fR\fR
+.ad
+.RS 11n
+The user id being switched to with  \fBsu\fR(8).
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample \fBsulog\fR file.
+.sp
+.LP
+Here is a sample \fBsulog\fR file:
+
+.sp
+.in +2
+.nf
+SU 02/25 09:29 + console root-sys
+SU 02/25 09:32 + pts/3 user1-root
+SU 03/02 08:03 + pts/5 user1-root
+SU 03/03 08:19 + pts/5 user1-root
+SU 03/09 14:24 - pts/5 guest3-root
+SU 03/09 14:24 - pts/5 guest3-root
+SU 03/14 08:31 + pts/4 user1-root
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/var/adm/sulog\fR\fR
+.ad
+.RS 19n
+su log file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/default/su\fR\fR
+.ad
+.RS 19n
+contains the default location of  \fBsulog\fR
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR su (8)

@@ -45,7 +45,7 @@ extern "C" {
  * ypclnt.h
  * This defines the symbols used in the c language
  * interface to the yp client functions.  A description of this interface
- * can be read in ypclnt(3N).
+ * can be read in ypclnt(3NSL).
  */
 
 /*

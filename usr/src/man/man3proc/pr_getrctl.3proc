@@ -103,4 +103,4 @@ in
 .Sh SEE ALSO
 .Xr getrctl 2 ,
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

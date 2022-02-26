@@ -102,7 +102,9 @@ application knows that the objects being copied do not overlap.
 .SH CONTEXT
 These functions can be called from user, interrupt, or kernel context.
 .SH SEE ALSO
-\fBbcopy\fR(9F), \fBddi_copyin\fR(9F), \fBstrcpy\fR(9F)
+.BR bcopy (9F),
+.BR ddi_copyin (9F),
+.BR strcpy (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

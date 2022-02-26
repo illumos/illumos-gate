@@ -96,7 +96,7 @@
 # library can handle multiple tc capabilities in an entry. 4.4BSD has this
 # capability.  Older versions of GNU termcap, through 1.3, do not.
 #
-# For details on these formats, see terminfo(5) in the ncurses distribution,
+# For details on these formats, see terminfo(7) in the ncurses distribution,
 # and termcap(5) in the 4.4BSD Unix Programmer's Manual.  Be aware that 4.4BSD
 # curses has been declared obsolete by the caretakers of the 4.4BSD sources
 # as of June 1995; they are encouraging everyone to migrate to ncurses.

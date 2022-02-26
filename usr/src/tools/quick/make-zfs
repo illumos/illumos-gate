@@ -262,23 +262,23 @@ do_mans() {
 
   case "$1" in
   install)
-    (cd $SRC/man/man1m && make \
-      $ROOT/usr/share/man/man1m/zdb.1m \
-      $ROOT/usr/share/man/man1m/zfs.1m \
-      $ROOT/usr/share/man/man1m/zfs-program.1m \
-      $ROOT/usr/share/man/man1m/zpool.1m \
-      $ROOT/usr/share/man/man1m/ztest.1m )
-    (cd $SRC/man/man5 && make \
-      $ROOT/usr/share/man/man5/zpool-features.5 )
+    (cd $SRC/man/man8 && make \
+      $ROOT/usr/share/man/man8/zdb.8 \
+      $ROOT/usr/share/man/man8/zfs.8 \
+      $ROOT/usr/share/man/man8/zfs-program.8 \
+      $ROOT/usr/share/man/man8/zpool.8 \
+      $ROOT/usr/share/man/man8/ztest.8 )
+    (cd $SRC/man/man7 && make \
+      $ROOT/usr/share/man/man7/zpool-features.7 )
     ;;
   lint)
-    (cd $SRC/man/man1m && make zdb.1m.check zfs.1m.check zfs-program.1m.check \
-      zpool.1m.check ztest.1m.check)
-    (cd $SRC/man/man5 && make zpool-features.5.check)
+    (cd $SRC/man/man8 && make zdb.8.check zfs.8.check zfs-program.8.check \
+      zpool.8.check ztest.8.check)
+    (cd $SRC/man/man7 && make zpool-features.7.check)
     ;;
   *)
-    (cd $SRC/man/man1m && make $1)
-    (cd $SRC/man/man5 && make $)
+    (cd $SRC/man/man8 && make $1)
+    (cd $SRC/man/man7 && make $)
     ;;
   esac
 }
@@ -345,12 +345,12 @@ usr/sbin/$arch64/zhack
 usr/sbin/$arch32/zinject
 usr/sbin/$arch64/zinject
 usr/sbin/zstreamdump
-usr/share/man/man1m/zdb.1m
-usr/share/man/man1m/zfs.1m
-usr/share/man/man1m/zfs-program.1m
-usr/share/man/man1m/zpool.1m
-usr/share/man/man1m/ztest.1m
-usr/share/man/man5/zpool-features.5
+usr/share/man/man8/zdb.8
+usr/share/man/man8/zfs.8
+usr/share/man/man8/zfs-program.8
+usr/share/man/man8/zpool.8
+usr/share/man/man8/ztest.8
+usr/share/man/man7/zpool-features.7
 "
 	(cd $ROOT && tar cfj ../../zfs-${git_rev}.tar.bz2 $files)
 }

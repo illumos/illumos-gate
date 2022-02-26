@@ -116,4 +116,4 @@ function can also return the error values for
 .Xr kstat_chain_update 3KSTAT ,
 .Xr kstat_lookup 3KSTAT ,
 .Xr kstat_read 3KSTAT ,
-.Xr attributes 5
+.Xr attributes 7

@@ -170,7 +170,7 @@ if ((pool = pool_get_pool(conf, "foo")) == NULL) {
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -188,4 +188,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)
+.BR libpool (3LIB),
+.BR pool_error (3POOL),
+.BR attributes (7)

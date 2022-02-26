@@ -174,7 +174,7 @@ done:
 		*np++ = '-';
 
 		/*
-		 * boot(1M) says to pass these on.
+		 * boot(8) says to pass these on.
 		 */
 		if (boothowto & RB_ASKNAME)
 			*np++ = 'a';

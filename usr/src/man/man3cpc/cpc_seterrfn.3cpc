@@ -68,7 +68,7 @@ myapp_errfn(const char *fn, const char *fmt, va_list ap)
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -86,8 +86,11 @@ Interface Stability	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBcpc\fR(3CPC), \fBcpc_seterrhndlr\fR(3CPC), \fBlibcpc\fR(3LIB),
-\fBvsnprintf\fR(3C), \fBattributes\fR(5)
+.BR vsnprintf (3C),
+.BR cpc (3CPC),
+.BR cpc_seterrhndlr (3CPC),
+.BR libcpc (3LIB),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

@@ -65,13 +65,13 @@
 .if '\\$1'PROGUTILS' .ds Tz "Programming Utilities Guide
 .if '\\$1'REFMAN' .ds Tz "SunOS Reference Manual
 .if '\\$1'REFMAN1' .ds Tz "man Pages(1): User Commands
-.if '\\$1'REFMAN1M' .ds Tz "man Pages(1M): System Administration Commands
 .if '\\$1'REFMAN2' .ds Tz "man Pages(2): System Calls
 .if '\\$1'REFMAN3' .ds Tz "man Pages(3): Library Routines
-.if '\\$1'REFMAN4' .ds Tz "man Pages(4): File Formats
-.if '\\$1'REFMAN5' .ds Tz "man Pages(5): Headers, Tables and Macros
+.if '\\$1'REFMAN4' .ds Tz "man Pages(4): Device and Network Interfaces
+.if '\\$1'REFMAN5' .ds Tz "man Pages(5): File Formats
 .if '\\$1'REFMAN6' .ds Tz "man Pages(6): Demos
-.if '\\$1'REFMAN7' .ds Tz "man Pages(7): Device and Network Interfaces
+.if '\\$1'REFMAN7' .ds Tz "man Pages(7): Headers, Tables and Macros
+.if '\\$1'REFMAN8' .ds Tz "man Pages(8): System Administration Commands
 .if '\\$1'REFMAN9' .ds Tz "man Pages(9): Device Driver Interfaces
 .if '\\$1'REFMAN9E' .ds Tz "man Pages(9E): Driver Entry Points
 .if '\\$1'REFMAN9F' .ds Tz "man Pages(9F): Kernel Functions for Drivers

@@ -98,7 +98,7 @@ None
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -116,6 +116,9 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBattroff\fR(3XCURSES), \fBcan_change_color\fR(3XCURSES),
-\fBlibcurses\fR(3XCURSES), \fBsetcchar\fR(3XCURSES), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR attroff (3XCURSES),
+.BR can_change_color (3XCURSES),
+.BR libcurses (3XCURSES),
+.BR setcchar (3XCURSES),
+.BR attributes (7),
+.BR standards (7)

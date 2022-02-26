@@ -290,7 +290,7 @@ increased for high-volume connections or may be decreased to limit the possible
 backlog of incoming data. The maximum buffer size for \fBUDP\fR is determined
 by the value of the \fBndd\fR variable \fBudp_max_buf\fR. The maximum buffer
 size for \fBTCP\fR is determined the value of the \fBndd\fR variable
-\fBtcp_max_buf\fR. Use the \fBndd\fR(1M) utility to determine the current
+\fBtcp_max_buf\fR. Use the \fBndd\fR(8) utility to determine the current
 default values. See the \fISolaris Tunable Parameters Reference Manual\fR for
 information on setting the values of \fBudp_max_buf\fR and \fBtcp_max_buf\fR.
 At present, lowering \fBSO_RCVBUF\fR on a TCP connection after it has been
@@ -315,7 +315,7 @@ the native data format, corresponding to when the datagram was received.
 The \fBSO_EXCLBIND\fR option is used to enable or disable the exclusive binding
 of a socket. It overrides the use of the \fBSO_REUSEADDR\fR option to reuse an
 address on \fBbind\fR(3SOCKET). The actual semantics of the \fBSO_EXCLBIND\fR
-option depend on the underlying protocol. See \fBtcp\fR(7P) or \fBudp\fR(7P)
+option depend on the underlying protocol. See \fBtcp\fR(4P) or \fBudp\fR(4P)
 for more information.
 .sp
 .LP
@@ -353,7 +353,7 @@ that use the \fBSO_ALLZONES\fR option to initiate connections or send datagram
 traffic should specify the source address for outbound traffic by binding to a
 specific address. There is no effect from setting this option in an
 exclusive-IP zone. Setting this option requires the \fBsys_net_config\fR
-privilege. See \fBzones\fR(5).
+privilege. See \fBzones\fR(7).
 .SH RETURN VALUES
 .sp
 .LP
@@ -505,7 +505,7 @@ has been shut down.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -521,11 +521,21 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBndd\fR(1M), \fBclose\fR(2), \fBioctl\fR(2), \fBread\fR(2),
-\fBbind\fR(3SOCKET), \fBgetprotobyname\fR(3SOCKET), \fBrecv\fR(3SOCKET),
-\fBrecvmsg\fR(3XNET), \fBsend\fR(3SOCKET), \fBsocket\fR(3SOCKET),
-\fBsocket.h\fR(3HEAD), \fBattributes\fR(5), \fBzones\fR(5), \fBtcp\fR(7P),
-\fBudp\fR(7P)
+.BR close (2),
+.BR ioctl (2),
+.BR read (2),
+.BR socket.h (3HEAD),
+.BR bind (3SOCKET),
+.BR getprotobyname (3SOCKET),
+.BR recv (3SOCKET),
+.BR send (3SOCKET),
+.BR socket (3SOCKET),
+.BR recvmsg (3XNET),
+.BR tcp (4P),
+.BR udp (4P),
+.BR attributes (7),
+.BR zones (7),
+.BR ndd (8)
 .sp
 .LP
 \fISolaris Tunable Parameters Reference Manual\fR

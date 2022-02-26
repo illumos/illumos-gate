@@ -45,7 +45,7 @@
 		<service_fmri value='svc:/network/inetd:default' />
 	</restarter>
 
-	<property_group name='inetd' type='framework'> 
+	<property_group name='inetd' type='framework'>
 		<stability value='Evolving' />
 		<propval name='endpoint_type' type='astring' value='stream' />
 		<propval name='wait' type='boolean' value='false' />
@@ -87,7 +87,7 @@
 				value='solaris.smf.value.firewall.config' />
 		</property_group>
 
-		<property_group name='inetd' type='framework'> 
+		<property_group name='inetd' type='framework'>
 			<propval name='name' type='astring' value='login' />
 			<propval name='proto' type='astring' value='tcp6' />
 		</property_group>
@@ -134,7 +134,7 @@
 		</property_group>
 
 		<!-- Only works over IPv4 at the moment -->
-		<property_group name='inetd' type='framework'> 
+		<property_group name='inetd' type='framework'>
 			<propval name='name' type='astring' value='klogin' />
 			<propval name='proto' type='astring' value='tcp' />
 		</property_group>
@@ -182,7 +182,7 @@ remote login with Kerberos authentication
 		</property_group>
 
 		<!-- Only works over IPv4 at the moment -->
-		<property_group name='inetd' type='framework'> 
+		<property_group name='inetd' type='framework'>
 			<propval name='name' type='astring' value='eklogin' />
 			<propval name='proto' type='astring' value='tcp' />
 		</property_group>
@@ -205,9 +205,9 @@ remote login with Kerberos authentication and encryption
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='in.rlogind' section='1M'
+			<manpage title='in.rlogind' section='8'
 			    manpath='/usr/share/man' />
-			<manpage title='rlogind' section='1M'
+			<manpage title='rlogind' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

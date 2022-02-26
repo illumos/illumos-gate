@@ -21,8 +21,8 @@ correspond to a functional responsibility rather than to an actual person
 .sp
 .LP
 Each user may have zero or more roles. Roles have most of the attributes of
-normal users and are identified like normal users in \fBpasswd\fR(4) and
-\fBshadow\fR(4). Each role must have an entry in the \fBuser_attr\fR(4) file
+normal users and are identified like normal users in \fBpasswd\fR(5) and
+\fBshadow\fR(5). Each role must have an entry in the \fBuser_attr\fR(5) file
 that identifies it as a role. Roles can have their own authorizations and
 profiles. See \fBauths\fR(1) and \fBprofiles\fR(1).
 .sp
@@ -35,7 +35,7 @@ the role.
 .sp
 .LP
 A role may not assume itself or any other role. Roles are not hierarchical.
-However, rights profiles (see \fBprof_attr\fR(4)) are hierarchical and can be
+However, rights profiles (see \fBprof_attr\fR(5)) are hierarchical and can be
 used to achieve the same effect as hierarchical roles.
 .sp
 .LP
@@ -43,10 +43,10 @@ Roles must have valid passwords and one of the shells that interprets profiles:
 either \fBpfcsh\fR, \fBpfksh\fR, or \fBpfsh\fR. See \fBpfexec\fR(1).
 .sp
 .LP
-Role assumption may be performed using \fBsu\fR(1M), \fBrlogin\fR(1), or some
+Role assumption may be performed using \fBsu\fR(8), \fBrlogin\fR(1), or some
 other service that supports the \fBPAM_RUSER\fR variable. Successful assumption
 requires knowledge of the role's password and membership in the role. Role
-assignments are specified in \fBuser_attr\fR(4).
+assignments are specified in \fBuser_attr\fR(5).
 .SH EXAMPLES
 .LP
 \fBExample 1\fR Sample output
@@ -97,6 +97,14 @@ An error occurred.
 \fB/etc/security/prof_attr\fR
 .SH SEE ALSO
 .LP
-\fBauths\fR(1), \fBpfexec\fR(1), \fBprofiles\fR(1), \fBrlogin\fR(1),
-\fBsu\fR(1M), \fBauth_attr\fR(4), \fBpasswd\fR(4),
-\fBprof_attr\fR(4), \fBshadow\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5)
+.BR auths (1),
+.BR pfexec (1),
+.BR profiles (1),
+.BR rlogin (1),
+.BR auth_attr (5),
+.BR passwd (5),
+.BR prof_attr (5),
+.BR shadow (5),
+.BR user_attr (5),
+.BR attributes (7),
+.BR su (8)

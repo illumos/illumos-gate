@@ -3806,7 +3806,7 @@ ses_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
 			goto error;
 
 		/*
-		 * We search both the ses(7D) and sgen(7D) locations, so we are
+		 * We search both the ses(4D) and sgen(4D) locations, so we are
 		 * independent of any particular driver class bindings.
 		 */
 		if (ses_process_dir("/dev/es", data) != 0 ||

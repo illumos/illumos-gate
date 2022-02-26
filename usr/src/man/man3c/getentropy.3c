@@ -62,4 +62,4 @@ Too many bytes requested, or some other fatal error occurred.
 .Sy Async-Signal-Safe
 .Sh SEE ALSO
 .Xr arc4random 3C ,
-.Xr attributes 5
+.Xr attributes 7

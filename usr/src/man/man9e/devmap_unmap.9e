@@ -186,8 +186,10 @@ xxdevmap_unmap(devmap_cookie_t dhp, void *pvtp, offset_t off,
 .in -2
 
 .SH SEE ALSO
-\fBexit\fR(2), \fBmunmap\fR(2), \fBdevmap_map\fR(9E),
-\fBdevmap_callback_ctl\fR(9S)
+.BR exit (2),
+.BR munmap (2),
+.BR devmap_map (9E),
+.BR devmap_callback_ctl (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

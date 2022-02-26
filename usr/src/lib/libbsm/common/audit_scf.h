@@ -30,7 +30,7 @@ extern "C" {
 #endif
 
 /*
- * auditd smf(5)/libscf(3LIB) interface - set and display audit parameters
+ * auditd smf(7)/libscf(3LIB) interface - set and display audit parameters
  */
 
 #include <audit_plugin.h>
@@ -110,7 +110,7 @@ typedef struct scf_qctrl scf_qctrl_t;
 #define	PRESELECTION_NAFLAGS	"naflags"
 #define	PRESELECTION_MAXBUF	256		/* max. length of na/flags */
 
-/* auditd(1M) plugin related well known properties */
+/* auditd(8) plugin related well known properties */
 #define	PLUGIN_ACTIVE		"active"	/* plugin state */
 #define	PLUGIN_PATH		"path"		/* plugin shared object */
 #define	PLUGIN_QSIZE		"qsize"		/* plugin queue size */

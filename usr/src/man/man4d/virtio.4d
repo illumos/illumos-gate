@@ -1,0 +1,47 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Oxide Computer Company
+.\"
+.Dd October 3, 2020
+.Dt VIRTIO 4D
+.Os
+.Sh NAME
+.Nm virtio
+.Nd virtio framework driver
+.Sh DESCRIPTION
+The
+.Nm
+driver provides a framework for other device drivers that implement
+specific types of virtio devices
+.Pq network, block, etc. .
+The driver takes care of feature negotiation, virtqueue management,
+used and available rings, interrupts, and more.
+The driver provides support for both direct and indirect descriptors
+inside of virtqueues.
+.Sh ARCHITECTURE
+The
+.Nm
+driver is only supported on
+.Sy x86 .
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /kernel/drv/amd64/virtio
+x86 device driver.
+.El
+.Sh SEE ALSO
+.Xr vioblk 4D ,
+.Xr vioif 4D
+.Rs
+.%T Virtual I/O Device (VIRTIO) Version 1.1
+.%D April, 2019
+.%U https://docs.oasis-open.org/virtio/virtio/v1.1/virtio-v1.1.html
+.Re

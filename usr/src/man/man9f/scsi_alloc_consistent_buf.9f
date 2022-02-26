@@ -168,9 +168,14 @@ attached.
 .in -2
 
 .SH SEE ALSO
-\fBddi_dma_mem_alloc\fR(9F), \fBddi_dma_sync\fR(9F), \fBgetrbuf\fR(9F),
-\fBscsi_destroy_pkt\fR(9F), \fBscsi_init_pkt\fR(9F),
-\fBscsi_free_consistent_buf\fR(9F), \fBbuf\fR(9S), \fBscsi_address\fR(9S)
+.BR ddi_dma_mem_alloc (9F),
+.BR ddi_dma_sync (9F),
+.BR getrbuf (9F),
+.BR scsi_destroy_pkt (9F),
+.BR scsi_free_consistent_buf (9F),
+.BR scsi_init_pkt (9F),
+.BR buf (9S),
+.BR scsi_address (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

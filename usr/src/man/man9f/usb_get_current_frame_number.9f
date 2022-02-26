@@ -68,7 +68,7 @@ May be called from user, kernel or interrupt context.
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -84,6 +84,9 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBusb_alloc_isoc_req\fR(9F),
-\fBusb_get_max_pkts_per_isoc_request\fR(9F), \fBusb_pipe_isoc_xfer\fR(9F),
-\fBusb_pipe_get_max_bulk_transfer_size\fR(9F), \fBusb_isoc_request\fR(9S)
+.BR attributes (7),
+.BR usb_alloc_isoc_req (9F),
+.BR usb_get_max_pkts_per_isoc_request (9F),
+.BR usb_pipe_get_max_bulk_transfer_size (9F),
+.BR usb_pipe_isoc_xfer (9F),
+.BR usb_isoc_request (9S)

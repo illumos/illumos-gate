@@ -122,8 +122,11 @@ increases to 9, more detailed debugging information is given.
 .SH SEE ALSO
 .sp
 .LP
-\fBcu\fR(1C), \fBlogin\fR(1), \fBuucp\fR(1C), \fBttymon\fR(1M),
-\fBattributes\fR(5)
+.BR login (1),
+.BR cu (1C),
+.BR uucp (1C),
+.BR attributes (7),
+.BR ttymon (8)
 .SH NOTES
 .sp
 .LP
@@ -132,4 +135,4 @@ The \fBct\fR program will not work with a DATAKIT Multiplex interface.
 .LP
 For a shared port, one used for both dial-in and dial-out, the \fBttymon\fR
 program running on the line must have the \fB-r\fR and \fB-b\fR options
-specified (see \fBttymon\fR(1M)).
+specified (see \fBttymon\fR(8)).

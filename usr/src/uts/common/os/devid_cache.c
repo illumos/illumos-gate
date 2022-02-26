@@ -47,7 +47,7 @@
  * involves walking the entire device tree attaching all possible disk
  * instances, to search for the device referenced by a devid.  Obviously,
  * full device discovery is something to be avoided where possible.
- * Note that simply invoking devfsadm(1M) is equivalent to running full
+ * Note that simply invoking devfsadm(8) is equivalent to running full
  * discovery at the devid cache level.
  *
  * Reasons why a disk may not be accessible:
@@ -61,7 +61,7 @@
  * When discovery may succeed:
  *	Discovery will result in success when a device has been moved
  *	to a different address.  Note that it's recommended that
- *	devfsadm(1M) be invoked (no arguments required) whenever a system's
+ *	devfsadm(8) be invoked (no arguments required) whenever a system's
  *	h/w configuration has been updated.  Alternatively, a
  *	reconfiguration boot can be used to accomplish the same result.
  *
@@ -69,7 +69,7 @@
  * failure for a device which was powered off.  Assuming the cache has an
  * entry for such a device, simply powering it on should permit the system
  * to access it.  If problems persist after powering it on, invoke
- * devfsadm(1M).
+ * devfsadm(8).
  *
  * Discovery prior to mounting root is only of interest when booting
  * from a filesystem which accesses devices by device id, which of

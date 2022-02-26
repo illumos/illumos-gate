@@ -39,8 +39,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/av1394 group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/av1394.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/av1394.4d
 driver name=av1394 perms="* 0600 root sys" \
     alias=firewire00a02d,010000 \
     alias=firewire00a02d,010001

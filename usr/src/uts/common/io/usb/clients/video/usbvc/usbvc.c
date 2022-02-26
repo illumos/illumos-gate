@@ -27,7 +27,7 @@
  */
 
 /*
- * USB video class driver (usbvc(7D))
+ * USB video class driver (usbvc(4D))
  *
  * 1. Overview
  * ------------

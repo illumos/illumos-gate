@@ -105,7 +105,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='ipadm' section='1M'
+			<manpage title='ipadm' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 		<pg_pattern name='install_ipv4_interface' type='application'
@@ -116,14 +116,14 @@
 			<prop_pattern name='name' type='astring'
 			    required='true'>
 				<description> <loctext xml:lang='C'>
-				    The "addrobj" value to be passed to the ipadm(1M) "create-addr" command.
+				    The "addrobj" value to be passed to the ipadm(8) "create-addr" command.
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 			</prop_pattern>
 			<prop_pattern name='address_type' type='astring'
 			    required='true'>
 				<description> <loctext xml:lang='C'>
-				    The "-T" option value to be passed to the ipadm(1M) "create-addr" command.
+				    The "-T" option value to be passed to the ipadm(8) "create-addr" command.
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 				<constraints>
@@ -142,14 +142,14 @@
 			<prop_pattern name='static_address'
 			    type='net_address_v4' required='false'>
 				<description> <loctext xml:lang='C'>
-				    The "local" address value to be passed to the ipadm(1M) "create-addr" command. Only required if "address_type" has a value of "static".
+				    The "local" address value to be passed to the ipadm(8) "create-addr" command. Only required if "address_type" has a value of "static".
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 			</prop_pattern>
 			<prop_pattern name='dhcp_wait' type='astring'
 			    required='false'>
 				<description> <loctext xml:lang='C'>
-				    The "-w" option value to be passed to the ipadm(1M) "create-addr" command. Represents the maximum time to wait for DHCP offer.
+				    The "-w" option value to be passed to the ipadm(8) "create-addr" command. Represents the maximum time to wait for DHCP offer.
 				</loctext> </description>
 				<units>
 				    <loctext xml:lang='C'>seconds</loctext>
@@ -159,7 +159,7 @@
 			<prop_pattern name='default_route'
 			    type='net_address_v4' required='false'>
 				<description> <loctext xml:lang='C'>
-				    The default route associated with this interface. Used to add a default route using route(1M).
+				    The default route associated with this interface. Used to add a default route using route(8).
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 			</prop_pattern>
@@ -172,14 +172,14 @@
 			<prop_pattern name='name' type='astring'
 			    required='true'>
 				<description> <loctext xml:lang='C'>
-				    The "addrobj" value to be passed to the ipadm(1M) "create-addr" command.
+				    The "addrobj" value to be passed to the ipadm(8) "create-addr" command.
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 			</prop_pattern>
 			<prop_pattern name='address_type' type='astring'
 			    required='true'>
 				<description> <loctext xml:lang='C'>
-				    The "-T" option value to be passed to the ipadm(1M) "create-addr" command.
+				    The "-T" option value to be passed to the ipadm(8) "create-addr" command.
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 				<constraints>
@@ -198,14 +198,14 @@
 			<prop_pattern name='static_address'
 			    type='net_address_v6' required='false'>
 				<description> <loctext xml:lang='C'>
-				    The "local" address value to be passed to the ipadm(1M) "create-addr" command. Only required if "address_type" has a value of "static".
+				    The "local" address value to be passed to the ipadm(8) "create-addr" command. Only required if "address_type" has a value of "static".
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 			</prop_pattern>
 			<prop_pattern name='interface_id'
 			    type='net_address_v6' required='false'>
 				<description> <loctext xml:lang='C'>
-				    The "-i" token value to be passed to the ipadm(1M) "create-addr" command. Ignored if "address_type" has a value of "static".
+				    The "-i" token value to be passed to the ipadm(8) "create-addr" command. Ignored if "address_type" has a value of "static".
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 			</prop_pattern>
@@ -213,7 +213,7 @@
 			<prop_pattern name='stateless'
 			    type='astring' required='false'>
 				<description> <loctext xml:lang='C'>
-				    The "stateless" value to be passed to the ipadm(1M) "create-addr" command. Ignored if "address_type" has a value of "static".
+				    The "stateless" value to be passed to the ipadm(8) "create-addr" command. Ignored if "address_type" has a value of "static".
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 				<constraints>
@@ -224,7 +224,7 @@
 			<prop_pattern name='stateful'
 			    type='astring' required='false'>
 				<description> <loctext xml:lang='C'>
-				    The "stateful" value to be passed to the ipadm(1M) "create-addr" command. Ignored if "address_type" has a value of "static".
+				    The "stateful" value to be passed to the ipadm(8) "create-addr" command. Ignored if "address_type" has a value of "static".
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 				<constraints>
@@ -235,7 +235,7 @@
 			<prop_pattern name='default_route'
 			    type='net_address_v6' required='false'>
 				<description> <loctext xml:lang='C'>
-				    The default route associated with this interface. Used to add a default route using route(1M).
+				    The default route associated with this interface. Used to add a default route using route(8).
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 			</prop_pattern>

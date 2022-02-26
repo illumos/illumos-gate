@@ -201,7 +201,7 @@ cpr_get_config(void)
 		cprconfig_loaded = 1;
 	else {
 		cpr_err(CE_CONT, "invalid config file \"%s\", "
-		    "rerun pmconfig(1M)\n", config_path);
+		    "rerun pmconfig(8)\n", config_path);
 		err = EINVAL;
 	}
 
@@ -255,7 +255,7 @@ cpr_verify_statefile_path(void)
 	    "cpr statefile device %s.\n";
 	static const char path_chg_fmt[] = "Device path for statefile "
 	    "has changed from %s to %s.\t%s\n";
-	static const char rerun[] = "Please rerun pmconfig(1m).";
+	static const char rerun[] = "Please rerun pmconfig(8).";
 	struct vfs *vfsp = NULL, *vfsp_save = rootvfs;
 	ufsvfs_t *ufsvfsp = (ufsvfs_t *)rootvfs->vfs_data;
 	ufsvfs_t *ufsvfsp_save = ufsvfsp;
@@ -406,7 +406,7 @@ cpr_verify_statefile_path(void)
 	if (ufsvfsp_save->vfs_devvp->v_rdev != vp->v_rdev) {
 		cpr_err(CE_CONT, "Filesystem containing "
 		    "statefile no longer mounted on device %s. "
-		    "See power.conf(4).", cf->cf_devfs);
+		    "See power.conf(5).", cf->cf_devfs);
 		VN_RELE(vp);
 		return (ENXIO);
 	}

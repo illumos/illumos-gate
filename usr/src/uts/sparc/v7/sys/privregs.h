@@ -48,7 +48,7 @@ extern "C" {
 /*
  * This structure is only here for compatibility.  It is not used by the kernel
  * and may be removed in a future release.  A better way to access this data
- * is to use gregset_t; see proc(4) and ucontext(3HEAD).
+ * is to use gregset_t; see proc(5) and ucontext(3HEAD).
  */
 struct regs {
 	long	r_psr;		/* processor status register */

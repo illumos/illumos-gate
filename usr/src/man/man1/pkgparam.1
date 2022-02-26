@@ -22,7 +22,7 @@ pkgparam \- display package parameter values
 .LP
 \fBpkgparam\fR displays the value associated with the parameter or parameters
 requested on the command line. The values are located in either the
-\fBpkginfo\fR(4) file for \fIpkginst\fR or from the specific file named with
+\fBpkginfo\fR(5) file for \fIpkginst\fR or from the specific file named with
 the \fB-f\fR option.
 .sp
 .LP
@@ -136,8 +136,13 @@ An error occurred.
 .SH SEE ALSO
 .sp
 .LP
-\fBpkgmk\fR(1), \fBpkgproto\fR(1), \fBpkgtrans\fR(1), \fBpkgadd\fR(1M),
-\fBpkginfo\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5)
+.BR pkgmk (1),
+.BR pkgproto (1),
+.BR pkgtrans (1),
+.BR pkginfo (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR pkgadd (8)
 .sp
 .LP
 \fIApplication Packaging Developer\&'s Guide\fR
@@ -146,11 +151,11 @@ An error occurred.
 .LP
 With the \fB-f\fR option, you can specify the file from which parameter values
 should be extracted. This file should be in the same  format as a
-\fBpkginfo\fR(4) file. For example, such a file might be created during package
+\fBpkginfo\fR(5) file. For example, such a file might be created during package
 development and used while testing software during this stage.
 .sp
 .LP
-Package commands are \fBlargefile\fR(5)-aware. They handle files larger than 2
+Package commands are \fBlargefile\fR(7)-aware. They handle files larger than 2
 GB in the same way they handle smaller files. In their current implementations,
-\fBpkgadd\fR(1M), \fBpkgtrans\fR(1) and other package commands can process a
+\fBpkgadd\fR(8), \fBpkgtrans\fR(1) and other package commands can process a
 datastream of  up to 4 GB.

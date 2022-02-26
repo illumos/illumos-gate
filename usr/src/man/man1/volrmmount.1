@@ -20,7 +20,7 @@ volrmmount \- call rmmount to mount or unmount media
 .SH DESCRIPTION
 .sp
 .LP
-The \fBvolrmmount\fR utility calls \fBrmmount\fR(1M) to, in effect, simulate an
+The \fBvolrmmount\fR utility calls \fBrmmount\fR(8) to, in effect, simulate an
 insertion (\fB-i\fR) or an ejection (\fB-e\fR). Simulating an insertion often
 means that \fBrmmount\fR will mount the media. Conversely, simulating an
 ejection often means that \fBrmmount\fR will unmount the media. However, these
@@ -179,5 +179,8 @@ volume management control port
 .SH SEE ALSO
 .sp
 .LP
-\fBcpio\fR(1), \fBeject\fR(1), \fBtar\fR(1), \fBrmmount\fR(1M),
-\fBattributes\fR(5)
+.BR cpio (1),
+.BR eject (1),
+.BR tar (1),
+.BR attributes (7),
+.BR rmmount (8)

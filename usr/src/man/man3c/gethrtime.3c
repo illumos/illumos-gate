@@ -58,7 +58,7 @@ printf("Avg getpid() time = %lld nsec\en", (end \(mi start) / iters);\fR
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -74,8 +74,11 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBproc\fR(1), \fBadjtime\fR(2), \fBgettimeofday\fR(3C),
-\fBsettimeofday\fR(3C), \fBattributes\fR(5)
+.BR proc (1),
+.BR adjtime (2),
+.BR gettimeofday (3C),
+.BR settimeofday (3C),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

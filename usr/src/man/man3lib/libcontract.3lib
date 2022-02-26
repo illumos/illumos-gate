@@ -17,7 +17,7 @@ cc [ \fIflag\fR... ] `getconf LFS_CFLAGS` \fIfile\fR... \fB-lcontract\fR [ \fIli
 .sp
 .LP
 Functions in this library provide various interfaces to interact with the
-\fBcontract\fR(4) file system. The header provides structure and function
+\fBcontract\fR(5) file system. The header provides structure and function
 declarations for all library interfaces.
 .SH INTERFACES
 .sp
@@ -96,7 +96,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -114,5 +114,8 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpvs\fR(1), \fBIntro\fR(3), \fBcontract\fR(4), \fBattributes\fR(5),
-\fBlfcompile\fR(5)
+.BR pvs (1),
+.BR Intro (3),
+.BR contract (5),
+.BR attributes (7),
+.BR lfcompile (7)

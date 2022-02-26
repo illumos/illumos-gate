@@ -286,12 +286,21 @@ xxdevmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 .in -2
 
 .SH SEE ALSO
-\fBmmap\fR(2), \fBattach\fR(9E), \fBdetach\fR(9E), \fBmmap\fR(9E),
-\fBsegmap\fR(9E), \fBddi_devmap_segmap\fR(9F),
-\fBddi_model_convert_from\fR(9F), \fBddi_soft_state\fR(9F),
-\fBddi_umem_alloc\fR(9F), \fBddi_umem_free\fR(9F),
-\fBdevmap_devmem_setup\fR(9F), \fBdevmap_setup\fR(9F),
-\fBdevmap_umem_setup\fR(9F), \fBcb_ops\fR(9S), \fBdevmap_callback_ctl\fR(9S)
+.BR mmap (2),
+.BR attach (9E),
+.BR detach (9E),
+.BR mmap (9E),
+.BR segmap (9E),
+.BR ddi_devmap_segmap (9F),
+.BR ddi_model_convert_from (9F),
+.BR ddi_soft_state (9F),
+.BR ddi_umem_alloc (9F),
+.BR ddi_umem_free (9F),
+.BR devmap_devmem_setup (9F),
+.BR devmap_setup (9F),
+.BR devmap_umem_setup (9F),
+.BR cb_ops (9S),
+.BR devmap_callback_ctl (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

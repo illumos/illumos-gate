@@ -34,11 +34,11 @@
 
 #
 # DESCRIPTION:
-# Ensure that the fstyp(1M) utility succeeds on a ZFS file system.
+# Ensure that the fstyp(8) utility succeeds on a ZFS file system.
 #
 # STRATEGY:
 # 1. Populate a ZFS file system with some files.
-# 2. Run fstyp(1M) against the device.
+# 2. Run fstyp(8) against the device.
 # 3. Ensure it fails.
 #
 
@@ -55,7 +55,7 @@ function cleanup
 
 log_onexit cleanup
 
-log_assert "Ensure that the fstyp(1M) utility succeeds on a ZFS file system."
+log_assert "Ensure that the fstyp(8) utility succeeds on a ZFS file system."
 
 populate_dir $NUM_FILES
 
@@ -67,4 +67,4 @@ else
 	log_must fstyp /dev/rdsk/${DISK}s0
 fi
 
-log_pass "fstyp(1M) returned successfully."
+log_pass "fstyp(8) returned successfully."

@@ -24,14 +24,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * DTrace Memory Buffer Routines
  *
  * The routines in this file are used to create an automatically resizing
  * memory buffer that can be written to like a file.  Memory buffers are
- * used to construct DOF to ioctl() to dtrace(7D), and provide semantics that
+ * used to construct DOF to ioctl() to dtrace(4D), and provide semantics that
  * simplify caller code.  Specifically, any allocation errors result in an
  * error code being set inside the buffer which is maintained persistently and
  * propagates to another buffer if the buffer in error is concatenated.  These

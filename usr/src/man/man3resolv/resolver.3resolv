@@ -326,10 +326,10 @@ the header would be updated.
 .SS "\fBres_ninit()\fR, \fBres_init()\fR"
 The \fBres_ninit()\fR and \fBres_init()\fR routines read the configuration
 file, if any is present, to get the default domain name, search list and the
-Internet address of the local name server(s). See \fBresolv.conf\fR(4). If no
+Internet address of the local name server(s). See \fBresolv.conf\fR(5). If no
 server is configured, \fBres_init()\fR or \fBres_ninit()\fR will try to obtain
 name resolution services from the host on which it is running. The current
-domain name is defined by \fBdomainname\fR(1M), or by the hostname if it is not
+domain name is defined by \fBdomainname\fR(8), or by the hostname if it is not
 specified in the configuration file. Use the environment variable
 \fBLOCALDOMAIN\fR to override the domain name. This environment variable may
 contain several blank-separated tokens if you wish to override the search list
@@ -338,7 +338,7 @@ configuration file. You can set the \fBRES_OPTIONS\fR environment variable to
 override certain internal resolver options. You can otherwise set them by
 changing fields in the \fBstatp\fR /\fB_res\fR structure. Alternatively, they
 are inherited from the configuration file's \fBoptions\fR command. See
-\fBresolv.conf\fR(4) for information regarding the syntax of the
+\fBresolv.conf\fR(5) for information regarding the syntax of the
 \fBRES_OPTIONS\fR environment variable. Initialization normally occurs on the
 first call to one of the other resolver routines.
 .SS "\fBres_nquery()\fR, \fBres_query()\fR"
@@ -483,7 +483,7 @@ resolver configuration file
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -500,8 +500,11 @@ T}
 .TE
 
 .SH SEE ALSO
-\fBdomainname\fR(1M), \fBgethostbyname\fR(3NSL), \fBlibresolv\fR(3LIB),
-\fBresolv.conf\fR(4), \fBattributes\fR(5)
+.BR libresolv (3LIB),
+.BR gethostbyname (3NSL),
+.BR resolv.conf (5),
+.BR attributes (7),
+.BR domainname (8)
 .sp
 .LP
 Lottor, M. \fIRFC 1033, Domain Administrators Operations Guide\fR. Network

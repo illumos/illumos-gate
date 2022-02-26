@@ -56,7 +56,8 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBpoll\fR(2), \fBchpoll\fR(9E)
+.BR poll (2),
+.BR chpoll (9E)
 .sp
 .LP
 \fIWriting Device Drivers\fR

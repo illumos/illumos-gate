@@ -25,8 +25,6 @@
 #ifndef _MEM_CACHE_H
 #define	_MEM_CACHE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -52,7 +50,7 @@ extern "C" {
 
 
 /*
- * Private ioctls for fmd(1M).  These interfaces are Sun Private.  Applications
+ * Private ioctls for fmd(8).  These interfaces are Sun Private.  Applications
  * and drivers should not make use of these interfaces: they can change without
  * notice and programs that consume them will fail to run on future releases.
  */

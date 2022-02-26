@@ -92,10 +92,10 @@ CTRL-h. In this case, recall that CTRL-h is the same as the BACKSPACE key). The
 sequence \fB^@\fR means that an option has a null value.
 .sp
 .LP
-See \fBtermio\fR(7I) for detailed information about the modes listed from
+See \fBtermio\fR(4I) for detailed information about the modes listed from
 \fBControl\fR \fBModes\fR through \fBLocal Modes\fR. For detailed information
 about the modes listed under \fBHardware\fR \fBFlow\fR \fBControl\fR
-\fBModes\fR and \fBClock Modes\fR, see \fBtermiox\fR(7I).
+\fBModes\fR and \fBClock Modes\fR, see \fBtermiox\fR(4I).
 .sp
 .LP
 Operands described in the \fBCombination Modes\fR section are implemented using
@@ -162,7 +162,7 @@ Select odd (even) parity, or mark (space) parity if \fBparext\fR is enabled.
 \fB\fBcs5\fR \fBcs6\fR \fBcs7\fR \fBcs8\fR\fR
 .ad
 .RS 24n
-Select character size (see \fBtermio\fR(7I)).
+Select character size (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -391,7 +391,7 @@ Ignore (do not ignore) parity errors.
 \fB\fBparmrk\fR (\fB-parmrk\fR)\fR
 .ad
 .RS 22n
-Mark (do not mark) parity errors (see \fBtermio\fR(7I)).
+Mark (do not mark) parity errors (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -570,7 +570,7 @@ Fill characters are DELs (NULs).
 \fB\fBcr0 cr1 cr2 cr3\fR\fR
 .ad
 .RS 23n
-Select style of delay for carriage returns (see \fBtermio\fR(7I)).
+Select style of delay for carriage returns (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -579,7 +579,7 @@ Select style of delay for carriage returns (see \fBtermio\fR(7I)).
 \fB\fBnl0 nl1\fR\fR
 .ad
 .RS 23n
-Select style of delay for line-feeds (see \fBtermio\fR(7I)).
+Select style of delay for line-feeds (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -588,7 +588,7 @@ Select style of delay for line-feeds (see \fBtermio\fR(7I)).
 \fB\fBtab0 tab1 tab2 tab3\fR\fR
 .ad
 .RS 23n
-Select style of delay for horizontal tabs (see \fBtermio\fR(7I)).
+Select style of delay for horizontal tabs (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -597,7 +597,7 @@ Select style of delay for horizontal tabs (see \fBtermio\fR(7I)).
 \fB\fBbs0 bs1\fR\fR
 .ad
 .RS 23n
-Select style of delay for backspaces (see \fBtermio\fR(7I)).
+Select style of delay for backspaces (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -606,7 +606,7 @@ Select style of delay for backspaces (see \fBtermio\fR(7I)).
 \fB\fBff0 ff1\fR\fR
 .ad
 .RS 23n
-Select style of delay for form-feeds (see \fBtermio\fR(7I)).
+Select style of delay for form-feeds (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -615,7 +615,7 @@ Select style of delay for form-feeds (see \fBtermio\fR(7I)).
 \fB\fBvt0 vt1\fR\fR
 .ad
 .RS 23n
-Select style of delay for vertical tabs (see \fBtermio\fR(7I)).
+Select style of delay for vertical tabs (see \fBtermio\fR(4I)).
 .RE
 
 .SS "Local Modes"
@@ -1018,7 +1018,7 @@ Set \fIcontrol-character\fR to \fIc\fR, where:
 is \fBctab\fR, \fBdiscard\fR, \fBdsusp\fR, \fBeof\fR, \fBeol\fR, \fBeol2\fR,
 \fBerase\fR, \fBerase2\fR, \fBintr\fR, \fBkill\fR, \fBlnext\fR, \fBquit\fR,
 \fBreprint\fR, \fBstart\fR, \fBstop\fR, \fBsusp\fR, \fBstatus\fR, \fBswtch\fR,
-or \fBwerase\fR (\fBctab\fR is used with \fB-stappl\fR, see \fBtermio\fR(7I)).
+or \fBwerase\fR (\fBctab\fR is used with \fB-stappl\fR, see \fBtermio\fR(4I)).
 For information on \fBswtch\fR, see NOTES.
 .RE
 
@@ -1338,7 +1338,7 @@ Since the \fB-a\fR format is so loosely specified, scripts that save and
 restore terminal settings should use the \fB-g\fR option.
 .SH ENVIRONMENT VARIABLES
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBstty\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
@@ -1364,7 +1364,7 @@ An error occurred.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/xpg4/bin/stty"
 .TS
 box;
@@ -1374,7 +1374,7 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 Interface Stability	Committed
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SS "/usr/xpg6/bin/stty"
@@ -1386,14 +1386,21 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 Interface Stability	Committed
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .LP
-\fBtabs\fR(1), \fBioctl\fR(2), \fBwrite\fR(2), \fBgetwidth\fR(3C),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5), \fBldterm\fR(7M),
-\fBtermio\fR(7I), \fBtermiox\fR(7I)
+.BR tabs (1),
+.BR ioctl (2),
+.BR write (2),
+.BR getwidth (3C),
+.BR termio (4I),
+.BR termiox (4I),
+.BR ldterm (4M),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)
 .SH NOTES
 .LP
 Solaris does not support any of the actions implied by \fBswtch\fR, which was

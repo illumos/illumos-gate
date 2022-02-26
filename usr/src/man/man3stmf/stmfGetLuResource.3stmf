@@ -70,7 +70,7 @@ The guid does not exist.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -88,4 +88,6 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibstmf\fR(3LIB), \fBstmfFreeLuResource\fR(3STMF), \fBattributes\fR(5)
+.BR libstmf (3LIB),
+.BR stmfFreeLuResource (3STMF),
+.BR attributes (7)

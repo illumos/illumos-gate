@@ -50,7 +50,7 @@ If an error occurs, \fINULL\fR is returned and the \fBld_errno\fR field in the
 for a description of possible error codes.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -65,8 +65,11 @@ Interface Stability	Evolving
 
 .SH SEE ALSO
 .LP
-\fBldap\fR(3LDAP), \fBldap_first_entry\fR(3LDAP), \fBldap_get_values\fR(3LDAP),
-\fBldap_error\fR(3LDAP), \fBattributes\fR(5)
+.BR ldap (3LDAP),
+.BR ldap_error (3LDAP),
+.BR ldap_first_entry (3LDAP),
+.BR ldap_get_values (3LDAP),
+.BR attributes (7)
 .SH NOTES
 .LP
 The \fBldap_first_attribute()\fR function alllocates memory that might need to

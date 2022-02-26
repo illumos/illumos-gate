@@ -334,7 +334,7 @@ main(int argc, char *argv[])
 	/* call the CLI parser */
 	ret = cmdParse(argc, argv, synTables, subcommandArgs, &funcRet);
 	if (ret == 1) {
-		fprintf(stdout, "%s %s(1M)\n",
+		fprintf(stdout, "%s %s(8)\n",
 		    gettext("For more information, please see"), cmdName);
 		return (1);
 	} else if (ret == -1) {

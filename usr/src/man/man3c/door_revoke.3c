@@ -54,7 +54,7 @@ The door descriptor was not created by this process (with
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -73,4 +73,6 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBclose\fR(2), \fBdoor_create\fR(3C), \fBattributes\fR(5)
+.BR close (2),
+.BR door_create (3C),
+.BR attributes (7)

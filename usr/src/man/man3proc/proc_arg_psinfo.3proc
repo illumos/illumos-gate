@@ -140,4 +140,4 @@ were set and no process or core file could be found corresponding to
 .Xr Pgrab_core 3PROC ,
 .Xr Prelease 3PROC ,
 .Xr proc_lwp_range_valid 3PROC ,
-.Xr proc 4
+.Xr proc 5

@@ -89,8 +89,8 @@ link path=usr/lib/efcode/$(ARCH64)/lfc_sun4v_pciex.so target=lfc_upa_pci.so
 file path=usr/lib/efcode/$(ARCH64)/lfc_upa.so
 file path=usr/lib/efcode/$(ARCH64)/lfc_upa_pci.so
 file path=usr/lib/efcode/efcode.sh mode=0555
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/efdaemon.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/efdaemon.8
 driver name=fcode
 legacy pkg=SUNWefc.u arch=$(ARCH).sun4u \
     desc="Embedded FCode Interpreter Drivers" \

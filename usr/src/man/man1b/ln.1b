@@ -117,7 +117,7 @@ Create a symbolic link or links.
 .SH USAGE
 .sp
 .LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBln\fR when
+See \fBlargefile\fR(7) for the description of the behavior of \fBln\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH EXAMPLES
 .LP
@@ -159,9 +159,16 @@ x@      y@      z@
 .SH SEE ALSO
 .sp
 .LP
-\fBcp\fR(1), \fBls\fR(1), \fBmv\fR(1), \fBrm\fR(1), \fBlink\fR(2),
-\fBreadlink\fR(2), \fBstat\fR(2), \fBsymlink\fR(2), \fBattributes\fR(5),
-\fBlargefile\fR(5)
+.BR cp (1),
+.BR ls (1),
+.BR mv (1),
+.BR rm (1),
+.BR link (2),
+.BR readlink (2),
+.BR stat (2),
+.BR symlink (2),
+.BR attributes (7),
+.BR largefile (7)
 .SH NOTES
 .sp
 .LP

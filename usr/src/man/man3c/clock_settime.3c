@@ -135,7 +135,7 @@ represents the amount of time (in seconds and nanoseconds) since some arbitrary
 time in the past; it is not correlated in any way to the time of day, and thus
 is not subject to resetting or drifting by way of
 .Xr adjtime 2 ,
-.Xr ntp adjtime 2 ,
+.Xr ntp_adjtime 2 ,
 .Xr settimeofday 3C ,
 or
 .Fn clock_settime .
@@ -166,7 +166,7 @@ and
 member of the
 .Vt lwpsinfo_t
 structure discussed in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 This clock cannot be set with
 .Fn clock_settime
@@ -183,7 +183,7 @@ The system time is the same that is seen in the
 member of the
 .Vt lwpsinfo_t
 structure discussed in
-.Xr proc 4    .
+.Xr proc 5   .
 System time includes both the system and trap microstates,
 .Fa pr_stime
 and
@@ -207,7 +207,7 @@ and
 members of the
 .Vt psinfo_t
 structure documented in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 This clock is not settable with
 .Fn clock_settime .
@@ -284,4 +284,4 @@ is
 .Xr settimeofday 3C ,
 .Xr timer_gettime 3C ,
 .Xr time.h 3HEAD ,
-.Xr proc 4
+.Xr proc 5

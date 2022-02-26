@@ -89,7 +89,7 @@ if ((n = project_walk(simple_callback, &total_count)) >= 0)
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -107,5 +107,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBgetprojid\fR(2), \fBlibproject\fR(3LIB), \fBsettaskid\fR(2),
-\fBattributes\fR(5)
+.BR getprojid (2),
+.BR settaskid (2),
+.BR libproject (3LIB),
+.BR attributes (7)

@@ -117,7 +117,7 @@ native byte order and big- or little-endian.
 All of the functions in this family simply return their input when the host's
 native byte order is the same as the desired order.
 For more information on endianness, see
-.Xr byteorder 5 .
+.Xr byteorder 7 .
 .Pp
 The
 .Fn betoh16 ,
@@ -188,5 +188,5 @@ converted.
 .Sh SEE ALSO
 .Xr byteorder 3C ,
 .Xr endian.h 3HEAD ,
-.Xr attributes 5 ,
-.Xr byteorder 5
+.Xr attributes 7 ,
+.Xr byteorder 7

@@ -35,7 +35,7 @@ information.
 The
 .Sy psinfo_t
 structure that is returned is defined in
-.Xr proc 4
+.Xr proc 5
 and is valid until a subsequent call to
 .Xr Prelease 3PROC .
 .Sh RETURN VALUES
@@ -56,4 +56,4 @@ in
 .Xr ps 1 ,
 .Xr libproc 3LIB ,
 .Xr Prelease 3PROC ,
-.Xr proc 4
+.Xr proc 5

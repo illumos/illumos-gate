@@ -110,7 +110,7 @@ Insufficient memory was allocated.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -128,5 +128,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBsetppriv\fR(2), \fBpriv_str_to_set\fR(3C), \fBattributes\fR(5),
-\fBprivileges\fR(5)
+.BR setppriv (2),
+.BR priv_str_to_set (3C),
+.BR attributes (7),
+.BR privileges (7)

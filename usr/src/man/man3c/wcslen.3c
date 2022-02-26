@@ -79,8 +79,8 @@ None.
 .Xr strlen 3C ,
 .Xr strnlen 3C ,
 .Xr wchar.h 3HEAD ,
-.Xr locale 5 ,
-.Xr standards 5
+.Xr locale 7 ,
+.Xr standards 7
 .Sh STANDARDS
 The
 .Fn wcslen

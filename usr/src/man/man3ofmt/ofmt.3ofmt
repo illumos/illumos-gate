@@ -342,4 +342,4 @@ function returns the
 .Sh SEE ALSO
 .Xr ioctl 2 ,
 .Xr strerror 3C ,
-.Xr attributes 5
+.Xr attributes 7

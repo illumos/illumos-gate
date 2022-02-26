@@ -42,7 +42,7 @@ read the object file.
 For more information on this, see the
 .Sy PROGRAMMING NOTES
 section of
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 If successful, the controlling process will obtain control of the
 process specified by
@@ -71,4 +71,4 @@ in
 .Xr libproc 3LIB ,
 .Xr Prelease 3PROC ,
 .Xr Pstatus 3PROC ,
-.Xr proc 4
+.Xr proc 5

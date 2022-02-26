@@ -92,7 +92,7 @@ or \fBNULL\fR if one is not set.
 If the \fBIFF_BROADCAST\fR bit is set in \fIifa_flags\fR, then
 \fIifa_broadaddr\fR is valid, or \fBNULL\fR if not present.  If the
 \fBIFF_POINTOPOINT\fR bit is set, then \fIifa_dstaddr\fR is valid, or \fBNULL\fR
-if not present.  These two flags are mutually exclusive; see \fBif_tcp\fR(7P)
+if not present.  These two flags are mutually exclusive; see \fBif_tcp\fR(4P)
 for more information.
 
 .sp
@@ -129,14 +129,20 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBipadm\fR(1M), \fBifconfig\fR(1M), \fBioctl\fR(2), \fBmalloc\fR(3C),
-\fBsocket\fR(3SOCKET), \fBsockaddr\fR(3SOCKET), \fBsocket.h\fR(3HEAD),
-\fBif_tcp\fR(7P), \fBattributes\fR(5)
+.BR ioctl (2),
+.BR malloc (3C),
+.BR socket.h (3HEAD),
+.BR sockaddr (3SOCKET),
+.BR socket (3SOCKET),
+.BR if_tcp (4P),
+.BR attributes (7),
+.BR ifconfig (8),
+.BR ipadm (8)
 
 .SH NOTES
 .LP
 On an illumos system, this function lists only interfaces with the \fBIFF_UP\fR
-flag set; see \fBif_tcp\fR(7P) and \fBifconfig\fR(1M) for more information.
+flag set; see \fBif_tcp\fR(4P) and \fBifconfig\fR(8) for more information.
 
 .SH BUGS
 .LP

@@ -22,7 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 OLD_CONF=/etc/default/syslogd
 
@@ -40,11 +39,11 @@ convert()
 			exit $SMF_EXIT_ERR_CONFIG
 		fi
 	fi
-	echo "Incorporated ${OLD_CONF} settings into SMF. See syslogd(1m)."
+	echo "Incorporated ${OLD_CONF} settings into SMF. See syslogd(8)."
 	awk '{
 		if ($1 ~ /^LOG_FROM_REMOTE=/) {
 			print "# LOG_FROM_REMOTE is now set using "
-			    "svccfg(1m), see syslog(1m).";
+			    "svccfg(8), see syslogd(8).";
 		} else {
 			print $0;
 		}

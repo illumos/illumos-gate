@@ -395,7 +395,7 @@ Maps ASCII QOP, mechansim to u_int number
 .LP
 The \fBgsscred\fR utility manages the \fBgsscred\fR table, which contains
 mappings of principal names between network and local credentials.  See
-\fBgsscred\fR(1M).
+\fBgsscred\fR(8).
 .SH FILES
 .sp
 .ne 2
@@ -418,7 +418,7 @@ List of valid QOPs
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -434,7 +434,12 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBgsscred\fR(1M), \fBrpc\fR(3NSL), \fBrpc_clnt_auth\fR(3NSL), \fBxdr\fR(3NSL), \fBattributes\fR(5), \fBenviron\fR(5)
+.BR rpc (3NSL),
+.BR rpc_clnt_auth (3NSL),
+.BR xdr (3NSL),
+.BR attributes (7),
+.BR environ (7),
+.BR gsscred (8)
 .sp
 .LP
 \fIONC+ Developer\&'s Guide\fR

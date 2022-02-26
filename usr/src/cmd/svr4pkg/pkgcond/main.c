@@ -31,7 +31,7 @@
 /*
  * Program:	pkgcond
  *
- * Function:	Implements the package command suite public utility pkgcond(1M)
+ * Function:	Implements the package command suite public utility pkgcond(8)
  *
  * Usage:	pkgcond [-nv] [-O debug] condition [ argument ]
  *

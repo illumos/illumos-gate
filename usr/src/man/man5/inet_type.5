@@ -1,0 +1,102 @@
+'\" te
+.\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH INET_TYPE 5 "Jun 16, 1999"
+.SH NAME
+inet_type \- default Internet protocol type
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/default/inet_type\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBinet_type\fR file defines the default \fBIP\fR protocol to use.
+Currently this file is only used by the \fBifconfig\fR(8) and
+\fBnetstat\fR(8) commands.
+.sp
+.LP
+The \fBinet_type\fR file can contain a number of \fB<variable>=<value>\fR
+lines. Currently, the only variable defined is \fBDEFAULT_IP\fR, which can be
+assigned a value of \fBIP_VERSION4\fR, \fBIP_VERSION6\fR, or \fBBOTH\fR.
+.sp
+.LP
+The output displayed by the \fBifconfig\fR and \fBnetstat\fR commands can be
+controlled by the value of \fBDEFAULT_IP\fR set in \fBinet_type\fR file. By
+default, both commands display the IPv4 and IPv6 information available on the
+system. The user can choose to suppress display of IPv6 information by setting
+the value of \fBDEFAULT_IP\fR.  The following shows the possible values for
+\fBDEFAULT_IP\fR and the resulting \fBifconfig\fR and \fBnetstat\fR output that
+will be displayed:
+.sp
+.ne 2
+.na
+\fB\fBIP_VERSION4\fR\fR
+.ad
+.RS 15n
+Displays only IPv4 related information. The output displayed is backward
+compatible with older versions of the \fBifconfig\fR(8) and \fBnetstat\fR(8)
+commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBIP_VERSION6\fR\fR
+.ad
+.RS 15n
+Displays both IPv4 and IPv6 related information for \fBifconfig\fR and
+\fBnetstat\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBBOTH\fR\fR
+.ad
+.RS 15n
+Displays both IPv4 and IPv6 related information for \fBifconfig\fR and
+\fBnetstat\fR.
+.RE
+
+.sp
+.LP
+The command-line options to the \fBifconfig\fR and \fBnetstat\fR commands
+override the effect of \fBDEFAULT_IP\fR as set in the \fBinet_type\fR file. For
+example, even if the value of \fBDEFAULT_IP\fR is \fBIP_VERSION4\fR, the
+command
+.sp
+.in +2
+.nf
+example% \fBifconfig -a6\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+will display all IPv6 interfaces.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSuppressing IPv6 Related Output
+.sp
+.LP
+This is what the \fBinet_type\fR file must contain if you want to suppress IPv6
+related output:
+
+.sp
+.in +2
+.nf
+DEFAULT_IP=IP_VERSION4
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+.BR ifconfig (8),
+.BR netstat (8)

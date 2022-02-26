@@ -137,7 +137,7 @@ extern "C" {
  * torn down.
  *
  * Oh, and last but not least: these ioctls are totally private and only
- * for use by lofiadm(1M).
+ * for use by lofiadm(8).
  *
  */
 

@@ -1,0 +1,130 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.\" Copyright 2022 Oxide Computer Company
+.Dd February 5, 2022
+.Dt PTEM 4M
+.Os
+.Sh NAME
+.Nm ptem
+.Nd STREAMS Pseudo-Terminal Emulation module
+.Sh SYNOPSIS
+.In unistd.h
+.In stropts.h
+.Ft int
+.Fo ioctl
+.Fa "int fildes" ,
+.Dv I_PUSH ,
+.Qq ptem
+.Fc
+.Sh DESCRIPTION
+.Nm ptem
+is a STREAMS module that emulates a terminal device when used in conjunction
+with the line discipline,
+.Xr ldterm 4M ,
+and the pseudo terminal driver,
+.Xr ptm 4D .
+.Pp
+The
+.Nm ptem
+module must be pushed
+.Po
+see
+.Dv I_PUSH
+in
+.Xr streamio 4I
+.Pc
+onto the subsidiary device of a pseudo-terminal STREAM, before the
+.Xr ldterm 4M
+module is pushed.
+.Ss Write-side Behaviour
+The
+.Dv TCSETA ,
+.Dv TCSETAF ,
+.Dv TCSETAW ,
+.Dv TCGETA ,
+.Dv TCSETS ,
+.Dv TCSETSW ,
+.Dv TCSETSF ,
+.Dv TCGETS ,
+.Dv TCSBRK ,
+.Dv JWINSIZE ,
+.Dv TIOCGWINSZ ,
+and
+.Dv TIOCSWINSZ
+.Xr termio 4I
+.Xr ioctl 2
+messages are processed and acknowledged.
+.Pp
+If
+.Em remote mode
+is not in effect,
+.Nm ptem
+handles the
+.Dv TIOCSTI
+ioctl by copying the argument bytes into an
+.Dv M_DATA
+message and passing it back up the read side.
+Regardless of the
+.Em remote mode
+setting,
+.Nm ptem
+acknowledges the ioctl and passes a copy of it downstream for possible further
+processing.
+.Pp
+A hang up
+.Po
+e.g.,
+.Ic stty 0
+.Pc
+is converted to a zero length
+.Dv M_DATA
+message and passed downstream.
+.Xr termio 4I
+.Sy cflags
+and window row and column information are stored locally, one per stream.
+.Dv M_DELAY
+messages are discarded.
+.Pp
+All other messages are passed downstream unmodified.
+.Ss Read-side Behaviour
+All messages are passed upstream unmodified with the following exceptions:
+.Bl -bullet
+.It
+All
+.Dv M_READ
+and
+.Dv M_DELAY
+messages are freed in both directions.
+.It
+A
+.Dv TCSBRK
+ioctl is converted to an
+.Dv M_BREAK
+message and passed upstream and an acknowledgement is returned downstream.
+.It
+A
+.Dv TIOCSIGNAL
+ioctl is converted into an
+.Dv M_PCSIG
+message, passed upstream, and an acknowledgement is returned downstream.
+.It
+A
+.Dv TIOCREMOTE
+ioctl is converted into an
+.Dv M_CTL
+message, acknowledged, and passed upstream; the resulting mode is retained for
+use in subsequent
+.Dv TIOCSTI
+parsing.
+.El
+.Sh SEE ALSO
+.Xr stty 1 ,
+.Xr ioctl 2 ,
+.Xr streamio 4I ,
+.Xr termio 4I ,
+.Xr ldterm 4M ,
+.Xr pckt 4M

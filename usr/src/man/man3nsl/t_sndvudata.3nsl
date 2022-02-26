@@ -260,7 +260,7 @@ In the \fBTLI\fR interface definition, no counterpart of this routine was
 defined.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -277,4 +277,5 @@ MT Level	Safe
 .LP
 \fBfcntl\fR(2), \fBt_alloc\fR(3NSL), \fBt_open\fR(3NSL),
 \fBt_rcvudata\fR(3NSL), \fBt_rcvvudata\fR(3NSL) \fBt_rcvuderr\fR(3NSL),
-\fBt_sndudata\fR(3NSL), \fBattributes\fR(5)
+.BR t_sndudata (3NSL),
+.BR attributes (7)

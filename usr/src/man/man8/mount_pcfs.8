@@ -1,0 +1,203 @@
+'\" te
+.\"  Based on mount_hsfs(8), which is Copyright 1989 AT&T Copyright (c) 2006 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH MOUNT_PCFS 8 "May 12, 2008"
+.SH NAME
+mount_pcfs \- mount pcfs file systems
+.SH SYNOPSIS
+.LP
+.nf
+\fBmount\fR \fB-F\fR pcfs [\fIgeneric_options\fR]
+     [\fB-o\fR \fIFSType-specific_options\fR] \fIspecial\fR | \fImount_point\fR
+.fi
+
+.LP
+.nf
+\fBmount\fR \fB-F\fR pcfs [\fIgeneric_options\fR]
+     [\fB-o\fR \fIFSType-specific_options\fR] \fIspecial\fR \fImount_point\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBmount\fR attaches an \fBMS-DOS\fR file system (\fBpcfs\fR) to the file
+system hierarchy at the \fImount_point\fR, which is the pathname of a
+directory. If \fImount_point\fR has any contents prior to the \fBmount\fR
+operation, these are hidden until the file system is unmounted.
+.sp
+.LP
+The \fBpcfs\fR file system supports direct mounting of files containing the
+file system as well as block devices. See \fBmount\fR(8) and
+\fBlofiadm\fR(8).
+.sp
+.LP
+If \fBmount\fR is invoked with \fIspecial\fR or \fImount_point\fR as the only
+arguments, \fBmount\fR will search \fB/etc/vfstab\fR to fill in the missing
+arguments, including the \fIFSType-specific_options\fR; see \fBmount\fR(8) for
+more details.
+.sp
+.LP
+The \fIspecial\fR argument can be one of two special device file types:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A floppy disk, such as \fB/dev/diskette0\fR or \fB/dev/diskette1\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A DOS logical drive on a hard disk expressed as
+\fIdevice-name\fR\fB:\fR\fIlogical-drive\fR , where \fIdevice-name\fR specifies
+the special block device-file for the whole disk and \fIlogical-drive\fR is
+either a drive letter (c through z) or a drive number (1 through 24). Examples
+are \fB/dev/dsk/c0t0d0p0:\fR\fIc\fR and \fB/dev/dsk/c0t0d0p0:\fR\fI1\fR.
+.RE
+.sp
+.LP
+The \fIspecial\fR device file type must have a formatted \fBMS-DOS\fR file
+system with either a 12-bit, 16-bit, or 32-bit File Allocation Table.
+.SH OPTIONS
+.sp
+.ne 2
+.na
+\fB\fIgeneric_options\fR\fR
+.ad
+.sp .6
+.RS 4n
+See \fBmount\fR(8) for the list of supported options.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-o\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify \fBpcfs\fR file system-specific options. The following options are
+supported:
+.sp
+.ne 2
+.na
+\fB\fBclamptime\fR | \fBnoclamptime\fR\fR
+.ad
+.sp .6
+.RS 4n
+File timestamps in \fBpcfs\fR cover a range between January 1st 1980 and
+December 31st 2127. This is not equal to the range of \fBtime_t\fR on Unix for
+either 32-bit or 64-bit applications. In particular, 32-bit applications fail
+with \fBEOVERFLOW\fR errors on the \fBstat\fR(2) system call when timestamps
+beyond the range of 32-bit \fBtime_t\fR are encountered. In order to prevent
+such spurious failures, \fBpcfs\fR by default clamps timestamps to the common
+subset of possible \fBpcfs\fR timestamps and the range available to 32-bit
+applications in Unix. The \fBclamptime\fR mount option therefore is active by
+default. If you want access to the full range of possible timestamps on
+\fBpcfs\fR, mount the file system with the \fBnoclamptime\fR mount option. Note
+that if \fBnoclamptime\fR is used, only 64-bit applications will have access to
+timestamps beyond January 19th 2038, 03:14:06 UTC; 32-bit applications will
+encounter \fBEOVERFLOW\fR errors.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfoldcase\fR | \fBnofoldcase\fR\fR
+.ad
+.sp .6
+.RS 4n
+Force uppercase characters in filenames to lowercase when reading them from the
+filesystem. This is for compatibility with the previous behavior of \fBpcfs\fR.
+The default is \fBnofoldcase\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBhidden\fR | \fBnohidden\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow or disallow listing of files with hidden or system bits set. Option
+\fBhidden\fR is the default. When \fBnohidden\fR is effect, hidden and system
+files are neither visible nor accessible. Note that PCFS in previous releases
+of the Solaris operating system used the \fBnohidden\fR option as the default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBatime\fR | \fBnoatime\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable or disable write access timestamps on DOS-formatted media. Default for
+fixed disks is \fBatime\fR, while for removable media \fBnoatime\fR is used.
+The latter default is so that writes to flash-based media ("memory sticks") can
+be minimized, to prolong lifetime.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtimezone=\fItimezone\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Timestamps on DOS-formatted media are recorded in the local time of the
+recording system. This can cause confusion when accessing removable media in
+which the recording and receiving system use different time zones. Use this
+option to force media timestamps to be interpreted for a specific time zone.
+The \fBmount_pcfs\fR command converts the given time zone name into a numerical
+offset that is passed to the \fBpcfs\fR kernel module, using the same rules as
+described in \fBenviron\fR(7) for the \fBTZ\fR environment variable. By
+default, the \fBtimezone\fR value is taken from the \fBTZ\fR environment
+variable.
+.RE
+
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/etc/mnttab\fR\fR
+.ad
+.sp .6
+.RS 4n
+table of mounted file systems
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/vfstab\fR\fR
+.ad
+.sp .6
+.RS 4n
+list of default parameters for each file system
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR mount (2),
+.BR stat (2),
+.BR time (2),
+.BR pcfs (4FS),
+.BR mnttab (5),
+.BR vfstab (5),
+.BR attributes (7),
+.BR environ (7),
+.BR lofiadm (8),
+.BR mount (8),
+.BR mountall (8)
+.SH NOTES
+.sp
+.LP
+If the directory on which a file system is to be mounted is a symbolic link,
+the file system is mounted on the directory to which the symbolic link refers,
+rather than on top of the symbolic link itself.

@@ -134,7 +134,7 @@ initshells(void)
 		return ((char **)okshells);
 	/*
 	 * The +1 in the malloc() below is needed to handle the final
-	 * fgets() NULL terminator.  From fgets(3S):
+	 * fgets() NULL terminator.  From fgets(3C):
 	 *
 	 * char *fgets(char *s, int n, FILE *stream);
 	 *

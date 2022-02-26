@@ -1,0 +1,44 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
+.TH STICKY 7 "Aug 1, 2002"
+.SH NAME
+sticky \- mark files for special treatment
+.SH DESCRIPTION
+.sp
+.LP
+The \fIsticky bit\fR (file mode bit  \fB01000\fR, see \fBchmod\fR(2)) is used
+to indicate special treatment of certain files and directories. A directory for
+which the sticky bit is set restricts deletion of files it contains.  A file in
+a sticky directory can only be removed or renamed by a user who has write
+permission on the directory, and either owns the file, owns the directory, has
+write permission on the file, or is a privileged user. Setting the sticky bit
+is useful for directories such as \fB/tmp\fR, which must be publicly writable
+but should deny users permission to arbitrarily delete or rename the files of
+others.
+.sp
+.LP
+If the sticky bit is set on a regular file and no execute bits are set, the
+system's page cache will not be used to hold the file's data. This bit is
+normally set on swap files of diskless clients so that accesses to these files
+do not flush more valuable data from the system's cache. Moreover, by default
+such files are treated as swap files, whose inode modification times may not
+necessarily be correctly recorded on permanent storage.
+.sp
+.LP
+Any user may create a sticky directory. See \fBchmod\fR for details about
+modifying file modes.
+.SH SEE ALSO
+.sp
+.LP
+.BR chmod (1),
+.BR chmod (2),
+.BR chown (2),
+.BR mkdir (2),
+.BR rename (2),
+.BR unlink (2)
+.SH BUGS
+.sp
+.LP
+The \fBmkdir\fR(2) function will not create a directory with the sticky bit
+set.

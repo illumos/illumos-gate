@@ -1,0 +1,756 @@
+'\" te
+.\" Copyright (c) 2002 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH UFSRESTORE 8 "Sep 24, 2002"
+.SH NAME
+ufsrestore \- incremental file system restore
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/ufsrestore\fR i | r | R | t | x [abcdfhlmostvyLT]
+     [\fIarchive_file\fR] [\fIfactor\fR] [\fIdumpfile\fR] [\fIn\fR] [\fIlabel\fR]
+     [\fItimeout\fR] [\fIfilename\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBufsrestore\fR utility restores files from backup media created with the
+\fBufsdump\fR command. \fBufsrestores\fR's actions are controlled by the
+\fIkey\fR argument. The \fIkey\fR is exactly one \fBfunction\fR \fIletter\fR
+(\fBi\fR, \fBr\fR, \fBR\fR , \fBt\fR, or \fBx\fR) and zero or more \fIfunction
+modifier\fRs (letters). The \fIkey\fR string contains no \fBSPACE\fR
+characters. Function modifier arguments are listed on the command line in the
+same order as their corresponding function modifiers appear in the \fIkey\fR
+string.
+.sp
+.LP
+\fIfilename\fR arguments which appear on the command line, or as arguments to
+an interactive command, are treated as shell \fBglob\fR patterns by the \fBx\fR
+and \fBt\fR functions; any files or directories matching the patterns are
+selected. The metacharacters \fB*\fR, \fB?\fR, and \fB[ ]\fR must be protected
+from the shell if they appear on the command line. There is no way to quote
+these metacharacters to explicitly match them in a filename.
+.sp
+.LP
+The temporary files \fBrstdir*\fR and \fBrstmode*\fR are placed in \fB/tmp\fR
+by default. If the environment variable \fBTMPDIR\fR is defined with a
+non-empty value, that location is used instead of \fB/tmp\fR.
+.SH OPTIONS
+.SS "Function Letters"
+.sp
+.LP
+You must specify one (and only one) of the function letters listed below. Note
+that \fBi\fR, \fBx\fR, and \fBr\fR are intended to restore files into an empty
+directory. The \fBR\fR function is intended for restoring into a populated
+directory.
+.sp
+.ne 2
+.na
+\fB\fBi\fR\fR
+.ad
+.RS 5n
+Interactive. After reading in the directory information from the media,
+\fBufsrestore\fR invokes a shell-like interface that allows you to browse
+through the dump file's directory hierarchy and select individual files to be
+extracted. Restoration has the same semantics as \fBx\fR (see below). See
+\fBInteractive Commands\fR, below, for a description of available commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fBr\fR
+.ad
+.RS 5n
+Recursive. Starting with an empty directory and a level 0 dump, the \fBr\fR
+function recreates the filesystem relative to the current working directory,
+exactly as it appeared when the dump was made. Information used to restore
+incremental dumps on top of the full dump (for example, \fBrestoresymtable\fR)
+is also included. Several \fBufsrestore\fR runs are typical, one for each
+higher level of dump (0, 1, ..., 9).  Files that were deleted between the level
+0 and a subsequent incremental dump will not exist after the final restore. To
+completely restore a file system, use the \fBr\fR function restore the level 0
+dump, and again for each incremental dump. Although  this function letter is
+intended for a complete restore onto a new file system (one just created with
+\fBnewfs\fR(8)), if the file  system contains files not on the backup media,
+they are preserved.
+.RE
+
+.sp
+.ne 2
+.na
+\fBR\fR
+.ad
+.RS 5n
+Resume restoring. If an \fBr\fR-mode \fBufsrestore\fR was interrupted, this
+function prompts for the volume from which to resume restoring and continues
+the restoration from where it was left off.  Otherwise identical to \fBr\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBt\fR
+.ad
+.RS 5n
+Table of contents. List each \fIfilename\fR that appears on the media. If no
+\fIfilename\fR argument is given, the root directory is listed. This results in
+a list of all files on the media, unless the \fBh\fR function modifier is in
+effect. The table of contents is taken from the media or from the specified
+archive file, when the \fBa\fR function modifier is used. The \fBa\fR function
+modifier is mutually exclusive with the \fBx\fR and \fBr\fR function letters.
+.RE
+
+.sp
+.ne 2
+.na
+\fBx\fR
+.ad
+.RS 5n
+Extract the named files from the media. Files are restored to the same relative
+locations that they had in the original file system.
+.sp
+If the \fIfilename\fR argument matches a directory whose contents were written
+onto the media, and the \fBh\fR modifier is not in effect, the directory is
+recursively extracted, relative to the current directory, which is expected to
+be empty. For each file, the owner, modification time, and mode are restored
+(if possible).
+.sp
+If you omit the \fIfilename\fR argument or specify \fB\&.\fR, the root
+directory is extracted. This results in the entire tape being extracted, unless
+the \fBh\fR modifier is in effect. . With the \fBx\fR function, existing files
+are overwritten and \fBufsrestore\fR displays the names of the overwritten
+files. Overwriting a currently-running executable can have unfortunate
+consequences.
+.sp
+Use the \fBx\fR option to restore partial file system dumps, as they are (by
+definition) not entire file systems.
+.RE
+
+.SS "Function Modifiers"
+.sp
+.ne 2
+.na
+\fBa \fIarchive_file\fR\fR
+.ad
+.RS 19n
+Read the table of contents from \fIarchive_file\fR instead of the media. This
+function modifier can be used in combination with the \fBt\fR, \fBi\fR, or
+\fBx\fR function letters, making it possible to check whether files are on the
+media without having to mount the media. When used with the \fBx\fR and
+interactive (\fBi\fR) function letters, it prompts for the volume containing
+the file(s) before extracting them.
+.RE
+
+.sp
+.ne 2
+.na
+\fBb \fIfactor\fR\fR
+.ad
+.RS 19n
+Blocking factor. Specify the blocking factor for tape reads. For variable
+length \fBSCSI\fR tape devices, unless the data was written with the default
+blocking factor, a blocking factor at least as great as that used to write the
+tape must be used; otherwise, an error will be generated. Note that a tape
+block is 512 bytes. Refer to the man page for your specific tape driver for the
+maximum blocking factor.
+.RE
+
+.sp
+.ne 2
+.na
+\fBc\fR
+.ad
+.RS 19n
+Convert the contents of the media in 4.1BSD format to the new \fBufs\fR file
+system format.
+.RE
+
+.sp
+.ne 2
+.na
+\fBd\fR
+.ad
+.RS 19n
+Debug. Turn on debugging output.
+.RE
+
+.sp
+.ne 2
+.na
+\fBf \fIdump_file\fR\fR
+.ad
+.RS 19n
+Use \fIdump_file\fR instead of \fB/dev/rmt/0\fR as the file to restore from.
+Typically \fIdump_file\fR specifies a tape or diskette drive. If
+\fIdump_file\fR is specified as `\fB\(mi\fR\&', \fBufsrestore\fR reads from the
+standard input. This allows \fBufsdump\fR(8) and \fBufsrestore\fR to be used
+in a pipeline to copy a file system:
+.sp
+.in +2
+.nf
+example# ufsdump 0f \(mi /dev/rdsk/c0t0d0s7 \e
+ | (cd /home;ufsrestore xf \(mi)
+.fi
+.in -2
+.sp
+
+If the name of the file is of the form \fImachine\fR\fB:\fR\fIdevice\fR, the
+restore is done from the specified machine over the network using
+\fBrmt\fR(8). Since \fBufsrestore\fR is normally run by root, the name of the
+local machine must appear in the \fB/.rhosts\fR file of the remote machine. If
+the file is specified as \fIuser\fR\fB@\fR\fImachine\fR\fB:\fR\fIdevice\fR,
+\fBufsrestore\fR will attempt to execute as the specified user on the remote
+machine. The specified user must have a \fB\&.rhosts\fR file on the remote
+machine that allows the user invoking the command from the local machine to
+access the remote machine.
+.RE
+
+.sp
+.ne 2
+.na
+\fBh\fR
+.ad
+.RS 19n
+Extract or list the actual directory, rather than the files that it references.
+This prevents hierarchical restoration of complete subtrees from the tape.
+.RE
+
+.sp
+.ne 2
+.na
+\fBl\fR
+.ad
+.RS 19n
+Autoload. When the end-of-tape is reached before the restore is complete, take
+the drive off-line and wait up to two minutes (the default, see the \fBT\fR
+function modifier) for the tape drive to be ready again. This gives autoloading
+(stackloader) tape drives a chance to load a new tape. If the drive is ready
+within two minutes, continue. If it is not, prompt for another tape and wait.
+.RE
+
+.sp
+.ne 2
+.na
+\fBL \fIlabel\fR\fR
+.ad
+.RS 19n
+The label that should appear in the header of the dump file. If the labels do
+not match, \fBufsrestore\fR issues a diagnostic and exits. The tape label is
+specific to the \fBufsdump\fR tape format, and bears no resemblance to
+\fBIBM\fR or \fBANSI\fR-standard tape labels.
+.RE
+
+.sp
+.ne 2
+.na
+\fBm\fR
+.ad
+.RS 19n
+Extract by inode numbers rather than by filename to avoid regenerating complete
+pathnames. Regardless of where the files are located in the dump hierarchy,
+they are restored into the current directory and renamed with their inode
+number. This is useful if only a few files are being extracted.
+.RE
+
+.sp
+.ne 2
+.na
+\fBo\fR
+.ad
+.RS 19n
+Offline. Take the drive off-line when the restore is complete or the
+end-of-media is reached and rewind the tape, or eject the diskette. In the case
+of some autoloading 8mm drives, the tape is removed from the drive
+automatically.
+.RE
+
+.sp
+.ne 2
+.na
+\fBs \fIn\fR\fR
+.ad
+.RS 19n
+Skip to the \fIn\fRth file when there are multiple dump files on the same tape.
+For example, the command:
+.sp
+.in +2
+.nf
+example# ufsrestore xfs /dev/rmt/0hn 5
+.fi
+.in -2
+.sp
+
+would position you to the fifth file on the tape when reading volume 1 of the
+dump. If a dump extends over more than one volume, all volumes except the first
+are assumed to start at position 0, no matter what "\fBs\fR \fIn\fR" value is
+specified.
+.sp
+If "\fBs\fR \fIn\fR" is specified, the backup media must be at \fBBOT\fR
+(beginning of tape). Otherwise, the initial positioning to read the table of
+contents will fail, as it is performed by skipping the tape forward
+\fIn\fR\fB-1\fR files rather than by using absolute positioning. This is
+because on some devices absolute positioning is very time consuming.
+.RE
+
+.sp
+.ne 2
+.na
+\fBT timeout [hms]\fR
+.ad
+.RS 19n
+Sets the amount of time to wait for an autoload command to complete. This
+function modifier is ignored unless the \fBl\fR function modifier has also been
+specified. The default timeout period is two minutes. The time units may be
+specified as a trailing \fBh\fR (hours), \fBm\fR (minutes), or \fBs\fR
+(seconds). The default unit is minutes.
+.RE
+
+.sp
+.ne 2
+.na
+\fBv\fR
+.ad
+.RS 19n
+Verbose. \fBufsrestore\fR displays the name and inode number of each file it
+restores, preceded by its file type.
+.RE
+
+.sp
+.ne 2
+.na
+\fBy\fR
+.ad
+.RS 19n
+Do not ask whether to abort the restore in the event of tape errors.
+\fBufsrestore\fR tries to skip over the bad tape block(s) and continue as best
+it can.
+.RE
+
+.SS "Interactive Commands"
+.sp
+.LP
+\fBufsrestore\fR enters interactive mode when invoked with the \fBi\fR function
+letters. Interactive commands are reminiscent of the shell. For those commands
+that accept an argument, the default is the current directory. The interactive
+options are:
+.sp
+.ne 2
+.na
+\fBadd [\fIfilename\fR]\fR
+.ad
+.RS 22n
+Add the named file or directory to the list of files to extract. If a directory
+is specified, add that directory and its files (recursively) to the extraction
+list (unless the \fBh\fR modifier is in effect).
+.RE
+
+.sp
+.ne 2
+.na
+\fBcd \fIdirectory\fR\fR
+.ad
+.RS 22n
+Change to \fIdirectory\fR (within the dump file).
+.RE
+
+.sp
+.ne 2
+.na
+\fBdelete [\fIfilename\fR]\fR
+.ad
+.RS 22n
+Delete the current directory, or the named file or directory from the list of
+files to extract. If a directory is specified, delete that directory and all
+its descendents from the extraction list (unless the \fBh\fR modifier is in
+effect). The most expedient way to extract a majority of files from a directory
+is to add that directory to the extraction list, and then delete specific files
+to omit.
+.RE
+
+.sp
+.ne 2
+.na
+\fBextract\fR
+.ad
+.RS 22n
+Extract all files on the extraction list from the dump media. \fBufsrestore\fR
+asks which volume the user wishes to mount. The fastest way to extract a small
+number of files is to start with the last volume and work toward the first. If
+"\fBs\fR \fIn\fR" is given on the command line, volume 1 will automatically be
+positioned to file \fIn\fR when it is read.
+.RE
+
+.sp
+.ne 2
+.na
+\fBhelp\fR
+.ad
+.RS 22n
+Display a summary of the available commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fBls [\fIdirectory\fR]\fR
+.ad
+.RS 22n
+List files in \fIdirectory\fR or the current directory, represented by a
+`\fB\&.\fR' (period). Directories are appended with a `\fB/\fR' (slash).
+Entries marked for extraction are prefixed with a `\fB*\fR' (asterisk). If the
+verbose option is in effect, inode numbers are also listed.
+.RE
+
+.sp
+.ne 2
+.na
+\fBmarked [\fIdirectory\fR]\fR
+.ad
+.RS 22n
+Like \fBls\fR, except only files marked for extraction are listed.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpager\fR
+.ad
+.RS 22n
+Toggle the pagination of the output from the \fBls\fR and \fBmarked\fR
+commands. The pager used is that defined by the \fBPAGER\fR environment
+variable, or more(1) if that envar is not defined. The \fBPAGER\fR envar may
+include white-space-separated arguments for the pagination program.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpwd\fR
+.ad
+.RS 22n
+Print the full pathname of the current working directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fBquit\fR
+.ad
+.RS 22n
+\fBufsrestore\fR exits immediately, even if the extraction list is not empty.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsetmodes\fR
+.ad
+.RS 22n
+Prompts: \fBset owner/mode for\fR `\fB\&.\fR' (period). Type \fBy\fR for yes to
+set the mode (permissions, owner, times) of the current directory `\fB\&.\fR'
+(period) into which files are being restored equal to the mode of the root
+directory of the file system from which they were dumped. Normally, this is
+what you want when restoring a whole file system, or restoring individual files
+into the same locations from which they were dumped. Type \fBn\fR for no, to
+leave the mode of the current directory unchanged. Normally, this is what you
+want when restoring part of a dump to a directory other than the one from which
+the files were dumped.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsetpager \fIcommand\fR\fR
+.ad
+.RS 22n
+Sets the command to use for paginating output instead of the default or that
+inherited from the environment. The \fIcommand\fR string may include arguments
+in addition to the command itself.
+.RE
+
+.sp
+.ne 2
+.na
+\fBverbose\fR
+.ad
+.RS 22n
+Toggle the status of the \fBv\fR modifier. While \fBv\fR is in effect, the
+\fBls\fR command lists the inode numbers of all entries, and \fBufsrestore\fR
+displays information about each file as it is extracted.
+.RE
+
+.sp
+.ne 2
+.na
+\fBwhat\fR
+.ad
+.RS 22n
+Display the dump header on the media.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported.
+.sp
+.ne 2
+.na
+\fB\fIfilename\fR\fR
+.ad
+.RS 12n
+Specifies the pathname of files (or directories) to be restored to disk. Unless
+the \fBh\fR function modifier is also used, a directory name refers to the
+files it contains, and (recursively) its subdirectories and the files they
+contain. \fIfilename\fR is associated with either the \fBx\fR or \fBt\fR
+function letters, and must come last.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(7) for the description of the behavior of \fBufsrestore\fR
+when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+An error occurred. Verbose messages are displayed.
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.na
+\fBPAGER\fR
+.ad
+.RS 10n
+The command to use as a filter for paginating output. This can also be used to
+specify the options to be used. Default is \fBmore\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fBTMPDIR\fR
+.ad
+.RS 10n
+Selects the directory for temporary files. Defaults to \fB/tmp\fR if not
+defined in the environment.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/rmt/0\fR\fR
+.ad
+.RS 23n
+the default tape drive
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$TMPDIR/rstdir*\fR\fR
+.ad
+.RS 23n
+file containing directories on the tape
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB$TMPDIR/rstmode*\fR\fR
+.ad
+.RS 23n
+owner, mode, and timestamps for directories
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&./restoresymtable\fR\fR
+.ad
+.RS 23n
+information passed between incremental restores
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR more (1),
+.BR ufsdump (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR mkfs (8),
+.BR mount (8),
+.BR rmt (8),
+.BR ufsdump (8)
+.SH DIAGNOSTICS
+.sp
+.LP
+\fBufsrestore\fR complains about bad option characters.
+.sp
+.LP
+Read errors result in complaints. If \fBy\fR has been specified, or the user
+responds \fBy\fR, \fBufsrestore\fR will attempt to continue.
+.sp
+.LP
+If the dump extends over more than one tape, \fBufsrestore\fR asks the user to
+change tapes. If the \fBx\fR or \fBi\fR function letter has been specified,
+\fBufsrestore\fR also asks which volume the user wishes to mount. If the
+\fBs\fR modifier has been specified, and volume 1 is mounted, it is
+automatically positioned to the indicated file.
+.sp
+.LP
+There are numerous consistency checks that can be listed by \fBufsrestore\fR.
+Most checks are self-explanatory or can "never happen". Common errors are given
+below.
+.sp
+.ne 2
+.na
+\fB\fBConverting to new file system format\fR\fR
+.ad
+.sp .6
+.RS 4n
+A dump tape created from the old file system has been loaded. It is
+automatically converted to the new file system format.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIfilename\fR\fB: not found on tape\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified file name was listed in the tape directory, but was not found on
+the tape. This is caused by tape read errors while looking for the file, using
+a dump tape created on an active file system, or restoring a partial dump with
+the \fBr\fR function.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBexpected next file\fR \fIinumber\fR\fB, got\fR \fIinumber\fR\fR
+.ad
+.sp .6
+.RS 4n
+A file that was not listed in the directory showed up. This can occur when
+using a dump tape created on an active file system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBIncremental tape too low\fR\fR
+.ad
+.sp .6
+.RS 4n
+When doing an incremental restore, a tape that was written before the previous
+incremental tape, or that has too low an incremental level has been loaded.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBIncremental tape too high\fR\fR
+.ad
+.sp .6
+.RS 4n
+When doing incremental restore, a tape that does not begin its coverage where
+the previous incremental tape left off, or one that has too high an incremental
+level has been loaded.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmedia\fR \fBread\fR \fBerror:\fR \fBinvalid\fR \fBargument\fR\fR
+.ad
+.sp .6
+.RS 4n
+Blocking factor specified for read is smaller than the blocking factor used to
+write data.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBTape read error while restoring\fR\fR
+.ad
+.br
+.na
+\fB\fBTape read error while skipping over inode inumber\fR\fR
+.ad
+.br
+.na
+\fB\fBTape read error while trying to resynchronize\fR\fR
+.ad
+.br
+.na
+\fB\fBA tape read error has\ occurred\fR\fR
+.ad
+.sp .6
+.RS 4n
+If a file name is specified, then its contents are probably partially wrong. If
+an inode is being skipped or the tape is trying to resynchronize, then no
+extracted files have been corrupted, though files may not be found on the tape.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBresync ufsrestore, skipped\fR \fInum\fR\fR
+.ad
+.sp .6
+.RS 4n
+After a tape read error, \fBufsrestore\fR may have to resynchronize itself.
+This message lists the number of blocks that were skipped over.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBIncorrect tape label. Expected `foo', got `bar'.\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBL\fR option was specified, and its value did not match what was recorded
+in the header of the dump file.
+.RE
+
+.SH NOTES
+.sp
+.LP
+\fBufsrestore\fR can get confused when doing incremental restores from dump
+tapes that were made on active file systems.
+.sp
+.LP
+A  \fBlevel 0\fR dump must be done after a full restore. Because
+\fBufsrestore\fR runs in user mode, it has no control over inode allocation.
+This means that \fBufsrestore\fR repositions the files, although it does not
+change their contents. Thus, a full dump must be done to get a new set of
+directories reflecting the new file positions, so that later incremental dumps
+will be correct.

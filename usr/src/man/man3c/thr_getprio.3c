@@ -124,7 +124,7 @@ value specified.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -140,6 +140,11 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpriocntl\fR(2), \fBpthread_setschedprio\fR(3C), \fBsched_setparam\fR(3C),
-\fBthr_create\fR(3C), \fBthr_suspend\fR(3C), \fBthr_yield\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR priocntl (2),
+.BR pthread_setschedprio (3C),
+.BR sched_setparam (3C),
+.BR thr_create (3C),
+.BR thr_suspend (3C),
+.BR thr_yield (3C),
+.BR attributes (7),
+.BR standards (7)

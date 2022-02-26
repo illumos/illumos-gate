@@ -217,7 +217,7 @@ Tests for any ASCII character, code between \fB0\fR and \fB0177\fR inclusive.
 .RS 13n
 Tests whether \fIc\fR is a character of class blank in the current locale. This
 macro/function is not available to applications conforming to standards prior
-to SUSv3. See \fBstandards\fR(5)
+to SUSv3. See \fBstandards\fR(7)
 .RE
 
 .sp
@@ -333,7 +333,7 @@ the function, the result is undefined. Otherwise, the macro or function returns
 non-zero if the classification is \fBTRUE\fR and \fB0\fR if the classification
 is \fBFALSE\fR.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .TS
 box;
 c | c
@@ -348,6 +348,10 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
-\fBstdio\fR(3C), \fBascii\fR(5), \fBenviron\fR(5),
-\fBstandards\fR(5)
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR stdio (3C),
+.BR uselocale (3C),
+.BR ascii (7),
+.BR environ (7),
+.BR standards (7)

@@ -1,0 +1,219 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ACCT 8 "August 29, 2021"
+.SH NAME
+acct, acctdisk, acctdusg, accton, acctwtmp, closewtmp, utmp2wtmp \- overview of
+accounting and miscellaneous accounting commands
+.SH SYNOPSIS
+.nf
+\fB/usr/lib/acct/acctdisk\fR
+.fi
+
+.LP
+.nf
+\fB/usr/lib/acct/acctdusg\fR [\fB-u\fR \fIfilename\fR] [\fB-p\fR \fIfilename\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/lib/acct/accton\fR [\fIfilename\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/lib/acct/acctwtmp\fR \fIreason\fR \fIfilename\fR
+.fi
+
+.LP
+.nf
+\fB/usr/lib/acct/closewtmp\fR
+.fi
+
+.LP
+.nf
+\fB/usr/lib/acct/utmp2wtmp\fR
+.fi
+
+.SH DESCRIPTION
+Accounting software is structured as a set of tools (consisting of both C
+programs and shell procedures) that can be used to build accounting systems.
+\fBacctsh\fR(8) describes the set of shell procedures built on top of the C
+programs.
+.sp
+.LP
+Connect time accounting is handled by various programs that write records into
+\fB/var/adm/wtmpx\fR, as described in \fButmpx\fR(5). The programs described in
+\fBacctcon\fR(8) convert this file into session and charging records, which
+are then summarized by \fBacctmerg\fR(8).
+.sp
+.LP
+Process accounting is performed by the system kernel. Upon termination of a
+process, one record per process is written to a file (normally
+\fB/var/adm/pacct\fR). The programs in \fBacctprc\fR(8) summarize this data
+for charging purposes; \fBacctcms\fR(8) is used to summarize command usage.
+Current process data may be examined using \fBacctcom\fR(1).
+.sp
+.LP
+Process accounting records and connect time accounting records (or any
+accounting records in the \fBtacct\fR format described in \fBacct.h\fR(3HEAD))
+can be merged and summarized into total accounting records by \fBacctmerg\fR
+(see \fBtacct\fR format in \fBacct.h\fR(3HEAD)). \fBprtacct\fR (see
+\fBacctsh\fR(8)) is used to format any or all accounting records.
+.sp
+.LP
+\fBacctdisk\fR reads lines that contain user \fBID\fR, login name, and number
+of disk blocks and converts them to total accounting records that can be merged
+with other accounting records. \fBacctdisk\fR returns an error if the input
+file is corrupt or improperly formatted.
+.sp
+.LP
+\fBacctdusg\fR reads its standard input (usually from \fBfind\fR \fB/\fR
+\fB-\fR\fBprint\fR) and computes disk resource consumption (including indirect
+blocks) by login.
+.sp
+.LP
+\fBaccton\fR without arguments turns process accounting off. If \fIfilename\fR
+is given, it must be the name of an existing file, to which the kernel appends
+process accounting records (see \fBacct\fR(2) and \fBacct.h\fR(3HEAD)).
+.sp
+.LP
+\fBacctwtmp\fR writes a \fButmpx\fR(5) record to \fIfilename\fR. The record
+contains the current time and a string of characters that describe the
+\fIreason\fR. A record type of \fBACCOUNTING\fR is assigned (see
+\fButmpx\fR(5)) \fIreason\fR must be a string of 11 or fewer characters,
+numbers, \fB$\fR, or spaces. For example, the following are suggestions for use
+in reboot and shutdown procedures, respectively:
+.sp
+.in +2
+.nf
+acctwtmp "acctg on" /var/adm/wtmpx
+acctwtmp "acctg off" /var/adm/wtmpx
+.fi
+.in -2
+
+.sp
+.LP
+For each user currently logged on, \fBclosewtmp\fR puts a false
+\fBDEAD_PROCESS\fR record in the \fB/var/adm/wtmpx\fR file. \fBrunacct\fR (see
+\fBrunacct\fR(8)) uses this false \fBDEAD_PROCESS\fR record so that the
+connect accounting procedures can track the time used by users logged on before
+\fBrunacct\fR was invoked.
+.sp
+.LP
+For each user currently logged on, \fBrunacct\fR uses \fButmp2wtmp\fR to create
+an entry in the file \fB/var/adm/wtmpx\fR, created by \fBrunacct\fR. Entries in
+\fB/var/adm/wtmpx\fR enable subsequent invocations of \fBrunacct\fR to account
+for connect times of users currently logged in.
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-u\fR \fIfilename\fR\fR
+.ad
+.RS 15n
+Places in \fIfilename\fR records consisting of those filenames for which
+\fBacctdusg\fR charges no one (a potential source for finding users trying to
+avoid disk charges).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIfilename\fR\fR
+.ad
+.RS 15n
+Specifies a password file, \fIfilename\fR. This option is not needed if the
+password file is \fB/etc/passwd\fR.
+.RE
+
+.SH ENVIRONMENT VARIABLES
+If any of the \fBLC_*\fR variables (\fBLC_TYPE\fR, \fBLC_MESSAGES\fR,
+\fBLC_TIME\fR, \fBLC_COLLATE\fR, \fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR) (see
+\fBenviron\fR(7)) are not set in the environment, the operational behavior of
+\fBacct\fR for each corresponding locale category is determined by the value of
+the \fBLANG\fR environment variable. If \fBLC_ALL\fR is set, its contents are
+used to override both the \fBLANG\fR and the other \fBLC_*\fR variables. If
+none of the above variables are set in the environment, the "C" (U.S. style)
+locale determines how \fBacct\fR behaves.
+.sp
+.ne 2
+.na
+\fB\fBLC_CTYPE\fR\fR
+.ad
+.RS 12n
+Determines how \fBacct\fR handles characters. When \fBLC_CTYPE\fR is set to a
+valid value, \fBacct\fR can display and handle text and filenames containing
+valid characters for that locale. \fBacct\fR can display and handle Extended
+Unix Code (EUC) characters where any  character can be 1, 2, or 3 bytes wide.
+\fBacct\fR can also handle EUC characters of 1, 2, or more column widths. In
+the "C" locale, only characters from ISO 8859-1 are valid.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBLC_TIME\fR\fR
+.ad
+.RS 12n
+Determines how \fBacct\fR handles date and time formats. In the "C" locale,
+date and time handling follows the U.S. rules.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 18n
+Used for login name to user \fBID\fR conversions.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/lib/acct\fR\fR
+.ad
+.RS 18n
+Holds all accounting commands listed in section 8 of this manual.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/adm/pacct\fR\fR
+.ad
+.RS 18n
+Current process accounting file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/adm/wtmpx\fR\fR
+.ad
+.RS 18n
+History of user access and administration information.
+.RE
+
+.SH SEE ALSO
+.BR acctcom (1),
+.BR acct (2),
+.BR acct.h (3HEAD),
+.BR passwd (5),
+.BR utmpx (5),
+.BR attributes (7),
+.BR environ (7),
+.BR acctcms (8),
+.BR acctcon (8),
+.BR acctmerg (8),
+.BR acctprc (8),
+.BR acctsh (8),
+.BR fwtmp (8),
+.BR runacct (8)
+.sp
+.LP
+\fI\fR

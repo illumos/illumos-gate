@@ -39,7 +39,7 @@ its trailing digits removed, a matching \fBDL_STYLE1\fR link has a filename of
 \fIprovider\fR. If a \fBDL_STYLE2\fR link is opened, \fBdlpi_open()\fR
 automatically performs the necessary \fBDLPI\fR operations to place the
 \fBDLPI\fR link instance and the associated \fBDLPI\fR handle in the
-\fBDL_UNBOUND\fR state. See \fBdlpi\fR(7P) for the definition of
+\fBDL_UNBOUND\fR state. See \fBdlpi\fR(4P) for the definition of
 \fIlinkname\fR.
 .sp
 .LP
@@ -57,7 +57,7 @@ listed below, defined in \fB<libdlpi.h>\fR.
 .ad
 .RS 18n
 Specify that the named DLPI device is an IP observability device (see
-\fBipnet\fR(7D)), and \fBdl_open()\fR will open the device from the
+\fBipnet\fR(4D)), and \fBdl_open()\fR will open the device from the
 \fB/dev/ipnet/\fR directory.
 .RE
 
@@ -70,7 +70,7 @@ Specify that the named DLPI device is an IP observability device (see
 This flag is applicable only when opening IP Observability devices (with
 \fBDLPI_DEVIPNET\fR or by opening the \fB/dev/lo0\fR device). This flag causes
 the \fBipnet\fR driver to prepend an \fBipnet\fR header to each received IP
-packet. See \fBipnet\fR(7D) for the contents of this header.
+packet. See \fBipnet\fR(4D) for the contents of this header.
 .RE
 
 .sp
@@ -79,7 +79,7 @@ packet. See \fBipnet\fR(7D) for the contents of this header.
 \fB\fBDLPI_NATIVE\fR\fR
 .ad
 .RS 18n
-Enable \fBDLPI\fR native mode (see \fBDLIOCNATIVE\fR in \fBdlpi\fR(7P)) on a
+Enable \fBDLPI\fR native mode (see \fBDLIOCNATIVE\fR in \fBdlpi\fR(4P)) on a
 \fBDLPI\fR link instance. Native mode persists until the \fBDLPI\fR handle is
 closed by \fBdlpi_close\fR(3DLPI).
 .RE
@@ -90,7 +90,7 @@ closed by \fBdlpi_close\fR(3DLPI).
 \fB\fBDLPI_PASSIVE\fR\fR
 .ad
 .RS 18n
-Enable \fBDLPI\fR passive mode (see \fBDL_PASSIVE_REQ\fR in \fBdlpi\fR(7P)) on
+Enable \fBDLPI\fR passive mode (see \fBDL_PASSIVE_REQ\fR in \fBdlpi\fR(4P)) on
 a \fBDLPI\fR link instance. Passive mode persists until the \fBDLPI\fR handle
 is closed by \fBdlpi_close\fR(3DLPI).
 .RE
@@ -101,7 +101,7 @@ is closed by \fBdlpi_close\fR(3DLPI).
 \fB\fBDLPI_RAW\fR\fR
 .ad
 .RS 18n
-Enable \fBDLPI\fR raw mode (see \fBDLIOCRAW\fR in \fBdlpi\fR(7P)) on a
+Enable \fBDLPI\fR raw mode (see \fBDLIOCRAW\fR in \fBdlpi\fR(4P)) on a
 \fBDLPI\fR link instance. Raw mode persists until the \fBDLPI\fR handle is
 closed by \fBdlpi_close\fR(3DLPI).
 .RE
@@ -192,7 +192,7 @@ DLPI operation failed
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -210,5 +210,9 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBdlpi_close\fR(3DLPI), \fBdlpi_set_timeout\fR(3DLPI), \fBlibdlpi\fR(3LIB),
-\fBattributes\fR(5), \fBdlpi\fR(7P), \fBipnet\fR(7D)
+.BR dlpi_close (3DLPI),
+.BR dlpi_set_timeout (3DLPI),
+.BR libdlpi (3LIB),
+.BR ipnet (4D),
+.BR dlpi (4P),
+.BR attributes (7)

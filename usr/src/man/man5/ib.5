@@ -1,0 +1,89 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH IB 5 "Feb 19, 2004"
+.SH NAME
+ib \- InfiniBand device driver configuration files
+.SH DESCRIPTION
+.sp
+.LP
+The InfiniBand (IB) bus is an I/O transport based on switched  fabrics. IB
+devices are managed by the \fBib\fR(4D) nexus driver. There are three
+categories of InfiniBand devices:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IB  port/IB VPPA/IB HCA_SVC devices
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IB IOC devices
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IB Pseudo devices
+.RE
+.sp
+.LP
+The IB  port/IB VPPA/IB HCA_SVC devices are enumerated by way of the
+\fBib.conf\fR file. See \fBib\fR(4D).
+.sp
+.LP
+The IB IOC devices are enumerated using the InfiniBand Device management class.
+See \fBibdm\fR(4D).
+.sp
+.LP
+For devices not in these two categories, most notably IB Pseudo devices, the
+driver must provide configuration files to inform the system of the IB  devices
+to be created. Configuration parameters are represented in the form of name
+value pairs you can retrieve using the DDI property interfaces. See
+\fBddi_prop_op\fR(9F) for details.
+.sp
+.LP
+Configuration files for IB device drivers must identify the parent driver
+explicitly as \fBib\fR, and must create a string array property called
+\fBunit-address\fR which is unique to this entry in the configuration file.
+Drivers name \fBibport\fR and \fBioc\fR are reserved by \fBib\fR(4D) and should
+not be used.
+.sp
+.LP
+Each entry in the configuration file creates a prototype \fBdevinfo\fR node.
+Each node is assigned a unit address which is determined by the value of the
+\fBunit-address\fR  property. This property is only applicable to children of
+the IB parent and is required. See \fBdriver.conf\fR(5) for further details on
+configuration file syntax.
+.SH EXAMPLES
+.sp
+.LP
+Example 1: Sample configuration file
+.sp
+.LP
+Here is a configuration file called \fBibgen.conf\fR for an IB  device driver
+that implements a generic IB driver. This file creates a node called
+\fBibgen\fR.
+.sp
+.in +2
+.nf
+     #
+     # Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+     # Use is subject to license terms.
+     #
+     #ident  "@(#)ibgen.conf       1.3     03/05/01 SMI"
+     name="ibgen" parent="ib" unit-address="0";
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+.BR ib (4D),
+.BR ibtl (4D),
+.BR driver.conf (5),
+.BR ddi_prop_op (9F)

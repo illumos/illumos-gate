@@ -35,4 +35,4 @@ This is commonly used in the implementation of spin loops.
 .Sh MT-LEVEL
 .Sy MT-Safe
 .Sh SEE ALSO
-.Xr attributes 5
+.Xr attributes 7

@@ -23,8 +23,6 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -86,9 +84,9 @@
 	</dependent>
 
 	<!--
-		The 'ntp' service on an OPL domain can be configured 
+		The 'ntp' service on an OPL domain can be configured
 		with SP as the NTP server, so create a dependency such that
-		the 'ntp' service is started after the DSCP service. 
+		the 'ntp' service is started after the DSCP service.
 	-->
 	<dependent
 	    name='dscp_ntp'
@@ -135,7 +133,7 @@
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='prtdscp' section='1M'
+			<manpage title='prtdscp' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

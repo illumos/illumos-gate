@@ -22,7 +22,7 @@ The \fBaudit()\fR function queues a record for writing to the system audit log.
 The data pointed to by \fIrecord\fR is queued for the log after a minimal
 consistency check, with the \fIlength\fR parameter specifying the size of the
 record  in bytes. The data should be a well-formed audit  record as described
-by \fBaudit.log\fR(4).
+by \fBaudit.log\fR(5).
 .sp
 .LP
 The kernel validates the record header token type and length,  and sets the
@@ -88,7 +88,7 @@ the calling process.
 Only privileged processes can successfully execute this call.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -105,11 +105,16 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBaudit\fR(1M), \fBauditd\fR(1M), \fBsvcadm\fR(1M),
-\fBauditon\fR(2), \fBgetaudit\fR(2), \fBaudit.log\fR(4), \fBattributes\fR(5),
-\fBprivileges\fR(5)
+.BR auditon (2),
+.BR getaudit (2),
+.BR audit.log (5),
+.BR attributes (7),
+.BR privileges (7),
+.BR audit (8),
+.BR auditd (8),
+.BR svcadm (8)
 .SH NOTES
 .LP
 The functionality described in this man page is available only if
-the audit daemon \fBauditd\fR(1M) has not been
-disabled by \fBaudit\fR(1M) or \fBsvcadm\fR(1M).
+the audit daemon \fBauditd\fR(8) has not been
+disabled by \fBaudit\fR(8) or \fBsvcadm\fR(8).

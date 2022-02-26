@@ -218,7 +218,7 @@ fi
 echo "Changing to init state $initstate - please wait"
 
 # We might be racing with a system that's still booting.
-# Before starting init, check to see if smf(5) is running.  The easiest way
+# Before starting init, check to see if smf(7) is running.  The easiest way
 # to do this is to check for the existence of the repository service door.
 
 i=0

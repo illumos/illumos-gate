@@ -86,7 +86,7 @@ There was no free space remaining on the device containing the file.
 .ad
 .RS 13n
 Remote connection timed out. This occurs when the file is on an  \fBNFS\fR file
-system mounted with the  \fIsoft\fR option. See  \fBmount_nfs\fR(1M).
+system mounted with the  \fIsoft\fR option. See  \fBmount_nfs\fR(8).
 .RE
 
 .sp
@@ -108,7 +108,7 @@ by the device driver that the write has taken place.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -122,12 +122,17 @@ Interface Stability	Committed
 _
 MT-Level	Async-Signal-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBmount_nfs\fR(1M), \fBread\fR(2), \fBsync\fR(2), \fBwrite\fR(2),
-\fBfcntl.h\fR(3HEAD), \fBfdatasync\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR read (2),
+.BR sync (2),
+.BR write (2),
+.BR fdatasync (3C),
+.BR fcntl.h (3HEAD),
+.BR attributes (7),
+.BR standards (7),
+.BR mount_nfs (8)

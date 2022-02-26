@@ -22,7 +22,7 @@ This function is obsolete. The management of removable media by the Volume
 Management feature, including \fBvold\fR, has been replaced by software that
 supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
 through the HAL APIs, which are documented on the HAL web site. See
-\fBhal\fR(5). The return value of this function is undefined.
+\fBhal\fR(7). The return value of this function is undefined.
 .sp
 .LP
 \fBvolmgt_inuse()\fR checks whether volume management is managing the specified
@@ -77,7 +77,7 @@ if (volmgt_inuse("/dev/rdiskette0") != 0) {
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -96,7 +96,7 @@ Interface Stability	Obsolete
 .sp
 .LP
 \fBopen\fR(2),  \fBstat\fR(2),  \fBerrno\fR(3C),  \fBvolmgt_check\fR(3VOLMGT),
-\fBvolmgt_running\fR(3VOLMGT),  \fBattributes\fR(5),  \fBhal\fR(5)
+\fBvolmgt_running\fR(3VOLMGT),  \fBattributes\fR(7),  \fBhal\fR(7)
 .SH NOTES
 .sp
 .LP

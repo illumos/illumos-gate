@@ -25,7 +25,7 @@
 #
 # /etc/security/auth_attr
 #
-# authorizations. see auth_attr(4)
+# authorizations. see auth_attr(5)
 #
 solaris.:::All Solaris Authorizations::help=AllSolAuthsHeader.html
 solaris.grant:::Grant All Solaris Authorizations::help=PriAdmin.html

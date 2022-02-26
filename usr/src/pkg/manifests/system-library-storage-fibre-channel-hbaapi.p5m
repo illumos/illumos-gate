@@ -43,8 +43,8 @@ file path=usr/lib/$(ARCH64)/libHBAAPI.so.1
 link path=usr/lib/libHBAAPI.so target=libHBAAPI.so.1
 file path=usr/lib/libHBAAPI.so.1
 dir  path=usr/share/man
-dir  path=usr/share/man/man4
-file path=usr/share/man/man4/hba.conf.4
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/hba.conf.5
 legacy pkg=SUNWcfcl \
     desc="Common Fibre Channel HBA API Library based on the T11 FC-MI specification" \
     name="Common Fibre Channel HBA API Library (Usr)"

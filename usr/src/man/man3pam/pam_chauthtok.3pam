@@ -58,7 +58,7 @@ entered.
 .LP
 Upon successful completion of the call, the authentication token of the user
 will be changed in accordance with the password service configured in the
-system through \fBpam.conf\fR(4).
+system through \fBpam.conf\fR(5).
 .SH RETURN VALUES
 .sp
 .LP
@@ -131,7 +131,7 @@ Preliminary check by password service failed.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -163,7 +163,7 @@ Typically, applications such as \fBpasswd\fR(1) should not use this flag.
 .LP
 The \fBpam_chauthtok()\fR functions performs a preliminary check before
 attempting to update passwords. This check is performed for each password
-module in the stack as listed in \fBpam.conf\fR(4). The check may include
+module in the stack as listed in \fBpam.conf\fR(5). The check may include
 pinging remote name services to determine if they are available. If
 \fBpam_chauthtok()\fR returns \fBPAM_TRY_AGAIN\fR, then the check has failed,
 and passwords are not updated.

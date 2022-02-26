@@ -99,7 +99,7 @@ General system failure
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -117,5 +117,6 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBptree_get_first_prop\fR(3PICLTREE),
-\fBptree_get_propval_by_name\fR(3PICLTREE), \fBattributes\fR(5)
+.BR ptree_get_first_prop (3PICLTREE),
+.BR ptree_get_propval_by_name (3PICLTREE),
+.BR attributes (7)

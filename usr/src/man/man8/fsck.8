@@ -1,0 +1,404 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH FSCK 8 "Sep 8, 2015"
+.SH NAME
+fsck \- check and repair file systems
+.SH SYNOPSIS
+.LP
+.nf
+\fBfsck\fR [\fB-F\fR \fIFSType\fR] [\fB-m\fR] [\fB-V\fR] [\fB-v\fR] [\fIspecial\fR]...
+.fi
+
+.LP
+.nf
+\fBfsck\fR [\fB-F\fR \fIFSType\fR] [\fB-n\fR | N | y | Y] [\fB-V\fR] [\fB-v\fR]
+     [\fB-o\fR \fIFSType-specific-options\fR] [\fIspecial\fR]...
+.fi
+
+.SH DESCRIPTION
+.LP
+\fBfsck\fR audits and interactively repairs inconsistent file system
+conditions. If the file system is inconsistent the default action for each
+correction is to wait for the user to respond \fByes\fR or \fBno\fR. If the
+user does not have write permission \fBfsck\fR defaults to a \fBno\fR action.
+Some corrective actions will result in loss of data. The amount and severity of
+data loss can be determined from the diagnostic output.
+.sp
+.LP
+\fIFSType-specific-options\fR are options specified in a comma-separated (with
+no intervening spaces) list of options or keyword-attribute pairs for
+interpretation by the \fIFSType-\fRspecific module of the command.
+.sp
+.LP
+\fIspecial\fR represents the character special device on which the file system
+resides, for example, \fB/dev/rdsk/c1t0d0s7\fR. Note: the character special
+device, not the block special device, should be used. \fBfsck\fR will not work
+if the block device is mounted.
+.sp
+.LP
+If no \fIspecial\fR device is specified \fBfsck\fR checks the file systems
+listed in \fB/etc/vfstab\fR. Those entries in \fB/etc/vfstab\fR which have a
+character special device entry in the \fBfsckdev\fR field and have a non-zero
+numeric entry in the \fBfsckpass\fR field will be checked. Specifying \fB-F\fR
+\fIFSType\fR limits the file systems to be checked to those of the type
+indicated.
+.sp
+.LP
+If \fIspecial\fR is specified, but \fB-F\fR is not, the file system type will
+be determined by looking for a matching entry in \fB/etc/vfstab\fR. If no entry
+is found, the default local file system type specified in \fB/etc/default/fs\fR
+will be used.
+.sp
+.LP
+If a file system type supports parallel checking, for example, \fBufs,\fR some
+file systems eligible for checking may be checked in parallel. Consult the file
+system-specific man page (for example, \fBfsck_ufs\fR(8)) for more
+information.
+.SH OPTIONS
+.LP
+The following generic options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-F\fR \fIFSType\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the file system type on which to operate.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Check but do not repair. This option checks that the file system is suitable
+for mounting, returning the appropriate exit status. If the file system is
+ready for mounting, \fBfsck\fR displays a message such as:
+.sp
+.in +2
+.nf
+ufs fsck: sanity check: /dev/rdsk/c0t3d0s1 okay
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR | \fB-N\fR\fR
+.ad
+.sp .6
+.RS 4n
+Assume a \fBno\fR response to all questions asked by \fBfsck\fR; do not open
+the file system for writing.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-V\fR\fR
+.ad
+.sp .6
+.RS 4n
+Echo the expanded command line but do not execute the command. This option may
+be used to verify and to validate the command line.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables verbose output. Might not be supported by all filesystem-specific
+\fBfsck\fR implementations.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-y\fR | \fBY\fR\fR
+.ad
+.sp .6
+.RS 4n
+Assume a \fByes\fR response to all questions asked by \fBfsck\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-o\fR \fIspecific-options\fR\fR
+.ad
+.sp .6
+.RS 4n
+These \fIspecific-options\fR can be any combination of the following separated
+by commas (with no intervening spaces).
+.sp
+.ne 2
+.na
+\fB\fBb=\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use block \fIn\fR as the super block for the file system. Block 32 is always
+one of the alternate super blocks. Determine the location of other super blocks
+by running \fBnewfs\fR(8) with the \fB-Nv\fR options specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBc\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the file system is in the old (static table) format, convert it to the new
+(dynamic table) format. If the file system is in the new format, convert it to
+the old format provided the old format can support the file system
+configuration. In interactive mode, \fBfsck\fR will list the direction the
+conversion is to be made and ask whether the conversion should be done. If a
+negative answer is given, no further operations are done on the file system. In
+preen mode, the direction of the conversion is listed and done if possible
+without user interaction. Conversion in preen mode is best used when all the
+file systems are being converted at once. The format of a file system can be
+determined from the first line of output from \fBfstyp\fR(8). Note: the
+\fBc\fR option is seldom used and is included only for compatibility with
+pre-4.1 releases. There is no guarantee that this option will be included in
+future releases.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBf\fR\fR
+.ad
+.sp .6
+.RS 4n
+Force checking of file systems regardless of the state of their super block
+clean flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Check and fix the file system non-interactively ("preen"). Exit immediately if
+there is a problem requiring intervention. This option is required to enable
+parallel file system checking.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBw\fR\fR
+.ad
+.sp .6
+.RS 4n
+Check writable file systems only.
+.RE
+
+.RE
+
+.SH EXIT STATUS
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+file system is unmounted and OK
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.sp .6
+.RS 4n
+erroneous parameters are specified
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB32\fR\fR
+.ad
+.sp .6
+.RS 4n
+file system is unmounted and needs checking (\fBfsck\fR \fB-m\fR only)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB33\fR\fR
+.ad
+.sp .6
+.RS 4n
+file system is already mounted
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB34\fR\fR
+.ad
+.sp .6
+.RS 4n
+cannot stat device
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB35\fR\fR
+.ad
+.sp .6
+.RS 4n
+a filesystem that is mounted read/write was modified - reboot
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB36\fR\fR
+.ad
+.sp .6
+.RS 4n
+uncorrectable errors detected - terminate normally
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB37\fR\fR
+.ad
+.sp .6
+.RS 4n
+a signal was caught during processing
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB39\fR\fR
+.ad
+.sp .6
+.RS 4n
+uncorrectable errors detected - terminate immediately
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB40\fR\fR
+.ad
+.sp .6
+.RS 4n
+file system is mounted read-only and is OK
+.RE
+
+.SH USAGE
+.LP
+The \fBfsck\fR command is \fBlarge file aware\fR for UFS file systems, per the
+\fBlargefile\fR(7) man page.
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/default/fs\fR\fR
+.ad
+.sp .6
+.RS 4n
+default local file system type. Default values can be set for the following
+flags in \fB/etc/default/fs\fR. For example: \fBLOCAL=ufs.\fR
+.sp
+.ne 2
+.na
+\fB\fBLOCAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+The default partition for a command if no FSType is specified.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/vfstab\fR\fR
+.ad
+.sp .6
+.RS 4n
+list of default parameters for each file system
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.LP
+.BR ufs (4FS),
+.BR vfstab (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR clri (8),
+.BR fsck_ufs (8),
+.BR fsdb_ufs (8),
+.BR fsirand (8),
+.BR fstyp (8),
+.BR mkfs (8),
+.BR mkfs_ufs (8),
+.BR mountall (8),
+.BR newfs (8),
+.BR reboot (8)
+.SH WARNINGS
+.LP
+The operating system buffers file system data. Running \fBfsck\fR on a mounted
+file system can cause the operating system's buffers to become out of date with
+respect to the disk. For this reason, the file system should be \fIunmounted\fR
+when \fBfsck\fR is used. If this is not possible, care should be taken that the
+system is quiescent and that it is rebooted immediately after \fBfsck\fR is
+run. Quite often, however, this will not be sufficient. A panic will probably
+occur if running \fBfsck\fR on a file system modifies the file system.
+.SH NOTES
+.LP
+This command may not be supported for all \fIFSTypes\fR.
+.LP
+Starting with Solaris 9, \fBfsck\fR manages extended attribute data on the
+disk. (See \fBfsattr\fR(7) for a description of extended file attributes.) A
+file system with extended attributes can be mounted on versions of Solaris that
+are not attribute-aware (versions prior to Solaris 9), but the attributes will
+not be accessible and \fBfsck\fR will strip them from the files and place them
+in \fBlost+found\fR. Once the attributes have been stripped, the file system is
+completely stable on versions of Solaris that are not attribute-aware, but
+would be considered corrupted on attribute-aware versions. In the latter
+circumstance, run the attribute-aware \fBfsck\fR to stabilize the file system
+before using it in an attribute-aware environment.

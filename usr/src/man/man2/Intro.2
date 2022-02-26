@@ -31,7 +31,7 @@ only after an error has been indicated.
 .sp
 .LP
 In the case of multithreaded applications, the \fB-mt\fR option must be
-specified on the command line at compilation time (see \fBthreads\fR(5)). When
+specified on the command line at compilation time (see \fBthreads\fR(7)). When
 the \fB-mt\fR option is specified, \fBerrno\fR becomes a macro that enables
 each thread to have its own \fBerrno\fR. This \fBerrno\fR macro can be used on
 either side of the assignment as though it were a variable.
@@ -46,7 +46,7 @@ SUS. An application should not rely this condition being detected and reported.
 An application that relies on such behavior cannot be assured to be portable
 across conforming implementations. If more than one error occurs in processing
 a function call, any one of the possible errors might may be returned, as the
-order of detection is undefined. See \fBstandards\fR(5) for additional
+order of detection is undefined. See \fBstandards\fR(7) for additional
 information regarding the Single UNIX Specification.
 .sp
 .LP
@@ -159,7 +159,7 @@ exported shell variables.
 Exec format error
 .sp
 A request is made to execute a file which, although it has the appropriate
-permissions, does not start with a valid format (see \fBa.out\fR(4)).
+permissions, does not start with a valid format (see \fBa.out\fR(5)).
 .RE
 
 .sp
@@ -1320,7 +1320,7 @@ A terminal that is associated with a session.  Each session may have, at most,
 one controlling terminal associated with it and a controlling terminal may be
 associated with only one session.  Certain input sequences from the controlling
 terminal cause signals to be sent to process groups in the session associated
-with the controlling terminal; see \fBtermio\fR(7I).
+with the controlling terminal; see \fBtermio\fR(4I).
 .SS "Directory"
 .sp
 .LP
@@ -1343,7 +1343,7 @@ In a stream, the direction from stream head to driver.
 .LP
 In a stream, the driver provides the interface between peripheral hardware and
 the stream. A driver can also be a pseudo-driver, such as a multiplexor or log
-driver (see \fBlog\fR(7D)), which is not associated with a hardware device.
+driver (see \fBlog\fR(4D)), which is not associated with a hardware device.
 .SS "Effective User \fBID\fR and Effective Group \fBID\fR"
 .sp
 .LP
@@ -1662,7 +1662,7 @@ Solaris software implements a set of privileges that provide fine-grained
 control over the actions of processes. The possession of of a certain privilege
 allows a process to perform a specific set of restricted operations. Prior to
 the Solaris 10 release, a process running with uid 0 was granted all
-privileges. See \fBprivileges\fR(5) for the semantics and the degree of
+privileges. See \fBprivileges\fR(7) for the semantics and the degree of
 backward compatibility awarded to processes with an effective uid of 0.
 .SS "Process \fBID\fR"
 .sp
@@ -2133,4 +2133,5 @@ This notice shall appear on any product containing this material.
 .SH SEE ALSO
 .sp
 .LP
-\fBstandards\fR(5), \fBthreads\fR(5)
+.BR standards (7),
+.BR threads (7)

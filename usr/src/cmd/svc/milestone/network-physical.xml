@@ -85,7 +85,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='ifconfig' section='1M'
+			<manpage title='ifconfig' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>
@@ -157,7 +157,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='nwamd' section='1M'
+			<manpage title='nwamd' section='8'
 				manpath='/usr/share/man' />
 			<doc_link
 			    name='Network Auto-Magic OpenSolaris Project Page'

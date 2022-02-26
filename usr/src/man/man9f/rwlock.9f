@@ -235,12 +235,16 @@ These functions can be called from user, interrupt, or kernel context, except
 for \fBrw_init()\fR and \fBrw_destroy()\fR, which can be called from user
 context only.
 .SH SEE ALSO
-\fBcondvar\fR(9F), \fBddi_intr_alloc\fR(9F), \fBddi_intr_add_handler\fR(9F),
-\fBddi_intr_get_pri\fR(9F), \fBddi_intr_get_softint_pri\fR(9F),
-\fBmutex\fR(9F), \fBsemaphore\fR(9F)
+.BR condvar (9F),
+.BR ddi_intr_add_handler (9F),
+.BR ddi_intr_alloc (9F),
+.BR ddi_intr_get_pri (9F),
+.BR ddi_intr_get_softint_pri (9F),
+.BR mutex (9F),
+.BR semaphore (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
 Compiling with \fB_LOCKTEST\fR or \fB_MPSTATS\fR defined no longer has any
-effect. To gather lock statistics, see \fBlockstat\fR(1M).
+effect. To gather lock statistics, see \fBlockstat\fR(8).

@@ -28,7 +28,7 @@
 #
 # get.ipv4remote.pl [tcpport]
 #
-# Find an IPv4 reachable remote host using both ifconfig(1M) and ping(1M).
+# Find an IPv4 reachable remote host using both ifconfig(8) and ping(8).
 # If a tcpport is specified, return a host that is also listening on this
 # TCP port.  Print the local address and the remote address, or an
 # error message if no suitable remote host was found.  Exit status is 0 if

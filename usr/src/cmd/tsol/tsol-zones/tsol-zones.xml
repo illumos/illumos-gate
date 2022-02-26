@@ -69,7 +69,7 @@
 		<documentation>
 			<manpage
 				title='tsol'
-				section='5'
+				section='7'
 				manpath='/usr/man' />
 		</documentation>
 	</template>

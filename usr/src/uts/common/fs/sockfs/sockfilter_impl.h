@@ -78,7 +78,7 @@ struct sof_entry_kstat {
 
 /*
  * Socket filter entry - one for each configured filter (added and
- * removed by soconfig(1M)).
+ * removed by soconfig(8)).
  *
  * sofe_flags, sofe_refcnt and sofe_mod are protected by sofe_lock, and all
  * other fields are write once.
@@ -104,7 +104,7 @@ struct sof_entry {
 /* Filter entry flags */
 #define	SOFEF_AUTO	0x1	/* automatic filter */
 #define	SOFEF_PROG	0x2	/* programmatic filter */
-#define	SOFEF_CONDEMED	0x4	/* removed by soconfig(1M) */
+#define	SOFEF_CONDEMED	0x4	/* removed by soconfig(8) */
 
 /*
  * Socket filter instance - one for each socket using a sof_entry_t

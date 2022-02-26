@@ -25,8 +25,8 @@
 .\" Each of the following lines should use the Fl and Ar options to
 .\" indicate the set of supported options and flags. There should be one
 .\" option and argument per line. If there are independent ways of
-.\" invoking the command or independent sub-commands ala zfs(1M) or
-.\" dladm(1M), there should be a fresh '.Nm' to indicate that and the
+.\" invoking the command or independent sub-commands ala zfs(8) or
+.\" dladm(8), there should be a fresh '.Nm' to indicate that and the
 .\" sub-command should use .Cm.
 .Sh DESCRIPTION
 .\" Describe the purpose of the utility, what it does and how it
@@ -77,7 +77,7 @@ Description of what oper2 is.
 .\" .Ev NLSPATH .
 .\" .Sh CODE SET INDEPENDENCE
 .\" If there are issues around the code set, indicate so here. See
-.\" attributes(5).
+.\" attributes(7).
 .Sh INTERFACE STABILITY
 .\" When documenting the stability of commands it's useful to
 .\" distinguish between the stability of the options and the command's

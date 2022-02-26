@@ -137,7 +137,7 @@ The \fBnanosleep()\fR function is not supported by this implementation.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -151,8 +151,11 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
-\fBsleep\fR(3C), \fBtime.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR sleep (3C),
+.BR time.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

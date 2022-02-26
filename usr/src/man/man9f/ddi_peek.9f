@@ -147,7 +147,9 @@ failure:
 .in -2
 
 .SH SEE ALSO
-\fBattach\fR(9E), \fBprobe\fR(9E), \fBddi_poke\fR(9F)
+.BR attach (9E),
+.BR probe (9E),
+.BR ddi_poke (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

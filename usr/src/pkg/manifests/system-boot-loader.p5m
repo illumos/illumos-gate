@@ -80,22 +80,22 @@ $(i386_ONLY)file path=boot/pmbr group=sys mode=0444
 $(i386_ONLY)file path=boot/pxeboot group=sys mode=0444
 $(i386_ONLY)dir path=usr/share/man
 $(i386_ONLY)dir path=usr/share/man/man3
-$(i386_ONLY)dir path=usr/share/man/man4
-$(i386_ONLY)file path=usr/share/man/man4/loader.conf.4
 $(i386_ONLY)dir path=usr/share/man/man5
-$(i386_ONLY)file path=usr/share/man/man5/beastie.4th.5
-$(i386_ONLY)file path=usr/share/man/man5/brand.4th.5
-$(i386_ONLY)file path=usr/share/man/man5/check-password.4th.5
-$(i386_ONLY)file path=usr/share/man/man5/color.4th.5
-$(i386_ONLY)file path=usr/share/man/man5/delay.4th.5
-$(i386_ONLY)file path=usr/share/man/man5/gptzfsboot.5
-$(i386_ONLY)file path=usr/share/man/man5/isoboot.5
-$(i386_ONLY)file path=usr/share/man/man5/loader.4th.5
-$(i386_ONLY)file path=usr/share/man/man5/loader.5
-$(i386_ONLY)file path=usr/share/man/man5/menu.4th.5
-$(i386_ONLY)file path=usr/share/man/man5/menusets.4th.5
-$(i386_ONLY)file path=usr/share/man/man5/pxeboot.5
-$(i386_ONLY)file path=usr/share/man/man5/version.4th.5
+$(i386_ONLY)file path=usr/share/man/man5/loader.conf.5
+$(i386_ONLY)dir path=usr/share/man/man7
+$(i386_ONLY)file path=usr/share/man/man7/beastie.4th.7
+$(i386_ONLY)file path=usr/share/man/man7/brand.4th.7
+$(i386_ONLY)file path=usr/share/man/man7/check-password.4th.7
+$(i386_ONLY)file path=usr/share/man/man7/color.4th.7
+$(i386_ONLY)file path=usr/share/man/man7/delay.4th.7
+$(i386_ONLY)file path=usr/share/man/man7/gptzfsboot.7
+$(i386_ONLY)file path=usr/share/man/man7/isoboot.7
+$(i386_ONLY)file path=usr/share/man/man7/loader.4th.7
+$(i386_ONLY)file path=usr/share/man/man7/loader.7
+$(i386_ONLY)file path=usr/share/man/man7/menu.4th.7
+$(i386_ONLY)file path=usr/share/man/man7/menusets.4th.7
+$(i386_ONLY)file path=usr/share/man/man7/pxeboot.7
+$(i386_ONLY)file path=usr/share/man/man7/version.4th.7
 license lic_CDDL license=lic_CDDL
 $(i386_ONLY)license usr/src/boot/COPYRIGHT license=usr/src/boot/COPYRIGHT
 $(i386_ONLY)license usr/src/boot/common/linenoise/LICENSE \

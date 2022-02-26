@@ -1,0 +1,87 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH IPSECESP 4P "May 18, 2003"
+.SH NAME
+ipsecesp, ESP \- IPsec Encapsulating Security Payload
+.SH SYNOPSIS
+.LP
+.nf
+\fBdrv/ipsecesp\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBipsecesp\fR module provides confidentiality, integrity, authentication,
+and partial sequence integrity (replay protection) to \fBIP\fR datagrams. The
+encapsulating security payload (\fBESP\fR) encapsulates its data, enabling it
+to protect data that follows in the datagram. For \fBTCP\fR packets, \fBESP\fR
+encapsulates the \fBTCP\fR header and its data only.  If the packet is an
+\fBIP\fR in \fBIP\fR datagram, \fBESP\fR protects the inner \fBIP\fR datagram.
+Per-socket policy allows "self-encapsulation" so \fBESP\fR can encapsulate
+\fBIP\fR options when necessary. See \fBipsec\fR(4P).
+.sp
+.LP
+Unlike the authentication header (\fBAH\fR), \fBESP\fR allows multiple
+varieties of datagram protection. (Using a single datagram protection form can
+expose vulnerabilities.) For example, only \fBESP\fR can be used to provide
+confidentiality. But protecting confidentiality alone exposes vulnerabilities
+in both replay attacks and cut-and-paste attacks. Similarly, if \fBESP\fR
+protects only integrity and does not fully protect against eavesdropping, it
+may provide weaker protection than \fBAH\fR. See \fBipsecah\fR(4P).
+.SS "ESP Device"
+.sp
+.LP
+\fBESP\fR is implemented as a module that is auto-pushed on top of \fBIP\fR.
+Use the \fB/dev/ipsecesp\fR entry to tune \fBESP\fR with \fBndd\fR(8).
+.SS "Algorithms"
+.sp
+.LP
+\fBESP\fRuses encryption and authentication algorithms. Authentication
+algorithms include HMAC-MD5 and HMAC-SHA-1. Encryption algorithms include DES,
+Triple-DES, Blowfish and AES. Each authentication and encryption algorithm
+contain key size and key format properties. You can obtain a list of
+authentication and encryption algorithms and their properties by using the
+\fBipsecalgs\fR(8) command. You can also use the functions described in the
+\fBgetipsecalgbyname\fR(3NSL) man page to retrieve the properties of
+algorithms. Because of export laws in the United States, not all encryption
+algorithms are available outside of the United States.
+.SS "Security Considerations"
+.sp
+.LP
+\fBESP\fR without authentication exposes vulnerabilities to cut-and-paste
+cryptographic attacks as well as eavesdropping attacks. Like AH, \fBESP\fR is
+vulnerable to eavesdropping when used without confidentiality.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR getipsecalgbyname (3NSL),
+.BR ip (4P),
+.BR ipsec (4P),
+.BR ipsecah (4P),
+.BR attributes (7),
+.BR ipsecalgs (8),
+.BR ipsecconf (8),
+.BR ndd (8)
+.sp
+.LP
+Kent, S. and Atkinson, R. \fIRFC 2406, IP Encapsulating Security Payload
+(ESP)\fR, The Internet Society, 1998.

@@ -1610,7 +1610,7 @@ zvol_log_truncate(zvol_state_t *zv, dmu_tx_t *tx, uint64_t off, uint64_t len,
 }
 
 /*
- * Dirtbag ioctls to support mkfs(1M) for UFS filesystems.  See dkio(7I).
+ * Dirtbag ioctls to support mkfs(8) for UFS filesystems.  See dkio(4I).
  * Also a dirtbag dkio ioctl for unmap/free-block functionality.
  */
 /*ARGSUSED*/

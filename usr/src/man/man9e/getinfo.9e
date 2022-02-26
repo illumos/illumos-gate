@@ -134,13 +134,16 @@ rd_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 .in -2
 
 .SH SEE ALSO
-\fBddi_no_info\fR(9F), \fBnodev\fR(9F), \fBcb_ops\fR(9S), \fBdev_ops\fR(9S)
+.BR ddi_no_info (9F),
+.BR nodev (9F),
+.BR cb_ops (9S),
+.BR dev_ops (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-Non-\fBgld\fR(7D)-based DLPI network streams drivers are encouraged to switch
-to \fBgld\fR(7D). Failing this, a driver that creates DLPI style-2   minor
+Non-\fBgld\fR(4D)-based DLPI network streams drivers are encouraged to switch
+to \fBgld\fR(4D). Failing this, a driver that creates DLPI style-2   minor
 nodes must specify CLONE_DEV for its style-2 \fBddi_create_minor_node\fR(9F)
 nodes and use \fBqassociate\fR(9F). A driver that supports both style-1 and
 style-2 minor nodes should return DDI_FAILURE for DDI_INFO_DEVT2INSTANCE and
@@ -148,5 +151,5 @@ DDI_INFO_DEVT2DEVINFO \fBgetinfo()\fR calls to style-2 minor nodes. (The
 correct association is already established by \fBqassociate\fR(9F)). A driver
 that only supports style-2 minor nodes can use \fBddi_no_info\fR(9F) for its
 \fBgetinfo()\fR implementation. For drivers that do not follow these rules, the
-results of a \fBmodunload\fR(1M) of the driver or a \fBcfgadm\fR(1M) remove of
+results of a \fBmodunload\fR(8) of the driver or a \fBcfgadm\fR(8) remove of
 hardware controlled by the driver are undefined.

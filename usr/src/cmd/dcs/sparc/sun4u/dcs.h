@@ -26,8 +26,6 @@
 #ifndef	_DCS_H
 #define	_DCS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -61,7 +59,7 @@ extern "C" {
 
 
 /*
- * The IPsec socket option struct, from ipsec(7P):
+ * The IPsec socket option struct, from ipsec(4P):
  *
  *     typedef struct ipsec_req {
  *         uint_t      ipsr_ah_req;            AH request
@@ -79,7 +77,7 @@ extern "C" {
  * field. Allowable arguments are the same as -a.
  *
  * The arguments ("md5", "des", etc.) are named so that they match
- * kmd(1m)'s accepted arguments which are listed on the SC in
+ * kmd(8)'s accepted arguments which are listed on the SC in
  * /etc/opt/SUNWSMS/SMS/config/kmd_policy.cf.
  */
 #define	AH_REQ		(IPSEC_PREF_REQUIRED | IPSEC_PREF_UNIQUE)

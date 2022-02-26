@@ -68,7 +68,7 @@
 
 /*
  * In all cases the data we care about is in the first PCI bar, bar 0. Per
- * pci(4)/pcie(4), this is always going to be register number 1.
+ * pci(5)/pcie(5), this is always going to be register number 1.
  */
 #define	PCHTEMP_RNUMBER	1
 

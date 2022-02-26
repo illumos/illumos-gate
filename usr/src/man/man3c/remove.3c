@@ -37,7 +37,7 @@ returns \fB\(mi1\fR and sets \fBerrno\fR to indicate an error.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -55,4 +55,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBrmdir\fR(2), \fBunlink\fR(2), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR rmdir (2),
+.BR unlink (2),
+.BR attributes (7),
+.BR standards (7)

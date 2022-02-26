@@ -59,7 +59,7 @@ otherwise zero is returned.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -77,9 +77,13 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBgetplabel\fR(3TSOL), \fBlabel_to_str\fR(3TSOL), \fBlibtsol\fR(3LIB),
-\fBucred_getlabel\fR(3C), \fBlabel_encodings\fR(4), \fBattributes\fR(5),
-\fBlabels\fR(5)
+.BR ucred_getlabel (3C),
+.BR libtsol (3LIB),
+.BR getplabel (3TSOL),
+.BR label_to_str (3TSOL),
+.BR label_encodings (5),
+.BR attributes (7),
+.BR labels (7)
 .sp
 .LP
 \fIDetermining the Relationship Between Two Labels\fR in \fISolaris Trusted

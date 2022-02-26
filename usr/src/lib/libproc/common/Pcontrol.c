@@ -401,7 +401,7 @@ dupfd(int fd, int dfd)
 	/*
 	 * Make fd be greater than 255 (the 32-bit stdio limit),
 	 * or at least make it greater than 2 so that the
-	 * program will work when spawned by init(1m).
+	 * program will work when spawned by init(8).
 	 * Also, if dfd is non-zero, dup the fd to be dfd.
 	 */
 	if ((mfd = minfd) == 0)

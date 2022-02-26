@@ -467,7 +467,7 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-See the \fBattributes\fR(5) man page for descriptions of the following attributes:
+See the \fBattributes\fR(7) man page for descriptions of the following attributes:
 .sp
 
 .sp
@@ -482,7 +482,7 @@ Availability	SUNWbtool
 
 .SH SEE ALSO
 .LP
-\fBcpp\fR(1), \fBrpcgen\fR(1), \fBcc\fR(1B), \fBattributes\fR(5)
+\fBcpp\fR(1), \fBrpcgen\fR(1), \fBcc\fR(1B), \fBattributes\fR(7)
 .SH BUGS
 .LP
 Some \fBcpp\fR(1) macros used by \fBndrgen\fR are not understood by \fB/usr/bin/cpp\fR or \fB/usr/sfw/bin/cpp\fR. Simple NDL files generally do not pose a problem. If problems occur, for example, when using unions, use \fB/usr/libexec/cpp\fR or \fBcw\fR.

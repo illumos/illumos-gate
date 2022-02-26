@@ -32,7 +32,7 @@
 /*
  * Polled I/O safe ANSI terminal emulator module;
  * Supporting TERM types 'sun' and 'sun-color, parsing
- * ANSI x3.64 escape sequences, and the like.  (See wscons(7d)
+ * ANSI x3.64 escape sequences, and the like.  (See wscons(4D)
  * for more information).
  *
  * IMPORTANT:

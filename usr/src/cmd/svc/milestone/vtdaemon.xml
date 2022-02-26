@@ -101,7 +101,7 @@ vtdaemon for virtual console secure switch
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='vtdaemon' section='1M'
+			<manpage title='vtdaemon' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

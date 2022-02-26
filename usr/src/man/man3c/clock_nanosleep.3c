@@ -155,7 +155,7 @@ is not supported, such as a CPU-time clock.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -169,11 +169,15 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBclock_getres\fR(3C), \fBnanosleep\fR(3C), \fBpthread_cond_timedwait\fR(3C),
-\fBsleep\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR clock_getres (3C),
+.BR nanosleep (3C),
+.BR pthread_cond_timedwait (3C),
+.BR sleep (3C),
+.BR attributes (7),
+.BR standards (7)

@@ -14,7 +14,7 @@ ps \- display the status of current processes
 .LP
 The \fBps\fR command displays information about processes. Normally, only those
 processes that are running with your effective user \fBID\fR and are attached
-to a controlling terminal (see \fBtermio\fR(7I)) are shown. Additional
+to a controlling terminal (see \fBtermio\fR(4I)) are shown. Additional
 categories of processes can be added to the display using various options. In
 particular, the \fB-a\fR option allows you to include processes that are not
 owned by you (that do not have your user \fBID\fR), and the \fB-x\fR option
@@ -389,8 +389,14 @@ the user block.
 
 .SH SEE ALSO
 .LP
-\fBkill\fR(1), \fBps\fR(1), \fBwhodo\fR(1M), \fBgetpriority\fR(3C),
-\fBnice\fR(2), \fBproc\fR(4), \fBattributes\fR(5), \fBtermio\fR(7I)
+.BR kill (1),
+.BR ps (1),
+.BR nice (2),
+.BR getpriority (3C),
+.BR termio (4I),
+.BR proc (5),
+.BR attributes (7),
+.BR whodo (8)
 .SH NOTES
 .LP
 Things can change while \fBps\fR is running. The picture \fBps\fR gives is only

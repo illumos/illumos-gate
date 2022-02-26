@@ -36,7 +36,7 @@ The \fBpam_strerror()\fR function returns the string "Unknown error" if
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -54,7 +54,9 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBpam\fR(3PAM), \fBpam_start\fR(3PAM), \fBattributes\fR(5)
+.BR pam (3PAM),
+.BR pam_start (3PAM),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

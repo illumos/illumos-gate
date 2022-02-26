@@ -1,0 +1,242 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH RBAC 7 "Jul 15, 2003"
+.SH NAME
+rbac, RBAC \- role-based access control
+.SH DESCRIPTION
+.sp
+.LP
+The addition of role-based access control (RBAC) to the Solaris operating
+environment gives developers the opportunity to deliver fine-grained security
+in new and modified applications. RBAC is an alternative to the all-or-nothing
+security model of traditional superuser-based systems. With RBAC, an
+administrator can assign privileged functions to specific user accounts (or
+special accounts called roles).
+.sp
+.LP
+There are two ways to give applications privileges:
+.RS +4
+.TP
+1.
+Administrators can assign special attributes such as setUID to application
+binaries (executable files).
+.RE
+.RS +4
+.TP
+2.
+Administrators can assign special attributes such as setUID to applications
+using execution profiles.
+.RE
+.sp
+.LP
+Special attribute assignment along with the theory behind RBAC is discussed in
+detail in "Role Based Access Control" chapter of the \fISystem Administration
+Guide: Security Services\fR. This chapter describes what authorizations are and
+how to code for them.
+.SS "Authorizations"
+.sp
+.LP
+An authorization is a unique string that represents a user's right to perform
+some operation or class of operations. Authorization definitions are stored in
+a database called \fBauth_attr\fR(5). For programming authorization checks,
+only the authorization name is significant.
+.sp
+.LP
+Some typical values in an \fBauth_attr\fR database are shown below.
+.sp
+.in +2
+.nf
+solaris.jobs.:::Cron and At Jobs::help=JobHeader.html
+solaris.jobs.grant:::Delegate Cron & At \e
+    Administration::help=JobsGrant.html
+solaris.jobs.admin:::Manage All Jobs::help=AuthJobsAdmin.html
+solaris.jobs.user:::Cron & At User::help=JobsUser.html
+.fi
+.in -2
+
+.sp
+.LP
+Authorization name strings ending with the \fBgrant\fR suffix are special
+authorizations that give a user the ability to delegate authorizations with the
+same prefix and functional area to other users.
+.SS "Creating Authorization Checks"
+.sp
+.LP
+To check authorizations, use the \fBchkauthattr\fR(3SECDB) library function,
+which verifies whether or not a user has a given authorization. The synopsis
+is:
+.sp
+.in +2
+.nf
+int chkauthattr(const char *authname, const char *username);
+.fi
+.in -2
+
+.sp
+.LP
+The \fBchkauthattr()\fR function checks the \fBpolicy.conf\fR(5),
+\fBuser_attr\fR(5), and \fBprof_attr\fR(5) databases in order for a match to
+the given authorization.
+.sp
+.LP
+If you are modifying existing code that tests for root UID, you should find the
+test in the code and replace it with the \fBchkauthattr()\fR function. A
+typical root UID check is shown in the first code segment below. An
+authorization check replacing it is shown in the second code segment; it uses
+the \fBsolaris.jobs.admin\fR authorization and a variable called
+\fBreal_login\fR representing the user.
+.LP
+\fBExample 1 \fRStandard root check
+.sp
+.in +2
+.nf
+ruid = getuid();
+
+if ((eflag || lflag || rflag) && argc == 1) {
+        if ((pwp = getpwnam(*argv)) == NULL)
+                crabort(INVALIDUSER);
+
+        if (ruid != 0) {
+                if (pwp->pw_uid != ruid)
+                        crabort(NOTROOT);
+                else
+                        pp = getuser(ruid);
+        } else
+                pp = *argv++;
+} else {
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRAuthorization check
+.sp
+.in +2
+.nf
+ruid = getuid();
+if ((pwp = getpwuid(ruid)) == NULL)
+        crabort(INVALIDUSER);
+
+strcpy(real_login, pwp->pw_name);
+
+if ((eflag || lflag || rflag) && argc == 1) {
+        if ((pwp = getpwnam(*argv)) == NULL)
+                crabort(INVALIDUSER);
+
+        if (!chkauthattr("solaris.jobs.admin", real_login)) {
+                if (pwp->pw_uid != ruid)
+                        crabort(NOTROOT);
+                else
+                        pp = getuser(ruid);
+        } else
+                pp = *argv++;
+} else {
+.fi
+.in -2
+
+.sp
+.LP
+For new applications, find an appropriate location for the test and use
+\fBchkauthattr()\fR as shown above. Typically the authorization check makes an
+access decision based on the identity of the calling user to determine if a
+privileged action (for example, a system call) should be taken on behalf of
+that user.
+.sp
+.LP
+Applications that perform a test to restrict who can perform their
+security-relevant functionality are generally \fBsetuid\fR to root. Programs
+that were written prior to RBAC and that are only available to the root user
+may not have such checks. In most cases, the kernel requires an effective user
+\fBID\fR of root to override policy enforcement. Therefore, authorization
+checking is most useful in programs that are \fBsetuid\fR to root.
+.sp
+.LP
+For instance, if you want to write a program that allows authorized users to
+set the system date, the command must be run with an effective user \fBID\fR of
+root. Typically, this means that the file modes for the file would be
+\fB-rwsr-xr-x\fR with root ownership.
+.sp
+.LP
+Use caution, though, when making programs \fBsetuid\fR to root. For example,
+the effective \fBUID\fR should be set to the real \fBUID\fR as early as
+possible in the program's initialization function. The effective \fBUID\fR can
+then be set back to root after the authorization check is performed and before
+the system call is made. On return from the system call, the effective UID
+should be set back to the real \fBUID\fR again to adhere to the principle of
+least privilege.
+.sp
+.LP
+Another consideration is that \fBLD_LIBRARY\fR path is ignored for setuid
+programs (see SECURITY section in \fBld.so.1\fR(1)) and that shell scripts must
+be modified to work properly when the effective and real \fBUID\fRs are
+different. For example, the \fB-p\fR flag in Bourne shell is required to avoid
+resetting the effective \fBUID\fR back to the real \fBUID\fR.
+.sp
+.LP
+Using an effective \fBUID\fR of root instead of the real \fBUID\fR requires
+extra care when writing shell scripts. For example, many shell scripts check to
+see if the user is root before executing their functionality. With RBAC, these
+shell scripts may be running with the effective \fBUID\fR of root and with a
+real \fBUID\fR of a user or role. Thus, the shell script should check
+\fBeuid\fR instead of \fBuid\fR. For example,
+.sp
+.in +2
+.nf
+WHO=`id | cut -f1 -d" "`
+if [ ! "$WHO" = "uid=0(root)" ]
+then
+       echo "$PROG: ERROR: you must be super-user to run this script."
+       exit 1
+fi
+.fi
+.in -2
+
+.sp
+.LP
+should be changed to
+.sp
+.in +2
+.nf
+WHO=`/usr/xpg4/bin/id -n -u`
+if [ ! "$WHO" = "root" ]
+then
+       echo "$PROG: ERROR: you are not authorized to run this script."
+       exit 1
+fi
+.fi
+.in -2
+
+.sp
+.LP
+Authorizations can be explicitly checked in shell scripts by checking the
+output of the \fBauths\fR(1) utility. For example,
+.sp
+.in +2
+.nf
+for auth in `auths | tr , " "` NOTFOUND
+do
+    [ "$auth" = "solaris.date" ] && break       # authorization found
+done
+
+if [ "$auth" != "solaris.date" ]
+then
+    echo >&2 "$PROG: ERROR: you are not authorized to set the date"
+    exit 1
+fi
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+.BR ld.so.1 (1),
+.BR chkauthattr (3SECDB),
+.BR auth_attr (5),
+.BR policy.conf (5),
+.BR prof_attr (5),
+.BR user_attr (5)
+.sp
+.LP
+\fISystem Administration Guide: Security Services\fR

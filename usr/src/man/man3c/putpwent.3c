@@ -38,7 +38,7 @@ update the shadow file.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -54,4 +54,6 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBgetpwnam\fR(3C), \fBputspent\fR(3C), \fBattributes\fR(5)
+.BR getpwnam (3C),
+.BR putspent (3C),
+.BR attributes (7)

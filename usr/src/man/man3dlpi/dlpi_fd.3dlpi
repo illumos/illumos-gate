@@ -23,7 +23,7 @@ used to directly operate on the open \fBDLPI\fR stream associated with the
 \fBDLPI\fR handle \fIdh\fR. This file descriptor can be used to perform
 non-\fBDLPI\fR operations that do not alter the state of the \fBDLPI\fR stream,
 such as waiting for an event using \fBpoll\fR(2), or pushing and configuring
-additional \fBSTREAMS\fR modules, such as \fBpfmod\fR(7M). If \fBDLPI\fR
+additional \fBSTREAMS\fR modules, such as \fBpfmod\fR(4M). If \fBDLPI\fR
 operations are directly performed on the file descriptor, or a \fBSTREAMS\fR
 module is pushed that alters the message-passing interface such that \fBDLPI\fR
 operations can no longer be issued, future operations on \fIdh\fR might not
@@ -40,7 +40,7 @@ handle \fIdh\fR. If \fIdh\fR is invalid, \fB-1\fR is returned.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -58,5 +58,8 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpoll\fR(2), \fBlibdlpi\fR(3LIB), \fBattributes\fR(5), \fBdlpi\fR(7P),
-\fBpfmod\fR(7M)
+.BR poll (2),
+.BR libdlpi (3LIB),
+.BR pfmod (4M),
+.BR dlpi (4P),
+.BR attributes (7)

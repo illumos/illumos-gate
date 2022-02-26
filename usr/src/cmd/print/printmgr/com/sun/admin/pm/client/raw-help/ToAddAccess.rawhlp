@@ -29,7 +29,7 @@
 <p> 
 
 Do the following to make an installed printer accessible to print
-client computers. See the printers.conf(4) man page for more
+client computers. See the printers.conf(5) man page for more
 information about print client commands.
 
 <p> 
@@ -38,7 +38,7 @@ information about print client commands.
 add access to a private printer (one that is not listed in the naming
 service) or to make the printer usable even if the naming service
 server is down. This adds access for all users in the naming service
-domain; see the man page for domainname(1M) for more information about
+domain; see the man page for domainname(8) for more information about
 domains. 
 
 <p>
@@ -83,7 +83,7 @@ Print Manager.
 
 Note that this is the last place the print commands will look to
 determine the printer for a specific print command; see the
-man page for printers.conf(4) for more information about resolving
+man page for printers.conf(5) for more information about resolving
 printer conflicts.
 
 <p>

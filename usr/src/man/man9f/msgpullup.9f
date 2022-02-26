@@ -78,7 +78,10 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBsrv\fR(9E), \fBallocb\fR(9F), \fBpullupmsg\fR(9F), \fBmsgb\fR(9S)
+.BR srv (9E),
+.BR allocb (9F),
+.BR pullupmsg (9F),
+.BR msgb (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

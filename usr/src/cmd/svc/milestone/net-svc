@@ -123,7 +123,7 @@ dhcp_edits ()
 # it is important to preserve order of domain entries vs. search
 # entries; the search entries are reserved for administrator
 # customization and if placed after the domain entry will override
-# it.  See resolv.conf(4).
+# it.  See resolv.conf(5).
 #
 # The first arg should be the dns servers string, the second
 # should be the dns domain.

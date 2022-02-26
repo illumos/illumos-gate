@@ -45,7 +45,7 @@ different server name if appropriate.
 2. Check the Distinguished Name (DN) for correctness. You may enter a
 different distinguished name of another user if appropriate. This may be the DN
 of any directory user who has permissions (directory update privileges) to
-update printer entries in the LDAP directory for the current ldapclient (1M)
+update printer entries in the LDAP directory for the current ldapclient(8)
 naming service (NS) domain.
 
 <p>
@@ -77,14 +77,14 @@ the default distinguished name is "cn=Directory Manager".
 If the LDAP server is Sun Directory Server then an example
 of the distinguished name is "cn=admin, dc=XYZ, dc=COM".
 
-The Oracle Solaris Print Manager uses ldapclient(1M) to determine
+The Oracle Solaris Print Manager uses ldapclient(8) to determine
 the default LDAP server name. If there is more than one
 server specified then the first one will be used.
 
 <p>
 
 The Print Manager always displays printer entries from the current 
-ldapclient (1M) server. If this is not the domain Master LDAP server then
+ldapclient(8) server. If this is not the domain Master LDAP server then
 the list of printers displayed may <b>not</b> be the current list of printers,
 this is because the ldapclient replica server may not have been updated by the
 master server and so be out of sync with the master. Replica servers can have
@@ -105,7 +105,7 @@ Users can use the ldap command line utilities (ldapadd (1) & ldapmodify (1))
 to update printer entries in the directory, but this is not recommended. If
 these utilities are used then the user <b>must ensure</b> that the printer-name
 attribute value is unique within the ou=printers container. If it is not unique
-the result of modifies done by the print manager (or lpset (1M)) may not be
+the result of modifies done by the print manager (or lpset(8)) may not be
 predictable.
 
 <p>

@@ -20,13 +20,13 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright (c) 2001 by Sun Microsystems, Inc.
 # All rights reserved.
 # 
 
-Configuration files for syseventd(1M).
+Configuration files for syseventd(8).
 
 These files are not intended to be edited and any changes made
 will not be preserved across upgrades.

@@ -43,4 +43,6 @@ contains the list of service grades
 .SH SEE ALSO
 .sp
 .LP
-\fBuucp\fR(1C), \fBuux\fR(1C), \fBattributes\fR(5)
+.BR uucp (1C),
+.BR uux (1C),
+.BR attributes (7)

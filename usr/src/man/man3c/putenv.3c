@@ -105,7 +105,7 @@ however, prevent two threads from successively accessing the environment list
 using \fBputenv()\fR or \fBgetenv()\fR.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -122,8 +122,12 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBexec\fR(2), \fBgetenv\fR(3C), \fBmalloc\fR(3C), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBstandards\fR(5)
+.BR exec (2),
+.BR getenv (3C),
+.BR malloc (3C),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)
 .SH WARNINGS
 .LP
 The \fIstring\fR argument should not be an automatic variable.  It should be

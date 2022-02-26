@@ -80,7 +80,7 @@ No errors are defined.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -98,5 +98,9 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBopendir\fR(3C), \fBreaddir\fR(3C), \fBrewinddir\fR(3C), \fBtelldir\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR opendir (3C),
+.BR readdir (3C),
+.BR rewinddir (3C),
+.BR telldir (3C),
+.BR attributes (7),
+.BR standards (7)

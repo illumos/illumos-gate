@@ -1,0 +1,1639 @@
+'\" te
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH IPSECKEY 8 "November 22, 2021"
+.SH NAME
+ipseckey \- manually manipulate an IPsec Security Association Database (SADB)
+.SH SYNOPSIS
+.nf
+\fBipseckey\fR  [\fB-nvp\fR]
+.fi
+
+.LP
+.nf
+\fBipseckey\fR  [\fB-nvp\fR] \fB-f\fR \fIfilename\fR
+.fi
+
+.LP
+.nf
+\fBipseckey\fR  \fB-c\fR \fIfilename\fR
+.fi
+
+.LP
+.nf
+\fBipseckey\fR  [\fB-nvp\fR] [delete | delete-pair | get] SA_TYPE {EXTENSION \fIvalue\fR...}
+.fi
+
+.LP
+.nf
+\fBipseckey\fR  [\fB-np\fR] [monitor |  passive_monitor |  pmonitor]
+.fi
+
+.LP
+.nf
+\fBipseckey\fR  [\fB-nvp\fR] flush {SA_TYPE}
+.fi
+
+.LP
+.nf
+\fBipseckey\fR  [\fB-nvp\fR] dump {SA_TYPE}
+.fi
+
+.LP
+.nf
+\fBipseckey\fR  [\fB-nvp\fR] save SA_TYPE {\fIfilename\fR}
+.fi
+
+.LP
+.nf
+\fBipseckey\fR  [\fB-nvp\fR] \fB-s\fR \fIfilename\fR
+.fi
+
+.SH DESCRIPTION
+The \fBipseckey\fR command is used to manually manipulate the security
+association databases of the network security services, \fBipsecah\fR(4P) and
+\fBipsecesp\fR(4P). You can use the \fBipseckey\fR command to set up security
+associations between communicating parties when automated key management is not
+available.
+.sp
+.LP
+While the \fBipseckey\fR utility has only a limited number of general options,
+it supports a rich command language. The user may specify requests to be
+delivered by means of a programmatic interface specific for manual keying. See
+\fBpf_key\fR(4P). When \fBipseckey\fR is invoked with no arguments, it will
+enter an interactive mode which prints a prompt to the standard output and
+accepts commands from the standard input until the end-of-file is reached. Some
+commands require an explicit security association ("\fBSA\fR") type, while
+others permit the \fBSA\fR type to be unspecified and act on all \fBSA\fR
+types.
+.sp
+.LP
+\fBipseckey\fR uses a \fBPF_KEY\fR socket and the message types \fBSADB_ADD\fR,
+\fBSADB_DELETE\fR, \fBSADB_GET\fR, \fBSADB_UPDATE\fR, \fBSADB_FLUSH\fR, and
+\fBSADB_X_PROMISC\fR. Thus, you must be a superuser to use this command.
+.sp
+.LP
+\fBipseckey\fR handles sensitive cryptographic keying information. Please read
+the \fBSecurity\fR section for details on how to use this command securely.
+.SH OPTIONS
+.ne 2
+.na
+\fB\fB-c\fR [\fIfilename\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Analogous to the \fB-f\fR option (see following), except that the input is not
+executed but only checked for syntactical correctness. Errors are reported to
+\fBstderr\fR. This option is provided to debug configurations without making
+changes. See \fBSECURITY\fR and "Service Management Facility" for more
+information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR [\fIfilename\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Read commands from an input file, \fIfilename\fR. The lines of the input file
+are identical to the command line language. The \fBload\fR command provides
+similar functionality. The \fB-s\fR option or the \fBsave\fR command can
+generate files readable by the \fB-f\fR argument.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prevent attempts to print host and network names symbolically when reporting
+actions. This is useful, for example, when all name servers are down or are
+otherwise unreachable.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.sp .6
+.RS 4n
+Paranoid. Do not print any keying material, even if saving \fBSA\fRs. Instead
+of an actual hexadecimal digit, print an \fBX\fR when this flag is turned on.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR [\fIfilename\fR]\fR
+.ad
+.sp .6
+.RS 4n
+The opposite of the \fB-f\fR option. If '\fB-\fR' is given for a
+\fIfilename\fR, then the output goes to the standard output. A snapshot of all
+current \fBSA\fR tables will be output in a form readable by the \fB-f\fR
+option. The output will be a series of \fBadd\fR commands, but with some names
+not used. This occurs because a single name may often indicate multiple
+addresses.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+Verbose. Print the messages being sent into the \fBPF_KEY\fR socket, and print
+raw seconds values for lifetimes.
+.RE
+
+.SH COMMANDS
+.ne 2
+.na
+\fB\fBadd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Add an \fBSA\fR. Because it involves the transfer of keying material, it cannot
+be invoked from the shell, lest the keys be visible in \fBps\fR(1) output. It
+can be used either from the interactive \fBipseckey>\fR prompt or in a command
+file specified by the \fB-f\fR command. The \fBadd\fR command accepts all
+extension-value pairs described below.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBupdate\fR\fR
+.ad
+.sp .6
+.RS 4n
+Update \fBSA\fR lifetime, and in the cases of larval \fBSA\fRs (leftover from
+aborted automated key management), keying material and other extensions. Like
+\fBadd\fR, this command cannot be invoked from the shell because keying
+material would be seen by the \fBps\fR(1) command. It can be used either from
+the interactive \fBipseckey>\fR prompt or in a command file specified by the
+\fB-f\fR command. The \fBupdate\fR command accepts all extension-value pairs,
+but normally is only used for \fBSA\fR lifetime updates.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBupdate-pair\fR\fR
+.ad
+.sp .6
+.RS 4n
+As update, but apply the update to the SA and its paired SA, if there is one.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdelete\fR\fR
+.ad
+.sp .6
+.RS 4n
+Delete a specific \fBSA\fR from a specific \fBSADB\fR. This command requires
+the \fBspi\fR extension, and the \fBdest\fR extension for IPsec \fBSA\fRs.
+Other extension-value pairs are superfluous for a delete message. If the SA to
+be deleted is paired with another SA, the SA is deleted and the paired SA is
+updated to indicate that it is now unpaired.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdelete-pair\fR\fR
+.ad
+.sp .6
+.RS 4n
+Delete a specific SA from a specific SADB. If the SA is paired with another SA,
+delete that SA too. This command requires the \fBspi\fR extension and the
+\fBdest\fR extension for the IPsec SA, or its pair.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBget\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lookup and display a security association from a specific \fBSADB\fR. Like
+\fBdelete\fR, this command only requires \fBspi\fR and \fBdest\fR for IPsec.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBflush\fR\fR
+.ad
+.sp .6
+.RS 4n
+Remove all \fBSA\fR for a given \fBSA_TYPE\fR, or all \fBSA\fR for all types.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmonitor\fR\fR
+.ad
+.sp .6
+.RS 4n
+Continuously report on any \fBPF_KEY\fR messages. This uses the
+\fBSADB_X_PROMISC\fR message to enable messages that a normal \fBPF_KEY\fR
+socket would not receive to be received. See \fBpf_key\fR(4P).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpassive_monitor\fR\fR
+.ad
+.sp .6
+.RS 4n
+Like monitor, except that it does not use the \fBSADB_X_PROMISC\fR message.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpmonitor\fR\fR
+.ad
+.sp .6
+.RS 4n
+Synonym for \fBpassive_monitor\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdump\fR\fR
+.ad
+.sp .6
+.RS 4n
+Will display all \fBSA\fRs for a given \fBSA\fR type, or will display all
+\fBSA\fRs. Because of the large amount of data generated by this command, there
+is no guarantee that all \fBSA\fR information will be successfully delivered,
+or that this command will even complete.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsave\fR\fR
+.ad
+.sp .6
+.RS 4n
+Is the command analog of the \fB-s\fR option. It is included as a command to
+provide a way to snapshot a particular \fBSA\fR type, for example, \fBesp\fR or
+\fBah\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBhelp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints a brief summary of commands.
+.RE
+
+.SS "\fBSA_TYPE\fR"
+.ne 2
+.na
+\fB\fBall\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies all known \fBSA\fR types. This type is only used for the \fBflush\fR
+and \fBdump\fR commands. This is equivalent to having no \fBSA\fR type for
+these commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBah\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the IPsec Authentication Header ("\fBAH\fR") \fBSA\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBesp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the IPsec Encapsulating Security Payload ("\fBESP\fR") \fBSA\fR.
+.RE
+
+.SH EXTENSION VALUE TYPES
+Commands like \fBadd\fR, \fBdelete\fR, \fBget\fR, and \fBupdate\fR require that
+certain extensions and associated values be specified. The extensions will be
+listed here, followed by the commands that use them, and the commands that
+require them. Requirements are currently documented based upon the IPsec
+definitions of an \fBSA\fR. Required extensions may change in the future.
+\fB<number>\fR can be in either hex (\fB0xnnn\fR), decimal (\fBnnn\fR) or octal
+(\fB0nnn\fR).\fB<string>\fR is a text string. \fB<hexstr>\fR is a long
+hexadecimal number with a bit-length. Extensions are usually paired with
+values; however, some extensions require two values after them.
+.sp
+.ne 2
+.na
+\fB\fBspi \fI<number>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the security parameters index of the \fBSA\fR. This extension is
+required for the \fBadd\fR, \fBdelete\fR, \fBget\fR and \fBupdate\fR commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpair-spi \fI<number>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+When \fBpair-spi\fR is used with the \fBadd\fR or \fBupdate\fR commands, the SA
+being added or updated will be paired with the SA defined by \fBpair-spi\fR. A
+pair of SAs can be updated or deleted with a single command.
+.sp
+The two SAs that make up the pair need to be in opposite directions from the
+same pair of IP addresses. The command will fail if either of the SAs specified
+are already paired with another SA.
+.sp
+If the pair-spi token is used in a command and the SA defined by pair-spi does
+not exist, the command will fail. If the command was \fBadd\fR and the pairing
+failed, the SA to be added will instead be removed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinbound | outbound\fR\fR
+.ad
+.sp .6
+.RS 4n
+These optional flags specify the direction of the SA. When the \fBinbound\fR or
+\fBoutbound\fR flag is specified with the \fBadd\fR command,  the kernel will
+insert the new SA into the specified hash table for faster lookups. If the flag
+is omitted, the kernel will decide into which hash table to insert the new SA
+based on its knowledge the IP addresses specified with the \fBsrc\fR and
+\fBdst\fR extensions.
+.sp
+When these flags are used with the \fBupdate\fR, \fBdelete\fR,
+\fBupdate-pair\fR or \fBget\fR commands, the flags provide a hint as to the
+hash table in which the kernel should find the SA.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreplay\fR \fI<number>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the replay window size. If not specified, the replay window size is
+assumed to be zero. It is not recommended that manually added \fBSA\fRs have a
+replay window. This extension is used by the \fBadd\fR and \fBupdate\fR
+commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreplay_value\fR \fI<number>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the replay value of the SA. This extension is used by the \fBadd\fR
+and \fBupdate\fR commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstate \fI<string>\fR|\fI<number>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the \fBSA\fR state, either by numeric value or by the strings
+"\fBlarval\fR", "\fBmature\fR", "\fBdying\fR" or "\fBdead\fR". If not
+specified, the value defaults to \fBmature\fR. This extension is used by the
+\fBadd\fR and \fBupdate\fR commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBauth_alg \fI<string>\fR|\fI<number>\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBauthalg <string>|<number>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the authentication algorithm for an \fBSA\fR, either by numeric
+value, or by strings indicating an algorithm name. Current authentication
+algorithms include:
+.sp
+.ne 2
+.na
+\fB\fBHMAC-MD5\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBmd5\fR, \fBhmac-md5\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBHMAC-SH-1\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBsha\fR, \fBsha-1\fR, \fBhmac-sha1\fR, \fBhmac-sha\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBHMAC-SHA-256\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBsha256\fR, \fBsha-256\fR, \fBhmac-sha256\fR, \fBhmac-sha-256\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBHMAC-SHA-384\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBsha384\fR, \fBsha-384\fR, \fBhmac-sha384\fR, \fBhmac-sha-384\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBHMAC-SHA-512\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBsha512\fR, \fBsha-512\fR, \fBhmac-sha512\fR, \fBhmac-sha-512\fR
+.RE
+
+Often, algorithm names will have several synonyms. This extension is required
+by the \fBadd\fR command for certain \fBSA\fR types. It is also used by the
+\fBupdate\fR command.
+.sp
+Use the \fBipsecalgs\fR(8) command to obtain the complete list of
+authentication algorithms.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBencr_alg \fI<string>\fR|\fI<number>\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBencralg \fI<string>\fR|\fI<number>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the encryption algorithm for an SA, either by numeric value, or by
+strings indicating an algorithm name. Current encryption algorithms include DES
+("\fBdes\fR"), Triple-DES ("\fB3des\fR"), Blowfish ("blowfish"), and AES
+("aes"). This extension is required by the add command for certain \fBSA\fR
+types. It is also used by the \fBupdate\fR command.
+.sp
+Use the \fBipsecalgs\fR(8) command to obtain the complete list of encryption
+algorithms.
+.RE
+
+.sp
+.LP
+The next six extensions are lifetime extensions. There are two varieties,
+"\fBhard\fR" and "\fBsoft\fR". If a \fBhard\fR lifetime expires, the \fBSA\fR
+will be deleted automatically by the system. If a \fBsoft\fR lifetime expires,
+an \fBSADB_EXPIRE\fR message will be transmitted by the system, and its state
+will be downgraded to \fBdying\fR from \fBmature\fR. See \fBpf_key\fR(4P). The
+\fBmonitor\fR command to \fBkey\fR allows you to view \fBSADB_EXPIRE\fR
+messages.
+.sp
+.ne 2
+.na
+\fB\fBidle_addtime\fR \fI<number>\fR\fR
+.ad
+.br
+.na
+\fB\fBidle_usetime\fR \fI<number>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the number of seconds that this SA can exist if the SA is not used
+before the SA is revalidated. If this extension is not present, the default
+value is half of the \fBhard_addtime\fR (see below). This extension is used by
+the \fBadd\fR and \fBupdate\fR commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsoft_bytes \fI<number>\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBhard_bytes \fI<number>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the number of bytes that this \fBSA\fR can protect. If this extension
+is not present, the default value is zero, which means that the \fBSA\fR will
+not expire based on the number of bytes protected. This extension is used by
+the \fBadd\fR and \fBupdate\fR commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsoft_addtime \fI<number>\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBhard_addtime \fI<number>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the number of seconds that this \fBSA\fR can exist after being added
+or updated from a larval \fBSA\fR. An update of a mature \fBSA\fR does not
+reset the initial time that it was added. If this extension is not present, the
+default value is zero, which means the \fBSA\fR will not expire based on how
+long it has been since it was added. This extension is used by the \fBadd\fR
+and \fBupdate\fR commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsoft_usetime \fI<number>\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBhard_usetime \fI<number>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the number of seconds this \fBSA\fR can exist after first being used.
+If this extension is not present, the default value is zero, which means the
+\fBSA\fR will not expire based on how long it has been since it was added. This
+extension is used by the \fBadd\fR and \fBupdate\fR commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsaddr \fIaddress\fR | \fIname\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBsrcaddr \fIaddress\fR | \fIname\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBsaddr6 \fIIPv6 address\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBsrcaddr6 \fIIPv6 address\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBsrc \fIaddress\fR | \fIname\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBsrc6 \fIIPv6 address\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBsrcaddr \fIaddress\fR\fR and \fBsrc \fIaddress\fR\fR are synonyms that
+indicate the source address of the \fBSA\fR. If unspecified, the source address
+will either remain unset, or it will be set to a wildcard address if a
+destination address was supplied. To not specify the source address is valid
+for IPsec \fBSA\fRs. Future \fBSA\fR types may alter this assumption. This
+extension is used by the \fBadd\fR, \fBupdate\fR, \fBget\fR and \fBdelete\fR
+commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdaddr \fI<address>\fR|\fI<name>\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBdstaddr \fI<address>\fR|\fI<name>\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBdaddr6 \fI<IPv6 address>\fR|\fI<name>\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBdstaddr6 \fI<IPv6 address>\fR|\fI<name>\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBdst \fI<addr>\fR|\fI<name>\fR\fR\fR
+.ad
+.br
+.na
+\fB\fBdst6 \fI<IPv6 address>\fR|\fI<name>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBdstaddr \fI<addr>\fR\fR and \fBdst \fI<addr>\fR\fR are synonyms that
+indicate the destination address of the \fBSA\fR. If unspecified, the
+destination address will remain unset. Because IPsec \fBSA\fRs require a
+specified destination address and \fBspi\fR for identification, this extension,
+with a specific value, is required for the \fBadd\fR, \fBupdate\fR, \fBget\fR
+and \fBdelete\fR commands.
+.sp
+If a name is given, \fBipseckey\fR will attempt to invoke the command on
+multiple \fBSA\fRs with all of the destination addresses that the name can
+identify. This is similar to how \fBipsecconf\fR handles addresses.
+.sp
+If \fBdst6\fR or \fBdstaddr6\fR is specified, only the IPv6 addresses
+identified by a name are used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsport\fR \fI<portnum>\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBsport\fR specifies the source port number for an SA. It should be used in
+combination with an upper-layer protocol (see below), but it does not have to
+be.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdport\fR \fI<portnum>\fR\fR
+.ad
+.sp .6
+.RS 4n
+sport specifies the destination port number for an SA. It should be used in
+combination with an upper-layer protocol (see below), but it does not have to
+be.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBencap\fR \fI<protocol>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Identifies the protocol used to encapsulate NAT-traversal IPsec packets. Other
+NAT-traversal parameters (\fBnat_*\fR) are below.  The only acceptable value
+for \fI<protocol>\fR currently is \fBudp\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBproto\fR \fI<protocol number>\fR\fR
+.ad
+.br
+.na
+\fB\fBulp\fR \fI<protocol number>\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBproto\fR, and its synonym \fBulp\fR, specify the IP protocol number of the
+SA.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnat_loc\fR \fI<address>\fR|\fI<name>\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the local address in the SA (source or destination) is behind a NAT, this
+extension indicates the NAT node's globally-routable address. This address can
+match the SA's local address if there is a \fBnat_lport\fR (see below)
+specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnat_rem\fR \fI<address>\fR|\fI<name>\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the remote address in the SA (source or destination) is behind a NAT, this
+extension indicates that node's internal (that is, behind-the-NAT) address.
+This address can match the SA's local address if there is a \fBnat_rport\fR
+(see below) specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnat_lport\fR \fI<portnum>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Identifies the local UDP port on which encapsulation of ESP occurs.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnat_rport\fR \fI<portnum>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Identifies the remote UDP port on which encapsulation of ESP occurs.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBisrc\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
+.ad
+.br
+.na
+\fB\fBinnersrc\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
+.ad
+.br
+.na
+\fB\fBisrc6\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
+.ad
+.br
+.na
+\fB\fBinnersrc6\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
+.ad
+.br
+.na
+\fB\fBproxyaddr\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
+.ad
+.br
+.na
+\fB\fBproxy\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
+.ad
+.sp .6
+.RS 4n
+\fBisrc\fR \fI<address>\fR[/\fI<prefix>\fR] and \fBinnersrc\fR
+\fI<address>\fR[/\fI<prefix>\fR] are synonyms. They indicate the inner source
+address for a tunnel-mode SA.
+.sp
+An inner-source can be a prefix instead of an address. As with other address
+extensions, there are IPv6-specific forms. In such cases, use only
+IPv6-specific addresses or prefixes.
+.sp
+Previous versions referred to this value as the proxy address. The usage, while
+deprecated, remains.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBidst\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
+.ad
+.br
+.na
+\fB\fBinnerdst\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
+.ad
+.br
+.na
+\fB\fBidst6\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
+.ad
+.br
+.na
+\fB\fBinnerdst6\fR \fI<address>\fR | \fI<name>\fR[/\fI<prefix>\fR]\fR
+.ad
+.sp .6
+.RS 4n
+\fBidst\fR \fI<address>\fR[/\fI<prefix>\fR] and \fBinnerdst\fR
+\fI<address>\fR[/\fI<prefix>\fR] are synonyms. They indicate the inner
+destination address for a tunnel-mode SA.
+.sp
+An inner-destination can be a prefix instead of an address. As with other
+address extensions, there are IPv6-specific forms. In such cases, use only
+IPv6-specific addresses or prefixes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinnersport\fR \fI<portnum>\fR\fR
+.ad
+.br
+.na
+\fB\fBisport\fR \fI<portnum>\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBinnersport\fR specifies the source port number of the inner header for a
+tunnel-mode SA. It should be used in combination with an upper-layer protocol
+(see below), but it does not have to be.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinnerdport\fR \fI<portnum>\fR\fR
+.ad
+.br
+.na
+\fB\fBidport\fR \fI<portnum>\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBinnerdport\fR specifies the destination port number of the inner header for
+a tunnel-mode SA. It should be used in combination with an upper-layer protocol
+(see below), but it does not have to be.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBiproto\fR \fI<protocol number>\fR\fBiulp\fR \fI<protocol number>\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBiproto\fR, and its synonym \fBiulp\fR, specify the IP protocol number of the
+inner header of a tunnel-mode SA.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBauthkey \fI<hexstring>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the authentication key for this \fBSA\fR. The key is expressed as a
+string of hexadecimal digits, with an optional \fB/\fR at the end, for example,
+\fB123/12\fR. Bits are counted from the most-significant bits down. For
+example, to express three '1' bits, the proper syntax is the string
+"\fBe/3\fR". For multi-key algorithms, the string is the concatenation of the
+multiple keys. This extension is used by the \fBadd\fR and \fBupdate\fR
+commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBencrkey \fI<hexstring>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the encryption key for this \fBSA\fR. The syntax of the key is the
+same as \fBauthkey\fR. A concrete example of a multi-key encryption algorithm
+is \fB3des\fR, which would express itself as a 192-bit key, which is three
+64-bit parity-included \fBDES\fR keys. This extension is used by the \fBadd\fR
+and \fBupdate\fR commands.
+.RE
+
+.sp
+.LP
+Certificate identities are very useful in the context of automated key
+management, as they tie the \fBSA\fR to the public key certificates used in
+most automated key management protocols. They are less useful for manually
+added \fBSA\fRs. Unlike other extensions, \fBsrcidtype\fR takes two values, a
+\fItype\fR, and an actual \fIvalue\fR. The type can be one of the following:
+.sp
+.ne 2
+.na
+\fB\fBprefix\fR\fR
+.ad
+.sp .6
+.RS 4n
+An address prefix.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfqdn\fR\fR
+.ad
+.sp .6
+.RS 4n
+A fully-qualified domain name.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdomain\fR\fR
+.ad
+.sp .6
+.RS 4n
+Domain name, synonym for \fBfqdn\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBuser_fqdn\fR\fR
+.ad
+.sp .6
+.RS 4n
+User identity of the form \fB\fIuser\fR@\fIfqdn\fR\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmailbox\fR\fR
+.ad
+.sp .6
+.RS 4n
+Synonym for \fBuser_fqdn\fR.
+.RE
+
+.sp
+.LP
+The \fIvalue\fR is an arbitrary text string that should identify the
+certificate.
+.sp
+.ne 2
+.na
+\fB\fBsrcidtype \fI<type, value>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a source certificate identity for this \fBSA\fR. This extension is
+used by the \fBadd\fR and \fBupdate\fR commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdstidtype \fI<type, value>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a destination certificate identity for this \fBSA\fR. This extension
+is used by the \fBadd\fR and \fBupdate\fR commands
+.RE
+
+.SS "Tunnel Mode versus Transport Mode SAs"
+An IPsec SA is a Tunnel Mode SA if the "proto" value is either 4 (\fBipip\fR)
+or 41 (\fBipv6\fR) \fBand\fR there is an inner-address or inner-port value
+specified. Otherwise, the SA is a Transport Mode SA.
+.SH SECURITY
+Keying material is very sensitive and should be generated as randomly as
+possible. Some algorithms have known weak keys. IPsec algorithms have built-in
+weak key checks, so that if a weak key is in a newly added \fBSA\fR, the
+\fBadd\fR command will fail with an invalid value.
+.sp
+.LP
+The \fBipseckey\fR command allows a privileged user to enter cryptographic
+keying information. If an adversary gains access to such information, the
+security of IPsec traffic is compromised. The following issues should be taken
+into account when using the \fBipseckey\fR command.
+.RS +4
+.TP
+1.
+Is the \fBTTY\fR going over a network (interactive mode)?
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If it is, then the security of the keying material is the security of the
+network path for this \fBTTY\fR's traffic. Using \fBipseckey\fR over a
+clear-text \fBtelnet\fR or \fBrlogin\fR session is risky.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Even local windows might be vulnerable to attacks where a concealed program
+that reads window events is present.
+.RE
+.RE
+.RS +4
+.TP
+2.
+Is the file accessed over the network or readable to the world (\fB-f\fR
+option)?
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A network-mounted file can be sniffed by an adversary as it is being read.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A world-readable file with keying material in it is also risky.
+.RE
+.RE
+.RS +4
+.TP
+3.
+The \fBipseckey\fR command is designed to be managed by the \fBmanual-key\fR
+\fBsmf\fR(7) service. Because the \fBsmf\fR(7) log files are world-readable,
+the \fBipseckey\fR does not record any syntax errors in the log files, as these
+errors might include secret information.
+.sp
+If a syntax error is found when the \fBmanual-key\fR \fBsmf\fR(7) service is
+enabled, the service enters maintenance mode. The log file will indicate that
+there was a syntax error, but will not specify what the error was.
+.sp
+The administrator should use \fBipeckey\fR \fB-c\fR \fIfilename\fR from the
+command line to discover the cause of the errors. See \fBOPTIONS\fR.
+.RE
+.sp
+.LP
+If your source address is a host that can be looked up over the network and
+your naming system itself is compromised, then any names used will not be
+trustworthy.
+.sp
+.LP
+Security weaknesses often lie in misapplication of tools, not in the tools
+themselves. Administrators are urged to be cautious when using \fBipseckey\fR.
+The safest mode of operation is probably on a console or other hard-connected
+\fBTTY\fR.
+.sp
+.LP
+For further thoughts on this subject, see the afterward by Matt Blaze in Bruce
+Schneier's \fIApplied Cryptography: Protocols, Algorithms, and Source Code in
+C\fR.
+.SS "Service Management Facility"
+IPsec manual keys are managed by the service management facility, \fBsmf\fR(7).
+The services listed below manage the components of IPsec. These services are
+delivered as follows:
+.sp
+.in +2
+.nf
+svc:/network/ipsec/policy:default (enabled)
+svc:/network/ipsec/ipsecalgs:default (enabled)
+svc:/network/ipsec/manual-key:default (disabled)
+svc:/network/ipsec/ike:default (disabled)
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The manual-key service is delivered disabled. The system administrator must
+create manual IPsec Security Associations (SAs), as described in this man page,
+before enabling that service.
+.sp
+.LP
+The policy service is delivered enabled, but without a configuration file, so
+that, as a starting condition, packets are not protected by IPsec. After you
+create the configuration file \fB/etc/inet/ipsecinit.conf\fR and refresh the
+service (\fBsvcadm refresh\fR, see below), the policy contained in the
+configuration file is applied. If there is an error in this file, the service
+enters maintenance mode. See \fBipsecconf\fR(8).
+.sp
+.LP
+Services that are delivered disabled are delivered that way because the system
+administrator must create configuration files for those services before
+enabling them. See \fBike.config\fR(5) for the \fBike\fR service.
+.sp
+.LP
+See \fBipsecalgs\fR(8) for the \fBipsecalgs\fR service.
+.sp
+.LP
+The correct administrative procedure is to create the configuration file for
+each service, then enable each service using \fBsvcadm\fR(8).
+.sp
+.LP
+If the configuration needs to be changed, edit the configuration file then
+refresh the service, as follows:
+.sp
+.in +2
+.nf
+example# \fBsvcadm refresh manual-key\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBWarning:\fR To prevent \fBipseckey\fR complaining about duplicate
+Associations, the \fBipseckey\fR command flushes the Security Association Data
+Base (SADB) when the \fBipseckey\fR command is run from \fBsmf\fR(7), before
+adding any new Security Associations defined in the configuration file. This
+differs from the command line behavior where the SADB is not flushed before
+adding new Security Associations.
+.sp
+.LP
+The \fBsmf\fR(7) framework will record any errors in the service-specific log
+file. Use any of the following commands to examine the \fBlogfile\fR property:
+.sp
+.in +2
+.nf
+example# \fBsvcs -l manual-key\fR
+example# \fBsvcprop manual-key\fR
+example# \fBsvccfg -s manual-key listprop\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following property is defined for the \fBmanual-key\fR service:
+.sp
+.in +2
+.nf
+config/config_file
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This property can be modified using \fBsvccfg\fR(8) by users who have been
+assigned the following authorization:
+.sp
+.in +2
+.nf
+solaris.smf.value.ipsec
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+See \fBauths\fR(1), \fBuser_attr\fR(5), \fBrbac\fR(7).
+.sp
+.LP
+The service needs to be refreshed using \fBsvcadm\fR(8) before the new
+property is effective. General non-modifiable properties can be viewed with the
+\fBsvcprop\fR(1) command.
+.sp
+.in +2
+.nf
+# \fBsvccfg -s ipsec/manual-key setprop config/config_file = \e
+/new/config_file\fR
+# \fBsvcadm refresh manual-key\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Administrative actions on this service, such as enabling, disabling,
+refreshing, and requesting restart can be performed using \fBsvcadm\fR(8). A
+user who has been assigned the authorization shown below can perform these
+actions:
+.sp
+.in +2
+.nf
+solaris.smf.manage.ipsec
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The service's status can be queried using the \fBsvcs\fR(1) command.
+.sp
+.LP
+The \fBipseckey\fR command is designed to be run under \fBsmf\fR(7) management.
+While the \fBipsecconf\fR command can be run from the command line, this is
+discouraged. If the \fBipseckey\fR command is to be run from the command line,
+the \fBmanual-key\fR \fBsmf\fR(7) service should be disabled first. See
+\fBsvcadm\fR(8).
+.SH EXAMPLES
+\fBExample 1 \fREmptying Out All \fBSA\fRs
+.sp
+.LP
+To empty out all \fBSA\fR:
+
+.sp
+.in +2
+.nf
+example# \fBipseckey flush\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRFlushing Out IPsec AH \fBSA\fRs Only
+.sp
+.LP
+To flush out only IPsec \fBAH\fR \fBSA\fRs:
+
+.sp
+.in +2
+.nf
+example# \fBipseckey flush ah\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRSaving All \fBSA\fRs To Standard Output
+.sp
+.LP
+To save all \fBSA\fRs to the standard output:
+
+.sp
+.in +2
+.nf
+example# \fBipseckey save all\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRSaving \fBESP\fR \fBSA\fRs To The File \fB/tmp/snapshot\fR
+.sp
+.LP
+To save \fBESP\fR \fBSA\fRs to the file \fB/tmp/snapshot\fR:
+
+.sp
+.in +2
+.nf
+example# \fBipseckey save esp /tmp/snapshot\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRDeleting an IPsec \fBSA\fR
+.sp
+.LP
+To delete an IPsec \fBSA\fR, only the \fBSPI\fR and the destination address are
+needed:
+
+.sp
+.in +2
+.nf
+example# \fBipseckey delete esp spi 0x2112 dst 224.0.0.1\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+An alternative would be to delete the SA and the SAs pair if it has one:
+
+.sp
+.in +2
+.nf
+example# \fBipseckey delete-pair esp spi 0x2112 dst 224.0.0.1\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRGetting Information on an IPsec \fBSA\fR
+.sp
+.LP
+Likewise, getting information on a \fBSA\fR only requires the destination
+address and \fBSPI\fR:
+
+.sp
+.in +2
+.nf
+example# \fBipseckey get ah spi 0x5150 dst mypeer\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 7 \fRAdding or Updating IPsec \fBSA\fRs
+.sp
+.LP
+Adding or updating \fBSA\fRs requires entering interactive mode:
+
+.sp
+.in +2
+.nf
+example# \fBipseckey\fR
+ipseckey> \fBadd ah spi 0x90125 src me.example.com dst you.example.com \e
+          authalg md5 authkey 1234567890abcdef1234567890abcdef\fR
+ipseckey> \fBupdate ah spi 0x90125 dst you.example.com hard_bytes \e
+          16000000\fR
+ipseckey> \fBexit\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Adding two SAs that are linked together as a pair:
+
+.sp
+.in +2
+.nf
+example# \fBipseckey\fR
+ipseckey> \fBadd esp spi 0x2345 src me.example.com dst you.example.com \e
+   authalg md5 authkey bde359723576fdea08e56cbe876e24ad \e
+   encralg des encrkey be02938e7def2839\fR
+ipseckey> \fBadd esp spi 0x5432 src me.example.com dst you.example.com \e
+   authalg md5 authkey bde359723576fdea08e56cbe876e24ad \e
+   encralg des encrkey be02938e7def2839 pair-spi 0x2345\fR
+ipseckey> \fBexit\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 8 \fRAdding an \fBSA\fR in the Opposite Direction
+.sp
+.LP
+In the case of IPsec, \fBSA\fRs are unidirectional. To communicate securely, a
+second \fBSA\fR needs to be added in the opposite direction. The peer machine
+also needs to add both \fBSA\fRs.
+
+.sp
+.in +2
+.nf
+example# \fBipseckey\fR
+ipseckey> \fBadd ah spi 0x2112 src you.example.com dst me.example.com \e
+          authalg md5 authkey bde359723576fdea08e56cbe876e24ad \e
+          hard_bytes 16000000\fR
+ipseckey> \fBexit\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 9 \fRMonitoring \fBPF_KEY\fR Messages
+.sp
+.LP
+Monitoring for \fBPF_KEY\fR messages is straightforward:
+
+.sp
+.in +2
+.nf
+example# \fBipseckey monitor\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 10 \fRUsing Commands in a File
+.sp
+.LP
+Commands can be placed in a file that can be parsed with the \fB-f\fR option.
+This file may contain comment lines that begin with the "#" symbol. For
+example:
+
+.sp
+.in +2
+.nf
+# This is a sample file for flushing out the ESP table and
+# adding a pair of SAs.
+
+flush esp
+
+### Watch out!  I have keying material in this file.  See the
+### SECURITY section in this manual page for why this can be
+### dangerous .
+
+add esp spi 0x2112 src me.example.com dst you.example.com \e
+    authalg md5 authkey bde359723576fdea08e56cbe876e24ad \e
+    encralg des encrkey be02938e7def2839 hard_usetime 28800
+add esp spi 0x5150 src you.example.com dst me.example.com \e
+    authalg md5 authkey 930987dbe09743ade09d92b4097d9e93 \e
+    encralg des encrkey 8bd4a52e10127deb hard_usetime 28800
+
+## End of file  -  This is a gratuitous comment
+.fi
+.in -2
+
+.LP
+\fBExample 11 \fRAdding SAs for IPv6 Addresses
+.sp
+.LP
+The following commands from the interactive-mode create an SA to protect IPv6
+traffic between the site-local addresses
+
+.sp
+.in +2
+.nf
+example # \fBipseckey\fR
+ipseckey> \fBadd esp spi 0x6789 src6 fec0:bbbb::4483 dst6 fec0:bbbb::7843\e
+           authalg md5 authkey bde359723576fdea08e56cbe876e24ad \e
+          encralg des encrkey be02938e7def2839 hard_usetime 28800\fR
+ipseckey>\fBexit\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 12 \fRLinking Two SAs as a Pair
+.sp
+.LP
+The following command links two SAs together, as a pair:
+
+.sp
+.in +2
+.nf
+example# \fBipseckey update esp spi 0x123456 dst 192.168.99.2 \e
+pair-spi 0x654321\fR
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/inet/secret/ipseckeys\fR\fR
+.ad
+.sp .6
+.RS 4n
+Default configuration file used at boot time. See "Service Management Facility"
+and \fBSECURITY\fR for more information.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.BR ps (1),
+.BR svcprop (1),
+.BR svcs (1),
+.BR ipsec (4P),
+.BR ipsecah (4P),
+.BR ipsecesp (4P),
+.BR pf_key (4P),
+.BR ike.config (5),
+.BR attributes (7),
+.BR smf (7),
+.BR ipsecalgs (8),
+.BR ipsecconf (8),
+.BR route (8),
+.BR svcadm (8),
+.BR svccfg (8)
+.sp
+.LP
+Schneier, B., \fIApplied Cryptography: Protocols, Algorithms, and Source Code
+in C\fR. Second ed. New York, New York: John Wiley & Sons, 1996.
+.SH DIAGNOSTICS
+The \fBipseckey\fR command parses the configuration file and reports any
+errors. In the case of multiple errors, \fBipseckey\fR reports as many of these
+as possible.
+.sp
+.LP
+The \fBipseckey\fR command does not attempt to use a \fBCOMMAND\fR that has a
+syntax error. A \fBCOMMAND\fR might be syntactically correct but can
+nevertheless generate an error because the kernel rejected the request made to
+\fBpf_key\fR(4P). This might occur because a key had an invalid length or
+because an unsupported algorithm was specified.
+.sp
+.LP
+If there are any errors in the configuration file, ipseckey reports the number
+of valid COMMANDS and the total number of COMMANDS parsed.
+.sp
+.ne 2
+.na
+\fB\fBParse error on line \fIN\fR.\fR\fR
+.ad
+.sp .6
+.RS 4n
+If an interactive use of \fBipseckey\fR would print usage information, this
+would print instead. Usually proceeded by another diagnostic. Because
+\fBCOMMANDS\fR can cover more than a single line in the configuration file by
+using the backslash character to delimit lines, its not always possible to
+pinpoint in the configuration file the exact line that caused the error.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBUnexpected end of command line.\fR\fR
+.ad
+.sp .6
+.RS 4n
+An additional argument was expected on the command line.
+.RE
+
+.sp
+.ne 2
+.na
+\fBUnknown\fR
+.ad
+.sp .6
+.RS 4n
+A value for a specific extension was unknown.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBAddress type \fIN\fR not supported.\fR\fR
+.ad
+.sp .6
+.RS 4n
+A name-to-address lookup returned an unsupported address family.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fIN\fR is not a bit specifier\fR\fR
+.ad
+.br
+.na
+\fB\fBbit length \fIN\fR is too big for\fR\fR
+.ad
+.br
+.na
+\fB\fBstring is not a hex string\fR\fR
+.ad
+.sp .6
+.RS 4n
+Keying material was not entered appropriately.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCan only specify single\fR\fR
+.ad
+.sp .6
+.RS 4n
+A duplicate extension was entered.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDon't use extension for \fI<string>\fR for \fI<command>\fR\&.\fR\fR
+.ad
+.sp .6
+.RS 4n
+An extension not used by a command was used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBOne of the entered values is incorrect: Diagnostic code \fINN\fR:
+\fI<msg>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+This is a general invalid parameter error. The diagnostic code and message
+provides more detail about what precise value was incorrect and why.
+.RE
+
+.SH NOTES
+In spite of its IPsec-specific name, \fBipseckey\fR is analogous to
+\fBroute\fR(8), in that it is a command-line interface to a socket-based
+administration engine, in this case, \fBPF_KEY\fR. \fBPF_KEY\fR was originally
+developed at the United States Naval Research Laboratory.
+.sp
+.LP
+To have machines communicate securely with manual keying, \fBSA\fRs need to be
+added by all communicating parties. If two nodes wish to communicate securely,
+both nodes need the appropriate \fBSA\fRs added.
+.sp
+.LP
+In the future \fBipseckey\fR may be invoked under additional names as other
+security protocols become available to \fBPF_KEY\fR.
+.sp
+.LP
+This command requires \fBsys_ip_config\fR privilege to operate and thus can run
+in the global zone and in exclusive-IP zones. The global zone can set up
+security associations with \fBipseckey\fR to protect traffic for shared-IP
+zones on the system.

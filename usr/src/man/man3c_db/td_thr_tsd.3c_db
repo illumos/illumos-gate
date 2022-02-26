@@ -68,7 +68,7 @@ A \fBlibc_db\fR internal error occurred.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -85,4 +85,4 @@ MT-Level	Safe
 .sp
 .LP
 \fBlibc_db\fR(3LIB), \fBtd_ta_tsd_iter\fR(3C_DB), \fBthr_getspecific\fR(3C),
-\fBattributes\fR(5)
+.BR attributes (7)

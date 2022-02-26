@@ -38,7 +38,7 @@ must be fully initialized.
 The definition of the
 .Sy prcred_t
 structure may be found in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 Note, the credentials may only be updated for an active process.
 If the process handle refers to a zombie process, core file, or a file, then
@@ -64,4 +64,4 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr Pcred 3PROC ,
-.Xr proc 4
+.Xr proc 5

@@ -1,0 +1,208 @@
+'\" te
+.\" Copyright (c) 2005 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SCSA1394 4D "May 13, 2017"
+.SH NAME
+scsa1394 \- SCSI to 1394 bridge driver
+.SH SYNOPSIS
+.LP
+.nf
+\fBunit@GUID\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBscsa1394\fR driver is a 1394 target and an SCSA HBA driver that supports
+1394 mass storage devices compliant with the \fISerial Bus Protocol 2
+(SBP-2\fR) specification. It supports both bus-powered and self-powered 1394
+mass storage devices.
+.sp
+.LP
+The \fBscsa1394\fR nexus driver maps SCSA target driver requests to SBP-2
+Operation Request Blocks (\fBORB\fR's).
+.sp
+.LP
+The \fBscsa1394\fR driver creates a child device info node for each logical
+unit (LUN) on the mass storage device. The standard Solaris SCSI disk driver is
+attached to those nodes. Refer to \fBsd\fR(4D).
+.sp
+.LP
+This driver supports multiple LUN devices and creates a separate child device
+info node for each LUN. All child LUN nodes attach to \fBsd\fR(4D).
+.sp
+.LP
+In previous releases, all 1394 mass storage devices were treated as removable
+media devices and managed by \fBrmformat\fR(1) and volume management software.
+In the current release, however, only mass storage devices with a removable bit
+(RMB) value of \fB1\fR are removable. (The RMB is part of the device's SCSI
+INQUIRY data.) See SCSI specifications T10/995D Revision 11a, T10/1236-D
+Revision 20 or T10/1416-D Revision 23 for more information. However, for
+backward compatibility, all 1394 mass storage devices can still be managed by
+\fBrmformat\fR(1). With or without a volume manager, you can mount, eject,
+hot remove and hot insert a 1394 mass storage device as the following sections
+explain.
+.SH USING VOLUME MANAGEMENT
+.LP
+Mass storage devices are managed by a volume manager. Software that manages
+removable media creates a device nickname that can be listed with
+\fBeject\fR(1) or \fBrmmount\fR(1). A device that is not mounted automatically
+can be mounted using \fBrmmount\fR(1) under \fB/rmdisk/\fIlabel\fR\fR. Note
+that the \fBmount\fR(8) and \fBmount\fR(8) commands do not accept nicknames;
+you must use explicit device names with these commands.
+.sp
+.LP
+See \fBrmmount\fR(1) to unmount the device and \fBeject\fR(1) to eject the
+media. If the device is ejected while it is mounted, volume management software
+unmounts the device before ejecting it. It also might kill any active
+applications that are accessing the device.
+.sp
+.LP
+Volume management software is hotplug-aware and normally mounts file systems on
+USB mass storage devices if the file system is recognized. Before hot removing
+the USB device, use \fBeject\fR(1) to unmount the file system.
+.sp
+.LP
+You can disable the automatic mounting and unmounting of removable devices by
+inserting a entry for a removable device in \fB/etc/vfstab\fR. In this entry,
+you must set the \fBmount at boot\fR field to \fBno\fR. See \fBvfstab\fR(5).
+.SH USING \fBmount\fR AND \fBumount\fR
+.LP
+Use \fBmount\fR(8) to explicitly mount the device and \fBumount\fR(8) to
+unmount the device. Use \fBeject\fR(1) to eject the media. After you have
+explicitly mounted a removable device, you cannot use a nickname as an argument
+to \fBeject\fR.
+.sp
+.LP
+Removing the storage device while it is being accessed or mounted fails with a
+console warning. To hot remove the storage device from the system, unmount the
+file system, then kill all applications accessing the device. Next, hot remove
+the device. A storage device can be hot inserted at any time.
+.SH DEVICE SPECIAL FILES
+.LP
+Block special file names are located in \fB/dev/dsk\fR. Raw file names are
+located in \fB/dev/rdsk\fR. Input/output requests to the devices must follow
+the same restrictions as those for SCSI disks. Refer to \fBsd\fR(4D).
+.SH IOCTLS
+.LP
+Refer to \fBcdio\fR(4I) and \fBdkio\fR(4I).
+.SH ERRORS
+.LP
+Refer to \fBsd\fR(4D).
+.SH FILES
+.LP
+The device special files for the 1394 mass storage device are created like
+those for a SCSI disk. Refer to \fBsd\fR(4D).
+.sp
+.ne 2
+.na
+\fB\fB/dev/dsk/c\fIn\fRt\fIn\fRd\fIn\fRs\fIn\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Block files
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rdsk/c\fIn\fRt\fIn\fRd\fIn\fRs\fIn\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Raw files
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/vol/dev/aliases/rmdisk0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Symbolic link to the character device for the media in removable drive 0. This
+is a generic removable media device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/scsa1394\fR\fR
+.ad
+.sp .6
+.RS 4n
+32-bit x86 ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/scsa1394\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit x86 ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/scsa1394\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit SPARC ELF kernel module
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86, PCI-based systems
+.TE
+
+.SH SEE ALSO
+.LP
+.BR cdrw (1),
+.BR eject (1),
+.BR rmformat (1),
+.BR rmmount (1),
+.BR hci1394 (4D),
+.BR sd (4D),
+.BR pcfs (4FS),
+.BR cdio (4I),
+.BR dkio (4I),
+.BR scsi (5),
+.BR vfstab (5),
+.BR attributes (7),
+.BR cfgadm_scsi (8),
+.BR fdisk (8),
+.BR mount (8),
+.BR umount (8)
+.sp
+.LP
+\fIIEEE Std 1394-1995 Standard for a High Performance Serial Bus\fR
+.sp
+.LP
+\fIANSI NCITS 325-1998 - Serial Bus Protocol 2 (SBP-2)\fR
+.sp
+.LP
+\fISystem Administration Guide: Devices and File Systems\fR
+.sp
+.LP
+SCSI Specification \fIT10/995D Revision 11a\fR \(em March 1997
+.sp
+.LP
+SCSI Specification \fIT10/1236-D Revision 20\fR \(em July 2001
+.sp
+.LP
+SCSI Specification \fIT10/1416-D Revision 23\fR \(em May 2005

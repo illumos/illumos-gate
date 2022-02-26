@@ -3399,7 +3399,7 @@ main(int argc, char *argv[])
 	ret = cmdParse(argc, argv, /* SUB_COMMAND_ISSUED, */ synTables,
 	    subcommandArgs, &funcRet);
 	if (ret == 1) {
-		(void) fprintf(stdout, "%s %s(1M)\n",
+		(void) fprintf(stdout, "%s %s(8)\n",
 		    getTextString(TEXT_MORE_INFO), cmdName);
 		return (ERROR_CLI_FAILED);
 	} else if (ret == -1) {

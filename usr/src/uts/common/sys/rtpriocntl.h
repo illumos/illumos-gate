@@ -67,7 +67,7 @@ typedef struct rtinfo {
 #define	RT_KY_TQSIG	4	/* real-time time quantum signal */
 
 /*
- * The following is used by the dispadmin(1M) command for
+ * The following is used by the dispadmin(8) command for
  * scheduler administration and is not for general use.
  */
 

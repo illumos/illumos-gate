@@ -67,7 +67,7 @@ PARALLEL_HEADERS = sysheaders userheaders libheaders cmdheaders
 #
 PARALLEL_DIRS = data uts lib man
 
-# The check target also causes smf(5) service manifests to be validated.
+# The check target also causes smf(7) service manifests to be validated.
 CHKMFSTSUBDIRS=	cmd
 
 # And man page formats

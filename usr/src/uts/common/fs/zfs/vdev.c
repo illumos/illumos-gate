@@ -203,7 +203,7 @@ vdev_getops(const char *type)
 
 /*
  * Derive the enumerated alloction bias from string input.
- * String origin is either the per-vdev zap or zpool(1M).
+ * String origin is either the per-vdev zap or zpool(8).
  */
 static vdev_alloc_bias_t
 vdev_derive_alloc_bias(const char *bias)

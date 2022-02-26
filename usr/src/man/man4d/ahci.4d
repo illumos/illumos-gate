@@ -1,0 +1,95 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH AHCI 4D "Sep 10, 2009"
+.SH NAME
+ahci \- Advanced Host Controller Interface SATA controller driver
+.SH SYNOPSIS
+.LP
+.nf
+\fBsata@unit-address\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBahci\fR driver is a SATA framework-compliant HBA driver that supports
+SATA HBA controllers that are compatible with the \fIAdvanced Host Controller
+Interface 1.0\fR specification. AHCI is an Intel-developed protocol that
+describes the register-level interface for host controllers for serial ATA 1.0a
+and Serial ATA II. The \fIAHCI 1.0\fR specification describes the interface
+between the system software and the host controller hardware.
+.sp
+.LP
+The \fBahci\fR driver currently supports the Intel ICH6/7/8/9/10, VIA vt8251
+and JMicron AHCI controllers which are compliant with the Advanced Host
+Controller Interface 1.0 specification. The Intel ICH6/7/8/9 and VIA vt8251
+controllers support standard SATA features. The \fBahci\fR driver currently
+supports hard disk, ATAPI DVD, ATAPI tape, ATAPI disk (i.e. Dell RD1000),
+hotplug, NCQ (Native command queuing) and Port multipliers (Silicon Image
+3726/4726). Power management is not yet supported.
+.SH CONFIGURATION
+.sp
+.LP
+The \fBahci\fR module contains no user configurable parameters.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/ahci\fR\fR
+.ad
+.sp .6
+.RS 4n
+32-bit \fBELF\fR kernel module (x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/ahci\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit \fBELF\fR kernel module (x86).
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attribute:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR sata (4D),
+.BR cfgadm (8),
+.BR cfgadm_sata (8),
+.BR prtconf (8)
+.sp
+.LP
+\fIAdvanced Host Controller Interface 1.0\fR
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+To bind the \fBahci\fR driver to your controller, choose the [AHCI] BIOS
+option.
+.sp
+.LP
+Note that booting is not supported if toggle exists between the [IDE] and
+[AHCI] BIOS options

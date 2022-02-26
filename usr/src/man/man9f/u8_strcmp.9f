@@ -318,7 +318,7 @@ docmp_nfd_caseinsensitive_u320(const char *u1, const char *u2) {
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -332,9 +332,13 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBu8_validate\fR(3C), \fBu8_textprep_str\fR(3C), \fBu8_validate\fR(3C),
-\fBattributes\fR(5), \fBu8_textprep_str\fR(9F), \fBu8_validate\fR(9F),
-\fBuconv_u16tou32\fR(9F)
+.BR u8_textprep_str (3C),
+.BR u8_validate (3C),
+.BR u8_validate (3C),
+.BR attributes (7),
+.BR u8_textprep_str (9F),
+.BR u8_validate (9F),
+.BR uconv_u16tou32 (9F)
 .sp
 .LP
 The Unicode Standard (http://www.unicode.org)

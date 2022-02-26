@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * tod driver module for OPL (implements a soft tod)
  */
@@ -94,7 +92,7 @@ static struct modlinkage modlinkage = {
  *
  * Note that on first powerup domain boot, diff is zero.
  *
- * When system updates the time via date(1m):
+ * When system updates the time via date(1):
  *
  *   FJSV,set-domain-time
  * OS   --------->   OBP                      SRAM
@@ -109,7 +107,7 @@ static struct modlinkage modlinkage = {
  * SP will be broken. In this particular case, we notify users that
  * "there is no time synchronization" and the logic will attempt to
  * resync with the SP whenever the OS tries to do a TOD update.
- * (e.g. via date(1m) or NTP).
+ * (e.g. via date(1) or NTP).
  */
 
 static	int enable_time_sync = 1;
@@ -221,7 +219,7 @@ todopl_get(void)
  *
  * When running NTP, tod_set is called at least once per second in order
  * to update the hardware clock. To minimize pressure on SP, we want only
- * to record significant time changes on the SP (when date(1M) is run).
+ * to record significant time changes on the SP (when date(1) is run).
  * We have 30 seconds threshold requirement before recording the time change.
  */
 /* ARGSUSED */

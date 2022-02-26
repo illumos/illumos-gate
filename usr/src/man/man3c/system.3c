@@ -139,7 +139,7 @@ See \fBpopen\fR(3C) for an alternative to \fBsystem()\fR that is thread-safe.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -157,5 +157,11 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBksh\fR(1), \fBsh\fR(1), \fBpopen\fR(3C), \fBposix_spawn\fR(3C),
-\fBwait\fR(3C), \fBwaitpid\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR ksh (1),
+.BR sh (1),
+.BR popen (3C),
+.BR posix_spawn (3C),
+.BR wait (3C),
+.BR waitpid (3C),
+.BR attributes (7),
+.BR standards (7)

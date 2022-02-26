@@ -27,7 +27,7 @@ mounts on that machine.
 .sp
 .LP
 At shutdown time a message is written to the system log daemon,
-\fBsyslogd\fR(1M), containing the time of shutdown, the instigator of the
+\fBsyslogd\fR(8), containing the time of shutdown, the instigator of the
 shutdown, and the reason. Then a terminate signal is sent to \fBinit\fR, which
 brings the system down to single-user mode.
 .SH OPTIONS
@@ -50,7 +50,7 @@ the file systems will not be checked.
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-Execute \fBhalt\fR(1M).
+Execute \fBhalt\fR(8).
 .RE
 
 .sp
@@ -77,7 +77,7 @@ Prevent the normal \fBsync\fR(2) before stopping.
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-Execute \fBreboot\fR(1M).
+Execute \fBreboot\fR(8).
 .RE
 
 .SH FILES
@@ -93,8 +93,14 @@ remote mounted file system table
 .SH SEE ALSO
 .sp
 .LP
-\fBfastboot\fR(1B), \fBlogin\fR(1), \fBhalt\fR(1M), \fBreboot\fR(1M),
-\fBsyslogd\fR(1M), \fBsync\fR(2), \fBrmtab\fR(4), \fBattributes\fR(5)
+.BR login (1),
+.BR fastboot (1B),
+.BR sync (2),
+.BR rmtab (5),
+.BR attributes (7),
+.BR halt (8),
+.BR reboot (8),
+.BR syslogd (8)
 .SH NOTES
 .sp
 .LP

@@ -97,7 +97,7 @@ FILE		*dfile;		/* debug file */
 /*
  * set_transq_count_max() - sets the transq_count_max value based on kernel
  * audit queue high water mark. This is backup solution for a case, when the
- * the default qsize zero value is (intentionally) set in the audit_remote(5)
+ * the default qsize zero value is (intentionally) set in the audit_remote(7)
  * plugin configuration.
  */
 static auditd_rc_t
@@ -696,7 +696,7 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 /*
  * auditd_plugin_open() may be called multiple times; on initial open or
  * `audit -s`, then kvlist != NULL; on `audit -n`, then kvlist == NULL.
- * For more information see audit(1M).
+ * For more information see audit(8).
  *
  * Note, that space on stack allocated for any error message returned along
  * with AUDITD_RETRY is subsequently freed by auditd.
@@ -803,7 +803,7 @@ auditd_plugin_open(const kva_t *kvlist, char **ret_list, char **error)
 
 /*
  * auditd_plugin_close() performs shutdown operations. The return values are
- * used by auditd to output warnings via the audit_warn(1M) script and the
+ * used by auditd to output warnings via the audit_warn(8) script and the
  * string returned via "error_text", is passed to audit_warn.
  *
  * Note, that space on stack allocated for any error message returned along

@@ -142,7 +142,7 @@ main( )
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -160,9 +160,14 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBbsearch\fR(3C), \fBlsearch\fR(3C), \fBmalloc\fR(3C), \fBstring\fR(3C),
-\fBtsearch\fR(3C), \fBmalloc\fR(3MALLOC), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR bsearch (3C),
+.BR lsearch (3C),
+.BR malloc (3C),
+.BR string (3C),
+.BR tsearch (3C),
+.BR malloc (3MALLOC),
+.BR attributes (7),
+.BR standards (7)
 .sp
 .LP
 \fIThe Art of Computer Programming, Volume 3, Sorting and Searching by Donald

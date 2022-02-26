@@ -108,7 +108,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='cron' section='1M' manpath='/usr/share/man' />
+			<manpage title='cron' section='8' manpath='/usr/share/man' />
 			<manpage title='crontab' section='1' manpath='/usr/share/man' />
 		</documentation>
 	</template>

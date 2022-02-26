@@ -1,0 +1,150 @@
+'\" te
+.\"  Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH CMDK 4D "Nov 4, 2008"
+.SH NAME
+cmdk \- common disk driver
+.SH SYNOPSIS
+.LP
+.nf
+cmdk@\fItarget\fR, \fIlun\fR : [ \fIpartition\fR \fB|\fR \fIslice\fR ]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcmdk\fR device driver is a common interface to various disk devices. The
+driver supports magnetic fixed disks and magnetic removable disks.
+.sp
+.LP
+The \fBcmdk\fR device driver supports three different disk labels: fdisk
+partition table, Solaris x86 VTOC and EFI/GPT.
+.sp
+.LP
+The block-files access the disk using the system's normal buffering mechanism
+and are read and written without regard to physical disk records. There is also
+a "raw" interface that provides for direct transmission between the disk and
+the user's read or write buffer. A single read or write call usually results in
+one I/O operation; raw I/O is therefore considerably more efficient when many
+bytes are transmitted. The names of the block files are found in
+\fB/dev/dsk\fR. Raw file names are found in \fB/dev/rdsk\fR.
+.sp
+.LP
+I/O requests to the magnetic disk must have an offset and transfer length that
+is a multiple of 512 bytes or the driver returns an \fBEINVAL\fR error.
+.sp
+.LP
+Slice 0 is normally used for the root file system on a disk, slice 1 as a
+paging area (for example, swap), and slice 2 for backing up the entire fdisk
+partition for Solaris software. Other slices may be used for \fBusr\fR file
+systems or system reserved area.
+.sp
+.LP
+The fdisk partition 0 is to access the entire disk and is generally used by the
+\fBfdisk\fR(8) program.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/dsk/c\fR\fIn\fR\fBd\fR\fIn\fR[\fBs\fR|\fBp\fR]\fIn\fR\fR
+.ad
+.RS 26n
+block device (IDE)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rdsk/c\fR\fIn\fR\fBd\fR\fIn\fR[\fBs\fR|\fBp\fR]\fIn\fR\fR
+.ad
+.RS 26n
+raw device (IDE)
+.sp
+where:
+.sp
+.ne 2
+.na
+\fB\fBc\fR\fIn\fR\fR
+.ad
+.RS 6n
+controller \fIn\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBd\fR\fIn\fR\fR
+.ad
+.RS 6n
+lun \fIn (0-1)\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBs\fR\fIn\fR\fR
+.ad
+.RS 6n
+UNIX system slice \fIn (0-15).\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBp\fR\fIn\fR\fR
+.ad
+.RS 6n
+fdisk partition (0-36).
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/cmdk\fR\fR
+.ad
+.RS 26n
+32-bit kernel module.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/cmdk\fR\fR
+.ad
+.RS 26n
+64-bit kernel module.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR lseek (2),
+.BR read (2),
+.BR write (2),
+.BR readdir (3C),
+.BR dkio (4I),
+.BR scsi (5),
+.BR vfstab (5),
+.BR attributes (7),
+.BR fdisk (8),
+.BR mount (8)

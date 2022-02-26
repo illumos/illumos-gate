@@ -104,8 +104,13 @@ my_periodic_func(void *arg)
 .in -2
 
 .SH SEE ALSO
-\fBcv_timedwait\fR(9F), \fBddi_intr_get_pri\fR(9F), \fBddi_periodic_add\fR(9F),
-\fBqtimeout\fR(9F), \fBquntimeout\fR(9F), \fBtimeout\fR(9F), \fBuntimeout\fR(9F)
+.BR cv_timedwait (9F),
+.BR ddi_intr_get_pri (9F),
+.BR ddi_periodic_add (9F),
+.BR qtimeout (9F),
+.BR quntimeout (9F),
+.BR timeout (9F),
+.BR untimeout (9F)
 .SH NOTES
 Historically this interface was advertised as safe for use from within the
 periodic callback function.  In order to ensure the correct operation of the

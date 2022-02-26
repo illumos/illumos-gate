@@ -111,7 +111,7 @@
 		<propval name='ipf_method' type='astring'
 			value='/lib/svc/method/print-svc ipfilter' />
 	</property_group>
- 
+
 	<property_group name='firewall_config' type='com.sun,fw_configuration'>
 		<propval name='policy' type='astring' value='use_global' />
 		<propval name='block_policy' type='astring'
@@ -135,7 +135,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='lpsched' section='1M'
+			<manpage title='lpsched' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

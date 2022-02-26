@@ -79,7 +79,7 @@ init_isa_regex(void)
 	char *p;
 
 	/*
-	 * Extract the isalist(5) for userland from the kernel.
+	 * Extract the isalist(7) for userland from the kernel.
 	 */
 	isalist = malloc(isalen);
 	do {

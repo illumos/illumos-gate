@@ -180,12 +180,14 @@ reply used to complete an unsuccessful \fBDL_UNITDATA_REQ\fR.
 None.
 .SH NOTES
 These functions are not required if you are are writing a \fBDLPI\fR device
-driver using \fBgld\fR(7D).
+driver using \fBgld\fR(4D).
 .SH CONTEXT
 All \fBDLPI\fR helper functions can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-\fBgld\fR(7D), \fBdlpi\fR(7P), \fBqreply\fR(9F)
+.BR gld (4D),
+.BR dlpi (4P),
+.BR qreply (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

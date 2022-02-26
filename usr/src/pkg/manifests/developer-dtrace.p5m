@@ -211,13 +211,13 @@ dir  path=usr/share
 dir  path=usr/share/lib
 dir  path=usr/share/lib/java group=sys
 file path=usr/share/lib/java/dtrace.jar group=sys
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/dtrace.1m
-file path=usr/share/man/man1m/intrstat.1m
-file path=usr/share/man/man1m/lockstat.1m
-file path=usr/share/man/man1m/plockstat.1m
 dir  path=usr/share/man/man3lib
 file path=usr/share/man/man3lib/libdtrace.3lib
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/dtrace.8
+file path=usr/share/man/man8/intrstat.8
+file path=usr/share/man/man8/lockstat.8
+file path=usr/share/man/man8/plockstat.8
 legacy pkg=SUNWdtrc desc="Dynamic Tracing (DTrace) Clients" \
     name="DTrace Clients"
 license cr_Sun license=cr_Sun

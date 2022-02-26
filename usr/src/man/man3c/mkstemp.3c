@@ -140,11 +140,11 @@ will be removed by the application before the application terminates.
 .sp
 .LP
 The \fBmkstemp()\fR function has a transitional interface for 64-bit file
-offsets. See \fBlf64\fR(5).
+offsets. See \fBlf64\fR(7).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -164,6 +164,12 @@ The \fBmkstemp()\fR function is Standard. The \fBmkstemps()\fR and
 .SH SEE ALSO
 .sp
 .LP
-\fBgetpid\fR(2), \fBlstat\fR(2), \fBmkdir\fR(2), \fBopen\fR(2),
-\fBtmpfile\fR(3C), \fBmktemp\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5),
-\fBstandards\fR(5)
+.BR getpid (2),
+.BR lstat (2),
+.BR mkdir (2),
+.BR open (2),
+.BR mktemp (3C),
+.BR tmpfile (3C),
+.BR attributes (7),
+.BR lf64 (7),
+.BR standards (7)

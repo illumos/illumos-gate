@@ -1,0 +1,234 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH RGE 4D "Dec 21, 2007"
+.SH NAME
+rge \- Realtek Gigabit/Fast Ethernet Network Adapter driver
+.SH SYNOPSIS
+.LP
+.nf
+/dev/rge
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrge\fR Gigabit/Fast Ethernet driver is a multi-threaded,  loadable,
+clonable,  GLD-based  STREAMS  driver supporting  the Data Link Provider
+Interface, \fBdlpi\fR(4P), on  the Realtek Gigabit/Fast Ethernet Network
+Adapter.
+.sp
+.LP
+The \fBrge\fR driver functions includes controller initialization, frame
+transmit and receive, promiscuous and multicast support, and error recovery and
+reporting.
+.SH APPLICATION PROGRAMMING INTERFACE
+.sp
+.LP
+The cloning,  character-special device \fB/dev/rge\fR is  used to access all
+Realtek Gigabit/Fast Ethernet devices installed within the system.
+.sp
+.LP
+The \fBrge\fR driver is managed by the \fBdladm\fR(8) command line utility,
+which allows VLANs to be defined on top of \fBrge\fR  instances and for
+\fBrge\fR instances to be aggregated. See \fBdladm\fR(8) for more details.
+.sp
+.LP
+The values returned by the driver in the DL_INFO_ACK primitive in response to
+the DL_INFO_REQ are as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum SDU (with jumbo frame) is \fB7000\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Minimum SDU is \fB0\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDSLAP\fR address length is \fB8\fR bytes.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBMAC\fR type is \fBDL_ETHER.\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSAP\fR length value is  -2, meaning the physical address component is
+followed immediately by a 2-byte sap component within the DLSAP address.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Broadcast address value is Ethernet/IEEE  broadcast address
+(FF:FF:FF:FF:FF:FF).
+.RE
+.sp
+.LP
+Once in the DL_ATTACHED state, you must send a DL_BIND_REQ to associate a
+particular Service Access Point (SAP) with the stream.
+.SH CONFIGURATION
+.sp
+.LP
+By default, the \fBrge\fR driver performs auto-negotiation to select the link
+speed and mode. Link speed and mode can be any one of the following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+1000 Mbps, full-duplex
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+100 Mbps, full-duplex
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+100 Mbps, half-duplex
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+10 Mbps, full-duplex
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+10 Mbps, half-duplex
+.RE
+.sp
+.LP
+Alternatively, you can set the capabilities advertised by the \fBrge\fR device
+using \fBndd\fR(8). The driver supports a number of parameters whose names
+begin with \fBadv_\fR. Each of these parameters contains a boolean value that
+determines if the device advertises that mode of operation. The
+\fIadv_pause_cap\fR indicates if half/full duplex pause is advertised to link
+partner. You can set \fIadv_asym_pause_cap\fR to advertise to the link partner
+that asymmetric pause is desired.
+.sp
+.LP
+For example, to prevent the device 'rge2' from advertising gigabit
+capabilities, enter (as super-user):
+.sp
+.in +2
+.nf
+# ndd -set /dev/rge2 adv_1000fdx_cap 0
+.fi
+.in -2
+
+.sp
+.LP
+All capabilities default to enabled. Note that changing any capability
+parameter causes the link to go down while the link partners renegotiate the
+link speed/duplex using the newly changed capabilities.
+.sp
+.LP
+You can find the current parameter settings by using \fBndd\fR \fB-get\fR. In
+addition, the driver exports the current state, speed, duplex setting, and
+working mode of the link via \fBndd\fR parameters (these are read only and may
+not be changed). For example, to check link state of device \fBrge0\fR:
+.sp
+.in +2
+.nf
+# ndd -get /dev/rge0 link_status
+1
+# ndd -get /dev/rge0 link_speed
+100
+# ndd -get /dev/rge0 link_duplex
+2
+.fi
+.in -2
+
+.sp
+.LP
+The output above indicates that the link is up and running at 100Mbps
+full-duplex. In addition, the driver exports its working mode by
+\fIloop_mode\fR. If it is set to 0, the loopback mode is disabled.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/rge*\fR\fR
+.ad
+.RS 27n
+Character special device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/rge\fR\fR
+.ad
+.RS 27n
+32-bit x86 \fBrge\fR driver binary.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/rge\fR\fR
+.ad
+.RS 27n
+64-bit x86 \fBrge\fR driver binary.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/rge\fR\fR
+.ad
+.RS 27n
+SPARC \fBrge\fR driver binary.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR streamio (4I),
+.BR dlpi (4P),
+.BR attributes (7),
+.BR dladm (8)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.sp
+.LP
+\fINetwork Interfaces Programmer's Guide\fR

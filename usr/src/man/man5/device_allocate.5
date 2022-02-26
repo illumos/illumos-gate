@@ -1,0 +1,272 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DEVICE_ALLOCATE 5 "Mar 6, 2017"
+.SH NAME
+device_allocate \- device_allocate file
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/security/device_allocate\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBdevice_allocate\fR file is an \fBASCII\fR file that resides in the
+\fB/etc/security\fR directory. It contains mandatory access control information
+about each physical device. Each device is represented by a one- line entry of
+the form:
+.sp
+.LP
+\fIdevice-name\fR;\fIdevice-type\fR;reserved1;reserved2;\fIauths\fR;\fIdevice-e
+xec\fR
+.sp
+.LP
+where:
+.sp
+.ne 2
+.na
+\fB\fIdevice-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Represents an arbitrary \fBASCII\fR string naming the physical device. This
+field contains no embedded white space or non-printable characters.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIdevice-type\fR\fR
+.ad
+.sp .6
+.RS 4n
+Represents an arbitrary \fBASCII\fR string naming the generic device type. This
+field identifies and groups together devices of like type. This field contains
+no embedded white space or non-printable characters. The following types of
+devices are currently managed by the system: audio, \fBsr\fR (represents CDROM
+drives), \fBfd\fR (represents floppy drives), \fBst\fR (represents tape
+drives), \fBrmdisk\fR (removable media devices).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreserved1\fR\fR
+.ad
+.sp .6
+.RS 4n
+On systems configured with Trusted Extensions, this field stores a
+colon-separated (\fB:\fR) list of key-value pairs that describe device
+allocation attributes used in Trusted Extensions. Zero or more keys can be
+specified. The following keys are currently interpreted by Trusted Extensions
+systems:
+.sp
+.ne 2
+.na
+\fB\fBminlabel\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the minimum label at which device can be allocated. Default value is
+\fBadmin_low\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmaxlabel\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the maximum label at which device can be allocated. Default value is
+\fBadmin_high\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzone\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the name of the zone in which device is currently allocated.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBclass\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies  a  logical grouping of devices. For example, all Sun Ray devices of
+all device types. There is no default  class.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBxdpy\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the X display name. This is used to identify devices associated with
+that X session. There is no default \fBxdpy\fR value.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreserved2\fR\fR
+.ad
+.sp .6
+.RS 4n
+Represents a field reserved for future use.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIauths\fR\fR
+.ad
+.sp .6
+.RS 4n
+Represents a field that contains a comma-separated list of authorizations
+required to allocate the device, an asterisk (\fB*\fR) to indicate that the
+device is \fInot\fR allocatable, or an '\fB@\fR' symbol to indicate that no
+explicit authorization is needed to allocate the device. The default
+authorization is \fBsolaris.device.allocate\fR. See \fBauths\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIdevice-exec\fR\fR
+.ad
+.sp .6
+.RS 4n
+The physical device's data clean program to be run any time the device is acted
+on by \fBallocate\fR(1). This ensures that unmanaged data does not remain in
+the physical device between uses. This field contains the filename of a program
+in \fB/etc/security/lib\fR or the full pathname of a cleanup script provided by
+the system administrator.
+.RE
+
+.SS "Notes on \fBdevice_allocate\fR"
+.LP
+The \fBdevice_allocate\fR file is an ASCII file that resides in the
+\fB/etc/security\fR directory.
+.sp
+.LP
+Lines in \fBdevice_allocate\fR can end with a `\fB\e\fR\&' to continue an entry
+on the next line.
+.sp
+.LP
+Comments can also be included. A `\fB#\fR' makes a comment of all further text
+until the next NEWLINE not immediately preceded by a `\fB\e\fR\&'.
+.sp
+.LP
+White space is allowed in any field.
+.sp
+.LP
+The \fBdevice_allocate\fR file must be created by the system administrator
+before device allocation is enabled.
+.sp
+.LP
+The \fBdevice_allocate\fR file is owned by root, with a group of \fBsys\fR, and
+a mode of 0644.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDeclaring an Allocatable Device
+.sp
+.LP
+Declare that physical device \fBst0\fR is a type \fBst\fR. \fBst\fR is
+allocatable, and the script used to clean the device after running
+\fBdeallocate\fR(1) is named \fB/etc/security/lib/st_clean\fR.
+
+.sp
+.in +2
+.nf
+# scsi tape
+st0;\e
+     st;\e
+     reserved;\e
+     reserved;\e
+     solaris.device.allocate;\e
+     /etc/security/lib/st_clean
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRDeclaring an Allocatable Device with Authorizations
+.sp
+.LP
+Declare that physical device \fBfd0\fR is of type \fBfd\fR. \fBfd\fR is
+allocatable by users with the \fBsolaris.device.allocate\fR authorization, and
+the script used to clean the device after running \fBdeallocate\fR(1) is named
+\fB/etc/security/lib/fd_clean\fR.
+
+.sp
+.in +2
+.nf
+# floppy drive
+fd0;\e
+     fd;\e
+     reserved;\e
+     reserved;\e
+     solaris.device.allocate;\e
+     /etc/security/lib/fd_clean
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Making a device allocatable means that you need to allocate and deallocate it
+to use it (with \fBallocate\fR(1) and \fBdeallocate\fR(1)). If a device is not
+allocatable, there is an asterisk (\fB*\fR) in the \fIauths\fR field, and no
+one can use the device.
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/security/device_allocate\fR\fR
+.ad
+.sp .6
+.RS 4n
+Contains list of allocatable devices
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Uncommitted
+.TE
+
+.SH SEE ALSO
+.LP
+.BR allocate (1),
+.BR auths (1),
+.BR deallocate (1),
+.BR list_devices (1),
+.BR auth_attr (5),
+.BR attributes (7)
+.SH NOTES
+.LP
+On systems configured with Trusted Extensions, the functionality is enabled by
+default. On such systems, the \fBdevice_allocate\fR file is updated
+automatically by the system.

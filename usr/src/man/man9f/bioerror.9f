@@ -48,4 +48,7 @@ call to \fBgeterror\fR(9F) will return  \fB0\fR.
 .SH CONTEXT
 \fBbioerror()\fR can be called from any context.
 .SH SEE ALSO
-\fBstrategy\fR(9E), \fBgeterror\fR(9F), \fBgetrbuf\fR(9F), \fBbuf\fR(9S)
+.BR strategy (9E),
+.BR geterror (9F),
+.BR getrbuf (9F),
+.BR buf (9S)

@@ -667,7 +667,7 @@ pc_mark_irrecov(struct pcfs *fsp)
 		    "an irrecoverable error was encountered.\n"
 		    "File damage is possible.  To prevent further\n"
 		    "damage, this pcfs instance will now be frozen.\n"
-		    "Use umount(1M) to release the instance.\n");
+		    "Use umount(8) to release the instance.\n");
 		(void) pc_unlockfs(fsp);
 	}
 }

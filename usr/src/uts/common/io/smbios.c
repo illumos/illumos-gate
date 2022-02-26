@@ -26,7 +26,7 @@
 
 
 /*
- * smbios(7D) driver
+ * smbios(4D) driver
  *
  * This pseudo-driver makes available a snapshot of the system's SMBIOS image
  * that can be accessed using libsmbios.  Clients may access a snapshot using

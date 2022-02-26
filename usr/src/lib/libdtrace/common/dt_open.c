@@ -640,7 +640,7 @@ inline long NULL = 0; \n\
  * Default DTrace configuration to use when opening libdtrace DTRACE_O_NODEV.
  * If DTRACE_O_NODEV is not set, we load the configuration from the kernel.
  * The use of CTF_MODEL_NATIVE is more subtle than it might appear: we are
- * relying on the fact that when running dtrace(1M), isaexec will invoke the
+ * relying on the fact that when running dtrace(8), isaexec will invoke the
  * binary with the same bitness as the kernel, which is what we want by default
  * when generating our DIF.  The user can override the choice using oflags.
  */

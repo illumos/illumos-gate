@@ -3239,7 +3239,7 @@ sadb_common_add(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 			/*
 			 * An error here indicates that alg is the wrong type
 			 * (IE: not authentication) or its not in the alg tables
-			 * created by ipsecalgs(1m), or Kcf does not like the
+			 * created by ipsecalgs(8), or Kcf does not like the
 			 * parameters passed in with this algorithm, which is
 			 * probably a coding error!
 			 */
@@ -6862,8 +6862,8 @@ ipsec_tun_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 			return (ENOENT);
 		}
 		/*
-		 * Else, this is a tunnel policy configured with ifconfig(1m)
-		 * or "negotiate transport" with ipsecconf(1m).  We have an
+		 * Else, this is a tunnel policy configured with ifconfig(8)
+		 * or "negotiate transport" with ipsecconf(8).  We have an
 		 * itp with policy set based on any match, so don't bother
 		 * changing fields in "sel".
 		 */

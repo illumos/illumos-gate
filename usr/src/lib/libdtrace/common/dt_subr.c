@@ -736,7 +736,7 @@ dt_difo_free(dtrace_hdl_t *dtp, dtrace_difo_t *dp)
 }
 
 /*
- * dt_gmatch() is similar to gmatch(3GEN) and dtrace(7D) globbing, but also
+ * dt_gmatch() is similar to gmatch(3GEN) and dtrace(4D) globbing, but also
  * implements the behavior that an empty pattern matches any string.
  */
 int

@@ -96,7 +96,7 @@ The \fIid\fR argument is an invalid socket.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -113,8 +113,16 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBbind\fR(3SOCKET), \fBin.h\fR(3HEAD), \fBlibsctp\fR(3LIB),
-\fBsctp_freepaddrs\fR(3SOCKET), \fBsctp_getpaddrs\fR(3SOCKET),
-\fBsockaddr\fR(3SOCKET),
-\fBsocket\fR(3SOCKET), \fBattributes\fR(5), \fBinet\fR(7P), \fBinet6\fR(7P),
-\fBip\fR(7P), \fBip6\fR(7P), \fBsctp\fR(7P)
+.BR in.h (3HEAD),
+.BR libsctp (3LIB),
+.BR bind (3SOCKET),
+.BR sctp_freepaddrs (3SOCKET),
+.BR sctp_getpaddrs (3SOCKET),
+.BR sockaddr (3SOCKET),
+.BR socket (3SOCKET),
+.BR inet (4P),
+.BR inet6 (4P),
+.BR ip (4P),
+.BR ip6 (4P),
+.BR sctp (4P),
+.BR attributes (7)

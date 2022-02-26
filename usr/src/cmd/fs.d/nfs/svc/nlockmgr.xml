@@ -110,7 +110,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='lockd' section='1M'
+			<manpage title='lockd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

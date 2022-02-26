@@ -388,7 +388,7 @@ base-type chain.
 .LP
 The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -404,5 +404,7 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBlibscf\fR(3LIB), \fBscf_entry_add_value\fR(3SCF), \fBscf_error\fR(3SCF),
-\fBattributes\fR(5)
+.BR libscf (3LIB),
+.BR scf_entry_add_value (3SCF),
+.BR scf_error (3SCF),
+.BR attributes (7)

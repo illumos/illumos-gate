@@ -36,7 +36,13 @@ allocated by \fBgetrbuf()\fR or initialized by \fBbioinit\fR(9F).
 .SH CONTEXT
 \fBbioreset()\fR can be called from any context.
 .SH SEE ALSO
-\fBstrategy\fR(9E), \fBbioinit\fR(9F), \fBbiofini\fR(9F), \fBfreerbuf\fR(9F),
-\fBgetrbuf\fR(9F), \fBkmem_alloc\fR(9F), \fBkmem_free\fR(9F), \fBbuf\fR(9S)
+.BR strategy (9E),
+.BR biofini (9F),
+.BR bioinit (9F),
+.BR freerbuf (9F),
+.BR getrbuf (9F),
+.BR kmem_alloc (9F),
+.BR kmem_free (9F),
+.BR buf (9S)
 .SH NOTES
 \fIbp\fR must not describe a transfer in progress.

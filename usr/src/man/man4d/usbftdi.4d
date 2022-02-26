@@ -1,0 +1,322 @@
+'\" te
+.\"  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH USBFTDI 4D "Aug 13, 2021"
+.SH NAME
+usbftdi \- FTDI USB to serial converter driver
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <fcntl.h>\fR
+\fB#include <sys/termio.h>\fR
+\fBusbftdi@unit\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBusbftdi\fR driver is a loadable STREAMS and USBA (Solaris USB
+Architecture) compliant client driver that provides basic asynchronous
+communication support for FTDI USB-to-serial converters. Serial device streams
+are built with appropriate modules that are pushed atop the \fBusbftdi\fR
+driver by the \fBautopush\fR(8) facility.
+.SS "Application Programming Interface"
+.sp
+.LP
+The \fBusbftdi\fR module supports the \fBtermio\fR(4I) device control functions
+specified by flags in the \fBc_cflag\fR word of the \fBtermios\fR structure,
+and by the \fBIGNBRK, IGNPAR, PARMRK\fR, and \fBINPCK\fR flags in the
+\fBc_iflag\fR word of the \fBtermios\fR structure. All other \fBtermio\fR(4I)
+functions must be performed by STREAMS modules pushed atop the driver. When a
+device is opened, the , \fBldterm\fR(4M) and \fBttcompat\fR(4M) STREAMS modules
+are automatically pushed on top of the stream, providing the standard
+\fBtermio\fR(4I) interface.
+.sp
+.LP
+Use device logical names \fB/dev/term/[0-9]*\fR to access the serial ports for
+a dial-in line that is used with a modem.
+.sp
+.LP
+Use device logical names \fB/dev/cua/[0-9]*\fR to access the serial ports for
+other applications. These names are also used to provide a logical access point
+for a dial-out line.
+.sp
+.LP
+Device hot-removal is functionally equivalent to a modem disconnect event, as
+defined in \fBtermio\fR(4I).
+.sp
+.LP
+Input and output line speeds can be set to the following baud rates: 300, 600,
+1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600,
+2000000, or 3000000.  Input and output line speeds can not be set
+independently. For example, when the output speed is set, the input speed is
+automatically set to the same speed.
+.SS "Soft Carrier Capabilities"
+.sp
+.LP
+Many devices that use this USB serial interface component are not, in fact
+dial-in lines connected to carefully configured RS-232 modems. They are often
+intelligent peripherals whose manufacturers want to present a serial port
+interface to application software. Some applications use only three wire
+connections, or are otherwise somewhat casual about the state of the Carrier
+Detect (electrical) signal, and the other modem control lines.
+.sp
+.LP
+The configuration file delivered with this driver, \fBusbftdi.conf\fR,
+acknowledges this by setting the driver property \fBignore-cd\fR to 1. This
+enables \fBsoft carrier\fR mode where the kernel does \fBnot\fR block opens
+waiting for DCD to be asserted.
+.sp
+.LP
+This behavior also matches the default \fBignore carrier detect\fR behavior of
+the onboard serial ports of machines that have them. See \fBeeprom\fR(8) for
+further details.
+.sp
+.LP
+The \fBhardware carrier\fR behavior (the driver's internal default) can be
+selected by either unsetting (commenting out) the \fBignore-cd\fR property, or
+by setting the value of the property to zero.
+.sp
+.LP
+More sophisticated selection of which devicesl ignore or obey the DCD signal
+can be effected using \fBport-%d-ignore-cd\fR properties.
+.SS "Dial-In and Dial-Out Support"
+.sp
+.LP
+A related feature is available for traditional usage that enables a single tty
+line to be connected to a modem and used for incoming and outgoing calls. By
+accessing through device logical name \fB/dev/cua/[0-9]*\fR, you can open a
+port without the carrier detect signal being asserted, either through hardware
+or an equivalent software mechanism. These devices are commonly known as
+dial-out lines.
+.sp
+.LP
+A dial-in line can be opened only if the corresponding dial-out line is closed.
+A blocking \fB/dev/term\fR open waits until the \fB/dev/cua\fR line is closed,
+which drops Data Terminal Ready, after which Carrier Detect usually drops as
+well.  When the carrier is detected again with the \fB/dev/cua\fR device
+remaining closed, this indicates an incoming call and the blocking open seizes
+exclusive use of the line.
+.sp
+.LP
+A non-blocking \fB/dev/term\fR open returns an error if the \fB/dev/cua\fR
+device is open.
+.sp
+.LP
+If the \fB/dev/term\fR line is opened successfully (usually only when carrier
+is recognized on the modem, though see \fBSoft Carrier Capabilities\fR section
+of this manual page), the corresponding \fB/dev/cua\fR line can not be opened.
+This allows a modem and port to be used for dial-in (enabling the line for
+login in \fB/etc/inittab\fR) or dial-out (using \fBtip\fR(1) or \fBuucp\fR(1C))
+when no-one is logged in on the line.
+.SH ERRORS
+.sp
+.LP
+An \fBopen()\fR fails under the following conditions:
+.sp
+.ne 2
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 9n
+The unit being opened does not exist.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 9n
+The \fB/dev/cua\fR (dial-out) device is being opened while the \fB/dev/term\fR
+(dial-in device) is open, or the dial-in device is being opened with a no-delay
+open while the dial-out device is open.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 9n
+The unit has been marked as exclusive-use by another process with a
+\fBTIOCEXCL\fR \fBioctl()\fR call.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 9n
+USB device I/O error.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/usr/kernel/drv/usbftdi\fR\fR
+.ad
+.sp .6
+.RS 4n
+32-bit x86 ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/kernel/drv/usbftdi.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+Kernel module configuration file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/kernel/drv/amd64/usbftdi\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit x86 ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/kernel/drv/sparcv9/usbftdi\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit SPARC ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/cua/[0-9]*\fR\fR
+.ad
+.sp .6
+.RS 4n
+Dial-out tty lines
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/term/[0-9]*\fR\fR
+.ad
+.sp .6
+.RS 4n
+Dial-in tty lines
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attribute:
+.sp
+
+.sp
+.TS
+box;
+l | l
+l | l .
+ATTRIBUTE  TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86, PCI-based systems
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBstrconf\fR(1), \fBtip\fR(1), \fBuucp\fR(1C), \fBautopush\fR(8),
+\fBeeprom\fR(8), \fBioctl\fR(2), \fBopen\fR(2), \fBtermios\fR(3C),
+\fBusba\fR(4D), \fBtermio\fR(4I), \fBldterm\fR(4M), \fBttcompat\fR(4M),
+\fBeeprom\fR(8), \fBattributes\fR(7),
+.SH DIAGNOSTICS
+.sp
+.LP
+In addition to being logged, the following messages might appear on the system
+console. All messages are formatted in the following manner:
+.sp
+.in +2
+.nf
+Warning: \fIdevice_path\fR usbftdi\fIinstance num\fR): Error Message ...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fB\fBDevice was disconnected while open. Data may have been lost.\fR\fR
+.ad
+.sp .6
+.RS 4n
+The device has been hot-removed or powered off while it was open and a possible
+data transfer was in progress. The job might be aborted.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDevice is not identical to the previous one on this port. Please
+disconnect and reconnect.\fR\fR
+.ad
+.sp .6
+.RS 4n
+The device was hot-removed while open. A new device was hot-inserted which is
+not identical to the original device. Please disconnect the device and
+reconnect the original device to the same port.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDevice has been reconnected, but data may have been lost.\fR\fR
+.ad
+.sp .6
+.RS 4n
+The device that was hot-removed from its USB port has been re-inserted again to
+the same port. It is available for access but data from a previous transfer
+might be lost.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCannot access \fIdevice\fR. Please reconnect.\fR\fR
+.ad
+.sp .6
+.RS 4n
+This device has been disconnected because a device other than the original one
+has been inserted. The driver informs you of this fact by displaying the name
+of the original device.
+.RE
+
+.sp
+.LP
+The following messages might be logged into the system log. They are formatted
+in the following manner:
+.sp
+.in +2
+.nf
+\fIdevice_path\fR usbftdi\fIiinstance number\fR): message ...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fB\fBInput overrun.\fR\fR
+.ad
+.RS 18n
+Data was lost.
+.RE
+

@@ -1,0 +1,63 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DLCOSMK 4IPP "Sep 29, 2004"
+.SH NAME
+dlcosmk \- Data Layer Class of Service Marker
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlcosmk\fR marker is an action module that is executed as a result of
+classifying or metering packets. It marks the packet with a user priority
+defined by the\fI IEEE 801.D\fR standard. This feature is only possible on a
+\fBVLAN\fR device.
+.sp
+.LP
+The 3-bit user priority is part of the \fI802.1Q\fR \fBVLAN\fR header tag that
+is part of the ethernet header (carrying the IP packet).
+.SH STATISTICS
+.sp
+.LP
+The \fBdlcosmk\fR module exports the following statistics through \fBkstat\fR:
+.sp
+.LP
+Global statistics:
+.sp
+.in +2
+.nf
+module: dlcosmk                          instance: <action id>
+ name:  dlcosmk statistics               class <action name>
+        crtime
+        snaptime
+        b_band                           <b_band value>
+        dl_max                           <dl_max value>
+        usr_pri                          <configured CoS>
+        npackets                         <number of packets>
+        epackets                         <number of packets in error>
+        ipackets                         <number of packets not processed>
+.fi
+.in -2
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/kernel/ipp/sparcv9/dlcosmk\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit module (SPARC only.)
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR dscpmk (4IPP),
+.BR flowacct (4IPP),
+.BR ipgpc (4IPP),
+.BR ipqos (4IPP),
+.BR tokenmt (4IPP),
+.BR tswtclmt (4IPP),
+.BR ipqosconf (8)

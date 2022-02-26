@@ -158,7 +158,7 @@ File descriptor duplication during fork presents a challenge to the
 facility since signal data and events are dependent on the process from which
 they are queried.
 Its use with caching event systems such as
-.Xr epoll 5 ,
+.Xr epoll 7 ,
 .Pa /dev/poll ,
 or
 .Xr port_create 3C
@@ -209,4 +209,4 @@ Unable to allocate state for the file descriptor.
 .Xr sigsetops 3C ,
 .Xr sigwaitinfo 3C ,
 .Xr signal.h 3HEAD ,
-.Xr epoll 5
+.Xr epoll 7

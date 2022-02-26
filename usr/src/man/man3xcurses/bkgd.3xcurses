@@ -117,7 +117,7 @@ using only constants with the A_ prefix.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -135,8 +135,16 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBaddch\fR(3XCURSES), \fBaddchstr\fR(3XCURSES), \fBattroff\fR(3XCURSES),
-\fBbkgrnd\fR(3XCURSES), \fBclear\fR(3XCURSES), \fBclrtoeol\fR(3XCURSES),
-\fBclrtobot\fR(3XCURSES), \fBerase\fR(3XCURSES), \fBinch\fR(3XCURSES),
-\fBlibcurses\fR(3XCURSES), \fBmvprintw\fR(3XCURSES), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR addch (3XCURSES),
+.BR addchstr (3XCURSES),
+.BR attroff (3XCURSES),
+.BR bkgrnd (3XCURSES),
+.BR clear (3XCURSES),
+.BR clrtobot (3XCURSES),
+.BR clrtoeol (3XCURSES),
+.BR erase (3XCURSES),
+.BR inch (3XCURSES),
+.BR libcurses (3XCURSES),
+.BR mvprintw (3XCURSES),
+.BR attributes (7),
+.BR standards (7)

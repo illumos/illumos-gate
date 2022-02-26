@@ -577,7 +577,7 @@ class ManifestTree(DirectoryTree):
     """
 
     def addmanifest(self, root, mfile, arch, modechecks, exceptions):
-        """Treats the specified input file as a pkg(5) package
+        """Treats the specified input file as a pkg(7) package
         manifest, and extends the ManifestTree dictionary with entries
         for the actions therein.
         """
@@ -607,9 +607,9 @@ class ManifestTree(DirectoryTree):
             #
             # The dir action is currently fully specified, in that it
             # lists owner, group, and mode attributes.  If that
-            # changes in pkg(5) code, we'll need to revisit either this
+            # changes in pkg(7) code, we'll need to revisit either this
             # code or the ActionInfo() constructor.  It's possible
-            # that the pkg(5) system could be extended to provide a
+            # that the pkg(7) system could be extended to provide a
             # mechanism for specifying directory permissions outside
             # of the individual manifests that deliver files into
             # those directories.  Doing so at time of manifest
@@ -644,7 +644,7 @@ class ManifestTree(DirectoryTree):
             var = None
 
             #
-            # The name of this method changed in pkg(5) build 150, we need to
+            # The name of this method changed in pkg(7) build 150, we need to
             # work with both sets.
             #
             if hasattr(action, 'get_variants'):
@@ -665,7 +665,7 @@ class ManifestTree(DirectoryTree):
             print("")
 
     def adddir(self, mdir, arch, modechecks, exceptions):
-        """Walks the specified directory looking for pkg(5) manifests.
+        """Walks the specified directory looking for pkg(7) manifests.
         """
         for mfile in os.listdir(mdir):
             if (mfile.endswith(".mog") and

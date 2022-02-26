@@ -137,7 +137,7 @@ extern struct mod_ops mod_driverops;
 #define	    VCC_ID_PROP		"id"
 
 /*
- * This is the string displayed by modinfo(1m).
+ * This is the string displayed by modinfo(8).
  */
 static char vcc_ident[] = "sun4v Virtual Console Concentrator Driver";
 

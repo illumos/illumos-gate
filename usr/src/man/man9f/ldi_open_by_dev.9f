@@ -313,8 +313,10 @@ These functions may be called from user or kernel context.
 These functions should not be called from a device's attach, detach, or power
 entry point. This could result in a system crash or deadlock.
 .SH SEE ALSO
-\fBscsi_vhci\fR(7D), \fBldi_ident_from_dev\fR(9F),
-\fBldi_ident_from_dip\fR(9F), \fBldi_ident_from_stream\fR(9F)
+.BR scsi_vhci (4D),
+.BR ldi_ident_from_dev (9F),
+.BR ldi_ident_from_dip (9F),
+.BR ldi_ident_from_stream (9F)
 .SH NOTES
 Use only OTYP_CHR or OTYP_BLK options when you use the \fBldi_open_by_dev()\fR
 and \fBldi_open_by_devid()\fR functions to open a device. Other flags,
@@ -323,9 +325,9 @@ interfaces.
 .sp
 .LP
 The caller should be aware of cases when multiple paths to a single device may
-exist.  (This can occur for scsi disk devices if \fBscsi_vhci\fR(7D)) is
+exist.  (This can occur for scsi disk devices if \fBscsi_vhci\fR(4D)) is
 disabled or a disk is connected to multiple controllers not supported by
-scsi_vhci(7D).
+scsi_vhci(4D).
 .sp
 .LP
 In these cases, \fBldi_open_by_devid()\fR returns a device handle that
@@ -337,6 +339,6 @@ different filesystem device paths and dev_t values.
 .LP
 In the cases where multiple paths to a device exist and access to the device
 has not been virtualized via MPXIO (as with scsi disk devices not accessed via
-\fBscsi_vhci\fR(7D)), the LDI does not provide any path fail-over capabilities.
+\fBscsi_vhci\fR(4D)), the LDI does not provide any path fail-over capabilities.
 If the caller wishes to do their own path management and failover they should
 open all available paths to a device via \fBldi_open_by_name()\fR.

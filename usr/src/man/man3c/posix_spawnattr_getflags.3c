@@ -156,7 +156,7 @@ The value of the attribute being set is not valid.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -170,14 +170,18 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBposix_spawn\fR(3C), \fBposix_spawnattr_destroy\fR(3C),
-\fBposix_spawnattr_getpgroup\fR(3C), \fBposix_spawnattr_getschedparam\fR(3C),
-\fBposix_spawnattr_getschedpolicy\fR(3C),
-\fBposix_spawnattr_getsigdefault\fR(3C), \fBposix_spawnattr_getsigmask\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR posix_spawn (3C),
+.BR posix_spawnattr_destroy (3C),
+.BR posix_spawnattr_getpgroup (3C),
+.BR posix_spawnattr_getschedparam (3C),
+.BR posix_spawnattr_getschedpolicy (3C),
+.BR posix_spawnattr_getsigdefault (3C),
+.BR posix_spawnattr_getsigmask (3C),
+.BR attributes (7),
+.BR standards (7)

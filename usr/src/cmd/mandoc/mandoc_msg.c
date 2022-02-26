@@ -58,7 +58,7 @@ static	const char *const type_message[MANDOCERR_MAX] = {
 
 	"generic style suggestion",
 
-	"legacy man(5) date format",
+	"legacy man(7) date format",
 	"normalizing date format to",
 	"lower case character in document title",
 	"duplicate RCS id",
@@ -257,7 +257,7 @@ static	const char *const type_message[MANDOCERR_MAX] = {
 	"bad option value",
 	"duplicate option value",
 	"no such tag",
-	"-Tmarkdown unsupported for man(5) input",
+	"-Tmarkdown unsupported for man(7) input",
 
 	/* system errors */
 	NULL,

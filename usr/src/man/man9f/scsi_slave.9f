@@ -145,7 +145,7 @@ allocated.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -161,10 +161,17 @@ Stability Level	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBattributes\fR(5), \fBattach\fR(9E), \fBprobe\fR(9E),
-\fBddi_iopb_alloc\fR(9F), \fBmakecom\fR(9F), \fBscsi_dmaget\fR(9F),
-\fBscsi_ifgetcap\fR(9F), \fBscsi_pktalloc\fR(9F), \fBscsi_poll\fR(9F),
-\fBscsi_probe\fR(9F), \fBscsi_device\fR(9S)
+.BR attributes (7),
+.BR attach (9E),
+.BR probe (9E),
+.BR ddi_iopb_alloc (9F),
+.BR makecom (9F),
+.BR scsi_dmaget (9F),
+.BR scsi_ifgetcap (9F),
+.BR scsi_pktalloc (9F),
+.BR scsi_poll (9F),
+.BR scsi_probe (9F),
+.BR scsi_device (9S)
 .sp
 .LP
  \fIANSI Small Computer System Interface-2 (SCSI-2)\fR

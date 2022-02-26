@@ -102,7 +102,7 @@ controlled process either stopped or exited (if the controlled process has
 invoked \fBexit\fR(2).) If an error has occurred (for example, if the
 controlled process has \fBexec\fR-ed a set-\fBID\fR executable, if certain
 callbacks have returned error indications, or if the process was unable to
-respond to \fBproc\fR(4) requests) an error message is printed and the function
+respond to \fBproc\fR(5) requests) an error message is printed and the function
 returns \(mi1.
 .SH USAGE
 .sp
@@ -112,7 +112,7 @@ be made to perform various system calls on its behalf. No system calls are
 directly supported in this version of the API, though system calls are executed
 by the \fBcpc_pctx\fR family of interfaces in \fBlibcpc\fR such as
 \fBcpc_pctx_bind_event\fR(3CPC). A specially created agent \fBLWP\fR is used to
-execute these system calls in the controlled process. See \fBproc\fR(4) for
+execute these system calls in the controlled process. See \fBproc\fR(5) for
 more details.
 .sp
 .LP
@@ -124,7 +124,7 @@ while the agent \fBLWP\fR is still alive inside the controlled process.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -142,5 +142,9 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBfork\fR(2), \fBcpc\fR(3CPC), \fBpctx_set_events\fR(3CPC),
-\fBlibpctx\fR(3LIB), \fBproc\fR(4), \fBattributes\fR(5)
+.BR fork (2),
+.BR cpc (3CPC),
+.BR pctx_set_events (3CPC),
+.BR libpctx (3LIB),
+.BR proc (5),
+.BR attributes (7)

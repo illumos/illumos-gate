@@ -1,0 +1,116 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1988 Sun Microsystems, Inc. - All Rights Reserved.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH UPDATERS 5 "Oct 24, 1996"
+.SH NAME
+updaters \- configuration file for NIS updating
+.SH SYNOPSIS
+.LP
+.nf
+\fB/var/yp/updaters\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The file \fB/var/yp/updaters\fR is a makefile (see \fBmake\fR(1S)) which is
+used for updating the Network Information Service (NIS) databases. Databases
+can only be updated in a secure network, that is, one that has a
+\fBpublickey\fR(5) database. Each entry in the file is a make target for a
+particular \fBNIS\fR database. For example, if there is an \fBNIS\fR database
+named \fBpasswd.byname\fR that can be updated, there should be a \fBmake\fR
+target named \fBpasswd.byname\fR in the \fBupdaters\fR file with the command to
+update the file.
+.sp
+.LP
+The information necessary to make the update is passed to the update command
+through standard input. The information passed is described below (all items
+are followed by a \fBNEWLINE\fR except for 4 and 6):
+.sp
+.ne 2
+.na
+\fB\fB1.\fR\fR
+.ad
+.RS 6n
+Network name of client wishing to make the update (a string).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2.\fR\fR
+.ad
+.RS 6n
+Kind of update (an integer).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB3.\fR\fR
+.ad
+.RS 6n
+Number of bytes in key (an integer).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB4.\fR\fR
+.ad
+.RS 6n
+Actual bytes of key.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB5.\fR\fR
+.ad
+.RS 6n
+Number of bytes in data (an integer).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB6.\fR\fR
+.ad
+.RS 6n
+Actual bytes of data.
+.RE
+
+.sp
+.LP
+After receiving this information through standard input, the command  to update
+the particular database determines whether the user is  allowed to make the
+change.  If not, it exits with the status \fBYPERR_ACCESS.\fR If the user is
+allowed to make the change, the command makes the  change and exits with a
+status of zero. If there are any errors that may prevent the  \fBupdaters\fR
+from making the change, it should exit with the status that matches a valid
+\fBNIS\fR error code described in \fB<rpcsvc/ypclnt.h>\fR\&.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/var/yp/updaters\fR\fR
+.ad
+.RS 20n
+The makefile used for updating the  \fBNIS\fR databases.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR make (1S),
+.BR publickey (5),
+.BR rpc.ypupdated (8)
+.SH NOTES
+.sp
+.LP
+The Network Information Service (NIS) was formerly known as Sun Yellow Pages
+(YP).  The functionality of the two remains the same; only the name has
+changed. The name Yellow Pages is a registered trademark in the United Kingdom
+of British Telecommunications plc, and may not be used without permission.

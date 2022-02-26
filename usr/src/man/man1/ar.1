@@ -393,7 +393,7 @@ options \fB-m\fR and \fB-r\fR.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBar\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
 .sp
@@ -438,7 +438,7 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "\fB/usr/bin/ar\fR"
 .TS
 box;
@@ -458,13 +458,21 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 Interface Stability	Committed
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
-\fBbasename\fR(1), \fBcpio\fR(1), \fBld\fR(1), \fBlorder\fR(1), \fBstrip\fR(1),
-\fBtar\fR(1), \fBar.h\fR(3HEAD), \fBa.out\fR(4), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBstandards\fR(5)
+.BR basename (1),
+.BR cpio (1),
+.BR ld (1),
+.BR lorder (1),
+.BR strip (1),
+.BR tar (1),
+.BR ar.h (3HEAD),
+.BR a.out (5),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)
 .SH NOTES
 If the same file is mentioned twice in an argument list, it may be put in the
 archive twice.

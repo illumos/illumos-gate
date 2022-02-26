@@ -47,7 +47,7 @@ connectivity to the remote host.
 The port \fIinport\fR specifies which \fBDARPA\fR Internet port to use for the
 connection. The port number used must be in network byte order, as supplied by
 a call to \fBhtons\fR(3C). The protocol for connection is described in
-detail in \fBin.rexecd\fR(1M).
+detail in \fBin.rexecd\fR(8).
 .sp
 .LP
 If the call succeeds, a socket of type \fBSOCK_STREAM\fR is returned to the
@@ -82,7 +82,7 @@ the socket type \fBSOCK_STREAM\fR in the address family \fBAF_INET\fR or
 If either \fBrexec()\fR or \fBrexec_af()\fR fails, \fB\(mi1\fR is returned.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -101,6 +101,10 @@ This interface is Unsafe in multithreaded applications. Unsafe interfaces
 should be called only from the main thread.
 .SH SEE ALSO
 .LP
-\fBin.rexecd\fR(1M), \fBgetaddrinfo\fR(3SOCKET), \fBgethostbyname\fR(3NSL),
-\fBgetservbyname\fR(3SOCKET), \fBhtonl\fR(3C), \fBsocket\fR(3SOCKET),
-\fBattributes\fR(5)
+.BR htonl (3C),
+.BR gethostbyname (3NSL),
+.BR getaddrinfo (3SOCKET),
+.BR getservbyname (3SOCKET),
+.BR socket (3SOCKET),
+.BR attributes (7),
+.BR in.rexecd (8)

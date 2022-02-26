@@ -170,7 +170,7 @@ fill_printer_uri_supported(papi_attribute_t ***list)
 		return;
 	}
 
-	/* do we have a printers.conf(4) "bsdaddr" to convert */
+	/* do we have a printers.conf(5) "bsdaddr" to convert */
 	papiAttributeListGetString(*list, NULL, "bsdaddr", &string);
 	if (string != NULL) { /* parse it, convert it, add it */
 		char *uri = bsdaddr_to_uri(*list, string);
@@ -184,7 +184,7 @@ fill_printer_uri_supported(papi_attribute_t ***list)
 		}
 	}
 
-	/* do we have a printers.conf(4) "rm" (and "rp") to convert */
+	/* do we have a printers.conf(5) "rm" (and "rp") to convert */
 	papiAttributeListGetString(*list, NULL, "rm", &string);
 	if (string != NULL) {
 		char *rp = NULL;

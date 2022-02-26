@@ -263,7 +263,7 @@ typedef struct ibnex_s {
 	IBNEX_MAX_COMPAT_NAMES * IBNEX_MAX_COMPAT_LEN
 #define	IBNEX_MAX_IBPORT_COMPAT_PROP_SZ	\
 	IBNEX_MAX_IBPORT_COMPAT_NAMES * IBNEX_MAX_COMPAT_LEN
-#define	IBNEX_DEVFS_ENUMERATE		0x1	/* enumerate via devfs(7fs) */
+#define	IBNEX_DEVFS_ENUMERATE		0x1	/* enumerate via devfs(4FS) */
 #define	IBNEX_CFGADM_ENUMERATE		0x2	/* enumerate via cfgadm */
 
 #define	IBNEX_MAX_NODEADDR_SZ		35

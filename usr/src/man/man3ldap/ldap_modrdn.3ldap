@@ -93,7 +93,7 @@ result.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes of the
+See \fBattributes\fR(7) for a description of the following attributes of the
 \fBldap_modrdn()\fR, \fBldap_modrdn_s()\fR, \fBldap_modrdn2()\fR and
 \fBldap_modrdn2_s()\fR functions:
 .sp
@@ -126,4 +126,4 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBldap\fR(3LDAP), \fBldap_error\fR(3LDAP) , \fBattributes\fR(5)
+\fBldap\fR(3LDAP), \fBldap_error\fR(3LDAP) , \fBattributes\fR(7)

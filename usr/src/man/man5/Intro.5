@@ -1,87 +1,50 @@
-'\" te
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 1989 AT&T
-.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INTRO 5 "Nov 17, 2008"
-.SH NAME
-Intro, intro \- introduction to miscellany
-.SH DESCRIPTION
-.sp
-.LP
-Among the topics presented in this section are:
-.sp
-.ne 2
-.na
-\fBStandards\fR
-.ad
-.RS 16n
-The POSIX (IEEE) Standards and the X/Open Specifications are described on the
-\fBstandards\fR page.
-.RE
-
-.sp
-.ne 2
-.na
-\fBEnvironments\fR
-.ad
-.RS 16n
-The user environment (\fBenviron\fR), the subset of the user environment that
-depends on language and cultural conventions (\fBlocale\fR), the large file
-compilation environment (\fBlfcompile\fR), and the transitional compilation
-environment (\fBlfcompile64\fR) are described.
-.RE
-
-.sp
-.ne 2
-.na
-\fBMacros\fR
-.ad
-.RS 16n
-The macros to format Reference Manual pages (\fBman\fR and \fBmansun\fR) as
-well as other text format macros (\fBme\fR, \fBmm\fR, and \fBms\fR) are
-described.
-.RE
-
-.sp
-.ne 2
-.na
-\fBCharacters\fR
-.ad
-.RS 16n
-Tables of character sets (\fBascii\fR, \fBcharmap\fR, \fBeqnchar\fR, and
-\fBiconv\fR), file format notation (\fBformats\fR), file name pattern matching
-(\fBfnmatch\fR), and regular expressions (\fBregex\fR and \fBregexp\fR) are
-presented.
-.RE
-
-.SH ACKNOWLEDGMENTS
-.sp
-.LP
-Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to
-reproduce portions of its copyrighted documentation. Original documentation
-from The Open Group can be obtained online at
-http://www.opengroup.org/bookstore/\&.
-.sp
-.LP
-The Institute of Electrical and Electronics Engineers and The Open Group, have
-given us permission to reprint portions of their documentation.
-.sp
-.LP
-In the following statement, the phrase ``this text'' refers to portions of the
-system documentation.
-.sp
-.LP
-Portions of this text are reprinted and reproduced in electronic form in the
-SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for
-Information Technology -- Portable Operating System Interface (POSIX), The Open
-Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of
-Electrical and Electronics Engineers, Inc and The Open Group.  In the event of
-any discrepancy between these versions and the original IEEE and The Open Group
-Standard, the original IEEE and The Open Group Standard is the referee
-document.  The original Standard can be obtained online at
-http://www.opengroup.org/unix/online.html\&.
-.sp
-.LP
-This notice shall appear on any product containing this material.
+.\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\"
+.Dd Mar 18, 2015
+.Dt INTRO 5
+.Os
+.Sh NAME
+.Nm Intro ,
+.Nm intro
+.Nd introduction to file formats and configurations
+.Sh DESCRIPTION
+This section outlines the formats of various files and configurations of
+various subsystems.
+The C structure declarations for the file formats are given where applicable.
+Usually, the headers containing these structure declarations can be found in the
+directories
+.Pa /usr/include
+or
+.Pa /usr/include/sys .
+For inclusion in C language programs, however, the syntax
+.Sy #include
+.Sm off
+<
+.Em filename.h No >
+.Sm on
+or
+.Sy #include
+.Sm off
+<
+.Sy sys/ Em filename.h No >
+.Sm on
+should be used.

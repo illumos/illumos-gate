@@ -14,12 +14,12 @@ accessing functionality and data within an implementation of a network layer
 protocol (OSI layer 3.) A protocol may or may not provide full coverage for
 each of the functions that  is described within this interface. Where it does
 not, it must return an appropriate error condition for that call. Documentation
-pertaining to the network protocol, as found in man page section 7pP, must list
+pertaining to the network protocol, as found in man page section 4P, must list
 which functions provided by this interface are and are not supported.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -35,18 +35,38 @@ Interface Stability	Committed
 .SH SEE ALSO
 .sp
 .LP
-\fBattributes\fR(5), \fBhook_alloc\fR(9F), \fBhook_free\fR(9F),
-\fBhook_nic_event\fR(9S), \fBhook_pkt_event\fR(9S), \fBhook_t\fR(9S),
-\fBnet_getifname\fR(9F), \fBnet_getlifaddr\fR(9F), \fBnet_getmtu\fR(9F),
-\fBnet_getnetid\fR(9F), \fBnet_getpmtuenabled\fR(9F),
-\fBnet_hook_register\fR(9F), \fBnet_hook_unregister\fR(9F),
-\fBnet_inject\fR(9F), \fBnet_inject_alloc\fR(9F), \fBnet_inject_free\fR(9F),
-\fBnet_inject_t\fR(9S), \fBnet_instance_alloc\fR(9F),
-\fBnet_instance_free\fR(9F), \fBnet_instance_register\fR(9F),
-\fBnet_instance_register\fR(9F), \fBnet_inject_t\fR(9S),
-\fBnet_ispartialchecksum\fR(9F), \fBnet_isvalidchecksum\fR(9F),
-\fBnet_kstat_create\fR(9F), \fBnet_kstat_delete\fR(9F),
-\fBnet_lifgetnext\fR(9F), \fBnet_netidtozonid\fR(9F), \fBnet_phygetnext\fR(9F),
-\fBnet_phylookup\fR(9F), \fBnet_protocol_lookup\fR(9F),
-\fBnet_protocol_release\fR(9F), \fBnet_protocol_walk\fR(9F),
-\fBnet_routeto\fR(9F), \fBnet_zoneidtonetid\fR(9F)
+.BR attributes (7),
+.BR hook_alloc (9F),
+.BR hook_free (9F),
+.BR net_getifname (9F),
+.BR net_getlifaddr (9F),
+.BR net_getmtu (9F),
+.BR net_getnetid (9F),
+.BR net_getpmtuenabled (9F),
+.BR net_hook_register (9F),
+.BR net_hook_unregister (9F),
+.BR net_inject (9F),
+.BR net_inject_alloc (9F),
+.BR net_inject_free (9F),
+.BR net_instance_alloc (9F),
+.BR net_instance_free (9F),
+.BR net_instance_register (9F),
+.BR net_instance_register (9F),
+.BR net_ispartialchecksum (9F),
+.BR net_isvalidchecksum (9F),
+.BR net_kstat_create (9F),
+.BR net_kstat_delete (9F),
+.BR net_lifgetnext (9F),
+.BR net_netidtozonid (9F),
+.BR net_phygetnext (9F),
+.BR net_phylookup (9F),
+.BR net_protocol_lookup (9F),
+.BR net_protocol_release (9F),
+.BR net_protocol_walk (9F),
+.BR net_routeto (9F),
+.BR net_zoneidtonetid (9F),
+.BR hook_nic_event (9S),
+.BR hook_pkt_event (9S),
+.BR hook_t (9S),
+.BR net_inject_t (9S),
+.BR net_inject_t (9S)

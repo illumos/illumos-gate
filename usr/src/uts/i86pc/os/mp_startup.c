@@ -1618,7 +1618,7 @@ done:
 		    boot_max_ncpus, ncpus);
 		cmn_err(CE_NOTE,
 		    "Use \"boot-ncpus\" parameter to enable more CPU(s). "
-		    "See eeprom(1M).");
+		    "See eeprom(8).");
 	}
 }
 

@@ -22,7 +22,7 @@ This function is obsolete. The management of removable media by the Volume
 Management feature, including \fBvold\fR, has been replaced by software that
 supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
 through the HAL APIs, which are documented on the HAL web site. See
-\fBhal\fR(5).
+\fBhal\fR(7).
 .sp
 .LP
 \fBvolmgt_running()\fR tells whether or not Volume Management is running.
@@ -76,7 +76,7 @@ To see if Volume Management is running:
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -94,8 +94,12 @@ Interface Stability	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBopen\fR(2), \fBstat\fR(2), \fBvolmgt_check\fR(3VOLMGT),
-\fBvolmgt_inuse\fR(3VOLMGT), \fBattributes\fR(5), \fBhal\fR(5)
+.BR open (2),
+.BR stat (2),
+.BR volmgt_check (3VOLMGT),
+.BR volmgt_inuse (3VOLMGT),
+.BR attributes (7),
+.BR hal (7)
 .SH NOTES
 .sp
 .LP

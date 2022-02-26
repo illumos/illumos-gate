@@ -848,34 +848,34 @@ $(sparc_ONLY)dir path=platform/sun4v/kernel/sys group=sys
 $(sparc_ONLY)dir path=platform/sun4v/kernel/sys/$(ARCH64) group=sys
 $(sparc_ONLY)link path=platform/sun4v/kernel/unix target=$(ARCH64)/unix
 $(sparc_ONLY)dir path=usr/share/man
-dir  path=usr/share/man/man4
-$(i386_ONLY)link path=usr/share/man/man4/isa.4 target=sysbus.4
-$(sparc_ONLY)file path=usr/share/man/man4/sbus.4
-$(i386_ONLY)file path=usr/share/man/man4/sysbus.4
-$(sparc_ONLY)dir path=usr/share/man/man7d
-$(sparc_ONLY)file path=usr/share/man/man7d/bbc_beep.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/dr.7d
-$(sparc_ONLY)link path=usr/share/man/man7d/drmach.7d target=dr.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/fd.7d
-link path=usr/share/man/man7d/fdc.7d target=fd.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/gpio_87317.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/grbeep.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/mc-opl.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/n2rng.7d
-$(i386_ONLY)file path=usr/share/man/man7d/npe.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/ntwdt.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/oplmsu.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/oplpanel.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/pcicmu.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/pcipsy.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/pcisch.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/smbus.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/su.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/todopl.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/tsalarm.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/zs.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/zsh.7d
-$(sparc_ONLY)dir path=usr/share/man/man7m
+$(sparc_ONLY)dir path=usr/share/man/man4d
+$(sparc_ONLY)file path=usr/share/man/man4d/bbc_beep.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/dr.4d
+$(sparc_ONLY)link path=usr/share/man/man4d/drmach.4d target=dr.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/fd.4d
+link path=usr/share/man/man4d/fdc.4d target=fd.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/gpio_87317.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/grbeep.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/mc-opl.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/n2rng.4d
+$(i386_ONLY)file path=usr/share/man/man4d/npe.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/ntwdt.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/oplmsu.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/oplpanel.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/pcicmu.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/pcipsy.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/pcisch.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/smbus.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/su.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/todopl.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/tsalarm.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/zs.4d
+$(sparc_ONLY)file path=usr/share/man/man4d/zsh.4d
+dir  path=usr/share/man/man5
+$(i386_ONLY)link path=usr/share/man/man5/isa.5 target=sysbus.5
+$(sparc_ONLY)file path=usr/share/man/man5/sbus.5
+$(i386_ONLY)file path=usr/share/man/man5/sysbus.5
+$(sparc_ONLY)dir path=usr/share/man/man5m
 $(sparc_ONLY)driver name=ac
 $(i386_ONLY)driver name=acpinex alias=acpivirtnex
 $(i386_ONLY)driver name=acpippm

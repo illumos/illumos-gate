@@ -1444,7 +1444,7 @@ phyint_offline(struct phyint *pi, uint_t minred)
 
 	/*
 	 * The interface is now offline, so stop probing it.  Note that
-	 * if_mpadm(1M) will down the test addresses, after receiving a
+	 * if_mpadm(8) will down the test addresses, after receiving a
 	 * success reply from us. The routing socket message will then make us
 	 * close the socket used for sending probes. But it is more logical
 	 * that an offlined interface must not be probed, even if it has test

@@ -388,7 +388,7 @@ The <\fBmath.h\fR> header defines the structure and constants used by the
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -404,5 +404,10 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(3), \fBfenv.h\fR(3HEAD), \fBlibm\fR(3LIB), \fBlimits.h\fR(3HEAD),
-\fBmatherr\fR(3M), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR Intro (3),
+.BR fenv.h (3HEAD),
+.BR limits.h (3HEAD),
+.BR libm (3LIB),
+.BR matherr (3M),
+.BR attributes (7),
+.BR standards (7)

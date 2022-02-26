@@ -152,7 +152,7 @@ The registered callback handlers execute in kernel context.
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -168,5 +168,7 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBattach\fR(9E), \fBdetach\fR(9E),
-\fBusb_get_status\fR(9F)
+.BR attributes (7),
+.BR attach (9E),
+.BR detach (9E),
+.BR usb_get_status (9F)

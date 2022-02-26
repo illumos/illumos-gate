@@ -31,7 +31,9 @@ microseconds into clock ticks.
 .SH CONTEXT
  This routine can be called from any context.
 .SH SEE ALSO
-\fBddi_get_time\fR(9F), \fBdrv_getparm\fR(9F), \fBdrv_usectohz\fR(9F)
+.BR ddi_get_time (9F),
+.BR drv_getparm (9F),
+.BR drv_usectohz (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

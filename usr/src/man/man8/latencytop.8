@@ -1,0 +1,305 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH LATENCYTOP 8 "Sep 29, 2009"
+.SH NAME
+latencytop \- report latency-related statistics in system and in applications
+.SH SYNOPSIS
+.LP
+.nf
+\fBlatencytop\fR [\fB-t\fR \fIinterval\fR] [\fB-o\fR \fIlog_file\fR] [\fB-k\fR \fIlog_level\fR]
+     [\fB-f\fR [no]\fIfeature\fR,...] [\fB-l\fR \fIlog_interval\fR] [\fB-h\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+LatencyTOP is an observability tool that reports statistics about latencies in
+the system and in applications. The tool reports statistics about where and
+what kind of latencies are happening in the system and in the applications that
+are running on the system. The statistics then can be used to improve
+performance throughput of applications and system, as you remove the identified
+latencies.
+.sp
+.LP
+The tool analyzes system activity periodically and displays the data in the
+output window. Two types of latencies are tracked: an LWP going in and out of
+sleep and an LWP spinning order to acquire a synchronization object. The tool
+uses the Solaris DTrace framework to collect the statistics corresponding to
+these two scenarios of inactivity of the system and application LWPs.
+.sp
+.LP
+The output window is divided into two sections. An upper part displays the
+system-wide statistics, while the lower part displays statistics about
+individual processes. The user can navigate the list of processes (using the
+left- and right-arrow keys) and select the list they are interested in. The
+tool will then display statistics about that selected process in the lower part
+of the window. If the t or T key is pressed, the tool displays the LWP-specific
+view of that selected process. The t or T key can be used to toggle between the
+process-view and the thread-view.
+.sp
+.LP
+During execution, a user can force a refresh of the analysis by pressing the r
+or R key. The interval time is restored to the default or to a specified value
+(if -t was used). To quit the application, the user must press the q or Q key.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB-f\fR, \fB--feature\fR [\fBno\fR]\fIfeature1\fR,[\fBno\fR]\fIfeature2\fR,...
+.ad
+.sp .6
+.RS 4n
+Enables/disables features in LatencyTOP. Features can be only one of the
+following:
+.sp
+.ne 2
+.na
+[\fBno\fR]\fBfilter\fR
+.ad
+.sp .6
+.RS 4n
+Filter large interruptible latencies, for example, sleep. The default is
+\fBoff\fR.
+.RE
+
+.sp
+.ne 2
+.na
+[\fBno\fR]\fBsched\fR
+.ad
+.sp .6
+.RS 4n
+Monitors \fBsched\fR (PID=0). The default is \fBoff\fR.
+.RE
+
+.sp
+.ne 2
+.na
+[\fBno\fR]\fBsobj\fR
+.ad
+.sp .6
+.RS 4n
+Monitors synchronize objects. The default is \fBon\fR.
+.RE
+
+.sp
+.ne 2
+.na
+[\fBno\fR]\fBlow\fR
+.ad
+.sp .6
+.RS 4n
+Lower overhead by sampling small latencies. Enabling this feature will lower
+CPU utilization by estimating small latencies statistically. Use it for heavy
+workloads such as a very busy web server. The default is \fBoff\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-h\fR\fR
+.ad
+.sp .6
+.RS 4n
+Displays the command's usage.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-k\fR \fIlog_level\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the level of logging in the log file. Valid values are:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+\fBnone\fR (default)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+\fBunknown\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+\fBall\fR
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR [\fIlog_interval\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Writes data to the log file every \fIlog_interval\fR seconds;
+\fIlog_interval\fR must be greater than 60.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-o\fR \fIlog_file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the log file where output will be written. The default log file is
+\fB/var/log/latencytop.log\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR \fIinterval\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the interval, in seconds, at which the tool collects statistics from
+the system. The possible values are between 1 and 60; the default is 5 seconds.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRRunning the Tool
+.sp
+.LP
+The following command launches the tool with default values for options.
+
+.sp
+.in +2
+.nf
+% \fBlatencytop\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRSetting the Interval
+.sp
+.LP
+The following command sets the sampling interval to two seconds.
+
+.sp
+.in +2
+.nf
+% \fBlatencytop -t 2\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRSpecifying the Log File
+.sp
+.LP
+The following command sets the log file to \fB/tmp/latencytop.log\fR.
+
+.sp
+.in +2
+.nf
+% \fBlatencytop -o /tmp/latencytop.log\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRSpecifying the Log Level
+.sp
+.LP
+The following command sets the log level to \fBall\fR.
+
+.sp
+.in +2
+.nf
+% \fBlatencytop -l 2\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fREnabling Tracing of Latencies
+.sp
+.LP
+The following command enables the tracing of latencies caused by
+synchronization objects.
+
+.sp
+.in +2
+.nf
+% \fBlatencytop -f sobj\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86, SPARC
+_
+Interface Stability	Volatile
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR attributes (7),
+.BR dtrace (8),
+.BR kstat (8)
+.SH USAGE
+.sp
+.LP
+You must have DTrace privileges to run LatencyTOP.

@@ -1,0 +1,178 @@
+'\" te
+.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH NDMP 5 "Feb 24, 2014"
+.SH NAME
+ndmp \- configuration properties for Solaris Network Data Management Protocol
+(NDMP) server
+.SH DESCRIPTION
+.sp
+.LP
+The behavior of the Solaris NDMP server is specified by property values that
+are stored in the Service Management Facility, \fBsmf\fR(7).
+.sp
+.LP
+An authorized user can use the \fBndmpadm\fR(8) command to set global values
+for these properties in SMF.
+.sp
+.LP
+You can set the following properties by using the \fBndmpadm set\fR command:
+.sp
+.ne 2
+.na
+\fB\fBbackup-quarantine\fR\fR
+.ad
+.RS 24n
+Backup the files marked as quarantined by AV. Acceptable values are \fByes\fR
+or \fBno\fR. The default is \fBno\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdar-support\fR\fR
+.ad
+.RS 24n
+Set the Direct Access Recovery mode. Acceptable values are \fByes\fR or
+\fBno\fR. The default is \fBno\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdebug-path\fR\fR
+.ad
+.RS 24n
+The path to which to save the debug log. The default is \fB/var/log/ndmp\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdebug-mode\fR\fR
+.ad
+.RS 24n
+Enable or disable debug log messages.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdump-pathnode\fR\fR
+.ad
+.RS 24n
+Enable or disable backing up the directories containing modified files or
+directories in \fBdump\fR(1) backup format. Acceptable values are yes or no.
+The default is no.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBignore-ctime\fR\fR
+.ad
+.RS 24n
+Determines whether the change timestamp (\fBctime\fR) of files and directories
+is used to determine whether a file should be backed up in level backup. If
+this parameter is set to \fByes\fR, only the modification time (\fBmtime\fR) of
+the file or directory determines whether it should be backed up. Acceptable
+values are \fByes\fR or \fBno\fR. The default value is \fBno\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBoverwrite-quarantine\fR\fR
+.ad
+.RS 24n
+Restore quarantined files on top of current files if they already exist.
+Acceptable values are \fByes\fR or \fBno\fR. The default value is \fBno\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrestore-quarantine\fR\fR
+.ad
+.RS 24n
+Restore the files that had been marked as quarantined by AV and are backed up.
+Acceptable values are yes or no. The default value is no.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtar-pathnode\fR\fR
+.ad
+.RS 24n
+Enable or disable backing up the directories containing modified files or
+directories in \fBtar\fR(1) backup format. Acceptable values are \fByes\fR or
+\fBno\fR. The default value is \fBno\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtoken-maxseq\fR\fR
+.ad
+.RS 24n
+Set the maximum sequence number for subsequent token-based incremental backup
+in NDMP-V4. The default value is \fB9\fR. There are two limits for this value:
+soft-limit, which is \fB59\fR, and hard-limit, equal to \fB64\fR. If the token
+sequence number, passed by the DMA, is between the soft and hard limits, a
+warning message is issued to the DMA. The token sequence number can never
+exceed the hard-limit value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBversion\fR\fR
+.ad
+.RS 24n
+Set the maximum active NDMP protocol version. Valid values are currently
+\fB2\fR, \fB3\fR, and \fB4\fR. The default is \fB4\fR.
+.RE
+
+.sp
+.LP
+The following property can only be set when using the \fBndmpadm enable\fR or
+\fBndmpadm disable\fR command:
+.sp
+.ne 2
+.na
+\fB\fBauth-type\fR\fR
+.ad
+.RS 13n
+Sets the password encryption type for the authentication of local users. Valid
+values are \fBcram-md5\fR or \fBcleartext\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR dump (1),
+.BR tar (1),
+.BR attributes (7),
+.BR smf (7),
+.BR ndmpadm (8),
+.BR ndmpd (8)

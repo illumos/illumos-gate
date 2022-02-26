@@ -596,7 +596,7 @@ extern smod_info_t *smod_lookup_byname(const char *);
 
 /*
  * Used to traverse the list of AF_UNIX sockets to construct the kstat
- * for netstat(1m).
+ * for netstat(8).
  */
 struct socklist {
 	kmutex_t	sl_lock;

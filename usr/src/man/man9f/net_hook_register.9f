@@ -169,7 +169,7 @@ The netstack corresponding to \fIinfo\fR is condemned or no longer exists.
 The \fBnet_hook_register()\fR function may be called from user  or kernel
 context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -183,4 +183,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBnet_hook_unregister\fR(9F), \fBhook_t\fR(9S)
+.BR net_hook_unregister (9F),
+.BR hook_t (9S)

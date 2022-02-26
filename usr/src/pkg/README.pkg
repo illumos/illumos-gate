@@ -29,7 +29,7 @@ Introduction
 This README describes some basics about creating, modifying, and
 building packages in ON.  All package creation in ON is done using
 tools available to our customers.  If terminology in this document
-is confusing, you may wish to review the pkg(5) manpage.
+is confusing, you may wish to review the pkg(7) manpage.
 
 Packaging Overview
 ------------------
@@ -150,7 +150,7 @@ available from /opt/onbld/bin or usr/src/tools/scripts/ to setup and
 upgrade your system.  A manpage is available in /opt/onbld/man
 or usr/src/tools/scripts/onu.1.
 
-Alternatively, you can manually start a pkg.depot(1M) server to
+Alternatively, you can manually start a pkg.depot(8) server to
 serve the generated repository to multiple test machines.
 
 	Start up a depot on your build machine.
@@ -263,7 +263,7 @@ in our manifests.
 Zones and Packages
 ------------------
 
-pkg(5) uses variants to implement zones.  If a package is marked
+pkg(7) uses variants to implement zones.  If a package is marked
 with both global and non-global zone variants, the package contents will
 be installed in both global and non-global by default.
 	set name=variant.opensolaris.zone value=global value=nonglobal
@@ -289,7 +289,7 @@ add a comment describing why the dependency is required.
 Moving Content Between Packages and Removing Content
 ----------------------------------------------------
 
-pkg(5) tracks when content is removed from packages, and automatically
+pkg(7) tracks when content is removed from packages, and automatically
 removes it.
 
 If you need to move content between packages, there are two primary

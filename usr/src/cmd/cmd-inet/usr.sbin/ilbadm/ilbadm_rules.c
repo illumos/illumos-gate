@@ -1123,7 +1123,7 @@ ilbadm_create_rule(int argc, char *argv[])
 	if (optind >= argc) {
 		ilbadm_err(gettext("missing mandatory arguments - please refer"
 		    " to 'ilbadm create-rule' subcommand description in"
-		    " ilbadm(1M)"));
+		    " ilbadm(8)"));
 		rc = ILBADM_LIBERR;
 		goto out;
 

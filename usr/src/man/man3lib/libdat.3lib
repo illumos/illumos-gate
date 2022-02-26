@@ -19,7 +19,7 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-ldat\fR [ \fIlibrary\fR... ]
 The libdat library provides an application with the User Direct Access
 Programming Library (uDAPL) 1.2 functions to access the underlying RDMA-able
 interconnects. Different uDAPL service providers listed in the DAT static
-registry \fBdat.conf\fR(4) can be registered during runtime with the DAT
+registry \fBdat.conf\fR(5) can be registered during runtime with the DAT
 library. After an application opens an interface adapter belonging to a
 particular service provider, all function calls will be redirected to that
 service provider's library.
@@ -118,7 +118,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -136,7 +136,10 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBdatadm\fR(1M), \fBIntro\fR(3), \fBdat.conf\fR(4), \fBattributes\fR(5)
+.BR Intro (3),
+.BR dat.conf (5),
+.BR attributes (7),
+.BR datadm (8)
 .SH NOTES
 .sp
 .LP
@@ -154,6 +157,6 @@ l l .
 .sp
 .LP
 In terms of installation, the service provider package should include a
-\fBservice_provider.conf\fR(4) file. The \fBdatadm\fR(1M) administrative
+\fBservice_provider.conf\fR(5) file. The \fBdatadm\fR(8) administrative
 configuration program should be used to add and remove service provider's
-entries in the system-wide \fBdat.conf\fR(4).
+entries in the system-wide \fBdat.conf\fR(5).

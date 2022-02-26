@@ -123,7 +123,7 @@ up to the user program and the driver to agree on what the arguments mean.
 .sp
 .LP
 I/O control commands are used to implement the terminal settings passed from
-\fBttymon\fR(1M) and  \fBstty\fR(1), to format disk devices, to implement a
+\fBttymon\fR(8) and  \fBstty\fR(1), to format disk devices, to implement a
 trace driver for debugging, and to clean up character queues. Since the kernel
 does not interpret the command type that defines the operation, a driver is
 free to define its own commands. Drivers must be prepared to receive commands
@@ -257,10 +257,20 @@ xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 .in -2
 
 .SH SEE ALSO
-\fBstty\fR(1), \fBttymon\fR(1M), \fBdkio\fR(7I), \fBfbio\fR(7I),
-\fBtermio\fR(7I), \fBopen\fR(9E), \fBput\fR(9E), \fBsrv\fR(9E),
-\fBcopyin\fR(9F), \fBcopyout\fR(9F), \fBddi_copyin\fR(9F),
-\fBddi_copyout\fR(9F), \fBddi_model_convert_from\fR(9F), \fBcb_ops\fR(9S)
+.BR stty (1),
+.BR dkio (4I),
+.BR fbio (4I),
+.BR termio (4I),
+.BR ttymon (8),
+.BR open (9E),
+.BR put (9E),
+.BR srv (9E),
+.BR copyin (9F),
+.BR copyout (9F),
+.BR ddi_copyin (9F),
+.BR ddi_copyout (9F),
+.BR ddi_model_convert_from (9F),
+.BR cb_ops (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

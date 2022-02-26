@@ -34,7 +34,7 @@
 
 #
 # DESCRIPTION:
-# Ensure that the clri(1M) utility fails on a ZFS file system.
+# Ensure that the clri(8) utility fails on a ZFS file system.
 #
 # STRATEGY:
 # 1. Populate a ZFS directory with a number of files.
@@ -51,7 +51,7 @@ function cleanup
 
 log_onexit cleanup
 
-log_assert "Ensure that the clri(1M) utility fails on a ZFS file system."
+log_assert "Ensure that the clri(8) utility fails on a ZFS file system."
 
 populate_dir $NUM_FILES
 
@@ -59,4 +59,4 @@ inode=`ls -i $TESTDIR/$TESTFILE.0 | awk '{print $1}'`
 log_mustnot clri /dev/rdsk/$DISK $inode
 log_mustnot clri -F zfs /dev/rdsk/$DISK $inode
 
-log_pass "clri(1M) returned an error as expected."
+log_pass "clri(8) returned an error as expected."

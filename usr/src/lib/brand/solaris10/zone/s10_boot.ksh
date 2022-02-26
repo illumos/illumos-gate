@@ -273,7 +273,7 @@ safe_copy /lib/svc/share/net_include.sh $filename
 
 #
 # PSARC 2009/306 removed the ND_SET/ND_GET ioctl's for modifying
-# IP/TCP/UDP/SCTP/ICMP tunables. If S10 ndd(1M) is used within an
+# IP/TCP/UDP/SCTP/ICMP tunables. If S10 ndd(8) is used within an
 # S10 container, the kernel will return EINVAL. So we need this.
 #
 replace_with_native /usr/sbin/ndd 0555 root:bin
@@ -302,7 +302,7 @@ replace_with_native /usr/lib/fs/autofs/automount 0555 root:bin
 replace_with_native /usr/lib/autofs/automountd 0555 root:bin
 
 #
-# The class-specific dispadmin(1M) and priocntl(1) binaries must be native
+# The class-specific dispadmin(8) and priocntl(1) binaries must be native
 # wrappers, and we must have all of the ones the native zone does.  This
 # allows new scheduling classes to appear without causing dispadmin and
 # priocntl to be unhappy.

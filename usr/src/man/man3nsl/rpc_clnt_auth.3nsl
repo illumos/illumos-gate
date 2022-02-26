@@ -109,7 +109,7 @@ Call \fBauthsys_create()\fR with the appropriate parameters.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -124,5 +124,8 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBrpc\fR(3NSL), \fBrpc_clnt_calls\fR(3NSL), \fBrpc_clnt_create\fR(3NSL),
-\fBsecure_rpc\fR(3NSL), \fBattributes\fR(5)
+.BR rpc (3NSL),
+.BR rpc_clnt_calls (3NSL),
+.BR rpc_clnt_create (3NSL),
+.BR secure_rpc (3NSL),
+.BR attributes (7)

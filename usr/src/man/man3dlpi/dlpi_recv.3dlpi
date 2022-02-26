@@ -67,7 +67,7 @@ use \fIdri_totmsglen\fR to determine the original total length of the message.
 .sp
 .LP
 If the handle is in raw mode, as described in \fBdlpi_open\fR(3DLPI),
-\fImsgbuf\fR starts with the link-layer header. See \fBdlpi\fR(7P). The values
+\fImsgbuf\fR starts with the link-layer header. See \fBdlpi\fR(4P). The values
 of \fIsaddrp\fR, \fIsaddrlenp\fR, and all the members of \fIdlpi_recvinfo_t\fR
 except \fIdri_totmsglen\fR are invalid because the address information is
 already included in the link-layer header returned by \fImsgbuf\fR.
@@ -142,7 +142,7 @@ Unavailable \fBDLPI\fR \fBSAP\fR
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -160,5 +160,8 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBdlpi_bind\fR(3DLPI), \fBdlpi_open\fR(3DLPI), \fBlibdlpi\fR(3LIB),
-\fBattributes\fR(5), \fBdlpi\fR(7P)
+.BR dlpi_bind (3DLPI),
+.BR dlpi_open (3DLPI),
+.BR libdlpi (3LIB),
+.BR dlpi (4P),
+.BR attributes (7)

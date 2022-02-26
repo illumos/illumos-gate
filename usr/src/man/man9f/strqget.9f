@@ -152,7 +152,8 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBstrqset\fR(9F), \fBqueue\fR(9S)
+.BR strqset (9F),
+.BR queue (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

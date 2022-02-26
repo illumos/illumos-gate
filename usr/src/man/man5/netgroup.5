@@ -1,0 +1,164 @@
+'\" te
+.\" Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH NETGROUP 5 "Jun 17, 2021"
+.SH NAME
+netgroup \- list of network groups
+.SH SYNOPSIS
+.nf
+\fB/etc/netgroup\fR
+.fi
+.SH DESCRIPTION
+A \fBnetgroup\fR defines a network-wide group of hosts and users. Use a
+\fBnetgroup\fR to restrict access to shared \fBNFS\fR filesystems and to
+restrict remote login and shell access.
+.sp
+Network groups are usually stored in network information services,
+such as \fBLDAP\fR, or \fBNIS\fR, but may alternatively be stored in
+the local \fB/etc/netgroup\fR file.  The \fBnetgroup\fR line of the
+\fBnsswitch.conf\fR(5) file determines which of those sources are used.
+.sp
+This manual page describes the format for a file that is used to supply input
+to a program such as \fBldapaddent\fR(8) for LDAP, or \fBmakedbm\fR(8) for
+NIS.  The same file format is used in the local \fB/etc/netgroup\fR file.
+.sp
+Each line of the file defines the name and membership of a network group. The
+line should have the format:
+.sp
+.in +2
+.nf
+\fIgroupname     member\fR...
+.fi
+.in -2
+.sp
+.sp
+The items on a line can be separated by a combination of one or more spaces or
+tabs.
+.sp
+The \fIgroupname\fR is the name of the group being defined. This is followed by
+a list of members of the group. Each \fImember\fR is either another group name,
+all of whose members are to be included in the group being defined, or a triple
+of the form:
+.sp
+.in +2
+.nf
+\fI(hostname,username,domainname)\fR
+.fi
+.in -2
+.sp
+.sp
+In each triple, any of the three fields \fIhostname\fR, \fIusername\fR, and
+\fIdomainname\fR, can be empty. An empty field signifies a wildcard that
+matches any value in that field. Thus:
+.sp
+.in +2
+.nf
+everything (\|,\|,this.domain)
+.fi
+.in -2
+.sp
+.sp
+defines a group named "everything" for the domain "this.domain" to which every
+host and user belongs.
+.sp
+The \fIdomainname\fR field refers to the domain in which the triple is valid,
+not the domain containing the host or user. In fact, applications using
+\fBnetgroup\fR generally do not check the \fIdomainname\fR. Therefore, using
+.sp
+.in +2
+.nf
+(,,domain)
+.fi
+.in -2
+.sp
+.sp
+is equivalent to
+.sp
+.in +2
+.nf
+(,,)
+.fi
+.in -2
+.sp
+.sp
+You can also use netgroups to control \fBNFS\fR mount access (see
+\fBshare_nfs\fR(8)) and to control remote login and shell access (see
+\fBhosts.equiv\fR(5)). You can also use them to control local login access (see
+\fBpasswd\fR(5), \fBshadow\fR(5), and \fBcompat\fR in \fBnsswitch.conf\fR(5)).
+.sp
+When used for these purposes, a host is considered a member of a \fBnetgroup\fR
+if the \fBnetgroup\fR contains any triple in which the \fBhostname\fR field
+matches the name of the host requesting access and the \fBdomainname\fR field
+matches the domain of the host controlling access.
+.sp
+Similarly, a user is considered a member of a \fBnetgroup\fR if the
+\fBnetgroup\fR contains any triple in which the \fIusername\fR field matches
+the name of the \fBuser\fR requesting access and the \fIdomainname\fR field
+matches the domain of the host controlling access.
+.sp
+Note that when netgroups are used to control NFS mount access, access is
+granted depending only on whether the requesting host is a member of the
+\fBnetgroup\fR. Remote login and shell access can be controlled both on the
+basis of host and user membership in separate netgroups.
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/netgroup\fR\fR
+.ad
+.RS 17n
+Used by a network information service's utility to construct a map or table
+that contains \fBnetgroup\fR information. For example, \fBldapaddent\fR(8)
+uses \fB/etc/netgroup\fR to construct an LDAP container.  Alternatively,
+the \fB/etc/netgroup\fR file may be used directly if the \fBfiles\fR
+source is specified in \fBnsswitch.conf\fR(5) for the \fBnetgroup\fR
+database.
+.RE
+.SH SEE ALSO
+.BR innetgr (3C),
+.BR hosts (5),
+.BR hosts.equiv (5),
+.BR nsswitch.conf (5),
+.BR passwd (5),
+.BR shadow (5),
+.BR ldapaddent (8),
+.BR makedbm (8),
+.BR share_nfs (8)
+.SH NOTES
+Applications may make general membership tests using the \fBinnetgr()\fR
+function. See \fBinnetgr\fR(3C).
+.sp
+Because the "-" character will not match any specific username or hostname, it
+is commonly used as a placeholder that will match only wildcarded membership
+queries. So, for example:
+.sp
+.in +2
+.nf
+onlyhosts	(host1,-,our.domain) (host2,-,our.domain)
+onlyusers	(-,john,our.domain) (-,linda,our.domain)
+.fi
+.in -2
+.sp
+.sp
+effectively define netgroups containing only hosts and only users,
+respectively. Any other string that is guaranteed not to be a legal username or
+hostname will also suffice for this purpose.
+.sp
+Use of placeholders will improve search performance.
+.sp
+When a machine with multiple interfaces and multiple names is defined as a
+member of a \fBnetgroup\fR, one must list all of the names. See \fBhosts\fR(5).
+A manageable way to do this is to define a \fBnetgroup\fR containing all of the
+machine names. For example, for a host "gateway" that has names
+"gateway-subnet1" and "gateway-subnet2" one may define the \fBnetgroup\fR:
+.sp
+.in +2
+.nf
+gateway (gateway-subnet1,\|,our.domain) (gateway-subnet2,\|,our.domain)
+.fi
+.in -2
+.sp
+and use this \fBnetgroup\fR "\fBgateway\fR" whenever the host is to be included
+in another \fBnetgroup\fR.

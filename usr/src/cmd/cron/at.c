@@ -113,7 +113,7 @@ extern int	audit_cron_is_anc_name(char *);
 extern int	audit_cron_delete_anc_file(char *, char *);
 
 /*
- * Error in getdate(3G)
+ * Error in getdate(3C)
  */
 static char 	*errlist[] = {
 /* 0 */ 	"",

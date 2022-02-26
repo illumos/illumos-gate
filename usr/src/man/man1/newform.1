@@ -67,7 +67,7 @@ Input tab specification: expands tabs to spaces, according to the tab
 specifications given. \fITabspec\fR recognizes all tab specification forms
 described in \fBtabs\fR(1). In addition, \fItabspec\fR may be \fB-\fR, in which
 \fBnewform\fR assumes that the tab specification is to be found in the first
-line read from the standard input (see \fBfspec\fR(4)). If no \fItabspec\fR is
+line read from the standard input (see \fBfspec\fR(5)). If no \fItabspec\fR is
 given, \fItabspec\fR defaults to \fB\(mi8\fR\&. A \fItabspec\fR of \fB\(mi0\fR
 expects no tabs; if any are found, they are treated as \fB\(mi1\fR\&.
 .RE
@@ -207,7 +207,10 @@ Operation failed.
 .SH SEE ALSO
 .sp
 .LP
-\fBcsplit\fR(1), \fBtabs\fR(1), \fBfspec\fR(4), \fBattributes\fR(5)
+.BR csplit (1),
+.BR tabs (1),
+.BR fspec (5),
+.BR attributes (7)
 .SH DIAGNOSTICS
 .sp
 .LP

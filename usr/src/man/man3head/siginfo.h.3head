@@ -259,10 +259,20 @@ T}
 .SH SEE ALSO
 .sp
 .LP
-\fB_lwp_kill\fR(2), \fBkill\fR(2), \fBsetrctl\fR(2), \fBsigaction\fR(2),
-\fBsigsend\fR(2), \fBwaitid\fR(2), \fBabort\fR(3C), \fBaio_read\fR(3C),
-\fBmq_notify\fR(3C), \fBraise\fR(3C), \fBsignal.h\fR(3HEAD),
-\fBsigqueue\fR(3C), \fBtimer_create\fR(3C), \fBtimer_settime\fR(3C)
+.BR _lwp_kill (2),
+.BR kill (2),
+.BR setrctl (2),
+.BR sigaction (2),
+.BR sigsend (2),
+.BR waitid (2),
+.BR abort (3C),
+.BR aio_read (3C),
+.BR mq_notify (3C),
+.BR raise (3C),
+.BR sigqueue (3C),
+.BR timer_create (3C),
+.BR timer_settime (3C),
+.BR signal.h (3HEAD)
 .SH NOTES
 .sp
 .LP

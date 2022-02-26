@@ -1,0 +1,121 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DOMAINNAME 8 "May 13, 2017"
+.SH NAME
+domainname \- set or display name of the current domain
+.SH SYNOPSIS
+.LP
+.nf
+\fBdomainname\fR [\fIname-of-domain\fR]
+.fi
+
+.SH DESCRIPTION
+.LP
+Without an argument, \fBdomainname\fR displays the name of the current domain
+name used in RPC exchanges, usually referred to as the NIS domain name.
+This name typically encompasses a group of \fBhosts\fR or \fBpasswd\fR entries
+under the same administration. The \fBdomainname\fR command is used by various
+components of Solaris to resolve names for entries such as are found in
+\fBpasswd\fR, \fBhosts\fR and \fBaliases\fR. By default, naming services such
+as \fBNIS\fR use \fBdomainname\fR to resolve names.
+.sp
+.LP
+With appropriate privileges (root or an equivalent role [see \fBrbac\fR(7)]),
+you can set the name of the domain by specifying the name as an argument to the
+\fBdomainname\fR command.
+.sp
+.LP
+The domain name for various naming services can also be set by other means. For
+example, \fBypinit\fR can be used to specify a different domain for all
+\fBNIS\fR calls. The domain name of the machine is usually set during boot time
+through the \fBdomainname\fR command by the \fBsvc:/system/identity:domain\fR
+service. If the new domain name is not saved in the \fB/etc/defaultdomain\fR
+file, the machine reverts to the old domain after it reboots.
+.sp
+.LP
+The \fBsendmail\fR(8) daemon, as shipped with Solaris, and the \fBsendmail\fR
+implementation provided by \fBsendmail.org\fR (formerly referred to as
+"Berkeley 8.x sendmail") both attempt to determine a local host's fully
+qualified host name at startup and both pursue follow-up actions if the initial
+search fails. It is in these follow-up actions that the two implementations
+differ.
+.sp
+.LP
+Both implementations use a standard Solaris or Unix system call to determine
+its fully qualified host name at startup, following the name service priorities
+specified in \fBnsswitch.conf\fR(5). To this point, the Solaris and
+\fBsendmail.org\fR versions behave identically.
+.sp
+.LP
+If the request for a fully qualified host name fails, the \fBsendmail.org\fR
+\fBsendmail\fR sleeps for 60 seconds, tries again, and, upon continuing
+failure, resorts to a short name. The Solaris version of \fBsendmail\fR makes
+the same initial request, but then, following initial failure, calls
+\fBdomainname\fR. If successful, the sleep is avoided.
+.sp
+.LP
+On a Solaris machine, if you run the \fBsendmail.org\fR version of sendmail,
+you get the startup behavior (omitting the \fBdomainname\fR call) described
+above. If you run the Solaris \fBsendmail\fR, the \fBdomainname\fR call is made
+if needed.
+.sp
+.LP
+If the Solaris \fBsendmail\fR cannot determine the fully qualified host name,
+use \fBcheck-hostname\fR(8) as a troubleshooting aid. This script can offer
+guidance as to appropriate corrective action.
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/defaultdomain\fR\fR
+.ad
+.RS 22n
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/nsswitch.conf\fR\fR
+.ad
+.RS 22n
+
+.RE
+
+.SH SEE ALSO
+.LP
+.BR svcs (1),
+.BR aliases (5),
+.BR defaultdomain (5),
+.BR hosts (5),
+.BR nsswitch.conf (5),
+.BR passwd (5),
+.BR attributes (7),
+.BR rbac (7),
+.BR smf (7),
+.BR check-hostname (8),
+.BR hostconfig (8),
+.BR named (8),
+.BR sendmail (8),
+.BR svcadm (8),
+.BR ypinit (8)
+.SH NOTES
+.LP
+The \fBdomainname\fR service is managed by the service management facility,
+\fBsmf\fR(7), under the service identifier:
+.sp
+.in +2
+.nf
+svc:/system/identity:domain
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using \fBsvcadm\fR(8). The service's
+status can be queried using the \fBsvcs\fR(1) command.

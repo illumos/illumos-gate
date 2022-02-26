@@ -61,7 +61,7 @@ getauevent_r, getauevnam_r, getauevnum_r \- get audit_event entry
 .SH DESCRIPTION
 .LP
 These functions document the programming interface for obtaining entries from
-the \fBaudit_event\fR(4) file. The \fBgetauevent()\fR, \fBgetauevnam()\fR,
+the \fBaudit_event\fR(5) file. The \fBgetauevent()\fR, \fBgetauevnam()\fR,
 \fBgetauevnum()\fR, \fBgetauevent()\fR, \fBgetauevnam()\fR, and
 \fBgetauevnum()\fR functions each return a pointer to an \fBaudit_event\fR
 structure.
@@ -150,7 +150,7 @@ file that stores user-ID to username mappings
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -171,9 +171,12 @@ are Unsafe. The equivalent functions \fBgetauevent_r()\fR,
 and an MT-Safe function call interface.
 .SH SEE ALSO
 .LP
-\fBgetauclassent\fR(3BSM), \fBgetpwnam\fR(3C),
-\fBaudit_class\fR(4), \fBaudit_event\fR(4), \fBpasswd\fR(4),
-\fBattributes\fR(5)
+.BR getauclassent (3BSM),
+.BR getpwnam (3C),
+.BR audit_class (5),
+.BR audit_event (5),
+.BR passwd (5),
+.BR attributes (7)
 .SH NOTES
 .LP
 All information for the \fBgetauevent()\fR, \fBgetauevnam()\fR, and

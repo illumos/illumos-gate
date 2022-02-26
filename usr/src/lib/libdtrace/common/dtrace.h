@@ -48,7 +48,7 @@ extern "C" {
  * Solaris system and DTrace subsystem and are subject to change at any time
  * without notice.  Applications and drivers using these interfaces will fail
  * to run on future releases.  These interfaces should not be used for any
- * purpose except those expressly outlined in dtrace(7D) and libdtrace(3LIB).
+ * purpose except those expressly outlined in dtrace(4D) and libdtrace(3LIB).
  * Please refer to the "Solaris Dynamic Tracing Guide" for more information.
  */
 
@@ -61,7 +61,7 @@ typedef struct dtrace_prog dtrace_prog_t;
 typedef struct dtrace_vector dtrace_vector_t;
 typedef struct dtrace_aggdata dtrace_aggdata_t;
 
-#define	DTRACE_O_NODEV		0x01	/* do not open dtrace(7D) device */
+#define	DTRACE_O_NODEV		0x01	/* do not open dtrace(4D) device */
 #define	DTRACE_O_NOSYS		0x02	/* do not load /system/object modules */
 #define	DTRACE_O_LP64		0x04	/* force D compiler to be LP64 */
 #define	DTRACE_O_ILP32		0x08	/* force D compiler to be ILP32 */
@@ -529,7 +529,7 @@ extern struct dt_node *dt_compile_sugar(dtrace_hdl_t *,
  *
  * Library clients can use these functions to iterate over the set of available
  * probe definitions and inquire as to their attributes.  The probe iteration
- * interfaces report probes that are declared as well as those from dtrace(7D).
+ * interfaces report probes that are declared as well as those from dtrace(4D).
  */
 typedef struct dtrace_probeinfo {
 	dtrace_attribute_t dtp_attr;		/* name attributes */
@@ -549,7 +549,7 @@ extern int dtrace_probe_info(dtrace_hdl_t *,
 /*
  * DTrace Vector Interface
  *
- * The DTrace library normally speaks directly to dtrace(7D).  However,
+ * The DTrace library normally speaks directly to dtrace(4D).  However,
  * this communication may be vectored elsewhere.  Consumers who wish to
  * perform a vectored open must fill in the vector, and use the dtrace_vopen()
  * entry point to obtain a library handle.

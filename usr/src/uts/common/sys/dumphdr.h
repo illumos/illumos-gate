@@ -40,8 +40,8 @@ extern "C" {
  * are written out: one at the beginning of the dump, and the other at
  * the very end of the dump device.  The terminal header is at a known
  * location (end of device) so we can always find it.  The initial header
- * is redundant, but helps savecore(1M) determine whether the dump has been
- * overwritten by swap activity.  See dumpadm(1M) for dump configuration.
+ * is redundant, but helps savecore(8) determine whether the dump has been
+ * overwritten by swap activity.  See dumpadm(8) for dump configuration.
  */
 #define	DUMP_MAGIC	0xdefec8edU		/* dump magic number */
 #define	DUMP_VERSION	10			/* version of this dumphdr */

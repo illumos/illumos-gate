@@ -28,11 +28,8 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- *	fopen(3S) with error checking
+ *	fopen(3C) with error checking
  */
 
 #include	"errmsg.h"

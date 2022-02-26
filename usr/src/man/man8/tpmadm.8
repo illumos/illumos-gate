@@ -1,0 +1,226 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TPMADM 8 "April 9, 2016"
+.SH NAME
+tpmadm \- administer Trusted Platform Module
+.SH SYNOPSIS
+.LP
+.nf
+\fBtpmadm status\fR
+.fi
+
+.LP
+.nf
+\fBtpmadm init\fR
+.fi
+
+.LP
+.nf
+\fBtpmadm clear\fR [\fBowner\fR | \fBlock\fR]
+.fi
+
+.LP
+.nf
+\fBtpmadm auth\fR
+.fi
+
+.LP
+.nf
+\fBtpmadm keyinfo\fR [\fIuuid\fR]
+.fi
+
+.LP
+.nf
+\fBtpmadm deletekey\fR \fIuuid\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+A Trusted Platform Module (TPM) is a hardware component that provides for
+protected key storage and reliable measurements of software used to boot the
+operating system. The \fBtpmadm\fR utility is used to initialize and administer
+the TPM so that it can be used by the operating system and other programs.
+.sp
+.LP
+The TPM subsystem can store and manage an unlimited number of keys for use by
+the operating system and by users. Each key is identified by a Universally
+Unique Identifier, or UUID.
+.sp
+.LP
+Although the TPM can hold only a limited number of keys at any given time, the
+supporting software automatically loads and unloads keys as needed. When a key
+is stored outside the TPM, it is always encrypted or "wrapped" by its parent
+key so that the key is never exposed in readable form outside the TPM.
+.sp
+.LP
+Before the TPM can be used, it must be initialized by the platform owner. This
+process involves setting an owner password which is used to authorize
+privileged operations.
+.sp
+.LP
+Although the TPM owner is similar to a traditional superuser, there are two
+important differences. First, process privilege is irrelevant for access to TPM
+functions. All privileged operations require knowledge of the owner password,
+regardless of the privilege level of the calling process. Second, the TPM owner
+is not able to override access controls for data protected by TPM keys. The
+owner can effectively destroy data by re-initializing the TPM, but he cannot
+access data that has been encrypted using TPM keys owned by other users.
+.SH SUBCOMMANDS
+.LP
+The following subcommands are used in the form:
+.sp
+.in +2
+.nf
+# tpmadm \fI<subcommand>\fR \fI[operand]\fR
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fB\fBstatus\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report status information about the TPM. Output includes basic information
+about whether ownership of the TPM has been established, current PCR contents,
+and the usage of TPM resources such as communication sessions and loaded keys.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinit\fR\fR
+.ad
+.sp .6
+.RS 4n
+Initialize the TPM for use. This involves taking ownership of the TPM by
+setting the owner authorization password. Taking ownership of the TPM creates a
+new storage root key, which is the ancestor of all keys created by this TPM.
+Once this command is issued, the TPM must be reset using BIOS operations before
+it can be re-initialized.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBauth\fR\fR
+.ad
+.sp .6
+.RS 4n
+Change the owner authorization password for the TPM.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBclear\fR \fBlock\fR\fR
+.ad
+.sp .6
+.RS 4n
+Clear the count of failed authentication attempts. After a number of failed
+authentication attempts, the TPM responds more slowly to subsequent attempts,
+in an effort to thwart attempts to find the owner password by exhaustive
+search. This command, which requires the correct owner password, resets the
+count of failed attempts.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBclear\fR \fBowner\fR\fR
+.ad
+.sp .6
+.RS 4n
+Deactivate the TPM and return it to an unowned state. This operation, which
+requires the current TPM owner password, invalidates all keys and data tied to
+the TPM. Before the TPM can be used again, the system must be restarted, the
+TPM must  be reactivated from the BIOS or ILOM pre-boot environment, and the
+TPM must be re-initialized using the \fBtpmadm init\fR command.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkeyinfo\fR [\fIuuid\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Report information about keys stored in the TPM subsystem. Without additional
+arguments, this subcommand produces a brief listing of all keys. If the UUID of
+an individual key is specified, detailed information about that key is
+displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdeletekey\fR \fIuuid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Delete the key with the specified UUID from the TPM subsystem's persistent
+storage.
+.RE
+
+.SH EXIT STATUS
+.LP
+After completing the requested operation, \fBtpmadm\fR exits with one of the
+following status values.
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful termination.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.sp .6
+.RS 4n
+Failure. The requested operation could not be completed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.sp .6
+.RS 4n
+Usage error. The \fBtpmadm\fR command was invoked with invalid arguments.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.LP
+.BR attributes (7)
+.sp
+.LP
+TCG Software Stack (TSS) Specifications:
+\fBhttps://www.trustedcomputinggroup.org/specs/TSS\fR (as of the date of
+publication)

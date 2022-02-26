@@ -145,7 +145,7 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -158,4 +158,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBIntro\fR(3), \fBtd_ta_new\fR(3C_DB), \fBattributes\fR(5), \fBthreads\fR(5)
+\fBIntro\fR(3), \fBtd_ta_new\fR(3C_DB), \fBattributes\fR(7),
+.BR threads (7)

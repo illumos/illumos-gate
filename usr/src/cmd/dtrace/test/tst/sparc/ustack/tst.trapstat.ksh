@@ -24,11 +24,10 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # This script verifies that user-land stacks can be walked safely
-# when the trapstat(1M) utility is running. An arbitrary program, w(1),
+# when the trapstat(8) utility is running. An arbitrary program, w(1),
 # is started once a second to ensure stacks can be walked at all stages
 # of the process lifecycle.
 #

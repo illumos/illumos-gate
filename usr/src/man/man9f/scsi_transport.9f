@@ -94,8 +94,12 @@ if ((status = scsi_transport(rqpkt)) != TRAN_ACCEPT) {
 .in -2
 
 .SH SEE ALSO
-\fBtran_start\fR(9E), \fBmakecom\fR(9F), \fBscsi_init_pkt\fR(9F),
-\fBscsi_pktalloc\fR(9F), \fBscsi_poll\fR(9F), \fBscsi_pkt\fR(9S)
+.BR tran_start (9E),
+.BR makecom (9F),
+.BR scsi_init_pkt (9F),
+.BR scsi_pktalloc (9F),
+.BR scsi_poll (9F),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

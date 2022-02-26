@@ -116,7 +116,9 @@ of the list, reschedule this routine.
 .SH SEE ALSO
 .sp
 .LP
-\fBallocb\fR(9F), \fBcanputnext\fR(9F), \fBdupmsg\fR(9F)
+.BR allocb (9F),
+.BR canputnext (9F),
+.BR dupmsg (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

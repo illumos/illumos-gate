@@ -89,13 +89,13 @@ should be used instead.
 .Sy Obsolete Standard .
 .Sh SEE ALSO
 .Xr getcwd 3C ,
-.Xr standards 5
+.Xr standards 7
 .Sh STANDARDS
 The
 .Fn getwd
 function is available in the following compilation environments.
 See
-.Xr standards 5 .
+.Xr standards 7 .
 .Lp
 .Bl -bullet -compact
 .It

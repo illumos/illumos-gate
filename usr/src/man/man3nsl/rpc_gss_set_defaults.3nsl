@@ -73,7 +73,7 @@ File containing valid QOPs
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -89,7 +89,11 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBrpc\fR(3NSL), \fBrpc_gss_get_mech_info\fR(3NSL), \fBrpcsec_gss\fR(3NSL), \fBqop\fR(4), \fBattributes\fR(5)
+.BR rpc (3NSL),
+.BR rpc_gss_get_mech_info (3NSL),
+.BR rpcsec_gss (3NSL),
+.BR qop (5),
+.BR attributes (7)
 .sp
 .LP
 \fIONC+ Developer\&'s Guide\fR

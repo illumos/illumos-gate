@@ -106,7 +106,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='in.rexecd' section='1M'
+			<manpage title='in.rexecd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

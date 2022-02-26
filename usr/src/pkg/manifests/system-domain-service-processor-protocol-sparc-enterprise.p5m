@@ -72,12 +72,12 @@ dir  path=usr/platform/sun4u group=sys
 dir  path=usr/platform/sun4u/lib
 file path=usr/platform/sun4u/lib/sckmd group=sys mode=0755
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/prtdscp.1m
-file path=usr/share/man/man1m/sckmd.1m
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/dm2s.7d
-file path=usr/share/man/man7d/oplkmdrv.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/dm2s.4d
+file path=usr/share/man/man4d/oplkmdrv.4d
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/prtdscp.8
+file path=usr/share/man/man8/sckmd.8
 driver name=dm2s
 driver name=oplkmdrv
 legacy pkg=SUNWdscpr.u arch=$(ARCH).sun4u \

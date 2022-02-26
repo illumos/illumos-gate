@@ -149,7 +149,7 @@ sysevent_evc_bind(const char *channel, evchan_t **scpp, uint32_t flags)
 	/*
 	 * Enable sysevent driver.  Fallback if the device link doesn't exist;
 	 * this situation can arise if a channel is bound early in system
-	 * startup, prior to devfsadm(1M) being invoked.
+	 * startup, prior to devfsadm(8) being invoked.
 	 */
 	EV_FD(scp) = open(DEVSYSEVENT, O_RDWR);
 	if (EV_FD(scp) == -1) {

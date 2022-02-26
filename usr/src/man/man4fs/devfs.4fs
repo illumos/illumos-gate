@@ -1,0 +1,110 @@
+.\"
+.\" Copyright (c) 2004 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2021 Oxide compuer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 29, 2021
+.Dt DEVFS 4FS
+.Os
+.Sh NAME
+.Nm devfs
+.Nd Devices file system
+.Sh DESCRIPTION
+The
+.Nm
+filesystem manages a name space of all devices in the operating environment and
+is mounted during boot on the
+.Pa /devices
+name space.
+.Pp
+The
+.Pa /devices
+name space is dynamic and reflects the current state of accessible devices.
+The names of all attached device instances are present under
+.Pa /devices .
+.Pp
+The content under
+.Pa /devices
+is under the exclusive control of the
+.Nm
+filesystem and cannot be changed.
+.Pp
+The system may be configured to include a device in one of two ways:
+.Bl -enum
+.It
+By means of dynamic reconfiguration
+.Pq DR ,
+using, for example,
+.Xr cfgadm 8 .
+Several different hardware buses such as PCIe and USB automatically discover and
+enumerate devices that they encounter.
+.It
+For devices driven by
+.Xr driver.conf 5
+enumeration, edit the
+.Pa driver.conf
+file to add a new entry, then use
+.Xr update_drv 8
+to cause the system to re-read the
+.Pa driver.conf
+file and thereby enumerate the instance.
+.El
+.Pp
+The device may be attached through a number of system calls and programs,
+including
+.Xr open 2 ,
+.Xr stat 2 ,
+and
+.Xr ls 1 .
+During device attach, the device driver typically creates minor nodes
+corresponding to the device via
+.Xr ddi_create_minor_node 9F .
+If the attach is successful, one or more minor nodes referring to the device are
+created under
+.Pa /devices .
+.Pp
+Operations like
+.Xr mknod 2 ,
+.Xr mkdir 2 ,
+and
+.Xr creat 2
+are not supported in
+.Pa /devices .
+.Pp
+This file system is not present in a non-global zone.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /devices
+Mount point for
+.Nm
+file system in the global zone.
+.El
+.Sh SEE ALSO
+.Xr vfstab 5 ,
+.Xr devfsadm 8 ,
+.Xr attach 9E
+.Sh NOTES
+The
+.Pa /devices
+name space cannot be unmounted.
+.Pp
+All content at or below the
+.Pa /devices
+name space is an implementation
+artifact and subject to incompatible change or removal without notification.
+Generally, user programs should leverage the device name space under
+.Pa /dev .

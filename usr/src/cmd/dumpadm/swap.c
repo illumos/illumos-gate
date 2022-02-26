@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <string.h>
 #include <stdlib.h>
@@ -89,7 +87,7 @@ swap_list(void)
 
 			/*
 			 * If the pathname isn't absolute, assume it begins
-			 * with /dev as swap(1m) does.
+			 * with /dev as swap(8) does.
 			 */
 			if (swt->swt_ent[n].ste_path[0] != '/') {
 				char buf[MAXPATHLEN];

@@ -67,7 +67,7 @@ Do not write code  bracketed by \fBddi_enter_critical()\fR and
 \fBddi_exit_critical()\fR that can get caught in an infinite loop, as the
 machine may crash if you do.
 .SH SEE ALSO
-\fBmutex\fR(9F)
+.BR mutex (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

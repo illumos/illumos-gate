@@ -266,7 +266,7 @@ Extended File and fileno()
 The 32-bit libc has historically been limited to 255 open streams
 because of the use of an unsigned char. This problem does not impact the
 64-bit libc. To deal with this, libc uses a series of techniques which
-are summarized for users in extendedFILE(5). The usage of extendedFILE
+are summarized for users in extendedFILE(7). The usage of extendedFILE
 can also be enabled by passing the special 'F' character to fopen(3C).
 
 The '_magic' member in the 32-bit 'struct __FILE_TAG' contains what used

@@ -90,7 +90,7 @@ audit_init_module()
 	/*
 	 * setup environment for asynchronous auditing. We can't use
 	 * audit_async_start() here since it assumes the audit system
-	 * has been started via auditd(1m). auditd sets the variable,
+	 * has been started via auditd(8). auditd sets the variable,
 	 * auk_auditstate, to indicate audit record generation should
 	 * commence. Here we want to always generate an audit record.
 	 */

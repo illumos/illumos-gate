@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 
 # For modifying the behavior of rmtmpfiles, do not edit this script.
-# Instead use svccfg(1m) to modify the SMF repository.  To achieve
+# Instead use svccfg(8) to modify the SMF repository.  To achieve
 # traditional System V treatment of /var/tmp, invoke the following
 # commands.:
 #

@@ -76,7 +76,9 @@ context.
 .in -2
 
 .SH SEE ALSO
-\fBtran_abort\fR(9E), \fBscsi_reset\fR(9F), \fBscsi_pkt\fR(9S)
+.BR tran_abort (9E),
+.BR scsi_reset (9F),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

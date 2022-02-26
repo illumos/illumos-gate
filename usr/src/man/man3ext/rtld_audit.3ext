@@ -103,7 +103,7 @@ for a full description of the link auditing mechanism.
 .SH SEE ALSO
 .sp
 .LP
-\fBld.so.1\fR(1)
+.BR ld.so.1 (1)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

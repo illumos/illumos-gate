@@ -1,0 +1,287 @@
+'\" te
+.\"  Copyright 1989 AT&T Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH MOUNT_HSFS 8 "May 29, 2008"
+.SH NAME
+mount_hsfs \- mount hsfs file systems
+.SH SYNOPSIS
+.LP
+.nf
+\fBmount\fR \fB-F\fR hsfs [\fIgeneric_options\fR]
+     [\fB-o\fR \fIFSType-specific_options\fR] [\fB-O\fR ] \fIspecial\fR | \fImount_point\fR
+.fi
+
+.LP
+.nf
+\fBmount\fR \fB-F\fR hsfs [\fIgeneric_options\fR]
+     [\fB-o\fR \fIFSType-specific_options\fR] [\fB-O\fR] \fIspecial\fR \fImount_point\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBmount\fR attaches an ISO 9660 filesystem (the High Sierra  file system,
+\fBhsfs\fR,  is  a  draft predecessor to ISO 9660, so the name reflects the
+filesystem's history) to  the  file  system hierarchy at the \fImount_point\fR,
+which is the pathname of a directory. If \fImount_point\fR has any contents
+prior to the mount operation, these are hidden until the file system is
+unmounted.
+.sp
+.LP
+If  \fBmount\fR is invoked with  \fIspecial\fR or  \fImount_point\fR as the
+only arguments,  \fBmount\fR will search  \fB/etc/vfstab\fR to fill in the
+missing arguments, including the  \fIFSType-specific_options\fR; see
+\fBmount\fR(8) for more details.
+.sp
+.LP
+The \fBhsfs\fR file system supports direct mounting of files containing the
+file system as well as block devices. See \fBmount\fR(8) and
+\fBlofiadm\fR(8).
+.sp
+.LP
+A file system conforming to ISO 9660 can contain extensions that allow it to
+overcome limitations of the original ISO 9660:1988 (version 1) standard. The
+following types of extensions are supported by \fBhsfs\fR:
+.sp
+.ne 2
+.na
+\fBRock Ridge extensions\fR
+.ad
+.sp .6
+.RS 4n
+This is the preferred type of extension as it allows file attributes, name
+length, and types equivalent to those on other UNIX-style filesystems. Example
+of supported features are device special files, POSIX permissions, symbolic
+links, and filenames of up to 255 bytes in length. Rock Ridge  extensions also
+remove the ISO9660:1988 restriction on  maximum nesting depth for directories
+(eight levels). \fBhsfs\fR  automatically detects the presence of Rock Ridge
+extensions and uses them, unless mount options are specified to disable the use
+of Rock Ridge or to use a different extension.
+.RE
+
+.sp
+.ne 2
+.na
+\fBISO9660:1999 (version 2) extensions\fR
+.ad
+.sp .6
+.RS 4n
+The first version of ISO9660, released in 1988, supported  only uppercase ASCII
+filenames of no more than 31 characters in length. ISO9660 version 2, released
+in 1999,  provides an extension that allows filenames of at least 207 bytes
+that can use UTF-8 characters and removes the limitation on the nesting depth
+for directories. Unlike Rock Ridge, it does not provide support  for UNIX-style
+file types and file attributes. \fBhsfs\fR automatically detects this extension
+and will use it for filename lookup if no Rock Ridge extensions are found on
+the media.
+.RE
+
+.sp
+.ne 2
+.na
+\fBJoliet extensions\fR
+.ad
+.sp .6
+.RS 4n
+The Joliet extension was devised by Microsoft to allow Unicode (UCS-2) long
+filenames with CDROM-based media. It allows filename lengths of up to 110
+Unicode characters and does not support UNIX-style file types and attributes.
+\fBhsfs\fR falls back to using Joliet if such an extension is present and
+neither Rock Ridge nor ISO9660 version 2 extensions are found.
+.sp
+If filenames are longer than the 64 UCS-2 characters officially allowed by
+Microsoft (that is, 110 Unicode  characters), they can translate to up to 330
+UTF-8 octets. Filenames that translate to more than 255 UTF-8 octets will be
+truncated.
+.RE
+
+.SH OPTIONS
+.sp
+.ne 2
+.na
+\fB\fIgeneric_options\fR\fR
+.ad
+.sp .6
+.RS 4n
+See \fBmount\fR(8) for the list of supported options.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-o\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify  \fBhsfs\fR file system specific options.  If invalid options are
+specified, a warning message is printed and the invalid options are ignored.
+The following options are available:
+.sp
+.ne 2
+.na
+\fB\fBglobal\fR |  \fBnoglobal\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBglobal\fR is specified and supported on the file system, and the system
+in question is part of a cluster, the file system will be globally visible on
+all nodes of the cluster. If \fBnoglobal\fR is specified, the mount will not be
+globally visible. The default behavior is \fBnoglobal\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBro\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mount the file system read-only.  This option is required.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrr\fR | \fBnrr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable (\fBrr\fR) or disable (\fBnrr\fR) the use of Rock Ridge. \fBrr\fR is the
+default and need not be specified. If you use \fBnrr\fR and Rock Ridge
+extensions are present in the file system, ignore them and search for other
+available extensions or fall back to plain ISO9660.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBvers2\fR | \fBnovers2\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable or disable the use of ISO9660 version 2  extensions. If \fBvers2\fR is
+specified and ISO9660 version 2 extensions are available, \fBhsfs\fR will use
+ISO9660  version 2 even if the file system contains the preferred Rock Ridge
+extensions as well. If \fBnovers2\fR is specified, it will fall back to using
+either Joliet extensions or plain ISO9660 even if ISO9660 version 2 extensions
+are available.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBjoliet\fR | \fBnojoliet\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable or disable the use of Joliet extensions. If \fBjoliet\fR is specified
+and Joliet extensions are available, \fBhsfs\fR  will use them even if the file
+system contains the preferred Rock Ridge and/or ISO9660 version 2 extensions.
+If \fBnojoliet\fR is specified, it will fall back to using plain ISO9660.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnotraildot\fR\fR
+.ad
+.sp .6
+.RS 4n
+File names on High Sierra file systems consist of a proper name and an
+extension separated by a '.' (dot) character.  By default, the separating dot
+is always considered part of the file's name for all file access operations,
+even if there is no extension present. Specifying  \fBnotraildot\fR makes it
+optional to specify the trailing dot to access a file whose name lacks an
+extension.
+.sp
+\fBExceptions:\fR This option is effective only on file systems for which Rock
+Ridge, ISO9660 version 2 or Joliet extensions are not active, either because
+they are not present on the CD-ROM, or they have been deliberately disabled via
+the \fBnrr\fR, \fBnovers2\fR and \fBnojoliet\fR option. If either extension is
+active, \fBhsfs\fR quietly ignores this option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnomaplcase\fR\fR
+.ad
+.sp .6
+.RS 4n
+File names on High Sierra/ISO9660 CD-ROMs with no extensions present should be
+uppercase characters only. By default,  \fBhsfs\fR maps file names read from a
+\fBnon-Rock Ridge\fR disk to all lowercase characters. \fBnomaplcase\fR turns
+off this mapping. The exceptions for  \fBnotraildot\fR discussed above apply to
+\fBnomaplcase\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-O\fR\fR
+.ad
+.sp .6
+.RS 4n
+Overlay mount.  Allow the file system to be mounted over an existing mount
+point, making the underlying file system inaccessible.  If a mount is attempted
+on a preexisting mount point without setting this flag, the mount will fail,
+producing the error: \f(CWdevice busy\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRMounting and Unmounting a DVD Image Directly
+.sp
+.LP
+The following commands mount and unmount a DVD image.
+
+.sp
+.in +2
+.nf
+# \fBmount -F hsfs /images/solaris.iso /mnt/solaris-image\fR
+# \fBumount /mnt/solaris-image\fR
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/etc/mnttab\fR\fR
+.ad
+.sp .6
+.RS 4n
+table of mounted file systems
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/vfstab\fR\fR
+.ad
+.sp .6
+.RS 4n
+list of default parameters for each file system
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR mount (2),
+.BR mnttab (5),
+.BR vfstab (5),
+.BR attributes (7),
+.BR lofiadm (8),
+.BR mount (8),
+.BR mountall (8)
+.SH NOTES
+.sp
+.LP
+If the directory on which a file system is to be mounted is a symbolic link,
+the file system is mounted on the directory to which the symbolic link refers,
+rather than on top of the symbolic link itself.

@@ -159,7 +159,7 @@ expand to the corresponding tokens (on the right):
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -175,4 +175,5 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR attributes (7),
+.BR standards (7)

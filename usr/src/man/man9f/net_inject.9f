@@ -122,7 +122,7 @@ The packet could not be queued up or sent out immediately.
 The \fBnet_inject()\fR function may be called from user,  kernel, or interrupt
 context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -136,4 +136,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBnet_protocol_lookup\fR(9F), \fBnetinfo\fR(9F), \fBnet_inject_t\fR(9S)
+.BR net_protocol_lookup (9F),
+.BR netinfo (9F),
+.BR net_inject_t (9S)

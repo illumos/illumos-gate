@@ -27,7 +27,7 @@
 
 /*
  * This routine should be kept in sync with the built-in version provided
- * as part of fmd(1M) itself -- see usr/src/cmd/fm/fmd/common/fmd_scheme.c
+ * as part of fmd(8) itself -- see usr/src/cmd/fm/fmd/common/fmd_scheme.c
  */
 ssize_t
 fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)

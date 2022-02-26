@@ -44,7 +44,7 @@ to dynamically-linked processes only. See the \fILinker and Libraries Guide\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -62,9 +62,16 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBld\fR(1), \fBld.so.1\fR(1), \fBatexit\fR(3C), \fBdladdr\fR(3C),
-\fBdldump\fR(3C), \fBdlerror\fR(3C), \fBdlopen\fR(3C), \fBdlsym\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR ld (1),
+.BR ld.so.1 (1),
+.BR atexit (3C),
+.BR dladdr (3C),
+.BR dldump (3C),
+.BR dlerror (3C),
+.BR dlopen (3C),
+.BR dlsym (3C),
+.BR attributes (7),
+.BR standards (7)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

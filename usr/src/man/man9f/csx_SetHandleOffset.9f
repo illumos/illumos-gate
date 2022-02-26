@@ -50,8 +50,9 @@ Successful operation.
 .SH CONTEXT
 This function may be called from user or kernel context.
 .SH SEE ALSO
-\fBcsx_GetHandleOffset\fR(9F), \fBcsx_RequestIO\fR(9F),
-\fBcsx_RequestIRQ\fR(9F)
+.BR csx_GetHandleOffset (9F),
+.BR csx_RequestIO (9F),
+.BR csx_RequestIRQ (9F)
 .sp
 .LP
 \fIPC Card 95 Standard\fR, PCMCIA/JEIDA

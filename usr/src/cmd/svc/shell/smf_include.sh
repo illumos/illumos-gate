@@ -242,7 +242,7 @@ smf_kill_contract() {
 }
 
 #
-# smf(5) method and monitor exit status definitions
+# smf(7) method and monitor exit status definitions
 #   SMF_EXIT_ERR_OTHER, although not defined, encompasses all non-zero
 #   exit status values.
 #

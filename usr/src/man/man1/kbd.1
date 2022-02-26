@@ -98,17 +98,17 @@ to the
 .Pa /etc/ppp/options
 file or any of the other configuration files used for the connection.
 See
-.Xr pppd 1M .
+.Xr pppd 8 .
 .Pp
 SLIP has no comparable capability, and must not be used if the Alternate Break
 sequence is in use.
 .Pp
 The Alternate Break sequence has no effect on the keyboard abort.
 For more information on the Alternate Break sequence, see
-.Xr zs 7D ,
-.Xr se 7D ,
+.Xr zs 4D ,
+.Xr se 4D ,
 and
-.Xr asy 7D .
+.Xr asy 4D .
 .Pp
 On many systems, the default effect of the keyboard abort sequence is to
 suspend the operating system and enter the debugger or the monitor.
@@ -157,9 +157,9 @@ Enables the alternate effect of the keyboard abort sequences (suspend the
 operating system and enter the debugger or the monitor) upon receiving the
 Alternate Break character sequence on the console.
 The Alternate Break sequence is defined by the drivers
-.Xr asy 7D ,
-.Xr se 7D ,
-.Xr zs 7D .
+.Xr asy 4D ,
+.Xr se 4D ,
+.Xr zs 4D .
 Due to a risk of incorrect sequence interpretation, binary protocols cannot be
 run over the serial console port when this value is used.
 .El
@@ -361,17 +361,17 @@ The following example sets the keyboard beeper frequency:
 .Sh SEE ALSO
 .Xr loadkeys 1 ,
 .Xr svcs 1 ,
-.Xr kadb 1M ,
-.Xr pppd 1M ,
-.Xr svcadm 1M ,
-.Xr keytables 4 ,
-.Xr attributes 5 ,
-.Xr smf 5 ,
-.Xr asy 7D ,
-.Xr se 7D ,
-.Xr virtualkm 7D ,
-.Xr zs 7D ,
-.Xr kb 7M
+.Xr asy 4D ,
+.Xr se 4D ,
+.Xr virtualkm 4D ,
+.Xr zs 4D ,
+.Xr kb 4M ,
+.Xr keytables 5 ,
+.Xr attributes 7 ,
+.Xr smf 7 ,
+.Xr kadb 8 ,
+.Xr pppd 8 ,
+.Xr svcadm 8
 .Sh NOTES
 Some server systems have key switches with a
 .Sy secure
@@ -391,16 +391,16 @@ setting.
 The
 .Nm
 service is managed by the service management facility,
-.Xr smf 5 ,
+.Xr smf 7 ,
 under the service identifier:
 .Pp
 .Dl svc:/system/keymap:default
 .Pp
 Administrative actions on this service, such as enabling, disabling, or
 requesting restart, can be performed using
-.Xr svcadm 1M .
+.Xr svcadm 8 .
 Use
-.Xr svccfg 1M
+.Xr svccfg 8
 to make configuration changes and to view configuration information for this
 service.
 The service's status can be queried using the

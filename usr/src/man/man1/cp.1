@@ -341,7 +341,7 @@ A pathname of a directory to contain the copied files.
 .RE
 
 .SH USAGE
-See \fBlargefile\fR(5) for the description of the behavior of \fBcp\fR when
+See \fBlargefile\fR(7) for the description of the behavior of \fBcp\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH EXAMPLES
 \fBExample 1 \fRCopying a File
@@ -448,7 +448,7 @@ $ ls -/c /tmp/file1
 .sp
 
 .SH ENVIRONMENT VARIABLES
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBcp\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
@@ -460,7 +460,7 @@ the behavior of ranges, equivalence classes, and multi-character collating
 elements used in the expression defined for \fByesexpr\fR. The locale specified
 in \fBLC_CTYPE\fR determines the locale for interpretation of sequences of
 bytes of text data a characters, the behavior of character classes used in the
-expression defined for the \fByesexpr\fR. See \fBlocale\fR(5).
+expression defined for the \fByesexpr\fR. See \fBlocale\fR(7).
 .SH EXIT STATUS
 The following exit values are returned:
 .sp
@@ -482,7 +482,7 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/bin/cp"
 .TS
 box;
@@ -508,9 +508,17 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBchmod\fR(1), \fBchown\fR(1), \fBsetfacl\fR(1), \fButime\fR(2),
-\fBfgetattr\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5), \fBfsattr\fR(5),
-\fBlargefile\fR(5), \fBlocale\fR(5), \fBstandards\fR(5)
+.BR chmod (1),
+.BR chown (1),
+.BR setfacl (1),
+.BR utime (2),
+.BR fgetattr (3C),
+.BR attributes (7),
+.BR environ (7),
+.BR fsattr (7),
+.BR largefile (7),
+.BR locale (7),
+.BR standards (7)
 .SH NOTES
 The permission modes of the source file are preserved in the copy.
 .sp

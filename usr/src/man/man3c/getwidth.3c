@@ -46,7 +46,7 @@ set to \fB0\fR if only single-byte characters are used.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -62,7 +62,9 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBeuclen\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5)
+.BR euclen (3C),
+.BR setlocale (3C),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

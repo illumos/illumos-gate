@@ -1,0 +1,329 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH UPDATE_DRV 8 "August 29, 2021"
+.SH NAME
+update_drv \- modify device driver attributes
+.SH SYNOPSIS
+.nf
+\fBupdate_drv\fR [\fB-f\fR | \fB-v\fR] [\fB-n\fR] \fIdriver_module\fR
+.fi
+
+.LP
+.nf
+\fBupdate_drv\fR [\fB-b\fR \fIbasedir\fR] [\fB-f\fR | \fB-v\fR] [\fB-n\fR] \fB-a\fR [\fB-m\fR '\fIpermission\fR']
+     [\fB-i\fR '\fIidentify-name\fR'] [\fB-P\fR '\fIprivilege\fR'] [\fB-p\fR '\fIpolicy\fR'] \fIdriver_module\fR
+.fi
+
+.LP
+.nf
+\fBupdate_drv\fR [\fB-b\fR \fIbasedir\fR] [\fB-f\fR | \fB-v\fR] [\fB-n\fR] \fB-d\fR [\fB-m\fR '\fIpermission\fR']
+     [\fB-i\fR '\fIidentify-name\fR'] [\fB-P\fR '\fIprivilege\fR'] [\fB-p\fR '\fIpolicy\fR'] \fIdriver_module\fR
+.fi
+
+.SH DESCRIPTION
+The \fBupdate_drv\fR command informs the system about attribute changes to an
+installed device driver. It can be used to re-read the \fBdriver.conf\fR(5)
+file, or to add, modify, or delete a driver's minor node permissions or
+aliases.
+.sp
+.LP
+Without options, \fBupdate_drv\fR reloads the \fBdriver.conf\fR file.
+.sp
+.LP
+Upon successfully updating the aliases, the driver binding takes effect upon
+reconfig boot or hotplug of the device.
+.sp
+.LP
+Upon successfully updating the permissions, only the new driver minor nodes get
+created with the modified set of file permissions. Existing driver minor nodes
+do not get modified.
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-a\fR\fR
+.ad
+.sp .6
+.RS 4n
+Add a \fIpermission\fR, \fIaliases\fR, \fIprivilege\fR or \fIpolicy\fR entry.
+.sp
+With the \fB-a\fR option specified, a permission entry (using the \fB-m\fR
+option), or a driver's aliases entry (using the \fB-i\fR option), a device
+privilege (using the \fB-P\fR option) or a a device policy (using the \fB-p\fR
+option), can be added or updated. If a matching minor node permissions entry is
+encountered (having the same driver name and the minor node), it is replaced.
+If a matching aliases entry is encountered (having a different driver name and
+the same alias), an error is reported.
+.sp
+The \fB-a\fR and \fB-d\fR options are mutually exclusive.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-b\fR \fIbasedir\fR\fR
+.ad
+.sp .6
+.RS 4n
+Installs or modifies the driver on the system with a root directory of basedir
+rather than installing on the system executing \fBupdate_drv\fR.
+.LP
+Note -
+.sp
+.RS 2
+The root file system of any non-global zones must not be referenced with the
+\fB-b\fR option. Doing so might damage the global zone's file system, might
+compromise the security of the global zone, and might damage the non-global
+zone's file system. See \fBzones\fR(7).
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR\fR
+.ad
+.sp .6
+.RS 4n
+Delete a \fIpermission\fR, \fIaliases\fR, \fIprivilege\fR or \fIpolicy\fR
+entry.
+.sp
+The \fB-m\fR \fIpermission\fR, \fB-i\fR \fIidentify-name\fR, \fB-P\fR
+\fIprivilege\fR or the \fB-p\fR \fIpolicy\fR option needs to be specified with
+the \fB-d\fR option.
+.sp
+The \fB-d\fR and \fB-a\fR options are mutually exclusive.
+.sp
+If the entry doesn't exist \fBupdate_drv\fR returns an error.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR\fR
+.ad
+.sp .6
+.RS 4n
+Force the system to reread the \fBdriver.conf\fR file even if the driver module
+cannot be unloaded. See \fBNOTES\fR section for details.
+.sp
+\fBWithout\fR this option, when removing an alias for a driver,
+\fBupdate_drv\fR updates the binding files for the next boot, but returns an
+error if one or more devices that reference the driver-alias binding remains.
+\fBWith\fR the \fB-f\fR option, \fBupdate_drv\fR does not return an error if
+such devices remain.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-i\fR '\fIidentify-name\fR'\fR
+.ad
+.sp .6
+.RS 4n
+A white-space separated list of aliases for the driver. If \fB-a\fR or \fB-d\fR
+option is not specified then this option is ignored. The \fIidentify-name\fR
+string is mandatory. If all aliases need to be removed, \fBrem_drv\fR(8) is
+recommended.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR '\fIpermission\fR'\fR
+.ad
+.sp .6
+.RS 4n
+Specify a white-space separated list of file system permissions for the device
+node of the device driver. If \fB-a\fR or \fB-d\fR option is not specified
+then, this option is ignored. The permission string is mandatory.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Do not try to load and attach \fIdevice_driver\fR, just modify the system
+configuration files for that driver.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR '\fIpolicy\fR'\fR
+.ad
+.sp .6
+.RS 4n
+With the \fB-a\fR option, policy is a white-space separated list of complete
+device policies. For the \fB-d\fR option, policy is a white space separated
+list of minor device specifications. The minor device specifications are
+matched exactly against the entries in \fB/etc/security/device_policy\fR, that
+is, no wildcard matching is performed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-P\fR '\fIprivilege\fR'\fR
+.ad
+.sp .6
+.RS 4n
+With the \fB-a\fR option, privilege is a comma separated list of additional
+driver privileges. For the \fB-d\fR option, privilege is a single privilege.
+The privileges are added to or removed from the \fB/etc/security/extra_privs\fR
+file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+Verbose.
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRAdding or Modifying an Existing Minor Permissions Entry
+.sp
+.LP
+The following command adds or modifies the existing minor permissions entry of
+the \fBclone\fR driver:
+
+.sp
+.in +2
+.nf
+example# update_drv -a -m 'llc1 777 joe staff' clone
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRRemoving All Minor Permissions Entries
+.sp
+.LP
+The following command removes all minor permission entries of the \fBusbprn\fR
+driver, the USB printer driver:
+
+.sp
+.in +2
+.nf
+example# update_drv -d -m '* 0666 root sys' usbprn
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRAdding a Driver Aliases Entry
+.sp
+.LP
+The following command adds a driver aliases entry of the \fBugen\fR driver with
+the identity string of \fBusb459,20\fR:
+
+.sp
+.in +2
+.nf
+example# update_drv -a -i '"usb459,20"' ugen
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRRe-reading the \fBdriver.conf\fR File For the \fBohci\fR Driver
+.sp
+.LP
+The following command re-reads the \fBdriver.conf\fR(5) file.
+
+.sp
+.in +2
+.nf
+ example# update_drv ohci
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRRequiring a Self-defined Privilege to Open a tcp Socket
+.sp
+.LP
+The following command requires a self-defined privilege to open a tcp socket:
+
+.sp
+.in +2
+.nf
+example#   update_drv -a -P net_tcp -p \e
+     'write_priv_set=net_tcp read_priv_set=net_tcp' tcp
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fREstablishing a Path-oriented Alias
+.sp
+.LP
+The following command establishes a path-oriented alias to force a specific
+driver, \fBqlt\fR, to be used for a particular device path:
+
+.sp
+.in +2
+.nf
+example#   update_drv -a -i '"/pci@8,600000/SUNW,qlc@4"' qlt
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB>\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.BR driver.conf (5),
+.BR attributes (7),
+.BR privileges (7),
+.BR add_drv (8),
+.BR modunload (8),
+.BR rem_drv (8)
+.SH NOTES
+If \fB-a\fR or \fB-d\fR options are specified, \fBupdate_drv\fR does not reread
+the \fBdriver.conf\fR file.
+.sp
+.LP
+A forced update of the \fBdriver.conf\fR file reloads the \fBdriver.conf\fR
+file without reloading the driver binary module. In this case, devices which
+cannot be detached reference driver global properties from the old
+\fBdriver.conf\fR file, while the remaining driver instances reference global
+properties in the new \fBdriver.conf\fR file.
+.sp
+.LP
+It is possible to add an alias , which changes the driver binding of a device
+already being managed by a different driver. A force update with the \fB-a\fR
+option tries to bind to the new driver and report error if it cannot. If you
+specify more than one of the \fB-m\fR, \fB-i\fR, \fB-P\fR or \fB-p\fR options,
+a force flag tries to modify aliases or permissions. This is done even if the
+other operation fails and vice-versa.

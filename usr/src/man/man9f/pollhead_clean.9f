@@ -55,5 +55,7 @@ of a \fBclose\fR(9E) entry point, but may be called from user or kernel
 context.
 .SH SEE ALSO
 .LP
-\fBpoll\fR(2), \fBchpoll\fR(9E), \fBpollwakeup\fR(9F)
+.BR poll (2),
+.BR chpoll (9E),
+.BR pollwakeup (9F)
 

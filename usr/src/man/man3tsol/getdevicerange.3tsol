@@ -87,7 +87,7 @@ Invalid upper or lower bound for device.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -105,8 +105,11 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlist_devices\fR(1), \fBfree\fR(3C), \fBlibtsol\fR(3LIB),
-\fBm_label_free\fR(3TSOL), \fBattributes\fR(5)
+.BR list_devices (1),
+.BR free (3C),
+.BR libtsol (3LIB),
+.BR m_label_free (3TSOL),
+.BR attributes (7)
 .sp
 .LP
 \fIValidating the Label Request Against the Printer\&'s Label Range\fR in

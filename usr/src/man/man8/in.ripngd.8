@@ -1,0 +1,231 @@
+'\" te
+.\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH IN.RIPNGD 8 "Jan 26, 2007"
+.SH NAME
+in.ripngd \- network routing daemon for IPv6
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/in.ripngd\fR  [\fB-s\fR] [\fB-q\fR] [\fB-t\fR] [\fB-p\fR \fIn\fR] [\fB-P\fR] [\fB-v\fR ]
+ [\fIlogfile\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBin.ripngd\fR is the IPv6 equivalent of \fBin.routed\fR(8). It is invoked at
+boot time to manage the network routing tables. The routing daemon uses the
+Routing Information Protocol for IPv6.
+.sp
+.LP
+\fBin.ripngd\fR is managed by the service management facility (SMF), by means
+of the service identifier:
+.sp
+.in +2
+.nf
+svc:/network/routing/ripng:default
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In normal operation, \fBin.ripngd\fR listens on the \fBudp\fR(4P) socket port
+521 for routing information packets. If the host is an internetwork router, it
+periodically supplies copies of its routing tables to any directly connected
+hosts and networks.
+.sp
+.LP
+When \fBin.ripngd\fR is started, it uses the \fBSIOCGLIFCONF\fR \fBioctl\fR(2)
+to find those directly connected IPv6 interfaces configured into the system and
+marked "up"; the software loopback interface is ignored. If multiple interfaces
+are present, it is assumed the host will forward packets between networks.
+\fBin.ripngd\fR then multicasts a request packet on each IPv6 interface and
+enters a loop, listening for request and response packets from other hosts.
+.sp
+.LP
+When a request packet is received, \fBin.ripngd\fR formulates a reply based on
+the information maintained in its internal tables. The response packet contains
+a list of known routes. With each route is a number specifying the number of
+bits in the prefix. The prefix is the number of bits in the high order part of
+an address that indicate the subnet or network that the route describes. Each
+route reported also has a "\fIhop count\fR" metric. A count of 16 or greater is
+considered "infinity." The metric associated with each route returned provides
+a metric relative to the sender.
+.sp
+.LP
+The request packets received by \fBin.ripngd\fR are used to update the routing
+tables if one of the following conditions is satisfied:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+No routing table entry exists for the destination network or host, and the
+metric indicates the destination is "reachable", that is, the \fIhop count\fR
+is not infinite.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The source host of the packet is the same as the router in the existing routing
+table entry. That is, updated information is being received from the very
+internetwork router through which packets for the destination are being routed.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The existing entry in the routing table has not been updated for a period of
+time, defined to be 90 seconds, and the route is at least as cost-effective as
+the current route.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The new route describes a shorter route to the destination than the one
+currently stored in the routing tables; this is determined by comparing the
+metric of the new route against the one stored in the table.
+.RE
+.sp
+.LP
+When an update is applied, \fBin.ripngd\fR records the change in its internal
+tables and generates a response packet to all directly connected hosts and
+networks. To allow possible unstable situations to settle, \fBin.ripngd\fR
+waits a short period of time (no more than 30 seconds) before modifying the
+kernel's routing tables.
+.sp
+.LP
+In addition to processing incoming packets, \fBin.ripngd\fR also periodically
+checks the routing table entries. If an entry has not been updated for 3
+minutes, the entry's metric is set to infinity and marked for deletion.
+Deletions are delayed an additional 60 seconds to insure the invalidation is
+propagated throughout the internet.
+.sp
+.LP
+Hosts acting as internetwork routers gratuitously supply their routing tables
+every 30 seconds to all directly connected hosts and networks.
+.SH OPTIONS
+.sp
+.LP
+\fB\fR\fBin.ripngd\fR supports the options listed below. Listed with the
+options are the equivalent SMF property values. These are set for the
+\fBripng:default\fR service with a command of the form:
+.sp
+.in +2
+.nf
+# \fBrouteadm -m ripng:default \fIkey\fR=\fIvalue\fR\fR
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIn\fR\fR
+.ad
+.RS 8n
+Send and receive the routing packets from other routers using the \fBUDP \fR
+port number \fIn\fR. Use of this option is equivalent to setting the
+\fBudp_port\fR property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-P\fR\fR
+.ad
+.RS 8n
+Do not use poison reverse. Use of this option is equivalent to setting the
+\fBpoison_reverse\fR property to false.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 8n
+Do not supply routing information. Use of this option is equivalent to setting
+the \fBquiet_mode\fR property to true.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 8n
+Force \fBin.ripngd\fR to supply routing information whether it is acting as an
+internetwork router or not. Use of this option is equivalent to setting the
+\fBsupply_routes\fR property to true.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 8n
+Print all packets sent or received to standard output. \fBin.ripngd\fR will not
+divorce itself from the controlling terminal. Accordingly, interrupts from the
+keyboard will kill the process. Not supported by the \fBripng\fR service.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 8n
+Print all changes made to the routing tables to standard output with a
+timestamp. Use of this option is equivalent to setting the \fBverbose\fR
+property to true.
+.sp
+Any other argument supplied to this option is interpreted as the name of the
+file in which the actions of \fBin.ripngd\fR, as specified by this option or by
+\fB-t\fR, should be logged instead of being sent to standard output.
+.sp
+The logfile can be specified for the \fBripng\fR service by means of the
+\fBlog_file\fR property.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR ioctl (2),
+.BR udp (4P),
+.BR attributes (7),
+.BR smf (7),
+.BR in.routed (8),
+.BR routeadm (8),
+.BR svcadm (8)
+.sp
+.LP
+G. Malkin, R. Minnear, \fIRFC 2080, RIPng for IPv6\fR, January 1997.
+.SH NOTES
+.sp
+.LP
+The kernel's routing tables may not correspond to those of \fBin.ripngd\fR for
+short periods of time while processes that utilize existing routes exit; the
+only remedy for this is to place the routing process in the kernel.
+.sp
+.LP
+\fBin.ripngd\fR currently does not support all of the functionality of
+\fBin.routed\fR(8). Future releases may support more if appropriate.
+.sp
+.LP
+\fBin.ripngd\fR initially obtains a routing table by examining the interfaces
+configured on a machine. It then sends a request on all directly connected
+networks for more routing information. \fBin.ripngd\fR does not recognize or
+use any routing information already established on the machine prior to
+startup. With the exception of interface changes, \fBin.ripngd\fR does not see
+any routing table changes that have been done by other programs on the machine,
+for example, routes added, deleted or flushed by means of the \fBroute\fR(8)
+command. Therefore, these types of changes should not be done while
+\fBin.ripngd\fR is running. Rather, shut down \fBin.ripngd\fR, make the changes
+required, and then restart \fBin.ripngd\fR.

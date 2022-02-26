@@ -102,4 +102,4 @@ in
 .Xr signal.h 3HEAD ,
 .Xr libproc 3LIB ,
 .Xr Psetsignal 3PROC ,
-.Xr proc 4
+.Xr proc 5

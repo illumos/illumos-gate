@@ -1,0 +1,3212 @@
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2019, Joyent, Inc.
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd May 17, 2020
+.Dt PROC 5
+.Os
+.Sh NAME
+.Nm proc
+.Nd /proc, the process file system
+.Sh DESCRIPTION
+.Pa /proc
+is a file system that provides access to the state of each process
+and light-weight process (lwp) in the system.
+The name of each entry in the
+.Pa /proc
+directory is a decimal number corresponding to a process-ID.
+These entries are themselves subdirectories.
+Access to process state is provided by additional files contained within each
+subdirectory; the hierarchy is described more completely below.
+In this document,
+.Dq Pa /proc file
+refers to a non-directory file within the hierarchy rooted at
+.Pa /proc .
+The owner of each
+.Pa /proc
+file and subdirectory is determined by the user-ID of the process.
+.Pp
+.Pa /proc
+can be mounted on any mount point, in addition to the standard
+.Pa /proc
+mount point, and can be mounted several places at once.
+Such additional mounts are allowed in order to facilitate the confinement of
+processes to subtrees of the file system via
+.Xr chroot 2
+and yet allow such processes access to commands like
+.Xr ps 1 .
+.Pp
+Standard system calls are used to access
+.Pa /proc
+files:
+.Xr open 2 ,
+.Xr close 2 ,
+.Xr read 2 ,
+and
+.Xr write 2
+(including
+.Xr readv 2 ,
+.Xr writev 2 ,
+.Xr pread 2 ,
+and
+.Xr pwrite 2 ) .
+Most files describe process state and can only be opened for reading.
+.Pa ctl
+and
+.Pa lwpctl
+(control) files permit manipulation of process state and can only be opened for
+writing.
+.Pa as
+(address space) files contain the image of the running process and can be
+opened for both reading and writing.
+An open for writing allows process control; a read-only open allows inspection
+but not control.
+In this document, we refer to the process as open for reading or writing if
+any of its associated
+.Pa /proc
+files is open for reading or writing.
+.Pp
+In general, more than one process can open the same
+.Pa /proc
+file at the same time. \fIExclusive\fR \fIopen\fR is an advisory mechanism provided to
+allow controlling processes to avoid collisions with each other.
+A process can obtain exclusive control of a target process, with respect to
+other cooperating processes, if it successfully opens any
+.Pa /proc
+file in the target process for writing (the
+.Pa as
+or
+.Pa ctl
+files, or the
+.Pa lwpctl
+file of any lwp) while specifying
+.Sy O_EXCL
+in the
+.Xr open 2 .
+Such an open will fail if the target process is already open for writing (that
+is, if an
+.Pa as ,
+.Pa ctl ,
+or
+.Pa lwpctl
+file is already open for writing).
+There can be any number of concurrent read-only opens;
+.Sy O_EXCL
+is ignored on opens for reading.
+It is recommended that the first open for writing by a controlling
+process use the
+.Sy O_EXCL
+flag; multiple controlling processes usually result in chaos.
+.Pp
+If a process opens one of its own
+.Pa /proc
+files for writing, the open
+succeeds regardless of
+.Sy O_EXCL
+and regardless of whether some other process has the process open for writing.
+Self-opens do not count when another process attempts an exclusive open.
+(A process cannot exclude a debugger by opening itself for writing and the
+application of a debugger cannot prevent a process from opening itself.)
+All self-opens for writing are forced to be close-on-exec (see the
+.Sy F_SETFD
+operation of
+.Xr fcntl 2 ) .
+.Pp
+Data may be transferred from or to any locations in the address space of the
+traced process by applying
+.Xr lseek 2
+to position the
+.Pa as
+file at the virtual address of interest followed by
+.Xr read 2
+or
+.Xr write 2
+(or by using
+.Xr pread 2
+or
+.Xr pwrite 2
+for the combined operation).
+The address-map files
+.Pa /proc/ Ns Em pid Ns Pa /map
+and
+.Pa /proc/ Ns Em pid Ns Pa /xmap
+can be read to determine the accessible areas (mappings) of the address space.
+.Sy I/O
+transfers may span contiguous mappings.
+An
+.Sy I/O
+request extending into an unmapped area is truncated at the boundary.
+A write request beginning at an unmapped virtual address fails with
+.Er EIO ;
+a read request beginning at an unmapped virtual address returns zero (an
+end-of-file indication).
+.Pp
+Information and control operations are provided through additional files.
+.In procfs.h
+contains definitions of data structures and message formats
+used with these files.
+Some of these definitions involve the use of sets of flags.
+The set types
+.Sy sigset_t ,
+.Sy fltset_t ,
+and
+.Sy sysset_t
+correspond, respectively, to signal, fault, and system call enumerations
+defined in
+.In sys/signal.h ,
+.In sys/fault.h ,
+and
+.In sys/syscall.h .
+Each set type is large enough to hold flags for its own enumeration.
+Although they are of different sizes, they have a common
+structure and can be manipulated by these macros:
+.Bd -literal -offset indent
+prfillset(&set);             /* turn on all flags in set */
+premptyset(&set);            /* turn off all flags in set */
+praddset(&set, flag);        /* turn on the specified flag */
+prdelset(&set, flag);        /* turn off the specified flag */
+r = prismember(&set, flag);  /* != 0 iff flag is turned on */
+.Ed
+.Pp
+One of
+.Fn prfillset
+or
+.Fn premptyset
+must be used to initialize
+.Fa set
+before it is used in any other operation.
+.Fa flag
+must be a member of the enumeration corresponding to
+.Fa set .
+.Pp
+Every process contains at least one
+.Em light-weight process ,
+or
+.Sy lwp .
+Each lwp represents a flow of execution that is independently scheduled by the
+operating system.
+All lwps in a process share its address space as well as many other attributes.
+Through the use of
+.Pa lwpctl
+and
+.Pa ctl
+files as described below, it is possible to affect individual lwps in a
+process or to affect all of them at once, depending on the operation.
+.Pp
+When the process has more than one lwp, a representative lwp is chosen by the
+system for certain process status files and control operations.
+The representative lwp is a stopped lwp only if all of the process's lwps are
+stopped; is stopped on an event of interest only if all of the lwps are so
+stopped (excluding
+.Sy PR_SUSPENDED
+lwps); is in a
+.Sy PR_REQUESTED
+stop only if there are no other events of interest to be found; or, failing
+everything else, is in a
+.Sy PR_SUSPENDED
+stop (implying that the process is deadlocked).
+See the description of the
+.Pa status
+file for definitions of stopped states.
+See the
+.Sy PCSTOP
+control operation for the definition of
+.Dq event of interest .
+.Pp
+The representative lwp remains fixed (it will be chosen again on the next
+operation) as long as all of the lwps are stopped on events of interest or are
+in a
+.Sy PR_SUSPENDED
+stop and the
+.Sy PCRUN
+control operation is not applied to any of them.
+.Pp
+When applied to the process control file, every
+.Pa /proc
+control operation
+that must act on an lwp uses the same algorithm to choose which lwp to act
+upon.
+Together with synchronous stopping (see
+.Sy PCSET ) ,
+this enables a debugger to control a multiple-lwp process using only the
+process-level status and control files if it so chooses.
+More fine-grained control can be achieved using the lwp-specific files.
+.Pp
+The system supports two process data models, the traditional 32-bit data model
+in which ints, longs and pointers are all 32 bits wide (the ILP32 data model),
+and on some platforms the 64-bit data model in which longs and pointers, but
+not ints, are 64 bits in width (the LP64 data model).
+In the LP64 data model some system data types, notably
+.Sy size_t ,
+.Sy off_t ,
+.Sy time_t
+and
+.Sy dev_t ,
+grow from 32 bits to 64 bits as well.
+.Pp
+The
+.Pa /proc
+interfaces described here are available to both 32-bit and
+64-bit controlling processes.
+However, many operations attempted by a 32-bit
+controlling process on a 64-bit target process will fail with
+.Er EOVERFLOW
+because the address space range of a 32-bit process cannot encompass a 64-bit
+process or because the data in some 64-bit system data type cannot be
+compressed to fit into the corresponding 32-bit type without loss of
+information.
+Operations that fail in this circumstance include reading and
+writing the address space, reading the address-map files, and setting the
+target process's registers.
+There is no restriction on operations applied by a
+64-bit process to either a 32-bit or a 64-bit target processes.
+.Pp
+The format of the contents of any
+.Pa /proc
+file depends on the data model of the observer (the controlling process), not
+on the data model of the target process.
+A 64-bit debugger does not have to translate the information it reads from a
+.Pa /proc
+file for a 32-bit process from 32-bit format to 64-bit format.
+However, it usually has to be aware of the data model of the target process.
+The
+.Sy pr_dmodel
+field of the
+.Pa status
+files indicates the target process's data model.
+.Pp
+To help deal with system data structures that are read from 32-bit processes, a
+64-bit controlling program can be compiled with the C preprocessor symbol
+.Dv _SYSCALL32
+defined before system header files are included.
+This makes explicit 32-bit fixed-width data structures (like
+.Sy struct stat32 )
+visible to the 64-bit program.
+See
+.Xr types32.h 3HEAD .
+.Sh DIRECTORY STRUCTURE
+At the top level, the directory
+.Pa /proc
+contains entries each of which names an existing process in the system.
+These entries are themselves directories.
+Except where otherwise noted, the files described below can be
+opened for reading only.
+In addition, if a process becomes a
+.Em zombie
+(one that has exited but whose parent has not yet performed a
+.Xr wait 3C
+upon it), most of its associated
+.Pa /proc
+files disappear from the hierarchy; subsequent attempts to open them, or to
+read or write files opened before the process exited, will elicit the error
+.Er ENOENT .
+.Pp
+Although process state and consequently the contents of
+.Pa /proc
+files can change from instant to instant, a single
+.Xr read 2
+of a
+.Pa /proc
+file is guaranteed to return a sane representation of state; that is, the read
+will be atomic with respect to the state of the process.
+No such guarantee applies to successive reads applied to a
+.Pa /proc
+file for a running process.
+In addition, atomicity is not guaranteed for
+.Sy I/O
+applied to the
+.Pa as
+(address-space) file for a running process or for a process whose address space
+contains memory shared by another running process.
+.Pp
+A number of structure definitions are used to describe the files.
+These structures may grow by the addition of elements at the end in future
+releases of the system and it is not legitimate for a program to assume that
+they will not.
+.Sh STRUCTURE OF Pa /proc/ Ns Em pid
+A given directory
+.Pa /proc/ Ns Em pid
+contains the following entries.
+A process can use the invisible alias
+.Pa /proc/self
+if it wishes to open one of its own
+.Pa /proc
+files (invisible in the sense that the name
+.Dq self
+does not appear in a directory listing of
+.Pa /proc
+obtained from
+.Xr ls 1 ,
+.Xr getdents 2 ,
+or
+.Xr readdir 3C ) .
+.Ss contracts
+A directory containing references to the contracts held by the process.
+Each entry is a symlink to the contract's directory under
+.Pa /system/contract .
+See
+.Xr contract 5 .
+.Ss as
+Contains the address-space image of the process; it can be opened for both
+reading and writing.
+.Xr lseek 2
+is used to position the file at the virtual address of interest and then the
+address space can be examined or changed through
+.Xr read 2
+or
+.Xr write 2
+(or by using
+.Xr pread 2
+or
+.Xr pwrite 2
+for the combined operation).
+.Ss ctl
+A write-only file to which structured messages are written directing the system
+to change some aspect of the process's state or control its behavior in some
+way.
+The seek offset is not relevant when writing to this file.
+Individual lwps also have associated
+.Pa lwpctl
+files in the lwp subdirectories.
+A control message may be written either to the process's
+.Pa ctl
+file or to a specific
+.Pa lwpctl
+file with operation-specific effects.
+The effect of a control message is immediately reflected in the state of the
+process visible through appropriate status and information files.
+The types of control messages are described in detail later.
+See
+.Sx CONTROL MESSAGES .
+.Ss status
+Contains state information about the process and the representative lwp.
+The file contains a
+.Sy pstatus
+structure which contains an embedded
+.Sy lwpstatus
+structure for the representative lwp, as follows:
+.Bd -literal -offset 2
+typedef struct pstatus {
+     int pr_flags;            /* flags (see below) */
+     int pr_nlwp;             /* number of active lwps in the process */
+     int pr_nzomb;            /* number of zombie lwps in the process */
+     pid_tpr_pid;             /* process id */
+     pid_tpr_ppid;            /* parent process id */
+     pid_tpr_pgid;            /* process group id */
+     pid_tpr_sid;             /* session id */
+     id_t pr_aslwpid;         /* obsolete */
+     id_t pr_agentid;         /* lwp-id of the agent lwp, if any */
+     sigset_t pr_sigpend;     /* set of process pending signals */
+     uintptr_t pr_brkbase;    /* virtual address of the process heap */
+     size_t pr_brksize;       /* size of the process heap, in bytes */
+     uintptr_t pr_stkbase;    /* virtual address of the process stack */
+     size_tpr_stksize;        /* size of the process stack, in bytes */
+     timestruc_t pr_utime;    /* process user cpu time */
+     timestruc_t pr_stime;    /* process system cpu time */
+     timestruc_t pr_cutime;   /* sum of children's user times */
+     timestruc_t pr_cstime;   /* sum of children's system times */
+     sigset_t pr_sigtrace;    /* set of traced signals */
+     fltset_t pr_flttrace;    /* set of traced faults */
+     sysset_t pr_sysentry;    /* set of system calls traced on entry */
+     sysset_t pr_sysexit;     /* set of system calls traced on exit */
+     char pr_dmodel;          /* data model of the process */
+     taskid_t pr_taskid;      /* task id */
+     projid_t pr_projid;      /* project id */
+     zoneid_t pr_zoneid;      /* zone id */
+     lwpstatus_t pr_lwp;      /* status of the representative lwp */
+} pstatus_t;
+.Ed
+.Pp
+.Sy pr_flags
+is a bit-mask holding the following process flags.
+For convenience, it also contains the lwp flags for the representative lwp,
+described later.
+.Bl -tag -width "PR_MSACCT" -offset indent
+.It Sy PR_ISSYS
+process is a system process (see
+.Sx PCSTOP ) .
+.It Sy PR_VFORKP
+process is the parent of a vforked child (see
+.Sx PCWATCH ) .
+.It Sy PR_FORK
+process has its inherit-on-fork mode set (see
+.Sx PCSET ) .
+.It Sy PR_RLC
+process has its run-on-last-close mode set (see
+.Sx PCSET ) .
+.It Sy PR_KLC
+process has its kill-on-last-close mode set (see
+.Sx PCSET ) .
+.It Sy PR_ASYNC
+process has its asynchronous-stop mode set (see
+.Sx PCSET ) .
+.It Sy PR_MSACCT
+Set by default in all processes to indicate that microstate accounting is
+enabled.
+However, this flag has been deprecated and no longer has any effect.
+Microstate accounting may not be disabled; however, it is still possible to
+toggle the flag.
+.It Sy PR_MSFORK
+Set by default in all processes to indicate that microstate accounting will be
+enabled for processes that this parent
+.Xr fork 2 Ns s .
+However, this flag has been deprecated and no longer has any effect.
+It is possible to toggle this flag; however, it is not possible to disable
+microstate accounting.
+.It Sy PR_BPTADJ
+process has its breakpoint adjustment mode set (see
+.Sx PCSET ) .
+.It Sy PR_PTRACE
+process has its ptrace-compatibility mode set (see
+.Sx PCSET ) .
+.El
+.Pp
+.Sy pr_nlwp
+is the total number of active lwps in the process.
+.Sy pr_nzomb
+is the total number of zombie lwps in the process.
+A zombie lwp is a non-detached lwp that has terminated but has not been reaped
+with
+.Xr thr_join 3C
+or
+.Xr pthread_join 3C .
+.Pp
+.Sy pr_pid ,
+.Sy pr_ppi ,
+.Sy pr_pgid ,
+and
+.Sy pr_sid
+are, respectively, the process ID, the ID of the process's parent, the
+process's process group ID, and the process's session ID.
+.Pp
+.Sy pr_aslwpid
+is obsolete and is always zero.
+.Pp
+.Sy pr_agentid
+is the lwp-ID for the
+.Pa /proc
+agent lwp (see the
+.Sx PCAGENT
+control operation).
+It is zero if there is no agent lwp in the process.
+.Pp
+.Sy pr_sigpend
+identifies asynchronous signals pending for the process.
+.Pp
+.Sy pr_brkbase
+is the virtual address of the process heap and
+.Sy pr_brksize
+is its size in bytes.
+The address formed by the sum of these values is the process
+.Sy break
+(see
+.Xr brk 2 ) .
+.Sy pr_stkbase
+and
+.Sy pr_stksize
+are, respectively, the virtual address of the process stack and its size in
+bytes.
+(Each lwp runs on a separate stack; the distinguishing characteristic of the
+process stack is that the operating system will grow it when necessary.)
+.Pp
+.Sy pr_utime ,
+.Sy pr_stime ,
+.Sy pr_cutime ,
+.Sy and pr_cstime
+are, respectively, the user
+.Sy CPU
+and system
+.Sy CPU
+time consumed by the process, and the cumulative user
+.Sy CPU
+and system
+.Sy CPU
+time consumed by the process's children, in seconds and nanoseconds.
+.Pp
+.Sy pr_sigtrace
+and
+.Sy pr_flttrace
+contain, respectively, the set of signals and the set of hardware faults that
+are being traced (see
+.Sx PCSTRACE
+and
+.Sx PCSFAULT ) .
+.Pp
+.Sy pr_sysentry
+and
+.Sy pr_sysexit
+contain, respectively, the sets of system calls being traced on entry and exit
+(see
+.Sx PCSENTRY
+and
+.Sx PCSEXIT ) .
+.Pp
+.Sy pr_dmodel
+indicates the data model of the process.
+Possible values are:
+.Bl -tag -width "PR_MODEL_NATIVE" -offset indent
+.It Sy PR_MODEL_ILP32
+process data model is ILP32.
+.It Sy PR_MODEL_LP64
+process data model is LP64.
+.It Sy PR_MODEL_NATIVE
+process data model is native.
+.El
+.Pp
+The
+.Sy pr_taskid ,
+.Sy pr_projid ,
+and
+.Sy pr_zoneid
+fields contain respectively, the numeric
+.Sy ID Ns s
+of the task, project, and zone in which the process was running.
+.Pp
+The constant
+.Sy PR_MODEL_NATIVE
+reflects the data model of the controlling process,
+.Em that is ,
+its value is
+.Sy PR_MODEL_ILP32
+or
+.Sy PR_MODEL_LP64
+according to whether the controlling process has been
+compiled as a 32-bit program or a 64-bit program, respectively.
+.Pp
+.Sy pr_lwp
+contains the status information for the representative lwp:
+.Bd -literal -offset 2
+typedef struct lwpstatus {
+  int pr_flags;              /* flags (see below) */
+  id_t pr_lwpid;             /* specific lwp identifier */
+  short pr_why;              /* reason for lwp stop, if stopped */
+  short pr_what;             /* more detailed reason */
+  short pr_cursig;           /* current signal, if any */
+  siginfo_t pr_info;         /* info associated with signal or fault */
+  sigset_t pr_lwppend;       /* set of signals pending to the lwp */
+  sigset_t pr_lwphold;       /* set of signals blocked by the lwp */
+  struct sigaction pr_action;/* signal action for current signal */
+  stack_t pr_altstack;       /* alternate signal stack info */
+  uintptr_t pr_oldcontext;   /* address of previous ucontext */
+  short pr_syscall;          /* system call number (if in syscall) */
+  short pr_nsysarg;          /* number of arguments to this syscall */
+  int pr_errno;              /* errno for failed syscall */
+  long pr_sysarg[PRSYSARGS]; /* arguments to this syscall */
+  long pr_rval1;             /* primary syscall return value */
+  long pr_rval2;             /* second syscall return value, if any */
+  char pr_clname[PRCLSZ];    /* scheduling class name */
+  timestruc_t pr_tstamp;     /* real-time time stamp of stop */
+  timestruc_t pr_utime;      /* lwp user cpu time */
+  timestruc_t pr_stime;      /* lwp system cpu time */
+  uintptr_t pr_ustack;       /* stack boundary data (stack_t) address */
+  ulong_t pr_instr;          /* current instruction */
+  prgregset_t pr_reg;        /* general registers */
+  prfpregset_t pr_fpreg;     /* floating-point registers */
+} lwpstatus_t;
+.Ed
+.Pp
+.Sy pr_flags
+is a bit-mask holding the following lwp flags.
+For convenience, it also contains the process flags, described previously.
+.Bl -tag -width "PR_STOPPED" -offset indent
+.It Sy PR_STOPPED
+The lwp is stopped.
+.It Sy PR_ISTOP
+The lwp is stopped on an event of interest (see
+.Sx PCSTOP ) .
+.It Sy PR_DSTOP
+The lwp has a stop directive in effect (see
+.Sx PCSTOP ) .
+.It Sy PR_STEP
+The lwp has a single-step directive in effect (see
+.Sx PCRUN ) .
+.It Sy PR_ASLEEP
+The lwp is in an interruptible sleep within a system call.
+.It Sy PR_PCINVAL
+The lwp's current instruction
+.Pq Sy pr_instr
+is undefined.
+.It Sy PR_DETACH
+This is a detached lwp (see
+.Xr pthread_create 3C
+and
+.Xr pthread_join 3C ) .
+.It Sy PR_DAEMON
+This is a daemon lwp (see
+.Xr pthread_create 3C ) .
+.It Sy PR_ASLWP
+This flag is obsolete and is never set.
+.It Sy PR_AGENT
+This is the
+.Pa /proc
+agent lwp for the process.
+.El
+.Pp
+.Sy pr_lwpid
+names the specific lwp.
+.Pp
+.Sy pr_why
+.Sy and
+pr_what
+together describe, for a stopped lwp, the reason for the stop.
+Possible values of
+.Sy pr_why
+and the associated
+.Sy pr_what
+are:
+.Bl -tag -width "PR_JOBCONTROL" -offset left
+.It Sy PR_REQUESTED
+indicates that the stop occurred in response to a stop directive, normally
+because
+.Sy PCSTOP
+was applied or because another lwp stopped on an event of interest and the
+asynchronous-stop flag (see
+.Sx PCSET )
+was not set for the process.
+.Sy pr_what
+is unused in this case.
+.It Sy PR_SIGNALLED
+indicates that the lwp stopped on receipt of a signal (see
+.Sx PCSTRACE ) ;
+.Sy pr_what
+holds the signal number that caused the stop (for a newly-stopped
+lwp, the same value is in
+.Sy pr_cursig ) .
+.It Sy PR_FAULTED
+indicates that the lwp stopped on incurring a hardware fault (see
+.Sx PCSFAULT ) ;
+.Sy pr_what
+holds the fault number that caused the stop.
+.It Sy PR_SYSENTRY
+.It Sy PR_SYSEXIT
+indicate a stop on entry to or exit from a system call (see
+.Sx PCSENTRY
+and
+.Sx PCSEXIT ) ;
+.Sy pr_what
+holds the system call number.
+.It Sy PR_JOBCONTROL
+indicates that the lwp stopped due to the default action of a job control stop
+signal (see
+.Xr sigaction 2 ) ;
+.Sy pr_what
+holds the stopping signal number.
+.It Sy PR_SUSPENDED
+indicates that the lwp stopped due to internal synchronization of lwps within
+the process.
+.Sy pr_what
+is unused in this case.
+.El
+.Pp
+.Sy pr_cursig
+names the current signal, that is, the next signal to be delivered to the lwp,
+if any.
+.Sy pr_info ,
+when the lwp is in a
+.Sy PR_SIGNALLED
+or
+.Sy PR_FAULTED
+stop, contains additional information pertinent to the particular signal or
+fault (see
+.In sys/siginfo.h ) .
+.Pp
+.Sy pr_lwppend
+identifies any synchronous or directed signals pending for the lwp.
+.Sy pr_lwphold
+identifies those signals whose delivery is being blocked by the lwp (the
+signal mask).
+.Pp
+.Sy pr_action
+contains the signal action information pertaining to the current signal (see
+.Xr sigaction 2 ) ;
+it is undefined if
+.Sy pr_cursig
+is zero.
+.Sy pr_altstack
+contains the alternate signal stack information for the lwp (see
+.Xr sigaltstack 2 ) .
+.Pp
+.Sy pr_oldcontext ,
+if not zero, contains the address on the lwp stack of a
+.Sy ucontext
+structure describing the previous user-level context (see
+.Xr ucontext.h 3HEAD ) .
+It is non-zero only if the lwp is executing in the context of a signal handler.
+.Pp
+.Sy pr_syscall
+is the number of the system call, if any, being executed by
+the lwp; it is non-zero if and only if the lwp is stopped on
+.Sy PR_SYSENTRY
+or
+.Sy PR_SYSEXIT ,
+or is asleep within a system call
+.Pf ( Sy PR_ASLEEP
+is set).
+If
+.Sy pr_syscall
+is non-zero,
+.Sy pr_nsysarg
+is the number of arguments to the system call and
+.Sy pr_sysarg
+contains the actual arguments.
+.Pp
+.Sy pr_rval1 ,
+.Sy pr_rval2 ,
+and
+.Sy pr_errno
+are defined only if the lwp
+is stopped on
+.Sy PR_SYSEXIT
+or if the
+.Sy PR_VFORKP
+flag is set.
+If
+.Sy pr_errno
+is zero,
+.Sy pr_rval1
+and
+.Sy pr_rval2
+contain the return values from the system call.
+Otherwise,
+.Sy pr_errno
+contains the error number for the failing system call (see
+.In sys/errno.h ) .
+.Pp
+.Sy pr_clname
+contains the name of the lwp's scheduling class.
+.Pp
+.Sy pr_tstamp ,
+if the lwp is stopped, contains a time stamp marking when the
+lwp stopped, in real time seconds and nanoseconds since an arbitrary time in
+the past.
+.Pp
+.Sy pr_utime
+is the amount of user level CPU time used by this LWP.
+.Pp
+.Sy pr_stime
+is the amount of system level CPU time used by this LWP.
+.Pp
+.Sy pr_ustack
+is the virtual address of the
+.Sy stack_t
+that contains the stack boundaries for this LWP.
+See
+.Xr getustack 2
+and
+.Xr _stack_grow 3C .
+.Pp
+.Sy pr_instr
+contains the machine instruction to which the lwp's program counter refers.
+The amount of data retrieved from the process is machine-dependent.
+On SPARC based machines, it is a 32-bit word.
+On x86-based machines, it is a single byte.
+In general, the size is that of the machine's smallest instruction.
+If
+.Sy PR_PCINVAL
+is set,
+.Sy pr_instr
+is undefined; this occurs whenever the lwp is not stopped or when the program
+counter refers to an invalid virtual address.
+.Pp
+.Sy pr_reg
+is an array holding the contents of a stopped lwp's general registers.
+.Bl -tag -offset left -width "SPARC V8 (32-bit)"
+.It Sy SPARC
+On SPARC-based machines, the predefined constants
+.Sy R_G0
+\&.\&.\&.
+.Sy R_G7 ,
+.Sy R_O0
+\&.\&.\&.
+.Sy R_O7 ,
+.Sy R_L0
+\&.\&.\&.
+.Sy R_L7 ,
+.Sy R_I0
+\&.\&.\&.
+.Sy R_I7 ,
+.Sy R_PC ,
+.Sy R_nPC ,
+and
+.Sy R_Y
+can be used as indices to refer to the corresponding registers; previous
+register windows can be read from their overflow locations on the stack
+(however, see the
+.Pa gwindows
+file in the
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid
+subdirectory).
+.It Sy SPARC V8 (32-bit)
+For SPARC V8 (32-bit) controlling processes, the predefined constants
+.Sy R_PSR ,
+.Sy R_WIM ,
+and
+.Sy R_TBR
+can be used as indices to refer to the corresponding special registers.
+For SPARC V9 (64-bit) controlling processes, the predefined constants
+.Sy R_CCR ,
+.Sy R_ASI ,
+and
+.Sy R_FPRS
+can be used as indices to refer to the corresponding special registers.
+.It Sy x86 (32-bit)
+For 32-bit x86 processes, the predefined constants listed belowcan be used as
+indices to refer to the corresponding registers.
+.Bl -tag -width "TRAPNO" -offset indent -compact
+.It SS
+.It UESP
+.It EFL
+.It CS
+.It EIP
+.It ERR
+.It TRAPNO
+.It EAX
+.It ECX
+.It EDX
+.It EBX
+.It ESP
+.It EBP
+.It ESI
+.It EDI
+.It DS
+.It ES
+.It GS
+.El
+.Pp
+The preceding constants are listed in
+.In sys/regset.h .
+.Pp
+Note that a 32-bit process can run on an x86 64-bit system, using the constants
+listed above.
+.It Sy x86 (64-bit)
+To read the registers of a 32-
+.Em or
+a 64-bit process, a 64-bit x86 process should use the predefined constants
+listed below.
+.Bl -tag -width "REG_TRAPNO" -offset indent -compact
+.It REG_GSBASE
+.It REG_FSBASE
+.It REG_DS
+.It REG_ES
+.It REG_GS
+.It REG_FS
+.It REG_SS
+.It REG_RSP
+.It REG_RFL
+.It REG_CS
+.It REG_RIP
+.It REG_ERR
+.It REG_TRAPNO
+.It REG_RAX
+.It REG_RCX
+.It REG_RDX
+.It REG_RBX
+.It REG_RBP
+.It REG_RSI
+.It REG_RDI
+.It REG_R8
+.It REG_R9
+.It REG_R10
+.It REG_R11
+.It REG_R12
+.It REG_R13
+.It REG_R14
+.It REG_R15
+.El
+.Pp
+The preceding constants are listed in
+.In sys/regset.h .
+.El
+.Pp
+.Sy pr_fpreg
+is a structure holding the contents of the floating-point registers.
+.Pp
+SPARC registers, both general and floating-point, as seen by a 64-bit
+controlling process are the V9 versions of the registers, even if the target
+process is a 32-bit (V8) process.
+V8 registers are a subset of the V9 registers.
+.Pp
+If the lwp is not stopped, all register values are undefined.
+.Ss psinfo
+Contains miscellaneous information about the process and the representative lwp
+needed by the
+.Xr ps 1
+command.
+.Sy psinfo
+remains accessible after a process becomes a
+.Em zombie .
+The file contains a
+.Sy psinfo
+structure which contains an embedded
+.Sy lwpsinfo
+structure for the representative lwp, as follows:
+.Bd -literal -offset 2
+typedef struct psinfo {
+    int pr_flag;             /* process flags (DEPRECATED: see below) */
+    int pr_nlwp;             /* number of active lwps in the process */
+    int pr_nzomb;            /* number of zombie lwps in the process */
+    pid_t pr_pid;            /* process id */
+    pid_t pr_ppid;           /* process id of parent */
+    pid_t pr_pgid;           /* process id of process group leader */
+    pid_t pr_sid;            /* session id */
+    uid_t pr_uid;            /* real user id */
+    uid_t pr_euid;           /* effective user id */
+    gid_t pr_gid;            /* real group id */
+    gid_t pr_egid;           /* effective group id */
+    uintptr_t pr_addr;       /* address of process */
+    size_t pr_size;          /* size of process image in Kbytes */
+    size_t pr_rssize;        /* resident set size in Kbytes */
+    dev_t pr_ttydev;         /* controlling tty device (or PRNODEV) */
+    ushort_t pr_pctcpu;      /* % of recent cpu time used by all lwps */
+    ushort_t pr_pctmem;      /* % of system memory used by process */
+    timestruc_t pr_start;    /* process start time, from the epoch */
+    timestruc_t pr_time;     /* cpu time for this process */
+    timestruc_t pr_ctime;    /* cpu time for reaped children */
+    char pr_fname[PRFNSZ];   /* name of exec'ed file */
+    char pr_psargs[PRARGSZ]; /* initial characters of arg list */
+    int pr_wstat;            /* if zombie, the wait() status */
+    int pr_argc;             /* initial argument count */
+    uintptr_t pr_argv;       /* address of initial argument vector */
+    uintptr_t pr_envp;       /* address of initial environment vector */
+    char pr_dmodel;          /* data model of the process */
+    taskid_t pr_taskid;      /* task id */
+    projid_t pr_projid;      /* project id */
+    poolid_t pr_poolid;      /* pool id */
+    zoneid_t pr_zoneid;      /* zone id */
+    ctid_t pr_contract;      /* process contract id */
+    lwpsinfo_t pr_lwp;       /* information for representative lwp */
+} psinfo_t;
+.Ed
+.Pp
+Some of the entries in
+.Sy psinfo ,
+such as
+.Sy pr_addr ,
+refer to internal kernel data structures and should not be expected to retain
+their meanings across different versions of the operating system.
+.Pp
+.Sy psinfo_t.pr_flag
+is a deprecated interface that should no longer be used.
+Applications currently relying on the
+.Sy SSYS
+bit in
+.Sy pr_flag
+should migrate to checking
+.Sy PR_ISSYS
+in the
+.Sy pstatus
+structure's
+.Sy pr_flags
+field.
+.Pp
+.Sy pr_pctcpu
+and
+.Sy pr_pctmem
+are 16-bit binary fractions in the range 0.0 to 1.0 with the binary point to
+the right of the high-order bit (1.0 == 0x8000).
+.Sy pr_pctcpu
+is the summation over all lwps in the process.
+.Pp
+.Sy pr_lwp
+contains the
+.Xr ps 1
+information for the representative lwp.
+If the process is a
+.Em zombie ,
+.Sy pr_nlwp ,
+.Sy pr_nzomb ,
+and
+.Sy pr_lwp.pr_lwpid
+are zero and the other fields of
+.Sy pr_lwp
+are undefined:
+.Bd -literal -offset 2
+typedef struct lwpsinfo {
+    int pr_flag;             /* lwp flags (DEPRECATED: see below) */
+    id_t pr_lwpid;           /* lwp id */
+    uintptr_t pr_addr;       /* internal address of lwp */
+    uintptr_t pr_wchan;      /* wait addr for sleeping lwp */
+    char pr_stype;           /* synchronization event type */
+    char pr_state;           /* numeric lwp state */
+    char pr_sname;           /* printable character for pr_state */
+    char pr_nice;            /* nice for cpu usage */
+    short pr_syscall;        /* system call number (if in syscall) */
+    char pr_oldpri;          /* pre-SVR4, low value is high priority */
+    char pr_cpu;             /* pre-SVR4, cpu usage for scheduling */
+    int pr_pri;              /* priority, high value = high priority */
+    ushort_t pr_pctcpu;      /* % of recent cpu time used by this lwp */
+    timestruc_t pr_start;    /* lwp start time, from the epoch */
+    timestruc_t pr_time;     /* cpu time for this lwp */
+    char pr_clname[PRCLSZ];  /* scheduling class name */
+    char pr_name[PRFNSZ];    /* name of system lwp */
+    processorid_t pr_onpro;  /* processor which last ran this lwp */
+    processorid_t pr_bindpro;/* processor to which lwp is bound */
+    psetid_t pr_bindpset;    /* processor set to which lwp is bound */
+    lgrp_id_t pr_lgrp;       /* home lgroup */
+} lwpsinfo_t;
+.Ed
+.Pp
+Some of the entries in
+.Sy lwpsinfo ,
+such as
+.Sy pr_addr ,
+.Sy pr_wchan ,
+.Sy pr_stype ,
+.Sy pr_state ,
+and
+.Sy pr_name ,
+refer to internal kernel data structures and should not be expected to retain
+their meanings across different versions of the operating system.
+.Pp
+.Sy lwpsinfo_t.pr_flag
+is a deprecated interface that should no longer be used.
+.Pp
+.Sy pr_pctcpu
+is a 16-bit binary fraction, as described above.
+It represents the
+.Sy CPU
+time used by the specific lwp.
+On a multi-processor machine, the maximum value is 1/N, where N is the number
+of
+.Sy CPU Ns s .
+.Pp
+.Sy pr_contract
+is the id of the process contract of which the process is a member.
+See
+.Xr contract 5
+and
+.Xr process 5 .
+.Ss cred
+Contains a description of the credentials associated with the process:
+.Bd -literal -offset 2
+typedef struct prcred {
+	uid_t pr_euid;      /* effective user id */
+	uid_t pr_ruid;      /* real user id */
+	uid_t pr_suid;      /* saved user id (from exec) */
+	gid_t pr_egid;      /* effective group id */
+	gid_t pr_rgid;      /* real group id */
+	gid_t pr_sgid;      /* saved group id (from exec) */
+	int pr_ngroups;     /* number of supplementary groups */
+	gid_t pr_groups[1]; /* array of supplementary groups */
+} prcred_t;
+.Ed
+.Pp
+The array of associated supplementary groups in
+.Sy pr_groups
+ is of variable
+length; the
+.Sy cred
+file contains all of the supplementary groups.
+.Sy pr_ngroups
+indicates the number of supplementary groups. (See also the
+.Sy PCSCRED
+and
+.Sy PCSCREDX
+control operations.)
+.Ss priv
+Contains a description of the privileges associated with the process:
+.Bd -literal -offset 2
+typedef struct prpriv {
+     uint32_t        pr_nsets;      /* number of privilege set */
+     uint32_t        pr_setsize;    /* size of privilege set */
+     uint32_t        pr_infosize;   /* size of supplementary data */
+     priv_chunk_t    pr_sets[1];    /* array of sets */
+} prpriv_t;
+.Ed
+.Pp
+The actual dimension of the
+.Sy pr_sets Ns []
+field is
+.D1 pr_sets[pr_nsets][pr_setsize]
+.Pp
+which is followed by additional information about the process state
+.Sy pr_infosize
+bytes in size.
+.Pp
+The full size of the structure can be computed using
+.Fn PRIV_PRPRIV_SIZE "prpriv_t *" .
+.Ss secflags
+This file contains the security-flags of the process.
+It contains a description of the security flags associated with the process.
+.Bd -literal -offset 2
+typedef struct prsecflags {
+	uint32_t pr_version;		/* ABI Versioning of this structure */
+	secflagset_t pr_effective;	/* Effective flags */
+	secflagset_t pr_inherit;	/* Inheritable flags */
+	secflagset_t pr_lower;		/* Lower flags */
+	secflagset_t pr_upper;		/* Upper flags */
+} prsecflags_t;
+.Ed
+.Pp
+The
+.Sy pr_version
+field is a version number for the structure, currently
+.Sy PRSECFLAGS_VERSION_1 .
+.Ss sigact
+Contains an array of
+.Sy sigaction structures
+describing the current dispositions of all signals associated with the traced
+process (see
+.Xr sigaction 2 ) .
+Signal numbers are displaced by 1 from array indices, so that the action for
+signal number
+.Va n
+appears in position
+.Va n Ns -1
+of the array.
+.Ss auxv
+Contains the initial values of the process's aux vector in an array of
+.Sy auxv_t
+structures (see
+.In sys/auxv.h ) .
+The values are those that were passed by the operating system as startup
+information to the dynamic linker.
+.Ss ldt
+This file exists only on x86-based machines.
+It is non-empty only if the process has established a local descriptor table
+.Pq Sy LDT .
+If non-empty, the file contains the array of currently active
+.Sy LDT
+entries in an array of elements of type
+.Vt struct ssd ,
+defined in
+.In sys/sysi86.h ,
+one element for each active
+.Sy LDT
+entry.
+.Ss map, xmap
+Contain information about the virtual address map of the process.
+The map file contains an array of
+.Sy prmap
+structures while the xmap file contains an
+array of
+.Sy prxmap
+structures.
+Each structure describes a contiguous virtual
+address region in the address space of the traced process:
+.Bd -literal -offset 2
+typedef struct prmap {
+	uintptr_tpr_vaddr;         /* virtual address of mapping */
+	size_t pr_size;            /* size of mapping in bytes */
+	char pr_mapname[PRMAPSZ];  /* name in /proc/pid/object */
+	offset_t pr_offset;        /* offset into mapped object, if any */
+	int pr_mflags;             /* protection and attribute flags */
+	int pr_pagesize;           /* pagesize for this mapping in bytes */
+	int pr_shmid;              /* SysV shared memory identifier */
+} prmap_t;
+.Ed
+.Bd -literal -offset 2
+typedef struct prxmap {
+	uintptr_t pr_vaddr;        /* virtual address of mapping */
+	size_t pr_size;            /* size of mapping in bytes */
+	char pr_mapname[PRMAPSZ];  /* name in /proc/pid/object */
+	offset_t pr_offset;        /* offset into mapped object, if any */
+	int pr_mflags;             /* protection and attribute flags */
+	int pr_pagesize;           /* pagesize for this mapping in bytes */
+	int pr_shmid;              /* SysV shared memory identifier */
+	dev_t pr_dev;              /* device of mapped object, if any */
+	uint64_t pr_ino;           /* inode of mapped object, if any */
+	size_t pr_rss;             /* pages of resident memory */
+	size_t pr_anon;            /* pages of resident anonymous memory */
+	size_t pr_locked;          /* pages of locked memory */
+	uint64_t pr_hatpagesize;   /* pagesize of mapping */
+} prxmap_t;
+.Ed
+.Pp
+.Sy pr_vaddr
+is the virtual address of the mapping within the traced process and
+.Sy pr_size
+is its size in bytes.
+.Sy pr_mapname ,
+if it does not contain a null string, contains the name of a file in the
+.Sy object
+directory (see below) that can be opened read-only to obtain a file descriptor
+for the mapped file associated with the mapping.
+This enables a debugger to find object file symbol tables without having to
+know the real path names of the executable file and shared libraries of
+the process.
+.Sy pr_offset
+is the 64-bit offset within the mapped file (if any) to which the virtual
+address is mapped.
+.Pp
+.Sy pr_mflags
+is a bit-mask of protection and attribute flags:
+.Bl -tag -width "MA_NORESERVE" -offset left
+.It Sy MA_READ
+mapping is readable by the traced process.
+.It Sy MA_WRITE
+mapping is writable by the traced process.
+.It Sy MA_EXEC
+mapping is executable by the traced process.
+.It Sy MA_SHARED
+mapping changes are shared by the mapped object.
+.It Sy MA_ISM
+mapping is intimate shared memory (shared MMU resources)
+.It Sy MAP_NORESERVE
+mapping does not have swap space reserved (mapped with MAP_NORESERVE)
+.It Sy MA_SHM
+mapping System V shared memory
+.El
+.Pp
+A contiguous area of the address space having the same underlying mapped object
+may appear as multiple mappings due to varying read, write, and execute
+attributes.
+The underlying mapped object does not change over the range of a
+single mapping.
+An
+.Sy I/O
+operation to a mapping marked
+.Sy MA_SHARED
+fails if applied at a virtual address not corresponding to a valid page in the
+underlying mapped object.
+A write to a
+.Sy MA_SHARED
+mapping that is not marked
+.Sy MA_WRITE
+fails.
+Reads and writes to private mappings always succeed.
+Reads and writes to unmapped addresses fail.
+.Pp
+.Sy pr_pagesize
+is the page size for the mapping, currently always the system pagesize.
+.Pp
+.Sy pr_shmid
+is the shared memory identifier, if any, for the mapping.
+Its value is \-1
+if the mapping is not System V shared memory.
+See
+.Xr shmget 2 .
+.Pp
+.Sy pr_dev
+is the device of the mapped object, if any, for the mapping.
+Its value is
+.Sy PRNODEV
+.Pq \-1
+if the mapping does not have a device.
+.Pp
+.Sy pr_ino
+is the inode of the mapped object, if any, for the mapping.
+Its contents are only valid if
+.Sy pr_dev
+is not
+.Sy PRNODEV .
+.Pp
+.Sy pr_rss
+is the number of resident pages of memory for the mapping.
+The number of resident bytes for the mapping may be determined by multiplying
+.Sy pr_rss
+by the page size given by
+.Sy pr_pagesize .
+.Pp
+.Sy pr_anon
+is the number of resident anonymous memory pages (pages which are
+private to this process) for the mapping.
+.Pp
+.Sy pr_locked
+is the number of locked pages for the mapping.
+Pages which are locked are always resident in memory.
+.Pp
+.Sy pr_hatpagesize
+is the size, in bytes, of the
+.Sy HAT
+.Pq Sy MMU
+translation for the mapping.
+.Sy pr_hatpagesize
+may be different than
+.Sy pr_pagesize .
+The possible values are hardware architecture specific, and
+may change over a mapping's lifetime.
+.Ss rmap
+Contains information about the reserved address ranges of the process.
+The file contains an array of
+.Sy prmap
+structures, as defined above for the
+.Sy map
+file.
+Each structure describes a contiguous virtual address region in the
+address space of the traced process that is reserved by the system in the sense
+that an
+.Xr mmap 2
+system call that does not specify
+.Sy MAP_FIXED
+will not use any part of it for the new mapping.
+Examples of such reservations include the address ranges reserved for the
+process stack and the individual thread stacks of a multi-threaded process.
+.Ss cwd
+A symbolic link to the process's current working directory.
+See
+.Xr chdir 2 .
+A
+.Xr readlink 2
+of
+.Pa /proc/ Ns Em pid Ns Pa /cwd
+yields a null string.
+However, it can be opened, listed, and searched as a directory, and can be the
+target of
+.Xr chdir 2 .
+.Ss root
+A symbolic link to the process's root directory.
+.Pa /proc/ Ns Em pid Ns Pa /root
+can differ from the system root directory if the process or one of its
+ancestors executed
+.Xr chroot 2
+as super user.
+It has the same semantics as
+.Pa /proc/ Ns Em pid Ns Pa /cwd .
+.Ss fd
+A directory containing references to the open files of the process.
+Each entry is a decimal number corresponding to an open file descriptor in the
+process.
+.Pp
+If an entry refers to a regular file, it can be opened with normal file system
+semantics but, to ensure that the controlling process cannot gain greater
+access than the controlled process, with no file access modes other than its
+read/write open modes in the controlled process.
+If an entry refers to a directory, it can be accessed with the same semantics
+as
+.Pa /proc/ Ns Em pid Ns Pa /cwd .
+An attempt to open any other type of entry fails with
+.Er EACCES .
+.Ss fdinfo
+A directory containing information about each of the process's open files.
+Each entry is a decimal number corresponding to an open file descriptor in the
+process.
+Each file contains a
+.Sy prfdinfo_t
+structure defined as follows:
+.Bd -literal -offset 2
+typedef struct prfdinfo {
+    int     pr_fd;          /* file descriptor number */
+    mode_t  pr_mode;        /* (see st_mode in stat(2)) */
+    uint64_t pr_ino;        /* inode number */
+    uint64_t pr_size;       /* file size */
+    int64_t pr_offset;      /* current offset of file descriptor */
+    uid_t   pr_uid;         /* owner's user id */
+    gid_t   pr_gid;         /* owner's group id */
+    major_t pr_major;       /* major number of device containing file */
+    minor_t pr_minor;       /* minor number of device containing file */
+    major_t pr_rmajor;      /* major number (if special file) */
+    minor_t pr_rminor;      /* minor number (if special file) */
+    int     pr_fileflags;   /* (see F_GETXFL in fcntl(2)) */
+    int     pr_fdflags;     /* (see F_GETFD in fcntl(2)) */
+    short   pr_locktype;    /* (see F_GETLK in fcntl(2)) */
+    pid_t   pr_lockpid;     /* process holding file lock (see F_GETLK) */
+    int     pr_locksysid;   /* sysid of locking process (see F_GETLK) */
+    pid_t   pr_peerpid;     /* peer process (socket, door) */
+    int     pr_filler[25];  /* reserved for future use */
+    char    pr_peername[PRFNSZ]; /* peer process name */
+#if __STDC_VERSION__ >= 199901L
+    char    pr_misc[];      /* self describing structures */
+#else
+    char    pr_misc[1];
+#endif
+} prfdinfo_t;
+.Ed
+.Pp
+The
+.Sy pr_misc
+element points to a list of additional miscellaneous data items, each of which
+has a header of type
+.Sy pr_misc_header_t
+specifying the size and type, and some data which immediately follow
+the header.
+.Bd -literal -offset 2
+typedef struct pr_misc_header {
+    uint_t          pr_misc_size;
+    uint_t          pr_misc_type;
+} pr_misc_header_t;
+.Ed
+.Pp
+The
+.Sy pr_misc_size
+field is the sum of the sizes of the header and the associated data and any
+trailing padding bytes which will be set to zero.
+The end of the list is indicated by a header with a zero size and a type with
+all bits set.
+.Pp
+The following miscellaneous data types can be present:
+.Bl -tag -width "PR_SOCKOPT_TCP_CONGESTION" -offset left
+.It Sy PR_PATHNAME
+The file descriptor's path in the filesystem.
+This is a NUL-terminated sequence of characters.
+.It Sy PR_SOCKETNAME
+A
+.Sy sockaddr
+structure representing the local socket name for this file descriptor, as
+would be returned by calling
+.Fn getsockname
+within the process.
+.It Sy PR_PEERSOCKNAME
+A
+.Sy sockaddr
+structure representing the peer socket name for this file descriptor, as
+would be returned by calling
+.Fn getpeername
+within the process.
+.It Sy PR_SOCKOPTS_BOOL_OPTS
+An unsigned integer which has bits set corresponding to options which are
+set on the underlying socket.
+The following bits may be set:
+.Bl -tag -width "PR_SO_PASSIVE_CONNECT"
+.It Sy PR_SO_DEBUG
+.It Sy PR_SO_REUSEADDR
+.It Sy PR_SO_REUSEPORT
+.It Sy PR_SO_KEEPALIVE
+.It Sy PR_SO_DONTROUTE
+.It Sy PR_SO_BROADCAST
+.It Sy PR_SO_OOBINLINE
+.It Sy PR_SO_DGRAM_ERRIND
+.It Sy PR_SO_ALLZONES
+.It Sy PR_SO_MAC_EXEMPT
+.It Sy PR_SO_EXCLBIND
+.It Sy PR_SO_PASSIVE_CONNECT
+.It Sy PR_SO_ACCEPTCONN
+.It Sy PR_UDP_NAT_T_ENDPOINT
+.It Sy PR_SO_VRRP
+.It Sy PR_SO_MAC_IMPLICIT
+.El
+.It Sy PR_SOCKOPT_LINGER
+A
+.Sy struct linger
+as would be returned by calling
+.Fn getsockopt SO_LINGER
+within the process.
+.It Sy PR_SOCKOPT_SNDBUF
+The data that would be returned by calling
+.Fn getsockopt SO_SNDBUF
+within the process.
+.It Sy PR_SOCKOPT_RCVBUF
+The data that would be returned by calling
+.Fn getsockopt SO_RCVBUF
+within the process.
+.It Sy PR_SOCKOPT_IP_NEXTHOP
+The data that would be returned by calling
+.Fn getsockopt IPPROTO_IP IP_NEXTHOP
+within the process.
+.It Sy PR_SOCKOPT_IPV6_NEXTHOP
+The data that would be returned by calling
+.Fn getsockopt IPPROTO_IPV6 IPV6_NEXTHOP
+within the process.
+.It Sy PR_SOCKOPT_TYPE
+The data that would be returned by calling
+.Fn getsockopt SO_TYPE
+within the process.
+.It Sy PR_SOCKOPT_TCP_CONGESTION
+For TCP sockets, the data that would be returned by calling
+.Fn getsockopt IPPROTO_TCP TCP_CONGESTION
+within the process.
+This is a NUL-terminated character array containing the name of the congestion
+algorithm in use for the socket.
+.It Sy PR_SOCKFILTERS_PRIV
+Private data relating to up to the first 32 socket filters pushed on this
+descriptor.
+.El
+.Ss object
+A directory containing read-only files with names corresponding to the
+.Sy pr_mapname
+entries in the
+.Sy map
+and
+.Sy pagedata
+files.
+Opening such a file yields a file descriptor for the underlying mapped file
+associated with an address-space mapping in the process.
+The file name
+.Pa a.out
+appears in the directory as an alias for the process's executable file.
+.Pp
+The
+.Pa object
+directory makes it possible for a controlling process to gain
+access to the object file and any shared libraries (and consequently the symbol
+tables) without having to know the actual path names of the executable files.
+.Ss path
+A directory containing symbolic links to files opened by the process.
+The directory includes one entry for
+.Pa cwd
+and
+.Pa root .
+The directory also contains a numerical entry for each file descriptor in the
+.Pa fd
+directory, and entries matching those in the
+.Pa object
+directory.
+If this information is not available, any attempt to read the contents of the
+symbolic link will fail.
+This is most common for files that do not exist in the filesystem namespace
+(such as
+.Sy FIFO Ns s
+and sockets), but can also happen for regular files.
+For the file descriptor entries, the path may be different from the one
+used by the process to open the file.
+.Ss pagedata
+Opening the page data file enables tracking of address space references and
+modifications on a per-page basis.
+.Pp
+A
+.Xr read 2
+of the page data file descriptor returns structured page data
+and atomically clears the page data maintained for the file by the system.
+That is to say, each read returns data collected since the last read; the
+first read returns data collected since the file was opened.
+When the call completes, the read buffer contains the following structure as
+its header and thereafter contains a number of section header structures and
+associated byte arrays that must be accessed by walking linearly through the
+buffer.
+.Bd -literal -offset 2
+typedef struct prpageheader {
+    timestruc_t pr_tstamp; /* real time stamp, time of read() */
+    ulong_t pr_nmap;       /* number of address space mappings */
+    ulong_t pr_npage;      /* total number of pages */
+} prpageheader_t;
+.Ed
+.Pp
+The header is followed by
+.Sy "pr_nmap prasmap"
+structures and associated data arrays.
+The
+.Sy prasmap
+structure contains the following elements:
+.Bd -literal -offset 2
+typedef struct prasmap {
+    uintptr_t pr_vaddr;        /* virtual address of mapping */
+    ulong_t pr_npage;          /* number of pages in mapping */
+    char pr_mapname[PRMAPSZ];  /* name in /proc/pid/object */
+    offset_t pr_offset;        /* offset into mapped object, if any */
+    int pr_mflags;             /* protection and attribute flags */
+    int pr_pagesize;           /* pagesize for this mapping in bytes */
+    int pr_shmid;              /* SysV shared memory identifier */
+} prasmap_t;
+.Ed
+.Pp
+Each section header is followed by
+.Sy pr_npage
+bytes, one byte for each page in the mapping, plus 0-7 null bytes at the end
+so that the next
+.Sy prasmap
+structure begins on an eight-byte aligned boundary.
+Each data byte may contain these flags:
+.Bl -tag -width "PG_REFERENCED" -offset 2
+.It Sy PG_REFERENCED
+page has been referenced.
+.It Sy PG_MODIFIED
+page has been modified.
+.El
+.Pp
+If the read buffer is not large enough to contain all of the page data, the
+read fails with
+.Er E2BIG
+and the page data is not cleared.
+The required size of the read buffer can be determined through
+.Xr fstat 2 .
+Application of
+.Xr lseek 2
+to the page data file descriptor is ineffective; every read
+starts from the beginning of the file.
+Closing the page data file descriptor
+terminates the system overhead associated with collecting the data.
+.Pp
+More than one page data file descriptor for the same process can be opened, up
+to a system-imposed limit per traced process.
+A read of one does not affect the data being collected by the system for the
+others.
+An open of the page data file will fail with
+.Er ENOMEM
+if the system-imposed limit would be exceeded.
+.Ss watch
+Contains an array of
+.Vt prwatch
+structures, one for each watched area established by the
+.Sy PCWATCH
+control operation.
+See
+.Sx PCWATCH
+for details.
+.Ss usage
+Contains process usage information described by a
+.Vt prusage
+structure which contains at least the following fields:
+.Bd -literal -offset 2
+typedef struct prusage {
+    id_t pr_lwpid;           /* lwp id.  0: process or defunct */
+    int pr_count;            /* number of contributing lwps */
+    timestruc_t pr_tstamp;   /* real time stamp, time of read() */
+    timestruc_t pr_create;   /* process/lwp creation time stamp */
+    timestruc_t pr_term;     /* process/lwp termination time stamp */
+    timestruc_t pr_rtime;    /* total lwp real (elapsed) time */
+    timestruc_t pr_utime;    /* user level CPU time */
+    timestruc_t pr_stime;    /* system call CPU time */
+    timestruc_t pr_ttime;    /* other system trap CPU time */
+    timestruc_t pr_tftime;   /* text page fault sleep time */
+    timestruc_t pr_dftime;   /* data page fault sleep time */
+    timestruc_t pr_kftime;   /* kernel page fault sleep time */
+    timestruc_t pr_ltime;    /* user lock wait sleep time */
+    timestruc_t pr_slptime;  /* all other sleep time */
+    timestruc_t pr_wtime;    /* wait-cpu (latency) time */
+    timestruc_t pr_stoptime; /* stopped time */
+    ulong_t pr_minf;         /* minor page faults */
+    ulong_t pr_majf;         /* major page faults */
+    ulong_t pr_nswap;        /* swaps */
+    ulong_t pr_inblk;        /* input blocks */
+    ulong_t pr_oublk;        /* output blocks */
+    ulong_t pr_msnd;         /* messages sent */
+    ulong_t pr_mrcv;         /* messages received */
+    ulong_t pr_sigs;         /* signals received */
+    ulong_t pr_vctx;         /* voluntary context switches */
+    ulong_t pr_ictx;         /* involuntary context switches */
+    ulong_t pr_sysc;         /* system calls */
+    ulong_t pr_ioch;         /* chars read and written */
+} prusage_t;
+.Ed
+.Pp
+Microstate accounting is now continuously enabled.
+While this information was
+previously an estimate, if microstate accounting were not enabled, the current
+information is now never an estimate represents time the process has spent in
+various states.
+.Ss lstatus
+Contains a
+.Vt prheader
+structure followed by an array of
+.Vt lwpstatus
+structures, one for each active lwp in the process (see also
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpstatus ,
+below).
+The
+.Vt prheader
+structure describes the number and size of the array entries that follow.
+.Bd -literal -offset 2
+typedef struct prheader {
+    long pr_nent;        /* number of entries */
+    size_t pr_entsize;   /* size of each entry, in bytes */
+} prheader_t;
+.Ed
+.Pp
+The
+.Vt lwpstatus
+structure may grow by the addition of elements at the end in future releases
+of the system.
+Programs must use
+.Sy pr_entsize
+in the file header to index through the array.
+These comments apply to all
+.Pa /proc
+files that include a
+.Vt prheader
+structure
+.Pf ( Pa lpsinfo
+and
+.Pa lusage ,
+below).
+.Ss lpsinfo
+Contains a
+.Vt prheader
+structure followed by an array of
+.Vt lwpsinfo
+structures, one for eachactive and zombie lwp in the process.
+See also
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpsinfo ,
+below.
+.Ss lusage
+Contains a
+.Vt prheader
+structure followed by an array of
+.Vt prusage
+structures, one for each active lwp in the process, plus an additional element
+at the beginning that contains the summation over all defunct lwps (lwps that
+once existed but no longer exist in the process).
+Excluding the
+.Sy pr_lwpid ,
+.Sy pr_tstamp ,
+.Sy pr_create ,
+and
+.Sy pr_term
+entries, the entry-by-entry summation over all these structures is the
+definition of the process usage information obtained from the
+.Pa usage
+file. (See also
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpusage ,
+below.)
+.Ss lwp
+A directory containing entries each of which names an active or zombie lwp
+within the process.
+These entries are themselves directories containing additional files as
+described below.
+Only the
+.Pa lwpsinfo
+file exists in the directory of a zombie lwp.
+.Sh "STRUCTURE OF" Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid
+A given directory
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid
+contains the following entries:
+.Ss lwpctl
+Write-only control file.
+The messages written to this file affect the specific
+lwp rather than the representative lwp, as is the case for the process's
+.Pa ctl
+file.
+.Ss lwpname
+A buffer of
+.Dv THREAD_NAME_MAX
+bytes representing the LWP name; the buffer is
+zero-filled if the thread name is shorter than the buffer.
+If no thread name is set, the buffer contains the empty string.
+A read with a buffer shorter than
+.Dv THREAD_NAME_MAX
+bytes is not guaranteed to be NUL-terminated.
+Writing to this file will set the LWP name for the specific lwp.
+This file may not be present in older operating system versions.
+.Dv THREAD_NAME_MAX
+may increase in the future; clients should be prepared for this.
+.Ss lwpstatus
+lwp-specific state information.
+This file contains the
+.Vt lwpstatus
+structure for the specific lwp as described above for the representative lwp in
+the process's
+.Pa status
+file.
+.Ss lwpsinfo
+lwp-specific
+.Xr ps 1
+information.
+This file contains the
+.Vt lwpsinfo
+structure for the specific lwp as described above for the representative lwp in
+the process's
+.Pa psinfo
+file.
+The
+.Pa lwpsinfo
+file remains accessible after an lwp becomes a zombie.
+.Ss lwpusage
+This file contains the
+.Vt prusage
+structure for the specific lwp as described above for the process's
+.Pa usage
+file.
+.Ss gwindows
+This file exists only on SPARC based machines.
+If it is non-empty, it contains a
+.Vt gwindows_t
+structure, defined in
+.In sys/regset.h ,
+with the values of those SPARC register windows that could not be stored on
+the stack when the lwp stopped.
+Conditions under which register windows are not stored on the
+stack are: the stack pointer refers to nonexistent process memory or the stack
+pointer is improperly aligned.
+If the lwp is not stopped or if there are no
+register windows that could not be stored on the stack, the file is empty (the
+usual case).
+.Ss xregs
+Extra state registers.
+The extra state register set is architecture dependent;
+this file is empty if the system does not support extra state registers.
+If the file is non-empty, it contains an architecture dependent structure of
+type
+.Vt prxregset_t ,
+defined in
+.In procfs.h ,
+with the values of the lwp's extra state registers.
+If the lwp is not stopped, all register values are undefined.
+See also the
+.Sx PCSXREG
+control operation, below.
+.Ss asrs
+This file exists only for 64-bit SPARC V9 processes.
+It contains an
+.Vt asrset_t
+structure, defined in
+.In sys/regset.h ,
+containing the values of the lwp's platform-dependent ancillary state registers.
+If the lwp is not stopped, all register values are undefined.
+See also the
+.Sx PCSASRS
+control operation, below.
+.Ss spymaster
+For an agent lwp (see
+.Sx PCAGENT ) ,
+this file contains a
+.Vt psinfo_t
+structure that corresponds to the process that created the agent lwp at the
+time the agent was created.
+This structure is identical to that retrieved via the
+.Pa psinfo
+file, with one modification: the
+.Sy pr_time
+field does not correspond to the CPU time for the process, but rather to the
+creation time of the agent lwp.
+.Ss templates
+A directory which contains references to the active templates for the lwp,
+named by the contract type.
+Changes made to an active template descriptor do
+not affect the original template which was activated, though they do affect the
+active template.
+It is not possible to activate an active template descriptor.
+See
+.Xr contract 5 .
+.Sh CONTROL MESSAGES
+Process state changes are effected through messages written to a process's
+.Sy ctl
+file or to an individual lwp's
+.Sy lwpctl
+file.
+All control messages consist of a
+.Sy long
+that names the specific operation followed by
+additional data containing the operand, if any.
+.Pp
+Multiple control messages may be combined in a single
+.Xr write 2
+(or
+.Xr writev 2 )
+to a control file, but no partial writes are permitted.
+That is, each control message, operation code plus operand, if any, must be
+presented in its entirety to the
+.Xr write 2
+and not in pieces over several system calls.
+If a control operation fails, no subsequent operations contained in the same
+.Xr write 2
+are attempted.
+.Pp
+Descriptions of the allowable control messages follow.
+In all cases, writing a message to a control file for a process or lwp that
+has terminated elicits the error
+.Er ENOENT .
+.Ss PCSTOP PCDSTOP PCWSTOP PCTWSTOP
+When applied to the process control file,
+.Sy PCSTOP
+directs all lwps to stop and waits for them to stop,
+.Sy PCDSTOP
+directs all lwps to stop without waiting for them to stop, and
+.Sy PCWSTOP
+simply waits for all lwps to stop.
+When applied to an lwp control file,
+.Sy PCSTOP
+directs the specific lwp to stop and waits until it has stopped,
+.Sy PCDSTOP
+directs the specific lwp to stop without waiting for it to stop, and
+.Sy PCWSTOP
+ simply waits for the specific lwp to stop.
+When applied to an lwp control file,
+.Sy PCSTOP
+and
+.Sy PCWSTOP
+complete when the lwp stops on an event of interest, immediately
+if already so stopped; when applied to the process control file, they complete
+when every lwp has stopped either on an event of interest or on a
+.Sy PR_SUSPENDED
+stop.
+.Pp
+.Sy PCTWSTOP
+is identical to
+.Sy PCWSTOP
+except that it enables the operation to time out, to avoid waiting forever for
+a process or lwp that may never stop on an event of interest.
+.Sy PCTWSTOP
+takes a
+.Sy long
+operand specifying a number of milliseconds; the wait will terminate
+successfully after the specified number of milliseconds even if the process or
+lwp has not stopped; a timeout value of zero makes the operation identical to
+.Sy PCWSTOP .
+.Pp
+An
+.Dq event of interest
+is either a
+.Sy PR_REQUESTED
+stop or a stop that has been specified in the process's tracing flags (set by
+.Sy PCSTRACE ,
+.Sy PCSFAULT ,
+.Sy PCSENTRY ,
+and
+.Sy PCSEXIT ) .
+.Sy PR_JOBCONTROL
+ and
+.Sy PR_SUSPENDED
+stops are specifically not events of interest.
+(An lwp may stop twice due to a stop signal, first showing
+.Sy PR_SIGNALLED
+if the signal is traced and again showing
+.Sy PR_JOBCONTROL
+if the lwp is set running without clearing the signal.)
+If
+.Sy PCSTOP
+or
+.Sy PCDSTOP
+is applied to an
+lwp that is stopped, but not on an event of interest, the stop directive takes
+effect when the lwp is restarted by the competing mechanism.
+At that time, the lwp enters a
+.Sy PR_REQUESTED
+stop before executing any user-level code.
+.Pp
+A write of a control message that blocks is interruptible by a signal so that,
+for example, an
+.Xr alarm 2
+can be set to avoid waiting forever for a
+process or lwp that may never stop on an event of interest.
+If
+.Sy PCSTOP
+is interrupted, the lwp stop directives remain in effect even though the
+.Xr write 2
+returns an error.
+(Use of
+.Sy PCTWSTOP
+with a non-zero timeout is recommended over
+.Sy PCWSTOP
+with an
+.Xr alarm 2 . )
+.Pp
+A system process (indicated by the
+.Sy PR_ISSYS
+flag) never executes at user level, has no user-level address space visible
+through
+.Pa /proc ,
+and cannot be stopped.
+Applying one of these operations to a system process or any of its
+lwps elicits the error
+.Er EBUSY .
+.Ss PCRUN
+Make an lwp runnable again after a stop.
+This operation takes a
+.Vt long
+operand containing zero or more of the following flags:
+.Bl -tag -width "PRSABORT" -offset left
+.It Sy PRCSIG
+clears the current signal, if any (see
+.Sx PCCSIG ) .
+.It Sy PRCFAULT
+clears the current fault, if any (see
+.Sx PCCFAULT ) .
+.It Sy PRSTEP
+directs the lwp to execute a single machine instruction.
+On completion of the instruction, a trace trap occurs.
+If
+.Sy FLTTRACE
+is being traced, the lwp stops; otherwise, it is sent
+.Sy SIGTRAP .
+If
+.Sy SIGTRAP
+is being traced and is not blocked, the lwp stops.
+When the lwp stops on an event of interest,
+the single-step directive is cancelled, even if the stop occurs before the
+instruction is executed.
+This operation requires hardware and operating system
+support and may not be implemented on all processors.
+It is implemented on SPARC and x86-based machines.
+.It Sy PRSABORT
+is meaningful only if the lwp is in a
+.Sy PR_SYSENTRY
+stop or is marked
+.Sy PR_ASLEEP ;
+it instructs the lwp to abort execution of the system call (see
+.Sx PCSENTRY
+and
+.Sx PCSEXIT ) .
+.It Sy PRSTOP
+directs the lwp to stop again as soon as possible after resuming execution (see
+.Sx PCDSTOP ) .
+In particular, if the lwp is stopped on
+.Sy PR_SIGNALLED
+or
+.Sy PR_FAULTED ,
+the next stop will show
+.Sy PR_REQUESTED ,
+no other stop
+will have intervened, and the lwp will not have executed any user-level code.
+.El
+.Pp
+When applied to an lwp control file,
+.Sy PCRUN
+clears any outstanding
+directed-stop request and makes the specific lwp runnable.
+The operation fails with
+.Er EBUSY
+if the specific lwp is not stopped on an event of interest or
+has not been directed to stop or if the agent lwp exists and this is not the
+agent lwp (see
+.Sx PCAGENT ) .
+.Pp
+When applied to the process control file, a representative lwp is chosen for
+the operation as described for
+.Pa /proc/ Ns Em pid Ns Pa /status .
+The operation fails with
+.Er EBUSY
+if the representative lwp is not stopped on an
+event of interest or has not been directed to stop or if the agent lwp exists.
+If
+.Sy PRSTEP
+or
+.Sy PRSTOP
+was requested, the representative lwp is made
+runnable and its outstanding directed-stop request is cleared; otherwise all
+outstanding directed-stop requests are cleared and, if it was stopped on an
+event of interest, the representative lwp is marked
+.Sy PR_REQUESTED .
+If, as a consequence, all lwps are in the
+.Sy PR_REQUESTED
+or
+.Sy PR_SUSPENDED
+stop state, all lwps showing
+.Sy PR_REQUESTED
+are made runnable.
+.Ss PCSTRACE
+Define a set of signals to be traced in the process.
+The receipt of one of these signals by an lwp causes the lwp to stop.
+The set of signals is defined using an operand
+.Sy sigset_t
+contained in the control message.
+Receipt of
+.Sy SIGKILL
+cannot be traced; if specified, it is silently ignored.
+.Pp
+If a signal that is included in an lwp's held signal set (the signal mask) is
+sent to the lwp, the signal is not received and does not cause a stop until it
+is removed from the held signal set, either by the lwp itself or by setting the
+held signal set with
+.Sy PCSHOLD .
+.Ss PCCSIG
+The current signal, if any, is cleared from the specific or representative lwp.
+.Ss PCSSIG
+The current signal and its associated signal information for the specific or
+representative lwp are set according to the contents of the operand
+.Vt siginfo
+structure (see
+.In sys/siginfo.h ) .
+If the specified signal number is zero, the current signal is cleared.
+The semantics of this operation are different from those of
+.Xr kill 2
+in that the signal is delivered to the lwp immediately after execution is
+resumed (even if it is being blocked) and an additional
+.Sy PR_SIGNALLED
+stop does not intervene even if the signal is traced.
+Setting the current signal to
+.Sy SIGKILL
+terminates the process immediately.
+.Ss PCKILL
+If applied to the process control file, a signal is sent to the process with
+semantics identical to those of
+.Xr kill 2
+If applied to an lwp control file, a directed signal is sent to the specific
+lwp.
+The signal is named in a
+.Vt long
+operand contained in the message.
+Sending
+.Sy SIGKILL
+terminates the process immediately.
+.Ss PCUNKILL
+A signal is deleted, that is, it is removed from the set of pending signals.
+If applied to the process control file, the signal is deleted from the process's
+pending signals.
+If applied to an lwp control file, the signal is deleted from
+the lwp's pending signals.
+The current signal (if any) is unaffected.
+The signal is named in a
+.Sy long
+operand in the control message.
+It is an error
+.Pq Er EINVAL
+to attempt to delete
+.Sy SIGKILL .
+.Ss PCSHOLD
+Set the set of held signals for the specific or representative lwp (signals
+whose delivery will be blocked if sent to the lwp).
+The set of signals is specified with a
+.Vt sigset_t
+operand.
+.Sy SIGKILL
+and
+.Sy SIGSTOP
+cannot be held; if specified, they are silently ignored.
+.Ss PCSFAULT
+Define a set of hardware faults to be traced in the process.
+On incurring one of these faults, an lwp stops.
+The set is defined via the operand
+.Vt fltset_t
+structure.
+Fault names are defined in
+.In sys/fault.h
+and include the following.
+Some of these may not occur on all processors; there may
+be processor-specific faults in addition to these.
+.Bl -tag -width "FLTACCESS" -offset indent
+.It Sy FLTILL
+illegal instruction
+.It Sy FLTPRIV
+privileged instruction
+.It Sy FLTBPT
+breakpoint trap
+.It Sy FLTTRACE
+trace trap (single-step)
+.It Sy FLTWATCH
+watchpoint trap
+.It Sy FLTACCESS
+memory access fault (bus error)
+.It Sy FLTBOUNDS
+memory bounds violation
+.It Sy FLTIOVF
+integer overflow
+.It Sy FLTIZDIV
+integer zero divide
+.It Sy FLTFPE
+floating-point exception
+.It Sy FLTSTACK
+unrecoverable stack fault
+.It Sy FLTPAGE
+recoverable page fault
+.El
+.Pp
+When not traced, a fault normally results in the posting of a signal to the lwp
+that incurred the fault.
+If an lwp stops on a fault, the signal is posted to
+the lwp when execution is resumed unless the fault is cleared by
+.Sy PCCFAULT
+or by the
+.Sy PRCFAULT
+option of
+.Sy PCRUN .
+.Sy FLTPAGE
+is an exception; no signal is posted.
+The
+.Sy pr_info
+field in the
+.Vt lwpstatus
+structure identifies the signal to be sent and contains machine-specific
+information about the fault.
+.Ss PCCFAULT
+The current fault, if any, is cleared; the associated signal will not be sent
+to the specific or representative lwp.
+.Ss PCSENTRY PCSEXIT
+These control operations instruct the process's lwps to stop on entry to or
+exit from specified system calls.
+The set of system calls to be traced is defined via an operand
+.Vt sysset_t
+structure.
+.Pp
+When entry to a system call is being traced, an lwp stops after having begun
+the call to the system but before the system call arguments have been fetched
+from the lwp.
+When exit from a system call is being traced, an lwp stops on completion of
+the system call just prior to checking for signals and returning to user level.
+At this point, all return values have been stored into the lwp's registers.
+.Pp
+If an lwp is stopped on entry to a system call
+.Pq Sy PR_SYSENTRY
+or when sleeping in an interruptible system call
+.Pf ( Sy PR_ASLEEP
+is set), it may be instructed to go directly to system call exit by specifying
+the
+.Sy PRSABORT
+flag in a
+.Sy PCRUN
+control message.
+Unless exit from the system call is being traced, the lwp returns to user
+level showing
+.Er EINTR .
+.Ss PCWATCH
+Set or clear a watched area in the controlled process from a
+.Vt prwatch
+structure operand:
+.Bd -literal -offset 2
+typedef struct prwatch {
+    uintptr_t pr_vaddr;  /* virtual address of watched area */
+    size_t pr_size;      /* size of watched area in bytes */
+    int pr_wflags;       /* watch type flags */
+} prwatch_t;
+.Ed
+.Pp
+.Sy pr_vaddr
+specifies the virtual address of an area of memory to be watched
+in the controlled process.
+.Sy pr_size
+specifies the size of the area, in bytes.
+.Sy pr_wflags
+specifies the type of memory access to be monitored as a
+bit-mask of the following flags:
+.Bl -tag -width "WA_TRAPAFTER" -offset indent
+.It Sy WA_READ
+read access
+.It Sy WA_WRITE
+write access
+.It Sy WA_EXEC
+execution access
+.It Sy WA_TRAPAFTER
+trap after the instruction completes
+.El
+.Pp
+If
+.Sy pr_wflags
+is non-empty, a watched area is established for the virtual
+address range specified by
+.Sy pr_vaddr
+and
+.Sy pr_size .
+If
+.Sy pr_wflags
+is empty, any previously-established watched area starting at the specified
+virtual address is cleared;
+.Sy pr_size
+is ignored.
+.Pp
+A watchpoint is triggered when an lwp in the traced process makes a memory
+reference that covers at least one byte of a watched area and the memory
+reference is as specified in
+.Sy pr_wflags .
+When an lwp triggers a watchpoint, it incurs a watchpoint trap.
+If
+.Sy FLTWATCH
+is being traced, the lwp stops; otherwise, it is sent a
+.Sy SIGTRAP
+signal; if
+.Sy SIGTRAP
+is being traced and is not blocked, the lwp stops.
+.Pp
+The watchpoint trap occurs before the instruction completes unless
+.Sy WA_TRAPAFTER
+was specified, in which case it occurs after the instruction completes.
+If it occurs before completion, the memory is not modified.
+If it occurs after completion, the memory is modified (if the access is a write
+access).
+.Pp
+Physical i/o is an exception for watchpoint traps.
+In this instance, there is no guarantee that memory before the watched area
+has already been modified (or in the case of
+.Sy WA_TRAPAFTER ,
+that the memory following the watched area
+has not been modified) when the watchpoint trap occurs and the lwp stops.
+.Pp
+.Sy pr_info
+in the
+.Vt lwpstatus
+structure contains information pertinent to the watchpoint trap.
+In particular, the
+.Sy si_addr
+field contains the
+virtual address of the memory reference that triggered the watchpoint, and the
+.Sy si_code
+field contains one of
+.Sy TRAP_RWATCH ,
+.Sy TRAP_WWATCH ,
+or
+.Sy TRAP_XWATCH ,
+indicating read, write, or execute access, respectively.
+The
+.Sy si_trapafter
+field is zero unless
+.Sy WA_TRAPAFTER
+is in effect for this watched area; non-zero indicates that the current
+instruction is not the instruction that incurred the watchpoint trap.
+The
+.Sy si_pc
+field contains the virtual address of the instruction that incurred the trap.
+.Pp
+A watchpoint trap may be triggered while executing a system call that makes
+reference to the traced process's memory.
+The lwp that is executing the system call incurs the watchpoint trap while
+still in the system call.
+If it stops as a result, the
+.Vt lwpstatus
+structure contains the system call number and its arguments.
+If the lwp does not stop, or if it is set running again without
+clearing the signal or fault, the system call fails with
+.Er EFAULT .
+If
+.Sy WA_TRAPAFTER
+was specified, the memory reference will have completed and
+the memory will have been modified (if the access was a write access) when the
+watchpoint trap occurs.
+.Pp
+If more than one of
+.Sy WA_READ ,
+.Sy WA_WRITE ,
+and
+.Sy WA_EXEC
+is specified for a watched area, and a single instruction incurs more than one
+of the specified types, only one is reported when the watchpoint trap occurs.
+The precedence is
+.Sy WA_EXEC ,
+.Sy WA_READ ,
+.Sy WA_WRITE
+.Pf ( Sy WA_EXEC
+and
+.Sy WA_READ
+take precedence over
+.Sy WA_WRITE ) ,
+unless
+.Sy WA_TRAPAFTER
+was specified, in which case it is
+.Sy WA_WRITE ,
+.Sy WA_READ ,
+.Sy WA_EXEC
+.Pf ( Sy WA_WRITE
+takes precedence).
+.Pp
+.Sy PCWATCH
+fails with
+.Er EINVAL
+if an attempt is made to specify overlapping watched areas or if
+.Sy pr_wflags
+contains flags other than those specified above.
+It fails with
+.Er ENOMEM
+if an attempt is made to establish more watched areas than the system can
+support (the system can support thousands).
+.Pp
+The child of a
+.Xr vfork 2
+borrows the parent's address space.
+When a
+.Xr vfork 2
+is executed by a traced process, all watched areas established
+for the parent are suspended until the child terminates or performs an
+.Xr exec 2 .
+Any watched areas established independently in the child are
+cancelled when the parent resumes after the child's termination or
+.Xr exec 2 .
+.Sy PCWATCH
+fails with
+.Er EBUSY
+if applied to the parent of a
+.Xr vfork 2
+before the child has terminated or performed an
+.Xr exec 2 .
+The
+.Sy PR_VFORKP
+flag is set in the
+.Sy pstatus
+structure for such a parent process.
+.Pp
+Certain accesses of the traced process's address space by the operating system
+are immune to watchpoints.
+The initial construction of a signal stack frame when a signal is delivered to
+an lwp will not trigger a watchpoint trap even if the new frame covers watched
+areas of the stack.
+Once the signal handler is entered, watchpoint traps occur normally.
+On SPARC based machines, register window overflow and underflow will not
+trigger watchpoint traps, even if the register window save areas cover watched
+areas of the stack.
+.Pp
+Watched areas are not inherited by child processes, even if the traced
+process's inherit-on-fork mode,
+.Sy PR_FORK ,
+is set (see
+.Sy PCSET ,
+below).
+All watched areas are cancelled when the traced process performs a successful
+.Xr exec 2 .
+.Ss PCSET PCUNSET
+.Sy PCSET
+sets one or more modes of operation for the traced process.
+.Sy PCUNSET
+unsets these modes.
+The modes to be set or unset are specified by flags in an operand
+.Sy long
+in the control message:
+.Bl -tag -offset left -width "PR_MSFORK"
+.It Sy PR_FORK
+(inherit-on-fork): When set, the process's tracing flags and its
+inherit-on-fork mode are inherited by the child of a
+.Xr fork 2 ,
+.Xr fork1 2 ,
+or
+.Xr vfork 2 .
+When unset, child processes start with all tracing flags cleared.
+.It Sy PR_RLC
+(run-on-last-close): When set and the last writable
+.Pa /proc
+file descriptor referring to the traced process or any of its lwps is closed,
+all of the process's tracing flags and watched areas are cleared, any
+outstanding stop directives are canceled, and if any lwps are stopped on
+events of interest, they are set running as though
+.Sy PCRUN
+had been applied to them.
+When unset, the process's tracing flags and watched areas are retained and
+lwps are not set running on last close.
+.It Sy PR_KLC
+(kill-on-last-close): When set and the last writable
+.Pa /proc
+file descriptor referring to the traced process or any of its lwps is closed,
+the process is terminated with
+.Sy SIGKILL .
+.It Sy PR_ASYNC
+(asynchronous-stop): When set, a stop on an event of interest by one lwp does
+not directly affect any other lwp in the process.
+When unset and an lwp stops on an event of interest other than
+.Sy PR_REQUESTED ,
+all other lwps in the process are directed to stop.
+.It Sy PR_MSACCT
+(microstate accounting): Microstate accounting is now continuously enabled.
+This flag is deprecated and no longer has any effect upon microstate
+accounting.
+Applications may toggle this flag; however, microstate accounting
+will remain enabled regardless.
+.It Sy PR_MSFORK
+(inherit microstate accounting): All processes now inherit microstate
+accounting, as it is continuously enabled.
+This flag has been deprecated and its use no longer has any effect upon the
+behavior of microstate accounting.
+.It Sy PR_BPTADJ
+(breakpoint trap pc adjustment): On x86-based machines, a breakpoint trap
+leaves the program counter (the
+.Sy EIP )
+referring to the breakpointed instruction plus one byte.
+When
+.Sy PR_BPTADJ
+is set, the system will adjust the program counter back to the location of the
+breakpointed instruction when the lwp stops on a breakpoint.
+This flag has no effect on SPARC based machines, where breakpoint traps leave
+the program counter referring to the breakpointed instruction.
+.It Sy PR_PTRACE
+(ptrace-compatibility): When set, a stop on an event of interest by the traced
+process is reported to the parent of the traced process by
+.Xr wait 3C ,
+.Sy SIGTRAP
+is sent to the traced process when it executes a successful
+.Xr exec 2 ,
+setuid/setgid flags are not honored for execs performed by the
+traced process, any exec of an object file that the traced process cannot read
+fails, and the process dies when its parent dies.
+This mode is deprecated; it is provided only to allow
+.Xr ptrace 3C
+to be implemented as a library function using
+.Pa /proc .
+.El
+.Pp
+It is an error
+.Pq Er EINVAL
+to specify flags other than those described above
+or to apply these operations to a system process.
+The current modes are reported in the
+.Sy pr_flags
+field of
+.Pa /proc/ Ns Em pid Ns Pa /status
+and
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwp Ns Pa /lwpstatus .
+.Ss PCSREG
+Set the general registers for the specific or representative lwp according to
+the operand
+.Vt prgregset_t
+structure.
+.Pp
+On SPARC based systems, only the condition-code bits of the processor-status
+register (R_PSR) of SPARC V8 (32-bit) processes can be modified by
+.Sy PCSREG .
+Other privileged registers cannot be modified at all.
+.Pp
+On x86-based systems, only certain bits of the flags register (EFL) can be
+modified by
+.Sy PCSREG :
+these include the condition codes, direction-bit, and overflow-bit.
+.Pp
+.Sy PCSREG
+fails with
+.Er EBUSY
+if the lwp is not stopped on an event of interest.
+.Ss PCSVADDR
+Set the address at which execution will resume for the specific or
+representative lwp from the operand
+.Vt long .
+On SPARC based systems, both %pc and %npc are set, with %npc set to the
+instruction following the virtual address.
+On x86-based systems, only %eip is set.
+.Sy PCSVADDR
+fails with
+.Er EBUSY
+if the lwp is not stopped on an event of interest.
+.Ss PCSFPREG
+Set the floating-point registers for the specific or representative lwp
+according to the operand
+.Vt prfpregset_t
+structure.
+An error
+.Pq Er EINVAL
+is returned if the system does not support floating-point operations (no
+floating-point hardware and the system does not emulate floating-point machine
+instructions).
+.Sy PCSFPREG
+fails with
+.Er EBUSY
+if the lwp is not stopped on an event of interest.
+.Ss PCSXREG
+Set the extra state registers for the specific or representative lwp according
+to the architecture-dependent operand
+.Vt prxregset_t
+structure.
+An error
+.Pq Er EINVAL
+is returned if the system does not support extra state registers.
+.Sy PCSXREG
+fails with
+.Er EBUSY
+if the lwp is not stopped on an event of interest.
+.Ss PCSASRS
+Set the ancillary state registers for the specific or representative lwp
+according to the SPARC V9 platform-dependent operand
+.Vt asrset_t
+structure.
+An error
+.Pq Er EINVAL
+is returned if either the target process or the
+controlling process is not a 64-bit SPARC V9 process.
+Most of the ancillary state registers are privileged registers that cannot be
+modified.
+Only those that can be modified are set; all others are silently ignored.
+.Sy PCSASRS
+fails with
+.Er EBUSY
+if the lwp is not stopped on an event of interest.
+.Ss PCAGENT
+Create an agent lwp in the controlled process with register values from the
+operand
+.Vt prgregset_t
+structure (see
+.Sy PCSREG ,
+above).
+The agent lwp is created in the stopped state showing
+.Sy PR_REQUESTED
+and with its held signal set (the signal mask) having all signals except
+.Sy SIGKILL
+and
+.Sy SIGSTOP
+blocked.
+.Pp
+The
+.Sy PCAGENT
+operation fails with
+.Er EBUSY
+unless the process is fully stopped via
+.Pa /proc ,
+that is, unless all of the lwps in the process are
+stopped either on events of interest or on
+.Sy PR_SUSPENDED ,
+or are stopped on
+.Sy PR_JOBCONTROL
+and have been directed to stop via
+.Sy PCDSTOP .
+It fails with
+.Er EBUSY
+if an agent lwp already exists.
+It fails with
+.Er ENOMEM
+if system resources for creating new lwps have been exhausted.
+.Pp
+Any
+.Sy PCRUN
+operation applied to the process control file or to the control
+file of an lwp other than the agent lwp fails with
+.Er EBUSY
+as long as the agent lwp exists.
+The agent lwp must be caused to terminate by executing the
+.Sy SYS_lwp_exit
+system call trap before the process can be restarted.
+.Pp
+Once the agent lwp is created, its lwp-ID can be found by reading the process
+status file.
+To facilitate opening the agent lwp's control and status files,
+the directory name
+.Pa /proc/ Ns Em pid Ns Pa /lwp/agent
+is accepted for lookup operations as an invisible alias for
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid ,
+.Em lwpid
+being the lwp-ID of the agent lwp (invisible in the sense that the name
+.Dq agent
+does not appear in a directory listing of
+.Pa /proc/ Ns Em pid Ns Pa /lwp
+obtained from
+.Xr ls 1 ,
+.Xr getdents 2 ,
+or
+.Xr readdir 3C .
+.Pp
+The purpose of the agent lwp is to perform operations in the controlled process
+on behalf of the controlling process: to gather information not directly
+available via
+.Pa /proc
+files, or in general to make the process change state
+in ways not directly available via
+.Pa /proc
+control operations.
+To make use of an agent lwp, the controlling process must be capable of making
+it execute system calls (specifically, the
+.Sy SYS_lwp_exit
+system call trap).
+The register values given to the agent lwp on creation are typically the
+registers of the representative lwp, so that the agent lwp can use its stack.
+.Pp
+If the controlling process neglects to force the agent lwp to execute the
+.Sy SYS_lwp_exit
+system call (due to either logic error or fatal failure on
+the part of the controlling process), the agent lwp will remain in the target
+process.
+For purposes of being able to debug these otherwise rogue agents,
+information as to the creator of the agent lwp is reflected in that lwp's
+.Pa spymaster
+file in
+.Pa /proc .
+Should the target process generate a core
+dump with the agent lwp in place, this information will be available via the
+.Sy NT_SPYMASTER
+note in the core file (see
+.Xr core 5 ) .
+.Pp
+The agent lwp is not allowed to execute any variation of the
+.Sy SYS_fork
+or
+.Sy SYS_exec
+system call traps.
+Attempts to do so yield
+.Er ENOTSUP
+to the agent lwp.
+.Pp
+Symbolic constants for system call trap numbers like
+.Sy SYS_lwp_exit
+and
+.Sy SYS_lwp_create
+can be found in the header file
+.In sys/syscall.h .
+.Ss PCREAD PCWRITE
+Read or write the target process's address space via a
+.Vt priovec
+structure operand:
+.Bd -literal -offset 2
+typedef struct priovec {
+    void *pio_base;      /* buffer in controlling process */
+    size_t pio_len;      /* size of read/write request in bytes */
+    off_t pio_offset;    /* virtual address in target process */
+} priovec_t;
+.Ed
+.Pp
+These operations have the same effect as
+.Xr pread 2
+and
+.Xr pwrite 2 ,
+respectively, of the target process's address space file.
+The difference is that more than one
+.Sy PCREAD
+or
+.Sy PCWRITE
+control operation can be
+written to the control file at once, and they can be interspersed with other
+control operations in a single write to the control file.
+This is useful, for example, when planting many breakpoint instructions in
+the process's address space, or when stepping over a breakpointed instruction.
+Unlike
+.Xr pread 2
+and
+.Xr pwrite 2 ,
+no provision is made for partial reads or writes; if the
+operation cannot be performed completely, it fails with
+.Er EIO .
+.Ss PCNICE
+The traced process's
+.Xr nice 2
+value is incremented by the amount in the
+operand
+.Vt long .
+Only a process with the
+.Brq Sy PRIV_PROC_PRIOCNTL
+privilege asserted in its effective set can better a process's priority in this
+way, but any user may lower the priority.
+This operation is not meaningful for all scheduling classes.
+.Ss PCSCRED
+Set the target process credentials to the values contained in the
+.Vt prcred_t
+structure operand (see
+.Pa /proc/ Ns Em pid Ns Pa /cred ) .
+The
+effective, real, and saved user-IDs and group-IDs of the target process are
+set.
+The target process's supplementary groups are not changed; the
+.Sy pr_ngroups
+and
+.Sy pr_groups
+members of the structure operand are ignored.
+Only the privileged processes can perform this operation; for all
+others it fails with
+.Er EPERM .
+.Ss PCSCREDX
+Operates like
+.Sy PCSCRED
+but also sets the supplementary groups; the length
+of the data written with this control operation should be "sizeof
+.Pq Vt prcred_t
++ sizeof
+.Pq Vt gid_t
+* (#groups - 1)".
+.Ss PCSPRIV
+Set the target process privilege to the values contained in the
+.Vt prpriv_t
+operand (see
+.Pa /proc/pid/priv ) .
+The effective, permitted, inheritable, and
+limit sets are all changed.
+Privilege flags can also be set.
+The process is made privilege aware unless it can relinquish privilege awareness.
+See
+.Xr privileges 7 .
+.Pp
+The limit set of the target process cannot be grown.
+The other privilege sets must be subsets of the intersection of the effective set
+of the calling process with the new limit set of the target process or subsets of
+the original values of the sets in the target process.
+.Pp
+If any of the above restrictions are not met,
+.Er EPERM
+is returned.
+If the structure written is improperly formatted,
+.Er EINVAL
+is returned.
+.Sh PROGRAMMING NOTES
+For security reasons, except for the
+.Sy psinfo ,
+.Sy usage ,
+.Sy lpsinfo ,
+.Sy lusage ,
+.Sy lwpsinfo ,
+and
+.Sy lwpusage
+files, which are world-readable, and except for privileged processes, an open
+of a
+.Pa /proc
+file fails unless both the user-ID and group-ID of the caller match those of
+the traced process and the process's object file is readable by the caller.
+The effective set of the caller is a superset of both the inheritable and the
+permitted set of the target process.
+The limit set of the caller is a superset of the limit set of the target
+process.
+Except for the world-readable files just mentioned, files corresponding to
+setuid and setgid processes can be opened only by the appropriately privileged
+process.
+.Pp
+A process that is missing the basic privilege
+.Brq Sy PRIV_PROC_INFO
+cannot see any processes under
+.Pa /proc
+that it cannot send a signal to.
+.Pp
+A process that has
+.Brq Sy PRIV_PROC_OWNER
+asserted in its effective set can open any file for reading.
+To manipulate or control a process, the controlling process must have at least
+as many privileges in its effective set as the target process has in its
+effective, inheritable, and permitted sets.
+The limit set of the controlling process must be a superset of the limit set
+of the target process.
+Additional restrictions apply if any of the uids of the target process are 0.
+See
+.Xr privileges 7 .
+.Pp
+Even if held by a privileged process, an open process or lwp file descriptor
+(other than file descriptors for the world-readable files) becomes invalid if
+the traced process performs an
+.Xr exec 2
+of a setuid/setgid object file or
+an object file that the traced process cannot read.
+Any operation performed on an invalid file descriptor, except
+.Xr close 2 ,
+fails with
+.Er EAGAIN .
+In this situation, if any tracing flags are set and the process or any lwp
+file descriptor is open for writing, the process will have been directed to
+stop and its run-on-last-close flag will have been set (see
+.Sx PCSET ) .
+This enables a controlling process (if it has permission) to reopen the
+.Pa /proc
+files to get new valid file descriptors, close the invalid file descriptors,
+unset the run-on-last-close flag (if desired), and proceed.
+Just closing the invalid file descriptors causes the traced process to resume
+execution with all tracing flags cleared.
+Any process not currently open for writing via
+.Pa /proc ,
+but that has left-over tracing flags from a previous open, and that executes
+a setuid/setgid or unreadable object file, will not be stopped but will have
+all its tracing flags cleared.
+.Pp
+To wait for one or more of a set of processes or lwps to stop or terminate,
+.Pa /proc
+file descriptors (other than those obtained by opening the
+.Pa cwd
+or
+.Pa root
+directories or by opening files in the
+.Pa fd
+or
+.Pa object
+directories) can be used in a
+.Xr poll 2
+system call.
+When requested and returned, either of the polling events
+.Sy POLLPRI
+or
+.Sy POLLWRNORM
+indicates that the process or lwp stopped on an event of
+interest.
+Although they cannot be requested, the polling events
+.Sy POLLHUP ,
+.Sy POLLERR ,
+and
+.Sy POLLNVAL
+may be returned.
+.Sy POLLHUP
+indicates that the process or lwp has terminated.
+.Sy POLLERR
+indicates that the file descriptor has become invalid.
+.Sy POLLNVAL
+is returned immediately if
+.Sy POLLPRI
+or
+.Sy POLLWRNORM
+is requested on a file descriptor referring to a system process (see
+.Sx  PCSTOP ) .
+The requested events may be empty to wait simply for termination.
+.Sh FILES
+.Bl -tag -compact -width Ds
+.It Pa /proc
+directory (list of processes)
+.It Pa /proc/ Ns Em pid
+specific process directory
+.It Pa /proc/self
+alias for a process's own directory
+.It Pa /proc/ Ns Em pid Ns Pa /as
+address space file
+.It Pa /proc/ Ns Em pid Ns Pa /ctl
+process control file
+.It Pa /proc/ Ns Em pid Ns Pa /status
+process status
+.It Pa /proc/ Ns Em pid Ns Pa /lstatus
+array of lwp status structs
+.It Pa /proc/ Ns Em pid Ns Pa /psinfo
+process
+.Xr ps 1
+info
+.It Pa /proc/ Ns Em pid Ns Pa /lpsinfo
+array of lwp
+.Xr ps 1
+info structs
+.It Pa /proc/ Ns Em pid Ns Pa /map
+address space map
+.It Pa /proc/ Ns Em pid Ns Pa /xmap
+extended address space map
+.It Pa /proc/ Ns Em pid Ns Pa /rmap
+reserved address map
+.It Pa /proc/ Ns Em pid Ns Pa /cred
+process credentials
+.It Pa /proc/ Ns Em pid Ns Pa /priv
+process privileges
+.It Pa /proc/ Ns Em pid Ns Pa /sigact
+process signal actions
+.It Pa /proc/ Ns Em pid Ns Pa /auxv
+process aux vector
+.It Pa /proc/ Ns Em pid Ns Pa /ldt
+process
+.Sy LDT
+(x86 only)
+.It Pa /proc/ Ns Em pid Ns Pa /usage
+process usage
+.It Pa /proc/ Ns Em pid Ns Pa /lusage
+array of lwp usage structs
+.It Pa /proc/ Ns Em pid Ns Pa /path
+symbolic links to process open files
+.It Pa /proc/ Ns Em pid Ns Pa /pagedata
+process page data
+.It Pa /proc/ Ns Em pid Ns Pa /watch
+active watchpoints
+.It Pa /proc/ Ns Em pid Ns Pa /cwd
+alias for the current working directory
+.It Pa /proc/ Ns Em pid Ns Pa /root
+alias for the root directory
+.It Pa /proc/ Ns Em pid Ns Pa /fd
+directory (list of open files)
+.It Pa /proc/ Ns Em pid Ns Pa /fd/*
+aliases for process's open files
+.It Pa /proc/ Ns Em pid Ns Pa /object
+directory (list of mapped files)
+.It Pa /proc/ Ns Em pid Ns Pa /object/a.out
+alias for process's executable file
+.It Pa /proc/ Ns Em pid Ns Pa /object/*
+aliases for other mapped files
+.It Pa /proc/ Ns Em pid Ns Pa /lwp
+directory (list of lwps)
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid
+specific lwp directory
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/agent
+alias for the agent lwp directory
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpctl
+lwp control file
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpstatus
+lwp status
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpsinfo
+lwp
+.Xr ps 1
+info
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpusage
+lwp usage
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /gwindows
+register windows (SPARC only)
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /xregs
+extra state registers
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /asrs
+ancillary state registers (SPARC V9 only)
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /spymaster
+For an agent LWP, the controlling process
+.El
+.Sh DIAGNOSTICS
+Errors that can occur in addition to the errors normally associated with file
+system access:
+.Bl -tag -width "EOVERFLOW" -offset left
+.It Er E2BIG
+Data to be returned in a
+.Xr read 2
+of the page data file exceeds the size of the read buffer provided by the
+caller.
+.It Er EACCES
+An attempt was made to examine a process that ran under a different uid than
+the controlling process and
+.Brq Sy PRIV_PROC_OWNER
+was not asserted in the effective set.
+.It Er EAGAIN
+The traced process has performed an
+.Xr exec 2
+of a setuid/setgid object
+file or of an object file that it cannot read; all further operations on the
+process or lwp file descriptor (except
+.Xr close 2 )
+elicit this error.
+.It Er EBUSY
+.Sy PCSTOP ,
+.Sy PCDSTOP ,
+.Sy PCWSTOP , or
+.Sy PCTWSTOP
+was applied to a system process; an exclusive
+.Xr open 2
+was attempted on a
+.Pa /proc
+file for a process already open for writing;
+.Sy PCRUN ,
+.Sy PCSREG ,
+.Sy PCSVADDR ,
+.Sy PCSFPREG ,
+or
+.Sy PCSXREG
+was applied to a process or
+lwp not stopped on an event of interest; an attempt was made to mount
+.Pa /proc
+when it was already mounted;
+.Sy PCAGENT
+was applied to a process
+that was not fully stopped or that already had an agent lwp.
+.It Er EINVAL
+In general, this means that some invalid argument was supplied to a system
+call.
+A non-exhaustive list of conditions eliciting this error includes: a
+control message operation code is undefined; an out-of-range signal number was
+specified with
+.Sy PCSSIG ,
+.Sy PCKILL ,
+or
+.Sy PCUNKILL ;
+.Sy SIGKILL
+was specified with
+.Sy PCUNKILL ;
+.Sy PCSFPREG
+was applied on a system that does not support floating-point operations;
+.Sy PCSXREG
+was applied on a system that does not support extra state registers.
+.It Er EINTR
+A signal was received by the controlling process while waiting for the traced
+process or lwp to stop via
+.Sy PCSTOP ,
+.Sy PCWSTOP ,
+or
+.Sy PCTWSTOP .
+.It Er EIO
+A
+.Xr write 2
+was attempted at an illegal address in the traced process.
+.It Er ENOENT
+The traced process or lwp has terminated after being opened.
+The basic privilege
+.Brq Sy PRIV_PROC_INFO
+is not asserted in the effective set of the calling process and the calling
+process cannot send a signal to the target process.
+.It Er ENOMEM
+The system-imposed limit on the number of page data file descriptors was
+reached on an open of
+.Pa /proc/ Ns Em pid Ns Pa /pagedata ;
+an attempt was made
+with
+.Sy PCWATCH
+to establish more watched areas than the system can support;
+the
+.Sy PCAGENT
+operation was issued when the system was out of resources for
+creating lwps.
+.It Er ENOSYS
+An attempt was made to perform an unsupported operation (such as
+.Xr creat 2 ,
+.Xr link 2 ,
+or
+.Xr unlink 2 )
+on an entry in
+.Pa /proc .
+.It Er EOVERFLOW
+A 32-bit controlling process attempted to read or write the
+.Pa as
+file or attempted to read the
+.Pa map ,
+.Pa rmap ,
+or
+.Pa pagedata
+file of a 64-bit target process.
+A 32-bit controlling process attempted to apply one of the
+control operations
+.Sy PCSREG ,
+.Sy PCSXREG ,
+.Sy PCSVADDR ,
+.Sy PCWATCH ,
+.Sy PCAGENT ,
+.Sy PCREAD ,
+.Sy PCWRITE
+to a 64-bit target process.
+.It Er EPERM
+The process that issued the
+.Sy PCSCRED
+or
+.Sy PCSCREDX
+operation did not have the
+.Brq Sy PRIV_PROC_SETID
+privilege asserted in its effective set, or
+the process that issued the
+.Sy PCNICE
+operation did not have the
+.Brq Sy PRIV_PROC_PRIOCNTL
+in its effective set.
+.Pp
+An attempt was made to control a process of which the E, P, and I privilege
+sets were not a subset of the effective set of the controlling process or the
+limit set of the controlling process is not a superset of limit set of the
+controlled process.
+.Pp
+Any of the uids of the target process are
+.Sy 0
+or an attempt was made to change any of the uids to
+.Sy 0
+using
+.Sy PCSCRED
+and the security policy imposed additional restrictions.
+See
+.Xr privileges 7 .
+.El
+.Sh SEE ALSO
+.Xr ls 1 ,
+.Xr ps 1 ,
+.Xr alarm 2 ,
+.Xr brk 2 ,
+.Xr chdir 2 ,
+.Xr chroot 2 ,
+.Xr close 2 ,
+.Xr creat 2 ,
+.Xr dup 2 ,
+.Xr exec 2 ,
+.Xr fcntl 2 ,
+.Xr fork 2 ,
+.Xr fork1 2 ,
+.Xr fstat 2 ,
+.Xr getdents 2 ,
+.Xr getustack 2 ,
+.Xr kill 2 ,
+.Xr lseek 2 ,
+.Xr mmap 2 ,
+.Xr nice 2 ,
+.Xr open 2 ,
+.Xr poll 2 ,
+.Xr pread 2 ,
+.Xr pwrite 2 ,
+.Xr read 2 ,
+.Xr readlink 2 ,
+.Xr readv 2 ,
+.Xr shmget 2 ,
+.Xr sigaction 2 ,
+.Xr sigaltstack 2 ,
+.Xr vfork 2 ,
+.Xr write 2 ,
+.Xr writev 2 ,
+.Xr _stack_grow 3C ,
+.Xr pthread_create 3C ,
+.Xr pthread_join 3C ,
+.Xr ptrace 3C ,
+.Xr readdir 3C ,
+.Xr thr_create 3C ,
+.Xr thr_join 3C ,
+.Xr wait 3C ,
+.Xr siginfo.h 3HEAD ,
+.Xr signal.h 3HEAD ,
+.Xr types32.h 3HEAD ,
+.Xr ucontext.h 3HEAD ,
+.Xr contract 5 ,
+.Xr core 5 ,
+.Xr process 5 ,
+.Xr lfcompile 7 ,
+.Xr privileges 7 ,
+.Xr security-flags 7 ,
+.Xr chroot 8
+.Sh NOTES
+Descriptions of structures in this document include only interesting structure
+elements, not filler and padding fields, and may show elements out of order for
+descriptive clarity.
+The actual structure definitions are contained in
+.In procfs.h .
+.Sh BUGS
+Because the old
+.Xr ioctl 2 Ns -based
+version of
+.Pa /proc
+is currently supported for binary compatibility with old applications, the
+top-level directory for a process,
+.Pa /proc/ Ns Em pid ,
+is not world-readable, but it is world-searchable.
+Thus, anyone can open
+.Pa /proc/ Ns Em pid Ns Pa /psinfo
+even though
+.Xr ls 1
+applied to
+.Pa /proc/ Ns Em pid
+will fail for anyone but the owner or an appropriately privileged process.
+Support for the old
+.Xr ioctl 2 Ns -based
+version of
+.Pa /proc
+will be dropped in a future release, at which time the top-level directory for
+a process will be made world-readable.
+.Pp
+On SPARC based machines, the types
+.Sy gregset_t
+and
+.Sy fpregset_t
+defined in
+.In sys/regset.h
+are similar to but not the same as the types
+.Sy prgregset_t
+and
+.Sy prfpregset_t
+defined in
+.In procfs.h .

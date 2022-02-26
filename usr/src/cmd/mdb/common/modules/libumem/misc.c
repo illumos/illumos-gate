@@ -44,7 +44,7 @@ umem_debug(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 /*
  * To further confuse the issue, this dmod can run against either
- * libumem.so.1 *or* the libstandumem.so linked into kmdb(1M).  To figure
+ * libumem.so.1 *or* the libstandumem.so linked into kmdb(1).  To figure
  * out which one we are working against, we look up "umem_alloc" in both
  * libumem.so and the executable.
  *

@@ -25,7 +25,7 @@ CDDL HEADER END
 Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
-Service manifests for iSCSI Target 
+Service manifests for iSCSI Target
 -->
 
 <!--
@@ -71,7 +71,7 @@ Service manifests for iSCSI Target
 			/>
 		</method_context>
 	</exec_method>
-        
+
 	<exec_method
 		type='method'
 		name='stop'
@@ -100,7 +100,7 @@ Service manifests for iSCSI Target
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='itadm' section='1M'
+			<manpage title='itadm' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

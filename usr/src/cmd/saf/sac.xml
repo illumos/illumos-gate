@@ -24,8 +24,6 @@
 
  CDDL HEADER END
 
-    ident	"%Z%%M%	%I%	%E% SMI"
-
     NOTE:  This service manifest is not editable; its contents will
     be overwritten by package or patch operations, including
     operating system upgrade.  Make customizations in a different
@@ -52,7 +50,7 @@
 	</dependency>
 
 	<!--
-	  sac(1M) has historically started as prior to run level 2.  Its
+	  sac(8) has historically started as prior to run level 2.  Its
 	  components have no dependents of their own.
 	-->
 	<dependency
@@ -101,7 +99,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='sac' section='1M' manpath='/usr/share/man' />
+			<manpage title='sac' section='8' manpath='/usr/share/man' />
 		</documentation>
 	</template>
 </service>

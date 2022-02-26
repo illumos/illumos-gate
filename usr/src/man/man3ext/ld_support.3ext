@@ -100,7 +100,7 @@ mechanism.
 .SH SEE ALSO
 .sp
 .LP
-\fBld\fR(1)
+.BR ld (1)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

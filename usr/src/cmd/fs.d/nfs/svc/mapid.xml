@@ -20,7 +20,7 @@
 
     CDDL HEADER END
 
-    Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved. 
+    Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 
     NOTE:  This service manifest is not editable; its contents will
     be overwritten by package or patch operations, including
@@ -71,7 +71,7 @@
 	    grouping='require_all'
 	    restart_on='error'
 	    type='service'>
-	    	<service_fmri value='svc:/system/filesystem/minimal' />
+		<service_fmri value='svc:/system/filesystem/minimal' />
 	</dependency>
 
 	<exec_method
@@ -111,7 +111,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='nfsmapid' section='1M'
+			<manpage title='nfsmapid' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

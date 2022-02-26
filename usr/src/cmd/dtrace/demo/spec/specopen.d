@@ -31,7 +31,7 @@ syscall::open64:entry
 {
 	/*
 	 * The call to speculation() creates a new speculation.  If this fails,
-	 * dtrace(1M) will generate an error message indicating the reason for
+	 * dtrace(8) will generate an error message indicating the reason for
 	 * the failed speculation(), but subsequent speculative tracing will be
 	 * silently discarded.
 	 */

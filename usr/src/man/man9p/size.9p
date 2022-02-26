@@ -96,7 +96,7 @@ The DDI property interfaces deal in signed numbers. All Size(9P) values should
 be considered unsigned. It is the responsibility of the code dealing with the
 property value to ensure that an unsigned interpretation occurs.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp

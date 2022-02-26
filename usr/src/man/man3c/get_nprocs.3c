@@ -53,8 +53,8 @@ configured.
 .Sy MT-Safe ,
 .Sy Async-Signal-Safe
 .Sh SEE ALSO
-.Xr psrinfo 1M ,
 .Xr processor_info 2 ,
 .Xr sysconf 3C ,
-.Xr attributes 5 ,
-.Xr standards 5
+.Xr attributes 7 ,
+.Xr standards 7 ,
+.Xr psrinfo 8

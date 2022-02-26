@@ -1,0 +1,164 @@
+'\" te
+.\"  Copyright (c) 1983 Regents of the University
+.\" of California.  All rights reserved.  The Berkeley software License Agreement
+.\"  specifies the terms and conditions for redistribution.  Copyright (c) 1995
+.\" Sun Microsystems, Inc.  All Rights Reserved.
+.\" from UCB 4.3
+.TH RMT 8 "Nov 6, 2000"
+.SH NAME
+rmt \- remote magtape protocol module
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/rmt\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+\fBrmt\fR is a program used by the remote dump and restore programs in
+manipulating a magnetic tape drive through an interprocess communication
+connection. \fBrmt\fR is normally started up with an \fBrexec\fR(3SOCKET) or
+\fBrcmd\fR(3SOCKET) call.
+.sp
+.LP
+The \fBrmt\fR program accepts requests that are specific to the manipulation of
+magnetic tapes, performs the commands, then responds with a status indication.
+All responses are in \fBASCII\fR and in one of two forms. Successful commands
+have responses of:
+.sp
+.in +2
+.nf
+
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fB\fBA\fR\fInumber\fR\fB\en\fR\fR
+.ad
+.RS 14n
+where \fInumber\fR is an \fBASCII\fR representation of a decimal number.
+.RE
+
+.sp
+.LP
+Unsuccessful commands are responded to with:
+.sp
+.ne 2
+.na
+\fB\fBE\fR\fIerror-number\fR\fB\en\fR\fIerror-message\fR\fB\en\fR\fR
+.ad
+.sp .6
+.RS 4n
+where \fIerror-number\fR is one of the possible error numbers described in
+\fBIntro\fR(3), and \fIerror-message\fR is the corresponding error string as
+printed from a call to \fBperror\fR(3C).
+.RE
+
+.sp
+.LP
+ The protocol consists of the following commands:
+.sp
+.ne 2
+.na
+\fB\fBS\en\fR\fR
+.ad
+.RS 25n
+Return the status of the open device, as obtained with a \fBMTIOCGET\fR
+\fBioctl\fR call.  If the operation was successful, an "ack" is sent with the
+size of the status buffer, then the status buffer is sent (in binary).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBC\fR\fIdevice\fR\fB\en\fR\fR
+.ad
+.RS 25n
+Close the currently open device. The \fIdevice\fR specified is ignored.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBI\fR\fIoperation\fR\fB\en\fR\fIcount\fR\fB\en\fR\fR
+.ad
+.RS 25n
+Perform a \fBMTIOCOP\fR \fBioctl\fR(2) command using the specified parameters.
+The parameters are interpreted as the \fBASCII\fR representations of the
+decimal values to place in the \fImt_op\fR and \fImt_count\fR fields of the
+structure used in the \fBioctl\fR call.   When the operation is successful the
+return value is the \fIcount\fR parameter.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBL\fR\fIoffset\fR\fB\en\fR\fBwhence\fR\fB\en\fR\fR
+.ad
+.RS 25n
+Perform an \fBlseek\fR(2) operation using the specified parameters. The
+response value is returned from the \fBlseek\fR call.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBO\fR\fIdevice\fR\fB\en\fR\fImode\fR\fB\en\fR\fR
+.ad
+.RS 25n
+Open the specified \fIdevice\fR using the indicated \fImode\fR. \fIdevice\fR is
+a full pathname, and \fImode\fR is an \fBASCII\fR representation of a decimal
+number suitable for passing to \fBopen\fR(9E). If a device is already open, it
+is closed before a new open is performed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBR\fR\fIcount\fR\fB\en\fR\fR
+.ad
+.RS 25n
+Read \fIcount\fR bytes of data from the open device. \fBrmt\fR performs the
+requested \fBread\fR(9E) and responds with \fBA\fR\fIcount-read\en\fR if the
+read was successful; otherwise an error in  standard format is returned. If the
+read was successful, the data read is sent.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBW\fR\fIcount\fR\fB\en\fR\fR
+.ad
+.RS 25n
+Write data onto the open device. \fBrmt\fR reads \fIcount\fR bytes from the
+connection, aborting if a premature \fBEOF\fR is encountered. The response
+value is returned from the \fBwrite\fR(9E) call.
+.RE
+
+.sp
+.LP
+Any other command causes \fBrmt\fR to exit.
+.SH SEE ALSO
+.LP
+.BR ioctl (2),
+.BR lseek (2),
+.BR Intro (3),
+.BR perror (3C),
+.BR rcmd (3SOCKET),
+.BR rexec (3SOCKET),
+.BR mtio (4I),
+.BR attributes (7),
+.BR ufsdump (8),
+.BR ufsrestore (8),
+.BR open (9E),
+.BR read (9E),
+.BR write (9E)
+.SH DIAGNOSTICS
+.LP
+All responses are of the form described above.
+.SH BUGS
+.LP
+Do not use this for a remote file access protocol.

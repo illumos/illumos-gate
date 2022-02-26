@@ -110,7 +110,7 @@ No errors are defined.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -128,10 +128,16 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBatomic_add\fR(3C), \fBatomic_bits\fR(3C), \fBatomic_cas\fR(3C),
-\fBatomic_dec\fR(3C), \fBatomic_inc\fR(3C), \fBatomic_or\fR(3C),
-\fBatomic_swap\fR(3C), \fBmembar_ops\fR(3C), \fBattributes\fR(5),
-\fBatomic_ops\fR(9F)
+.BR atomic_add (3C),
+.BR atomic_bits (3C),
+.BR atomic_cas (3C),
+.BR atomic_dec (3C),
+.BR atomic_inc (3C),
+.BR atomic_or (3C),
+.BR atomic_swap (3C),
+.BR membar_ops (3C),
+.BR attributes (7),
+.BR atomic_ops (9F)
 .SH NOTES
 .sp
 .LP

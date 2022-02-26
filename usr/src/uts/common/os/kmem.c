@@ -2250,7 +2250,7 @@ kmem_dumppr(char **pp, char *e, const char *format, ...)
 }
 
 /*
- * Called when dumpadm(1M) configures dump parameters.
+ * Called when dumpadm(8) configures dump parameters.
  */
 void
 kmem_dump_init(size_t size)

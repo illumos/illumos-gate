@@ -96,7 +96,8 @@ in its buffer (line 11), then remove it from the message (line 12) and free it
 .SH SEE ALSO
 .sp
 .LP
-\fBfreeb\fR(9F), \fBmsgb\fR(9S)
+.BR freeb (9F),
+.BR msgb (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

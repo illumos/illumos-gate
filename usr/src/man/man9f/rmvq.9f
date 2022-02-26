@@ -97,7 +97,9 @@ by using STREAMS functions or by implementing your own locking.
 .SH SEE ALSO
 .sp
 .LP
-\fBfreemsg\fR(9F), \fBgetq\fR(9F), \fBinsq\fR(9F)
+.BR freemsg (9F),
+.BR getq (9F),
+.BR insq (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

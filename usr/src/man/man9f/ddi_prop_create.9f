@@ -503,7 +503,7 @@ for (minor = 0; minor < 8; minor ++) {
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -519,9 +519,13 @@ T}
 .TE
 
 .SH SEE ALSO
-\fBdriver.conf\fR(4), \fBattributes\fR(5), \fBattach\fR(9E),
-\fBddi_getproplen\fR(9F), \fBddi_prop_op\fR(9F), \fBddi_prop_update\fR(9F),
-\fBmakedevice\fR(9F)
+.BR driver.conf (5),
+.BR attributes (7),
+.BR attach (9E),
+.BR ddi_getproplen (9F),
+.BR ddi_prop_op (9F),
+.BR ddi_prop_update (9F),
+.BR makedevice (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

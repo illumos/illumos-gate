@@ -1,0 +1,2548 @@
+'\" te
+.\" Copyright (C) 2012, Darren Reed. All rights reserved
+.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
+.TH IFCONFIG 8 "June 13, 2021"
+.SH NAME
+ifconfig \- configure network interface parameters
+.SH SYNOPSIS
+.nf
+\fBifconfig\fR \fIinterface\fR [\fIaddress_family\fR] [\fIaddress\fR [\fI/prefix_length\fR]
+ [\fIdest_address\fR]] [\fBaddif\fR \fIaddress\fR [\fI/prefix_length\fR]]
+ [\fBremoveif\fR \fIaddress\fR [\fI/prefix_length\fR]] [\fBarp\fR | \fB-arp\fR]
+ [\fBauth_algs\fR \fIauthentication algorithm\fR] [\fBencr_algs\fR \fIencryption algorithm\fR]
+ [\fBencr_auth_algs\fR \fIauthentication algorithm\fR] [\fBauto-revarp\fR]
+ [\fBbroadcast\fR \fIaddress\fR] [\fBdeprecated\fR | \fB-deprecated\fR]
+ [\fBpreferred\fR | \fB-preferred\fR] [\fBdestination\fR \fIdest_address\fR]
+ [ether [\fIaddress\fR]] [\fBfailover\fR | \fB-failover\fR] [\fBgroup\fR
+ [\fIname\fR | ""\fB\fR]] [\fBindex\fR \fIif_index\fR] [ipmp] [\fBmetric\fR \fIn\fR] [modlist]
+ [modinsert \fImod_name@pos\fR] [modremove \fImod_name@pos\fR]
+ [\fBmtu\fR \fIn\fR] [\fBnetmask\fR \fImask\fR] [\fBplumb\fR] [\fBunplumb\fR] [\fBprivate\fR
+ | \fB-private\fR] [\fBnud\fR | \fB-nud\fR] [\fBset\fR [\fIaddress\fR] [\fI/netmask\fR]]
+ [\fBstandby\fR | \fB-standby\fR] [\fBsubnet\fR \fIsubnet_address\fR] [\fBtdst\fR
+ \fItunnel_dest_address\fR] [\fBtoken\fR \fIaddress\fR/\fIprefix_length\fR]
+ [\fBtsrc\fR \fItunnel_src_address\fR] [\fBtrailers\fR | \fB-trailers\fR]
+ [\fBup\fR] [\fBdown\fR] [\fBusesrc\fR [\fIname\fR | none]] [\fBxmit\fR | \fB-xmit\fR]
+ [\fBencaplimit\fR \fIn\fR | \fB-encaplimit\fR] [\fBthoplimit\fR \fIn\fR] [\fBrouter\fR
+ | \fB-router\fR] [zone \fIzonename\fR | \fB-zone\fR | \fB-all-zones\fR]
+.fi
+
+.LP
+.nf
+\fBifconfig\fR [\fIaddress_family\fR] \fIinterface\fR {\fBauto-dhcp\fR | \fBdhcp\fR} [\fBprimary\fR]
+ [\fBwait\fR \fIseconds\fR] \fBdrop\fR | \fBextend\fR | \fBinform\fR | \fBping\fR
+ | \fBrelease\fR | \fBstart\fR | \fBstatus\fR
+.fi
+
+.SH DESCRIPTION
+The command \fBifconfig\fR is used to assign an address to a network interface
+and to configure network interface parameters. The \fBifconfig\fR command must
+be used at boot time to define the network address of each interface present on
+a machine; it may also be used at a later time to redefine an interface's
+address or other operating parameters. If no option is specified,
+\fBifconfig\fR displays the current configuration for a network interface. If
+an address family is specified, \fBifconfig\fR reports only the details
+specific to that address family. Only privileged users may modify the
+configuration of a network interface. Options appearing within braces
+(\fB{\|}\fR) indicate that one of the options must be specified.
+.SS Network Interface Observability
+Network interface observability with \fBifconfig\fR is limited to those
+network interfaces that have been prepared for use with the IP
+protocol suite. The preferred method for configuring a network
+interface for use with TCP/IP is with \fBipadm\fR and alternatively
+with the use of the \fBplumb\fR option as documented below. Network
+interfaces that have not been configured for use with the IP
+protocol suite can only be observed by using the \fBdladm\fR command.
+.SS DHCP Configuration
+The forms of \fBifconfig\fR that use the \fBauto-dhcp\fR or \fBdhcp\fR
+arguments are used to control the Dynamic Host Configuration Protocol
+("\fBDHCP\fR") configuration of the interface. In this mode, \fBifconfig\fR is
+used to control operation of \fBdhcpagent\fR(8), the \fBDHCP\fR client daemon.
+Once an interface is placed under \fBDHCP\fR control by using the \fBstart\fR
+operand, \fBifconfig\fR should not, in normal operation, be used to modify the
+address or characteristics of the interface. If the address of an interface
+under \fBDHCP\fR is changed, \fBdhcpagent\fR will remove the interface from its
+control.
+.SH OPTIONS
+When the \fBifconfig\fR command is executed without any options
+its behavior is the same as when the \fB\-a\fR option is supplied
+with no other options or arguments.
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fBaddif\fR \fIaddress\fR\fR
+.ad
+.sp .6
+.RS 4n
+Create the next unused logical interface on the specified physical interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBall-zones\fR\fR
+.ad
+.sp .6
+.RS 4n
+Make the interface available to every shared-IP zone on the system. The
+appropriate zone to which to deliver data is determined using the
+\fBtnzonecfg\fR database. This option is available only if the system is
+configured with the Solaris Trusted Extensions feature.
+.sp
+The \fBtnzonecfg\fR database is described in the \fBtnzonecfg(5)\fR man page,
+which is part of the \fISolaris Trusted Extensions Reference Manual\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBanycast\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks the logical interface as an anycast address by setting the \fBANYCAST\fR
+flag. See "INTERFACE FLAGS," below, for more information on anycast.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-anycast\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks the logical interface as not an anycast address by clearing the
+\fBANYCAST\fR flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBarp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable the use of the Address Resolution Protocol ("\fBARP\fR") in mapping
+between network level addresses and link level addresses (default). This is
+currently implemented for mapping between IPv4 addresses and MAC addresses.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-arp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disable the use of the \fBARP\fR on a physical interface. ARP cannot be
+disabled on an IPMP IP interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBauth_algs\fR \fIauthentication algorithm\fR\fR
+.ad
+.sp .6
+.RS 4n
+For a tunnel, enable IPsec \fBAH\fR with the authentication algorithm
+specified. The algorithm can be either a number or an algorithm name, including
+\fIany\fR to express no preference in algorithm. All IPsec tunnel properties
+must be specified on the same command line. To disable tunnel security, specify
+an \fBauth_alg\fR of \fBnone\fR.
+.sp
+It is now preferable to use the \fBipsecconf\fR(8) command when configuring a
+tunnel's security properties. If \fBipsecconf\fR was used to set a tunnel's
+security properties, this keyword will not affect the tunnel.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBauto-dhcp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use DHCP to automatically acquire an address for this interface. This option
+has a completely equivalent alias called \fBdhcp\fR.
+.sp
+For IPv6, the interface specified must be the zeroth logical interface (the
+physical interface name), which has the link-local address.
+.sp
+.ne 2
+.na
+\fBprimary\fR
+.ad
+.sp .6
+.RS 4n
+Defines the interface as the \fBprimary\fR. The interface is defined as the
+preferred one for the delivery of client-wide configuration data. Only one
+interface can be the primary at any given time. If another interface is
+subsequently selected as the primary, it replaces the previous one. Nominating
+an interface as the primary one will not have much significance once the client
+work station has booted, as many applications will already have started and
+been configured with data read from the previous primary interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fBwait \fIseconds\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBifconfig\fR command will wait until the operation either completes or
+for the interval specified, whichever is the sooner. If no wait interval is
+given, and the operation is one that cannot complete immediately,
+\fBifconfig\fR will wait 30 seconds for the requested operation to complete.
+The symbolic value \fBforever\fR may be used as well, with obvious meaning.
+.RE
+
+.sp
+.ne 2
+.na
+\fBdrop\fR
+.ad
+.sp .6
+.RS 4n
+Remove the specified interface from \fBDHCP\fR control without notifying the
+DHCP server, and record the current lease for later use. Additionally, for
+IPv4, set the IP address to zero. For IPv6, unplumb all logical interfaces
+plumbed by \fBdhcpagent\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBextend\fR
+.ad
+.sp .6
+.RS 4n
+Attempt to extend the lease on the interface's IP address. This is not
+required, as the agent will automatically extend the lease well before it
+expires.
+.RE
+
+.sp
+.ne 2
+.na
+\fBinform\fR
+.ad
+.sp .6
+.RS 4n
+Obtain network configuration parameters from \fBDHCP\fR without obtaining a
+lease on \fBIP\fR addresses. This is useful in situations where an \fBIP\fR
+address is obtained through mechanisms other than \fBDHCP\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBping\fR
+.ad
+.sp .6
+.RS 4n
+Check whether the interface given is under \fBDHCP\fR control, which means that
+the interface is managed by the \fBDHCP\fR agent and is working properly. An
+exit status of \fB0\fR means success.
+.RE
+
+.sp
+.ne 2
+.na
+\fBrelease\fR
+.ad
+.sp .6
+.RS 4n
+Relinquish the IP addresses on the interface by notifying the server and
+discard the current lease. For IPv4, set the IP address to zero. For IPv6, all
+logical interfaces plumbed by \fBdhcpagent\fR are unplumbed.
+.RE
+
+.sp
+.ne 2
+.na
+\fBstart\fR
+.ad
+.sp .6
+.RS 4n
+Start \fBDHCP\fR on the interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fBstatus\fR
+.ad
+.sp .6
+.RS 4n
+Display the \fBDHCP\fR configuration status of the interface.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBauto-revarp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use the Reverse Address Resolution Protocol (RARP) to automatically acquire an
+address for this interface. This will fail if the interface does not support
+RARP; for example, IPoIB (IP over InfiniBand), and on IPv6 interfaces.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbroadcast\fR \fIaddress\fR\fR
+.ad
+.sp .6
+.RS 4n
+For IPv4 only. Specify the address to use to represent broadcasts to the
+network. The default broadcast address is the address with a host part of all
+\fB1\fR's. A "\fB+\fR" (plus sign) given for the broadcast value causes the
+broadcast address to be reset to a default appropriate for the (possibly new)
+address and netmask. The arguments of \fBifconfig\fR are interpreted left to
+right. Therefore
+.sp
+.in +2
+.nf
+example% ifconfig -a netmask + broadcast +
+.fi
+.in -2
+.sp
+
+and
+.sp
+.in +2
+.nf
+example% ifconfig -a broadcast + netmask +
+.fi
+.in -2
+.sp
+
+may result in different values being assigned for the broadcast addresses of
+the interfaces.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdeprecated\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks the logical interface as deprecated. An address associated with a
+deprecated interface will not be used as source address for outbound packets
+unless either there are no other addresses available on the interface or the
+application has bound to this address explicitly. The status display shows
+\fBDEPRECATED\fR as part of flags. See  for information on the flags supported
+by \fBifconfig\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-deprecated\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks a logical interface as not deprecated. An address associated with such an
+interface could be used as a source address for outbound packets.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpreferred\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks the logical interface as preferred. This option is only valid for IPv6
+addresses. Addresses assigned to preferred logical interfaces are preferred as
+source addresses over all other addresses configured on the system, unless the
+address is of an inappropriate scope relative to the destination address.
+Preferred addresses are used as source addresses regardless of which physical
+interface they are assigned to. For example, you can configure a preferred
+source address on the loopback interface and advertise reachability of this
+address by using a routing protocol.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-preferred\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks the logical interface as not preferred.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdestination\fR \fIdest_address\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the destination address for a point-to point interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdhcp\fR\fR
+.ad
+.sp .6
+.RS 4n
+This option is an alias for option \fBauto-dhcp\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdown\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mark a logical interface as "down". (That is, turn off the \fBIFF_UP\fR bit.)
+When a logical interface is marked "down," the system does not attempt to use
+the address assigned to that interface as a source address for outbound packets
+and will not recognize inbound packets destined to that address as being
+addressed to this host. Additionally, when all logical interfaces on a given
+physical interface are "down," the physical interface itself is disabled.
+.sp
+When a logical interface is down, all routes that specify that interface as the
+output (using the \fB-ifp\fR option in the \fBroute\fR(8) command or
+\fBRTA_IFP\fR in a \fBroute\fR(4P) socket) are removed from the forwarding
+table. Routes marked with \fBRTF_STATIC\fR are returned to the table if the
+interface is brought back up, while routes not marked with \fBRTF_STATIC\fR are
+simply deleted.
+.sp
+When all logical interfaces that could possibly be used to reach a particular
+gateway address are brought down (specified without the interface option as in
+the previous paragraph), the affected gateway routes are treated as though they
+had the \fBRTF_BLACKHOLE\fR flag set. All matching packets are discarded
+because the gateway is unreachable.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBencaplimit\fR \fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the tunnel encapsulation limit for the interface to n. This option applies
+to IPv4-in-IPv6 and IPv6-in-IPv6 tunnels only, and it simply modifies the
+\fBencaplimit\fR link property of the underlying IPv6 tunnel link (see
+\fBdladm\fR(8)). The tunnel encapsulation limit controls how many more tunnels
+a packet can enter before it leaves any tunnel, that is, the tunnel nesting
+level.
+.sp
+This option is obsolete, superseded by the \fBdladm\fR(8) \fBencaplimit\fR
+link property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-encaplimit\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disable generation of the tunnel encapsulation limit. This option applies only
+to IPv4-in-IPv6 and IPv6-in-IPv6 tunnels. This simply sets the \fBencaplimit\fR
+link property of the underlying IPv6 tunnel link to 0 (see \fBdladm\fR(8)
+\fBencaplimit\fR).
+.sp
+This option is obsolete, superseded by the \fBdladm\fR(8) \fBencaplimit\fR
+link property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBencr_auth_algs\fR \fIauthentication algorithm\fR\fR
+.ad
+.sp .6
+.RS 4n
+For a tunnel, enable IPsec \fBESP\fR with the authentication algorithm
+specified. It can be either a number or an algorithm name, including \fBany\fR
+or \fBnone\fR, to indicate no algorithm preference. If an \fBESP\fR encryption
+algorithm is specified but the authentication algorithm is not, the default
+value for the \fBESP\fR authentication algorithm will be \fBany\fR.
+.sp
+It is now preferable to use the \fBipsecconf\fR(8) command when configuring a
+tunnel's security properties. If \fBipsecconf\fR was used to set a tunnel's
+security properties, this keyword will not affect the tunnel.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBencr_algs\fR \fIencryption algorithm\fR\fR
+.ad
+.sp .6
+.RS 4n
+For a tunnel, enable IPsec \fBESP\fR with the encryption algorithm specified.
+It can be either a number or an algorithm name. Note that all IPsec tunnel
+properties must be specified on the same command line. To disable tunnel
+security, specify the value of \fBencr_alg\fR as \fBnone\fR. If an \fBESP\fR
+authentication algorithm is specified, but the encryption algorithm is not, the
+default value for the \fBESP\fR encryption will be \fBnull\fR.
+.sp
+It is now preferable to use the \fBipsecconf\fR(8) command when configuring a
+tunnel's security properties. If \fBipsecconf\fR was used to set a tunnel's
+security properties, this keyword will not affect the tunnel.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBether\fR [ \fIaddress\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+If no address is given and the user is root or has sufficient privileges to
+open the underlying datalink, then display the current Ethernet address
+information.
+.sp
+Otherwise, if the user is root or has sufficient privileges, set the Ethernet
+address of the interfaces to \fIaddress\fR. The address is an Ethernet address
+represented as \fIx:x:x:x:x:x\fR where \fIx\fR is a hexadecimal number between
+0 and FF. Similarly, for the IPoIB (IP over InfiniBand) interfaces, the address
+will be 20 bytes of colon-separated hex numbers between \fB0\fR and \fBFF\fR.
+.sp
+Some, though not all, Ethernet interface cards have their own addresses. To use
+cards that do not have their own addresses, refer to section 3.2.3(4) of the
+IEEE 802.3 specification for a definition of the locally administered address
+space. Note that all IP interfaces in an IPMP group must have unique hardware
+addresses; see \fBin.mpathd\fR(8).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-failover\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set \fBNOFAILOVER\fR on the logical interface. This makes the associated
+address available for use by \fBin.mpathd\fR to perform probe-based failure
+detection for the associated physical IP interface. As a side effect,
+\fBDEPRECATED\fR will also be set on the logical interface. This operation is
+not permitted on an IPMP IP interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfailover\fR\fR
+.ad
+.sp .6
+.RS 4n
+Clear \fBNOFAILOVER\fR on the logical interface. This is the default. These
+logical interfaces are subject to migration when brought up (see \fBIP
+MULTIPATHING GROUPS\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBgroup\fR [ \fIname\fR |\fB""\fR]\fR
+.ad
+.sp .6
+.RS 4n
+When applied to a physical interface, it places the interface into the named
+group. If the group does not exist, it will be created, along with one or more
+IPMP IP interfaces (for IPv4, IPv6, or both). Any \fBUP\fR addresses that are
+not also marked \fBNOFAILOVER\fR are subject to migration to the IPMP IP
+interface (see \fBIP MULTIPATHING GROUPS\fR). Specifying a group name of
+\fB""\fR removes the physical IP interface from the group.
+.sp
+When applied to a physical IPMP IP interface, it renames the IPMP group to have
+the new name. If the name already exists, or a name of \fB""\fR is specified,
+it fails. Renaming IPMP groups is discouraged. Instead, the IPMP IP interface
+should be given a meaningful name when it is created by means of the \fBipmp\fR
+subcommand, which the system will also use as the IPMP group name.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBindex\fR \fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Change the interface index for the interface. The value of \fIn\fR must be an
+interface index (\fIif_index\fR) that is not used on another interface.
+\fIif_index\fR will be a non-zero positive number that uniquely identifies the
+network interface on the system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipmp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Create an IPMP IP interface with the specified name. An interface must be
+separately created for use by IPv4 and IPv6. The \fIaddress_family\fR parameter
+controls whether the command applies to IPv4 or IPv6 (IPv4 if unspecified). All
+IPMP IP interfaces have the \fBIPMP\fR flag set.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmetric\fR \fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the routing metric of the interface to \fIn\fR; if no value is specified,
+the default is \fB0\fR. The routing metric is used by the routing protocol.
+Higher metrics have the effect of making a route less favorable. Metrics are
+counted as addition hops to the destination network or host.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmodinsert\fR \fImod_name@pos\fR\fR
+.ad
+.sp .6
+.RS 4n
+Insert a module with name \fImod_name\fR to the stream of the device at
+position \fIpos\fR. The position is relative to the stream head. Position
+\fB0\fR means directly under stream head.
+.sp
+Based upon the example in the \fBmodlist\fR option, use the following command
+to insert a module with name \fBipqos\fR under the \fBip\fR module and above
+the firewall module:
+.sp
+.in +2
+.nf
+example% ifconfig eri0 modinsert ipqos@2
+.fi
+.in -2
+.sp
+
+A subsequent listing of all the modules in the stream of the device follows:
+.sp
+.in +2
+.nf
+example% ifconfig eri0 modlist
+0 arp
+1 ip
+2 ipqos
+3 firewall
+4 eri
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmodlist\fR\fR
+.ad
+.sp .6
+.RS 4n
+List all the modules in the stream of the device.
+.sp
+The following example lists all the modules in the stream of the device:
+.sp
+.in +2
+.nf
+example% ifconfig eri0 modlist
+0 arp
+1 ip
+2 firewall
+4 eri
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmodremove\fR \fImod_name@pos\fR\fR
+.ad
+.sp .6
+.RS 4n
+Remove a module with name \fImod_name\fR from the stream of the device at
+position \fIpos\fR. The position is relative to the stream head.
+.sp
+Based upon the example in the \fBmodinsert\fR option, use the following command
+to remove the firewall module from the stream after inserting the \fBipqos\fR
+module:
+.sp
+.in +2
+.nf
+example% ifconfig eri0 modremove firewall@3
+.fi
+.in -2
+.sp
+
+A subsequent listing of all the modules in the stream of the device follows:
+.sp
+.in +2
+.nf
+example% ifconfig eri0 modlist
+0 arp
+1 ip
+2 ipqos
+3 eri
+.fi
+.in -2
+.sp
+
+Note that the core IP stack modules, for example, \fBip\fR and \fBtun\fR
+modules, cannot be removed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmtu\fR \fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the maximum transmission unit of the interface to \fIn\fR. For many types
+of networks, the \fBmtu\fR has an upper limit, for example, \fB1500\fR for
+Ethernet. This option sets the \fBFIXEDMTU\fR flag on the affected interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnetmask\fR \fImask\fR\fR
+.ad
+.sp .6
+.RS 4n
+For IPv4 only. Specify how much of the address to reserve for subdividing
+networks into subnetworks. The mask includes the network part of the local
+address and the subnet part, which is taken from the host field of the address.
+The mask contains 1's for the bit positions in the 32-bit address which are to
+be used for the network and subnet parts, and 0's for the host part. The mask
+should contain at least the standard network portion, and the subnet field
+should be contiguous with the network portion. The mask can be specified in one
+of four ways:
+.RS +4
+.TP
+1.
+with a single hexadecimal number with a leading 0x,
+.RE
+.RS +4
+.TP
+2.
+with a dot-notation address,
+.RE
+.RS +4
+.TP
+3.
+with a "\fB+\fR" (plus sign) address, or
+.RE
+.RS +4
+.TP
+4.
+with a pseudo host name/pseudo network name found in the network database
+\fBnetworks\fR(5).
+.RE
+If a "\fB+\fR" (plus sign) is given for the netmask value, the mask is looked
+up in the \fBnetmasks\fR(5) database. This lookup finds the longest matching
+netmask in the database by starting with the interface's IPv4 address as the
+key and iteratively masking off more and more low order bits of the address.
+This iterative lookup ensures that the \fBnetmasks\fR(5) database can be used
+to specify the netmasks when variable length subnetmasks are used within a
+network number.
+.sp
+If a pseudo host name/pseudo network name is supplied as the netmask value,
+netmask data may be located in the \fBhosts\fR or \fBnetworks\fR database.
+Names are looked up by first using \fBgethostbyname\fR(3NSL). If not found
+there, the names are looked up in \fBgetnetbyname\fR(3SOCKET). These interfaces
+may in turn use \fBnsswitch.conf\fR(5) to determine what data store(s) to use
+to fetch the actual value.
+.sp
+For both \fBinet\fR and \fBinet6\fR, the same information conveyed by
+\fImask\fR can be specified as a \fIprefix_length\fR attached to the
+\fIaddress\fR parameter.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnud\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables the neighbor unreachability detection mechanism on a point-to-point
+physical interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-nud\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disables the neighbor unreachability detection mechanism on a point-to-point
+physical interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBplumb\fR\fR
+.ad
+.sp .6
+.RS 4n
+For a physical IP interface, open the datalink associated with the physical
+interface name and set up the plumbing needed for IP to use the datalink. When
+used with a logical interface name, this command is used to create a specific
+named logical interface on an existing physical IP interface.
+.sp
+An interface must be separately plumbed for IPv4 and IPv6 according to the
+\fIaddress_family\fR parameter (IPv4 if unspecified). Before an interface has
+been plumbed, it will not be shown by \fBifconfig\fR \fB-a\fR.
+.sp
+Note that IPMP IP interfaces are not tied to a specific datalink and are
+instead created with the \fBipmp\fR subcommand.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBprivate\fR\fR
+.ad
+.sp .6
+.RS 4n
+Tells the \fBin.routed\fR routing daemon that a specified logical interface
+should not be advertised.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-private\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify unadvertised interfaces.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBremoveif\fR \fIaddress\fR\fR
+.ad
+.sp .6
+.RS 4n
+Remove the logical interface on the physical interface specified that matches
+the \fIaddress\fR specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrouter\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable IP forwarding on the interface. When enabled, the interface is marked
+\fBROUTER\fR, and IP packets can be forwarded to and from the interface.
+Enabling \fBROUTER\fR on any IP interface in an IPMP group enables it on all IP
+interfaces in that IPMP group.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-router\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disable IP forwarding on the interface. IP packets are not forwarded to and
+from the interface. Disabling \fBROUTER\fR on any IP interface in an IPMP group
+disables it on all IP interfaces in that IPMP group.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBset\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the \fIaddress\fR, \fIprefix_length\fR or both, for a logical interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstandby\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mark the physical IP interface as a \fBSTANDBY\fR interface. If an interface is
+marked \fBSTANDBY\fR and is part of an IPMP group, the interface will not be
+used for data traffic unless another interface in the IPMP group becomes
+unusable. When a \fBSTANDBY\fR interface is functional but not being used for
+data traffic, it will also be marked \fBINACTIVE\fR. This operation is not
+permitted on an IPMP IP interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-standby\fR\fR
+.ad
+.sp .6
+.RS 4n
+Clear \fBSTANDBY\fR on the interface. This is the default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsubnet\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the subnet \fIaddress\fR for an interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtdst\fR \fItunnel_dest_address\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the destination address of a tunnel. The address should not be the same as
+the \fBdest_address\fR of the tunnel, because no packets leave the system over
+such a tunnel.
+.sp
+This option is obsolete, superseded by the \fBdladm\fR(8) \fBcreate-iptun\fR
+and \fBmodify-iptun\fR subcommands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBthoplimit\fR \fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the hop limit for a tunnel interface. The hop limit value is used as the
+\fBTTL\fR in the IPv4 header for the IPv6-in-IPv4 and IPv4-in-IPv4 tunnels. For
+IPv6-in-IPv6 and IPv4-in-IPv6 tunnels, the hop limit value is used as the hop
+limit in the IPv6 header. This option simply modifies the \fBhoplimit\fR link
+property of the underlying IP tunnel link (see \fBdladm\fR(8)).
+.sp
+This option is obsolete, superseded by the \fBdladm\fR(8) \fBhoplimit\fR link
+property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtoken\fR \fIaddress\fR/\fIprefix_length\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the IPv6 token of an interface to be used for address autoconfiguration.
+.sp
+.in +2
+.nf
+example% \fBifconfig eri0 inet6 token ::1/64\fR
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtrailers\fR\fR
+.ad
+.sp .6
+.RS 4n
+This flag previously caused a nonstandard encapsulation of IPv4 packets on
+certain link levels. Drivers supplied with this release no longer use this
+flag. It is provided for compatibility, but is ignored.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-trailers\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disable the use of a "trailer" link level encapsulation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtsrc\fR \fItunnel_src_address\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the source address of a tunnel. This is the source address on an outer
+encapsulating \fBIP\fR header. It must be an address of another interface
+already configured using \fBifconfig\fR.
+.sp
+This option is obsolete, superseded by the \fBdladm\fR(8) \fBcreate-iptun\fR
+and \fBmodify-iptun\fR subcommands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBunplumb\fR\fR
+.ad
+.sp .6
+.RS 4n
+For a physical or IPMP interface, remove all associated logical IP interfaces
+and tear down any plumbing needed for IP to use the interface. For an IPMP IP
+interface, this command will fail if the group is not empty. For a logical
+interface, the logical interface is removed.
+.sp
+An interface must be separately unplumbed for IPv4 and IPv6 according to the
+\fIaddress_family\fR parameter (IPv4 if unspecified). Upon success, the
+interface name will no longer appear in the output of \fBifconfig\fR \fB-a\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBup\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mark a logical interface \fBUP\fR. As a result, the IP module will accept
+packets destined to the associated address (unless the address is zero), along
+with any associated multicast and broadcast IP addresses. Similarly, the IP
+module will allow packets to be sent with the associated address as a source
+address. At least one logical interface must be \fBUP\fR for the associated
+physical interface to send or receive packets
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBusesrc\fR [ \fIname\fR | \fBnone\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Specify a physical interface to be used for source address selection. If the
+keyword \fBnone\fR is used, then any previous selection is cleared.
+.sp
+When an application does not choose a non-zero source address using
+\fBbind\fR(3SOCKET), the system will select an appropriate source address based
+on the outbound interface and the address selection rules (see
+\fBipaddrsel\fR(8)).
+.sp
+When \fBusesrc\fR is specified and the specified interface is selected in the
+forwarding table for output, the system looks first to the specified physical
+interface and its associated logical interfaces when selecting a source
+address. If no usable address is listed in the forwarding table, the ordinary
+selection rules apply. For example, if you enter:
+.sp
+.in +2
+.nf
+# \fBifconfig eri0 usesrc vni0\fR
+.fi
+.in -2
+.sp
+
+\&...and \fBvni0\fR has address 10.0.0.1 assigned to it, the system will prefer
+10.0.0.1 as the source address for any packets originated by local connections
+that are sent through \fBeri0\fR. Further examples are provided in the
+\fBEXAMPLES\fR section.
+.sp
+While you can specify any physical interface (or even loopback), be aware that
+you can also specify the virtual IP interface (see \fBvni\fR(4D)). The virtual
+IP interface is not associated with any physical hardware and is thus immune to
+hardware failures. You can specify any number of physical interfaces to use the
+source address hosted on a single virtual interface. This simplifies the
+configuration of routing-based multipathing. If one of the physical interfaces
+were to fail, communication would continue through one of the remaining,
+functioning physical interfaces. This scenario assumes that the reachability of
+the address hosted on the virtual interface is advertised in some manner, for
+example, through a routing protocol.
+.sp
+Because the \fBifconfig\fR \fBpreferred\fR option is applied to all interfaces,
+it is coarser-grained than the \fBusesrc\fR option. It will be overridden by
+\fBusesrc\fR and \fBsetsrc\fR (route subcommand), in that order.
+.sp
+IPMP and the \fBusesrc\fR option are mutually exclusive. That is, if an
+interface is part of an IPMP group or marked \fBSTANDBY\fR, then it cannot be
+specified by means of \fBusesrc\fR, and vice-versa.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBxmit\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable a logical interface to transmit packets. This is the default behavior
+when the logical interface is up.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-xmit\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disable transmission of packets on an interface. The interface will continue to
+receive packets.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzone\fR \fIzonename\fR\fR
+.ad
+.sp .6
+.RS 4n
+Place the logical interface in zone \fIzonename\fR. The named zone must be
+active in the kernel in the ready or running state. The interface is unplumbed
+when the zone is halted or rebooted. The zone must be configured to be an
+shared-IP zone. \fBzonecfg\fR(8) is used to assign network interface names to
+exclusive-IP zones.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-zone\fR\fR
+.ad
+.sp .6
+.RS 4n
+Place IP interface in the global zone. This is the default.
+.RE
+
+.SH OPERANDS
+The \fIinterface\fR operand, as well as address parameters that affect it, are
+described below.
+.sp
+.ne 2
+.na
+\fB\fIinterface\fR\fR
+.ad
+.sp .6
+.RS 4n
+A string of one of the following forms:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIname physical-unit\fR, for example, \fBeri0\fR or \fBce1\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIname physical-unit\fR\fB:\fR\fIlogical-unit\fR, for example, \fBeri0:1\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBip.tun\fR\fIN\fR, \fBip6.tun\fR\fIN\fR, or \fBip6to4.tun\fR\fIN\fR for
+implicit IP tunnel links
+.RE
+If the interface name starts with a dash (-), it is interpreted as a set of
+options which specify a set of interfaces. In such a case, \fB-a\fR must be
+part of the options and any of the additional options below can be added in any
+order. If one of these interface names is given, the commands following it are
+applied to all of the interfaces that match.
+.sp
+.ne 2
+.na
+\fB\fB-a\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply the command to all interfaces of the specified address family. If no
+address family is supplied, either on the command line or by means of
+\fB/etc/default/inet_type\fR, then all address families will be selected.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply the commands to all "down" interfaces in the system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-D\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply the commands to all interfaces not under \fBDHCP\fR (Dynamic Host
+Configuration Protocol) control.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-u\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply the commands to all "up" interfaces in the system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-Z\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply the commands to all interfaces in the user's zone.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-4\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply the commands to all IPv4 interfaces.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-6\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply the commands to all IPv6 interfaces.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIaddress_family\fR\fR
+.ad
+.sp .6
+.RS 4n
+The address family is specified by the \fIaddress_family\fR parameter. The
+\fBifconfig\fR command currently supports the following families: \fBinet\fR
+and \fBinet6\fR. If no address family is specified, the default is \fBinet\fR.
+.sp
+\fBifconfig\fR honors the \fBDEFAULT_IP\fR setting in the
+\fB/etc/default/inet_type\fR file when it displays interface information . If
+\fBDEFAULT_IP\fR is set to \fBIP_VERSION4\fR, then \fBifconfig\fR will omit
+information that relates to IPv6 interfaces. However, when you explicitly
+specify an address family (\fBinet\fR or \fBinet6\fR) on the \fBifconfig\fR
+command line, the command line overrides the \fBDEFAULT_IP\fR settings.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIaddress\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the IPv4 family (\fBinet\fR), the \fIaddress\fR is either a host name
+present in the host name data base (see \fBhosts\fR(5)) or in the Network
+Information Service (NIS) map \fBhosts\fR, or an IPv4 address expressed in the
+Internet standard "dot notation".
+.sp
+For the IPv6 family (\fBinet6\fR), the \fIaddress\fR is either a host name
+present in the host name data base (see \fBhosts\fR(5)) or in the Network
+Information Service (\fBNIS\fR) map \fBipnode\fR, or an IPv6 address expressed
+in the Internet standard colon-separated hexadecimal format represented as
+\fIx:x:x:x:x:x:x:x\fR where \fIx\fR is a hexadecimal number between \fB0\fR and
+\fBFFFF\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIprefix_length\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the IPv4 and IPv6 families (\fBinet\fR and \fBinet6\fR), the
+\fIprefix_length\fR is a number between 0 and the number of bits in the
+address. For \fBinet\fR, the number of bits in the address is 32; for
+\fBinet6\fR, the number of bits in the address is 128. The \fIprefix_length\fR
+denotes the number of leading set bits in the netmask.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIdest_address\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the \fIdest_address\fR parameter is supplied in addition to the
+\fIaddress\fR parameter, it specifies the address of the correspondent on the
+other end of a point-to-point link.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fItunnel_dest_address\fR\fR
+.ad
+.sp .6
+.RS 4n
+An address that is or will be reachable through an interface other than the
+tunnel being configured. This tells the tunnel where to send the tunneled
+packets. This address must not be the same as the interface destination address
+being configured.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fItunnel_src_address\fR\fR
+.ad
+.sp .6
+.RS 4n
+An address that is attached to an already configured interface that has been
+configured "up" with \fBifconfig\fR.
+.RE
+
+.SH INTERFACE FLAGS
+The \fBifconfig\fR command supports the following interface flags. The term
+"address" in this context refers to a logical interface, for example,
+\fBeri0:0\fR, while "interface" refers to the physical interface, for example,
+\fBeri0\fR.
+.sp
+.ne 2
+.na
+\fB\fBADDRCONF\fR\fR
+.ad
+.sp .6
+.RS 4n
+The address is from stateless \fBaddrconf\fR. The stateless mechanism allows a
+host to generate its own address using a combination of information advertised
+by routers and locally available information. Routers advertise prefixes that
+identify the subnet associated with the link, while the host generates an
+"interface identifier" that uniquely identifies an interface in a subnet. In
+the absence of information from routers, a host can generate link-local
+addresses. This flag is specific to IPv6.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBANYCAST\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates an \fBanycast\fR address. An \fBanycast\fR address identifies the
+nearest member of a group of systems that provides a particular type of
+service. An \fBanycast\fR address is assigned to a group of systems. Packets
+are delivered to the nearest group member identified by the \fBanycast\fR
+address instead of being delivered to all members of the group.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBBROADCAST\fR\fR
+.ad
+.sp .6
+.RS 4n
+This \fBbroadcast\fR address is valid. This flag and \fBPOINTTOPOINT\fR are
+mutually exclusive
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCoS\fR\fR
+.ad
+.sp .6
+.RS 4n
+This interface supports some form of Class of Service (CoS) marking. An example
+is the 802.1D user priority marking supported on \fBVLAN\fR interfaces. For
+IPMP IP interfaces, this will only be set if all interfaces in the group have
+CoS set.
+.sp
+Note that this flag is only set on interfaces over VLAN links and over Ethernet
+links that have their \fBdladm\fR(8) \fBtagmode\fR link property set to
+\fBnormal\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDEPRECATED\fR\fR
+.ad
+.sp .6
+.RS 4n
+This address is deprecated. This address will not be used as a source address
+for outbound packets unless there are no other addresses on this interface or
+an application has explicitly bound to this address. An IPv6 deprecated address
+is part of the standard mechanism for renumbering in IPv6 and will eventually
+be deleted when not used. For both IPv4 and IPv6, \fBDEPRECATED\fR is also set
+on all \fBNOFAILOVER\fR addresses, though this may change in a future release.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDHCPRUNNING\fR\fR
+.ad
+.sp .6
+.RS 4n
+The logical interface is managed by \fBdhcpagent\fR(8).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDUPLICATE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The logical interface has been disabled because the IP address configured on
+the interface is a duplicate. Some other node on the network is using this
+address. If the address was configured by DHCP or is temporary, the system will
+choose another automatically, if possible. Otherwise, the system will attempt
+to recover this address periodically and the interface will recover when the
+conflict has been removed from the network. Changing the address or netmask, or
+setting the logical interface to \fBup\fR will restart duplicate detection.
+Setting the interface to \fBdown\fR terminates recovery and removes the
+\fBDUPLICATE\fR flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBFAILED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBin.mpathd\fR daemon has determined that the interface has failed.
+\fBFAILED\fR interfaces will not be used to send or receive IP data traffic. If
+this is set on a physical IP interface in an IPMP group, IP data traffic will
+continue to flow over other usable IP interfaces in the IPMP group. If this is
+set on an IPMP IP interface, the entire group has failed and no data traffic
+can be sent or received over any interfaces in that group.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBFIXEDMTU\fR\fR
+.ad
+.sp .6
+.RS 4n
+The MTU has been set using the \fB-mtu\fR option. This flag is read-only.
+Interfaces that have this flag set have a fixed MTU value that is unaffected by
+dynamic MTU changes that can occur when drivers notify IP of link MTU changes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBINACTIVE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The physical interface is functioning but is not used to send or receive data
+traffic according to administrative policy. This flag is initially set by the
+\fBstandby\fR subcommand and is subsequently controlled by \fBin.mpathd\fR. It
+also set when \fBFAILBACK=no\fR mode is enabled (see \fBin.mpathd\fR(8)) to
+indicate that the IP interface has repaired but is not being used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBIPMP\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that this is an IPMP IP interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBLOOPBACK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that this is the loopback interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBMULTI_BCAST\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the broadcast address is used for multicast on this interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBMULTICAST\fR\fR
+.ad
+.sp .6
+.RS 4n
+The interface supports multicast. \fBIP\fR assumes that any interface that
+supports hardware broadcast, or that is a point-to-point link, will support
+multicast.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBNOARP\fR\fR
+.ad
+.sp .6
+.RS 4n
+There is no address resolution protocol (\fBARP\fR) for this interface that
+corresponds to all interfaces for a device without a broadcast address. This
+flag is specific to IPv4.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBNOFAILOVER\fR\fR
+.ad
+.sp .6
+.RS 4n
+The address associated with this logical interface is available to
+\fBin.mpathd\fR for probe-based failure detection of the associated physical IP
+interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBNOLOCAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+The interface has no address, just an on-link subnet.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBNONUD\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBNUD\fR is disabled on this interface. \fBNUD\fR (neighbor unreachability
+detection) is used by a node to track the reachability state of its neighbors,
+to which the node actively sends packets, and to perform any recovery if a
+neighbor is detected to be unreachable. This flag is specific to IPv6.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBNORTEXCH\fR\fR
+.ad
+.sp .6
+.RS 4n
+The interface does not exchange routing information. For RIP-2, routing packets
+are not sent over this interface. Additionally, messages that appear to come
+over this interface receive no response. The subnet or address of this
+interface is not included in advertisements over other interfaces to other
+routers.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBNOXMIT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the address does not transmit packets. RIP-2 also does not
+advertise this address.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBOFFLINE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The interface is offline and thus cannot send or receive IP data traffic. This
+is only set on IP interfaces in an IPMP group. See \fBif_mpadm\fR(8) and
+\fBcfgadm\fR(8).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPOINTOPOINT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the address is a point-to-point link. This flag and
+\fBBROADCAST\fR are mutually exclusive
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPREFERRED\fR\fR
+.ad
+.sp .6
+.RS 4n
+This address is a preferred IPv6 source address. This address will be used as a
+source address for IPv6 communication with all IPv6 destinations, unless
+another address on the system is of more appropriate scope. The
+\fBDEPRECATED\fR flag takes precedence over the \fBPREFERRED\fR flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPRIVATE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that this address is not advertised. For RIP-2, this interface is
+used to send advertisements. However, neither the subnet nor this address are
+included in advertisements to other routers.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPROMISC\fR\fR
+.ad
+.sp .6
+.RS 4n
+A read-only flag indicating that an interface is in promiscuous mode. All
+addresses associated with an interface in promiscuous mode will display (in
+response to \fBifconfig\fR \fB-a\fR, for example) the \fBPROMISC\fR flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBROUTER\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that IP packets can be forwarded to and from the interface.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBRUNNING\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the required resources for an interface are allocated. For some
+interfaces this also indicates that the link is up. For IPMP IP interfaces,
+\fBRUNNING\fR is set as long as one IP interface in the group is active.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSTANDBY\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that this physical interface will not be used for data traffic unless
+another interface in the IPMP group becomes unusable. The \fBINACTIVE\fR and
+\fBFAILED\fR flags indicate whether it is actively being used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBTEMPORARY\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that this is a temporary IPv6 address as defined in RFC 3041.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBUNNUMBERED\fR\fR
+.ad
+.sp .6
+.RS 4n
+This flag is set when the local IP address on the link matches the local
+address of some other link in the system
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBUP\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the logical interface (and the associated physical interface) is
+up. The IP module will accept packets destined to \fBUP\fR addresses (unless
+the address is zero), along with any associated multicast and broadcast IP
+addresses. Similarly, the IP module will allow packets to be sent with an
+\fBUP\fR address as a source address.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBVIRTUAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the physical interface has no underlying hardware. It is not
+possible to transmit or receive packets through a virtual interface. These
+interfaces are useful for configuring local addresses that can be used on
+multiple interfaces. (See also the \fBusesrc\fR option.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBXRESOLV\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that the interface uses an IPv6 external resolver.
+.RE
+
+.SH LOGICAL INTERFACES
+Solaris \fBTCP/IP\fR allows multiple logical interfaces to be associated with a
+physical network interface. This allows a single machine to be assigned
+multiple \fBIP\fR addresses, even though it may have only one network
+interface. Physical network interfaces have names of the form \fIdriver-name
+physical-unit-number\fR, while logical interfaces have names of the form
+\fIdriver-name physical-unit-number\fR\fB:\fR\fIlogical-unit-number\fR. A
+physical interface is configured into the system using the \fBplumb\fR command.
+For example:
+.sp
+.in +2
+.nf
+example% \fBifconfig eri0 plumb\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Once a physical interface has been "plumbed", logical interfaces associated
+with the physical interface can be configured by separate \fB-plumb\fR or
+\fB-addif\fR options to the \fBifconfig\fR command.
+.sp
+.in +2
+.nf
+example% \fBifconfig eri0:1 plumb\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+allocates a specific logical interface associated with the physical interface
+\fBeri0\fR. The command
+.sp
+.in +2
+.nf
+example% \fBifconfig eri0 addif 192.168.200.1/24 up\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+allocates the next available logical unit number on the \fBeri0\fR physical
+interface and assigns an \fIaddress\fR and \fIprefix_length\fR.
+.sp
+.LP
+A logical interface can be configured with parameters (\fIaddress\fR,
+\fIprefix_length\fR, and so on) different from the physical
+interface with which it is associated. Logical interfaces that are associated
+with the same physical interface can be given different parameters as well.
+Each logical interface must be associated with an existing and "up" physical
+interface. So, for example, the logical interface \fBeri0:1\fR can only be
+configured after the physical interface \fBeri0\fR has been plumbed.
+.sp
+.LP
+To delete a logical interface, use the \fBunplumb\fR or \fBremoveif\fR options.
+For example,
+.sp
+.in +2
+.nf
+example% \fBifconfig eri0:1 down unplumb\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+will delete the logical interface \fBeri0:1\fR.
+.SH IP MULTIPATHING GROUPS
+Physical interfaces that share the same link-layer broadcast domain \fBmust\fR
+be collected into a single IP Multipathing (IPMP) group using the \fBgroup\fR
+subcommand. Each IPMP group has an associated IPMP IP interface, which can
+either be explicitly created (the preferred method) by using the \fBipmp\fR
+subcommand or implicitly created by \fBifconfig\fR in response to placing an IP
+interface into a new IPMP group. Implicitly-created IPMP interfaces will be
+named \fBipmp\fR\fIN\fR where \fIN\fR is the lowest integer that does not
+conflict with an existing IP interface name or IPMP group name.
+.sp
+.LP
+Each IPMP IP interface is created with a matching IPMP group name, though it
+can be changed using the \fBgroup\fR subcommand. Each IPMP IP interface hosts a
+set of highly-available IP addresses. These addresses will remain reachable so
+long as at least one interface in the group is active, where "active" is
+defined as having at least one \fBUP\fR address and having \fBINACTIVE\fR,
+\fBFAILED\fR, and \fBOFFLINE\fR clear. IP addresses hosted on the IPMP IP
+interface may either be configured statically or configured through DHCP by
+means of the \fBdhcp\fR subcommand.
+.sp
+.LP
+Interfaces assigned to the same IPMP group are treated as equivalent and
+monitored for failure by \fBin.mpathd\fR. Provided that active interfaces in
+the group remain, IP interface failures (and any subsequent repairs) are
+handled transparently to sockets-based applications. IPMP is also integrated
+with the Dynamic Reconfiguration framework (see \fBcfgadm\fR(8)), which
+enables network adapters to be replaced in a way that is invisible to
+sockets-based applications.
+.sp
+.LP
+The IP module automatically load-spreads all outbound traffic across all active
+interfaces in an IPMP group. Similarly, all \fBUP\fR addresses hosted on the
+IPMP IP interface will be distributed across the active interfaces to promote
+inbound load-spreading. The \fBipmpstat\fR(8) utility allows many aspects of
+the IPMP subsystem to be observed, including the current binding of IP data
+addresses to IP interfaces.
+.sp
+.LP
+When an interface is placed into an IPMP group, any \fBUP\fR logical interfaces
+are "migrated" to the IPMP IP interface for use by the group, unless:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the logical interface is marked \fBNOFAILOVER\fR;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the logical interface hosts an IPv6 link-local address;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the logical interface hosts an IPv4 0.0.0.0 address.
+.RE
+.sp
+.LP
+Likewise, once an interface is in a group, if changes are made to a logical
+interface such that it is \fBUP\fR and not exempted by one of the conditions
+above, it will also migrate to the associated IPMP IP interface. Logical
+interfaces never migrate back, even if the physical interface that contributed
+the address is removed from the group.
+.sp
+.LP
+Each interface placed into an IPMP group may be optionally configured with a
+"test" address that \fBin.mpathd\fR will use for probe-based failure detection;
+see \fBin.mpathd\fR(8). These addresses must be marked \fBNOFAILOVER\fR (using
+the \fB-failover\fR subcommand) prior to being marked \fBUP\fR. Test addresses
+may also be acquired through DHCP by means of the \fBdhcp\fR subcommand.
+.sp
+.LP
+For more background on IPMP, please see the IPMP-related chapters of the
+\fISystem Administration Guide: Network Interfaces and Network
+Virtualization\fR.
+.SH CONFIGURING IPV6 INTERFACES
+When an IPv6 physical interface is plumbed and configured "up" with
+\fBifconfig\fR, it is automatically assigned an IPv6 link-local address for
+which the last 64 bits are calculated from the \fBMAC\fR address of the
+interface.
+.sp
+.in +2
+.nf
+example% \fBifconfig eri0 inet6 plumb up\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following example shows that the link-local address has a prefix of
+\fBfe80::/10\fR.
+.sp
+.in +2
+.nf
+example% \fBifconfig eri0 inet6\fR
+ce0: flags=2000841<UP,RUNNING,MULTICAST,IPv6>
+           mtu 1500 index 2 \
+        inet6 fe80::a00:20ff:fe8e:f3ad/10
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Link-local addresses are only used for communication on the local subnet and
+are not visible to other subnets.
+.sp
+.LP
+If an advertising IPv6 router exists on the link advertising prefixes, then the
+newly plumbed IPv6 interface will autoconfigure logical interface(s) depending
+on the prefix advertisements. For example, for the prefix advertisement
+\fB2001:0db8:3c4d:0:55::/64\fR, the autoconfigured interface will look like:
+.sp
+.in +2
+.nf
+eri0:2: flags=2080841<UP,RUNNING,MULTICAST,ADDRCONF,IPv6>
+          mtu 1500 index 2
+        inet6 2001:0db8:3c4d:55:a00:20ff:fe8e:f3ad/64
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Even if there are no prefix advertisements on the link, you can still assign
+global addresses manually, for example:
+.sp
+.in +2
+.nf
+example% \fBifconfig eri0 inet6 addif \e
+2001:0db8:3c4d:55:a00:20ff:fe8e:f3ad/64 up\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To configure boot-time defaults for the interface \fBeri0\fR, place the
+following entry in the \fB/etc/hostname6.eri0\fR file:
+.sp
+.in +2
+.nf
+addif 2001:0db8:3c4d:55:a00:20ff:fe8e:f3ad/64 up
+.fi
+.in -2
+
+.SS "Configuring IP-over-IP Tunnel Interfaces"
+An IP tunnel is conceptually comprised of two parts: a virtual link between two
+or more IP nodes, and an IP interface above this link which allows the system
+to transmit and receive IP packets encapsulated by the underlying link.
+.sp
+.LP
+The \fBdladm\fR(8) command is used to configure tunnel links, and
+\fBifconfig\fR is used to configure IP interfaces over those tunnel links.  An
+IPv4-over-IPv4 tunnel is created by plumbing an IPv4 interface over an IPv4
+tunnel link.  An IPv6-over-IPv4 tunnel is created by plumbing an IPv6 interface
+over an IPv6 tunnel link, and so forth.
+.sp
+.LP
+When IPv6 interfaces are plumbed over IP tunnel links, their IPv6 addresses are
+automatically set. For IPv4 and IPv6 tunnels, source and destination link-local
+addresses of the form \fBfe80::\fR\fIinterface-id\fR are configured. For IPv4
+tunnels, the \fIinterface-id\fR is the IPv4 tunnel source or destination
+address. For IPv6 tunnels, the \fIinterface-id\fR is the last 64 bits of the
+IPv6 tunnel source or destination address. For example, for an IPv4 tunnel
+between 10.1.2.3 and 10.4.5.6, the IPv6 link-local source and destination
+addresses of the IPv6 interface would be \fBfe80::a01:203\fR and
+\fBfe80::a04:506\fR. For an IPv6 tunnel between \fB2000::1234:abcd\fR and
+\fB3000::5678:abcd\fR, the IPv6 link-local source and destination addresses of
+the interface would be \fBfe80::1234:abcd\fR and \fBfe80::5678:abcd\fR. These
+default link-local addresses can be overridden by specifying the addresses
+explicitly, as with any other point-to-point interface.
+.sp
+.LP
+For 6to4 tunnels, a 6to4 global address of the form \fB2002:\fItsrc\fR::1/16\fR
+is configured. The \fItsrc\fR portion is the tunnel source IPv4 address. The
+prefix length of the 6to4 interface is automatically set to 16, as all 6to4
+packets (destinations in the \fB2002::/16\fR range) are forwarded to the 6to4
+tunnel interface. For example, for a 6to4 link with a tunnel source of
+75.1.2.3, the IPv6 interface would have an address of
+\fB2002:4b01:203::1/16\fR.
+.sp
+.LP
+Additional IPv6 addresses can be added using the \fBaddif\fR option or by
+plumbing additional logical interfaces.
+.sp
+.LP
+For backward compatibility, the plumbing of tunnel IP interfaces with special
+names will implicitly result in the creation of tunnel links without invoking
+\fBdladm create-iptun\fR. These tunnel names are:
+.sp
+.ne 2
+.na
+\fB\fBip.tun\fR\fIN\fR\fR
+.ad
+.RS 15n
+An IPv4 tunnel
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBip6.tun\fR\fIN\fR\fR
+.ad
+.RS 15n
+An IPv6 tunnel
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBip.6to4tun\fR\fIN\fR\fR
+.ad
+.RS 15n
+A 6to4 tunnel
+.RE
+
+.sp
+.LP
+These tunnels are "implicit tunnels", denoted with the \fBi\fR flag in \fBdladm
+show-iptun\fR output. The tunnel links over which these special IP interfaces
+are plumbed are automatically created, and they are automatically deleted when
+the last reference is released (that is, when the last IP interface is
+unplumbed).
+.sp
+.LP
+The \fBtsrc\fR, \fBtdst\fR, \fBencaplim\fR, and \fBhoplimit\fR options to
+\fBifconfig\fR are obsolete and maintained only for backward compatibility.
+They are equivalent to their \fBdladm\fR(8) counterparts.
+.SS "Display of Tunnel Security Settings"
+The \fBifconfig\fR output for IP tunnel interfaces indicates whether IPsec
+policy is configured for the underlying IP tunnel link. For example, a line of
+the following form will be displayed if IPsec policy is present:
+.sp
+.in +2
+.nf
+tunnel security settings  -->  use 'ipsecconf -ln -i ip.tun1'
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If you do net set security policy, using either \fBifconfig\fR or
+\fBipsecconf\fR(8), there is no tunnel security setting displayed.
+.SH EXAMPLES
+\fBExample 1 \fRUsing the \fBifconfig\fR Command
+.sp
+.LP
+If your workstation is not attached to an Ethernet, the network interface, for
+example, \fBeri0\fR, should be marked "down" as follows:
+
+.sp
+.in +2
+.nf
+example% \fBifconfig eri0 down\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRPrinting Addressing Information
+.sp
+.LP
+To print out the addressing information for each interface, use the following
+command:
+
+.sp
+.in +2
+.nf
+example% \fBifconfig -a\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRResetting the Broadcast Address
+.sp
+.LP
+To reset each interface's broadcast address after the netmasks have been
+correctly set, use the next command:
+
+.sp
+.in +2
+.nf
+example% \fBifconfig -a broadcast +\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRChanging the Ethernet Address
+.sp
+.LP
+To change the Ethernet address for interface \fBce0\fR, use the following
+command:
+
+.sp
+.in +2
+.nf
+example% \fBifconfig ce0 ether aa:1:2:3:4:5\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRConfiguring an IP-in-IP Tunnel
+.sp
+.LP
+To configure an IP-in-IP tunnel, first create an IP tunnel link (\fBtunsrc\fR
+and \fBtundst\fR are hostnames with corresponding IPv4 entries in
+\fB/etc/hosts\fR):
+
+.sp
+.in +2
+.nf
+example% \fBdladm create-iptun -T ipv4 -s tunsrc -d tundst tun0\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Then plumb a point-to-point interface, supplying the source and destination
+addresses (\fBmysrc\fR and \fBthedst\fR are hostnames with corresponding IPv4
+entries in \fB/etc/hosts\fR):
+
+.sp
+.in +2
+.nf
+example% \fBifconfig tun0 plumb mysrc thedst up\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Use \fBipsecconf\fR(8), as described above, to configure tunnel security
+properties.
+
+.sp
+.LP
+Configuring IPv6 tunnels is done by using a tunnel type of \fBipv6\fR with
+\fBcreate-iptun\fR. IPv6 interfaces can also be plumbed over either type of
+tunnel.
+
+.LP
+\fBExample 6 \fRConfiguring 6to4 Tunnels
+.sp
+.LP
+To configure 6to4 tunnels, first create a 6to4 tunnel link (\fBmyv4addr\fR is a
+hostname with a corresponding IPv4 entry in \fB/etc/hosts\fR):
+
+.sp
+.in +2
+.nf
+example% \fBdladm create-iptun -T 6to4 -s myv4addr my6to4tun0\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Then an IPv6 interface is plumbed over this link:
+
+.sp
+.in +2
+.nf
+example% \fBifconfig my6to4tun0 inet6 plumb up\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The IPv6 address of the interface is automatically set as described above.
+
+.LP
+\fBExample 7 \fRConfiguring IP Forwarding on an Interface
+.sp
+.LP
+To enable IP forwarding on a single interface, use the following command:
+
+.sp
+.in +2
+.nf
+example% \fBifconfig eri0 router\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To disable IP forwarding on a single interface, use the following command:
+
+.sp
+.in +2
+.nf
+example% \fBifconfig eri0 -router\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 8 \fRConfiguring Source Address Selection Using a Virtual Interface
+.sp
+.LP
+The following command configures source address selection such that every
+packet that is locally generated with no bound source address and going out on
+\fBqfe2\fR prefers a source address hosted on \fBvni0\fR.
+
+.sp
+.in +2
+.nf
+example% \fBifconfig qfe2 usesrc vni0\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBifconfig\fR \fB-a\fR output for the \fBqfe2\fR and \fBvni0\fR interfaces
+displays as follows:
+
+.sp
+.in +2
+.nf
+qfe2: flags=1100843<UP,BROADCAST,RUNNING,MULTICAST,ROUTER,IPv4> mtu
+  1500 index 4
+  usesrc vni0
+  inet 1.2.3.4 netmask ffffff00 broadcast 1.2.3.255
+  ether 0:3:ba:17:4b:e1
+vni0: flags=20011100c1<UP,RUNNING,NOARP,NOXMIT,ROUTER,IPv4,VIRTUAL>
+  mtu 0 index 5
+  srcof qfe2
+  inet 3.4.5.6 netmask ffffffff
+.fi
+.in -2
+
+.sp
+.LP
+Observe, above, the \fBusesrc\fR and \fBsrcof\fR keywords in the \fBifconfig\fR
+output. These keywords also appear on the logical instances of the physical
+interface, even though this is a per-physical interface parameter. There is no
+\fBsrcof\fR keyword in \fBifconfig\fR for configuring interfaces. This
+information is determined automatically from the set of interfaces that have
+\fBusesrc\fR set on them.
+
+.sp
+.LP
+The following command, using the \fBnone\fR keyword, undoes the effect of the
+preceding \fBifconfig\fR \fBusesrc\fR command.
+
+.sp
+.in +2
+.nf
+example% \fBifconfig qfe2 usesrc none\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Following this command, \fBifconfig\fR \fB-a\fR output displays as follows:
+
+.sp
+.in +2
+.nf
+qfe2: flags=1100843<UP,BROADCAST,RUNNING,MULTICAST,ROUTER,IPv4> mtu
+  1500 index 4
+  inet 1.2.3.4 netmask ffffff00 broadcast 1.2.3.255
+  ether 0:3:ba:17:4b:e1
+vni0: flags=20011100c1<UP,RUNNING,NOARP,NOXMIT,ROUTER,IPv4,VIRTUAL>
+  mtu 0 index 5
+  inet 3.4.5.6 netmask ffffffff
+.fi
+.in -2
+
+.sp
+.LP
+Note the absence of the \fBusesrc\fR and \fBsrcof\fR keywords in the output
+above.
+
+.LP
+\fBExample 9 \fRConfiguring Source Address Selection for an IPv6 Address
+.sp
+.LP
+The following command configures source address selection for an IPv6 address,
+selecting a source address hosted on \fBvni0\fR.
+
+.sp
+.in +2
+.nf
+example% \fBifconfig qfe1 inet6 usesrc vni0\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Following this command, \fBifconfig\fR \fB-a\fR output displays as follows:
+
+.sp
+.in +2
+.nf
+qfe1: flags=2000841<UP,RUNNING,MULTICAST,IPv6> mtu 1500 index 3
+  usesrc vni0
+  inet6 fe80::203:baff:fe17:4be0/10
+  ether 0:3:ba:17:4b:e0
+vni0: flags=2002210041<UP,RUNNING,NOXMIT,NONUD,IPv6,VIRTUAL> mtu 0
+  index 5
+  srcof qfe1
+  inet6 fe80::203:baff:fe17:4444/128
+vni0:1: flags=2002210040<RUNNING,NOXMIT,NONUD,IPv6,VIRTUAL> mtu 0
+  index 5
+  srcof qfe1
+  inet6 fec0::203:baff:fe17:4444/128
+vni0:2: flags=2002210040<RUNNING,NOXMIT,NONUD,IPv6,VIRTUAL> mtu 0
+  index 5
+  srcof qfe1
+  inet6 2000::203:baff:fe17:4444/128
+.fi
+.in -2
+
+.sp
+.LP
+Depending on the scope of the destination of the packet going out on
+\fBqfe1\fR, the appropriately scoped source address is selected from \fBvni0\fR
+and its aliases.
+
+.LP
+\fBExample 10 \fRUsing Source Address Selection with Shared-IP Zones
+.sp
+.LP
+The following is an example of how the \fBusesrc\fR feature can be used with
+the \fBzones\fR(7) facility in Solaris. The following commands are invoked in
+the global zone:
+
+.sp
+.in +2
+.nf
+example% \fBifconfig hme0 usesrc vni0\fR
+example% \fBifconfig eri0 usesrc vni0\fR
+example% i\fBfconfig qfe0 usesrc vni0\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Following the preceding commands, the \fBifconfig\fR \fB-a\fR output for the
+virtual interfaces would display as:
+
+.sp
+.in +2
+.nf
+vni0: flags=20011100c1<UP,RUNNING,NOARP,NOXMIT,ROUTER,IPv4,VIRTUAL>
+   mtu 0 index 23
+   srcof hme0 eri0 qfe0
+   inet 10.0.0.1 netmask ffffffff
+vni0:1:
+   flags=20011100c1<UP,RUNNING,NOARP,NOXMIT,ROUTER,IPv4,VIRTUAL> mtu 0
+   index 23
+   zone test1
+   srcof hme0 eri0 qfe0
+   inet 10.0.0.2 netmask ffffffff
+vni0:2:
+   flags=20011100c1<UP,RUNNING,NOARP,NOXMIT,ROUTER,IPv4,VIRTUAL> mtu 0
+   index 23
+   zone test2
+   srcof hme0 eri0 qfe0
+   inet 10.0.0.3 netmask ffffffff
+vni0:3:
+   flags=20011100c1<UP,RUNNING,NOARP,NOXMIT,ROUTER,IPv4,VIRTUAL> mtu 0
+   index 23
+   zone test3
+   srcof hme0 eri0 qfe0
+   inet 10.0.0.4 netmask ffffffff
+.fi
+.in -2
+
+.sp
+.LP
+There is one virtual interface alias per zone (\fBtest1\fR, \fBtest2\fR, and
+\fBtest3\fR). A source address from the virtual interface alias in the same
+zone is selected. The virtual interface aliases were created using
+\fBzonecfg\fR(8) as follows:
+
+.sp
+.in +2
+.nf
+example% \fBzonecfg -z test1\fR
+zonecfg:test1> \fBadd net\fR
+zonecfg:test1:net> \fBset physical=vni0\fR
+zonecfg:test1:net> \fBset address=10.0.0.2\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBtest2\fR and \fBtest3\fR zone interfaces and addresses are created in
+the same way.
+
+.LP
+\fBExample 11 \fRTurning Off DHCPv6
+.sp
+.LP
+The following example shows how to disable automatic use of DHCPv6 on all
+interfaces, and immediately shut down DHCPv6 on the interface named \fBhme0\fR.
+See \fBin.ndpd\fR(8) and \fBndpd.conf\fR(5) for more information on the
+automatic DHCPv6 configuration mechanism.
+
+.sp
+.in +2
+.nf
+example% \fBecho ifdefault StatefulAddrConf false >> /etc/inet/ndpd.conf\fR
+example% \fBpkill -HUP -x in.ndpd\fR
+example% \fBifconfig hme0 dhcp release\fR
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/netmasks\fR\fR
+.ad
+.sp .6
+.RS 4n
+Netmask data.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/default/inet_type\fR\fR
+.ad
+.sp .6
+.RS 4n
+Default Internet protocol type.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+T{
+Interface Stability for command-line options
+T}	Committed
+_
+Interface Stability for command output	Uncommitted
+.TE
+
+.SH SEE ALSO
+.BR dhcpinfo (1),
+.BR gethostbyname (3NSL),
+.BR ethers (3SOCKET),
+.BR getnetbyname (3SOCKET),
+.BR arp (4P),
+.BR ipsecah (4P),
+.BR ipsecesp (4P),
+.BR hosts (5),
+.BR inet_type (5),
+.BR ndpd.conf (5),
+.BR netmasks (5),
+.BR networks (5),
+.BR nsswitch.conf (5),
+.BR attributes (7),
+.BR privileges (7),
+.BR zones (7),
+.BR cfgadm (8),
+.BR dhcpagent (8),
+.BR dladm (8),
+.BR if_mpadm (8),
+.BR in.mpathd (8),
+.BR in.ndpd (8),
+.BR in.routed (8),
+.BR ipmpstat (8),
+.BR ipsecconf (8),
+.BR ndd (8),
+.BR netstat (8),
+.BR zoneadm (8),
+.BR zonecfg (8)
+.sp
+.LP
+\fISystem Administration Guide: IP Services\fR
+.SH DIAGNOSTICS
+\fBifconfig\fR sends messages that indicate if:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the specified interface does not exist
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the requested address is unknown
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user is not privileged and tried to alter an interface's configuration
+.RE
+.SH NOTES
+Do not select the names \fBbroadcast\fR, \fBdown\fR, \fBprivate\fR,
+\fBtrailers\fR, \fBup\fR or other possible option names when you choose host
+names. If you choose any one of these names as host names, it can cause unusual
+problems that are extremely difficult to diagnose.

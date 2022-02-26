@@ -197,7 +197,7 @@ data structures.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -215,9 +215,13 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBcpc_bind_curlwp\fR(3CPC), \fBcpc_buf_create\fR(3CPC), \fBcpc_npic\fR(3CPC),
-\fBcpc_seterrhndlr\fR(3CPC), \fBlibcpc\fR(3LIB), \fBstrtol\fR(3C),
-\fBattributes\fR(5)
+.BR strtol (3C),
+.BR cpc_bind_curlwp (3CPC),
+.BR cpc_buf_create (3CPC),
+.BR cpc_npic (3CPC),
+.BR cpc_seterrhndlr (3CPC),
+.BR libcpc (3LIB),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

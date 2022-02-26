@@ -105,7 +105,7 @@ the firing time is the value of \fBgethrtime\fR(3C) at the moment the action on
 the resource control value was taken.
 .sp
 .LP
-The global actions and flags are the action and flags set by \fBrctladm\fR(1M).
+The global actions and flags are the action and flags set by \fBrctladm\fR(8).
 These values cannot be set with \fBsetrctl\fR(2).  Valid global actions are
 listed in the table below. Global flags are generally a published property of
 the control and are not modifiable.
@@ -419,7 +419,7 @@ main()
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -436,5 +436,8 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBrctladm\fR(1M), \fBgetrctl\fR(2), \fBsetrctl\fR(2), \fBgethrtime\fR(3C),
-\fBattributes\fR(5)
+.BR getrctl (2),
+.BR setrctl (2),
+.BR gethrtime (3C),
+.BR attributes (7),
+.BR rctladm (8)

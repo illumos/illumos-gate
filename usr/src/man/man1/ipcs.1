@@ -173,7 +173,7 @@ access permissions for all facilities, time of last \fBmsgsnd\fR(2) and last
 .ad
 .RS 12n
 Prints information about facilities associated with the specified zone (see
-\fBzones\fR(5)). The zone can be specified as either a name or a numeric id.
+\fBzones\fR(7)). The zone can be specified as either a name or a numeric id.
 The default is to display information about the zone in which the command is
 executing. Notice that this option is only useful when executing in the global
 zone.
@@ -551,7 +551,7 @@ The zone with which the facility is associated.
 .SH ENVIRONMENT VARIABLES
 .sp
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of  \fBipcs\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
@@ -585,7 +585,7 @@ user names
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -597,17 +597,29 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 Interface Stability	Committed
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBipcrm\fR(1), \fBmsgget\fR(2), \fBmsgids\fR(2), \fBmsgrcv\fR(2),
-\fBmsgsnap\fR(2), \fBmsgsnd\fR(2), \fBsemget\fR(2), \fBsemids\fR(2),
-\fBsemop\fR(2), \fBshmctl\fR(2), \fBshmget\fR(2), \fBshmids\fR(2),
-\fBshmop\fR(2), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5),
-\fBzones\fR(5)
+.BR ipcrm (1),
+.BR msgget (2),
+.BR msgids (2),
+.BR msgrcv (2),
+.BR msgsnap (2),
+.BR msgsnd (2),
+.BR semget (2),
+.BR semids (2),
+.BR semop (2),
+.BR shmctl (2),
+.BR shmget (2),
+.BR shmids (2),
+.BR shmop (2),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7),
+.BR zones (7)
 .SH NOTES
 .sp
 .LP

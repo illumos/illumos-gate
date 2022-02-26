@@ -110,7 +110,10 @@ The sense data in the buffer is in "descriptor format".
 The \fBscsi_validate_sense()\fR function can be called from user or interrupt
 context.
 .SH SEE ALSO
-\fBscsi_ext_sense_fields\fR(9F), \fBscsi_find_sense_descr\fR(9F),
-\fBscsi_sense_asc\fR(9F), \fBscsi_sense_ascq\fR(9F),
-\fBscsi_sense_cmdspecific_uint64\fR(9F), \fBscsi_sense_info_uint64\fR(9F),
-\fBscsi_sense_key\fR(9F)
+.BR scsi_ext_sense_fields (9F),
+.BR scsi_find_sense_descr (9F),
+.BR scsi_sense_asc (9F),
+.BR scsi_sense_ascq (9F),
+.BR scsi_sense_cmdspecific_uint64 (9F),
+.BR scsi_sense_info_uint64 (9F),
+.BR scsi_sense_key (9F)

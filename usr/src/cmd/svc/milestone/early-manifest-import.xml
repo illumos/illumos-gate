@@ -64,7 +64,7 @@
 
 	<!--
 	    Make service transient, so that startd doesn't try to restart
-	    the service when there are no processes associated with it. 
+	    the service when there are no processes associated with it.
 	-->
 	<property_group name='startd' type='framework'>
 		<propval name='duration' type='astring'
@@ -87,13 +87,13 @@ early manifest import
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='svc.startd' section='1M'
+			<manpage title='svc.startd' section='8'
 			    manpath='/usr/share/man' />
-			<manpage title='smf_method' section='5'
+			<manpage title='smf_method' section='7'
 			    manpath='/usr/share/man' />
-			<manpage title='smf' section='5'
+			<manpage title='smf' section='7'
 			    manpath='/usr/share/man' />
-			<manpage title='smf_bootstrap' section='5'
+			<manpage title='smf_bootstrap' section='7'
 			    manpath='/usr/share/man' />
 		</documentation>
 

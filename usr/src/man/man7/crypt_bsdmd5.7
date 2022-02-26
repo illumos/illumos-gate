@@ -1,0 +1,53 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH CRYPT_BSDMD5 7 "Aug 6, 2003"
+.SH NAME
+crypt_bsdmd5 \- password hashing module using MD5 message hash algorithm
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/lib/security/$ISA/crypt_bsdmd5.so\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcrypt_bsdmd5\fR module is a one-way password hashing module for use with
+\fBcrypt\fR(3C) that uses the MD5 message hash algorithm. The algorithm
+identifier for \fBcrypt.conf\fR(5) and \fBpolicy.conf\fR(5) is \fB1\fR. The
+output is compatible with \fBmd5crypt\fR on BSD and Linux systems.
+.sp
+.LP
+The maximum password length for \fBcrypt_bsdmd5\fR is 255 characters.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+MT-Level	Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR passwd (1),
+.BR crypt (3C),
+.BR crypt_genhash_impl (3C),
+.BR crypt_gensalt (3C),
+.BR crypt_gensalt_impl (3C),
+.BR getpassphrase (3C),
+.BR crypt.conf (5),
+.BR passwd (5),
+.BR policy.conf (5),
+.BR attributes (7)

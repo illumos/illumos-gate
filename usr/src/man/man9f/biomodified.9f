@@ -77,7 +77,8 @@ Buffer is not used for paged \fBI/O\fR request.
 .SH CONTEXT
 \fBbiomodified()\fR can be called from any context.
 .SH SEE ALSO
-\fBbp_mapin\fR(9F), \fBbuf\fR(9S)
+.BR bp_mapin (9F),
+.BR buf (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

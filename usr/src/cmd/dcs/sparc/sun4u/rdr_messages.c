@@ -31,8 +31,8 @@
  *
  *	Project	    Location
  *	-------	    --------
- *	Solaris	    usr/src/cmd/dcs/sparc/sun4u/%M%
- *	SMS	    src/sms/lib/librdr/%M%
+ *	Solaris	    usr/src/cmd/dcs/sparc/sun4u/rdr_messages.c
+ *	SMS	    src/sms/lib/librdr/rdr_messages.c
  *
  * In order for proper communication to occur,  the files in the
  * above locations must match exactly. Any changes that are made
@@ -1291,7 +1291,7 @@ rdr_setopt(int fd, int name, int level)
  * Bind the specified file descriptor to a specified
  * address. If the address is already bound, no error is
  * returned. This is the expected behavior if a server
- * has been started by inetd (1M).
+ * has been started by inetd(8).
  */
 static int
 rdr_bind(int fd, struct sockaddr *addr)
@@ -1322,7 +1322,7 @@ rdr_bind(int fd, struct sockaddr *addr)
 	 * Ignore the error if EINVAL is returned. In
 	 * this case, we assume that this means that
 	 * the address was already bound. This is not
-	 * an error for servers started by inetd (1M).
+	 * an error for servers started by inetd(8).
 	 */
 	if ((rc == -1) && (errno != EINVAL)) {
 		return (RDR_NET_ERR);

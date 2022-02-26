@@ -28,5 +28,9 @@ These commands are provided for compatibility only.
 .SH SEE ALSO
 .sp
 .LP
-\fBfsck\fR(1M), \fBhalt\fR(1M), \fBinit\fR(1M), \fBreboot\fR(1M),
-\fBinit.d\fR(4), \fBattributes\fR(5)
+.BR init.d (5),
+.BR attributes (7),
+.BR fsck (8),
+.BR halt (8),
+.BR init (8),
+.BR reboot (8)

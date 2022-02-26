@@ -703,7 +703,7 @@ param_check(void)
 #if defined(__x86)
 	if (physmem != original_physmem) {
 		cmn_err(CE_NOTE, "physmem cannot be modified to 0x%lx"
-		    " via /etc/system. Please use eeprom(1M) instead.",
+		    " via /etc/system. Please use eeprom(8) instead.",
 		    physmem);
 		physmem = original_physmem;
 	}

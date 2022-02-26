@@ -1,0 +1,82 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ZYD 4D "Dec 10, 2008"
+.SH NAME
+zyd \- ZyDAS ZD1211/ZD1211B USB 802.11b/g Wireless Driver
+.SH DESCRIPTION
+.sp
+.LP
+The \fBzyd\fR \fI802.11b/g\fR wireless driver is  a multi-threaded, loadable,
+clonable,  GLDv3-based  STREAMS driver supporting the ZyDAS ZD1211/ZD1211B USB
+chipset-based wireless devices.
+.SH CONFIGURATION
+.sp
+.LP
+The \fBzyd\fR driver performs auto-negotiation to determine the data  rate and
+mode. Supported \fI802.11b\fR data rates are 1, 2, 5.5 and 11 Mbits/sec.
+Supported \fI802.11g\fR data rates are 1, 2, 5.5, 11, 6, 9, 12, 18, 24, 36, 48
+and 54 Mbits/sec. The \fBzyd\fR driver supports only BSS  networks (also known
+as "ap" or "infrastructure"  networks) and open (or "open-system"), shared key
+and WPA/WPA2 authentication. Supported encryption types are WEP40, WEP104, TKIP
+and AES-CCMP.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/zyd*\fR\fR
+.ad
+.RS 25n
+Special character device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/zyd\fR\fR
+.ad
+.RS 25n
+32-bit kernel module (x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/zyd\fR\fR
+.ad
+.RS 25n
+64-bit kernel module (x86).
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR gld (4D),
+.BR dlpi (4P),
+.BR attributes (7),
+.BR dladm (8),
+.BR wificonfig (8)
+.sp
+.LP
+\fI802.11 - Wireless LAN  Media  Access Control and  Physical Layer
+Specification\fR - IEEE, 2001

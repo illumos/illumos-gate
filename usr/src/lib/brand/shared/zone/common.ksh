@@ -367,7 +367,7 @@ get_archiver()
 
 #
 # Unpack flar into current directory (which should be zoneroot).  The flash
-# archive is standard input.  See flash_archive(4) man page.
+# archive is standard input.  See flash_archive(5) man page.
 # 
 # We can't use "flar split" since it will only unpack into a directory called
 # "archive".  We need to unpack in place in order to properly handle nested
@@ -439,7 +439,7 @@ install_flar()
 
 		#
 		# Otherwise skip past this section; read lines until detecting
-		# section_end.  According to flash_archive(4) we can have
+		# section_end.  According to flash_archive(5) we can have
 		# an arbitrary number of sections but the archive section
 		# must be last.
 		#

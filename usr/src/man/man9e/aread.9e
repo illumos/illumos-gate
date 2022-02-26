@@ -22,7 +22,7 @@ int\fIprefix\fR
 .SH INTERFACE LEVEL
 illumos \fBDDI \fRspecific (illumos DDI). This entry point is \fIoptional\fR.
 Drivers that do not support an \fBaread()\fR entry point should use
-\fBnodev\fR(9F)
+.BR nodev (9F)
 .SH PARAMETERS
 .ne 2
 .na
@@ -92,11 +92,22 @@ xxaread(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 .in -2
 
 .SH SEE ALSO
-\fBread\fR(2), \fBaioread\fR(3C), \fBawrite\fR(9E), \fBread\fR(9E),
-\fBstrategy\fR(9E), \fBwrite\fR(9E), \fBanocancel\fR(9F), \fBaphysio\fR(9F),
-\fBddi_get_soft_state\fR(9F), \fBdrv_priv\fR(9F), \fBgetminor\fR(9F),
-\fBminphys\fR(9F), \fBnodev\fR(9F), \fBaio_req\fR(9S), \fBcb_ops\fR(9S),
-\fBuio\fR(9S)
+.BR read (2),
+.BR aioread (3C),
+.BR awrite (9E),
+.BR read (9E),
+.BR strategy (9E),
+.BR write (9E),
+.BR anocancel (9F),
+.BR aphysio (9F),
+.BR ddi_get_soft_state (9F),
+.BR drv_priv (9F),
+.BR getminor (9F),
+.BR minphys (9F),
+.BR nodev (9F),
+.BR aio_req (9S),
+.BR cb_ops (9S),
+.BR uio (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

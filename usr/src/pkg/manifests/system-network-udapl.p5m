@@ -50,8 +50,6 @@ file path=usr/lib/libdat.so.1
 dir  path=usr/sbin
 file path=usr/sbin/datadm mode=0555
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/datadm.1m
 dir  path=usr/share/man/man3dat
 file path=usr/share/man/man3dat/dat_cno_create.3dat
 file path=usr/share/man/man3dat/dat_cno_free.3dat
@@ -128,8 +126,10 @@ file path=usr/share/man/man3dat/dat_srq_set_lw.3dat
 file path=usr/share/man/man3dat/dat_strerror.3dat
 dir  path=usr/share/man/man3lib
 file path=usr/share/man/man3lib/libdat.3lib
-dir  path=usr/share/man/man4
-file path=usr/share/man/man4/dat.conf.4
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/dat.conf.5
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/datadm.8
 legacy pkg=SUNWudaplr desc="DAT static registry file" \
     name="Sun User Direct Access Programming Library (Root)"
 legacy pkg=SUNWudaplu desc="Sun DAT registry library and datadm" \

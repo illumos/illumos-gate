@@ -141,7 +141,7 @@ is not ignoring or blocking \fBSIGTTOU\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -159,4 +159,7 @@ MT-Level	MT-Safe, and Async-Signal-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBtcdrain\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5), \fBtermio\fR(7I)
+.BR tcdrain (3C),
+.BR termio (4I),
+.BR attributes (7),
+.BR standards (7)

@@ -1554,7 +1554,7 @@ fastboot_update_and_load(int fcn, char *mdep)
 	if (fcn != AD_FASTREBOOT) {
 		/*
 		 * If user has explicitly requested reboot to prom,
-		 * or uadmin(1M) was invoked with other functions,
+		 * or uadmin(8) was invoked with other functions,
 		 * don't try to fast reboot after dumping.
 		 */
 		fastreboot_onpanic_disable();

@@ -73,7 +73,7 @@ system default), the application needs to raise the limit (see
 descriptor limit.
 .sp
 .LP
-This function is used by the \fBextendedFILE\fR(5) preloadable library to
+This function is used by the \fBextendedFILE\fR(7) preloadable library to
 enable the extended FILE facility.
 .SH RETURN VALUES
 .sp
@@ -145,7 +145,7 @@ process it. Alternatively, the \fBenable_extended_FILE_stdio()\fR function can
 be used at a higher level in the code.
 .sp
 .LP
-Use \fBextendedFILE\fR(5) for binary relief.
+Use \fBextendedFILE\fR(7) for binary relief.
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRIncrease the file limit and enable the extended FILE facility.
@@ -175,7 +175,7 @@ if (retval == -1) {
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -193,9 +193,16 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBclose\fR(2), \fBfcntl\fR(2), \fBgetrlimit\fR(2), \fBfdopen\fR(3C),
-\fBfopen\fR(3C), \fBpopen\fR(3C), \fBsignal.h\fR(3HEAD), \fBstdio\fR(3C),
-\fBattributes\fR(5), \fBextendedFILE\fR(5)
+.BR close (2),
+.BR fcntl (2),
+.BR getrlimit (2),
+.BR fdopen (3C),
+.BR fopen (3C),
+.BR popen (3C),
+.BR stdio (3C),
+.BR signal.h (3HEAD),
+.BR attributes (7),
+.BR extendedFILE (7)
 .SH NOTES
 .sp
 .LP

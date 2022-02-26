@@ -390,7 +390,7 @@ main(int32_t argc, int8_t *argv[])
 			(void) fprintf(stdout,
 				gettext("can't check mount point; "));
 			(void) fprintf(stdout,
-				gettext("%s is mounted but not in mnttab(4)\n"),
+				gettext("%s is mounted but not in mnttab(5)\n"),
 				special);
 			exit(32);
 		}

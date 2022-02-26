@@ -65,4 +65,7 @@ or for network drivers only providing DLPI-2 services. Such drivers can use
 .SH RETURN VALUES
 The \fBddi_no_info()\fR function always returns \fBDDI_FAILURE\fR.
 .SH SEE ALSO
-\fBgetinfo\fR(9E), \fBqassociate\fR(9F), \fBcb_ops\fR(9S), \fBdev_ops\fR(9S)
+.BR getinfo (9E),
+.BR qassociate (9F),
+.BR cb_ops (9S),
+.BR dev_ops (9S)

@@ -148,7 +148,7 @@
  *   The locking subsequence of interest is: p_lock, rctl_dict_lock,
  *   rctl_lists_lock, entity->rcs_lock.
  *
- * The projects(4) database and project entity resource controls
+ * The project(5) database and project entity resource controls
  *   A special case is made for RCENTITY_PROJECT values set through the
  *   setproject(3PROJECT) interface.  setproject() makes use of a private
  *   interface, setprojrctl(), which passes through an array of resource control
@@ -169,7 +169,7 @@
  *
  *      rctl->rc_values - a linked list of rctl_val_t.  These are the active
  *      resource values associated with this rctl, and may have been set by
- *      setrctl() - via prctl(1M), or by setprojrctl() - via
+ *      setrctl() - via prctl(1), or by setprojrctl() - via
  *      setproject(3PROJECT).
  *
  *      rctl->rc_projdb - a linked list of rctl_val_t.  These reflect the

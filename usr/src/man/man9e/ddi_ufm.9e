@@ -522,7 +522,7 @@ block until it is terminated.
 .Ss ioctl Interface
 Userland consumers can access UFM information via a set of ioctls that are
 implemented by the
-.Xr ufm 7D
+.Xr ufm 4D
 driver.
 .Sh CONTEXT
 The various UFM entry points that a device driver must implement will
@@ -531,7 +531,7 @@ always be called from
 context.
 .Sh SEE ALSO
 .Xr Intro 2 ,
-.Xr ufd 7D ,
+.Xr ufd 4D ,
 .Xr attach 9E ,
 .Xr ddi_ufm_fini 9F ,
 .Xr ddi_ufm_image 9F ,

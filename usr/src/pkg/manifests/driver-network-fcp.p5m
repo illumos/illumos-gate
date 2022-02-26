@@ -40,8 +40,8 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/fcp group=sys
 file path=kernel/drv/fcp.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/fcp.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/fcp.4d
 driver name=fcp perms="* 0600 root sys"
 legacy pkg=SUNWfcp desc="Sun FCP SCSI Fibre Channel Device Driver" \
     name="Sun FCP SCSI Device Driver"

@@ -61,7 +61,7 @@ attached.
 Each of these entries shows up in the file system of the global zone under
 .Pa /devices
 .Po see
-.Xr devfs 7FS
+.Xr devfs 4FS
 .Pc .
 These nodes are referred to as a devfs nodes
 .Pq Vt dv_node .
@@ -117,4 +117,4 @@ The
 .Fn devfs_clean
 function always succeeds and returns zero.
 .Sh SEE ALSO
-.Xr devfs 7FS
+.Xr devfs 4FS

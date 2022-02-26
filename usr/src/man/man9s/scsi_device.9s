@@ -68,8 +68,13 @@ buffer.
 \fBsd_private\fR is reserved for the use of target drivers and should generally
 be used to point to target specific data structures.
 .SH SEE ALSO
-\fBdetach\fR(9E), \fBprobe\fR(9E), \fBmakecom\fR(9F), \fBmutex\fR(9F),
-\fBscsi_probe\fR(9F), \fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
+.BR detach (9E),
+.BR probe (9E),
+.BR makecom (9F),
+.BR mutex (9F),
+.BR scsi_probe (9F),
+.BR scsi_extended_sense (9S),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

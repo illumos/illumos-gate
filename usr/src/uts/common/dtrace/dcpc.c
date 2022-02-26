@@ -75,7 +75,7 @@
  * A consumer will fail to enable probes when resources are currently in use.
  *
  * The cpc provider contends for shared hardware resources along with other
- * consumers of the kernel CPU performance counter subsystem (e.g. cpustat(1M)).
+ * consumers of the kernel CPU performance counter subsystem (e.g. cpustat(8)).
  * Only one such consumer can use the performance counters at any one time and
  * counters are made available on a first-come, first-served basis. As with
  * cpustat, the cpc provider has priority over per-LWP libcpc usage (e.g.

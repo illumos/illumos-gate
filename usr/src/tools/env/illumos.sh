@@ -213,7 +213,7 @@ export MAILTO="${MAILTO:-$STAFFER}"
 # MAILFROM.
 #export MAILFROM="user@example.com"
 
-# The project (see project(4)) under which to run this build.  If not
+# The project (see project(5)) under which to run this build.  If not
 # specified, the build is simply run in a new task in the current project.
 export BUILD_PROJECT=''
 

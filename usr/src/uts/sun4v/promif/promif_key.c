@@ -24,17 +24,15 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/promif_impl.h>
 
 /*
  * Secure WAN boot requires firmware support for storing and
  * retrieving security keys. The user command to set these
- * keys in firmware storage is ickey(1M). Currently, sun4v
+ * keys in firmware storage is ickey(8). Currently, sun4v
  * platforms do not support this functionality. However, there
  * is an external interface to these prom interfaces from the
- * openprom(7D) driver. They are not documented in the man page,
+ * openprom(4D) driver. They are not documented in the man page,
  * but they should still be handled just well enough so that
  * the user gets a sensible error back.
  */

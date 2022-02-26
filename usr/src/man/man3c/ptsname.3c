@@ -70,7 +70,7 @@ pseudo-terminal manager device; e.g., by calling
 or by performing an
 .Xr open 2
 of the
-.Xr ptm 7D
+.Xr ptm 4D
 device.
 .Pp
 The
@@ -108,7 +108,7 @@ in the file system.
 .Xr posix_openpt 3C ,
 .Xr ttyname 3C ,
 .Xr unlockpt 3C ,
-.Xr attributes 5 ,
-.Xr standards 5 ,
-.Xr ptm 7D ,
-.Xr pts 7D
+.Xr ptm 4D ,
+.Xr pts 4D ,
+.Xr attributes 7 ,
+.Xr standards 7

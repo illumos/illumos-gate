@@ -1,0 +1,241 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH LPSET 8 "November 22, 2021"
+.SH NAME
+lpset \- set printing configuration in /etc/printers.conf or other supported
+databases
+.SH SYNOPSIS
+.nf
+\fBlpset\fR [\fB-n\fR system | fnsldap] [\fB-x\fR]
+     [ [\fB-D\fR binddn] [\fB-w\fR passwd] [\fB-h\fR ldaphost]]
+     [\fB-a\fR \fIkey=value\fR] [\fB-d\fR \fIkey\fR] \fIdestination\fR
+.fi
+
+.SH DESCRIPTION
+The \fBlpset\fR utility sets printing configuration information in  the system
+configuration databases. Use \fBlpset\fR to create and update printing
+configuration in \fB/etc/printers.conf\fR.
+See \fBnsswitch.conf\fR(5) and \fBprinters.conf\fR(5).
+.sp
+.LP
+Only a superuser or a member of Group 14 may execute \fBlpset\fR.
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-n\fR \fBsystem\fR|\fBldap\fR\fR
+.ad
+.RS 26n
+Create or update the configuration information for the \fIdestination\fR entry
+in \fB/etc/printers.conf\fR or LDAP printer contexts. \fBsystem\fR specifies
+that the information is created or updated in \fB/etc/printers.conf\fR.
+\fBldap\fR specifies that the information is written to an LDAP server.
+.sp
+If  \fB-n\fR is not specified, \fBsystem\fR is the default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 26n
+Remove all configuration for  the \fIdestination\fR entry from the database
+specified by the \fB-n\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-a\fR \fIkey\fR\fB=\fR\fIvalue\fR\fR
+.ad
+.RS 26n
+Configure the specified \fIkey\fR\fB=\fR\fIvalue\fR pair for the
+\fIdestination\fR. See \fBprinters.conf\fR(5) for information regarding the
+specification of \fIkey\fR\fB=\fR\fIvalue\fR pairs.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR \fIkey\fR\fR
+.ad
+.RS 26n
+Delete the configuration option specified by \fIkey\fR for the
+\fIdestination\fR entry. See \fBprinters.conf\fR(5) for information regarding
+the specification of \fIkey\fR and  \fIkey\fR\fB=\fR\fIvalue\fR pairs.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-D\fR \fBbinddn\fR\fR
+.ad
+.RS 26n
+Use the distinguished name (DN) \fBbinddn\fR to bind to the LDAP directory
+server.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-w\fR \fBpasswd\fR\fR
+.ad
+.RS 26n
+Use \fBpasswd\fR as the password for authentication to the LDAP directory
+server.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-h\fR \fBldaphost\fR\fR
+.ad
+.RS 26n
+Specify an alternate host on which the LDAP server is running. This option is
+only used when \fBldap\fR is specified as the naming service. If this option is
+not specified, the default is the current host system.
+.RE
+
+.SH OPERANDS
+The following operand is supported:
+.sp
+.ne 2
+.na
+\fB\fIdestination\fR\fR
+.ad
+.RS 15n
+Specifies the entry in  \fB/etc/printers.conf\fR or
+LDAP, in which to create or modify information. \fIdestination\fR names a
+printer of class of printers. See  \fBlpadmin\fR(8). Each entry in
+\fBprinters.conf\fR describes one destination. Specify \fIdestination\fR using
+atomic names. POSIX-style destination names are not acceptable. See
+\fBprinters.conf\fR(5) for information regarding the naming conventions for
+atomic names and \fBstandards\fR(7) for information regarding POSIX.
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRRemoving All Existing Printing Configuration Information
+.sp
+.LP
+The following example removes all existing printing configuration information
+for destination \fBdogs\fR from \fB/etc/printers.conf\fR:
+
+.sp
+.in +2
+.nf
+example% \fBlpset -x dogs\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRSetting a \fBkey=value\fR Pair in LDAP
+.sp
+.in +2
+.nf
+example% \fBlpset -n ldap -h ldapl.example.com -D "cn=Directory Manager" \e
+   -w passwd -a key1=value1 printer1\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+An error occurred.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/printers.conf\fR\fR
+.ad
+.RS 26n
+System configuration database.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability Level	Stable
+.TE
+
+.SH SEE ALSO
+.BR ldap (1),
+.BR lp (1),
+.BR lpstat (1),
+.BR lpc (1B),
+.BR lpq (1B),
+.BR lpr (1B),
+.BR nsswitch.conf (5),
+.BR printers (5),
+.BR printers.conf (5),
+.BR attributes (7),
+.BR standards (7),
+.BR ldapclient (8),
+.BR lpadmin (8),
+.BR lpget (8)
+.sp
+.LP
+\fI\fR
+.SH NOTES
+If the \fBldap\fR database is used, the printer administrator should be mindful
+of the following when updating printer information.
+.RS +4
+.TP
+1.
+Because the domain information for the printer being updated is extracted
+from the \fBldapclient\fR(8) configuration, the LDAP server being updated must
+host the same domain that is used by the current \fBldapclient\fR(8) server.
+.RE
+.RS +4
+.TP
+2.
+If the LDAP server being updated is a replica LDAP server, the updates will
+be referred to the master LDAP server and completed there. The updates might be
+out of sync and not appear immediately, as the replica server may not have
+been updated by the master server.  For example, a printer that you deleted by
+using \fBlpset\fR may still appear in the printer list you display with
+\fBlpget\fR until the replica is updated from the master. Replica servers vary
+as to how often they are updated from the master.  See \fISystem Administration
+Guide: Solaris Printing\fR for information on LDAP server replication.
+.RE
+.RS +4
+.TP
+3.
+Although users can use the LDAP command line utilities \fBldapadd\fR(1) and
+\fBldapmodify\fR(1) to update printer entries in the directory, the preferred
+method is to use \fBlpset\fR. Otherwise, if the \fBldapadd\fR and
+\fBldapmodify\fR utilities are used, the administrator must ensure that the
+\fBprinter-name\fR attribute value is unique within the \fBou=printers\fR
+container on the LDAP server. If the value is not unique, the result of
+modifications done using \fBlpset\fR or the Solaris Print Manager,
+\fBprintmgr\fR(8) may be unpredictable.
+.RE

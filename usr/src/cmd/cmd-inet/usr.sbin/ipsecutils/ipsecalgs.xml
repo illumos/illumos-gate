@@ -113,7 +113,7 @@
 			svcadm mark <state> ipsecalgs
 			svcadm clear ipsecalgs
 
-		see auths(1) and user_attr(4)-->
+		see auths(1) and user_attr(5)-->
 
 		<propval
 			name='action_authorization'
@@ -125,7 +125,7 @@
 			svcadm disable ipsecalgs
 			svcadm enable ipsecalgs
 
-		 see auths(1) and user_attr(4)-->
+		 see auths(1) and user_attr(5)-->
 		<propval
 			name='value_authorization'
 			type='astring'
@@ -158,7 +158,7 @@
 		<documentation>
 			<manpage
 				title='ipsecalgs'
-				section='1M'
+				section='8'
 				manpath='/usr/share/man'
 			/>
 		</documentation>

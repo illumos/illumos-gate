@@ -1,0 +1,228 @@
+'\" te
+.\" Copyright 2021 Peter Tribble
+.\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH BOOTPARAMS 5 "November 22, 2021"
+.SH NAME
+bootparams \- boot parameter data base
+.SH SYNOPSIS
+.nf
+\fB/etc/bootparams\fR
+.fi
+
+.SH DESCRIPTION
+The \fBbootparams\fR file contains a list of client entries that diskless
+clients use for booting. Diskless booting clients retrieve this information by
+issuing requests to a server running the \fBrpc.bootparamd\fR(8) program. The
+\fBbootparams\fR file may be used in conjunction with or in place of other
+sources for the \fBbootparams\fR information. See \fBnsswitch.conf\fR(5).
+.sp
+.LP
+For each client the file contains an entry with the client's name and a list of
+boot parameter values for that client. Each entry has the form:
+.sp
+.in +2
+.nf
+\fIclientname    keyword=value\fR...
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The first item of each entry is the host name of the diskless client. You can
+use the asterisk ('*') character as a "wildcard" in place of the client name in
+a single entry. A wildcard entry applies to all clients for which there is not
+an entry that specifically names them.
+.sp
+.LP
+In a given entry, the host name or asterisk is followed by one or more
+whitespace characters and a series of keyword\(emvalue pairs separated by
+whitespace characters. There must not be any whitespace within a
+keyword\(emvalue pair.
+.sp
+.LP
+Each keyword\(emvalue pair has the syntax:
+.sp
+.in +2
+.nf
+\fIkeyword\fR\fB=\fR\fIvalue\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The preceding form breaks out further as:
+.sp
+.in +2
+.nf
+\fIkeyword\fR\fB=\fR\fIserver\fR\fB:\fR\fIvalue\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Where \fIserver\fR can be null and \fIvalue\fR can be a pathname.
+.sp
+.LP
+An example that includes a server is:
+.sp
+.in +2
+.nf
+client1 root=server1:/export/client1/root
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+An example where \fIserver\fR is null is:
+.sp
+.in +2
+.nf
+client1 rootopts=:vers2
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+A minor variation of the \fIkeyword=value\fR syntax is used for the
+\fBdomain\fR keyword. Unlike the forms shown above, this syntax does not use a
+colon. For example:
+.sp
+.in +2
+.nf
+client1 domain=bldg1.example.com
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Entries can span multiple lines. Use the backslash ('\e') character as the last
+character of a line to continue the entry to the following line. For
+multiple-line entries, you can split a line only in places where whitespace is
+allowed. For example, you can use a backslash to split the following entry
+between the end of the path (\fBroot\fR) and the keyword \fBdomain\fR:
+.sp
+.in +2
+.nf
+client1 root=server1:/export/client1/root domain=bldg1.example.com
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In entries that specify a server, \fIserver\fR is the name of the server that
+will provide the file or filesystem to the diskless client and \fIvalue\fR is
+the pathname of the exported file or filesystem on that server.
+.sp
+.LP
+In entries that use the \fBdomain\fR keyword, the domain name specified must be
+the client's domain name. The algorithm for determining a client's domain name
+is to first check for a \fBdomain\fR keyword in the client-specific entry and
+then in "wildcard" entry. If none is found, the server's domain name is used.
+.sp
+.LP
+For the JumpStart installation of machines that do not have video displays, use
+the \fBterm\fR keyword to identify the terminal type of the boot server.
+Terminal types are listed in \fB/usr/share/lib/terminfo\fR (see
+\fBterminfo\fR(5)).
+.sp
+.LP
+An entry with the \fBns\fR keyword associates a server (a name server) with,
+instead of a pathname, a specific name service (\fBNIS+\fR, \fBNIS\fR,
+\fBLDAP\fR, or \fBnone\fR) and, if that server is not on a local subnet, the
+netmask needed to reach it. For example:
+.sp
+.in +2
+.nf
+ns=hoot:nisplus(255.255.255.0)
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+An \fBns\fR entry forces \fBsysidtool\fR to use the specified name service.
+By default, \fBsysidtool\fR uses \fBNIS+\fR in preference to \fBNIS\fR or
+\fBLDAP\fR if it can find an \fBNIS+\fR server for the system's domain on the
+subnet. An \fBns\fR entry might be necessary if you are trying to set up a
+hands-off installation, or if the name server is on a different subnet, which
+is common with \fBNIS+\fR.
+.sp
+.LP
+If an \fBns\fR keyword is not used, \fBsysidtool\fR uses broadcast to attempt
+to bind to either a \fBNIS+\fR, \fBNIS\fR, or \fBLDAP\fR server. If a name
+server is not on the local subnet, which is possible for \fBNIS+\fR or
+\fBLDAP\fR, the bind will fail, automatic configuration of the name service
+will fail, and an interactive screen is displayed, prompting the user to
+specify the name service.
+.sp
+.LP
+The \fBns\fR keyword can be set in \fBadd_install_client\fR or by Host Manager.
+.SH EXAMPLES
+\fBExample 1 \fRSample \fBbootparams\fR Entry
+.sp
+.LP
+Here is an example of an entry in the \fBbootparams\fR file:
+
+.sp
+.in +2
+.nf
+	client1 root=server1:/export/client1/root rootopts=:vers=2 \e
+		domain=bldg1.example.com
+	client2 root=server2:/export/client2/root ns=:nis
+	client3 root=server2:/export/client3/root ns=watson:
+	client4 root=server2:/export/client4/root \e
+		ns=mach:nisplus(255.255.255.0)
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRSample Entry for JumpStart
+.sp
+.LP
+The following is an example of an entry that might be used for the JumpStart
+installation of diskless clients that do not have displays.
+
+.sp
+.in +2
+.nf
+mozart root=haydn:/export/install/sparc/os/latest/Solaris_9/boot \e
+install=haydn:/export/install/sparc/os/8.1/latest boottype=:in \e
+install_config=haydn:/usr/local/share/lib/jump-net \e
+ns=otis:nisplus(255.255.255.0) term=:xterms domain=eu.cte.example.com
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/bootparams\fR\fR
+.ad
+.RS 19n
+
+.RE
+
+.SH SEE ALSO
+.BR nsswitch.conf (5),
+.BR rpc.bootparamd (8)
+.SH NOTES
+The \fBNIS+\fR, \fBsysidtool\fR, and jumpstart facilities are not present in
+illumos. They are documented here solely for users who wish to use illumos as
+a jumpstart server for older Solaris releases.
+.sp
+.LP
+Solaris diskless clients use the keywords \fBroot\fR and \fBrootopts\fR to look
+up the pathname for the root filesystem and the mount options for the root
+filesystem, respectively. These are the only keywords meaningful for diskless
+booting clients. See \fBmount_ufs\fR(8).

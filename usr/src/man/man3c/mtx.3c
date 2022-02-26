@@ -58,7 +58,7 @@ family of functions implement mutual exclusion locks (mutexes) and behave
 similarly to both POSIX threads and illumos threads; however, they have
 slightly different call signatures and return values.
 For more information, see
-.Xr threads 5 .
+.Xr threads 7 .
 Importantly, they do not allow for inter-process synchronization.
 .Ss Creating and Destroying Mutexes
 The
@@ -218,4 +218,4 @@ is returned.
 .Xr pthread_mutex_trylock 3C ,
 .Xr pthread_mutex_unlock 3C ,
 .Xr threads.h 3HEAD ,
-.Xr attributes 5
+.Xr attributes 7

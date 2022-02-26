@@ -35,7 +35,7 @@ Number of bytes in the message.
 .SH CONTEXT
 This function can be called from user, kernel or interrupt context.
 .SH SEE ALSO
-\fBmsgdsize\fR(9F)
+.BR msgdsize (9F)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

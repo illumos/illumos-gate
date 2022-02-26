@@ -29,11 +29,11 @@ file path=kernel/drv/$(ARCH64)/pchtemp group=sys
 file path=kernel/drv/$(ARCH64)/smntemp group=sys
 file path=kernel/drv/coretemp.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/amdnbtemp.7d
-file path=usr/share/man/man7d/coretemp.7d
-file path=usr/share/man/man7d/pchtemp.7d
-file path=usr/share/man/man7d/smntemp.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/amdnbtemp.4d
+file path=usr/share/man/man4d/coretemp.4d
+file path=usr/share/man/man4d/pchtemp.4d
+file path=usr/share/man/man4d/smntemp.4d
 driver name=amdnbtemp \
     alias=pci1022,1203,p \
     alias=pci1022,1303,p \

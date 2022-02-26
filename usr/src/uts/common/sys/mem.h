@@ -68,7 +68,7 @@ typedef struct mem_vtop32 {
 #endif
 
 /*
- * Private ioctls for fmd(1M).  These interfaces are Sun Private.  Applications
+ * Private ioctls for fmd(8).  These interfaces are Sun Private.  Applications
  * and drivers should not make use of these interfaces: they can change without
  * notice and programs that consume them will fail to run on future releases.
  */
@@ -86,7 +86,7 @@ typedef struct mem_vtop32 {
 #define	MEM_SID			(('M' << 8) | 0x0B)
 
 /*
- * Bits returned from MEM_PAGE_GETERRORS ioctl for use by fmd(1M).
+ * Bits returned from MEM_PAGE_GETERRORS ioctl for use by fmd(8).
  */
 #define	MEM_PAGE_ERR_NONE	0x0
 #define	MEM_PAGE_ERR_MULTI_CE	0x1

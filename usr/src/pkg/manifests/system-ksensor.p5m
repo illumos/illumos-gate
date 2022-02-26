@@ -29,7 +29,7 @@ dir  path=usr/lib/devfsadm group=sys
 dir  path=usr/lib/devfsadm/linkmod group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_sensor_link.so group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/ksensor.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/ksensor.4d
 driver name=ksensor
 license lic_CDDL license=lic_CDDL

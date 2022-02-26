@@ -193,9 +193,9 @@ link path=usr/share/man/man3tecla/ppc_file_start.3tecla \
     target=pca_lookup_file.3tecla
 link path=usr/share/man/man3tecla/ppc_literal_escapes.3tecla \
     target=pca_lookup_file.3tecla
-dir  path=usr/share/man/man5
-file path=usr/share/man/man5/tecla.5
-link path=usr/share/man/man5/teclarc.5 target=tecla.5
+dir  path=usr/share/man/man7
+file path=usr/share/man/man7/tecla.7
+link path=usr/share/man/man7/teclarc.7 target=tecla.7
 legacy pkg=SUNWtecla desc="Tecla command-line editing library" \
     name="Tecla command-line editing library"
 license usr/src/lib/libtecla/THIRDPARTYLICENSE \

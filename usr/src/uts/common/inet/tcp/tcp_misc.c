@@ -44,7 +44,7 @@ static boolean_t tcp_do_reclaim = B_TRUE;
  * TCP_IOC_ABORT_CONN is a non-transparent ioctl command used for aborting
  * TCP connections. To invoke this ioctl, a tcp_ioc_abort_conn_t structure
  * (defined in tcp.h) needs to be filled in and passed into the kernel
- * via an I_STR ioctl command (see streamio(7I)). The tcp_ioc_abort_conn_t
+ * via an I_STR ioctl command (see streamio(4I)). The tcp_ioc_abort_conn_t
  * structure contains the four-tuple of a TCP connection and a range of TCP
  * states (specified by ac_start and ac_end). The use of wildcard addresses
  * and ports is allowed. Connections with a matching four tuple and a state

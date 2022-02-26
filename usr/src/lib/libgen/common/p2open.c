@@ -27,10 +27,8 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Similar to popen(3S) but with pipe to cmd's stdin and from stdout.
+ * Similar to popen(3C) but with pipe to cmd's stdin and from stdout.
  */
 
 #include <sys/types.h>

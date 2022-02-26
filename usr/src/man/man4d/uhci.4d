@@ -1,0 +1,119 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH UHCI 4D "May 13, 2017"
+.SH NAME
+uhci \- host controller driver
+.SH SYNOPSIS
+.LP
+.nf
+\fBpcivid,pid@unit-address\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBuhci\fR host controller driver is a \fBUSBA \fR (Solaris USB
+Architecture) compliant nexus driver that supports the \fIUniversal Host
+Controller Interface Specification 1.1\fR, an industry standard developed by
+Intel. The \fBuhci\fR driver supports all USB transfers, including interrupt,
+control, isochronous and bulk.
+.SH FILES
+.ne 2
+.na
+\fB\fB/kernel/drv/uhci\fR\fR
+.ad
+.RS 28n
+32-bit ELF kernel module. (SPARC or x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/uhci\fR\fR
+.ad
+.RS 28n
+64-bit ELF kernel module. (x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/uhci\fR\fR
+.ad
+.RS 28n
+64-bit SPARC ELF kernel module.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/uhci.conf\fR\fR
+.ad
+.RS 28n
+Driver configuration file.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC or  x86  PCI-based systems
+.TE
+
+.SH SEE ALSO
+.LP
+.BR ehci (4D),
+.BR hubd (4D),
+.BR ohci (4D),
+.BR usba (4D),
+.BR attributes (7)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIUniversal Host Controller Interface Specification for USB 1.1\fR
+.sp
+.LP
+\fIUniversal Serial Bus Specification 2.0\fR
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.SH DIAGNOSTICS
+.LP
+All host controller errors are passed to the client drivers. Root errors are
+documented in \fBhubd\fR(4D).
+.sp
+.LP
+In addition to being logged, the following messages may appear on the system
+console. All messages are formatted in the following manner:
+.sp
+.in +2
+.nf
+WARNING: <device path> <uhci><instance number>>: Error message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBNo SOF interrupts have been received. This USB UHCI host controller is
+unusable.\fR
+.ad
+.sp .6
+.RS 4n
+The USB hardware is not generating Start Of Frame interrupts. Please reboot the
+system. If this problem persists, contact your system vendor.
+.RE
+

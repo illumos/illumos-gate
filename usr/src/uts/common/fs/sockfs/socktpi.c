@@ -865,7 +865,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			/*
 			 * Force a zero sa_family to match so_family.
 			 *
-			 * Some programs like inetd(1M) don't set the
+			 * Some programs like inetd(8) don't set the
 			 * family field. Other programs leave
 			 * sin_family set to garbage - SunOS 4.X does
 			 * not check the family field on a bind.
@@ -6518,7 +6518,7 @@ socktpi_init(void)
 {
 	/*
 	 * Create sonode caches.  We create a special one for AF_UNIX so
-	 * that we can track them for netstat(1m).
+	 * that we can track them for netstat(8).
 	 */
 	socktpi_cache = kmem_cache_create("socktpi_cache",
 	    sizeof (struct sotpi_sonode), 0, socktpi_constructor,

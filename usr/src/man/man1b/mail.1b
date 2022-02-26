@@ -29,4 +29,5 @@ these commands.
 .SH SEE ALSO
 .sp
 .LP
-\fBmailx\fR(1), \fBattributes\fR(5)
+.BR mailx (1),
+.BR attributes (7)

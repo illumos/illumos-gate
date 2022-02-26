@@ -71,7 +71,7 @@ file that has not been opened for writing.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -87,5 +87,10 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBferror\fR(3C), \fBfopen\fR(3C), \fBfread\fR(3C), \fBgetws\fR(3C),
-\fBprintf\fR(3C), \fBputwc\fR(3C), \fBattributes\fR(5)
+.BR ferror (3C),
+.BR fopen (3C),
+.BR fread (3C),
+.BR getws (3C),
+.BR printf (3C),
+.BR putwc (3C),
+.BR attributes (7)

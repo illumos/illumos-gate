@@ -28,7 +28,7 @@
 #
 # get.ipv6remote.pl
 #
-# Find an IPv6 reachable remote host using both ifconfig(1M) and ping(1M).
+# Find an IPv6 reachable remote host using both ifconfig(8) and ping(8).
 # Print the local address and the remote address, or print nothing if either
 # no IPv6 interfaces or remote hosts were found.  (Remote IPv6 testing is
 # considered optional, and so not finding another IPv6 host is not an error

@@ -6158,7 +6158,7 @@ share_mount_one(zfs_handle_t *zhp, int op, int flags, char *protocol,
 
 		(void) fprintf(stderr, gettext("cannot share '%s': "
 		    "legacy share\n"), zfs_get_name(zhp));
-		(void) fprintf(stderr, gettext("use share(1M) to "
+		(void) fprintf(stderr, gettext("use share(8) to "
 		    "share this filesystem, or set "
 		    "sharenfs property on\n"));
 		return (1);
@@ -6175,7 +6175,7 @@ share_mount_one(zfs_handle_t *zhp, int op, int flags, char *protocol,
 
 		(void) fprintf(stderr, gettext("cannot %s '%s': "
 		    "legacy mountpoint\n"), cmdname, zfs_get_name(zhp));
-		(void) fprintf(stderr, gettext("use %s(1M) to "
+		(void) fprintf(stderr, gettext("use %s(8) to "
 		    "%s this filesystem\n"), cmdname, cmdname);
 		return (1);
 	}
@@ -6676,7 +6676,7 @@ unshare_unmount_path(int op, char *path, int flags, boolean_t is_manual)
 			(void) fprintf(stderr, gettext("cannot unshare "
 			    "'%s': legacy share\n"), path);
 			(void) fprintf(stderr, gettext("use "
-			    "unshare(1M) to unshare this filesystem\n"));
+			    "unshare(8) to unshare this filesystem\n"));
 		} else if (!zfs_is_shared(zhp)) {
 			(void) fprintf(stderr, gettext("cannot unshare '%s': "
 			    "not currently shared\n"), path);
@@ -6695,7 +6695,7 @@ unshare_unmount_path(int op, char *path, int flags, boolean_t is_manual)
 			(void) fprintf(stderr, gettext("cannot unmount "
 			    "'%s': legacy mountpoint\n"),
 			    zfs_get_name(zhp));
-			(void) fprintf(stderr, gettext("use umount(1M) "
+			(void) fprintf(stderr, gettext("use umount(8) "
 			    "to unmount this filesystem\n"));
 		} else {
 			ret = zfs_unmountall(zhp, flags);
@@ -6951,7 +6951,7 @@ unshare_unmount(int op, int argc, char **argv)
 				    "unshare '%s': legacy share\n"),
 				    zfs_get_name(zhp));
 				(void) fprintf(stderr, gettext("use "
-				    "unshare(1M) to unshare this "
+				    "unshare(8) to unshare this "
 				    "filesystem\n"));
 				ret = 1;
 			} else if (!zfs_is_shared(zhp)) {
@@ -6970,7 +6970,7 @@ unshare_unmount(int op, int argc, char **argv)
 				    "unmount '%s': legacy "
 				    "mountpoint\n"), zfs_get_name(zhp));
 				(void) fprintf(stderr, gettext("use "
-				    "umount(1M) to unmount this "
+				    "umount(8) to unmount this "
 				    "filesystem\n"));
 				ret = 1;
 			} else if (!zfs_is_mounted(zhp, NULL)) {
@@ -7099,7 +7099,7 @@ manual_mount(int argc, char **argv)
 		    "instead.\n"), path);
 		(void) fprintf(stderr, gettext("If you must use 'mount -F zfs' "
 		    "or /etc/vfstab, use 'zfs set mountpoint=legacy'.\n"));
-		(void) fprintf(stderr, gettext("See zfs(1M) for more "
+		(void) fprintf(stderr, gettext("See zfs(8) for more "
 		    "information.\n"));
 		ret = 1;
 	}

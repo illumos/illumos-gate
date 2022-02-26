@@ -25,7 +25,7 @@ This function is obsolete. The management of removable media by the Volume
 Management feature, including \fBvold\fR, has been replaced by software that
 supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
 through the HAL APIs, which are documented on the HAL web site. See
-\fBhal\fR(5). The return value of this function is undefined.
+\fBhal\fR(7). The return value of this function is undefined.
 .sp
 .LP
 \fBmedia_findname()\fR converts the supplied \fIstart\fR string into an
@@ -140,7 +140,7 @@ currently known to be the first floppy drive.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -158,11 +158,19 @@ Interface Stability	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBfdformat\fR(1), \fBlstat\fR(2), \fBreadlink\fR(2), \fBstat\fR(2),
-\fBfree\fR(3C), \fBmalloc\fR(3C), \fBvolmgt_check\fR(3VOLMGT),
-\fBvolmgt_inuse\fR(3VOLMGT), \fBvolmgt_root\fR(3VOLMGT),
-\fBvolmgt_running\fR(3VOLMGT), \fBvolmgt_symname\fR(3VOLMGT),
-\fBattributes\fR(5), \fBhal\fR(5)
+.BR fdformat (1),
+.BR lstat (2),
+.BR readlink (2),
+.BR stat (2),
+.BR free (3C),
+.BR malloc (3C),
+.BR volmgt_check (3VOLMGT),
+.BR volmgt_inuse (3VOLMGT),
+.BR volmgt_root (3VOLMGT),
+.BR volmgt_running (3VOLMGT),
+.BR volmgt_symname (3VOLMGT),
+.BR attributes (7),
+.BR hal (7)
 .SH NOTES
 .sp
 .LP

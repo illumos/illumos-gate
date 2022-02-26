@@ -56,7 +56,7 @@
 
 /*
  * This file contains support functions that are shared by the ipsec
- * utilities and daemons including ipseckey(1m), ikeadm(1m) and in.iked(1m).
+ * utilities and daemons including ipseckey(8), ikeadm(8) and in.iked(8).
  */
 
 
@@ -370,7 +370,7 @@ dump_sockaddr(struct sockaddr *sa, uint8_t prefixlen, boolean_t addr_only,
  * value, this will also be part of the dumped key. The last "saltbits" of the
  * key string, reading left to right will be the salt value. To make it easier
  * to see which bits make up the key, the salt value is enclosed in []'s.
- * This function can also be called when ipseckey(1m) -s is run, this "saves"
+ * This function can also be called when ipseckey(8) -s is run, this "saves"
  * the SAs, including the key to a file. When this is the case, the []'s are
  * not printed.
  *
@@ -850,12 +850,12 @@ do_interactive(FILE *infile, char *configfile, char *promptstring,
 
 		/*
 		 * There were errors. Putting the service in maintenance mode.
-		 * When svc.startd(1M) allows services to degrade themselves,
+		 * When svc.startd(8) allows services to degrade themselves,
 		 * this should be revisited.
 		 *
 		 * If this function was called from a program running as a
-		 * smf_method(5), print a warning message. Don't spew out the
-		 * errors as these will end up in the smf(5) log file which is
+		 * smf_method(7), print a warning message. Don't spew out the
+		 * errors as these will end up in the smf(7) log file which is
 		 * publically readable, the errors may contain sensitive
 		 * information.
 		 */
@@ -867,7 +867,7 @@ do_interactive(FILE *infile, char *configfile, char *promptstring,
 				    "errors.\n"
 				    "Manually check the configuration with:\n"
 				    "ipseckey -c %s\n"
-				    "Use svcadm(1M) to clear maintenance "
+				    "Use svcadm(8) to clear maintenance "
 				    "condition when errors are resolved.\n"),
 				    lines_parsed - lines_added, configfile);
 			} else {
@@ -3381,24 +3381,24 @@ rparseidtype(uint16_t type)
 
 /*
  * This is a general purpose exit function, calling functions can specify an
- * error type. If the command calling this function was started by smf(5) the
+ * error type. If the command calling this function was started by smf(7) the
  * error type could be used as a hint to the restarter. In the future this
  * function could be used to do something more intelligent with a process that
  * encounters an error. If exit() is called with an error code other than those
- * defined by smf(5), the program will just get restarted. Unless restarting
+ * defined by smf(7), the program will just get restarted. Unless restarting
  * is likely to resolve the error condition, its probably sensible to just
  * log the error and keep running.
  *
  * The SERVICE_* exit_types mean nothing if the command was run from the
  * command line, just exit(). There are two special cases:
  *
- * SERVICE_DEGRADE - Not implemented in smf(5), one day it could hint that
+ * SERVICE_DEGRADE - Not implemented in smf(7), one day it could hint that
  *                   the service is not running as well is it could. For
  *                   now, don't do anything, just record the error.
  * DEBUG_FATAL - Something happened, if the command was being run in debug
  *               mode, exit() as you really want to know something happened,
  *               otherwise just keep running. This is ignored when running
- *               under smf(5).
+ *               under smf(7).
  *
  * The function will handle an optional variable args error message, this
  * will be written to the error stream, typically a log file or stderr.
@@ -3437,7 +3437,7 @@ ipsecutil_exit(exit_type_t type, char *fmri, FILE *fp, const char *fmt, ...)
 			break;
 		}
 	} else {
-		/* Command being run as a smf(5) method. */
+		/* Command being run as a smf(7) method. */
 		switch (type) {
 		case SERVICE_EXIT_OK:
 			exit_status = SMF_EXIT_OK;

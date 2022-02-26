@@ -25,7 +25,7 @@
  */
 
 /*
- * This file defines zonecfg(1M)'s grammar.
+ * This file defines zonecfg(8)'s grammar.
  *
  * Reduction rules that consume TOKENs must invoke claim_token() immediately
  * before freeing the TOKENs or adding them to data structures (e.g., cmd) that

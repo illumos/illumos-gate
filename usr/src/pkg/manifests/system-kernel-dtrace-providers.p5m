@@ -71,14 +71,14 @@ hardlink path=kernel/dtrace/$(ARCH64)/sdt \
 hardlink path=kernel/dtrace/$(ARCH64)/systrace \
     target=../../../kernel/drv/$(ARCH64)/systrace
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/dtrace.7d
-file path=usr/share/man/man7d/fasttrap.7d
-file path=usr/share/man/man7d/fbt.7d
-file path=usr/share/man/man7d/lockstat.7d
-file path=usr/share/man/man7d/profile.7d
-file path=usr/share/man/man7d/sdt.7d
-file path=usr/share/man/man7d/systrace.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/dtrace.4d
+file path=usr/share/man/man4d/fasttrap.4d
+file path=usr/share/man/man4d/fbt.4d
+file path=usr/share/man/man4d/lockstat.4d
+file path=usr/share/man/man4d/profile.4d
+file path=usr/share/man/man4d/sdt.4d
+file path=usr/share/man/man4d/systrace.4d
 driver name=dcpc
 driver name=dtrace perms="* 0666 root sys"
 driver name=fasttrap perms="fasttrap 0666 root sys"

@@ -3288,7 +3288,7 @@ print "<table>"
 # syntax characters) in the email address.
 #
 # Otherwise, use the current userid in the form "John Doe (jdoe)", but
-# to maintain compatibility with passwd(4), we must support '&' substitutions.
+# to maintain compatibility with passwd(5), we must support '&' substitutions.
 #
 preparer=
 if [[ "$SCM_MODE" == git ]]; then

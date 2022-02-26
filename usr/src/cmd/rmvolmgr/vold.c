@@ -158,7 +158,7 @@ vold_init(int argc, char **argv)
 }
 
 /*
- * Old version of rmmount(1M)
+ * Old version of rmmount(8)
  */
 /* ARGSUSED */
 int
@@ -601,7 +601,7 @@ vold_action(struct action_arg *aap)
 	if (result == TRUE) {
 		/*
 		 * File Manager is running. return 0.
-		 * see man page rmmount.conf(4).
+		 * see man page rmmount.conf(5).
 		 */
 		return (0);
 	} else {

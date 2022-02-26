@@ -26,9 +26,9 @@
 
 /*
  * This is the main program file for the configuration administration
- * command as set out in manual page cfgadm(1M).  It uses the configuration
+ * command as set out in manual page cfgadm(8).  It uses the configuration
  * administration library interface, libcfgadm, as set out in manual
- * page config_admin(3X).
+ * page config_admin(3CFGADM).
  */
 
 #include <stdio.h>
@@ -649,7 +649,7 @@ usage(void)
 /*
  * Emit an error message.
  * As a side-effect the hardware specific error message is deallocated
- * as described in config_admin(3X).
+ * as described in config_admin(3CFGADM).
  */
 static void
 cfgadm_error(int errnum, char *estrp)

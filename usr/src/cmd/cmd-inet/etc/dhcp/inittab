@@ -29,10 +29,10 @@
 # add support for SITE options for clients; no existing options should
 # be modified.  Only SITE options will be preserved during an upgrade.
 # If you need to configure the Solaris DHCP server to support the vendor 
-# options of a different client, see dhcptab(4) for details.  
+# options of a different client, see dhcptab(5) for details.
 #
-# Please consult dhcp_inittab(4) for further information.  Note that
-# this interface is "Unstable" as defined by attributes(5).
+# Please consult dhcp_inittab(5) for further information.  Note that
+# this interface is "Unstable" as defined by attributes(7).
 #
 
 Subnet		STANDARD,	1,	IP,	   1,	1,	sdmi
@@ -179,7 +179,7 @@ SHTTPproxy	VENDOR,		17,	ASCII,	   1,	0,	smi
 # the  SITE category, meaning it is defined by each individual site.
 # It is option code 132, which is of type IP Address, consisting of
 # a potentially infinite number of pairs of IP addresses.  (See
-# dhcp_inittab(4) for details)
+# dhcp_inittab(5) for details)
 #
 # ipPairs     SITE,           132,    IP,     2,      0,      sdmi
 #

@@ -19,14 +19,14 @@
 #
 # Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# The /etc/inittab file controls the configuration of init(1M); for more
-# information refer to init(1M) and inittab(4).  It is no longer
-# necessary to edit inittab(4) directly; administrators should use the
+# The /etc/inittab file controls the configuration of init(8); for more
+# information refer to init(8) and inittab(5).  It is no longer
+# necessary to edit inittab(5) directly; administrators should use the
 # Solaris Service Management Facility (SMF) to define services instead.
-# Refer to smf(5) and the System Administration Guide for more
+# Refer to smf(7) and the System Administration Guide for more
 # information on SMF.
 #
-# For modifying parameters passed to ttymon, use svccfg(1m) to modify
+# For modifying parameters passed to ttymon, use svccfg(8) to modify
 # the SMF repository. For example:
 #
 #	# svccfg

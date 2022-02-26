@@ -1,0 +1,71 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DEFAULT_FS 5 "Mar 20, 1992"
+.SH NAME
+default_fs, fs \- specify the default file system type for local or remote file
+systems
+.SH DESCRIPTION
+.sp
+.LP
+When file system administration commands have both specific and generic
+components (for example, \fBfsck\fR(8)), the file system type must be
+specified. If it is not explicitly specified using the \fB-F\fR \fIFSType\fR
+command line option, the generic command looks in \fB/etc/vfstab\fR in order to
+determine the file system type, using the supplied raw or block device or mount
+point.  If the file system type can not be determined by searching
+\fB/etc/vfstab\fR, the command will use the default file system type specified
+in either \fB/etc/default/fs\fR or \fB/etc/dfs/dfstypes\fR, depending on
+whether the file system is local or remote.
+.sp
+.LP
+The default local file system type is specified in \fB/etc/default/fs\fR by a
+line of the form \fBLOCAL=\fR\fIfstype\fR (for example, \fBLOCAL=ufs\fR). The
+default remote file system type is determined by the first entry in the
+\fB/etc/dfs/fstypes\fR file.
+.sp
+.LP
+File system administration commands will determine whether the file system is
+local or remote by examining the specified device name.  If the device  name
+starts with ``/'' (slash), it is considered to be local; otherwise it is
+remote.
+.sp
+.LP
+The default file system types can be changed by editing the default files with
+a text editor.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/etc/vfstab\fR\fR
+.ad
+.RS 20n
+list of default parameters for each file system
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/default/fs\fR\fR
+.ad
+.RS 20n
+the default local file system type
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/dfs/fstypes\fR\fR
+.ad
+.RS 20n
+the default remote file system type
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR fstypes (5),
+.BR vfstab (5),
+.BR fsck (8)

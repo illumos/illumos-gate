@@ -1,0 +1,385 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ATA 4D "Aug 18, 2016"
+.SH NAME
+ata \- AT attachment disk driver
+.SH SYNOPSIS
+.LP
+.nf
+\fBide@unit-\fR\fIaddress\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBata\fR driver supports disk and ATAPI CD/DVD devices conforming to the
+AT Attachment specification including IDE interfaces. Support is provided for
+both parallel ATA (PATA) and serial ATA (SATA) interfaces.
+.sp
+.LP
+Refer to the \fISolaris x86 Hardware Compatibility List\fR for a list of
+supported controllers.
+.SH PRECONFIGURE
+.LP
+A PCI IDE controller can operate in compatibility mode or in PCI-native mode.
+If more than one controller is present in the system, only one can operate in
+compatibility mode.
+.sp
+.LP
+If two PATA drives share the same controller, you must set one to master and
+the other to slave. If both a PATA disk drive and a PATA CD-ROM drive utilize
+the same controller, you can designate the disk drive as the master with the
+CD-ROM drive as the slave, although this is not mandatory.
+.SS "Supported Settings"
+.LP
+Supported settings for the primary controller when in compatibility mode are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IRQ Level: 14
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+I/O Address: 0x1F0
+.RE
+.sp
+.LP
+Supported settings for the secondary controller when in compatibility mode are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IRQ Level: 15
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+I/O Address: 0x170
+.RE
+.LP
+Note -
+.sp
+.RS 2
+When in PCI-native mode, the IRQ and I/O address resources are configured by
+the system BIOS.
+.RE
+.SS "Known Problems and Limitations"
+.RS +4
+.TP
+.ie t \(bu
+.el o
+This driver does not support any RAID features present on a PATA/SATA
+controller. As a result, you should configure BIOS to select IDE mode rather
+than RAID mode. Some systems may require updating BIOS to allow switching
+modes.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+On some systems, the SATA controller must have option ROM enabled or BIOS will
+not consider SATA drives as bootable devices.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Panasonic LK-MC579B and the Mitsumi FX34005 IDE CD-ROM drives are not supported
+and cannot be used to install the Solaris operating environment.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+CMD-604 is unable to handle simultaneous I/O on both IDE interfaces. This
+defect causes the Solaris software to hang if both interfaces are used. Use
+only the primary IDE interface at address 0x1F0.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+NEC CDR-260/CDR-260R/CDR-273 and Sony CDU-55E ATAPI CD-ROM drives might fail
+during installation.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Sony CDU-701 CD-ROM drives must be upgraded to use firmware version 1.0r or
+later to support booting from the CD.
+.sp
+A Compact Flash(CF) card can work as an ATA disk through a CF-to-ATA adapter.
+If both card and adapter implement Compact Flash Version 2.0, DMA is supported.
+If either of them does not, you should set ata-disk-dma-enabled to '0.'
+.RE
+.SH CONFIGURATION
+.LP
+The ata driver properties are usually set in \fBata.conf\fR. However, it may be
+convenient, or in some cases necessary, for you to set some of the DMA related
+properties as a system global boot environment property. You set or modify
+properties in the boot environment immediately prior to booting the illumos
+kernel using the boot loader command line. You can also set
+boot environment properties using the \fBeeprom\fR(8) command or by editing
+the \fBbootenv.rc\fR configuration file. If a property is set in both the
+driver's \fBata.conf\fR file and the boot environment, the \fBata.conf\fR
+property takes precedence.
+.sp
+.LP
+Property modifications other than with the boot loader command line are
+not effective until you reboot the system.  Property modifications via the
+boot loader command line do not persist across future boots.
+.sp
+.LP
+Direct Memory Access is enabled for disks and atapi CD/DVD by default. If you
+want to disable DMA when booting from a CD/DVD, you must first set
+atapi-cd-dma-enabled  to 0 using the boot loader command line.
+.sp
+.ne 2
+.na
+\fB\fBata-dma-enabled\fR\fR
+.ad
+.RS 27n
+This property is examined before the DMA properties discussed below. If it is
+set to '0,' DMA is disabled for all ATA/ATAPI devices, and no further property
+checks are made. If this property is absent or is set to '1,' DMA status is
+determined by further examining one of the other properties listed below.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBata-disk-dma-enabled\fR\fR
+.ad
+.RS 27n
+This property is examined only for ATA disk devices, and only if
+ata-dma-enabled is not set to '0.'
+.sp
+If ata-disk-dma-enabled set to '0,' DMA is disabled for all ATA disks in the
+system. If this property is absent or set to '1,' DMA is enabled for all ATA
+disks and no further property checks are made. If needed, this property should
+be created by the administrator using the boot loader command line or the
+\fBeeprom\fR(8) command.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBatapi-cd-dma-enabled\fR\fR
+.ad
+.RS 27n
+This property is examined only for ATAPI CD/DVD devices, and only if
+ata-dma-enabled is not set to '0.'
+.sp
+If atapi-cd-dma-enabled is absent or set to '0,' DMA is disabled for all ATAPI
+CD/DVD's. If set to '1,' DMA is enabled and no further property checks are
+made.
+.sp
+The Solaris installation program creates this property in the boot environment
+with a value of '1.' It can be changed with the boot loader command line
+or \fBeeprom\fR(8) as shown in the Example section of this manpage.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBatapi-other-dma-enabled\fR\fR
+.ad
+.RS 27n
+This property is examined only for non-CD/DVD ATAPI devices such as ATAPI tape
+drives, and only if ata-dma-enabled is not set to '0.'
+.sp
+If atapi-other-dma-enabled is set to '0,' DMA is disabled for all non-CD/DVD
+ATAPI devices. If this property is absent or set to '1,' DMA is enabled and no
+further property checks are made.
+.sp
+If needed, this property should be created by the administrator using the
+boot loader command line or the \fBeeprom\fR(8) command.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdrive0_block_factor\fR\fR
+.ad
+.br
+.na
+\fB\fBdrive1_block_factor\fR\fR
+.ad
+.RS 27n
+\fBATA\fR controllers support some amount of buffering (blocking). The purpose
+is to interrupt the host when an entire buffer full of data has been read or
+written instead of using an interrupt for each sector. This reduces interrupt
+overhead and significantly increases throughput. The driver interrogates the
+controller to find the buffer size. Some controllers hang when buffering is
+used, so the values in the configuration file are used by the driver to reduce
+the effect of buffering (blocking). The values presented may be chosen from
+\fB0x1\fR, \fB0x2\fR, \fB0x4\fR, \fB0x8\fR and \fB0x10\fR.
+.sp
+The values as shipped are set to \fB0x1\fR, and they can be tuned to increase
+performance.
+.sp
+If your controller hangs when attempting to use higher block factors, you may
+be unable to reboot the system. For x86 based systems, it is recommended that
+tuning be performed using a duplicate of the \fB/platform/i86pc/kernel\fR
+directory subtree. This ensures that a bootable kernel subtree exists in the
+event of a failed test.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBata-revert-to-defaults\fR\fR
+.ad
+.br
+.na
+\fB\fBrevert\(em<diskmodel>\fR\fR
+.ad
+.RS 27n
+When rebooting or shutting down, the driver can set a feature which allows the
+drive to return to the power-on settings when the drive receives a software
+reset (SRST) sequence. If this property is present and set to 1, the driver
+will set the feature to revert to defaults during reset. Setting this property
+to 1 may prevent some systems from soft-rebooting and would require cycling the
+power to boot the system. If this property is not present the system will not
+set the feature to revert to defaults during reset.
+.sp
+To determine the string to substitute for <diskmodel>, boot your system (you
+may have to press the reset button or power-cycle) and then view
+\fB/var/adm/messages\fR. Look for the string "IDE device at targ" or "ATAPI
+device at targ." The next line will contain the word "model" followed by the
+model number and a comma. Ignore all characters except letters, digits, ".",
+"_", and "-". Change uppercase letters to lower case. If the string
+revert-<diskmodel> is longer than 31 characters, use only the first 31
+characters.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSample ata Configuration File
+.sp
+.in +2
+.nf
+\fB# for higher performance - set block factor to 16
+	drive0_block_factor=0x1 drive1_block_factor=0x1
+	max_transfer=0x100
+	flow_control="dmult" queue="qsort" disk="dadk" ;\fR
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRRevert to defaults property
+.sp
+.in +2
+.nf
+\fBrevert-st320420a=1;\fR
+.fi
+.in -2
+
+.sp
+.LP
+Output of \fB/var/adm/messages\fR:
+
+.sp
+.in +2
+.nf
+Aug 17 06:49:43 caesar ata:[ID 640982 kern.info] IDE device at targ 0,
+                           lun 0 lastlun 0x0
+Aug 17 06:49:43 caesar ata:[ID 521533 kern.info] model ST320420A, stat
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRChange DMA property using the boot loader command line
+.sp
+.LP
+To change a DMA property using the boot loader command line:
+
+.RS +4
+.TP
+1.
+Reset the system.
+.RE
+.RS +4
+.TP
+2.
+Press "Esc" to interrupt the timeout.
+.RE
+.RS +4
+.TP
+3.
+Enter: boot -B atapi-cd-dma-enabled=1
+.RE
+.LP
+\fBExample 4 \fRChange DMA Property with eeprom(8)
+.sp
+.LP
+To enable DMA for optical devices while the Solaris kernel is running with the
+\fBeeprom\fR(8) system command:
+
+.sp
+.in +2
+.nf
+eeprom 'atapi-cd-dma-enabled=1'
+.fi
+.in -2
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/platform/i86pc/kernel/drv/ata\fR\fR
+.ad
+.sp .6
+.RS 4n
+Device driver.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/platform/i86pc/kernel/drv/ata.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+Configuration file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/boot/solaris/bootenv.rc\fR\fR
+.ad
+.sp .6
+.RS 4n
+Boot environment variables file for Solaris x86. \fBeeprom\fR(8) can be used
+to modify properties in this file.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+.TE
+
+.SH SEE ALSO
+.LP
+.BR attributes (7),
+.BR eeprom (8)
+.sp
+.LP
+\fIINCITS T13 ATA/ATAPI-7\fR specifications

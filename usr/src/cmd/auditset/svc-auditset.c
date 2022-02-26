@@ -86,7 +86,7 @@ main(void)
 #ifdef	DEBUG
 		if (errno == ENOTSUP) {
 			(void) printf("c2audit module is excluded from "
-			    "the system(4); kernel won't be updated.\n");
+			    "the system(5); kernel won't be updated.\n");
 		} else {
 			(void) printf("%s\n", strerror(errno));
 		}

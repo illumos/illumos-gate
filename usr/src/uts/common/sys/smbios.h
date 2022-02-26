@@ -2085,7 +2085,7 @@ extern const char *smbios_csn(smbios_hdl_t *);
 #ifndef _KERNEL
 /*
  * The smbios_*_desc() and smbios_*_name() interfaces can be used for utilities
- * such as smbios(1M) that wish to decode SMBIOS fields for humans.  The _desc
+ * such as smbios(8) that wish to decode SMBIOS fields for humans.  The _desc
  * functions return the comment string next to the #defines listed above, and
  * the _name functions return the appropriate #define identifier itself.
  */

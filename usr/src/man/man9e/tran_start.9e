@@ -226,9 +226,14 @@ A fatal error has occurred in the \fBHBA. \fR
 The \fBtran_start()\fR function can be called from user or interrupt context.
 This requirement comes from \fBscsi_transport()\fR.
 .SH SEE ALSO
-\fBattach\fR(9E), \fBtran_init_pkt\fR(9E), \fBscsi_hba_attach\fR(9F),
-\fBscsi_transport\fR(9F), \fBscsi_address\fR(9S), \fBscsi_arq_status\fR(9S),
-\fBscsi_hba_tran\fR(9S), \fBscsi_pkt\fR(9S)
+.BR attach (9E),
+.BR tran_init_pkt (9E),
+.BR scsi_hba_attach (9F),
+.BR scsi_transport (9F),
+.BR scsi_address (9S),
+.BR scsi_arq_status (9S),
+.BR scsi_hba_tran (9S),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -419,7 +419,7 @@ The \fB-\fR option character prefix is optional. This supports the obsolete
 .RS 5n
 The number specifies the number of \fB-\fR characters that must prefix long
 option names. The default is \fB2\fR. \fB0\fR, \fB1\fR or \fB2\fR are accepted,
-for example \fBp0\fR for \fBdd\fR(1M) and \fBp1\fR for \fBfind\fR(1).
+for example \fBp0\fR for \fBdd\fR(8) and \fBp1\fR for \fBfind\fR(1).
 .RE
 
 .sp
@@ -786,7 +786,7 @@ cmd -o xxx,z,yy -b -a filename
 .SH ENVIRONMENT VARIABLES
 .sp
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBgetopts\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
@@ -865,7 +865,7 @@ A usage or information message was generated.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/bin/getopts, sh, ksh"
 .sp
 
@@ -878,7 +878,7 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 Interface Stability	Committed
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SS "ksh93"
@@ -897,9 +897,16 @@ Interface Stability	Uncommitted
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(1), \fBgetoptcvt\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBps\fR(1),
-\fBsh\fR(1), \fBgetopt\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBstandards\fR(5)
+.BR Intro (1),
+.BR getoptcvt (1),
+.BR ksh (1),
+.BR ksh93 (1),
+.BR ps (1),
+.BR sh (1),
+.BR getopt (3C),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)
 .SH DIAGNOSTICS
 .sp
 .LP

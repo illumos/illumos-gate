@@ -183,7 +183,7 @@ on a user credential structure that is referenced by other parts of the system.
 .SH CONTEXT
 These functions can be called from user and kernel contexts.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -199,7 +199,9 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBprivileges\fR(5), \fBdrv_priv\fR(9F)
+.BR attributes (7),
+.BR privileges (7),
+.BR drv_priv (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

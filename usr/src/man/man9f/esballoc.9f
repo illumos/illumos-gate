@@ -155,7 +155,7 @@ The \fBesballoc()\fR, \fBesballoca()\fR, \fBdesballoc()\fR and
 \fBdesballoca()\fR functions can be called from user,
 interrupt, or kernel context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -169,9 +169,12 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBallocb\fR(9F), \fBddi_intr_get_pri\fR(9F),
-\fBddi_intr_get_softint_pri\fR(9F), \fBfreeb\fR(9F), \fBdatab\fR(9S),
-\fBfree_rtn\fR(9S)
+.BR allocb (9F),
+.BR ddi_intr_get_pri (9F),
+.BR ddi_intr_get_softint_pri (9F),
+.BR freeb (9F),
+.BR datab (9S),
+.BR free_rtn (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

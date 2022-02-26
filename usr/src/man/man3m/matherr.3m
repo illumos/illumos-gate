@@ -128,7 +128,7 @@ will be printed and \fBerrno\fR is not set.
 .sp
 .LP
 When an application is built as a SVID3 conforming application (see
-\fBstandards\fR(5)), if \fBmatherr()\fR is not supplied by the user, the
+\fBstandards\fR(7)), if \fBmatherr()\fR is not supplied by the user, the
 default matherr exception-handling mechanisms, summarized in the table below,
 are invoked upon exception:
 .sp
@@ -537,7 +537,7 @@ matherr(struct exception *x) {
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -554,4 +554,5 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR attributes (7),
+.BR standards (7)

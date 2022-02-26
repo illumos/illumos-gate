@@ -192,7 +192,7 @@ is set to indicate the error that occurred.
 For a full list of possible errors see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Pdstop ,
@@ -214,7 +214,7 @@ Callers should call
 For more information on losing control, see
 .Sy PROGRAMMING NOTES
 in
-.Xr proc 4 .
+.Xr proc 5 .
 .It Er ENOENT
 The request was not
 .Dv PCNULL
@@ -242,4 +242,4 @@ in
 .Xr Pgrab 3PROC ,
 .Xr Pgrab_core 3PROC ,
 .Xr Pgrab_file 3PROC ,
-.Xr proc 4
+.Xr proc 5

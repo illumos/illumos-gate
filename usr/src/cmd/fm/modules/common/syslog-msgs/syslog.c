@@ -49,8 +49,8 @@ static struct stats {
 } syslog_stats = {
 	{ "bad_vers", FMD_TYPE_UINT64, "event version is missing or invalid" },
 	{ "bad_code", FMD_TYPE_UINT64, "event code has no dictionary name" },
-	{ "log_err", FMD_TYPE_UINT64, "failed to log message to log(7D)" },
-	{ "msg_err", FMD_TYPE_UINT64, "failed to log message to sysmsg(7D)" },
+	{ "log_err", FMD_TYPE_UINT64, "failed to log message to log(4D)" },
+	{ "msg_err", FMD_TYPE_UINT64, "failed to log message to sysmsg(4D)" },
 	{ "no_msg", FMD_TYPE_UINT64, "message logging suppressed" }
 };
 
@@ -72,18 +72,18 @@ static const struct facility {
 
 static fmd_msg_hdl_t *syslog_msghdl; /* handle for libfmd_msg calls */
 static int syslog_msgall;	/* set to message all faults */
-static log_ctl_t syslog_ctl;	/* log(7D) meta-data for each msg */
-static int syslog_logfd = -1;	/* log(7D) file descriptor */
-static int syslog_msgfd = -1;	/* sysmsg(7D) file descriptor */
+static log_ctl_t syslog_ctl;	/* log(4D) meta-data for each msg */
+static int syslog_logfd = -1;	/* log(4D) file descriptor */
+static int syslog_msgfd = -1;	/* sysmsg(4D) file descriptor */
 static int syslog_file;		/* log to syslog_logfd */
 static int syslog_cons;		/* log to syslog_msgfd */
 static const char SYSLOG_POINTER[] = "syslog-msgs-pointer";
 
 /*
  * Ideally we would just use syslog(3C) for outputting our messages, but our
- * messaging standard defines a nice multi-line format and syslogd(1M) is very
+ * messaging standard defines a nice multi-line format and syslogd(8) is very
  * inflexible and stupid when it comes to multi-line messages.  It pulls data
- * out of log(7D) and splits it up by \n, printing each line to the console
+ * out of log(4D) and splits it up by \n, printing each line to the console
  * with its usual prefix of date and sender; it uses the same behavior for the
  * messages file as well.  Further, syslog(3C) provides no CE_CONT equivalent
  * for userland callers (which at least works around repeated file prefixing).
@@ -97,12 +97,12 @@ static const char SYSLOG_POINTER[] = "syslog-msgs-pointer";
  * messages and some knowledge of how the Solaris log drivers work.  We first
  * construct an enlarged format string containing the appropriate msgid(1).
  * We then format the caller's message using the provided format and buffer.
- * We send this message to log(7D) using putmsg() with SL_CONSOLE | SL_LOGONLY
+ * We send this message to log(4D) using putmsg() with SL_CONSOLE | SL_LOGONLY
  * set in the log_ctl_t.  The log driver allows us to set SL_LOGONLY when we
  * construct messages ourself, indicating that syslogd should only emit the
  * message to /var/adm/messages and any remote hosts, and skip the console.
  * Then we emit the message a second time, without the special prefix, to the
- * sysmsg(7D) device, which handles console redirection and also permits us
+ * sysmsg(4D) device, which handles console redirection and also permits us
  * to output any characters we like to the console, including \n and \r.
  */
 static void

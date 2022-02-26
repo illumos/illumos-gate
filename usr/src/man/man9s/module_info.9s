@@ -53,7 +53,8 @@ eight in this release.
 .SH SEE ALSO
 .sp
 .LP
-\fBfmodsw\fR(9S), \fBqueue\fR(9S)
+.BR fmodsw (9S),
+.BR queue (9S)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

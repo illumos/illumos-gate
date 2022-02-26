@@ -70,7 +70,7 @@ process holding a lock on a file forks and the child explicitly unlocks the
 file, the parent will lose its lock.  See \fBfcntl\fR(2) for more information
 about file locking and the interaction between locks created by this function
 and those created by other mechanisms. These locks are currently not supported
-over remote file systems (e.g. \fBnfs\fR(4)) which use the Network Lock
+over remote file systems (e.g. \fBnfs\fR(5)) which use the Network Lock
 Manager.
 .sp
 .LP
@@ -181,7 +181,7 @@ removed OFD-style locks; see \fBfcntl\fR(2) for information about the
 interaction between OFD-style and POSIX-style file locks.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -198,6 +198,15 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBIntro\fR(2), \fBalarm\fR(2), \fBchmod\fR(2), \fBclose\fR(2), \fBcreat\fR(2),
-\fBfcntl\fR(2), \fBmmap\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR Intro (2),
+.BR alarm (2),
+.BR chmod (2),
+.BR close (2),
+.BR creat (2),
+.BR fcntl (2),
+.BR mmap (2),
+.BR open (2),
+.BR read (2),
+.BR write (2),
+.BR attributes (7),
+.BR standards (7)

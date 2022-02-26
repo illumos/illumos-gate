@@ -424,7 +424,7 @@ context.
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -440,11 +440,19 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBusb_alloc_request\fR(9F), \fBusb_get_cfg\fR(9F),
-\fBusb_get_status\fR(9F), \fBusb_pipe_bulk_xfer\fR(9F),
-\fBusb_pipe_intr_xfer\fR(9F), \fBusb_pipe_isoc_xfer\fR(9F),
-\fBusb_pipe_xopen\fR(9F), \fBusb_pipe_reset\fR(9F),
-\fBusb_pipe_get_state\fR(9F), \fBusb_bulk_request\fR(9S),
-\fBusb_callback_flags\fR(9S), \fBusb_ctrl_request\fR(9S),
-\fBusb_completion_reason\fR(9S), \fBusb_intr_request\fR(9S),
-\fBusb_isoc_request\fR(9S)
+.BR attributes (7),
+.BR usb_alloc_request (9F),
+.BR usb_get_cfg (9F),
+.BR usb_get_status (9F),
+.BR usb_pipe_bulk_xfer (9F),
+.BR usb_pipe_get_state (9F),
+.BR usb_pipe_intr_xfer (9F),
+.BR usb_pipe_isoc_xfer (9F),
+.BR usb_pipe_reset (9F),
+.BR usb_pipe_xopen (9F),
+.BR usb_bulk_request (9S),
+.BR usb_callback_flags (9S),
+.BR usb_completion_reason (9S),
+.BR usb_ctrl_request (9S),
+.BR usb_intr_request (9S),
+.BR usb_isoc_request (9S)

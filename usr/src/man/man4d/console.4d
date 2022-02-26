@@ -1,0 +1,56 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH CONSOLE 4D "Apr 23, 1999"
+.SH NAME
+console \- STREAMS-based console interface
+.SH SYNOPSIS
+.LP
+.nf
+\fB/dev/console\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The file \fB/dev/console\fR refers to the system console device.
+\fB/dev/console\fR should be used for interactive purposes only. Use of
+\fB/dev/console\fR for logging purposes is discouraged; \fBsyslog\fR(3C) or
+\fBmsglog\fR(4D) should be used instead.
+.sp
+.LP
+The identity of this device depends on the \fBEEPROM\fR or \fBNVRAM\fR settings
+in effect at the most recent system reboot; by default, it is the ``workstation
+console'' device consisting of the workstation keyboard and frame buffer acting
+in concert to emulate an \fBASCII\fR terminal (see \fBwscons\fR(4D)).
+.sp
+.LP
+Regardless of the system configuration, the console device provides
+asynchronous serial driver semantics so that, in conjunction with the
+\fBSTREAMS\fR line discipline module \fBldterm\fR(4M), it supports the
+\fBtermio\fR(4I) terminal interface.
+.SH SEE ALSO
+.sp
+.LP
+.BR syslog (3C),
+.BR termios (3C),
+.BR msglog (4D),
+.BR wscons (4D),
+.BR termio (4I),
+.BR ldterm (4M)
+.SH NOTES
+.sp
+.LP
+In contrast to pre-SunOS 5.0 releases, it is no longer possible to redirect I/O
+intended for \fB/dev/console\fR to some other device. Instead, redirection now
+applies to the workstation console device using a revised programming interface
+(see \fBwscons\fR(4D)). Since the system console is normally configured to be
+the work station console, the overall effect is largely unchanged from previous
+releases.
+.sp
+.LP
+See \fBwscons\fR(4D) for detailed descriptions of control sequence syntax,
+\fBANSI\fR control functions, control character functions and escape sequence
+functions.

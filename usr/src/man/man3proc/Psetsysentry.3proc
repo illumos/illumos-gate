@@ -55,7 +55,7 @@ For more information on the state of the thread and for information on
 manipulating the
 .Sy sysset_t ,
 see
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 Note that only active processes may have their system call tracing flags
 updated.
@@ -71,4 +71,4 @@ in
 .Sh SEE ALSO
 .Xr Intro 2 ,
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

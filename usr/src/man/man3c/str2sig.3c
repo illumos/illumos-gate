@@ -68,4 +68,5 @@ sig2str(9,buf);            /* stores "KILL" in buf */
 .SH SEE ALSO
 .sp
 .LP
-\fBkill\fR(1), \fBstrsignal\fR(3C)
+.BR kill (1),
+.BR strsignal (3C)

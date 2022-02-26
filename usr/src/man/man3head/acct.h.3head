@@ -107,7 +107,7 @@ information pertaining to prime time and non-prime time hours.  The first
 element in each array represents the time the  resource was used during prime
 time hours.  The second element in  each array represents the time the resource
 was used during non-prime time hours.  Prime time and non-prime time hours may
-be set in the  \fBholidays\fR file (see \fBholidays\fR(4)).
+be set in the  \fBholidays\fR file (see \fBholidays\fR(5)).
 .sp
 .LP
 The \fBta_kcore\fR member is a cumulative measure of the amount of memory used
@@ -131,9 +131,18 @@ prime/non-prime time table
 .SH SEE ALSO
 .sp
 .LP
-\fBacctcom\fR(1), \fBacct\fR(1M), \fBacctcon\fR(1M), \fBacctmerg\fR(1M),
-\fBacctprc\fR(1M), \fBacctsh\fR(1M), \fBprtacct\fR(1M), \fBrunacct\fR(1M),
-\fBshutacct\fR(1M), \fBacct\fR(2), \fBexec\fR(2), \fBfork\fR(2)
+.BR acctcom (1),
+.BR acct (2),
+.BR exec (2),
+.BR fork (2),
+.BR acct (8),
+.BR acctcon (8),
+.BR acctmerg (8),
+.BR acctprc (8),
+.BR acctsh (8),
+.BR prtacct (8),
+.BR runacct (8),
+.BR shutacct (8)
 .SH NOTES
 .sp
 .LP

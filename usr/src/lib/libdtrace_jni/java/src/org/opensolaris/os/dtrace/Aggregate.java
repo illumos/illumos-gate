@@ -237,7 +237,7 @@ public final class Aggregate implements Serializable
      * </code></pre>
      * Use {@code getOrderedRecords()} instead of {@code getRecords()}
      * when you want to list records as they would be ordered by {@code
-     * dtrace(1M)}.
+     * dtrace(8)}.
      *
      * @return a newly created list of this aggregate's records
      * in the order used by the native DTrace library

@@ -77,7 +77,7 @@ dir  path=lib/svc/method
 file path=lib/svc/method/svc-labeld mode=0555
 file path=lib/svc/method/svc-tnctl mode=0555
 file path=lib/svc/method/svc-tnd mode=0555
-dir  path=usr/share/man/man1m
+dir  path=usr/share/man/man8
 dir  path=var group=sys
 dir  path=var/tsol group=sys
 dir  path=var/tsol/doors group=sys

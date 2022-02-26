@@ -34,7 +34,7 @@
  * sgen - SCSI generic device driver
  *
  * The sgen driver provides user programs access to SCSI devices that
- * are not supported by other drivers by providing the USCSI(7I) interface.
+ * are not supported by other drivers by providing the uscsi(4I) interface.
  */
 
 #include <sys/modctl.h>
@@ -1128,7 +1128,7 @@ sgen_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 /*
  * sgen_ioctl()
- *	sgen supports the USCSI(7I) ioctl interface.
+ *	sgen supports the uscsi(4I) ioctl interface.
  */
 /*ARGSUSED4*/
 static int
@@ -1195,7 +1195,7 @@ sgen_ioctl(dev_t dev,
 
 /*
  * sgen_uscsi_cmd()
- *	Setup, configuration and teardown for a uscsi(7I) command
+ *	Setup, configuration and teardown for a uscsi(4I) command
  */
 /*ARGSUSED*/
 static int

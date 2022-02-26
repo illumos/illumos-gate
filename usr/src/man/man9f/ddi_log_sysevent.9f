@@ -326,8 +326,10 @@ static int
 .in -2
 
 .SH SEE ALSO
-\fBsyseventd\fR(1M), \fBattributes\fR(5), \fBnvlist_add_boolean\fR(9F),
-\fBnvlist_alloc\fR(9F)
+.BR attributes (7),
+.BR syseventd (8),
+.BR nvlist_add_boolean (9F),
+.BR nvlist_alloc (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

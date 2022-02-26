@@ -191,8 +191,11 @@ stripe_done(struct buf *bp)
 .in -2
 
 .SH SEE ALSO
-\fBbiodone\fR(9F), \fBbp_mapin\fR(9F), \fBfreerbuf\fR(9F), \fBgetrbuf\fR(9F),
-\fBbuf\fR(9S)
+.BR biodone (9F),
+.BR bp_mapin (9F),
+.BR freerbuf (9F),
+.BR getrbuf (9F),
+.BR buf (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

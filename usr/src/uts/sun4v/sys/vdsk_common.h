@@ -531,7 +531,7 @@ int vd_efi_alloc_and_read(vd_efi_dev_t *dev, efi_gpt_t **gpt, efi_gpe_t **gpe);
 void vd_efi_free(vd_efi_dev_t *dev, efi_gpt_t *gpt, efi_gpe_t *gpe);
 
 /*
- * Macros to update the I/O statistics kstat consumed by iostat(1m).
+ * Macros to update the I/O statistics kstat consumed by iostat(8).
  */
 
 /*

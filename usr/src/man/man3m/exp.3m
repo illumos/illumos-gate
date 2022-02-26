@@ -92,7 +92,7 @@ If \fIx\fR is +Inf, \fIx\fR is returned.
 .sp
 .LP
 For exceptional cases, \fBmatherr\fR(3M) tabulates the values to be returned by
-\fBexp()\fR as specified by SVID3 and XPG3. See \fBstandards\fR(5).
+\fBexp()\fR as specified by SVID3 and XPG3. See \fBstandards\fR(7).
 .SH ERRORS
 .sp
 .LP
@@ -131,7 +131,7 @@ return, if \fBerrno\fR is non-zero, an error has occurred. The \fBexpf()\fR and
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -150,6 +150,12 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBfeclearexcept\fR(3M), \fBfetestexcept\fR(3M), \fBisnan\fR(3M),
-\fBlog\fR(3M), \fBmath.h\fR(3HEAD), \fBmatherr\fR(3M), \fBmp\fR(3MP),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR math.h (3HEAD),
+.BR feclearexcept (3M),
+.BR fetestexcept (3M),
+.BR isnan (3M),
+.BR log (3M),
+.BR matherr (3M),
+.BR mp (3MP),
+.BR attributes (7),
+.BR standards (7)

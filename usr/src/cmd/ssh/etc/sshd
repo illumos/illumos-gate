@@ -69,7 +69,7 @@ create_ipf_rules()
 }
 
 # This script is being used for two purposes: as part of an SMF
-# start/stop/refresh method, and as a sysidconfig(1M)/sys-unconfig(1M)
+# start/stop/refresh method, and as a sysidconfig(8)/sys-unconfig(8)
 # application.
 #
 # Both, the SMF methods and sysidconfig/sys-unconfig use different
@@ -86,7 +86,7 @@ case $1 in
 	;;
 
 '-u')
-	# sys-unconfig(1M) knows how to remove ssh host keys, so there's
+	# sys-unconfig(8) knows how to remove ssh host keys, so there's
 	# nothing to do here.
 	:
 	;;

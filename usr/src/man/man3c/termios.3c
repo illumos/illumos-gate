@@ -83,7 +83,7 @@ termios \- general terminal interface
 .LP
 These functions describe a general terminal interface for controlling
 asynchronous communications ports. A more detailed overview of the terminal
-interface can be found in \fBtermio\fR(7I), which also describes an
+interface can be found in \fBtermio\fR(4I), which also describes an
 \fBioctl\fR(2) interface that provides the same functionality. However, the
 function interface described by these functions is the preferred user
 interface.
@@ -93,8 +93,19 @@ Each of these functions is now described on a separate manual page.
 .SH SEE ALSO
 .sp
 .LP
-\fBioctl\fR(2), \fBcfgetispeed\fR(3C), \fBcfgetospeed\fR(3C),
-\fBcfsetispeed\fR(3C), \fBcfsetospeed\fR(3C), \fBtcdrain\fR(3C),
-\fBtcflow\fR(3C), \fBtcflush\fR(3C), \fBtcgetattr\fR(3C), \fBtcgetpgrp\fR(3C),
-\fBtcgetsid\fR(3C), \fBtcsendbreak\fR(3C), \fBtcsetattr\fR(3C),
-\fBtcgetpgrp\fR(3C), \fBtcsendbreak\fR(3C), \fBtermio\fR(7I)
+.BR ioctl (2),
+.BR cfgetispeed (3C),
+.BR cfgetospeed (3C),
+.BR cfsetispeed (3C),
+.BR cfsetospeed (3C),
+.BR tcdrain (3C),
+.BR tcflow (3C),
+.BR tcflush (3C),
+.BR tcgetattr (3C),
+.BR tcgetpgrp (3C),
+.BR tcgetpgrp (3C),
+.BR tcgetsid (3C),
+.BR tcsendbreak (3C),
+.BR tcsendbreak (3C),
+.BR tcsetattr (3C),
+.BR termio (4I)

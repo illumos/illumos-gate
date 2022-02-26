@@ -552,7 +552,7 @@ lxml_store_value(value_t *v, element_t type, const xmlChar *value)
 		/*
 		 * Although an SC_COUNT represents a uint64_t the use
 		 * of a negative value is acceptable due to the usage
-		 * established by inetd(1M).
+		 * established by inetd(8).
 		 */
 		errno = 0;
 		v->sc_u.sc_count = strtoull((char *)value, &endptr, 10);
@@ -1085,7 +1085,7 @@ lxml_get_exec_method(entity_t *entity, xmlNodePtr emeth)
 		/*
 		 * Although an SC_COUNT represents a uint64_t the use
 		 * of a negative value is acceptable due to the usage
-		 * established by inetd(1M).
+		 * established by inetd(8).
 		 */
 		errno = 0;
 		u_timeout = strtoull((char *)timeout, &endptr, 10);

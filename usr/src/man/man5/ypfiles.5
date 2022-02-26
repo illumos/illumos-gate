@@ -1,0 +1,161 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH YPFILES 5 "Feb 25, 2017"
+.SH NAME
+ypfiles \- Network Information Service Version 2, formerly known as YP
+.SH DESCRIPTION
+.LP
+The NIS network information service uses a distributed, replicated database of
+\fBdbm\fR files , in ASCII form, that are contained in the \fB/var/yp\fR
+directory hierarchy on each NIS server.
+.sp
+.LP
+A \fBdbm\fR database served by the NIS server is called a NIS \fImap\fR. A NIS
+\fIdomain\fR is a subdirectory of \fB/var/yp\fR that contains a set of NIS maps
+on each NIS server.
+.sp
+.LP
+Standard nicknames are defined in the file \fB/var/yp/nicknames\fR. These names
+can be used in place of the full map name in the \fBypmatch\fR and \fBypcat\fR
+commands. Use the command \fBypwhich\fR \fB-x\fR to display the current set of
+nicknames. Use the command \fBypwhich\fR \fB-m\fR to display all the available
+maps. Each line of the nickname file contains two fields separated by white
+space. The first field is the nickname, and the second field is the name of the
+map that it expands to. The nickname cannot contain a ".".
+.SS "NIS to LDAP (N2L)"
+.LP
+If the \fB/var/yp/NISLDAPmapping\fR configuration file is present, the NIS
+server operates in NIS to LDAP (N2L) mode. In this mode, NIS maps are stored in
+a new set of DBM files, prepended by the \fBLDAP_\fR prefix, at
+\fB/var/yp/\fIdomainname\fR\fR. These files are used as a cache backed by
+information from an LDAP server. Additional DBM files are created in the same
+directory to hold the cache's TTL values.
+.sp
+.LP
+N2L mode enables NIS clients to be supported in an LDAP environment.
+.sp
+.LP
+In N2L mode, the old style DBM files, NIS source files, and the
+\fBypmake\fR(8) utility have to role. They are retained to enable easy
+conversion back to the traditional mode, if required.
+.SS "Converting from N2L to Traditional NIS"
+.LP
+When NIS is operating in N2L mode, it uses a new set of NIS maps with an
+\fBLDAP_\fR prefix, based on the contents of the LDAP DIT. The NIS source files
+are unused and become out of date. If you wish to convert back to the
+traditional NIS mode, the N2L configuration file should be deleted. The system
+will then return to using the standard map files. Optionally, the N2L mode map
+files, \fB/var/yp/*/LDAP_*\fR can also be deleted.
+.sp
+.LP
+If you want to run the system in traditional mode with information based on the
+DIT, then the NIS source files must be regenerated based on the N2L maps. To
+regenerate the NIS source files based on the N2L maps, run \fBypmap2src\fR(8).
+.SH FILES
+.ne 2
+.na
+\fB\fB/var/yp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory containing NIS configuration files.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/yp/binding\fR\fR
+.ad
+.sp .6
+.RS 4n
+Stores the information required to bind the NIS client to the NIS server.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/yp/binding/\fIypdomain\fR/ypservers\fR\fR
+.ad
+.sp .6
+.RS 4n
+Contains the servers to which the NIS client is allowed to bind.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/yp/Makefile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Builds the NIS \fBndbm\fR databases.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/yp/nicknames\fR\fR
+.ad
+.sp .6
+.RS 4n
+Nicknames file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/yp/securenets\fR\fR
+.ad
+.sp .6
+.RS 4n
+Defines the hosts and networks that are granted access to information in the
+served domain. This file is read at startup time by \fBypserv\fR and
+\fBypxfrd\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/yp/\fIypdomain\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory containing \fBndbm\fR databases.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/yp/NISLDAPmapping\fR\fR
+.ad
+.sp .6
+.RS 4n
+NIS to LDAP configuration file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/yp/*/LDAP_*\fR\fR
+.ad
+.sp .6
+.RS 4n
+NIS to LDAP mode map files
+.RE
+
+.SH SEE ALSO
+.LP
+.BR ldap (1),
+.BR ndbm (3C),
+.BR ypclnt (3NSL),
+.BR makedbm (8),
+.BR ypbind (8),
+.BR ypinit (8),
+.BR ypmake (8),
+.BR ypmap2src (8),
+.BR ypserv (8),
+.BR ypxfrd (8)

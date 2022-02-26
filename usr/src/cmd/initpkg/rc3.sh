@@ -27,7 +27,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 # Run Commands executed when the system is changing to init state 3,
 # same as state 2 (multi-user) but with remote file sharing.
@@ -35,7 +34,7 @@
 PATH=/usr/sbin:/usr/bin
 
 if [ -z "$SMF_RESTARTER" ]; then
-	echo "This script cannot be run outside smf(5)."
+	echo "This script cannot be run outside smf(7)."
 	exit 1
 fi
 

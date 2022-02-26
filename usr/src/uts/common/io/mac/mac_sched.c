@@ -44,7 +44,7 @@
  *
  *	This driver. It interfaces with device drivers and provides abstractions
  *	that the rest of the system consumes. All data links -- things managed
- *	with dladm(1M), are accessed through MAC.
+ *	with dladm(8), are accessed through MAC.
  *
  * GLDv3 DEVICE DRIVER
  *
@@ -65,7 +65,7 @@
  *	which is used for all unicast traffic addressed to the address of a MAC
  *	device. For example, when a VNIC is created, a default flow is created
  *	for the VNIC's MAC address. In addition, flows are created for broadcast
- *	groups and a user may create a flow with flowadm(1M).
+ *	groups and a user may create a flow with flowadm(8).
  *
  * CLASSIFICATION
  *
@@ -77,7 +77,7 @@
  *	destination MAC address.
  *
  *	The system also will do classification based on layer three and layer
- *	four properties. This is used to support things like flowadm(1M), which
+ *	four properties. This is used to support things like flowadm(8), which
  *	allows setting QoS and other properties on a per-flow basis.
  *
  * RING
@@ -230,8 +230,8 @@
  * capabilities and rules in place and then to supplement that with hardware
  * resources when available. In general, simple layer two classification is
  * sufficient and nothing else is used, unless a specific flow is created with
- * tools such as flowadm(1M) or bandwidth limits are set on a device with
- * dladm(1M).
+ * tools such as flowadm(8) or bandwidth limits are set on a device with
+ * dladm(8).
  *
  * RINGS AND GROUPS
  *
@@ -292,7 +292,7 @@
  *
  * MAC makes the determination as to which of these modes a given soft ring set
  * obtains based on parameters such as whether or not it's the primary mac
- * client, whether it's on a 10 GbE or faster device, user controlled dladm(1M)
+ * client, whether it's on a 10 GbE or faster device, user controlled dladm(8)
  * properties, and the nature of the hardware and the resources that it has.
  *
  * When there is no fanout, MAC does not create any soft rings for a device and

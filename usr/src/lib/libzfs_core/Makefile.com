@@ -35,7 +35,7 @@ OBJECTS= $(OBJS_COMMON) $(OBJS_SHARED)
 
 include ../../Makefile.lib
 
-# libzfs_core must be installed in the root filesystem for mount(1M)
+# libzfs_core must be installed in the root filesystem for mount(8)
 include ../../Makefile.rootfs
 
 LIBS=	$(DYNLIB)

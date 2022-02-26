@@ -53,7 +53,7 @@ See \fBbufcall\fR(9F) for an example that uses \fBmsgdsize()\fR.
 .SH SEE ALSO
 .sp
 .LP
-\fBbufcall\fR(9F)
+.BR bufcall (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

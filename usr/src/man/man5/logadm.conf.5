@@ -1,0 +1,71 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH LOGADM.CONF 5 "May 23, 2007"
+.SH NAME
+logadm.conf \- configuration file for logadm command
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/logadm.conf\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fB/etc/logadm.conf\fR is the default configuration file for the log management
+tool \fBlogadm\fR(8). Comments are allowed using the pound character (\fB#\fR)
+and extend to the end of line. Each non-comment line has the form:
+.sp
+.in +2
+.nf
+\fIlogname\fR \fIoptions\fR
+.fi
+.in -2
+
+.sp
+.LP
+where \fIlogname\fR is the name of the entry and \fIoptions\fR are the default
+command line options for the \fBlogadm\fR command. The name of the entry may be
+the same as the name of the log file, or a log file name may be given in the
+options section of the entry. Long lines may be folded using a backslash
+followed by a newline to continue an entry on the next line. Single or double
+quotes may be used to protect spaces or alternate-style quotes in strings.
+.sp
+.LP
+The preferred method for changing \fB/etc/logadm.conf\fR is to use the
+\fB-V\fR, \fB-w\fR, and \fB-r\fR options to the \fBlogadm\fR(8) command, which
+allow you to lookup an entry, write an entry, or remove an entry from
+\fB/etc/logadm.conf\fR.
+.sp
+.LP
+A full description of how and when \fB/etc/logadm.conf\fR is used and sample
+entries are found in \fBlogadm\fR(8).
+.sp
+.LP
+By default, \fBlogadm\fR(8) works in \fBGMT\fR. Therefore, all entries in
+\fB/etc/logadm.conf\fR will have a \fBGMT\fR timestamp. Users can use the
+\fB-l\fR option to set \fBlogadm\fR to local time.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR attributes (7),
+.BR logadm (8)

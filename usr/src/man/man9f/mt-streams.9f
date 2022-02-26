@@ -149,9 +149,15 @@ or outer perimeter from shared to exclusive.
 The use and semantics of \fBqprocson()\fR and \fBqprocsoff\fR(9F) is
 independent of the inner and outer perimeters.
 .SH SEE ALSO
-\fBclose\fR(9E), \fBopen\fR(9E), \fBput\fR(9E), \fBsrv\fR(9E),
-\fBqprocsoff\fR(9F), \fBqprocson\fR(9F), \fBqwait\fR(9F), \fBqwriter\fR(9F),
-\fBcb_ops\fR(9S)
+.BR close (9E),
+.BR open (9E),
+.BR put (9E),
+.BR srv (9E),
+.BR qprocsoff (9F),
+.BR qprocson (9F),
+.BR qwait (9F),
+.BR qwriter (9F),
+.BR cb_ops (9S)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

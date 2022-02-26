@@ -87,7 +87,7 @@ if ((ret = csx_RegisterClient(&client_handle, &
 .in -2
 
 .SH SEE ALSO
-\fBcsx_Event2Text\fR(9F)
+.BR csx_Event2Text (9F)
 .sp
 .LP
 \fIPC Card 95 Standard, PCMCIA/JEIDA\fR

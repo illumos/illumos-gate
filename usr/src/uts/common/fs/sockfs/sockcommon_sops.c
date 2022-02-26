@@ -174,7 +174,7 @@ so_bind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 		/*
 		 * Force a zero sa_family to match so_family.
 		 *
-		 * Some programs like inetd(1M) don't set the
+		 * Some programs like inetd(8) don't set the
 		 * family field. Other programs leave
 		 * sin_family set to garbage - SunOS 4.X does
 		 * not check the family field on a bind.

@@ -250,7 +250,7 @@ An internal error occurred.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -266,6 +266,12 @@ MT Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBprex\fR(1), \fBTNF_PROBE\fR(3TNF), \fBfree\fR(3C), \fBlibtnfctl\fR(3TNF),
-\fBtnfctl_kernel_open\fR(3TNF), \fBtnfctl_trace_attrs_get\fR(3TNF),
-\fBtracing\fR(3TNF), \fBtnf_kernel_probes\fR(4), \fBattributes\fR(5)
+.BR prex (1),
+.BR free (3C),
+.BR TNF_PROBE (3TNF),
+.BR libtnfctl (3TNF),
+.BR tnfctl_kernel_open (3TNF),
+.BR tnfctl_trace_attrs_get (3TNF),
+.BR tracing (3TNF),
+.BR tnf_kernel_probes (5),
+.BR attributes (7)

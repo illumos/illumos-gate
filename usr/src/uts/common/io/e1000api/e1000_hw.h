@@ -290,8 +290,8 @@ enum e1000_mac_type {
 	e1000_pch_lnp,
 	e1000_pch_rpl,
 	/*
-	 * After this point all MACs are used by the igb(7D) driver as opposed
-	 * to e1000g(7D). If a new MAC is specific to e1000g series of devices,
+	 * After this point all MACs are used by the igb(4D) driver as opposed
+	 * to e1000g(4D). If a new MAC is specific to e1000g series of devices,
 	 * then it should be added above this.
 	 */
 	e1000_82575,

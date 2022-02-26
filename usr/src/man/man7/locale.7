@@ -1,0 +1,2463 @@
+.\"
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for
+.\" permission to reproduce portions of its copyrighted documentation.
+.\" Original documentation from The Open Group can be obtained online at
+.\" http://www.opengroup.org/bookstore/.
+.\"
+.\" The Institute of Electrical and Electronics Engineers and The Open
+.\" Group, have given us permission to reprint portions of their
+.\" documentation.
+.\"
+.\" In the following statement, the phrase ``this text'' refers to portions
+.\" of the system documentation.
+.\"
+.\" Portions of this text are reprinted and reproduced in electronic form
+.\" in the SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition,
+.\" Standard for Information Technology -- Portable Operating System
+.\" Interface (POSIX), The Open Group Base Specifications Issue 6,
+.\" Copyright (C) 2001-2004 by the Institute of Electrical and Electronics
+.\" Engineers, Inc and The Open Group.  In the event of any discrepancy
+.\" between these versions and the original IEEE and The Open Group
+.\" Standard, the original IEEE and The Open Group Standard is the referee
+.\" document.  The original Standard can be obtained online at
+.\" http://www.opengroup.org/unix/online.html.
+.\"
+.\" This notice shall appear on any product containing this material.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\"
+.TH LOCALE 7 "May 16, 2020"
+.SH NAME
+locale \- subset of a user's environment that depends on language and cultural
+conventions
+.SH DESCRIPTION
+A \fBlocale\fR is the definition of the subset of a user's environment that
+depends on language and cultural conventions. It is made up from one or more
+categories. Each category is identified by its name and controls specific
+aspects of the behavior of components of the system. Category names correspond
+to the following environment variable names:
+.sp
+.ne 2
+.na
+\fB\fBLC_CTYPE\fR\fR
+.ad
+.RS 15n
+Character classification and case conversion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBLC_COLLATE\fR\fR
+.ad
+.RS 15n
+Collation order.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBLC_TIME\fR\fR
+.ad
+.RS 15n
+Date and time formats.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBLC_NUMERIC\fR\fR
+.ad
+.RS 15n
+Numeric formatting.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBLC_MONETARY\fR\fR
+.ad
+.RS 15n
+Monetary formatting.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBLC_MESSAGES\fR\fR
+.ad
+.RS 15n
+Formats of informative and diagnostic messages and interactive responses.
+.RE
+
+.sp
+.LP
+The standard utilities  base their behavior on the current locale, as defined
+in the ENVIRONMENT VARIABLES section for each utility. The behavior of some of
+the C-language functions will also be modified based on the current locale, as
+defined by the last call to \fBsetlocale\fR(3C).
+.sp
+.LP
+Locales other than those supplied by the implementation can be created by the
+application via the \fBlocaledef\fR(1) utility. The value that is used to
+specify a locale when using environment variables will be the string specified
+as the \fIname\fR operand to  \fBlocaledef\fR when the locale was created. The
+strings "C" and "POSIX" are reserved as identifiers for the POSIX locale.
+.sp
+.LP
+Applications can select the desired locale by invoking the \fBsetlocale()\fR
+function with the appropriate value. If the function is invoked with an empty
+string, such as:
+.sp
+.in +2
+.nf
+setlocale(LC_ALL, "");
+.fi
+.in -2
+
+.sp
+.LP
+the value of the corresponding environment variable is used. If the environment
+variable is unset or is set to the empty string, the  \fBsetlocale()\fR
+function sets the appropriate environment.
+.SS "Locale Definition"
+Locales can be described with the file format accepted by the \fBlocaledef\fR
+utility.
+.sp
+.LP
+The locale definition file must contain one or more locale category source
+definitions, and must not contain more than one definition for the same locale
+category.
+.sp
+.LP
+A category source definition consists of a category header, a category body and
+a category trailer. A category header consists of the character string naming
+of the category, beginning with the characters \fBLC_\fR. The category trailer
+consists of the string \fBEND\fR, followed by one or more blank characters and
+the string used in the corresponding category header.
+.sp
+.LP
+The category body consists of one or more lines of text. Each line contains an
+identifier, optionally followed by one or more operands. Identifiers are either
+keywords, identifying a particular locale element, or collating elements. Each
+keyword within a locale must have a unique name (that is, two categories cannot
+have a commonly-named keyword). No keyword can start with the characters
+\fBLC_\fR. Identifiers must be separated from the operands by one or more blank
+characters.
+.sp
+.LP
+Operands must be characters, collating elements, or strings of characters.
+Strings must be enclosed in double-quotes (\fB"\fR). Literal double-quotes
+within strings must be preceded by the <\fIescape character\fR>, as described
+below. When a keyword is followed by more than one operand, the operands must
+be separated by semicolons (\fB;\fR). Blank characters are allowed both before
+and after a semicolon.
+.sp
+.LP
+The first category header in the file can be preceded by a line modifying the
+comment character. It has the following format, starting in column 1:
+.sp
+.in +2
+.nf
+"comment_char %c\en",<\fIcomment character\fR>
+.fi
+.in -2
+
+.sp
+.LP
+The comment character defaults to the number sign (\fB#\fR). Blank lines and
+lines containing the <\fIcomment character\fR> in the first position are
+ignored.
+.sp
+.LP
+The first category header in the file can be preceded by a line modifying the
+escape character to be used in the file. It has the following format, starting
+in column 1:
+.sp
+.in +2
+.nf
+"escape_char %c\en",<\fIescape character\fR>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The escape character defaults to backslash.
+.sp
+.LP
+A line can be continued by placing an escape character as the last character on
+the line; this continuation character will be discarded from the input.
+Although the implementation need not accept any one portion of a continued line
+with a length exceeding \fB{LINE_MAX}\fR bytes, it places no limits on the
+accumulated length of the continued line. Comment lines cannot be continued on
+a subsequent line using an escaped newline character.
+.sp
+.LP
+Individual characters, characters in strings, and collating elements must be
+represented using symbolic names, as defined below. In addition, characters can
+be represented using the characters themselves or as octal, hexadecimal or
+decimal constants. When non-symbolic notation is used, the resultant locale
+definitions will in many cases not be portable between systems. The left angle
+bracket (\fB<\fR) is a reserved symbol, denoting the start of a symbolic name;
+when used to represent itself it must be preceded by the escape character. The
+following rules apply to character representation:
+.RS +4
+.TP
+1.
+A character can be represented via a symbolic name, enclosed within angle
+brackets \fB<\fR and \fB>\fR. The symbolic name, including the angle brackets,
+must exactly match a symbolic name defined in the charmap file specified via
+the \fBlocaledef\fR \fB-f\fR option, and will be replaced by a character value
+determined from the value associated with the symbolic name in the charmap
+file. The use of a symbolic name not found in the charmap file constitutes an
+error, unless the category is \fBLC_CTYPE\fR or  \fBLC_COLLATE\fR, in which
+case it constitutes a warning condition (see \fBlocaledef\fR(1) for a
+description of action resulting from errors and warnings). The specification of
+a symbolic name in a \fBcollating-element\fR or \fBcollating-symbol\fR section
+that duplicates a symbolic name in the charmap file (if present) is an error.
+Use of the escape character or a right angle bracket within a symbolic name is
+invalid unless the character is preceded by the escape character.
+.sp
+Example:
+.sp
+.in +2
+.nf
+<C>;<c-cedilla> "<M><a><y>"
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+2.
+A character can be represented by the character itself, in which case the
+value of the character is implementation-dependent. Within a string, the
+double-quote character, the escape character and the right angle bracket
+character must be escaped (preceded by the escape character) to be interpreted
+as the character itself. Outside strings, the characters
+.sp
+.in +2
+.nf
+\fB,     ;     <     >\fR \fIescape_char\fR
+.fi
+.in -2
+.sp
+
+must be escaped to be interpreted as the character itself.
+.sp
+Example:
+.sp
+.in +2
+.nf
+c       "May"
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+3.
+A character can be represented as an octal constant. An octal constant is
+specified as the escape character followed by two or more octal digits. Each
+constant represents a byte value. Multi-byte values can be represented by
+concatenated constants specified in byte order with the last constant
+specifying the least significant byte of the character.
+.sp
+Example:
+.sp
+.in +2
+.nf
+\e143;\e347;\e143\e150    "\e115\e141\e171"
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+4.
+A character can be represented as a hexadecimal constant. A hexadecimal
+constant is specified as the escape character followed by an \fBx\fR followed
+by two or more hexadecimal digits. Each constant represents a byte value.
+Multi-byte values can be represented by concatenated constants specified in
+byte order with the last constant specifying the least significant byte of the
+character.
+.sp
+Example:
+.sp
+.in +2
+.nf
+\ex63;\exe7;\ex63\ex68    "\ex4d\ex61\ex79"
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+5.
+A character can be represented as a decimal constant. A decimal constant is
+specified as the escape character followed by a \fBd\fR followed by two or more
+decimal digits. Each constant represents a byte value. Multi-byte values can be
+represented by concatenated constants specified in byte order with the last
+constant specifying the least significant byte of the character.
+.sp
+Example:
+.sp
+.in +2
+.nf
+\ed99;\ed231;\ed99\ed104   "\ed77\ed97\ed121"
+.fi
+.in -2
+.sp
+
+Only characters existing in the character set for which the locale definition
+is created can be specified, whether using symbolic names, the characters
+themselves, or octal, decimal or hexadecimal constants. If a charmap file is
+present, only characters defined in the charmap can be specified using octal,
+decimal or hexadecimal constants. Symbolic names not present in the charmap
+file can be specified and will be ignored, as specified under item 1 above.
+.RE
+.SS "LC_CTYPE"
+The  \fBLC_CTYPE\fR category defines character classification, case conversion
+and other character attributes. In addition, a series of characters can be
+represented by three adjacent periods representing an ellipsis symbol
+(\fB\&...\fR). The ellipsis specification is interpreted as meaning that all
+values between the values preceding and following it represent valid
+characters. The ellipsis specification is valid only within a single encoded
+character set, that is, within a group of characters of the same size. An
+ellipsis is interpreted as including in the list all characters with an encoded
+value higher than the encoded value of the character preceding the ellipsis and
+lower than the encoded value of the character following the ellipsis.
+.sp
+.LP
+Example:
+.sp
+.in +2
+.nf
+\ex30;...;\ex39;
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+includes in the character class all characters with encoded values between the
+endpoints.
+.sp
+.LP
+The following keywords are recognized. In the descriptions, the term
+``automatically included'' means that it is not an error either to include or
+omit any of the referenced characters.
+.sp
+.LP
+The character classes \fBdigit\fR, \fBxdigit\fR, \fBlower\fR, \fBupper\fR, and
+\fBspace\fR have a set of automatically included characters. These only need to
+be specified if the character values (that is, encoding) differ from the
+implementation default values.
+.sp
+.ne 2
+.na
+\fB\fBupper\fR\fR
+.ad
+.RS 18n
+Define characters to be classified as upper-case letters.
+.sp
+In the POSIX locale, the 26 upper-case letters are included:
+.sp
+.in +2
+.nf
+A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+.fi
+.in -2
+.sp
+
+In a locale definition file, no character specified for the keywords
+\fBcntrl\fR, \fBdigit\fR, \fBpunct\fR, or \fBspace\fR can be specified. The
+upper-case letters \fBA\fR to \fBZ\fR are automatically included in this class.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlower\fR\fR
+.ad
+.RS 18n
+Define characters to be classified as lower-case letters. In the POSIX locale,
+the 26 lower-case letters are included:
+.sp
+.in +2
+.nf
+a b c d e f g h i j k l m n o p q r s t u v w x y z
+.fi
+.in -2
+.sp
+
+In a locale definition file, no character specified for the keywords
+\fBcntrl\fR, \fBdigit\fR, \fBpunct\fR, or \fBspace\fR can be specified. The
+lower-case letters \fBa\fR to \fBz\fR of the portable character set are
+automatically included in this class.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBalpha\fR\fR
+.ad
+.RS 18n
+Define characters to be classified as letters.
+.sp
+In the POSIX locale, all characters in the classes \fBupper\fR and \fBlower\fR
+are included.
+.sp
+In a locale definition file, no character specified for the keywords
+\fBcntrl\fR, \fBdigit\fR, \fBpunct\fR, or \fBspace\fR can be specified.
+Characters classified as either \fBupper\fR or \fBlower\fR are automatically
+included in this class.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdigit\fR\fR
+.ad
+.RS 18n
+Define the characters to be classified as numeric digits.
+.sp
+In the POSIX locale, only
+.sp
+.in +2
+.nf
+0 1 2 3 4 5 6 7 8 9
+.fi
+.in -2
+.sp
+
+are included.
+.sp
+In a locale definition file, only the digits \fB0\fR, \fB1\fR, \fB2\fR,
+\fB3\fR, \fB4\fR, \fB5\fR, \fB6\fR, \fB7\fR, \fB8\fR, and \fB9\fR can be
+specified, and in contiguous ascending sequence by numerical value. The digits
+\fB0\fR to \fB9\fR of the portable character set are automatically included in
+this class.
+.sp
+The definition of character class \fBdigit\fR requires that only ten
+characters; the ones defining digits can be specified; alternative digits (for
+example, Hindi or Kanji) cannot be specified here.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBalnum\fR\fR
+.ad
+.RS 18n
+Define characters to be classified as letters and numeric digits. Only the
+characters specified for the \fBalpha\fR and \fBdigit\fR keywords are
+specified. Characters specified for the keywords \fBalpha\fR and \fBdigit\fR
+are automatically included in this class.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBspace\fR\fR
+.ad
+.RS 18n
+Define characters to be classified as white-space characters.
+.sp
+In the POSIX locale, at a minimum, the characters  \fBSPACE\fR, \fBFORMFEED\fR,
+\fBNEWLINE\fR, \fBCARRIAGE RETURN\fR, \fBTAB\fR, and  \fBVERTICAL TAB\fR are
+included.
+.sp
+In a locale definition file, no character specified for the keywords
+\fBupper\fR, \fBlower\fR, \fBalpha\fR, \fBdigit\fR, \fBgraph\fR, or
+\fBxdigit\fR can be specified. The characters \fBSPACE\fR, \fBFORMFEED\fR,
+\fBNEWLINE\fR, \fBCARRIAGE RETURN\fR, \fBTAB\fR, and  \fBVERTICAL TAB\fR of the
+portable character set, and any characters included in the class \fBblank\fR
+are automatically included in this class.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcntrl\fR\fR
+.ad
+.RS 18n
+Define characters to be classified as control characters.
+.sp
+In the POSIX locale, no characters in classes \fBalpha\fR or \fBprint\fR are
+included.
+.sp
+In a locale definition file, no character specified for the keywords
+\fBupper\fR, \fBlower\fR, \fBalpha\fR, \fBdigit\fR, \fBpunct\fR, \fBgraph\fR,
+\fBprint\fR, or \fBxdigit\fR can be specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpunct\fR\fR
+.ad
+.RS 18n
+Define characters to be classified as punctuation characters.
+.sp
+In the POSIX locale, neither the space character nor any characters in classes
+\fBalpha\fR, \fBdigit\fR, or \fBcntrl\fR are included.
+.sp
+In a locale definition file, no character specified for the keywords
+\fBupper\fR, \fBlower\fR, \fBalpha\fR, \fBdigit\fR, \fBcntrl\fR, \fBxdigit\fR
+or as the space character can be specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBgraph\fR\fR
+.ad
+.RS 18n
+Define characters to be classified as printable characters, not including the
+space character.
+.sp
+In the POSIX locale, all characters in classes \fBalpha\fR, \fBdigit\fR, and
+\fBpunct\fR are included; no characters in class \fBcntrl\fR are included.
+.sp
+In a locale definition file, characters specified for the keywords \fBupper\fR,
+\fBlower\fR, \fBalpha\fR, \fBdigit\fR, \fBxdigit\fR, and \fBpunct\fR are
+automatically included in this class. No character specified for the keyword
+\fBcntrl\fR can be specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBprint\fR\fR
+.ad
+.RS 18n
+Define characters to be classified as printable characters, including the space
+character.
+.sp
+In the POSIX locale, all characters in class \fBgraph\fR are included; no
+characters in class \fBcntrl\fR are included.
+.sp
+In a locale definition file, characters specified for the keywords \fBupper\fR,
+\fBlower\fR, \fBalpha\fR, \fBdigit\fR, \fBxdigit\fR, \fBpunct\fR, and the space
+character are automatically included in this class. No character specified for
+the keyword \fBcntrl\fR can be specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBxdigit\fR\fR
+.ad
+.RS 18n
+Define the characters to be classified as hexadecimal digits.
+.sp
+In the POSIX locale, only:
+.sp
+.in +2
+.nf
+0 1 2 3 4 5 6 7 8 9 A B C D E F a b c d e f
+.fi
+.in -2
+.sp
+
+are included.
+.sp
+In a locale definition file, only the characters defined for the class
+\fBdigit\fR can be specified, in contiguous ascending sequence by numerical
+value, followed by one or more sets of six characters representing the
+hexadecimal digits 10 to 15 inclusive, with each set in ascending order (for
+example \fBA\fR, \fBB\fR, \fBC\fR, \fBD\fR, \fBE\fR, \fBF\fR, \fBa\fR, \fBb\fR,
+\fBc\fR, \fBd\fR, \fBe\fR, \fBf\fR). The digits \fB0\fR to \fB9\fR, the
+upper-case letters \fBA\fR to \fBF\fR and the lower-case letters \fBa\fR to
+\fBf\fR of the portable character set are automatically included in this class.
+.sp
+The definition of character class \fBxdigit\fR requires that the characters
+included in character class \fBdigit\fR be included here also.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBblank\fR\fR
+.ad
+.RS 18n
+Define characters to be classified as blank characters.
+.sp
+In the POSIX locale, only the space and tab characters are included.
+.sp
+In a locale definition file, the characters space and tab are automatically
+included in this class.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcharclass\fR\fR
+.ad
+.RS 18n
+Define one or more locale-specific character class names as strings separated
+by semi-colons. Each named character class can then be defined subsequently in
+the \fBLC_CTYPE\fR definition. A character class name consists of at least one
+and at most \fB{CHARCLASS_NAME_MAX}\fR bytes of alphanumeric characters from
+the portable filename character set. The first character of a character class
+name cannot be a digit. The name cannot match any of the \fBLC_CTYPE\fR
+keywords defined in this document.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcharclass-name\fR\fR
+.ad
+.RS 18n
+Define characters to be classified as belonging to the named locale-specific
+character class. In the POSIX locale, the locale-specific named character
+classes need not exist. If a class name is defined by a \fBcharclass\fR
+keyword, but no characters are subsequently assigned to it, this is not an
+error; it represents a class without any characters belonging to it. The
+\fBcharclass-name\fR can be used as the \fIproperty\fR argument to the
+\fBwctype\fR(3C) function, in regular expression and shell pattern-matching
+bracket expressions, and by the \fBtr\fR(1) command.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtoupper\fR\fR
+.ad
+.RS 18n
+Define the mapping of lower-case letters to upper-case letters.
+.sp
+In the POSIX locale, at a minimum, the 26 lower-case characters:
+.sp
+.in +2
+.nf
+a b c d e f g h i j k l m n o p q r s t u v w x y z
+.fi
+.in -2
+.sp
+
+are mapped to the corresponding 26 upper-case characters:
+.sp
+.in +2
+.nf
+A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+.fi
+.in -2
+.sp
+
+In a locale definition file, the operand consists of character pairs, separated
+by semicolons. The characters in each character pair are separated by a comma
+and the pair enclosed by parentheses. The first character in each pair is the
+lower-case letter, the second the corresponding upper-case letter. Only
+characters specified for the keywords \fBlower\fR and \fBupper\fR can be
+specified. The lower-case letters \fBa\fR to \fBz\fR, and their corresponding
+upper-case letters \fBA\fR to \fBZ\fR, of the portable character set are
+automatically included in this mapping, but only when the \fBtoupper\fR keyword
+is omitted from the locale definition.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtolower\fR\fR
+.ad
+.RS 18n
+Define the mapping of upper-case letters to lower-case letters.
+.sp
+In the POSIX locale, at a minimum, the 26 upper-case characters:
+.sp
+.in +2
+.nf
+A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+.fi
+.in -2
+.sp
+
+are mapped to the corresponding 26 lower-case characters:
+.sp
+.in +2
+.nf
+a b c d e f g h i j k l m n o p q r s t u v w x y z
+.fi
+.in -2
+.sp
+
+In a locale definition file, the operand consists of character pairs, separated
+by semicolons. The characters in each character pair are separated by a comma
+and the pair enclosed by parentheses. The first character in each pair is the
+upper-case letter, the second the corresponding lower-case letter. Only
+characters specified for the keywords \fBlower\fR and \fBupper\fR can be
+specified. If the \fBtolower\fR keyword is omitted from the locale definition,
+the mapping will be the reverse mapping of the one specified for \fBtoupper\fR.
+.RE
+
+.SS "LC_COLLATE"
+The  \fBLC_COLLATE\fR category provides a collation sequence definition for
+numerous utilities (such as \fBsort\fR(1), \fBuniq\fR(1), and so forth),
+regular expression matching (see \fBregex\fR(7)), and the \fBstrcoll\fR(3C),
+\fBstrxfrm\fR(3C), \fBwcscoll\fR(3C), and \fBwcsxfrm\fR(3C) functions.
+.sp
+.LP
+A collation sequence definition defines the relative order between collating
+elements (characters and multi-character collating elements) in the locale.
+This order is expressed in terms of collation values, that is, by assigning
+each element one or more collation values (also known as collation weights).
+The following capabilities are provided:
+.RS +4
+.TP
+1.
+\fBMulti-character collating elements\fR. Specification of multi-character
+collating elements (that is, sequences of two or more characters to be collated
+as an entity).
+.RE
+.RS +4
+.TP
+2.
+\fBUser-defined ordering of collating elements\fR. Each collating element is
+assigned a collation value defining its order in the character (or basic)
+collation sequence. This ordering is used by regular expressions and pattern
+matching and, unless collation weights are explicitly specified, also as the
+collation weight to be used in sorting.
+.RE
+.RS +4
+.TP
+3.
+\fBMultiple weights and equivalence classes\fR. Collating elements can be
+assigned one or more (up to the limit \fB{COLL_WEIGHTS_MAX}\fR \fB)\fR
+collating weights for use in sorting. The first weight is hereafter referred to
+as the primary weight.
+.RE
+.RS +4
+.TP
+4.
+\fBOne-to-Many mapping\fR. A single character is mapped into a string of
+collating elements.
+.RE
+.RS +4
+.TP
+5.
+\fBEquivalence class definition\fR. Two or more collating elements have the
+same collation value (primary weight).
+.RE
+.RS +4
+.TP
+6.
+\fBOrdering by weights\fR. When two strings are compared to determine their
+relative order, the two strings are first broken up into a series of collating
+elements. The elements in each successive pair of elements are then compared
+according to the relative primary weights for the elements. If equal, and more
+than one weight has been assigned, the pairs of collating elements are
+recompared according to the relative subsequent weights, until either a pair of
+collating elements compare unequal or the weights are exhausted.
+.RE
+.sp
+.LP
+The following keywords are recognized in a collation sequence definition. They
+are described in detail in the following sections.
+.sp
+.ne 2
+.na
+\fB\fBcopy\fR\fR
+.ad
+.RS 21n
+Specify the name of an existing locale which is used as the definition of this
+category. If this keyword is specified, no other keyword is specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcollating-element\fR\fR
+.ad
+.RS 21n
+Define a collating-element symbol representing a multi-character collating
+element. This keyword is optional.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcollating-symbol\fR\fR
+.ad
+.RS 21n
+Define a collating symbol for use in collation order statements. This keyword
+is optional.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBorder_start\fR\fR
+.ad
+.RS 21n
+Define collation rules. This statement is followed by one or more collation
+order statements, assigning character collation values and collation weights to
+collating elements.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBorder_end\fR\fR
+.ad
+.RS 21n
+Specify the end of the collation-order statements.
+.RE
+
+.SS "collating-element \fIkeyword\fR"
+In addition to the collating elements in the character set, the
+\fBcollating-element\fR keyword is used to define multi-character collating
+elements. The syntax is:
+.sp
+.in +2
+.nf
+\fB"collating-element %s from \e"%s\e"\en",\fR<\fIcollating-symbol\fR>,<\fIstring\fR>
+.fi
+.in -2
+
+.sp
+.LP
+The <\fIcollating-symbol\fR> operand is a symbolic name, enclosed between angle
+brackets (\fB<\fR and \fB>\fR), and must not duplicate any symbolic name in the
+current charmap file (if any), or any other symbolic name defined in this
+collation definition. The string operand is a string of two or more characters
+that collates as an entity. A <\fIcollating-element\fR> defined via this
+keyword is only recognized with the \fBLC_COLLATE\fR category.
+.sp
+.LP
+Example:
+.br
+.in +2
+\fBcollating-element\fR <\fBch\fR> from "<\fBc\fR><\fBh\fR>"
+.in -2
+.br
+.in +2
+\fBcollating-element\fR <\fBe-acute\fR> from "<\fBacute\fR><\fBe\fR>"
+.in -2
+.br
+.in +2
+\fBcollating-element\fR <\fBll\fR> from "\fBll\fR"
+.in -2
+.SS "collating-symbol \fIkeyword\fR"
+This keyword will be used to define symbols for use in collation sequence
+statements; that is, between the \fBorder_start\fR and the \fBorder_end\fR
+keywords. The syntax is:
+.sp
+.in +2
+.nf
+\fB"collating-symbol %s\en",\fR<\fIcollating-symbol\fR>
+.fi
+.in -2
+
+.sp
+.LP
+The \fB<\fR\fIcollating-symbol\fR\fB>\fR is a symbolic name, enclosed between
+angle brackets (\fB<\fR and \fB>\fR), and must not duplicate any symbolic name
+in the current charmap file (if any), or any other symbolic name defined in
+this collation definition.
+.sp
+.LP
+A \fBcollating-symbol\fR defined via this keyword is only recognized with the
+\fBLC_COLLATE\fR category.
+.sp
+.LP
+Example:
+.br
+.in +2
+\fBcollating-symbol\fR <\fBUPPER_CASE\fR>
+.in -2
+.br
+.in +2
+\fBcollating-symbol\fR <\fBHIGH\fR>
+.in -2
+.sp
+.LP
+The \fBcollating-symbol\fR keyword defines a symbolic name that can be
+associated with a relative position in the character order sequence. While such
+a symbolic name does not represent any collating element, it can be used as a
+weight.
+.SS "order_start \fIkeyword\fR"
+The \fBorder_start\fR keyword must precede collation order entries and also
+defines the number of weights for this collation sequence definition and other
+collation rules.
+.sp
+.LP
+The syntax of the \fBorder_start\fR keyword is:
+.sp
+.in +2
+.nf
+\fB"order_start %s;%s;...;%s\en",\fR<\fIsort-rules\fR>,<\fIsort-rules\fR>
+.fi
+.in -2
+
+.sp
+.LP
+The operands to the \fBorder_start\fR keyword are optional. If present, the
+operands define rules to be applied when strings are compared. The number of
+operands define how many weights each element is assigned. If no operands are
+present, one \fBforward\fR operand is assumed. If present, the first operand
+defines rules to be applied when comparing strings using the first (primary)
+weight; the second when comparing strings using the second weight, and so on.
+Operands are separated by semicolons (\fB;\fR). Each operand consists of one or
+more collation directives, separated by commas (\fB,\fR). If the number of
+operands exceeds the \fB{COLL_WEIGHTS_MAX}\fR limit, the utility will issue a
+warning message. The following directives will be supported:
+.sp
+.ne 2
+.na
+\fB\fBforward\fR\fR
+.ad
+.RS 12n
+Specifies that comparison operations for the weight level proceed from start of
+string towards the end of string.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbackward\fR\fR
+.ad
+.RS 12n
+Specifies that comparison operations for the weight level proceed from end of
+string towards the beginning of string.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBposition\fR\fR
+.ad
+.RS 12n
+Specifies that comparison operations for the weight level will consider the
+relative position of elements in the strings not subject to \fBIGNORE.\fR The
+string containing an element not subject to \fBIGNORE\fR after the fewest
+collating elements subject to \fBIGNORE\fR from the start of the compare will
+collate first. If both strings contain a character not subject to \fBIGNORE\fR
+in the same relative position, the collating values assigned to the elements
+will determine the ordering. In case of equality, subsequent characters not
+subject to \fBIGNORE\fR are considered in the same manner.
+.RE
+
+.sp
+.LP
+The directives \fBforward\fR and \fBbackward\fR are mutually exclusive.
+.sp
+.LP
+Example:
+.sp
+.in +2
+.nf
+order_start	forward;backward
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If no operands are specified, a single \fBforward\fR operand is assumed.
+.SS "Collation Order"
+The \fBorder_start\fR keyword is followed by collating identifier entries. The
+syntax for the collating element entries is:
+.sp
+.in +2
+.nf
+\fB"%s %s;%s;...;%s\en"\fR<\fIcollating-identifier\fR>,<\fIweight\fR>,<\fIweight\fR>\fB,...\fR
+.fi
+.in -2
+
+.sp
+.LP
+Each \fIcollating-identifier\fR consists of either a character described in
+\fBLocale Definition\fR above,  a <\fIcollating-element\fR>, a
+<\fIcollating-symbol\fR>, an ellipsis, or the special symbol \fBUNDEFINED\fR.
+The order in which collating elements are specified determines the character
+order sequence, such that each collating element compares less than the
+elements following it. The  \fBNUL\fR character compares lower than any other
+character.
+.sp
+.LP
+A <\fIcollating-element\fR> is used to specify multi-character collating
+elements, and indicates that the character sequence specified via the
+<\fIcollating-element\fR> is to be collated as a unit and in the relative order
+specified by its place.
+.sp
+.LP
+A <\fIcollating-symbol\fR> is used to define a position in the relative order
+for use in weights. No weights are specified with a <\fIcollating-symbol\fR>.
+.sp
+.LP
+The ellipsis symbol specifies that a sequence of characters will collate
+according to their encoded character values. It is interpreted as indicating
+that all characters with a coded character set value higher than the value of
+the character in the preceding line, and lower than the coded character set
+value for the character in the following line, in the current coded character
+set, will be placed in the character collation order between the previous and
+the following character in ascending order according to their coded character
+set values. An initial ellipsis is interpreted as if the preceding line
+specified the NUL character, and a trailing ellipsis as if the following line
+specified the highest coded character set value in the current coded character
+set. An ellipsis is treated as invalid if the preceding or following lines do
+not specify characters in the current coded character set. The use of the
+ellipsis symbol ties the definition to a specific coded character set and may
+preclude the definition from being portable between implementations.
+.sp
+.LP
+The symbol \fBUNDEFINED\fR is interpreted as including all coded character set
+values not specified explicitly or via the ellipsis symbol. Such characters are
+inserted in the character collation order at the point indicated by the symbol,
+and in ascending order according to their coded character set values. If no
+\fBUNDEFINED\fR symbol is specified, and the current coded character set
+contains characters not specified in this section, the utility will issue a
+warning message and place such characters at the end of the character collation
+order.
+.sp
+.LP
+The optional operands for each collation-element are used to define the
+primary, secondary, or subsequent weights for the collating element. The first
+operand specifies the relative primary weight, the second the relative
+secondary weight, and so on. Two or more collation-elements can be assigned the
+same weight; they belong to the same \fIequivalence class\fR if they have the
+same primary weight. Collation behaves as if, for each weight level, elements
+subject to \fBIGNORE\fR are removed, unless the \fBposition\fR collation
+directive is specified for the corresponding level with the \fBorder_start\fR
+keyword. Then each successive pair of elements is compared according to the
+relative weights for the elements. If the two strings compare equal, the
+process is repeated for the next weight level, up to the limit
+{\fBCOLL_WEIGHTS_MAX\fR}.
+.sp
+.LP
+Weights are expressed as characters  described in \fBLocale Definition\fR
+above, <\fIcollating-symbol\fR>s, <\fIcollating-element\fR>s, an ellipsis, or
+the special symbol \fBIGNORE.\fR A single character, a <\fIcollating-symbol\fR>
+or a <\fIcollating-element\fR> represent the relative position in the character
+collating sequence of the character or symbol, rather than the character or
+characters themselves. Thus, rather than assigning absolute values to weights,
+a particular weight is expressed using the relative order value assigned to a
+collating element based on its order in the character collation sequence.
+.sp
+.LP
+One-to-many mapping is indicated by specifying two or more concatenated
+characters or symbolic names. For example, if the character <\fBeszet\fR> is
+given the string "<\fBs\fR><\fBs\fR>" as a weight, comparisons are performed as
+if all occurrences of the character <\fBeszet\fR> are replaced by
+<\fBs\fR><\fBs\fR> (assuming that <\fBs\fR> has the collating weight
+<\fBs\fR>). If it is necessary to define <\fBeszet\fR> and <\fBs\fR><\fBs\fR>
+as an equivalence class, then a collating element must be defined for the
+string \fBss\fR.
+.sp
+.LP
+All characters specified via an ellipsis will by default be assigned unique
+weights, equal to the relative order of characters. Characters specified via an
+explicit or implicit \fBUNDEFINED\fR special symbol will by default be assigned
+the same primary weight (that is, belong to the same equivalence class). An
+ellipsis symbol as a weight is interpreted to mean that each character in the
+sequence has unique weights, equal to the relative order of their character in
+the character collation sequence. The use of the ellipsis as a weight is
+treated as an error if the collating element is neither an ellipsis nor the
+special symbol \fBUNDEFINED\fR.
+.sp
+.LP
+The special keyword \fBIGNORE\fR as a weight indicates that when strings are
+compared using the weights at the level where \fBIGNORE\fR is specified, the
+collating element is ignored; that is, as if the string did not contain the
+collating element. In regular expressions and pattern matching, all characters
+that are subject to \fBIGNORE\fR in their primary weight form an equivalence
+class.
+.sp
+.LP
+An empty operand is interpreted as the collating element itself.
+.sp
+.LP
+For example, the order statement:
+.sp
+.in +2
+.nf
+<a>	 <a>;<a>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+is equal to:
+.sp
+.in +2
+.nf
+<a>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+An ellipsis can be used as an operand if the collating element was an ellipsis,
+and is interpreted as the value of each character defined by the ellipsis.
+.sp
+.LP
+The collation order as defined in this section defines the interpretation of
+bracket expressions in regular expressions.
+.sp
+.LP
+Example:
+.sp
+
+.sp
+.TS
+l l
+l l .
+\fBorder_start\fR	\fBforward;backward\fR
+\fBUNDEFINED\fR	\fBIGNORE;IGNORE\fR
+\fB<LOW>\fR
+\fB<space>\fR	\fB<LOW>;<space>\fR
+\fB\&.\|.\|.\fR	\fB<LOW>;.\|.\|.\fR
+\fB<a>\fR	\fB<a>;<a>\fR
+\fB<a-acute>\fR	\fB<a>;<a-acute>\fR
+\fB<a-grave>\fR	\fB<a>;<a-grave>\fR
+\fB<A>\fR	\fB<a>;<A>\fR
+\fB<A-acute>\fR	\fB<a>;<A-acute>\fR
+\fB<A-grave>\fR	\fB<a>;<A-grave>\fR
+\fB<ch>\fR	\fB<ch>;<ch>\fR
+\fB<Ch>\fR	\fB<ch>;<Ch>\fR
+\fB<s>\fR	\fB<s>;<s>\fR
+\fB<eszet>\fR	\fB"<s><s>";"<eszet><eszet>"\fR
+\fBorder_end\fR
+.TE
+
+.sp
+.LP
+This example is interpreted as follows:
+.RS +4
+.TP
+1.
+The \fBUNDEFINED\fR means that all characters not specified in this
+definition (explicitly or via the ellipsis) are ignored for collation purposes;
+for regular expression purposes they are ordered first.
+.RE
+.RS +4
+.TP
+2.
+All characters between <\fBspace\fR> and <\fBa\fR> have the same primary
+equivalence class and individual secondary weights based on their ordinal
+encoded values.
+.RE
+.RS +4
+.TP
+3.
+All characters based on the upper- or lower-case character \fBa\fR belong to
+the same primary equivalence class.
+.RE
+.RS +4
+.TP
+4.
+The multi-character collating element <\fBch\fR> is represented by the
+collating symbol <\fBch\fR> and belongs to the same primary equivalence class
+as the multi-character collating element <\fBCh\fR>.
+.RE
+.SS "order_end \fIkeyword\fR"
+The collating order entries must be terminated with an \fBorder_end\fR keyword.
+.SS "LC_MONETARY"
+The  \fBLC_MONETARY\fR category defines the rules and symbols that are used to
+format monetary numeric information. This information is available through the
+\fBlocaleconv\fR(3C) function
+.sp
+.LP
+The following items are defined in this category of the locale. The item names
+are the keywords recognized by the \fBlocaledef\fR(1) utility when defining a
+locale. They are also similar to the member names of the \fBlconv\fR structure
+defined in <\fBlocale.h\fR>. The \fBlocaleconv\fR function returns
+\fB{CHAR_MAX}\fR for unspecified integer items and the empty string (\fB""\fR)
+for unspecified or size zero string items.
+.sp
+.LP
+In a locale definition file the operands are strings. For some keywords, the
+strings can contain only integers. Keywords that are not provided, string
+values set to the empty string (\fB""\fR), or integer keywords set to \fB-1\fR,
+are used to indicate that the value is not available in the locale.
+.sp
+.ne 2
+.na
+\fB\fBint_curr_symbol\fR\fR
+.ad
+.RS 22n
+The international currency symbol. The operand is a four-character string, with
+the first three characters containing the alphabetic international currency
+symbol in accordance with those specified in the ISO 4217 standard. The fourth
+character is the character used to separate the international currency symbol
+from the monetary quantity.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcurrency_symbol\fR\fR
+.ad
+.RS 22n
+The string used as the local currency symbol.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmon_decimal_point\fR\fR
+.ad
+.RS 22n
+The operand is a string containing the symbol that is used as the decimal
+delimiter (radix character) in monetary formatted quantities.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmon_thousands_sep\fR\fR
+.ad
+.RS 22n
+The operand is a string containing the symbol that is used as a separator for
+groups of digits to the left of the decimal delimiter in formatted monetary
+quantities.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmon_grouping\fR\fR
+.ad
+.RS 22n
+Define the size of each group of digits in formatted monetary quantities. The
+operand is a sequence of integers separated by semicolons. Each integer
+specifies the number of digits in each group, with the initial integer defining
+the size of the group immediately preceding the decimal delimiter, and the
+following integers defining the preceding groups. If the last integer is not
+\fB-1\fR, then the size of the previous group (if any) will be repeatedly used
+for the remainder of the digits. If the last integer is \fB-1\fR, then no
+further grouping will be performed.
+.sp
+The following is an example of the interpretation of the \fBmon_grouping\fR
+keyword. Assuming that the value to be formatted is \fB123456789\fR and the
+\fBmon_thousands_sep\fR is \fB\&'\fR, then the following table shows the
+result. The third column shows the equivalent string in the ISO C standard that
+would be used by the \fBlocaleconv\fR function to accommodate this grouping.
+.sp
+.in +2
+.nf
+mon_grouping   Formatted Value  ISO C String
+
+3;-1           123456'789       "\e3\e177"
+3              123'456'789      "\e3"
+3;2;-1         1234'56'789      "\e3\e2\e177"
+3;2            12'34'56'789     "\e3\e2"
+-1             1234567898       "\e177"
+.fi
+.in -2
+.sp
+
+In these examples, the octal value of \fB{CHAR_MAX}\fR is 177.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpositive_sign\fR\fR
+.ad
+.RS 22n
+A string used to indicate a non-negative-valued formatted monetary quantity.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnegative_sign\fR\fR
+.ad
+.RS 22n
+A string used to indicate a negative-valued formatted monetary quantity.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBint_frac_digits\fR\fR
+.ad
+.RS 22n
+An integer representing the number of fractional digits (those to the right of
+the decimal delimiter) to be written in a formatted monetary quantity using
+\fBint_curr_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfrac_digits\fR\fR
+.ad
+.RS 22n
+An integer representing the number of fractional digits (those to the right of
+the decimal delimiter) to be written in a formatted monetary quantity using
+\fBcurrency_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBp_cs_precedes\fR\fR
+.ad
+.RS 22n
+In an application conforming to the SUSv3 standard, an integer set to \fB1\fR
+if the \fBcurrency_symbol\fR precedes the value for a monetary quantity with a
+non-negative value, and set to \fB0\fR if the symbol succeeds the value.
+.sp
+In an application \fBnot\fR conforming to the SUSv3 standard, an integer set to
+\fB1\fR if the \fBcurrency_symbol\fR or \fBint_currency_symbol\fR precedes the
+value for a monetary quantity with a non-negative value, and set to \fB0\fR if
+the symbol succeeds the value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBp_sep_by_space\fR\fR
+.ad
+.RS 22n
+In an application conforming to the SUSv3 standard, an integer set to \fB0\fR
+if no space separates the \fBcurrency_symbol\fR from the value for a monetary
+quantity with a non-negative value, set to \fB1\fR if a space separates the
+symbol from the value, and set to \fB2\fR if a space separates the symbol and
+the sign string, if adjacent.
+.sp
+In an application \fBnot\fR conforming to the SUSv3 standard, an integer set to
+\fB0\fR if no space separates the \fBcurrency_symbol\fR or
+\fBint_curr_symbol\fR from the value for a monetary quantity with a
+non-negative value, set to \fB1\fR if a space separates the symbol from the
+value, and set to \fB2\fR if a space separates the symbol and the sign string,
+if adjacent.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBn_cs_precedes\fR\fR
+.ad
+.RS 22n
+In an application conforming to the SUSv3 standard, an integer set to \fB1\fR
+if the \fBcurrency_symbol\fR precedes the value for a monetary quantity with a
+negative value, and set to \fB0\fR if the symbol succeeds the value.
+.sp
+In an application \fBnot\fR conforming to the SUSv3 standard, an integer set to
+\fB1\fR if the \fBcurrency_symbol\fR or \fBint_currency_symbol\fR precedes the
+value for a monetary quantity with a negative value, and set to \fB0\fR if the
+symbol succeeds the value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBn_sep_by_space\fR\fR
+.ad
+.RS 22n
+In an application conforming to the SUSv3 standard, an integer set to \fB0\fR
+if no space separates the \fBcurrency_symbol\fR from the value for a monetary
+quantity with a negative value, set to \fB1\fR if a space separates the symbol
+from the value, and set to \fB2\fR if a space separates the symbol and the sign
+string, if adjacent.
+.sp
+In an application \fBnot\fR conforming to the SUSv3 standard, an integer set to
+\fB0\fR if no space separates the \fBcurrency_symbol\fR or
+\fBint_curr_symbol\fR from the value for a monetary quantity with a negative
+value, set to \fB1\fR if a space separates the symbol from the value, and set
+to \fB2\fR if a space separates the symbol and the sign string, if adjacent.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBp_sign_posn\fR\fR
+.ad
+.RS 22n
+An integer set to a value indicating the positioning of the \fBpositive_sign\fR
+for a monetary quantity with a non-negative value. The following integer values
+are recognized for both \fBp_sign_posn\fR and \fBn_sign_posn\fR:
+.sp
+In an application conforming to the SUSv3 standard:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+Parentheses enclose the quantity and the \fBcurrency_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+The sign string precedes the quantity and the \fBcurrency_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+The sign string succeeds the quantity and the \fBcurrency_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+The sign string precedes the \fBcurrency_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB4\fR\fR
+.ad
+.RS 5n
+The sign string succeeds the \fBcurrency_symbol\fR.
+.RE
+
+In an application \fBnot\fR conforming to the SUSv3 standard:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+Parentheses enclose the quantity and the \fBcurrency_symbol\fR or
+\fBint_curr_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+The sign string precedes the quantity and the \fBcurrency_symbol\fR or
+\fBint_curr_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+The sign string succeeds the quantity and the \fBcurrency_symbol\fR or
+\fBint_curr_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+The sign string precedes the \fBcurrency_symbol\fR or \fBint_curr_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB4\fR\fR
+.ad
+.RS 5n
+The sign string succeeds the \fBcurrency_symbol\fR or \fBint_curr_symbol\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBn_sign_posn\fR\fR
+.ad
+.RS 22n
+An integer set to a value indicating the positioning of the \fBnegative_sign\fR
+for a negative formatted monetary quantity.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBint_p_cs_precedes\fR\fR
+.ad
+.RS 22n
+An integer set to \fB1\fR if the \fBint_curr_symbol\fR precedes the value for a
+monetary quantity with a non-negative value, and set to \fB0\fR if the symbol
+succeeds the value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBint_n_cs_precedes\fR\fR
+.ad
+.RS 22n
+An integer set to \fB1\fR if the \fBint_curr_symbol\fR precedes the value for a
+monetary quantity with a negative value, and set to \fB0\fR if the symbol
+succeeds the value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBint_p_sep_by_space\fR\fR
+.ad
+.RS 22n
+An integer set to \fB0\fR if no space separates the \fBint_curr_symbol\fR from
+the value for a monetary quantity with a non-negative value, set to \fB1\fR if
+a space separates the symbol from the value, and set to \fB2\fR if a space
+separates the symbol and the sign string, if adjacent.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBint_n_sep_by_space\fR\fR
+.ad
+.RS 22n
+An integer set to \fB0\fR if no space separates the \fBint_curr_symbol\fR from
+the value for a monetary quantity with a negative value, set to \fB1\fR if a
+space separates the symbol from the value, and set to \fB2\fR if a space
+separates the symbol and the sign string, if adjacent.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBint_p_sign_posn\fR\fR
+.ad
+.RS 22n
+An integer set to a value indicating the positioning of the \fBpositive_sign\fR
+for a positive monetary quantity formatted with the international format. The
+following integer values are recognized for \fBint_p_sign_posn\fR and
+\fBint_n_sign_posn\fR:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+Parentheses enclose the quantity and the \fB\fR\fBint_curr_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+The sign string precedes the quantity and the \fBint_curr_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+The sign string precedes the quantity and the \fBint_curr_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+The sign string precedes the \fBint_curr_symbol\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB4\fR\fR
+.ad
+.RS 5n
+The sign string succeeds the \fBint_curr_symbol\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBint_n_sign_posn\fR\fR
+.ad
+.RS 22n
+An integer set to a value indicating the positioning of the \fBnegative_sign\fR
+for a negative monetary quantity formatted with the international format.
+.RE
+
+.sp
+.LP
+The following table shows the result of various combinations:
+.sp
+
+.sp
+.TS
+l l l l l l
+l l l l l l .
+		\fBp_sep_by_space\fR
+		2	1	0
+\fBp_cs_precedes\fR= 1	\fBp_sign_posn\fR= 0	\fB($1.25)\fR	\fB($1.25)\fR	\fB($1.25)\fR
+	\fBp_sign_posn\fR= 1	\fB+$1.25\fR	\fB+$1.25\fR	\fB+$1.25\fR
+	\fBp_sign_posn\fR= 2	\fB$1.25+\fR	\fB$1.25+\fR	\fB$1.25+\fR
+	\fBp_sign_posn\fR= 3	\fB+$1.25\fR	\fB+$1.25\fR	\fB+$1.25\fR
+	\fBp_sign_posn\fR= 4	\fB$+1.25\fR	\fB$+1.25\fR	\fB$+1.25\fR
+\fBp_cs_precedes\fR= 0	\fBp_sign_posn\fR= 0	\fB(1.25 $)\fR	\fB(1.25 $)\fR	\fB(1.25$)\fR
+	\fBp_sign_posn\fR= 1	\fB+1.25 $\fR	\fB+1.25 $\fR	\fB+1.25$\fR
+	\fBp_sign_posn\fR= 2	\fB1.25$ +\fR	\fB1.25 $+\fR	\fB1.25$+\fR
+	\fBp_sign_posn\fR= 3	\fB1.25+ $\fR	\fB1.25 +$\fR	\fB1.25+$\fR
+	\fBp_sign_posn\fR= 4	\fB1.25$ +\fR	\fB1.25 $+\fR	\fB1.25$+\fR
+.TE
+
+.sp
+.LP
+The monetary formatting definitions for the POSIX locale follow. The code
+listing depicts the \fBlocaledef\fR(1) input, the table representing the same
+information with the addition of \fBlocaleconv\fR(3C) and \fBnl_langinfo\fR(3C)
+formats. All values are unspecified in the POSIX locale.
+.sp
+.in +2
+.nf
+LC_MONETARY
+# This is the POSIX locale definition for
+# the LC_MONETARY category.
+#
+int_curr_symbol       ""
+currency_symbol       ""
+mon_decimal_point     ""
+mon_thousands_sep     ""
+mon_grouping          -1
+positive_sign         ""
+negative_sign         ""
+int_frac_digits       -1
+frac_digits           -1
+p_cs_precedes         -1
+p_sep_by_space        -1
+n_cs_precedes         -1
+n_sep_by_space        -1
+p_sign_posn           -1
+n_sign_posn           -1
+int_p_cs_precedes     -1
+int_p_sep_by_space    -1
+int_n_cs_precedes     -1
+int_n_sep_by_space    -1
+int_p_sign_posn       -1
+int_n_sign_posn       -1
+#
+END LC_MONETARY
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The entry \fBn/a\fR indicates that the value is not available in the POSIX
+locale.
+.SS "LC_NUMERIC"
+The  \fBLC_NUMERIC\fR category defines the rules and symbols that will be used
+to format non-monetary numeric information. This information is available
+through the \fBlocaleconv\fR(3C) function.
+.sp
+.LP
+The following items are defined in this category of the locale. The item names
+are the keywords recognized by the \fBlocaledef\fR utility when defining a
+locale. They are also similar to the member names of the \fIlconv\fR structure
+defined in <\fBlocale.h\fR>. The \fBlocaleconv()\fR function returns
+\fB{CHAR_MAX}\fR for unspecified integer items and the empty string (\fB""\fR)
+for unspecified or size zero string items.
+.sp
+.LP
+In a locale definition file the operands are strings. For some keywords, the
+strings only can contain integers. Keywords that are not provided, string
+values set to the empty string (\fB""\fR), or integer keywords set to \fB-1\fR,
+will be used to indicate that the value is not available in the locale. The
+following keywords are recognized:
+.sp
+.ne 2
+.na
+\fB\fBdecimal_point\fR\fR
+.ad
+.RS 17n
+The operand is a string containing the symbol that is used as the decimal
+delimiter (radix character) in numeric, non-monetary formatted quantities. This
+keyword cannot be omitted and cannot be set to the empty string. In contexts
+where standards limit the \fBdecimal_point\fR to a single byte, the result of
+specifying a multi-byte operand is unspecified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBthousands_sep\fR\fR
+.ad
+.RS 17n
+The operand is a string containing the symbol that is used as a separator for
+groups of digits to the left of the decimal delimiter in numeric, non-monetary
+formatted monetary quantities. In contexts where standards limit the
+\fBthousands_sep\fR to a single byte, the result of specifying a multi-byte
+operand is unspecified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBgrouping\fR\fR
+.ad
+.RS 17n
+Define the size of each group of digits in formatted non-monetary quantities.
+The operand is a sequence of integers separated by semicolons. Each integer
+specifies the number of digits in each group, with the initial integer defining
+the size of the group immediately preceding the decimal delimiter, and the
+following integers defining the preceding groups. If the last integer is not
+\fB\(mi1\fR, then the size of the previous group (if any) will be repeatedly
+used for the remainder of the digits. If the last integer is \fB-1\fR, then no
+further grouping will be performed. The non-monetary numeric formatting
+definitions for the POSIX locale follow. The code listing depicts the
+\fBlocaledef\fR input, the table representing the same information with the
+addition of \fBlocaleconv\fR values, and \fBnl_langinfo\fR constants.
+.sp
+.in +2
+.nf
+LC_NUMERIC
+# This is the POSIX locale definition for
+# the LC_NUMERIC category.
+#
+decimal_point	"<period>"
+thousands_sep	""
+grouping	-1
+#
+END LC_NUMERIC
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+
+.sp
+.TS
+l l l l l
+l l l l l .
+	\fBPOSIX locale\fR	\fBlanginfo\fR	\fBlocaleconv()\fR	\fBlocaledef\fR
+\fBItem\fR	\fBValue\fR	\fBConstant\fR	\fBValue\fR	\fBValue\fR
+_
+\fBdecimal_point\fR	\fB"."\fR	\fBRADIXCHAR\fR	\fB"."\fR	\fB\&.\fR
+\fBthousands_sep\fR	\fBn/a\fR	\fBTHOUSEP\fR	\fB""\fR	\fB""\fR
+\fBgrouping\fR	\fBn/a\fR	\fB-\fR	\fB""\fR	\fB\(mi1\fR
+.TE
+
+.sp
+.LP
+The entry \fBn/a\fR indicates that the value is not available in the POSIX
+locale.
+.SS "LC_TIME"
+The  \fBLC_TIME\fR category defines the interpretation of the field descriptors
+supported by  \fBdate\fR(1) and affects the behavior of the \fBstrftime\fR(3C),
+\fBwcsftime\fR(3C), \fBstrptime\fR(3C), and \fBnl_langinfo\fR(3C) functions.
+Because the interfaces for C-language access and locale definition differ
+significantly, they are described separately. For locale definition, the
+following mandatory keywords are recognized:
+.sp
+.ne 2
+.na
+\fB\fBabday\fR\fR
+.ad
+.RS 15n
+Define the abbreviated weekday names, corresponding to the \fB%a\fR field
+descriptor (conversion specification in the \fBstrftime()\fR, \fBwcsftime()\fR,
+and \fBstrptime()\fR functions). The operand consists of seven
+semicolon-separated strings, each surrounded by double-quotes. The first string
+is the abbreviated name of the day corresponding to Sunday, the second the
+abbreviated name of the day corresponding to Monday, and so on.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBday\fR\fR
+.ad
+.RS 15n
+Define the full weekday names, corresponding to the \fB%A\fR field descriptor.
+The operand consists of seven semicolon-separated  strings, each surrounded by
+double-quotes. The first string is the full name of the day corresponding to
+Sunday, the second the full name of the day corresponding to Monday, and so on.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBabmon\fR\fR
+.ad
+.RS 15n
+Define the abbreviated month names, corresponding to the \fB%b\fR field
+descriptor. The operand consists of twelve semicolon-separated strings, each
+surrounded by double-quotes. The first string is the abbreviated name of the
+first month of the year (January), the second the abbreviated name of the
+second month, and so on.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmon\fR\fR
+.ad
+.RS 15n
+Define the full month names, corresponding to the \fB%B\fR field descriptor.
+The operand consists of twelve semicolon-separated strings, each surrounded by
+double-quotes. The first string is the full name of the first month of the year
+(January), the second the full name of the second month, and so on.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBd_t_fmt\fR\fR
+.ad
+.RS 15n
+Define the appropriate date and time representation, corresponding to the
+\fB%c\fR field descriptor. The operand consists of a string, and can contain
+any combination of characters and field descriptors. In addition, the string
+can contain the escape sequences  \e\e, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR,
+\fB\en\fR, \fB\er\fR, \fB\et\fR, \fB\ev\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdate_fmt\fR\fR
+.ad
+.RS 15n
+Define the appropriate date and time representation, corresponding to the
+\fB%C\fR field descriptor. The operand consists of a string, and can contain
+any combination of characters and field descriptors. In addition, the string
+can contain the escape sequences  \fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR,
+\fB\en\fR, \fB\er\fR, \fB\et\fR, \fB\ev\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBd_fmt\fR\fR
+.ad
+.RS 15n
+Define the appropriate date representation, corresponding to the \fB%x\fR field
+descriptor. The operand consists of a string, and can contain any combination
+of characters and field descriptors. In addition, the string can contain the
+escape sequences  \fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR,
+\fB\er\fR, \fB\et\fR, \fB\ev\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBt_fmt\fR\fR
+.ad
+.RS 15n
+Define the appropriate time representation, corresponding to the \fB%X\fR field
+descriptor. The operand consists of a string, and can contain any combination
+of characters and field descriptors. In addition, the string can contain the
+escape sequences  \fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR,
+\fB\er\fR, \fB\et\fR, \fB\ev\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBam_pm\fR\fR
+.ad
+.RS 15n
+Define the appropriate representation of the \fIante meridiem\fR and \fIpost
+meridiem\fR strings, corresponding to the \fB%p\fR field descriptor. The
+operand consists of two strings, separated by a semicolon, each surrounded by
+double-quotes. The first string represents the \fIante meridiem\fR designation,
+the last string the \fIpost meridiem\fR designation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBt_fmt_ampm\fR\fR
+.ad
+.RS 15n
+Define the appropriate time representation in the 12-hour clock format with
+\fBam_pm\fR, corresponding to the \fB%r\fR field descriptor. The operand
+consists of a string and can contain any combination of characters and field
+descriptors. If the string is empty, the 12-hour format is not supported in the
+locale.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBera\fR\fR
+.ad
+.RS 15n
+Define how years are counted and displayed for each era in a locale. The
+operand consists of semicolon-separated strings. Each string is an era
+description segment with the format:
+.sp
+\fIdirection\fR:\fIoffset\fR:\fIstart_date\fR:\fIend_date\fR:\fIera_name\fR:\fIera_format\fR
+.sp
+according to the definitions below.  There can be as many era description
+segments as are necessary to describe the different eras.
+.sp
+The start of an era might not be the earliest point For example, the Christian
+era B.C. starts on the day before January 1, A.D. 1, and increases with earlier
+time.
+.sp
+.ne 2
+.na
+\fB\fIdirection\fR\fR
+.ad
+.RS 14n
+Either a \fB+\fR or a \fB-\fR character. The \fB+\fR character indicates that
+years closer to the \fIstart_date\fR have lower numbers than those closer to
+the \fIend_date\fR. The \fB-\fR character indicates that years closer to the
+\fIstart_date\fR have higher numbers than those closer to the \fIend_date\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIoffset\fR\fR
+.ad
+.RS 14n
+The number of the year closest to the \fIstart_date\fR in the era,
+corresponding to the \fB%Eg\fR and \fB%Ey\fR field descriptors.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIstart_date\fR\fR
+.ad
+.RS 14n
+A date in the form \fIyyyy\fR/\fImm\fR/\fBdd\fR, where \fIyyyy\fR, \fImm\fR,
+and \fBdd\fR are the year, month and day numbers respectively of the start of
+the era. Years prior to A.D. 1 are represented as negative numbers.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIend_date\fR\fR
+.ad
+.RS 14n
+The ending date of the era, in the same format as the \fIstart_date\fR, or one
+of the two special values -* or +*. The value -* indicates that the ending date
+is the beginning of time. The value +* indicates that the ending date is the
+end of time.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIera_name\fR\fR
+.ad
+.RS 14n
+A string representing the name of the era, corresponding to the \fB%EC\fR field
+descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIera_format\fR\fR
+.ad
+.RS 14n
+A string for formatting the year in the era, corresponding to the \fB%EG\fR and
+\fB%EY\fR field descriptors.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBera_d_fmt\fR\fR
+.ad
+.RS 15n
+Define the format of the date in alternative era notation, corresponding to the
+\fB%Ex\fR field descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBera_t_fmt\fR\fR
+.ad
+.RS 15n
+Define the locale's appropriate alternative time format, corresponding to the
+\fB%EX\fR field descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBera_d_t_fmt\fR\fR
+.ad
+.RS 15n
+Define the locale's appropriate alternative date and time format, corresponding
+to the \fB%Ec\fR field descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBalt_digits\fR\fR
+.ad
+.RS 15n
+Define alternative symbols for digits, corresponding to the \fB%O\fR field
+descriptor modifier. The operand consists of semicolon-separated strings, each
+surrounded by double-quotes. The first string is the alternative symbol
+corresponding with zero, the second string the symbol corresponding with one,
+and so on. Up to 100 alternative symbol strings can be specified. The \fB%O\fR
+modifier indicates that the string corresponding to the value specified via the
+field descriptor will be used instead of the value.
+.RE
+
+.SS "LC_TIME \fIC-language\fR Access"
+The following information can be accessed. These correspond to constants
+defined in <\fBlanginfo.h\fR> and used as arguments to the
+\fBnl_langinfo\fR(3C) function.
+.sp
+.ne 2
+.na
+\fB\fBABDAY_\fIx\fR\fR\fR
+.ad
+.RS 15n
+The abbreviated weekday names (for example Sun), where \fIx\fR is a number from
+1 to 7.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDAY_\fIx\fR\fR\fR
+.ad
+.RS 15n
+The full weekday names (for example Sunday), where \fIx\fR is a number from 1
+to 7.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBABMON_\fIx\fR\fR\fR
+.ad
+.RS 15n
+The abbreviated month names (for example Jan), where \fIx\fR is a number from 1
+to 12.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBMON_\fIx\fR\fR\fR
+.ad
+.RS 15n
+The full month names (for example January), where \fIx\fR is a number from 1 to
+12.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBD_T_FMT\fR\fR
+.ad
+.RS 15n
+The appropriate date and time representation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBD_FMT\fR\fR
+.ad
+.RS 15n
+The appropriate date representation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBT_FMT\fR\fR
+.ad
+.RS 15n
+The appropriate time representation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBAM_STR\fR\fR
+.ad
+.RS 15n
+The appropriate ante-meridiem affix.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPM_STR\fR\fR
+.ad
+.RS 15n
+The appropriate post-meridiem affix.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBT_FMT_AMPM\fR\fR
+.ad
+.RS 15n
+The appropriate time representation in the 12-hour clock format with
+\fBAM_STR\fR and  \fBPM_STR.\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBERA\fR\fR
+.ad
+.RS 15n
+The era description segments, which describe how years are counted and
+displayed for each era in a locale. Each era description segment has the
+format:
+.sp
+.in +2
+.nf
+\fIdirection\fR:\fIoffset\fR:\fIstart_date\fR:\fIend_date\fR:\fIera_name\fR:\fIera_format\fR
+.fi
+.in -2
+.sp
+
+according to the definitions below. There will be as many era description
+segments as are necessary to describe the different eras. Era description
+segments are separated by semicolons.
+.sp
+The start of an era might not be the earliest point For example, the Christian
+era B.C. starts on the day before January 1, A.D. 1, and increases with earlier
+time.
+.sp
+.ne 2
+.na
+\fB\fIdirection\fR\fR
+.ad
+.RS 14n
+Either a + or a - character. The + character indicates that years closer to the
+\fIstart_date\fR have lower numbers than those closer to the \fIend_date\fR.
+The - character indicates that years closer to the \fIstart_date\fR have higher
+numbers than those closer to the \fIend_date\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIoffset\fR\fR
+.ad
+.RS 14n
+The number of the year closest to the start_date in the era.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIstart_date\fR\fR
+.ad
+.RS 14n
+A date in the form \fIyyyy\fR/\fImm\fR/\fIdd\fR, where \fIyyyy\fR, \fImm\fR,
+and \fBdd\fR are the year, month and day numbers respectively of the start of
+the era. Years prior to AD 1 are represented as negative numbers.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIend_date\fR\fR
+.ad
+.RS 14n
+The ending date of the era, in the same format as the \fIstart_date\fR, or one
+of the two special values, \fB-*\fR or \fB+*\fR. The value \fB-*\fR indicates
+that the ending date is the beginning of time. The value \fB+*\fR indicates
+that the ending date is the end of time.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIera_name\fR\fR
+.ad
+.RS 14n
+The era, corresponding to the \fB%EC\fR conversion specification.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIera_format\fR\fR
+.ad
+.RS 14n
+The format of the year in the era, corresponding to the \fB%EY\fR and \fB%EY\fR
+conversion specifications.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBERA_D_FMT\fR\fR
+.ad
+.RS 15n
+The era date format.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBERA_T_FMT\fR\fR
+.ad
+.RS 15n
+The locale's appropriate alternative time format, corresponding to the
+\fB%EX\fR field descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBERA_D_T_FMT\fR\fR
+.ad
+.RS 15n
+The locale's appropriate alternative date and time format, corresponding to the
+\fB%Ec\fR field descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBALT_DIGITS\fR\fR
+.ad
+.RS 15n
+The alternative symbols for digits, corresponding to the \fB%O\fR conversion
+specification modifier. The value consists of semicolon-separated symbols. The
+first is the alternative symbol corresponding to zero, the second is the symbol
+corresponding to one, and so on.  Up to 100 alternative symbols may be
+specified. The following table displays the correspondence between the items
+described above and the conversion specifiers used by  \fBdate\fR(1) and the
+\fBstrftime\fR(3C), \fBwcsftime\fR(3C), and \fBstrptime\fR(3C) functions.
+.RE
+
+.sp
+
+.sp
+.TS
+box;
+c | c | c
+c | c | c .
+\fBlocaledef\fR	\fBlanginfo\fR	\fBConversion\fR
+\fBKeyword\fR	\fBConstant\fR	\fBSpecifier\fR
+_
+\fBabday\fR	\fBABDAY_\fR\fIx\fR	\fB%a\fR
+\fBday\fR	\fBDAY_\fR\fIx\fR	\fB%A\fR
+\fBabmon\fR	\fBABMON_\fR\fIx\fR	\fB%b\fR
+\fBmon\fR	\fBMON\fR	\fB%B\fR
+\fBd_t_fmt\fR	\fBD_T_FMT\fR	\fB%c\fR
+\fBdate_fmt\fR	\fBDATE_FMT\fR	\fB%C\fR
+\fBd_fmt\fR	\fBD_FMT\fR	\fB%x\fR
+\fBt_fmt\fR	\fBT_FMT\fR	\fB%X\fR
+\fBam_pm\fR	\fBAM_STR\fR	\fB%p\fR
+\fBam_pm\fR	\fBPM_STR\fR	\fB%p\fR
+\fBt_fmt_ampm\fR	\fBT_FMT_AMPM\fR	\fB%r\fR
+\fBera\fR	\fBERA\fR	\fB%EC, %Eg,\fR
+		\fB%EG, %Ey, %EY\fR
+\fBera_d_fmt\fR	\fBERA_D_FMT\fR	\fB%Ex\fR
+\fBera_t_fmt\fR	\fBERA_T_FMT\fR	\fB%EX\fR
+\fBera_d_t_fmt\fR	\fBERA_D_T_FMT\fR	\fB%Ec\fR
+\fBalt_digits\fR	\fBALT_DIGITS\fR	\fB%O\fR
+.TE
+
+.SS "LC_TIME \fIGeneral\fR Information"
+Although certain of the field descriptors in the POSIX locale (such as the name
+of the month) are shown with initial capital letters, this need not be the case
+in other locales. Programs using these fields may need to adjust the
+capitalization if the output is going to be used at the beginning of a
+sentence.
+.sp
+.LP
+The \fBLC_TIME\fR descriptions of \fBabday\fR, \fBday\fR, \fBmon\fR, and
+\fBabmon\fR imply a Gregorian style calendar (7-day weeks, 12-month years, leap
+years, and so forth). Formatting time strings for other types of calendars is
+outside the scope of this document set.
+.sp
+.LP
+As specified under \fBdate\fR in \fBLocale Definition\fR and
+\fBstrftime\fR(3C), the field descriptors corresponding to the optional
+keywords consist of a modifier followed by a traditional field descriptor (for
+instance \fB%Ex\fR). If the optional keywords are not supported by the
+implementation or are unspecified for the current locale, these field
+descriptors are treated as the traditional field descriptor. For instance,
+assume the following keywords:
+.sp
+.in +2
+.nf
+alt_digits	"0th" ; "1st" ; "2nd" ; "3rd" ; "4th" ; "5th" ; \e
+"6th" ; "7th" ; "8th" ; "9th" ; "10th">
+d_fmt	"The %Od day of %B in %Y"
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+On 7/4/1776, the \fB%x\fR field descriptor would result in "The 4th day of July
+in 1776" while 7/14/1789 would come out as "The 14 day of July in 1789" The
+above example is for illustrative purposes only. The \fB%O\fR modifier is
+primarily intended to provide for Kanji or Hindi digits in \fBdate\fR formats.
+.SS "LC_MESSAGES"
+The  \fBLC_MESSAGES\fR category defines the format and values for affirmative
+and negative responses.
+.sp
+.LP
+The following keywords are recognized as part of the locale definition file.
+The \fBnl_langinfo\fR(3C) function accepts upper-case versions of the first
+four keywords.
+.sp
+.ne 2
+.na
+\fB\fByesexpr\fR\fR
+.ad
+.RS 11n
+The operand consists of an extended regular expression (see \fBregex\fR(7))
+that describes the acceptable affirmative response to a question expecting an
+affirmative or negative response.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnoexpr\fR\fR
+.ad
+.RS 11n
+The operand consists of an extended regular expression that describes the
+acceptable negative response to a question expecting an affirmative or negative
+response.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fByesstr\fR\fR
+.ad
+.RS 11n
+The operand consists of a fixed string (not a regular expression) that can be
+used by an application for composition of a message that lists an acceptable
+affirmative response, such as in a prompt.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnostr\fR\fR
+.ad
+.RS 11n
+The operand consists of a fixed string that can be used by an application for
+composition of a message that lists an acceptable negative response. The format
+and values for affirmative and negative responses of the POSIX locale follow;
+the code listing depicting the \fBlocaledef\fR input, the table representing
+the same information with the addition of \fBnl_langinfo()\fR constants.
+.sp
+.in +2
+.nf
+LC_MESSAGES
+# This is the POSIX locale definition for
+# the LC_MESSAGES category.
+#
+yesexpr "<circumflex><left-square-bracket><y><Y>\e
+        <right-square-bracket>"
+#
+noexpr  "<circumflex><left-square-bracket><n><N>\e
+        <right-square-bracket>"
+#
+yesstr	"yes"
+nostr	"no"
+END LC_MESSAGES
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+
+.sp
+.TS
+box;
+l | l | l
+l | l | l .
+\fBlocaledef Keyword\fR	\fBlanginfo Constant\fR	\fBPOSIX Locale Value\fR
+\fByesexpr\fR	\fBYESEXPR\fR	\fB"^[yY]"\fR
+\fBnoexpr\fR	\fBNOEXPR\fR	\fB"^[nN]"\fR
+\fByesstr\fR	\fBYESSTR\fR	\fB"yes"\fR
+\fBnostr\fR	\fBNOSTR\fR	\fB"no"\fR
+.TE
+
+.sp
+.LP
+In an application conforming to the SUSv3 standard, the information on
+\fByesstr\fR and \fBnostr\fR is not available.
+.SH SEE ALSO
+.BR date (1),
+.BR locale (1),
+.BR localedef (1),
+.BR sort (1),
+.BR tr (1),
+.BR uniq (1),
+.BR localeconv (3C),
+.BR nl_langinfo (3C),
+.BR setlocale (3C),
+.BR strcoll (3C),
+.BR strftime (3C),
+.BR strptime (3C),
+.BR strxfrm (3C),
+.BR wcscoll (3C),
+.BR wcsftime (3C),
+.BR wcsxfrm (3C),
+.BR wctype (3C),
+.BR attributes (7),
+.BR charmap (7),
+.BR extensions (7),
+.BR regex (7)

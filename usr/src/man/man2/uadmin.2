@@ -100,7 +100,7 @@ taken next is specified by \fIfcn\fR as above.
 .ad
 .RS 14n
 The system is forced to panic immediately without any further processing and a
-crash dump is written to the dump device (see \fBdumpadm\fR(1M)).  The action
+crash dump is written to the dump device (see \fBdumpadm\fR(8)).  The action
 to be taken next is specified by \fIfcn\fR, as above.
 .RE
 
@@ -325,7 +325,7 @@ the calling process.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -344,12 +344,17 @@ The \fBA_FREEZE\fR command and its subcommands are Committed.
 .SH SEE ALSO
 .sp
 .LP
-\fBdumpadm\fR(1M), \fBhalt\fR(1M), \fBkernel\fR(1M), \fBreboot\fR(1M),
-\fBuadmin\fR(1M), \fBattributes\fR(5), \fBprivileges\fR(5)
+.BR attributes (7),
+.BR privileges (7),
+.BR dumpadm (8),
+.BR halt (8),
+.BR kernel (8),
+.BR reboot (8),
+.BR uadmin (8)
 .SH WARNINGS
 .sp
 .LP
-Shutting down or halting the system by means of \fBuadmin\fR(1M) does not
+Shutting down or halting the system by means of \fBuadmin\fR(8) does not
 update the  boot  archive.  Avoid  using  this command after
 .RS +4
 .TP
@@ -371,4 +376,4 @@ updating existing driver binaries or kernel binaries.
 .RE
 .sp
 .LP
-Use \fBreboot\fR(1M) or \fBhalt\fR(1M) instead.
+Use \fBreboot\fR(8) or \fBhalt\fR(8) instead.

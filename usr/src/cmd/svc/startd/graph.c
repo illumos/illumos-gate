@@ -127,8 +127,8 @@
  *   stn_global for the system-wide set. They are re-read when instances are
  *   refreshed.
  *
- *   The GPEC events published by svc.startd are consumed by fmd(1M). After
- *   processing these events, fmd(1M) publishes the processed events to
+ *   The GPEC events published by svc.startd are consumed by fmd(8). After
+ *   processing these events, fmd(8) publishes the processed events to
  *   notification agents. The notification agents read the notification
  *   parameters from the SMF repository through libscf(3LIB) interfaces and send
  *   the notification, or not, based on those parameters.

@@ -114,7 +114,7 @@ authentication session should be quit. See \fBsasl_errors\fR(3SASL) for
 information on SASL error codes.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -131,4 +131,5 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBsasl_errors\fR(3SASL), \fBattributes\fR(5)
+.BR sasl_errors (3SASL),
+.BR attributes (7)

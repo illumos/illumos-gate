@@ -33,7 +33,7 @@ A handle to a snapshot of devlinks in "\fB/dev\fR".
 \fB\fIre\fR\fR
 .ad
 .RS 11n
-An extended regular expression as specified in \fBregex\fR(5) describing the
+An extended regular expression as specified in \fBregex\fR(7) describing the
 paths of devlinks to visit. A null value matches all devlinks.  The expression
 should not involve the "\fB/dev\fR" prefix. For example, the "^\fBdsk/\fR" will
 invoke \fIdevlink_callback\fR() for all "\fB/dev/dsk/\fR" links.
@@ -139,7 +139,7 @@ Insufficient memory is available.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -157,5 +157,9 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBdi_devlink_init\fR(3DEVINFO), \fBdi_devlink_path\fR(3DEVINFO),
-\fBlibdevinfo\fR(3LIB), \fBmalloc\fR(3C), \fBattributes\fR(5), \fBregex\fR(5)
+.BR malloc (3C),
+.BR di_devlink_init (3DEVINFO),
+.BR di_devlink_path (3DEVINFO),
+.BR libdevinfo (3LIB),
+.BR attributes (7),
+.BR regex (7)

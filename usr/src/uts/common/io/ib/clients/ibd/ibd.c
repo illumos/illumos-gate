@@ -109,14 +109,14 @@
  * objects that can be plumbed and they alone participate in I/O and not the
  * port driver.
  *
- * There are some info ioctls supported in ibd which are used by dladm(1M) to
+ * There are some info ioctls supported in ibd which are used by dladm(8) to
  * display useful information. The info entry point for ibd is
  * ibd_get_partition_info().
  *
  * 2. Late HCA initialization feature.
  * ------------------------------------
  * As mentioned in section 1, the user creates the partition objects via
- * dladm(1M). It is possible that:
+ * dladm(8). It is possible that:
  * a) The physical port itself is down and the SM cannot be reached.
  * b) The PKEY specified by the used has not been created in the SM yet.
  * c) An IPoIB broadcast group for the specified PKEY is not present.

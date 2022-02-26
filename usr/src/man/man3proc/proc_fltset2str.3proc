@@ -116,4 +116,4 @@ is returned.
 .Xr proc_str2sys 3PROC ,
 .Xr proc_str2sysset 3PROC ,
 .Xr proc_sysname 3PROC ,
-.Xr proc 4
+.Xr proc 5

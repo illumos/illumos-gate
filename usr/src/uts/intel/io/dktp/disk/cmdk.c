@@ -948,7 +948,7 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 		 * This is not an update mechanism to add bad blocks
 		 * to the bad block structures stored on disk.
 		 *
-		 * addbadsec(1M) will update the bad block data on disk
+		 * addbadsec(8) will update the bad block data on disk
 		 * and use this ioctl to force the driver to re-initialize
 		 * the list of bad blocks in the driver.
 		 */

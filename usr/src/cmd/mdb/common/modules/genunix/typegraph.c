@@ -2383,7 +2383,7 @@ typegraph(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (!mdb_prop_postmortem) {
 		mdb_warn("typegraph: can only be run on a system "
-		    "dump; see dumpadm(1M)\n");
+		    "dump; see dumpadm(8)\n");
 		return (DCMD_ERR);
 	}
 

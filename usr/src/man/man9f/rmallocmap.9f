@@ -99,7 +99,9 @@ interrupt context.
 .SH SEE ALSO
 .sp
 .LP
-\fBrmalloc\fR(9F), \fBrmalloc_wait\fR(9F), \fBrmfree\fR(9F)
+.BR rmalloc (9F),
+.BR rmalloc_wait (9F),
+.BR rmfree (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

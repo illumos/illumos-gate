@@ -1,4 +1,3 @@
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # CDDL HEADER START
 #
@@ -24,14 +23,14 @@
 #
 # /etc/default/syslogd
 #
-# Legacy configuration file for syslogd(1M). See syslogd(1M).
+# Legacy configuration file for syslogd(8). See syslogd(8).
 #
 # This file should no longer be directly used to configure syslogd. 
 # These settings are kept here for backwards compatibility only. 
-# Please use svccfg(1M) to modify the properties of syslogd(1M).
+# Please use svccfg(8) to modify the properties of syslogd(8).
 #
 # The LOG_FROM_REMOTE setting used to affect the logging of remote
-# messages. Its definition here will override the svccfg(1M) settings
+# messages. Its definition here will override the svccfg(8) settings
 # for log_from_remote.
 #
 #LOG_FROM_REMOTE=YES

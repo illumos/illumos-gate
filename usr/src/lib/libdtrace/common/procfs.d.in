@@ -32,7 +32,7 @@
 #pragma D depends_on module procfs
 
 /*
- * The following miscellaneous constants are used by the proc(4) translators
+ * The following miscellaneous constants are used by the proc(5) translators
  * defined below.  These are assigned the latest values from the system .h's.
  */
 inline char SSLEEP = @SSLEEP@;
@@ -207,7 +207,7 @@ inline int POLL_HUP = @POLL_HUP@;
 #pragma D binding "1.0" POLL_HUP
 
 /*
- * Translate from the kernel's proc_t structure to a proc(4) psinfo_t struct.
+ * Translate from the kernel's proc_t structure to a proc(5) psinfo_t struct.
  * We do not provide support for pr_size, pr_rssize, pr_pctcpu, and pr_pctmem.
  * We also do not fill in pr_lwp (the lwpsinfo_t for the representative LWP)
  * because we do not have the ability to select and stop any representative.
@@ -252,7 +252,7 @@ translator psinfo_t < proc_t *T > {
 };
 
 /*
- * Translate from the kernel's kthread_t structure to a proc(4) psinfo_t
+ * Translate from the kernel's kthread_t structure to a proc(5) psinfo_t
  * struct.  Lacking a facility to define one translator only in terms of
  * another, we explicitly define each member by using the proc_t-to-psinfo_t
  * translator, above; any members added to that translator should also be
@@ -287,7 +287,7 @@ translator psinfo_t < kthread_t *T > {
 };
 
 /*
- * Translate from the kernel's kthread_t structure to a proc(4) lwpsinfo_t.
+ * Translate from the kernel's kthread_t structure to a proc(5) lwpsinfo_t.
  * We do not provide support for pr_nice, pr_oldpri, pr_cpu, or pr_pctcpu.
  * Also, for the moment, pr_start and pr_time are not supported, but these
  * could be supported by DTrace in the future using subroutines.

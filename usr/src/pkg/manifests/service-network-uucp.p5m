@@ -107,16 +107,16 @@ link path=usr/share/man/man1c/uupick.1c target=uuto.1c
 file path=usr/share/man/man1c/uustat.1c
 file path=usr/share/man/man1c/uuto.1c
 file path=usr/share/man/man1c/uux.1c
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/Uutry.1m
-file path=usr/share/man/man1m/in.uucpd.1m
-file path=usr/share/man/man1m/uucheck.1m
-file path=usr/share/man/man1m/uucico.1m
-file path=usr/share/man/man1m/uucleanup.1m
-link path=usr/share/man/man1m/uucpd.1m target=in.uucpd.1m
-file path=usr/share/man/man1m/uusched.1m
-link path=usr/share/man/man1m/uutry.1m target=Uutry.1m
-file path=usr/share/man/man1m/uuxqt.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/Uutry.8
+file path=usr/share/man/man8/in.uucpd.8
+file path=usr/share/man/man8/uucheck.8
+file path=usr/share/man/man8/uucico.8
+file path=usr/share/man/man8/uucleanup.8
+link path=usr/share/man/man8/uucpd.8 target=in.uucpd.8
+file path=usr/share/man/man8/uusched.8
+link path=usr/share/man/man8/uutry.8 target=Uutry.8
+file path=usr/share/man/man8/uuxqt.8
 dir  path=var group=sys
 dir  path=var/spool
 dir  path=var/spool/uucp owner=uucp group=uucp

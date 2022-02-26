@@ -1031,7 +1031,7 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			    " I/O\n"
 			    " For more information, read about "
 			    " tape-driver-buffering "
-			    "property in the st(7d) man page\n");
+			    "property in the st(4D) man page\n");
 		}
 	}
 

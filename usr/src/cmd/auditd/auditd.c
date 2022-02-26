@@ -34,7 +34,7 @@
  * used for the child to tell the parent that audit is ready.
  *
  * Configuration data comes from audit service configuration
- * (AUDITD_FMRI/smf(5)) and the auditon system call.
+ * (AUDITD_FMRI/smf(7)) and the auditon system call.
  *
  * The major errors are EBUSY (auditing is already in use) and EINTR
  * (one of the above signals was received).  File space errors are
@@ -273,7 +273,7 @@ main(int argc, char *argv[])
 	 */
 	(void) umask(007);
 
-	if (__logpost("")) {	/* Cannot unlink pointer to audit.log(4) file */
+	if (__logpost("")) {	/* Cannot unlink pointer to audit.log(5) file */
 		DPRINT((dbfp, "logpost failed\n"));
 		auditd_exit(1);
 	}
@@ -285,7 +285,7 @@ main(int argc, char *argv[])
 	while (running) {
 		/*
 		 * Read auditd / auditd plugins related configuration from
-		 * smf(5) repository and create plugin lists.
+		 * smf(7) repository and create plugin lists.
 		 *
 		 * loadauditlist() and auditd_thread_init() are called
 		 * while under the plugin_mutex lock to avoid a race
@@ -399,7 +399,7 @@ main(int argc, char *argv[])
 			 * over unless audit configuration actually changed.
 			 *
 			 * They want to reread the audit configuration from
-			 * smf(5) repository (AUDITD_FMRI). Set reset_list
+			 * smf(7) repository (AUDITD_FMRI). Set reset_list
 			 * which will return us to the main while loop in the
 			 * main routine.
 			 */
@@ -579,7 +579,7 @@ init_plugin(char *name, kva_t *list, int cnt_flag)
 }
 
 /*
- * loadauditlist() - read the auditd plugin configuration from smf(5) and
+ * loadauditlist() - read the auditd plugin configuration from smf(7) and
  * prepare appropriate plugin related structures (plugin_t). Set cnt policy here
  * based on currently active policy settings. (future could have a policy =
  * {+|-}cnt entry per plugin with auditconfig providing the default)
@@ -814,7 +814,7 @@ fail:
 
 /*
  * conf_to_kernel() - configure the event to class mapping; see also
- * auditconfig(1M) -conf option.
+ * auditconfig(8) -conf option.
  */
 static void
 conf_to_kernel(void)

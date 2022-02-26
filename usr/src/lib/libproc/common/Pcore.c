@@ -2171,7 +2171,7 @@ core_exec_open(const char *path, void *efp)
 /*
  * Attempt to load any section headers found in the core file.  If present,
  * this will refer to non-loadable data added to the core file by the kernel
- * based on coreadm(1M) settings, including CTF data and the symbol table.
+ * based on coreadm(8) settings, including CTF data and the symbol table.
  */
 static void
 core_load_shdrs(struct ps_prochandle *P, elf_file_t *efp)

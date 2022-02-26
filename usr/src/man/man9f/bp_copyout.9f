@@ -78,5 +78,8 @@ The \fBbp_copyout()\fR function can be called from user or kernel context only.
 .SH SEE ALSO
 .sp
 .LP
-\fBbp_copyin\fR(9F), \fBbp_mapin\fR(9F), \fBbp_mapout\fR(9F),
-\fBddi_copyout\fR(9F), \fBbuf\fR(9S)
+.BR bp_copyin (9F),
+.BR bp_mapin (9F),
+.BR bp_mapout (9F),
+.BR ddi_copyout (9F),
+.BR buf (9S)

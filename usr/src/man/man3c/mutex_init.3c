@@ -253,7 +253,7 @@ PTHREAD_MUTEX_ERRORCHECK\fR type.
 The \fBLOCK_PRIO_INHERIT\fR attribute is the same as the POSIX
 \fBPTHREAD_PRIO_INHERIT\fR attribute. The \fBLOCK_PRIO_PROTECT\fR attribute is
 the same as the POSIX \fBPTHREAD_PRIO_PROTECT\fR attribute. See
-\fBpthread_mutexattr_getprotocol\fR(3C),
+.BR pthread_mutexattr_getprotocol (3C),
 \fBpthread_mutexattr_getprioceiling\fR(3C), and
 \fBpthread_mutex_getprioceiling\fR(3C) for a full discussion. The
 \fBLOCK_PRIO_INHERIT\fR and \fBLOCK_PRIO_PROTECT\fR attributes are mutually
@@ -938,7 +938,7 @@ free(r);                /* then free memory */
 If the mutex is not destroyed, the program could have memory leaks.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -955,11 +955,17 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBmmap\fR(2), \fBshmop\fR(2), \fBpthread_mutexattr_getprioceiling\fR(3C),
-\fBpthread_mutexattr_getprotocol\fR(3C), \fBpthread_mutexattr_getrobust\fR(3C),
-\fBpthread_mutexattr_gettype\fR(3C), \fBpthread_mutex_getprioceiling\fR(3C),
-\fBpthread_mutex_init\fR(3C), \fBattributes\fR(5), \fBmutex\fR(5),
-\fBstandards\fR(5)
+.BR mmap (2),
+.BR shmop (2),
+.BR pthread_mutex_getprioceiling (3C),
+.BR pthread_mutex_init (3C),
+.BR pthread_mutexattr_getprioceiling (3C),
+.BR pthread_mutexattr_getprotocol (3C),
+.BR pthread_mutexattr_getrobust (3C),
+.BR pthread_mutexattr_gettype (3C),
+.BR attributes (7),
+.BR mutex (7),
+.BR standards (7)
 .SH NOTES
 .LP
 Previous releases of Solaris provided the \fBUSYNC_PROCESS_ROBUST\fR mutex

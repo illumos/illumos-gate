@@ -39,8 +39,8 @@ $(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/a5k_g_fc_i18n_cat
 $(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/ibfirmware
 dir  path=usr/sbin
 file path=usr/sbin/luxadm mode=0555 variant.opensolaris.zone=global
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/luxadm.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/luxadm.8
 legacy pkg=SUNWluxop \
     desc="Sun Enterprise Network Array firmware and utilities" \
     name="Sun Enterprise Network Array firmware and utilities"

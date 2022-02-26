@@ -16,7 +16,7 @@ rcapstat \- report resource cap enforcement daemon statistics
 .sp
 .LP
 The \fBrcapstat\fR command reports on the projects or zones capped by
-\fBrcapd\fR(1M). Each report contains statistics that pertain to the project or
+\fBrcapd\fR(8). Each report contains statistics that pertain to the project or
 zone and paging statistics. Paging refers to the act of relocating portions of
 memory, called pages, to or from physical memory. \fBrcapd\fR pages out the
 most infrequently used pages.
@@ -40,7 +40,7 @@ The following options are supported:
 .ad
 .RS 12n
 Global statistics. Reports the minimum memory utilization for memory cap
-enforcement (see \fBrcapadm\fR(1M)) and reports current memory utilization as a
+enforcement (see \fBrcapadm\fR(8)) and reports current memory utilization as a
 percentage of installed physical memory.
 .RE
 
@@ -145,7 +145,7 @@ does not account for shared pages.
 \fB\fBcap\fR\fR
 .ad
 .RS 11n
-The \fBRSS\fR cap for the project or zone. See \fBrcapd\fR(1M) for information
+The \fBRSS\fR cap for the project or zone. See \fBrcapd\fR(8) for information
 about how to specify memory caps.
 .RE
 
@@ -169,7 +169,7 @@ from physical memory. \fBrcapd\fR pages out the most infrequently used pages.
 .RS 11n
 The average amount of memory that \fBrcapd\fR attempted to page out during
 each sample cycle. The rate at which \fBrcapd\fR samples \fBRSS\fR can be set
-with \fBrcapadm\fR(1M).
+with \fBrcapadm\fR(8).
 .RE
 
 .sp
@@ -328,7 +328,7 @@ example% \fBrcapstat 5 5\fR
 .LP
 By inhibiting cap enforcement, either by raising the cap of a project or by
 changing the minimum physical  memory utilization for cap enforcement (see
-\fBrcapadm\fR(1M)), the resident set can become the working set. The \fBrss\fR
+\fBrcapadm\fR(8)), the resident set can become the working set. The \fBrss\fR
 column might stabilize to show the project \fBWSS\fR, as shown in the previous
 example. The \fBWSS\fR is the minimum cap value that allows the project's
 processes to operate without perpetually incurring page faults.
@@ -367,7 +367,9 @@ Invalid command-line options were specified.
 .SH SEE ALSO
 .sp
 .LP
-\fBrcapadm\fR(1M), \fBrcapd\fR(1M), \fBattributes\fR(5)
+.BR attributes (7),
+.BR rcapadm (8),
+.BR rcapd (8)
 .sp
 .LP
 \fIPhysical Memory Control Using the Resource Capping Daemon\fR in \fISystem
@@ -376,7 +378,7 @@ Administration Guide: Resource Management\fR
 .sp
 .LP
 If the interval specified to \fBrcapstat\fR is shorter than the reporting
-interval specified to \fBrcapd\fR (with \fBrcapadm\fR(1M)), the output for some
+interval specified to \fBrcapd\fR (with \fBrcapadm\fR(8)), the output for some
 intervals can be zero. This is because \fBrcapd\fR does not update statistics
 more frequently than the interval specified with \fBrcapadm\fR, and this
 interval is independent of (and less precise than) the sampling interval used

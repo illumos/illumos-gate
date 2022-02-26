@@ -33,7 +33,7 @@ function returns the status information about the process handle
 The
 .Sy pstatus_t
 structure is defined in
-.Xr proc 4
+.Xr proc 5
 and contains information about the process including its flags, the
 number of threads, the size of the stack, and more.
 .Pp
@@ -57,4 +57,4 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr Prelease 3PROC ,
-.Xr proc 4
+.Xr proc 5

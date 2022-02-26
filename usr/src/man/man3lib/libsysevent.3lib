@@ -19,7 +19,7 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lsysevent\fR [ \fIlibrary\fR... ]
 Functions in this library extract specific identifier, publisher, and attribute
 information from a system event (sysevent) handle, defined as \fBsysevent_t\fR,
 and allow privileged user-level applications to queue system events for
-delivery to the system event daemon, \fBsyseventd\fR(1M).
+delivery to the system event daemon, \fBsyseventd\fR(8).
 .sp
 .LP
 The \fBlibsysevent\fR interfaces do not work at all in non-global zones.
@@ -71,7 +71,7 @@ shared object
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -88,4 +88,6 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBsyseventd\fR(1M), \fBIntro\fR(3), \fBattributes\fR(5)
+.BR Intro (3),
+.BR attributes (7),
+.BR syseventd (8)

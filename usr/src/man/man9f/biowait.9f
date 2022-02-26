@@ -70,7 +70,10 @@ the error number which it returns.
 .SH SEE ALSO
 .sp
 .LP
-\fBbiodone\fR(9F), \fBgeterror\fR(9F), \fBgetrbuf\fR(9F), \fBbuf\fR(9S)
+.BR biodone (9F),
+.BR geterror (9F),
+.BR getrbuf (9F),
+.BR buf (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

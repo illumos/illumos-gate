@@ -24,7 +24,7 @@ where caller provides /proc functionality
 .SH DESCRIPTION
 The interfaces  \fBtnfctl_indirect_open()\fR and \fBtnfctl_check_libs()\fR are
 used to control probes in another process where the \fBlibtnfctl\fR(3TNF)
-client has already opened  \fBproc\fR(4) on the target process. An example of
+client has already opened  \fBproc\fR(5) on the target process. An example of
 this is when the client is a debugger. Since these clients already use
 \fB/proc\fR on the target, \fBlibtnfctl\fR(3TNF) cannot use \fB/proc\fR
 directly.  Therefore, these clients must provide callback functions that can be
@@ -173,7 +173,7 @@ An internal error occurred.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -187,10 +187,16 @@ MT Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBprex\fR(1), \fBTNF_PROBE\fR(3TNF), \fBdlclose\fR(3C), \fBdlopen\fR(3C),
-\fBlibtnfctl\fR(3TNF), \fBtnfctl_probe_enable\fR(3TNF),
-\fBtnfctl_probe_trace\fR(3TNF), \fBtracing\fR(3TNF), \fBproc\fR(4),
-\fBattributes\fR(5)
+.BR prex (1),
+.BR dlclose (3C),
+.BR dlopen (3C),
+.BR TNF_PROBE (3TNF),
+.BR libtnfctl (3TNF),
+.BR tnfctl_probe_enable (3TNF),
+.BR tnfctl_probe_trace (3TNF),
+.BR tracing (3TNF),
+.BR proc (5),
+.BR attributes (7)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

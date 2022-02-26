@@ -495,7 +495,7 @@ main(int argc, char *argv[])
 
 	if (!fg && getenv("SMF_FMRI") == NULL) {
 		(void) fprintf(stderr,
-		    "ipmgmtd is a smf(5) managed service and cannot be run "
+		    "ipmgmtd is a smf(7) managed service and cannot be run "
 		    "from the command line.\n");
 		return (EINVAL);
 	}

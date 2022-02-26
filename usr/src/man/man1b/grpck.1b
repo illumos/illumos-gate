@@ -15,7 +15,7 @@ grpck \- check group database entries
 .SH DESCRIPTION
 .sp
 .LP
-The \fBgrpck\fR utility checks that a file in \fBgroup\fR(4) does not contain
+The \fBgrpck\fR utility checks that a file in \fBgroup\fR(5) does not contain
 any errors; it checks the \fB/etc/group\fR file by default.
 .SH FILES
 .sp
@@ -24,7 +24,10 @@ any errors; it checks the \fB/etc/group\fR file by default.
 .SH SEE ALSO
 .sp
 .LP
-\fBgroups\fR(1), \fBgroup\fR(4), \fBpasswd\fR(4), \fBattributes\fR(5)
+.BR groups (1),
+.BR group (5),
+.BR passwd (5),
+.BR attributes (7)
 .SH DIAGNOSTICS
 .sp
 .ne 2

@@ -44,7 +44,7 @@
   <xi:include href='file:/etc/svc/profile/name_service.xml' />
 
   <!--
-      svc.startd(1M) services
+      svc.startd(8) services
   -->
   <service name='system/coreadm' version='1' type='service'>
     <instance name='default' enabled='true'/>
@@ -201,7 +201,7 @@
   </service>
 
   <!--
-	default inetd(1M) services
+	default inetd(8) services
   -->
   <service name='network/finger' version='1' type='service'>
     <instance name='default' enabled='false'/>
@@ -220,7 +220,7 @@
   </service>
 
   <!--
-	non-default inetd(1M) services
+	non-default inetd(8) services
   -->
   <service name='network/uucp' version='1' type='service'>
     <instance name='default' enabled='false'/>
@@ -262,7 +262,7 @@
   </service>
 
   <!--
-	default inetd(1M) RPC services enabled
+	default inetd(8) RPC services enabled
   -->
   <service name='network/rpc/gss' version='1' type='service'>
     <instance name='default' enabled='true'/>
@@ -278,7 +278,7 @@
   </service>
 
   <!--
-	default inetd(1M) RPC services disabled
+	default inetd(8) RPC services disabled
   -->
   <service name='network/rpc/rstat' version='1' type='service'>
     <instance name='default' enabled='false'/>
@@ -288,7 +288,7 @@
   </service>
 
   <!--
-	non-default inetd(1M) RPC services disabled
+	non-default inetd(8) RPC services disabled
   -->
   <service name='network/rpc/rex' version='1' type='service'>
     <instance name='default' enabled='false'/>

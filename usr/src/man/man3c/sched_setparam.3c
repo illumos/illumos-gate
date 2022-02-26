@@ -139,7 +139,7 @@ No process can be found corresponding to that specified by \fIpid\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -153,12 +153,18 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(2), \fBexec\fR(2), \fBlibrt\fR(3LIB), \fBsched.h\fR(3HEAD),
-\fBsched_getparam\fR(3C), \fBsched_getscheduler\fR(3C),
-\fBsched_setscheduler\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR Intro (2),
+.BR exec (2),
+.BR sched_getparam (3C),
+.BR sched_getscheduler (3C),
+.BR sched_setscheduler (3C),
+.BR sched.h (3HEAD),
+.BR librt (3LIB),
+.BR attributes (7),
+.BR standards (7)

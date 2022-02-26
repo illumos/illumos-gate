@@ -1,7 +1,7 @@
 Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 
 The /usr/share/lib/zoneinfo/src directory contains zoneinfo timezone source
-files.  These source files have been compiled using zic(1M) to create
+files.  These source files have been compiled using zic(8) to create
 the zoneinfo data files in /usr/share/lib/zoneinfo.  The zic command can be
 used with the zoneinfo source files to create additional data files.
 
@@ -13,7 +13,7 @@ the zoneinfo files is based on tzdata2010k.tar.gz.
 The /usr/share/lib/zoneinfo/GMT[+-]* timezones listed below have been
 removed from the release.  Replace usage of the
 /usr/share/lib/zoneinfo/GMT[+-]* files with the equivalent quoted timezone
-(see environ(5)).  Note the signs of the offsets of the equivalent quoted
+(see environ(7)).  Note the signs of the offsets of the equivalent quoted
 timezone are reversed from the signs of the /usr/share/lib/zoneinfo/GMT[+-]*
 files.
 
@@ -63,5 +63,5 @@ offset from standard time, and could return incorrect values.  This affects
 64-bit versions of interfaces such as ascftime(3C), cftime(3C), ctime(3C),
 getdate(3C), ftime(3C), mktime(3C), and localtime(3C).
 
-For more information see zic(1M), zdump(1M), environ(5), TIMEZONE(4),
+For more information see zic(8), zdump(8), environ(7), TIMEZONE(5),
 ctime(3C), and mktime(3C) man pages.

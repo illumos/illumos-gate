@@ -96,7 +96,7 @@ fi
 
 #
 # Now run dumpadm to configure the dump device based on the settings
-# previously saved by dumpadm.  See dumpadm(1m) for instructions on
+# previously saved by dumpadm.  See dumpadm(8) for instructions on
 # how to modify the dump settings.
 #
 if [ -x /usr/sbin/dumpadm ]; then

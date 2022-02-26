@@ -1,0 +1,382 @@
+'\" te
+.\" Copyright (c) 2007 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH POLL 4D "January 10, 2020"
+.SH NAME
+poll \- driver for fast poll on many file descriptors
+.SH SYNOPSIS
+.nf
+\fB#include <sys/devpoll.h>
+int fd = open("/dev/poll", O_RDWR);
+ssize_t n = write(int fd, struct pollfd buf[], int bufsize);
+int n = ioctl(int fd, DP_POLL, struct dvpoll* arg);
+int n = ioctl(int fd, DP_ISPOLLED, struct pollfd* pfd);\fR
+.fi
+
+.SH PARAMETERS
+.ne 2
+.na
+\fB\fIfd\fR \fR
+.ad
+.RS 12n
+Open file descriptor that refers to the  \fB/dev/poll\fR driver.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpath\fR \fR
+.ad
+.RS 12n
+\fB/dev/poll\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIbuf\fR \fR
+.ad
+.RS 12n
+Array of  \fBpollfd\fR structures.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIbufsize\fR \fR
+.ad
+.RS 12n
+Size of  \fIbuf\fR in bytes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIarg\fR \fR
+.ad
+.RS 12n
+Pointer to  \fBpollcall\fR structure.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpfd\fR \fR
+.ad
+.RS 12n
+Pointer to \fBpollfd\fR structure.
+.RE
+
+.SH DESCRIPTION
+The  \fB/dev/poll\fR driver is a special driver that enables you to monitor
+multiple sets  of polled file descriptors. By using the  \fB/dev/poll\fR
+driver, you can efficiently poll large numbers of file descriptors. Access to
+the \fB/dev/poll\fR driver is provided through \fBopen\fR(2), \fBwrite\fR(2),
+and  \fBioctl(2)\fR system calls.
+.sp
+.LP
+Writing an array of  \fBpollfd\fR struct to the  \fB/dev/poll\fR driver has the
+effect of  adding these file descriptors to the monitored \fBpoll\fR file
+descriptor set  represented by the \fIfd\fR. To monitor multiple file
+descriptor sets, open the \fB/dev/poll\fR driver multiple times. Each \fBfd\fR
+corresponds to one set. For each \fBpollfd\fR struct entry (defined in
+\fBsys/poll.h\fR):
+.sp
+.in +2
+.nf
+ struct pollfd {
+    int  fd;
+    short events;
+    short revents;
+ }
+.fi
+.in -2
+
+.sp
+.LP
+The  \fBfd\fR field specifies the file descriptor being polled. The
+\fBevents\fR field indicates the interested \fBpoll\fR \fBevents\fR on the file
+descriptor. If a \fBpollfd\fR array contains multiple \fBpollfd\fR entries with
+the same \fBfd\fR field, the "events" field in each \fBpollfd\fR entry is
+OR'ed. A special \fBPOLLREMOVE\fR event in the \fBevents\fR field of the
+\fBpollfd\fR structure removes the \fBfd\fR from the monitored set. The
+\fBrevents\fR field is not used. Write returns the  number of bytes written
+successfully or \fB-1\fR when write fails.
+.sp
+.LP
+The \fBDP_POLL\fR ioctl is used to retrieve returned \fBpoll\fR \fBevents\fR
+occurred on the  polled file descriptors in the monitored set represented by
+\fIfd\fR. \fIarg\fR \fIis\fR \fIa\fR pointer to the devpoll structures which
+are defined as follows:
+.sp
+.in +2
+.nf
+ struct dvpoll {
+     struct pollfd* dp_fds;
+     int dp_nfds;
+     int dp_timeout;
+ }
+.fi
+.in -2
+
+.sp
+.LP
+The  \fBdp_fds\fR points to a buffer that holds an array of returned
+\fBpollfd\fR structures. The \fBdp_nfds\fR field specifies the size of the
+buffer in terms of the  number of \fBpollfd\fR entries it contains. The
+\fBdp_nfds\fR field also indicates the maximum number of file descriptors from
+which poll information can be obtained. If there is no interested  \fBevents\fR
+on any of the polled file descriptors, the \fBDP_POLL\fR ioctl call will wait
+\fBdp_timeout\fR milliseconds before returning. If \fBdp_timeout\fR is
+\fB0\fR, the ioctl call returns immediately. If \fBdp_timeout\fR is \fB-1\fR,
+the call blocks until an interested \fBpoll\fR \fBevents\fR is available or the
+call is interrupted. Upon return, if the ioctl call has failed, \fB-1\fR is
+returned. The memory content pointed by \fBdp_fds\fR is not modified. A return
+value \fB0\fR means the ioctl is timed out. In this case, the memory content
+pointed by  \fBdp_fds\fR is not modified. If the call is successful, it returns
+the number of valid \fBpollfd\fR entries in  the array pointed by \fBdp_fds\fR;
+the contents of the rest of the buffer is undefined. For each valid
+\fBpollfd\fR entry, the \fBfd\fR field indicates the file descriptor on which
+the polled \fBevents\fR happened. The  \fBevents\fR field is the user specified
+\fBpoll\fR \fBevents\fR. The \fBrevents\fR field contains the  \fBevents\fR
+occurred. \fB-1\fR is returned if the  call fails.
+.sp
+.LP
+\fBDP_ISPOLLED\fR ioctl allows you to query if a file descriptor is already in
+the  monitored set represented by  \fBfd\fR. The \fBfd\fR field of the
+\fBpollfd\fR structure indicates the file descriptor of interest. The
+\fBDP_ISPOLLED\fR ioctl returns  \fB1\fR if the file descriptor is in the set.
+The \fBevents\fR field contains  \fB0\fR. The \fBrevents\fR field contains the
+currently polled \fBevents\fR. The ioctl returns  \fB0\fR if the file
+descriptor is not in the set. The  \fBpollfd\fR structure pointed by  \fIpfd\fR
+is not modified. The ioctl returns a  \fB-1\fR if the call fails.
+.SH EXAMPLES
+The following example shows how  \fB/dev/poll\fR may be used.
+.sp
+.in +2
+.nf
+{
+        ...
+        /*
+         * open the driver
+         */
+        if ((wfd = open("/dev/poll", O_RDWR)) < 0) {
+                exit(-1);
+        }
+        pollfd = (struct pollfd* )malloc(sizeof(struct pollfd) * MAXBUF);
+        if (pollfd == NULL) {
+                close(wfd);
+                exit(-1);
+        }
+        /*
+         * initialize buffer
+         */
+        for (i = 0; i < MAXBUF; i++) {
+                pollfd[i].fd = fds[i];
+                pollfd[i].events = POLLIN;
+                pollfd[i].revents = 0;
+        }
+        if (write(wfd, &pollfd[0], sizeof(struct pollfd) * MAXBUF) !=
+                        sizeof(struct pollfd) * MAXBUF) {
+                perror("failed to write all pollfds");
+                close (wfd);
+                free(pollfd);
+                exit(-1);
+        }
+        /*
+         * read from the devpoll driver
+         */
+        dopoll.dp_timeout = -1;
+        dopoll.dp_nfds = MAXBUF;
+        dopoll.dp_fds = pollfd;
+        result = ioctl(wfd, DP_POLL, &dopoll);
+        if (result < 0) {
+                perror("/dev/poll ioctl DP_POLL failed");
+                close (wfd);
+                free(pollfd);
+                exit(-1);
+        }
+        for (i = 0; i < result; i++) {
+                read(dopoll.dp_fds[i].fd, rbuf, STRLEN);
+        }
+ ...
+}
+.fi
+.in -2
+
+.sp
+.LP
+The following example is part of a test program which shows how
+\fBDP_ISPOLLED()\fR ioctl may be used.
+.sp
+.in +2
+.nf
+{
+	...
+
+        loopcnt = 0;
+        while (loopcnt < ITERATION) {
+                rn = random();
+                rn %= RANGE;
+                if (write(fds[rn], TESTSTRING, strlen(TESTSTRING)) !=
+                                strlen(TESTSTRING)) {
+                        perror("write to fifo failed.");
+                        close (wfd);
+                        free(pollfd);
+                        error = 1;
+                        goto out1;
+                }
+                dpfd.fd = fds[rn];
+                dpfd.events = 0;
+                dpfd.revents = 0;
+                result = ioctl(wfd, DP_ISPOLLED, &dpfd);
+                if (result < 0) {
+                        perror("/dev/poll ioctl DP_ISPOLLED failed");
+                        printf("errno = %d\en", errno);
+                        close (wfd);
+                        free(pollfd);
+                        error = 1;
+                        goto out1;
+                }
+                if (result != 1) {
+                        printf("DP_ISPOLLED returned incorrect result: %d.\en",
+                                result);
+                        close (wfd);
+                        free(pollfd);
+                        error = 1;
+                        goto out1;
+                }
+                if (dpfd.fd != fds[rn]) {
+                        printf("DP_ISPOLLED returned wrong fd %d, expect %d\en",
+                                dpfd.fd, fds[rn]);
+                        close (wfd);
+                        free(pollfd);
+                        error = 1;
+                        goto out1;
+ }
+                if (dpfd.revents != POLLIN) {
+                        printf("DP_ISPOLLED returned unexpected revents %d\en",
+                                dpfd.revents);
+                        close (wfd);
+                        free(pollfd);
+                        error = 1;
+                        goto out1;
+                }
+                if (read(dpfd.fd, rbuf, strlen(TESTSTRING)) !=
+                                strlen(TESTSTRING)) {
+                        perror("read from fifo failed");
+                        close (wfd);
+                        free(pollfd);
+                        error = 1;
+                        goto out1;
+                }
+                loopcnt++;
+        }
+
+.fi
+.in -2
+
+.SH ERRORS
+.ne 2
+.na
+\fB\fBEACCES\fR \fR
+.ad
+.RS 11n
+A process does not have permission to access the content cached in
+\fB/dev/poll\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINTR\fR \fR
+.ad
+.RS 11n
+A signal was caught during the execution of the \fBioctl\fR(2) function.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEFAULT\fR \fR
+.ad
+.RS 11n
+The request argument requires a data transfer to or from a buffer pointed to by
+\fIarg\fR, but \fIarg\fR points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR \fR
+.ad
+.RS 11n
+The request or \fIarg\fR parameter is not valid for  this device, or field of
+the dvpoll struct pointed by \fIarg\fR is not valid  (for example, when using
+write/pwrite dp_nfds is greater than {OPEN_MAX}, or when using the DPPOLL ioctl
+dp_nfds is greater than or equal to {OPEN_MAX}}.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENXIO\fR \fR
+.ad
+.RS 11n
+The \fBO_NONBLOCK\fR flag is set, the named file is a FIFO, the \fBO_WRONLY\fR
+flag is set, and no process has the file open for reading; or the named file is
+a character special or block special file and the device associated with this
+special file does not exist.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+l l
+l l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Architecture	SPARC, x86
+Interface Stability	Obsolete
+MT-Level	Safe
+.TE
+
+.SH SEE ALSO
+.BR open (2),
+.BR poll (2),
+.BR write (2),
+.BR attributes (7)
+.SH NOTES
+The \fB/dev/poll\fR API is particularly beneficial to applications that poll a
+large number of file descriptors repeatedly.  Applications will exhibit the
+best performance gain if the polled file descriptor list rarely change.
+.sp
+.LP
+When using the \fB/dev/poll\fR driver, you should remove a closed file
+descriptor from a monitored poll set. Failure to do so may result in a
+\fBPOLLNVAL\fR \fBrevents\fR being returned for the closed file descriptor.
+When a file descriptor is closed but not removed from the monitored set, and is
+reused in subsequent open of a different device, you will be polling the device
+associated with the reused file descriptor. In a multithreaded application,
+careful coordination among threads doing close and \fBDP_POLL\fR ioctl is
+recommended for consistent results.
+.sp
+.LP
+The \fB/dev/poll\fR driver caches a list of polled file descriptors, which are
+specific to a process. Therefore, the  \fB/dev/poll\fR file descriptor of a
+process will be inherited by its child process, just like any other file
+descriptors. But the child process will have very limited access through this
+inherited \fB/dev/poll\fR file descriptor. Any attempt to write or do ioctl by
+the child process will result in an \fBEACCES\fR error. The child process
+should close the inherited  \fB/dev/poll\fR file descriptor and open its own if
+desired.
+.sp
+.LP
+The  \fB/dev/poll\fR driver does not yet support polling. Polling on a
+\fB/dev/poll\fR file descriptor will result in \fBPOLLERR\fR being returned in
+the \fBrevents\fR field of \fBpollfd\fR structure.

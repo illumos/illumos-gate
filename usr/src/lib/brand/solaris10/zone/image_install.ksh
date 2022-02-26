@@ -59,7 +59,7 @@ $(gettext "you must specify an installation source using '-a', '-d' or '-r'.\n%s
 cfgchoice_missing=\
 $(gettext "you must specify -u (sys-unconfig) or -p (preserve identity).\n%s")
 
-mount_failed=$(gettext "ERROR: zonecfg(1M) 'fs' mount failed")
+mount_failed=$(gettext "ERROR: zonecfg(8) 'fs' mount failed")
 
 not_flar=$(gettext "Input is not a flash archive")
 bad_flar=$(gettext "Flash archive is a corrupt")

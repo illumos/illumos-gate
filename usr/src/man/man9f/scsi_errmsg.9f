@@ -210,8 +210,11 @@ ASC: 0x29 (reset), ASCQ: 0x0, FRU: 0x0\fR
 .in -2
 
 .SH SEE ALSO
-\fBcmn_err\fR(9F), \fBscsi_log\fR(9F), \fBscsi_device\fR(9S),
-\fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
+.BR cmn_err (9F),
+.BR scsi_log (9F),
+.BR scsi_device (9S),
+.BR scsi_extended_sense (9S),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

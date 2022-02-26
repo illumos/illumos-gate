@@ -339,7 +339,7 @@ of the \fIhints\fR structure should be set to \fBAF_INET\fR when
 \fBgetaddrinfo()\fR is called.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -356,7 +356,13 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBconnect\fR(3XNET), \fBgai_strerror\fR(3XNET), \fBgethostbyname\fR(3XNET),
-\fBgetnameinfo\fR(3XNET), \fBgetservbyname\fR(3XNET), \fBinet_addr\fR(3XNET),
-\fBinet_ntop\fR(3XNET), \fBsocket\fR(3XNET), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR connect (3XNET),
+.BR gai_strerror (3XNET),
+.BR gethostbyname (3XNET),
+.BR getnameinfo (3XNET),
+.BR getservbyname (3XNET),
+.BR inet_addr (3XNET),
+.BR inet_ntop (3XNET),
+.BR socket (3XNET),
+.BR attributes (7),
+.BR standards (7)

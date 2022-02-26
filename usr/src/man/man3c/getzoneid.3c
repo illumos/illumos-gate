@@ -108,7 +108,7 @@ The \fIbuf\fR argument points to an illegal address.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -126,5 +126,8 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(2), \fBchroot\fR(2), \fBmalloc\fR(3C), \fBattributes\fR(5),
-\fBzones\fR(5)
+.BR Intro (2),
+.BR chroot (2),
+.BR malloc (3C),
+.BR attributes (7),
+.BR zones (7)

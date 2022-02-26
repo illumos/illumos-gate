@@ -114,7 +114,7 @@ struct call_list {
  *
  * the variables should be accessed via library routines.
  *
- * see nlsgetcall(3X) and nlsprovider(3X).
+ * see nlsgetcall(3NSL) and nlsprovider(3NSL).
  */
 
 #define	NLSADDR		"NLSADDR"

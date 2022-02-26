@@ -34,7 +34,7 @@ with \fIdevice\fR to the \fBuid\fR of the current process.
 .sp
 .LP
 Only authorized users may allocate a device. The required authorizations are
-specified in \fBdevice_allocate\fR(4).
+specified in \fBdevice_allocate\fR(5).
 .sp
 .LP
 When the system is configured with Trusted Extensions, \fBallocate\fR runs the
@@ -165,7 +165,7 @@ An error occurred.
 \fB/etc/security/lib/*\fR
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -184,14 +184,19 @@ The invocation is Uncommitted. The options are Uncommitted. The output is
 Not-an-Interface.
 .SH SEE ALSO
 .LP
-\fBdeallocate\fR(1), \fBlist_devices\fR(1),
-\fBdminfo\fR(1M), \fBmkdevalloc\fR(1M), \fBmkdevmaps\fR(1M),
-\fBdevice_allocate\fR(4), \fBdevice_maps\fR(4), \fBattributes\fR(5)
+.BR deallocate (1),
+.BR list_devices (1),
+.BR device_allocate (5),
+.BR device_maps (5),
+.BR attributes (7),
+.BR dminfo (8),
+.BR mkdevalloc (8),
+.BR mkdevmaps (8)
 .SH NOTES
 .LP
 On systems configured with Trusted Extensions, the functionality is enabled by
 default.
 .sp
 .LP
-\fB/etc/security/dev\fR, \fBmkdevalloc\fR(1M), and \fBmkdevmaps\fR(1M) might
+\fB/etc/security/dev\fR, \fBmkdevalloc\fR(8), and \fBmkdevmaps\fR(8) might
 not be supported in a future release of the Solaris Operating Environment.

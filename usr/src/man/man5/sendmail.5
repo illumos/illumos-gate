@@ -1,0 +1,298 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SENDMAIL 5 "May 13, 2017"
+.SH NAME
+sendmail, sendmail.cf, submit.cf \- sendmail configuration files
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/mail/sendmail.cf\fR
+.fi
+
+.LP
+.nf
+\fB/etc/mail/submit.cf\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBsendmail.cf\fR and \fBsubmit.cf\fR files are the configuration files for
+\fBsendmail\fR(8). Starting with version 8.12 of \fBsendmail\fR, which was
+shipped with version 9 of the Solaris operating system, two configuration files
+are used for submission and transmission of mail, instead of only
+\fBsendmail.cf\fR, as before. These are:
+.sp
+.ne 2
+.na
+\fB\fBsendmail.cf\fR\fR
+.ad
+.RS 15n
+Remains the principal \fBsendmail\fR configuration file. Used for the Mail
+Transmission Agent (MTA).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsubmit.cf\fR\fR
+.ad
+.RS 15n
+Used for the Mail Submission Program (MSP). The MSP is used to submit mail
+messages. Unlike the MTA, it does not run as an SMTP daemon.
+.RE
+
+.sp
+.LP
+The MSP does not require root privileges, thus the two-file model provides
+better security than the pre-\fBsendmail\fR 8.12 model, in which the MSP ran as
+a daemon and required root privileges.
+.sp
+.LP
+In the default \fBsendmail\fR configuration, \fBsendmail\fR uses
+\fBsubmit.cf\fR, as indicated in \fBps\fR(1) output. In \fBps\fR output, you
+will observe two \fBsendmail\fR invocations, such as the ones below:
+.sp
+.in +2
+.nf
+/usr/lib/sendmail -Ac -q15m
+/usr/lib/sendmail -bd -q15m
+.fi
+.in -2
+
+.sp
+.LP
+The first indicates the use of \fBsubmit.cf\fR, with the client queue
+(\fB/var/spool/clientmqueue\fR) being checked\(emand, if needed,
+flushed\(emevery 15 minutes. The second invocation runs \fBsendmail\fR as a
+daemon, waiting for incoming SMTP connections.
+.sp
+.LP
+As shipped, \fBsendmail.cf\fR and, in particular, \fBsubmit.cf\fR, are
+appropriate for most environments. Where a knowledgeable system administrator
+needs to make a change, he should use the following procedures.
+.sp
+.LP
+For \fBsendmail.cf\fR:
+.RS +4
+.TP
+1.
+Change directories to the directory that contains the source files for the
+configuration files.
+.sp
+.in +2
+.nf
+# \fBcd /etc/mail/cf/cf\fR
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+2.
+Create a copy of the \fBsendmail\fR file for your system.
+.sp
+.in +2
+.nf
+# \fBcp sendmail.mc `hostname`.mc\fR
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+3.
+Edit \fB`hostname`.mc\fR. Make changes suitable for your system and
+environment.
+.RE
+.RS +4
+.TP
+4.
+Run \fBmake\fR to generate the configuration file.
+.sp
+.in +2
+.nf
+# \fB/usr/bin/make `hostname`.cf\fR
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+5.
+Copy the newly generated file to its correct location.
+.sp
+.in +2
+.nf
+# \fBcp `hostname`.cf /etc/mail/sendmail.cf\fR
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+6.
+Restart the \fBsendmail\fR service.
+.sp
+.in +2
+.nf
+# \fBsvcadm restart sendmail\fR
+.fi
+.in -2
+.sp
+
+.RE
+.sp
+.LP
+You must restart \fBsendmail\fR for \fBsendmail.cf\fR file changes to take
+effect, as indicated in step 6. Steps 4 - 6 can be automated. See \fBAutomated
+Rebuilding of Configuration Files\fR below.
+.sp
+.LP
+For \fBsubmit.cf\fR:
+.RS +4
+.TP
+1.
+Change directories to the directory that contains the source files for the
+configuration files.
+.sp
+.in +2
+.nf
+# \fBcd /etc/mail/cf/cf\fR
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+2.
+Create a copy of the \fBsubmit\fR file for your system.
+.sp
+.in +2
+.nf
+# \fBcp submit.mc submit-`hostname`.mc\fR
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+3.
+Edit \fBsubmit-`hostname`.mc\fR. Make changes suitable for your system and
+environment.
+.RE
+.RS +4
+.TP
+4.
+Run \fBmake\fR to generate the configuration file.
+.sp
+.in +2
+.nf
+# \fB/usr/bin/make submit-`hostname`.cf\fR
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+5.
+Copy the newly generated file to its correct location.
+.sp
+.in +2
+.nf
+# \fBcp submit-`hostname`.cf /etc/mail/submit.cf\fR
+.fi
+.in -2
+.sp
+
+.RE
+.sp
+.LP
+You do not need to restart \fBsendmail\fR for changes to \fBsubmit.cf\fR to
+take effect.  Steps 4 and 5 can be automated. See \fBAutomated Rebuilding of
+Configuration Files\fR below.
+.SS "Enabling Access to Remote Clients"
+.LP
+The \fBsendmail\fR(8) man page describes how the \fBconfig/local_only\fR
+property can be set to \fBtrue\fR or \fBfalse\fR to disallow or allow,
+respectively, access to remote clients for unmodified systems.
+.sp
+.LP
+Setting values for the following properties for the service instance
+\fBsvc:/network/smtp:sendmail\fR results in automated (re)building of
+configuration files:
+.sp
+.in +2
+.nf
+path_to_sendmail_mc
+path_to_submit_mc
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The values for these properties should be strings which represent the path name
+of the \fB\&.mc\fR files referred to in steps 2 and 3 of both procedures above.
+Recommended values are:
+.sp
+.in +2
+.nf
+/etc/mail/cf/cf/`hostname`.mc
+/etc/mail/cf/cf/submit-`hostname`.mc
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Each property, if set, results in the corresponding \fB\&.mc\fR file being used
+to (re)build the matching \fB\&.cf\fR file when the service is started.
+.sp
+.LP
+These properties persist across updates. To prevent an update
+from clobbering your \fB\&.cf\fR file, or renaming it to
+\fB\&.cf.old\fR, you can set the desired properties instead.
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/mail/cf/README\fR\fR
+.ad
+.RS 23n
+Describes \fBsendmail\fR configuration files.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.LP
+.BR ps (1),
+.BR make (1S),
+.BR attributes (7),
+.BR sendmail (8),
+.BR svcadm (8)
+.sp
+.LP
+\fISystem Administration Guide: Network Services\fR

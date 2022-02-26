@@ -112,7 +112,7 @@ of the \fIminor_status\fR parameter details the error condition.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -128,9 +128,11 @@ MT Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBgss_add_oid_set_member\fR(3GSS), \fBgss_create_empty_oid_set\fR(3GSS),
-\fBgss_oid_to_str\fR(3GSS), \fBgss_release_oid_set\fR(3GSS),
-\fBattributes\fR(5)
+.BR gss_add_oid_set_member (3GSS),
+.BR gss_create_empty_oid_set (3GSS),
+.BR gss_oid_to_str (3GSS),
+.BR gss_release_oid_set (3GSS),
+.BR attributes (7)
 .sp
 .LP
 \fISolaris Security for Developers Guide\fR

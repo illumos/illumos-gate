@@ -75,7 +75,8 @@ can delay(9F) be relied upon, since it is implemented via \fBtimeout()\fR. See
 .SH RETURN VALUES
 \fBdump()\fR returns \fB0\fR on success, or the appropriate error number.
 .SH SEE ALSO
-\fBcpr\fR(7), \fBnodev\fR(9F)
+.BR cpr (4),
+.BR nodev (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

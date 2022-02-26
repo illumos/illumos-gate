@@ -117,9 +117,9 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='rpc.rusersd' section='1M'
+			<manpage title='rpc.rusersd' section='8'
 			    manpath='/usr/share/man' />
-			<manpage title='rusersd' section='1M'
+			<manpage title='rusersd' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

@@ -292,7 +292,7 @@ optimization. The default \fIsize\fR is 5.
 \fB\fB-I\fR\fR
 .ad
 .RS 18n
-Compiles support for \fBinetd\fR(1M) in the server side stubs. Such servers can
+Compiles support for \fBinetd\fR(8) in the server side stubs. Such servers can
 be self-started or can be started by \fBinetd\fR. When the server is
 self-started, it backgrounds itself by default. A special define symbol
 \fBRPC_SVC_FG\fR can be used to run the server process in foreground, or the
@@ -321,7 +321,7 @@ interval can be changed using the \fB-K\fR flag. To create a server that exits
 immediately upon servicing a request, use \fB-K\fR \fB0\fR. To create a server
 that never exits, the appropriate argument is \fB-K\fR \fB\(mi1\fR\&.
 .sp
-When monitoring for a server, some portmonitors, like \fBlisten\fR(1M),
+When monitoring for a server, some portmonitors, like \fBlisten\fR(8),
 \fBalways\fR spawn a new process in response to a service request. If it is
 known that a server are used with such a monitor, the server should exit
 immediately on completion. For such servers, \fBrpcgen\fR should be used with
@@ -589,9 +589,14 @@ An error occurred.
 .SH SEE ALSO
 .sp
 .LP
-\fBinetd\fR(1M), \fBlisten\fR(1M), \fBrpc\fR(3NSL), \fBrpc_control\fR(3NSL),
-\fBrpc_svc_calls\fR(3NSL), \fBsyslog\fR(3C), \fBnetconfig\fR(4),
-\fBattributes\fR(5)
+.BR syslog (3C),
+.BR rpc (3NSL),
+.BR rpc_control (3NSL),
+.BR rpc_svc_calls (3NSL),
+.BR netconfig (5),
+.BR attributes (7),
+.BR inetd (8),
+.BR listen (8)
 .sp
 .LP
 The \fBrpcgen\fR chapter in the \fIONC+ Developer\&'s Guide\fR manual.

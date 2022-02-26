@@ -41,8 +41,8 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/audiohd group=sys
 file path=kernel/drv/audiohd.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/audiohd.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/audiohd.4d
 driver name=audiohd \
     alias=pci10de,371 \
     alias=pci8086,2668 \

@@ -198,7 +198,7 @@ ROOTADMIN_SRC_FILE= $(ADMINFILE:%=$(ROOTADMIN_SRC_DIR)/%)
 $(ROOTADMIN_SRC_FILE) := FILEMODE = 0444
 
 #
-# Directories for smf(5) service manifests and profiles.
+# Directories for smf(7) service manifests and profiles.
 #
 ROOTSVC=			$(ROOT)/lib/svc
 ROOTETCSVC=			$(ROOT)/etc/svc

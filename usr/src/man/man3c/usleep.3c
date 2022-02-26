@@ -90,13 +90,13 @@ function is preferred over this function.
 .Xr nanosleep 3C ,
 .Xr sleep 3C ,
 .Xr unistd.h 3HEAD ,
-.Xr standards 5
+.Xr standards 7
 .Sh STANDARDS
 The
 .Fn usleep
 function is available in the following compilation environments.
 See
-.Xr standards 5 .
+.Xr standards 7 .
 .Lp
 .Bl -bullet -compact
 .It

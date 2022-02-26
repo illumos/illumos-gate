@@ -58,7 +58,7 @@ extern "C" {
 
 /*
  * Publicly available DLPI notification types. This list may change if
- * new DLPI notification types are made public. See dlpi(7P).
+ * new DLPI notification types are made public. See dlpi(4P).
  *
  */
 #define	DLPI_NOTIFICATION_TYPES	(DL_NOTE_LINK_DOWN | DL_NOTE_LINK_UP | \

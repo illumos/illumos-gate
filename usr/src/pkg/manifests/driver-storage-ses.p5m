@@ -40,8 +40,8 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/ses group=sys
 file path=kernel/drv/ses.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/ses.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/ses.4d
 driver name=ses perms="* 0666 bin bin" \
     alias=scsiclass,03S \
     alias=scsiclass,0d

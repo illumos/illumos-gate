@@ -45,7 +45,7 @@ The options and arguments for this command are:
 \fB\fB-i\fR\fR
 .ad
 .RS 15n
-Copies only the \fBpkginfo\fR(4) and \fBpkgmap\fR(4) files.
+Copies only the \fBpkginfo\fR(5) and \fBpkgmap\fR(5) files.
 .RE
 
 .sp
@@ -56,7 +56,7 @@ Copies only the \fBpkginfo\fR(4) and \fBpkgmap\fR(4) files.
 .RS 15n
 Creates a new instance of the package on the destination device if any instance
 of this package already exists, up to the number specified by the \fBMAXINST\fR
-variable in the \fBpkginfo\fR(4) file.
+variable in the \fBpkginfo\fR(5) file.
 .RE
 
 .sp
@@ -119,8 +119,8 @@ quotes (\fB\&'\fR) or preceded by a backslash (\fB\e\fR).
 
 .SH DEVICE SPECIFIERS
 .LP
-Packaging tools, including \fBpkgtrans\fR, \fBpkgadd\fR(1M), and
-\fBpkgchk\fR(1M), have options for specifying a package location by specifying
+Packaging tools, including \fBpkgtrans\fR, \fBpkgadd\fR(8), and
+\fBpkgchk\fR(8), have options for specifying a package location by specifying
 the device on which it resides. Listed below are the device types that a
 package can be stored to and retrieved from. Note that source and destination
 devices cannot be the same.
@@ -135,7 +135,7 @@ identifier as the device. Common examples of this device type are
 \fB/dev/rmt/0\fR for a removable magnetic tape and \fB/floppy/floppy0\fR for
 the first floppy disk on the system. \fBpkgtrans\fR can also produce regular
 file system files in a stream format, which is suitable for storage on a
-character device, web server, or as input to \fBpkgadd\fR(1M).
+character device, web server, or as input to \fBpkgadd\fR(8).
 .RE
 
 .sp
@@ -160,7 +160,7 @@ device specification are \fBspool\fR (the default package device location) and
 Packages can be stored onto a directory by specifying an absolute path to a
 file system directory. The package contents reside in a directory within the
 specified directory. The package directory name must be identical to its
-\fBPKG\fR specification in the \fBpkginfo\fR(4) file. An example device
+\fBPKG\fR specification in the \fBpkginfo\fR(5) file. An example device
 specification of this type is \fB/export/packages\fR.
 .RE
 
@@ -228,7 +228,7 @@ example%  pkgtrans /tmp/pkg1.pkg ~/tmp pkg1
 
 .SH ENVIRONMENT VARIABLES
 .LP
-The \fBMAXINST\fR variable is set in the \fBpkginfo\fR(4) file and declares the
+The \fBMAXINST\fR variable is set in the \fBpkginfo\fR(5) file and declares the
 maximum number of package instances.
 .SH EXIT STATUS
 .ne 2
@@ -250,7 +250,7 @@ An error occurred.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -268,10 +268,19 @@ Interface Stability	See below.
 The command-line syntax is Evolving.
 .SH SEE ALSO
 .LP
-\fBpkginfo\fR(1), \fBpkgmk\fR(1), \fBpkgparam\fR(1), \fBpkgproto\fR(1),
-\fBinstallf\fR(1M), \fBpkgadd\fR(1M), \fBpkgask\fR(1M), \fBpkgrm\fR(1M),
-\fBremovef\fR(1M), \fBpkginfo\fR(4), \fBpkgmap\fR(4), \fBattributes\fR(5),
-\fBlargefile\fR(5)
+.BR pkginfo (1),
+.BR pkgmk (1),
+.BR pkgparam (1),
+.BR pkgproto (1),
+.BR pkginfo (5),
+.BR pkgmap (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR installf (8),
+.BR pkgadd (8),
+.BR pkgask (8),
+.BR pkgrm (8),
+.BR removef (8)
 .sp
 .LP
 \fIApplication Packaging Developer\&'s Guide\fR
@@ -285,7 +294,7 @@ already exists. Neither of these options are useful if the destination device
 is a datastream.
 .sp
 .LP
-Package commands are \fBlargefile\fR(5)-aware. They handle files larger than 2
+Package commands are \fBlargefile\fR(7)-aware. They handle files larger than 2
 GB in the same way they handle smaller files. In their current implementations,
-\fBpkgadd\fR(1M), \fBpkgtrans\fR and other package commands can process a
+\fBpkgadd\fR(8), \fBpkgtrans\fR and other package commands can process a
 datastream of  up to 4 GB.

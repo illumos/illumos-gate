@@ -1042,7 +1042,7 @@ rctlsys(int code, char *name, void *obuf, void *nbuf, size_t obufsz, int flags)
 
 	case 3:
 		/*
-		 * Private code for rctladm(1M):  "rctlctl".
+		 * Private code for rctladm(8):  "rctlctl".
 		 */
 		return (rctlsys_ctl(name, obuf, flags));
 	case 4:

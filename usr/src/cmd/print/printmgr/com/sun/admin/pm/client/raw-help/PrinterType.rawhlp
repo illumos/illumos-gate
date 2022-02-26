@@ -23,7 +23,6 @@
 -- Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
 -- Use is subject to license terms.
 --
--- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!-- Tag=PrinterType -->
 
@@ -40,7 +39,7 @@ understands the printer type. Examples are PostScript, Daisy, and Diablo.
 If you have a PostScript printer, for example, select PostScript as
 the Printer Type.  To install a printer type that is not listed select
 Other.  The printer type you enter must correspond to an entry in the
-/usr/share/lib/terminfo directories. See the terminfo(4) man page for
+/usr/share/lib/terminfo directories. See the terminfo(5) man page for
 more information.
 
 <p>

@@ -38,8 +38,8 @@ passwd:     files
 group:      files
 
 # You must also set up the /etc/resolv.conf file for DNS name
-# server lookup.  See resolv.conf(4). For lookup via mdns
-# svc:/network/dns/multicast:default must also be enabled. See mdnsd(1M)
+# server lookup.  See resolv.conf(5). For lookup via mdns
+# svc:/network/dns/multicast:default must also be enabled. See mdnsd(8)
 hosts:      files dns mdns
 
 # Note that IPv4 addresses are searched for in all of the ipnodes databases

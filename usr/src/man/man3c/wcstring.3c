@@ -377,7 +377,7 @@ The third argument points to a caller-provided \fBwchar_t\fR pointer into which
 the \fBwcstok()\fR function stores information necessary for it to continue
 scanning the same wide-character string. This argument is not available with
 the XPG4 and SUS versions of \fBwcstok()\fR, nor is it available with the
-\fBwstok()\fR function.  See \fBstandards\fR(5).
+\fBwstok()\fR function.  See \fBstandards\fR(7).
 .LP
 The first call in the sequence has \fIws1\fR as its first argument, and is
 followed by calls with a null pointer as their first argument. The separator
@@ -407,7 +407,7 @@ wide-character code of a token. Otherwise, if there is no token, a null pointer
 is returned.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -426,15 +426,15 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBmalloc\fR(3C),
-\fBstring\fR(3C),
-\fBwcscasecmp\fR(3C),
-\fBwcsdup\fR(3C),
-\fBwcslen\fR(3C),
-\fBwcswidth\fR(3C),
-\fBwcwidth\fR(3C),
-\fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR malloc (3C),
+.BR string (3C),
+.BR wcscasecmp (3C),
+.BR wcsdup (3C),
+.BR wcslen (3C),
+.BR wcswidth (3C),
+.BR wcwidth (3C),
+.BR attributes (7),
+.BR standards (7)
 .SH NOTES
 .LP
 The \fBwcscat()\fR, \fBwcsncat()\fR, \fBwcscmp()\fR, \fBwcsncmp()\fR,

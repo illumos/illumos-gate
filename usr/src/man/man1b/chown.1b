@@ -23,7 +23,7 @@ In the default case, only the super-user of the machine where  the file is
 physically located can change the owner. The system configuration option
 \fB{_POSIX_CHOWN_RESTRICTED}\fR and the privileges \fBPRIV_FILE_CHOWN\fR and
 \fBPRIV_FILE_CHOWN_SELF\fR also affect who can change the ownership of a file.
-See \fBchown\fR(2) and \fBprivileges\fR(5).
+See \fBchown\fR(2) and \fBprivileges\fR(7).
 .SH OPTIONS
 .sp
 .LP
@@ -51,7 +51,7 @@ changed, but they are not traversed.
 .SH USAGE
 .sp
 .LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBchown\fR when
+See \fBlargefile\fR(7) for the description of the behavior of \fBchown\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH FILES
 .sp
@@ -66,5 +66,10 @@ Password file
 .SH SEE ALSO
 .sp
 .LP
-\fBchgrp\fR(1), \fBchown\fR(2), \fBgroup\fR(4), \fBpasswd\fR(4),
-\fBattributes\fR(5), \fBlargefile\fR(5), \fBprivileges\fR(5)
+.BR chgrp (1),
+.BR chown (2),
+.BR group (5),
+.BR passwd (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR privileges (7)

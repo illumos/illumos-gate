@@ -151,9 +151,14 @@ _fini(void)
 .in -2
 
 .SH SEE ALSO
-\fBadd_drv\fR(1M), \fBmod_info\fR(9F), \fBmod_install\fR(9F),
-\fBmod_remove\fR(9F), \fBmutex\fR(9F), \fBmodldrv\fR(9S), \fBmodlinkage\fR(9S),
-\fBmodlstrmod\fR(9S)
+.BR add_drv (8),
+.BR mod_info (9F),
+.BR mod_install (9F),
+.BR mod_remove (9F),
+.BR mutex (9F),
+.BR modldrv (9S),
+.BR modlinkage (9S),
+.BR modlstrmod (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

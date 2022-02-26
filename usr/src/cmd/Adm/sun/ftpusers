@@ -1,5 +1,5 @@
 #
-# List of users denied access to the FTP server, see ftpusers(4).
+# List of users denied access to the FTP server, see ftpusers(5).
 #
 root
 daemon

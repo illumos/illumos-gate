@@ -77,12 +77,12 @@ The \fBpthread_testcancel()\fR function does not return errors.
 .SH EXAMPLES
 .sp
 .LP
-See \fBcancellation\fR(5) for an example of using \fBpthread_testcancel()\fR to
+See \fBcancellation\fR(7) for an example of using \fBpthread_testcancel()\fR to
 force testing for cancellation and a discussion of cancellation concepts.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -100,11 +100,18 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(3), \fBpthread_cleanup_pop\fR(3C), \fBpthread_cleanup_push\fR(3C),
-\fBpthread_exit\fR(3C), \fBpthread_join\fR(3C),
-\fBpthread_setcancelstate\fR(3C), \fBpthread_setcanceltype\fR(3C),
-\fBsetjmp\fR(3C), \fBattributes\fR(5), \fBcancellation\fR(5),
-\fBcondition\fR(5), \fBstandards\fR(5)
+.BR Intro (3),
+.BR pthread_cleanup_pop (3C),
+.BR pthread_cleanup_push (3C),
+.BR pthread_exit (3C),
+.BR pthread_join (3C),
+.BR pthread_setcancelstate (3C),
+.BR pthread_setcanceltype (3C),
+.BR setjmp (3C),
+.BR attributes (7),
+.BR cancellation (7),
+.BR condition (7),
+.BR standards (7)
 .SH NOTES
 .sp
 .LP
@@ -122,5 +129,5 @@ to \fBPTHREAD_CANCEL_ASYNCHRONOUS\fR.
 It is possible to kill a thread when it is holding a resource, such as lock or
 allocated memory. If that thread has not setup a cancellation cleanup handler
 to release the held resource, the application is "cancel-unsafe".  See
-\fBattributes\fR(5) for a discussion of Cancel-Safety, Deferred-Cancel-Safety,
+\fBattributes\fR(7) for a discussion of Cancel-Safety, Deferred-Cancel-Safety,
 and Asynchronous-Cancel-Safety.

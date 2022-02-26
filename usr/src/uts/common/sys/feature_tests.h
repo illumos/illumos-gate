@@ -58,7 +58,7 @@ extern "C" {
  * compress common standards specified feature test macros for easier reading.
  * These macros should not be used by the application developer as
  * unexpected results may occur. Instead, the user should reference
- * standards(5) for correct usage of the standards feature test macros.
+ * standards(7) for correct usage of the standards feature test macros.
  *
  * __XOPEN_OR_POSIX     Used in cases where a symbol is defined by both
  *                      X/Open or POSIX or in the negative, when neither
@@ -259,7 +259,7 @@ extern "C" {
  *
  * When writing a conforming X/Open application, as per the specification
  * requirements, the appropriate feature test macros must be defined at
- * compile time. These are as follows. For more info, see standards(5).
+ * compile time. These are as follows. For more info, see standards(7).
  *
  * Feature Test Macro				     Specification
  * ------------------------------------------------  -------------

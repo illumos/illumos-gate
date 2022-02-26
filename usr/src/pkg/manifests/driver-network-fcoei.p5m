@@ -41,8 +41,8 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/fcoei group=sys
 file path=kernel/drv/fcoei.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/fcoei.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/fcoei.4d
 driver name=fcoei perms="* 0600 root sys"
 legacy pkg=SUNWfcoei \
     desc="Sun FCoE (Fibre Channel over Ethernet) Initiator Driver" \

@@ -74,7 +74,9 @@ The \fBnochpoll()\fR function returns \fBENXIO\fR.
 The \fBnochpoll()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-\fBpoll\fR(2), \fBchpoll\fR(9E), \fBcb_ops\fR(9S)
+.BR poll (2),
+.BR chpoll (9E),
+.BR cb_ops (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

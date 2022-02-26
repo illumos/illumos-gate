@@ -1,0 +1,176 @@
+'\" te
+.\" Copyright (c) 1994, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH NETID 5 "November 22, 2021"
+.SH NAME
+netid \- netname database
+.SH SYNOPSIS
+.nf
+\fB/etc/netid\fR
+.fi
+
+.SH DESCRIPTION
+The \fBnetid\fR file is a local source of information on mappings between
+netnames (see \fBsecure_rpc\fR(3NSL)) and user ids or hostnames in the local
+domain. The \fBnetid\fR file can be used in conjunction with, or instead of,
+a network nameservice. The \fBpublickey\fR entry in
+the \fBnsswitch.conf\fR (see \fBnsswitch.conf\fR(5)) file determines which of
+these sources will be queried by the system to translate netnames to local user
+ids or hostnames.
+.sp
+.LP
+Each entry in the \fBnetid\fR file is a single line of the form:
+.sp
+.in +2
+.nf
+\fInetname uid\fR\fB:\fR\fIgid, gid, gid\|.\|.\|.\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+\fInetname\fR \fB      0:\fR\fBhostname\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The first entry associates a local user id with a netname. The second entry
+associates a hostname with a netname.
+.sp
+.LP
+The  \fBnetid\fR file field descriptions are as follows:
+.sp
+.ne 2
+.na
+\fB\fInetname\fR\fR
+.ad
+.RS 12n
+The operating system independent network name for the user or host.
+\fInetname\fR has one of two formats. The format used to specify a host is of
+the form:
+.sp
+\fBunix.\fR\fBhostname\fR\fB@\fR\fIdomain\fR
+.sp
+where \fBhostname\fR is the name of the host and \fIdomain\fR is the network
+domain name.
+.sp
+The format used to specify a user id is of the form:
+.sp
+\fBunix.\fR\fIuid\fR\fB@\fR\fIdomain\fR
+.sp
+where \fIuid\fR is the numerical id of the user and \fIdomain\fR is the network
+domain name.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIuid\fR\fR
+.ad
+.RS 12n
+The numerical id of the user (see \fBpasswd\fR(5)). When specifying a host
+name, \fIuid\fR is always zero.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIgroup\fR\fR
+.ad
+.RS 12n
+The numerical id of the group the user belongs to (see \fBgroup\fR(5)).
+Several groups, separated by commas, may be listed for a single \fIuid\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBhostname\fR\fR
+.ad
+.RS 12n
+The local hostname (see \fBhosts\fR(5)).
+.RE
+
+.sp
+.LP
+Blank lines are ignored. Any part of a line to the right of a `\fB#\fR' symbol
+is treated as a comment.
+.SH EXAMPLES
+\fBExample 1 \fRA sample \fBnetid\fR file.
+.sp
+.LP
+Here is a sample \fBnetid\fR file:
+
+.sp
+.in +2
+.nf
+unix.789@West.Example.COM	789:30,65
+unix.123@Bldg_xy.Example.COM	123:20,1521
+unix.candlestick@campus1.example.NET	0:candlestick
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/group\fR\fR
+.ad
+.RS 18n
+groups file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/hosts\fR\fR
+.ad
+.RS 18n
+hosts database
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/netid\fR\fR
+.ad
+.RS 18n
+netname database
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 18n
+password file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/publickey\fR\fR
+.ad
+.RS 18n
+public key database
+.RE
+
+.SH SEE ALSO
+.BR netname2user (3NSL),
+.BR secure_rpc (3NSL),
+.BR group (5),
+.BR hosts (5),
+.BR nsswitch.conf (5),
+.BR passwd (5),
+.BR publickey (5)

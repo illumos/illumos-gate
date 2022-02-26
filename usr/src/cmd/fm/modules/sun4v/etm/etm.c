@@ -233,10 +233,10 @@ etm_fma_resp_wait_time = 30;	/*  time (sec) wait for fma event resp */
 static pthread_mutex_t
 etm_write_lock = PTHREAD_MUTEX_INITIALIZER;	/* for write operations */
 
-static log_ctl_t syslog_ctl;	/* log(7D) meta-data for each msg */
-static int syslog_facility;	/* log(7D) facility (part of priority) */
-static int syslog_logfd = -1;	/* log(7D) file descriptor */
-static int syslog_msgfd = -1;	/* sysmsg(7D) file descriptor */
+static log_ctl_t syslog_ctl;	/* log(4D) meta-data for each msg */
+static int syslog_facility;	/* log(4D) facility (part of priority) */
+static int syslog_logfd = -1;	/* log(4D) file descriptor */
+static int syslog_msgfd = -1;	/* sysmsg(4D) file descriptor */
 static int syslog_file = 0;	/* log to syslog_logfd */
 static int syslog_cons = 0;	/* log to syslog_msgfd */
 
@@ -517,9 +517,9 @@ static struct stats {
 	/* Alert logging errors */
 
 	{ "etm_log_err", FMD_TYPE_UINT64,
-		"failed to log message to log(7D)" },
+		"failed to log message to log(4D)" },
 	{ "etm_msg_err", FMD_TYPE_UINT64,
-		"failed to log message to sysmsg(7D)" },
+		"failed to log message to sysmsg(4D)" },
 
 	/* miscellaneous stats */
 
@@ -1342,7 +1342,7 @@ etm_post_to_fmd(fmd_hdl_t *hdl, fmd_xprt_t *fmd_xprt, nvlist_t *evp)
  * that would create the situation where this module's openlog() would
  * have the monopoly on syslog(3C) for the daemon and all its modules.
  * To avoid that situation, this module uses the same logic as the
- * syslog-msgs FM module to directly call into the log(7D) and sysmsg(7D)
+ * syslog-msgs FM module to directly call into the log(4D) and sysmsg(4D)
  * devices for syslog and console.
  */
 

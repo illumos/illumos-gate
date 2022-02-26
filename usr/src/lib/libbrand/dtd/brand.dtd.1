@@ -278,13 +278,13 @@
 <!--
   user_cmd
 
-    Path to the binary that will translate a user name to a passwd(4) entry.
+    Path to the binary that will translate a user name to a passwd(5) entry.
 
     The following replacements are performed:
 
       %u        User login name
 
-    It has no attributes.  The passwd(4) entry is used to determine $LOGNAME,
+    It has no attributes.  The passwd(5) entry is used to determine $LOGNAME,
     $HOME, and $SHELL for non-interactive "zlogin -l <user> <cmd>".
 -->
 <!ELEMENT user_cmd   (#PCDATA) >
@@ -624,7 +624,7 @@
 <!--
   security-flags
     Specifies the default security flags applied to zones of this brand. This
-    set can be overridden via security-flags in zonecfg(1m).
+    set can be overridden via security-flags in zonecfg(8).
 -->
 <!ELEMENT security-flags	(#PCDATA) >
 <!ATTLIST security-flags>
@@ -636,12 +636,12 @@
     zones of this brand with ip-type matched.  If a privilege is added
     to the default set all zones of this brand with ip-type matched on
     the system will inherit this privilege unless the privilege is
-    removed via limitpriv in zonecfg(1m).  If a privilege is added to
+    removed via limitpriv in zonecfg(8).  If a privilege is added to
     the prohibited set it can not be added to any zones with ip-type
-    matched via limitpriv in zonecfg(1m).  If a privilege is added to
+    matched via limitpriv in zonecfg(8).  If a privilege is added to
     the required set then all zones of this brand with ip-type matched
     on the system will inherit this privilege and it can't be removed via
-    limitpriv in zonecfg(1m).
+    limitpriv in zonecfg(8).
 
     Its attributes are
       set	The name of the set the privilege should go into.

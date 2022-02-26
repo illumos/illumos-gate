@@ -1,0 +1,131 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SMF_BOOTSTRAP 7 "Sep 25, 2008"
+.SH NAME
+smf_bootstrap \- service management facility boot, packaging, and compatibility
+behavior
+.SH DESCRIPTION
+.sp
+.LP
+The service management facility establishes conventions for delivering service
+manifests, incorporating service manifest changes, describing service
+configuration stability, using service configuration overrides, and the use of
+service profiles.
+.SS "Manifest Loading at Boot"
+.sp
+.LP
+The \fBsvc:/system/manifest-import:default\fR service uses \fBsvccfg\fR(8) to
+import certain manifest files from the \fB/var/svc/manifest\fR directory tree
+into the service configuration repository. The service imports files that it
+has not imported previously and those files which have changed since the last
+time they were imported by the service. When a manifest is imported by the
+service, a hash of the file that includes its contents is recorded in a
+property group of the \fBsvc:/smf/manifest\fR service. The
+\fBmanifest-import\fR service uses the hash to determine whether the file has
+changed. See \fBsvccfg\fR(8) for information on the \fBsvccfg import\fR
+behavior for services that already exist in the repository.
+.SS "Manifest Handling During Packaging Operations"
+.sp
+.LP
+Service manifests within packages should be identified with the class
+\fBmanifest\fR. Class action scripts that install and remove service manifests
+are included in the packaging subsystem. When \fBpkgadd\fR(8) is invoked, the
+service manifest is imported.
+.sp
+.LP
+When \fBpkgrm\fR(8) is invoked, instances in the manifest that are disabled
+are deleted. Instances in the manifest that are online or degraded are disabled
+first and then deleted. Any services in the manifest with no remaining
+instances are also deleted.
+.sp
+.LP
+If the \fB-R\fR option is supplied to \fBpkgadd\fR(8) or \fBpkgrm\fR(8), the
+actions described in this section will be done when the system is next rebooted
+with that alternate root path.
+.SS "Stability Declarations"
+.sp
+.LP
+Each service group and each property group delivered in a manifest should
+declare a stability level based on \fBattributes\fR(7) definitions. With
+knowledge of the stability level, an application developer can determine the
+likelihood that feature development based on the existence or components of a
+service or object is likely to remain functional across a release boundary.
+.sp
+.LP
+In an \fBsmf\fR(7) context, the stability value also identifies the expected
+scope of the changes to properties within the property group across a release
+boundary for the service, which can include patches for that service. The
+following two sections discuss this in more detail.
+.SS "Property Overrides"
+.sp
+.LP
+The \fBservice_bundle\fR(5) document type definition includes an override
+attribute that is applicable to each property in a service manifest. If set to
+\fBtrue\fR, the attribute instructs \fBsvccfg\fR(8) and other manifest import
+tools to replace the current value of a property in the repository with the one
+from the manifest. If the override attribute is absent or present but set to
+\fBfalse\fR, the current value in the repository is preserved.
+.sp
+.LP
+Property groups declared as Stable do not contain override attributes on
+enclosed properties. Property groups declared as Evolving do so only to correct
+an erroneous setting. Property groups declared as Unstable can contain
+overrides on any property. The exception to this behavior is for the stability
+property itself, which can be modified to identify incipient change to the
+interface presented by the service.
+.SS "Property Group Deletion"
+.sp
+.LP
+The \fBservice_bundle\fR(5) document type definition includes a delete
+attribute, applicable to each property group in a service manifest. If set to
+\fBtrue\fR, the delete attribute instructs \fBsvccfg\fR(8) and other manifest
+import tools to delete this property group from the repository. If the delete
+attribute is absent or present but set to \fBfalse\fR, the property group in
+the repository is preserved.
+.sp
+.LP
+Property groups declared as Stable or Evolving are not deleted. Property groups
+declared as Unstable can be deleted across any release boundary.
+.SS "Profile Application"
+.sp
+.LP
+The first time the existence of each of the three service profiles listed below
+is detected, \fBsvc.startd\fR(8) automatically applies the profile.
+.sp
+.in +2
+.nf
+/var/svc/profile/generic.xml
+/var/svc/profile/platform.xml
+/var/svc/profile/site.xml
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsvc:/smf/manifest\fR service is used in a similar fashion.
+.sp
+.LP
+Additional service profiles that characterize the activation of various groups
+of service instances might be present in \fB/var/svc/profile\fR. None of the
+\fB/var/svc/profile\fR profiles are automatically applied to the repository. A
+profile can be manually applied or re-applied using \fBsvccfg\fR(8).
+.SH SEE ALSO
+.sp
+.LP
+.BR libscf (3LIB),
+.BR service_bundle (5),
+.BR attributes (7),
+.BR smf (7),
+.BR smf_security (7),
+.BR pkgadd (8),
+.BR pkgrm (8),
+.BR svc.startd (8),
+.BR svcadm (8),
+.BR svccfg (8)
+.SH NOTES
+.sp
+.LP
+The present version of \fBsmf\fR(7) does not support multiple repositories.

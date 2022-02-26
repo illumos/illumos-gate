@@ -1,0 +1,41 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Oxide Computer Company
+.\"
+.Dd June 9, 2020
+.Dt KSENSOR 4D
+.Os
+.Sh NAME
+.Nm ksensor
+.Nd kernel sensor driver
+.Sh SYNOPSIS
+.In sys/sensors.h
+.Pp
+.Pa /dev/sensors/
+.Sh DESCRIPTION
+The
+.Nm
+driver provides access to sensors that are built using the kernel sensor
+framework.
+Sensors register with the framework are automatically made available to
+the system and used with the fault management architecture
+.Pq FMA .
+.Pp
+The file system location and programming interface to the
+.Nm
+driver are considered
+.Sy Volatile ,
+subject to change without notice, and should not be used directly.
+Sensor information can be dumped through the FMA developer utility
+.Sy fmtopo .
+.Sh SEE ALSO
+.Xr fmadm 8

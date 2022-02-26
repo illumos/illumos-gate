@@ -40,7 +40,7 @@
 
 /*
  * The fmd resource scheme, used for fmd modules, must be implemented here for
- * the benefit of fmd-self-diagnosis and also in schemes/fmd for fmdump(1M).
+ * the benefit of fmd-self-diagnosis and also in schemes/fmd for fmdump(8).
  */
 ssize_t
 fmd_scheme_fmd_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)

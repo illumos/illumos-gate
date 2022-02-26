@@ -73,7 +73,7 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -88,4 +88,7 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBIntro\fR(3), \fBcomplex.h\fR(3HEAD), \fBlibm\fR(3LIB), \fBattributes\fR(5)
+.BR Intro (3),
+.BR complex.h (3HEAD),
+.BR libm (3LIB),
+.BR attributes (7)

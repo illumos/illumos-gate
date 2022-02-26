@@ -171,7 +171,7 @@ cannot be allocated.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -187,9 +187,12 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBmdb\fR(1), \fBabort\fR(3C), \fBsignal\fR(3C),
-\fBumem_cache_create\fR(3MALLOC), \fBumem_setmtbf\fR(3MALLOC),
-\fBattributes\fR(5)
+.BR mdb (1),
+.BR abort (3C),
+.BR signal (3C),
+.BR umem_cache_create (3MALLOC),
+.BR umem_setmtbf (3MALLOC),
+.BR attributes (7)
 .sp
 .LP
 \fIModular Debugger Guide\fR:

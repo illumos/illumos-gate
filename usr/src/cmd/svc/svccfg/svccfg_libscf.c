@@ -756,7 +756,7 @@ remove_tempfile(void)
 }
 
 /*
- * Launch private svc.configd(1M) for manipulating alternate repositories.
+ * Launch private svc.configd(8) for manipulating alternate repositories.
  */
 static void
 start_private_repository(engine_state_t *est)
@@ -832,7 +832,7 @@ void
 lscf_cleanup(void)
 {
 	/*
-	 * In the case where we've launched a private svc.configd(1M)
+	 * In the case where we've launched a private svc.configd(8)
 	 * instance, we must terminate our child and remove the temporary
 	 * rendezvous point.
 	 */

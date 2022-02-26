@@ -1,0 +1,187 @@
+.\"
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for
+.\" permission to reproduce portions of its copyrighted documentation.
+.\" Original documentation from The Open Group can be obtained online at
+.\" http://www.opengroup.org/bookstore/.
+.\"
+.\" The Institute of Electrical and Electronics Engineers and The Open
+.\" Group, have given us permission to reprint portions of their
+.\" documentation.
+.\"
+.\" In the following statement, the phrase ``this text'' refers to portions
+.\" of the system documentation.
+.\"
+.\" Portions of this text are reprinted and reproduced in electronic form
+.\" in the SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition,
+.\" Standard for Information Technology -- Portable Operating System
+.\" Interface (POSIX), The Open Group Base Specifications Issue 6,
+.\" Copyright (C) 2001-2004 by the Institute of Electrical and Electronics
+.\" Engineers, Inc and The Open Group.  In the event of any discrepancy
+.\" between these versions and the original IEEE and The Open Group
+.\" Standard, the original IEEE and The Open Group Standard is the referee
+.\" document.  The original Standard can be obtained online at
+.\" http://www.opengroup.org/unix/online.html.
+.\"
+.\" This notice shall appear on any product containing this material.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Portions Copyright (c) 1995 IEEE All Rights Reserved.
+.\" Copyright (c) 1998 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
+.\"
+.TH MUTEX 7 "Jun 5, 2007"
+.SH NAME
+mutex \- concepts relating to mutual exclusion locks
+.SH DESCRIPTION
+.sp
+.LP
+Mutual exclusion locks (mutexes) prevent multiple threads from simultaneously
+executing critical sections of code which access shared data (that is, mutexes
+are used to serialize the execution of threads). All mutexes must be global. A
+successful call to acquire a mutex will cause another thread that is also
+trying to lock the same mutex to block until the owner thread unlocks the
+mutex.
+.sp
+.LP
+Mutexes can synchronize threads within the same process or in other processes.
+Mutexes can be used to synchronize threads between processes if the mutexes are
+allocated in writable memory and shared among the cooperating processes (see
+\fBmmap\fR(2)), and have been initialized for this task.
+.sp
+.LP
+The following table lists mutex functions and the actions they perform.
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+FUNCTION        	ACTION
+_
+\fBmutex_init\fR	Initialize a mutex.
+\fBmutex_destroy\fR	Destroy a mutex.
+\fBmutex_lock\fR	Lock a mutex.
+\fBmutex_trylock\fR	Attempt to lock a mutex.
+\fBmutex_unlock\fR	Unlock a mutex.
+\fBpthread_mutex_init\fR	Initialize a mutex.
+\fBpthread_mutex_destroy\fR	Destroy a mutex.
+\fBpthread_mutex_lock\fR	Lock a mutex.
+\fBpthread_mutex_trylock\fR	Attempt to lock a mutex.
+\fBpthread_mutex_unlock\fR	Unlock a mutex.
+.TE
+
+.SS "Initialization"
+.sp
+.LP
+Mutexes are either intra-process or inter-process, depending upon the argument
+passed implicitly or explicitly to the initialization of that mutex. A
+statically allocated mutex does not need to be explicitly initialized; by
+default, a statically allocated mutex is initialized with all zeros and its
+scope is set to be within the calling process.
+.sp
+.LP
+For inter-process synchronization, a mutex needs to be allocated in memory
+shared between these processes. Since the memory for such a mutex must be
+allocated dynamically, the mutex needs to be explicitly initialized with the
+appropriate attribute that indicates inter-process use.
+.SS "Locking and Unlocking"
+.sp
+.LP
+A critical section of code is enclosed by a call to lock the mutex and the call
+to unlock the mutex to protect it from simultaneous access by multiple threads.
+Only one thread at a time may possess mutually exclusive access to the critical
+section of code that is enclosed by the mutex-locking call and the
+mutex-unlocking call, whether the mutex's scope is intra-process or
+inter-process. A thread calling to lock the mutex either gets exclusive  access
+to the code starting from the successful locking until its call to unlock the
+mutex, or it waits until the mutex is unlocked by the thread that locked it.
+.sp
+.LP
+Mutexes have ownership, unlike semaphores. Only the thread that locked a mutex,
+(that is, the owner of the mutex), should unlock it.
+.sp
+.LP
+If a thread waiting for a mutex receives a signal, upon return from the signal
+handler, the thread resumes waiting for the mutex as if there was no interrupt.
+.SS "Caveats"
+.sp
+.LP
+Mutexes are almost like data - they can be embedded in data structures,  files,
+dynamic or static memory, and so forth. Hence, they are easy to introduce into
+a program. However, too many mutexes can degrade performance and scalability of
+the application. Because too few mutexes can hinder the concurrency of the
+application, they should be introduced with care. Also, incorrect usage (such
+as recursive calls, or violation of locking order, and so forth) can lead to
+deadlocks, or worse, data inconsistencies.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR mmap (2),
+.BR shmop (2),
+.BR mutex_destroy (3C),
+.BR mutex_init (3C),
+.BR mutex_lock (3C),
+.BR mutex_trylock (3C),
+.BR mutex_unlock (3C),
+.BR pthread_create (3C),
+.BR pthread_mutex_destroy (3C),
+.BR pthread_mutex_init (3C),
+.BR pthread_mutex_lock (3C),
+.BR pthread_mutex_trylock (3C),
+.BR pthread_mutex_unlock (3C),
+.BR pthread_mutexattr_init (3C),
+.BR attributes (7),
+.BR standards (7)
+.SH NOTES
+.sp
+.LP
+In the current implementation of threads, \fBpthread_mutex_lock()\fR,
+\fBpthread_mutex_unlock()\fR, \fBmutex_lock()\fR \fBmutex_unlock()\fR,
+\fBpthread_mutex_trylock()\fR, and \fBmutex_trylock()\fR do not validate the
+mutex type. Therefore, an uninitialized mutex or a mutex with an invalid type
+does not return \fBEINVAL\fR. Interfaces for mutexes with an invalid type have
+unspecified behavior.
+.sp
+.LP
+By default, if multiple threads are waiting for a mutex, the order of
+acquisition is undefined.
+.sp
+.LP
+The system does not support multiple mappings to the same logical synch object
+if it is initialized as process-private (\fBUSYNC_THREAD\fR for Solaris,
+\fBPTHREAD_PROCESS_PRIVATE\fR for POSIX). If you need to \fBmmap\fR(2)a synch
+object to different locations within the same address space, then the synch
+object should be initialized as a shared object (\fBUSYNC_PROCESS\fR for
+Solaris, \fBPTHREAD_PROCESS_SHARED\fR for POSIX).

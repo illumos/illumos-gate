@@ -348,7 +348,7 @@ on the remote machine. After the first session terminates, if the remote
 machine is configured to transfer the spooled files to the local machine, the
 remote machine initiates a call and send the files; otherwise, the user must
 "call" the remote machine to transfer the files from the spool directory to the
-local machine. This call can be done manually using \fBUutry\fR(1M), or as a
+local machine. This call can be done manually using \fBUutry\fR(8), or as a
 side effect of another \fBuux\fR(1C) or \fBuucp\fR call.
 .sp
 .LP
@@ -362,7 +362,7 @@ files.
 .SH ENVIRONMENT VARIABLES
 .sp
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBuucp\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR,
 \fBNLSPATH\fR, and \fBTZ\fR.
@@ -428,7 +428,7 @@ public directory for receiving and sending
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -444,9 +444,16 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBmail\fR(1), \fBuuglist\fR(1C), \fBuustat\fR(1C), \fBuux\fR(1C),
-\fBUutry\fR(1M), \fBuuxqt\fR(1M), \fBchmod\fR(2), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBstandards\fR(5)
+.BR mail (1),
+.BR uuglist (1C),
+.BR uustat (1C),
+.BR uux (1C),
+.BR chmod (2),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7),
+.BR Uutry (8),
+.BR uuxqt (8)
 .SH NOTES
 .sp
 .LP

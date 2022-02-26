@@ -25,7 +25,7 @@ epoll_create, epoll_create1 \- create an epoll instance
 
 .SH DESCRIPTION
 The \fBepoll_create()\fR and \fBepoll_create1()\fR functions both create an
-\fBepoll\fR(5) instance that can be operated upon via \fBepoll_ctl\fR(3C),
+\fBepoll\fR(7) instance that can be operated upon via \fBepoll_ctl\fR(3C),
 \fBepoll_wait\fR(3C) and \fBepoll_pwait\fR(3C).  \fBepoll\fR instances are
 represented as file descriptors, and should be closed via \fBclose\fR(2).
 
@@ -81,11 +81,13 @@ The maximum allowable number of files is currently open in the system.
 
 .sp
 .SH NOTES
-The \fBepoll\fR(5) facility is implemented for purposes of offering
+The \fBepoll\fR(7) facility is implemented for purposes of offering
 compatibility for Linux-borne applications; native
 applications should continue to prefer using event ports via the
 \fBport_create\fR(3C), \fBport_associate\fR(3C) and \fBport_get\fR(3C)
-interfaces.  See \fBepoll\fR(5) for compatibility details and restrictions.
+interfaces.  See \fBepoll\fR(7) for compatibility details and restrictions.
 
 .SH SEE ALSO
-\fBepoll_ctl\fR(3C), \fBepoll_wait\fR(3C), \fBepoll\fR(5)
+.BR epoll_ctl (3C),
+.BR epoll_wait (3C),
+.BR epoll (7)

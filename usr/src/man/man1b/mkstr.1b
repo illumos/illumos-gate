@@ -90,4 +90,5 @@ part of a large \fBmkstr\fRed program.
 .SH SEE ALSO
 .sp
 .LP
-\fBxstr\fR(1), \fBattributes\fR(5)
+.BR xstr (1),
+.BR attributes (7)

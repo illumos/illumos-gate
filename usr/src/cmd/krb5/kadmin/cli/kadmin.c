@@ -1360,8 +1360,8 @@ void kadmin_addprinc(argc, argv)
 		gettext("while doing a get_principal on \"%s\"."), canon);
 	    printf(gettext("\nWarning: Principal \"%s\" could have incomplete "
 		"flag settings, as a result of a failed get_principal.\n"
-		"Check the 'default_principal_flags' setting in kdc.conf(4).\n"
-		"If there is a mismatch, use modprinc in kadmin(1M) to rectify "
+		"Check the 'default_principal_flags' setting in kdc.conf(5).\n"
+		"If there is a mismatch, use modprinc in kadmin(8) to rectify "
 		"the same.\n\n"), canon);
 	}
 

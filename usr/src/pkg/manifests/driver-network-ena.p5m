@@ -26,8 +26,8 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/ena group=sys
 file path=kernel/drv/ena.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/ena.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/ena.4d
 driver name=ena perms="* 0666 root sys" clone_perms="ena 0666 root sys" \
     alias=pciex1d0f,ec2 \
     alias=pciex1d0f,1ec2 \

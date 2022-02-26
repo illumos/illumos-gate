@@ -1,0 +1,54 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2004 Sun Microsystems, Inc. - All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH RPC.RWALLD 8 "Nov 4, 2004"
+.SH NAME
+rpc.rwalld, rwalld \- network rwall server
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/lib/netsvc/rwall/rpc.rwalld\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBrpc.rwalld\fR is a server that handles \fBrwall\fR(8) requests. It is
+implemented by calling \fBwall\fR(8) on all the appropriate network machines.
+The \fBrpc.rwalld\fR daemon may be started by \fBinetd\fR(8) or
+\fBlisten\fR(8).
+.SH SEE ALSO
+.sp
+.LP
+.BR svcs (1),
+.BR attributes (7),
+.BR smf (7),
+.BR inetadm (8),
+.BR inetd (8),
+.BR listen (8),
+.BR rwall (8),
+.BR svcadm (8),
+.BR wall (8)
+.SH NOTES
+.sp
+.LP
+The \fBrpc.rwalld\fR service is managed by the service management facility,
+\fBsmf\fR(7), under the service identifier:
+.sp
+.in +2
+.nf
+svc:/network/rpc/wall:default
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using \fBsvcadm\fR(8). Responsibility for
+initiating and restarting this service is delegated to \fBinetd\fR(8). Use
+\fBinetadm\fR(8) to make configuration changes and to view configuration
+information for this service. The service's status can be queried using the
+\fBsvcs\fR(1) command.

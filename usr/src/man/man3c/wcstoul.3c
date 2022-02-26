@@ -204,7 +204,7 @@ if those numbers can ever be negative.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -222,5 +222,10 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBisspace\fR(3C), \fBiswalpha\fR(3C), \fBscanf\fR(3C), \fBwcstod\fR(3C),
-\fBwcstol\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR isspace (3C),
+.BR iswalpha (3C),
+.BR scanf (3C),
+.BR wcstod (3C),
+.BR wcstol (3C),
+.BR attributes (7),
+.BR standards (7)

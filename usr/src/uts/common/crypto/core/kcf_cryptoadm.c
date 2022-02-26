@@ -1122,7 +1122,7 @@ add_soft_config(char *name, uint_t count, crypto_mech_name_t *array)
 		 * This is because the default entries for Software providers
 		 * are more up-to-date than possibly stale entries in kcf.conf.
 		 * If an entry is to be deleted, the proper way to do it is
-		 * to add it to the disablelist (with cryptoadm(1M)),
+		 * to add it to the disablelist (with cryptoadm(8)),
 		 * instead of removing it from the supportedlist.
 		 */
 		if (entry->ce_mechs == NULL) { /* add new mechanisms */

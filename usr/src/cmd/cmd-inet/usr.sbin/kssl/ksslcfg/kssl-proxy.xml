@@ -40,7 +40,7 @@
 	    grouping='require_all'
 	    restart_on='restart'
 	    type='service'>
-		<service_fmri value='svc:/network/socket-filter:kssl' />	
+		<service_fmri value='svc:/network/socket-filter:kssl' />
 	</dependency>
 
 	<dependency
@@ -72,7 +72,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='ksslcfg' section='1M'
+			<manpage title='ksslcfg' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

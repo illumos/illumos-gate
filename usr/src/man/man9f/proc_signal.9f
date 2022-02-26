@@ -169,7 +169,8 @@ The \fBproc_unref()\fR and \fBproc_signal()\fR functions can be called from
 user, interrupt, or kernel context. The \fBproc_ref()\fR function should be
 called only from user context.
 .SH SEE ALSO
-\fBsignal.h\fR(3HEAD), \fBputnextctl1\fR(9F)
+.BR signal.h (3HEAD),
+.BR putnextctl1 (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

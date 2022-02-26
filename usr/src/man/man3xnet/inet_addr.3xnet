@@ -200,7 +200,7 @@ No errors are defined.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -218,5 +218,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBendhostent\fR(3XNET), \fBendnetent\fR(3XNET), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR endhostent (3XNET),
+.BR endnetent (3XNET),
+.BR attributes (7),
+.BR standards (7)

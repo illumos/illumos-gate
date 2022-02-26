@@ -20,8 +20,13 @@ printenv \- display environment variables currently set
 .SH SEE ALSO
 .sp
 .LP
-\fBcsh\fR(1), \fBecho\fR(1), \fBsh\fR(1), \fBstty\fR(1), \fBtset\fR(1B),
-\fBattributes\fR(5), \fBenviron\fR(5)
+.BR csh (1),
+.BR echo (1),
+.BR sh (1),
+.BR stty (1),
+.BR tset (1B),
+.BR attributes (7),
+.BR environ (7)
 .SH DIAGNOSTICS
 .sp
 .LP

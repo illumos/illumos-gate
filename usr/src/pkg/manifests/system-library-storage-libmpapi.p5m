@@ -94,8 +94,8 @@ file path=usr/share/man/man3mpapi/MP_SetProbingPollingRate.3mpapi
 file path=usr/share/man/man3mpapi/MP_SetProprietaryProperties.3mpapi
 file path=usr/share/man/man3mpapi/MP_SetTPGAccess.3mpapi
 file path=usr/share/man/man3mpapi/Sun_MP_SendScsiCmd.3mpapi
-dir  path=usr/share/man/man4
-file path=usr/share/man/man4/mpapi.conf.4
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/mpapi.conf.5
 legacy pkg=SUNWmpapi desc="Common Library based on SNIA MP API specification" \
     name="SNIA Multipath Management API Common Library"
 legacy pkg=SUNWmpapir \

@@ -3221,7 +3221,7 @@ i_dladm_add_ap_module(const char *module, struct dlautopush *dlap)
 /*
  * Currently, both '.' and ' '(space) can be used as the delimiters between
  * autopush modules. The former is used in dladm set-linkprop, and the
- * latter is used in the autopush(1M) file.
+ * latter is used in the autopush(8) file.
  */
 /* ARGSUSED */
 static dladm_status_t

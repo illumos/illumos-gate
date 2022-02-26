@@ -23,7 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 export PATH=/usr/bin:/usr/sbin:/usr/ccs/bin
 unset ENV TMPDIR
@@ -176,13 +175,13 @@ if $opt_h || [[ -z "$files" && $opt_i = false ]]; then
 	    "[-t args] [file ...]"
 
 	echo "\t-d  set the simulation root directory to the given location"
-	echo "\t-D  start fmd(1M) using dtrace(1M) and specified D script"
+	echo "\t-D  start fmd(8) using dtrace(8) and specified D script"
 	echo "\t-e  display error log content instead of fault log content"
 	echo "\t-h  display usage information for fmsim and exit"
 	echo "\t-i  set interactive mode: do not stop after sending events"
-	echo "\t-o  set fmd(1M) option to specified value during simulation"
+	echo "\t-o  set fmd(8) option to specified value during simulation"
 	echo "\t-s  set up simulation world but do not actually run simulation"
-	echo "\t-t  start fmd(1M) using truss(1) and specified arguments"
+	echo "\t-t  start fmd(8) using truss(1) and specified arguments"
 	echo "\t-v  set verbose mode: display additional event detail"
 	echo "\t-V  set very verbose mode: display complete event contents"
 	echo "\t-w  wait for a keypress after simulation completes"
@@ -255,7 +254,7 @@ cat >$simscript <<EOS
 #ident	"@(#)fmsim.ksh	1.5	06/10/11 SMI"
 
 #
-# fmsim(1M) script generated for $simroot $(date)
+# fmsim(8) script generated for $simroot $(date)
 #
 
 export LD_LIBRARY_PATH=$simroot/usr/lib:$simroot/usr/lib/fm
@@ -282,7 +281,7 @@ fi
 export LD_LIBRARY_PATH=$simroot/usr/lib:$simroot/usr/lib/fm
 export LD_LIBRARY_PATH_64=$simroot/usr/lib/64:$simroot/usr/lib/fm/$isa64
 
-echo "fmsim: simulation $$ running fmd(1M)\c"
+echo "fmsim: simulation $$ running fmd(8)\c"
 ./usr/lib/fm/fmd/fmd -V | cut -d: -f2
 
 ./$simscript &

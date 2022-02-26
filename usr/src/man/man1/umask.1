@@ -136,7 +136,7 @@ If \fIooo\fR is omitted, the current value of the mask is printed.
 .ie t \(bu
 .el o
 \fBumask\fR can be included in the user's \fB\&.profile\fR (see
-\fBprofile\fR(4)) and invoked at login to automatically set the user's
+\fBprofile\fR(5)) and invoked at login to automatically set the user's
 permissions on files or directories created.
 .RE
 .SS "csh"
@@ -355,7 +355,7 @@ from being interpreted as an option.
 .SH ENVIRONMENT VARIABLES
 .sp
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBumask\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
@@ -384,7 +384,7 @@ An error occurred.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/bin/umask, csh, ksh, sh"
 .sp
 
@@ -414,6 +414,15 @@ Interface Stability	External
 .SH SEE ALSO
 .sp
 .LP
-\fBchmod\fR(1), \fBcsh\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBsh\fR(1),
-\fBchmod\fR(2), \fBcreat\fR(2), \fBumask\fR(2), \fBprofile\fR(4),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.BR chmod (1),
+.BR csh (1),
+.BR ksh (1),
+.BR ksh93 (1),
+.BR sh (1),
+.BR chmod (2),
+.BR creat (2),
+.BR umask (2),
+.BR profile (5),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)

@@ -21,7 +21,7 @@ cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lproject\fR [ \fIlibrary \&.
 .LP
 The \fBsetproject()\fR function provides a simplified method for the
 association of a user process with a project and its various resource
-management attributes, as stored in the \fBproject\fR(4) name service database.
+management attributes, as stored in the \fBproject\fR(5) name service database.
 These attributes include resource control settings, resource pool membership,
 and third party attributes (which are ignored by \fBsetproject()\fR.)
 .sp
@@ -39,7 +39,7 @@ superuser to join any project.
 .sp
 .LP
 The current process will not be bound to a resource pool if the resource pools
-facility (see \fBpooladm\fR(1M)) is inactive. The \fBsetproject()\fR function
+facility (see \fBpooladm\fR(8)) is inactive. The \fBsetproject()\fR function
 will succeed whether or not the project specified by \fIproject_name\fR
 specifies a \fBproject.pool\fR attribute. If the resource pools facility is
 active, \fBsetproject()\fR will fail if the project does not specify a
@@ -153,7 +153,7 @@ attributes.
 .sp
 .LP
 The \fBsetproject()\fR function recognizes a name-structured value pair for the
-attributes in the \fBproject\fR(4) database with the following format:
+attributes in the \fBproject\fR(5) database with the following format:
 .sp
 .in +2
 .nf
@@ -217,7 +217,7 @@ project.pool=pool_name
 .sp
 .LP
 where \fBpool_name\fR is a valid resource pool within the active configuration
-enabled with \fBpooladm\fR(1M).
+enabled with \fBpooladm\fR(8).
 .sp
 .LP
 The final attribute is used to finalize the task created by \fBsetproject()\fR.
@@ -232,11 +232,11 @@ task.final
 .sp
 .LP
 All further attempts to create new tasks, such as using \fBnewtask\fR(1) and
-\fBsu\fR(1M), will fail.
+\fBsu\fR(8), will fail.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -254,7 +254,13 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpooladm\fR(1M), \fBsetrctl\fR(2), \fBsettaskid\fR(2),
-\fBinproj\fR(3PROJECT), \fBlibproject\fR(3LIB), \fBpool_error\fR(3POOL),
-\fBpool_set_binding\fR(3POOL), \fBpasswd\fR(4), \fBproject\fR(4),
-\fBattributes\fR(5)
+.BR setrctl (2),
+.BR settaskid (2),
+.BR libproject (3LIB),
+.BR pool_error (3POOL),
+.BR pool_set_binding (3POOL),
+.BR inproj (3PROJECT),
+.BR passwd (5),
+.BR project (5),
+.BR attributes (7),
+.BR pooladm (8)

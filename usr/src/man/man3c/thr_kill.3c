@@ -99,7 +99,7 @@ ID.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -115,5 +115,10 @@ MT-Level	Async-Signal-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBkill\fR(2), \fBsigaction\fR(2), \fBraise\fR(3C), \fBsignal.h\fR(3HEAD),
-\fBthr_self\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR kill (2),
+.BR sigaction (2),
+.BR raise (3C),
+.BR thr_self (3C),
+.BR signal.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

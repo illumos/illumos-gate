@@ -111,21 +111,21 @@
 			<prop_pattern name='nameserver' type='net_address'
 			    required='true'>
 				<description> <loctext xml:lang='C'>
-				    The value used to construct the "nameserver" directive in resolv.conf(4).
+				    The value used to construct the "nameserver" directive in resolv.conf(5).
 				</loctext> </description>
 				<cardinality min='1' max='3'/>
 			</prop_pattern>
 			<prop_pattern name='domain' type='astring'
 			    required='false'>
 				<description> <loctext xml:lang='C'>
-				    The value used to construct the "domain" directive in resolv.conf(4).
+				    The value used to construct the "domain" directive in resolv.conf(5).
 				</loctext> </description>
 				<cardinality min='1' max='1'/>
 			</prop_pattern>
 			<prop_pattern name='search' type='astring'
 			    required='false'>
 				<description> <loctext xml:lang='C'>
-				    The value used to construct the "search" directive in resolv.conf(4).
+				    The value used to construct the "search" directive in resolv.conf(5).
 				</loctext> </description>
 				<cardinality min='1' max='6'/>
 			</prop_pattern>

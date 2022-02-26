@@ -39,7 +39,7 @@ extern "C" {
 
 /*
  * UGEN  provides a mechanism  to  retrieve  USB bus  specific information
- * through endpoint status minor nodes (See ugen(7D) for more information).
+ * through endpoint status minor nodes (See ugen(4D) for more information).
  * Whenever an error occurs on any endpoint, the application can retrieve
  * the last command status (int). Possible values are give below
  */
@@ -81,7 +81,7 @@ extern "C" {
 /*
  * Possible Device status (int) values
  * Application can poll(2) and read(2) device status on device status minor
- * nodes (See ugen(7D) for more details).
+ * nodes (See ugen(4D) for more details).
  */
 #define	USB_DEV_STAT_ONLINE		0x1	/* Device is online	  */
 #define	USB_DEV_STAT_DISCONNECTED	0x2	/* Device is disconnected */

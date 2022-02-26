@@ -83,7 +83,7 @@ shared object
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -97,9 +97,13 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBcputrack\fR(1), \fBcpustat\fR(1M), \fBIntro\fR(3), \fBcpc\fR(3CPC),
-\fBattributes\fR(5), \fBxVM\fR(5)
+.BR cputrack (1),
+.BR Intro (3),
+.BR cpc (3CPC),
+.BR attributes (7),
+.BR xVM (7),
+.BR cpustat (8)
 .SH NOTES
 .LP
-There is no support for access to performance counters in the \fBxVM\fR(5)
+There is no support for access to performance counters in the \fBxVM\fR(7)
 environment. The \fB-h\fR operations for \fBcputrack\fR(1) are not enabled.

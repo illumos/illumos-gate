@@ -189,7 +189,7 @@ server to respond.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -207,5 +207,8 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBendservent\fR(3XNET), \fBhtonl\fR(3XNET), \fBinet_addr\fR(3XNET),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR endservent (3XNET),
+.BR htonl (3XNET),
+.BR inet_addr (3XNET),
+.BR attributes (7),
+.BR standards (7)

@@ -77,7 +77,7 @@ error. \fBldap_add_s()\fR will return an LDAP error code directly.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -92,5 +92,7 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBldap\fR(3LDAP), \fBldap_error\fR(3LDAP), \fBldap_modify\fR(3LDAP),
-\fBattributes\fR(5)
+.BR ldap (3LDAP),
+.BR ldap_error (3LDAP),
+.BR ldap_modify (3LDAP),
+.BR attributes (7)

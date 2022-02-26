@@ -1,0 +1,62 @@
+.\"
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 29, 2021
+.Dt OBJFS 4FS
+.Os
+.Sh NAME
+.Nm objfs
+.Nd Kernel object filesystem
+.Sh DESCRIPTION
+The
+.Nm
+filesystem describes the state of all modules currently loaded
+by the kernel.
+It is mounted during boot at
+.Pa /system/object .
+.Pp
+The contents of the filesystem are dynamic and reflect the current state of the
+system.
+Each module is represented by a directory containing a single file,
+.Sq object' .
+The object file is a read only ELF file which contains information about the
+object loaded in the kernel.
+.Pp
+The kernel may load and unload modules dynamically as the system runs.
+As a result, applications may observe different directory contents in
+.Pa /system/object
+if they repeatedly rescan the directory.
+If a module is unloaded, its associated
+.Pa /system/object
+files disappear from the hierarchy and subsequent attempts to open them, or to
+read files opened before the module unloaded, elicits an error.
+.Pp
+This file system is generally not present in a non-global zone.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /system/object
+Mount point for objfs file system in the global zone.
+.El
+.Sh Interface Stability
+.Sy Private
+.Sh SEE ALSO
+.Xr vfstab 5
+.Sh NOTES
+The content of the ELF files is private to the implementation and subject to
+change without notice.

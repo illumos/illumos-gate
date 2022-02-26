@@ -37,10 +37,10 @@ default back ones) in the "inetd_private" property group of the service.
 This means that only the "proto" field can be specialized for an instance, which
 limits the creation of instances of a service to only those with all fields
 common, bar the "proto" field. This would enable the following two services
-to be created as instances of a common service: 
+to be created as instances of a common service:
 
 exec    stream  tcp     nowait  root    /usr/sbin/in.rexecd     in.rexecd
-exec    stream  tcp6    nowait  root    /usr/sbin/in.rexecd     in.rexecd 
+exec    stream  tcp6    nowait  root    /usr/sbin/in.rexecd     in.rexecd
 
 but dissallow common service create for these (different socket type):
 
@@ -60,7 +60,7 @@ also, so an instance can't have a different method than its service.
 Inetd is soon going to change to use instance composition for its configuration.
 This will mean that any of the properties/methods can be present in either the
 instance or the service (with the instance one overriding in the case both are
-present) and that multiple instances can be created for a service with the 
+present) and that multiple instances can be created for a service with the
 potential to specialize all the properties/methods.
 
 -->
@@ -126,7 +126,7 @@ potential to specialize all the properties/methods.
 			/>
 		</method_context>
 	</exec_method>
-        
+
 	<exec_method
 		type='method'
 		name='stop'
@@ -140,7 +140,7 @@ potential to specialize all the properties/methods.
 			/>
 		</method_context>
 	</exec_method>
-        
+
 	<!--
 	    Create an enabled instance.
 	-->
@@ -161,7 +161,7 @@ potential to specialize all the properties/methods.
 		<documentation>
 			<manpage
 				title='iscsi'
-				section='7D'
+				section='4D'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

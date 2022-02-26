@@ -139,7 +139,7 @@ if (blkno >= (1<<20)) {
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -155,8 +155,10 @@ Stability Level	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBattributes\fR(5), \fBscsi_setup_cdb\fR(9F), \fBscsi_device\fR(9S),
-\fBscsi_pkt\fR(9S)
+.BR attributes (7),
+.BR scsi_setup_cdb (9F),
+.BR scsi_device (9S),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIANSI Small Computer System Interface-2 (SCSI-2)\fR

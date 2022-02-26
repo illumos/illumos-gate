@@ -36,7 +36,7 @@ printed. Otherwise, a negative value is returned.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -52,5 +52,8 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBwsscanf\fR(3C), \fBprintf\fR(3C), \fBscanf\fR(3C), \fBsprintf\fR(3C),
-\fBattributes\fR(5)
+.BR printf (3C),
+.BR scanf (3C),
+.BR sprintf (3C),
+.BR wsscanf (3C),
+.BR attributes (7)

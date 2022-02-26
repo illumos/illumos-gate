@@ -333,7 +333,7 @@ Prefer a destination that is reachable through the IP routing table.
 T}
 _
 Prefer matching scope.	T{
-Prefer a destination whose scope is equal to the scope of its source address. See \fBinet6\fR(7P) for the definition of scope used by this rule.
+Prefer a destination whose scope is equal to the scope of its source address. See \fBinet6\fR(4P) for the definition of scope used by this rule.
 T}
 _
 Avoid link-local source.	T{
@@ -345,13 +345,13 @@ Prefer a destination that is not deprecated (\fBIFF_DEPRECATED\fR).
 T}
 _
 T{
-Prefer matching label. This rule uses labels that are obtained through the IPv6 default address selection policy table. See \fBipaddrsel\fR(1M) for a description of the default contents of the table and how the table is configured.
+Prefer matching label. This rule uses labels that are obtained through the IPv6 default address selection policy table. See \fBipaddrsel\fR(8) for a description of the default contents of the table and how the table is configured.
 T}	T{
 Prefer a destination whose label is equal to the label of its source address.
 T}
 _
 T{
-Prefer higher precedence. This rule uses precedence values that are obtained through the IPv6 default address selection policy table. See \fBipaddrsel\fR(1M) for a description of the default contents of the table and how the table is configured.
+Prefer higher precedence. This rule uses precedence values that are obtained through the IPv6 default address selection policy table. See \fBipaddrsel\fR(8) for a description of the default contents of the table and how the table is configured.
 T}	T{
 Prefer the destination whose precedence is higher than the other destination.
 T}
@@ -361,7 +361,7 @@ Prefer a destination if the interface that is used for sending packets to that d
 T}
 _
 T{
-Prefer smaller scope. See \fBinet6\fR(7P) for the definition of this rule.
+Prefer smaller scope. See \fBinet6\fR(4P) for the definition of this rule.
 T}	T{
 Prefer the destination whose scope is smaller than the other destination.
 T}
@@ -512,7 +512,7 @@ configuration file for the name service switch
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -526,15 +526,24 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .LP
-\fBipaddrsel\fR(1M), \fBgethostbyname\fR(3NSL), \fBgetipnodebyname\fR(3SOCKET),
-\fBhtonl\fR(3C), \fBinet\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
-\fBnetdb.h\fR(3HEAD), \fBsocket\fR(3SOCKET), \fBhosts\fR(4),
-\fBnsswitch.conf\fR(4), \fBattributes\fR(5), \fBstandards\fR(5), \fBinet6\fR(7P)
+.BR htonl (3C),
+.BR netdb.h (3HEAD),
+.BR gethostbyname (3NSL),
+.BR getipnodebyname (3SOCKET),
+.BR inet (3SOCKET),
+.BR sockaddr (3SOCKET),
+.BR socket (3SOCKET),
+.BR inet6 (4P),
+.BR hosts (5),
+.BR nsswitch.conf (5),
+.BR attributes (7),
+.BR standards (7),
+.BR ipaddrsel (8)
 .sp
 .LP
 Draves, R. \fIRFC 3484, Default Address Selection for Internet Protocol version

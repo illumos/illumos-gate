@@ -41,8 +41,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/yge group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/yge.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/yge.4d
 driver name=yge perms="* 0666 root sys" \
     alias=pciex1148,9e00 \
     alias=pciex1186,4b00 \

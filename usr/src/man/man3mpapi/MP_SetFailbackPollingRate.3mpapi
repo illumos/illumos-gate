@@ -106,7 +106,7 @@ The implementation does not support the API.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -126,7 +126,8 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibMPAPI\fR(3LIB), \fBattributes\fR(5)
+.BR libMPAPI (3LIB),
+.BR attributes (7)
 .sp
 .LP
 \fIMultipath Management API Version 1.0\fR

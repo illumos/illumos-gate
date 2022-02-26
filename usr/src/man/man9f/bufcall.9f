@@ -173,9 +173,16 @@ time.
 .SH SEE ALSO
 .sp
 .LP
-\fBsrv\fR(9E), \fBallocb\fR(9F), \fBcanputnext\fR(9F), \fBesballoc\fR(9F),
-\fBesbbcall\fR(9F), \fBputnext\fR(9F), \fBqenable\fR(9F), \fBtestb\fR(9F),
-\fBtimeout\fR(9F), \fBunbufcall\fR(9F)
+.BR srv (9E),
+.BR allocb (9F),
+.BR canputnext (9F),
+.BR esballoc (9F),
+.BR esbbcall (9F),
+.BR putnext (9F),
+.BR qenable (9F),
+.BR testb (9F),
+.BR timeout (9F),
+.BR unbufcall (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

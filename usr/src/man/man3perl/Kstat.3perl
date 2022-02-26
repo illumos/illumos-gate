@@ -106,9 +106,13 @@ while (1) {
 .SH SEE ALSO
 .sp
 .LP
-\fBperl\fR(1), \fBkstat\fR(1M), \fBkstat\fR(3KSTAT),
-\fBkstat_chain_update\fR(3KSTAT), \fBkstat_close\fR(3KSTAT),
-\fBkstat_open\fR(3KSTAT), \fBkstat_read\fR(3KSTAT)
+.BR perl (1),
+.BR kstat (3KSTAT),
+.BR kstat_chain_update (3KSTAT),
+.BR kstat_close (3KSTAT),
+.BR kstat_open (3KSTAT),
+.BR kstat_read (3KSTAT),
+.BR kstat (8)
 .SH NOTES
 .sp
 .LP

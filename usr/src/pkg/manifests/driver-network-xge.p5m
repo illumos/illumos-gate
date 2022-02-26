@@ -41,8 +41,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/xge group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/xge.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/xge.4d
 driver name=xge perms="* 0666 root sys" clone_perms="xge 0666 root sys" \
     alias=pci17d5,5731 \
     alias=pci17d5,5831 \

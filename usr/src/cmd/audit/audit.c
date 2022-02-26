@@ -212,7 +212,7 @@ is_audit_config_ok() {
 
 	/*
 	 * There must be at least one active plugin configured; if the
-	 * configured plugin is audit_binfile(5), then the p_dir must not be
+	 * configured plugin is audit_binfile(7), then the p_dir must not be
 	 * empty.
 	 */
 	if (!do_getpluginconfig_scf(NULL, &plugin_kva_ll)) {
@@ -238,12 +238,12 @@ is_audit_config_ok() {
 			cval_str = kva_match(kvlist, "p_dir");
 			if (cval_str == NULL || cval_str[0] == '\0') {
 				(void) fprintf(stderr,
-				    gettext("%s: audit_binfile(5) \"p_dir:\" "
+				    gettext("%s: audit_binfile(7) \"p_dir:\" "
 				    "attribute empty\n"), progname);
 				state = B_FALSE;
 			} else if (!contains_valid_dirs(cval_str)) {
 				(void) fprintf(stderr,
-				    gettext("%s: audit_binfile(5) \"p_dir:\" "
+				    gettext("%s: audit_binfile(7) \"p_dir:\" "
 				    "attribute invalid\n"), progname);
 				state = B_FALSE;
 			}
@@ -252,7 +252,7 @@ is_audit_config_ok() {
 			cval_int = atoi(cval_str);
 			if (cval_int < 0 || cval_int > 100) {
 				(void) fprintf(stderr,
-				    gettext("%s: audit_binfile(5) "
+				    gettext("%s: audit_binfile(7) "
 				    "\"p_minfree:\" attribute invalid\n"),
 				    progname);
 				state = B_FALSE;

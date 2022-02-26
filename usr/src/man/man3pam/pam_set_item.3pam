@@ -37,7 +37,7 @@ following:
 .RS 19n
 The authenticated user name.  Applications that are trusted to correctly
 identify the authenticated user should set this item to the authenticated user
-name. See NOTES and \fBpam_unix_cred\fR(5).
+name. See NOTES and \fBpam_unix_cred\fR(7).
 .RE
 
 .sp
@@ -76,7 +76,7 @@ The old user authentication token.
 A semicolon-separated list of \fIkey\fR=\fIvalue\fR pairs that represent the
 set of resource controls for application by \fBpam_setcred\fR(3PAM) or
 \fBpam_open_session\fR(3PAM). See the individual service module definitions,
-such as \fBpam_unix_cred\fR(5), for interpretations of the keys and values.
+such as \fBpam_unix_cred\fR(7), for interpretations of the keys and values.
 .RE
 
 .sp
@@ -198,7 +198,7 @@ related return values.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -220,11 +220,17 @@ multithreaded application uses its own \fBPAM\fR handle.
 .SH SEE ALSO
 .sp
 .LP
-\fBlibpam\fR(3LIB), \fBpam\fR(3PAM), \fBpam_acct_mgmt\fR(3PAM),
-\fBpam_authenticate\fR(3PAM), \fBpam_chauthtok\fR(3PAM),
-\fBpam_get_user\fR(3PAM), \fBpam_open_session\fR(3PAM),
-\fBpam_setcred\fR(3PAM), \fBpam_start\fR(3PAM), \fBattributes\fR(5),
-\fBpam_unix_cred\fR(5)
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_acct_mgmt (3PAM),
+.BR pam_authenticate (3PAM),
+.BR pam_chauthtok (3PAM),
+.BR pam_get_user (3PAM),
+.BR pam_open_session (3PAM),
+.BR pam_setcred (3PAM),
+.BR pam_start (3PAM),
+.BR attributes (7),
+.BR pam_unix_cred (7)
 .SH NOTES
 .sp
 .LP
@@ -237,4 +243,4 @@ not set, a service module performs its default action.
 PAM_AUSER is not intended as a replacement for PAM_USER.  It is expected to be
 used to supplement PAM_USER when there is an authenticated user from a source
 other than \fBpam_authenticate\fR(3PAM). Such sources could be \fBsshd\fR
-host-based authentication, kerberized \fBrlogin\fR, and \fBsu\fR(1M).
+host-based authentication, kerberized \fBrlogin\fR, and \fBsu\fR(8).

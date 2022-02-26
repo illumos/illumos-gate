@@ -98,7 +98,7 @@ afterwards to clean up.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -116,8 +116,10 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBfwprintf\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR fwprintf (3C),
+.BR setlocale (3C),
+.BR attributes (7),
+.BR standards (7)
 .SH NOTES
 .sp
 .LP

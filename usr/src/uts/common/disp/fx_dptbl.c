@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/proc.h>
 #include <sys/priocntl.h>
 #include <sys/class.h>
@@ -37,7 +35,7 @@
 /*
  * The purpose of this file is to allow a user to make their own
  * fx_dptbl. The contents of this file should be included in the
- * fx_dptbl(4) man page with proper instructions for making
+ * fx_dptbl(5) man page with proper instructions for making
  * and replacing the FX_DPTBL in usr/kernel/sched.
  * It is recommended that the system calls be used to change the time
  * quantums instead of re-building the module.

@@ -658,7 +658,7 @@ boot_prop_display(char *buffer)
 
 /*
  * 2nd part of building the table of boot properties. This includes:
- * - values from /boot/solaris/bootenv.rc (ie. eeprom(1m) values)
+ * - values from /boot/solaris/bootenv.rc (ie. eeprom(8) values)
  *
  * lines look like one of:
  * ^$
@@ -1464,7 +1464,7 @@ process_boot_environment(struct boot_modules *benv)
  * 1st pass at building the table of boot properties. This includes:
  * - values set on the command line: -B a=x,b=y,c=z ....
  * - known values we just compute (ie. from xbp)
- * - values from /boot/solaris/bootenv.rc (ie. eeprom(1m) values)
+ * - values from /boot/solaris/bootenv.rc (ie. eeprom(8) values)
  *
  * the grub command line looked like:
  * kernel boot-file [-B prop=value[,prop=value]...] [boot-args]

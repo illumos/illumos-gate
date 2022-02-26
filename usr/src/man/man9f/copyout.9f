@@ -143,7 +143,7 @@ returned.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -159,8 +159,13 @@ Stability Level	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBattributes\fR(5), \fBioctl\fR(9E), \fBbcopy\fR(9F), \fBcopyin\fR(9F),
-\fBddi_copyin\fR(9F), \fBddi_copyout\fR(9F), \fBuiomove\fR(9F)
+.BR attributes (7),
+.BR ioctl (9E),
+.BR bcopy (9F),
+.BR copyin (9F),
+.BR ddi_copyin (9F),
+.BR ddi_copyout (9F),
+.BR uiomove (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

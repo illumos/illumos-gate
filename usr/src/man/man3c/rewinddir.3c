@@ -86,7 +86,7 @@ contents of the directory. This method is recommended for portability.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -104,5 +104,10 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBfork\fR(2), \fBclosedir\fR(3C), \fBopendir\fR(3C), \fBreaddir\fR(3C),
-\fBseekdir\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR fork (2),
+.BR closedir (3C),
+.BR opendir (3C),
+.BR readdir (3C),
+.BR seekdir (3C),
+.BR attributes (7),
+.BR standards (7)

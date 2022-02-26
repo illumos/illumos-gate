@@ -157,7 +157,7 @@ These entry points must be implemented by a device-specific network driver
 designed to interface with the Generic LAN Driver (GLD).
 .sp
 .LP
-As described in \fBgld\fR(7D), the main data structure for communication
+As described in \fBgld\fR(4D), the main data structure for communication
 between the device-specific driver and the GLD module is the
 \fBgld_mac_info\fR(9S) structure. Some of the elements in that structure are
 function pointers to the entry points described here. The device-specific
@@ -306,7 +306,7 @@ private counters, and updates the \fBgld_stats\fR(9S) structure pointed to by
 \fIstats\fR. This routine is called by GLD when it gets a request for
 statistics, and provides the mechanism by which GLD acquires device dependent
 statistics from the driver before composing its reply to the statistics
-request. See \fBgld_stats\fR(9S) and \fBgld\fR(7D) for a description of the
+request. See \fBgld_stats\fR(9S) and \fBgld\fR(4D) for a description of the
 defined statistics counters.
 .sp
 .LP
@@ -404,8 +404,13 @@ on hardware failure.
 .RE
 
 .SH SEE ALSO
-\fBgld\fR(7D), \fBgld\fR(9F), \fBgld_mac_info\fR(9S), \fBgld_stats\fR(9S),
-\fBdlpi\fR(7P), \fBattach\fR(9E), \fBddi_add_intr\fR(9F)
+.BR gld (4D),
+.BR dlpi (4P),
+.BR attach (9E),
+.BR ddi_add_intr (9F),
+.BR gld (9F),
+.BR gld_mac_info (9S),
+.BR gld_stats (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

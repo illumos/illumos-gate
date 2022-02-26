@@ -69,7 +69,7 @@ extern int class_pci_items;
 #define	MSG_HOTPLUG_DISABLED \
 	"Error: hotplug service is probably not running, " \
 	"please use 'svcadm enable hotplug' to enable the service. " \
-	"See cfgadm_shp(1M) for more details."
+	"See cfgadm_shp(8) for more details."
 
 #define	DEVICES_DIR		"/devices"
 #define	SLASH			"/"

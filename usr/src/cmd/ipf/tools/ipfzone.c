@@ -27,7 +27,7 @@ extern char	*optarg;
 
 /*
  * Get the zonename if it's the last argument and set the zonename
- * in ipfzo to it. This is used by ipf(1m) only - all of the other tools
+ * in ipfzo to it. This is used by ipf(8) only - all of the other tools
  * specify the zone with the -z option, and therefore use getzoneopt() below.
  */
 void

@@ -35,7 +35,7 @@ device, if any, or \fBDDI_MAJOR_T_NONE\fR otherwise.
 .SH CONTEXT
 \fBddi_driver_major()\fR can be called from kernel or interrupt context.
 .SH SEE ALSO
-\fBddi_driver_name\fR(9F)
+.BR ddi_driver_name (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

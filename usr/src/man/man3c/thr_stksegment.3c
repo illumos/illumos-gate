@@ -68,7 +68,7 @@ initialization is not yet complete, or the thread is an internal thread.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -84,4 +84,6 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBsigaltstack\fR(2), \fBthr_create\fR(3C), \fBattributes\fR(5)
+.BR sigaltstack (2),
+.BR thr_create (3C),
+.BR attributes (7)

@@ -15,7 +15,7 @@ Description
 This module provided access to the Solaris Project subsystem, which is part of
 the Solaris resource management infrastructure.
 
-For more information on Solaris Projects, see the project(4) manpage and the
+For more information on Solaris Projects, see the project(5) manpage and the
 following on-line documentation:
 
 System Administration Guide: Resource Management and Network Services

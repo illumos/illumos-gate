@@ -1,0 +1,79 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH RWN 4D "Mar 30, 2009"
+.SH NAME
+rwn \- Ralink RT2700/2800 IEEE802.11 a/b/g/n wireless network device
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrwn\fR IEEE802.11 a/b/g/n wireless driver is a multi-threaded, loadable,
+clonable, GLDv3-based STREAMS driver supporting Ralink RT2700/RT2800 IEEE802.11
+a/b/g/n wireless network device.
+.SS "Configuration"
+.sp
+.LP
+The \fBrwn\fR driver performs auto-negotiation to determine the data rate and
+mode. The driver supports only BSS networks (also known as \fBap\fR or
+\fBinfrastructure\fR networks) and \fBopen\fR (\fBopen-system\fR) or \fBshared
+system\fR authentication.
+.sp
+.LP
+For wireless security, WEP encryption, WPA-PSK, and WPA2-PSK are currently
+supported. You can perform configuration and administration tasks using the
+\fBdladm\fR(8) and \fBwificonfig\fR(8) utilities.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/rwn\fR\fR
+.ad
+.RS 25n
+Special character device
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/rwn\fR\fR
+.ad
+.RS 25n
+32-bit ELF kernel module, x86
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/rwn\fR\fR
+.ad
+.RS 25n
+64-bit ELF kernel module, x86
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR attributes (7),
+.BR dladm (8),
+.BR wificonfig (8)
+.sp
+.LP
+\fIIEEE802.11b/g - Wireless LAN Standard - IEEE, 2003\fR

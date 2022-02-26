@@ -177,7 +177,8 @@ xx_write_cmd(uchar_t *cmdp, int ncmdbytes, ...)
 .in -2
 
 .SH SEE ALSO
-\fBvcmn_err\fR(9F), \fBvsprintf\fR(9F)
+.BR vcmn_err (9F),
+.BR vsprintf (9F)
 .SH NOTES
 It is up to the calling routine to specify in some manner how many arguments
 there are, since it is not always possible to determine the number of arguments

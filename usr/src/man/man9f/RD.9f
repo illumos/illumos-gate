@@ -60,7 +60,8 @@ See the \fBqreply\fR(9F) function page for an example of \fBRD()\fR.
 .SH SEE ALSO
 .sp
 .LP
-\fBqreply\fR(9F), \fBWR\fR(9F)
+.BR WR (9F),
+.BR qreply (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -125,7 +125,7 @@ typedef struct dt_module {
 	uint_t dm_asrsv;	/* actual reserved size of dm_asmap */
 	uint_t dm_aslen;	/* number of entries in dm_asmap */
 	uint_t dm_flags;	/* module flags (see below) */
-	int dm_modid;		/* modinfo(1M) module identifier */
+	int dm_modid;		/* modinfo(8) module identifier */
 	GElf_Addr dm_text_va;	/* virtual address of text section */
 	GElf_Xword dm_text_size; /* size in bytes of text section */
 	GElf_Addr dm_data_va;	/* virtual address of data section */

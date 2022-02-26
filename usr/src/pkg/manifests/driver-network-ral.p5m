@@ -40,8 +40,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/ral group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/ral.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/ral.4d
 driver name=ral perms="* 0666 root sys" clone_perms="ral 0666 root sys" \
     alias=pci1814,201
 legacy pkg=SUNWralink desc="Ralink RT2500 802.11b/g Wireless Driver" \

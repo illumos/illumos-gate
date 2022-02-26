@@ -430,9 +430,12 @@ int	noptions;
 .in -2
 
 .SH SEE ALSO
-\fBexecve\fR(2), \fBddi_prop_exists\fR(9F), \fBddi_prop_get_int\fR(9F),
-\fBddi_prop_remove\fR(9F), \fBddi_prop_undefine\fR(9F),
-\fBddi_prop_update\fR(9F)
+.BR execve (2),
+.BR ddi_prop_exists (9F),
+.BR ddi_prop_get_int (9F),
+.BR ddi_prop_remove (9F),
+.BR ddi_prop_undefine (9F),
+.BR ddi_prop_update (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

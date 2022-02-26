@@ -57,7 +57,7 @@ used to selectively import constants and functions defined in this module:
 
 =head1 ATTRIBUTES
 
-See C<attributes(5)> for descriptions of the following attributes:
+See C<attributes(7)> for descriptions of the following attributes:
 
   ___________________________________________________________
  |       ATTRIBUTE TYPE        |       ATTRIBUTE VALUE       |
@@ -69,4 +69,4 @@ See C<attributes(5)> for descriptions of the following attributes:
 
 =head1 SEE ALSO
 
-C<gettaskid(2)>, C<settaskid(2)>, C<attributes(5)>
+C<gettaskid(2)>, C<settaskid(2)>, C<attributes(7)>

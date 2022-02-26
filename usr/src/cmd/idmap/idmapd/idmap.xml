@@ -154,9 +154,9 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='idmapd' section='1M'
+			<manpage title='idmapd' section='8'
 				manpath='/usr/share/man' />
-			<manpage title='idmap' section='1M'
+			<manpage title='idmap' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

@@ -225,7 +225,7 @@ xxdevmap_contextmgt(devmap_cookie_t dhp, void *pvtp, offset_t off,
 
 .SH SEE ALSO
 \fBdevmap_access\fR(9E), \fBdevmap_do_ctxmgt\fR(9F) \fBdevmap_load\fR(9F),
-\fBdevmap_unload\fR(9F)
+.BR devmap_unload (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

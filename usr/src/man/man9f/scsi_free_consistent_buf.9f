@@ -35,7 +35,9 @@ consistent data buffer that was previously allocated using
 The \fBscsi_free_consistent_buf()\fR function can be called from user,
 interrupt, or kernel context.
 .SH SEE ALSO
-\fBfreerbuf\fR(9F), \fBscsi_alloc_consistent_buf\fR(9F), \fBbuf\fR(9S)
+.BR freerbuf (9F),
+.BR scsi_alloc_consistent_buf (9F),
+.BR buf (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

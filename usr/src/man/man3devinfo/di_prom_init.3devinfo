@@ -54,11 +54,11 @@ error.
 .sp
 .LP
 The \fBdi_prom_init()\fR sets \fBerrno\fR function to any error code that can
-also be set by \fBopenprom\fR(7D) or \fBmalloc\fR(3C).
+also be set by \fBopenprom\fR(4D) or \fBmalloc\fR(3C).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -76,6 +76,10 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBdi_nodeid\fR(3DEVINFO), \fBdi_prom_prop_next\fR(3DEVINFO),
-\fBdi_prom_prop_lookup_bytes\fR(3DEVINFO), \fBlibdevinfo\fR(3LIB),
-\fBmalloc\fR(3C), \fBattributes\fR(5), \fBopenprom\fR(7D)
+.BR malloc (3C),
+.BR di_nodeid (3DEVINFO),
+.BR di_prom_prop_lookup_bytes (3DEVINFO),
+.BR di_prom_prop_next (3DEVINFO),
+.BR libdevinfo (3LIB),
+.BR openprom (4D),
+.BR attributes (7)

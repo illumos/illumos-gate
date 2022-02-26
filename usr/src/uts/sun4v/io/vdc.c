@@ -41,7 +41,7 @@
  *	allows the LDC clients to transfer data via memory mappings.
  *
  * 3) Support exported to upper layers (filesystems, etc)
- *	The upper layers call into vdc via strategy(9E) and DKIO(7I)
+ *	The upper layers call into vdc via strategy(9E) and dkio(4I)
  *	ioctl calls. vdc will copy the data to be written to the descriptor
  *	ring or maps the buffer to store the data read by the vDisk
  *	server into the descriptor ring. It then sends a message to the
@@ -724,7 +724,7 @@ vdc_do_attach(dev_info_t *dip)
 
 	(void) md_fini_handle(mdp);
 
-	/* Create the kstats for saving the I/O statistics used by iostat(1M) */
+	/* Create the kstats for saving the I/O statistics used by iostat(8) */
 	vdc_create_io_kstats(vdc);
 	vdc_create_err_kstats(vdc);
 
@@ -3010,7 +3010,7 @@ done:
 	/*
 	 * If this is a block read/write we update the I/O statistics kstat
 	 * to indicate that this request has been placed on the queue for
-	 * processing (i.e sent to the vDisk server) - iostat(1M) will
+	 * processing (i.e sent to the vDisk server) - iostat(8) will
 	 * report the time waiting for the vDisk server under the %b column
 	 *
 	 * In the case of an error we take it off the wait queue only if
@@ -5504,7 +5504,7 @@ vdc_is_supported_version(vio_ver_msg_t *ver_msg)
 /* -------------------------------------------------------------------------- */
 
 /*
- * DKIO(7) support
+ * dkio(4I) support
  */
 
 typedef struct vdc_dk_arg {
@@ -5926,7 +5926,7 @@ vdc_scsi_status(vdc_t *vdc, vd_scsi_t *vd_scsi, boolean_t log_error)
 }
 
 /*
- * Implemented the USCSICMD uscsi(7I) ioctl. This ioctl is converted to
+ * Implemented the USCSICMD uscsi(4I) ioctl. This ioctl is converted to
  * a VD_OP_SCSICMD operation which is sent to the vdisk server. If a SCSI
  * reset is requested (i.e. a flag USCSI_RESET* is set) then the ioctl is
  * converted to a VD_OP_RESET operation.
@@ -6180,7 +6180,7 @@ vdc_scsi_alloc_persistent_out(uchar_t cmd, int len, int *vd_scsi_len)
 }
 
 /*
- * Implement the MHIOCGRP_INKEYS mhd(7i) ioctl. The ioctl is converted
+ * Implement the MHIOCGRP_INKEYS mhd(4I) ioctl. The ioctl is converted
  * to a SCSI PERSISTENT IN READ KEYS command which is sent to the vdisk
  * server with a VD_OP_SCSICMD operation.
  */
@@ -6292,7 +6292,7 @@ done:
 }
 
 /*
- * Implement the MHIOCGRP_INRESV mhd(7i) ioctl. The ioctl is converted
+ * Implement the MHIOCGRP_INRESV mhd(4I) ioctl. The ioctl is converted
  * to a SCSI PERSISTENT IN READ RESERVATION command which is sent to
  * the vdisk server with a VD_OP_SCSICMD operation.
  */
@@ -6420,7 +6420,7 @@ done:
 }
 
 /*
- * Implement the MHIOCGRP_REGISTER mhd(7i) ioctl. The ioctl is converted
+ * Implement the MHIOCGRP_REGISTER mhd(4I) ioctl. The ioctl is converted
  * to a SCSI PERSISTENT OUT REGISTER command which is sent to the vdisk
  * server with a VD_OP_SCSICMD operation.
  */
@@ -6459,7 +6459,7 @@ vdc_mhd_register(vdc_t *vdc, caddr_t arg, int mode)
 }
 
 /*
- * Implement the MHIOCGRP_RESERVE mhd(7i) ioctl. The ioctl is converted
+ * Implement the MHIOCGRP_RESERVE mhd(4I) ioctl. The ioctl is converted
  * to a SCSI PERSISTENT OUT RESERVE command which is sent to the vdisk
  * server with a VD_OP_SCSICMD operation.
  */
@@ -6500,7 +6500,7 @@ vdc_mhd_reserve(vdc_t *vdc, caddr_t arg, int mode)
 }
 
 /*
- * Implement the MHIOCGRP_PREEMPTANDABORT mhd(7i) ioctl. The ioctl is
+ * Implement the MHIOCGRP_PREEMPTANDABORT mhd(4I) ioctl. The ioctl is
  * converted to a SCSI PERSISTENT OUT PREEMPT AND ABORT command which
  * is sent to the vdisk server with a VD_OP_SCSICMD operation.
  */
@@ -6545,7 +6545,7 @@ vdc_mhd_preemptabort(vdc_t *vdc, caddr_t arg, int mode)
 }
 
 /*
- * Implement the MHIOCGRP_REGISTERANDIGNOREKEY mhd(7i) ioctl. The ioctl
+ * Implement the MHIOCGRP_REGISTERANDIGNOREKEY mhd(4I) ioctl. The ioctl
  * is converted to a SCSI PERSISTENT OUT REGISTER AND IGNORE EXISTING KEY
  * command which is sent to the vdisk server with a VD_OP_SCSICMD operation.
  */
@@ -6934,7 +6934,7 @@ vdc_eio_thread(void *arg)
 }
 
 /*
- * Implement the MHIOCENFAILFAST mhd(7i) ioctl.
+ * Implement the MHIOCENFAILFAST mhd(4I) ioctl.
  */
 static int
 vdc_failfast(vdc_t *vdc, caddr_t arg, int mode)
@@ -6959,7 +6959,7 @@ vdc_failfast(vdc_t *vdc, caddr_t arg, int mode)
 }
 
 /*
- * Implement the MHIOCTKOWN and MHIOCRELEASE mhd(7i) ioctls. These ioctls are
+ * Implement the MHIOCTKOWN and MHIOCRELEASE mhd(4I) ioctls. These ioctls are
  * converted to VD_OP_SET_ACCESS operations.
  */
 static int
@@ -6975,7 +6975,7 @@ vdc_access_set(vdc_t *vdc, uint64_t flags)
 }
 
 /*
- * Implement the MHIOCSTATUS mhd(7i) ioctl. This ioctl is converted to a
+ * Implement the MHIOCSTATUS mhd(4I) ioctl. This ioctl is converted to a
  * VD_OP_GET_ACCESS operation.
  */
 static int
@@ -7166,7 +7166,7 @@ vdc_check_capacity(vdc_t *vdc)
 }
 
 /*
- * This structure is used in the DKIO(7I) array below.
+ * This structure is used in the dkio(4I) array below.
  */
 typedef struct vdc_dk_ioctl {
 	uint8_t		op;		/* VD_OP_XXX value */
@@ -7179,7 +7179,7 @@ typedef struct vdc_dk_ioctl {
 } vdc_dk_ioctl_t;
 
 /*
- * Subset of DKIO(7I) operations currently supported
+ * Subset of dkio(4I) operations currently supported
  */
 static vdc_dk_ioctl_t	dk_ioctl[] = {
 	{VD_OP_FLUSH,		DKIOCFLUSHWRITECACHE,	0,
@@ -7212,13 +7212,13 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 	/* DIOCTL_RWCMD is converted to a read or a write */
 	{0, DIOCTL_RWCMD,  sizeof (struct dadkio_rwcmd), NULL},
 
-	/* mhd(7I) non-shared multihost disks ioctls */
+	/* mhd(4I) non-shared multihost disks ioctls */
 	{0, MHIOCTKOWN,				0, vdc_null_copy_func},
 	{0, MHIOCRELEASE,			0, vdc_null_copy_func},
 	{0, MHIOCSTATUS,			0, vdc_null_copy_func},
 	{0, MHIOCQRESERVE,			0, vdc_null_copy_func},
 
-	/* mhd(7I) shared multihost disks ioctls */
+	/* mhd(4I) shared multihost disks ioctls */
 	{0, MHIOCGRP_INKEYS,			0, vdc_null_copy_func},
 	{0, MHIOCGRP_INRESV,			0, vdc_null_copy_func},
 	{0, MHIOCGRP_REGISTER,			0, vdc_null_copy_func},
@@ -7226,7 +7226,7 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 	{0, MHIOCGRP_PREEMPTANDABORT,		0, vdc_null_copy_func},
 	{0, MHIOCGRP_REGISTERANDIGNOREKEY,	0, vdc_null_copy_func},
 
-	/* mhd(7I) failfast ioctl */
+	/* mhd(4I) failfast ioctl */
 	{0, MHIOCENFAILFAST,			0, vdc_null_copy_func},
 
 	/*
@@ -7268,7 +7268,7 @@ vd_process_efi_ioctl(void *vdisk, int cmd, uintptr_t arg)
  *
  * Arguments:
  *	dev	- the device number
- *	cmd	- the operation [dkio(7I)] to be processed
+ *	cmd	- the operation [dkio(4I)] to be processed
  *	arg	- pointer to user provided structure
  *		  (contains data to be set or reference parameter for get)
  *	mode	- bit flag, indicating open settings, 32/64 bit type, etc
@@ -8095,7 +8095,7 @@ vdc_set_efi_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
  *
  * Description:
  *	This routine fakes up the disk info needed for some DKIO ioctls such
- *	as DKIOCINFO and DKIOCGMEDIAINFO [just like lofi(7D) and ramdisk(7D) do]
+ *	as DKIOCINFO and DKIOCGMEDIAINFO [just like lofi(4D) and ramdisk(4D) do]
  *
  *	Note: This function must not be called until the vDisk attributes have
  *	been exchanged as part of the handshake with the vDisk server.

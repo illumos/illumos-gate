@@ -15,7 +15,7 @@
  */
 
 /*
- * The ufm(7D) pseudo driver provides an ioctl interface for DDI UFM
+ * The ufm(4D) pseudo driver provides an ioctl interface for DDI UFM
  * information.  See ddi_ufm.h.
  */
 #include <sys/ddi.h>

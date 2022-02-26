@@ -25,7 +25,7 @@
 
 
 /*
- * Streams log driver.  See log(7D).
+ * Streams log driver.  See log(4D).
  */
 
 #include <sys/types.h>

@@ -70,7 +70,8 @@ processing.
 .SH SEE ALSO
 .sp
 .LP
-\fBnoenable\fR(9F), \fBqenable\fR(9F)
+.BR noenable (9F),
+.BR qenable (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

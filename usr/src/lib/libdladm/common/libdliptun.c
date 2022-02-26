@@ -44,7 +44,7 @@
 
 /*
  * IP Tunneling Administration Library.
- * This library is used by dladm(1M) and to configure IP tunnel links.
+ * This library is used by dladm(8) and to configure IP tunnel links.
  */
 
 #define	IPTUN_CONF_TYPE		"type"

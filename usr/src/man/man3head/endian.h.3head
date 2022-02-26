@@ -30,7 +30,7 @@ the functions are documented separately in
 .Xr endian 3C .
 More information on endianness and a general background on the topic can
 be found in
-.Xr byteorder 5 .
+.Xr byteorder 7 .
 .Pp
 The
 .In endian.h
@@ -88,5 +88,5 @@ endianness of the system.
 .Xr byteorder 3C ,
 .Xr endian 3C ,
 .Xr types.h 3HEAD ,
-.Xr attributes 5 ,
-.Xr byteorder 5
+.Xr attributes 7 ,
+.Xr byteorder 7

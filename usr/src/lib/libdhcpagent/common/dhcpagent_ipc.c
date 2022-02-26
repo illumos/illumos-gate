@@ -438,7 +438,7 @@ dhcp_ipc_init(int *listen_fd)
 	/*
 	 * we use SO_REUSEADDR here since in the case where there
 	 * really is another daemon running that is using the agent's
-	 * port, bind(3N) will fail.  so we can't lose.
+	 * port, bind(3SOCKET) will fail.  so we can't lose.
 	 */
 
 	(void) setsockopt(*listen_fd, SOL_SOCKET, SO_REUSEADDR, &on,
@@ -477,7 +477,7 @@ dhcp_ipc_accept(int listen_fd, int *fd, int *is_priv)
 	/*
 	 * if we were extremely concerned with portability, we would
 	 * set the socket into nonblocking mode before doing the
-	 * accept(3N), since on BSD-based networking stacks, there is
+	 * accept(3SOCKET), since on BSD-based networking stacks, there is
 	 * a potential race that can occur if the socket which
 	 * connected to us performs a TCP RST before we accept, since
 	 * BSD handles this case entirely in the kernel and as a

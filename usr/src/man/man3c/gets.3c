@@ -51,7 +51,7 @@ returns data not supplied by a prior call to \fBungetc\fR(3C) or
 .LP
 If end-of-file is encountered and no bytes have been read, no bytes are
 transferred to \fIs\fR and a null pointer is returned. For standard-conforming
-(see \fBstandards\fR(5)) applications, if the end-of-file indicator for the
+(see \fBstandards\fR(7)) applications, if the end-of-file indicator for the
 stream is set, no bytes are transferred to \fIs\fR and a null pointer is
 returned whether or not the stream is at end-of-file. If a read error occurs,
 such as trying to use these functions on a file that has not been opened for
@@ -65,7 +65,7 @@ Refer to \fBfgetc\fR(3C).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -83,7 +83,17 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlseek\fR(2), \fBread\fR(2), \fBferror\fR(3C), \fBfgetc\fR(3C),
-\fBfgetwc\fR(3C), \fBfopen\fR(3C), \fBfread\fR(3C), \fBgetchar\fR(3C),
-\fBscanf\fR(3C), \fBstdio\fR(3C), \fBungetc\fR(3C), \fBungetwc\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR lseek (2),
+.BR read (2),
+.BR ferror (3C),
+.BR fgetc (3C),
+.BR fgetwc (3C),
+.BR fopen (3C),
+.BR fread (3C),
+.BR getchar (3C),
+.BR scanf (3C),
+.BR stdio (3C),
+.BR ungetc (3C),
+.BR ungetwc (3C),
+.BR attributes (7),
+.BR standards (7)

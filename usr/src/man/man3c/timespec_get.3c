@@ -79,4 +79,4 @@ There was an error obtaining the time for
 .Sh SEE ALSO
 .Xr clock_gettime 3C ,
 .Xr time.h 3HEAD ,
-.Xr attributes 5
+.Xr attributes 7

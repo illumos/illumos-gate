@@ -151,7 +151,7 @@ hrtime_t	dtrace_unregister_defunct_reap = (hrtime_t)60 * NANOSEC;
 /*
  * DTrace External Variables
  *
- * As dtrace(7D) is a kernel module, any DTrace variables are obviously
+ * As dtrace(4D) is a kernel module, any DTrace variables are obviously
  * available to DTrace consumers via the backtick (`) syntax.  One of these,
  * dtrace_zero, is made deliberately so:  it is provided as a source of
  * well-known, zero-filled memory.  While this variable is not documented,

@@ -53,7 +53,7 @@ The following options are supported:
 .RS 4n
 Labels the media with a SUNOS label. A SUNOS volume label name is restricted to
 8 characters. For media size greater than 1 TB, an EFI label is created. For
-writing a \fBDOS\fR Volume label, the user should use \fBmkfs_pcfs\fR(1M).
+writing a \fBDOS\fR Volume label, the user should use \fBmkfs_pcfs\fR(8).
 .RE
 
 .sp
@@ -238,7 +238,7 @@ cautious in using this option on such devices.
 .sp .6
 .RS 4n
 Performs \fBumount\fR on any file systems and then formats. See
-\fBmount\fR(1M). This option unmounts all the mounted slices and issues a long
+\fBmount\fR(8). This option unmounts all the mounted slices and issues a long
 format on the device requested.
 .RE
 
@@ -510,11 +510,24 @@ cards and other removable media devices.
 .SH SEE ALSO
 .sp
 .LP
-\fBcpio\fR(1), \fBeject\fR(1), \fBfdformat\fR(1), \fBtar\fR(1),
-\fBvolcheck\fR(1), \fBvolrmmount\fR(1), \fBformat\fR(1M), \fBmkfs_pcfs\fR(1M),
-\fBmount\fR(1M), \fBnewfs\fR(1M), \fBprtvtoc\fR(1M), \fBrmmount\fR(1M),
-\fBrpc.smserverd\fR(1M), \fBattributes\fR(5), \fBscsa2usb\fR(7D), \fBsd\fR(7D),
-\fBpcfs\fR(7FS), \fBudfs\fR(7FS)
+.BR cpio (1),
+.BR eject (1),
+.BR fdformat (1),
+.BR tar (1),
+.BR volcheck (1),
+.BR volrmmount (1),
+.BR scsa2usb (4D),
+.BR sd (4D),
+.BR pcfs (4FS),
+.BR udfs (4FS),
+.BR attributes (7),
+.BR format (8),
+.BR mkfs_pcfs (8),
+.BR mount (8),
+.BR newfs (8),
+.BR prtvtoc (8),
+.BR rmmount (8),
+.BR rpc.smserverd (8)
 .sp
 .LP
 \fISystem Administration Guide: Basic Administration\fR
@@ -523,12 +536,12 @@ cards and other removable media devices.
 .LP
 A rewritable media or \fBPCMCIA\fR memory card or \fBPCMCIA\fR ata card
 containing a \fBufs\fR file system created on a SPARC-based system (using
-\fBnewfs\fR(1M)) is not identical to a rewritable media or \fBPCMCIA\fR memory
+\fBnewfs\fR(8)) is not identical to a rewritable media or \fBPCMCIA\fR memory
 card containing a \fBufs\fR file system created on an x86 based system. Do not
 interchange any removable media containing \fBufs\fR between these platforms;
 use \fBcpio\fR(1) or \fBtar\fR(1) to transfer files on diskettes or memory
-cards between them. For interchangeable filesystems refer to \fBpcfs\fR(7FS)
-and \fBudfs\fR(7FS).
+cards between them. For interchangeable filesystems refer to \fBpcfs\fR(4FS)
+and \fBudfs\fR(4FS).
 .sp
 .LP
 \fBrmformat\fR might not list all removable devices in virtualization

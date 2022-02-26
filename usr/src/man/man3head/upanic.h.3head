@@ -38,4 +38,4 @@ generating core files.
 .Sy Committed
 .Sh SEE ALSO
 .Xr upanic 2 ,
-.Xr core 4
+.Xr core 5

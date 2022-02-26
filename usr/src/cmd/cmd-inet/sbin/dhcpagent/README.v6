@@ -45,13 +45,13 @@ Introduction
   - RFCs 2131 and 2132: IPv4 DHCP
   - RFCs 2461 and 2462: IPv6 NDP and stateless autoconfiguration
   - RFC 3484: IPv6 default address selection
-  - ifconfig(1M): Solaris IP interface configuration
-  - in.ndpd(1M): Solaris IPv6 Neighbor and Router Discovery daemon
-  - dhcpagent(1M): Solaris DHCP client
+  - ifconfig(8): Solaris IP interface configuration
+  - in.ndpd(8): Solaris IPv6 Neighbor and Router Discovery daemon
+  - dhcpagent(8): Solaris DHCP client
   - dhcpinfo(1): Solaris DHCP parameter utility
-  - ndpd.conf(4): in.ndpd configuration file
-  - netstat(1M): Solaris network status utility
-  - snoop(1M): Solaris network packet capture and inspection
+  - ndpd.conf(5): in.ndpd configuration file
+  - netstat(8): Solaris network status utility
+  - snoop(8): Solaris network packet capture and inspection
   - "DHCPv6 Client High-Level Design"
 
   Several terms from those documents (such as the DHCPv6 IA_NA and

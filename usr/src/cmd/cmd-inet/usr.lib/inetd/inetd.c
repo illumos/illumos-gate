@@ -3809,23 +3809,23 @@ static void
 legacy_usage(void)
 {
 	(void) fprintf(stderr,
-	    "inetd is now an smf(5) managed service and can no longer be run "
+	    "inetd is now an smf(7) managed service and can no longer be run "
 	    "from the\n"
-	    "command line. To enable or disable inetd refer to svcadm(1M) on\n"
+	    "command line. To enable or disable inetd refer to svcadm(8) on\n"
 	    "how to enable \"%s\", the inetd instance.\n"
 	    "\n"
 	    "The traditional inetd command line option mappings are:\n"
 	    "\t-d : there is no supported debug output\n"
 	    "\t-s : inetd is only runnable from within the SMF\n"
-	    "\t-t : See inetadm(1M) on how to enable TCP tracing\n"
-	    "\t-r : See inetadm(1M) on how to set a failure rate\n"
+	    "\t-t : See inetadm(8) on how to enable TCP tracing\n"
+	    "\t-r : See inetadm(8) on how to set a failure rate\n"
 	    "\n"
-	    "To specify an alternative configuration file see svccfg(1M)\n"
+	    "To specify an alternative configuration file see svccfg(8)\n"
 	    "for how to modify the \"%s/%s\" string type property of\n"
 	    "the inetd instance, and modify it according to the syntax:\n"
 	    "\"%s [alt_config_file] %%m\".\n"
 	    "\n"
-	    "For further information on inetd see inetd(1M).\n",
+	    "For further information on inetd see inetd(8).\n",
 	    INETD_INSTANCE_FMRI, START_METHOD_ARG, SCF_PROPERTY_EXEC,
 	    INETD_PATH);
 }

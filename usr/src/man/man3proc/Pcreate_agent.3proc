@@ -33,7 +33,7 @@ function creates the agent LWP in the process represented by the handle
 The agent LWP is used as a means to force system calls to be invoked on
 the controlled process.
 For more information on the agent LWP, see
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The agent LWP cannot be created for process handles corresponding to
 core files, zombie processes, processes that have yet to run, and ELF
@@ -83,4 +83,4 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr Pdestroy_agent 3PROC ,
-.Xr proc 4
+.Xr proc 5

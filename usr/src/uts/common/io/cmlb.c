@@ -1689,7 +1689,7 @@ cmlb_validate_geometry(struct cmlb_lun *cl, boolean_t forcerevalid, int flags,
 				cmlb_log(CMLB_DEVINFO(cl), CMLB_LABEL(cl),
 				    CE_NOTE, "!Disk (%s%d) is limited to 2 TB "
 				    "due to VTOC label. To use the full "
-				    "capacity of the disk, use format(1M) to "
+				    "capacity of the disk, use format(8) to "
 				    "relabel the disk with EFI/GPT label.\n",
 				    CMLB_LABEL(cl),
 				    ddi_get_instance(CMLB_DEVINFO(cl)));

@@ -50,9 +50,9 @@ file path=usr/lib/vscan/libvscan.so.1
 file path=usr/lib/vscan/vscand mode=0555
 dir  path=usr/sbin
 file path=usr/sbin/vscanadm mode=0555
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/vscanadm.1m
-file path=usr/share/man/man1m/vscand.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/vscanadm.8
+file path=usr/share/man/man8/vscand.8
 driver name=vscan perms="* 0640 root sys"
 legacy pkg=SUNWvscankr desc="Virus Scan Service Kernel Root Components" \
     name="Virus Scan Service Kernel (Root)"

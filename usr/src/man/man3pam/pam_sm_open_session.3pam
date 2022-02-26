@@ -29,7 +29,7 @@ for pam_open_session and pam_close_session
 In response to a call to \fBpam_open_session\fR(3PAM) and
 \fBpam_close_session\fR(3PAM), the \fBPAM\fR framework calls
 \fBpam_sm_open_session()\fR and \fBpam_sm_close_session()\fR, respectively from
-the modules listed in the \fBpam.conf\fR(4) file.  The session management
+the modules listed in the \fBpam.conf\fR(5) file.  The session management
 provider supplies the back-end functionality for this interface function.
 .sp
 .LP
@@ -49,7 +49,7 @@ Session service should not generate any messages.
 .sp
 .LP
 The \fIargc\fR argument represents the number of module options passed in from
-the configuration file \fBpam.conf\fR(4). \fIargv\fR specifies the module
+the configuration file \fBpam.conf\fR(5). \fIargv\fR specifies the module
 options, which are interpreted and processed by the session management service.
 If an unknown option is passed in, an error should be logged through
 \fBsyslog\fR(3C) and the option ignored.
@@ -76,7 +76,7 @@ Ignore underlying session module regardless of whether the control flag is
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -92,8 +92,12 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-\fBpam\fR(3PAM), \fBpam_open_session\fR(3PAM), \fBsyslog\fR(3C),
-\fBlibpam\fR(3LIB), \fBpam.conf\fR(4), \fBattributes\fR(5)
+.BR syslog (3C),
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_open_session (3PAM),
+.BR pam.conf (5),
+.BR attributes (7)
 .SH NOTES
 The interfaces in \fBlibpam\fR are MT-Safe only if each thread within the
 multithreaded application uses its own \fBPAM\fR handle.

@@ -31,7 +31,7 @@
 
 <service_bundle type='manifest' name='SUNWcsr:network-netmask'>
 
-<!-- 
+<!--
   network/netmask service resets the netmask and broadcast address
   whenever new information is available from NIS.
 -->
@@ -107,7 +107,7 @@
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='ifconfig' section='1M'
+			<manpage title='ifconfig' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

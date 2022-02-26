@@ -1431,7 +1431,7 @@ build_corefile(const char *namelist, const char *corefile)
 
 /*
  * When the system panics, the kernel saves all undelivered messages (messages
- * that never made it out to syslogd(1M)) in the dump.  At a mimimum, the
+ * that never made it out to syslogd(8)) in the dump.  At a mimimum, the
  * panic message itself will always fall into this category.  Upon reboot,
  * the syslog startup script runs savecore -m to recover these messages.
  *
@@ -1442,7 +1442,7 @@ build_corefile(const char *namelist, const char *corefile)
  *
  * Note: since savecore -m is used *only* for this purpose, it does *not*
  * attempt to save the crash dump.  The dump will be saved later, after
- * syslogd(1M) starts, by the savecore startup script.
+ * syslogd(8) starts, by the savecore startup script.
  */
 static int
 message_save(void)
@@ -1830,7 +1830,7 @@ main(int argc, char *argv[])
 
 		logprint(lvl | ec,
 		    "Panic crashdump pending on dump device%s "
-		    "run savecore(1M) manually to extract. "
+		    "run savecore(8) manually to extract. "
 		    "Image UUID %s%s.",
 		    disabled ? " but dumpadm -n in effect;" : ";",
 		    corehdr.dump_uuid,

@@ -67,8 +67,8 @@
  *
  * The implementation of (1) is all in this file. The implementation of (2) is
  * in uts/common/io/ksensor/ksensor_drv.c. The implementation of (3) is found in
- * all of the different leaf devices. Examples of (3) include pchtemp(7D) and
- * igb(7D).
+ * all of the different leaf devices. Examples of (3) include pchtemp(4D) and
+ * igb(4D).
  *
  * We separate numbers one and two into two different components for a few
  * reasons. The most important thing is that drivers that provide sensors should

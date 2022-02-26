@@ -257,7 +257,9 @@ shell and, therefore, must be quoted.
 .SH SEE ALSO
 .sp
 .LP
-\fBfind\fR(1), \fBsh\fR(1), \fBattributes\fR(5)
+.BR find (1),
+.BR sh (1),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

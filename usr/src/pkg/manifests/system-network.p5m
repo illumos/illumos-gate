@@ -85,10 +85,10 @@ file path=usr/lib/dl/dlrecv mode=0555
 file path=usr/lib/dl/dlsend mode=0555
 file path=usr/lib/dl/dltraninfo mode=0555
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/dladm.1m
-file path=usr/share/man/man1m/flowadm.1m
-file path=usr/share/man/man1m/ipadm.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/dladm.8
+file path=usr/share/man/man8/flowadm.8
+file path=usr/share/man/man8/ipadm.8
 group groupname=netadm gid=65
 user username=dladm ftpuser=false gcos-field="Datalink Admin" group=netadm \
     uid=15

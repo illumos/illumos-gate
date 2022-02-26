@@ -1,0 +1,69 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH NCAPORT.CONF 5 "Jul 30, 2001"
+.SH NAME
+ncaport.conf \- ncaport configuration file
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/nca/ncaport.conf\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBncaport.conf\fR file is used to configure the IP addresses and ports
+that the Solaris Network Cache and Acceleration (NCA) kernel module services.
+The file contains two fields, key and value, in the format of
+\fBncaport=\fIipaddress\fR/\fIport\fR\fR. IPv4 addresses must be in the dot
+notation \fId\fR.\fId\fR.\fId\fR.\fId\fR. IPv6 addresses must be in one of the
+three conventional forms (see \fBinet_pton\fR(3C)). If an asterisk
+(\fB*\fR) is used for an IP address, it is interpreted as \fBINADDR_ANY\fR,
+which matches any IP address.
+.sp
+.LP
+A web server uses the environment variable \fBLD_PRELOAD\fR and the
+\fBncaport.conf\fR configuration file to convert an \fBAF_INET\fR socket to an
+\fBAF_NCA\fR socket. \fBLD_PRELOAD\fR enables the NCA socket utility library to
+be loaded before \fBlibsocket.so.1\fR. See the \fBncad_addr\fR(5) for details.
+When a web server issues the \fBbind\fR(3SOCKET) system call, it is intercepted
+by the interposition library \fBncad_addr.so\fR. If the bind address is in the
+\fBncaport.conf\fR file, the \fBAF_INET\fR socket is converted to a
+\fBAF_NCA\fR socket.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSample \fBncaport.conf\fR File
+.sp
+.LP
+The following is a sample \fBncaport.conf\fR file:
+
+.sp
+.in +2
+.nf
+#
+# NCA Kernel Module Port Configuration File
+#
+ncaport=1080:0:0:0:8:800:200C:417A/100
+ncaport=192.168.84.71/80
+ncaport=*/9000
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.LP
+.BR nca (1),
+.BR inet_pton (3C),
+.BR bind (3SOCKET),
+.BR ncad_addr (5),
+.BR attributes (7)
+.SH NOTES
+.LP
+For those web servers that use \fBAF_NCA\fR sockets, the NCA port configuration
+described here has no effect.
+.sp
+.LP
+NCA does not currently support IPv6. Any IPv6 addresses in the file
+\fBncaport.conf\fR are ignored.

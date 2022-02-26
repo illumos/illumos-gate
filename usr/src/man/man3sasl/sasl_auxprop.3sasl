@@ -295,7 +295,7 @@ that return a pointer will return a valid pointer upon success and return
 \fINULL\fR upon failure.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -312,5 +312,7 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBsasl_auxprop_getctx\fR(3SASL), \fBsasl_auxprop_request\fR(3SASL),
-\fBsasl_errors\fR(3SASL), \fBattributes\fR(5)
+.BR sasl_auxprop_getctx (3SASL),
+.BR sasl_auxprop_request (3SASL),
+.BR sasl_errors (3SASL),
+.BR attributes (7)

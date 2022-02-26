@@ -37,7 +37,7 @@ The \fBgetvfsent()\fR, \fBgetvfsfile()\fR, \fBgetvfsspec()\fR, and
 with the broken-out fields of a line in the \fB/etc/vfstab\fR file. Each line
 in the file contains a \fBvfstab\fR structure, declared in the
 <\fBsys/vfstab.h\fR> header, whose following members are described on the
-\fBvfstab\fR(4) manual page:
+\fBvfstab\fR(5) manual page:
 .sp
 .in +2
 .nf
@@ -115,7 +115,7 @@ A line in the file contains too few fields.
 \fB/etc/vfstab\fR
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -130,7 +130,8 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBvfstab\fR(4), \fBattributes\fR(5)
+.BR vfstab (5),
+.BR attributes (7)
 .SH NOTES
 .LP
 The members of the \fBvfstab\fR structure point to information contained in a

@@ -51,7 +51,7 @@ call tracing, see the
 and
 .Sy PCSEXIT
 sections of
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The value of the
 .Fa stop
@@ -123,5 +123,5 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4 ,
-.Xr attributes 5
+.Xr proc 5 ,
+.Xr attributes 7

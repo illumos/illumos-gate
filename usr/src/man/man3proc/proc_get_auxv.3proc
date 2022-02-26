@@ -49,4 +49,4 @@ is returned to indicate an error occurred.
 .Sy MT-Safe
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

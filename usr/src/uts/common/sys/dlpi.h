@@ -277,7 +277,7 @@ typedef struct dl_ipnetinfo {
 #define	DL_IPV6		0x80000002ul	/* IPv6 Tunnel Link */
 #define	SUNW_DL_VNI	0x80000003ul	/* Virtual network interface */
 #define	DL_WIFI		0x80000004ul	/* IEEE 802.11 */
-#define	DL_IPNET	0x80000005ul	/* ipnet(7D) link */
+#define	DL_IPNET	0x80000005ul	/* ipnet(4D) link */
 #define	SUNW_DL_IPMP	0x80000006ul	/* IPMP stub interface */
 #define	DL_6TO4		0x80000007ul	/* 6to4 Tunnel Link */
 

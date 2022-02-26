@@ -474,7 +474,7 @@ default, this information is not included.
 .RS 4n
 Enable auditing for each local zone. If not set, audit records from all zones
 are collected in a single log accessible in the global zone and certain
-\fBauditconfig\fR(1M) operations are disallowed. This policy can be set only
+\fBauditconfig\fR(8) operations are disallowed. This policy can be set only
 from the global zone.
 .RE
 
@@ -555,7 +555,7 @@ permitted only in the global zone: \fBA_SETCOND\fR, \fBA_SETCLASS\fR,
 \fBA_SETPOLICY\fR. All other \fBauditon()\fR commands are valid from any zone.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -572,8 +572,13 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBauditconfig\fR(1M), \fBauditd\fR(1M), \fBaudit\fR(2),
-\fBexec\fR(2), \fBaudit.log\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5)
+.BR audit (2),
+.BR exec (2),
+.BR audit.log (5),
+.BR attributes (7),
+.BR privileges (7),
+.BR auditconfig (8),
+.BR auditd (8)
 .SH NOTES
 .LP
 The auditon options that modify or display process-based information are not

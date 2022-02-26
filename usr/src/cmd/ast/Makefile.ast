@@ -88,7 +88,7 @@ CSTD= $(CSTD_GNU99)
 #	SHOPT_FS_3D		3d file system
 #	SHOPT_OLDTERMIO		support both TCGETA and TCGETS
 #	SHOPT_P_SUID		real uid's that require -p for set[ug]id
-#	SHOPT_PFSH		solaris exec_attr(4) profile execution
+#	SHOPT_PFSH		solaris exec_attr(5) profile execution
 #	SHOPT_REGRESS		enable __regress__ builtin
 #	SHOPT_REMOTE		enable --rc if running as a remote shell
 #	SHOPT_SEVENBIT		strip the eigth bit from characters

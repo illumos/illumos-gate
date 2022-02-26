@@ -80,8 +80,8 @@ int sequence;
 After receipt of this indication, the user may not attempt to receive  more
 data by means of  \fBt_rcv\fR(3NSL) or  \fBt_rcvv\fR(3NSL) Such an attempt will
 fail with  \fIt_error\fR set to \fBTOUTSTATE\fR. However, the user may continue
-to send data over the connection if  \fBt_sndrel\fR(3NSL) or \fBt_sndreldata\fR
-\fB(3N)\fR has not been called by the user.
+to send data over the connection if  \fBt_sndrel\fR(3NSL) or
+\fBt_sndreldata\fR(3NSL) has not been called by the user.
 .sp
 .LP
 The field  \fIreason\fR specifies the reason for the disconnection through a
@@ -210,7 +210,7 @@ defined.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -226,8 +226,12 @@ MT Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBt_getinfo\fR(3NSL), \fBt_open\fR(3NSL), \fBt_sndreldata\fR(3NSL),
-\fBt_rcvrel\fR(3NSL), \fBt_sndrel\fR(3NSL), \fBattributes\fR(5)
+.BR t_getinfo (3NSL),
+.BR t_open (3NSL),
+.BR t_rcvrel (3NSL),
+.BR t_sndrel (3NSL),
+.BR t_sndreldata (3NSL),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

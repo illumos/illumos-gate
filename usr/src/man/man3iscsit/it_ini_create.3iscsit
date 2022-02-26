@@ -163,7 +163,7 @@ Resources could not be allocated.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -181,8 +181,13 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBit_config_commit\fR(3ISCSIT), \fBit_portal_create\fR(3ISCSIT),
-\fBit_tgt_create\fR(3ISCSIT), \fBit_tpg_create\fR(3ISCSIT),
-\fBlibiscsit\fR(3LIB), \fBlibnvpair\fR(3LIB), \fBlibstmf\fR(3LIB),
-\fBstmfGetProviderData\fR(3STMF), \fBstmfSetProviderData\fR(3STMF),
-\fBattributes\fR(5)
+.BR it_config_commit (3ISCSIT),
+.BR it_portal_create (3ISCSIT),
+.BR it_tgt_create (3ISCSIT),
+.BR it_tpg_create (3ISCSIT),
+.BR libiscsit (3LIB),
+.BR libnvpair (3LIB),
+.BR libstmf (3LIB),
+.BR stmfGetProviderData (3STMF),
+.BR stmfSetProviderData (3STMF),
+.BR attributes (7)

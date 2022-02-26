@@ -1,0 +1,561 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PROCESS 5 "December 28, 2020"
+.SH NAME
+process \- process contract type
+.SH SYNOPSIS
+.nf
+\fB/system/contract/process\fR
+.fi
+
+.SH DESCRIPTION
+Process contracts allow processes to create a fault boundary around a set of
+subprocesses and observe events which occur within that boundary.
+.sp
+.LP
+Process contracts are managed using the \fBcontract\fR(5) file system and the
+\fBlibcontract\fR(3LIB) library. The process contract type directory is
+\fB/system/contract/process\fR.
+.SS "CREATION"
+A process contract is created when an LWP that has an active process contract
+template calls \fBfork\fR(2). Initially, the child process created by
+\fBfork()\fR is the only resource managed by the contract. When an LWP that
+does not have an active process contract template calls \fBfork()\fR, the child
+process created by \fBfork()\fR is added as a resource to the process contract
+of which the parent was a member.
+.SS "EVENT TYPES"
+The following events types are defined:
+.sp
+.ne 2
+.na
+\fB\fBCT_PR_EV_EMPTY\fR\fR
+.ad
+.sp .6
+.RS 4n
+The last member of the process contract exited.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCT_PR_EV_FORK\fR\fR
+.ad
+.sp .6
+.RS 4n
+A new process has been added to the process contract.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCT_PR_EV_EXIT\fR\fR
+.ad
+.sp .6
+.RS 4n
+A member of the process contract exited.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCT_PR_EV_CORE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A process failed and dumped core. This could also occur if the process would
+have dumped core had appropriate \fBcoreadm\fR(8) options been enabled and
+core file size was unlimited.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCT_PR_EV_SIGNAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+A process received a fatal signal from a process, other than the owner of the
+process contract, that is a member of a different process contract.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCT_PR_EV_HWERR\fR\fR
+.ad
+.sp .6
+.RS 4n
+A process was killed because of an uncorrectable hardware error.
+.RE
+
+.SS "TERMS"
+The following common contract terms, defined in \fBcontract\fR(5), have
+process-contract specific attributes:
+.sp
+.ne 2
+.na
+\fBcritical event set\fR
+.ad
+.sp .6
+.RS 4n
+The default value for the critical event set is \fB(CT_PR_EV_EMPTY |
+CT_PR_EV_HWERR)\fR.
+.sp
+An attempt by a user without the \fB{PRIV_CONTRACT_EVENT}\fR privilege in its
+effective set to add an event, other than \fBCT_PR_EV_EMPTY\fR, to the critical
+event set which is not present in the fatal set, or if the \fBCT_PR_PGONLY\fR
+parameter is set and the same user attempts to add any event, other than
+\fBCT_PR_EV_EMPTY\fR, to the critical event set, fails.
+.RE
+
+.sp
+.ne 2
+.na
+\fBinformative event set\fR
+.ad
+.sp .6
+.RS 4n
+The default value for the informative event set is \fB(CT_PR_EV_CORE |
+CT_PR_EV_SIGNAL)\fR.
+.RE
+
+.sp
+.LP
+The following contract terms can be read from or written to a process contract
+template using the named \fBlibcontract\fR(3LIB) interfaces. These contract
+terms are in addition to those described in \fBcontract\fR(5).
+.sp
+.ne 2
+.na
+\fBcreator's aux\fR
+.ad
+.sp .6
+.RS 4n
+Auxiliary contract description. The purpose of this field is to provide the
+contract creator with a way to differentiate process contracts it creates under
+the same service FMRI. Use ct_pr_tmpl_set_svc_aux(3CONTRACT) to set this term.
+The default value is an empty string. The contents of this field should be
+limited to 7-bit ASCII values.
+.RE
+
+.sp
+.ne 2
+.na
+\fBfatal event set\fR
+.ad
+.sp .6
+.RS 4n
+Defines a set of events which, when generated, causes all members of the
+process contract to be killed with \fBSIGKILL\fR, or the intersection of the
+contract and the containing process group if the \fBCT_PR_PGRPONLY\fR parameter
+is set. Set this term with \fBct_pr_tmpl_set_fatal\fR(3CONTRACT). The fatal
+event set is restricted to \fBCT_PR_EV_CORE\fR, \fBCT_PR_EV_SIGNAL\fR, and
+\fBCT_PR_EV_HWERR\fR. For \fBCT_PR_EV_CORE\fR and \fBCT_PR_EV_SIGNAL\fR events,
+the scope of \fBSIGKILL\fR is limited to those processes which the contract
+author or the event source could have normally sent signals to.
+.sp
+The default value for the fatal event set is \fBCT_PR_EV_HWERR\fR.
+.sp
+If a user without the \fB{PRIV_CONTRACT_EVENT}\fR privilege in its effective
+set removes an event from the fatal event set which is present in the critical
+event set, the corresponding event is automatically removed from the critical
+event set and added to the informative event set.
+.RE
+
+.sp
+.ne 2
+.na
+\fBparameter set\fR
+.ad
+.sp .6
+.RS 4n
+Defines miscellaneous other settings. Use \fBct_pr_tmpl_set_param\fR(3CONTRACT)
+to set this term.
+.sp
+The default parameter set is empty.
+.sp
+The value is a bit vector comprised of some or all of:
+.sp
+.ne 2
+.na
+\fB\fBCT_PR_INHERIT\fR\fR
+.ad
+.sp .6
+.RS 4n
+If set, indicates that the process contract is to be inherited by the process
+contract the contract owner is a member of if the contract owner exits before
+explicitly abandoning the process contract.
+.sp
+If not set, the process contract is automatically abandoned when the owner
+exits.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCT_PR_NOORPHAN\fR\fR
+.ad
+.sp .6
+.RS 4n
+If set, all processes in a process contract are sent \fBSIGKILL\fR if the
+process contract is abandoned, either explicitly or because the holder died and
+\fBCT_PR_INHERIT\fR was not set. The scope of \fBSIGKILL\fR is limited to those
+processes which the contract author or the event source could have normally
+sent signals to.
+.sp
+If this is not set and the process contract is abandoned, the process contract
+is orphaned, that is, continues to exist without owner.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCT_PR_PGRPONLY\fR\fR
+.ad
+.sp .6
+.RS 4n
+If set, only those processes within the same process group and process contract
+as a fatal error-generating process are killed.
+.sp
+If not set, all processes within the process contract are killed if a member
+process encounters an error specified in the fatal set.
+.sp
+If a user without the \fB{PRIV_CONTRACT_EVENT}\fR privilege in its effective
+set adds \fBCT_PR_PGRPONLY\fR to a template's parameter set, any events other
+than \fBCT_PR_EV_EMPTY\fR are automatically removed from the critical event set
+and added to the informative event set.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCT_PR_REGENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+If set, the process contract can inherit unabandoned contracts left by exiting
+member processes.
+.sp
+If not set, indicates that the process contract should not inherit contracts
+from member processes. If a process exits before abandoning a contract it owns
+and is a member of a process contract which does not have \fBCT_PR_REGENT\fR
+set, the system automatically abandons the contract.
+.sp
+If a regent process contract has inherited contracts and is abandoned by its
+owner, its inherited contracts are abandoned.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBservice FMRI\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the service FMRI associated with the process contract. Use
+\fBct_pr_tmpl_set_svc_fmri\fR(3CONTRACT) to set this term. The default is to
+inherit the value from the creator's process contract. When this term is
+uninitialized, \fBct_pr_tmpl_get_svc_fmri\fR(3CONTRACT) returns the token
+string \fBinherited:\fR to indicate the value has not been set and is
+inherited. Setting the service FMRI to \fBinherited\fR: clears the current
+(\fBB\fR value and the \fBterm\fR is inherited from the creator's process
+contract. To set this term a process must have \fB{PRIV_CONTRACT_IDENTITY}\fR
+in its effective set.
+.RE
+
+.sp
+.ne 2
+.na
+\fBtransfer contract\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the ID of an empty process contract held by the caller whose
+inherited process contracts are to be transferred to the newly created
+contract. Use \fBct_pr_tmpl_set_transfer\fR(3CONTRACT) to set the transfer
+contract. Attempts to specify a contract not held by the calling process, or a
+contract which still has processes in it, fail.
+.sp
+The default transfer term is \fB0\fR, that is, no contract.
+.RE
+
+.SS "STATUS"
+In addition to the standard items, the status object read from a status file
+descriptor contains the following items to obtain this information
+respectively:
+.sp
+.ne 2
+.na
+\fBservice contract ID\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the process contract id which defined the service FMRI term. Use
+\fBct_pr_status_get_svc_ctid\fR(3CONTRACT) to read the term's value. It can be
+used to determine if the service FMRI was inherited as in the example below.
+.sp
+.in +2
+.nf
+ctid_t ctid;           /* our contract id */
+int fd;       /* fd of ctid's status file */
+
+ct_stathdl_(Bt status;
+ctid_t svc_ctid;
+
+if (ct_status_read(fd, CTD_FIXED, &status) == 0) {
+      if (ct_pr_status_get_svc_ctid(status, &svc_ctid) == 0) {
+            if (svc_ctid == ctid)
+                /* not inherited */
+            else
+                /* inherited */
+      }
+      ct_status_free(status);
+}
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.LP
+If \fBCTD_ALL\fR is specified, the following items are also available:
+.sp
+.ne 2
+.na
+\fBMember list\fR
+.ad
+.sp .6
+.RS 4n
+The PIDs of processes which are members of the process contract. Use
+\fBct_pr_status_get_members\fR(3CONTRACT) for this information.
+.RE
+
+.sp
+.ne 2
+.na
+\fBInherited contract list\fR
+.ad
+.sp .6
+.RS 4n
+The IDs of contracts which have been inherited by the process contract. Use
+\fBct_pr_status_get_contracts\fR(3CONTRACT) to obtain this information.
+.RE
+
+.sp
+.ne 2
+.na
+\fBService FMRI (term)\fR
+.ad
+.sp .6
+.RS 4n
+Values equal to the terms used when the contract was written. The Service FMRI
+term of the process contract of a process en(\fBBtering\fR a zone has  the
+value \fBsvc:/system/zone_enter:default\fR when read from the non-global zone.
+.RE
+
+.sp
+.ne 2
+.na
+\fBcontract creator\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the process that created the process contract. Use
+\fBct_pr_status_get_svc_creator\fR(3CONTRACT) to read the term's value.
+.RE
+
+.sp
+.ne 2
+.na
+\fBcreator's aux (term)\fR
+.ad
+.sp .6
+.RS 4n
+Values equal to the terms used when the contract was written.
+.RE
+
+.sp
+.LP
+The following standard status items have different meanings in some situations:
+.sp
+.ne 2
+.na
+\fBOwnership state\fR
+.ad
+.sp .6
+.RS 4n
+If the process contract has a state of \fBCTS_OWNED\fR or \fBCTS_INHERITED\fR
+and is held by an entity in the global zone, but contains processes in a
+non-global zone, it appears to have the state \fBCTS_OWNED\fR when observed by
+processes in the non-global zone.
+.RE
+
+.sp
+.ne 2
+.na
+\fBContract holder\fR
+.ad
+.sp .6
+.RS 4n
+If the process contract has a state of \fBCTS_OWNED\fR or \fBCTS_INHERITED\fR
+and is held by an entity in the global zone, but contains processes in a
+non-global zone, it appears to be held by the non-global zone's \fBzsched\fR
+when observed by processes in the non-global zone.
+.RE
+
+.SS "EVENTS"
+In addition to the standard items, an event generated by a process contract
+contains the following information:
+.sp
+.ne 2
+.na
+\fBGenerating PID\fR
+.ad
+.sp .6
+.RS 4n
+The process ID of the member process which experienced the event, or caused the
+contract event to be generated (in the case of \fBCT_PR_EV_EMPTY\fR). Use
+\fBct_pr_event_get_pid\fR(3CONTRACT) to obtain this information.
+.RE
+
+.sp
+.LP
+If the event type is \fBCT_PR_EV_FORK\fR, the event contains:
+.sp
+.ne 2
+.na
+\fBParent PID\fR
+.ad
+.sp .6
+.RS 4n
+The process ID which forked [Generating PID]. Use
+\fBct_pr_event_get_ppid\fR(3CONTRACT) to obtain this information.
+.RE
+
+.sp
+.LP
+If the event type is \fBCT_PR_EV_EXIT\fR, the event contains:
+.sp
+.ne 2
+.na
+\fBExit status\fR
+.ad
+.sp .6
+.RS 4n
+The exit status of the process. Use \fBct_pr_event_get_exitstatus\fR(3CONTRACT)
+to obtain this information.
+.RE
+
+.sp
+.LP
+If the event type is \fBCT_PR_EV_CORE\fR, the event can contain:
+.sp
+.ne 2
+.na
+\fBProcess core name\fR
+.ad
+.sp .6
+.RS 4n
+The name of the per-process core file. Use
+\fBct_pr_event_get_pcorefile\fR(3CONTRACT) to obtain this information.
+.RE
+
+.sp
+.ne 2
+.na
+\fBGlobal core name\fR
+.ad
+.sp .6
+.RS 4n
+The name of the process's zone's global core file. Use
+\fBct_pr_event_get_gcorefile\fR(3CONTRACT) to obtain this information.
+.RE
+
+.sp
+.ne 2
+.na
+\fBZone core name\fR
+.ad
+.sp .6
+.RS 4n
+The name of the system-wide core file in the global zone. Use
+\fBct_pr_event_get_zcorefile\fR(3CONTRACT) to obtain this information.
+.RE
+
+.sp
+.LP
+See \fBcoreadm\fR(8) for more information about per-process, global, and
+system-wide core files.
+.sp
+.LP
+If the event type is \fBCT_PR_EV_SIGNAL\fR, the event contains:
+.sp
+.ne 2
+.na
+\fBSignal\fR
+.ad
+.sp .6
+.RS 4n
+The number of the signal which killed the process. Use
+\fBct_pr_event_get_signal\fR(3CONTRACT) to obtain this information.
+.RE
+
+.sp
+.LP
+It can contain:
+.sp
+.ne 2
+.na
+\fBsender\fR
+.ad
+.sp .6
+.RS 4n
+The PID of the process which sent the signal. Use
+\fBct_pr_event_get_sender\fR(3CONTRACT) to obtain this information.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/usr/include/sys/contract/process.h\fR\fR
+.ad
+.sp .6
+.RS 4n
+Contains definitions of event-type macros.
+.RE
+
+.SH SEE ALSO
+.BR ctrun (1),
+.BR ctstat (1),
+.BR ctwatch (1),
+.BR close (2),
+.BR fork (2),
+.BR ioctl (2),
+.BR open (2),
+.BR poll (2),
+.BR ct_pr_event_get_exitstatus (3CONTRACT),
+.BR ct_pr_event_get_gcorefile (3CONTRACT),
+.BR ct_pr_event_get_pcorefile (3CONTRACT),
+.BR ct_pr_event_get_pid (3CONTRACT),
+.BR ct_pr_event_get_ppid (3CONTRACT),
+.BR ct_pr_event_get_signal (3CONTRACT),
+.BR ct_pr_event_get_zcorefile (3CONTRACT),
+.BR ct_pr_status_get_contracts (3CONTRACT),
+.BR ct_pr_status_get_members (3CONTRACT),
+.BR ct_pr_status_get_param (3CONTRACT),
+.BR ct_pr_tmpl_set_fatal (3CONTRACT),
+.BR ct_pr_tmpl_set_param (3CONTRACT),
+.BR ct_pr_tmpl_set_transfer (3CONTRACT),
+.BR ct_tmpl_set_cookie (3CONTRACT),
+.BR ct_tmpl_set_critical (3CONTRACT),
+.BR ct_tmpl_set_informative (3CONTRACT),
+.BR libcontract (3LIB),
+.BR contract (5),
+.BR privileges (7),
+.BR coreadm (8)

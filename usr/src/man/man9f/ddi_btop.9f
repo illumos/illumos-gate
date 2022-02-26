@@ -67,7 +67,9 @@ pagesize = ddi_ptob(dip, 1L);
 .in -2
 
 .SH SEE ALSO
-\fBbtop\fR(9F), \fBbtopr\fR(9F), \fBptob\fR(9F)
+.BR btop (9F),
+.BR btopr (9F),
+.BR ptob (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

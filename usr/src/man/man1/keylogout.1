@@ -15,7 +15,7 @@ keylogout \- delete stored secret key with keyserv
 .SH DESCRIPTION
 .LP
 \fBkeylogout\fR deletes the key stored by the key server process
-\fBkeyserv\fR(1M). Further access to the key is revoked; however, current
+\fBkeyserv\fR(8). Further access to the key is revoked; however, current
 session keys might remain valid until they expire or are refreshed.
 .sp
 .LP
@@ -40,6 +40,11 @@ services, such as  \fBNFS,\fR that are started by the superuser.
 
 .SH SEE ALSO
 .LP
-\fBat\fR(1), \fBchkey\fR(1), \fBlogin\fR(1), \fBkeylogin\fR(1),
-\fBkeyserv\fR(1M), \fBnewkey\fR(1M), \fBpublickey\fR(4),
-\fBattributes\fR(5)
+.BR at (1),
+.BR chkey (1),
+.BR keylogin (1),
+.BR login (1),
+.BR publickey (5),
+.BR attributes (7),
+.BR keyserv (8),
+.BR newkey (8)

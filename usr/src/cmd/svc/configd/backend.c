@@ -27,7 +27,7 @@
 /*
  * sqlite is not compatible with _FILE_OFFSET_BITS=64, but we need to
  * be able to statvfs(2) possibly large systems.  This define gives us
- * access to the transitional interfaces.  See lfcompile64(5) for how
+ * access to the transitional interfaces.  See lfcompile64(7) for how
  * _LARGEFILE64_SOURCE works.
  */
 #define	_LARGEFILE64_SOURCE
@@ -1978,7 +1978,7 @@ integrity_fail:
 		} else {
 			(void) fprintf(stderr,
 "\n"
-"svc.configd: smf(5) database integrity check of:\n"
+"svc.configd: smf(7) database integrity check of:\n"
 "\n"
 "    %s\n"
 "\n"
@@ -1987,7 +1987,7 @@ integrity_fail:
 "  your service provider%s%s\n"
 "\n"
 "  The system will not be able to boot until you have restored a working\n"
-"  database.  svc.startd(1M) will provide a sulogin(1M) prompt for recovery\n"
+"  database.  svc.startd(8) will provide a sulogin(8) prompt for recovery\n"
 "  purposes.  The command:\n"
 "\n"
 "    /lib/svc/bin/restore_repository\n"

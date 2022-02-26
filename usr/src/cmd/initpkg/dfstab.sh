@@ -25,12 +25,12 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1.2.1	*/
+
 case "$MACH" in
   "u3b2"|"sparc"|"i386"|"ppc" )
 	echo "
 # Do not modify this file directly.
-# Use the sharemgr(1m) command for all share management
+# Use the sharemgr(8) command for all share management
 # This file is reconstructed and only maintained for backward
 # compatibility. Configuration lines could be lost.
 #

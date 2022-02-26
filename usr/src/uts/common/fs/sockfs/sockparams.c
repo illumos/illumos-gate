@@ -64,7 +64,7 @@ static int 	sockparams_sdev_init(struct sockparams *, char *, int);
 static void 	sockparams_sdev_fini(struct sockparams *);
 
 /*
- * Global sockparams list (populated via soconfig(1M)).
+ * Global sockparams list (populated via soconfig(8)).
  */
 static list_t sphead;
 

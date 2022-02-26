@@ -23,7 +23,7 @@ getipsecprotobyname, getipsecprotobynum \- query IPsec protocols entries
 
 .SH DESCRIPTION
 Use the \fBgetipsecprotobyname()\fR and \fBgetipsecprotobynum()\fR functions to
-obtain the IPsec algorithm mappings that are defined by \fBipsecalgs\fR(1M).
+obtain the IPsec algorithm mappings that are defined by \fBipsecalgs\fR(8).
 You can also use the \fBgetipsecprotobyname()\fR and \fBgetipsecprotobynum()\fR
 functions in conjunction with \fBgetipsecalgbyname\fR(3NSL) and
 \fBgetipsecalgbynum\fR(3NSL) to obtain information about the supported IPsec
@@ -88,7 +88,7 @@ success, or \fB-1\fR if the protocol specified does not exist.
  The \fBgetipsecprotobynum()\fR function returns a protocol name upon success,
 or the \fINULL\fR value if the protocol number specified does not exist.
 .SH ATTRIBUTES
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 .TS
 box;
@@ -101,8 +101,10 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-\fBipsecalgs\fR(1M), \fBgetipsecalgbyname\fR(3NSL),
-\fBgetipsecalgbyname\fR(3NSL), \fBattributes\fR(5)
+.BR getipsecalgbyname (3NSL),
+.BR getipsecalgbyname (3NSL),
+.BR attributes (7),
+.BR ipsecalgs (8)
 .sp
 .LP
 Piper, D. \fIRFC 2407, The Internet IP Security Domain of Interpretation for

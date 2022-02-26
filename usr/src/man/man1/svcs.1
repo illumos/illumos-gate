@@ -58,7 +58,7 @@ Error messages are printed to the standard error stream.
 .sp
 .LP
 The output of this command can be used appropriately as input to the
-\fBsvcadm\fR(1M) command.
+\fBsvcadm\fR(8) command.
 .SH OPTIONS
 The following options are supported:
 .sp
@@ -128,7 +128,7 @@ The following specific attributes require further explanation:
 .RS 14n
 Information about a dependency. The grouping and \fBrestart_on\fR properties
 are displayed first and are separated by a forward slash (\fB/\fR). Next, each
-entity and its state is listed. See \fBsmf\fR(5) for information about states.
+entity and its state is listed. See \fBsmf\fR(7) for information about states.
 In addition to the standard states, each service dependency can have the
 following state descriptions:
 .sp
@@ -146,7 +146,7 @@ No such service is defined on the system.
 \fB\fBinvalid\fR\fR
 .ad
 .RS 12n
-The fault management resource identifier (FMRI) is invalid (see \fBsmf\fR(5)).
+The fault management resource identifier (FMRI) is invalid (see \fBsmf\fR(7)).
 .RE
 
 .sp
@@ -190,7 +190,7 @@ service's dependencies, it can consider the dependency to be unsatisfied.
 \fBstat\fR(2) failed for a reason other than \fBENOENT\fR.
 .RE
 
-See \fBsmf\fR(5) for additional details about dependencies, grouping, and
+See \fBsmf\fR(7) for additional details about dependencies, grouping, and
 \fBrestart_on\fR values.
 .RE
 
@@ -207,7 +207,7 @@ temporarily (until the next system reboot). The former is specified as either
 .sp
 A service might be temporarily disabled because an administrator has run
 \fBsvcadm disable -t\fR, used \fBsvcadm milestone\fR, or booted the system to a
-specific milestone. See \fBsvcadm\fR(1M) for details.
+specific milestone. See \fBsvcadm\fR(8) for details.
 .sp
 If a service instance was disabled via
 \fBsvcadm disable -c\fR
@@ -322,7 +322,7 @@ are preventing another enabled service from running.
 .ad
 .RS 20n
 Display only the services in the \fIzone\fR.  This option is only applicable
-in the global zone, see \fBzones\fR(5).
+in the global zone, see \fBzones\fR(7).
 .RE
 
 .sp
@@ -333,7 +333,7 @@ in the global zone, see \fBzones\fR(5).
 .RS 20n
 Display services from all zones, with an additional column indicating in which
 zone the service is running.  This option is only applicable in the global
-zone, see \fBzones\fR(5).
+zone, see \fBzones\fR(7).
 .RE
 
 .SH OPERANDS
@@ -345,7 +345,7 @@ The following operands are supported:
 .ad
 .RS 17n
 A fault management resource identifier (FMRI) that specifies one or more
-instances (see \fBsmf\fR(5)). FMRIs can be abbreviated by specifying the
+instances (see \fBsmf\fR(7)). FMRIs can be abbreviated by specifying the
 instance name, or the trailing portion of the service name. For example, given
 the FMRI:
 .sp
@@ -394,7 +394,7 @@ other permanent tools.
 .ad
 .RS 17n
 A pattern that is matched against the \fIFMRI\fRs of service instances
-according to the "globbing" rules described by \fBfnmatch\fR(5). If the pattern
+according to the "globbing" rules described by \fBfnmatch\fR(7). If the pattern
 does not begin with \fBsvc:\fR, then \fBsvc:/\fR is prepended. The following is
 a typical example of a glob pattern:
 .sp
@@ -506,7 +506,7 @@ The service name of the service instance.
 \fB\fBSTA\fR\fR
 .ad
 .RS 10n
-The abbreviated state of the service instance (see \fBsmf\fR(5)):
+The abbreviated state of the service instance (see \fBsmf\fR(7)):
 .sp
 .ne 2
 .na
@@ -574,7 +574,7 @@ Absent or unrecognized states are denoted by a question mark (\fB?\fR)
 character. An asterisk (\fB*\fR) is appended for instances in transition,
 unless the \fBNSTA\fR or \fBNSTATE\fR column is also being displayed.
 .sp
-See \fBsmf\fR(5) for an explanation of service states.
+See \fBsmf\fR(7) for an explanation of service states.
 .RE
 
 .sp
@@ -587,7 +587,7 @@ The state of the service instance. An asterisk is appended for instances in
 transition, unless the \fBNSTA\fR or \fBNSTATE\fR column is also being
 displayed.
 .sp
-See \fBsmf\fR(5) for an explanation of service states.
+See \fBsmf\fR(7) for an explanation of service states.
 .RE
 
 .sp
@@ -716,7 +716,7 @@ svc:/application/print/server:default (LP print server)
  State: disabled since Mon Feb 13 17:56:21 2006
 Reason: Disabled by an administrator.
    See: http://illumos.org/msg/SMF-8000-05
-   See: lpsched(1M)
+   See: lpsched(8)
 Impact: 2 dependent services are not running. (Use -v for list.)
 .fi
 .in -2
@@ -754,7 +754,7 @@ Reason: Service svc:/network/nfs/status:default
   Path: svc:/network/nfs/client:default
           svc:/network/nfs/nlockmgr:default
             svc:/network/nfs/status:default
-   See: man -M /usr/share/man -s 1M mount_nfs
+   See: man -M /usr/share/man -s 8 mount_nfs
    See: /var/svc/log/network-nfs-client:default.log
 Impact: This service is not running.
 .fi
@@ -791,7 +791,7 @@ Invalid command line options were specified.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -808,6 +808,14 @@ Interface Stability	See below.
 .LP
 Screen output is Uncommitted. The invocation is Committed.
 .SH SEE ALSO
-\fBps\fR(1), \fBsvcprop\fR(1), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
-\fBsvc.startd\fR(1M), \fBstat\fR(2), \fBlibscf\fR(3LIB), \fBattributes\fR(5),
-\fBfnmatch\fR(5), \fBsmf\fR(5), \fBzones\fR(5)
+.BR ps (1),
+.BR svcprop (1),
+.BR stat (2),
+.BR libscf (3LIB),
+.BR attributes (7),
+.BR fnmatch (7),
+.BR smf (7),
+.BR zones (7),
+.BR svc.startd (8),
+.BR svcadm (8),
+.BR svccfg (8)

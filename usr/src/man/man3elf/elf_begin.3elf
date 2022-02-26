@@ -353,7 +353,7 @@ not obtain the performance advantages of \fBmmap\fR(2).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -371,9 +371,22 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBcreat\fR(2), \fBlseek\fR(2), \fBmmap\fR(2), \fBopen\fR(2),
-\fBar.h\fR(3HEAD), \fBelf\fR(3ELF), \fBelf32_getehdr\fR(3ELF),
-\fBelf_cntl\fR(3ELF), \fBelf_getarhdr\fR(3ELF), \fBelf_getarsym\fR(3ELF),
-\fBelf_getbase\fR(3ELF), \fBelf_getdata\fR(3ELF), \fBelf_getscn\fR(3ELF),
-\fBelf_kind\fR(3ELF), \fBelf_rawfile\fR(3ELF), \fBelf_update\fR(3ELF),
-\fBelf_version\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)
+.BR creat (2),
+.BR lseek (2),
+.BR mmap (2),
+.BR open (2),
+.BR elf (3ELF),
+.BR elf32_getehdr (3ELF),
+.BR elf_cntl (3ELF),
+.BR elf_getarhdr (3ELF),
+.BR elf_getarsym (3ELF),
+.BR elf_getbase (3ELF),
+.BR elf_getdata (3ELF),
+.BR elf_getscn (3ELF),
+.BR elf_kind (3ELF),
+.BR elf_rawfile (3ELF),
+.BR elf_update (3ELF),
+.BR elf_version (3ELF),
+.BR ar.h (3HEAD),
+.BR libelf (3LIB),
+.BR attributes (7)

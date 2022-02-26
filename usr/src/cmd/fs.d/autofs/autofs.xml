@@ -124,7 +124,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='automount' section='1M'
+			<manpage title='automount' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

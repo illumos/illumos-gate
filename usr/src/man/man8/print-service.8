@@ -1,0 +1,182 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PRINT-SERVICE 8 "Mar 18, 2008"
+.SH NAME
+print-service \- select, report, import, export active print service on a
+system
+.SH SYNOPSIS
+.LP
+.nf
+\fBprint-service\fR  [\fB-s\fR \fIservice\fR [\fB-m\fR] | \fB-q\fR | \fB-e\fR \fIfile\fR | \fB-i\fR \fIfile\fR]
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBprint-service\fR utility manages print service selection, as well as
+export and import of basic print queue configuration.
+.sp
+.LP
+Only a user root privileges or with the Printer Management profile can change
+the active print service or import print queue configuration.
+.SH OPTIONS
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-s\fR \fIservice\fR\fR
+.ad
+.sp .6
+.RS 4n
+Select the active print service for on a host. \fIservice\fR can be one of
+\fBlp\fR or \fBcups\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Migrate print queue configuration during print service selection.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-q\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report the active print service on a host.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR \fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Export basic print queue configuration to a file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-i\fR \fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Import basic print queue configuration from a file.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSelecting a Print Service
+.sp
+.LP
+The following command selects the CUPS print service as the active print
+service on a host.
+
+.sp
+.in +2
+.nf
+# \fBprint-service -s cups\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRReporting the Active Print Service
+.sp
+.LP
+The following command reports the active print service on a host.
+
+.sp
+.in +2
+.nf
+# \fBprint-service -q\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRExporting a Print Queue Configuration
+.sp
+.LP
+The following command exports the print queue configuration from the active
+print service.
+
+.sp
+.in +2
+.nf
+# \fBprint-service -e /tmp/queues\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRImporting a Print Queue Configuration
+.sp
+.LP
+The following command imports the print queue configuration to the active print
+service.
+
+.sp
+.in +2
+.nf
+# \fBprint-service -i /tmp/queues\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnon-zero\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Obsolete
+.TE
+
+.SH SEE ALSO
+.LP
+.BR Intro (1),
+.BR attributes (7)
+.SH NOTES
+.LP
+The print queue configuration saved and restored during export, import, and
+migration is limited to queue name and device name. It is likely that further
+configuration changes will be required before imported or migrated print queues
+become usable.

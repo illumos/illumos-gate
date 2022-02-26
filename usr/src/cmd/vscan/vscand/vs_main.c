@@ -139,7 +139,7 @@ vscand_sig_handler(int sig)
 /*
  * main
  *
- * main must return SMF return code (see smf_method (5)) if vscand
+ * main must return SMF return code (see smf_method(7)) if vscand
  * is invoked directly by smf (see manifest: vscan.xml)
  * Exit codes: SMF_EXIT_ERR_CONFIG - error
  *             SMF_EXIT_ERR_FATAL - fatal error

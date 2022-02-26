@@ -22,7 +22,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-/* auditd smf(5)/libscf(3LIB) interface - set and display audit parameters */
+/* auditd smf(7)/libscf(3LIB) interface - set and display audit parameters */
 #include <audit_scf.h>
 #include <audit_policy.h>
 
@@ -691,7 +691,7 @@ do_getpolicy_scf(uint32_t *policy_mask)
 	bzero(prop_vect, sizeof (prop_vect));
 	bzero(policy_arr, sizeof (policy_arr));
 
-	/* prepare the smf(5) query */
+	/* prepare the smf(7) query */
 	for (i = 0; i < POLICY_TBL_SZ; i++) {
 
 		cur_policy_str = policy_table[i].policy_str;

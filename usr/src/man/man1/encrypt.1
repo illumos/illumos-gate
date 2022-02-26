@@ -115,7 +115,7 @@ key length, and passphrases set from the terminal are always used to generate
 128 bit long keys for ciphers with a variable key length.
 .sp
 For information on generating a key file, see the \fBgenkey\fR subcommand in
-\fBpktool\fR(1). Alternatively, \fBdd\fR(1M) can be used.
+\fBpktool\fR(1). Alternatively, \fBdd\fR(8) can be used.
 .RE
 
 .sp
@@ -357,7 +357,7 @@ An error occurred.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -373,9 +373,14 @@ Interface Stability	Committed
 .SH SEE ALSO
 .sp
 .LP
-\fBdigest\fR(1), \fBpktool\fR(1), \fBmac\fR(1), \fBdd\fR(1M),
-\fBgetpassphrase\fR(3C), \fBlibpkcs11\fR(3LIB), \fBattributes\fR(5),
-\fBpkcs11_softtoken\fR(5)
+.BR digest (1),
+.BR mac (1),
+.BR pktool (1),
+.BR getpassphrase (3C),
+.BR libpkcs11 (3LIB),
+.BR attributes (7),
+.BR pkcs11_softtoken (7),
+.BR dd (8)
 .sp
 .LP
 \fISystem Administration Guide: Security Services\fR

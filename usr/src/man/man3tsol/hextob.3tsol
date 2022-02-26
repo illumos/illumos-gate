@@ -61,7 +61,7 @@ zero is returned.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -84,8 +84,10 @@ removed in a future Solaris Trusted Extensions release. Use the
 .SH SEE ALSO
 .sp
 .LP
-\fBlibtsol\fR(3LIB), \fBstr_to_label\fR(3TSOL), \fBattributes\fR(5),
-\fBlabels\fR(5)
+.BR libtsol (3LIB),
+.BR str_to_label (3TSOL),
+.BR attributes (7),
+.BR labels (7)
 .SH NOTES
 .sp
 .LP

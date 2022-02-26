@@ -1,0 +1,316 @@
+'\" te
+.\" Copyright (c) 2017 Peter Tribble.
+.\" Copyright (c) 1992, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH MANSUN 7 "Apr 2, 2017"
+.SH NAME
+mansun \- macros to format Reference Manual pages
+.SH SYNOPSIS
+.LP
+.nf
+\fBnroff\fR \fB-mansun\fR \fIfilename\fR...
+.fi
+
+.LP
+.nf
+\fBtroff\fR \fB-mansun\fR \fIfilename\fR...
+.fi
+
+.SH DESCRIPTION
+.LP
+These macros are used to lay out the reference pages in this manual. Note: if
+\fIfilename\fR contains format input for a preprocessor, the commands shown
+above must be piped through the appropriate preprocessor. This is handled
+automatically by \fBman\fR(1). See the ``Conventions'' section.
+.sp
+.LP
+Any text argument \fIt\fR may be zero to six words. Quotes may be used to
+include SPACE characters in a "word". If \fItext\fR is empty, the special
+treatment is applied to the next input line with text to be printed. In this
+way \fB\&.I\fR may be used to italicize a whole line, or \fB\&.SB\fR may be
+used to make small bold letters.
+.sp
+.LP
+A prevailing indent distance is remembered between successive indented
+paragraphs, and is reset to default value upon reaching a non-indented
+paragraph. Default units for indents \fIi\fR are ens.
+.sp
+.LP
+Type font and size are reset to default values before each paragraph, and after
+processing font and size setting macros.
+.sp
+.LP
+These strings are predefined by \fB-mansun\fR:
+.sp
+.ne 2
+.na
+\fB\fB\e*R\fR\fR
+.ad
+.RS 8n
+`\(rg', `(Reg)' in \fBnroff\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\e*S\fR\fR
+.ad
+.RS 8n
+Change to default type size.
+.RE
+
+.SS "Requests"
+.LP
+* n.t.l. = next text line; p.i. = prevailing indent
+.sp
+
+.sp
+.TS
+c c c c
+c c c c .
+\fIRequest\fR	\fICause\fR	\fIIf no\fR	\fIExplanation\fR
+	\fIBreak\fR	\fIArgument\fR
+\fB\&.B \fR\fIt\fR	no	\fIt\fR=n.t.l.*	Text is in bold font.
+\fB\&.BI \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating bold and italic.
+\fB\&.BR \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating bold and Roman.
+\fB\&.DT\fR	no	\&.5i 1i...	Restore default tabs.
+\fB\&.HP \fR\fIi\fR	yes	\fIi\fR=p.i.*	T{
+Begin paragraph with hanging indent. Set prevailing indent to \fIi\fR.
+T}
+\fB\&.I \fR\fIt\fR	no	\fIt\fR=n.t.l.	Text is italic.
+\fB\&.IB \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating italic and bold.
+\fB\&.IP \fR\fIx i\fR	yes	\fIx\fR=""	Same as \fB\&.TP\fR with tag \fIx\fR.
+\fB\&.IR \fR\fIt\fR	no	\fIt\fR=n.t.l.	T{
+Join words, alternating italic and Roman.
+T}
+\fB\&.IX \fR\fIt\fR	no	-	Index macro, for SunSoft internal use.
+\fB\&.LP\fR	yes	-	T{
+Begin left-aligned paragraph. Set prevailing indent to .5i.
+T}
+\fB\&.P\fR	yes	-	Same as \fB\&.LP\fR.
+\fB\&.PD \fR\fId\fR	no	\fId\fR=.4v	T{
+Set vertical distance between paragraphs.
+T}
+\fB\&.PP\fR	yes	-	Same as \fB\&.LP\fR.
+\fB\&.RE\fR	yes	-	T{
+End of relative indent. Restores prevailing indent.
+T}
+\fB\&.RB \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating Roman and bold.
+\fB\&.RI \fR\fIt\fR	no	\fIt\fR=n.t.l.	T{
+Join words, alternating Roman and italic.
+T}
+\fB\&.RS \fR\fIi\fR	yes	\fIi\fR=p.i.	T{
+Start relative indent, increase indent by \fIi\fR. Sets prevailing indent to .5i for nested indents.
+T}
+\fB\&.SB \fR\fIt\fR	no	-	T{
+Reduce size of text by 1 point, make text bold.
+T}
+\fB\&.SH \fR\fIt\fR	yes	-	Section Heading.
+\fB\&.SM \fR\fIt\fR	no	\fIt\fR=n.t.l.	Reduce size of text by 1 point.
+\fB\&.SS \fR\fIt\fR	yes	\fIt\fR=n.t.l.	Section Subheading.
+\fB\&.TH \fR\fIN S "f d, m\fR"
+\fB\&.TH \fR\fIn s d f m\fR	yes	-	T{
+Begin reference page \fIn\fR, of of section \fIs\fR; \fId\fR is the date of the most recent change. If present, \fIf\fR is the left page footer; \fIm\fR is the main page (center) header. Sets prevailing indent and tabs to .5i.
+T}
+\fB\&.TP \fR\fIi\fR	yes	\fIi\fR=p.i.	T{
+Begin indented paragraph, with the tag given on the next text line. Set prevailing indent to \fIi\fR.
+T}
+\fB\&.TX \fR\fIt \fR\fIp\fR	no	-	T{
+Resolve the title abbreviation \fIt\fR; join to punctuation mark (or text) \fIp\fR.
+T}
+.TE
+
+.SS "Conventions"
+.LP
+When formatting a manual page, \fBmansun\fR examines the first line to
+determine whether it requires special processing. For example a first line
+consisting of:
+.sp
+.LP
+\fB\&'\e" t\fR
+.sp
+.LP
+indicates that the manual page must be run through the \fBtbl\fR(1)
+preprocessor.
+.sp
+.LP
+A typical manual page for a command or function is laid out as follows:
+.sp
+.ne 2
+.na
+\fB\&.TH\fI TITLE \fR[1-8]\fR " , "
+.ad
+.RS 21n
+The name of the command or function, which serves as the title of the manual
+page. This is followed by the number of the section in which it appears.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\&.SH NAME\fR
+.ad
+.RS 21n
+The name, or list of names, by which the command is called, followed by a dash
+and then a one-line summary of the action performed. All in Roman font, this
+section contains no \fBtroff\fR(1) commands or escapes, and no macro requests.
+It is used to generate the \fBwhatis\fR database, which is used by the
+\fBwhatis\fR(1) and \fBapropos\fR(1) commands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\&.SH SYNOPSIS\fR
+.ad
+.RS 21n
+.sp
+.ne 2
+.na
+\fBCommands:\fR
+.ad
+.RS 13n
+The syntax of the command and its arguments, as typed on the command line.
+When in boldface, a word must be typed exactly as printed. When in italics, a
+word can be replaced with an argument that you supply. References to bold or
+italicized items are not capitalized in other sections, even when they begin a
+sentence.
+.sp
+Syntactic symbols appear in Roman face:
+.sp
+.ne 2
+.na
+\fB[ ]\fR
+.ad
+.RS 13n
+An argument, when surrounded by brackets is optional.
+.RE
+
+.sp
+.ne 2
+.na
+\fB|\fR
+.ad
+.RS 13n
+Arguments separated by a vertical bar are exclusive. You can supply only one
+item from such a list.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\&.\|.\|.\fR
+.ad
+.RS 13n
+Arguments followed by an ellipsis can be repeated. When an ellipsis follows a
+bracketed set, the expression within the brackets can be repeated.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBFunctions:\fR
+.ad
+.RS 14n
+If required, the data declaration, or \fB#include\fR directive, is shown first,
+followed by the function declaration. Otherwise, the function declaration is
+shown.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\&.SH DESCRIPTION\fR
+.ad
+.RS 21n
+A narrative overview of the command or function's external behavior. This
+includes how it interacts with files or data, and how it handles the standard
+input, standard output and standard error. Internals and implementation details
+are normally omitted. This section attempts to provide a succinct overview in
+answer to the question, "what does it do?"
+.sp
+Literal text from the synopsis appears in constant width, as do literal
+filenames and references to items that appear elsewhere in the reference
+manuals. Arguments are italicized.
+.sp
+If a command interprets either subcommands or an input grammar, its command
+interface or input grammar is normally described in a \fBUSAGE\fR section,
+which follows the \fBOPTIONS\fR section. The \fBDESCRIPTION\fR section only
+describes the behavior of the command itself, not that of subcommands.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\&.SH OPTIONS\fR
+.ad
+.RS 21n
+The list of options along with a description of how each affects the command's
+operation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\&.SH FILES\fR
+.ad
+.RS 21n
+A list of files associated with the command or function.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\&.SH SEE ALSO\fR
+.ad
+.RS 21n
+A comma-separated list of related manual pages, followed by references to other
+published materials.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\&.SH DIAGNOSTICS\fR
+.ad
+.RS 21n
+A list of diagnostic messages and an explanation of each.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\&.SH BUGS\fR
+.ad
+.RS 21n
+A description of limitations, known defects, and possible problems associated
+with the command or function.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/usr/share/lib/tmac/ansun\fR\fR
+.ad
+.RS 29n
+
+.RE
+
+.SH SEE ALSO
+.LP
+.BR man (1),
+.BR nroff (1),
+.BR troff (1)
+.sp
+.LP
+Dale Dougherty and Tim O'Reilly, \fIUnix\fR \fIText\fR \fIProcessing\fR
+
+.SH NOTES
+.LP
+New manual pages should be coded in the \fBmdoc\fR(7) format.

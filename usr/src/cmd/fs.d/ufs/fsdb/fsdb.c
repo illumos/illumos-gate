@@ -404,7 +404,7 @@ main(int argc, char *argv[])
 "Warning: The '-z' option of 'fsdb_ufs' has been declared obsolete",
 "and may not be supported in a future version of Solaris.",
 "While this functionality is currently still supported, the",
-"recommended procedure to clear an inode is to use clri(1M).");
+"recommended procedure to clear an inode is to use clri(8).");
 			if (isnumber(optarg)) {
 				inum = atoi(optarg);
 				special = argv[optind];

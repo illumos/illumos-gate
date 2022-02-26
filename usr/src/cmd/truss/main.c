@@ -2003,7 +2003,7 @@ xcreat(char *path)
 
 	/*
 	 * Make sure it's not one of 0, 1, or 2.
-	 * This allows truss to work when spawned by init(1m).
+	 * This allows truss to work when spawned by init(8).
 	 */
 	if (0 <= fd && fd <= 2) {
 		int dfd = fcntl(fd, F_DUPFD, 3);

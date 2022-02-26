@@ -88,5 +88,5 @@ argument .
 .Sh SEE ALSO
 .Xr pthread_once 3C ,
 .Xr threads.h 3HEAD ,
-.Xr attributes 5 ,
-.Xr threads 5
+.Xr attributes 7 ,
+.Xr threads 7

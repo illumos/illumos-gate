@@ -62,7 +62,7 @@ static mac_stat_info_t ether_stats[] = {
 	{ ETHER_STAT_TOOSHORT_ERRORS, "runt_errors", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_JABBER_ERRORS, "jabber_errors", KSTAT_DATA_UINT32,	0 },
 
-	/* Statistics described in the ieee802.3(5) man page */
+	/* Statistics described in the ieee802.3(7) man page */
 	{ ETHER_STAT_XCVR_ADDR, "xcvr_addr", KSTAT_DATA_UINT32,		0 },
 	{ ETHER_STAT_XCVR_ID, "xcvr_id", KSTAT_DATA_UINT32, 		0 },
 	{ ETHER_STAT_XCVR_INUSE, "xcvr_inuse", KSTAT_DATA_UINT32,	0 },

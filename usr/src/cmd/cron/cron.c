@@ -352,7 +352,7 @@ static void *get_obj(struct shared *obj);
  * it's original intended use.
  */
 static time_t last_time, init_time, t_old;
-static int reset_needed; /* set to 1 when cron(1M) needs to re-initialize */
+static int reset_needed; /* set to 1 when cron(8) needs to re-initialize */
 
 static int		refresh;
 static sigset_t		defmask, sigmask;
@@ -436,7 +436,7 @@ main(int argc, char *argv[])
 
 	/*
 	 * reset_needed is set to 1 whenever el_add() finds out that a cron
-	 * job is scheduled to be run before the time when cron(1M) daemon
+	 * job is scheduled to be run before the time when cron(8) daemon
 	 * initialized.
 	 * Other cases where a reset is needed is when ex() finds that the
 	 * event to be executed is being run at the wrong time, or when idle()
@@ -688,7 +688,7 @@ initialize(int firstpass)
 					    REMOVE_FIFO|CONSOLE_MSG);
 			} else {
 				if (NOFORK) {
-					/* didn't fork... init(1M) is waiting */
+					/* didn't fork... init(8) is waiting */
 					(void) sleep(60);
 				}
 				perror("FIFO");
@@ -697,7 +697,7 @@ initialize(int firstpass)
 			}
 		} else {
 			if (NOFORK) {
-				/* didn't fork... init(1M) is waiting */
+				/* didn't fork... init(8) is waiting */
 				(void) sleep(60);
 				/*
 				 * the wait is painful, but we don't want

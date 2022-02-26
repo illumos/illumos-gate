@@ -89,5 +89,5 @@ Insufficient storage space is available.
 .Xr _Exit 2 ,
 .Xr atexit 3C ,
 .Xr exit 3C ,
-.Xr attributes 5 ,
-.Xr standards 5
+.Xr attributes 7 ,
+.Xr standards 7

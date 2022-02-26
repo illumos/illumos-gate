@@ -41,7 +41,7 @@
 The
 .Fn eventfd
 function creates an
-.Xr eventfd 5
+.Xr eventfd 7
 instance that has an associated 64-bit unsigned counter.
 It returns a file descriptor that can be operated upon via
 .Xr read 2 ,
@@ -237,4 +237,4 @@ file descriptors open in the calling process.
 .Xr write 2 ,
 .Xr epoll_wait 3C ,
 .Xr port_get 3C ,
-.Xr eventfd 5
+.Xr eventfd 7

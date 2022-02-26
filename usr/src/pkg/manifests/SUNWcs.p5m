@@ -33,11 +33,11 @@
 #
 
 <include SUNWcs.man1.inc>
-<include SUNWcs.man1m.inc>
-<include SUNWcs.man4.inc>
+<include SUNWcs.man4d.inc>
+<include SUNWcs.man4fs.inc>
 <include SUNWcs.man5.inc>
-<include SUNWcs.man7d.inc>
-<include SUNWcs.man7fs.inc>
+<include SUNWcs.man7.inc>
+<include SUNWcs.man8.inc>
 set name=pkg.fmri value=pkg:/SUNWcs@$(PKGVERS)
 set name=pkg.summary value="Core Solaris"
 set name=pkg.description \
@@ -1547,11 +1547,11 @@ dir  path=usr/share/lib/xml/style group=sys
 file path=usr/share/lib/xml/style/adt_record.xsl.1
 dir  path=usr/share/man
 dir  path=usr/share/man/man1
-dir  path=usr/share/man/man1m
 dir  path=usr/share/man/man4
+dir  path=usr/share/man/man4d
+dir  path=usr/share/man/man4fs
 dir  path=usr/share/man/man5
-dir  path=usr/share/man/man7d
-dir  path=usr/share/man/man7fs
+dir  path=usr/share/man/man8
 dir  path=usr/share/src group=sys
 link path=usr/spool target=../var/spool
 link path=usr/src target=./share/src

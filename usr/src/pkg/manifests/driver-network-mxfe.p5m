@@ -40,8 +40,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/mxfe group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/mxfe.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/mxfe.4d
 driver name=mxfe perms="* 0666 root sys" clone_perms="mxfe 0666 root sys" \
     alias=pci10d9,512 \
     alias=pci10d9,531 \

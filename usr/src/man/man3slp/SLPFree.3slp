@@ -67,9 +67,15 @@ When set, use this file for configuration.
 .SH SEE ALSO
 .sp
 .LP
-\fBslpd\fR(1M), \fBSLPEscape\fR(3SLP), \fBSLPFindScopes\fR(3SLP),
-\fBSLPParseSrvURL\fR(3SLP), \fBSLPUnescape\fR(3SLP), \fBslp_api\fR(3SLP),
-\fBslp.conf\fR(4), \fBslpd.reg\fR(4), \fBattributes\fR(5)
+.BR SLPEscape (3SLP),
+.BR SLPFindScopes (3SLP),
+.BR SLPParseSrvURL (3SLP),
+.BR SLPUnescape (3SLP),
+.BR slp_api (3SLP),
+.BR slp.conf (5),
+.BR slpd.reg (5),
+.BR attributes (7),
+.BR slpd (8)
 .sp
 .LP
 \fISystem Administration Guide: Network Services\fR

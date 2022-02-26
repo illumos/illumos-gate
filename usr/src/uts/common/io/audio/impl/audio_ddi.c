@@ -507,7 +507,7 @@ audio_init_ops(struct dev_ops *devops, const char *name)
 
 	(void) strlcpy(helper->name, name, sizeof (helper->name));
 
-	helper->minfo.mi_idnum = 0;	/* only for strlog(1M) */
+	helper->minfo.mi_idnum = 0;	/* only for strlog(8) */
 	helper->minfo.mi_idname = helper->name;
 	helper->minfo.mi_minpsz = 0;
 	helper->minfo.mi_maxpsz = 8192;

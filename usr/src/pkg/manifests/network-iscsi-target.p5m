@@ -59,8 +59,6 @@ link path=usr/lib/libiscsit.so target=libiscsit.so.1
 file path=usr/lib/libiscsit.so.1
 dir  path=usr/sbin
 file path=usr/sbin/itadm mode=0555
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/itadm.1m
 dir  path=usr/share/man/man3iscsit
 link path=usr/share/man/man3iscsit/it_config_commit.3iscsit \
     target=it_config_load.3iscsit
@@ -99,6 +97,8 @@ link path=usr/share/man/man3iscsit/it_tpgt_free.3iscsit \
     target=it_tgt_create.3iscsit
 dir  path=usr/share/man/man3lib
 file path=usr/share/man/man3lib/libiscsit.3lib
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/itadm.8
 driver name=iscsit perms="* 0600 root sys"
 legacy pkg=SUNWiscsitr desc="Sun iSCSI COMSTAR Port Provider" \
     name="Sun iSCSI COMSTAR Port Provider (root)"

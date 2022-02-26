@@ -200,7 +200,7 @@ The requested data is not present in the status object.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -218,6 +218,10 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBct_status_free\fR(3CONTRACT), \fBct_status_read\fR(3CONTRACT),
-\fBlibcontract\fR(3LIB), \fBcontract\fR(4), \fBdevices\fR(4),
-\fBattributes\fR(5), \fBlfcompile\fR(5)
+.BR ct_status_free (3CONTRACT),
+.BR ct_status_read (3CONTRACT),
+.BR libcontract (3LIB),
+.BR contract (5),
+.BR devices (5),
+.BR attributes (7),
+.BR lfcompile (7)

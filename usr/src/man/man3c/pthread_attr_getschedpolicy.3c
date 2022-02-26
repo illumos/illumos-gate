@@ -110,7 +110,7 @@ not affect the current running thread.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -124,14 +124,19 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBpthread_attr_init\fR(3C), \fBpthread_attr_setscope\fR(3C),
-\fBpthread_attr_setinheritsched\fR(3C), \fBpthread_attr_setschedparam\fR(3C),
-\fBpthread_create\fR(3C), \fBpthread_getschedparam\fR(3C),
-\fBsched.h\fR(3HEAD), \fBsched_getscheduler\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR pthread_attr_init (3C),
+.BR pthread_attr_setinheritsched (3C),
+.BR pthread_attr_setschedparam (3C),
+.BR pthread_attr_setscope (3C),
+.BR pthread_create (3C),
+.BR pthread_getschedparam (3C),
+.BR sched_getscheduler (3C),
+.BR sched.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

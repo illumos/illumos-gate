@@ -19,11 +19,11 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+
 # Public Key Database
 #
 # To add an entry to this file, an administrator should use the command
-# newkey(1M) on the local machine.
+# newkey(8) on the local machine.
 # Non root users are not allowed to change their key-pair in this file.
 # Entries in this file are only available to services on the local host
 # and can be compromised. Hence, we recommend that Users store their

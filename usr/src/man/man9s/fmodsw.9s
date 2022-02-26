@@ -38,7 +38,9 @@ int               f_flag;                 /* flags */
 .in -2
 
 .SH SEE ALSO
-\fBmt-streams\fR(9F), \fBmodlstrmod\fR(9S), \fBmodule_info\fR(9S)
+.BR mt-streams (9F),
+.BR modlstrmod (9S),
+.BR module_info (9S)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

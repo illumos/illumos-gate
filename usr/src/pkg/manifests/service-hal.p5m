@@ -169,19 +169,19 @@ dir  path=usr/share/lib/xml group=sys
 dir  path=usr/share/lib/xml/dtd group=sys
 file path=usr/share/lib/xml/dtd/fdi.dtd.1
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/hal-device.1m
-file path=usr/share/man/man1m/hal-fdi-validate.1m
-link path=usr/share/man/man1m/hal-find-by-capability.1m target=hal-find.1m
-link path=usr/share/man/man1m/hal-find-by-property.1m target=hal-find.1m
-file path=usr/share/man/man1m/hal-find.1m
-file path=usr/share/man/man1m/hal-get-property.1m
-link path=usr/share/man/man1m/hal-set-property.1m target=hal-get-property.1m
-file path=usr/share/man/man1m/hald.1m
-dir  path=usr/share/man/man4
-file path=usr/share/man/man4/fdi.4
 dir  path=usr/share/man/man5
-file path=usr/share/man/man5/hal.5
+file path=usr/share/man/man5/fdi.5
+dir  path=usr/share/man/man7
+file path=usr/share/man/man7/hal.7
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/hal-device.8
+file path=usr/share/man/man8/hal-fdi-validate.8
+link path=usr/share/man/man8/hal-find-by-capability.8 target=hal-find.8
+link path=usr/share/man/man8/hal-find-by-property.8 target=hal-find.8
+file path=usr/share/man/man8/hal-find.8
+file path=usr/share/man/man8/hal-get-property.8
+link path=usr/share/man/man8/hal-set-property.8 target=hal-get-property.8
+file path=usr/share/man/man8/hald.8
 legacy pkg=SUNWhal desc="Hardware Abstraction Layer, HAL (freedesktop.org)" \
     name="Hardware Abstraction Layer"
 legacy pkg=SUNWhalr \

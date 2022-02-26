@@ -90,7 +90,7 @@ In no case will the value returned be greater than the value of the
 No errors are defined.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .TS
 box;
 c | c
@@ -109,6 +109,12 @@ The \fBwctomb()\fR function is Standard.  The \fBwctomb_l()\fR function
 is Uncommitted.
 .SH SEE ALSO
 .LP
-\fBmblen\fR(3C), \fBmbstowcs\fR(3C), \fBmbtowc\fR(3C),
-\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
-\fBwcstombs\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR mblen (3C),
+.BR mbstowcs (3C),
+.BR mbtowc (3C),
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR uselocale (3C),
+.BR wcstombs (3C),
+.BR attributes (7),
+.BR standards (7)

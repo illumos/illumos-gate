@@ -28,7 +28,7 @@
 	operating system upgrade.  Make customizations in a different
 	file.
 
-	Service manifest for mpxio upgrade, enabled by stmsboot(1M).
+	Service manifest for mpxio upgrade, enabled by stmsboot(8).
 -->
 
 <service_bundle type='manifest' name='SUNWcsr:mpxio-upgrade'>
@@ -86,7 +86,7 @@
 		<documentation>
 			<manpage
 				title='stmsboot'
-				section='1M'
+				section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

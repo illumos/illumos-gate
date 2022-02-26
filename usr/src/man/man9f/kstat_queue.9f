@@ -138,9 +138,13 @@ These transitions must be protected by holding the \fBkstat\fR's \fBks_lock\fR,
 and must be completely accurate (all transitions are recorded). Forgetting a
 transition may, for example, make an idle disk appear 100% busy.
 .SH SEE ALSO
-\fBbiodone\fR(9F), \fBdisksort\fR(9F), \fBkstat_create\fR(9F),
-\fBkstat_delete\fR(9F), \fBkstat_named_init\fR(9F), \fBkstat\fR(9S),
-\fBkstat_io\fR(9S)
+.BR biodone (9F),
+.BR disksort (9F),
+.BR kstat_create (9F),
+.BR kstat_delete (9F),
+.BR kstat_named_init (9F),
+.BR kstat (9S),
+.BR kstat_io (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

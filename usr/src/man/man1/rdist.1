@@ -46,17 +46,17 @@ authentication. Encryption of the data being transferred is also possible. The
 specific options : \fB-a\fR, \fB-PN\fR or \fB-PO\fR, \fB-x\fR, and \fB-k\fR
 \fIrealm\fR. Some of these options (\fB-a\fR, \fB-x\fR, \fB-PN\fR or \fB-PO\fR,
 and \fB-f\fR or \fB-F\fR) can also be specified in the \fB[appdefaults]\fR
-section of \fBkrb5.conf\fR(4). The usage of these options and the expected
+section of \fBkrb5.conf\fR(5). The usage of these options and the expected
 behavior is discussed in the OPTIONS section below. If Kerberos authentication
 is used, authorization to the account is controlled by rules in
-\fBkrb5_auth_rules\fR(5). If this authorization fails, fallback to normal
+\fBkrb5_auth_rules\fR(7). If this authorization fails, fallback to normal
 \fBrdist\fR using rhosts occurs only if the \fB-PO\fR option is used explicitly
-on the command line or is specified in \fBkrb5.conf\fR(4). Also notice that the
+on the command line or is specified in \fBkrb5.conf\fR(5). Also notice that the
 \fB-PN\fR or \fB-PO\fR, \fB-x\fR, and \fB-k\fR \fIrealm\fR options are just
 supersets of the \fB-a\fR option. In order to use the non-secure version of
 \fBrdist\fR across machines, each host machine must have a
 \fB/etc/host.equiv\fR file, or the user must have an entry in the
-\fB\&.rhosts\fR file in the home directory. See \fBhosts.equiv\fR(4) for more
+\fB\&.rhosts\fR file in the home directory. See \fBhosts.equiv\fR(5) for more
 information.
 .SH OPTIONS
 The following options are supported:
@@ -69,7 +69,7 @@ The following options are supported:
 .RS 4n
 This option explicitly enables Kerberos authentication and trusts the
 \fB\&.k5login\fR file for access-control. If the authorization check by
-\fBin.rshd\fR(1M) on the server-side succeeds and if the \fB\&.k5login\fR file
+\fBin.rshd\fR(8) on the server-side succeeds and if the \fB\&.k5login\fR file
 permits access, the user is allowed to carry out the \fBrdist\fR transfer.
 .RE
 
@@ -165,7 +165,7 @@ be found.
 .sp .6
 .RS 4n
 Causes \fBrdist\fR to obtain tickets for the remote host in \fIrealm\fR instead
-of the remote host's realm as determined by \fBkrb5.conf\fR(4).
+of the remote host's realm as determined by \fBkrb5.conf\fR(5).
 .RE
 
 .sp
@@ -176,7 +176,7 @@ of the remote host's realm as determined by \fBkrb5.conf\fR(4).
 .sp .6
 .RS 4n
 This option explicitly disables Kerberos authentication. It can be used to
-override the \fBautologin\fR variable in \fBkrb5.conf\fR(4).
+override the \fBautologin\fR variable in \fBkrb5.conf\fR(5).
 .RE
 
 .sp
@@ -216,7 +216,7 @@ Explicitly requests new (\fB-PN\fR) or old (\fB-PO\fR) version of the Kerberos
 "\fBrcmd\fR" protocol. The new protocol avoids many security problems prevalent
 in the old one and is regarded much more secure, but is not interoperable with
 older (MIT/SEAM) servers. The new protocol is used by default, unless
-explicitly specified using these options or through \fBkrb5.conf\fR(4). If
+explicitly specified using these options or through \fBkrb5.conf\fR(5). If
 Kerberos authorization fails when using the old "\fBrcmd\fR" protocol, there is
 fallback to regular, non-kerberized \fBrdist\fR. This is not the case when the
 new, more secure "\fBrcmd\fR" protocol is used.
@@ -473,7 +473,7 @@ is the user's home directory on the remote host.
 .RE
 
 .SS "IPv6"
-The \fBrdist\fR command is IPv6-enabled. See \fBip6\fR(7P). \fBIPv6\fR is not
+The \fBrdist\fR command is IPv6-enabled. See \fBip6\fR(4P). \fBIPv6\fR is not
 currently supported with Kerberos V5 authentication.
 .SH EXAMPLES
 \fBExample 1 \fRA Sample distfile
@@ -550,9 +550,17 @@ Kerberos configuration file
 .RE
 
 .SH SEE ALSO
-\fBcsh\fR(1), \fBed\fR(1), \fBmake\fR(1S), \fBsh\fR(1), \fBin.rshd\fR(1M),
-\fBstat\fR(2), \fBhosts.equiv\fR(4), \fBkrb5.conf\fR(4), \fBattributes\fR(5),
-\fBkrb5_auth_rules\fR(5), \fBip6\fR(7P)
+.BR csh (1),
+.BR ed (1),
+.BR sh (1),
+.BR make (1S),
+.BR stat (2),
+.BR ip6 (4P),
+.BR hosts.equiv (5),
+.BR krb5.conf (5),
+.BR attributes (7),
+.BR krb5_auth_rules (7),
+.BR in.rshd (8)
 .SH DIAGNOSTICS
 A complaint about mismatch of \fBrdist\fR version numbers might really stem
 from some problem with starting your shell, for example, you are in too many

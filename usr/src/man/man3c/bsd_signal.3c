@@ -115,7 +115,7 @@ that expects more than one argument, the application has to be modified to use
 these flags is not specified for the \fBBSD\fR \fBsignal()\fR.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -130,5 +130,8 @@ Interface Stability	Standard
 
 .SH SEE ALSO
 .LP
-\fBsigaction\fR(2), \fBsigaddset\fR(3C), \fBsigemptyset\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR sigaction (2),
+.BR sigaddset (3C),
+.BR sigemptyset (3C),
+.BR attributes (7),
+.BR standards (7)

@@ -170,11 +170,11 @@ restart_init(int what, int why)
 	 * zone) know that init has failed and will be restarted.
 	 */
 	zcmn_err(p->p_zone->zone_id, CE_WARN,
-	    "init(1M) %s: restarting automatically",
+	    "init(8) %s: restarting automatically",
 	    exit_reason(reason_buf, sizeof (reason_buf), what, why));
 
 	if (!INGLOBALZONE(p)) {
-		cmn_err(CE_WARN, "init(1M) for zone %s (pid %d) %s: "
+		cmn_err(CE_WARN, "init(8) for zone %s (pid %d) %s: "
 		    "restarting automatically",
 		    p->p_zone->zone_name, p->p_pid, reason_buf);
 	}
@@ -189,7 +189,7 @@ restart_init(int what, int why)
 
 	/*
 	 * Grab p_lock and begin clearing miscellaneous global process
-	 * state that needs to be reset before we exec the new init(1M).
+	 * state that needs to be reset before we exec the new init(8).
 	 */
 
 	mutex_enter(&p->p_lock);
@@ -287,7 +287,7 @@ restart_init(int what, int why)
 	(void) freectty(B_TRUE);
 
 	/*
-	 * Now exec() the new init(1M) on top of the current process.  If we
+	 * Now exec() the new init(8) on top of the current process.  If we
 	 * succeed, the caller will treat this like a successful system call.
 	 * If we fail, we issue messages and the caller will proceed with exit.
 	 */
@@ -297,11 +297,11 @@ restart_init(int what, int why)
 		return (0);
 
 	zcmn_err(p->p_zone->zone_id, CE_WARN,
-	    "failed to restart init(1M) (err=%d): system reboot required", err);
+	    "failed to restart init(8) (err=%d): system reboot required", err);
 
 	if (!INGLOBALZONE(p)) {
-		cmn_err(CE_WARN, "failed to restart init(1M) for zone %s "
-		    "(pid %d, err=%d): zoneadm(1M) boot required",
+		cmn_err(CE_WARN, "failed to restart init(8) for zone %s "
+		    "(pid %d, err=%d): zoneadm(8) boot required",
 		    p->p_zone->zone_name, p->p_pid, err);
 	}
 

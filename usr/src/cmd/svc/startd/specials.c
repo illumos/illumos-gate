@@ -23,12 +23,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * specials.c - knowledge of special services
  *
- * svc.startd(1M) has duties that cannot be carried out without knowledge of the
+ * svc.startd(8) has duties that cannot be carried out without knowledge of the
  * transition of various services, such as the milestones, to their online
  * states.  Hooks are called with the restarter instance's ri_lock held, so
  * operations on all instances (or on the graph) should be performed

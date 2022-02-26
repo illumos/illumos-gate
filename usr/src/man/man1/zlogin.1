@@ -61,7 +61,7 @@ within the login session. Programs requiring a tty device, for example,
 If a utility is specified, \fBzlogin\fR operates in \fBnon-interactive mode\fR.
 This mode can be useful for script authors since stdin, stdout, and stderr are
 preserved and the exit status of \fIutility\fR is returned upon termination. In
-this mode, \fBzlogin\fR invokes \fBsu\fR(1M) in order to set up the user's
+this mode, \fBzlogin\fR invokes \fBsu\fR(8) in order to set up the user's
 environment and to provide a login environment.
 .sp
 The specified command is passed as a string and interpreted by a shell running
@@ -165,7 +165,7 @@ in another zone.
 .ad
 .RS 15n
 "Safe" login mode. \fBzlogin\fR does minimal processing and does not invoke
-\fBlogin\fR(1) or \fBsu\fR(1M). The \fB-S\fR option can not be used if a
+\fBlogin\fR(1) or \fBsu\fR(8). The \fB-S\fR option can not be used if a
 username is specified through the \fB-l\fR option, and cannot be used with
 console logins. This mode should only be used to recover a damaged zone when
 other forms of login have become impossible.
@@ -263,14 +263,14 @@ Permission denied, or failure to enter the zone.
 \fBAny\fR
 .ad
 .RS 7n
-Return code from utility, or from \fBsu\fR(1M) if operating in non-interactive
+Return code from utility, or from \fBsu\fR(8) if operating in non-interactive
 mode.
 .RE
 
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -286,8 +286,14 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBlogin\fR(1), \fBrsh\fR(1), \fBvi\fR(1), \fBsu\fR(1M), \fBzoneadm\fR(1M),
-\fBzonecfg\fR(1M), \fBattributes\fR(5), \fBzones\fR(5)
+.BR login (1),
+.BR rsh (1),
+.BR vi (1),
+.BR attributes (7),
+.BR zones (7),
+.BR su (8),
+.BR zoneadm (8),
+.BR zonecfg (8)
 .SH NOTES
 .sp
 .LP

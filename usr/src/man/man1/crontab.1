@@ -97,7 +97,7 @@ crontab \- user crontab file
 
 .SH DESCRIPTION
 The \fBcrontab\fR utility manages a user's access with \fBcron\fR (see
-\fBcron\fR(1M)) by copying, creating, listing, and removing \fBcrontab\fR
+\fBcron\fR(8)) by copying, creating, listing, and removing \fBcrontab\fR
 files. If invoked without options, \fBcrontab\fR copies the specified file, or
 the standard input if no file is specified, into a directory that holds all
 users' crontabs.
@@ -248,7 +248,7 @@ executed must  explicitly do so in the \fBcrontab\fR file. \fBcron\fR supplies
 a default environment for every shell, defining HOME, LOGNAME, SHELL, TZ, and
 PATH. The default PATH for user \fBcron\fR jobs is \fB/usr/bin\fR; while root
 \fBcron\fR jobs default to \fB/usr/sbin:/usr/bin\fR. The default PATH can be
-set in \fB/etc/default/cron\fR (see \fBcron\fR(1M)). The TZ, HOME, and SHELL
+set in \fB/etc/default/cron\fR (see \fBcron\fR(8)). The TZ, HOME, and SHELL
 environment variables are set to match those that are in effect in the
 \fBcrontab\fR file at the time.
 .sp
@@ -537,7 +537,7 @@ Korn shell. The file concludes with \fBTZ\fR, \fBHOME\fR, and \fBSHELL\fR
 entries that return those variable to their default values.
 
 .SH ENVIRONMENT VARIABLES
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBcrontab\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SS "\fB/usr/bin/crontab\fR"
@@ -667,7 +667,7 @@ spool area for \fBcrontab\fR
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "\fB/usr/bin/crontab\fR"
 
 .TS
@@ -702,9 +702,18 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-\fBatq\fR(1), \fBatrm\fR(1), \fBauths\fR(1), \fBed\fR(1), \fBsh\fR(1),
-\fBvi\fR(1), \fBcron\fR(1M), \fBsu\fR(1M), \fBauth_attr\fR(4),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.BR atq (1),
+.BR atrm (1),
+.BR auths (1),
+.BR ed (1),
+.BR sh (1),
+.BR vi (1),
+.BR auth_attr (5),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7),
+.BR cron (8),
+.BR su (8)
 .SH NOTES
 If you inadvertently enter the \fBcrontab\fR command with no arguments, do not
 attempt to get out with Control-d. This removes all entries in your
@@ -726,7 +735,7 @@ seconds after the current date and time.
 .LP
 If an authorized user other than root modifies another user's \fBcrontab\fR
 file, the resulting behavior can be unpredictable. Instead, the authorized user
-should first use \fBsu\fR(1M) to become superuser to the other user's login
+should first use \fBsu\fR(8) to become superuser to the other user's login
 before making any changes to the \fBcrontab\fR file.
 .sp
 .LP

@@ -158,7 +158,7 @@ This function provides a portable method for obtaining the file descriptor of a
 manager terminal device for a pseudo-terminal, as opposed to using
 .Xr open 2
 on the
-.Xr ptm 7D
+.Xr ptm 4D
 device which is system-specific.
 .Pp
 The
@@ -177,7 +177,7 @@ function can be used to obtain the name of the subsidiary device.
 .Xr grantpt 3C ,
 .Xr ptsname 3C ,
 .Xr unlockpt 3C ,
-.Xr attributes 5 ,
-.Xr standards 5 ,
-.Xr ptm 7D ,
-.Xr pts 7D
+.Xr ptm 4D ,
+.Xr pts 4D ,
+.Xr attributes 7 ,
+.Xr standards 7

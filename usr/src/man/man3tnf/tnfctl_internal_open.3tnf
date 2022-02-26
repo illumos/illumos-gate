@@ -71,7 +71,7 @@ An internal error occurred.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -87,9 +87,14 @@ MT Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBld\fR(1), \fBprex\fR(1), \fBTNF_PROBE\fR(3TNF), \fBdlopen\fR(3C),
-\fBdlclose\fR(3C), \fBlibtnfctl\fR(3TNF), \fBtracing\fR(3TNF),
-\fBattributes\fR(5)
+.BR ld (1),
+.BR prex (1),
+.BR dlclose (3C),
+.BR dlopen (3C),
+.BR TNF_PROBE (3TNF),
+.BR libtnfctl (3TNF),
+.BR tracing (3TNF),
+.BR attributes (7)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

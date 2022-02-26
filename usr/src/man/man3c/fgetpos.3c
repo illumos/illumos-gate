@@ -104,11 +104,11 @@ object of type \fBfpos_t\fR.
 .sp
 .LP
 The \fBfgetpos()\fR function has a transitional interface for 64-bit file
-offsets.  See \fBlf64\fR(5).
+offsets.  See \fBlf64\fR(7).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -124,5 +124,11 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBfopen\fR(3C), \fBfsetpos\fR(3C), \fBftell\fR(3C), \fBrewind\fR(3C),
-\fBungetc\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)
+.BR fopen (3C),
+.BR fsetpos (3C),
+.BR ftell (3C),
+.BR rewind (3C),
+.BR ungetc (3C),
+.BR attributes (7),
+.BR lf64 (7),
+.BR standards (7)

@@ -146,7 +146,7 @@ None.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -164,5 +164,9 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBaddch\fR(3XCURSES), \fBaddchstr\fR(3XCURSES), \fBcurses\fR(3XCURSES),
-\fBlibcurses\fR(3XCURSES), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR addch (3XCURSES),
+.BR addchstr (3XCURSES),
+.BR curses (3XCURSES),
+.BR libcurses (3XCURSES),
+.BR attributes (7),
+.BR standards (7)

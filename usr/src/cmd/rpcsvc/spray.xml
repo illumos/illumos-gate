@@ -113,9 +113,9 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='rpc.sprayd' section='1M'
+			<manpage title='rpc.sprayd' section='8'
 			    manpath='/usr/share/man' />
-			<manpage title='sprayd' section='1M'
+			<manpage title='sprayd' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

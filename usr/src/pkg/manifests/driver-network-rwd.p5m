@@ -42,8 +42,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/rwd group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/rwd.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/rwd.4d
 driver name=rwd perms="* 0666 root sys" clone_perms="rwd 0666 root sys" \
     alias=pci1814,401
 legacy pkg=SUNWrwd \

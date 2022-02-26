@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * RCM module for managing dump device during dynamic
  * reconfiguration.
@@ -313,10 +311,10 @@ dump_remove(rcm_handle_t *hdl, char *rsrcname, id_t id, uint_t flags,
 }
 
 /*
- * For dedicated dump devices, invoke dumpadm(1M)
+ * For dedicated dump devices, invoke dumpadm(8)
  * to relocate dump to swap. For dump device on
  * swap, this is a no-op as the RCM swap module
- * will relocate by invoking swap(1M).
+ * will relocate by invoking swap(8).
  *
  * Call with cache_lock held.
  */

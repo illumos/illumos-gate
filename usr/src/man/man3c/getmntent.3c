@@ -50,7 +50,7 @@ structure pointed to by \fImp\fR with the broken-out fields of a line in the
 \fBmnttab\fR file. Each line read from the file contains a \fBmnttab\fR
 structure, which is defined in the <\fBsys/mnttab.h\fR> header. The structure
 contains the following members, which correspond to the broken-out fields from
-a line in \fB/etc/mnttab\fR (see \fBmnttab\fR(4)).
+a line in \fB/etc/mnttab\fR (see \fBmnttab\fR(5)).
 .sp
 .in +2
 .nf
@@ -111,7 +111,7 @@ function name is still defined for transition purposes.
 .LP
 The \fBresetmnttab()\fR function notifies \fBgetextmntent()\fR to reload from
 the kernel the device information that corresponds to the new snapshot of the
-\fBmnttab\fR information (see \fBmnttab\fR(4)). Subsequent \fBgetextmntent()\fR
+\fBmnttab\fR information (see \fBmnttab\fR(5)). Subsequent \fBgetextmntent()\fR
 calls then return correct \fBextmnttab\fR information. This function should be
 called whenever the \fBmnttab\fR file is either rewound or closed and reopened
 before any calls are made to \fBgetextmntent()\fR.
@@ -163,7 +163,7 @@ The \fBputmntent()\fR is obsolete and always returns \fB\(mi1\fR\&.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -179,4 +179,6 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBmount\fR(2), \fBmnttab\fR(4), \fBattributes\fR(5)
+.BR mount (2),
+.BR mnttab (5),
+.BR attributes (7)

@@ -157,7 +157,7 @@ value for keypad is false.
 .sp
 .LP
 Initially, whether the terminal returns 7 or 8 significant bits on input
-depends on the control mode of the tty driver (see \fBtermio\fR(7I)). To force
+depends on the control mode of the tty driver (see \fBtermio\fR(4I)). To force
 8 bits to be returned, invoke \fBmeta\fR(\fIwin\fR,  \fBTRUE\fR). To force 7
 bits to be returned, invoke \fBmeta\fR(\fIwin\fR,  \fBFALSE\fR). The window
 argument, \fIwin\fR, is always ignored. If the terminfo capabilities \fBsmm\fR
@@ -189,7 +189,7 @@ by \fBcurses\fR.
 .LP
 When the \fBnoqiflush()\fR routine is used, normal flush of input and output
 queues associated with the \fBINTR\fR, \fBQUIT\fR and \fBSUSP\fR characters
-will not be done (see \fBtermio\fR(7I)). When \fBqiflush()\fR is called, the
+will not be done (see \fBtermio\fR(4I)). When \fBqiflush()\fR is called, the
 queues will be flushed when these control characters are read.
 .sp
 .LP
@@ -222,7 +222,7 @@ noted in the preceding routine descriptions.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -238,8 +238,11 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBcurs_getch\fR(3CURSES), \fBcurs_initscr\fR(3CURSES), \fBcurses\fR(3CURSES),
-\fBattributes\fR(5), \fBtermio\fR(7I)
+.BR curs_getch (3CURSES),
+.BR curs_initscr (3CURSES),
+.BR curses (3CURSES),
+.BR termio (4I),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

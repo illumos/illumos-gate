@@ -36,7 +36,7 @@ device.
 .SH CONTEXT
 \fBddi_driver_name()\fR can  be  called  from kernel, or interrupt context.
 .SH SEE ALSO
-\fBddi_get_name\fR(9F)
+.BR ddi_get_name (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

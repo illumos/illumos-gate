@@ -26,7 +26,7 @@
 #
 
 #
-# Startup script for the hotplugd(1M) daemon.
+# Startup script for the hotplugd(8) daemon.
 #
 
 . /lib/svc/share/smf_include.sh

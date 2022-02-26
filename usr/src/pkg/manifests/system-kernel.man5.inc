@@ -9,10 +9,23 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
-file path=usr/share/man/man5/epoll.5
-file path=usr/share/man/man5/fsattr.5
-file path=usr/share/man/man5/ieee802.11.5
-file path=usr/share/man/man5/ieee802.3.5
+file path=usr/share/man/man5/cardbus.5
+link path=usr/share/man/man5/dir.5 target=dir_ufs.5
+file path=usr/share/man/man5/dir_ufs.5
+file path=usr/share/man/man5/driver.conf.5
+file path=usr/share/man/man5/pci.5
+link path=usr/share/man/man5/pcie.5 target=pci.5
+file path=usr/share/man/man5/priv_names.5
+file path=usr/share/man/man5/proc.5
+file path=usr/share/man/man5/process.5
+file path=usr/share/man/man5/pseudo.5
+file path=usr/share/man/man5/scsi.5
+file path=usr/share/man/man5/sock2path.d.5
+file path=usr/share/man/man5/system.5
+file path=usr/share/man/man5/tnf_kernel_probes.5
+file path=usr/share/man/man5/ts_dptbl.5

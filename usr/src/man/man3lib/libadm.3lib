@@ -59,7 +59,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -75,5 +75,8 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBpvs\fR(1), \fBIntro\fR(3), \fBread_vtoc\fR(3EXT), \fBattributes\fR(5),
-\fBregexp\fR(5)
+.BR pvs (1),
+.BR Intro (3),
+.BR read_vtoc (3EXT),
+.BR attributes (7),
+.BR regexp (7)

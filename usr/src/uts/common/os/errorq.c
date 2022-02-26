@@ -946,7 +946,7 @@ errorq_cancel(errorq_t *eqp, errorq_elem_t *eqep)
 
 /*
  * Write elements on the dump list of each nvlist errorq to the dump device.
- * Upon reboot, fmd(1M) will extract and replay them for diagnosis.
+ * Upon reboot, fmd(8) will extract and replay them for diagnosis.
  */
 void
 errorq_dump(void)

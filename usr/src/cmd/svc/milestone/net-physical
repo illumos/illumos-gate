@@ -52,7 +52,7 @@ if smf_is_globalzone; then
 	update_pvid
 
 	#
-	# Upgrade handling. The upgrade file consists of a series of dladm(1M)
+	# Upgrade handling. The upgrade file consists of a series of dladm(8)
 	# commands. Note that after we are done, we cannot rename the upgrade
 	# script file as the file system is still read-only at this point.
 	# Defer this to the manifest-import service.

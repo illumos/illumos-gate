@@ -23,8 +23,6 @@
  * Copyright (c) 1994, by Sun Microsytems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <strings.h>
 #include "expr.h"
@@ -85,7 +83,7 @@ static char *helptopicstrings[NUMHELPTOPICS] = {
 "Controlling Kernel Probes\n"
 "\n"
 "The Solaris kernel is instrumented with a small number of strategically\n"
-"placed probes, documented in tnf_kernel_probes(4).  The superuser can\n"
+"placed probes, documented in tnf_kernel_probes(5).  The superuser can\n"
 "control these probes by running prex with the \"-k\" option.\n"
 "\n"
 "In kernel mode, trace output is written to an in-core buffer, rather\n"

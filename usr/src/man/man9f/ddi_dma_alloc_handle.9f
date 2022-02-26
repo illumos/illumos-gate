@@ -155,9 +155,12 @@ No resources are available.
 context, except when \fIcallback\fR is set to  \fBDDI_DMA_SLEEP\fR, in which
 case it can be called from user or kernel context only.
 .SH SEE ALSO
-\fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F),
-\fBddi_dma_burstsizes\fR(9F), \fBddi_dma_free_handle\fR(9F),
-\fBddi_dma_unbind_handle\fR(9F), \fBddi_dma_attr\fR(9S)
+.BR ddi_dma_addr_bind_handle (9F),
+.BR ddi_dma_buf_bind_handle (9F),
+.BR ddi_dma_burstsizes (9F),
+.BR ddi_dma_free_handle (9F),
+.BR ddi_dma_unbind_handle (9F),
+.BR ddi_dma_attr (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

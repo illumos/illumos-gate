@@ -524,7 +524,7 @@ adt_done:
 		default:
 			/*
 			 * Resource control assignment failed.  Unlike
-			 * newtask(1m), we treat this as an error.
+			 * newtask(1), we treat this as an error.
 			 */
 			if (error < 0) {
 				/*

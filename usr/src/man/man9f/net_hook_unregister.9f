@@ -43,7 +43,7 @@ an error indicating the problem      encountered.
 The \fBnet_hook_unregister()\fR function may be called from user, kernel, or
 interrupt context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -57,4 +57,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBnet_hook_register\fR(9F)
+.BR net_hook_register (9F)

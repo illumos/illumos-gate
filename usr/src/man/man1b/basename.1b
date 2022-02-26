@@ -41,4 +41,5 @@ example% \fBmv a.out `basename $1 .c`\fR
 .SH SEE ALSO
 .sp
 .LP
-\fBsh\fR(1), \fBattributes\fR(5)
+.BR sh (1),
+.BR attributes (7)

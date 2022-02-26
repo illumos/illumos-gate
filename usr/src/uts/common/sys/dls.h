@@ -45,7 +45,7 @@ extern "C" {
 #define	DLS_MODULE_NAME	"dls"
 
 /*
- * Data-Link Services Information (text emitted by modinfo(1m))
+ * Data-Link Services Information (text emitted by modinfo(8))
  */
 #define	DLS_INFO	"Data-Link Services"
 

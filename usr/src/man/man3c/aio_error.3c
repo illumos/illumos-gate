@@ -90,7 +90,7 @@ return status has not yet been retrieved.
 .sp
 .LP
 The \fBaio_error()\fR function has a transitional interface for 64-bit file
-offsets.  See \fBlf64\fR(5).
+offsets.  See \fBlf64\fR(7).
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRThe following is an example of an error handling routine using
@@ -137,7 +137,7 @@ my_aiocbp = siginfo->si_value.sival_ptr;
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -151,14 +151,26 @@ Interface Stability	Committed
 _
 MT-Level	Async-Signal-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fB_Exit\fR(2), \fBclose\fR(2), \fBfork\fR(2), \fBlseek\fR(2), \fBread\fR(2),
-\fBwrite\fR(2), \fBaio.h\fR(3HEAD), \fBaio_cancel\fR(3C), \fBaio_fsync\fR(3C),
-\fBaio_read\fR(3C), \fBaio_return\fR(3C), \fBaio_write\fR(3C),
-\fBlio_listio\fR(3C), \fBsignal.h\fR(3HEAD), \fBattributes\fR(5),
-\fBlf64\fR(5), \fBstandards\fR(5)
+.BR _Exit (2),
+.BR close (2),
+.BR fork (2),
+.BR lseek (2),
+.BR read (2),
+.BR write (2),
+.BR aio_cancel (3C),
+.BR aio_fsync (3C),
+.BR aio_read (3C),
+.BR aio_return (3C),
+.BR aio_write (3C),
+.BR lio_listio (3C),
+.BR aio.h (3HEAD),
+.BR signal.h (3HEAD),
+.BR attributes (7),
+.BR lf64 (7),
+.BR standards (7)

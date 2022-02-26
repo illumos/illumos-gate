@@ -54,7 +54,7 @@ extern "C" {
 
 /*
  * External definitions for
- * functions in inet(3N)
+ * functions in inet(3C)
  */
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int inet_net_pton(int, const char *, void *, size_t);

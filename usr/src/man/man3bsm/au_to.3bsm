@@ -255,7 +255,7 @@ These functions return \fINULL\fR if memory cannot be allocated to put the
 resultant token into, or if an error in the input is detected.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -272,4 +272,5 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBau_open\fR(3BSM), \fBattributes\fR(5)
+.BR au_open (3BSM),
+.BR attributes (7)

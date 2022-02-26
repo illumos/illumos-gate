@@ -250,7 +250,7 @@ example% \fBfind . \e( -name SCCS -prune -name \e\e
 Notice that spaces must be entered exactly as shown.
 
 .SH ENVIRONMENT VARIABLES
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBctags\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
@@ -294,8 +294,14 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-\fBex\fR(1), \fBlex\fR(1), \fBvgrind\fR(1), \fBvi\fR(1), \fByacc\fR(1),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.BR ex (1),
+.BR lex (1),
+.BR vgrind (1),
+.BR vi (1),
+.BR yacc (1),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)
 .SH NOTES
 Recognition of \fBfunctions\fR, \fBsubroutines\fR, and \fBprocedures\fR for
 \fBFORTRAN\fR and Pascal is done in a very simpleminded way. No attempt is made

@@ -412,7 +412,7 @@ Matches an optionally signed floating-point number, whose format is the same as
 expected for the subject sequence of \fBwcstod\fR(3C). In the absence of a size
 modifier, the corresponding argument must be a pointer to \fBfloat\fR. The
 \fBe\fR, \fBf\fR, and \fBg\fR specifiers match hexadecimal floating point
-values only in C99/SUSv3 (see \fBstandards\fR(5)) mode, but the \fBa\fR
+values only in C99/SUSv3 (see \fBstandards\fR(7)) mode, but the \fBa\fR
 specifier always matches hexadecimal floating point values.
 .sp
 These conversion specifiers match any subject sequence accepted by
@@ -694,7 +694,7 @@ character \fBa\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -708,17 +708,32 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBfgetc\fR(3C), \fBfgets\fR(3C), \fBfgetwc\fR(3C), \fBfgetws\fR(3C),
-\fBfread\fR(3C), \fBfscanf\fR(3C), \fBfwprintf\fR(3C), \fBgetc\fR(3C),
-\fBgetchar\fR(3C), \fBgets\fR(3C), \fBgetwc\fR(3C), \fBgetwchar\fR(3C),
-\fBsetlocale\fR(3C), \fBstrtod\fR(3C), \fBwcrtomb\fR(3C), \fBwcstod\fR(3C),
-\fBwcstol\fR(3C), \fBwcstoul\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR fgetc (3C),
+.BR fgets (3C),
+.BR fgetwc (3C),
+.BR fgetws (3C),
+.BR fread (3C),
+.BR fscanf (3C),
+.BR fwprintf (3C),
+.BR getc (3C),
+.BR getchar (3C),
+.BR gets (3C),
+.BR getwc (3C),
+.BR getwchar (3C),
+.BR setlocale (3C),
+.BR strtod (3C),
+.BR wcrtomb (3C),
+.BR wcstod (3C),
+.BR wcstol (3C),
+.BR wcstoul (3C),
+.BR attributes (7),
+.BR standards (7)
 .SH NOTES
 .sp
 .LP

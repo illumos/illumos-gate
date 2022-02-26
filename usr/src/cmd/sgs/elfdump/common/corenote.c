@@ -47,7 +47,7 @@
 /*
  * This module contains the code that displays data from the note
  * sections found in Solaris core files. The format of these
- * note sections are described in the core(4) manpage.
+ * note sections are described in the core(5) manpage.
  */
 
 

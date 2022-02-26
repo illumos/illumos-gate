@@ -61,7 +61,7 @@ else if((max_ptime = sdp_find_attribute(media->m_attr,
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -79,4 +79,6 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibcommputil\fR(3LIB), \fBsdp_parse\fR(3COMMPUTIL), \fBattributes\fR(5)
+.BR sdp_parse (3COMMPUTIL),
+.BR libcommputil (3LIB),
+.BR attributes (7)

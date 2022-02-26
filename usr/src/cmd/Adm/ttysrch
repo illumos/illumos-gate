@@ -42,7 +42,7 @@
 #	soon as it is found.  This is especially useful for cloned
 #	devices, which generally will not match inode numbers.
 #
-#	For additional information see ttysrch(4).
+#	For additional information see ttysrch(5).
 #
 # EXAMPLE:
 #

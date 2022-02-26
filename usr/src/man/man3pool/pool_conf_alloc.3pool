@@ -646,7 +646,7 @@ if (pool_conf_open(pool_conf, input_location,
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -666,4 +666,6 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)
+.BR libpool (3LIB),
+.BR pool_error (3POOL),
+.BR attributes (7)

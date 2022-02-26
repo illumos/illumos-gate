@@ -1,0 +1,355 @@
+'\" te
+.\"  Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SCSI 5 "May 30, 2008"
+.SH NAME
+scsi \- configuration files for SCSI target drivers
+.SH DESCRIPTION
+The architecture of the illumos \fBSCSI\fR subsystem distinguishes two types of
+device drivers: \fBSCSI\fR target drivers, and \fBSCSI\fR host adapter drivers.
+Target drivers like \fBsd\fR(4D) and \fBst\fR(4D) manage the device on the
+other end of the \fBSCSI\fR bus. Host adapter drivers manage the \fBSCSI\fR bus
+on behalf of all the devices that share it.
+.sp
+.LP
+Drivers for host adapters provide a common set of interfaces for target
+drivers. These interfaces comprise the Sun Common \fBSCSI\fR Architecture (
+\fBSCSA)\fR which are documented as part of the illumos DDI/DKI. See
+\fBscsi_ifgetcap\fR(9F), \fBscsi_init_pkt\fR(9F), and \fBscsi_transport\fR(9F)
+for further details of these, and associated routines.
+.sp
+.LP
+Depending on the interconnect (transport), SCSI target devices are either
+self-identifying or rely on \fBdriver.conf\fR(5) entries to be recognized by
+the system. For self-identifying target devices the driver binding is chosen
+based on the IEEE-1275 like 'compatible' forms of the target devices. Currently
+the Fibre Channel interconnects, \fBfcp\fR(4D), \fBifp\fR(4D),
+\fBscsi_vhci\fR(4D), \fBsf\fR(4D), and the SATA framework drivers (see
+\fBsata\fR(4D)) are self-identifying. You must specify other possible
+interconnects target devices by using the target driver \fBdriver.conf\fR(5)
+configuration files.
+.SS "Self-Identifying"
+Host adapter drivers of class scsi-self-identifying that dynamically create
+self-identifying target device children establish a \fBcompatible\fR property
+on each child. The compatible property is an ordered array of strings, each
+string is a compatible \fBform\fR. High precedence forms are defined first. For
+a particular device, the highest precedence form that has an established driver
+alias selects the driver for the device. Driver associations to compatible
+forms, called aliases, are administered by way of \fBadd_drv\fR(8),
+\fBupdate_drv\fR(8), and \fBrem_drv\fR(8) utilities.
+.sp
+.LP
+The forms for self-identifying SCSI target devices are derived from the SCSI
+target device's INQUIRY data. A diverse set of forms is defined, allowing for
+flexibility in binding.
+.sp
+.LP
+From the SCSI INQUIRY data, three types of information are extracted:
+scsi_dtype, flag bits, and SCSI_ASCII vendor product revision.
+.sp
+.LP
+The scsi_dtype is the first component of most forms. It is represented as two
+hex digits. For nodes that represent embedded secondary functions, such as an
+embedded enclosure service or media changer, additional forms are generated
+that contain the dtype of the secondary function followed by the dtype of the
+device in which the secondary function is embedded.
+.sp
+.LP
+For forms that use flag bits, all applicable flags are concatenated (in
+alphabetical order) into a single flags string. Removable media is represented
+by a flag. For forms that use the SCSI_ASCII INQUIRY vendor, product, and
+revision fields, a one-way conversion algorithm translates SCSI_ASCII to a IEEE
+1275 compatible string.
+.sp
+.LP
+It is possible that a device might change the INQUIRY data it returns over time
+as a result of a device initialization sequence or in response to out-of-band
+management. A device node's compatible property is based on the INQUIRY data
+when the device node was created.
+.sp
+.LP
+The following forms, in high to low precedence order, are defined for SCSI
+target device nodes.
+.sp
+.in +2
+.nf
+scsiclass,DDEEFFF.vVVVVVVVV.pPPPPPPPPPPPPPPPP.rRRRR (1  *1&2)
+scsiclass,DDEE.vVVVVVVVV.pPPPPPPPPPPPPPPPP.rRRRR    (2  *1)
+scsiclass,DDFFF.vVVVVVVVV.pPPPPPPPPPPPPPPPP.rRRRR   (3  *2)
+scsiclass,DD.vVVVVVVVV.pPPPPPPPPPPPPPPPP.rRRRR      (4)
+scsiclass,DDEEFFF.vVVVVVVVV.pPPPPPPPPPPPPPPPP       (5  *1&2)
+scsiclass,DDEE.vVVVVVVVV.pPPPPPPPPPPPPPPPP          (6  *1)
+scsiclass,DDFFF.vVVVVVVVV.pPPPPPPPPPPPPPPPP         (7  *2)
+scsiclass,DD.vVVVVVVVV.pPPPPPPPPPPPPPPPP            (8)
+scsiclass,DDEEFFF                                   (9 *1&2)
+scsiclass,DDEE                                      (10 *1)
+scsiclass,DDFFF                                     (11 *2)
+scsiclass,DD                                        (12)
+scsiclass                                           (13)
+   *1 only produced on a secondary function node
+   *2 only produced on a node with flags
+.fi
+.in -2
+
+.sp
+.LP
+where:
+.sp
+.ne 2
+.na
+\fB\fBv\fR\fR
+.ad
+.RS 20n
+Is the letter \fBv\fR. Denotes the beginning of \fBVVVVVVVV\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBVVVVVVVV\fR\fR
+.ad
+.RS 20n
+Translated scsi_vendor: SCSI standard INQUIRY data "Vendor identification"
+SCSI_ASCII field (bytes 8-15).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBp\fR\fR
+.ad
+.RS 20n
+Is the letter \fBp\fR. Denotes the beginning of \fBPPPPPPPPPPPPPPPP\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPPPPPPPPPPPPPPPP\fR\fR
+.ad
+.RS 20n
+Translated scsi_product: SCSI standard INQUIRY data "Product identification"
+SCSI_ASCII field (bytes 16-31).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBr\fR\fR
+.ad
+.RS 20n
+Is the letter \fBr\fR. Denotes the beginning of \fBRRRR\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBRRRR\fR\fR
+.ad
+.RS 20n
+Translated scsi_revision: SCSI standard INQUIRY data "Product revision level"
+SCSI_ASCII field (bytes 32-35).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDD\fR\fR
+.ad
+.RS 20n
+Is a two digit ASCII hexadecimal number. The value of the two digits is based
+one the SCSI "Peripheral device type" command set associated with the node. On
+a primary node this is the scsi_dtype of the primary command set; on a
+secondary node this is the \fBscsi_dtype\fR associated with the embedded
+function command set.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEE\fR\fR
+.ad
+.RS 20n
+Same encoding used for \fBDD\fR. This form is only generated on secondary
+function nodes. The \fBDD\fR function is embedded in an \fBEE\fR device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBFFF\fR\fR
+.ad
+.RS 20n
+Concatenation, in alphabetical order, of the flag characters below. The
+following flag characters are defined:
+.sp
+.ne 2
+.na
+\fBR\fR
+.ad
+.RS 5n
+Removable media: Used when \fBscsi_rmb\fR is set
+.RE
+
+Forms using \fBFFF\fR are only be generated if there are applicable flag
+characters.
+.RE
+
+.sp
+.LP
+illumos might create additional \fBcompatible\fR forms not described. These
+forms are for illumos internal use only. Any additional use of these forms is
+discouraged. Future releases of illumos might not produce these forms.
+.SS "driver.conf"
+Configuration files for \fBSCSI\fR target drivers should identify the host
+adapter driver implicitly using the \fIclass\fR keyword to remove any
+dependency on the particular host adapter involved.
+.sp
+.LP
+All host adapter drivers of class \fBscsi\fR recognize the following
+properties:
+.sp
+.ne 2
+.na
+\fB\fBtarget\fR\fR
+.ad
+.RS 10n
+Integer-valued \fBSCSI\fR target identifier that this driver claims.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlun\fR\fR
+.ad
+.RS 10n
+Integer-valued \fBSCSI\fR logical unit number ( \fBLUN)\fR that this driver
+claims.
+.RE
+
+.sp
+.LP
+All \fBSCSI\fR target driver configuration file device definitions except stub
+device definitions for discovery of \fBdevid\fR must provide target and
+\fBlun\fR properties. These properties are used to construct the address part
+of the device name under \fB/devices\fR. The stub device definitions for
+discovery of \fBdevid\fR must be able to specify or imply the host adapter
+drivers that might have children that bind to the target driver. So all SCSI
+target driver configuration file stub device definitions must be defined by
+property class or parent.
+.sp
+.LP
+The \fBSCSI\fR target driver configuration files shipped with illumos have
+entries for \fBLUN\fR \fB0\fR only. For devices that support other \fBLUNs,\fR
+such as some \fBCD\fR changers, the system administrator can edit the driver
+configuration file to add entries for other \fBLUNs.\fR
+.SH EXAMPLES
+\fBExample 1 \fRAn Example Configuration File for a SCSI Target Driver
+.sp
+.LP
+The following is an example configuration file for a SCSI target driver called
+\fBtoaster.conf\fR.
+
+.sp
+.in +2
+.nf
+#
+# Copyright (c) 1992, by Sun Microsystems, Inc.
+#
+#ident "@(#)toaster.conf  1.2     92/05/12 SMI"
+name="toaster" class="scsi" target=4 lun=0;
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Add the following lines to  \fBsd.conf\fR for a six- \fBCD\fR changer on
+\fBtarget 3\fR, with  \fBLUNs\fR \fB0\fR to  \fB5\fR.
+
+.sp
+.in +2
+.nf
+name="sd" class="scsi" target=3 lun=1;
+name="sd" class="scsi" target=3 lun=2;
+name="sd" class="scsi" target=3 lun=3;
+name="sd" class="scsi" target=3 lun=4;
+name="sd" class="scsi" target=3 lun=5;
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+It is not necessary to add the line for \fBLUN\fR \fB0\fR, as it already exists
+in the file shipped with illumos.
+
+.LP
+\fBExample 2 \fRA Stub Device Definition of \fBsd.conf\fR
+.sp
+.LP
+The following line is a stub device definition which implies the host adapter
+drivers of class scsi-self-identifying might have children that bind to the
+\fBsd\fR(4D) driver:
+
+.sp
+.in +2
+.nf
+name="sd" class="scsi-self-identifying";
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.BR fcp (4D),
+.BR ifp (4D),
+.BR sata (4D),
+.BR scsi_vhci (4D),
+.BR sd (4D),
+.BR sf (4D),
+.BR st (4D),
+.BR driver.conf (5),
+.BR attributes (7),
+.BR add_drv (8),
+.BR rem_drv (8),
+.BR update_drv (8),
+.BR scsi_ifgetcap (9F),
+.BR scsi_init_pkt (9F),
+.BR scsi_transport (9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIANS X3T9.2/82-2 SMALL COMPUTER SYSTEM INTERFACE (SCSI-1)\fR
+.sp
+.LP
+\fIANS X3T9.2/375D Small Computer System Interface - 2 (SCSI-2)\fR
+.sp
+.LP
+\fIANS X3T10/994D SCSI-3 Architecture Model (SAM)\fR
+.sp
+.LP
+\fIIEEE 1275 SCSI Target Device Binding\fR
+.SH NOTES
+With \fBdriver.conf\fR(5) configuration, you need to ensure that the
+\fBtarget\fR and \fBlun\fR values claimed by your target driver do not conflict
+with existing target drivers on the system. For example, if the target is a
+direct access device, the standard \fBsd.conf\fR file usually makes \fBsd\fR
+claim it before any other driver has a chance to probe it.

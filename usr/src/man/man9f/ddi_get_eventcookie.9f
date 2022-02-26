@@ -80,7 +80,7 @@ device tree hierarchy.
 The \fBddi_get_eventcookie()\fR function can be called from user and kernel
 contexts only.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -94,8 +94,9 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBddi_add_event_handler\fR(9F),
-\fBddi_remove_event_handler\fR(9F)
+.BR attributes (7),
+.BR ddi_add_event_handler (9F),
+.BR ddi_remove_event_handler (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

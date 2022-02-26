@@ -29,7 +29,7 @@
  */
 
 /*
- * lofiadm - administer lofi(7d). Very simple, add and remove file<->device
+ * lofiadm - administer lofi(4D). Very simple, add and remove file<->device
  * associations, and display status. All the ioctls are private between
  * lofi and lofiadm, and so are very simple - device information is
  * communicated via a minor number.
@@ -1750,7 +1750,7 @@ lofi_compress(int *lfd, const char *filename, int compress_index,
 
 	/*
 	 * Round up the compressed file size to be a multiple of
-	 * DEV_BSIZE. lofi(7D) likes it that way.
+	 * DEV_BSIZE. lofi(4D) likes it that way.
 	 */
 	if ((offset = statbuf.st_size % DEV_BSIZE) > 0) {
 

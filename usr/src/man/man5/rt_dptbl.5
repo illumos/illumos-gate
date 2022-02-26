@@ -1,0 +1,348 @@
+'\" te
+.\" Copyright 1989 AT&T, Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH RT_DPTBL 5 "Oct 15, 2002"
+.SH NAME
+rt_dptbl \- real-time dispatcher parameter table
+.SH DESCRIPTION
+The process scheduler (or dispatcher) is the portion of the kernel that
+controls allocation of the \fBCPU\fR to processes. The scheduler supports the
+notion of scheduling classes where each class defines a scheduling policy, used
+to schedule processes within that class. Associated with each scheduling class
+is a set of priority queues on which ready to run processes are linked. These
+priority queues are mapped by the system configuration into a set of global
+scheduling priorities which are available to processes within the class. The
+dispatcher always selects for execution the process with the highest global
+scheduling priority in the system. The priority queues associated with a given
+class are viewed by that class as a contiguous set of priority levels numbered
+from 0 (lowest priority) to \fIn\fR (highest priority\(ema configuration
+dependent value). The set of global scheduling priorities that the queues for a
+given class are mapped into might not start at zero and might not be
+contiguous, depending on the configuration.
+.sp
+.LP
+The real-time class maintains an in-core table, with an entry for each priority
+level, giving the properties of that level. This table is called the real-time
+dispatcher parameter table (\fBrt_dptbl\fR). The \fBrt_dptbl\fR consists of an
+array (\fBconfig_rt_dptbl[]\fR) of parameter structures (\fBstruct
+rtdpent_t\fR), one for each of the \fIn\fR priority levels. The structure are
+accessed via a pointer, (\fBrt_dptbl\fR), to the array. The properties of a
+given priority level \fIi\fR are specified by the \fIi\fRth parameter structure
+in this array ( \fBrt_dptbl[\fR\fIi\fR\fB]\fR ).
+.sp
+.LP
+A parameter structure consists of the following members. These are also
+described in the \fB/usr/include/sys/rt.h\fR header file.
+.sp
+.ne 2
+.na
+\fB\fBrt_globpri\fR\fR
+.ad
+.RS 14n
+The global scheduling priority associated with this priority level. The
+\fBrt_globpri\fR values cannot be changed with \fBdispadmin\fR(8).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrt_quantum\fR\fR
+.ad
+.RS 14n
+The length of the time quantum allocated to processes at this level in ticks
+(\fBhz\fR). The time quantum value is only a default or starting value for
+processes at a particular level as the time quantum of a real-time process can
+be changed by the user with the \fBpriocntl\fR command or the \fBpriocntl\fR
+system call.
+.sp
+In the default high resolution clock mode (\fBhires_tick\fR set to \fB1\fR),
+the value of \fBhz\fR is set to \fB1000\fR.  If this value is overridden to
+\fB0\fR then \fBhz\fR will instead be \fB100\fR; the number of ticks per
+quantum must then be decreased to maintain the same length of quantum in
+absolute time.
+.RE
+
+.sp
+.LP
+An administrator can affect the behavior of the real-time portion of the
+scheduler by reconfiguring the \fBrt_dptbl\fR. There are two methods available
+for doing this: reconfigure with a loadable module at boot-time or by using
+\fBdispadmin\fR(8) at run-time.
+.SS "rt_dptbl Loadable Module"
+The \fBrt_dptbl\fR can be reconfigured with a loadable module which contains a
+new real time dispatch table. The module containing the dispatch table is
+separate from the RT loadable module which contains the rest of the real time
+software. This is the only method that can be used to change the number of real
+time priority levels or the set of global scheduling priorities used by the
+real time class. The relevant procedure and source code is described in the
+Examples section.
+.SS "dispadmin Configuration File"
+The \fBrt_quantum\fR values in the \fBrt_dptbl\fR can be examined and modified
+on a running system using the \fBdispadmin\fR(8) command. Invoking
+\fBdispadmin\fR for the real-time class allows the administrator to retrieve
+the current \fBrt_dptbl\fR configuration from the kernel's in-core table, or
+overwrite the in-core table with values from a configuration file. The
+configuration file used for input to \fBdispadmin\fR must conform to the
+specific format described below.
+.sp
+.LP
+Blank lines are ignored and any part of a line to the right of a \fI#\fR symbol
+is treated as a comment. The first non-blank, non-comment line must indicate
+the resolution to be used for interpreting the time quantum values. The
+resolution is specified as
+.sp
+.in +2
+.nf
+RES=\fIres\fR
+.fi
+.in -2
+
+.sp
+.LP
+where \fIres\fR is a positive integer between 1 and 1,000,000,000 inclusive and
+the resolution used is the reciprocal of \fIres\fR in seconds. (For example,
+\fBRES=1000\fR specifies millisecond resolution.) Although very fine
+(nanosecond) resolution may be specified, the time quantum lengths are rounded
+up to the next integral multiple of the system clock's resolution.
+.sp
+.LP
+The remaining lines in the file are used to specify the \fBrt_quantum\fR values
+for each of the real-time priority levels. The first line specifies the quantum
+for real-time level 0, the second line specifies the quantum for real-time
+level 1. There must be exactly one line for each configured real-time priority
+level. Each \fBrt_quantum\fR entry must be either a positive integer specifying
+the desired time quantum (in the resolution given by \fIres\fR), or the value
+-2 indicating an infinite time quantum for that level.
+.SH EXAMPLES
+\fBExample 1 \fRA Sample \fBdispadmin\fR Configuration File
+.sp
+.LP
+The following excerpt from a \fBdispadmin\fR configuration file illustrates the
+format. Note that for each line specifying a time quantum there is a comment
+indicating the corresponding priority level. These level numbers indicate
+priority within the real-time class, and the mapping between these real-time
+priorities and the corresponding global scheduling priorities is determined by
+the configuration specified in the \fBRT_DPTBL\fR loadable module. The level
+numbers are strictly for the convenience of the administrator reading the file
+and, as with any comment, they are ignored by \fBdispadmin\fR on input.
+\fBdispadmin\fR assumes that the lines in the file are ordered by consecutive,
+increasing priority level (from 0 to the maximum configured real-time
+priority). The level numbers in the comments should normally agree with this
+ordering; if for some reason they don't, however, \fBdispadmin\fR is
+unaffected.
+
+.sp
+.in +2
+.nf
+# Real-Time Dispatcher Configuration File
+RES=1000
+
+# TIME QUANTUM PRIORITY
+# (rt_quantum)LEVEL
+100#   0
+100#   1
+100#   2
+100#   3
+100#   4
+100#   5
+90 #   6
+90 #   7
+\&..    .
+\&..    .
+\&..    .
+10#   58
+10#   59
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRReplacing The rt_dptbl Loadable Module
+.sp
+.LP
+In order to change the size of the real time dispatch table, the loadable
+module which contains the dispatch table information will have to be built. It
+is recommended that you save the existing module before using the following
+procedure.
+
+.RS +4
+.TP
+1.
+Place the dispatch table code shown below in a file called \fBrt_dptbl.c\fR
+An example of an \fBrt_dptbl.c\fR file follows.
+.RE
+.RS +4
+.TP
+2.
+Compile the code using the given compilation and link lines supplied.
+.sp
+.in +2
+.nf
+cc -c -0 -D_KERNEL rt_dptbl.c
+ld -r -o RT_DPTBL rt_dptbl.o
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+3.
+Copy the current dispatch table in \fB/usr/kernel/sched\fR to
+\fBRT_DPTBL.bak\fR.
+.RE
+.RS +4
+.TP
+4.
+Replace the current \fBRT_DPTBL\fR in \fB/usr/kernel/sched\fR.
+.RE
+.RS +4
+.TP
+5.
+You will have to make changes in the \fB/etc/system\fR file to reflect the
+changes to the sizes of the tables. See \fBsystem\fR(5). The \fBrt_maxpri\fR
+variable may need changing. The syntax for setting this is:
+.sp
+.in +2
+.nf
+set RT:rt_maxpri=(class-specific value for maximum \e
+        real-time priority)
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+6.
+Reboot the system to use the new dispatch table.
+.RE
+.sp
+.LP
+Great care should be used in replacing the dispatch table using this method. If
+you don't get it right, the system may not behave properly.
+
+.sp
+.LP
+The following is an example of a \fBrt_dptbl.c\fR file used for building the
+new \fBrt_dptbl\fR.
+
+.sp
+.in +2
+.nf
+/*  BEGIN rt_dptbl.c  */
+#include <sys/proc.h>
+#include <sys/priocntl.h>
+#include <sys/class.h>
+#include <sys/disp.h>
+#include <sys/rt.h>
+#include <sys/rtpriocntl.h>
+/*
+ * This is the loadable module wrapper.
+ */
+#include <sys/modctl.h>
+extern struct mod_ops mod_miscops;
+/*
+ * Module linkage information for the kernel.
+ */
+static struct modlmisc modlmisc = {
+	&mod_miscops, "realtime dispatch table"
+};
+static struct modlinkage modlinkage = {
+	MODREV_1, &modlmisc, 0
+};
+_init()
+{
+	return (mod_install(&modlinkage));
+}
+_info (struct modinfo *modinfop)
+{
+	return (mod_info(&modlinkage, modinfop));
+}
+rtdpent_t       config_rt_dptbl[] = {
+
+/*   prilevel Time quantum  */
+
+100,100,
+101,100,
+102,100,
+103,100,
+104,100,
+105,100,
+106,100,
+107,100,
+108,100,
+109,100,
+110,80,
+111,80,
+112,80,
+113,80,
+114,80,
+115,80,
+116,80,
+117,80,
+118,80,
+119,80,
+120,60,
+121,60,
+122,60,
+123,60,
+124,60,
+125,60,
+126,60,
+127,60,
+128,60,
+129,60,
+130,40,
+131,40,
+132,40,
+133,40,
+134,40,
+135,40,
+136,40,
+137,40,
+138,40,
+139,40,
+140,20,
+141,20,
+142,20,
+143,20,
+144,20,
+145,20,
+146,20,
+147,20,
+148,20,
+149,20,
+150,10,
+151,10,
+152,10,
+153,10,
+154,10,
+155,10,
+156,10,
+157,10,
+158,10,
+159,10,
+
+};
+/*
+ * Return the address of config_rt_dptbl
+ */ rtdpent_t *
+    rt_getdptbl()
+{
+           return (config_rt_dptbl);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.BR priocntl (1),
+.BR priocntl (2),
+.BR system (5),
+.BR dispadmin (8)
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.sp
+.LP
+ \fIProgramming Interfaces Guide\fR

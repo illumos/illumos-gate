@@ -85,5 +85,5 @@ state.
 .Xr pthread_mutexattr_getrobust 3C ,
 .Xr pthread 3HEAD ,
 .Xr libpthread 3LIB ,
-.Xr attributes 5 ,
-.Xr mutex 5
+.Xr attributes 7 ,
+.Xr mutex 7

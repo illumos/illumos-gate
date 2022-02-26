@@ -39,7 +39,7 @@ Because of this, the value returned will wrap around after accumulating only
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -57,5 +57,9 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBtimes\fR(2), \fBpopen\fR(3C), \fBsystem\fR(3C), \fBwait\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR times (2),
+.BR popen (3C),
+.BR system (3C),
+.BR wait (3C),
+.BR attributes (7),
+.BR standards (7)

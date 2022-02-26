@@ -51,7 +51,9 @@ which is linked into the \fBdev_info\fR structure pointed to by \fBdip\fR:
 .in -2
 
 .SH SEE ALSO
-\fBattach\fR(9E), \fBdetach\fR(9E), \fBddi_create_minor_node\fR(9F)
+.BR attach (9E),
+.BR detach (9E),
+.BR ddi_create_minor_node (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

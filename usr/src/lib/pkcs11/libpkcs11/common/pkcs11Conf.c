@@ -64,7 +64,7 @@ metaslot_config_t metaslot_config;
 void (*Tmp_GetThreshold)(void *) = NULL;
 cipher_mechs_threshold_t meta_mechs_threshold[MAX_NUM_THRESHOLD];
 
-static const char *conf_err = "See cryptoadm(1M). Skipping this plug-in.";
+static const char *conf_err = "See cryptoadm(8). Skipping this plug-in.";
 
 /*
  * Set up metaslot for the framework using either user configuration
@@ -95,7 +95,7 @@ setup_metaslot(uentry_t *metaslot_entry) {
 			 */
 			cryptoerror(LOG_ERR,
 			    "libpkcs11: Policy invalid or corrupted "
-			    "for metaslot. Use cryptoadm(1M) to fix "
+			    "for metaslot. Use cryptoadm(8) to fix "
 			    "this. Disabling metaslot functionality.\n");
 			metaslot_enabled = B_FALSE;
 			return (rv);
@@ -532,7 +532,7 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 				 */
 				cryptoerror(LOG_ERR,
 				    "libpkcs11: Policy invalid or corrupted "
-				    "for %s. Use cryptoadm(1M) to fix "
+				    "for %s. Use cryptoadm(8) to fix "
 				    "this. Skipping this plug-in.",
 				    fullpath);
 				(void) prov_funcs->C_Finalize(NULL);

@@ -537,7 +537,7 @@ is device-specific.
 When
 .Fn open
 is invoked to open a named stream, and the
-.Xr connld 7M
+.Xr connld 4M
 module has been pushed on the pipe,
 .Fn open
 blocks until the server process has issued an
@@ -545,7 +545,7 @@ blocks until the server process has issued an
 .Xr ioctl 2
 .Po
 see
-.Xr streamio 7I
+.Xr streamio 4I
 .Pc
 to receive the file descriptor.
 .Pp
@@ -718,7 +718,8 @@ The
 privilege allows processes to open files for writing regardless of permission
 bits.
 See
-.Xr privileges 5 for special considerations when opening files owned by user ID
+.Xr privileges 7
+for special considerations when opening files owned by user ID
 .Sy 0
 for writing.
 The
@@ -949,7 +950,7 @@ The
 .Fn open
 function has a transitional interface for 64-bit file offsets.
 See
-.Xr lf64 5 .
+.Xr lf64 7 .
 Note that using
 .Fn open64
 is equivalent to using
@@ -982,12 +983,12 @@ set in
 .Xr unlockpt 3C ,
 .Xr fcntl.h 3HEAD ,
 .Xr stat.h 3HEAD ,
-.Xr attributes 5 ,
-.Xr lf64 5 ,
-.Xr privileges 5 ,
-.Xr standards 5 ,
-.Xr streamio 7I ,
-.Xr connld 7M
+.Xr streamio 4I ,
+.Xr connld 4M ,
+.Xr attributes 7 ,
+.Xr lf64 7 ,
+.Xr privileges 7 ,
+.Xr standards 7
 .Sh NOTES
 Hierarchical Storage Management
 .Pq HSM

@@ -148,7 +148,7 @@ else
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -166,9 +166,14 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBcpc\fR(3CPC), \fBcpc_getcpuver\fR(3CPC), \fBcpc_set_add_request\fR(3CPC),
-\fBcpc_seterrfn\fR(3CPC), \fBfree\fR(3C), \fBgetsubopt\fR(3C),
-\fBlibcpc\fR(3LIB), \fBattributes\fR(5)
+.BR free (3C),
+.BR getsubopt (3C),
+.BR cpc (3CPC),
+.BR cpc_getcpuver (3CPC),
+.BR cpc_set_add_request (3CPC),
+.BR cpc_seterrfn (3CPC),
+.BR libcpc (3LIB),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

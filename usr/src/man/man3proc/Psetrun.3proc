@@ -65,7 +65,7 @@ For the specific mechanics of single-stepping and what traps or signals will be
 injected, see the
 .Sy PRSTEP
 section of
-.Xr proc 4 .
+.Xr proc 5 .
 .It Dv PRSABORT
 Indicates that the thread should abort the system call that it is
 currently executing.
@@ -92,7 +92,7 @@ changes will be synchronized with the process.
 For more information on resuming a thread see the
 .Sy PCRUN
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 Note, the
 .Fn Psetrun
@@ -129,7 +129,7 @@ is set to indicate the error.
 For a full list of possible errors see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Psetrun
@@ -154,4 +154,4 @@ in
 .Xr signal.h 3HEAD ,
 .Xr libproc 3LIB ,
 .Xr Pstatus 3PROC ,
-.Xr proc 4
+.Xr proc 5

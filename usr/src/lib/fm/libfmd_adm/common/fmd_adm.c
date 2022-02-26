@@ -113,9 +113,9 @@ fmd_adm_svc_errmsg(enum fmd_adm_error err)
 	case FMD_ADM_ERR_MODEXIST:
 		return ("module using same name is already loaded");
 	case FMD_ADM_ERR_MODINIT:
-		return ("module failed to initialize (consult fmd(1M) log)");
+		return ("module failed to initialize (consult fmd(8) log)");
 	case FMD_ADM_ERR_MODLOAD:
-		return ("module failed to load (consult fmd(1M) log)");
+		return ("module failed to load (consult fmd(8) log)");
 	case FMD_ADM_ERR_RSRCSRCH:
 		return ("specified resource is not cached by fault manager");
 	case FMD_ADM_ERR_RSRCNOTF:
@@ -127,7 +127,7 @@ fmd_adm_svc_errmsg(enum fmd_adm_error err)
 	case FMD_ADM_ERR_ROTSRCH:
 		return ("invalid log file name");
 	case FMD_ADM_ERR_ROTFAIL:
-		return ("failed to rotate log file (consult fmd(1M) log)");
+		return ("failed to rotate log file (consult fmd(8) log)");
 	case FMD_ADM_ERR_ROTBUSY:
 		return ("log file is too busy to rotate (try again later)");
 	case FMD_ADM_ERR_CASESRCH:

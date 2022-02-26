@@ -1,0 +1,193 @@
+'\" te
+.\"  Copyright 1989 AT&T Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH CRON 8 "Mar 30, 2017"
+.SH NAME
+cron \- clock daemon
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/cron\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+\fBcron\fR starts a process that executes commands at specified dates and
+times.
+.sp
+.LP
+You can specify regularly scheduled commands to \fBcron\fR according to
+instructions found in \fBcrontab\fR files in the directory
+\fB/var/spool/cron/crontabs\fR. Users can submit their own \fBcrontab\fR file
+using the \fBcrontab\fR(1) command. Commands which are to be executed only once
+can be submitted using the \fBat\fR(1) command.
+.sp
+.LP
+\fBcron\fR only examines \fBcrontab\fR or \fBat\fR command files during its own
+process initialization phase and when the \fBcrontab\fR or \fBat\fR command is
+run. This reduces the overhead of checking for new or changed files at
+regularly scheduled intervals.
+.sp
+.LP
+As \fBcron\fR never exits, it should be executed only once. This is done
+routinely by way of the \fBsvc:/system/cron:default\fR service. The file
+\fB/etc/cron.d/FIFO\fR file is used as a lock file to prevent the execution of
+more than one instance of \fBcron\fR.
+.sp
+.LP
+\fBcron\fR captures the output of the job's \fBstdout\fR and \fBstderr\fR
+streams, and, if it is not empty, mails the output to the user. If the job does
+not produce output, no mail is sent to the user. An exception is if the job is
+an \fBat\fR(1) job and the \fB-m\fR option was specified when the job was
+submitted.
+.sp
+.LP
+\fBcron\fR and \fBat\fR jobs are not executed if your account is locked.
+The \fBshadow\fR(5) file defines which accounts are not
+locked and will have their jobs executed.
+.SS "Setting cron Jobs Across Timezones"
+.LP
+The timezone of the \fBcron\fR daemon sets the system-wide timezone for
+\fBcron\fR entries. This, in turn, is by set by default system-wide using
+\fB/etc/default/init\fR. The timezone for \fBcron\fR entries can be overridden
+in a user's crontab file; see \fBcrontab\fR(1).
+.sp
+.LP
+If some form of \fBdaylight savings\fR or \fBsummer/winter time\fR is in
+effect, then jobs scheduled during the switchover period could be executed
+once, twice, or not at all.
+.SS "Setting cron Defaults"
+.LP
+To keep a log of all actions taken by \fBcron\fR, you must specify
+\fBCRONLOG=YES\fR in the \fB/etc/default/cron\fR file. If you specify
+\fBCRONLOG=NO\fR, no logging is done. Keeping the log is a user configurable
+option since \fBcron\fR usually creates huge log files.
+.sp
+.LP
+You can specify the \fBPATH\fR for \fBuser\fR cron jobs by using
+\fBPATH\fR\fB=\fR in \fB/etc/default/cron\fR. You can set the \fBPATH\fR for
+\fBroot\fR cron jobs using \fBSU\fR\fBPATH\fR\fB=\fR in
+\fB/etc/default/cron\fR. Carefully consider the security implications of
+setting \fBPATH\fR and \fBSUPATH\fR.
+.sp
+.LP
+Example \fB/etc/default/cron\fR file:
+.sp
+.in +2
+.nf
+CRONLOG=YES
+PATH=/usr/bin:/usr/ucb:
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This example enables logging and sets the default \fBPATH\fR used by non-root
+jobs to \fB/usr/bin:/usr/ucb:\fR. Root jobs continue to use
+\fB/usr/sbin:/usr/bin\fR.
+.sp
+.LP
+The \fBcron\fR log file is periodically rotated by \fBlogadm\fR(8).
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/cron.d\fR\fR
+.ad
+.RS 25n
+Main \fBcron\fR directory
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/cron.d/FIFO\fR\fR
+.ad
+.RS 25n
+Lock file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/default/cron\fR\fR
+.ad
+.RS 25n
+\fBcron\fR default settings file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/cron/log\fR\fR
+.ad
+.RS 25n
+\fBcron\fR history information
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/spool/cron\fR\fR
+.ad
+.RS 25n
+Spool area
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/cron.d/queuedefs\fR\fR
+.ad
+.RS 25n
+Queue description file for \fBat\fR, \fBbatch\fR, and \fBcron\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/logadm.conf\fR\fR
+.ad
+.RS 25n
+Configuration file for \fBlogadm\fR
+.RE
+
+.SH SEE ALSO
+.LP
+.BR at (1),
+.BR crontab (1),
+.BR sh (1),
+.BR svcs (1),
+.BR queuedefs (5),
+.BR shadow (5),
+.BR attributes (7),
+.BR rbac (7),
+.BR smf (7),
+.BR smf_security (7),
+.BR logadm (8),
+.BR svcadm (8)
+.SH NOTES
+.LP
+The \fBcron\fR service is managed by the service management facility,
+\fBsmf\fR(7), under the service identifier:
+.sp
+.in +2
+.nf
+svc:/system/cron:default
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using \fBsvcadm\fR(8). The service's
+status can be queried using the \fBsvcs\fR(1) command. Most administrative
+actions may be delegated to users with the \fBsolaris.smf.manage.cron\fR
+authorization (see \fBrbac\fR(7) and \fBsmf_security\fR(7)).
+.SH DIAGNOSTICS
+.LP
+A history of all actions taken by \fBcron\fR is stored in \fB/var/cron/log\fR
+and possibly in \fB/var/cron/olog\fR.

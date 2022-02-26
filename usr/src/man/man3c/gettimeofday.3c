@@ -43,7 +43,7 @@ set.
 .sp
 .LP
 The \fBTZ\fR environment variable holds time zone information. See
-\fBTIMEZONE\fR(4).
+\fBTIMEZONE\fR(5).
 .sp
 .LP
 The \fItzp\fR argument to \fBgettimeofday()\fR and \fBsettimeofday()\fR is
@@ -103,7 +103,7 @@ second accuracy, call \fBsettimeofday()\fR for the seconds and then
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -121,5 +121,10 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBadjtime\fR(2), \fBctime\fR(3C), \fBgethrtime\fR(3C), \fBTIMEZONE\fR(4),
-\fBattributes\fR(5), \fBprivileges\fR(5), \fBstandards\fR(5)
+.BR adjtime (2),
+.BR ctime (3C),
+.BR gethrtime (3C),
+.BR TIMEZONE (5),
+.BR attributes (7),
+.BR privileges (7),
+.BR standards (7)

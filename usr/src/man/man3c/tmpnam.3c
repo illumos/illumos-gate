@@ -120,7 +120,7 @@ applications.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -138,6 +138,13 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBcreat\fR(2), \fBunlink\fR(2), \fBfopen\fR(3C), \fBfree\fR(3C),
-\fBmalloc\fR(3C), \fBmktemp\fR(3C), \fBmkstemp\fR(3C), \fBtmpfile\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR creat (2),
+.BR unlink (2),
+.BR fopen (3C),
+.BR free (3C),
+.BR malloc (3C),
+.BR mkstemp (3C),
+.BR mktemp (3C),
+.BR tmpfile (3C),
+.BR attributes (7),
+.BR standards (7)

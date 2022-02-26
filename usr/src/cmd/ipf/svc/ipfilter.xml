@@ -156,7 +156,7 @@
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='ipfilter' section='5'
+			<manpage title='ipfilter' section='7'
 				manpath='/usr/share/man' />
 		</documentation>
 

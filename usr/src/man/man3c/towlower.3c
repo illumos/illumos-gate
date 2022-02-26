@@ -72,4 +72,4 @@ MT-Level	MT-Safe
 .BR setlocale (3C),
 .BR towupper (3C),
 .BR uselocale (3C),
-.BR locale (5)
+.BR locale (7)

@@ -67,7 +67,9 @@ See \fBdupb\fR(9F) for an example that uses \fBlinkb()\fR.
 .SH SEE ALSO
 .sp
 .LP
-\fBdupb\fR(9F), \fBunlinkb\fR(9F), \fBmsgb\fR(9S)
+.BR dupb (9F),
+.BR unlinkb (9F),
+.BR msgb (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

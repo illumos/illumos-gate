@@ -39,15 +39,20 @@ The \fBNIS\fR password daemon, \fBrpc.yppasswdd\fR must be running on your
 \fBNIS\fR server in order for the new password to take effect.
 .SH SEE ALSO
 .LP
-\fBkeylogin\fR(1), \fBlogin\fR(1),
-\fBpasswd\fR(1), \fBgetpwnam\fR(3C), \fBgetspnam\fR(3C),
-\fBsecure_rpc\fR(3NSL), \fBnsswitch.conf\fR(4), \fBattributes\fR(5)
+.BR keylogin (1),
+.BR login (1),
+.BR passwd (1),
+.BR getpwnam (3C),
+.BR getspnam (3C),
+.BR secure_rpc (3NSL),
+.BR nsswitch.conf (5),
+.BR attributes (7)
 .SH WARNINGS
 .LP
 Even after the user has successfully changed his or her password using this
 command, the subsequent \fBlogin\fR(1) using the new password will be
 successful only if the user's password and shadow information is obtained from
-NIS. See \fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), and \fBnsswitch.conf\fR(4).
+NIS. See \fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), and \fBnsswitch.conf\fR(5).
 .SH NOTES
 .LP
 The use of \fByppasswd\fR is discouraged, as it is now only a wrapper around

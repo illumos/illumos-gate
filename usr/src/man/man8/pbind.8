@@ -1,0 +1,361 @@
+'\" te
+.\"  Copyright 2015 Ryan Zezeski
+.\"  Copyright (c) 2008, Sun Microsystems, Inc.
+.\"  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PBIND 8 "Feb 25, 2008"
+.SH NAME
+pbind \- control and query bindings of processes or LWPs
+.SH SYNOPSIS
+.LP
+.nf
+\fBpbind\fR \fB-b\fR \fIprocessor_id\fR \fIpid\fR [\fI/lwpid\fR]...
+.fi
+
+.LP
+.nf
+\fBpbind\fR \fB-e\fR \fIprocessor_id\fR \fIcmd\fR [\fIargs\fR...]
+.fi
+
+.LP
+.nf
+\fBpbind\fR [\fB-q\fR] [\fIpid\fR [\fI/lwpid\fR]]...
+.fi
+
+.LP
+.nf
+\fBpbind\fR \fB-Q\fR [\fIprocessor_id\fR]...
+.fi
+
+.LP
+.nf
+\fBpbind\fR \fB-u\fR \fIpid\fR [\fI/lwpid\fR]...
+.fi
+
+.LP
+.nf
+\fBpbind\fR \fB-U\fR [\fIprocessor_id\fR]...
+.fi
+
+.SH DESCRIPTION
+.LP
+\fBpbind\fR controls and queries bindings of processes and LWPs (lightweight
+processes) to processors. \fBpbind\fR can also remove processor bindings that
+were previously established.
+.sp
+.LP
+When an LWP is bound to a processor, it will be executed only by that processor
+except when the LWP requires a resource that is provided only by another
+processor. The binding is not exclusive, that is, the processor is free to
+execute other LWPs as well.
+.sp
+.LP
+Bindings are inherited, so new LWPs and processes created by a bound LWP will
+have the same binding. Binding an interactive shell to a processor, for
+example, binds all commands executed by the shell.
+.sp
+.LP
+The \fIprocessor_id\fR must be present and on-line. Use the
+\fBpsrinfo\fR(8) command to determine which processors are
+available.
+.sp
+.LP
+Superusers may bind or unbind any process or LWP, while other users can bind or
+unbind any process or LWP for which they have permission to signal, that is,
+any process that has the same effective user ID as the user.
+.SH OPTIONS
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-b\fR \fIprocessor_id\fR\fR
+.ad
+.sp .6
+.RS 4n
+Binds all or a subset of the LWPs of the specified processes to
+\fIprocessor_id\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-e\fR \fIprocessor_id\fR
+.ad
+.sp .6
+.RS 4n
+Execute a command while bound to \fIprocessor_id\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-q\fR\fR
+.ad
+.sp .6
+.RS 4n
+Displays the bindings of the specified processes or of all processes. If a
+process is composed of multiple LWPs which have different bindings and the LWPs
+are not explicitly specified, the bindings of only one of the bound LWPs will
+be displayed. The bindings of a subset of LWPs can be displayed by appending
+"/lwpids" to the process \fBID\fRs. Multiple LWPs may be selected using "-" and
+"," delimiters. See EXAMPLES.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-Q\fR\fR
+.ad
+.sp .6
+.RS 4n
+Displays the LWPs bound to the specified list of processors, or all LWPs with
+processor bindings. For processes composed of multiple LWPs, the bindings of
+individual LWPs will be displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-u\fR\fR
+.ad
+.sp .6
+.RS 4n
+Removes the bindings of all or a subset of the LWPs of the specified processes,
+allowing them to be executed on any on-line processor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-U\fR\fR
+.ad
+.sp .6
+.RS 4n
+Removes the bindings of all LWPs bound to the specified list of processors, or
+to any processor if no argument is specified.
+.RE
+
+.SH OPERANDS
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fB\fIpid\fR\fR
+.ad
+.sp .6
+.RS 4n
+The process \fBID\fR of the process to be controlled or queried.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIlwpid\fR\fR
+.ad
+.sp .6
+.RS 4n
+The set of LWP IDs of the specified process to be controlled or queried. The
+syntax for selecting \fBLWP\fR \fBID\fRs is as follows:
+.sp
+.in +2
+.nf
+2,3,4-8       LWP IDs 2, 3, and 4 through 8
+-4            LWPs whose IDs are 4 or below
+4-            LWPs whose IDs are 4 or above
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIprocessor_id\fR\fR
+.ad
+.sp .6
+.RS 4n
+The processor \fBID\fR of the processor to be controlled or queried.
+.RE
+
+.sp
+.ne 2
+.na
+\fIcmd [args...]\fR
+.ad
+.sp .6
+.RS 4n
+The command to execute along with optional arguments.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRBinding Processes
+.sp
+.LP
+The following example binds processes 204 and 223 to processor 2:
+
+.sp
+.in +2
+.nf
+example% \fBpbind -b 2 204 223\fR
+process id 204: was 2, now 2
+process id 223: was 3, now 2
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRUnbinding a Process
+.sp
+.LP
+The following example unbinds process 204:
+
+.sp
+.in +2
+.nf
+example% \fBpbind -u 204\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRQuerying Bindings
+.sp
+.LP
+The following example queries bindings. It demonstrates that process 1 is bound
+to processor 0, process 149 has at least one LWP bound to CPU3, and process 101
+has no bound LWPs.
+
+.sp
+.in +2
+.nf
+example% \fBpbind -q 1 149 101\fR
+process id 1: 0
+process id 149: 3
+process id 101: not bound
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRQuerying LWP Bindings
+.sp
+.LP
+The following example queries bindings of LWPs. It demonstrates that LWP 1 of
+process 149 is bound to CPU3, and LWP 2 of process 149 is not bound.
+
+.sp
+.in +2
+.nf
+example% \fBpbind -q 149/1-2\fR
+lwp id 149/1: 3
+lwp id 149/2: not bound
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRQuerying LWP Bindings for Processor 2:
+.sp
+.LP
+The following example queries all LWPs bound to processor 2:
+
+.sp
+.in +2
+.nf
+example% \fBpbind -Q 2\fR
+lwp id 149/4: 2
+lwp id 149/5: 2
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRExecuting a bound command:
+.sp
+.LP
+The following example executes ls while bound to processor 6:
+
+.sp
+.in +2
+.nf
+example% \fBpbind -e 6 ls -la
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB>0\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.LP
+.BR processor_bind (2),
+.BR processor_info (2),
+.BR sysconf (3C),
+.BR attributes (7),
+.BR psradm (8),
+.BR psrinfo (8),
+.BR psrset (8)
+.SH DIAGNOSTICS
+.ne 2
+.na
+\fB\fBpbind: cannot query pid 31: No such process\fR\fR
+.ad
+.sp .6
+.RS 4n
+The process specified did not exist or has exited.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpbind: cannot bind pid 31: Not owner\fR\fR
+.ad
+.sp .6
+.RS 4n
+The user does not have permission to bind the process.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpbind: cannot bind pid 31: Invalid argument\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified processor is not on-line.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpbind: failed to exec\fR \fIcmd\fR
+.ad
+.sp .6
+.RS 4n
+Could not resolve the \fIcmd\fR from \fBPATH\fR.
+.RE

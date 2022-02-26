@@ -95,7 +95,7 @@ the \fBsys_trans_label\fR privilege.
 .LP
 The manifest constants \fBADMIN_HIGH\fR and \fBADMIN_LOW\fR are the human
 readable strings that correspond to the Trusted Extensions policy
-\fBadmin_high\fR and \fBadmin_low\fR label values. See \fBlabels\fR(5).
+\fBadmin_high\fR and \fBadmin_low\fR label values. See \fBlabels\fR(7).
 .SH RETURN VALUES
 .sp
 .LP
@@ -141,7 +141,7 @@ cannot be allocated.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -161,12 +161,16 @@ Standard	See below.
 .sp
 .LP
 Parsing types that are relative to Defense Intelligence Agency (DIA) encodings
-schema are Standard. Standard is specified in \fBlabel_encodings\fR(4).
+schema are Standard. Standard is specified in \fBlabel_encodings\fR(5).
 .SH SEE ALSO
 .sp
 .LP
-\fBlabel_to_str\fR(3TSOL), \fBlibtsol\fR(3LIB), \fBm_label\fR(3TSOL),
-\fBlabel_encodings\fR(4), \fBattributes\fR(5), \fBlabels\fR(5)
+.BR libtsol (3LIB),
+.BR label_to_str (3TSOL),
+.BR m_label (3TSOL),
+.BR label_encodings (5),
+.BR attributes (7),
+.BR labels (7)
 .sp
 .LP
 \fIValidating the Label Request Against the Printer\&'s Label Range\fR in

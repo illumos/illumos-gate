@@ -25,10 +25,8 @@
  */
 
 /*
- * ptrace(2) interface built on top of proc(4).
+ * ptrace(2) interface built on top of proc(5).
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma weak _ptrace = ptrace
 

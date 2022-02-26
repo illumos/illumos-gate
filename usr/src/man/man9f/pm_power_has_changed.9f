@@ -152,7 +152,7 @@ xxdisk_power(dev_info *dip, int comp, int level)
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -166,10 +166,17 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBpower.conf\fR(4), \fBpm\fR(7D), \fBattach\fR(9E), \fBdetach\fR(9E),
-\fBpower\fR(9E), \fBpm_busy_component\fR(9F), \fBpm_idle_component\fR(9F),
-\fBpm_raise_power\fR(9F), \fBpm_lower_power\fR(9F), \fBpm\fR(9P),
-\fBpm-components\fR(9P)
+.BR pm (4D),
+.BR power.conf (5),
+.BR attach (9E),
+.BR detach (9E),
+.BR power (9E),
+.BR pm_busy_component (9F),
+.BR pm_idle_component (9F),
+.BR pm_lower_power (9F),
+.BR pm_raise_power (9F),
+.BR pm (9P),
+.BR pm-components (9P)
 .sp
 .LP
 \fIWriting Device Drivers\fR

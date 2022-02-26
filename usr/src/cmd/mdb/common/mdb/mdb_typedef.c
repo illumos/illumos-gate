@@ -729,7 +729,7 @@ static char typedef_desc[] =
 "All built up definitions may be exported as a valid CTF container that can\n"
 "be used again with ::typedef -r or anything that uses libctf. To write them\n"
 "out, use ::typedef -w and specify the name of a file. For more information\n"
-"on the CTF file format, see ctf(4).\n"
+"on the CTF file format, see ctf(5).\n"
 "\n";
 
 static char typedef_opts[] =

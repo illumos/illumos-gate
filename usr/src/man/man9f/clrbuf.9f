@@ -48,7 +48,8 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBgetrbuf\fR(9F), \fBbuf\fR(9S)
+.BR getrbuf (9F),
+.BR buf (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

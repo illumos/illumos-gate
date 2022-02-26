@@ -65,7 +65,7 @@ Cannot make or remove an entry for the specified session.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -83,8 +83,12 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBgetutxent\fR(3C), \fBpam\fR(3PAM), \fBpam_acct_mgmt\fR(3PAM),
-\fBpam_authenticate\fR(3PAM), \fBpam_start\fR(3PAM), \fBattributes\fR(5)
+.BR getutxent (3C),
+.BR pam (3PAM),
+.BR pam_acct_mgmt (3PAM),
+.BR pam_authenticate (3PAM),
+.BR pam_start (3PAM),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

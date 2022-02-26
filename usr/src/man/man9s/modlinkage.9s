@@ -46,8 +46,12 @@ have only one linkage structure.
 .RE
 
 .SH SEE ALSO
-\fBadd_drv\fR(1M), \fB_fini\fR(9E), \fB_info\fR(9E), \fB_init\fR(9E),
-\fBmodldrv\fR(9S), \fBmodlstrmod\fR(9S)
+.BR add_drv (8),
+.BR _fini (9E),
+.BR _info (9E),
+.BR _init (9E),
+.BR modldrv (9S),
+.BR modlstrmod (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

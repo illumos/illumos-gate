@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 #
-# r.manifest - smf(5) manifest remove class action script
+# r.manifest - smf(7) manifest remove class action script
 #
 
 MFSTSCAN=/lib/svc/bin/mfstscan

@@ -79,7 +79,7 @@ do_common()
 	AUDITCOND="`$AUDITCONFIG -getcond 2>/dev/null`"
 	if [ $? -ne 0 ]; then
 		# The decision whether to start
-		# auditing is driven by bsmconv(1M) / bsmunconv(1M)
+		# auditing is driven by bsmconv(8) / bsmunconv(8)
 		echo "$0: Unable to get current kernel auditing condition."
 		$SVCADM mark maintenance $AUDITD_FMRI
 		exit $SMF_EXIT_MON_OFFLINE
@@ -91,9 +91,9 @@ do_common()
 		$AUDITCONFIG -t -getpolicy | \
 		    $EGREP "perzone|all" 1>/dev/null 2>&1
 		if [ $? -eq 1 ]; then
-			echo "$0: auditd(1M) is not configured to run in"
+			echo "$0: auditd(8) is not configured to run in"
 			echo "   a local zone, perzone policy not set" \
-			    "(see auditconfig(1M))."
+			    "(see auditconfig(8))."
 			$SVCADM disable $AUDITD_FMRI
 			$SLEEP 5 &
 			exit $SMF_EXIT_OK
@@ -114,7 +114,7 @@ do_common()
 do_start()
 {
 	#
-	# The transition of the audit_startup(1M) has to be performed.
+	# The transition of the audit_startup(8) has to be performed.
 	if [ -f "$AUDIT_STARTUP" ]; then
 		
 		if [ -x "$AUDIT_STARTUP" ]; then
@@ -125,7 +125,7 @@ do_start()
 			exit $SMF_EXIT_MON_OFFLINE
 		fi
 		
-		echo "$0: Transition of audit_startup(1M) started."
+		echo "$0: Transition of audit_startup(8) started."
 
 		$MV $AUDIT_STARTUP $AUDIT_STARTUP._transitioned_
 		if [ $? -ne 0 ]; then
@@ -144,7 +144,7 @@ do_start()
 			exit $SMF_EXIT_ERR_CONFIG
 		fi
 
-		echo "$0: Transition of audit_startup(1M) finished."
+		echo "$0: Transition of audit_startup(8) finished."
 	fi
 
 	#
@@ -158,7 +158,7 @@ do_refresh()
 {
 	#
 	# The refresh capability is available only for those systems
-	# with already transformed audit_startup(1M) into $AUDITD_FMRI
+	# with already transformed audit_startup(8) into $AUDITD_FMRI
 	# service properties. See do_start() for more information.
 	if [ ! -f "$AUDIT_STARTUP" ]; then
 		#
@@ -171,7 +171,7 @@ do_refresh()
 			exit $SMF_EXIT_ERR_FATAL
 		fi
 		#
-		# signal to auditd(1M):
+		# signal to auditd(8):
 		$PKILL -HUP -c ${contract_id}
 		if [ $? -ne 0 ]; then
 			echo "$0: SIGHUP was not successfully delivered to" \
@@ -182,8 +182,8 @@ do_refresh()
 		$SLEEP 5 &
 	else 
 		echo "$0: Service refresh method not supported on systems" \
-		   "without converted audit_startup(1M) into auditd service" \
-		   "SMF configuration. Clear the service (svcadm(1M))."
+		   "without converted audit_startup(8) into auditd service" \
+		   "SMF configuration. Clear the service (svcadm(8))."
 		$SVCADM mark maintenance $AUDITD_FMRI
 		exit $SMF_EXIT_ERR_CONFIG
 	fi

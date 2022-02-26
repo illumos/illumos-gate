@@ -25,7 +25,7 @@
 #define	_MLXCX_H
 
 /*
- * mlxcx(7D) defintions
+ * mlxcx(4D) defintions
  */
 
 #include <sys/ddi.h>

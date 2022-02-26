@@ -1,0 +1,77 @@
+'\" te
+.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH IPSECAH 4P "Sep 25, 2009"
+.SH NAME
+ipsecah, AH \- IPsec Authentication Header
+.SH SYNOPSIS
+.LP
+.nf
+\fBdrv/ipsecah\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBipsecah\fR module (\fBAH\fR) provides strong integrity,  authentication,
+and partial sequence integrity (replay protection) to \fBIP\fR datagrams.
+\fBAH\fR protects the parts of the \fBIP\fR datagram that can be predicted by
+the sender as it will be received by the receiver. For example, the \fBIP\fR
+\fBTTL\fR field is not a predictable field, and is not protected by \fBAH\fR.
+.sp
+.LP
+\fBAH\fR is inserted between the \fBIP\fR header and the transport header. The
+transport header can be  \fBTCP\fR,  \fBUDP\fR, \fBICMP\fR, or another \fBIP\fR
+header, if tunnels are  being used.
+.SS "AH Device"
+.sp
+.LP
+AH is implemented as a module that is auto-pushed on top of IP. The entry
+\fB/dev/ipsecah\fR is used for tuning AH with \fBndd\fR(8).
+.SS "Authentication Algorithms"
+.sp
+.LP
+Current authentication algorithms supported include HMAC-MD5 and HMAC-SHA-1.
+Each authentication algorithm has its own key size and key format properties.
+You can obtain a list of authentication algorithms and their properties by
+using the \fBipsecalgs\fR(8) command. You can also use the functions described
+in the \fBgetipsecalgbyname\fR(3NSL) man page to retrieve the properties of
+algorithms.
+.SS "Security Considerations"
+.sp
+.LP
+Without replay protection enabled, \fBAH\fR is vulnerable to replay attacks.
+\fBAH\fR does not protect against eavesdropping. Data protected with \fBAH\fR
+can still be seen by an adversary.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR getipsecalgbyname (3NSL),
+.BR ip (4P),
+.BR ipsec (4P),
+.BR ipsecesp (4P),
+.BR attributes (7),
+.BR ipsecalgs (8),
+.BR ipsecconf (8),
+.BR ndd (8)
+.sp
+.LP
+Kent, S. and Atkinson, R. \fIRFC 2402, IP Authentication Header\fR, The
+Internet Society, 1998.

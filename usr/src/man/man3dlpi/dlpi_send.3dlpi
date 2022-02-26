@@ -55,7 +55,7 @@ SAP or priority (but not both), the current SAP can be retrieved using
 .sp
 .LP
 If the handle is in raw mode (see \fBDLPI_RAW\fR in \fBdlpi_open\fR(3DLPI)),
-\fImsgbuf\fR must start with the link-layer header (see \fBdlpi\fR(7P)). In raw
+\fImsgbuf\fR must start with the link-layer header (see \fBdlpi\fR(4P)). In raw
 mode, the contents of \fIdaddrp\fR and \fIsendp\fR are ignored, as they are
 already specified by the link-layer header in \fImsgbuf\fR.
 .sp
@@ -93,7 +93,7 @@ Invalid argument
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -111,5 +111,9 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBdlpi_bind\fR(3DLPI), \fBdlpi_info\fR(3DLPI), \fBdlpi_open\fR(3DLPI),
-\fBlibdlpi\fR(3LIB), \fBattributes\fR(5), \fBdlpi\fR(7P)
+.BR dlpi_bind (3DLPI),
+.BR dlpi_info (3DLPI),
+.BR dlpi_open (3DLPI),
+.BR libdlpi (3LIB),
+.BR dlpi (4P),
+.BR attributes (7)

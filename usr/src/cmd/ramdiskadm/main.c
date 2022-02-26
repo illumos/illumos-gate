@@ -23,13 +23,11 @@
  * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * ramdiskadm - administer ramdisk(7d). Allows creation and deletion of
+ * ramdiskadm - administer ramdisk(4D). Allows creation and deletion of
  * ramdisks, and display status. All the ioctls are private between
  * ramdisk and ramdiskadm, and so are very simple - device information is
  * communicated via a name or a minor number.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>

@@ -48,4 +48,4 @@ be set to \fBEILSEQ\fR.
 .SH SEE ALSO
 .sp
 .LP
-\fBwstring\fR(3C)
+.BR wstring (3C)

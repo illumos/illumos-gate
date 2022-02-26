@@ -4,8 +4,6 @@
 	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -28,7 +26,7 @@
 	<dependency
 		name='dns'
 		grouping='require_all'
-		restart_on='error' 
+		restart_on='error'
 		type='service'>
 		<service_fmri value='svc:/network/dns/client' />
 	</dependency>
@@ -62,7 +60,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='krb5kdc' section='1M'
+			<manpage title='krb5kdc' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

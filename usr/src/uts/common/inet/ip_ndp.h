@@ -161,7 +161,7 @@ typedef	struct ndp_g_s {
 
 /*
  * NCE_F_NONUD is used to disable IPv6 Neighbor Unreachability Detection or
- * IPv4 aging and maps to the ATF_PERM flag for arp(1m)
+ * IPv4 aging and maps to the ATF_PERM flag for arp(8)
  */
 #define	NCE_F_NONUD		0x10
 
@@ -181,7 +181,7 @@ typedef	struct ndp_g_s {
  * NCE_F_AUTHORITY is set for any address that we have authoritatitve
  * information for. This includes locally configured addresses as well
  * as statically configured arp entries that are set up using the "permanent"
- * option described in arp(1m). The NCE_F_AUTHORITY asserts that we would
+ * option described in arp(8). The NCE_F_AUTHORITY asserts that we would
  * reject any updates for that nce's (host, link-layer-address) information
  */
 #define	NCE_F_AUTHORITY		0x800

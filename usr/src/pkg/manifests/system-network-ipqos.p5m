@@ -55,8 +55,8 @@ file path=usr/lib/ipqosconf/tokenmt.types mode=0444
 file path=usr/lib/ipqosconf/tswtclmt.types mode=0444
 dir  path=usr/sbin
 file path=usr/sbin/ipqosconf mode=0755
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/ipqosconf.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/ipqosconf.8
 legacy pkg=SUNWqosu desc="Solaris IP Quality of Service (Usr)" \
     name="IP QoS, (Usr)"
 license cr_Sun license=cr_Sun

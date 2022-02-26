@@ -230,7 +230,7 @@ A data corruption problem with the message has been detected.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -249,9 +249,13 @@ Standard	See below.
 
 .sp
 .LP
-For \fBmq_receive()\fR and \fBmq_timedreceive()\fR. see \fBstandards\fR(5).
+For \fBmq_receive()\fR and \fBmq_timedreceive()\fR. see \fBstandards\fR(7).
 .SH SEE ALSO
 .sp
 .LP
-\fBmqueue.h\fR(3HEAD), \fBmq_open\fR(3C), \fBmq_send\fR(3C),
-\fBmq_setattr\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR mq_open (3C),
+.BR mq_send (3C),
+.BR mq_setattr (3C),
+.BR mqueue.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

@@ -112,7 +112,7 @@ file that aps audit class numbers to audit class names
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -134,8 +134,9 @@ functionality as the Unsafe functions, but have a slightly different function
 call interface to make them MT-Safe.
 .SH SEE ALSO
 .LP
-\fBaudit_class\fR(4), \fBaudit_event\fR(4),
-\fBattributes\fR(5)
+.BR audit_class (5),
+.BR audit_event (5),
+.BR attributes (7)
 .SH NOTES
 .LP
 All information is contained in a static area, so it must be copied if it is to

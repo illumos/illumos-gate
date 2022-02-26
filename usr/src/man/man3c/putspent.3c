@@ -60,7 +60,7 @@ For this reason, its use is discouraged. If used at all, if should be used with
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -76,4 +76,7 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), \fBputpwent\fR(3C), \fBattributes\fR(5)
+.BR getpwnam (3C),
+.BR getspnam (3C),
+.BR putpwent (3C),
+.BR attributes (7)

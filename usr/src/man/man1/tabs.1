@@ -78,10 +78,10 @@ last value given takes effect:
 .ad
 .RS 12n
 \fBtabs\fR needs to know the type of terminal in order to set tabs and margins.
-\fItype\fR is a name listed in \fBterm\fR(5). If no \fB-T\fR flag is supplied,
+\fItype\fR is a name listed in \fBterm\fR(7). If no \fB-T\fR flag is supplied,
 \fBtabs\fR uses the value of the environment variable \fBTERM\fR. If the value
 of \fBTERM\fR is \fINULL\fR or \fBTERM\fR is not defined in the environment
-(see \fBenviron\fR(5)), \fBtabs\fR uses \fBansi+tabs\fR as the terminal type to
+(see \fBenviron\fR(7)), \fBtabs\fR uses \fBansi+tabs\fR as the terminal type to
 provide a sequence that will work for many terminals.
 .RE
 
@@ -161,7 +161,7 @@ COBOL, normal format
 COBOL compact format (columns 1-6 omitted). Using this code, the first typed
 character corresponds to card column 7, one space gets you to column 8, and a
 tab reaches column 12. Files using this tab setup should include a format
-specification as follows (see \fBfspec\fR(4)):
+specification as follows (see \fBfspec\fR(5)):
 .sp
 .in +2
 .nf
@@ -181,7 +181,7 @@ specification as follows (see \fBfspec\fR(4)):
 .sp
 COBOL compact format (columns 1-6 omitted), with more tabs than
 \fB\fR\fB-c2\fR\fB\&.\fR This is the recommended format for COBOL. The
-appropriate format specification is (see \fBfspec\fR(4)):
+appropriate format specification is (see \fBfspec\fR(5)):
 .sp
 .in +2
 .nf
@@ -262,7 +262,7 @@ See OPERANDS.
 .ad
 .RS 9n
 If the name of a \fIfile\fR is given, \fBtabs\fR reads the first line of the
-file, searching for a format specification (see \fBfspec\fR(4)). If it finds
+file, searching for a format specification (see \fBfspec\fR(5)). If it finds
 one there, it sets the tab stops according to it, otherwise it sets them as
 \fB\(mi8\fR\&. This type of specification may be used to make sure that a
 tabbed file is printed with correct tab settings, and would be used with the
@@ -347,7 +347,7 @@ example% \fBtabs 1,8,36\fR
 .LP
 The last command is an example of using \fI-file\fR (\fBfile\fR specification)
 to indicate that tabs should be set according to the first line of
-$\fBHOME\fR/fspec.list/att4425  (see \fBfspec\fR(4)).
+$\fBHOME\fR/fspec.list/att4425  (see \fBfspec\fR(5)).
 
 .sp
 .in +2
@@ -360,7 +360,7 @@ example% \fBtabs -$HOME/fspec.list/att4425\fR
 .SH ENVIRONMENT VARIABLES
 .sp
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBtabs\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
@@ -398,7 +398,7 @@ An error occurred.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -416,9 +416,17 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBexpand\fR(1), \fBnewform\fR(1), \fBpr\fR(1), \fBstty\fR(1), \fBtput\fR(1),
-\fBfspec\fR(4), \fBterminfo\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBterm\fR(5), \fBstandards\fR(5)
+.BR expand (1),
+.BR newform (1),
+.BR pr (1),
+.BR stty (1),
+.BR tput (1),
+.BR fspec (5),
+.BR terminfo (5),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7),
+.BR term (7)
 .SH NOTES
 .sp
 .LP

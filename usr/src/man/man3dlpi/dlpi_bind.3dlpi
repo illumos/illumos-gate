@@ -85,7 +85,7 @@ Unavailable \fBDLPI\fR \fBSAP\fR
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -103,5 +103,9 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBdlpi_info\fR(3DLPI), \fBdlpi_recv\fR(3DLPI), \fBdlpi_send\fR(3DLPI),
-\fBdlpi_unbind\fR(3DLPI), \fBlibdlpi\fR(3LIB), \fBattributes\fR(5)
+.BR dlpi_info (3DLPI),
+.BR dlpi_recv (3DLPI),
+.BR dlpi_send (3DLPI),
+.BR dlpi_unbind (3DLPI),
+.BR libdlpi (3LIB),
+.BR attributes (7)

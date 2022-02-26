@@ -1,0 +1,217 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PAM_DHKEYS 7 "Feb 25, 2017"
+.SH NAME
+pam_dhkeys \- authentication Diffie-Hellman keys management module
+.SH SYNOPSIS
+.LP
+.nf
+\fBpam_dhkeys.so.1\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBpam_dhkeys.so.1\fR service module provides functionality to two
+\fBPAM\fR services: Secure \fBRPC\fR authentication and Secure \fBRPC\fR
+authentication token management.
+.sp
+.LP
+Secure RPC authentication differs from regular unix authentication because
+some \fBONC RPC\fRs use Secure RPC as the underlying security mechanism.
+.sp
+.LP
+The following options may be passed to the module:
+.sp
+.ne 2
+.na
+\fBdebug\fR
+.ad
+.RS 10n
+\fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level
+.RE
+
+.sp
+.ne 2
+.na
+\fBnowarn\fR
+.ad
+.RS 10n
+Turn off warning messages
+.RE
+
+.SS "Authentication Services"
+.LP
+If the user has Diffie-Hellman keys, \fBpam_sm_authenticate()\fR establishes
+secret keys for the user specified by the \fBPAM_USER\fR (equivalent to running
+\fBkeylogin\fR(1)), using the authentication token found in the
+\fBPAM_AUTHTOK\fR item. If \fBpam_sm_setcred()\fR is called with
+\fBPAM_ESTABLISH_CRED\fR and the user's secure \fBRPC\fR credentials need to be
+established, these credentials are set. This is equivalent to running
+\fBkeylogin\fR(1).
+.sp
+.LP
+If the credentials could not be set and \fBPAM_SILENT\fR is not specified, a
+diagnostic message is displayed. If \fBpam_setcred()\fR is called with
+\fBPAM_DELETE_CRED\fR, the user's secure \fBRPC\fR credentials are unset. This
+is equivalent to running \fBkeylogout\fR(1).
+.sp
+.LP
+\fBPAM_REINITIALIZE_CRED\fR and \fBPAM_REFRESH_CRED\fR are not supported and
+return \fBPAM_IGNORE\fR.
+.SS "Authentication Token Management"
+.LP
+The \fBpam_sm_chauthtok()\fR implementation checks whether the old login
+password decrypts the users secret keys. If it doesn't this module prompts the
+user for an old Secure \fBRPC\fR password and stores it in a pam data item
+called \fBSUNW_OLDRPCPASS\fR. This data item can be used by the store module to
+effectively update the users secret keys.
+.SH ERRORS
+.LP
+The authentication service returns the following error codes:
+.sp
+.ne 2
+.na
+\fB\fBPAM_SUCCESS\fR\fR
+.ad
+.RS 20n
+Credentials set successfully.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_IGNORE\fR\fR
+.ad
+.RS 20n
+Credentials not needed to access the password repository.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.RS 20n
+\fBPAM_USER\fR is not set, or the user is unknown.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_AUTH_ERR\fR\fR
+.ad
+.RS 20n
+No secret keys were set. \fBPAM_AUTHTOK\fR is not set, no credentials are
+present or there is a wrong password.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_BUF_ERR\fR\fR
+.ad
+.RS 20n
+Module ran out of memory.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SYSTEM_ERR\fR\fR
+.ad
+.RS 20n
+Credentials could not be stored, or netname could not be created.
+.RE
+
+.sp
+.LP
+The authentication token management returns the following error codes:
+.sp
+.ne 2
+.na
+\fB\fBPAM_SUCCESS \fR\fR
+.ad
+.RS 20n
+Old \fBrpc\fR password is set in \fBSUNW_OLDRPCPASS\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.RS 20n
+User in \fBPAM_USER\fR is unknown.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_AUTHTOK_ERR\fR\fR
+.ad
+.RS 20n
+User did not provide a password that decrypts the secret keys.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_BUF_ERR\fR\fR
+.ad
+.RS 20n
+Module ran out of memory.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+_
+MT Level	MT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.LP
+.BR keylogin (1),
+.BR keylogout (1),
+.BR syslog (3C),
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_authenticate (3PAM),
+.BR pam_chauthtok (3PAM),
+.BR pam_get_data (3PAM),
+.BR pam_get_item (3PAM),
+.BR pam_set_data (3PAM),
+.BR pam_setcred (3PAM),
+.BR pam.conf (5),
+.BR attributes (7),
+.BR pam_authtok_check (7),
+.BR pam_authtok_get (7),
+.BR pam_authtok_store (7),
+.BR pam_passwd_auth (7),
+.BR pam_unix_account (7),
+.BR pam_unix_auth (7),
+.BR pam_unix_session (7)
+.SH NOTES
+.LP
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
+multi-threaded application uses its own PAM handle.
+.sp
+.LP
+The \fBpam_unix\fR(7) module is no longer supported. Similar functionality is
+provided by \fBpam_authtok_check\fR(7), \fBpam_authtok_get\fR(7),
+\fBpam_authtok_store\fR(7), \fBpam_dhkeys\fR(7), \fBpam_passwd_auth\fR(7),
+\fBpam_unix_account\fR(7), \fBpam_unix_auth\fR(7), and
+\fBpam_unix_session\fR(7).

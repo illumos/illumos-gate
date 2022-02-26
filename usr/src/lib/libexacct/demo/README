@@ -23,8 +23,6 @@
 Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 1. Introduction
 
 This directory contains  source code for the "exdump"  utility that uses
@@ -64,7 +62,7 @@ execute the default "make all" target.
 4. References
 
 Exacct files:	/var/adm/exacct/proc, /var/adm/exacct/task
-Man pages:	acctadm(1M), libexacct(3LIB)
+Man pages:	acctadm(8), libexacct(3LIB)
 Documentation:	"System Administration Guide:
 		Resource Management and Network Services"
 		"System Administration Guide: IP Services"

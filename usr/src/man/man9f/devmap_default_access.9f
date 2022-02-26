@@ -176,8 +176,9 @@ xxdevmap_access(devmap_cookie_t dhp, void *pvtp, offset_t off,
 .in -2
 
 .SH SEE ALSO
-\fBdevmap_access\fR(9E), \fBdevmap_do_ctxmgt\fR(9F),
-\fBdevmap_callback_ctl\fR(9S)
+.BR devmap_access (9E),
+.BR devmap_do_ctxmgt (9F),
+.BR devmap_callback_ctl (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

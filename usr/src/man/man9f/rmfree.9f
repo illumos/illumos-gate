@@ -80,8 +80,10 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBrmalloc\fR(9F), \fBrmalloc_wait\fR(9F), \fBrmallocmap\fR(9F),
-\fBrmfreemap\fR(9F)
+.BR rmalloc (9F),
+.BR rmalloc_wait (9F),
+.BR rmallocmap (9F),
+.BR rmfreemap (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

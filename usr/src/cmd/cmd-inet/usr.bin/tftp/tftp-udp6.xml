@@ -73,7 +73,7 @@ operating system upgrade.
 			</loctext>
 		</common_name>
 		<documentation>
-                        <manpage title='in.tftpd' section='1M'
+                        <manpage title='in.tftpd' section='8'
 				manpath='/usr/share/man' />
                 </documentation>
 	</template>

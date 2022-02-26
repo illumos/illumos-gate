@@ -118,7 +118,7 @@ The value of the attribute being set is not valid.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -138,6 +138,7 @@ MT-Level	MT-Safe
 .LP
 \fBposix_spawn\fR(3C), \fBposix_spawnattr_destroy\fR(3C),
 \fBposix_spawnattr_getflags\fR(3C), \fBposix_spawnattr_getpgroup\fR(3C),
-\fBposix_spawnattr_getschedparam\fR(3C),
+.BR posix_spawnattr_getschedparam (3C),
 \fBposix_spawnattr_getschedpolicy\fR(3C), posix_spawnattr_getsigmask(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR attributes (7),
+.BR standards (7)

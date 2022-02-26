@@ -107,7 +107,7 @@ The \fBeconvert\fR(3C), \fBfconvert\fR(3C), \fBgconvert\fR(3C),
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -123,5 +123,9 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBeconvert\fR(3C), \fBfconvert\fR(3C), \fBgconvert\fR(3C), \fBprintf\fR(3C),
-\fBsprintf\fR(3C), \fBattributes\fR(5)
+.BR econvert (3C),
+.BR fconvert (3C),
+.BR gconvert (3C),
+.BR printf (3C),
+.BR sprintf (3C),
+.BR attributes (7)

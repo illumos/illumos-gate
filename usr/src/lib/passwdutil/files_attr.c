@@ -1135,7 +1135,7 @@ files_putpwnam(char *name, char *oldpw, pwu_repository_t *rep, void *buf)
 
 /*
  *	NOTE:  This is all covered under the repository lock held for updating
- *	passwd(4) and shadow(4).
+ *	passwd(5) and shadow(5).
  */
 int
 files_update_history(char *name, struct spwd *spwd)

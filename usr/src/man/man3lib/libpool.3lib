@@ -25,8 +25,8 @@ common abstraction called a pool. Processor sets and other entities can be
 configured, grouped, and labelled in a persistent fashion such that workload
 components can be associated with a subset of a system's total resources. The
 \fBlibpool\fR library provides a C language API for accessing this
-functionality, while \fBpooladm\fR(1M), \fBpoolbind\fR(1M), and
-\fBpoolcfg\fR(1M) make this facility available through command invocations from
+functionality, while \fBpooladm\fR(8), \fBpoolbind\fR(8), and
+\fBpoolcfg\fR(8) make this facility available through command invocations from
 a shell. Each of those manual pages describes aspects of the pools facility;
 this page describes the properties available to the various entities managed
 within the pools facility. These entities include the system, pools, and the
@@ -132,7 +132,7 @@ avoid denying users access to the system.
 .sp
 .LP
 The various \fBpoold\fR properties are used to configure the operation of
-\fBpoold\fR(1M).
+\fBpoold\fR(8).
 .sp
 .LP
 The \fBsystem.poold.log-level\fR property is used to specify the level of
@@ -202,7 +202,7 @@ T}
 Relative importance of this pool; for possible resource dispute resolution.
 T}
 \fBpool.name\fR	\fBstring\fR	T{
-User name for pool; used by \fBsetproject\fR(3PROJECT) as value for 'project.pool' project attribute in \fBproject\fR(4) database.
+User name for pool; used by \fBsetproject\fR(3PROJECT) as value for 'project.pool' project attribute in \fBproject\fR(5) database.
 T}
 \fBpool.scheduler\fR	\fBstring\fR	T{
 Scheduler class to which consumers of this pool will be bound. This property is optional and if not specified, the scheduler bindings for consumers of this pool are not affected.
@@ -481,7 +481,7 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -499,20 +499,28 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBIntro\fR(3), \fBpool_component_info\fR(3POOL), \fBpool_conf_open\fR(3POOL),
-\fBpool_conf_to_elem\fR(3POOL), \fBpool_create\fR(3POOL),
-\fBpool_error\fR(3POOL), \fBpool_get_binding\fR(3POOL),
-\fBpool_get_property\fR(3POOL), \fBpool_get_resource\fR(3POOL),
-\fBpool_resource_create\fR(3POOL), \fBpool_value_alloc\fR(3POOL),
-\fBpool_walk_pools\fR(3POOL), \fBattributes\fR(5), \fBsmf\fR(5)
+.BR Intro (3),
+.BR pool_component_info (3POOL),
+.BR pool_conf_open (3POOL),
+.BR pool_conf_to_elem (3POOL),
+.BR pool_create (3POOL),
+.BR pool_error (3POOL),
+.BR pool_get_binding (3POOL),
+.BR pool_get_property (3POOL),
+.BR pool_get_resource (3POOL),
+.BR pool_resource_create (3POOL),
+.BR pool_value_alloc (3POOL),
+.BR pool_walk_pools (3POOL),
+.BR attributes (7),
+.BR smf (7)
 .SH NOTES
 Functions in \fBlibpool\fR can be used to manipulate static configurations even
-when the pools facility is not enabled. See \fBpooladm\fR(1M) and
+when the pools facility is not enabled. See \fBpooladm\fR(8) and
 \fBpool_set_status\fR(3POOL) for more information about enabling the pools
 facility. The pools facility must be enabled, however, to modify the dynamic
 configuration.
 .sp
 .LP
-Since the Resource Pools facility is an \fBsmf\fR(5) service, it can also be
+Since the Resource Pools facility is an \fBsmf\fR(7) service, it can also be
 enabled and disabled using the standard Service Management Facility (SMF)
 interfaces.

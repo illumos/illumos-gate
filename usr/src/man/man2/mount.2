@@ -30,7 +30,7 @@ path names.
 After a successful call to \fBmount()\fR, all references to the file \fIdir\fR
 refer to the root directory on the mounted file system. The mounted file system
 is inserted into the kernel list of all mounted file systems. This list can be
-examined through the mounted file system table (see \fBmnttab\fR(4)).
+examined through the mounted file system table (see \fBmnttab\fR(5)).
 .sp
 .LP
 The \fIfstype\fR argument is the file system type name. Standard file system
@@ -85,7 +85,7 @@ type does not require this data, \fIdataptr\fR and \fIdatalen\fR should both be
 .ad
 .RS 16n
 Mount a file system globally if the system is configured and booted as part of
-a cluster (see \fBclinfo\fR(1M)).
+a cluster (see \fBclinfo\fR(8)).
 .RE
 
 .sp
@@ -349,7 +349,9 @@ privileges.
 .SH SEE ALSO
 .sp
 .LP
-\fBmount\fR(1M), \fBumount\fR(2), \fBmnttab\fR(4)
+.BR umount (2),
+.BR mnttab (5),
+.BR mount (8)
 .SH NOTES
 .sp
 .LP

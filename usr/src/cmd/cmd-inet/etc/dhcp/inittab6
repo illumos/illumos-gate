@@ -21,13 +21,12 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This file provides information about all supported DHCPv6 options, for
 # use by DHCPv6-related programs.
 #
-# Please consult dhcp_inittab(4) for further information.  Note that
-# this interface is "Uncommitted" as defined by attributes(5).
+# Please consult dhcp_inittab(5) for further information.  Note that
+# this interface is "Uncommitted" as defined by attributes(7).
 #
 # Note: options 10 and 35 are not assigned.
 #

@@ -17,7 +17,7 @@
 #define	_PCIEADM_H
 
 /*
- * Common definitions for pcieadm(1M).
+ * Common definitions for pcieadm(8).
  */
 
 #include <libdevinfo.h>

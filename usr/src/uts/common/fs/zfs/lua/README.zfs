@@ -26,7 +26,7 @@ maintenance policy, the modifications that have been made to it, and how it
 should (and should not) be used.
 
 For a description of the Lua language and features exposed by ZFS channel
-programs, please refer to the zfs-program(1m) man page instead.
+programs, please refer to the zfs-program(8) man page instead.
 
 
 Maintenance policy

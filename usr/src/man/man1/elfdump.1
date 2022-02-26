@@ -257,7 +257,7 @@ Dumps the contents of the \fB\&.SUNW_move\fR section.
 .RS 18n
 Dumps the contents of \fB\&.note\fR sections. By default, \fBelfdump\fR
 displays this data without interpretation in hexadecimal form. Core files are
-an exception. A subset of the core file notes described in \fBcore\fR(4) are
+an exception. A subset of the core file notes described in \fBcore\fR(5) are
 interpreted by \fBelfdump\fR and displayed in a high level format: NT_PRSTATUS,
 NT_PRPSINFO, NT_PLATFORM, NT_AUXV, NT_ASRS, NT_PSTATUS, NT_PSINFO, NT_PRCRED,
 NT_UTSNAME, NT_LWPSTATUS, NT_LWPSINFO, NT_PRPRIV, NT_PRPRIVINFO, NT_CONTENT,
@@ -569,7 +569,7 @@ linker debugging library
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -584,8 +584,13 @@ Interface Stability	Committed
 
 .SH SEE ALSO
 .LP
-\fBar\fR(1), \fBdump\fR(1), \fBnm\fR(1), \fBpvs\fR(1), \fBelf\fR(3ELF),
-\fBcore\fR(4), \fBattributes\fR(5)
+.BR ar (1),
+.BR dump (1),
+.BR nm (1),
+.BR pvs (1),
+.BR elf (3ELF),
+.BR core (5),
+.BR attributes (7)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

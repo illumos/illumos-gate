@@ -107,7 +107,7 @@ None.
 .Xr wcscpy 3C ,
 .Xr wcsncpy 3C ,
 .Xr wchar.h 3HEAD ,
-.Xr standards 5
+.Xr standards 7
 .Sh STANDARDS
 The
 .Fn wcpcpy

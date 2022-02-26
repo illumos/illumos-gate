@@ -1,0 +1,804 @@
+'\" te
+.\" Copyright 2020 Peter Tribble
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH FLOWADM 8 "February 5, 2022"
+.SH NAME
+flowadm \- administer bandwidth resource control and priority for protocols,
+services, containers, and virtual machines
+.SH SYNOPSIS
+.nf
+\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR \fIlink\fR \fB-a\fR \fIattr\fR=\fIvalue\fR[,...]
+     [\fB-p\fR \fIprop\fR=\fIvalue\fR[,...]] \fIflow\fR
+\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] {\fB-l\fR \fIlink\fR | \fIflow\fR}
+\fBflowadm show-flow\fR [\fB-p\fR] [\fB-l\fR \fIlink\fR] [\fB-o\fR \fIfield\fR[,...]] [\fIflow\fR]
+.fi
+
+.LP
+.nf
+\fBflowadm set-flowprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIflow\fR
+\fBflowadm reset-flowprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-p\fR \fIprop\fR[,...]] \fIflow\fR
+\fBflowadm show-flowprop\fR [\fB-cP\fR] [\fB-l\fR \fIlink\fR] [\fB-o\fR \fIfield\fR[,...]]
+     [\fB-p\fR \fIprop\fR[,...]] [\fIflow\fR]
+.fi
+
+.SH DESCRIPTION
+The \fBflowadm\fR command is used to create, modify, remove, and show
+networking bandwidth and associated resources for a type of traffic on a
+particular link.
+.sp
+.LP
+The \fBflowadm\fR command allows users to manage networking bandwidth resources
+for a transport, service, or a subnet. The service is specified as a
+combination of transport and local port. The subnet is specified by its IP
+address and subnet mask. The command can be used on any type of data link,
+including physical links, virtual NICs, and link aggregations.
+.sp
+.LP
+A flow is defined as a set of attributes based on Layer 3 and Layer 4 headers,
+which can be used to identify a protocol, service, or a virtual machine. When a
+flow is identified based on flow attributes, separate kernel resources
+including layer 2, 3, and 4 queues, their processing threads, and other
+resources are uniquely created for it, such that other traffic has minimal or
+zero impact on it.
+.sp
+.LP
+Inbound and outbound packet are matched to flows in a very fast and scalable
+way, so that limits can be enforced with minimal performance impact.
+.sp
+.LP
+The \fBflowadm\fR command can be used to define a flow without imposing any
+bandwidth resource control. This would result in the traffic type getting its
+own resources and queues so that it is isolated from rest of the networking
+traffic for more observable and deterministic behavior.
+.sp
+.LP
+\fBflowadm\fR is implemented as a set of subcommands with corresponding
+options. Options are described in the context of each subcommand.
+.SH SUBCOMMANDS
+The following subcommands are supported:
+.sp
+.ne 2
+.na
+\fB\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR
+\fIlink\fR \fB-a\fR \fIattr\fR=\fIvalue\fR[,...] [\fB-p\fR
+\fIprop\fR=\fIvalue\fR[,...]] \fIflow\fR\fR
+.ad
+.sp .6
+.RS 4n
+Adds a flow to the system. The flow is identified by its flow attributes and
+properties.
+.sp
+As part of identifying a particular flow, its bandwidth resource can be limited
+and its relative priority to other traffic can be specified. If no bandwidth
+limit or priority is specified, the traffic still gets its unique layer 2, 3,
+and 4 queues and processing threads, including NIC hardware resources (when
+supported), so that the selected traffic can be separated from others and can
+flow with minimal impact from other traffic.
+.sp
+.ne 2
+.na
+\fB\fB-t\fR, \fB--temporary\fR\fR
+.ad
+.sp .6
+.RS 4n
+The changes are temporary and will not persist across reboots. Persistence is
+the default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies an alternate root directory where \fBflowadm\fR should apply
+persistent creation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the link to which the flow will be added.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-a\fR \fIattr\fR=\fIvalue\fR[,...], \fB--attr\fR=\fIvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+A mandatory comma-separated list of attributes to be set to the specified
+values.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIprop\fR=\fIvalue\fR[,...], \fB--prop\fR=\fIvalue\fR[,...]\fR
+.ad
+.sp .6
+.RS 4n
+An optional comma-separated list of properties to be set to the specified
+values. Flow properties are documented in the "Flow Properties" section, below.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR
+{\fIlink\fR | \fIflow\fR}\fR
+.ad
+.sp .6
+.RS 4n
+Remove an existing flow identified by its link or name.
+.sp
+.ne 2
+.na
+\fB\fB-t\fR, \fB--temporary\fR\fR
+.ad
+.sp .6
+.RS 4n
+The changes are temporary and will not persist across reboots. Persistence is
+the default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies an alternate root directory where \fBflowadm\fR should apply
+persistent removal.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR \fIlink\fR | \fIflow\fR, \fB--link\fR=\fIlink\fR | \fIflow\fR\fR
+.ad
+.sp .6
+.RS 4n
+If a link is specified, remove all flows from that link. If a single flow is
+specified, remove only that flow.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBflowadm show-flow\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]]
+[\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fIflow\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Show flow configuration information, either for all
+flows, all flows on a link, or for the specified \fIflow\fR.
+.sp
+.ne 2
+.na
+\fB\fB-o\fR \fIfield\fR[,...]\fR
+.ad
+.sp .6
+.RS 4n
+A case-insensitive, comma-separated list of output fields to display. The field
+name must be one of the fields listed below, or a special value \fBall\fR, to
+display all fields. For each flow found, the following fields can be displayed:
+.sp
+.ne 2
+.na
+\fB\fBflow\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the flow.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlink\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the link the flow is on.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipaddr\fR\fR
+.ad
+.sp .6
+.RS 4n
+IP address of the flow. This can be either local or remote depending on how the
+flow was defined.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBproto\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the layer for protocol to be used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Local port of service for flow.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Remote port of service for flow.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdsfld\fR\fR
+.ad
+.sp .6
+.RS 4n
+Differentiated services value for flow and mask used with \fBDSFIELD\fR value
+to state the bits of interest in the differentiated services field of the IP
+header.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR, \fB--parsable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display using a stable machine-parsable format.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-P\fR, \fB--persistent\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display persistent flow property information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR | \fIflow\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display information for all flows on the named link or information for the
+named flow.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBflowadm set-flowprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-p\fR
+\fIprop\fR=\fIvalue\fR[,...] \fIflow\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set values of one or more properties on the flow specified by name. The
+complete list of properties can be retrieved using the \fBshow-flowprop\fR
+subcommand.
+.sp
+.ne 2
+.na
+\fB\fB-t\fR, \fB--temporary\fR\fR
+.ad
+.sp .6
+.RS 4n
+The changes are temporary and will not persist across reboots. Persistence is
+the default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies an alternate root directory where \fBflowadm\fR should apply
+persistent setting of properties.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIprop\fR=\fIvalue\fR[,...], \fB--prop\fR=\fIvalue\fR[,...]\fR
+.ad
+.sp .6
+.RS 4n
+A comma-separated list of properties to be set to the specified values.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBflowadm reset-flowprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-p\fR
+[\fIprop\fR=\fIvalue\fR[,...]] \fIflow\fR\fR
+.ad
+.sp .6
+.RS 4n
+Resets one or more properties to their default values on the specified flow. If
+no properties are specified, all properties are reset. See the
+\fBshow-flowprop\fR subcommand for a description of properties, which includes
+their default values.
+.sp
+.ne 2
+.na
+\fB\fB-t\fR, \fB--temporary\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies that the resets are temporary. Temporary resets last until the next
+reboot.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies an alternate root directory where \fBflowadm\fR should apply
+persistent setting of properties.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIprop\fR=\fIvalue\fR[,...], \fB--prop\fR=\fIvalue\fR[,...]\fR
+.ad
+.sp .6
+.RS 4n
+A comma-separated list of properties to be reset.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBflowadm show-flowprop\fR [\fB-cP\fR] [\fB-l\fR \fIlink\fR] [\fB-p\fR
+\fIprop\fR[,...]] [\fIflow\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Show the current or persistent values of one or more properties, either for all
+flows, flows on a specified link, or for the specified flow.
+.sp
+By default, current values are shown. If no properties are specified, all
+available flow properties are displayed. For each property, the following
+fields are displayed:
+.sp
+.ne 2
+.na
+\fB\fBFLOW\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the flow.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPROPERTY\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBVALUE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The current (or persistent) property value. The value is shown as \fB--\fR
+(double hyphen), if it is not set, and \fB?\fR (question mark), if the value is
+unknown. Persistent values that are not set or have been reset will be shown as
+\fB--\fR and will use the system \fBDEFAULT\fR value (if any).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDEFAULT\fR\fR
+.ad
+.sp .6
+.RS 4n
+The default value of the property. If the property has no default value,
+\fB--\fR (double hyphen), is shown.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPOSSIBLE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A comma-separated list of the values the property can have. If the values span
+a numeric range, the minimum and maximum values might be shown as shorthand. If
+the possible values are unknown or unbounded, \fB--\fR (double hyphen), is
+shown.
+.RE
+
+Flow properties are documented in the "Flow Properties" section, below.
+.sp
+.ne 2
+.na
+\fB\fB-c\fR
+.ad
+.sp .6
+.RS 4n
+Display using a stable machine-parsable format.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-P\fR, \fB--persistent\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display persistent flow property information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIprop\fR[,...], \fB--prop\fR=\fIprop\fR[,...]\fR
+.ad
+.sp .6
+.RS 4n
+A comma-separated list of properties to show.
+.RE
+
+.RE
+
+.SS "Flow Attributes"
+The flow operand that identifies a flow in a \fBflowadm\fR command is a
+comma-separated list of one or more keyword, value pairs from the list below.
+.sp
+.ne 2
+.na
+\fB\fBlocal_ip\fR=\fIvalue\fR[\fB/\fR\fIprefix_len\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Identifies a network flow by the local IP address. \fIvalue\fR must be a IPv4
+address in dotted-decimal notation or an IPv6 address in colon-separated
+notation. \fIprefix_len\fR is optional.
+.sp
+If \fIprefix_len\fR is specified, it describes the netmask for a subnet
+address, following the same notation convention of \fBifconfig\fR(8) and
+\fBroute\fR(8) addresses. If unspecified, the given IP address will be
+considered as a host address for which the default prefix length for a IPv4
+address is \fB/32\fR and for IPv6 is \fB/128\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBremote_ip\fR=\fIvalue\fR[\fB/\fR\fIprefix_len\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Identifies a network flow by the remote IP address. The syntax is the same as
+the \fBlocal_ip\fR attribute.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtransport\fR={\fBtcp\fR|\fBudp\fR|\fBsctp\fR|\fBicmp\fR|\fBicmpv6\fR}\fR
+.ad
+.sp .6
+.RS 4n
+Identifies a layer 4 protocol to be used. It is typically used in combination
+with local_port to identify the service that needs special attention.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlocal_port\fR=\fIport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Identifies a service specified by the local port.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBremote_port\fR=\fIport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Identifies a service specified by the remote port.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdsfield\fR=\fIvalue\fR[\fB:\fR\fIdsfield_mask\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Identifies the 8-bit differentiated services field (as defined in RFC 2474).
+.sp
+The optional \fIdsfield_mask\fR is used to state the bits of interest in the
+differentiated services field when comparing with the \fBdsfield\fR value. A
+\fB0\fR in a bit position indicates that the bit value needs to be ignored and
+a \fB1\fR indicates otherwise. The mask can range from \fB0x01\fR to
+\fB0xff\fR. If \fIdsfield_mask\fR is not specified, the default mask \fB0xff\fR
+is used. Both the \fBdsfield\fR value and mask must be in hexadecimal.
+.RE
+
+.sp
+.LP
+The following six types of combinations of attributes are supported:
+.sp
+.in +2
+.nf
+local_ip=\fIaddress\fR[/\fIprefixlen\fR]
+remote_ip=\fIaddress\fR[/\fIprefixlen\fR]
+transport={tcp|udp|sctp|icmp|icmpv6}
+transport={tcp|udp|sctp},local_port=\fIport\fR
+transport={tcp|udp|sctp},remote_port=\fIport\fR
+dsfield=\fIval\fR[:\fIdsfield_mask\fR]
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+On a given link, the types of combinations above are mutually exclusive. An
+attempt to create flows of different types on a given link will fail.
+.SS "Restrictions"
+There are individual flow restrictions and flow restrictions per zone.
+.SS "Individual Flow Restrictions"
+Restrictions on individual flows do not require knowledge of other flows that
+have been added to the link.
+.sp
+.LP
+An attribute can be listed only once for each flow. For example, the following
+command is not valid:
+.sp
+.in +2
+.nf
+# \fBflowadm add-flow -l vnic1 -a local_port=80,local_port=8080 httpflow\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBtransport\fR and \fBlocal_port\fR:
+.sp
+.LP
+TCP, UDP, or SCTP flows can be specified with a local port. An ICMP or ICMPv6
+flow that specifies a port is not allowed. The following commands are valid:
+.sp
+.in +2
+.nf
+# \fBflowadm add-flow -l e1000g0 -a transport=udp udpflow\fR
+# \fBflowadm add-flow -l e1000g0 -a transport=tcp,local_port=80 \e
+udp80flow\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following commands are not valid:
+.sp
+.in +2
+.nf
+# \fBflowadm add-flow -l e1000g0 -a local_port=25 flow25\fR
+# \fBflowadm add-flow -l e1000g0 -a transport=icmpv6,local_port=16 \e
+flow16\fR
+.fi
+.in -2
+.sp
+
+.SS "Flow Restrictions Per Zone"
+Within a zone, no two flows can have the same name. After adding a flow with
+the link specified, the link will not be required for display, modification, or
+deletion of the flow.
+.SS "Flow Properties"
+The following flow properties are supported. Note that the ability to set a
+given property to a given value depends on the driver and hardware.
+.sp
+.ne 2
+.na
+\fB\fBmaxbw\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the full duplex bandwidth for the flow. The bandwidth is specified as an
+integer with one of the scale suffixes(\fBK\fR, \fBM\fR, or \fBG\fR for Kbps,
+Mbps, and Gbps). If no units are specified, the input value will be read as
+Mbps. The default is no bandwidth limit.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpriority\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the relative priority for the flow. The value can be given as one of the
+tokens \fBhigh\fR, \fBmedium\fR, or \fBlow\fR. The default is \fBmedium\fR.
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRCreating a Policy Around a Mission-Critical Port
+.sp
+.LP
+The command below creates a policy around inbound HTTPS traffic on an HTTPS
+server so that HTTPS obtains dedicated NIC hardware and kernel TCP/IP
+resources. The name specified, \fBhttps-1\fR, can be used later to modify or
+delete the policy.
+
+.sp
+.in +2
+.nf
+# \fBflowadm add-flow -l bge0 -a transport=TCP,local_port=443 https-1\fR
+# \fBflowadm show-flow -l bge0\fR
+FLOW         LINK       IPADDR                   PROTO  LPORT   RPORT   DSFLD
+https1       bge0       --                       tcp    443     --      --
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRModifying an Existing Policy to Add Bandwidth Resource Control
+.sp
+.LP
+The following command modifies the \fBhttps-1\fR policy from the preceding
+example. The command adds bandwidth control and give the policy a high
+priority.
+
+.sp
+.in +2
+.nf
+# \fBflowadm set-flowprop -p maxbw=500M,priority=high https-1\fR
+# \fBflowadm show-flow https-1\fR
+FLOW        LINK        IPADDR                   PROTO  LPORT   RPORT   DSFLD
+https-1     bge0        --                       tcp    443     --      --
+
+# \fBflowadm show-flowprop https-1\fR
+FLOW         PROPERTY        VALUE          DEFAULT        POSSIBLE
+https-1      maxbw             500          --             --
+https-1      priority        high           --             low,medium,high
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRLimiting the UDP Bandwidth Usage
+.sp
+.LP
+The following command creates a policy for UDP protocol so that it cannot
+consume more than 100Mbps of available bandwidth. The flow is named
+\fBlimit-udp-1\fR.
+
+.sp
+.in +2
+.nf
+# \fBflowadm add-flow -l bge0 -a transport=UDP -p maxbw=100M, \e
+priority=low limit-udp-1\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRSetting Policy, Making Use of \fBdsfield\fR Attribute
+.sp
+.LP
+The following command sets a policy for EF PHB (DSCP value of 101110 from RFC
+2598) with a bandwidth of 500 Mbps and a high priority. The \fBdsfield\fR value
+for this flow will be \fB0x2e\fR (101110) with the \fBdsfield_mask\fR being
+\fB0xfc\fR (because we want to ignore the 2 least significant bits).
+
+.sp
+.in +2
+.nf
+# \fBflowadm add-flow -l bge0 -a dsfield=0x2e:0xfc \e
+-p maxbw=500M,priority=high efphb-flow\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+All actions were performed successfully.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB>0\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.BR attributes (7),
+.BR dladm (8),
+.BR flowstat (8),
+.BR ifconfig (8),
+.BR route (8)
+
+.SH NOTES
+The display of statistics by the \fBshow-flow\fR subcommand, and the
+\fBshow-usage\fR subcommand, have been removed. This functionality can
+now be accessed using the \fBflowstat\fR(8) utility.

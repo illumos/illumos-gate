@@ -1,0 +1,30 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TTY 4D "Jul 3, 1990"
+.SH NAME
+tty \- controlling terminal interface
+.SH DESCRIPTION
+.sp
+.LP
+The file \fB/dev/tty\fR is, in each process, a synonym for the control terminal
+associated with the process group of that process, if any. It is useful for
+programs or shell sequences that wish to be sure of writing messages on the
+terminal no matter how output has been redirected. It can also be used for
+programs that demand the name of a file for output, when typed output is
+desired and it is tiresome to find out what terminal is currently in use.
+.SH FILES
+.sp
+.LP
+\fB/dev/tty\fR
+.sp
+.LP
+\fB/dev/tty*\fR
+.SH SEE ALSO
+.sp
+.LP
+.BR console (4D),
+.BR ports (8)

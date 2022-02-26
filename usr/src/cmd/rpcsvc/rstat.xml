@@ -82,7 +82,7 @@
 		<stability value='Evolving' />
 		<propval name='name' type='astring' value='rstatd' />
 		<propval name='endpoint_type' type='astring' value='tli' />
-		<propval name='proto' type='astring' value='datagram_v' 
+		<propval name='proto' type='astring' value='datagram_v'
 		    override='true' />
 		<propval name='isrpc' type='boolean' value='true' />
 		<propval name='rpc_low_version' type='integer' value='2' />
@@ -113,9 +113,9 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='rpc.rstatd' section='1M'
+			<manpage title='rpc.rstatd' section='8'
 				manpath='/usr/share/man' />
-			<manpage title='rstatd' section='1M'
+			<manpage title='rstatd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

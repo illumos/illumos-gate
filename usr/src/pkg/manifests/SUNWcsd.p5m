@@ -76,8 +76,8 @@ file path=lib/svc/manifest/system/sysevent.xml group=sys mode=0444
 dir  path=lib/svc/method
 file path=lib/svc/method/svc-syseventd mode=0555
 dir  path=usr/share/man
-dir  path=usr/share/man/man4
-file path=usr/share/man/man4/path_to_inst.4
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/path_to_inst.5
 legacy pkg=SUNWcsd \
     desc="core entries for /dev and /devices needed for the initial boot of Solaris" \
     name="Core Solaris Devices"

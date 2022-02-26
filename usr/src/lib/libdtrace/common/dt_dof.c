@@ -496,7 +496,7 @@ dof_add_provider(dt_dof_t *ddo, const dt_provider_t *pvp)
 
 	if (pvp->pv_flags & DT_PROVIDER_IMPL) {
 		/*
-		 * ignore providers that are exported by dtrace(7D)
+		 * ignore providers that are exported by dtrace(4D)
 		 */
 		return (0);
 	}

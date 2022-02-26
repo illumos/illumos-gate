@@ -479,11 +479,11 @@ $(sparc_ONLY)file path=usr/platform/sun4v/lib/libtsalarm.so.1
 $(sparc_ONLY)dir path=usr/platform/sun4v/sbin
 $(sparc_ONLY)file path=usr/platform/sun4v/sbin/device_remap mode=0544
 $(sparc_ONLY)file path=usr/platform/sun4v/sbin/prtdiag group=sys mode=2755
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/device_remap.1m
-file path=usr/share/man/man1m/scadm.1m
 dir  path=usr/share/man/man3lib
 file path=usr/share/man/man3lib/libtsalarm.3lib
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/device_remap.8
+file path=usr/share/man/man8/scadm.8
 $(i386_ONLY)legacy pkg=SUNWkvm.i arch=$(ARCH).i86pc \
     desc="core software for a specific hardware platform group" \
     name="Core Architecture, (Kvm)"

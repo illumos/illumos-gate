@@ -69,7 +69,7 @@ For example, callers could allocate space as:
 For more information on the LDT and the
 .Sy struct ssd ,
 see
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn proc_get_ldt
@@ -106,7 +106,7 @@ to indicate the error that occurred.
 For a full list of possible errors see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Pldt
@@ -133,4 +133,4 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

@@ -245,7 +245,7 @@ Comparative features of the various allocation libraries can be found in the
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -261,6 +261,12 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBbrk\fR(2), \fBbsdmalloc\fR(3MALLOC), \fBlibmtmalloc\fR(3LIB),
-\fBmalloc\fR(3C), \fBmapmalloc\fR(3MALLOC), \fBmtmalloc\fR(3MALLOC),
-\fBumem_alloc\fR(3MALLOC), \fBwatchmalloc\fR(3MALLOC), \fBattributes\fR(5)
+.BR brk (2),
+.BR malloc (3C),
+.BR libmtmalloc (3LIB),
+.BR bsdmalloc (3MALLOC),
+.BR mapmalloc (3MALLOC),
+.BR mtmalloc (3MALLOC),
+.BR umem_alloc (3MALLOC),
+.BR watchmalloc (3MALLOC),
+.BR attributes (7)

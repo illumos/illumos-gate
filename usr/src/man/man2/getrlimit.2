@@ -309,7 +309,7 @@ than the limit.
 .sp
 .LP
 The \fBgetrlimit()\fR and \fBsetrlimit()\fR functions have transitional
-interfaces for 64-bit file offsets.  See \fBlf64\fR(5).
+interfaces for 64-bit file offsets.  See \fBlf64\fR(7).
 .sp
 .LP
 The rlimit functionality is now provided by the more general resource control
@@ -321,7 +321,7 @@ awareness should investigate the resource controls facility.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -337,8 +337,21 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBrctladm\fR(1M), \fBbrk\fR(2), \fBexec\fR(2), \fBfork\fR(2), \fBopen\fR(2),
-\fBsetrctl\fR(2), \fBsigaltstack\fR(2), \fBulimit\fR(2),
-\fBgetdtablesize\fR(3C), \fBmalloc\fR(3C), \fBsignal\fR(3C),
-\fBsignal.h\fR(3HEAD), \fBsysconf\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5),
-\fBprivileges\fR(5), \fBresource_controls\fR(5), \fBstandards\fR(5)
+.BR brk (2),
+.BR exec (2),
+.BR fork (2),
+.BR open (2),
+.BR setrctl (2),
+.BR sigaltstack (2),
+.BR ulimit (2),
+.BR getdtablesize (3C),
+.BR malloc (3C),
+.BR signal (3C),
+.BR sysconf (3C),
+.BR signal.h (3HEAD),
+.BR attributes (7),
+.BR lf64 (7),
+.BR privileges (7),
+.BR resource_controls (7),
+.BR standards (7),
+.BR rctladm (8)

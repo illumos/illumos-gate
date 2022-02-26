@@ -608,7 +608,7 @@ a particular event came from. In multi-threaded programs, there is a race
 condition with a thread doing a fork while the other threads are still running.
 For the trace file not to get corrupted, the user should either use
 \fBfork1\fR(2), or make sure that all other threads are quiescent when doing a
-\fBfork\fR(2),
+.BR fork (2),
 .sp
 .LP
 If the target program itself (not any children it may \fBfork\fR(2)) does an
@@ -625,7 +625,7 @@ parent process will appear to have been logged by the parent.
 .LP
 Invoking \fBprex\fR with the \fB-k\fR flag causes \fBprex\fR to run in
 \fBkernel mode\fR. In kernel mode, \fBprex\fR controls probes in the Solaris
-kernel. See \fBtnf_kernel_probes\fR(4) for a list of available probes in the
+kernel. See \fBtnf_kernel_probes\fR(5) for a list of available probes in the
 Solaris kernel. A few \fBprex\fR commands are unavailable in kernel mode; many
 other commands are valid in kernel mode only.
 .sp
@@ -899,12 +899,27 @@ process files
 .SH SEE ALSO
 .sp
 .LP
-\fBed\fR(1), \fBkill\fR(1), \fBksh\fR(1), \fBld\fR(1), \fBtnfdump\fR(1),
-\fBtnfxtract\fR(1), \fBtruss\fR(1), \fBexec\fR(2), \fBfork\fR(2),
-\fBfork1\fR(2), \fBvfork\fR(2), \fBTNF_DECLARE_RECORD\fR(3TNF),
-\fBTNF_PROBE\fR(3TNF), \fBdlclose\fR(3C), \fBdlopen\fR(3C),
-\fBgethrtime\fR(3C), \fBlibtnfctl\fR(3TNF), \fBtnf_process_disable\fR(3TNF),
-\fBtracing\fR(3TNF), \fBtnf_kernel_probes\fR(4), \fBattributes\fR(5)
+.BR ed (1),
+.BR kill (1),
+.BR ksh (1),
+.BR ld (1),
+.BR tnfdump (1),
+.BR tnfxtract (1),
+.BR truss (1),
+.BR exec (2),
+.BR fork (2),
+.BR fork1 (2),
+.BR vfork (2),
+.BR dlclose (3C),
+.BR dlopen (3C),
+.BR gethrtime (3C),
+.BR TNF_DECLARE_RECORD (3TNF),
+.BR TNF_PROBE (3TNF),
+.BR libtnfctl (3TNF),
+.BR tnf_process_disable (3TNF),
+.BR tracing (3TNF),
+.BR tnf_kernel_probes (5),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

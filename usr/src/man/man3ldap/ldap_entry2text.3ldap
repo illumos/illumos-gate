@@ -78,7 +78,7 @@ cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
 
 .SH DESCRIPTION
 These functions use the LDAP display template functions (see
-\fBldap_disptmpl\fR(3LDAP) and \fBldaptemplates.conf\fR(4)) to produce a
+\fBldap_disptmpl\fR(3LDAP) and \fBldaptemplates.conf\fR(5)) to produce a
 plain text or an HyperText Markup Language (HTML) display of an entry or a set
 of values.  Typical plain text output produced for an entry might look like:
 .sp
@@ -205,7 +205,7 @@ field of the \fIld\fR parameter is also set to indicate the error.
 .SH FILES
 \fBETCDIR/ldaptemplates.conf\fR
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -218,5 +218,5 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-\fBldap\fR(3LDAP), \fBldap_disptmpl\fR(3LDAP), \fBldaptemplates.conf\fR(4) ,
-\fBattributes\fR(5)
+\fBldap\fR(3LDAP), \fBldap_disptmpl\fR(3LDAP), \fBldaptemplates.conf\fR(5) ,
+.BR attributes (7)

@@ -41,8 +41,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/afe group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/afe.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/afe.4d
 driver name=afe perms="* 0666 root sys" clone_perms="afe 0666 root sys" \
     alias=pci10b7,9300 \
     alias=pci1113,1216 \

@@ -170,8 +170,8 @@ ndd_perm2str(uint_t perm)
  *	- replace leading underscores with protocol name.
  *	  For example: `_strong_iss' --> `tcp_strong_iss'
  *
- *	- don't print new public properties that are supported only by ipadm(1M)
- *	  For example: `hostmodel' should be supported only from ipadm(1M).
+ *	- don't print new public properties that are supported only by ipadm(8)
+ *	  For example: `hostmodel' should be supported only from ipadm(8).
  *	  Such properties are identified by not having leading '_' and not
  *	  being present in the mapping table.
  */
@@ -211,7 +211,7 @@ print_ipadm2ndd(char *oldbuf, uint_t obufsize)
 		}
 		/*
 		 * print only if it's a private property. We should
-		 * not be printing any new public property in ndd(1M)
+		 * not be printing any new public property in ndd(8)
 		 * output.
 		 */
 		if (!matched && pname[0] == '_') {
@@ -234,7 +234,7 @@ print_ipadm2ndd(char *oldbuf, uint_t obufsize)
  * get/set the value for a given property by calling into libipadm. The
  * IPH_LEGACY flag is used by libipadm for special handling. For some
  * properties, libipadm.so displays strings (for e.g., on/off,
- * never/passive/active, et al) instead of numerals. However ndd(1M) always
+ * never/passive/active, et al) instead of numerals. However ndd(8) always
  * printed numberals. This flag will help in avoiding printing strings.
  */
 static boolean_t
@@ -270,7 +270,7 @@ do_ipadm_getset(int cmd, char *buf, int buflen)
 	}
 
 	if (nimap->ndd_name == NULL && strcmp(pname, "?") != 0) {
-		/* do not allow set/get of public properties from ndd(1M) */
+		/* do not allow set/get of public properties from ndd(8) */
 		if (ipadm_legacy2new_propname(pname, nname, sizeof (nname),
 		    &proto) != 0) {
 			status = IPADM_PROP_UNKNOWN;
@@ -371,7 +371,7 @@ gldv3_warning(char *module)
 			    "WARNING: The ndd commands for datalink "
 			    "administration are obsolete and may be "
 			    "removed in a future release of Solaris. "
-			    "Use dladm(1M) to manage datalink tunables.\n"));
+			    "Use dladm(8) to manage datalink tunables.\n"));
 		}
 	}
 	dladm_close(handle);

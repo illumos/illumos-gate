@@ -1,0 +1,117 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH USB_IA 4D "May 13, 2017"
+.SH NAME
+usb_ia \- USB interface association driver
+.SH SYNOPSIS
+.LP
+.nf
+interface association@unit-address
+.fi
+
+.LP
+.nf
+
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBusb_ia\fR driver is a USBA (Solaris Universal Serial Bus
+Architecture)-compliant nexus driver that binds to a device's interface
+association nodes when no vendor or class specific driver is available. To do
+this, \fBusb_ia\fR creates nodes for the internal interfaces and then attempts
+to bind drivers to each child interface.
+.sp
+.LP
+Each interface association node has a parent device node that is created by
+\fBusb_mid\fR(4D) and all \fBugen\fR(4D) interfaces are exported by
+\fBusb_mid\fR(4D). (Note: attempting to export \fBugen\fR(4D) interfaces using
+\fBusb_ia\fR is prohibited.)
+.SH FILES
+.ne 2
+.na
+\fB\fB/kernel/drv/usb_ia\fR\fR
+.ad
+.sp .6
+.RS 4n
+32-bit ELF kernel module. (x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/usb_ia\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit ELF kernel module. (x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/usb_ia\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit ELF kernel module. (SPARC).
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC & x86 PCI-based systems
+.TE
+
+.SH SEE ALSO
+.LP
+.BR ugen (4D),
+.BR usb_mid (4D),
+.BR usba (4D),
+.BR attributes (7)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.sp
+.LP
+\fIUniversal Serial Bus Specification 2.0\fR \(em 2000
+.sp
+.LP
+\fIInterface Association Descriptor Engineering Change Notice (ECN)\fR\(em2003
+.SH DIAGNOSTICS
+.LP
+In addition to being logged, the following messages may appear on the system
+console. All messages are formatted in the     following manner:
+.sp
+.in +2
+.nf
+<device path> (usb_ia<instance num>):message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBNo driver found for interface <n> (nodename: <string>) of <device>.\fR
+.ad
+.sp .6
+.RS 4n
+No driver is available for this interface.
+.RE
+

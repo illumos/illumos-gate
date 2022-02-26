@@ -159,7 +159,7 @@ nwamd_get_dhcpinfo_data(const char *sym_name, char *ifname)
 	if (ifname == NULL)
 		ifname = "";
 
-	/* find code and category in dhcp_inittab(4) */
+	/* find code and category in dhcp_inittab(5) */
 	entry = inittab_getbyname(ITAB_CAT_SITE | ITAB_CAT_STANDARD |
 	    ITAB_CAT_VENDOR | ITAB_CAT_FIELD, ITAB_CONS_INFO, sym_name);
 

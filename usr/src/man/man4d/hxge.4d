@@ -1,0 +1,208 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH HXGE 4D "June 20, 2021"
+.SH NAME
+hxge \- Sun Blade 10 Gigabit Ethernet network driver
+.SH SYNOPSIS
+.nf
+/dev/hxge*
+.fi
+
+.SH DESCRIPTION
+The \fBhxge\fR Gigabit Ethernet driver is a multi-threaded, loadable, clonable,
+GLD-based STREAMS driver supporting the Data Link Provider Interface,
+\fBdlpi\fR(4P), on the Sun Blade Shared 10Gb Ethernet Interface.
+.sp
+.LP
+The Shared PCI-Express 10 Gb networking interface provides network I/O
+consolidation for up to six Constellation blades, with each blade seeing its
+own portion of the network interface.
+.sp
+.LP
+The \fBhxge\fR driver functions include chip initialization, frame transmit and
+receive, flow classification, multicast and promiscuous support and error
+recovery and reporting in the blade domain.
+.SH APPLICATION PROGRAMMING INTERFACE
+The cloning character-special device, \fB/dev/hxge\fR, is used to access Sun
+Blade Shared 10Gb Ethernet Interface devices installed within the system.
+.sp
+.LP
+The \fBhxge\fR driver is managed by the \fBdladm\fR(8) command line utility,
+which allows VLANs to be defined on top of \fBhxge\fR instances and for
+\fBhxge\fR instances to be aggregated. See \fBdladm\fR(8) for more details.
+.sp
+.LP
+You must send an explicit DL_ATTACH_REQ message to associate the opened stream
+with a particular device (PPA). The PPA ID is interpreted as an unsigned
+integer data type and indicates the corresponding device instance (unit)
+number. The driver returns an error (DL_ERROR_ACK) if the PPA field value does
+not correspond to a valid device instance number for the system. The device is
+initialized on first attach and de-initialized (stopped) at last detach
+.sp
+.LP
+The values returned by the driver in the DL_INFO_ACK primitive in response to a
+DL_INFO_REQ are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum SDU is 1500 (ETHERMTU - defined in <\fBsys/ethernet.h\fR>).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Minimum SDU is 0.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+DLSAP address length is 8.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+MAC type is \fBDL_ETHER\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSAP\fR length value is \fI-2\fR, meaning the physical address component is
+followed immediately by a 2-byte \fBSAP\fR component within the \fBDLSAP\fR
+address.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Broadcast address value is the Ethernet/IEEE broadcast address
+(FF:FF:FF:FF:FF:FF).
+.sp
+Due to the nature of the link address definition for IPoIB, the
+DL_SET_PHYS_ADDR_REQ DLPI primitive is not supported.
+.sp
+In the transmit case for streams that have been put in raw mode via the
+DLIOCRAW ioctl, the \fBdlpi\fR application must prepend the 20 byte IPoIB
+destination address to the data it wants to transmit over-the-wire. In the
+receive case, applications receive the IP/ARP datagram along with the IETF
+defined 4 byte header.
+.RE
+.sp
+.LP
+Once in the DL_ATTACHED state, you must send a DL_BIND_REQ to associate a
+particular Service Access Point (SAP) with the stream.
+.SH CONFIGURATION
+The link speed and mode are fixed at 10 Gbps full-duplex.
+.sp
+.LP
+The default MTU is 1500. To enable jumbo frame support, you configure the
+\fBhxge\fR driver by defining the accept-jumbo property to 1 in the
+\fBhxge.conf\fR file. Note that the largest jumbo size is 9178 bytes.
+.sp
+.LP
+The driver may be configured to discard certain classes of traffic. By default,
+no class of traffic is allowed. You configure the \fBhxge\fR driver by defining
+the class option property to 0x20000 in \fBhxge.conf\fR to discard the
+specified class of traffic. For example, the following line in \fBhxge.conf\fR
+discards all IP Version 4 TCP traffic:
+.sp
+.in +2
+.nf
+class-opt-ipv4-tcp = 0x20000;
+.fi
+.in -2
+
+.sp
+.LP
+You can also use the \fBndd\fR(8) command to configure the \fBhxge\fR driver
+at runtime to discard any classes of traffic.
+.sp
+.LP
+The \fBhxge\fR driver supports self-healing functionality, see \fBfmd\fR(8). By
+default it is configured to DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE.
+You configure the \fBhxge\fR driver by defining the fm-capable property in
+\fBhxge.conf\fR to other capabilities or to 0x0 to disable it entirely.
+.sp
+.LP
+The \fBhxge\fR driver may be configured using the standard \fBifconfig\fR(8)
+command.
+.sp
+.LP
+The \fBhxge\fR driver also reports various hardware and software statistics
+data. You can view these statistics using the \fBkstat\fR(8) command.
+.SH FILES
+.ne 2
+.na
+\fB\fB/dev/hxge*\fR\fR
+.ad
+.RS 28n
+Special character device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/hxge\fR\fR
+.ad
+.RS 28n
+64-bit device driver (SPARC).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/hxge\fR\fR
+.ad
+.RS 28n
+64-bit device driver (x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/hxge.conf\fR\fR
+.ad
+.RS 28n
+Configuration file.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86
+.TE
+
+.SH SEE ALSO
+.BR streamio (4I),
+.BR dlpi (4P),
+.BR driver.conf (5),
+.BR attributes (7),
+.BR dladm (8),
+.BR fmd (8),
+.BR ifconfig (8),
+.BR kstat (8),
+.BR ndd (8),
+.BR netstat (8)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.sp
+.LP
+\fINetwork Interfaces Programmer's Guide\fR

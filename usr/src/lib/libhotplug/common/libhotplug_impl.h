@@ -64,7 +64,7 @@ struct hp_node {
 #define	HP_INFO_TIME	"hp_info.last_change"
 
 /*
- * Definitions for the door interface to hotplugd(1m).
+ * Definitions for the door interface to hotplugd(8).
  */
 #define	HOTPLUGD_PID	"/var/run/hotplugd.pid"
 #define	HOTPLUGD_DOOR	"/var/run/hotplugd_door"

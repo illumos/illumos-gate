@@ -87,7 +87,7 @@ MPAPI library configuration file
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -105,8 +105,10 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBlibMPAPI\fR(3LIB), \fBMP_RegisterPlugin\fR(3MPAPI), \fBmpapi.conf\fR(4),
-\fBattributes\fR(5)
+.BR libMPAPI (3LIB),
+.BR MP_RegisterPlugin (3MPAPI),
+.BR mpapi.conf (5),
+.BR attributes (7)
 .sp
 .LP
 \fIMultipath Management API Version 1.0\fR

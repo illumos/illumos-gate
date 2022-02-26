@@ -102,7 +102,7 @@ stack.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -120,5 +120,9 @@ MT-Level	Async-Signal-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBsigaction\fR(2), \fBsigaltstack\fR(2), \fBstack_getbounds\fR(3C),
-\fBstack_inbounds\fR(3C), \fBstack_setbounds\fR(3C), \fBattributes\fR(5)
+.BR sigaction (2),
+.BR sigaltstack (2),
+.BR stack_getbounds (3C),
+.BR stack_inbounds (3C),
+.BR stack_setbounds (3C),
+.BR attributes (7)

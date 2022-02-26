@@ -290,7 +290,7 @@ Matches only processes whose zone \fBID\fR is in the given list. Each zone
 \fBID\fR may be specified as either a zone name or a numerical zone \fBID\fR.
 This option is only useful when executed in the global zone. If the \fBpkill\fR
 utility is used to send signals to processes in  other zones, the process must
-have asserted the \fB{PRIV_PROC_ZONE}\fR privilege (see \fBprivileges\fR(5)).
+have asserted the \fB{PRIV_PROC_ZONE}\fR privilege (see \fBprivileges\fR(7)).
 .RE
 
 .sp
@@ -319,7 +319,7 @@ The following operand is supported:
 .RS 11n
 Specifies an Extended Regular Expression (\fBERE\fR) pattern to match against
 either the executable file name or full process argument string. See
-\fBregex\fR(5) for a complete description of the \fBERE\fR syntax.
+\fBregex\fR(7) for a complete description of the \fBERE\fR syntax.
 .RE
 
 .SH EXAMPLES
@@ -405,9 +405,17 @@ Process information files
 .SH SEE ALSO
 .sp
 .LP
-\fBkill\fR(1), \fBproc\fR(1), \fBps\fR(1), \fBtruss\fR(1), \fBkill\fR(2),
-\fBsignal.h\fR(3HEAD), \fBproc\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5),
-\fBregex\fR(5), \fBzones\fR(5)
+.BR kill (1),
+.BR proc (1),
+.BR ps (1),
+.BR truss (1),
+.BR kill (2),
+.BR signal.h (3HEAD),
+.BR proc (5),
+.BR attributes (7),
+.BR privileges (7),
+.BR regex (7),
+.BR zones (7)
 .SH NOTES
 .sp
 .LP

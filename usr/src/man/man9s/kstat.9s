@@ -123,7 +123,7 @@ data structures.
 .RE
 
 .SH SEE ALSO
-\fBkstat_create\fR(9F)
+.BR kstat_create (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

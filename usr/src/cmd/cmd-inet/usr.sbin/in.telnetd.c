@@ -488,7 +488,7 @@ rd_and_store_forwarded_creds(krb5_context context,
 	if ((retval = krb5_cc_close(context, ccache)) != 0)
 		goto cleanup;
 
-	/* Register with ktkt_warnd(1M) */
+	/* Register with ktkt_warnd(8) */
 	if ((retval = krb5_unparse_name(context, (*creds)->client,
 					&client_name)) != 0)
 		goto cleanup;
@@ -496,11 +496,11 @@ rd_and_store_forwarded_creds(krb5_context context,
 	if (kwarn_add_warning(client_name, (*creds)->times.endtime) != 0) {
 		syslog(LOG_AUTH|LOG_NOTICE,
 		    "rd_and_store_forwarded_creds: kwarn_add_warning"
-		    " failed: ktkt_warnd(1M) down? ");
+		    " failed: ktkt_warnd(8) down? ");
 		if (auth_debug)
 			(void) fprintf(stderr,
 				    "kwarn_add_warning failed:"
-				    " ktkt_warnd(1M) down?\n");
+				    " ktkt_warnd(8) down?\n");
 	}
 	free(client_name);
 	client_name = NULL;

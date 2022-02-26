@@ -203,7 +203,7 @@ main() {
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -220,8 +220,11 @@ MT-Level	See \fBNOTES\fR below.
 
 .SH SEE ALSO
 .LP
-\fBarc4random\fR(3C), \fBdrand48\fR(3C), \fBrand\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR arc4random (3C),
+.BR drand48 (3C),
+.BR rand (3C),
+.BR attributes (7),
+.BR standards (7)
 .SH NOTES
 .LP
 The \fBrandom()\fR and \fBsrandom()\fR functions are unsafe in multithreaded

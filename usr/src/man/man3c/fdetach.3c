@@ -167,7 +167,7 @@ length exceeds \fBPATH_MAX\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -183,8 +183,12 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBfdetach\fR(1M), \fBclose\fR(2), \fBfattach\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5), \fBstreamio\fR(7I)
+.BR close (2),
+.BR fattach (3C),
+.BR streamio (4I),
+.BR attributes (7),
+.BR standards (7),
+.BR fdetach (8)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

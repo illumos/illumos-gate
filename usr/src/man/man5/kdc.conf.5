@@ -1,0 +1,1087 @@
+'\" te
+.\" Copyright (c) 2007 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH KDC.CONF 5 "Oct 29, 2015"
+.SH NAME
+kdc.conf \- Key Distribution Center (KDC) configuration file
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/krb5/kdc.conf\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkdc.conf\fR file contains \fBKDC\fR configuration information, including
+defaults used when issuing Kerberos tickets. This file must reside on all
+\fBKDC\fR servers. After you make any changes to the \fBkdc.conf\fR file, stop
+and restart the \fBkrb5kdc\fR daemon on the \fBKDC\fR for the changes to take
+effect.
+.sp
+.LP
+The format of the \fBkdc.conf\fR consists of section headings in square
+brackets (\fB[]\fR). Each section contains zero or more configuration variables
+(called relations), of the form of:
+.sp
+.in +2
+.nf
+\fIrelation\fR = \fIrelation-value\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+\fIrelation-subsection\fR = {
+     \fIrelation\fR = \fIrelation-value\fR
+     \fIrelation\fR = \fIrelation-value\fR
+     }
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBkdc.conf\fR file contains one of more of the following three sections:
+.sp
+.ne 2
+.na
+\fB\fBkdcdefaults\fR\fR
+.ad
+.sp .6
+.RS 4n
+Contains default values for overall behavior of the \fBKDC\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrealms\fR\fR
+.ad
+.sp .6
+.RS 4n
+Contains subsections for Kerberos realms, where \fIrelation-subsection\fR is
+the name of a realm. Each subsection contains relations that define \fBKDC\fR
+properties for that particular realm, including where to find the Kerberos
+servers for that realm.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlogging\fR\fR
+.ad
+.sp .6
+.RS 4n
+Contains relations that determine how Kerberos programs perform logging.
+.RE
+
+.SS "The \fBkdcdefaults\fR Section"
+.sp
+.LP
+The following relation can be defined in the \fB[kdcdefaults]\fR section:
+.sp
+.ne 2
+.na
+\fB\fBkdc_ports\fR\fR
+.ad
+.sp .6
+.RS 4n
+This relation lists the UDP ports on which the Kerberos server should listen by
+default. This list is a comma-separated list of integers. If the assigned value
+is 0, the Kerberos server does not listen on any UDP port. If this relation is
+not specified, the Kerberos server listens on port \fB750\fR and port \fB88\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkdc_tcp_ports\fR\fR
+.ad
+.sp .6
+.RS 4n
+This relation lists the TCP ports on which the Kerberos server should listen by
+default. This list is a comma-separated list of integers. If the assigned value
+is 0, the Kerberos server does not listen on any TCP port. If this relation is
+not specified, the Kerberos server listens on the \fBkdc\fR TCP port specified
+in \fB/etc/services\fR. If this port is not found in \fB/etc/services\fR the
+Kerberos server defaults to listen on TCP port 88.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkdc_max_tcp_connections\fR\fR
+.ad
+.sp .6
+.RS 4n
+This relation controls the maximum number of TCP connections the KDC allows.
+The minimum value is 10. If this relation is not specified, the Kerberos server
+allows a maximum of 30 TCP connections.
+.RE
+
+.SS "The \fBrealms\fR Section"
+.sp
+.LP
+This section contains subsections for Kerberos realms, where
+\fIrelation-subsection\fR is the name of a realm. Each subsection contains
+relations that define \fBKDC\fR properties for that particular realm.
+.sp
+.LP
+The following relations can be specified in each subsection:
+.sp
+.ne 2
+.na
+\fB\fBacl_file\fR\fR
+.ad
+.sp .6
+.RS 4n
+(string) Location of the Kerberos V5 access control list (\fBACL\fR) file that
+\fBkadmin\fR uses to determine the privileges allowed to each principal on the
+database. The default location is \fB\fR\fB/etc/krb5/kadm5.acl\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadmin_keytab\fR\fR
+.ad
+.sp .6
+.RS 4n
+(string) Location of the \fBkeytab\fR file that \fBkadmin\fR uses to
+authenticate to the database. The default location is
+\fB/etc/krb5/kadm5.keytab\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdatabase_name\fR\fR
+.ad
+.sp .6
+.RS 4n
+(string) Location of the Kerberos database for this realm. The default location
+is \fB/var/krb5/principal\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdefault_principal_expiration\fR\fR
+.ad
+.sp .6
+.RS 4n
+(absolute time string) The default expiration date of principals created in
+this realm. See the \fBTime Format\fR section in \fBkinit\fR(1) for the valid
+absolute time formats you can use for \fBdefault_principal_expiration\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdefault_principal_flags\fR\fR
+.ad
+.sp .6
+.RS 4n
+(flag string) The default attributes of principals created in this realm. Some
+of these flags are better to set on an individual principal basis through the
+use of the attribute modifiers when using the \fBkadmin\fR command to create
+and modify principals. However, some of these options can be applied to all
+principals in the realm by adding them to the list of flags associated with
+this relation.
+.sp
+A "flag string" is a list of one or more of the flags listed below preceded by
+a minus (\fB-\fR) or a plus (\fB+\fR) character, indicating that the option
+that follows should be enabled or disabled.
+.sp
+Flags below marked with an asterisk (\fB*\fR) are flags that are best applied
+on an individual principal basis through the \fBkadmin\fR interface rather
+than as a blanket attribute to be applied to all principals.
+.sp
+.ne 2
+.na
+\fB\fBpostdateable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Create postdatable tickets.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBforwardable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Create forwardable tickets.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtgt-based\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow TGT-based requests.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrenewable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Create Renewable tickets.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBproxiable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Create Proxiable tickets.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdup-skey\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow DUP_SKEY requests, this enables user-to-user authentication.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpreauth\fR\fR
+.ad
+.sp .6
+.RS 4n
+Require the use of pre-authentication data whenever principals request TGTs.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBhwauth\fR\fR
+.ad
+.sp .6
+.RS 4n
+Require the use of hardware-based pre-authentication data whenever principals
+request TGTs.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB* allow-tickets\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow tickets to be issued for all principals.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB* pwdchange\fR\fR
+.ad
+.sp .6
+.RS 4n
+Require principal's to change their password.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB* service\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable or disable a service.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB* pwservice\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mark principals as password changing principals.
+.RE
+
+An example of \fBdefault_principal_flags\fR is shown in EXAMPLES, below.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdict_file\fR\fR
+.ad
+.sp .6
+.RS 4n
+(string) Location of the dictionary file containing strings that are not
+allowed as passwords. A principal with any password policy is not allowed to
+select a password in the dictionary. The default location is
+\fB/var/krb5/kadm5.dict\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkadmind_port\fR\fR
+.ad
+.sp .6
+.RS 4n
+(port number) The port that the \fBkadmind\fR daemon is to listen on for this
+realm. The assigned port for \fBkadmind\fR is 749.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkey_stash_file\fR\fR
+.ad
+.sp .6
+.RS 4n
+(string) Location where the master key has been stored (by \fBkdb5_util
+stash\fR). The default location is \fB/var/krb5/.k5.\fR\fIrealm\fR, where
+\fIrealm\fR is the Kerberos realm.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkdc_ports\fR\fR
+.ad
+.sp .6
+.RS 4n
+(string) The list of UDP ports that the \fBKDC\fR listens on for this realm. By
+default, the value of \fBkdc_ports\fR as specified in the \fB[kdcdefaults]\fR
+section is used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkdc_tcp_ports\fR\fR
+.ad
+.sp .6
+.RS 4n
+(string) The list of TCP ports that the KDC listens on (in addition to the UDP
+ports specified by \fBkdc_ports\fR) for this realm. By default, the value of
+\fBkdc_tcp_ports\fR as specified in the \fB[kdcdefaults]\fR section is used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmaster_key_name\fR\fR
+.ad
+.sp .6
+.RS 4n
+(string) The name of the master key.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmaster_key_type\fR\fR
+.ad
+.sp .6
+.RS 4n
+(key type string) The master key's key type. This is used to determine the type
+of encryption that encrypts the entries in the principal db. \fBdes-cbc-crc\fR,
+\fBdes3-cbc-md5\fR, \fBdes3-cbc-sha1-kd\fR, \fBarcfour-hmac-md5\fR,
+\fBarcfour-hmac-md5-exp\fR, \fBaes128-cts-hmac-sha1-96\fR, and
+\fBaes256-cts-hmac-sha1-96\fR are supported at this time (\fBdes-cbc-crc\fR is
+the default). If you set this to \fBdes3-cbc-sha1-kd\fR all systems that
+receive copies of the principal db, such as those running slave KDC's, must
+support \fBdes3-cbc-sha1-kd\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmax_life\fR\fR
+.ad
+.sp .6
+.RS 4n
+(delta time string) The maximum time period for which a ticket is valid in this
+realm. See the \fBTime\fR \fBFormat\fR section in \fBkinit\fR(1) for the valid
+time duration formats you can use for \fBmax_life\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmax_renewable_life\fR\fR
+.ad
+.sp .6
+.RS 4n
+(delta time string) The maximum time period during which a valid ticket can be
+renewed in this realm. See the \fBTime\fR \fBFormat\fR section in
+\fBkinit\fR(1) for the valid time duration formats you can use for
+\fBmax_renewable_life\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsunw_dbprop_enable = [true | false]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable or disable incremental database propagation. Default is \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsunw_dbprop_master_ulogsize = N\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the maximum number of log entries available for incremental
+propagation to the slave KDC servers. The maximum value that this can be is
+2500 entries. Default value is 1000 entries.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsunw_dbprop_slave_poll = N[s, m, h]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies how often the slave KDC polls for new updates that the master might
+have. Default is \fB2m\fR (two minutes).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsupported_enctypes\fR\fR
+.ad
+.sp .6
+.RS 4n
+List of \fBkey\fR/\fBsalt\fR strings. The default \fBkey\fR/\fBsalt\fR
+combinations of principals for this realm. The \fBkey\fR is separated from the
+\fBsalt\fR by a colon (\fB:\fR) or period (\fB\&.\fR). Multiple
+\fBkey\fR/\fBsalt\fR strings can be used by separating each string with a
+space. The \fBsalt\fR is additional information encoded within the key that
+tells what kind of key it is. Only the \fBnormal\fR \fBsalt\fR is supported at
+this time, for example, \fBdes-cbc-crc:normal\fR. If this relation is not
+specified, the default setting is:
+.sp
+.in +2
+.nf
+aes256-cts-hmac-sha1-96:normal \e \fI(see note below)\fR
+aes128-cts-hmac-sha1-96:normal \e
+des3-cbc-sha1-kd:normal \e
+arcfour-hmac-md5:normal \e
+des-cbc-md5:normal
+.fi
+.in -2
+
+.LP
+Note -
+.sp
+.RS 2
+The unbundled Strong Cryptographic packages must be installed for the
+\fBaes256-cts-hmac-sha1-96:normal\fR \fBenctype\fR to be available for
+Kerberos.
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreject_bad_transit\fR\fR
+.ad
+.sp .6
+.RS 4n
+This boolean specifies whether the list of transited realms for cross-realm
+tickets should be checked against the transit path computed from the realm
+names and the \fB[capaths]\fR section of its \fBkrb5.conf\fR(5) file.
+.sp
+The default for \fBreject_bad_transit\fR is \fBtrue\fR.
+.RE
+
+.SS "The \fBlogging\fR Section"
+.sp
+.LP
+This section indicates how Kerberos programs perform logging. The same relation
+can be repeated if you want to assign it multiple logging methods. The
+following relations can be defined in the \fB[logging]\fR section:
+.sp
+.ne 2
+.na
+\fB\fBkdc\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies how the \fBKDC\fR is to perform its logging. The default is
+\fBFILE:/var/krb5/kdc.log\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadmin_server\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies how the administration server is to perform its logging. The default
+is \fBFILE:/var/krb5/kadmin.log\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdefault\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies how to perform logging in the absence of explicit specifications.
+.RE
+
+.sp
+.LP
+The \fB[logging]\fR relations can have the following values:
+.sp
+.LP
+\fBFILE:\fR\fIfilename\fR
+.sp
+.LP
+or
+.sp
+.ne 2
+.na
+\fB\fBFILE=\fR\fIfilename\fR\fR
+.ad
+.sp .6
+.RS 4n
+This value causes the entity's logging messages to go to the specified file. If
+the `=' form is used, the file is overwritten. If the `:' form is used, the
+file is appended to.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSTDERR\fR\fR
+.ad
+.sp .6
+.RS 4n
+This value sends the entity's logging messages to its standard error stream.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCONSOLE\fR\fR
+.ad
+.sp .6
+.RS 4n
+This value sends the entity's logging messages to the console, if the system
+supports it.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDEVICE=\fR\fIdevicename\fR\fR
+.ad
+.sp .6
+.RS 4n
+This sends the entity's logging messages to the specified device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSYSLOG[:\fR\fIseverity\fR\fB[:\fR\fIfacility\fR\fB]]\fR\fR
+.ad
+.sp .6
+.RS 4n
+This sends the entity's logging messages to the system log.
+.sp
+The \fIseverity\fR argument specifies the default severity of system log
+messages. This default can be any of the following severities supported by the
+\fBsyslog\fR(3C) call, minus the \fBLOG_\fR prefix: \fBLOG_EMERG\fR,
+\fBLOG_ALERT\fR, \fBLOG_CRIT\fR, \fBLOG_ERR\fR, \fBLOG_WARNING\fR,
+\fBLOG_NOTICE\fR, \fBLOG_INFO\fR, and \fBLOG_DEBUG\fR. For example, a value of
+\fBCRIT\fR would specify \fBLOG_CRIT\fR severity.
+.sp
+The \fIfacility\fR argument specifies the facility under which the messages are
+logged. This can be any of the following facilities supported by the
+\fBsyslog\fR(3C) call minus the \fBLOG_\fR prefix: \fBLOG_KERN\fR,
+\fBLOG_USER\fR, \fBLOG_MAIL\fR, \fBLOG_DAEMON\fR, \fBLOG_AUTH\fR,
+\fBLOG_LPR\fR, \fBLOG_NEWS\fR, \fBLOG_UUCP\fR, \fBLOG_CRON\fR, and
+\fBLOG_LOCAL0\fR through \fBLOG_LOCAL7\fR.
+.sp
+If no severity is specified, the default is \fBERR\fR. If no facility is
+specified, the default is \fBAUTH\fR.
+.sp
+In the following example, the logging messages from the \fBKDC\fR go to the
+console and to the system log under the facility \fBLOG_DAEMON\fR with default
+severity of \fBLOG_INFO\fR; the logging messages from the administration server
+are appended to the \fB/var/krb5/kadmin.log\fR file and sent to the
+\fB/dev/tty04\fR device.
+.sp
+.in +2
+.nf
+[logging]
+kdc = CONSOLE
+kdc = SYSLOG:INFO:DAEMON
+admin_server = FILE:/export/logging/kadmin.log
+admin_server = DEVICE=/dev/tty04
+.fi
+.in -2
+.sp
+
+.RE
+
+.SS "PKINIT-specific Options"
+.sp
+.LP
+The following are \fBpkinit-specific\fR options. These values can be specified
+in \fB[kdcdefaults]\fR as global defaults, or within a realm-specific
+subsection of \fB[realms]\fR. A realm-specific value overrides, does not add
+to, a generic \fB[kdcdefaults]\fR specification. The search order is
+.RS +4
+.TP
+1.
+realm-specific subsection of \fB[realms]\fR
+.sp
+.ne 2
+.na
+\fB[realms]\fR
+.ad
+.RS 12n
+.sp
+.in +2
+.nf
+[realms]
+    EXAMPLE.COM = {
+         pkinit_anchors = FILE:/usr/local/example.com.crt
+    }
+.fi
+.in -2
+
+.RE
+
+.RE
+.RS +4
+.TP
+2.
+generic value in the \fB[kdcdefaults]\fR section
+.sp
+.in +2
+.nf
+[kdcdefaults]
+    pkinit_anchors = DIR:/usr/local/generic_trusted_cas/
+.fi
+.in -2
+
+.RE
+.sp
+.ne 2
+.na
+\fB\fBpkinit_identity\fR \fB=\fR \fIURI\fR\fR
+.ad
+.RS 25n
+Specifies the location of the KDC's X.509 identity information. This option is
+required if \fBpkinit\fR is supported by the KDC. Valid \fIURI\fR types are
+\fBFILE\fR, \fBDIR\fR, \fBPKCS11\fR, \fBPKCS12\fR, and \fBENV\fR. See the
+\fBPKINIT URI Types\fR section for more details.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpkinit_anchors\fR \fB=\fR \fIURI\fR\fR
+.ad
+.RS 25n
+Specifies the location of trusted anchor (root) certificates which the KDC
+trusts to sign client certificates. This option is required if \fBpkinit\fR is
+supported by the KDC. This option can be specified multiple times. Valid
+\fIURI\fR types are \fBFILE\fR and \fBDIR\fR. See the \fBPKINIT URI Types\fR
+section for details.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpkinit_pool\fR\fR
+.ad
+.RS 25n
+Specifies the location of intermediate certificates which can be used by the
+KDC to complete the trust chain between a client's certificate and a trusted
+anchor. This option can be specified multiple times. Valid \fIURI\fR types are
+\fBFILE\fR and \fBDIR\fR. See the \fBPKINIT URI Types\fR section for more
+details.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpkinit_revoke\fR\fR
+.ad
+.RS 25n
+Specifies the location of Certificate Revocation List (CRL) information to be
+used by the KDC when verifying the validity of client certificates. This option
+can be specified multiple times. The default certificate verification process
+always checks the available revocation information to see if a certificate has
+been revoked. If a match is found for the certificate in a CRL, verification
+fails. If the certificate being verified is not listed in a CRL, or there is no
+CRL present for its issuing CA, and \fBpkinit_require_crl_checking\fR is
+\fBfalse\fR, then verification succeeds. The only valid \fIURI\fR types is
+\fBDIR\fR. See the \fBPKINIT URI Types\fR section for more details. If
+\fBpkinit_require_crl_checking\fR is \fBtrue\fR and there is no CRL information
+available for the issuing CA, verification fails.
+\fBpkinit_require_crl_checking\fR should be set to \fBtrue\fR if the policy is
+such that up-to-date CRLs must be present for every CA.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpkinit_dh_min_bits\fR\fR
+.ad
+.RS 25n
+Specifies the minimum number of bits the KDC is willing to accept for a
+client's Diffie-Hellman key.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpkinit_allow_upn\fR\fR
+.ad
+.RS 25n
+Specifies that the KDC is willing to accept client certificates with the
+Microsoft UserPrincipalName (UPN) Subject Alternative Name (SAN). This means
+the KDC accepts the binding of the UPN in the certificate to the Kerberos
+principal name.
+.sp
+The default is \fBfalse\fR.
+.sp
+Without this option, the KDC only accepts certificates with the
+\fBid-pkinit-san\fR as defined in RFC4556. There is currently no option to
+disable SAN checking in the KDC.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpkinit_eku_checking\fR\fR
+.ad
+.RS 25n
+This option specifies what Extended Key Usage (EKU) values the KDC is willing
+to accept in client certificates. The values recognized in the \fBkdc.conf\fR
+file are:
+.sp
+.ne 2
+.na
+\fBkpClientAuth\fR
+.ad
+.RS 16n
+This is the default value and specifies that client certificates must have the
+\fBid-pkinit-KPClientAuth EKU\fR as defined in RFC4556.
+.RE
+
+.sp
+.ne 2
+.na
+\fBscLogin\fR
+.ad
+.RS 16n
+If \fBscLogin\fR is specified, client certificates with the Microsoft Smart
+Card Login EKU (\fBid-ms-kp-sc-logon\fR) is accepted.
+.RE
+
+.RE
+
+.SS "PKINIT URI Types"
+.sp
+.ne 2
+.na
+\fBFILE:\fIfile-name\fR[\fI,key-file-name\fR]\fR
+.ad
+.sp .6
+.RS 4n
+This option has context-specific behavior.
+.sp
+.ne 2
+.na
+\fBpkinit_identity\fR
+.ad
+.RS 19n
+\fIfile-name\fR specifies the name of a PEM-format file containing the user's
+certificate. If \fIkey-file-name\fR is not specified, the user's private key is
+expected to be in \fIfile-name\fR as well. Otherwise, \fIkey-file-name\fR is
+the name of the file containing the private key.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpkinit_anchors\fR
+.ad
+.br
+.na
+\fBpkinit_pool\fR
+.ad
+.RS 19n
+\fIfile-name\fR is assumed to be the name of an OpenSSL-style ca-bundle file.
+The \fIca-bundle\fR file should be base-64 encoded.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBDIR:\fIdirectory-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+This option has context-specific behavior.
+.sp
+.ne 2
+.na
+\fBpkinit_identity\fR
+.ad
+.RS 19n
+\fIdirectory-name\fR specifies a directory with files named \fB*.crt\fR and
+\fB*.key\fR, where the first part of the file name is the same for matching
+pairs of certificate and private key files. When a file with a name ending with
+\fB\&.crt\fR is found, a matching file ending with .\fBkey\fR is assumed to
+contain the private key. If no such file is found, then the certificate in the
+\fB\&.crt\fR is not used.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpkinit_anchors\fR
+.ad
+.br
+.na
+\fBpkinit_pool\fR
+.ad
+.RS 19n
+\fIdirectory-name\fR is assumed to be an OpenSSL-style hashed CA directory
+where each CA cert is stored in a file named \fBhash-of-ca-cert.\fR\fI#\fR.
+This infrastructure is encouraged, but all files in the directory is examined
+and if they contain certificates (in PEM format), they are used.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpkinit_revoke\fR
+.ad
+.RS 19n
+\fIdirectory-name\fR is assumed to be an OpenSSL-style hashed CA directory
+where each revocation list is stored in a file named
+\fBhash-of-ca-cert.r\fR\fI#\fR. This infrastructure is encouraged, but all
+files in the directory is examined and if they contain a revocation list (in
+PEM format), they are used.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBPKCS12:pkcs12-file-name\fR
+.ad
+.sp .6
+.RS 4n
+\fBpkcs12-file-name\fR is the name of a PKCS #12 format file, containing the
+user's certificate and private key.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPKCS11:[slotid=\fIslot-id\fR][:token=\fItoken-label\fR][:certid=\fIcert-id\fR][:certlabel=\fIcert-label\fR]\fR
+.ad
+.sp .6
+.RS 4n
+All keyword/values are optional. PKCS11 modules (for example,
+\fBopensc-pkcs11.so\fR) must be installed as a crypto provider under
+\fBlibpkcs11\fR(3LIB). \fBslotid=\fR and/or \fBtoken=\fR can be specified to
+force the use of a particular smard card reader or token if there is more than
+one available. \fBcertid=\fR and/or \fBcertlabel=\fR can be specified to force
+the selection of a particular certificate on the device. See the
+\fBpkinit_cert_match\fR configuration option for more ways to select a
+particular certificate to use for \fBpkinit\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBENV:\fIenvironment-variable-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fIenvironment-variable-name\fR specifies the name of an environment variable
+which has been set to a value conforming to one of the previous values. For
+example, \fBENV:X509_PROXY\fR, where environment variable \fBX509_PROXY\fR has
+been set to \fBFILE:/tmp/my_proxy.pem\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSample \fBkdc.conf\fR File
+.sp
+.LP
+The following is an example of a \fBkdc.conf\fR file:
+
+.sp
+.in +2
+.nf
+[kdcdefaults]
+   kdc_ports = 88
+
+[realms]
+   ATHENA.MIT.EDU = {
+      kadmind_port = 749
+      max_life = 10h 0m 0s
+      max_renewable_life = 7d 0h 0m 0s
+      default_principal_flags = +preauth,+forwardable,-postdateable
+      master_key_type = des-cbc-crc
+      supported_enctypes = des-cbc-crc:normal
+   }
+
+[logging]
+   kdc = FILE:/export/logging/kdc.log
+   admin_server = FILE:/export/logging/kadmin.log
+.fi
+.in -2
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/etc/krb5/kadm5.acl\fR\fR
+.ad
+.sp .6
+.RS 4n
+List of principals and their \fBkadmin\fR administrative privileges.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/krb5/kadm5.keytab\fR\fR
+.ad
+.sp .6
+.RS 4n
+Keytab for \fBkadmind\fR principals: \fBkadmin\fR/\fIfqdn\fR,
+\fBchangepw\fR/\fIfqdn\fR, and \fBkadmin\fR/\fBchangepw\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/principal\fR\fR
+.ad
+.sp .6
+.RS 4n
+Kerberos principal database.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/principal.ulog\fR\fR
+.ad
+.sp .6
+.RS 4n
+The update log file for incremental propagation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/kadm5.dict\fR\fR
+.ad
+.sp .6
+.RS 4n
+Dictionary of strings explicitly disallowed as passwords.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/kdc.log\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBKDC\fR logging file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/kadmin.log\fR\fR
+.ad
+.sp .6
+.RS 4n
+Kerberos administration server logging file.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	See below.
+.TE
+
+.sp
+.LP
+All of the keywords, except for the \fBPKINIT\fR keywords are Committed. The
+\fBPKINIT\fR keywords are Volatile.
+.SH SEE ALSO
+.sp
+.LP
+.BR kpasswd (1),
+.BR syslog (3C),
+.BR libpkcs11 (3LIB),
+.BR kadm5.acl (5),
+.BR krb5.conf (5),
+.BR attributes (7),
+.BR kerberos (7),
+.BR kadmin.local (8),
+.BR kadmind (8),
+.BR kdb5_util (8),
+.BR kpropd (8)

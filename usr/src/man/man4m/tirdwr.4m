@@ -1,0 +1,168 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TIRDWR 4M "Jul 3, 1990"
+.SH NAME
+tirdwr \- Transport Interface read/write interface STREAMS module
+.SH SYNOPSIS
+.LP
+.nf
+\fBint ioctl( \fR\fIfd, \fR\fBI_PUSH\fR\fI, \fR\fB"tirdwr");\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBtirdwr\fR is a STREAMS module  that provides an alternate interface to a
+transport provider which supports the  Transport Interface ("\fBTI\fR")
+functions of the Network Services library (see Section 3N). This alternate
+interface allows a user to communicate with the transport protocol  provider
+using the  \fBread\fR(2) and  \fBwrite\fR(2) system calls. The  \fBputmsg\fR(2)
+and  \fBgetmsg\fR(2) system calls may also be used. However, \fBputmsg\fR and
+\fBgetmsg\fR can only transfer data messages between  user and stream; control
+portions are disallowed.
+.sp
+.LP
+The \fBtirdwr\fR module must only be pushed (see \fBI_PUSH\fR in
+\fBstreamio\fR(4I)) onto a stream terminated by a transport protocol provider
+which supports the \fBTI\fR. After the \fBtirdwr\fR module has been pushed onto
+a stream, none of the \fBTI\fR functions can be used. Subsequent calls to
+\fBTI\fR functions cause an error on the stream. Once the error is detected,
+subsequent system calls on the stream return an error with \fBerrno\fR set to
+\fBEPROTO\fR.
+.sp
+.LP
+The following are the actions taken by the \fBtirdwr\fR module when pushed on
+the stream, popped (see \fBI_POP\fR in  \fBstreamio\fR(4I)) off  the stream, or
+when data passes through it.
+.sp
+.ne 2
+.na
+\fB\fBpush\fR\fR
+.ad
+.RS 9n
+When the module is pushed onto a stream, it checks any existing data destined
+for the user to ensure that only regular data messages are present. It ignores
+any messages on the stream that relate to process management, such as messages
+that generate signals to the user processes associated with the stream. If any
+other messages are present, the \fBI_PUSH\fR will return an error with
+\fBerrno\fR set to \fBEPROTO\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBwrite\fR\fR
+.ad
+.RS 9n
+The module takes the following actions on data that originated from a
+\fBwrite\fR system call:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All messages with the exception of messages that contain control portions (see
+the \fBputmsg\fR and \fBgetmsg\fR system calls) are transparently passed onto
+the module's downstream neighbor.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Any zero length data messages are freed by the module and they will not be
+passed onto the module's downstream neighbor.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Any messages with control portions generate an error, and any further system
+calls associated with the stream fails with \fBerrno\fR set to \fBEPROTO\fR.
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBread\fR\fR
+.ad
+.RS 9n
+The module takes the following actions on data that originated from the
+transport protocol provider.
+.sp
+All messages with the exception of those that contain control portions (see the
+\fBputmsg\fR and \fBgetmsg\fR system calls) are transparently passed onto the
+module's upstream neighbor. The action taken on messages with control portions
+will be as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Any data messages with control portions have the control portions removed from
+the message before to passing the message on to the upstream neighbor.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Messages that represent an orderly release indication from the transport
+provider generate a zero length data message, indicating the end of file, which
+will be sent to the reader of the stream. The orderly release message itself is
+freed by the module.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Messages that represent an abortive disconnect indication from the transport
+provider cause all further \fBwrite\fR and \fBputmsg\fR system calls to fail
+with \fBerrno\fR set to \fBENXIO\fR. All further \fBread\fR and \fBgetmsg\fR
+system calls return zero length data (indicating end of file) once all previous
+data has been read.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+With the exception of the above rules, all other messages with control portions
+generate an error and all further system calls associated with the stream will
+fail with \fBerrno\fR set to \fBEPROTO\fR.
+.RE
+Any zero length data messages are freed by the module and they are not passed
+onto the module's upstream neighbor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpop\fR\fR
+.ad
+.RS 9n
+When the module is popped off the stream or the stream is closed, the module
+takes the following action:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If an orderly release indication has been previously received, then an orderly
+release request will be sent to the remote side of the transport connection.
+.RE
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR getmsg (2),
+.BR putmsg (2),
+.BR read (2),
+.BR write (2),
+.BR Intro (3),
+.BR Intro (3),
+.BR streamio (4I),
+.BR timod (4M)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

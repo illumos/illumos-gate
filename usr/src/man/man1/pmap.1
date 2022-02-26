@@ -409,7 +409,7 @@ reserve swap space.
 .ad
 .RS 6n
 The data for the mapping is not present in the core file (only applicable when
-applied to a core file). See \fBcoreadm\fR(1M) for information on configuring
+applied to a core file). See \fBcoreadm\fR(8) for information on configuring
 core file content.
 .RE
 
@@ -568,7 +568,7 @@ this mapping. See \fBmemcntl\fR(2) for further information.
 The amount of swap space in kilobytes that is reserved for this mapping. That
 is, swap space that is deducted from the total available pool of reservable
 swap space that is displayed with the command \fBswap\fR \fB-s\fR. See
-\fBswap\fR(1M).
+\fBswap\fR(8).
 .RE
 
 .SH EXAMPLES
@@ -842,7 +842,7 @@ total Kb   50464   23496
 The swap reservation information can be used to estimate the amount of virtual
 swap used by each additional process. Each process consumes virtual swap from a
 global virtual swap pool. Global swap reservations are reported by
-the '\fBavail\fR' field of the \fBswap\fR(1M) command.
+the '\fBavail\fR' field of the \fBswap\fR(8) command.
 
 .LP
 \fBExample 5 \fRLabeling Stacks in a Multi-threaded Process
@@ -979,7 +979,7 @@ process files
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -998,8 +998,21 @@ The command syntax is Evolving. The \fB-L\fR option and the output formats are
 Unstable.
 .SH SEE ALSO
 .LP
-\fBldd\fR(1), \fBlgrpinfo\fR(1), \fBmadv.so.1\fR(1), \fBmdb\fR(1),
-\fBplgrp\fR(1), \fBpmadvise\fR(1), \fBproc\fR(1), \fBps\fR(1),
-\fBcoreadm\fR(1M), \fBprstat\fR(1M), \fBswap\fR(1M), \fBmmap\fR(2),
-\fBmemcntl\fR(2), \fBmeminfo\fR(2), \fBshmop\fR(2), \fBdlopen\fR(3C),
-\fBproc\fR(4), \fBattributes\fR(5)
+.BR ldd (1),
+.BR lgrpinfo (1),
+.BR madv.so.1 (1),
+.BR mdb (1),
+.BR plgrp (1),
+.BR pmadvise (1),
+.BR proc (1),
+.BR ps (1),
+.BR memcntl (2),
+.BR meminfo (2),
+.BR mmap (2),
+.BR shmop (2),
+.BR dlopen (3C),
+.BR proc (5),
+.BR attributes (7),
+.BR coreadm (8),
+.BR prstat (8),
+.BR swap (8)

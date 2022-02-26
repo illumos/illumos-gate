@@ -1,7 +1,7 @@
 #
 # Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Configuration file for sshd(1m) (see also sshd_config(4))
+# Configuration file for sshd(8) (see also sshd_config(5))
 #
 
 # Protocol versions supported

@@ -57,7 +57,7 @@ isaexec(const char *execname, char *const *argv, char *const *envp)
 	int saved_errno;
 
 	/*
-	 * Extract the isalist(5) for userland from the kernel.
+	 * Extract the isalist(7) for userland from the kernel.
 	 */
 	isalist = malloc(isalen);
 	do {

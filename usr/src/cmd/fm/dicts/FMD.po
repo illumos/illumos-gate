@@ -61,7 +61,7 @@ msgstr "An illumos Fault Manager component generated a diagnosis for which no me
 msgid "FMD-8000-11.response"
 msgstr "The diagnosis has been saved in the fault log for examination by your illumos distribution team."
 msgid "FMD-8000-11.impact"
-msgstr "The fault log will need to be manually examined using fmdump(1M) in order to determine if any human response is required."
+msgstr "The fault log will need to be manually examined using fmdump(8) in order to determine if any human response is required."
 msgid "FMD-8000-11.action"
 msgstr "Use fmdump -v -u <EVENT-ID> to view the diagnosis result.  Ensure that fault management software is installed properly."
 #

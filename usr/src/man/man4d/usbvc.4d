@@ -1,0 +1,462 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH USBVC 4D "May 13, 2017"
+.SH NAME
+usbvc \- USB video class driver
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/usb/clients/video/usbvc/usbvc.h>
+
+#include <sys/videodev2.h>
+
+usbvc@unit-address
+.fi
+
+.LP
+.nf
+
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBusbvc\fR driver is a USBA (Solaris USB Architecture)-compliant client
+driver that supports the \fIUSB Device Class Definition for Video Devices\fR
+specification, Versions 1.0 and 1.1. The \fBusbvc\fR driver supports a subset
+of the video controls and formats described in the USB specification.
+.sp
+.LP
+The \fBusbvc\fR driver also implements the Video4Linux2 API (\fIV4L2\fR),
+Version 0.20 for applications. For more information on the \fIV4L2 API\fR,
+visit \fIhttp://www.thedirks.org/v4l2\fR.
+.sp
+.LP
+Note that the \fBusbvc\fR driver supports the video capture function only and
+that video output is not supported.
+.SH READING DATA
+.LP
+The \fBusbvc\fR driver reads video data from the isochronous endpoint of the
+device. Bulk data endpoints are not supported.
+.sp
+.LP
+MJPEG and UNCOMPRESSED video formats are supported. Isochronous data are read
+from the isochronous input device frame-by-frame and are maintained in a
+buffer array within the driver. Video frames are read from the driver using the
+\fBread\fR(2) or \fBmmap\fR(2) I/O method. For \fBread\fR(2), each read returns
+a buffer of a video frame. For \fBmmap\fR(2), each \fBVIDIOC_DQBUF\fR ioctl
+returns the buffer structure v4l2_buffer. (A video frame buffer pointer is
+included in the structure). See the \fIV4L2 API\fR for buffer structure and
+other related data structure information.
+.SH IOCTLS
+.LP
+A brief overview of supported ioctl requests appears below. For more detailed
+information, refer to the \fIV4L2 API\fR document. Note: ioctl information
+presented in the \fIV4L2 API\fR document may differ slightly from the content
+of this manpage. In such cases, you should rely on the information in this
+manpage.
+.sp
+.ne 2
+.na
+\fBVIDIOC_QUERYCAP\fR
+.ad
+.sp .6
+.RS 4n
+Query the device capabilities. Besides device capabilities, the \fBusbvc\fR
+driver returns structure v4l2_capability which includes information on the
+driver, data bus and OS kernel. Please note that the "Version" structure member
+has no meaning in Solaris and is always set to 1.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_ENUM_FMT\fR
+.ad
+.sp .6
+.RS 4n
+Enumerate the video formats supported by the device.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_S_FMT\fR
+.ad
+.sp .6
+.RS 4n
+Set a video format.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_G_FMT\fR
+.ad
+.sp .6
+.RS 4n
+Get a video format.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_REQBUFS\fR
+.ad
+.sp .6
+.RS 4n
+Request the \fBusbvc\fR driver to allocate video data buffers. If a buffer is
+set to zero, the driver stops reading video data from the device and releases
+all allocated buffers. (For \fBmmap\fR(2) only).
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_QUERYBUF\fR
+.ad
+.sp .6
+.RS 4n
+Query a given buffer's status. (For \fBmmap\fR(2) only).
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_QBUF\fR
+.ad
+.sp .6
+.RS 4n
+Enqueue an empty buffer to the video data buffer array. (For \fBmmap\fR(2)
+only).
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_DQBUF\fR
+.ad
+.sp .6
+.RS 4n
+Dequeue a done buffer from the video data buffer array. (For \fBmmap\fR(2)
+only).
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_STREAMON\fR
+.ad
+.sp .6
+.RS 4n
+Start reading video data.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_STREAMOFF\fR
+.ad
+.sp .6
+.RS 4n
+Stop reading video data.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_ENUMINPUT\fR
+.ad
+.sp .6
+.RS 4n
+Enumerate all device inputs. Currently, the \fBusbvc\fR driver supports one
+input only.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_G_INPUT\fR
+.ad
+.sp .6
+.RS 4n
+Get the device's current input. At this time, the \fBusbvc\fR driver supports
+one input only.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_S_INPUT\fR
+.ad
+.sp .6
+.RS 4n
+Set the device's current input. At this time, the \fBusbvc\fR driver supports
+one input only.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_QUERYCTRL\fR
+.ad
+.sp .6
+.RS 4n
+Query the device and driver for supported video controls. Currently, the
+\fBusbvc\fR driver supports the brightness, contrast, saturation, hue, and
+gamma video controls.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_G_CTRL\fR
+.ad
+.sp .6
+.RS 4n
+Get the device's current video control.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_S_CTRL\fR
+.ad
+.sp .6
+.RS 4n
+Set the device's current video control.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_G_PARM\fR
+.ad
+.sp .6
+.RS 4n
+Get streaming parameters, the number of frames per second and number of buffers
+used internally by driver in read/write mode.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVIDIOC_S_PARM\fR
+.ad
+.sp .6
+.RS 4n
+Set streaming parameters, the number of frames per second and number of buffers
+used internally by driver in read/write mode.
+.RE
+
+.SH ERRORS
+.ne 2
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+An open was attempted after the device has already been opened.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+An unsupported ioctl is received or an ioctl is attempted with an out-of-range
+value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+The driver received an unrecoverable device error or the device did not
+respond or the device stalled when attempting an access. A \fBread\fR(2) or
+\fBioctl\fR(2) did not complete due to a peripheral access.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 10n
+The driver received an \fBopen\fR(2) request for a device for which the attach
+failed.
+.RE
+
+.sp
+.ne 2
+.na
+\fBENODEV\fR
+.ad
+.RS 10n
+The driver received an \fBopen\fR(2) request for a disconnected device.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/kernel/drv/usbvc\fR\fR
+.ad
+.sp .6
+.RS 4n
+32-bit ELF kernel module. (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/usbvc\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit ELF kernel module. (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/usbvc\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit ELF kernel module. (SPARC)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/usb/*/*/*\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBugen\fR(4D) nodes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/videoN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Device node for isochronous input from USB video device and device control.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	 SPARC, x86, PCI-based systems
+.TE
+
+.SH SEE ALSO
+.LP
+.BR ioctl (2),
+.BR mmap (2),
+.BR open (2),
+.BR read (2),
+.BR ugen (4D),
+.BR usba (4D),
+.BR attributes (7),
+.BR cfgadm_usb (8),
+.BR attach (9E)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.sp
+.LP
+\fIUniversal Serial Bus Specification 1.0, 1.1 and 2.0\fR\(em 1996, 1998, 2000
+.sp
+.LP
+\fIUSB Device Class Definition for Video Devices 1.0 and 1.1\fR\(em 2003, 2005
+.sp
+.LP
+\fIVideo4Linux2 API (V4L2), Version 0.20\fR
+.sp
+.LP
+\fIhttp://www.usb.org\fR
+.sp
+.LP
+\fIhttp://www.thedirks.org/v4l2\fR
+.SH DIAGNOSTICS
+.LP
+In addition to being logged, the following messages may appear on the system
+console. All messages are formatted in the following manner:
+.sp
+.in +2
+.nf
+Warning: <device path> (usbvc<instance num>):Error Message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBDevice was disconnected while open. Data may have been lost.\fR
+.ad
+.sp .6
+.RS 4n
+The device has been hot-removed or powered off while it was open and a possible
+data transfer was in progress. The job may be aborted.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCannot access <device>. Please reconnect.\fR
+.ad
+.sp .6
+.RS 4n
+This device has been disconnected because a device other than the original one
+has been inserted. The driver informs you of this fact by displaying the name
+of the original device.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDevice is not identical to the previous one on this port. Please disconnect
+and reconnect.\fR
+.ad
+.sp .6
+.RS 4n
+The device was hot-removed while open. A new device was hot-inserted which is
+not identical to the original device. Please disconnect the device and
+reconnect the original device to the same port.
+.RE
+
+.SH NOTES
+.LP
+The USB video device will be power-managed when the device is idle.
+.sp
+.LP
+If a USB video device is hot-removed while active, a console warning is
+displayed requesting you to put the device back in the same port and telling
+you of potential data loss. Hot-removal of an active video device is strongly
+discouraged.
+.sp
+.LP
+Always close all applications before hot-removing or hot-inserting a device.
+If an application is open when a device is hot-removed, inserting the device
+in a different port will create new \fB/dev/video\fR\fIN\fR links. Moving
+an active device to another port is not recommended.

@@ -452,9 +452,14 @@ An error occurred.
 \fBdevmap_devmem_setup()\fR and \fBdevmap_umem_setup()\fR can be called from
 user, kernel, and interrupt context.
 .SH SEE ALSO
-\fBexit\fR(2), \fBfork\fR(2), \fBmmap\fR(2), \fBmunmap\fR(2), \fBdevmap\fR(9E),
-\fBddi_umem_alloc\fR(9F), \fBddi_device_acc_attr\fR(9S),
-\fBdevmap_callback_ctl\fR(9S)
+.BR exit (2),
+.BR fork (2),
+.BR mmap (2),
+.BR munmap (2),
+.BR devmap (9E),
+.BR ddi_umem_alloc (9F),
+.BR ddi_device_acc_attr (9S),
+.BR devmap_callback_ctl (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

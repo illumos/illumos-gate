@@ -156,7 +156,7 @@ The \fBinet6_opt_get_val()\fR function returns the \fIoffset\fR for the next
 field (that is, \fIoffset\fR + \fIvallen\fR) which can be used when extracting
 option content with multiple fields.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp

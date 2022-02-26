@@ -2584,7 +2584,7 @@ dt_node_provider(char *name, dt_node_t *probes)
 
 	/*
 	 * Check to see if the provider is already defined or visible through
-	 * dtrace(7D).  If so, set dn_provred to treat it as a re-declaration.
+	 * dtrace(4D).  If so, set dn_provred to treat it as a re-declaration.
 	 * If not, create a new provider and set its interface-only flag.  This
 	 * flag may be cleared later by calls made to dt_probe_declare().
 	 */
@@ -4438,7 +4438,7 @@ dt_cook_provider(dt_node_t *dnp, uint_t idflags)
 
 	/*
 	 * If we're declaring a provider for the first time and it is unknown
-	 * to dtrace(7D), insert the probe definitions into the provider's hash.
+	 * to dtrace(4D), insert the probe definitions into the provider's hash.
 	 * If we're redeclaring a known provider, verify the interface matches.
 	 */
 	for (pnp = dnp->dn_probes; pnp != NULL; pnp = pnp->dn_list) {

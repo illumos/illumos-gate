@@ -1,0 +1,461 @@
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+.\"
+.Dd June 6, 2019
+.Dt SMBADM 8
+.Os
+.Sh NAME
+.Nm smbadm
+.Nd configure and manage SMB local groups and users, and manage domain
+membership
+.Sh SYNOPSIS
+.Nm
+.Cm create
+.Op Fl d Ar description
+.Ar group
+.Nm
+.Cm delete
+.Ar group
+.Nm
+.Cm rename
+.Ar group new-group
+.Nm
+.Cm show
+.Op Fl mp
+.Op Ar group
+.Nm
+.Cm get
+.Oo Fl p Ar property Oc Ns ...
+.Ar group
+.Nm
+.Cm set
+.Fl p Ar property Ns = Ns Ar value
+.Oo Fl p Ar property Ns = Ns Ar value Oc Ns ...
+.Ar group
+.Nm
+.Cm add-member
+.Fl m Ar member Oo Fl m Ar member Oc Ns ...
+.Ar group
+.Nm
+.Cm remove-member
+.Fl m Ar member Oo Fl m Ar member Oc Ns ...
+.Ar group
+.Nm
+.Cm delete-user
+.Ar username
+.Nm
+.Cm disable-user
+.Ar username
+.Nm
+.Cm enable-user
+.Ar username
+.Nm
+.Cm join
+.Op Fl y
+.Fl u Ar username
+.Ar domain
+.Nm
+.Cm join
+.Op Fl y
+.Fl w Ar workgroup
+.Nm
+.Cm list
+.Nm
+.Cm lookup
+.Ar account-name Oo Ar account-name Oc Ns ...
+.Sh DESCRIPTION
+The
+.Nm
+command is used to configure SMB local groups and users, and to manage domain
+membership.
+You can also use the
+.Nm
+command to enable or disable SMB password generation for individual local users.
+.Pp
+SMB local groups can be used when Windows accounts must be members of some local
+groups and when Windows style privileges must be granted.
+System local groups cannot provide these functions.
+.Pp
+There are two types of local groups: user defined and built-in.
+Built-in local groups are predefined local groups to support common
+administration tasks.
+.Pp
+In order to provide proper identity mapping between SMB local groups and
+system groups, a SMB local group must have a corresponding system group.
+This requirement has two consequences: first, the group name must conform to the
+intersection of the Windows and system group name rules.
+Thus, a SMB local group name can be up to eight (8) characters long and contain
+only lowercase characters and numbers.
+Second, a system local group has to be created before a SMB local group can
+be created.
+.Pp
+Built-in groups are standard Windows groups and are predefined by the SMB
+service.
+The built-in groups cannot be added, removed, or renamed, and these groups do
+not follow the SMB local group naming conventions.
+.Pp
+When the SMB server is started, the following built-in groups are available:
+.Bl -tag -width "Backup Operators"
+.It Sy Administrators
+Group members can administer the system.
+.It Sy Backup Operators
+Group members can bypass file access controls to back up and restore files.
+.It Sy Power Users
+Group members can share directories.
+.El
+.Pp
+System local users must have an SMB password for authentication and to gain
+access to SMB resources.
+This password is created by using the
+.Xr passwd 1
+command when the
+.Sy pam_smb_password
+module is added to the system's PAM configuration.
+See the
+.Xr pam_smb_passwd 7
+man page.
+.Pp
+The
+.Cm disable-user
+and
+.Cm enable-user
+subcommands control SMB password-generation for a specified local user.
+When disabled, the user is prevented from connecting to the SMB service.
+By default, SMB password-generation is enabled for all local users.
+.Pp
+To reenable a disabled user, you must use the
+.Cm enable-user
+subcommand and then reset the user's password by using the
+.Nm passwd
+command.
+The
+.Pa pam_smb_passwd.so.1
+module must be added to the system's PAM configuration to generate an SMB
+password.
+.Ss Escaping Backslash Character
+For the
+.Cm add-member ,
+.Cm remove-member ,
+and
+.Cm join
+.Po with
+.Fl u
+.Pc
+subcommands, the backslash character
+.Pq Qq \e
+is a valid separator between member or user names and domain names.
+The backslash character is a shell special character and must be quoted.
+For example, you might escape the backslash character with another backslash
+character:
+.Ar domain Ns \e\e Ns Ar username .
+For more information about handling shell special characters, see the man page
+for your shell.
+.Sh OPERANDS
+The
+.Nm
+command uses the following operands:
+.Bl -tag -width "username"
+.It Ar domain
+Specifies the name of an existing Windows domain to join.
+.It Ar group
+Specifies the name of the SMB local group.
+.It Ar username
+Specifies the name of a system local user.
+.El
+.Sh SUBCOMMANDS
+The
+.Nm
+command includes these subcommands:
+.Bl -tag -width Ds
+.It Xo
+.Cm create
+.Op Fl d Ar description
+.Ar group
+.Xc
+Creates a SMB local group with the specified name.
+You can optionally specify a description of the group by using the
+.Fl d
+option.
+.It Xo
+.Cm delete
+.Ar group
+.Xc
+Deletes the specified SMB local group.
+The built-in groups cannot be deleted.
+.It Xo
+.Cm rename
+.Ar group new-group
+.Xc
+Renames the specified SMB local group.
+The group must already exist.
+The built-in groups cannot be renamed.
+.It Xo
+.Cm show
+.Op Fl mp
+.Op Ar group
+.Xc
+Shows information about the specified SMB local group or groups.
+If no group is specified, information is shown for all groups.
+If the
+.Fl m
+option is specified, the group members are also shown.
+If the
+.Fl p
+option is specified, the group privileges are also shown.
+.It Xo
+.Cm get
+.Oo Fl p Ar property Ns = Ns Ar value Oc Ns ...
+.Ar group
+.Xc
+Retrieves property values for the specified group.
+If no property is specified, all property values are shown.
+.It Xo
+.Cm set
+.Fl p Ar property Ns = Ns Ar value
+.Oo Fl p Ar property Ns = Ns Ar value Oc Ns ...
+.Ar group
+.Xc
+Sets configuration properties for a SMB local group.
+The description and the privileges for the built-in groups cannot be changed.
+.Pp
+The
+.Fl p Ar property Ns = Ns Ar value
+option specifies the list of properties to be set on the specified group.
+.Pp
+The group-related properties are as follows:
+.Bl -tag -width Ds
+.It Cm backup Ns = Ns Cm on Ns | Ns Cm off
+Specifies whether members of the SMB local group can bypass file access controls
+to back up file system objects.
+.It Cm description Ns = Ns Ar description-text
+Specifies a text description for the SMB local group.
+.It Cm restore Ns = Ns Cm on Ns | Ns Cm off
+Specifies whether members of the SMB local group can bypass file access controls
+to restore file system objects.
+.It Cm take-ownership Ns = Ns Cm on Ns | Ns Cm off
+Specifies whether members of the SMB local group can take ownership of file
+system objects.
+.It Cm bypass-read Ns = Ns Cm on Ns | Ns Cm off
+Specifies whether members of the SMB local group can always bypass Read access controls.
+.It Cm bypass-write Ns = Ns Cm on Ns | Ns Cm off
+Specifies whether members of the SMB local group can always bypass Write and Delete access controls.
+.El
+.It Xo
+.Cm add-member
+.Fl m Ar member Oo Fl m Ar member Oc Ns ...
+.Ar group
+.Xc
+Adds the specified member to the specified SMB local group.
+The
+.Fl m Ar member
+option specifies the name of a SMB local group member.
+The member name must include an existing user name and an optional domain name.
+.Pp
+Specify the member name in either of the following formats:
+.Bd -literal -offset indent
+[domain\e]username
+[domain/]username
+.Ed
+.Pp
+For example, a valid member name might be
+.Sy sales\eterry
+or
+.Sy sales/terry ,
+where
+.Sy sales
+is the Windows domain name and
+.Sy terry
+is the name of a user in the
+.Sy sales
+domain.
+.It Xo
+.Cm remove-member
+.Fl m Ar member Oo Fl m Ar member Oc Ns ...
+.Ar group
+.Xc
+Removes the specified member from the specified SMB local group.
+The
+.Fl m Ar member
+option specifies the name of a SMB local group member.
+The member name must include an existing user name and an optional domain name.
+.Pp
+Specify the member name in either of the following formats:
+.Bd -literal -offset indent
+[domain\e]username
+[domain/]username
+.Ed
+.Pp
+For example, a valid member name might be
+.Sy sales\eterry
+or
+.Sy sales/terry ,
+where
+.Sy sales
+is the Windows domain name and
+.Sy terry
+is the name of a user in the
+.Sy sales
+domain.
+.It Xo
+.Cm delete-user
+.Ar username
+.Xc
+Deletes SMB password for the specified local user effectively preventing the
+access by means of the SMB service.
+Use
+.Nm passwd
+command to create the SMB password and re-enable access.
+.It Xo
+.Cm disable-user
+.Ar username
+.Xc
+Disables SMB password-generation capabilities for the specified local user
+effectively preventing access by means of the SMB service.
+When a local user account is disabled, you cannot use the
+.Nm passwd
+command to modify the user's SMB password until the user account is re-enabled.
+.It Xo
+.Cm enable-user
+.Ar username
+.Xc
+Enables SMB password-generation capabilities for the specified local user and
+re-enables access.
+After the password-generation capabilities are re-enabled, use the
+.Nm passwd
+command to generate the SMB password for the local user.
+.Pp
+The
+.Nm passwd
+command manages both the system password and SMB password for this user if the
+.Pa pam_smb_passwd
+module has been added to the system's PAM configuration.
+.It Xo
+.Cm join
+.Op Fl y
+.Fl u Ar username
+.Ar domain
+.Xc
+Joins a Windows domain.
+.Pp
+An authenticated user account is required to join a domain, so you must specify
+the Windows administrative user name with the
+.Fl u
+option.
+If the password is not specified on the command line, the user is prompted for
+it.
+This user should be the domain administrator or any user who has administrative
+privileges for the target domain.
+.Pp
+.Ar username
+and
+.Ar domain
+can be entered in any of the following formats:
+.Bd -literal -offset indent
+username[+password] domain
+domain\eusername[+password]
+domain/username[+password]
+username@domain
+.Ed
+.Pp
+\&...where
+.Ar domain
+can be the NetBIOS or DNS domain name.
+.Pp
+If a machine trust account for the system already exists on a domain controller,
+any authenticated user account can be used when joining the domain.
+However, if the machine trust account does
+.Em not
+already exist, an account that has administrative privileges on the domain is
+required to join the domain.
+Specifying
+.Fl y
+will bypass the SMB service restart prompt.
+.It Xo
+.Cm join
+.Op Fl y
+.Fl w Ar workgroup
+.Xc
+Joins a Windows workgroup.
+.Pp
+The default mode for the SMB service is workgroup mode, which uses the default
+workgroup name,
+.Qq WORKGROUP .
+.Pp
+The
+.Fl w Ar workgroup
+option specifies the name of the workgroup to join when using the
+.Cm join
+subcommand.
+Specifying
+.Fl y
+will bypass the SMB service restart prompt.
+.It Cm list
+Shows information about the current workgroup or domain.
+The information typically includes the workgroup name or the primary domain
+name.
+When in domain mode, the information includes domain controller names and
+trusted domain names.
+.Pp
+Each entry in the output is identified by one of the following tags:
+.Bl -tag -width "[*]"
+.It Sy [*]
+Primary domain
+.It Sy [.]
+Local domain
+.It Sy [-]
+Other domains
+.It Sy [+]
+Selected domain controller
+.El
+.It Xo
+.Cm lookup
+.Ar account-name Oo Ar account-name Oc Ns ...
+.Xc
+Lookup the SID for the given
+.Ar account-name ,
+or lookup the
+.Ar account-name
+for the given SID.
+This subcommand is primarily for diagnostic use, to confirm whether the server
+can lookup domain accounts and/or SIDs.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh INTERFACE STABILITY
+Utility name and options are
+.Sy Uncommitted .
+Utility output format is
+.Sy Not-An-Interface .
+.Sh SEE ALSO
+.Xr passwd 1 ,
+.Xr smb 5 ,
+.Xr smbautohome 5 ,
+.Xr attributes 7 ,
+.Xr pam_smb_passwd 7 ,
+.Xr smf 7 ,
+.Xr groupadd 8 ,
+.Xr idmap 8 ,
+.Xr idmapd 8 ,
+.Xr kclient 8 ,
+.Xr share 8 ,
+.Xr sharectl 8 ,
+.Xr sharemgr 8 ,
+.Xr smbd 8 ,
+.Xr smbstat 8

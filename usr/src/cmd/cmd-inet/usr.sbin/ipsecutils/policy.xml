@@ -102,7 +102,7 @@
 			svcadm mark <state> policy
 			svcadm clear policy
 
-		see auths(1) and user_attr(4)-->
+		see auths(1) and user_attr(5)-->
 
 		<propval
 			name='action_authorization'
@@ -113,7 +113,7 @@
 			svcadm disable policy
 			svcadm enable policy
 
-		see auths(1) and user_attr(4)-->
+		see auths(1) and user_attr(5)-->
 
 		<propval
 			name='value_authorization'
@@ -123,8 +123,8 @@
 	</property_group>
 
 	<!-- The properties defined below can be changed by a user
-	with 'solaris.smf.value.ipsec' authorization using the 
-	svccfg(1M) command.
+	with 'solaris.smf.value.ipsec' authorization using the
+	svccfg(8) command.
 
 	EG:
 
@@ -176,7 +176,7 @@
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='ipsecconf' section='1M'
+			<manpage title='ipsecconf' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

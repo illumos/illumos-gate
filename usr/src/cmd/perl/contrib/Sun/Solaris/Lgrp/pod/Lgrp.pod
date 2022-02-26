@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Sun::Solaris::Lgrp documentation.
@@ -702,7 +700,7 @@ version 1.
 
 =head1 ATTRIBUTES
 
-See L<attributes(5)> for descriptions of the following attributes:
+See L<attributes(7)> for descriptions of the following attributes:
 
   ___________________________________________________________
  |       ATTRIBUTE TYPE        |       ATTRIBUTE VALUE       |
@@ -733,6 +731,6 @@ L<lgrp_version(3LGRP)>,
 L<lgrp_view(3LGRP)>,
 L<lgrp_resources(3LGRP)>,
 L<lgrp_latency_cookie(3LGRP)>,
-L<attributes(5)>
+L<attributes(7)>
 
 =cut

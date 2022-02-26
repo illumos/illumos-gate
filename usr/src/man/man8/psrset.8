@@ -1,0 +1,553 @@
+'\" te
+.\"  Copyright (c) 2013, Joyent, Inc. All Rights Reserved
+.\"  Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PSRSET 8 "Mar 11, 2013"
+.SH NAME
+psrset \- creation and management of processor sets
+.SH SYNOPSIS
+.LP
+.nf
+\fBpsrset\fR \fB-a\fR [\fB-F\fR] \fIprocessor_set_id\fR \fIprocessor_id\fR...
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-b\fR \fIprocessor_set_id\fR \fIpid\fR [\fI/lwpid\fR]...
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-b\fR \fB-z\fR \fIzone name\fR \fIprocessor_set_id\fR
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-c\fR [\fB-F\fR] [\fIprocessor_id\fR]...
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-d\fR \fIprocessor_set_id\fR...
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-e\fR \fIprocessor_set_id\fR \fIcommand\fR [\fIargument(s)\fR]
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-f\fR \fIprocessor_set_id\fR
+.fi
+
+.LP
+.nf
+\fBpsrset\fR [\fB-i\fR] [\fIprocessor_set_id\fR]...
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-n\fR \fIprocessor_set_id\fR
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-p\fR [\fIprocessor_id\fR]...
+.fi
+
+.LP
+.nf
+\fBpsrset\fR [\fB-q\fR] [\fIpid\fR [\fI/lwpid\fR]]...
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-Q\fR [\fIprocessor_set_id\fR]...
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-r\fR [\fB-F\fR] \fIprocessor_id\fR...
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-u\fR \fIpid\fR [\fI/lwpid\fR]...
+.fi
+
+.LP
+.nf
+\fBpsrset\fR \fB-U\fR [\fIprocessor_set_id\fR]...
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBpsrset\fR utility controls the management of processor sets. Processor
+sets allow the binding of processes or LWPs to groups of processors, rather
+than just a single processor. Processors assigned to processor sets can run
+only LWPs that have been bound to that processor set.
+.sp
+.LP
+This command cannot be used to modify processor disposition when pools are
+enabled. Use \fBpooladm\fR(8) and \fBpoolcfg\fR(8) to modify processor set
+configuration through the resource pools facility.
+.SH OPTIONS
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+Assign the specified processors to the specified processor set. With the
+additional \fB-F\fR option, all LWPs bound to the specified processors will be
+unbound prior to changing processor sets.
+.sp
+This option is restricted to users with the \fBPRIV_SYS_RES_CONFIG\fR
+privilege.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-b\fR [\fB-z\fR \fIzonename\fR]
+.ad
+.RS 6n
+Bind all or a subset of the \fBLWP\fRs of the specified processes to the
+specified processor set. If \fB-z\fR is specified, all processes and threads
+inside the specified zone are bound to the processor set.
+.sp
+LWPs bound to a processor set are restricted to run only on the processors in
+that set. Processes can only be bound to non-empty processor sets, that is,
+processor sets that have had processors assigned to them.
+.sp
+Bindings are inherited, so new LWPs and processes created by a bound LWP have
+the same binding. Binding an interactive shell to a processor, for example,
+binds all commands executed by the shell.
+.sp
+This option is restricted to users with the \fBPRIV_SYS_RES_CONFIG\fR
+privilege.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 6n
+Create a new processor set and displays the new processor set \fBID\fR. With
+the additional \fB-F\fR option, all LWPs bound to the specified processors will
+be unbound prior to assigning them to the processor set being created.
+.sp
+If a list of processors is given, it also attempts to assign those processors
+to the processor set. If this succeeds, the processors are idle until
+\fBLWP\fRs are bound to the processor set. This option is restricted to users
+with the \fBPRIV_SYS_RES_CONFIG\fR privilege.
+.sp
+Only a limited number of processor sets can be active (created and not
+destroyed) at a given time. This limit is always be greater than the number of
+processors in the system. If the \fB-c\fR option is used when the maximum
+number of processor sets is already active, the command fails.
+.sp
+The following format is used for the first line of output of the \fB-c\fR
+option when the \fBLC_MESSAGES\fR locale category specifies the "C" locale. In
+other locales, the strings \fBcreated\fR, \fBprocessor\fR, and \fBset\fR can be
+replaced with more appropriate strings corresponding to the locale.
+.sp
+.in +2
+.nf
+"created processor set %d\en" \fIprocessor set ID\fR
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 6n
+Remove the specified processor set, releasing all processors and processes
+associated with it.
+.sp
+This option is restricted to users with the \fBPRIV_SYS_RES_CONFIG\fR
+privilege.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 6n
+Execute a command (with optional arguments) in the specified processor set.
+.sp
+The command process and any child processes are executed only by processors in
+the processor set.
+.sp
+This option is restricted to users with the \fBPRIV_SYS_RES_CONFIG\fR
+privilege.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+Disables interrupts for all processors within the specified processor set. See
+\fBpsradm\fR(8).
+.sp
+If some processors in the set cannot have their interrupts disabled, the other
+processors still have their interrupts disabled, and the command reports an
+error and return non-zero exit status.
+.sp
+This option is restricted to users with the \fBPRIV_SYS_RES_CONFIG\fR
+privilege.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 6n
+Forces the specified processor set operation by unbinding all threads bound to
+the specified processor. Only the \fB-a\fR or the \fB-r\fR option can be used
+in combination with this option. Administrators are encouraged to use the
+\fB-Q\fR option for \fBpbind\fR(8) to find out which threads will be affected
+by such operation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 6n
+Display a list of processors assigned to each named processor set. If no
+argument is given, a list of all processor sets and the processors assigned to
+them is displayed. This is also the default operation if the \fBpsrset\fR
+command is not given an option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+Enable interrupts for all processors within the specified processor set. See
+\fBpsradm\fR(8).
+.sp
+This option is restricted to users with the \fBPRIV_SYS_RES_CONFIG\fR
+privilege.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+Display the processor set assignments for the specified list of processors. If
+no argument is given, the processor set assignments for all processors in the
+system is given.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 6n
+Display the processor set bindings of the specified processes or of all
+processes. If a process is composed of multiple \fBLWP\fRs which have different
+bindings and the LWPs are not explicitly specified, the bindings of only one of
+the bound \fBLWP\fRs is displayed. The bindings of a subset of LWPs can be
+displayed by appending "/lwpids" to the process \fBID\fRs. Multiple LWPs may be
+selected using "-" and "," delimiters. See EXAMPLES.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-Q\fR\fR
+.ad
+.RS 6n
+Display the LWPs bound to the specified list of processor sets, or all LWPs
+with processor set bindings.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+Remove a list of processors from their current processor sets. Processors that
+are removed return to the general pool of processors.
+.sp
+Processors with \fBLWP\fRs bound to them using \fBpbind\fR(8) can be assigned
+to or removed from processor sets using the \fB-F\fR option.
+.sp
+This option is restricted to users with the \fBPRIV_SYS_RES_CONFIG\fR
+privilege.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 6n
+Remove the processor set bindings of a subset or all the \fBLWP\fRs of the
+specified processes, allowing them to be executed on any on-line processor if
+they are not bound to individual processors through \fBpbind\fR.
+.sp
+Users with the \fBPRIV_SYS_RES_CONFIG\fR privilege can unbind any process or
+LWP from any active processor set. Other users can unbind processes and LWPs
+from processor sets that do not have the \fBPSET_NOESCAPE\fR attribute set. In
+addition, the user must have permission to control the affected processes; the
+real or effective user ID of the user must match the real or saved user ID of
+the target processes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-U\fR\fR
+.ad
+.RS 6n
+Removes the bindings of all LWPs bound to the specified list of processor sets,
+or to any processor set if no argument is specified.
+.RE
+
+.SH OPERANDS
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fB\fIpid\fR\fR
+.ad
+.RS 20n
+Specify \fIpid\fR as a process \fBID\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIlwpid\fR\fR
+.ad
+.RS 20n
+The set of LWP\fBID\fRs of the specified process to be controlled or queried.
+The syntax for selecting LWP \fBID\fRs is as follows:
+.sp
+.in +2
+.nf
+2,3,4-8       LWP IDs 2, 3, and 4 through 8
+-4            LWPs whose IDs are 4 or below
+4-            LWPs whose IDs are 4 or above
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIprocessor_id\fR\fR
+.ad
+.RS 20n
+Specify \fIprocessor_id\fR as an individual processor number (for example,
+\fB3\fR), multiple processor numbers separated by spaces (for example, \fB1 2
+3\fR), or a range of processor numbers (for example, \fB1-4\fR). It is also
+possible to combine ranges and (individual or multiple) \fIprocessor_id\fRs
+(for example, \fB1-3 5 7-8 9\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIprocessor_set_id\fR\fR
+.ad
+.RS 20n
+Specify \fIprocessor_set_id\fR as a processor set \fBID\fR.
+.RE
+
+.SH EXIT STATUS
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 9n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fBnon-0\fR
+.ad
+.RS 9n
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability Level	Stable
+.TE
+
+.SH SEE ALSO
+.LP
+.BR processor_bind (2),
+.BR processor_info (2),
+.BR pset_bind (2),
+.BR pset_create (2),
+.BR pset_info (2),
+.BR sysconf (3C),
+.BR libpool (3LIB),
+.BR attributes (7),
+.BR privileges (7),
+.BR pbind (8),
+.BR pooladm (8),
+.BR poolcfg (8),
+.BR psradm (8),
+.BR psrinfo (8)
+.SH DIAGNOSTICS
+.LP
+The following output indicates that the specified process did not exist or has
+exited:
+.sp
+.in +2
+.nf
+psrset: cannot query pid 31: No such process
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following output indicates that the user does not have permission to bind
+the process:
+.sp
+.in +2
+.nf
+psrset: cannot bind pid 31: Not owner
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following output indicates that the user does not have permission to assign
+the processor:
+.sp
+.in +2
+.nf
+psrset: cannot assign processor 4: Not owner
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following output indicates that the specified processor is not on-line, or
+the specified processor does not exist.
+.sp
+.in +2
+.nf
+psrset: cannot assign processor 8: Invalid argument
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following output indicates that an \fBLWP\fR in the specified process is
+bound to a processor and cannot be bound to a processor set that does not
+include that processor:
+.sp
+.in +2
+.nf
+psrset: cannot bind pid 67: Device busy
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following output indicates that the specified processor could not be added
+to the processor set. This can be due to bound \fBLWP\fRs on that processor, or
+because that processor cannot be combined in the same processor set with other
+processors in that set, or because the processor is the last one in its current
+processor set:
+.sp
+.in +2
+.nf
+psrset: cannot assign processor 7: Device busy
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following output indicates that the specified processor set does not exist:
+.sp
+.in +2
+.nf
+psrset: cannot execute in processor set 8: Invalid argument
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following output indicates that the maximum number of processor sets
+allowed in the system is already active:
+.sp
+.in +2
+.nf
+psrset: cannot create processor set: Not enough space
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following output indicates that the pools facility is active.
+.sp
+.in +2
+.nf
+psrset: cannot assign processor 7: Operation not supported
+psrset: cannot bind pid 31: Operation not supported
+psrset: cannot bind pid 31: Operation not supported
+psrset: could not create processor set: Operation not supported
+psrset: could not remove processor set 1: Operation not supported
+psrset: cannot exec in processor set 1: Operation not supported
+psrset: cannot remove processor 7: Operation not supported
+psrset: cannot unbind pid 31: Operation not supported
+.fi
+.in -2
+.sp
+

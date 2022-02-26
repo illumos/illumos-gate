@@ -92,10 +92,10 @@
 		</exec_method>
 
 		<exec_method
-	    		type='method'
-	    		name='inetd_disable'
-	    		exec=':kill'
-	    		timeout_seconds='0'>
+			type='method'
+			name='inetd_disable'
+			exec=':kill'
+			timeout_seconds='0'>
 		</exec_method>
 
 		<property_group name='firewall_config' type='com.sun,fw_configuration'>
@@ -176,9 +176,9 @@ remote shell with Kerberos authentication
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='in.rshd' section='1M'
+			<manpage title='in.rshd' section='8'
 			    manpath='/usr/share/man' />
-			<manpage title='rshd' section='1M'
+			<manpage title='rshd' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

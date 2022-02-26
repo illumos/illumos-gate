@@ -96,4 +96,4 @@ in
 .Sh SEE ALSO
 .Xr unlink 2 ,
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

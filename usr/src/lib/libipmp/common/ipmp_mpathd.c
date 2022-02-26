@@ -25,7 +25,7 @@
  */
 
 /*
- * Low-level interfaces for communicating with in.mpathd(1M).
+ * Low-level interfaces for communicating with in.mpathd(8).
  *
  * These routines are not intended for use outside of libipmp.
  */

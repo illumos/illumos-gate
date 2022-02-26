@@ -41,7 +41,7 @@ shutdown_zones()
 [ ! -x /usr/sbin/zoneadm ] && exit 0	# SUNWzoneu not installed
 
 if [ -z "$SMF_FMRI" ]; then
-	echo "this script can only be invoked by smf(5)"	
+	echo "this script can only be invoked by smf(7)"	
 	exit $SMF_EXIT_ERR_NOSMF
 fi
 

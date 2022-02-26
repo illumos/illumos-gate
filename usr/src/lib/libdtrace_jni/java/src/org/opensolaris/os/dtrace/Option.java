@@ -520,7 +520,7 @@ public final class Option implements Serializable {
      * Only output explicitly traced data (no option value).  Makes no
      * difference to generated {@link ProbeData}, but user apps may use
      * the {@code quiet} flag as a rendering hint similar to the {@code
-     * -q} {@code dtrace(1M)} command option.  Runtime option.
+     * -q} {@code dtrace(8)} command option.  Runtime option.
      */
     public static final String quiet = "quiet";
     /** Speculation buffer size (size).  Runtime option. */

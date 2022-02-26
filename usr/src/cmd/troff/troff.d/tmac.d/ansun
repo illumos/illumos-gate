@@ -1,6 +1,5 @@
-.\"		Copyright Notice 
-.\" ident	"%Z%%M%	%I%	%E% SMI"
-.\"Notice of copyright on this source code product does not indicate 
+.\"		Copyright Notice
+.\"Notice of copyright on this source code product does not indicate
 .\"publication.
 .\"
 .\" Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
@@ -201,7 +200,7 @@
 .                       ds ]L
 .                       ds T1 \\*(]W
 .                       ds ]W
-.                       bp 
+.                       bp
 .               \}
 .       \}
 .\}
@@ -209,14 +208,12 @@
 .if '\\$2'1' .ds ]D User Commands
 .if '\\$2'1B' .ds ]D SunOS/BSD Compatibility Package Commands
 .if '\\$2'1b' .ds ]D SunOS/BSD Compatibility Package Commands
-.if '\\$2'1C' .ds ]D Communication Commands 
+.if '\\$2'1C' .ds ]D Communication Commands
 .if '\\$2'1c' .ds ]D Communication Commands
-.if '\\$2'1F' .ds ]D FMLI Commands 
+.if '\\$2'1F' .ds ]D FMLI Commands
 .if '\\$2'1f' .ds ]D FMLI Commands
-.if '\\$2'1G' .ds ]D Graphics and CAD Commands 
-.if '\\$2'1g' .ds ]D Graphics and CAD Commands 
-.if '\\$2'1M' .ds ]D Maintenance Commands
-.if '\\$2'1m' .ds ]D Maintenance Commands
+.if '\\$2'1G' .ds ]D Graphics and CAD Commands
+.if '\\$2'1g' .ds ]D Graphics and CAD Commands
 .if '\\$2'1S' .ds ]D SunOS Specific Commands
 .if '\\$2'1s' .ds ]D SunOS Specific Commands
 .if '\\$2'2' .ds ]D System Calls
@@ -333,27 +330,29 @@
 .if '\\$2'3x' .ds ]D Miscellaneous Library Functions
 .if '\\$2'3XC' .ds ]D X/Open Curses Library Functions
 .if '\\$2'3xc' .ds ]D X/Open Curses Library Functions
-.if '\\$2'3XN' .ds ]D X/Open Networking Services Library Functions 
+.if '\\$2'3XN' .ds ]D X/Open Networking Services Library Functions
 .if '\\$2'3xn' .ds ]D X/Open Networking Services Library Functions
-.if '\\$2'4' .ds ]D File Formats
-.if '\\$2'4B' .ds ]D SunOS/BSD Compatibility Package File Formats
-.if '\\$2'4b' .ds ]D SunOS/BSD Compatibility Package File Formats
-.if '\\$2'5' .ds ]D Standards, Environments, and Macros
+.if '\\$2'4' .ds ]D Device and Network Interfaces
+.if '\\$2'4B' .ds ]D SunOS/BSD Compatibility Special Files
+.if '\\$2'4b' .ds ]D SunOS/BSD Compatibility Special Files
+.if '\\$2'4D' .ds ]D Devices
+.if '\\$2'4d' .ds ]D Devices
+.if '\\$2'4FS' .ds ]D File Systems
+.if '\\$2'4fs' .ds ]D File Systems
+.if '\\$2'4I' .ds ]D Ioctl Requests
+.if '\\$2'4i' .ds ]D Ioctl Requests
+.if '\\$2'4IPP' .ds ]D IP Quality of Service Modules
+.if '\\$2'4ipp' .ds ]D IP Quality of Service Modules
+.if '\\$2'4M' .ds ]D STREAMS Modules
+.if '\\$2'4m' .ds ]D STREAMS Modules
+.if '\\$2'4P' .ds ]D Protocols
+.if '\\$2'4p' .ds ]D Protocols
+.if '\\$2'5' .ds ]D File Formats
+.if '\\$2'5B' .ds ]D SunOS/BSD Compatibility Package File Formats
+.if '\\$2'5b' .ds ]D SunOS/BSD Compatibility Package File Formats
 .if '\\$2'6' .ds ]D Games and Demos
-.if '\\$2'7' .ds ]D Device and Network Interfaces
-.if '\\$2'7B' .ds ]D SunOS/BSD Compatibility Special Files
-.if '\\$2'7b' .ds ]D SunOS/BSD Compatibility Special Files
-.if '\\$2'7D' .ds ]D Devices
-.if '\\$2'7d' .ds ]D Devices
-.if '\\$2'7FS' .ds ]D File Systems
-.if '\\$2'7fs' .ds ]D File Systems
-.if '\\$2'7I' .ds ]D Ioctl Requests
-.if '\\$2'7i' .ds ]D Ioctl Requests
-.if '\\$2'7M' .ds ]D STREAMS Modules
-.if '\\$2'7m' .ds ]D STREAMS Modules
-.if '\\$2'7P' .ds ]D Protocols
-.if '\\$2'7p' .ds ]D Protocols
-.if '\\$2'8' .ds ]D Maintenance Procedures
+.if '\\$2'7' .ds ]D Standards, Environments, and Macros
+.if '\\$2'8' .ds ]D Maintenance Commands and Procedures
 .if '\\$2'8C' .ds ]D Maintenance Procedures
 .if '\\$2'8c' .ds ]D Maintenance Procedures
 .if '\\$2'8S' .ds ]D Maintenance Procedures
@@ -467,7 +466,7 @@
 .ie \\$1RETURN \{
 .       if \\$2VALUES \{
 .       ds s1 \\$1\\ \\$2
-.       ds      s2 
+.       ds      s2
 .       \}
 .\}
 .el \{\
@@ -501,7 +500,7 @@
 .de }X
 .if t .rs
 .}E
-.if t .in \\$1 
+.if t .in \\$1
 .if n .ti \\$1
 .sp \\n()Pu
 .sp \\n()Pu
@@ -509,7 +508,7 @@
 .ne 2
 .if t .mk #H
 .if t .nr )R 1i
-.if n .nr )R 0n 
+.if n .nr )R 0n
 .fi
 .it 1 }N
 .if t .ll 1.25i
@@ -581,7 +580,7 @@
 ..
 .	# small and boldface
 .de SB
-.ps -1 
+.ps -1
 .it 1 }N
 .if !"\\$1"" \&\f3\\$1 \\$2 \\$3 \\$4 \\$5 \\$6
 ..
@@ -597,7 +596,7 @@
 .ne 2
 .}E
 .nr )I .5i
-.ns 
+.ns
 ..
 .	# paragraph distance
 .de PD

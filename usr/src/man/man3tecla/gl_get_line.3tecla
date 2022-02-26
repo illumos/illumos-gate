@@ -273,7 +273,7 @@ UNIX \fBtcsh\fR shell. In addition to simple command-line editing, it supports
 recall of previously entered command lines, TAB completion of file names, and
 in-line wild-card expansion of filenames. Documentation of both the user-level
 command-line editing features and all user configuration options can be found
-on the \fBtecla\fR(5) manual page.
+on the \fBtecla\fR(7) manual page.
 .SS "An Example"
 The following shows a complete example of how to use the \fBgl_get_line()\fR
 function to get input from the user:
@@ -2339,7 +2339,7 @@ locale -a
 .sp
 .LP
 at the shell prompt. Further documentation on how the user can make use of this
-to enter international characters can be found in the \fBtecla\fR(5) man page.
+to enter international characters can be found in the \fBtecla\fR(7) man page.
 .SS "Thread Safety"
 Unfortunately neither \fBterminfo\fR nor \fBtermcap\fR were designed to be
 reentrant, so you cannot safely use the functions of the getline module in
@@ -2350,7 +2350,7 @@ directories, it is safe to use this module from a single thread of a
 multi-threaded program, provided that your other threads do not use any
 \fBtermcap\fR or \fBterminfo\fR functions.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -2366,6 +2366,10 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBcpl_complete_word\fR(3TECLA), \fBef_expand_file\fR(3TECLA),
-\fBgl_io_mode\fR(3TECLA), \fBlibtecla\fR(3LIB), \fBpca_lookup_file\fR(3TECLA),
-\fBattributes\fR(5), \fBtecla\fR(5)
+.BR libtecla (3LIB),
+.BR cpl_complete_word (3TECLA),
+.BR ef_expand_file (3TECLA),
+.BR gl_io_mode (3TECLA),
+.BR pca_lookup_file (3TECLA),
+.BR attributes (7),
+.BR tecla (7)

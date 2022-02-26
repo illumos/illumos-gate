@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
@@ -195,7 +194,7 @@ main(int argc, char *argv[])
 	tzset();
 	/*
 	 * We perform this validation only in case the user of
-	 * mount(1m) specified the "timezone=..." option. That's
+	 * mount(8) specified the "timezone=..." option. That's
 	 * because we don't want PCFS mounts to fail due to a
 	 * botched $TZ environment variable. If the admin's
 	 * environment contains garbage, it'll just parse as

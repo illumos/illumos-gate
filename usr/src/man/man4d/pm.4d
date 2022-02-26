@@ -1,0 +1,413 @@
+'\" te
+.\"  Copyright (c) 2001 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PM 4D "Sep 20, 1999"
+.SH NAME
+pm \- Power Management driver
+.SH SYNOPSIS
+.LP
+.nf
+\fB/dev/pm\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The Power Management ( \fBpm\fR) driver provides an interface for applications
+to configure devices within the system for Power Management. The interface is
+provided through \fBioctl\fR(2) commands. The \fBpm\fR driver may be accessed
+using \fB/dev/pm\fR.
+.SS "Power Management Framework"
+.sp
+.LP
+The Power Management framework model allows the system to be viewed as a
+collection of devices. Each device is a collection of components that comprise
+the smallest power manageable units. The device driver controls the definition
+of a device's power manageable components.
+.sp
+.LP
+A component can either be \fBbusy\fR or \fBidle\fR at the current power level.
+Normally, the Power Management framework takes an \fBidle\fR component to the
+next lower power level. The Power Management framework uses two factors to
+determine this transition: the component must have been idle for at least the
+threshold time, and the device to which the component belongs must satisfy any
+dependency requirements. A dependency occurs when a device requires another
+device to be power managed before it can be power managed. Dependencies occur
+on a per device basis: when a dependency exists, no components of a device may
+be managed unless all the devices it depends upon are first power managed.
+.sp
+.LP
+Using the commands below, an application may take control of the Power
+Management of a device from the Power Management framework driver and manage
+the transition of device power levels directly.
+.sp
+.LP
+For this set of ioctl commands, \fIarg\fR (see \fBioctl\fR(2)) points to a
+structure of type \fBpm_req\fR defined in <\fBsys/pm.h\fR>:
+.sp
+.in +2
+.nf
+typedef struct pm_req {
+         char *physpath;     /* physical path of device  */
+                             /* to configure. See libdevinfo(3LIB) */
+         int  component;     /* device component   */
+         int  value;         /* power level, threshold value, or count */
+         void *data;         /* command-dependent variable-sized data */
+         size_t  datasize;   /* size of data buffer */
+     } pm_req_t;
+.fi
+.in -2
+
+.sp
+.LP
+The fields should contain the following data:
+.sp
+.ne 2
+.na
+\fB\fIphyspath\fR\fR
+.ad
+.RS 13n
+Pointer to the physical path of a device. See \fBlibdevinfo\fR(3LIB). For
+example, for the device \fB/devices/pseudo/pm@0:pm\fR the \fIphyspath\fR value
+would be \fB/pseudo/pm@0\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIcomponent\fR\fR
+.ad
+.RS 13n
+Non-negative integer specifying which component is being configured. The
+numbering starts at zero.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIvalue\fR\fR
+.ad
+.RS 13n
+Non-negative integer specifying the threshold value in seconds or the desired
+power level, or the number of levels being specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIdata\fR\fR
+.ad
+.RS 13n
+Pointer to a buffer which contains or receives variable-sized data, such as the
+name of a device upon which this device has a dependency.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 13n
+Size of the data buffer.
+.RE
+
+.sp
+.LP
+Not all fields are used in each command.
+.sp
+.ne 2
+.na
+\fB\fBPM_DIRECT_PM\fR\fR
+.ad
+.sp .6
+.RS 4n
+The device named by \fIphyspath\fR is disabled from being power managed by the
+framework. The caller will power manage the device directly using the
+\fBPM_DIRECT_NOTIFY\fR, \fBPM_GET_TIME_IDLE\fR and \fBPM_GET_CURRENT_POWER\fR,
+\fBPM_GET_FULL_POWER\fR and \fBPM_SET_CURRENT_POWER\fR commands. If the device
+needs to have its power level changed either because its driver calls
+\fBpm_raise_power\fR(9F), \fBpm_lower_power\fR(9F), or
+\fBpm_power_has_changed\fR(9F) or because the device is the parent of another
+device that is changing power level or a device that this device depends on is
+changing power level, then the power level change of the device will be blocked
+and the caller will be notified as described below for the
+\fBPM_DIRECT_NOTIFY\fR command.
+.sp
+Error codes:
+.sp
+.ne 2
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 9n
+Device already disabled for Power Management by framework.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 9n
+Caller is neither superuser nor effective group ID of 0.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPM_RELEASE_DIRECT_PM\fR\fR
+.ad
+.sp .6
+.RS 4n
+The device named by \fIphyspath\fR (which must have been the target of a
+\fBPM_DIRECT_PM\fR command) is re-enabled for Power Management by the
+framework.
+.sp
+Error codes:
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+Device component out of range.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPM_DIRECT_NOTIFY \fR\fBPM_DIRECT_NOTIFY_WAIT\fR\fR
+.ad
+.sp .6
+.RS 4n
+These commands allow the process that is directly power managing a device to be
+notified of events that could change the power level of the device. When such
+an event occurs, this command returns information about the event.
+.sp
+ \fIarg\fR (see \fBioctl\fR(2)) points to a structure of type
+\fBpm_state_change\fR defined in \fB<sys/pm.h>\fR:
+.sp
+.in +2
+.nf
+typedef struct  pm_state_change {
+   char   *physpath;    /* device which has changed state */
+   int     component;   /* which component changed state */
+#if defined(_BIG_ENDIAN)
+	ushort_t flags;      /* PSC_EVENT_LOST, PSC_ALL_LOWEST */
+	ushort_t event;      /* type of event */
+#else
+	ushort_t event;      /* type of event *
+	ushort_t flags;      /* PSC_EVENT_LOST, PSC_ALL_LOWEST */
+#endif
+	time_t  timestamp;   /* time of state change */+
+	int     old_level;    /* power level changing from */
+	int    new_level;   /* power level changing to */
+	size_t  size;        /* size of buffer physpath points to */
+} pm_state_change_t;
+.fi
+.in -2
+
+When an event occurs, the struct pointed to by \fIarg\fR is filled in. If the
+event type is \fBPSC_PENDING_CHANGE\fR, then the information in the rest of the
+struct describes an action that the framework would have taken if the device
+were not directly power managed by the caller. The caller is responsible for
+completing the indicated level changes using \fBPM_SET_CURRENT_POWER\fR below.
+.sp
+An event type of \fBPSC_HAS_CHANGED\fR indicates that the driver for the
+directly power managed device has called \fBpm_power_has_changed\fR(9F) due to
+the device changing power on its own. It is provided to allow the caller to
+track the power state of the device.
+.sp
+The system keeps events in a circular buffer. If the buffer overflow, the
+oldest events are lost and when the event that next follows a lost event is
+retrieved it will have PSC_EVENT_LOST set in flags.
+.sp
+\fBPM_DIRECT_NOTIFY\fR returns \fBEWOULDBLOCK\fR if no event is pending, and
+\fBPM_DIRECT_NOTIFY_WAIT\fR blocks until an event is available.
+.sp
+\fBpm\fR also supports the \fBpoll\fR(2) interface. When an event is pending a
+\fBpoll\fR(2) call that includes a file descriptor for \fB/dev/pm\fR and that
+has \fBPOLLIN \fR or \fBPOLLRDNORM \fR set in its event mask will return.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPM_SET_CURRENT_POWER\fR\fR
+.ad
+.sp .6
+.RS 4n
+Component \fIcomponent\fR of the device named by \fIphyspath\fR (which must
+contain the physical path of a device against which the process has issued a
+\fBPM_DIRECT_PM\fR command) is set to power level \fIvalue. \fRIf all
+components of the device named by \fIphyspath\fR were at level 0, \fIvalue\fR
+is non-zero and some device has a dependency on this device, then all
+components of that device will be brought to full power before this command
+returns. Similarly, if the parent of the target device is powered off, then it
+will be brought up as needed before this command returns. When
+PM_SET_CURRENT_POWER is issued against a device, the resulting power change is
+included in the event list for PM_DIRECT_NOTIFY.
+.sp
+Error codes:
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+Device component out of range, or power level < 0.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+Failed to power device or its ancestors or the devices on which this device has
+dependency or their ancestors. Note that this may not indicate a failure, the
+device driver may have rejected the command as inappropriate because the
+component has become busy.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+Caller has not previously issued a successful \fBPM_DIRECT_PM\fR command
+against this device.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPM_GET_FULL_POWER\fR\fR
+.ad
+.sp .6
+.RS 4n
+The highest supported power level of component \fIcomponent\fR of the device
+named by \fIphyspath\fR is returned.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPM_GET_CURRENT_POWER\fR\fR
+.ad
+.sp .6
+.RS 4n
+The current power level of component \fIcomponent\fR of the device named by
+\fIphyspath\fR is returned.
+.sp
+Error codes:
+.sp
+.ne 2
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+Device component power level is not currently known.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPM_GET_TIME_IDLE\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBPM_GET_TIME_IDLE\fR returns the number of seconds that component
+\fIcomponent\fR of the device named by \fIphyspath\fR has been idle. If the
+device is not idle, then \fB0\fR is returned.
+.sp
+Note that because the state of the device may change between the time the
+process issues the \fBPM_GET_TIME_IDLE\fR command and the time the process
+issues a \fBPM_SET_CURRENT_POWER\fR command to reduce the power level of an
+idle component, the process must be prepared to deal with a
+\fBPM_SET_CURRENT_POWER\fR command returning failure because the driver has
+rejected the command as inappropriate because the device component has become
+busy. This can be differentiated from other types of failures by issuing the
+\fBPM_GET_TIME_IDLE\fR command again to see if the component has become busy.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+Upon error, the commands will return \fB\(mi1\fR, and set \fIerrno\fR. In
+addition to the error codes listed above by command, the following error codes
+are common to all commands:
+.sp
+.ne 2
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+ Bad address passed in as argument.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENODEV\fR\fR
+.ad
+.RS 10n
+ Device is not power manageable, or device is not configured.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 10n
+ Too many opens attempted.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface stability	Unstable
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR Intro (2),
+.BR ioctl (2),
+.BR libdevinfo (3LIB),
+.BR power.conf (5),
+.BR attributes (7),
+.BR pmconfig (8),
+.BR attach (9E),
+.BR detach (9E),
+.BR power (9E),
+.BR pm_busy_component (9F),
+.BR pm_idle_component (9F),
+.BR pm_lower_power (9F),
+.BR pm_power_has_changed (9F),
+.BR pm_raise_power (9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

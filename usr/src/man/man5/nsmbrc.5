@@ -1,0 +1,420 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.\" Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+.TH NSMBRC 5 "November 22, 2021"
+.SH NAME
+nsmbrc \- configuration file for Solaris CIFS client requests
+.SH SYNOPSIS
+.nf
+\fB$HOME/.nsmbrc\fR
+.fi
+
+.SH DESCRIPTION
+Global behavior of the Solaris CIFS client is defined by property values that
+are stored in the Service Management Facility (SMF). The \fB\&.nsmbrc\fR file
+can be used to customize the behavior of the Solaris CIFS client on a per-user
+basis. Settings in the \fB$HOME/.nsmbrc\fR file are used unless they have
+security implications.
+.sp
+.LP
+An authorized user can use the \fBsharectl\fR command to set global values for
+these properties in SMF. See \fBsharectl\fR(8).
+.sp
+.LP
+A regular user can change the global values when granted the "SMBFS Management"
+rights profile in the \fB/etc/user_attr\fR file. See \fBuser_attr\fR(5) and
+\fBrbac\fR(7).
+.sp
+.LP
+The SMBFS library first reads from SMF and then the \fB$HOME/.nsmbrc\fR file
+when determining which policy to apply to a particular server, user, or share.
+\fB$HOME/.nsmbrc\fR entries take precedence with the exception of the
+\fBminauth\fR property value. For \fBminauth\fR, the strongest authentication
+level specified is used. Sections are applied so that more specific sections
+override less specific sections. Not all keywords are valid in all sections.
+.sp
+.LP
+The configuration file is comprised of these four section types. Each section
+can include zero or more properties and associated values. The sections also
+have a hierarchical relationship with each other, as shown by the order of the
+following list:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDefault section.\fR Specifies the default property values to be used by all
+other sections unless specifically overridden.
+.sp
+The section name appears in the \fB\&.nsmbrc\fR file as \fB[default]\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBServer section.\fR Specifies the property values to be used by sections that
+are related to the named server. These property values can be specifically
+overridden by a related user section or share section.
+.sp
+The section name appears in the \fB\&.nsmbrc\fR file as
+\fB[\fIserver-name\fR]\fR. \fIserver-name\fR must use uppercase characters to
+match.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBUser section.\fR Specifies the property values to be used by sections that
+are related to the named server and user. These property values can be
+specifically overridden by a related share section.
+.sp
+The section name appears in the \fB\&.nsmbrc\fR as
+\fB[\fIserver-name\fR:\fIusername\fR]\fR. Both \fIserver-name\fR and
+\fIusername\fR must use uppercase characters to match.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBShare section.\fR Specifies the property values to be used by sections that
+are related to the named server, user, and share.
+.sp
+The section name appears in the \fB\&.nsmbrc\fR as
+\fB[\fIserver-name\fR:\fIusername\fR:\fIshare-name\fR]\fR. Both
+\fIserver-name\fR and \fIusername\fR must use uppercase characters to match.
+.RE
+.sp
+.LP
+The end of each section is marked either by the start of a new section or by an
+end of file (EOF).
+.sp
+.LP
+The following list describes the properties and states in which sections they
+can be set:
+.sp
+.ne 2
+.na
+\fB\fBaddr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the DNS name or IP address of the CIFS server. This property can only
+be set in a server section. If this property is specified, it must specify a
+value as there is no default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdomain\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the Windows domain name to use when authenticating with a server. The
+default value is \fBWORKGROUP\fR. This property can only be set in the default
+and server sections.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBminauth\fR\fR
+.ad
+.sp .6
+.RS 4n
+Is the minimum authentication level required, which can be one of
+\fBkerberos\fR, \fBntlmv2\fR, \fBntlm\fR, \fBlm\fR, or \fBnone\fR. If
+\fBminauth\fR is set globally and in a user's \fB\&.nsmbrc\fR file, the
+stronger authentication setting are used whether set by the user or globally.
+This property can only be set in the default and server sections. The default
+value is \fBntlm\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmin_protocol\fR\fR
+.ad
+.sp .6
+.RS 4n
+Is the minimum SMB protocol level that will be negotiated,
+which must be one of: \fB1\fR, \fB2.1\fR
+This property can only be set in the default and server sections.
+The default value is \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmax_protocol\fR\fR
+.ad
+.sp .6
+.RS 4n
+Is the maximum SMB protocol level that will be negotiated,
+which must be one of: \fB1\fR, \fB2.1\fR
+This property can only be set in the default and server sections.
+The default value is \fB2.1\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnbns\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the DNS name or IP address of the NetBIOS/WINS name server. This
+property can \fBonly\fR be set by an administrator by using the \fBsharectl\fR
+command. This property can only be set in the default section. The default
+value is empty, \fBnbns=""\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnbns_broadcast\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies whether to perform NetBIOS/WINS broadcast lookups. Broadcast lookups
+are less secure than unicast lookups. To prevent broadcast lookups, set the
+value to \fBno\fR. This property has no effect if the \fBnbns_enable\fR
+property is set to \fBno\fR or \fBfalse\fR. This property can \fBonly\fR be set
+by an administrator by using the \fBsharectl\fR command. This property can only
+be set in the default section. Valid values are \fByes\fR, \fBtrue\fR,
+\fBno\fR, and \fBfalse\fR. The default value is \fByes\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnbns_enable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies whether to perform NetBIOS/WINS name lookups. To force all lookups to
+be done through the name service switch (see \fBnsswitch.conf\fR(5)), set the
+value to \fBno\fR. This property can \fBonly\fR be set by an administrator by
+using the \fBsharectl\fR command. This property can only be set in the default
+section. Valid values are \fByes\fR, \fBtrue\fR, \fBno\fR, and \fBfalse\fR. The
+default value is \fByes\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpassword\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the password to use when authenticating a server. The \fBpassword\fR
+property value is used as long as the \fB\&.nsmbrc\fR file can \fBonly\fR be
+read and written by the owner. This property can be set in the default, server,
+user, and share sections.
+.sp
+If you assign the hashed password from the \fBsmbutil crypt\fR command to the
+\fBpassword\fR property, be sure to escape the special characters in the
+password.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsigning\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies whether communications are digitally signed by SMB security
+signatures for the Solaris CIFS client. This property can only be set in the
+default and server sections. Valid values are \fBdisabled\fR, \fBenabled\fR,
+and \fBrequired\fR. The default value is \fBdisabled\fR.
+.sp
+When set to \fBdisabled\fR, the client permits the use of SMB security
+signatures only if the server requires signing. In such an instance, the
+Solaris CIFS client ignores local property values.
+.sp
+When set to \fBenabled\fR, the client permits, but does not require, the use of
+SMB security signatures.
+.sp
+When set to \fBrequired\fR, the client requires the use of SMB security
+signatures. So, if SMB security signatures are disabled on a CIFS server and a
+client has signing required, the client cannot connect to that server.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtimeout\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the CIFS request timeout. By default, the timeout is 15 seconds. This
+property can only be set in the default, server, and share sections.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBuser\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the user name to use when authenticating a server. The default value
+is the Solaris account name of the user performing the authentication. This
+property can only be set in the default and server sections.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBworkgroup\fR\fR
+.ad
+.sp .6
+.RS 4n
+Is supported for compatibility purposes and is a synonym for the \fBdomain\fR
+property. Use the \fBdomain\fR property instead.
+.RE
+
+.SH EXAMPLES
+The examples in this section show how to use the \fB\&.nsmbrc\fR file and the
+\fBsmbutil\fR command to configure the \fBexample.com\fR environment.
+.sp
+.LP
+The \fBexample.com\fR environment is described by means of these sections and
+settings:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBdefault\fR section describes the default domain, which is called
+\fBMYDOMAIN\fR, and sets a default user of \fBMYUSER\fR. These default settings
+are inherited by other sections unless property values are overridden.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBFSERVER\fR is a server section that defines a server called
+\fBfserv.example.com\fR. It is part of the \fBSALES\fR domain.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBRSERVER\fR is a server section that defines a server called
+\fBrserv.example.com\fR that belongs to a new domain called \fBREMGROUP\fR.
+.RE
+.LP
+\fBExample 1 \fRUsing the \fB$HOME/.nsmbrc\fR Configuration File
+.sp
+.LP
+The following example shows how a user can configure the \fBexample.com\fR
+environment by creating the \fB\&.nsmbrc\fR file.
+
+.sp
+.LP
+All lines that begin with the \fB#\fR character are comments and are not
+parsed.
+
+.sp
+.in +2
+.nf
+# Configuration file for example.com
+# Specify the Windows account name to use everywhere.
+[default]
+domain=MYDOMAIN
+user=MYUSER
+
+# The 'FSERVER' is server in our domain.
+[FSERVER]
+addr=fserv.example.com
+
+# The 'RSERVER' is a server in another domain.
+[RSERVER]
+domain=REMGROUP
+addr=rserv.example.com
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRUsing the \fBsharectl\fR Command
+.sp
+.LP
+The following example shows how an authorized user can use \fBsharectl\fR
+commands to configure global settings for the \fBexample.com\fR environment in SMF.
+
+.sp
+.in +2
+.nf
+# \fBsharectl set -p section=default -p domain=MYDOMAIN \e
+-p user=MYUSER smbfs\fR
+# \fBsharectl set -p section=FSERVER -p addr=fserv.example.com smbfs\fR
+# \fBsharectl set -p section=RSERVER -p domain=REMGROUP \e
+-p addr=rserv.example.com smbfs\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRUsing the \fBsharectl\fR Command to Show Current Settings
+.sp
+.LP
+The following example shows how an authorized user can use the \fBsharectl
+get\fR command to view the global settings for \fBsmbfs\fR in SMF. The values
+shown are those set by the previous example.
+
+.sp
+.in +2
+.nf
+# \fBsharectl get smbfs\fR
+[default]
+  domain=MYDOMAIN
+  user=MYUSER
+[FSERVER]
+  addr=fserv.example.com
+[RSERVER]
+  domain=REMGROUP
+  addr=rserv.example.com
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB$HOME/.nsmbrc\fR\fR
+.ad
+.sp .6
+.RS 4n
+User-settable mount point configuration file to store the description for each
+connection.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.BR smbutil (1),
+.BR smbfs (4FS),
+.BR nsswitch.conf (5),
+.BR user_attr (5),
+.BR attributes (7),
+.BR rbac (7),
+.BR mount_smbfs (8),
+.BR sharectl (8)
+.SH NOTES
+By default, passwords stored in the \fB\&.nsmbrc\fR file are ignored unless
+\fBonly\fR the file owner has read and write permission.

@@ -52,7 +52,7 @@ stop either the entire process or the thread with \fBtd_thr_dbsuspend()\fR,
 .TP
 2.
 determine the thread's existing signal mask by calling
-\fBtd_thr_get_info\fR(3C_DB),
+.BR td_thr_get_info (3C_DB),
 .RE
 .RS +4
 .TP
@@ -102,7 +102,7 @@ A \fBlibc_db\fR internal error occurred.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -117,4 +117,4 @@ MT-Level	Safe
 
 .SH SEE ALSO
 \fBlibc_db\fR(3LIB), \fBtd_thr_dbsuspend\fR(3C_DB),
-\fBtd_thr_get_info\fR(3C_DB), \fBattributes\fR(5)
+\fBtd_thr_get_info\fR(3C_DB), \fBattributes\fR(7)

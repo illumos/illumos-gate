@@ -54,7 +54,9 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBbcopy\fR(9F), \fBclrbuf\fR(9F), \fBkmem_zalloc\fR(9F)
+.BR bcopy (9F),
+.BR clrbuf (9F),
+.BR kmem_zalloc (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

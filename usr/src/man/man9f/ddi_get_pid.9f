@@ -30,7 +30,7 @@ the current process.
 .SH CONTEXT
  This routine can be called from user context only.
 .SH SEE ALSO
-\fBdrv_getparm\fR(9F)
+.BR drv_getparm (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

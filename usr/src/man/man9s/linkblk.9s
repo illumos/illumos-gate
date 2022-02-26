@@ -23,7 +23,7 @@ Architecture independent level 1 (DDI/DKI)
 The  \fBlinkblk\fR structure is used to connect a lower Stream to an upper
 STREAMS multiplexor driver.  This structure is used in conjunction with the
 \fBI_LINK\fR, \fBI_UNLINK\fR,  \fBP_LINK\fR, and \fBP_UNLINK\fR ioctl commands.
-See  \fBstreamio\fR(7I). The  \fBM_DATA\fR portion of the  \fBM_IOCTL\fR
+See  \fBstreamio\fR(4I). The  \fBM_DATA\fR portion of the  \fBM_IOCTL\fR
 message contains the  \fBlinkblk\fR structure.  Note that the \fBlinkblk\fR
 structure is allocated and initialized by the Stream head as a result of  one
 of the above ioctl commands.
@@ -41,7 +41,8 @@ int       l_index;   /* index for lower stream. */
 .SH SEE ALSO
 .sp
 .LP
-\fBioctl\fR(2), \fBstreamio\fR(7I)
+.BR ioctl (2),
+.BR streamio (4I)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

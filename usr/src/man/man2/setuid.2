@@ -62,7 +62,7 @@ If the {\fBPRIV_PROC_SETID\fR} privilege is asserted in the effective set of
 the process calling \fBsetuid()\fR, the real, effective, and saved user IDs are
 set to the \fIuid\fR argument.  If the \fIuid\fR argument is 0 and none of the
 saved, effective or real UID is 0, additional restrictions apply. See
-\fBprivileges\fR(5).
+\fBprivileges\fR(7).
 .sp
 .LP
 If the {\fBPRIV_PROC_SETID\fR} privilege is not asserted in the effective set,
@@ -116,7 +116,7 @@ either the real or saved group IDs.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -134,6 +134,11 @@ MT-Level	Async-Signal-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(2), \fBexec\fR(2), \fBgetgroups\fR(2), \fBgetuid\fR(2),
-\fBstat.h\fR(3HEAD), \fBattributes\fR(5), \fBprivileges\fR(5),
-\fBstandards\fR(5)
+.BR Intro (2),
+.BR exec (2),
+.BR getgroups (2),
+.BR getuid (2),
+.BR stat.h (3HEAD),
+.BR attributes (7),
+.BR privileges (7),
+.BR standards (7)

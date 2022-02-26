@@ -87,8 +87,8 @@ SYSLOG=YES
 
 # RETRIES determines the number of failed logins that will be
 # allowed before login exits. Default is 5 and maximum is 15.
-# If account locking is configured (user_attr(4)/policy.conf(4))
-# for a local user's account (passwd(4)/shadow(4)), that account
+# If account locking is configured (user_attr(5)/policy.conf(5))
+# for a local user's account (passwd(5)/shadow(5)), that account
 # will be locked if failed logins equals or exceeds RETRIES.
 #
 #RETRIES=5

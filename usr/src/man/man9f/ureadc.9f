@@ -59,7 +59,10 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBuiomove\fR(9F), \fBuwritec\fR(9F), \fBiovec\fR(9S), \fBuio\fR(9S)
+.BR uiomove (9F),
+.BR uwritec (9F),
+.BR iovec (9S),
+.BR uio (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

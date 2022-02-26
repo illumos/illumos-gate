@@ -27,7 +27,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 # Run Commands executed when the system is changing to init state 2,
 # traditionally called "multi-user". Pick up start-up packages for mounts,
@@ -36,7 +35,7 @@
 PATH=/usr/sbin:/usr/bin
 
 if [ -z "$SMF_RESTARTER" ]; then
-	echo "Cannot be run outside smf(5)"
+	echo "Cannot be run outside smf(7)"
 	exit 1
 fi
 

@@ -70,7 +70,7 @@
 #define	VDS_DEV_DELAY		10000000 /* 10 secs */
 #define	VDS_NCHAINS		32
 
-/* Identification parameters for MD, synthetic dkio(7i) structures, etc. */
+/* Identification parameters for MD, synthetic dkio(4I) structures, etc. */
 #define	VDS_NAME		"virtual-disk-server"
 
 #define	VD_NAME			"vd"
@@ -1040,7 +1040,7 @@ vd_build_default_label(size_t disk_size, size_t bsize, struct dk_label *label)
 	vd_get_readable_size(disk_size, &size, &unit);
 
 	/*
-	 * We must have a correct label name otherwise format(1m) will
+	 * We must have a correct label name otherwise format(8) will
 	 * not recognized the disk as labeled.
 	 */
 	(void) snprintf(label->dkl_asciilabel, LEN_DKL_ASCII,
@@ -5724,8 +5724,8 @@ vd_setup_partition_vtoc(vd_t *vd)
 		    &size, &unit);
 
 		/*
-		 * Set some attributes of the geometry to what format(1m) uses
-		 * so that writing a default label using format(1m) does not
+		 * Set some attributes of the geometry to what format(8) uses
+		 * so that writing a default label using format(8) does not
 		 * produce any error.
 		 */
 		vd->dk_geom.dkg_bcyl = 0;
@@ -5734,7 +5734,7 @@ vd_setup_partition_vtoc(vd_t *vd)
 		vd->dk_geom.dkg_read_reinstruct = 0;
 
 		/*
-		 * We must have a correct label name otherwise format(1m) will
+		 * We must have a correct label name otherwise format(8) will
 		 * not recognized the disk as labeled.
 		 */
 		(void) snprintf(vd->vtoc.v_asciilabel, LEN_DKL_ASCII,
@@ -6089,7 +6089,7 @@ vd_setup_disk_image(vd_t *vd)
 
 /*
  * Description:
- *	Open a device using its device path (supplied by ldm(1m))
+ *	Open a device using its device path (supplied by ldm(8))
  *
  * Parameters:
  *	vd	- pointer to structure containing the vDisk info

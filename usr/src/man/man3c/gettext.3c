@@ -96,7 +96,7 @@ determine the plural form.  If no message catalogues are found, \fImsgid1\fR is
 returned if \fIn\fR == 1, otherwise \fImsgid2\fR is returned.
 .sp
 .LP
-The \fBNLSPATH\fR environment variable (see \fBenviron\fR(5)) is searched first
+The \fBNLSPATH\fR environment variable (see \fBenviron\fR(7)) is searched first
 for the location of the  \fBLC_MESSAGES\fR catalogue. The setting of the
 \fBLC_MESSAGES\fR category of the current locale determines the locale used by
 \fBgettext()\fR and \fBdgettext()\fR for string retrieval. The \fIcategory\fR
@@ -321,7 +321,7 @@ location for files containing messages for domain \fIdomainname,\fR language
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -342,6 +342,10 @@ The external variables \fB_nl_msg_cat_cntr\fR and \fB_nl_domain_bindings\fR are
 Uncommitted.
 .SH SEE ALSO
 .LP
-\fBmsgfmt\fR(1), \fBxgettext\fR(1), \fBiconv_open\fR(3C),
-\fBlibintl.h\fR(3HEAD), \fBsetlocale\fR(3C), \fBattributes\fR(5),
-\fBenviron\fR(5)
+.BR msgfmt (1),
+.BR xgettext (1),
+.BR iconv_open (3C),
+.BR setlocale (3C),
+.BR libintl.h (3HEAD),
+.BR attributes (7),
+.BR environ (7)

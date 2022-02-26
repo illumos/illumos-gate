@@ -1,0 +1,43 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DTRACE 4D "Dec 10, 2017"
+.SH NAME
+dtrace \- DTrace dynamic tracing facility
+.SH DESCRIPTION
+.LP
+The \fBdtrace\fR driver provides the dynamic instrumentation and tracing
+facilities for the DTrace software, as well as the built-in \fBdtrace\fR
+provider. The \fBdtrace\fR driver is not a public interface and you access the
+instrumentation offered by this provider through DTrace tools such as
+\fBdtrace\fR(8).  Refer to the \fIDynamic Tracing Guide\fR for a
+description of the public documented interfaces available for the DTrace
+facility and dtrace provider probes.
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability 	Private
+.TE
+
+.SH SEE ALSO
+.LP
+.BR libdtrace (3LIB),
+.BR attributes (7),
+.BR dtrace (8)
+.sp
+.LP
+\fIDynamic Tracing Guide\fR:
+.sp
+.LP
+https://illumos.org/books/dtrace/

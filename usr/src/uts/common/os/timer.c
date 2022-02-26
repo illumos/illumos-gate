@@ -178,7 +178,7 @@ timer_delete_locked(proc_t *p, timer_t tid, itimer_t *it)
 
 /*
  * timer_grab() and its companion routine, timer_release(), are wrappers
- * around timer_lock()/_unlock() which allow the timer_*(3R) routines to
+ * around timer_lock()/_unlock() which allow the timer_*(3C) routines to
  * (a) share error handling code and (b) not grab p_lock themselves.  Routines
  * which are called with p_lock held (e.g. timer_lwpbind(), timer_lwpexit())
  * must call timer_lock()/_unlock() explictly.
@@ -193,7 +193,7 @@ timer_delete_locked(proc_t *p, timer_t tid, itimer_t *it)
  *  (a)	The specified timer ID is out of range.
  *
  *  (b)	The specified timer ID does not correspond to a timer ID returned
- *	from timer_create(3R).
+ *	from timer_create(3C).
  *
  *  (c)	The specified timer ID is currently being removed.
  *

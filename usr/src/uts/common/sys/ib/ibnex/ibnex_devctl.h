@@ -82,14 +82,14 @@ typedef enum ib_service_type_e {
 #define	IBNEX_NODE_COND_NVL		"node_condition"
 
 /*
- * This flag is passed from cfgadm to ib(7d) to convey that it
+ * This flag is passed from cfgadm to ib(4D) to convey that it
  * need not attempt to probe the fabric.
  *
  * The value of these flags should be same as flags in enum
  * ibdm_ibnex_get_ioclist_mtd_t.
  */
 #define	IBNEX_DONOT_PROBE_FLAG	1
-#define	IBNEX_NORMAL_PROBE	0	/* flag used by ib(7d) only */
+#define	IBNEX_NORMAL_PROBE	0	/* flag used by ib(4D) only */
 
 /*
  * The following are sub-commands to DEVCTL_AP_CONTROL.

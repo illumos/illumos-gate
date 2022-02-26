@@ -423,7 +423,7 @@ if (usb_set_alt_if(
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -439,5 +439,8 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_get_dev_data\fR(9F),
-\fBusb_get_string_descr\fR(9F), \fBusb_get_cfg\fR(9F)
+.BR attributes (7),
+.BR usb_get_cfg (9F),
+.BR usb_get_dev_data (9F),
+.BR usb_get_string_descr (9F),
+.BR usb_pipe_ctrl_xfer (9F)

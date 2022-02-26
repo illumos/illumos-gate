@@ -55,8 +55,8 @@ dir  path=platform/i86xpv/kernel/drv/$(ARCH64) group=sys
 file path=platform/i86xpv/kernel/drv/$(ARCH64)/pci-ide group=sys
 file path=platform/i86xpv/kernel/drv/pci-ide.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/ata.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/ata.4d
 driver name=ata class=dada class=scsi alias=ide
 driver name=pci-ide
 legacy pkg=SUNWpsdir desc="Platform Support, ISA Bus Device Drivers, (Root)" \

@@ -68,7 +68,7 @@
 /*
  * The defined behavior for epoll_wait/epoll_pwait when using a timeout less
  * than 0 is to wait for events until they arrive (or interrupted by a signal).
- * While poll(7d) operates in this manner for a timeout of -1, using other
+ * While poll(4D) operates in this manner for a timeout of -1, using other
  * negative values results in an immediate timeout, as if it had been set to 0.
  * For that reason, negative values are clamped to -1.
  */

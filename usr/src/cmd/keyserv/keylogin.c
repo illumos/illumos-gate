@@ -36,8 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Set secret key on local machine
  */
@@ -238,7 +236,7 @@ oldkeylogin(char *fullname, char *pass)
 "The system default domain '%s' is different from the Secure RPC\n\
 domain %s where the key is stored.  The Secure RPC domainname is\n\
 defined by the directory object stored in the /var/nis/NIS_COLD_START file.\n\
-If you need to change this Secure RPC domainname, please use the nisinit(1M)\n\
+If you need to change this Secure RPC domainname, please use the nisinit(8)\n\
 command with the `-k` option.\n", local_domain, sec_domain);
 			} else {
 				fprintf(stderr,

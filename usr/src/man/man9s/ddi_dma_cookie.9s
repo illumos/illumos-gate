@@ -69,9 +69,14 @@ to be specified in a \fBddi_dma_attr\fR(9S) structure.
 \fBdmac_type\fR contains bus-specific type bits, if appropriate. For example, a
 device on a \fBPCI\fR bus has \fBPCI\fR address modifier bits placed here.
 .SH SEE ALSO
-\fBpci\fR(4), \fBsbus\fR(4), \fBsysbus\fR(4),
-\fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F),
-\fBddi_dma_getwin\fR(9F), \fBddi_dma_nextcookie\fR(9F), \fBddi_dma_attr\fR(9S)
+.BR pci (5),
+.BR sbus (5),
+.BR sysbus (5),
+.BR ddi_dma_addr_bind_handle (9F),
+.BR ddi_dma_buf_bind_handle (9F),
+.BR ddi_dma_getwin (9F),
+.BR ddi_dma_nextcookie (9F),
+.BR ddi_dma_attr (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

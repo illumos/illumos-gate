@@ -348,7 +348,7 @@ iprop_full_resync_1(
 #else
 		(void) signal(SIGCHLD, SIG_DFL);
 #endif /* POSIX_SIGNALS */
-		/* run kdb5_util(1M) dump for IProp */
+		/* run kdb5_util(8) dump for IProp */
 		pret = pclose(popen(ubuf, "w"));
 		DPRINT(("%s: pclose=%d\n", whoami, pret));
 		if (pret == -1) {

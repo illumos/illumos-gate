@@ -226,7 +226,7 @@ typedef struct {
 /*
  * zone_status values
  *
- * You must modify zone_status_names in mdb(1M)'s genunix module
+ * You must modify zone_status_names in mdb(1)'s genunix module
  * (genunix/zone.c) when you modify this enum.
  */
 typedef enum {
@@ -283,7 +283,7 @@ typedef struct zone_cmd_rval {
 #define	GLOBAL_ZONENAME		"global"
 
 /*
- * Extended Regular expression (see regex(5)) which matches all valid zone
+ * Extended Regular expression (see regex(7)) which matches all valid zone
  * names.
  */
 #define	ZONENAME_REGEXP		"[a-zA-Z0-9][-_.a-zA-Z0-9]{0,62}"

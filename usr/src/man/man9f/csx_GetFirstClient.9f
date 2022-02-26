@@ -165,7 +165,7 @@ No \fBPCMCIA \fRhardware installed.
 .SH CONTEXT
 This function may be called from user or kernel context.
 .SH SEE ALSO
-\fBcsx_event_handler\fR(9E)
+.BR csx_event_handler (9E)
 .sp
 .LP
 \fIPC Card 95 Standard,\fR PCMCIA/JEIDA

@@ -206,4 +206,4 @@ Too many files are currently open on the system.
 .Xr rewinddir 3C ,
 .Xr seekdir 3C ,
 .Xr telldir 3C ,
-.Xr attributes 5
+.Xr attributes 7

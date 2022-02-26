@@ -181,7 +181,7 @@ just loss of precision if those numbers can ever be negative.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -199,5 +199,10 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBisalpha\fR(3C), \fBisspace\fR(3C), \fBscanf\fR(3C), \fBstrtod\fR(3C),
-\fBstrtol\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR isalpha (3C),
+.BR isspace (3C),
+.BR scanf (3C),
+.BR strtod (3C),
+.BR strtol (3C),
+.BR attributes (7),
+.BR standards (7)

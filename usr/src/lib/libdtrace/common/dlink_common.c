@@ -30,7 +30,7 @@
 
 /*
  * Common functions for helper provider loading both compiled into the
- * executable via drti.o and dtrace(1M) -G, and the libdaudit.so library.
+ * executable via drti.o and dtrace(8) -G, and the libdaudit.so library.
  */
 
 #include <errno.h>

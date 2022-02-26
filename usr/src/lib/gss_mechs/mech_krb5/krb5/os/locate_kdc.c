@@ -898,7 +898,7 @@ krb5int_locate_server (krb5_context context, const krb5_data *realm,
 	 * Solaris Kerberos:
 	 * If kpasswd_server has not been configured and dns_lookup_kdc -
 	 * dns_fallback are not configured then admin_server should
-	 * be inferred, per krb5.conf(4).
+	 * be inferred, per krb5.conf(5).
 	 */
 	if (code && svc == locate_service_kpasswd &&
 	    !maybe_use_dns(context, "dns_lookup_kdc", 0)) {
@@ -948,28 +948,28 @@ krb5int_locate_server (krb5_context context, const krb5_data *realm,
 	    krb5_set_error_message(context,
 				KRB5_REALM_CANT_RESOLVE,
 				dgettext(TEXT_DOMAIN,
-					"Cannot find a master KDC entry in krb5.conf(4) or DNS Service Location records for realm '%.*s'"),
+					"Cannot find a master KDC entry in krb5.conf(5) or DNS Service Location records for realm '%.*s'"),
 				realm->length, realm->data);
 	    break;
 	case locate_service_kadmin:
 	    krb5_set_error_message(context,
 				KRB5_REALM_CANT_RESOLVE,
 				dgettext(TEXT_DOMAIN,
-					"Cannot find a kadmin KDC entry in krb5.conf(4) or DNS Service Location records for realm '%.*s'"),
+					"Cannot find a kadmin KDC entry in krb5.conf(5) or DNS Service Location records for realm '%.*s'"),
 				realm->length, realm->data);
 	    break;
 	case locate_service_kpasswd:
 	    krb5_set_error_message(context,
 				KRB5_REALM_CANT_RESOLVE,
 				dgettext(TEXT_DOMAIN,
-					"Cannot find a kpasswd KDC entry in krb5.conf(4) or DNS Service Location records for realm '%.*s'"),
+					"Cannot find a kpasswd KDC entry in krb5.conf(5) or DNS Service Location records for realm '%.*s'"),
 				realm->length, realm->data);
 	    break;
 	default: 	  /*  locate_service_kdc: */
 		krb5_set_error_message(context,
 				    KRB5_REALM_CANT_RESOLVE,
 				    dgettext(TEXT_DOMAIN,
-					    "Cannot find any KDC entries in krb5.conf(4) or DNS Service Location records for realm '%.*s'"),
+					    "Cannot find any KDC entries in krb5.conf(5) or DNS Service Location records for realm '%.*s'"),
 				    realm->length, realm->data);
 			       
 	}
@@ -1039,7 +1039,7 @@ krb5int_locate_server (krb5_context context, const krb5_data *realm,
 	    hostlist_str = hostlist2str(hostlist);
 	    krb5_set_error_message(context, KRB5_REALM_CANT_RESOLVE,
 				dgettext(TEXT_DOMAIN,
-					"Cannot resolve network address for KDCs '%s' specified in krb5.conf(4) for realm %.*s"),
+					"Cannot resolve network address for KDCs '%s' specified in krb5.conf(5) for realm %.*s"),
 				hostlist_str ? hostlist_str : "unknown",
 				realm->length, realm->data);
 	    if (hostlist_str)

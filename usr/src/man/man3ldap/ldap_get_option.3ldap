@@ -527,7 +527,7 @@ If unsuccessful
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -545,7 +545,9 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBldap_init\fR(3LDAP), \fBsasl_setprop\fR(3SASL), \fBattributes\fR(5)
+.BR ldap_init (3LDAP),
+.BR sasl_setprop (3SASL),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

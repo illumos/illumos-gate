@@ -1,0 +1,157 @@
+'\" te
+.\"  Copyright 2003 Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH MECH 5 "Sep 6, 2006"
+.SH NAME
+mech, qop \- mechanism and QOP files
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/gss/mech\fR
+\fB/etc/gss/qop\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fB/etc/gss/mech\fR and \fB/etc/gss/qop\fR files contain tables showing
+installed security mechanisms and the Quality of Protection (\fBQOP\fR)
+associated with them, respectively. As security mechanisms are installed on the
+system, entries are added to these two files. Contents of these files may be
+accessed either manually or programmatically. For example, manually with
+\fBcat\fR(1) or \fBmore\fR(1), or programmatically with either
+\fBrpc_gss_get_mechanisms\fR(3NSL) or \fBrpc_gss_get_mech_info\fR(3NSL).
+.sp
+.LP
+The order of entries in the \fB/etc/gss/mech\fR file is significant: the order
+should be from the most preferred to the least preferred mechanisms.
+.sp
+.LP
+The \fB/etc/gss/mech\fR file contains five fields:
+.sp
+.ne 2
+.na
+\fB\fImechanism name\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBASCII\fR string representing the mechanism.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIobject identifier\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBRPC\fR \fBOID\fR for this mechanism.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIshared library\fR\fR
+.ad
+.sp .6
+.RS 4n
+Shared library which implements the services provided by this mechanism.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIkernel module\fR\fR
+.ad
+.sp .6
+.RS 4n
+Kernel module which implements the services provided by this mechanism.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIlibrary options\fR (optional field)\fR
+.ad
+.sp .6
+.RS 4n
+Optional parameters that are interpreted by the individual mechanism with which
+they are associated. Specific supported options are described in the
+documentation for the individual mechanism, if any. Not all mechanisms have
+support for optional parameters. \fIlibrary options\fR must be enclosed in
+brackets (\fB[ ]\fR) so they may be differentiated from the optional kernel
+module entries.
+.RE
+
+.sp
+.LP
+The \fB/etc/gss/qop\fR file contains three fields:
+.sp
+.ne 2
+.na
+\fB\fIQOP string\fR\fR
+.ad
+.RS 19n
+Name, in \fBASCII\fR, of this Quality of Protection.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIQOP value\fR\fR
+.ad
+.RS 19n
+Numeric value by which \fBRPC\fR identifies this \fBQOP\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fImechanism name\fR \fR
+.ad
+.RS 19n
+\fBASCII\fR string representing the mechanism with which this \fBQOP\fR is
+associated.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA Typical Entry in \fB/etc/gss/mech\fR
+.sp
+.LP
+This is a typical entry in a \fB/etc/gss/mech\fR file:
+
+.sp
+.in +2
+.nf
+kerberosv5	1.2.840.113554.1.2.2	mech_krb5.so	kmech_krb5
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRA Typical Entry in \fB/etc/gss/qop\fR
+.sp
+.LP
+This is a typical entry in a \fB/etc/gss/qop\fR file:
+
+.sp
+.in +2
+.nf
+GSS_KRB5_CONF_C_QOP_DES	0	kerberosv5
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+.BR rpc (3NSL),
+.BR rpc_gss_get_mech_info (3NSL),
+.BR rpc_gss_get_mechanisms (3NSL),
+.BR rpcsec_gss (3NSL)
+.sp
+.LP
+\fIONC+ Developer\&'s Guide\fR

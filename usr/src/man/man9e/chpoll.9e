@@ -190,7 +190,7 @@ return (0);
 .fi
 .in -2
 
-Note: Prior to the integration of \fBepoll\fR(5), which included
+Note: Prior to the integration of \fBepoll\fR(7), which included
 edge-triggering via the \fBPOLLET\fR flag, standard chpoll mechanisms would
 only provide a pollhead in \fBphpp\fR if there were no matching events.
 Edge-triggered polling requires that \fBpollwakeup()\fR always be called for a
@@ -266,7 +266,10 @@ associated with the \fBpollhead\fR is about to be deallocated by the
 number.
 .SH SEE ALSO
 .LP
-\fBpoll\fR(2), \fBepoll\fR(5), \fBnochpoll\fR(9F), \fBpollwakeup\fR(9F)
+.BR poll (2),
+.BR epoll (7),
+.BR nochpoll (9F),
+.BR pollwakeup (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

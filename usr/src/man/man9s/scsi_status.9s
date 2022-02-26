@@ -165,8 +165,10 @@ it is returned when the command queue in the target is full.
 .RE
 
 .SH SEE ALSO
-\fBscsi_ifgetcap\fR(9F), \fBscsi_init_pkt\fR(9F),
-\fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
+.BR scsi_ifgetcap (9F),
+.BR scsi_init_pkt (9F),
+.BR scsi_extended_sense (9S),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

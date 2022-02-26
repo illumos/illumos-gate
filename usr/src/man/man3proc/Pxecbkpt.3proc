@@ -94,7 +94,7 @@ is set to indicate the error.
 For a full list of errors see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 The
 .Fn Pxecbkpt ,
 .Fn Pxecwapt ,
@@ -123,4 +123,4 @@ in
 .Xr Pdelwapt 3PROC ,
 .Xr Psetbkpt 3PROC ,
 .Xr Psetwapt 3PROC ,
-.Xr proc 4
+.Xr proc 5

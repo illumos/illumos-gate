@@ -29,7 +29,7 @@ returned.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -43,11 +43,14 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBhostid\fR(1), \fBsysinfo\fR(2), \fBattributes\fR(5), \fBstandards\fR(5),
-\fBzones\fR(5)
+.BR hostid (1),
+.BR sysinfo (2),
+.BR attributes (7),
+.BR standards (7),
+.BR zones (7)

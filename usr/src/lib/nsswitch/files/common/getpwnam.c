@@ -180,7 +180,7 @@ validate_passwd_ids(char *line, int *linelenp, int buflen, int extra_chars)
 	int	linelen = *linelenp, newlinelen;
 
 	/*
-	 * +name entries in passwd(4) do not override uid and gid
+	 * +name entries in passwd(5) do not override uid and gid
 	 * values. Therefore no need to validate the ids in these
 	 * entries.
 	 */

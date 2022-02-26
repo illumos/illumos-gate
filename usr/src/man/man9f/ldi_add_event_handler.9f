@@ -156,8 +156,10 @@ The \fBldi_add_event_handler()\fR function can be called from user and kernel
 contexts only.
 .SH SEE ALSO
 .LP
-\fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F),
-\fBldi_get_eventcookie\fR(9F), \fBldi_remove_event_handler\fR(9F)
+.BR ldi_ev_get_cookie (9F),
+.BR ldi_ev_register_callbacks (9F),
+.BR ldi_get_eventcookie (9F),
+.BR ldi_remove_event_handler (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

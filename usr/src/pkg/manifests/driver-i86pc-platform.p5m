@@ -62,11 +62,11 @@ file path=kernel/strmod/$(ARCH64)/vuidm3p group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/vuidm4p group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/vuidm5p group=sys mode=0755
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/asy.7d
-file path=usr/share/man/man7d/cmdk.7d
-file path=usr/share/man/man7d/ecpp.7d
-file path=usr/share/man/man7d/fd.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/asy.4d
+file path=usr/share/man/man4d/cmdk.4d
+file path=usr/share/man/man4d/ecpp.4d
+file path=usr/share/man/man4d/fd.4d
 driver name=asy perms="* 0666 root sys" perms="*,cu 0600 uucp uucp" \
     alias=pci11c1,480
 driver name=cmdk perms="* 0640 root sys"

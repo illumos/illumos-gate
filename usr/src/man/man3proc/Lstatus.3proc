@@ -32,7 +32,7 @@ function returns the status information about the thread handle
 The
 .Sy lwpstatus_t
 structure is defined in
-.Xr proc 4
+.Xr proc 5
 and contains information about the thread including its flags, the size
 of its stack, its user and system time, and more.
 .Pp
@@ -57,4 +57,4 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr Lfree 3PROC ,
-.Xr proc 4
+.Xr proc 5

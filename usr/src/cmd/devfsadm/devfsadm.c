@@ -677,7 +677,7 @@ parse_args(int argc, char *argv[])
 				break;
 			case 'u':
 				/*
-				 * Invoked via update_drv(1m) to update
+				 * Invoked via update_drv(8) to update
 				 * the kernel's driver/alias binding
 				 * when removing one or more aliases.
 				 */
@@ -4826,7 +4826,7 @@ get_component(char *str, const char *comp_str)
  * rules[] is an array of  devfsadm_enumerate_t structures which defines
  * the enumeration rules to be used for a specified set of links in /dev.
  * The set of links is specified through regular expressions (of the flavor
- * described in regex(5)). These regular expressions are used to determine
+ * described in regex(7)). These regular expressions are used to determine
  * the set of links in /dev to examine. The last path component in these
  * regular expressions MUST contain a parenthesized subexpression surrounding
  * the RE which is to be considered the enumerating component. The subexp
@@ -7041,7 +7041,7 @@ devfsadm_free_dev_names(char **dev_names, int len)
  * devfsadm_free_dev_names() is used to free the returned array.
  * NULL is returned on failure or when there are no matching devlinks.
  *
- * re is an extended regular expression in regex(5) format used to further
+ * re is an extended regular expression in regex(7) format used to further
  * match devlinks pointing to phys_path; it may be NULL to match all
  */
 char **

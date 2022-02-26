@@ -278,7 +278,7 @@ is provided for backwards compatibility and will be removed in a future release
 of the operating system. There is no plan to fix any of its defects.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -295,5 +295,8 @@ MT-Level	Unsafe
 
 .SH SEE ALSO
 .LP
-\fBIntro\fR(3), \fBcurses\fR(3XCURSES), \fBlibcurses\fR(3LIB),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR Intro (3),
+.BR libcurses (3LIB),
+.BR curses (3XCURSES),
+.BR attributes (7),
+.BR standards (7)

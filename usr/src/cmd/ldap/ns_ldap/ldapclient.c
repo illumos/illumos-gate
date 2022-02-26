@@ -79,7 +79,7 @@
  *		generate (gen_profile). (formerly -P)
  *	profileTTL
  *		Client info TTL.  If set to 0 this information will not be
- *		automatically updated by the ldap_cachemgr(1M).
+ *		automatically updated by the ldap_cachemgr(8).
  *		(formerly -e)
  *	proxyDN
  *		Binding DN.  Ex. cn=client,ou=people,cd=eng,dc=sun,dc=com
@@ -1964,7 +1964,7 @@ usage(void)
 	    gettext("<args> take the form of \'-a attrName=attrVal\' as "
 	    "described in the\n"),
 	    stderr);
-	CLIENT_FPUTS(gettext("man page: ldapclient(1M)\n"), stderr);
+	CLIENT_FPUTS(gettext("man page: ldapclient(8)\n"), stderr);
 }
 
 

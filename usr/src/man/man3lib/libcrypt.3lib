@@ -52,7 +52,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -68,5 +68,8 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBcrypt\fR(1), \fBIntro\fR(3), \fBencrypt\fR(3C), \fBsetkey\fR(3C),
-\fBattributes\fR(5)
+.BR crypt (1),
+.BR Intro (3),
+.BR encrypt (3C),
+.BR setkey (3C),
+.BR attributes (7)

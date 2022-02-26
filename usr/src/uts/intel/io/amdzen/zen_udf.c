@@ -14,7 +14,7 @@
  */
 
 /*
- * A companion to zen_udf(7D) that allows user access to read the data fabric
+ * A companion to zen_udf(4D) that allows user access to read the data fabric
  * for development purposes.
  */
 

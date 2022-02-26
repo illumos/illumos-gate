@@ -109,7 +109,8 @@ disk and the buffer are part of the kernel address space.
 .SH SEE ALSO
 .sp
 .LP
-\fBcopyin\fR(9F), \fBcopyout\fR(9F)
+.BR copyin (9F),
+.BR copyout (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -86,8 +86,11 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBbcanputnext\fR(9F), \fBcanput\fR(9F), \fBcanputnext\fR(9F), \fBputbq\fR(9F),
-\fBputnext\fR(9F)
+.BR bcanputnext (9F),
+.BR canput (9F),
+.BR canputnext (9F),
+.BR putbq (9F),
+.BR putnext (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

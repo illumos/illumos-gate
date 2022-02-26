@@ -116,7 +116,8 @@ xxdevmap_dup(devmap_cookie_t dhp, void *pvtp, \e
 .in -2
 
 .SH SEE ALSO
-\fBfork\fR(2), \fBdevmap_callback_ctl\fR(9S)
+.BR fork (2),
+.BR devmap_callback_ctl (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

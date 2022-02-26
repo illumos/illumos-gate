@@ -43,7 +43,7 @@ extern "C" {
  * Solaris system and DTrace subsystem and are subject to change at any time
  * without notice.  Applications and drivers using these interfaces will fail
  * to run on future releases.  These interfaces should not be used for any
- * purpose except those expressly outlined in dtrace(7D) and libdtrace(3LIB).
+ * purpose except those expressly outlined in dtrace(4D) and libdtrace(3LIB).
  * Please refer to the "Solaris Dynamic Tracing Guide" for more information.
  */
 
@@ -1188,7 +1188,7 @@ typedef struct dtrace_argdesc {
  * The D compiler can query the provider attributes (dtrace_pattr_t below) in
  * order to compute the properties of an input program and report them.
  */
-typedef uint8_t dtrace_stability_t;	/* stability code (see attributes(5)) */
+typedef uint8_t dtrace_stability_t;	/* stability code (see attributes(7)) */
 typedef uint8_t dtrace_class_t;		/* architectural dependency class */
 
 #define	DTRACE_STABILITY_INTERNAL	0	/* private to DTrace itself */

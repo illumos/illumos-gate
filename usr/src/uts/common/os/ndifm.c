@@ -669,7 +669,7 @@ ndi_fm_dma_err_set(ddi_dma_handle_t handle, ddi_fm_error_t *dfe)
 /*
  * Call parent busop fm initialization routine.
  *
- * Called during driver attach(1M)
+ * Called during driver attach(9E)
  */
 int
 i_ndi_busop_fm_init(dev_info_t *dip, int tcap, ddi_iblock_cookie_t *ibc)
@@ -696,7 +696,7 @@ i_ndi_busop_fm_init(dev_info_t *dip, int tcap, ddi_iblock_cookie_t *ibc)
 /*
  * Call parent busop fm clean-up routine.
  *
- * Called during driver detach(1M)
+ * Called during driver detach(9E)
  */
 void
 i_ndi_busop_fm_fini(dev_info_t *dip)

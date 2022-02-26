@@ -273,8 +273,11 @@ type of request (ctrl, intr, isoc or bulk.)
 
 .SS "COMMAND COMPLETION CALLBACKS"
 Calls to some non-transfer functions can be set up for callback notification.
-These include \fBusb_pipe_close\fR(9F), \fBusb_pipe_reset\fR(9F),
-\fBusb_pipe_drain_reqs\fR(9F), \fBusb_set_cfg\fR(9F), \fBusb_set_alt_if\fR(9F)
+These include \fBusb_pipe_close\fR(9F),
+.BR usb_pipe_reset (9F),
+.BR usb_pipe_drain_reqs (9F),
+.BR usb_set_cfg (9F),
+.BR usb_set_alt_if (9F)
 and \fBusb_clr_feature\fR(9F).
 .sp
 .LP
@@ -308,7 +311,7 @@ The callback flags can be checked when rval indicates failure status. Just as
 for transfer completion callbacks, callback flags return additional information
 on execution events.
 .SH ATTRIBUTES
-See attributes(5) for descriptions of the following attributes:
+See attributes(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -324,8 +327,12 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBusb_alloc_request\fR(9F), \fBusb_pipe_bulk_xfer\fR(9F),
-\fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_pipe_intr_xfer\fR(9F),
-\fBusb_pipe_isoc_xfer\fR(9F), \fBusb_bulk_request\fR(9S),
-\fBusb_ctrl_request\fR(9S), \fBusb_intr_request\fR(9S),
-\fBusb_isoc_request\fR(9S)
+.BR usb_alloc_request (9F),
+.BR usb_pipe_bulk_xfer (9F),
+.BR usb_pipe_ctrl_xfer (9F),
+.BR usb_pipe_intr_xfer (9F),
+.BR usb_pipe_isoc_xfer (9F),
+.BR usb_bulk_request (9S),
+.BR usb_ctrl_request (9S),
+.BR usb_intr_request (9S),
+.BR usb_isoc_request (9S)

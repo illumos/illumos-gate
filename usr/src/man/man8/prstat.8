@@ -1,0 +1,892 @@
+'\" te
+.\" Copyright (c) 2013 Gary Mills
+.\" Copyright (c) 2006, 2009 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2019 Joyent, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PRSTAT 8 "June 6, 2019"
+.SH NAME
+prstat \- report active process statistics
+.SH SYNOPSIS
+.LP
+.nf
+\fBprstat\fR [\fB-acHJLmRrtTvWZ\fR] [\fB-d\fR u | d] [\fB-C\fR \fIpsrsetlist\fR] [\fB-h\fR \fIlgrplist\fR]
+     [\fB-j\fR \fIprojlist\fR] [\fB-k\fR \fItasklist\fR] [\fB-n\fR \fIntop\fR[,\fInbottom\fR]]
+     [\fB-p\fR \fIpidlist\fR] [\fB-P\fR \fIcpulist\fR] [\fB-s\fR \fIkey\fR | \fB-S\fR \fIkey\fR ]
+     [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR] [\fB-z\fR \fIzoneidlist\fR]
+     [\fIinterval\fR [\fIcount\fR]]
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBprstat\fR utility iteratively examines all active processes on the
+system and reports statistics based on the selected output mode and sort order.
+\fBprstat\fR provides options to examine only processes matching specified
+\fBPID\fRs, \fBUID\fRs, zone \fBID\fRs, \fBCPU\fR \fBID\fRs, and processor set
+\fBID\fRs.
+.sp
+.LP
+The \fB-j\fR, \fB-k\fR, \fB-C\fR, \fB-p\fR, \fB-P\fR, \fB-u\fR, \fB-U\fR, and
+\fB-z\fR options accept lists as arguments. Items in a list can be either
+separated by commas or enclosed in quotes and separated by commas or spaces.
+.sp
+.LP
+If you do not specify an option, \fBprstat\fR examines all processes and
+reports statistics sorted by \fBCPU\fR usage.
+.SH OPTIONS
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-a\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report information about processes and users. In this mode \fBprstat\fR
+displays separate reports about processes and users at the same time.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-c\fR\fR
+.ad
+.sp .6
+.RS 4n
+Print new reports below previous reports instead of overprinting them.
+Long names are not truncated in this mode.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-C\fR \fIpsrsetlist\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report only processes or lwps that are bound to processor sets in the given
+list. Each processor set is identified by an integer as reported by
+\fBpsrset\fR(8). The load averages displayed are the sum of the load averages
+of the specified processor sets (see \fBpset_getloadavg\fR(3C)). Processes with
+one or more LWPs bound to processor sets in the given list are reported even
+when the \fB-L\fR option is not used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR \fBu | d\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify \fBu\fR for a printed representation of the internal representation of
+time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
+\fBdate\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-h\fR \fIlgrplist\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report only processes or lwps whose home \fIlgroup\fR is in the given list of
+\fIlgroups\fR. No processes or lwps will be listed for invalid \fIlgroups\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-H\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report information about home \fIlgroup\fR. In this mode, \fBprstat\fR adds an
+extra column showing process or lwps home \fIlgroup\fR with the header LGRP.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-j\fR \fIprojlist\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report only processes or lwps whose project \fBID\fR is in the given list. Each
+project \fBID\fR can be specified as either a project name or a numerical
+project \fBID\fR. See \fBproject\fR(5).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-J\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report information about processes and projects. In this mode \fBprstat\fR
+displays separate reports about processes and projects at the same time.
+A trailing asterisk marks a long name that has been truncated
+to fit the column.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-k\fR \fItasklist\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report only processes or lwps whose task \fBID\fR is in \fItasklist\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-L\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report statistics for each light-weight process (\fBLWP\fR). By default,
+\fBprstat\fR reports only the number of \fBLWP\fRs for each process.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report microstate process accounting information. This output format includes
+the percentage of time the process has spent in user mode, in system mode, and
+sleeping. It also includes the number of voluntary and involuntary context
+switches, system calls, the number of signals received, and the percentage of
+time the process has spent processing system traps, text page faults, data page
+faults, waiting for user locks and waiting for \fBCPU\fR (latency time).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR \fIntop\fR[\fI,nbottom\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Restrict number of output lines. The \fIntop\fR argument determines how many
+lines of process or \fBlwp\fR statistics are reported, and the \fInbottom\fR
+argument determines how many lines of user, task, project or zone statistics
+are reported if the \fB-a\fR, \fB-t\fR, \fB-T\fR, \fB-J\fR or \fB-Z\fR options
+are specified. By default, \fBprstat\fR displays as many lines of output that
+fit in a window or terminal. When you specify the \fB-c\fR option or direct the
+output to a file, the default values for \fBntop\fR and \fBnbottom\fR are
+\fB15\fR and \fB5\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIpidlist\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report only processes whose process \fBID\fR is in the given list.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-P\fR \fIcpulist\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report only processes or \fBlwp\fRs which have most recently executed on a
+\fBCPU\fR in the given list. Each \fBCPU\fR is identified by an integer as
+reported by \fBpsrinfo\fR(8).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR\fR
+.ad
+.sp .6
+.RS 4n
+Put \fBprstat\fR in the real time scheduling class. When this option is used,
+\fBprstat\fR is given priority over time-sharing and interactive processes.
+This option is available only for superuser.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disable lookups for user names and project names. (Note that this does not
+apply to lookups for the \fB-j\fR, \fB-u\fR, or \fB-U\fR options.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR \fIkey\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sort output lines (that is, processes, \fBlwp\fRs, or users) by \fIkey\fR in
+descending order. Only one \fIkey\fR can be used as an argument.
+.sp
+There are five possible key values:
+.sp
+.ne 2
+.na
+\fBcpu\fR
+.ad
+.sp .6
+.RS 4n
+Sort by process \fBCPU\fR usage. This is the default.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpri\fR
+.ad
+.sp .6
+.RS 4n
+Sort by process priority.
+.RE
+
+.sp
+.ne 2
+.na
+\fBrss\fR
+.ad
+.sp .6
+.RS 4n
+Sort by resident set size.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsize\fR
+.ad
+.sp .6
+.RS 4n
+Sort by size of process image.
+.RE
+
+.sp
+.ne 2
+.na
+\fBtime\fR
+.ad
+.sp .6
+.RS 4n
+Sort by process execution time.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-S\fR \fIkey\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sort output lines by \fIkey\fR in ascending order. Possible \fIkey\fR values
+are the same as for the \fB-s\fR option. See \fB-s\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report total usage summary for each user. The summary includes the total number
+of processes or \fBLWP\fRs owned by the user, total size of process images,
+total resident set size, total cpu time, and percentages of recent cpu time and
+system memory.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-T\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report information about processes and tasks. In this mode \fBprstat\fR
+displays separate reports about processes and tasks at the same time.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-u\fR \fIeuidlist\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report only processes whose effective user \fBID\fR is in the given list. Each
+user \fBID\fR may be specified as either a login name or a numerical user
+\fBID\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-U\fR \fIuidlis\fRt\fR
+.ad
+.sp .6
+.RS 4n
+Report only processes whose real user \fBID\fR is in the given list. Each user
+\fBID\fR may be specified as either a login name or a numerical user \fBID\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+Same as \fB-m\fR, for backwards compatibility.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-W\fR\fR
+.ad
+.sp .6
+.RS 4n
+Truncate long names even when \fBprstat\fR would normally print them
+in full.
+A trailing asterisk marks a long name that has been truncated
+to fit the column.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-z\fR \fIzoneidlist\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report only processes or LWPs whose zone ID is in the given list. Each zone ID
+can be specified as either a zone name or a numerical zone ID. See
+\fBzones\fR(7).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-Z\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report information about processes and zones. In this mode, \fBprstat\fR
+displays separate reports about processes and zones at the same time.
+A trailing asterisk marks a long name that has been truncated
+to fit the column.
+.RE
+
+.SH OUTPUT
+.LP
+The following list defines the column headings and the meanings of a
+\fBprstat\fR report:
+.sp
+.ne 2
+.na
+\fBPID\fR
+.ad
+.sp .6
+.RS 4n
+The process \fBID\fR of the process.
+.RE
+
+.sp
+.ne 2
+.na
+\fBUSERNAME\fR
+.ad
+.sp .6
+.RS 4n
+The real user (login) name or real user \fBID\fR.
+A trailing asterisk marks a long name that has been truncated
+to fit the column.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSWAP\fR
+.ad
+.sp .6
+.RS 4n
+The total virtual memory size of the process, including all mapped files and
+devices, in kilobytes (\fBK\fR), megabytes (\fBM\fR), or gigabytes (\fBG\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fBRSS\fR
+.ad
+.sp .6
+.RS 4n
+The resident set size of the process (\fBRSS\fR), in kilobytes (\fBK\fR),
+megabytes (\fBM\fR), or gigabytes (\fBG\fR). The RSS value is an estimate
+provided by \fBproc\fR(5) that might underestimate the actual resident set
+size. Users who want to get more accurate usage information for capacity
+planning should use the \fB-x\fR option to \fBpmap\fR(1) instead.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSTATE\fR
+.ad
+.sp .6
+.RS 4n
+The state of the process:
+.sp
+.ne 2
+.na
+\fBcpu\fIN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Process is running on \fBCPU\fR \fIN\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsleep\fR
+.ad
+.sp .6
+.RS 4n
+Sleeping: process is waiting for an event to complete.
+.RE
+
+.sp
+.ne 2
+.na
+\fBwait\fR
+.ad
+.sp .6
+.RS 4n
+Waiting: process is waiting for CPU usage to drop to the CPU-caps enforced
+limits. See the description of \fBCPU-caps\fR in \fBresource_controls\fR(7).
+.RE
+
+.sp
+.ne 2
+.na
+\fBrun\fR
+.ad
+.sp .6
+.RS 4n
+Runnable: process in on run queue.
+.RE
+
+.sp
+.ne 2
+.na
+\fBzombie\fR
+.ad
+.sp .6
+.RS 4n
+Zombie state: process terminated and parent not waiting.
+.RE
+
+.sp
+.ne 2
+.na
+\fBstop\fR
+.ad
+.sp .6
+.RS 4n
+Process is stopped.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBPRI\fR
+.ad
+.sp .6
+.RS 4n
+The priority of the process. Larger numbers mean higher priority.
+.RE
+
+.sp
+.ne 2
+.na
+\fBNICE\fR
+.ad
+.sp .6
+.RS 4n
+Nice value used in priority computation. Only processes in certain scheduling
+classes have a nice value.
+.RE
+
+.sp
+.ne 2
+.na
+\fBTIME\fR
+.ad
+.sp .6
+.RS 4n
+The cumulative execution time for the process.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCPU\fR
+.ad
+.sp .6
+.RS 4n
+The percentage of recent \fBCPU\fR time used by the process. If executing in a
+non-global \fBzone\fR and the pools facility is active, the percentage will be
+that of the processors in the processor set in use by the pool to which the
+\fBzone\fR is bound.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPROCESS\fR
+.ad
+.sp .6
+.RS 4n
+The name of the process (name of executed file).
+.RE
+
+.sp
+.ne 2
+.na
+\fBLWP\fR
+.ad
+.sp .6
+.RS 4n
+The \fBlwp\fR \fBID\fR of the \fBlwp\fR being reported, as well as the LWP
+name if any is set.
+.RE
+
+.sp
+.ne 2
+.na
+\fBNLWP\fR
+.ad
+.sp .6
+.RS 4n
+The number of \fBlwp\fRs in the process.
+.RE
+
+.sp
+.LP
+With the some options, in addition to a number of the column headings shown
+above, there are:
+.sp
+.ne 2
+.na
+\fBNPROC\fR
+.ad
+.sp .6
+.RS 4n
+Number of processes in a specified collection.
+.RE
+
+.sp
+.ne 2
+.na
+\fBMEMORY\fR
+.ad
+.sp .6
+.RS 4n
+Percentage of memory used by a specified collection of processes.
+.RE
+
+.sp
+.LP
+The following columns are displayed when the \fB-v\fR or \fB-m\fR option is
+specified
+.sp
+.ne 2
+.na
+\fBUSR\fR
+.ad
+.sp .6
+.RS 4n
+The percentage of time the process has spent in user mode.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSYS\fR
+.ad
+.sp .6
+.RS 4n
+The percentage of time the process has spent in system mode.
+.RE
+
+.sp
+.ne 2
+.na
+\fBTRP\fR
+.ad
+.sp .6
+.RS 4n
+The percentage of time the process has spent in processing system traps.
+.RE
+
+.sp
+.ne 2
+.na
+\fBTFL\fR
+.ad
+.sp .6
+.RS 4n
+The percentage of time the process has spent processing text page faults.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDFL\fR
+.ad
+.sp .6
+.RS 4n
+The percentage of time the process has spent processing data page faults.
+.RE
+
+.sp
+.ne 2
+.na
+\fBLCK\fR
+.ad
+.sp .6
+.RS 4n
+The percentage of time the process has spent waiting for user locks.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSLP\fR
+.ad
+.sp .6
+.RS 4n
+The percentage of time the process has spent sleeping.
+.RE
+
+.sp
+.ne 2
+.na
+\fBLAT\fR
+.ad
+.sp .6
+.RS 4n
+The percentage of time the process has spent waiting for CPU.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVCX\fR
+.ad
+.sp .6
+.RS 4n
+The number of voluntary context switches.
+.RE
+
+.sp
+.ne 2
+.na
+\fBICX\fR
+.ad
+.sp .6
+.RS 4n
+The number of involuntary context switches.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSCL\fR
+.ad
+.sp .6
+.RS 4n
+The number of system calls.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSIG\fR
+.ad
+.sp .6
+.RS 4n
+The number of signals received.
+.RE
+
+.sp
+.LP
+Under the \fB-L\fR option, one line is printed for each \fBlwp\fR in the
+process and some reporting fields show the values for the \fBlwp\fR, not the
+process.
+.sp
+.LP
+The following column is displayed when the \fB-H\fR option is specified:
+.sp
+.ne 2
+.na
+\fBLGRP\fR
+.ad
+.sp .6
+.RS 4n
+The home \fIlgroup\fR of the process or lwp.
+.RE
+
+.SH OPERANDS
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fB\fIcount\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the number of times that the statistics are repeated. By default,
+\fBprstat\fR reports statistics until a termination signal is received.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIinterval\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the sampling interval in seconds; the default interval is \fB5\fR
+seconds.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRReporting the Five Most Active Super-User Processes
+.sp
+.LP
+The following command reports the five most active super-user processes running
+on \fBCPU1\fR and \fBCPU2\fR:
+
+.sp
+.in +2
+.nf
+example% prstat -u root -n 5 -P 1,2 1 1
+
+PID   USERNAME  SWAP   RSS STATE  PRI  NICE      TIME  CPU PROCESS/LWP
+ 306   root     3024K 1448K sleep   58    0   0:00.00 0.3% sendmail/1
+ 102   root     1600K  592K sleep   59    0   0:00.00 0.1% in.rdisc/1
+ 250   root     1000K  552K sleep   58    0   0:00.00 0.0% utmpd/1
+ 288   root     1720K 1032K sleep   58    0   0:00.00 0.0% sac/1
+   1   root      744K  168K sleep   58    0   0:00.00 0.0% init/1
+TOTAL:       25, load averages:  0.05, 0.08, 0.12
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRDisplaying Verbose Process Usage Information
+.sp
+.LP
+The following command displays verbose process usage information about
+processes with lowest resident set sizes owned by users \fBroot\fR and
+\fBjohn\fR.
+
+.sp
+.in +2
+.nf
+example% prstat -S rss -n 5 -vc -u root,john
+
+ PID USERNAME USR SYS TRP TFL DFL LCK SLP LAT VCX ICX SCL SIG PROCESS/LWP
+   1 root     0.0 0.0  -   -   -   -  100  -    0   0   0   0 init/1
+ 102 root     0.0 0.0  -   -   -   -  100  -    0   0   3   0 in.rdisc/1
+ 250 root     0.0 0.0  -   -   -   -  100  -    0   0   0   0 utmpd/1
+1185 john    0.0 0.0  -   -   -   -  100  -    0   0   0   0 csh/1
+ 240 root     0.0 0.0  -   -   -   -  100  -    0   0   0   0 powerd/4
+ TOTAL:       71, load averages:  0.02, 0.04, 0.08
+
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.LP
+.BR date (1),
+.BR lgrpinfo (1),
+.BR plgrp (1),
+.BR proc (1),
+.BR ps (1),
+.BR time (2),
+.BR pset_getloadavg (3C),
+.BR proc (5),
+.BR project (5),
+.BR attributes (7),
+.BR resource_controls (7),
+.BR zones (7),
+.BR psrinfo (8),
+.BR psrset (8),
+.BR sar (8)
+.SH NOTES
+.LP
+The snapshot of system usage displayed by \fBprstat\fR is true only for a
+split-second, and it may not be accurate by the time it is displayed. When the
+\fB-m\fR option is specified, \fBprstat\fR tries to turn on microstate
+accounting for each process; the original state is restored when \fBprstat\fR
+exits. See \fBproc\fR(5) for additional information about the microstate
+accounting facility.
+.sp
+.LP
+The total memory size reported in the SWAP and RSS columns for groups of
+processes can sometimes overestimate the actual amount of memory used by
+processes with shared memory segments.

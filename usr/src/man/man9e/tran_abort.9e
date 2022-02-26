@@ -83,8 +83,12 @@ upon failure.
 The \fBtran_abort()\fR function can be called from user or interrupt context.
 This requirement comes from \fBscsi_abort()\fR.
 .SH SEE ALSO
-\fBattach\fR(9E), \fBscsi_abort\fR(9F), \fBscsi_hba_attach\fR(9F),
-\fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S), \fBscsi_pkt\fR(9S)
+.BR attach (9E),
+.BR scsi_abort (9F),
+.BR scsi_hba_attach (9F),
+.BR scsi_address (9S),
+.BR scsi_hba_tran (9S),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

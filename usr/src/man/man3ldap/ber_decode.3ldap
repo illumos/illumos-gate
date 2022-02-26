@@ -463,7 +463,7 @@ application.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -479,7 +479,8 @@ Interface Stability	Committed
 .SH SEE ALSO
 .sp
 .LP
-\fBber_encode\fR(3LDAP), \fBattributes\fR(5)
+.BR ber_encode (3LDAP),
+.BR attributes (7)
 .sp
 .LP
 Yeong, W., Howes, T., and Hardcastle-Kille, S., "Lightweight Directory Access

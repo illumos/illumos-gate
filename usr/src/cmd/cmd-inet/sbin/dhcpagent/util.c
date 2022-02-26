@@ -763,7 +763,7 @@ dhcp_get_nodename(char *buf, size_t buflen)
  *			    affirmative and if 1) dsm_msg_reqhost is available;
  *			    or 2) hostname is read from an extant
  *			    /etc/hostname.<ifname> file; or 3) interface is
- *			    primary and nodename(4) is defined.
+ *			    primary and nodename(5) is defined.
  *
  *   input: dhcp_pkt_t *: pointer to DHCP message being constructed;
  *	    dhcp_smach_t *: pointer to interface DHCP state machine;
@@ -1000,8 +1000,8 @@ dhcp_pick_domainname(char *namebuf, size_t buflen, dhcp_smach_t *dsmp)
 /*
  * dhcp_assemble_fqdn(): Set fqdnbuf if REQUEST_FQDN is set and
  *			 either a host name was sent in the IPC message (e.g.,
- *			 from ipadm(1M) -h,--reqhost) or the interface is
- *			 primary and a nodename(4) is defined. If the host
+ *			 from ipadm(8) -h,--reqhost) or the interface is
+ *			 primary and a nodename(5) is defined. If the host
  *			 name is not already fully qualified per is_fqdn(),
  *			 then dhcp_pick_domainname() is tried to select a
  *			 domain to be used to construct an FQDN.

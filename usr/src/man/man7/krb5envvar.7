@@ -1,0 +1,235 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH KRB5ENVVAR 7 "Feb 13, 2008"
+.SH NAME
+krb5envvar \- Kerberos environment variables
+.SH DESCRIPTION
+.sp
+.LP
+The Kerberos mechanism provides a number of environment variables to configure
+different behavior in order to meet applications' needs. Environment variables
+used within the Kerberos mechanism are:
+.sp
+.ne 2
+.na
+\fB\fBKRB5_KTNAME\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used by the mechanism to specify the location of the key table file. The
+variable can be set to the following value:
+.sp
+.in +2
+.nf
+[[\fI<kt type>\fR:]\fI<file name>\fR]
+.fi
+.in -2
+
+where \fI<kt type>\fR can be \fBFILE\fR or \fBWRFILE\fR. \fBFILE\fR is for read
+operations; \fBWRFILE\fR is for write operations. \fI<file name>\fR is the
+location of the \fBkeytab\fR file.
+.sp
+r
+.sp
+If \fBKRB5_KTNAME\fR is not defined, the default value is:
+.sp
+.in +2
+.nf
+FILE:/etc/krb5/krb5.keytab
+.fi
+.in -2
+
+The \fBkeytab\fR file is used to store credentials persistently and is used
+commonly for service daemons.
+.sp
+Specifying the \fBFILE\fR type assumes that the subsequent operations on the
+associated file are readable by the invoking process. Care must be taken to
+ensure that the file is readable only by the set of principals that need to
+retrieve their unencrypted keys.
+.sp
+The \fBWRFILE\fR type is used by the \fBkadmin\fR(8) command. Specifying this
+type allows the administrator to designate an alternate \fBkeytab\fR file to
+write to without using extra command line arguments for file location.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBKRB5CCNAME\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used by the mechanism to specify the location of the credential cache. The
+variable can be set to the following value:
+.sp
+.in +2
+.nf
+[[\fI<cc type>\fR:]\fI<file name>\fR]
+.fi
+.in -2
+
+where \fI<cc type>\fR can be \fBFILE\fR or \fBMEMORY\fR. \fI<file name>\fR is
+the location of the principal's credential cache.
+.sp
+If \fBKRB5CCNAME\fR is not defined, the default value is:
+.sp
+.in +2
+.nf
+FILE:/tmp/krb5cc_\fI<uid>\fR
+.fi
+.in -2
+
+where \fI<uid>\fR is the user id of the process that created the cache file.
+.sp
+The credential cache file is used to store tickets that have been granted to
+the principal.
+.sp
+Specifying the \fBFILE\fR types assumes that subsequent operations on the
+associated file are readable and writable by the invoking process. Care must be
+taken to ensure that the file is accessible only by the set of principals that
+need to access their credentials. If the credential file is in a directory to
+which other users have write access, you need to set that directory's sticky
+bit (see \fBchmod\fR(1)).
+.sp
+The \fBMEMORY\fR credential cache type is used only in special cases, such as
+when making a temporary cache for the life of the invoking process.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBKRB5RCNAME\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used by the mechanism to specify the type and location of the replay cache. The
+variable can be set to the following value:
+.sp
+.in +2
+.nf
+[[\fI<rc type>\fR:]\fI<file name>\fR]
+.fi
+.in -2
+
+where \fI<rc type>\fR can be either \fBFILE\fR, \fBMEMORY\fR, or \fBNONE\fR.
+\fI<file name>\fR is relevant only when specifying the replay cache file type.
+.sp
+If not defined, the default value is:
+.sp
+.in +2
+.nf
+FILE:/var/krb5/rcache/root/rc_\fI<service>\fR
+.fi
+.in -2
+
+\&...if the process is owned by root, or:
+.sp
+.in +2
+.nf
+FILE:/var/krb5/rcache/rc_\fI<service>\fR
+.fi
+.in -2
+
+\&...if the process is owned by a user other than root. \fI<service>\fR is the
+service process name associated with the replay cache file.
+.sp
+The replay cache is used by Kerberos to detect the replay of authentication
+data. This prevents people who capture authentication messages on the network
+from authenticating to the server by resending these messages.
+.sp
+When specifying the \fBFILE\fR replay cache type, care must be taken to prevent
+the replay cache file from being deleted by another user. Make sure that every
+directory in the replay cache path is either writable only by the owner of the
+replay cache or that the sticky bit ("\fBt\fR") is set on every directory in
+the replay cache path to which others have write permission.
+.sp
+When specifying the \fBMEMORY\fR replay cache type you need to weigh the
+trade-off of performance against the slight security risk created by using a
+non-persistent cache. The risk occurs during system reboots when the following
+condition obtains:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The duration from the last write to the replay cache before reboot to the point
+when the Kerberized server applications are running is less than the Kerberos
+clockskew (see \fBkrb5.conf\fR(5)).
+.RE
+When specifying the \fBNONE\fR replay cache time you need to understand that
+this disables the replay cache, and all security risks that this presents. This
+includes all the risks outlined in this section of the man page.
+.sp
+Under this condition, the server applications can accept a replay of Kerberos
+authentication data (up to the difference between the time of the last write
+and the clockskew). Typically, this is a small window of time. If the server
+applications take longer than the clockskew to start accepting connections
+there is no replay risk.
+.sp
+The risk described above is the same when using \fBFILE\fR replay cache types
+when the replay cache resides on swap file systems, such as \fB/tmp\fR and
+\fB/var/run\fR.
+.sp
+The performance improvement in \fBMEMORY\fR replay cache types over \fBFILE\fR
+types is derived from the absence of disk I/O. This is true even if the
+\fBFILE\fR replay cache is on a memory-backed file system, such as swap
+(\fB/tmp\fR and \fB/var/run\fR).
+.sp
+Note that \fBMEMORY\fR-type caches are per-process caches,  therefore use of
+these types of caches must be carefully considered. One  example of where
+\fBMEMORY\fR-type caches can be problematic  is when an application uses  more
+than one process for establishing security contexts. In such a case, memory
+replay caches are not shared across the processes, thus  allowing potential for
+replay attacks.
+.RE
+
+.sp
+.ne 2
+.na
+\fBKRB5_CONFIG\fR
+.ad
+.sp .6
+.RS 4n
+Allows you to change the default location of the \fB/etc/krb5/krb5.conf\fR file
+to enable the Kerberos library code to read configuration parameters from
+another file specified by KRB5_CONFIG. For example (using kinit from
+\fBksh\fR(1)):
+.sp
+.in +2
+.nf
+ KRB5_CONFIG=/var/tmp/krb5.conf kinit
+.fi
+.in -2
+
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Uncommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR chmod (1),
+.BR kinit (1),
+.BR klist (1),
+.BR ksh (1),
+.BR krb5.conf (5),
+.BR attributes (7),
+.BR kerberos (7),
+.BR kadmin (8),
+.BR kadmind (8)

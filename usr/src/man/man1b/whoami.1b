@@ -33,5 +33,8 @@ username data base
 .SH SEE ALSO
 .sp
 .LP
-\fBsu\fR(1M), \fBwho\fR(1), \fBgetuid\fR(2), \fBgetpwnam\fR(3C),
-\fBattributes\fR(5)
+.BR who (1),
+.BR getuid (2),
+.BR getpwnam (3C),
+.BR attributes (7),
+.BR su (8)

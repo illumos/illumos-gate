@@ -295,7 +295,7 @@ check_file(const char *file, boolean_t force, boolean_t isspare)
 			libdiskmgt_error(err);
 		else
 			vdev_error(gettext("%s is currently used by swap. "
-			    "Please see swap(1M).\n"), file);
+			    "Please see swap(8).\n"), file);
 		return (-1);
 	}
 

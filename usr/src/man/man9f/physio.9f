@@ -142,8 +142,11 @@ Upon failure.
 .SH CONTEXT
 \fBphysio()\fR can be called from user context only.
 .SH SEE ALSO
-\fBstrategy\fR(9E), \fBbiodone\fR(9F), \fBbiowait\fR(9F), \fBbuf\fR(9S),
-\fBuio\fR(9S)
+.BR strategy (9E),
+.BR biodone (9F),
+.BR biowait (9F),
+.BR buf (9S),
+.BR uio (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

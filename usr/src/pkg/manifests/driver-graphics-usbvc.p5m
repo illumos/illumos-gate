@@ -39,8 +39,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/usbvc group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/usbvc.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/usbvc.4d
 driver name=usbvc perms="* 0666 root sys" \
     alias=usbia46d,8c1.config1.0 \
     alias=usbia46d,8c2.config1.0 \

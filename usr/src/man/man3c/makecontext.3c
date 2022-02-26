@@ -174,11 +174,11 @@ main(int argc, char **argv)
 These functions are useful for implementing user-level context switching
 between multiple threads of control within a process (co-processing). More
 effective multiple threads of control can be obtained by using native support
-for multithreading. See \fBthreads\fR(5).
+for multithreading. See \fBthreads\fR(7).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -196,9 +196,15 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBmmap\fR(2), \fBgetcontext\fR(2), \fBsigaction\fR(2), \fBsigprocmask\fR(2),
-\fBpthread_exit\fR(3C), \fBucontext.h\fR(3HEAD), \fBattributes\fR(5),
-\fBstandards\fR(5), \fBthreads\fR(5)
+.BR getcontext (2),
+.BR mmap (2),
+.BR sigaction (2),
+.BR sigprocmask (2),
+.BR pthread_exit (3C),
+.BR ucontext.h (3HEAD),
+.BR attributes (7),
+.BR standards (7),
+.BR threads (7)
 .SH NOTES
 .sp
 .LP

@@ -81,7 +81,7 @@ Refer to \fBfputwc\fR(3C).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -99,5 +99,11 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBexit\fR(2), \fBabort\fR(3C), \fBfclose\fR(3C), \fBfflush\fR(3C),
-\fBfopen\fR(3C), \fBfputwc\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR exit (2),
+.BR abort (3C),
+.BR fclose (3C),
+.BR fflush (3C),
+.BR fopen (3C),
+.BR fputwc (3C),
+.BR attributes (7),
+.BR standards (7)

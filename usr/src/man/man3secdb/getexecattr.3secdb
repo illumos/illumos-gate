@@ -53,9 +53,9 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lsecdb  -lsocket  -lnsl  [ \fIlibrary\fR... 
 
 .SH DESCRIPTION
 .LP
-The \fBgetexecattr()\fR function returns a single \fBexec_attr\fR(4) entry.
+The \fBgetexecattr()\fR function returns a single \fBexec_attr\fR(5) entry.
 Entries can come from any of the sources specified in the
-\fBnsswitch.conf\fR(4) file.
+\fBnsswitch.conf\fR(5) file.
 .sp
 .LP
 Successive calls to \fBgetexecattr()\fR return either successive
@@ -101,11 +101,11 @@ file, deallocate any internal storage, and so forth.
 .LP
 The \fBgetexecuser()\fR function returns a linked list of entries that match
 the \fItype\fR and \fIid\fR arguments and have a profile that has been assigned
-to the user specified by \fIusername\fR, as described in \fBpasswd\fR(4).
+to the user specified by \fIusername\fR, as described in \fBpasswd\fR(5).
 Profiles for the user are obtained from the list of default profiles in
-\fB/etc/security/policy.conf\fR (see \fBpolicy.conf\fR(4)) and the
-\fBuser_attr\fR(4) database. Only entries in the name service scope for which
-the corresponding profile entry is found in the \fBprof_attr\fR(4) database are
+\fB/etc/security/policy.conf\fR (see \fBpolicy.conf\fR(5)) and the
+\fBuser_attr\fR(5) database. Only entries in the name service scope for which
+the corresponding profile entry is found in the \fBprof_attr\fR(5) database are
 returned.
 .sp
 .LP
@@ -254,7 +254,7 @@ profile information
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -269,7 +269,13 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBgetauthattr\fR(3SECDB), \fBgetprofattr\fR(3SECDB), \fBgetuserattr\fR(3SECDB),
-\fBkva_match\fR(3SECDB), \fBexec_attr\fR(4), \fBpasswd\fR(4),
-\fBpolicy.conf\fR(4), \fBprof_attr\fR(4), \fBuser_attr\fR(4),
-\fBattributes\fR(5)
+.BR getauthattr (3SECDB),
+.BR getprofattr (3SECDB),
+.BR getuserattr (3SECDB),
+.BR kva_match (3SECDB),
+.BR exec_attr (5),
+.BR passwd (5),
+.BR policy.conf (5),
+.BR prof_attr (5),
+.BR user_attr (5),
+.BR attributes (7)

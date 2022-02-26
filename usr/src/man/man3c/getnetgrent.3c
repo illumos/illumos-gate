@@ -39,11 +39,11 @@ group entry
 .SH DESCRIPTION
 These functions are used to test membership in and enumerate members of
 ``netgroup'' network groups defined in a system database.  Netgroups are sets
-of (machine,user,domain) triples (see \fBnetgroup\fR(4)).
+of (machine,user,domain) triples (see \fBnetgroup\fR(5)).
 .sp
 .LP
 These functions consult the source specified for \fBnetgroup\fR in the
-\fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(4)).
+\fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(5)).
 .sp
 .LP
 The function \fBinnetgr()\fR returns  \fB1\fR if there is a netgroup
@@ -138,7 +138,7 @@ success.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -152,8 +152,11 @@ MT-Level	See \fBDESCRIPTION\fR section.
 .TE
 
 .SH SEE ALSO
-\fBIntro\fR(2), \fBIntro\fR(3), \fBnetgroup\fR(4), \fBnsswitch.conf\fR(4),
-\fBattributes\fR(5)
+.BR Intro (2),
+.BR Intro (3),
+.BR netgroup (5),
+.BR nsswitch.conf (5),
+.BR attributes (7)
 .SH WARNINGS
 The function \fBgetnetgrent_r()\fR is included in this release on an
 uncommitted basis only, and is subject to change or removal in future minor
@@ -162,7 +165,7 @@ releases.
 Network groups are usually stored in network information services,
 such as \fBLDAP\fR, or \fBNIS\fR, but may alternatively be stored in
 the local \fB/etc/netgroup\fR file.  The \fBnetgroup\fR line of the
-\fBnsswitch.conf\fR(4) file determines which of those sources are used.
+\fBnsswitch.conf\fR(5) file determines which of those sources are used.
 .sp
 .LP
 When compiling multi-threaded applications, see  \fBIntro\fR(3), \fINotes On

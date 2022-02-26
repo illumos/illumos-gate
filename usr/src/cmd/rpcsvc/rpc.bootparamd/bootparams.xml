@@ -122,7 +122,7 @@ diskless clients at boot time.
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='rpc.bootparamd' section='1M'
+			<manpage title='rpc.bootparamd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

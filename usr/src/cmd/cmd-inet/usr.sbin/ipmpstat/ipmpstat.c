@@ -280,7 +280,7 @@ main(int argc, char **argv)
 		die_ipmperr(err, "cannot create IPMP handle");
 
 	if (ipmp_ping_daemon(ih) != IPMP_SUCCESS)
-		die("cannot contact in.mpathd(1M) -- is IPMP in use?\n");
+		die("cannot contact in.mpathd(8) -- is IPMP in use?\n");
 
 	/*
 	 * If we've been asked to display probes, then call the probe output

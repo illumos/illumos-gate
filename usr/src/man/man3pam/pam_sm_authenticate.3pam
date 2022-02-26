@@ -23,7 +23,7 @@ pam_sm_authenticate \- service provider implementation for pam_authenticate
 .LP
 In response to a call to \fBpam_authenticate\fR(3PAM), the  \fBPAM\fR framework
 calls \fBpam_sm_authenticate()\fR from the modules listed in the
-\fBpam.conf\fR(4) file. The authentication provider supplies the back-end
+\fBpam.conf\fR(5) file. The authentication provider supplies the back-end
 functionality for this interface function.
 .sp
 .LP
@@ -70,7 +70,7 @@ The user has a null authentication token.
 .sp
 .LP
 The \fIargc\fR argument represents the number of module options passed in from
-the configuration file \fBpam.conf\fR(4). \fIargv\fR specifies the module
+the configuration file \fBpam.conf\fR(5). \fIargv\fR specifies the module
 options, which are interpreted and processed by the authentication service.
 Please refer to the specific module man pages for the various available
 \fIoptions\fR. If any unknown option is passed in, the module should log the
@@ -150,7 +150,7 @@ is \fIrequired\fR,\fIoptional,\fR or \fIsufficient\fR1.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -168,10 +168,16 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBpam\fR(3PAM), \fBpam_authenticate\fR(3PAM), \fBpam_get_item\fR(3PAM),
-\fBpam_set_data\fR(3PAM), \fBpam_set_item\fR(3PAM), \fBpam_setcred\fR(3PAM),
-\fBpam_start\fR(3PAM), \fBlibpam\fR(3LIB), \fBpam.conf\fR(4),
-\fBattributes\fR(5)
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_authenticate (3PAM),
+.BR pam_get_item (3PAM),
+.BR pam_set_data (3PAM),
+.BR pam_set_item (3PAM),
+.BR pam_setcred (3PAM),
+.BR pam_start (3PAM),
+.BR pam.conf (5),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

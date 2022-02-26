@@ -68,7 +68,7 @@
 
 	<!-- these are passed to vntsd in the method script -->
 	<property_group name='vntsd' type='application'>
-		<propval name='vcc_device' type='astring' 
+		<propval name='vcc_device' type='astring'
 			value='virtual-console-concentrator@0' />
 		<propval name='listen_addr' type='astring' value='localhost' />
 		<propval name='timeout_minutes' type='integer' value='0' />
@@ -84,7 +84,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='vntsd' section='1M'
+			<manpage title='vntsd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

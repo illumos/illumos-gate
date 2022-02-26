@@ -52,7 +52,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -68,4 +68,6 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fByacc\fR(1), \fBIntro\fR(3), \fBattributes\fR(5)
+.BR yacc (1),
+.BR Intro (3),
+.BR attributes (7)

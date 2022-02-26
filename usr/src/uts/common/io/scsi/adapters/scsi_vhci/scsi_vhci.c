@@ -97,7 +97,7 @@ static int	vhci_bus_config_debug = 0;
 
 /*
  * Bidirectional map of 'target-port' to port id <pid> for support of
- * iostat(1M) '-Xx' and '-Yx' output.
+ * iostat(8) '-Xx' and '-Yx' output.
  */
 static kmutex_t		vhci_targetmap_mutex;
 static uint_t		vhci_targetmap_pid = 1;
@@ -4966,14 +4966,14 @@ vhci_kstat_create_pathinfo(mdi_pathinfo_t *pip)
 	 *
 	 * We maintain a bidirectional 'target-port' to <pid> map,
 	 * called targetmap. All pathinfo nodes with the same
-	 * 'target-port' map to the same <pid>. The iostat(1M) code,
+	 * 'target-port' map to the same <pid>. The iostat(8) code,
 	 * when parsing a path oriented kstat name, uses the <pid> as
 	 * a SCSI_VHCI_GET_TARGET_LONGNAME ioctl argument in order
 	 * to get the 'target-port'. For KSTAT_FLAG_PERSISTENT kstats,
 	 * this ioctl needs to translate a <pid> to a 'target-port'
 	 * even after all pathinfo nodes associated with the
 	 * 'target-port' have been destroyed. This is needed to support
-	 * consistent first-iteration activity-since-boot iostat(1M)
+	 * consistent first-iteration activity-since-boot iostat(8)
 	 * output. Because of this requirement, the mapping can't be
 	 * based on pathinfo information in a devinfo snapshot.
 	 */
@@ -5003,7 +5003,7 @@ vhci_kstat_create_pathinfo(mdi_pathinfo_t *pip)
 		 * For this type of mapping we don't want the
 		 * <id> -> 'target-port' mapping to be made.  This
 		 * will cause the SCSI_VHCI_GET_TARGET_LONGNAME ioctl
-		 * to fail, and the iostat(1M) long '-n' output will
+		 * to fail, and the iostat(8) long '-n' output will
 		 * still use the <pid>.  We do this because we just
 		 * made up the 'target-port' using the guid, and we
 		 * don't want to expose that fact in iostat output.
@@ -8346,7 +8346,7 @@ vhci_uscsi_send_sense(struct scsi_pkt *pkt, mp_uscsi_cmd_t *mp_uscmdp)
 	rqpkt->pkt_private = mp_uscmdp;
 
 	/*
-	 * NOTE: This code path is related to MPAPI uscsi(7I), so path
+	 * NOTE: This code path is related to MPAPI uscsi(4I), so path
 	 * selection is not based on path_instance.
 	 */
 	if (scsi_pkt_allocated_correctly(rqpkt))
@@ -8577,7 +8577,7 @@ vhci_uscsi_iostart(struct buf *bp)
 	    (void *)bp, bp->b_bcount, (void *)mp_uscmdp->pip, stat_size));
 
 	/*
-	 * NOTE: This code path is related to MPAPI uscsi(7I), so path
+	 * NOTE: This code path is related to MPAPI uscsi(4I), so path
 	 * selection is not based on path_instance.
 	 */
 	if (scsi_pkt_allocated_correctly(pkt))

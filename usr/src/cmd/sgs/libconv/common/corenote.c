@@ -517,7 +517,7 @@ conv_cnote_pr_what(short why, short what, Conv_fmt_flags_t fmt_flags,
 {
 	/*
 	 * The meaning of pr_what depends on the corresponding
-	 * value of pr_why, as discussed in the proc(4) manpage.
+	 * value of pr_why, as discussed in the proc(5) manpage.
 	 */
 	switch (why) {
 	case PR_SIGNALLED:

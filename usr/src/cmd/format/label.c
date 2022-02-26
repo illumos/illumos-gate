@@ -670,7 +670,7 @@ read_efi_label(int fd, struct efi_info *label, struct disk_info *disk_info)
 /*
  * We've read a 64-bit label which has no geometry information.  Use
  * some heuristics to fake up a geometry that would match the disk in
- * order to make the rest of format(1M) happy.
+ * order to make the rest of format(8) happy.
  */
 static int
 vtoc64_to_label(struct efi_info *label, struct dk_gpt *vtoc)

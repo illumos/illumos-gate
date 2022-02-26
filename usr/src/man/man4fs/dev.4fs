@@ -1,0 +1,83 @@
+.\"
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd November 29, 2021
+.Dt DEV 4FS
+.Os
+.Sh NAME
+.Nm dev
+.Nd Device name file system
+.Sh DESCRIPTION
+The
+.Nm
+filesystem manages the name spaces of devices in the operating system.
+The global zone's instance of the
+.Nm
+filesystem is mounted during boot on
+.Pa /dev .
+This filesystem is colloqiually called
+.Sq sdev
+as a way to distinguish it from the
+.Xr devfs 4FS
+filesystem mounted at
+.Pa /devices .
+.Pp
+A subdirectory under
+.Pa /dev
+may have unique operational semantics.
+Most of the common device names under
+.Pa /dev
+are created automatically by
+.Xr devfsadm 8
+Others, such as
+.Pa /dev/pts ,
+.Pa /dev/net ,
+and
+.Pa /dev/zvol
+are dynamic and reflect the operational state of the system.
+You can manually generate device names for newly attached hardware by invoking
+.Xr devfsadm 8
+or implicitly, by indirectly causing a lookup or readdir operation in the
+filesystem to occur.
+For example, you can discover a disk that was attached when the system was
+powered down (and generate a name for that device) by invoking
+.Xr format 8 .
+.Pp
+In a non-global zone, the
+.Nm
+filesystem is also mounted at
+.Pa /dev ;
+however, it is generally speaking read-only.
+Unlike in the global zone, a privileged user in a non-global zone cannot create
+directories or files, directories, or other objects within the filesystem.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev
+Mount point for the
+.Nm
+filesystem in the global zone and non-global zones.
+.El
+.Sh SEE ALSO
+.Xr devfs 4FS ,
+.Xr devfsadm 8 ,
+.Xr format 8
+.Sh NOTES
+The global
+.Pa /dev
+instance cannot be unmounted.

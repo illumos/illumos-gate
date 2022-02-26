@@ -1,0 +1,1268 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH LUXADM 8 "May 17, 2020"
+.SH NAME
+luxadm \- administer Sun Fire 880 storage subsystem and FC_AL devices
+.SH SYNOPSIS
+.nf
+\fBluxadm\fR [\fIoptions\fR]... \fIsubcommand\fR [\fIoptions\fR]... \fIenclosure\fR
+     [,\fIdev\fR] | \fIpathname\fR...
+.fi
+
+.SH DESCRIPTION
+The \fBluxadm\fR program is an administrative command that manages the
+\fBSENA\fR, Sun Fire 880 internal storage subsystem, and individual Fiber
+Channel Arbitrated Loop (\fBFC_AL\fR) devices. \fBluxadm\fR performs a variety
+of control and query tasks depending on the command line arguments and options
+used.
+.sp
+.LP
+The command line must contain a subcommand. The command line may also contain
+options, usually at least one enclosure name or pathname, and other parameters
+depending on the subcommand. You need specify only as many characters as are
+required to uniquely identify a subcommand.
+.sp
+.LP
+Specify the device that a subcommand interacts with by entering a pathname. For
+the \fBSENA\fR subsystem, a disk device or enclosure services controller may
+instead be specified by entering the World Wide Name (\fBWWN\fR) for the device
+or a port to the device. The device may also be specified by entering the name
+of the \fBSENA\fR enclosure, and an optional identifier for the particular
+device in the enclosure. The individual \fBFC_AL\fR devices may be specified by
+entering the \fBWWN\fR for the device or a port to the device.
+.SS "Pathname"
+Specify the device or controller by either a complete physical pathname or a
+complete logical pathname.
+.sp
+.LP
+For \fBSENA,\fR a typical physical pathname for a device is:
+.sp
+.in +2
+.nf
+/devices/sbus@1f,0/SUNW,socal@1,0/sf@0,0/ssd@w2200002037000f96,
+         0:a,raw
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+For all \fBSENA IBs\fR (Interface Boards) and Sun Fire 880 SES device
+controllers on the system, a logical link to the physical paths is kept in the
+directory \fB/dev/es\fR. An example of a logical link is \fB/dev/es/ses0\fR.
+.sp
+.LP
+The \fBWWN\fR may be used in place of the pathname to select an \fBFC_AL\fR
+device, \fBSENA\fR subsystem IB, or Sun Fire 880 internal storage subsystem.
+The \fBWWN\fR is a unique 16 hexadecimal digit value that specifies either the
+port used to access the device or the device itself. A typical \fBWWN\fR value
+is:
+.sp
+.in +2
+.nf
+2200002037000f96
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+See NOTES for more information on the \fBWWN\fR formats.
+.sp
+.LP
+For a disk in a Sun Fire 880 internal storage subsystem, a typical physical
+pathname is:
+.sp
+.in +2
+.nf
+/devices/pci@8,600000/SUNW,qlc@2/fp@0,0/ssd@w2100002037a6303c,0:a
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+and a typical logical pathname is:
+.sp
+.in +2
+.nf
+/dev/rdsk/c2t8d0s2
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+For individual FC_AL devices, a typical physical pathname is:
+.sp
+.in +2
+.nf
+/devices/sbus@3.0/SUNW,socal@d,10000/sf@0,0/ssd@w2200002037049fc3,0:a,raw
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+and a typical logical pathname is:
+.sp
+.in +2
+.nf
+/dev/rdsk/c1t0d0s2
+.fi
+.in -2
+.sp
+
+.SS "Enclosure"
+For \fBSENA,\fR a device may be identified by its enclosure name and slotname:
+.br
+.in +2
+\fIbox_name\fR[\fB,f\fR\fIslot_number\fR]
+.in -2
+.br
+.in +2
+\fIbox_name\fR[\fB,r\fR\fIslot_number\fR]
+.in -2
+.sp
+.LP
+\fIbox_name\fR is the name of the \fBSENA\fR enclosure, as specified by the
+\fBenclosure_name\fR subcommand. When used without the optional
+\fIslot_number\fR parameter, the \fIbox_name\fR identifies the \fBSENA\fR
+subsystem \fBIB.\fR
+.sp
+.LP
+\fBf\fR or \fBr\fR specifies the front or rear slots in the \fBSENA\fR
+enclosure.
+.sp
+.LP
+\fIslot_number\fR specifies the slot number of the device in the \fBSENA\fR
+enclosure, \fB0-6\fR or \fB0-10\fR.
+.sp
+.LP
+For a Sun Fire 880 internal storage subsystem, a device may also be identified
+by its enclosure name and slot name. However, there is only one set of disks:
+.sp
+.in +2
+.nf
+\fIbox_name\fR[,\fIsslot_number\fR]
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fIbox_name\fR is the name of the Sun Fire 880 enclosure, as specified by the
+\fBenclosure_name\fR subcommand. When used without the optional
+\fIslot_number\fR parameter, \fIbox_name\fR identifies the Sun Fire 880
+internal storage subsystem enclosure services device. Use \fIs\fR to specify
+the disk slot number in the Sun Fire 880 internal storage subsystem, \fB0\fR -
+\fB11\fR.
+.sp
+.LP
+See \fBdisks\fR(8) and \fBdevlinks\fR(8) for additional information on
+logical names for disks and subsystems.
+.SH OPTIONS
+The following options are supported by all subcommands:
+.sp
+.ne 2
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 6n
+Expert mode. This option is not recommended for the novice user.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 6n
+Verbose mode.
+.RE
+
+.sp
+.LP
+Options that are specific to particular subcommands are described with the
+subcommand in the \fBUSAGE\fR section.
+.SH OPERANDS
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fB\fIenclosure\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fIbox_name\fR of the \fBSENA\fR or Sun Fire 880 internal storage
+subsystem.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIfibre_channel_HBA_port\fR\fR
+.ad
+.sp .6
+.RS 4n
+The path to the host controller port. A typical path is:
+.sp
+.in +2
+.nf
+ /devices/pci@8,600000/pci@1/SUNW,qlc@4/fp@0,0:devctl
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+The logical or physical path of a \fBSENA IB\fR, Sun Fire 880 internal storage
+subsystem, or disk device. \fIpathname\fR can also be the \fBWWN\fR of a
+\fBSENA IB\fR, \fBSENA\fR disk, or individual \fBFC_AL\fR device.
+.RE
+
+.SH USAGE
+.SS "Subcommands"
+.ne 2
+.na
+\fB\fBdisplay\fR \fIenclosure\fR[,\fIdev\fR]\|.\|.\|.\||
+\fIpathname\fR\|.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBdisplay\fR \fB-p\fR \fIpathname\fR\|.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBdisplay\fR \fB-r\fR \fIenclosure\fR[,\fIdev\fR]\|.\|.\|.\||
+\fIpathname\fR\|.\|.\|.\fR
+.ad
+.br
+.na
+\fB\fBdisplay\fR \fB-v\fR \fIenclosure\fR[,\fIdev\fR]\|.\|.\|.\||
+\fIpathname\fR\|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Displays enclosure or device specific data.
+.sp
+Subsystem data consists of enclosure environmental sense information and status
+for all subsystem devices, including disks.
+.sp
+Disk data consists of inquiry, capacity, and configuration information.
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+Displays performance information for the device or subsystem specified by
+\fIpathname\fR. This option only applies to subsystems that accumulate
+performance information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+Displays error information for the \fBFC_AL\fR device specified by the
+pathname, or, if the path is a \fBSENA,\fR for all devices on the loop. The
+\fB-r\fR option only applies to \fBSENA\fR subsystems and individual
+\fBFC_AL\fR devices.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 6n
+Displays in verbose mode, including mode sense data.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdownload\fR [ \fB-s\fR ] [ \fB-f\fR \fIfilename_path\fR ]
+\fIenclosure\fR.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Download the prom image pointed to the SENA subsystem Interface Board unit or
+the Sun Fire 880 internal storage subsystem specified by the enclosure or
+pathname.
+.sp
+When the \fBSENA's\fR download is complete, the \fBSENA\fR will be reset and
+the downloaded code executed. If no filename is specified, the default prom
+image will be used. The default prom image for the \fBSENA\fR is in the
+directory \fB/usr/lib/locale/C/LC_MESSAGES\fR and is named \fBibfirmware\fR
+.sp
+When the Sun Fire 880 internal storage subsystem's download is complete, the
+subsystem resets and the downloaded code begins execution. The default firmware
+image for the Sun Fire 880 internal storage subsystem is in:
+\fB/usr/platform/SUNW,Sun-Fire-880/lib/images/int_fcbpl_fw\fR.
+.sp
+.ne 2
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 6n
+Save. The \fB-s\fR option is used to save the downloaded firmware in the
+FEPROM. If \fB-s\fR is not specified, the downloaded firmware will not be saved
+across power cycles.
+.sp
+The \fB-s\fR option does not apply to the Sun Fire 880 internal storage
+subsystem as it always stores downloaded firmware in the flash memory.
+.sp
+When using the \fB-s\fR option, the \fBdownload\fR subcommand modifies the
+\fBFEPROM\fR on the subsystem and should be used with \fIcaution\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBenclosure_name\fR \fInew_name\fR \fIenclosure\fR | \fIpathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Change the enclosure name of the enclosure or enclosures specified by the
+enclosure or pathname. The new name (\fInew_name\fR) must be 16 or less
+characters. Only alphabetic or numeric characters are acceptable. This
+subcommand applies only to the SENA and the Sun Fire 880 internal storage
+subsystem.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfailover primary\fR | \fBsecondary\fR \fIpathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Select which Sun Storage T3 storage array partner group controller accesses a
+given logical volume. If \fBprimary\fR is specified, the logical volume is
+accessed through the primary controller. If \fBsecondary\fR is specified, the
+logical volume is accessed through the secondary controller specified by
+\fIpathname\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfcal_s_download\fR [ \fB-f\fR \fIfcode-file\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Download the fcode contained in the file \fIfcode-file\fR into \fIall\fR the
+\fBFC100/S\fR Sbus Cards. This command is interactive and expects user
+confirmation before downloading the fcode.
+.sp
+Use \fBfcal_s_download\fR \fIonly\fR in single-user mode. Using
+\fBfcal_s_download\fR to update a host adapter while there is \fBI/O\fR
+activity through that adapter \fIwill\fR cause the adapter to reset. Newly
+updated FCode will not be executed or visible until a system reboot.
+.sp
+.ne 2
+.na
+\fB\fB-f\fR \fIfcode-file\fR\fR
+.ad
+.RS 17n
+When invoked without the \fB-f\fR option, the current version of the fcode in
+each \fBFC100/S\fR Sbus card is printed.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfcode_download\fR \fB-p\fR\fR
+.ad
+.br
+.na
+\fB\fBfcode_download\fR \fB-d\fR \fIdir-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Locate the installed \fBFC/S\fR, \fBFC100/S, FC100/P\fR, or \fBFC100/2P\fR host
+bus adapter cards and download the FCode files in \fIdir-name\fR to the
+appropriate cards. The command determines the correct card for each type of
+file, and is interactive. User confirmation is required before downloading the
+FCode to each device.
+.sp
+Use \fBfcode_download\fR to load FCode only in single-user mode. Using
+\fBfcode_download\fR to update a host adapter while there is \fBI/O\fR activity
+through that adapter causes the adapter to reset. Newly updated FCode will not
+be executed or visible until a system reboot.
+.sp
+.ne 2
+.na
+\fB\fB-d\fR \fIdir-name\fR\fR
+.ad
+.RS 15n
+Download the FCode files contained in the directory \fIdir-name\fR to the
+appropriate adapter cards.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 15n
+Prints the current version of FCode loaded on each card. No download is
+performed.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinquiry\fR \fIenclosure\fR[,\fIdev\fR ]\|.\|.\|.\| |
+\fIpathname\fR\|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Display the inquiry information for the selected device specified by the
+enclosure or pathname.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinsert_device\fR [ \fIenclosure\fR,\fIdev\fR\|.\|.\|. ]\fR
+.ad
+.sp .6
+.RS 4n
+Assist the user in the hot insertion of a new device or a chain of new devices.
+Refer to \fBNOTES\fR for limitations on hotplug operations. This subcommand
+applies only to the \fBSENA\fR, Sun Fire 880 internal storage subsystem, and
+individual FC_AL drives. For the \fBSENA\fR, if more than one enclosure has
+been specified, concurrent hot insertions on multiple busses can be performed.
+With no arguments to the subcommand, entire enclosures or individual
+\fBFC_AL\fR drives can be inserted. For the \fBSENA\fR or the Sun Fire 880
+internal storage subsystem, this subcommand guides the user interactively
+through the hot insertion steps of a new device or chain of devices. If a list
+of disks was entered it will ask the user to verify the list of devices to be
+inserted is correct, at which point the user can continue or quit. It then
+interactively asks the user to insert the disk(s) or enclosure(s) and then
+creates and displays the logical pathnames for the devices.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBled\fR \fIenclosure\fR,\fIdev\fR\|.\|.\|.\|| \fIpathname\fR.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Display the current state of the \fBLED\fR associated with the disk specified
+by the enclosure or pathname. This subcommand only applies to subsystems that
+support this functionality.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBled_blink\fR \fIenclosure\fR,\fIdev\fR\|.\|.\|.\||
+\fIpathname\fR\|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Requests the subsystem to start blinking the \fBLED\fR associated with the disk
+specified by the enclosure or pathname. This subcommand only applies to
+subsystems that support this functionality.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBled_off\fR \fIenclosure\fR,\fIdev\fR\|.\|.\|.\||
+\fIpathname\fR\|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Requests the subsystem to disable (turn off) the \fBLED\fR associated with the
+disk specified by the enclosure or pathname. On a \fBSENA\fR subsystem, this
+may or may not cause the \fBLED\fR to turn off or stop blinking depending on
+the state of the \fBSENA\fR subsystem. Refer to the \fBSENA\fR Array
+Installation and Service Manual (p/n 802-7573). This subcommand only applies to
+subsystems that support this functionality.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBled_on\fR \fIpathname\fR\|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Requests the subsystem to enable (turn on) the \fBLED\fR associated with the
+disk specified by the pathname. This subcommand only applies to subsystems that
+support this functionality.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpower_off\fR [ \fB-F\fR ] \fIenclosure\fR[,\fIdev\fR]\|.\|.\|. |
+\fIpathname\fR \|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+When a \fBSENA\fR is addressed, this subcommand causes the \fBSENA\fR subsystem
+to go into the power-save mode. The \fBSENA\fR drives are not available when in
+the power-save mode. When a drive in a \fBSENA\fR is addressed the drive is set
+to the drive off/unmated state. In the drive off/unmated state, the drive is
+spun down (stopped) and in bypass mode. This command does not apply to the Sun
+Fire 880 internal storage subsystem.
+.sp
+.ne 2
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 6n
+The force option only applies to the \fBSENA.\fR Instructs \fBluxadm\fR to
+attempt to power off one or more devices even if those devices are being used
+by this host (and are, therefore, busy).
+.sp
+\fBWarning\fR: Powering off a device which has data that is currently being
+used will cause unpredictable results. Users should attempt to power off the
+device normally (without \fB-F\fR) first, only resorting to this option when
+sure of the consequences of overriding normal checks.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpower_on\fR \fIenclosure\fR[\fB,\fR\fIdev\fR]\|.\|.\|\fR
+.ad
+.sp .6
+.RS 4n
+Causes the \fBSENA\fR subsystem to go out of the power-save mode, when this
+subcommand is addressed to a \fBSENA.\fR. When this subcommand is addressed to
+a drive the drive is set to its normal start-up state. This command does not
+apply to the Sun Fire 880 internal storage subsystem.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBprobe\fR [ \fB-p\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Finds and displays information about all attached \fBSENA\fR subsystems, Sun
+Fire 880 internal storage subsystems, and individual \fBFC_AL\fR devices,
+including the logical pathname, the \fBWWNs,\fR and enclosure names. This
+subcommand warns the user if it finds different \fBSENAs\fR with the same
+enclosure names.
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+Includes the physical pathname in the display.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBqlgc_s_download\fR [ \fB-f\fR \fIfcode-file\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Download the FCode contained in the file \fIfcode-file\fR into all the
+\fBFC100/P\fR, \fBFC100/2P\fR \fBPCI\fR host adapter cards. This command is
+interactive and expects user confirmation before downloading the FCode to each
+device. Only use \fBqlgc_s_download\fR in single-user mode. Using
+\fBqlgc_s_download\fR to update a host adapter while there is\fB I/O\fR
+activity through that adapter will cause the adapter to reset. Newly updated
+FCode will not be executed or visible until a system reboot.
+.sp
+.ne 2
+.na
+\fB\fB-f\fR \fIfcode-file\fR\fR
+.ad
+.RS 17n
+When invoked without the \fB-f\fR option, the current version of the FCode in
+each \fBFC100/P\fR,\fB FC100/2P PCI\fR card is printed.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrelease\fR \fIpathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Release a reservation held on the specified disk. The pathname should be the
+physical or logical pathname for the disk.
+.sp
+This subcommand is included for historical and diagnostic purposes only.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBremove_device\fR [ \fB-F\fR ] \fIenclosure\fR[,\fIdev\fR]\|.\|.\|.\||
+\fIpathname\fR\|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Assists the user in hot removing a device or a chain of devices. This
+subcommand can also be used to remove entire enclosures. This subcommand
+applies to the \fBSENA\fR, Sun Fire 880 internal storage subsystem, and
+individual \fBFC_AL\fR drives. Refer to \fBNOTES\fR for limitations on hotplug
+operations. For the \fBSENA\fR, Sun Fire 880 internal storage subsystem, and
+individual \fBFC_AL\fR devices, this subcommand guides the user through the hot
+removal of a device or devices. During execution it will ask the user to verify
+the list of devices to be removed is correct, at which point the user can
+continue or quit. It then prepares the disk(s) or enclosure(s) for removal and
+interactively asks the user to remove the disk(s) or enclosure(s).
+.sp
+For Multi-Hosted disk, the steps taken are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Issue the \fBluxadm\fR \fBremove_device\fR command on the first host. When
+prompted to continue, wait.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Issue the \fBluxadm\fR \fBremove_device\fR command on the secondary hosts. When
+prompted to continue, wait.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Continue with the \fBremove_device\fR command on the first host. Remove the
+device when prompted to do so.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Complete the \fBluxadm\fR \fBremove_device\fR command on the additional hosts.
+.RE
+.sp
+.ne 2
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 6n
+Instructs \fBluxadm\fR to attempt to hot plug one or more devices even if those
+devices are being used by this host (and are, therefore, \fBbusy\fR or
+\fBreserved\fR), to \fBforce\fR the hotplugging operation.
+.sp
+\fBWarning\fR: Removal of a device which has data that is currently being used
+will cause unpredictable results. Users should attempt to hotplug normally
+(without \fB-F\fR) first, only resorting to this option when sure of the
+consequences of overriding normal hotplugging checks.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreserve\fR \fIpathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Reserve the specified disk for exclusive use by the issuing host. The pathname
+used should be the physical or logical pathname for the disk.
+.sp
+This subcommand is included for historical and diagnostic purposes only.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBset_boot_dev\fR [ \fB-y\fR ] \fIpathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the boot-device variable in the system \fBPROM\fR to the physical device
+name specified by \fIpathname\fR, which can be a block special device or the
+pathname of the directory on which the boot file system is mounted. The command
+normally runs interactively requesting confirmation for setting the default
+boot-device in the \fBPROM\fR. The \fB-y\fR option can be used to run it
+non-interactively, in which case no confirmation is requested or required.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstart\fR \fIpathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Spin up the specified disk(s) in a SENA.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstop\fR \fIpathname\fR...\fR
+.ad
+.sp .6
+.RS 4n
+Spin down the specified disks in a SENA.
+.RE
+
+.SS "SENA, Sun Fire 880 Internal Storage Subsystem, and Individual FC_AL Drive Expert Mode Subcommands"
+The following subcommands are for expert use only, and are applicable only to
+the \fBSENA\fR, Sun Fire 880 internal storage subsystem, and fiber channel
+loops. They should only be used by users that are knowledgeable about the
+\fBSENA\fR subsystem and fiber channel loops.
+.sp
+.LP
+If you specify a disk to an expert subcommand that operates on a bus, the
+subcommand operates on the bus to which the specified disk is attached.
+.sp
+.ne 2
+.na
+\fB\fB-e\fR \fBbypass\fR \fB[\fR\fB-ab\fR\fB]\fR \fIenclosure\fR,\fIdev\fR\fR
+.ad
+.br
+.na
+\fB\fB-e\fR \fBbypass\fR \fB-f\fR \fIenclosure\fR\fR
+.ad
+.sp .6
+.RS 4n
+Request the enclosure services controller to set the LRC (Loop Redundancy
+Circuit) to the bypassed state for the port and device specified.
+.sp
+This subcommand supports the following options:
+.sp
+.ne 2
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+Bypass port \fBa\fR of the device specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 6n
+Bypass port \fBb\fR of the device specified.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR \fBdump_map\fR \fIfibre_channel_HBA_port\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display WWN data for a target device or host bus adapter on the specified fibre
+channel port. If there are no target devices on the specified port, an error is
+returned.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR \fBenable\fR \fB[\fR\fB-ab\fR\fB]\fR \fIenclosure\fR,\fIdev\fR\fR
+.ad
+.br
+.na
+\fB\fB-e\fR \fBenable\fR \fB-f\fR \fIenclosure\fR\fR
+.ad
+.sp .6
+.RS 4n
+Request the enclosure services controller to set the LRC (Loop Redundancy
+Circuit) to the enabled state for the port and device specified.
+.sp
+This subcommand supports the following options:
+.sp
+.ne 2
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+Enable port \fBa\fR of the device specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 6n
+Enable port \fBb\fR of the device specified.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-e\fR \fBforcelip\fR \fIenclosure\fR[\fB,\fR\fIdev\fR] \|.\|.\|. |
+\fIpathname\fR\|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Force the link to reinitialize, using the Loop Initialization Primitive
+(\fBLIP\fR) sequence. The enclosure or pathname can specify any device on the
+loop. Use the pathname to specify a specific path for multiple loop
+configurations.
+.sp
+This is an expert only command and should be used with caution. It will reset
+all ports on the loop.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-e\fR \fBrdls\fR \fIenclosure\fR[\fB,\fR\fIdev\fR] \|.\|.\|. |
+\fIpathname\fR\|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Read and display the link error status information for all available devices on
+the loop that contains the device specified by the enclosure or pathname.
+.RE
+
+.SS "Other Expert Mode Subcommands"
+See \fBNOTES\fR for limitations of these subcommands. They should only be used
+by users that are knowledgeable about the systems they are managing.
+.sp
+.LP
+These commands do not apply to the Sun Fire 880 internal storage subsystem.
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-e\fR \fBbus_getstate\fR \fIpathname\fR\fR
+.ad
+.RS 29n
+Get and display the state of the specified bus.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-e\fR \fBbus_quiesce\fR \fIpathname\fR\fR
+.ad
+.RS 29n
+Quiesce the specified bus.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-e\fR \fBbus_reset\fR \fIpathname\fR\fR
+.ad
+.RS 29n
+Reset the specified bus only.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-e\fR \fBbus_resetall\fR \fIpathname\fR\fR
+.ad
+.RS 29n
+Reset the specified bus and all devices.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-e\fR \fBbus_unquiesce\fR \fIpathname\fR\fR
+.ad
+.RS 29n
+Unquiesce the specified bus. the specified device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-e\fR \fBdev_getstate\fR \fIpathname\fR\fR
+.ad
+.RS 29n
+Get and display the state of the specified device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-e\fR \fBdev_reset\fR \fIpathname\fR\fR
+.ad
+.RS 29n
+Reset the specified device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-e\fR \fBoffline\fR \fIpathname\fR\fR
+.ad
+.RS 29n
+Take the specified device offline.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-e\fR \fBonline\fR \fIpathname\fR\fR
+.ad
+.RS 29n
+Put the specified device online.
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRDisplaying the \fBSENA\fRs and Individual FC_AL Devices on a
+System
+.sp
+.LP
+The following example finds and displays all of the \fBSENA\fRs and individual
+\fBFC_AL\fR devices on a system:
+
+.sp
+.in +2
+.nf
+example% \fBluxadm probe\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRDisplaying a \fBSENA\fR or Sun Fire 880 Internal Storage
+Subsystem
+.sp
+.LP
+The following example displays a \fBSENA\fR or Sun Fire 880 internal storage
+subsystem:
+
+.sp
+.in +2
+.nf
+example% \fBluxadm display /dev/es/ses0\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRDisplaying Two Subsystems
+.sp
+.LP
+The following example displays two subsystems using the enclosure names:
+
+.sp
+.in +2
+.nf
+example% \fBluxadm display BOB system1\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRDisplaying Information about the First Disk
+.sp
+.LP
+The following example displays information about the first disk in the front of
+the enclosure named \fBBOB.\fR Use \fBf\fR to specify the front disks. Use
+\fBr\fR to specify the rear disks.
+
+.sp
+.in +2
+.nf
+example% \fBluxadm display BOB,f0\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRDisplaying Information on a Sun Fire 880 Internal Storage
+Subsystem
+.sp
+.LP
+The Sun Fire 880 internal storage subsystem has only one set of disks. In this
+case, use \fIs\fR to specify the slot:
+
+.sp
+.in +2
+.nf
+example% \fBluxadm display BOB,s0\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRDisplaying Information about a \fBSENA\fR disk, an Enclosure,
+or an Individual \fBFC_AL\fR Drive
+.sp
+.LP
+The following example displays information about a \fBSENA\fR disk, an
+enclosure, or an individual \fBFC_AL\fR drive with the port \fBWWN\fR of
+\fB2200002037001246\fR:
+
+.sp
+.in +2
+.nf
+example% \fBluxadm display 2200002037001246\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 7 \fRUsing Unique Characters to Issue a Subcommand
+.sp
+.LP
+The following example uses only as many characters as are required to uniquely
+identify a subcommand:
+
+.sp
+.in +2
+.nf
+example% \fBluxadm disp BOB\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 8 \fRDisplaying Error Information
+.sp
+.LP
+The following example displays error information about the loop that the
+enclosure \fBBOB\fR is on:
+
+.sp
+.in +2
+.nf
+example% \fBluxadm display \fR\fB-r\fR\fB BOB\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 9 \fRDownloading New Firmware into the Interface Board
+.sp
+.LP
+The following example downloads new firmware into the Interface Board in the
+enclosure named \fBBOB\fR (using the default path for the file to download):
+
+.sp
+.in +2
+.nf
+example% \fBluxadm download \fR\fB-s\fR\fB BOB\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 10 \fRDisplaying Information from the \fBSCSI\fR Inquiry Command
+.sp
+.LP
+The following example displays information from the \fBSCSI\fR inquiry command
+from all individual disks on the system, using only as many characters as
+necessary to uniquely identify the inquiry subcommand:
+
+.sp
+.in +2
+.nf
+example% \fBluxadm inq /dev/rdsk/c?t?d?s2\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 11 \fRHotplugging
+.sp
+.LP
+The following example hotplugs a new drive into the first slot in the front of
+the enclosure named \fBBOB:\fR
+
+.sp
+.in +2
+.nf
+example% \fBluxadm insert_device BOB,f0\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following example hotplugs a new drive into the first slot in the Sun Fire
+880 internal storage subsystem named SF880-1:
+
+.sp
+.in +2
+.nf
+example% \fBluxadm insert_device SF880-1,s0\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 12 \fRRunning an Expert Subcommand
+.sp
+.LP
+The following example runs an expert subcommand. The subcommand forces a loop
+initialization on the loop that the enclosure \fBBOB\fR is on:
+
+.sp
+.in +2
+.nf
+example% \fBluxadm \fR\fB-e\fR\fB forcelip BOB\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 13 \fRUsing the Expert Mode Hot Plugging Subcommands
+.sp
+.LP
+An example of using the expert mode hot plugging subcommands to hot remove a
+disk follows. See \fBNOTES\fR for hot plugging limitations.
+
+.sp
+.LP
+The first step reserves the SCSI device so that it can't be accessed by way of
+its second SCSI bus:
+
+.sp
+.in +2
+.nf
+example# \fBluxadm reserve /dev/rdsk/c1t8d0s2\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 14 \fRTaking the Disk to be Removed Offline
+.sp
+.LP
+The next two steps take the disk to be removed offline then quiesce the bus:
+
+.sp
+.in +2
+.nf
+example# \fBluxadm \fR\fB-e\fR\fB offline /dev/rdsk/c1t8d0s2\fR
+example# \fBluxadm -e bus_quiesce /dev/rdsk/c1t8d0s2\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 15 \fRUnquiescing the Bus
+.sp
+.LP
+The user then removes the disk and continues by unquiescing the bus, putting
+the disk back online, then unreserving it:
+
+.sp
+.in +2
+.nf
+example# \fBluxadm \fR\fB-e\fR\fB bus_unquiesce /dev/rdsk/c1t8d0s2\fR
+example# \fBluxadm \fR\fB-e\fR\fB online /dev/rdsk/c1t8d0s2\fR
+example# \fBluxadm release /dev/rdsk/c1t8d0s2\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+See \fBenviron\fR(7) for a description of the \fBLANG\fR environment variable
+that affects the execution of \fBluxadm\fR.
+.SH EXIT STATUS
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 9n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\(mi1\fR\fR
+.ad
+.RS 9n
+An error occurred.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/usr/lib/firmware/fc_s/fc_s_fcode\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/lib/locale/C/LC_MESSAGES/ibfirmware\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.SH SEE ALSO
+.BR ses (4D),
+.BR attributes (7),
+.BR environ (7),
+.BR devlinks (8),
+.BR disks (8)
+.SH NOTES
+Currently, only some device drivers
+support hot plugging. If hot plugging is attempted on a disk or bus where it is
+not supported, an error message of the form:
+.sp
+.in +2
+.nf
+luxadm: can't acquire "PATHNAME": No such file or directory
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+will be displayed.
+.sp
+.LP
+You must be careful not to quiesce a bus that contains the root or the
+\fB/usr\fR filesystems or any swap data. If you do quiesce such a bus a
+deadlock can result, requiring a system reboot.

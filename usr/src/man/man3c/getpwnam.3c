@@ -124,7 +124,7 @@ cc [ \fIflag\fR...] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary\
 .LP
 These functions are used to obtain password entries. Entries can come from any
 of the sources for \fBpasswd\fR specified in the \fB/etc/nsswitch.conf\fR file
-(see \fBnsswitch.conf\fR(4)).
+(see \fBnsswitch.conf\fR(5)).
 .sp
 .LP
 The \fBgetpwnam()\fR function searches for a password entry with the login name
@@ -155,7 +155,7 @@ functions after calling \fBendpwent()\fR.
 The \fBfgetpwent()\fR function, unlike the other functions above, does not use
 \fBnsswitch.conf\fR but reads and parses the next line from the stream \fIf\fR,
 which is assumed to have the format of the \fBpasswd\fR file.  See
-\fBpasswd\fR(4).
+\fBpasswd\fR(5).
 .SS "Reentrant Interfaces"
 .LP
 The \fBgetpwnam()\fR, \fBgetpwuid()\fR, \fBgetpwent()\fR, and \fBfgetpwent()\fR
@@ -186,7 +186,7 @@ the returned \fBstruct passwd\fR \fIpwd\fR point to data stored within this
 buffer; see \fBpasswd Structure\fR below. The buffer must be large enough to
 hold all the data associated with the password entry. The parameter
 \fIbuflen\fR (or \fIbufsize\fR for the standard-conforming versions; see
-\fBstandards\fR(5)) should give the size in bytes of \fIbuffer\fR. The maximum
+\fBstandards\fR(7)) should give the size in bytes of \fIbuffer\fR. The maximum
 size needed for this buffer can be determined with the
 {\fB_SC_GETPW_R_SIZE_MAX\fR} \fBsysconf\fR(3C) parameter. The
 standard-conforming versions place a pointer to the modified \fIpwd\fR
@@ -388,7 +388,7 @@ current login activity; and \fBgetpwuid\fR(\fBgetuid()\fR) returns the name
 associated with the real user ID of the process.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -409,13 +409,22 @@ Standard	See below.
 .LP
 For \fBendpwent()\fR,  \fBgetpwent()\fR,  \fBgetpwnam()\fR,
 \fBgetpwnam_r()\fR, \fBgetpwuid()\fR, \fBgetpwuid_r()\fR, and \fBsetpwent()\fR,
-see \fBstandards\fR(5).
+see \fBstandards\fR(7).
 .SH SEE ALSO
 .LP
-\fBpasswd\fR(1), \fByppasswd\fR(1), \fBIntro\fR(2),
-\fBIntro\fR(3), \fBcuserid\fR(3C), \fBgetgrnam\fR(3C), \fBgetlogin\fR(3C),
-\fBgetspnam\fR(3C), \fBnsswitch.conf\fR(4), \fBpasswd\fR(4), \fBshadow\fR(4),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR passwd (1),
+.BR yppasswd (1),
+.BR Intro (2),
+.BR Intro (3),
+.BR cuserid (3C),
+.BR getgrnam (3C),
+.BR getlogin (3C),
+.BR getspnam (3C),
+.BR nsswitch.conf (5),
+.BR passwd (5),
+.BR shadow (5),
+.BR attributes (7),
+.BR standards (7)
 .SH NOTES
 .LP
 When compiling multithreaded programs, see \fBIntro\fR(3).
@@ -425,7 +434,7 @@ Use of the enumeration interfaces \fBgetpwent()\fR and \fBgetpwent_r()\fR is
 discouraged; enumeration is supported for the \fBpasswd\fR file and \fBNIS\fR
 but in general is not efficient and might not be supported for all
 database sources.  The semantics of enumeration are discussed further in
-\fBnsswitch.conf\fR(4).
+\fBnsswitch.conf\fR(5).
 .sp
 .LP
 Previous releases allowed the use of `+' and `-' entries in \fB/etc/passwd\fR
@@ -436,7 +445,7 @@ might not be supported in future releases.
 .LP
 If required, the `+/-' functionality can still be obtained for \fBNIS\fR by
 specifying \fBcompat\fR as the source for \fBpasswd\fR. See
-\fBnsswitch.conf\fR(4).
+\fBnsswitch.conf\fR(5).
 .sp
 .LP
 If the `+/-' is used, both \fB/etc/shadow\fR and \fB/etc/passwd\fR should have

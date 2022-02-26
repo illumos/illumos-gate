@@ -1,0 +1,325 @@
+'\" te
+.\" Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ICONV_UNICODE 7 "Apr 18, 1997"
+.SH NAME
+iconv_unicode \- code set conversion tables for Unicode
+.SH DESCRIPTION
+.sp
+.LP
+The following code set conversions are supported:
+.sp
+.in +2
+.nf
+                    CODE SET CONVERSIONS SUPPORTED
+                    ------------------------------
+  FROM Code Set                               TO Code Set
+      Code              FROM          Target Code            TO
+                        Filename                             Filename
+                        Element                              Element
+
+ISO 8859-1 (Latin 1)    8859-1            UTF-8               UTF-8
+ISO 8859-2 (Latin 2)    8859-2            UTF-8               UTF-8
+ISO 8859-3 (Latin 3)    8859-3            UTF-8               UTF-8
+ISO 8859-4 (Latin 4)    8859-4            UTF-8               UTF-8
+ISO 8859-5 (Cyrillic)   8859-5            UTF-8               UTF-8
+ISO 8859-6 (Arabic)     8859-6            UTF-8               UTF-8
+ISO 8859-7 (Greek)      8859-7            UTF-8               UTF-8
+ISO 8859-8 (Hebrew)     8859-8            UTF-8               UTF-8
+ISO 8859-9 (Latin 5)    8859-9            UTF-8               UTF-8
+ISO 8859-10 (Latin 6)   8859-10           UTF-8               UTF-8
+Japanese EUC            eucJP             UTF-8               UTF-8
+Chinese/PRC EUC
+(GB 2312-1980)          gb2312            UTF-8               UTF-8
+ISO-2022                iso2022           UTF-8               UTF-8
+Korean EUC              ko_KR-euc         Korean UTF-8        ko_KR-UTF-8
+ISO-2022-KR             ko_KR-iso2022-7   Korean UTF-8        ko_KR_UTF-8
+Korean Johap
+(KS C 5601-1987)        ko_KR-johap       Korean UTF-8        ko_KR-UTF-8
+Korean Johap
+(KS C 5601-1992)        ko_KR-johap92     Korean UTF-8        ko_KR-UTF-8
+Korean UTF-8            ko_KR-UTF-8       Korean EUC          ko_KR-euc
+Korean UTF-8            ko_KR-UTF-8       Korean Johap        ko_KR-johap
+                                          (KS C 5601-1987)
+Korean UTF-8            ko_KR-UTF-8       Korean Johap        ko_KR-johap92
+                                          (KS C 5601-1992)
+KOI8-R (Cyrillic)       KOI8-R            UCS-2               UCS-2
+KOI8-R (Cyrillic)       KOI8-R            UTF-8               UTF-8
+PC Kanji (SJIS)         PCK               UTF-8               UTF-8
+PC Kanji (SJIS)         SJIS              UTF-8               UTF-8
+UCS-2                   UCS-2             KOI8-R (Cyrillic)   KOI8-R
+UCS-2                   UCS-2             UCS-4               UCS-4
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+                    CODE SET CONVERSIONS SUPPORTED
+                    ------------------------------
+  FROM Code Set                               TO Code Set
+      Code              FROM          Target Code            TO
+                        Filename                             Filename
+                        Element                              Element
+
+UCS-2              UCS-2           UTF-7                   UTF-7
+UCS-2              UCS-2           UTF-8                   UTF-8
+UCS-4              UCS-4           UCS-2                   UCS-2
+UCS-4              UCS-4           UTF-16                  UTF-16
+UCS-4              UCS-4           UTF-7                   UTF-7
+UCS-4              UCS-4           UTF-8                   UTF-8
+UTF-16             UTF-16          UCS-4                   UCS-4
+UTF-16             UTF-16          UTF-8                   UTF-8
+UTF-7              UTF-7           UCS-2                   UCS-2
+UTF-7              UTF-7           UCS-4                   UCS-4
+UTF-7              UTF-7           UTF-8                   UTF-8
+UTF-8              UTF-8           ISO 8859-1 (Latin 1)    8859-1
+UTF-8              UTF-8           ISO 8859-2 (Latin 2)    8859-2
+UTF-8              UTF-8           ISO 8859-3 (Latin 3)    8859-3
+UTF-8              UTF-8           ISO 8859-4 (Latin 4)    8859-4
+UTF-8              UTF-8           ISO 8859-5 (Cyrillic)   8859-5
+UTF-8              UTF-8           ISO 8859-6 (Arabic)     8859-6
+UTF-8              UTF-8           ISO 8859-7 (Greek)      8859-7
+UTF-8              UTF-8           ISO 8859-8 (Hebrew)     8859-8
+UTF-8              UTF-8           ISO 8859-9 (Latin 5)    8859-9
+UTF-8              UTF-8           ISO 8859-10 (Latin 6)   8859-10
+UTF-8              UTF-8           Japanese EUC            eucJP
+UTF-8              UTF-8           Chinese/PRC EUC         gb2312
+                                   (GB 2312-1980)
+UTF-8              UTF-8           ISO-2022                iso2022
+UTF-8              UTF-8           KOI8-R (Cyrillic)       KOI8-R
+UTF-8              UTF-8           PC Kanji (SJIS)         PCK
+UTF-8              UTF-8           PC Kanji (SJIS)         SJIS
+UTF-8              UTF-8           UCS-2                   UCS-2
+UTF-8              UTF-8           UCS-4                   UCS-4
+UTF-8              UTF-8           UTF-16                  UTF-16
+UTF-8              UTF-8           UTF-7                   UTF-7
+UTF-8              UTF-8           Chinese/PRC EUC         zh_CN.euc
+                                   (GB 2312-1980)
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+                    CODE SET CONVERSIONS SUPPORTED
+                    ------------------------------
+  FROM Code Set                               TO Code Set
+      Code              FROM          Target Code            TO
+                        Filename                             Filename
+                        Element                              Element
+
+UTF-8                 UTF-8             ISO 2022-CN           zh_CN.iso2022-7
+UTF-8                 UTF-8             Chinese/Taiwan Big5   zh_TW-big5
+UTF-8                 UTF-8             Chinese/Taiwan  EUC   zh_TW-euc
+                                        (CNS 11643-1992)
+UTF-8                 UTF-8             ISO 2022-TW           zh_TW-iso2022-7
+Chinese/PRC EUC       zh_CN.euc         UTF-8                 UTF-8
+(GB 2312-1980)
+ISO 2022-CN           zh_CN.iso2022-7   UTF-8                 UTF-8
+Chinese/Taiwan Big5   zh_TW-big5        UTF-8                 UTF-8
+Chinese/Taiwan  EUC   zh_TW-euc         UTF-8                 UTF-8
+(CNS 11643-1992)
+ISO 2022-TW           zh_TW-iso2022-7   UTF-8                 UTF-8
+.fi
+.in -2
+.sp
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRThe library module filename
+.sp
+.LP
+In the conversion library, \fB/usr/lib/iconv\fR (see \fBiconv\fR(3C)), the
+library module filename is composed of two symbolic elements separated by the
+percent sign (\fB%\fR). The first symbol specifies the code set that is being
+converted; the second symbol specifies the \fItarget code\fR, that is, the code
+set to which the first one is being converted.
+
+.sp
+.LP
+In the conversion table above, the first  symbol is termed the "FROM Filename
+Element". The second symbol, representing the target code set, is the "TO
+Filename Element".
+
+.sp
+.LP
+For example, the library module filename to convert from the \fIKorean\fR
+\fIEUC\fR code set to the \fIKorean\fR \fIUTF-8\fR code set is
+
+.sp
+.LP
+\fBko_KR-euc%ko_KR-UTF-8\fR
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/usr/lib/iconv/*.so\fR\fR
+.ad
+.RS 23n
+conversion modules
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR iconv (1),
+.BR iconv (3C),
+.BR iconv (7)
+.sp
+.LP
+Chernov, A., \fIRegistration of a Cyrillic Character Set\fR, RFC 1489, RELCOM
+Development Team, July 1993.
+.sp
+.LP
+Chon, K., H. Je Park, and U. Choi, \fIKorean Character Encoding for Internet
+Messages\fR, RFC 1557, Solvit Chosun Media, December 1993.
+.sp
+.LP
+Goldsmith, D., and M. Davis, \fIUTF-7 - A Mail-Safe Transformation Format of
+Unicode\fR, RFC 1642, Taligent, Inc., July 1994.
+.sp
+.LP
+Lee, F., \fIHZ - A Data Format for Exchanging Files of\fR \fIArbitrarily Mixed
+Chinese and ASCII characters\fR, RFC 1843, Stanford University, August 1995.
+.sp
+.LP
+Murai, J., M. Crispin, and E. van der Poel, \fIJapanese Character Encoding for
+Internet Messages\fR, RFC 1468, Keio University, Panda Programming, June 1993.
+.sp
+.LP
+Nussbacher, H., and Y. Bourvine, \fIHebrew Character Encoding for Internet
+Messages\fR, RFC 1555, Israeli Inter-University, Hebrew University, December
+1993.
+.sp
+.LP
+Ohta, M., \fICharacter Sets ISO-10646 and ISO-10646-J-1\fR, RFC 1815, Tokyo
+Institute of Technology, July 1995.
+.sp
+.LP
+Ohta, M., and K. Handa, \fIISO-2022-JP-2: Multilingual Extension of
+ISO-2022-JP\fR, RFC 1554, Tokyo Institute of Technology, December 1993.
+.sp
+.LP
+Reynolds, J., and J. Postel, \fIASSIGNED NUMBERS\fR, RFC 1700, University of
+Southern California/Information Sciences Institute, October 1994.
+.sp
+.LP
+Simonson, K., \fICharacter Mnemonics & Character Sets\fR, RFC 1345, Rationel
+Almen Planlaegning, June 1992.
+.sp
+.LP
+Spinellis, D., \fIGreek Character Encoding for Electronic Mail Messages\fR, RFC
+1947, SENA S.A., May 1996.
+.sp
+.LP
+The Unicode Consortium, \fIThe Unicode Standard\fR, Version 2.0, Addison Wesley
+Developers Press, July 1996.
+.sp
+.LP
+Wei, Y., Y. Zhang, J. Li, J. Ding, and Y. Jiang, \fIASCII Printable
+Characters-Based Chinese Character Encoding\fR \fIfor Internet Messages\fR, RFC
+1842, AsiaInfo Services Inc., Harvard University, Rice University, University
+of Maryland, August 1995.
+.sp
+.LP
+Yergeau, F., \fIUTF-8, a transformation format of Unicode and ISO 10646\fR, RFC
+2044, Alis Technologies, October 1996.
+.sp
+.LP
+Zhu, H., D. Hu, Z. Wang, T. Kao, W. Chang, and M. Crispin, \fIChinese Character
+Encoding for Internet Messages\fR, RFC 1922, Tsinghua University, China
+Information Technology Standardization Technical Committee (CITS), Institute
+for Information Industry (III), University of Washington, March 1996.
+.SH NOTES
+.sp
+.LP
+ISO 8859 character sets using Latin alphabetic characters are distinguished as
+follows:
+.sp
+.ne 2
+.na
+\fB\fBISO\fR \fB8859-1\fR \fB(Latin\fR \fB1)\fR\fR
+.ad
+.RS 25n
+For most West European languages, including:
+.sp
+
+.sp
+.TS
+l l l
+l l l .
+Albanian	Finnish	Italian
+Catalan	French	Norwegian
+Danish	German	Portuguese
+Dutch	Galician	Spanish
+English	Irish	Swedish
+Faeroese	Icelandic	
+.TE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBISO\fR \fB8859-2\fR \fB(Latin\fR \fB2)\fR\fR
+.ad
+.RS 25n
+For most Latin-written Slavic and Central European languages:
+.sp
+
+.sp
+.TS
+l l l
+l l l .
+Czech	Polish	Slovak
+German	Rumanian	Slovene
+Hungarian	Croatian	
+.TE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBISO\fR \fB8859-3\fR \fB(Latin\fR \fB3)\fR\fR
+.ad
+.RS 25n
+Popularly used for Esperanto, Galician, Maltese, and Turkish.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBISO\fR \fB8859-4\fR \fB(Latin\fR \fB4)\fR\fR
+.ad
+.RS 25n
+Introduces letters for Estonian, Latvian, and Lithuanian. It is an incomplete
+predecessor of ISO 8859-10 (Latin 6).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBISO\fR \fB8859-9\fR \fB(Latin\fR \fB5)\fR\fR
+.ad
+.RS 25n
+Replaces the rarely needed Icelandic letters in ISO 8859-1 (Latin 1) with the
+Turkish ones.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBISO\fR \fB8859-10\fR \fB(Latin\fR \fB6)\fR\fR
+.ad
+.RS 25n
+Adds the last Inuit (Greenlandic) and Sami (Lappish) letters that were not
+included in ISO 8859-4 (Latin 4) to complete coverage of the Nordic area.
+.RE
+

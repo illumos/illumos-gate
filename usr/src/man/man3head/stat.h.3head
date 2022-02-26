@@ -63,7 +63,7 @@ l l l .
 
 .sp
 .LP
-The following macros are for POSIX conformance (see \fBstandards\fR(5)):
+The following macros are for POSIX conformance (see \fBstandards\fR(7)):
 .sp
 
 .sp
@@ -93,7 +93,7 @@ of the range [0, 999 999 999], for use with the \fBfutimens()\fR and
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -105,10 +105,13 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 Interface Stability	Committed
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .LP
-\fBfutimens\fR(2), \fBstat\fR(2), \fBtypes.h\fR(3HEAD), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR futimens (2),
+.BR stat (2),
+.BR types.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

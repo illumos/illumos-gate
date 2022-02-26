@@ -40,9 +40,9 @@ dir  path=usr/sbin
 file path=usr/sbin/nvmeadm mode=0555
 dir  path=usr/share
 dir  path=usr/share/man
-file path=usr/share/man/man1m/nvmeadm.1m
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/nvme.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/nvme.4d
+file path=usr/share/man/man8/nvmeadm.8
 driver name=nvme perms="* 0600 root sys" class=disk \
     alias=pciclass,010802 \
     alias=pciexclass,010802

@@ -87,7 +87,7 @@ typedef	daddr32_t	blkaddr32_t;
 
 /*
  * partition headers:  section 1
- * Returned in struct dk_allmap by ioctl DKIOC[SG]APART (dkio(7I))
+ * Returned in struct dk_allmap by ioctl DKIOC[SG]APART (dkio(4I))
  */
 struct dk_map {
 	blkaddr_t	dkl_cylno;	/* starting cylinder */

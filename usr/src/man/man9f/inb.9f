@@ -69,7 +69,7 @@ was read from the I/O port.
 .SH CONTEXT
 These functions may be called from user, interrupt, or kernel context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -85,8 +85,12 @@ Stability Level	 Obsolete
 .TE
 
 .SH SEE ALSO
-\fBisa\fR(4), \fBattributes\fR(5), \fBddi_get8\fR(9F), \fBddi_get16\fR(9F),
-\fBddi_get32\fR(9F), \fBoutb\fR(9F)
+.BR isa (5),
+.BR attributes (7),
+.BR ddi_get16 (9F),
+.BR ddi_get32 (9F),
+.BR ddi_get8 (9F),
+.BR outb (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

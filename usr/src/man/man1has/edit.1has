@@ -346,7 +346,7 @@ The \fIfilename\fR argument indicates one or more files to be edited.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/bin/edit"
 .sp
 
@@ -389,7 +389,11 @@ CSI	Enabled
 .SH SEE ALSO
 .sp
 .LP
-\fBed\fR(1), \fBex\fR(1), \fBvi\fR(1), \fBattributes\fR(5), \fBXPG4\fR(5)
+.BR ed (1),
+.BR ex (1),
+.BR vi (1),
+.BR XPG4 (7),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

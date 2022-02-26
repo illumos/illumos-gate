@@ -79,7 +79,7 @@ The API is not supported.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -97,7 +97,9 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBlibMPAPI\fR(3LIB), \fBMP_DisableAutoFailback\fR(3MPAPI), \fBattributes\fR(5)
+.BR libMPAPI (3LIB),
+.BR MP_DisableAutoFailback (3MPAPI),
+.BR attributes (7)
 .sp
 .LP
 \fIMultipath Management API Version 1.0\fR

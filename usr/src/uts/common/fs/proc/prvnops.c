@@ -6038,7 +6038,7 @@ prseek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 /*
  * We use the p_execdir member of proc_t to expand the %d token in core file
  * paths (the directory path for the executable that dumped core; see
- * coreadm(1M) for details). We'd like gcore(1) to be able to expand %d in
+ * coreadm(8) for details). We'd like gcore(1) to be able to expand %d in
  * the same way as core dumping from the kernel, but there's no convenient
  * and comprehensible way to export the path name for p_execdir. To solve
  * this, we try to find the actual path to the executable that was used. In

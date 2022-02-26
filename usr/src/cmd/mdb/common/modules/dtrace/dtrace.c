@@ -84,7 +84,7 @@ dtrace_help(void)
 
 	mdb_printf("Given a dtrace_state_t structure that represents a "
 	    "DTrace consumer, prints\n"
-	    "dtrace(1M)-like output for in-kernel DTrace data.  (The "
+	    "dtrace(8)-like output for in-kernel DTrace data.  (The "
 	    "dtrace_state_t\n"
 	    "structures for all DTrace consumers may be obtained by running "
 	    "the \n"
@@ -1653,7 +1653,7 @@ dtrace_state_help(void)
 	    "no state structure is provided, iterates\nover all state "
 	    "structures.\n\n"
 	    "Addresses in ADDR column may be provided to ::dtrace to obtain\n"
-	    "dtrace(1M)-like output for in-kernel DTrace data.\n");
+	    "dtrace(8)-like output for in-kernel DTrace data.\n");
 }
 
 int
@@ -2764,7 +2764,7 @@ dtrace_probes(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 const mdb_dcmd_t kernel_dcmds[] = {
 	{ "id2probe", ":", "translate a dtrace_id_t to a dtrace_probe_t",
 	    id2probe },
-	{ "dtrace", ":[-c cpu]", "print dtrace(1M)-like output",
+	{ "dtrace", ":[-c cpu]", "print dtrace(8)-like output",
 	    dtrace, dtrace_help },
 	{ "dtrace_errhash", ":", "print DTrace error hash", dtrace_errhash },
 	{ "dtrace_helptrace", ":", "print DTrace helper trace",

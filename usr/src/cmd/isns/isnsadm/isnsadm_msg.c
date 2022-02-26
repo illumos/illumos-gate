@@ -128,7 +128,7 @@ char *getTextMessage(msg_code_t code) {
 			"server failed."));
 		case ERROR_ISNS_SMF_SERVICE_NOT_ONLINE:
 		    return (gettext
-			("Error: network/isns_server smf(5) "
+			("Error: network/isns_server smf(7) "
 			"service is not online."));
 		case ERROR_MALLOC_FAILED:
 		    return (gettext

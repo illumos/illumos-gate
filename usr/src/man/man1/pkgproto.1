@@ -20,7 +20,7 @@ pkgproto \- generate prototype file entries for input to pkgmk command
 .SH DESCRIPTION
 .sp
 .LP
-\fBpkgproto\fR scans the indicated paths and generates \fBprototype\fR(4) file
+\fBpkgproto\fR scans the indicated paths and generates \fBprototype\fR(5) file
 entries that may be used as input to the \fBpkgmk\fR(1) command.
 .sp
 .LP
@@ -30,9 +30,9 @@ the contents of the directory is searched. However, if input is read from
 \fBstdin\fR, a directory specified as a pathname will not be searched.
 .sp
 .LP
-Package commands, such as \fBpkgproto\fR, are \fBlargefile\fR(5)-aware. They
+Package commands, such as \fBpkgproto\fR, are \fBlargefile\fR(7)-aware. They
 handle files larger than 2 GB in the same way they handle smaller files. In
-their current implementations, \fBpkgadd\fR(1M), \fBpkgtrans\fR(1) and other
+their current implementations, \fBpkgadd\fR(8), \fBpkgtrans\fR(1) and other
 package commands can process a datastream of  up to 4 GB.
 .SH OPTIONS
 .sp
@@ -140,8 +140,13 @@ An error occurred.
 .SH SEE ALSO
 .sp
 .LP
-\fBpkgmk\fR(1), \fBpkgparam\fR(1), \fBpkgtrans\fR(1), \fBpkgadd\fR(1M),
-\fBprototype\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5)
+.BR pkgmk (1),
+.BR pkgparam (1),
+.BR pkgtrans (1),
+.BR prototype (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR pkgadd (8)
 .sp
 .LP
 \fIApplication Packaging Developer\&'s Guide\fR
@@ -151,7 +156,7 @@ An error occurred.
 By default, \fBpkgproto\fR creates symbolic link entries for any symbolic link
 encountered (\fBftype\fR=\fBs\fR). When you use the \fB-i\fR option,
 \fBpkgproto\fR creates a file entry for symbolic links (\fBftype\fR=\fBf\fR).
-The \fBprototype\fR(4) file would have to be edited to assign such file types
+The \fBprototype\fR(5) file would have to be edited to assign such file types
 as \fBv\fR (volatile), \fBe\fR (editable), or \fBx\fR (exclusive directory).
 \fBpkgproto\fR detects linked files. If multiple files are linked together, the
 first path encountered is considered the source of the link.

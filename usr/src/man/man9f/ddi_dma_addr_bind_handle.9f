@@ -371,12 +371,19 @@ configuration.
 context, except when \fIcallback\fR is set to  \fBDDI_DMA_SLEEP\fR, in which
 case it can only be called from user or kernel context.
 .SH SEE ALSO
-\fBddi_dma_alloc_handle\fR(9F), \fBddi_dma_cookie_get\fR(9F),
-\fBddi_dma_cookie_iter\fR(9F), \fBddi_dma_free_handle\fR(9F),
-\fBddi_dma_getwin\fR(9F), \fBddi_dma_mem_alloc\fR(9F),
-\fBddi_dma_mem_free\fR(9F), \fBddi_dma_ncookies\fR(9F),
-\fBddi_dma_sync\fR(9F), \fBddi_dma_unbind_handle\fR(9F),
-\fBddi_umem_iosetup\fR(9F), \fBddi_dma_attr\fR(9S), \fBddi_dma_cookie\fR(9S)
+.BR ddi_dma_alloc_handle (9F),
+.BR ddi_dma_cookie_get (9F),
+.BR ddi_dma_cookie_iter (9F),
+.BR ddi_dma_free_handle (9F),
+.BR ddi_dma_getwin (9F),
+.BR ddi_dma_mem_alloc (9F),
+.BR ddi_dma_mem_free (9F),
+.BR ddi_dma_ncookies (9F),
+.BR ddi_dma_sync (9F),
+.BR ddi_dma_unbind_handle (9F),
+.BR ddi_umem_iosetup (9F),
+.BR ddi_dma_attr (9S),
+.BR ddi_dma_cookie (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

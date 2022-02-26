@@ -534,7 +534,7 @@
 0	string		\043\040PaCkAgE\040DaTaStReAm	package datastream
 0	short		0xcff1		CTF data file
 0	string		\177DOF		DTrace DOF data file
-0	string		\177FCF		fmd(1M) checkpoint file
+0	string		\177FCF		fmd(8) checkpoint file
 0	string		EFT\0		Fault tree file,
 >4	ushort		x		v%u
 >6	ushort		x		rev %u,

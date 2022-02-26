@@ -1,0 +1,130 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd Apr 10, 2015
+.Dt VXLAN 4P
+.Os
+.Sh NAME
+.Nm VXLAN ,
+.Nm vxlan
+.Nd Virtual eXtensible Local Area Network
+.Sh SYNOPSIS
+.In sys/vxlan.h
+.Sh DESCRIPTION
+.Nm
+(RFC 7348) is a network encapsulation protocol that is used by
+.Xr overlay 7
+devices.
+A payload, commonly an Ethernet frame, is placed inside of a
+UDP packet and prepended with an 8-byte
+.Nm
+header.
+.Pp
+The
+.Nm
+header contains two 32-bit words.
+The first word is an 8-bit flags field followed by 24 reserved bits.
+The second word is a 24-bit virtual network identifier followed by 8
+reserved bits.
+The virtual network identifier identifies a unique
+.Nm
+and
+is similar in concept to an IEEE 802.1Q VLAN identifier.
+.Pp
+The system provides access to
+.Nm
+through dladm overlays.
+See
+.Xr dladm 8
+and
+.Xr overlay 7
+for more information.
+.Pp
+The
+.In sys/vxlan.h
+header provides information for working with the
+.Nm
+protocol.
+The contents of this header are
+.Sy uncommitted .
+The header defines a structure that may be used to encode and decode a VXLAN
+header.
+It defines a packed structure type
+.Sy vxlan_hdr_t
+which represents the
+.Nm
+frame header and has the following members:
+.Bd -literal
+	uint32_t	vxlan_flags;	/* flags in upper 8 bits */
+	uint32_t	vxlan_id;	/* VXLAN ID in upper 24 bits */
+.Ed
+.Sh EXAMPLES
+.Sy Example 1
+Decoding a
+.Nm
+header
+.Pp
+The following example shows how to validate a
+.Nm header.
+For more information on this process, see RFC 7348.
+.Bd -literal -offset indent
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <inttypes.h>
+#include <sys/vxlan.h>
+
+\&...
+
+/*
+ * Validate the following bytes as a VXLAN header. If valid, return
+ * 0 and store the VXLAN identifier in *vidp. Otherwise, return an
+ * error.
+ */
+int
+validate_vxlan(void *buf, int len, uint32_t *vidp)
+{
+	vxlan_hdr_t *hdr;
+
+	if (len < sizeof (vxlan_hdr_t))
+		return (EINAVL);
+
+	hdr = buf;
+	if ((ntohl(hdr->vxlan_flags) & VXLAN_MAGIC) == 0)
+		return (EINAVL);
+
+	*vidp = ntohl(vxlan->vxlan_id) >> VXLAN_ID_SHIFT;
+
+	return (0);
+}
+.Ed
+.Sh STABILITY
+The contents of
+.In sys/vxlan.h
+are
+.Sy Uncommitted .
+.Sh SEE ALSO
+.Xr overlay 7 ,
+.Xr dladm 8
+.Rs
+.%A Mahalingam, M.
+.%A Dutt, D.
+.%A Duda, K.
+.%A Agarwal, P.
+.%A Kreeger L.
+.%A Sridhar, T.
+.%A Bursell, M.
+.%A C. Wright
+.%T RFC 7348, Virtual eXtensible Local Area Network (VXLAN): A Framework
+.%T for Overlaying Virtualized Layer 2 Networks over Layer 3 Networks
+.%D August 2014
+.Re

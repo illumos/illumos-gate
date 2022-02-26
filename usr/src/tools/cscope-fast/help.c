@@ -28,8 +28,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	cscope - interactive C symbol cross-reference
  *
@@ -55,7 +53,7 @@ help(void)
 			*tp++ = "type the pattern to search for, and then "
 			    "press the RETURN key.  For the first 5\n";
 			*tp++ = "and last 2 input fields, the pattern can be "
-			    "a regcmp(3X) regular expression.\n";
+			    "a regcmp(3C) regular expression.\n";
 			*tp++ = "If the search is successful, you can edit "
 			    "the file containing a displayed line\n";
 			*tp++ = "by pointing with the mouse and clicking "
@@ -68,7 +66,7 @@ help(void)
 			*tp++ = "pattern to search for, and then press the "
 			    "RETURN key.  For the first 4 and\n";
 			*tp++ = "last 2 input fields, the pattern can be a "
-			    "regcmp(3X) regular expression.\n";
+			    "regcmp(3C) regular expression.\n";
 			*tp++ = "If the search is successful, you can use "
 			    "these command characters:\n\n";
 			*tp++ = "1-9\tEdit the file containing the displayed "

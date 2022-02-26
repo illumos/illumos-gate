@@ -56,7 +56,7 @@ Specify the architecture of the package as \fBarch\fR.
 .sp .6
 .RS 4n
 Display packages that match  \fIcategory\fR. Categories are defined with the
-\fBCATEGORY\fR parameter in the \fBpkginfo\fR(4) file. If more than one
+\fBCATEGORY\fR parameter in the \fBpkginfo\fR(5) file. If more than one
 category is supplied, the  package needs to match only one category in the
 list. The match is not case specific.
 .RE
@@ -146,7 +146,7 @@ tree starting in the specified \fIroot_path\fR.
 .sp .6
 .RS 4n
 Specify the version of the package as \fIversion\fR. The version is defined
-with the \fBVERSION\fR parameter in the \fBpkginfo\fR(4) file. All compatible
+with the \fBVERSION\fR parameter in the \fBpkginfo\fR(5) file. All compatible
 versions can be requested by preceding the version name with a tilde
 (\fB\(ap\fR). Multiple white spaces are replaced with a single white space
 during version comparison.
@@ -215,15 +215,21 @@ default installation spool directory
 .SH SEE ALSO
 .sp
 .LP
-\fBpkgtrans\fR(1), \fBpkgadd\fR(1M), \fBpkgask\fR(1M), \fBpkgchk\fR(1M),
-\fBpkgrm\fR(1M), \fBpkginfo\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5)
+.BR pkgtrans (1),
+.BR pkginfo (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR pkgadd (8),
+.BR pkgask (8),
+.BR pkgchk (8),
+.BR pkgrm (8)
 .sp
 .LP
 \fIApplication Packaging Developer\&'s Guide\fR
 .SH NOTES
 .sp
 .LP
-Package commands are \fBlargefile\fR(5)-aware. They handle files larger than 2
+Package commands are \fBlargefile\fR(7)-aware. They handle files larger than 2
 GB in the same way they handle smaller files. In their current implementations,
-\fBpkgadd\fR(1M), \fBpkgtrans\fR(1) and other package commands can process a
+\fBpkgadd\fR(8), \fBpkgtrans\fR(1) and other package commands can process a
 datastream of  up to 4 GB.

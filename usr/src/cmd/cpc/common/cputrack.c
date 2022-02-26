@@ -218,7 +218,7 @@ main(int argc, char *argv[])
 		    "\t-o file\t  write cpu statistics to this file\n"
 		    "\t-c events specify processor events to be monitored\n"
 		    "\t-p pid\t  pid of existing process to capture\n\n"
-		    "\tUse cpustat(1M) to monitor system-wide statistics.\n"),
+		    "\tUse cpustat(8) to monitor system-wide statistics.\n"),
 		    opts->pgmname, CPC_TICKREG_NAME);
 		if (opts->dohelp) {
 			(void) putchar('\n');

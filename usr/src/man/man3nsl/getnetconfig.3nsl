@@ -55,7 +55,7 @@ The library routines described on this page  are part of the Network Selection
 component. They provide the application access to the system network
 configuration database,  \fB/etc/netconfig\fR. In addition to the routines for
 accessing the  \fBnetconfig\fR database, Network Selection includes the
-environment variable \fBNETPATH\fR (see \fBenviron\fR(5)) and the
+environment variable \fBNETPATH\fR (see \fBenviron\fR(7)) and the
 \fBNETPATH\fR access routines described in \fBgetnetpath\fR(3NSL).
 .sp
 .LP
@@ -134,7 +134,7 @@ applications, this buffer is implemented as thread-specific data.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -150,5 +150,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBgetnetpath\fR(3NSL), \fBnetconfig\fR(4), \fBattributes\fR(5),
-\fBenviron\fR(5)
+.BR getnetpath (3NSL),
+.BR netconfig (5),
+.BR attributes (7),
+.BR environ (7)

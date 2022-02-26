@@ -340,7 +340,7 @@ An encode/decode method is not supported.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -356,5 +356,7 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBlibnvpair\fR(3LIB), \fBnvlist_alloc\fR(3NVPAIR), \fBnvpair_type\fR(3NVPAIR),
-\fBattributes\fR(5)
+.BR libnvpair (3LIB),
+.BR nvlist_alloc (3NVPAIR),
+.BR nvpair_type (3NVPAIR),
+.BR attributes (7)

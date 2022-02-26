@@ -14,7 +14,7 @@ drives\(emand that supports power management and expects automatic mounting of
 the device via the volume manager should export the boolean (zero length)
 property \fBremovable-media\fR. This property enables the system to make the
 power state of the device dependent on the power state of the frame buffer and
-monitor. See the \fBpower.conf\fR(4) discussion of the
+monitor. See the \fBpower.conf\fR(5) discussion of the
 \fBdevice-dependency-property\fR entry for more information.
 .sp
 .LP
@@ -63,7 +63,7 @@ xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -79,8 +79,11 @@ Interface stability	Committed
 .SH SEE ALSO
 .sp
 .LP
-\fBpower.conf\fR(4), \fBpm\fR(7D), \fBattach\fR(9E), \fBdetach\fR(9E),
-\fBddi_prop_create\fR(9F)
+.BR pm (4D),
+.BR power.conf (5),
+.BR attach (9E),
+.BR detach (9E),
+.BR ddi_prop_create (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

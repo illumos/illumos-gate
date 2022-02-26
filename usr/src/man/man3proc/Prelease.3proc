@@ -115,4 +115,4 @@ in
 .Xr Pcreate 3PROC ,
 .Xr Pgrab 3PROC ,
 .Xr Pgrab_core 3PROC ,
-.Xr proc 4
+.Xr proc 5

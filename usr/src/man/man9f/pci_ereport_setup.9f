@@ -160,7 +160,7 @@ Error report events are generated automatically if \fBfme_flag\fR is set to
 \fBDDI_FM_ERR_UNEXPECTED\fR and the corresponding error bits are set in the
 various \fBPCI\fR, \fBPCI/X\fR or \fBPCI Express Bus\fR error registers of the
 device associated with \fIdip\fR. The generated error report events are posted
-to the illumos Fault Manager, \fBfmd\fR(1M), for diagnosis.
+to the illumos Fault Manager, \fBfmd\fR(8), for diagnosis.
 .sp
 .LP
 If the status argument is non-null, \fBpci_ereport_post()\fR saves the contents
@@ -256,7 +256,7 @@ xxx_detach(dev_info_t *dip, ddi_attach_cmd_t cmd) {
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -270,6 +270,10 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBfmd\fR(1M), \fBattributes\fR(5), \fBddi_fm_handler_register\fR(9F),
-\fBddi_fm_init\fR(9F), \fBddi_peek\fR(9F), \fBddi_poke\fR(9F),
-\fBddi_fm_error\fR(9S)
+.BR attributes (7),
+.BR fmd (8),
+.BR ddi_fm_handler_register (9F),
+.BR ddi_fm_init (9F),
+.BR ddi_peek (9F),
+.BR ddi_poke (9F),
+.BR ddi_fm_error (9S)

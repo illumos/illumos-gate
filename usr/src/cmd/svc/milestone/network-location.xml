@@ -33,8 +33,8 @@
 
 <!--
   network/location is used as a medium to refresh and restart SMF
-  services dependent on network/location whenever nwamd(1M) changes
-  locations.  nwamd(1M) updates the different configuration files
+  services dependent on network/location whenever nwamd(8) changes
+  locations.  nwamd(8) updates the different configuration files
   according to the location being (de)activated and refreshes
   network/location.  This causes the services dependent on network/location
   to restart and read in the updated configuration files.
@@ -69,7 +69,7 @@
 	<instance name='default' enabled='false'>
 
 	<!--
-		nwamd(1M) refreshes network/location when a new location is
+		nwamd(8) refreshes network/location when a new location is
 		activated, thus the "restart_on none" dependency.
 	-->
 	<dependency
@@ -96,7 +96,7 @@
 		<service_fmri value='svc:/system/filesystem/usr' />
 	</dependency>
 
-	<!-- 
+	<!--
 		This dependency on system/manifest-import is just for the
 		case of the boot after upgrade.  We don't want
 		network/location starting up until network/netcfg has been
@@ -157,7 +157,7 @@
 	</dependent>
 
 	<!--
-		The following three dependents will be refreshed by 
+		The following three dependents will be refreshed by
 		/lib/svc/method/net-loc, rather than restarted,
 		when network/location is refreshed.
 	-->
@@ -232,7 +232,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='nwamd' section='1M'
+			<manpage title='nwamd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

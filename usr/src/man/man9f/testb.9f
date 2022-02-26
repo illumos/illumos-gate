@@ -124,7 +124,10 @@ the amount of time spent in a \fBtimeout()\fR routine.
 .SH SEE ALSO
 .sp
 .LP
-\fBallocb\fR(9F), \fBbufcall\fR(9F), \fBcopymsg\fR(9F), \fBtimeout\fR(9F)
+.BR allocb (9F),
+.BR bufcall (9F),
+.BR copymsg (9F),
+.BR timeout (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

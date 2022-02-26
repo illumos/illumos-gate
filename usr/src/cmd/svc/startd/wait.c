@@ -294,7 +294,7 @@ wait_thread(void *args)
 			    psi.pr_lwp.pr_lwpid != 0) {
 				/*
 				 * We have determined, in accordance with the
-				 * definition in proc(4), this process is not a
+				 * definition in proc(5), this process is not a
 				 * zombie.  Reassociate.
 				 */
 				if (port_associate(port_fd, PORT_SOURCE_FD, fd,

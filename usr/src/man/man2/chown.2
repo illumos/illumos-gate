@@ -170,9 +170,9 @@ If
 is not in effect, the privilege
 .Brq PRIV_FILE_CHOWN_SELF
 is asserted in the inheritable set of all processes unless overridden by
-.Xr policy.conf 4
+.Xr policy.conf 5
 or
-.Xr user_attr 4 .
+.Xr user_attr 5 .
 To set this configuration option, include the following
 line in
 .Pa /etc/system :
@@ -187,7 +187,7 @@ set rstchown = 0
 .Ed
 .Pp
 See
-.Xr system 4
+.Xr system 5
 and
 .Xr fpathconf 2 .
 .Pp
@@ -335,6 +335,6 @@ resides on a read-only file system.
 .Xr chown 1 ,
 .Xr chmod 2 ,
 .Xr fpathconf 2 ,
-.Xr system 4 ,
-.Xr attributes 5 ,
-.Xr standards 5
+.Xr system 5 ,
+.Xr attributes 7 ,
+.Xr standards 7

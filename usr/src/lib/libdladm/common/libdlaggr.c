@@ -45,7 +45,7 @@
 /*
  * Link Aggregation Administration Library.
  *
- * This library is used by administration tools such as dladm(1M) to
+ * This library is used by administration tools such as dladm(8) to
  * configure link aggregations.
  */
 

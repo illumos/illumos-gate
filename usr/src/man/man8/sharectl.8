@@ -1,0 +1,231 @@
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd November 22, 2021
+.Dt SHARECTL 8
+.Os
+.Sh NAME
+.Nm sharectl
+.Nd configure and manage file sharing services
+.Sh SYNOPSIS
+.Nm
+.Ar subcommand
+.Op Fl h
+.Nm
+.Cm delsect
+.Ar section protocol
+.Nm
+.Cm get
+.Oo Fl p Ar property Oc Ns ...
+.Ar protocol
+.Nm
+.Cm set
+.Bro Fl p Ar property Ns = Ns Ar value Brc Ns ...
+.Ar protocol
+.Nm
+.Cm status
+.Op Ar protocol
+.Sh DESCRIPTION
+The
+.Nm
+command operates on file sharing services.
+The command sets the client and server operational properties, takes and
+restores configuration snapshots, and gets status of the protocol service.
+Currently supported services are
+.Xr autofs 5 ,
+.Xr nfs 5 ,
+.Xr smb 5
+and smbfs.
+.Pp
+The
+.Cm set
+subcommand requires root privileges or that you assume the Primary Administrator
+role.
+.Pp
+A non-privileged user can change the persistent settings when granted required
+authorizations, see appropriate sharing protocol man page.
+.Ss Options
+The following options are supported where applicable:
+.Bl -tag -width Ds
+.It Fl h
+Displays usage message.
+Supported for all subcommands.
+.It Fl p Ar property Ns Op = Ns Ar value
+Specifies a property.
+See
+.Sx Subcommands ,
+below.
+.El
+.Ss Subcommands
+.Nm
+supports the subcommands described below:
+.Bl -tag -width Ds
+.It Xo
+.Nm
+.Cm delsect
+.Ar section protocol
+.Xc
+Delete configuration section for the specified protocol.
+Currently only protocol that has configuration sections is
+.Nm smbfs
+.Po see
+.Xr nsmbrc 5
+and
+.Sx EXAMPLES
+.Pc .
+.It Xo
+.Nm
+.Cm get
+.Oo Fl p Ar property Oc Ns ...
+.Ar protocol
+.Xc
+Get the property values for the specified protocol.
+If no
+.Fl p
+option is provided, get all the properties for the specified protocol.
+For NFS, properties correspond to entries in the
+.Pa /etc/default/nfs
+file.
+See
+.Xr nfs 5 .
+.It Xo
+.Nm
+.Cm set
+.Bro Fl p Ar property Ns = Ns Ar value Brc Ns ...
+.Ar protocol
+.Xc
+Set properties for the specified file sharing protocol.
+.It Xo
+.Nm
+.Cm status
+.Op Ar protocol
+.Xc
+Display status of the specified protocol, or, if no protocol is specified, of
+all file sharing protocols.
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /usr/include/libshare.h
+Error codes used for exit status.
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds
+.It Sy 0
+Successful completion.
+.It Sy non-zero
+Command failed.
+.El
+.Sh EXAMPLES
+.Bl -tag -width Ds
+.It Sy Example 1 No Setting a Property
+The following command sets the minimum version of the server NFS protocol to
+version 3.
+.Bd -literal
+# sharectl -p server_versmin=3 nfs
+.Ed
+.It Sy Example 2 No Getting Properties
+The following command gets the properties for the NFS protocol.
+.Bd -literal
+# sharectl get nfs
+lockd_listen_backlog=32
+lockd_servers=256
+lockd_retransmit_timeout=5
+grace_period=90
+nfsmapid_domain=example.com
+servers=1024
+server_versmin=2
+server_versmax=4
+max_connections=-1
+.Ed
+.Pp
+The following command gets the value of the grace_period property for the NFS
+protocol.
+.Bd -literal
+# sharectl get -p grace_period nfs
+grace_period=90
+.Ed
+.It Sy Example 3 No Obtaining Status
+The following command obtains the status of all file-sharing protocols on a
+system.
+.Bd -literal
+# sharectl status
+nfs      enabled
+.Ed
+.It Sy Example 4 No Configuring Global Settings
+The following command shows how an authorized user can use
+.Nm
+commands to configure global settings for the
+.Pa example.com
+environment in the service management facility
+.Pq SMF .
+See
+.Xr nsmbrc 5
+for a description of the example environment,
+.Pa example.com .
+See
+.Xr smf 7
+for a description of the SMF.
+.Bd -literal
+# sharectl set -p section=default -p workgroup=SALES \e
+  -p timeout=5 smbfs
+# sharectl set -p section=FSERVER -p addr=fserv.example.com smbfs
+# sharectl set -p section=RSERVER -p workgroup=REMGROUP \e
+  -p addr=rserv.example.com smbfs
+# sharectl set -p section=RSERVER:george -p timeout=30 smbfs
+# sharectl set -p section="SSERV:*:POKY" -p addr=sserv.example.com \e
+  -p timeout=25 smbfs
+.Ed
+.It Sy Example 5 No Displaying Current Settings
+The following command shows how an authorized user can use the
+.Nm sharectl Cm get
+command to view the global settings for
+.Nm smbfs
+in the SMF.
+The values shown are those set by the previous example.
+.Bd -literal
+# sharectl get smbfs
+[default]
+workgroup=SALES
+timeout=5
+[FSERVER]
+addr=fserv.example.com
+[RSERVER]
+workgroup=REMGROUP
+addr=rserv.example.com
+[RSERVER:george]
+timeout=30
+[SSERV:*:POKY]
+addr=sserv.example.com
+timeout=25
+.Ed
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr autofs 5 ,
+.Xr nfs 5 ,
+.Xr nsmbrc 5 ,
+.Xr smb 5 ,
+.Xr user_attr 5 ,
+.Xr attributes 7 ,
+.Xr rbac 7 ,
+.Xr smf 7 ,
+.Xr standards 7 ,
+.Xr sharemgr 8

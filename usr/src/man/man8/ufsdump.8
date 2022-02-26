@@ -1,0 +1,673 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH UFSDUMP 8 "April 9, 2016"
+.SH NAME
+ufsdump \- incremental file system dump
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/ufsdump\fR [\fIoptions\fR] [\fIarguments\fR] \fIfiles_to_dump\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+\fBufsdump\fR backs up all files specified by \fIfiles_to_dump\fR (usually
+either a whole file system or files within a file system changed after a certain
+date) to magnetic tape, diskette, or disk file.
+.sp
+.LP
+The \fBufsdump\fR command can only be used on unmounted file systems, or those
+mounted read-only. Attempting to dump a mounted, read-write file system might
+result in a system disruption or the inability to restore files from the dump.
+Consider using the \fBfssnap\fR(8) command to create a file system snapshot if
+you need a point-in-time image of a file system that is mounted.
+.sp
+.LP
+If a filesystem was mounted with the logging option, it is strongly
+recommended that you run \fBufsdump\fR as the root user. Running the command as
+a non-root user might result in the creation of an inconsistent dump.
+.sp
+.LP
+\fIoptions\fR is a single string of one-letter \fBufsdump\fR options.
+.sp
+.LP
+\fIarguments\fR may be multiple strings whose association with the options is
+determined by order. That is, the first argument goes with the first option
+that takes an argument; the second argument goes with the second option that
+takes an argument, and so on.
+.sp
+.LP
+\fIfiles_to_dump\fR is required and must be the last argument on the command
+line. See \fBOPERANDS\fR for more information.
+.sp
+.LP
+With most devices \fBufsdump\fR can automatically detect the end-of-media.
+Consequently, the \fBd\fR, \fBs\fR, and \fBt\fR options are not necessary for
+multi-volume dumps, unless \fBufsdump\fR does not understand the way the device
+detects the end-of-media, or the files are to be restored on a system with an
+older version of the \fBrestore\fR command.
+.SH OPTIONS
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB0\(mi9\fR\fR
+.ad
+.sp .6
+.RS 4n
+The "dump level." All files specified by \fIfiles_to_dump\fR that have been
+modified since the last \fBufsdump\fR at a lower dump level are copied to the
+\fIdump_file\fR destination (normally a magnetic tape device). For instance, if
+a "level \fB2\fR" dump was done on Monday, followed by a "level \fB4\fR" dump
+on Tuesday, a subsequent "level \fB3\fR" dump on Wednesday would contain all
+files modified or added since the "level \fB2\fR" (Monday) backup. A "level
+\fB0\fR" dump copies the entire file system to the \fIdump_file\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBa\fR \fIarchive_file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Archive file. Archive a dump table-of-contents in the specified
+\fIarchive_file\fR to be used by \fBufsrestore\fR(8) to determine whether a
+file is in the dump file that is being restored.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBb\fR \fIfactor\fR\fR
+.ad
+.sp .6
+.RS 4n
+Blocking factor. Specify the blocking factor for tape writes. The default is 20
+blocks per write for tapes of density less than 6250BPI (bytes-per-inch). The
+default blocking factor for tapes of density 6250BPI and greater is 64. The
+default blocking factor for cartridge tapes (\fBc\fR option) is 126. The
+highest blocking factor available with most tape drives is 126. Note: the
+blocking factor is specified in terms of 512-byte blocks, for compatibility
+with \fBtar\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBc\fR\fR
+.ad
+.sp .6
+.RS 4n
+Cartridge. Set the defaults for cartridge instead of the standard half-inch
+reel. This sets the density to 1000BPI and the blocking factor to 126. Since
+\fBufsdump\fR can automatically detect the end-of-media, only the blocking
+parameter normally has an effect. When cartridge tapes are used, and this
+option is \fInot\fR specified, \fBufsdump\fR will slightly miscompute the size
+of the tape. If the \fBb\fR, \fBd\fR, \fBs\fR or \fBt\fR options are specified
+with this option, their values will override the defaults set by this option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBd\fR \fIbpi\fR\fR
+.ad
+.sp .6
+.RS 4n
+Tape density. Not normally required, as \fBufsdump\fR can detect end-of-media.
+This parameter can be used to keep a running tab on the amount of tape used per
+reel. The default density is 6250BPI except when the \fBc\fR option is used for
+cartridge tape, in which case it is assumed to be 1000BPI per track. Typical
+values for tape devices are:
+.sp
+.ne 2
+.na
+\fB1/2 inch tape\fR
+.ad
+.sp .6
+.RS 4n
+6250 BPI
+.RE
+
+.sp
+.ne 2
+.na
+\fB1/4 inch cartridge\fR
+.ad
+.sp .6
+.RS 4n
+1000 BPI The tape densities and other options are documented in the
+\fBst\fR(4D) man page.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBD\fR\fR
+.ad
+.sp .6
+.RS 4n
+Diskette. Dump to diskette.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBf\fR \fIdump_file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Dump file. Use \fIdump_file\fR as the file to dump to, instead of
+\fB/dev/rmt/0\fR. If \fIdump_file\fR is specified as \fB\(mi\fR, dump to
+standard output.
+.sp
+If the name of the file is of the form \fImachine\fR\fB:\fR\fIdevice,\fR the
+dump is done from the specified machine over the network using \fBrmt\fR(8).
+Since \fBufsdump\fR is normally run by root, the name of the local machine must
+appear in the \fB/.rhosts\fR file of the remote machine. If the file is
+specified as \fIuser\fR\fB@\fR\fImachine\fR\fB:\fR\fIdevice,\fR \fBufsdump\fR
+will attempt to execute as the specified user on the remote machine. The
+specified user must have a \fB\&.rhosts\fR file on the remote machine that
+allows the user invoking the command from the local machine to access the
+remote machine.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBl\fR\fR
+.ad
+.sp .6
+.RS 4n
+Autoload. When the end-of-tape is reached before the dump is complete, take the
+drive offline and wait up to two minutes for the tape drive to be ready again.
+This gives autoloading (stackloader) tape drives a chance to load a new tape.
+If the drive is ready within two minutes, continue. If it is not, prompt for
+another tape and wait.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBL\fR \fIstring\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the tape label to \fIstring\fR, instead of the default \fBnone\fR.
+\fIstring\fR may be no more than sixteen characters long. If it is longer, it
+is truncated and a warning printed; the dump will still be done. The tape label
+is specific to the \fBufsdump\fR tape format, and bears no resemblance to
+\fBIBM\fR or \fBANSI\fR-standard tape labels.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Notify all operators in the \fBsys\fR group that \fBufsdump\fR requires
+attention by sending messages to their terminals, in a manner similar to that
+used by the \fBwall\fR(8) command. Otherwise, such messages are sent only to
+the terminals (such as the console) on which the user running \fBufsdump\fR is
+logged in.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBN\fR \fIdevice_name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use \fIdevice_name\fR when recording information in \fB/etc/dumpdates\fR (see
+the \fBu\fR option) and when comparing against information in
+\fB/etc/dumpdates\fR for incremental dumps. The \fIdevice_name\fR provided can
+contain no white space as defined in \fBscanf\fR(3C) and is case-sensitive.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBo\fR\fR
+.ad
+.sp .6
+.RS 4n
+Offline. Take the drive offline when the dump is complete or the end-of-media
+is reached and rewind the tape, or eject the diskette. In the case of some
+autoloading 8mm drives, the tape is removed from the drive automatically. This
+prevents another process which rushes in to use the drive, from inadvertently
+overwriting the media.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBs\fR \fIsize\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the \fIsize\fR of the volume being dumped to. Not normally required, as
+\fBufsdump\fR can detect end-of-media. When the specified size is reached,
+\fBufsdump\fR waits for you to change the volume. \fBufsdump\fR interprets the
+specified size as the length in feet for tapes and cartridges, and as the
+number of 1024-byte blocks for diskettes. The values should be a little smaller
+than the actual physical size of the media (for example, 425 for a 450-foot
+cartridge). Typical values for tape devices depend on the \fBc\fR option, for
+cartridge devices, and the \fBD\fR option for diskettes:
+.sp
+.ne 2
+.na
+\fB1/2 inch tape\fR
+.ad
+.sp .6
+.RS 4n
+2300 feet
+.RE
+
+.sp
+.ne 2
+.na
+\fB60-Mbyte 1/4 inch cartridge\fR
+.ad
+.sp .6
+.RS 4n
+425 feet
+.RE
+
+.sp
+.ne 2
+.na
+\fB150-Mbyte 1/4 inch cartridge\fR
+.ad
+.sp .6
+.RS 4n
+700 feet
+.RE
+
+.sp
+.ne 2
+.na
+\fBdiskette\fR
+.ad
+.sp .6
+.RS 4n
+1422 blocks (Corresponds to a 1.44-Mbyte diskette, with one cylinder reserved
+for bad block information.)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Size estimate. Determine the amount of space that is needed to perform the dump
+without actually doing it, and display the estimated number of bytes it will
+take. This is useful with incremental dumps to determine how many volumes of
+media will be needed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBt\fR \fItracks\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the number of tracks for a cartridge tape. Not normally required, as
+\fBufsdump\fR can detect end-of-media. The default is 9 tracks. The \fBt\fR
+option is not compatible with the \fBD\fR option. Values for Sun-supported tape
+devices are:
+.sp
+.ne 2
+.na
+\fB60-Mbyte 1/4 inch cartridge\fR
+.ad
+.sp .6
+.RS 4n
+9 tracks
+.RE
+
+.sp
+.ne 2
+.na
+\fB150-Mbyte 1/4 inch cartridge\fR
+.ad
+.sp .6
+.RS 4n
+18 tracks
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBT\fR \fItime_wait\fR\fB[hms]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the amount of time to wait for an \fBautoload\fR command to complete. This
+option is ignored unless the \fBl\fR option has also been specified. The
+default time period to wait is two minutes. Specify time units with a trailing
+\fBh\fR ( for hours), \fBm\fR (for minutes), or \fBs\fR (for seconds). The
+default unit is minutes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBu\fR\fR
+.ad
+.sp .6
+.RS 4n
+Update the dump record. Add an entry to the file \fB/etc/dumpdates,\fR for each
+file system successfully dumped that includes the file system name (or
+\fIdevice_name\fR as specified with the \fBN\fR option), date, and dump level.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBv\fR\fR
+.ad
+.sp .6
+.RS 4n
+Verify. After each tape or diskette is written, verify the contents of the
+media against the source file system. If any discrepancies occur, prompt for
+new media, then repeat the dump/verification process. The file system
+\fImust\fR be unmounted. This option cannot be used to verify a dump to
+standard output.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBw\fR\fR
+.ad
+.sp .6
+.RS 4n
+Warning. List the file systems that have not been backed up within a day. This
+information is gleaned from the files \fB/etc/dumpdates\fR and
+\fB/etc/vfstab\fR. When the \fBw\fR option is used, all other options are
+ignored. After reporting, \fBufsdump\fR exits immediately.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBW\fR\fR
+.ad
+.sp .6
+.RS 4n
+Warning with highlight. Similar to the \fBw\fR option, except that the \fBW\fR
+option includes all file systems that appear in \fB/etc/dumpdates\fR, along
+with information about their most recent dump dates and levels. File systems
+that have not been backed up within a day are highlighted.
+.RE
+
+.SH OPERANDS
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.na
+\fB\fIfiles_to_dump\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the files to dump. Usually it identifies a whole file system by its
+raw device name (for example, \fB/dev/rdsk/c0t3d0s6\fR). Incremental dumps
+(levels \fB1\fR to \fB9\fR) of files changed after a certain date only apply to
+a whole file system. Alternatively, \fIfiles_to_dump\fR can identify individual
+files or directories. All named directories that may be examined by the user
+running \fBufsdump\fR, as well as any explicitly-named files, are dumped. This
+dump is equivalent to a level \fB0\fR dump of the indicated portions of the
+filesystem, except that \fB/etc/dumpdates\fR is not updated even if the
+\fB-u\fR option has been specified. In all cases, the files must be contained
+in the same file system, and the file system must be local to the system where
+\fBufsdump\fR is being run.
+.sp
+\fIfiles_to_dump\fR is required and must be the last argument on the command
+line.
+.RE
+
+.sp
+.LP
+If no \fIoptions\fR are given, the default is \fB9uf\fR \fB/dev/rmt/0\fR
+\fIfiles_to_dump\fR.
+.SH USAGE
+.LP
+See \fBlargefile\fR(7) for the description of the behavior of \fBufsdump\fR
+when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBufsdump\fR
+.sp
+.LP
+The following command makes a full dump of a root file system on \fBc0t3d0\fR,
+on a 150-MByte cartridge tape unit \fB0\fR:
+
+.sp
+.in +2
+.nf
+example# ufsdump 0cfu /dev/rmt/0 /dev/rdsk/c0t3d0s0
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following command makes and verifies an incremental dump at level \fB5\fR
+of the \fBusr\fR partition of \fBc0t3d0\fR, on a 1/2 inch reel tape unit
+\fB1,\fR:
+
+.sp
+.in +2
+.nf
+example# ufsdump 5fuv /dev/rmt/1 /dev/rdsk/c0t3d0s6
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.LP
+While running, \fBufsdump\fR emits many verbose messages. \fBufsdump\fR returns
+the following exit values:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Normal exit.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.sp .6
+.RS 4n
+Startup errors encountered.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB3\fR\fR
+.ad
+.sp .6
+.RS 4n
+Abort \(mi no checkpoint attempted.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/dev/rmt/0\fR\fR
+.ad
+.sp .6
+.RS 4n
+default unit to dump to
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/dumpdates\fR\fR
+.ad
+.sp .6
+.RS 4n
+dump date record
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/group\fR\fR
+.ad
+.sp .6
+.RS 4n
+to find group \fBsys\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/hosts\fR\fR
+.ad
+.sp .6
+.RS 4n
+to gain access to remote system with drive
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/vfstab\fR\fR
+.ad
+.sp .6
+.RS 4n
+list of file systems
+.RE
+
+.SH SEE ALSO
+.LP
+.BR cpio (1),
+.BR tar (1),
+.BR scanf (3C),
+.BR st (4D),
+.BR ufsdump (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR dd (8),
+.BR devnm (8),
+.BR fssnap (8),
+.BR prtvtoc (8),
+.BR rmt (8),
+.BR shutdown (8),
+.BR ufsrestore (8),
+.BR volcopy (8),
+.BR wall (8)
+.SH NOTES
+.SS "Read Errors"
+.LP
+Fewer than 32 read errors on the file system are ignored.
+.SS "Process Per Reel"
+.LP
+Because each reel requires a new process, parent processes for reels that are
+already written hang around until the entire tape is written.
+.SS "Operator Intervention"
+.LP
+\fBufsdump\fR requires operator intervention on these conditions: end of
+volume, end of dump, volume write error, volume open error or disk read error
+(if there are more than a threshold of 32). In addition to alerting all
+operators implied by the \fBn\fR option, \fBufsdump\fR interacts with the
+operator on \fBufsdump\fR's control terminal at times when \fBufsdump\fR can no
+longer proceed, or if something is grossly wrong. All questions \fBufsdump\fR
+poses \fImust\fR be answered by typing \fByes\fR or \fBno\fR, as appropriate.
+.sp
+.LP
+Since backing up a disk can involve a lot of time and effort, \fBufsdump\fR
+checkpoints at the start of each volume. If writing that volume fails for some
+reason, \fBufsdump\fR will, with operator permission, restart itself from the
+checkpoint after a defective volume has been replaced.
+.SS "Suggested Dump Schedule"
+.LP
+It is vital to perform full, "level \fB0\fR", dumps at regular intervals. When
+performing a full dump, bring the machine down to single-user mode using
+\fBshutdown\fR(8). While preparing for a full dump, it is a good idea to clean
+the tape drive and heads. Incremental dumps should be performed with the system
+running in single-user mode.
+.sp
+.LP
+Incremental dumps allow for convenient backup and recovery of active files on a
+more frequent basis, with a minimum of media and time. However, there are some
+tradeoffs. First, the interval between backups should be kept to a minimum
+(once a day at least). To guard against data loss as a result of a media
+failure (a rare, but possible occurrence), capture active files on (at least)
+two sets of dump volumes. Another consideration is the desire to keep
+unnecessary duplication of files to a minimum to save both operator time and
+media storage. A third consideration is the ease with which a particular
+backed-up version of a file can be located and restored. The following
+four-week schedule offers a reasonable tradeoff between these goals.
+.sp
+.in +2
+.nf
+              Sun    Mon    Tue    Wed    Thu    Fri
+    Week 1:   Full    5      5      5      5      3
+    Week 2:           5      5      5      5      3
+    Week 3:           5      5      5      5      3
+    Week 4:           5      5      5      5      3
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Although the Tuesday through Friday incrementals contain "extra copies" of
+files from Monday, this scheme assures that any file modified during the week
+can be recovered from the previous day's incremental dump.
+.SS "Process Priority of ufsdump"
+.LP
+\fBufsdump\fR uses multiple processes to allow it to read from the disk and
+write to the media concurrently. Due to the way it synchronizes between these
+processes, any attempt to run dump with a \fBnice\fR (process priority) of
+`\(mi5' or better will likely make \fBufsdump\fR run \fIslower\fR instead of
+faster.
+.SS "Overlapping Partitions"
+.LP
+Most disks contain one or more overlapping slices because slice 2 covers the
+entire disk. The other slices are of various sizes and usually do not overlap.
+For example, a common configuration places \fBroot\fR on slice 0, \fBswap\fR on
+slice 1, \fB/opt\fR on slice 5 and \fB/usr\fR on slice 6.
+.sp
+.LP
+It should be emphasized that \fBufsdump\fR dumps one \fBufs\fR file system at a
+time. Given the above scenario where slice 0 and slice 2 have the same starting
+offset, executing \fBufsdump\fR on slice 2 with the intent of dumping the
+entire disk would instead dump only the \fBroot\fR file system on slice 0. To
+dump the entire disk, the user must dump the file systems on each slice
+separately.
+.SH BUGS
+.LP
+The \fB/etc/vfstab\fR file does not allow the desired frequency of backup for
+file systems to be specified (as \fB/etc/fstab\fR did). Consequently, the
+\fBw\fR and \fBW\fR options assume file systems should be backed up daily,
+which limits the usefulness of these options.

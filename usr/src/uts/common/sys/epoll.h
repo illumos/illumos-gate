@@ -45,7 +45,7 @@ typedef struct epoll_event {
 #endif
 
 /*
- * Define the EPOLL* constants in terms of their poll(2)/poll(7) equivalents.
+ * Define the EPOLL* constants in terms of their poll(2)/poll(4D) equivalents.
  * Note that the values match the equivalents in Linux to allow for any binary
  * compatibility layers to not need to translate them.
  */

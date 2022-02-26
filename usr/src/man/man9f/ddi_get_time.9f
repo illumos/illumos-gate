@@ -32,8 +32,10 @@ instead use \fBddi_get_lbolt\fR(9F) or \fBgethrtime\fR(9F).
 .SH CONTEXT
  This routine can be called from any context.
 .SH SEE ALSO
-\fBddi_get_lbolt\fR(9F), \fBdrv_getparm\fR(9F), \fBdrv_usectohz\fR(9F),
-\fBgethrtime\fR(9F)
+.BR ddi_get_lbolt (9F),
+.BR drv_getparm (9F),
+.BR drv_usectohz (9F),
+.BR gethrtime (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

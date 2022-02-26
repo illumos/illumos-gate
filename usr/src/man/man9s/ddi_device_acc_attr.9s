@@ -208,7 +208,7 @@ The following examples illustrate the use of device register address mapping
 setup functions and different data access functions.
 .LP
 \fBExample 1 \fRUsing \fBddi_device_acc_attr()\fR in
-\fBddi_regs_map_setup\fR(9F)
+.BR ddi_regs_map_setup (9F)
 .sp
 .LP
 This example demonstrates the use of the \fBddi_device_acc_attr()\fR structure
@@ -353,7 +353,7 @@ if (status & DATA_READY)
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -367,8 +367,11 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBddi_fm_acc_err_get\fR(9F), \fBddi_get16\fR(9F),
-\fBddi_put16\fR(9F), \fBddi_regs_map_setup\fR(9F)
+.BR attributes (7),
+.BR ddi_fm_acc_err_get (9F),
+.BR ddi_get16 (9F),
+.BR ddi_put16 (9F),
+.BR ddi_regs_map_setup (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

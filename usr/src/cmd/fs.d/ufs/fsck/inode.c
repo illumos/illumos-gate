@@ -1331,7 +1331,7 @@ truncino(fsck_ino_t ino, offset_t new_length, int update)
 			 */
 			pwarn("Could not determine former parent of "
 			    "inode %d, link counts are possibly\n"
-			    "incorrect.  Please rerun fsck(1M) to "
+			    "incorrect.  Please rerun fsck(8) to "
 			    "correct this.\n",
 			    ino);
 			iscorrupt = 1;

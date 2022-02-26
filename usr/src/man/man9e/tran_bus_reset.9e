@@ -79,7 +79,7 @@ on failure.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -93,4 +93,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBtran_quiesce\fR(9E), \fBscsi_hba_tran\fR(9S)
+.BR attributes (7),
+.BR tran_quiesce (9E),
+.BR scsi_hba_tran (9S)

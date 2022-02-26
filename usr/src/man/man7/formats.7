@@ -1,0 +1,481 @@
+.\"
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for
+.\" permission to reproduce portions of its copyrighted documentation.
+.\" Original documentation from The Open Group can be obtained online at
+.\" http://www.opengroup.org/bookstore/.
+.\"
+.\" The Institute of Electrical and Electronics Engineers and The Open
+.\" Group, have given us permission to reprint portions of their
+.\" documentation.
+.\"
+.\" In the following statement, the phrase ``this text'' refers to portions
+.\" of the system documentation.
+.\"
+.\" Portions of this text are reprinted and reproduced in electronic form
+.\" in the SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition,
+.\" Standard for Information Technology -- Portable Operating System
+.\" Interface (POSIX), The Open Group Base Specifications Issue 6,
+.\" Copyright (C) 2001-2004 by the Institute of Electrical and Electronics
+.\" Engineers, Inc and The Open Group.  In the event of any discrepancy
+.\" between these versions and the original IEEE and The Open Group
+.\" Standard, the original IEEE and The Open Group Standard is the referee
+.\" document.  The original Standard can be obtained online at
+.\" http://www.opengroup.org/unix/online.html.
+.\"
+.\" This notice shall appear on any product containing this material.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved.
+.\"
+.TH FORMATS 7 "Mar 28, 1995"
+.SH NAME
+formats \- file format notation
+.SH DESCRIPTION
+.sp
+.LP
+Utility descriptions use a syntax to describe the data organization within
+files\(emstdin, stdout, stderr, input files, and output files\(emwhen that
+organization is not otherwise obvious. The syntax is similar to that used by
+the  \fBprintf\fR(3C) function.  When used for stdin or input file
+descriptions, this syntax describes the format that could have been used to
+write the text to be read, not a format that could be used by the
+\fBscanf\fR(3C) function to read the input file.
+.SS "Format"
+.sp
+.LP
+The description of an individual record is as follows:
+.sp
+.in +2
+.nf
+"<\fBformat\fR>", [<\fIarg1\fR>, <\fIarg2\fR>, .\|.\|., <\fIargn\fR>]
+.fi
+.in -2
+
+.sp
+.LP
+The \fBformat\fR is a character string that contains three types of objects
+defined below:
+.sp
+.ne 2
+.na
+\fB\fI\fR\fIcharacters\fR\fI\fR \fR
+.ad
+.RS 30n
+Characters that are not \fIescape sequences\fR or \fIconversion
+specifications\fR, as described below, are copied to the output.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fI\fR\fIescape sequences\fR\fI\fR \fR
+.ad
+.RS 30n
+Represent non-graphic characters.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fI\fR\fIconversion specifications\fR\fI\fR \fR
+.ad
+.RS 30n
+Specifies the output format of each argument. (See below.)
+.RE
+
+.sp
+.LP
+The following characters have the following special meaning in the format
+string:
+.sp
+.ne 2
+.na
+\fB`` \&''\fR
+.ad
+.RS 11n
+(An empty character position.) One or more blank characters.
+.RE
+
+.sp
+.ne 2
+.na
+\fB/\e \fR
+.ad
+.RS 11n
+Exactly one space character.
+.RE
+
+.sp
+.LP
+The notation for spaces allows some flexibility for application output. Note
+that an empty character position in \fBformat\fR represents one or more blank
+characters on the output (not \fIwhite space\fR, which can include newline
+characters). Therefore, another utility that reads that output as its input
+must be prepared to parse the data using \fBscanf\fR(3C), \fBawk\fR(1), and so
+forth. The  character is used when exactly one space character is output.
+.SS "Escape Sequences"
+.sp
+.LP
+The following table lists escape sequences and  associated actions on display
+devices capable of the action.
+.sp
+
+.sp
+.TS
+c c c
+l l l .
+\fBSequence\fR	\fBCharacter\fR	\fBTerminal Action\fR
+_
+\fB\e\e\fR	backslash	None.
+\fB\ea\fR	alert	T{
+Attempts to alert the user through audible or visible notification.
+T}
+\fB\eb\fR	backspace	T{
+Moves the printing position to one column before the current position, unless the current position is the start of a line.
+T}
+\fB\ef\fR	form-feed	T{
+Moves the printing position to the initial printing position of the next logical page.
+T}
+\fB\en\fR	newline	T{
+Moves the printing position to the start of the next line.
+T}
+\fB\er\fR	carriage-return	T{
+Moves the printing position to the start of the current line.
+T}
+\fB\et\fR	tab	T{
+Moves the printing position to the next tab position on the current line. If there are no more tab positions left on the line, the behavior is undefined.
+T}
+\fB\ev\fR	vertical-tab	T{
+Moves the printing position to the start of the next vertical tab position. If there are no more vertical tab positions left on the page, the behavior is undefined.
+T}
+.TE
+
+.SS "Conversion Specifications"
+.sp
+.LP
+Each conversion specification is introduced by the percent-sign character (%).
+After the character %, the following appear in sequence:
+.sp
+.ne 2
+.na
+\fB\fI\fR\fIflags\fR\fI\fR \fR
+.ad
+.RS 26n
+Zero or more \fIflags\fR, in any order, that modify the meaning of the
+conversion specification.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fI\fR\fIfield width\fR\fI\fR \fR
+.ad
+.RS 26n
+An optional string of decimal digits to specify a minimum \fIfield width\fR.
+For an output field, if the converted value has fewer bytes than the field
+width, it is padded on the left (or right, if the left-adjustment flag (\(mi),
+described below, has been given to the field width).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fI\fR\fIprecision\fR\fI\fR \fR
+.ad
+.RS 26n
+Gives the minimum number of digits to appear for the d, o, i, u, x or X
+conversions (the field is padded with leading zeros), the number of digits to
+appear after the radix character for the e and f conversions, the maximum
+number of significant digits for the g conversion; or the maximum number of
+bytes to be written from a string in s conversion. The precision takes the form
+of a period (.) followed by a decimal digit string; a null digit string is
+treated as zero.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fI\fR\fIconversion characters\fR\fI\fR \fR
+.ad
+.RS 26n
+A conversion character (see below) that indicates the type of conversion to be
+applied.
+.RE
+
+.SS "\fIflags\fR"
+.sp
+.LP
+The \fIflags\fR and their meanings are:
+.sp
+.ne 2
+.na
+\fB\fI\(mi\fR \fR
+.ad
+.RS 12n
+The result of the conversion is left-justified within the field.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fI+\fR \fR
+.ad
+.RS 12n
+The result of a signed conversion always begins with a sign (+ or \(mi).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fI<space>\fR \fR
+.ad
+.RS 12n
+If the first character of a signed conversion is not a sign, a space character
+is prefixed to the result. This means that if the space character and + flags
+both appear, the space character flag is ignored.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fI#\fR \fR
+.ad
+.RS 12n
+The value is to be converted to an alternative form. For c, d, i, u, and s
+conversions, the behaviour is undefined. For o conversion, it increases the
+precision to force the first digit of the result to be a zero. For x or X
+conversion, a non-zero result has 0x or 0X prefixed to it, respectively. For e,
+E, f, g, and G conversions, the result always contains a radix character, even
+if no digits follow the radix character. For g and G conversions, trailing
+zeros are not removed from the result as they usually are.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fI0\fR \fR
+.ad
+.RS 12n
+For d, i, o, u, x, X, e, E, f, g, and G conversions, leading zeros (following
+any indication of sign or base) are used to pad to the field width; no space
+padding is performed. If the 0 and \(mi flags both appear, the 0 flag is
+ignored. For d, i, o, u, x and X conversions, if a precision is specified, the
+0 flag is ignored. For other conversions, the behaviour is undefined.
+.RE
+
+.SS "Conversion Characters"
+.sp
+.LP
+Each conversion character results in fetching zero or more arguments. The
+results are undefined if there are insufficient arguments for the format. If
+the format is exhausted while arguments remain, the excess arguments are
+ignored.
+.sp
+.LP
+The \fIconversion characters\fR and their meanings are:
+.sp
+.ne 2
+.na
+\fB\fId,i,o,u,x,X\fR \fR
+.ad
+.RS 16n
+The integer argument is written as signed decimal (d or i), unsigned octal (o),
+unsigned decimal (u), or unsigned hexadecimal notation (x and X). The d and i
+specifiers convert to signed decimal in the style \fB[\fR\(mi\fB]\fR\fIdddd\fR.
+The x conversion uses the numbers and letters 0123456789abcdef and the X
+conversion uses the numbers and letters 0123456789ABCDEF. The \fIprecision\fR
+component of the argument specifies the minimum number of digits to appear. If
+the value being converted can be represented in fewer digits than the specified
+minimum, it is expanded with leading zeros. The default precision is 1. The
+result of converting a zero value with a precision of 0 is no characters. If
+both the field width and precision are omitted, the implementation may precede,
+follow or precede and follow numeric arguments of types d, i and u with blank
+characters; arguments of type o (octal) may be preceded with leading zeros.
+.sp
+The treatment of integers and spaces is different from the \fBprintf\fR(3C)
+function in that they can be surrounded with blank characters. This was done so
+that, given a format such as:
+.sp
+.in +2
+.nf
+"%d\en",<\fIfoo\fR>
+.fi
+.in -2
+
+the implementation could use a \fBprintf()\fR call such as:
+.sp
+.in +2
+.nf
+printf("%6d\en", \fIfoo\fR);
+.fi
+.in -2
+
+and still conform. This notation is thus somewhat like \fBscanf()\fR in
+addition to \fBprintf(\|).\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIf\fR \fR
+.ad
+.RS 16n
+The floating point number argument is written in decimal notation in the style
+\fB[\fR\(mi\fB]\fR\fIddd\fR.\fIddd\fR, where the number of digits after the
+radix character (shown here as a decimal point) is equal to the \fIprecision\fR
+specification. The \fBLC_NUMERIC\fR locale category determines the radix
+character to use in this format. If the \fIprecision\fR is omitted from the
+argument, six digits are written after the radix character; if the
+\fIprecision\fR is explicitly 0, no radix character appears.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIe,E\fR \fR
+.ad
+.RS 16n
+The floating point number argument is written in the style
+\fB[\fR\(mi\fB]\fR\fId\fR.\fIddd\fRe\(+-\fBdd\fR (the symbol \(+- indicates
+either a plus or minus sign), where there is one digit before the radix
+character (shown here as a decimal point) and the number of digits after it is
+equal to the precision. The  \fBLC_NUMERIC\fR locale category determines the
+radix character to use in this format. When the precision is missing, six
+digits are  written after the radix character; if the precision is 0, no radix
+character appears. The E conversion character produces a number with E instead
+of e introducing the exponent. The exponent always contains at least two
+digits. However, if the value to be written requires an exponent greater than
+two digits, additional exponent digits are written as necessary.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIg,G\fR \fR
+.ad
+.RS 16n
+The floating point number argument is written in style f or e (or in style E in
+the case of a G conversion character), with the precision specifying the number
+of significant digits. The style used depends on the value converted: style g
+is used only if the exponent resulting from the conversion is less than \(mi4
+or greater than or equal to the precision. Trailing zeros are removed from the
+result. A radix character appears only if it is followed by a digit.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIc\fR \fR
+.ad
+.RS 16n
+The integer argument is converted to an \fBunsigned char\fR and the resulting
+byte is written.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIs\fR \fR
+.ad
+.RS 16n
+The argument is taken to be a string and bytes from the string are written
+until the end of the string or the number of bytes indicated by the
+\fIprecision\fR specification of the argument is reached. If the precision is
+omitted from the argument, it is taken to be infinite, so all bytes up to the
+end of the string are written.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fI%\fR \fR
+.ad
+.RS 16n
+Write a % character; no argument is converted.
+.RE
+
+.sp
+.LP
+In no case does a non-existent or insufficient \fIfield width\fR cause
+truncation of a field; if the result of a conversion is wider than the field
+width, the field is simply expanded to contain the conversion result. The term
+\fIfield width\fR should not be confused with the term \fIprecision\fR used in
+the description of %s.
+.sp
+.LP
+One difference from the C function \fBprintf()\fR is that the l and h
+conversion characters are not used. There is no differentiation between decimal
+values for type \fBint\fR, type  \fBlong\fR, or type  \fBshort\fR. The
+specifications %d or %i should be interpreted as an arbitrary length sequence
+of digits. Also, no distinction is made between single precision and double
+precision numbers (\fBfloat\fR or \fBdouble\fR in C).  These are simply
+referred to as floating point numbers.
+.sp
+.LP
+Many of the output descriptions  use the term \fBline\fR, such as:
+.sp
+.in +2
+.nf
+"%s", <\fIinput line\fR>
+.fi
+.in -2
+
+.sp
+.LP
+Since the definition of \fBline\fR includes the trailing newline character
+already, there is no need to include a \fB\en\fR in the format; a double
+newline character would otherwise result.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRTo represent the output of a program that prints a date and
+time in the form Sunday, July 3, 10:02, where \fI<weekday>\fR and \fI<month>\fR
+are strings:
+.sp
+.in +2
+.nf
+"%s,/\e%s/\e%d,/\e%d:%.2d\en",<\fIweekday\fR>,<\fImonth\fR>,<\fIday\fR>,<\fIhour\fR>,<\fImin\fR>
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRTo show pi written to 5 decimal places:
+.sp
+.in +2
+.nf
+"pi/\e=/\e%.5f\en",<\fIvalue of pi\fR>
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRTo show an input file format consisting of five colon-separated
+fields:
+.sp
+.in +2
+.nf
+"%s:%s:%s:%s:%s\en",<\fIarg1\fR>,<\fIarg2\fR>,<\fIarg3\fR>,<\fIarg4\fR>,<\fIarg5\fR>
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+.BR awk (1),
+.BR printf (1),
+.BR printf (3C),
+.BR scanf (3C)

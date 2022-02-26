@@ -148,7 +148,7 @@ is not modified.
 For a full list of possible errors also see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Plwp_stack ,
@@ -193,4 +193,4 @@ in
 .Xr sigaction 2 ,
 .Xr sigaltstack 2 ,
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

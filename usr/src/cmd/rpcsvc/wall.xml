@@ -113,9 +113,9 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='rpc.rwalld' section='1M'
+			<manpage title='rpc.rwalld' section='8'
 			    manpath='/usr/share/man' />
-			<manpage title='rwalld' section='1M'
+			<manpage title='rwalld' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

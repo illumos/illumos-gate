@@ -1,0 +1,52 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1990, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PCKT 4M "Feb 5, 2022"
+.SH NAME
+pckt \- STREAMS Packet Mode module
+.SH SYNOPSIS
+.nf
+int ioctl(\fI fd, \fRI_PUSH, "pckt");
+.fi
+
+.SH DESCRIPTION
+\fBpckt\fR is a STREAMS module that may be used with a pseudo terminal to
+packetize certain messages. The \fBpckt\fR module should be pushed (see
+\fBI_PUSH\fR on \fBstreamio\fR(4I)) onto the manager side of a pseudo terminal.
+.sp
+.LP
+Packetizing is performed by prefixing a message with an  \fBM_PROTO\fR message.
+The original message type is stored in the 1 byte data portion of the
+\fBM_PROTO\fR message.
+.sp
+.LP
+On the read-side, only the \fBM_PROTO\fR, \fBM_PCPROTO\fR, \fBM_STOP\fR,
+\fBM_START\fR, \fBM_STOPI\fR, \fBM_STARTI\fR, \fBM_IOCTL\fR, \fBM_DATA\fR,
+\fBM_FLUSH\fR, and  \fBM_READ\fR messages are packetized. All other message
+types are passed upstream unmodified.
+.sp
+.LP
+Since all unread state information is held in the manager's stream head read
+queue, flushing of this queue is disabled.
+.sp
+.LP
+On the write-side, all messages are sent down unmodified.
+.sp
+.LP
+With this module in place, all reads from the manager side of the pseudo
+terminal should be performed with the  \fBgetmsg\fR(2) or \fBgetpmsg\fR()
+function. The control part of the message contains the message type. The data
+part contains the actual data associated with that message type. The onus is on
+the application to separate the data into its component parts.
+.SH SEE ALSO
+.BR getmsg (2),
+.BR ioctl (2),
+.BR streamio (4I),
+.BR termio (4I),
+.BR ldterm (4M),
+.BR ptem (4M)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

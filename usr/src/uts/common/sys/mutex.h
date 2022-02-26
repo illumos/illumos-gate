@@ -51,7 +51,7 @@ extern "C" {
  * either MUTEX_ADAPTIVE or MUTEX_SPIN depending on the iblock cookie.
  *
  * Mutex statistics can be gathered on the fly, without rebooting or
- * recompiling the kernel, via the lockstat driver (lockstat(7D)).
+ * recompiling the kernel, via the lockstat driver (lockstat(4D)).
  */
 typedef enum {
 	MUTEX_ADAPTIVE = 0,	/* spin if owner is running, otherwise block */

@@ -58,7 +58,7 @@ The physical interface where the packet will be injected.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -72,4 +72,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBnet_inject\fR(9F), \fBnetinfo\fR(9F), \fBattributes\fR(5)
+.BR attributes (7),
+.BR net_inject (9F),
+.BR netinfo (9F)

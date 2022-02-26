@@ -218,7 +218,7 @@ Provider. For portable applications, the Consumer should align each buffer
 segment of \fIlocal_iov\fR to the \fBDAT_OPTIMAL_ALIGNMENT\fR.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -235,4 +235,5 @@ MT-Level	Unsafe
 
 .SH SEE ALSO
 .LP
-\fBlibdat\fR(3LIB), \fBattributes\fR(5)
+.BR libdat (3LIB),
+.BR attributes (7)

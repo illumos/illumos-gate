@@ -75,7 +75,7 @@ flags are to be use.
 .LP
 The \fBsmf_disable_instance()\fR function places the service instance specified
 by \fIinstance\fR FMRI in the disabled state and triggers the stop method (see
-\fBsvc.startd\fR(1M)). If \fIflags\fR is \fBSMF_TEMPORARY\fR, the disabling of
+\fBsvc.startd\fR(8)). If \fIflags\fR is \fBSMF_TEMPORARY\fR, the disabling of
 the service instance is a temporary change, lasting only for the lifetime of
 the current system instance. The \fIflags\fR argument is set to \fB0\fR if no
 flags are to be use.
@@ -208,7 +208,7 @@ The \fBsmf_maintain_instance()\fR, \fBsmf_refresh_instance()\fR,
 .ad
 .sp .6
 .RS 4n
-User does not have proper authorizations. See \fBsmf_security\fR(5).
+User does not have proper authorizations. See \fBsmf_security\fR(7).
 .RE
 
 .sp
@@ -249,7 +249,7 @@ The function is called on an instance in an inappropriate state.
 .LP
 The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -265,5 +265,9 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBsvc.startd\fR(1M), \fBlibscf\fR(3LIB), \fBscf_error\fR(3SCF),
-\fBattributes\fR(5), \fBsmf_security\fR(5), \fBsvcs\fR(1)
+.BR svcs (1),
+.BR libscf (3LIB),
+.BR scf_error (3SCF),
+.BR attributes (7),
+.BR smf_security (7),
+.BR svc.startd (8)

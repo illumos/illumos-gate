@@ -154,7 +154,7 @@ BAD_SYS \(mi13       /* system not in Systems file*/
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -170,8 +170,12 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBuucp\fR(1C), \fBalarm\fR(2), \fBread\fR(2), \fBwrite\fR(2),
-\fBattributes\fR(5), \fBtermio\fR(7I)
+.BR uucp (1C),
+.BR alarm (2),
+.BR read (2),
+.BR write (2),
+.BR termio (4I),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

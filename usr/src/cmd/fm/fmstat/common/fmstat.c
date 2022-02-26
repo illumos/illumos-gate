@@ -540,7 +540,7 @@ stat_mod(const char *name, int aflag, int zflag)
 
 	if (fmd_adm_stats_read(g_adm, name, &ams) != 0) {
 		die("failed to retrieve statistics for %s",
-		    name ? name : "fmd(1M)");
+		    name ? name : "fmd(8)");
 	}
 
 	(void) printf("%20s %-16s %s\n", "NAME", "VALUE", "DESCRIPTION");

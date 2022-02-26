@@ -58,12 +58,12 @@ dir  path=usr/sbin
 file path=usr/sbin/ndmpadm mode=0555
 file path=usr/sbin/ndmpstat mode=0555
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/ndmpadm.1m
-file path=usr/share/man/man1m/ndmpd.1m
-file path=usr/share/man/man1m/ndmpstat.1m
-dir  path=usr/share/man/man4
-file path=usr/share/man/man4/ndmp.4
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/ndmp.5
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/ndmpadm.8
+file path=usr/share/man/man8/ndmpd.8
+file path=usr/share/man/man8/ndmpstat.8
 legacy pkg=SUNWndmpr \
     desc="Network Data Management Protocol Service (root components)" \
     name="Network Data Management Protocol Service (Root)"

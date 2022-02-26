@@ -1,0 +1,771 @@
+'\" te
+.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (C) 2021 H. William Welliver
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ROUTE 8 "August 29, 2021"
+.SH NAME
+route \- manually manipulate the routing tables
+.SH SYNOPSIS
+.nf
+\fBroute\fR [\fB-fnvq\fR] \fIsub-command\fR [ [\fImodifiers\fR] \fIargs\fR]
+.fi
+
+.LP
+.nf
+\fBroute\fR [\fB-fnvq\fR] [\fB-p\fR [\fB-R\fR \fIroot-dir\fR]] add | delete [\fImodifiers\fR] \fIdestination\fR \fIgateway\fR
+     [\fIargs\fR]
+.fi
+
+.LP
+.nf
+\fBroute\fR [\fB-fnvq\fR] change | get [\fImodifiers\fR] \fIdestination\fR
+     [\fIgateway\fR [\fIargs\fR]]
+.fi
+
+.LP
+.nf
+\fBroute\fR [\fB-fn\fR] monitor [\fImodifiers\fR]
+.fi
+
+.LP
+.nf
+\fBroute\fR [\fB-fnvq\fR] flush [\fImodifiers\fR]
+.fi
+
+.LP
+.nf
+\fBroute\fR \fB-p\fR [\fB-R\fR \fIroot-dir\fR] show
+.fi
+
+.SH DESCRIPTION
+\fBroute\fR manually manipulates the network routing tables. These tables are
+normally maintained by the system routing daemon, such as \fBin.routed\fR(8)
+and \fBin.ripngd\fR(8).
+.sp
+.LP
+\fBroute\fR supports a limited number of general options, but a rich command
+language. Users can specify an arbitrary request that can be delivered by means
+of the programmatic interface discussed in \fBroute\fR(4P).
+.sp
+.LP
+\fBroute\fR uses a routing socket and the new message types \fBRTM_ADD\fR,
+\fBRTM_DELETE\fR, \fBRTM_GET\fR, and \fBRTM_CHANGE\fR. While only superusers
+can modify routing tables, the \fBRTM_GET\fR operation is allowed for
+non-privileged users.
+.SH OPTIONS
+.ne 2
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 15n
+Flush the routing tables of all gateway entries. If you use the \fB-f\fR option
+in conjunction with any of the \fBroute\fR subcommands, \fBroute\fR flushes
+the gateways before performing the subcommand. Specify the table to flush by
+placing the \fBinet\fR or \fBinet6\fR modifier immediately after the \fB-f\fR
+option. If unspecified, flushing IPv4 (\fBinet\fR) routes is the default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 15n
+Prevent attempts to print host and network names symbolically when reporting
+actions. This option is useful when name servers are unavailable.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 15n
+Make changes to the network route tables persistent across system restarts. The
+operation is applied to the network routing tables first and, if successful, is
+then applied to the list of saved routes used at system startup. In determining
+whether an operation was successful, a failure to add a route that already
+exists or to delete a route that is not in the routing table is ignored. At
+startup, any directly reachable routes (those specified with the
+\fB-interface\fR or \fB-iface\fR options) will be created first, followed by
+any remaining routes. Particular care should be taken when using host or network
+names in persistent routes, as network-based name resolution services are not
+available at the time routes are added at startup.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 15n
+Suppress all output.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR \fIroot-dir\fR\fR
+.ad
+.RS 15n
+Specify an alternate root directory where \fBroute\fR applies changes. This
+option is ignored unless used in conjunction with the \fB-p\fR option. When
+\fB-R\fR is specified, route changes are applied only to the list of saved
+routes to be used at startup, \fBnot\fR to the network routing tables. In
+addition, certain checks, such as the existence of network interfaces used with
+\fB-ifp\fR, are skipped.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 15n
+Print additional details in verbose mode.
+.RE
+
+.SS "Subcommands"
+The following subcommands are supported:
+.sp
+.ne 2
+.na
+\fB\fBadd\fR\fR
+.ad
+.RS 11n
+Add a route.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBchange\fR\fR
+.ad
+.RS 11n
+Change aspects of a route (such as its gateway).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdelete\fR\fR
+.ad
+.RS 11n
+Delete a specific route.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBflush\fR\fR
+.ad
+.RS 11n
+Remove all gateway entries from the routing table.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBget\fR\fR
+.ad
+.RS 11n
+Look up and display the route for a destination.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmonitor\fR\fR
+.ad
+.RS 11n
+Continuously report any changes to the routing information base, routing lookup
+misses, or suspected network partitionings.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshow\fR\fR
+.ad
+.RS 11n
+Display the list of routes to be applied at system startup. Can be used only in
+conjunction with the \fB-p\fR option.
+.RE
+
+.sp
+.LP
+The \fBadd\fR and \fBdelete\fR subcommands have the following syntax:
+.sp
+.in +2
+.nf
+route [ -fnvq ] cmd \fIdestination\fR \fIgateway\fR [metric/netmask]
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where \fIcmd\fR is \fBadd\fR or \fBdelete\fR, \fIdestination\fR is the
+destination host or network, and \fIgateway\fR is the next-hop intermediary
+through which packets should be routed. Modifiers described in \fBOPERANDS\fR
+can be placed anywhere on the command line.
+.sp
+.LP
+The \fBget\fR and \fBchange\fR subcommands have the following syntax:
+.sp
+.in +2
+.nf
+route [ -fnvq ] \fIcmd\fR \fIdestination\fR [\fIgateway\fR [metric/netmask]]
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where \fIcmd\fR is \fBget\fR or \fBchange\fR, \fIdestination\fR is the
+destination host or network, and \fIgateway\fR is the next-hop intermediary
+through which packets should be routed. Modifiers described in \fBOPERANDS\fR
+can be placed anywhere on the command line.
+.sp
+.LP
+The \fBmonitor\fR subcommand has the following syntax:
+.sp
+.in +2
+.nf
+route monitor [ -inet | -inet6 ]
+.fi
+.in -2
+.sp
+
+.SH OPERANDS
+\fBroute\fR executes its subcommands on routes to destinations by way of
+gateways.
+.SS "Destinations and Gateways"
+By default, destination and gateway addresses are interpreted as IPv4
+addresses. All symbolic names are tried first as a host name, using
+\fBgetipnodebyname\fR(3SOCKET). If this lookup fails in the AF_INET case,
+\fBgetnetbyname\fR(3SOCKET) interprets the name as that of a network.
+.sp
+.LP
+Including an optional modifier on the command line before the address changes
+how the \fBroute\fR subcommand interprets it.
+.sp
+.LP
+The following modifiers are supported:
+.sp
+.ne 2
+.na
+\fB\fB-inet\fR\fR
+.ad
+.RS 10n
+Force the address to be interpreted as an IPv4 address, that is, under the
+\fBAF_INET\fR address family.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-inet6\fR\fR
+.ad
+.RS 10n
+Force the address to be interpreted as an IPv6 address, that is, under the
+\fBAF_INET6\fR address family.
+.RE
+
+.sp
+.LP
+For IPv4 addresses, routes to a particular host are by default distinguished
+from those to a network by interpreting the Internet address specified as the
+destination. If the destination has a \fBlocal address part\fR (that is, the
+portion not covered by the netmask) of \fB0\fR, or if the destination is
+resolved as the symbolic name of a network, then the route is assumed to be to
+a network; otherwise, it is presumed to be a route to a host.
+.sp
+.LP
+You can force this selection by using one of the following modifiers:
+.sp
+.ne 2
+.na
+\fB\fB-host\fR\fR
+.ad
+.RS 9n
+Force the destination to be interpreted as a host.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-net\fR\fR
+.ad
+.RS 9n
+Force the destination to be interpreted as a network.
+.RE
+
+.sp
+.LP
+For example:
+.sp
+
+.sp
+.TS
+c c
+l l .
+Destination	Destination Equivalent
+_
+\fB128.32\fR	\fB-host\fR \fB128.0.0.32\fR
+\fB128.32.130\fR	\fB-host\fR \fB128.32.0.130\fR
+\fB-net\fR \fB128.32\fR	\fB128.32.0.0\fR
+\fB-net\fR \fB128.32.130\fR	\fB\fR\fB128.32.130.0\fR
+.TE
+
+.sp
+.LP
+Two modifiers avoid confusion between addresses and keywords (for example,
+\fBhost\fR used as a symbolic host name). You can distinguish a
+\fIdestination\fR by preceding it with the \fB-dst\fR modifier. You can
+distinguish a gateway address by using the \fB-gateway\fR modifier. If the
+destination is directly reachable by way of an interface requiring no
+intermediary IP router to act as a gateway, this can be indicated by using the
+\fB-interface\fR or \fB-iface\fR modifier.
+.sp
+.LP
+In the following example, the route does not refer to an external gateway
+(router), but rather to one of the machine's interfaces. Packets with IP
+destination addresses matching the destination and mask on such a route are
+sent out on the interface identified by the gateway address. For interfaces
+using the ARP protocol, this type of route is used to specify that all matching
+destinations are local to the physical link. That is, a host could be
+configured to ARP for all addresses, without regard to the configured interface
+netmask, by adding a default route using this command. For example:
+.sp
+.in +2
+.nf
+example# route add default \fIhostname\fR -interface
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where gateway address \fIhostname\fR is the name or IP address associated with
+the network interface over which all matching packets should be sent. On a host
+with a single network interface, \fIhostname\fR is usually the same as the
+\fInodename\fR returned by the \fBuname -n\fR command. See \fBuname\fR(1).
+.sp
+.LP
+For backward compatibility with older systems, directly reachable routes can
+also be specified by placing a \fB0\fR after the gateway address:
+.sp
+.in +2
+.nf
+example# route add default \fIhostname\fR 0
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This value was once a route metric, but this metric is no longer used. If the
+value is specified as \fB0\fR, then the destination is directly reachable
+(equivalent to specifying \fB-\fR\fBinterface\fR). If it is non-zero but cannot
+be interpreted as a subnet mask, then a gateway is used (default).
+.sp
+.LP
+With the \fBAF_INET\fR address family or an IPv4 address, a separate subnet
+mask can be specified. This can be specified in one of the following ways:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IP address following the gateway address . This is typically specified in
+\fIdecimal dot\fR notation as for \fBinet_addr\fR(3C) rather than in
+symbolic form.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+IP address following the \fB-netmask\fR qualifier.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Slash character and a decimal length appended to the destination address.
+.RE
+.sp
+.LP
+If a subnet mask is not specified, the mask used is the subnet mask of the
+output interface selected by the gateway address, if the classful network of
+the destination is the same as the classful network of the interface.
+Otherwise, the classful network mask for the destination address is used.
+.sp
+.LP
+Each of the following examples creates an IPv4 route to the destination
+\fB192.0.2.32\fR subnet with a subnet mask of \fB255.255.255.224\fR:
+.sp
+.in +2
+.nf
+example# route add 192.0.2.32/27 somegateway
+example# route add 192.0.2.32 -netmask 255.255.255.224 somegateway
+example# route add 192.0.2.32 somegateway 255.255.255.224
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+For IPv6, only the slash format is accepted. The following example creates an
+IPv6 route to the destination \fB33fe::\fR with a netmask of \fB16\fR one-bits
+followed by 112 zero-bits.
+.sp
+.in +2
+.nf
+example# route add -inet6 3ffe::/16 somegateway
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In cases where the gateway does not uniquely identify the output interface (for
+example, when several interfaces have the same address), you can use the
+\fB-ifp\fR \fIifname\fR modifier to specify the interface by name.  For
+example, \fB\fR\fB-ifp\fR \fBlo0\fR associates the route with the \fBlo0\fR
+interface. If the named interface is an underlying interface in an IPMP (IP
+multipathing) group, then requests to add a route will automatically be
+translated to the corresponding IPMP IP interface, and requests to delete or
+change a route on an underlying interface will fail.
+.SS "Routing Flags"
+Routes have associated flags that influence operation of the protocols when
+sending to destinations matched by the routes. These flags can be set (and in
+some cases cleared, indicated by \fB~\fR) by including the following modifiers
+on the command line:
+.sp
+
+.sp
+.TS
+c c c
+l l l .
+Modifier	Flag	Description
+_
+\fB-interface\fR	\fB~RTF_GATEWAY\fR	Destination is directly reachable
+\fB-iface\fR	\fB~RTF_GATEWAY\fR	Alias for interface modifier
+\fB-static\fR	\fBRTF_STATIC\fR	Manually added route
+\fB-nostatic\fR	\fB~RTF_STATIC\fR	T{
+Pretend route was added by kernel or routing daemon
+T}
+\fB-reject\fR	\fBRTF_REJECT\fR	Emit an ICMP unreachable when matched
+\fB-blackhole\fR	\fBRTF_BLACKHOLE\fR	Silently discard packets during updates
+\fB-proto1\fR	\fBRTF_PROTO1\fR	Set protocol specific routing flag #1
+\fB-proto2\fR	\fBRTF_PROTO2\fR	Set protocol specific routing flag #2
+\fB-private\fR	\fBRTF_PRIVATE\fR	Do not advertise this route
+\fB-multirt\fR	\fBRTF_MULTIRT\fR	Creates the specified redundant route
+\fB-setsrc\fR	\fBRTF_SETSRC\fR	Assigns the default source address
+.TE
+
+.sp
+.LP
+The optional modifiers \fB-rtt\fR, \fB-rttvar\fR, \fB-sendpipe\fR,
+\fB-recvpipe\fR, \fB-mtu\fR, \fB-hopcount\fR, \fB-expire\fR, and
+\fB-ssthresh\fR provide initial values to quantities maintained in the routing
+entry by transport level protocols, such as \fBTCP\fR. These can be
+individually locked either by preceding each modifier to be locked by the
+\fB-lock\fR meta-modifier, or by specifying that all ensuing metrics can be
+locked by the \fB-lockrest\fR meta-modifier.
+.sp
+.LP
+Some transport layer protocols can support only some of these metrics. The
+following optional modifiers are supported:
+.sp
+.ne 2
+.na
+\fB\fB-expire\fR\fR
+.ad
+.RS 13n
+Lifetime for the entry. This optional modifier is not currently supported.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-hopcount\fR\fR
+.ad
+.RS 13n
+Maximum hop count. This optional modifier is not currently supported.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-mtu\fR\fR
+.ad
+.RS 13n
+Maximum MTU in bytes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-recvpipe\fR\fR
+.ad
+.RS 13n
+Receive pipe size in bytes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-rtt\fR\fR
+.ad
+.RS 13n
+Round trip time in microseconds.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-rttvar\fR\fR
+.ad
+.RS 13n
+Round trip time variance in microseconds.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-sendpipe\fR\fR
+.ad
+.RS 13n
+Send pipe size in bytes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-ssthresh\fR\fR
+.ad
+.RS 13n
+Send pipe size threshold in bytes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-secattr\fR\fR
+.ad
+.RS 13n
+Security attributes of the route. This modifier is available only if the system
+is configured with the Solaris Trusted Extensions feature.
+.sp
+The \fB-secattr\fR modifier has the following format:
+.sp
+.in +2
+.nf
+min_sl=\fIval\fR,max_sl=\fIval\fR,doi=\fIval\fR,cipso
+.fi
+.in -2
+
+or:
+.sp
+.in +2
+.nf
+sl=VAL,doi=VAL,cipso
+.fi
+.in -2
+
+In the first form, above, the \fIval\fR for \fBmin_sl\fR and \fBmax_sl\fR is a
+sensitivity label in either hex or string form. The \fIval\fR for \fBdoi\fR is
+a non-negative integer. The route will apply only for packets with the same
+domain of interpretation as defined by the \fBdoi\fR value and within the
+accreditation range defined by the \fBmin_sl\fR and \fBmax_sl\fR values. The
+\fBcipso\fR keyword is optional and set by default. Valid \fBmin_sl\fR,
+\fBmax_sl\fR and \fBdoi\fR keyword/value pairs are mandatory. Note that if
+\fIval\fR contains a space, it must be protected by double quotes.
+.sp
+The second form, above, is equivalent to specifying the first form with the
+same \fBVAL\fR for \fBmin_sl\fR and \fBmax_sl\fR. The second form should be
+used for the \fBget\fR command, because \fBget\fR uses only a single
+sensitivity label.
+.RE
+
+.SS "Compatibility"
+The modifiers \fBhost\fR and \fBnet\fR are taken to be equivalent to
+\fB-\fR\fBhost\fR and \fB-net\fR\fB\fR. To specify a symbolic address that
+matches one of these names, use the \fBdst\fR or \fBgateway\fR keyword to
+distinguish it. For example: \fB\fR\fB-dst\fR \fBhost\fR
+.sp
+.LP
+The following two flags are also accepted for compatibility with older systems,
+but have no effect.
+.sp
+
+.sp
+.TS
+c c
+l l .
+Modifier	Flag
+_
+\fB-cloning\fR	RTF_CLONING
+\fB-xresolve\fR	RTF_XRESOLVE
+.TE
+
+.sp
+.LP
+The \fB\fR\fB-ifa\fR \fBhostname\fR modifier is also accepted, but has no
+effect.
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/defaultrouter\fR\fR
+.ad
+.RS 22n
+List of default routers
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/hosts\fR\fR
+.ad
+.RS 22n
+List of host names and net addresses
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/networks\fR\fR
+.ad
+.RS 22n
+List of network names and addresses
+.RE
+
+.SH SEE ALSO
+.BR uname (1),
+.BR ioctl (2),
+.BR inet_addr (3C),
+.BR getipnodebyname (3SOCKET),
+.BR getnetbyname (3SOCKET),
+.BR ARP (4P),
+.BR ip (4P),
+.BR route (4P),
+.BR routing (4P),
+.BR defaultrouter (5),
+.BR hosts (5),
+.BR networks (5),
+.BR attributes (7),
+.BR in.ripngd (8),
+.BR in.routed (8),
+.BR netstat (8),
+.BR routed (8)
+.SH DIAGNOSTICS
+.ne 2
+.na
+\fB\fBadd\fR [ \fBhost\fR\||\ \fBnetwork\|]\fR \fIdestination\fR:\fIgateway\fR
+\fIflags\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified route is being added to the tables. The values printed are from
+the routing table entry supplied in the \fBioctl\fR(2) call. If the gateway
+address used was not the primary address of the gateway (the first one returned
+by \fBgetipnodebyname\fR(3SOCKET)) the gateway address is printed numerically
+as well as symbolically.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdelete\fR [ \fBhost\fR\||\ \fBnetwork\fR\|]
+\fIdestination\fR:\fIgateway\fR \fIflags\fR\fR
+.ad
+.br
+.na
+\fB\fBchange\fR [ \fBhost\fR\||\ \fBnetwork\fR\|]
+\fIdestination\fR:\fIgateway\fR \fIflags\fR\fR
+.ad
+.sp .6
+.RS 4n
+As \fBadd\fR, but when deleting or changing an entry.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIdestination\fR \fBdone\fR\fR
+.ad
+.sp .6
+.RS 4n
+When the \fB-f\fR flag is specified, or the \fBflush\fR subcommand is used,
+each routing table entry deleted is indicated with a message of this form.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBNetwork is unreachable\fR\fR
+.ad
+.sp .6
+.RS 4n
+An attempt to add a route failed because the gateway listed was not on a
+directly-connected network. Give the next-hop gateway instead.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnot in table\fR\fR
+.ad
+.sp .6
+.RS 4n
+A \fBdelete\fR operation was attempted for an entry that is not in the table.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBentry exists\fR\fR
+.ad
+.sp .6
+.RS 4n
+An \fBadd\fR operation was attempted for a route that already exists in the
+kernel.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrouting table overflow\fR\fR
+.ad
+.sp .6
+.RS 4n
+An operation was attempted, but the system was unable to allocate memory to
+create the new entry.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinsufficient privileges\fR\fR
+.ad
+.sp .6
+.RS 4n
+An attempt to add, delete, change, or flush a route failed because the calling
+process does not have appropriate privileges.
+.RE
+
+.SH NOTES
+Specifying that destinations are local (with the \fB-interface\fR modifier)
+assumes that the routers implement \fBproxy ARP\fR, meaning that they respond
+to ARP queries for all reachable destinations. Normally, using either router
+discovery or RIP is more reliable and scalable than using proxy ARP. See
+\fBin.routed\fR(8) for information related to RIP.
+.sp
+.LP
+Combining the all destinations are local route with subnet or network routes
+can lead to unpredictable results. The search order as it relates to the all
+destinations are local route are undefined and can vary from release to
+release.

@@ -213,5 +213,5 @@ could produce unexpected results.
 .Sh SEE ALSO
 .Xr chdir 2 ,
 .Xr free 3C ,
-.Xr attributes 5 ,
-.Xr standards 5
+.Xr attributes 7 ,
+.Xr standards 7

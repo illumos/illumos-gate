@@ -41,7 +41,7 @@
  *
  * Socket filter entry (sof_entry_t):
  *
- *   There exists one entry for each configured filter (done via soconfig(1M)),
+ *   There exists one entry for each configured filter (done via soconfig(8)),
  *   and they are all in sof_entry_list. In addition to the global list, each
  *   sockparams entry maintains a list of filters that is interested in that
  *   particular socket type. So the filter entry may be referenced by multiple

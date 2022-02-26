@@ -30,7 +30,7 @@
 * files in /etc/system.d are combined in alphabetical order and read by
 * the kernel before this file (/etc/system) is processed.
 *
-* Refer to the system(4) manual page for more information and
+* Refer to the system(5) manual page for more information and
 * recommendations on naming fragment files.
 *
 * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NOTE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -95,7 +95,7 @@
 * set:
 *
 *	Set an integer variable in the kernel or a module to a new value.
-*	This facility should be used with caution.  See system(4).
+*	This facility should be used with caution.  See system(5).
 *
 *	Examples:
 *

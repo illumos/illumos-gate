@@ -40,7 +40,7 @@ instance, using \fB/dev/ksyms\fR as a default \fInamelist\fR file.
 .sp
 .LP
 The \fIcorefile\fR argument specifies a file that contains an image of physical
-memory, for instance, a kernel crash dump file (see \fBsavecore\fR(1M)) or the
+memory, for instance, a kernel crash dump file (see \fBsavecore\fR(8)) or the
 special device \fB/dev/mem\fR. If \fIcorefile\fR is \fINULL\fR, the currently
 running kernel is accessed, using \fB/dev/mem\fR and \fB/dev/kmem\fR.
 .sp
@@ -139,7 +139,7 @@ The \fBkvm_close()\fR function returns 0 on success and \(mi1 on failure.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -157,11 +157,21 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBsavecore\fR(1M), \fBexec\fR(2), \fBexit\fR(2), \fBpathconf\fR(2),
-\fBgetloadavg\fR(3C), \fBkstat\fR(3KSTAT), \fBkvm_getu\fR(3KVM),
-\fBkvm_nextproc\fR(3KVM), \fBkvm_nlist\fR(3KVM), \fBkvm_kread\fR(3KVM),
-\fBlibkvm\fR(3LIB), \fBsysconf\fR(3C), \fBproc\fR(4), \fBattributes\fR(5),
-\fBlfcompile\fR(5)
+.BR exec (2),
+.BR exit (2),
+.BR pathconf (2),
+.BR getloadavg (3C),
+.BR sysconf (3C),
+.BR kstat (3KSTAT),
+.BR kvm_getu (3KVM),
+.BR kvm_kread (3KVM),
+.BR kvm_nextproc (3KVM),
+.BR kvm_nlist (3KVM),
+.BR libkvm (3LIB),
+.BR proc (5),
+.BR attributes (7),
+.BR lfcompile (7),
+.BR savecore (8)
 .SH NOTES
 .sp
 .LP
@@ -189,5 +199,5 @@ release-dependent.
 Most of the traditional uses of \fBlibkvm\fR have been superseded by more
 stable interfaces that allow the same information to be extracted more
 efficiently, yet  independent of the kernel data model.  For examples, see
-\fBsysconf\fR(3C), \fBproc\fR(4), \fBkstat\fR(3KSTAT), \fBgetloadavg\fR(3C),
+\fBsysconf\fR(3C), \fBproc\fR(5), \fBkstat\fR(3KSTAT), \fBgetloadavg\fR(3C),
 and \fBpathconf\fR(2).

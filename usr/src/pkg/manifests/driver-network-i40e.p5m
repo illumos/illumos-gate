@@ -26,8 +26,8 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/i40e group=sys
 file path=kernel/drv/i40e.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/i40e.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/i40e.4d
 driver name=i40e perms="* 0666 root sys" clone_perms="i40e 0666 root sys" \
     alias=pciex8086,cf8 \
     alias=pciex8086,d58 \

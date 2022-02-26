@@ -1,209 +1,87 @@
-.\" Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved.
+'\" te
 .\" Copyright 1989 AT&T
-.\" Copyright 2020 Joyent, Inc.
-.\"
-.\" The contents of this file are subject to the terms of the
-.\" Common Development and Distribution License (the "License").
-.\" You may not use this file except in compliance with the License.
-.\"
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-.\" or http://www.opensolaris.org/os/licensing.
-.\" See the License for the specific language governing permissions
-.\" and limitations under the License.
-.\"
-.\" When distributing Covered Code, include this CDDL HEADER in each
-.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-.\" If applicable, add the following below this CDDL HEADER, with the
-.\" fields enclosed by brackets "[]" replaced with your own identifying
-.\" information: Portions Copyright [yyyy] [name of copyright owner]
-.\"
-.Dd January  6, 2020
-.Dt INTRO 7
-.Os
-.Sh NAME
-.Nm Intro ,
-.Nm intro
-.Nd introduction to special files
-.Sh DESCRIPTION
-This section describes various device and network interfaces available on the
-sysstem.
-The types of interfaces described include character and block
-devices,
-.Sy STREAMS
-modules, network protocols, file systems, and ioctl requests
-for driver subsystems and classes.
-.Pp
-This section contains the following major collections:
-.Bl -tag -width "xxxxx"
-.It Pq Sy 7D
-The system provides drivers for a variety of hardware devices, such as disk,
-magnetic tapes, serial communication lines, mice, and frame buffers, as well
-as virtual devices such as pseudo-terminals and windows.
-.Pp
-This section describes special files that refer to specific hardware
-peripherals and device drivers.
-.Sy STREAMS
-device drivers are also described.
-Characteristics of both the hardware device and the corresponding device driver
-are discussed where applicable.
-.Pp
-An application accesses a device through that device's special file.
-This
-section specifies the device special file to be used to access the device as
-well as application programming interface (API) information relevant to the use
-of the device driver.
-All device special files are located under the
-.Pa /devices
-directory.
-The
-.Pa /devices
-directory hierarchy attempts to mirror the hierarchy of system
-busses, controllers, and devices configured on the system.
-Logical device names for special files in
-.Pa /devices
-are located under the
-.Pa /dev
-directory.
-Although not every special file under
-.Pa /devices
-will have a corresponding logical entry under
-.Pa /dev ,
-whenever possible, an
-application should reference a device using the logical name for the device.
-Logical device names are listed in the
-.Sy FILES
-section of the page for the device in question.
-.Pp
-This section also describes driver configuration where applicable.
-Many device drivers have a driver configuration file of the form
-.Em driver_name Ns \&.conf
-associated with them (see
-.Xr driver.conf 4 ) .
-The configuration information stored in the driver
-configuration file is used to configure the driver and the device.
-Driver configuration files are located in
-.Pa /kernel/drv
-and
-.Pa /usr/kernel/drv .
-Driver configuration files for platform dependent
-drivers are located in
-.Pa /platform/`uname\ -i`/kernel/drv
-where
-.Pa `uname\ -i`
-is the output of the
-.Xr uname 1
-command with the
-.Fl i
-option.
-.Pp
-Some driver configuration files may contain user configurable properties.
-Changes in a driver's configuration file will not take effect until the system
-is rebooted or the driver has been removed and re-added (see
-.Xr rem_drv 1M
-and
-.Xr add_drv 1M ) .
-.It Pq Sy 7FS
-This section describes the programmatic interface for several file systems
-supported by SunOS.
-.It Pq Sy 7I
-This section describes ioctl requests which apply to a class of drivers or
-subsystems.
-For example, ioctl requests which apply to most tape devices are
-discussed in
-.Xr mtio 7I .
-Ioctl requests relevant to only a specific
-device are described on the man page for that device.
-The page for the device
-in question should still be examined for exceptions to the ioctls listed in
-section 7I.
-.It Pq Sy 7M
-This section describes
-.Sy STREAMS
-modules.
-Note that
-.Sy STREAMS
-drivers are discussed in section 7D.
-.Xr streamio 7I
-contains a list of ioctl requests used to manipulate
-.Sy STREAMS
-modules and interface with the
-.Sy STREAMS
-framework.
-.Xr ioctl 2
-requests specific to a
-.Sy STREAMS
-module will be discussed on the man page for that module.
-.It Pq Sy 7P
-This section describes various network protocols available in SunOS.
-SunOS supports both socket-based and
-.Sy STREAMS Ns -based
-network communications.
-.Pp
-The Internet protocol family, described in
-.Xr inet 7P ,
-is the primary protocol family supported by SunOS, although the system can
-support a number of others.
-The raw interface provides low-level services, such as
-packet fragmentation and reassembly, routing, addressing, and basic transport
-for socket-based implementations.
-Facilities for communicating using an
-Internet-family protocol are generally accessed by specifying the
-.Dv AF_INET
-address family when binding a socket; see
-.Xr socket 3SOCKET
-for details.
-.Pp
-Major protocols in the Internet family include:
-.Bl -bullet -offset indent
-.It
-The Internet Protocol (IP) itself, which supports the universal datagram
-format, as described in
-.Xr ip 7P .
-This is the default protocol for
-.Dv SOCK_RAW
-type sockets within the
-.Dv AF_INET
-domain.
-.It
-The Transmission Control Protocol (TCP); see
-.Xr tcp 7P .
-This is the default protocol for
-.Dv SOCK_STREAM
-type sockets.
-.It
-The User Datagram Protocol (UDP); see
-.Xr udp 7P .
-This is the default
-protocol for
-.Dv SOCK_DGRAM
-type sockets.
-.It
-The Address Resolution Protocol (ARP); see
-.Xr arp 7P .
-.It
-The Internet Control Message Protocol (ICMP); see
-.Xr icmp 7P .
-.El
-.El
-.Sh SEE ALSO
-.Xr add_drv 1M ,
-.Xr rem_drv 1M ,
-.Xr ioctl 2 ,
-.Xr Intro 3 ,
-.Xr socket 3SOCKET ,
-.Xr driver.conf 4 ,
-.Xr st 7D ,
-.Xr mtio 7I ,
-.Xr streamio 7I ,
-.Xr arp 7P ,
-.Xr icmp 7P ,
-.Xr inet 7P ,
-.Xr ip 7P ,
-.Xr tcp 7P ,
-.Xr udp 7P
-.Pp
-.%T System Administration Guide: IP Services
-.Pp
-.%T STREAMS Programming Guide
-.Pp
-.%T Writing Device Drivers
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH INTRO 7 "Nov 17, 2008"
+.SH NAME
+Intro, intro \- introduction to miscellany
+.SH DESCRIPTION
+.sp
+.LP
+Among the topics presented in this section are:
+.sp
+.ne 2
+.na
+\fBStandards\fR
+.ad
+.RS 16n
+The POSIX (IEEE) Standards and the X/Open Specifications are described on the
+\fBstandards\fR page.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEnvironments\fR
+.ad
+.RS 16n
+The user environment (\fBenviron\fR), the subset of the user environment that
+depends on language and cultural conventions (\fBlocale\fR), the large file
+compilation environment (\fBlfcompile\fR), and the transitional compilation
+environment (\fBlfcompile64\fR) are described.
+.RE
+
+.sp
+.ne 2
+.na
+\fBMacros\fR
+.ad
+.RS 16n
+The macros to format Reference Manual pages (\fBman\fR and \fBmansun\fR) as
+well as other text format macros (\fBme\fR, \fBmm\fR, and \fBms\fR) are
+described.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCharacters\fR
+.ad
+.RS 16n
+Tables of character sets (\fBascii\fR, \fBcharmap\fR, \fBeqnchar\fR, and
+\fBiconv\fR), file format notation (\fBformats\fR), file name pattern matching
+(\fBfnmatch\fR), and regular expressions (\fBregex\fR and \fBregexp\fR) are
+presented.
+.RE
+
+.SH ACKNOWLEDGMENTS
+.sp
+.LP
+Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to
+reproduce portions of its copyrighted documentation. Original documentation
+from The Open Group can be obtained online at
+http://www.opengroup.org/bookstore/\&.
+.sp
+.LP
+The Institute of Electrical and Electronics Engineers and The Open Group, have
+given us permission to reprint portions of their documentation.
+.sp
+.LP
+In the following statement, the phrase ``this text'' refers to portions of the
+system documentation.
+.sp
+.LP
+Portions of this text are reprinted and reproduced in electronic form in the
+SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for
+Information Technology -- Portable Operating System Interface (POSIX), The Open
+Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of
+Electrical and Electronics Engineers, Inc and The Open Group.  In the event of
+any discrepancy between these versions and the original IEEE and The Open Group
+Standard, the original IEEE and The Open Group Standard is the referee
+document.  The original Standard can be obtained online at
+http://www.opengroup.org/unix/online.html\&.
+.sp
+.LP
+This notice shall appear on any product containing this material.

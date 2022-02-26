@@ -1,0 +1,200 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DMFE 4D "Sep 17, 2007"
+.SH NAME
+dmfe \- Davicom Fast Ethernet driver for Davicom DM9102A
+.SH SYNOPSIS
+.LP
+.nf
+/kernel/drv/sparcv9/dmfe
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdmfe\fR Ethernet device provides 100Base-TX networking interfaces using
+the Davicom DM9102A chip, which incorporates its own internal transceiver.
+.sp
+.LP
+The \fBdmfe\fR driver functions include controller initialization, frame
+transmit and receive, promiscuous and multicast support, and error recovery and
+reporting. Multiple controllers installed within the system are supported by
+the driver.
+.sp
+.LP
+The 100Base-TX standard specifies an auto-negotiation protocol to automatically
+select the mode and speed of operation. The internal transceiver is capable of
+performing auto-negotiation with the remote-end of the link (link partner) and
+receives the capabilities of the remote end. It selects the highest common
+denominator mode of operation based on the priorities. The internal transceiver
+also supports a forced-mode of operation under which the driver selects the
+operational mode.
+.SH APPLICATION PROGRAMMING INTERFACE
+.sp
+.LP
+The \fB/dev/dmfe\fR cloning character-special device is used to access all
+Davicom DM9102A devices installed in the system.
+.sp
+.LP
+You must send an explicit DL_ATTACH_REQ message to associate the opened stream
+with a particular device (ppa). The ppa ID is interpreted as an unsigned
+integer data type and indicates the corresponding device  instance (unit)
+number. If the ppa field value does not correspond to a valid device instance
+number for this system, an error (DL_ERROR_ACK) is returned. The device is
+initialized on first attach and de-initialized (stopped) at last detach.
+.sp
+.LP
+The values returned by the driver in the DL_INFO_ACK primitive in response to a
+DL_INFO_REQ are as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum  SDU  is  1500  (ETHERMTU - defined  in \fBsys/ethernet.h\fR).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Minimum SDU is 0.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+DLSAP address length is 8.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+MAC type is DL_ETHER.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The sap length value  is  -2,  meaning the physical address component is
+followed immediately by a 2-byte sap component within the DLSAP address.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The broadcast address value is  the Ethernet/IEEE broadcast address
+(FF:FF:FF:FF:FF:FF).
+.RE
+.sp
+.LP
+Once  in  the  DL_ATTACHED  state, you must send  a DL_BIND_REQ to  associate a
+particular Service Access Point (SAP) with the stream.
+.SH CONFIGURATION
+.sp
+.LP
+By default, the \fBdmfe\fR driver performs auto-negotiation to select the speed
+and mode of the link. Link speed and mode can be 100 Mbps (full or half-duplex)
+or 10 Mbps (full or half-duplex) as described in the 100Base-TX standard.
+.sp
+.LP
+The auto-negotiation protocol automatically selects speed mode (either 100 Mbps
+or 10 Mbps) and operation mode (either full-duplex or half-duplex) as the
+highest common denominator supported by both link partners. Because the
+\fBdmfe\fR device supports all modes, this effectively selects the
+highest-throughput mode supported by the other device.
+.sp
+.LP
+Alternatively, you can explicitly specify the link parameters by adding entries
+to the \fBdmfe\fR driver configuration file (\fB/kernel/drv/dmfe.conf\fR). You
+can set the \fBspeed\fR parameter to 10 or 100 to force \fBdmfe\fR devices to
+operate at the specified speed. Additionally, you can set the full-duplex
+parameter to 0 or 1 to disable or force full-duplex operation, respectively.
+.sp
+.LP
+Note that specifying either "speed" or "full-duplex" explicitly disables
+auto-negotiation. To enable the driver to determine the appropriate setting for
+each parameter, you should always set both parameters. If it is necessary to
+force either speed or duplex setting (for example, because the  \fBdmfe\fR
+device is connected to an ancient device or hub that does not support
+auto-negotiation), both parameters should be explicitly specified to match the
+requirements of the external device.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/dmfe\fR\fR
+.ad
+.RS 28n
+Character special device
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/dmfe\fR\fR
+.ad
+.RS 28n
+32-bit kernel module (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/dmfe\fR\fR
+.ad
+.RS 28n
+64-bit kernel module (SPARC)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/dmfe\fR\fR
+.ad
+.RS 28n
+64-bit kernel module (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/dmfe.conf\fR\fR
+.ad
+.RS 28n
+\fBdmfe\fR configuration file
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR gld (4D),
+.BR streamio (4I),
+.BR dlpi (4P),
+.BR attributes (7)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.sp
+.LP
+\fINetwork Interfaces Programmer's Guide\fR

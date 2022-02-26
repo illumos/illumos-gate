@@ -771,7 +771,7 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 
 		/*
 		 * If no privilege to look up, skip.
-		 * 'files' requires PRIV_FILE_DAC_READ to read shadow(4) data,
+		 * 'files' requires PRIV_FILE_DAC_READ to read shadow(5) data,
 		 * 'ldap' requires all zones privilege.
 		 */
 		if (params.privdb == 1 && swret != NULL) {

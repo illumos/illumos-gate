@@ -5449,7 +5449,7 @@ checkServiceStatus(void)
 		    gettext("Unable to query the service status of"
 		    " iSCSI initiator."),
 		    gettext("For more information, please refer to"
-		    " iscsi(7D)."));
+		    " iscsi(4D)."));
 		return (B_FALSE);
 	}
 
@@ -5459,7 +5459,7 @@ checkServiceStatus(void)
 		    " try 'svcadm enable network/iscsi/initiator' to"
 		    " enable the service."),
 		    gettext("For more information, please refer to"
-		    " iscsi(7D)."));
+		    " iscsi(4D)."));
 		return (B_FALSE);
 	}
 
@@ -5478,7 +5478,7 @@ seeMan(void)
 	if (sent)
 		return;
 
-	(void) fprintf(stdout, "%s %s(1M)\n",
+	(void) fprintf(stdout, "%s %s(8)\n",
 	    gettext("For more information, please see"), cmdName);
 
 	sent = 1;

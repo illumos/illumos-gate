@@ -1738,7 +1738,7 @@ showrev_objectversions(int showall)
 }
 
 /*
- * Display information similar to what showrev(1M) displays when invoked
+ * Display information similar to what showrev(8) displays when invoked
  * with no arguments.
  */
 static int
@@ -1755,7 +1755,7 @@ showrev_sysinfo(void)
 	}
 
 	/*
-	 * Match the order of the showrev(1M) output and put "Application
+	 * Match the order of the showrev(8) output and put "Application
 	 * architecture" before "Kernel version"
 	 */
 	if ((s = mdb_tgt_isa(mdb.m_target)) != NULL)

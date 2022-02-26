@@ -28,7 +28,7 @@
 # console login.
 #
 # For modifying parameters passed to ttymon, do not edit
-# this script. Instead use svccfg(1m) to modify the SMF
+# this script. Instead use svccfg(8) to modify the SMF
 # repository. For example:
 #
 # # svccfg

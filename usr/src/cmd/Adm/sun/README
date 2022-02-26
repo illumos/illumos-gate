@@ -26,8 +26,6 @@ Elimination of /usr/kvm
 Copyright (c) 1995-2000 by Sun Microsystems, Inc.
 All rights reserved.
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 As of Solaris 2.5, the /usr/kvm directory is no longer needed by the
 operating environment.  The mount point continues to be provided for
 backward compatibility although all of the contents have been removed.
@@ -49,7 +47,7 @@ Implementation		Interface(s)
 /usr/kvm/crash		/usr/bin/mdb
 
 			Note: Solaris Modular Debugger Guide describes how to
-			transition from crash(1M) to mdb(1).
+			transition from crash(8) to mdb(1).
 
 /usr/kvm/eeprom		/usr/sbin/eeprom
 

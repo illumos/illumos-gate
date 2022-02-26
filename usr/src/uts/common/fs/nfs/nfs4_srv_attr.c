@@ -2093,7 +2093,7 @@ rfs4_fattr4_owner(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		 * occur. Please refer to nfs4_idmap.c for details.
 		 *
 		 * Any other errors, such as the mapping not being found by
-		 * nfsmapid(1m), and interrupted clnt_call, etc, will result
+		 * nfsmapid(8), and interrupted clnt_call, etc, will result
 		 * in NFS4ERR_BADOWNER.
 		 *
 		 * XXX need to return consistent errors, perhaps all
@@ -2206,7 +2206,7 @@ rfs4_fattr4_owner_group(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		 * cannot occur. Please refer to nfs4_idmap.c for details.
 		 *
 		 * Any other errors, such as the mapping not being found by
-		 * nfsmapid(1m), and interrupted clnt_call, etc, will result
+		 * nfsmapid(8), and interrupted clnt_call, etc, will result
 		 * in NFS4ERR_BADOWNER.
 		 *
 		 * XXX need to return consistent errors, perhaps all

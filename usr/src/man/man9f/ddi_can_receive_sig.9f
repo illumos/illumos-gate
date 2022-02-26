@@ -56,4 +56,6 @@ are blocked (see \fBsigprocmask\fR(2)).
 The \fBddi_can_receive_sig()\fR function  may be called from user, kernel, or
 interrupt context.
 .SH SEE ALSO
-\fBclose\fR(9E), \fBcv_wait\fR(9F), \fBqwait\fR(9F)
+.BR close (9E),
+.BR cv_wait (9F),
+.BR qwait (9F)

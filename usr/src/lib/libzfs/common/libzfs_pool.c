@@ -4726,7 +4726,7 @@ zpool_label_disk(libzfs_handle_t *hdl, zpool_handle_t *zhp, const char *name,
 		efi_free(vtoc);
 
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "try using fdisk(1M) and then provide a specific slice"));
+		    "try using fdisk(8) and then provide a specific slice"));
 		return (zfs_error(hdl, EZFS_LABELFAILED, errbuf));
 	}
 

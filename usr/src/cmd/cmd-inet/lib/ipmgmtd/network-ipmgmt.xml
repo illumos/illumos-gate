@@ -86,7 +86,7 @@
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='ipadm' section='1M'
+			<manpage title='ipadm' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

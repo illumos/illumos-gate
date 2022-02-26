@@ -219,7 +219,7 @@ nfsauth_zone_init(nfs_globals_t *ng)
 	nag = kmem_zalloc(sizeof (*nag), KM_SLEEP);
 
 	/*
-	 * mountd can be restarted by smf(5).  We need to make sure
+	 * mountd can be restarted by smf(7).  We need to make sure
 	 * the updated door handle will safely make it to mountd_dh.
 	 */
 	mutex_init(&nag->mountd_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -462,7 +462,7 @@ retry:
 	if (dh == NULL) {
 		/*
 		 * The rendezvous point has not been established yet!
-		 * This could mean that either mountd(1m) has not yet
+		 * This could mean that either mountd(8) has not yet
 		 * been started or that _this_ routine nuked the door
 		 * handle after receiving an EINTR for a REVOKED door.
 		 *
@@ -523,8 +523,8 @@ retry:
 				/*
 				 * The server barfed and revoked
 				 * the (existing) door on us; we
-				 * want to wait to give smf(5) a
-				 * chance to restart mountd(1m)
+				 * want to wait to give smf(7) a
+				 * chance to restart mountd(8)
 				 * and establish a new door handle.
 				 */
 				mutex_enter(&nag->mountd_lock);

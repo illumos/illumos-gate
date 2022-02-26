@@ -61,7 +61,7 @@ tcsetattr \- set the parameters associated with the terminal
 The \fBtcsetattr()\fR function sets the parameters associated with the terminal
 referred to by the open file descriptor \fIfildes\fR (an open file descriptor
 associated with a terminal) from the \fBtermios\fR structure (see
-\fBtermio\fR(7I)) referenced by \fItermios_p\fR as follows:
+\fBtermio\fR(4I)) referenced by \fItermios_p\fR as follows:
 .RS +4
 .TP
 .ie t \(bu
@@ -198,7 +198,7 @@ is not ignoring or blocking \fBSIGTTOU\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -216,5 +216,8 @@ MT-Level	MT-Safe, and Async-Signal-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBcfgetispeed\fR(3C), \fBtcgetattr\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5), \fBtermio\fR(7I)
+.BR cfgetispeed (3C),
+.BR tcgetattr (3C),
+.BR termio (4I),
+.BR attributes (7),
+.BR standards (7)

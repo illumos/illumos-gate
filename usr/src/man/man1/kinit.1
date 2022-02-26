@@ -20,7 +20,7 @@ The \fBkinit\fR command is used to obtain and cache an initial ticket-granting
 ticket (credential) for \fIprincipal\fR. This ticket is used for authentication
 by the Kerberos system. Only users with Kerberos principals can use the
 Kerberos system. For information about Kerberos principals, see
-\fBkerberos\fR(5).
+\fBkerberos\fR(7).
 .sp
 .LP
 When you use \fBkinit\fR without options, the utility prompts for your
@@ -121,7 +121,7 @@ not specified, the default ticket lifetime (configured by each site) is used.
 Specifying a ticket lifetime longer than the maximum ticket lifetime
 (configured by each site) results in a ticket with the maximum lifetime. See
 the \fBTime\fR \fBFormats\fR section for the valid time duration formats that
-you can specify for \fIlifetime\fR. See \fBkdc.conf\fR(4) and \fBkadmin\fR(1M)
+you can specify for \fIlifetime\fR. See \fBkdc.conf\fR(5) and \fBkadmin\fR(8)
 (for \fBgetprinc\fR command to verify the lifetime values for the server
 principal).
 .sp
@@ -183,8 +183,8 @@ option allows a user to explicitly obtain a non-proxiable ticket.
 .RS 24n
 Requests renewable tickets, with a total lifetime of \fIrenewable_life\fR. See
 the \fBTime\fR \fBFormats\fR section for the valid time duration formats that
-you can specify for \fIrenewable_life\fR. See \fBkdc.conf\fR(4) and
-\fBkadmin\fR(1M) (for \fBgetprinc\fR command to verify the lifetime values for
+you can specify for \fIrenewable_life\fR. See \fBkdc.conf\fR(5) and
+\fBkadmin\fR(8) (for \fBgetprinc\fR command to verify the lifetime values for
 the server principal).
 .sp
 The renewable lifetime of the tickets returned is the minimum of the following:
@@ -527,7 +527,7 @@ Variable	Description
 \fB\fBKRB5CCNAME\fR\fR
 .ad
 .RS 14n
-Location of the credentials (ticket) cache. See \fBkrb5envvar\fR(5) for syntax
+Location of the credentials (ticket) cache. See \fBkrb5envvar\fR(7) for syntax
 and details.
 .RE
 
@@ -556,11 +556,11 @@ Default location for the local host's \fBkeytab\fR file.
 .ad
 .RS 25n
 Default location for the local host's configuration file. See
-\fBkrb5.conf\fR(4).
+\fBkrb5.conf\fR(5).
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -577,9 +577,17 @@ Interface Stability	See below.
 .LP
 The command arguments are Evolving. The command output is Unstable.
 .SH SEE ALSO
-\fBkdestroy\fR(1), \fBklist\fR(1), \fBkadmin\fR(1M), \fBktkt_warnd\fR(1M),
-\fBlibpkcs11\fR(3LIB), \fBkdc.conf\fR(4), \fBkrb5.conf\fR(4),
-\fBattributes\fR(5), \fBkerberos\fR(5), \fBkrb5envvar\fR(5), \fBpam_krb5\fR(5)
+.BR kdestroy (1),
+.BR klist (1),
+.BR libpkcs11 (3LIB),
+.BR kdc.conf (5),
+.BR krb5.conf (5),
+.BR attributes (7),
+.BR kerberos (7),
+.BR krb5envvar (7),
+.BR pam_krb5 (7),
+.BR kadmin (8),
+.BR ktkt_warnd (8)
 .SH NOTES
-On success, \fBkinit\fR notifies \fBktkt_warnd\fR(1M) to alert the user when
+On success, \fBkinit\fR notifies \fBktkt_warnd\fR(8) to alert the user when
 the initial credentials (ticket-granting ticket) are about to expire.

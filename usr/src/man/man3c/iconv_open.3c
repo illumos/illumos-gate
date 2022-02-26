@@ -71,7 +71,7 @@ are implementation-dependent.
 .LP
 The \fBiconv_open()\fR function supports the alias of the encoding name
 specified in \fItocode\fR and \fIfromcode\fR.  The alias table of the encoding
-name is described in the file \fB/usr/lib/iconv/alias\fR. See \fBalias\fR(4).
+name is described in the file \fB/usr/lib/iconv/alias\fR. See \fBalias\fR(5).
 .sp
 .LP
 A conversion descriptor remains valid in a process until that process closes
@@ -139,7 +139,7 @@ alias table file of the encoding name
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -157,8 +157,12 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBexec\fR(2), \fBiconv\fR(3C), \fBiconv_close\fR(3C), \fBmalloc\fR(3C),
-\fBalias\fR(4), \fBattributes\fR(5)
+.BR exec (2),
+.BR iconv (3C),
+.BR iconv_close (3C),
+.BR malloc (3C),
+.BR alias (5),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

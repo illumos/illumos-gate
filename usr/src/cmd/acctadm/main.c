@@ -266,7 +266,7 @@ main(int argc, char *argv[])
 		die(gettext("failed to open dladm handle\n"));
 
 	/*
-	 * smf(5) start method.  The FMRI to operate on is retrieved from the
+	 * smf(7) start method.  The FMRI to operate on is retrieved from the
 	 * SMF_FMRI environment variable that the restarter provides.
 	 */
 	if (sflg) {
@@ -276,7 +276,7 @@ main(int argc, char *argv[])
 			return (ret);
 		}
 
-		die(gettext("-s option should only be invoked by smf(5)\n"));
+		die(gettext("-s option should only be invoked by smf(7)\n"));
 	}
 
 	assert(type == AC_PROC || type == AC_TASK || type == AC_FLOW ||
@@ -292,7 +292,7 @@ main(int argc, char *argv[])
 
 	/*
 	 * Since the sys_acct the privilege allows use of acctctl() regardless
-	 * of the accounting type, we check the smf(5) authorizations granted
+	 * of the accounting type, we check the smf(7) authorizations granted
 	 * to the user to determine whether the user is allowed to change the
 	 * configuration for this particular accounting type.
 	 */

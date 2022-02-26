@@ -62,7 +62,7 @@ typedef struct tsinfo {
 #define	TS_KY_UPRI	2	/* user priority */
 
 /*
- * The following is used by the dispadmin(1M) command for
+ * The following is used by the dispadmin(8) command for
  * scheduler administration and is not for general use.
  */
 

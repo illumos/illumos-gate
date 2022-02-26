@@ -81,7 +81,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='ktkt_warnd' section='1M'
+			<manpage title='ktkt_warnd' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

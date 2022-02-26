@@ -29,7 +29,7 @@
  */
 
 /*
- * bootadm(1M) is a new utility for managing bootability of
+ * bootadm(8) is a new utility for managing bootability of
  * Solaris *Newboot* environments. It has two primary tasks:
  *	- Allow end users to manage bootability of Newboot Solaris instances
  *	- Provide services to other subsystems in Solaris (primarily Install)
@@ -604,7 +604,7 @@ static struct cmd_map {
 };
 
 /*
- * Commands syntax published in bootadm(1M) are parsed here
+ * Commands syntax published in bootadm(8) are parsed here
  */
 static void
 parse_args(int argc, char *argv[])
@@ -4985,7 +4985,7 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 			prev->entryNum = lp->entryNum;
 			curr_ent = boot_entry_new(mp, prev, lp);
 			curr_ent->flags |= BAM_ENTRY_BOOTADM;
-			BAM_DPRINTF(("%s: is bootadm(1M) entry: %s\n",
+			BAM_DPRINTF(("%s: is bootadm(8) entry: %s\n",
 			    fcn, arg));
 		} else {
 			curr_ent = boot_entry_new(mp, lp, lp);

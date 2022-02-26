@@ -214,7 +214,7 @@ delay slot. For further information, see \fIThe SPARC Architecture Manual\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -236,8 +236,12 @@ Async-Signal-Safe.
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(2), \fBgetcontext\fR(2), \fBsigaction\fR(2), \fBdladdr\fR(3C),
-\fBsiginfo.h\fR(3HEAD), \fBattributes\fR(5)
+.BR Intro (2),
+.BR getcontext (2),
+.BR sigaction (2),
+.BR dladdr (3C),
+.BR siginfo.h (3HEAD),
+.BR attributes (7)
 .sp
 .LP
 Weaver, David L. and Tom Germond, eds. \fIThe SPARC Architecture Manual\fR,

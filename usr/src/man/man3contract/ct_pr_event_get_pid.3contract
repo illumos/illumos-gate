@@ -231,7 +231,7 @@ for (;;) {
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -247,6 +247,11 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBct_event_free\fR(3CONTRACT), \fBct_event_read\fR(3CONTRACT),
-\fBct_event_read_critical\fR(3CONTRACT), \fBlibcontract\fR(3LIB),
-\fBcontract\fR(4), \fBprocess\fR(4), \fBattributes\fR(5), \fBlfcompile\fR(5)
+.BR ct_event_free (3CONTRACT),
+.BR ct_event_read (3CONTRACT),
+.BR ct_event_read_critical (3CONTRACT),
+.BR libcontract (3LIB),
+.BR contract (5),
+.BR process (5),
+.BR attributes (7),
+.BR lfcompile (7)

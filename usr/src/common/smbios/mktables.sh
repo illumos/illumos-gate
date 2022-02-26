@@ -31,7 +31,7 @@
 #
 # The SMBIOS interfaces defined in <sys/smbios.h> include a set of integer-to-
 # string conversion routines for the various constants defined in the SMBIOS
-# spec.  These functions are used by smbios(1M) and prtdiag(1M) and can be
+# spec.  These functions are used by smbios(8) and prtdiag(8) and can be
 # leveraged by other clients as well.  To simplify maintenance of the source
 # base, this shell script automatically generates the source code for all of
 # these functions from the <sys/smbios.h> header file and its comments.  Each

@@ -27,7 +27,7 @@ The external variable \fBcur_term\fR to identifies the record in the
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -45,5 +45,8 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibcurses\fR(3XCURSES), \fBset_curterm\fR(3XCURSES),
-\fBtigetflag\fR(3XCURSES), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR libcurses (3XCURSES),
+.BR set_curterm (3XCURSES),
+.BR tigetflag (3XCURSES),
+.BR attributes (7),
+.BR standards (7)

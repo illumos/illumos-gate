@@ -176,7 +176,7 @@ be set by the \fBTLI\fR interface are:
 \fBTOUTSTATE\fR
 .in -2
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -190,5 +190,7 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBt_getinfo\fR(3NSL), \fBt_open\fR(3NSL), \fBt_sndrel\fR(3NSL),
-\fBattributes\fR(5)
+.BR t_getinfo (3NSL),
+.BR t_open (3NSL),
+.BR t_sndrel (3NSL),
+.BR attributes (7)

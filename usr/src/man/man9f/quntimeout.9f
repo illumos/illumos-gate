@@ -54,8 +54,10 @@ Otherwise, \fBquntimeout()\fR returns a \fB0\fR or positive value.
 The \fBquntimeout()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-\fBmt-streams\fR(9F), \fBqbufcall\fR(9F), \fBqtimeout\fR(9F),
-\fBqunbufcall\fR(9F)
+.BR mt-streams (9F),
+.BR qbufcall (9F),
+.BR qtimeout (9F),
+.BR qunbufcall (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -101,7 +101,7 @@ argument. If \fIflags\fR includes \fBSCF_TMPL_VALIDATE_FLAG_CURRENT\fR, the
 .LP
 By default, these functions also explore template data defined by the service
 or instance itself, the service's restarter, and global template data. See
-\fBsmf_template\fR(5) for more information about this composition.
+\fBsmf_template\fR(7) for more information about this composition.
 .sp
 .LP
 An instance FMRI is required, and FMRIs that specify other entities (for
@@ -426,7 +426,7 @@ FMRI of the source of the template that was violated. This string is freed by
 .LP
 The \fBscf_tmpl_error_pg_tmpl()\fR function retrieves strings with the name and
 type of the property group template that was violated. If the property group
-name or type was implicitly wildcarded (see \fBsmf_template\fR(5)) in the
+name or type was implicitly wildcarded (see \fBsmf_template\fR(7)) in the
 template, this function returns a string containing \fBSCF_TMPL_WILDCARD\fR
 ("*"). These strings are freed by \fBscf_tmpl_errors_destroy()\fR.
 .sp
@@ -438,7 +438,7 @@ of the property group that was violated. These strings are freed by
 .LP
 The \fBscf_tmpl_error_prop_tmpl()\fR function retrieves strings with the name
 and type of the property template that was violated. If the property type was
-implicitly wildcarded (see \fBsmf_template\fR(5)) in the template, this
+implicitly wildcarded (see \fBsmf_template\fR(7)) in the template, this
 function returns a string containing \fBSCF_TMPL_WILDCARD\fR ("*"). These
 strings are freed by \fBscf_tmpl_errors_destroy()\fR.
 .sp
@@ -489,7 +489,7 @@ The \fBscf_tmpl_validate_fmri()\fR function will fail if:
 .ad
 .sp .6
 .RS 4n
-The storage mechanism that the repository server (\fBsvc.configd\fR(1M)) chose
+The storage mechanism that the repository server (\fBsvc.configd\fR(8)) chose
 for the operation denied access.
 .RE
 
@@ -639,7 +639,7 @@ supplied.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -657,5 +657,7 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBsvc.configd\fR(1M), \fBscf_tmpl_value_in_constraint\fR(3SCF),
-\fBattributes\fR(5), \fBsmf_template\fR(5)
+.BR scf_tmpl_value_in_constraint (3SCF),
+.BR attributes (7),
+.BR smf_template (7),
+.BR svc.configd (8)

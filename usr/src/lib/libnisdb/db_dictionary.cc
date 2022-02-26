@@ -699,7 +699,7 @@ db_dictionary::change_table_name(db_table_desc *clone, char *tok, char *repl)
 	while (clone) {
 		/*
 		 * Special case for a tok="". This is used for the
-		 * nisrestore(1M), when restoring a replica in another
+		 * nisrestore(8), when restoring a replica in another
 		 * domain. This routine is used to change the datafile
 		 * names in the data.dict (see bugid #4031273). This will not
 		 * effect massage_dict(), since it never generates an empty

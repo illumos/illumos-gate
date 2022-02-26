@@ -45,9 +45,9 @@ $(i386_ONLY)dir path=kernel/misc group=sys
 $(i386_ONLY)dir path=kernel/misc/$(ARCH64) group=sys
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/sda group=sys mode=0755
 $(i386_ONLY)dir path=usr/share/man
-$(i386_ONLY)dir path=usr/share/man/man7d
-$(i386_ONLY)file path=usr/share/man/man7d/sda.7d
-$(i386_ONLY)file path=usr/share/man/man7d/sdhost.7d
+$(i386_ONLY)dir path=usr/share/man/man4d
+$(i386_ONLY)file path=usr/share/man/man4d/sda.4d
+$(i386_ONLY)file path=usr/share/man/man4d/sdhost.4d
 $(i386_ONLY)driver name=sdhost perms="* 0644 root root" \
     alias=pciclass,080500 \
     alias=pciclass,080501

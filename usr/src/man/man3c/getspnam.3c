@@ -58,7 +58,7 @@ fgetspent_r \- get password entry
 .LP
 These functions are used to obtain shadow password entries.  An entry may come
 from any of the sources for \fBshadow\fR specified in the
-\fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(4)).
+\fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(5)).
 .sp
 .LP
 The \fBgetspnam()\fR function searches for a shadow password entry with the
@@ -89,7 +89,7 @@ call more shadow password functions after calling \fBendspent()\fR.
 The \fBfgetspent()\fR function, unlike the other functions above, does not use
 \fBnsswitch.conf\fR; it reads and parses the next line from the stream
 \fIfp\fR, which is assumed to have the format of the \fBshadow\fR file (see
-\fBshadow\fR(4)).
+\fBshadow\fR(5)).
 .SS "Reentrant Interfaces"
 .LP
 The  \fBgetspnam()\fR, \fBgetspent()\fR, and \fBfgetspent()\fR functions use
@@ -154,7 +154,7 @@ Password entries are represented by the \fBstruct spwd\fR structure defined in
 
 .sp
 .LP
-See \fBshadow\fR(4) for more information on the interpretation of this data.
+See \fBshadow\fR(5) for more information on the interpretation of this data.
 .sp
 .LP
 The  \fBgetspnam()\fRand \fBgetspnam_r()\fR functions each return a pointer to
@@ -185,7 +185,7 @@ result.  See \fBIntro\fR(2) for the proper usage and interpretation of
 \fBerrno\fR in multithreaded applications.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -202,9 +202,15 @@ T}
 
 .SH SEE ALSO
 .LP
-\fBpasswd\fR(1), \fByppasswd\fR(1), \fBIntro\fR(3),
-\fBgetlogin\fR(3C), \fBgetpwnam\fR(3C), \fBnsswitch.conf\fR(4),
-\fBpasswd\fR(4), \fBshadow\fR(4), \fBattributes\fR(5)
+.BR passwd (1),
+.BR yppasswd (1),
+.BR Intro (3),
+.BR getlogin (3C),
+.BR getpwnam (3C),
+.BR nsswitch.conf (5),
+.BR passwd (5),
+.BR shadow (5),
+.BR attributes (7)
 .SH WARNINGS
 .LP
 The reentrant interfaces \fBgetspnam_r()\fR, \fBgetspent_r()\fR, and
@@ -221,7 +227,7 @@ Use of the enumeration interfaces \fBgetspent()\fR and \fBgetspent_r()\fR is
 not recommended; enumeration is supported for the shadow file and \fBNIS\fR
 but in general is not efficient and may not be supported for all
 database sources.  The semantics of enumeration are discussed further in
-\fBnsswitch.conf\fR(4).
+\fBnsswitch.conf\fR(5).
 .sp
 .LP
 Access to shadow password information may be restricted in a manner depending

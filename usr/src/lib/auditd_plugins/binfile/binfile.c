@@ -333,7 +333,7 @@ loadauditlist(char *dirstr, char *minfreestr)
 	}
 	if (rc == -2) {
 		(void) pthread_mutex_lock(&log_mutex);
-		DPRINT((dbfp, "loadauditlist:  close / open audit.log(4)\n"));
+		DPRINT((dbfp, "loadauditlist:  close / open audit.log(5)\n"));
 		if (open_log(listhead) == 0) {
 			openNewFile = 1;	/* try again later */
 		} else {
@@ -934,7 +934,7 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 
 /*
  * It may be called multiple times as auditd handles SIGHUP and SIGUSR1
- * corresponding to the audit(1M) flags -s and -n
+ * corresponding to the audit(8) flags -s and -n
  *
  * kvlist is NULL only if auditd caught a SIGUSR1 (audit -n), so after the first
  * time open is called; the reason is -s if kvlist != NULL and -n otherwise.

@@ -2272,7 +2272,7 @@ restarter_contracts_event_thread(void *unused)
 		startd_close(sfd);
 
 		/*
-		 * svc.configd(1M) restart handling performed by the
+		 * svc.configd(8) restart handling performed by the
 		 * fork_configd_thread.  We don't acknowledge, as that thread
 		 * will do so.
 		 */

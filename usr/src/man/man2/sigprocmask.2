@@ -41,7 +41,7 @@ call to \fBsigprocmask()\fR returns.
 It is not possible to block signals that cannot be caught or ignored (see
 \fBsigaction\fR(2)). It is also not possible to block or unblock SIGCANCEL, as
 SIGCANCEL is reserved for the implementation of POSIX thread cancellation (see
-\fBpthread_cancel\fR(3C) and \fBcancellation\fR(5)). This restriction is
+\fBpthread_cancel\fR(3C) and \fBcancellation\fR(7)). This restriction is
 silently enforced by the standard C library.
 .sp
 .LP
@@ -76,7 +76,7 @@ The \fIset\fR or \fIoset\fR argument points to an illegal address.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -93,9 +93,14 @@ MT-Level	Async-Signal-Safe
 
 .SH SEE ALSO
 .LP
-\fBsigaction\fR(2), \fBpthread_cancel\fR(3C), \fBpthread_sigmask\fR(3C),
-\fBsignal\fR(3C), \fBsignal.h\fR(3HEAD), \fBsigsetops\fR(3C),
-\fBattributes\fR(5), \fBcancellation\fR(5)
+.BR sigaction (2),
+.BR pthread_cancel (3C),
+.BR pthread_sigmask (3C),
+.BR signal (3C),
+.BR sigsetops (3C),
+.BR signal.h (3HEAD),
+.BR attributes (7),
+.BR cancellation (7)
 .SH NOTES
 .LP
 The call to \fBsigprocmask()\fR affects only the calling thread's signal mask.

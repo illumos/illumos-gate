@@ -320,7 +320,7 @@ example% \fB/usr/ucb/echo -n "$USER's current directory is $PWD"\fR
 
 .SH ENVIRONMENT VARIABLES
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBecho\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 
@@ -347,7 +347,7 @@ An error occurred.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -361,14 +361,21 @@ CSI	Enabled
 _
 Interface Stability	Committed
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .LP
-\fBksh93\fR(1), \fBprintf\fR(1), \fBshell_builtins\fR(1), \fBtr\fR(1),
-\fBwc\fR(1), \fBecho\fR(1B), \fBascii\fR(5), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBstandards\fR(5)
+.BR ksh93 (1),
+.BR printf (1),
+.BR shell_builtins (1),
+.BR tr (1),
+.BR wc (1),
+.BR echo (1B),
+.BR ascii (7),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)
 .SH NOTES
 .LP
 When representing an 8-bit character by using the escape convention
@@ -403,4 +410,4 @@ the three digits "033" rather than just the two digits "33" after the
 
 .sp
 .LP
-For the octal equivalents of each character, see \fBascii\fR(5).
+For the octal equivalents of each character, see \fBascii\fR(7).

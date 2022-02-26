@@ -1204,7 +1204,7 @@ mac_link_flow_init(mac_client_handle_t mch, flow_entry_t *sub_flow)
 
 /*
  * mac_link_flow_add()
- * Used by flowadm(1m) or kernel mac clients for creating flows.
+ * Used by flowadm(8) or kernel mac clients for creating flows.
  */
 int
 mac_link_flow_add(datalink_id_t linkid, char *flow_name,
@@ -1344,7 +1344,7 @@ mac_link_flow_clean(mac_client_handle_t mch, flow_entry_t *sub_flow)
 
 	/*
 	 * Delete the SRSs associated with this subflow. If this is being
-	 * driven by flowadm(1M) then the subflow will be deleted by
+	 * driven by flowadm(8) then the subflow will be deleted by
 	 * dls_rem_flow. However if this is a result of the interface being
 	 * unplumbed then the subflow itself won't be deleted.
 	 */
@@ -1370,7 +1370,7 @@ mac_link_flow_clean(mac_client_handle_t mch, flow_entry_t *sub_flow)
 
 /*
  * mac_link_flow_remove()
- * Used by flowadm(1m) or kernel mac clients for removing flows.
+ * Used by flowadm(8) or kernel mac clients for removing flows.
  */
 int
 mac_link_flow_remove(char *flow_name)

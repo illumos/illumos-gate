@@ -97,7 +97,7 @@ n
 s/'//g
 p
 }
-/from the inetd.conf(4) format line/{
+/from the inetd.conf(5) format line/{
 n
 p
 }

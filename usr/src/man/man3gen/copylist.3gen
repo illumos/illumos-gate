@@ -31,7 +31,7 @@ Otherwise it returns NULL if it has trouble finding the file, calling
 .sp
 .LP
 The \fBcopylist()\fR function has a transitional interface for 64-bit file
-offsets. See \fBlf64\fR(5).
+offsets. See \fBlf64\fR(7).
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRExample of \fBcopylist()\fR function.
@@ -59,7 +59,7 @@ if (buf) {
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -75,7 +75,9 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBmalloc\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5)
+.BR malloc (3C),
+.BR attributes (7),
+.BR lf64 (7)
 .SH NOTES
 .sp
 .LP

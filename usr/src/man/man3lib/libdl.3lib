@@ -63,7 +63,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -79,5 +79,8 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBld.so.1\fR(1), \fBpvs\fR(1), \fBIntro\fR(3), \fBlibc\fR(3LIB),
-\fBattributes\fR(5)
+.BR ld.so.1 (1),
+.BR pvs (1),
+.BR Intro (3),
+.BR libc (3LIB),
+.BR attributes (7)

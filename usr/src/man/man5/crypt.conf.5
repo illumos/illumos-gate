@@ -1,0 +1,107 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH CRYPT.CONF 5 "December 28, 2020"
+.SH NAME
+crypt.conf \- configuration file for pluggable crypt modules
+.SH SYNOPSIS
+.nf
+/etc/security/crypt.conf
+.fi
+
+.SH DESCRIPTION
+\fBcrypt.conf\fR is the configuration file for the pluggable crypt
+architecture.  Each crypt module must provide a function to generate a password
+hash, \fBcrypt_genhash_impl\fR(3C), and a function to generate the salt,
+\fBcrypt_gensalt_impl\fR(3C).
+.sp
+.LP
+There must be at least one entry in \fBcrypt.conf\fR with the same name as is
+stored in the \fBcrypt_algorithm_magic\fR symbol of the module. The
+documentation provided with the module should list this name.
+.sp
+.LP
+The \fBmodule_path\fR field specifies the path name to a shared library object
+that implements \fBcrypt_genhash_impl()\fR, \fBcrypt_gensalt_impl()\fR, and
+\fBcrypt_algorithm_magic\fR.  If the path name is not absolute, it is assumed
+to be relative to \fB/usr/lib/security/$ISA\fR.  If the path name contains the
+\fB$ISA\fR token, the token is replaced by an implementation-defined directory
+name that defines the path relative to the calling program's instruction set
+architecture.
+.sp
+.LP
+The \fBparams\fR field is used to pass module-specific options to the shared
+objects. See \fBcrypt_genhash_impl\fR(3C) and \fBcrypt_gensalt_impl\fR(3C).  It
+is the responsibility of the module to parse and interpret the options.  The
+\fBparams\fR field can be used by the modules to turn on debugging or to pass
+any module-specific parameters that control the output of the hashing
+algorithm.
+.SH EXAMPLES
+\fBExample 1 \fRProvide compatibility for md5crypt-generated passwords.
+.sp
+.LP
+The default configuration preserves previous Solaris behavior while adding
+compatibility for md5crypt-generated passwords as provided on some BSD and
+Linux systems.
+
+.sp
+.in +2
+.nf
+#
+# crypt.conf
+#
+1 /usr/lib/security/$ISA/crypt_bsdmd5.so
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRUse md5crypt to demonstrate compatibility with BSD- and
+Linux-based systems.
+.sp
+.LP
+The following example lists 4 algorithms and demonstrates how compatibility
+with BSD- and Linux-based systems using md5crypt is made available, using the
+algorithm names 1 and 2.
+
+.sp
+.in +2
+.nf
+#
+# crypt.conf
+#
+md5 /usr/lib/security/$ISA/crypt_md5.so
+rot13 /usr/lib/security/$ISA/crypt_rot13.so
+
+# For *BSD/Linux compatibility
+# 1 is md5,  2 is Blowfish
+1 /usr/lib/security/$ISA/crypt_bsdmd5.so
+2 /usr/lib/security/$ISA/crypt_bsdbf.so
+.fi
+.in -2
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.BR passwd (1),
+.BR crypt (3C),
+.BR crypt_genhash_impl (3C),
+.BR crypt_gensalt (3C),
+.BR crypt_gensalt_impl (3C),
+.BR getpassphrase (3C),
+.BR passwd (5),
+.BR attributes (7),
+.BR crypt_unix (7)

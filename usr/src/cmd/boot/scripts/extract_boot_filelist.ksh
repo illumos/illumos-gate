@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # set path, but inherit /tmp/bfubin if it is sane
@@ -35,9 +34,9 @@ else
 fi
 
 usage() {
-	echo "This utility is a component of the bootadm(1M) implementation"
+	echo "This utility is a component of the bootadm(8) implementation"
 	echo "and it is not recommended for stand-alone use."
-	echo "Please use bootadm(1M) instead."
+	echo "Please use bootadm(8) instead."
 	echo ""
 	echo "Usage: ${0##*/}: [-R <root>] [-p <platform>] <filelist> ..."
 	echo "where <platform> is one of i86pc, sun4u or sun4v"

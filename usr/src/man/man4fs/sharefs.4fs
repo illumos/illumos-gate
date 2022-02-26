@@ -1,0 +1,61 @@
+.\"
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" Copyright 2020 Joyent, Inc.
+.\" Copyright 2021 Oxide Computer Company
+.Dd February 4, 2020
+.Dt SHAREFS 4FS
+.Os
+.Sh NAME
+.Nm sharefs
+.Nd Kernel sharetab filesystem
+.Sh DESCRIPTION
+The
+.Nm
+filesystem describes the state of all shares currently loaded by the kernel, and
+shared by the invoking zone.
+It is mounted during boot time as a read-only file at
+.Pa /etc/dfs/sharetab .
+.Pp
+Filesystem contents are dynamic and reflect the current set of shares in the
+zone.
+File contents are described in
+.Xr sharetab 5 .
+.Pp
+File contents can be modified as a result of
+.Xr share 8 ,
+.Xr sharectl 8 ,
+.Xr sharemgr 8 ,
+and changing properties of a
+.Xr zfs 8
+data set.
+.Pp
+The module may not be unloaded dynamically by the kernel.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /etc/dfs/sharetab
+System record of shared file systems.
+.El
+.Sh SEE ALSO
+.Xr sharetab 5 ,
+.Xr zones 7 ,
+.Xr share 8 ,
+.Xr sharectl 8 ,
+.Xr sharemgr 8 ,
+.Xr zfs 8

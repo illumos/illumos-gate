@@ -131,7 +131,7 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	/* must be only running version of add_drv/mod_drv/rem_drv */
+	/* must be only running version of add_drv/update_drv/rem_drv */
 	enter_lock();
 
 	if ((check_perms_aliases(1, 1)) == ERROR)

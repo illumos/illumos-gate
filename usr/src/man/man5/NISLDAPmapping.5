@@ -1,0 +1,1497 @@
+'\" te
+.\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH NISLDAPMAPPING 5 "November 22, 2021"
+.SH NAME
+NISLDAPmapping \- mapping file used by the NIS server components
+.SH SYNOPSIS
+.nf
+\fB/var/yp/NISLDAPmapping\fR
+.fi
+
+.SH DESCRIPTION
+The \fBNISLDAPmapping\fR file specifies the mapping between NIS map entries and
+equivalent Directory Information Tree (DIT) entries.
+.sp
+.LP
+The presence of \fB/var/yp/NISLDAPmapping\fR on a NIS master server causes that
+server to obtain NIS data from LDAP. See \fBypserv\fR(5). If
+\fB/var/yp/NISLDAPmapping\fR is present but the connection configuration file
+that is defined in \fB/etc/default/ypserv\fR cannot be found, a warning is
+logged. See \fBypserv\fR(8).
+.sp
+.LP
+NIS slave servers always obtain their data from a NIS master server, whether or
+not that server is getting data from LDAP, and ignore the
+\fB/var/yp/NISLDAPmapping\fR file.
+.sp
+.LP
+A simple \fBNISLDAPmapping\fR file is created using \fBinityp2l\fR(8). You can
+customize your \fBNISLDAPmapping\fR file as you require.
+.sp
+.LP
+Each attribute defined below can be specified
+in \fB/var/yp/NISLDAPmapping\fR or as an LDAP attribute. If both are
+specified, then the attribute in \fB/var/yp/NISLDAPmapping\fR (including empty
+values) takes precedence.
+.sp
+.LP
+A continuation is indicated by a '\e' (backslash) in the last position,
+immediately before the newline of a line. Characters are escaped, that is,
+exempted from special interpretation, when preceded by a backslash character.
+.sp
+.LP
+The '#' (hash) character starts a comment. White space is either ASCII space or
+a horizontal tab. In general, lines consist of optional white space, an
+attribute name, at least one white space character, and an attribute value.
+.SH EXTENDED DESCRIPTION
+.SS "File Syntax"
+Repeated fields, with separator characters, are described by the following
+syntax:
+.sp
+.ne 2
+.na
+\fBOne or more entries\fR
+.ad
+.RS 24n
+entry:entry:entry
+.sp
+.in +2
+.nf
+entry[":"...]
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBZero or more entries\fR
+.ad
+.RS 24n
+.sp
+.in +2
+.nf
+[entry":"...]
+.fi
+.in -2
+
+.RE
+
+.SS "Attributes"
+Attributes generally apply to one more more NIS maps. Map names can be
+specified either on their own, that is in \fBpasswd.byname\fR, in which case
+they apply to all domains, or for individual NIS domains, for example, in
+\fBpasswd.byname,example.sun.uk\fR. Where a map is mentioned in more than one
+attribute, both versions are applied. If any parts of the attributes are in
+conflict, the domain specific version takes precedence over the non-domain
+specific version.
+.sp
+.LP
+Each domain specific attributes must appear in \fBNISLDAPmapping\fR before any
+related non-domain specific attribute. If non-domain specific attributes appear
+first, behavior may be unpredictable. Errors are logged when non-domain
+specific attributes are found first.
+.sp
+.LP
+You can associate a group of map names with a \fBdatabaseId\fR. In effect, a
+macro is expanded to the group of names. Use this mechanism where the same
+group of names is used in many attributes or where domain specific map names
+are used. Then, you can make any changes to the domain name in one place.
+.sp
+.LP
+Unless otherwise noted, all elements of the syntaxes below may be surrounded by
+white space. Separator characters and white space must be escaped if they are
+part of syntactic elements.
+.sp
+.LP
+The following attributes are recognized.
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPdomainContext\fR\fR
+.ad
+.sp .6
+.RS 4n
+The context to use for a NIS domain.
+.sp
+The syntax for \fBnisLDAPdomainContext\fR is:
+.sp
+.in +2
+.nf
+NISDomainName ":" context
+.fi
+.in -2
+
+The following is an example of the \fBnisLDAPdomainContext\fR attribute:
+.sp
+.in +2
+.nf
+domain.one : dc=site, dc=example, dc=com
+.fi
+.in -2
+
+The mapping file should define the context for each domain before any other
+attribute makes use of the \fBNISDomainName\fR specified for that domain.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPyppasswddDomains\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists the domains for which password changes should be made. NIS password
+change requests do not specify the domains in which any given password should
+be changed. In traditional NIS this information is effectively hard coded in
+the NIS makefile.
+.sp
+The syntax for the \fBnisLDAPyppasswddDomains\fR attribute is:
+.sp
+.in +2
+.nf
+domainname
+.fi
+.in -2
+
+If there are multiple domains, use multiple \fBnisLDAPyppasswddDomain\fR
+entries with one domainname per entry.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPdatabaseIdMapping\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets up an alias for a group of NIS map names. There is no default value.
+.sp
+The syntax for the \fBnisLDAPdatabaseIdMapping\fR attribute is:
+.sp
+.in +2
+.nf
+databaseId ":" ["["indexlist"]"] mapname[" "...]
+.fi
+.in -2
+
+where
+.sp
+.in +2
+.nf
+databaseId      = Label identifying a (subset of a) NIS
+                  object for mapping purposes.
+indexlist       = fieldspec[","...]
+fieldspec       = fieldname "=" fieldvalue
+fieldname       = The name of a entry field as defined in
+                  nisLDAPnameFields.
+fieldvalue      = fieldvaluestring | \e" fieldvaluestring \e"
+.fi
+.in -2
+
+\fBindexlist\fR is used for those cases where it is necessary to select a
+subset of entries from a NIS map. The subset are those NIS entries that match
+the \fBindexlist\fR. If there are multiple specifications indexed for a
+particular NIS map, they are tried in the order retrieved until one matches.
+Note that retrieval order usually is unspecified for multi-valued LDAP
+attributes. Hence, if using indexed specifications when
+\fBnisLDAPdatabaseIdMapping\fR is retrieved from LDAP, make sure that the
+subset match is unambiguous.
+.sp
+If the \fBfieldvaluestring\fR contains white space or commas, it must either be
+surrounded by double quotes, or the special characters must be escaped.
+Wildcards are allowed in the \fBfieldvaluestring\fR. See Wildcards.
+.sp
+To associate the \fBpasswd.byname\fR and \fBpasswd.byuid\fR maps with the
+\fBpasswd databaseId\fR:
+.sp
+.in +2
+.nf
+passwd:passwd.byname passwd.byuid
+.fi
+.in -2
+
+The \fBpasswd\fR and \fBpasswd.adjunct\fR \fBdatabaseIds\fR receive special
+handling. In addition to its normal usage, \fBpasswd\fR defines which maps
+\fByppasswdd\fR is to update when a \fBpasswd\fR is changed. In addition to its
+normal usage \fBpasswd.adjunct\fR defines which maps \fByppasswdd\fR is to
+update when an adjunct \fBpasswd\fR is changed.
+.sp
+You may not alias a single map name to a different name, as the results are
+unpredictable.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPentryTtl\fR\fR
+.ad
+.sp .6
+.RS 4n
+Establish TTLs for NIS entries derived from LDAP.
+.sp
+The syntax for the \fBnisLDAPentryTtl\fR attribute is:
+.sp
+.in +2
+.nf
+mapName[" "...]":"
+        initialTTLlo ":" initialTTLhi ":" runningTTL
+.fi
+.in -2
+
+where
+.sp
+.ne 2
+.na
+\fB\fBinitialTTLlo\fR\fR
+.ad
+.RS 16n
+The lower limit for the initial \fBTTL\fR (in seconds) for data read from LDAP
+when the \fBypserv\fR starts. If the \fBinitialTTLhi\fR also is specified, the
+actual \fBinitialTTL\fR will be randomly selected from the interval
+\fBinitialTTLlo\fR to \fBinitialTTLhi\fR, inclusive. Leaving the field empty
+yields the default value of 1800 seconds.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinitialTTLhi\fR\fR
+.ad
+.RS 16n
+The upper limit for the initial TTL. If left empty, defaults to 5400 seconds.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrunningTTL\fR\fR
+.ad
+.RS 16n
+The TTL (in seconds) for data retrieved from LDAP while the ypserv is running.
+Leave the field empty to obtain the default value of 3600 seconds.
+.RE
+
+If there is no specification of \fBTTL\fRs for a particular map, the default
+values are used.
+.sp
+If the \fBinitialTTLlo\fR and \fBinitialTTLhi\fR have the same value, the
+effect will be that all data known to the \fBypserv\fR at startup times out at
+the same time. Depending on NIS data lookup patterns, this could cause spikes
+in ypserv-to-LDAP traffic. In order to avoid that, you can specify different
+\fBinitialTTLlo\fR and \fBinitialTTLhi\fR values, and obtain a spread in
+initial TTLs.
+.sp
+The following is an example of the \fBnisLDAPentryTtl\fR attribute used to
+specify that entries in the NIS host maps read from LDAP should be valid for
+four hours. When \fBypserv\fR restarts, the disk database entries are valid for
+between two and three hours.
+.sp
+.in +2
+.nf
+hosts.byname hosts.byaddr:7200:10800:14400
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPobjectDN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the connection between a group of NIS maps and the LDAP directory.
+This attribute also defines the 'order' of the NIS maps. When NIS maps are bulk
+copied to or from the DIT, they are processed in the same order as related
+\fBnisLDAPobjectDN\fR attributes appear in \fB/var/yp/NISLDAPmapping.\fR
+.sp
+The syntax for the \fBnisLDAPobjectDN\fR\ attribute is:
+.sp
+.in +2
+.nf
+mapName[" "...] ":" objectDN *( ";" objectDN )
+.fi
+.in -2
+
+where
+.sp
+.in +2
+.nf
+objectDN            = readObjectSpec [":"[writeObjectSpec]]
+readObjectSpec      = [baseAndScope [filterAttrValList]]
+writeObjectSpec     = [baseAndScope [attrValList]]
+baseAndScope        = [baseDN] ["?" [scope]]
+filterAttrValList   = ["?" [filter | attrValList]]]
+scope               = "base" | "one" | "sub"
+attrValList         = attribute "=" value
+                            *("," attribute "=" value)
+.fi
+.in -2
+
+The \fBbaseDN\fR defaults to the value of the \fBnisLDAPdomainContext\fR
+attribute for the accessed domain. If the \fBbaseDN\fR ends in a comma, the
+\fBnisLDAPdomainContext\fR value is appended.
+.sp
+\fBscope\fR defaults to one. \fBscope\fR has no meaning and is ignored in a
+\fBwriteObjectSpec\fR.
+.sp
+The \fBfilter\fR is an LDAP search filter and has no default value.
+.sp
+The \fBattrValList\fR is a list of attribute and value pairs. There is no
+default value.
+.sp
+As a convenience, if an \fBattrValList\fR is specified in a
+\fBreadObjectSpec\fR, it is converted to a search filter by ANDing together the
+attributes and the values. For example, the attribute and value list:
+.sp
+.in +2
+.nf
+objectClass=posixAccount,objectClass=shadowAccount
+.fi
+.in -2
+
+is converted to the filter:
+.sp
+.in +2
+.nf
+(&(objectClass=posixAccount)\e
+        (objectClass=shadowAccount))
+.fi
+.in -2
+
+Map entries are mapped by means of the relevant mapping rules in the
+\fBnisLDAPnameFields\fR and \fBnisLDAPattributeFromField\fR .
+.sp
+If a \fBwriteObjectSpec\fR is omitted, the effect is one of the following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If there is no trailing colon after the \fBreadObjectSpec\fR, then there is no
+write at all.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If there is a colon after the \fBreadObjectSpec\fR, then \fBwriteObjectSpec\fR
+equals \fBreadObjectSpec\fR.
+.RE
+The following is an example of a \fBnisLDAPobjectDN\fR attribute declaration
+that gets the \fBhosts.byaddr\fR map entries from the \fBou=Hosts\fR container
+under the default search base and writes to the same place.
+.sp
+.in +2
+.nf
+hosts.byaddr:ou=Hosts,?one?objectClass=ipHost:
+.fi
+.in -2
+
+The following is an example of a \fBnisLDAPobjectDN\fR attribute declaration
+that obtains \fBpasswd\fR map entries from the \fBou=People\fR containers under
+the default search base, and also from \fBdc=another,dc=domain\fR.
+.sp
+.in +2
+.nf
+passwd:ou=People,?one?\e
+                objectClass=shadowAccount,\e
+                objectClass=posixAccount:;\e
+       ou=People,dc=another,dc=domain,?one?\e
+                objectClass=shadowAccount,\e
+                objectClass=posixAccount
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPnameFields\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the content of entries in a NIS map and how they should be broken
+into named fields. \fBnisLDAPnameFields\fR is required because NIS
+maps do not store information in named fields.
+.sp
+The syntax for the \fBnisLDAPnameFields\fR attribute is as follows:
+.sp
+.in +2
+.nf
+"nisLDAPnameFields" mapName ":" "(" matchspec "," fieldNames ")"
+fieldName       = nameOrArrayName[","...]
+nameOrArrayName = Name of field or 'array' of repeated fields.
+matchspec       = \e" formatString \e"
+.fi
+.in -2
+
+\fBformatString\fR may contain a list of \fB%s\fR and \fB%a\fR elements each
+of which represents a single named field or a list of repeated fields. A
+\fB%a\fR field is interpreted as an IPv4 address or an IPv6 address in
+preferred format. If an IPv6 address in non preferred format is found, then it
+is converted and a warning is logged.
+.sp
+Where there are a list of repeated fields, the entire list is stored as one
+entry. The fields are broken up into individual entries, based on the internal
+separator, at a latter stage. Other characters represent separators which must
+be present. Any separator, including whitespace, specified by the
+\fBformatString\fR, may be surrounded by a number of whitespace and tab
+characters. The whitespace and tab characters are ignored.
+.sp
+Regardless of the content of this entry some \fBfieldNames\fR are reserved:
+.sp
+.ne 2
+.na
+\fB\fBrf_key\fR\fR
+.ad
+.RS 18n
+The DBM key value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrf_ipkey\fR\fR
+.ad
+.RS 18n
+The DBM key value handled as an IP address. See the discussion of \fB%a\fR
+fields.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrf_comment\fR\fR
+.ad
+.RS 18n
+Everything following the first occurrence of a symbol. \fBrf_comment\fR is
+defined by \fBnisLDAPcommentChar\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrf_domain\fR\fR
+.ad
+.RS 18n
+The name of the domain in which the current NIS operation is being carried out.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrf_searchipkey\fR\fR
+.ad
+.RS 18n
+The \fBrf_searchkey\fR value handled as an IP address. See the discussion of
+\fB%a\fR fields above.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrf_searchkey\fR\fR
+.ad
+.RS 18n
+See the description under \fBnisLDAPattributeFromField\fR below.
+.RE
+
+For example, the \fBrpc.bynumber\fR map has the format:
+.sp
+.in +2
+.nf
+name number alias[" "...]
+.fi
+.in -2
+
+The NIS to LDAP system is instructed to break it into a name, a number, and an
+array of alias field by the following entry in the mapping file:
+.sp
+.in +2
+.nf
+nisLDAPnameFields rpc.bynumber : \e
+        "%s %s %s", name,number,aliases)
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPsplitFields\fR\fR
+.ad
+.sp .6
+.RS 4n
+Defines how a field, or list of fields, named by \fBnisLDAPnameFields\fR is
+split into subfields. The original field is compared with each line of this
+attribute until one matches. When a match is found named subfields are
+generated. In latter operations subfield names can be used in the same way as
+other field names.
+.sp
+The syntax for the \fBnisLDAPsplitFields\fR attribute is as follows:
+.sp
+.in +2
+.nf
+"nisLDAPsplitFields" fieldName ":" splitSpec[","...]
+splitSpec       = "(" matchspec "," subFieldNames ")"
+fieldName       = Name of a field from nisLDAPnameFields
+subFieldNames   = subFieldname[","...]
+matchspec       = \e" formatString \e"
+.fi
+.in -2
+
+The netgroup \fBmemberTriples\fR can have format \fB(host, user, domain)\fR or
+\fBgroupname\fR. The format is specified by the attribute:
+.sp
+.in +2
+.nf
+nisLDAPsplitField memberTriple: \e
+      ("(%s,%s,%s)", host, user, domain) , \e
+      ("%s", group)
+.fi
+.in -2
+
+Later operations can then use field names \fBhost\fR, \fBuser\fR, \fBdomain\fR,
+\fBgroup\fR or \fBmemberTriple\fR. Because lines are processed in order, if
+\fBhost\fR, \fBuser\fR and \fBdomain\fR are found, \fBgroup\fR will not be
+generated.
+.sp
+Several maps and databaseIds may contain fields that are to be split in the
+same way. As a consequence, the names of fields to be split must be unique
+across all maps and databaseIds.
+.sp
+Only one level of splitting is supported. That is, a subfield cannot be split
+into further subfields.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPrepeatedFieldSeparators\fR\fR
+.ad
+.sp .6
+.RS 4n
+Where there is a list of repeated, splittable fields,
+\fBnisLDAPrepeatedFieldSeparators\fR specifies which characters separate
+instances of the splittable field.
+.sp
+The syntax for the \fBnisLDAPrepeatedFieldSeparators\fR attribute is as
+follows:
+.sp
+.in +2
+.nf
+"nisLDAPrepeatedFieldSeparators" fieldName \e"sepChar[...]\e"
+sepChar = A separator character.
+.fi
+.in -2
+
+The default value is space or tab. If repeated splittable fields are adjacent,
+that is, there is no separating character, then the following should be
+specified:
+.sp
+.in +2
+.nf
+nisLDAPrepeatedFieldSeparators netIdEntry: ""
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPcommentChar\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies which character represents the start of the special comment field in
+a given NIS map. If this attribute is not present then the default comment
+character \fB#\fR is used.
+.sp
+To specify that a map uses an asterisk to mark the start of comments.
+.sp
+.in +2
+.nf
+nisLDAPcommentChar mapname : '*'
+.fi
+.in -2
+
+If a map cannot contain comments, then the following attribute should be
+specified.
+.sp
+.in +2
+.nf
+nisLDAPcommentChar mapname : ''
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPmapFlags\fR\fR
+.ad
+.sp .6
+.RS 4n
+ Indicates if \fBYP_INTERDOMAIN\fR or \fBYP_SECURE\fR entries should be created
+in a map. Using \fBnisLDAPmapFlags\fR is equivalent to running
+\fBmakedbm\fR(8) with the \fB-b\fR or the \fB-s\fR option. When a map is
+created from the contents of the DIT, the mapping file attribute is the only
+source for the \fBYP_INTERDOMAIN\fR or \fBYP_SECURE\fR entries.
+.sp
+The syntax for the \fBnisLDAPmapFlags\fR attribute is as follows:
+.sp
+.in +2
+.nf
+"nisLDAPmapFlags" mapname ":" ["b"]["s"]
+.fi
+.in -2
+
+By default neither entry is created.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPfieldFromAttribute\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies how a NIS entries field values are derived from LDAP attribute
+values.
+.sp
+The syntax for the \fBnisLDAPfieldFromAttribute\fR attribute is as follows:
+.sp
+.in +2
+.nf
+mapName ":" fieldattrspec *("," fieldattrspec)
+.fi
+.in -2
+
+The format of \fBfieldattrspec\fR is shown below at Field and Attribute
+Conversion Syntax.
+.sp
+To map by direct copy and assignment the value of the \fBipHostNumber\fR
+attribute to the \fBaddr\fR named field, for example:
+.sp
+.in +2
+.nf
+addr=ipHostNumber
+.fi
+.in -2
+
+Formats for the named field and attribute conversion syntax are discussed
+below, including examples of complex attribute to field conversions.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnisLDAPattributeFromField\fR\fR
+.ad
+.sp .6
+.RS 4n
+ Specifies how an LDAP attribute value is derived from a NIS entry field
+value.
+.sp
+The syntax for the \fBnisLDAPattributeFromField\fR attribute is as follows:
+.sp
+.in +2
+.nf
+mapName ":" fieldattrspec *("," fieldattrspec )
+.fi
+.in -2
+
+The format of \fBfieldattrspec\fR is shown below at Field and Attribute
+Conversion Syntax.
+.sp
+As a special case, if the \fBdn\fR attribute value derived from a
+\fBfieldattrspec\fR ends in a comma ("\fB,\fR"), the domains context from
+\fBnisLDAPdomainContext\fR is appended.
+.sp
+Use the following example to map the value of the \fBaddr\fR field to the
+\fBipHostNumber\fR attribute by direct copy and assignment:
+.sp
+.in +2
+.nf
+ipHostNumber=addr
+.fi
+.in -2
+
+All relevant attributes, including the \fBdn\fR, must be specified.
+.sp
+For every map it must be possible to rapidly find a DIT entry based on its key.
+There are some maps for which a NIS to LDAP mapping for the key is not
+desirable, so a key mapping cannot be specified. In these cases a mapping that
+uses the reserved \fBrf_searchkey\fR must be specified. Mappings that use this
+field name are ignored when information is mapped into the DIT.
+.RE
+
+.SS "Field and Attribute Conversion Syntax"
+The general format of a \fBfieldattrspec\fR is:
+.sp
+.in +2
+.nf
+fieldattrspec     = lhs "=" rhs
+lhs               = lval | namespeclist
+rhs               = rval | [namespec]
+namespeclist      = namespec | "(" namespec *("," namespec) ")"
+.fi
+.in -2
+
+.sp
+.LP
+The \fBlval\fR and \fBrval\fR syntax are defined below at Values. The format of
+a \fBnamespec\fR is:
+.sp
+.ne 2
+.na
+\fB\fBnamespec\fR\fR
+.ad
+.RS 16n
+.sp
+.in +2
+.nf
+["ldap:"] attrspec [searchTriple] | ["yp:"] fieldname
+[mapspec]
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfieldname\fR\fR
+.ad
+.RS 16n
+.sp
+.in +2
+.nf
+field | "(" field ")"
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBattrspec\fR\fR
+.ad
+.RS 16n
+.sp
+.in +2
+.nf
+attribute | "(" attribute ")"
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsearchTriple\fR\fR
+.ad
+.RS 16n
+.sp
+.in +2
+.nf
+":" [baseDN] ["?" [scope] ["?" [filter]]]
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbaseDN\fR\fR
+.ad
+.RS 16n
+Base DN for search
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfilter\fR\fR
+.ad
+.RS 16n
+LDAP search filter
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmapspec\fR\fR
+.ad
+.RS 16n
+Map name
+.RE
+
+.sp
+.LP
+The repository specification in a \fBnamespec\fR defaults is as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For assignments to a field:
+.RS
+
+.sp
+.ne 2
+.na
+\fBon the \fBLHS\fR\fR
+.ad
+.RS 14n
+yp
+.RE
+
+.sp
+.ne 2
+.na
+\fBon the \fBRHS\fR\fR
+.ad
+.RS 14n
+ldap
+.RE
+
+.RE
+
+NIS field values on the \fBRHS\fR are those that exist before the NIS entry is
+modified.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For assignments to an attribute:
+.RS
+
+.sp
+.ne 2
+.na
+\fBon the \fBLHS\fR\fR
+.ad
+.RS 14n
+ldap
+.RE
+
+.sp
+.ne 2
+.na
+\fBon the \fBRHS\fR\fR
+.ad
+.RS 14n
+yp
+.RE
+
+.RE
+
+Attribute values on the \fBRHS\fR are those that exist before the LDAP entry is
+modified.
+.RE
+.sp
+.LP
+When the field or attribute name is enclosed in parenthesis, it denotes a list
+of field or attribute values. For attributes, the meaning is the list of all
+attributes of that name, and the interpretation depends on the context. See the
+discussion at Values. The list specification is ignored when a
+\fBsearchTriple\fR or \fBmapspec\fR is supplied.
+.sp
+.LP
+For fields, the \fBfieldname\fR syntax is used to map multiple attribute
+instances to multiple NIS entries.
+.sp
+.LP
+The \fBsearchTriple\fR can be used to specify an attribute from a location
+other than the read or write target. The defaultvalues are as follows:
+.sp
+.ne 2
+.na
+\fB\fBbaseDN\fR\fR
+.ad
+.RS 10n
+If \fBbaseDN\fR is omitted, the default is the current \fBobjectDN\fR. If the
+\fBbaseDN\fR ends in a comma, the context of the domain is appended from
+\fBnisLDAPdomainContext\fR .
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBscope\fR\fR
+.ad
+.RS 10n
+one
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfilter\fR\fR
+.ad
+.RS 10n
+Empty
+.RE
+
+.sp
+.LP
+Similarly, the \fBmapspec\fR can be used to specify a field value from a NIS
+map other than the one implicitly indicated by the \fBmapName\fR. If
+\fBsearchTriple\fR or \fBmapspec\fR is explicitly specified in a
+\fBnamespec\fR, the retrieval or assignment, whether from or to LDAP or NIS, is
+performed without checking if read and write are enabled for the LDAP container
+or NIS map.
+.sp
+.LP
+The omission of the \fBnamespec\fR in an \fBrhs\fR is only allowed if the
+\fBlhs\fR is one or more attributes. The effect is to delete the specified
+attribute(s). In all other situations, an omitted \fBnamespec\fR means that the
+rule is ignored.
+.sp
+.LP
+The \fBfilter\fR can be a value. See Values. For example, to find the
+\fBipHostNumber\fRthat uses the \fBcn\fR, you specify the following in the
+\fBfilter\fR field:
+.sp
+.in +2
+.nf
+ldap:ipHostNumber:?one?("cn=%s", (cname, "%s.*"))
+.fi
+.in -2
+
+.sp
+.LP
+In order to remove ambiguity, the unmodified value of a single field or
+attribute must be specified as the following when used in the \fBfilter\fR
+field.
+.sp
+.in +2
+.nf
+("%s", namespec)
+.fi
+.in -2
+
+.sp
+.LP
+If the \fBfilter\fR is not specified, the scope will be base, and the
+\fBbaseDN\fR is assumed to be the \fBDN\fR of the entry that contains the
+attribute to be retrieved or modified. To use previously existing field or
+attribute values in the mapping rules requires a lookup to find those values.
+Obviously, this adds to the time required to perform the modification. Also,
+there is a window between the time when a value is retrieved and then slightly
+later stored back. If the values have changed in the meantime, the change may
+be overwritten.
+.sp
+.LP
+When \fBfieldattrspecs\fR are grouped into rule sets, in the value of a
+\fBnisLDAPfieldFromAttribute\fR or \fBnisLDAPattributeFromField\fR attribute,
+the evaluation of the \fBfieldattrspecs\fR proceed in the listed order.
+However, evaluation may be done in parallel for multiple \fBfieldattrspecs\fR.
+If there is an error when evaluating a certain \fBfieldattrspec\fR, including
+retrieval or assignment of entry or field values, the extent to which the other
+\fBfieldattrspec\fR rules are evaluated is unspecified.
+.SS "Wildcards"
+Where wildcard support is available, it is of the following limited form:
+.sp
+.ne 2
+.na
+\fB\fB*\fR\fR
+.ad
+.RS 9n
+Matches any number of characters
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB[x]\fR\fR
+.ad
+.RS 9n
+Matches the character x
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB[x-y]\fR\fR
+.ad
+.RS 9n
+Matches any character in the range x to y, inclusive
+.RE
+
+.sp
+.LP
+Combinations such as \fB[a-cA-C0123]\fR are also allowed, which would match any
+one of a, b, c, A, B, C, 0, 1, 2, or 3.
+.SS "Substring Extraction"
+.in +2
+.nf
+substringextract = "(" namespec "," matchspec ")"
+name             = field or attribute name
+matchspec        =
+.fi
+.in -2
+
+.sp
+.LP
+The \fBmatchspec\fR is a string like the \fBsscanf\fR(3C) format string, except
+that there may be at most one format specifier, a single \fB%s\fR. The output
+value of the \fBsubstringextract\fR is the substring that matches the location
+of the \fB%s\fR.
+.sp
+.LP
+If there is no \fB%s\fR in the formatstring, it must instead be a single
+character, which is assumed to be a field separator for the \fBnamespec\fR. The
+output values are the field values. Wild cards are supported. If there is no
+match, the output value is the empty string, " ".
+.sp
+.LP
+For example, if the \fBfieldcname\fR has the value
+\fBuser.some.domain.name.\fR, the value of the expression:
+.sp
+.in +2
+.nf
+(cname, "%s.*")
+.fi
+.in -2
+
+.sp
+.LP
+is \fBuser\fR, which can be used to extract the user name from a NIS principal
+name.
+.sp
+.LP
+Similarly, use this expression to extract the third of the colon-separated
+fields of the shadow field:
+.sp
+.in +2
+.nf
+(shadow, "*:*:%s:*")
+.fi
+.in -2
+
+.sp
+.LP
+This form can be used to extract all of the shadow fields. However, a simpler
+way to specify that special case is:
+.sp
+.in +2
+.nf
+(shadow, ":")
+.fi
+.in -2
+
+.SS "Values"
+.in +2
+.nf
+lval            = "(" formatspec "," namespec *("," namespec) ")"
+rval            = "(" formatspec ["," namelist ["," elide] ] ")"
+
+namelist        = name_or_sse *( "," name_or_sse)
+name_or_sse     = namespec | removespec | substringextract
+removespec      = list_or_name "-" namespec
+list_or_name    = "(" namespec ")" | namespec
+formatspec      =
+formatstring    = A string combining text and % field specifications
+elide           =
+singlechar      = Any character
+.fi
+.in -2
+
+.sp
+.LP
+The syntax above is used to produce \fBrval\fR values that incorporate field or
+attribute values, in a manner like \fBsprintf\fR(3C), or to perform assignments
+to \fBlval\fR like \fBsscanf\fR(3C). One important restriction is that the
+format specifications,\fB%\fR plus a single character, use the designations
+from \fBber_printf\fR(3LDAP). Thus, while \fB%s\fR is used to extract a string
+value, \fB%i\fR causes BER conversion from an integer. Formats other than
+\fB%s\fR, for instance, \fB%i\fR, are only meaningfully defined in simple
+format strings without any other text.
+.sp
+.LP
+The following \fBber_printf()\fR format characters are recognized:
+.sp
+.in +2
+.nf
+b  i  n  o  s
+.fi
+.in -2
+
+.sp
+.LP
+If there are too few format specifiers, the format string may be repeated as
+needed.
+.sp
+.LP
+When used as an \fBlval\fR, there is a combination of pattern matching and
+assignment, possibly to multiple fields or attributes.
+.sp
+.LP
+In an assignment to an attribute, if the value of the \fBaddr\fR field is
+\fB1.2.3.4\fR, the \fBrval\fR:
+.sp
+.in +2
+.nf
+("ipNetworkNumber=%s,", addr)
+.fi
+.in -2
+
+.sp
+.LP
+produces the value \fBipNetworkNumber=1.2.3.4,\fR, while:
+.sp
+.in +2
+.nf
+("(%s,%s,%s)", host, user, domain)
+.fi
+.in -2
+
+.sp
+.LP
+results in:
+.sp
+.in +2
+.nf
+(assuming host="xyzzy", user="-", domain="x.y.z")
+"(xyzzy,-,x.y.z)"
+.fi
+.in -2
+
+.sp
+.LP
+The elide character feature is used with attribute lists. So:
+.sp
+.in +2
+.nf
+("%s,", (mgrprfc822mailmember), ",")
+.fi
+.in -2
+
+.sp
+.LP
+concatenates all \fBmgrprfc822mailmember\fR values into one comma-separated
+string, and then elides the final trailing comma. Thus, for
+.sp
+.in +2
+.nf
+mgrprfc822mailmember=usera
+mgrprfc822mailmember=userb
+mgrprfc822mailmember=userc
+.fi
+.in -2
+
+.sp
+.LP
+the value would be:
+.sp
+.in +2
+.nf
+usera,userb,userc
+.fi
+.in -2
+
+.sp
+.LP
+As a special case, to combine an \fBLHS\fR extraction with an \fBRHS\fR
+implicit list creates multiple entries and values. So
+.sp
+.in +2
+.nf
+("(%s,%s,%s)", host, user, domain)=(nisNetgroupTriple)
+.fi
+.in -2
+
+.sp
+.LP
+creates one NIS entry for each \fBnisNetgroupTriple\fR value.
+.sp
+.LP
+The \fB\&'removespec'\fR form is used to exclude previously assigned fields
+values from a list. So, if an LDAP entry contains:
+.sp
+.in +2
+.nf
+name: foo
+cn: foo
+cn: foo1
+cn: foo2
+.fi
+.in -2
+
+.sp
+.LP
+and the mapping file specifies :
+.sp
+.in +2
+.nf
+myName = name, \e
+myAliases = ("%s ", (cn) - yp:myName, " ")
+.fi
+.in -2
+
+.sp
+.LP
+then the following assignments are carried out:
+.RS +4
+.TP
+1.
+Assign value \fBfoo\fR to \fBmyName\fR
+.RE
+.RS +4
+.TP
+2.
+Assign value \fBfoo foo1 foo2\fR to \fBmyAliases\fR
+.RE
+.RS +4
+.TP
+3.
+Remove value of \fBmyName\fR from value \fBmyAliases\fR
+.RE
+.sp
+.LP
+This results in the field values \fBmyName\fR is set to \fBfoo\fR, and
+\fBmyAliases\fR is set to \fBfoo1 foo2\fR.
+.SS "Assignments"
+The assignment syntax, also found at Field and Attribute Conversion Syntax, is
+as follows:
+.sp
+.in +2
+.nf
+fieldattrspec    = lhs "=" rhs
+lhs              = lval | namespeclist
+rhs              = rval | namespec
+namespeclist     = namespec | "(" namespec *("," namespec) ")"
+.fi
+.in -2
+
+.sp
+.LP
+The general form of a simple assignment, which is a one-to-one mapping of field
+to attribute, is:
+.sp
+.in +2
+.nf
+("%s", fieldname)=("%s", attrname)
+.fi
+.in -2
+
+.sp
+.LP
+As a convenient shorthand, this can also be written as:
+.sp
+.in +2
+.nf
+fieldname=attrname
+.fi
+.in -2
+
+.sp
+.LP
+A list specification, which is a name enclosed in parenthesis, can be used to
+make many-to-many assignments. The expression:
+.sp
+.in +2
+.nf
+(fieldname)=(attrname)
+.fi
+.in -2
+
+.sp
+.LP
+where there are multiple instances of \fBattrname\fR, creates one NIS entry for
+each such instance, differentiated by their \fBfieldname\fR values. The
+following combinations of lists are allowed, but they are not particularly
+useful:
+.sp
+.ne 2
+.na
+\fB\fB(attrname)=(fieldname)\fR\fR
+.ad
+.RS 26n
+Equivalent to \fBattrname=fieldname\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBattrname=(fieldname)\fR\fR
+.ad
+.RS 26n
+Equivalent to \fBattrname=fieldname\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB(fieldname)=attrname\fR\fR
+.ad
+.RS 26n
+Equivalent to \fBfieldname=attrname\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfieldname=(attrname)\fR\fR
+.ad
+.RS 26n
+Equivalent to \fBfieldname=attrname\fR
+.RE
+
+.sp
+.LP
+If a multi-valued \fBRHS\fR is assigned to a single-valued \fBLHS\fR, the
+\fBLHS\fR value will be the first of the \fBRHS\fR values. If the \fBRHS\fR is
+an attribute list, the first attribute is the first one returned by the LDAP
+server when queried. Otherwise, the definition of "first" is implementation
+dependent.
+.sp
+.LP
+Finally, the \fBLHS\fR can be an explicit list of fields or attributes, such
+as:
+.sp
+.in +2
+.nf
+(name1,name2,name3)
+.fi
+.in -2
+
+.sp
+.LP
+If the \fBRHS\fR is single-valued, this assigns the \fBRHS\fR value to all
+entities in the list. If the \fBRHS\fR is multi-valued, the first value is
+assigned to the first entity of the list, the second value to the second
+entity, and so on. Excess values or entities are silently ignored.
+.SH EXAMPLES
+\fBExample 1 \fRAssigning an Attribute Value to a Field
+.sp
+.LP
+The following example illustrates how to assign the value of the
+\fBipHostNumber\fR attribute to the \fBaddr\fR field
+
+.sp
+.in +2
+.nf
+addr=ipHostNumber
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRCreating Multiple NIS Entries from Multi-Valued LDAP Attributes
+.sp
+.LP
+An LDAP entry with:
+
+.sp
+.in +2
+.nf
+cn=name1
+cn=name2
+cn=name3
+.fi
+.in -2
+
+.sp
+.LP
+and the following assignments:
+
+.sp
+.in +2
+.nf
+cname=cn
+(name)=(cn)
+.fi
+.in -2
+
+.sp
+.LP
+creates three NIS entries. Other attributes and fields are omitted for clarity.
+
+.sp
+.in +2
+.nf
+cname=name1, name=name1
+cname=name1, name=name2
+cname=name1, name=name3
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRAssigning String Constants
+.sp
+.LP
+The following expression sets the \fBpasswd\fR field to x:
+
+.sp
+.in +2
+.nf
+passwd=("x")
+.fi
+.in -2
+
+.LP
+\fBExample 4 \fRSplitting Field Values to Multi-Valued Attributes
+.sp
+.LP
+The \fBexpansion\fR field contains a comma-separated list of alias member
+names. In the following example, the expression assigns each member name to an
+instance of \fBmgrprfc822mailmember\fR:
+
+.sp
+.in +2
+.nf
+(mgrprfc822mailmember)=(expansion, ",")
+.fi
+.in -2
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/var/yp/NISLDAPmapping\fR\fR
+.ad
+.RS 26n
+Mapping file used by the NIS server components
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Obsolete
+.TE
+
+.SH SEE ALSO
+.BR sprintf (3C),
+.BR sscanf (3C),
+.BR ber_printf (3LDAP),
+.BR ypserv (5),
+.BR attributes (7),
+.BR inityp2l (8),
+.BR makedbm (8),
+.BR ypserv (8)
+.sp
+.LP
+\fISystem Administration Guide: Naming and Directory Services (DNS, NIS, and
+LDAP)\fR

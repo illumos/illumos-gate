@@ -40,9 +40,9 @@
 
 /*
  * keyserv - server for storing private encryption keys
- *   keyserv(1M) performs multiple functions:  it stores secret keys per uid; it
+ *   keyserv(8) performs multiple functions:  it stores secret keys per uid; it
  *   performs public key encryption and decryption operations; and it generates
- *   "random" keys.  keyserv(1M) will talk to no one but a local root process on
+ *   "random" keys.  keyserv(8) will talk to no one but a local root process on
  *   the local transport only.
  */
 

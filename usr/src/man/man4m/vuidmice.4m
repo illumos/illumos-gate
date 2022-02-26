@@ -1,0 +1,297 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH VUIDMICE 4M "Jun 21, 2005"
+.SH NAME
+vuidmice, vuidm3p, vuidm4p, vuidm5p, vuid2ps2, vuid3ps2 \- converts mouse
+protocol to Firm Events
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+.fi
+
+.LP
+.nf
+#include <sys/vuid_event.h>
+.fi
+
+.LP
+.nf
+#include <sys/vuid_wheel.h>
+.fi
+
+.LP
+.nf
+int ioctl(\fIfd\fR, I_PUSH, vuidm3p);
+.fi
+
+.LP
+.nf
+int ioctl(\fIfd\fR, I_PUSH, vuidm4p);
+.fi
+
+.LP
+.nf
+int ioctl(\fIfd\fR, I_PUSH, vuidm5p);
+.fi
+
+.LP
+.nf
+int ioctl(\fIfd\fR, I_PUSH, vuid2ps2);
+.fi
+
+.LP
+.nf
+int ioctl(\fIfd\fR, I_PUSH, vuid3ps2);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  STREAMS modules \fBvuidm3p\fR, \fBvuidm4p\fR, \fBvuidm5p\fR,
+\fBvuid2ps2\fR, and \fBvuid3ps2\fR convert mouse protocols to Firm events. The
+Firm event structure is described in  <\fBsys/vuid_event.h\fR>. Pushing a
+STREAMS module does not automatically enable mouse protocol conversion to Firm
+events.  The  STREAMS module state is initially set to raw or \fBVUID_NATIVE\fR
+mode which performs  no message processing. You must change the state to
+\fBVUID_FIRM_EVENT\fR mode to initiate mouse protocol conversion to Firm
+events. This can be accomplished by the following code:
+.sp
+.in +2
+.nf
+int format;
+format = VUID_FIRM_EVENT;
+ioctl(fd, VUIDSFORMAT, &format);
+.fi
+.in -2
+
+.sp
+.LP
+You can also query the state of the  STREAMS module by using the
+\fBVUIDGFORMAT\fR option.
+.sp
+.in +2
+.nf
+int format;
+int fd;	/* file descriptor */
+ioctl(fd, VUIDGFORMAT, &format);
+if ( format == VUID_NATIVE );
+	/* The state of the module is in raw mode.
+	 * Message processing is not enabled.
+	 */
+if ( format == VUID_FIRM_EVENT );
+	/* Message processing is enabled.
+	 * Mouse protocol conversion to Firm events
+	 * are performed.
+.fi
+.in -2
+
+.sp
+.LP
+The remainder of this section describes the processing of STREAMS messages on
+the read- and write-side.
+.SS "Read Side Behavior"
+.sp
+.ne 2
+.na
+\fB\fBM_DATA\fR \fR
+.ad
+.RS 12n
+Incoming messages are queued and converted to Firm events.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBM_FLUSH\fR \fR
+.ad
+.RS 12n
+The read queue of the module is flushed of all its data messages and all data
+in the record being accumulated are also flushed. The message is passed
+upstream.
+.RE
+
+.SS "Write Side Behavior"
+.sp
+.ne 2
+.na
+\fB\fBM_IOCTL\fR \fR
+.ad
+.RS 16n
+Messages sent downstream as a result of an \fBioctl\fR(2) system call.  The two
+valid \fBioctl\fR options processed by the \fBvuidmice\fR modules are
+\fBVUIDGFORMAT\fR and \fBVUIDSFORMAT\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBM_FLUSH\fR \fR
+.ad
+.RS 16n
+The write queue of the module is flushed of all its data messages and the
+message is passed downstream.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBVUIDGFORMAT\fR \fR
+.ad
+.RS 16n
+This option returns the current state of the  STREAMS module. The state of the
+\fBvuidmice\fR STREAMS module may either be \fBVUID_NATIVE\fR (no message
+processing) or \fBVUID_FIRM_EVENT\fR (convert to Firm events).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBVUIDSFORMAT\fR \fR
+.ad
+.RS 16n
+This option sets the state of the  STREAMS module to \fBVUID_FIRM_EVENT.\fR If
+the state of the STREAMS module is already in \fBVUID_FIRM_EVENT\fR, this
+option is non-operational. It is not possible  to set the state back to
+\fBVUID_NATIVE\fR once the state becomes \fBVUID_FIRM_EVENT.\fR To disable
+message processing, pop the STREAMS module out by calling \fBioctl(fd, 1I_POP,
+vuid*)\fR.
+.RE
+
+.sp
+.LP
+The following wheel support ioctls are defined for PS/2 mouse only:
+.sp
+.ne 2
+.na
+\fBVUIDGWHEELCOUNT\fR
+.ad
+.RS 19n
+This ioctl takes a pointer to an integer as argument and sets the value of the
+integer to the number of wheels available on this device.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVUIDGWHEELINFO\fR
+.ad
+.RS 19n
+This command returns static information   about  the  wheel that does not
+change while a  device is in use. Currently the  only information defined  is
+the  wheel orientation                                 which is either
+VUID_WHEEL_FORMAT_VERTICAL or  VUID_WHEEL_FORMAT_HORIZONTAL.
+.sp
+.in +2
+.nf
+   typedef struct {
+           int     vers;
+           int     id;
+           int     format;
+   } wheel_info;
+.fi
+.in -2
+
+The  ioctl  takes a pointer to "wheel_info" structure with the "vers" set to
+the current version of the "wheel_info" structure and "id" set to the id of the
+wheel for which the information is desired.
+.RE
+
+.sp
+.ne 2
+.na
+\fBVUIDSWHEELSTATE\fR
+.ad
+.br
+.na
+\fBVUIDGWHEELSTATE\fR
+.ad
+.RS 19n
+VUIDSWHEELSTATE sets the state of the wheel to that specified in the
+stateflags. VUIDGWHEELSTATE returns the current state settings in the
+stateflags field.
+.sp
+stateflags is an  OR'ed  set of  flag bits. The only flag currently defined is
+VUID_WHEEL_STATE_ENABLED.
+.sp
+When stateflags is set to VUID_WHEEL_STATE_ENABLED the module converts  motion
+of the specified wheel into VUID events and sends those up  stream.
+.sp
+Wheel events are disabled by default.
+.sp
+Applications that want to  change a flag  should  first get the current flags
+and then change only the bit they want.
+.sp
+.in +2
+.nf
+   typedef struct {
+           int             vers;
+           int            id;
+           uint32_t       stateflags;
+    } wheel_state;
+.fi
+.in -2
+
+These ioctls take pointer to 'wheel_state' as an argument with the 'vers'
+and 'id' members filled up. These members have the same meaning as that
+for 'VUIDGWHEELINFO' ioctl.
+.RE
+
+.SS "Mouse Configurations"
+.sp
+
+.sp
+.TS
+box;
+c | c | c
+l | l | l .
+Module	Protocol Type	Device
+_
+vuidm3p	T{
+3-Byte Protocol Microsoft 2 Button Serial Mouse
+T}	/dev/tty*
+_
+vuidm4p	T{
+4-Byte Protocol Logitech 3 Button Mouseman
+T}	/dev/tty*
+_
+vuidm5p	T{
+Logitech 3 Button Bus Mouse Microsoft Bus Mouse
+T}	/dev/logi/ dev/msm
+_
+vuid2ps2	T{
+PS/2 Protocol 2 Button PS/2 Compatible Mouse
+T}	/dev/kdmouse
+_
+vuid3ps2	T{
+PS/2 Protocol 3 Button PS/2 Compatible Mouse
+T}	/dev/kdmouse
+.TE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR virtualkm (4D),
+.BR attributes (7)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

@@ -54,7 +54,7 @@ extern long	priocntlset(procset_t *, int, ...);
 #define	PC_SETPARMS	2	/* Set scheduling parameters */
 #define	PC_GETPARMS	3	/* Get scheduling parameters */
 #define	PC_ADMIN	4	/* Scheduler administration (used by */
-				/* dispadmin(1M), not for general use) */
+				/* dispadmin(8), not for general use) */
 #define	PC_GETPRIRANGE	5	/* Get priority range for a class */
 				/* posix.4 scheduling, not for general use */
 #define	PC_DONICE	6	/* Set or get nice value */
@@ -152,7 +152,7 @@ typedef struct pcpri {
 } pcpri_t;
 
 /*
- * The following is used by the dispadmin(1M) command for
+ * The following is used by the dispadmin(8) command for
  * scheduler administration and is not for general use.
  */
 

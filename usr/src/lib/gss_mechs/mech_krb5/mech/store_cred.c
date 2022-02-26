@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <k5-int.h>
 #include <gssapiP_krb5.h>
 #include <memory.h>
@@ -231,7 +229,7 @@ gss_cred_usage_t *cred_usage_stored;
 	if (GSS_ERROR(maj))
 		goto cleanup;
 
-	/* Alert ktkt_warnd(1M) */
+	/* Alert ktkt_warnd(8) */
 	maj = krb5_unparse_name(ctx, cred->princ, &client_name);
 	if (GSS_ERROR(maj))
 		goto cleanup;
@@ -239,7 +237,7 @@ gss_cred_usage_t *cred_usage_stored;
 	if (kwarn_add_warning(client_name, cred->tgt_expire) != 0) {
 		syslog(LOG_AUTH|LOG_NOTICE,
 		    "store_cred: kwarn_add_warning"
-		    " failed: ktkt_warnd(1M) down? ");
+		    " failed: ktkt_warnd(8) down? ");
 	}
 	free(client_name);
 	client_name = NULL;

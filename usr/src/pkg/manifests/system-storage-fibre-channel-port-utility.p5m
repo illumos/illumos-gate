@@ -49,9 +49,9 @@ dir  path=usr group=sys
 dir  path=usr/sbin
 hardlink path=usr/sbin/fcadm target=../../usr/sbin/fcinfo
 file path=usr/sbin/fcinfo mode=0555
-dir  path=usr/share/man/man1m
-link path=usr/share/man/man1m/fcadm.1m target=fcinfo.1m
-file path=usr/share/man/man1m/fcinfo.1m
+dir  path=usr/share/man/man8
+link path=usr/share/man/man8/fcadm.8 target=fcinfo.8
+file path=usr/share/man/man8/fcinfo.8
 legacy pkg=SUNWfcprt desc="Utility for Fibre Channel Host Bus Adapters" \
     name="Fibre Channel HBA Port utility"
 legacy pkg=SUNWfcprtr \

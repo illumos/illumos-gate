@@ -58,7 +58,7 @@ getnetent_r, setnetent, endnetent \- get network entry
 .LP
 These functions are used to obtain entries for networks. An entry may come from
 any of the sources for \fBnetworks\fR specified in the \fB/etc/nsswitch.conf\fR
-file. See \fBnsswitch.conf\fR(4).
+file. See \fBnsswitch.conf\fR(5).
 .sp
 .LP
 \fBgetnetbyname()\fR searches for a network entry with the network name
@@ -242,7 +242,7 @@ configuration file for the name service switch
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -258,9 +258,14 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(2), \fBIntro\fR(3), \fBbyteorder\fR(3SOCKET), \fBinet\fR(3SOCKET),
-\fBnetdb.h\fR(3HEAD), \fBnetworks\fR(4), \fBnsswitch.conf\fR(4),
-\fBattributes\fR(5)
+.BR Intro (2),
+.BR Intro (3),
+.BR netdb.h (3HEAD),
+.BR byteorder (3SOCKET),
+.BR inet (3SOCKET),
+.BR networks (5),
+.BR nsswitch.conf (5),
+.BR attributes (7)
 .sp
 .LP
 Fuller, V., Li, T., Yu, J., and Varadhan, K. \fIRFC 1519, Classless
@@ -288,4 +293,4 @@ Multithread Applications\fR, for information about the use of the
 .LP
 Use of the enumeration interfaces \fBgetnetent()\fR and \fBgetnetent_r()\fR is
 discouraged; enumeration may not be supported for all database sources. The
-semantics of enumeration are discussed further in \fBnsswitch.conf\fR(4).
+semantics of enumeration are discussed further in \fBnsswitch.conf\fR(5).

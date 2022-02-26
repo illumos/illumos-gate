@@ -49,7 +49,7 @@ smf_configure_ip || exit $SMF_EXIT_OK
 /sbin/routeadm -u
 
 #
-# Are we routing dynamically? routeadm(1M) reports this in the
+# Are we routing dynamically? routeadm(8) reports this in the
 # "current" values of ipv4/6-routing - if either are true, we are running
 # routing daemons (or at least they are enabled to run).
 #
@@ -162,7 +162,7 @@ else
 fi
 
 #
-# Use routeadm(1M) to configure forwarding and launch routing daemons
+# Use routeadm(8) to configure forwarding and launch routing daemons
 # for IPv4 and IPv6 based on preset values.  These settings only apply
 # to the global zone.  For IPv4 dynamic routing, the system will default
 # to disabled if a default route was previously added via BOOTP, DHCP,

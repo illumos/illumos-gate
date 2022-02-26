@@ -31,11 +31,11 @@
  * mapping code is executing on the client or server. Thus, the following
  * rules represents the latest incantation of the id mapping policies.
  *
- * 1) For the case in which the nfsmapid(1m) daemon has _never_ been
+ * 1) For the case in which the nfsmapid(8) daemon has _never_ been
  *    started, the policy is to _always_ work with stringified uid's
  *    and gid's
  *
- * 2) For the case in which the nfsmapid(1m) daemon _was_ started but
+ * 2) For the case in which the nfsmapid(8) daemon _was_ started but
  *    has either died or become unresponsive, the mapping policies are
  *    as follows:
  *
@@ -72,7 +72,7 @@
  *         `-------------------------------'---------------------------------'
  *
  * 3) Lastly, in order to leverage better cache utilization whenever
- *    communication with nfsmapid(1m) is currently hindered, cache
+ *    communication with nfsmapid(8) is currently hindered, cache
  *    entry eviction is throttled whenever nfsidmap_daemon_dh == NULL.
  *
  *
@@ -80,28 +80,28 @@
  *  ====================================================
  *
  *   GETATTR - Server-side GETATTR *id to attr string conversion policies
- *             for unresponsive/dead nfsmapid(1m) daemon
+ *             for unresponsive/dead nfsmapid(8) daemon
  *
  *	a) If the *id is *ID_NOBODY, the string "nobody" is returned
  *
- *	b) If the *id is not *ID_NOBODY _and_ the nfsmapid(1m) daemon
+ *	b) If the *id is not *ID_NOBODY _and_ the nfsmapid(8) daemon
  *	   _is_ operational, the daemon is contacted to convert the
  *	   [u/g]id into a string of type "[user/group]@domain"
  *
- *	c) If the nfsmapid(1m) daemon has died or has become unresponsive,
+ *	c) If the nfsmapid(8) daemon has died or has become unresponsive,
  *	   the server returns status == NFS4_OK for the GETATTR operation,
  *	   and returns a strigified [u/g]id to let the client map it into
  *	   the appropriate value.
  *
  *   SETATTR - Server-side SETATTR attr string to *id conversion policies
- *             for unresponsive/dead nfsmapid(1m) daemon
+ *             for unresponsive/dead nfsmapid(8) daemon
  *
  *	a) If the otw string is a stringified uid (ie. does _not_ contain
  *	   an '@' sign and is of the form "12345") then the literal uid is
  *	   decoded and it is used to perform the mapping.
  *
  *	b) If, on the other hand, the otw string _is_ of the form
- *	   "[user/group]@domain" and problems arise contacting nfsmapid(1m),
+ *	   "[user/group]@domain" and problems arise contacting nfsmapid(8),
  *	   the SETATTR operation _must_ fail w/NFS4ERR_DELAY, as the server
  *	   cannot default to *ID_NOBODY, which would allow a file to be
  *	   given away by setting it's owner or owner_group to "nobody".
@@ -329,7 +329,7 @@ nfs_idmap_str_uid(utf8string *u8s, uid_t *uid, bool_t isserver)
 	}
 
 	/*
-	 * Start-off with upcalls disabled, and once nfsmapid(1m) is up and
+	 * Start-off with upcalls disabled, and once nfsmapid(8) is up and
 	 * running, we'll leverage it's first flush to let the kernel know
 	 * when it's up and available to perform mappings. Also, on client
 	 * only, be smarter about when to issue upcalls by checking the
@@ -399,7 +399,7 @@ retry:
 			/*
 			 * string came in as stringified id. Don't cache !
 			 *
-			 * nfsmapid(1m) semantics have changed in order to
+			 * nfsmapid(8) semantics have changed in order to
 			 * support diskless clients. Thus, for stringified
 			 * id's that have passwd/group entries, we'll go
 			 * ahead and map them, returning no error.
@@ -538,7 +538,7 @@ nfs_idmap_uid_str(uid_t uid, utf8string *u8s, bool_t isserver)
 	}
 
 	/*
-	 * Start-off with upcalls disabled, and once nfsmapid(1m) is
+	 * Start-off with upcalls disabled, and once nfsmapid(8) is
 	 * up and running, we'll leverage it's first flush to let the
 	 * kernel know when it's up and available to perform mappings.
 	 * We fall back to answering with stringified uid's.
@@ -708,7 +708,7 @@ nfs_idmap_str_gid(utf8string *u8s, gid_t *gid, bool_t isserver)
 	}
 
 	/*
-	 * Start-off with upcalls disabled, and once nfsmapid(1m) is up and
+	 * Start-off with upcalls disabled, and once nfsmapid(8) is up and
 	 * running, we'll leverage it's first flush to let the kernel know
 	 * when it's up and available to perform mappings. Also, on client
 	 * only, be smarter about when to issue upcalls by checking the
@@ -779,7 +779,7 @@ retry:
 			/*
 			 * string came in as stringified id. Don't cache !
 			 *
-			 * nfsmapid(1m) semantics have changed in order to
+			 * nfsmapid(8) semantics have changed in order to
 			 * support diskless clients. Thus, for stringified
 			 * id's that have passwd/group entries, we'll go
 			 * ahead and map them, returning no error.
@@ -918,7 +918,7 @@ nfs_idmap_gid_str(gid_t gid, utf8string *u8s, bool_t isserver)
 	}
 
 	/*
-	 * Start-off with upcalls disabled, and once nfsmapid(1m) is
+	 * Start-off with upcalls disabled, and once nfsmapid(8) is
 	 * up and running, we'll leverage it's first flush to let the
 	 * kernel know when it's up and available to perform mappings.
 	 * We fall back to answering with stringified gid's.
@@ -1119,7 +1119,7 @@ nfs_idmap_args(struct nfsidmap_args *idmp)
 	nfs_idmap_cache_flush(&nig->s2g_ci);
 
 	/*
-	 * nfsmapid(1m) up and running; enable upcalls
+	 * nfsmapid(8) up and running; enable upcalls
 	 * State:
 	 *	0	Just flush caches
 	 *	1	Re-establish door knob
@@ -1309,7 +1309,7 @@ nfs_idmap_cache_s2i_lkup(idmap_cache_info_t *cip, utf8string *u8s,
 		 * Check entry for staleness first, as user's id
 		 * may have changed and may need to be remapped.
 		 * Note that we don't evict entries from the cache
-		 * if we're having trouble contacting nfsmapid(1m)
+		 * if we're having trouble contacting nfsmapid(8)
 		 */
 		if (TIMEOUT(p->id_time) && (*cip->nfsidmap_daemon_dh) != NULL) {
 			nfs_idmap_cache_rment(p);
@@ -1405,7 +1405,7 @@ nfs_idmap_cache_s2i_insert(idmap_cache_info_t *cip, uid_t id, utf8string *u8s,
 		 * Check entry for staleness first, as user's id
 		 * may have changed and may need to be remapped.
 		 * Note that we don't evict entries from the cache
-		 * if we're having trouble contacting nfsmapid(1m)
+		 * if we're having trouble contacting nfsmapid(8)
 		 */
 		if (TIMEOUT(p->id_time) && (*cip->nfsidmap_daemon_dh) != NULL) {
 			nfs_idmap_cache_rment(p);
@@ -1486,7 +1486,7 @@ nfs_idmap_cache_i2s_lkup(idmap_cache_info_t *cip, uid_t id, uint_t *hashno,
 		 * Check entry for staleness first, as user's id
 		 * may have changed and may need to be remapped.
 		 * Note that we don't evict entries from the cache
-		 * if we're having trouble contacting nfsmapid(1m)
+		 * if we're having trouble contacting nfsmapid(8)
 		 */
 		if (TIMEOUT(p->id_time) && (*cip->nfsidmap_daemon_dh) != NULL) {
 			nfs_idmap_cache_rment(p);
@@ -1570,7 +1570,7 @@ nfs_idmap_cache_i2s_insert(idmap_cache_info_t *cip, uid_t id, utf8string *u8s,
 		 * Check entry for staleness first, as user's id
 		 * may have changed and may need to be remapped.
 		 * Note that we don't evict entries from the cache
-		 * if we're having trouble contacting nfsmapid(1m)
+		 * if we're having trouble contacting nfsmapid(8)
 		 */
 		if (TIMEOUT(p->id_time) && (*cip->nfsidmap_daemon_dh) != NULL) {
 			nfs_idmap_cache_rment(p);

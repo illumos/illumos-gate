@@ -1153,7 +1153,7 @@ ehci_init_workaround(ehci_state_t	*ehcip)
 			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 			    "If you are interested in enabling USB2.x");
 			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-			    "support please, refer to the ehci(7D) man page.");
+			    "support please, refer to the ehci(4D) man page.");
 			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 			    "Please also refer to www.sun.com/io for");
 			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,

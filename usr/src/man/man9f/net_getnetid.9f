@@ -33,7 +33,7 @@ The \fBnet_getnetid()\fR function returns the value of the instance identifier.
 The \fBnet_getnetid()\fR function may be called from user,  kernel, or
 interrupt context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -47,4 +47,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBnet_protocol_lookup\fR(9F)
+.BR net_protocol_lookup (9F)

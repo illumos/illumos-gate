@@ -439,9 +439,11 @@ No \fBPCMCIA \fRhardware installed.
 .SH CONTEXT
 These functions may be called from user or kernel context.
 .SH SEE ALSO
-\fBcsx_ConvertSpeed\fR(9F), \fBcsx_MapMemPage\fR(9F),
-\fBcsx_ModifyWindow\fR(9F), \fBcsx_RegisterClient\fR(9F),
-\fBcsx_RequestConfiguration\fR(9F)
+.BR csx_ConvertSpeed (9F),
+.BR csx_MapMemPage (9F),
+.BR csx_ModifyWindow (9F),
+.BR csx_RegisterClient (9F),
+.BR csx_RequestConfiguration (9F)
 .sp
 .LP
 \fIPC\fR \fICard\fR \fI95\fR \fIStandard,\fR PCMCIA/JEIDA

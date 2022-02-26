@@ -49,8 +49,8 @@ dir  path=usr/lib/locale/C/LC_MESSAGES
 file path=usr/lib/locale/C/LC_MESSAGES/SCA1000.mo mode=0444
 file path=usr/lib/locale/C/LC_MESSAGES/SCA500.mo mode=0444
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/dca.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/dca.4d
 driver name=dca \
     alias=pci108e,5454 \
     alias=pci108e,5455 \

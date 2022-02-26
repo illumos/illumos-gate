@@ -178,9 +178,13 @@ allocated.
 .in -2
 
 .SH SEE ALSO
-\fBattach\fR(9E), \fBprobe\fR(9E), \fBscsi_slave\fR(9F),
-\fBscsi_unprobe\fR(9F), \fBscsi_unslave\fR(9F), \fBscsi_device\fR(9S),
-\fBscsi_inquiry\fR(9S)
+.BR attach (9E),
+.BR probe (9E),
+.BR scsi_slave (9F),
+.BR scsi_unprobe (9F),
+.BR scsi_unslave (9F),
+.BR scsi_device (9S),
+.BR scsi_inquiry (9S)
 .sp
 .LP
 \fIANSI Small Computer System Interface-2 (SCSI-2)\fR

@@ -32,7 +32,7 @@ it checks for the authorization attribute, \fBsolaris.mail.mailq\fR. If the
 check for the invoking user succeeds, \fBsendmail\fR \fB-bp\fR is executed with
 the remaining argument vector. Otherwise, an error message is printed. This
 authorization attribute is by default enabled for all users. It can be disabled
-by modifying the Basic Solaris User entry in \fBprof_attr\fR(4).
+by modifying the Basic Solaris User entry in \fBprof_attr\fR(5).
 .SH OPTIONS
 .sp
 .LP
@@ -43,7 +43,7 @@ The following options are supported:
 \fB\fB-Ac\fR\fR
 .ad
 .RS 17n
-Like \fBsendmail\fR(1M), this flag tells \fBmailq\fR to use \fBsubmit.cf\fR
+Like \fBsendmail\fR(8), this flag tells \fBmailq\fR to use \fBsubmit.cf\fR
 rather than \fBsendmail.cf\fR even  if  the  operation  mode  does  not
 indicate an initial mail submission. This will result in the client queue
 \fB/var/spool/clientmqueue\fR being displayed rather than the default server
@@ -178,4 +178,6 @@ client queue
 .SH SEE ALSO
 .sp
 .LP
-\fBsendmail\fR(1M), \fBprof_attr\fR(4), \fBattributes\fR(5)
+.BR prof_attr (5),
+.BR attributes (7),
+.BR sendmail (8)

@@ -167,7 +167,7 @@ fmd_adm_moddstat_1_svc(char *name,
 	 * Note: the bcopy() here is valid only if no FMD_TYPE_STRING stats
 	 * are present in mp->mod_stats.  We don't use any for the daemon-
 	 * maintained stats and provide this function in order to reduce the
-	 * overhead of the fmstat(1M) default view, where these minimal stats
+	 * overhead of the fmstat(8) default view, where these minimal stats
 	 * must be retrieved for all of the active modules.
 	 */
 	(void) pthread_mutex_lock(&mp->mod_stats_lock);

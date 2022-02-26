@@ -40,8 +40,8 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/amr group=sys
 file path=kernel/drv/amr.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/amr.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/amr.4d
 driver name=amr class=scsi \
     alias=pci1000,532 \
     alias=pci1028,e \

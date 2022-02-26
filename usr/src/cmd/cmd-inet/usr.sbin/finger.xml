@@ -101,9 +101,9 @@ status and individual users.
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='in.fingerd' section='1M'
+			<manpage title='in.fingerd' section='8'
 			    manpath='/usr/share/man' />
-			<manpage title='fingerd' section='1M'
+			<manpage title='fingerd' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

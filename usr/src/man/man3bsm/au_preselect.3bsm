@@ -21,7 +21,7 @@ The \fBau_preselect()\fR function determines whether the audit event
 \fIevent\fR is preselected  against the binary preselection mask pointed to by
 \fImask_p\fR (usually obtained by a call to \fBgetaudit\fR(2)). The
 \fBau_preselect()\fR function looks up the classes associated with \fIevent\fR
-in \fBaudit_event\fR(4) and compares them with the classes in \fImask_p\fR. If
+in \fBaudit_event\fR(5) and compares them with the classes in \fImask_p\fR. If
 the classes associated with \fIevent\fR match the classes in the specified
 portions of the binary preselection mask  pointed to by \fImask_p\fR, the event
 is said to be preselected.
@@ -64,8 +64,8 @@ preselection mask.
 .sp
 .LP
 The \fIflag\fR argument tells \fBau_preselect()\fR how to read the
-\fBaudit_event\fR(4) database. Upon initial invocation, \fBau_preselect()\fR
-reads the \fBaudit_event\fR(4) database and allocates space in an internal
+\fBaudit_event\fR(5) database. Upon initial invocation, \fBau_preselect()\fR
+reads the \fBaudit_event\fR(5) database and allocates space in an internal
 cache for each entry with \fBmalloc\fR(3C). In subsequent invocations, the
 value of \fIflag\fR determines where \fBau_preselect()\fR obtains audit event
 information. The following are the valid values of \fIflag\fR:
@@ -75,7 +75,7 @@ information. The following are the valid values of \fIflag\fR:
 \fB\fBAU_PRS_REREAD\fR\fR
 .ad
 .RS 19n
-Get audit event information by searching the \fBaudit_event\fR(4) database.
+Get audit event information by searching the \fBaudit_event\fR(5) database.
 .RE
 
 .sp
@@ -92,7 +92,7 @@ invocation. This option is much faster.
 .LP
 Upon successful completion,\fBau_preselect()\fR returns 0 if \fIevent\fR is not
 preselected or 1 if \fIevent\fR is preselected. If \fBau_preselect()\fR could
-not allocate memory or could not find  \fIevent\fR in the \fBaudit_event\fR(4)
+not allocate memory or could not find  \fIevent\fR in the \fBaudit_event\fR(5)
 database, \(mi1 is returned.
 .SH FILES
 .ne 2
@@ -115,7 +115,7 @@ associated audit classes
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -132,9 +132,14 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBgetaudit\fR(2), \fBau_open\fR(3BSM),
-\fBgetauclassent\fR(3BSM), \fBgetauevent\fR(3BSM), \fBmalloc\fR(3C),
-\fBaudit_class\fR(4), \fBaudit_event\fR(4), \fBattributes\fR(5)
+.BR getaudit (2),
+.BR au_open (3BSM),
+.BR getauclassent (3BSM),
+.BR getauevent (3BSM),
+.BR malloc (3C),
+.BR audit_class (5),
+.BR audit_event (5),
+.BR attributes (7)
 .SH NOTES
 .LP
 The \fBau_preselect()\fR function is normally called prior to constructing and

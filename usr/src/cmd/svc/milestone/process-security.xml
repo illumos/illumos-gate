@@ -76,7 +76,7 @@
 				<loctext xml:lang='C'>Security Flag Configuration</loctext>
 			</common_name>
 			<documentation>
-				<manpage title='security-flags' section='5'
+				<manpage title='security-flags' section='7'
 					 manpath='/usr/share/man' />
 				<manpage title='psecflags' section='1'
 					 manpath='/usr/share/man' />

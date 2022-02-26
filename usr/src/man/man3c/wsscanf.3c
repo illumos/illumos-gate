@@ -32,7 +32,7 @@ string for \fBwsscanf()\fR and on Extended Unix Code (EUC) character string for
 Upon successful completion, \fBwsscanf()\fR returns the number of characters
 matched. Otherwise, it returns a negative value.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -46,4 +46,7 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBwsprintf\fR(3C), \fBprintf\fR(3C), \fBscanf\fR(3C), \fBattributes\fR(5)
+.BR printf (3C),
+.BR scanf (3C),
+.BR wsprintf (3C),
+.BR attributes (7)

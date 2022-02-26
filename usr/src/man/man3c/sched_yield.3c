@@ -73,7 +73,7 @@ No errors are defined.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -87,11 +87,13 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBlibrt\fR(3LIB), \fBsched.h\fR(3HEAD), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR sched.h (3HEAD),
+.BR librt (3LIB),
+.BR attributes (7),
+.BR standards (7)

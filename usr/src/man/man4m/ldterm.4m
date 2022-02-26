@@ -1,0 +1,282 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH LDTERM 4M "June 20, 2021"
+.SH NAME
+ldterm \- standard STREAMS terminal line discipline module
+.SH SYNOPSIS
+.nf
+#include <sys/stream.h>
+.fi
+
+.LP
+.nf
+#include <sys/termios.h>
+.fi
+
+.LP
+.nf
+int ioctl(\fIfd\fR,I_PUSH,"ldterm");
+.fi
+
+.SH DESCRIPTION
+The \fBldterm\fR STREAMS module provides most of the \fBtermio\fR(4I) terminal
+interface.  The \fBvis \fRmodule does not perform the low-level device control
+functions specified by flags in the \fBc_cflag\fR word of the
+\fBtermio/termios\fR structure, or by the \fBIGNBRK\fR, \fBIGNPAR\fR,
+\fBPARMRK\fR, or \fBINPCK\fR flags in the \fBc_iflag\fR word of the
+\fBtermio/termios\fR structure.  Those functions must be performed by the
+driver or by modules pushed below the  \fBldterm\fR module. \fBThe \fR\fBldterm
+module\fR performs all other \fBtermio/termios\fR functions, though some may
+require the cooperation of the driver or modules pushed below \fBldterm\fR and
+may not be performed in some cases.  These include the \fBIXOFF\fR flag in the
+\fBc_iflag\fR word and the delays  specified in the \fBc_oflag\fR word.
+.sp
+.LP
+\fBThe \fR\fBldterm module\fR also handles single and multi-byte characters
+from various codesets including both Extended Unix Code (\fBEUC\fR) and non-EUC
+codesets.
+.sp
+.LP
+The remainder of this section describes the processing of various \fBSTREAMS\fR
+messages on the read- and write-side.
+.SS "Read-side Behavior"
+Various types of STREAMS messages are processed as follows:
+.sp
+.ne 2
+.na
+\fB\fBM_BREAK\fR \fR
+.ad
+.RS 12n
+Depending on the state of the \fBBRKINT\fR flag, either an interrupt signal is
+generated or the message is treated as if it were an \fBM_DATA\fR message
+containing a single \fBASCII NUL\fR character when this message is received.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBM_DATA\fR \fR
+.ad
+.RS 12n
+This message is normally processed using the standard \fBtermio\fR input
+processing. If the \fBICANON\fR flag is set, a single input record (``line'')
+is accumulated in an internal buffer and sent upstream when a line-terminating
+character is received. If the \fBICANON\fR flag is not set, other input
+processing is performed and the processed data are passed upstream.
+.sp
+If output is to be stopped or started as a result of the arrival of characters
+(usually \fBCNTRL-Q\fR and \fBCNTRL-S),\fR \fBM_STOP\fR and \fBM_START\fR
+messages are sent downstream. If the \fBIXOFF\fR flag is set and input is to be
+stopped or started as a result of flow-control considerations, \fBM_STOPI\fR
+and \fBM_STARTI\fR messages are sent downstream.
+.sp
+\fBM_DATA\fR messages are sent downstream, as necessary, to perform echoing.
+.sp
+If a signal is to be generated, an \fBM_FLUSH\fR message with a flag byte of
+\fBFLUSHR\fR is placed on the read queue. If the signal is also to flush
+output, an \fBM_FLUSH\fR message with a flag  byte of \fBFLUSHW\fR is sent
+downstream.
+.RE
+
+.sp
+.LP
+All other messages are passed upstream unchanged.
+.SS "Write-side Behavior"
+Various types of \fBSTREAMS\fR messages are processed as follows:
+.sp
+.ne 2
+.na
+\fB\fBM_FLUSH\fR \fR
+.ad
+.RS 13n
+The write queue of the module is flushed of all its data messages and the
+message is passed downstream.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBM_IOCTL\fR \fR
+.ad
+.RS 13n
+The function of this \fBioctl\fR is performed and the message is passed
+downstream in most cases.  The \fBTCFLSH\fR and \fBTCXONC\fR \fBioctls\fR can
+be performed entirely in the  \fBldterm\fR module, so the reply is sent
+upstream and the message is not passed downstream.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBM_DATA\fR \fR
+.ad
+.RS 13n
+If the \fBOPOST\fR flag is set, or both the \fBXCASE\fR and \fBICANON\fR flags
+are set, output processing is performed and the processed message is passed
+downstream along with any \fBM_DELAY\fR messages generated.  Otherwise, the
+message is passed downstream without change.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBM_CTL\fR \fR
+.ad
+.RS 13n
+If the size of the data buffer associated with the message is the size of
+\fBstruct iocblk\fR, \fBldterm\fR will perform functional negotiation to
+determine where the \fBtermio\fR(4I) processing is to be done. If the command
+field of the \fBiocblk\fR structure (\fBioc_cmd\fR) is set to
+\fBMC_NO_CANON\fR, the input canonical processing normally performed on
+\fBM_DATA\fR messages is disabled and those messages are passed upstream
+unmodified. (This is for the use of modules or drivers that perform their own
+input processing, such as a pseudo-terminal in \fBTIOCREMOTE\fR mode connected
+to a program that performs this processing). If the command is
+\fBMC_DO_CANON\fR, all input processing is enabled. If the command is
+\fBMC_PART_CANON\fR, then an \fBM_DATA\fR message containing a \fBtermios\fR
+structure is expected to be attached to the original \fBM_CTL\fR message. The
+\fBldterm\fR module will examine the \fBiflag\fR, \fBoflag\fR, and
+\fB\fR\fBlflag\fR fields of the \fBtermios\fR structure and from that point on,
+will process only those flags that have not been turned \fBON.\fR If none of
+the above commands are found, the message is ignored. In any case, the message
+is passed upstream.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBM_FLUSH\fR \fR
+.ad
+.RS 13n
+The read queue of the module is flushed of all its data messages and all data
+in the record being accumulated are also flushed.  The message is passed
+upstream.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBM_IOCACK\fR \fR
+.ad
+.RS 13n
+The data contained within the message, which is to be returned to the process,
+are augmented if necessary, and the message is passed upstream.
+.RE
+
+.sp
+.LP
+All other messages are passed downstream unchanged.
+.SH IOCTLS
+\fBThe \fR\fBldterm module\fR  processes the following \fBTRANSPARENT\fR
+ioctls. All others are passed downstream.
+.sp
+.ne 2
+.na
+\fB\fBTCGETS/TCGETA\fR \fR
+.ad
+.sp .6
+.RS 4n
+The message is passed downstream. If an acknowledgment is seen, the data
+provided by the driver and modules downstream are augmented and the
+acknowledgement is passed upstream.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBTCSETS/TCSETSW/TCSETSF/TCSETA/TCSETAW/TCSETAF\fR \fR
+.ad
+.sp .6
+.RS 4n
+The parameters that control the behavior of the \fBldterm\fR module are
+changed. If a mode change requires options at the stream head to be changed, an
+\fBM_SETOPTS\fR message is sent upstream.  If the \fBICANON\fR flag is turned
+on or off, the read mode at the stream head is changed to message-nondiscard or
+byte-stream mode, respectively. If the \fBTOSTOP\fR flag is turned on or off,
+the tostop mode at the  stream head is turned on or off, respectively. In any
+case,  \fBldterm\fR passes the \fBioctl\fR on downstream for possible
+additional processing.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBTCFLSH\fR \fR
+.ad
+.sp .6
+.RS 4n
+If the argument is 0, an \fBM_FLUSH\fR message with a flag byte of \fBFLUSHR\fR
+is sent downstream and placed on the read queue. If the argument is 1, the
+write queue is flushed of all its data messages and an \fBM_FLUSH\fR message
+with a flag byte of \fBFLUSHW\fR is sent  upstream and downstream. If the
+argument is 2, the write queue is flushed of all its data messages and an
+\fBM_FLUSH\fR message with a flag byte of \fBFLUSHRW\fR is sent  downstream and
+placed on the read queue.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBTCXONC\fR \fR
+.ad
+.sp .6
+.RS 4n
+If the argument is 0 and output is not already stopped, an \fBM_STOP\fR message
+is sent downstream. If the argument is 1 and output is stopped, an
+\fBM_START\fR message is sent  downstream. If the argument is 2 and input is
+not already stopped, an \fBM_STOPI\fR message is sent downstream. If the
+argument is 3 and input is stopped, an \fBM_STARTI\fR message  is sent
+downstream.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBTCSBRK\fR \fR
+.ad
+.sp .6
+.RS 4n
+The message is passed downstream, so the driver has a chance to drain the data
+and then send an \fBM_IOCACK\fR message upstream.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEUC_WSET\fR \fR
+.ad
+.sp .6
+.RS 4n
+This call takes a pointer to an \fBeucioc\fR structure, and uses it to set the
+\fBEUC\fR line discipline's local definition for the code set widths to be used
+for subsequent operations. Within the stream, the line discipline may
+optionally notify other modules of this setting using \fBM_CTL\fR messages.
+When this call is received and the \fBeucioc\fR structure contains valid data,
+the line discipline changes into \fBEUC \fRhandling mode once the
+\fBeucioc\fR data is completely transferred to an internal data structure.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEUC_WGET\fR \fR
+.ad
+.sp .6
+.RS 4n
+This call takes a pointer to an \fBeucioc\fR structure, and returns in it the
+\fBEUC\fR code set widths currently in use by the \fBEUC\fR line discipline. If
+the current codeset of the line discipline is not an \fBEUC\fR one, the result
+is meaningless.
+.RE
+
+.SH SEE ALSO
+.BR termios (3C),
+.BR console (4D),
+.BR termio (4I)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

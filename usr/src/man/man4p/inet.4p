@@ -1,0 +1,181 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (C) 2000, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH INET 4P "Aug 3, 2000"
+.SH NAME
+inet \- Internet protocol family
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <sys/types.h>\fR
+.fi
+
+.LP
+.nf
+\fB#include <netinet/in.h>\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The Internet protocol family implements a collection of protocols which are
+centered around the Internet Protocol ("\fBIP\fR") and which share a common
+address format. The Internet family protocols can be accessed using the socket
+interface, where they support the \fBSOCK_STREAM\fR, \fBSOCK_DGRAM\fR, and
+\fBSOCK_RAW\fR socket types, or the Transport Level Interface (TLI), where they
+support the connectionless (\fBT_CLTS\fR)  and connection oriented
+(\fBT_COTS_ORD\fR) service types.
+.SH PROTOCOLS
+.LP
+The Internet protocol family is comprised of the Internet Protocol
+("\fBIP\fR"), the Address Resolution Protocol ("\fBARP\fR"), the Internet
+Control Message Protocol ("\fBICMP\fR"), the Transmission Control Protocol
+("\fBTCP\fR"), and the User Datagram Protocol ("\fBUDP\fR").
+.sp
+.LP
+\fBTCP\fR supports the socket interface's \fBSOCK_STREAM\fR abstraction and
+\fBTLI\fR's \fBT_COTS_ORD\fR service type. \fBUDP\fR supports the
+\fBSOCK_DGRAM\fR socket abstraction and the \fBTLI\fR \fBT_CLTS\fR service
+type. See \fBtcp\fR(4P) and \fBudp\fR(4P). A direct interface to \fBIP\fR is
+available using both \fBTLI\fR and the socket interface (see \fBip\fR(4P)).
+\fBICMP\fR is used by the kernel to handle and report errors in protocol
+processing. It is also accessible to user programs (see \fBicmp\fR(4P)).
+\fBARP\fR is used to translate 32-bit \fBIP\fR addresses into 48-bit Ethernet
+addresses. See \fBarp\fR(4P).
+.sp
+.LP
+The 32-bit \fBIP\fR address is divided into network number and host number
+parts. It is frequency-encoded. The most-significant bit is zero in Class A
+addresses, in which the high-order 8 bits represent the network number. Class B
+addresses have their high order two bits set to 10 and use the high-order 16
+bits as the network number field. Class C addresses have a 24-bit network
+number part of which the high order three bits are 110. Sites with a cluster of
+\fBIP\fR networks may chose to use a single network number for the cluster;
+this is done by using subnet addressing. The host number portion of the address
+is further subdivided into subnet number and host number parts. Within a
+subnet, each subnet appears to be an individual network. Externally, the entire
+cluster appears to be a single, uniform network requiring only a single routing
+entry. Subnet addressing is enabled and examined by the following
+\fBioctl\fR(2) commands. They have the same form as the \fBSIOCSIFADDR\fR
+command.
+.sp
+.ne 2
+.na
+\fB\fBSIOCSIFNETMASK\fR\fR
+.ad
+.RS 18n
+Set interface network mask. The network mask defines the network part of the
+address; if it contains more of the address than the address type would
+indicate, then subnets are in use.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSIOCGIFNETMASK\fR\fR
+.ad
+.RS 18n
+Get interface network mask.
+.RE
+
+.SH ADDRESSING
+.LP
+\fBIP\fR addresses are four byte quantities, stored in network byte order.
+\fBIP\fR addresses should be manipulated using the byte order conversion
+routines. See  \fBbyteorder\fR(3C).
+.sp
+.LP
+Addresses in the Internet protocol family use the  \fBsockaddr_in\fR structure,
+which has that following members:
+.sp
+.in +2
+.nf
+short    sin_family;
+ushort_t sin_port;
+struct   in_addr  sin_addr;
+char     sin_zero[8];
+.fi
+.in -2
+
+.sp
+.LP
+Library routines are provided to manipulate structures of this form; See
+\fBinet\fR(3SOCKET).
+.sp
+.LP
+The \fBsin_addr\fR field of the \fBsockaddr_in\fR structure specifies a local
+or remote \fBIP\fR address.  Each network interface has its own unique \fBIP\fR
+address.  The special value \fBINADDR_ANY\fR may be used in this field to
+effect "wildcard" matching. Given in a \fBbind\fR(3SOCKET) call, this value
+leaves the local \fBIP\fR address of the socket unspecified, so that the socket
+will receive connections or messages directed at any of the valid \fBIP\fR
+addresses of the system. This can prove useful when a process neither knows nor
+cares what the local \fBIP\fR address is or when a process wishes to receive
+requests using all of its network interfaces. The \fBsockaddr_in\fR structure
+given in the \fBbind\fR(3SOCKET) call must specify an \fBin_addr\fR value of
+either \fBINADDR_ANY\fR or one of the system's valid \fBIP\fR addresses.
+Requests to bind any other address will elicit the error  \fBEADDRNOTAVAIL\fR.
+When a \fBconnect\fR(3SOCKET) call is made for a socket that has a wildcard
+local address, the system sets the \fBsin_addr\fR field of the socket to the
+\fBIP\fR address of the network interface that the packets for that connection
+are routed through.
+.sp
+.LP
+The \fBsin_port\fR field of the \fBsockaddr_in\fR structure specifies a port
+number used by \fBTCP\fR or \fBUDP.\fR The local port address specified in a
+\fBbind\fR(3SOCKET) call is restricted to be greater than \fBIPPORT_RESERVED\fR
+(defined in <\fB<netinet/in.h>\fR>) unless the creating process is running as
+the superuser, providing a space of protected port numbers. In addition, the
+local port address must not be in use by any socket of same address family and
+type. Requests to bind sockets to port numbers being used by other sockets
+return the error \fBEADDRINUSE\fR. If the local port address is specified as 0,
+then the system picks a unique port address greater than \fBIPPORT_RESERVED\fR.
+A unique local port address is also picked when a socket which is not bound is
+used in a \fBconnect\fR(3SOCKET) or \fBsendto\fR (see \fBsend\fR(3SOCKET))
+call. This allows programs which do not care which local port number is used to
+set up \fBTCP\fR connections by simply calling \fBsocket\fR(3SOCKET) and then
+\fBconnect\fR(3SOCKET), and to send \fBUDP\fR datagrams with a
+\fBsocket\fR(3SOCKET) call followed by a \fBsendto()\fR call.
+.sp
+.LP
+Although this implementation restricts sockets to unique local port numbers,
+\fBTCP\fR allows multiple simultaneous connections involving the same local
+port number so long as the remote \fBIP\fR addresses or port numbers are
+different for each connection. Programs may explicitly override the socket
+restriction by setting the \fBSO_REUSEADDR\fR socket option with
+\fBsetsockopt\fR (see \fBgetsockopt\fR(3SOCKET)).
+.sp
+.LP
+\fBTLI\fR applies somewhat different semantics to the binding of local port
+numbers. These semantics apply when Internet family protocols are used using
+the \fBTLI\fR.
+.SH SEE ALSO
+.LP
+.BR ioctl (2),
+.BR byteorder (3C),
+.BR gethostbyname (3NSL),
+.BR bind (3SOCKET),
+.BR connect (3SOCKET),
+.BR getnetbyname (3SOCKET),
+.BR getprotobyname (3SOCKET),
+.BR getservbyname (3SOCKET),
+.BR getsockopt (3SOCKET),
+.BR send (3SOCKET),
+.BR sockaddr (3SOCKET),
+.BR socket (3SOCKET),
+.BR arp (4P),
+.BR icmp (4P),
+.BR ip (4P),
+.BR tcp (4P),
+.BR udp (4P)
+.sp
+.LP
+Network Information Center, \fIDDN Protocol Handbook\fR (3 vols.), Network
+Information Center, \fBSRI\fR International, Menlo Park, Calif., 1985.
+.SH NOTES
+.LP
+The Internet protocol support is subject to change as the Internet protocols
+develop.  Users should not depend on details of the current implementation, but
+rather the services exported.

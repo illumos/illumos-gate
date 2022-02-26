@@ -61,7 +61,9 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBddi_get_lbolt\fR(9F), \fBdrv_usectohz\fR(9F), \fBdrv_usecwait\fR(9F)
+.BR ddi_get_lbolt (9F),
+.BR drv_usectohz (9F),
+.BR drv_usecwait (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

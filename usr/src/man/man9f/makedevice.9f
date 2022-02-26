@@ -61,4 +61,5 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBgetmajor\fR(9F), \fBgetminor\fR(9F)
+.BR getmajor (9F),
+.BR getminor (9F)

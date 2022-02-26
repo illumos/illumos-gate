@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * probe-printer.c : Probe for prnio(7i) printer device information
+ * probe-printer.c : Probe for prnio(4I) printer device information
  *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -8,8 +8,6 @@
  * Licensed under the Academic Free License version 2.1
  *
  **************************************************************************/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -69,8 +67,8 @@ prnio_out:
 }
 
 /*
- * It is assumed that all devices that support prnio(7i), also have a link
- * in /dev/printers.  
+ * It is assumed that all devices that support prnio(4I), also have a link
+ * in /dev/printers.
  */
 static char *
 prnio_device_name(void)
@@ -135,7 +133,7 @@ main(int argc, char *argv[])
 		goto out;
 	}
 
-	/* Probe the printer for characteristics via prnio(7i) */
+	/* Probe the printer for characteristics via prnio(4I) */
 	ret = prnio_printer_info(device_file, &manufacturer, &model,
 			&description, &serial_number, &command_set);
 	if (ret < 0) {

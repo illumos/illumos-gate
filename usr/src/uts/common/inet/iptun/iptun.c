@@ -1115,12 +1115,12 @@ iptun_setparams(iptun_t *iptun, const iptun_kparams_t *ik)
 
 	if (ik->iptun_kparam_flags & IPTUN_KPARAM_SECINFO) {
 		/*
-		 * Set IPsec policy originating from the ifconfig(1M) command
+		 * Set IPsec policy originating from the ifconfig(8) command
 		 * line.  This is traditionally called "simple" policy because
 		 * the ipsec_req_t (iptun_kparam_secinfo) can only describe a
 		 * simple policy of "do ESP on everything" and/or "do AH on
 		 * everything" (as opposed to the rich policy that can be
-		 * defined with ipsecconf(1M)).
+		 * defined with ipsecconf(8)).
 		 */
 		if (iptun->iptun_typeinfo->iti_type == IPTUN_TYPE_6TO4) {
 			/*

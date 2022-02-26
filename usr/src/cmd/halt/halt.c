@@ -45,7 +45,7 @@
 
 
 /*
- * Common code for halt(1M), poweroff(1M), and reboot(1M).  We use
+ * Common code for halt(8), poweroff(8), and reboot(8).  We use
  * argv[0] to determine which behavior to exhibit.
  */
 
@@ -1529,7 +1529,7 @@ main(int argc, char *argv[])
 
 	/*
 	 * If we're not forcing a crash dump, mark the system as quiescing for
-	 * smf(5)'s benefit, and idle the init process.
+	 * smf(7)'s benefit, and idle the init process.
 	 */
 	if (cmd != A_DUMP) {
 		if (direct_init(PCDSTOP) == -1) {

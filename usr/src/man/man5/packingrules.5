@@ -1,0 +1,183 @@
+'\" te
+.\"  Copyright (c) 1996 Sun Microsystems, Inc.  All Rights Reserved.
+.\"  Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PACKINGRULES 5 "Sep 8, 2015"
+.SH NAME
+packingrules \- packing rules file for filesync
+.SH SYNOPSIS
+.LP
+.nf
+\fB$\fR\fBHOME\fR\fB/.packingrules\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+\fB$\fR\fBHOME\fR\fB/.packingrules\fR is a packing rules file for
+\fBfilesync\fR. \fB$\fR\fBHOME\fR\fB/.packingrules\fR
+contains a list of directories and files that are to be packed and
+synchronized.  It also contains a list of directories and files that  are to be
+specifically excluded from packing and synchronization. See  \fBfilesync\fR(1).
+.LP
+The \fB$\fR\fBHOME\fR\fB/.packingrules\fR file is automatically created if
+users invoke \fBfilesync\fR with filename arguments. By using \fBfilesync\fR
+options, users can augment the packing rules in
+\fB$\fR\fBHOME\fR\fB/.packingrules\fR.
+.LP
+Many users choose to manually create the packing rules file and edit it by
+hand. Users can edit \fB$\fR\fBHOME\fR\fB/.packingrules\fR (using any editor)
+to permanently change the \fB$\fR\fBHOME\fR\fB/.packingrules\fR file, or to
+gain access to more powerful options that are not available from the command
+line (such as \fBIGNORE\fR commands). It is much easier to enter complex
+wildcard expressions by editing the \fB$\fR\fBHOME\fR\fB/.packingrules\fR file.
+.LP
+Blank lines and lines that begin with a pound sign  (`\fB#\fR') are ignored.
+.LP
+Any line can be continued by placing a backslash  (`\fB\e\fR\&') immediately
+before the  \fBNEWLINE.\fR
+.LP
+All other lines in the  \fB$\fR\fBHOME\fR\fB/.packingrules\fR file have one of
+the following formats:
+.sp
+.ne 2
+.na
+\fB\fBPACKINGRULES\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fImajor\fR. \fIminor\fR. This line is not actually required, but it should be
+the first  line of every packing rules file. This line identifies the packing
+rules file for the  \fBfile\fR(1) command and specifies a format version
+number. The current version number is 1.1. See \fBfile\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBBASE\fR \fIdirectory-1\fR [\fIdirectory-2\fR]\fR
+.ad
+.sp .6
+.RS 4n
+This line identifies a directory (or pair of directories) under which files
+should be packed and synchronized. At least one directory name must be
+specified. For rules that are to be used by \fBfilesync\fR a second directory
+name (where the copies are to be kept) must also be specified. The arguments
+must be fully qualified path names, and may include environment variables.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBLIST\fR \fIname\fR \|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+This line enumerates a list of files and sub-directories  (beneath the current
+\fBBASE)\fR that are to be kept  synchronized. This specification is recursive,
+in that specifying the name of a directory automatically includes all files and
+subdirectories it contains. Regular expressions  (as described in \fBglob\fR
+and \fBgmatch\fR) are permitted. See \fBglob\fR(1) and  \fBgmatch\fR(3GEN).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBIGNORE\fR \fIname\fR \|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+This line enumerates a list of files that are not to be kept synchronized.
+Regular expressions  (using \fBglob\fR  and \fBgmatch\fR) are permitted.
+.RE
+
+.sp
+.LP
+There are important differences between the arguments to \fBLIST\fR and
+\fBIGNORE\fR statements. The arguments to a \fBLIST\fR statement can contain
+slashes and are interpreted as file names relative to the  \fBBASE\fR
+directories. The arguments to an \fBIGNORE\fR statement are simpler names or
+expressions that cannot contain slashes. An \fBIGNORE\fR statement will not
+override a \fBLIST\fR statement. \fBIGNORE\fR statements only exclude files
+that are found beneath \fBLISTed\fR directories.
+.sp
+.LP
+If the first name argument to a  \fBLIST\fR statement begins with an
+exclamation point  (`\fB!\fR'), the remainder of the statement will be executed
+as a command. The command will be run in the current \fBBASE\fR directory. The
+output of the command will be treated as a  list of newline separated file
+names to be packed/synchronized. The resulting file names will be interpreted
+relative to the enclosing  \fBBASE\fR directory.
+.sp
+.LP
+If the first name argument to an  \fBIGNORE\fR statement begins with an
+exclamation point  (`\fB!\fR'), the remainder of the statement will be executed
+as a command. The command will be run in the current \fBBASE\fR directory. The
+command will be expected to figure out which names should not be synchronized.
+The output of the command will be treated as a list of newline separated file
+names that should be excluded from the packing and synchronization list.
+.sp
+.LP
+Commands will be broken into distinct arguments and run directly with  \fBsh
+\fR\fB-c\fR. Blanks can be embedded in an argument by escaping them with a
+backslash (`\fB\e\fR\&') or enclosing the argument in  double quotes (`
+\fB"\fR '). Double quotes can be passed in arguments by escaping the double quotes with
+a backslash (`\fB\e\fR\&').
+.sp
+.LP
+\fBLIST\fR lines only apply to the  \fBBASE\fR statement that precedes them.
+\fBIGNORE\fR lines can appear before any  \fBBASE\fR statement (in which case
+they apply to all \fBBASEs)\fR or after a  \fBBASE\fR statement (in which case
+they only apply to the  \fBBASE\fR that precedes them). Any number of  these
+statements can occur in any combination. The order is not important.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample \fB$\fR\fBHOME\fR\fB\&.packingrules\fR file.
+.sp
+.LP
+The use of these statements is illustrated in the following
+\fB$\fR\fBHOME\fR\fB\&.packingrules\fR file.
+
+.sp
+.in +2
+.nf
+#
+# junk files, not worth copying
+#
+IGNORE core *.o *.bak *%
+#
+# most of the stuff I want to keep in sync is in my $HOME
+#
+BASE /net/bigserver/export/home/myname $HOME
+# everything in my work sub-directory should be maintained
+LIST work
+# a few of my favorite mail boxes should be replicated
+LIST m/incoming
+LIST m/action
+LIST m/pending
+#
+# I like to carry around a couple of project directories
+# but skip all the postscript output
+#
+BASE /net/bigserver/export/projects $HOME/projects
+LIST poindexter epiphany
+IGNORE *.ps
+#
+# the foonly package should always be kept on every machine
+#
+BASE /net/bigserver/opt/foonly /opt/foonly
+LIST !cat .packinglist
+#
+# and the latest executables for the standard build environment
+#
+BASE /net/bigserver/export/buildenv $HOME/buildenv
+LIST !find . -type f -a -perm -111 -a -print
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.LP
+.BR file (1),
+.BR filesync (1)

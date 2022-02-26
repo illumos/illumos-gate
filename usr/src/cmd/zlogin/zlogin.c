@@ -39,7 +39,7 @@
  *   "already authenticated") is employed to take care of the initialization
  *   of the user's session.
  *
- * - "non-interactive login" is similar to su(1M); the user could issue
+ * - "non-interactive login" is similar to su(8); the user could issue
  *   'zlogin my-zone ls -l' and the command would be run as specified.
  *   In this mode, zlogin sets up pipes as the communication channel, and
  *   'su' is used to do the login setup work.
@@ -972,7 +972,7 @@ retry:
 }
 
 /*
- * Fetch the user_cmd brand hook for getting a user's passwd(4) entry.
+ * Fetch the user_cmd brand hook for getting a user's passwd(5) entry.
  */
 static const char *
 zone_get_user_cmd(brand_handle_t bh, const char *login, char *user_cmd,
@@ -1094,7 +1094,7 @@ zone_login_cmd(brand_handle_t bh, const char *login)
 
 /*
  * Prepare argv array for exec'd process; if we're passing commands to the
- * new process, then use su(1M) to do the invocation.  Otherwise, use
+ * new process, then use su(8) to do the invocation.  Otherwise, use
  * 'login -z <from_zonename> -f' (-z is an undocumented option which tells
  * login that we're coming from another zone, and to disregard its CONSOLE
  * checks).
@@ -1553,7 +1553,7 @@ noninteractive_login(char *zonename, const char *user_cmd, zoneid_t zoneid,
 	 * When the user types ^D, we get a zero length message on STDIN.
 	 * We need to echo that down the pipe to send it to the other side;
 	 * but by default, pipes don't propagate zero-length messages.  We
-	 * toggle that behavior off using I_SWROPT.  See streamio(7i).
+	 * toggle that behavior off using I_SWROPT.  See streamio(4I).
 	 */
 	if (ioctl(stdin_pipe[0], I_SWROPT, SNDZERO) != 0) {
 		zperror(gettext("could not configure STDIN pipe"));
@@ -2059,7 +2059,7 @@ main(int argc, char **argv)
 	}
 	/*
 	 * Get the brand specific user_cmd.  This command is used to get
-	 * a passwd(4) entry for login.
+	 * a passwd(5) entry for login.
 	 */
 	if (!interactive && !failsafe) {
 		if (zone_get_user_cmd(bh, login, user_cmd,

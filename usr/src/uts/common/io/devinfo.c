@@ -1987,7 +1987,7 @@ property:
 		 * Make copy of global property list if this devinfo refers
 		 * global properties different from what's on the devnames
 		 * array. It can happen if there has been a forced
-		 * driver.conf update. See mod_drv(1M).
+		 * driver.conf update. See update_drv(8).
 		 */
 		ASSERT(me->drv_major != -1);
 		if (node->devi_global_prop_list !=

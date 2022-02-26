@@ -99,7 +99,7 @@ Otherwise, an error number is returned to indicate the error.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -117,6 +117,9 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpthread_rwlock_init\fR(3C), \fBpthread_rwlock_rdlock\fR(3C),
-\fBpthread_rwlock_wrlock\fR(3C), \fBpthread_rwlockattr_init\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR pthread_rwlock_init (3C),
+.BR pthread_rwlock_rdlock (3C),
+.BR pthread_rwlock_wrlock (3C),
+.BR pthread_rwlockattr_init (3C),
+.BR attributes (7),
+.BR standards (7)

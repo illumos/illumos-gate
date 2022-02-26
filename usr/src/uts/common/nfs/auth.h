@@ -177,7 +177,7 @@ typedef struct nfsauth_res nfsauth_res_t;
 
 /*
  * For future extensibility, we version the data structures so
- * future incantations of mountd(1m) will know how to XDR decode
+ * future incantations of mountd(8) will know how to XDR decode
  * the arguments.
  */
 enum vtypes {

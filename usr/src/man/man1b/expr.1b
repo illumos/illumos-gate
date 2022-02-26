@@ -97,7 +97,7 @@ Multiplication, division, or remainder of the integer-valued arguments.
 The two forms of the matching operator above are synonymous. The matching
 operators \fB:\fR and \fBmatch\fR compare the first argument with the second
 argument which must be a regular expression. Regular expression syntax is the
-same as that of \fBregexp\fR(5), except that all patterns are "anchored"
+same as that of \fBregexp\fR(7), except that all patterns are "anchored"
 (treated as if they begin with \fB^\fR) and therefore \fB^\fR is not a special
 character, in that context. Normally, the matching operator returns the number
 of characters matched (\fB0\fR on failure). Alternatively, the
@@ -248,7 +248,10 @@ For invalid expressions.
 .SH SEE ALSO
 .sp
 .LP
-\fBsh\fR(1), \fBtest\fR(1), \fBattributes\fR(5), \fBregexp\fR(5)
+.BR sh (1),
+.BR test (1),
+.BR attributes (7),
+.BR regexp (7)
 .SH DIAGNOSTICS
 .sp
 .ne 2

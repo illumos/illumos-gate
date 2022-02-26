@@ -32,7 +32,7 @@ sources:
 .TP
 .ie t \(bu
 .el o
-\fB/etc/publickey\fR file. See \fBpublickey\fR(4).
+\fB/etc/publickey\fR file. See \fBpublickey\fR(5).
 .RE
 .RS +4
 .TP
@@ -40,7 +40,7 @@ sources:
 .el o
 \fBNIS\fR map ``publickey.byname''.
 The sources and their lookup order are specified in the
-\fB/etc/nsswitch.conf\fR file. See \fBnsswitch.conf\fR(4).
+\fB/etc/nsswitch.conf\fR file. See \fBnsswitch.conf\fR(5).
 .RE
 .sp
 .LP
@@ -55,7 +55,7 @@ null-terminated, hexadecimal strings. If the password supplied to
 but the \fIsecretkey\fR [0] will be set to \fINULL\fR.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -70,5 +70,7 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBsecure_rpc\fR(3NSL), \fBnsswitch.conf\fR(4), \fBpublickey\fR(4),
-\fBattributes\fR(5)
+.BR secure_rpc (3NSL),
+.BR nsswitch.conf (5),
+.BR publickey (5),
+.BR attributes (7)

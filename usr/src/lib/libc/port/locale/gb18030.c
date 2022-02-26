@@ -29,7 +29,7 @@
 /*
  * PRC National Standard GB 18030-2000 encoding of Chinese text.
  *
- * See gb18030(5) for details.
+ * See gb18030(7) for details.
  */
 
 #include "lint.h"

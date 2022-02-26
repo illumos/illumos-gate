@@ -453,7 +453,7 @@ type \fIs\fR. For example, \fIs\fR is a \fBSOCK_DGRAM\fR socket, while
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -468,6 +468,11 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBclose\fR(2), \fBaccept\fR(3SOCKET), \fBgetsockname\fR(3SOCKET),
-\fBselect\fR(3C), \fBsocket\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
-\fBsocket.h\fR(3HEAD), \fBattributes\fR(5)
+.BR close (2),
+.BR select (3C),
+.BR socket.h (3HEAD),
+.BR accept (3SOCKET),
+.BR getsockname (3SOCKET),
+.BR sockaddr (3SOCKET),
+.BR socket (3SOCKET),
+.BR attributes (7)

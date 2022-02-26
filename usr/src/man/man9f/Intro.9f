@@ -801,4 +801,5 @@ _
 .TE
 
 .SH SEE ALSO
-\fBIntro\fR(9E), \fBmutex\fR(9F)
+.BR Intro (9E),
+.BR mutex (9F)

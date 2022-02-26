@@ -275,7 +275,7 @@ completions are Notification events.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -293,8 +293,13 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBdat_cr_accept\fR(3DAT), \fBdat_cr_handoff\fR(3DAT),
-\fBdat_cr_reject\fR(3DAT), \fBdat_ep_connect\fR(3DAT),
-\fBdat_ep_dup_connect\fR(3DAT), \fBdat_ep_free\fR(3DAT),
-\fBdat_evd_dequeue\fR(3DAT), \fBdat_evd_set_unwaitable\fR(3DAT),
-\fBlibdat\fR(3LIB), \fBattributes\fR(5)
+.BR dat_cr_accept (3DAT),
+.BR dat_cr_handoff (3DAT),
+.BR dat_cr_reject (3DAT),
+.BR dat_ep_connect (3DAT),
+.BR dat_ep_dup_connect (3DAT),
+.BR dat_ep_free (3DAT),
+.BR dat_evd_dequeue (3DAT),
+.BR dat_evd_set_unwaitable (3DAT),
+.BR libdat (3LIB),
+.BR attributes (7)

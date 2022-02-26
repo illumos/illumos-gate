@@ -279,7 +279,7 @@ retry:
  * Return the next anonymous port in the privileged port range for
  * bind checking.  It starts at IPPORT_RESERVED - 1 and goes
  * downwards.  This is the same behavior as documented in the userland
- * library call rresvport(3N).
+ * library call rresvport(3SOCKET).
  *
  * TS note: skip multilevel ports.
  */

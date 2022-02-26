@@ -78,7 +78,7 @@ typedef struct iainfo {
 #define	IA_KY_MODE	3	/* interactive on/off */
 
 /*
- * The following is used by the dispadmin(1M) command for
+ * The following is used by the dispadmin(8) command for
  * scheduler administration and is not for general use.
  */
 

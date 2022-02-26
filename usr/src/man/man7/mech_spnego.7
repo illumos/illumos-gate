@@ -1,0 +1,122 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH MECH_SPNEGO 7 "Oct 4, 2004"
+.SH NAME
+mech_spnego \- Simple and Protected GSS-API Negotiation Mechanism
+.SH SYNOPSIS
+.LP
+.nf
+/usr/lib/gss/mech_spnego.so.1
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The SPNEGO security mechanism for \fBGSS\fR-\fBAPI\fR allows
+\fBGSS\fR-\fBAPI\fR applications to negotiate the actual security mechanism to
+be used in the \fBGSS\fR-\fBAPI\fR session. \fBmech_spnego.so.1\fR is a shared
+object module that is dynamically opened by applications that specify the
+SPNEGO Object Identifier (\fBOID\fR) in calls to the \fBGSS\fR-\fBAPI\fR
+functions (see \fBlibgss\fR(3LIB)).
+.sp
+.LP
+SPNEGO is described by IETF RFC 2478 and is intended to be used in environments
+where multiple \fBGSS\fR-\fBAPI \fRmechanisms are available to the client or
+server and neither side knows what mechanisms are supported by the other.
+.sp
+.LP
+When SPNEGO is used, it selects the list of mechanisms to advertise by reading
+the \fBGSS\fR mechanism configuration file, \fB/etc/gss/mech\fR (see
+\fBmech\fR(5)), and by listing all active mechanisms except for itself.
+.SH OPTIONS
+.sp
+.LP
+SPNEGO may be configured to function in two ways. The first way is to
+interoperate with Microsoft SSPI clients and servers that use the Microsoft
+"\fBNegotiate\fR" method, which is also based on SPNEGO. The Microsoft
+"\fBNegotiate\fR" mechanism does not strictly follow the IETF RFC. Therefore,
+use special handling in order to enable full interoperability. In order to
+interoperate, place option "\fB[ msinterop ]\fR" at the end of the SPNEGO line
+in \fB/etc/gss/mech\fR.
+.sp
+.LP
+This is an example (from \fB/etc/gss/mech\fR):
+.sp
+.in +2
+.nf
+\fBspnego	1.3.6.1.5.5.2	mech_spnego.so	[ msinterop ]\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Without the "\fB[ msinterop ]\fR" option, \fBmech_spnego\fR will follow the
+strict IETF RFC 2478 specification and will not be able to negotiate with
+Microsoft applications that try to use the SSPI "\fBNegotiate\fR" mechanism.
+.SH INTERFACES
+.sp
+.LP
+\fBmech_spnego.so.1\fR has no public interfaces. It is only activated and used
+through the \fBGSS\fR-\fBAPI\fR interface provided by \fBlibgss.so.1\fR (see
+\fBlibgss\fR(3LIB)).
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/usr/lib/gss/mech_spnego.so.1\fR\fR
+.ad
+.sp .6
+.RS 4n
+shared object file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/lib/sparcv9/gss/mech_spnego.so.1\fR\fR
+.ad
+.sp .6
+.RS 4n
+SPARC 64-bit shared object file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/lib/amd64/gss/mech_spnego.so.1\fR\fR
+.ad
+.sp .6
+.RS 4n
+x86 64-bit shared object file
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+MT Level	Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR Intro (3),
+.BR libgss (3LIB),
+.BR mech (5),
+.BR attributes (7)
+.sp
+.LP
+\fISolaris Security for Developers Guide\fR

@@ -42,5 +42,5 @@ No errors are defined.
 .Xr pthread_self 3C ,
 .Xr thr_self 3C ,
 .Xr thrd_create 3C ,
-.Xr attributes 5 ,
-.Xr threads 5
+.Xr attributes 7 ,
+.Xr threads 7

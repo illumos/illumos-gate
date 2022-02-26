@@ -141,7 +141,7 @@ terminates unsuccessfully.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -157,7 +157,7 @@ Interface Stability	Evolving
 .sp
 .LP
 \fBldap\fR(3LDAP), \fBldap_result\fR(3LDAP), \fBldap_getfilter\fR(3LDAP),
-\fBldap_error\fR(3LDAP) , \fBattributes\fR(5)
+\fBldap_error\fR(3LDAP) , \fBattributes\fR(7)
 .sp
 .LP
 Howes, T., Kille, S., Yeong, W., Robbins, C., Wenn, J. \fIRFC 1778, The String

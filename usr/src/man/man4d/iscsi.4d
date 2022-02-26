@@ -1,0 +1,104 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ISCSI 4D "Mar 30, 2009"
+.SH NAME
+iscsi \- iSCSI software initiator driver and service
+.SH DESCRIPTION
+.sp
+.LP
+The \fBiscsi\fR driver is a software initiator that transports SCSI commands
+over TCP/IP as described in \fIRFC 3720\fR.
+.sp
+.LP
+The initiator driver is administered through \fBiscsiadm\fR(8). The
+\fBiscsi\fR initiator service is managed by the service management facility,
+\fBsmf\fR(7), under the following FMRI:
+.sp
+.in +2
+.nf
+svc:/network/iscsi/initiator:default
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBiscsi\fR initiator acts as a host adapter driver that attaches the
+appropriate target driver, for example, \fBsd\fR(4D) for disks, or \fBst\fR(4D)
+for tapes) for devices it discovers. See the \fISystem Administration Guide:
+Devices and File Systems\fR for more information.
+.sp
+.LP
+Once enabled, the \fBiscsi\fR initiator service ensures the right timing to
+start the discovery and enumeration of iSCSI devices during boot, but it
+doesn't guarantee the success of discovery for certain iSCSI devices. If the
+service is disabled, \fBiscsi\fR driver stops the discovery and enumeration of
+iSCSI devices and also tries to offline all existing iSCSI devices.
+\fBiscsiadm\fR(8) works only when the service is enabled.
+.sp
+.LP
+iSCSI \fBboot\fR(8) is not affected by the status of the \fBiscsi\fR initiator
+service.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/iscsi\fR\fR
+.ad
+.RS 29n
+32-bit ELF kernel driver
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/iscsi\fR\fR
+.ad
+.RS 29n
+64-bit SPARC ELF kernel driver
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/iscsi\fR\fR
+.ad
+.RS 29n
+64-bit AMD64 ELF kernel driver
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/iscsi.conf\fR\fR
+.ad
+.RS 29n
+Driver configuration file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/iscsi/*\fR\fR
+.ad
+.RS 29n
+\fBiscsi\fR persistent store
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR sd (4D),
+.BR st (4D),
+.BR attributes (7),
+.BR smf (7),
+.BR iscsiadm (8)
+.sp
+.LP
+\fIRFC 3720 Internet Small Computer Systems Interface (iSCSI)\fR
+.sp
+.LP
+\fISystem Administration Guide: Devices and File Systems\fR

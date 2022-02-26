@@ -213,7 +213,7 @@ privilege PRIV_NET_BINDMLP
 	Allow a process to bind to a port that is configured as a
 	multi-level port(MLP) for the process's zone. This privilege
 	applies to both shared address and zone-specific address MLPs.
-	See tnzonecfg(4) from the Trusted Extensions manual pages for
+	See tnzonecfg(5) from the Trusted Extensions manual pages for
 	information on configuring MLP ports.
 	This privilege is interpreted only if the system is configured
 	with Trusted Extensions.
@@ -499,7 +499,7 @@ privilege PRIV_SYS_TRANS_LABEL
 privilege PRIV_VIRT_MANAGE
 
 	Allows a process to manage virtualized environments such as
-	xVM(5).
+	xVM(7).
 
 privilege PRIV_WIN_COLORMAP
 
@@ -605,7 +605,7 @@ privilege PRIV_WIN_UPGRADE_SL
 
 privilege PRIV_XVM_CONTROL
 
-	Allows a process access to the xVM(5) control devices for
+	Allows a process access to the xVM(7) control devices for
 	managing guest domains and the hypervisor. This privilege is
 	used only if booted into xVM on x86 platforms.
 

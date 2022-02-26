@@ -40,8 +40,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/rge group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/rge.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/rge.4d
 driver name=rge perms="* 0666 root sys" clone_perms="rge 0666 root sys" \
     alias=pci10ec,8136 \
     alias=pci10ec,8167 \

@@ -59,10 +59,15 @@ write operation.
 Other \fBI/O\fR statistics are updated through the use of the
 \fBkstat_queue\fR(9F) functions.
 .SH SEE ALSO
-\fBkstat_create\fR(9F), \fBkstat_named_init\fR(9F), \fBkstat_queue\fR(9F),
-\fBkstat_runq_back_to_waitq\fR(9F), \fBkstat_runq_enter\fR(9F),
-\fBkstat_runq_exit\fR(9F), \fBkstat_waitq_enter\fR(9F),
-\fBkstat_waitq_exit\fR(9F), \fBkstat_waitq_to_runq\fR(9F)
+.BR kstat_create (9F),
+.BR kstat_named_init (9F),
+.BR kstat_queue (9F),
+.BR kstat_runq_back_to_waitq (9F),
+.BR kstat_runq_enter (9F),
+.BR kstat_runq_exit (9F),
+.BR kstat_waitq_enter (9F),
+.BR kstat_waitq_exit (9F),
+.BR kstat_waitq_to_runq (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

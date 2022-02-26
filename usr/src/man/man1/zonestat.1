@@ -288,7 +288,7 @@ An interval of
 .Em default
 will use the configured interval of the zones
 monitoring service - see
-.Xr zonestatd 1m .
+.Xr zonestatd 8 .
 .Pp
 Interval is required.
 An interval of zero is not permitted.
@@ -360,7 +360,7 @@ The amount of resource used as a percent of the total resource.
 The amount of cpu uses as a percentage of the total cpu in a processor-set to
 which the zone is bound.
 A zone can only have processes bound to multiple processor sets if it is the
-global zone, or if psrset(1m) psets are used.
+global zone, or if psrset(8) psets are used.
 If multiple binding are found for a zone, its %PART will be the fraction used
 of all bound psets.
 For [total] and [system], %PART is the percent used of all cpus on the system.
@@ -471,15 +471,15 @@ zones, will be reported as used by
 .Em system .
 .Sh SEE ALSO
 .Xr date 1 ,
-.Xr pooladm 1m ,
-.Xr poolcfg 1m ,
-.Xr prctl 1m ,
-.Xr rcapadm 1m ,
-.Xr zoneadm 1m ,
-.Xr zonecfg 1m ,
-.Xr zonestatd 1m ,
 .Xr libzonestat 3lib ,
-.Xr timezone 4 ,
-.Xr privileges 5 ,
-.Xr resource_controls 5 ,
-.Xr zones 5
+.Xr timezone 5 ,
+.Xr privileges 7 ,
+.Xr resource_controls 7 ,
+.Xr zones 7 ,
+.Xr pooladm 8 ,
+.Xr poolcfg 8 ,
+.Xr prctl 8 ,
+.Xr rcapadm 8 ,
+.Xr zoneadm 8 ,
+.Xr zonecfg 8 ,
+.Xr zonestatd 8

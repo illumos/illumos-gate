@@ -24,8 +24,6 @@
 # Use is subject to license terms.
 #
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 	Notes Regarding Modification of generic_open.xml
 
 Any changes made to generic_open.xml will need to be considered for
@@ -35,7 +33,7 @@ in PSARC/2004/781:
 
 	...
 	The generic_limited_net profile explicitly disables all
-	smf(5) converted inetd services that are not required to
+	smf(7) converted inetd services that are not required to
 	run the window system, SVM, or vold.  It retains ssh and
 	X remote login as the remote login methods available.
 	...

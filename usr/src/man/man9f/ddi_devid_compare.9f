@@ -520,8 +520,12 @@ Failure; the \fIdevidstr\fR string was not valid.
 .SH CONTEXT
 These functions can be called from a user or kernel context.
 .SH SEE ALSO
-\fBdevid_get\fR(3DEVID), \fBlibdevid\fR(3LIB), \fBattributes\fR(5),
-\fBattach\fR(9E), \fBdetach\fR(9E), \fBkmem_free\fR(9F)
+.BR devid_get (3DEVID),
+.BR libdevid (3LIB),
+.BR attributes (7),
+.BR attach (9E),
+.BR detach (9E),
+.BR kmem_free (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -77,7 +77,7 @@ is set to indicate an error.
 For the full list of errors see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4
+.Xr proc 5
 and
 the
 .Sy ERRORS
@@ -102,4 +102,4 @@ in
 .Sh SEE ALSO
 .Xr pwrite 2 ,
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

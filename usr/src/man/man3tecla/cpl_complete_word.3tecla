@@ -385,7 +385,7 @@ that each thread uses a separately allocated \fBWordCompletion\fR object. In
 other words, if two threads want to do word completion, they should each call
 \fBnew_WordCompletion()\fR to allocate their own completion objects.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -401,5 +401,8 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBef_expand_file\fR(3TECLA), \fBgl_get_line\fR(3TECLA), \fBlibtecla\fR(3LIB),
-\fBpca_lookup_file\fR(3TECLA), \fBattributes\fR(5)
+.BR libtecla (3LIB),
+.BR ef_expand_file (3TECLA),
+.BR gl_get_line (3TECLA),
+.BR pca_lookup_file (3TECLA),
+.BR attributes (7)

@@ -655,7 +655,7 @@ conf_print(FILE *cstream, FILE *tstream)
 		exclude_opts++;		/* -P option goes to config file */
 	} else {
 		(void) fprintf(tstream, gettext(
-		    "# This file holds internal data for logadm(1M).\n"
+		    "# This file holds internal data for logadm(8).\n"
 		    "# Do not edit.\n"));
 	}
 	for (cp = Confinfo; cp; cp = cp->cf_next) {

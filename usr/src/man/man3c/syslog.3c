@@ -61,7 +61,7 @@ syslog, openlog, closelog, setlogmask \- control system log
 
 .SH DESCRIPTION
 .LP
-The \fBsyslog()\fR function sends a message to \fBsyslogd\fR(1M), which,
+The \fBsyslog()\fR function sends a message to \fBsyslogd\fR(8), which,
 depending on the configuration of \fB/etc/syslog.conf\fR, logs it in an
 appropriate system log, writes it to the system console, forwards it to a list
 of users, or forwards it to \fBsyslogd\fR on another host over the network.
@@ -212,7 +212,7 @@ System daemons.
 .ad
 .RS 14n
 The authentication / security / authorization system: \fBlogin\fR(1),
-\fBsu\fR(1M), \fBgetty\fR(1M).
+\fBsu\fR(8), \fBgetty\fR(8).
 .RE
 
 .sp
@@ -249,7 +249,7 @@ Designated for the \fBUUCP\fR system; it does not currently use \fBsyslog()\fR.
 .ad
 .RS 14n
 The \fBcron\fR/\fBat\fR facility; \fBcrontab\fR(1), \fBat\fR(1),
-\fBcron\fR(1M).
+\fBcron\fR(8).
 .RE
 
 .sp
@@ -258,7 +258,7 @@ The \fBcron\fR/\fBat\fR facility; \fBcrontab\fR(1), \fBat\fR(1),
 \fB\fBLOG_AUDIT\fR\fR
 .ad
 .RS 14n
-The audit facility, for example, \fBauditd\fR(1M).
+The audit facility, for example, \fBauditd\fR(8).
 .RE
 
 .sp
@@ -358,7 +358,7 @@ specific daemon processes (for daemons that fork).
 .ad
 .RS 14n
 Write messages to the system console if they cannot be sent to
-\fBsyslogd\fR(1M). This option is safe to use in daemon processes that have no
+\fBsyslogd\fR(8). This option is safe to use in daemon processes that have no
 controlling terminal, since \fBsyslog()\fR forks before opening the console.
 .RE
 
@@ -368,7 +368,7 @@ controlling terminal, since \fBsyslog()\fR forks before opening the console.
 \fB\fBLOG_NDELAY\fR\fR
 .ad
 .RS 14n
-Open the connection to \fBsyslogd\fR(1M) immediately.  Normally the open is
+Open the connection to \fBsyslogd\fR(8) immediately.  Normally the open is
 delayed until the first message is logged. This is useful for programs that
 need to manage the order in which file descriptors are allocated.
 .RE
@@ -444,7 +444,7 @@ This call logs a message at priority \fBLOG_ALERT\fR:
 .LP
 The \fBFTP\fR daemon \fBftpd\fR would make this call to \fBopenlog()\fR to
 indicate that all messages it logs should have an identifying string of
-\fBftpd\fR, should be treated by \fBsyslogd\fR(1M) as other messages from
+\fBftpd\fR, should be treated by \fBsyslogd\fR(8) as other messages from
 system daemons are, should include the process \fBID\fR of the process logging
 the message:
 
@@ -486,7 +486,7 @@ call to \fBsyslog\fR:
 .sp
 .LP
 A locally-written utility could use the following call to \fBsyslog()\fR to log
-a message at priority \fBLOG_INFO\fR to be treated by \fBsyslogd\fR(1M) as
+a message at priority \fBLOG_INFO\fR to be treated by \fBsyslogd\fR(8) as
 other messages to the facility \fBLOG_LOCAL2\fR are:
 
 .sp
@@ -499,7 +499,7 @@ other messages to the facility \fBLOG_LOCAL2\fR are:
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -513,12 +513,23 @@ Interface Stability	Committed
 _
 MT-Level	Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .LP
-\fBat\fR(1), \fBcrontab\fR(1), \fBlogger\fR(1), \fBlogin\fR(1), \fBlpc\fR(1B),
-\fBlpr\fR(1B), \fBauditd\fR(1M), \fBcron\fR(1M), \fBgetty\fR(1M),
-\fBsu\fR(1M), \fBsyslogd\fR(1M), \fBprintf\fR(3C),
-\fBsyslog.conf\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR at (1),
+.BR crontab (1),
+.BR logger (1),
+.BR login (1),
+.BR lpc (1B),
+.BR lpr (1B),
+.BR printf (3C),
+.BR syslog.conf (5),
+.BR attributes (7),
+.BR standards (7),
+.BR auditd (8),
+.BR cron (8),
+.BR getty (8),
+.BR su (8),
+.BR syslogd (8)

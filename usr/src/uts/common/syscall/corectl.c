@@ -48,10 +48,10 @@
  * structure (the core dumping sub-system for example) to safely use the
  * string without holding any locks on it in light of updates.
  *
- * At system and zone boot, init_core() sets init(1M)'s core file path and
+ * At system and zone boot, init_core() sets init(8)'s core file path and
  * content to the same value as the fields core_default_path and
  * core_default_content respectively (for the global zone). All subsequent
- * children of init(1M) reference those same settings. During boot coreadm(1M)
+ * children of init(8) reference those same settings. During boot coreadm(8)
  * is invoked with the -u option to update the system settings from
  * /etc/coreadm.conf. This has the effect of also changing the values in
  * core_default_path and core_default_content which updates the core file
@@ -60,7 +60,7 @@
  * content are set to the zone's default path and content.
  *
  * Processes that have their core file settings explicitly overridden using
- * coreadm(1M) no longer reference core_default_path or core_default_content
+ * coreadm(8) no longer reference core_default_path or core_default_content
  * so subsequent changes to the default will not affect them.
  */
 

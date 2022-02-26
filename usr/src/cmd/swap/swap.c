@@ -497,7 +497,7 @@ dumpadm_err(const char *warning)
 {
 	(void) fprintf(stderr, "%s (%s):\n", warning, strerror(errno));
 	(void) fprintf(stderr, gettext(
-	    "run dumpadm(1M) to verify dump configuration\n"));
+	    "run dumpadm(8) to verify dump configuration\n"));
 }
 
 static int
@@ -535,7 +535,7 @@ delete(char *path, off_t offset)
 		if (ioctl(fd, DIOCGETDEV, dumpdev) == -1) {
 			if (errno == ENODEV) {
 				(void) printf(gettext("%s was dump device --\n"
-				    "invoking dumpadm(1M) -d swap to "
+				    "invoking dumpadm(8) -d swap to "
 				    "select new dump device\n"), path);
 				/*
 				 * Close /dev/dump prior to executing dumpadm
@@ -643,7 +643,7 @@ add(char *path, off_t offset, off_t cnt, int flags)
 
 		(void) printf(
 		    gettext("operating system crash dump was previously "
-		    "disabled --\ninvoking dumpadm(1M) -d swap to select "
+		    "disabled --\ninvoking dumpadm(8) -d swap to select "
 		    "new dump device\n"));
 
 		if (system("/usr/sbin/dumpadm -ud swap") == -1)

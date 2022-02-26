@@ -60,6 +60,6 @@ function does not return, the calling thread is terminated.
 .Sh SEE ALSO
 .Xr pthread_exit 3C ,
 .Xr thr_exit 3C ,
-.Xr attributes 5 ,
-.Xr attributes 5 ,
-.Xr threads 5
+.Xr attributes 7 ,
+.Xr attributes 7 ,
+.Xr threads 7

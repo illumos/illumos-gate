@@ -187,7 +187,7 @@ included. See \fBipc.h\fR(3HEAD).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -203,5 +203,10 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBsemctl\fR(2), \fBsemget\fR(2), \fBsemop\fR(2), \fBipc.h\fR(3HEAD),
-\fBtypes.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR semctl (2),
+.BR semget (2),
+.BR semop (2),
+.BR ipc.h (3HEAD),
+.BR types.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

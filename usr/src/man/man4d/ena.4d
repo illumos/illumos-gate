@@ -1,0 +1,135 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2021 Oxide Computer Company
+.\"
+.Dd Nov 17, 2021
+.Dt ENA 4D
+.Os
+.Sh NAME
+.Nm ena
+.Nd Driver for the AWS Elastic Network Adapter
+.Sh SYNOPSIS
+.Pa /dev/net/ena*
+.Sh DESCRIPTION
+The
+.Sy ena
+driver is a GLDv3 NIC driver for the AWS Elastic Network Adapter
+family of virtual devices.
+The driver supports:
+.Bl -dash -offset indent
+.It
+Jumbo frames up to 9216 bytes.
+.It
+Multiple Rx and Tx rings.
+.El
+.Pp
+By design, this driver does not support VNICs.
+A given ENA device can only ever receive traffic for a single unicast
+MAC address and IP address combination, as determined by the AWS configuration.
+There is no support for promiscuous mode, or for receiving traffic for
+additional unicast or multicast addresses.
+.Sh CONFIGURATION
+The
+.Sy ena.conf
+file contains user configurable parameters, each of which is described
+below.
+This file is read when an ENA device is found and an instance of the
+driver is attached to it.
+Changes made to this file do not affect running instances.
+Only instances attached after the changes will see the effects of
+those changes.
+Therefore, if you want your change to take effect on a running
+instance, you must somehow reload it.
+That could be done by a manual reloading of the driver or a system
+reboot.
+.Sh PROPERTIES
+The configuration file can be found at
+.Pa /kernel/drv/ena.conf .
+.Bl -hang -width Ds
+.It Sy rx_queue_num_descs
+.Bd -filled -compact
+Minimum:
+.Sy 64 |
+Maximum:
+.Sy device dependent
+.Ed
+.Bd -filled -compact
+Default:
+.Sy device maximum
+.Ed
+.Bd -filled
+The
+.Sy rx_queue_num_descs
+property determines the number of descriptors provided by the Rx queue.
+Currently a single descriptor is equal to a single packet, but in the
+future it may be that a single packet consumes multiple descriptors.
+.Ed
+.It Sy rx_queue_intr_limit
+.Bd -filled -compact
+Minimum:
+.Sy 16 |
+Maximum:
+.Sy 4096
+.Ed
+.Bd -filled -compact
+Default:
+.Sy 256
+.Ed
+.Bd -filled
+The
+.Sy rx_queue_intr_limit
+property determines the number frames an Rx interrupt will attempt to
+process before returning and claiming the interrupt.
+This is meant to keep the ENA Rx interrupt handler from consuming too
+much system time.
+In general, when a NIC becomes saturated with packets, the
+.Sy MAC
+layer will switch the driver into polling mode to reduce interrupt
+load.
+.Ed
+.It Sy tx_queue_num_descs
+.Bd -filled -compact
+Minimum:
+.Sy 64 |
+Maximum:
+.Sy device dependent
+.Ed
+.Bd -filled -compact
+Default:
+.Sy device maximum
+.Ed
+.Bd -filled
+The
+.Sy tx_queue_num_descs
+property determines the number of descriptors provided by the Tx queue.
+Currently a single descriptor is equal to a single packet, but in the
+future it may be that a single packet consumes multiple descriptors.
+.Ed
+.El
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /kernel/drv/amd64/ena
+Device driver (x86)
+.It Pa /kernel/drv/ena.conf
+Driver configuration file containing user-configurable options
+.El
+.Sh INTERFACE STABILITY
+The tunables in
+.Pa ena.conf
+are considered
+.Sy Evolving
+and may change in the future.
+.Sh SEE ALSO
+.Xr dlpi 4P ,
+.Xr driver.conf 5 ,
+.Xr dladm 8 ,
+.Xr snoop 8

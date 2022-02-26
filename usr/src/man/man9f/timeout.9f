@@ -145,8 +145,12 @@ xxcheckcond(struct xxstate *xsp)
 .SH SEE ALSO
 .sp
 .LP
-\fBbufcall\fR(9F), \fBcv_timedwait\fR(9F), \fBddi_in_panic\fR(9F),
-\fBdelay\fR(9F), \fBdrv_usectohz\fR(9F), \fBuntimeout\fR(9F)
+.BR bufcall (9F),
+.BR cv_timedwait (9F),
+.BR ddi_in_panic (9F),
+.BR delay (9F),
+.BR drv_usectohz (9F),
+.BR untimeout (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

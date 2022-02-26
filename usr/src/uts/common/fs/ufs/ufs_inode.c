@@ -612,7 +612,7 @@ again:
 			vp->v_vfsp = &EIO_vfs;
 			VN_RELE(vp);
 			cmn_err(CE_NOTE,
-			    "%s: unexpected free inode %d, run fsck(1M)%s",
+			    "%s: unexpected free inode %d, run fsck(8)%s",
 			    fs->fs_fsmnt, (int)ino,
 			    (TRANS_ISTRANS(ufsvfsp) ? " -o f" : ""));
 			return (EIO);

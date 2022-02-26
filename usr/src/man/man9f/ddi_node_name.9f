@@ -38,7 +38,7 @@ the \fBdev_info\fR structure.
 The \fBddi_node_name()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-\fBddi_binding_name\fR(9F)
+.BR ddi_binding_name (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

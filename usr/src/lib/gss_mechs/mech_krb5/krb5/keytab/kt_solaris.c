@@ -128,7 +128,7 @@ cleanup:
  *
  * Note: this function is used for adding service principals to the
  * local /etc/krb5/krb5.keytab (unless KRB5_KTNAME has been set to something
- * different, see krb5envvar(5)) file when the client belongs to an AD domain.
+ * different, see krb5envvar(7)) file when the client belongs to an AD domain.
  * The keytab file is populated differently for an AD domain as the various
  * service principals share the same key material, unlike MIT based
  * implementations.

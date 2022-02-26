@@ -234,13 +234,13 @@ function import_manifests {
 		$X /usr/sbin/svccfg import $dirs > $logf 2>&1
 	fi
 
-	grep "Loaded .*. smf(5) service descriptions" $logf > /dev/null 2>&1
+	grep "Loaded .*. smf(7) service descriptions" $logf > /dev/null 2>&1
 	if [ $? -eq 0 ]; then
 		activity=true
 	fi
 
 	if [ -s $logf ]; then
-		grep "smf(5) service descriptions failed to load" $logf > /dev/null 2>&1
+		grep "smf(7) service descriptions failed to load" $logf > /dev/null 2>&1
 		failures=$?
 		if [ $failures -eq 0 ]; then
 			echo "svccfg warnings:"
@@ -313,7 +313,7 @@ function apply_profile {
 
 #
 # 4.  Upgrade handling.  The upgrade file generally consists of a series
-# of svcadm(1M) and svccfg(1M) commands.
+# of svcadm(8) and svccfg(8) commands.
 #
 function handle_upgrade {
 

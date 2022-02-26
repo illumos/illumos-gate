@@ -2492,7 +2492,7 @@ kgrep_subr(kgrep_cb_func *cb, void *cbdata)
 
 	if (mdb_get_state() == MDB_STATE_RUNNING) {
 		mdb_warn("kgrep can only be run on a system "
-		    "dump or under kmdb; see dumpadm(1M)\n");
+		    "dump or under kmdb; see dumpadm(8)\n");
 		return (DCMD_ERR);
 	}
 
@@ -4050,7 +4050,7 @@ panicinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (!mdb_prop_postmortem) {
 		mdb_warn("panicinfo can only be run on a system "
-		    "dump; see dumpadm(1M)\n");
+		    "dump; see dumpadm(8)\n");
 		return (DCMD_ERR);
 	}
 

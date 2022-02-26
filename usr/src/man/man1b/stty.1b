@@ -142,7 +142,7 @@ Select odd (even) parity, or mark (space) parity if \fBparext\fR is enabled.
 .ad
 .sp .6
 .RS 4n
-Select character size (see \fBtermio\fR(7I)).
+Select character size (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -295,7 +295,7 @@ Ignore (do not ignore) parity errors.
 \fB\fBparmrk\fR (\fB-parmrk\fR)\fR
 .ad
 .RS 22n
-Mark (do not mark) parity errors (see \fBtermio\fR(7I)).
+Mark (do not mark) parity errors (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -497,7 +497,7 @@ Fill characters are DELs (NULs).
 \fB\fBcr0 cr1 cr2 cr3\fR\fR
 .ad
 .RS 23n
-Select style of delay for carriage returns (see \fBtermio\fR(7I)).
+Select style of delay for carriage returns (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -506,7 +506,7 @@ Select style of delay for carriage returns (see \fBtermio\fR(7I)).
 \fB\fBnl0 nl1\fR\fR
 .ad
 .RS 23n
-Select style of delay for line-feeds (see \fBtermio\fR(7I)).
+Select style of delay for line-feeds (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -515,7 +515,7 @@ Select style of delay for line-feeds (see \fBtermio\fR(7I)).
 \fB\fBtab0 tab1 tab2 tab3\fR\fR
 .ad
 .RS 23n
-Select style of delay for horizontal tabs (see \fBtermio\fR(7I)).
+Select style of delay for horizontal tabs (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -524,7 +524,7 @@ Select style of delay for horizontal tabs (see \fBtermio\fR(7I)).
 \fB\fBbs0 bs1\fR\fR
 .ad
 .RS 23n
-Select style of delay for backspaces (see \fBtermio\fR(7I)).
+Select style of delay for backspaces (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -533,7 +533,7 @@ Select style of delay for backspaces (see \fBtermio\fR(7I)).
 \fB\fBff0 ff1\fR\fR
 .ad
 .RS 23n
-Select style of delay for form-feeds (see \fBtermio\fR(7I)).
+Select style of delay for form-feeds (see \fBtermio\fR(4I)).
 .RE
 
 .sp
@@ -542,7 +542,7 @@ Select style of delay for form-feeds (see \fBtermio\fR(7I)).
 \fB\fBvt0 vt1\fR\fR
 .ad
 .RS 23n
-Select style of delay for vertical tabs (see \fBtermio\fR(7I)).
+Select style of delay for vertical tabs (see \fBtermio\fR(4I)).
 .RE
 
 .SS "Local Modes"
@@ -938,7 +938,7 @@ Set \fIcontrol-character\fR to \fIc\fR, where \fIcontrol-character\fR is
 \fBeol2\fR, \fBswtch\fR, \fBstart\fR, \fBstop\fR, \fBsusp\fR, \fBdsusp\fR,
 \fBrprnt\fR, \fBflush\fR, \fBwerase\fR, \fBlnext\fR \fBmin\fR, \fBctab\fR,
 \fBtime\fR, or \fBbrk\fR) (\fBctab\fR is used with \fB-stappl\fR; \fBmin\fR and
-\fBtime\fR are used with \fB-icanon\fR; see \fBtermio\fR(7I)). If \fIc\fR is
+\fBtime\fR are used with \fB-icanon\fR; see \fBtermio\fR(4I)). If \fIc\fR is
 preceded by an (escaped from the shell) caret (\fB^\fR), then the value used is
 the corresponding CTRL character (for example, ``^d'' is a Control-d). ``^?''
 is interpreted as DEL and ``\fB^\(mi\fR'' is interpreted as undefined. For
@@ -1220,8 +1220,11 @@ Set horizontal window size to \fIn\fR \fIpixels\fR.
 .SH SEE ALSO
 .sp
 .LP
-\fBtabs\fR(1), \fBioctl\fR(2), \fBattributes\fR(5), \fBtermio\fR(7I),
-\fBtermiox\fR(7I)
+.BR tabs (1),
+.BR ioctl (2),
+.BR termio (4I),
+.BR termiox (4I),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

@@ -22,11 +22,11 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # File which defines additional driver specific privileges.
 #
-# This file is loaded by devfsadm(1m) at system boot.
+# This file is loaded by devfsadm(8) at system boot.
 #
-# DO NOT EDIT.  This file is maintained by add_drv(1m),
-# rem_drv(1m) and update_drv(1m).
+# DO NOT EDIT.  This file is maintained by add_drv(8),
+# rem_drv(8) and update_drv(8).

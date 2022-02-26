@@ -41,8 +41,8 @@ Driver instance number or -1.
 .SH DESCRIPTION
 The \fBqassociate()\fR function must be used by \fBDLPI\fR style 2 device
 drivers to manage the association between STREAMS queues and device instances.
-The \fBgld\fR(7D) does this automatically on behalf of drivers based on it. It
-is recommended that the \fBgld\fR(7D) be used for network device drivers
+The \fBgld\fR(4D) does this automatically on behalf of drivers based on it. It
+is recommended that the \fBgld\fR(4D) be used for network device drivers
 whenever possible.
 .sp
 .LP
@@ -54,7 +54,7 @@ dissolved.
 .LP
 A DLPI style 2 driver calls \fBqassociate()\fR while processing the
 \fBDL_ATTACH_REQ\fR message. The driver is also expected to call this interface
-while performing stream associations through other means, such as \fBndd\fR(1M)
+while performing stream associations through other means, such as \fBndd\fR(8)
 ioctl commands.
 .sp
 .LP
@@ -131,5 +131,9 @@ qassociate(q, -1);
 This informs the framework that this driver has been modified to be
 DDI-compliant.
 .SH SEE ALSO
-\fBdlpi\fR(7P), \fBgld\fR(7D), \fBopen\fR(9E), \fBput\fR(9E),
-\fBddi_no_info\fR(9F), \fBqueue\fR(9S)
+.BR gld (4D),
+.BR dlpi (4P),
+.BR open (9E),
+.BR put (9E),
+.BR ddi_no_info (9F),
+.BR queue (9S)

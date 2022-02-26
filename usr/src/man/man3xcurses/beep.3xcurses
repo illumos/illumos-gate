@@ -31,7 +31,7 @@ The \fBbeep()\fR and \fBflash()\fR functions produce an audio and visual alarm
 on the terminal, respectively.  If the terminal has the capability,
 \fBbeep()\fR sounds a bell or beep and  \fBflash()\fR flashes the screen.  One
 alarm is substituted for another if the terminal does not support the
-capability called (see  \fBterminfo\fR(4) \fBbel\fR and \fBflash\fR
+capability called (see  \fBterminfo\fR(5) \fBbel\fR and \fBflash\fR
 capabilities). For example, a call to \fBbeep()\fR for a terminal without that
 capability  results in a flash.
 .SH RETURN VALUES
@@ -45,7 +45,7 @@ None.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -63,5 +63,7 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibcurses\fR(3XCURSES), \fBterminfo\fR(4), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR libcurses (3XCURSES),
+.BR terminfo (5),
+.BR attributes (7),
+.BR standards (7)

@@ -14260,7 +14260,7 @@ sd_initpkt_for_uscsi(struct buf *bp, struct scsi_pkt **pktpp)
 	SD_FILL_SCSI1_LUN(un, pktp);
 
 	/*
-	 * Set up the optional USCSI flags. See the uscsi (7I) man page
+	 * Set up the optional USCSI flags. See the uscsi(4I) man page
 	 * for listing of the supported flags.
 	 */
 
@@ -30967,7 +30967,7 @@ sd_faultinjection(struct scsi_pkt *pktp)
  * 4. Building default VTOC label
  *
  *     As section 3 says, sd checks if some kinds of devices have VTOC label.
- *     If those devices have no valid VTOC label, sd(7d) will attempt to
+ *     If those devices have no valid VTOC label, sd(4D) will attempt to
  *     create default VTOC for them. Currently sd creates default VTOC label
  *     for all devices on x86 platform (VTOC_16), but only for removable
  *     media devices on SPARC (VTOC_8).
@@ -31000,7 +31000,7 @@ sd_faultinjection(struct scsi_pkt *pktp)
  *
  * 6. Automatic mount & unmount
  *
- *     Sd(7d) driver provides DKIOCREMOVABLE ioctl. This ioctl is used to query
+ *     sd(4D) driver provides DKIOCREMOVABLE ioctl. This ioctl is used to query
  *     if a device is removable media device. It return 1 for removable media
  *     devices, and 0 for others.
  *
@@ -31010,9 +31010,9 @@ sd_faultinjection(struct scsi_pkt *pktp)
  *
  * 7. fdisk partition management
  *
- *     Fdisk is traditional partition method on x86 platform. Sd(7d) driver
+ *     Fdisk is traditional partition method on x86 platform. sd(4D) driver
  *     just supports fdisk partitions on x86 platform. On sparc platform, sd
- *     doesn't support fdisk partitions at all. Note: pcfs(7fs) can recognize
+ *     doesn't support fdisk partitions at all. Note: pcfs(4FS) can recognize
  *     fdisk partitions on both x86 and SPARC platform.
  *
  *     -----------------------------------------------------------
@@ -31026,7 +31026,7 @@ sd_faultinjection(struct scsi_pkt *pktp)
  *
  * 8. MBOOT/MBR
  *
- *     Although sd(7d) doesn't support fdisk on SPARC platform, it does support
+ *     Although sd(4D) doesn't support fdisk on SPARC platform, it does support
  *     read/write mboot for removable media devices on sparc platform.
  *
  *     -----------------------------------------------------------

@@ -149,6 +149,8 @@ the header \fB<time.h>\fR.
 .SH SEE ALSO
 .sp
 .LP
-\fBpriocntl\fR(2), \fBsched_get_priority_max\fR(3C),
-\fBsched_get_priority_min\fR(3C), \fBsched_rr_get_interval\fR(3C),
-\fBtime.h\fR(3HEAD)
+.BR priocntl (2),
+.BR sched_get_priority_max (3C),
+.BR sched_get_priority_min (3C),
+.BR sched_rr_get_interval (3C),
+.BR time.h (3HEAD)

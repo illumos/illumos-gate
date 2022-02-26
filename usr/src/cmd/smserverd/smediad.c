@@ -121,7 +121,7 @@
  * 	The sole function of this descriptor HAD been to inform the server of
  * the untimely death of the client. This descriptor is no longer used, though
  * it is still created, as libsmedia expects to use it.  This descriptor's
- * service procedure had used pthread cancellation(5) to terminate the thread of
+ * service procedure had used pthread cancellation(7) to terminate the thread of
  * the associated client_door_descriptor.  The client_door_descriptor now
  * handles the scenarios where a door_call/client are aborted/terminated.
  *
@@ -1374,8 +1374,8 @@ sm_server_thread(void *arg)
 	    door_dp->dd_cdoor_descriptor);
 
 	/*
-	 * Set these two cancellation(5) attributes.  Ensure that the
-	 * pthread we create has cancellation(5) DISABLED and DEFERRED,
+	 * Set these two cancellation(7) attributes.  Ensure that the
+	 * pthread we create has cancellation(7) DISABLED and DEFERRED,
 	 * as our implementation is based on this.  DEFERRED is the
 	 * default, but set it anyways, in case the defaults change in
 	 * the future.

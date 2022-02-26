@@ -155,8 +155,6 @@ dir  path=usr/sbin
 file path=usr/sbin/cpustat mode=0555
 dir  path=usr/share/man/man1
 file path=usr/share/man/man1/cputrack.1
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/cpustat.1m
 dir  path=usr/share/man/man3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/amd_f17h_zen1_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/amd_f17h_zen2_events.3cpc
@@ -270,6 +268,8 @@ $(i386_ONLY)file path=usr/share/man/man3cpc/wsm_ex_events.3cpc
 dir  path=usr/share/man/man3lib
 file path=usr/share/man/man3lib/libcpc.3lib
 file path=usr/share/man/man3lib/libpctx.3lib
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/cpustat.8
 legacy pkg=SUNWcpcu desc="CPU Performance Counter libraries and utilities" \
     name="CPU Performance Counter libraries and utilities"
 license cr_Sun license=cr_Sun

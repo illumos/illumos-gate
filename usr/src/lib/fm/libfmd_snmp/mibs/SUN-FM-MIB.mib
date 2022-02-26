@@ -68,7 +68,7 @@ SunFmUuidString ::= TEXTUAL-CONVENTION
 SunFmModuleState ::= TEXTUAL-CONVENTION
 	STATUS	current
 	DESCRIPTION
-		"Represents the status of an fmd(1M) module."
+		"Represents the status of an fmd(8) module."
 	SYNTAX	INTEGER {
 		other(1),	-- Unknown or unsupported
 		active(2),
@@ -146,7 +146,7 @@ sunFmProblemUUIDIndex OBJECT-TYPE
 	STATUS		current
 	DESCRIPTION
 		"The Universal Unique Identifier (UUID) for this problem, as
-		recorded by fmd(1M) and shown by fmadm(1M) or fmdump(1M).
+		recorded by fmd(8) and shown by fmadm(8) or fmdump(8).
 		This is the index into sunFmProblemTable."
 	::= { sunFmProblemEntry 1 }
 
@@ -156,7 +156,7 @@ sunFmProblemUUID OBJECT-TYPE
 	STATUS		current
 	DESCRIPTION
 		"The Universal Unique Identifier (UUID) for this problem, as
-		recorded by fmd(1M) and shown by fmadm(1M) or fmdump(1M)."
+		recorded by fmd(8) and shown by fmadm(8) or fmdump(8)."
 	::= { sunFmProblemEntry 2 }
 
 sunFmProblemCode OBJECT-TYPE
@@ -165,7 +165,7 @@ sunFmProblemCode OBJECT-TYPE
 	STATUS		current
 	DESCRIPTION
 		"The SUNW-MSG-ID static message identifier for this class of
-		problem, as recorded by fmd(1M) and shown by fmdump(1M).  The
+		problem, as recorded by fmd(8) and shown by fmdump(8).  The
 		message identifier can be used as a key at http://illumos.org/msg/"
 	::= { sunFmProblemEntry 3 }
 
@@ -202,7 +202,7 @@ sunFmProblemSuspectCount OBJECT-TYPE
 	DESCRIPTION
 		"The number of individual suspect defects or faults
 		associated with this problem diagnosis, as shown by
-		fmdump(1M) -v -u <UUID>."
+		fmdump(8) -v -u <UUID>."
 	::= { sunFmProblemEntry 7 }
 
 --
@@ -218,7 +218,7 @@ sunFmFaultEventTable OBJECT-TYPE
 	STATUS		current
 	DESCRIPTION
 		"List of individual suspect defects or faults associated with
-		a problem diagnosis, as shown by fmdump(1M) -v -u <UUID>."
+		a problem diagnosis, as shown by fmdump(8) -v -u <UUID>."
 	::= { sunFmMIB 2 }
 
 sunFmFaultEventEntry OBJECT-TYPE
@@ -324,7 +324,7 @@ sunFmFaultEventStatus OBJECT-TYPE
 	STATUS		current
 	DESCRIPTION
 		"The current status of this suspect for this diagnosis. 
-		See fmadm(1M) faulty."
+		See fmadm(8) faulty."
 	::= { sunFmFaultEventEntry 9 }
 
 sunFmFaultEventLocation OBJECT-TYPE
@@ -346,7 +346,7 @@ sunFmModuleTable OBJECT-TYPE
 	MAX-ACCESS	not-accessible
 	STATUS		current
 	DESCRIPTION
-		"List of modules configured in fmd(1M)."
+		"List of modules configured in fmd(8)."
 	::= { sunFmMIB 3 }
 
 sunFmModuleEntry OBJECT-TYPE
@@ -354,7 +354,7 @@ sunFmModuleEntry OBJECT-TYPE
 	MAX-ACCESS	not-accessible
 	STATUS		current
 	DESCRIPTION
-		"A module which has been loaded into fmd(1M) to handle events.
+		"A module which has been loaded into fmd(8) to handle events.
 		The information provided is equivalent to the output of
 		fmadm(1) config'"
 	INDEX	{ sunFmModuleIndex }
@@ -425,7 +425,7 @@ sunFmResourceTable OBJECT-TYPE
 	DESCRIPTION
 		"A table containing information about all resources for which
 		the fault manager has received telemetry.  This is the same
-		information provided by the fmadm(1M) faulty command."
+		information provided by the fmadm(8) faulty command."
 	::= { sunFmMIB 5 }
 
 sunFmResourceEntry OBJECT-TYPE
@@ -467,7 +467,7 @@ sunFmResourceStatus OBJECT-TYPE
 	MAX-ACCESS	read-only
 	STATUS		current
 	DESCRIPTION
-		"The current status of the resource.  See fmadm(1M) faulty."
+		"The current status of the resource.  See fmadm(8) faulty."
 	::= { sunFmResourceEntry 3 }
 
 sunFmResourceDiagnosisUUID OBJECT-TYPE
@@ -477,7 +477,7 @@ sunFmResourceDiagnosisUUID OBJECT-TYPE
 	DESCRIPTION
 		"The Universal Unique Identifier (UUID) for the problem
 		associated with the fault in this resource, as recorded by
-		fmd(1M) and shown by fmadm(1M)."
+		fmd(8) and shown by fmadm(8)."
 	::= { sunFmResourceEntry 4 }
 
 sunFmObjectGroups OBJECT IDENTIFIER ::= { sunFmMIB 6 }
@@ -529,7 +529,7 @@ sunFmProblemTrap NOTIFICATION-TYPE
 	STATUS	current
 	DESCRIPTION
 		"Trap notification that a diagnosis has been made or the
-		fault manager fmd(1M) has restarted and the corresponding
+		fault manager fmd(8) has restarted and the corresponding
 		problem is still believed to be present in the managed entity."
 	::= { sunFmTraps 1 }
 

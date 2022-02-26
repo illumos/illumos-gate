@@ -1,6 +1,4 @@
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -27,12 +25,12 @@
 
 ##
 ## This file should be copied into /etc/inet/ike/config to enable the
-## launch of the IKE daemon, in.iked(1m), at boot time.  You can also
+## launch of the IKE daemon, in.iked(8), at boot time.  You can also
 ## launch the IKE daemon after creating this file without rebooting by
 ## invoking /usr/lib/inet/in.iked with a root shell.
 ##
 
-# Consult the ike.config(4) man page for further details.  Here is a small
+# Consult the ike.config(5) man page for further details.  Here is a small
 # example from the man page.
 
 ### BEGINNING OF FILE
@@ -47,7 +45,7 @@
 ## certificate parameters...
 
 # Root certificates.  I SHOULD use a full Distinguished Name.
-# I MUST have this certificate in my local filesystem, see ikecert(1m).
+# I MUST have this certificate in my local filesystem, see ikecert(8).
 cert_root    "C=US, O=Sun Microsystems\\, Inc., CN=Sun CA"
 
 # Explicitly trusted certs that need no signatures, or perhaps self-signed

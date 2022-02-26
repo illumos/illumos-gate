@@ -47,7 +47,7 @@ error \fBYPERR_KEY\fR if the key already exists in the database.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -63,7 +63,9 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBsecure_rpc\fR(3NSL), \fBypclnt\fR(3NSL), \fBattributes\fR(5)
+.BR secure_rpc (3NSL),
+.BR ypclnt (3NSL),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

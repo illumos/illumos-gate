@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IMPORTANT NOTE:
  *
@@ -328,7 +326,7 @@ regex(const char *regexp, const char *stringp, ...)
 	 *
 	 * NOTE:
 	 *
-	 * According to manual page regcmp(3G), regex() returns substrings
+	 * According to manual page regcmp(3C), regex() returns substrings
 	 * that match subexpressions even when no substring matches the
 	 * entire regular expression.
 	 */

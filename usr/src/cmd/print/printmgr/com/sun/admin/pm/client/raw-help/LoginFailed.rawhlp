@@ -32,7 +32,7 @@ If the NIS naming service is being used, you will need to know the
 password for the naming service master. If LDAP is being used then
 a fully distinguished name with update privilege and password will
 be required. Note that default values may need to be overridden. 
-See the man page for lpadmin(1M) and the help articles, "About 
+See the man page for lpadmin(8) and the help articles, "About 
 Naming Services" and "NIS Authentication," for further information.
 
 <p>

@@ -533,4 +533,4 @@ ATTRIBUTES
 
 
 SEE ALSO
-	nwamd(1M), nwamcfg(1M), nwamadm(1M)
+	nwamd(8), nwamcfg(8), nwamadm(8)

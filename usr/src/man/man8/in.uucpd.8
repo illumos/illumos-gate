@@ -1,0 +1,189 @@
+'\" te
+.\"  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH IN.UUCPD 8 "Aug 12, 2004"
+.SH NAME
+in.uucpd, uucpd \- UUCP server
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/in.uucpd\fR [\fB-n\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBin.uucpd\fR is the server for supporting \fBUUCP\fR connections over
+networks.
+.sp
+.LP
+\fBin.uucpd\fR is invoked by \fBinetd\fR(8) when a \fBUUCP\fR connection is
+established, that is, a connection to the port indicated in the "uucp" service
+specification, and executes the following protocol. See \fBservices\fR(5):
+.RS +4
+.TP
+1.
+The server prompts with \fBlogin:\fR. The \fBuucico\fR(8) process at the
+other end must supply a username.
+.RE
+.RS +4
+.TP
+2.
+Unless the username refers to an account without a password, the server then
+prompts with \fBPassword:\fR. The \fBuucico\fR process at the other end must
+supply the password for that account.
+.RE
+.sp
+.LP
+If the username is not valid, or is valid but refers to an account that does
+not have \fB/usr/lib/uucp/uucico\fR as its login shell, or if the password is
+not the correct password for that account, the connection is dropped.
+Otherwise, \fBuucico\fR is run, with the user \fBID\fR, group \fBID\fR, group
+set, and home directory for that account, with the environment variables
+\fBUSER\fR and \fB LOGNAME\fR set to the specified username, and with a
+\fB-u\fR flag specifying the username. Unless the \fB-n\fR flag is specified,
+entries are made in \fB/var/adm/utmpx\fR, \fB/var/adm/wtmpx\fR, and
+\fB/var/adm/lastlog\fR for the username. \fBin.uucpd\fR must be invoked by a
+user with appropriate privilege (usually root) in order to be able to verify
+that the password is correct.
+.SH SECURITY
+.sp
+.LP
+\fBin.uucpd\fR uses \fBpam\fR(3PAM) for authentication, account management, and
+session management.  The \fBPAM\fR configuration policy, listed through
+\fB/etc/pam.conf\fR, specifies the modules to be used for \fBin.uucpd\fR. Here
+is a partial \fBpam.conf\fR file with entries for \fBuucp\fR using the UNIX
+authentication, account management, and session management module.
+.sp
+.in +2
+.nf
+uucp    auth requisite          pam_authtok_get.so.1
+uucp    auth required           pam_dhkeys.so.1
+uucp    auth required           pam_unix_auth.so.1
+
+uucp    account requisite       pam_roles.so.1
+uucp    account required        pam_projects.so.1
+uucp    account required        pam_unix_account.so.1
+
+uucp      session required      pam_unix_session.so.1
+.fi
+.in -2
+
+.sp
+.LP
+If there are no entries for the \fBuucp\fR service, then the entries for the
+"other" service will be used. If multiple authentication modules are listed,
+then the peer may be prompted for multiple passwords.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/var/adm/utmpx\fR\fR
+.ad
+.RS 20n
+accounting
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/adm/wtmpx\fR\fR
+.ad
+.RS 20n
+accounting
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/adm/lastlog\fR\fR
+.ad
+.RS 20n
+time of last login
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR svcs (1),
+.BR pam (3PAM),
+.BR pam.conf (5),
+.BR services (5),
+.BR attributes (7),
+.BR pam_authtok_check (7),
+.BR pam_authtok_get (7),
+.BR pam_authtok_store (7),
+.BR pam_dhkeys (7),
+.BR pam_passwd_auth (7),
+.BR pam_unix_account (7),
+.BR pam_unix_auth (7),
+.BR pam_unix_session (7),
+.BR smf (7),
+.BR inetadm (8),
+.BR inetd (8),
+.BR svcadm (8),
+.BR uucico (8)
+.SH DIAGNOSTICS
+.sp
+.LP
+All diagnostic messages are returned on the connection, after which the
+connection is closed.
+.sp
+.ne 2
+.na
+\fB\fBuser read\fR\fR
+.ad
+.RS 20n
+An error occurred while reading the username.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpasswd read\fR\fR
+.ad
+.RS 20n
+An error occurred while reading the password.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBLogin incorrect.\fR\fR
+.ad
+.RS 20n
+The username is invalid or refers to an account with a login shell other than
+\fB/usr/lib/uucp/uucico\fR, or the password is not the correct password for the
+account.
+.RE
+
+.SH NOTES
+.sp
+.LP
+The \fBin.uucpd\fR service is managed by the service management facility,
+\fBsmf\fR(7), under the service identifier:
+.sp
+.in +2
+.nf
+svc:/network/uucp
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using \fBsvcadm\fR(8). Responsibility for
+initiating and restarting this service is delegated to \fBinetd\fR(8). Use
+\fBinetadm\fR(8) to make configuration changes and to view configuration
+information for this service. The service's status can be queried using the
+\fBsvcs\fR(1) command.
+.sp
+.LP
+The \fBpam_unix\fR(7) module is no longer supported. Similar functionality is
+provided by \fBpam_authtok_check\fR(7), \fBpam_authtok_get\fR(7),
+\fBpam_authtok_store\fR(7), \fBpam_dhkeys\fR(7), \fBpam_passwd_auth\fR(7),
+\fBpam_unix_account\fR(7), \fBpam_unix_auth\fR(7), and
+\fBpam_unix_session\fR(7).

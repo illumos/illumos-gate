@@ -103,9 +103,9 @@ requested to be told when mail arrives.
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='in.comsat' section='1M'
+			<manpage title='in.comsat' section='8'
 			    manpath='/usr/share/man' />
-			<manpage title='comsat' section='1M'
+			<manpage title='comsat' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

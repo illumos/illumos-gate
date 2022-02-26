@@ -1,0 +1,157 @@
+'\" te
+.\" Copyright (c) 2001 Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TH_MANAGE 8 "Jan 4, 2001"
+.SH NAME
+th_manage \- manage the fault injection test harness
+.SH SYNOPSIS
+.LP
+.nf
+\fBth_manage\fR \fIname\fR \fIinstance\fR \fIcommand\fR
+.fi
+
+.LP
+.nf
+\fBth_manage\fR \fIpath\fR \fIcommand\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBth_manage\fR applies the action specified by \fIcommand\fR to the instance
+specified by \fIinstance\fR of the driver specified by \fIname\fR (or the
+driver instance specified by \fIpath\fR). The driver instance must be running
+fault injection specifications (errdefs) defined by \fBth_define\fR(8).
+.sp
+.LP
+\fBth_manage\fR supports several commands that operate on the driver instance
+specified by \fIname\fR and \fIinstance\fR (or \fIpath\fR). The commands are:
+.sp
+.ne 2
+.na
+\fB\fBbroadcast\fR \fR
+.ad
+.RS 18n
+Awaken all \fBth_define\fR processes, causing them to display their current
+status and exit if the errdef is now defunct (that is, if \fIcount\fR,
+\fIfailcount\fR, and \fIacc_chk \fR are all zero).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBclear_acc_chk\fR \fR
+.ad
+.RS 18n
+Awaken all \fBth_define\fR processes. If \fIcount\fR and \fIfailcount\fR are
+already zero, then set \fIacc_chk\fR to zero, so that \fBth_define\fR exits
+once it has displayed its status.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBclear_errdefs\fR \fR
+.ad
+.RS 18n
+Awaken all \fBth_define\fR \fBprocesses\fR. \fIcount\fR, \fIfailcount\fR and
+\fIacc_chk\fR are all set to zero so that all \fBth_define\fR commands exit
+once they have displayed their status.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBclear_errors\fR \fR
+.ad
+.RS 18n
+Awaken all \fBth_define\fR processes. If \fIcount\fR is already zero, set
+\fIfailcount\fR and \fIacc_chk\fR to zero, so that \fBth_define\fR exits once
+it has displayed its status.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBget_handles\fR \fR
+.ad
+.RS 18n
+List all the access handles.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstart\fR \fR
+.ad
+.RS 18n
+Begin or resume execution of all errdefs.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstop\fR \fR
+.ad
+.RS 18n
+Suspend all errdefs for this \fIname\fR and \fIinstance\fR (or \fIpath).\fR
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUseful Commands
+.sp
+.LP
+To begin the tests, enter:
+
+.sp
+.LP
+\fB#\fR \fBth_manage\fR \fBfoo\fR \fB0\fR \fBstart\fR
+
+.sp
+.LP
+To check the status of the errdefs, enter:
+
+.sp
+.LP
+\fB#\fR \fBth_manage\fR \fBfoo\fR \fB0\fR \fBbroadcast\fR
+
+.sp
+.LP
+This causes each \fBth_define\fR process to print out its current status.
+
+.sp
+.LP
+If the driver has reported a fatal error, you can take the driver offline using
+\fBlibdevice\fR, clear the error condition by entering:
+
+.sp
+.LP
+\fB#\fR \fBth_manage\fR \fBfoo\fR \fB0\fR \fBclear_acc_chk\fR
+
+.sp
+.LP
+or
+
+.sp
+.LP
+\fB#\fR \fBth_manage\fR \fBfoo\fR \fB0\fR \fBclear_errors\fR
+
+.sp
+.LP
+and bring the driver online again using \fBlibdevice\fR.
+
+.sp
+.LP
+To terminate testing, enter:
+
+.sp
+.LP
+\fB#\fR \fBth_manage\fR \fBfoo\fR \fB0\fR \fBclear_errdefs\fR
+
+.SH SEE ALSO
+.sp
+.LP
+.BR th_define (8)

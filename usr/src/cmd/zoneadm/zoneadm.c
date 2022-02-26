@@ -230,7 +230,7 @@ long_help(int cmd_num)
 		return (gettext("Print usage message."));
 	case CMD_BOOT:
 		return (gettext("Activates (boots) specified zone.  See "
-		    "zoneadm(1m) for valid boot\n\targuments."));
+		    "zoneadm(8) for valid boot\n\targuments."));
 	case CMD_HALT:
 		return (gettext("Halts specified zone, bypassing shutdown "
 		    "scripts and removing runtime\n\tresources of the zone."));
@@ -240,11 +240,11 @@ long_help(int cmd_num)
 	case CMD_SHUTDOWN:
 		return (gettext("Gracefully shutdown the zone or reboot if "
 		    "the '-r' option is specified.\n\t"
-		    "See zoneadm(1m) for valid boot arguments."));
+		    "See zoneadm(8) for valid boot arguments."));
 	case CMD_REBOOT:
 		return (gettext("Restarts the zone (equivalent to a halt / "
 		    "boot sequence).\n\tFails if the zone is not active.  "
-		    "See zoneadm(1m) for valid boot\n\targuments."));
+		    "See zoneadm(8) for valid boot\n\targuments."));
 	case CMD_LIST:
 		return (gettext("Lists the current zones, or a "
 		    "specific zone if indicated.  By default,\n\tall "
@@ -268,12 +268,12 @@ long_help(int cmd_num)
 	case CMD_INSTALL:
 		return (gettext("Install the configuration on to the system.  "
 		    "All arguments are passed to the brand installation "
-		    "function;\n\tsee brands(5) for more information."));
+		    "function;\n\tsee brands(7) for more information."));
 	case CMD_UNINSTALL:
 		return (gettext("Uninstall the configuration from the system.  "
 		    "The -F flag can be used\n\tto force the action.  All "
 		    "other arguments are passed to the brand\n\tuninstall "
-		    "function; see brands(5) for more information."));
+		    "function; see brands(7) for more information."));
 	case CMD_CLONE:
 		return (gettext("Clone the installation of another zone.  "
 		    "The -m option can be used to\n\tspecify 'copy' which "
@@ -283,7 +283,7 @@ long_help(int cmd_num)
 		    "snapshot will be used as the source\n\tinstead of "
 		    "creating a new ZFS snapshot.  All other arguments are "
 		    "passed\n\tto the brand clone function; see "
-		    "brands(5) for more information."));
+		    "brands(7) for more information."));
 	case CMD_MOVE:
 		return (gettext("Move the zone to a new zonepath."));
 	case CMD_DETACH:
@@ -296,7 +296,7 @@ long_help(int cmd_num)
 		    "needed to attach\n\tthe zone is sent to standard output "
 		    "but the zone is not actually\n\tdetached.  All other "
 		    "arguments are passed to the brand detach function;\n\tsee "
-		    "brands(5) for more information."));
+		    "brands(7) for more information."));
 	case CMD_ATTACH:
 		return (gettext("Attach the zone to the system.  The zone "
 		    "state must be 'configured'\n\tprior to attach; upon "
@@ -312,7 +312,7 @@ long_help(int cmd_num)
 		    "can\n\tbe '-' to specify standard input.  The -F and -n "
 		    "options are mutually\n\texclusive.  All other arguments "
 		    "are passed to the brand attach\n\tfunction; see "
-		    "brands(5) for more information."));
+		    "brands(7) for more information."));
 	case CMD_MARK:
 		return (gettext("Set the state of the zone.  This can be used "
 		    "to force the zone\n\tstate to 'incomplete' "
@@ -1635,16 +1635,16 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 	if (getzoneid() != GLOBAL_ZONEID) {
 		switch (cmd_num) {
 		case CMD_HALT:
-			zerror(gettext("use %s to %s this zone."), "halt(1M)",
+			zerror(gettext("use %s to %s this zone."), "halt(8)",
 			    cmd_to_str(cmd_num));
 			break;
 		case CMD_SHUTDOWN:
 			zerror(gettext("use %s to %s this zone."),
-			    "shutdown(1M)", cmd_to_str(cmd_num));
+			    "shutdown(8)", cmd_to_str(cmd_num));
 			break;
 		case CMD_REBOOT:
 			zerror(gettext("use %s to %s this zone."),
-			    "reboot(1M)", cmd_to_str(cmd_num));
+			    "reboot(8)", cmd_to_str(cmd_num));
 			break;
 		default:
 			zerror(gettext("must be in the global zone to %s a "
@@ -2413,7 +2413,7 @@ free_local_netifs(int if_cnt, struct net_if **if_list)
 
 /*
  * Get a list of the network interfaces, along with their address families,
- * that are plumbed in the global zone.  See if_tcp(7p) for a description
+ * that are plumbed in the global zone.  See if_tcp(4P) for a description
  * of the ioctls used here.
  */
 static int
@@ -2760,10 +2760,10 @@ no_net:
 	    modctl(MODLOAD, 1, "fs/lofs", NULL) != 0) {
 		if (errno == ENXIO)
 			(void) fprintf(stderr, gettext("could not verify "
-			    "lofs(7FS): possibly excluded in /etc/system\n"));
+			    "lofs(4FS): possibly excluded in /etc/system\n"));
 		else
 			(void) fprintf(stderr, gettext("could not verify "
-			    "lofs(7FS): %s\n"), strerror(errno));
+			    "lofs(4FS): %s\n"), strerror(errno));
 		return_code = Z_ERR;
 	}
 
@@ -5249,7 +5249,7 @@ check_sched_fss(zone_dochandle_t handle)
 		    "FSS is not the default scheduling class for this zone.  "
 		    "FSS will be\nused for processes in the zone but to get "
 		    "the full benefit of FSS,\nit should be the default "
-		    "scheduling class.  See dispadmin(1M) for\nmore details."));
+		    "scheduling class.  See dispadmin(8) for\nmore details."));
 		return (Z_SYSTEM);
 	}
 

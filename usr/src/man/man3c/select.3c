@@ -527,5 +527,5 @@ argument may be modified.
 .Xr ualarm 3C ,
 .Xr accept 3SOCKET ,
 .Xr listen 3SOCKET ,
-.Xr attributes 5 ,
-.Xr standards 5
+.Xr attributes 7 ,
+.Xr standards 7

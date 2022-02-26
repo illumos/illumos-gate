@@ -181,7 +181,7 @@ free_ldapbuf(ldapbuf_t *p)
  *
  * If the Shadow Update functionality is enabled, then we check to
  * see if the caller has 0 as the euid or has all zone privs. If so,
- * the caller would be able to modify shadow(4) data stored on the
+ * the caller would be able to modify shadow(5) data stored on the
  * LDAP server. Otherwise, when LDAP Shadow Update is not enabled,
  * we can't determine whether the user is "privileged" in the LDAP
  * sense. The operation should be attempted and will succeed if the

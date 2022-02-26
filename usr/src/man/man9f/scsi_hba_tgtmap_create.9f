@@ -231,9 +231,9 @@ arguments are optional function pointers that will be run in the context
 of devices being added and removed from the system.
 This allows the HBA driver to perform any required operations prior to
 the system attaching a target driver such as
-.Xr sd 7D
+.Xr sd 4D
 or
-.Xr ses 7D
+.Xr ses 4D
 in the activate case and after the system has detached the driver, in
 the removal case.
 .Pp
@@ -486,8 +486,8 @@ Otherwise,
 .Dv DDI_FAILURE
 is returned.
 .Sh SEE ALSO
-.Xr sd 7D ,
-.Xr ses 7D ,
+.Xr sd 4D ,
+.Xr ses 4D ,
 .Xr tgtmap 9 ,
 .Xr attach 9E ,
 .Xr detach 9E ,

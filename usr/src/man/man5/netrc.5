@@ -1,0 +1,149 @@
+'\" te
+.\"  Copyright (c) 2006 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH NETRC 5 "Aug 25, 2006"
+.SH NAME
+netrc \- file for ftp remote login data
+.SH DESCRIPTION
+.LP
+The \fB\&.netrc\fR file contains data for logging in to a remote host over the
+network for file transfers by \fBftp\fR(1). This file resides in the user's
+home directory on the machine initiating the file transfer. Its permissions
+should be set to disallow read access by group and others. See \fBchmod\fR(1).
+.sp
+.LP
+Tokens can be separated by \fBSPACE\fR, \fBTAB\fR, or \fBNEWLINE\fR characters.
+The following tokens are supported:
+.sp
+.ne 2
+.na
+\fB\fBaccount\fR \fIstring\fR\fR
+.ad
+.RS 19n
+Supply an additional account password. If this token is present, the auto-login
+process supplies the specified string if the remote server requires an
+additional account password. If the remote server does not require an
+additional account password, the auto-login process initiates an \fBACCT\fR
+command.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdefault\fR\fR
+.ad
+.RS 19n
+Same as \fBmachine\fR \fIname\fR, except that default matches any name. There
+can be only one \fBdefault\fR token, and it must be after all \fBmachine\fR
+tokens. The \fBdefault\fR token is normally used as follows:
+.sp
+.in +2
+.nf
+default login anonymous password \fIuser\fR@\fIsite\fR
+.fi
+.in -2
+.sp
+
+Such an entry gives the user automatic anonymous \fBftp\fR login to machines
+not specified in \fB\&.netrc\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlogin\fR \fIname\fR\fR
+.ad
+.RS 19n
+Identify a user on the remote machine. If this token is present, the auto-login
+process initiates a login using the specified name.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmachine\fR \fIname\fR\fR
+.ad
+.RS 19n
+Identify a remote machine name. The auto-login process searches the
+\fB\&.netrc\fR file for a \fBmachine\fR token that matches the remote machine
+specified on the \fBftp\fR command line or as an \fBopen\fR command argument.
+Once a match is made, the subsequent \fB\&.netrc\fR tokens are processed,
+stopping when the \fBEOF\fR is reached or another \fBmachine\fR token is
+encountered.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmacdef\fR \fIname\fR\fR
+.ad
+.RS 19n
+Define a macro. This token functions the same as \fBftp\fR \fBmacdef\fR. A
+macro is defined with the specified name; its contents begin with the next
+\fB\&.netrc\fR line and continue until a null line (consecutive \fBNEWLINE\fR
+characters) is encountered. If a macro named \fBinit\fR is defined, it is
+automatically executed as the last step in the auto-login process.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpassword\fR \fIstring\fR\fR
+.ad
+.RS 19n
+Supply a password. If this token is present, the auto-login process supplies
+the specified string if the remote server requires a password as part of the
+login process. If this token is present in the \fB\&.netrc\fR file, \fBftp\fR
+aborts the auto-login process if the \fB\&.netrc\fR is readable by anyone
+besides the user.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBskipsyst\fR\fR
+.ad
+.RS 19n
+Skip the \fBSYST\fR command that is sent by default to all remote servers upon
+connection. The system command is what enables the automatic use of binary mode
+rather than the protocol default ascii mode.
+.sp
+As some older servers cannot handle the \fBftp\fR command, this directive is
+provided to allow inter-operability with these servers.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA Sample \fB\&.netrc\fR File
+.sp
+.LP
+A \fB\&.netrc\fR file containing the following line:
+
+.sp
+.in +2
+.nf
+machine ray login demo password mypassword
+.fi
+.in -2
+
+.sp
+.LP
+allows an autologin to the machine \fBray\fR using the login name \fBdemo\fR
+with password \fBmypassword\fR.
+
+.SH FILES
+.ne 2
+.na
+\fB\fB~/.netrc\fR\fR
+.ad
+.RS 12n
+
+.RE
+
+.SH SEE ALSO
+.LP
+.BR chmod (1),
+.BR ftp (1)

@@ -81,4 +81,4 @@ is returned to indicate that a conversion could not take place.
 .Xr proc_str2sigset 3PROC ,
 .Xr proc_str2sysset 3PROC ,
 .Xr proc_sysset2str 3PROC ,
-.Xr proc 4
+.Xr proc 5

@@ -43,7 +43,7 @@ extern "C" {
  * Solaris system and DTrace subsystem and are subject to change at any time
  * without notice.  Applications and drivers using these interfaces will fail
  * to run on future releases.  These interfaces should not be used for any
- * purpose except those expressly outlined in dtrace(7D) and libdtrace(3LIB).
+ * purpose except those expressly outlined in dtrace(4D) and libdtrace(3LIB).
  * Please refer to the "Solaris Dynamic Tracing Guide" for more information.
  */
 
@@ -1201,7 +1201,7 @@ typedef struct dtrace_enabling {
  * properties in the dtrace.conf file.  If there is an anonymous enabling, a
  * DTrace consumer state and enabling are created on attach.  The state may be
  * subsequently grabbed by the first consumer specifying the "grabanon"
- * option.  As long as an anonymous DTrace enabling exists, dtrace(7D) will
+ * option.  As long as an anonymous DTrace enabling exists, dtrace(4D) will
  * refuse to unload.
  */
 typedef struct dtrace_anon {

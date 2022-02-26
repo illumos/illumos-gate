@@ -90,7 +90,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='cryptoadm' section='1M'
+			<manpage title='cryptoadm' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

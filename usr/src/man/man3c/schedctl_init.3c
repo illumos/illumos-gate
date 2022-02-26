@@ -40,7 +40,7 @@ preemption control
 .sp
 .LP
 These functions provide limited control over the scheduling of a thread (see
-\fBthreads\fR(5)). They allow a running thread to give a hint to the kernel
+\fBthreads\fR(7)). They allow a running thread to give a hint to the kernel
 that preemptions of that thread should be avoided. The most likely use for
 these functions is to block preemption while holding a spinlock. Improper use
 of this facility, including attempts to block preemption for sustained periods
@@ -94,7 +94,7 @@ No errors are returned.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -112,8 +112,12 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpriocntl\fR(1), \fBexec\fR(2), \fBfork\fR(2), \fBpriocntl\fR(2),
-\fBattributes\fR(5), \fBthreads\fR(5)
+.BR priocntl (1),
+.BR exec (2),
+.BR fork (2),
+.BR priocntl (2),
+.BR attributes (7),
+.BR threads (7)
 .SH NOTES
 .sp
 .LP

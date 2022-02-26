@@ -151,7 +151,7 @@ addend values, \fIa\fR and \fIc\fR, specified above.
 .LP
 For a more powerful random number generator, see \fBarc4random\fR(3C).
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -167,4 +167,7 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBarc4random\fR(3C), \fBrand\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR arc4random (3C),
+.BR rand (3C),
+.BR attributes (7),
+.BR standards (7)

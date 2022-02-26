@@ -122,7 +122,7 @@ Invalid library version.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -140,5 +140,6 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBrsm_memseg_export_create\fR(3RSM), \fBrsm_memseg_import_connect\fR(3RSM),
-\fBattributes\fR(5)
+.BR rsm_memseg_export_create (3RSM),
+.BR rsm_memseg_import_connect (3RSM),
+.BR attributes (7)

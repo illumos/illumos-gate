@@ -177,8 +177,8 @@ dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 
 	/*
 	 * Special case: DLPI_SERIAL flag is set to indicate a synchronous
-	 * serial line interface (see syncinit(1M), syncstat(1M),
-	 * syncloop(1M)), which is not a DLPI link.
+	 * serial line interface (see syncinit(8), syncstat(8),
+	 * syncloop(8)), which is not a DLPI link.
 	 */
 	if (dip->dli_oflags & DLPI_SERIAL) {
 		if ((retval = i_dlpi_style2_open(dip)) != DLPI_SUCCESS) {
@@ -1233,7 +1233,7 @@ i_dlpi_attach(dlpi_impl_t *dip)
  * if this request fails, as this indicates the underlying DLPI device does
  * not support link aggregation (pre-GLDV3 device drivers), and thus will
  * see the expected behavior without failing with DL_SYSERR/EBUSY when issuing
- * DLPI primitives like DL_BIND_REQ. For further info see dlpi(7p).
+ * DLPI primitives like DL_BIND_REQ. For further info see dlpi(4P).
  */
 static void
 i_dlpi_passive(dlpi_impl_t *dip)

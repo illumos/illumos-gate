@@ -1,0 +1,1314 @@
+'\" te
+.\" Copyright 2019 Peter Tribble.
+.\" Copyright 2020 Carlos Neira <cneirabustos@gmail.com>.
+.\"  Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH EEPROM 8 "Jun 13, 2019"
+.SH NAME
+eeprom \- EEPROM display and load utility
+.SH SYNOPSIS
+.nf
+\fB/usr/sbin/eeprom\fR [\fB-\fR] [\fB-f\fR \fIdevice\fR] [\fIparameter\fR[=\fIvalue\fR]]
+.fi
+
+.SH DESCRIPTION
+\fBeeprom\fR displays or changes the values of parameters in the \fBEEPROM.\fR
+It processes parameters in the order given. When processing a \fIparameter\fR
+accompanied by a \fIvalue\fR, \fBeeprom\fR makes the indicated alteration to
+the \fBEEPROM;\fR otherwise, it displays the \fIparameter\fR's value. When
+given no parameter specifiers, \fBeeprom\fR displays the values of all
+\fBEEPROM\fR parameters. A `\|\(mi\fB\&'\fR (hyphen) flag specifies that
+parameters and values are to be read from the standard input (one
+\fIparameter\fR or \fIparameter\fR\fB=\fR\fIvalue\fR per line).
+.sp
+.LP
+Only the super-user may alter the \fBEEPROM\fR contents.
+.sp
+.LP
+\fBeeprom\fR verifies the \fBEEPROM\fR checksums and complains if they are
+incorrect.
+.sp
+.LP
+\fIplatform-name\fR is the name of the platform implementation and can be found
+using the \fB-i\fR option of \fBuname\fR(1).
+.SS "SPARC"
+\fBSPARC\fR based systems implement firmware password protection with
+\fBeeprom\fR, using the \fBsecurity-mode\fR, \fBsecurity-password\fR and
+\fBsecurity-#badlogins\fR properties.
+.SS "x86"
+\fBEEPROM\fR storage is simulated using a file residing in the
+platform-specific boot area. The \fB/boot/solaris/bootenv.rc\fR file simulates
+\fBEEPROM\fR storage.
+.sp
+.LP
+Because x86 based systems typically implement password protection in the system
+\fBBIOS,\fR there is no support for password protection in the \fBeeprom\fR
+program. While it is possible to set the \fBsecurity-mode\fR,
+\fBsecurity-password\fR and \fBsecurity-#badlogins\fR properties on x86 based
+systems, these properties have no special meaning or behavior on x86 based
+systems.
+.SH OPTIONS
+.ne 2
+.na
+\fB\fB-f\fR \fIdevice\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use \fIdevice\fR as the \fBEEPROM\fR device.
+.RE
+
+.SH OPERANDS
+.SS "x86 Only"
+.ne 2
+.na
+\fB\fIacpi-user-options\fR\fR
+.ad
+.sp .6
+.RS 4n
+A configuration variable that controls the use of Advanced Configuration and
+Power Interface (ACPI), a power management specification. The acceptable values
+for this variable depend on the release of the Solaris operating system you are
+using.
+.sp
+For all releases of Solaris 10 and Solaris 11, a value of of \fB0x0\fR means
+that there will be an attempt to use ACPI if it is available on the system. A
+value of \fB0x2\fR disables the use of ACPI.
+.sp
+For the Solaris 10 1/06 release, a value of \fB0x8\fR means that there will be
+an attempt to use ACPI in a mode compatible with previous releases of Solaris
+10 if it is available on the system. The default for Solaris 10 1/06 is
+\fB0x8\fR.
+.sp
+For releases of Solaris 10 after the 1/06 release and for Solaris 11, the
+default is \fB0x0\fR.
+.sp
+Most users can safely accept the default value, which enables ACPI if
+available. If issues related to the use of ACPI are suspected on releases of
+Solaris after Solaris 1/06, it is suggested to first try a value of \fB0x8\fR
+and then, if you do not obtain satisfactory results, \fB0x02\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIconsole\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the console device.
+Possible values are \fBttya\fR, \fBttyb\fR, \fBttyc\fR, \fBttyd\fR, and
+\fBtext\fR. In \fBtext\fR mode, console output goes to the frame buffer and
+input comes from the keyboard. For SPARC, when this property is not present,
+the console device falls back to the device specified by \fBinput-device\fR and
+\fBoutput-device\fR. When neither the console property or the
+\fBinput-device\fR and \fBoutput-device\fR property pair are present, the
+console defaults to the frame buffer and keyboard.
+.RE
+
+.ne 2
+.na
+\fB\fIos_console\fR\fR
+.ad
+.sp .6
+.RS 4n
+While \fBconsole\fR controls both boot loader and kernel console, setting
+\fBos_console\fR allows setting console device only for kernel. Values
+are the same as for \fBconsole\fR.
+.RE
+
+.ne 2
+.na
+\fB\fIdiag-device\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBdiag-device\fR is currently implemented to support serial port
+as output for system early boot diagnostic messages and input and output
+for \fBkmdb\fR debugger. For early boot, all the console messages are mirrored
+to \fBdiag-device\fR, until the console drivers are loaded.
+After that, only \fBkmdb\fR will continue to use the \fBdiag-device\fR.
+.RE
+
+.ne 2
+.na
+\fB\fIsegkpsize\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the amount in \fBbytes\fR of kernel pageable memory available.
+Increasing this variable allows either larger stacks for the same number
+of kernel threads or more kernel threads, by default this value is \fB0x80000000 (2GiB)\fR.
+If the value specified exceeds the size of physical memory it will be automatically capped to
+that.
+
+Valid Ranges: 0xC800000 - 0x200000000(200MiB - 8GiB)
+
+
+.RE
+
+
+.SH NVRAM CONFIGURATION PARAMETERS
+Not all OpenBoot systems support all parameters. Defaults vary depending on the
+system and the \fBPROM\fR revision. See the output in the "Default Value"
+column of the \fBprintenv\fR command, as entered at the \fBok\fR (OpenBoot)
+prompt, to determine the default for your system.
+.sp
+.ne 2
+.na
+\fBauto-boot?\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, boots automatically after power-on or reset. Defaults to
+\fBtrue\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBansi-terminal?\fR
+.ad
+.sp .6
+.RS 4n
+Configuration variable used to control the behavior of the terminal emulator.
+The value \fBfalse\fR makes the terminal emulator stop interpreting \fBANSI\fR
+escape sequences; instead, echoes them to the output device. Defaults to
+\fBtrue\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBboot-args\fR
+.ad
+.sp .6
+.RS 4n
+Holds a string of arguments that are passed to the boot subsystem. For example,
+you can use \fBboot-args=' - install dhcp'\fR to request a customer jumpstart
+installation. See \fBboot\fR(8), \fBkadb\fR(8) and \fBkernel\fR(8).
+.RE
+
+.sp
+.ne 2
+.na
+\fBboot-command\fR
+.ad
+.sp .6
+.RS 4n
+Command executed if \fBauto-boot?\fR is \fBtrue\fR. Defaults to \fBboot\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBboot-device\fR
+.ad
+.sp .6
+.RS 4n
+Device from which to boot. \fIboot-device\fR may contain 0 or more device
+specifiers separated by spaces. Each device specifier may be either a prom
+device alias or a prom device path. The boot prom will attempt to open each
+successive device specifier in the list beginning with the first device
+specifier. The first device specifier that opens successfully will be used as
+the device to boot from. Defaults to \fBdisk net\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBboot-file\fR
+.ad
+.sp .6
+.RS 4n
+File to boot (an empty string lets the secondary booter choose default).
+Defaults to empty string.
+.RE
+
+.sp
+.ne 2
+.na
+\fBboot-from\fR
+.ad
+.sp .6
+.RS 4n
+Boot device and file (OpenBoot PROM version 1.\fIx\fR only). Defaults to
+\fBvmunix\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBboot-from-diag\fR
+.ad
+.sp .6
+.RS 4n
+Diagnostic boot device and file (OpenBoot PROM version 1.\fIx\fR only).
+Defaults to \fBle(\|)unix\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBboot-ncpus\fR
+.ad
+.sp .6
+.RS 4n
+Configuration variable that controls the number of processors with which the
+system should boot. By default, the system boots with maximum supported number
+of processors.
+.RE
+
+.sp
+.ne 2
+.na
+\fBcom\fIX\fR-noprobe\fR
+.ad
+.sp .6
+.RS 4n
+Where \fIX\fR is the number of the serial port, prevents device probe on serial
+port \fIX.\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBdiag-device\fR
+.ad
+.sp .6
+.RS 4n
+Diagnostic boot source device. Defaults to \fBnet\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBdiag-file\fR
+.ad
+.sp .6
+.RS 4n
+File from which to boot in diagnostic mode. Defaults to empty string.
+.RE
+
+.sp
+.ne 2
+.na
+\fBdiag-level\fR
+.ad
+.sp .6
+.RS 4n
+Diagnostics level. Values include \fBoff\fR, \fBmin\fR, \fBmax\fR and
+\fBmenus\fR. There may be additional platform-specific values. When set to
+\fBoff\fR, \fBPOST\fR is not called. If \fBPOST\fR is called, the value is made
+available as an argument to, and is interpreted by \fBPOST.\fR Defaults to
+\fBplatform-dependent\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBdiag-switch?\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, run in diagnostic mode. Defaults to \fBfalse\fR on most desktop
+systems, \fBtrue\fR on most servers.
+.RE
+
+.sp
+.ne 2
+.na
+\fBerror-reset-recovery\fR
+.ad
+.sp .6
+.RS 4n
+Recover after an error reset trap. Defaults to platform-specific setting.
+.sp
+On platforms supporting this variable, it replaces the \fBwatchdog-reboot?\fR,
+\fBwatchdog-sync?\fR, \fBredmode-reboot?\fR, \fBredmode-sync?\fR,
+\fBsir-sync?\fR, and \fBxir-sync?\fR parameters.
+.sp
+The options are:
+.sp
+.ne 2
+.na
+\fBnone\fR
+.ad
+.sp .6
+.RS 4n
+Print a message describing the reset trap and go to OpenBoot PROM's user
+interface, \fBaka\fR \fBOK\fR prompt.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsync\fR
+.ad
+.sp .6
+.RS 4n
+Invoke OpenBoot PROM's \fBsync\fR word after the reset trap. Some platforms may
+treat this as \fBnone\fR after an externally initiated reset (\fBXIR\fR) trap.
+.RE
+
+.sp
+.ne 2
+.na
+\fBboot\fR
+.ad
+.sp .6
+.RS 4n
+Reboot after the reset trap. Some platforms may treat this as \fBnone\fR after
+an \fBXIR\fR trap.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBfcode-debug?\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, include name parameter for plug-in device FCodes. Defaults to
+\fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBhardware-revision\fR
+.ad
+.sp .6
+.RS 4n
+System version information.
+.RE
+
+.sp
+.ne 2
+.na
+\fBinput-device\fR
+.ad
+.sp .6
+.RS 4n
+Input device used at power-on (usually \fBkeyboard\fR, \fBttya\fR,
+\fBttyb\fR, \fBttyc\fR, or \fBttyd\fR). Defaults to \fBkeyboard\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBkeyboard-click?\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, enable keyboard click. Defaults to \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBkeyboard-layout\fR
+.ad
+.sp .6
+.RS 4n
+A string that specifies the layout name for non-self-identifying keyboards
+(type 7c). Invoke \fBkbd\fR \fB-s\fR to obtain a list of acceptable layout
+names. See \fBkbd\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fBkeymap\fR
+.ad
+.sp .6
+.RS 4n
+Keymap for custom keyboard.
+.RE
+
+.sp
+.ne 2
+.na
+\fBlast-hardware-update\fR
+.ad
+.sp .6
+.RS 4n
+System update information.
+.RE
+
+.sp
+.ne 2
+.na
+\fBload-base\fR
+.ad
+.sp .6
+.RS 4n
+Default load address for client programs. Default value is \fB16384\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBlocal-mac-address?\fR
+.ad
+.sp .6
+.RS 4n
+If true, network drivers use their own MAC address, not the system's. Defaults
+to \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBmfg-mode\fR
+.ad
+.sp .6
+.RS 4n
+Manufacturing mode argument for \fBPOST.\fR Possible values include \fBoff\fR
+or \fBchamber\fR. The value is passed as an argument to \fBPOST.\fR Defaults to
+\fBoff\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBmfg-switch?\fR
+.ad
+.sp .6
+.RS 4n
+If true, repeat system self-tests until interrupted with STOP-A. Defaults to
+\fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBnvramrc\fR
+.ad
+.sp .6
+.RS 4n
+Contents of NVRAMRC. Defaults to empty.
+.RE
+
+.sp
+.ne 2
+.na
+\fBnetwork-boot-arguments\fR
+.ad
+.sp .6
+.RS 4n
+Arguments to be used by the PROM for network booting. Defaults to an empty
+string. \fBnetwork-boot-arguments\fR can be used to specify the boot protocol
+(RARP/DHCP) to be used and a range of system knowledge to be used in the
+process.
+.sp
+The syntax for arguments supported for network booting is:
+.sp
+.in +2
+.nf
+[\fIprotocol\fR,] [\fIkey\fR=\fIvalue\fR,]*
+.fi
+.in -2
+.sp
+
+All arguments are optional and can appear in any order. Commas are required
+unless the argument is at the end of the list. If specified, an argument takes
+precedence over any default values, or, if booting using DHCP, over
+configuration information provided by a DHCP server for those parameters.
+.sp
+\fIprotocol\fR, above, specifies the address discovery protocol to be used.
+.sp
+Configuration parameters, listed below, are specified as \fIkey\fR=\fIvalue\fR
+attribute pairs.
+.sp
+.ne 2
+.na
+\fB\fBtftp-server\fR\fR
+.ad
+.sp .6
+.RS 4n
+IP address of the TFTP server
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+file to download using TFTP or URL for WAN boot
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBhost-ip\fR\fR
+.ad
+.sp .6
+.RS 4n
+IP address of the client (in dotted-decimal notation)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrouter-ip\fR\fR
+.ad
+.sp .6
+.RS 4n
+IP address of the default router (in dotted-decimal notation)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsubnet-mask\fR\fR
+.ad
+.sp .6
+.RS 4n
+subnet mask (in dotted-decimal notation)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBclient-id\fR\fR
+.ad
+.sp .6
+.RS 4n
+DHCP client identifier
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBhostname\fR\fR
+.ad
+.sp .6
+.RS 4n
+hostname to use in DHCP transactions
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBhttp-proxy\fR\fR
+.ad
+.sp .6
+.RS 4n
+HTTP proxy server specification (IPADDR[:PORT])
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtftp-retries\fR\fR
+.ad
+.sp .6
+.RS 4n
+maximum number of TFTP retries
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdhcp-retries\fR\fR
+.ad
+.sp .6
+.RS 4n
+maximum number of DHCP retries
+.RE
+
+If no parameters are specified (that is, \fBnetwork-boot-arguments\fR is an
+empty string), the PROM will use the platform-specific default address
+discovery protocol.
+.sp
+Absence of the protocol parameter when other configuration parameters are
+specified implies manual configuration.
+.sp
+Manual configuration requires that the client be provided with all the
+information necessary for boot. If using manual configuration, information
+required by the PROM to load the second-stage boot program must be provided in
+\fBnetwork-boot-arguments\fR while information required for the second-stage
+boot program can be specified either as arguments to the \fBboot\fR program or
+by means of the \fBboot\fR program's interactive command interpreter.
+.sp
+Information required by the PROM when using manual configuration includes the
+booting client's IP address, name of the boot file, and the address of the
+server providing the boot file image. Depending on network configuration, it
+might be required that the subnet mask and address of the default router to use
+also be specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fBoem-banner\fR
+.ad
+.sp .6
+.RS 4n
+Custom OEM banner (enabled by setting \fBoem-banner?\fR to \fBtrue\fR).
+Defaults to empty string.
+.RE
+
+.sp
+.ne 2
+.na
+\fBoem-banner?\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, use custom \fBOEM\fR banner. Defaults to \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBoem-logo\fR
+.ad
+.sp .6
+.RS 4n
+Byte array custom OEM logo (enabled by setting \fBoem-logo?\fR to \fBtrue\fR).
+Displayed in hexadecimal.
+.RE
+
+.sp
+.ne 2
+.na
+\fBoem-logo?\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, use custom OEM logo (else, use Sun logo). Defaults to
+\fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpci-mem64?\fR
+.ad
+.sp .6
+.RS 4n
+If true, the OpenBoot PROM allocates 64-bit PCI memory addresses to a PCI
+device that can support 64-bit addresses.
+.sp
+This variable is available on SPARC platforms only and is optional. Some
+versions of SunOS do not support PCI \fBMEM64\fR addresses and will fail in
+unexpected ways if the OpenBoot PROM allocates PCI \fBMEM64\fR addresses.
+.sp
+The default value is system-dependent. If the variable exists, the default
+value is appropriate to the lowest version of the SunOS that shipped with a
+specific platform.
+.RE
+
+.sp
+.ne 2
+.na
+\fBoutput-device\fR
+.ad
+.sp .6
+.RS 4n
+Output device used at power-on (usually \fBscreen\fR, \fBttya\fR,
+\fBttyb\fR, \fBttyc\fR, or \fBttyd\fR). Defaults to \fBscreen\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBrootpath\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the root device of the operating system.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsbus-probe-list\fR
+.ad
+.sp .6
+.RS 4n
+Designate which SBus slots are probed and in what order. Defaults to
+\fB0123\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBscreen-#columns\fR
+.ad
+.sp .6
+.RS 4n
+Number of on-screen columns (characters/line). Defaults to \fB80\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBscreen-#rows\fR
+.ad
+.sp .6
+.RS 4n
+Number of on-screen rows (lines). Defaults to \fB34\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBscsi-initiator-id\fR
+.ad
+.sp .6
+.RS 4n
+\fBSCSI\fR bus address of host adapter, range 0-7. Defaults to \fB7\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsd-targets\fR
+.ad
+.sp .6
+.RS 4n
+Map \fBSCSI\fR disk units (OpenBoot PROM version 1.\fIx\fR only). Defaults to
+\fB31204567\fR, which means that unit 0 maps to target \fB3\fR, unit 1 maps to
+target \fB1\fR, and so on.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsecurity-#badlogins\fR
+.ad
+.sp .6
+.RS 4n
+Number of incorrect security password attempts.This property has no special
+meaning or behavior on x86 based systems.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsecurity-mode\fR
+.ad
+.sp .6
+.RS 4n
+Firmware security level (options: \fBnone\fR, \fBcommand\fR, or \fBfull\fR). If
+set to \fBcommand\fR or \fBfull\fR, system will prompt for \fBPROM\fR security
+password. Defaults to \fBnone\fR.This property has no special meaning or
+behavior on x86 based systems.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsecurity-password\fR
+.ad
+.sp .6
+.RS 4n
+Firmware security password (never displayed). Can be set only when
+\fBsecurity-mode\fR is set to \fBcommand\fR or \fBfull\fR.This property has no
+special meaning or behavior on x86 based systems.
+.sp
+.in +2
+.nf
+example# eeprom security-password=
+Changing PROM password:
+New password:
+Retype new password:
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBselftest-#megs\fR
+.ad
+.sp .6
+.RS 4n
+Megabytes of \fBRAM\fR to test. Ignored if \fBdiag-switch?\fR is \fBtrue\fR.
+Defaults to \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBskip-vme-loopback?\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, POST does not do VMEbus loopback tests. Defaults to \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBst-targets\fR
+.ad
+.sp .6
+.RS 4n
+Map \fBSCSI\fR tape units (OpenBoot PROM version 1.\fIx\fR only). Defaults to
+\fB45670123\fR, which means that unit 0 maps to target \fB4\fR, unit 1 maps to
+target \fB5\fR, and so on.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsunmon-compat?\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, display Restricted Monitor prompt (\|>). Defaults to
+\fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBtestarea\fR
+.ad
+.sp .6
+.RS 4n
+One-byte scratch field, available for read/write test. Defaults to \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBtpe-link-test?\fR
+.ad
+.sp .6
+.RS 4n
+Enable 10baseT link test for built-in twisted pair Ethernet. Defaults to
+\fBtrue\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBttya-mode\fR
+.ad
+.sp .6
+.RS 4n
+\fBTTYA\fR (baud rate, #bits, parity, #stop, handshake). Defaults to
+\fB9600,8,n,1,\(mi\fR.
+.sp
+Fields, in left-to-right order, are:
+.sp
+.ne 2
+.na
+\fBBaud rate:\fR
+.ad
+.sp .6
+.RS 4n
+110, 300, 1200, 4800, 9600\|.\|.\|.
+.RE
+
+.sp
+.ne 2
+.na
+\fBData bits:\fR
+.ad
+.sp .6
+.RS 4n
+5, 6, 7, 8
+.RE
+
+.sp
+.ne 2
+.na
+\fBParity:\fR
+.ad
+.sp .6
+.RS 4n
+n(none), e(even), o(odd), m(mark), s(space)
+.RE
+
+.sp
+.ne 2
+.na
+\fBStop bits:\fR
+.ad
+.sp .6
+.RS 4n
+1, 1.5, 2
+.RE
+
+.sp
+.ne 2
+.na
+\fBHandshake:\fR
+.ad
+.sp .6
+.RS 4n
+\(mi(none), h(hardware:rts/cts), s(software:xon/xoff)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBtty\fIX\fR-mode\fR
+.ad
+.sp .6
+.RS 4n
+\fBTTYB, TTYC, or TTYD\fR (baud rate, #bits, parity, #stop, handshake). Defaults to
+\fB9600,8,n,1,\(mi\fR.
+.sp
+Fields, in left-to-right order, are:
+.sp
+.ne 2
+.na
+\fBBaud rate:\fR
+.ad
+.sp .6
+.RS 4n
+110, 300, 1200, 4800, 9600\|.\|.\|.
+.RE
+
+.sp
+.ne 2
+.na
+\fBData bits:\fR
+.ad
+.sp .6
+.RS 4n
+5, 6, 7, 8
+.RE
+
+.sp
+.ne 2
+.na
+\fBStop bits:\fR
+.ad
+.sp .6
+.RS 4n
+1, 1.5, 2
+.RE
+
+.sp
+.ne 2
+.na
+\fBParity:\fR
+.ad
+.sp .6
+.RS 4n
+n(none), e(even), o(odd), m(mark), s(space)
+.RE
+
+.sp
+.ne 2
+.na
+\fBHandshake:\fR
+.ad
+.sp .6
+.RS 4n
+\(mi(none), h(hardware:rts/cts), s(software:xon/xoff)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBttya-ignore-cd\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, operating system ignores carrier-detect on TTYA. Defaults to
+\fBtrue\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBtty\fIX\fR-ignore-cd\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, operating system ignores carrier-detect on TTYB, TTYC, or TTYD.
+Defaults to \fBtrue\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBttya-rts-dtr-off\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, operating system does not assert DTR and RTS on TTYA. Defaults
+to \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBtty\fIX\fR-rts-dtr-off\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, operating system does not assert DTR and RTS on TTYB, TTYC,
+or TTYD. Defaults to \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBuse-nvramrc?\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, execute commands in \fBNVRAMRC\fR during system start-up.
+Defaults to \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBverbosity\fR
+.ad
+.sp .6
+.RS 4n
+Controls the level of verbosity of PROM messages. Can be one of \fBdebug\fR,
+\fBmax\fR, \fBnormal\fR, \fBmin\fR, or \fBnone\fR. Defaults to \fBnormal\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBversion2?\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, hybrid (1.\fIx\fR/2.\fIx\fR) PROM comes up in version 2.\fIx\fR.
+Defaults to \fBtrue\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBwatchdog-reboot?\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtrue\fR, reboot after watchdog reset. Defaults to \fBfalse\fR.
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRChanging the Number of Megabytes of RAM.
+.sp
+.LP
+The following example demonstrates the method for changing from one to two the
+number of megabytes of \fBRAM\fR that the system will test.
+
+.sp
+.in +2
+.nf
+example# \fBeeprom selftest-#megs\fR
+selftest-#megs=1
+
+example# eeprom selftest-#megs=2
+
+example# \fBeeprom selftest-#megs\fR
+selftest-#megs=2
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRSetting the \fBauto-boot?\fR Parameter to \fBtrue\fR.
+.sp
+.LP
+The following example demonstrates the method for setting the \fBauto-boot?\fR
+parameter to \fBtrue\fR.
+
+.sp
+.in +2
+.nf
+example# \fBeeprom auto-boot?=true\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+When the \fBeeprom\fR command is executed in user mode, the parameters with a
+trailing question mark (?) need to be enclosed in double quotation marks (" ")
+to prevent the shell from interpreting the question mark. Preceding the
+question mark with an escape character (\fB\e\fR) will also prevent the shell
+from interpreting the question mark.
+
+.sp
+.in +2
+.nf
+\fBexample% eeprom "auto-boot?"=true\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRUsing \fBnetwork-boot-arguments\fR
+.sp
+.LP
+To use DHCP as the boot protocol and a hostname of \fBabcd.example.com\fR for
+network booting, set these values in \fBnetwork-boot-arguments\fR as:
+
+.sp
+.in +2
+.nf
+example# \fBeeprom network-boot-arguments="dhcp,hostname=abcd.example.com"\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\&...then boot using the command:
+
+.sp
+.in +2
+.nf
+ok \fBboot net\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Note that network boot arguments specified from the PROM command line cause the
+contents of \fBnetwork-boot-arguments\fR to be ignored. For example, with
+\fBnetwork-boot-arguments\fR set as shown above, the \fBboot\fR command:
+
+.sp
+.in +2
+.nf
+ok \fBboot net:dhcp\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\&...causes DHCP to be used, but the \fBhostname\fR specified in
+\fBnetwork-boot-arguments\fR will not be used during network boot.
+
+.LP
+\fBExample 4 \fRSetting System Console to Auxiliary Device
+.sp
+.LP
+The command below assigns the device \fB/dev/term/a\fR as the system console
+device. You would make such an assignment prior to using \fBtip\fR(1) to
+establish a \fBtip\fR connection to a host.
+
+.sp
+.LP
+On a SPARC machine:
+
+.sp
+.in +2
+.nf
+# \fBeeprom output-device=/dev/term/a\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+On an x86 machine:
+
+.sp
+.in +2
+.nf
+# \fBeeprom console=ttya\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+On a SPARC machine, the preceding command would be sufficient for assigning the
+console to an auxiliary device. For an x86 machine, you might, in addition,
+need to set the characteristics of the serial line, for which you would have to
+consult the BIOS documentation for that machine. Also, on some x86 machines,
+you might use a device other than device \fBa\fR, as shown above. For example,
+you could set console to \fBttyb\fR if the second serial port is present.
+
+\fBExample 5 \fRChanging segkpsize.
+.sp
+.LP
+The following example demonstrates the method for changing the
+number of bytes that will be used for kernel pageable memory.
+Running the following command will set segkpsize to 3GiB.
+.sp
+.in +2
+.nf
+# \fBeeprom segkpsize=0xC0000000\fR
+
+.fi
+.in -2
+.sp
+
+
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/boot/solaris/bootenv.rc\fR\fR
+.ad
+.sp .6
+.RS 4n
+File storing \fBeeprom\fR values on x86 machines.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/openprom\fR\fR
+.ad
+.sp .6
+.RS 4n
+Device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/platform/\fR\fIplatform-name\fR\fB/sbin/eeprom\fR\fR
+.ad
+.sp .6
+.RS 4n
+Platform-specific version of \fBeeprom\fR. Use \fBuname\fR \fB-i\fR to obtain
+\fIplatform-name\fR.
+.RE
+
+
+.SH SEE ALSO
+.BR passwd (1),
+.BR sh (1),
+.BR svcs (1),
+.BR tip (1),
+.BR uname (1),
+.BR attributes (7),
+.BR smf (7),
+.BR boot (8),
+.BR init (8),
+.BR kadb (8),
+.BR kernel (8),
+.BR svcadm (8)
+.sp
+.LP
+\fIOpenBoot 3.x Command Reference Manual\fR
+.sp
+.LP
+\fI\fR

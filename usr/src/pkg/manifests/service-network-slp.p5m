@@ -58,8 +58,6 @@ dir  path=usr/share/lib/slp
 file path=usr/share/lib/slp/slp.jar group=sys
 file path=usr/share/lib/slp/slpd.jar group=sys mode=0600
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/slpd.1m
 dir  path=usr/share/man/man3lib
 file path=usr/share/man/man3lib/libslp.3lib
 dir  path=usr/share/man/man3slp
@@ -81,11 +79,13 @@ file path=usr/share/man/man3slp/SLPSetProperty.3slp
 file path=usr/share/man/man3slp/SLPUnescape.3slp
 file path=usr/share/man/man3slp/slp_api.3slp
 file path=usr/share/man/man3slp/slp_strerror.3slp
-dir  path=usr/share/man/man4
-file path=usr/share/man/man4/slp.conf.4
-file path=usr/share/man/man4/slpd.reg.4
-dir  path=usr/share/man/man7p
-file path=usr/share/man/man7p/slp.7p
+dir  path=usr/share/man/man4p
+file path=usr/share/man/man4p/slp.4p
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/slp.conf.5
+file path=usr/share/man/man5/slpd.reg.5
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/slpd.8
 legacy pkg=SUNWslpr \
     desc="Root filesystem portion of the Service Location Protocol (SLP) framework. Includes the SLP configuration file and start scripts for the SLP daemon." \
     name="SLP, (Root)"

@@ -100,7 +100,7 @@ function may fail if:
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -118,6 +118,9 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpthread_attr_init\fR(3C), \fBpthread_attr_setstackaddr\fR(3C),
-\fBpthread_attr_setdetachstate\fR(3C), \fBpthread_create\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR pthread_attr_init (3C),
+.BR pthread_attr_setdetachstate (3C),
+.BR pthread_attr_setstackaddr (3C),
+.BR pthread_create (3C),
+.BR attributes (7),
+.BR standards (7)

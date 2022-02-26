@@ -1,0 +1,97 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH IWI 4D "Mar 11, 2007"
+.SH NAME
+iwi \- Intel Pro. Wireless 802.11a/b/g IPW2200B/G IPW2915A/B/G Driver
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBiwi\fR \fI802.11b/g \fR wireless NIC driver is a multi-threaded,
+loadable, clonable,  GLDv3-based STREAMS driver supporting  the Data Link
+Provider Interface, \fBdlpi\fR(4P), on Intel Pro Wireless 2200BG 2915ABG
+chipset-based wireless NIC's. Driver functions include controller
+initialization, wireless \fI802.11b \fR infrastructure network connection, WEP
+and frame transmit and receive.
+.SH DRIVER CONFIGURATION
+.sp
+.LP
+The \fBiwi\fR driver performs auto-negotiation to determine the data rate and
+mode. Supported \fI802.11b \fR data rates are 1, 2, 5.5 and 11 Mbits/sec.
+Supported \fI802.11g\fR data rates are 1, 2, 5.5, 11, 6, 9, 12, 18, 24, 36, 48
+and 54 Mbits/sec.
+.sp
+.LP
+The \fBiwi\fR driver supports only BSS networks (also known as "ap" or
+"infrastructure" networks) and "open"(or "open-system") or "shared system"
+authentication. Only WEP encryption is currently supported. You perform
+configuration and administration tasks using the \fBdladm\fR(8) and
+\fBwificonfig\fR(8) utilities.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/iwi*\fR\fR
+.ad
+.RS 25n
+Special character device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB/kernel/drv/iwi\fR
+.ad
+.RS 25n
+32-bit ELF kernel module (x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/iwi\fR\fR
+.ad
+.RS 25n
+64-bit ELF kernel module (x86).
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR gld (4D),
+.BR dlpi (4P),
+.BR attributes (7),
+.BR dladm (8),
+.BR wificonfig (8)
+.sp
+.LP
+\fIANSI/IEEE Std 802.11- Standard for Wireless LAN  Technology\fR \(em 1999
+.sp
+.LP
+\fIIEEE Std 802.11a- Standard for Wireless LAN  Technology-Rev. A\fR\(em 2003
+.sp
+.LP
+\fIIEEE Std 802.11b - Standard  for  Wireless  LAN  Technology-Rev. B \fR\(em
+2003
+.sp
+.LP
+\fIIEEE Std 802.11g- Standard for  Wireless  LAN  Technology  -Rev. G\fR\(em
+2003

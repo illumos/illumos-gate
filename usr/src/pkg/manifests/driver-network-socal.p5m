@@ -40,8 +40,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/socal group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/socal.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/socal.4d
 driver name=socal alias=SUNW,socal
 legacy pkg=SUNWluxl desc="Sun Enterprise Network Array socal Device Driver" \
     name="Sun Enterprise Network Array socal Device Driver"

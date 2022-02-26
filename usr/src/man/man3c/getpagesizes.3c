@@ -55,7 +55,7 @@ into consideration when using \fBgetpagesizes()\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -71,4 +71,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBmemcntl\fR(2), \fBmmap\fR(2), \fBgetpagesize\fR(3C), \fBattributes\fR(5)
+.BR memcntl (2),
+.BR mmap (2),
+.BR getpagesize (3C),
+.BR attributes (7)

@@ -23,5 +23,5 @@
 #
 
 #
-# Moved to SMF. Use sharectl(1M) to manage NFS properties.
+# Moved to SMF. Use sharectl(8) to manage NFS properties.
 #

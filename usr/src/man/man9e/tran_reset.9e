@@ -124,8 +124,12 @@ on failure.
 The \fBtran_reset()\fR function can be called from user or interrupt context.
 This requirement comes from \fBscsi_reset()\fR.
 .SH SEE ALSO
-\fBattach\fR(9E), \fBddi_dma_buf_setup\fR(9F), \fBscsi_hba_attach\fR(9F),
-\fBscsi_reset\fR(9F), \fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S)
+.BR attach (9E),
+.BR ddi_dma_buf_setup (9F),
+.BR scsi_hba_attach (9F),
+.BR scsi_reset (9F),
+.BR scsi_address (9S),
+.BR scsi_hba_tran (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

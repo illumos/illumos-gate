@@ -62,4 +62,7 @@ shared object
 .SH SEE ALSO
 .sp
 .LP
-\fBpvs\fR(1), \fBIntro\fR(2), \fBIntro\fR(3), \fBattributes\fR(5)
+.BR pvs (1),
+.BR Intro (2),
+.BR Intro (3),
+.BR attributes (7)

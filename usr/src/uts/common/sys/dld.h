@@ -48,7 +48,7 @@ extern "C" {
 #endif
 
 /*
- * Data-Link Driver Information (text emitted by modinfo(1m))
+ * Data-Link Driver Information (text emitted by modinfo(8))
  */
 #define	DLD_INFO	"Data-Link Driver"
 

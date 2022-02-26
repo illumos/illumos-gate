@@ -143,9 +143,12 @@ Resources for the specified \fBDMA\fR window are allocated.
 .SH SEE ALSO
 \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
 \fBddi_dma_buf_bind_handle\fR(9F),  \fBddi_dma_cookie_get\fR(9F),
-\fBddi_dma_cookie_iter\fR(9F), \fBddi_dma_ncookies\fR(9F),
-\fBddi_dma_numwin\fR(9F), \fBddi_dma_sync\fR(9F),
-\fBddi_dma_unbind_handle\fR(9F), \fBddi_dma_cookie\fR(9S)
+.BR ddi_dma_cookie_iter (9F),
+.BR ddi_dma_ncookies (9F),
+.BR ddi_dma_numwin (9F),
+.BR ddi_dma_sync (9F),
+.BR ddi_dma_unbind_handle (9F),
+.BR ddi_dma_cookie (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

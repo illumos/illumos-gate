@@ -47,7 +47,7 @@
 /*
  * Bridge Administration Library.
  *
- * This library is used by administration tools such as dladm(1M) to configure
+ * This library is used by administration tools such as dladm(8) to configure
  * bridges, and by the bridge daemon to retrieve configuration information.
  */
 

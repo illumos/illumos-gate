@@ -67,7 +67,7 @@ static const char *skip_files[] = {
  *
  * This file contains two sets of interfaces which operate on the reverse
  * links database. One set (which includes di_devlink_open()/_close())
- * allows link generators like devfsadm(1M) and ucblinks(1B) (writers) to
+ * allows link generators like devfsadm(8) and ucblinks(1B) (writers) to
  * populate the database with /devices -> /dev mappings. Another set
  * of interfaces (which includes di_devlink_init()/_fini()) allows
  * applications (readers) to lookup the database for /dev links corresponding
@@ -3731,7 +3731,7 @@ walk_cache_node(di_devlink_handle_t hdp, const char *path, link_desc_t *linkp)
  *		are selected.
  *		If neither flag is specified, all devlinks are selected.
  *
- * re		An extended regular expression in regex(5) format which
+ * re		An extended regular expression in regex(7) format which
  *		selects the /dev links to be returned. The regular
  *		expression should use link pathnames relative to
  *		/dev. i.e. without the leading "/dev/" prefix.

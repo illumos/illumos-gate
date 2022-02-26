@@ -1,0 +1,482 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SCSA2USB 4D "May 23, 2021"
+.SH NAME
+scsa2usb \- SCSI to USB bridge driver
+.SH SYNOPSIS
+.nf
+\fBstorage@unit-address\fR
+.fi
+
+.SH DESCRIPTION
+The \fBscsa2usb\fR driver is a \fBUSBA\fR (Solaris USB architecture) compliant
+nexus driver that supports the \fIUSB Mass Storage Bulk Only Transport
+Specification 1.0\fR and \fIUSB Control/Bulk/Interrupt (CBI) Transport
+Specification 1.0\fR. The \fBscsa2usb\fR driver also supports USB storage
+devices that implement CBI Transport without the interrupt completion for
+status (that is, Control/Bulk (CB) devices.) It supports bus-powered and
+self-powered USB mass storage devices. This nexus driver is both a USB client
+driver and a \fBSCSA\fR HBA driver. As such, the \fBscsa2usb\fR driver only
+supports storage devices that utilize the above two transports.
+.sp
+.LP
+The \fBscsa2usb\fR driver also supports a \fBugen\fR(4D) interface allowing raw
+access to the device, for example by libusb applications, bypassing
+the child \fBsd\fR(4D) or \fBst\fR(4D) driver. Because a libusb application
+might change the state of the device, you should not access the disk or tape
+concurrently.
+.sp
+.LP
+The \fBscsa2usb\fR nexus driver maps \fBSCSA\fR target driver requests to
+\fBUSBA\fR client driver requests.
+.sp
+.LP
+The \fBscsa2usb\fR driver creates a child device info node for each logical
+unit (LUN) on the mass storage device. The standard Solaris \fBSCSI\fR disk
+driver or tape driver is attached to those nodes. Refer to \fBsd\fR(4D) or
+\fBst\fR(4D).
+.sp
+.LP
+This driver supports multiple LUN devices and creates a separate child device
+info node for each LUN. All child LUN nodes attach to \fBsd\fR(4D) for disks or
+\fBst\fR(4D) for tapes.
+.sp
+.LP
+In previous releases, all USB disk storage devices were treated as removable
+media devices and managed by \fBrmformat\fR(1) and volume management software.
+In the current release, however, only disk storage devices with a removable bit
+(RMB) value of \fB1\fR are removable. (The RMB is part of the device's SCSI
+INQUIRY data.) See SCSI specifications T10/995D Revision 11a, T10/1236-D
+Revision 20 or T10/1416-D Revision 23 for more information. However, for
+backward compatibility, all USB disk storage devices can still be managed by
+\fBrmformat\fR(1). With or without a volume manager, you can mount, eject,
+hot remove and hot insert a 1394 mass storage device as the following sections
+explain.
+.sp
+.LP
+Some devices may be supported by the USB mass storage driver even though they
+do not identify themselves as compliant with the USB mass storage class.
+.sp
+.LP
+The \fBscsa2usb.conf\fR file contains an \fBattribute-override-list\fR that
+lists the vendor ID, product ID, and revision for matching mass storage
+devices, as well as fields for overriding the default device attributes. The
+entries in this list are commented out by default and may be uncommented to
+enable support of particular devices.
+.sp
+.LP
+Follow the information given in the \fBscsa2usb.conf\fR file to see if a
+particular device can be supported using the override information.
+For example, by adding the following to the
+\fBscsa2usb.conf\fR file, many USB memory sticks and card readers might operate
+more reliably:
+.sp
+.in +2
+.nf
+attribute-override-list = "vid=* reduced-cmd-support=true";
+.fi
+.in -2
+
+.sp
+.LP
+Note that this override applies to all USB mass storage devices and might be
+inappropriate for a USB CD writer. If so, you can add an entry for each device
+to the attribute override list.
+.sp
+.LP
+If USB mass storage support is considered a security risk, this driver can be
+disabled in \fB/etc/system\fR as follows:
+.sp
+.in +2
+.nf
+exclude: scsa2usb
+.fi
+.in -2
+
+.sp
+.LP
+Alternatively, you can disable automatic handling of a device as described in
+the following subsection.
+.SS "Using Volume Management"
+Disk storage devices are managed by Volume Manager. Software that manages
+removable media creates a device nickname that can be listed with
+\fBeject\fR(1) or \fBrmmount\fR(1). A device that is not mounted automatically
+can be mounted using \fBrmmount\fR(1) under \fB/rmdisk/\fIlabel\fR\fR. Note
+that the \fBmount\fR(8) and \fBmount\fR(8) commands do not accept nicknames;
+you must use explicit device names with these commands.
+.sp
+.LP
+See \fBrmmount\fR(1) to unmount the device and \fBeject\fR(1) to eject the
+media. If the device is ejected while it is mounted, volume management software
+unmounts the device before ejecting it. It also might kill any active
+applications that are accessing the device.
+.sp
+.LP
+Volume management software is hotplug-aware and normally mounts file systems on
+USB mass storage devices if the file system is recognized. Before hot removing
+the USB device, use \fBeject\fR(1) to unmount the file system. After the device
+is removed, a console warning, such as "The disconnected device was busy,
+please reconnect," might display. The warning is harmless and you can ignore
+it.
+.sp
+.LP
+You can disable the automatic mounting and unmounting of removable devices by
+inserting a entry for a removable device in \fB/etc/vfstab\fR. In this entry,
+you must set the \fBmount at boot\fR field to \fBno\fR. See \fBvfstab\fR(5).
+.SS "Using \fBmount\fR and \fBumount\fR"
+Use \fBmount\fR(8) to explicitly mount the device and \fBumount\fR(8) to
+unmount the device. Use \fBeject\fR(1) to eject the media. After you have
+explicitly mounted a removable device, you cannot use a nickname as an argument
+to \fBeject\fR.
+.sp
+.LP
+Removing the disk device while it is being accessed or mounted fails with a
+console warning. To hot remove the disk device from the system, unmount the
+file system, then kill all applications accessing the device. Next, hot remove
+the device. A storage device can be hot inserted at any time.
+.SH DEVICE SPECIAL FILES
+Disk block special file names are located in \fB/dev/dsk\fR, while raw file
+names are located in \fB/dev/rdsk\fR. Tape raw file names are located in
+\fB/dev/rmt\fR. Input/output requests to the devices must follow the same
+restrictions as those for SCSI disks or tapes. Refer to \fBsd\fR(4D) or
+\fBst\fR(4D).
+.SH IOCTLS
+Refer to \fBdkio\fR(4I) and \fBcdio\fR(4I).
+.SH ERRORS
+Refer to \fBsd\fR(4D) for disks or \fBst\fR(4D) for tapes.
+.SH FILES
+The device special files for the USB mass storage device are created like those
+for a \fBSCSI\fR disk or SCSI tape. Refer to \fBsd\fR(4D) or \fBst\fR(4D).
+.sp
+.ne 2
+.na
+\fB\fB/dev/dsk/c\fIn\fRt\fIn\fRd\fIn\fRs\fIn\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Block files for disks.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rdsk/c\fIn\fRt\fIn\fRd\fIn\fRs\fIn\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Raw files for disks.
+.RE
+
+.sp
+.ne 2
+.na
+\fB/dev/usb/*/*/*\fR
+.ad
+.sp .6
+.RS 4n
+ugen(4D) nodes
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rmt/[0-127][l,m,h,u,c][b][n]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Raw files for tapes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/vol/dev/aliases/zip0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Symbolic link to the character device for the media in Zip drive 0
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/vol/dev/aliases/jaz0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Symbolic link to the character device for the media in Jaz drive 0.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/vol/dev/aliases/rmdisk0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Symbolic link to the character device for the media in removable drive 0. This
+is a generic removable media device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/scsa2usb\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit x86 ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/scsa2usb\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit SPARC ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/scsa2usb.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+Can be used to override specific characteristics.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86, PCI-based systems
+.TE
+
+.SH SEE ALSO
+.BR cdrw (1),
+.BR eject (1),
+.BR rmformat (1),
+.BR rmmount (1),
+.BR ieee1394 (4D),
+.BR sd (4D),
+.BR st (4D),
+.BR ugen (4D),
+.BR usba (4D),
+.BR pcfs (4FS),
+.BR cdio (4I),
+.BR dkio (4I),
+.BR scsi (5),
+.BR vfstab (5),
+.BR attributes (7),
+.BR cfgadm_scsi (8),
+.BR cfgadm_usb (8),
+.BR fdisk (8),
+.BR mount (8),
+.BR umount (8)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISystem Administration Guide, Volume I\fR
+.sp
+.LP
+\fIUniversal Serial Bus Specification 2.0\fR
+.sp
+.LP
+\fIUniversal Serial Bus Mass Storage Class Specification Overview 1.0\fR
+.sp
+.LP
+\fIUniversal Serial Bus Mass Storage Class Bulk-Only Transport Specification
+1.0\fR
+.sp
+.LP
+\fIUniversal Serial Bus Mass Storage Class Control/Bulk/Interrupt (CBI)
+Transport Specification 1.0\fR
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.sp
+.LP
+SCSI Specification \fIT10/995D Revision 11a\fR \(em March 1997
+.sp
+.LP
+SCSI Specification \fIT10/1236-D Revision 20\fR \(em July 2001
+.sp
+.LP
+SCSI Specification \fIT10/1416-D Revision 23\fR \(em May 2005
+.SH DIAGNOSTICS
+Refer to \fBsd\fR(4D) and \fBst\fR(4D).
+.sp
+.LP
+In addition to being logged, the following messages may appear on the system
+console. All messages are formatted in the following manner:
+.sp
+.in +2
+.nf
+Warning: <device path> (scsa2usb<instance number>): Error Message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBCannot access <device>. Please reconnect.\fR
+.ad
+.sp .6
+.RS 4n
+There was an error in accessing the mass-storage device during reconnect.
+Please reconnect the device.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDevice is not identical to the previous one on this port. Please disconnect
+and reconnect.\fR
+.ad
+.sp .6
+.RS 4n
+Another USB device has been inserted on a port that was connected to a
+mass-storage device. Please disconnect the USB device and reconnect the
+mass-storage device back into that port.
+.RE
+
+.sp
+.ne 2
+.na
+\fBReinserted device is accessible again.\fR
+.ad
+.sp .6
+.RS 4n
+The mass-storage device that was hot-removed from its USB slot has been
+re-inserted to the same slot and is available for access.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPlease disconnect and reconnect this device.\fR
+.ad
+.sp .6
+.RS 4n
+A hotplug of the device is needed before it can be restored.
+.RE
+
+.sp
+.LP
+The following messages may be logged into the system log. They are formatted in
+the following manner:
+.sp
+.in +2
+.nf
+<device path><scsa2usb<instance number>): message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBInvalid <record> in scsa2usb.conf file entry.\fR
+.ad
+.sp .6
+.RS 4n
+An unrecognized record was specified in the \fBscsa2usb.conf\fR file.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPkt submitted with 0 timeout which may cause indefinite hangs.\fR
+.ad
+.sp .6
+.RS 4n
+An application submitted a request but did not specify a timeout.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSyncing not supported.\fR
+.ad
+.sp .6
+.RS 4n
+Syncing after a panic is not supported. The filesystem may be corrupted.
+.RE
+
+.sp
+.ne 2
+.na
+\fBscsa2usb.conf override: <record>.\fR
+.ad
+.sp .6
+.RS 4n
+An override record specified in \fBscsa2usb.conf\fR was applied. Examples of an
+override record applied to a device with vendor ID 123 and product ID 456 are:
+.sp
+.in +2
+.nf
+vid=0x123 pid=0x456 reduced-cmd-support=true
+
+	or
+
+vid=* reduced-cmd-support=true
+.fi
+.in -2
+
+\&...meaning that the override record is applied to this device and all other
+USB mass storage devices.
+.RE
+
+.SH NOTES
+The Zip 100 drive does not comply with \fIUniversal Serial Bus Specification
+1.0\fR and cannot be power managed. Power Management support for Zip 100 has
+been disabled.
+.sp
+.LP
+If the system panics while a UFS file system is mounted on the mass storage
+media, no syncing will take place for the disk mass-storage device. (Syncing is
+not supported by the \fBscsa2usb\fR driver.) As a result, the file system on
+the media will not be consistent on reboot.
+.sp
+.LP
+If a PCFS file system is mounted, no syncing is needed and the filesystem will
+be consistent on reboot.
+.sp
+.LP
+If a mass-storage device is busy, system suspend cannot proceed and the system
+will immediately resume again.
+.sp
+.LP
+Attempts to remove a mass-storage device from the system will fail. The failure
+will be logged to the console. An attempt to replace the removed device with
+some other USB device will also fail. To successfully remove a USB mass-storage
+device you must "close" all references to it.
+.sp
+.LP
+Concurrent I/O to devices with multiple LUNs on the same device is not
+supported.
+.sp
+.LP
+Some USB CD-RW devices may perform inadequately at their advertised speeds. To
+compensate, use USB CD-RW devices at lower speeds (2X versus 4X). See
+\fBcdrw\fR(1) for details.
+.sp
+.LP
+This driver also supports CBI devices that do not use USB interrupt pipe for
+status completion.

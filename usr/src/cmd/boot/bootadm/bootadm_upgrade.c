@@ -615,8 +615,8 @@ bam_warn_hand_entries(menu_t *mp, char *osroot)
 		hand_list[hand_num - 1] = entry->entryNum;
 	}
 
-	bam_error(_("bootadm(1M) will only upgrade GRUB menu entries added "
-	    "by \nbootadm(1M) or lu(1M). The following entries on %s will "
+	bam_error(_("bootadm(8) will only upgrade GRUB menu entries added "
+	    "by \nbootadm(8) or lu(8). The following entries on %s will "
 	    "not be upgraded.\nFor details on manually updating entries, "
 	    "see %s\n"), osroot, MENU_URL(osroot));
 	bam_print_stderr("Entry Number%s: ", (hand_num > 1) ?

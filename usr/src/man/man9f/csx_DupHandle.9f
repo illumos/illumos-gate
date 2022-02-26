@@ -179,9 +179,13 @@ No \fBPCMCIA \fRhardware installed.
 .SH CONTEXT
 This function may be called from user or kernel context.
 .SH SEE ALSO
-\fBcsx_Get8\fR(9F), \fBcsx_GetMappedAddr\fR(9F), \fBcsx_Put8\fR(9F),
-\fBcsx_RepGet8\fR(9F), \fBcsx_RepPut8\fR(9F), \fBcsx_RequestIO\fR(9F),
-\fBcsx_RequestWindow\fR(9F)
+.BR csx_Get8 (9F),
+.BR csx_GetMappedAddr (9F),
+.BR csx_Put8 (9F),
+.BR csx_RepGet8 (9F),
+.BR csx_RepPut8 (9F),
+.BR csx_RequestIO (9F),
+.BR csx_RequestWindow (9F)
 .sp
 .LP
 \fIPC Card 95 Standard, PCMCIA/JEIDA\fR

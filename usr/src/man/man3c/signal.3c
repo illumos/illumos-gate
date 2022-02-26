@@ -145,7 +145,7 @@ guarantee the reception of every generated signal.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -163,6 +163,13 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBexit\fR(2), \fBkill\fR(2), \fBpause\fR(2), \fBsigaction\fR(2),
-\fBsigsend\fR(2), \fBwaitid\fR(2), \fBsignal.h\fR(3HEAD), \fBwait\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR exit (2),
+.BR kill (2),
+.BR pause (2),
+.BR sigaction (2),
+.BR sigsend (2),
+.BR waitid (2),
+.BR wait (3C),
+.BR signal.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

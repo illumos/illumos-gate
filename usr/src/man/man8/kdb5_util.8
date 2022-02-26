@@ -1,0 +1,526 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH KDB5_UTIL 8 "November 22, 2021"
+.SH NAME
+kdb5_util \- Kerberos Database maintenance utility
+.SH SYNOPSIS
+.nf
+\fB/usr/sbin/kdb5_util\fR  [\fB-d\fR \fIdbname\fR] [\fB-f\fR \fIstashfile_name\fR]
+     [\fB-k\fR \fImkeytype\fR] [\fB-m\fR ] [\fB-M\fR \fImkeyname\fR] [\fB-P\fR \fIpassword\fR] [\fB-r\fR \fIrealm\fR]
+     [\fB-x\fR \fIdb_args\fR]... \fIcmd\fR
+.fi
+
+.SH DESCRIPTION
+The \fBkdb5_util\fR utility enables you to create, dump, load, and destroy the
+Kerberos V5 database. You can also use \fBkdb5_util\fR to create a stash file
+containing the Kerberos database master key.
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-d\fR \fIdbname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the database name. \fB\&.db\fR is appended to whatever name is
+specified. You can specify an absolute path. If you do not specify the \fB-d\fR
+option, the default database name is \fB/var/krb5/principal\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR \fIstashfile_name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the stash file name. You can specify an absolute path.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-k\fR \fImkeytype\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the master key type. Valid values are \fBdes3-cbc-sha1\fR,
+\fBdes-cbc-crc\fR, \fBdes-cbc-md5\fR, \fBdes-cbc-raw\fR,
+\fBarcfour-hmac-md5\fR, \fBarcfour-hmac-md5-exp\fR,
+\fBaes128-cts-hmac-sha1-96\fR, and \fBaes256-cts-hmac-sha1-96\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enter the master key manually.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-M\fR \fImkeyname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the master key name.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-P\fR \fIpassword\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use the specified \fIpassword\fR instead of the stash file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR \fIrealm\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use \fIrealm\fR as the default database realm.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-x\fR \fIdb_args\fR\fR
+.ad
+.sp .6
+.RS 4n
+Pass database-specific arguments to \fBkadmin\fR. Supported arguments are for
+LDAP and the \fBBerkeley-db2\fR plug-in. These arguments are:
+.sp
+.ne 2
+.na
+\fB\fBbinddn\fR=\fIbinddn\fR\fR
+.ad
+.sp .6
+.RS 4n
+LDAP simple bind DN for authorization on the directory server. Overrides the
+\fBldap_kadmind_dn\fR parameter setting in \fBkrb5.conf\fR(5).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbindpwd\fR=\fIbindpwd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Bind password.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdbname\fR=\fIname\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the \fBBerkeley-db2\fR plug-in, specifies a name for the Kerberos database.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnconns\fR=\fInum\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of server connections.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBport\fR=\fInum\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory server connection port.
+.RE
+
+.RE
+
+.SH OPERANDS
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fB\fIcmd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies whether to create, destroy, dump, or load the database, or to create
+a stash file.
+.sp
+You can specify the following commands:
+.sp
+.ne 2
+.na
+\fB\fBcreate\fR \fB-s\fR\fR
+.ad
+.sp .6
+.RS 4n
+Creates the database specified by the \fB-d\fR option. You will be prompted for
+the database master password. If you specify \fB-s\fR, a stash file is created
+as specified by the \fB-f\fR option. If you did not specify \fB-f\fR, the
+default stash file name is \fB/var/krb5/.k5.realm\fR. If you use the \fB-f\fR,
+\fB-k\fR, or \fB-M\fR options when you create a database, then you must use the
+same options when modifying or destroying the database.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdestroy\fR\fR
+.ad
+.sp .6
+.RS 4n
+Destroys the database specified by the \fB-d\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstash\fR\fR
+.ad
+.sp .6
+.RS 4n
+Creates a stash file. If \fB-f\fR was not specified, the default stash file
+name is \fB/var/krb5/.k5.realm\fR. You will be prompted for the master database
+password. This command is useful when you want to generate the stash file from
+the password.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdump\fR [\fB-old\fR] [\fB-b6\fR] [\fB-b7\fR] [\fB-ov\fR] [\fB-verbose\fR]
+[\fB-mkey_convert\fR] [\fB-new_mkey_file\fR \fImkey_file\fR] [\fB-rev\fR]
+[\fB-recurse\fR] [\fIfilename\fR [\fIprincipals\fR...]]\fR
+.ad
+.sp .6
+.RS 4n
+Dumps the current Kerberos and KADM5 database into an ASCII file. By default,
+the database is dumped in current format, "\fBkdb5_util load_dumpversion 5\fR".
+If \fIfilename\fR is not specified or is the string "-", the dump is sent to
+standard output. Options are as follows:
+.sp
+.ne 2
+.na
+\fB\fB-old\fR\fR
+.ad
+.sp .6
+.RS 4n
+Causes the dump to be in the Kerberos 5 Beta 5 and earlier dump format
+("\fBkdb5_edit load_dump version 2.0\fR").
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-b6\fR\fR
+.ad
+.sp .6
+.RS 4n
+Causes the dump to be in the Kerberos 5 Beta 6 format ("\fBkdb5_edit load_dump
+version 3.0\fR").
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-b7\fR\fR
+.ad
+.sp .6
+.RS 4n
+Causes the dump to be in the Kerberos 5 Beta 7 format ("\fBkdb5_util load_dump
+version 4\fR"). This was the dump format produced on releases prior to 1.2.2.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-ov\fR\fR
+.ad
+.sp .6
+.RS 4n
+Causes the dump to be in \fBovsec_adm_export\fR format.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-verbose\fR\fR
+.ad
+.sp .6
+.RS 4n
+Causes the name of each principal and policy to be displayed as it is dumped.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-mkey_convert\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prompts for a new master key. This new master key will be used to re-encrypt
+the key data in the dumpfile. The key data in the database will not be changed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-new_mkey_file\fR \fImkey_file\fR\fR
+.ad
+.sp .6
+.RS 4n
+The filename of a stash file. The master key in this stash file will be used to
+re-encrypt the key data in the dumpfile. The key data in the database will not
+be changed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-rev\fR\fR
+.ad
+.sp .6
+.RS 4n
+Dumps in reverse order. This might recover principals that do not dump
+normally, in cases where database corruption has occurred.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-recurse\fR\fR
+.ad
+.sp .6
+.RS 4n
+Causes the dump to walk the database recursively (\fBbtree\fR only). This might
+recover principals that do not dump normally, in cases where database
+corruption has occurred. In cases of such corruption, this option will probably
+retrieve more principals than will the \fB-rev\fR option.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBload\fR [\fB-old\fR] [\fB-b6\fR] [\fB-b7\fR] [\fB-ov\fR] [\fB-hash\fR]
+[\fB-verbose\fR] [\fB-update\fR] \fIfilename\fR \fIdbname\fR
+[\fIadmin_dbname\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Loads a database dump from \fIfilename\fR into \fIdbname\fR. Unless the
+\fB-old\fR or \fB-b6\fR option is specified, the format of the dump file is
+detected automatically and handled appropriately. Unless the \fB-update\fR
+option is specified, \fBload\fR creates a new database containing only the
+principals in the dump file, overwriting the contents of any existing database.
+The \fB-old\fR option requires the database to be in the Kerberos 5 Beta 5 or
+earlier format ("\fBkdb5_edit load_dump version 2.0\fR").
+.sp
+.ne 2
+.na
+\fB\fB-b6\fR\fR
+.ad
+.sp .6
+.RS 4n
+Requires the database to be in the Kerberos 5 Beta 6 format ("\fBkdb5_edit
+load_dump version 3.0\fR").
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-b7\fR\fR
+.ad
+.sp .6
+.RS 4n
+Requires the database to be in the Kerberos 5 Beta 7 format ("\fBkdb5_util
+load_dump version 4\fR").
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-ov\fR\fR
+.ad
+.sp .6
+.RS 4n
+Requires the database to be in \fBovsec_adm_import\fR format. Must be used with
+the \fB-update\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-hash\fR\fR
+.ad
+.sp .6
+.RS 4n
+Requires the database to be stored as a hash. If this option is not specified,
+the database will be stored as a \fBbtree\fR. This option is not recommended,
+as databases stored in hash format are known to corrupt data and lose
+principals.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-verbose\fR\fR
+.ad
+.sp .6
+.RS 4n
+Causes the name of each principal and policy to be displayed as it is dumped.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-update\fR\fR
+.ad
+.sp .6
+.RS 4n
+Records from the dump file are added to or updated in the existing database.
+Otherwise, a new database is created containing only what is in the dump file
+and the old one is destroyed upon successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIfilename\fR\fR
+.ad
+.sp .6
+.RS 4n
+Required argument that specifies a path to a file containing database dump.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIdbname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Required argument that overrides the value specified on the command line or
+overrides the default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIadmin_dbname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Optional argument that is derived from \fIdbname\fR if not specified.
+.RE
+
+.RE
+
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRCreating File that Contains Information about Two Principals
+.sp
+.LP
+The following example creates a file named \fBslavedata\fR that contains the
+information about two principals, \fBjdb@EXAMPLE.COM\fR and \fBpak@EXAMPLE.COM\fR.
+
+.sp
+.in +2
+.nf
+# /usr/krb5/bin/kdb5_util dump -verbose slavedata
+jdb@EXAMPLE.COM pak@EXAMPLE.COM
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/var/krb5/principal\fR\fR
+.ad
+.sp .6
+.RS 4n
+Kerberos principal database.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/principal.kadm5\fR\fR
+.ad
+.sp .6
+.RS 4n
+Kerberos administrative database. Contains policy information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/principal.kadm5.lock\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lock file for the Kerberos administrative database. This file works backwards
+from most other lock files (that is, \fBkadmin\fR exits with an error if this
+file does not exist).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/principal.ulog\fR\fR
+.ad
+.sp .6
+.RS 4n
+The update log file for incremental propagation.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.BR kpasswd (1),
+.BR kadm5.acl (5),
+.BR kdc.conf (5),
+.BR attributes (7),
+.BR kerberos (7),
+.BR kadmin (8),
+.BR kadmin.local (8),
+.BR kadmind (8),
+.BR kdb5_ldap_util (8),
+.BR kproplog (8)

@@ -809,7 +809,7 @@ door_server_create(door_server_func_t *create_func)
 
 /*
  * Thread start function for door_create_server() below.
- * Create door server threads with cancellation(5) disabled.
+ * Create door server threads with cancellation(7) disabled.
  */
 static void *
 door_create_func(void *arg)

@@ -1,0 +1,325 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SAD 4D "Apr 16, 1997"
+.SH NAME
+sad \- STREAMS Administrative Driver
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+.fi
+
+.LP
+.nf
+#include <sys/conf.h>
+.fi
+
+.LP
+.nf
+#include <sys/sad.h>
+.fi
+
+.LP
+.nf
+#include <sys/stropts.h>
+.fi
+
+.LP
+.nf
+\fBint\fR \fBioctl\fR\fB(int\fR \fIfildes\fR, \fBint\fR \fIcommand\fR, \fBint \fR\fIarg\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBSTREAMS\fR Administrative Driver provides an interface for
+applications to perform administrative operations on  \fBSTREAMS\fR modules and
+drivers. The interface is provided through  \fBioctl\fR(2) commands. Privileged
+operations may access the \fBsad\fR driver using \fB/dev/sad/admin\fR.
+Unprivileged operations may access the  \fBsad\fR driver using
+\fB/dev/sad/user\fR.
+.sp
+.LP
+The \fIfildes\fR argument is an open file descriptor that refers to the
+\fBsad\fR driver.  The \fBcommand\fR argument determines the control function
+to be performed as described below.  The \fIarg\fR argument represents
+additional information that is needed by this command. The type of \fIarg\fR
+depends upon the command, but it is generally an integer or a pointer to a
+\fBcommand\fR-specific data structure.
+.SH COMMAND FUNCTIONS
+.sp
+.LP
+The autopush facility (see  \fBautopush\fR(8)) allows one to configure a list
+of modules to be automatically pushed on a stream when a driver is  first
+opened. Autopush is controlled by the following commands:
+.sp
+.ne 2
+.na
+\fB\fBSAD_SAP\fR\fR
+.ad
+.RS 11n
+Allows the administrator to configure the given device's autopush information.
+\fIarg\fR points to a  \fBstrapush\fR structure, which contains the following
+members:
+.sp
+.in +2
+.nf
+ unit_t   ap_cmd;
+ major_t  sap_major;
+ minor_t  sap_minor;
+ minor_t  sap_lastminor;
+ unit_t   sap_npush;
+ unit_t   sap_list [MAXAPUSH] [FMNAMESZ + 1];
+.fi
+.in -2
+
+The  \fBsap_cmd\fR field indicates the type of configuration being done. It may
+take on one of the following values:
+.sp
+.ne 2
+.na
+\fB\fBSAP_ONE\fR\fR
+.ad
+.RS 13n
+Configure one minor device of a driver.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSAP_RANGE\fR\fR
+.ad
+.RS 13n
+Configure a range of minor devices of a driver.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSAP_ALL\fR\fR
+.ad
+.RS 13n
+Configure all minor devices of a driver.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSAP_CLEAR\fR\fR
+.ad
+.RS 13n
+Undo configuration information for a driver.
+.RE
+
+The  \fBsap_major\fR field is the major device number of the device to be
+configured. The  \fBsap_minor\fR field is the minor device number of the device
+to be configured. The  \fBsap_lastminor\fR field is used only with the
+\fBSAP_RANGE\fR command,  which configures a range of minor devices between
+\fBsap_minor\fR and  \fBsap_lastminor\fR, inclusive. The minor fields have no
+meaning for the  \fBSAP_ALL\fR command. The  \fBsap_npush\fR field indicates
+the number of modules to be automatically pushed when the device is opened. It
+must be less than or equal to  \fBMAXAPUSH\fR \fB,\fR defined in  \fBsad.h\fR.
+It must also be less than or equal to  \fBNSTRPUSH,\fR the maximum number of
+modules that can be pushed on a stream, defined in the kernel master file.  The
+field  \fBsap_list\fR is an array of NULL-terminated module names to be pushed
+in the order  in which they appear in the list.
+.sp
+When using the  \fBSAP_CLEAR\fR command, the user sets only  \fBsap_major\fR
+and \fBsap_minor\fR. This will undo the configuration information for any of
+the other commands.  If a previous entry was configured as  \fBSAP_ALL,
+sap_minor\fR should be set to zero. If a previous entry was configured as
+\fBSAP_RANGE\fR \fB, sap_minor\fR should be set to the lowest minor device
+number in the range configured.
+.sp
+On failure,  \fBerrno\fR is set to the following value:
+.sp
+.ne 2
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+\fIarg\fR points outside the allocated address space.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+The major device number is invalid, the number of modules is invalid, or the
+list of module names is invalid.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENOSTR\fR\fR
+.ad
+.RS 10n
+The major device number does not represent a  \fBSTREAMS\fR driver.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEEXIST\fR\fR
+.ad
+.RS 10n
+The major-minor device pair is already configured.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+The command is  \fBSAP_RANGE\fR and  \fBsap_lastminor\fR is not greater than
+\fBsap_minor\fR, or the command is  \fBSAP_CLEAR\fR and  \fBsap_minor\fR is not
+equal to the first minor in the range.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENODEV\fR\fR
+.ad
+.RS 10n
+The command is  \fBSAP_CLEAR\fR and the device is not configured for autopush.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENOSR\fR\fR
+.ad
+.RS 10n
+An internal autopush data structure cannot be allocated.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSAD_GAP\fR\fR
+.ad
+.RS 11n
+Allows any user to query the  \fBsad\fR driver to get the autopush
+configuration information for a given device. \fIarg\fR points to a
+\fBstrapush\fR structure as described in the previous command.
+.sp
+The user should set the  \fBsap_major\fR and  \fBsap_minor\fR fields of the
+\fBstrapush\fR structure to the major and minor device numbers, respectively,
+of the device in question. On return, the  \fBstrapush\fR structure will be
+filled in with the entire information used to configure the device. Unused
+entries in the module list will be zero-filled.
+.sp
+On failure,  \fBerrno\fR is set to one of the following values:
+.sp
+.ne 2
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+\fIarg\fR points outside the allocated address space.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+The major device number is invalid.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENOSTR\fR\fR
+.ad
+.RS 10n
+The major device number does not represent a  \fBSTREAMS\fR driver.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENODEV\fR\fR
+.ad
+.RS 10n
+The device is not configured for autopush.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSAD_VML\fR\fR
+.ad
+.RS 11n
+Allows any user to validate a list of modules (that is, to see if they are
+installed on the system). \fIarg\fR is a pointer to a  \fBstr_list\fR structure
+with the following members:
+.sp
+.in +2
+.nf
+int     sl_nmods;
+ struct  str_mlist	*sl_modlist;
+.fi
+.in -2
+
+The  \fBstr_mlist\fR structure has the following member:
+.sp
+.in +2
+.nf
+char  l_name[FMNAMESZ+1];
+.fi
+.in -2
+
+\fBsl_nmods\fR indicates the number of entries the user has allocated in the
+array and  \fBsl_modlist\fR points to the array of module names. The return
+value is 0 if the list is valid, 1 if the list contains an invalid module name,
+or \(mi1 on failure. On failure,  \fBerrno\fR is set to one of the following
+values:
+.sp
+.ne 2
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+\fIarg\fR points outside the allocated address space.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+The  \fBsl_nmods\fR field of the  \fBstr_list\fR structure is less than or
+equal to zero.
+.RE
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR Intro (2),
+.BR ioctl (2),
+.BR open (2)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH DIAGNOSTICS
+.sp
+.LP
+Unless otherwise specified, the return value from  \fBioctl()\fR is \fB0\fR
+upon success and  \fB\(mi1\fR upon failure with  \fBerrno\fR set as indicated.

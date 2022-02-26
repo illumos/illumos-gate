@@ -3263,7 +3263,7 @@ rootnex_bind_slowpath(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 			    "replaced with a corrected version for proper "
 			    "system operation. To disable this warning, add "
 			    "'set rootnex:rootnex_bind_warn=0' to "
-			    "/etc/system(4).", ddi_driver_name(dma->dp_dip));
+			    "/etc/system(5).", ddi_driver_name(dma->dp_dip));
 		}
 		return (DDI_DMA_TOOBIG);
 	}

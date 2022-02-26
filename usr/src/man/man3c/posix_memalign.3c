@@ -104,7 +104,7 @@ There is insufficient memory available with the requested alignment.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -118,11 +118,14 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBfree\fR(3C), \fBmalloc\fR(3C), \fBmemalign\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR free (3C),
+.BR malloc (3C),
+.BR memalign (3C),
+.BR attributes (7),
+.BR standards (7)

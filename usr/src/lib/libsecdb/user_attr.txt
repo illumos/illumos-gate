@@ -22,7 +22,7 @@
 #
 # /etc/user_attr
 #
-# user attributes. see user_attr(4)
+# user attributes. see user_attr(5)
 #
 #
 root::::auths=solaris.*,solaris.grant;profiles=All;audit_flags=lo\:no;lock_after_retries=no;min_label=admin_low;clearance=admin_high

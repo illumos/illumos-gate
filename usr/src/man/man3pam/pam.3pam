@@ -58,7 +58,7 @@ restrictions.
 .LP
 Category four contains the functions that perform session management after
 access to the system has been granted. See \fBpam_open_session\fR(3PAM) and
-\fBpam_close_session\fR(3PAM)
+.BR pam_close_session (3PAM)
 .sp
 .LP
 The fifth category consists of the function that changes authentication tokens,
@@ -140,7 +140,7 @@ The \fBPAM\fR architecture enables authentication by multiple authentication
 services through \fIstacking\fR. System entry applications, such as
 \fBlogin\fR(1), stack multiple service modules to authenticate users with
 multiple authentication services. The order in which authentication service
-modules are stacked is specified in the configuration file, \fBpam.conf\fR(4).
+modules are stacked is specified in the configuration file, \fBpam.conf\fR(5).
 A system administrator determines this ordering, and also determines  whether
 the same password can be used for all authentication services.
 .SS "Administrative Interface"
@@ -148,7 +148,7 @@ the same password can be used for all authentication services.
 .LP
 The authentication library, \fB/usr/lib/libpam.so.1\fR, implements the
 framework interface. Various authentication services are  implemented by their
-own loadable modules whose paths are specified through the \fBpam.conf\fR(4)
+own loadable modules whose paths are specified through the \fBpam.conf\fR(5)
 file.
 .SH RETURN VALUES
 .sp
@@ -230,7 +230,7 @@ Permission denied.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -246,10 +246,17 @@ MT Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBlogin\fR(1), \fBpam_authenticate\fR(3PAM), \fBpam_chauthtok\fR(3PAM),
-\fBpam_open_session\fR(3PAM), \fBpam_set_item\fR(3PAM),
-\fBpam_setcred\fR(3PAM), \fBpam_sm\fR(3PAM), \fBpam_start\fR(3PAM),
-\fBpam_strerror\fR(3PAM), \fBpam.conf\fR(4), \fBattributes\fR(5)
+.BR login (1),
+.BR pam_authenticate (3PAM),
+.BR pam_chauthtok (3PAM),
+.BR pam_open_session (3PAM),
+.BR pam_set_item (3PAM),
+.BR pam_setcred (3PAM),
+.BR pam_sm (3PAM),
+.BR pam_start (3PAM),
+.BR pam_strerror (3PAM),
+.BR pam.conf (5),
+.BR attributes (7)
 .sp
 .LP
 \fISolaris Security for Developers Guide\fR

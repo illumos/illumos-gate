@@ -86,7 +86,7 @@ None.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -104,7 +104,13 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBdel_curterm\fR(3XCURSES), \fBdelscreen\fR(3XCURSES),
-\fBdoupdate\fR(3XCURSES), \fBendwin\fR(3XCURSES), \fBfilter\fR(3XCURSES),
-\fBlibcurses\fR(3XCURSES), \fBslk_attroff\fR(3XCURSES),
-\fBuse_env\fR(3XCURSES), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR del_curterm (3XCURSES),
+.BR delscreen (3XCURSES),
+.BR doupdate (3XCURSES),
+.BR endwin (3XCURSES),
+.BR filter (3XCURSES),
+.BR libcurses (3XCURSES),
+.BR slk_attroff (3XCURSES),
+.BR use_env (3XCURSES),
+.BR attributes (7),
+.BR standards (7)

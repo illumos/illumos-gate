@@ -33,7 +33,7 @@
 PATH=/usr/sbin:/usr/bin
 
 if [ -z "$SMF_RESTARTER" ]; then
-	echo "Cannot be run outside smf(5)"
+	echo "Cannot be run outside smf(7)"
 	exit 1
 fi
 

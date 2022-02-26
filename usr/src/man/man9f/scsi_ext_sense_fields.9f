@@ -159,6 +159,8 @@ The \fBscsi_ext_sense_fields()\fR, \fBscsi_sense_info_uint64()\fR and
 \fBscsi_sense_cmdspecific_uint64()()\fR functions can be called from user or
 interrupt context.
 .SH SEE ALSO
-\fBscsi_find_sense_descr\fR(9F), \fBscsi_sense_asc\fR(9F),
-\fBscsi_sense_ascq\fR(9F), \fBscsi_sense_key\fR(9F),
-\fBscsi_validate_sense\fR(9F)
+.BR scsi_find_sense_descr (9F),
+.BR scsi_sense_asc (9F),
+.BR scsi_sense_ascq (9F),
+.BR scsi_sense_key (9F),
+.BR scsi_validate_sense (9F)

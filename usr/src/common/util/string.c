@@ -61,7 +61,7 @@
  * described by <fmt, args> as possible.  The string will always be
  * null-terminated, so the maximum string length is 'buflen - 1'.
  * Returns the number of bytes that would be necessary to render the
- * entire string, not including null terminator (just like vsnprintf(3S)).
+ * entire string, not including null terminator (just like vsnprintf(3C)).
  * To determine buffer size in advance, use vsnprintf(NULL, 0, fmt, args) + 1.
  *
  * There is no support for floating point, and the C locale is assumed.

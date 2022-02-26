@@ -1,0 +1,286 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH VIRTUALKM 4D "May 13, 2017"
+.SH NAME
+virtualkm \- Virtual keyboard and mouse
+.SH SYNOPSIS
+.LP
+.nf
+\fB/dev/kbd\fR
+.fi
+
+.LP
+.nf
+\fB/dev/mouse\fR
+.fi
+
+.LP
+.nf
+\fB#include <sys/types.h>\fR
+.fi
+
+.LP
+.nf
+\fB#include <sys/kbio.h>\fR
+.fi
+
+.LP
+.nf
+\fBint ioctl(int fildes, int command, ... /*arg*/);\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+A virtual keyboard or mouse is an abstraction of one or more physical keyboards
+or mice (USB or PS2) connected to a system.  Input streams for these physical
+devices are coalesced into a single input stream and appear as a single device
+to the upper layers.
+.sp
+.LP
+\fB/dev/kbd\fR is the virtual keyboard device file. Inputs from multiple
+keyboards are coalesced into a single input stream, meaning that all keyboards
+appear as a single keyboard to a console or window system and accordingly, are
+treated as a single device. The virtual keyboard layout is consistent with the
+layout of the first keyboard plugged into the system. Note that on x86
+platforms, the virtual keyboard layout can be overloaded by \fBeeprom\fR(8).
+.sp
+.LP
+\fB/dev/mouse\fR is the virtual mouse device file. Inputs from multiple mice
+are coalesced into a single input stream, meaning that all mice appear as
+single mouse to the window system.
+.sp
+.LP
+Commands from applications are dispatched by the virtual keyboard/mouse
+facility to the underlying physical devices and will succeed provided that one
+of the underlying devices responds with success. For example, a single command
+issued to turn on LED's will turn on corresponding LED's for all underlying
+physical keyboards.
+.sp
+.LP
+Although physical keyboards/mice are linked to the virtual keyboard/mouse
+facility, each may be opened separately by accessing its associated device
+file. (For example, \fB/dev/usb/hid0\fR for a usb mouse).  Directly accessing a
+device file can be useful for multi-seat or similar purposes.
+.sp
+.LP
+When a single physical device is opened via its associated device file, it is
+automatically removed from the single virtual input stream. When closed, it is
+automatically re- coalesced into the single virtual input stream.
+.sp
+.LP
+Under the \fBvirtualkm\fR facility, the PS/2 mouse is coalesced into a virtual
+mouse single input stream and can be accessed using the \fB/dev/mouse\fR file.
+(Note that in previous releases, the PS/2 mouse was accessed via the
+\fB/dev/kdmouse\fR physical device file). In the current release, you use the
+\fB/dev/kdmouse\fR file to directly access the physical PS/2 mouse.
+.SS "INTERFACES"
+.LP
+The virtual mouse provides the following event ID's for mouse capability
+changes:
+.sp
+.ne 2
+.na
+\fBMOUSE_CAP_CHANGE_NUM_BUT\fR
+.ad
+.RS 30n
+This event is reported when the total number of mouse buttons changes. The
+\fBFirm_event.value\fR is set to the new button total, which is the maximum
+number of all mice buttons. Other fields are ignored.
+.RE
+
+.sp
+.ne 2
+.na
+\fBMOUSE_CAP_CHANGE_NUM_WHEEL\fR
+.ad
+.RS 30n
+This event is reported when the total number of mouse wheels changes. The
+\fBFirm_event.value\fR is set to the new wheel total. Other fields are ignored.
+The event value (\fBFirm_event.value\fR) can be 0 (no wheel), 1 (vertical
+wheel), or 2 (vertical and horizontal wheel).
+.RE
+
+.sp
+.LP
+The \fBFirm_event\fR structure is described in <\fBsys/vuid_event.h\fR>. As
+with other events, firm events are received using \fBread\fR(2).
+.sp
+.LP
+Event ID's are used by applications (including certain mouse demo applications)
+that are programmed to graphically represent the actual number of buttons and
+wheels on a mouse. When an application of this type receives a \fBFirm_event\fR
+with a ID MOUSE_CAP_CHANGE_NUM_BUT or MOUSE_CAP_CHANGE_NUM_WHEEL event, it is
+instructed to update its state information using the new value. Consider, for
+example, a mouse demo application whose sole function is to display a mouse
+with buttons that graphically correspond to the actual number of buttons on the
+mouse. If, for example, the system has a single two-button USB mouse attached,
+the application, by default, will graphically display the mouse with a left and
+a right button. However, if a another three-button USB mouse is hot-plugged
+into the system, a MOUSE_CAP_CHANGE_NUM_BUT Firm event with
+\fBFirm_event.value\fR of three instructs the demo application to update the
+mouse display to indicate three buttons.
+.SH IOCTLS
+.ne 2
+.na
+\fBKIOCSETFREQ\fR
+.ad
+.RS 15n
+Sets the frequency for either keyboard beeper or console beeper. To set the
+corresponding beeper frequency, \fIarg\fR must point to a \fBfreq_request\fR
+structure:
+.sp
+.in +2
+.nf
+struct freq_request {
+        enum fr_beep_type type; /* beep type */
+        int16_t freq;           /* frequency */
+};
+.fi
+.in -2
+
+Where \fItype\fR is the corresponding beeper type defined as:
+.sp
+.in +2
+.nf
+enum fr_beep_type { CONSOLE_BEEP =1, KBD_BEEP =2 };
+.fi
+.in -2
+
+and \fIfreq\fR is the frequency value to be set as the beeper frequency
+indicated by \fItype\fR. This value should be between 0 and 32767 with border
+inclusive.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/dev/kbd\fR\fR
+.ad
+.RS 18n
+Virtual Keyboard device file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/mouse\fR\fR
+.ad
+.RS 18n
+Virtual Mouse device file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/kdmouse\fR\fR
+.ad
+.RS 18n
+Physical PS/2 mouse device file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/usb/hid*\fR\fR
+.ad
+.RS 18n
+Physical USB keyboard/mouse device file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/dacf.conf\fR\fR
+.ad
+.RS 18n
+Device auto-configuration file.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+l l
+l l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Architecture	SPARC, x86
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.LP
+.BR kbd (1),
+.BR read (2),
+.BR hid (4D),
+.BR usba (4D),
+.BR kb (4M),
+.BR usbkbm (4M),
+.BR usbms (4M),
+.BR vuidmice (4M),
+.BR attributes (7),
+.BR eeprom (8)
+.SH DIAGNOSTICS
+.LP
+The messages described below may appear on the system console as well as
+being logged. All messages are formatted in the following manner:
+.sp
+.in +2
+.nf
+WARNING: Error message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBconskbd: keyboard is not available for system debugging:
+\fIdevice_path\fR.\fR
+.ad
+.sp .6
+.RS 4n
+Errors were encountered while entering kmdb during initialization for debugger
+mode. As a result, the keyboard is not available.
+.RE
+
+.sp
+.ne 2
+.na
+\fBconskbd: keyboard is not available:  <\fIdevice_path\fR>\fR
+.ad
+.sp .6
+.RS 4n
+Errors were encountered while exiting kmdb during un-initialization for
+debugger mode. As a result, the keyboard is not available.
+.RE
+
+.sp
+.ne 2
+.na
+\fBFailed to relink the mouse <\fR\fIdevice_path\fR\fB> underneath virtual mouse\fR
+.ad
+.sp .6
+.RS 4n
+An error was encountered and the mouse is unavailable. (When a mouse is
+physically opened via a physical device file such as \fB/dev/usb/hid0\fR, it is
+removed from the single virtual input stream (\fB/dev/mouse\fR). When closed,
+it is re-coalesced into a single virtual input stream beneath \fB/dev/mouse\fR.
+If an error is encountered, (for example, the mouse has been physically
+removed), it is unavailable beneath \fB/dev/mouse\fR.
+.RE
+
+.SH NOTES
+.LP
+Currently, the \fBvirtualkm\fR device supports only USB and PS2 keyboards and
+mice.
+.sp
+.LP
+The \fBvirtualkm\fR device maintains complete compatibility on select legacy
+systems, (including Ultra 10's), that are equipped with serial keyboard/mouse.

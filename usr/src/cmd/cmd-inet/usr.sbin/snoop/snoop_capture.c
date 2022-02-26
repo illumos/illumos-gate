@@ -111,7 +111,7 @@ select_datalink(const char *linkname, void *arg)
 
 /*
  * Open `linkname' in raw/passive mode (see dlpi_open(3DLPI)).  If `linkname'
- * is NULL, pick a datalink as per snoop(1M).  Also gather some information
+ * is NULL, pick a datalink as per snoop(8).  Also gather some information
  * about the datalink useful for building the proper packet filters.
  */
 boolean_t

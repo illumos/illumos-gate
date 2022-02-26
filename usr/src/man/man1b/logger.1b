@@ -110,4 +110,6 @@ by \fBsyslogd\fR as other messages to the facility \fBlocal0\fR are.
 .SH SEE ALSO
 .sp
 .LP
-\fBsyslogd\fR(1M), \fBsyslog\fR(3C), \fBattributes\fR(5)
+.BR syslog (3C),
+.BR attributes (7),
+.BR syslogd (8)

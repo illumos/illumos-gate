@@ -74,11 +74,11 @@
  *	inactive - number of days a login maybe inactive before it is locked
  *	expire - date when a login is no longer valid
  *	authorization - One or more comma separated authorizations defined
- *			in auth_attr(4).
+ *			in auth_attr(5).
  *	profile - One or more comma separated execution profiles defined
- *		  in prof_attr(4)
- *	role - One or more comma-separated role names defined in user_attr(4)
- *	key=value - One or more -K options each specifying a valid user_attr(4)
+ *		  in prof_attr(5)
+ *	role - One or more comma-separated role names defined in user_attr(5)
+ *	key=value - One or more -K options each specifying a valid user_attr(5)
  *		attribute.
  *
  */

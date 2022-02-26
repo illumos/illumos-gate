@@ -1,0 +1,551 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ROUTEADM 8 "May 13, 2017"
+.SH NAME
+routeadm \- IP forwarding and routing configuration
+.SH SYNOPSIS
+.LP
+.nf
+\fBrouteadm\fR  [\fB-p\fR  [\fIoption\fR]]
+.fi
+
+.LP
+.nf
+\fBrouteadm\fR  [\fB-R\fR \fIroot-dir\fR] [\fB-e\fR \fIoption\fR ...] [\fB-d\fR \fIoption\fR...]
+ [\fB-r\fR \fIoption\fR...] [\fB-s\fR \fIvar\fR=\fIvalue\fR]
+.fi
+
+.LP
+.nf
+\fBrouteadm\fR  [\fB-l\fR \fIfmri\fR]
+.fi
+
+.LP
+.nf
+\fBrouteadm\fR  [\fB-m\fR \fIfmri\fR \fIkey\fR=\fIvalue\fR [\fIkey\fR=\fIvalue\fR]...]
+.fi
+
+.LP
+.nf
+\fBrouteadm\fR  [\fB-u\fR]
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBrouteadm\fR command is used to administer system-wide configuration for
+IP forwarding and routing. IP forwarding is the passing of IP packets from one
+network to another; IP routing is the use of a routing protocol to determine
+routes.
+.sp
+.LP
+IP forwarding and routing functions are also represented as services within the
+service management facility (SMF), and can be administered by means of
+\fBsvcadm\fR(8) also, using the following fault management resource
+identifiers (FMRIs):
+.sp
+.in +2
+.nf
+svc:/network/ipv4-forwarding:default
+svc:/network/ipv6-forwarding:default
+svc:/network/routing/route:default
+svc:/network/routing/ripng:default
+.fi
+.in -2
+
+.sp
+.LP
+See EXAMPLES for relevant examples.
+.sp
+.LP
+In addition to enabling and disabling routing and forwarding, \fBrouteadm\fR is
+used to interact with SMF-based routing daemon services. Routing daemon
+services are identified by the presence of a \fBrouteadm\fR application
+property group, which \fBrouteadm\fR uses in administering the given service.
+Routing daemon services can also specify properties relating to their operation
+in the \fBrouting\fR application property group; these can be modified by means
+of routeadm -m. If an FMRI for a service without such a property group is
+specified, an error is issued and the operation is not carried out. If a
+routing daemon has not been converted to SMF, the \fBipv4\fI[or
+6]\fR-routing-daemon\fR, \fBipv4\fI[or 6]\fR-routing-daemon-args\fR, and
+\fBipv4\fI[or 6]\fR-routing-stop-cmd\fR variables can be used to specify the
+appropriate daemon for IPv4 or IPv6 routing. \fBrouteadm\fR will then run that
+daemon using the \fBsvc:/network/routing/legacy-routing:ipv4\fR\fI[or 6]\fR
+service as appropriate. This conversion process occurs when you issue an enable
+(\fB-e\fR), disable (\fB-d\fR) or an update (\fB-u\fR) command.
+.sp
+.LP
+The first usage, in the SYNOPSIS above, reports the current configuration.
+.SH OPTIONS
+.LP
+The following command-line options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-p\fR [\fIoption\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print the configuration in parsable format. If \fIoption\fR is specified, only
+the configuration for the specified option or variable is displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR \fIroot-dir\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify an alternate root directory where \fBrouteadm\fR applies changes.
+.LP
+Note -
+.sp
+.RS 2
+The root file system of any non-global zones must not be referenced with the
+\fB-R\fR option. Doing so might damage the global zone's file system, might
+compromise the security of the global zone, and might damage the non-global
+zone's file system. See \fBzones\fR(7).
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR \fIoption\fR...\fR
+.ad
+.sp .6
+.RS 4n
+Enable the specified option. The effect is to prepare the associated services
+(\fBsvc:/network/ipv4-forwarding:default\fR in the case of
+\fBipv4-forwarding\fR) for enabling. By means of the \fBrouting-svcs\fR
+variable, the routing daemons are specified to be enabled on subsequent boot or
+when \fBrouteadm\fR \fB-u\fR is run.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR \fIoption\fR...\fR
+.ad
+.sp .6
+.RS 4n
+Disable the specified option. The effect is to prepare the associated services
+(\fBsvc:/network/ipv4-forwarding:default\fR in the case of
+\fBipv4-forwarding\fR) for enabling. By means of the \fBrouting-svcs\fR
+variable, the routing daemons are specified to be disabled on subsequent boot
+or when \fBrouteadm\fR \fB-u\fR is run.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR \fIfmri\fR\fR
+.ad
+.sp .6
+.RS 4n
+List all properties in the routing application property group for the SMF
+routing daemon service.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR \fIfmri\fR\ \fIkey\fR=\fIvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+Change property value of property \fIkey\fR to \fIvalue\fR in routing
+application property group for the SMF routing daemon service. For multi-valued
+properties, the property name can be used multiple times in the modify
+operation, and each associated value will be added.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR \fIoption...\fR\fR
+.ad
+.sp .6
+.RS 4n
+Revert the specified option to the system default. The system defaults are
+specified in the description of each \fIoption\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-u\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply the currently configured options to the running system. These options
+might include enabling or disabling IP forwarding and launching or killing
+routing daemons, if any are specified. It does not alter the state of the
+system for those settings that have been set to default. This option is meant
+to be used by administrators who do not want to reboot to apply their changes.
+In addition, this option upgrades non-SMF configurations from the invocations
+of daemon stop commands, which might include a set of arguments, to a simple
+enabling of the appropriate service.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR \fIkey\fR=\fIvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify string values for specific variables in a comma-separated list with no
+intervening spaces. If invalid options are specified, a warning message is
+displayed and the program exits. The following variables can be specified:
+.sp
+.ne 2
+.na
+\fB\fBrouting-svcs=\fR\fIfmrilist\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the routing daemon services to be enabled. Routing daemon services
+are determined to be IPv4 or IPv6 (and so enabled or disabled when
+\fBrouteadm\fR \fB-e\fR/\fB-d\fR \fBipv4\fR\fI(6)\fR\fB-routing\fR is run) on
+the basis of property values in the \fBrouteadm\fR application property group.
+Default: \fBroute:default ripng:default\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipv4-routing-daemon=\fI<full_path_to_routing_daemon>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the routing daemon to be started when \fBipv4-routing\fR is enabled.
+The routing daemon specified must be an executable binary or shell-script. If
+the specified program maps to an SMF service, the service will be used, and
+daemon arguments to the program will be transferred to the properties of the
+service at enable time. Default: \fB""\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipv4-routing-daemon-args=\fI<args>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the startup arguments to be passed to the \fBipv4-routing-daemon\fR
+when \fBipv4-routing\fR is enabled. Default: no arguments
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipv4-routing-stop-cmd=\fI<command>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the command to be executed to stop the routing daemon when
+\fBipv4-routing\fR is disabled. \fI<command>\fR can be an executable binary or
+shell-script, or a string that can be parsed by \fBsystem\fR(3C). Default:
+\fB""\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipv6-routing-daemon=\fI<full_path_to_routing_daemon>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the routing daemon to be started when \fBipv6-routing\fR is enabled.
+The routing daemon specified must be an executable binary or shell-script. If
+the specified program maps to an SMF service, the service will be used, and
+daemon arguments to the program will be transferred to the properties of the
+service at enable time. Default: \fB""\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipv6-routing-daemon-args=\fI<args>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the startup arguments to be passed to the \fBipv6-routing-daemon\fR
+when \fBipv6-routing\fR is enabled. Default: \fB""\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipv6-routing-stop-cmd=\fI<command>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the command to be executed to stop the routing daemon when
+\fBipv6-routing\fR is disabled. \fI<command>\fR can be an executable binary or
+shell-script, or a string that can be parsed by \fBsystem\fR(3C). Default:
+\fB""\fR
+.RE
+
+.RE
+
+.sp
+.LP
+Multiple \fB-e\fR, \fB-d\fR, and \fB-r\fR options can be specified on the
+command line. Changes made by \fB-e\fR, \fB-d\fR, and \fB-r\fR are persistent,
+but are not applied to the running system unless \fBrouteadm\fR is called later
+with the \fB-u\fR option.
+.sp
+.LP
+Use the following options as arguments to the \fB-e\fR, \fB-d\fR, and \fB-r\fR
+options (shown above as \fIoption...\fR).
+.sp
+.ne 2
+.na
+\fB\fBipv4-forwarding\fR\fR
+.ad
+.sp .6
+.RS 4n
+Controls the global forwarding configuration for all IPv4 interfaces. The
+system default is \fBdisabled\fR. If enabled, IP will forward IPv4 packets to
+and from interfaces when appropriate. If disabled, IP will not forward IPv4
+packets to and from interfaces when appropriate. The SMF service associated
+with this configuration variable is \fBsvc:/network/routing/ipv4-forwarding\fR.
+This service will be enabled or disabled as appropriate when \fBrouteadm\fR is
+called with the \fBu\fR option. As an alternative, you can use
+\fBsvcadm\fR(8). Services that require \fBipv4-forwarding\fR to be enabled
+should specify a dependency on this service.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipv4-routing\fR\fR
+.ad
+.sp .6
+.RS 4n
+Determines whether an IPv4 routing daemon is run. The system default is
+\fBenabled\fR unless the \fB/etc/defaultrouter\fR file exists (see
+\fBdefaultrouter\fR(5)), in which case the default is \fBdisabled\fR. The value
+of this option reflects the state of all IPv4 routing services, such that if
+any IPv4 routing service is enabled, \fBipv4-routing\fR is enabled. This allows
+users to interact with routing services using \fBsvcadm\fR(8), as well as
+through \fBrouteadm\fR. IPv4 routing services, specified by means of the
+\fBrouting-svcs\fR variable, will be prepared for enable on next boot when the
+user explicitly enables \fBipv4-routing\fR. The SMF routing daemon service for
+\fBin.routed\fR (\fBsvc:/network/routing/route:default\fR) is specified by
+default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipv6-forwarding\fR\fR
+.ad
+.sp .6
+.RS 4n
+Controls the global forwarding configuration for all IPv6 interfaces. The
+system default is \fBdisabled\fR. If enabled, IP will forward IPv6 packets to
+and from interfaces when appropriate. If disabled, IP will not forward IPv6
+packets to and from interfaces when appropriate. The SMF service associated
+with this configuration variable is \fBsvc:/network/routing/ipv6-forwarding\fR.
+This service will be enabled or disabled as appropriate when \fBrouteadm\fR is
+called with the \fB-u\fR option, or \fBsvcadm\fR(8) is used. Services that
+require \fBipv6-forwarding\fR to be enabled should specify a dependency on this
+service.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipv6-routing\fR\fR
+.ad
+.sp .6
+.RS 4n
+Determines whether an IPv6 routing daemon is run. The system default is
+\fBdisabled\fR. The value of this option reflects the state of all IPv6 routing
+services, such that, if any IPv6 routing service is enabled, \fBipv6-routing\fR
+is enabled. This allows users to interact with routing services via
+\fBsvcadm\fR(8) as well as through \fBrouteadm\fR. IPv6 routing services,
+specified by means of the \fBrouting-svcs\fR variable, will be prepared for
+enable on next boot when the user explicitly enables \fBipv6-routing\fR. The
+SMF routing daemon service for \fBin.ripngd\fR
+(\fBsvc:/network/routing/ripng:default\fR) is specified by default.
+.RE
+
+.sp
+.LP
+The forwarding and routing settings are related but not mutually dependent. For
+example, a router typically forwards IP packets and uses a routing protocol,
+but nothing would prevent an administrator from configuring a router that
+forwards packets and does not use a routing protocol. In that case, the
+administrator would enable forwarding, disable routing, and populate the
+router's routing table with static routes.
+.sp
+.LP
+The forwarding settings are global settings. Each interface also has an
+\fBIFF_ROUTER\fR forwarding flag that determines whether packets can be
+forwarded to or from a particular interface. That flag can be independently
+controlled by means of \fBifconfig\fR(8)'s router option. When the global
+forwarding setting is changed (that is, \fB-u\fR is issued to change the value
+from \fBenabled\fR to \fBdisabled\fR or vice-versa), all interface flags in the
+system are changed simultaneously to reflect the new global policy. Interfaces
+configured by means of DHCP automatically have their interface-specific
+\fBIFF_ROUTER\fR flag cleared.
+.sp
+.LP
+When a new interface is plumbed by means of \fBifconfig\fR, the value of the
+interface-specific forwarding flag is set according to the current global
+forwarding value. Thus, the forwarding value forms the "default" for all new
+interfaces.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fREnabling IPv4 Forwarding
+.sp
+.LP
+IPv4 forwarding is disabled by default. The following command enables IPv4
+forwarding:
+
+.sp
+.in +2
+.nf
+example# \fBrouteadm -e ipv4-forwarding\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRApply Configured Settings to the Running System
+.sp
+.LP
+In the previous example, a system setting was changed, but will not take effect
+until the next reboot unless a command such as the following is used:
+
+.sp
+.in +2
+.nf
+example# \fBrouteadm -u\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+An alternative to the above two steps is to simply enable the equivalent SMF
+service:
+
+.sp
+.in +2
+.nf
+example# \fBsvcadm enable svc:/network/ipv4-forwarding\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\&...or, using the abbreviated FMRI:
+
+.sp
+.in +2
+.nf
+example# \fBsvcadm enable ipv4-forwarding\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRMaking a Setting Revert to its Default
+.sp
+.LP
+To make the setting changed in the first example revert to its default, enter
+the following:
+
+.sp
+.in +2
+.nf
+example# \fBrouteadm -r ipv4-forwarding\fR
+example# \fBrouteadm -u\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRStarting \fBin.routed\fR with the \fB-q\fR Flag
+.sp
+.LP
+Setting the \fB-q\fR flag is represented in the SMF service by setting the
+\fBquiet_mode\fR property to true. The following sequence of commands starts
+\fBin.routed\fR with the \fB-q\fR flag:
+
+.sp
+.in +2
+.nf
+example# \fBrouteadm -m route:default quiet_mode=true\fR
+example# \fBrouteadm -e ipv4-routing -u\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+See \fBin.routed\fR(8) for details of property names and how they relate to
+daemon behavior.
+
+.SH EXIT STATUS
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 7n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB!=0\fR\fR
+.ad
+.RS 7n
+An error occurred while obtaining or modifying the system configuration.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/inet/routing.conf\fR\fR
+.ad
+.RS 26n
+Parameters for IP forwarding and routing. (Not to be edited.)
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Stable
+.TE
+
+.SH SEE ALSO
+.LP
+.BR gateways (5),
+.BR attributes (7),
+.BR smf (7),
+.BR ifconfig (8),
+.BR in.routed (8),
+.BR svcadm (8)

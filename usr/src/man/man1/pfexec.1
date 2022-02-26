@@ -35,28 +35,28 @@ pfexec, pfsh, pfcsh, pfksh \- execute a command in a profile
 .SH DESCRIPTION
 .LP
 The \fBpfexec\fR program is used to execute commands with the attributes
-specified by the user's profiles in the \fBexec_attr\fR(4) database. It is
+specified by the user's profiles in the \fBexec_attr\fR(5) database. It is
 invoked by the profile shells, \fBpfsh\fR, \fBpfcsh\fR, and \fBpfksh\fR which
 are linked to the Bourne shell, C shell, and Korn shell, respectively.
 .sp
 .LP
 Profiles are searched in the order specified in the user's entry in the
-\fBuser_attr\fR(4) database. If the same command appears in more than one
+\fBuser_attr\fR(5) database. If the same command appears in more than one
 profile, the profile shell uses the first matching entry.
 .sp
 .LP
 The second form, \fBpfexec\fR \fB-P\fR \fIprivspec\fR, allows a user to obtain
-the additional privileges awarded to the user's profiles in \fBprof_attr\fR(4).
+the additional privileges awarded to the user's profiles in \fBprof_attr\fR(5).
 The privileges specification on the commands line is parsed using
 \fBpriv_str_to_set\fR(3C). The resulting privileges are intersected with the
 union of the privileges specified using the "\fBprivs\fR" keyword in
-\fBprof_attr\fR(4) for all the user's profiles and added to the inheritable set
+\fBprof_attr\fR(5) for all the user's profiles and added to the inheritable set
 before executing the command.
 .sp
 .LP
 For \fBpfexec\fR to function correctly, the \fBpfexecd\fR daemon must be running
 in the current zone. This is normally managed by the
-"\fBsvc:/system/pfexec:default\fR" SMF service (see \fBsmf\fR(5)).
+"\fBsvc:/system/pfexec:default\fR" SMF service (see \fBsmf\fR(7)).
 .SH USAGE
 .LP
 \fBpfexec\fR is used to execute commands with predefined process attributes,
@@ -104,5 +104,12 @@ An error occurred.
 
 .SH SEE ALSO
 .LP
-\fBcsh\fR(1), \fBksh\fR(1), \fBprofiles\fR(1), \fBsh\fR(1), \fBexec_attr\fR(4),
-\fBprof_attr\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5), \fBsmf\fR(5)
+.BR csh (1),
+.BR ksh (1),
+.BR profiles (1),
+.BR sh (1),
+.BR exec_attr (5),
+.BR prof_attr (5),
+.BR user_attr (5),
+.BR attributes (7),
+.BR smf (7)

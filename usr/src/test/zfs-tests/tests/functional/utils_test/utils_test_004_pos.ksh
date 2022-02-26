@@ -34,7 +34,7 @@
 
 #
 # DESCRIPTION:
-# Ensure that the quotaon(1M) utility fails on a ZFS file system.
+# Ensure that the quotaon(8) utility fails on a ZFS file system.
 #
 # STRATEGY:
 # 1. Enable a quota on a ZFS file system.
@@ -51,10 +51,10 @@ function cleanup
 
 log_onexit cleanup
 
-log_assert "Ensure that the quotaon(1M) utility fails on a ZFS file system."
+log_assert "Ensure that the quotaon(8) utility fails on a ZFS file system."
 
 log_must zfs set quota=1099511627776 $TESTPOOL/$TESTFS
 log_must touch $TESTDIR/quotas
 log_mustnot quotaon /dev/dsk/${DISK}s0
 
-log_pass "quotaon(1M) returned an error as expected."
+log_pass "quotaon(8) returned an error as expected."

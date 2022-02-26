@@ -137,7 +137,7 @@ extern "C" {
 #define	ZONE_INDEX_GID		3		/* sys */
 #define	ZONE_INDEX_MODE		0644
 
-/* The maximum length of the VERSION string in the pkginfo(4) file. */
+/* The maximum length of the VERSION string in the pkginfo(5) file. */
 #define	ZONE_PKG_VERSMAX	256
 
 /*

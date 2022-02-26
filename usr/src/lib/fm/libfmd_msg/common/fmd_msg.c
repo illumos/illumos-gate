@@ -36,7 +36,7 @@
  * fmd_msg_init - set up the library and return a handle
  * fmd_msg_fini - destroy the handle from fmd_msg_init
  *
- * fmd_msg_locale_set - set the default locale (initially based on environ(5))
+ * fmd_msg_locale_set - set the default locale (initially based on environ(7))
  * fmd_msg_locale_get - get the default locale
  *
  * fmd_msg_url_set - set the default URL for knowledge articles
@@ -310,7 +310,7 @@ fmd_msg_init(const char *root, int version)
 	 * directory for our default catalog, and set fmh_binding as the same
 	 * directory prefixed with the new root directory.  This simply turns
 	 * usr/lib/locale into <rootdir>/usr/lib/locale, but handles all of the
-	 * environ(5) settings that can change the default messages binding.
+	 * environ(7) settings that can change the default messages binding.
 	 */
 	if (root != NULL && root[0] != '\0' && strcmp(root, "/") != 0) {
 		if (root[0] != '/')

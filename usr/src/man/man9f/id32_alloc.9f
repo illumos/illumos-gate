@@ -86,7 +86,7 @@ These functions can be called from user or interrupt context. The routine
 \fBKM_SLEEP\fR flag is passed in. All other routines can be called from
 interrupt or kernel context.
 .SH SEE ALSO
-\fBkmem_alloc\fR(9F)
+.BR kmem_alloc (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

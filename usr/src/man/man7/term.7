@@ -1,0 +1,215 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TERM 7 "Jul 3, 1990"
+.SH NAME
+term \- conventional names for terminals
+.SH DESCRIPTION
+.sp
+.LP
+Terminal names are maintained as part of the shell environment in the
+environment variable \fB\fR\fBTERM\fR\fB\&. \fR See \fBsh\fR(1),
+\fBprofile\fR(5), and \fBenviron\fR(7). These names are used by certain
+commands (for example, \fBtabs\fR, \fBtput\fR, and \fBvi\fR) and certain
+functions (for example, see \fBcurses\fR(3CURSES)).
+.sp
+.LP
+Files under \fB/usr/share/lib/terminfo\fR are used to name terminals and
+describe their capabilities. These files are in the format described in
+\fBterminfo\fR(5). Entries in \fBterminfo\fR source files consist of a number
+of comma-separated fields. To print a description of a terminal  \fIterm\fR,
+use the command  \fBinfocmp\fR \fB-I\fR \fIterm\fR. See \fBinfocmp\fR(8).
+White space after each comma is ignored. The first line of each terminal
+description in the \fBterminfo\fR database gives the names by which
+\fBterminfo\fR knows the terminal, separated by bar (\fB|\fR) characters. The
+first name given is the most common abbreviation for the terminal (this is the
+one to use to set the environment variable \fBTERMINFO\fR in
+\fB$HOME/.profile\fR; see \fBprofile\fR(5)), the last name given should be a
+long name fully identifying the terminal, and all others are understood as
+synonyms for the terminal name. All names but the last should contain no blanks
+and must be unique in the first 14 characters; the last name may contain blanks
+for readability.
+.sp
+.LP
+Terminal names (except for the last, verbose entry) should be chosen using the
+following conventions. The particular piece of hardware making up the terminal
+should have a root name chosen, for example, for the AT&T 4425 terminal,
+\fBatt4425\fR. This name should not contain hyphens, except that synonyms may
+be chosen that do not conflict with other names. Up to 8 characters, chosen
+from the set \fBa\fR through \fBz\fR and \fB0\fR through \fB9\fR, make up a
+basic terminal name. Names should generally be based on original vendors rather
+than local distributors. A terminal acquired from one vendor should not have
+more than one distinct basic name. Terminal sub-models, operational modes that
+the hardware can be in, or user preferences should be indicated by appending a
+hyphen and an indicator of the mode. Thus, an AT&T 4425 terminal in 132 column
+mode is \fBatt4425\(miw\fR. The following suffixes should be used where
+possible:
+.sp
+
+.sp
+.TS
+l l l
+l l l .
+Suffix	Meaning	Example
+\(miw	Wide mode (more than 80 columns)	att4425\(miw
+\(miam	With auto. margins (usually default)	vt100\(miam
+\(minam	Without automatic margins	vt100\(minam
+\(mi\fIn\fR	Number of lines on the screen 	aaa\(mi60
+\(mina	No arrow keys (leave them in local)	c100\(mina
+\(minp	Number of pages of memory	c100\(mi4p
+\(mirv	Reverse video	att4415\(mirv
+.TE
+
+.sp
+.LP
+To avoid conflicts with the naming conventions used in describing the different
+modes of a terminal (for example, \fB-w\fR), it is recommended that a
+terminal's root name not contain hyphens. Further, it is good practice to make
+all terminal names used in the  \fBterminfo\fR(5) database unique. Terminal
+entries that are present only for inclusion in other entries via the \fBuse=\fR
+facilities should have a '\fB+\fR' in their name, as in  \fB4415+nl\fR.
+.sp
+.LP
+Here are some of the known terminal names: (For a complete list, enter the
+command \fBls -C /usr/share/lib/terminfo/?\fR ).
+.sp
+
+.sp
+.TS
+l l
+l l .
+2621,hp2621	Hewlett-Packard 2621 series
+2631	Hewlett-Packard 2631 line printer
+2631\(mic	T{
+Hewlett-Packard 2631 line printer, compressed mode
+T}
+2631\(mie	T{
+Hewlett-Packard 2631 line printer, expanded mode
+T}
+2640,hp2640	Hewlett-Packard 2640 series
+2645,hp2645	Hewlett-Packard 2645 series
+3270	IBM Model 3270
+33,tty33	AT&T Teletype Model 33 KSR
+35,tty35	AT&T Teletype Model 35 KSR
+37,tty37	AT&T Teletype Model 37 KSR
+4000a	Trendata 4000a
+4014,tek4014	TEKTRONIX 4014
+40,tty40	AT&T Teletype Dataspeed 40/2
+43,tty43	AT&T Teletype Model 43 KSR
+4410,5410	T{
+AT&T 4410/5410 in 80-column mode, version 2
+T}
+4410\(minfk,5410\(minfk	T{
+AT&T 4410/5410 without function keys, version 1
+T}
+4410\(minsl,5410\(minsl	AT&T 4410/5410 without pln defined
+4410\(miw,5410\(miw	AT&T 4410/5410 in 132-column mode
+4410v1,5410v1	T{
+AT&T 4410/5410 in 80-column mode, version 1
+T}
+4410v1\(miw,5410v1\(miw	T{
+AT&T 4410/5410 in 132-column mode, version 1
+T}
+4415,5420	AT&T 4415/5420 in 80-column mode
+4415\(minl,5420\(minl	AT&T 4415/5420 without changing labels
+4415\(mirv,5420\(mirv	T{
+AT&T 4415/5420 80 columns in reverse video
+T}
+4415\(mirv\(minl,5420\(mirv\(minl	T{
+AT&T 4415/5420 reverse video without changing labels
+T}
+4415\(miw,5420\(miw 	AT&T 4415/5420 in 132-column mode
+4415\(miw\(minl,5420\(miw\(minl	T{
+AT&T 4415/5420 in 132-column mode without changing labels
+T}
+4415\(miw\(mirv,5420\(miw\(mirv	T{
+AT&T 4415/5420 132 columns in reverse video
+T}
+4418,5418	AT&T 5418 in 80-column mode
+4418\(miw,5418\(miw	AT&T 5418 in 132-column mode
+4420	AT&T Teletype Model 4420
+4424	AT&T Teletype Model 4424
+4424-2	T{
+AT&T Teletype Model 4424 in display function group ii
+T}
+4425,5425	 AT&T 4425/5425
+4425\(mifk,5425\(mifk	AT&T 4425/5425 without function keys
+4425\(minl,5425\(minl	T{
+AT&T 4425/5425 without changing labels in 80-column mode
+T}
+4425\(miw,5425\(miw	AT&T 4425/5425 in 132-column mode
+4425\(miw\(mifk,5425\(miw\(mifk	T{
+AT&T 4425/5425 without function keys in 132-column mode
+T}
+4425\(minl\(miw,5425\(minl\(miw	T{
+AT&T 4425/5425 without changing labels in 132-column mode
+T}
+4426	AT&T Teletype Model 4426S
+450	DASI 450 (same as Diablo 1620)
+450\(mi12	DASI 450 in 12-pitch mode
+500,att500	AT&T-IS 500 terminal
+510,510a	AT&T 510/510a in 80-column mode
+513bct,att513	AT&T 513 bct terminal
+5320	AT&T 5320 hardcopy terminal
+5420_2	AT&T 5420 model 2 in 80-column mode
+5420_2\(miw	AT&T 5420 model 2 in 132-column mode
+5620,dmd	AT&T 5620 terminal 88 columns
+5620\(mi24,dmd\(mi24	T{
+AT&T Teletype Model DMD 5620 in a 24x80 layer
+T}
+5620\(mi34,dmd\(mi34 	T{
+AT&T Teletype Model DMD 5620 in a 34x80 layer
+T}
+610,610bct	AT&T 610 bct terminal in 80-column mode
+610\(miw,610bct\(miw	AT&T 610 bct terminal in 132-column mode
+630,630MTG	AT&T 630 Multi-Tasking Graphics terminal
+7300,pc7300,unix_pc	AT&T UNIX PC Model 7300
+735,ti	Texas Instruments TI735 and TI725
+745	Texas Instruments TI745
+dumb	T{
+generic name for terminals that lack reverse line-feed and other special escape sequences
+T}
+hp	Hewlett-Packard (same as 2645)
+lp	generic name for a line printer
+pt505	AT&T Personal Terminal 505 (22 lines)
+pt505\(mi24	T{
+AT&T Personal Terminal 505 (24-line mode)
+T}
+sync	T{
+generic name for synchronous Teletype Model 4540-compatible terminals
+T}
+.TE
+
+.sp
+.LP
+Commands whose behavior depends on the type of terminal should accept arguments
+of the form \fB-T\fR\fIterm\fR where \fIterm\fR is one of the names given
+above; if no such argument is present, such commands should obtain the terminal
+type from the environment variable \fBTERM\fR, which, in turn, should contain
+\fIterm\fR.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/usr/share/lib/terminfo/?/*\fR\fR
+.ad
+.sp .6
+.RS 4n
+compiled terminal description database
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR sh (1),
+.BR stty (1),
+.BR tabs (1),
+.BR tput (1),
+.BR vi (1),
+.BR curses (3CURSES),
+.BR profile (5),
+.BR terminfo (5),
+.BR environ (7),
+.BR infocmp (8)

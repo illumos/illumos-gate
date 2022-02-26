@@ -62,7 +62,7 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -
 .sp
 .LP
 These functions operate on contract template file descriptors obtained from the
-\fBcontract\fR(4) file system.
+\fBcontract\fR(5) file system.
 .sp
 .LP
 The \fBct_tmpl_activate()\fR function makes the template referenced by the file
@@ -145,14 +145,14 @@ The \fBct_tmpl_set_critical()\fR function will fail if:
 .ad
 .RS 9n
 One of the specified events was disallowed given other contract terms (see
-\fBcontract\fR(4)) and {\fBPRIV_CONTRACT_EVENT\fR} was not in the effective set
+\fBcontract\fR(5)) and {\fBPRIV_CONTRACT_EVENT\fR} was not in the effective set
 for the calling process.
 .RE
 
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -170,5 +170,7 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibcontract\fR(3LIB), \fBcontract\fR(4), \fBattributes\fR(5),
-\fBlfcompile\fR(5)
+.BR libcontract (3LIB),
+.BR contract (5),
+.BR attributes (7),
+.BR lfcompile (7)

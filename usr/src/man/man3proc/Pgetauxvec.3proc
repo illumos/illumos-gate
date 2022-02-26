@@ -56,4 +56,4 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr Pgetauxval 3PROC ,
-.Xr proc 4
+.Xr proc 5

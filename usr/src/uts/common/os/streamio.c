@@ -3627,7 +3627,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 
 		/*
 		 * The I_STR facility provides a trap door for malicious
-		 * code to send down bogus streamio(7I) ioctl commands to
+		 * code to send down bogus streamio(4I) ioctl commands to
 		 * unsuspecting STREAMS modules and drivers which expect to
 		 * only get these messages from the stream head.
 		 * Explicitly prohibit any streamio ioctls which can be

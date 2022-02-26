@@ -35,7 +35,7 @@
 # Creating and writing xattrs on files in snapshot directories fails. Also,
 # we shouldn't be able to list the xattrs of files in snapshots who didn't have
 # xattrs when the snapshot was created (the xattr namespace wouldn't have been
-# created yet, and snapshots are read-only) See fsattr(5) for more details.
+# created yet, and snapshots are read-only) See fsattr(7) for more details.
 #
 # STRATEGY:
 #	1. Create a file and add an xattr to it.

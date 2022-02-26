@@ -41,7 +41,7 @@
  *	an application that has opened the device is going away, a new
  *	minor clone is created for each open(9E) request.  There are
  *	allocations for creating minor clones between 1 and 255.  The ioctl
- *	interface is defined by pbio(7I) and approved as part of
+ *	interface is defined by pbio(4I) and approved as part of
  *	PSARC/1999/393 case.
  */
 
