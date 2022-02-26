@@ -40,6 +40,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/cdefs.h>
@@ -236,18 +237,18 @@ usage(int code)
 #ifdef	__FreeBSD__
 		"Usage: %s [-AaCDeHhPSuWwxY]\n"
 #else
-		"Usage: %s [-AaCDdeHhPSuWwxY]\n"
+		"Usage: %s [-aCDdeHhPSuWwxY]\n"
 #endif
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
 #ifdef	__FreeBSD__
 		"       %*s [-G port] [-k config_file] [-l lpc] [-m mem] [-o var=value]\n"
 		"       %*s [-p vcpu:hostcpu] [-r file] [-s pci] [-U uuid] vmname\n"
 
+		"       -A: create ACPI tables\n"
 #else
 		"       %*s [-k <config_file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
 		"       %*s [-s <pci>] [-U uuid] vmname\n"
 #endif
-		"       -A: create ACPI tables\n"
 		"       -a: local apic is in xAPIC mode (deprecated)\n"
 		"       -C: include guest memory in core file\n"
 		"       -c: number of cpus and/or topology specification\n"
@@ -1429,7 +1430,17 @@ main(int argc, char *argv[])
 			set_config_bool("x86.x2apic", false);
 			break;
 		case 'A':
+#ifdef __FreeBSD__
+			/*
+			 * This option is ignored on illumos since the
+			 * generated ACPI tables are not used; the bootroms
+			 * have their own. The option is retained for backwards
+			 * compatibility but does nothing. Note that the
+			 * acpi_tables configuration is still accepted via
+			 * -o if somebody really wants to generate these tables.
+			 */
 			set_config_bool("acpi_tables", true);
+#endif
 			break;
 		case 'D':
 			set_config_bool("destroy_on_poweroff", true);

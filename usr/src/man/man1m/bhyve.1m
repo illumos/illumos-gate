@@ -22,9 +22,9 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" Portions Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+.\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd November 18, 2021
+.Dd February 26, 2022
 .Dt BHYVE 1M
 .Os
 .Sh NAME
@@ -772,7 +772,7 @@ block device backed by the
 filesystem image, and a serial port for the console:
 .Bd -literal -offset indent
 bhyve -c 2 -s 0,hostbridge -s 1,lpc -s 2,virtio-blk,/my/image \e
-  -l com1,stdio -A -H -P -m 1G vm1
+  -l com1,stdio -H -P -m 1G vm1
 .Ed
 .Pp
 Run a 24GB single-CPU virtual machine with three network ports.
@@ -780,7 +780,7 @@ Run a 24GB single-CPU virtual machine with three network ports.
 bhyve -s 0,hostbridge -s 1,lpc -s 2:0,virtio-net-viona,vmvnic0 \e
   -s 2:1,virtio-net-viona,vmvnic1 -s 2:2,virtio-net-viona,vmvnic2 \e
   -s 3,virtio-blk,/my/image -l com1,stdio \e
-  -A -H -P -m 24G bigvm
+  -H -P -m 24G bigvm
 .Ed
 .Pp
 Run an 8GB virtual machine with 2 quad core CPUs, 2 NVMe disks and one other
@@ -795,7 +795,7 @@ bhyve -c sockets=2,cores=4,threads=2 \e
   -s 2:0,ahci,cd:/images/install.iso \e
   -s 3,virtio-net-viona,vnic=vmvnic0 \e
   -l com1,socket,/tmp/vm.com1,wait \e
-  -A -H -P -m 8G
+  -H -P -m 8G
 .Ed
 .Pp
 Run a UEFI virtual machine with a display resolution of 800 by 600 pixels
@@ -806,7 +806,7 @@ bhyve -c 2 -m 4G -w -H \e
   -s 3,ahci-cd,/path/to/uefi-OS-install.iso \e
   -s 4,nvme,/dev/zvol/rdsk/tank/hdd0 \e
   -s 5,virtio-net-viona,vnic=vnmic0 \e
-  -s 29,fbuf,rfb=0.0.0.0:5900,w=800,h=600,wait \e
+  -s 29,fbuf,vga=off,rfb=0.0.0.0:5900,w=800,h=600,wait \e
   -s 30,xhci,tablet \e
   -s 31,lpc -l com1,stdio \e
   -l bootrom,/usr/share/bhyve/firmware/BHYVE_UEFI.fd \e
