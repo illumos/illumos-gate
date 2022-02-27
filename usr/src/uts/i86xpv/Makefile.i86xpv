@@ -280,7 +280,7 @@ SYS_KMODS	+=
 #
 #	'Misc' Modules (/kernel/misc):
 #
-MISC_KMODS	+= xpv_autoconfig gfx_private xnb
+MISC_KMODS	+= xpv_autoconfig gfx_private xnb pcie
 
 #	'Dacf' modules (/kernel/dacf)
 #
